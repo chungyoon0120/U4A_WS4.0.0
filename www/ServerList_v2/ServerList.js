@@ -14,6 +14,20 @@
 (function (window) {
     "use strict";
 
+    /**
+     * "ResizeObserver loop limit exceeded" / "...loop completed with undelivered
+     * notifications" 는 브라우저가 내는 무해한 경고다. 전역 에러 핸들러
+     * (ws_trycatch)가 이를 크리티컬 오류로 오인하지 않도록 가장 먼저 가로채 무시한다.
+     */
+    window.addEventListener("error", function (oErr) {
+        const sMsg = oErr && oErr.message ? oErr.message : "";
+        if (sMsg.indexOf("ResizeObserver loop") >= 0) {
+            oErr.stopImmediatePropagation();
+            oErr.preventDefault();
+            return false;
+        }
+    }, true);
+
     /********************************************************************
      * Electron / Node 자원 (유지 — doc 02 §9.4 / 8장 A)
      ********************************************************************/
@@ -203,7 +217,9 @@
         edit: _fa("pen"),
         trash: _fa("trash"),
         accept: _fa("check"),
-        decline: _fa("xmark")
+        decline: _fa("xmark"),
+        sortAsc: _fa("caret-up"),
+        sortDesc: _fa("caret-down")
     };
 
     /********************************************************************
@@ -882,8 +898,9 @@
         const oSubTitle = _el("span", "u4a-bar__title", T("004"));
         oAPP.attr._elSubTitle = oSubTitle;
         const oSubSpacer = _el("div", "u4a-bar__spacer");
+
         const oSettingsBtn = _el("button", "u4a-btn-icon");
-        oSettingsBtn.title = "Settings";
+        oSettingsBtn.title = L("settings");
         oSettingsBtn.setAttribute("aria-haspopup", "true");
         oSettingsBtn.innerHTML = ICON.gear;
         oSettingsBtn.addEventListener("click", (ev) => oAPP.fn.fnOpenSettingsMenu(ev));
@@ -918,11 +935,52 @@
         setTimeout(() => { oContent.dataset.show = "true"; }, 50);
     };
 
-    // 언어 변경 후 셸 텍스트 갱신
+    // 현재 WS 언어 코드 (KO/EN) — GlobalSettings 우선, 없으면 ws_settings.json
+    function _getCurrentWsLangu() {
+        try {
+            const oG = oAPP.data.GlobalSettings && oAPP.data.GlobalSettings.language;
+            if (oG && oG.value) {
+                return String(oG.value).toUpperCase();
+            }
+            const oS = WSUTIL.getWsSettingsInfo();
+            return String((oS && oS.globalLanguage) || "EN").toUpperCase();
+        } catch (e) {
+            return "EN";
+        }
+    }
+
+    /**
+     * 서버리스트 화면 전용 i18n (doc 02 §8: "JS 메시지 객체" 방식 허용).
+     * WSUTIL 메시지 클래스에 키가 없는 라벨(컬럼 헤더/버튼/상태 등)을 현지화한다.
+     * 언어 전환 시 화면 텍스트가 실제로 바뀌어 KO/EN 을 식별할 수 있게 한다.
+     */
+    const I18N = {
+        EN: {
+            status: "STATUS", serverName: "SERVER NAME", sid: "SID", host: "HOST(Or IP)",
+            sno: "SNO", settingsCol: "Settings", settings: "Settings",
+            edit: "Edit", del: "Delete", active: "Active", inactive: "Inactive",
+            noData: "No data", selectServer: "Please select a server first."
+        },
+        KO: {
+            status: "상태", serverName: "서버 이름", sid: "시스템 ID", host: "호스트(또는 IP)",
+            sno: "인스턴스", settingsCol: "설정", settings: "설정",
+            edit: "편집", del: "삭제", active: "활성", inactive: "비활성",
+            noData: "데이터 없음", selectServer: "서버를 먼저 선택하세요."
+        }
+    };
+    function L(sKey) {
+        const oDict = I18N[_getCurrentWsLangu()] || I18N.EN;
+        return (oDict[sKey] != null) ? oDict[sKey] : (I18N.EN[sKey] != null ? I18N.EN[sKey] : sKey);
+    }
+
+    // 언어 변경 후 화면 텍스트(UI 라벨) 갱신 — 트리 폴더명(XML 데이터)은 대상 아님
     oAPP.fn.fnRefreshShellTexts = function () {
+        // 서브헤더 타이틀 (WSUTIL 메시지)
         if (oAPP.attr._elSubTitle) {
             oAPP.attr._elSubTitle.textContent = T("004");
         }
+        // 서버 테이블(헤더/버튼/상태/no-data) 재렌더 → 현지화 반영
+        oAPP.fn.fnRenderServerTable();
     };
 
     /********************************************************************
@@ -982,6 +1040,7 @@
         const oIcon = _el("span", "u4a-tree__icon");
         oIcon.innerHTML = ICON.folder;
 
+        // 트리 라벨은 SAPUILandscape.xml 의 폴더명(사용자 데이터) — 현지화 대상 아님
         const oLabel = _el("span", "u4a-tree__label", oAttr.name || "");
 
         oRow.append(oToggle, oIcon, oLabel);
@@ -1185,12 +1244,12 @@
         // 헤더 툴바 (Edit / Delete — fnGetSAPLogonListTableToolbar 대체)
         const oToolbar = _el("div", "u4a-toolbar");
         const oEditBtn = _el("button", "u4a-btn u4a-btn--emphasized");
-        oEditBtn.innerHTML = ICON.edit + "<span>Edit</span>";
-        oEditBtn.title = "Edit";
+        oEditBtn.innerHTML = ICON.edit + "<span>" + _esc(L("edit")) + "</span>";
+        oEditBtn.title = L("edit");
         oEditBtn.addEventListener("click", () => oAPP.fn.fnPressEdit());
         const oDelBtn = _el("button", "u4a-btn u4a-btn--negative");
-        oDelBtn.innerHTML = ICON.trash + "<span>Delete</span>";
-        oDelBtn.title = "Delete";
+        oDelBtn.innerHTML = ICON.trash + "<span>" + _esc(L("del")) + "</span>";
+        oDelBtn.title = L("del");
         oDelBtn.addEventListener("click", () => oAPP.fn.fnPressDelete());
         oToolbar.append(oEditBtn, oDelBtn);
         oPane.appendChild(oToolbar);
@@ -1201,23 +1260,27 @@
 
         // 헤더 (정렬 가능 컬럼: ISSAVE/name/systemid/host)
         const aCols = [
-            { key: "ISSAVE", label: "STATUS", sortable: true },
-            { key: "name", label: "SERVER NAME", sortable: true },
-            { key: "systemid", label: "SID", sortable: true },
-            { key: "host", label: "HOST(Or IP)", sortable: true },
-            { key: "insno", label: "SNO", sortable: false, align: "center" },
-            { key: "__action", label: "Settings", sortable: false, align: "center" }
+            { key: "ISSAVE", label: L("status"), sortable: true, cls: "u4a-c-status" },
+            { key: "name", label: L("serverName"), sortable: true, cls: "u4a-c-name" },
+            { key: "systemid", label: L("sid"), sortable: true, cls: "u4a-c-sid" },
+            { key: "host", label: L("host"), sortable: true, cls: "u4a-c-host" },
+            { key: "insno", label: L("sno"), sortable: false, align: "center", cls: "u4a-c-sno" },
+            { key: "__action", label: L("settingsCol"), sortable: false, align: "center", cls: "u4a-c-action" }
         ];
 
         const oThead = _el("thead");
         const oHrow = _el("tr");
         for (const oCol of aCols) {
-            const oTh = _el("th", null, oCol.label);
+            const oTh = _el("th", oCol.cls);
+            oTh.appendChild(_el("span", null, oCol.label));
             if (oCol.align === "center") { oTh.style.textAlign = "center"; }
             if (oCol.sortable) {
                 oTh.dataset.col = oCol.key;
                 if (oAPP.attr._sortCol === oCol.key) {
-                    oTh.dataset.sort = oAPP.attr._sortDir || "asc";
+                    // 정렬 표시 — Font Awesome caret (일반 문자 대신)
+                    const oSortIco = _el("span", "u4a-sort-ico");
+                    oSortIco.innerHTML = (oAPP.attr._sortDir === "desc") ? ICON.sortDesc : ICON.sortAsc;
+                    oTh.appendChild(oSortIco);
                 }
                 oTh.addEventListener("click", () => oAPP.fn.fnSortServerTable(oCol.key));
             } else {
@@ -1234,7 +1297,7 @@
 
         if (aItems.length === 0) {
             const oTr = _el("tr", "u4a-table__nodata");
-            const oTd = _el("td", null, "No data");
+            const oTd = _el("td", null, L("noData"));
             oTd.colSpan = aCols.length;
             oTr.appendChild(oTd);
             oTbody.appendChild(oTr);
@@ -1247,23 +1310,24 @@
                 oTr._rowData = oItem;
 
                 // STATUS (ObjectStatus 대체)
-                const oTdStatus = _el("td");
+                const oTdStatus = _el("td", "u4a-c-status");
                 const bSave = (oItem.ISSAVE === true);
                 const oStatus = _el("span", "u4a-status" + (bSave ? " u4a-status--success" : ""),
-                    bSave ? "Active" : "Inactive");
+                    bSave ? L("active") : L("inactive"));
                 oTdStatus.appendChild(oStatus);
 
-                const oTdName = _el("td", null, oItem.name || "");
-                const oTdSid = _el("td", null, oItem.systemid || "");
-                const oTdHost = _el("td", null, oItem.host || "");
-                const oTdSno = _el("td", null, oItem.insno || "");
+                const oTdName = _el("td", "u4a-c-name", oItem.name || "");
+                oTdName.title = oItem.name || "";
+                const oTdSid = _el("td", "u4a-c-sid", oItem.systemid || "");
+                const oTdHost = _el("td", "u4a-c-host", oItem.host || "");
+                const oTdSno = _el("td", "u4a-c-sno", oItem.insno || "");
                 oTdSno.style.textAlign = "center";
 
                 // Settings 버튼
-                const oTdAct = _el("td", "u4a-col-action");
+                const oTdAct = _el("td", "u4a-col-action u4a-c-action");
                 const oActBtn = _el("button", "u4a-btn-icon");
                 oActBtn.innerHTML = ICON.settings;
-                oActBtn.title = "Settings";
+                oActBtn.title = L("settings");
                 oActBtn.disabled = !bSave;
                 oActBtn.addEventListener("click", (ev) => {
                     ev.stopPropagation();
@@ -1291,7 +1355,71 @@
         oTable.appendChild(oTbody);
         oWrap.appendChild(oTable);
         oPane.appendChild(oWrap);
+
+        // 반응형: 테이블 폭에 따라 저우선 컬럼 접기 (스플리터 드래그/창 리사이즈 모두 반응)
+        _observeTableWidth(oWrap);
     };
+
+    // 현재 테이블 폭으로 data-w(lg/md/sm/xs) 갱신 — 폭은 엘리먼트에서 직접 읽는다.
+    function _setTableWidthClass() {
+        const oWrap = oAPP.attr._tblWrap;
+        if (!oWrap || !oWrap.isConnected) {
+            return;
+        }
+        const iWidth = oWrap.getBoundingClientRect().width;
+        if (!iWidth) {
+            return;
+        }
+        let sKey = "lg";
+        if (iWidth < 400) { sKey = "xs"; }
+        else if (iWidth < 520) { sKey = "sm"; }
+        else if (iWidth < 680) { sKey = "md"; }
+        // 값이 바뀔 때만 기록 (불필요한 레이아웃 무효화/루프 방지)
+        if (oWrap.dataset.w !== sKey) {
+            oWrap.dataset.w = sKey;
+        }
+    }
+
+    /**
+     * rAF 디바운스 — ResizeObserver 콜백 내부에서 동기로 레이아웃을 바꾸면
+     * "ResizeObserver loop limit exceeded" 가 발생한다. 갱신을 다음 프레임으로
+     * 미뤄 관측 사이클 밖에서 처리한다.
+     */
+    function _scheduleTableWidthUpdate() {
+        if (oAPP.attr._tblRAF) {
+            return;
+        }
+        const fnRAF = (typeof requestAnimationFrame === "function")
+            ? requestAnimationFrame
+            : function (cb) { return setTimeout(cb, 16); };
+        oAPP.attr._tblRAF = fnRAF(function () {
+            oAPP.attr._tblRAF = null;
+            _setTableWidthClass();
+        });
+    }
+    oAPP.fn.fnUpdateTableWidthClass = _scheduleTableWidthUpdate;
+
+    function _observeTableWidth(oWrap) {
+        oAPP.attr._tblWrap = oWrap;
+
+        // 1) 즉시 1회 (observer 초기 콜백 타이밍에 의존하지 않음)
+        _setTableWidthClass();
+
+        // 2) ResizeObserver (스플리터 드래그/내용 변화 등) — rAF 디바운스
+        if (oAPP.attr._tblRO) {
+            oAPP.attr._tblRO.disconnect();
+        }
+        if (typeof ResizeObserver !== "undefined") {
+            oAPP.attr._tblRO = new ResizeObserver(function () { _scheduleTableWidthUpdate(); });
+            oAPP.attr._tblRO.observe(oWrap);
+        }
+
+        // 3) window resize (창 리사이즈 — 1회만 바인딩)
+        if (!oAPP.attr._tblResizeBound) {
+            oAPP.attr._tblResizeBound = true;
+            window.addEventListener("resize", function () { _scheduleTableWidthUpdate(); });
+        }
+    }
 
     oAPP.fn.fnSortServerTable = function (sKey) {
         // none → asc → desc → asc ... (UI5 컬럼 정렬 메뉴 대체)
@@ -1403,7 +1531,7 @@
     oAPP.fn.fnPressEdit = function () {
         const oSel = oAPP.attr._selectedServer;
         if (!oSel) {
-            oAPP.fn.showToast("Please select a server first.");
+            oAPP.fn.showToast(L("selectServer"));
             return;
         }
         oAPP.fn.fnEditDialogOpen(oSel.data);
@@ -1412,7 +1540,7 @@
     oAPP.fn.fnPressDelete = async function () {
         const oSel = oAPP.attr._selectedServer;
         if (!oSel) {
-            oAPP.fn.showToast("Please select a server first.");
+            oAPP.fn.showToast(L("selectServer"));
             return;
         }
         const oData = oSel.data;
@@ -2038,6 +2166,12 @@
             oSettingInfo.globalLanguage = sKey;
             WSUTIL.setWsSettingsInfo(oSettingInfo);
             await WSUTIL.saveGlobalSettingInfo("language", sKey);
+            // GlobalSettings 도 갱신 — _getCurrentWsLangu()/L() 가 이 값을 우선 참조하므로
+            // 갱신하지 않으면 i18n 텍스트(헤더/버튼/상태)가 이전 언어로 남는다.
+            if (!oAPP.data.GlobalSettings) {
+                oAPP.data.GlobalSettings = {};
+            }
+            oAPP.data.GlobalSettings.language = { value: sKey };
             await oAPP.fn.fnWsGlobalMsgList();
             await oAPP.fn.fnOnInitModeling();
             oAPP.fn.fnRefreshShellTexts();
@@ -2155,12 +2289,14 @@
      * [설정] About WS (aboutWs.html iframe)
      ********************************************************************/
     function _openAboutWsPopup() {
-        const oBody = _el("div");
-        oBody.style.width = "48rem";
-        oBody.style.height = "30rem";
+        // 본문을 다이얼로그 폭에 꽉 채운다(흰 여백 제거). iframe 은 본문 100% 채움.
+        const oBody = _el("div", "u4a-about-body");
         const oFrame = document.createElement("iframe");
         oFrame.className = "u4a-about-frame";
-        oFrame.src = _toFileUrl(PATH.join(APPPATH, "aboutWs.html"));
+        // 현재 테마의 다이얼로그 표면색을 aboutWs.html 에 넘겨 배경을 일치시킨다
+        // (iframe 투명 의존 대신 명시적으로 칠함 — 다크/라이트 모두 균일).
+        const sBg = encodeURIComponent(_resolveColor("--surface-raised"));
+        oFrame.src = _toFileUrl(PATH.join(APPPATH, "aboutWs.html")) + "?bg=" + sBg;
         oBody.appendChild(oFrame);
 
         _createFormDialog({
@@ -2168,9 +2304,9 @@
             icon: ICON.hint,
             bodyEl: oBody,
             bodyFlush: true,
-            width: "50rem",
+            width: "46rem",
             buttons: [
-                { text: T("002") || "OK", type: "emphasized", onClick: (oCtl) => oCtl.close() }
+                { text: T("002") || "OK", type: "emphasized", onClick: (oDlg) => oDlg.close() }
             ]
         });
     }
@@ -2271,6 +2407,16 @@
         return s;
     }
 
+    // CSS 변수를 실제 색(rgb(...))으로 해석 (var() 미해석 문제 회피)
+    function _resolveColor(sVarName) {
+        const oEl = document.createElement("div");
+        oEl.style.cssText = "position:absolute;visibility:hidden;background:var(" + sVarName + ")";
+        document.body.appendChild(oEl);
+        const sColor = getComputedStyle(oEl).backgroundColor;
+        oEl.remove();
+        return sColor;
+    }
+
     function _deepClone(o) {
         return JSON.parse(JSON.stringify(o));
     }
@@ -2288,7 +2434,8 @@
     function _createFormDialog(opt) {
         const oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog";
-        if (opt.width) { oDlg.style.width = opt.width; }
+        // 반응형: 지정 폭을 뷰포트(92vw) 내로 제한
+        if (opt.width) { oDlg.style.width = "min(" + opt.width + ", 92vw)"; }
 
         const oCtl = {
             dlg: oDlg,
@@ -2502,6 +2649,10 @@
             const iMax = oRect.width - 200;
             iWidth = Math.max(iMin, Math.min(iMax, iWidth));
             oLeftPane.style.flex = `0 0 ${iWidth}px`;
+            // 스플리터 드래그 시 테이블 반응형 즉시 갱신
+            if (oAPP.fn.fnUpdateTableWidthClass) {
+                oAPP.fn.fnUpdateTableWidthClass();
+            }
         });
         window.addEventListener("mouseup", () => {
             if (bDrag) {

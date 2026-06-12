@@ -3,209 +3,65 @@
 
 <head>
     <title>U4A Workspace #Login</title>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- Font Awesome 7.2.0 (아이콘) -->
+    <link rel="stylesheet" href="../../../lib/fontawesome/7.2.0/css/all.min.css">
+
+    <!-- 테마 시스템 (doc 12 §6.1) : tokens → themes → shell -->
+    <link rel="stylesheet" href="../theme/tokens.css">
+    <link rel="stylesheet" href="../theme/themes/horizon_white.css">
+    <link rel="stylesheet" href="../theme/themes/horizon_dark.css">
+    <link rel="stylesheet" href="../theme/themes/horizon_purple.css">
+    <link rel="stylesheet" href="../theme/themes/horizon_red.css">
+    <link rel="stylesheet" href="../theme/themes/horizon_green.css">
+    <link rel="stylesheet" href="../theme/shell.css">
+
+    <!-- 로그인 컴포넌트 CSS (theme/tokens.css 의 var(--*)만 소비) -->
     <link rel="stylesheet" href="css/login.css">
-    <!-- <link rel="stylesheet" href="../css/common.css"> -->
-    <!-- <link rel="stylesheet" href="./style.css"> -->
 
-
-    <style>
-        html,
-        body {
-            margin: 0px;
-        }
-
-        /* Loading Page */
-        .u4a_loaders {
-            font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            font-size: 2.5rem;
-            color: rgba(2, 8, 16, 0.55);
-            position: absolute;
-            top: 0;
-            width: 100%;
-            background: white;
-            box-shadow: rgba(0, 0, 0, 0.11) 0px 15px 30px 0px, rgba(0, 0, 0, 0.08) 0px 5px 15px 0px;
-        }
-
-        .u4a_loader {
-            display: inline-block;
-            position: relative;
-            width: 60px;
-            height: 20px;
-            text-align: center;
-            vertical-align: middle;
-        }
-
-        .u4a_loadersInactive {
-            display: none;
-        }
-
-        .u4a_loader-bars:before,
-        .u4a_loader-bars:after,
-        .u4a_loader-bars span {
-            content: "";
-            display: block;
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 10px;
-            height: 30px;
-            background-color: rgba(2, 8, 16, 0.55);
-            -webkit-animation: u4a_grow 1.5s linear infinite;
-            animation: u4a_grow 1.5s linear infinite;
-        }
-
-        .u4a_loader-bars:after {
-            left: 15px;
-            -webkit-animation: u4a_grow 1.5s linear -0.5s infinite;
-            animation: u4a_grow 1.5s linear -0.5s infinite;
-        }
-
-        .u4a_loader-bars span {
-            left: 30px;
-            -webkit-animation: u4a_grow 1.5s linear -1s infinite;
-            animation: u4a_grow 1.5s linear -1s infinite;
-        }
-
-        @-webkit-keyframes u4a_grow {
-            0% {
-                -webkit-transform: scaleY(0);
-                transform: scaleY(0);
-                opacity: 0;
-            }
-
-            50% {
-                -webkit-transform: scaleY(1);
-                transform: scaleY(1);
-                opacity: 1;
-            }
-
-            100% {
-                -webkit-transform: scaleY(0);
-                transform: scaleY(0);
-                opacity: 0;
-            }
-        }
-
-        @keyframes u4a_grow {
-            0% {
-                -webkit-transform: scaleY(0);
-                transform: scaleY(0);
-                opacity: 0;
-            }
-
-            50% {
-                -webkit-transform: scaleY(1);
-                transform: scaleY(1);
-                opacity: 1;
-            }
-
-            100% {
-                -webkit-transform: scaleY(0);
-                transform: scaleY(0);
-                opacity: 0;
-            }
-        }
-
-
-        .u4aWsLoginFormFcard {
-            min-width: 300px;
-        }
-
-        .u4aWsLoginFormFcard .sapFAvatarSquare .sapFAvatarImageCover {
-            background-size: 45px 35px;
-        }
-
-        .u4aWsLoginFormFcard .sapFCardHeaderImage .sapFAvatarSquare.sapFCardIcon {
-            margin-right: 0.5rem;
-        }
-
-        .u4aWsLoginFormFcard.sapFCard .sapFCardHeader .sapFCardHeaderWrapper .sapFCardHeaderText .sapMText {
-            font-size: 1.2rem;
-            font-weight: bold;
-        }
-
-        .u4aWsLoginFormFcard.sapFCard .sapFCardHeader:focus::before {
-            border: 0px;
-        }
-
-        .u4aWsVersionCheckDialog--illustMsg .sapMTitle {
-            /* margin-top: 1rem; */
-            color: #ecececeb;
-            animation: editTitle 1.2s infinite;
-            -webkit-animation: editTitle 1.2s infinite;
-            -moz-animation-duration: 1.2s;
-            -moz-animation-name: editTitle;
-            -moz-animation-iteration-count: infinite;
-        }
-
-        /* .u4aWsVersionCheckDialog--illustMsg .sapMIllustratedMessageDescription {
-            display: none;
-        } */
-
-        .u4aWsVersionCheckDialog .u4aWsVersionCheckDialog--illustMsg.sapMIllustratedMessage .sapMIllustratedMessageDescription {
-            margin-top: 1rem;
-            margin-bottom: 0rem;
-            font-size: 1rem;
-            font-weight: bold;
-        }
-
-        @keyframes editTitle {
-            0% {
-                color: #ecececeb;
-            }
-
-            50% {
-                color: #000000;
-            }
-
-            100% {
-                color: #ecececeb;
-            }
-        }
-
-
-        /* .u4aLoginErrorMsgBox .sapMDialogTitle .sapMIBar */
-        
-    </style>
-</head>
-
-
-
-<body class="sapUiBody">
-
-    <div id="content" style="display:none;" class="u4aWsContent"></div>
-
-    <!-- Page Loading Start -->
-    <!-- <div id="u4a_main_load" class="u4a_loaders u4a_loadersInactive">
-        <span class="u4a_loader u4a_loader-bars"> <span></span> </span> Loading...
-    </div> -->
-    <!-- Page Loading End -->
     <script>
-
         /************************************************************************
-         * 에러 감지
+         * Electron 자원 (원본 계약 유지) — Login.js 가 parent.* 로 참조한다.
          ************************************************************************/
-         var require = parent.require, 
+        var require = parent.require,
             REMOTE = require('@electron/remote'),
             IPCMAIN = REMOTE.require('electron').ipcMain,
             PATH = REMOTE.require('path'),
             APP = REMOTE.app,
             APPPATH = APP.getAppPath(),
-            PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")), 
+            PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")),
             WSERR = require(PATHINFO.WSTRYCATCH);
 
         var zconsole = WSERR(window, document, console);
-
     </script>
+
+    <!-- 테마 API + 초기 테마 동기 적용 (첫 페인트 전 → 흰색 깜빡임 방지) -->
+    <script src="../theme/theme-api.js"></script>
+    <script>
+        (function () {
+            try {
+                var oThemeInfo = parent.getThemeInfo && parent.getThemeInfo();
+                var sTheme = oThemeInfo && oThemeInfo.THEME;
+                if (sTheme && window.U4ATheme) {
+                    document.documentElement.dataset.theme = window.U4ATheme.normalize(sTheme);
+                }
+            } catch (e) { /* 실패 시 기본(:root) */ }
+        })();
+    </script>
+</head>
+
+<body>
+
+    <!-- 셸 컨텐츠 (Login.js 가 동적 렌더) — 초기 hidden, 렌더 후 페이드인 -->
+    <div id="content" class="u4a-login u4a-fade" style="display:none;"></div>
+
+    <!-- 로그인 로직 (테마 API 는 head 에서 선로드) -->
     <script src="Login.js"></script>
-    <script src="Login_trial.js"></script>
+
 </body>
 
 </html>

@@ -63,15 +63,6 @@
     background: var(--hover-bg);
 }
 
-/* zebra (alternateRowColors) */
-.u4a-tree__row[data-odd="true"] {
-    background: var(--hover-bg);
-}
-
-.u4a-tree__row[data-odd="true"]:hover {
-    background: var(--active-bg);
-}
-
 /* 선택 행 — 테이블과 동일 규칙(강한 배경 + 좌측 강조 바 + 굵게 + 강조색),
    zebra/hover 위에서도 확실히 구분되도록 마지막에 정의 */
 .u4a-tree__row[aria-selected="true"],
@@ -131,6 +122,11 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-width: 13rem;
+}
+
+#u4aWsTreePane {
+    min-width: 7rem;
 }
 
 /* 테이블 헤더 툴바 (Edit / Delete) */
@@ -178,27 +174,49 @@
     color: var(--text);
 }
 
-/* 정렬 표시 (asc/desc) */
-.u4a-table thead th[data-sort]::after {
-    content: "";
-    display: inline-block;
-    width: 0.75rem;
-}
-
-.u4a-table thead th[data-sort="asc"]::after {
-    content: " \25B2";
+/* 정렬 표시 (asc/desc) — Font Awesome caret */
+.u4a-sort-ico {
+    margin-left: 0.3rem;
     color: var(--accent);
 }
 
-.u4a-table thead th[data-sort="desc"]::after {
-    content: " \25BC";
-    color: var(--accent);
+.u4a-sort-ico i {
+    font-size: 0.7rem;
 }
 
 .u4a-table tbody td {
     padding: 0.5rem 0.75rem;
     border-bottom: 0.0625rem solid var(--line);
     white-space: nowrap;
+}
+
+/* ── 반응형: 서버명 말줄임 + 폭별 저우선 컬럼 숨김 (doc 02 §8 autoPopinMode) ──
+   Electron(Chromium) 컨테이너쿼리 미지원 → ResizeObserver 가 .u4a-table-wrap
+   에 data-w(lg/md/sm/xs) 를 세팅하고, 아래 규칙이 컬럼을 접는다. */
+.u4a-c-name {
+    max-width: min(28rem, 38vw);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.u4a-table-wrap[data-w="md"] .u4a-c-sno {
+    display: none;
+}
+
+.u4a-table-wrap[data-w="sm"] .u4a-c-sno,
+.u4a-table-wrap[data-w="sm"] .u4a-c-host {
+    display: none;
+}
+
+.u4a-table-wrap[data-w="xs"] .u4a-c-sno,
+.u4a-table-wrap[data-w="xs"] .u4a-c-host,
+.u4a-table-wrap[data-w="xs"] .u4a-c-sid {
+    display: none;
+}
+
+.u4a-table-wrap[data-w="sm"] .u4a-c-name,
+.u4a-table-wrap[data-w="xs"] .u4a-c-name {
+    max-width: 55vw;
 }
 
 /* row hover / 선택 / zebra (체크리스트 E) */

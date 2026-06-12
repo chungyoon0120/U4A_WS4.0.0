@@ -6,8 +6,8 @@
     <meta name="google" content="notranslate">
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
-        html, body { width: 100%; height: 100%; margin: 0; padding: 0; 
-            /* background-color: #000000;  */
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0;
+            background-color: transparent;
             overflow: hidden; font-family: 'Segoe UI', Roboto, sans-serif; }
 
         #canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
@@ -99,6 +99,16 @@
         }
 
     </style>
+    <script>
+        // 부모 창이 전달한 배경색(?bg=)을 첫 페인트 전에 적용 → 다이얼로그 테마 배경과 일치.
+        // 글로우/텍스트는 그대로(원본 디자인 유지), 배경색만 테마에 맞춘다.
+        (function () {
+            try {
+                var bg = new URLSearchParams(location.search).get('bg');
+                if (bg) { document.documentElement.style.backgroundColor = decodeURIComponent(bg); }
+            } catch (e) { }
+        })();
+    </script>
 </head>
 <body>
 

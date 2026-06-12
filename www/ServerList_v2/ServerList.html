@@ -22,6 +22,31 @@
 
       <!-- 서버 리스트 컴포넌트 CSS -->
       <link rel="stylesheet" href="./css/serverlist.css">
+
+      <!-- 테마 API + 초기 테마 동기 적용 (첫 페인트 전에 적용 → 흰색 깜빡임 방지) -->
+      <script src="../ws30/ws10_20/theme/theme-api.js"></script>
+      <script>
+            (function () {
+                  try {
+                        var R = require('@electron/remote');
+                        var FS = R.require('fs');
+                        var PATH = R.require('path');
+                        var APPPATH = R.app.getAppPath();
+                        var PI = require(PATH.join(APPPATH, 'ws30', 'resources', 'pathInfo.js'));
+                        var sRaw;
+                        try {
+                              sRaw = FS.readFileSync(PI.WSSETTINGS, 'utf8');
+                        } catch (e) {
+                              sRaw = FS.readFileSync(PATH.join(APPPATH, 'settings', 'ws_settings.json'), 'utf8');
+                        }
+                        var oCfg = JSON.parse(sRaw);
+                        var sTheme = oCfg.globalTheme || oCfg.defaultTheme;
+                        if (sTheme && window.U4ATheme) {
+                              document.documentElement.dataset.theme = window.U4ATheme.normalize(sTheme);
+                        }
+                  } catch (e) { /* 실패 시 기본(:root) */ }
+            })();
+      </script>
 </head>
 
 <body>
@@ -37,8 +62,7 @@
             <div class="u4a-busy__spinner"></div>
       </div>
 
-      <!-- 테마 API shim → 그 다음 서버리스트 로직 -->
-      <script src="../ws30/ws10_20/theme/theme-api.js"></script>
+      <!-- 서버리스트 로직 (테마 API 는 head 에서 선로드) -->
       <script src="ServerList.js"></script>
 
 </body>

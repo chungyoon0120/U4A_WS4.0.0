@@ -3,14 +3,20 @@
  * 배경·텍스트·경계·강조 + 6.6 표면 색까지 override (doc 12 §4.1 Layer3)
  ************************************************************************/
 [data-theme="horizon_dark"] {
+    color-scheme: dark;
+
     --app-bg: var(--c-bg-dark);
     --surface: var(--c-surface-dark);
     --surface-raised: #2a323a;
     --text: var(--c-text-dark);
     --text-muted: #a9b4be;
     --line: var(--c-line-dark);
+    /* 다크에서 경계선이 너무 흐려 헤더/푸터 구분이 안 되므로 분리선만 더 또렷하게 */
+    --divider: #45515d;
     --accent: #1c93f2;
     --accent-strong: #5dc6ff;
+    /* 스위치 off 트랙 — 다크 표면 위에서 보이도록 */
+    --switch-off: #55626e;
 
     /* dark 는 색 표면도 함께 override (체크리스트 표면 누락 방지) */
     --hover-bg: rgba(255, 255, 255, .06);
@@ -28,6 +34,7 @@
     --scrollbar-thumb-hover: #4d5a66;
 
     --overlay-scrim: rgba(0, 0, 0, .6);
+    --busy-scrim: rgba(18, 23, 28, .6);
     --popover-bg: #1c2228;
     --popover-shadow: 0 0.5rem 2rem rgba(0, 0, 0, .5);
 

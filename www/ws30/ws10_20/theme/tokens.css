@@ -43,6 +43,9 @@
 
 /* ── Layer 2: Semantic (:root = white 기본) ─────────────────────── */
 :root {
+    /* 네이티브 컨트롤(체크박스/라디오/스크롤바 등)을 테마 모드에 맞춰 렌더 */
+    color-scheme: light;
+
     /* color */
     --app-bg: var(--c-bg-light);
     --surface: var(--c-white);
@@ -50,6 +53,7 @@
     --text: var(--c-text);
     --text-muted: var(--c-text-muted);
     --line: var(--c-line);
+    --divider: var(--line);
     --accent: var(--c-blue);
     --accent-strong: var(--c-blue-strong);
     --success: var(--c-success);
@@ -65,6 +69,7 @@
     --disabled-bg: #f5f6f7;
     --disabled-text: #a9b4be;
     --disabled-opacity: .4;
+    --switch-off: #c4ccd4;
 
     /* value states — UI5 ValueState (체크리스트 B/F) */
     --state-error: var(--c-error);
@@ -84,6 +89,8 @@
 
     /* overlay / popup (체크리스트 C) */
     --overlay-scrim: rgba(0, 0, 0, .45);
+    /* busy 베일 — 검정 스크림 대신 밝은 톤(깜빡임/눈부심 완화) */
+    --busy-scrim: rgba(245, 246, 247, .6);
     --popover-bg: var(--c-white);
     --popover-shadow: 0 0.5rem 2rem rgba(34, 54, 84, .20);
 

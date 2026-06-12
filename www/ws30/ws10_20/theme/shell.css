@@ -15,6 +15,7 @@
 html,
 body {
     height: 100%;
+    background: var(--app-bg);
 }
 
 body {
@@ -389,15 +390,23 @@ a:hover {
 .u4a-busy {
     position: absolute;
     inset: 0;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--overlay-scrim);
+    background: var(--busy-scrim);
     z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--motion) linear, visibility 0s linear var(--motion);
 }
 
+/* 표시를 0.3s 지연 → 짧은 busy(빠른 on/off)는 화면에 나타나지 않아 깜빡임 없음 */
 .u4a-busy[data-busy="true"] {
-    display: flex;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.18s linear 0.3s, visibility 0s linear 0.3s;
 }
 
 .u4a-busy__spinner {
@@ -446,8 +455,10 @@ a:hover {
 
 /* ── 메시지 박스 (MessageBox 대체) ──────────────────────────────── */
 .u4a-msgbox {
-    min-width: 18rem;
-    max-width: 28rem;
+    min-width: min(18rem, 90vw);
+    max-width: min(28rem, 92vw);
+    max-height: 90vh;
+    overflow: auto;
     padding: 0;
     border: 0.0625rem solid var(--line);
     border-radius: var(--radius);
@@ -486,10 +497,13 @@ a:hover {
     padding: 0.5rem 1rem 1rem;
 }
 
-/* ── 폼 다이얼로그 (Dialog + Form 대체) ─────────────────────────── */
+/* ── 폼 다이얼로그 (Dialog + Form 대체) — 뷰포트 초과 방지(반응형) ── */
 .u4a-dialog {
-    min-width: 22rem;
-    max-width: 90vw;
+    min-width: min(22rem, 90vw);
+    max-width: 92vw;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
     padding: 0;
     border: 0.0625rem solid var(--line);
     border-radius: var(--radius);
@@ -498,12 +512,17 @@ a:hover {
     box-shadow: var(--popover-shadow);
 }
 
+.u4a-dialog__header,
+.u4a-dialog__footer {
+    flex: 0 0 auto;
+}
+
 .u4a-dialog__header {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.625rem 1rem;
-    border-bottom: 0.0625rem solid var(--line);
+    border-bottom: 0.0625rem solid var(--divider);
     font-weight: 700;
 }
 
@@ -513,6 +532,9 @@ a:hover {
 }
 
 .u4a-dialog__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
     padding: 1rem;
 }
 
@@ -520,7 +542,8 @@ a:hover {
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
-    padding: 0.5rem 1rem 1rem;
+    padding: 0.75rem 1rem;
+    border-top: 0.0625rem solid var(--divider);
 }
 
 .u4a-dialog__body--flush {
@@ -756,9 +779,9 @@ a:hover {
     position: absolute;
     inset: 0;
     border-radius: 1rem;
-    background: var(--disabled-bg);
-    border: 0.0625rem solid var(--line);
-    transition: background-color var(--motion) linear;
+    background: var(--switch-off);
+    border: 0.0625rem solid var(--switch-off);
+    transition: background-color var(--motion) linear, border-color var(--motion) linear;
     cursor: pointer;
 }
 
@@ -770,7 +793,8 @@ a:hover {
     left: 0.1875rem;
     top: 0.125rem;
     border-radius: 50%;
-    background: var(--surface);
+    /* 핸들은 항상 밝게 → off(회색)/on(강조색) 트랙 위에서 모두 잘 보임 */
+    background: var(--c-white);
     box-shadow: var(--elevation);
     transition: transform var(--motion) linear;
 }
@@ -789,11 +813,20 @@ a:hover {
     outline-offset: var(--focus-ring-offset);
 }
 
-/* About iframe */
+/* About 팝업 — 본문을 다이얼로그 폭에 꽉 채운다(흰 여백 제거).
+   배경/내용은 aboutWs.html 이 전달받은 테마 모드(light/dark)에 맞춰 렌더한다. */
+.u4a-about-body {
+    width: 100%;
+    height: min(26rem, 60vh);
+    background: var(--surface-raised);
+}
+
 .u4a-about-frame {
+    display: block;
     width: 100%;
     height: 100%;
     border: 0;
+    background: transparent;
 }
 
 /* ── 모달 backdrop (체크리스트 C) ───────────────────────────────── */

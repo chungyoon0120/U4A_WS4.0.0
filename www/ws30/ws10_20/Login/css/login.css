@@ -1,597 +1,276 @@
-*,
-*:before,
-*:after {
-  box-sizing: border-box;
-}
+/************************************************************************
+ * U4A Workspace — 로그인 화면 컴포넌트 CSS (doc 02 §9.2)
+ * ----------------------------------------------------------------------
+ * theme/tokens.css 의 의미 토큰만 소비한다 (hex/하드코딩 색·radius·shadow 0).
+ * 기준 비주얼: sap_horizon. 타이틀바/버튼/입력/select/dialog/busy 등 공통
+ * 컴포넌트는 shell.css 를 재사용하고, 로그인 전용 레이아웃만 여기서 정의한다.
+ ************************************************************************/
 
 html,
-.u4aWsLoginBody {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-.u4aWsLoginBody {
-  font-family: "Source Sans Pro", sans-serif;
-  color: white;
-  font-weight: 300;
+body {
+    margin: 0;
+    height: 100%;
 }
 
-.u4aWsLoginBody ::-webkit-input-placeholder {
-  /* WebKit browsers */
-  font-family: "Source Sans Pro", sans-serif;
-  color: white;
-  font-weight: 300;
-}
-
-.u4aWsLoginBody :-moz-placeholder {
-  /* Mozilla Firefox 4 to 18 */
-  font-family: "Source Sans Pro", sans-serif;
-  color: white;
-  opacity: 1;
-  font-weight: 300;
-}
-
-.u4aWsLoginBody ::-moz-placeholder {
-  /* Mozilla Firefox 19+ */
-  font-family: "Source Sans Pro", sans-serif;
-  color: white;
-  opacity: 1;
-  font-weight: 300;
-}
-
-.u4aWsLoginBody :-ms-input-placeholder {
-  /* Internet Explorer 10+ */
-  font-family: "Source Sans Pro", sans-serif;
-  color: white;
-  font-weight: 300;
-}
-
-.u4aWsLoginWrapper {
-  background: linear-gradient(
-    125deg,
-    rgba(160, 0, 161, 1) 0%,
-    rgba(148, 40, 197, 1) 51%,
-    rgba(49, 80, 233, 1) 100%
-  );
-  position: absolute;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.u4aWsLoginWrapper.form-success .u4aWsLoginContainer h1 {
-  transform: translateY(85px);
-}
-
-.u4aWsLoginContainer {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  -moz-transform: translate(-50%, -50%);
-  -webkit-transform: translate(-50%, -50%);
-  -ms-transform: translate(-50%, -50%);
-  display: block;
-  position: absolute;
-  transition: width 0.3s;
-  -webkit-transition: width 0.3s;
-}
-
-.u4aWsLoginContainer h1 {
-  font-size: 40px;
-  transition-duration: 1s;
-  transition-timing-function: ease-in-put;
-  font-weight: 200;
-}
-
-.u4aWsLoginForm {
-  padding: 20px 0;
-  position: relative;
-  z-index: 2;
-}
-
-.u4aWsLoginForm input:hover {
-  background-color: rgba(255, 255, 255, 0.4);
-}
-
-.u4aWsLoginForm button {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  outline: 0;
-  background-color: white;
-  border: 0;
-  padding: 10px 15px;
-  color: #53e3a6;
-  border-radius: 3px;
-  width: 250px;
-  cursor: pointer;
-  font-size: 18px;
-  transition-duration: 0.25s;
-}
-
-.u4aWsLoginForm button:hover {
-  background-color: #f5f7f9;
-}
-
-.bg-bubbles {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-}
-
-.bg-bubbles li {
-  position: absolute;
-  list-style: none;
-  display: block;
-  width: 40px;
-  height: 40px;
-  background-color: rgba(255, 255, 255, 0.15);
-  bottom: -160px;
-  -webkit-animation: square 25s infinite;
-  animation: square 25s infinite;
-  transition-timing-function: linear;
+/* ── 페이지 골격 (sap.m.Page 대체) ─────────────────────────────── */
+.u4a-login {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--app-bg);
+    color: var(--text);
+    font: 0.875rem/1.4 var(--font);
 }
 
-.bg-bubbles li:nth-child(1) {
-  left: 10%;
+/* 본문 페이드인 (UI5 fadeIn 대체) */
+.u4a-fade {
+    opacity: 0;
+    transition: opacity var(--motion) linear;
 }
 
-.bg-bubbles li:nth-child(2) {
-  left: 20%;
-  width: 80px;
-  height: 80px;
-  -webkit-animation-delay: 2s;
-  animation-delay: 2s;
-  -webkit-animation-duration: 17s;
-  animation-duration: 17s;
-}
-
-.bg-bubbles li:nth-child(3) {
-  left: 25%;
-  -webkit-animation-delay: 4s;
-  animation-delay: 4s;
-}
-
-.bg-bubbles li:nth-child(4) {
-  left: 40%;
-  width: 60px;
-  height: 60px;
-  -webkit-animation-duration: 22s;
-  animation-duration: 22s;
-  background-color: rgba(255, 255, 255, 0.25);
-}
-
-.bg-bubbles li:nth-child(5) {
-  left: 70%;
-}
-
-.bg-bubbles li:nth-child(6) {
-  left: 80%;
-  width: 120px;
-  height: 120px;
-  -webkit-animation-delay: 3s;
-  animation-delay: 3s;
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-.bg-bubbles li:nth-child(7) {
-  left: 32%;
-  width: 160px;
-  height: 160px;
-  -webkit-animation-delay: 7s;
-  animation-delay: 7s;
-}
-
-.bg-bubbles li:nth-child(8) {
-  left: 55%;
-  width: 20px;
-  height: 20px;
-  -webkit-animation-delay: 15s;
-  animation-delay: 15s;
-  -webkit-animation-duration: 40s;
-  animation-duration: 40s;
-}
-
-.bg-bubbles li:nth-child(9) {
-  left: 25%;
-  width: 10px;
-  height: 10px;
-  -webkit-animation-delay: 2s;
-  animation-delay: 2s;
-  -webkit-animation-duration: 40s;
-  animation-duration: 40s;
-  background-color: rgba(255, 255, 255, 0.3);
-}
-
-.bg-bubbles li:nth-child(10) {
-  left: 90%;
-  width: 160px;
-  height: 160px;
-  -webkit-animation-delay: 11s;
-  animation-delay: 11s;
-}
-
-@-webkit-keyframes square {
-  0% {
-    transform: translateY(0);
-  }
-
-  100% {
-    transform: translateY(-700px) rotate(600deg);
-  }
-}
-
-@keyframes square {
-  0% {
-    transform: translateY(0);
-  }
-
-  100% {
-    transform: translateY(-700px) rotate(600deg);
-  }
-}
-
-.u4a_logo {
-  width: 56px;
-  height: 56px;
-}
-
-.u4aWsLoginContainer {
-  display: flex;
-  flex-direction: column;
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  width: 430px;
-  background: linear-gradient(rgba(35, 43, 85, 0.75), rgba(35, 43, 85, 0.95));
-  background-size: cover;
-  margin-left: auto;
-  margin-right: auto;
-  border-radius: 5px;
-  box-shadow: 0px 2px 7px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-  z-index: 2;
-}
-
-.u4aWsLoginHeader {
-  margin-bottom: 20px;
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  justify-content: center;
-  align-items: center;
-}
-
-.u4aWsLoginHeader > div {
-  color: white;
-  text-align: center;
-}
-
-.u4aWsLoginHeader > h3 {
-  color: #ffffff;
-  text-align: center;
-  margin-left: 15px;
-  font-size: 1.4rem;
-}
-
-.u4aWsLoginFormArea * {
-  box-sizing: border-box;
-}
-
-.u4aWsLoginFormArea {
-  position: relative;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.u4aWsLoginForm {
-  height: auto;
-  width: 80%;
-  transition: opacity 0.5s ease, transform 0.5s ease;
-}
-
-.u4aWsLoginForm input,
-.form-signup input {
-  color: #ffffff;
-  font-size: 13px;
-  box-sizing: border-box;
-}
-
-.u4aWsLoginFormStyling {
-  width: 100%;
-  height: 35px;
-  padding-left: 15px;
-  border: none;
-  border-radius: 20px;
-  margin-bottom: 20px;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.u4aWsLoginFormArea label {
-  font-weight: 400;
-  text-transform: uppercase;
-  font-size: 13px;
-  padding-left: 15px;
-  padding-bottom: 10px;
-  color: rgba(255, 255, 255, 0.7);
-  display: block;
-}
-
-:focus {
-  outline: none;
-}
-
-.u4aWsLoginForm input:focus,
-textarea:focus,
-.form-signup input:focus,
-textarea:focus {
-  background: rgba(255, 255, 255, 0.3);
-  border: none;
-  /* padding-right: 40px; */
-  transition: background 0.5s ease;
+.u4a-fade[data-show="true"] {
+    opacity: 1;
 }
 
-.u4aWsLoginBtnSignin {
-  float: left;
-  padding-top: 8px;
-  width: 100%;
-  height: 35px;
-  border: none;
-  border-radius: 20px;
-  margin-top: -8px;
+/* ── 본문: 카드 중앙 정렬 (sap.m.VBox center 대체) ──────────────── */
+.u4a-login__main {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    overflow: auto;
 }
 
-.u4aWsLoginBtnAnimate {
-  float: left;
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 13px;
-  text-align: center;
-  color: rgba(255, 255, 255, 1);
-  padding-top: 8px;
-  width: 100%;
-  height: 35px;
-  border: none;
-  border-radius: 20px;
-  margin-top: 23px;
-  background-color: rgba(16, 89, 255, 1);
-  left: 0px;
-  top: 0px;
-  transition: all 0.5s ease, top 0.5s ease 0.5s, height 0.5s ease 0.5s,
-    background-color 0.5s ease 0.75s;
+/* ── 로그인 카드 (sap.f.Card 대체) ─────────────────────────────── */
+.u4a-login__card {
+    width: clamp(18rem, 42%, 30rem);
+    box-sizing: border-box;
+    padding: 1.5rem;
+    background: var(--surface-raised);
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--elevation);
+    transition: opacity 0.5s linear;
 }
 
-.u4aWsLoginBody a.btn-signup:hover,
-a.u4aWsLoginBtnSignin:hover {
-  cursor: pointer;
-  background-color: #0f4fe6;
-  transition: background-color 0.5s;
+/* 좁은 폭(스플리터/리사이즈/터치)에서 카드 폭 확장 */
+@media (max-width: 600px) {
+    .u4a-login__card {
+        width: 100%;
+    }
 }
 
-@media screen and (max-width: 500px) {
-  .u4aWsLoginContainer {
-    width: 300px;
-  }
-
-  .u4aWsLoginHeader > h3 {
-    margin-right: 15px;
-  }
-
-  .u4a_logo {
-    margin-left: 20px;
-  }
+/* 카드 헤더 (sap.f.cards.Header 대체) */
+.u4a-login__card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 0.0625rem solid var(--divider);
 }
 
-.staffLoginBtn {
-  width: 50px !important;
-  height: 30px !important;
-  font-size: 0.8rem !important;
-  color: black !important;
-  padding: 0px !important;
+.u4a-login__card-logo {
+    width: 2.25rem;
+    height: 1.75rem;
+    object-fit: contain;
 }
 
-.u4aWsGuestLoginCard
-  .sapFCardHeaderWrapper
-  .sapFCardHeaderText
-  .sapFCardHeaderTextFirstLine
-  .sapFCardTitle {
-  font-weight: bold;
-  font-size: 1.2rem;
+.u4a-login__card-title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text);
 }
 
-.u4aWsBrowserDraggable {
-  -webkit-app-region: drag !important;
+/* ── 폼 (shell .u4a-form 재사용) ───────────────────────────────── */
+.u4a-login__form {
+    margin-bottom: 1rem;
 }
 
-.u4aWsBrowserDraggable .sapMBtn,
-.u4aWsBrowserDraggable .sapMSlt {
-  -webkit-app-region: no-drag;
+/* 비밀번호 입력 + 보기/숨기기 토글 */
+.u4a-login__pw {
+    position: relative;
+    display: flex;
+    align-items: center;
 }
 
-/* BusyIndicator */
-#u4aWsBusyIndicator {
-  right: 0;
+.u4a-login__pw .u4a-input {
+    padding-right: 2.25rem;
 }
 
-.u4aWsBusyIndicator {
-  z-index: 2000000;
+.u4a-login__pw-toggle {
+    position: absolute;
+    right: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0;
+    background: transparent;
+    color: var(--icon-muted);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
 }
 
-.sapUiUserSelectable {
-  -webkit-touch-callout: text;
-  -webkit-user-select: text;
-  -khtml-user-select: text;
-  -moz-user-select: text;
-  -ms-user-select: text;
-  user-select: text;
+.u4a-login__pw-toggle:hover {
+    background: var(--hover-bg);
+    color: var(--text);
 }
 
-.sapUiBusy {
-  display: block;
-  width: 48px;
-  height: 48px;
-  outline: none;
-  cursor: wait;
-  top: 0 !important;
+/* CapsLock 등 정보성 메시지 (Information ValueState 대체) */
+.u4a-field__msg[data-vs="information"] {
+    color: var(--state-info);
+    background: var(--state-info-bg);
+    border-color: var(--state-info);
 }
 
-#u4aWsBusyIndicator > .sapUiLocalBusyIndicatorFade {
-  cursor: wait;
+/* 로그인 버튼 (sap.m.Button Emphasized, width 100%) */
+.u4a-login__btn {
+    width: 100%;
+    height: 2.5rem;
+    justify-content: center;
+    font-weight: 700;
 }
 
-.sapUiLocalBusyIndicatorSizeBig {
-  font-size: 2rem;
-  background-color: transparent;
+/* R&D Staff 자동 로그인 버튼 그룹 */
+.u4a-login__staff {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
 }
 
-.sapUiLocalBusyIndicatorFade {
-  opacity: 1;
+.u4a-login__staff .u4a-btn {
+    flex: 1 1 auto;
+    justify-content: center;
 }
 
-.sapUiLocalBusyIndicator {
-  opacity: 0;
-  transition: opacity 0.3s ease-in;
-  outline: none;
+/* ── 푸터 (sap.m.Toolbar footer 대체) ──────────────────────────── */
+.u4a-login__footer {
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    border-top: 0.0625rem solid var(--divider);
 }
 
-.sapUiLocalBusyIndicator {
-  background-color: rgba(247, 247, 247, 0.72);
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  right: 0;
+/* ── 로그인 오류 Dialog ────────────────────────────────────────── */
+.u4a-login__errdlg {
+    max-width: min(31.25rem, 92vw);
 }
 
-.sapUiLocalBusyIndicatorAnimation {
-  position: absolute;
-  width: 3em;
-  top: 50%;
-  left: 50%;
+.u4a-login__errdlg[data-state="error"] .u4a-dialog__header,
+.u4a-login__errdlg[data-state="error"] .u4a-dialog__header i {
+    color: var(--state-error);
 }
 
-.sapUiLocalBusyIndicatorAnimStandard > div:nth-child(1) {
-  animation-delay: -0.32s;
+.u4a-login__errdlg-desc {
+    margin-bottom: 0.75rem;
+    white-space: pre-wrap;
+    line-height: 1.45;
 }
 
-.sapUiLocalBusyIndicatorAnimStandard > div:nth-child(2) {
-  animation-delay: -0.16s;
+.u4a-login__errdlg-hint {
+    color: var(--text-muted);
 }
 
-.sapUiLocalBusyIndicatorAnimStandard > div {
-  animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
+/* ── 권한 오류 리스트 Dialog ───────────────────────────────────── */
+.u4a-login__authdlg {
+    min-width: min(40rem, 92vw);
 }
 
-.sapUiLocalBusyIndicatorAnimation > div,
-.sapUiLocalBusyIndicatorAnimation > div::before,
-.sapUiLocalBusyIndicatorAnimation > div::after {
-  animation-fill-mode: both;
+.u4a-login__authdlg .u4a-dialog__body {
+    max-height: 50vh;
 }
 
-.sapUiLocalBusyIndicatorAnimation > div {
-  width: 1em;
-  height: 1em;
-  border-radius: 100%;
-  display: block;
-  float: left;
-  margin: 0px;
-  position: relative;
-  top: -0.5em;
-  left: -1.5em;
-  text-indent: 1px;
+.u4a-login__authdlg-msg {
+    margin-bottom: 0.75rem;
+    font-weight: 700;
+    color: var(--state-error);
+    white-space: pre-wrap;
 }
 
-.sapUiLocalBusyIndicatorAnimStandard > div {
-  animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
+/* ── 버전 체크 Dialog (IllustratedMessage + ProgressIndicator 대체) ─ */
+.u4a-login__verdlg {
+    min-width: min(24rem, 92vw);
 }
 
-.sapUiLocalBusyIndicatorAnimation > div::before {
-  background: #0854a0;
-  animation-duration: 0ms;
+.u4a-login__verdlg-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2rem 1.5rem;
+    text-align: center;
 }
 
-.sapUiLocalBusyIndicatorAnimStandard > div::before {
-  animation: sapUiBusyAnimationStandardBackground 1.8s infinite ease-in-out;
+.u4a-login__verdlg-illust {
+    font-size: 2.75rem;
+    color: var(--accent);
 }
 
-.sapUiLocalBusyIndicatorAnimation > div::before {
-  background: #0a6ed1;
+.u4a-login__verdlg-illust[data-spin="true"] i {
+    animation: u4a-login-spin 1s linear infinite;
 }
 
-.sapUiLocalBusyIndicatorAnimation > div::before,
-.sapUiLocalBusyIndicatorAnimation > div::after {
-  content: "";
-  opacity: 1;
-  position: absolute;
-  z-index: -1;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 100%;
+.u4a-login__verdlg-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
 }
 
-.sapUiLocalBusyIndicatorAnimation > div::after {
-  box-shadow: inset 0 0 0 0 #0854a0;
+.u4a-login__verdlg-desc {
+    color: var(--text-muted);
+    white-space: pre-wrap;
 }
 
-.sapUiLocalBusyIndicatorAnimStandard > div::after {
-  animation: sapUiBusyAnimationStandardShadow 1.8s infinite ease-in-out;
+.u4a-login__verdlg-progress {
+    width: 100%;
+    height: 0.5rem;
+    accent-color: var(--success);
 }
 
-.sapUiLocalBusyIndicatorAnimation > div::after {
-  box-shadow: inset 0 0 2px 1px rgb(10 110 209 / 80%);
+.u4a-login__verdlg-pct {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
 }
 
-.sapUiLocalBusyIndicatorAnimation > div {
-  width: 1em;
-  height: 1em;
-  border-radius: 100%;
-  display: block;
-  float: left;
-  margin: 0px;
-  position: relative;
-  top: -0.5em;
-  left: -1.5em;
-  text-indent: 1px;
+/* ── 권한 없음 Dialog ──────────────────────────────────────────── */
+.u4a-login__noauth {
+    min-width: min(31.25rem, 92vw);
 }
 
-.sapUiLocalBusyIndicatorSizeBig {
-  font-size: 2rem;
-  background-color: transparent;
+.u4a-login__noauth-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2rem 1.5rem;
+    text-align: center;
 }
 
-.sapUiLocalBusyIndicator {
-  opacity: 0;
-  transition: opacity 0.3s ease-in;
-  outline: none;
+.u4a-login__noauth-illust {
+    font-size: 2.75rem;
+    color: var(--state-error);
 }
 
-.sapUiLocalBusyIndicatorFade {
-  opacity: 1;
+.u4a-login__noauth-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
 }
 
-@keyframes sapUiBusyAnimationStandard {
-  0%,
-  80%,
-  100% {
-    transform: scale(0.4);
-  }
-
-  40% {
-    transform: scale(1);
-  }
+.u4a-login__noauth-desc {
+    color: var(--text-muted);
+    white-space: pre-wrap;
 }
-
 
-.sapMSF.u4aWsSearchError.sapMFocus>.sapMSFF::before {
-    border: .125rem solid #fa6161;
+@keyframes u4a-login-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
