@@ -91,20 +91,19 @@ body {
     margin-bottom: 1rem;
 }
 
-/* 비밀번호 입력 + 보기/숨기기 토글 */
+/* ── 입력 + 트레일링 아이콘 버튼 (클리어 X / 비밀번호 토글) ───────── */
+/* 단일 입력 + X 버튼 래퍼(CLIENT/ID) 및 비밀번호 래퍼 공통 */
+.u4a-login__field,
 .u4a-login__pw {
     position: relative;
     display: flex;
     align-items: center;
 }
 
-.u4a-login__pw .u4a-input {
-    padding-right: 2.25rem;
-}
-
+/* 트레일링 아이콘 버튼 공통 모양 (UI5 showClearIcon / showValueHelp 대체) */
+.u4a-login__clear,
 .u4a-login__pw-toggle {
     position: absolute;
-    right: 0.25rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -117,9 +116,46 @@ body {
     border-radius: var(--radius-sm);
 }
 
+.u4a-login__clear:hover,
 .u4a-login__pw-toggle:hover {
     background: var(--hover-bg);
     color: var(--text);
+}
+
+/* 클리어(X) 버튼은 값이 있을 때만 노출 (data-filled) */
+.u4a-login__clear {
+    right: 0.25rem;
+    display: none;
+}
+
+.u4a-login__field[data-filled="true"] > .u4a-login__clear,
+.u4a-login__pw[data-filled="true"] > .u4a-login__clear {
+    display: inline-flex;
+}
+
+/* X 버튼이 텍스트와 겹치지 않게 우측 패딩 확보 */
+.u4a-login__field > .u4a-input {
+    padding-right: 2.25rem;
+}
+
+/* number 입력(CLIENT)의 네이티브 스피너 제거 — X 버튼과 겹침 방지 */
+.u4a-login__field > .u4a-input[type="number"]::-webkit-outer-spin-button,
+.u4a-login__field > .u4a-input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* 비밀번호: [X][눈] 두 버튼 → 패딩 더 넓게, 위치 분리 */
+.u4a-login__pw .u4a-input {
+    padding-right: 4rem;
+}
+
+.u4a-login__pw > .u4a-login__clear {
+    right: 2rem;
+}
+
+.u4a-login__pw > .u4a-login__pw-toggle {
+    right: 0.25rem;
 }
 
 /* CapsLock 등 정보성 메시지 (Information ValueState 대체) */

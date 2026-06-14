@@ -219,7 +219,12 @@
         accept: _fa("check"),
         decline: _fa("xmark"),
         sortAsc: _fa("caret-up"),
-        sortDesc: _fa("caret-down")
+        sortDesc: _fa("caret-down"),
+        // 메시지 박스 타입별 아이콘 (Confirm/Success/Error/Warning)
+        confirm: _fa("circle-question"),
+        success: _fa("circle-check"),
+        error: _fa("circle-xmark"),
+        warning: _fa("triangle-exclamation")
     };
 
     /********************************************************************
@@ -257,57 +262,56 @@
 
     // sap.m.MessageBox 대체 — 테마 토큰 소비 native <dialog>
     oAPP.fn.fnShowMessageBox = function (TYPE, sMsg, fnCallback) {
-        let oDlg = document.getElementById("u4aWsMsgDlg");
-        if (oDlg) {
-            oDlg.remove();
-        }
-        oDlg = document.createElement("dialog");
-        oDlg.id = "u4aWsMsgDlg";
-        oDlg.className = "u4a-msgbox";
+        // 설정 다이얼로그(_createFormDialog)와 동일한 .u4a-dialog 구조/스타일로 통일.
+        // 중복 표시 방지 — 이전 메시지 박스 제거
+        const oPrev = document.getElementById("u4aWsMsgDlg");
+        if (oPrev) { oPrev.remove(); }
 
-        const sTitle = { C: "Confirm", S: "Success", E: "Error", W: "Warning" }[TYPE] || "";
+        // 타입별 아이콘 + 현지화 타이틀 (I18N JS 객체 — doc 02 §8)
+        const oMeta = ({
+            C: { icon: ICON.confirm, title: L("dlgConfirm") },
+            S: { icon: ICON.success, title: L("dlgSuccess") },
+            E: { icon: ICON.error, title: L("dlgError") },
+            W: { icon: ICON.warning, title: L("dlgWarning") }
+        })[TYPE] || { icon: "", title: "" };
 
-        const oBody = document.createElement("div");
-        oBody.className = "u4a-msgbox__body";
+        // 본문 (줄바꿈 \n 유지)
+        const oBody = _el("div");
+        oBody.style.whiteSpace = "pre-wrap";
+        oBody.style.lineHeight = "1.45";
         oBody.textContent = sMsg;
 
-        const oFoot = document.createElement("div");
-        oFoot.className = "u4a-msgbox__footer";
+        let oCtl;
+        const _done = (sAction) => {
+            oCtl.close();
+            if (typeof fnCallback === "function") { fnCallback(sAction); }
+        };
 
-        function _close(sAction) {
-            oDlg.close();
-            oDlg.remove();
-            if (typeof fnCallback === "function") {
-                fnCallback(sAction);
-            }
-        }
-
-        const oOk = document.createElement("button");
-        oOk.className = "u4a-btn u4a-btn--emphasized";
-        oOk.textContent = "OK";
-        oOk.addEventListener("click", () => _close("OK"));
-        oFoot.appendChild(oOk);
-
+        // 버튼 현지화 — 확인=T("002"), 취소=T("003") (설정 다이얼로그와 동일 소스)
+        const aButtons = [
+            { text: T("002") || "OK", type: "emphasized", onClick: () => _done("OK") }
+        ];
         if (TYPE === "C") {
-            const oCancel = document.createElement("button");
-            oCancel.className = "u4a-btn";
-            oCancel.textContent = "Cancel";
-            oCancel.addEventListener("click", () => _close("CANCEL"));
-            oFoot.appendChild(oCancel);
+            aButtons.push({ text: T("003") || "Cancel", onClick: () => _done("CANCEL") });
         }
 
-        if (sTitle) {
-            const oHead = document.createElement("div");
-            oHead.className = "u4a-msgbox__title";
-            oHead.dataset.type = TYPE;
-            oHead.textContent = sTitle;
-            oDlg.appendChild(oHead);
-        }
-        oDlg.appendChild(oBody);
-        oDlg.appendChild(oFoot);
-        document.body.appendChild(oDlg);
-        oDlg.showModal();
-        oOk.focus();
+        oCtl = _createFormDialog({
+            title: oMeta.title,
+            icon: oMeta.icon,
+            bodyEl: oBody,
+            width: "28rem",
+            buttons: aButtons,
+            // ESC: 확인형(C)만 취소 콜백, 그 외는 단순 닫기(원본과 동일하게 콜백 미실행)
+            onCancel: (c) => {
+                c.close();
+                if (TYPE === "C" && typeof fnCallback === "function") { fnCallback("CANCEL"); }
+            }
+        });
+
+        // 헤더 아이콘 타입별 색상용 마커 + 중복 제거용 id
+        oCtl.dlg.id = "u4aWsMsgDlg";
+        const oHead = oCtl.dlg.querySelector(".u4a-dialog__header");
+        if (oHead) { oHead.dataset.type = TYPE; }
 
         // 사운드
         if (TYPE === "S") { oAPP.setSoundMsg("01"); }
@@ -377,9 +381,10 @@
         // WS Global 메시지 텍스트
         await oAPP.fn.fnWsGlobalMsgList();
 
-        // 작업표시줄 메뉴 / 현재 창 이벤트
+        // 작업표시줄 메뉴 / 현재 창 이벤트 / OS 닫기 가드
         _createTaskBarMenu();
         _attachCurrentWindowEvents();
+        _attachWindowCloseGuard();
 
         // i18n 모델 구성
         await oAPP.fn.fnOnInitModeling();
@@ -418,6 +423,7 @@
             oAPP.msg.M10 = G("016"); oAPP.msg.M11 = G("017"); oAPP.msg.M12 = G("018");
             oAPP.msg.M13 = G("019"); oAPP.msg.M14 = G("020"); oAPP.msg.M15 = G("080");
             oAPP.msg.M16 = G("206"); oAPP.msg.M270 = G("270"); oAPP.msg.M271 = G("271");
+            oAPP.msg.M048 = G("048"); oAPP.msg.M049 = G("049"); // 프로그램 종료 확인 문구
             oAPP.msg.M017 = "A problem occurred while saving the server settings.";
         } catch (e) {
             // 메시지 조회 실패 시 영문 폴백 (display 차단 방지)
@@ -432,6 +438,8 @@
             oAPP.msg.M11 = "Not exists save file.";
             oAPP.msg.M12 = "Server List file not exists.";
             oAPP.msg.M16 = "Shut Down";
+            oAPP.msg.M048 = "Unsaved data will be lost.";
+            oAPP.msg.M049 = "Are you sure you want to exit the Program?";
             oAPP.msg.M017 = "A problem occurred while saving the server settings.";
         }
     };
@@ -959,13 +967,15 @@
             status: "STATUS", serverName: "SERVER NAME", sid: "SID", host: "HOST(Or IP)",
             sno: "SNO", settingsCol: "Settings", settings: "Settings",
             edit: "Edit", del: "Delete", active: "Active", inactive: "Inactive",
-            noData: "No data", selectServer: "Please select a server first."
+            noData: "No data", selectServer: "Please select a server first.",
+            dlgConfirm: "Confirm", dlgSuccess: "Success", dlgError: "Error", dlgWarning: "Warning"
         },
         KO: {
             status: "상태", serverName: "서버 이름", sid: "시스템 ID", host: "호스트(또는 IP)",
             sno: "인스턴스", settingsCol: "설정", settings: "설정",
             edit: "편집", del: "삭제", active: "활성", inactive: "비활성",
-            noData: "데이터 없음", selectServer: "서버를 먼저 선택하세요."
+            noData: "데이터 없음", selectServer: "서버를 먼저 선택하세요.",
+            dlgConfirm: "확인", dlgSuccess: "성공", dlgError: "오류", dlgWarning: "경고"
         }
     };
     function L(sKey) {
@@ -1096,10 +1106,15 @@
         if (oSel) { oSel.removeAttribute("aria-selected"); }
     };
 
-    function _selectServerRow(oTr, oItem) {
+    function _selectServerRow(oTr, oItem, bSkipPersist) {
         oAPP.fn.fnServerListUnselect();
         oTr.setAttribute("aria-selected", "true");
         oAPP.attr._selectedServer = { data: oItem, tr: oTr };
+        // 마지막 선택 서버 키 기억 (앱 재시작 후 복원용). 복원 중(bSkipPersist)에는 재저장 생략.
+        oAPP.attr._lastSelectedServerKey = (oItem && oItem.uuid) || "";
+        if (!bSkipPersist && oAPP.attr._lastSelectedServerKey) {
+            oAPP.fn.setRegistryLastSelectedServerKey(oAPP.attr._lastSelectedServerKey);
+        }
     }
 
     // 현재 선택 폴더 기준으로 우측 서버 목록 재조회 (저장/삭제 후 갱신)
@@ -1178,6 +1193,21 @@
         }
     };
 
+    // 마지막 선택 서버(행) 키 저장 — 노드 키와 같은 레지스트리 경로에 별도 값으로 보관.
+    oAPP.fn.setRegistryLastSelectedServerKey = async function (sServerKey) {
+        try {
+            const sSettingsPath = SETTINGS.regPaths.LogonSettings;
+            const oRegData = {};
+            oRegData[sSettingsPath] = {
+                "LastSelectedServerKey": { value: sServerKey, type: "REG_SZ" }
+            };
+            const RegeditPromisified = parent.require('regedit').promisified;
+            await RegeditPromisified.putValue(oRegData);
+        } catch (e) {
+            console.warn("[setRegistryLastSelectedServerKey] 실패:", e);
+        }
+    };
+
     oAPP.fn.fnRestoreLastSelectedNode = async function () {
         let sLastKey = "";
         try {
@@ -1187,6 +1217,10 @@
                 const oRegData = oResult.RTDATA[sLogonSettingsPath];
                 if (oRegData && oRegData.values && oRegData.values["LastSelectedNodeKey"]) {
                     sLastKey = oRegData.values["LastSelectedNodeKey"].value;
+                }
+                // 서버(행) 선택 복원용 키도 같은 타이밍에 읽어 메모리에 보관
+                if (oRegData && oRegData.values && oRegData.values["LastSelectedServerKey"]) {
+                    oAPP.attr._lastSelectedServerKey = oRegData.values["LastSelectedServerKey"].value;
                 }
             }
         } catch (e) { /* 무시 */ }
@@ -1355,6 +1389,16 @@
         oTable.appendChild(oTbody);
         oWrap.appendChild(oTable);
         oPane.appendChild(oWrap);
+
+        // 마지막 선택 서버(행) 복원 — 현재 목록에 그 uuid 가 있을 때만 (없으면 선택 없음).
+        const sRestoreKey = oAPP.attr._lastSelectedServerKey;
+        if (sRestoreKey) {
+            const oTargetRow = oTbody.querySelector(`tr.server-row[data-uuid="${sRestoreKey}"]`);
+            if (oTargetRow && oTargetRow._rowData) {
+                _selectServerRow(oTargetRow, oTargetRow._rowData, true); // 복원 시 재저장 생략
+                oTargetRow.scrollIntoView({ block: "nearest" });
+            }
+        }
 
         // 반응형: 테이블 폭에 따라 저우선 컬럼 접기 (스플리터 드래그/창 리사이즈 모두 반응)
         _observeTableWidth(oWrap);
@@ -2314,24 +2358,26 @@
     /********************************************************************
      * 창 제어 — 닫기 (자식 창 존재 시 안내, 없으면 종료) — 로직 유지
      ********************************************************************/
-    oAPP.fn.fnRequestClose = function () {
+    /** SERVERLIST/FLTMENU 를 제외한 활성 자식 창(MAIN 등) 개수 */
+    function _countActiveChildWindows() {
         const aBrowserList = REMOTE.BrowserWindow.getAllWindows();
         let iChildLength = 0;
         for (const oBrows of aBrowserList) {
-            if (oBrows.isDestroyed()) { continue; }
+            if (!oBrows || oBrows.isDestroyed()) { continue; }
             let oWebPref;
             try {
-                const sBrowserUrl = oBrows.getURL();
-                oWebPref = WSUTIL.QueryString.parse(sBrowserUrl);
+                oWebPref = WSUTIL.QueryString.parse(oBrows.getURL());
             } catch (error) {
                 continue;
             }
-            if (oWebPref.OBJTY === "SERVERLIST" || oWebPref.OBJTY === "FLTMENU") {
-                continue;
-            }
+            if (oWebPref.OBJTY === "SERVERLIST" || oWebPref.OBJTY === "FLTMENU") { continue; }
             ++iChildLength;
         }
-        if (iChildLength === 0) {
+        return iChildLength;
+    }
+
+    oAPP.fn.fnRequestClose = function () {
+        if (_countActiveChildWindows() === 0) {
             APP.exit();
             return;
         }
@@ -2343,16 +2389,21 @@
 
     oAPP.fn.fnShowMainWindow = function () {
         const aBrowserList = REMOTE.BrowserWindow.getAllWindows();
+        let oFirst = null;
         for (const oBrows of aBrowserList) {
             try {
                 if (oBrows.isDestroyed()) { continue; }
                 const sBrowserUrl = oBrows.getURL();
                 const oWebPref = WSUTIL.QueryString.parse(sBrowserUrl);
-                if (oWebPref.OBJTY === "SERVERLIST") {
-                    oBrows.show();
-                }
+                // 활성 자식 창(로그인/메인)은 OBJTY === "MAIN" — 이들을 전면으로 끌어온다.
+                if (oWebPref.OBJTY !== "MAIN") { continue; }
+                if (oBrows.isMinimized()) { oBrows.restore(); }
+                oBrows.show();
+                if (!oFirst) { oFirst = oBrows; }
             } catch (error) { continue; }
         }
+        // 가장 먼저 열린(첫 번째) 활성 창을 포커스
+        if (oFirst) { oFirst.focus(); }
     };
 
     function _attachCurrentWindowEvents() {
@@ -2366,21 +2417,108 @@
         });
     }
 
+    /********************************************************************
+     * OS/타이틀바발 창 닫기 가드 (원본 window.onbeforeunload 대체)
+     * ----------------------------------------------------------------
+     * 서버리스트 외 실행 중인 자식 창(MAIN 등)이 있으면 닫기를 막고 안내한다.
+     * 사유: SameSite 쿠키 처리 webRequest 핸들러가 서버리스트에 있어, 먼저 닫히면
+     *      실행 중인 앱에서 ajax 통신이 깨진다.
+     * 앱 자체 종료(fnRequestClose / 종료팝업)는 APP.exit() 로 beforeunload 를
+     * 우회하므로 이 가드의 영향을 받지 않는다.
+     ********************************************************************/
+    function _attachWindowCloseGuard() {
+        window.onbeforeunload = () => {
+            // 창을 잠깐 최상단으로 끌어올린다 (원본 동작)
+            try {
+                CURRWIN.setAlwaysOnTop(true, "screen-saver");
+                CURRWIN.show();
+                CURRWIN.setAlwaysOnTop(false);
+            } catch (e) { /* 무시 */ }
+
+            // 자식 창이 없으면 정상 종료 허용 (Electron: undefined 반환 → 닫기 진행)
+            if (_countActiveChildWindows() === 0) { return undefined; }
+            if (CURRWIN.isDestroyed()) { return undefined; }
+
+            // 자식 창이 살아있으면: 안내 + (OK 시) 해당 메인 창을 전면·포커스 → 사용자가
+            // 어떤 창을 닫아야 하는지 알 수 있게 한다. (fnRequestClose 와 동일 동작)
+            oAPP.fn.fnShowMessageBox("W", T("043") || "An activated window exists. Please close all activated windows first.", () => {
+                oAPP.fn.fnShowMainWindow();
+            });
+            // Electron: undefined 외 값을 반환하면 닫기가 취소된다.
+            return false;
+        };
+    }
+    // 단일 인스턴스 잠금은 메인 프로세스(electron/main.js configureSingleInstanceLock)
+    // 에서 이미 처리하므로 렌더러에서는 추가하지 않는다 (second-instance 포커스는
+    // main.js 에서 의도적으로 비활성화된 상태 — 2026-03-04 결정).
+
     function _createTaskBarMenu() {
         try {
             CURRWIN.setThumbarButtons([{
                 tooltip: oAPP.msg.M16 || "Shut Down",
                 icon: PATH.join(APPPATH, "img", "shutdown.png"),
                 click() {
+                    // 창을 잠깐 최상단으로 끌어올린 뒤 종료 확인 팝업 표시 (원본 동작)
                     CURRWIN.setAlwaysOnTop(true, "screen-saver");
                     CURRWIN.show();
                     CURRWIN.setAlwaysOnTop(false);
-                    oAPP.fn.fnRequestClose();
+                    oAPP.fn.fnShowShutdownAskPopup();
                 }
             }]);
         } catch (e) {
             console.warn("[_createTaskBarMenu] 실패(무시):", e);
         }
+    }
+
+    /********************************************************************
+     * 프로그램 종료 질문 팝업 (원본 _showShuttdownAskPopup 대체)
+     *  - OK : 전체 자식(MAIN) 프로그램 종료 요청 후, 모두 닫히면 APP.exit()
+     *  - CANCEL : 아무것도 하지 않음
+     ********************************************************************/
+    oAPP.fn.fnShowShutdownAskPopup = function () {
+        const sMsg = (oAPP.msg.M048 || "Unsaved data will be lost.") + " \n " +
+            (oAPP.msg.M049 || "Are you sure you want to exit the Program?");
+
+        oAPP.fn.fnShowMessageBox("C", sMsg, (sAction) => {
+            if (sAction !== "OK") { return; }
+
+            oAPP.fn.fnProgramShuttDown(); // 전체 자식 프로그램 종료 요청
+
+            if (oAPP.attr.windowCloseInterval) {
+                clearInterval(oAPP.attr.windowCloseInterval);
+                delete oAPP.attr.windowCloseInterval;
+            }
+            // 자식(MAIN) 창이 모두 닫힐 때까지 폴링 후 종료
+            oAPP.attr.windowCloseInterval = setInterval(() => {
+                if (!_checkMainProgramExit()) { return; }
+                clearInterval(oAPP.attr.windowCloseInterval);
+                delete oAPP.attr.windowCloseInterval;
+                APP.exit();
+            }, 500);
+        });
+    };
+
+    /** 전체 프로그램 종료 요청 (IPC — 원본 PRCCD "04" 유지) */
+    oAPP.fn.fnProgramShuttDown = function () {
+        IPCRENDERER.send("if-browser-interconnection", { PRCCD: "04" });
+    };
+
+    /** MAIN(자식) 프로그램이 모두 종료되었는지 확인 — 남아있으면 false */
+    function _checkMainProgramExit() {
+        const aBrowserList = REMOTE.BrowserWindow.getAllWindows();
+        let iChildLength = 0;
+        for (const oBrows of aBrowserList) {
+            if (oBrows && oBrows.isDestroyed()) { continue; }
+            let oWebPref;
+            try {
+                oWebPref = WSUTIL.QueryString.parse(oBrows.getURL());
+            } catch (error) {
+                continue;
+            }
+            if (oWebPref.OBJTY !== "MAIN") { continue; }
+            ++iChildLength;
+        }
+        return iChildLength === 0;
     }
 
     /********************************************************************

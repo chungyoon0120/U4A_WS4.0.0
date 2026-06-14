@@ -110,8 +110,22 @@ var oAPP = (function () {
         question: _fa("circle-question"),
         noauth: _fa("user-lock"),
         spinner: _fa("spinner"),
-        success: _fa("circle-check")
+        success: _fa("circle-check"),
+        caret: _fa("chevron-down"),
+        accept: _fa("check"),
+        clear: _fa("xmark")
     };
+
+    /** createElement 단축 헬퍼 (ServerList 와 동일 규칙) */
+    function _el(sTag, sClass, sText) {
+        const o = document.createElement(sTag);
+        if (sClass) { o.className = sClass; }
+        if (typeof sText !== "undefined") { o.textContent = sText; }
+        return o;
+    }
+
+    // 화면에 생성된 커스텀 콤보 인스턴스 보관 (id → combo element)
+    const oCombos = {};
 
     /********************************************************************
      * 깊은 복제 (jQuery.extend(true,...) 대체)
@@ -381,14 +395,19 @@ var oAPP = (function () {
 
         oForm.appendChild(_buildField({
             label: "CLIENT",
-            ctrl: `<input id="ws_client" class="u4a-input" type="number" inputmode="numeric" maxlength="3" autocomplete="off">`,
+            ctrl: `<div class="u4a-login__field">` +
+                `<input id="ws_client" class="u4a-input" type="number" inputmode="numeric" maxlength="3" autocomplete="off">` +
+                `<button type="button" class="u4a-login__clear" data-clear="ws_client" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+                `</div>`,
             id: "ws_client"
         }));
 
         oForm.appendChild(_buildField({
             label: "ID",
-            ctrl: `<input id="ws_id" class="u4a-input" type="text" list="ws_id_sugg" autocomplete="off">` +
-                `<datalist id="ws_id_sugg"></datalist>`,
+            ctrl: `<div class="u4a-login__field">` +
+                `<input id="ws_id" class="u4a-input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">` +
+                `<button type="button" class="u4a-login__clear" data-clear="ws_id" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+                `</div>`,
             id: "ws_id"
         }));
 
@@ -396,6 +415,7 @@ var oAPP = (function () {
             label: "PASSWORD",
             ctrl: `<div class="u4a-login__pw">` +
                 `<input id="ws_pw" class="u4a-input" type="password" autocomplete="off">` +
+                `<button type="button" class="u4a-login__clear" data-clear="ws_pw" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
                 `<button type="button" id="ws_pw_toggle" class="u4a-login__pw-toggle" title="Show / Hide" tabindex="-1">${ICON.eye}</button>` +
                 `</div>`,
             id: "ws_pw"
@@ -406,24 +426,27 @@ var oAPP = (function () {
             label: "LANGUAGE",
             rowId: "ws_langu_input_form",
             hidden: true,
-            ctrl: `<input id="ws_langu" class="u4a-input" type="text" maxlength="2" autocomplete="off">`,
+            ctrl: `<div class="u4a-login__field">` +
+                `<input id="ws_langu" class="u4a-input" type="text" maxlength="2" autocomplete="off">` +
+                `<button type="button" class="u4a-login__clear" data-clear="ws_langu" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+                `</div>`,
             id: "ws_langu"
         }));
 
-        // LANGUAGE — Select (기본 hidden)
+        // LANGUAGE — 커스텀 콤보 (네이티브 <select> 대체, ServerList 와 동일 UX, 기본 hidden)
         oForm.appendChild(_buildField({
             label: "LANGUAGE",
             rowId: "ws_langu_select_form",
             hidden: true,
-            ctrl: `<select id="ws_langu_select" class="u4a-select"></select>`,
-            id: "ws_langu_select"
+            ctrl: `<div id="ws_langu_select_host"></div>`,
+            id: "ws_langu_select_host"
         }));
 
-        // Workspace Language
+        // Workspace Language — 커스텀 콤보 (ServerList 와 동일 UX)
         oForm.appendChild(_buildField({
             label: "Workspace Language",
-            ctrl: `<select id="ws_wslangu" class="u4a-select"></select>`,
-            id: "ws_wslangu"
+            ctrl: `<div id="ws_wslangu_host"></div>`,
+            id: "ws_wslangu_host"
         }));
 
         // Remember
@@ -485,6 +508,38 @@ var oAPP = (function () {
         return oRow;
     }
 
+    // 클리어(X) 버튼 동기화 함수 모음 — 모델 → 입력 렌더 후 채움 상태 갱신용
+    const aClearSyncs = [];
+
+    /**
+     * 입력값 클리어(X) 버튼 부착 — 값이 있으면 노출(.data-filled), 클릭 시 비운다.
+     * (UI5 Input showClearIcon 대체) 비밀번호처럼 추가 버튼이 있는 래퍼도 지원.
+     * @param {string} sInputId 대상 입력 id
+     */
+    function _attachClear(sInputId) {
+        const oInput = document.getElementById(sInputId);
+        if (!oInput) { return; }
+        const oWrap = oInput.closest(".u4a-login__field, .u4a-login__pw");
+        const oClear = oWrap && oWrap.querySelector(".u4a-login__clear");
+        if (!oWrap || !oClear) { return; }
+
+        const _sync = () => { oWrap.dataset.filled = oInput.value ? "true" : "false"; };
+        oInput.addEventListener("input", _sync);
+        // mousedown preventDefault → 클릭해도 입력 포커스 유지
+        oClear.addEventListener("mousedown", (ev) => ev.preventDefault());
+        oClear.addEventListener("click", () => {
+            oInput.value = "";
+            // input 이벤트로 모델 동기화/자동완성/채움상태를 한 번에 갱신
+            oInput.dispatchEvent(new Event("input", { bubbles: true }));
+            oInput.focus();
+        });
+        aClearSyncs.push(_sync);
+        _sync();
+    }
+
+    /** 모델→입력 렌더(프로그램 set) 후 클리어 버튼 노출 상태 재계산 */
+    function _refreshClearButtons() { aClearSyncs.forEach((fn) => fn()); }
+
     /** 입력 필드 ↔ 모델 동기화 및 키 이벤트 */
     function _attachFormEvents() {
 
@@ -492,8 +547,6 @@ var oAPP = (function () {
         const oId = document.getElementById("ws_id");
         const oPw = document.getElementById("ws_pw");
         const oLangu = document.getElementById("ws_langu");
-        const oLanguSel = document.getElementById("ws_langu_select");
-        const oWsLangu = document.getElementById("ws_wslangu");
         const oRem = document.getElementById("ws_rem");
 
         const _set = (sPath, val) => oModel.setProperty(sPath, val);
@@ -506,9 +559,15 @@ var oAPP = (function () {
             oLangu.value = (oLangu.value || "").toUpperCase();
             _set("/LOGIN/LANGU", oLangu.value);
         });
-        oLanguSel.addEventListener("change", () => _set("/LOGIN/LANGU", oLanguSel.value));
-        oWsLangu.addEventListener("change", () => _set("/LOGIN/WSLANGU", oWsLangu.value));
+        // 언어 콤보(ws_langu_select / ws_wslangu)의 값 변경은 _createSelect 콜백에서 모델에 반영한다.
         oRem.addEventListener("change", () => _set("/LOGIN/REMEMBER", oRem.checked));
+
+        // 입력값 클리어(X) 버튼 (UI5 showClearIcon 대체) — CLIENT/ID/PASSWORD/LANGUAGE(직접입력)
+        ["ws_client", "ws_id", "ws_pw", "ws_langu"].forEach(_attachClear);
+
+        // ID 자동완성 — 네이티브 <datalist> 대체(테마 드롭다운). Enter 로그인 핸들러보다
+        // 먼저 등록해, 목록이 열린 상태의 Enter 는 선택으로 소비(stopImmediatePropagation)한다.
+        _attachSuggest(oId, () => (oModel.getProperty("/LOGIN/IDSUGG") || []).map((o) => o.ID), (sVal) => _set("/LOGIN/ID", sVal));
 
         // Enter → 로그인 (CLIENT/ID/PW/LANGU)
         [oClient, oId, oPw, oLangu].forEach((el) => {
@@ -563,25 +622,19 @@ var oAPP = (function () {
         _v("ws_pw", oLogin.PW);
         _v("ws_langu", oLogin.LANGU);
 
-        // ID Suggestion datalist
-        const oList = document.getElementById("ws_id_sugg");
-        if (oList) {
-            oList.innerHTML = "";
-            (oLogin.IDSUGG || []).forEach((o) => {
-                const opt = document.createElement("option");
-                opt.value = o.ID;
-                oList.appendChild(opt);
-            });
-        }
+        // 프로그램으로 값을 채운 뒤 클리어(X) 버튼 노출 상태 갱신
+        _refreshClearButtons();
 
-        // Workspace Language Select (모델 WSLANGU 가 비었으면 렌더된 선택값으로 동기화)
-        _fnFillSelect("ws_wslangu", oLogin.T_WSLANGU, "KEY", "VALUE", oLogin.WSLANGU);
-        const oWsLanguSel = document.getElementById("ws_wslangu");
+        // ID Suggestion 은 커스텀 드롭다운(_attachSuggest)이 모델 IDSUGG 를 직접 읽어 표시.
+
+        // Workspace Language 콤보 (모델 WSLANGU 가 비었으면 렌더된 선택값으로 동기화)
+        _fnFillCombo("ws_wslangu_host", "ws_wslangu", oLogin.T_WSLANGU, "KEY", "VALUE", oLogin.WSLANGU, "/LOGIN/WSLANGU");
+        const oWsLanguSel = oCombos["ws_wslangu"];
         if (oWsLanguSel && !oLogin.WSLANGU && oWsLanguSel.value) {
             oModel.setProperty("/LOGIN/WSLANGU", oWsLanguSel.value);
         }
-        // SAP Language Select
-        _fnFillSelect("ws_langu_select", oLogin.T_LANGU, "KEY", "LANGU", oLogin.LANGU);
+        // SAP Language 콤보
+        _fnFillCombo("ws_langu_select_host", "ws_langu_select", oLogin.T_LANGU, "KEY", "LANGU", oLogin.LANGU, "/LOGIN/LANGU");
 
         const oRem = document.getElementById("ws_rem");
         if (oRem) { oRem.checked = !!oLogin.REMEMBER; }
@@ -590,17 +643,292 @@ var oAPP = (function () {
         if (oSysid) { oSysid.textContent = "SYSID: " + (oLogin.SYSID || ""); }
     };
 
-    function _fnFillSelect(sId, aItems, sKey, sText, sSelected) {
-        const oSel = document.getElementById(sId);
-        if (!oSel) { return; }
-        oSel.innerHTML = "";
-        (aItems || []).forEach((o) => {
-            const opt = document.createElement("option");
-            opt.value = o[sKey];
-            opt.textContent = (o[sText] != null ? o[sText] : o[sKey]);
-            oSel.appendChild(opt);
+    /**
+     * 호스트 컨테이너에 커스텀 콤보를 생성/재생성하고 모델과 연결한다.
+     * (ServerList 의 _createSelect 와 동일한 테마 콤보 — 펼침 목록까지 테마 적용)
+     * @param {string} sHostId   콤보를 담을 컨테이너 id
+     * @param {string} sComboId  콤보 인스턴스 식별자(oCombos 키)
+     * @param {Array}  aItems    원본 항목 배열
+     * @param {string} sKey      값 필드명
+     * @param {string} sText     표시 텍스트 필드명
+     * @param {*}      sSelected 초기 선택값
+     * @param {string} sModelPath 값 변경 시 갱신할 모델 경로
+     */
+    function _fnFillCombo(sHostId, sComboId, aItems, sKey, sText, sSelected, sModelPath) {
+        const oHost = document.getElementById(sHostId);
+        if (!oHost) { return; }
+
+        const aOpt = (aItems || []).map((o) => ({
+            value: o[sKey],
+            text: (o[sText] != null ? o[sText] : o[sKey])
+        }));
+
+        // 네이티브 <select> 와 동일하게: 선택값이 목록에 없으면 첫 항목으로 폴백
+        const bHas = sSelected != null && sSelected !== "" && aOpt.some(o => o.value === sSelected);
+        const sInit = bHas ? sSelected : (aOpt[0] ? aOpt[0].value : "");
+
+        const oCombo = _createSelect(aOpt, sInit, (sVal) => {
+            oModel.setProperty(sModelPath, sVal);
         });
-        if (sSelected != null) { oSel.value = sSelected; }
+        oCombo.id = sComboId;
+
+        oHost.innerHTML = "";
+        oHost.appendChild(oCombo);
+        oCombos[sComboId] = oCombo;
+    }
+
+    /**
+     * 커스텀 셀렉트 (네이티브 <select> 대체 — 펼침 목록까지 테마 적용).
+     * ServerList 의 동명 함수와 동일 동작/마크업으로 UX 를 일치시킨다.
+     * @param {Array<{value:string,text:string}>} aItems
+     * @param {string} sValue 초기 값
+     * @param {Function} [fnChange] 값 변경 콜백(newValue)
+     * @returns {HTMLElement} `.value` getter/setter 를 가진 combo 엘리먼트
+     */
+    function _createSelect(aItems, sValue, fnChange) {
+
+        const oCombo = _el("div", "u4a-combo");
+        oCombo.tabIndex = 0;
+        oCombo.setAttribute("role", "combobox");
+        oCombo.setAttribute("aria-haspopup", "listbox");
+        oCombo.setAttribute("aria-expanded", "false");
+
+        const oText = _el("span", "u4a-combo__text");
+        const oArrow = _el("span", "u4a-combo__arrow");
+        oArrow.innerHTML = ICON.caret;
+        oCombo.append(oText, oArrow);
+
+        let sCurrent = sValue;
+        let oList = null;
+        let iActive = -1;
+
+        function _label(v) {
+            const o = aItems.find(i => i.value === v);
+            return o ? o.text : "";
+        }
+        oText.textContent = _label(sCurrent);
+
+        Object.defineProperty(oCombo, "value", {
+            get() { return sCurrent; },
+            set(v) { sCurrent = v; oText.textContent = _label(v); }
+        });
+
+        function _onOutside(ev) {
+            if (!oCombo.contains(ev.target) && (!oList || !oList.contains(ev.target))) {
+                _close();
+            }
+        }
+
+        function _setActive(idx) {
+            if (!oList) { return; }
+            const aEl = oList.querySelectorAll(".u4a-combo__item");
+            aEl.forEach((el, i) => { el.dataset.active = (i === idx) ? "true" : "false"; });
+            iActive = idx;
+            if (aEl[idx]) { aEl[idx].scrollIntoView({ block: "nearest" }); }
+        }
+
+        function _open() {
+            if (oList) { return; }
+            oList = _el("div", "u4a-combo__list");
+            oList.setAttribute("role", "listbox");
+
+            aItems.forEach((it, idx) => {
+                const oItem = _el("div", "u4a-combo__item");
+                oItem.setAttribute("role", "option");
+                if (it.value === sCurrent) {
+                    oItem.setAttribute("aria-selected", "true");
+                    iActive = idx;
+                }
+                const oLbl = _el("span", null, it.text);
+                const oChk = _el("span", "u4a-combo__check");
+                oChk.innerHTML = ICON.accept;
+                oItem.append(oLbl, oChk);
+                oItem.addEventListener("mousedown", (ev) => { ev.preventDefault(); _select(idx); });
+                oItem.addEventListener("mousemove", () => _setActive(idx));
+                oList.appendChild(oItem);
+            });
+
+            // 모달 <dialog> 내부면 top-layer 유지 위해 dialog 에 append
+            const oHost = oCombo.closest("dialog") || document.body;
+            oHost.appendChild(oList);
+
+            const r = oCombo.getBoundingClientRect();
+            oList.style.left = r.left + "px";
+            oList.style.top = (r.bottom + 2) + "px";
+            oList.style.minWidth = r.width + "px";
+
+            oCombo.dataset.open = "true";
+            oCombo.setAttribute("aria-expanded", "true");
+            _setActive(iActive < 0 ? 0 : iActive);
+
+            setTimeout(() => document.addEventListener("mousedown", _onOutside), 0);
+        }
+
+        function _close() {
+            if (!oList) { return; }
+            oList.remove();
+            oList = null;
+            oCombo.removeAttribute("data-open");
+            oCombo.setAttribute("aria-expanded", "false");
+            document.removeEventListener("mousedown", _onOutside);
+        }
+
+        function _select(idx) {
+            const it = aItems[idx];
+            if (!it) { return; }
+            const bChanged = it.value !== sCurrent;
+            sCurrent = it.value;
+            oText.textContent = it.text;
+            _close();
+            oCombo.focus();
+            if (bChanged && typeof fnChange === "function") {
+                fnChange(sCurrent);
+            }
+        }
+
+        oCombo.addEventListener("click", () => { if (oList) { _close(); } else { _open(); } });
+        oCombo.addEventListener("keydown", (ev) => {
+            switch (ev.key) {
+                case "ArrowDown":
+                    ev.preventDefault();
+                    if (!oList) { _open(); } else { _setActive(Math.min(iActive + 1, aItems.length - 1)); }
+                    break;
+                case "ArrowUp":
+                    ev.preventDefault();
+                    if (oList) { _setActive(Math.max(iActive - 1, 0)); }
+                    break;
+                case "Enter":
+                case " ":
+                    ev.preventDefault();
+                    if (oList) { _select(iActive); } else { _open(); }
+                    break;
+                case "Escape":
+                    if (oList) { ev.stopPropagation(); _close(); }
+                    break;
+                case "Tab":
+                    _close();
+                    break;
+            }
+        });
+
+        return oCombo;
+    }
+
+    /**
+     * 텍스트 입력에 커스텀 자동완성 드롭다운을 부착한다 (네이티브 <datalist> 대체).
+     * 펼침 목록은 콤보와 동일한 .u4a-combo__list/__item 테마를 재사용한다.
+     * @param {HTMLInputElement} oInput  대상 입력
+     * @param {Function} fnItems  현재 후보 문자열 배열을 반환하는 함수
+     * @param {Function} [fnPick] 항목 선택 시 콜백(value)
+     */
+    function _attachSuggest(oInput, fnItems, fnPick) {
+
+        let oList = null;
+        let iActive = -1;
+        let aMatch = [];
+
+        function _onOutside(ev) {
+            if (oInput !== ev.target && (!oList || !oList.contains(ev.target))) { _close(); }
+        }
+
+        // bShowAll: 포커스로 열 때는 입력값과 무관하게 전체 이력을 보여준다
+        // (Remember 로 ID 가 미리 채워져 있어도 누적된 모든 계정을 선택할 수 있게).
+        // 사용자가 직접 타이핑(input)할 때만 부분일치로 좁힌다.
+        function _filtered(bShowAll) {
+            const aAll = fnItems() || [];
+            const sQ = (oInput.value || "").toLowerCase();
+            if (bShowAll || !sQ) { return aAll.slice(); }
+            const a = aAll.filter((s) => String(s).toLowerCase().includes(sQ));
+            // 입력값과 정확히 일치하는 단일 후보만 남으면 더 보여줄 게 없으므로 닫는다.
+            if (a.length === 1 && String(a[0]).toLowerCase() === sQ) { return []; }
+            return a;
+        }
+
+        function _setActive(idx) {
+            if (!oList) { return; }
+            const aEl = oList.querySelectorAll(".u4a-combo__item");
+            aEl.forEach((el, i) => { el.dataset.active = (i === idx) ? "true" : "false"; });
+            iActive = idx;
+            if (aEl[idx]) { aEl[idx].scrollIntoView({ block: "nearest" }); }
+        }
+
+        function _position() {
+            const r = oInput.getBoundingClientRect();
+            oList.style.left = r.left + "px";
+            oList.style.top = (r.bottom + 2) + "px";
+            oList.style.minWidth = r.width + "px";
+        }
+
+        function _open(bShowAll) {
+            aMatch = _filtered(bShowAll);
+            if (!aMatch.length) { _close(); return; }
+
+            if (!oList) {
+                oList = _el("div", "u4a-combo__list");
+                oList.setAttribute("role", "listbox");
+                (oInput.closest("dialog") || document.body).appendChild(oList);
+                setTimeout(() => document.addEventListener("mousedown", _onOutside), 0);
+            }
+
+            oList.innerHTML = "";
+            aMatch.forEach((s, idx) => {
+                const oItem = _el("div", "u4a-combo__item");
+                oItem.setAttribute("role", "option");
+                oItem.appendChild(_el("span", null, String(s)));
+                oItem.addEventListener("mousedown", (ev) => { ev.preventDefault(); _select(idx); });
+                oItem.addEventListener("mousemove", () => _setActive(idx));
+                oList.appendChild(oItem);
+            });
+            iActive = -1;
+            _position();
+            oInput.setAttribute("aria-expanded", "true");
+        }
+
+        function _close() {
+            if (!oList) { return; }
+            oList.remove();
+            oList = null;
+            iActive = -1;
+            oInput.setAttribute("aria-expanded", "false");
+            document.removeEventListener("mousedown", _onOutside);
+        }
+
+        function _select(idx) {
+            const s = aMatch[idx];
+            if (s == null) { return; }
+            oInput.value = String(s);
+            if (typeof fnPick === "function") { fnPick(oInput.value); }
+            _close();
+            oInput.focus();
+        }
+
+        oInput.addEventListener("input", () => _open(false));     // 타이핑 → 부분일치 필터
+        oInput.addEventListener("focus", () => _open(true));       // 포커스 → 전체 이력
+        oInput.addEventListener("keydown", (ev) => {
+            switch (ev.key) {
+                case "ArrowDown":
+                    ev.preventDefault();
+                    if (!oList) { _open(true); } else { _setActive(Math.min(iActive + 1, aMatch.length - 1)); }
+                    break;
+                case "ArrowUp":
+                    if (oList) { ev.preventDefault(); _setActive(Math.max(iActive - 1, 0)); }
+                    break;
+                case "Enter":
+                    // 후보가 활성화된 상태의 Enter 는 선택으로 소비 → Enter-로그인 핸들러 차단
+                    if (oList && iActive >= 0) { ev.preventDefault(); ev.stopImmediatePropagation(); _select(iActive); }
+                    break;
+                case "Escape":
+                    if (oList) { ev.stopPropagation(); _close(); }
+                    break;
+                case "Tab":
+                    _close();
+                    break;
+            }
+        });
+        // 포커스 아웃 시 닫기(클릭 선택의 mousedown 이 먼저 처리되도록 약간 지연)
+        oInput.addEventListener("blur", () => setTimeout(_close, 120));
+
+        return { close: _close };
     }
 
     /************************************************************************

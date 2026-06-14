@@ -17,81 +17,14 @@ export async function getView() {
         autoFocus: false,
     });
 
+    /**
+     * 헤더 미사용 — 로그인 화면(Login.js)이 자체 HTML5 타이틀바(u4a-titlebar)로
+     * 로고/타이틀/min·max·close 및 maximize 아이콘 동기화를 모두 처리한다.
+     * 과거 UI5 CUSTOMHEADER1 과 중복되어 타이틀바가 두 개로 보이던 문제 제거.
+     */
     let ROOT_PAGE = new sap.m.Page({
-        showHeader: true
+        showHeader: false
     });
-
-    /**
-     * 헤더 부분 시작 ---------------------------------------------
-     */
-    let CUSTOMHEADER1 = new sap.m.Bar({
-        contentLeft: [
-            new sap.m.Image({
-                width: "25px",
-                src: parent.PATHINFO.WS_LOGO
-            }),
-
-        ]
-    });
-    CUSTOMHEADER1.addStyleClass("u4aWsBrowserDraggable");
-
-    let TITLE1 = new sap.m.Title({
-        text: ""
-    });
-
-    CUSTOMHEADER1.addContentLeft(TITLE1);
-
-    oContr.ui.WINDOW_TITLE = TITLE1;
-
-    ROOT_PAGE.setCustomHeader(CUSTOMHEADER1);
-
-    let BUTTON1 = new sap.m.Button({
-        icon: "sap-icon://less",
-        press: function () {
-
-            parent.CURRWIN.minimize();
-
-        }
-    });
-    CUSTOMHEADER1.addContentRight(BUTTON1);
-
-    oContr.ui.LESS_BTN = BUTTON1;
-
-    let BUTTON2 = new sap.m.Button("maxWinBtn", {
-        icon: "sap-icon://header",
-        press: function (oEvent) {
-
-            let bIsMax = parent.CURRWIN.isMaximized();
-
-            if (bIsMax) {
-                parent.CURRWIN.unmaximize();
-                return;
-            }
-
-            parent.CURRWIN.maximize();
-
-        }
-    });
-    CUSTOMHEADER1.addContentRight(BUTTON2);
-
-    oContr.ui.MAX_WIN_BTN = BUTTON2;
-
-    let BUTTON3 = new sap.m.Button("mainWinClose", {
-        icon: "sap-icon://decline",
-        press: function () {
-
-            oAPP.attr.isPressWindowClose = "X";
-            
-            parent.CURRWIN.close();
-
-        }
-    });
-    CUSTOMHEADER1.addContentRight(BUTTON3);
-    
-    /**
-     * 헤더 부분 끝 ---------------------------------------------
-     */
-
 
     oContr.ui.ROOT_PAGE = ROOT_PAGE;
 

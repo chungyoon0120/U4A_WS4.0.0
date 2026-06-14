@@ -41,27 +41,6 @@ export async function getControl() {
     oContr.oModel.setSizeLimit(Infinity);
 
 
-    /************************************************************************
-     * 현재 브라우저의 이벤트 핸들러
-     ************************************************************************/
-    function _attachCurrentWindowEvents() {
-
-        let oMaxWinBtn = oContr.ui.MAX_WIN_BTN;
-
-        parent.CURRWIN.on("maximize", () => {
-
-            oMaxWinBtn.setIcon("sap-icon://value-help");
-
-        });
-
-        parent.CURRWIN.on("unmaximize", () => {
-
-            oMaxWinBtn.setIcon("sap-icon://header");
-
-        });
-
-    } // end of _attachCurrentWindowEvents
-
     oContr.fn.setBusy = function (sBusy) {
         oAPP.fn.setBusy(sBusy);
     };
@@ -130,11 +109,8 @@ export async function getControl() {
      *************************************************************/
     oContr.onViewReady = async function (IF_DATA) {
 
-        // 브라우저 타이틀 변경
-        // parent.CURRWIN.setTitle("U4A Workspace - Login");
-
-        // 현재 브라우저의 이벤트 핸들러
-        _attachCurrentWindowEvents();
+        // 창 타이틀/컨트롤(min·max·close) 및 maximize 아이콘 동기화는
+        // 로그인 화면의 자체 HTML5 타이틀바(Login.js)에서 처리한다.
 
         // 이벤트 버스 등록하기
         _attachEventBus();
@@ -159,8 +135,6 @@ export async function getControl() {
         // 여기서 분기 처리..
         let oUserInfo = parent.getUserInfo();
         if (!oUserInfo) {
-
-            oContr.ui.WINDOW_TITLE.setText("U4A Workspace - Login");
 
             _loadLoginPage();
 

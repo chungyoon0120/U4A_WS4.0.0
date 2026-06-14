@@ -274,3 +274,22 @@
     width: 2.5rem;
     text-align: center;
 }
+
+/* ── 메시지 박스(공통 다이얼로그) 타입별 헤더 아이콘 색상 ─────────── */
+/* fnShowMessageBox 가 .u4a-dialog__header 에 data-type(C/S/E/W) 을 세팅한다.
+   설정 다이얼로그와 같은 .u4a-dialog 구조를 쓰되, 타입 의미색만 아이콘에 입힌다. */
+.u4a-dialog__header[data-type="E"] i {
+    color: var(--state-error);
+}
+
+.u4a-dialog__header[data-type="W"] i {
+    color: var(--state-warning);
+}
+
+.u4a-dialog__header[data-type="S"] i {
+    color: var(--state-success);
+}
+
+.u4a-dialog__header[data-type="C"] i {
+    color: var(--accent);
+}
