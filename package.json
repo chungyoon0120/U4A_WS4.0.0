@@ -63,7 +63,7 @@
       "package.json",
       "!www/**/_*.*",
       "!www/**/_*/**"
-    ],    
+    ],
     "asarUnpack": [
       "**/node_modules/@electron/remote/**/*"
     ],
