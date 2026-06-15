@@ -329,25 +329,9 @@
     align-items: center;
 }
 
-.u4a-ws10__searchfield .u4a-input {
-    padding-right: 2.25rem;
-}
-
-.u4a-ws10__searchbtn {
-    position: absolute;
-    right: 0.125rem;
-    width: 2rem;
-    height: 2rem;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--icon-muted);
-    cursor: pointer;
-}
-
-.u4a-ws10__searchbtn:hover {
-    color: var(--accent);
-}
+/* 입력 우측 패딩(아이콘 겹침 방지)·트레일링 아이콘(X/Search)은 공통 컴포넌트
+   (.u4a-field, shell.css)가 처리한다 — .u4a-field__clear / .u4a-field__vh.
+   (doc 15 공통 입력 UX 가이드) */
 
 /* ── Row 5 : 콘텐츠(히어로 배경) 영역 (ws10_contPage) ──────────────── */
 .u4a-ws10__content {

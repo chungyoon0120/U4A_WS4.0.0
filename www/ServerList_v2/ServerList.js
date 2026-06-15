@@ -218,6 +218,7 @@
         trash: _fa("trash"),
         accept: _fa("check"),
         decline: _fa("xmark"),
+        clear: _fa("xmark"),
         sortAsc: _fa("caret-up"),
         sortDesc: _fa("caret-down"),
         // 메시지 박스 타입별 아이콘 (Confirm/Success/Error/Warning)
@@ -1809,7 +1810,7 @@
         oInpHost.type = "text";
         oInpHost.value = oSaveData.host || "";
         const oHostMsg = _el("div", "u4a-field__msg");
-        oRowH.append(oInpHost, oHostMsg);
+        oRowH.append(_wrapClear(oInpHost), oHostMsg);
         oForm.appendChild(oRowH);
 
         // Port (number, maxlength 5)
@@ -1819,7 +1820,7 @@
         oInpPort.type = "number";
         oInpPort.maxLength = 5;
         oInpPort.value = oSaveData.port || "";
-        oRowPort.appendChild(oInpPort);
+        oRowPort.appendChild(_wrapClear(oInpPort));
         oForm.appendChild(oRowPort);
 
         // 편집 컨텍스트 보관
@@ -2556,6 +2557,28 @@
         if (sClass) { o.className = sClass; }
         if (typeof sText !== "undefined") { o.textContent = sText; }
         return o;
+    }
+
+    /**
+     * 입력을 .u4a-field 래퍼로 감싸고 "값이 있을 때만" 보이는 X(clear) 버튼을 단다.
+     * (UI5 Input showClearIcon 대체 — Login 화면과 동일한 공통 컴포넌트/동작 사용)
+     * @param {HTMLInputElement} oInput 대상 입력 (u4a-input)
+     * @returns {HTMLElement} .u4a-field 래퍼 (행에 append 하여 사용)
+     */
+    function _wrapClear(oInput) {
+        oInput.classList.add("u4a-field__input");
+        const oWrap = _el("div", "u4a-field");
+        oWrap.dataset.trail = "1";
+        const oClear = _el("button", "u4a-field__clear");
+        oClear.type = "button";
+        oClear.title = "Clear";
+        oClear.setAttribute("aria-label", "Clear");
+        oClear.tabIndex = -1;
+        oClear.innerHTML = ICON.clear;
+        oWrap.append(oInput, oClear);
+        // 값 있을 때만 노출 + 클릭 시 비우고 input 이벤트 발화 (data-filled 토글)
+        window.U4AUI.attachClear(oInput, oClear);
+        return oWrap;
     }
 
     function _winBtn(sIcon, sTitle, fnClick) {

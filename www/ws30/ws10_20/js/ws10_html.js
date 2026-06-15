@@ -94,7 +94,7 @@
         disconnected: _fa("plug-circle-xmark"), connected: _fa("plug-circle-check"),
         eye: _fa("eye"), eyeSlash: _fa("eye-slash"), pin: _fa("thumbtack"),
         zoom: _fa("magnifying-glass-plus"), search: _fa("magnifying-glass"), power: _fa("power-off"),
-        caret: _fa("chevron-down")
+        caret: _fa("chevron-down"), clear: _fa("xmark")
     };
 
     /********************************************************************
@@ -691,13 +691,16 @@
         oLabel.setAttribute("for", "AppNmInput");
         oLabel.textContent = _txt("A33");
 
+        // 공통 입력 컴포넌트(.u4a-field) 소비 — clear(X)는 값 있을 때만, 맨 우측은 Search 헬프.
+        // (doc 15 공통 입력 UX 가이드)  trail=2 : [X][검색]
         var oField = document.createElement("div");
-        oField.className = "u4a-ws10__searchfield";
+        oField.className = "u4a-ws10__searchfield u4a-field";
+        oField.dataset.trail = "2";
 
         var oInput = document.createElement("input");
-        oInput.className = "u4a-input";
+        oInput.className = "u4a-input u4a-field__input";
         oInput.id = "AppNmInput";
-        oInput.type = "search";
+        oInput.type = "text";
         oInput.autocomplete = "off";
         oInput.setAttribute("role", "combobox");
         oInput.placeholder = "Search";
@@ -711,17 +714,33 @@
         });
         oInput.addEventListener("dblclick", function () { oInput.select(); });
 
+        // 값 있을 때만 보이는 clear(X) — 공통 컴포넌트 (U4AUI.attachClear 가 노출/비우기 처리)
+        var oClearBtn = document.createElement("button");
+        oClearBtn.className = "u4a-field__clear";
+        oClearBtn.type = "button";
+        oClearBtn.title = "Clear";
+        oClearBtn.setAttribute("aria-label", "Clear");
+        oClearBtn.tabIndex = -1;
+        oClearBtn.innerHTML = ICON.clear;
+
+        // 맨 우측 : Search Help (F4) — 공통 트레일링 슬롯(.u4a-field__vh)
         var oSearchBtn = document.createElement("button");
-        oSearchBtn.className = "u4a-ws10__searchbtn";
+        oSearchBtn.className = "u4a-field__vh";
         oSearchBtn.type = "button";
         oSearchBtn.title = "Search Help (F4)";
         oSearchBtn.innerHTML = ICON.search;
         oSearchBtn.addEventListener("click", function () { _invoke("ev_AppValueHelp", "App Search Help (F4)"); });
 
         oField.appendChild(oInput);
+        oField.appendChild(oClearBtn);
         oField.appendChild(oSearchBtn);
         o.appendChild(oLabel);
         o.appendChild(oField);
+
+        // clear(X) 동작 연결 — 비운 뒤 모델(APPID)도 동기화
+        if (window.U4AUI && window.U4AUI.attachClear) {
+            window.U4AUI.attachClear(oInput, oClearBtn, function () { WS_STATE.WS10.APPID = ""; });
+        }
 
         if (window.U4AUI && window.U4AUI.attachSuggest) {
             // fnItems = 저장된 APPID 목록(매 포커스마다 P13N 에서 최신 로드 → 방금 연 앱도 노출)

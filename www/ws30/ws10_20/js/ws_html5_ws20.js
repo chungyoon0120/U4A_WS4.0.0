@@ -249,7 +249,7 @@
             { id: "activateBtn", fa: "bolt", text: "", tooltip: _msg("B73", "Activate") + " (Ctrl+F3)", ev: "ev_pressActivateBtn" },
             // Save (원본 saveBtn: icon save, A64 + Ctrl+S)
             { id: "saveBtn", fa: "floppy-disk", text: "", tooltip: _msg("A64", "Save") + " (Ctrl+S)", ev: "ev_pressSaveBtn" },
-            { sep: true },
+            { sep: true, sepId: "ws20ActionSep" },
             // MIME Repository (원본 mimeBtn: icon picture, text A10)
             { id: "mimeBtn", fa: "image", text: _msg("A10", "MIME Repository"), tooltip: _msg("A10", "MIME Repository") + " (Ctrl+Shift+F12)", ev: "ev_pressMimeBtn" },
             // Controller (Class Builder) (원본 controllerBtn: icon developer-settings, text A11)
@@ -335,6 +335,7 @@
             displayModeBtn:       !bVms && bChange,
             changeModeBtn:        !bVms && bDev && !bAdminBlock && !bChange,
             ws20DevSep:           bDev && !bAdminBlock,
+            ws20ActionSep:        true,   // 구조적 구분선 — 실제 노출은 _collapseToolbarSeparators 가 결정
             syntaxCheckBtn:       !bVms && bChange,
             activateBtn:          !bVms && bChange,
             saveBtn:              !bVms && bDev && bChange,
@@ -353,7 +354,46 @@
             if (el) { el.style.display = oVis[sId] ? "" : "none"; }
         });
 
+        // 버튼 가시성 확정 후 구분선 정리 — 모드별 버튼 숨김으로 생기는
+        // 선행/후행/중복(연속) 구분선을 접어 "구분선만 두 개" 같은 잔재를 없앤다.
+        _collapseToolbarSeparators();
+
     }; // end of oAPP.fn.fnUpdateWs20Toolbar
+
+    /************************************************************************
+     * 툴바 구분선 정리 — 현재 버튼 가시성을 기준으로 구조적 구분선을 접는다.
+     *   규칙(보이는 요소 기준):
+     *     · 선행 구분선(앞에 보이는 버튼이 없음) → 숨김
+     *     · 연속 구분선(직전 보이는 요소도 구분선) → 숨김
+     *     · 후행 구분선(뒤에 보이는 버튼이 없음) → 숨김
+     *   oVis 가 이미 숨긴 구분선(예: 비개발자 ws20DevSep)은 "없는 것"으로 취급한다.
+     *   fnUpdateWs20Toolbar 가 매번 oVis 로 구분선 기본 가시성을 리셋하므로 idempotent.
+     ************************************************************************/
+    function _collapseToolbarSeparators() {
+        var BAR = document.getElementById("ws20TxToolbar");
+        if (!BAR) { return; }
+        var aKids = Array.prototype.slice.call(BAR.children);
+        var bPrevVisibleIsSep = true; // 시작을 구분선으로 간주 → 선행 구분선 제거
+
+        aKids.forEach(function (el) {
+            var bSep = el.classList.contains("u4a-tx-sep");
+            if (el.style.display === "none") { return; } // 숨겨진 요소는 없는 셈
+            if (bSep) {
+                if (bPrevVisibleIsSep) { el.style.display = "none"; } // 선행/연속 → 제거
+                else { bPrevVisibleIsSep = true; }
+                return;
+            }
+            bPrevVisibleIsSep = false; // 보이는 버튼
+        });
+
+        // 후행 구분선 제거 — 뒤에서부터 첫 보이는 요소가 구분선이면 숨김(반복)
+        for (var i = aKids.length - 1; i >= 0; i--) {
+            var el2 = aKids[i];
+            if (el2.style.display === "none") { continue; }
+            if (el2.classList.contains("u4a-tx-sep")) { el2.style.display = "none"; continue; }
+            break;
+        }
+    }
 
     /************************************************************************
      * (A0) WS20 앱 헤더 줄 — 원본 화면 상단의 [← APPID Change Active ... 🔍 ⤓]
