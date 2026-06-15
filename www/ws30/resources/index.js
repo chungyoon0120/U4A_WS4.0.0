@@ -705,6 +705,10 @@ oAPP.views = window?.oAPP?.views || {};
             OBJTY: sPopupName,
             SYSID: process.USERINFO.SYSID,
             USERINFO: process.USERINFO,
+            // [흰색 플래시 방지] 새 창은 top-level 이라 parent.getThemeInfo() 폴백이 안 먹는다.
+            // index.html head 가 동기로 --boot-bg(BGCOL)+테마(THEME)를 깔도록 쿼리로 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
         };
 
         // URL에 QueryString 파라미터를 적용한다.
@@ -994,16 +998,15 @@ oAPP.views = window?.oAPP?.views || {};
      **********************************************************/
     oWS.utill.fn.setBusyDialog = function (sIsbusy, oOptions) {
 
-        if (!oWS.utill.attr.sap) {
-            return;
-        }
+        // [UI5 제거] 구: if(!attr.sap) return; → BusyDialog 가 sap 의존이라 HTML5 에선
+        //   아무것도 안 떴음. 이제 attr.oBusy(더미 busy = DOM 카드 컨트롤러)로 동작.
 
         oWS.utill.attr.isBusy = sIsbusy;
 
         var bIsBusy = (sIsbusy === "X" ? true : false);
 
-        // 실행 즉시 lock을 건다
-        if (bIsBusy) {
+        // 실행 즉시 lock을 건다 (UI5 있을 때만 — HTML5 는 setBusy 가 pointerEvents 차단)
+        if (bIsBusy && oWS.utill.attr.sap) {
             oWS.utill.attr.sap.ui.getCore().lock();
         }
 
@@ -1136,7 +1139,9 @@ oAPP.views = window?.oAPP?.views || {};
                 oBusyDlg.setTitle("");
                 oBusyDlg.setText("");
 
-                oWS.utill.attr.sap.ui.getCore().unlock();
+                if (oWS.utill.attr.sap) {
+                    oWS.utill.attr.sap.ui.getCore().unlock();
+                }
 
             }
 
@@ -1531,7 +1536,7 @@ function setDomBusy(bIsBusy) {
     }
 
     if (bIsBusy === "X") {
-        oBusyDom.style.display = "block";
+        oBusyDom.style.display = "flex"; // 카드 중앙정렬 (스크림 flex center)
         return;
     }
 

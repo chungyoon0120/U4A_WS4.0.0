@@ -101,11 +101,22 @@ a:hover {
 .u4a-titlebar {
     display: flex;
     align-items: center;
+    /* flex 컬럼에서 절대 grow/shrink 안 함 → 세로 압박에도 높이 고정 */
+    flex: 0 0 auto;
     height: 2.75rem;
+    box-sizing: border-box;
     padding: 0 0.25rem 0 0.75rem;
     background: var(--titlebar-bg);
     border-bottom: 0.0625rem solid var(--line);
+    /* 창 이동 = 네이티브 -webkit-app-region:drag (JS 로직 드래그는 근본 해결이 안 됨).
+       ★ 단, 같은 문서(또는 iframe) 안에 "영구 컴포지팅 레이어"를 만드는 CSS
+          (backdrop-filter/blur, mix-blend-mode, will-change + 무한 animation,
+           filter: blur/drop-shadow)가 있으면 창 리사이즈 시 부모 창의 app-region
+          드래그 영역이 죽는다. → 그런 CSS 를 이 문서에 두지 않는다.
+       ★ iframe 교체 직후의 stale 은 호스트가 _kickHostDragRegion(1px 리사이즈→원복)
+          으로 강제 재계산한다. (드래그 중 텍스트 선택 방지) */
     -webkit-app-region: drag;
+    user-select: none;
 }
 
 .u4a-titlebar__logo {
@@ -163,7 +174,10 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-height: 2.75rem;
+    /* flex 컬럼에서 절대 grow/shrink 안 함 → 높이 고정 */
+    flex: 0 0 auto;
+    height: 2.75rem;
+    box-sizing: border-box;
     padding: 0 0.75rem;
     background: var(--surface);
     border-bottom: 0.0625rem solid var(--line);
@@ -279,6 +293,92 @@ a:hover {
     font-size: 1.05rem;
 }
 
+/* ── 공통 트리 컴포넌트 (ServerList 좌측 트리 / WS20 디자인 트리 공용) ──
+   재귀 <ul.u4a-tree> > <li> > <div.u4a-tree__row>(toggle/icon/label).
+   상태: row[aria-expanded] 로 셰브론 회전, row[aria-selected] 로 선택 강조.
+   화면별 부가요소(체크박스·액션·행높이 등)는 각 화면 CSS 에서 확장. */
+.u4a-tree {
+    list-style: none;
+    margin: 0;
+    padding: 0.25rem 0;
+    height: 100%;
+    width: max-content;
+    min-width: 100%;
+    background: var(--surface);
+    color: var(--text);
+}
+
+.u4a-tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.u4a-tree__row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 2rem;
+    padding-right: 0.5rem;
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--text);
+}
+
+.u4a-tree__row:hover {
+    background: var(--hover-bg);
+}
+
+.u4a-tree__row[aria-selected="true"],
+.u4a-tree__row[aria-selected="true"]:hover {
+    background: var(--selected-bg);
+    color: var(--selected-text);
+    font-weight: 600;
+    box-shadow: inset 0.1875rem 0 0 0 var(--accent);
+}
+
+.u4a-tree__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    flex: 0 0 auto;
+    border: 0;
+    background: transparent;
+    color: var(--icon-muted);
+    cursor: pointer;
+}
+
+.u4a-tree__toggle i {
+    font-size: 0.7rem;
+    transition: transform var(--motion) linear;
+}
+
+/* 후손 선택자(공백) — 토글이 행 직속(ServerList)이든 래퍼 안(WS20 RowLeft)이든 모두 회전.
+   (자식 행은 li 의 별도 <ul> 에 있어 이 행 div 의 후손이 아니므로 과매칭 없음) */
+.u4a-tree__row[aria-expanded="true"] .u4a-tree__toggle i {
+    transform: rotate(90deg);
+}
+
+.u4a-tree__toggle--leaf {
+    visibility: hidden;
+}
+
+.u4a-tree__icon {
+    flex: 0 0 auto;
+    color: var(--icon-muted);
+    display: inline-flex;
+}
+
+.u4a-tree__icon i {
+    font-size: 0.9rem;
+}
+
+.u4a-tree__label {
+    white-space: nowrap;
+}
+
 /* ── 드롭다운 메뉴 / 팝오버 (체크리스트 C) ──────────────────────── */
 .u4a-menu {
     position: fixed;
@@ -330,6 +430,9 @@ a:hover {
     width: 100%;
     height: 100%;
     min-height: 0;
+    min-width: 0;
+    /* 내부 패널 폭 합이 넘쳐도 페이지로 전파되지 않게 클립 (헤더/세로공간 보호) */
+    overflow: hidden;
 }
 
 .u4a-splitter__pane {
@@ -564,6 +667,12 @@ a:hover {
     gap: 0.25rem;
 }
 
+/* [hidden] 행은 확실히 숨긴다 — display:flex 가 UA 의 [hidden]{display:none} 을
+   덮어쓰는 함정 방지(로그인 LANGUAGE 입력/콤보 토글이 이 속성에 의존). */
+.u4a-form__row[hidden] {
+    display: none;
+}
+
 .u4a-label {
     font-weight: 700;
     color: var(--text);
@@ -640,6 +749,70 @@ a:hover {
 .u4a-select {
     appearance: auto;
 }
+
+/* ── 입력 + 트레일링 아이콘 공통 컴포넌트 (단일 출처) ──────────────────
+   UI5 Input showClearIcon / showValueHelp / 비밀번호 토글 을 한 곳에서 정의.
+   모든 화면(Login/ServerList/WS20)이 이 클래스를 소비 → 모양/동작 통일.
+
+   마크업:
+     <div class="u4a-field" data-trail="1|2">              ← 래퍼(상대좌표)
+        <input class="u4a-input u4a-field__input">         ← 입력(우측 패딩 자동)
+        <button class="u4a-field__clear">×</button>        ← 값 있을 때만(data-filled)
+        <button class="u4a-field__vh|__pw">▾|👁</button>   ← value-help/비번토글(맨 우측)
+     </div>
+   - 아이콘은 input "안쪽" 우측에 absolute 로 겹친다(밖에 따로 X).
+   - clear 는 값이 있을 때만 노출 — U4AUI.attachClear 가 래퍼에 data-filled 토글.
+   - 화면별 크기 조정: --field-icon(아이콘 정사각 크기) / --field-edge(우측 여백). */
+.u4a-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.u4a-field__input { width: 100%; }
+/* 트레일링 슬롯 수만큼 입력 우측 패딩(아이콘·텍스트 겹침 방지, 항상 예약) */
+.u4a-field[data-trail="1"] .u4a-field__input {
+    padding-right: calc(var(--field-icon, 1.75rem) + var(--field-edge, 0.25rem));
+}
+.u4a-field[data-trail="2"] .u4a-field__input {
+    padding-right: calc(var(--field-icon, 1.75rem) * 2 + var(--field-edge, 0.25rem));
+}
+/* 트레일링 아이콘 버튼 공통 모양 */
+.u4a-field__clear,
+.u4a-field__vh,
+.u4a-field__pw {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--field-icon, 1.75rem);
+    height: var(--field-icon, 1.75rem);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--icon-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+    line-height: 1;
+}
+.u4a-field__clear:hover,
+.u4a-field__vh:hover,
+.u4a-field__pw:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+/* 맨 오른쪽 슬롯: value-help / 비밀번호 토글 */
+.u4a-field__vh,
+.u4a-field__pw { right: var(--field-edge, 0.25rem); }
+/* clear(X): 기본 맨 오른쪽 / 오른쪽에 다른 아이콘이 있으면(trail=2) 그 왼쪽 */
+.u4a-field__clear { right: var(--field-edge, 0.25rem); display: none; }
+.u4a-field[data-trail="2"] .u4a-field__clear {
+    right: calc(var(--field-edge, 0.25rem) + var(--field-icon, 1.75rem));
+}
+/* clear 는 값이 있을 때만 노출 (data-filled — attachClear 가 토글) */
+.u4a-field[data-filled="true"] .u4a-field__clear { display: inline-flex; }
 
 /* ── 커스텀 셀렉트 (네이티브 <select> 대체 — 체크리스트 A/C) ────── */
 .u4a-combo {

@@ -257,8 +257,8 @@
             oBrowserOptions = JSON.parse(JSON.stringify(oDefaultOption.browserWindow)),
             oWebPreferences = oBrowserOptions.webPreferences;
 
+        // [흰색 플래시 수정] 다크 배경 직후 흰색(#f7f7f7)으로 덮어쓰던 버그 제거.
         oBrowserOptions.backgroundColor = "#1c2228";
-        oBrowserOptions.backgroundColor = "#f7f7f7";
 
         // 브라우저 윈도우 기본 사이즈
         oBrowserOptions.x = mainWindowState.x;
@@ -478,6 +478,9 @@
 
         let oQueryParams = {
             OBJTY: sPopupName,
+            // [흰색 플래시 방지] 첫 페인트 전 동기 배경(--boot-bg)용 테마/배경색 전달
+            THEME: sTheme,
+            BGCOL: sBgColor,
         };
 
         // URL에 QueryString 파라미터를 적용한다.

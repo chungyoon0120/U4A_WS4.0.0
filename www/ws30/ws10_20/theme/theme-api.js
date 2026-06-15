@@ -15,6 +15,32 @@
     var DEFAULT_THEME = "horizon_white";
 
     /**
+     * 이 스크립트(theme-api.js)의 디렉터리. 활성 테마 CSS 를 자기 위치 기준
+     * (`./themes/{key}.css`)으로 동적 로드하기 위해 사용한다 → 화면(경로) 독립적.
+     */
+    var THEME_DIR = (function () {
+        try {
+            var s = document.currentScript && document.currentScript.src;
+            return s ? s.replace(/\/[^\/]*$/, "") : "";
+        } catch (e) { return ""; }
+    })();
+
+    /**
+     * 활성 테마 CSS 보장 로드 (없으면 <link> 주입).
+     * horizon_white 는 tokens.css(:root) 기본값이라 별도 CSS 불필요.
+     * → 화면은 5종을 모두 로드할 필요 없이 활성 테마 1종만 로드한다.
+     */
+    function _ensureThemeCss(sKey) {
+        if (!sKey || sKey === DEFAULT_THEME) { return; }
+        if (document.querySelector('link[data-theme-css="' + sKey + '"]')) { return; }
+        var l = document.createElement("link");
+        l.rel = "stylesheet";
+        l.href = (THEME_DIR ? THEME_DIR + "/" : "") + "themes/" + sKey + ".css";
+        l.dataset.themeCss = sKey;
+        document.head.appendChild(l);
+    }
+
+    /**
      * 테마 별칭 매핑 → 정식 data-theme 키.
      * 명명 규칙: {대표테마}_{색상의미} (예: horizon_white). 베이스 테마 확장 대비.
      *  - UI5 테마명(sap_horizon 등)
@@ -56,12 +82,18 @@
             return DEFAULT_THEME;
         },
 
-        /** applyTheme() 대체 */
+        /** applyTheme() 대체 — 활성 테마 CSS 보장 로드 후 data-theme 전환 */
         apply: function (name) {
             var t = this.normalize(name);
+            _ensureThemeCss(t);
             document.documentElement.dataset.theme = t;
             global.dispatchEvent(new CustomEvent("u4a-theme-changed", { detail: { name: t } }));
             return t;
+        },
+
+        /** 활성 테마 CSS 만 보장 로드 (data-theme 전환 없이) */
+        ensureCss: function (name) {
+            _ensureThemeCss(this.normalize(name));
         },
 
         /** 현재 적용된 테마 키 */

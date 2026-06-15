@@ -368,6 +368,14 @@
         } catch (e) {
             U4ATheme.apply("horizon_white");
         }
+        // [흰색 플래시] 첫 페인트용 동기 배경(--boot-bg, intro 가 BGCOL 로 전달)은 테마 CSS 가
+        //   로드된 지금 역할 종료. 다음 프레임에 제거하여, 이후 런타임 테마 변경(설정 실시간
+        //   미리보기)이 var(--app-bg) 로 배경까지 갱신되게 한다. (제거 전이라도 첫 페인트는 보호됨)
+        try {
+            requestAnimationFrame(function () {
+                document.documentElement.style.removeProperty("--boot-bg");
+            });
+        } catch (e) { }
         oAPP.fn.fnOnMainStart();
     };
 
@@ -900,6 +908,8 @@
         oCloseBtn.classList.add("u4a-winbtn--close");
 
         oTitlebar.append(oLogo, oTitle, oSpacer, oMinBtn, oMaxBtn, oCloseBtn);
+        // 창 이동은 .u4a-titlebar 의 네이티브 -webkit-app-region:drag(shell.css)로 처리
+        // (ServerList 는 최상위 문서라 iframe stale 문제 없음).
 
         // ── 서브헤더 (Logon Pad 타이틀 + 설정 메뉴) ──
         const oSubBar = _el("div", "u4a-bar");
@@ -1052,6 +1062,7 @@
 
         // 트리 라벨은 SAPUILandscape.xml 의 폴더명(사용자 데이터) — 현지화 대상 아님
         const oLabel = _el("span", "u4a-tree__label", oAttr.name || "");
+        oLabel.title = oAttr.name || "";   // 좁을 때 툴팁으로도 전체 이름 확인
 
         oRow.append(oToggle, oIcon, oLabel);
 
@@ -1293,13 +1304,14 @@
         oTable.id = SERVER_TBL_ID;
 
         // 헤더 (정렬 가능 컬럼: ISSAVE/name/systemid/host)
+        // width: fixed 레이아웃용 컬럼 폭. name 은 미지정 → 남은 폭을 차지.
         const aCols = [
-            { key: "ISSAVE", label: L("status"), sortable: true, cls: "u4a-c-status" },
+            { key: "ISSAVE", label: L("status"), sortable: true, cls: "u4a-c-status", width: "6rem" },
             { key: "name", label: L("serverName"), sortable: true, cls: "u4a-c-name" },
-            { key: "systemid", label: L("sid"), sortable: true, cls: "u4a-c-sid" },
-            { key: "host", label: L("host"), sortable: true, cls: "u4a-c-host" },
-            { key: "insno", label: L("sno"), sortable: false, align: "center", cls: "u4a-c-sno" },
-            { key: "__action", label: L("settingsCol"), sortable: false, align: "center", cls: "u4a-c-action" }
+            { key: "systemid", label: L("sid"), sortable: true, cls: "u4a-c-sid", width: "5rem" },
+            { key: "host", label: L("host"), sortable: true, cls: "u4a-c-host", width: "9rem" },
+            { key: "insno", label: L("sno"), sortable: false, align: "center", cls: "u4a-c-sno", width: "4rem" },
+            { key: "__action", label: L("settingsCol"), sortable: false, align: "center", cls: "u4a-c-action", width: "3.75rem" }
         ];
 
         const oThead = _el("thead");
@@ -1307,6 +1319,7 @@
         for (const oCol of aCols) {
             const oTh = _el("th", oCol.cls);
             oTh.appendChild(_el("span", null, oCol.label));
+            if (oCol.width) { oTh.style.width = oCol.width; }
             if (oCol.align === "center") { oTh.style.textAlign = "center"; }
             if (oCol.sortable) {
                 oTh.dataset.col = oCol.key;
@@ -1357,8 +1370,15 @@
                 const oTdSno = _el("td", "u4a-c-sno", oItem.insno || "");
                 oTdSno.style.textAlign = "center";
 
+                // 카드(타일) 뷰에서 라벨로 쓰일 컬럼명
+                oTdStatus.dataset.label = L("status");
+                oTdSid.dataset.label = L("sid");
+                oTdHost.dataset.label = L("host");
+                oTdSno.dataset.label = L("sno");
+
                 // Settings 버튼
                 const oTdAct = _el("td", "u4a-col-action u4a-c-action");
+                oTdAct.dataset.label = L("settingsCol");
                 const oActBtn = _el("button", "u4a-btn-icon");
                 oActBtn.innerHTML = ICON.settings;
                 oActBtn.title = L("settings");
@@ -1414,13 +1434,11 @@
         if (!iWidth) {
             return;
         }
-        let sKey = "lg";
-        if (iWidth < 400) { sKey = "xs"; }
-        else if (iWidth < 520) { sKey = "sm"; }
-        else if (iWidth < 680) { sKey = "md"; }
+        // 일정 폭(560px) 미만이면 컬럼을 숨기지 않고 카드(타일) 뷰로 전환.
+        const sView = (iWidth < 560) ? "card" : "table";
         // 값이 바뀔 때만 기록 (불필요한 레이아웃 무효화/루프 방지)
-        if (oWrap.dataset.w !== sKey) {
-            oWrap.dataset.w = sKey;
+        if (oWrap.dataset.view !== sView) {
+            oWrap.dataset.view = sView;
         }
     }
 
@@ -1441,7 +1459,8 @@
             _setTableWidthClass();
         });
     }
-    oAPP.fn.fnUpdateTableWidthClass = _scheduleTableWidthUpdate;
+    // 드래그/리사이즈는 동기로 즉시 갱신(관측 사이클 밖이라 루프 위험 없음)
+    oAPP.fn.fnUpdateTableWidthClass = _setTableWidthClass;
 
     function _observeTableWidth(oWrap) {
         oAPP.attr._tblWrap = oWrap;
@@ -1449,7 +1468,7 @@
         // 1) 즉시 1회 (observer 초기 콜백 타이밍에 의존하지 않음)
         _setTableWidthClass();
 
-        // 2) ResizeObserver (스플리터 드래그/내용 변화 등) — rAF 디바운스
+        // 2) ResizeObserver — 콜백 안 동기 변경 시 루프 경고 → rAF 디바운스만 여기 사용
         if (oAPP.attr._tblRO) {
             oAPP.attr._tblRO.disconnect();
         }
@@ -1458,10 +1477,13 @@
             oAPP.attr._tblRO.observe(oWrap);
         }
 
-        // 3) window resize (창 리사이즈 — 1회만 바인딩)
+        // 3) window resize (창 리사이즈 — 동기, 1회만 바인딩)
         if (!oAPP.attr._tblResizeBound) {
             oAPP.attr._tblResizeBound = true;
-            window.addEventListener("resize", function () { _scheduleTableWidthUpdate(); });
+            window.addEventListener("resize", function () {
+                _clampSplitterPane();   // restore 시 트리 패널이 창보다 넓어지는 것 방지
+                _setTableWidthClass();
+            });
         }
     }
 
@@ -2009,7 +2031,12 @@
             browserkey: BROWSERKEY,
             sessionKey: SESSKEY,
             OBJTY: "MAIN",
-            SYSID: oLoginInfo.SYSID
+            SYSID: oLoginInfo.SYSID,
+            // [테마 기반 부팅] 메인 프레임이 첫 페인트 전에 설정 테마를 적용하도록 테마명 전달.
+            // BGCOL: 테마 CSS(<link>)가 비동기 로드되는 찰나의 흰색을 막기 위해, 창이 이미 아는
+            //        테마 배경색을 동기 캔버스(--boot-bg)로 즉시 깔도록 함께 전달.
+            THEME: oThemeInfo.THEME || "",
+            BGCOL: oThemeInfo.BGCOL || ""
         };
         const sLoadUrl = WSUTIL.QueryString.build(PATHINFO.MAINFRAME, oQueryParams);
         oBrowserWindow.loadURL(sLoadUrl);
@@ -2643,132 +2670,8 @@
      * @returns {HTMLElement} `.value` getter/setter 를 가진 combo 엘리먼트
      */
     function _createSelect(aItems, sValue, fnChange) {
-
-        const oCombo = _el("div", "u4a-combo");
-        oCombo.tabIndex = 0;
-        oCombo.setAttribute("role", "combobox");
-        oCombo.setAttribute("aria-haspopup", "listbox");
-        oCombo.setAttribute("aria-expanded", "false");
-
-        const oText = _el("span", "u4a-combo__text");
-        const oArrow = _el("span", "u4a-combo__arrow");
-        oArrow.innerHTML = ICON.caret;
-        oCombo.append(oText, oArrow);
-
-        let sCurrent = sValue;
-        let oList = null;
-        let iActive = -1;
-
-        function _label(v) {
-            const o = aItems.find(i => i.value === v);
-            return o ? o.text : "";
-        }
-        oText.textContent = _label(sCurrent);
-
-        Object.defineProperty(oCombo, "value", {
-            get() { return sCurrent; },
-            set(v) { sCurrent = v; oText.textContent = _label(v); }
-        });
-
-        function _onOutside(ev) {
-            if (!oCombo.contains(ev.target) && (!oList || !oList.contains(ev.target))) {
-                _close();
-            }
-        }
-
-        function _setActive(idx) {
-            if (!oList) { return; }
-            const aEl = oList.querySelectorAll(".u4a-combo__item");
-            aEl.forEach((el, i) => { el.dataset.active = (i === idx) ? "true" : "false"; });
-            iActive = idx;
-            if (aEl[idx]) { aEl[idx].scrollIntoView({ block: "nearest" }); }
-        }
-
-        function _open() {
-            if (oList) { return; }
-            oList = _el("div", "u4a-combo__list");
-            oList.setAttribute("role", "listbox");
-
-            aItems.forEach((it, idx) => {
-                const oItem = _el("div", "u4a-combo__item");
-                oItem.setAttribute("role", "option");
-                if (it.value === sCurrent) {
-                    oItem.setAttribute("aria-selected", "true");
-                    iActive = idx;
-                }
-                const oLbl = _el("span", null, it.text);
-                const oChk = _el("span", "u4a-combo__check");
-                oChk.innerHTML = ICON.accept;
-                oItem.append(oLbl, oChk);
-                oItem.addEventListener("mousedown", (ev) => { ev.preventDefault(); _select(idx); });
-                oItem.addEventListener("mousemove", () => _setActive(idx));
-                oList.appendChild(oItem);
-            });
-
-            // 모달 <dialog> 내부면 top-layer 유지 위해 dialog 에 append
-            const oHost = oCombo.closest("dialog") || document.body;
-            oHost.appendChild(oList);
-
-            const r = oCombo.getBoundingClientRect();
-            oList.style.left = r.left + "px";
-            oList.style.top = (r.bottom + 2) + "px";
-            oList.style.minWidth = r.width + "px";
-
-            oCombo.dataset.open = "true";
-            oCombo.setAttribute("aria-expanded", "true");
-            _setActive(iActive < 0 ? 0 : iActive);
-
-            setTimeout(() => document.addEventListener("mousedown", _onOutside), 0);
-        }
-
-        function _close() {
-            if (!oList) { return; }
-            oList.remove();
-            oList = null;
-            oCombo.removeAttribute("data-open");
-            oCombo.setAttribute("aria-expanded", "false");
-            document.removeEventListener("mousedown", _onOutside);
-        }
-
-        function _select(idx) {
-            const it = aItems[idx];
-            if (!it) { return; }
-            const bChanged = it.value !== sCurrent;
-            sCurrent = it.value;
-            oText.textContent = it.text;
-            _close();
-            oCombo.focus();
-            if (bChanged && typeof fnChange === "function") {
-                fnChange(sCurrent);
-            }
-        }
-
-        oCombo.addEventListener("click", () => { if (oList) { _close(); } else { _open(); } });
-        oCombo.addEventListener("keydown", (ev) => {
-            switch (ev.key) {
-                case "ArrowDown":
-                    ev.preventDefault();
-                    if (!oList) { _open(); } else { _setActive(Math.min(iActive + 1, aItems.length - 1)); }
-                    break;
-                case "ArrowUp":
-                    ev.preventDefault();
-                    if (oList) { _setActive(Math.max(iActive - 1, 0)); }
-                    break;
-                case "Enter":
-                case " ":
-                    ev.preventDefault();
-                    if (oList) { _select(iActive); } else { _open(); }
-                    break;
-                case "Escape":
-                    if (oList) { ev.stopPropagation(); _close(); }
-                    break;
-                case "Tab":
-                    _close();
-                    break;
-            }
-        });
-
-        return oCombo;
+        // 공통 컴포넌트 라이브러리(U4AUI)에 위임 — 단일 표준 (theme/u4a-ui.js)
+        return window.U4AUI.createSelect(aItems, sValue, fnChange);
     }
 
     function _attachSplitterDrag(oBar, oLeftPane) {
@@ -2784,7 +2687,8 @@
             const oRect = oSplitter.getBoundingClientRect();
             let iWidth = ev.clientX - oRect.left;
             const iMin = 120;
-            const iMax = oRect.width - 200;
+            // 우측(서버리스트) 패널 min-width(14rem) + 바 + 스크롤바 여유 확보
+            const iMax = oRect.width - 248;
             iWidth = Math.max(iMin, Math.min(iMax, iWidth));
             oLeftPane.style.flex = `0 0 ${iWidth}px`;
             // 스플리터 드래그 시 테이블 반응형 즉시 갱신
@@ -2798,6 +2702,28 @@
                 document.body.style.cursor = "";
             }
         });
+    }
+
+    /**
+     * 창 리사이즈(특히 최대화→restore) 시, 드래그로 고정 px 가 된 트리 패널이
+     * 창보다 넓어 바·테이블이 화면 밖으로 밀리는 것을 방지한다.
+     * 현재 폭이 (전체 - 우측최소확보) 보다 넓을 때만 줄여 클램프한다.
+     */
+    function _clampSplitterPane() {
+        const oPane = document.getElementById("u4aWsTreePane");
+        if (!oPane || !oPane.parentElement) {
+            return;
+        }
+        const iTotal = oPane.parentElement.getBoundingClientRect().width;
+        if (!iTotal) {
+            return;
+        }
+        const iReserve = 248; // 스플리터 바 + 우측 테이블 최소폭(14rem) + 스크롤바 확보
+        const iMaxLeft = iTotal - iReserve;
+        const iCur = oPane.getBoundingClientRect().width;
+        if (iCur > iMaxLeft) {
+            oPane.style.flex = "0 0 " + Math.max(120, iMaxLeft) + "px";
+        }
     }
 
     function _positionMenu(oMenu, oAnchor) {

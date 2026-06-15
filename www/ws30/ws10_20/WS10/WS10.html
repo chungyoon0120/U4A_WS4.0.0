@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>U4A Workspace - Main</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- Font Awesome 7.2.0 (아이콘) -->
+    <link rel="stylesheet" href="../../../lib/fontawesome/7.2.0/css/all.min.css">
+
+    <!-- 테마 시스템 (doc 12 §6.1) : tokens(=white 기본) → shell → ws10.
+         WS10 도 단일 활성 테마만 쓰므로 5종을 전부 로드하지 않고,
+         활성 테마 1종만 아래 스크립트에서 동적 로드한다.
+         (horizon_white 는 tokens.css 의 :root 가 곧 기본값이라 별도 CSS 불필요) -->
+    <link rel="stylesheet" href="../theme/tokens.css">
+    <link rel="stylesheet" href="../theme/shell.css">
+
+    <!-- WS10 셸 크롬 + 히어로 배경 CSS (theme/tokens.css 의 var(--*)만 소비) -->
+    <link rel="stylesheet" href="css/ws10.css">
+
+    <script>
+        /************************************************************************
+         * Electron 자원 (원본 계약 유지) — WS10.js 가 parent.* 로 참조한다.
+         *   셸(메인프레임)에 통합되면 Login 과 동일하게 parent 가 제공된다.
+         *   독립 미리보기(브라우저 단독 실행) 시에는 parent.require 가 없으므로
+         *   여기서 가드만 해두고, WS10.js 가 부재 시 폴백 렌더한다.
+         ************************************************************************/
+        try {
+            if (parent && parent.require) {
+                var require = parent.require,
+                    REMOTE = require('@electron/remote'),
+                    PATH = REMOTE.require('path'),
+                    APP = REMOTE.app,
+                    APPPATH = APP.getAppPath(),
+                    PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")),
+                    WSERR = require(PATHINFO.WSTRYCATCH);
+                var zconsole = WSERR(window, document, console);
+            }
+        } catch (e) { /* 독립 미리보기 — Electron 부재. WS10.js 가 폴백 처리 */ }
+    </script>
+
+    <!-- 테마 API + 공통 UI 컴포넌트 라이브러리 (shell.css 의 짝) -->
+    <script src="../theme/theme-api.js"></script>
+    <script src="../theme/u4a-ui.js"></script>
+
+    <!-- 초기 테마 동기 적용 (첫 페인트 전 → 깜빡임 방지).
+         apply() 가 활성 테마 CSS 1종 동적 로드 + data-theme 전환을 함께 처리한다.
+         · 셸 통합 시 : parent.getThemeInfo().THEME 사용
+         · 독립 미리보기 : 첨부 시안과 동일한 다크 톤(horizon_dark)으로 폴백 -->
+    <script>
+        (function () {
+            try {
+                var sTheme = null;
+                if (parent && parent.getThemeInfo) {
+                    var oThemeInfo = parent.getThemeInfo();
+                    sTheme = oThemeInfo && oThemeInfo.THEME;
+                }
+                if (window.U4ATheme) {
+                    window.U4ATheme.apply(sTheme || "horizon_dark");
+                }
+            } catch (e) {
+                if (window.U4ATheme) { window.U4ATheme.apply("horizon_dark"); }
+            }
+        })();
+    </script>
+</head>
+
+<body>
+
+    <!-- 셸 컨텐츠 (WS10.js 가 동적 렌더) — 초기 hidden, 렌더 후 페이드인 -->
+    <div id="content" class="u4a-ws10 u4a-fade" style="display:none;"></div>
+
+    <!-- WS10 로직 (테마 API 는 head 에서 선로드) -->
+    <script src="WS10.js"></script>
+
+</body>
+
+</html>

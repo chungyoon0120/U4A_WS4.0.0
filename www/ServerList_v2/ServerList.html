@@ -11,20 +11,36 @@
       <!-- Font Awesome 7.2.0 (아이콘) -->
       <link rel="stylesheet" href="../lib/fontawesome/7.2.0/css/all.min.css">
 
-      <!-- 테마 시스템 (doc 12 §6.1) : tokens → themes → shell -->
+      <!-- 테마 시스템 (doc 12 §6.1) : tokens(=white 기본) → shell.
+           단일 고정 테마만 쓰므로 5종 전부 로드하지 않고 활성 테마 1종만
+           아래 스크립트에서 동적 로드한다. (horizon_white 는 :root 기본값) -->
       <link rel="stylesheet" href="../ws30/ws10_20/theme/tokens.css">
-      <link rel="stylesheet" href="../ws30/ws10_20/theme/themes/horizon_white.css">
-      <link rel="stylesheet" href="../ws30/ws10_20/theme/themes/horizon_dark.css">
-      <link rel="stylesheet" href="../ws30/ws10_20/theme/themes/horizon_purple.css">
-      <link rel="stylesheet" href="../ws30/ws10_20/theme/themes/horizon_red.css">
-      <link rel="stylesheet" href="../ws30/ws10_20/theme/themes/horizon_green.css">
       <link rel="stylesheet" href="../ws30/ws10_20/theme/shell.css">
 
       <!-- 서버 리스트 컴포넌트 CSS -->
       <link rel="stylesheet" href="./css/serverlist.css">
 
-      <!-- 테마 API + 초기 테마 동기 적용 (첫 페인트 전에 적용 → 흰색 깜빡임 방지) -->
+      <!-- [흰색 플래시 방지 — 동기] 인트로(intro.js)가 넘긴 테마 배경색(BGCOL)을
+           첫 페인트 전에 인라인 변수(--boot-bg)로 깔아, 비동기 테마 CSS(<link>) 로드 전
+           --app-bg 가 :root 화이트로 떨어져 생기는 깜빡임을 막는다. (index.html 과 동일 패턴) -->
+      <style>
+            html, body { margin: 0; height: 100%; background: var(--boot-bg, var(--app-bg)); }
+            #content { background: var(--boot-bg, var(--app-bg)); }
+      </style>
+      <script>
+            (function () {
+                  try {
+                        var bg = new URLSearchParams(location.search).get("BGCOL");
+                        if (bg) { document.documentElement.style.setProperty("--boot-bg", bg); }
+                  } catch (e) { /* 쿼리 없으면 아래 테마 스크립트/--app-bg 폴백 */ }
+            })();
+      </script>
+
+      <!-- 테마 API + 공통 UI 컴포넌트 라이브러리 (shell.css 의 짝) -->
       <script src="../ws30/ws10_20/theme/theme-api.js"></script>
+      <script src="../ws30/ws10_20/theme/u4a-ui.js"></script>
+
+      <!-- 초기 테마 동기 적용 + 활성 테마 1종 동적 로드 (첫 페인트 전 → 깜빡임 방지) -->
       <script>
             (function () {
                   try {
@@ -41,8 +57,9 @@
                         }
                         var oCfg = JSON.parse(sRaw);
                         var sTheme = oCfg.globalTheme || oCfg.defaultTheme;
+                        // apply() 가 활성 테마 CSS 1종 동적 로드 + data-theme 전환을 함께 처리
                         if (sTheme && window.U4ATheme) {
-                              document.documentElement.dataset.theme = window.U4ATheme.normalize(sTheme);
+                              window.U4ATheme.apply(sTheme);
                         }
                   } catch (e) { /* 실패 시 기본(:root) */ }
             })();

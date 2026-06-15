@@ -118,29 +118,8 @@
 
     /************************************************************************
      * 초기 화면 그리기
-     * ----------------------------------------------------------------------
-     * [UI5 제거 1단계] WS10 을 순수 HTML5 로 그린다.
-     *   · UI5 셸 트리(App/NavContainer/Page/Bar) 대신 ws10_html.js 의
-     *     oAPP.fn.fnRenderWs10Html() 이 #content 에 HTML5 WS10 화면을 그린다.
-     *   · 기존 UI5 렌더는 fnOnInitRendering_ui5() 로 보존(백업 _backup_ui5_*).
-     *   · WS20/WS30·페이지전환·로직 연결은 2단계에서 순차 진행.
      ************************************************************************/
     oAPP.fn.fnOnInitRendering = function () {
-
-        if (oAPP.fn.fnRenderWs10Html) {
-            oAPP.fn.fnRenderWs10Html(); // #[ws10_html.js]
-            return;
-        }
-
-        // 렌더러 미로드 시 폴백 — 기존 UI5 렌더
-        oAPP.fn.fnOnInitRendering_ui5();
-
-    }; // end of fnOnInitRendering (HTML5)
-
-    /************************************************************************
-     * [보존] 기존 UI5 초기 화면 그리기 (참조/롤백용)
-     ************************************************************************/
-    oAPP.fn.fnOnInitRendering_ui5 = function () {
 
         let oRootApp = new sap.m.App({
             autoFocus: false,

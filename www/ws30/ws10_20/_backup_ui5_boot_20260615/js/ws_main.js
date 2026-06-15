@@ -385,9 +385,8 @@
     oAPP.main.fnBeforeunload = function (isClearStorage) {
 
         // 1. UI 잠금 및 초기화 작업
-        // [UI5 제거] 구: sap.ui.getCore().lock() → HTML5 busy/lock 헬퍼.
-        //  (호스트에 UI5 없음 → bare `sap` ReferenceError 가 종료 시 Critical 다이얼로그 원인이었음)
-        oAPP.common.fnSetBusyLock("X");
+        sap.ui.getCore().lock();
+        parent.setBusy("X");
         oAPP.common.fnRemoveGlobalShortcut();
 
         // 2. 이벤트 리스너 해제
@@ -432,8 +431,8 @@
 
             // UI 잠금 해제 및 Busy 끄기
             // (창이 즉시 닫히지 않는 환경을 대비해 안전하게 수행)
-            // [UI5 제거] 구: sap.ui.getCore().unlock() → HTML5 busy/lock 헬퍼.
-            oAPP.common.fnSetBusyLock("");
+            sap.ui.getCore().unlock();
+            parent.setBusy("");
 
         });
 
@@ -1063,16 +1062,17 @@
      ************************************************************************/
     oAPP.main.fnWsStart = function () {
 
-        // [UI5 제거] 구: sap.ui.getCore().attachInit(async ...) 래퍼 → 즉시 실행 async IIFE.
-        (async function () {
+        sap.ui.getCore().attachInit(async function () {
 
-            // [UI5 제거] jQuery.sap.require(...) 제거 (UI5 없음).
+            jQuery.sap.require("sap.m.MessageBox");
+
+            jQuery.sap.require("sap.ui.core.format.DateFormat");
 
             // 마우스 휠 이벤트 적용하기 (줌 기능)
-            try { oAPP.fn.fnAttachMouseWheelEvent(); } catch (e) { console.warn("[HTML5] fnAttachMouseWheelEvent skip:", e && e.message); }
+            oAPP.fn.fnAttachMouseWheelEvent();
 
             // 화면 보호기 감지 이벤트
-            try { oAPP.fn.fnAttachPowerMonitorEvent(); } catch (e) { console.warn("[HTML5] fnAttachPowerMonitorEvent skip:", e && e.message); }
+            oAPP.fn.fnAttachPowerMonitorEvent();
 
             /**
              * [RND Tool] 현재 영역(Window/Iframe)에 소스 탐색 이벤트 주입
@@ -1081,40 +1081,45 @@
              * 1. 이벤트 타겟팅: 호출한 이 영역(Iframe 등) 내에서 발생하는 우클릭만 감시하기 위함.
              * 2. 객체 참조: 이 영역에 로드된 UI5 객체(sap)와 DOM을 정확히 뒤지기 위해 현재 스코프를 주입함.
              */
-            if (parent.DEV_SOURCE_FINDER && parent.DEV_SOURCE_FINDER.init) {
-                parent.DEV_SOURCE_FINDER.init(window);
-            }
+            parent.DEV_SOURCE_FINDER.init(window);
 
             // 공통 인스턴스 정의
-            try { oAPP.main.fnPredefineGlobalObject(); } catch (e) { console.warn("[HTML5] fnPredefineGlobalObject skip:", e && e.message); }
+            oAPP.main.fnPredefineGlobalObject();
 
             // 초기 모델 바인딩
-            try { oAPP.main.fnOnInitModelBinding(); } catch (e) { console.warn("[HTML5] fnOnInitModelBinding skip:", e && e.message); }
+            oAPP.main.fnOnInitModelBinding();
 
             // 초기 현재 화면 위치 정보 저장
-            try { parent.setCurrPage("WS10"); } catch (e) { }
+            parent.setCurrPage("WS10");
 
-            // [UI5 제거] parent.oWS.utill.attr.sap = sap; 제거 (sap 없음).
+            // oAPP.sap = sap;
 
-            // [UI5 제거] UI5 BusyDialog → 호환 더미 객체 (setBusy/setDomBusy 위임)
-            parent.oWS.utill.attr.oBusy = (oAPP.fn.fnCreateDummyBusy && oAPP.fn.fnCreateDummyBusy());
+            // 부모에 sap 인스턴스 전달
+            parent.oWS.utill.attr.sap = sap;
+
+            // 20250207
+            parent.oWS.utill.attr.oBusy = new BusyDialog();
 
             // AI 연결 관련 커스텀 이벤트 초기 설정
-            if (parent.UAI && parent.UAI.init) { parent.UAI.init(); }
+            parent.UAI.init();
 
             // // UAI 쪽에서 파라미터를 전달받기 위한 이벤트 생성
             // _attach_AI_Events();
 
             // 작업표시줄 메뉴 생성하기
-            try { _createTaskBarMenu(); } catch (e) { console.warn("[HTML5] _createTaskBarMenu skip:", e && e.message); }
+            _createTaskBarMenu();
 
             // 현재 브라우저의 이벤트 핸들러
-            try { _attachCurrentWindowEvents(); } catch (e) { console.warn("[HTML5] _attachCurrentWindowEvents skip:", e && e.message); }
+            _attachCurrentWindowEvents();
 
-            // [UI5 무력화] illustration/SAP/U4A 아이콘 등록은 UI5 전용 → sap 참조 시 크래시. 가드.
-            try { if (oAPP.fn.fnRegisterIllustrationPool) oAPP.fn.fnRegisterIllustrationPool(); } catch (e) { }
-            try { if (oAPP.fn.fnRegisterSAPIcons) oAPP.fn.fnRegisterSAPIcons(); } catch (e) { }
-            try { if (oAPP.fn.fnRegisterU4AIcons) oAPP.fn.fnRegisterU4AIcons(); } catch (e) { }
+            // Register illustration Message Pool
+            oAPP.fn.fnRegisterIllustrationPool();
+
+            // SAP Icon 등록 (TNT, Business)
+            oAPP.fn.fnRegisterSAPIcons();
+
+            // U4A Icon 추가하기
+            oAPP.fn.fnRegisterU4AIcons();
 
             // // 초기 현재 화면 위치 정보 저장
             // parent.setCurrPage("WS10");
@@ -1131,7 +1136,7 @@
             // oAPP.common.fnSetGlobalShortcut();
 
             // APP 전체 대상 공통 Shortcut 지정하기
-            try { oAPP.common.fnSetCommonShortcut(); } catch (e) { console.warn("[HTML5] fnSetCommonShortcut skip:", e && e.message); }
+            oAPP.common.fnSetCommonShortcut();
 
             // // 초기 모델 바인딩
             // oAPP.main.fnOnInitModelBinding();
@@ -1140,54 +1145,49 @@
             await oAPP.main.fnGetWsMsgModelData();
 
             // WS Global 메시지 글로벌 변수 설정
-            try { await oAPP.fn.fnWsGlobalMsgList(); } catch (e) { console.warn("[HTML5] fnWsGlobalMsgList skip:", e && e.message); }
+            await oAPP.fn.fnWsGlobalMsgList();
 
-            // 초기 화면 그리기 (HTML5: ws_fn_01.fnOnInitRendering → ws10_html.fnRenderWs10Html)
-            //   렌더가 실패해도 빈 화면이 되지 않도록 폴백으로 WS10 직접 렌더를 재시도한다.
-            try {
-                oAPP.fn.fnOnInitRendering();
-            } catch (e) {
-                console.error("[HTML5] fnOnInitRendering error:", e);
-                try { oAPP.fn.fnRenderWs10Html && oAPP.fn.fnRenderWs10Html(); } catch (e2) { console.error("[HTML5] fnRenderWs10Html error:", e2); }
-            }
+            // 초기 화면 그리기
+            oAPP.fn.fnOnInitRendering(); // #[ws_fn_01.js]
 
-            // 개인화 정보 설정 (HTML5: ws_html5_shell 스텁)
-            try { oAPP.fn.fnOnInitP13nSettings(); } catch (e) { console.warn("[HTML5] fnOnInitP13nSettings skip:", e && e.message); }
+            // 개인화 정보 설정
+            oAPP.fn.fnOnInitP13nSettings(); // #[ws_fn_01.js]
 
-            // 서버 세션 타임아웃 체크
-            try { oAPP.fn.fnServerSession(); } catch (e) { console.warn("[HTML5] fnServerSession skip:", e && e.message); }
+            // 서버 세션 타임아웃 체크            
+            oAPP.fn.fnServerSession(); // #[fnServerSession.js]
 
             // DOM 감지
-            try { oAPP.fn.fnSetMutationObserver(); } catch (e) { console.warn("[HTML5] fnSetMutationObserver skip:", e && e.message); }
+            oAPP.fn.fnSetMutationObserver(); // #[ws_fn_03.js]
 
             // 공통 IPCMAIN 이벤트 걸기
-            try { oAPP.fn.fnIpcMain_Attach_Event_Handler(); } catch (e) { console.warn("[HTML5] fnIpcMain_Attach skip:", e && e.message); }
+            oAPP.fn.fnIpcMain_Attach_Event_Handler(); // #[ws_fn_ipc.js]
 
             // 공통 BroadCast 이벤트 걸기
-            try { oAPP.fn.fnBroadCast_Attach_Event_Handler(); } catch (e) { console.warn("[HTML5] fnBroadCast_Attach skip:", e && e.message); }
+            oAPP.fn.fnBroadCast_Attach_Event_Handler(); // #[ws_fn_broad.js]
 
-            // [UI5 제거] 구: sap.ui.getCore().attachEvent(UIUpdated, ...) → 렌더 직후 1회 직접 실행.
-            await (async function _afterRender() {
+            // 자연스러운 로딩
+            sap.ui.getCore().attachEvent(sap.ui.core.Core.M_EVENTS.UIUpdated, async function () {
 
                 if (parent.oWS.utill.attr.UIUpdated) { return; }
 
-                // [UI5 제거] _applyWs10ContPageThemeClass / attachThemeChanged 는 UI5 테마 의존
-                //            → ws10_html.js 가 U4ATheme 로 처리. 여기선 생략.
+                // WS10번의 배경 이미지 페이지 영역에 테마별 css 적용
+                _applyWs10ContPageThemeClass();
+
+                // 테마 변경 이벤트
+                sap.ui.getCore().attachThemeChanged(_applyWs10ContPageThemeClass);
 
                 parent.oWS.utill.attr.UIUpdated = "X";
 
                 // WS 10번 화면 관련 AI 커스텀 이벤트 등록
-                try { if (parent.UAI && parent.UAI.setCustomEvent_WS_10) parent.UAI.setCustomEvent_WS_10(); } catch (e) { }
+                parent.UAI.setCustomEvent_WS_10();
 
                 // 시스템 공지사항이 있을 경우 화면에 출력
-                try {
-                    if (oAPP.common.checkWLOList("C", "UHAK901215") === true) {
-                        await oAPP.common.showSystemNotiMsg();
-                    }
-                } catch (e) { }
+                if (oAPP.common.checkWLOList("C", "UHAK901215") === true) {
+                    await oAPP.common.showSystemNotiMsg();
+                }
 
                 // 새창 띄우면서 IF_DATA에 파라미터가 존재할 경우
-                let oNewWin_IF_DATA = parent.getNewBrowserIF_DATA && parent.getNewBrowserIF_DATA();
+                let oNewWin_IF_DATA = parent.getNewBrowserIF_DATA();
                 if (oNewWin_IF_DATA) {
 
                     let ACTCD = oNewWin_IF_DATA.ACTCD;
@@ -1200,11 +1200,12 @@
                                 break;
                             }
 
-                            // [HTML5] AppNmInput = DOM input. displayBtn(WS20 진입)은 WS20 셸(S3) 전까지 보류.
-                            try {
-                                let oInp = oAPP.fn.fnGetWs10AppInputDom && oAPP.fn.fnGetWs10AppInputDom();
-                                if (oInp) { oInp.value = APPID; }
-                            } catch (e) { }
+                            sap.ui.getCore().byId("AppNmInput").setValue(APPID);
+                            sap.ui.getCore().byId("displayBtn").firePress();
+
+                            setTimeout(function () {
+                                sap.ui.getCore().byId("AppNmInput").setValue("");
+                            }, 0);
 
                             break;
 
@@ -1216,16 +1217,16 @@
                 window.requestAnimationFrame(function () {
 
                     // activate 이벤트 전파
-                    try {
-                        let IPC_HANDLER = new parent.CLIpcHandler();
-                        IPC_HANDLER.command("WS_MAIN_UI_UPDATED", {
-                            fromPage: parent.getCurrPage(),
-                            sessionKey: parent.getSessionKey(),
-                            browserKey: parent.getBrowserKey()
-                        });
-                        zconsole.log("IPC_HANDLER.command - WS_MAIN_UI_UPDATED!");
-                    } catch (e) { }
+                    let IPC_HANDLER = new parent.CLIpcHandler();
+                    IPC_HANDLER.command("WS_MAIN_UI_UPDATED", {
+                        fromPage: parent.getCurrPage(),
+                        sessionKey: parent.getSessionKey(),
+                        browserKey: parent.getBrowserKey()
+                    });
 
+                    zconsole.log("IPC_HANDLER.command - WS_MAIN_UI_UPDATED!");
+
+                    // $('#content').fadeIn(300, 'linear');
                     jQuery('#content').fadeIn({
                         duration: 300,
                         complete: function () {
@@ -1236,13 +1237,9 @@
 
                 });
 
-            })();
+            });
 
-        })().catch(function (e) {
-            console.error("[HTML5] fnWsStart error:", e);
-            parent.setBusy && parent.setBusy("");
-            parent.setDomBusy && parent.setDomBusy("");
-        }); // end of fnWsStart async
+        }); // end of attachInit
 
         /************************************************************************
          * 네트워크 연결 및 해제 시 발생되는 이벤트

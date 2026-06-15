@@ -89,6 +89,13 @@ module.exports.getTargetAfterRenderingUI = function(oTarget){
 		return;
 	}
 
+	//[UI5 제거 가드] 이 함수는 UI5(sap) onAfterRendering 조작 전용이라 sap 없으면 무의미.
+	//WS20 뒤로가기 등 메인 컨텍스트(sap 제거)에서 호출 시 "sap is not defined" throw 방지.
+	//(미선언 식별자는 옵셔널체이닝 sap?.도 ReferenceError 라 typeof 로 가드)
+	if(typeof sap === "undefined"){
+		return;
+	}
+
 	var _oTarget = oTarget;
 	
 	

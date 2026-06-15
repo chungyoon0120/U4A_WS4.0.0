@@ -103,7 +103,9 @@
     --link: var(--accent);
     --link-hover: var(--accent-strong);
     --icon: currentColor;
-    --icon-muted: var(--c-text-muted);
+    /* 아이콘색 = 본문색(--text). 회색(muted)은 disable 처럼 보인다는 피드백 →
+       활성 아이콘은 본문과 같은 또렷한 색으로. (실제 disabled 는 별도 --disabled-text 가 덮음) */
+    --icon-muted: var(--text);
 
     /* titlebar / desktop (체크리스트 H) */
     --titlebar-bg: var(--surface);

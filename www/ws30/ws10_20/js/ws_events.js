@@ -979,8 +979,14 @@
         var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "301");
         sMsg += " \n " + APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "302");
 
-        // 질문 팝업?
-        parent.showMessage(sap, 30, 'I', sMsg, lf_MsgCallback);
+        // 질문 팝업 — [UI5 제거] 구: parent.showMessage(sap, 30, 'I', ...) 는 sap.m.MessageBox
+        //  의존이라 HTML5 에서 ReferenceError. 셸의 테마 native 확인창으로 대체(YES/NO 동일 계약).
+        if (oAPP.common && typeof oAPP.common.fnConfirmBox === "function") {
+            oAPP.common.fnConfirmBox('I', sMsg, lf_MsgCallback);
+        } else {
+            // 폴백: 헬퍼 미로드 시 브라우저 confirm
+            lf_MsgCallback(window.confirm(sMsg) ? "YES" : "NO");
+        }
 
         function lf_MsgCallback(TYPE) {
 

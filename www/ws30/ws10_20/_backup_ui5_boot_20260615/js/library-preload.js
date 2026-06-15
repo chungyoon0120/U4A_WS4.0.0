@@ -80,6 +80,11 @@
         MIMETYPE: "script"
     },
     {
+        // WS10 HTML5 렌더러 (UI5 제거 1단계) — fnOnInitRendering 이 호출
+        URL: "./js/ws10_html.js",
+        MIMETYPE: "script"
+    },
+    {
         URL: "./js/ws_fn_02.js",
         MIMETYPE: "script"
     },
@@ -139,39 +144,6 @@
         URL: "./js/ws_main.js",
         MIMETYPE: "script"
     },
-    // [UI5 제거] 모델/공통 override 레이어 — 반드시 원본들 "뒤"에 로드(덮어쓰기).
-    {
-        URL: "./js/ws_html5_shell.js",
-        MIMETYPE: "script"
-    },
-    // [UI5 제거] WS10 HTML5 렌더러 — fnOnInitRendering 이 호출(fnRenderWs10Html).
-    {
-        URL: "./js/ws10_html.js",
-        MIMETYPE: "script"
-    },
-    // [UI5 제거] WS20 HTML5 — 반드시 shell/ws10_html "뒤"(가장 마지막) 순서대로 로드.
-    //   ws20(셸) → ws20_tree(트리) → ws20_data(데이터) → ws20_attr(속성) → ws20_prev(미리보기).
-    //   각 파일은 앞 파일이 정의한 함수를 super 로 감싸 override 하므로 순서가 중요.
-    {
-        URL: "./js/ws_html5_ws20.js",
-        MIMETYPE: "script"
-    },
-    {
-        URL: "./js/ws_html5_ws20_tree.js",
-        MIMETYPE: "script"
-    },
-    {
-        URL: "./js/ws_html5_ws20_data.js",
-        MIMETYPE: "script"
-    },
-    {
-        URL: "./js/ws_html5_ws20_attr.js",
-        MIMETYPE: "script"
-    },
-    {
-        URL: "./js/ws_html5_ws20_prev.js",
-        MIMETYPE: "script"
-    },
     ];
 
     oAPP.loadLibrary = function (scripts, index, fnCallback) {
@@ -191,14 +163,8 @@
                 // 2. 변환된 절대경로를 sourceURL에 적용
                 var sSourceURL = "\n//# sourceURL=" + absoluteURL;
 
-                // 3. 실행 — [UI5 제거] 한 스크립트가 eval 시점에 top-level 에서 sap 등을 참조해
-                //    throw 하더라도 이후 스크립트(ws_main/ws_html5_shell/ws10_html 등) 로드가
-                //    멈추지 않도록 개별 try/catch 로 격리한다(빈 화면 방지).
-                try {
-                    window["eval"].call(window, data + sSourceURL);
-                } catch (e) {
-                    console.error("[HTML5] preload eval error: " + oLoadFile.URL, e);
-                }
+                // 3. 실행 (기존 로직 동일)
+                window["eval"].call(window, data + sSourceURL);
 
                 // --- 재귀 로직 시작 ---
                 if (scripts.length - 1 <= index) {
@@ -244,17 +210,21 @@
      ************************************************************************/
     oAPP.fnWindowOnInitLoad = function () {
 
-        // [UI5 제거] 구: sap.ui.getCore().attachInit(...) 래퍼 → UI5 없으므로 즉시 실행.
+        sap.ui.getCore().attachInit(function () {
 
-        parent.CURRWIN.setOpacity(1.0);
+            parent.CURRWIN.setOpacity(1.0);
 
-        parent.CURRWIN.show();
+            parent.CURRWIN.show();
 
-        // 초기 JS Load (모든 WS 스크립트 eval 로드)
-        oAPP.loadLibrary(oAPP.aPreloadScripts, 0);
+            // 초기 JS Load
+            oAPP.loadLibrary(oAPP.aPreloadScripts, 0);
 
-        // WS 시작
-        oAPP.main.fnWsStart();
+            // WS 시작
+            oAPP.main.fnWsStart();
+
+
+
+        });
 
     }; // end of oAPP.fnWindowOnInitLoad
 

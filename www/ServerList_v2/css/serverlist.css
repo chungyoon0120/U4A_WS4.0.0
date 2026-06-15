@@ -16,6 +16,8 @@
 .u4a-page__body {
     flex: 1 1 auto;
     min-height: 0;
+    min-width: 0;
+    overflow: hidden;
 }
 
 #content {
@@ -32,97 +34,16 @@
     opacity: 1;
 }
 
-/* ── 좌측 워크스페이스 트리 (체크리스트 E) ─────────────────────── */
-.u4a-tree {
-    list-style: none;
-    margin: 0;
-    padding: 0.25rem 0;
-    height: 100%;
-    background: var(--surface);
-    color: var(--text);
-}
-
-.u4a-tree ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.u4a-tree__row {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    height: 2rem;
-    padding-right: 0.5rem;
-    cursor: pointer;
-    white-space: nowrap;
-    color: var(--text);
-}
-
-.u4a-tree__row:hover {
-    background: var(--hover-bg);
-}
-
-/* 선택 행 — 테이블과 동일 규칙(강한 배경 + 좌측 강조 바 + 굵게 + 강조색),
-   zebra/hover 위에서도 확실히 구분되도록 마지막에 정의 */
-.u4a-tree__row[aria-selected="true"],
-.u4a-tree__row[aria-selected="true"][data-odd="true"],
-.u4a-tree__row[aria-selected="true"]:hover,
-.u4a-tree__row[aria-selected="true"][data-odd="true"]:hover {
-    background: var(--selected-bg);
-    color: var(--selected-text);
-    font-weight: 600;
-    box-shadow: inset 0.1875rem 0 0 0 var(--accent);
-}
-
-/* expand/collapse 셰브론 (체크리스트 E) */
-.u4a-tree__toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.25rem;
-    height: 1.25rem;
-    flex: 0 0 auto;
-    border: 0;
-    background: transparent;
-    color: var(--icon-muted);
-    cursor: pointer;
-}
-
-.u4a-tree__toggle i {
-    font-size: 0.7rem;
-    transition: transform var(--motion) linear;
-}
-
-.u4a-tree__row[aria-expanded="true"] > .u4a-tree__toggle i {
-    transform: rotate(90deg);
-}
-
-.u4a-tree__toggle--leaf {
-    visibility: hidden;
-}
-
-.u4a-tree__icon {
-    flex: 0 0 auto;
-    color: var(--icon-muted);
-    display: inline-flex;
-}
-
-.u4a-tree__icon i {
-    font-size: 0.9rem;
-}
-
-.u4a-tree__label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+/* ── 좌측 워크스페이스 트리 (체크리스트 E) ─────────────────────────
+   [공통화] 트리 컴포넌트(.u4a-tree*)는 theme/shell.css 로 이관(ServerList/WS20 공용).
+   ServerList 는 shell.css 를 먼저 로드하므로 그대로 적용된다. */
 
 /* ── 우측 서버 테이블 (체크리스트 E) ───────────────────────────── */
 #u4aWsTablePane {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    min-width: 13rem;
+    min-width: 14rem;
 }
 
 #u4aWsTreePane {
@@ -135,19 +56,34 @@
     align-items: center;
     gap: 0.5rem;
     flex: 0 0 auto;
-    padding: 0.375rem 0.5rem;
+    /* 높이 고정 — 패널/창 리사이즈·뷰(table/card) 전환과 무관하게 항상 동일 */
+    height: 2.75rem;
+    box-sizing: border-box;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    padding: 0 0.5rem;
     background: var(--surface);
     border-bottom: 0.0625rem solid var(--line);
+}
+
+/* 툴바 버튼은 줄어들거나 줄바꿈되지 않음 (높이 변동 원천 차단) */
+.u4a-toolbar .u4a-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .u4a-table-wrap {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
+    /* 서버리스트는 가로 스크롤 금지 — 세로만 */
+    overflow-x: hidden;
+    overflow-y: auto;
     background: var(--surface);
 }
 
 .u4a-table {
+    /* fixed 레이아웃 → 컬럼이 패널 폭을 넘지 않고 셀 내용은 말줄임 */
+    table-layout: fixed;
     width: 100%;
     border-collapse: collapse;
     color: var(--text);
@@ -188,35 +124,124 @@
     padding: 0.5rem 0.75rem;
     border-bottom: 0.0625rem solid var(--line);
     white-space: nowrap;
-}
-
-/* ── 반응형: 서버명 말줄임 + 폭별 저우선 컬럼 숨김 (doc 02 §8 autoPopinMode) ──
-   Electron(Chromium) 컨테이너쿼리 미지원 → ResizeObserver 가 .u4a-table-wrap
-   에 data-w(lg/md/sm/xs) 를 세팅하고, 아래 규칙이 컬럼을 접는다. */
-.u4a-c-name {
-    max-width: min(28rem, 38vw);
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.u4a-table-wrap[data-w="md"] .u4a-c-sno {
+/* ── 반응형 (doc 02 §8) ────────────────────────────────────────────
+   Electron(Chromium) 컨테이너쿼리 미지원 → ResizeObserver 가 .u4a-table-wrap
+   에 data-view(table|card) 를 세팅. 넓으면 테이블, 좁으면(<560px) 카드(타일). */
+
+/* 테이블 뷰: 긴 서버명은 컬럼 폭 안에서 말줄임 (fixed 레이아웃이 폭 제어) */
+.u4a-c-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── 카드(타일) 뷰 — 좁을 때 각 행을 카드로 전환 (컬럼 숨김 대신) ───── */
+.u4a-table-wrap[data-view="card"] thead {
     display: none;
 }
 
-.u4a-table-wrap[data-w="sm"] .u4a-c-sno,
-.u4a-table-wrap[data-w="sm"] .u4a-c-host {
+.u4a-table-wrap[data-view="card"] table,
+.u4a-table-wrap[data-view="card"] tbody {
+    display: block;
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin: 0.5rem;
+    padding: 0.6rem 0.25rem;
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--elevation);
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr:hover {
+    background: var(--hover-bg);
+}
+
+.u4a-table-wrap[data-view="card"] tbody td {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.15rem 0.75rem;
+    border: 0;
+    padding: 0.25rem 0.75rem;
+    min-width: 0;
+    white-space: normal;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    /* 값(IP 등)이 길어도 카드 안에서 줄바꿈 — 가로 넘침/스크롤 방지 */
+    overflow-wrap: anywhere;
+    text-align: left;
+}
+
+/* 라벨(컬럼명): 값 왼쪽에 흐리게 */
+.u4a-table-wrap[data-view="card"] tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    margin-right: 0.5rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* 서버명 = 카드 타이틀 (맨 위, 라벨 없음) */
+.u4a-table-wrap[data-view="card"] tbody td.u4a-c-name {
+    order: -2;
+    justify-content: flex-start;
+    font-weight: 700;
+    font-size: 1rem;
+    padding-bottom: 0.35rem;
+}
+
+.u4a-table-wrap[data-view="card"] tbody td.u4a-c-name::before {
     display: none;
 }
 
-.u4a-table-wrap[data-w="xs"] .u4a-c-sno,
-.u4a-table-wrap[data-w="xs"] .u4a-c-host,
-.u4a-table-wrap[data-w="xs"] .u4a-c-sid {
+/* 상태 뱃지 = 타이틀 아래, 라벨 없음 */
+.u4a-table-wrap[data-view="card"] tbody td.u4a-c-status {
+    order: -1;
+    justify-content: flex-start;
+}
+
+.u4a-table-wrap[data-view="card"] tbody td.u4a-c-status::before {
     display: none;
 }
 
-.u4a-table-wrap[data-w="sm"] .u4a-c-name,
-.u4a-table-wrap[data-w="xs"] .u4a-c-name {
-    max-width: 55vw;
+/* 설정 버튼 = 카드 하단, 라벨+버튼 한 줄 유지 */
+.u4a-table-wrap[data-view="card"] tbody td.u4a-c-action {
+    order: 10;
+    flex-wrap: nowrap;
+}
+
+/* 선택 카드 = 강조 테두리 + 좌측 바 */
+.u4a-table-wrap[data-view="card"] tbody tr[aria-selected="true"] {
+    border-color: var(--accent);
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr[aria-selected="true"] > td:first-child {
+    box-shadow: none;
+}
+
+/* no-data 카드 */
+.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata {
+    display: block;
+    text-align: center;
+    box-shadow: none;
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata td {
+    justify-content: center;
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata td::before {
+    display: none;
 }
 
 /* row hover / 선택 / zebra (체크리스트 E) */

@@ -11,13 +11,11 @@
     <!-- Font Awesome 7.2.0 (아이콘) -->
     <link rel="stylesheet" href="../../../lib/fontawesome/7.2.0/css/all.min.css">
 
-    <!-- 테마 시스템 (doc 12 §6.1) : tokens → themes → shell -->
+    <!-- 테마 시스템 (doc 12 §6.1) : tokens(=white 기본) → shell → login.
+         로그인은 단일 고정 테마만 쓰므로 5종을 전부 로드하지 않고,
+         활성 테마 1종만 아래 스크립트에서 동적 로드한다.
+         (horizon_white 는 tokens.css 의 :root 가 곧 기본값이라 별도 CSS 불필요) -->
     <link rel="stylesheet" href="../theme/tokens.css">
-    <link rel="stylesheet" href="../theme/themes/horizon_white.css">
-    <link rel="stylesheet" href="../theme/themes/horizon_dark.css">
-    <link rel="stylesheet" href="../theme/themes/horizon_purple.css">
-    <link rel="stylesheet" href="../theme/themes/horizon_red.css">
-    <link rel="stylesheet" href="../theme/themes/horizon_green.css">
     <link rel="stylesheet" href="../theme/shell.css">
 
     <!-- 로그인 컴포넌트 CSS (theme/tokens.css 의 var(--*)만 소비) -->
@@ -39,15 +37,28 @@
         var zconsole = WSERR(window, document, console);
     </script>
 
-    <!-- 테마 API + 초기 테마 동기 적용 (첫 페인트 전 → 흰색 깜빡임 방지) -->
+    <!-- 테마 API + 공통 UI 컴포넌트 라이브러리 (shell.css 의 짝) -->
     <script src="../theme/theme-api.js"></script>
+    <script src="../theme/u4a-ui.js"></script>
+
+    <!-- 초기 테마 동기 적용 (첫 페인트 전 → 흰색 깜빡임 방지).
+         테마 CSS(<link>)는 비동기 로드라, 그 사이 --app-bg 가 화이트 기본으로 보인다.
+         vw_main 이 iframe src 쿼리로 넘긴 BGCOL 을 동기 --boot-bg 로 즉시 깔고(첫 페인트부터
+         테마 배경), 테마명으로 컴포넌트 테마를 적용한다(쿼리 없으면 parent.getThemeInfo 폴백). -->
+    <style>html, body { background: var(--boot-bg, var(--app-bg)); }</style>
     <script>
         (function () {
             try {
-                var oThemeInfo = parent.getThemeInfo && parent.getThemeInfo();
-                var sTheme = oThemeInfo && oThemeInfo.THEME;
+                var q = new URLSearchParams(location.search);
+                var sTheme = q.get("THEME");
+                var sBg = q.get("BGCOL");
+                if (!sTheme || !sBg) {
+                    var o = (parent.getThemeInfo && parent.getThemeInfo()) || null;
+                    if (o) { sTheme = sTheme || o.THEME; sBg = sBg || o.BGCOL; }
+                }
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
                 if (sTheme && window.U4ATheme) {
-                    document.documentElement.dataset.theme = window.U4ATheme.normalize(sTheme);
+                    window.U4ATheme.apply(sTheme);
                 }
             } catch (e) { /* 실패 시 기본(:root) */ }
         })();

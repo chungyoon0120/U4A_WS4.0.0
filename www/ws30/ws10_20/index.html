@@ -17,9 +17,53 @@
     <!-- ===== from Frame.html ===== -->
     <link rel="stylesheet" href="./css/frame.css">
 
+    <!-- ===== [UI5 제거 1단계] WS10 HTML5 테마/컴포넌트 (doc 12) ===== -->
+    <link rel="stylesheet" href="./theme/tokens.css">
+    <link rel="stylesheet" href="./theme/shell.css">
+    <link rel="stylesheet" href="./WS10/css/ws10.css">
+    <link rel="stylesheet" href="./WS10/css/ws20.css">
+
+    <!-- Font Awesome 7.2.0 (HTML5 아이콘) -->
+    <link rel="stylesheet" href="../../lib/fontawesome/7.2.0/css/all.min.css">
+
     <!-- ===== from Frame.html : scripts ===== -->
+    <!-- [UI5 제거] nodeIntegration 에서 jQuery UMD 가 module.exports 로 등록되어 전역(window.jQuery)이
+         비게 되므로, 로드 동안 module 을 잠시 숨겨 브라우저 전역 경로로 등록시킨다.
+         (구: UI5 부트스트랩이 전역 jQuery 를 제공했으나 제거됨) -->
+    <script>window.__m_bak = window.module; window.module = undefined;</script>
     <script src="../../js/jquery.min.js"></script>
-    
+    <script>window.module = window.__m_bak; delete window.__m_bak;</script>
+
+    <!-- 테마 API + 공통 UI 컴포넌트 (shell.css 의 짝) -->
+    <script src="./theme/theme-api.js"></script>
+    <script src="./theme/u4a-ui.js"></script>
+
+    <!-- [테마 기반] 첫 페인트 전에 "설정된 테마"를 적용 → var(--app-bg) 가 해당 테마 배경으로
+         해석되어 흰색 플래시 없이 사용자 테마 배경으로 시작한다.
+         테마명: 로그인 창이 넘긴 쿼리(THEME) 우선 → 없으면 메타 수신 후 getThemeInfo() 폴백
+         (메타가 늦게 오면 ws10_html.js 가 렌더 시 테마를 재적용한다). -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sTheme = q.get("THEME");
+                var sBg = q.get("BGCOL");
+                // [흰색 방지 — 동기] 테마 CSS(<link>)는 비동기 로드라 그 사이 --app-bg 가 화이트 기본으로
+                //   보인다. 창이 이미 아는 테마 배경색(BGCOL)을 동기 인라인 변수(--boot-bg)로 즉시 깔아
+                //   첫 페인트부터 테마 배경이 되게 한다(static <style> 가 var(--boot-bg) 소비).
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                if (!sTheme) {
+                    var o = (window.parent && parent.getThemeInfo) ? parent.getThemeInfo() : null;
+                    sTheme = o && o.THEME;
+                    if (!sBg && o && o.BGCOL) { document.documentElement.style.setProperty("--boot-bg", o.BGCOL); }
+                }
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+            } catch (e) { /* 메타 수신 후 ws10_html.js 가 테마 재적용 */ }
+        })();
+    </script>
+
     <!-- 공통 리소스 로드 -->
     <script src="../resources/index.js"></script>
 
@@ -28,14 +72,25 @@
             transition: top 0.35;
         }
 
+        /* [흰색 플래시 방지 — 테마 기반] 부팅 캔버스를 "설정된 테마"의 배경(var(--app-bg))으로 시작.
+           head 의 조기 테마 적용(아래 script)이 data-theme 을 설정 → --app-bg 가 해당 테마 배경으로
+           해석된다(라이트/다크/퍼플 등 사용자 테마 그대로). 하드코딩 색 없음.
+           (스타일 블록을 stylesheet 링크 "뒤"에 두어 shell.css 의 body 배경보다 우선) */
         html,
         body {
             overflow-y: hidden;
+            height: 100%;
+            margin: 0;
+            background: var(--boot-bg, var(--app-bg));
+        }
+
+        #content {
+            background: var(--boot-bg, var(--app-bg));
         }
     </style>
 </head>
 
-<body class="sapUiBody u4aWsMainBody">
+<body class="u4aWsMainBody">
 
     <!-- ===== from ws10_20.html ===== -->
     <div id="content" style="display: none;" class="u4aWsContent"></div>
@@ -46,18 +101,13 @@
     <!-- <iframe id="ws_frame" name="ws_frame" style="border:none;width:100%;height:100%;" allow="autoplay 'src';">
     </iframe> -->
 
-    <!-- Busy Indicator Start -->
-    <div id="u4aWsBusyIndicator" class="u4aWsBusyIndicator sapUiUserSelectable"
-        style="position: absolute; display: block; top: 0px; height: 100%; width: 100%; left: 0px;">
-        <div class="sapUiBusy" tabindex="0" role="progressbar" alt="" title="Please wait"></div>
-        <div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig sapUiLocalBusyIndicatorFade"
-            role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="Busy" alt="" tabindex="0"
-            title="Please wait">
-            <div class="sapUiLocalBusyIndicatorAnimation sapUiLocalBusyIndicatorAnimStandard">
-                <div></div>
-                <div></div>
-                <div></div>
-            </div>
+    <!-- Busy Indicator (resources/index.js 의 setBusy/setBusyDialog/setDomBusy 가 제어) — UI5 BusyDialog 대체
+         구 sap.m.BusyDialog 처럼 스크림 + 중앙 카드(스피너 + 제목 + 메시지). 메시지는 setBusy("X",{TITLE,DESC}). -->
+    <div id="u4aWsBusyIndicator" class="u4aWsBusyIndicator">
+        <div class="u4aWsBusyCard">
+            <div class="u4aWsSpinner"></div>
+            <div class="u4aWsBusyTitle" id="u4aWsBusyTitle"></div>
+            <div class="u4aWsBusyText" id="u4aWsBusyText"></div>
         </div>
     </div>
     <!-- Busy Indicator End -->

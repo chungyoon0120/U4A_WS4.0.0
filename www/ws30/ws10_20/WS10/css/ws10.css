@@ -1,0 +1,580 @@
+/************************************************************************
+ * U4A Workspace — WS10 (애플리케이션 검색 / 홈) 화면 CSS
+ * ----------------------------------------------------------------------
+ * doc 03 §5 + §11(B) 매핑 / doc 12 테마 전략 기반 SAP UI5 → 순수 HTML5.
+ *   · 셸 크롬(타이틀바·윈도우 메뉴바·공통 헤더·서브헤더·검색폼·푸터)은
+ *     theme/tokens.css 의 의미 토큰만 소비한다 (hex/하드코딩 0).
+ *   · 히어로 배경(.u4a-ws-root … )은 테마 무관 브랜드 비주얼이므로
+ *     원본 ws10_20.css 의 고정 톤을 그대로 유지한다(Login 일러스트와 동일 취급).
+ ************************************************************************/
+
+/* ── 루트 레이아웃 (sap.m.App + Page flex) ──────────────────────── */
+.u4a-ws10 {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--app-bg);
+    color: var(--text);
+}
+
+/* 렌더 후 페이드인 (Login 과 동일) */
+.u4a-fade {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.u4a-fade.u4a-fade--in {
+    opacity: 1;
+}
+
+/* ── Row 1 : 커스텀 타이틀바 (oRootPage.customHeader Bar 대체) ───── */
+.u4a-ws10__titlebar {
+    flex: 0 0 auto;
+}
+
+/* ── Row 2 : 윈도우 메뉴 툴바 (customHeader OverflowToolbar) ─────── */
+.u4a-ws10__menubar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    min-height: 2.5rem;
+    padding: 0 0.5rem 0 0.25rem;
+    background: var(--surface);
+    border-bottom: 0.0625rem solid var(--line);
+}
+
+/* 메뉴 카테고리 버튼 (Extras / Utilities / System / Help / Test) */
+.u4a-wmenu-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 2rem;
+    padding: 0 0.625rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.u4a-wmenu-btn:hover {
+    background: var(--hover-bg);
+}
+
+.u4a-wmenu-btn:active,
+.u4a-wmenu-btn[aria-expanded="true"] {
+    background: var(--active-bg);
+}
+
+.u4a-wmenu-btn[hidden] {
+    display: none;
+}
+
+/* ── 공통 헤더 영역 (오른쪽 끝, fnGetCommonHeaderButtons 대체) ───── */
+.u4a-ws10__common {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* AI 연결상태 버튼 (텍스트 + 아이콘) */
+.u4a-ai-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 1.875rem;
+    padding: 0 0.625rem;
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.u4a-ai-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+.u4a-ai-btn[data-state="on"] {
+    color: var(--state-success);
+    border-color: var(--state-success);
+}
+
+/* 테마 스와치 버튼 (현재 강조색 미리보기 + 테마 선택 트리거) */
+.u4a-theme-swatch {
+    width: 1.875rem;
+    height: 1.875rem;
+    padding: 0;
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    cursor: pointer;
+}
+
+.u4a-theme-swatch:hover {
+    filter: brightness(1.08);
+}
+
+/* T-CODE 입력 (헤더용 컴팩트 인풋) */
+.u4a-tcode {
+    width: clamp(7rem, 12vw, 12rem);
+    height: 1.875rem;
+    padding: 0 0.625rem;
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-style: italic;
+}
+
+.u4a-tcode::placeholder {
+    color: var(--placeholder);
+    font-style: italic;
+}
+
+.u4a-tcode:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 0.1875rem var(--selected-bg);
+}
+
+/* 전원(Logoff) 버튼 — 위험 강조 */
+.u4a-btn-icon.u4a-btn-power {
+    color: var(--error);
+}
+
+.u4a-btn-icon.u4a-btn-power:hover {
+    background: var(--close-hover-bg);
+    color: var(--close-hover-text);
+}
+
+/* ── Row 3 : 서브헤더 트랜잭션 툴바 (subHeader OverflowToolbar) ──── */
+.u4a-ws10__subheader {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    min-height: 2.75rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--surface);
+    border-bottom: 0.0625rem solid var(--line);
+}
+
+/* 트랜잭션 버튼 (텍스트 + 아이콘, 플랫) */
+.u4a-tx-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 2rem;
+    padding: 0 0.625rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.u4a-tx-btn:hover {
+    background: var(--hover-bg);
+}
+
+.u4a-tx-btn:active {
+    background: var(--active-bg);
+}
+
+.u4a-tx-btn i {
+    font-size: 0.95rem;
+    color: var(--icon-muted);
+}
+
+.u4a-tx-btn[hidden] {
+    display: none;
+}
+
+/* Delete (Reject) — 위험 강조 */
+.u4a-tx-btn--reject {
+    color: var(--error);
+}
+
+.u4a-tx-btn--reject i {
+    color: var(--error);
+}
+
+.u4a-tx-btn--reject:hover {
+    background: var(--state-error-bg);
+}
+
+/* 툴바 구분선 (sap.m.ToolbarSeparator) */
+.u4a-tx-sep {
+    flex: 0 0 auto;
+    width: 0.0625rem;
+    align-self: stretch;
+    margin: 0.375rem 0.25rem;
+    background: var(--divider);
+}
+
+.u4a-tx-sep[hidden] {
+    display: none;
+}
+
+/* ── 앱 실행 분할 메뉴 버튼 (sap.m.MenuButton Split 대체) ─────────── */
+.u4a-split {
+    display: inline-flex;
+    align-items: stretch;
+    height: 2rem;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.u4a-split:hover {
+    background: var(--hover-bg);
+}
+
+.u4a-split__main {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0 0.5rem 0 0.625rem;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.u4a-split__main i {
+    font-size: 0.95rem;
+    color: var(--icon-muted);
+}
+
+.u4a-split__arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    border: 0;
+    border-left: 0.0625rem solid var(--divider);
+    background: transparent;
+    color: var(--icon-muted);
+    cursor: pointer;
+}
+
+.u4a-split__arrow i {
+    font-size: 0.7rem;
+}
+
+.u4a-split__arrow:hover {
+    background: var(--active-bg);
+}
+
+/* ── 드롭다운 메뉴 / 서브메뉴 (sap.m.Menu 대체, shell .u4a-menu 확장) ─ */
+.u4a-menu__item {
+    position: relative;
+    justify-content: flex-start;
+}
+
+/* 서브메뉴 보유 항목의 우측 화살표 */
+.u4a-menu__item--has-sub::after {
+    content: "\f054"; /* fa chevron-right */
+    font-family: "Font Awesome 7 Free", "Font Awesome 6 Free";
+    font-weight: 900;
+    margin-left: auto;
+    padding-left: 1rem;
+    font-size: 0.7rem;
+    color: var(--icon-muted);
+}
+
+.u4a-menu__item-text {
+    flex: 1 1 auto;
+}
+
+/* ── Row 4 : Application name 검색 폼 (Form + SearchField 대체) ───── */
+.u4a-ws10__searchbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.875rem 1.25rem;
+    background: var(--surface);
+    border-bottom: 0.0625rem solid var(--line);
+}
+
+.u4a-ws10__searchlabel {
+    flex: 0 0 auto;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.u4a-ws10__searchfield {
+    position: relative;
+    flex: 1 1 auto;
+    max-width: 32rem;
+    display: flex;
+    align-items: center;
+}
+
+.u4a-ws10__searchfield .u4a-input {
+    padding-right: 2.25rem;
+}
+
+.u4a-ws10__searchbtn {
+    position: absolute;
+    right: 0.125rem;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--icon-muted);
+    cursor: pointer;
+}
+
+.u4a-ws10__searchbtn:hover {
+    color: var(--accent);
+}
+
+/* ── Row 5 : 콘텐츠(히어로 배경) 영역 (ws10_contPage) ──────────────── */
+.u4a-ws10__content {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── 플로팅 푸터 메시지 (floatingFooter OverflowToolbar) ──────────── */
+/* 플로팅 푸터 메시지 (구 sap.m floatingFooter:true) — 가장자리에서 띄운 라운드 카드.
+   숨김 = display:none (transform 슬라이드 미사용 → 프레임리스 타이틀바 보호). */
+.u4a-ws10__footer {
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    z-index: 40;
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.875rem;
+    background: var(--surface);
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--popover-shadow);
+}
+
+.u4a-ws10__footer[data-show="true"] {
+    display: flex;
+}
+
+.u4a-ws10__footer-icon i {
+    font-size: 1rem;
+}
+
+.u4a-ws10__footer[data-type="E"] .u4a-ws10__footer-icon {
+    color: var(--state-error);
+}
+
+.u4a-ws10__footer[data-type="S"] .u4a-ws10__footer-icon {
+    color: var(--state-success);
+}
+
+.u4a-ws10__footer[data-type="W"] .u4a-ws10__footer-icon {
+    color: var(--state-warning);
+}
+
+.u4a-ws10__footer[data-type="I"] .u4a-ws10__footer-icon {
+    color: var(--state-info);
+}
+
+.u4a-ws10__footer-text {
+    flex: 1 1 auto;
+    color: var(--text);
+}
+
+/*=======================================================================
+ * 히어로 배경 (브랜드 비주얼 — 테마 무관 고정 톤, 원본 ws10_20.css 이식)
+ * 첨부 시안과 동일: 다크 베이스 + 우측 곰 이미지 + 보라/블루 글로우 브리딩
+ *=====================================================================*/
+.u4a-ws-root {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    padding: 4.5vh 4.5vw;
+    font-family: 'Montserrat', 'Segoe UI', sans-serif;
+    overflow: hidden;
+    background: #0a0d14;
+}
+
+/* ── 이미지 래퍼 ── */
+.u4a-ws-bg-image {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 78%;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.u4a-ws-bg-image img {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+    object-position: right center;
+}
+
+/* ⚡ 글로우 브리딩 애니메이션 */
+.u4a-ws-anim-glow {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 78%;
+    pointer-events: none;
+    z-index: 3;
+    background:
+        radial-gradient(ellipse 20% 80% at 100% 50%, rgba(130, 70, 255, 0.55) 0%, transparent 100%),
+        radial-gradient(ellipse 80% 20% at 55% 0%, rgba(80, 130, 255, 0.45) 0%, transparent 100%),
+        radial-gradient(ellipse 80% 20% at 55% 100%, rgba(150, 60, 255, 0.40) 0%, transparent 100%),
+        radial-gradient(ellipse 50% 65% at 72% 48%, rgba(120, 80, 255, 0.30) 0%, rgba(60, 100, 255, 0.15) 50%, transparent 80%);
+    animation: breatheGlow 2.5s ease-in-out infinite;
+    will-change: opacity;
+}
+
+@keyframes breatheGlow {
+    0%, 100% { opacity: 0.25; }
+    50%      { opacity: 1.0; }
+}
+
+/* ── 페이드 오버레이 ── */
+.u4a-ws-bg-fade {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 85%;
+    pointer-events: none;
+    z-index: 7;
+    background: linear-gradient(to right,
+        #0a0d14 0%,
+        #0a0d14 10%,
+        rgba(10, 13, 20, 0.97) 16%,
+        rgba(10, 13, 20, 0.90) 22%,
+        rgba(10, 13, 20, 0.78) 28%,
+        rgba(10, 13, 20, 0.60) 35%,
+        rgba(10, 13, 20, 0.38) 43%,
+        rgba(10, 13, 20, 0.18) 52%,
+        rgba(10, 13, 20, 0.05) 61%,
+        transparent 70%);
+}
+
+/* ── 브랜드 텍스트 ── */
+.u4a-ws-brand-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+    z-index: 20;
+    position: relative;
+}
+
+.u4a-ws-brand-text {
+    color: #ffffff;
+    line-height: 1.1;
+    text-transform: uppercase;
+}
+
+.u4a-ws-brand-u4a {
+    font-size: 6.5rem;
+    font-weight: 900;
+    letter-spacing: -0.2rem;
+    background: linear-gradient(to bottom, #cc00ff 40%, #aaa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: fadeInBlur 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.u4a-ws-brand-desc {
+    font-size: 2.2rem;
+    font-weight: 300;
+    letter-spacing: 0.5rem;
+    margin-top: -0.5rem;
+    opacity: 0;
+    animation: fadeInUp 1s cubic-bezier(0.22, 1, 0.36, 1) 0.4s forwards;
+}
+
+/* ── 인증 뱃지 ── */
+.u4a-ws-cert-layer {
+    position: absolute;
+    left: 28%;
+    right: 4.5vw;
+    bottom: 4.5vh;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: flex-end;
+    gap: 1vw;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.u4a-ws-cert-layer img {
+    height: clamp(28px, 3.5vw, 85px);
+    width: auto;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+}
+
+@keyframes fadeInBlur {
+    0%   { opacity: 0; filter: blur(10px); transform: scale(0.95); }
+    100% { opacity: 1; filter: blur(0); transform: scale(1); }
+}
+
+@keyframes fadeInUp {
+    0%   { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 0.8; transform: translateY(0); }
+}
+
+/* ── 반응형 (doc 12 §4.3 브레이크포인트) ────────────────────────── */
+@media (max-width: 1024px) {
+    .u4a-ws-brand-u4a { font-size: 4.5rem; }
+    .u4a-ws-brand-desc { font-size: 1.5rem; }
+}
+
+@media (max-width: 768px) {
+    .u4a-ws-brand-u4a { font-size: 3.5rem; }
+    .u4a-ws-brand-desc { font-size: 1.2rem; }
+    .u4a-ws-cert-layer { bottom: 16px; right: 16px; left: 32%; gap: 8px; }
+    .u4a-ws-cert-layer img { height: clamp(22px, 3vw, 32px); }
+    .u4a-ws-bg-image, .u4a-ws-anim-glow { width: 88%; }
+
+    /* 좁은 폭 : 검색바 세로 적층, T-CODE 축소 */
+    .u4a-ws10__searchbar { flex-wrap: wrap; }
+    .u4a-tcode { width: 6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .u4a-ws-anim-glow,
+    .u4a-ws-brand-u4a,
+    .u4a-ws-brand-desc { animation: none; }
+}

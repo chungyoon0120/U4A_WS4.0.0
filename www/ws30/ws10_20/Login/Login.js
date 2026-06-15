@@ -116,14 +116,6 @@ var oAPP = (function () {
         clear: _fa("xmark")
     };
 
-    /** createElement 단축 헬퍼 (ServerList 와 동일 규칙) */
-    function _el(sTag, sClass, sText) {
-        const o = document.createElement(sTag);
-        if (sClass) { o.className = sClass; }
-        if (typeof sText !== "undefined") { o.textContent = sText; }
-        return o;
-    }
-
     // 화면에 생성된 커스텀 콤보 인스턴스 보관 (id → combo element)
     const oCombos = {};
 
@@ -330,6 +322,7 @@ var oAPP = (function () {
     oAPP.fn.fnApplyTheme = (oThemeInfo) => {
         try {
             if (oThemeInfo && oThemeInfo.THEME && window.U4ATheme) {
+                // apply() 가 활성 테마 CSS 보장 로드 + data-theme 전환을 함께 처리
                 window.U4ATheme.apply(oThemeInfo.THEME);
             }
             if (oThemeInfo && oThemeInfo.BGCOL) {
@@ -351,25 +344,15 @@ var oAPP = (function () {
 
         const sLogo = _toFileUrl(PATHINFO.WS_LOGO);
 
-        // ── 1) 커스텀 타이틀바 (sap.m.Bar customHeader 대체, draggable) ──
-        const oTitlebar = document.createElement("header");
-        oTitlebar.className = "u4a-titlebar";
-        oTitlebar.innerHTML =
-            `<img class="u4a-titlebar__logo" src="${sLogo}" alt="U4A">` +
-            `<span class="u4a-titlebar__title">U4A Workspace - Login</span>` +
-            `<span class="u4a-titlebar__spacer"></span>` +
-            `<button class="u4a-winbtn" data-action="min" title="Minimize">${ICON.min}</button>` +
-            `<button class="u4a-winbtn" id="maxWinBtn" data-action="max" title="Maximize">${ICON.max}</button>` +
-            `<button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close">${ICON.close}</button>`;
-
-        oTitlebar.querySelector('[data-action="min"]').addEventListener("click", () => CURRWIN.minimize());
-        oTitlebar.querySelector('[data-action="max"]').addEventListener("click", () => {
-            if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); }
-        });
-        oTitlebar.querySelector('[data-action="close"]').addEventListener("click", () => {
-            oAPP.attr.isPressWindowClose = "X";
-            CURRWIN.close();
-        });
+        // ── 1) 타이틀바는 그리지 않는다 — 호스트(vw_main)의 최상위 헤더 사용 ──
+        //   ★ 창 드래그 근본 해결: 로그인은 iframe 안에 있고, iframe 내부의
+        //     -webkit-app-region:drag 영역은 창 리사이즈를 반복하면 Chromium 이
+        //     hit-test 영역을 재계산하지 못해 드래그가 먹통된다(레이아웃/컴포지팅 차원,
+        //     JS 로직 드래그로도 근본 해결 안 됨). 따라서 로그인은 자체 타이틀바를
+        //     그리지 않고 "콘텐츠 전용"으로 두고, 창 크롬(로고/제목/min·max·close/드래그)은
+        //     최상위 문서 헤더(.u4aFrameHeader)가 담당한다. 호스트(control.js _loadLoginPage)
+        //     가 그 헤더를 표시하고 제목을 "U4A Workspace - Login" 으로 설정한다.
+        //     (참고: u4a-ws-40 커밋 7e7f98d "공통 헤더 단일화 + 창 드래그 근본 해결")
 
         // ── 2) 본문(중앙 정렬) + 로그인 카드 ──
         const oMain = document.createElement("main");
@@ -395,28 +378,28 @@ var oAPP = (function () {
 
         oForm.appendChild(_buildField({
             label: "CLIENT",
-            ctrl: `<div class="u4a-login__field">` +
-                `<input id="ws_client" class="u4a-input" type="number" inputmode="numeric" maxlength="3" autocomplete="off">` +
-                `<button type="button" class="u4a-login__clear" data-clear="ws_client" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+            ctrl: `<div class="u4a-login__field u4a-field" data-trail="1">` +
+                `<input id="ws_client" class="u4a-input u4a-field__input" type="number" inputmode="numeric" maxlength="3" autocomplete="off">` +
+                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_client" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
                 `</div>`,
             id: "ws_client"
         }));
 
         oForm.appendChild(_buildField({
             label: "ID",
-            ctrl: `<div class="u4a-login__field">` +
-                `<input id="ws_id" class="u4a-input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">` +
-                `<button type="button" class="u4a-login__clear" data-clear="ws_id" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+            ctrl: `<div class="u4a-login__field u4a-field" data-trail="1">` +
+                `<input id="ws_id" class="u4a-input u4a-field__input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">` +
+                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_id" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
                 `</div>`,
             id: "ws_id"
         }));
 
         oForm.appendChild(_buildField({
             label: "PASSWORD",
-            ctrl: `<div class="u4a-login__pw">` +
-                `<input id="ws_pw" class="u4a-input" type="password" autocomplete="off">` +
-                `<button type="button" class="u4a-login__clear" data-clear="ws_pw" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
-                `<button type="button" id="ws_pw_toggle" class="u4a-login__pw-toggle" title="Show / Hide" tabindex="-1">${ICON.eye}</button>` +
+            ctrl: `<div class="u4a-login__pw u4a-field" data-trail="2">` +
+                `<input id="ws_pw" class="u4a-input u4a-field__input" type="password" autocomplete="off">` +
+                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_pw" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+                `<button type="button" id="ws_pw_toggle" class="u4a-login__pw-toggle u4a-field__pw" title="Show / Hide" tabindex="-1">${ICON.eye}</button>` +
                 `</div>`,
             id: "ws_pw"
         }));
@@ -426,9 +409,9 @@ var oAPP = (function () {
             label: "LANGUAGE",
             rowId: "ws_langu_input_form",
             hidden: true,
-            ctrl: `<div class="u4a-login__field">` +
-                `<input id="ws_langu" class="u4a-input" type="text" maxlength="2" autocomplete="off">` +
-                `<button type="button" class="u4a-login__clear" data-clear="ws_langu" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+            ctrl: `<div class="u4a-login__field u4a-field" data-trail="1">` +
+                `<input id="ws_langu" class="u4a-input u4a-field__input" type="text" maxlength="2" autocomplete="off">` +
+                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_langu" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
                 `</div>`,
             id: "ws_langu"
         }));
@@ -451,7 +434,7 @@ var oAPP = (function () {
 
         // Remember
         const oRemRow = document.createElement("div");
-        oRemRow.className = "u4a-form__row";
+        oRemRow.className = "u4a-form__row u4a-login__remember";
         oRemRow.innerHTML =
             `<label class="u4a-label" for="ws_rem">Remember</label>` +
             `<label class="u4a-check"><input id="ws_rem" type="checkbox"><span></span></label>`;
@@ -486,7 +469,7 @@ var oAPP = (function () {
             `<span class="u4a-bar__spacer"></span>` +
             `<span id="ws_footer_sysid">SYSID: </span>`;
 
-        oContent.appendChild(oTitlebar);
+        // 타이틀바 없음(호스트 최상위 헤더 사용) → 본문 + 푸터만 마운트
         oContent.appendChild(oMain);
         oContent.appendChild(oFooter);
 
@@ -567,7 +550,7 @@ var oAPP = (function () {
 
         // ID 자동완성 — 네이티브 <datalist> 대체(테마 드롭다운). Enter 로그인 핸들러보다
         // 먼저 등록해, 목록이 열린 상태의 Enter 는 선택으로 소비(stopImmediatePropagation)한다.
-        _attachSuggest(oId, () => (oModel.getProperty("/LOGIN/IDSUGG") || []).map((o) => o.ID), (sVal) => _set("/LOGIN/ID", sVal));
+        window.U4AUI.attachSuggest(oId, () => (oModel.getProperty("/LOGIN/IDSUGG") || []).map((o) => o.ID), (sVal) => _set("/LOGIN/ID", sVal));
 
         // Enter → 로그인 (CLIENT/ID/PW/LANGU)
         [oClient, oId, oPw, oLangu].forEach((el) => {
@@ -667,7 +650,7 @@ var oAPP = (function () {
         const bHas = sSelected != null && sSelected !== "" && aOpt.some(o => o.value === sSelected);
         const sInit = bHas ? sSelected : (aOpt[0] ? aOpt[0].value : "");
 
-        const oCombo = _createSelect(aOpt, sInit, (sVal) => {
+        const oCombo = window.U4AUI.createSelect(aOpt, sInit, (sVal) => {
             oModel.setProperty(sModelPath, sVal);
         });
         oCombo.id = sComboId;
@@ -675,260 +658,6 @@ var oAPP = (function () {
         oHost.innerHTML = "";
         oHost.appendChild(oCombo);
         oCombos[sComboId] = oCombo;
-    }
-
-    /**
-     * 커스텀 셀렉트 (네이티브 <select> 대체 — 펼침 목록까지 테마 적용).
-     * ServerList 의 동명 함수와 동일 동작/마크업으로 UX 를 일치시킨다.
-     * @param {Array<{value:string,text:string}>} aItems
-     * @param {string} sValue 초기 값
-     * @param {Function} [fnChange] 값 변경 콜백(newValue)
-     * @returns {HTMLElement} `.value` getter/setter 를 가진 combo 엘리먼트
-     */
-    function _createSelect(aItems, sValue, fnChange) {
-
-        const oCombo = _el("div", "u4a-combo");
-        oCombo.tabIndex = 0;
-        oCombo.setAttribute("role", "combobox");
-        oCombo.setAttribute("aria-haspopup", "listbox");
-        oCombo.setAttribute("aria-expanded", "false");
-
-        const oText = _el("span", "u4a-combo__text");
-        const oArrow = _el("span", "u4a-combo__arrow");
-        oArrow.innerHTML = ICON.caret;
-        oCombo.append(oText, oArrow);
-
-        let sCurrent = sValue;
-        let oList = null;
-        let iActive = -1;
-
-        function _label(v) {
-            const o = aItems.find(i => i.value === v);
-            return o ? o.text : "";
-        }
-        oText.textContent = _label(sCurrent);
-
-        Object.defineProperty(oCombo, "value", {
-            get() { return sCurrent; },
-            set(v) { sCurrent = v; oText.textContent = _label(v); }
-        });
-
-        function _onOutside(ev) {
-            if (!oCombo.contains(ev.target) && (!oList || !oList.contains(ev.target))) {
-                _close();
-            }
-        }
-
-        function _setActive(idx) {
-            if (!oList) { return; }
-            const aEl = oList.querySelectorAll(".u4a-combo__item");
-            aEl.forEach((el, i) => { el.dataset.active = (i === idx) ? "true" : "false"; });
-            iActive = idx;
-            if (aEl[idx]) { aEl[idx].scrollIntoView({ block: "nearest" }); }
-        }
-
-        function _open() {
-            if (oList) { return; }
-            oList = _el("div", "u4a-combo__list");
-            oList.setAttribute("role", "listbox");
-
-            aItems.forEach((it, idx) => {
-                const oItem = _el("div", "u4a-combo__item");
-                oItem.setAttribute("role", "option");
-                if (it.value === sCurrent) {
-                    oItem.setAttribute("aria-selected", "true");
-                    iActive = idx;
-                }
-                const oLbl = _el("span", null, it.text);
-                const oChk = _el("span", "u4a-combo__check");
-                oChk.innerHTML = ICON.accept;
-                oItem.append(oLbl, oChk);
-                oItem.addEventListener("mousedown", (ev) => { ev.preventDefault(); _select(idx); });
-                oItem.addEventListener("mousemove", () => _setActive(idx));
-                oList.appendChild(oItem);
-            });
-
-            // 모달 <dialog> 내부면 top-layer 유지 위해 dialog 에 append
-            const oHost = oCombo.closest("dialog") || document.body;
-            oHost.appendChild(oList);
-
-            const r = oCombo.getBoundingClientRect();
-            oList.style.left = r.left + "px";
-            oList.style.top = (r.bottom + 2) + "px";
-            oList.style.minWidth = r.width + "px";
-
-            oCombo.dataset.open = "true";
-            oCombo.setAttribute("aria-expanded", "true");
-            _setActive(iActive < 0 ? 0 : iActive);
-
-            setTimeout(() => document.addEventListener("mousedown", _onOutside), 0);
-        }
-
-        function _close() {
-            if (!oList) { return; }
-            oList.remove();
-            oList = null;
-            oCombo.removeAttribute("data-open");
-            oCombo.setAttribute("aria-expanded", "false");
-            document.removeEventListener("mousedown", _onOutside);
-        }
-
-        function _select(idx) {
-            const it = aItems[idx];
-            if (!it) { return; }
-            const bChanged = it.value !== sCurrent;
-            sCurrent = it.value;
-            oText.textContent = it.text;
-            _close();
-            oCombo.focus();
-            if (bChanged && typeof fnChange === "function") {
-                fnChange(sCurrent);
-            }
-        }
-
-        oCombo.addEventListener("click", () => { if (oList) { _close(); } else { _open(); } });
-        oCombo.addEventListener("keydown", (ev) => {
-            switch (ev.key) {
-                case "ArrowDown":
-                    ev.preventDefault();
-                    if (!oList) { _open(); } else { _setActive(Math.min(iActive + 1, aItems.length - 1)); }
-                    break;
-                case "ArrowUp":
-                    ev.preventDefault();
-                    if (oList) { _setActive(Math.max(iActive - 1, 0)); }
-                    break;
-                case "Enter":
-                case " ":
-                    ev.preventDefault();
-                    if (oList) { _select(iActive); } else { _open(); }
-                    break;
-                case "Escape":
-                    if (oList) { ev.stopPropagation(); _close(); }
-                    break;
-                case "Tab":
-                    _close();
-                    break;
-            }
-        });
-
-        return oCombo;
-    }
-
-    /**
-     * 텍스트 입력에 커스텀 자동완성 드롭다운을 부착한다 (네이티브 <datalist> 대체).
-     * 펼침 목록은 콤보와 동일한 .u4a-combo__list/__item 테마를 재사용한다.
-     * @param {HTMLInputElement} oInput  대상 입력
-     * @param {Function} fnItems  현재 후보 문자열 배열을 반환하는 함수
-     * @param {Function} [fnPick] 항목 선택 시 콜백(value)
-     */
-    function _attachSuggest(oInput, fnItems, fnPick) {
-
-        let oList = null;
-        let iActive = -1;
-        let aMatch = [];
-
-        function _onOutside(ev) {
-            if (oInput !== ev.target && (!oList || !oList.contains(ev.target))) { _close(); }
-        }
-
-        // bShowAll: 포커스로 열 때는 입력값과 무관하게 전체 이력을 보여준다
-        // (Remember 로 ID 가 미리 채워져 있어도 누적된 모든 계정을 선택할 수 있게).
-        // 사용자가 직접 타이핑(input)할 때만 부분일치로 좁힌다.
-        function _filtered(bShowAll) {
-            const aAll = fnItems() || [];
-            const sQ = (oInput.value || "").toLowerCase();
-            if (bShowAll || !sQ) { return aAll.slice(); }
-            const a = aAll.filter((s) => String(s).toLowerCase().includes(sQ));
-            // 입력값과 정확히 일치하는 단일 후보만 남으면 더 보여줄 게 없으므로 닫는다.
-            if (a.length === 1 && String(a[0]).toLowerCase() === sQ) { return []; }
-            return a;
-        }
-
-        function _setActive(idx) {
-            if (!oList) { return; }
-            const aEl = oList.querySelectorAll(".u4a-combo__item");
-            aEl.forEach((el, i) => { el.dataset.active = (i === idx) ? "true" : "false"; });
-            iActive = idx;
-            if (aEl[idx]) { aEl[idx].scrollIntoView({ block: "nearest" }); }
-        }
-
-        function _position() {
-            const r = oInput.getBoundingClientRect();
-            oList.style.left = r.left + "px";
-            oList.style.top = (r.bottom + 2) + "px";
-            oList.style.minWidth = r.width + "px";
-        }
-
-        function _open(bShowAll) {
-            aMatch = _filtered(bShowAll);
-            if (!aMatch.length) { _close(); return; }
-
-            if (!oList) {
-                oList = _el("div", "u4a-combo__list");
-                oList.setAttribute("role", "listbox");
-                (oInput.closest("dialog") || document.body).appendChild(oList);
-                setTimeout(() => document.addEventListener("mousedown", _onOutside), 0);
-            }
-
-            oList.innerHTML = "";
-            aMatch.forEach((s, idx) => {
-                const oItem = _el("div", "u4a-combo__item");
-                oItem.setAttribute("role", "option");
-                oItem.appendChild(_el("span", null, String(s)));
-                oItem.addEventListener("mousedown", (ev) => { ev.preventDefault(); _select(idx); });
-                oItem.addEventListener("mousemove", () => _setActive(idx));
-                oList.appendChild(oItem);
-            });
-            iActive = -1;
-            _position();
-            oInput.setAttribute("aria-expanded", "true");
-        }
-
-        function _close() {
-            if (!oList) { return; }
-            oList.remove();
-            oList = null;
-            iActive = -1;
-            oInput.setAttribute("aria-expanded", "false");
-            document.removeEventListener("mousedown", _onOutside);
-        }
-
-        function _select(idx) {
-            const s = aMatch[idx];
-            if (s == null) { return; }
-            oInput.value = String(s);
-            if (typeof fnPick === "function") { fnPick(oInput.value); }
-            _close();
-            oInput.focus();
-        }
-
-        oInput.addEventListener("input", () => _open(false));     // 타이핑 → 부분일치 필터
-        oInput.addEventListener("focus", () => _open(true));       // 포커스 → 전체 이력
-        oInput.addEventListener("keydown", (ev) => {
-            switch (ev.key) {
-                case "ArrowDown":
-                    ev.preventDefault();
-                    if (!oList) { _open(true); } else { _setActive(Math.min(iActive + 1, aMatch.length - 1)); }
-                    break;
-                case "ArrowUp":
-                    if (oList) { ev.preventDefault(); _setActive(Math.max(iActive - 1, 0)); }
-                    break;
-                case "Enter":
-                    // 후보가 활성화된 상태의 Enter 는 선택으로 소비 → Enter-로그인 핸들러 차단
-                    if (oList && iActive >= 0) { ev.preventDefault(); ev.stopImmediatePropagation(); _select(iActive); }
-                    break;
-                case "Escape":
-                    if (oList) { ev.stopPropagation(); _close(); }
-                    break;
-                case "Tab":
-                    _close();
-                    break;
-            }
-        });
-        // 포커스 아웃 시 닫기(클릭 선택의 mousedown 이 먼저 처리되도록 약간 지연)
-        oInput.addEventListener("blur", () => setTimeout(_close, 120));
-
-        return { close: _close };
     }
 
     /************************************************************************

@@ -46,13 +46,21 @@ body {
 
 /* ── 로그인 카드 (sap.f.Card 대체) ─────────────────────────────── */
 .u4a-login__card {
-    width: clamp(18rem, 42%, 30rem);
+    width: clamp(20rem, 44%, 27rem);
     box-sizing: border-box;
-    padding: 1.5rem;
-    background: var(--surface-raised);
+    padding: 2rem 2rem 1.75rem;
+    /* 평면 단색 대신 표면색 위로 아주 옅은 세로 그라데이션 → 깊이감(컴포지팅 X) */
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, var(--accent) 5%, var(--surface-raised)) 0%,
+            var(--surface-raised) 38%);
     border: 0.0625rem solid var(--line);
-    border-radius: var(--radius);
-    box-shadow: var(--elevation);
+    border-radius: 0.875rem;
+    /* 부드럽고 넓은 다층 그림자 + 상단 하이라이트(은은한 입체) */
+    box-shadow:
+        0 1.5rem 3rem -0.75rem rgba(0, 0, 0, 0.45),
+        0 0.25rem 0.75rem -0.25rem rgba(0, 0, 0, 0.30),
+        inset 0 0.0625rem 0 rgba(255, 255, 255, 0.06);
     transition: opacity 0.5s linear;
 }
 
@@ -60,6 +68,7 @@ body {
 @media (max-width: 600px) {
     .u4a-login__card {
         width: 100%;
+        padding: 1.5rem 1.25rem 1.25rem;
     }
 }
 
@@ -67,95 +76,88 @@ body {
 .u4a-login__card-head {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
     border-bottom: 0.0625rem solid var(--divider);
 }
 
+/* 로고를 둥근 배지 안에 — 브랜드감 + 정돈 */
 .u4a-login__card-logo {
-    width: 2.25rem;
-    height: 1.75rem;
+    flex: 0 0 auto;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0.5rem;
     object-fit: contain;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 0.0625rem solid color-mix(in srgb, var(--accent) 22%, transparent);
+    border-radius: 0.625rem;
 }
 
 .u4a-login__card-title {
     margin: 0;
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     font-weight: 700;
+    letter-spacing: -0.01em;
     color: var(--text);
 }
 
 /* ── 폼 (shell .u4a-form 재사용) ───────────────────────────────── */
 .u4a-login__form {
-    margin-bottom: 1rem;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
 }
 
-/* ── 입력 + 트레일링 아이콘 버튼 (클리어 X / 비밀번호 토글) ───────── */
-/* 단일 입력 + X 버튼 래퍼(CLIENT/ID) 및 비밀번호 래퍼 공통 */
-.u4a-login__field,
-.u4a-login__pw {
-    position: relative;
-    display: flex;
-    align-items: center;
+/* 라벨: 굵은 본문 → 작은 대문자 캡션(현대적 폼 위계). 로그인 한정 스코프. */
+.u4a-login__form .u4a-label,
+.u4a-login__remember .u4a-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
 }
 
-/* 트레일링 아이콘 버튼 공통 모양 (UI5 showClearIcon / showValueHelp 대체) */
-.u4a-login__clear,
-.u4a-login__pw-toggle {
-    position: absolute;
-    display: inline-flex;
+/* 입력/콤보: 약간 더 크고 둥글게 통일(콤보=입력 높이 일치) */
+.u4a-login .u4a-input,
+.u4a-login .u4a-combo {
+    height: 2.5rem;
+    border-radius: var(--radius);
+}
+
+.u4a-login .u4a-combo {
+    padding: 0 0.75rem;
+}
+
+/* X 버튼 위치도 큰 입력 높이에 맞춰 중앙 정렬은 flex 가 처리 → 별도 보정 불필요 */
+
+/* Remember: 라벨 위/체크박스 아래(세로) → 한 줄 가로 정렬 */
+.u4a-login__remember {
+    flex-direction: row;
     align-items: center;
-    justify-content: center;
-    width: 1.75rem;
-    height: 1.75rem;
-    border: 0;
-    background: transparent;
-    color: var(--icon-muted);
+    gap: 0.5rem;
+}
+
+.u4a-login__remember .u4a-label {
+    order: 2;
     cursor: pointer;
-    border-radius: var(--radius-sm);
 }
 
-.u4a-login__clear:hover,
-.u4a-login__pw-toggle:hover {
-    background: var(--hover-bg);
-    color: var(--text);
+.u4a-login__remember .u4a-check {
+    order: 1;
 }
 
-/* 클리어(X) 버튼은 값이 있을 때만 노출 (data-filled) */
-.u4a-login__clear {
-    right: 0.25rem;
-    display: none;
-}
-
-.u4a-login__field[data-filled="true"] > .u4a-login__clear,
-.u4a-login__pw[data-filled="true"] > .u4a-login__clear {
-    display: inline-flex;
-}
-
-/* X 버튼이 텍스트와 겹치지 않게 우측 패딩 확보 */
-.u4a-login__field > .u4a-input {
-    padding-right: 2.25rem;
-}
-
-/* number 입력(CLIENT)의 네이티브 스피너 제거 — X 버튼과 겹침 방지 */
+/* ── 입력 + 트레일링 아이콘 (클리어 X / 비밀번호 토글) ─────────────────
+   메커니즘(래퍼 상대좌표 + 아이콘 absolute + data-filled/data-trail)은
+   shell.css 의 공통 컴포넌트 .u4a-field 가 담당한다. 마크업에 이미
+   .u4a-field / .u4a-field__input / .u4a-field__clear / .u4a-field__pw + data-trail
+   을 부여했으므로 여기서 따로 정의하지 않는다(전 화면 단일 출처).
+   클리어 노출은 _attachClear 가 래퍼에 data-filled 를 토글. */
+/* number 입력(CLIENT)의 네이티브 스피너 제거 — X 버튼과 겹침 방지 (Login 전용) */
 .u4a-login__field > .u4a-input[type="number"]::-webkit-outer-spin-button,
 .u4a-login__field > .u4a-input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
-}
-
-/* 비밀번호: [X][눈] 두 버튼 → 패딩 더 넓게, 위치 분리 */
-.u4a-login__pw .u4a-input {
-    padding-right: 4rem;
-}
-
-.u4a-login__pw > .u4a-login__clear {
-    right: 2rem;
-}
-
-.u4a-login__pw > .u4a-login__pw-toggle {
-    right: 0.25rem;
 }
 
 /* CapsLock 등 정보성 메시지 (Information ValueState 대체) */
@@ -168,9 +170,22 @@ body {
 /* 로그인 버튼 (sap.m.Button Emphasized, width 100%) */
 .u4a-login__btn {
     width: 100%;
-    height: 2.5rem;
+    height: 2.75rem;
     justify-content: center;
     font-weight: 700;
+    font-size: 0.9375rem;
+    letter-spacing: 0.02em;
+    border-radius: var(--radius);
+    box-shadow: 0 0.375rem 1rem -0.375rem color-mix(in srgb, var(--accent) 70%, transparent);
+    transition: background var(--motion) linear, box-shadow var(--motion) linear, transform var(--motion) linear;
+}
+
+.u4a-login__btn:hover {
+    box-shadow: 0 0.5rem 1.25rem -0.375rem color-mix(in srgb, var(--accent) 80%, transparent);
+}
+
+.u4a-login__btn:active {
+    transform: translateY(0.0625rem);
 }
 
 /* R&D Staff 자동 로그인 버튼 그룹 */
@@ -178,12 +193,15 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin-top: 0.75rem;
+    margin-top: 0.875rem;
+    padding-top: 0.875rem;
+    border-top: 0.0625rem solid var(--divider);
 }
 
 .u4a-login__staff .u4a-btn {
     flex: 1 1 auto;
     justify-content: center;
+    border-radius: var(--radius);
 }
 
 /* ── 푸터 (sap.m.Toolbar footer 대체) ──────────────────────────── */

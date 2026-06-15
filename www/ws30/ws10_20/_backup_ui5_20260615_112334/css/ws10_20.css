@@ -1,0 +1,794 @@
+html,
+body,
+.u4aWsContent {
+  height: 100%;
+  -webkit-app-region: no-drag;  
+}
+
+.u4aWsApp.sapUiSizeCompact
+  .sapMPageWithFooter.sapMPageWithFloatingFooter
+  > section {
+  padding-bottom: 0rem;
+}
+
+.sapUiIcon:focus {
+  outline-width: 0 !important;
+  /* outline-style: dotted;
+  outline-color: #4db1ff; */
+}
+
+.sapMSticky .sapMTableTH {
+  top: 0;
+  position: sticky;
+  position: -webkit-sticky;
+  z-index: 1;
+}
+
+.sapMSticky5 .sapMTableTH,
+.sapMSticky7 > .sapMListInfoTBarContainer {
+  top: 2.75rem;
+}
+
+.sapMMessageToast {
+  max-width: none !important;
+}
+
+.sapMSelectListItemBase,
+.sapMITBText,
+.sapMListTblCellNoData,
+.sapMGHLITitle,
+.sapMObjStatusText {
+  font-family: "72", "72full", Arial, Helvetica, sans-serif;
+}
+
+.sapMBtn {
+  font-weight: bold;
+}
+
+.sapMDialog > .sapMDialogTitle:focus::after {
+  border: none !important;
+}
+
+.u4aWs10_HeaderToolbar .sapMBtn .sapMBtnInner {
+  border-color: transparent !important;
+}
+
+.u4aCssEditorDialog .sapMDialogScroll {
+  height: 100%;
+}
+
+/* Message Footer */
+.u4aWsMsgFooter {
+  position: absolute !important;
+  visibility: visible;
+  /* z-index: 10000000; */
+  bottom: 0;
+  width: 100%;
+  height: 200px;
+  min-height: 50px;
+  border: none;
+  box-shadow: 0 0 0 0.0625rem rgb(0 0 0 / 42%),
+    0 0.625rem 1.875rem 0 rgb(0 0 0 / 30%);
+  border-radius: 0.25rem;
+  overflow: hidden;
+  background: #fff;
+  box-sizing: border-box;
+  outline: none;
+  transform: translate(-50%);
+  -moz-transform: translate(-50%);
+  -webkit-transform: translate(-50%);
+  -ms-transform: translate(-50%);
+  display: inline-block;
+  left: 50%;
+}
+
+.u4aWsMsgFooterInner {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+}
+
+.u4aWsMsgFooterInactive {
+  display: none;
+}
+
+/* Toolbar Header */
+.u4aWs20_HeaderToolbar .sapMBtn .sapMBtnInner {
+  border-color: transparent !important;
+}
+
+.u4aWs20Page .sapTntToolPageHeader .sapMIBar {
+  padding-left: 0px;
+}
+
+/* WS10-> APP F4 Dialog */
+.u4aWsAppF4Dialog.sapMDialog {
+  min-height: 500px !important;
+  min-width: 800px !important;
+}
+
+/* WS20-> Mime Dialog */
+.u4aMimeTreeDlg.sapMDialog {
+  min-height: 500px !important;
+  min-width: 800px !important;
+}
+
+.u4aWsAppf4tree .sapUiTableTr,
+.u4aWsAppf4tree .sapUiTableTreeIcon,
+.u4aWsAppf4tree .sapUiTableCellFlex > .sapUiTableCellInner,
+.u4aWsAppf4tree .sapUiTableCellFlex > .sapUiTableCellInner .sapMText,
+.u4aWsAppf4tree .sapUiTableCell > .sapUiTableCellInner,
+.u4aWsAppf4tree .sapUiTableCell > .sapUiTableCellInner .sapMText {
+  cursor: pointer;
+}
+
+.u4aWsMimeImgPrev {
+  max-width: 100%;
+}
+
+/* .sapUiSizeCompact .sapTntToolHeader.sapMTB {
+    height: 2rem;
+} */
+
+.sapTntToolHeader.sapMTB {
+  height: 2.775rem;
+}
+
+.sapMPageFooterControlShow.sapUiHidden {
+  visibility: visible;
+  top: auto;
+  bottom: 0 !important;
+}
+
+.u4aWsBusyDialog.sapMDialog {
+  box-shadow: none !important;
+}
+
+.u4aWsBusyDialog.sapMDialog .sapMDialogSection {
+  background: transparent;
+}
+
+.u4aWsBusyDialog .u4aWsAvatarBusy {
+  background-color: transparent;
+}
+
+.u4aWs30Page > .sapMPageHeader > .sapMIBar {
+  border-bottom: 0px;
+}
+
+.u4aWs30Page .u4aWsUspIntroImg {
+  max-width: 100%;
+  height: auto;
+}
+
+.u4aWsApp .u4aWs30Page.sapMPageWithFooter.sapMPageWithFloatingFooter > section {
+  padding-bottom: 0rem;
+}
+
+.u4aWsUspTree .sapMText {
+  user-select: none;
+}
+
+.u4aWs10Page .sapMTB.sapMTBStandard {
+  border-bottom: 0rem;
+}
+
+.u4aWs30Page .sapMPageSubHeader .sapMTB.sapMTBStandard,
+.u4aWs30Page > section .sapMVBox > .sapMTB.sapMTBStandard {
+  border-bottom: 0rem;
+}
+
+.sapUiSizeCompact .u4aWs20Page .sapTntToolPage .sapTntToolPageHeader,
+.sapUiSizeCompact
+  .u4aWs20Page
+  .sapTntToolPage
+  .sapTntToolPageHeader
+  .sapTntToolHeader.sapMTB {
+  height: 2.75rem;
+}
+
+.u4aWs20Page .sapTntToolPage .sapTntToolPageHeaderWrapper {
+  box-shadow: none;
+}
+
+.sapUiSizeCompact .u4aWs20Page .sapTntToolPageAsideContent .sapTntNavLIItem {
+  height: 2.5rem;
+}
+
+.u4aWs20MainPage > .sapMPageHeader > .sapMTB.sapMTBStandard {
+  border-bottom: 0rem;
+}
+
+/* .u4aWs30Page .sapMTB.sapMTBStandard {
+	border-bottom: 0rem;	
+} */
+.u4aWs30Page.sapMPage .sapMPageHeader:not(.sapMIBar-CTX):after,
+.u4aWs30Page.sapMPageWithSubHeader .sapMPageSubHeader:not(.sapMIBar-CTX):after {
+  box-shadow: none;
+}
+
+.u4aWsUspTree .u4aWsTreeTableSelected {
+  background-color: var(--sapContent_Illustrative_Color20) !important;
+}
+
+/************************************************************************************ 
+    sap_fiori_3_dark 
+ ************************************************************************************/
+
+.sapUiTheme-sap_fiori_3_dark .sapMListTblCellNoData {
+  color: #fff;
+}
+
+.sapUiTheme-sap_fiori_3_dark .u4aWsMsgFooterInner {
+  background-color: #29313a;
+}
+
+.sapUiTheme-sap_fiori_3_dark .sapMTBSeparator {
+  background: #b6cae0;
+}
+
+.sapUiTheme-sap_fiori_3_dark .u4aWsMsgFooter_HeaderToolbar.sapTntToolHeader {
+  background-color: #354a5f !important;
+  box-shadow: inset 0 -0.0625rem 0 0 #354a5f !important;
+}
+
+.sapUiTheme-sap_fiori_3_dark .sapTntToolHeader.sapMTB.u4aWsWindowMenuToolbar {
+  background-color: #29313a;
+}
+
+.sapUiTheme-sap_fiori_3_dark
+  .sapMInput.sapMInputBaseReadonly
+  .sapMInputBaseReadonlyWrapper.sapMInputBaseContentWrapperError {
+  background: #29313a;
+  border-color: #f88;
+}
+
+.u4aWsDisableTreeDrop {
+  opacity: 0.3;
+}
+
+.sapUiTheme-sap_fiori_3_dark .u4aWsDisableTreeDrop,
+.sapUiTheme-sap_horizon_dark .u4aWsDisableTreeDrop {
+  opacity: 0.3;
+}
+
+.sapUiTheme-sap_fiori_3_dark
+  .u4aWsTmplWzdSideNav
+  .sapTntNavLIItem
+  > .sapUiIcon {
+  color: #8696a9;
+}
+
+.sapUiTheme-sap_fiori_3_dark
+  .u4aWsTmplWzdAttrActive
+  .sapTntNavLIItem
+  > .sapUiIcon {
+  color: #abe2ab;
+}
+
+/* CSS Link Add Popup */
+.sapUiTheme-sap_fiori_3_dark .u4aWsCssJsLinkAddStatSuccess {
+  color: #107e3e;
+}
+
+.sapUiTheme-sap_fiori_3_dark .u4aWsCssJsLinkAddStatError {
+  color: #bb0000;
+}
+
+.sapUiTheme-sap_fiori_3_dark .u4aWsCssJsLinkAddStatSuccess {
+  color: #abe2ab;
+}
+
+.sapUiTheme-sap_fiori_3_dark .u4aWsCssJsLinkAddStatError {
+  color: #ff8888;
+}
+
+/* Mime Repository Dialog */
+/* .sapUiTheme-sap_fiori_3_dark .u4aWsMimeTreeTable .u4aMimeTreeMyApp.sapUiTableContentRow,
+.sapUiTheme-sap_fiori_3_dark .u4aWsMimeTreeTable .u4aMimeTreeMyApp.sapUiTableContentRow.sapUiTableRowHvr {
+    background-color: #3c597a;
+} */
+
+.sapUiTheme-sap_fiori_3_dark .u4aWsMimeTreeTable .u4aMimeTreeMyApp .sapMText,
+.sapUiTheme-sap_fiori_3_dark
+  .u4aWsMimeTreeTable
+  .u4aMimeTreeMyAppChild
+  .sapMText,
+.sapUiTheme-sap_fiori_3_dark
+  .u4aWsMimeTreeTable
+  .u4aMimeTreeBrightRow
+  .sapMText {
+  color: #fff;
+}
+
+.sapUiTheme-sap_fiori_3_dark .u4aWsMimeTreeTable .u4aMimeTreeDarkRow .sapMText {
+  color: #89919a;
+}
+
+/************************************************************************************ 
+    sap_horizon_dark 
+ ************************************************************************************/
+
+.sapUiTheme-sap_horizon_dark .sapMDialog {
+  box-shadow: 0 0 0 0.0625rem rgb(111, 111, 111),
+    1px 0rem 20rem 0 rgba(255, 255, 255, 0.3);
+}
+
+.sapUiTheme-sap_horizon_dark .u4aWsTmplWzdSideNav .sapTntNavLIItem .sapUiIcon {
+  color: #eaecee;
+}
+
+.sapUiTheme-sap_horizon_dark
+  .u4aWsTmplWzdAttrActive
+  .sapTntNavLIItem
+  .sapUiIcon,
+.sapUiTheme-sap_horizon_dark
+  .sapTntNavLI
+  .u4aWsTmplWzdAttrActive
+  .sapTntNavLIGroup.sapTntNavLIItem:not(.sapTntNavLIItemDisabled):active
+  .sapUiIcon {
+  color: #97dd40;
+}
+
+/* Mime Repository Dialog */
+.sapUiTheme-sap_horizon_dark
+  .u4aWsMimeTreeTable
+  .u4aMimeTreeMyApp.sapUiTableContentRow,
+.sapUiTheme-sap_horizon_dark
+  .u4aWsMimeTreeTable
+  .u4aMimeTreeMyApp.sapUiTableContentRow.sapUiTableRowHvr {
+  background-color: #3c597a;
+}
+
+.sapUiTheme-sap_horizon_dark .u4aWsMimeTreeTable .u4aMimeTreeMyApp .sapMText,
+.sapUiTheme-sap_horizon_dark
+  .u4aWsMimeTreeTable
+  .u4aMimeTreeMyAppChild
+  .sapMText,
+.sapUiTheme-sap_horizon_dark
+  .u4aWsMimeTreeTable
+  .u4aMimeTreeBrightRow
+  .sapMText {
+  color: #fff;
+}
+
+.sapUiTheme-sap_horizon_dark .u4aWsMimeTreeTable .u4aMimeTreeDarkRow .sapMText {
+  color: #89919a;
+}
+
+/************************************************************************************ 
+    default
+ ************************************************************************************/
+/* Mime Repository Dialog */
+.u4aWsMimeTreeTable .u4aMimeTreeMyApp.sapUiTableContentRow,
+.u4aWsMimeTreeTable .u4aMimeTreeMyApp.sapUiTableContentRow.sapUiTableRowHvr {
+  background-color: #eaecee;
+}
+
+/* App F4 Popup */
+.u4aAppF4IconTabbar,
+.u4aAppF4IconTabbar .sapMITBContainerContent,
+.u4aAppF4IconTabbar .sapMITBContent {
+  height: calc(100% - 2rem);
+}
+
+/* UI Template Wizard */
+.u4aWsTmplWzdDlg .u4aWsTmplWzdAttrActive .sapTntNavLIItem .sapUiIcon {
+  color: var(--sapContent_Illustrative_Color12);
+}
+
+.u4aWsCommonHeaderArea .sapMFlexItem {
+  margin: 0 0 0 0.5rem;
+}
+
+.sapUiLoSplitterV.uspCodeeditorSplit .sapUiLoSplitterContent {
+  display: block !important;
+}
+
+.ace_print-margin {
+  visibility: hidden !important;
+}
+
+.u4aWsDropArea {
+  /* border: 1rem solid black; */
+  border: 0.0625rem solid;
+  border-style: dashed !important;
+}
+
+.u4aWsDisplayNone {
+  display: none !important;
+}
+
+.u4aWsProgressDialog--illustMsg.sapMIllustratedMessage.sapMIllustratedMessage-Dialog
+  .sapMIllustratedMessageDescription {
+  margin-bottom: 0rem;
+}
+
+.u4aWsBrowserDraggable {
+  -webkit-app-region: drag !important;
+  /* -webkit-user-select: none; */
+}
+
+.u4aWsBrowserDraggable .sapMBtn,
+.u4aWsBrowserDraggable .sapMSlt {
+  -webkit-app-region: no-drag;
+}
+
+
+/***************************************************
+ * [TEST] 미리 보기 영역 테두리 구분 표시 --- Start
+ ***************************************************/
+/* .u4aWsDesignPreview {
+  padding: 0.5rem;
+  border: 0.125rem solid;
+  border-style: dashed;
+}
+
+.u4aWsDesignPreview > section {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-bottom: 0.5rem;
+} */
+/***************************************************
+ * 미리 보기 영역 테두리 구분 표시 --- End
+ ***************************************************/
+
+
+
+/***************************************************
+ * 메인페이지의 u4a bot 배경 이미지 --- START
+ ***************************************************/
+
+/* 다크테마일 경우 */
+/* html[class*=sapUiTheme][class*="dark"] .u4aWs10Page .sapMPage > section {
+  background-image: url(../../img/u4a_bot_dark.jpg);
+  background-repeat: no-repeat;
+  background-size: 80%;
+  background-position: center;
+  background-color: #000000;
+} */
+
+/* 다크테마 이외의 나머지 테마 */
+/* html[class*=sapUiTheme]:not([class*="dark"]) .u4aWs10Page .sapMPage > section {
+  background-image: url(../../img/u4a_bot_white.jpg);
+  background-repeat: no-repeat;
+  background-size: 80%;
+  background-position: center;
+  background-color: #FFFFFF;
+} */
+/***************************************************
+ * 메인페이지의 u4a bot 배경 이미지 --- END
+ ***************************************************/
+
+
+
+/* 디자인 영역의 Attribute 영역 */
+
+.u4aWsDesignAttr .sapMInputBaseDisabled {
+	opacity: 0.8;
+}
+
+/**
+ * @since   2026-01-05 14:04:25
+ * @version v3.5.7-4
+ * @author  pes
+ * @description
+ * WS design 화면의 attribute 리스트에서 비활성화된 input box의 글자색상을
+ * 변경하는 CSS 주석 처리.
+ * - 사유: 변경된 라인을 표현하기 위해 배경 및 글자 색상을 강조하는 내용이
+ *   추가 되면서 기존 CSS때문에 변경된 라인을 판단하기 어려워 주석 처리함.
+ */
+/* .u4aWsDesignAttr .sapMInputBaseDisabled .sapMInputBaseInner {
+	color: #4098ff;
+} */
+
+.u4awsSelBrowsPanHdr {
+  padding-left: 0rem !important;
+  cursor: pointer;
+}
+
+.u4awsSelBrowsPanHdr div,
+.u4awsSelBrowsPanHdr span {
+  cursor: pointer;
+}
+
+
+.sapUiLocalBusyIndicatorAnimation.sapUiLocalBusyIndicatorAnimStandard::after {
+  content: "";
+  border: 0px !important;
+}
+.sapUiBlockLayer.sapUiLocalBusyIndicator::after {
+  content: "";
+  border: 0px !important;
+}
+
+
+.sapMPopover .sapMPopoverResizeHandle {
+  z-index: 3;
+}
+
+
+.u4aWsMainBody .sapMBusyDialog.sapMDialog.sapMBusyDialog-Light {
+  box-shadow: auto;
+  background: none;
+  border: none;
+}
+.u4aWsMainBody .sapMBusyDialog.sapMDialog.sapMBusyDialog-Light .sapMDialogSection {
+  background: auto;
+}
+
+.u4aWsMainBody .sapUiBLy {
+  background-color: transparent;
+}
+
+/**
+ * @since   2026-01-03 00:08:42
+ * @version v3.5.7-4
+ * @author  PES
+ * @description
+ * UI의 ATTRIBUTE 변경건 표현 CSS 처리 내용 추가.
+ */
+/**
+   dark 계열 일 경우 
+*/
+/* html[class*=sapUiTheme][class*="dark"] .u4aWs20Page .u4aWsDesignAttr .changeValue {
+    background:linear-gradient(to bottom,#1f2630,#161c24);
+    box-shadow:inset 6px 6px 12px rgba(0,0,0,.6), inset -6px -6px 12px rgba(255,255,255,.06);
+    border-radius:8px;
+}
+
+html[class*=sapUiTheme][class*="dark"] .u4aWs20Page .u4aWsDesignAttr .changeValue * {
+    color:#6aa9ff;
+    font-weight:bold;
+} */
+
+/* 1. 배경/그림자 (원본 유지) */
+html[class*=sapUiTheme][class*="dark"] .u4aWs20Page .u4aWsDesignAttr .changeValue {
+    background: linear-gradient(to bottom,#1f2630,#161c24);
+    box-shadow: inset 6px 6px 12px rgba(0,0,0,.6), inset -6px -6px 12px rgba(255,255,255,.06);
+    border-radius: 8px;
+}
+
+/* 2. 글자색 및 볼드체 (버튼 영역만 침범하지 않게 방어) */
+/* .sapMBtnBase 자체와 .sapMBtnBase 내부에 있는 모든 요소(*)를 제외시킵니다. */
+html[class*=sapUiTheme][class*="dark"] .u4aWs20Page .u4aWsDesignAttr .changeValue td *:not(.sapMBtnBase):not(.sapMBtnBase *) {
+    color: #6aa9ff;
+    font-weight: bold;
+}
+
+
+
+/**
+   white 계열일 경우
+*/
+/* html[class*=sapUiTheme]:not([class*="dark"]) .u4aWs20Page .u4aWsDesignAttr .changeValue {
+    background:linear-gradient(to bottom,#f4f6f8,#e9edf1);
+    box-shadow:inset 6px 6px 12px rgba(0,0,0,.12), inset -6px -6px 12px rgba(255,255,255,.9);
+    border-radius:8px;
+}
+
+html[class*=sapUiTheme]:not([class*="dark"]) .u4aWs20Page .u4aWsDesignAttr .changeValue * {
+    color:#0066ff;
+    font-weight:bold;
+} */
+
+/* 1. 행(Row) 배경/그림자 - 라이트 테마 원본 유지 */
+html[class*=sapUiTheme]:not([class*="dark"]) .u4aWs20Page .u4aWsDesignAttr .changeValue {
+    background: linear-gradient(to bottom,#f4f6f8,#e9edf1);
+    box-shadow: inset 6px 6px 12px rgba(0,0,0,.12), inset -6px -6px 12px rgba(255,255,255,.9);
+    border-radius: 8px;
+}
+
+/* 2. 글자색 및 볼드체 - 버튼 영역(본체 및 자식들)만 제외하고 적용 */
+html[class*=sapUiTheme]:not([class*="dark"]) .u4aWs20Page .u4aWsDesignAttr .changeValue td *:not(.sapMBtnBase):not(.sapMBtnBase *) {
+    color: #0066ff;
+    font-weight: bold;
+}
+
+
+/**
+ * @since   2026-01-05 13:56:47
+ * @version v3.5.7-4
+ * @author  soccerhs
+ * @description
+ *   Dialog Header 영역에 버튼 제외한 나머지 포인터 이벤트 해제
+ *   - 사유: 기본적으로 Dialog Header는 Drag 영역인데 텍스트 등이 있으면 드래그가 안되므로
+ *     버튼을 제외한 나머지는 클릭 이벤트를 방지하면 드래그가 정상 동작함.
+ */
+.sapMDialog.sapMDialogDraggable
+.sapMDialogTitle
+.sapMIBar * {
+    pointer-events: none;
+}
+
+.sapMDialog.sapMDialogDraggable
+.sapMDialogTitle
+.sapMIBar .sapMBtn,
+.sapMDialog.sapMDialogDraggable
+.sapMDialogTitle
+.sapMIBar .sapMBtn * {
+    pointer-events: auto;
+}
+
+
+
+
+
+
+/**
+ * @since   2026-02-24 16:48:25
+ * @version v3.5.9-3
+ * @author  soccerhs
+ * @description
+ * 
+ * Workspace 메인 페이지의 배경 이미지 관련 CSS
+ * 
+ */
+.u4a-ws-root {
+    position: absolute; inset: 0;
+    display: flex; align-items: flex-end;
+    padding: 4.5vh 4.5vw;
+    font-family: 'Montserrat', 'Segoe UI', sans-serif;
+    overflow: hidden;
+    background: #0a0d14;
+}
+
+/* ── 이미지 래퍼 ── */
+.u4a-ws-bg-image {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 78%;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+}
+.u4a-ws-bg-image img {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    height: 100%; width: 100%;
+    object-fit: cover;
+    object-position: right center;
+}
+
+/* ══════════════════════════════════
+    ⚡ 글로우 브리딩 애니메이션
+    이미지 주변이 숨쉬듯 강약 반복
+══════════════════════════════════ */
+.u4a-ws-anim-glow {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 78%;
+    pointer-events: none;
+    z-index: 3;
+    background:
+        radial-gradient(ellipse 20% 80% at 100% 50%,
+            rgba(130, 70, 255, 0.55) 0%, transparent 100%),
+        radial-gradient(ellipse 80% 20% at 55% 0%,
+            rgba(80, 130, 255, 0.45) 0%, transparent 100%),
+        radial-gradient(ellipse 80% 20% at 55% 100%,
+            rgba(150, 60, 255, 0.40) 0%, transparent 100%),
+        radial-gradient(ellipse 50% 65% at 72% 48%,
+            rgba(120, 80, 255, 0.30) 0%,
+            rgba(60, 100, 255, 0.15) 50%,
+            transparent 80%
+        );
+    /* opacity만 사용 - blur 없이 성능 최적화 */
+    animation: breatheGlow 2.5s ease-in-out infinite;
+    will-change: opacity; /* GPU 레이어 힌트 */
+}
+
+@keyframes breatheGlow {
+    0%, 100% { opacity: 0.25; }
+    50%       { opacity: 1.0;  }
+}
+
+/* ── 페이드 오버레이 (z-index 높여서 애니 위에 걸침) ── */
+.u4a-ws-bg-fade {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 85%;
+    pointer-events: none;
+    z-index: 7;
+    background: linear-gradient(to right,
+        #0a0d14      0%,
+        #0a0d14      10%,
+        rgba(10,13,20,0.97) 16%,
+        rgba(10,13,20,0.90) 22%,
+        rgba(10,13,20,0.78) 28%,
+        rgba(10,13,20,0.60) 35%,
+        rgba(10,13,20,0.38) 43%,
+        rgba(10,13,20,0.18) 52%,
+        rgba(10,13,20,0.05) 61%,
+        transparent  70%
+    );
+}
+
+/* ── 브랜드 텍스트 ── */
+.u4a-ws-brand-wrap { display: flex; align-items: flex-end; gap: 0; z-index: 20; position: relative; }
+.u4a-ws-brand-logo  { display: none !important; }
+.u4a-ws-brand-text  { color: #ffffff; line-height: 1.1; text-transform: uppercase; }
+.u4a-ws-brand-u4a {
+    font-size: 6.5rem; font-weight: 900; letter-spacing: -0.2rem;
+    background: linear-gradient(to bottom, #cc00ff 40%, #aaa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    animation: fadeInBlur 1.2s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+.u4a-ws-brand-desc {
+    font-size: 2.2rem; font-weight: 300; letter-spacing: 0.5rem; margin-top: -0.5rem;
+    opacity: 0; animation: fadeInUp 1s cubic-bezier(0.22,1,0.36,1) 0.4s forwards;
+}
+
+/* ── 인증 뱃지 ── */
+.u4a-ws-cert-layer {
+    position: absolute;
+    left: 28%; right: 4.5vw; bottom: 4.5vh;
+    display: flex; flex-direction: row; flex-wrap: wrap;
+    justify-content: flex-end; align-items: flex-end;
+    gap: 1vw; z-index: 20; pointer-events: none;
+}
+.u4a-ws-cert-layer img {
+    /* height: clamp(28px, 3.5vw, 50px);  */
+    height: clamp(28px, 3.5vw, 85px); 
+    width: auto;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+}
+
+@keyframes fadeInBlur { 0%{opacity:0;filter:blur(10px);transform:scale(0.95)} 100%{opacity:1;filter:blur(0);transform:scale(1)} }
+@keyframes fadeInUp   { 0%{opacity:0;transform:translateY(20px)} 100%{opacity:0.8;transform:translateY(0)} }
+
+/* ── 반응형 ── */
+@media (max-width: 1024px) {
+    .u4a-ws-brand-u4a  { font-size: 4.5rem; }
+    .u4a-ws-brand-desc { font-size: 1.5rem; }
+}
+@media (max-width: 768px) {
+    .u4a-ws-brand-u4a  { font-size: 3.5rem; }
+    .u4a-ws-brand-desc { font-size: 1.2rem; }
+    .u4a-ws-cert-layer { bottom: 16px; right: 16px; left: 32%; gap: 8px; }
+    .u4a-ws-cert-layer img { height: clamp(22px, 3vw, 32px); }
+    .u4a-ws-bg-image, .u4a-ws-anim-glow { width: 88%; }
+    .u4a-ws-bg-fade { width: 94%; }
+}
+@media (max-width: 480px) {
+    .u4a-ws-brand-u4a  { font-size: 2.8rem; }
+    .u4a-ws-brand-desc { font-size: 1rem; letter-spacing: 0.2rem; }
+    .u4a-ws-bg-image, .u4a-ws-anim-glow { width: 92%; }
+    .u4a-ws-bg-fade { width: 98%; }
+}
+
+/* ══════════════════════════════════════
+    라이트 테마
+══════════════════════════════════════ */
+.u4a-ws-light-theme .u4a-ws-root { background: #ffffff; }
+.u4a-ws-light-theme .u4a-ws-bg-fade {
+    background: linear-gradient(to right,
+        #ffffff      0%,
+        #ffffff      10%,
+        rgba(255,255,255,0.97) 16%,
+        rgba(255,255,255,0.90) 22%,
+        rgba(255,255,255,0.78) 28%,
+        rgba(255,255,255,0.60) 35%,
+        rgba(255,255,255,0.38) 43%,
+        rgba(255,255,255,0.18) 52%,
+        rgba(255,255,255,0.05) 61%,
+        transparent  70%
+    );
+}
+.u4a-ws-light-theme .u4a-ws-brand-text { color: #12172a; }
+.u4a-ws-light-theme .u4a-ws-brand-u4a {
+    background: linear-gradient(160deg, #0d1020 0%, #cc00ff 50%, #2e2472 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    -webkit-font-smoothing: antialiased;
+}
+.u4a-ws-light-theme .u4a-ws-brand-desc { color: #1e2240; }
+.u4a-ws-light-theme .u4a-ws-cert-layer img { filter: drop-shadow(0 1px 4px rgba(0,0,0,0.15)); }
+
+
+
+
+
+.u4aWsSapguiLogo {
+  border-radius: 0.5rem;
+  padding-left: 0.3rem;
+  padding-right: 0.3rem;
+}

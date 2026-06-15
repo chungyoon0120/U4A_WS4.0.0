@@ -1,0 +1,668 @@
+/************************************************************************
+ * U4A Workspace — WS20 (애플리케이션 편집화면) HTML5 CSS
+ * ----------------------------------------------------------------------
+ * doc 03 §6·§7 + .analy/14 설계 기반. WS3.0 검증 구현 이식(ws10_20.css 951~1547).
+ *   · 구 sap.tnt.ToolPage / OverflowToolbar / Splitter(3분할) / TreeTable /
+ *     Table(속성) / sap.ui.core.HTML(Preview iframe) → 순수 HTML5 + flex + CSS.
+ *   · WS20 색은 원본 sap_horizon_dark 실측 팔레트(--ws20-*)로 자체 관리
+ *     (디자인 편집기는 대상 앱 미리보기와 분리된 고정 다크 톤 — doc 12 §6.4).
+ *   · Preview iframe(#prevHTML) 내부는 "사용자가 만드는 UI5 앱" → 흰 배경 KEEP.
+ *
+ * 페이지 컨테이너(.u4aWsApp / .u4aWsPage / .u4aWsHidden / .u4aWsConvertNotice)는
+ * 구 sap.m.NavContainer 대체 — ws10_html.js 가 #WSAPP 에 WS10/WS20/WS30 페이지를
+ * 만들고 fnNavTo 로 토글한다.
+ ************************************************************************/
+
+/* ── 셸 (공유 타이틀바 + 페이지 컨테이너) ──────────────────────── */
+/* #content = 세로 플렉스: [공유 타이틀바(고정)] + [#WSAPP(가변)] */
+.u4aWsShell { display: flex; flex-direction: column; }
+
+/* ── 페이지 컨테이너 (구 sap.m.NavContainer "WSAPP") ─────────────── */
+.u4aWsHidden { display: none !important; }
+.u4aWsApp { flex: 1 1 auto; position: relative; min-height: 0; min-width: 0; }
+.u4aWsPage {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+/* WS10 페이지는 이제 타이틀바 아래(#WSAPP 안)에 들어가므로 100vh 대신 컨테이너를 채운다
+   (구 .u4a-ws10 { height:100vh } 는 타이틀바를 포함했을 때 기준 — 페이지로 분리되며 보정). */
+.u4aWsApp > .u4a-ws10 { height: 100%; }
+
+/* ── 페이지 전환 애니메이션 (구 NavContainer slide) ──────────────
+   fnNavTo 가 방향(forward: WS10→WS20 / back: WS20→WS10)에 따라 클래스를 부여.
+   들어오는 페이지는 위로(z-index) 올려 슬라이드+페이드 인, 나가는 페이지는 아웃. */
+.u4aWsNavInFwd, .u4aWsNavInBack { z-index: 2; }
+.u4aWsNavInFwd  { animation: u4aWsNavInFwd  .26s ease both; }
+.u4aWsNavInBack { animation: u4aWsNavInBack .26s ease both; }
+.u4aWsNavOutFwd { animation: u4aWsNavOutFwd .26s ease both; }
+.u4aWsNavOutBack{ animation: u4aWsNavOutBack .26s ease both; }
+@keyframes u4aWsNavInFwd  { from { transform: translateX(32px);  opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes u4aWsNavInBack { from { transform: translateX(-32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes u4aWsNavOutFwd { from { transform: none; opacity: 1; } to { transform: translateX(-32px); opacity: 0; } }
+@keyframes u4aWsNavOutBack{ from { transform: none; opacity: 1; } to { transform: translateX(32px);  opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .u4aWsNavInFwd, .u4aWsNavInBack, .u4aWsNavOutFwd, .u4aWsNavOutBack { animation: none; }
+}
+/* WS20/WS30 콘텐츠 렌더 전 임시 안내 플레이스홀더 */
+.u4aWsConvertNotice {
+  flex: 1 1 auto;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 600;
+  color: var(--text-subtle, #9aa3ad);
+  padding: 24px; text-align: center;
+}
+
+/* =====================================================================
+ * [HTML5 컨버전 — W1] WS20 비주얼 편집화면 "셸"
+ *  구 sap.tnt.ToolPage / sap.m.OverflowToolbar(트랜잭션 툴바) /
+ *     sap.ui.layout.Splitter(designSplit) 3분할 을 DOM + flex + CSS 로 대체.
+ * ===================================================================== */
+
+/* WS20 색상 토큰 — [테마 통일] 의미 토큰(theme/tokens.css)만 소비.
+ *   .u4aWs20MainPage 하위 전체가 var(--ws20-*) 로 참조하므로, 이 매핑 한 곳만
+ *   theme 토큰으로 바꾸면 WS20 전체가 활성 테마(화이트/다크/퍼플/레드/그린)를 따라간다.
+ *   (구: sap_horizon_dark 고정 다크 팔레트 → WS10/셸과 UX 통일을 위해 토큰화) */
+.u4aWs20MainPage {
+  --ws20-bg: var(--app-bg);              /* 트랜잭션 툴바/스플릿 바탕 = 앱 배경 */
+  --ws20-header-bg: var(--titlebar-bg);  /* 앱 헤더/패널 헤더/트리 툴바 = 크롬 헤더색 */
+  --ws20-panel: var(--surface);          /* 패널 바탕 = 표면색 */
+  --ws20-line: var(--line);              /* 행 그리드/구분 보더 */
+  --ws20-sep: var(--divider);            /* 툴바 구분선 */
+  --ws20-accent: var(--accent);          /* 선택 액센트/리사이저 hover */
+  --ws20-btn: var(--icon);               /* 버튼 아이콘·텍스트 = 테마 아이콘색 */
+  --ws20-btn-hover: var(--hover-bg);
+  --ws20-text: var(--text);              /* 전반 텍스트 */
+  --ws20-text-strong: var(--text);       /* 헤더 강조 텍스트 */
+  --ws20-text-sub: var(--text-muted);    /* 보조 텍스트 */
+  --ws20-aggr: var(--accent);            /* aggregation 라벨 */
+  --ws20-danger: var(--error);           /* 삭제(거부) */
+  --ws20-sel-bg: var(--selected-bg);     /* 선택 행 배경 */
+  --ws20-hover-bg: var(--hover-bg);
+  --ws20-grip: var(--text-muted);        /* 리사이저 점 그립 / 점선 밑줄 */
+}
+
+/* WS20 메인 페이지 래퍼 (구 sap.m.Page "WS20_MAIN") */
+.u4aWs20MainPage {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  min-height: 0;
+  font-family: "72", "Segoe UI", sans-serif;
+  color: var(--ws20-text);
+  background: var(--ws20-bg);
+}
+
+/* (A0) WS20 앱 헤더 줄 (#ws20AppHeader) — ← APPID · Change · Active ... 🔍 ⤓ */
+.u4aWs20AppHeader {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  height: 40px; min-height: 40px; padding: 0 10px;
+  background: var(--ws20-header-bg);
+  color: var(--ws20-text-strong);
+  border-bottom: 1px solid var(--ws20-line);
+}
+.u4aWs20AppHdrBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 28px; padding: 0 6px;
+  border: none; background: transparent; color: var(--ws20-btn);
+  border-radius: 4px; cursor: pointer; font-size: 15px; line-height: 1;
+  font-family: inherit;
+}
+.u4aWs20AppHdrBtn:hover { background: var(--ws20-btn-hover); }
+.u4aWs20AppHdrAppId { font-weight: 700; color: var(--text); font-size: 14px; }
+.u4aWs20AppHdrMode,
+.u4aWs20AppHdrStat { color: var(--ws20-text); font-size: 13px; }
+.u4aWs20AppHdrSpacer { flex: 1 1 auto; }
+
+/* (A) WS20 트랜잭션 툴바 (구 OverflowToolbar)
+ *    — 투명 버튼 + 연파랑(#9fc5ff) 아이콘·텍스트 (원본 ToolHeader 스타일) */
+.u4aWs20_HeaderToolbar {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--ws20-bg);
+  border-bottom: 1px solid var(--ws20-line);
+}
+.u4aWs20TxSep {
+  width: 1px; align-self: stretch; margin: 6px 4px;
+  background: var(--ws20-sep);
+}
+/* 트랜잭션 버튼 (구 sap.m.Button) — 투명 배경 + 아이콘·라벨 가로 배치 */
+.u4aWs20TxBtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid transparent; background: transparent; color: var(--ws20-btn);
+  font-size: 13px; padding: 5px 10px; border-radius: 4px; cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.u4aWs20TxBtn:hover { background: var(--ws20-btn-hover); }
+.u4aWs20TxBtn.reject { color: var(--ws20-danger); }
+.u4aWs20TxBtn.reject:hover { background: rgba(255, 92, 92, 0.12); }
+.u4aWs20TxBtnIcon { font-size: 14px; line-height: 1; }
+.u4aWs20TxBtnTxt { line-height: 1; }
+
+/* (B) 3분할 레이아웃 (구 sap.ui.layout.Splitter "designSplit") */
+.u4aWs20Split {
+  flex: 1 1 auto;
+  display: flex; flex-direction: row;
+  min-height: 0; min-width: 0;
+  overflow: hidden; /* 드래그 시 서브픽셀 반올림으로 가로 스크롤 생기는 것 방지 */
+  background: var(--ws20-bg);
+}
+/* 각 패널 (구 designTree / designPreview / designAttr) */
+.u4aWs20Panel {
+  display: flex; flex-direction: column;
+  min-height: 0; min-width: 0; overflow: hidden;
+  background: var(--ws20-panel);
+  border: 1px solid var(--ws20-line);
+}
+.u4aWs20PanelBody {
+  flex: 1 1 auto;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 0; min-width: 0; overflow: auto;
+}
+.u4aWs20PanelLabel {
+  font-size: 14px; font-weight: 600; color: var(--ws20-text-sub);
+  padding: 16px; text-align: center;
+}
+
+/* 패널 헤더 줄 (#ws20PrevHeader 등) — 높이 36px, 헤더 배경 */
+.u4aWs20PanelHdr {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  height: 36px; min-height: 36px; padding: 0 8px;
+  background: var(--ws20-header-bg);
+  border-bottom: 1px solid var(--ws20-line);
+  color: var(--ws20-text-strong);
+}
+.u4aWs20PanelHdrTitle { font-weight: 600; font-size: 13px; color: var(--text); }
+.u4aWs20PanelHdrSpacer { flex: 1 1 auto; }
+.u4aWs20PanelHdrBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  border: none; background: transparent; color: var(--ws20-btn);
+  border-radius: 4px; cursor: pointer; font-size: 14px; line-height: 1;
+  font-family: inherit;
+}
+.u4aWs20PanelHdrBtn:hover { background: var(--ws20-btn-hover); }
+
+/* 미리보기 헤더의 줌 슬라이더(비활성)/OFF 토글 — 정적, W2 예정 */
+.u4aWs20PrevZoom {
+  width: 90px; accent-color: var(--ws20-accent);
+  opacity: 0.45; cursor: default;
+}
+.u4aWs20PrevToggle {
+  display: inline-flex; align-items: center;
+  height: 18px; padding: 0 8px;
+  border: 1px solid var(--ws20-grip); border-radius: 9px;
+  color: var(--ws20-text-sub); font-size: 11px; line-height: 1;
+  user-select: none; cursor: default;
+}
+
+/* 미리보기 본문 — 원본처럼 흰 배경 */
+.u4aWsDesignPreview .u4aWs20PanelBody { background: #ffffff; }
+.u4aWsDesignPreview .u4aWs20PanelLabel { color: #9a9a9a; }
+
+/* 속성 패널 — 본문 상단 "Properties" 섹션 바(#ws20AttrSectionBar) + 중앙 라벨 */
+.u4aWsDesignAttr .u4aWs20PanelBody {
+  flex-direction: column; align-items: stretch; justify-content: flex-start;
+}
+.u4aWs20AttrSectionBar {
+  flex: 0 0 auto;
+  display: flex; align-items: center;
+  height: 32px; min-height: 32px; padding: 0 10px;
+  background: var(--ws20-header-bg);
+  color: var(--ws20-text-strong);
+  font-size: 13px; font-weight: 600;
+  border-bottom: 1px solid var(--ws20-line);
+}
+.u4aWsDesignAttr .u4aWs20PanelLabel {
+  flex: 1 1 auto;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* 드래그 리사이저 바 (구 Splitter 바) — 투명 + 중앙 점 그립(⋮⋮) */
+.u4aWs20Resizer {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+}
+.u4aWs20Resizer::after {
+  content: "\22EE\22EE"; /* ⋮⋮ */
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--ws20-grip);
+  font-size: 9px; line-height: 1; letter-spacing: -1px;
+  pointer-events: none;
+}
+.u4aWs20Resizer:hover::after { color: var(--ws20-accent); }
+/* 리사이즈 중 전역 커서 고정 (드래그 중 텍스트 선택 방지) */
+.u4aWs20ResizingCursor { cursor: col-resize !important; user-select: none !important; }
+/* 리사이즈 중 iframe(가운데 미리보기 등)이 mousemove 를 가로채 드래그가 끊기는 것 방지.
+ * 드래그 동안만 모든 iframe 의 포인터 이벤트를 꺼서 커서가 iframe 위를 지나도
+ * document 의 mousemove 가 계속 수신되게 한다. mouseup 시 클래스 제거로 원복. */
+.u4aWs20ResizingCursor iframe { pointer-events: none !important; }
+
+/* =====================================================================
+ * [HTML5 컨버전 — W3] WS20 좌측 "UI 트리"
+ *   구 sap.ui.table.TreeTable → 순수 HTML5 재귀 트리(<ul>/<li>) + 트리 툴바.
+ *   (ws_html5_ws20_tree.js 가 #ws20DesignTree 컨테이너에 렌더)
+ * ===================================================================== */
+
+/* 트리 패널 본문 (툴바 + 스크롤) — 패널 라벨 대신 채움 */
+.u4aWsDesignTree .u4aWs20PanelBody { align-items: stretch; justify-content: flex-start; }
+.u4aWs20TreeWrap {
+  display: flex; flex-direction: column;
+  width: 100%; height: 100%; min-height: 0;
+}
+
+/* (A) 트리 툴바 (구 OverflowToolbar) — 헤더 배경 + 연파랑 버튼 (삭제만 빨강) */
+.u4aWs20TreeToolbar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 2px; padding: 4px 6px;
+  background: var(--ws20-header-bg);
+  border-bottom: 1px solid var(--ws20-line);
+}
+.u4aWs20TreeTbBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 26px;
+  border: 1px solid transparent; background: transparent; color: var(--ws20-btn);
+  border-radius: 4px; cursor: pointer; font-size: 14px; line-height: 1;
+  font-family: inherit;
+}
+.u4aWs20TreeTbBtn:hover { background: var(--ws20-btn-hover); }
+.u4aWs20TreeTbBtn.reject { color: var(--ws20-danger); }
+.u4aWs20TreeTbBtn.reject:hover { background: rgba(255, 92, 92, 0.12); }
+.u4aWs20TreeTbBtn.accept { color: var(--ws20-btn); }
+.u4aWs20TreeTbIcon { pointer-events: none; }
+.u4aWs20TreeTbSep {
+  width: 1px; height: 18px; margin: 0 3px;
+  background: var(--ws20-sep);
+}
+
+/* (B) 트리 스크롤 영역
+ *    빈 행 그리드: 트리 내용이 끝나도 32px 행 보더가 패널 끝까지 이어져 보이게 */
+.u4aWs20TreeScroll {
+  flex: 1 1 auto; min-height: 0;
+  overflow: auto;
+  padding: 0;
+  background: var(--ws20-panel); /* ServerList 트리 컨셉 — 스트라이프 제거, 깔끔한 행 */
+}
+.u4aWs20TreeEmpty {
+  padding: 16px; text-align: center; color: var(--ws20-text-sub); font-size: 13px;
+}
+
+/* 재귀 트리 (구 TreeTable rows) */
+.u4aWs20Tree, .u4aWs20TreeChildren {
+  list-style: none; margin: 0; padding: 0;
+}
+.u4aWs20TreeNode { margin: 0; padding: 0; }
+
+/* WS20 트리 행 — 공통 .u4a-tree__row(shell.css) 위에 WS20 확장만:
+   우측정렬(aggr/액션 배치) + 행 높이(원본 ~40px) + 상태 highlight 컬러바.
+   (행/hover/선택/토글 기본 스타일은 shell.css .u4a-tree* 공통 컴포넌트가 제공) */
+.u4aWs20TreeRow {
+  justify-content: space-between;
+  height: 40px;
+  font-size: 13px;
+  border-left: 2px solid transparent;   /* highlight(상태) 컬러바 자리 */
+}
+.u4aWs20TreeRow.hl-Indication02 { border-left-color: var(--state-error); }   /* Error/Negative */
+.u4aWs20TreeRow.hl-Indication04 { border-left-color: var(--state-warning); } /* Warning */
+.u4aWs20TreeRow.hl-Indication08 { border-left-color: var(--state-info); }    /* Information */
+
+/* 토글 클릭 영역 확대 — 행 높이만큼 세로로 꽉, 가로 28px (펼치기 쉽게) */
+.u4aWs20TreeRow .u4a-tree__toggle {
+  width: 28px;
+  height: 40px;
+}
+
+.u4aWs20TreeRowLeft {
+  display: flex; align-items: center; gap: 4px;
+  min-width: 0; flex: 1 1 auto; overflow: hidden;
+}
+.u4aWs20TreeRowRight {
+  display: flex; align-items: center; gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* 체크박스 (구 sap.m.CheckBox) */
+.u4aWs20TreeChk {
+  flex: 0 0 auto; margin: 0 2px; cursor: pointer;
+  accent-color: var(--ws20-accent);
+}
+
+/* UI 아이콘 (구 sap.m.Image src="{UICON}") */
+.u4aWs20TreeIcon { flex: 0 0 auto; width: 18px; height: 18px; object-fit: contain; }
+
+/* UI 이름 (구 sap.m.Text "{OBJID}") */
+.u4aWs20TreeName {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* aggregation 라벨 (구 sap.m.ObjectStatus text="{UIATT}" icon="{UIATT_ICON}")
+ *   — 행 우측 정렬, 작은 글씨(12px) */
+.u4aWs20TreeAggr {
+  display: inline-flex; align-items: center; gap: 3px;
+  color: var(--ws20-aggr); font-size: 12px; white-space: nowrap;
+}
+.u4aWs20TreeAggrIcon { font-size: 10px; color: var(--ws20-aggr); }
+
+/* 행 액션 (구 add/delete Icon) — hover 시 노출 */
+.u4aWs20TreeActions {
+  display: inline-flex; align-items: center; gap: 2px;
+  visibility: hidden;
+}
+.u4aWs20TreeRow:hover .u4aWs20TreeActions { visibility: visible; }
+.u4aWs20TreeActBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px;
+  border: none; background: transparent; cursor: pointer;
+  border-radius: 3px; font-size: 13px; line-height: 1;
+  font-family: inherit;
+}
+.u4aWs20TreeActBtn.add { color: var(--ws20-btn); }
+.u4aWs20TreeActBtn.add:hover { background: var(--ws20-btn-hover); }
+.u4aWs20TreeActBtn.del { color: var(--ws20-danger); }
+.u4aWs20TreeActBtn.del:hover { background: rgba(255, 92, 92, 0.18); }
+
+/* =====================================================================
+ * [HTML5 컨버전 — W4] WS20 우측 "속성(Attribute) 패널"
+ *   구 sap.f.DynamicPage(타이틀/헤더) + sap.m.Table(라벨/값/40px×2)
+ *   → 순수 HTML5 (ws_html5_ws20_attr.js 가 #ws20DesignAttr 컨테이너에 렌더)
+ *   스크린샷 실측: 다크 네이비 패널(#15202e = --ws20-panel), 점선 밑줄 입력,
+ *   파란 채움 토글(Show Changed Items), 노란 테두리 팝업 버튼(Attention).
+ * ===================================================================== */
+
+/* 패널 본문을 속성 패널이 채움 */
+.u4aWs20AttrWrap {
+  display: flex; flex-direction: column;
+  width: 100%; height: 100%; min-height: 0;
+  background: var(--ws20-panel);
+  font-size: 13px; color: var(--ws20-text);
+}
+
+/* (a) 상단 헤더 — [UI 아이콘] [UI명(흰색 굵게)] … [UILIB] */
+.u4aWs20AttrHeader {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 6px;
+  height: 36px; min-height: 36px; padding: 0 8px;
+  background: var(--ws20-header-bg);
+  border-bottom: 1px solid var(--ws20-line);
+}
+.u4aWs20AttrHdrIcon { width: 20px; height: 20px; object-fit: contain; }
+.u4aWs20AttrHdrTitle {
+  color: var(--ws20-text-strong); font-weight: 700; font-size: 14px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.u4aWs20AttrHdrSpacer { flex: 1 1 auto; }
+.u4aWs20AttrHdrLib {
+  color: var(--ws20-text-sub); font-size: 12px; white-space: nowrap;
+  cursor: default; user-select: text;
+}
+.u4aWs20AttrHdrBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  border: 1px solid transparent; background: transparent; color: var(--ws20-btn);
+  border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1;
+  font-family: inherit;
+}
+.u4aWs20AttrHdrBtn:hover { background: var(--ws20-btn-hover); }
+
+/* (b) UI Object ID / Description 입력 영역 (구 DynamicPageHeader) */
+.u4aWs20AttrInfo {
+  flex: 0 0 auto;
+  padding: 6px 10px 8px 10px;
+  border-bottom: 1px solid var(--ws20-line);
+}
+.u4aWs20AttrInfoLbl {
+  margin: 6px 0 2px 0;
+  color: var(--ws20-text-strong); font-weight: 600; font-size: 12px;
+}
+.u4aWs20AttrInfoRow { display: flex; align-items: center; gap: 4px; }
+
+/* 값 입력 (구 sap.m.Input) — 공통 폼 필드 스타일(깔끔/고대비).
+   · 읽기전용(Display/non-edit): 보더 없는 일반 텍스트, 본문색(--text) 으로 또렷하게.
+   · 편집가능(Change & edit): "항상" 보더+입력 배경 → 어떤 게 입력 필드인지 한눈에 구분. */
+.u4aWs20AttrInp {
+  flex: 1 1 auto; min-width: 0;
+  background: transparent; color: var(--text);
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  padding: 6px 8px; font-size: 13px; font-family: inherit;
+  outline: none;
+}
+/* ★ 편집 가능 input(읽기전용/비활성 아님) — 평상시에도 보더+입력 배경으로 명확한 어포던스 */
+.u4aWs20AttrInp:not(:read-only):not(:disabled) {
+  border-color: var(--line);
+  background: var(--surface-raised, var(--surface));
+}
+.u4aWs20AttrInp:not(:read-only):not(:disabled):hover { border-color: var(--accent); background: var(--hover-bg); }
+.u4aWs20AttrInp:focus { border-color: var(--accent); background: var(--surface-raised, var(--surface)); }
+/* 읽기전용/비활성 — 보더·배경 없는 평문 텍스트(입력 필드 아님을 명확히) */
+.u4aWs20AttrInp:read-only { color: var(--text); cursor: default; background: transparent; border-color: transparent; }
+.u4aWs20AttrInp:disabled { color: var(--text-muted); background: transparent; border-color: transparent; }
+/* 에러 — 편집 가능 보더 규칙보다 우선하도록 specificity 확보 */
+.u4aWs20AttrInp.err,
+.u4aWs20AttrInp.err:not(:read-only):not(:disabled) { border-color: var(--error); color: var(--error); }
+
+/* Description textarea (구 sap.m.TextArea rows:4) */
+.u4aWs20AttrTxa {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  background: var(--surface-raised, var(--surface)); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 4px 6px; font-size: 13px; font-family: inherit;
+  outline: none;
+}
+.u4aWs20AttrTxa:focus { border-color: var(--accent); }
+.u4aWs20AttrTxa:disabled { color: var(--text-muted); }
+
+/* 작은 버튼 (⧉ 복사 / ∧ 접기 / 📌 핀) */
+.u4aWs20AttrSmBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; flex: 0 0 auto;
+  border: 1px solid transparent; background: transparent; color: var(--ws20-btn);
+  border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1;
+  font-family: inherit;
+}
+.u4aWs20AttrSmBtn:hover { background: var(--ws20-btn-hover); }
+.u4aWs20AttrSmBtn.pinned { background: var(--ws20-sel-bg); border-color: var(--ws20-accent); }
+
+/* (c) 접기/핀 작은 버튼 줄 */
+.u4aWs20AttrInfoCtl {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 1px 0;
+  border-bottom: 1px solid var(--ws20-line);
+}
+
+/* (d) 속성 툴바 — Reset … [Show Changed Items](파란 채움) [⋯] [?] */
+.u4aWs20AttrToolbar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 4px;
+  height: 34px; min-height: 34px; padding: 0 8px;
+  background: var(--ws20-header-bg);
+  border-bottom: 1px solid var(--ws20-line);
+}
+.u4aWs20AttrTbSpacer { flex: 1 1 auto; }
+.u4aWs20AttrTbBtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 24px; padding: 0 8px;
+  border: 1px solid transparent; background: transparent; color: var(--ws20-btn);
+  border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1;
+  font-family: inherit; white-space: nowrap;
+}
+.u4aWs20AttrTbBtn:hover { background: var(--ws20-btn-hover); }
+.u4aWs20AttrTbBtn.accept { color: var(--success); }
+/* Show Changed Items — 구 ToggleButton type:Emphasized(액센트 채움) */
+.u4aWs20AttrTbBtn.emph {
+  background: var(--ws20-accent); color: var(--selected-text); font-weight: 600;
+  border-color: var(--ws20-accent);
+}
+.u4aWs20AttrTbBtn.emph:hover { filter: brightness(1.1); }
+.u4aWs20AttrTbBtn.emph.pressed {
+  background: var(--accent-strong); color: var(--selected-text); border-color: var(--accent-strong);
+}
+
+/* (f) 속성 행 스크롤 영역 */
+.u4aWs20AttrRows {
+  flex: 1 1 auto; min-height: 0;
+  overflow: auto;
+}
+.u4aWs20AttrEmpty { padding: 16px; text-align: center; color: var(--ws20-text-sub); }
+
+/* 그룹 헤더 (구 Sorter group: Properties / Events / Aggregations …) */
+.u4aWs20AttrGroupHdr {
+  position: sticky; top: 0; z-index: 1;
+  padding: 7px 12px;
+  background: var(--ws20-header-bg);
+  color: var(--ws20-accent); font-weight: 700; font-size: 12px;
+  border-bottom: 1px solid var(--ws20-line);
+}
+
+/* 속성 행 — [라벨][값][아이콘][아이콘] (구 ColumnListItem). 행 높이 키움(가독성). */
+.u4aWs20AttrRow {
+  display: flex; align-items: center;
+  min-height: 40px; box-sizing: border-box; padding: 4px 6px 4px 12px;
+  border-bottom: 1px solid var(--ws20-line);
+}
+.u4aWs20AttrRow:hover { background: var(--ws20-hover-bg); }
+
+/* 라벨 셀 (좌) */
+.u4aWs20AttrRowLbl {
+  flex: 0 0 42%; min-width: 0;
+  display: flex; align-items: center; gap: 4px;
+  overflow: hidden;
+}
+.u4aWs20AttrLblTxt {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  cursor: pointer;
+}
+.u4aWs20AttrReqIcon { font-size: 10px; flex: 0 0 auto; }
+
+/* 변경된 행 — 구 changedDataMarker 의 .changeValue (라벨 파랑 강조) */
+.u4aWs20AttrRow.changeValue .u4aWs20AttrLblTxt {
+  color: var(--ws20-accent); font-weight: 700;
+}
+
+/* 값 셀 (우) */
+.u4aWs20AttrRowVal { flex: 1 1 auto; min-width: 0; }
+/* [공통 컴포넌트] 트레일링 아이콘 입력 메커니즘은 shell.css .u4a-field 가 담당.
+   WS20 는 속성 그리드에 맞춰 아이콘 크기/여백만 컴팩트하게 오버라이드. */
+.u4aWs20AttrValBox { --field-icon: 22px; --field-edge: 4px; }
+.u4aWs20AttrValBox .u4aWs20AttrInp.val { width: 100%; }
+
+/* DDLB — 공통 .u4a-combo 를 속성 그리드 행에 맞게 컴팩트/인라인화.
+   폼용 기본(.u4a-combo: 36px 보더 박스)은 빽빽한 속성 행에 과하게 크다 → 컴팩트화.
+   텍스트 입력과 동일 감성으로: 편집 가능 시 항상 보더 박스, 비활성은 투명 평문. */
+.u4aWs20AttrCombo {
+  width: 100%;
+  height: 32px;
+  padding: 0 4px 0 8px;
+  border-color: transparent;
+  background: transparent;
+}
+.u4aWs20AttrCombo .u4a-combo__text { font-size: 13px; }
+/* ★ 편집 가능 콤보(.is-disabled 아님) — 평상시에도 보더+입력 배경으로 명확한 어포던스 */
+.u4aWs20AttrCombo:not(.is-disabled) {
+  border-color: var(--line);
+  background: var(--surface-raised, var(--surface));
+}
+.u4aWs20AttrCombo:not(.is-disabled):hover { border-color: var(--accent); background: var(--hover-bg); }
+.u4aWs20AttrCombo:focus-visible,
+.u4aWs20AttrCombo[data-open="true"] {
+  border-color: var(--accent);
+  background: var(--surface-raised, var(--surface));
+  box-shadow: none;            /* 그리드에선 포커스 링 생략(컴팩트) */
+}
+.u4aWs20AttrCombo.is-disabled { pointer-events: none; opacity: var(--disabled-opacity, 0.5); }
+
+/* DDLB (구 sap.m.ComboBox — 네이티브 폴백 전용, 공통 폼 보더) */
+.u4aWs20AttrSel {
+  width: 100%;
+  background: var(--surface-raised, var(--surface)); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 3px 6px; font-size: 13px; font-family: inherit; outline: none;
+}
+.u4aWs20AttrSel:focus { border-color: var(--accent); }
+.u4aWs20AttrSel:disabled { color: var(--text-muted); }
+.u4aWs20AttrSel option { background: var(--ws20-panel); color: var(--ws20-text); }
+.u4aWs20AttrSel option.bind { color: var(--warning); }
+
+/* 체크박스 (구 sap.m.CheckBox) */
+.u4aWs20AttrChk { accent-color: var(--ws20-accent); cursor: pointer; margin: 0; }
+.u4aWs20AttrChk:disabled { cursor: default; }
+
+/* 팝업 호출형 버튼 (구 sap.m.Button type:Attention — 노란 테두리.
+   CSS Link Add / JS Link Add / Web Security Settings 등) */
+.u4aWs20AttrPopBtn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; height: 24px; padding: 0 8px;
+  border: 1px solid var(--ws20-grip); background: transparent; color: var(--ws20-text);
+  border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1;
+  font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.u4aWs20AttrPopBtn.attention { border-color: var(--warning); color: var(--warning); }
+.u4aWs20AttrPopBtn:hover { background: var(--ws20-btn-hover); }
+.u4aWs20AttrPopBtn:disabled { opacity: 0.55; cursor: default; }
+
+/* 아이콘 셀 ×2 (구 40px 컬럼 — 바인딩/help) */
+.u4aWs20AttrRowIc {
+  flex: 0 0 28px; display: flex; align-items: center; justify-content: center;
+}
+.u4aWs20AttrIcBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  border: none; background: transparent; color: var(--ws20-btn);
+  border-radius: 3px; cursor: pointer; font-size: 12px; line-height: 1;
+  font-family: inherit;
+}
+.u4aWs20AttrIcBtn:hover { background: var(--ws20-btn-hover); }
+
+/* ************************************************************************
+ * [HTML5 컨버전 — W2] WS20 중앙 "미리보기(Preview)" 영역
+ *   구: design/js/uiPreviewArea.js (sap.ui.core.HTML iframe + sap.m 툴바)
+ *   - iframe(#prevHTML) 내부는 "사용자가 만드는 대상 앱"(UI5) — 흰 배경 유지.
+ *   - 헤더(#ws20PrevHeader)의 ⟳/줌 슬라이더/풀스크린 토글/? 활성화 스타일.
+ * ************************************************************************ */
+
+/* 미리보기 iframe 래퍼 — 흰 배경(미리보기 앱 영역) */
+.u4aWs20PrevFrameWrap {
+  flex: 1 1 auto;
+  background: #ffffff;          /* 대상 앱 영역 — 다크 테마와 분리(흰 배경 유지) */
+  overflow: hidden;
+}
+.u4aWs20PrevFrameWrap > iframe#prevHTML {
+  display: block;
+  width: 100%; height: 100%;
+  border: 0;
+  background: #ffffff;
+}
+
+/* 패널 본문이 iframe 을 꽉 채우도록 (W1 라벨 중앙정렬 잔여 스타일 무력화) */
+#ws20DesignPreview > .u4aWs20PanelBody {
+  display: flex; flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 단축키 잠금 표시 아이콘 (구 sap.m.Avatar sap-icon://locked, visible:false) */
+.u4aWs20PrevLockIcon {
+  margin-left: 6px;
+  font-size: 12px; line-height: 1;
+  color: var(--ws20-danger);
+}
+
+/* 줌 슬라이더 — 활성화(W2) 상태 */
+.u4aWs20PrevZoom:not(:disabled) { cursor: pointer; }
+
+/* 풀스크린 토글 — ON 상태 (구 sap.m.Switch state:true) */
+.u4aWs20PrevToggle { cursor: pointer; user-select: none; }
+.u4aWs20PrevToggle.on {
+  background: var(--ws20-accent);
+  border-color: var(--ws20-accent);
+  color: var(--selected-text);
+}

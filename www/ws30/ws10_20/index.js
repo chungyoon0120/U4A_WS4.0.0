@@ -1,6 +1,19 @@
 /*************************************************************
- * @function - Node 글로벌 변수를 백업본으로부터 복구한다.
- *             UI5 attachInit 이후 호출.
+ * U4A Workspace - 메인 프레임 부트스트랩 (HTML5)
+ *
+ * [컨버전 메모]
+ *  - 원본은 UI5 부트스트랩(<script id="sap-ui-bootstrap">)을 동적 주입하고
+ *    attachInit 이후 vw_main(UI5 View)을 placeAt 했다.
+ *  - HTML5 버전에서는 UI5 로더를 제거하고, vw_main(HTML5)을 직접 마운트한다.
+ *  - Electron/Node 연동(IPC if-meta-info, parent 전역, getUserInfo 등)은 그대로 유지.
+ *************************************************************/
+
+// 중복 초기화 방지 플래그
+let _bMainFrameInited = false;
+
+
+/*************************************************************
+ * @function - Node 글로벌 복구 (UI5 미사용 시 no-op, 호환 위해 유지)
  *************************************************************/
 function _restoreNodeGlobals() {
 
@@ -20,67 +33,53 @@ function _restoreNodeGlobals() {
 
 
 /*************************************************************
- * @function - 메인화면 초기 렌더링
+ * @function - 메인화면 초기 렌더링 (HTML5 vw_main 마운트)
  *************************************************************/
 async function _initRendering() {
 
-    let sViewPath = parent.PATH.join(parent.__dirname, "views", "vw_main", "view.js");
+    let sViewPath = PATHINFO.WS10_20_ROOT + "/views/vw_main/view.js";
 
-    const oRes = await import(sViewPath);
+    // file:/// URL 로 변환 (윈도우 경로 → ESM import 가능 형태)
+    let URL = require('url');
+    let sViewUrl = URL.pathToFileURL(sViewPath).href;
+
+    const oRes = await import(sViewUrl);
     const oView = await oRes.getView();
 
-    oAPP.views.VW_MAIN = {};
     oAPP.views.VW_MAIN = oView;
 
-    let oMainAPP = oAPP.views.VW_MAIN.ui.APP;
+    let oContentDom = document.getElementById("content");
 
-    let oDelegate = {
-        onAfterRendering: async function () {
+    // HTML5 프레임을 #content 에 마운트
+    oView.mount(oContentDom);
 
-            oMainAPP.removeEventDelegate(oDelegate);
+    // (WS3.0 원형) #content 페이드인. 흰색 플래시는 --boot-bg 동기 캔버스로 방지됨.
+    jQuery(oContentDom).fadeIn({ duration: 1000 });
 
-            let oContentDom = document.getElementById("content");
-
-            jQuery(oContentDom).fadeIn({ duration: 1500 });
-
-            await oAPP.views.VW_MAIN.onViewReady();
-
-        }
-    };
-
-    oMainAPP.addEventDelegate(oDelegate);
-
-    oMainAPP.placeAt("content");
+    await oView.onViewReady();
 
 } // end of _initRendering
 
 
 /*************************************************************
- * @function - 부트스트립 로드 이후에 호출되는 이벤트
+ * @function - 메인 프레임 초기화 진입점
+ *             (원본 _data_sap_ui_oninit 의 HTML5 대체)
  *************************************************************/
-// async function _data_sap_ui_oninit() {
+async function _mainFrameInit() {
 
-//     _restoreNodeGlobals();
-
-//     await _initRendering();
-
-// } // end of _data_sap_ui_oninit
-
-/*************************************************************
- * @function - 부트스트립 로드 이후에 호출되는 이벤트
- *************************************************************/
-async function _data_sap_ui_oninit() {
+    if (_bMainFrameInited) {
+        return;
+    }
+    _bMainFrameInited = true;
 
     _restoreNodeGlobals();
 
+    // 로그인 유저 정보가 이미 있으면(로그인 후 새창) WS 본 앱을 바로 로드
     let oUserInfo = parent.getUserInfo();
-    if(oUserInfo){
+    if (oUserInfo) {
 
         document.getElementById("content").style.display = "none";
 
-        // // oContr.ui.ROOT_PAGE.destroyContent();
-        // oContr.ui.APP.destroy();
-        
         let oScript = document.createElement("script");
         oScript.src = "./js/library-preload.js";
 
@@ -89,9 +88,10 @@ async function _data_sap_ui_oninit() {
         return;
     }
 
+    // 로그인 전: HTML5 프레임(헤더+빈 바디)을 렌더링하고, 바디에 로그인 화면 로드
     await _initRendering();
 
-} // end of _data_sap_ui_oninit
+} // end of _mainFrameInit
 
 
 /**
@@ -138,11 +138,6 @@ IPCRENDERER.on('if-meta-info', (event, res) => {
         setBrowserKey(oMetadata.BROWSERKEY);
     }
 
-    // // 이동할 페이지
-    // if (oMetadata.EXEPAGE) {
-    //     onMoveToPage(oMetadata.EXEPAGE);
-    // }
-
     // 테마정보
     if (oMetadata.THEMEINFO) {
         setThemeInfo(oMetadata.THEMEINFO);
@@ -168,63 +163,25 @@ IPCRENDERER.on('if-meta-info', (event, res) => {
     // 타이틀 설정
     CURRWIN.setTitle("U4A Workspace - #Main");
 
-
     /******************************************************************************
-     * 🔥 UI5와 Electron Node의 충돌 방지 로직
-     *    - UI5 bootstrap 로드 전 글로벌 require/module 을 제거하고,
-     *      attachInit 이후 _restoreNodeGlobals() 로 복구한다.
+     * 🔥 메타 정보 수신 완료 → HTML5 메인 프레임 초기화
+     *    (원본은 이 시점에 UI5 bootstrap 을 주입했으나, HTML5 에서는 직접 init)
      ******************************************************************************/
+    _mainFrameInit();
 
-    (function () {
-        if (typeof module !== 'object' || typeof require !== 'function') {
-            return;
+});
+
+
+/******************************************************************************
+ * 🔧 [DEV] 직접 로드(메타 정보 IPC 미수신) 대비 폴백 초기화
+ *    - 정상 부팅에서는 if-meta-info 수신 시 init 되므로 아래는 거의 타지 않음.
+ *    - index.html 을 단독으로 띄워 빈 메인 프레임을 확인할 때 동작.
+ ******************************************************************************/
+window.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        if (!_bMainFrameInited) {
+            console.log("[DEV] if-meta-info 미수신 → 폴백 초기화 실행");
+            _mainFrameInit();
         }
-
-        console.log('[System] Node environment detected. Isolating global variables for UI5 bootstrap...');
-
-        window.__node = {
-            require: window.require,
-            module: window.module,
-            exports: window.exports
-        };
-
-        window.require = undefined;
-        window.module = undefined;
-        window.exports = undefined;
-    }());
-
-
-    /****************************************************************************
-     * 🔥 UI5 Bootstrap 삽입
-     ****************************************************************************/
-
-    (function () {
-
-        let oSettings = parent.WSUTIL.getWsSettingsInfo();
-        let oSetting_UI5 = oSettings.UI5;
-        let oBootStrap = oSetting_UI5.bootstrap;
-        let oThemeInfo = parent.getThemeInfo();
-        let sLangu = oSettings.globalLanguage;
-
-        let oScript = document.createElement('script');
-        oScript.id = 'sap-ui-bootstrap';
-
-        // 기본 bootstrap 속성 주입
-        for (const key in oBootStrap) {
-            oScript.setAttribute(key, oBootStrap[key]);
-        }
-
-        // 추가 속성 설정
-        oScript.setAttribute('data-sap-ui-theme', oThemeInfo.THEME);
-        oScript.setAttribute('data-sap-ui-language', sLangu);
-        oScript.setAttribute('data-sap-ui-libs', 'sap.m, sap.tnt, sap.ui.table, sap.ui.layout, sap.f, sap.ui.codeeditor, sap.ui.unified');
-        oScript.setAttribute('src', oSetting_UI5.resourceUrl);
-        oScript.setAttribute('data-sap-ui-resourceroots', JSON.stringify({ i18n_root: './' }));
-        oScript.setAttribute("data-sap-ui-oninit", "_data_sap_ui_oninit");
-
-        document.head.appendChild(oScript);
-
-    }());
-
-
+    }, 600);
 });
