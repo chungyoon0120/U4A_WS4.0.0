@@ -524,7 +524,7 @@
      *   - 우측 아이콘 2개: 자리만(정적) — 클릭 시 console.warn 가드
      *   - 텍스트 값은 fnUpdateWs20AppHeader 가 채움 (재진입 시마다 갱신)
      ************************************************************************/
-    function _appHdrIconBtn(sId, sGly, sTooltip) {
+    function _appHdrIconBtn(sId, sGly, sTooltip, fnClick) {
         var BTN = document.createElement("button");
         BTN.type = "button";
         BTN.id = sId;
@@ -533,8 +533,12 @@
         BTN.innerHTML = sGly; // FontAwesome 아이콘 HTML
         BTN.addEventListener("click", function () {
             try {
+                // 핸들러가 연결돼 있으면 실행, 아니면 미구현 가드(W2 예정).
+                if (typeof fnClick === "function") { fnClick(); return; }
                 console.warn("[HTML5][WS20] app header action not implemented (W2 예정):", sId);
-            } catch (e) { }
+            } catch (e) {
+                console.warn("[HTML5][WS20] app header action error:", sId, e && e.message);
+            }
         });
         return BTN;
     }
@@ -586,10 +590,18 @@
         // 아이콘 버튼 2개 (구 ws20_findBtn / ws20_newWinBtn) — 원본처럼 상태 텍스트 "바로 뒤"에 배치.
         //   · Find UI : 원본 sap-icon://sys-find(쌍안경) → binoculars. 타이틀바 전역검색(magnifying-glass)과
         //               구분되도록 의미 맞는 아이콘 사용. (A70 "Find UI")
-        //   · New Window : 원본 sap-icon://create + parent.onNewWindow → "새 창으로 열기" 의미의
-        //               up-right-from-square. (구 window-restore = 창 '복원' 컨트롤이라 의미 불일치)
+        //   · New Window : WS10 새창 버튼과 동일하게 통일 — 아이콘 window-restore(WS10 newWindowBtn 과
+        //               동일) + oAPP.events.ev_NewWindow(→ parent.onNewWindow(), Electron 메인프레임
+        //               새 창, sap 무관). 라벨도 WS10 과 같은 A09("새 창/New Window") 사용.
         HDR.appendChild(_appHdrIconBtn("ws20AppHeaderFindBtn", _fa("binoculars"), _msg("A70") + " (Ctrl+F)"));
-        HDR.appendChild(_appHdrIconBtn("ws20AppHeaderExportBtn", _fa("up-right-from-square"), _msg("B71") + " (Ctrl+N)"));
+        HDR.appendChild(_appHdrIconBtn("ws20AppHeaderExportBtn", _fa("window-restore"), _msg("A09") + " (Ctrl+N)", function () {
+            // WS10 ev_NewWindow 와 동일 경로 호출 (ws_events.js:966 → parent.onNewWindow())
+            if (oAPP.events && typeof oAPP.events.ev_NewWindow === "function") {
+                oAPP.events.ev_NewWindow();
+                return;
+            }
+            console.warn("[HTML5][WS20] ev_NewWindow not available");
+        }));
 
         // 스페이서 — 아이콘 클러스터 뒤(우측 남는 공간 흡수). 원본은 [상태][Find][New] 가 좌측에 모임.
         var SPC = document.createElement("span");

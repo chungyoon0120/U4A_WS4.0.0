@@ -2995,7 +2995,8 @@
         "sap-icon://border": "square",                      // event
         "sap-icon://complete": "check",                     // event(wait off)
         "sap-icon://color-fill": "diamond",                 // aggregation 0:1
-        "sap-icon://dimension": "diamond"                   // aggregation 0:N
+        "sap-icon://dimension": "diamond",                  // aggregation 0:N
+        "sap-icon://value-help": "square-caret-down"        // F4 값도움(원본 sap.m.Input showValueHelp 기본 아이콘) — 드롭다운 셰브론과 구분되는 네모틀 표현
     };
     // sap-icon → FontAwesome <i> 마크업. 못 찾으면 sFaFallback(기본 circle).
     function _iconHtml(sIcon, sFaFallback) {
@@ -3479,7 +3480,9 @@
                 F4.type = "button";
                 F4.className = "u4a-field__vh";
                 F4.title = "Value Help";
-                F4.innerHTML = '<i class="fa-solid fa-angle-down"></i>';
+                //원본 sap.m.Input showValueHelp 의 기본 값도움 아이콘(sap-icon://value-help) 재현.
+                // (구 fa-angle-down 은 DDLB 드롭다운과 동일해 혼동 → value-help 전용 글리프로 교체)
+                F4.innerHTML = _iconHtml("sap-icon://value-help");
                 F4.disabled = !bEnabled;
                 F4.addEventListener("click", function () {
                     console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT);
