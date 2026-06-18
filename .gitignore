@@ -2,3 +2,6 @@
 *.db-wal
 dist/
 node_modules/
+
+# 로컬 MCP 서버 설정 (머신 종속 경로 / 개인 환경) — 커밋 제외
+.mcp.json
