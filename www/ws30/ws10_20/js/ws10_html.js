@@ -296,7 +296,8 @@
      *   공통 헤더(WS10/WS20)의 T-CODE 입력(.u4a-tcode #sapTcode) Enter 시 호출.
      *   대문자화 → 정규식 검증(062) → 이력저장(fnSaveTCodeSuggestion)/SUGG갱신 → 실행.
      ********************************************************************/
-    function _runTcode(sValue) {
+    //   bSilent=true 면 입력칸(#sapTcode)에 값을 쓰지 않는다(예: SAP 로고 클릭 SMEN 실행).
+    function _runTcode(sValue, bSilent) {
         sValue = (sValue == null ? "" : String(sValue)).trim();
         if (sValue === "") { return; }
 
@@ -308,12 +309,12 @@
                 var sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "062", sTcode);
                 oAPP.common.fnShowFloatingFooterMsg("E", parent.getCurrPage(), sMsg);
             } catch (e) { }
-            var oClr = document.getElementById("sapTcode"); if (oClr) { oClr.value = ""; }
+            var oClr = document.getElementById("sapTcode"); if (oClr && !bSilent) { oClr.value = ""; }
             return;
         }
 
         // 대문자 반영 (원본 oSrchField.setValue(sTcode))
-        var oInp = document.getElementById("sapTcode"); if (oInp) { oInp.value = sTcode; }
+        var oInp = document.getElementById("sapTcode"); if (oInp && !bSilent) { oInp.value = sTcode; }
 
         // 이력 저장 + /SUGG/TCODE 모델 갱신 (원본 동일)
         try { oAPP.fn.fnSaveTCodeSuggestion(sTcode); } catch (e) { }
@@ -697,6 +698,21 @@
         return o;
     };
 
+    // 테마 스와치 버튼 (5종 테마 선택 트리거). 공통 헤더(AI 우측, SAP 로고 좌측)에 둔다.
+    function _buildThemeSwatch() {
+        var oSwatch = document.createElement("button");
+        oSwatch.className = "u4a-theme-swatch";
+        oSwatch.type = "button";
+        oSwatch.title = "Theme";
+        oSwatch.setAttribute("data-menu-anchor", "theme");
+        oSwatch.addEventListener("click", function () {
+            var sCur = (window.U4ATheme && window.U4ATheme.current()) || "horizon_white";
+            var aItems = THEMES.map(function (t) { return { key: t.key, text: t.text, icon: "circle-half-stroke", disabled: t.key === sCur }; });
+            _openMenuAt(oSwatch, aItems, function (it) { if (window.U4ATheme) { window.U4ATheme.apply(it.key); } }, "right");
+        });
+        return oSwatch;
+    }
+
     function _renderCommonHeader() {
         var o = document.createElement("div");
         o.className = "u4a-ws10__common";
@@ -713,30 +729,18 @@
         });
         o.appendChild(oAi);
 
-        var oEye = document.createElement("button");
-        oEye.className = "u4a-btn-icon";
-        oEye.type = "button";
-        oEye.title = "Light / Dark";
-        oEye.innerHTML = ICON.eyeSlash;
-        oEye.addEventListener("click", function () {
-            var sCur = (window.U4ATheme && window.U4ATheme.current()) || "horizon_white";
-            var sNext = (sCur === "horizon_dark") ? "horizon_white" : "horizon_dark";
-            if (window.U4ATheme) { window.U4ATheme.apply(sNext); }
-            oEye.innerHTML = (sNext === "horizon_dark") ? ICON.eyeSlash : ICON.eye;
-        });
-        o.appendChild(oEye);
+        // 테마 변경 버튼(스와치) — 눈(Light/Dark) 토글을 제거하고 이 자리로 이동.
+        o.appendChild(_buildThemeSwatch());
 
-        var oSwatch = document.createElement("button");
-        oSwatch.className = "u4a-theme-swatch";
-        oSwatch.type = "button";
-        oSwatch.title = "Theme";
-        oSwatch.setAttribute("data-menu-anchor", "theme");
-        oSwatch.addEventListener("click", function () {
-            var sCur = (window.U4ATheme && window.U4ATheme.current()) || "horizon_white";
-            var aItems = THEMES.map(function (t) { return { key: t.key, text: t.text, icon: "circle-half-stroke", disabled: t.key === sCur }; });
-            _openMenuAt(oSwatch, aItems, function (it) { if (window.U4ATheme) { window.U4ATheme.apply(it.key); } }, "right");
-        });
-        o.appendChild(oSwatch);
+        // SAP 로고 (svg) — T-CODE 좌측. 클릭 시 T-CODE 실행 로직으로 SMEN(SAP 메인메뉴) 실행.
+        var oSapLogo = document.createElement("img");
+        oSapLogo.className = "u4a-sap-logo";
+        oSapLogo.src = "../../svg/logos--sap.svg"; // www/svg/logos--sap.svg (logo.png 와 동일 기준)
+        oSapLogo.alt = "SAP";
+        oSapLogo.title = "SMEN";
+        oSapLogo.addEventListener("error", function () { oSapLogo.style.visibility = "hidden"; });
+        oSapLogo.addEventListener("click", function () { _runTcode("SMEN", true); });
+        o.appendChild(oSapLogo);
 
         var oTcode = document.createElement("input");
         oTcode.className = "u4a-tcode";

@@ -125,6 +125,22 @@
     filter: brightness(1.08);
 }
 
+/* SAP 로고 (헤더 우측, T-CODE 좌측) — 자체 색을 가진 svg 라 그대로 표시.
+   클릭 시 SMEN(SAP 메인메뉴) 실행 → 클릭 가능 표시. */
+.u4a-sap-logo {
+    height: 1.375rem;
+    width: auto;
+    margin: 0 0.25rem;
+    display: block;
+    flex: 0 0 auto;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+}
+
+.u4a-sap-logo:hover {
+    filter: brightness(1.1);
+}
+
 /* T-CODE 입력 (헤더용 컴팩트 인풋) */
 .u4a-tcode {
     width: clamp(7rem, 12vw, 12rem);

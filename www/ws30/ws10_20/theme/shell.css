@@ -123,6 +123,17 @@ a:hover {
           으로 강제 재계산한다. (드래그 중 텍스트 선택 방지) */
     -webkit-app-region: drag;
     user-select: none;
+    /* 창 포커스 상태 전환(활성↔비활성)을 부드럽게. opacity 트랜지션은 유한(끝나면
+       컴포지팅 레이어 해제)이라 위 app-region 경고(영구 레이어)에 해당하지 않는다. */
+    transition: opacity 0.15s ease;
+}
+
+/* ── 창 비활성(blur) 표시 ───────────────────────────────────────────
+   현재 브라우저 창에 포커스가 없으면 u4a-ui.js 가 <body>.u4a-window-blurred 를
+   달아 타이틀바를 살짝 흐리게(opacity) 한다 → "포커스 간 창/아닌 창" 시각 구분.
+   모든 셸(index/WS10/Login/ServerList) 공통. */
+body.u4a-window-blurred .u4a-titlebar {
+    opacity: 0.6;
 }
 
 .u4a-titlebar__logo {
@@ -771,8 +782,15 @@ button:focus-visible {
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
-    padding: 0.75rem 1rem;
+    /* 서버리스트 공통 Dialog(.modal-footer, bootstrap-skin.css)와 푸터 높이 통일 — 동일 패딩. */
+    padding: 0.5rem 0.875rem;
     border-top: 0.0625rem solid var(--divider);
+}
+
+/* 푸터 버튼 높이도 서버리스트 .btn-sm(31px) 과 동일하게 — .u4a-btn 기본 2rem(32px)이라
+   푸터가 1px 더 높던 차이를 제거(푸터 총 48px 일치). 푸터 안 버튼에만 한정. */
+.u4a-dialog__footer .u4a-btn {
+    height: 1.9375rem;
 }
 
 /* 리사이즈 그립(우하단) — U4AUI.makeDialogResizable 이 푸터 우하단 패딩 영역에 삽입.

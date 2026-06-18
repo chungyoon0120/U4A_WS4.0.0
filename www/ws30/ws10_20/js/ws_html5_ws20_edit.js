@@ -637,6 +637,10 @@
     if (typeof oAPP.fn.designUIAdd !== "function") {
         oAPP.fn.designUIAdd = function (oNode) { _showInsertPopup(oNode); };
     }
+    // 구 UI5 디자인 영역(uiDesignArea.js)이 designUIAdd 를 UI5 버전으로 덮어쓰더라도
+    // 부트스트랩 삽입 팝업(.u4a-dialog)을 호출할 수 있도록 안정적 핸들로 항상 노출.
+    // (WS20 디자인 다이얼로그 UX 통일 — UI5 sap.m.Dialog 대신 .u4a-dialog 사용)
+    oAPP.fn.designInsertPopupHtml5 = _showInsertPopup;
 
     /********************************************************************
      * UI 삽입 팝업 (구 callUIInsertPopup, sap.m.Dialog → HTML5 .u4a-dialog)

@@ -644,6 +644,50 @@
         });
     }
 
+    /**
+     * 창 포커스 상태 표시 — 현재 브라우저 창에 포커스가 없으면(blur) <body> 에
+     * u4a-window-blurred 클래스를 달아 타이틀바(.u4a-titlebar)를 살짝 흐리게 한다.
+     * (시각 처리는 shell.css) "포커스 간 창 / 아닌 창" 을 구분해 주기 위함.
+     * 모든 셸 화면(index/WS10/Login/ServerList) 공통, 전역 1회 호출.
+     *
+     * ★ DOM 의 window 'blur'/'focus' 는 쓰지 않는다 — 화면 안 iframe(자식 프레임)으로
+     *   포커스가 옮겨가기만 해도 부모 window 에서 blur 가 발화해, OS 창은 활성인데도
+     *   비활성으로 오판한다(Login 화면 등). → Electron 네이티브 창 포커스를 쓴다.
+     */
+    function initWindowFocusState() {
+        const CLS = "u4a-window-blurred";
+        const _set = function (bBlurred) {
+            if (!document.body) { return; }
+            document.body.classList.toggle(CLS, bBlurred);
+        };
+        const _applyInitial = function (bBlurred) {
+            if (document.body) { _set(bBlurred); }
+            else { document.addEventListener("DOMContentLoaded", function () { _set(bBlurred); }); }
+        };
+
+        // ① Electron 네이티브 창 포커스 — OS 창 활성 여부만 추적하므로 iframe 포커스
+        //    이동에 영향받지 않는다. (기존 _attachCurrentWindowEvents 와 동일 계열 신호)
+        try {
+            const oWin = require("@electron/remote").getCurrentWindow();
+            const _onFocus = function () { _set(false); };
+            const _onBlur = function () { _set(true); };
+            oWin.on("focus", _onFocus);
+            oWin.on("blur", _onBlur);
+            // 창 종료 시 remote 리스너 정리(누수 방지). 다른 곳의 focus/blur 리스너는
+            // 건드리지 않도록 우리가 단 핸들러만 지명 제거한다.
+            window.addEventListener("beforeunload", function () {
+                try { oWin.removeListener("focus", _onFocus); oWin.removeListener("blur", _onBlur); } catch (e) { }
+            });
+            _applyInitial(!oWin.isFocused());
+            return;
+        } catch (e) { /* remote 미가용(비-Electron 등) → ② 폴백 */ }
+
+        // ② 폴백: DOM window 포커스 (iframe 오발화 한계 있음, remote 없을 때만)
+        window.addEventListener("focus", function () { _set(false); });
+        window.addEventListener("blur", function () { _set(true); });
+        _applyInitial(!document.hasFocus());
+    }
+
     const U4AUI = {
         el: _el,
         createSelect: createSelect,
@@ -653,13 +697,17 @@
         btnLabel: btnLabel,
         makeDialogRecenter: makeDialogRecenter,
         makeDialogResizable: makeDialogResizable,
-        initTooltip: initTooltip
+        initTooltip: initTooltip,
+        initWindowFocusState: initWindowFocusState
     };
 
     global.U4AUI = U4AUI;
 
     // 커스텀 툴팁 전역 1회 초기화 (모든 화면 공통 — [data-tip] 요소에 자동 적용)
     try { initTooltip(); } catch (e) { }
+
+    // 창 포커스 상태(활성/비활성) 표시 전역 1회 초기화 (모든 셸 공통)
+    try { initWindowFocusState(); } catch (e) { }
 
     // CommonJS(Electron nodeIntegration) 환경에서도 require 가능하게
     if (typeof module === "object" && module.exports) {

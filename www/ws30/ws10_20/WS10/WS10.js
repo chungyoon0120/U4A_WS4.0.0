@@ -427,6 +427,21 @@
         return o;
     }
 
+    // 테마 스와치 버튼 (5종 테마 선택 트리거). 공통 헤더(AI 우측, SAP 로고 좌측)에 둔다.
+    function _buildThemeSwatch() {
+        const oSwatch = document.createElement("button");
+        oSwatch.className = "u4a-theme-swatch";
+        oSwatch.type = "button";
+        oSwatch.title = "Theme";
+        oSwatch.setAttribute("data-menu-anchor", "theme");
+        oSwatch.addEventListener("click", () => {
+            const sCur = (window.U4ATheme && window.U4ATheme.current()) || "horizon_white";
+            const aItems = THEMES.map((t) => Object.assign({}, t, { icon: "circle-half-stroke", disabled: t.key === sCur }));
+            _openMenuAt(oSwatch, aItems, (it) => _applyTheme(it.key), "right");
+        });
+        return oSwatch;
+    }
+
     function _renderCommonHeader() {
         const o = document.createElement("div");
         o.className = "u4a-ws10__common";
@@ -445,33 +460,18 @@
         });
         o.appendChild(oAi);
 
-        // 표시 토글(eye) — light/dark 빠른 전환
-        const oEye = document.createElement("button");
-        oEye.className = "u4a-btn-icon";
-        oEye.id = "themeModeBtn";
-        oEye.type = "button";
-        oEye.title = "Light / Dark";
-        oEye.innerHTML = ICON.eyeSlash;
-        oEye.addEventListener("click", () => {
-            const sCur = (window.U4ATheme && window.U4ATheme.current()) || "horizon_white";
-            const sNext = (sCur === "horizon_dark") ? "horizon_white" : "horizon_dark";
-            _applyTheme(sNext);
-            oEye.innerHTML = (sNext === "horizon_dark") ? ICON.eyeSlash : ICON.eye;
-        });
-        o.appendChild(oEye);
+        // 테마 변경 버튼(스와치) — 눈(Light/Dark) 토글을 제거하고 이 자리로 이동.
+        o.appendChild(_buildThemeSwatch());
 
-        // 테마 스와치 — 5종 테마 선택
-        const oSwatch = document.createElement("button");
-        oSwatch.className = "u4a-theme-swatch";
-        oSwatch.type = "button";
-        oSwatch.title = "Theme";
-        oSwatch.setAttribute("data-menu-anchor", "theme");
-        oSwatch.addEventListener("click", () => {
-            const sCur = (window.U4ATheme && window.U4ATheme.current()) || "horizon_white";
-            const aItems = THEMES.map((t) => Object.assign({}, t, { icon: "circle-half-stroke", disabled: t.key === sCur }));
-            _openMenuAt(oSwatch, aItems, (it) => _applyTheme(it.key), "right");
-        });
-        o.appendChild(oSwatch);
+        // SAP 로고 (svg) — T-CODE 좌측. 클릭 시 T-CODE 실행 로직으로 SMEN(SAP 메인메뉴) 실행.
+        const oSapLogo = document.createElement("img");
+        oSapLogo.className = "u4a-sap-logo";
+        oSapLogo.src = "../../../svg/logos--sap.svg"; // www/svg/logos--sap.svg (logo.png 와 동일 기준)
+        oSapLogo.alt = "SAP";
+        oSapLogo.title = "SMEN";
+        oSapLogo.addEventListener("error", () => { oSapLogo.style.visibility = "hidden"; });
+        oSapLogo.addEventListener("click", () => { _invoke("ev_TcodeRun", "SAP T-CODE: SMEN"); });
+        o.appendChild(oSapLogo);
 
         // SAP T-CODE 입력
         const oTcode = document.createElement("input");

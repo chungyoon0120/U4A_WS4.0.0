@@ -6570,12 +6570,20 @@
   oAPP.fn.designUIAdd = function(is_tree){
 
     if(!is_tree){
-      
+
       //단축키 잠금 해제처리.
       oAPP.fn.setShortcutLock(false);
 
       parent.setBusy("");
 
+      return;
+    }
+
+    //부트스트랩 삽입 팝업(.u4a-dialog)이 있으면 UI5 sap.m.Dialog 대신 그것을 사용.
+    //(WS20 디자인 다이얼로그 UX 통일 — ws_html5_ws20_edit.js _showInsertPopup,
+    // 최종적으로 동일한 designAddUIObject 를 호출하므로 추가 흐름은 동일)
+    if(typeof oAPP.fn.designInsertPopupHtml5 === "function"){
+      oAPP.fn.designInsertPopupHtml5(is_tree);
       return;
     }
 
