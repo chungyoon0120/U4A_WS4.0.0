@@ -272,66 +272,208 @@
 
         sendAjax(sPath, oFormData, function (oResult) {
 
-            if (oResult.RETCD == "E") {
-
-                // 스크립트가 있으면 eval 처리
-                //   [HTML5] 서버 SCRIPT 가 UI5(sap) 의존 코드를 담아 보낼 수 있어, sap 미정의로
-                //   ReferenceError → window.onerror(ws_trycatch) → APP.exit() 로 앱이 강제종료되던
-                //   회귀를 try/catch 로 차단(앱 유지 + busy 해제 보장). 실패 시 서버 메시지로 폴백.
-                if (oResult.SCRIPT) {
-
-                    try {
-                        eval(oResult.SCRIPT);
-                    } catch (e) {
-                        console.error("[HTML5] /app_copy SCRIPT eval 실패 (UI5 의존 추정):", e && e.message, oResult.SCRIPT);
-                        if (oResult.RTMSG) { APPCOMMON.fnShowFloatingFooterMsg("E", parent.getCurrPage(), oResult.RTMSG); }
-                    }
-
-                    parent.setBusy('');
-
-                    return;
-                }
-
-                parent.showMessage(null, 20, 'E', oResult.RTMSG);
-
-                parent.setBusy('');
-
-                return;
-
-            }
-
-            // APP 복사 성공 → 대상 앱으로 Change 모드 진입.
-            //   서버 SCRIPT 는 UI5 의존(sap.ui.getCore().byId('AppNmInput').setValue +
-            //   appChangeBtn.firePress)이라 HTML5 에선 byId()=null 로 크래시. eval 하지 않고
-            //   공통 진입점 onAppCrAndChgMode(앱명 세팅 + ev_AppChange)로 동일 동작 수행한다.
-            //   (생성 팝업 createApplicationPopup 성공 처리와 동일 패턴)
+            // 복사 성공이면 복사 팝업을 먼저 닫는다(이후 SCRIPT 가 화면전환 수행).
             if (oResult.RETCD == "S") {
-
-                // 복사 팝업 닫기
                 lf_AppCopyPopupClose();
+            }
 
-                // 대상 앱 Change 모드 진입(자체 busy 처리 — 화면 전환 = 성공 피드백).
-                try {
-                    if (typeof window.onAppCrAndChgMode === "function") {
-                        window.onAppCrAndChgMode(sTargetAppId);
-                    }
-                } catch (e) {
-                    console.error("[HTML5] app_copy onAppCrAndChgMode 실패:", e && e.message);
-                }
+            // 서버가 케이스별로 내려준 SCRIPT 를 그대로 수행한다.
+            //   분기는 "스크립트가 호출하는 심볼" 이 결정한다(문자열 파싱 아님):
+            //     · byId('AppNmInput').setValue + appChangeBtn.firePress → Change 모드(성공/정상)
+            //     · 〃                          + displayBtn.firePress    → Display 모드(성공/제한)
+            //     · lf_appCopyCtsPopup()                                  → CTS 팝업(비로컬 패키지)
+            //     · parent.showMessage(sap,…)                             → 각종 검증 실패 메시지
+            //   UI5 의존 심볼은 _evalServerScript 가 "이 스코프 한정" 으로 HTML5 동작에
+            //   연결(전역 sap 스텁 무영향). 메시지 텍스트가 바뀌어도 안 깨진다.
+            if (oResult.SCRIPT) {
 
+                // 화면전환/CTS 팝업이 busy 가드에 막히지 않게 먼저 해제.
+                //   (성공 스크립트는 ev_AppChange/ev_AppDisplay 가 다시 busy 를 건다)
                 parent.setBusy('');
+
+                try {
+                    _evalServerScript(oResult.SCRIPT);
+                } catch (e) {
+                    console.error("[HTML5] /app_copy SCRIPT 수행 실패:", e && e.message, oResult.SCRIPT);
+                    if (oResult.RTMSG) {
+                        parent.showMessage(null, 20, (oResult.RETCD === "S" ? "S" : "E"), _relocalizeBakedMsg(oResult.RTMSG));
+                    }
+                }
 
                 return;
             }
 
-            // 성공이지만 위 분기에 안 걸린 경우 — 서버 메시지로 폴백.
-            parent.showMessage(null, 20, 'S', oResult.RTMSG);
+            // SCRIPT 가 없는 응답(예: 타깃 객체 존재 220 — RTMSG 만) — 서버 메시지로 폴백.
+            parent.showMessage(null, 20, (oResult.RETCD === "E" ? "E" : "S"), _relocalizeBakedMsg(oResult.RTMSG));
 
             parent.setBusy('');
 
         });
 
     }; // end of oAPP.fn.fnSetAppCopy
+
+    /************************************************************************
+     * (Local) 서버 SCRIPT 수행 — UI5 의존 심볼을 "이 스코프 한정" 으로 HTML5 동작에 연결.
+     * ---------------------------------------------------------------------
+     *  /app_copy(/U4A/WS000002 FORM APP_COPY) 응답 SCRIPT 는 케이스별로 서로 다른
+     *  UI5 심볼을 호출한다. 전역 sap 스텁(byId→null)을 기능형으로 바꾸면 byId('AppNmInput')
+     *  null 반환을 전제로 가드된 코드(ws_events/ws_fn_*)가 회귀하므로, 여기서만 기능하는
+     *  지역 sap.byId shim + lf_appCopyCtsPopup 을 두고 eval 한다(strict eval 은 바깥
+     *  지역변수를 "읽기" 가능 — 새 전역을 만들지 않음).
+     *    · byId('AppNmInput').setValue/getValue → WS10 앱명 DOM
+     *    · byId('appChangeBtn').firePress()     → ev_AppChange (Change 모드)
+     *    · byId('displayBtn').firePress()       → ev_AppDisplay (Display 모드)
+     *    · lf_appCopyCtsPopup()                 → CTS(전송요청) 팝업
+     *    · parent.showMessage(sap,…)            → 메시지(부모 showMessage 가 sap 인자 무시)
+     ************************************************************************/
+    function _evalServerScript(sScript) {
+        // 서버 스크립트가 참조하는 지역 심볼(아래 sap / lf_appCopyCtsPopup).
+        // eslint-disable-next-line no-unused-vars
+        var sap = {
+            ui: {
+                getCore: function () {
+                    return {
+                        byId: function (sId) {
+                            if (sId === "AppNmInput") {
+                                var el = document.getElementById("AppNmInput");
+                                return {
+                                    setValue: function (v) { if (el) { el.value = (v == null ? "" : v); } },
+                                    getValue: function () { return el ? el.value : ""; }
+                                };
+                            }
+                            if (sId === "appChangeBtn") { return { firePress: function () { oAPP.events.ev_AppChange(); } }; }
+                            if (sId === "displayBtn") { return { firePress: function () { oAPP.events.ev_AppDisplay(); } }; }
+                            return null;
+                        }
+                    };
+                }
+            }
+        };
+        // eslint-disable-next-line no-unused-vars
+        var lf_appCopyCtsPopup = _appCopyCtsPopup;
+
+        // 백엔드가 "구운 텍스트"(백엔드 로그온 언어)로 내려준 검증실패 메시지를
+        //   워크스페이스 언어로 재현지화 — 이 eval 동안만 parent.showMessage 를 감싼다.
+        //   (성공 스크립트는 showMessage 를 안 부르므로 영향 없음. CTS 케이스도 무관.)
+        var _origShowMessage = parent.showMessage;
+        parent.showMessage = function (oUI5, kind, type, sMsg, fnCb) {
+            return _origShowMessage.call(parent, oUI5, kind, type, _relocalizeBakedMsg(sMsg), fnCb);
+        };
+
+        try {
+            // eslint-disable-next-line no-eval
+            eval(sScript);
+        } finally {
+            parent.showMessage = _origShowMessage;
+        }
+    }
+
+    // 백엔드 언어별 "파라미터(&) 템플릿" 캐시(REMOTE 왕복 1회 후 정규식 컴파일 보관).
+    var _oParamTmplCache = {};
+
+    /************************************************************************
+     * (Local) baked 메시지 재현지화 — 백엔드가 메시지번호 없이 텍스트만 구워 보낼 때,
+     *   그 텍스트를 백엔드 언어 DB 에서 역조회 → 키 확보 → 워크스페이스 언어로 재현지화.
+     * ---------------------------------------------------------------------
+     *  1) 완전일치 역조회 — 파라미터 없는 메시지(예: /U4A/MSG_WS 163).
+     *  2) 템플릿 역매칭 — 파라미터(&1..) baked 메시지(008/050/073/220 등). 백엔드가
+     *     &1 을 값으로 치환해버려 완전일치는 실패하므로, 템플릿의 & 자리를 와일드카드로
+     *     매칭 → 파라미터 추출 → fnGetMsgClsText(번호, 파라미터)로 워크스페이스 언어 재구성.
+     *  둘 다 실패하면 원문 폴백(예: SAP 시스템 메시지 — 우리 메시지클래스에 키 없음).
+     *  ※ 백엔드 ABAP 의 MESSAGE Exxx INTO(=백엔드 언어로 구움)를 못 고칠 때의 클라이언트 우회.
+     ************************************************************************/
+    function _relocalizeBakedMsg(sText) {
+        if (typeof sText !== "string" || sText === "") { return sText; }
+        try {
+            var sWsLangu = (parent.getUserInfo() || {}).LANGU;        // 워크스페이스(화면) 언어
+            var sBeLangu = (parent.getServerInfo() || {}).LANGU;      // 백엔드 로그온 언어(구운 언어)
+            if (!sBeLangu || sBeLangu === sWsLangu) { return sText; } // 언어 같으면 손댈 필요 없음
+
+            // 1) 완전일치(파라미터 없는 메시지).
+            var oKey = REMOTE.getGlobal("WsMsgCls").findKeyByText(sBeLangu, sText);
+            if (oKey && oKey.ARBGB) {
+                var sLocal = APPCOMMON.fnGetMsgClsText(oKey.ARBGB, oKey.MSGNR);
+                if (sLocal && sLocal.indexOf("|") === -1) { return sLocal; }
+            }
+
+            // 2) 템플릿 역매칭(파라미터 있는 메시지).
+            var aTmpl = _getParamTemplates(sBeLangu);
+            for (var i = 0; i < aTmpl.length; i++) {
+                var m = aTmpl[i].re.exec(sText);
+                if (!m) { continue; }
+                // 캡처값(텍스트 순서) → 자리표시자 번호(&n) 슬롯에 배치 → p1..p4.
+                var p = ["", "", "", ""];
+                var aSlots = aTmpl[i].slots;
+                for (var g = 1; g < m.length; g++) {
+                    var slot = aSlots[g - 1];
+                    if (slot >= 1 && slot <= 4) { p[slot - 1] = m[g]; }
+                }
+                var sLoc = APPCOMMON.fnGetMsgClsText(aTmpl[i].ARBGB, aTmpl[i].MSGNR, p[0], p[1], p[2], p[3]);
+                if (sLoc && sLoc.indexOf("|") === -1) { return sLoc; }
+            }
+
+            return sText; // 어느 것도 못 잡음(예: SAP 시스템 메시지) → 원문.
+        } catch (e) {
+            return sText;
+        }
+    }
+
+    /************************************************************************
+     * (Local) 백엔드 언어 "파라미터 템플릿" 목록을 정규식으로 컴파일해 캐시 반환.
+     *   리터럴 많은(=구체적인) 템플릿이 먼저 매칭되도록 정렬 → 오매칭 최소화.
+     ************************************************************************/
+    function _getParamTemplates(sLangu) {
+        if (_oParamTmplCache[sLangu]) { return _oParamTmplCache[sLangu]; }
+
+        var aRows = [];
+        try { aRows = REMOTE.getGlobal("WsMsgCls").getParamTemplates(sLangu) || []; } catch (e) { aRows = []; }
+
+        var aCompiled = [];
+        aRows.forEach(function (r) {
+            var re = _tmplToRegex(r.TEXT);
+            if (!re) { return; }
+            aCompiled.push({
+                ARBGB: r.ARBGB, MSGNR: r.MSGNR, re: re,
+                slots: _tmplSlots(r.TEXT),
+                litLen: r.TEXT.replace(/&[1-4]|&/g, "").length // 리터럴 길이(구체성)
+            });
+        });
+        // 구체적인(리터럴 긴) 템플릿 우선.
+        aCompiled.sort(function (a, b) { return b.litLen - a.litLen; });
+
+        _oParamTmplCache[sLangu] = aCompiled;
+        return aCompiled;
+    }
+
+    // 템플릿 TEXT → 앵커 정규식(리터럴 이스케이프 + &/&n → 캡처그룹).
+    function _tmplToRegex(sText) {
+        try {
+            var sEsc = sText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // 정규식 특수문자 이스케이프(& 는 비특수 → 보존)
+            sEsc = sEsc.replace(/&[1-4]/g, "(.+?)").replace(/&/g, "(.+?)"); // &n 먼저(긴 토큰 우선)
+            return new RegExp("^" + sEsc + "$");
+        } catch (e) { return null; }
+    }
+
+    // 템플릿 자리표시자 등장순서 → 파라미터 슬롯번호 배열(&n→n, 바깥 &→1부터 순차).
+    function _tmplSlots(sText) {
+        var aTokens = sText.match(/&[1-4]|&/g) || [];
+        var iPos = 0, aSlots = [];
+        aTokens.forEach(function (t) {
+            if (t.length === 2) { aSlots.push(parseInt(t.charAt(1), 10)); }
+            else { iPos += 1; aSlots.push(iPos); }
+        });
+        return aSlots;
+    }
+
+    /************************************************************************
+     * (Local) APP 복사 전용 CTS(전송요청) 팝업 — 구 lf_appCopyCtsPopup.
+     *   요청번호 선택 후 그 TRKORR 로 복사를 재수행한다.
+     ************************************************************************/
+    function _appCopyCtsPopup() {
+        oAPP.fn.fnCtsPopupOpener(function (oResult) {
+            oAPP.fn.fnSetAppCopy(oResult);
+        });
+    }
 
     /************************************************************************
      * Application Copy Dialog After Close Event (원본 호환 유지)

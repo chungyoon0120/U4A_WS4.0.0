@@ -702,7 +702,7 @@
         var LEFT = _buildPanel("ws20DesignTree", "u4aWsDesignTree", "UI 트리 — W3 예정");
         LEFT.style.flex = "0 1 25%";   // 0 1 = 창 좁아지면 같이 줄어듦(속성패널이 안 숨게)
         LEFT.style.minWidth = "96px";  // 하드 플로어(창 강제축소 시 이 이하론 안 줄어 사라지지 않게)
-        LEFT.dataset.dragMin = "260";  // 스플릿바 드래그 시 적정 최소폭(창 축소와 분리)
+        LEFT.dataset.dragMin = "300";  // 스플릿바 드래그 시 적정 최소폭 — 우측 속성패널(300)과 통일
 
         // 중: 미리보기 (구 designPreview, 나머지)
         var CENTER = _buildPanel("ws20DesignPreview", "u4aWsDesignPreview", "미리보기 — W2 예정");
@@ -716,7 +716,7 @@
         var RIGHT = _buildPanel("ws20DesignAttr", "u4aWsDesignAttr", "속성 — W4 예정");
         RIGHT.style.flex = "0 1 30%";  // 0 1 = 창 좁아지면 같이 줄어듦(이 패널이 안 숨게)
         RIGHT.style.minWidth = "96px"; // 하드 플로어(좌측 트리와 동일)
-        RIGHT.dataset.dragMin = "260"; // 스플릿바 드래그 최소폭 — 좌측 트리(260)와 통일
+        RIGHT.dataset.dragMin = "300"; // 스플릿바 드래그 최소폭 — 속성 내용(드롭다운+링크아이콘) 안 잘리게 300, 좌측 트리와 통일
 
         // 패널 맵 보관(레이아웃 변경 시 재배치용) + 저장된 순서대로 배치/리사이저 바인딩.
         //   (구 setDesignLayout / sap.ui.layout.Splitter content 순서 = P13N "designLayout")

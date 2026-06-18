@@ -176,6 +176,21 @@
         URL: "./js/ws_html5_ws20_edit.js",
         MIMETYPE: "script"
     },
+    // [UI5 제거] WS30 USP 코드에디터 HTML5 — shell/원본 ws_usp*.js "뒤"에 순서대로 로드.
+    //   usp(셸+나브+속성+문서+overrides) → usp_tree(트리) → usp_editor(Monaco iframe).
+    //   shell 의 fnOnMoveToPage("WS30") 와 원본 UI5 빌더(fnMoveToWs30/fnUspTreeTableRowSelect)를 override.
+    {
+        URL: "./js/usp/ws_html5_usp.js",
+        MIMETYPE: "script"
+    },
+    {
+        URL: "./js/usp/ws_html5_usp_tree.js",
+        MIMETYPE: "script"
+    },
+    {
+        URL: "./js/usp/ws_html5_usp_editor.js",
+        MIMETYPE: "script"
+    },
     ];
 
     oAPP.loadLibrary = function (scripts, index, fnCallback) {

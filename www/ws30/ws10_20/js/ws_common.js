@@ -462,7 +462,13 @@
             return "X";
         }
 
-        // 화면에 메뉴 팝업이 떠있을 경우 단축키 실행 불가.
+        // [HTML5] 드롭다운 메뉴(.u4a-menu: 윈도우메뉴/오버플로/split 등)가 떠 있으면 단축키 실행 불가.
+        if (document.querySelector(".u4a-menu")) {
+            zconsole.log("!! (HTML5) 메뉴가 떠 있어서 단축기 실행 불가!!");
+            return "X";
+        }
+
+        // 화면에 메뉴 팝업이 떠있을 경우 단축키 실행 불가. (구 UI5 sapMMenu — HTML5 엔 없어 통과)
         var oMenuDom = document.querySelector(".sapMMenu");
         if (oMenuDom) {
             var sId = oMenuDom.id,
@@ -473,7 +479,7 @@
             }
         }
 
-        // 현재 Dialog Popup이 실행 되어 있는지 확인.
+        // 현재 Dialog Popup이 실행 되어 있는지 확인. (HTML5 native <dialog open> 도 fnCheckIsDialogOpen 이 봄)
         var bIsDialogOpen = oAPP.fn.fnCheckIsDialogOpen();
         if (bIsDialogOpen) {
             zconsole.log("!! Dialog 팝업이 떠 있어서 단축기 실행 불가!!");
@@ -508,6 +514,10 @@
         }
 
         // 4. 화면에 메뉴 팝업이 떠있는 상태인지?
+        //    [HTML5] 드롭다운 메뉴(.u4a-menu) 또는 구 UI5(.sapMMenu).
+        if (document.querySelector(".u4a-menu")) {
+            return true;
+        }
         var oMenuDom = document.querySelector(".sapMMenu");
         if (oMenuDom) {
             var sId = oMenuDom.id,
@@ -517,7 +527,7 @@
             }
         }
 
-        // 5. 현재 Dialog Popup이 실행 되어 있는지?
+        // 5. 현재 Dialog Popup(화면에 팝업)이 떠 있는지? (HTML5 native <dialog open> 포함 — fnCheckIsDialogOpen)
         var bIsDialogOpen = oAPP.fn.fnCheckIsDialogOpen();
         if (bIsDialogOpen) {
             return true;
@@ -1155,21 +1165,16 @@
                         return;
                     }
 
-                    if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    // 단축키 실행 할지 말지 여부 체크 (busy/락/메뉴/팝업 가드 — HTML5-safe)
+                    if (oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
                         return;
                     }
 
-                    // 단축키 실행 할지 말지 여부 체크
-                    var result = oAPP.common.fnShortCutExeAvaliableCheck();
-
-                    // X 이면 실행 불가
-                    if (result == "X") {
-                        return;
-                    }
-
-                    var oChangeModeBtn = sap.ui.getCore().byId("changeModeBtn"),
-                        oDisplayBtn = sap.ui.getCore().byId("displayModeBtn");
+                    // [HTML5] sap.ui.getCore().byId → DOM 버튼. 표시 토글은 fnUpdateWs20Toolbar 가
+                    //   style.display 로 처리(조회/변경 중 한쪽만 display!=="none") → 보이는 쪽을
+                    //   click(= ev_pressDisplayModeBtn) 해서 모드 전환. firePress 대체.
+                    var oChangeModeBtn = document.getElementById("changeModeBtn"),
+                        oDisplayBtn = document.getElementById("displayModeBtn");
 
                     if (!oChangeModeBtn && !oDisplayBtn) {
                         return;
@@ -1180,18 +1185,17 @@
                         document.activeElement.blur();
                     }
 
-                    var bIsChgVisi = oChangeModeBtn.getVisible(),
-                        bIsDisVisi = oDisplayBtn.getVisible();
-
-                    if (bIsChgVisi == true) {
+                    // Display(조회) 모드 → changeModeBtn(변경으로) 가 보임
+                    if (oChangeModeBtn && oChangeModeBtn.style.display !== "none") {
                         oChangeModeBtn.focus();
-                        oChangeModeBtn.firePress();
+                        oChangeModeBtn.click();
                         return;
                     }
 
-                    if (bIsDisVisi == true) {
+                    // Change(변경) 모드 → displayModeBtn(조회로) 가 보임
+                    if (oDisplayBtn && oDisplayBtn.style.display !== "none") {
                         oDisplayBtn.focus();
-                        oDisplayBtn.firePress();
+                        oDisplayBtn.click();
                         return;
                     }
 
@@ -1201,36 +1205,26 @@
                 KEY: "Ctrl+F3", // [WS20] Activate Button
                 DESC: oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B73"), // Activate
                 CODE: `new sap.m.Button({icon: "sap-icon://activate"})`,
-                fn: async (e) => {
+                fn: (e) => {
                     e.stopImmediatePropagation();
 
                     if (e.repeat === true) {
                         return;
                     }
 
-                    var oActivateBtn = sap.ui.getCore().byId("activateBtn");
-                    if (!oActivateBtn || !oActivateBtn.getEnabled() || !oActivateBtn.getVisible()) {
+                    // [HTML5] sap.ui.getCore().byId → DOM 버튼. 활성/표시도 DOM 기준(sap 참조 제거).
+                    var oActivateBtn = document.getElementById("activateBtn");
+                    if (!oActivateBtn || oActivateBtn.disabled ||
+                        oActivateBtn.hidden || oActivateBtn.style.display === "none") {
                         return;
                     }
 
-                    if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
-                        return;
-                    }
-
-                    // 단축키 실행 할지 말지 여부 체크
-                    var result = oAPP.common.fnShortCutExeAvaliableCheck();
-
-                    // X 이면 실행 불가
-                    if (result == "X") {
+                    // 단축키 실행 할지 말지 여부 체크 (busy/락/메뉴/다이얼로그 가드 — HTML5-safe)
+                    if (oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
                         return;
                     }
 
                     // Active 버튼 누르기 전 커서의 위치를 저장한다.
-                    if (oAPP.attr.beforeActiveElement) {
-                        delete oAPP.attr.beforeActiveElement;
-                    }
-
                     oAPP.attr.beforeActiveElement = document.activeElement;
 
                     // 커서 포커스 날리기
@@ -1240,23 +1234,8 @@
 
                     oActivateBtn.focus();
 
-                    sap.ui.getCore().lock();
-
-                    await new Promise((resolve) => {
-
-                        var _ointer = setInterval(() => {
-
-                            if (parent.getBusy() === "X") { return; }
-
-                            clearInterval(_ointer);
-
-                            resolve();
-
-                        }, 0);
-
-                    });
-
-                    oActivateBtn.firePress();
+                    // [HTML5] firePress → click (버튼 click 핸들러가 oAPP.events.ev_pressActivateBtn 호출)
+                    oActivateBtn.click();
 
                 }
             },
@@ -1283,7 +1262,7 @@
                 KEY: "Ctrl+S", // [WS20] Save Button
                 DESC: oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A64"), // Save
                 CODE: `new sap.m.Button({icon: "sap-icon://save"})`,
-                fn: async (e) => {
+                fn: (e) => {
 
                     e.stopImmediatePropagation();
 
@@ -1291,29 +1270,19 @@
                         return;
                     }
 
-                    var oSaveBtn = sap.ui.getCore().byId("saveBtn");
-                    if (!oSaveBtn || !oSaveBtn.getEnabled() || !oSaveBtn.getVisible()) {
+                    // [HTML5] sap.ui.getCore().byId → DOM 버튼. 활성/표시도 DOM 기준(sap 참조 제거).
+                    var oSaveBtn = document.getElementById("saveBtn");
+                    if (!oSaveBtn || oSaveBtn.disabled ||
+                        oSaveBtn.hidden || oSaveBtn.style.display === "none") {
                         return;
                     }
 
-                    if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    // 단축키 실행 할지 말지 여부 체크 (busy/락/메뉴/다이얼로그 가드 — HTML5-safe)
+                    if (oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
                         return;
                     }
 
-                    // 단축키 실행 할지 말지 여부 체크
-                    var result = oAPP.common.fnShortCutExeAvaliableCheck();
-
-                    // X 이면 실행 불가
-                    if (result == "X") {
-                        return;
-                    }
-
-                    // Active 버튼 누르기 전 커서의 위치를 저장한다.
-                    if (oAPP.attr.beforeActiveElement) {
-                        delete oAPP.attr.beforeActiveElement;
-                    }
-
+                    // Save 버튼 누르기 전 커서의 위치를 저장한다.
                     oAPP.attr.beforeActiveElement = document.activeElement;
 
                     // 커서 포커스 날리기
@@ -1323,22 +1292,41 @@
 
                     oSaveBtn.focus();
 
-                    sap.ui.getCore().lock();
+                    // [HTML5] firePress → click (버튼 click 핸들러가 oAPP.events.ev_pressSaveBtn 호출)
+                    oSaveBtn.click();
 
-                    await new Promise((resolve) => {
+                }
+            },
+            {
+                KEY: "F8", // [WS20] Application Execution (실행) — 원본 앱헤더 ev_pressAppExecBtn (F8)
+                DESC: oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A06"), // Application Execution
+                fn: (e) => {
 
-                        var _ointer = setInterval(() => {
+                    e.stopImmediatePropagation();
 
-                            if (parent.getBusy() === "X") { return; }
+                    if (e.repeat === true) {
+                        return;
+                    }
 
-                            clearInterval(_ointer);
-                            resolve();
+                    // [HTML5] 표시 여부는 DOM 기준(App Exec 는 split 버튼 → 본체 동작은 이벤트 직접 호출)
+                    var oExecBtn = document.getElementById("ws20_appExecMenuBtn");
+                    if (!oExecBtn || oExecBtn.hidden || oExecBtn.style.display === "none") {
+                        return;
+                    }
 
-                        }, 0);
+                    // 단축키 실행 할지 말지 여부 체크 (busy/락/메뉴/다이얼로그 가드 — HTML5-safe)
+                    if (oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
+                        return;
+                    }
 
-                    });
+                    // 커서 포커스 날리기
+                    if (document.activeElement && document.activeElement.blur) {
+                        document.activeElement.blur();
+                    }
 
-                    oSaveBtn.firePress();
+                    // split 버튼 본체 = 기본 실행(ev_pressAppExecBtn). firePress 대체로 이벤트 직접 호출.
+                    try { oAPP.events.ev_pressAppExecBtn(); }
+                    catch (err) { if (typeof console !== "undefined") { console.warn("[WS20] F8 AppExec error", err); } }
 
                 }
             },

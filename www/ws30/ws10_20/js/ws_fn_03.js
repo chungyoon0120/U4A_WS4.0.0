@@ -298,22 +298,14 @@
      ************************************************************************/
     oAPP.fn.fnCheckIsDialogOpen = function () {
 
-        var $oDialog = $(".sapMDialogOpen"),
-            iDialogLength = $oDialog.length;
-
-        if (iDialogLength <= 0) {
-            return false;
+        // [HTML5] UI5 다이얼로그(.sapMDialogOpen)뿐 아니라 HTML5 native <dialog open> 도 본다.
+        //   변환 후 팝업/메시지박스/확인창/값도움/busy 가 전부 <dialog> 라, UI5 셀렉터만 보면
+        //   HTML5 모달이 떠 있어도 "안 떠 있음"으로 오판 → 단축키/프로세스 가드가 무력화된다.
+        if (document.querySelector(".sapMDialogOpen, dialog[open]")) {
+            return true;
         }
 
-        return true;
-        
-        // let oInstManager = sap.m.InstanceManager;
-        
-        // return (
-        //     oInstManager.hasOpenDialog()    ||
-        //     oInstManager.hasOpenLightBox()  ||
-        //     oInstManager.hasOpenPopover()
-        // );
+        return false;
 
     }; // end of oAPP.fn.fnCheckIsDialogOpen
 

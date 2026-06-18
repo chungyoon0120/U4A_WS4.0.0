@@ -1,0 +1,1112 @@
+/************************************************************************
+ * ws_html5_usp.js  (HTML5)  — WS30 USP 코드에디터 "셸"
+ * ----------------------------------------------------------------------
+ * [HTML5 컨버전 — U1 단계: WS30 셸 + 트리 + 속성 + 에디터 열기(읽기)]
+ *  원본 ws_usp.js(UI5 sap.m.Page / sap.ui.table.TreeTable / JSONModel / iframe)
+ *  → 순수 HTML5(DOM + flex + CSS + 바닐라 JS) 로 재구현한다.
+ *  권위 스펙: .analy/04_WS30_USP_코드에디터.md, 셸 테마: .analy/12 (theme/tokens.css).
+ *
+ *  - 본 파일은 library-preload.js 의 로드 목록에서 ws_html5_shell.js·원본 ws_usp*.js
+ *    "보다 뒤" 에 위치하여, shell 의 fnOnMoveToPage("WS30") placeholder 분기와
+ *    원본 UI5 빌더(fnMoveToWs30 / fnUspTreeTableRowSelect) 를 override 한다.
+ *    (원본 ws_usp*.js 는 수정하지 않음 — 롤백/참조 보존.)
+ *
+ *  - 보존(불변, 9장 표 A): 서버 Ajax(/usp_init_prc, /usp_get_object_line_data),
+ *    sendAjax, Node FS(SVG 아이콘), @electron/remote, Monaco iframe 플러밍
+ *    (onFrameLoadUspEditor / sendEditorPostMessageAll / getSelectedUspLineData /
+ *     USP_EDITOR_CHANNEL — 원본 ws_usp*.js 가 정의, UI5 비의존 → 그대로 재사용).
+ *
+ *  - 1차 보류(다음 단계): 저장/활성화, Display↔Change 모드전환(서버 lock),
+ *    컨텍스트메뉴 CRUD, 패턴/스니펫, New Window, 멀티(2분할) 에디터/Pretty/풀스크린.
+ *    해당 버튼은 표시하되 클릭은 try/catch 가드(미구현 시 푸터 안내).
+ *
+ *  - 트리 렌더는 ws_html5_usp_tree.js, 에디터 iframe 은 ws_html5_usp_editor.js 가 담당
+ *    (각각 oAPP.fn.fnRenderUspTree / oAPP.usphtml.editor* 를 정의).
+ ************************************************************************/
+
+(function (window, $, oAPP) {
+    "use strict";
+
+    var APPCOMMON = oAPP.common;
+
+    // 네임스페이스 보장 (원본 ws_usp.js 가 먼저 만들지만 방어적)
+    oAPP.usp = oAPP.usp || {};
+    oAPP.ui = oAPP.ui || {};
+    oAPP.attr = oAPP.attr || {};
+    oAPP.usphtml = oAPP.usphtml || {};
+
+    // FontAwesome 7.2.0 (다른 화면과 동일 — ws10_html.js / ws_html5_ws20.js ICON 규칙)
+    function _fa(sName, bBrand) {
+        return '<i class="' + (bBrand ? "fa-brands" : "fa-solid") + ' fa-' + sName + '"></i>';
+    }
+
+    // HTML escape (innerHTML 삽입 안전)
+    function _esc(s) {
+        return String(s == null ? "" : s)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    /************************************************************************
+     * 라벨 메시지 — 서버 메시지 클래스 단일 출처에서만(영문 사전/폴백 금지).
+     *   · _msg(코드)   : /U4A/CL_WS_COMMON (A05/B66/C17 …). 원본 fnGetMsgClsText 동일.
+     *   · _wsMsg(번호) : ZMSG_WS_COMMON_001 (059/068/808 …). 원본 oAPP.msg.M0xx 동일.
+     *   M0xx 키는 ZMSG_WS_COMMON_001 "번호"(M 제거)로 라우팅(ws-language-mechanism).
+     ************************************************************************/
+    function _msg(sNum) {
+        if (/^M\d{3}$/.test(sNum)) { return _wsMsg(sNum.slice(1)); }
+        try {
+            var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum);
+            if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
+        } catch (e) { }
+        return sNum;
+    }
+    function _wsMsg(sNr) {
+        try {
+            var lg = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
+            var s = parent.WSUTIL.getWsMsgClsTxt(lg, "ZMSG_WS_COMMON_001", sNr);
+            if (s && s.indexOf("|") === -1) { return s; }
+        } catch (e) { }
+        return sNr;
+    }
+    // 모듈 공용 노출(트리/에디터 모듈이 동일 라벨 출처 사용)
+    oAPP.usphtml._msg = _msg;
+    oAPP.usphtml._wsMsg = _wsMsg;
+    oAPP.usphtml._fa = _fa;
+    oAPP.usphtml._esc = _esc;
+
+    // 모델 안전 읽기
+    function _model(sPath) {
+        try {
+            var v = APPCOMMON.fnGetModelProperty(sPath);
+            if (v != null) { return v; }
+        } catch (e) { }
+        return null;
+    }
+
+    /************************************************************************
+     * 멀티파트 응답 파서 (구 _getUspMultiPartData [ws_usp.js:5626] 1:1 이식)
+     *   원본은 IIFE-private 라 외부에서 못 부른다 → 동일 로직 포팅(Node 'dicer' 사용, UI5 무관).
+     ************************************************************************/
+    function _uspMultiPart(res_data, xhr) {
+        return new Promise(function (resolve) {
+            try {
+                var contentType = xhr.getResponseHeader("Content-Type");
+                var boundary = contentType && contentType.split("boundary=")[1];
+
+                if (!xhr.response || xhr.response.type !== "multipart/form-data") { return resolve({ RETCD: "E" }); }
+                if (typeof boundary === "undefined") { return resolve({ RETCD: "E" }); }
+
+                var dicer = parent.require("dicer");
+                var parser = new dicer({ boundary: boundary });
+                var oPartData = {};
+
+                parser.on("part", function (part) {
+                    part.on("header", function (header) { part._name = header["content-disposition"][0]; });
+                    part.on("data", function (data) { oPartData[part._name] = data.toString(); });
+                });
+                parser.on("finish", function () { resolve({ RETCD: "S", RDATA: oPartData }); });
+
+                parser.write(res_data);
+                parser.end();
+            } catch (e) {
+                console.error("[HTML5][WS30] _uspMultiPart error:", e);
+                resolve({ RETCD: "E" });
+            }
+        });
+    }
+
+    /************************************************************************
+     * WS30 윈도우 메뉴 데이터 (원본 fnGetWindowMenuWS30 / fnGetWindowMenuListWS30 미러)
+     *   sap-icon → FontAwesome 매핑. ws10_html.js 의 공유 buildMenubar 가 소비.
+     *   카테고리: Utilities(B35)/System(B36)/Help(B39)/Test(B69, staffOnly).
+     ************************************************************************/
+    function _getWindowMenuWS30() {
+
+        var bIconViewer = true;
+        try { bIconViewer = APPCOMMON.checkWLOList("C", "UHAK900630"); } catch (e) { }
+
+        var aMenu = [
+            { key: "WMENU20", text: _msg("B35"), items: [
+                { key: "WMENU20_01", icon: "globe", text: _msg("B49") },        // Select Browser Type
+                { key: "WMENU20_03", icon: "video", text: _wsMsg("808") },      // Screen Recording
+                { key: "WMENU20_05", icon: "code", text: _wsMsg("059") }        // Source Pattern
+            ] },
+            { key: "WMENU30", text: _msg("B36"), items: [
+                { key: "WMENU30_01", icon: "window-restore", text: _msg("A09") },          // New Window
+                { key: "WMENU30_02", icon: "xmark", text: _msg("B51") },                   // Close Window
+                { key: "WMENU30_03", icon: "gear", text: _msg("B52") },                    // Options
+                { key: "WMENU30_04", icon: "right-from-bracket", text: _msg("B53") },      // Logoff
+                { key: "WMENU30_06", icon: "user-gear", text: _msg("B55"), items: [        // Administrator
+                    { key: "WMENU30_06_01", icon: "bug", text: _wsMsg("252") },            // DevTool
+                    { key: "WMENU30_06_02", icon: "note-sticky", text: _msg("B54") },      // Release Notes
+                    { key: "WMENU30_06_03", icon: "triangle-exclamation", text: _msg("B70") } // Error Log
+                ] },
+                { key: "WMENU30_07", icon: "server", text: _msg("C42") }                   // Server Information
+            ] },
+            { key: "WMENU50", text: _msg("B39"), items: [
+                { key: "WMENU50_01", icon: "book-open-reader", text: _msg("B44") },         // U4A Help Document
+                { key: "WMENU50_04", icon: "keyboard", text: _wsMsg("253") }               // Keyboard Shortcut List
+            ] },
+            { key: "Test10", text: _msg("B69"), staffOnly: true, items: [
+                { key: "Test97", text: "개발툴" },
+                { key: "Test86", text: "모나코 에디터 테마 디자이너" },
+                { key: "Test85", text: "모나코 에디터 스니펫 생성기" }
+            ] }
+        ];
+
+        // Icon Viewer(WMENU20_04) — WLO 활성 시에만 노출 (원본 visible 조건)
+        if (bIconViewer) {
+            aMenu[0].items.push({ key: "WMENU20_04", icon: "icons", text: _wsMsg("068"), items: [
+                { key: "WMENU20_04_01", icon: "icons", text: _wsMsg("047") },   // Icon List
+                { key: "WMENU20_04_02", icon: "image", text: _wsMsg("067") }    // Image Icons
+            ] });
+        }
+
+        return aMenu;
+    }
+
+    // WS30 메뉴 항목 선택 → 실제 핸들러 oAPP.fn.fnWS30{key} 위임(없으면 안내). WS20 패턴 동일.
+    function _ws30MenuSelect(it) {
+        var fn = oAPP.fn["fnWS30" + it.key];
+        if (typeof fn === "function") {
+            try { fn(); } catch (e) { console.error("[HTML5][WS30] menu " + it.key + " error:", e); }
+            return;
+        }
+        console.warn("[HTML5][WS30] menu not implemented:", it.key);
+        try { oAPP.common.fnShowFloatingFooterMsg("I", "WS30", (it.text || it.key) + " — 변환 예정"); } catch (e) { }
+    }
+
+    /************************************************************************
+     * 트랜잭션 버튼 1개 (구 sap.m.Button) — WS20 _txBtn 와 동일 컴포넌트(.u4a-tx-btn).
+     *   oCfg: { id, fa, brand, text, tooltip, ev, evFn, reject }
+     *     - ev   : oAPP.events[ev] 위임(가드). evFn: 직접 콜백(우선).
+     ************************************************************************/
+    function _txBtn(oCfg) {
+        var BTN = document.createElement("button");
+        BTN.type = "button";
+        if (oCfg.id) { BTN.id = oCfg.id; }
+        BTN.className = "u4a-tx-btn" + (oCfg.reject ? " u4a-tx-btn--reject" : "");
+        BTN.title = oCfg.tooltip || oCfg.text || "";
+        BTN.innerHTML = (oCfg.fa ? _fa(oCfg.fa, oCfg.brand) : "")
+            + (oCfg.text ? "<span>" + _esc(oCfg.text) + "</span>" : "");
+
+        BTN.addEventListener("click", function () {
+            if (typeof oCfg.evFn === "function") {
+                try { oCfg.evFn(); } catch (e) { console.error("[HTML5][WS30] tx action error:", oCfg.id, e); }
+                return;
+            }
+            if (oCfg.ev) {
+                var fn = oAPP.events && oAPP.events[oCfg.ev];
+                if (typeof fn !== "function") {
+                    console.warn("[HTML5][WS30] transaction action not implemented:", oCfg.ev);
+                    try { oAPP.common.fnShowFloatingFooterMsg("I", "WS30", (oCfg.text || oCfg.tooltip || oCfg.ev) + " — 변환 예정"); } catch (e) { }
+                    return;
+                }
+                try { fn(); } catch (e) { console.error("[HTML5][WS30] transaction action error:", oCfg.ev, e); }
+            }
+        });
+        return BTN;
+    }
+
+    function _sep(sId) {
+        var S = document.createElement("span");
+        S.className = "u4a-tx-sep";
+        if (sId) { S.id = sId; }
+        return S;
+    }
+
+    // 트리 툴바 아이콘 버튼 — WS20 트리 툴바(_tbBtn, .u4a-btn-icon + .u4aWs20TreeTbIcon)와 동일.
+    function _treeTbBtn(sFa, sTip, fnPress) {
+        var B = document.createElement("button");
+        B.type = "button";
+        B.className = "u4a-btn-icon";
+        B.title = sTip || "";
+        B.innerHTML = '<span class="u4aWs30TreeTbIcon">' + _fa(sFa) + "</span>";
+        B.addEventListener("click", function () {
+            try { fnPress(); } catch (e) { console.error("[HTML5][WS30] tree toolbar:", sFa, e); }
+        });
+        return B;
+    }
+
+    /************************************************************************
+     * (A) 앱 헤더 줄 (구 fnGetSubHeaderWs30)
+     *   [← APPID  모드  상태 | NewWindow] ...  — 텍스트는 fnUpdateUspAppHeader 가 채움.
+     ************************************************************************/
+    function _buildUspAppHeader() {
+
+        var HDR = document.createElement("div");
+        HDR.id = "ws30AppHeader";
+        HDR.className = "u4aWs30AppHeader";
+
+        // 뒤로가기 (←) — 원본 ev_pressWs30Back. 1차: WS30→WS10 안전 이동(미저장 프롬프트는 다음 단계).
+        var BACK = document.createElement("button");
+        BACK.type = "button";
+        BACK.id = "ws30AppHeaderBackBtn";
+        BACK.className = "u4aWs30AppHdrBtn back";
+        BACK.title = "Back";
+        BACK.innerHTML = _fa("arrow-left");
+        BACK.addEventListener("click", _uspBack);
+        HDR.appendChild(BACK);
+
+        var APPID = document.createElement("span");
+        APPID.id = "ws30AppHeaderAppId";
+        APPID.className = "u4aWs30AppHdrAppId";
+        HDR.appendChild(APPID);
+
+        var MODE = document.createElement("span");
+        MODE.id = "ws30AppHeaderMode";
+        MODE.className = "u4aWs30AppHdrMode";
+        HDR.appendChild(MODE);
+
+        var STAT = document.createElement("span");
+        STAT.id = "ws30AppHeaderStatus";
+        STAT.className = "u4aWs30AppHdrStat";
+        HDR.appendChild(STAT);
+
+        // New Window (구 ws30_newWindowBtn, sap-icon://create) — WS10/WS20 와 동일 통일(window-restore + A09).
+        var NEWWIN = document.createElement("button");
+        NEWWIN.type = "button";
+        NEWWIN.id = "ws30AppHeaderNewWinBtn";
+        NEWWIN.className = "u4aWs30AppHdrBtn";
+        NEWWIN.title = _msg("A09") + " (Ctrl+N)";
+        NEWWIN.innerHTML = _fa("window-restore");
+        NEWWIN.addEventListener("click", function () {
+            if (oAPP.events && typeof oAPP.events.ev_NewWindow === "function") {
+                try { oAPP.events.ev_NewWindow(); return; } catch (e) { console.error("[HTML5][WS30] ev_NewWindow error:", e); }
+            }
+            console.warn("[HTML5][WS30] ev_NewWindow not available");
+        });
+        HDR.appendChild(NEWWIN);
+
+        var SPC = document.createElement("span");
+        SPC.className = "u4aWs30AppHdrSpacer";
+        HDR.appendChild(SPC);
+
+        return HDR;
+    }
+
+    // WS30 → WS10 뒤로가기 (1차 안전판). 다음 단계에서 미저장 변경 프롬프트(원본 ev_pressWs30Back) 이식.
+    function _uspBack() {
+        try {
+            if (oAPP.fn && typeof oAPP.fn.fnMoveToWs10 === "function") { oAPP.fn.fnMoveToWs10(); return; }
+        } catch (e) { console.error("[HTML5][WS30] fnMoveToWs10 error:", e); }
+        try { oAPP.fn.fnOnMoveToPage("WS10"); } catch (e) { console.error("[HTML5][WS30] back fallback error:", e); }
+    }
+
+    /************************************************************************
+     * [PUBLIC] 앱 헤더 텍스트 갱신 (APPID / 모드 / 상태) — 원본 fnGetSubHeaderWs30 formatter 미러.
+     *   모드  : IS_EDIT === "X" ? Change(A02) : Display(A05)
+     *   상태  : ACTST === "A" ? Active(B66) : Inactive(B67)  (APPID 없으면 빈값)
+     *   윈도우/헤더 타이틀: "U4A Workspace - {APPID} {모드} {상태}" (원본 리터럴 접두).
+     ************************************************************************/
+    oAPP.fn.fnUpdateUspAppHeader = function () {
+
+        var elAppId = document.getElementById("ws30AppHeaderAppId");
+        var elMode = document.getElementById("ws30AppHeaderMode");
+        var elStat = document.getElementById("ws30AppHeaderStatus");
+        if (!elAppId && !elMode && !elStat) { return; }
+
+        var oApp = _model("/WS30/APP") || {};
+        var sAppId = oApp.APPID || "";
+        var sIsEdit = oApp.IS_EDIT;
+        var sActst = oApp.ACTST;
+
+        var sModeTxt = (sIsEdit === "X") ? _msg("A02") : _msg("A05");
+        var sStatTxt = "";
+        if (sAppId) { sStatTxt = (sActst === "A") ? _msg("B66") : _msg("B67"); }
+
+        if (elAppId) { elAppId.textContent = sAppId; }
+        if (elMode) { elMode.textContent = sModeTxt; }
+        if (elStat) { elStat.textContent = sStatTxt; }
+
+        try {
+            if (sAppId) {
+                var sTitle = "U4A Workspace - " + sAppId + " " + sModeTxt + (sStatTxt ? (" " + sStatTxt) : "");
+                if (APPCOMMON.setWSHeadText) { APPCOMMON.setWSHeadText(sTitle); }
+                var oWin = (parent.CURRWIN) || (parent.REMOTE && parent.REMOTE.getCurrentWindow && parent.REMOTE.getCurrentWindow());
+                if (oWin && oWin.setTitle) { oWin.setTitle(sTitle); }
+            }
+        } catch (e) { }
+
+        try { oAPP.fn.fnUpdateUspToolbar(); } catch (e) { }
+    };
+
+    /************************************************************************
+     * (B) 트랜잭션 툴바 (구 fnGetUspPageToolbarButtonsWs30)
+     *   Display/Change · Activate · Save · | · MIME · Controller · App Exec
+     *   가시성은 IS_EDIT/권한에 따라 fnUpdateUspToolbar 가 토글(원본 binding 미러).
+     ************************************************************************/
+    function _buildUspToolbar() {
+
+        var BAR = document.createElement("div");
+        BAR.id = "ws30Toolbar";
+        BAR.className = "u4aWs30Toolbar u4a-ws10__subheader";
+
+        var sDispChg = _msg("A05") + " <--> " + _msg("A02") + " (Ctrl+F1)";
+
+        // [공통 UX 통일] WS20 트랜잭션 툴바와 동일 아이콘 사용(_buildWs20Toolbar 기준):
+        //   Display=display · Change=pen-to-square · Activate=wand-magic-sparkles ·
+        //   Save=floppy-disk · MIME=image · Controller=screwdriver-wrench · App Exec=globe.
+        // Display 모드 버튼 (Change 모드에서 노출 — display 아이콘으로 Display 로 전환). 1차: 모드전환 보류.
+        BAR.appendChild(_txBtn({ id: "ws30_displayModeBtn", fa: "display", tooltip: sDispChg }));
+        // Change 모드 버튼 (Display 모드 + 개발/관리 권한에서 노출). 1차: 모드전환 보류.
+        BAR.appendChild(_txBtn({ id: "ws30_changeModeBtn", fa: "pen-to-square", tooltip: sDispChg }));
+
+        BAR.appendChild(_sep("ws30_sepEdit"));
+
+        // Activate (Change 모드) — WS20 와 동일 마법사 아이콘. 1차 보류.
+        BAR.appendChild(_txBtn({ id: "ws30_activateBtn", fa: "wand-magic-sparkles", tooltip: _msg("B73") + " (Ctrl+F3)" }));
+        // Save (Change 모드 + 개발 권한). 1차 보류.
+        BAR.appendChild(_txBtn({ id: "ws30_saveBtn", fa: "floppy-disk", tooltip: _msg("A64") + " (Ctrl+S)" }));
+
+        BAR.appendChild(_sep());
+
+        // MIME Repository — 원본 oAPP.events.ev_pressMimeBtn (가드)
+        BAR.appendChild(_txBtn({ id: "ws30_MimeBtn", fa: "image", text: _msg("A10"),
+            tooltip: _msg("A10") + " (Ctrl+Shift+F12)", ev: "ev_pressMimeBtn" }));
+        // Controller (Class Builder) — WS20 와 동일 아이콘(screwdriver-wrench). 원본 ev_pressControllerBtn (가드)
+        BAR.appendChild(_txBtn({ id: "ws30_controllerBtn", fa: "screwdriver-wrench", text: _msg("A11"),
+            tooltip: _msg("C38") + " (Ctrl+F12)", ev: "ev_pressControllerBtn" }));
+        // Application Execution — 원본 ev_AppExec (가드)
+        BAR.appendChild(_txBtn({ id: "ws30_appExecBtn", fa: "globe", text: _msg("A06"),
+            tooltip: _msg("A06") + " (F8)", ev: "ev_AppExec" }));
+
+        return BAR;
+    }
+
+    /************************************************************************
+     * [PUBLIC] 트랜잭션 버튼 모드별 표시/숨김 (원본 fnGetUspPageToolbarButtonsWs30 binding 미러)
+     *   bIsEdit = IS_EDIT==="X"
+     *   · displayModeBtn : edit 모드에서만(되돌리기)        · changeModeBtn : display 모드 + 개발/관리 권한
+     *   · activateBtn/saveBtn : edit 모드(저장은 개발 권한)  · sepEdit : edit 모드
+     *   · MIME/Controller/AppExec : 항상
+     ************************************************************************/
+    oAPP.fn.fnUpdateUspToolbar = function () {
+
+        var oApp = _model("/WS30/APP") || {};
+        var bIsEdit = (oApp.IS_EDIT === "X");
+
+        var sIsDev = _model("/USERINFO/USER_AUTH/IS_DEV");
+        var sIsAdm = _model("/USERINFO/ISADM");
+        var sAdminApp = oApp.ADMIN_APP;
+
+        function lf_show(sId, bShow) {
+            var el = document.getElementById(sId);
+            if (el) { el.style.display = bShow ? "" : "none"; }
+        }
+
+        // changeMode 노출 조건(원본): 개발권한 D + (관리자거나 관리앱 아님) + display 모드
+        var bShowChange = (sIsDev === "D") && !(sIsAdm !== "X" && sAdminApp === "X") && !bIsEdit;
+
+        lf_show("ws30_displayModeBtn", bIsEdit);
+        lf_show("ws30_changeModeBtn", bShowChange);
+        lf_show("ws30_sepEdit", bIsEdit);
+        lf_show("ws30_activateBtn", bIsEdit);
+        lf_show("ws30_saveBtn", bIsEdit && (sIsDev === "D"));
+    };
+
+    /************************************************************************
+     * (C) Properties 패널 (구 fnGetUspPanelWs30) — USP20 상단.
+     *   URL(SPATH, readonly) + URL Copy / Is Folder?(ISFLD) / Description(DESCT) / Charset(CODPG)
+     ************************************************************************/
+    function _buildUspPanel() {
+
+        var PANEL = document.createElement("section");
+        PANEL.id = "uspPanel";
+        PANEL.className = "u4aWs30Panel";
+
+        // 헤더(접힘/펼침) — 원본 sap.m.Panel(expandable)
+        var HEAD = document.createElement("button");
+        HEAD.type = "button";
+        HEAD.className = "u4aWs30PanelHead";
+        HEAD.setAttribute("aria-expanded", "true");
+        HEAD.innerHTML = '<span class="u4aWs30PanelTwisty">' + _fa("chevron-down") + "</span>"
+            + '<span class="u4aWs30PanelTitle">' + _esc(_msg("C17")) + "</span>"; // Properties
+        HEAD.addEventListener("click", function () {
+            var bOpen = PANEL.getAttribute("data-collapsed") !== "X";
+            PANEL.setAttribute("data-collapsed", bOpen ? "X" : "");
+            HEAD.setAttribute("aria-expanded", bOpen ? "false" : "true");
+            HEAD.querySelector(".u4aWs30PanelTwisty").innerHTML = bOpen ? _fa("chevron-right") : _fa("chevron-down");
+        });
+        PANEL.appendChild(HEAD);
+
+        var BODY = document.createElement("div");
+        BODY.className = "u4aWs30PanelBody u4aWs30Form";
+
+        // URL (readonly) + Copy
+        BODY.appendChild(_formRow(_msg("C18"), (function () {
+            var WRAP = document.createElement("div");
+            WRAP.className = "u4aWs30UrlRow";
+            var I = document.createElement("input");
+            I.type = "text"; I.id = "uspPropUrl"; I.readOnly = true;
+            I.className = "u4a-input u4aWs30Input";
+            WRAP.appendChild(I);
+            var B = document.createElement("button");
+            B.type = "button"; B.className = "u4a-btn u4aWs30UrlCopyBtn";
+            B.textContent = _msg("C21"); // URL Copy
+            B.addEventListener("click", function () { _uspUrlCopy(I.value); });
+            WRAP.appendChild(B);
+            return WRAP;
+        })()));
+
+        // Is Folder? (readonly checkbox)
+        BODY.appendChild(_formRow(_msg("C19"), (function () {
+            var C = document.createElement("input");
+            C.type = "checkbox"; C.id = "uspPropIsFld"; C.disabled = true;
+            C.className = "u4aWs30Check";
+            return C;
+        })()));
+
+        // Description (1차 readonly — 편집은 Change 모드 단계에서)
+        BODY.appendChild(_formRow(_msg("A35"), (function () {
+            var I = document.createElement("input");
+            I.type = "text"; I.id = "uspPropDesc"; I.readOnly = true;
+            I.className = "u4a-input u4aWs30Input";
+            return I;
+        })()));
+
+        // Charset (폴더면 숨김)
+        var oCharRow = _formRow(_msg("C20"), (function () {
+            var I = document.createElement("input");
+            I.type = "text"; I.id = "uspPropCodpg"; I.readOnly = true;
+            I.className = "u4a-input u4aWs30Input";
+            return I;
+        })());
+        oCharRow.id = "uspPropCharsetRow";
+        BODY.appendChild(oCharRow);
+
+        PANEL.appendChild(BODY);
+        return PANEL;
+    }
+
+    // 라벨 + 필드 한 줄 (구 FormElement) — CSS Grid(label | field)
+    function _formRow(sLabel, oField) {
+        var ROW = document.createElement("div");
+        ROW.className = "u4aWs30FormRow";
+        var L = document.createElement("label");
+        L.className = "u4aWs30FormLabel";
+        L.textContent = sLabel;
+        ROW.appendChild(L);
+        var F = document.createElement("div");
+        F.className = "u4aWs30FormField";
+        F.appendChild(oField);
+        ROW.appendChild(F);
+        return ROW;
+    }
+
+    function _uspUrlCopy(sUrl) {
+        try {
+            if (parent.REMOTE && parent.REMOTE.clipboard) { parent.REMOTE.clipboard.writeText(sUrl || ""); }
+            else if (navigator.clipboard) { navigator.clipboard.writeText(sUrl || ""); }
+            oAPP.common.fnShowFloatingFooterMsg("S", "WS30", _msg("C21"));
+        } catch (e) { console.error("[HTML5][WS30] url copy error:", e); }
+    }
+
+    /************************************************************************
+     * [PUBLIC] Properties 패널 값 채움 (/WS30/USPDATA)
+     ************************************************************************/
+    oAPP.fn.fnRenderUspProperties = function () {
+        var oData = _model("/WS30/USPDATA") || {};
+        var bFld = (oData.ISFLD === "X");
+
+        var elUrl = document.getElementById("uspPropUrl");
+        var elFld = document.getElementById("uspPropIsFld");
+        var elDesc = document.getElementById("uspPropDesc");
+        var elCod = document.getElementById("uspPropCodpg");
+        var elCodRow = document.getElementById("uspPropCharsetRow");
+
+        if (elUrl) { elUrl.value = oData.SPATH || ""; }
+        if (elFld) { elFld.checked = bFld; }
+        if (elDesc) { elDesc.value = oData.DESCT || ""; }
+        if (elCod) { elCod.value = oData.CODPG || ""; }
+        if (elCodRow) { elCodRow.style.display = bFld ? "none" : ""; }
+    };
+
+    /************************************************************************
+     * (D) Document 페이지 (구 fnGetUspDocPageWs30 / fnGetUspDocPageContentWs30) — USP30.
+     *   루트 노드 선택 시 표시되는 전체 메타데이터 폼(읽기). 모든 필드 readonly(1차).
+     ************************************************************************/
+    // (라벨코드, USPDATA 필드) 매핑 — 원본 순서/키 그대로
+    var DOC_FIELDS = [
+        ["A90", "APPID"],  // Web Application ID
+        ["A91", "DESCT"],  // Web Application Name
+        ["C12", "REQNO"],  // Request/Task
+        ["A98", "LANGU"],  // Language Key
+        ["C03", "CODPG"],  // Code Page
+        ["C13", "PACKG"],  // Dev. Package
+        ["A92", "CLSID"],  // Assigned Class Object ID
+        ["C14", "PGMID"],  // Program ID in Requests and Tasks
+        ["B27", "OBJTY"],  // Object Type
+        ["C15", "AUTHG"],  // Authorization Group
+        ["C16", "ERUSR"],  // Create User
+        ["C06", "ERDAT"],  // Create Date
+        ["C07", "ERTIM"],  // Create Time
+        ["C08", "AEUSR"],  // Change User
+        ["C09", "AEDAT"],  // Change Date
+        ["C10", "AETIM"]   // Change Time
+    ];
+
+    function _buildUspDocPage() {
+        var PAGE = document.createElement("div");
+        PAGE.id = "USP30";
+        PAGE.className = "u4aWs30NavPage u4aWsHidden";
+
+        var HEAD = document.createElement("div");
+        HEAD.className = "u4aWs30DocHead";
+        HEAD.textContent = _msg("B65"); // Document
+        PAGE.appendChild(HEAD);
+
+        var FORM = document.createElement("div");
+        FORM.className = "u4aWs30Form u4aWs30DocForm";
+        FORM.id = "uspDocForm";
+        DOC_FIELDS.forEach(function (f) {
+            var I = document.createElement("input");
+            I.type = "text"; I.readOnly = true;
+            I.className = "u4a-input u4aWs30Input";
+            I.setAttribute("data-doc", f[1]);
+            FORM.appendChild(_formRow(_msg(f[0]), I));
+        });
+        PAGE.appendChild(FORM);
+        return PAGE;
+    }
+
+    oAPP.fn.fnRenderUspDoc = function () {
+        var oData = _model("/WS30/USPDATA") || {};
+        var FORM = document.getElementById("uspDocForm");
+        if (!FORM) { return; }
+        DOC_FIELDS.forEach(function (f) {
+            var el = FORM.querySelector('[data-doc="' + f[1] + '"]');
+            if (el) { el.value = (oData[f[1]] != null ? oData[f[1]] : ""); }
+        });
+    };
+
+    /************************************************************************
+     * (E) NavContainer (구 fnGetUspNavContainerWs30 — usp_navcon) : USP10/USP20/USP30
+     *   USP10 = 인트로(로고), USP20 = 콘텐츠(Properties 패널 + 에디터), USP30 = 문서폼.
+     ************************************************************************/
+    function _buildUspNav() {
+        var NAV = document.createElement("div");
+        NAV.id = "usp_navcon";
+        NAV.className = "u4aWs30Nav";
+
+        // USP10 인트로
+        var INTRO = document.createElement("div");
+        INTRO.id = "USP10";
+        INTRO.className = "u4aWs30NavPage u4aWs30Intro";
+        var IMG = document.createElement("img");
+        IMG.className = "u4aWs30IntroImg";
+        try {
+            // 구 fnGetUspIntroPageWs30: PATH.join(APPPATH, "img", "intro.png"). 없으면 미표시(깨진 아이콘 방지).
+            var sImg = parent.PATH.join(parent.APPPATH, "img", "intro.png");
+            if (sImg && (!parent.FS || parent.FS.existsSync(sImg))) { IMG.src = sImg; }
+        } catch (e) { }
+        IMG.alt = "";
+        INTRO.appendChild(IMG);
+        NAV.appendChild(INTRO);
+
+        // USP20 콘텐츠 (Properties 패널 + 에디터 호스트)
+        var CONT = document.createElement("div");
+        CONT.id = "USP20";
+        CONT.className = "u4aWs30NavPage u4aWsHidden";
+        CONT.appendChild(_buildUspPanel());
+        var EDHOST = document.createElement("div");
+        EDHOST.id = "uspEditorHost";
+        EDHOST.className = "u4aWs30EditorHost";
+        CONT.appendChild(EDHOST);
+        NAV.appendChild(CONT);
+
+        // USP30 문서
+        NAV.appendChild(_buildUspDocPage());
+
+        return NAV;
+    }
+
+    /************************************************************************
+     * [PUBLIC] USP 내부 페이지 전환 (구 usp_navcon.to / fnOnMoveToPage("USPxx"))
+     ************************************************************************/
+    oAPP.fn.fnUspNavTo = function (sPgId) {
+        var NAV = document.getElementById("usp_navcon");
+        if (!NAV) { return; }
+        ["USP10", "USP20", "USP30"].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) { el.classList.toggle("u4aWsHidden", id !== sPgId); }
+        });
+        oAPP.attr.uspCurrNav = sPgId;
+    };
+
+    /************************************************************************
+     * (F) 푸터 (구 floatingFooter /FMSG/WS30) — WS20 와 동일 컴포넌트(.u4aWs10__footer 재사용).
+     ************************************************************************/
+    //  WS10 푸터 컴포넌트(.u4a-ws10__footer, data-show/data-type)와 동일 마크업 → ws10.css 재사용.
+    function _buildUspFooter() {
+        var F = document.createElement("div");
+        F.id = "ws30Footer";
+        F.className = "u4a-ws10__footer";
+        F.setAttribute("data-show", "false");
+        F.innerHTML =
+            '<span class="u4a-ws10__footer-icon"></span>' +
+            '<span class="u4a-ws10__footer-text"></span>';
+        return F;
+    }
+
+    var FOOTER_ICON = { S: "circle-check", E: "circle-exclamation", W: "triangle-exclamation", I: "circle-info" };
+    oAPP.usphtml.showFooter = function (sType, sMsg) {
+        var F = document.getElementById("ws30Footer");
+        if (!F) { return; }
+        F.dataset.type = sType || "I";
+        F.dataset.show = "true";
+        var elI = F.querySelector(".u4a-ws10__footer-icon");
+        var elM = F.querySelector(".u4a-ws10__footer-text");
+        if (elI) { elI.innerHTML = _fa(FOOTER_ICON[sType] || "circle-info"); }
+        if (elM) { elM.textContent = sMsg || ""; }
+    };
+    oAPP.usphtml.hideFooter = function () {
+        var F = document.getElementById("ws30Footer");
+        if (F) { F.dataset.show = "false"; }
+    };
+
+    // 셸 푸터 라우팅(fnShowFloatingFooterMsg)에 WS30 분기 추가 — shell.js 무수정(super-wrap).
+    var _superShowFooter = oAPP.common.fnShowFloatingFooterMsg;
+    var _superHideFooter = oAPP.common.fnHideFloatingFooterMsg;
+    oAPP.common.fnShowFloatingFooterMsg = function (TYPE, POS, MSG) {
+        var sPos = POS || (function () { try { return parent.getCurrPage(); } catch (e) { return ""; } })();
+        if (sPos === "WS30") {
+            try { oAPP.common.fnHideFloatingFooterMsg(); } catch (e) { }
+            try { APPCOMMON.fnSetModelProperty("/FMSG/WS30", { ISSHOW: true, TYPE: TYPE, TXT: MSG }); } catch (e) { }
+            try { oAPP.usphtml.showFooter(TYPE || "I", MSG || ""); } catch (e) { }
+            if (oAPP.attr.footerMsgTimeout) { clearTimeout(oAPP.attr.footerMsgTimeout); }
+            oAPP.attr.footerMsgTimeout = setTimeout(function () {
+                try { oAPP.common.fnHideFloatingFooterMsg(); } catch (e) { }
+            }, 10000);
+            return;
+        }
+        if (typeof _superShowFooter === "function") { return _superShowFooter(TYPE, POS, MSG); }
+    };
+    oAPP.common.fnHideFloatingFooterMsg = function () {
+        try { oAPP.usphtml.hideFooter(); } catch (e) { }
+        if (typeof _superHideFooter === "function") { return _superHideFooter(); }
+    };
+
+    /************************************************************************
+     * WS30 셸 렌더 (1회) — #WS30 컨테이너에 [메뉴바 + 앱헤더 + 툴바 + 2분할 + 푸터] 그림.
+     ************************************************************************/
+    oAPP.fn.fnRenderUspShell = function () {
+
+        var oUi = oAPP.attr.ui || {};
+        var oPages = oUi.pages || {};
+        var oWS30 = (oPages && oPages.WS30) || document.getElementById("WS30");
+        if (!oWS30) {
+            console.warn("[HTML5][WS30] #WS30 container not found — shell 미초기화");
+            return;
+        }
+
+        // 앱 경로(인트로 이미지/SVG 아이콘용) 보관 — 원본 APP.getAppPath()
+        try {
+            oAPP.attr.uspAppPath = (parent.APP && parent.APP.getAppPath && parent.APP.getAppPath()) || oAPP.attr.uspAppPath || "";
+        } catch (e) { }
+
+        // 이미 셸 렌더됨 → 헤더/툴바/패널만 최신화
+        if (oWS30.getAttribute("data-ws30-shell") === "X") {
+            try { oAPP.fn.fnUpdateUspAppHeader(); } catch (e) { }
+            return;
+        }
+
+        oWS30.innerHTML = "";
+        oWS30.removeAttribute("data-placeholder-shown");
+
+        var MAIN = document.createElement("div");
+        MAIN.id = "WS30_MAIN";
+        MAIN.className = "u4aWs30MainPage";
+
+        // 윈도우 메뉴바 + 공통 헤더 (WS10/WS20 공통 컴포넌트)
+        try {
+            if (oAPP.ws10html && typeof oAPP.ws10html.buildMenubar === "function") {
+                MAIN.appendChild(oAPP.ws10html.buildMenubar(_getWindowMenuWS30(), _ws30MenuSelect));
+            }
+        } catch (e) { console.error("[HTML5][WS30] menubar build error:", e); }
+
+        // 앱 헤더 + 트랜잭션 툴바
+        MAIN.appendChild(_buildUspAppHeader());
+        MAIN.appendChild(_buildUspToolbar());
+
+        // 2분할: 좌(트리, 500px) | 우(NavContainer)
+        var SPLIT = document.createElement("div");
+        SPLIT.id = "ws30SplitRow";
+        SPLIT.className = "u4aWs30SplitRow";
+
+        var LEFT = document.createElement("div");
+        LEFT.id = "ws30TreePane";
+        LEFT.className = "u4aWs30TreePane";
+        // 트리 헤더 툴바 (expand-all / collapse-all) — WS20 트리 툴바와 동일 UX
+        //   (.u4aWs20TreeToolbar 와 동일 스타일·.u4a-btn-icon 버튼 — 컬럼 헤더는 두지 않음[WS20 동일]).
+        var THEAD = document.createElement("div");
+        THEAD.className = "u4aWs30TreeToolbar";
+        THEAD.appendChild(_treeTbBtn("angles-down", "Expand All", function () { if (oAPP.fn.fnUspTreeExpandAll) { oAPP.fn.fnUspTreeExpandAll(); } }));
+        THEAD.appendChild(_treeTbBtn("angles-up", "Collapse All", function () { if (oAPP.fn.fnUspTreeCollapseAll) { oAPP.fn.fnUspTreeCollapseAll(); } }));
+        LEFT.appendChild(THEAD);
+        // 트리 본문 컨테이너 (ws_html5_usp_tree.js 가 채움) — WS20 처럼 컬럼 헤더 없이 트리만.
+        var TBODY = document.createElement("div");
+        TBODY.id = "uspTreeBody";
+        TBODY.className = "u4aWs30TreeBody";
+        LEFT.appendChild(TBODY);
+        SPLIT.appendChild(LEFT);
+
+        // 리사이저(좌우 드래그)
+        var RES = document.createElement("div");
+        RES.id = "ws30Resizer";
+        RES.className = "u4aWs30Resizer";
+        SPLIT.appendChild(RES);
+
+        // 우측 NavContainer
+        var RIGHT = document.createElement("div");
+        RIGHT.id = "ws30ContentPane";
+        RIGHT.className = "u4aWs30ContentPane";
+        RIGHT.appendChild(_buildUspNav());
+        SPLIT.appendChild(RIGHT);
+
+        MAIN.appendChild(SPLIT);
+
+        // 푸터
+        MAIN.appendChild(_buildUspFooter());
+
+        oWS30.appendChild(MAIN);
+        oWS30.setAttribute("data-ws30-shell", "X");
+
+        // 참조 보관
+        oAPP.attr.ui = oAPP.attr.ui || {};
+        oAPP.attr.ui.usp = { main: MAIN, treeBody: TBODY, nav: document.getElementById("usp_navcon") };
+
+        // 리사이저 바인딩
+        _bindResizer(RES, LEFT, SPLIT);
+
+        // 초기 표시: 인트로
+        oAPP.fn.fnUspNavTo("USP10");
+
+        // 헤더/툴바 텍스트
+        try { oAPP.fn.fnUpdateUspAppHeader(); } catch (e) { }
+
+        // 렌더 전 설정된 /FMSG/WS30 리플레이
+        try {
+            var oFMsg = _model("/FMSG/WS30");
+            if (oFMsg && oFMsg.ISSHOW) { oAPP.usphtml.showFooter(oFMsg.TYPE || "I", oFMsg.TXT || ""); }
+        } catch (e) { }
+    };
+
+    // 좌측 트리 패널 폭 드래그 리사이즈 (구 SplitterLayoutData usptreeSplitLayout 500px)
+    function _bindResizer(oBar, oLeft, oSplit) {
+        var bDrag = false, iStartX = 0, iStartW = 0;
+        function lf_move(e) {
+            if (!bDrag) { return; }
+            var iW = iStartW + (e.clientX - iStartX);
+            var iMin = 220, iMax = oSplit.clientWidth - 320;
+            if (iW < iMin) { iW = iMin; }
+            if (iW > iMax) { iW = iMax; }
+            oLeft.style.flex = "0 0 " + iW + "px";
+        }
+        function lf_up() {
+            bDrag = false;
+            document.body.classList.remove("u4aWs20ResizingCursor");
+            document.removeEventListener("mousemove", lf_move);
+            document.removeEventListener("mouseup", lf_up);
+        }
+        oBar.addEventListener("mousedown", function (e) {
+            bDrag = true;
+            iStartX = e.clientX;
+            iStartW = oLeft.getBoundingClientRect().width;
+            document.body.classList.add("u4aWs20ResizingCursor");
+            document.addEventListener("mousemove", lf_move);
+            document.addEventListener("mouseup", lf_up);
+            e.preventDefault();
+        });
+    }
+
+    /************************************************************************
+     * [OVERRIDE] 페이지 이동 (shell fnOnMoveToPage 를 super-wrap) — WS20 패턴 동일.
+     *   sPgNm === "WS30" 일 때 placeholder 대신 셸 렌더 + 서버 트리 로드(fnMoveToWs30).
+     ************************************************************************/
+    var _fnOnMoveToPage_super = oAPP.fn.fnOnMoveToPage;
+    oAPP.fn.fnOnMoveToPage = function (sPgNm) {
+        if (typeof _fnOnMoveToPage_super === "function") { _fnOnMoveToPage_super(sPgNm); }
+        if (sPgNm === "WS30") {
+            try { oAPP.fn.fnRenderUspShell(); } catch (e) { console.error("[HTML5][WS30] fnOnMoveToPage render error:", e); }
+            try { oAPP.fn.fnMoveToWs30(); } catch (e) { console.error("[HTML5][WS30] fnMoveToWs30 error:", e); }
+        }
+    };
+
+    /************************************************************************
+     * [OVERRIDE] WS30 진입 — 서버 트리 로드 (구 oAPP.fn.fnMoveToWs30 [ws_fn_02.js:668])
+     * ---------------------------------------------------------------------
+     *  UI5 의존부(sap.ui.getCore().lock / byId("usptree") / getModel().refresh) 제거.
+     *  서버 흐름 보존: ajax /usp_init_prc(APPID) → /WS30/USPTREE = T_DATA →
+     *  평면→중첩 트리화 → 트리 렌더 → 루트 자동 선택. RETCD 분기도 보존.
+     ************************************************************************/
+    oAPP.fn.fnMoveToWs30 = function () {
+
+        oAPP.common.fnSetBusyLock("X");
+
+        var oAppInfo = _model("/WS30/APP") || {};
+        var sServerPath = parent.getServerPath();
+        var sInitPath = sServerPath + "/usp_init_prc";
+
+        var oFormData = new FormData();
+        oFormData.append("APPID", oAppInfo.APPID || "");
+
+        sendAjax(sInitPath, oFormData, _fnCallback);
+
+        function _fnCallback(oResult) {
+
+            // Critical Error → 10번 강제 이동
+            if (oResult.RETCD === "Z") {
+                oAPP.common.fnSetBusyLock("");
+                try { oAPP.fn.fnCriticalErrorWs30(oResult); } catch (e) { console.error("[HTML5][WS30] critical:", e); }
+                return;
+            }
+
+            if (oResult.RETCD !== "S") {
+                oAPP.common.fnSetBusyLock("");
+                try {
+                    parent.showMessage(null, 20, "E", oResult.RTMSG, function () {
+                        try { oAPP.fn.fnCriticalErrorWs30(oResult); } catch (e) { }
+                    });
+                } catch (e) {
+                    oAPP.common.fnShowFloatingFooterMsg("E", "WS30", oResult.RTMSG || "");
+                }
+                return;
+            }
+
+            // 좌측 트리 데이터(평면) → 중첩 트리화 후 모델 반영
+            var aFlat = oResult.T_DATA || [];
+            APPCOMMON.fnSetModelProperty("/WS30/USPTREE", aFlat);
+            var aTree = oAPP.fn.fnBuildUspTree(aFlat);
+            APPCOMMON.fnSetModelProperty("/WS30/USPTREE", aTree);
+
+            // 트리 렌더 (ws_html5_usp_tree.js)
+            try {
+                if (typeof oAPP.fn.fnRenderUspTree === "function") { oAPP.fn.fnRenderUspTree(); }
+            } catch (e) { console.error("[HTML5][WS30] fnRenderUspTree error:", e); }
+
+            // 화면 처음 로딩 시 Root Node 자동 선택 (구 ev_getRootNodeRowsUpdated)
+            try {
+                var oRoot = (aTree && aTree.length) ? aTree[0] : null;
+                if (oRoot) { oAPP.fn.fnUspTreeTableRowSelect(oRoot); }
+                else { oAPP.common.fnSetBusyLock(""); }
+            } catch (e) {
+                console.error("[HTML5][WS30] root auto-select error:", e);
+                oAPP.common.fnSetBusyLock("");
+            }
+        }
+    };
+
+    /************************************************************************
+     * 평면 배열(OBJKY/PUJKY) → 중첩 트리(USPTREE children). 구 fnSetTreeJson 대체.
+     *   루트 = PUJKY 가 빈값이거나 부모를 못 찾는 노드.
+     ************************************************************************/
+    oAPP.fn.fnBuildUspTree = function (aFlat) {
+        if (!Array.isArray(aFlat)) { return []; }
+
+        // 이미 중첩(자식 USPTREE 보유)인지 감지 — 중첩이면 그대로 사용
+        var bNested = aFlat.some(function (o) { return o && Array.isArray(o.USPTREE) && o.USPTREE.length; });
+        if (bNested) { return aFlat; }
+
+        var oMap = {}, aRoot = [];
+        aFlat.forEach(function (o) {
+            o.USPTREE = o.USPTREE || [];
+            oMap[o.OBJKY] = o;
+        });
+        aFlat.forEach(function (o) {
+            var sPar = o.PUJKY;
+            if (sPar && oMap[sPar] && oMap[sPar] !== o) { oMap[sPar].USPTREE.push(o); }
+            else { aRoot.push(o); }
+        });
+        return aRoot;
+    };
+
+    /************************************************************************
+     * [OVERRIDE] 트리 Row 선택 → 서버에서 파일 내용 요청 (구 fnUspTreeTableRowSelect [ws_usp.js:4747])
+     * ---------------------------------------------------------------------
+     *  UI5 row 대신 선택 노드 데이터(oNodeData) 를 받는다(트리 모듈이 전달).
+     ************************************************************************/
+    oAPP.fn.fnUspTreeTableRowSelect = function (oNodeData) {
+
+        if (!oNodeData) { return; }
+
+        oAPP.common.fnSetBusyLock("X");
+
+        var sServerPath = parent.getServerPath();
+        var sPath = sServerPath + "/usp_get_object_line_data";
+
+        var oSendData = { S_HEAD: oNodeData };
+        var oFormData = new FormData();
+        oFormData.append("sData", JSON.stringify(oSendData));
+        oFormData.append("response_format", "SINGLE");   // 단일 멀티파트(원본 동일)
+
+        var oParam = { oNodeData: oNodeData };
+
+        // sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_error, bIsBlob
+        sendAjax(sPath, oFormData, _fnLineSelectCb.bind(oParam), null, null, null, null, "X");
+    };
+
+    /************************************************************************
+     * 파일 내용 응답 처리 (구 _fnLineSelectCb [ws_usp.js:5054]) — 멀티파트/헤더분리 보존.
+     *   읽기 경로: /WS30/USPDATA 갱신 → 루트면 USP30(문서)/파일·폴더면 USP20 →
+     *   파일이면 에디터 iframe 에 내용 표시(에디터 모듈).
+     ************************************************************************/
+    async function _fnLineSelectCb(oResult, xhr) {
+
+        var oNodeData = this && this.oNodeData;
+
+        // Blob → text
+        var oJsonResult = await new Promise(function (resolve) {
+            var reader = new FileReader();
+            reader.onload = function () { resolve({ RETCD: "S", RDATA: reader.result }); };
+            reader.onerror = function (error) {
+                console.error("[HTML5][WS30] _fnLineSelectCb Blob→Text 변환 오류", error);
+                var sErrMsg = "";
+                try { sErrMsg = (oAPP.msg.M348 || "") + "\n\n" + (oAPP.msg.M228 || ""); } catch (e) { }
+                resolve({ RETCD: "E", RTMSG: sErrMsg });
+            };
+            reader.readAsText(oResult);
+        });
+
+        if (oJsonResult.RETCD === "E") {
+            try { oAPP.fn.fnCriticalErrorWs30({ RTMSG: oJsonResult.RTMSG }); } catch (e) { }
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        // 멀티파트(UHAK900763 버전) — 원본 _getUspMultiPartData 보존(원본 ws_usp.js 가 정의)
+        var oMULTI_RESULT;
+        try {
+            if (APPCOMMON.checkWLOList("C", "UHAK900763")) {
+                oMULTI_RESULT = await _uspMultiPart(oJsonResult.RDATA, xhr);
+                if (oMULTI_RESULT && oMULTI_RESULT.RETCD !== "E") {
+                    oJsonResult.RDATA = oMULTI_RESULT.RDATA.usp_head_data;
+                }
+            }
+        } catch (error) {
+            console.error("[HTML5][WS30] _getUspMultiPartData 오류", error);
+            var sErrMsg2 = "";
+            try { sErrMsg2 = (oAPP.msg.M348 || "") + "\n\n" + (oAPP.msg.M228 || ""); } catch (e) { }
+            try { oAPP.fn.fnCriticalErrorWs30({ RTMSG: sErrMsg2 }); } catch (e) { }
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        // BLOB→string→JSON (응답 헤더 usp_head_data_Length 기반 헤더/컨텐츠 분리 보존)
+        var sJsonResult = oJsonResult.RDATA;
+        var oParsed;
+        try {
+            var sUspHeaderLength = xhr && xhr.getResponseHeader && xhr.getResponseHeader("usp_head_data_Length");
+            if (sUspHeaderLength) {
+                var oUspBytes = new TextEncoder().encode(sJsonResult);
+                var oDecoder = new TextDecoder("utf-8");
+                sJsonResult = oDecoder.decode(oUspBytes.slice(0, Number(sUspHeaderLength)));
+                oParsed = JSON.parse(sJsonResult);
+                oParsed.CONTENT = oDecoder.decode(oUspBytes.slice(Number(sUspHeaderLength)));
+            } else {
+                oParsed = JSON.parse(sJsonResult);
+            }
+        } catch (error) {
+            console.error("[HTML5][WS30] _fnLineSelectCb JSON Parse 오류", error);
+            var sErrMsg3 = "";
+            try { sErrMsg3 = (oAPP.msg.M348 || "") + "\n\n" + (oAPP.msg.M228 || ""); } catch (e) { }
+            try { oAPP.fn.fnCriticalErrorWs30({ RTMSG: sErrMsg3 }); } catch (e) { }
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        if (typeof oParsed !== "object" || oParsed == null) {
+            try { oAPP.fn.fnCriticalErrorWs30({ RTMSG: "[usp_get_object_line_data] JSON Parse Error" }); } catch (e) { }
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        if (oMULTI_RESULT && oMULTI_RESULT.RDATA && typeof oMULTI_RESULT.RDATA.usp_body_data !== "undefined") {
+            oParsed.CONTENT = oMULTI_RESULT.RDATA.usp_body_data;
+        }
+
+        // 서버 분기 (Z/E)
+        if (oParsed.RETCD === "Z") {
+            console.error(oParsed);
+            try { oAPP.fn.fnCriticalErrorWs30(oParsed); } catch (e) { }
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+        if (oParsed.RETCD === "E") {
+            console.error(oParsed);
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { parent.CURRWIN.flashFrame(true); } catch (e) { }
+            oAPP.common.fnShowFloatingFooterMsg("E", "WS30", oParsed.RTMSG || "");
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        // 이전 선택 해제 (트리 모듈)
+        try { if (oAPP.fn.fnOnUspTreeUnSelect) { oAPP.fn.fnOnUspTreeUnSelect(); } } catch (e) { }
+
+        // 서버 라인 정보 + 노드 데이터 병합
+        var oResultRowData = oParsed.S_HEAD || {};
+        oResultRowData.ISSEL = true;
+        oResultRowData = $.extend(true, {}, oNodeData || {}, oResultRowData);
+
+        var bIsRoot = (oResultRowData.PUJKY === "" || oResultRowData.PUJKY == null);
+        var bIsFold = (oResultRowData.ISFLD === "X");
+
+        // CONTENT 매핑
+        oResultRowData.CONTENT = oParsed.CONTENT;
+
+        // 선택 라인 저장 (에디터 iframe 이 getSelectedUspLineData 로 읽음)
+        oAPP.usp.oSelectRowData = JSON.parse(JSON.stringify(oResultRowData));
+
+        // 트리 노드 상태(선택 표시) 반영 — 원래 노드 객체에도 머지
+        try {
+            if (oNodeData) {
+                oNodeData.ISSEL = true;
+                $.extend(oNodeData, { SPATH: oResultRowData.SPATH, DESCT: oResultRowData.DESCT, CODPG: oResultRowData.CODPG });
+            }
+            if (oAPP.fn.fnUspTreeMarkSelected) { oAPP.fn.fnUspTreeMarkSelected(oNodeData); }
+        } catch (e) { }
+
+        if (bIsRoot) {
+            // 루트 → APP 정보 머지 + 문서 페이지
+            var oAppInfo = _model("/WS30/APP") || {};
+            oAppInfo = Object.assign({}, oAppInfo, oParsed.S_APPINFO);
+            APPCOMMON.fnSetModelProperty("/WS30/APP", oAppInfo);
+            oResultRowData = $.extend(true, oResultRowData, oAppInfo);
+            APPCOMMON.fnSetModelProperty("/WS30/USPDATA", oResultRowData);
+
+            try { oAPP.fn.fnUpdateUspAppHeader(); } catch (e) { }
+            try { oAPP.fn.fnRenderUspDoc(); } catch (e) { }
+            oAPP.fn.fnUspNavTo("USP30");
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        APPCOMMON.fnSetModelProperty("/WS30/USPDATA", oResultRowData);
+
+        // 콘텐츠 페이지 (Properties + 에디터)
+        try { oAPP.fn.fnRenderUspProperties(); } catch (e) { }
+        oAPP.fn.fnUspNavTo("USP20");
+
+        if (bIsFold) {
+            // 폴더 → 에디터 없음(비움). busy 해제.
+            try { if (oAPP.usphtml.editorClear) { oAPP.usphtml.editorClear(); } } catch (e) { }
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        // 파일 → 에디터에 내용 표시(에디터 모듈). busy 는 에디터 로드 완료/실패 시 해제.
+        try {
+            if (oAPP.usphtml.editorLoadSelected) {
+                oAPP.usphtml.editorLoadSelected(oResultRowData);
+            } else {
+                oAPP.common.fnSetBusyLock("");
+            }
+        } catch (e) {
+            console.error("[HTML5][WS30] editorLoadSelected error:", e);
+            oAPP.common.fnSetBusyLock("");
+        }
+    }
+
+})(window, jQuery, oAPP);

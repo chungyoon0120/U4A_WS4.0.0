@@ -1065,6 +1065,22 @@ button:focus-visible {
     white-space: nowrap;
 }
 
+/* 그룹 헤더(선택 불가) — createSelect 의 item.group 으로 렌더(예: USP 에디터 테마 standard/custom) */
+.u4a-combo__group {
+    padding: 0.375rem 0.625rem 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    cursor: default;
+    white-space: nowrap;
+}
+.u4a-combo__group:not(:first-child) {
+    margin-top: 0.25rem;
+    border-top: 0.0625rem solid var(--divider);
+}
+
 .u4a-combo__item:hover,
 .u4a-combo__item[data-active="true"] {
     background: var(--hover-bg);

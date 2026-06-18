@@ -48,17 +48,34 @@
                 try { parent.showMessage(null, KIND, TYPE, sMsg, fnCb); } catch (e) { }
             }
             // 구 sap.ui.getCore() — byId 는 null(컨트롤 없음), lock/unlock/테마는 no-op.
+            //   isLocked 는 항상 false(HTML5 의 "잠금"은 UI5 코어락이 아니라 busy=parent.getBusy
+            //   이며 그쪽에서 따로 검사). isProcessRunning 등 sap.ui.getCore().isLocked() 호출부가
+            //   스텁에 isLocked 가 없어 TypeError 나던 것 방지.
             var oCore = {
                 byId: function () { return null; },
                 lock: _noop,
                 unlock: _noop,
+                isLocked: function () { return false; },
                 applyTheme: _noop,
                 setModel: _noop,
                 getModel: function () { return null; },
                 setLanguage: _noop,
                 attachInit: function (fn) { try { if (typeof fn === "function") { fn(); } } catch (e) { } },
                 getConfiguration: function () {
-                    return { getLanguage: function () { return ""; }, getRTL: function () { return false; } };
+                    return {
+                        getLanguage: function () { return ""; },
+                        getRTL: function () { return false; },
+                        // 구 sap.ui.getCore().getConfiguration().getTheme() — USP Monaco iframe
+                        //   (monaco/index.js:691)이 다크 여부 판정에 사용. 스텁에 없으면 TypeError →
+                        //   에디터 EDITOR_LOAD 디스패치가 막혀 busy 가 안 꺼지던 원인.
+                        //   활성 셸 테마(U4ATheme)를 반환 → 다크면 "...dark" 로 끝나 vs-dark 폴백 매칭.
+                        getTheme: function () {
+                            try {
+                                var s = (window.U4ATheme && window.U4ATheme.current && window.U4ATheme.current()) || "";
+                                return s || "";
+                            } catch (e) { return ""; }
+                        }
+                    };
                 }
             };
             window.sap = {

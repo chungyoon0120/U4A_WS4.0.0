@@ -1,0 +1,352 @@
+/* =====================================================================
+ * usp.css — WS30 USP 코드에디터 셸 (HTML5 컨버전 U1)
+ * ---------------------------------------------------------------------
+ *  구 sap.m.Page("WS30") / OverflowToolbar / sap.ui.layout.Splitter /
+ *     sap.ui.table.TreeTable("usptree") / sap.m.Panel / Form 을
+ *     DOM + flex + CSS 로 대체. 셸 크롬 색·모양은 theme/tokens.css 의미 토큰만 소비.
+ *  Monaco 에디터 "내부" 색은 본 파일 대상 아님(iframe 안 Monaco API — doc 04 §4.4).
+ *  WS20 와 동일하게 로컬 토큰(--ws30-*) → theme 토큰 매핑 한 곳만으로 5종 테마 추종.
+ * ===================================================================== */
+
+.u4aWs30MainPage {
+    --ws30-bg: var(--app-bg);
+    --ws30-header-bg: var(--titlebar-bg);
+    --ws30-panel: var(--surface);
+    --ws30-line: var(--line);
+    --ws30-sep: var(--divider);
+    --ws30-accent: var(--accent);
+    --ws30-btn: var(--icon);
+    --ws30-text: var(--text);
+    --ws30-text-sub: var(--text-muted);
+    --ws30-selected-bg: var(--selected-bg);
+    --ws30-selected-text: var(--selected-text);
+    --ws30-hover-bg: var(--hover-bg);
+
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    background: var(--ws30-bg);
+    color: var(--ws30-text);
+    font-family: var(--font);
+}
+
+/* ── 앱 헤더 줄 (← APPID 모드 상태 | NewWindow) ─────────────────── */
+.u4aWs30AppHeader {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--ws30-header-bg);
+    border-bottom: 0.0625rem solid var(--ws30-line);
+}
+
+.u4aWs30AppHdrBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--ws30-btn);
+    cursor: pointer;
+    transition: background var(--motion);
+}
+
+.u4aWs30AppHdrBtn:hover { background: var(--ws30-hover-bg); }
+.u4aWs30AppHdrBtn:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+.u4aWs30AppHdrAppId { font-weight: 700; color: var(--ws30-text); }
+.u4aWs30AppHdrMode { color: var(--ws30-text); }
+.u4aWs30AppHdrStat { color: var(--ws30-text-sub); }
+.u4aWs30AppHdrSpacer { flex: 1 1 auto; }
+
+/* ── 트랜잭션 툴바 (.u4a-ws10__subheader 컴포넌트 재사용 + 보정) ── */
+.u4aWs30Toolbar {
+    flex: 0 0 auto;
+}
+
+/* ── 2분할 (트리 | 콘텐츠) ─────────────────────────────────────── */
+.u4aWs30SplitRow {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: stretch;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.u4aWs30TreePane {
+    flex: 0 0 500px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--ws30-panel);
+    border-right: 0.0625rem solid var(--ws30-line);
+}
+
+.u4aWs30Resizer {
+    flex: 0 0 0.375rem;
+    cursor: col-resize;
+    background: transparent;
+    position: relative;
+}
+.u4aWs30Resizer::after {
+    content: "";
+    position: absolute;
+    inset: 0 0.125rem;
+    background: var(--ws30-line);
+    opacity: 0;
+    transition: opacity var(--motion);
+}
+.u4aWs30Resizer:hover::after { opacity: 1; background: var(--ws30-accent); }
+
+.u4aWs30ContentPane {
+    flex: 1 1 auto;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    background: var(--ws30-bg);
+}
+
+/* ── 트리 헤더(expand/collapse 툴바) — WS20 트리 툴바(.u4aWs20TreeToolbar)와 동일 ──
+   surface-raised 배경 + 하단 보더 + .u4a-btn-icon 버튼. 컬럼 헤더는 두지 않음(WS20 동일). */
+.u4aWs30TreeToolbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.125rem;
+    padding: 0.25rem 0.375rem;
+    background: var(--surface-raised);
+    border-bottom: 0.0625rem solid var(--ws30-line);
+}
+.u4aWs30TreeTbIcon { pointer-events: none; }
+
+/* ── 트리 본문 (공통 .u4a-tree 컴포넌트 + USP 확장 — WS20 트리와 동일 UX) ──
+   hover/선택(aria-selected)/셰브론 회전(aria-expanded)/토글/아이콘/라벨은
+   shell.css 의 .u4a-tree__* 공통 컴포넌트가 담당. 여기선 WS20 트리와 동일하게
+   행높이(40px)·글자크기(13px)·들여쓰기·우측 설명 라벨만 확장한다. */
+.u4aWs30TreeBody {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden auto;        /* 세로만 스크롤(WS20 동일) — 설명 라벨 우측 고정 */
+    background: var(--ws30-panel);
+}
+
+/* 공통 트리(width:max-content) 무력화 — 행을 패널 폭에 맞춰 우측 설명이 항상 보이게(WS20 동일) */
+.u4aWs30Tree.u4a-tree {
+    width: auto;
+    min-width: 100%;
+}
+
+.u4aWs30TreeNode { margin: 0; }
+
+/* 행 — WS20 .u4aWs20TreeRow 와 동일(높이 40px·13px·space-between·들여쓰기 6px+깊이×16px) */
+.u4aWs30TreeRow {
+    justify-content: space-between;
+    height: 2.5rem;
+    font-size: 0.8125rem;
+    padding-left: calc(0.375rem + var(--ws30-depth, 0) * 1rem);
+}
+/* 토글 클릭 영역 — WS20 동일(가로 1.75rem, 세로 행높이) */
+.u4aWs30TreeRow .u4a-tree__toggle { width: 1.75rem; height: 2.5rem; }
+
+/* 아이콘 — WS20 18px */
+.u4aWs30TreeIcon { flex: 0 0 auto; }
+.u4aWs30TreeIcon img { width: 1.125rem; height: 1.125rem; display: block; object-fit: contain; }
+
+/* 이름 — 남는 폭, 말줄임(WS20 .u4aWs20TreeName) */
+.u4aWs30TreeName {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 설명 — WS20 aggregation 라벨(.u4aWs20TreeAggr)처럼 우측 muted, 좁으면 양보(접힘) */
+.u4aWs30TreeDesc {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 0.5rem;
+    color: var(--ws30-text-sub);
+    font-size: 0.8125rem;
+}
+.u4aWs30TreeRow[aria-selected="true"] .u4aWs30TreeDesc { color: inherit; }
+
+/* ── NavContainer 3페이지 (인트로 / 콘텐츠 / 문서) ───────────────── */
+.u4aWs30Nav {
+    flex: 1 1 auto;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+}
+.u4aWs30NavPage {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+}
+.u4aWs30NavPage.u4aWsHidden { display: none !important; }
+
+/* 인트로 */
+.u4aWs30Intro {
+    align-items: center;
+    justify-content: center;
+}
+.u4aWs30IntroImg { max-width: 60%; max-height: 60%; opacity: .9; }
+
+/* ── Properties 패널 (구 sap.m.Panel uspPanel) ─────────────────── */
+.u4aWs30Panel {
+    flex: 0 0 auto;
+    margin: 0.5rem;
+    border: 0.0625rem solid var(--ws30-line);
+    border-radius: var(--radius);
+    background: var(--ws30-panel);
+    overflow: hidden;
+}
+.u4aWs30PanelHead {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: var(--ws30-header-bg);
+    color: var(--ws30-text);
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+}
+.u4aWs30PanelHead:hover { background: var(--ws30-hover-bg); }
+.u4aWs30PanelTwisty { color: var(--ws30-text-sub); font-size: 0.75rem; }
+.u4aWs30Panel[data-collapsed="X"] .u4aWs30PanelBody { display: none; }
+.u4aWs30PanelBody { padding: 0.75rem; }
+
+/* ── 폼 (라벨 | 필드) — 구 sap.ui.layout.form.Form ──────────────── */
+.u4aWs30Form { display: flex; flex-direction: column; gap: 0.5rem; }
+.u4aWs30FormRow {
+    display: grid;
+    grid-template-columns: 12rem 1fr;
+    align-items: center;
+    gap: 0.5rem;
+}
+.u4aWs30FormLabel {
+    font-weight: 700;
+    color: var(--ws30-text);
+    text-align: right;
+}
+.u4aWs30FormField { min-width: 0; }
+.u4aWs30Input { width: 100%; }
+.u4aWs30Check { accent-color: var(--ws30-accent); }
+
+.u4aWs30UrlRow { display: flex; gap: 0.375rem; align-items: center; }
+.u4aWs30UrlRow .u4aWs30Input { flex: 1 1 auto; }
+.u4aWs30UrlCopyBtn { flex: 0 0 auto; white-space: nowrap; }
+
+/* 문서 페이지 (구 USP30) */
+.u4aWs30DocHead {
+    flex: 0 0 auto;
+    padding: 0.5rem 0.75rem;
+    font-weight: 700;
+    color: var(--ws30-text);
+    border-bottom: 0.0625rem solid var(--ws30-line);
+    background: var(--ws30-header-bg);
+}
+.u4aWs30DocForm { padding: 0.75rem; }
+
+/* ── 에디터 호스트 (Monaco iframe 2개 — 스플릿) ───────────────────
+   구 sap.ui.layout.Splitter "uspCodeeditorSplit": 좌(EDITPAGE1, 초기 0px) | 우(EDITPAGE2 메인). */
+.u4aWs30EditorHost {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    margin: 0 0.5rem 0.5rem;
+    border: 0.0625rem solid var(--ws30-line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--ws30-panel);
+    display: flex;
+    flex-direction: column;        /* 헤더 툴바 + 스플릿 */
+}
+
+/* ── 에디터 헤더 툴바 (구 fnGetUspPageWs30 customHeader) ─────────── */
+.u4aWs30EditorToolbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--ws30-header-bg);
+    border-bottom: 0.0625rem solid var(--ws30-line);
+}
+.u4aWs30EditorTitle {
+    font-weight: 700;
+    color: var(--ws30-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40%;
+}
+.u4aWs30EditorTbSpacer { flex: 1 1 auto; }
+.u4aWs30EditorThemeSel { min-width: 11rem; }
+
+.u4aWs30EditorSplit {
+    flex: 1 1 auto;
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    align-items: stretch;
+}
+/* 세로 분할 (구 Orientation Vertical) */
+.u4aWs30EditorSplit.is-vertical { flex-direction: column; }
+
+.u4aWs30EditorPane {
+    height: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+.u4aWs30EditorPane iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+/* 좌측 에디터(분할 대상) — 초기 0px(인라인 flex 로 제어), 분할바 드래그로 넓힘 */
+.u4aWs30EditorPaneLeft { border-right: 0.0625rem solid var(--ws30-line); }
+.u4aWs30EditorSplit.is-vertical .u4aWs30EditorPaneLeft {
+    border-right: none;
+    border-bottom: 0.0625rem solid var(--ws30-line);
+}
+
+/* 분할바 — 드래그 리사이즈 / 더블클릭 0px 초기화 (가로=col-resize / 세로=row-resize) */
+.u4aWs30EditorSplitBar {
+    flex: 0 0 0.375rem;
+    cursor: col-resize;
+    position: relative;
+    background: transparent;
+}
+.u4aWs30EditorSplit.is-vertical .u4aWs30EditorSplitBar { cursor: row-resize; }
+.u4aWs30EditorSplitBar::after {
+    content: "";
+    position: absolute;
+    inset: 0 0.125rem;
+    background: var(--ws30-line);
+    opacity: 0;
+    transition: opacity var(--motion);
+}
+.u4aWs30EditorSplit.is-vertical .u4aWs30EditorSplitBar::after { inset: 0.125rem 0; }
+.u4aWs30EditorSplitBar:hover::after { opacity: 1; background: var(--ws30-accent); }

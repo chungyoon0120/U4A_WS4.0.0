@@ -546,6 +546,7 @@
         WS10.appendChild(_renderSubHeader());
         WS10.appendChild(_renderSearchbar());
         WS10.appendChild(_renderContent());
+        WS10.appendChild(_renderStatusBar());
         WSAPP.appendChild(WS10);
 
         // WS20 / WS30 빈 페이지 (display 토글 대비 — 내용은 WS20 진입 시 렌더)
@@ -560,6 +561,14 @@
         WSAPP.appendChild(WS30);
 
         oContent.appendChild(WSAPP);
+
+        // 히어로 배경 테마 클래스(.u4a-ws-light-theme) 적용 + 테마 변경 감시 (원본 _applyWs10ContPageThemeClass)
+        _applyHeroThemeClass();
+        _ensureHeroThemeObserver();
+
+        // 하단 접속정보 상태바 값 채우기 (메타데이터 늦게 오는 경우 대비 짧은 재시도 1회)
+        _updateStatusBar();
+        setTimeout(_updateStatusBar, 600);
 
         // 셸 페이지 참조 + 네비게이션 헬퍼 (구 NavContainer.to → div 토글)
         //   ws_html5_shell.js fnOnMoveToPage / ws_html5_ws20.js 가 이 계약을 소비.
@@ -1005,6 +1014,75 @@
         o.innerHTML = _heroHtml() + _footerHtml();
         o.querySelector(".u4a-ws10__footer-close").addEventListener("click", _hideFooter);
         return o;
+    }
+
+    // 하단 접속정보 상태바 (SAP GUI 상태바 스타일) — 시스템/클라이언트/사용자/언어/서버/WS버전.
+    //   라벨은 메시지키 임의생성 금지라 아이콘으로 표시(값만 데이터). 색은 테마 토큰.
+    function _renderStatusBar() {
+        var o = document.createElement("div");
+        o.className = "u4a-ws10__statusbar";
+        o.id = "ws10StatusBar";
+        var aF = [
+            { id: "sys", icon: "server" },          // 시스템(SYSID)
+            { id: "client", icon: "hashtag" },      // 클라이언트(CLIENT)
+            { id: "user", icon: "user" },           // 사용자(UNAME)
+            { id: "langu", icon: "language" },      // 언어(LANGU)
+            { id: "server", icon: "network-wired" } // 서버(SERVER_INFO)
+        ];
+        var s = "";
+        for (var i = 0; i < aF.length; i++) {
+            s += '<span class="u4a-ws10__stat" data-stat="' + aF[i].id + '">' +
+                 _fa(aF[i].icon) + '<span class="u4a-ws10__stat-val">-</span></span>';
+        }
+        // WS 버전은 우측 끝(SAP GUI 시스템정보 우측 배치)
+        s += '<span class="u4a-ws10__stat u4a-ws10__stat--right" data-stat="ws">' +
+             _fa("code-branch") + '<span class="u4a-ws10__stat-val">-</span></span>';
+        o.innerHTML = s;
+        return o;
+    }
+
+    // 상태바 값 채우기 — getServerInfo()/getUserInfo() (없으면 "-").
+    function _updateStatusBar() {
+        var oBar = document.getElementById("ws10StatusBar");
+        if (!oBar) { return; }
+        var si = {}, ui = {};
+        try { si = (parent.getServerInfo && parent.getServerInfo()) || {}; } catch (e) { }
+        try { ui = (parent.getUserInfo && parent.getUserInfo()) || {}; } catch (e) { }
+        function set(id, v) {
+            var el = oBar.querySelector('[data-stat="' + id + '"] .u4a-ws10__stat-val');
+            if (el) { el.textContent = (v == null || v === "") ? "-" : String(v); }
+        }
+        set("sys", si.SYSID || ui.SYSID);
+        set("client", si.CLIENT || ui.CLIENT);
+        set("user", ui.UNAME);
+        set("langu", si.LANGU || ui.LANGU);       // 백엔드 로그온 언어(serverInfo.LANGU 우선)
+        // SERVER_INFO 는 {protocol,host,port} 객체 → host:port 문자열로(없으면 SYSTEMID/SERVERIP)
+        var sv = si.SERVER_INFO;
+        var sServer = (sv && sv.host) ? (sv.host + (sv.port ? ":" + sv.port : "")) : (si.SYSTEMID || si.SERVERIP);
+        set("server", sServer);
+        set("ws", si.WSVER ? (si.WSVER + (si.WSPATCH_LEVEL ? " (" + si.WSPATCH_LEVEL + ")" : "")) : "");
+    }
+
+    // WS10 히어로 배경을 테마별 CSS(.u4a-ws-light-theme — css/ws10_20.css 에 흰배경/페이드/글자/인증마크
+    //   규칙 이미 존재)로 전환. (원본 ws_main.js _applyWs10ContPageThemeClass 의 oPage.addStyleClass 이식)
+    //   다크/hcb = 클래스 제거(기본 다크 히어로) / 그 외(라이트 계열) = 클래스 추가(흰 히어로).
+    function _applyHeroThemeClass() {
+        var oPage = document.getElementById("WS10");
+        if (!oPage) { return; }
+        var sTheme;
+        try { sTheme = (window.U4ATheme && window.U4ATheme.current()) || document.documentElement.dataset.theme || ""; }
+        catch (e) { sTheme = document.documentElement.dataset.theme || ""; }
+        var bDark = sTheme.indexOf("dark") > -1 || sTheme.indexOf("hcb") > -1;
+        oPage.classList.toggle("u4a-ws-light-theme", !bDark);
+    }
+
+    // 테마 변경(data-theme) 1회 감시 → 히어로 라이트/다크 클래스 자동 토글.
+    function _ensureHeroThemeObserver() {
+        if (window.__u4aHeroThemeObs) { return; }
+        try {
+            window.__u4aHeroThemeObs = new MutationObserver(_applyHeroThemeClass);
+            window.__u4aHeroThemeObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+        } catch (e) { }
     }
 
     // 배경 마크업 (doc 03 §5 _getWs10ContentHtml — ws10_20/index.html 기준 ../../img)

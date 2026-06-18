@@ -89,7 +89,15 @@
             oList = _el("div", "u4a-combo__list");
             oList.setAttribute("role", "listbox");
 
+            let sLastGroup = null;
             aItems.forEach((it, idx) => {
+                // 그룹 헤더(선택 불가) — it.group 이 바뀔 때마다 1개 삽입. group 없는 항목은 종전과 동일.
+                //   (.u4a-combo__group 은 .u4a-combo__item 이 아니므로 키보드 내비/인덱스에서 자동 제외)
+                if (it.group != null && it.group !== sLastGroup) {
+                    sLastGroup = it.group;
+                    const oGrp = _el("div", "u4a-combo__group", it.group);
+                    oList.appendChild(oGrp);
+                }
                 const oItem = _el("div", "u4a-combo__item");
                 oItem.setAttribute("role", "option");
                 if (it.value === sCurrent) {

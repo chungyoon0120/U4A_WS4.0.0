@@ -169,7 +169,7 @@
             o[aParts[aParts.length - 1]] = val;
         },
         refresh() {
-            oAPP.fn.fnRenderServerTable();
+            _renderFolderContents();
         }
     };
     oAPP.model = M;
@@ -887,6 +887,286 @@
     };
 
     /********************************************************************
+     * 뷰 모드 (Tree / Master-Detail) — 상태 + appdata 영속화
+     *   SAP Logon Pad 의 뷰 전환 컨셉. 레지스트리 대신 userData(appdata)/p13n
+     *   에 마지막 선택 뷰를 저장한다(사용자 지시). [Launcher 뷰는 다음 단계]
+     ********************************************************************/
+    const VIEW_MODES = { TREE: "tree", MASTER: "master" };
+
+    function _viewStateFilePath() {
+        return PATH.join(USERDATA, "p13n", "serverlist_view.json");
+    }
+    oAPP.fn.fnLoadViewMode = function () {
+        try {
+            const sPath = _viewStateFilePath();
+            if (FS.existsSync(sPath)) {
+                const o = JSON.parse(FS.readFileSync(sPath, "utf-8") || "{}");
+                if (o && (o.viewMode === VIEW_MODES.TREE || o.viewMode === VIEW_MODES.MASTER)) {
+                    return o.viewMode;
+                }
+            }
+        } catch (e) { /* 손상/누락 → 기본값 */ }
+        return VIEW_MODES.TREE;
+    };
+    oAPP.fn.fnSaveViewMode = function (sMode) {
+        try {
+            const sDir = PATH.join(USERDATA, "p13n");
+            if (!FS.existsSync(sDir)) { FS.mkdirSync(sDir, { recursive: true }); }
+            FS.writeFileSync(_viewStateFilePath(), JSON.stringify({ viewMode: sMode }, null, 2), "utf-8");
+        } catch (e) {
+            console.error("[ServerList] 뷰 모드 저장 실패:", e);
+        }
+    };
+
+    /** 서브헤더 뷰 전환 세그먼트 (Tree / Master-Detail) */
+    function _buildViewSwitcher() {
+        const oWrap = _el("div", "u4a-viewsw");
+        oWrap.setAttribute("role", "group");
+        const aBtns = [
+            { mode: VIEW_MODES.TREE, icon: "sitemap", tip: L("viewTree") },
+            { mode: VIEW_MODES.MASTER, icon: "table-columns", tip: L("viewMaster") }
+        ];
+        for (const o of aBtns) {
+            const oBtn = _el("button", "u4a-viewsw__btn");
+            oBtn.type = "button";
+            oBtn.dataset.mode = o.mode;
+            oBtn.title = o.tip;
+            oBtn.innerHTML = _fa(o.icon);
+            oBtn.addEventListener("click", () => {
+                if (oAPP.attr._viewMode === o.mode) { return; }
+                oAPP.attr._viewMode = o.mode;
+                oAPP.fn.fnSaveViewMode(o.mode);
+                oAPP.fn.fnRenderActiveView();
+            });
+            oWrap.appendChild(oBtn);
+        }
+        return oWrap;
+    }
+    function _updateViewSwitcherActive() {
+        document.querySelectorAll(".u4a-viewsw__btn").forEach((b) => {
+            b.setAttribute("aria-pressed", (b.dataset.mode === oAPP.attr._viewMode) ? "true" : "false");
+        });
+    }
+
+    /** Tree 뷰 본문 (좌 트리 / 우 테이블 — 기존 레이아웃) */
+    function _buildTreeViewBody(oBody) {
+        const oSplitter = _el("div", "u4a-splitter");
+        const oPaneLeft = _el("div", "u4a-splitter__pane");
+        oPaneLeft.id = "u4aWsTreePane";
+        oPaneLeft.style.flex = "0 0 30%";
+        const oBar = _el("div", "u4a-splitter__bar");
+        oBar.setAttribute("role", "separator");
+        _attachSplitterDrag(oBar, oPaneLeft);
+        const oPaneRight = _el("div", "u4a-splitter__pane");
+        oPaneRight.id = "u4aWsTablePane";
+        oPaneRight.style.flex = "1 1 auto";
+        oSplitter.append(oPaneLeft, oBar, oPaneRight);
+        oBody.appendChild(oSplitter);
+    }
+
+    /** Master-Detail 뷰 본문 (폴더 → 서버목록 → 상세, 3컬럼) */
+    function _buildMasterDetailBody(oBody) {
+        const oSplit = _el("div", "u4a-splitter");
+        const oCol1 = _el("div", "u4a-splitter__pane");
+        oCol1.id = "u4aWsTreePane";
+        oCol1.style.flex = "0 0 24%";
+        const oBar1 = _el("div", "u4a-splitter__bar");
+        oBar1.setAttribute("role", "separator");
+        _attachSplitterDrag(oBar1, oCol1);
+        const oCol2 = _el("div", "u4a-splitter__pane u4a-md__list");
+        oCol2.id = "u4aWsMasterListPane";
+        oCol2.style.flex = "0 0 34%";
+        const oBar2 = _el("div", "u4a-splitter__bar");
+        oBar2.setAttribute("role", "separator");
+        _attachSplitterDrag(oBar2, oCol2);
+        const oCol3 = _el("div", "u4a-splitter__pane u4a-md__detail");
+        oCol3.id = "u4aWsMasterDetailPane";
+        oCol3.style.flex = "1 1 auto";
+        oSplit.append(oCol1, oBar1, oCol2, oBar2, oCol3);
+        oBody.appendChild(oSplit);
+    }
+
+    /** 선택 폴더 내용 렌더 — 활성 뷰에 맞게 분기 */
+    function _renderFolderContents() {
+        if (oAPP.attr._viewMode === VIEW_MODES.MASTER) {
+            oAPP.fn.fnRenderMasterList();
+        } else {
+            oAPP.fn.fnRenderServerTable();
+        }
+    }
+
+    /** [PUBLIC] 활성 뷰 렌더 (본문 재구성 + 트리/내용 채움) */
+    oAPP.fn.fnRenderActiveView = function () {
+        const oBody = document.getElementById("u4aWsBody");
+        if (!oBody) { return; }
+        if (!oAPP.attr._viewMode) { oAPP.attr._viewMode = oAPP.fn.fnLoadViewMode(); }
+        oBody.innerHTML = "";
+        if (oAPP.attr._viewMode === VIEW_MODES.MASTER) {
+            _buildMasterDetailBody(oBody);
+        } else {
+            _buildTreeViewBody(oBody);
+        }
+        _updateViewSwitcherActive();
+
+        // 트리(좌측)는 두 뷰 공통
+        oAPP.fn.fnRenderTree();
+
+        // 트리 선택 하이라이트 복원 (뷰 전환 시 트리가 재렌더되므로)
+        const oSelNode = oAPP.attr._selectedTreeNodeData;
+        if (oSelNode && oSelNode._attributes) {
+            const sUuid = oSelNode._attributes.uuid;
+            const oPane = document.getElementById("u4aWsTreePane");
+            if (oPane) {
+                const aRows = oPane.querySelectorAll(".u4a-tree__row");
+                for (const r of aRows) {
+                    if (r._nodeData && r._nodeData._attributes && r._nodeData._attributes.uuid === sUuid) {
+                        r.setAttribute("aria-selected", "true");
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 선택 폴더 내용(테이블/리스트)
+        _renderFolderContents();
+    };
+
+    /** [PUBLIC] Master-Detail 가운데 컬럼 — 서버 카드 목록 */
+    oAPP.fn.fnRenderMasterList = function () {
+        const oPane = document.getElementById("u4aWsMasterListPane");
+        if (!oPane) { return; }
+        oPane.innerHTML = "";
+        oAPP.attr._selectedServer = null;
+
+        const aItems = M.getProperty("/SAPLogonItems") || [];
+
+        // 헤더: 폴더명 · N servers / M active
+        let sFolder = "";
+        try { sFolder = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { }
+        const iActive = aItems.filter(o => o.ISSAVE === true).length;
+        const oHead = _el("div", "u4a-md__listhead");
+        const oHInfo = _el("div", "u4a-md__listinfo");
+        oHInfo.appendChild(_el("span", "u4a-md__listtitle", sFolder || ""));
+        if (aItems.length) {
+            oHInfo.appendChild(_el("span", "u4a-md__listmeta", "· " + aItems.length + " " + L("servers")));
+        }
+        oHead.appendChild(oHInfo);
+        if (aItems.length && iActive > 0) {
+            // 활성 개수는 성공 틴트 pill 로 (점 + 숫자)
+            const oCnt = _el("span", "u4a-md__listcount");
+            oCnt.append(_el("span", "u4a-status-dot u4a-status-dot--on"), _el("span", null, iActive + " " + L("active").toLowerCase()));
+            oHead.appendChild(oCnt);
+        }
+        oPane.appendChild(oHead);
+
+        if (aItems.length === 0) {
+            oPane.appendChild(_el("div", "u4a-md__empty", L("noData")));
+            // 빈 폴더 → 상세도 비움
+            oAPP.fn.fnRenderServerDetail(null);
+            return;
+        }
+
+        const oList = _el("div", "u4a-md__cards");
+        aItems.forEach((oItem) => {
+            const bSave = (oItem.ISSAVE === true);
+            const oCard = _el("div", "u4a-md__card");
+            oCard.tabIndex = 0;
+            oCard._rowData = oItem;
+            const oBadge = _el("span", "u4a-md__badge", oItem.systemid || "");
+            const oMain = _el("div", "u4a-md__cardmain");
+            oMain.append(_el("div", "u4a-md__cardname", oItem.name || ""), _el("div", "u4a-md__cardsub", oItem.host || ""));
+            const oDot = _el("span", "u4a-status-dot" + (bSave ? " u4a-status-dot--on" : ""));
+            oCard.append(oBadge, oMain, oDot);
+
+            const _sel = () => {
+                oPane.querySelectorAll('.u4a-md__card[aria-selected="true"]').forEach(c => c.removeAttribute("aria-selected"));
+                oCard.setAttribute("aria-selected", "true");
+                oAPP.attr._selectedServer = { data: oItem, tr: oCard };
+                oAPP.fn.fnRenderServerDetail(oItem);
+            };
+            oCard.addEventListener("click", _sel);
+            oCard.addEventListener("dblclick", () => oAPP.fn.fnPressServerListItem(oItem, oCard));
+            oCard.addEventListener("keydown", (ev) => {
+                if (ev.key === "Enter") { ev.preventDefault(); oAPP.fn.fnPressServerListItem(oItem, oCard); }
+            });
+            oList.appendChild(oCard);
+        });
+        oPane.appendChild(oList);
+
+        // 첫 항목 자동 선택 → 상세 표시
+        const oFirst = oList.querySelector(".u4a-md__card");
+        if (oFirst) { oFirst.click(); }
+    };
+
+    /** [PUBLIC] Master-Detail 우측 컬럼 — 서버 상세 */
+    oAPP.fn.fnRenderServerDetail = function (oItem) {
+        const oPane = document.getElementById("u4aWsMasterDetailPane");
+        if (!oPane) { return; }
+        oPane.innerHTML = "";
+
+        if (!oItem) {
+            oPane.appendChild(_el("div", "u4a-md__detailempty", L("selectServerHint")));
+            return;
+        }
+        const bSave = (oItem.ISSAVE === true);
+
+        // 상태 pill (active 면 성공 틴트)
+        const oStat = _el("div", "u4a-md__detailstat" + (bSave ? " u4a-md__detailstat--on" : ""));
+        oStat.append(_el("span", "u4a-status-dot" + (bSave ? " u4a-status-dot--on" : "")), _el("span", null, bSave ? L("active") : L("inactive")));
+        oPane.appendChild(oStat);
+
+        // 제목 줄: [SID 배지] 서버명
+        const oHead = _el("div", "u4a-md__detailhead");
+        oHead.append(
+            _el("span", "u4a-md__badge u4a-md__badge--lg", oItem.systemid || ""),
+            _el("div", "u4a-md__detailtitle", oItem.name || "")
+        );
+        oPane.appendChild(oHead);
+
+        // 접속 문자열 (액센트 · 모노)
+        const sConn = (oItem.host || "") + (oItem.port ? (":" + oItem.port) : "");
+        oPane.appendChild(_el("div", "u4a-md__detailconn", sConn));
+
+        // 구분선
+        oPane.appendChild(_el("div", "u4a-md__rule"));
+
+        // 필드 그리드
+        let sGroup = "";
+        try { sGroup = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { }
+        const _field = (sLabel, sVal) => {
+            const oF = _el("div", "u4a-md__field");
+            oF.append(_el("div", "u4a-md__flabel", sLabel), _el("div", "u4a-md__fval", sVal || "—"));
+            return oF;
+        };
+        const oGrid = _el("div", "u4a-md__fields");
+        oGrid.append(
+            _field(L("host"), oItem.host),
+            _field(L("port"), oItem.port),
+            _field(L("sid"), oItem.systemid),
+            _field(L("sno"), oItem.insno),
+            _field(L("group"), sGroup)
+        );
+        oPane.appendChild(oGrid);
+
+        // 액션 (Connect / Edit / Delete) — 기존 핸들러 재사용
+        const oActions = _el("div", "u4a-md__actions");
+        const oConnect = _el("button", "u4a-btn u4a-btn--emphasized");
+        oConnect.innerHTML = _fa("play") + "<span>" + _esc(L("connect")) + "</span>";
+        oConnect.disabled = !bSave;
+        oConnect.addEventListener("click", () => oAPP.fn.fnPressServerListItem(oItem));
+        const oEdit = _el("button", "u4a-btn");
+        oEdit.innerHTML = ICON.edit + "<span>" + _esc(L("edit")) + "</span>";
+        oEdit.addEventListener("click", () => oAPP.fn.fnPressEdit());
+        const oSpc = _el("div", "u4a-md__actionspacer");
+        const oDel = _el("button", "u4a-btn u4a-btn--negative");
+        oDel.innerHTML = ICON.trash + "<span>" + _esc(L("del")) + "</span>";
+        oDel.disabled = !bSave;
+        oDel.addEventListener("click", () => oAPP.fn.fnPressDelete());
+        oActions.append(oConnect, oEdit, oSpc, oDel);
+        oPane.appendChild(oActions);
+    };
+
+    /********************************************************************
      * 셸 렌더 — 타이틀바 / 서브헤더 / 스플리터 (UI5 App/Page/Bar 대체)
      ********************************************************************/
     oAPP.fn.fnRenderShell = function () {
@@ -928,32 +1208,22 @@
         oSettingsBtn.setAttribute("aria-haspopup", "true");
         oSettingsBtn.innerHTML = ICON.gear;
         oSettingsBtn.addEventListener("click", (ev) => oAPP.fn.fnOpenSettingsMenu(ev));
-        oSubBar.append(oSubTitle, oSubSpacer, oSettingsBtn);
+        // 마지막 선택 뷰 복원(appdata) 후 뷰 전환 세그먼트 배치
+        if (!oAPP.attr._viewMode) { oAPP.attr._viewMode = oAPP.fn.fnLoadViewMode(); }
+        oSubBar.append(oSubTitle, oSubSpacer, _buildViewSwitcher(), oSettingsBtn);
 
-        // ── 본문: 스플리터 (좌 트리 / 우 테이블) ──
+        // ── 본문: 활성 뷰(Tree/Master-Detail)에 따라 fnRenderActiveView 가 채운다 ──
         const oBody = _el("div", "u4a-page__body");
-        const oSplitter = _el("div", "u4a-splitter");
-
-        const oPaneLeft = _el("div", "u4a-splitter__pane");
-        oPaneLeft.id = "u4aWsTreePane";
-        oPaneLeft.style.flex = "0 0 30%";
-
-        const oBar = _el("div", "u4a-splitter__bar");
-        oBar.setAttribute("role", "separator");
-        _attachSplitterDrag(oBar, oPaneLeft);
-
-        const oPaneRight = _el("div", "u4a-splitter__pane");
-        oPaneRight.id = "u4aWsTablePane";
-        oPaneRight.style.flex = "1 1 auto";
-
-        oSplitter.append(oPaneLeft, oBar, oPaneRight);
-        oBody.appendChild(oSplitter);
+        oBody.id = "u4aWsBody";
 
         oPage.append(oTitlebar, oSubBar, oBody);
         oContent.appendChild(oPage);
 
-        // 초기 빈 테이블
-        oAPP.fn.fnRenderServerTable();
+        // 활성 뷰 렌더 (초기엔 데이터 비어있음 — fnOnListupSapLogon 이후 재렌더됨)
+        oAPP.fn.fnRenderActiveView();
+
+        // 창 리사이즈 시 스플리터 폭 재클램프 (드래그로 고정된 px 가 창 축소 시 넘치는 문제)
+        _bindSplitterResizeClamp();
 
         // 페이드 인
         setTimeout(() => { oContent.dataset.show = "true"; }, 50);
@@ -984,14 +1254,22 @@
             sno: "SNO", settingsCol: "Settings", settings: "Settings",
             edit: "Edit", del: "Delete", active: "Active", inactive: "Inactive",
             noData: "No data", selectServer: "Please select a server first.",
-            dlgConfirm: "Confirm", dlgSuccess: "Success", dlgError: "Error", dlgWarning: "Warning"
+            dlgConfirm: "Confirm", dlgSuccess: "Success", dlgError: "Error", dlgWarning: "Warning",
+            // 뷰 전환 / Master-Detail 라벨 (메시지 클래스에 키 없음 → 화면 전용 i18n, doc 02 §8)
+            viewTree: "Tree View", viewMaster: "Master-Detail View",
+            port: "PORT", group: "GROUP", connect: "Connect", servers: "servers",
+            selectServerHint: "Select a server to see details."
         },
         KO: {
             status: "상태", serverName: "서버 이름", sid: "시스템 ID", host: "호스트(또는 IP)",
             sno: "인스턴스", settingsCol: "설정", settings: "설정",
             edit: "편집", del: "삭제", active: "활성", inactive: "비활성",
             noData: "데이터 없음", selectServer: "서버를 먼저 선택하세요.",
-            dlgConfirm: "확인", dlgSuccess: "성공", dlgError: "오류", dlgWarning: "경고"
+            dlgConfirm: "확인", dlgSuccess: "성공", dlgError: "오류", dlgWarning: "경고",
+            // 뷰 전환 / Master-Detail 라벨 (메시지 클래스에 키 없음 → 화면 전용 i18n, doc 02 §8)
+            viewTree: "트리 뷰", viewMaster: "마스터-디테일 뷰",
+            port: "포트", group: "그룹", connect: "연결", servers: "서버",
+            selectServerHint: "서버를 선택하면 상세가 표시됩니다."
         }
     };
     function L(sKey) {
@@ -1005,8 +1283,8 @@
         if (oAPP.attr._elSubTitle) {
             oAPP.attr._elSubTitle.textContent = T("004");
         }
-        // 서버 테이블(헤더/버튼/상태/no-data) 재렌더 → 현지화 반영
-        oAPP.fn.fnRenderServerTable();
+        // 활성 뷰 전체 재렌더 → 현지화(헤더/버튼/상태/상세 라벨) 반영
+        oAPP.fn.fnRenderActiveView();
     };
 
     /********************************************************************
@@ -1140,7 +1418,7 @@
         if (oNode) {
             oAPP.fn.fnPressWorkSpaceTreeItem(oNode);
         } else {
-            oAPP.fn.fnRenderServerTable();
+            _renderFolderContents();
         }
     };
 
@@ -1157,7 +1435,7 @@
         M.setProperty("/SAPLogonItems", []);
 
         if (!oNodeData || !oNodeData._attributes) {
-            oAPP.fn.fnRenderServerTable();
+            _renderFolderContents();
             return;
         }
 
@@ -1169,7 +1447,7 @@
         // 폴더의 서버(Item) 목록
         let aItem = oNodeData.Item;
         if (!aItem) {
-            oAPP.fn.fnRenderServerTable();
+            _renderFolderContents();
             return;
         }
         if (!Array.isArray(aItem)) {
@@ -1196,7 +1474,7 @@
         // 기 저장된 서버 정보 동기화 (ISSAVE 플래그)
         _syncSavedServerInfo(M);
 
-        oAPP.fn.fnRenderServerTable();
+        _renderFolderContents();
     };
 
     /********************************************************************
@@ -2850,11 +3128,14 @@
         window.addEventListener("mousemove", (ev) => {
             if (!bDrag) { return; }
             const oSplitter = oBar.parentElement;
-            const oRect = oSplitter.getBoundingClientRect();
-            let iWidth = ev.clientX - oRect.left;
+            const oSplitRect = oSplitter.getBoundingClientRect();
+            // 폭은 "이 패널 자신의 왼쪽 모서리" 기준으로 계산 → 3컬럼(중간 바) 에도 정확.
+            //  (첫 패널은 패널왼쪽=스플리터왼쪽 이라 기존 2컬럼 동작과 동일)
+            const oPaneRect = oLeftPane.getBoundingClientRect();
+            let iWidth = ev.clientX - oPaneRect.left;
             const iMin = 120;
-            // 우측(서버리스트) 패널 min-width(14rem) + 바 + 스크롤바 여유 확보
-            const iMax = oRect.width - 248;
+            // 이 패널 오른쪽으로 최소 248px(우측 패널 min-width+바+스크롤바) 확보
+            const iMax = oSplitRect.right - oPaneRect.left - 248;
             iWidth = Math.max(iMin, Math.min(iMax, iWidth));
             oLeftPane.style.flex = `0 0 ${iWidth}px`;
             // 스플리터 드래그 시 테이블 반응형 즉시 갱신
@@ -2867,6 +3148,37 @@
                 bDrag = false;
                 document.body.style.cursor = "";
             }
+        });
+    }
+
+    /**
+     * 창 리사이즈 시: 드래그로 고정된 px 폭의 스플리터 패널이 줄어든 창을 넘쳐
+     * 다른 패널/스플릿 바가 overflow:hidden 에 잘려 숨는 문제 방지.
+     *  → 현재 화면의 모든 .u4a-splitter 패널(px 고정분)을 컨테이너에 맞게 재클램프.
+     *  (한 번만 바인딩 — 뷰 전환으로 스플리터가 새로 그려져도 querySelector 로 현재 것 처리)
+     */
+    let _splitterResizeBound = false;
+    function _bindSplitterResizeClamp() {
+        if (_splitterResizeBound) { return; }
+        _splitterResizeBound = true;
+        window.addEventListener("resize", () => {
+            document.querySelectorAll(".u4a-splitter").forEach((oSplitter) => {
+                const oSplitRect = oSplitter.getBoundingClientRect();
+                oSplitter.querySelectorAll(":scope > .u4a-splitter__pane").forEach((oPane) => {
+                    const m = (oPane.style.flex || "").match(/(\d+(?:\.\d+)?)px/);
+                    if (!m) { return; } // 퍼센트/auto → 자동 적응, 건드리지 않음
+                    const oPaneRect = oPane.getBoundingClientRect();
+                    const iMin = 120;
+                    const iMax = oSplitRect.right - oPaneRect.left - 248;
+                    if (iMax < iMin) { return; } // 공간 부족(극단적 좁은 창) → 보류
+                    const iCur = parseFloat(m[1]);
+                    const iClamped = Math.max(iMin, Math.min(iMax, iCur));
+                    if (Math.abs(iClamped - iCur) > 0.5) {
+                        oPane.style.flex = `0 0 ${iClamped}px`;
+                    }
+                });
+            });
+            if (oAPP.fn.fnUpdateTableWidthClass) { oAPP.fn.fnUpdateTableWidthClass(); }
         });
     }
 

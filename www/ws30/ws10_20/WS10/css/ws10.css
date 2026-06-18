@@ -358,6 +358,42 @@
     overflow: hidden;
 }
 
+/* ── 하단 접속정보 상태바 (SAP GUI 상태바 스타일 — 시스템/클라이언트/사용자/언어/서버/WS버전) ── */
+.u4a-ws10__statusbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    height: 1.625rem;
+    padding: 0 0.875rem;
+    background: var(--titlebar-bg, var(--surface));
+    border-top: 0.0625rem solid var(--line);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    white-space: nowrap;
+    /* 접속정보는 복사 가능하게(body 전역 user-select:none 해제) */
+    user-select: text;
+}
+.u4a-ws10__stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+}
+.u4a-ws10__stat i {
+    font-size: 0.8125rem;
+    color: var(--icon-muted);
+    opacity: 0.85;
+}
+.u4a-ws10__stat-val {
+    color: var(--text);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.u4a-ws10__stat--right { margin-left: auto; }
+
 /* ── 플로팅 푸터 메시지 (floatingFooter OverflowToolbar) ──────────── */
 /* 플로팅 푸터 메시지 (구 sap.m floatingFooter:true) — 가장자리에서 띄운 라운드 카드.
    숨김 = display:none. 노출 시에만 1회 키프레임으로 "밑에서 위로 스르륵" 슬라이드업.

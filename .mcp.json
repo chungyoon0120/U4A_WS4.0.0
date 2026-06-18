@@ -1,0 +1,13 @@
+{
+  "mcpServers": {    
+    "sap-adt": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "D:/workspace/sap_adt_mcp_server_py",
+        "run",
+        "sap-adt-mcp"
+      ]
+    }
+  }
+}

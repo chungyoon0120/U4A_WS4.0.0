@@ -850,6 +850,72 @@
         return (oFrame && oFrame.contentWindow) || null;
     }
 
+    /************************************************************************
+     * [HTML5] 미리보기 iframe 에 포커스가 가도 WS20 단축키가 동작하도록 keydown 포워딩
+     * ---------------------------------------------------------------------
+     *  미리보기 iframe 에 포커스가 있으면 keydown 이 iframe 문서로만 들어가, 메인 문서에
+     *  걸린 단축키 리스너(shortcut.js: add → document)가 못 받아 Ctrl+S/F1/F3/F8 등이 안 먹는다.
+     *  → iframe 문서 keydown 을 가로채, "WS20 에 등록된 단축키 조합"이면 iframe 기본동작/전파를
+     *  막고 메인 document 로 합성 keydown 을 재발송한다(shortcut.js 가 e.keyCode 로 판별하므로
+     *  생성자로 안 들어가는 keyCode/which 를 강제 주입). WS20 단축키가 아니면 그대로 iframe 에 맡김.
+     *  iframe (re)load 마다 호출(문서가 새로 생기므로 __u4aScFwd 플래그로 중복만 방지).
+     ************************************************************************/
+    function _attachPreviewShortcutForward(oFrame) {
+
+        var oDoc = null;
+        try { oDoc = oFrame.contentDocument || (oFrame.contentWindow && oFrame.contentWindow.document); }
+        catch (e) { return; }              // cross-origin(이론상 없음, file://) → 포기
+        if (!oDoc || oDoc.__u4aScFwd) { return; }
+        oDoc.__u4aScFwd = true;
+
+        function _sig(sKey, bCtrl, bShift, bAlt) {
+            return String(sKey).toUpperCase() + "|" + (bCtrl ? 1 : 0) + (bShift ? 1 : 0) + (bAlt ? 1 : 0);
+        }
+        function _sigFromKeyStr(s) {
+            var c = false, sh = false, a = false, k = "";
+            String(s).toUpperCase().split("+").forEach(function (x) {
+                x = x.trim();
+                if (x === "CTRL" || x === "META" || x === "CMD") { c = true; }
+                else if (x === "SHIFT") { sh = true; }
+                else if (x === "ALT") { a = true; }
+                else if (x) { k = x; }
+            });
+            return _sig(k, c, sh, a);
+        }
+
+        // 메인에 등록된 WS20 단축키 KEY → 시그니처 셋 (iframe 로드당 1회)
+        var oSet = {};
+        try {
+            (oAPP.common.getShortCutList("WS20") || []).forEach(function (it) {
+                if (it && it.KEY) { oSet[_sigFromKeyStr(it.KEY)] = 1; }
+            });
+        } catch (e) { }
+
+        oDoc.addEventListener("keydown", function (e) {
+            var k = e.key || "";
+            if (!k || k === "Control" || k === "Shift" || k === "Alt" || k === "Meta") { return; }
+            var sig = _sig(k.length === 1 ? k.toUpperCase() : k, (e.ctrlKey || e.metaKey), e.shiftKey, e.altKey);
+            if (!oSet[sig]) { return; }     // WS20 단축키 아님 → iframe 에 맡김
+
+            // iframe 기본동작(브라우저 Ctrl+S 등)·전파 차단.
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.repeat === true) { return; }   // 키 꾹 누름 — 재발송 안 함(핸들러도 e.repeat 가드)
+
+            try {
+                var ev = new KeyboardEvent("keydown", {
+                    key: e.key, code: e.code, bubbles: true, cancelable: true,
+                    ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey, repeat: e.repeat
+                });
+                Object.defineProperty(ev, "keyCode", { get: function () { return e.keyCode; } });
+                Object.defineProperty(ev, "which", { get: function () { return e.which || e.keyCode; } });
+                document.dispatchEvent(ev);
+            } catch (err) {
+                console.warn("[HTML5][WS20][prev] shortcut forward 실패:", err && err.message);
+            }
+        }, true);   // capture — iframe 앱보다 먼저 가로채기
+    }
+
     //가운데 페이지(미리보기 영역) 구성 — HTML5.
     function _ws20RenderPreviewHost() {
 
@@ -889,6 +955,14 @@
 
         oWrap.appendChild(oFrame);
         oBody.appendChild(oWrap);
+
+        // [HTML5] 미리보기 iframe 에 포커스가 가도 WS20 단축키가 동작하도록 keydown 포워딩 부착.
+        //   src 설정/리로드로 load 가 날 때마다(=문서 새로 생길 때마다) 재부착.
+        oFrame.addEventListener("load", function () {
+            try { _attachPreviewShortcutForward(oFrame); } catch (e) { }
+        });
+        // 이미 로드된 상태(load 이벤트를 놓친 경우)도 즉시 시도.
+        try { _attachPreviewShortcutForward(oFrame); } catch (e) { }
 
         /* ── 헤더(#ws20PrevHeader) 컨트롤 연결 ───────────────────────── */
 
