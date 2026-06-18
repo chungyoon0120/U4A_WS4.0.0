@@ -11,12 +11,20 @@
     <!-- Font Awesome 7.2.0 (아이콘) -->
     <link rel="stylesheet" href="../../../lib/fontawesome/7.2.0/css/all.min.css">
 
-    <!-- 테마 시스템 (doc 12 §6.1) : tokens(=white 기본) → shell → ws10.
+    <!-- Bootstrap 5.0.2 (레이아웃/컴포넌트 토대) — 테마보다 먼저 로드해
+         브리지/스킨이 색을 override 하도록 한다. (ServerList/Login 과 동일 컨셉) -->
+    <link rel="stylesheet" href="../../../lib/bootstrap/5.0.2/css/bootstrap.min.css">
+
+    <!-- 테마 시스템 (doc 12 §6.1) : tokens(=white 기본) → shell → bootstrap 브리지/스킨 → ws10.
          WS10 도 단일 활성 테마만 쓰므로 5종을 전부 로드하지 않고,
          활성 테마 1종만 아래 스크립트에서 동적 로드한다.
          (horizon_white 는 tokens.css 의 :root 가 곧 기본값이라 별도 CSS 불필요) -->
     <link rel="stylesheet" href="../theme/tokens.css">
     <link rel="stylesheet" href="../theme/shell.css">
+    <!-- Bootstrap 컴포넌트 색을 프로젝트 토큰으로 입히는 브리지 -->
+    <link rel="stylesheet" href="../theme/bootstrap-bridge.css">
+    <!-- Bootstrap 데모 스킨 (전 화면 공통 — 36px 헤더/--sl- 팔레트/컴포넌트 데모색) -->
+    <link rel="stylesheet" href="../theme/bootstrap-skin.css">
 
     <!-- WS10 셸 크롬 + 히어로 배경 CSS (theme/tokens.css 의 var(--*)만 소비) -->
     <link rel="stylesheet" href="css/ws10.css">
@@ -72,6 +80,9 @@
 
     <!-- 셸 컨텐츠 (WS10.js 가 동적 렌더) — 초기 hidden, 렌더 후 페이드인 -->
     <div id="content" class="u4a-ws10 u4a-fade" style="display:none;"></div>
+
+    <!-- Bootstrap 번들(Popper 포함) — dropdown/modal/tooltip JS. WS10.js 보다 먼저. -->
+    <script src="../../../lib/bootstrap/5.0.2/js/bootstrap.bundle.min.js"></script>
 
     <!-- WS10 로직 (테마 API 는 head 에서 선로드) -->
     <script src="WS10.js"></script>

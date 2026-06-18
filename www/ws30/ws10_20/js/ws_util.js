@@ -644,6 +644,13 @@ const WSUTIL = {
             "sap_belize":        "#fafafa",
             "sap_fiori_3":       "#f7f7f7",
             "sap_fiori_3_dark":  "#1c2228",
+            // 현재 5종 테마 키(부트스트랩 데모 스킨 --sl-bg 와 일치) — 첫 페인트 흰색 깜빡임 방지.
+            // (구 맵엔 sap_* 키만 있어 horizon_* 는 #ffffff 로 떨어져 흰 깜빡임 발생했음)
+            "horizon_white":     "#ffffff",
+            "horizon_dark":      "#161d26",
+            "horizon_purple":    "#f6f2fe",
+            "horizon_red":       "#fdf4f4",
+            "horizon_green":     "#f1faf4",
         };
 
         return _oThemeColorMap[sTheme] || "#ffffff";

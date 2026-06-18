@@ -90,6 +90,8 @@
     width: 100%;
     border-collapse: collapse;
     color: var(--text);
+    /* Bootstrap .table 가 주는 하단 마진 제거(스크롤 영역에 불필요한 빈 공간 방지) */
+    margin-bottom: 0;
 }
 
 /* 컬럼 헤더 — sticky (체크리스트 E) */
@@ -380,6 +382,16 @@
     color: var(--accent);
 }
 
+/* Bootstrap modal 헤더로 쓰일 때: 아이콘+제목을 좌측에 모음(기본 space-between 무력화).
+   (아이콘 색은 위 [data-type] 규칙 / 기본 inherit 유지 — 여기선 레이아웃만) */
+.modal-header.u4a-dialog__header {
+    justify-content: flex-start;
+    gap: 0.5rem;
+}
+.modal-header.u4a-dialog__header .modal-title {
+    font-weight: 700;
+}
+
 /* ══════════════════════════════════════════════════════════════════
    뷰 전환 세그먼트 (서브헤더) — Tree / Master-Detail
    ══════════════════════════════════════════════════════════════════ */
@@ -427,6 +439,9 @@
     display: flex;
     flex-direction: column;
     background: var(--surface);
+    /* 가운데 목록도 가로 스크롤 금지(세로만) + 최소폭(스플리터 예약 계산에 사용) */
+    min-width: 13rem;
+    overflow-x: hidden;
 }
 
 .u4a-md__listhead {
@@ -499,13 +514,17 @@
     padding: 0.5rem 0.625rem;
     border-radius: var(--radius);
     cursor: pointer;
+    /* Bootstrap list-group-item 의 연결 보더/사각 모서리 제거 → 개별 둥근 카드 유지 */
+    border: 0;
+    margin: 0;
 }
 
 .u4a-md__card:hover {
     background: var(--hover-bg);
 }
 
-.u4a-md__card[aria-selected="true"] {
+/* 선택 = Bootstrap .active. 좌측 강조바는 커스텀 유지(텍스트색은 각 span 이 직접 지정) */
+.u4a-md__card.active {
     background: var(--selected-bg);
     box-shadow: inset 0.1875rem 0 0 0 var(--accent);
 }
@@ -586,6 +605,10 @@
     gap: 0.5rem;
     padding: 1.5rem;
     background: var(--surface);
+    /* 가로 스크롤 금지 — 내용은 아래 반응형 규칙으로 리플로우(세로만 스크롤) */
+    min-width: 14rem;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .u4a-md__detailempty {
@@ -615,7 +638,7 @@
 /* 제목 줄: SID 배지 + 서버명 */
 .u4a-md__detailhead {
     display: flex;
-    align-items: center;
+    align-items: flex-start;   /* SID 배지를 제목 첫 줄(좌상단)에 맞춤(제목 다줄일 때 가운데로 안 뜨게) */
     gap: 0.625rem;
     margin-top: 0.25rem;
 }
@@ -644,7 +667,8 @@
 
 .u4a-md__fields {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* 반응형: 패널이 좁아지면 2열 → 1열로 자동 접힘(컨테이너쿼리 없이) */
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
     gap: 1.125rem 1.5rem;
     margin-top: 0.75rem;
 }
@@ -665,6 +689,7 @@
 .u4a-md__actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.5rem;
     margin-top: auto;
     padding-top: 1rem;
@@ -672,4 +697,257 @@
 
 .u4a-md__actionspacer {
     flex: 1 1 auto;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DEMO SKIN — 공통 단일 출처(theme/bootstrap-skin.css)로 이관됨.
+   팔레트(--sl-*/--u4a-*)·타이틀바·서브바·아이콘버튼·Bootstrap 컴포넌트(.btn/
+   .form-*/.dropdown/.modal) 색은 bootstrap-skin.css + theme-api.js(SKIN_MAP)가
+   전 화면 공통으로 담당한다. 아래에는 ServerList "화면 전용" 스킨
+   (트리/테이블/스플리터/상태 pill/마스터-디테일/런처)만 남긴다.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── 본문/패널 배경 ───────────────────────────────────────────────── */
+#u4aWsBody, .u4a-page__body { background: var(--sl-bg); }
+.u4a-splitter__pane { background: var(--sl-bg); }
+#u4aWsTreePane { border-right: 1px solid var(--sl-border); }
+
+/* ── 스플리터 그립 ────────────────────────────────────────────────── */
+.u4a-splitter__bar {
+    flex: 0 0 11px; background: var(--sl-surface);
+    border-left: 1px solid var(--sl-border); border-right: 1px solid var(--sl-border);
+    position: relative;
+}
+.u4a-splitter__bar::before {
+    content: ""; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 5px; height: 36px; border-radius: 4px; background: var(--sl-muted); opacity: .5;
+    transition: background .15s ease, opacity .15s ease, height .15s ease;
+}
+.u4a-splitter__bar:hover { background: var(--sl-surface-2); }
+.u4a-splitter__bar:hover::before { background: var(--u4a-accent); opacity: 1; height: 50px; }
+
+/* ── 트리 ─────────────────────────────────────────────────────────── */
+.u4a-tree__row {
+    gap: .4rem; padding: .34rem .5rem; margin: 1px .25rem; font-size: .85rem;
+    border-radius: var(--sl-radius-sm); color: var(--sl-fg); position: relative;
+}
+.u4a-tree__row:hover { background: var(--sl-surface-2); }
+.u4a-tree__row[aria-selected="true"] {
+    background: var(--u4a-accent-soft); color: var(--u4a-accent); font-weight: 600; box-shadow: none;
+}
+.u4a-tree__row[aria-selected="true"]::before {
+    content: ""; position: absolute; left: -.05rem; top: 18%; bottom: 18%;
+    width: 3px; border-radius: 3px; background: var(--u4a-accent);
+}
+.u4a-tree__icon { color: #e6a93a; }
+.u4a-tree__row[aria-selected="true"] .u4a-tree__icon { color: var(--u4a-accent); }
+
+/* ── 테이블 ───────────────────────────────────────────────────────── */
+.u4a-table-wrap { padding: .35rem 0; background: var(--sl-bg); }
+.u4a-table { color: var(--sl-fg); }
+.u4a-table thead th {
+    /* 헤더는 테마 틴트가 든 surface 밴드 + 또렷한 하단 보더로 본문과 구분(밋밋함 해소) */
+    background: var(--sl-surface); color: var(--sl-muted);
+    border-bottom: 2px solid var(--sl-border);
+    box-shadow: none;
+    font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: .62rem .9rem;
+}
+/* 헤더 첫/끝 셀 모서리 살짝 둥글려 밴드처럼 보이게 */
+.u4a-table thead th:first-child { border-top-left-radius: var(--sl-radius-sm); }
+.u4a-table thead th:last-child { border-top-right-radius: var(--sl-radius-sm); }
+/* 정렬/필터가 걸린(활성) 헤더는 액센트로 강조 */
+.u4a-table thead th.u4a-th--menu:hover { color: var(--u4a-accent); background: var(--sl-surface-2); }
+.u4a-table tbody td {
+    font-size: .84rem; vertical-align: middle;
+    border-bottom-color: var(--sl-border); color: var(--sl-fg); padding: .6rem .9rem;
+}
+.u4a-table tbody tr.server-row:hover { background: var(--sl-surface-2); }
+.u4a-table tbody tr.server-row[aria-selected="true"] { background: var(--u4a-accent-soft); }
+.u4a-table tbody tr.server-row[aria-selected="true"] > td:first-child { box-shadow: inset 3px 0 0 var(--u4a-accent); }
+.u4a-th__ind { color: var(--u4a-accent); }
+
+/* ── 상태 pill(테이블): 소프트 톤 + 점 + active pulse (점은 shell ::before 재활용) ── */
+.u4a-status {
+    border-radius: 999px; padding: .16rem .6rem .16rem .5rem;
+    font-size: .72rem; font-weight: 600;
+    color: var(--sl-muted); background: var(--sl-muted-soft);
+}
+/* 상태 셀은 pill 이라 말줄임(…) 대상 아님 — 셀 전역 ellipsis 예외 */
+.u4a-table tbody td.u4a-c-status {
+    overflow: visible;
+    text-overflow: clip;
+}
+.u4a-status--success { color: var(--sl-ok); background: var(--sl-ok-soft); }
+.u4a-status--success::before { box-shadow: 0 0 0 .12rem var(--sl-ok-glow); animation: slPulse 2s infinite; }
+@keyframes slPulse {
+    0% { box-shadow: 0 0 0 0 var(--sl-ok-pulse); }
+    70% { box-shadow: 0 0 0 .32rem rgba(0, 0, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .u4a-status--success::before { animation: none; }
+}
+
+/* ── 툴바 / 행 설정 아이콘 ────────────────────────────────────────── */
+.u4a-toolbar { padding: .6rem .9rem; border-bottom: 1px solid var(--sl-border); background: var(--sl-bg); height: auto; }
+.u4a-toolbar .btn { font-weight: 600; border-radius: var(--sl-radius-sm); box-shadow: var(--sl-elev-sm); }
+
+/* ── Master-Detail: 데모 팔레트 정렬 ─────────────────────────────── */
+.u4a-md__list, .u4a-md__detail { background: var(--sl-bg); }
+.u4a-md__listhead { border-bottom: 1px solid var(--sl-border); }
+.u4a-md__badge { background: var(--u4a-accent-soft); color: var(--u4a-accent); }
+.u4a-md__card.active { background: var(--u4a-accent-soft); box-shadow: inset 3px 0 0 var(--u4a-accent); }
+.u4a-status-dot--on { background: var(--sl-ok); box-shadow: 0 0 0 .12rem var(--sl-ok-glow); }
+
+/* (버튼/폼/드롭다운/모달 등 Bootstrap 컴포넌트 데모 색은 theme/bootstrap-skin.css
+   단일 출처가 전 화면 공통으로 담당 — 중복 제거) */
+
+/* ════════════════════════════════════════════════════════════════════
+   LAUNCHER 뷰 (검색 중심 런처) — 사진 참고. --sl-* 팔레트 사용.
+   ════════════════════════════════════════════════════════════════════ */
+.u4a-launcher {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    padding: 1.5rem 2rem 0;
+    background: var(--sl-bg);
+}
+
+/* 검색창 */
+.u4a-lnch__search {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    flex: 0 0 auto;
+    max-width: 46rem;
+    width: 100%;
+    margin: 0.5rem auto 1.25rem;
+    padding: .7rem 1rem;
+    border: 1px solid var(--sl-border);
+    border-radius: var(--sl-radius);
+    background: var(--sl-surface);
+    box-shadow: var(--sl-elev-sm);
+}
+.u4a-lnch__search:focus-within {
+    border-color: var(--u4a-accent);
+    box-shadow: 0 0 0 .2rem var(--u4a-accent-soft);
+}
+.u4a-lnch__searchico { color: var(--sl-muted); font-size: 1rem; flex: 0 0 auto; }
+.u4a-lnch__input {
+    flex: 1 1 auto; min-width: 0;
+    border: 0; outline: none; background: transparent; color: var(--sl-fg);
+    font-size: 1.05rem;
+}
+.u4a-lnch__input::placeholder { color: var(--sl-muted); }
+/* 값 있을 때만 노출되는 X(clear) — 공통 입력 UX(U4AUI.attachClear)와 동일.
+   (비-.u4a-field 폴백은 attachClear 가 빈값일 때 inline style display:none 으로 숨김.
+    채워지면 inline style 을 ""로 비워 이 규칙(inline-flex)으로 복귀하므로 기본을 보임으로 둔다.) */
+.u4a-lnch__clear {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem; height: 1.75rem;
+    padding: 0; border: 0; cursor: pointer;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--sl-muted);
+    font-size: .95rem;
+}
+.u4a-lnch__clear:hover { background: var(--sl-surface-2); color: var(--sl-fg); }
+.u4a-lnch__kbd {
+    flex: 0 0 auto; font-size: .72rem; color: var(--sl-muted);
+    border: 1px solid var(--sl-border); border-radius: 5px; padding: .1rem .4rem;
+    background: var(--sl-bg);
+}
+
+/* 본문(최근/결과) 스크롤 영역 */
+.u4a-lnch__body {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    max-width: 46rem; width: 100%; margin: 0 auto;
+}
+.u4a-lnch__sec { margin-bottom: 1.25rem; }
+.u4a-lnch__seclabel {
+    font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--sl-muted); margin-bottom: .5rem; padding-left: .15rem;
+}
+
+/* 최근 연결 카드 행 */
+.u4a-lnch__recent {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem;
+}
+.u4a-lnch__rcard {
+    border: 1px solid var(--sl-border); border-radius: var(--sl-radius);
+    background: var(--sl-surface); padding: .75rem .85rem; cursor: pointer;
+    transition: border-color .12s ease, background .12s ease, transform .1s ease;
+}
+.u4a-lnch__rcard:hover { border-color: var(--u4a-accent); background: var(--sl-surface-2); transform: translateY(-1px); }
+.u4a-lnch__rhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: .4rem; }
+.u4a-lnch__rname { font-weight: 600; color: var(--sl-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u4a-lnch__rtime { font-size: .75rem; color: var(--sl-muted); margin-top: .15rem; font-variant-numeric: tabular-nums; }
+
+/* 검색 결과 리스트 */
+.u4a-lnch__results {
+    border: 1px solid var(--sl-border); border-radius: var(--sl-radius);
+    background: var(--sl-surface); overflow: hidden;
+}
+.u4a-lnch__row {
+    display: flex; align-items: center; gap: .7rem;
+    padding: .6rem .85rem; cursor: pointer;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid var(--sl-border);
+}
+.u4a-lnch__row:last-child { border-bottom: 0; }
+.u4a-lnch__row:hover { background: var(--sl-surface-2); }
+.u4a-lnch__row.active { background: var(--u4a-accent-soft); border-left-color: var(--u4a-accent); }
+.u4a-lnch__rowmain { flex: 1 1 auto; min-width: 0; }
+.u4a-lnch__rowname { font-weight: 600; color: var(--sl-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u4a-lnch__rowsub { font-size: .76rem; color: var(--sl-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.u4a-lnch__rowstat { flex: 0 0 auto; font-size: .74rem; color: var(--sl-muted); }
+.u4a-lnch__rowstat.on { color: var(--sl-ok); }
+.u4a-lnch__go { flex: 0 0 auto; }
+.u4a-lnch__empty { padding: 1.5rem; text-align: center; color: var(--sl-muted); }
+
+/* 푸터 액션 바 (Connect / Edit / Delete) — 활성 결과 대상 */
+.u4a-lnch__foot {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: .5rem;
+    max-width: 46rem; width: 100%; margin: 0 auto;
+    padding: .7rem 0 1rem;
+    border-top: 1px solid var(--sl-border);
+}
+.u4a-lnch__footspacer { flex: 1 1 auto; }
+
+/* ── LAUNCHER 최근 카드 강화 (Chrome 새 탭식: 횟수 배지·메타·제거×·하이라이트) ── */
+.u4a-lnch__recent { grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); }
+.u4a-lnch__rcard:focus-visible { outline: none; border-color: var(--u4a-accent); box-shadow: 0 0 0 .2rem var(--u4a-accent-soft); }
+.u4a-lnch__rheadL { display: inline-flex; align-items: center; gap: .4rem; }
+.u4a-lnch__rheadR { display: inline-flex; align-items: center; gap: .35rem; }
+.u4a-lnch__rcount {
+    font-size: .66rem; font-weight: 700; color: var(--u4a-accent);
+    background: var(--u4a-accent-soft); border-radius: 999px; padding: .05rem .4rem;
+}
+.u4a-lnch__rdel {
+    border: 0; background: transparent; color: var(--sl-muted); cursor: pointer;
+    width: 1.3rem; height: 1.3rem; border-radius: 6px; line-height: 1; font-size: .72rem;
+    display: inline-flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .12s ease, background .12s ease, color .12s ease;
+}
+.u4a-lnch__rcard:hover .u4a-lnch__rdel,
+.u4a-lnch__rcard:focus-within .u4a-lnch__rdel { opacity: 1; }
+.u4a-lnch__rdel:hover { background: var(--sl-muted-soft); color: var(--sl-fg); }
+.u4a-lnch__rmeta { display: flex; flex-direction: column; gap: .1rem; margin-top: .35rem; }
+.u4a-lnch__rhost { font-size: .76rem; color: var(--sl-fg); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 검색어 하이라이트 */
+.u4a-lnch__hl { background: var(--u4a-accent-soft); color: var(--u4a-accent); padding: 0 .05rem; border-radius: 3px; }
+
+/* LAUNCHER: connect 버튼 ↵ 글리프 + 최근연결 빈 상태 메시지 */
+.u4a-lnch__gokbd { font-size: .9rem; line-height: 1; }
+.u4a-lnch__recentempty {
+    padding: 1rem; text-align: center; color: var(--sl-muted);
+    border: 1px dashed var(--sl-border); border-radius: var(--sl-radius);
+    background: var(--sl-surface); font-size: .82rem;
 }

@@ -369,7 +369,8 @@ var oAPP = (function () {
         oMain.className = "u4a-login__main";
 
         const oCard = document.createElement("section");
-        oCard.className = "u4a-login__card u4aWsLoginFormFcard";
+        // Bootstrap .card(브리지로 토큰 색) + 로그인 전용 레이아웃(.u4a-login__card)
+        oCard.className = "card u4a-login__card u4aWsLoginFormFcard";
 
         // 카드 헤더 (sap.f.cards.Header 대체)
         const oCardHead = document.createElement("header");
@@ -442,12 +443,12 @@ var oAPP = (function () {
             id: "ws_wslangu_host"
         }));
 
-        // Remember
+        // Remember (Bootstrap form-check — 체크색은 브리지가 accent 로 입힘)
         const oRemRow = document.createElement("div");
-        oRemRow.className = "u4a-form__row u4a-login__remember";
+        oRemRow.className = "form-check u4a-login__remember";
         oRemRow.innerHTML =
-            `<label class="u4a-label" for="ws_rem">Remember</label>` +
-            `<label class="u4a-check"><input id="ws_rem" type="checkbox"><span></span></label>`;
+            `<input id="ws_rem" type="checkbox" class="form-check-input">` +
+            `<label class="form-check-label u4a-label" for="ws_rem">Remember</label>`;
         oForm.appendChild(oRemRow);
 
         oCard.appendChild(oForm);
@@ -456,7 +457,7 @@ var oAPP = (function () {
         const oLoginBtn = document.createElement("button");
         oLoginBtn.id = "ws_loginBtn";
         oLoginBtn.type = "button";
-        oLoginBtn.className = "u4a-btn u4a-btn--emphasized u4a-login__btn";
+        oLoginBtn.className = "btn btn-primary u4a-login__btn";
         oLoginBtn.textContent = "LOGIN";
         oLoginBtn.addEventListener("click", () => oAPP.events.ev_login());
         oCard.appendChild(oLoginBtn);
@@ -685,7 +686,7 @@ var oAPP = (function () {
         aStaff.forEach((o) => {
             const oBtn = document.createElement("button");
             oBtn.type = "button";
-            oBtn.className = "u4a-btn";
+            oBtn.className = "btn btn-outline-secondary btn-sm";
             oBtn.textContent = o.text;
             oBtn.addEventListener("click", () => oAPP.fn.fnStaffLogin(o.id));
             oWrap.appendChild(oBtn);

@@ -60,6 +60,32 @@
         "green": "horizon_green"
     };
 
+    /**
+     * [Bootstrap 데모 스킨] 테마별 틴트 맵 — 전 화면 공통(bootstrap-skin.css 의 짝).
+     *  apply() 가 documentElement 에 data-sl-theme + 인라인 --u4a-/--sl- 변수를 세팅한다.
+     *  (구: ServerList.js 의 THEME_MAP/applyBsTheme → 단일 출처로 theme-api 로 이관)
+     */
+    var SKIN_MAP = {
+        horizon_white: { mode: "light", accent: "#0070f2", hover: "#0064d9", soft: "rgba(0,112,242,.14)", bar: "#354a5f", bar2: "#2c5a7a" },
+        horizon_dark: { mode: "dark", accent: "#3c93f5", hover: "#5aa6f7", soft: "rgba(60,147,245,.18)", bar: "#1b2a3a", bar2: "#22405e" },
+        horizon_purple: { mode: "light", accent: "#7a3ff2", hover: "#6a2fe0", soft: "rgba(122,63,242,.16)", bar: "#4a2a6f", bar2: "#5e3491", bg: "#f6f2fe", surface: "#efe8fd", surface2: "#e7dcfb", border: "#e3d8f6" },
+        horizon_red: { mode: "light", accent: "#e23b3b", hover: "#c92f2f", soft: "rgba(226,59,59,.15)", bar: "#6f2a2a", bar2: "#8c3030", bg: "#fdf4f4", surface: "#fbeaea", surface2: "#f7dcdc", border: "#f2d6d6" },
+        horizon_green: { mode: "light", accent: "#1f9d57", hover: "#178047", soft: "rgba(31,157,87,.15)", bar: "#244d2c", bar2: "#2c6639", bg: "#f1faf4", surface: "#e6f5ec", surface2: "#d6eede", border: "#d3ead9" }
+    };
+
+    function _applySkin(sKey) {
+        var oT = SKIN_MAP[sKey] || SKIN_MAP[DEFAULT_THEME];
+        var oRoot = document.documentElement;
+        oRoot.setAttribute("data-sl-theme", oT.mode);
+        oRoot.style.setProperty("--u4a-accent", oT.accent);
+        oRoot.style.setProperty("--u4a-accent-hover", oT.hover);
+        oRoot.style.setProperty("--u4a-accent-soft", oT.soft);
+        oRoot.style.setProperty("--u4a-titlebar-bg", oT.bar);
+        oRoot.style.setProperty("--u4a-titlebar-bg2", oT.bar2 || oT.bar);
+        var _v = function (sName, sVal) { if (sVal) { oRoot.style.setProperty(sName, sVal); } else { oRoot.style.removeProperty(sName); } };
+        _v("--sl-bg", oT.bg); _v("--sl-surface", oT.surface); _v("--sl-surface-2", oT.surface2); _v("--sl-border", oT.border);
+    }
+
     var U4ATheme = {
 
         THEMES: ["horizon_white", "horizon_dark", "horizon_purple", "horizon_red", "horizon_green"],
@@ -87,6 +113,8 @@
             var t = this.normalize(name);
             _ensureThemeCss(t);
             document.documentElement.dataset.theme = t;
+            // Bootstrap 데모 스킨 틴트(전 화면 공통) — bootstrap-skin.css 가 소비.
+            _applySkin(t);
             global.dispatchEvent(new CustomEvent("u4a-theme-changed", { detail: { name: t } }));
             return t;
         },

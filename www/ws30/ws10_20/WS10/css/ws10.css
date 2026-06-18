@@ -14,8 +14,9 @@
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    background: var(--app-bg);
-    color: var(--text);
+    /* Bootstrap 데모 스킨 캔버스(--sl-bg) — ServerList/Login 과 동일 (폴백 토큰) */
+    background: var(--sl-bg, var(--app-bg));
+    color: var(--sl-fg, var(--text));
 }
 
 /* 렌더 후 페이드인 (Login 과 동일) */
@@ -41,8 +42,8 @@
     gap: 0.125rem;
     min-height: 2.5rem;
     padding: 0 0.5rem 0 0.25rem;
-    background: var(--surface);
-    border-bottom: 0.0625rem solid var(--line);
+    background: var(--sl-surface, var(--surface));
+    border-bottom: 0.0625rem solid var(--sl-border, var(--line));
 }
 
 /* 메뉴 카테고리 버튼 (Extras / Utilities / System / Help / Test) */
@@ -169,8 +170,8 @@
     gap: 0.25rem;
     min-height: 2.75rem;
     padding: 0.25rem 0.75rem;
-    background: var(--surface);
-    border-bottom: 0.0625rem solid var(--line);
+    background: var(--sl-surface, var(--surface));
+    border-bottom: 0.0625rem solid var(--sl-border, var(--line));
 }
 
 /* 오버플로(⋯) 버튼 — 항상 툴바 우측 끝에 배치 */
@@ -327,8 +328,8 @@
     align-items: center;
     gap: 1rem;
     padding: 0.875rem 1.25rem;
-    background: var(--surface);
-    border-bottom: 0.0625rem solid var(--line);
+    background: var(--sl-surface, var(--surface));
+    border-bottom: 0.0625rem solid var(--sl-border, var(--line));
 }
 
 .u4a-ws10__searchlabel {
@@ -356,6 +357,8 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
+    /* 본문 캔버스도 스킨 바탕색으로 통일 (히어로가 덮지 않는 영역 backstop) */
+    background: var(--sl-bg, var(--app-bg));
 }
 
 /* ── 하단 접속정보 상태바 (SAP GUI 상태바 스타일 — 시스템/클라이언트/사용자/언어/서버/WS버전) ── */
@@ -366,10 +369,10 @@
     gap: 1.25rem;
     height: 1.625rem;
     padding: 0 0.875rem;
-    background: var(--titlebar-bg, var(--surface));
-    border-top: 0.0625rem solid var(--line);
+    background: var(--sl-surface, var(--titlebar-bg, var(--surface)));
+    border-top: 0.0625rem solid var(--sl-border, var(--line));
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--sl-muted, var(--text-muted));
     overflow: hidden;
     white-space: nowrap;
     /* 접속정보는 복사 가능하게(body 전역 user-select:none 해제) */
@@ -410,10 +413,10 @@
     gap: 0.5rem;
     min-height: 2.5rem;
     padding: 0.5rem 0.875rem;
-    background: var(--surface);
-    border: 0.0625rem solid var(--line);
-    border-radius: var(--radius);
-    box-shadow: var(--popover-shadow);
+    background: var(--sl-surface, var(--surface));
+    border: 0.0625rem solid var(--sl-border, var(--line));
+    border-radius: var(--sl-radius, var(--radius));
+    box-shadow: var(--sl-elev, var(--popover-shadow));
 }
 
 .u4a-ws10__footer[data-show="true"] {

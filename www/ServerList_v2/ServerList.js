@@ -133,6 +133,16 @@
     window.oAPP = oAPP;
 
     /********************************************************************
+     * 테마 적용 — 베이스 토큰(shell) + Bootstrap 데모 스킨 틴트.
+     *  스킨 틴트(data-sl-theme + --u4a-/--sl- 인라인 변수)는 theme-api.js 의
+     *  U4ATheme.apply() 가 SKIN_MAP 으로 직접 세팅한다(전 화면 단일 출처).
+     *  (구: 여기 THEME_MAP/applyBsTheme → theme-api 로 이관, 중복 제거)
+     ********************************************************************/
+    oAPP.fn.fnApplyTheme = function (sKey) {
+        try { U4ATheme.apply(sKey); } catch (e) { }
+    };
+
+    /********************************************************************
      * 상태 저장소 (UI5 JSONModel 대체) — doc 00 §5 / 플레이북 모델 shim
      *   getProperty / setProperty / refresh 시그니처 유지.
      ********************************************************************/
@@ -216,6 +226,7 @@
         hint: _fa("circle-info"),
         edit: _fa("pen"),
         trash: _fa("trash"),
+        connect: _fa("arrow-right-to-bracket"),
         accept: _fa("check"),
         decline: _fa("xmark"),
         clear: _fa("xmark"),
@@ -366,9 +377,9 @@
         try {
             const oTheme = oAPP.data.GlobalSettings.theme;
             const sUi5Theme = (oTheme && oTheme.value) ? oTheme.value : SETTINGS.defaultTheme;
-            U4ATheme.apply(sUi5Theme);
+            oAPP.fn.fnApplyTheme(sUi5Theme);
         } catch (e) {
-            U4ATheme.apply("horizon_white");
+            oAPP.fn.fnApplyTheme("horizon_white");
         }
         // [흰색 플래시] 첫 페인트용 동기 배경(--boot-bg, intro 가 BGCOL 로 전달)은 테마 CSS 가
         //   로드된 지금 역할 종료. 다음 프레임에 제거하여, 이후 런타임 테마 변경(설정 실시간
@@ -671,6 +682,12 @@
             oAPP.fn.fnRenderTree();
             await oAPP.fn.fnRestoreLastSelectedNode();
 
+            // Launcher 뷰는 트리/폴더 선택과 무관하게 전체 서버를 보여주므로,
+            // /ServerList 로드가 끝난 지금 시점에 반드시 다시 그린다(초기 'No data' 방지).
+            if (oAPP.attr._viewMode === VIEW_MODES.LAUNCHER) {
+                oAPP.fn.fnRenderLauncher();
+            }
+
             resolve();
         });
     };
@@ -891,7 +908,7 @@
      *   SAP Logon Pad 의 뷰 전환 컨셉. 레지스트리 대신 userData(appdata)/p13n
      *   에 마지막 선택 뷰를 저장한다(사용자 지시). [Launcher 뷰는 다음 단계]
      ********************************************************************/
-    const VIEW_MODES = { TREE: "tree", MASTER: "master" };
+    const VIEW_MODES = { TREE: "tree", MASTER: "master", LAUNCHER: "launcher" };
 
     function _viewStateFilePath() {
         return PATH.join(USERDATA, "p13n", "serverlist_view.json");
@@ -901,7 +918,7 @@
             const sPath = _viewStateFilePath();
             if (FS.existsSync(sPath)) {
                 const o = JSON.parse(FS.readFileSync(sPath, "utf-8") || "{}");
-                if (o && (o.viewMode === VIEW_MODES.TREE || o.viewMode === VIEW_MODES.MASTER)) {
+                if (o && (o.viewMode === VIEW_MODES.TREE || o.viewMode === VIEW_MODES.MASTER || o.viewMode === VIEW_MODES.LAUNCHER)) {
                     return o.viewMode;
                 }
             }
@@ -918,16 +935,18 @@
         }
     };
 
-    /** 서브헤더 뷰 전환 세그먼트 (Tree / Master-Detail) */
+    /** 서브헤더 뷰 전환 세그먼트 (Tree / Master-Detail) — Bootstrap btn-group */
     function _buildViewSwitcher() {
-        const oWrap = _el("div", "u4a-viewsw");
+        const oWrap = _el("div", "btn-group btn-group-sm");
+        oWrap.id = "u4aWsViewSwitcher";
         oWrap.setAttribute("role", "group");
         const aBtns = [
             { mode: VIEW_MODES.TREE, icon: "sitemap", tip: L("viewTree") },
-            { mode: VIEW_MODES.MASTER, icon: "table-columns", tip: L("viewMaster") }
+            { mode: VIEW_MODES.MASTER, icon: "table-columns", tip: L("viewMaster") },
+            { mode: VIEW_MODES.LAUNCHER, icon: "magnifying-glass", tip: L("viewLauncher") }
         ];
         for (const o of aBtns) {
-            const oBtn = _el("button", "u4a-viewsw__btn");
+            const oBtn = _el("button", "btn btn-outline-secondary");
             oBtn.type = "button";
             oBtn.dataset.mode = o.mode;
             oBtn.title = o.tip;
@@ -943,9 +962,44 @@
         return oWrap;
     }
     function _updateViewSwitcherActive() {
-        document.querySelectorAll(".u4a-viewsw__btn").forEach((b) => {
-            b.setAttribute("aria-pressed", (b.dataset.mode === oAPP.attr._viewMode) ? "true" : "false");
+        const oSw = document.getElementById("u4aWsViewSwitcher");
+        if (!oSw) { return; }
+        oSw.querySelectorAll("[data-mode]").forEach((b) => {
+            const bOn = (b.dataset.mode === oAPP.attr._viewMode);
+            b.classList.toggle("btn-primary", bOn);
+            b.classList.toggle("btn-outline-secondary", !bOn);
+            b.setAttribute("aria-pressed", bOn ? "true" : "false");
         });
+    }
+
+    /** 서브헤더 설정(기어) 드롭다운 — Bootstrap dropdown (구 fnOpenSettingsMenu/.u4a-menu) */
+    function _buildSettingsDropdown() {
+        const oWrap = _el("div", "dropdown");
+        // 뷰 전환 버튼(plain btn-sm)과 동일한 박스 → 높이 일치(기존 d-inline-flex 가 높이 어긋남 유발)
+        const oBtn = _el("button", "btn btn-sm btn-outline-secondary");
+        oBtn.type = "button";
+        oBtn.title = L("settings");
+        oBtn.setAttribute("data-bs-toggle", "dropdown");
+        oBtn.setAttribute("aria-expanded", "false");
+        oBtn.innerHTML = ICON.gear;
+        const oMenu = _el("ul", "dropdown-menu dropdown-menu-end");
+        const aItems = [
+            { key: "WSLANGU", icon: ICON.translate, text: T("001") },
+            { key: "WSTHEME", icon: ICON.palette, text: T("005") },
+            { key: "WSSOUND", icon: ICON.sound, text: T("204") },
+            { key: "ABOUTWS", icon: ICON.hint, text: T("044") }
+        ];
+        for (const oItem of aItems) {
+            const oLi = _el("li");
+            const oA = _el("button", "dropdown-item d-flex align-items-center gap-2");
+            oA.type = "button";
+            oA.innerHTML = oItem.icon + "<span>" + _esc(oItem.text) + "</span>";
+            oA.addEventListener("click", () => oAPP.fn.fnSettingItemSelected(oItem.key, oBtn));
+            oLi.appendChild(oA);
+            oMenu.appendChild(oLi);
+        }
+        oWrap.append(oBtn, oMenu);
+        return oWrap;
     }
 
     /** Tree 뷰 본문 (좌 트리 / 우 테이블 — 기존 레이아웃) */
@@ -975,7 +1029,8 @@
         _attachSplitterDrag(oBar1, oCol1);
         const oCol2 = _el("div", "u4a-splitter__pane u4a-md__list");
         oCol2.id = "u4aWsMasterListPane";
-        oCol2.style.flex = "0 0 34%";
+        // 축소 가능(0 1) → 공간 부족 시 가운데가 min-width 까지 줄고 상세(col3)가 안 잘림
+        oCol2.style.flex = "0 1 34%";
         const oBar2 = _el("div", "u4a-splitter__bar");
         oBar2.setAttribute("role", "separator");
         _attachSplitterDrag(oBar2, oCol2);
@@ -988,6 +1043,11 @@
 
     /** 선택 폴더 내용 렌더 — 활성 뷰에 맞게 분기 */
     function _renderFolderContents() {
+        if (oAPP.attr._viewMode === VIEW_MODES.LAUNCHER) {
+            // Launcher 는 전체 서버 기준 → 데이터 로드/갱신 시 다시 그린다(검색어는 보존)
+            oAPP.fn.fnRenderLauncher();
+            return;
+        }
         if (oAPP.attr._viewMode === VIEW_MODES.MASTER) {
             oAPP.fn.fnRenderMasterList();
         } else {
@@ -995,12 +1055,348 @@
         }
     }
 
+    /********************************************************************
+     * [LAUNCHER 뷰] 검색 중심 런처 (사진 참고) — 검색창 + 최근연결 + 결과 + 단축키
+     ********************************************************************/
+    const _bIsMac = (typeof process !== "undefined" && process.platform === "darwin");
+
+    // 접속 이력(appdata, 레지스트리 X) — { uuid: timestampMs }
+    function _recentFilePath() { return PATH.join(USERDATA, "p13n", "serverlist_recent.json"); }
+    function _loadRecentMap() {
+        try {
+            const p = _recentFilePath();
+            if (FS.existsSync(p)) {
+                const o = JSON.parse(FS.readFileSync(p, "utf-8") || "{}");
+                if (o && typeof o === "object") { return o; }
+            }
+        } catch (e) { /* 손상/누락 → 빈 이력 */ }
+        return {};
+    }
+    // 이력 엔트리 정규화(구 포맷 number → {ts,count} 호환)
+    function _recentEntry(v) {
+        if (v && typeof v === "object") { return { ts: v.ts || 0, count: v.count || 1 }; }
+        return { ts: (typeof v === "number" ? v : 0), count: 1 };
+    }
+    function _writeRecentMap(o) {
+        const sDir = PATH.join(USERDATA, "p13n");
+        if (!FS.existsSync(sDir)) { FS.mkdirSync(sDir, { recursive: true }); }
+        FS.writeFileSync(_recentFilePath(), JSON.stringify(o), "utf-8");
+    }
+    // 연결 시 호출 — 타임스탬프 + 접속 횟수 누적
+    oAPP.fn.fnRecordConnection = function (sUuid) {
+        if (!sUuid) { return; }
+        try {
+            const o = _loadRecentMap();
+            const e = _recentEntry(o[sUuid]);
+            o[sUuid] = { ts: Date.now(), count: e.count + 1 };
+            _writeRecentMap(o);
+        } catch (e) { console.error("[ServerList] 접속 이력 저장 실패:", e); }
+    };
+    // 최근 카드에서 항목 제거(× 버튼)
+    oAPP.fn.fnRemoveRecent = function (sUuid) {
+        try {
+            const o = _loadRecentMap();
+            if (o[sUuid] != null) { delete o[sUuid]; _writeRecentMap(o); }
+        } catch (e) { console.error("[ServerList] 접속 이력 삭제 실패:", e); }
+    };
+    // 상대 시간 표기 — 오늘/어제 HH:MM, 그 외 MM-DD HH:MM (오늘/어제는 i18n)
+    function _fmtConnTime(ts) {
+        const d = new Date(ts), now = new Date();
+        const p2 = (n) => (n < 10 ? "0" : "") + n;
+        const hm = p2(d.getHours()) + ":" + p2(d.getMinutes());
+        const _start = (dt) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+        const iDiff = Math.round((_start(now) - _start(d)) / 86400000);
+        if (iDiff <= 0) { return L("today") + " " + hm; }
+        if (iDiff === 1) { return L("yesterday") + " " + hm; }
+        return p2(d.getMonth() + 1) + "-" + p2(d.getDate()) + " " + hm;
+    }
+
+    // uuid → 소속 폴더(그룹)명 매핑 (SAPLogon 트리 순회)
+    function _buildServerGroupMap() {
+        const oMap = {};
+        const oSAP = M.getProperty("/SAPLogon");
+        const aRoot = (oSAP && oSAP.Node) ? (Array.isArray(oSAP.Node) ? oSAP.Node : [oSAP.Node]) : [];
+        function _walk(oNode) {
+            const oAttr = oNode._attributes || {};
+            const aItems = oNode.Item ? (Array.isArray(oNode.Item) ? oNode.Item : [oNode.Item]) : [];
+            aItems.forEach((it) => {
+                const sid = it._attributes && it._attributes.serviceid;
+                if (sid && !oMap[sid]) { oMap[sid] = oAttr.name || ""; }
+            });
+            const aKids = oNode.Node ? (Array.isArray(oNode.Node) ? oNode.Node : [oNode.Node]) : [];
+            aKids.forEach(_walk);
+        }
+        aRoot.forEach(_walk);
+        return oMap;
+    }
+
+    // 전체 서버 목록 + 저장(활성) 여부 동기화 (읽기 전용 사본)
+    function _getAllServers() {
+        const aAll = M.getProperty("/ServerList") || [];
+        const oSaved = new Set();
+        try {
+            const r = oAPP.fn.fnGetSavedServerListDataAll();
+            if (r.RETCD === "S") { r.RETDATA.forEach((s) => oSaved.add(s.uuid)); }
+        } catch (e) { /* 저장파일 없음 → 전부 미저장 */ }
+        return aAll.map((o) => Object.assign({}, o, { ISSAVE: oSaved.has(o.uuid) }));
+    }
+    function _getRecentServers(iLimit) {
+        const oMap = _loadRecentMap();
+        const oByUuid = {};
+        _getAllServers().forEach((s) => { oByUuid[s.uuid] = s; });
+        return Object.keys(oMap)
+            .filter((u) => oByUuid[u])
+            .map((u) => { const e = _recentEntry(oMap[u]); return { uuid: u, srv: oByUuid[u], ts: e.ts, count: e.count }; })
+            .sort((a, b) => b.ts - a.ts)
+            .slice(0, iLimit || 8);
+    }
+
+    // 검색어 매칭부 하이라이트 (HTML 안전: 전부 _esc 후 <mark> 삽입)
+    function _hlMatch(sText, sQ) {
+        const t = sText || "";
+        if (!sQ) { return _esc(t); }
+        const i = t.toLowerCase().indexOf(sQ);
+        if (i < 0) { return _esc(t); }
+        return _esc(t.slice(0, i)) + "<mark class=\"u4a-lnch__hl\">" + _esc(t.slice(i, i + sQ.length)) + "</mark>" + _esc(t.slice(i + sQ.length));
+    }
+
+    /** Launcher 본문 컨테이너 (트리/스플리터 없음) */
+    function _buildLauncherBody(oBody) {
+        const oWrap = _el("div", "u4a-launcher");
+        oWrap.id = "u4aWsLauncher";
+        oBody.appendChild(oWrap);
+    }
+
+    // 현재 결과(키보드 핸들러 공유)
+    function _launcherConnectActive() {
+        const aRes = oAPP.attr._launcherResults || [];
+        const s = aRes[oAPP.attr._launcherActiveIdx || 0];
+        if (s) { oAPP.fn.fnPressServerListItem(s); }
+    }
+    function _launcherEditActive() {
+        const aRes = oAPP.attr._launcherResults || [];
+        const s = aRes[oAPP.attr._launcherActiveIdx || 0];
+        if (s) { oAPP.fn.fnEditDialogOpen(s); }
+    }
+
+    /** [PUBLIC] Launcher 렌더 — 검색창은 1회, 결과/최근은 부분 갱신(커서 유지) */
+    oAPP.fn.fnRenderLauncher = function () {
+        const oWrap = document.getElementById("u4aWsLauncher");
+        if (!oWrap) { return; }
+        oWrap.innerHTML = "";
+        if (oAPP.attr._launcherQuery == null) { oAPP.attr._launcherQuery = ""; }
+        oAPP.attr._launcherActiveIdx = oAPP.attr._launcherActiveIdx || 0;
+
+        // ── 검색창 ──
+        const oSearch = _el("div", "u4a-lnch__search");
+        const oIco = _el("span", "u4a-lnch__searchico");
+        oIco.innerHTML = _fa("magnifying-glass");
+        const oInput = _el("input", "u4a-lnch__input");
+        oInput.type = "text";
+        oInput.placeholder = L("launcherPlaceholder");
+        oInput.value = oAPP.attr._launcherQuery;
+        // 값 있을 때만 보이는 X(clear) — 다른 입력과 동일한 공통 UX(U4AUI.attachClear)
+        const oClear = _el("button", "u4a-lnch__clear");
+        oClear.type = "button";
+        oClear.title = "Clear";
+        oClear.setAttribute("aria-label", "Clear");
+        oClear.tabIndex = -1;
+        oClear.innerHTML = ICON.clear;
+        oSearch.append(oIco, oInput, oClear);
+        oWrap.appendChild(oSearch);
+        // clear 클릭 → 입력 비우고 input 이벤트 발화(아래 input 리스너가 쿼리/렌더 동기화)
+        window.U4AUI.attachClear(oInput, oClear);
+
+        // ── 결과/최근 컨테이너 (부분 갱신 대상) ──
+        const oBodyArea = _el("div", "u4a-lnch__body");
+        oWrap.appendChild(oBodyArea);
+
+        // ── 푸터 액션 (Connect / Edit / Delete) — 활성 결과 대상 ──
+        const _activeSrv = () => {
+            const a = oAPP.attr._launcherResults || [];
+            return a[oAPP.attr._launcherActiveIdx || 0] || null;
+        };
+        const oFoot = _el("div", "u4a-lnch__foot");
+        const oConnBtn = _el("button", "btn btn-sm btn-primary d-inline-flex align-items-center gap-2");
+        oConnBtn.id = "u4aLnchConn";
+        oConnBtn.innerHTML = ICON.connect + "<span>" + _esc(L("connect")) + "</span>";
+        oConnBtn.addEventListener("click", () => { const s = _activeSrv(); if (s) { oAPP.fn.fnPressServerListItem(s); } });
+        const oEditBtn = _el("button", "btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2");
+        oEditBtn.id = "u4aLnchEdit";
+        oEditBtn.innerHTML = ICON.edit + "<span>" + _esc(L("edit")) + "</span>";
+        oEditBtn.addEventListener("click", () => { const s = _activeSrv(); if (s) { oAPP.fn.fnEditDialogOpen(s); } });
+        const oFootSpacer = _el("div", "u4a-lnch__footspacer");
+        const oDelBtn2 = _el("button", "btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-2");
+        oDelBtn2.id = "u4aLnchDel";
+        oDelBtn2.innerHTML = ICON.trash + "<span>" + _esc(L("del")) + "</span>";
+        oDelBtn2.addEventListener("click", () => { const s = _activeSrv(); if (s) { oAPP.attr._selectedServer = { data: s, tr: null }; oAPP.fn.fnPressDelete(); } });
+        oFoot.append(oConnBtn, oEditBtn, oFootSpacer, oDelBtn2);
+        oWrap.appendChild(oFoot);
+
+        // 결과/최근 부분 렌더
+        function _renderBody() {
+            oBodyArea.innerHTML = "";
+            const sQ = (oAPP.attr._launcherQuery || "").trim().toLowerCase();
+            const oGroupMap = _buildServerGroupMap();
+
+            // 최근 연결 — 검색 중에도 항상 상단 노출(Chrome 새 탭식 카드 그리드·원클릭 재연결)
+            {
+                const aRecent = _getRecentServers(8);
+                const oSec = _el("div", "u4a-lnch__sec");
+                oSec.appendChild(_el("div", "u4a-lnch__seclabel", L("recentConn")));
+                if (!aRecent.length) {
+                    // 이력 없어도 섹션은 유지 — 안내 메시지
+                    oSec.appendChild(_el("div", "u4a-lnch__recentempty", L("recentEmpty")));
+                } else {
+                    const oRow = _el("div", "u4a-lnch__recent");
+                    aRecent.forEach((o) => {
+                        const s = o.srv, bSave = (s.ISSAVE === true);
+                        const sGroup = oGroupMap[s.uuid] || "";
+                        const sHostPort = (s.host || "") + (s.port ? (":" + s.port) : "");
+                        const oCard = _el("div", "u4a-lnch__rcard");
+                        oCard.tabIndex = 0;
+                        oCard.title = (s.name || "") + "  (" + L("connect") + ")";
+
+                        // 헤더: SID 배지 + (접속 횟수) + 상태점 + 제거(×)
+                        const oHead = _el("div", "u4a-lnch__rhead");
+                        const oLeft = _el("div", "u4a-lnch__rheadL");
+                        oLeft.append(_el("span", "u4a-md__badge", s.systemid || ""));
+                        const oRight = _el("div", "u4a-lnch__rheadR");
+                        oRight.append(_el("span", "u4a-status-dot" + (bSave ? " u4a-status-dot--on" : "")));
+                        const oDelBtn = _el("button", "u4a-lnch__rdel");
+                        oDelBtn.type = "button";
+                        oDelBtn.title = L("hintClear");
+                        oDelBtn.innerHTML = _fa("xmark");
+                        oDelBtn.addEventListener("click", (ev) => { ev.stopPropagation(); oAPP.fn.fnRemoveRecent(o.uuid); _renderBody(); });
+                        oRight.append(oDelBtn);
+                        oHead.append(oLeft, oRight);
+
+                        const oName = _el("div", "u4a-lnch__rname", s.name || "");
+                        const oMeta = _el("div", "u4a-lnch__rmeta");
+                        oMeta.append(
+                            _el("span", "u4a-lnch__rhost", sHostPort),
+                            _el("span", "u4a-lnch__rtime", (sGroup ? sGroup + " · " : "") + _fmtConnTime(o.ts))
+                        );
+                        oCard.append(oHead, oName, oMeta);
+
+                        const _go = () => oAPP.fn.fnPressServerListItem(s);
+                        oCard.addEventListener("dblclick", _go);
+                        oCard.addEventListener("keydown", (ev) => {
+                            if (ev.key === "Enter") { ev.preventDefault(); _go(); }
+                        });
+                        oRow.appendChild(oCard);
+                    });
+                    oSec.appendChild(oRow);
+                }
+                oBodyArea.appendChild(oSec);
+            }
+
+            // 검색 결과
+            const aAll = _getAllServers();
+            const aRes = sQ ? aAll.filter((s) =>
+                (s.name || "").toLowerCase().indexOf(sQ) !== -1 ||
+                (s.systemid || "").toLowerCase().indexOf(sQ) !== -1 ||
+                (s.host || "").toLowerCase().indexOf(sQ) !== -1
+            ) : aAll;
+            oAPP.attr._launcherResults = aRes;
+            if (oAPP.attr._launcherActiveIdx > aRes.length - 1) { oAPP.attr._launcherActiveIdx = Math.max(0, aRes.length - 1); }
+
+            const oSecR = _el("div", "u4a-lnch__sec");
+            oSecR.appendChild(_el("div", "u4a-lnch__seclabel", L("searchResults") + (aRes.length ? "  ·  " + aRes.length : "")));
+            const oList = _el("div", "u4a-lnch__results");
+            if (!aRes.length) {
+                oList.appendChild(_el("div", "u4a-lnch__empty", L("noData")));
+            } else {
+                aRes.forEach((s, idx) => {
+                    const bSave = (s.ISSAVE === true);
+                    const bActive = (idx === oAPP.attr._launcherActiveIdx);
+                    const oR = _el("div", "u4a-lnch__row" + (bActive ? " active" : ""));
+                    oR.dataset.idx = idx;
+                    const oBadge = _el("span", "u4a-md__badge", s.systemid || "");
+                    const oMain = _el("div", "u4a-lnch__rowmain");
+                    const sGroup = oGroupMap[s.uuid] || "";
+                    const sHostPort = (s.host || "") + (s.port ? (":" + s.port) : "");
+                    // 검색어 하이라이트(이름/호스트) + 잘릴 때 hover 툴팁
+                    const oNm = _el("div", "u4a-lnch__rowname");
+                    oNm.innerHTML = _hlMatch(s.name || "", sQ);
+                    oNm.title = s.name || "";
+                    const oSub = _el("div", "u4a-lnch__rowsub");
+                    oSub.innerHTML = (sGroup ? _esc(sGroup) + " · " : "") + _hlMatch(sHostPort, sQ);
+                    oSub.title = (sGroup ? sGroup + " · " : "") + sHostPort;
+                    oMain.append(oNm, oSub);
+                    oR.append(oBadge, oMain);
+                    // 상태는 모든 행 공통 표시(연결은 더블클릭/Enter/푸터 버튼)
+                    oR.appendChild(_el("span", "u4a-lnch__rowstat" + (bSave ? " on" : ""), bSave ? L("active") : L("inactive")));
+                    oR.addEventListener("click", () => { oAPP.attr._launcherActiveIdx = idx; _renderBody(); });
+                    oR.addEventListener("dblclick", () => oAPP.fn.fnPressServerListItem(s));
+                    oList.appendChild(oR);
+                });
+            }
+            oSecR.appendChild(oList);
+            oBodyArea.appendChild(oSecR);
+
+            // 활성 행 보이게 스크롤
+            const oActiveRow = oList.querySelector(".u4a-lnch__row.active");
+            if (oActiveRow && oActiveRow.scrollIntoView) { try { oActiveRow.scrollIntoView({ block: "nearest" }); } catch (e) { } }
+
+            // 활성 서버 기준으로 푸터 버튼 상태/선택 동기화
+            const oActSrv = aRes[oAPP.attr._launcherActiveIdx] || null;
+            const bActSave = !!(oActSrv && oActSrv.ISSAVE === true);
+            oAPP.attr._selectedServer = oActSrv ? { data: oActSrv, tr: null } : null;
+            const _setDis = (sId, bDis) => { const el = document.getElementById(sId); if (el) { el.disabled = bDis; } };
+            _setDis("u4aLnchConn", !bActSave);   // 저장(활성)된 서버만 연결
+            _setDis("u4aLnchEdit", !oActSrv);    // 선택 있으면 편집(미저장은 등록 팝업)
+            _setDis("u4aLnchDel", !bActSave);    // 저장된 서버만 삭제
+        }
+
+        // 입력/단축키
+        oInput.addEventListener("input", () => {
+            oAPP.attr._launcherQuery = oInput.value;
+            oAPP.attr._launcherActiveIdx = 0;
+            _renderBody();
+        });
+        oInput.addEventListener("keydown", (ev) => {
+            const aRes = oAPP.attr._launcherResults || [];
+            if (ev.key === "ArrowDown") {
+                ev.preventDefault();
+                oAPP.attr._launcherActiveIdx = Math.min((oAPP.attr._launcherActiveIdx || 0) + 1, aRes.length - 1);
+                _renderBody();
+            } else if (ev.key === "ArrowUp") {
+                ev.preventDefault();
+                oAPP.attr._launcherActiveIdx = Math.max((oAPP.attr._launcherActiveIdx || 0) - 1, 0);
+                _renderBody();
+            } else if (ev.key === "Enter") {
+                ev.preventDefault();
+                _launcherConnectActive();
+            } else if ((ev.ctrlKey || ev.metaKey) && (ev.key === "e" || ev.key === "E")) {
+                ev.preventDefault();
+                _launcherEditActive();
+            } else if (ev.key === "Escape") {
+                ev.preventDefault();
+                // 값 비우고 input 발화 → 쿼리/렌더/clear(X) 노출까지 한 경로로 동기화
+                if (oInput.value) { oInput.value = ""; oInput.dispatchEvent(new Event("input", { bubbles: true })); }
+            }
+        });
+
+        _renderBody();
+        setTimeout(() => { try { oInput.focus(); oInput.setSelectionRange(oInput.value.length, oInput.value.length); } catch (e) { } }, 0);
+    };
+
     /** [PUBLIC] 활성 뷰 렌더 (본문 재구성 + 트리/내용 채움) */
     oAPP.fn.fnRenderActiveView = function () {
         const oBody = document.getElementById("u4aWsBody");
         if (!oBody) { return; }
         if (!oAPP.attr._viewMode) { oAPP.attr._viewMode = oAPP.fn.fnLoadViewMode(); }
         oBody.innerHTML = "";
+
+        // Launcher 뷰: 트리/폴더 없이 전체 검색 UI (별도 처리)
+        if (oAPP.attr._viewMode === VIEW_MODES.LAUNCHER) {
+            _updateViewSwitcherActive();
+            _buildLauncherBody(oBody);
+            oAPP.fn.fnRenderLauncher();
+            return;
+        }
+
         if (oAPP.attr._viewMode === VIEW_MODES.MASTER) {
             _buildMasterDetailBody(oBody);
         } else {
@@ -1011,12 +1407,14 @@
         // 트리(좌측)는 두 뷰 공통
         oAPP.fn.fnRenderTree();
 
-        // 트리 선택 하이라이트 복원 (뷰 전환 시 트리가 재렌더되므로)
+        // 트리 선택 복원
         const oSelNode = oAPP.attr._selectedTreeNodeData;
-        if (oSelNode && oSelNode._attributes) {
-            const sUuid = oSelNode._attributes.uuid;
-            const oPane = document.getElementById("u4aWsTreePane");
-            if (oPane) {
+        const oPane = document.getElementById("u4aWsTreePane");
+        let bRestoredViaKey = false;
+        if (oPane) {
+            if (oSelNode && oSelNode._attributes) {
+                // (1) 메모리에 선택이 있으면 하이라이트만 복원 (뷰 전환 시)
+                const sUuid = oSelNode._attributes.uuid;
                 const aRows = oPane.querySelectorAll(".u4a-tree__row");
                 for (const r of aRows) {
                     if (r._nodeData && r._nodeData._attributes && r._nodeData._attributes.uuid === sUuid) {
@@ -1024,11 +1422,22 @@
                         break;
                     }
                 }
+            } else if (oAPP.attr._lastSelectedNodeKey) {
+                // (2) 메모리 선택이 없으면(런처로 시작 후 트리/마스터로 전환 등) 마지막 키로
+                //     '전체 선택' = 폴더 로드 + 하이라이트. fnSelectTreeNode 가 내용까지 렌더.
+                const aRows = oPane.querySelectorAll(".u4a-tree__row");
+                for (const r of aRows) {
+                    if (r._nodeData && r._nodeData._attributes && r._nodeData._attributes.uuid === oAPP.attr._lastSelectedNodeKey) {
+                        oAPP.fn.fnSelectTreeNode(r);
+                        bRestoredViaKey = true;
+                        break;
+                    }
+                }
             }
         }
 
-        // 선택 폴더 내용(테이블/리스트)
-        _renderFolderContents();
+        // 선택 폴더 내용(테이블/리스트) — (2) 에서 fnSelectTreeNode 가 이미 렌더했으면 중복 생략
+        if (!bRestoredViaKey) { _renderFolderContents(); }
     };
 
     /** [PUBLIC] Master-Detail 가운데 컬럼 — 서버 카드 목록 */
@@ -1046,7 +1455,9 @@
         const iActive = aItems.filter(o => o.ISSAVE === true).length;
         const oHead = _el("div", "u4a-md__listhead");
         const oHInfo = _el("div", "u4a-md__listinfo");
-        oHInfo.appendChild(_el("span", "u4a-md__listtitle", sFolder || ""));
+        const oListTitle = _el("span", "u4a-md__listtitle", sFolder || "");
+        oListTitle.title = sFolder || "";   // 잘릴 때 hover 툴팁으로 전체 폴더경로
+        oHInfo.appendChild(oListTitle);
         if (aItems.length) {
             oHInfo.appendChild(_el("span", "u4a-md__listmeta", "· " + aItems.length + " " + L("servers")));
         }
@@ -1066,10 +1477,11 @@
             return;
         }
 
-        const oList = _el("div", "u4a-md__cards");
+        // Bootstrap list-group 기반 + 폴리시된 카드 외형(둥근/간격/배지/점) 유지
+        const oList = _el("div", "u4a-md__cards list-group");
         aItems.forEach((oItem) => {
             const bSave = (oItem.ISSAVE === true);
-            const oCard = _el("div", "u4a-md__card");
+            const oCard = _el("div", "u4a-md__card list-group-item list-group-item-action");
             oCard.tabIndex = 0;
             oCard._rowData = oItem;
             const oBadge = _el("span", "u4a-md__badge", oItem.systemid || "");
@@ -1079,9 +1491,12 @@
             oCard.append(oBadge, oMain, oDot);
 
             const _sel = () => {
-                oPane.querySelectorAll('.u4a-md__card[aria-selected="true"]').forEach(c => c.removeAttribute("aria-selected"));
-                oCard.setAttribute("aria-selected", "true");
+                oPane.querySelectorAll(".u4a-md__card.active").forEach(c => c.classList.remove("active"));
+                oCard.classList.add("active");
                 oAPP.attr._selectedServer = { data: oItem, tr: oCard };
+                // 뷰별 마지막 선택 기억 (master)
+                oAPP.attr._viewSel = oAPP.attr._viewSel || {};
+                oAPP.attr._viewSel.master = oItem.uuid || null;
                 oAPP.fn.fnRenderServerDetail(oItem);
             };
             oCard.addEventListener("click", _sel);
@@ -1093,9 +1508,17 @@
         });
         oPane.appendChild(oList);
 
-        // 첫 항목 자동 선택 → 상세 표시
-        const oFirst = oList.querySelector(".u4a-md__card");
-        if (oFirst) { oFirst.click(); }
+        // 이 뷰(master)의 마지막 선택 복원 → 현재 폴더에 그 서버가 있으면 그것, 없으면 첫 항목
+        const sRemMaster = (oAPP.attr._viewSel && oAPP.attr._viewSel.master) || null;
+        let oTargetCard = null;
+        if (sRemMaster) {
+            const aCards = oList.querySelectorAll(".u4a-md__card");
+            for (let i = 0; i < aCards.length; i++) {
+                if (aCards[i]._rowData && aCards[i]._rowData.uuid === sRemMaster) { oTargetCard = aCards[i]; break; }
+            }
+        }
+        if (!oTargetCard) { oTargetCard = oList.querySelector(".u4a-md__card"); }
+        if (oTargetCard) { oTargetCard.click(); oTargetCard.scrollIntoView({ block: "nearest" }); }
     };
 
     /** [PUBLIC] Master-Detail 우측 컬럼 — 서버 상세 */
@@ -1148,17 +1571,17 @@
         );
         oPane.appendChild(oGrid);
 
-        // 액션 (Connect / Edit / Delete) — 기존 핸들러 재사용
+        // 액션 (Connect / Edit / Delete) — 기존 핸들러 재사용, Bootstrap 버튼
         const oActions = _el("div", "u4a-md__actions");
-        const oConnect = _el("button", "u4a-btn u4a-btn--emphasized");
-        oConnect.innerHTML = _fa("play") + "<span>" + _esc(L("connect")) + "</span>";
+        const oConnect = _el("button", "btn btn-primary btn-sm d-inline-flex align-items-center gap-2");
+        oConnect.innerHTML = ICON.connect + "<span>" + _esc(L("connect")) + "</span>";
         oConnect.disabled = !bSave;
         oConnect.addEventListener("click", () => oAPP.fn.fnPressServerListItem(oItem));
-        const oEdit = _el("button", "u4a-btn");
+        const oEdit = _el("button", "btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2");
         oEdit.innerHTML = ICON.edit + "<span>" + _esc(L("edit")) + "</span>";
         oEdit.addEventListener("click", () => oAPP.fn.fnPressEdit());
         const oSpc = _el("div", "u4a-md__actionspacer");
-        const oDel = _el("button", "u4a-btn u4a-btn--negative");
+        const oDel = _el("button", "btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-2");
         oDel.innerHTML = ICON.trash + "<span>" + _esc(L("del")) + "</span>";
         oDel.disabled = !bSave;
         oDel.addEventListener("click", () => oAPP.fn.fnPressDelete());
@@ -1203,11 +1626,7 @@
         oAPP.attr._elSubTitle = oSubTitle;
         const oSubSpacer = _el("div", "u4a-bar__spacer");
 
-        const oSettingsBtn = _el("button", "u4a-btn-icon");
-        oSettingsBtn.title = L("settings");
-        oSettingsBtn.setAttribute("aria-haspopup", "true");
-        oSettingsBtn.innerHTML = ICON.gear;
-        oSettingsBtn.addEventListener("click", (ev) => oAPP.fn.fnOpenSettingsMenu(ev));
+        const oSettingsBtn = _buildSettingsDropdown();
         // 마지막 선택 뷰 복원(appdata) 후 뷰 전환 세그먼트 배치
         if (!oAPP.attr._viewMode) { oAPP.attr._viewMode = oAPP.fn.fnLoadViewMode(); }
         oSubBar.append(oSubTitle, oSubSpacer, _buildViewSwitcher(), oSettingsBtn);
@@ -1256,9 +1675,12 @@
             noData: "No data", selectServer: "Please select a server first.",
             dlgConfirm: "Confirm", dlgSuccess: "Success", dlgError: "Error", dlgWarning: "Warning",
             // 뷰 전환 / Master-Detail 라벨 (메시지 클래스에 키 없음 → 화면 전용 i18n, doc 02 §8)
-            viewTree: "Tree View", viewMaster: "Master-Detail View",
+            viewTree: "Tree View", viewMaster: "Master-Detail View", viewLauncher: "Launcher",
             port: "PORT", group: "GROUP", connect: "Connect", servers: "servers",
-            selectServerHint: "Select a server to see details."
+            selectServerHint: "Select a server to see details.",
+            launcherPlaceholder: "Search servers…", recentConn: "Recent", searchResults: "Results",
+            hintMove: "Move", hintClear: "Clear", today: "Today", yesterday: "Yesterday",
+            recentEmpty: "No recent connections yet."
         },
         KO: {
             status: "상태", serverName: "서버 이름", sid: "시스템 ID", host: "호스트(또는 IP)",
@@ -1267,9 +1689,12 @@
             noData: "데이터 없음", selectServer: "서버를 먼저 선택하세요.",
             dlgConfirm: "확인", dlgSuccess: "성공", dlgError: "오류", dlgWarning: "경고",
             // 뷰 전환 / Master-Detail 라벨 (메시지 클래스에 키 없음 → 화면 전용 i18n, doc 02 §8)
-            viewTree: "트리 뷰", viewMaster: "마스터-디테일 뷰",
+            viewTree: "트리 뷰", viewMaster: "마스터-디테일 뷰", viewLauncher: "런처",
             port: "포트", group: "그룹", connect: "연결", servers: "서버",
-            selectServerHint: "서버를 선택하면 상세가 표시됩니다."
+            selectServerHint: "서버를 선택하면 상세가 표시됩니다.",
+            launcherPlaceholder: "서버 검색…", recentConn: "최근 연결", searchResults: "검색 결과",
+            hintMove: "이동", hintClear: "지우기", today: "오늘", yesterday: "어제",
+            recentEmpty: "최근 접속이 없습니다."
         }
     };
     function L(sKey) {
@@ -1306,12 +1731,27 @@
             _renderTreeNode(oRoot, oNode, 0, true, iRowOdd);
         }
         oPane.appendChild(oRoot);
+
+        // 스크롤 위치 기억/복원 (뷰 전환 시 트리 스크롤 유지)
+        if (oAPP.attr._treeScroll) { oPane.scrollTop = oAPP.attr._treeScroll; }
+        if (!oPane._u4aScrollBound) {
+            oPane._u4aScrollBound = true;
+            oPane.addEventListener("scroll", () => { oAPP.attr._treeScroll = oPane.scrollTop; });
+        }
     };
 
     function _renderTreeNode(oParentUl, oNode, iLevel, bExpanded, iRowOdd) {
         const oAttr = oNode._attributes || {};
         const aChildNodes = oNode.Node ? (Array.isArray(oNode.Node) ? oNode.Node : [oNode.Node]) : [];
         const bHasChild = aChildNodes.length > 0;
+
+        // 펼침 상태 기억: 사용자가 한 번이라도 토글한 노드는 그 상태를, 아니면 기본값(iLevel<1)을 사용.
+        //  (뷰 전환마다 트리가 재렌더돼도 펼침 위치가 유지되도록)
+        const sUuid = oAttr.uuid;
+        oAPP.attr._treeExpanded = oAPP.attr._treeExpanded || {};
+        const bEff = (sUuid && Object.prototype.hasOwnProperty.call(oAPP.attr._treeExpanded, sUuid))
+            ? !!oAPP.attr._treeExpanded[sUuid]
+            : bExpanded;
 
         const oLi = _el("li");
         oLi.setAttribute("role", "treeitem");
@@ -1323,7 +1763,7 @@
         oRow.tabIndex = 0;
         oRow._nodeData = oNode;
         if (bHasChild) {
-            oRow.setAttribute("aria-expanded", bExpanded ? "true" : "false");
+            oRow.setAttribute("aria-expanded", bEff ? "true" : "false");
         }
 
         // 토글(셰브론)
@@ -1339,6 +1779,8 @@
             const bNowOpen = oRow.getAttribute("aria-expanded") === "true";
             oRow.setAttribute("aria-expanded", bNowOpen ? "false" : "true");
             oChildUl.hidden = bNowOpen;
+            // 펼침 상태 기억(재렌더/뷰전환에도 유지)
+            if (sUuid) { oAPP.attr._treeExpanded[sUuid] = !bNowOpen; }
         });
 
         const oIcon = _el("span", "u4a-tree__icon");
@@ -1364,8 +1806,8 @@
         if (bHasChild) {
             const oChildUl = _el("ul");
             oChildUl.setAttribute("role", "group");
-            oChildUl.hidden = !bExpanded;
-            // 루트(level0)와 그 하위(level1)까지 펼침
+            oChildUl.hidden = !bEff;   // 기억된 펼침 상태 반영
+            // 기본 펼침: 루트(level0)와 그 하위(level1)까지 (그 외는 토글 기억값)
             for (const oChild of aChildNodes) {
                 _renderTreeNode(oChildUl, oChild, iLevel + 1, iLevel < 1, iRowOdd);
             }
@@ -1405,6 +1847,9 @@
         oAPP.fn.fnServerListUnselect();
         oTr.setAttribute("aria-selected", "true");
         oAPP.attr._selectedServer = { data: oItem, tr: oTr };
+        // 뷰별 마지막 선택 기억 (현재 뷰 슬롯). master 에서 연결 시에도 master 슬롯에 기록됨.
+        oAPP.attr._viewSel = oAPP.attr._viewSel || {};
+        oAPP.attr._viewSel[oAPP.attr._viewMode] = (oItem && oItem.uuid) || null;
         // 마지막 선택 서버 키 기억 (앱 재시작 후 복원용). 복원 중(bSkipPersist)에는 재저장 생략.
         oAPP.attr._lastSelectedServerKey = (oItem && oItem.uuid) || "";
         if (!bSkipPersist && oAPP.attr._lastSelectedServerKey) {
@@ -1441,7 +1886,8 @@
 
         const sUUID = oNodeData._attributes.uuid;
 
-        // 마지막 선택 노드 키 저장
+        // 마지막 선택 노드 키 저장 (메모리 + 레지스트리)
+        oAPP.attr._lastSelectedNodeKey = sUUID;
         await oAPP.fn.setRegistryLastSelectedNodeKey(sUUID);
 
         // 폴더의 서버(Item) 목록
@@ -1526,6 +1972,10 @@
             }
         } catch (e) { /* 무시 */ }
 
+        // 선택 노드 키는 뷰(트리 유무)와 무관하게 메모리에 보관 — 런처로 시작했다가
+        //  나중에 트리/마스터로 전환할 때 폴더 선택을 복원하기 위함.
+        if (sLastKey) { oAPP.attr._lastSelectedNodeKey = sLastKey; }
+
         const oPane = document.getElementById("u4aWsTreePane");
         if (!oPane) { return; }
 
@@ -1576,13 +2026,13 @@
         oPane.innerHTML = "";
         oAPP.attr._selectedServer = null;
 
-        // 헤더 툴바 (Edit / Delete — fnGetSAPLogonListTableToolbar 대체)
+        // 헤더 툴바 (Edit / Delete — fnGetSAPLogonListTableToolbar 대체), Bootstrap 버튼
         const oToolbar = _el("div", "u4a-toolbar");
-        const oEditBtn = _el("button", "u4a-btn u4a-btn--emphasized");
+        const oEditBtn = _el("button", "btn btn-primary btn-sm d-inline-flex align-items-center gap-2");
         oEditBtn.innerHTML = ICON.edit + "<span>" + _esc(L("edit")) + "</span>";
         oEditBtn.title = L("edit");
         oEditBtn.addEventListener("click", () => oAPP.fn.fnPressEdit());
-        const oDelBtn = _el("button", "u4a-btn u4a-btn--negative");
+        const oDelBtn = _el("button", "btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-2");
         oDelBtn.innerHTML = ICON.trash + "<span>" + _esc(L("del")) + "</span>";
         oDelBtn.title = L("del");
         oDelBtn.addEventListener("click", () => oAPP.fn.fnPressDelete());
@@ -1590,13 +2040,15 @@
         oPane.appendChild(oToolbar);
 
         const oWrap = _el("div", "u4a-table-wrap");
-        const oTable = _el("table", "u4a-table");
+        // Bootstrap .table 기반(테마=브리지 --bs-table-*) + 커스텀 .u4a-table 비주얼 유지.
+        //  (sticky/zebra/선택/반응형/컬럼메뉴는 커스텀 CSS 가 담당 → table-hover/striped 는 미사용)
+        const oTable = _el("table", "u4a-table table align-middle");
         oTable.id = SERVER_TBL_ID;
 
         // 헤더 (정렬 가능 컬럼: ISSAVE/name/systemid/host)
         // width: fixed 레이아웃용 컬럼 폭. name 은 미지정 → 남은 폭을 차지.
         const aCols = [
-            { key: "ISSAVE", label: L("status"), sortable: true, cls: "u4a-c-status", width: "6rem" },
+            { key: "ISSAVE", label: L("status"), sortable: true, cls: "u4a-c-status", width: "7.5rem" },
             { key: "name", label: L("serverName"), sortable: true, cls: "u4a-c-name" },
             { key: "systemid", label: L("sid"), sortable: true, cls: "u4a-c-sid", width: "5rem" },
             { key: "host", label: L("host"), sortable: true, cls: "u4a-c-host", width: "9rem" },
@@ -1723,8 +2175,8 @@
         oWrap.appendChild(oTable);
         oPane.appendChild(oWrap);
 
-        // 마지막 선택 서버(행) 복원 — 현재 목록에 그 uuid 가 있을 때만 (없으면 선택 없음).
-        const sRestoreKey = oAPP.attr._lastSelectedServerKey;
+        // 마지막 선택 서버(행) 복원 — 이 뷰(tree) 슬롯 우선, 없으면 앱 재시작 복원용 키.
+        const sRestoreKey = (oAPP.attr._viewSel && oAPP.attr._viewSel.tree) || oAPP.attr._lastSelectedServerKey;
         if (sRestoreKey) {
             const oTargetRow = oTbody.querySelector(`tr.server-row[data-uuid="${sRestoreKey}"]`);
             if (oTargetRow && oTargetRow._rowData) {
@@ -1962,7 +2414,7 @@
             bodyEl: oForm,
             buttons: [
                 {
-                    text: "", icon: ICON.accept, type: "emphasized",
+                    text: T("002") || "OK", type: "emphasized",
                     onClick: async (oCtl) => {
                         const oNewSettings = {
                             useInternal: oChk1.checked,
@@ -1980,7 +2432,7 @@
                         oAPP.fn.showToast(oAPP.msg.M01);
                     }
                 },
-                { text: "", icon: ICON.decline, type: "reject", onClick: (oCtl) => oCtl.close() }
+                { text: T("003") || "Cancel", onClick: (oCtl) => oCtl.close() }
             ]
         });
     };
@@ -2185,6 +2637,13 @@
         // 선택 정보 레지스트리 저장
         await _registSelectedSystemInfo(oLoginInfo);
 
+        // 접속 이력 기록 (Launcher '최근 연결' 용 — appdata)
+        oAPP.fn.fnRecordConnection(sUUID);
+        // Launcher 가 떠 있으면 즉시 RECENT 갱신(연결 새 창은 별도 → 이 창은 남아있음)
+        if (oAPP.attr._viewMode === VIEW_MODES.LAUNCHER) {
+            try { oAPP.fn.fnRenderLauncher(); } catch (e) { }
+        }
+
         fnLoginPage(oLoginInfo);
     };
 
@@ -2261,8 +2720,8 @@
             width: "32rem",
             initialFocusEl: oInpHost,
             buttons: [
-                { text: "", icon: ICON.accept, type: "emphasized", onClick: (oCtl) => oAPP.fn.fnPressSave(oCtl) },
-                { text: "", icon: ICON.decline, type: "reject", onClick: (oCtl) => oCtl.close() }
+                { text: T("002") || "OK", type: "emphasized", onClick: (oCtl) => oAPP.fn.fnPressSave(oCtl) },
+                { text: T("003") || "Cancel", onClick: (oCtl) => oCtl.close() }
             ]
         });
         oAPP.attr._editCtx.ctl = oDlgCtl;
@@ -2693,7 +3152,7 @@
         const oSel = _createSelect(
             aThemes.map(t => ({ value: t.KEY, text: t.TXT })),
             sCurrent,
-            (v) => U4ATheme.apply(v)   // 실시간 미리보기
+            (v) => oAPP.fn.fnApplyTheme(v)   // 실시간 미리보기
         );
 
         const oForm = _el("div", "u4a-form");
@@ -2706,10 +3165,10 @@
             icon: ICON.palette,
             bodyEl: oForm,
             width: "24rem",
-            onCancel: (oCtl) => { U4ATheme.apply(sCurrent); oCtl.close(); },
+            onCancel: (oCtl) => { oAPP.fn.fnApplyTheme(sCurrent); oCtl.close(); },
             buttons: [
                 { text: T("002") || "OK", type: "emphasized", onClick: async (oCtl) => { oAPP.setBusy(true); await _saveWsThemeInfo(oSel.value, oCtl); } },
-                { text: T("003") || "Cancel", onClick: (oCtl) => { U4ATheme.apply(sCurrent); oCtl.close(); } }
+                { text: T("003") || "Cancel", onClick: (oCtl) => { oAPP.fn.fnApplyTheme(sCurrent); oCtl.close(); } }
             ]
         });
     }
@@ -2723,7 +3182,7 @@
         } catch (e) {
             console.warn("[_saveWsThemeInfo] 실패:", e);
         }
-        U4ATheme.apply(sKey);
+        oAPP.fn.fnApplyTheme(sKey);
         oCtl.close();
         oAPP.setBusy(false);
         oAPP.fn.showToast(oAPP.msg.M01);
@@ -3041,68 +3500,88 @@
      * @returns {{dlg:HTMLDialogElement, close:Function}}
      */
     function _createFormDialog(opt) {
-        const oDlg = document.createElement("dialog");
-        oDlg.className = "u4a-dialog";
-        // 반응형: 지정 폭을 뷰포트(92vw) 내로 제한
-        if (opt.width) { oDlg.style.width = "min(" + opt.width + ", 92vw)"; }
+        // Bootstrap modal (구 native <dialog>). 반환 계약(dlg/close)·.u4a-dialog__header 훅·
+        // ESC(onCancel)·initialFocus 동작을 그대로 보존한다.
+        const oRoot = _el("div", "modal fade");
+        oRoot.tabIndex = -1;
+        oRoot.setAttribute("aria-hidden", "true");
 
+        const oDialog = _el("div", "modal-dialog modal-dialog-centered modal-dialog-scrollable");
+        if (opt.width) { oDialog.style.maxWidth = "min(" + opt.width + ", 92vw)"; }
+        const oContent = _el("div", "modal-content");
+
+        let oModalInst = null;
         const oCtl = {
-            dlg: oDlg,
+            dlg: oRoot,
             close() {
-                if (oDlg.open) { oDlg.close(); }
-                oDlg.remove();
+                if (oModalInst) { try { oModalInst.hide(); return; } catch (e) { } }
+                oRoot.remove();
             }
         };
 
-        // header (icon + title)
-        const oHead = _el("div", "u4a-dialog__header");
+        // header (icon + title) — .u4a-dialog__header 유지(data-type 아이콘색/메시지박스 쿼리 호환)
+        const oHead = _el("div", "modal-header u4a-dialog__header");
         if (opt.icon) {
             const oIconSpan = document.createElement("span");
             oIconSpan.innerHTML = opt.icon;
             if (oIconSpan.firstChild) { oHead.appendChild(oIconSpan.firstChild); }
         }
-        oHead.appendChild(_el("span", null, opt.title || ""));
-        oDlg.appendChild(oHead);
+        oHead.appendChild(_el("span", "modal-title", opt.title || ""));
+        oContent.appendChild(oHead);
 
         // body
-        const oBody = _el("div", "u4a-dialog__body" + (opt.bodyFlush ? " u4a-dialog__body--flush" : ""));
+        const oBody = _el("div", "modal-body" + (opt.bodyFlush ? " p-0" : ""));
         if (opt.bodyEl) { oBody.appendChild(opt.bodyEl); }
-        oDlg.appendChild(oBody);
+        oContent.appendChild(oBody);
 
-        // footer (buttons)
-        const oFoot = _el("div", "u4a-dialog__footer");
-        (opt.buttons || []).forEach(b => {
-            let sCls = "u4a-btn";
-            if (b.type === "emphasized") { sCls += " u4a-btn--emphasized"; }
-            if (b.type === "reject") { sCls += " u4a-btn--negative"; }
-            const oBtn = _el("button", sCls);
-            if (b.icon) {
-                oBtn.innerHTML = b.icon + (b.text ? `<span>${_esc(b.text)}</span>` : "");
-            } else {
-                oBtn.textContent = b.text || "";
-            }
-            oBtn.addEventListener("click", () => b.onClick(oCtl));
-            oFoot.appendChild(oBtn);
-        });
-        oDlg.appendChild(oFoot);
-
-        // ESC → cancel
-        oDlg.addEventListener("cancel", (ev) => {
-            ev.preventDefault();
-            if (typeof opt.onCancel === "function") {
-                opt.onCancel(oCtl);
-            } else {
-                oCtl.close();
-            }
-        });
-
-        document.body.appendChild(oDlg);
-        oDlg.showModal();
-
-        if (opt.initialFocusEl) {
-            setTimeout(() => opt.initialFocusEl.focus(), 0);
+        // footer (buttons) — Bootstrap 버튼 매핑(emphasized→primary, reject→outline-danger, 기본→outline-secondary)
+        if (opt.buttons && opt.buttons.length) {
+            const oFoot = _el("div", "modal-footer");
+            opt.buttons.forEach(b => {
+                // btn-sm 통일 — 푸터가 본문보다 커보이던 문제 해소(전 팝업 공통)
+                let sCls = "btn btn-sm btn-outline-secondary";
+                if (b.type === "emphasized") { sCls = "btn btn-sm btn-primary"; }
+                if (b.type === "reject") { sCls = "btn btn-sm btn-outline-danger"; }
+                const oBtn = _el("button", sCls + " d-inline-flex align-items-center gap-2");
+                oBtn.type = "button";
+                if (b.icon) {
+                    oBtn.innerHTML = b.icon + (b.text ? `<span>${_esc(b.text)}</span>` : "");
+                } else {
+                    oBtn.textContent = b.text || "";
+                }
+                oBtn.addEventListener("click", () => b.onClick(oCtl));
+                oFoot.appendChild(oBtn);
+            });
+            oContent.appendChild(oFoot);
         }
 
+        oDialog.appendChild(oContent);
+        oRoot.appendChild(oDialog);
+        document.body.appendChild(oRoot);
+
+        // backdrop=static + keyboard=off → 자동 닫힘을 끄고 원본 cancel 동작을 직접 재현
+        oModalInst = new bootstrap.Modal(oRoot, { backdrop: "static", keyboard: false });
+
+        // ESC → 원본 cancel: onCancel 있으면 위임, 없으면 close
+        oRoot.addEventListener("keydown", (ev) => {
+            if (ev.key === "Escape") {
+                ev.preventDefault();
+                if (typeof opt.onCancel === "function") { opt.onCancel(oCtl); }
+                else { oCtl.close(); }
+            }
+        });
+
+        // 닫힘 후 DOM 제거
+        oRoot.addEventListener("hidden.bs.modal", () => { oRoot.remove(); });
+
+        // 초기 포커스 (모달 표시 완료 후)
+        if (opt.initialFocusEl) {
+            oRoot.addEventListener("shown.bs.modal", () => {
+                try { opt.initialFocusEl.focus(); } catch (e) { }
+            }, { once: true });
+        }
+
+        oModalInst.show();
         return oCtl;
     }
 
@@ -3118,6 +3597,55 @@
         return window.U4AUI.createSelect(aItems, sValue, fnChange);
     }
 
+    /** 드래그 대상 패널 오른쪽으로 확보해야 할 폭 — 뒤 형제(패널 min-width + 바)를 합산.
+     *  2컬럼/3컬럼 모두 정확(마지막 패널이 짜부되어 사라지는 문제 방지). */
+    function _splitterReserve(oPane) {
+        let iReserve = 0;
+        let el = oPane.nextElementSibling;
+        while (el) {
+            if (el.classList && el.classList.contains("u4a-splitter__bar")) {
+                iReserve += el.offsetWidth || 11;
+            } else if (el.classList && el.classList.contains("u4a-splitter__pane")) {
+                // 뒤 패널이 px 고정(드래그됨, 축소 불가)이면 '실제 폭'을, 유연(1 1 auto)이면
+                // 최소폭을 예약 → 고정 패널들 합이 커도 마지막 유연 패널이 잘려 사라지지 않음.
+                const bFixed = /\dpx/.test(el.style.flex || "");
+                if (bFixed) {
+                    iReserve += el.offsetWidth || 160;
+                } else {
+                    const mw = parseFloat(getComputedStyle(el).minWidth);
+                    iReserve += (mw && mw > 0) ? mw : 160;
+                }
+            }
+            el = el.nextElementSibling;
+        }
+        return iReserve > 0 ? iReserve : 248; // 폴백(뒤 형제 없을 때)
+    }
+
+    function _minPaneW(oPane) {
+        const mw = parseFloat(getComputedStyle(oPane).minWidth);
+        return (mw && mw > 0) ? mw : 120;
+    }
+    // 바 바로 오른쪽의 인접 패널
+    function _rightPaneOf(oBar) {
+        let el = oBar.nextElementSibling;
+        while (el && !(el.classList && el.classList.contains("u4a-splitter__pane"))) { el = el.nextElementSibling; }
+        return el;
+    }
+    // 해당 패널이 (뒤에 다른 패널이 없는) 마지막 유연 패널인가
+    function _isLastPane(oPane) {
+        let el = oPane && oPane.nextElementSibling;
+        while (el) {
+            if (el.classList && el.classList.contains("u4a-splitter__pane")) { return false; }
+            el = el.nextElementSibling;
+        }
+        return true;
+    }
+
+    /**
+     * 표준 스플리터(인접 재분배): 바를 드래그하면 "양 옆 인접 패널" 사이에서만 폭을
+     * 주고받는다. 오른쪽 이웃이 마지막(유연) 패널이면 왼쪽만 px 로 두고 flex 로 채운다.
+     *  → 바2 를 옮겨도 바1 은 col2 를 줄이며 정상 이동(상식적 동작). 마지막 패널 안 사라짐.
+     */
     function _attachSplitterDrag(oBar, oLeftPane) {
         let bDrag = false;
         oBar.addEventListener("mousedown", (ev) => {
@@ -3127,18 +3655,27 @@
         });
         window.addEventListener("mousemove", (ev) => {
             if (!bDrag) { return; }
-            const oSplitter = oBar.parentElement;
-            const oSplitRect = oSplitter.getBoundingClientRect();
-            // 폭은 "이 패널 자신의 왼쪽 모서리" 기준으로 계산 → 3컬럼(중간 바) 에도 정확.
-            //  (첫 패널은 패널왼쪽=스플리터왼쪽 이라 기존 2컬럼 동작과 동일)
-            const oPaneRect = oLeftPane.getBoundingClientRect();
-            let iWidth = ev.clientX - oPaneRect.left;
-            const iMin = 120;
-            // 이 패널 오른쪽으로 최소 248px(우측 패널 min-width+바+스크롤바) 확보
-            const iMax = oSplitRect.right - oPaneRect.left - 248;
-            iWidth = Math.max(iMin, Math.min(iMax, iWidth));
-            oLeftPane.style.flex = `0 0 ${iWidth}px`;
-            // 스플리터 드래그 시 테이블 반응형 즉시 갱신
+            const oLRect = oLeftPane.getBoundingClientRect();
+            const iMinL = _minPaneW(oLeftPane);
+            const oRight = _rightPaneOf(oBar);
+
+            if (oRight && !_isLastPane(oRight)) {
+                // 인접 재분배 — 왼쪽/오른쪽 패널 폭 합은 보존(그 뒤 패널은 불변)
+                const iTotal = oLeftPane.offsetWidth + oRight.offsetWidth;
+                const iMinR = _minPaneW(oRight);
+                let newL = ev.clientX - oLRect.left;
+                newL = Math.max(iMinL, Math.min(iTotal - iMinR, newL));
+                oLeftPane.style.flex = `0 0 ${newL}px`;
+                oRight.style.flex = `0 0 ${iTotal - newL}px`;
+            } else {
+                // 오른쪽이 마지막(유연) 패널 → 왼쪽만 px, 오른쪽은 flex 로 잔여폭 채움
+                const oSplitRect = oBar.parentElement.getBoundingClientRect();
+                const iReserve = oRight ? (oBar.offsetWidth + _minPaneW(oRight)) : 0;
+                let newL = ev.clientX - oLRect.left;
+                newL = Math.max(iMinL, Math.min(oSplitRect.right - oLRect.left - iReserve, newL));
+                oLeftPane.style.flex = `0 0 ${newL}px`;
+            }
+
             if (oAPP.fn.fnUpdateTableWidthClass) {
                 oAPP.fn.fnUpdateTableWidthClass();
             }
@@ -3163,19 +3700,29 @@
         _splitterResizeBound = true;
         window.addEventListener("resize", () => {
             document.querySelectorAll(".u4a-splitter").forEach((oSplitter) => {
-                const oSplitRect = oSplitter.getBoundingClientRect();
-                oSplitter.querySelectorAll(":scope > .u4a-splitter__pane").forEach((oPane) => {
-                    const m = (oPane.style.flex || "").match(/(\d+(?:\.\d+)?)px/);
-                    if (!m) { return; } // 퍼센트/auto → 자동 적응, 건드리지 않음
-                    const oPaneRect = oPane.getBoundingClientRect();
-                    const iMin = 120;
-                    const iMax = oSplitRect.right - oPaneRect.left - 248;
-                    if (iMax < iMin) { return; } // 공간 부족(극단적 좁은 창) → 보류
-                    const iCur = parseFloat(m[1]);
-                    const iClamped = Math.max(iMin, Math.min(iMax, iCur));
-                    if (Math.abs(iClamped - iCur) > 0.5) {
-                        oPane.style.flex = `0 0 ${iClamped}px`;
-                    }
+                const iAvail = oSplitter.getBoundingClientRect().width;
+                if (!iAvail) { return; }
+                const aKids = Array.prototype.slice.call(oSplitter.children);
+                const aPanes = aKids.filter((el) => el.classList && el.classList.contains("u4a-splitter__pane"));
+                if (!aPanes.length) { return; }
+                const iBars = aKids.filter((el) => el.classList && el.classList.contains("u4a-splitter__bar"))
+                    .reduce((s, b) => s + b.offsetWidth, 0);
+                const _minOf = (p) => { const m = parseFloat(getComputedStyle(p).minWidth); return (m && m > 0) ? m : 120; };
+                const _pxOf = (p) => { const m = (p.style.flex || "").match(/(\d+(?:\.\d+)?)px/); return m ? parseFloat(m[1]) : null; };
+                // px 고정 패널 vs 유연 패널 분리
+                const aFixed = [], aFlex = [];
+                aPanes.forEach((p) => { (_pxOf(p) != null ? aFixed : aFlex).push(p); });
+                const iFixedW = aFixed.reduce((s, p) => s + _pxOf(p), 0);
+                const iFlexMin = aFlex.reduce((s, p) => s + _minOf(p), 0);
+                // 고정폭 합 + 바 + 유연패널 최소 가 창을 넘으면, 큰 고정 패널부터 min 까지 줄여 확보
+                //  → 마지막(유연) 패널(상세 등)이 화면 밖으로 밀려 잘리는 것 방지
+                let iNeed = (iFixedW + iBars + iFlexMin) - iAvail;
+                if (iNeed <= 0) { return; }
+                aFixed.slice().sort((a, b) => _pxOf(b) - _pxOf(a)).forEach((p) => {
+                    if (iNeed <= 0) { return; }
+                    const iCur = _pxOf(p), iMin = _minOf(p);
+                    const iCut = Math.min(Math.max(0, iCur - iMin), iNeed);
+                    if (iCut > 0) { p.style.flex = `0 0 ${iCur - iCut}px`; iNeed -= iCut; }
                 });
             });
             if (oAPP.fn.fnUpdateTableWidthClass) { oAPP.fn.fnUpdateTableWidthClass(); }

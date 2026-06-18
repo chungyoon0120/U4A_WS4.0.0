@@ -18,8 +18,9 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    background: var(--app-bg);
-    color: var(--text);
+    /* Bootstrap 데모 스킨 캔버스(--sl-bg) — ServerList 본문과 동일 (폴백 토큰) */
+    background: var(--sl-bg, var(--app-bg));
+    color: var(--sl-fg, var(--text));
     font: 0.875rem/1.4 var(--font);
 }
 
@@ -49,18 +50,11 @@ body {
     width: clamp(20rem, 44%, 27rem);
     box-sizing: border-box;
     padding: 2rem 2rem 1.75rem;
-    /* 평면 단색 대신 표면색 위로 아주 옅은 세로 그라데이션 → 깊이감(컴포지팅 X) */
-    background:
-        linear-gradient(180deg,
-            color-mix(in srgb, var(--accent) 5%, var(--surface-raised)) 0%,
-            var(--surface-raised) 38%);
-    border: 0.0625rem solid var(--line);
-    border-radius: 0.875rem;
-    /* 부드럽고 넓은 다층 그림자 + 상단 하이라이트(은은한 입체) */
-    box-shadow:
-        0 1.5rem 3rem -0.75rem rgba(0, 0, 0, 0.45),
-        0 0.25rem 0.75rem -0.25rem rgba(0, 0, 0, 0.30),
-        inset 0 0.0625rem 0 rgba(255, 255, 255, 0.06);
+    /* Bootstrap 데모 스킨 카드 — ServerList 와 동일 표면/보더/그림자/라운드(--sl-*) */
+    background: var(--sl-surface, var(--surface-raised));
+    border: 1px solid var(--sl-border, var(--line));
+    border-radius: var(--sl-radius, 0.875rem);
+    box-shadow: var(--sl-elev, 0 1.5rem 3rem -0.75rem rgba(0, 0, 0, 0.45));
     transition: opacity 0.5s linear;
 }
 
@@ -131,20 +125,21 @@ body {
 
 /* X 버튼 위치도 큰 입력 높이에 맞춰 중앙 정렬은 flex 가 처리 → 별도 보정 불필요 */
 
-/* Remember: 라벨 위/체크박스 아래(세로) → 한 줄 가로 정렬 */
+/* Remember: Bootstrap form-check 를 깔끔한 flex 한 줄로 (float/padding 모델 해제) */
 .u4a-login__remember {
-    flex-direction: row;
+    display: flex;
     align-items: center;
     gap: 0.5rem;
+    padding-left: 0;
 }
 
-.u4a-login__remember .u4a-label {
-    order: 2;
+.u4a-login__remember .form-check-input {
+    margin: 0;
+    float: none;
+}
+
+.u4a-login__remember .form-check-label {
     cursor: pointer;
-}
-
-.u4a-login__remember .u4a-check {
-    order: 1;
 }
 
 /* ── 입력 + 트레일링 아이콘 (클리어 X / 비밀번호 토글) ─────────────────
@@ -171,6 +166,8 @@ body {
 .u4a-login__btn {
     width: 100%;
     height: 2.75rem;
+    display: flex;
+    align-items: center;
     justify-content: center;
     font-weight: 700;
     font-size: 0.9375rem;
@@ -198,7 +195,7 @@ body {
     border-top: 0.0625rem solid var(--divider);
 }
 
-.u4a-login__staff .u4a-btn {
+.u4a-login__staff .btn {
     flex: 1 1 auto;
     justify-content: center;
     border-radius: var(--radius);

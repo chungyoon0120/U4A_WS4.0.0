@@ -1,0 +1,395 @@
+/*======================================================================
+  U4A Workspace - Bootstrap demo skin (common / all screens, single source)
+  ----------------------------------------------------------------------
+  Applies the "U4A_WS4.0.0_bootstrap" demo visual to every screen
+  (ServerList / Login / Main shell). Screen-agnostic parts only:
+    - --sl-* palette (light :root / dark html[data-sl-theme="dark"])
+    - titlebar (.u4a-titlebar) 36px gradient header + window buttons
+    - sub bar (.u4a-bar), icon button (.u4a-btn-icon)
+    - Bootstrap components (.btn / .form-* / .dropdown / .modal) demo colors
+  Screen-specific rules (tree/table/splitter/launcher/master-detail) stay
+  in each screen's own CSS.
+
+  Per-theme colors (--u4a-accent / --u4a-titlebar-bg / --sl-bg ...) are set
+  inline on documentElement by theme-api.js U4ATheme.apply() (SKIN_MAP).
+
+  Load order: bootstrap.css -> tokens.css -> shell.css -> bootstrap-bridge.css
+              -> [this file] -> screen CSS
+======================================================================*/
+
+/* palette: light defaults */
+:root {
+    --sl-bg: #ffffff;
+    --sl-fg: #1f2733;
+    --sl-muted: #6b7785;
+    --sl-border: #e3e8ee;
+    --sl-surface: #f6f8fa;
+    --sl-surface-2: #eef2f6;
+    --sl-elev: 0 6px 20px rgba(20, 33, 51, .10);
+    --sl-elev-sm: 0 2px 8px rgba(20, 33, 51, .08);
+    --sl-radius: 10px;
+    --sl-radius-sm: 7px;
+    --sl-ok: #1aa260;
+    --sl-ok-soft: rgba(26, 162, 96, .14);
+    --sl-ok-glow: rgba(26, 162, 96, .25);
+    --sl-ok-pulse: rgba(26, 162, 96, .45);
+    --sl-muted-soft: rgba(120, 130, 145, .15);
+    /* accent / titlebar colors are overridden per theme by theme-api.js (fallbacks below) */
+    --u4a-accent: var(--accent);
+    --u4a-accent-hover: var(--accent-strong, var(--accent));
+    --u4a-accent-soft: var(--selected-bg);
+    --u4a-titlebar-bg: #354a5f;
+    --u4a-titlebar-bg2: #2c5a7a;
+    --u4a-titlebar-fg: #ffffff;
+}
+
+/* palette: dark */
+html[data-sl-theme="dark"] {
+    --sl-bg: #161d26;
+    --sl-fg: #e7ecf3;
+    --sl-muted: #8a96a6;
+    --sl-border: #28323e;
+    --sl-surface: #1d2630;
+    --sl-surface-2: #26313d;
+    --sl-elev: 0 10px 28px rgba(0, 0, 0, .45);
+    --sl-elev-sm: 0 2px 10px rgba(0, 0, 0, .35);
+    --sl-ok: #34d27f;
+    --sl-ok-soft: rgba(52, 210, 127, .16);
+    --sl-ok-glow: rgba(52, 210, 127, .30);
+    --sl-ok-pulse: rgba(52, 210, 127, .45);
+    --sl-muted-soft: rgba(138, 150, 166, .16);
+}
+
+/* body text color follows demo palette */
+body {
+    color: var(--sl-fg);
+}
+
+/* titlebar: 36px gradient header (unified across windows) */
+.u4a-titlebar {
+    height: 36px;
+    min-height: 36px;
+    flex: 0 0 36px;
+    padding: 0 0 0 .75rem;
+    background: linear-gradient(100deg, var(--u4a-titlebar-bg), var(--u4a-titlebar-bg2));
+    color: var(--u4a-titlebar-fg);
+    border-bottom: 0;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, .25);
+}
+
+.u4a-titlebar__title {
+    color: var(--u4a-titlebar-fg);
+    font-size: .82rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+}
+
+.u4a-titlebar__logo {
+    height: 17px;
+    width: auto;
+}
+
+.u4a-winbtn {
+    width: 46px;
+    height: 36px;
+    color: var(--u4a-titlebar-fg);
+    border-radius: 0;
+}
+
+.u4a-winbtn:hover {
+    background: rgba(255, 255, 255, .16);
+    color: var(--u4a-titlebar-fg);
+}
+
+.u4a-winbtn--close:hover {
+    background: #e81123;
+    color: #fff;
+}
+
+.u4a-winbtn i {
+    font-size: .9rem;
+}
+
+/* sub bar: accent bar + bold title */
+.u4a-bar {
+    height: auto;
+    padding: .55rem .9rem;
+    background: var(--sl-surface);
+    border-bottom: 1px solid var(--sl-border);
+    box-shadow: var(--sl-elev-sm);
+}
+
+.u4a-bar__title {
+    font-size: .98rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    color: var(--sl-fg);
+}
+
+.u4a-bar__title::before {
+    content: "";
+    width: .32rem;
+    height: 1.05rem;
+    border-radius: 3px;
+    background: linear-gradient(var(--u4a-accent), var(--u4a-accent-hover));
+    margin-right: .55rem;
+}
+
+/* icon button */
+.u4a-btn-icon {
+    color: var(--sl-muted);
+    border-radius: var(--sl-radius-sm);
+}
+
+.u4a-btn-icon:hover {
+    color: var(--u4a-accent);
+    background: var(--u4a-accent-soft);
+}
+
+/* Bootstrap components: demo colors + radius/shadow */
+.btn-primary {
+    background-color: var(--u4a-accent);
+    border-color: var(--u4a-accent);
+    color: #fff;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+    background-color: var(--u4a-accent-hover);
+    border-color: var(--u4a-accent-hover);
+    color: #fff;
+}
+
+.btn-primary:focus {
+    box-shadow: 0 0 0 .2rem var(--u4a-accent-soft);
+}
+
+.btn-outline-secondary {
+    color: var(--sl-muted);
+    border-color: var(--sl-border);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--sl-surface-2);
+    color: var(--sl-fg);
+    border-color: var(--sl-border);
+}
+
+.form-control,
+.form-select {
+    background-color: var(--sl-bg);
+    color: var(--sl-fg);
+    border-color: var(--sl-border);
+}
+
+.form-control::placeholder {
+    color: var(--sl-muted);
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--sl-bg);
+    color: var(--sl-fg);
+    border-color: var(--u4a-accent);
+    box-shadow: 0 0 0 .2rem var(--u4a-accent-soft);
+}
+
+.form-check-input:checked {
+    background-color: var(--u4a-accent);
+    border-color: var(--u4a-accent);
+}
+
+.form-check-input:focus {
+    border-color: var(--u4a-accent);
+    box-shadow: 0 0 0 .2rem var(--u4a-accent-soft);
+}
+
+.dropdown-menu {
+    background-color: var(--sl-surface);
+    border-color: var(--sl-border);
+    color: var(--sl-fg);
+    border-radius: var(--sl-radius);
+    box-shadow: var(--sl-elev);
+}
+
+.dropdown-item {
+    color: var(--sl-fg);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: var(--sl-surface-2);
+    color: var(--sl-fg);
+}
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background-color: var(--u4a-accent);
+    color: #fff;
+}
+
+.dropdown-divider {
+    border-top-color: var(--sl-border);
+}
+
+.modal-content {
+    background-color: var(--sl-surface);
+    color: var(--sl-fg);
+    border-color: var(--sl-border);
+    border-radius: var(--sl-radius);
+    box-shadow: var(--sl-elev);
+}
+
+.modal-header {
+    background-color: var(--sl-surface-2);
+    border-bottom: 1px solid var(--sl-border);
+    border-top-left-radius: var(--sl-radius);
+    border-top-right-radius: var(--sl-radius);
+}
+
+.modal-footer {
+    background-color: transparent;
+    border-top: 1px solid var(--sl-border);
+    border-bottom-left-radius: var(--sl-radius);
+    border-bottom-right-radius: var(--sl-radius);
+    padding: 0.5rem 0.875rem;
+    gap: 0.5rem;
+}
+/* Bootstrap 의 .modal-footer>* margin(.25rem)이 푸터 높이를 부풀림 → 제거하고 gap 만 사용 */
+.modal-footer > * {
+    margin: 0;
+}
+
+.modal-title {
+    color: var(--sl-fg);
+}
+
+html[data-sl-theme="dark"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* common project dialog (.u4a-dialog) demo skin — Login + shared popup modules.
+   (Bootstrap .modal 을 안 쓰는 프로젝트 자체 팝업도 동일 데모 스킨으로 통일.
+    shell.css 의 .u4a-dialog 뒤에 로드되어 색만 override) */
+.u4a-dialog {
+    background-color: var(--sl-surface);
+    border-color: var(--sl-border);
+    border-radius: var(--sl-radius);
+    box-shadow: var(--sl-elev);
+    color: var(--sl-fg);
+}
+
+.u4a-dialog__header,
+.u4a-dialog__footer {
+    background: var(--sl-surface-2);
+    border-color: var(--sl-border);
+}
+
+.u4a-dialog__body {
+    background: var(--sl-surface);
+    color: var(--sl-fg);
+}
+
+.u4a-dialog .u4a-input,
+.u4a-dialog .u4a-combo,
+.u4a-dialog .u4a-select {
+    background: var(--sl-bg);
+    border-color: var(--sl-border);
+}
+
+/*======================================================================
+  common project components (.u4a-*) demo skin — 전 화면 공통 단일 출처.
+  shell.css 뒤에 로드되어 "색만" override (구조/크기는 shell.css 유지).
+  → 프로젝트 자체 버튼/메뉴/콤보/입력/토스트/busy/스위치/체크 전부 데모 스킨 통일.
+======================================================================*/
+
+/* 프로젝트 버튼 (.u4a-btn) — Bootstrap .btn 안 쓰는 곳도 동일 톤 */
+.u4a-btn {
+    background: var(--sl-surface);
+    border-color: var(--sl-border);
+    color: var(--sl-fg);
+}
+.u4a-btn:hover { background: var(--sl-surface-2); }
+.u4a-btn:active { background: var(--sl-surface-2); }
+.u4a-btn--emphasized {
+    background: var(--u4a-accent);
+    border-color: var(--u4a-accent);
+    color: #fff;
+}
+.u4a-btn--emphasized:hover {
+    background: var(--u4a-accent-hover);
+    border-color: var(--u4a-accent-hover);
+}
+
+/* 드롭다운 메뉴 (.u4a-menu) */
+.u4a-menu {
+    background: var(--sl-surface);
+    border-color: var(--sl-border);
+    box-shadow: var(--sl-elev);
+}
+.u4a-menu__item { color: var(--sl-fg); }
+.u4a-menu__item:hover,
+.u4a-menu__item:focus-visible { background: var(--sl-surface-2); }
+
+/* 입력 / 셀렉트 (.u4a-input / .u4a-select) */
+.u4a-input,
+.u4a-select {
+    background: var(--sl-bg);
+    border-color: var(--sl-border);
+    color: var(--sl-fg);
+}
+
+/* 커스텀 콤보 (.u4a-combo) */
+.u4a-combo {
+    background: var(--sl-bg);
+    border-color: var(--sl-border);
+    color: var(--sl-fg);
+}
+.u4a-combo__arrow { color: var(--sl-muted); }
+.u4a-combo__list {
+    background: var(--sl-surface);
+    border-color: var(--sl-border);
+    box-shadow: var(--sl-elev);
+}
+.u4a-combo__item { color: var(--sl-fg); }
+.u4a-combo__item:hover,
+.u4a-combo__item[data-active="true"] { background: var(--sl-surface-2); }
+.u4a-combo__item[aria-selected="true"] {
+    background: var(--u4a-accent-soft);
+    color: var(--u4a-accent);
+}
+
+/* 체크박스 / 스위치 — on 상태 강조색 */
+.u4a-check input[type="checkbox"],
+.u4a-check input[type="radio"] { accent-color: var(--u4a-accent); }
+.u4a-switch input:checked + .u4a-switch__slider {
+    background: var(--u4a-accent);
+    border-color: var(--u4a-accent);
+}
+
+/* 토스트 / 툴팁 / busy 카드 / empty */
+.u4a-toast {
+    background: var(--sl-surface);
+    border-color: var(--sl-border);
+    color: var(--sl-fg);
+    box-shadow: var(--sl-elev);
+}
+.u4a-tooltip {
+    background: var(--sl-surface);
+    border-color: var(--sl-border);
+    color: var(--sl-fg);
+    box-shadow: var(--sl-elev);
+}
+.u4a-busy__card {
+    background: var(--sl-surface);
+    border-color: var(--sl-border);
+    color: var(--sl-fg);
+    box-shadow: var(--sl-elev);
+}
+.u4a-busy__spinner::before { border-color: var(--sl-border); border-top-color: var(--u4a-accent); }
+.u4a-busy__spinner::after { border-bottom-color: var(--u4a-accent-hover); }
+.u4a-empty { color: var(--sl-muted); }
+
+
