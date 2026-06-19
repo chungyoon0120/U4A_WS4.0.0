@@ -1,16 +1,67 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <meta charset="utf-8">   
+        <meta charset="utf-8">
+
+    <!-- ===== 공통 헤더(.u4a-titlebar) 적용을 위한 테마/컴포넌트 (index.html 과 동일 짝) ===== -->
+    <link rel="stylesheet" href="./theme/tokens.css">
+    <link rel="stylesheet" href="./theme/shell.css">
+    <!-- ★ Bootstrap 스킨 = 공통 헤더의 "진짜" 모양(.u4a-titlebar 36px 그라데이션 + 윈도우 버튼).
+         index.html 과 동일하게 shell.css 뒤에 로드해야 메인 창과 헤더 높이/색이 일치한다.
+         (이게 없으면 shell.css 의 44px 평면 다크로 떠서 메인보다 헤더가 더 높아 보임) -->
+    <link rel="stylesheet" href="./theme/bootstrap-skin.css">
+    <!-- Font Awesome 7.2.0 (창 제어 아이콘) -->
+    <link rel="stylesheet" href="../../lib/fontawesome/7.2.0/css/all.min.css">
+
+    <!-- 테마 API + 공통 UI(initWindowFocusState = 창 blur 흐림) -->
+    <script src="./theme/theme-api.js"></script>
+    <script src="./theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] 호출부(fnExternalOpen)가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* extopen.js 가 재적용 */ }
+        })();
+    </script>
+
     <style>
-    html,body {
-        height: 100%;    
+    html, body {
+        height: 100%;
     }
     body {
         margin: 0px;
         overflow: hidden;
-    }     
-    
+        /* 타이틀바(고정) + 콘텐츠(가변) 세로 스택 */
+        display: flex;
+        flex-direction: column;
+        background: var(--boot-bg, var(--app-bg));
+    }
+
+    /* 콘텐츠 영역 = iframe + busy 오버레이 (타이틀바 아래 전체 채움) */
+    #extopenContent {
+        flex: 1 1 auto;
+        position: relative;
+        min-height: 0;
+        background: var(--boot-bg, var(--app-bg));
+    }
+    #ws_exam {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+
     /* Loading Page */
     .u4a_loaders {
         font-family: sans-serif;
@@ -277,31 +328,43 @@
     </head>
 
     <body>
-        <iframe id="ws_exam" name="ws_exam" style="display:none; border:none;width:100%;height:100%;" allowfullscreen>
-        </iframe>
+        <!-- ===== 공통 커스텀 헤더 (메인 창 .u4a-titlebar 와 동일) ===== -->
+        <header class="u4a-titlebar" id="extopenTitlebar">
+            <img class="u4a-titlebar__logo" id="extopenLogo" src="../../img/logo.png" alt="U4A">
+            <span class="u4a-titlebar__title" id="extopenTitle"></span>
+            <span class="u4a-titlebar__spacer"></span>
+            <button class="u4a-winbtn" data-action="min" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+            <button class="u4a-winbtn" id="extopenMaxBtn" data-action="max" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+            <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </header>
 
-        <!-- Page Loading Start -->
-        <!-- <div id="u4a_main_load" class="u4a_loaders u4a_loadersInactive">
-            <span class="u4a_loader u4a_loader-bars"> <span></span> </span> Loading...
-        </div> -->
+        <div id="extopenContent">
+            <iframe id="ws_exam" name="ws_exam" style="display:none;" allowfullscreen>
+            </iframe>
 
-        <!-- Busy Indicator Start -->
-        <div id="u4aWsBusyIndicator" data-sap-ui-popup="id-1622786200065-234" class="u4aWsBusyIndicator sapUiUserSelectable"
-            style="position: absolute; display: block; top: 0px; height: 100%; width: 100%; left: 0px;">
-            <div class="sapUiBusy" tabindex="0" role="progressbar" alt="" title="Please wait"></div>
-            <div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig sapUiLocalBusyIndicatorFade"
-                role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="Busy" alt="" tabindex="0"
-                title="Please wait">
-                <div class="sapUiLocalBusyIndicatorAnimation sapUiLocalBusyIndicatorAnimStandard">
-                    <div></div>
-                    <div></div>
-                    <div></div>
+            <!-- Page Loading Start -->
+            <!-- <div id="u4a_main_load" class="u4a_loaders u4a_loadersInactive">
+                <span class="u4a_loader u4a_loader-bars"> <span></span> </span> Loading...
+            </div> -->
+
+            <!-- Busy Indicator Start -->
+            <div id="u4aWsBusyIndicator" data-sap-ui-popup="id-1622786200065-234" class="u4aWsBusyIndicator sapUiUserSelectable"
+                style="position: absolute; display: block; top: 0px; height: 100%; width: 100%; left: 0px;">
+                <div class="sapUiBusy" tabindex="0" role="progressbar" alt="" title="Please wait"></div>
+                <div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig sapUiLocalBusyIndicatorFade"
+                    role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="Busy" alt="" tabindex="0"
+                    title="Please wait">
+                    <div class="sapUiLocalBusyIndicatorAnimation sapUiLocalBusyIndicatorAnimStandard">
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
                 </div>
             </div>
+            <!-- Busy Indicator End -->
         </div>
-        <!-- Busy Indicator End -->
 
-    <script src="extopen.js"></script>    
+    <script src="extopen.js"></script>
 
     </body>
 </html>

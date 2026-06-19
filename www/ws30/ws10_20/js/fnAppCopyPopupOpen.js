@@ -194,7 +194,7 @@
         oOk.addEventListener("click", oAPP.events.ev_AppCopyDlgOK);
         oFoot.appendChild(oOk);
 
-        const oCancel = _el("button", "u4a-btn u4a-btn--negative");
+        const oCancel = _el("button", "u4a-btn u4a-btn--negative"); // 닫기 — Reject 느낌
         oCancel.type = "button";
         oCancel.innerHTML = _fa("xmark") + '<span></span>';
         oCancel.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
@@ -224,8 +224,8 @@
         // ESC → 취소(닫기).
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); oAPP.events.ev_AppCopyDlgCancel(); });
 
-        _attachDrag(oDlg, oHeader);
-        // 헤더 더블클릭 → 화면 중앙 복귀 / 우하단 grip → 크기조절 (공통 U4AUI, SAPUI5 동일 UX)
+        // 헤더 드래그(화면 밖/상단 공통헤더 침범 방지) / 더블클릭 리센터 / grip 리사이즈 — 공통 U4AUI.
+        if (window.U4AUI && U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHeader); }
         if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
         if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 360, minH: 260 }); }
 
@@ -584,31 +584,7 @@
 
     //-------------------------------------------------------------------------------//
     //-------------------------------------------------------------------------------//
-
-    /************************************************************************
-     * (Local Function) 헤더 드래그 이동 (구 sap.m.Dialog draggable 대체)
-     ************************************************************************/
-    function _attachDrag(oDlg, oHandle) {
-        let bDrag = false, dx = 0, dy = 0;
-        oHandle.addEventListener("mousedown", function (e) {
-            if (e.target.closest(".u4a-btn-icon")) { return; }
-            bDrag = true;
-            const r = oDlg.getBoundingClientRect();
-            oDlg.style.margin = "0";
-            oDlg.style.position = "fixed";
-            oDlg.style.left = r.left + "px";
-            oDlg.style.top = r.top + "px";
-            dx = e.clientX - r.left;
-            dy = e.clientY - r.top;
-            e.preventDefault();
-        });
-        document.addEventListener("mousemove", function (e) {
-            if (!bDrag) { return; }
-            oDlg.style.left = (e.clientX - dx) + "px";
-            oDlg.style.top = (e.clientY - dy) + "px";
-        });
-        document.addEventListener("mouseup", function () { bDrag = false; });
-    }
+    // 헤더 드래그는 공통 U4AUI.makeDialogDraggable 사용(화면 밖/상단 헤더 클램프). 로컬 _attachDrag 제거.
 
     /************************************************************************
      * (Local Function) 모델 단일 프로퍼티 갱신

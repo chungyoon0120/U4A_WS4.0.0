@@ -1013,7 +1013,7 @@ var oAPP = (function () {
             const oFoot = document.createElement("div");
             oFoot.className = "u4a-dialog__footer";
             const oOk = document.createElement("button");
-            oOk.className = "u4a-btn u4a-btn--negative";
+            oOk.className = "u4a-btn u4a-btn--negative"; // 닫기 — Reject 느낌
             oOk.textContent = "Close";
             oOk.addEventListener("click", () => { oDlg.close(); oDlg.remove(); resolve(true); });
             oFoot.appendChild(oOk);

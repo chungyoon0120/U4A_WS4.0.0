@@ -460,6 +460,9 @@
         oBrowserOptions.opacity = 0.0;
         oBrowserOptions.resizable = true;
         oBrowserOptions.movable = true;
+        // 최소 크기 — 메인 윈도우(ServerList.js fnLoginPage)와 동일하게 1000x800 으로 고정
+        oBrowserOptions.minWidth = 1000;
+        oBrowserOptions.minHeight = 800;
 
         // 인트로 화면 닫기
         let oCurrWindow = REMOTE.getCurrentWindow();

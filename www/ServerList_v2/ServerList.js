@@ -187,16 +187,8 @@
     /********************************************************************
      * i18n 텍스트 헬퍼 (메시지 키 → 텍스트, 하드코딩 금지 — doc 02 §9.3)
      ********************************************************************/
-    const MSG_FALLBACK = {
-        "001": "Language",
-        "004": "U4A Workspace Logon Pad",
-        "005": "Theme",
-        "044": "About WS..",
-        "204": "Sound",
-        "809": "Sort",
-        "810": "Ascending",
-        "811": "Descending"
-    };
+    // ★ 언어 텍스트는 소스에 두지 않는다 — 폴백 영문 문구 제거. T() 는 DB(/WSLANGU 모델)에서만 읽는다.
+    const MSG_FALLBACK = {};
     function T(sMsgNr) {
         const oCls = M.getProperty("/WSLANGU/ZMSG_WS_COMMON_001");
         if (oCls && typeof oCls[sMsgNr] !== "undefined" && oCls[sMsgNr] !== "") {
@@ -280,7 +272,7 @@
         const oPrev = document.getElementById("u4aWsMsgDlg");
         if (oPrev) { oPrev.remove(); }
 
-        // 타입별 아이콘 + 현지화 타이틀 (I18N JS 객체 — doc 02 §8)
+        // 타입별 아이콘 + 현지화 타이틀 (L()=MSGNR_MAP→DB 조회)
         const oMeta = ({
             C: { icon: ICON.confirm, title: L("dlgConfirm") },
             S: { icon: ICON.success, title: L("dlgSuccess") },
@@ -488,7 +480,12 @@
     function _getModelBindMsgTxtList() {
         const aNr = ["000", "001", "002", "003", "004", "005", "006", "007", "008", "009",
             "010", "011", "012", "013", "014", "015", "016", "017", "018", "019", "020",
-            "043", "044", "048", "049", "080", "204", "205", "206", "270", "271", "809", "810", "811"];
+            "029", "043", "044", "048", "049", "080", "204", "205", "206", "270", "271",
+            "380", "667", "809", "810", "811",
+            // 화면 라벨(MSGNR_MAP) — 신규 키. DB(ZMSG_WS_COMMON_001) 적재 후 출력됨
+            "913", "914", "915", "916", "917", "918", "919", "920", "921", "922", "923",
+            "924", "925", "926", "927", "928", "929", "930", "931", "932", "933", "934",
+            "935", "936", "937", "938", "939", "940", "941", "942", "943", "944", "945", "946"];
         return aNr.map(nr => ({ ARBGB: "ZMSG_WS_COMMON_001", MSGNR: nr }));
     }
 
@@ -1193,13 +1190,13 @@
         oIco.innerHTML = _fa("magnifying-glass");
         const oInput = _el("input", "u4a-lnch__input");
         oInput.type = "text";
-        oInput.placeholder = L("launcherPlaceholder");
+        oInput.placeholder = L("launcherPlaceholder") + "…";   // "…"는 표현이라 DB 텍스트가 아닌 소스에서 부착
         oInput.value = oAPP.attr._launcherQuery;
         // 값 있을 때만 보이는 X(clear) — 다른 입력과 동일한 공통 UX(U4AUI.attachClear)
         const oClear = _el("button", "u4a-lnch__clear");
         oClear.type = "button";
-        oClear.title = "Clear";
-        oClear.setAttribute("aria-label", "Clear");
+        oClear.title = L("hintClear");
+        oClear.setAttribute("aria-label", L("hintClear"));
         oClear.tabIndex = -1;
         oClear.innerHTML = ICON.clear;
         oSearch.append(oIco, oInput, oClear);
@@ -1207,9 +1204,48 @@
         // clear 클릭 → 입력 비우고 input 이벤트 발화(아래 input 리스너가 쿼리/렌더 동기화)
         window.U4AUI.attachClear(oInput, oClear);
 
+        // ── 섹션 앵커바 (SAPUI5 ObjectPageLayout 식) — 최근/결과 점프 + scroll-spy ──
+        const oAnchor = _el("div", "u4a-lnch__anchor");
+        const _mkChip = (sKey) => {
+            const b = _el("button", "u4a-lnch__achip");
+            b.type = "button";
+            b.append(_el("span", "u4a-lnch__achipdot"));
+            b.append(_el("span", "u4a-lnch__achiptext", L(sKey)));
+            const c = _el("span", "u4a-lnch__achipcount", "");
+            b.append(c);
+            return { btn: b, count: c };
+        };
+        const oChipRecent = _mkChip("recentConn");
+        const oChipResults = _mkChip("searchResults");
+        oAnchor.append(oChipRecent.btn, oChipResults.btn);
+        oWrap.appendChild(oAnchor);
+
         // ── 결과/최근 컨테이너 (부분 갱신 대상) ──
         const oBodyArea = _el("div", "u4a-lnch__body");
         oWrap.appendChild(oBodyArea);
+
+        // 섹션 점프 + scroll-spy (본문 스크롤 위치로 현재 섹션 칩 하이라이트)
+        const _secEl = (sMod) => oBodyArea.querySelector(".u4a-lnch__sec--" + sMod);
+        const _scrollToSec = (sMod) => {
+            const sec = _secEl(sMod);
+            if (!sec) { return; }
+            const nTop = oBodyArea.scrollTop + (sec.getBoundingClientRect().top - oBodyArea.getBoundingClientRect().top);
+            oBodyArea.scrollTo({ top: Math.max(0, nTop - 4), behavior: "smooth" });
+        };
+        oChipRecent.btn.addEventListener("click", () => _scrollToSec("recent"));
+        oChipResults.btn.addEventListener("click", () => _scrollToSec("results"));
+        const _syncSpy = () => {
+            const oResSec = _secEl("results");
+            let sActive = "recent";
+            if (oResSec) {
+                const nResTop = oResSec.getBoundingClientRect().top - oBodyArea.getBoundingClientRect().top;
+                if (nResTop <= 8) { sActive = "results"; }
+            }
+            if (!_secEl("recent")) { sActive = "results"; }
+            oChipRecent.btn.classList.toggle("is-active", sActive === "recent");
+            oChipResults.btn.classList.toggle("is-active", sActive === "results");
+        };
+        oBodyArea.addEventListener("scroll", _syncSpy, { passive: true });
 
         // ── 푸터 액션 (Connect / Edit / Delete) — 활성 결과 대상 ──
         const _activeSrv = () => {
@@ -1242,7 +1278,8 @@
             // 최근 연결 — 검색 중에도 항상 상단 노출(Chrome 새 탭식 카드 그리드·원클릭 재연결)
             {
                 const aRecent = _getRecentServers(8);
-                const oSec = _el("div", "u4a-lnch__sec");
+                oChipRecent.count.textContent = aRecent.length ? String(aRecent.length) : "";
+                const oSec = _el("div", "u4a-lnch__sec u4a-lnch__sec--recent");
                 oSec.appendChild(_el("div", "u4a-lnch__seclabel", L("recentConn")));
                 if (!aRecent.length) {
                     // 이력 없어도 섹션은 유지 — 안내 메시지
@@ -1299,9 +1336,10 @@
                 (s.host || "").toLowerCase().indexOf(sQ) !== -1
             ) : aAll;
             oAPP.attr._launcherResults = aRes;
+            oChipResults.count.textContent = aRes.length ? String(aRes.length) : "";
             if (oAPP.attr._launcherActiveIdx > aRes.length - 1) { oAPP.attr._launcherActiveIdx = Math.max(0, aRes.length - 1); }
 
-            const oSecR = _el("div", "u4a-lnch__sec");
+            const oSecR = _el("div", "u4a-lnch__sec u4a-lnch__sec--results");
             oSecR.appendChild(_el("div", "u4a-lnch__seclabel", L("searchResults") + (aRes.length ? "  ·  " + aRes.length : "")));
             const oList = _el("div", "u4a-lnch__results");
             if (!aRes.length) {
@@ -1347,6 +1385,9 @@
             _setDis("u4aLnchConn", !bActSave);   // 저장(활성)된 서버만 연결
             _setDis("u4aLnchEdit", !oActSrv);    // 선택 있으면 편집(미저장은 등록 팝업)
             _setDis("u4aLnchDel", !bActSave);    // 저장된 서버만 삭제
+
+            // 재렌더로 섹션 구성이 바뀌면 앵커 칩 활성 상태도 재평가
+            _syncSpy();
         }
 
         // 입력/단축키
@@ -1571,6 +1612,23 @@
         );
         oPane.appendChild(oGrid);
 
+        // 활성(저장)된 서버는 등록한 호스트 정보(protocol://host:port)도 표기 — 접속 host 와 별개
+        if (bSave) {
+            try {
+                const oSaved = oAPP.fn.fnGetSavedServerListData(oItem.uuid);
+                if (oSaved.RETCD === "S" && oSaved.RETDATA && oSaved.RETDATA.host) {
+                    const d = oSaved.RETDATA;
+                    const sUrl = (d.protocol ? d.protocol + "://" : "") + d.host + (d.port ? (":" + d.port) : "");
+                    const oReg = _el("div", "u4a-md__reg");
+                    oReg.append(
+                        _el("div", "u4a-md__flabel", L("regHost")),
+                        _el("div", "u4a-md__regval", sUrl)
+                    );
+                    oPane.appendChild(oReg);
+                }
+            } catch (e) { console.error("[ServerList] registered host read failed", e); }
+        }
+
         // 액션 (Connect / Edit / Delete) — 기존 핸들러 재사용, Bootstrap 버튼
         const oActions = _el("div", "u4a-md__actions");
         const oConnect = _el("button", "btn btn-primary btn-sm d-inline-flex align-items-center gap-2");
@@ -1663,43 +1721,29 @@
     }
 
     /**
-     * 서버리스트 화면 전용 i18n (doc 02 §8: "JS 메시지 객체" 방식 허용).
-     * WSUTIL 메시지 클래스에 키가 없는 라벨(컬럼 헤더/버튼/상태 등)을 현지화한다.
-     * 언어 전환 시 화면 텍스트가 실제로 바뀌어 KO/EN 을 식별할 수 있게 한다.
+     * 화면 라벨 → SQLite 메시지 클래스(ZMSG_WS_COMMON_001) MSGNR 매핑.
+     * ★ 언어 텍스트는 절대 소스에 두지 않는다 — 실제 문구는 DB 에서 읽어 출력한다.
+     *   L(key) 는 이 표로 번호를 찾아 T(번호)(=/WSLANGU 모델, DB 적재) 로 조회한다.
+     *   여기에 쓰는 번호들은 _getModelBindMsgTxtList() 에 함께 적재되어야 한다.
+     *   (재사용: status=380, settings=667, del=029 / 신규: 913~946)
      */
-    const I18N = {
-        EN: {
-            status: "STATUS", serverName: "SERVER NAME", sid: "SID", host: "HOST(Or IP)",
-            sno: "SNO", settingsCol: "Settings", settings: "Settings",
-            edit: "Edit", del: "Delete", active: "Active", inactive: "Inactive",
-            noData: "No data", selectServer: "Please select a server first.",
-            dlgConfirm: "Confirm", dlgSuccess: "Success", dlgError: "Error", dlgWarning: "Warning",
-            // 뷰 전환 / Master-Detail 라벨 (메시지 클래스에 키 없음 → 화면 전용 i18n, doc 02 §8)
-            viewTree: "Tree View", viewMaster: "Master-Detail View", viewLauncher: "Launcher",
-            port: "PORT", group: "GROUP", connect: "Connect", servers: "servers",
-            selectServerHint: "Select a server to see details.",
-            launcherPlaceholder: "Search servers…", recentConn: "Recent", searchResults: "Results",
-            hintMove: "Move", hintClear: "Clear", today: "Today", yesterday: "Yesterday",
-            recentEmpty: "No recent connections yet."
-        },
-        KO: {
-            status: "상태", serverName: "서버 이름", sid: "시스템 ID", host: "호스트(또는 IP)",
-            sno: "인스턴스", settingsCol: "설정", settings: "설정",
-            edit: "편집", del: "삭제", active: "활성", inactive: "비활성",
-            noData: "데이터 없음", selectServer: "서버를 먼저 선택하세요.",
-            dlgConfirm: "확인", dlgSuccess: "성공", dlgError: "오류", dlgWarning: "경고",
-            // 뷰 전환 / Master-Detail 라벨 (메시지 클래스에 키 없음 → 화면 전용 i18n, doc 02 §8)
-            viewTree: "트리 뷰", viewMaster: "마스터-디테일 뷰", viewLauncher: "런처",
-            port: "포트", group: "그룹", connect: "연결", servers: "서버",
-            selectServerHint: "서버를 선택하면 상세가 표시됩니다.",
-            launcherPlaceholder: "서버 검색…", recentConn: "최근 연결", searchResults: "검색 결과",
-            hintMove: "이동", hintClear: "지우기", today: "오늘", yesterday: "어제",
-            recentEmpty: "최근 접속이 없습니다."
-        }
+    const MSGNR_MAP = {
+        status: "380", serverName: "913", sid: "914", host: "915", sno: "916",
+        settingsCol: "667", settings: "667", edit: "917", del: "029",
+        active: "918", inactive: "919", noData: "946", selectServer: "920",
+        dlgConfirm: "921", dlgSuccess: "922", dlgError: "923", dlgWarning: "924",
+        viewTree: "925", viewMaster: "926", viewLauncher: "927",
+        port: "928", group: "929", connect: "930", servers: "931",
+        selectServerHint: "932", regHost: "933",
+        launcherPlaceholder: "934", recentConn: "935", searchResults: "936",
+        hintMove: "937", hintClear: "938", today: "939", yesterday: "940",
+        recentEmpty: "941",
+        // 다이얼로그/폼 인라인 라벨
+        protocol: "942", hostShort: "943", useInternal: "944", skipCertificate: "945"
     };
     function L(sKey) {
-        const oDict = I18N[_getCurrentWsLangu()] || I18N.EN;
-        return (oDict[sKey] != null) ? oDict[sKey] : (I18N.EN[sKey] != null ? I18N.EN[sKey] : sKey);
+        const sNr = MSGNR_MAP[sKey];
+        return sNr ? T(sNr) : "";
     }
 
     // 언어 변경 후 화면 텍스트(UI 라벨) 갱신 — 트리 폴더명(XML 데이터)은 대상 아님
@@ -2393,7 +2437,7 @@
         const oChk1 = document.createElement("input");
         oChk1.type = "checkbox";
         oChk1.checked = !!oSettings.useInternal;
-        oChk1Lbl.append(oChk1, _el("span", null, "Use Internal"));
+        oChk1Lbl.append(oChk1, _el("span", null, L("useInternal")));
         oRow1.appendChild(oChk1Lbl);
 
         // Skip Certificate
@@ -2402,14 +2446,14 @@
         const oChk2 = document.createElement("input");
         oChk2.type = "checkbox";
         oChk2.checked = !!oSettings.skipCertificate;
-        oChk2Lbl.append(oChk2, _el("span", null, "Skip Certificate"));
+        oChk2Lbl.append(oChk2, _el("span", null, L("skipCertificate")));
         oRow2.appendChild(oChk2Lbl);
 
         const oForm = _el("div", "u4a-form");
         oForm.append(oRow1, oRow2);
 
         _createFormDialog({
-            title: `Settings - ${oItem.name || ""}`,
+            title: `${L("settings")} - ${oItem.name || ""}`,
             icon: ICON.settings,
             bodyEl: oForm,
             buttons: [
@@ -2675,7 +2719,7 @@
 
         // Protocol
         const oRowP = _el("div", "u4a-form__row");
-        oRowP.appendChild(_el("label", "u4a-label u4a-label--required", "Protocol"));
+        oRowP.appendChild(_el("label", "u4a-label u4a-label--required", L("protocol")));
         const oSelProto = _createSelect(
             [{ value: "http", text: "http" }, { value: "https", text: "https" }],
             oSaveData.protocol
@@ -2685,7 +2729,7 @@
 
         // Host (required + ValueState)
         const oRowH = _el("div", "u4a-form__row");
-        oRowH.appendChild(_el("label", "u4a-label u4a-label--required", "Host"));
+        oRowH.appendChild(_el("label", "u4a-label u4a-label--required", L("hostShort")));
         const oInpHost = _el("input", "u4a-input");
         oInpHost.type = "text";
         oInpHost.value = oSaveData.host || "";
@@ -2695,7 +2739,7 @@
 
         // Port (number, maxlength 5)
         const oRowPort = _el("div", "u4a-form__row");
-        oRowPort.appendChild(_el("label", "u4a-label", "Port"));
+        oRowPort.appendChild(_el("label", "u4a-label", L("port")));
         const oInpPort = _el("input", "u4a-input");
         oInpPort.type = "number";
         oInpPort.maxLength = 5;
@@ -3451,8 +3495,8 @@
         oWrap.dataset.trail = "1";
         const oClear = _el("button", "u4a-field__clear");
         oClear.type = "button";
-        oClear.title = "Clear";
-        oClear.setAttribute("aria-label", "Clear");
+        oClear.title = L("hintClear");
+        oClear.setAttribute("aria-label", L("hintClear"));
         oClear.tabIndex = -1;
         oClear.innerHTML = ICON.clear;
         oWrap.append(oInput, oClear);

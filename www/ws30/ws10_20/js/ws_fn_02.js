@@ -1259,15 +1259,28 @@
                 // sPath = parent.getServerPath() + "/external_open?URL=" + sExtUrl,
                 sExtOpenHtmlUrl = parent.getPath('EXTOPEN');
 
+            // [공통 헤더] 모든 extopen 팝업(예제 열기/아이콘 리스트/Property Help 등)은
+            //   네이티브 타이틀바를 숨기고 extopen.html 의 공통 커스텀 헤더(.u4a-titlebar = 메인창과 동일)를 쓴다.
+            //   → 창마다 따로 처리하지 않고 여기서 일괄 적용(홀리스틱 통일).
+            oBrowserOptions.titleBarStyle = "hidden";
+
             // 브라우저 오픈
-            let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);            
+            let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
 
             oBrowserWindow.setMenu(null);
+
+            // 공통 헤더가 "첫 페인트부터" 테마/제목을 반영하도록 쿼리스트링으로 전달
+            //   (extopen.html head 의 조기 테마 적용 스크립트가 THEME/BGCOL/TITLE 을 소비).
+            var oExtTheme = {};
+            try { oExtTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { oExtTheme = {}; }
 
             const oQueryParams = {
                 browserkey: oBrowserOptions?.webPreferences?.browserkey,
                 sessionKey: oBrowserOptions?.webPreferences?.partition,
                 OBJTY: oBrowserOptions?.webPreferences?.OBJTY || "",
+                TITLE: oBrowserOptions?.title || "",
+                THEME: oExtTheme.THEME || "",
+                BGCOL: oExtTheme.BGCOL || "",
             };
 
             // URL에 QueryString 파라미터를 적용한다.

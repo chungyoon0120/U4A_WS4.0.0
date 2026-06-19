@@ -3,38 +3,48 @@
 
 <head>
     <meta charset="utf-8">
-    <title></title>
+    <title>Options</title>
+
+    <!-- ServerList 와 동일한 Bootstrap 스택 (별도창 표준):
+         FA → bootstrap → tokens → shell → bootstrap-bridge → bootstrap-skin.
+         경로: www/ws30/ws10_20/Popups/optionPopup/ → lib 는 ../../../../, 테마는 ../../theme -->
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="../../../../lib/bootstrap/5.0.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <!-- Bootstrap 컴포넌트 색을 프로젝트 토큰으로 입히는 브리지/스킨 (bootstrap·shell 뒤) -->
+    <link rel="stylesheet" href="../../theme/bootstrap-bridge.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
 
     <style>
-
-
+        html, body { margin: 0; height: 100%; background: var(--app-bg); color: var(--text); overflow: hidden; }
     </style>
-
 </head>
 
-<body style="margin:0px;padding:0px;overflow:hidden">
-
-    <iframe id="mainFRAME" src="" frameborder="0"
-        style="overflow:hidden;overflow-x:hidden;overflow-y:hidden;height:100%;width:100%;position:absolute;top:0px;left:0px;right:0px;bottom:0px; display:none;">
-    </iframe>
+<body>
 
     <script>
-        /************************************************************************
-         * 에러 감지
-         ************************************************************************/
+        /* 에러 감지 (원본 유지) */
         var REMOTE = require('@electron/remote'),
             PATH = REMOTE.require('path'),
             APP = REMOTE.app,
             APPPATH = APP.getAppPath(),
             PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
             PATHINFO = require(PATHINFOURL),
-            WSUTIL = parent.require(PATHINFO.WSUTIL),
+            WSUTIL = parent.require ? parent.require(PATHINFO.WSUTIL) : require(PATHINFO.WSUTIL),
             WSERR = require(PATHINFO.WSTRYCATCH);
 
         var zconsole = WSERR(window, document, console);
     </script>
 
-    <script src="js/index.js"></script>
+    <!-- HTML5 옵션 UI (Bootstrap 마스터-디테일: 좌측 섹션 + 우측 콘텐츠) -->
+    <div id="optRoot"></div>
+
+    <script src="../../../../lib/bootstrap/5.0.2/js/bootstrap.bundle.min.js"></script>
+    <script src="js/optionMain.js"></script>
 
 </body>
 

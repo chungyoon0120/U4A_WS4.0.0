@@ -157,7 +157,7 @@
         const bClear = cfg.clear === true;
         const bVh = typeof cfg.vh === "function";
 
-        let oInput, oWrap = null, oClearBtn = null;
+        let oInput, oWrap = null, oClearBtn = null, oVhBtn = null;
 
         if (bClear || bVh) {
             oWrap = _el("div", "u4a-field");
@@ -174,11 +174,11 @@
                 oWrap.appendChild(oClearBtn);
             }
             if (bVh) {
-                const oVh = _el("button", "u4a-field__vh");
-                oVh.type = "button";
-                oVh.innerHTML = _fa("magnifying-glass");
-                oVh.addEventListener("click", function () { cfg.vh(oModel, oInput); });
-                oWrap.appendChild(oVh);
+                oVhBtn = _el("button", "u4a-field__vh");
+                oVhBtn.type = "button";
+                oVhBtn.innerHTML = _fa("magnifying-glass");
+                oVhBtn.addEventListener("click", function () { cfg.vh(oModel, oInput); });
+                oWrap.appendChild(oVhBtn);
             }
             oRow.control.appendChild(oWrap);
         } else {
@@ -203,10 +203,29 @@
             if (typeof cfg.onChange === "function") { cfg.onChange(oModel); }
         });
 
+        // 입력 중(live) 부수효과 — 예: 패키지 수정 즉시 Request No 비활성(blur 까지 안 기다림).
+        if (typeof cfg.onInput === "function") {
+            oInput.addEventListener("input", function () { cfg.onInput(oModel, oInput); });
+        }
+
+        // 값도움 전용(읽기전용) 필드 — 활성 상태면 입력 영역 클릭만으로도 값도움 팝업을 연다(돋보기 버튼과 동일).
+        if (bVh && cfg.readOnly) {
+            oInput.addEventListener("click", function () {
+                if (!oInput.disabled) { cfg.vh(oModel, oInput); }
+            });
+        }
+
         // clear 토글 (값 있을 때만 노출) — 공통 U4AUI.attachClear
         if (oClearBtn && window.U4AUI && U4AUI.attachClear) {
             U4AUI.attachClear(oInput, oClearBtn, function () {
                 oModel.setProperty(cfg.valPath, "");
+                // 연동 필드(예: Request No X → Request Desc)도 같이 비운다.
+                if (Array.isArray(cfg.clearAlso)) {
+                    cfg.clearAlso.forEach(function (sPath) { oModel.setProperty(sPath, ""); });
+                }
+                // 값 지움도 "변경"이다 — 예: 패키지 X 로 지우면 onChange(lf_packageChangeEvent)가
+                //   돌아 Request No 가 비활성/초기화된다(타이핑 change 와 동일 경로).
+                if (typeof cfg.onChange === "function") { cfg.onChange(oModel); }
             });
         }
 
@@ -219,8 +238,12 @@
             let bEdit = true;
             if (cfg.editPath) { bEdit = oModel.getProperty(cfg.editPath) !== false; }
             oInput.disabled = !bEdit;
+            // 필드가 비활성(입력 불가)이면 값도움(F4) 버튼도 비활성 — 클릭 차단.
+            if (oVhBtn) { oVhBtn.disabled = !bEdit; }
             // 값도움 전용 필드는 직접 타이핑 불가(읽기전용) — clear/F4 로만.
             if (cfg.readOnly) { oInput.readOnly = true; }
+            // 값도움 전용 읽기필드: 활성일 때 입력 클릭으로 열 수 있음을 알리는 포인터 커서.
+            if (bVh && cfg.readOnly) { oInput.style.cursor = bEdit ? "pointer" : ""; }
 
             // required (label 별표)
             if (cfg.requPath) {
@@ -334,7 +357,7 @@
         }
 
         const aTabDef = [
-            { key: "K01", text: "General", enabled: true },
+            { key: "K01", text: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "947"), enabled: true }, // General
             { key: "K02", text: _txt("/U4A/CL_WS_COMMON", "B26"), enabled: true }, // Data Set
             { key: "UAWD", text: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "457"), enabled: bUawdEnabled } // Web Dynpro Conversion
         ];
@@ -408,7 +431,7 @@
         oCreate.addEventListener("click", function () { lf_createApplication(oModel, oUIobj, appid, false); });
         oFoot.appendChild(oCreate);
 
-        // A39 Close
+        // A39 Close — 원본 UI5 Reject 느낌(빨강 텍스트/아이콘 + 옅은 호버 틴트, --negative).
         const oClose = _el("button", "u4a-btn u4a-btn--negative");
         oClose.type = "button";
         oClose.innerHTML = _fa("xmark") + '<span></span>';
@@ -423,8 +446,8 @@
         // ESC → 닫기(취소 메시지).
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_closeDialog(oDlg); });
 
-        _attachDrag(oDlg, oHeader);
-        // 헤더 더블클릭 → 화면 중앙 복귀 / 우하단 grip → 크기조절 (공통 U4AUI, SAPUI5 동일 UX)
+        // 헤더 드래그(화면 밖/상단 공통헤더 침범 방지) / 더블클릭 리센터 / grip 리사이즈 — 공통 U4AUI.
+        if (window.U4AUI && U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHeader); }
         if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
         if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 480, minH: 360 }); }
 
@@ -434,29 +457,7 @@
     }; // end of oAPP.fn.createApplicationPopup
 
 
-    // 헤더 드래그 이동 (구 sap.m.Dialog draggable 대체)
-    function _attachDrag(oDlg, oHandle) {
-        let bDrag = false, dx = 0, dy = 0;
-        oHandle.addEventListener("mousedown", function (e) {
-            if (e.target.closest(".u4aCapX")) { return; }
-            bDrag = true;
-            const r = oDlg.getBoundingClientRect();
-            // dialog 를 absolute 위치로 고정(최초 1회).
-            oDlg.style.margin = "0";
-            oDlg.style.position = "fixed";
-            oDlg.style.left = r.left + "px";
-            oDlg.style.top = r.top + "px";
-            dx = e.clientX - r.left;
-            dy = e.clientY - r.top;
-            e.preventDefault();
-        });
-        document.addEventListener("mousemove", function (e) {
-            if (!bDrag) { return; }
-            oDlg.style.left = (e.clientX - dx) + "px";
-            oDlg.style.top = (e.clientY - dy) + "px";
-        });
-        document.addEventListener("mouseup", function () { bDrag = false; });
-    }
+    // 헤더 드래그는 공통 U4AUI.makeDialogDraggable 사용(화면 밖/상단 헤더 클램프). 로컬 _attachDrag 제거.
 
 
     /************************************************************************
@@ -512,7 +513,7 @@
         oUIobj.gen.oInpPack = _buildInput(oModel, oR, {
             valPath: "/CREATE/PACKG", statPath: "/CREATE/PACKG_stat", stxtPath: "/CREATE/PACKG_stxt",
             editPath: "/CREATE/PACKG_edit", maxLength: 30, upper: true, clear: true,
-            onChange: lf_packageChangeEvent
+            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset
         });
         oGrid.appendChild(oR.row);
 
@@ -521,7 +522,7 @@
         oUIobj.gen.oInpReqNo = _buildInput(oModel, oR, {
             valPath: "/CREATE/REQNR", statPath: "/CREATE/REQNR_stat", stxtPath: "/CREATE/REQNR_stxt",
             editPath: "/CREATE/REQNR_edit", requPath: "/CREATE/REQNR_requ", maxLength: 20,
-            readOnly: true, clear: true, vh: lf_RequestF4help
+            readOnly: true, clear: true, clearAlso: ["/CREATE/REQTX"], vh: lf_RequestF4help
         });
         oGrid.appendChild(oR.row);
 
@@ -627,7 +628,7 @@
         oUIobj.dataset.oInpPack = _buildInput(oModel, oR, {
             valPath: "/DATASET/PACKG", statPath: "/DATASET/PACKG_stat", stxtPath: "/DATASET/PACKG_stxt",
             editPath: "/DATASET/PACKG_edit", maxLength: 30, upper: true, clear: true,
-            onChange: lf_packageChangeEvent
+            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset
         });
         oLeft.appendChild(oR.row);
 
@@ -636,7 +637,7 @@
         oUIobj.dataset.oInpReqNo = _buildInput(oModel, oR, {
             valPath: "/DATASET/REQNR", statPath: "/DATASET/REQNR_stat", stxtPath: "/DATASET/REQNR_stxt",
             editPath: "/DATASET/REQNR_edit", requPath: "/DATASET/REQNR_requ", maxLength: 20,
-            readOnly: true, clear: true, vh: lf_RequestF4help
+            readOnly: true, clear: true, clearAlso: ["/DATASET/REQTX"], vh: lf_RequestF4help
         });
         oLeft.appendChild(oR.row);
 
@@ -787,33 +788,35 @@
     function lf_chkPackage(oModel, is_create) {
 
         // busy dialog open.
-        oAPP.common.fnSetBusyDialog(true);
+        parent.setBusy("X");
 
         const oFormData = new FormData();
         oFormData.append("PACKG", is_create.PACKG);
 
         sendAjax(parent.getServerPath() + "/chkPackage", oFormData, function (ret) {
 
-            oAPP.common.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             const ls_stru = lf_getStruName(oModel);
             if (!ls_stru) { return; }
 
-            // 잘못된 PACKAGE.
+            // 잘못된 PACKAGE — 필드 인라인 에러로만 표시.
+            //   [UX 통일] 구 원본은 인라인(PACKG_stxt) + 모달 팝업(showMessage)을 둘 다 띄워,
+            //   같은 '패키지 입력 오류'인데 표준/미입력(인라인만)과 달리 이 케이스만 팝업이 떠
+            //   일관성이 깨졌다. → 폼의 다른 필드 검증과 동일하게 인라인만 남기고 팝업 제거.
+            //   (메시지 내용 ret.ERMSG 는 인라인에 그대로 표시 → 정보 손실 없음)
             if (ret.ERFLG === "X") {
                 is_create.PACKG_stat = "Error";
                 is_create.PACKG_stxt = ret.ERMSG;
                 oModel.setProperty(ls_stru, is_create);
-                parent.showMessage(null, 20, "E", ret.ERMSG);
                 return;
             }
 
-            // 점검 중 오류.
+            // 점검 중 오류 — 동일하게 인라인 에러로만 표시(팝업 제거).
             if (ret.ERFLG === "E") {
                 is_create.PACKG_stat = "Error";
                 is_create.PACKG_stxt = ret.ERMSG;
                 oModel.setProperty(ls_stru, is_create);
-                parent.showMessage(null, 20, "E", ret.ERMSG);
                 return;
             }
 
@@ -847,6 +850,9 @@
         l_create.REQNR_requ = false;
 
         if (l_create.PACKG === "") {
+            // 패키지를 비우면 Request No 값/설명도 비운다(비활성 필드에 잔값 방지).
+            l_create.REQNR = "";
+            l_create.REQTX = "";
             oModel.setProperty(ls_stru, l_create);
             return;
         }
@@ -869,6 +875,23 @@
 
         // Y,Z 패키지 정합성 점검(서버).
         lf_chkPackage(oModel, l_create);
+    }
+
+    // 패키지 입력 중(live) — Request No 즉시 비활성 + 초기화. (정합성 재검은 blur 의 lf_packageChangeEvent)
+    //   이미 비활성+빈값이면 skip 해 키 입력마다 불필요한 refresh 를 막는다.
+    function lf_packageLiveReset(oModel, oInput) {
+        const ls_stru = lf_getStruName(oModel);
+        if (!ls_stru) { return; }
+        const l_create = oModel.getProperty(ls_stru);
+        // 모델 PACKG 를 현재 입력값과 동기 — clear(X)/타이핑 시 모델-DOM 불일치로
+        //   refresh 가 패키지 입력을 옛 값으로 되돌리는 것을 막는다.
+        if (oInput) { l_create.PACKG = oInput.value || ""; }
+        if (l_create.REQNR_edit === false && !l_create.REQNR && !l_create.REQTX) { return; }
+        l_create.REQNR_edit = false;
+        l_create.REQNR_requ = false;
+        l_create.REQNR = "";
+        l_create.REQTX = "";
+        oModel.setProperty(ls_stru, l_create);
     }
 
     // valueState 바인딩 필드 초기화.
@@ -1058,7 +1081,7 @@
      ************************************************************************/
     function lf_createAppData(oModel, oUIobj, appid) {
 
-        oAPP.common.fnSetBusyDialog(true);
+        parent.setBusy("X");
 
         const ls_stru = lf_getStruName(oModel);
         if (!ls_stru) { return; }
@@ -1084,7 +1107,7 @@
 
         sendAjax(parent.getServerPath() + l_path, oFormData, function (ret) {
 
-            oAPP.common.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             // 생성중 오류.
             if (ret.RETCD === "E") {
@@ -1108,7 +1131,7 @@
      ************************************************************************/
     async function lf_createApplication(oModel, oUIobj, appid, bIsLocal) {
 
-        oAPP.common.fnSetBusyDialog(true);
+        parent.setBusy("X");
 
         // WEBDYNPRO → U4A 컨버전 생성.
         if (oModel.oData.selHKey === "UAWD") {
@@ -1121,17 +1144,17 @@
                 const _oCEvt = new CustomEvent("conversionWebdynpro", { detail: _sParam });
                 oUIobj.UAWD.oContr.onEvt.dispatchEvent(_oCEvt);
             } catch (e) {
-                oAPP.common.fnSetBusyDialog(false);
-                parent.showMessage(null, 20, "E", "Web Dynpro Conversion is not available.");
+                parent.setBusy("");
+                parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "948")); // Web Dynpro Conversion is not available.
             }
             return;
         }
 
         const l_stru = lf_getStruName(oModel);
-        if (!l_stru) { oAPP.common.fnSetBusyDialog(false); return; }
+        if (!l_stru) { parent.setBusy(""); return; }
 
         const l_create = oModel.getProperty(l_stru);
-        if (!l_create) { oAPP.common.fnSetBusyDialog(false); return; }
+        if (!l_create) { parent.setBusy(""); return; }
 
         // 로컬로 생성.
         if (bIsLocal === true) {
@@ -1145,11 +1168,11 @@
 
         // 입력값 점검.
         if (lf_chkValue(oModel, oUIobj) === true) {
-            oAPP.common.fnSetBusyDialog(false);
+            parent.setBusy("");
             return;
         }
 
-        oAPP.common.fnSetBusyDialog(false);
+        parent.setBusy("");
 
         // DataSet: VIEW(TABLE)명을 입력했다면 검색필드 선택 팝업 호출.
         if (oModel.getProperty("/selHKey") === "K02") {
@@ -1223,7 +1246,7 @@
                 oAPP.fn.callF4HelpPopup(l_f4help, l_f4help, [], [], lf_callback);
             });
         } catch (e) {
-            parent.showMessage(null, 20, "E", "Value help is not available.");
+            parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "949")); // Value help is not available.
         }
     }
 
@@ -1237,7 +1260,7 @@
                 oModel.setProperty(ls_stru + "/REQTX", param.AS4TEXT);
             });
         } catch (e) {
-            parent.showMessage(null, 20, "E", "Request value help is not available.");
+            parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "950")); // Request value help is not available.
         }
     }
 

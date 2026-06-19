@@ -1431,12 +1431,33 @@ function setDomBusy(bIsBusy) {
         return;
     }
 
+    // busy 요소가 <dialog> 면 showModal() 로 띄운다 — 모달 팝업(showModal)도 top-layer 라
+    //   일반 <div>(z-index 무한대라도) busy 는 그 뒤로 가려 안 보인다. busy 도 모달이어야
+    //   어떤 모달 팝업 위에도 보인다(전 화면 공통 — 모든 parent.setBusy 가 그대로 위에 뜸).
+    //   <dialog> 가 아니면(다른 창) 기존 display 토글로 폴백.
+    var bIsDialog = (typeof oBusyDom.showModal === "function");
+
     if (bIsBusy === "X") {
-        oBusyDom.style.display = "flex"; // 카드 중앙정렬 (스크림 flex center)
+        if (bIsDialog) {
+            if (!oBusyDom.__escGuard) {
+                oBusyDom.__escGuard = true;
+                // busy 중 ESC 로 닫히지 않게(닫혀도 작업은 계속되지만 시각 잠금 유지).
+                oBusyDom.addEventListener("cancel", function (e) { e.preventDefault(); });
+            }
+            if (!oBusyDom.open) {
+                try { oBusyDom.showModal(); } catch (e) { oBusyDom.style.display = "flex"; }
+            }
+        } else {
+            oBusyDom.style.display = "flex"; // 카드 중앙정렬 (스크림 flex center)
+        }
         return;
     }
 
-    oBusyDom.style.display = "none";
+    if (bIsDialog) {
+        if (oBusyDom.open) { try { oBusyDom.close(); } catch (e) { } }
+    } else {
+        oBusyDom.style.display = "none";
+    }
 
 }
 

@@ -22,6 +22,79 @@ var oAPP = {};
     oAPP.attr.isBusy = ""; // 현재 busy 상태
 
 
+/***********************************************************
+ * 공통 커스텀 헤더(.u4a-titlebar) 초기화
+ *   - 메인 창과 동일한 헤더(로고/제목/최소화·최대화·닫기)를 extopen 팝업에도 적용.
+ *   - titleBarStyle:'hidden'(fnExternalOpen 에서 일괄 적용)으로 네이티브 타이틀바는 제거됨.
+ *   - 창 이동은 shell.css 의 .u4a-titlebar { -webkit-app-region: drag } 가 처리.
+ *   - 스크립트가 <body> 끝에 있으므로 DOM 은 이미 준비됨.
+ ***********************************************************/
+(function _initCommonTitlebar() {
+
+    function lf_toFileUrl(p) {
+        return encodeURI("file:///" + String(p).replaceAll("\\", "/"));
+    }
+
+    try {
+
+        // 로고 (메인 창과 동일: APPPATH/img/logo.png)
+        var oLogo = document.getElementById("extopenLogo");
+        if (oLogo) {
+            try { oLogo.src = lf_toFileUrl(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { }
+        }
+
+        // 제목 (head 의 조기 스크립트가 쿼리 TITLE → document.title 로 세팅, 없으면 창 제목)
+        var oTitle = document.getElementById("extopenTitle");
+        if (oTitle) {
+            var sTitle = "";
+            try { sTitle = document.title || CURRWIN.getTitle() || ""; } catch (e) { sTitle = document.title || ""; }
+            oTitle.textContent = sTitle;
+        }
+
+        // 최소화
+        var oMin = document.querySelector('#extopenTitlebar [data-action="min"]');
+        if (oMin) {
+            oMin.addEventListener("click", function () {
+                try { CURRWIN.minimize(); } catch (e) { }
+            });
+        }
+
+        // 최대화 / 복원 (아이콘 토글)
+        var oMax = document.getElementById("extopenMaxBtn");
+        if (oMax) {
+            var lf_syncMaxIcon = function () {
+                var oIco = oMax.querySelector("i");
+                if (!oIco) { return; }
+                var bMax = false;
+                try { bMax = CURRWIN.isMaximized(); } catch (e) { bMax = false; }
+                oIco.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
+                oMax.title = bMax ? "Restore" : "Maximize";
+            };
+            oMax.addEventListener("click", function () {
+                try {
+                    if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); }
+                } catch (e) { }
+            });
+            try {
+                CURRWIN.on("maximize", lf_syncMaxIcon);
+                CURRWIN.on("unmaximize", lf_syncMaxIcon);
+            } catch (e) { }
+            lf_syncMaxIcon();
+        }
+
+        // 닫기 (busy 중에는 CURRWIN.closable=false 라 무시됨 — 메인 창과 동일하게 close() 호출)
+        var oClose = document.querySelector('#extopenTitlebar [data-action="close"]');
+        if (oClose) {
+            oClose.addEventListener("click", function () {
+                try { CURRWIN.close(); } catch (e) { }
+            });
+        }
+
+    } catch (e) { /* 헤더 초기화 실패해도 본문(iframe)은 정상 동작 */ }
+
+})();
+
+
 
 /***********************************************************
  * 스르륵 나타나게 하는 효과

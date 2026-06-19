@@ -1866,6 +1866,74 @@
     } // end of _ensurePrev
 
     /************************************************************************
+     * [OVERRIDE] DOCUMENT 영역 ATTRIBUTE 갱신 — 원본 uiAttributeArea.js attrUpdateDocAttr(8318행) 1:1.
+     *   액티브/저장 후 서버 SCRIPT(eval) 가 oAPP.fn.attrUpdateDocAttr([{UIATK,UIATV},...]) 로 호출한다
+     *   (예: Request/Task DH001025 갱신). WS20 HTML5 빌드는 UI5 파일 uiAttributeArea.js 를 로드하지
+     *   않으므로 데이터 함수인 이걸 여기에 포팅한다 — 없으면 SCRIPT eval 에서
+     *   "attrUpdateDocAttr is not a function" → onError 크리티컬(액티브 시 실측).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrUpdateDocAttr !== "function") {
+        oAPP.fn.attrUpdateDocAttr = function (it_attr) {
+
+            if (!Array.isArray(it_attr) || it_attr.length === 0) { return; }
+
+            //ROOT 수집본(prev 스탠드인) — 안전 초기화.
+            var lt_0015 = _ensurePrev("ROOT")._T_0015 || [];
+
+            //갱신 대상건 기준으로 ROOT 수집 attribute 갱신.
+            for (var i = 0, l = it_attr.length; i < l; i++) {
+
+                switch (it_attr[i].UIATK) {
+                    case "DH001020": oAPP.attr.appInfo.APPVR = it_attr[i].UIATV; break;   // Web Application Version
+                    case "DH001025": oAPP.attr.appInfo.REQNR = it_attr[i].UIATV;          // Request/Task
+                                     oAPP.attr.appInfo.REQNO = it_attr[i].UIATV; break;
+                    case "DH001140": oAPP.attr.appInfo.AEUSR = it_attr[i].UIATV; break;   // Change User
+                    case "DH001150": oAPP.attr.appInfo.AEDAT = it_attr[i].UIATV; break;   // Change Date
+                    case "DH001160": oAPP.attr.appInfo.AETIM = it_attr[i].UIATV; break;   // Change Time
+                }
+
+                //기존 수집 항목 갱신.
+                var ls_attr = lt_0015.find(a => a.UIATK === it_attr[i].UIATK);
+                if (ls_attr) { ls_attr.UIATV = it_attr[i].UIATV; continue; }
+
+                //코드마스터(UA003)에서 document attr 정보 얻기.
+                var ls_ua003 = (oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011))
+                    ? oAPP.DATA.LIB.T_9011.find(a => a.CATCD === "UA003" && a.ITMCD === it_attr[i].UIATK) : null;
+                if (!ls_ua003) { continue; }
+
+                //신규 라인 생성.
+                ls_attr = oAPP.fn.crtStru0015();
+                ls_attr.APPID = oAPP.attr.appInfo.APPID;
+                ls_attr.GUINR = oAPP.attr.appInfo.GUINR;
+                ls_attr.OBJID = "ROOT";
+                ls_attr.UIATK = it_attr[i].UIATK;
+                ls_attr.UIATV = it_attr[i].UIATV;
+                ls_attr.UIOBK = "ROOT";
+                ls_attr.UIATT = ls_ua003.FLD01;
+                ls_attr.UIASN = ls_attr.UIATT.toUpperCase().substr(0, 18);
+                ls_attr.UIADT = "string";
+                ls_attr.UIATY = "1";
+                lt_0015.push(ls_attr);
+            }
+
+            //현재 선택 TREE 가 ROOT 가 아니면 표시 갱신 불필요.
+            var oData = oAPP.attr.oModel && oAPP.attr.oModel.oData;
+            if (!oData || !oData.uiinfo || oData.uiinfo.OBJID !== "ROOT") { return; }
+            if (!Array.isArray(oData.T_ATTR)) { return; }
+
+            //ATTRIBUTE 영역 출력값 갱신.
+            for (var j = 0, m = it_attr.length; j < m; j++) {
+                var ls_disp = oData.T_ATTR.find(a => a.UIATK === it_attr[j].UIATK);
+                if (!ls_disp) { continue; }
+                ls_disp.UIATV = it_attr[j].UIATV;
+            }
+
+            if (oAPP.attr.oModel.refresh) { oAPP.attr.oModel.refresh(); }
+
+        }; // end of [OVERRIDE] oAPP.fn.attrUpdateDocAttr
+    }
+
+    /************************************************************************
      * UI Info 영역 정보 구성 — 원본 uiAttributeArea.js setUIInfo(7453행) 1:1.
      ************************************************************************/
     function _setUIInfo(is_tree) {

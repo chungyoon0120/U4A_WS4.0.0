@@ -1241,7 +1241,7 @@ export async function createControl(oParam){
                 //wait off 처리.
                 parent.setBusy("");
 
-                oAPP.common.fnSetBusyDialog(false);
+                parent.setBusy("");
 
                 return;
             }
@@ -1251,7 +1251,7 @@ export async function createControl(oParam){
 
             oContr.oModel.refresh(true);
 
-            oAPP.common.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             parent.setBusy("");
 
@@ -1271,7 +1271,7 @@ export async function createControl(oParam){
                 return resolve(param);
             });
 
-            oAPP.common.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             parent.setBusy("");
 
@@ -1330,7 +1330,7 @@ export async function createControl(oParam){
                 //wait off 처리.
                 parent.setBusy("");
 
-                oAPP.common.fnSetBusyDialog(false);
+                parent.setBusy("");
 
                 return;
             }
@@ -1345,7 +1345,7 @@ export async function createControl(oParam){
         }
 
         //busy dialog close.
-        oAPP.common.fnSetBusyDialog(false);
+        parent.setBusy("");
 
 
         //생성 처리 성공 이후 work space UI editor 화면으로 이동 처리.

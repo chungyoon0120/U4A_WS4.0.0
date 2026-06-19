@@ -281,15 +281,51 @@ html[data-sl-theme="dark"] .btn-close {
     color: var(--sl-fg);
 }
 
-.u4a-dialog__header,
-.u4a-dialog__footer {
+/* 헤더 = 살짝 다른 톤 밴드 / 푸터 = 본문과 같은 톤(투명) — Bootstrap .modal 과 동일 규칙 */
+.u4a-dialog__header {
     background: var(--sl-surface-2);
+    border-color: var(--sl-border);
+}
+.u4a-dialog__footer {
+    background: transparent;
     border-color: var(--sl-border);
 }
 
 .u4a-dialog__body {
     background: var(--sl-surface);
     color: var(--sl-fg);
+}
+
+/*======================================================================
+  ★ 전 팝업 헤더/푸터 높이·여백 통일 (.u4a-dialog__* + Bootstrap .modal-* 양쪽)
+    → 메시지박스 · 로그인 · 어플리케이션 생성 팝업 · ServerList 등
+      "모든 팝업"의 헤더/푸터가 동일 높이(48px)·동일 여백·동일 제목 크기.
+    (한 곳만 고치면 양 시스템 전부 따라옴 — UX 통일 단일 출처)
+======================================================================*/
+.u4a-dialog__header,
+.modal-header {
+    /* height 고정(+border-box) → 패딩/보더/로드순서 무관하게 정확히 48px (49px 방지) */
+    box-sizing: border-box;
+    height: 3rem;
+    min-height: 3rem;
+    padding: 0.5rem 1rem;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.u4a-dialog__footer,
+.modal-footer {
+    box-sizing: border-box;
+    height: 3rem;
+    min-height: 3rem;
+    padding: 0.5rem 0.875rem;
+    align-items: center;
+}
+
+/* 헤더 제목 글자 크기 통일 (Bootstrap .modal-title 기본 1.25rem → .u4a-dialog 헤더와 동일) */
+.modal-title {
+    font-size: 1.0625rem;
+    font-weight: 700;
 }
 
 .u4a-dialog .u4a-input,
@@ -321,6 +357,23 @@ html[data-sl-theme="dark"] .btn-close {
 .u4a-btn--emphasized:hover {
     background: var(--u4a-accent-hover);
     border-color: var(--u4a-accent-hover);
+}
+/* Reject(닫기/취소) — 원본 UI5 처럼 정적 빨강(텍스트/아이콘+테두리). 호버는 중립 하이라이트만
+   (빨강 배경 없음). ★ skin 의 .u4a-btn 이 shell.css 보다 늦게 로드돼 색을 덮으므로 여기에도 둔다. */
+.u4a-btn--negative {
+    background: transparent;
+    border-color: var(--error);
+    color: var(--error);
+}
+.u4a-btn--negative:hover {
+    background: var(--sl-surface-2);
+    border-color: var(--error);
+    color: var(--error);
+}
+.u4a-btn--negative:active {
+    background: var(--sl-surface-2);
+    border-color: var(--error);
+    color: var(--error);
 }
 
 /* 드롭다운 메뉴 (.u4a-menu) */
@@ -391,5 +444,25 @@ html[data-sl-theme="dark"] .btn-close {
 .u4a-busy__spinner::before { border-color: var(--sl-border); border-top-color: var(--u4a-accent); }
 .u4a-busy__spinner::after { border-bottom-color: var(--u4a-accent-hover); }
 .u4a-empty { color: var(--sl-muted); }
+
+/*======================================================================
+  ★ 비활성/읽기전용/display 입력 — 전부 "동일한 잠긴 톤"으로 통일.
+    문제: disabled 는 opacity 0.4 로 흐려지고 display 는 opacity 1 솔리드라,
+          같은 배경색이어도 두 비활성 필드가 달라 보였다(Request No vs Request Desc).
+    해결: 직접 타이핑 불가 필드(disabled / [readonly] / .u4a-input--display)를
+          같은 배경(--sl-surface-2) + 같은 글자(--sl-muted) + opacity:1 로 일치.
+    .u4a-dialog 안에서도 이기도록 (0,2,1)/(0,3,0) 까지 명시.
+======================================================================*/
+.u4a-input:disabled,
+.u4a-input[readonly],
+.u4a-input.u4a-input--display,
+.u4a-dialog .u4a-input:disabled,
+.u4a-dialog .u4a-input[readonly],
+.u4a-dialog .u4a-input.u4a-input--display {
+    background: var(--sl-surface-2);
+    color: var(--sl-muted);
+    border-color: var(--sl-border);
+    opacity: 1;
+}
 
 

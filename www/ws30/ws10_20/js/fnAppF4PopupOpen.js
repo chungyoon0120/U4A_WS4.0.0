@@ -1,2318 +1,606 @@
-/************************************************************************
- * Copyright 2020. INFOCG Inc. all rights reserved. 
- * ----------------------------------------------------------------------
- * - file Name : fnAppF4PopupOpen.js
- * - file Desc : CSS, JAVASCRIPT, HTML Editor
- ************************************************************************/
-
+/**************************************************************************
+ * fnAppF4PopupOpen.js  (UI5 → HTML5 변환)
+ * ------------------------------------------------------------------------
+ * App Search Help (앱 검색 도움말) — WS10 앱이름 입력의 F4/돋보기 value-help.
+ *   원본: sap.m.Dialog + IconTabBar + sap.ui.table.Table/TreeTable.
+ *   HTML5: 공통 <dialog class="u4a-dialog"> + 공통 컴포넌트(.u4a-field, U4AUI.createSelect,
+ *          makeDialogDraggable/Resizable/Recenter) + 토큰 기반 테이블/트리.
+ *
+ *   탭1 "[U4A] 모든 앱": 검색폼(패키지/사용자/웹앱ID/앱설명/앱유형/최대조회수) + 검색버튼
+ *                        + 결과 테이블(사용자/앱실행/앱조회/웹앱ID/앱명/앱유형[+생성·변경정보]).
+ *   탭2 "[U4A] 패키지별 앱 계층 구조": 트리 테이블 + Expand/Collapse all + 검색(클라이언트 필터).
+ *
+ *   백엔드(원본 동일): POST {serverPath}/getappsearch (APPINFO=JSON)        → 앱 배열
+ *                      POST {serverPath}/getapplhierarchydata (no body)    → {RETCD,RTMSG,T_APPL[]}
+ *   행 액션: pick(더블클릭=콜백+닫기) / 앱실행(fnCheckAppExists→fnOnExecApp) / 앱조회(WS10 Display).
+ *   ※ 이 팝업엔 eval(SCRIPT) 없음. 데이터 콜만 존재.
+ **************************************************************************/
 (function (window, $, oAPP) {
     "use strict";
 
-    const USERINFO = parent.getUserInfo();
-    const LANGU = USERINFO.LANGU;
+    var APPCOMMON = oAPP.common;
 
-    const C_BIND_ROOT_PATH = "/WS10/APPF4";
-    const C_DIALOG_ID = "AppF4Dialog";
+    /* ── 작은 유틸 ─────────────────────────────────────────────────── */
+    var _fa = function (s) { return '<i class="fa-solid fa-' + s + '"></i>'; };
 
-    var APPCOMMON = oAPP.common,
-        REMOTE = parent.REMOTE,
-        bIsTrial = parent.getIsTrial();        
+    function _el(tag, cls, txt) {
+        var o = document.createElement(tag);
+        if (cls) { o.className = cls; }
+        if (txt != null) { o.textContent = txt; }
+        return o;
+    }
 
-    oAPP.fn.fnAppF4PopupOpen = function (options, fnCallback) {        
+    // 코드형 라벨(/U4A/CL_WS_COMMON 등). p1 = &1 치환 파라미터(선택).
+    function _txt(sCls, sCode, p1) {
+        try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1); } catch (e) { return sCode; }
+    }
+    // ZMSG_WS_COMMON_001 "번호" — 워크스페이스 언어(getUserInfo().LANGU) 기준.
+    function _wsTxt(sNo) {
+        try {
+            var sLangu = (parent.getUserInfo() || {}).LANGU;
+            return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sNo);
+        } catch (e) { return sNo; }
+    }
 
-        // 1. 호출된 순간, 이 함수 안에서만 쓸 고유 변수를 생성 (전역 오염 방지)
-        const sEXPAGE       = options?.initCond?.EXPAGE || "";
-        const sDialogId     = `${C_DIALOG_ID}${sEXPAGE}`;
-        const sBindRootPath = `${C_BIND_ROOT_PATH}${sEXPAGE}`;
-        
-        // 2. 콜백 함수도 이 시점의 변수로 고정
-        const localCallback = fnCallback;
+    function _msg(sType, sText) { try { parent.showMessage(null, 10, sType, sText); } catch (e) { } }
+    function _flash() {
+        try { (parent.CURRWIN || parent.REMOTE.getCurrentWindow()).flashFrame(true); } catch (e) { }
+    }
+    function _busy(bOn) { try { APPCOMMON.fnSetBusyLock(bOn ? "X" : ""); } catch (e) { } }
 
-        var oTab1_Data = options.initCond;
+    function _isRoot(o) { return !!(o && (o.APPID === "ROOT" || o.PACKG === "ROOT")); }
+    function _fmtDate(s) {
+        if (!s || s === "00000000") { return ""; }
+        s = String(s); if (s.length !== 8) { return s; }
+        return s.slice(0, 4) + "-" + s.slice(4, 6) + "-" + s.slice(6, 8);
+    }
+    function _fmtTime(s) {
+        if (!s || s === "000000") { return ""; }
+        s = String(s); if (s.length !== 6) { return s; }
+        return s.slice(0, 2) + ":" + s.slice(2, 4) + ":" + s.slice(4, 6);
+    }
 
-        var oBindData = {
-            options: options,
-            ISTRIAL: bIsTrial, // Trial 여부 플래그
-            // APPLIST1: aAPPLIST,
-            TAB1: oTab1_Data,            
-            aAPPTY: [{
-                KEY: "M",
-                TEXT: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B96"), // U4A Application
-            },
-            {
-                KEY: "U",
-                TEXT: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D48"), // U4A Server Page
-            }
-            ],
-            APPF4HIER: null
-        };
+    // 생성/변경 부가 컬럼 표시 여부(원본: checkWLOList("C","UHAK901182"))
+    function _showAudit() {
+        try { return !!APPCOMMON.checkWLOList("C", "UHAK901182"); } catch (e) { return false; }
+    }
 
-        // 모델 업데이트
-        APPCOMMON.fnSetModelProperty(sBindRootPath, oBindData);
- 
-        var oAppF4Dialog = sap.ui.getCore().byId(sDialogId);
-        if (oAppF4Dialog) {
+    /* ── 공통 입력 필드(.u4a-field + clear X) ─────────────────────── */
+    function _mkField(sVal, opt) {
+        opt = opt || {};
+        var wrap = _el("div", "u4a-field u4aAppF4Field");
+        wrap.setAttribute("data-trail", "1");
+        if (opt.w) { wrap.style.width = opt.w; }
+        var inp = _el("input", "u4a-input u4a-field__input");
+        inp.type = opt.type || "text";
+        inp.value = (sVal == null ? "" : String(sVal));
+        if (opt.ph) { inp.placeholder = opt.ph; }
+        if (opt.disabled) { inp.disabled = true; }
+        var clr = _el("button", "u4a-field__clear");
+        clr.type = "button"; clr.tabIndex = -1; clr.innerHTML = _fa("xmark");
+        wrap.append(inp, clr);
+        try { if (window.U4AUI && U4AUI.attachClear) { U4AUI.attachClear(inp, clr); } } catch (e) { }
+        // 대문자 필드(패키지/사용자/웹앱ID) — 커서 보존 업서치.
+        if (opt.upper) {
+            inp.addEventListener("input", function () {
+                var s = inp.selectionStart, e = inp.selectionEnd;
+                var up = inp.value.toUpperCase();
+                if (up !== inp.value) { inp.value = up; try { inp.setSelectionRange(s, e); } catch (x) { } }
+            });
+        }
+        if (opt.onEnter) {
+            inp.addEventListener("keydown", function (ev) {
+                if (ev.key === "Enter") { ev.preventDefault(); opt.onEnter(); }
+            });
+        }
+        return { wrap: wrap, input: inp };
+    }
 
-            oAppF4Dialog.data("sBindRootPath", sBindRootPath);
-            oAppF4Dialog.data("fnCallback", localCallback);
+    /* ====================================================================
+     * 메인 진입 — 팝업 생성/오픈
+     * ================================================================== */
+    oAPP.fn.fnAppF4PopupOpen = function (options, fnCallback) {
 
-            // 첫번째 탭 선택
-            let oTab = oAppF4Dialog.data("appf4tab");
-            if (oTab) {
-                // oTab.setSelectedKey("K1");
-                oTab.fireSelect({
-                    key: "K1"
-                });
-            }
+        _ensureStyle();
 
-            // 두번째 탭의 Tree Table
-            // Select 효과 제거, 트리 레벨 전체 접기            
-            let oTree = oAppF4Dialog.data("appf4tree");
-            if (oTree) {
-                oTree.clearSelection();
-                oTree.collapseAll();
-            }
+        options = options || {};
+        var initCond = options.initCond || {};
+        var bWS10 = initCond.EXPAGE === "WS10";       // 앱조회(display) 활성 조건
+        var bAudit = _showAudit();
 
-            if(oAppF4Dialog.getVisible() === false){
-                oAppF4Dialog.setVisible(true);
-                oAppF4Dialog.oPopup.setModal(true);
-                return;
-            }
+        // 중복 방지(이미 떠 있으면 닫고 새로).
+        var oOld = document.getElementById("u4aAppF4Dlg");
+        if (oOld) { try { oOld.close(); } catch (e) { } oOld.remove(); }
 
-            oAppF4Dialog.open();
+        // 팝업 상태(스코프 변수로 보관).
+        var aResult = [];           // 탭1 검색결과
+        var aTreeRoot = [];         // 탭2 트리 루트
+        var oExpand = {};           // 트리 펼침 상태(노드 _uid → bool)
+        var bTreeLoaded = false;
+        var sTreeFilter = "";
+        var _uidSeq = 0;
 
-            return;
+        /* ── 다이얼로그 골격 ─────────────────────────────────────── */
+        var oDlg = document.createElement("dialog");
+        oDlg.className = "u4a-dialog u4aAppF4Dlg";
+        oDlg.id = "u4aAppF4Dlg";
+
+        function lf_close() { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
+
+        // 헤더
+        var oHeader = _el("div", "u4a-dialog__header");
+        oHeader.setAttribute("data-type", "I");
+        oHeader.innerHTML = _fa("magnifying-glass") + "<span></span>";
+        oHeader.querySelector("span").textContent =
+            _txt("/U4A/CL_WS_COMMON", "B96") + " " + _txt("/U4A/CL_WS_COMMON", "A26");
+        var oX = _el("button", "u4a-btn-icon");
+        oX.type = "button"; oX.setAttribute("data-act", "close");
+        oX.title = _txt("/U4A/CL_WS_COMMON", "A39"); oX.innerHTML = _fa("xmark");
+        oX.addEventListener("click", lf_close);
+        oHeader.appendChild(oX);
+        oDlg.appendChild(oHeader);
+
+        // 탭바
+        var oTabs = _el("div", "u4aAppF4Tabs");
+        var oTab1Btn = _el("button", "u4aAppF4Tab", "[U4A] " + _txt("/U4A/CL_WS_COMMON", "B94")); // All App.
+        var oTab2Btn = _el("button", "u4aAppF4Tab", "[U4A] " + _txt("/U4A/CL_WS_COMMON", "B98")); // Hierarchy By Packages
+        oTab1Btn.type = "button"; oTab2Btn.type = "button";
+        oTabs.append(oTab1Btn, oTab2Btn);
+        oDlg.appendChild(oTabs);
+
+        // 바디(탭 페이지 컨테이너)
+        var oBody = _el("div", "u4a-dialog__body u4a-dialog__body--flush u4aAppF4Body");
+        oDlg.appendChild(oBody);
+
+        var oPage1 = _el("div", "u4aAppF4Page u4aAppF4Page1");
+        var oPage2 = _el("div", "u4aAppF4Page u4aAppF4Page2");
+        oPage2.hidden = true;
+        oBody.append(oPage1, oPage2);
+
+        // 푸터(닫기)
+        var oFoot = _el("div", "u4a-dialog__footer");
+        var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative");
+        oCloseBtn.type = "button";
+        oCloseBtn.innerHTML = _fa("xmark") + "<span></span>";
+        oCloseBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39");
+        oCloseBtn.addEventListener("click", lf_close);
+        oFoot.appendChild(oCloseBtn);
+        oDlg.appendChild(oFoot);
+
+        /* ── 공통 액션 아이콘 버튼 ───────────────────────────────── */
+        function _actBtn(sIcon, sTip, fn) {
+            var b = _el("button", "u4a-btn-icon u4aAppF4ActBtn");
+            b.type = "button"; b.title = sTip || ""; b.innerHTML = _fa(sIcon);
+            b.addEventListener("click", fn);
+            return b;
         }
 
-        let sTitleTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B96"); // U4A Application
-        sTitleTxt += " " + APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A26"); // Search Help
+        /* ── 탭 전환 ─────────────────────────────────────────────── */
+        function _selectTab(sKey) {
+            var b1 = sKey === "K1";
+            oPage1.hidden = !b1; oPage2.hidden = b1;
+            oTab1Btn.setAttribute("aria-selected", b1 ? "true" : "false");
+            oTab2Btn.setAttribute("aria-selected", b1 ? "false" : "true");
+            if (!b1 && !bTreeLoaded) { _loadTree(); }
+        }
+        oTab1Btn.addEventListener("click", function () { _selectTab("K1"); });
+        oTab2Btn.addEventListener("click", function () { _selectTab("K2"); });
 
-        var oAppF4Dialog = new sap.m.Dialog(sDialogId, {
+        /* ============================================================
+         * 탭 1 — 검색 폼 + 결과 테이블
+         * ========================================================== */
+        var oForm = _el("div", "u4aAppF4Form");
 
-            // Properties
-            draggable: true,
-            resizable: true,
-            contentWidth: "100%",
-            contentHeight: "100%",
-            verticalScrolling: false,
-            // title: "UI5 Application Search Help",
-            // titleAlignment: sap.m.TitleAlignment.Center,
-            // icon: "sap-icon://search",
+        function _row(sLabel, oControl) {
+            var r = _el("div", "u4aAppF4FRow");
+            var l = _el("label", "u4a-label", sLabel);
+            r.append(l, oControl);
+            return r;
+        }
 
-            // Aggregations
-            customHeader: new sap.m.Toolbar({
-                content: [
-                    new sap.m.ToolbarSpacer(),
+        var bTrial = false; try { bTrial = !!(parent.getIsTrial && parent.getIsTrial()); } catch (e) { }
 
-                    new sap.ui.core.Icon({
-                        src: "sap-icon://search"
-                    }),
+        var oPkg = _mkField(initCond.PACKG || "", { upper: true, disabled: bTrial, onEnter: _doSearch });
+        var oUsr = _mkField(initCond.ERUSR || "", { upper: true, disabled: bTrial, onEnter: _doSearch });
+        var oApp = _mkField(initCond.APPID || "", { upper: true, onEnter: _doSearch });
+        var oDesc = _mkField(initCond.APPNM || "", { onEnter: _doSearch });
+        var oHits = _mkField(initCond.HITS != null ? initCond.HITS : 500, { onEnter: _doSearch });
 
-                    new sap.m.Title({
-                        text: sTitleTxt
-                    }).addStyleClass("sapUiTinyMarginBegin"),
+        var aApptyItems = [
+            { value: "M", text: "M ( " + _txt("/U4A/CL_WS_COMMON", "B96") + " )" }, // U4A Application
+            { value: "U", text: "U ( " + _txt("/U4A/CL_WS_COMMON", "D48") + " )" }  // U4A Server Page
+        ];
+        var sApptyDef = initCond.APPTY || "M";
+        var oApptySel = (window.U4AUI && U4AUI.createSelect)
+            ? U4AUI.createSelect(aApptyItems, sApptyDef, function () { _doSearch(); })
+            : (function () { var s = _el("div"); s.value = sApptyDef; return s; })();
+        oApptySel.classList.add("u4aAppF4Sel");
 
-                    new sap.m.ToolbarSpacer(),
+        oForm.append(
+            _row(_txt("/U4A/CL_WS_COMMON", "A22"), oPkg.wrap),   // Package
+            _row(_txt("/U4A/CL_WS_COMMON", "B95"), oUsr.wrap),   // User Name
+            _row(_txt("/U4A/CL_WS_COMMON", "A90"), oApp.wrap),   // Web App ID
+            _row(_txt("/U4A/CL_WS_COMMON", "A91"), oDesc.wrap),  // App Desc
+            _row(_txt("/U4A/CL_WS_COMMON", "B02"), oApptySel),   // App Type
+            _row(_txt("/U4A/CL_WS_COMMON", "A76"), oHits.wrap)   // Max rows
+        );
 
-                    new sap.m.Button({
-                        icon: "sap-icon://decline",
-                        press: function(){
-                            oAppF4Dialog.close();
-                        }
-                    })
-                ]
-            }),
+        var oSrchBar = _el("div", "u4aAppF4SrchBar");
+        var oSrchTitle = _el("div", "u4aAppF4SrchTitle", "[U4A] " + _txt("/U4A/CL_WS_COMMON", "B94"));
+        var oSrchBtn = _el("button", "u4a-btn u4a-btn--emphasized");
+        oSrchBtn.type = "button";
+        oSrchBtn.innerHTML = _fa("magnifying-glass") + "<span></span>";
+        oSrchBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A75"); // Search
+        oSrchBtn.addEventListener("click", _doSearch);
+        oSrchBar.append(oSrchTitle, _el("span", "u4aAppF4Spacer"), oSrchBtn);
 
-            buttons: [
-                new sap.m.Button({
-                    type: sap.m.ButtonType.Reject,
-                    icon: "sap-icon://decline",
-                    press: function(){
-                        oAppF4Dialog.close();
+        var T1_COLS = [
+            { key: "ERUSR", label: _txt("/U4A/CL_WS_COMMON", "B95"), w: "8rem", align: "center" },
+            { action: "run" },
+            { action: "disp" },
+            { key: "APPID", label: _txt("/U4A/CL_WS_COMMON", "A90"), w: "14rem" },
+            { key: "APPNM", label: _txt("/U4A/CL_WS_COMMON", "A91"), w: "20rem" },
+            { key: "APPTY", label: _txt("/U4A/CL_WS_COMMON", "B97"), w: "6rem", align: "center" }
+        ];
+        if (bAudit) {
+            T1_COLS.push(
+                { key: "ERDAT", label: _wsTxt("387"), w: "8rem", align: "center", fmt: _fmtDate },
+                { key: "ERTIM", label: _wsTxt("388"), w: "7rem", align: "center", fmt: _fmtTime },
+                { key: "AEUSR", label: _wsTxt("411"), w: "8rem", align: "center" },
+                { key: "AEDAT", label: _wsTxt("412"), w: "8rem", align: "center", fmt: _fmtDate },
+                { key: "AETIM", label: _wsTxt("413"), w: "7rem", align: "center", fmt: _fmtTime }
+            );
+        }
+
+        var oT1Wrap = _el("div", "u4aAppF4TblWrap");
+        var oT1 = _el("table", "u4aAppF4Tbl");
+        var oT1Head = _el("thead");
+        var oT1Hr = _el("tr");
+        T1_COLS.forEach(function (c) {
+            var th = _el("th", c.align === "center" ? "is-center" : null,
+                c.action ? (c.action === "run" ? _wsTxt("436") : _wsTxt("564")) : c.label);
+            if (c.w) { th.style.width = c.w; }
+            if (c.action) { th.classList.add("is-action"); }
+            oT1Hr.appendChild(th);
+        });
+        oT1Head.appendChild(oT1Hr);
+        var oT1Body = _el("tbody");
+        oT1.append(oT1Head, oT1Body);
+        oT1Wrap.appendChild(oT1);
+        var oT1Empty = _el("div", "u4aAppF4Empty", "—");
+        oT1Empty.hidden = true;
+        oT1Wrap.appendChild(oT1Empty);
+
+        oPage1.append(oForm, oSrchBar, oT1Wrap);
+
+        function _renderT1() {
+            oT1Body.textContent = "";
+            oT1Empty.hidden = aResult.length > 0;
+            aResult.forEach(function (row) {
+                var tr = _el("tr");
+                tr.addEventListener("dblclick", function () { _pick(row); });
+                T1_COLS.forEach(function (c) {
+                    var td = _el("td", c.align === "center" ? "is-center" : null);
+                    if (c.action === "run") {
+                        td.classList.add("is-action");
+                        td.appendChild(_actBtn("globe", _wsTxt("436"), function (e) { e.stopPropagation(); _doRun(row); }));
+                    } else if (c.action === "disp") {
+                        td.classList.add("is-action");
+                        var b = _actBtn("desktop", _wsTxt("564"), function (e) { e.stopPropagation(); _doDisplay(row); });
+                        if (!bWS10) { b.disabled = true; }
+                        td.appendChild(b);
+                    } else {
+                        var v = row[c.key];
+                        td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
                     }
-                }),
-            ],
+                    tr.appendChild(td);
+                });
+                oT1Body.appendChild(tr);
+            });
+        }
 
-            // Events
-            beforeOpen: oAPP.events.ev_AppF4DialogAfterOpen,
-            // afterOpen: oAPP.events.ev_AppF4DialogAfterOpen,
-            afterClose: function(){
-                oAppF4Dialog.close();
+        function _doSearch() {
+            _busy(true);
+            var oCond = {
+                PACKG: oPkg.input.value, ERUSR: oUsr.input.value, APPID: oApp.input.value,
+                APPNM: oDesc.input.value, APPTY: oApptySel.value,
+                HITS: oHits.input.value, EXPAGE: initCond.EXPAGE || ""
+            };
+            try { oAPP.attr.gAPPTY = oApptySel.value; } catch (e) { }
+            var sPath = parent.getServerPath() + "/getappsearch";
+            var fd = new FormData();
+            fd.append("APPINFO", JSON.stringify(oCond));
+            try {
+                sendAjax(sPath, fd, function (oRes) {
+                    if (oRes && !Array.isArray(oRes) && oRes.RETCD === "E") { _flash(); _msg("E", oRes.RTMSG || ""); _busy(false); return; }
+                    var arr = Array.isArray(oRes) ? oRes : [];
+                    arr.sort(function (a, b) { return String(a.APPID).localeCompare(String(b.APPID)); });
+                    aResult = arr;
+                    _renderT1();
+                    _busy(false);
+                });
+            } catch (e) { _busy(false); _msg("E", String(e && e.message || e)); }
+        }
+
+        /* ============================================================
+         * 탭 2 — 패키지 계층 트리
+         * ========================================================== */
+        var T2_COLS = [
+            { tree: true, key: "APPNM", label: _txt("/U4A/CL_WS_COMMON", "B99"), w: "26rem" },
+            { action: "disp" },
+            { key: "APPID", label: _txt("/U4A/CL_WS_COMMON", "C01"), w: "12rem", link: true },
+            { key: "APPVR", label: _txt("/U4A/CL_WS_COMMON", "C02"), w: "6rem", align: "center", nz: true },
+            { key: "CODPG", label: _txt("/U4A/CL_WS_COMMON", "C03"), w: "6rem", align: "center", nz: true },
+            { key: "UITHM", label: _txt("/U4A/CL_WS_COMMON", "C04"), w: "8rem", nz: true },
+            { key: "ERUSR", label: _txt("/U4A/CL_WS_COMMON", "C05"), w: "8rem", nz: true },
+            { key: "ERDAT", label: _wsTxt("387"), w: "7rem", align: "center", nz: true, fmt: _fmtDate },
+            { key: "ERTIM", label: _wsTxt("388"), w: "6rem", align: "center", nz: true, fmt: _fmtTime },
+            { key: "AEUSR", label: _wsTxt("411"), w: "8rem", nz: true },
+            { key: "AEDAT", label: _wsTxt("412"), w: "7rem", align: "center", nz: true, fmt: _fmtDate },
+            { key: "AETIM", label: _wsTxt("413"), w: "6rem", align: "center", nz: true, fmt: _fmtTime }
+        ];
+
+        var oTBar = _el("div", "u4aAppF4TreeBar");
+        var oExpandBtn = _actBtn("angles-down", "Expand", function () { _treeExpandAll(true); });
+        oExpandBtn.title = "Expand";
+        var oCollapseBtn = _actBtn("angles-up", "Collapse", function () { _treeExpandAll(false); });
+        oCollapseBtn.title = "Collapse";
+        var oTSrch = _mkField("", { w: "16rem", ph: _wsTxt("565") }); // 어플리케이션 검색
+        oTSrch.input.addEventListener("input", function () {
+            sTreeFilter = oTSrch.input.value.trim().toUpperCase();
+            _renderTree();
+        });
+        oTBar.append(oExpandBtn, oCollapseBtn, _el("span", "u4aAppF4TBarSep"), oTSrch.wrap);
+
+        var oT2Wrap = _el("div", "u4aAppF4TblWrap u4aAppF4TreeWrap");
+        var oT2 = _el("table", "u4aAppF4Tbl u4aAppF4Tree");
+        var oT2Head = _el("thead");
+        var oT2Hr = _el("tr");
+        T2_COLS.forEach(function (c) {
+            var th = _el("th", c.align === "center" ? "is-center" : null, c.action ? _wsTxt("564") : c.label);
+            if (c.w) { th.style.width = c.w; }
+            if (c.action) { th.classList.add("is-action"); }
+            oT2Hr.appendChild(th);
+        });
+        oT2Head.appendChild(oT2Hr);
+        var oT2Body = _el("tbody");
+        oT2.append(oT2Head, oT2Body);
+        oT2Wrap.appendChild(oT2);
+        oPage2.append(oTBar, oT2Wrap);
+
+        function _matchFilter(node) {
+            if (!sTreeFilter || _isRoot(node)) { return true; }
+            return String(node.APPID || "").toUpperCase().indexOf(sTreeFilter) > -1
+                || String(node.APPNM || "").toUpperCase().indexOf(sTreeFilter) > -1;
+        }
+        // 필터 시: 자신 또는 하위에 매칭이 있으면 표시.
+        function _subtreeHasMatch(node) {
+            if (!_isRoot(node) && _matchFilter(node)) { return true; }
+            var kids = node.APPF4HIER || [];
+            for (var i = 0; i < kids.length; i++) { if (_subtreeHasMatch(kids[i])) { return true; } }
+            return false;
+        }
+
+        function _renderTree() {
+            oT2Body.textContent = "";
+            function walk(node, depth) {
+                if (sTreeFilter && !_isRoot(node) && !_subtreeHasMatch(node)) { return; }
+                if (sTreeFilter && _isRoot(node)) {
+                    // 루트는 하위 매칭 있을 때만 표시(없으면 자식만 그릴 일도 없음)
+                }
+                var kids = node.APPF4HIER || [];
+                var bHasKids = kids.length > 0;
+                var bExp = sTreeFilter ? true : !!oExpand[node._uid];
+                var tr = _el("tr");
+                if (_isRoot(node)) { tr.classList.add("is-root"); }
+                tr.addEventListener("dblclick", function () { if (!_isRoot(node)) { _pick(node); } });
+                T2_COLS.forEach(function (c) {
+                    var td = _el("td", c.align === "center" ? "is-center" : null);
+                    if (c.tree) {
+                        td.classList.add("u4aAppF4TreeCell");
+                        var ind = _el("span", "u4aAppF4Indent");
+                        ind.style.width = (depth * 1.25) + "rem";
+                        var tog = _el("button", "u4aAppF4Toggle");
+                        tog.type = "button";
+                        if (bHasKids) {
+                            tog.innerHTML = _fa(bExp ? "chevron-down" : "chevron-right");
+                            tog.addEventListener("click", function (e) {
+                                e.stopPropagation();
+                                oExpand[node._uid] = !oExpand[node._uid];
+                                _renderTree();
+                            });
+                        } else { tog.classList.add("is-leaf"); }
+                        var lbl = _el("span", "u4aAppF4TreeLabel", _isRoot(node) ? (node.APPNM || "ROOT") : (node.APPNM || ""));
+                        td.append(ind, tog, lbl);
+                    } else if (c.action === "disp") {
+                        td.classList.add("is-action");
+                        var b = _actBtn("desktop", _wsTxt("564"), function (e) { e.stopPropagation(); _doTreeDisplay(node); });
+                        if (!bWS10 || bHasKids || _isRoot(node)) { b.disabled = true; }
+                        td.appendChild(b);
+                    } else if (c.link) {
+                        if (_isRoot(node)) { td.textContent = ""; }
+                        else {
+                            var a = _el("a", "u4aAppF4Link", node[c.key] || "");
+                            a.href = "javascript:void(0)";
+                            a.addEventListener("click", function (e) { e.stopPropagation(); _doTreeRun(node); });
+                            td.appendChild(a);
+                        }
+                    } else {
+                        var v = node[c.key];
+                        if (c.nz && _isRoot(node)) { v = ""; }
+                        td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
+                    }
+                    tr.appendChild(td);
+                });
+                oT2Body.appendChild(tr);
+                if (bExp && bHasKids) { kids.forEach(function (k) { walk(k, depth + 1); }); }
             }
+            aTreeRoot.forEach(function (n) { walk(n, 0); });
+        }
 
-        }).addStyleClass(C_DIALOG_ID);
+        function _treeExpandAll(bExpand) {
+            function walkAll(n) { oExpand[n._uid] = bExpand; (n.APPF4HIER || []).forEach(walkAll); }
+            aTreeRoot.forEach(walkAll);
+            if (!bExpand) { aTreeRoot.forEach(function (n) { oExpand[n._uid] = true; }); } // 루트는 펼친 채
+            _renderTree();
+        }
 
-        oAppF4Dialog.data("sBindRootPath", sBindRootPath);
-        oAppF4Dialog.data("fnCallback", localCallback);  
+        // flat T_APPL → nested(APPF4HIER), 원본 _appF4Tree 규칙.
+        function _buildTree(aRaw) {
+            var arr = (aRaw || []).slice().sort(function (a, b) { return String(a.APPID).localeCompare(String(b.APPID)); });
+            var mLookup = {};
+            arr.forEach(function (n) {
+                n._uid = ++_uidSeq; n.APPF4HIER = [];
+                if (!mLookup[n.APPID] || n.PACKG === "" || n.PACKG === "ROOT") { mLookup[n.APPID] = n; }
+            });
+            arr.forEach(function (n) {
+                var par = mLookup[n.PACKG];
+                if (par && par !== n) { par.APPF4HIER.push(n); }
+            });
+            var rootNode = arr.find(function (n) { return n.APPID === "ROOT"; });
+            if (rootNode) { return [rootNode]; }
+            // ROOT 노드가 없으면 부모를 못 찾은 노드들을 최상위로.
+            return arr.filter(function (n) { return !mLookup[n.PACKG] || mLookup[n.PACKG] === n; });
+        }
 
-        // tab container 생성
-        let oIconTab = oAPP.fn.fnCreateAppF4TabCon(oAppF4Dialog);
+        function _loadTree() {
+            _busy(true);
+            var sPath = parent.getServerPath() + "/getapplhierarchydata";
+            try {
+                sendAjax(sPath, null, function (oRes) {
+                    if (oRes && oRes.RETCD === "E") {
+                        _flash(); _busy(false);
+                        try { APPCOMMON.fnShowFloatingFooterMsg("E", parent.getCurrPage(), oRes.RTMSG); } catch (e) { }
+                        return;
+                    }
+                    aTreeRoot = _buildTree(oRes && oRes.T_APPL);
+                    bTreeLoaded = true;
+                    aTreeRoot.forEach(function (n) { oExpand[n._uid] = true; }); // 최초 1레벨
+                    _renderTree();
+                    _busy(false);
+                });
+            } catch (e) { _busy(false); _msg("E", String(e && e.message || e)); }
+        }
 
-        oAppF4Dialog.addContent(oIconTab);
-    
-        oAppF4Dialog.data("appf4tab", oIconTab);      
-        oAppF4Dialog.data("DLG_NAME", "APPF4");
- 
-        oAppF4Dialog.addStyleClass("sapUiSizeCompact");
+        /* ── 행 액션 ─────────────────────────────────────────────── */
+        function _pick(row) {
+            try { if (typeof fnCallback === "function") { fnCallback(row); } } catch (e) { }
+            lf_close();
+        }
 
-        oAppF4Dialog.open();
+        function _doRun(row) {
+            var sAPPID = row && row.APPID;
+            if (!sAPPID) { return; }
+            oAPP.fn.fnCheckAppExists(sAPPID, function (oRes) {
+                var info = (oRes && oRes.RETURN) || {};
+                if (oRes && oRes.RETCD === "E") {
+                    parent.setBusy(""); _flash();
+                    _msg("E", _txt("/U4A/MSG_WS", "007", info.APPID || sAPPID));
+                    return;
+                }
+                if (info.APPTY === "U") { parent.setBusy(""); _msg("E", _txt("/U4A/MSG_WS", "189")); return; }
+                if (info.ACTST === "I") { parent.setBusy(""); _msg("E", _wsTxt("434")); return; }
+                try { oAPP.fn.fnOnExecApp(sAPPID); } catch (e) { parent.setBusy(""); _msg("E", String(e && e.message || e)); }
+            });
+        }
+
+        // WS10 Display 모드(원본 _navToWS20Display: 입력값 세팅 + Display 발화).
+        function _doDisplay(row) {
+            var sAPPID = row && row.APPID;
+            if (!sAPPID || !bWS10) { return; }
+            var inp = document.getElementById("AppNmInput");
+            if (inp) {
+                inp.value = sAPPID;
+                try { inp.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { }
+            }
+            lf_close();
+            try { if (oAPP.events && oAPP.events.ev_AppDisplay) { oAPP.events.ev_AppDisplay(); } } catch (e) { }
+        }
+
+        // 트리: 실행 불가(자식 있음/ROOT/APPID 없음) 가드.
+        function _treeRunnable(node) {
+            if (!node || !node.APPID || node.APPID === "ROOT") { return false; }
+            if ((node.APPF4HIER || []).length > 0) { return false; }
+            return true;
+        }
+        function _doTreeRun(node) {
+            if (!_treeRunnable(node)) { _flash(); _msg("E", _wsTxt("435")); return; }
+            _doRun(node);
+        }
+        function _doTreeDisplay(node) {
+            if (!_treeRunnable(node)) { _flash(); _msg("E", _wsTxt("435")); return; }
+            _doDisplay(node);
+        }
+
+        /* ── 오픈 ────────────────────────────────────────────────── */
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
+        if (window.U4AUI) {
+            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { }
+            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { }
+            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 720, minH: 420 }); } catch (e) { }
+        }
+
+        document.body.appendChild(oDlg);
+        _selectTab("K1");
+        oDlg.showModal();
+        try { oApp.input.focus(); } catch (e) { }
+
+        if (options.autoSearch) { _doSearch(); }
 
     }; // end of oAPP.fn.fnAppF4PopupOpen
 
-    /************************************************************************
-     * WS10에 있는 APPID F4 HELP 팝업내의 TAB CONTAINER 생성
-     ************************************************************************/
-    oAPP.fn.fnCreateAppF4TabCon = function (oAppF4Dialog) {
-
-        let oItem1 = oAPP.fn.fnCreateAppF4Tab1(oAppF4Dialog),
-            oItem2 = oAPP.fn.fnCreateAppF4Tab2(oAppF4Dialog);
-
-        let oIconTab = new sap.m.IconTabBar({
-            backgroundDesign: sap.m.BackgroundDesign.Transparent,
-            selectedKey: "K1",
-            expandable: false,
-            items: [
-                oItem1,
-                oItem2,
-            ],
-            select: function (oEvent) {
-
-                let oDialog = oAppF4Dialog;
-                let sBindRootPath = oDialog.data("sBindRootPath");
-
-                let oModel = sap.ui.getCore().getModel();
-
-                let oModelData = oModel.getProperty(sBindRootPath),
-                    oOptions = oModelData.options,
-                    bAutoSearch = oOptions.autoSearch;
-
-                let sSelectedKey = oEvent.getParameter("key");
-
-                let sBeforeKey = oDialog.data("beforeSelectedKey");
-
-                // 이전에 선택한 키와 현재 선택한 키가 다를 경우에만 선택한 키 정보를 글로벌 변수에 저장
-                if (sSelectedKey !== sBeforeKey) {
-                    oDialog.data("beforeSelectedKey", sSelectedKey);
-                }
-
-                switch (sSelectedKey) {
-
-                    case "K1":
-
-                        let oTree = oDialog.data("appf4tree");                 
-                        let oInput = oDialog.data("appf4_packg");            
-
-                        if (oTree) {
-                            oTree.clearSelection();
-                            oTree.collapseAll();
-
-                            // Binding data 없이 expandToLevel 실행하면 core에서 assert 경고 메시지가 발생한다.
-                            if (oTree.getBinding()) {
-                                oTree.expandToLevel(1);
-                            }
-
-                        }
-
-                        oModel.setProperty(sBindRootPath, oModelData);
-
-                        oDialog.setInitialFocus(oInput);
-
-                        if (!bAutoSearch) {
-                            return;
-                        }
-
-                        oInput.fireSubmit();
-
-                        break;
-
-                    case "K2":
-
-                        // App Hierarchy 정보 구하기..
-                        oAPP.fn.fnGetAppHierList(oAppF4Dialog);
-
-                        break;
-
-                    default:
-                        break;
-
-                }
-
-            }
-
-        }).addStyleClass("u4aAppF4IconTabbar");
-
-        return oIconTab;
-
-    }; // end of oAPP.fn.fnCreateAppF4TabCon
-
-    /************************************************************************
-     * Application Name F4 의 TabContainer Item1 생성
-     ************************************************************************/
-    oAPP.fn.fnCreateAppF4Tab1 = function (oAppF4Dialog) {
-
-        let sBindRootPath = oAppF4Dialog.data("sBindRootPath");
-
-        var ENUM_LABEL_DESIGN_BOLD = sap.m.LabelDesign.Bold;
-
-        var oForm = new sap.ui.layout.form.Form({
-            editable: true,
-            layout: new sap.ui.layout.form.ResponsiveGridLayout({
-                labelSpanXL: 2,
-                labelSpanL: 3,
-                labelSpanM: 3,
-                labelSpanS: 12,
-                singleContainerFullSize: true
-            })    
-        });
-
-        let oFormContainer1 = new sap.ui.layout.form.FormContainer();
-
-        oForm.addFormContainer(oFormContainer1);
-
-        let oFormElement1 = new sap.ui.layout.form.FormElement({
-            label: new sap.m.Label({
-                design: ENUM_LABEL_DESIGN_BOLD,
-                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A22"), // Package
-            })
-        });
-
-        oFormContainer1.addFormElement(oFormElement1);
-
-        let oInput1 = new sap.m.Input({
-            showClearIcon: true,
-            width: "200px",
-            value: "{PACKG}",
-            submit: function(){
-                oAPP.events.ev_AppF4Search(oAppF4Dialog);
-            },
-            liveChange: function(oEvent){
-
-                var oInput = oEvent.getSource(),
-                    sValue = oInput.getValue();
-
-                /**
-                 * UI5의 Input에 setValue 메소드를 수행하면 무조건 커서가 맨 끝으로 이동되는 현상때문에
-                 * 텍스트의 중간부터 입력할 경우에도 setValue를 할 경우 무조건 커서가 텍스트 맨 마지막으로 
-                 * 이동되기 때문에 이전 커서 위치를 기억했다가 setValue 이후에 이전 위치로 다시 커서를 
-                 * 이동시켜야 자연스럽게 입력이 됨.
-                 */
-
-                // 입력한 값의 커서 위치
-                let beforeCurPos;
-
-                let oHtmlInputDom = $(oInput.getDomRef()).find("input")[0];
-                if(oHtmlInputDom){
-                    beforeCurPos = oHtmlInputDom.selectionStart;
-                }
-
-                if(sValue){
-                    oInput.setValue(sValue.toUpperCase());
-                }
-
-                // 입력한 값의 이전 위치로 이동
-                if(typeof beforeCurPos !== "undefined"){
-                    oHtmlInputDom.setSelectionRange(beforeCurPos, beforeCurPos);
-                }
-
-            }
-        }).bindProperty("enabled", {
-            parts: [
-                `${sBindRootPath}/ISTRIAL`
-            ],
-            formatter: (IS_TRIAL) => {
-
-                /**
-                 * Only Trial Version Specific
-                 */
-
-                return !IS_TRIAL;
-
-            }
-        });
-
-        oAppF4Dialog.data("appf4_packg", oInput1);
-
-        oFormElement1.addField(oInput1);
-
-        let oFormElement2 = new sap.ui.layout.form.FormElement({
-            label: new sap.m.Label({
-                design: ENUM_LABEL_DESIGN_BOLD,
-                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B95"), // User Name
-            }),
-            fields: new sap.m.Input({
-                showClearIcon: true,
-                width: "200px",
-                value: "{ERUSR}",
-                submit: function(){
-                    oAPP.events.ev_AppF4Search(oAppF4Dialog);
-                },
-                // liveChange: function(oEvent){
-
-                //     var oInput = oEvent.getSource(),
-                //         sValue = oInput.getValue();
-
-                //     if (typeof sValue == "string" && sValue.length > 0 && sValue !== "") {
-                //         oInput.setValue(sValue.toUpperCase());
-                //     }
-                    
-                // }
-                liveChange: function(oEvent){
-
-                    var oInput = oEvent.getSource(),
-                        sValue = oInput.getValue();
-
-                    /**
-                     * UI5의 Input에 setValue 메소드를 수행하면 무조건 커서가 맨 끝으로 이동되는 현상때문에
-                     * 텍스트의 중간부터 입력할 경우에도 setValue를 할 경우 무조건 커서가 텍스트 맨 마지막으로 
-                     * 이동되기 때문에 이전 커서 위치를 기억했다가 setValue 이후에 이전 위치로 다시 커서를 
-                     * 이동시켜야 자연스럽게 입력이 됨.
-                     */
-
-                    // 입력한 값의 커서 위치
-                    let beforeCurPos;
-
-                    let oHtmlInputDom = $(oInput.getDomRef()).find("input")[0];
-                    if(oHtmlInputDom){
-                        beforeCurPos = oHtmlInputDom.selectionStart;
-                    }
-
-                    if(sValue){
-                        oInput.setValue(sValue.toUpperCase());
-                    }
-
-                    // 입력한 값의 이전 위치로 이동
-                    if(typeof beforeCurPos !== "undefined"){
-                        oHtmlInputDom.setSelectionRange(beforeCurPos, beforeCurPos);
-                    }
-
-                }
-
-            }).bindProperty("enabled", {
-                parts: [
-                    `${sBindRootPath}/ISTRIAL`
-                ],
-                formatter: (IS_TRIAL) => {
-
-                    /**
-                     * Only Trial Version Specific
-                     */
-
-                    return !IS_TRIAL;
-
-                }
-            })
-        });
-
-        oFormContainer1.addFormElement(oFormElement2);
-
-        let oFormElement3 = new sap.ui.layout.form.FormElement({
-            label: new sap.m.Label({
-                design: ENUM_LABEL_DESIGN_BOLD,
-                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A90"), // Web Application ID
-            }),
-            fields: new sap.m.Input({
-                showClearIcon: true,
-                value: "{APPID}",
-                width: "200px",
-                submit: function(){
-                    oAPP.events.ev_AppF4Search(oAppF4Dialog);
-                },
-                // liveChange: function(oEvent){
-
-                //     var oInput = oEvent.getSource(),
-                //         sValue = oInput.getValue();
-
-                //     if (typeof sValue == "string" && sValue.length > 0 && sValue !== "") {
-                //         oInput.setValue(sValue.toUpperCase());
-                //     }
-                    
-                // }
-                liveChange: function(oEvent){
-
-                    var oInput = oEvent.getSource(),
-                        sValue = oInput.getValue();
-
-                    /**
-                     * UI5의 Input에 setValue 메소드를 수행하면 무조건 커서가 맨 끝으로 이동되는 현상때문에
-                     * 텍스트의 중간부터 입력할 경우에도 setValue를 할 경우 무조건 커서가 텍스트 맨 마지막으로 
-                     * 이동되기 때문에 이전 커서 위치를 기억했다가 setValue 이후에 이전 위치로 다시 커서를 
-                     * 이동시켜야 자연스럽게 입력이 됨.
-                     */
-
-                    // 입력한 값의 커서 위치
-                    let beforeCurPos;
-
-                    let oHtmlInputDom = $(oInput.getDomRef()).find("input")[0];
-                    if(oHtmlInputDom){
-                        beforeCurPos = oHtmlInputDom.selectionStart;
-                    }
-
-                    if(sValue){
-                        oInput.setValue(sValue.toUpperCase());
-                    }
-
-                    // 입력한 값의 이전 위치로 이동
-                    if(typeof beforeCurPos !== "undefined"){
-                        oHtmlInputDom.setSelectionRange(beforeCurPos, beforeCurPos);
-                    }
-
-                }                                
-            })
-        });
-
-        oFormContainer1.addFormElement(oFormElement3);
-
-        let oFormElement4 = new sap.ui.layout.form.FormElement({
-            label: new sap.m.Label({
-                design: ENUM_LABEL_DESIGN_BOLD,
-                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A91"), // APP Description
-            }),
-            fields: new sap.m.Input({
-                showClearIcon: true,
-                value: "{APPNM}",
-                submit: function(){
-                    oAPP.events.ev_AppF4Search(oAppF4Dialog);
-                }
-
-            })
-        });
-
-        oFormContainer1.addFormElement(oFormElement4);
-
-        let oFormElement5 = new sap.ui.layout.form.FormElement({
-            label: new sap.m.Label({
-                design: ENUM_LABEL_DESIGN_BOLD,
-                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B02"), // Web Application Type
-            }),
-            fields: new sap.m.Select({
-                selectedKey: "{APPTY}",
-                showSecondaryValues: true,
-                items: {
-                    path: `${sBindRootPath}/aAPPTY`,
-                    template: new sap.ui.core.ListItem({
-                        key: "{KEY}",
-                        text: "{KEY}\t( {TEXT} )",
-                        // additionalText: "{TEXT}"
-                    })
-                },
-                change: function (oEvent) {
-
-                    var oSelectedItem = oEvent.getParameter("selectedItem"),
-                        sSelectedKey = oSelectedItem.getProperty("key");
-
-                    // oAPP.attr.gAPPTY = sSelectedKey;
-
-                    oAPP.events.ev_AppF4Search(oAppF4Dialog);
-
-                }
-
-            }).bindProperty("enabled", {
-                parts: [
-                    "APPTY",
-                    "EXPAGE"
-                ],
-                formatter: (APPTY, EXPAGE) => {
-
-                    if (!APPTY || !EXPAGE) {
-                        return false;
-                    }
-
-                    // WS10번 페이지가 아니면 Application Type을 Disable 처리한다.
-                    if (EXPAGE != "WS10") {
-                        return false;
-                    }
-
-
-                    return true;
-
-                }
-            })
-
-        });
-
-        oFormContainer1.addFormElement(oFormElement5);
-
-        let oFormElement6 = new sap.ui.layout.form.FormElement({
-            label: new sap.m.Label({
-                design: ENUM_LABEL_DESIGN_BOLD,
-                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A76"), // Maximum No, of Hits
-            }),
-            fields: new sap.m.Input({
-                showClearIcon: true,
-                width: "100px",
-                value: "{HITS}",
-                submit: function(){
-                    oAPP.events.ev_AppF4Search(oAppF4Dialog);
-                }
-            })
-        });
-
-        oFormContainer1.addFormElement(oFormElement6);
-
-
-        // form Ui에 대한 바인딩 루트 패스 지정
-        oForm.bindElement(`${sBindRootPath}/TAB1`);
-
-        let sHeaderText = "[U4A] " + APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B94"); // All App.
-
-        let oPanel = new sap.m.Panel({
-            // headerText: sHeaderText,
-            backgroundDesign: sap.m.BackgroundDesign.Transparent,
-            expandable: true,
-            expanded: true,
-            content: oForm,
-        }).addStyleClass("sapUiNoContentPadding");        
-
-        let oToolbar = new sap.m.Toolbar();
-        oPanel.setHeaderToolbar(oToolbar);
-
-        let oTitle1 = new sap.m.Title({
-            text: sHeaderText
-        });
-        oToolbar.addContent(oTitle1);
-
-        oTitle1.addStyleClass("sapUiTinyMarginEnd");
-
-        let oBtn1 = new sap.m.Button({
-            type: "Emphasized",
-            text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A75"), // Search
-            icon: "sap-icon://search",               
-            press: function(){
-                oAPP.events.ev_AppF4Search(oAppF4Dialog);
-            }
-        });
-        oToolbar.addContent(oBtn1);
-        
-        let sTableListBindRootPath = `${sBindRootPath}/TAB1`;
-        
-        oAppF4Dialog.data("sTableListBindRootPath", sTableListBindRootPath);
-
-        let oUiTable = getAppF4ListUiTable(oAppF4Dialog);
-
-        let oDialog = oAppF4Dialog;
-        if (oDialog) {
-            oDialog.data("TAB1_TABLE", oUiTable);
-        }
-
-        var oItem = new sap.m.IconTabFilter({
-            key: "K1",
-            text: sHeaderText,
-            content: [
-                new sap.m.VBox({
-                    renderType: sap.m.FlexRendertype.Bare,
-                    height: "100%",
-                    items: [
-                        new sap.m.VBox({
-                            renderType: sap.m.FlexRendertype.Bare,
-                            items: [oPanel]
-                        }),
-                        new sap.m.Page({
-                            showHeader: false,
-                            content: [
-                                // oTable
-                                oUiTable
-                            ]
-                        }),
-
-                    ]
-                }),
-
-            ]
-        });
-
-        return oItem;
-
-    }; // end of oAPP.fn.fnCreateAppF4Tab1
-
-
-    // [원본]
-    // /************************************************************************
-    // * APP SearchHelp의 App List UI Table object return
-    // ************************************************************************/
-    // function getAppF4ListUiTable(sBindPath) {
-
-    //     return new sap.ui.table.Table({
-    //         // visibleRowCount: 1,
-    //         minAutoRowCount: 1,
-    //         visibleRowCountMode: sap.ui.table.VisibleRowCountMode.Auto,
-    //         alternateRowColors: true,
-    //         selectionMode: sap.ui.table.SelectionMode.Single,
-    //         selectionBehavior: sap.ui.table.SelectionBehavior.RowOnly,
-    //         rowHeight: 45,
-    //         columns: [
-
-    //             new sap.ui.table.Column({
-    //                 sortProperty: "ERUSR",
-    //                 filterProperty: "ERUSR",
-    //                 label: new sap.m.Label({
-    //                     text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B95"), // User Name
-    //                     design: sap.m.LabelDesign.Bold
-    //                 }),
-
-    //                 template: new sap.m.Text({
-    //                     text: "{ERUSR}"
-    //                 }),
-
-    //             }),
-
-    //             new sap.ui.table.Column({
-    //                 sortProperty: "APPID",
-    //                 filterProperty: "APPID",
-    //                 label: new sap.m.Label({
-    //                     text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A90"), // Web Application ID
-    //                     design: sap.m.LabelDesign.Bold
-    //                 }),
-    //                 template: new sap.m.Text({
-    //                     text: "{APPID}"
-    //                 }),
-
-    //             }),
-
-    //             new sap.ui.table.Column({
-    //                 sortProperty: "APPNM",
-    //                 filterProperty: "APPNM",
-    //                 label: new sap.m.Label({
-    //                     text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A91"), // Web Application Name
-    //                     design: sap.m.LabelDesign.Bold
-    //                 }),
-    //                 template: new sap.m.Text({
-    //                     text: "{APPNM}"
-    //                 }),
-
-    //             }),
-
-    //             new sap.ui.table.Column({
-    //                 sortProperty: "APPTY",
-    //                 filterProperty: "APPTY",
-    //                 label: new sap.m.Label({
-    //                     text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B97"), // App Type
-    //                     design: sap.m.LabelDesign.Bold
-    //                 }),
-    //                 template: new sap.m.Text({
-    //                     text: "{APPTY}"
-    //                 }),
-
-    //             }),
-
-    //         ],
-
-    //         rows: {
-    //             path: sBindPath,
-    //         },
-
-
-    //     }).addEventDelegate({
-
-    //         ondblclick: ev_AppF4ListUiTableDblClick
-
-    //     });
-
-    // } // end of getAppF4ListUiTable
-
-
-    function _checkAvaliableApp(oBindData){
-
-        if(!oBindData){
-            return { RETCD: "E", STCOD: "E999" };
-        }
-
-        // 실행할 수 없는 어플리케이션 입니다.
-        var sNoExeAppMsg = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "435");
-
-        // 하위 정보가 있다는건 루트 노드라는 의미로 실행 하지 않음.
-        if(oBindData.APPF4HIER && Array.isArray(oBindData.APPF4HIER) === true && oBindData.APPF4HIER.length !== 0){                                
-            return { RETCD: "E", STCOD: "E001" };
-        }                            
-
-        // APPID가 없을 경우 실행 불가
-        let sAPPID = oBindData?.APPID || "";
-        if(!sAPPID){
-            return { RETCD: "E", STCOD: "E002" };
-        }
-
-        // ROOT인 경우 어플리케이션이 아니므로 실행 불가
-        if(sAPPID === "ROOT"){
-            return { RETCD: "E", STCOD: "E003" };
-        }
-
-        return { RETCD: "S" };
-
-    } // end of _checkAvaliableApp
-
-
-    /**
-     * UI Table의 전체 데이터 중 특정 컨텍스트를 찾아 선택 상태로 변경합니다.
-     * (visibleRowCount 제한 없이 전체 바인딩 데이터를 뒤집니다.)
-     */
-    function _setUiTableSelectedRow(oTable, oCtx) {
-
-        // 1. 기초 가드 클로저
-        if (!oTable || !oCtx) return;
-
-        var oBinding = oTable.getBinding("rows");
-        if (!oBinding) return;
-
-        // 2. 핵심: 전체 컨텍스트를 가져오기 (0부터 모델의 전체 길이만큼)
-        // getLength()를 통해 visibleRowCount에 상관없이 전체 범위를 지정합니다.
-        var iTotalLength = oBinding.getLength();
-        var aAllContexts = oBinding.getContexts(0, iTotalLength);
-
-        var sPath = oCtx.getPath();
-
-        // 3. 전체 데이터에서 해당 경로를 가진 인덱스 탐색
-        var iSelectedIndex = aAllContexts.findIndex(function(ctx) {
-            return ctx && ctx.getPath() === sPath;
-        });
-
-        // 4. 찾지 못했다면 조기 종료
-        if (iSelectedIndex === -1) return;
-
-        // 5. 인덱스 선택
-        oTable.setSelectedIndex(iSelectedIndex);
-        
-        // [옵션] 선택한 행이 화면 밖에 있다면 해당 위치로 이동시켜주는 센스
-        // oTable.setFirstVisibleRow(iSelectedIndex);
-
-    } // end of _setUiTableSelectedRow
-
-    
-    /*************************************************************************
-     * WS20 페이지 이동 (조회 모드 전용)
-     * - 다이얼로그를 닫고 특정 앱 ID를 입력값으로 세팅하여 조회 이벤트를 발생시킨다.
-     * 
-     * @param {object} oParams
-     * @param {sap.m.Dialog} oParams.oDialog - 제어할 다이얼로그 객체
-     * @param {string} oParams.APPID - 조회할 애플리케이션 ID
-     * @private
-     *************************************************************************/
-    function _navToWS20Display(oParams) {
-
-        // 1. 필수 파라미터 및 컨트롤 존재 여부 체크 (Guard Clauses)
-        const oDialog = oParams?.oDialog;
-        const sAPPID = oParams?.sAPPID;
-
-        if (!oDialog || !sAPPID) {
-            return;
-        }
-
-        const oAppInput = sap.ui.getCore().byId("AppNmInput");
-        const oDispBtn = sap.ui.getCore().byId("displayBtn");
-
-        if (!oAppInput || !oDispBtn) {
-            return;
-        }
-
-        // 2. UI 상태 초기화 (다이얼로그 숨김 및 모달 해제)
-        oDialog.setVisible(false);
-        oDialog.oPopup.setModal(false);
-
-        // 3. 애플리케이션 ID 세팅 및 조회 버튼 강제 클릭(firePress)
-        oAppInput.setValue(sAPPID);
-        oDispBtn.firePress();
-
-        // 4. 입력 필드 초기화 (Side Effect 방지)
-        oAppInput.setValue("");
-
-    } // end of _navToWS20Display
-
-    /************************************************************************
-    * APP SearchHelp의 App List UI Table object return
-    ************************************************************************/
-    function getAppF4ListUiTable(oAppF4Dialog) {
-
-        let sBindRootPath = oAppF4Dialog.data("sBindRootPath");
-        let sTableListBindRootPath = oAppF4Dialog.data("sTableListBindRootPath");
-
-        let oTable = new sap.ui.table.Table({
-            width: "100%",
-            // visibleRowCount: 1,
-            minAutoRowCount: 1,
-            visibleRowCountMode: sap.ui.table.VisibleRowCountMode.Auto,
-            alternateRowColors: true,
-            selectionMode: sap.ui.table.SelectionMode.Single,
-            selectionBehavior: sap.ui.table.SelectionBehavior.RowOnly,            
-            rowHeight: 45,
-            columns: [
-
-                new sap.ui.table.Column({
-                    hAlign: "Center",
-                    width: "120px",
-                    sortProperty: "ERUSR",
-                    filterProperty: "ERUSR",
-                    label: new sap.m.Label({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B95"), // User Name
-                        design: sap.m.LabelDesign.Bold
-                    }),
-
-                    template: new sap.m.Text({
-                        text: "{ERUSR}",
-                        wrapping: true,
-                        tooltip: "{ERUSR}",
-                    }),
-
-                }),
-
-
-                new sap.ui.table.Column({
-                    hAlign: "Center",
-                    width: "120px",
-                    // sortProperty: "APPID",
-                    // filterProperty: "APPID",
-                    label: new sap.m.Label({
-                        // text: "앱 실행",                        
-                        // text: "Open in Browser",                        
-                        text: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "436"), // 앱 실행,                        
-                        design: sap.m.LabelDesign.Bold
-                    }),
-
-                    template: new sap.m.Button({
-                        width: "100%",
-                        type: "Transparent",
-                        icon: "sap-icon://internet-browser",
-                        press: function(oEvent){
-
-                            parent.setBusy('X');
-
-                            if(!oEvent){                                
-                                return parent.setBusy('');
-                            }
-
-                            let oUi = oEvent.getSource();
-                            if(!oUi){
-                                return parent.setBusy('');
-                            }
-                            let oBindCtx = oUi.getBindingContext();
-                            if(!oBindCtx){
-                                return parent.setBusy('');
-                            }
-
-                            let oBindData = oBindCtx.getObject();
-                            if(!oBindData){
-                                return parent.setBusy('');
-                            }
-
-                            let sAPPID = oBindData?.APPID || "";
-                            if(!sAPPID){
-                                return parent.setBusy('');
-                            }
-
-                            // APP 존재 유무 확인
-                            oAPP.fn.fnCheckAppExists(sAPPID, (oResult) => {
-
-                                var oAppInfo = oResult.RETURN;
-                                if (oAppInfo.RETCD === 'E') {
-
-                                    // 작업표시줄 깜빡임
-                                    parent.CURRWIN.flashFrame(true);
-                                    
-                                    // Application ID &1 does not exist.
-                                    var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "007", oAppInfo.APPID);
-
-                                    parent.showMessage(sap, 10, "E", sMsg);
-
-                                    return parent.setBusy('');
-                                }
-
-                                // USP App 일 경우 실행하지 않음.
-                                if(oAppInfo.APPTY === "U"){
-
-                                    // 작업표시줄 깜빡임
-                                    parent.CURRWIN.flashFrame(true);
-
-                                    // USP apps are not supported.
-                                    var sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "189"); 
-
-                                    parent.showMessage(sap, 10, "E", sMsg);
-                                    
-                                    return parent.setBusy('');
-                                }
-
-                                // Inactivate 상태일 경우 실행 불가
-                                if (oAppInfo.ACTST == "I") {
-
-                                    // 작업표시줄 깜빡임
-                                    parent.CURRWIN.flashFrame(true);
-
-                                    // This application cannot be executed.
-                                    var sMsg = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "434"); 
-
-                                    parent.showMessage(sap, 10, "E", sMsg);
-                                    
-                                    return parent.setBusy('');
-                                }
-
-                                // 어플리케이션 브라우저 실행
-                                oAPP.fn.fnOnExecApp(sAPPID);                            
-
-                                // // 연속 클릭 방지용
-                                // setTimeout(function(){
-                                //     parent.setBusy('');
-                                // }, 1000);
-
-                            });                            
-
-                        }
-                    })
-
-                }),
-
-                /**
-                 * @since   2026-04-20 12:40:23
-                 * @version v3.6.0-4
-                 * @author  soccerhs
-                 * @description
-                 * 
-                 * - 어플리케이션 조회 모드로 이동해주는 기능 추가
-                 * 해당 버튼을 통해서 조회 모드로 들어간 이후에 다시 메인 페이지로 돌아오면
-                 * 해당 팝업을 다시 띄워준다.
-                 * 
-                 * - 메인 페이지에서 앱 검색 조회 리스트 상태에서 빠르게 여러 어플리케이션을
-                 * 확인할때 유용하게 사용할 수 있는 기능이다.
-                 */ 
-                new sap.ui.table.Column({
-                    // visible: !parent.APP.isPackaged,
-                    hAlign: "Center",
-                    width: "120px",
-                    label: new sap.m.Label({
-                        text: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "564"), // 앱 조회,   
-                        design: sap.m.LabelDesign.Bold
-                    }),
-
-                    template: new sap.m.Button({
-                        width: "100%",
-                        type: "Transparent",
-                        icon: "sap-icon://display",
-                        press: function(oEvent){
-
-                            let oUi = oEvent.getSource();
-                            let oBindCtx = oUi.getBindingContext();
-                            let oBindData = oBindCtx.getObject();
-                            let sAPPID = oBindData?.APPID || "";
-
-                            
-                            let oParams = {
-                                oDialog: oAppF4Dialog,
-                                sAPPID: sAPPID
-                            };
-
-                            let oTable = oAppF4Dialog.data("TAB1_TABLE");
-
-                            // UI 테이블에 바인딩 컨텍스트 기준으로 선택 표시
-                            _setUiTableSelectedRow(oTable, oBindCtx);
-
-                            // WS20 페이지 이동 (조회 모드 전용)
-                            _navToWS20Display(oParams);
-
-                        }
-                    }).bindProperty("enabled", {
-                        parts: [
-                            { path: `${sBindRootPath}/options/initCond/EXPAGE` }
-                        ],
-                        formatter: function(EXPAGE){
-                            
-                            if(!EXPAGE){
-                                return false;
-                            }
-
-                            if(EXPAGE !== "WS10"){
-                                return false;
-                            }
-
-                            return true;
-                        }
-                    })
-
-                }),
-
-                new sap.ui.table.Column({
-                    width: "250px",
-                    sortProperty: "APPID",
-                    filterProperty: "APPID",
-                    label: new sap.m.Label({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A90"), // Web Application ID
-                        design: sap.m.LabelDesign.Bold
-                    }),
-                    template: new sap.m.Text({
-                        text: "{APPID}",
-                        wrapping: false,
-                        tooltip: "{APPID}",
-                    }),
-                    // template: new sap.m.Link({
-                    //     emphasized: true,
-                    //     text: "{APPID}",
-                    //     tooltip: "{APPID}",
-                    //     press: function(oEvent){
-                            
-                            
-             
-                    //     }
-                    // })
-
-                }),
-
-                new sap.ui.table.Column({
-                    width: "400px",
-                    sortProperty: "APPNM",
-                    filterProperty: "APPNM",
-                    label: new sap.m.Label({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A91"), // Web Application Name
-                        design: sap.m.LabelDesign.Bold
-                    }),
-                    template: new sap.m.Text({
-                        text: "{APPNM}",
-                        wrapping: false,
-                        tooltip: "{APPNM}",
-                    }),
-
-                }),
-
-                new sap.ui.table.Column({
-                    hAlign: "Center",
-                    width: "100px",
-                    sortProperty: "APPTY",
-                    filterProperty: "APPTY",
-                    label: new sap.m.Label({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B97"), // App Type
-                        design: sap.m.LabelDesign.Bold
-                    }),
-                    template: new sap.m.Text({
-                        text: "{APPTY}",
-                        wrapping: false,
-                        tooltip: "{APPTY}",
-                    }),
-
-                }),
-
-            ],
-
-            rows: {
-                path: sTableListBindRootPath + "/APPLIST",
-            },
-
-
-        }).addEventDelegate({
-
-            ondblclick: ev_AppF4ListUiTableDblClick.bind(oAppF4Dialog)
-
-        });
-
-        oTable.data("parentDialog", oAppF4Dialog);
-
-  
-        // let COLUMN1 = new sap.ui.table.Column({
-        //     hAlign: "Center",
-        //     width: "120px",
-        //     sortProperty: "ERUSR",
-        //     filterProperty: "ERUSR",
-        //     label: new sap.m.Label({
-        //         text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B95"), // User Name
-        //         design: sap.m.LabelDesign.Bold
-        //     }),
-        //     template: new sap.m.Text({
-        //         text: "{ERUSR}",
-        //         wrapping: false,
-        //         tooltip: "{ERUSR}",
-        //     }),
-
-        // });
-        // oTable.addColumn(COLUMN1);
-
-
-        let aColumns = [];
-
-        /**
-         * @since   2025-06-16
-         * @version v3.5.6-8
-         * @author  soccerhs
-         * 
-         * @description 컬럼추가
-         * - ERDAT : 생성일자
-         * - ERTIM : 생성시간
-         * - AEUSR : 변경자
-         * - AEDAT : 변경일자
-         * - AETIM : 변경시간
-         */      
-        let COLUMN2 = new sap.ui.table.Column({
-            hAlign: "Center",
-            width: "120px",
-            sortProperty: "ERDAT",
-            filterProperty: "ERDAT",
-            label: new sap.m.Label({                
-                text: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "387"), // 생성일자                
-                design: sap.m.LabelDesign.Bold
-            }),
-            template: new sap.m.Text({
-                // text: "{ERDAT}",
-                // text: {
-                //     path: "ERDAT",
-                //     type: "sap.ui.model.type.Date",
-                //     formatOptions: {
-                //         pattern: "yyyy-MM-dd",
-                //         source: {
-                //             pattern: "yyyyMMdd"
-                //         }
-                //     }
-                // },
-                wrapping: false,
-                tooltip: "{ERDAT}",
-            }).bindProperty("text", "ERDAT", lf_nozero_date),
-
-        });
-        // oTable.addColumn(COLUMN2);
-
-        aColumns.push(COLUMN2);
-
-        let COLUMN3 = new sap.ui.table.Column({
-            hAlign: "Center",
-            width: "120px",
-            sortProperty: "ERTIM",
-            filterProperty: "ERTIM",
-            label: new sap.m.Label({
-                text: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "388"), // 생성시간                
-                design: sap.m.LabelDesign.Bold
-            }),
-            template: new sap.m.Text({
-                // text: "{ERTIM}",
-                // text: {
-                //     path: "ERTIM",
-                //     type: "sap.ui.model.type.Time",
-                //     formatOptions: {
-                //         pattern: "hh:mm:ss",
-                //         source: {
-                //             pattern: "HHmmss"
-                //         }
-                //     }
-                // },
-                wrapping: false,
-                tooltip: "{ERTIM}",
-            }).bindProperty("text", "ERTIM", lf_nozero_time),
-
-        });
-        // oTable.addColumn(COLUMN3);
-        aColumns.push(COLUMN3);
-
-        let COLUMN4 = new sap.ui.table.Column({
-            hAlign: "Center",
-            width: "120px",
-            sortProperty: "AEUSR",
-            filterProperty: "AEUSR",
-            label: new sap.m.Label({
-                text: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "411"), // 변경자                
-                design: sap.m.LabelDesign.Bold
-            }),
-            template: new sap.m.Text({
-                text: "{AEUSR}",
-                wrapping: false,
-                tooltip: "{AEUSR}",
-            }),
-
-        });
-        // oTable.addColumn(COLUMN4);
-        aColumns.push(COLUMN4);
-
-        let COLUMN5 = new sap.ui.table.Column({
-            hAlign: "Center",
-            width: "120px",
-            sortProperty: "AEDAT",
-            filterProperty: "AEDAT",
-            label: new sap.m.Label({
-                text: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "412"), // 변경일자                
-                design: sap.m.LabelDesign.Bold
-            }),
-            template: new sap.m.Text({
-                // text: "{AEDAT}",
-                // text: {
-                //     path: "AEDAT",
-                //     type: "sap.ui.model.type.Date",
-                //     formatOptions: {
-                //         pattern: "yyyy-MM-dd",
-                //         source: {
-                //             pattern: "yyyyMMdd"
-                //         }
-                //     }
-                // },
-                wrapping: false,
-                tooltip: "{AEDAT}",
-            }).bindProperty("text", "AEDAT", lf_nozero_date),
-
-        });
-        // oTable.addColumn(COLUMN5);
-        aColumns.push(COLUMN5);
-
-        let COLUMN6 = new sap.ui.table.Column({
-            hAlign: "Center",
-            width: "120px",
-            sortProperty: "AETIM",
-            filterProperty: "AETIM",
-            label: new sap.m.Label({
-                text: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "413"), // 변경시간                
-                design: sap.m.LabelDesign.Bold
-            }),
-            template: new sap.m.Text({
-                // text: "{AETIM}",
-                // text: {
-                //     path: "AETIM",
-                //     type: "sap.ui.model.type.Time",
-                //     formatOptions: {
-                //         pattern: "hh:mm:ss",
-                //         source: {
-                //             pattern: "HHmmss"
-                //         }
-                //     }
-                // },
-                wrapping: false,
-                tooltip: "{AETIM}",
-            }).bindProperty("text", "AETIM", lf_nozero_time),
-
-        });
-        // oTable.addColumn(COLUMN6);
-
-        aColumns.push(COLUMN6);
-
-        /**
-         * @since   2025-06-16
-         * @version v3.5.6-8
-         * @author  soccerhs
-         * 
-         * @description 컬럼추가
-         * - ERDAT : 생성일자
-         * - ERTIM : 생성시간
-         * - AEUSR : 변경자
-         * - AEDAT : 변경일자
-         * - AETIM : 변경시간
-         */      
-        if(oAPP.common.checkWLOList("C", "UHAK901182")){
-            
-            // 고정 컬럼 지정
-            oTable.setFixedColumnCount(3);
-
-            for(const oColumn of aColumns){
-                oTable.addColumn(oColumn);
-            }
-
-        }        
-
-        return oTable;
-
-    } // end of getAppF4ListUiTable
-
-
-    /************************************************************************
-     * APP SearchHelp의 App List UI Table의 더블 클릭 이벤트
-     ************************************************************************/
-    function ev_AppF4ListUiTableDblClick(oEvent) {
-
-        let oDialog = this;
-
-        var oTarget = oEvent.target,
-            $oTreeIcon = $(oTarget).closest(".sapUiTableTreeIcon"),
-            $SelectedRow = $(oTarget).closest(".sapUiTableRow");
-
-        if ($oTreeIcon.length || !$SelectedRow.length) {
-            return;
-        }
-
-        var oRow = $SelectedRow[0],
-
-            sRowId1 = oRow.getAttribute("data-sap-ui-related"),
-            sRowId2 = oRow.getAttribute("data-sap-ui"),
-            sRowId = "";
-
-        if (sRowId1 == null && sRowId2 == null) {
-            return;
-        }
-
-        if (sRowId1) {
-            sRowId = sRowId1;
-        }
-
-        if (sRowId2) {
-            sRowId = sRowId2;
-        }
-
-        var oRow = sap.ui.getCore().byId(sRowId);
-        if (!oRow) {
-            return;
-        }
-
-        // 바인딩 정보가 없으면 빠져나간다.
-        if (oRow.isEmpty()) {
-            return;
-        }
-
-        var oCtx = oRow.getBindingContext(),
-            oRowData = oRow.getModel().getProperty(oCtx.sPath);
-
-        // 콜백이 있을 경우는 선택한 데이터를 콜백해준다.
-        let fnCallback = oDialog.data("fnCallback");
-        if (typeof fnCallback === "function") {
-            fnCallback(oRowData);
-        }
-
-        oDialog.close();
-
-    } // end of ev_AppF4ListUiTableDblClick
-
-
-    function lf_nozero_time(sBindValue){
-
-        // if (!sBindValue) {
-        //     return;
-        // }
-
-        // if(sBindValue === "000000"){
-        //     return;
-        // }
-
-        // var oBindCtx = this.getBindingContext();
-        // if (oBindCtx == null) { 
-        //     return;
-        // }
-
-        // var oBindData = this.getModel().getProperty(oBindCtx.sPath);
-        // if (oBindData.APPID == "ROOT") {
-        //     return "";
-        // }
-
-        // if (oBindData.PACKG == "ROOT") {
-        //     return "";
-        // }
-
-        // const oTime = sap.ui.core.format.DateFormat.getTimeInstance({
-        //     pattern: "HHmmss"
-        // }).parse(sBindValue);
-
-        // if (!oTime) return "";
-
-        // return sap.ui.core.format.DateFormat.getTimeInstance({
-        //     pattern: "hh:mm:ss" // a는 AM/PM 표시. 원하면 제거 가능
-        // }).format(oTime);
-
-        if (!sBindValue) {
-            return;
-        }
-
-        if (sBindValue === "000000") {
-            return;
-        }
-
-        var oBindCtx = this.getBindingContext();
-        if (oBindCtx == null) { 
-            return;
-        }
-
-        var oBindData = this.getModel().getProperty(oBindCtx.sPath);
-        if (oBindData.APPID === "ROOT" || oBindData.PACKG === "ROOT") {
-            return "";
-        }
-
-        try {
-
-            const oParseFormat = sap.ui.core.format.DateFormat.getTimeInstance({
-                pattern: "HHmmss"
-            });
-
-            const oTime = oParseFormat.parse(sBindValue);
-
-            if (!oTime) return "";
-
-            /**
-             * @since   2026-05-18 12:08:46
-             * @version v3.6.0-4
-             * @author  soccerhs
-             * @description
-             * 
-             * 앱 검색 F4 화면에서, 시간 관련 표시를 24시 표기법으로 변경.
-             * 
-             */
-            const oDisplayFormat = sap.ui.core.format.DateFormat.getTimeInstance({
-                pattern: "HH:mm:ss" // 필요에 따라 "HH:mm:ss"로 24시간제 가능
-            });
-
-            return oDisplayFormat.format(oTime);
-
-        } catch (e) {
-            
-            return "";
-        }
-
-
-    } // end of lf_nozero_time
-
-    function lf_nozero_date(sBindValue){
-
-    //     if (!sBindValue) {
-    //         return;
-    //     }
-
-    //     if(sBindValue === "00000000"){                
-    //         return;
-    //     }
-
-    //     var oBindCtx = this.getBindingContext();
-    //     if (oBindCtx == null) { 
-    //         return;
-    //     }
-
-    //     var oBindData = this.getModel().getProperty(oBindCtx.sPath);
-    //     if (oBindData.APPID == "ROOT") {
-    //         return "";
-    //     }
-
-    //     if (oBindData.PACKG == "ROOT") {
-    //         return "";
-    //     }
-
-    //     // 날짜 형식이 yyyyMMdd 인 경우 포맷팅
-    //     const oDateFormat = sap.ui.core.format.DateFormat.getInstance({
-    //         pattern: "yyyy-MM-dd"
-    //     });
-
-    //     const oDate = sap.ui.core.format.DateFormat.getInstance({
-    //         pattern: "yyyyMMdd"
-    //     }).parse(sBindValue);
-
-    //     return oDate ? oDateFormat.format(oDate) : "";
-
-
-        if (!sBindValue) {
-            return;
-        }
-
-        if (sBindValue === "00000000") {
-            return;
-        }
-
-        var oBindCtx = this.getBindingContext();
-        if (oBindCtx == null) { 
-            return;
-        }
-
-        var oBindData = this.getModel().getProperty(oBindCtx.sPath);
-        if (oBindData.APPID === "ROOT" || oBindData.PACKG === "ROOT") {
-            return "";
-        }
-
-        try {
-
-            // 날짜 형식이 yyyyMMdd 인 경우 포맷팅
-            const oDateFormat = sap.ui.core.format.DateFormat.getInstance({
-                pattern: "yyyy-MM-dd"
-            });
-
-            const oParseFormat = sap.ui.core.format.DateFormat.getInstance({
-                pattern: "yyyyMMdd"
-            });
-
-            const oDate = oParseFormat.parse(sBindValue);
-
-            return oDate ? oDateFormat.format(oDate) : "";
-
-        } catch (e) {
-            // 오류 발생 시 안전하게 처리
-            // console.error("날짜 포맷팅 중 오류 발생:", e);
-            return "";
-        }
-
-    } // end of lf_nozero_date
-
-    
-
-    /************************************************************************
-     * Application Name F4 의 TabContainer Item2 생성
-     ************************************************************************/
-    oAPP.fn.fnCreateAppF4Tab2 = function (oAppF4Dialog) {        
-
-        function lf_nozero(sBindValue) {
-
-            if (sBindValue == null) {
-                return;
-            }
-
-            var oBindCtx = this.getBindingContext();
-            if (oBindCtx == null) { 
-                return;
-            }
-
-            var oBindData = this.getModel().getProperty(oBindCtx.sPath);
-            if (oBindData.APPID == "ROOT") {
-                return "";
-            }
-
-            if (oBindData.PACKG == "ROOT") {
-                return "";
-            }
-
-            return sBindValue;
-
-        }
-
-        let sBindRootPath = oAppF4Dialog.data("sBindRootPath");
-
-        var ENUM_HORIZONTAL_ALIGN = sap.ui.core.HorizontalAlign,
-            sTableBindingPath = `${sBindRootPath}/APPF4HIER`;
-
-        var sHeaderText = "[U4A] " + APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B98"); // Application Hierarchy By Packages;
-
-        var oTreeTable = new sap.ui.table.TreeTable({
-            selectionMode: sap.ui.table.SelectionMode.Single,
-            selectionBehavior: sap.ui.table.SelectionBehavior.RowOnly,
-            alternateRowColors: true,
-            visibleRowCountMode: sap.ui.table.VisibleRowCountMode.Auto,
-            // minAutoRowCount: 20,
-            fixedColumnCount: 2,
-            columns: [
-                new sap.ui.table.Column({
-                    sortProperty: "APPNM",
-                    filterProperty: "APPNM",
-                    width: "450px",
-                    label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B99"), // U4A IDE Solution
-                    template: new sap.m.Text({
-                        text: "{APPNM}"
-                    }),
-                }),
-
-                /**
-                 * @since   2026-04-20 12:40:23
-                 * @version v3.6.0-4
-                 * @author  soccerhs
-                 * @description
-                 * 
-                 * - 어플리케이션 조회 모드로 이동해주는 기능 추가
-                 * 해당 버튼을 통해서 조회 모드로 들어간 이후에 다시 메인 페이지로 돌아오면
-                 * 해당 팝업을 다시 띄워준다.
-                 * 
-                 * - 메인 페이지에서 앱 검색 조회 리스트 상태에서 빠르게 여러 어플리케이션을
-                 * 확인할때 유용하게 사용할 수 있는 기능이다.
-                 */
-                new sap.ui.table.Column({
-                    // visible: !parent.APP.isPackaged,
-                    hAlign: "Center",
-                    width: "120px",
-                    label: new sap.m.Label({
-                        text: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "564"), // 앱 조회, 
-                        design: sap.m.LabelDesign.Bold
-                    }),
-
-                    template: new sap.m.Button({
-                        width: "100%",
-                        type: "Transparent",
-                        icon: "sap-icon://display",
-                        press: function(oEvent){
-
-                            let oUi = oEvent.getSource();
-                            let oBindCtx = oUi.getBindingContext();
-                            let oBindData = oBindCtx.getObject();
-                            let sAPPID = oBindData?.APPID || "";
-
-                            let oParams = {
-                                oDialog: oAppF4Dialog,
-                                sAPPID: sAPPID
-                            };
-
-                            let oTable = oAppF4Dialog.data("appf4tree");
-
-                            // 실행할 수 없는 어플리케이션 입니다.
-                            let sNoExeAppMsg = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "435");
-
-                            // 어플리케이션 정합성 체크
-                            let oCheckResult = _checkAvaliableApp(oBindData);
-                            if(oCheckResult.RETCD === "E"){
-
-                                // 작업표시줄 깜빡임
-                                parent.CURRWIN.flashFrame(true);
-
-                                parent.showMessage(sap, 10, "E", sNoExeAppMsg);
-
-                                return;                            
-                            }
-
-                            // UI 테이블에 바인딩 컨텍스트 기준으로 선택 표시
-                            _setUiTableSelectedRow(oTable, oBindCtx);
-
-                            // WS20 페이지 이동 (조회 모드 전용)
-                            _navToWS20Display(oParams);
-
-                        }
-                    }).bindProperty("enabled", {
-                        parts: [
-                            { path: `${sBindRootPath}/options/initCond/EXPAGE` }
-                        ],
-                        formatter: function(EXPAGE){
-                            
-                            if(!EXPAGE){
-                                return false;
-                            }
-
-                            if(EXPAGE !== "WS10"){
-                                return false;
-                            }
-
-                            return true;
-                        }
-                    })
-
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "APPID",
-                    filterProperty: "APPID",
-                    width: "180px",
-                    label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C01"), // Identification
-                    template: new sap.m.Link({
-                        emphasized: true,
-                        text: "{APPID}",
-                        tooltip: "{APPID}",
-                        press: function(oEvent){                           
-                            
-                            parent.setBusy('X');
-
-                            if(!oEvent){
-                                parent.setBusy('');
-                                return;
-                            }
-
-                            let oUi = oEvent.getSource();
-                            if(!oUi){
-                                parent.setBusy('');
-                                return;
-                            }
-                            let oBindCtx = oUi.getBindingContext();
-                            if(!oBindCtx){
-                                parent.setBusy('');
-                                return;
-                            }
-
-                            let oBindData = oBindCtx.getObject();
-                            if(!oBindData){
-                                parent.setBusy('');
-                                return;
-                            }
-                            
-                            // 실행할 수 없는 어플리케이션 입니다.
-                            var sNoExeAppMsg = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "435");
-
-                            // 하위 정보가 있다는건 루트 노드라는 의미로 실행 하지 않음.
-                            if(oBindData.APPF4HIER && Array.isArray(oBindData.APPF4HIER) === true && oBindData.APPF4HIER.length !== 0){                                
-
-                                // 작업표시줄 깜빡임
-                                parent.CURRWIN.flashFrame(true);
-
-                                parent.showMessage(sap, 10, "E", sNoExeAppMsg);
-
-                                parent.setBusy('');
-
-                                return;
-                            }                            
-
-                            // APPID가 없을 경우 실행 불가
-                            let sAPPID = oBindData?.APPID || "";
-                            if(!sAPPID){
-
-                                // 작업표시줄 깜빡임
-                                parent.CURRWIN.flashFrame(true);
-
-                                parent.showMessage(sap, 10, "E", sNoExeAppMsg);
-
-                                parent.setBusy('');
-
-                                return;
-                            }
-
-                            // ROOT인 경우 어플리케이션이 아니므로 실행 불가
-                            if(sAPPID === "ROOT"){
-
-                                // 작업표시줄 깜빡임
-                                parent.CURRWIN.flashFrame(true);
-
-                                parent.showMessage(sap, 10, "E", sNoExeAppMsg);
-
-                                parent.setBusy('');
-
-                                return;
-                            }
-
-                            // APP 존재 유무 확인
-                            oAPP.fn.fnCheckAppExists(sAPPID, (oResult) => {
-
-                                var oAppInfo = oResult.RETURN;
-                                if (oAppInfo.RETCD === 'E') {
-
-                                    // 작업표시줄 깜빡임
-                                    parent.CURRWIN.flashFrame(true);
-                                    
-                                    // Application ID &1 does not exist.
-                                    var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "007", oAppInfo.APPID);
-
-                                    parent.showMessage(sap, 10, "E", sMsg);
-
-                                    return parent.setBusy('');
-                                }
-
-                                // USP App 일 경우 실행하지 않음.
-                                if(oAppInfo.APPTY === "U"){
-
-                                    // 작업표시줄 깜빡임
-                                    parent.CURRWIN.flashFrame(true);
-
-                                    // USP apps are not supported.
-                                    var sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "189"); 
-
-                                    parent.showMessage(sap, 10, "E", sMsg);
-                                    
-                                    return parent.setBusy('');
-                                }
-
-                                // Inactivate 상태일 경우 실행 불가
-                                if (oAppInfo.ACTST === "I") {
-
-                                    // 작업표시줄 깜빡임
-                                    parent.CURRWIN.flashFrame(true);
-
-                                    // Only in activity state !!!
-                                    // var sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "031"); 
-                                    var sMsg = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "434"); 
-
-                                    parent.showMessage(sap, 10, "E", sMsg);
-                                    
-                                    return parent.setBusy('');
-                                }
-
-                                // 어플리케이션 브라우저 실행
-                                oAPP.fn.fnOnExecApp(sAPPID);                            
-
-                                // // 연속 클릭 방지용
-                                // setTimeout(function(){
-                                //     parent.setBusy('');
-                                // }, 1000);
-
-                            });
-
-                        }
-                    })
-
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "APPVR",
-                    filterProperty: "APPVR",
-                    width: "100px",
-                    hAlign: ENUM_HORIZONTAL_ALIGN.Center,
-                    label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C02"), // Active Ver.
-                    template: new sap.m.Text().bindProperty("text", "APPVR", lf_nozero),
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "CODPG",
-                    filterProperty: "CODPG",
-                    width: "100px",
-                    hAlign: ENUM_HORIZONTAL_ALIGN.Center,
-                    label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C03"), // Code Page
-                    template: new sap.m.Text({
-                        text: "{CODPG}"
-                    }),
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "UITHM",
-                    filterProperty: "UITHM",
-                    width: "150px",
-                    hAlign: ENUM_HORIZONTAL_ALIGN.Center,
-                    label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C04"), // Theme
-                    template: new sap.m.Text({
-                        text: "{UITHM}"
-                    }),
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "ERUSR",
-                    filterProperty: "ERUSR",
-                    width: "120px",
-                    hAlign: ENUM_HORIZONTAL_ALIGN.Center,
-                    // label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C05"), // Creator
-                    label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C05"), // Creator
-                    template: new sap.m.Text({
-                        text: "{ERUSR}"
-                    }),
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "ERDAT",
-                    filterProperty: "ERDAT",
-                    width: "120px",
-                    hAlign: ENUM_HORIZONTAL_ALIGN.Center,
-                    // label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C06"), // Create Date                    
-                    // template: new sap.m.Text().bindProperty("text", "ERDAT", lf_nozero),
-                    label: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "387"), // Create Date
-                    template: new sap.m.Text().bindProperty("text", "ERDAT", lf_nozero_date),
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "ERTIM",
-                    filterProperty: "ERTIM",
-                    width: "120px",
-                    hAlign: ENUM_HORIZONTAL_ALIGN.Center,
-                    // label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C07"), // Create Time                    
-                    // template: new sap.m.Text().bindProperty("text", "ERTIM", lf_nozero),
-                    label: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "388"), // Create Time
-                    template: new sap.m.Text().bindProperty("text", "ERTIM", lf_nozero_time),
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "AEUSR",
-                    filterProperty: "AEUSR",
-                    width: "120px",
-                    hAlign: ENUM_HORIZONTAL_ALIGN.Center,
-                    // label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C08"), // Change User
-                    label: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "411"), // Change User
-                    template: new sap.m.Text({
-                        text: "{AEUSR}"
-                    }),
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "AEDAT",
-                    filterProperty: "AEDAT",
-                    width: "120px",
-                    hAlign: ENUM_HORIZONTAL_ALIGN.Center,
-                    // label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C09"), // Change Date
-                    label: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "412"), // Change Date
-                    // template: new sap.m.Text().bindProperty("text", "AEDAT", lf_nozero),
-                    template: new sap.m.Text().bindProperty("text", "AEDAT", lf_nozero_date),
-                }),
-                new sap.ui.table.Column({
-                    sortProperty: "AETIM",
-                    filterProperty: "AETIM",
-                    width: "120px",
-                    hAlign: ENUM_HORIZONTAL_ALIGN.Center,
-                    // label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C10"), // Change Time
-                    label: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "413"), // Change Time
-                    // template: new sap.m.Text().bindProperty("text", "AETIM", lf_nozero),
-                    template: new sap.m.Text().bindProperty("text", "AETIM", lf_nozero_time),
-                }),
-            ],
-            rows: {
-                path: sTableBindingPath,
-                parameters: {
-                    arrayNames: ['APPF4HIER']
-                },
-            },
-            extension: [
-                new sap.m.OverflowToolbar({
-                    content: [
-                        new sap.m.Button({
-                            icon: "sap-icon://expand-group",
-                            press: function (oEvent) {
-
-                                var iSelIdx = oTreeTable.getSelectedIndex();
-                                if (iSelIdx == -1) {
-                                    return;
-                                }
-
-                                var oCtx = oTreeTable.getContextByIndex(iSelIdx),
-                                    oData = oTreeTable.getModel().getProperty(oCtx.sPath);
-
-                                if (oData.APPID == "ROOT") {
-                                    oTreeTable.expandToLevel(99);
-                                    return;
-                                }
-
-                                oTreeTable.expand(iSelIdx);
-
-                            }
-                        }),
-                        new sap.m.Button({
-                            icon: "sap-icon://collapse-group",
-                            press: function (oEvent) {
-
-                                var iSelIdx = oTreeTable.getSelectedIndex();
-                                if (iSelIdx == -1) {
-                                    return;
-                                }
-
-                                oTreeTable.collapse(iSelIdx);
-
-                            }
-                        }),
-
-                        new sap.m.ToolbarSeparator(),
-
-                        new sap.m.Input({
-                            showClearIcon: true,
-                            width: "200px",
-                            placeholder: parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "565"), // 어플리케이션 검색
-                            change: function(oEvent){
-
-                                // row 의 바인딩 정보
-                                let oBindingInfo = oTreeTable.getBinding("rows");
-                                if(!oBindingInfo){
-                                    return;
-                                }
-
-                                let sValue = oEvent.getParameter("value") || "";
-
-                                let oFilter = [
-                                    new sap.ui.model.Filter({ path:"APPID", operator:"Contains", value1: "ROOT" }),
-                                    new sap.ui.model.Filter({ path:"APPID", operator:"Contains", value1: sValue }),
-                                    new sap.ui.model.Filter({ path:"APPNM", operator:"Contains", value1: sValue }),
-                                ];
-
-                                oBindingInfo.filter([new sap.ui.model.Filter(oFilter, false)]);
-
-                                if(sValue){                                   
-                                    oTreeTable.expandToLevel(99);
-                                } else {
-                                    oTreeTable.collapseAll();
-                                    oTreeTable.expandToLevel(1);
-                                }
-
-                            }
-
-                        }).addStyleClass("sapUiSmallMarginBegin")
-                    ]
-                })
-            ],
-
-        }).addStyleClass("u4aWsAppf4tree");
-
-        let oDialog = oAppF4Dialog;
-        if (oDialog) {
-            oDialog.data("appf4tree", oTreeTable);
-        }
-
-        let oItem = new sap.m.IconTabFilter({
-            key: "K2",
-            text: sHeaderText,
-            content: [
-                oTreeTable
-            ]
-        });
-
-        oTreeTable.addEventDelegate({
-            ondblclick: function (oEvent) {
-
-                let oTarget = oEvent.target,
-                    $SelectedRow = $(oTarget).closest(".sapUiTableRow");
-
-                if (!$SelectedRow.length) {
-                    return;
-                }
-
-                var oRow = $SelectedRow[0],
-
-                    sRowId1 = oRow.getAttribute("data-sap-ui-related"),
-                    sRowId2 = oRow.getAttribute("data-sap-ui"),
-                    sRowId = "";
-
-                if (sRowId1 == null && sRowId2 == null) {
-                    return;
-                }
-
-                if (sRowId1) {
-                    sRowId = sRowId1;
-                }
-
-                if (sRowId2) {
-                    sRowId = sRowId2;
-                }
-
-                var oRow = sap.ui.getCore().byId(sRowId);
-                if (!oRow) {
-                    return;
-                }
-
-                let oCtx = oRow.getBindingContext(),
-                    oRowData = oRow.getModel().getProperty(oCtx.sPath);
-
-                if (oRowData.APPID == "ROOT" || oRowData.PACKG == "ROOT") {
-                    return;
-                }
-
-                let fnCallback = oDialog.data("fnCallback");
-                if (typeof fnCallback == "function") {
-                    fnCallback(oRowData);
-                }
-
-                let oAppF4Dialog = oDialog;
-                if (oAppF4Dialog) {
-                    oAppF4Dialog.close();
-                    return;
-                }
-
-            }
-        });
-
-        return oItem;
-
-    }; // end of oAPP.fn.fnCreateAppF4Tab2
-
-    /**
-     * 잘되는 버전 (정렬 X)
-     */
-    // function _appF4Tree(aRawData) {
-  
-    //     // 1. 모든 노드를 복사하여 새로운 객체 배열 생성 (참조 끊기 및 필드명 변경)
-    //     let aNodes = aRawData.map(item => ({
-    //         ...item,
-    //         APPF4HIER: [] // 자식 배열 이름을 'APPF4HIER'로 설정
-    //     }));
-
-    //     let oRootNode = null;
-
-    //     // 2. 계층 연결 로직
-    //     aNodes.forEach(oCurrent => {
-    //         // 진짜 ROOT 노드 식별 (APPID가 ROOT이고 PACKG가 비어있음)
-    //         if (oCurrent.APPID === "ROOT" && oCurrent.PACKG === "") {
-    //             oRootNode = oCurrent;
-    //             return;
-    //         }
-
-    //         let sParentId = oCurrent.PACKG;
-
-    //         // 3. 부모 찾기 (핵심 로직)
-    //         // 현재 노드의 PACKG와 같은 APPID를 가진 노드를 찾되, 자기 자신(동일 인스턴스)은 제외
-    //         let oParent = aNodes.find(oNode => 
-    //             oNode.APPID === sParentId && oNode !== oCurrent
-    //         );
-
-    //         if (oParent) {
-    //             // 부모를 찾은 경우 해당 부모의 APPF4HIER에 추가
-    //             oParent.APPF4HIER.push(oCurrent);
-    //         } else {
-    //             // 부모를 못 찾았거나 PACKG가 "ROOT"인 경우 최상위 ROOT 아래에 배치
-    //             if (oRootNode && oCurrent !== oRootNode) {
-    //                 oRootNode.APPF4HIER.push(oCurrent);
-    //             }
-    //         }
-    //     });
-
-    //     // 최상위 루트를 배열에 담아 반환 (TreeTable 바인딩용)
-    //     return oRootNode ? [oRootNode] : [];
-    // }
-
-    /**
-     * @since   2026-03-11 00:53:07
-     * @version v3.6.0-3
-     * @author  soccerhs
-     * @description
-     * 
-     * APP F4 전용 트리 구조 만드는 함수
-     * - PACKAGE 명과 어플리케이션 명이 동일 할 경우 무한 재귀 현상으로 인한
-     *   예외 로직이 적용된 트리 구조 만드는 함수
-     * 
-     */
-    function _appF4Tree(aRawData) {
-        if (!aRawData || aRawData.length === 0) return [];
-
-        // 1. APPID 기준으로 전체 데이터를 미리 정렬 (O(N log N))
-        // 미리 정렬해두면 나중에 자식 배열에 push할 때 자동으로 정렬된 상태가 됩니다.
-        aRawData.sort((a, b) => {
-            let idA = (a.APPID || "").toUpperCase();
-            let idB = (b.APPID || "").toUpperCase();
-            return idA < idB ? -1 : (idA > idB ? 1 : 0);
-        });
-
-        // 2. 빠른 조회를 위한 Map 생성 (O(N))
-        const mLookup = {};
-        const aNodes = aRawData.map(item => {
-            const oNewNode = { ...item, APPF4HIER: [] };
-            
-            // 동일한 APPID가 중복될 경우, 부모 역할을 할 놈(PACKG가 ROOT거나 비어있는 것)을 Map에 우선 등록
-            if (!mLookup[item.APPID] || item.PACKG === "ROOT" || item.PACKG === "") {
-                mLookup[item.APPID] = oNewNode;
-            }
-            return oNewNode;
-        });
-
-        let oRootNode = mLookup["ROOT"];
-        
-        // 3. 계층 연결 (O(N)) - find를 쓰지 않고 Map에서 바로 꺼냄
-        aNodes.forEach(oCurrent => {
-            // 진짜 ROOT 노드 자체는 건너뜀
-            if (oCurrent.APPID === "ROOT" && (oCurrent.PACKG === "" || oCurrent.PACKG === "ROOT")) {
-                if (!oRootNode) oRootNode = oCurrent;
-                return;
-            }
-
-            const sParentId = oCurrent.PACKG;
-            const oParent = mLookup[sParentId];
-
-            // 부모가 존재하고, 그 부모가 '나 자신'이 아닐 때만 연결 (무한 재귀 방지)
-            if (oParent && oParent !== oCurrent) {
-                oParent.APPF4HIER.push(oCurrent);
-            } else if (oRootNode && oCurrent !== oRootNode) {
-                // 부모를 못 찾거나 자기 참조일 경우 ROOT 아래로
-                oRootNode.APPF4HIER.push(oCurrent);
-            }
-        });
-
-        // ROOT를 배열에 담아 반환
-        return oRootNode ? [oRootNode] : [];
+    /* ====================================================================
+     * 스코프 CSS (1회 주입) — 토큰 기반, 공통 컴포넌트와 일관.
+     * ================================================================== */
+    function _ensureStyle() {
+        if (document.getElementById("u4aAppF4Style")) { return; }
+        var s = document.createElement("style");
+        s.id = "u4aAppF4Style";
+        s.textContent = [
+            ".u4aAppF4Dlg{width:min(94vw,1400px);height:86vh;max-width:none;display:flex;flex-direction:column;}",
+            ".u4aAppF4Dlg .u4a-dialog__header{cursor:move;user-select:none;}",
+            ".u4aAppF4Body{display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0;}",
+            ".u4aAppF4Tabs{flex:0 0 auto;display:flex;gap:.25rem;padding:.5rem .75rem 0;border-bottom:.0625rem solid var(--line);background:var(--surface);}",
+            ".u4aAppF4Tab{appearance:none;border:0;background:transparent;color:var(--text-muted);font:inherit;font-weight:600;padding:.5rem .875rem;border-radius:var(--radius-sm) var(--radius-sm) 0 0;border-bottom:.125rem solid transparent;cursor:pointer;}",
+            ".u4aAppF4Tab:hover{background:var(--hover-bg);color:var(--text);}",
+            ".u4aAppF4Tab[aria-selected=\"true\"]{color:var(--accent);border-bottom-color:var(--accent);}",
+            ".u4aAppF4Page{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:.875rem 1rem;gap:.75rem;overflow:hidden;}",
+            ".u4aAppF4Page[hidden]{display:none;}",
+            ".u4aAppF4Form{flex:0 0 auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.625rem 2rem;}",
+            ".u4aAppF4FRow{display:flex;align-items:center;gap:.75rem;}",
+            ".u4aAppF4FRow>.u4a-label{flex:0 0 6rem;text-align:right;color:var(--text-muted);font-weight:600;}",
+            ".u4aAppF4FRow .u4aAppF4Field{flex:1 1 auto;min-width:0;width:auto;}",
+            ".u4aAppF4FRow .u4aAppF4Sel{flex:1 1 auto;min-width:0;max-width:none;}",
+            ".u4aAppF4Field .u4a-field__input{width:100%;}",
+            ".u4aAppF4SrchBar{flex:0 0 auto;display:flex;align-items:center;gap:.5rem;padding-top:.25rem;border-top:.0625rem solid var(--divider);}",
+            ".u4aAppF4SrchTitle{font-weight:700;color:var(--text);}",
+            ".u4aAppF4Spacer{flex:1 1 auto;}",
+            ".u4aAppF4TreeBar{flex:0 0 auto;display:flex;align-items:center;gap:.375rem;}",
+            ".u4aAppF4TBarSep{width:.0625rem;height:1.25rem;background:var(--line);margin:0 .25rem;}",
+            ".u4aAppF4TblWrap{flex:1 1 auto;min-height:0;overflow:auto;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--surface);}",
+            ".u4aAppF4Tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:.8125rem;}",
+            ".u4aAppF4Tbl th,.u4aAppF4Tbl td{padding:.4375rem .625rem;text-align:left;white-space:nowrap;border-bottom:.0625rem solid var(--line);}",
+            ".u4aAppF4Tbl thead th{position:sticky;top:0;z-index:1;background:var(--surface-raised);color:var(--text-muted);font-weight:700;border-bottom:.0625rem solid var(--divider);}",
+            ".u4aAppF4Tbl th.is-center,.u4aAppF4Tbl td.is-center{text-align:center;}",
+            ".u4aAppF4Tbl th.is-action,.u4aAppF4Tbl td.is-action{text-align:center;width:5rem;}",
+            ".u4aAppF4Tbl tbody tr:hover{background:var(--hover-bg);}",
+            ".u4aAppF4Tbl tbody tr:nth-child(even){background:var(--app-bg);}",
+            ".u4aAppF4Tbl tbody tr:nth-child(even):hover{background:var(--hover-bg);}",
+            ".u4aAppF4ActBtn{width:1.75rem;height:1.75rem;}",
+            ".u4aAppF4ActBtn i{font-size:.8125rem;}",
+            ".u4aAppF4Empty{padding:2rem;text-align:center;color:var(--text-muted);}",
+            ".u4aAppF4TreeCell{display:flex;align-items:center;}",
+            ".u4aAppF4Indent{flex:0 0 auto;}",
+            ".u4aAppF4Toggle{flex:0 0 auto;width:1.25rem;height:1.25rem;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--icon-muted);cursor:pointer;border-radius:var(--radius-sm);}",
+            ".u4aAppF4Toggle:hover{background:var(--hover-bg);color:var(--text);}",
+            ".u4aAppF4Toggle.is-leaf{visibility:hidden;}",
+            ".u4aAppF4Toggle i{font-size:.6875rem;}",
+            ".u4aAppF4TreeLabel{margin-left:.25rem;overflow:hidden;text-overflow:ellipsis;}",
+            ".u4aAppF4Tbl tbody tr.is-root>td{font-weight:700;background:var(--surface-raised);}",
+            ".u4aAppF4Link{color:var(--link);font-weight:600;cursor:pointer;}",
+            ".u4aAppF4Link:hover{text-decoration:underline;}"
+        ].join("\n");
+        document.head.appendChild(s);
     }
-
-
-    /************************************************************************
-     * App Hierarchy 정보 구하기
-     ************************************************************************/
-    oAPP.fn.fnGetAppHierList = function (oAppF4Dialog) {
-
-        let sPath = parent.getServerPath() + '/getapplhierarchydata';
-
-        sendAjax(sPath, null, lf_success);
-
-        function lf_success(oResult) {
-
-            let oCurrPage = parent.getCurrPage();
-
-            if (oResult.RETCD == 'E') {
-
-                let oCurrWin = REMOTE.getCurrentWindow();
-                oCurrWin.flashFrame(true); // 작업표시줄 깜빡임
-
-                parent.setBusy('');
-
-                // 페이지 푸터 메시지
-                APPCOMMON.fnShowFloatingFooterMsg("E", oCurrPage, oResult.RTMSG);
-
-                return;
-            }
-
-            let sBindRootPath = oAppF4Dialog.data("sBindRootPath");
-
-            let sTreeTableBindPath = sBindRootPath + "/APPF4HIER";
-
-            /**
-             * @since   2026-03-11 00:54:14
-             * @version v3.6.0-3
-             * @author  soccerhs
-             * @description
-             * 
-             * - 기존 트리 구조 만들어주는 공통 함수 사용시,
-             * 부모와 자식의 이름이 동일 할경우 무한 루프 오류 현상으로 인해
-             * 예외 로직 적용된 새로운 함수 적용함.
-             * 
-             */
-            // // APP DATA setModel
-            // APPCOMMON.fnSetModelProperty(sTreeTableBindPath, oResult.T_APPL);
-
-            // var oModel = sap.ui.getCore().getModel(),
-            //     sTreeJsonPath = sTreeTableBindPath.replace(/\//g, ".");
-            // sTreeJsonPath = sTreeJsonPath.replace(/^./g, "");
-
-            // // Model Data를 Tree로 구성
-            // oAPP.fn.fnSetTreeJson(oModel, sTreeJsonPath, "APPID", "PACKG", "APPF4HIER");
-
-            APPCOMMON.fnSetModelProperty(sTreeTableBindPath, _appF4Tree(oResult.T_APPL));
-
-            let oModel = sap.ui.getCore().getModel();
-            oModel.refresh();
-
-            parent.setBusy('');
-   
-            let oAppf4tree;
-
-            let oDialog = oAppF4Dialog;
-            if (oDialog) {                
-                oAppf4tree = oDialog.data("appf4tree");
-            }
-
-            // mime Tree에서 처음 실행 시 1레벨 펼치고 첫번째 라인에 셀렉션을 추가한다.             
-            if (!oAppf4tree) {
-                return;
-            }
-
-            oAppf4tree.expandToLevel(1);
-            oAppf4tree.setSelectedIndex(0);
-
-        }
-
-    }; // end of oAPP.fn.fnGetAppHierList
-
-    /************************************************************************
-     * Application Name Search Help(F4) Ok Button
-     ************************************************************************/
-    oAPP.events.ev_AppF4Search = function (oAppF4Dialog) {
-
-        // busy 키고 Lock 걸기
-        oAPP.common.fnSetBusyLock("X");
-
-        let sBindRootPath = oAppF4Dialog.data("sBindRootPath");
-
-        var sAppF4BindPath = sBindRootPath + "/TAB1";
-
-        // 검색 조건 구하기
-        var oSrchCond = APPCOMMON.fnGetModelProperty(sAppF4BindPath);
-
-        if (!oSrchCond) {
-
-            // busy 끄고 Lock 풀기
-            oAPP.common.fnSetBusyLock("");
-
-            return;
-        }
-
-        // 서버를 호출하여 Application 정보 검색
-        var sPath = parent.getServerPath() + '/getappsearch',
-            oFormData = new FormData();
-
-        oFormData.append("APPINFO", JSON.stringify(oSrchCond));
-
-        sendAjax(sPath, oFormData, lf_AppInfo);
-
-        function lf_AppInfo(aAppInfo) {
-
-            // 검색 결과 모델 업데이트
-            var oModelData = sap.ui.getCore().getModel().getData();
-
-            if (oModelData.APPLIST1) {
-                delete oModelData.APPLIST1;
-            }
-
-            var sAppListBindPath = sBindRootPath + "/TAB1/APPLIST";
-
-            // APPID 기준으로 오름차순 정렬해주기
-            let iAppInfoLength = aAppInfo.length;
-            if (iAppInfoLength > 0) {
-
-                aAppInfo.sort(function (a, b) {
-                    return a.APPID < b.APPID ? -1 : a.APPID > b.APPID ? 1 : 0;
-
-                });
-
-            }
-
-            APPCOMMON.fnSetModelProperty(sAppListBindPath, aAppInfo);
-
-            // busy 끄고 Lock 풀기
-            oAPP.common.fnSetBusyLock("");
-
-        }
-
-    }; // end of oAPP.events.ev_AppF4Search
-
-
-    /************************************************************************
-     * Application Name Search Help(F4) 팝업 오픈 후 이벤트
-     ************************************************************************/
-    oAPP.events.ev_AppF4DialogAfterOpen = function (oEvent) {
-        
-        let oDialog = oEvent.getSource();
-        let oIconTab = oDialog.data("appf4tab");                
-
-        if (!oIconTab) {
-            return;
-        }
-
-        // 현재 선택된 Tab의 key를 구한다.
-        let sKey = oIconTab.getSelectedKey();
-        let sBeforeKey = oDialog.data("beforeSelectedKey");
-
-        // 이전에 선택한 키값이 있다면
-        if (sBeforeKey) {
-
-            // 이전에 선택한 키값과 현재 선택된 key값이 다를 경우에만 키 값을 갱신한다.
-            if (sBeforeKey != sKey) {
-                sKey = sBeforeKey;
-                oIconTab.setSelectedKey(sKey);
-            }
-
-        }
-
-        oIconTab.fireSelect({
-            key: sKey
-        });
-
-    }; // end of oAPP.events.ev_AppF4DialogAfterOpen
 
 })(window, $, oAPP);

@@ -142,8 +142,15 @@
 }
 
 /* T-CODE 입력 (헤더용 컴팩트 인풋) */
-.u4a-tcode {
+/* T-CODE 입력 + 공통 클리어(X) 래퍼 — 폭은 래퍼가, 입력은 100%(.u4a-field__input).
+   --field-icon/--field-edge 로 작은 입력(30px)에 맞춰 클리어 X 크기 축소(다른 화면과 동일 컴포넌트). */
+.u4a-tcode-field {
+    flex: 0 0 auto;
     width: clamp(7rem, 12vw, 12rem);
+    --field-icon: 1.25rem;
+    --field-edge: 0.25rem;
+}
+.u4a-tcode {
     height: 1.875rem;
     padding: 0 0.625rem;
     border: 0.0625rem solid var(--line);
@@ -638,7 +645,7 @@
 
     /* 좁은 폭 : 검색바 세로 적층, T-CODE 축소 */
     .u4a-ws10__searchbar { flex-wrap: wrap; }
-    .u4a-tcode { width: 6rem; }
+    .u4a-tcode-field { width: 6rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,911 +1,327 @@
-/************************************************************************
- * Copyright 2020. INFOCG Inc. all rights reserved. 
- * ----------------------------------------------------------------------
- * - file Name : fnCtsPopupOpen.js
- * - file Desc : CTS POPUP
- ************************************************************************/
+/**************************************************************************
+ * fnCtsPopupOpen.js  (HTML5)
+ * ------------------------------------------------------------------------
+ * CTS(이관요청) 선택 공통 팝업 — "Prompt for Transportable Workbench Request".
+ *
+ * [컨버전 메모]
+ *  원본: sap.m.Dialog(customHeader Toolbar) + 상단 Form(Request No/Short Desc, 읽기전용)
+ *        + Refresh 버튼 + sap.ui.table.Table(CTS No./Description/Date/Time) + Accept/Cancel.
+ *  HTML5: native <dialog class="u4a-dialog u4aCtsDlg"> + 공통 컴포넌트(.u4a-input/.u4a-btn)
+ *        + 스크롤 sticky-header <table class="u4aCtsTb">.
+ *
+ *  ★ 공통 팝업: 진입점은 oAPP.fn.fnCtsPopupOpen(fnCallback) 하나뿐이며, 전 코드베이스의
+ *    Request No(CTS) 값도움이 oAPP.fn.fnCtsPopupOpener → 이 함수로 위임된다
+ *    (createApplicationPopup / changeAppPackagePopup / conversionWebdynpro /
+ *     createEventPopup / ws_events / fnMimePopupOpen / fnAppCopyPopupOpen / ws_usp ...).
+ *    → 이 한 파일만 고치면 모든 호출부의 Request No F4 가 동일 UX 로 통일된다.
+ *  ★ 콜백 계약(원본 유지): 선택한 행 데이터 객체를 그대로 전달. 호출부는 param.TRKORR /
+ *    param.AS4TEXT (그 외 AS4DATE/AS4TIME/AS4USER/STRKORR) 를 사용한다.
+ *  ★ 메시지: 전부 SQLite 메시지 클래스 키 사용(임의 영문 금지) — 원본 키 그대로 재사용.
+ **************************************************************************/
 
-(function(window, $, oAPP) {
+(function (window, $, oAPP) {
     "use strict";
 
+    const APPCOMMON = oAPP.common;
+
+    // 데이터 조회 endpoint(원본 ev_GetCtsDialogAfterOpen 유지).
+    const C_GET_CTS_URL = "/getctsdata";
+
+    // 메시지 클래스 텍스트 헬퍼(원본 fnGetMsgClsText 호출 그대로).
+    function _txt(sCls, sCode) {
+        try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, "", "", "", ""); }
+        catch (e) { return ""; }
+    }
+    const _fa = (sName) => '<i class="fa-solid fa-' + sName + '"></i>';
+
+    function _el(sTag, sClass, sText) {
+        const o = document.createElement(sTag);
+        if (sClass) { o.className = sClass; }
+        if (typeof sText !== "undefined") { o.textContent = sText; }
+        return o;
+    }
+
+    // 서버 날짜(YYYYMMDD)/시간(HHMMSS) → 가독 포맷(yyyy-MM-dd / HH:mm:ss). 형식 안 맞으면 원본 그대로.
+    //   ※ 표시(셀)에만 적용 — 콜백으로 넘기는 행 데이터(AS4DATE/AS4TIME)는 원본 유지.
+    function _fmtDate(s) {
+        s = (s == null) ? "" : String(s);
+        return /^\d{8}$/.test(s) ? (s.slice(0, 4) + "-" + s.slice(4, 6) + "-" + s.slice(6, 8)) : s;
+    }
+    function _fmtTime(s) {
+        s = (s == null) ? "" : String(s);
+        return /^\d{6}$/.test(s) ? (s.slice(0, 2) + ":" + s.slice(2, 4) + ":" + s.slice(4, 6)) : s;
+    }
+
     /************************************************************************
-     * Root Variable Area..
+     * 공통 스타일 1회 주입 (테마 토큰 소비 — 하드코딩 색 없음)
      ************************************************************************/
-    const
-        C_BIND_ROOT_PATH = "/CTS",
-        C_DLG_ID = "u4aWsCtsDlg",
-        C_CTS_NEW_DLG_ID = "u4aWsCtsNewDlg",
-        C_CTS_NEW_BIND_ROOT_PATH = C_BIND_ROOT_PATH + "/CTSNEW",
-        C_CTS_TB_ID = "u4aCtsTb";
+    function _ensureStyle() {
+        if (document.getElementById("u4aCtsStyle")) { return; }
+        const oStyle = document.createElement("style");
+        oStyle.id = "u4aCtsStyle";
+        oStyle.textContent = `
+        .u4aCtsDlg { width: min(70vw, 1000px); height: min(78vh, 680px); padding: 0; display: flex; flex-direction: column; }
+        .u4aCtsDlg .u4a-dialog__header { cursor: move; user-select: none; }
+        .u4aCtsDlg .u4a-dialog__header span { flex: 1 1 auto; }
+        .u4aCtsBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+                      gap: 0.75rem; padding: 1rem 1.25rem 1.25rem; overflow: hidden; }
+        /* 상단 선택정보 폼(읽기전용) — 라벨 우측정렬 + 입력 (원본 Form 레이아웃) */
+        .u4aCtsForm { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 0.875rem;
+                      align-items: center; flex: 0 0 auto; }
+        .u4aCtsForm label { justify-self: end; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+        /* 조회 툴바(Refresh) */
+        .u4aCtsBar { display: flex; align-items: center; gap: 0.5rem; flex: 0 0 auto; }
+        .u4aCtsBar .u4aCtsSpacer { flex: 1 1 auto; }
+        .u4aCtsCount { font-size: 0.8125rem; color: var(--text-muted); }
+        /* 결과 테이블 — 스크롤 컨테이너 + sticky 헤더 */
+        .u4aCtsTbWrap { flex: 1 1 auto; min-height: 0; overflow: auto;
+                        border: 0.0625rem solid var(--line); border-radius: var(--radius-sm);
+                        background: var(--surface-raised); }
+        .u4aCtsTb { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.8125rem; }
+        .u4aCtsTb thead th { position: sticky; top: 0; z-index: 1; background: var(--surface);
+                             color: var(--text); font-weight: 700; text-align: left;
+                             padding: 0.5rem 0.75rem; border-bottom: 0.0625rem solid var(--line); white-space: nowrap; }
+        .u4aCtsTb tbody td { padding: 0.4375rem 0.75rem; color: var(--text);
+                             border-bottom: 0.0625rem solid var(--line); white-space: nowrap; }
+        .u4aCtsTb tbody tr { cursor: pointer; }
+        .u4aCtsTb tbody tr:hover { background: var(--hover-bg); }
+        .u4aCtsTb tbody tr[aria-selected="true"] { background: var(--selection-bg); }
+        .u4aCtsTb tbody tr[aria-selected="true"] td { color: var(--selected-text); font-weight: 600; }
+        /* 컬럼 정렬: CTS No./Date/Time 중앙, Description 좌측(원본 hAlign) */
+        .u4aCtsTb .u4aCtsColC { text-align: center; }
+        .u4aCtsEmpty { padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.875rem; }
+        `;
+        document.head.appendChild(oStyle);
+    }
 
-    var APPCOMMON = oAPP.common,
-        GfnCtsCallback;
+    // 헤더 드래그는 공통 U4AUI.makeDialogDraggable 사용(화면 밖/상단 헤더 클램프). 로컬 _attachDrag 제거.
 
     /************************************************************************
-     * CTS 관련 정보를 구하는 팝업
+     * CTS 선택 팝업 열기
      ************************************************************************
-     * @param {Function} fnCallback
-     * - CTS 팝업에서 CTS 번호 선택한 값 전달하기 위한 callback function
+     * @param {Function} fnCallback  선택한 CTS 행 데이터 객체를 전달하는 콜백.
      ************************************************************************/
-    oAPP.fn.fnCtsPopupOpen = function(fnCallback) {
+    oAPP.fn.fnCtsPopupOpen = function (fnCallback) {
 
-        if (typeof GfnCtsCallback !== "undefined") {
-            GfnCtsCallback = undefined;
+        _ensureStyle();
+
+        // 팝업 상태(클로저) — 행 데이터 / 선택 인덱스.
+        const oState = { aRows: [], iSel: -1, fnCb: (typeof fnCallback === "function") ? fnCallback : null };
+
+        // ── 다이얼로그 골격 ─────────────────────────────────────────────
+        const oDlg = document.createElement("dialog");
+        oDlg.className = "u4a-dialog u4aCtsDlg";
+
+        // 헤더: 아이콘(이관/트럭) + 제목 + 닫기 X
+        const oHeader = _el("div", "u4a-dialog__header");
+        oHeader.setAttribute("data-type", "I");
+        oHeader.innerHTML = _fa("truck") + "<span></span>";
+        // 345  Prompt for Transportable Workbench Request
+        oHeader.querySelector("span").textContent = _txt("/U4A/MSG_WS", "345");
+        const oXBtn = _el("button", "u4a-btn-icon");
+        oXBtn.type = "button";
+        oXBtn.setAttribute("data-act", "close");
+        oXBtn.innerHTML = _fa("xmark");
+        oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
+        oXBtn.addEventListener("click", function () { _close(); });
+        oHeader.appendChild(oXBtn);
+        oDlg.appendChild(oHeader);
+
+        // ── 바디 ────────────────────────────────────────────────────────
+        const oBody = _el("div", "u4a-dialog__body u4aCtsBody");
+        oDlg.appendChild(oBody);
+
+        // 상단 선택정보 폼(읽기전용): Request No / Short Description.
+        const oForm = _el("div", "u4aCtsForm");
+        // B03  Request No
+        oForm.appendChild(_el("label", null, _txt("/U4A/CL_WS_COMMON", "B03")));
+        const oInpNo = _el("input", "u4a-input");
+        oInpNo.type = "text";
+        oInpNo.readOnly = true;
+        oForm.appendChild(oInpNo);
+        // D54  Short Description
+        oForm.appendChild(_el("label", null, _txt("/U4A/CL_WS_COMMON", "D54")));
+        const oInpTx = _el("input", "u4a-input");
+        oInpTx.type = "text";
+        oInpTx.readOnly = true;
+        oForm.appendChild(oInpTx);
+        oBody.appendChild(oForm);
+
+        // 조회 툴바: Refresh + 결과건수.
+        const oBar = _el("div", "u4aCtsBar");
+        const oRefresh = _el("button", "u4a-btn u4a-btn--emphasized");
+        oRefresh.type = "button";
+        oRefresh.innerHTML = _fa("rotate") + "<span></span>";
+        oRefresh.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A48"); // Refresh
+        oRefresh.addEventListener("click", function () { _loadData(); });
+        oBar.appendChild(oRefresh);
+        oBar.appendChild(_el("span", "u4aCtsSpacer"));
+        const oCount = _el("span", "u4aCtsCount", "");
+        oBar.appendChild(oCount);
+        oBody.appendChild(oBar);
+
+        // 결과 테이블.
+        const oTbWrap = _el("div", "u4aCtsTbWrap");
+        const oTb = _el("table", "u4aCtsTb");
+        const oThead = _el("thead");
+        const oHr = _el("tr");
+        // A21 CTS No. / A35 Description / D55 Date / D56 Time
+        const aCols = [
+            { txt: _txt("/U4A/CL_WS_COMMON", "A21"), cls: "u4aCtsColC" },
+            { txt: _txt("/U4A/CL_WS_COMMON", "A35"), cls: "" },
+            { txt: _txt("/U4A/CL_WS_COMMON", "D55"), cls: "u4aCtsColC" },
+            { txt: _txt("/U4A/CL_WS_COMMON", "D56"), cls: "u4aCtsColC" }
+        ];
+        aCols.forEach(function (c) {
+            const oTh = _el("th", c.cls, c.txt);
+            oHr.appendChild(oTh);
+        });
+        oThead.appendChild(oHr);
+        oTb.appendChild(oThead);
+        const oTbody = _el("tbody");
+        oTb.appendChild(oTbody);
+        oTbWrap.appendChild(oTb);
+        const oEmpty = _el("div", "u4aCtsEmpty");
+        oEmpty.hidden = true;
+        oTbWrap.appendChild(oEmpty);
+        oBody.appendChild(oTbWrap);
+
+        // ── 푸터: Confirm(A40) / Close(A39) ─────────────────────────────
+        const oFoot = _el("div", "u4a-dialog__footer");
+        oFoot.style.display = "flex";
+        oFoot.style.gap = "0.5rem";
+        oFoot.style.alignItems = "center";
+        oFoot.appendChild(_el("span", null, "")).style.flex = "1 1 auto";
+
+        const oAccept = _el("button", "u4a-btn u4a-btn--emphasized");
+        oAccept.type = "button";
+        oAccept.innerHTML = _fa("check") + "<span></span>";
+        oAccept.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A40"); // Confirm
+        oAccept.addEventListener("click", function () { _accept(); });
+        oFoot.appendChild(oAccept);
+
+        const oCancel = _el("button", "u4a-btn u4a-btn--negative"); // 닫기 — Reject 느낌
+        oCancel.type = "button";
+        oCancel.innerHTML = _fa("xmark") + "<span></span>";
+        oCancel.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
+        oCancel.addEventListener("click", function () { _close(); });
+        oFoot.appendChild(oCancel);
+        oDlg.appendChild(oFoot);
+
+        // busy — 전역 parent.setBusy(셸의 setDomBusy 가 모달 <dialog> 로 top-layer 표시).
+        function _setBusy(bOn) { parent.setBusy(bOn ? "X" : ""); }
+
+        // ── 행 선택/렌더 헬퍼 ───────────────────────────────────────────
+        function _selectRow(iIdx) {
+            oState.iSel = iIdx;
+            const aTr = oTbody.querySelectorAll("tr");
+            for (let i = 0; i < aTr.length; i++) {
+                aTr[i].setAttribute("aria-selected", i === iIdx ? "true" : "false");
+            }
+            const oRow = (iIdx >= 0) ? oState.aRows[iIdx] : null;
+            oInpNo.value = oRow ? (oRow.TRKORR || "") : "";
+            oInpTx.value = oRow ? (oRow.AS4TEXT || "") : "";
         }
 
-        // callback function 글로벌 변수로 저장
-        GfnCtsCallback = fnCallback;
-
-        var oCtsDialog = sap.ui.getCore().byId(C_DLG_ID);
-
-        if (oCtsDialog) {
-            oCtsDialog.open();
-            return;
+        function _renderRows() {
+            oTbody.innerHTML = "";
+            oState.iSel = -1;
+            oInpNo.value = "";
+            oInpTx.value = "";
+            const aRows = oState.aRows;
+            oEmpty.hidden = aRows.length > 0;
+            if (aRows.length === 0) {
+                // 268  Selected line does not exists. (목록 없음 안내 재사용)
+                oEmpty.textContent = _txt("/U4A/MSG_WS", "268");
+            }
+            // A73 Search Result : n  형태로 건수 표기(원본 결과건수 라벨과 동일 키).
+            oCount.textContent = _txt("/U4A/CL_WS_COMMON", "A73") + " : " + aRows.length;
+            aRows.forEach(function (oRow, iIdx) {
+                const oTr = _el("tr");
+                oTr.setAttribute("aria-selected", "false");
+                const aCell = [
+                    { v: oRow.TRKORR, cls: "u4aCtsColC" },
+                    { v: oRow.AS4TEXT, cls: "" },
+                    { v: _fmtDate(oRow.AS4DATE), cls: "u4aCtsColC" },
+                    { v: _fmtTime(oRow.AS4TIME), cls: "u4aCtsColC" }
+                ];
+                aCell.forEach(function (c) { oTr.appendChild(_el("td", c.cls, c.v || "")); });
+                oTr.addEventListener("click", function () { _selectRow(iIdx); });
+                oTr.addEventListener("dblclick", function () { _selectRow(iIdx); _accept(true); });
+                oTbody.appendChild(oTr);
+            });
         }
 
-        var oCtsContent = oAPP.fn.fnGetCtsContents();
+        // ── 서버 조회(원본 ev_GetCtsDialogAfterOpen / fnGetCtsDataSucc/Err) ──
+        function _loadData() {
+            _setBusy(true);       // 공통 top-layer busy(모달 위에도 보임)
+            oState.aRows = [];
+            _renderRows();
+            const sPath = parent.getServerPath() + C_GET_CTS_URL,
+                oUserInfo = parent.getUserInfo(),
+                oFormData = new FormData();
+            oFormData.append("USRID", oUserInfo.ID);
+            sendAjax(sPath, oFormData, _onDataSucc, null, null, "POST", _onDataErr);
+        }
 
-        var oCtsDialog = new sap.m.Dialog(C_DLG_ID, {
+        function _onDataSucc(oResult) {
+            _setBusy(false);
+            if (!oResult || oResult.RETCD !== "S") { return; }
+            oState.aRows = Array.isArray(oResult.RESULT) ? oResult.RESULT : [];
+            _renderRows();
+        }
 
-            // Properties
-            busy: "{/CTS/ISBUSY}",
-            draggable: true,
-            resizable: true,
-            contentWidth: "100%",
-            contentHeight: "100%",
+        function _onDataErr() {
+            _setBusy(false);
+        }
 
-            // Aggregations
-            customHeader: new sap.m.Toolbar({
-                content: [
-                    new sap.m.ToolbarSpacer(),
+        // ── 선택 확정(Accept / 더블클릭) ────────────────────────────────
+        //   더블클릭(bImmediate=true) 은 원본과 동일하게 확인 질문 후 콜백.
+        function _accept(bImmediate) {
+            if (oState.iSel < 0) {
+                // 268  Selected line does not exists.
+                parent.showMessage(null, 10, "I", _txt("/U4A/MSG_WS", "268"));
+                return;
+            }
+            const oRow = oState.aRows[oState.iSel];
+            if (bImmediate) {
+                // 346  Do you want to choose?
+                parent.showMessage(null, 30, "I", _txt("/U4A/MSG_WS", "346"), function (sAction) {
+                    if (sAction !== "YES") { return; }
+                    _fireCallback(oRow);
+                });
+                return;
+            }
+            _fireCallback(oRow);
+        }
 
-                    new sap.ui.core.Icon({
-                        src: "sap-icon://shipping-status"
-                    }),
+        function _fireCallback(oRow) {
+            if (oState.fnCb) {
+                try { oState.fnCb(oRow); }
+                catch (e) { if (typeof console !== "undefined") { console.error("[CTS] callback 실패:", e && e.message); } }
+            }
+            _close();
+        }
 
-                    new sap.m.Title({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "345"), // Prompt for Transportable Workbench Request
-                    }).addStyleClass("sapUiTinyMarginBegin"),
+        function _close() {
+            try { oDlg.close(); } catch (e) { }
+            try { oDlg.remove(); } catch (e) { }
+        }
 
-                    new sap.m.ToolbarSpacer(),
+        // ESC → 닫기.
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); _close(); });
 
-                    new sap.m.Button({
-                        icon: "sap-icon://decline",
-                        press: function() {
+        // 공통 팝업 UX(드래그/더블클릭 리센터/우하단 resize grip) — SAPUI5 동일.
+        if (window.U4AUI && U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHeader); }
+        if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
+        if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 560, minH: 360 }); }
 
-                            oCtsDialog.close();
+        document.body.appendChild(oDlg);
+        oDlg.showModal();
 
-                        }
-                    })
-                ]
-            }),
-            content: [
-
-                oCtsContent
-
-            ],
-            buttons: [
-                // Accept 버튼
-                new sap.m.Button({
-                    type: sap.m.ButtonType.Emphasized,
-                    icon: "sap-icon://accept",
-                    press: function() {
-                        oAPP.events.ev_CtsPopupAccept();
-                    }
-                }),
-
-                // // CTS 신규 생성 버튼
-                // new sap.m.Button({
-                //     type: sap.m.ButtonType.Ghost,
-                //     icon: "sap-icon://document",
-                //     press: function() {
-                //         oAPP.fn.fnNewCtsPopUpOpen();
-                //     }
-                // }).addStyleClass("sapUiSmallMarginBegin"),
-
-                // Cancel 버튼
-                new sap.m.Button({
-                    type: sap.m.ButtonType.Reject,
-                    icon: "sap-icon://decline",
-                    press: function() {
-
-                        oCtsDialog.close();
-
-                    }.bind(oCtsDialog)
-                }),
-            ],
-
-            // Events
-            beforeOpen: oAPP.events.ev_CtsDlgBeforeOpen,
-            afterOpen: oAPP.events.ev_GetCtsDialogAfterOpen,
-            afterClose: oAPP.events.ev_CtsDlgAfterClose,
-
-        }).addStyleClass("sapUiContentPadding sapUiSizeCompact");
-
-        oCtsDialog.bindElement(C_BIND_ROOT_PATH);
-
-        oCtsDialog.open();
+        // 오픈 직후 데이터 조회(원본 afterOpen).
+        _loadData();
 
     }; // end of oAPP.fn.fnCtsPopupOpen
-
-    /************************************************************************
-     * CTS 팝업의 컨텐츠 영역 UI Object
-     ************************************************************************/
-    oAPP.fn.fnGetCtsContents = function() {
-
-        var oCtsPanel = oAPP.fn.fnGetCtsDlgPanel(),
-            oCtsTreeTable = oAPP.fn.fnGetCtsDlgTreeTable();
-
-        var oCtsPage = new sap.m.Page({
-            showHeader: false,
-            content: [
-                new sap.m.VBox({
-                    renderType: sap.m.FlexRendertype.Bare,
-                    height: "100%",
-                    items: [
-
-                        oCtsPanel,
-
-                        new sap.m.Page({
-                            showHeader: true,
-                            customHeader: new sap.m.Bar({
-                                contentLeft: [
-                                    new sap.m.Button({
-                                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A48"), // Refresh
-                                        icon: "sap-icon://refresh",
-                                        type: sap.m.ButtonType.Emphasized,
-                                        press: () => {
-
-                                            var oCtsDialog = sap.ui.getCore().byId(C_DLG_ID);
-                                            if (oCtsDialog == null) {
-                                                return;
-                                            }
-
-                                            oCtsDialog.fireBeforeOpen();
-                                            oCtsDialog.fireAfterOpen();
-
-                                        }
-                                    })
-                                ]
-                            }),
-                            content: [
-                                oCtsTreeTable // CTS Dialog의 Tree Table 영역
-                            ]
-                        })
-
-                    ]
-
-                })
-
-            ]
-
-        });
-
-
-
-        // var oCtsPage = new sap.m.Page({
-        //     showHeader: false,
-        //     content: [
-
-        //         new sap.ui.layout.Splitter({
-        //             height: "100%",
-        //             width: "100%",
-        //             orientation: sap.ui.core.Orientation.Vertical,
-        //             contentAreas: [
-
-        //                 oCtsPanel, // CTS Dialog의 Panel 영역
-
-        //                 new sap.m.Page({
-        //                     showHeader: true,
-        //                     customHeader: new sap.m.Bar(),
-        //                     content: [
-        //                         oCtsTreeTable // CTS Dialog의 Tree Table 영역
-        //                     ]
-        //                 })
-
-        //             ]
-        //         })
-
-        //     ]
-
-        // });
-
-        return oCtsPage;
-
-    }; // end of oAPP.fn.fnGetCtsContents
-
-    /************************************************************************
-     * CTS 팝업의 Panel 영역 UI Object
-     ************************************************************************/
-    oAPP.fn.fnGetCtsDlgPanel = function() {
-
-        var oCtsForm = oAPP.fn.fnGetCtsDlgForm();
-
-        var oCtsPanel = new sap.m.Panel({
-            layoutData: new sap.ui.layout.SplitterLayoutData({
-                size: "180px",
-                resizable: true,
-                minSize: 180
-            }),
-            content: [
-                oCtsForm
-            ]
-
-        });
-
-        return oCtsPanel;
-
-    }; // end of oAPP.fn.fnGetCtsDlgPanel
-
-    /************************************************************************
-     * CTS 팝업의 Panel 영역 UI Object
-     ************************************************************************/
-    oAPP.fn.fnGetCtsDlgForm = function() {
-
-        // MIME Folder 생성 팝업의 FORM
-        var oCtsForm = new sap.ui.layout.form.Form({
-            editable: true,
-            busy: "{/CTS/ISBUSY}",
-            busyIndicatorDelay: 0,
-            layout: new sap.ui.layout.form.ResponsiveGridLayout({
-                labelSpanXL: 3,
-                labelSpanL: 4,
-                labelSpanM: 6,
-                labelSpanS: 12,
-                singleContainerFullSize: false
-            }),
-
-            formContainers: [
-                new sap.ui.layout.form.FormContainer({
-                    formElements: [
-
-                        new sap.ui.layout.form.FormElement({
-                            label: new sap.m.Label({
-                                design: sap.m.LabelDesign.Bold,
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B03"), // Request No
-                            }),
-                            fields: new sap.m.Input({
-                                value: "{CTSNO}",
-                                editable: false
-                            })
-                        }),
-
-                        new sap.ui.layout.form.FormElement({
-                            label: new sap.m.Label({
-                                design: sap.m.LabelDesign.Bold,
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D54"), // Short Description
-                            }),
-                            fields: new sap.m.Input({
-                                value: "{CTSDESC}",
-                                editable: false
-                            })
-                        }),
-
-                    ]
-
-                }),
-
-            ]
-
-        });
-
-        oCtsForm.bindElement(C_BIND_ROOT_PATH + "/CTSHEAD");
-
-        return oCtsForm;
-
-    }; // end of oAPP.fn.fnGetCtsDlgFormInPanel
-
-    /************************************************************************
-     * CTS 팝업의 TreeTable 영역 UI Object
-     ************************************************************************/
-    oAPP.fn.fnGetCtsDlgTreeTable = function() {
-
-        var oCtsTreeTable = new sap.ui.table.Table(C_CTS_TB_ID, {
-            selectionMode: sap.ui.table.SelectionMode.Single,
-            selectionBehavior: sap.ui.table.SelectionBehavior.RowOnly,
-            visibleRowCountMode: sap.ui.table.VisibleRowCountMode.Auto,
-            columns: [
-                new sap.ui.table.Column({
-                    hAlign: sap.ui.core.HorizontalAlign.Center,
-                    width: "150px",
-                    label: new sap.m.Label({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A21"), // CTS No.
-                        design: sap.m.LabelDesign.Bold
-                    }),
-                    template: new sap.m.Text({
-                        text: "{TRKORR}"
-                    }),
-                }),
-
-                // new sap.ui.table.Column({
-                //     label: new sap.m.Label({
-                //         text: "SAP ID",
-                //         design: sap.m.LabelDesign.Bold
-                //     }),
-                //     template: new sap.m.Text({
-                //         text: "{AS4USER}"
-                //     }),
-                // }),
-
-                new sap.ui.table.Column({
-                    width: "auto",
-                    minWidth: 500,
-                    label: new sap.m.Label({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A35"), // Description
-                        design: sap.m.LabelDesign.Bold
-                    }),
-                    template: new sap.m.Text({
-                        text: "{AS4TEXT}"
-                    }),
-                }),
-
-                new sap.ui.table.Column({
-                    hAlign: sap.ui.core.HorizontalAlign.Center,
-                    width: "150px",
-                    label: new sap.m.Label({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D55"), // Date
-                        design: sap.m.LabelDesign.Bold
-                    }),
-                    template: new sap.m.Text({
-                        text: "{AS4DATE}"
-                    }),
-                }),
-
-                new sap.ui.table.Column({
-                    hAlign: sap.ui.core.HorizontalAlign.Center,
-                    width: "150px",
-                    label: new sap.m.Label({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D56"), // Time
-                        design: sap.m.LabelDesign.Bold
-                    }),
-                    template: new sap.m.Text({
-                        text: "{AS4TIME}"
-                    }),
-                }),
-
-            ],
-            rows: {
-                path: "/CTS/CTSTREE",
-                // parameters: {
-                //     numberOfExpandedLevels: 1,
-                //     collapseRecursive: true,
-                //     arrayNames: ['CTSTREE']
-                // }
-            },
-            rowSelectionChange: oAPP.events.ev_CtsTreeTableRowSelect,
-
-        });
-
-        oCtsTreeTable.attachBrowserEvent("dblclick", function(oEvent) {
-
-            var oTarget = oEvent.target,
-                $SelectedRow = $(oTarget).closest(".sapUiTableRow");
-
-            if (!$SelectedRow.length) {
-                return;
-            }
-
-            var oRow = $SelectedRow[0],
-
-                sRowId1 = oRow.getAttribute("data-sap-ui-related"),
-                sRowId2 = oRow.getAttribute("data-sap-ui"),
-                sRowId = "";
-
-            if (sRowId1 == null && sRowId2 == null) {
-                return;
-            }
-
-            if (sRowId1) {
-                sRowId = sRowId1;
-            }
-
-            if (sRowId2) {
-                sRowId = sRowId2;
-            }
-
-            var oRow = sap.ui.getCore().byId(sRowId);
-            if (!oRow) {
-                return;
-            }
-
-            var oCtx = oRow.getBindingContext();
-            if (!oCtx) {
-                return;
-            }
-
-            var oRowData = oRow.getModel().getProperty(oCtx.sPath);
-
-            // 저장 확인 질문 팝업
-            let sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "346"); // Do you want to choose?
-            parent.showMessage(sap, 30, "I", sMsg, lf_msgCallback.bind(oRowData));
-
-            function lf_msgCallback(sAction) {
-
-                var YES = sap.m.MessageBox.Action.YES,
-                    bIsAction = (sAction == YES ? true : false);
-
-                if (!bIsAction) {
-                    return;
-                }
-
-                var oRowData = this;
-
-                // 선택된 CTS 정보의 Parent, child 번호를 전달한다.        
-                if (typeof GfnCtsCallback === "function") {
-                    GfnCtsCallback(oRowData);
-                }
-
-                var oCtsDialog = sap.ui.getCore().byId(C_DLG_ID);
-                if (oCtsDialog) {
-                    oCtsDialog.close();
-                }
-
-            }
-
-        });
-
-        return oCtsTreeTable;
-
-    }; // end of oAPP.fn.fnGetCtsDlgTreeTable    
-
-    /************************************************************************
-     * CTS 정보 가져오기 성공 function
-     ************************************************************************/
-    oAPP.fn.fnGetCtsDataSucc = function(oResult) {
-
-        parent.setBusy('');
-
-        APPCOMMON.fnSetModelProperty("/CTS/ISBUSY", false);
-
-        if (oResult.RETCD != "S") {
-            return;
-        }
-
-        var aCtsData = oResult.RESULT,
-            oCtsModel = {
-                CTSTREE: aCtsData,
-                CTSHEAD: {
-                    CTSNO: "",
-                    CTSDESC: ""
-                }
-            };
-
-        APPCOMMON.fnSetModelProperty(C_BIND_ROOT_PATH, oCtsModel);
-
-        // var oModel = sap.ui.getCore().getModel();
-
-        // // Model Data를 Tree로 구성
-        // oAPP.fn.fnSetTreeJson(oModel, "CTS.CTSTREE", "TRKORR", "STRKORR", "CTSTREE");
-
-    }; // end of oAPP.fn.fnGetCtsDataSucc
-
-    /************************************************************************
-     * CTS 정보 가져오기 실패 function
-     ************************************************************************/
-    oAPP.fn.fnGetCtsDataErr = function() {
-
-        parent.setBusy('');
-
-        APPCOMMON.fnSetModelProperty("/CTS/ISBUSY", false);
-
-    }; // end of oAPP.fn.fnGetCtsDataErr
-
-    /************************************************************************
-     * CTS 신규 생성 Dialog
-     ************************************************************************/
-    oAPP.fn.fnNewCtsPopUpOpen = function() {
-
-        var oCtsDialog = sap.ui.getCore().byId(C_CTS_NEW_DLG_ID);
-
-        if (oCtsDialog) {
-            oCtsDialog.open();
-            return;
-        }
-
-        var oCtsNewContents = oAPP.fn.fnGetCtsNewContents();
-
-        var oCtsNewDialog = new sap.m.Dialog(C_CTS_NEW_DLG_ID, {
-
-            // properties
-            draggable: true,
-            resizable: true,
-            contentWidth: "60%",
-            // contentHeight: "60%",
-            // title: "Create Request",
-            // titleAlignment: sap.m.TitleAlignment.Center,
-            // icon: "sap-icon://document",
-            // beforeOpen: oAPP.events.ev_CtsDlgBeforeOpen,
-
-            // Aggregations
-            customHeader: new sap.m.Toolbar({
-                content: [
-                    new sap.m.ToolbarSpacer(),
-
-                    new sap.ui.core.Icon({
-                        src: "sap-icon://document"
-                    }),
-
-                    new sap.m.Title({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D57"), // Create Request
-                    }).addStyleClass("sapUiTinyMarginBegin"),
-
-                    new sap.m.ToolbarSpacer(),
-
-                    new sap.m.Button({
-                        icon: "sap-icon://decline",
-                        press: function() {
-
-                            var oDialog = sap.ui.getCore().byId(C_CTS_NEW_DLG_ID);
-                            if (oDialog == null) {
-                                return;
-                            }
-
-                            if (oDialog.isOpen()) {
-                                oDialog.close();
-                            }
-
-                        }
-                    })
-                ]
-            }),
-            content: [
-                oCtsNewContents
-            ],
-
-            // Events
-            afterOpen: oAPP.events.ev_ctsNewDlgAfterOpen,
-
-        }).addStyleClass("sapUiSizeCompact");
-
-        oCtsNewDialog.bindElement(C_CTS_NEW_BIND_ROOT_PATH);
-
-        oCtsNewDialog.open();
-
-    }; // end of oAPP.fn.fnNewCtsPopUpOpen
-
-    /************************************************************************
-     * CTS 신규 생성 Dialog의 Contents..
-     ************************************************************************/
-    oAPP.fn.fnGetCtsNewContents = function() {
-
-        var oForm1 = oAPP.fn.fngetCtsNewForm1(),
-            oForm2 = oAPP.fn.fngetCtsNewForm2(),
-            oForm3 = oAPP.fn.fngetCtsNewForm3();
-
-        return new sap.m.Page({
-            showHeader: false,
-            content: [
-                oForm1,
-                oForm2,
-                oForm3
-            ]
-        });
-
-    }; // end of oAPP.fn.fnGetCtsNewContents
-
-    oAPP.fn.fngetCtsNewForm1 = function() {
-
-        return new sap.ui.layout.form.Form({
-            editable: true,
-            layout: new sap.ui.layout.form.ResponsiveGridLayout({
-                columnsM: 2,
-            }),
-            formContainers: [
-                new sap.ui.layout.form.FormContainer({
-                    formElements: [
-                        new sap.ui.layout.form.FormElement({
-                            label: new sap.m.Label({
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B03"), // Request No
-                                design: sap.m.LabelDesign.Bold
-                            }),
-                            fields: [
-                                new sap.m.Input({
-                                    value: "{TRKORR}",
-                                    editable: false,
-                                    description: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D58"), // Workbench Request
-                                })
-                            ]
-                        }),
-                        new sap.ui.layout.form.FormElement({
-                            label: new sap.m.Label({
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D54"), // Short Description
-                                design: sap.m.LabelDesign.Bold
-                            }),
-                            fields: [
-                                new sap.m.Input({
-                                    value: "{AS4TEXT}",
-                                })
-                            ]
-                        })
-                    ]
-                })
-            ]
-
-        }).addStyleClass("u4aWsCtsNewForm1");
-
-    };
-
-    oAPP.fn.fngetCtsNewForm2 = function() {
-
-        return new sap.ui.layout.form.Form({
-            editable: true,
-            layout: new sap.ui.layout.form.ResponsiveGridLayout({
-                columnsM: 2,
-            }),
-            formContainers: [
-                new sap.ui.layout.form.FormContainer({
-                    formElements: [
-
-                        new sap.ui.layout.form.FormElement({
-                            label: new sap.m.Label({
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D59"), // Owner
-                                design: sap.m.LabelDesign.Bold
-                            }),
-                            fields: [
-                                new sap.m.Input({
-                                    value: "{AS4USER}",
-                                    editable: false,
-                                    layoutData: new sap.ui.layout.GridData({
-                                        span: "XL4 L4 M4 S12"
-                                    })
-                                })
-                            ]
-                        }),
-
-                        new sap.ui.layout.form.FormElement({
-                            label: new sap.m.Label({
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D53"), // Status
-                                design: sap.m.LabelDesign.Bold
-                            }),
-                            fields: [
-                                new sap.m.Input({
-                                    value: "{TRSTATUS_T}",
-                                    editable: false,
-                                    layoutData: new sap.ui.layout.GridData({
-                                        span: "XL4 L4 M8 S12"
-                                    })
-                                })
-                            ]
-                        }),
-
-                        new sap.ui.layout.form.FormElement({
-                            label: new sap.m.Label({
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D60"), // Last Changed
-                                design: sap.m.LabelDesign.Bold
-                            }),
-                            fields: [
-                                new sap.m.Input({
-                                    value: "{AS4DATE}",
-                                    editable: false,
-                                    layoutData: new sap.ui.layout.GridData({
-                                        span: "XL4 L4 M4 S12"
-                                    })
-                                }),
-                                new sap.m.Input({
-                                    value: "{AS4TIME}",
-                                    editable: false,
-                                    layoutData: new sap.ui.layout.GridData({
-                                        span: "XL4 L4 M4 S12"
-                                    })
-                                })
-                            ]
-
-                        })
-
-                    ]
-                }),
-
-                new sap.ui.layout.form.FormContainer({
-                    formElements: [
-
-                        new sap.ui.layout.form.FormElement({
-                            label: new sap.m.Label({
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D61"), // Source Client
-                                design: sap.m.LabelDesign.Bold
-                            }),
-                            fields: [
-                                new sap.m.Input({
-                                    value: "{CLIENT}",
-                                    editable: false,
-                                    layoutData: new sap.ui.layout.GridData({
-                                        span: "XL4 L4 M4 S12"
-                                    })
-                                })
-                            ]
-                        }),
-
-                        new sap.ui.layout.form.FormElement({
-                            label: new sap.m.Label({
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D62"), // Target
-                                design: sap.m.LabelDesign.Bold
-                            }),
-                            fields: [
-                                new sap.m.Input({
-                                    value: "{TARSYSTEM}",
-                                    layoutData: new sap.ui.layout.GridData({
-                                        span: "XL4 L4 M4 S12"
-                                    })
-                                })
-                            ]
-                        }),
-
-                    ]
-                })
-
-            ]
-        });
-
-    };
-
-    oAPP.fn.fngetCtsNewForm3 = function() {
-
-
-    };
-
-
-    /************************************************************************
-     * CTS 신규 생성 Dialog의 AfterOpen 이벤트
-     ************************************************************************/
-    oAPP.events.ev_ctsNewDlgAfterOpen = function() {
-
-        var oUserInfo = parent.getUserInfo();
-
-        var oNewCts = {
-            TRKORR: "",
-            AS4TEXT: "",
-            AS4USER: oUserInfo.ID.toUpperCase(),
-            TRSTATUS_T: "New",
-            AS4DATE: new Date().format("yyyy-MM-dd"),
-            AS4TIME: new Date().format("HH:mm:ss"),
-            CLIENT: oUserInfo.CLIENT,
-            TARSYSTEM: "",
-            GT_TASKS: [{
-                USER: ""
-            }]
-        };
-
-        APPCOMMON.fnSetModelProperty(C_CTS_NEW_BIND_ROOT_PATH, oNewCts);
-
-    }; // end of oAPP.events.ev_ctsNewDlgAfterOpen
-
-    /************************************************************************
-     * Cts Dialog의 Accept 버튼
-     * **********************************************************************/
-    oAPP.events.ev_CtsPopupAccept = function() {
-
-        var oCtsInfo = APPCOMMON.fnGetModelProperty("/CTS/CTSHEAD");
-
-        if (oCtsInfo.CTSNO == "") {
-            let sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "268"); // Selected line does not exists.
-            parent.showMessage(sap, 10, null, sMsg);
-            return;
-        }
-
-        var oTable = sap.ui.getCore().byId(C_CTS_TB_ID);
-        if (oTable == null) {
-            return;
-        }
-
-        // 테이블의 선택된 라인의 바인딩 정보를 구한다.
-        var iSelIdx = oTable.getSelectedIndex(),
-            oCtx = oTable.getContextByIndex(iSelIdx),
-            sBindPath = oCtx.sPath,
-            oBindData = APPCOMMON.fnGetModelProperty(sBindPath);
-
-        // 선택된 CTS 정보의 Parent, child 번호를 전달한다.        
-        if (typeof GfnCtsCallback === "function") {
-            GfnCtsCallback(oBindData);
-        }
-
-        var oCtsDialog = sap.ui.getCore().byId(C_DLG_ID);
-        if (oCtsDialog) {
-            oCtsDialog.close();
-        }
-
-    }; // end of oAPP.events.ev_CtsPopupAccept
-
-    /************************************************************************
-     * Cts Tree Table Row Select Event
-     * **********************************************************************/
-    oAPP.events.ev_CtsTreeTableRowSelect = function(oEvent) {
-
-        var oTable = oEvent.getSource(),
-            iSelIdx = oEvent.getParameter("rowIndex");
-
-        oTable.setSelectedIndex(iSelIdx);
-
-        var oCtsHeadInfo = APPCOMMON.fnGetModelProperty("/CTS/CTSHEAD");
-        oCtsHeadInfo.CTSNO = "";
-        oCtsHeadInfo.CTSDESC = "";
-
-        APPCOMMON.fnSetModelProperty("/CTS/CTSHEAD", oCtsHeadInfo);
-
-        // 선택한 라인이 있는지 체크
-        if (iSelIdx < 0) {
-            return;
-        }
-
-        var oCtx = oTable.getContextByIndex(iSelIdx),
-            oTableModel = oTable.getModel(),
-            oModelData = oTableModel.getProperty(oCtx.sPath);
-
-        // // Target System 영역을 클릭 했을 경우 리턴
-        // if (oModelData.ISROOT == 'X' && oModelData.TARSYSTEM == 'X') {
-        //     oTable.clearSelection();
-        //     return;
-        // }
-
-        var TRKORR = oModelData.TRKORR,
-            AS4TEXT = oModelData.AS4TEXT,
-            STRKORR = oModelData.STRKORR;
-
-        oCtsHeadInfo.CTSNO = TRKORR;
-        oCtsHeadInfo.CTSDESC = AS4TEXT;
-
-        var oCtsInfo = {
-            PARENT: "",
-            CHILD: ""
-        }
-
-        // 선택한 CTS의 Parent, Child 번호를 구한다.
-        oCtsInfo.CHILD = TRKORR;
-        oCtsInfo.PARENT = STRKORR;
-
-        // if (oModelData.ISROOT != 'X') {
-        //     oCtsInfo.PARENT = STRKORR;
-        // }
-
-        // CTS 팝업 상단에 CTS 정보를 뿌려줄 데이터 바인딩
-        APPCOMMON.fnSetModelProperty("/CTS/CTSHEAD", oCtsHeadInfo);
-
-        // 선택한 CTS의 부모 자식 정보를 콜백 메소드로 전달할 데이터
-        APPCOMMON.fnSetModelProperty("/CTS/SEL_CTS", oCtsInfo);
-
-    };
-
-    /************************************************************************
-     * CTS 팝업을 띄우기 전 Dialog 초기화 및 Busy Indicator 켜기
-     ************************************************************************/
-    oAPP.events.ev_CtsDlgBeforeOpen = function() {
-
-        var oCts = {
-            ISBUSY: true,
-            CTSHEAD: {}
-        }
-
-        APPCOMMON.fnSetModelProperty(C_BIND_ROOT_PATH, oCts);
-
-    }; // end of oAPP.events.ev_CtsDlgBeforeOpen
-
-    /************************************************************************
-     * CTS 팝업을 띄운 후 CTS 정보 불러오는 로직
-     ************************************************************************/
-    oAPP.events.ev_GetCtsDialogAfterOpen = function() {
-
-        var oTable = sap.ui.getCore().byId(C_CTS_TB_ID);
-        if (oTable != null) {
-            oTable.clearSelection();
-        }
-
-        var sPath = parent.getServerPath() + '/getctsdata',
-            oUserInfo = parent.getUserInfo(),
-            oFormData = new FormData();
-
-        oFormData.append("USRID", oUserInfo.ID);
-
-        sendAjax(sPath, oFormData, oAPP.fn.fnGetCtsDataSucc, null, null, 'POST', oAPP.fn.fnGetCtsDataErr);
-
-    }; // end of oAPP.events.ev_GetCtsDialogAfterOpen    
-
-    /************************************************************************
-     * CTS 팝업을 닫은 후 이벤트
-     ************************************************************************/
-    oAPP.events.ev_CtsDlgAfterClose = function() {
-
-        // CTS 팝업을 닫으면 CTS 모델을 초기화 한다.
-        APPCOMMON.fnSetModelProperty(C_BIND_ROOT_PATH, undefined);
-
-    }; // end of oAPP.events.ev_CtsDlgAfterClose
-
 
 })(window, $, oAPP);

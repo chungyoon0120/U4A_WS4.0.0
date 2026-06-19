@@ -547,6 +547,29 @@ body {
     z-index: 9999;
 }
 
+/* busy 요소가 <dialog> 일 때(ws10_20/index.html) — setDomBusy 가 showModal() 로 띄워
+   모달 팝업 위(top-layer)에도 보이게 한다. 전체화면 투명 + 카드 중앙 + 무스크림 backdrop. */
+dialog.u4aWsBusyIndicator {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: hidden;
+}
+dialog.u4aWsBusyIndicator:not([open]) { display: none; }
+dialog.u4aWsBusyIndicator[open] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+dialog.u4aWsBusyIndicator::backdrop { background: transparent; }
+
 /* 중앙 카드 (구 BusyDialog 다이얼로그) — 테마 표면색 + 라운드 + 그림자.
    사이즈를 키우고(가독성) 등장 시 살짝 팝업되어 존재감을 준다. */
 .u4aWsBusyCard {

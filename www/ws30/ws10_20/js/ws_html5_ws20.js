@@ -893,7 +893,7 @@
             '<div class="u4a-dialog__footer">' +
             '  <button type="button" class="u4a-btn" data-act="default"><i class="fa-solid fa-rotate-left"></i> ' + _esc(_msg("A63")) + '</button>' +   // Default
             '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="save"><i class="fa-solid fa-floppy-disk"></i> ' + _esc(_msg("A64")) + '</button>' +   // Save
-            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="close"><i class="fa-solid fa-xmark"></i> ' + _esc(_msg("A39")) + '</button>' +   // Close
+            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="close"><i class="fa-solid fa-xmark"></i> ' + _esc(_msg("A39")) + '</button>' +   // Close (Reject 느낌)
             '</div>';
 
         var CARDS = DLG.querySelector(".u4aWs20LayoutCards");

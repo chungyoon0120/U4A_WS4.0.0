@@ -1202,280 +1202,134 @@
 
 
     /************************************************************************
-     * System Information Dialog Open
+     * System Information Dialog Open (UI5 sap.m.Dialog → HTML5 공통 .u4a-dialog)
+     *   · 데이터는 모델 복사본 대신 원본 소스 직접(상태바 _updateStatusBar 와 동일):
+     *     getServerInfo()/getUserInfo()/getMetadata(). 표시 필드/순서/메시지키는 원본과 동일.
+     *   · 공통 다이얼로그 UX(드래그·더블클릭 리센터·resize grip·헤더 상태아이콘·닫기 X).
      ************************************************************************/
-    oAPP.fn.fnServerInfoDialogOpen = function(){
+    oAPP.fn.fnServerInfoDialogOpen = function () {
 
-        let oDialog = new sap.m.Dialog({          
-            draggable: true,        // boolean         
-            resizable: true,       // boolean        
-            afterClose: function(){
-                oDialog.destroy();
-            },           
-            buttons: [
-                new sap.m.Button({
-                    icon: "sap-icon://decline",
-                    type: sap.m.ButtonType.Reject,
-                    press: function(){
-                        oDialog.close();
-                    }
-                })
-            ],             // sap.m.Button
-            // content: [],             // sap.ui.core.Control               
-            customHeader: new sap.m.Toolbar({
-                content: [
-                    new sap.ui.core.Icon({
-                        src: "sap-icon://it-system",
+        // 이미 떠 있으면 중복 방지
+        var oExist = document.getElementById("u4aSvrInfoDlg");
+        if (oExist) {
+            try { oExist.close(); } catch (e) { }
+            try { oExist.remove(); } catch (e) { }
+        }
 
-                    }).addStyleClass("sapUiTinyMarginBegin"),
+        // 스코프 스타일 1회 주입 — 공통 .u4a-form 재사용 + 라벨/값 "가로" 정렬만 조정(읽기전용 정보).
+        if (!document.getElementById("u4aSvrInfoStyle")) {
+            var oStyle = document.createElement("style");
+            oStyle.id = "u4aSvrInfoStyle";
+            oStyle.textContent =
+                ".u4aSvrInfoDlg { min-width: 22rem; }" +
+                ".u4aSvrInfoDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
+                ".u4aSvrInfoForm .u4a-form__row { flex-direction: row; align-items: baseline; gap: 0.75rem; }" +
+                ".u4aSvrInfoForm .u4a-label { flex: 0 0 9rem; }" +
+                ".u4aSvrInfoVal { color: var(--text); word-break: break-all; }";
+            document.head.appendChild(oStyle);
+        }
 
-                    new sap.m.Title({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C42") // Server Information
-                    }),
+        // ── 데이터 (원본 모델 /SERVERINFO·/USERINFO·/METADATA 의 실제 소스) ──
+        var si = {}, ui = {}, meta = {};
+        try { si = (parent.getServerInfo && parent.getServerInfo()) || {}; } catch (e) { }
+        try { ui = (parent.getUserInfo && parent.getUserInfo()) || {}; } catch (e) { }
+        try { meta = (parent.getMetadata && parent.getMetadata()) || {}; } catch (e) { }
 
-                    new sap.m.ToolbarSpacer(),
+        var oSvrVer = meta.S_WSVER;                                              // {SVRVER, WSSVER} | undefined
+        var sUserId = (typeof ui.ID === "string") ? ui.ID.toUpperCase() : "";    // 원본: ID 대문자
+        var oHostInfo = si.SERVER_INFO;                                          // {protocol,host,port} | undefined
 
-                    new sap.m.Button({
-                        icon: "sap-icon://decline",
-                        type: sap.m.ButtonType.Reject,
-                        press: function(){
-                            oDialog.close();
-                        }
-                    })
-                ]
-            }),
+        // 라벨/값 정의 — 원본 Form 순서·메시지키 그대로.
+        var aRows = [
+            { label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C43"), val: si.WSVER },                          // WS Version
+            { label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E26"), val: si.WSPATCH_LEVEL },                  // Patch Level
+            { label: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "285"),                                    // Server Version
+              val: oSvrVer ? (oSvrVer.SVRVER + " ( " + oSvrVer.WSSVER + " )") : null, hideIfEmpty: true },            //   (원본: S_WSVER 있을 때만 표시)
+            { label: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "063"), val: si.CLIENT },                  // Client
+            { label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C45"), val: si.SYSID },                          // System ID
+            { label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C46"), val: sUserId },                           // USER
+            { label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C47"), val: si.LANGU },                          // Language
+            { label: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C48"), val: oHostInfo ? oHostInfo.host : null }  // Host
+        ];
 
-            content: [
+        var _fa = function (s) { return '<i class="fa-solid fa-' + s + '"></i>'; };
 
-                new sap.ui.layout.form.Form({
-                    // width: "300px",
-                    editable: true,
+        // ── 다이얼로그 골격 (공통 .u4a-dialog) ──
+        var oDlg = document.createElement("dialog");
+        oDlg.className = "u4a-dialog u4aSvrInfoDlg";
+        oDlg.id = "u4aSvrInfoDlg";
 
-                    layout: new sap.ui.layout.form.ResponsiveGridLayout({
-                        labelSpanS: 5,
-                        labelSpanM: 4,
-                        labelSpanL: 4,
-                        columnsM: 1,
-                        columnsL: 2
-                    }), // end of layout
+        function lf_close() {
+            try { oDlg.close(); } catch (e) { }
+            try { oDlg.remove(); } catch (e) { }
+        }
 
-                    formContainers: [
+        // 헤더 (상태 아이콘 + 제목 + 닫기 X)
+        var oHeader = document.createElement("div");
+        oHeader.className = "u4a-dialog__header";
+        oHeader.setAttribute("data-type", "I");                                  // 정보 → accent 색 선두 아이콘
+        oHeader.innerHTML = _fa("server") + "<span></span>";                     // 원본 sap-icon://it-system ≈ server
+        oHeader.querySelector("span").textContent = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C42"); // Server Information
 
-                        new sap.ui.layout.form.FormContainer({
-                            formElements: [
+        var oX = document.createElement("button");
+        oX.type = "button";
+        oX.className = "u4a-btn-icon u4aSvrInfoX";                                // 공통 닫기 X(+data-act=close hover 빨강)
+        oX.setAttribute("data-act", "close");
+        oX.innerHTML = _fa("xmark");
+        oX.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");         // Close
+        oX.addEventListener("click", lf_close);
+        oHeader.appendChild(oX);
+        oDlg.appendChild(oHeader);
 
-                                /*****************************
-                                 * WS Version
-                                 *****************************/
-                                new sap.ui.layout.form.FormElement({
-                                    label: new sap.m.Label({
-                                        design: sap.m.LabelDesign.Bold,
-                                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C43") // WS Version
-                                    }), // end of label
-
-                                    fields: [
-                                        new sap.m.Text({
-                                            // text: "{/USERINFO/WSVER}"
-                                            text: "{/SERVERINFO/WSVER}"
-                                        })
-                                    ] // end of fields
-
-                                }), // end of sap.ui.layout.form.FormElement
-
-                                /*****************************
-                                 * Patch Level
-                                 *****************************/
-                                new sap.ui.layout.form.FormElement({
-                                    label: new sap.m.Label({
-                                        design: sap.m.LabelDesign.Bold,
-                                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E26") // Patch Level                                        
-                                    }), // end of label
-
-                                    fields: [
-                                        new sap.m.Text({
-                                            // text: "{/USERINFO/WSPATCH_LEVEL}"
-                                            text: "{/SERVERINFO/WSPATCH_LEVEL}"
-                                        })
-                                    ] // end of fields
-
-                                }).bindProperty("visible", {
-                                    parts: [
-                                        // "/USERINFO/WSPATCH_LEVEL"
-                                        "/SERVERINFO/WSPATCH_LEVEL"
-                                    ],
-                                    formatter: function () {
-
-                                        return true;
-                                        // return APP.isPackaged;
-
-                                    }
-                                }), // end of sap.ui.layout.form.FormElement
-
-                                /*****************************
-                                 * Server Version
-                                 *****************************/
-                                new sap.ui.layout.form.FormElement({
-                                    label: new sap.m.Label({
-                                        design: sap.m.LabelDesign.Bold,
-                                        text: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "285") // Server Version
-                                    }), // end of label
-
-                                    fields: [
-                                        new sap.m.Text().bindProperty("text", {
-                                            parts: [
-                                                "/METADATA/S_WSVER/SVRVER",
-                                                "/METADATA/S_WSVER/WSSVER"
-                                            ],
-                                            formatter: function(SVRVER, WSSVER){
-                                                
-                                                if(SVRVER == null || WSSVER == null){
-                                                    return;
-                                                }                                                
-
-                                                return `${SVRVER} ( ${WSSVER} )`;
-
-                                            }
-                                        })
-                                    ] // end of fields
-
-                                }).bindProperty("visible", {
-                                    parts: [
-                                        "/METADATA/S_WSVER"
-                                    ],
-                                    formatter: function (S_WSVER) {
-
-                                        if(!S_WSVER){
-                                            return false;
-                                        }
-
-                                        return true;                                        
-
-                                    }
-                                }), // end of sap.ui.layout.form.FormElement
-
-                                /*****************************
-                                 * Client
-                                 *****************************/
-                                new sap.ui.layout.form.FormElement({
-                                    label: new sap.m.Label({
-                                        design: sap.m.LabelDesign.Bold,
-                                        text: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "063") // Client,
-                                        // APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C44") // Client
-                                    }), // end of label
-
-                                    fields: [
-                                        new sap.m.Text({
-                                            // text: "{/USERINFO/CLIENT}"
-                                            text: "{/SERVERINFO/CLIENT}"
-                                        })
-                                    ] // end of fields
-
-                                }), // end of sap.ui.layout.form.FormElement
-
-                                /*****************************
-                                 * System ID
-                                 *****************************/
-                                new sap.ui.layout.form.FormElement({
-                                    label: new sap.m.Label({
-                                        design: sap.m.LabelDesign.Bold,
-                                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C45") // System ID
-                                    }), // end of label
-
-                                    fields: [
-                                        new sap.m.Text({
-                                            // text: "{/USERINFO/SYSID}"
-                                            text: "{/SERVERINFO/SYSID}"
-                                        })
-                                    ] // end of fields
-
-                                }), // end of sap.ui.layout.form.FormElement
-
-                                /*****************************
-                                 * USER
-                                 *****************************/
-                                new sap.ui.layout.form.FormElement({
-                                    label: new sap.m.Label({
-                                        design: sap.m.LabelDesign.Bold,
-                                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C46"), // USER
-                                    }), // end of label
-
-                                    fields: [
-                                        new sap.m.Text().bindProperty("text", "/USERINFO/ID", function (sId) {
-
-                                            if (typeof sId !== "string") {
-                                                return "";
-                                            }
-
-                                            return sId.toUpperCase();
-
-                                        })
-                                    ] // end of fields
-
-                                }), // end of sap.ui.layout.form.FormElement
-
-                                /*****************************
-                                 * Language
-                                 *****************************/
-                                new sap.ui.layout.form.FormElement({
-                                    label: new sap.m.Label({
-                                        design: sap.m.LabelDesign.Bold,
-                                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C47") // Language
-                                    }), // end of label
-
-                                    fields: [
-                                        new sap.m.Text({
-                                            // text: "{/USERINFO/LANGU}"
-                                            text: "{/SERVERINFO/LANGU}"
-                                        })
-                                    ] // end of fields
-
-                                }), // end of sap.ui.layout.form.FormElement
-
-                                /*****************************
-                                 * Host
-                                 *****************************/
-                                new sap.ui.layout.form.FormElement({
-                                    label: new sap.m.Label({
-                                        design: sap.m.LabelDesign.Bold,
-                                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C48") // Host
-                                    }), // end of label
-
-                                    fields: [
-                                        new sap.m.Text().bindProperty("text", {
-                                            parts: [
-                                                "/SERVERINFO/SERVER_INFO"
-                                            ],
-                                            formatter: (SERVERINFO) => {
-
-                                                if (!SERVERINFO) {
-                                                    return;
-                                                }
-
-                                                return SERVERINFO.host;
-
-                                            }
-                                        })
-                                    ] // end of fields
-
-                                }), // end of sap.ui.layout.form.FormElement
-
-                            ]
-
-                        })
-
-                    ] // end of formContainers
-
-                }) // end of sap.ui.layout.form.Form
-
-            ]
-
+        // 바디 (라벨-값 폼 — 공통 .u4a-form/.u4a-label)
+        var oBody = document.createElement("div");
+        oBody.className = "u4a-dialog__body";
+        var oForm = document.createElement("div");
+        oForm.className = "u4a-form u4aSvrInfoForm";
+        aRows.forEach(function (r) {
+            if (r.hideIfEmpty && (r.val == null || r.val === "")) { return; }
+            var oRow = document.createElement("div");
+            oRow.className = "u4a-form__row";
+            var oLbl = document.createElement("span");
+            oLbl.className = "u4a-label";
+            oLbl.textContent = r.label;
+            var oVal = document.createElement("span");
+            oVal.className = "u4aSvrInfoVal";
+            oVal.textContent = (r.val == null) ? "" : String(r.val);
+            oRow.appendChild(oLbl);
+            oRow.appendChild(oVal);
+            oForm.appendChild(oRow);
         });
+        oBody.appendChild(oForm);
+        oDlg.appendChild(oBody);
 
-        oDialog.addStyleClass("sapUiSizeCompact");
-        oDialog.open();
+        // 푸터 (닫기 — 원본 UI5 Reject 느낌의 negative)
+        var oFoot = document.createElement("div");
+        oFoot.className = "u4a-dialog__footer";
+        var oClose = document.createElement("button");
+        oClose.type = "button";
+        oClose.className = "u4a-btn u4a-btn--negative";
+        oClose.innerHTML = _fa("xmark") + "<span></span>";
+        oClose.querySelector("span").textContent = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39"); // Close
+        oClose.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
+        oClose.addEventListener("click", lf_close);
+        oFoot.appendChild(oClose);
+        oDlg.appendChild(oFoot);
+
+        // ESC → 닫기
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
+
+        // 헤더 드래그(화면 밖/상단 공통헤더 침범 방지) / 더블클릭 리센터 / grip 리사이즈 — 공통 U4AUI.
+        if (window.U4AUI && U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHeader); }
+        if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
+        if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 320, minH: 240 }); }
+
+        document.body.appendChild(oDlg);
+        oDlg.showModal();
 
     }; // end of oAPP.fn.fnServerInfoDialogOpen
-    
+
+
 
     /************************************************************************
      * 현재 브라우저에 종속된 팝업 종류들을 닫는다.

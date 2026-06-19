@@ -3340,7 +3340,7 @@
         function lf_callback(oReturn) {
 
             // Busy Dialog를 끈다.
-            APPCOMMON.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             if (oReturn.SUBRC == "E") {
 
@@ -3424,7 +3424,7 @@
         function lf_callback(oReturn) {
 
             // Busy Dialog를 끈다.
-            APPCOMMON.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             if (oReturn.SUBRC == "E") {
                 
@@ -3485,7 +3485,7 @@
         function lf_callback(oReturn) {
 
             // Busy Dialog를 끈다.
-            APPCOMMON.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             if (oReturn.SUBRC == "E") {
 

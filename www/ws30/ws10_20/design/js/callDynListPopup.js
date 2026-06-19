@@ -86,7 +86,7 @@
     function lf_getDynLayout(oDlg, oTab, oModel, sName, it_param){
 
         //busy dialog open.
-        oAPP.common.fnSetBusyDialog(true);
+        parent.setBusy("X");
 
         //동적 테이블 구성 구분자 전송 데이터에 구성.
         var oFormData = new FormData();
@@ -103,7 +103,7 @@
         sendAjax(oAPP.attr.servNm + "/getDynList", oFormData, function(param){
 
             //busy dialog close.
-            oAPP.common.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             //테이블 구성정보를 얻지 못한 경우.
             if(param.RETCD === "E"){

@@ -677,26 +677,9 @@
     }
 
     // 헤더를 잡고 드래그해서 팝업 이동(구 sap.m.Dialog draggable:true 대체).
+    // 헤더 드래그는 공통 U4AUI.makeDialogDraggable 사용(화면 밖/상단 공통헤더 클램프).
     function _enableDrag(oDlg, oHandle) {
-        var sx, sy, ox, oy, on = false;
-        function mv(e) {
-            if (!on) { return; }
-            var w = oDlg.offsetWidth, h = oDlg.offsetHeight;
-            var nx = Math.max(40 - w, Math.min(ox + (e.clientX - sx), window.innerWidth - 40));
-            var ny = Math.max(0, Math.min(oy + (e.clientY - sy), window.innerHeight - 36));
-            oDlg.style.left = nx + "px"; oDlg.style.top = ny + "px";
-        }
-        function up() { on = false; document.removeEventListener("mousemove", mv, true); document.removeEventListener("mouseup", up, true); }
-        oHandle.addEventListener("mousedown", function (e) {
-            if (e.button !== 0 || (e.target.closest && e.target.closest("button"))) { return; }
-            var r = oDlg.getBoundingClientRect();
-            oDlg.style.position = "fixed"; oDlg.style.margin = "0";
-            oDlg.style.left = r.left + "px"; oDlg.style.top = r.top + "px";
-            sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top; on = true;
-            document.addEventListener("mousemove", mv, true);
-            document.addEventListener("mouseup", up, true);
-            e.preventDefault();
-        });
+        if (window.U4AUI && U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHandle); }
     }
 
     function _showInsertPopup(is_tree) {

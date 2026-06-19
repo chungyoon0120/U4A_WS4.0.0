@@ -192,6 +192,7 @@
         let oList = null;
         let iActive = -1;
         let aMatch = [];
+        let _suppressOpen = false;  // 선택 시 프로그램적 input 이벤트가 목록을 재오픈하지 않도록
 
         function _onOutside(ev) {
             if (oInput !== ev.target && (!oList || !oList.contains(ev.target))) { _close(); }
@@ -263,10 +264,16 @@
             oInput.value = String(s);
             if (typeof fnPick === "function") { fnPick(oInput.value); }
             _close();
+            // [공통 UX] 값이 프로그램적으로 채워졌으니 input 이벤트를 쏴서 다른 리스너(attachClear 의
+            //   클리어 X 노출=data-filled, 모델 바인딩 등)도 함께 동기화. 단 자기 자신의 input 핸들러는
+            //   재오픈하지 않게 잠깐 억제. (타이핑이 아니라 "선택"으로 채울 때도 X 가 떠야 함)
+            _suppressOpen = true;
+            try { oInput.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { }
+            _suppressOpen = false;
             oInput.focus();
         }
 
-        oInput.addEventListener("input", () => _open(false));     // 타이핑 → 부분일치 필터
+        oInput.addEventListener("input", () => { if (_suppressOpen) { return; } _open(false); }); // 타이핑 → 부분일치 필터
         oInput.addEventListener("focus", () => _open(true));       // 포커스 → 전체 이력
         oInput.addEventListener("keydown", (ev) => {
             switch (ev.key) {
@@ -645,14 +652,109 @@
     }
 
     /**
+     * 드래그 다이얼로그 상단 경계 = "창 타이틀바(.u4a-titlebar) 하단 y".
+     * 즉 다이얼로그는 타이틀바(로고/제목/min·max·close 창 크롬) 바로 아래까지만 올라간다.
+     * (메뉴바·툴바 위는 덮어도 됨 — 사용자 요구: 타이틀바만 침범 금지.)
+     */
+    function _topChromeBottom() {
+        try {
+            const el = document.querySelector(".u4a-titlebar");
+            if (el) {
+                const r = el.getBoundingClientRect();
+                if (r.height > 0 && r.top < window.innerHeight * 0.5) { return r.bottom; }
+            }
+            return 0;
+        } catch (e) { return 0; }
+    }
+
+    /**
+     * 다이얼로그 헤더 드래그 — ★전역 자동★. document 에 위임 리스너 1개만 설치하면
+     * 모든 `.u4a-dialog` 가 헤더(`.u4a-dialog__header` 또는 `[data-u4a-draghandle]`)를 잡고
+     * 드래그된다 + 화면 밖/상단 공통 헤더 영역으로 못 나가게 클램프. → 팝업마다 배선 불필요
+     * (현재·미래 전부 자동). makeDialogRecenter/Resizable 과 달리 "한 번 설치 = 전체 적용".
+     *   · 좌/우/하: 뷰포트 안. · 상: 공통 헤더(타이틀바+메뉴바+툴바) 하단 아래로만.
+     *   · 헤더 내 버튼/입력(.u4a-btn-icon/button/input…) 에서 시작한 드래그는 무시.
+     */
+    let _DLG_DRAG_ON = false;
+    function _installGlobalDialogDrag() {
+        if (_DLG_DRAG_ON || typeof document === "undefined") { return; }
+        _DLG_DRAG_ON = true;
+
+        const sIgnore = ".u4a-btn-icon, button, input, select, textarea, a";
+        let oCur = null, dx = 0, dy = 0;
+
+        const _minTop = function (oDlg) {
+            const tb = oDlg && oDlg.__u4aTopBoundary;
+            if (typeof tb === "function") { return tb() || 0; }
+            if (typeof tb === "number") { return tb; }
+            return _topChromeBottom();
+        };
+        function mv(e) {
+            if (!oCur) { return; }
+            const r = oCur.getBoundingClientRect();
+            const vw = window.innerWidth, vh = window.innerHeight, mt = _minTop(oCur);
+            const left = Math.min(Math.max(e.clientX - dx, 0), Math.max(0, vw - r.width));
+            const top = Math.min(Math.max(e.clientY - dy, mt), Math.max(mt, vh - r.height));
+            oCur.style.left = left + "px";
+            oCur.style.top = top + "px";
+        }
+        function up() {
+            oCur = null;
+            document.removeEventListener("mousemove", mv, true);
+            document.removeEventListener("mouseup", up, true);
+        }
+        document.addEventListener("mousedown", function (e) {
+            if (e.button !== 0 || !e.target.closest) { return; }
+            const oHandle = e.target.closest(".u4a-dialog__header, [data-u4a-draghandle]");
+            if (!oHandle) { return; }
+            if (e.target.closest(sIgnore)) { return; } // 헤더 내 버튼/입력에서 시작한 드래그 제외
+            const oDlg = oHandle.closest(".u4a-dialog");
+            if (!oDlg) { return; }
+            oCur = oDlg;
+            const r = oDlg.getBoundingClientRect();
+            oDlg.style.margin = "0"; oDlg.style.position = "fixed";
+            oDlg.style.left = r.left + "px"; oDlg.style.top = r.top + "px";
+            dx = e.clientX - r.left; dy = e.clientY - r.top;
+            e.preventDefault();
+            document.addEventListener("mousemove", mv, true);
+            document.addEventListener("mouseup", up, true);
+        }, true);
+    }
+
+    /**
+     * (옵션) 표준 `.u4a-dialog__header` 는 전역 자동 처리라 호출이 필요 없다.
+     * 헤더가 `.u4a-dialog__header` 가 아닌 커스텀 핸들이거나, 상단 경계를 커스텀할 때만 사용.
+     * @param {HTMLDialogElement} oDlg
+     * @param {HTMLElement} [oHandle]  커스텀 드래그 핸들(없으면 표준 헤더 자동)
+     * @param {object} [opt]  opt.topBoundary(number|fn)
+     */
+    function makeDialogDraggable(oDlg, oHandle, opt) {
+        _installGlobalDialogDrag(); // 전역 1회 설치 보장
+        try {
+            if (oHandle && oHandle.matches && !oHandle.matches(".u4a-dialog__header")) {
+                oHandle.setAttribute("data-u4a-draghandle", ""); // 커스텀 핸들도 위임이 잡게 표식
+            }
+            if (oDlg && opt && opt.topBoundary != null) { oDlg.__u4aTopBoundary = opt.topBoundary; }
+        } catch (e) { }
+    }
+
+    /**
      * 창 포커스 상태 표시 — 현재 브라우저 창에 포커스가 없으면(blur) <body> 에
      * u4a-window-blurred 클래스를 달아 타이틀바(.u4a-titlebar)를 살짝 흐리게 한다.
      * (시각 처리는 shell.css) "포커스 간 창 / 아닌 창" 을 구분해 주기 위함.
      * 모든 셸 화면(index/WS10/Login/ServerList) 공통, 전역 1회 호출.
      *
-     * ★ DOM 의 window 'blur'/'focus' 는 쓰지 않는다 — 화면 안 iframe(자식 프레임)으로
-     *   포커스가 옮겨가기만 해도 부모 window 에서 blur 가 발화해, OS 창은 활성인데도
-     *   비활성으로 오판한다(Login 화면 등). → Electron 네이티브 창 포커스를 쓴다.
+     * 설계 (★ 두 신호를 합치고 항상 OS 포커스를 재독한다):
+     *  - 활성 여부의 "정답"은 언제나 Electron 네이티브 oWin.isFocused() 다. 모든
+     *    핸들러는 이 값을 다시 읽어(_resync) 클래스를 정한다.
+     *  - DOM 의 window 'blur'/'focus' 만 단독으로 쓰면, 화면 안 iframe(자식 프레임)으로
+     *    포커스가 옮겨가기만 해도 부모 window 에서 blur 가 발화해 OS 창은 활성인데도
+     *    비활성으로 오판한다(Login 화면). → 그래서 DOM 이벤트는 "신호"로만 쓰고
+     *    실제 상태는 oWin.isFocused() 로 재확인하므로 오판이 없다.
+     *  - 반대로 네이티브 oWin.on('blur') 만 쓰면, index.html 처럼 u4a-ui.js 를 <head>
+     *    에서 매우 일찍 로드하는 창은 remote 리스너 등록이 "유실"돼(첫 등록이 안 붙음)
+     *    blur 가 와도 토글이 안 된다(실측: 재등록하면 정상). → 'load' 후 네이티브
+     *    리스너를 다시 바인딩해 보정하고, 전달이 확실한 DOM 이벤트를 병행한다.
      */
     function initWindowFocusState() {
         const CLS = "u4a-window-blurred";
@@ -660,32 +762,43 @@
             if (!document.body) { return; }
             document.body.classList.toggle(CLS, bBlurred);
         };
-        const _applyInitial = function (bBlurred) {
-            if (document.body) { _set(bBlurred); }
-            else { document.addEventListener("DOMContentLoaded", function () { _set(bBlurred); }); }
+
+        let oWin = null;
+        try { oWin = require("@electron/remote").getCurrentWindow(); } catch (e) { oWin = null; }
+
+        // 활성 여부를 항상 네이티브 OS 창 포커스에서 재독 → iframe 포커스 이동에도 오판 없음
+        const _resync = function () {
+            let bFocused;
+            try { bFocused = oWin ? oWin.isFocused() : document.hasFocus(); }
+            catch (e) { bFocused = document.hasFocus(); }
+            _set(!bFocused);
         };
 
-        // ① Electron 네이티브 창 포커스 — OS 창 활성 여부만 추적하므로 iframe 포커스
-        //    이동에 영향받지 않는다. (기존 _attachCurrentWindowEvents 와 동일 계열 신호)
-        try {
-            const oWin = require("@electron/remote").getCurrentWindow();
-            const _onFocus = function () { _set(false); };
-            const _onBlur = function () { _set(true); };
-            oWin.on("focus", _onFocus);
-            oWin.on("blur", _onBlur);
-            // 창 종료 시 remote 리스너 정리(누수 방지). 다른 곳의 focus/blur 리스너는
-            // 건드리지 않도록 우리가 단 핸들러만 지명 제거한다.
+        // ① 네이티브 창 포커스(재바인딩 가능) — "iframe 에 포커스가 있는 상태의 OS blur"
+        //    까지 잡는 유일한 신호. <head> 선로드 유실 보정을 위해 remove 후 재등록한다.
+        const _rebindNative = function () {
+            if (!oWin) { return; }
+            try { oWin.removeListener("focus", _resync); oWin.removeListener("blur", _resync); } catch (e) { }
+            try { oWin.on("focus", _resync); oWin.on("blur", _resync); } catch (e) { }
+        };
+        _rebindNative();
+        window.addEventListener("load", _rebindNative);   // 로드 후 재바인딩(유실 보정)
+        if (oWin) {
             window.addEventListener("beforeunload", function () {
-                try { oWin.removeListener("focus", _onFocus); oWin.removeListener("blur", _onBlur); } catch (e) { }
+                try { oWin.removeListener("focus", _resync); oWin.removeListener("blur", _resync); } catch (e) { }
             });
-            _applyInitial(!oWin.isFocused());
-            return;
-        } catch (e) { /* remote 미가용(비-Electron 등) → ② 폴백 */ }
+        }
 
-        // ② 폴백: DOM window 포커스 (iframe 오발화 한계 있음, remote 없을 때만)
-        window.addEventListener("focus", function () { _set(false); });
-        window.addEventListener("blur", function () { _set(true); });
-        _applyInitial(!document.hasFocus());
+        // ② DOM 신호(전달 확실) — isFocused 재독이라 iframe 오발화 안전. 네이티브가
+        //    유실된 창에서도 OS blur/focus 를 보정한다.
+        window.addEventListener("focus", _resync);
+        window.addEventListener("blur", _resync);
+        document.addEventListener("visibilitychange", _resync);
+
+        // ③ 초기 상태 + 로드 후 1회 재확정
+        if (document.body) { _resync(); }
+        else { document.addEventListener("DOMContentLoaded", _resync); }
+        window.addEventListener("load", _resync);
     }
 
     const U4AUI = {
@@ -697,6 +810,7 @@
         btnLabel: btnLabel,
         makeDialogRecenter: makeDialogRecenter,
         makeDialogResizable: makeDialogResizable,
+        makeDialogDraggable: makeDialogDraggable,
         initTooltip: initTooltip,
         initWindowFocusState: initWindowFocusState
     };
@@ -708,6 +822,10 @@
 
     // 창 포커스 상태(활성/비활성) 표시 전역 1회 초기화 (모든 셸 공통)
     try { initWindowFocusState(); } catch (e) { }
+
+    // 다이얼로그 헤더 드래그 전역 1회 설치 — 모든 .u4a-dialog 가 자동으로 드래그+화면/헤더 클램프.
+    //   (팝업마다 배선 불필요. 헤더는 .u4a-dialog__header / [data-u4a-draghandle] 둘 다 인식)
+    try { _installGlobalDialogDrag(); } catch (e) { }
 
     // CommonJS(Electron nodeIntegration) 환경에서도 require 가능하게
     if (typeof module === "object" && module.exports) {

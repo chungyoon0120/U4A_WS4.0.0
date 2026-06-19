@@ -226,16 +226,23 @@
             return { key: o.NAME, text: o.DESC || o.NAME, icon: ic.icon, brand: ic.brand, disabled: !en };
         });
     }
-    // 선택 브라우저로 실행: /DEFBR 의 SELECTED 지정 후 ev_AppExec (WS10 은 AppNmInput 의 앱을 실행)
+    // 선택 브라우저로 실행 (WS10 = AppNmInput 의 앱).
+    //   ★ 메인 ev_AppExec(SELECTED 브라우저 + 저장된 APP_MODE)이 아니라, 원본 WS20
+    //     ev_pressAppExecBtnByBrowser 와 동일하게 "선택 브라우저 + APP_MODE:false" 로 실행하는
+    //     ev_AppExecByBrowser(ws_events.js)를 호출한다. (SELECTED 만 바꿔 ev_AppExec 를 타면
+    //      fnLaunchBrowser 가 fnOnP13nExeDefaultBrowser 로 /DEFBR 을 재적재해 선택이 무시되고
+    //      저장된 APP_MODE 로 앱모드 실행되던 회귀 수정.)
     function _execAppInBrowser(sName) {
-        try {
-            var a = oAPP.common.fnGetModelProperty("/DEFBR") || [];
-            if (Array.isArray(a) && a.length) {
-                a.forEach(function (o) { o.SELECTED = (o.NAME === sName); });
-                oAPP.common.fnSetModelProperty("/DEFBR", a, true);
+        if (window.oAPP && oAPP.events && typeof oAPP.events.ev_AppExecByBrowser === "function") {
+            try { oAPP.events.ev_AppExecByBrowser(sName); }
+            catch (e) {
+                if (typeof console !== "undefined") { console.warn("[WS10] ev_AppExecByBrowser error", e); }
+                _showFooter("E", "Application Execution 오류: " + (e && e.message));
             }
-        } catch (e) { }
-        _invoke("ev_AppExec", "");
+            return;
+        }
+        // 핸들러 미로드 폴백 — 안내만(구 SELECTED+ev_AppExec 우회는 앱모드 회귀라 사용 안 함).
+        _showFooter("I", "Application Execution — 로직 연결 진행 중");
     }
     // (구 _openAppExecBrowserMenu 제거 — 공통 buildSplitButton 에 흡수)
 
@@ -271,7 +278,13 @@
     //   sap 무관). ws_events.js 의 원본 핸들러 그대로 호출.
     //   Create(Ctrl+F12/버튼) → ev_AppCreate → 이름검증·존재확인 후 HTML5 생성 팝업
     //   (design/js/createApplicationPopup.js). ws_html5_shell.js override 참조.
-    var WIRED_EVENTS = { ev_AppCreate: 1, ev_AppChange: 1, ev_AppDelete: 1, ev_AppDisplay: 1, ev_NewWindow: 1, ev_AppExec: 1, ev_AppCopy: 1 };
+    //   App Multi Preview(Ctrl+F3/버튼) → ev_MultiPrev → 이름검증·존재확인(fnCheckAppExists) 후
+    //   fnOnExecApp(appid, true)(멀티프리뷰 URL /zu4a_imp/ui5multipreview 브라우저 실행 — Electron, sap 무관).
+    //   ev_MultiPrev 핸들러는 이미 fnGetWs10AppInputDom(DOM) 사용 = HTML5-aware.
+    //   Example Open(Ctrl+F1/버튼) → ev_AppExam → busy/lock(fnSetBusyLock 셸 오버라이드=parent.setBusy)
+    //   + 자식창 BUSY_ON 브로드캐스트 후 fnExternalOpen 으로 샘플 URL(/zu4a_imp/u4a_samples) 모달 브라우저 실행.
+    //   입력값 검증 없이 항상 동작(원본과 동일), sap 참조 없음.
+    var WIRED_EVENTS = { ev_AppCreate: 1, ev_AppChange: 1, ev_AppDelete: 1, ev_AppDisplay: 1, ev_NewWindow: 1, ev_AppExec: 1, ev_AppCopy: 1, ev_MultiPrev: 1, ev_AppExam: 1, ev_AppValueHelp: 1 };
     function _invoke(sName, sLabel) {
         if (WIRED_EVENTS[sName] && window.oAPP && oAPP.events && typeof oAPP.events[sName] === "function") {
             try { oAPP.events[sName](); }
@@ -309,12 +322,14 @@
                 var sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "062", sTcode);
                 oAPP.common.fnShowFloatingFooterMsg("E", parent.getCurrPage(), sMsg);
             } catch (e) { }
-            var oClr = document.getElementById("sapTcode"); if (oClr && !bSilent) { oClr.value = ""; }
+            var oClr = document.getElementById("sapTcode");
+            if (oClr && !bSilent) { oClr.value = ""; oClr.dispatchEvent(new Event("input", { bubbles: true })); } // 클리어 X 노출 동기화
             return;
         }
 
         // 대문자 반영 (원본 oSrchField.setValue(sTcode))
-        var oInp = document.getElementById("sapTcode"); if (oInp && !bSilent) { oInp.value = sTcode; }
+        var oInp = document.getElementById("sapTcode");
+        if (oInp && !bSilent) { oInp.value = sTcode; oInp.dispatchEvent(new Event("input", { bubbles: true })); } // 클리어 X 노출 동기화
 
         // 이력 저장 + /SUGG/TCODE 모델 갱신 (원본 동일)
         try { oAPP.fn.fnSaveTCodeSuggestion(sTcode); } catch (e) { }
@@ -743,7 +758,7 @@
         o.appendChild(oSapLogo);
 
         var oTcode = document.createElement("input");
-        oTcode.className = "u4a-tcode";
+        oTcode.className = "u4a-tcode u4a-field__input";
         oTcode.id = "sapTcode";
         oTcode.type = "text";
         oTcode.placeholder = "SAP T-CODE";
@@ -760,7 +775,25 @@
                 },
                 function (v) { oTcode.value = v; });   // 선택 시 채움(원본처럼 실행은 Enter)
         }
-        o.appendChild(oTcode);
+
+        // [공통] 클리어(X) — 값 있을 때만 노출. 다른 입력(Login/WS20/ServerList)과 동일한
+        //   shell.css .u4a-field + U4AUI.attachClear 컴포넌트 사용(data-filled 토글).
+        var oTcodeField = document.createElement("div");
+        oTcodeField.className = "u4a-field u4a-tcode-field";
+        oTcodeField.setAttribute("data-trail", "1");
+        oTcodeField.appendChild(oTcode);
+
+        var oTcodeClr = document.createElement("button");
+        oTcodeClr.type = "button";
+        oTcodeClr.className = "u4a-field__clear";
+        oTcodeClr.title = "Clear";
+        oTcodeClr.textContent = "×"; // ×
+        oTcodeField.appendChild(oTcodeClr);
+
+        if (window.U4AUI && U4AUI.attachClear) {
+            U4AUI.attachClear(oTcode, oTcodeClr);
+        }
+        o.appendChild(oTcodeField);
 
         o.appendChild(_iconBtn(ICON.pin, "Pin", function () { _invoke("ev_Pin", "Pin"); }));
         o.appendChild(_iconBtn(ICON.zoom, "Zoom In", function () { _invoke("ev_ZoomIn", "Zoom In"); }));
@@ -1125,13 +1158,26 @@
             { sc: "F7", ev: "ev_AppDisplay", t: _txt("A05") },
             { sc: "F8", ev: "ev_AppExec", t: _txt("A06") },
             { sc: "ctrl+F1", ev: "ev_AppExam", t: _txt("A07") },
-            { sc: "ctrl+F3", ev: "ev_MultiPrev", t: _txt("A08") },
-            { sc: "ctrl+N", ev: "ev_NewWindow", t: _txt("A09") }
+            { sc: "ctrl+F3", ev: "ev_MultiPrev", t: _txt("A08") }
+            // ※ Ctrl+N(새 창)은 여기서 등록하지 않는다 — 앱 글로벌 단축키(ws_common.js
+            //   fnSetCommonShortcut → shortcut.js, ws_main 부팅 시 등록)가 원본 owner 다.
+            //   여기 또 넣으면 두 핸들러가 같이 발화해 새 창이 2개 뜬다(원본 getShortCutList
+            //   에도 Ctrl+N 은 없음 = 페이지 단축키가 아니라 글로벌). 새 창 버튼 클릭은
+            //   ev_NewWindow(WIRED_EVENTS)로 정상 동작, 툴바의 "Ctrl+N" 힌트는 글로벌이 충족.
         ];
         // 중복 등록 방지
         if (oAPP.ws10html._scWired) { return; }
         oAPP.ws10html._scWired = true;
         document.addEventListener("keydown", function (e) {
+            // 자동 반복(키 꾹 누름) 중복 발화 방지.
+            if (e.repeat) { return; }
+            // ★ WS10 단축키는 WS10 화면에서만 동작한다.
+            //   WS10·WS20 는 같은 문서(#content 교체)라 이 document 리스너가 페이지 이동 후에도
+            //   살아있다 → WS20 에서 같은 키를 눌러도 WS10 액션이 발화되던 버그. 현재 페이지가
+            //   WS10 이 아니면 무시(WS20 undo/redo 핸들러의 getCurrPage 가드와 동일 패턴).
+            try { if (parent.getCurrPage && parent.getCurrPage() !== "WS10") { return; } } catch (e2) { }
+            // 모달 팝업이 떠 있으면 메인 단축키 무시(팝업 위에서 뒤 화면 액션 실행 방지).
+            if (document.querySelector("dialog[open]")) { return; }
             var parts = [];
             if (e.ctrlKey) { parts.push("ctrl"); }
             if (e.shiftKey) { parts.push("shift"); }

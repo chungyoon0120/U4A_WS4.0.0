@@ -1858,16 +1858,19 @@
 
         if (sFlag == "EXPORT") {
 
-            var oAppNmInput = sap.ui.getCore().byId("AppNmInput");
+            // [HTML5] AppNmInput 은 WS10 의 DOM <input> — sap.ui.getCore().byId 는 스텁에서 null
+            //   을 반환해(크래시 없이) 여기서 조용히 return → "내보내기 무반응" 의 원인이었다.
+            //   DOM 헬퍼로 읽고 getValue()→.value 호환.
+            var oAppNmInput = (typeof oAPP.fn.fnGetWs10AppInputDom === "function")
+                ? oAPP.fn.fnGetWs10AppInputDom()
+                : ((typeof sap !== "undefined" && sap.ui) ? sap.ui.getCore().byId("AppNmInput") : null);
             if (!oAppNmInput) {
-
-                // busy 키고 Lock 걸기
                 oAPP.common.fnSetBusyLock("");
-
+                oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
                 return;
             }
 
-            var sValue = oAppNmInput.getValue(),
+            var sValue = (typeof oAppNmInput.getValue === "function" ? oAppNmInput.getValue() : (oAppNmInput.value || "")),
                 sCurrPage = parent.getCurrPage();
 
             let oUserInfo = parent.process.USERINFO;
@@ -2006,7 +2009,8 @@
         };
 
         if (sFlag === "EXPORT") {
-            oSendData.APPID = sAppId;
+            // [HTML5] /WS10/APPID 모델이 비어있을 수 있어, 검증 통과한 입력값(sValue)을 우선 사용.
+            oSendData.APPID = sValue || sAppId;
         }
 
         // 브라우저 실행 경로에 붙일 QueryString 정보
@@ -2047,6 +2051,11 @@
 
             // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
             oBrowserWindow.show();
+
+            // [HTML5] 팝업 창이 떠 표시되면 부모 busy/Lock 해제(성공 경로에서 해제 누락 →
+            //   Import/Export 둘 다 busy 잔류하던 문제 방지. 창은 modal 이라 부모 상호작용은 계속 차단됨).
+            oAPP.common.fnSetBusyLock("");
+            oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
 
         });
 
@@ -2094,7 +2103,14 @@
         const oBrowserOptions = {
             "height": 640,
             "width": 500,
-            "resizable": false,
+            // ★ 둥근 모서리: 프레임리스(titleBarStyle:hidden) 창은 resizable:true 라야 Windows DWM 이
+            //   둥근 모서리를 입힌다(다른 공통헤더 창과 동일). About 은 고정크기이므로 min=max 로 잠가
+            //   실제 리사이즈는 막으면서 둥근 모서리만 얻는다.
+            "resizable": true,
+            "minWidth": 500,
+            "maxWidth": 500,
+            "minHeight": 640,
+            "maxHeight": 640,
             "fullscreenable": true,
             "maximizable": false,
             "minimizable": false,
@@ -2112,6 +2128,10 @@
 
         oBrowserOptions.opacity = 0.0;
         oBrowserOptions.autoHideMenuBar = true;
+        // [공통 헤더] 네이티브 타이틀바 제거 → index.html 공통 .u4a-titlebar(메인창과 동일)로 대체.
+        oBrowserOptions.titleBarStyle = "hidden";
+        // 로드 전 배경 깜빡임 방지 + 둥근 모서리 밖 배경을 테마색으로(다른 공통헤더 창과 동일).
+        try { oBrowserOptions.backgroundColor = (parent.getThemeInfo && parent.getThemeInfo().BGCOL) || undefined; } catch (e) { }
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B48"); // About U4A WS IDE
         oBrowserOptions.webPreferences.partition = SESSKEY;
         oBrowserOptions.webPreferences.browserkey = BROWSKEY;
@@ -2122,10 +2142,14 @@
         oBrowserOptions.webPreferences.USERINFO = parent.process.USERINFO;
 
         // 브라우저 오픈
-        let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);        
+        let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
 
         // 브라우저 상단 메뉴 없애기
-        oBrowserWindow.setMenu(null);        
+        oBrowserWindow.setMenu(null);
+
+        // 공통 헤더가 첫 페인트부터 테마/제목 반영하도록 전달(index.html head 조기 적용 스크립트가 소비).
+        let oAboutTheme = {};
+        try { oAboutTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { oAboutTheme = {}; }
 
         // 브라우저 실행 경로에 붙일 QueryString 정보
         const oQueryParams = {
@@ -2133,6 +2157,9 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            TITLE: oBrowserOptions.title || "",
+            THEME: oAboutTheme.THEME || "",
+            BGCOL: oAboutTheme.BGCOL || "",
         };
 
         const sUrlPath = parent.getPath(sPopupName);

@@ -126,7 +126,7 @@ oAPP.fn.createEventPopup = function(is_attr, f_callBack){
     // parent.setBusy("X");
     
     //busy dialog open.
-    oAPP.common.fnSetBusyDialog(true);
+    parent.setBusy("X");
 
 
     //화면에서 입력한 값 얻기.
@@ -172,7 +172,7 @@ oAPP.fn.createEventPopup = function(is_attr, f_callBack){
       // parent.setBusy("");
       
       //busy dialog close.
-      oAPP.common.fnSetBusyDialog(false);
+      parent.setBusy("");
 
       //오류가 발생한 경우, eval 처리 script가 존재하지 않는경우.
       if(param.RETCD === "E" && typeof param.SCRIPT === "undefined"){
@@ -450,7 +450,7 @@ oAPP.fn.createEventPopup = function(is_attr, f_callBack){
     // parent.setBusy("X");
     
     //busy dialog open.
-    oAPP.common.fnSetBusyDialog(true);
+    parent.setBusy("X");
 
 
     //입력값 점검 오류가 발생한 경우 exit.
@@ -459,7 +459,7 @@ oAPP.fn.createEventPopup = function(is_attr, f_callBack){
       // parent.setBusy("");
       
       //busy dialog close.
-      oAPP.common.fnSetBusyDialog(false);
+      parent.setBusy("");
       return;
     }
 

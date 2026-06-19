@@ -108,13 +108,15 @@
 
     <!-- Busy Indicator (resources/index.js 의 setBusy/setBusyDialog/setDomBusy 가 제어) — UI5 BusyDialog 대체
          구 sap.m.BusyDialog 처럼 스크림 + 중앙 카드(스피너 + 제목 + 메시지). 메시지는 setBusy("X",{TITLE,DESC}). -->
-    <div id="u4aWsBusyIndicator" class="u4aWsBusyIndicator">
+    <!-- ★ <dialog> 로 둔다 — setDomBusy 가 showModal()/close() 로 제어. 모달 팝업(showModal)도
+         top-layer 라 일반 <div> busy 는 가려진다 → busy 도 모달이어야 그 위에 보인다. -->
+    <dialog id="u4aWsBusyIndicator" class="u4aWsBusyIndicator">
         <div class="u4aWsBusyCard">
             <div class="u4aWsSpinner"></div>
             <div class="u4aWsBusyTitle" id="u4aWsBusyTitle"></div>
             <div class="u4aWsBusyText" id="u4aWsBusyText"></div>
         </div>
-    </div>
+    </dialog>
     <!-- Busy Indicator End -->
 
     <!-- Network 연결 해제 시 띄울 Loading Bar -->

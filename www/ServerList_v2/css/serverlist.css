@@ -611,6 +611,17 @@
     overflow-y: auto;
 }
 
+/* 상세 패널 텍스트는 드래그 선택/복사 허용 (body user-select:none 의 예외) — 정보 공유용.
+   접속문자열·호스트/포트·SID·등록 호스트 등을 복사해 전달할 수 있게 한다. */
+.u4a-md__detail,
+.u4a-md__detail * {
+    -webkit-user-select: text;
+    user-select: text;
+    cursor: auto;
+}
+/* 버튼은 클릭 대상이라 포인터 커서 유지 */
+.u4a-md__detail .btn { cursor: pointer; }
+
 .u4a-md__detailempty {
     margin: auto;
     color: var(--text-muted);
@@ -683,6 +694,23 @@
 .u4a-md__fval {
     margin-top: 0.1875rem;
     color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+/* 활성 서버 등록 호스트(protocol://host:port) — 접속 host 와 구분해 카드 블록으로 */
+.u4a-md__reg {
+    margin-top: 1.125rem;
+    padding: 0.625rem 0.75rem;
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+}
+.u4a-md__regval {
+    margin-top: 0.25rem;
+    color: var(--accent);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
     overflow-wrap: anywhere;
 }
 
@@ -807,6 +835,7 @@
    LAUNCHER 뷰 (검색 중심 런처) — 사진 참고. --sl-* 팔레트 사용.
    ════════════════════════════════════════════════════════════════════ */
 .u4a-launcher {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -814,6 +843,44 @@
     padding: 1.5rem 2rem 0;
     background: var(--sl-bg);
 }
+
+/* 섹션 앵커바 (ObjectPageLayout 식) — 검색창 아래 고정, 칩 클릭=섹션 점프 + scroll-spy */
+.u4a-lnch__anchor {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: .5rem;
+    max-width: 46rem; width: 100%; margin: 0 auto .75rem;
+    padding-bottom: .5rem;
+    border-bottom: 1px solid var(--sl-border);
+}
+.u4a-lnch__achip {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .3rem .7rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sl-muted);
+    font-size: .82rem; font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.u4a-lnch__achip:hover { background: var(--sl-surface-2); color: var(--sl-fg); }
+.u4a-lnch__achip.is-active {
+    background: var(--u4a-accent-soft);
+    color: var(--u4a-accent);
+    border-color: var(--u4a-accent);
+}
+.u4a-lnch__achipdot {
+    width: .5rem; height: .5rem; border-radius: 50%;
+    background: currentColor; opacity: .55;
+}
+.u4a-lnch__achip.is-active .u4a-lnch__achipdot { opacity: 1; }
+.u4a-lnch__achipcount {
+    font-variant-numeric: tabular-nums;
+    font-size: .72rem; font-weight: 700;
+    color: var(--sl-muted);
+}
+.u4a-lnch__achip.is-active .u4a-lnch__achipcount { color: var(--u4a-accent); }
+.u4a-lnch__achipcount:empty { display: none; }
 
 /* 검색창 */
 .u4a-lnch__search {

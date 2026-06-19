@@ -161,7 +161,7 @@
             oAPP.fn.designAreaLockUnlock(true);
 
             //busy dialog open.
-            oAPP.common.fnSetBusyDialog(true);
+            parent.setBusy("X");
 
             setTimeout(() => {
 

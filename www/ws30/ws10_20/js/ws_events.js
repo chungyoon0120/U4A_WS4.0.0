@@ -722,6 +722,108 @@
     }; // end of oAPP.events.ev_AppExec
 
     /************************************************************************
+     * Application Execution — 특정 브라우저로 실행 (WS10 / AppNmInput 기준)
+     * ----------------------------------------------------------------------
+     * 실행 분할버튼의 드롭다운 항목(Chrome/Edge/...)에서 호출.
+     *   ★ 메인 ev_AppExec(→ fnLaunchBrowser, SELECTED 브라우저 + 저장된 APP_MODE)과 달리,
+     *     원본 WS20 ev_pressAppExecBtnByBrowser 와 동일하게 "선택한 브라우저 + APP_MODE:false"
+     *     로 실행한다. (fnLaunchBrowser 는 fnOnP13nExeDefaultBrowser 로 /DEFBR 을 재적재해
+     *      임시 SELECTED 가 덮어써지고 저장된 APP_MODE 가 적용되어 앱모드로 떠버리는 문제.)
+     *   검증(앱명 필수/공백/특수문자/존재/USP/Inactive)은 ev_AppExec 와 동일.
+     * @param {string} sBrowserName "CHROME" | "MSEDGE" | "DEV_BROWSER"
+     ************************************************************************/
+    oAPP.events.ev_AppExecByBrowser = function (sBrowserName) {
+
+        // busy 키고 Lock 걸기
+        oAPP.common.fnSetBusyLock("X");
+
+        var oAppNmInput = (typeof oAPP.fn.fnGetWs10AppInputDom === "function")
+            ? oAPP.fn.fnGetWs10AppInputDom()
+            : ((typeof sap !== "undefined" && sap.ui) ? sap.ui.getCore().byId("AppNmInput") : null);
+        if (!oAppNmInput) { oAPP.common.fnSetBusyLock(""); return; }
+
+        var sValue = (typeof oAppNmInput.getValue === "function" ? oAppNmInput.getValue() : (oAppNmInput.value || "")),
+            sCurrPage = parent.getCurrPage(),
+            sLangu = (parent.process.USERINFO || {}).LANGU;
+
+        // 입력값 유무 확인 (273 Application name is required.)
+        if (typeof sValue !== "string" || sValue == "") {
+            APPCOMMON.fnShowFloatingFooterMsg("E", sCurrPage, parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "273"));
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        // 공백 (274 must not contain any spaces.)
+        if (/\s/.test(sValue)) {
+            APPCOMMON.fnShowFloatingFooterMsg("E", sCurrPage, parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "274"));
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        // 특수문자 (278 Special characters are not allowed.)
+        if (/[^\w]/.test(sValue)) {
+            APPCOMMON.fnShowFloatingFooterMsg("E", sCurrPage, APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "278"));
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        // APP 존재/상태 확인 후 실행 (ev_AppExec lf_result 와 동일 가드)
+        oAPP.fn.fnCheckAppExists(sValue, function (RESULT) {
+
+            var oAppInfo = RESULT.RETURN,
+                oCurrWin = REMOTE.getCurrentWindow();
+
+            if (RESULT.RETCD == "E") {
+                oCurrWin.flashFrame(true);
+                APPCOMMON.fnShowFloatingFooterMsg("E", sCurrPage, APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "007", oAppInfo.APPID));
+                oAPP.common.fnSetBusyLock("");
+                return;
+            }
+
+            // USP App 미지원 (189)
+            if (oAppInfo.APPTY === "U") {
+                oCurrWin.flashFrame(true);
+                APPCOMMON.fnShowFloatingFooterMsg("E", sCurrPage, oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "189"));
+                oAPP.common.fnSetBusyLock("");
+                return;
+            }
+
+            // Inactivate 상태 (434)
+            if (oAppInfo.ACTST == "I") {
+                oCurrWin.flashFrame(true);
+                APPCOMMON.fnShowFloatingFooterMsg("W", sCurrPage, parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "434"));
+                oAPP.common.fnSetBusyLock("");
+                return;
+            }
+
+            // 선택한 브라우저 정보 (/DEFBR)
+            var aDefBrows = APPCOMMON.fnGetModelProperty("/DEFBR") || [],
+                oBrows = aDefBrows.find(function (o) { return o.NAME === sBrowserName; });
+            if (!oBrows) { oAPP.common.fnSetBusyLock(""); return; }
+
+            // 선택 브라우저로 일반 모드 실행(APP_MODE:false — 원본 동일). fnLaunchBrowser 미경유.
+            var oOptions = {
+                BROWSER_TYPE: oBrows.NAME,
+                INSPATH: oBrows.INSPATH,
+                APP_MODE: false,
+                URL: oAPP.fn.fnGetAppUrl(oAppInfo.APPID)
+            };
+
+            Promise.resolve(oAPP.fn.fnOpenAppInBrowser(oOptions)).then(function (oResult) {
+                if (oResult && oResult.RETCD === "E" && oResult.STCOD === "E001") {
+                    // 설치된 브라우저 정보를 찾을 수 없습니다. (333)
+                    APPCOMMON.fnShowFloatingFooterMsg("W", sCurrPage, APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "333"));
+                }
+                oAPP.common.fnSetBusyLock("");
+            }).catch(function (e) {
+                if (typeof console !== "undefined") { console.error("[WS10] ev_AppExecByBrowser:", e && e.message ? e.message : e); }
+                oAPP.common.fnSetBusyLock("");
+            });
+        });
+
+    }; // end of oAPP.events.ev_AppExecByBrowser
+
+    /************************************************************************
      * Example 실행
      ************************************************************************/
     oAPP.events.ev_AppExam = function (oEvent) {

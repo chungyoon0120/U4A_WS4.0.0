@@ -50,7 +50,7 @@ async function lf_chkdataset(is_dataSet){
         sap.ui.getCore().lock();
 
         //busy dialog open.
-        oAPP.common.fnSetBusyDialog(true);
+        parent.setBusy("X");
 
         //VIEW(TABLE)명 서버전송 데이터 구성.
         var oFormData = new FormData();
@@ -82,7 +82,7 @@ async function lf_chkdataset(is_dataSet){
             sap.ui.getCore().unlock();
 
             //busy dialog close.
-            oAPP.common.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             //wait off 처리.
             parent.setBusy("");

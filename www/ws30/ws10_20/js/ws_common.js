@@ -94,9 +94,14 @@
                 return;
             }
 
-            // 2. 스크립트가 있을 경우에만 eval 처리
-
-            eval(sNotiScript);
+            // 2. [HTML5] 구 eval(sNotiScript) 는 sap.m.Dialog/MessageView/MessageItem 등
+            //    UI5 컨트롤 생성 스크립트라 UI5 제거 환경에선 실행 불가.
+            //    → 백엔드(/U4A/SP200002 SET_SYS_NOTI_MESSAGE)가 내려준 스크립트에서
+            //      제목/부제/본문만 파싱(_parseSysNotiScript)해, 동일 모양의 네이티브
+            //      다이얼로그(_renderSysNotiDialog)로 그린다.
+            var aNotiItems = _parseSysNotiScript(sNotiScript);
+            if (!aNotiItems.length) { return; }
+            _renderSysNotiDialog(aNotiItems, _parseSysNotiTitle(sNotiScript));
 
         } catch (error) {
 
@@ -119,6 +124,209 @@
         }
 
     }; // end of oAPP.common.showSystemNotiMsg
+
+
+    /******************************************************************
+     *  [HTML5] 시스템 공지 다이얼로그 — UI5 스크립트 파싱 & 네이티브 렌더
+     * ----------------------------------------------------------------
+     *  백엔드(/U4A/SP200002)가 내려주는 SYS_NOTI_SCR 은 sap.m.Dialog +
+     *  sap.m.MessageView + sap.m.MessageItem 생성 JS 다. UI5 가 없으므로
+     *  eval 대신 스크립트에서 항목(제목/부제/본문)만 추출해 동일 모양으로 그린다.
+     *
+     *  원본 스크립트 항목 포맷(반복):
+     *    var oMi = new sap.m.MessageItem({type:"Information",subtitle:"<부제>"});
+     *    oMi.setTitle("<제목>"); oMi.setDescription("<본문>"); oMv.addItem(oMi);
+     *  헤더 라벨: new sap.m.ObjectNumber({number:"System Message", ...})
+     ******************************************************************/
+
+    // JS 문자열 리터럴 이스케이프 해제(\n \t \" \\ \/ \uXXXX 등).
+    function _sysNotiUnescape(s) {
+        return String(s).replace(/\\(u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|.)/g, function (m, p) {
+            switch (p.charAt(0)) {
+                case "n": return "\n";
+                case "r": return "\r";
+                case "t": return "\t";
+                case "b": return "\b";
+                case "f": return "\f";
+                case "v": return "\v";
+                case "0": return "\0";
+                case "u": return String.fromCharCode(parseInt(p.slice(1), 16));
+                case "x": return String.fromCharCode(parseInt(p.slice(1), 16));
+                default: return p; // \" → "  /  \\ → \  /  \/ → /
+            }
+        });
+    }
+
+    // 스크립트 → 항목 배열 [{ subtitle, title, description }] (원본 등장 순서).
+    function _parseSysNotiScript(sScript) {
+        var aItems = [];
+        if (typeof sScript !== "string" || !sScript) { return aItems; }
+        // MessageItem 생성 + setTitle + setDescription 한 묶음을 항목 1개로 캡처.
+        //   (?:\\.|[^"\\])*  = JS 문자열 리터럴 내부(이스케이프 허용) 매칭.
+        var re = /new sap\.m\.MessageItem\(\{type:"[^"]*",subtitle:"((?:\\.|[^"\\])*)"\}\);\s*oMi\.setTitle\("((?:\\.|[^"\\])*)"\);\s*oMi\.setDescription\("((?:\\.|[^"\\])*)"\);/g;
+        var m;
+        while ((m = re.exec(sScript)) !== null) {
+            aItems.push({
+                subtitle: _sysNotiUnescape(m[1]),
+                title: _sysNotiUnescape(m[2]),
+                description: _sysNotiUnescape(m[3])
+            });
+        }
+        return aItems;
+    }
+
+    // 헤더 라벨(ObjectNumber number) 추출. 없으면 "System Message".
+    function _parseSysNotiTitle(sScript) {
+        var m = /new sap\.m\.ObjectNumber\(\{number:"((?:\\.|[^"\\])*)"/.exec(sScript || "");
+        return m ? _sysNotiUnescape(m[1]) : "System Message";
+    }
+
+    // 공통 스타일 1회 주입(테마 토큰 소비 — 하드코딩 색 없음).
+    function _ensureSysNotiStyle() {
+        if (document.getElementById("u4aSysNotiStyle")) { return; }
+        var o = document.createElement("style");
+        o.id = "u4aSysNotiStyle";
+        o.textContent = ""
+            + ".u4aSysNotiDlg{width:min(92vw,520px);height:min(72vh,520px);padding:0;display:flex;flex-direction:column;}"
+            + ".u4aSysNotiDlg .u4a-dialog__header{cursor:move;user-select:none;}"
+            + ".u4aSysNotiDlg .u4a-dialog__header span{flex:1 1 auto;}"
+            + ".u4aSysNotiBody{flex:1 1 auto;overflow:auto;padding:0;}"
+            + ".u4aSysNotiRow{display:flex;align-items:flex-start;gap:.625rem;width:100%;text-align:left;"
+            + "padding:.75rem 1rem;border:0;border-bottom:.0625rem solid var(--line);background:transparent;"
+            + "font:inherit;color:var(--text);cursor:pointer;}"
+            + ".u4aSysNotiRow:hover{background:var(--hover-bg);}"
+            + ".u4aSysNotiIco{color:var(--accent);margin-top:.125rem;}"
+            + ".u4aSysNotiMeta{flex:1 1 auto;min-width:0;}"
+            + ".u4aSysNotiTitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;}"
+            + ".u4aSysNotiSub{font-size:.8125rem;color:var(--text-muted);margin-top:.125rem;}"
+            + ".u4aSysNotiChev{color:var(--icon-muted);margin-top:.125rem;}"
+            + ".u4aSysNotiDetail{padding:1rem 1.25rem 1.5rem;}"
+            + ".u4aSysNotiBack{margin-bottom:.75rem;}"
+            + ".u4aSysNotiDetail .u4aSysNotiTitle{font-size:1rem;font-weight:700;display:flex;align-items:center;gap:.5rem;}"
+            + ".u4aSysNotiDetail .u4aSysNotiSub{margin:.25rem 0 1rem;}"
+            + ".u4aSysNotiDesc{white-space:pre-wrap;line-height:1.5;color:var(--text);}"
+            + ".u4aSysNotiFoot{display:flex;justify-content:flex-end;}";
+        document.head.appendChild(o);
+    }
+
+    function _sysNotiEl(sTag, sClass, sText) {
+        var e = document.createElement(sTag);
+        if (sClass) { e.className = sClass; }
+        if (typeof sText !== "undefined") { e.textContent = sText; }
+        return e;
+    }
+
+    var _fa_sn = function (s) { return '<i class="fa-solid fa-' + s + '"></i>'; };
+
+    // 항목 배열 → 네이티브 다이얼로그 렌더(원본 sap.m.Dialog+MessageView 모양).
+    function _renderSysNotiDialog(aItems, sHeaderTitle) {
+
+        _ensureSysNotiStyle();
+
+        // 이미 떠 있으면 제거 후 재생성.
+        var oOld = document.getElementById("u4aSysNotiDlg");
+        if (oOld) { try { oOld.close(); } catch (e) { } oOld.remove(); }
+
+        var sClose = "Close";
+        try {
+            var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
+            if (s && s.indexOf("|") === -1) { sClose = s; }
+        } catch (e) { }
+
+        var oDlg = document.createElement("dialog");
+        oDlg.id = "u4aSysNotiDlg";
+        oDlg.className = "u4a-dialog u4aSysNotiDlg";
+
+        // 헤더 — 원본: 종이비행기 아이콘 + "System Message".
+        var oHeader = _sysNotiEl("div", "u4a-dialog__header");
+        oHeader.setAttribute("data-type", "I");
+        oHeader.innerHTML = _fa_sn("paper-plane") + "<span></span>";
+        oHeader.querySelector("span").textContent = sHeaderTitle || "System Message";
+        var oX = _sysNotiEl("button", "u4a-btn-icon");
+        oX.type = "button";
+        oX.setAttribute("data-act", "close");
+        oX.innerHTML = _fa_sn("xmark");
+        oX.title = sClose;
+        oX.addEventListener("click", function () { _sysNotiClose(oDlg); });
+        oHeader.appendChild(oX);
+        oDlg.appendChild(oHeader);
+
+        // 바디 — 리스트 / 상세 두 영역.
+        var oBody = _sysNotiEl("div", "u4a-dialog__body u4aSysNotiBody");
+        oDlg.appendChild(oBody);
+
+        var oList = _sysNotiEl("div", "u4aSysNotiList");
+        var oDetail = _sysNotiEl("div", "u4aSysNotiDetail");
+        oBody.appendChild(oList);
+        oBody.appendChild(oDetail);
+
+        function _showList() { oList.hidden = false; oDetail.hidden = true; }
+        function _showDetail(i, bHasBack) {
+            var it = aItems[i];
+            oDetail.innerHTML = "";
+            if (bHasBack) {
+                var oBack = _sysNotiEl("button", "u4a-btn u4aSysNotiBack");
+                oBack.type = "button";
+                oBack.innerHTML = _fa_sn("chevron-left") + "<span></span>";
+                oBack.querySelector("span").textContent = sClose === "Close" ? "List" : sClose; // 목록으로
+                oBack.addEventListener("click", _showList);
+                // 목록 라벨은 코드 폴백("List") — 메시지키 없으면 닫기 라벨 대신 최소 표기.
+                oDetail.appendChild(oBack);
+            }
+            var oT = _sysNotiEl("div", "u4aSysNotiTitle");
+            oT.innerHTML = '<span class="u4aSysNotiIco">' + _fa_sn("circle-info") + "</span>";
+            oT.appendChild(_sysNotiEl("span", null, it.title));
+            oDetail.appendChild(oT);
+            oDetail.appendChild(_sysNotiEl("div", "u4aSysNotiSub", it.subtitle));
+            oDetail.appendChild(_sysNotiEl("div", "u4aSysNotiDesc", it.description));
+            oList.hidden = true; oDetail.hidden = false;
+        }
+
+        if (aItems.length === 1) {
+            // 원본 MessageView: 1건이면 상세 바로 표시(목록/뒤로 없음).
+            _showDetail(0, false);
+        } else {
+            aItems.forEach(function (it, i) {
+                var oRow = _sysNotiEl("button", "u4aSysNotiRow");
+                oRow.type = "button";
+                oRow.innerHTML = '<span class="u4aSysNotiIco">' + _fa_sn("circle-info") + "</span>";
+                var oMeta = _sysNotiEl("div", "u4aSysNotiMeta");
+                oMeta.appendChild(_sysNotiEl("div", "u4aSysNotiTitle", it.title));
+                oMeta.appendChild(_sysNotiEl("div", "u4aSysNotiSub", it.subtitle));
+                oRow.appendChild(oMeta);
+                var oChev = _sysNotiEl("span", "u4aSysNotiChev");
+                oChev.innerHTML = _fa_sn("chevron-right");
+                oRow.appendChild(oChev);
+                oRow.addEventListener("click", function () { _showDetail(i, true); });
+                oList.appendChild(oRow);
+            });
+            _showList();
+        }
+
+        // 푸터 — 닫기(원본 Accept 버튼 = 강조).
+        var oFoot = _sysNotiEl("div", "u4a-dialog__footer u4aSysNotiFoot");
+        var oCloseBtn = _sysNotiEl("button", "u4a-btn u4a-btn--emphasized");
+        oCloseBtn.type = "button";
+        oCloseBtn.innerHTML = _fa_sn("xmark") + "<span></span>";
+        oCloseBtn.querySelector("span").textContent = sClose;
+        oCloseBtn.addEventListener("click", function () { _sysNotiClose(oDlg); });
+        oFoot.appendChild(oCloseBtn);
+        oDlg.appendChild(oFoot);
+
+        // ESC → 닫기.
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); _sysNotiClose(oDlg); });
+
+        // 헤더 드래그(화면 밖/상단 공통헤더 침범 방지) — 공통 U4AUI.makeDialogDraggable.
+        if (window.U4AUI && U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHeader); }
+
+        document.body.appendChild(oDlg);
+        oDlg.showModal();
+    }
+
+    function _sysNotiClose(oDlg) {
+        try { oDlg.close(); } catch (e) { }
+        try { oDlg.remove(); } catch (e) { }
+    }
 
 
     /************************************************************************
@@ -2711,95 +2919,9 @@
 
     }; // end of oAPP.common.fnRemoveGlobalShortcut
 
-    /**
-     * Gif Busy Dialog
-     * @param {Boolean} bIsOpen 
-     * 
-     * @param {Function} fnExecFunc 
-     */
-    oAPP.common.fnSetBusyDialog = function (bIsOpen) {
-
-        const BusyDialogID = "u4aWsBusyDialog";
-
-        var oDialog = sap.ui.getCore().byId(BusyDialogID);
-        if (oDialog) {
-
-            if (oDialog.isOpen() == bIsOpen) {
-                return;
-            }
-
-            if (bIsOpen) {
-
-                oDialog.open();
-
-                // 작업표시줄에 progress bar 실행
-                parent.setProgressBar("S", bIsOpen);
-
-                return;
-            }
-
-            // 작업표시줄에 progress bar 중지
-            parent.setProgressBar("S", bIsOpen);
-
-            oDialog.close();
-
-            return;
-
-        }
-
-        var sLoaderGif = PATH.join(APPPATH, "\\img\\loader.gif"),
-            oBusyDialog = new sap.m.Dialog(BusyDialogID, {
-
-                // properties
-                showHeader: false,
-                escapeHandler: function () {
-
-
-                },
-
-                // aggregations
-                content: [
-
-                    new sap.m.VBox({
-                        justifyContent: sap.m.FlexJustifyContent.Center,
-                        alignItems: sap.m.FlexAlignItems.Center,
-                        items: [
-
-                            new sap.m.Avatar({
-                                customDisplaySize: "10rem",
-                                customFontSize: "3rem",
-                                displaySize: sap.m.AvatarSize.Custom,
-                                src: sLoaderGif
-                            }).addStyleClass("u4aWsAvatarBusy")
-
-                        ]
-
-                    })
-
-                ]
-
-            }).addStyleClass(`${BusyDialogID} sapUiSizeCompact`);
-
-        if (oBusyDialog.isOpen() == bIsOpen) {
-            return;
-        }
-
-        if (bIsOpen) {
-
-            oBusyDialog.open();
-
-            // 작업표시줄에 progress bar 실행
-            parent.setProgressBar("S", bIsOpen);
-
-            return;
-        }
-
-        // 작업표시줄에 progress bar 중지
-        parent.setProgressBar("S", bIsOpen);
-
-        oBusyDialog.close();
-
-    }; // end of oAPP.common.fnSetBusyDialog
+    /* [제거됨] oAPP.common.fnSetBusyDialog — 구 UI5 sap.m.Dialog+Avatar(gif) busy.
+       전 사용처를 기존 busy(parent.setBusy "X"/"")로 직접 대체하고 함수는 삭제했다.
+       (sap.m.AvatarSize.Custom 이 sap 안전스텁에서 터지던 크래시 원인 제거) */
 
     /************************************************************************
      * 현재 떠있는 화면에서 메뉴 또는 Popover 들을 전부 숨긴다.
@@ -4052,7 +4174,7 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
             parent.setBusy("");
 
             // gif busy dialog 종료 (앱 생성 시 사용하는 Busy)
-            oAPP.common.fnSetBusyDialog(false);
+            parent.setBusy("");
 
             try {
 

@@ -470,6 +470,47 @@
     };
 
     /************************************************************************
+     * [OVERRIDE] WS10 App Search Help (F4/돋보기) — 구 ev_AppValueHelp [ws_events.js, UI5]
+     * ---------------------------------------------------------------------
+     *  원본 진입 로직 이식: 현재 사용자/앱ID/앱유형으로 초기조건 구성 → fnAppF4PopupOpener
+     *  (lazy-load fnAppF4PopupOpen[HTML5]). pick 콜백은 선택 APPID 를 AppNmInput 에 반영.
+     ************************************************************************/
+    oAPP.events.ev_AppValueHelp = function () {
+
+        var sSapId = "";
+        try { sSapId = String((parent.getUserInfo() || {}).ID || "").toUpperCase(); } catch (e) { }
+
+        var oAppNmInput = document.getElementById("AppNmInput");
+        var sAppId = oAppNmInput ? (oAppNmInput.value || "") : "";
+
+        oAPP.attr = oAPP.attr || {};
+        if (!oAPP.attr.gAPPTY) { oAPP.attr.gAPPTY = "M"; }
+
+        var oOptions = {
+            autoSearch: true,
+            initCond: {
+                PACKG: "", APPID: sAppId, APPNM: "", APPTY: oAPP.attr.gAPPTY,
+                EXPAGE: "WS10", ERUSR: sSapId, HITS: 500
+            }
+        };
+
+        // pick(더블클릭) 시 선택 APPID 를 입력값으로 반영(원본: fnSetModelProperty("/WS10/APPID")).
+        function fnAppF4DataCallback(oAppData) {
+            var i = document.getElementById("AppNmInput");
+            if (i && oAppData && oAppData.APPID != null) {
+                i.value = oAppData.APPID;
+                try { i.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { }
+            }
+        }
+
+        if (oAPP.fn.fnAppF4PopupOpener) {
+            oAPP.fn.fnAppF4PopupOpener(oOptions, fnAppF4DataCallback);
+        } else if (oAPP.fn.fnAppF4PopupOpen) {
+            oAPP.fn.fnAppF4PopupOpen(oOptions, fnAppF4DataCallback);
+        }
+    };
+
+    /************************************************************************
      * [OVERRIDE] WS10 트랜잭션 — App 생성 (구 oAPP.events.ev_AppCreate [ws_events.js])
      * ---------------------------------------------------------------------
      *  WS3.0 패턴 이식. AppNmInput(DOM) 값을 읽어 이름검증 → 서버 존재여부 확인 후
