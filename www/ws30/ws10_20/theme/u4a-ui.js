@@ -30,7 +30,8 @@
     const _fa = (sName) => `<i class="fa-solid fa-${sName}"></i>`;
     const ICON = {
         caret: _fa("chevron-down"),
-        accept: _fa("check")
+        accept: _fa("check"),
+        treeChevron: _fa("chevron-right")   // 트리 펼침/접힘 토글(회전은 aria-expanded CSS)
     };
 
     /**
@@ -801,8 +802,216 @@
         window.addEventListener("load", _resync);
     }
 
+    /**
+     * 공통 베이스 트리 — 재귀 <ul.u4a-tree>/<li>/<div.u4a-tree__row> 렌더러.
+     * (ServerList / WS20 디자인트리 / WS30 USP 등 모든 트리의 코어 UX 단일 출처)
+     *
+     *   · 마크업/색/상태는 shell.css 의 .u4a-tree__* 공통 컴포넌트를 소비(토큰만).
+     *   · ARIA role 미부착 — aria-expanded(셰브론 회전)·aria-selected(선택 강조)만.
+     *   · 토글 = WS20식: 자식 항상 렌더, 펼침=ul.hidden=false(제자리),
+     *       접기=이 노드+자손 재귀 접힘 후 서브트리 재빌드(재오픈 시 자손은 접힌 상태).
+     *   · 들여쓰기 = 행의 --u4a-tree-depth(=레벨) → padding 은 shell.css 가 계산.
+     *   · 부가요소(체크박스/배지/설명/액션)는 slotLead/slotTrailing 콜백으로 주입 —
+     *       베이스는 코어만, 확장 스타일은 각 화면 CSS 가 책임진다(소스 단일화 + 화면별 확장).
+     *
+     * @param {object} cfg
+     *  --- 데이터 접근 ---
+     *  @param {function():Array<*>}     cfg.roots         루트 노드 배열(매 render 호출 → 모델 최신값)
+     *  @param {function(*):Array<*>}    cfg.children      자식 배열(없으면 [])
+     *  @param {function(*):string}      cfg.key           노드 고유키(펼침 기억/행 조회용; 안정적이어야 함)
+     *  @param {function(*):boolean}     [cfg.hasChildren] 기본: children(node).length>0
+     *  --- 표현 ---
+     *  @param {function(*):string}      cfg.label         라벨 텍스트
+     *  @param {function(*):string}      [cfg.icon]        아이콘 HTML(<i>/<img>). 빈값이면 icon span 생략
+     *  @param {function(*):string}      [cfg.tip]         행 data-tip(말줄임 시 .u4a-tree__label 기준 툴팁)
+     *  --- 슬롯(HTMLElement|null 반환) ---
+     *  @param {function(*,object):?Node} [cfg.slotLead]     토글↔아이콘 사이(예: 체크박스)
+     *  @param {function(*,object):?Node} [cfg.slotTrailing] 라벨 뒤 우측(예: 배지/설명/액션). 반환 시 행에 data-u4a-tree-split
+     *  --- 동작 ---
+     *  @param {function(*,HTMLElement,object)} [cfg.onSelect]        행 클릭/Enter/Space
+     *  @param {function(*,boolean,HTMLElement)} [cfg.onToggle]       토글 후(펼침 영속화 훅)
+     *  @param {function(*,number):boolean}      [cfg.initialExpanded] 최초 펼침(기본 level<1)
+     *  --- 행 후크 ---
+     *  @param {function(HTMLElement,*,object)} [cfg.rowHook]   행 div 직후(줄무늬/클래스/data-속성/노드 stash)
+     *  @param {boolean}                        [cfg.selectable=true]
+     *
+     * @returns {{el:HTMLUListElement, render:Function, expandAll:Function,
+     *   collapseAll:Function, expandToLevel:Function, setExpanded:Function,
+     *   setSelected:Function, selectByKey:Function, findRow:Function}}
+     */
+    function createTree(cfg) {
+        cfg = cfg || {};
+        const _roots = cfg.roots || function () { return []; };
+        const _children = cfg.children || function () { return []; };
+        const _key = cfg.key || function () { return ""; };
+        const _hasChildren = cfg.hasChildren || function (n) { return (_children(n) || []).length > 0; };
+        const _label = cfg.label || function () { return ""; };
+        const _icon = cfg.icon || null;
+        const _tip = cfg.tip || null;
+        const _slotLead = cfg.slotLead || null;
+        const _slotTrailing = cfg.slotTrailing || null;
+        const _onSelect = cfg.onSelect || null;
+        const _onToggle = cfg.onToggle || null;
+        const _initialExpanded = cfg.initialExpanded || function (n, lvl) { return lvl < 1; };
+        const _rowHook = cfg.rowHook || null;
+        const bSelectable = cfg.selectable !== false;
+
+        const oUl = _el("ul", "u4a-tree");   // controller.el — role 미부착
+        const _expanded = {};                // key → bool (render 간 유지; onToggle 으로 외부 영속화 동기)
+        let _index = 0;                       // full render 마다 0 → 행 홀짝(ctx.odd)
+
+        // 펼침 상태: 한 번 본 키는 기억, 처음이면 initialExpanded 로 seed.
+        function _isExpanded(node, level) {
+            const k = _key(node);
+            if (k !== "" && Object.prototype.hasOwnProperty.call(_expanded, k)) { return !!_expanded[k]; }
+            const b = !!_initialExpanded(node, level);
+            if (k !== "") { _expanded[k] = b; }
+            return b;
+        }
+        // 접기 시 자손까지 재귀 접힘(WS20식 — 재오픈해도 자손은 접힌 상태)
+        function _collapseRec(node) {
+            const k = _key(node);
+            if (k !== "") { _expanded[k] = false; }
+            const aCh = _children(node) || [];
+            for (let i = 0; i < aCh.length; i++) { _collapseRec(aCh[i]); }
+        }
+
+        function _childrenUl(node, level, bExp) {
+            const oCUl = _el("ul");
+            oCUl.hidden = !bExp;
+            const aCh = _children(node) || [];
+            for (let i = 0; i < aCh.length; i++) { oCUl.appendChild(_buildNode(aCh[i], level + 1)); }
+            return oCUl;
+        }
+
+        function _toggle(node, oLi, oRow, level) {
+            const bNowOpen = oRow.getAttribute("aria-expanded") === "true";
+            if (bNowOpen) {
+                _collapseRec(node);
+                const oOld = oLi.querySelector(":scope > ul");
+                if (oOld) { oLi.replaceChild(_childrenUl(node, level, false), oOld); }
+                oRow.setAttribute("aria-expanded", "false");
+            } else {
+                const k = _key(node);
+                if (k !== "") { _expanded[k] = true; }
+                oRow.setAttribute("aria-expanded", "true");
+                const oCUl = oLi.querySelector(":scope > ul");
+                if (oCUl) { oCUl.hidden = false; }
+            }
+            if (_onToggle) { _onToggle(node, !bNowOpen, oRow); }
+        }
+
+        function _buildNode(node, level) {
+            const bHas = _hasChildren(node);
+            const bExp = bHas ? _isExpanded(node, level) : false;
+            const idx = _index++;
+            const oCtx = { level: level, index: idx, odd: (idx % 2 === 1), expanded: bExp, hasChildren: bHas, key: _key(node) };
+
+            const oLi = _el("li");
+
+            const oRow = _el("div", "u4a-tree__row");
+            oRow.style.setProperty("--u4a-tree-depth", String(level));
+            oRow.__u4aKey = _key(node);
+            if (bSelectable) { oRow.tabIndex = 0; }
+            if (bHas) { oRow.setAttribute("aria-expanded", bExp ? "true" : "false"); }
+            if (_tip) {
+                const sTip = _tip(node);
+                if (sTip) { oRow.setAttribute("data-tip", sTip); oRow.setAttribute("data-tip-trunc-sel", ".u4a-tree__label"); }
+            }
+
+            // 토글(셰브론) — 자식 없으면 leaf(투명, 자리만)
+            const oTog = _el("button", "u4a-tree__toggle" + (bHas ? "" : " u4a-tree__toggle--leaf"));
+            oTog.type = "button";
+            oTog.innerHTML = ICON.treeChevron;
+            if (bHas) {
+                oTog.addEventListener("click", function (ev) { ev.stopPropagation(); _toggle(node, oLi, oRow, level); });
+            }
+            oRow.appendChild(oTog);
+
+            // lead 슬롯(체크박스 등)
+            if (_slotLead) { const x = _slotLead(node, oCtx); if (x) { oRow.appendChild(x); } }
+
+            // 아이콘
+            if (_icon) {
+                const sIcon = _icon(node);
+                if (sIcon) { const oIc = _el("span", "u4a-tree__icon"); oIc.innerHTML = sIcon; oRow.appendChild(oIc); }
+            }
+
+            // 라벨
+            oRow.appendChild(_el("span", "u4a-tree__label", _label(node)));
+
+            // trailing 슬롯(배지/설명/액션 등) — 있으면 우측정렬(space-between)
+            if (_slotTrailing) {
+                const x = _slotTrailing(node, oCtx);
+                if (x) { oRow.setAttribute("data-u4a-tree-split", ""); oRow.appendChild(x); }
+            }
+
+            // 행 후크(줄무늬/클래스/data-속성/노드 stash)
+            if (_rowHook) { _rowHook(oRow, node, oCtx); }
+
+            // 선택
+            if (bSelectable && _onSelect) {
+                oRow.addEventListener("click", function () { _onSelect(node, oRow, oCtx); });
+                oRow.addEventListener("keydown", function (ev) {
+                    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); _onSelect(node, oRow, oCtx); }
+                });
+            }
+
+            oLi.appendChild(oRow);
+            if (bHas) { oLi.appendChild(_childrenUl(node, level, bExp)); }
+            return oLi;
+        }
+
+        function render() {
+            _index = 0;
+            oUl.innerHTML = "";
+            const aRoots = _roots() || [];
+            for (let i = 0; i < aRoots.length; i++) { oUl.appendChild(_buildNode(aRoots[i], 0)); }
+        }
+
+        // 전체 펼침/접힘 — 모델 전체 순회로 _expanded 갱신 후 재렌더(WS20/USP 툴바용)
+        function _walk(fn) {
+            (function rec(aNodes, level) {
+                if (!Array.isArray(aNodes)) { return; }
+                for (let i = 0; i < aNodes.length; i++) {
+                    const n = aNodes[i];
+                    if (!n) { continue; }
+                    fn(n, level);
+                    rec(_children(n) || [], level + 1);
+                }
+            })(_roots() || [], 0);
+        }
+        function expandAll() { _walk(function (n) { if (_hasChildren(n)) { const k = _key(n); if (k !== "") { _expanded[k] = true; } } }); render(); }
+        function collapseAll() { _walk(function (n) { const k = _key(n); if (k !== "") { _expanded[k] = false; } }); render(); }
+        function expandToLevel(iLevel) { _walk(function (n, lvl) { if (_hasChildren(n)) { const k = _key(n); if (k !== "") { _expanded[k] = (lvl < iLevel); } } }); render(); }
+
+        function setExpanded(node, bVal) { const k = _key(node); if (k !== "") { _expanded[k] = !!bVal; } render(); }
+
+        function findRow(sKey) {
+            const aRows = oUl.querySelectorAll(".u4a-tree__row");
+            for (let i = 0; i < aRows.length; i++) { if (aRows[i].__u4aKey === sKey) { return aRows[i]; } }
+            return null;
+        }
+        // (선택사항) 베이스가 선택 강조를 소유할 화면용 — 한 행만 aria-selected
+        function setSelected(node) { selectByKey(_key(node)); }
+        function selectByKey(sKey) {
+            const oPrev = oUl.querySelector('.u4a-tree__row[aria-selected="true"]');
+            if (oPrev) { oPrev.removeAttribute("aria-selected"); }
+            const oRow = findRow(sKey);
+            if (oRow) { oRow.setAttribute("aria-selected", "true"); }
+            return oRow;
+        }
+
+        return {
+            el: oUl, render: render,
+            expandAll: expandAll, collapseAll: collapseAll, expandToLevel: expandToLevel,
+            setExpanded: setExpanded, setSelected: setSelected, selectByKey: selectByKey, findRow: findRow
+        };
+    }
+
     const U4AUI = {
         el: _el,
+        createTree: createTree,
         createSelect: createSelect,
         attachSuggest: attachSuggest,
         attachClear: attachClear,

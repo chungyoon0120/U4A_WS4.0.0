@@ -1762,19 +1762,38 @@
     oAPP.fn.fnRenderTree = function () {
         const oPane = document.getElementById("u4aWsTreePane");
         if (!oPane) { return; }
-        oPane.innerHTML = "";
 
-        const oRoot = _el("ul", "u4a-tree");
-        oRoot.setAttribute("role", "tree");
-
-        const oSAPLogon = M.getProperty("/SAPLogon");
-        const aNode = (oSAPLogon && oSAPLogon.Node) ? oSAPLogon.Node : [];
-
-        let iRowOdd = { v: 0 };
-        for (const oNode of aNode) {
-            _renderTreeNode(oRoot, oNode, 0, true, iRowOdd);
+        // 공통 베이스 트리(U4AUI.createTree) — 코어 UX 단일 출처(재귀 마크업/토글/들여쓰기).
+        //   펼침 영속(uuid 맵)·선택·복원은 기존 외부 로직이 DOM 계약(li>.u4a-tree__row+ul) 위에서
+        //   그대로 동작한다. 컨트롤러는 1회 생성 후 재사용(상태 유지), 매 호출 render() 만 다시.
+        if (!oAPP.attr._treeCtrl) {
+            oAPP.attr._treeCtrl = window.U4AUI.createTree({
+                roots:    () => { const o = M.getProperty("/SAPLogon"); return (o && o.Node) ? (Array.isArray(o.Node) ? o.Node : [o.Node]) : []; },
+                children: (n) => { const c = n.Node; return c ? (Array.isArray(c) ? c : [c]) : []; },
+                key:      (n) => (n._attributes && n._attributes.uuid) || "",
+                // 트리 라벨/툴팁은 SAPUILandscape.xml 의 폴더명(사용자 데이터) — 현지화 대상 아님
+                label:    (n) => (n._attributes && n._attributes.name) || "",
+                tip:      (n) => (n._attributes && n._attributes.name) || "",
+                icon:     () => ICON.folder,
+                // 기본 펼침: 루트(level0)와 그 하위(level1)까지. 그 외는 토글 기억값(uuid 맵).
+                initialExpanded: (n, lvl) => {
+                    const u = n._attributes && n._attributes.uuid;
+                    const m = (oAPP.attr._treeExpanded = oAPP.attr._treeExpanded || {});
+                    return (u && Object.prototype.hasOwnProperty.call(m, u)) ? !!m[u] : (lvl < 2);
+                },
+                onToggle: (n, bOpen) => {
+                    const u = n._attributes && n._attributes.uuid;
+                    if (u) { (oAPP.attr._treeExpanded = oAPP.attr._treeExpanded || {})[u] = bOpen; }
+                },
+                // 외부 로직(재선택 복원/우클릭 복원)이 r._nodeData 로 행을 찾으므로 stash 필수. 홀짝 줄무늬도 유지.
+                rowHook: (oRow, n, ctx) => { oRow.dataset.odd = ctx.odd ? "true" : "false"; oRow._nodeData = n; },
+                onSelect: (n, oRow) => oAPP.fn.fnSelectTreeNode(oRow),
+            });
         }
-        oPane.appendChild(oRoot);
+
+        const oCtrl = oAPP.attr._treeCtrl;
+        if (oCtrl.el.parentElement !== oPane) { oPane.innerHTML = ""; oPane.appendChild(oCtrl.el); }
+        oCtrl.render();
 
         // 스크롤 위치 기억/복원 (뷰 전환 시 트리 스크롤 유지)
         if (oAPP.attr._treeScroll) { oPane.scrollTop = oAPP.attr._treeScroll; }
@@ -1783,83 +1802,6 @@
             oPane.addEventListener("scroll", () => { oAPP.attr._treeScroll = oPane.scrollTop; });
         }
     };
-
-    function _renderTreeNode(oParentUl, oNode, iLevel, bExpanded, iRowOdd) {
-        const oAttr = oNode._attributes || {};
-        const aChildNodes = oNode.Node ? (Array.isArray(oNode.Node) ? oNode.Node : [oNode.Node]) : [];
-        const bHasChild = aChildNodes.length > 0;
-
-        // 펼침 상태 기억: 사용자가 한 번이라도 토글한 노드는 그 상태를, 아니면 기본값(iLevel<1)을 사용.
-        //  (뷰 전환마다 트리가 재렌더돼도 펼침 위치가 유지되도록)
-        const sUuid = oAttr.uuid;
-        oAPP.attr._treeExpanded = oAPP.attr._treeExpanded || {};
-        const bEff = (sUuid && Object.prototype.hasOwnProperty.call(oAPP.attr._treeExpanded, sUuid))
-            ? !!oAPP.attr._treeExpanded[sUuid]
-            : bExpanded;
-
-        const oLi = _el("li");
-        oLi.setAttribute("role", "treeitem");
-
-        const oRow = _el("div", "u4a-tree__row");
-        oRow.style.paddingLeft = (0.5 + iLevel * 1.1) + "rem";
-        oRow.dataset.odd = (iRowOdd.v % 2 === 1) ? "true" : "false";
-        iRowOdd.v++;
-        oRow.tabIndex = 0;
-        oRow._nodeData = oNode;
-        if (bHasChild) {
-            oRow.setAttribute("aria-expanded", bEff ? "true" : "false");
-        }
-
-        // 토글(셰브론)
-        const oToggle = _el("button", "u4a-tree__toggle");
-        oToggle.innerHTML = ICON.chevron;
-        if (!bHasChild) {
-            oToggle.classList.add("u4a-tree__toggle--leaf");
-        }
-        oToggle.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            const oChildUl = oLi.querySelector(":scope > ul");
-            if (!oChildUl) { return; }
-            const bNowOpen = oRow.getAttribute("aria-expanded") === "true";
-            oRow.setAttribute("aria-expanded", bNowOpen ? "false" : "true");
-            oChildUl.hidden = bNowOpen;
-            // 펼침 상태 기억(재렌더/뷰전환에도 유지)
-            if (sUuid) { oAPP.attr._treeExpanded[sUuid] = !bNowOpen; }
-        });
-
-        const oIcon = _el("span", "u4a-tree__icon");
-        oIcon.innerHTML = ICON.folder;
-
-        // 트리 라벨은 SAPUILandscape.xml 의 폴더명(사용자 데이터) — 현지화 대상 아님
-        const oLabel = _el("span", "u4a-tree__label", oAttr.name || "");
-        oLabel.title = oAttr.name || "";   // 좁을 때 툴팁으로도 전체 이름 확인
-
-        oRow.append(oToggle, oIcon, oLabel);
-
-        // 선택
-        oRow.addEventListener("click", () => oAPP.fn.fnSelectTreeNode(oRow));
-        oRow.addEventListener("keydown", (ev) => {
-            if (ev.key === "Enter" || ev.key === " ") {
-                ev.preventDefault();
-                oAPP.fn.fnSelectTreeNode(oRow);
-            }
-        });
-
-        oLi.appendChild(oRow);
-
-        if (bHasChild) {
-            const oChildUl = _el("ul");
-            oChildUl.setAttribute("role", "group");
-            oChildUl.hidden = !bEff;   // 기억된 펼침 상태 반영
-            // 기본 펼침: 루트(level0)와 그 하위(level1)까지 (그 외는 토글 기억값)
-            for (const oChild of aChildNodes) {
-                _renderTreeNode(oChildUl, oChild, iLevel + 1, iLevel < 1, iRowOdd);
-            }
-            oLi.appendChild(oChildUl);
-        }
-
-        oParentUl.appendChild(oLi);
-    }
 
     /********************************************************************
      * 트리 노드 선택 → 우측 서버 목록 필터 (UI5 rowSelectionChange 대체)

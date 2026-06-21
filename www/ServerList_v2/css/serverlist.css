@@ -619,8 +619,14 @@
     user-select: text;
     cursor: auto;
 }
-/* 버튼은 클릭 대상이라 포인터 커서 유지 */
-.u4a-md__detail .btn { cursor: pointer; }
+/* 버튼은 클릭 대상이라 포인터 커서 유지 — 버튼 안 텍스트/아이콘(자식)까지 포함해야
+   라벨 위에서 I-beam(텍스트 선택 커서)이 뜨지 않는다. 선택도 막는다. */
+.u4a-md__detail .btn,
+.u4a-md__detail .btn * {
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
 
 .u4a-md__detailempty {
     margin: auto;
@@ -755,8 +761,12 @@
 .u4a-splitter__bar:hover::before { background: var(--u4a-accent); opacity: 1; height: 50px; }
 
 /* ── 트리 ─────────────────────────────────────────────────────────── */
+/* 좁은 패널에서 들여쓰기 step 축소(shell.css @container) 활성화 */
+#u4aWsTreePane { container-type: inline-size; }
 .u4a-tree__row {
-    gap: .4rem; padding: .34rem .5rem; margin: 1px .25rem; font-size: .85rem;
+    /* padding-left 는 shell.css 의 들여쓰기 calc(--u4a-tree-depth) 가 소유 → 좌측은 건드리지 않는다.
+       (단축 padding 으로 좌측까지 덮으면 깊이 들여쓰기가 깨짐) */
+    gap: .4rem; padding-block: .34rem; padding-right: .5rem; margin: 1px .25rem; font-size: .85rem;
     border-radius: var(--sl-radius-sm); color: var(--sl-fg); position: relative;
 }
 .u4a-tree__row:hover { background: var(--sl-surface-2); }

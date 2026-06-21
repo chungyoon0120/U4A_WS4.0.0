@@ -362,6 +362,19 @@ button:focus-visible {
     cursor: pointer;
     white-space: nowrap;
     color: var(--text);
+    /* 들여쓰기 표준(전 트리 공통) — 깊이(--u4a-tree-depth)는 createTree 가 행에 부여,
+       padding 은 여기서 계산. 좁은 패널에선 아래 컨테이너 쿼리가 step 을 줄여 이름 공간 확보. */
+    padding-left: calc(0.375rem + var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem));
+}
+
+/* trailing 슬롯(배지/설명/액션 등)을 우측정렬 — createTree 가 slotTrailing 반환 시 행에 부여 */
+.u4a-tree__row[data-u4a-tree-split] {
+    justify-content: space-between;
+}
+
+/* 좁은 트리 패널(container-type:inline-size 인 조상 필요)에선 들여쓰기 step 축소 */
+@container (max-width: 17rem) {
+    .u4a-tree__row { --u4a-tree-indent-step: 0.625rem; }
 }
 
 .u4a-tree__row:hover {
