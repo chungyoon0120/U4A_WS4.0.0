@@ -32,11 +32,31 @@
      * @version v3.5.7-4
      * @author  soccerhs
      * @description
-     *  처음 로딩 시 리소스 무거운 npm 라이브러리는 미리 로드하는 용도
+     *  처음 로딩 시 리소스 무거운 npm 라이브러리는 미리 로드하는 용도.
+     *
+     * @since   2026-06-22
+     * @version v3.6.4-x
+     * @author  soccerhs
+     * @description
+     *  [첫 실행 속도 개선]
+     *  무거운 라이브러리(puppeteer-core ≈ 8MB)를 모듈 로드 시점에 동기 require 하면,
+     *  인트로가 화면에 뜨기 전 임계 경로에서 콜드 디스크 로드를 그대로 떠안아 첫 실행이
+     *  크게 느려진다. 인트로 표시 자체는 이 라이브러리에 의존하지 않으므로 preload 를
+     *  인트로가 뜬 뒤 백그라운드로 미룬다(_preloadHeavyModules).
+     *
+     *  ※ 인트로 렌더러와 본 앱은 별도 프로세스라 require 캐시는 공유되지 않으며,
+     *    이 preload 의 실효는 "OS 파일 캐시 워밍"이므로 시점을 미뤄도 효과는 동일하다.
      */
-    const EventEmitter = require('events');
-    const puppeteer = require("puppeteer-core");
-    const crypto = require("crypto");    
+    function _preloadHeavyModules() {
+
+        // 인트로 페인트를 막지 않도록 다음 틱으로 미루고, 실패해도 무시한다(워밍 목적).
+        setTimeout(() => {
+            try { require("events"); }        catch (e) {}
+            try { require("puppeteer-core"); } catch (e) {}
+            try { require("crypto"); }         catch (e) {}
+        }, 0);
+
+    } // end of _preloadHeavyModules
 
     const vbsDirectory = PATH.join(PATH.dirname(APP.getPath('exe')), 'resources/regedit/vbs');
     REGEDIT.setExternalVBSLocation(vbsDirectory);
@@ -128,6 +148,15 @@
          * - 사계절 인트로 적용
          */
         await _showIntro();
+
+        /**
+         * @since   2026-06-22
+         * @description
+         *  [첫 실행 속도 개선] 인트로가 화면에 뜬 직후, 무거운 라이브러리를 백그라운드로
+         *  미리 로드한다. await 하지 않으므로 인트로 표시/이후 부팅 작업을 막지 않고,
+         *  남은 부팅 디스크 I/O 와 겹쳐져 다음 실행을 위한 OS 파일 캐시를 데운다.
+         */
+        _preloadHeavyModules();
 
         /**
          * @since   2026-05-23 15:10:49
