@@ -1173,6 +1173,7 @@
         }
         function _out(e) { if (!POP.contains(e.target) && e.target !== oAnchor && !oAnchor.contains(e.target)) { _close(); } }
         function _esc(e) { if (e.key === "Escape") { _close(); } }
+        // 미리보기(iframe) 클릭 닫기는 전역(u4a-ui.js _installIframeBlurClose)이 합성 mousedown 으로 처리.
         setTimeout(function () {
             document.addEventListener("mousedown", _out, true);
             document.addEventListener("keydown", _esc, true);
@@ -1242,6 +1243,29 @@
 
         // 도움말 (자리만)
         HDR.appendChild(lf_hdrBtn("ws20PrevHelpBtn", _fa("circle-question"), "Help"));
+
+        // 패널 좁아지면 우측 컨트롤(⟳/줌/OFF/?)이 잘려 사라지지 않도록 ⋯ 오버플로 메뉴로 접는다
+        //   (트리 툴바와 동일 — U4AUI.attachOverflow). 스페이서만 isSkip, 우측정렬이라 noOvfAutoMargin.
+        try {
+            if (window.U4AUI && U4AUI.attachOverflow) {
+                U4AUI.attachOverflow(HDR, {
+                    noOvfAutoMargin: true,
+                    isSkip: function (el) { return el.classList.contains("u4aWs20PanelHdrSpacer"); },
+                    isSep: function () { return false; },
+                    btnClass: "u4aWs20PanelHdrBtn",
+                    btnHtml: '<i class="fa-solid fa-ellipsis"></i>',
+                    menuItem: function (el) {
+                        var oI = el.querySelector("i");
+                        var bDis = el.disabled === true || el.classList.contains("is-disabled");
+                        var sIcon, sText;
+                        if (el.id === "ws20PrevZoomSlider") { sIcon = _fa("magnifying-glass"); sText = "Zoom"; bDis = true; }
+                        else if (el.id === "ws20PrevOffToggle") { sIcon = _fa("toggle-off"); sText = el.textContent || "OFF"; }
+                        else { sIcon = oI ? oI.outerHTML : ""; sText = el.title || (window.U4AUI && U4AUI.btnLabel ? U4AUI.btnLabel(el, true) : "") || ""; }
+                        return { iconHtml: sIcon, text: sText, disabled: bDis, onClick: function () { if (!bDis) { el.click(); } } };
+                    }
+                });
+            }
+        } catch (e) { console.warn("[HTML5][WS20] preview header overflow attach 실패:", e && e.message); }
 
         return HDR;
 

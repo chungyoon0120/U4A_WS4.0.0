@@ -79,7 +79,9 @@
         "GUIPath": "HKCU\\SOFTWARE\\U4A\\WS\\GUIPath",
         "systems": "HKCU\\SOFTWARE\\U4A\\WS\\Systems",
         "LogonSettings": "HKCU\\SOFTWARE\\U4A\\WS\\WSLogon\\Settings",
-        "globalSettings": "HKCU\\SOFTWARE\\U4A\\WS\\GlobalSettings",
+        "u4aws4": "HKCU\\SOFTWARE\\U4A\\WS\\WS4",
+        "globalSettings": "HKCU\\SOFTWARE\\U4A\\WS\\WS4\\GlobalSettings",
+        "globalSettingsWs3": "HKCU\\SOFTWARE\\U4A\\WS\\GlobalSettings",
         "globalPaths": "HKCU\\SOFTWARE\\U4A\\WS\\GlobalPaths",
         "devBrowser": "HKCU\\SOFTWARE\\U4A\\WS\\GlobalPaths\\U4A_DEV_BROWSER"
     },

@@ -108,18 +108,76 @@
     }
 
     /************************************************************************
-     * showCriticalErrorDialog 폴백 (구 ws_trycatch.js — 현재 미로드)
-     *   미리보기 iframe(design/preview/index.js)이 parent.parent.showCriticalErrorDialog
-     *   로 오류를 보고하는데, 메인 창에 정의가 없어 2차 TypeError 가 났음.
-     *   UI5 의존 없이 푸터 메시지/콘솔로 안전하게 대체. (이미 있으면 유지)
+     * showCriticalErrorDialog (메인 창 전역 — 구 ws_trycatch.js 동작 복원)
+     * ---------------------------------------------------------------------
+     *  미리보기 iframe(design/preview/index.js)이 parent.parent.showCriticalErrorDialog
+     *  로 critical 오류를 보고한다. 변환 과정에서 메인 창에 ws_trycatch(WSERR)가
+     *  미로드라 이 전역이 사라져 2차 TypeError + 푸터 토스트로 격하됐었다.
+     *
+     *  원본 동작을 복원한다(01 §10.6 #3 / ws_trycatch.js):
+     *   ① 중복/무한루프 방지 flag → ② Electron 네이티브 모달 오류창(blocking) →
+     *   ③ 닫으면 로그 폴더 열기(WSLOG.openLOG) → ④ APP.exit() 로 앱 종료.
+     *  ※ critical 오류 후엔 앱을 더 조작하면 안 되므로 셧다운한다(사용자 결정).
+     *    문서 11 §2-3 의 "APP 종료 방지" 권고와는 의도적으로 어긋남(완료보고 명기).
+     *  ※ 메인 창의 window.onerror 까지 ws_trycatch 로 재무장하지는 않는다(미변환
+     *    엣지 오류로 앱이 죽는 것 방지 — 변환 설계 유지). 이 전역 함수만 복원.
      ************************************************************************/
     if (typeof window.showCriticalErrorDialog !== "function") {
-        window.showCriticalErrorDialog = function (sMsg) {
-            try { console.error("[Critical]", sMsg); } catch (e) { }
+
+        // 중복 호출 방지(원본 bIsError). 한 번 뜨면 이후 critical 은 무시.
+        var _bCriticalShown = false;
+
+        window.showCriticalErrorDialog = function (sErrorMsg) {
+
+            if (_bCriticalShown === true) {
+                return;
+            }
+            _bCriticalShown = true;
+
+            try { console.error("[Critical]", sErrorMsg); } catch (e) { }
+
+            var REMOTE, DIALOG, APP, CURRWIN, WSLOG;
             try {
-                var sPage = (parent.getCurrPage && parent.getCurrPage()) || "WS10";
-                APPCOMMON.fnShowFloatingFooterMsg && APPCOMMON.fnShowFloatingFooterMsg("E", sPage, String(sMsg || ""));
-            } catch (e) { }
+                REMOTE = require('@electron/remote');
+                var ELECTRON = REMOTE.require('electron');
+                DIALOG = ELECTRON.dialog;
+                APP = REMOTE.app;
+                CURRWIN = REMOTE.getCurrentWindow();
+                var PATH = REMOTE.require('path');
+                WSLOG = require(PATH.join(APP.getAppPath(), "ws30", "ws10_20", "js", "ws_log.js"));
+            } catch (e) {
+                // remote 접근 불가 — 최소한 콘솔에만 남기고 종료 시도
+                try { console.error("[Critical] remote 접근 실패", e); } catch (e2) { }
+            }
+
+            // ② Electron 네이티브 모달 오류 다이얼로그
+            if (DIALOG && CURRWIN) {
+
+                var sTitle = "[Critical Error]: Please contact the solution team.";
+
+                DIALOG.showMessageBox(CURRWIN, {
+                    title: sTitle,
+                    message: String(sErrorMsg || ""),
+                    type: "error"
+                }).then(function () {
+
+                    // ③ 닫을 때 로그 폴더 열기(있을 때만)
+                    try { WSLOG && WSLOG.openLOG && WSLOG.openLOG(true); } catch (e) { }
+
+                    // ④ critical 오류 → 앱 종료
+                    try { APP && APP.exit(); } catch (e) { }
+
+                }).catch(function () {
+                    try { APP && APP.exit(); } catch (e) { }
+                });
+
+            } else {
+
+                // 다이얼로그 자체가 불가하면 그래도 종료(원본 의도: critical 후 미조작)
+                try { APP && APP.exit(); } catch (e) { }
+
+            }
+
         };
     }
 

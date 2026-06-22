@@ -346,7 +346,10 @@ button:focus-visible {
 .u4a-tree {
     list-style: none;
     margin: 0;
-    padding: 0.25rem 0;
+    /* 좌측 1px = 선택/상태 좌측바(box-shadow inset, 행 좌측 가장자리)가 패널 가장자리에 딱 붙지 않게
+       하는 공통 여백(옵션 팝업 사이드바와 동일 1px). 들여쓰기는 행의 --u4a-tree-depth padding 이
+       소유하므로 여기 좌측 1px 추가해도 깊이는 안 깨짐. (2026-06-22 USP/WS20 트리 적용) */
+    padding: 0.25rem 0 0.25rem 1px;
     /* height:100% 였을 때: 노드를 펼쳐 내용이 패널보다 길어지면 배경(surface)은
        패널 높이까지만 칠해지고, 넘친 영역엔 뒤 페이지 배경이 비쳐 보였음.
        min-height 로 바꿔 내용만큼 늘어나며 배경이 전체를 덮게 한다. */
@@ -370,7 +373,10 @@ button:focus-visible {
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    height: 2rem;
+    /* 행 높이는 전 트리 공통 단일 출처(토큰). 각 트리는 --u4a-tree-row-h 만 설정하면 되고
+       행 CSS 를 재정의하지 않는다. min-height 라 내용(예: USP 설명 2줄)에 맞춰 늘어난다.
+       기본값 2rem(ServerList 등 그대로). */
+    min-height: var(--u4a-tree-row-h, 2rem);
     padding-right: 0.5rem;
     cursor: pointer;
     white-space: nowrap;
@@ -537,8 +543,13 @@ button:focus-visible {
         width var(--motion) linear, height var(--motion) linear;
 }
 
+/* hover 바 배경 — 불투명 surface 위에 hover 틴트를 "얹는다"(레이어). `background: var(--hover-bg)`
+   처럼 반투명 색만 주면 surface 가 사라지고 "바 뒤 컨테이너 배경"이 비치는데, 그 컨테이너가 화면마다
+   다르다(WS20=--ws20-bg/app-bg, 옵션 팝업=투명→body 등) → 같은 토큰인데 hover 색이 화면마다 달라
+   보인다. surface 베이스 + 틴트 오버레이로 고정해 어느 화면에서나 동일한 hover 색. (2026-06-22) */
 .u4a-splitter__bar:hover {
-    background: var(--hover-bg);
+    background-color: var(--surface);
+    background-image: linear-gradient(var(--hover-bg), var(--hover-bg));
 }
 
 .u4a-splitter__bar:hover::before {

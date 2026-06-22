@@ -195,7 +195,14 @@
                     return;
 
                 case "CONTENT_SYNC":
-                    // 편집 내용 → 모델 동기화 (1차 읽기에서는 보류 — Change 모드 단계)
+                    // 편집 내용 → /WS30/USPDATA.CONTENT 동기화 + 변경 플래그(구 _fnLineSelectCb CONTENT_SYNC).
+                    //   (저장 시 라이브 getValue 도 다시 읽지만, 변경표시[Inactive]는 입력 즉시 반영돼야 함)
+                    try {
+                        var oUd = APPCOMMON.fnGetModelProperty("/WS30/USPDATA") || {};
+                        oUd.CONTENT = (oData.CONTENT != null ? oData.CONTENT : "");
+                        APPCOMMON.fnSetModelProperty("/WS30/USPDATA", oUd);
+                        if (oAPP.fn.setAppChangeWs30) { oAPP.fn.setAppChangeWs30("X"); }
+                    } catch (e) { console.error("[HTML5][WS30] CONTENT_SYNC:", e); }
                     return;
 
                 default:
@@ -410,6 +417,9 @@
 
         // 이미 에디터 iframe 이 있으면 재로드하지 않는다(워커 누적/크래시 방지).
         if (aFrames.length) {
+            // 폴더/루트 선택으로 숨겨졌던 경우(editorClear) 다시 보이게 한다.
+            oHost.classList.remove("u4aWs30EditorHidden");
+
             // 헤더 툴바는 정보만 갱신(파일명/Pretty/테마콤보값) — 통째 재생성/테마목록 재조회 회피.
             _refreshToolbarInfo();
 
@@ -420,6 +430,10 @@
                 // 준비된 에디터에 내용/언어만 전달(전 에디터 동기) → 즉시 busy 해제.
                 try { oAPP.usp.sendEditorPostMessageAll({ actcd: "setValue", value: (oRowData && oRowData.CONTENT) || "" }); } catch (e) { console.error("[HTML5][WS30] editor setValue:", e); }
                 try { oAPP.usp.sendEditorPostMessageAll({ actcd: "language_change", extension: (oRowData && oRowData.EXTEN) || "" }); } catch (e) { console.error("[HTML5][WS30] editor language_change:", e); }
+                // display:none 으로 숨겨져 있던 동안 Monaco 가 컨테이너 0 크기로 굳었을 수 있어 강제 relayout.
+                Array.prototype.forEach.call(aFrames, function (f) {
+                    try { if (f.contentWindow && f.contentWindow.editor) { f.contentWindow.editor.layout(); } } catch (e) { }
+                });
                 _releaseBusy();
             }
             // 아직 로딩 중이면: 진행 중인 editor.create 가 최신 getSelectedUspLineData().CONTENT 를
@@ -435,6 +449,7 @@
         oAPP.attr.uspEditorLoadCnt = EDITOR_COUNT;
 
         oHost.innerHTML = "";
+        oHost.classList.remove("u4aWs30EditorHidden");   // 최초 빌드는 보이는 상태로
         oHost.appendChild(_buildEditorToolbar());   // 헤더 툴바 (최초 1회 전체 생성)
 
         var SPLIT = document.createElement("div");
@@ -474,13 +489,49 @@
     };
 
     /************************************************************************
-     * [PUBLIC] 에디터 비우기 — 폴더/루트(문서 페이지) 등 파일 아닌 경우.
+     * [PUBLIC] Display↔Change 모드 전환 시 에디터 읽기전용 동기화.
+     *   에디터는 1회만 로드하고 재사용하므로(setValue 방식) editor.create 시점의
+     *   readOnly 가 고정된다. 모드가 바뀌면 살아있는 두 iframe 의 Monaco 인스턴스에
+     *   updateOptions({readOnly}) 를 직접 적용해 재로드 없이 읽기/쓰기를 전환한다.
+     *   (parent → iframe.contentWindow.editor 접근은 file:// 동일 출처라 가능 — 저장 시
+     *    getValue 와 동일 경로.)
+     ************************************************************************/
+    oAPP.usphtml.editorSetReadOnly = function (bReadOnly) {
+        var oHost = document.getElementById("uspEditorHost");
+        if (!oHost) { return; }
+        var aFrames = oHost.querySelectorAll("iframe.MONACO_EDITOR");
+        Array.prototype.forEach.call(aFrames, function (f) {
+            try {
+                if (f.contentWindow && f.contentWindow.editor) {
+                    f.contentWindow.editor.updateOptions({ readOnly: !!bReadOnly });
+                }
+            } catch (e) { console.error("[HTML5][WS30] editorSetReadOnly:", e); }
+        });
+    };
+
+    /************************************************************************
+     * [PUBLIC] 에디터 영역 비우기 — 폴더/루트(문서 페이지) 등 파일 아닌 경우.
+     *   ★ 파괴(innerHTML="")하지 않고, host 박스(테두리+배경)는 **항상 보이게 두고 안의
+     *   내용(툴바+iframe)만 숨긴다**(.u4aWs30EditorHidden > * { display:none }).
+     *     - 영역(빈 에디터 박스) 모양이 폴더/파일·최초/재선택 모두 일관(박스가 사라졌다 생겼다 X).
+     *     - Monaco 는 무거워(loader+worker) 폴더↔파일마다 destroy+재생성하면 느리고 크래시
+     *       위험 → iframe(2개)은 DOM 에 살려두고(display:none) 파일 재선택 시 editorLoadSelected
+     *       가 숨김 해제 + setValue + layout() 으로 재로드 없이 재사용.
+     *   (분할바 옵저버는 그대로 유지 — DOM 이 남아 있으므로 해제하지 않는다.)
      ************************************************************************/
     oAPP.usphtml.editorClear = function () {
-        // 에디터 분할바 옵저버 해제(에디터 DOM 제거되므로) — 중앙 레지스트리.
-        try { if (oAPP.usphtml.disconnectObserver) { oAPP.usphtml.disconnectObserver("editorSplit"); } } catch (e) { }
         var oHost = document.getElementById("uspEditorHost");
-        if (oHost) { oHost.innerHTML = ""; }
+        if (!oHost) { return; }
+        var aFrames = oHost.querySelectorAll("iframe.MONACO_EDITOR");
+        if (aFrames.length) {
+            // 이미 만들어진 에디터 → 파괴하지 말고 내용만 숨김(박스 유지, 재선택 시 재로드 없이 재사용).
+            oHost.classList.add("u4aWs30EditorHidden");
+            return;
+        }
+        // 아직 에디터가 없으면 잔여물만 정리(빈 박스 상태로 둠).
+        try { if (oAPP.usphtml.disconnectObserver) { oAPP.usphtml.disconnectObserver("editorSplit"); } } catch (e) { }
+        oHost.innerHTML = "";
+        oHost.classList.remove("u4aWs30EditorHidden");
         oAPP.attr.uspEditorLoadCnt = 0;
     };
 

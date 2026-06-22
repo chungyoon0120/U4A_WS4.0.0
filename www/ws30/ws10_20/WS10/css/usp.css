@@ -23,6 +23,8 @@
     --ws30-hover-bg: var(--hover-bg);
     /* 좌측 트리 패널 최소=기본 폭 단일 출처(_bindResizer 가 computed min-width 로 읽어 드래그 하한과 일치) */
     --ws30-tree-minw: 21.25rem;   /* 340px */
+    /* 트리 설명(Description) 컬럼 폭 단일 출처 — 컬럼 헤더와 각 행 설명 셀이 공유(정렬 일치) */
+    --ws30-desc-w: 42%;
 
     height: 100%;
     display: flex;
@@ -106,8 +108,9 @@
     background: var(--ws30-bg);
 }
 
-/* ── 트리 헤더(expand/collapse 툴바) — WS20 트리 툴바(.u4aWs20TreeToolbar)와 동일 ──
-   surface-raised 배경 + 하단 보더 + .u4a-btn-icon 버튼. 컬럼 헤더는 두지 않음(WS20 동일). */
+.u4aWs30TreeTbIcon { pointer-events: none; }
+
+/* ── 접힘/펼침 툴바 (별도 밴드) — 원본처럼 컬럼 헤더 위에 분리. surface-raised + 하단 보더. ── */
 .u4aWs30TreeToolbar {
     flex: 0 0 auto;
     display: flex;
@@ -118,7 +121,42 @@
     background: var(--surface-raised);
     border-bottom: 0.0625rem solid var(--ws30-line);
 }
-.u4aWs30TreeTbIcon { pointer-events: none; }
+
+/* ── 트리 컬럼 헤더(이름 | 설명) — 원본 TreeTable 2컬럼(Name C11 / Description A35).
+   ★ 본문(스크롤 영역) 안에 sticky 로 둔다 → 행과 동일한 폭 컨텍스트(스크롤바 영향 동일,
+     box-sizing/padding 동일)를 공유해야 컬럼 구분선이 행 구분선과 정확히 정렬된다.
+   두께는 트랜잭션 툴바(.u4a-ws10__subheader)와 동일. 설명 컬럼 폭은 --ws30-desc-w 단일 출처. */
+.u4aWs30TreeColHead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    display: flex;
+    align-items: stretch;
+    height: 2.75rem;        /* 트랜잭션 툴바(.u4a-ws10__subheader min-height 2.75rem)와 동일 두께 */
+    padding-left: 0.375rem; /* 행(.u4a-tree__row) padding-left 과 동일 → 설명 컬럼 기준폭 일치 */
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--ws30-text-sub);
+    background: var(--ws30-header-bg);
+    border-bottom: 0.0625rem solid var(--ws30-line);
+}
+.u4aWs30TreeColName {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    padding-left: 0.5rem;
+}
+.u4aWs30TreeColDesc {
+    flex: 0 0 var(--ws30-desc-w);
+    min-width: 0;
+    box-sizing: border-box;          /* 행 설명셀과 동일 박스모델 → 구분선 위치 일치 */
+    display: flex;
+    align-items: center;
+    padding-left: 0.5rem;
+    border-left: 0.0625rem solid var(--ws30-line);
+}
 
 /* ── 트리 본문 (공통 .u4a-tree 컴포넌트 + USP 확장 — WS20 트리와 동일 UX) ──
    hover/선택(aria-selected)/셰브론 회전(aria-expanded)/토글/아이콘/라벨은
@@ -131,23 +169,19 @@
     background: var(--ws30-panel);
 }
 
-/* 공통 트리(width:max-content) 무력화 — 행을 패널 폭에 맞춰 우측 설명이 항상 보이게(WS20 동일) */
+/* 공통 트리 설정(행 CSS 재정의 X — base 가 단일 출처):
+   - width:auto/min-width:100% : 행을 패널 폭에 맞춰 설명 컬럼이 항상 보이게(공통 max-content 무력화)
+   - --u4a-tree-row-h : 행 높이 토큰만 설정(공통/원본 트리 기준 40px). 실제 행 높이/가변은 shell.css
+     .u4a-tree__row 의 min-height:var(--u4a-tree-row-h) 가 담당 → 설명 2줄이면 자동으로 늘어난다.
+   - font-size : 트리 글자크기(라벨/설명 공통). */
 .u4aWs30Tree.u4a-tree {
     width: auto;
     min-width: 100%;
+    --u4a-tree-row-h: 2.5rem;
+    font-size: 0.8125rem;
 }
 
 .u4aWs30TreeNode { margin: 0; }
-
-/* 행 — 공통 .u4a-tree__row(shell.css) 위에 WS30 확장만(행높이/폰트). 들여쓰기는
-   공통 --u4a-tree-depth(createTree 부여) 가 단일 출처로 담당 → 자체 --ws30-depth padding 제거.
-   trailing(DESC) 우측정렬도 createTree 의 data-u4a-tree-split → shell.css 가 처리(중복 제거). */
-.u4aWs30TreeRow {
-    height: 2.5rem;
-    font-size: 0.8125rem;
-}
-/* 토글 클릭 영역 — WS20 동일(가로 1.75rem, 세로 행높이) */
-.u4aWs30TreeRow .u4a-tree__toggle { width: 1.75rem; height: 2.5rem; }
 
 /* 아이콘 — 공통 createTree 아이콘 슬롯(.u4a-tree__icon)에 USP SVG(img) 18px.
    ※ createTree 는 .u4a-tree__icon 으로 렌더 → 옛 .u4aWs30TreeIcon 은 더 이상 안 나옴(타겟 정정). */
@@ -164,18 +198,41 @@
     white-space: nowrap;
 }
 
-/* 설명 — WS20 aggregation 라벨(.u4aWs20TreeAggr)처럼 우측 muted, 좁으면 양보(접힘) */
+/* 설명 컬럼 — 고정 폭(--ws30-desc-w)으로 헤더와 정렬, 좌측 구분선, 최대 2줄 클램프(초과 시 …),
+   2줄 초과분은 트리 모듈이 overflow 감지해 title(툴팁) 부여. */
 .u4aWs30TreeDesc {
-    flex: 0 1 auto;
+    flex: 0 0 var(--ws30-desc-w);
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding-right: 0.5rem;
+    align-self: stretch;
+    box-sizing: border-box;
+    padding: 0.15rem 0.5rem;
+    border-left: 0.0625rem solid var(--ws30-line);
     color: var(--ws30-text-sub);
     font-size: 0.8125rem;
+    line-height: 1.25;
+    white-space: normal;       /* 공통 행 nowrap 무력화 — 설명은 줄바꿈 허용 */
+    word-break: break-word;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;     /* 최대 2줄 */
 }
 .u4aWs30TreeRow[aria-selected="true"] .u4aWs30TreeDesc { color: inherit; }
+
+/* 공통 행의 data-u4a-tree-split(space-between) 무력화 — 라벨 flex:1 이 가운데를 채우고
+   설명은 고정폭 우측 컬럼이 되도록 좌측정렬. */
+.u4aWs30Tree .u4a-tree__row[data-u4a-tree-split] { justify-content: flex-start; }
+/* 공통 행의 우측 padding 제거 — 설명 셀이 우측 끝까지 채워 컬럼 구분선이 닿게 */
+.u4aWs30TreeRow { padding-right: 0; }
+
+/* 들여쓰기를 행 padding-left → 토글 margin-left 로 이동.
+   이유: 설명 컬럼 폭이 flex-basis(%)라 행 content box 폭이 기준인데, 들여쓰기가 행
+   padding 에 있으면 깊이마다 기준폭이 달라져 설명 컬럼/구분선이 어긋난다. 들여쓰기를
+   토글 margin 으로 옮기면 행 content box 폭이 깊이와 무관하게 일정 → 컬럼 헤더와 정렬 일치. */
+.u4aWs30Tree .u4a-tree__row { padding-left: 0.375rem; }
+.u4aWs30Tree .u4a-tree__toggle {
+    margin-left: calc(var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem));
+}
 
 /* ── NavContainer 3페이지 (인트로 / 콘텐츠 / 문서) ───────────────── */
 .u4aWs30Nav {
@@ -302,6 +359,12 @@
 }
 .u4aWs30EditorTbSpacer { flex: 1 1 auto; }
 .u4aWs30EditorThemeSel { min-width: 11rem; }
+
+/* 폴더/루트 선택 시 에디터를 파괴하지 않고 숨김만(Monaco 재로드 방지·재사용).
+ *   ★ host(박스: 테두리+배경)는 항상 보이게 두고 안의 내용(툴바+에디터 iframe)만 숨긴다.
+ *     → 폴더는 '빈 에디터 박스', 파일은 '에디터'로 영역 모양이 일관(최초/재선택 동일).
+ *     iframe 은 DOM 에 살아있어(display:none) 파일 재선택 시 재로드 없이 재사용 + layout() 재계산. */
+.u4aWs30EditorHidden > * { display: none !important; }
 
 .u4aWs30EditorSplit {
     flex: 1 1 auto;

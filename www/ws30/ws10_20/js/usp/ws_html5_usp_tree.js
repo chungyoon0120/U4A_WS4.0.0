@@ -109,12 +109,32 @@
         var oTree = _ensureTree();
         if (!oTree) { return; }
 
+        // BODY 에는 컬럼 헤더(.u4aWs30TreeColHead, sticky)가 먼저 들어 있으므로 통째로 비우지 않고
+        //   트리 el 만 헤더 뒤에 1회 붙인다(헤더 보존 → 행과 동일 폭 컨텍스트 유지).
         if (oTree.el.parentNode !== BODY) {
-            BODY.innerHTML = "";
             BODY.appendChild(oTree.el);
         }
         oTree.render();
+
+        // 설명 컬럼: 2줄(-webkit-line-clamp) 초과분만 title(툴팁) 부여 — 레이아웃 후 측정.
+        try { window.requestAnimationFrame(_applyDescTooltips); } catch (e) { _applyDescTooltips(); }
     };
+
+    // 설명 셀이 2줄 클램프로 잘렸을 때만 전체 텍스트를 title 로 (마우스 오버 시 툴팁).
+    function _applyDescTooltips() {
+        var BODY = document.getElementById("uspTreeBody");
+        if (!BODY) { return; }
+        var aDesc = BODY.querySelectorAll(".u4aWs30TreeDesc");
+        Array.prototype.forEach.call(aDesc, function (el) {
+            try {
+                if (el.scrollHeight > el.clientHeight + 1) {
+                    el.title = el.textContent || "";
+                } else {
+                    el.title = "";   // 잘리지 않으면 툴팁 없음(행=이름 title 이 설명 위에서 새는 것 차단)
+                }
+            } catch (e) { }
+        });
+    }
 
     /************************************************************************
      * 선택 표시 (구 _fnUspTreeSelectedRowMark + setSelectedIndex)

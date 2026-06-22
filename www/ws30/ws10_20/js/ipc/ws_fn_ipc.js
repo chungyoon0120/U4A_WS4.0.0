@@ -697,6 +697,9 @@
             }
         } catch (error) { /* noop */ }
 
+        // (body/#content 의 부팅 캔버스 --boot-bg 는 U4ATheme.apply 가 테마 CSS 로드 후 --app-bg 로
+        //   중앙 동기화한다(theme-api.js _syncBootBg) → 여기서 따로 손대지 않는다.)
+
 
         /*****************************************************
          * @since   2025-05-06

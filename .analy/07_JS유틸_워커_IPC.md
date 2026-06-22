@@ -126,6 +126,11 @@ Renderer ─ipcRenderer.send()─▶ Main ─ipcMain.on()─▶ Renderer(broadca
 | `if-session-time` | `IPCMAIN.off` (해제만) | `fnIpcMain_if_session_time` | 세션 타임아웃 Worker 시작 트리거 |
 | `if-dev-browser` | `IPC_HANDLER.on/off` | `fnIpcMain_if_dev_browser` | 개발 브라우저 모듈 실행 (dev_browser/index.js 로딩) |
 
+> **`if-p13n-themeChange-{SYSID}` 는 "전 창 브로드캐스트" — 테마를 보여주는 모든 창/팝업이 직접 구독해야 한다(필수).**
+> - 동작: 테마를 적용한 창이 `ipcRenderer.send("if-p13n-themeChange-"+SYSID, {THEME, BGCOL})` 로 보내면, **각 창·팝업이 `REMOTE.require('electron').ipcMain.on(...)`(=remote ipcMain) 으로 같은 채널을 구독**하고 있다가 받아 `U4ATheme.apply(THEME)` + `--boot-bg` removeProperty 로 즉시 반영한다. remote ipcMain 리스너라 한 send 가 전 렌더러로 퍼지는 브로드캐스트가 된다. 메인 셸=`ws_fn_ipc.js fnIpcMain_if_p13n_themeChange`, 별도창 팝업들=각자 `_onIpcMain_if_p13n_themeChange`.
+> - ⚠️ **새 HTML5 BrowserWindow 팝업은 이 "수신" 구독을 빠뜨리기 쉽다.** `send`(적용 시 알림)만 있고 `IPCMAIN.on` 구독이 없으면 **그 팝업만** 다른 창의 테마변경에 반응하지 않는다(같은 SYSID 두 창에서 각각 옵션 팝업을 띄우고 한쪽서 바꿔도 다른쪽이 안 바뀜 — 2026-06-22 신 옵션팝업 `optionMain.js` 누락 사례). 수신 시 `sOrigTheme`(되돌림 기준)도 새 테마로 갱신해 Close 가 옛 테마로 되돌리지 않게 한다.
+> - ⚠️ **리스너 해제 필수**: remote ipcMain 리스너는 창 파괴 후에도 메인에 남아 다음 브로드캐스트 때 죽은 콜백 호출로 오류난다. `window` `beforeunload`(모든 닫힘 경로 커버)에서 `IPCMAIN.off` 한다. 별도창 공통 체크리스트는 [16_공통_화면UX_표준.md](16_공통_화면UX_표준.md)·skin/shell + ServerList 레퍼런스 참고.
+
 **if-browser-close ACTCD 상세**:
 
 | ACTCD | 동작 |

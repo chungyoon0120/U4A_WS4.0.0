@@ -51,6 +51,15 @@ body {
     width: auto;
 }
 
+/* 헤더 줄바꿈 허용 — 공통 thead th 는 nowrap 이라 좁은 컬럼에서 "Error Type" 이
+   넘쳐 옆 헤더 배경에 덮여 잘렸음. 이 테이블 헤더만 줄바꿈(예: "Error"/"Type"). */
+.u4aErrTbl thead th {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
+    vertical-align: middle;
+}
+
 /* Type/Line = 가운데 정렬 (공통 thead th 좌측정렬보다 우선) */
 .u4a-table .u4a-c-etype,
 .u4a-table .u4a-c-eline {

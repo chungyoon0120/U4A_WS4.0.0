@@ -30,14 +30,31 @@
      * horizon_white 는 tokens.css(:root) 기본값이라 별도 CSS 불필요.
      * → 화면은 5종을 모두 로드할 필요 없이 활성 테마 1종만 로드한다.
      */
-    function _ensureThemeCss(sKey) {
-        if (!sKey || sKey === DEFAULT_THEME) { return; }
-        if (document.querySelector('link[data-theme-css="' + sKey + '"]')) { return; }
+    function _ensureThemeCss(sKey, fnLoaded) {
+        // 기본 테마(:root)거나 이미 로드된 테마면 CSS 가 즉시 사용 가능 → 콜백 바로 호출.
+        if (!sKey || sKey === DEFAULT_THEME) { if (fnLoaded) { fnLoaded(); } return; }
+        if (document.querySelector('link[data-theme-css="' + sKey + '"]')) { if (fnLoaded) { fnLoaded(); } return; }
         var l = document.createElement("link");
         l.rel = "stylesheet";
         l.href = (THEME_DIR ? THEME_DIR + "/" : "") + "themes/" + sKey + ".css";
         l.dataset.themeCss = sKey;
+        if (fnLoaded) { l.addEventListener("load", fnLoaded); }
         document.head.appendChild(l);
+    }
+
+    /**
+     * 부팅 캔버스(--boot-bg) ↔ 현재 테마 배경(--app-bg) 동기화.
+     * body/#content 등이 `var(--boot-bg, var(--app-bg))` 를 쓰는 창에서, 런타임 테마 변경이
+     * 배경까지 자연히 따라오게 한다(다크↔화이트 전환 시 화면 이동 애니메이션에 옛 배경=흰/검 잔상 방지).
+     * 반드시 "테마 CSS 로드 후"에 호출해야 --app-bg 가 새 테마값이라 정확하다(_ensureThemeCss 콜백).
+     * 색 하드코딩 없음 — 실제 적용된 --app-bg 를 읽어 그대로 복사(테마 CSS 값과 100% 일치, 드리프트 0).
+     */
+    function _syncBootBg() {
+        try {
+            if (typeof document === "undefined" || !document.documentElement) { return; }
+            var bg = getComputedStyle(document.documentElement).getPropertyValue("--app-bg").trim();
+            if (bg) { document.documentElement.style.setProperty("--boot-bg", bg); }
+        } catch (e) { /* noop */ }
     }
 
     /**
@@ -111,10 +128,15 @@
         /** applyTheme() 대체 — 활성 테마 CSS 보장 로드 후 data-theme 전환 */
         apply: function (name) {
             var t = this.normalize(name);
-            _ensureThemeCss(t);
             document.documentElement.dataset.theme = t;
             // Bootstrap 데모 스킨 틴트(전 화면 공통) — bootstrap-skin.css 가 소비.
             _applySkin(t);
+            // [systemic] 런타임(초기 로드 후) 테마 변경 시 --boot-bg 를 새 테마 --app-bg 로 동기화.
+            //   초기 head 적용(readyState==='loading')은 opener 가 넘긴 --boot-bg(첫 페인트 보호)를 유지하고
+            //   여기서 건드리지 않는다(이 시점엔 테마 CSS 미로드라 --app-bg 가 부정확할 수 있음).
+            //   테마 CSS 로드 완료 콜백에서 동기화 → 모든 창이 별도 코드 없이 배경까지 테마를 따라온다.
+            var bRuntime = (typeof document !== "undefined" && document.readyState !== "loading");
+            _ensureThemeCss(t, bRuntime ? _syncBootBg : null);
             global.dispatchEvent(new CustomEvent("u4a-theme-changed", { detail: { name: t } }));
             return t;
         },

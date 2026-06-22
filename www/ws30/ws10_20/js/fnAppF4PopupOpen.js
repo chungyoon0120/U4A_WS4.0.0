@@ -96,6 +96,97 @@
         return { wrap: wrap, input: inp };
     }
 
+    /* ── 가상 스크롤(windowing) — 보이는 행만 DOM 에 렌더 ───────────────
+     *  스크롤 기준: scrollTop+행높이+뷰포트로 보일 구간[start,end] 계산 → 그 구간만 <tr> 생성.
+     *  안 보이는 위/아래 영역 높이는 **스페이서 <tr> 의 <td><div height></div></td>** 로 확보
+     *  (빈 td 높이가 안 먹는 함정 회피 — div 는 빈 높이도 100% 확보). 전체 표 높이 = total*ROWH 로
+     *  항상 일정 → 스크롤바 안정(재렌더해도 scrollTop 안 튐). 윈도잉 계산은 node 로 단위검증함.
+     *  opt: { colCount, buildRow(item,absIdx)→<tr>, rowH?, overscan?, nodata?, getSelKey?(item) }
+     *  반환: { setRows(arr, bKeepScroll), refresh(), setSel(key) }
+     ************************************************************************/
+    function _makeVScroller(oWrap, oTbody, opt) {
+        var ROWH = opt.rowH || 36;          // 행 높이(첫 렌더 후 실제 측정으로 보정)
+        var OVER = opt.overscan || 6;       // 위/아래 여유 행
+        var aData = [];
+        var bMeasured = false;
+        var raf = 0;
+        var selKey = null;
+
+        function _spacer() {
+            var tr = document.createElement("tr");
+            tr.className = "u4aVSpacer"; tr.setAttribute("aria-hidden", "true");
+            var td = document.createElement("td");
+            td.colSpan = opt.colCount;
+            td.style.padding = "0"; td.style.border = "0";
+            var div = document.createElement("div");
+            div.style.height = "0px"; div.style.width = "1px";
+            td.appendChild(div);
+            tr.appendChild(td);
+            tr._h = div;   // 높이 세터(div)
+            return tr;
+        }
+        var oTop = _spacer(), oBot = _spacer();
+
+        function _render() {
+            var total = aData.length;
+            oTbody.textContent = "";
+            if (!total) {
+                if (opt.nodata != null) {
+                    var trN = document.createElement("tr"); trN.className = "u4a-table__nodata";
+                    var tdN = document.createElement("td"); tdN.colSpan = opt.colCount; tdN.textContent = opt.nodata;
+                    trN.appendChild(tdN); oTbody.appendChild(trN);
+                }
+                return;
+            }
+            var st = oWrap.scrollTop, vh = oWrap.clientHeight || 400;
+            var start = Math.max(0, Math.floor(st / ROWH) - OVER);
+            var cnt = Math.ceil(vh / ROWH) + OVER * 2;
+            var end = Math.min(total, start + cnt);
+            oTop._h.style.height = (start * ROWH) + "px";
+            oBot._h.style.height = (Math.max(0, total - end) * ROWH) + "px";
+            oTbody.appendChild(oTop);
+            var frag = document.createDocumentFragment();
+            for (var i = start; i < end; i++) {
+                var tr = opt.buildRow(aData[i], i);
+                if (selKey != null && opt.getSelKey && opt.getSelKey(aData[i]) === selKey) {
+                    tr.setAttribute("aria-selected", "true");
+                }
+                frag.appendChild(tr);
+            }
+            oTbody.appendChild(frag);
+            oTbody.appendChild(oBot);
+            // 첫 렌더 1회 실제 행높이 측정 → 보정 재렌더(스크롤 위치 정확)
+            if (!bMeasured) {
+                var oFirst = oTop.nextElementSibling;
+                if (oFirst && oFirst !== oBot) {
+                    bMeasured = true;
+                    var h = oFirst.getBoundingClientRect().height;
+                    if (h && Math.abs(h - ROWH) > 0.5) { ROWH = h; _render(); }
+                }
+            }
+        }
+        function _onScroll() {
+            if (raf) { return; }
+            raf = requestAnimationFrame(function () { raf = 0; _render(); });
+        }
+        oWrap.addEventListener("scroll", _onScroll);
+
+        return {
+            setRows: function (a, bKeepScroll) {
+                aData = a || [];
+                if (!bKeepScroll) {
+                    try { oWrap.scrollTop = 0; } catch (e) { }
+                } else {
+                    var maxTop = Math.max(0, aData.length * ROWH - (oWrap.clientHeight || 0));
+                    if (oWrap.scrollTop > maxTop) { try { oWrap.scrollTop = maxTop; } catch (e) { } }
+                }
+                _render();
+            },
+            refresh: _render,
+            setSel: function (k) { selKey = k; }
+        };
+    }
+
     /* ====================================================================
      * 메인 진입 — 팝업 생성/오픈
      * ================================================================== */
@@ -136,6 +227,7 @@
         var MSG_SORTASC = _wsTxt("810");                        // 오름차순 정렬
         var MSG_SORTDESC = _wsTxt("811");                       // 내림차순 정렬
         var MSG_FILTERVAL = _txt("/U4A/CL_WS_COMMON", "A68");   // 필터 값(placeholder)
+        var MSG_CLEARFILTER = _txt("/U4A/CL_WS_COMMON", "A69"); // 필터 초기화
 
         /* ── 다이얼로그 골격 ─────────────────────────────────────── */
         var oDlg = document.createElement("dialog");
@@ -334,47 +426,43 @@
             return th;
         }
 
+        // 결과 행 1개 빌드(가상 스크롤러가 보이는 구간만 호출). i=절대 인덱스(zebra).
+        function _buildT1Row(row, i) {
+            var tr = _el("tr");
+            if (i % 2 === 1) { tr.setAttribute("data-odd", "true"); }
+            tr.addEventListener("click", function () { _vs1.setSel(row.APPID); _selTr(oT1Body, tr); });
+            tr.addEventListener("dblclick", function () { _pick(row); });
+            T1_COLS.forEach(function (c) {
+                var td = _el("td", c.align === "center" ? "is-center" : null);
+                if (c.action === "run") {
+                    td.classList.add("is-action");
+                    td.appendChild(_actBtn("globe", MSG_RUN, function (e) { e.stopPropagation(); _doRun(row); }));
+                } else if (c.action === "disp") {
+                    td.classList.add("is-action");
+                    var b = _actBtn("desktop", MSG_DISP, function (e) { e.stopPropagation(); _doDisplay(row); });
+                    if (!bWS10) { b.disabled = true; }
+                    td.appendChild(b);
+                } else {
+                    var v = row[c.key];
+                    td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
+                }
+                tr.appendChild(td);
+            });
+            return tr;
+        }
         function _renderT1() {
             // 헤더(정렬/필터 표시자 갱신 위해 매 렌더 재구성)
             oT1Head.textContent = "";
             var hr = _el("tr");
             T1_COLS.forEach(function (c) { hr.appendChild(_buildT1Th(c)); });
             oT1Head.appendChild(hr);
-            // 바디(필터+정렬 파생 뷰)
-            oT1Body.textContent = "";
-            var view = _deriveView(aResult);
-            if (!view.length) {
-                var trN = _el("tr", "u4a-table__nodata");
-                var tdN = _el("td", null, "—"); tdN.colSpan = T1_COLS.length;
-                trN.appendChild(tdN); oT1Body.appendChild(trN);
-                return;
-            }
-            var frag = document.createDocumentFragment();
-            view.forEach(function (row, i) {
-                var tr = _el("tr");
-                if (i % 2 === 1) { tr.setAttribute("data-odd", "true"); }
-                tr.addEventListener("click", function () { _selTr(oT1Body, tr); });
-                tr.addEventListener("dblclick", function () { _pick(row); });
-                T1_COLS.forEach(function (c) {
-                    var td = _el("td", c.align === "center" ? "is-center" : null);
-                    if (c.action === "run") {
-                        td.classList.add("is-action");
-                        td.appendChild(_actBtn("globe", MSG_RUN, function (e) { e.stopPropagation(); _doRun(row); }));
-                    } else if (c.action === "disp") {
-                        td.classList.add("is-action");
-                        var b = _actBtn("desktop", MSG_DISP, function (e) { e.stopPropagation(); _doDisplay(row); });
-                        if (!bWS10) { b.disabled = true; }
-                        td.appendChild(b);
-                    } else {
-                        var v = row[c.key];
-                        td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
-                    }
-                    tr.appendChild(td);
-                });
-                frag.appendChild(tr);
-            });
-            oT1Body.appendChild(frag);
+            // 바디 = 가상 스크롤(필터→정렬 파생 뷰)
+            _vs1.setRows(_deriveView(aResult));
         }
+        var _vs1 = _makeVScroller(oT1Wrap, oT1Body, {
+            colCount: T1_COLS.length, buildRow: _buildT1Row, nodata: "—",
+            getSelKey: function (row) { return row.APPID; }
+        });
 
         // ── 컬럼 헤더 메뉴(정렬 asc/desc + 필터 input + 초기화) — 공통 .u4a-menu 소비 ──
         var _oColMenu = null;
@@ -387,30 +475,12 @@
         }
         function _openColMenu(c, th) {
             _closeColMenu();
+            // ★ ServerList(fnOpenColumnMenu)와 동일 구성/순서: 필터 input → 정렬 asc/desc → 필터 초기화.
             var m = _el("div", "u4a-menu u4a-colmenu");
             m.setAttribute("role", "menu");
             m.addEventListener("click", function (e) { e.stopPropagation(); });
 
-            // 정렬 (오름/내림 — 활성 방향 재클릭 시 해제)
-            function mkSort(sDir, sIcon, sLabel) {
-                var it = _el("div", "u4a-menu__item");
-                it.setAttribute("role", "menuitem");
-                it.innerHTML = _fa(sIcon) + "<span></span>";
-                it.querySelector("span").textContent = sLabel;
-                var bActive = (_sortKey === c.key && _sortDir === sDir);
-                if (bActive) { it.setAttribute("data-active", "true"); }
-                it.addEventListener("click", function () {
-                    if (bActive) { _sortKey = null; _sortDir = null; }
-                    else { _sortKey = c.key; _sortDir = sDir; }
-                    _renderT1(); _closeColMenu();
-                });
-                return it;
-            }
-            m.appendChild(mkSort("asc", "arrow-up", MSG_SORTASC));    // 오름차순 정렬
-            m.appendChild(mkSort("desc", "arrow-down", MSG_SORTDESC)); // 내림차순 정렬
-            m.appendChild(_el("div", "u4a-colmenu__sep"));
-
-            // 필터 (contains, Enter/blur 적용)
+            // ── 필터 input (contains, Enter/blur 적용) ──
             var fw = _el("div", "u4a-colmenu__filter");
             var fi = _el("input", "u4a-input");
             fi.type = "text"; fi.placeholder = MSG_FILTERVAL;
@@ -425,7 +495,40 @@
             fi.addEventListener("blur", applyF);
             fw.appendChild(fi);
             m.appendChild(fw);
-            // (원본 화면과 동일하게 오름/내림 정렬 + 필터 input 만. 필터 해제는 입력값을 비우면 됨.)
+
+            m.appendChild(_el("div", "u4a-colmenu__sep"));
+
+            // ── 정렬 (오름/내림 — 활성 방향 재클릭 시 해제) ──
+            function mkSort(sDir, sIcon, sLabel) {
+                var it = _el("div", "u4a-menu__item");
+                it.setAttribute("role", "menuitem");
+                it.innerHTML = _fa(sIcon) + "<span></span>";
+                it.querySelector("span").textContent = sLabel;
+                var bActive = (_sortKey === c.key && _sortDir === sDir);
+                if (bActive) { it.setAttribute("data-active", "true"); }
+                it.addEventListener("click", function () {
+                    if (bActive) { _sortKey = null; _sortDir = null; }
+                    else { _sortKey = c.key; _sortDir = sDir; }
+                    _renderT1(); _closeColMenu();
+                });
+                return it;
+            }
+            m.appendChild(mkSort("asc", "arrow-up", MSG_SORTASC));     // 오름차순 정렬
+            m.appendChild(mkSort("desc", "arrow-down", MSG_SORTDESC)); // 내림차순 정렬
+
+            m.appendChild(_el("div", "u4a-colmenu__sep"));
+
+            // ── 필터 초기화(이 컬럼) — 활성 필터 없으면 비활성 ──
+            var clr = _el("div", "u4a-menu__item");
+            clr.setAttribute("role", "menuitem");
+            clr.innerHTML = _fa("xmark") + "<span></span>";
+            clr.querySelector("span").textContent = MSG_CLEARFILTER;
+            if (!_colFilters[c.key]) { clr.setAttribute("aria-disabled", "true"); }
+            clr.addEventListener("click", function () {
+                if (!_colFilters[c.key]) { return; }
+                delete _colFilters[c.key]; fi.value = ""; _renderT1(); _closeColMenu();
+            });
+            m.appendChild(clr);
 
             // top-layer 다이얼로그 안에 붙여(모달 위로) th 아래에 위치.
             oDlg.appendChild(m);
@@ -489,11 +592,10 @@
         var _filtT = null;
         oTSrch.input.addEventListener("input", function () {
             if (_filtT) { clearTimeout(_filtT); }
-            // 디바운스(타이핑 중 매 글자 재렌더 방지) + 다음 프레임 비동기 렌더(입력 먼저 반영 → 멈춤처럼 안 보임).
+            // 디바운스(타이핑 중 매 글자 재렌더 방지). 가상 스크롤이라 렌더는 보이는 행만 → 즉시.
             _filtT = setTimeout(function () {
                 sTreeFilter = oTSrch.input.value.trim().toUpperCase();
-                _busy(true);
-                _defer(function () { _renderTree(); _busy(false); });
+                _renderTree();
             }, 200);
         });
         oTBar.append(oExpandBtn, oCollapseBtn, _el("span", "u4aAppF4TBarSep"), oTSrch.wrap);
@@ -527,16 +629,16 @@
             return false;
         }
 
-        // 한 노드 → <tr>(전 컬럼). 토글 클릭은 "전체 재렌더 없이" 해당 서브트리만 증분 삽입/삭제.
-        function _treeRow(node, depth) {
+        // 한 노드 → <tr>(전 컬럼). idx=가상스크롤 절대 인덱스(zebra). 토글=펼침상태만 바꾸고 평탄목록 재세팅.
+        function _treeRow(node, depth, idx) {
             var kids = node.APPF4HIER || [];
             var bHasKids = kids.length > 0;
             var bExp = sTreeFilter ? true : !!oExpand[node._uid];
             var tr = _el("tr");
-            tr._node = node; tr.dataset.depth = depth;
+            if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }
             if (_isRoot(node)) { tr.classList.add("is-root"); }
             if (bHasKids) { tr.setAttribute("aria-expanded", bExp ? "true" : "false"); }
-            tr.addEventListener("click", function () { _selTr(oT2Body, tr); });
+            tr.addEventListener("click", function () { _vs2.setSel(node._uid); _selTr(oT2Body, tr); });
             tr.addEventListener("dblclick", function () { if (!_isRoot(node)) { _pick(node); } });
             T2_COLS.forEach(function (c) {
                 var td = _el("td", c.align === "center" ? "is-center" : null);
@@ -550,16 +652,9 @@
                     if (bHasKids) {
                         tog.addEventListener("click", function (e) {
                             e.stopPropagation();
-                            var bNow = oExpand[node._uid] = !oExpand[node._uid];
-                            tr.setAttribute("aria-expanded", bNow ? "true" : "false");
-                            if (!bNow) { _removeDescendants(tr, depth); _restripeTree(); return; }
-                            // 펼침: 들어갈 행이 많으면 busy 켜고 다음 프레임에 비동기로 삽입(멈춤처럼 안 보이게).
-                            if (_countVisibleDesc(node) > TREE_ASYNC_THRESHOLD) {
-                                _busy(true);
-                                _defer(function () { _insertChildren(tr, node, depth); _restripeTree(); _busy(false); });
-                            } else {
-                                _insertChildren(tr, node, depth); _restripeTree();
-                            }
+                            oExpand[node._uid] = !oExpand[node._uid];
+                            // 가상 스크롤: 펼침상태만 바꾸고 평탄목록 재계산 → 보이는 행만 렌더(대용량도 즉시).
+                            _vs2.setRows(_flattenTree(), true);
                         });
                     } else { tog.classList.add("u4a-tree__toggle--leaf"); }
                     var lbl = _el("span", "u4aAppF4TreeLabel", _isRoot(node) ? (node.APPNM || "ROOT") : (node.APPNM || ""));
@@ -588,78 +683,37 @@
             return tr;
         }
 
-        // tr 뒤에 node 의 (펼쳐진) 자손 행들을 삽입. 반환=마지막 삽입 행.
-        function _insertChildren(tr, node, depth) {
-            var kids = node.APPF4HIER || [];
-            var ref = tr;
-            kids.forEach(function (k) {
-                if (sTreeFilter && !_subtreeHasMatch(k)) { return; }
-                var ctr = _treeRow(k, depth + 1);
-                ref.after(ctr); ref = ctr;
-                var bExp = sTreeFilter ? true : !!oExpand[k._uid];
-                if (bExp && (k.APPF4HIER || []).length) { ref = _insertChildren(ctr, k, depth + 1); }
-            });
-            return ref;
-        }
-        // tr 뒤의 depth 보다 깊은(자손) 행 제거.
-        function _removeDescendants(tr, depth) {
-            var n = tr.nextElementSibling;
-            while (n && Number(n.dataset.depth) > depth) { var nx = n.nextElementSibling; n.remove(); n = nx; }
-        }
-        // zebra(data-odd) 재계산 — 증분 삽입/삭제 후 호출.
-        function _restripeTree() {
-            var rows = oT2Body.children;
-            for (var i = 0; i < rows.length; i++) {
-                if (i % 2 === 1) { rows[i].setAttribute("data-odd", "true"); }
-                else { rows[i].removeAttribute("data-odd"); }
-            }
-        }
-
-        // busy 가 "페인트된 다음" 무거운 작업 실행(더블 rAF) → 메인스레드 멈춤처럼 안 보임.
-        function _defer(fn) {
-            requestAnimationFrame(function () { requestAnimationFrame(fn); });
-        }
-        // 펼침 시 새로 그려질 (보이는) 자손 행 수 추정 — DOM 없이 카운트.
-        function _countVisibleDesc(node) {
-            var n = 0;
-            (node.APPF4HIER || []).forEach(function (k) {
-                if (sTreeFilter && !_subtreeHasMatch(k)) { return; }
-                n++;
-                var bExp = sTreeFilter ? true : !!oExpand[k._uid];
-                if (bExp && (k.APPF4HIER || []).length) { n += _countVisibleDesc(k); }
-            });
-            return n;
-        }
-        var TREE_ASYNC_THRESHOLD = 150;   // 이 행수 넘으면 busy + 비동기 삽입
-
-        // 전체 렌더(로드/필터/Expand·Collapse all) — fragment 로 한 번에.
-        function _renderTree() {
-            oT2Body.textContent = "";
-            var frag = document.createDocumentFragment();
+        // 펼침/필터 상태 기준 "보이는 노드"를 평탄화 → [{node, depth}] (DOM 없이, 빠름).
+        function _flattenTree() {
+            var out = [];
             function walk(node, depth) {
                 if (sTreeFilter && !_isRoot(node) && !_subtreeHasMatch(node)) { return; }
-                frag.appendChild(_treeRow(node, depth));
+                out.push({ node: node, depth: depth });
                 var bExp = sTreeFilter ? true : !!oExpand[node._uid];
                 if (bExp && (node.APPF4HIER || []).length) {
                     node.APPF4HIER.forEach(function (k) { walk(k, depth + 1); });
                 }
             }
             aTreeRoot.forEach(function (n) { walk(n, 0); });
-            oT2Body.appendChild(frag);
-            _restripeTree();
+            return out;
         }
+        function _buildTreeRow(item, i) { return _treeRow(item.node, item.depth, i); }
+
+        // 전체 렌더(로드/필터/Expand·Collapse all) = 평탄목록을 가상 스크롤러에 세팅.
+        function _renderTree() { _vs2.setRows(_flattenTree()); }
 
         function _treeExpandAll(bExpand) {
-            // 전체 펼침/접힘은 무거우니 busy 켜고 다음 프레임에(멈춤처럼 안 보이게).
-            _busy(true);
-            _defer(function () {
-                function walkAll(n) { oExpand[n._uid] = bExpand; (n.APPF4HIER || []).forEach(walkAll); }
-                aTreeRoot.forEach(walkAll);
-                if (!bExpand) { aTreeRoot.forEach(function (n) { oExpand[n._uid] = true; }); } // 루트는 펼친 채
-                _renderTree();
-                _busy(false);
-            });
+            // 가상 스크롤이라 전체 펼침/접힘도 즉시(보이는 행만 렌더) — busy 불필요.
+            function walkAll(n) { oExpand[n._uid] = bExpand; (n.APPF4HIER || []).forEach(walkAll); }
+            aTreeRoot.forEach(walkAll);
+            if (!bExpand) { aTreeRoot.forEach(function (n) { oExpand[n._uid] = true; }); } // 루트는 펼친 채
+            _renderTree();
         }
+
+        var _vs2 = _makeVScroller(oT2Wrap, oT2Body, {
+            colCount: T2_COLS.length, buildRow: _buildTreeRow,
+            getSelKey: function (item) { return item.node._uid; }
+        });
 
         // flat T_APPL → nested(APPF4HIER), 원본 _appF4Tree 규칙.
         function _buildTree(aRaw) {
@@ -847,6 +901,9 @@
             ".u4aAppF4TreeLabel{overflow:hidden;text-overflow:ellipsis;}",
             ".u4aAppF4Link{color:var(--link);font-weight:600;cursor:pointer;}",
             ".u4aAppF4Link:hover{text-decoration:underline;}",
+            /* 가상 스크롤 스페이서 행 — hover/zebra/선택 표시 없음 */
+            ".u4aAppF4Dlg .u4aVSpacer,.u4aAppF4Dlg .u4aVSpacer:hover{background:transparent;cursor:default;}",
+            ".u4aAppF4Dlg .u4aVSpacer td{padding:0;border:0;}",
             /* 컬럼 헤더 정렬/필터 메뉴 (ServerList 패턴 — 공통 .u4a-menu 위에 덧입힘) */
             ".u4aAppF4Tbl thead th.u4a-th--menu{cursor:pointer;}",
             ".u4aAppF4Tbl thead th.u4a-th--menu:hover{background:var(--hover-bg);color:var(--text);}",

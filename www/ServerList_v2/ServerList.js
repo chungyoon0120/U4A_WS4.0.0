@@ -3394,9 +3394,12 @@
         oAPP.fn.fnShowMessageBox("C", sMsg, (sAction) => {
             if (sAction !== "OK") { return; }
 
-            // 종료 진행 동안 busy 오버레이 + 안내 문구로 사용자 인지 ("종료 중…")
+            // 종료 진행 동안 busy 오버레이 + 안내 문구로 사용자 인지 ("종료 중… (남은초)")
             const sExiting = L("exiting");
-            oAPP.setBusy(true, sExiting ? sExiting + "…" : "");
+            const sBase = sExiting ? sExiting + "…" : "";
+            const _renderBusy = (iSec) => {
+                oAPP.setBusy(true, sBase ? `${sBase} (${iSec}s)` : `(${iSec}s)`);
+            };
 
             oAPP.fn.fnProgramShuttDown(); // 전체 자식 프로그램 종료 요청
 
@@ -3404,13 +3407,29 @@
                 clearInterval(oAPP.attr.windowCloseInterval);
                 delete oAPP.attr.windowCloseInterval;
             }
-            // 자식(MAIN) 창이 모두 닫힐 때까지 폴링 후 종료
-            oAPP.attr.windowCloseInterval = setInterval(() => {
-                if (!_checkMainProgramExit()) { return; }
+
+            // 자식(MAIN) 창이 모두 닫히면 즉시 종료. 단, 최대 30초까지만 기다리고
+            // 그래도 안 닫힌 창이 있으면 강제로 파기한 뒤 앱을 종료한다(무한 대기 방지).
+            let iLeft = 30;
+            _renderBusy(iLeft);
+            const _finish = () => {
                 clearInterval(oAPP.attr.windowCloseInterval);
                 delete oAPP.attr.windowCloseInterval;
                 APP.exit();
-            }, 500);
+            };
+            oAPP.attr.windowCloseInterval = setInterval(() => {
+                if (_checkMainProgramExit()) { _finish(); return; }
+
+                iLeft -= 1;
+                if (iLeft <= 0) {
+                    // 30초 경과 — 정상 종료에 응답하지 않는 MAIN 창을 강제 파기 후 종료
+                    console.warn("[shutdown] 30초 경과 — 남은 MAIN 창 강제 종료");
+                    _forceCloseRemainMain();
+                    _finish();
+                    return;
+                }
+                _renderBusy(iLeft);
+            }, 1000);
         });
     };
 
@@ -3435,6 +3454,26 @@
             ++iChildLength;
         }
         return iChildLength === 0;
+    }
+
+    /** 정상 종료에 응답하지 않는 MAIN 창을 강제 파기 (30초 타임아웃 후 호출) */
+    function _forceCloseRemainMain() {
+        const aBrowserList = REMOTE.BrowserWindow.getAllWindows();
+        for (const oBrows of aBrowserList) {
+            if (!oBrows || oBrows.isDestroyed()) { continue; }
+            let oWebPref;
+            try {
+                oWebPref = WSUTIL.QueryString.parse(oBrows.getURL());
+            } catch (error) {
+                continue;
+            }
+            if (oWebPref.OBJTY !== "MAIN") { continue; }
+            try {
+                oBrows.destroy();
+            } catch (e) {
+                console.error("[shutdown] MAIN 창 강제 종료 실패:", e);
+            }
+        }
     }
 
     /********************************************************************

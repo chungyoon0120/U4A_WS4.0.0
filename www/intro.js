@@ -809,16 +809,35 @@
         return new Promise(async (resolve) => {
 
             // 레지스트리의 글로벌 세팅 경로 구하기
+            //  · sGlobalSettingPath : WS4 전용 노드(...\WS\WS4\GlobalSettings)
+            //  · sLegacySettingPath : WS3(UI5) 공유 노드(...\WS\GlobalSettings) — 최초 1회 import 소스
+            // WS3·WS4 공존: theme/language/sound 는 렌더 엔진마다 값 규약이 달라(예: UI5=sap_horizon_dark,
+            // HTML5=horizon_dark) 공유 노드에 함께 쓰면 구버전이 깨진다. 따라서 WS4 전용 서브트리로 분리하되,
+            // WS4 노드가 비어 있으면(최초 실행) 기존 WS3 값을 승계(import)해 사용자의 테마/언어를 보존한다.
+            // 이후로는 WS4 노드에만 write 하며, WS3(공유) 노드는 절대 되쓰지 않는다.
             let oSettings = oAPP.fn.fnGetSettingsInfo(),
                 sRegPath = oSettings.regPaths,
-                sGlobalSettingPath = sRegPath.globalSettings;
+                sGlobalSettingPath = sRegPath.globalSettings,
+                sLegacySettingPath = sRegPath.globalSettingsWs3;
 
-            // 레지스트리에 저장된 글로벌 세팅 정보 구하기
-            let oRegList = await WSUTIL.getRegeditList([sGlobalSettingPath]),
-                oRetData = oRegList.RTDATA;
+            // (WS4 노드는 _initCreateRegistryFolders 에서 globalSettings 경로로 이미 생성됨)
+            // WS4 노드 + WS3(레거시) 노드를 함께 조회
+            let aReadPaths = [sGlobalSettingPath];
+            if (sLegacySettingPath) {
+                aReadPaths.push(sLegacySettingPath);
+            }
 
-            var oGlobalSettingRegData = oRetData[sGlobalSettingPath],
-                oSettingValues = oGlobalSettingRegData.values;
+            let oRegList = await WSUTIL.getRegeditList(aReadPaths),
+                oRetData = oRegList.RTDATA || {};
+
+            var oSettingValues = (oRetData[sGlobalSettingPath] || {}).values || {},
+                oLegacyValues = (oRetData[sLegacySettingPath] || {}).values || {};
+
+            // WS4 노드에 값이 없을 때 적용할 값: WS3(레거시) 값이 있으면 승계, 없으면 기본값
+            function _legacyOrDefault(sKey, sDefault) {
+                let sLegacy = oLegacyValues?.[sKey]?.value;
+                return (typeof sLegacy !== "undefined" && sLegacy !== "") ? sLegacy : sDefault;
+            }
 
             // WS Language 정보 저장
             if (!oSettingValues?.language || !oSettingValues?.language?.value) {
@@ -826,7 +845,7 @@
                 let oRegData = {};
                 oRegData[sGlobalSettingPath] = {};
                 oRegData[sGlobalSettingPath]["language"] = {
-                    value: oSettings.defaultLanguage || "EN",
+                    value: _legacyOrDefault("language", oSettings.defaultLanguage || "EN"),
                     type: "REG_SZ"
                 };
 
@@ -840,7 +859,7 @@
                 let oRegData = {};
                 oRegData[sGlobalSettingPath] = {};
                 oRegData[sGlobalSettingPath]["theme"] = {
-                    value: oSettings.defaultTheme || "sap_horizon_dark",
+                    value: _legacyOrDefault("theme", oSettings.defaultTheme || "sap_horizon_dark"),
                     type: "REG_SZ"
                 };
 
@@ -855,7 +874,7 @@
                 let oRegData = {};
                 oRegData[sGlobalSettingPath] = {};
                 oRegData[sGlobalSettingPath]["sound"] = {
-                    value: oSettings.defaultSound || "X",
+                    value: _legacyOrDefault("sound", oSettings.defaultSound || "X"),
                     type: "REG_SZ"
                 };
 

@@ -247,6 +247,12 @@
 }
 .u4aWs20PanelHdrBtn:hover { background: var(--ws20-btn-hover); }
 
+/* 미리보기 헤더 오버플로(⋯) — 패널 좁아지면 우측 컨트롤이 잘리지 않고 ⋯ 메뉴로 접히게.
+   항목은 자연폭 유지(flex:0 0 auto)라야 overflow 측정이 정확, 스페이서만 가변, 넘침은 클립. */
+.u4aWs20PrevHeader { overflow: hidden; flex-wrap: nowrap; }
+.u4aWs20PrevHeader > * { flex: 0 0 auto; }
+.u4aWs20PrevHeader > .u4aWs20PanelHdrSpacer { flex: 1 1 auto; min-width: 0; }
+
 /* 미리보기 헤더의 줌 슬라이더(비활성)/OFF 토글 — 정적, W2 예정 */
 .u4aWs20PrevZoom {
   width: 90px; accent-color: var(--ws20-accent);
@@ -263,6 +269,18 @@
 /* 미리보기 본문 — 원본처럼 흰 배경 */
 .u4aWsDesignPreview .u4aWs20PanelBody { background: #ffffff; }
 .u4aWsDesignPreview .u4aWs20PanelLabel { color: #9a9a9a; }
+
+/* ── 텍스트 복사 허용 (body 전역 user-select:none 해제 — ws10.css 접속정보 선례와 동일 정책) ──
+   데이터/값/라벨/식별자는 드래그로 선택·복사 가능해야 한다. 패널(부모)에 text 를 켜도 내부
+   chrome(드래그그립/토글/리사이저 등 자체 user-select:none)은 더 구체적이라 그대로 차단 유지된다. */
+.u4aWsDesignAttr,                      /* 속성(Properties) 패널 — 컨트롤명/UI Object ID/라벨/값 전부 */
+.u4aWsDesignTree .u4a-tree__label,     /* 트리 노드명(OBJID 등) */
+.u4aWs20AppHdrAppId,                   /* 앱 헤더 — APPID */
+.u4aWs20AppHdrMode,                    /*          + Change/Display 모드 */
+.u4aWs20AppHdrStat {                   /*          + Active/Inactive 상태 */
+  -webkit-user-select: text;
+  user-select: text;
+}
 
 /* 속성 패널 — 본문은 세로 스택(툴바 → 그룹 헤더/행). 그룹 구분은 .u4aWs20AttrGroupHdr 가 담당 */
 .u4aWsDesignAttr .u4aWs20PanelBody {
@@ -359,16 +377,20 @@
   justify-content: space-between;
   height: 40px;
   font-size: 13px;
-  border-left: 2px solid transparent;   /* highlight(상태) 컬러바 자리 */
+  /* ※ 선택/상태 컬러바는 전부 box-shadow inset(아래)로 통일 — border-left 를 쓰면 그 두께만큼
+     공통 선택 box-shadow(shell.css, 좌측 가장자리 flush)가 안쪽으로 밀려 USP/옵션과 선택바 위치·
+     두께가 달라 보였다(2026-06-22 사용자 지적). border-left 제거 → 전 화면 선택바 flush 3px 통일. */
   /* Find UI 하이라이트 색 — 테마 accent(파랑/녹색/보라/빨강)와 항상 구분되도록 "테마 무관 고정 amber"
      (검색=노랑/금 관습색). 어떤 테마든 선택=accent / find=amber 로 색이 갈린다. */
   --ws20-find-hl: #e3a008;
   /* 들여쓰기 padding 은 shell.css .u4a-tree__row 가 공통 --u4a-tree-depth 로 단일 계산
      (ServerList/USP 와 동일 출처). WS20 전용 --ws20-depth/--ws20-indent-step override 제거. */
 }
-.u4aWs20TreeRow.hl-Indication02 { border-left-color: var(--state-error); }   /* Error/Negative */
-.u4aWs20TreeRow.hl-Indication04 { border-left-color: var(--state-warning); } /* Warning */
-.u4aWs20TreeRow.hl-Indication08 { border-left-color: var(--state-info); }    /* Information */
+/* 상태 컬러바 — 선택바와 동일한 box-shadow inset 3px(0.1875rem)·좌측 flush. 공통 선택 inset 바
+   (shell.css)를 덮도록 specificity 보강(.u4a-tree__row.u4aWs20TreeRow.hl-*). 레이아웃 시프트 0. */
+.u4a-tree__row.u4aWs20TreeRow.hl-Indication02 { box-shadow: inset 0.1875rem 0 0 0 var(--state-error); }   /* Error/Negative */
+.u4a-tree__row.u4aWs20TreeRow.hl-Indication04 { box-shadow: inset 0.1875rem 0 0 0 var(--state-warning); } /* Warning */
+.u4a-tree__row.u4aWs20TreeRow.hl-Indication08 { box-shadow: inset 0.1875rem 0 0 0 var(--state-info); }    /* Information */
 /* Find UI 검색 결과 — 글로우 박스/점멸 없이 깔끔한 amber 좌측 바 + 좌→우로 자연스럽게 사라지는
    그라데이션 워시(미니멀·모던). 사방 글로우/외곽선이 프레임처럼 보이던 촌스러움 제거.
    ★ 선택=테마 accent(파랑/녹색/보라/빨강) / find=테마무관 amber(--ws20-find-hl) 로 색 분리.
@@ -797,18 +819,36 @@
 .u4aWs20AttrRowLbl {
   flex: 0 0 42%; min-width: 0;
   display: flex; align-items: center; gap: 4px;
+  /* ★ 셀을 행 높이(40px)로 늘린다 — 행이 align-items:center 라 셀이 "텍스트 높이(~16px)"로만 잡혀,
+       셀의 overflow:hidden 이 텍스트 바로 아래 hover 밑줄을 잘라먹던 진짜 원인. stretch 로 40px 가 되면
+       밑줄이 들어갈 세로 여유가 생긴다(가로 긴 라벨 클립은 그대로 유지). */
+  align-self: stretch;
   overflow: hidden;
+  cursor: pointer;                  /* 라벨 셀 전체가 클릭 영역(클릭=속성 설명 도움말) */
 }
 .u4aWs20AttrLblTxt {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* ★ overflow/text-overflow 를 이 요소에 두지 않는다 — 그게 hover 밑줄(박스 아래)을 클립하던 진짜 원인.
+       긴 라벨의 가로 클립은 부모 셀(.u4aWs20AttrRowLbl{overflow:hidden})이 담당하고, 부모는 행 높이
+       40px 라 밑줄(세로)은 안 잘린다. 말줄임 '…' 은 포기(짧은 라벨이 대부분) — 밑줄 가시성 우선. */
+  min-width: 0; white-space: nowrap;
   cursor: pointer;
+  color: inherit;                   /* <a> 여도 라벨은 일반 텍스트색 (shell.css a{color:--link} 무력화) */
   text-decoration: none;            /* 평상시 밑줄 없음 (구 .u4aAttrObjectStatus) */
   text-underline-offset: 2px;
 }
-/* 마우스 오버 — 클릭 가능한 링크(설명 팝업)임을 밑줄+액센트색으로 명확히
-   (구 design/css/common.css .u4aAttrObjectStatus:hover 의 underline 동작과 동일).
+/* 마우스 오버 — 클릭 시 설명(도움말) 팝업이 있음을 밑줄+액센트색으로 명확히.
+   ★ 라벨 셀(.u4aWs20AttrRowLbl) 어디에 오버해도 밑줄이 뜨게 한다 — 짧은 라벨("homeIcon")의
+     우측 여백을 오버해도 어포던스가 보이도록(구: 텍스트 span 위에서만 떠 체감 안 됨).
    밑줄만 추가하므로 글자 폭이 변하지 않아 레이아웃이 밀리지 않는다. */
-.u4aWs20AttrLblTxt:hover { text-decoration: underline; color: var(--ws20-accent); }
+.u4aWs20AttrRowLbl:hover .u4aWs20AttrLblTxt,
+.u4aWs20AttrLblTxt:hover {
+  /* 구 design/css/common.css 가 동일 기능(속성명 hover 밑줄)에 !important 를 썼다 — 어떤 경합/캐시가
+     있어도 확실히 이기도록 동일하게 !important + 밑줄색 명시(테마 액센트). 폭 불변(레이아웃 안 밀림). */
+  text-decoration: underline !important;
+  text-decoration-color: var(--ws20-accent) !important;
+  text-underline-offset: 2px;
+  color: var(--ws20-accent);
+}
 .u4aWs20AttrReqIcon { font-size: 10px; flex: 0 0 auto; }
 
 /* 변경된 행 — 구 changedDataMarker 의 .changeValue.

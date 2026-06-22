@@ -1068,6 +1068,40 @@
         };
     }
 
+    /**
+     * iframe(미리보기 등) 클릭 시 "열린 모든 오버레이"(팝오버/드롭다운/메뉴/셀렉트/서제스트/컨텍스트메뉴)를
+     * 닫는다 — ★전역 1개 자동★ (팝오버마다 배선 불필요).
+     *  ─ 문제: 바깥클릭 닫기는 전부 `document` 의 mousedown 으로 동작하는데, iframe **내부** 클릭은
+     *    그 이벤트가 iframe 문서에서 소진돼 부모 document 로 안 올라온다 → 미리보기를 눌러도 안 닫혔다.
+     *  ─ 해법: iframe 클릭 시 부모 window 가 blur 되고 document.activeElement 가 <iframe> 이 된다. 그 순간
+     *    `document.body` 에 **합성 mousedown 을 1회 발화**하면, 이미 존재하는 모든 outside-close 핸들러가
+     *    "바깥 클릭"으로 인식해 각자 닫힌다(메뉴바·셀렉트·서제스트·팝오버·컨텍스트메뉴 전부 한 번에).
+     *  ─ 안전: 드래그류 document 핸들러(.u4a-dialog__header / .u4a-splitter__bar)는 target.closest 가드라
+     *    body 가 target 이면 즉시 bail → 부작용 없음. alt-tab/다른 창 전환은 activeElement 가 iframe 이
+     *    아니므로 발화 안 함(정확).
+     */
+    let _IFRAME_BLUR_CLOSE_ON = false;
+    function _installIframeBlurClose() {
+        if (_IFRAME_BLUR_CLOSE_ON || typeof window === "undefined") { return; }
+        _IFRAME_BLUR_CLOSE_ON = true;
+        window.addEventListener("blur", function () {
+            // blur 시점엔 activeElement 가 아직 확정 전일 수 있어 다음 틱에 확인.
+            setTimeout(function () {
+                var oAE = document.activeElement;
+                if (!oAE || oAE.tagName !== "IFRAME") { return; }   // iframe 클릭일 때만
+                // 1) 합성 mousedown — 모든 outside-close 오버레이가 각자 정상 닫힘(리스너 정리까지).
+                try {
+                    document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+                } catch (e) { }
+                // 2) 안전망 — 그래도 남은 메뉴(.u4a-menu = 상단 메뉴바 드롭다운 / 툴바 오버플로 ⋯)는 직접 제거.
+                try {
+                    var aMenus = document.querySelectorAll(".u4a-menu");
+                    for (var i = 0; i < aMenus.length; i++) { aMenus[i].remove(); }
+                } catch (e) { }
+            }, 0);
+        });
+    }
+
     const U4AUI = {
         el: _el,
         createTree: createTree,
@@ -1097,6 +1131,9 @@
 
     // 스플릿바 더블클릭 → 최초 위치 복귀 전역 1회 설치 — 모든 .u4a-splitter__bar 자동(배선 불필요).
     try { _installGlobalSplitterReset(); } catch (e) { }
+
+    // iframe(미리보기) 클릭 시 열린 모든 오버레이(메뉴/드롭다운/팝오버) 닫기 전역 1회 설치 — 배선 불필요.
+    try { _installIframeBlurClose(); } catch (e) { }
 
     // CommonJS(Electron nodeIntegration) 환경에서도 require 가능하게
     if (typeof module === "object" && module.exports) {

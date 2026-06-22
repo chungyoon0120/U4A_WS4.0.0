@@ -36,11 +36,9 @@
 
     <style>
         html, body { margin: 0; height: 100%; background: var(--boot-bg, var(--app-bg)); color: var(--text); overflow: hidden; }
-
-        /* 스플릿바 — 이 팝업은 패널이 surface 가 아니라 본문 배경(--app-bg)을 그대로 쓴다(테마 미리보기
-           카드 대비 유지). 공통 바의 surface 채움이 라벤더 패널 위에서 밝은 띠로 튀어 보이므로, 이 팝업
-           한정으로 바 배경을 패널과 동일하게(투명=--app-bg) 맞춘다. 그립/좌우 경계는 공통대로 유지. */
-        #optRoot .u4a-splitter__bar { background: transparent; }
+        /* 스플릿바는 공통 .u4a-splitter__bar 스킨 그대로 — 콘텐츠 패널이 --surface 라 바(surface)가 같은 면이
+           되어 흰 줄로 튀지 않는다(사이드바=--app-bg 와는 톤 대비로 구분). 옵션 전용 override 없음 → WS20/USP/
+           ServerList 와 기본색·hover 색 100% 동일. (사이드바/콘텐츠 톤은 optionMain.js _ensureStyle 에서 지정.) */
     </style>
 </head>
 

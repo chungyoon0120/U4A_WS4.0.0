@@ -14,6 +14,7 @@
 
     var REMOTE = require('@electron/remote');
     var IPC = require('electron').ipcRenderer;
+    var IPCMAIN = REMOTE.require('electron').ipcMain;   // 전 창 공통 브로드캐스트(if-p13n-themeChange) 수신용
     var FS = REMOTE.require('fs');
     var PATH = REMOTE.require('path');
     var APP = REMOTE.app;
@@ -131,10 +132,38 @@
         var s = document.createElement("style");
         s.id = "u4aOptStyle";
         s.textContent = `
-        /* 마스터-디테일 영역을 표면색(--surface)으로 통일 → 공통 스플릿바(--surface)가 패널과
-           같은 면이 되어 흰 줄로 튀지 않고 경계선+그립만 보이는 깔끔한 분할이 된다.
-           (콘텐츠 패널이 --app-bg(테마 페이지색)면 바(--surface)와 대비돼 흰 막대처럼 보였음) */
-        #optSplit, #optNav, #optCont { background: var(--surface); }
+        /* 좌우 구분 — 사이드바(좌)=살짝 가라앉은 페이지색(--app-bg), 콘텐츠(우)/컨테이너=표면색(--surface).
+           바는 공통 스킨 그대로(콘텐츠와 같은 면이라 흰 줄 안 튀고, 사이드바와는 톤 대비로 구분). */
+        #optSplit { background: var(--surface); }
+        /* padding-left = 사이드바 좌측 여백 — 항목(선택 하이라이트/좌측바)이 창 왼쪽 가장자리에
+           딱 붙지 않게 띄운다(2026-06-22 사용자 요청). */
+        #optNav { background: var(--app-bg); padding: 0.375rem 0 0.375rem 1px; }
+        /* 좌측 메뉴 = 리스트 행 디자인 — 앱 트리/메뉴와 동일 토큰(hover/선택 강조 + 선택 시 accent 좌측바·굵게,
+           아이콘 색). bootstrap list-group 기본 카드/보더 스타일은 덮어쓴다. */
+        #optNav .list-group-item {
+            border: 0; border-radius: 0; background: transparent;
+            /* 행 높이 = WS20/USP 트리 행(40px)과 동일 → 선택 좌측바(box-shadow inset 3px)의 "높이"도 동일.
+               (전엔 항목이 ~36px 라 트리보다 바가 짧아 두께/마진이 달라 보였다 — 2026-06-22 사용자 지적) */
+            min-height: 2.5rem; padding: 0 0.875rem;
+            color: var(--text); font: inherit; text-align: left; cursor: pointer;
+            transition: background-color var(--motion) linear;
+        }
+        #optNav .list-group-item > i { flex: 0 0 auto; width: 1.1rem; text-align: center; color: var(--icon-muted); }
+        #optNav .list-group-item:hover { background: var(--hover-bg); }
+        #optNav .list-group-item:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: -0.125rem; }
+        #optNav .list-group-item.active {
+            background: var(--selected-bg); color: var(--selected-text);
+            font-weight: 600; box-shadow: inset 0.1875rem 0 0 0 var(--accent);
+        }
+        #optNav .list-group-item.active > i { color: var(--accent); }
+        /* 콘텐츠 = 헤더(제목 고정) + 본문(스크롤) 세로 스택 */
+        #optCont { background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+        /* 페이지 제목 헤더 — 앱 공통 패널 헤더(surface-raised + 하단 보더) 패턴으로 본문과 구분 */
+        .u4aOptSecHdr { flex: 0 0 auto; display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.625rem 1rem; font-weight: 600; color: var(--text);
+            background: var(--surface-raised); border-bottom: 0.0625rem solid var(--line); }
+        .u4aOptSecHdr i { color: var(--accent); }
+        .u4aOptSecBody { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 1rem; }
         /* 컨테이너(패널) 폭 기준 자동 reflow — 좁아지면 열 줄고 결국 1열로 쌓임(뷰포트 무관).
            min(11rem,100%) 로 패널이 11rem 보다 좁아도 카드가 넘치지 않게 한다(Chromium93 min() OK). */
         .u4aOptGrid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr)); align-content: start; }
@@ -158,12 +187,13 @@
     /* ── 섹션: 테마 (Bootstrap card 그리드) ── */
     function _renderTheme(el) {
         var html =
-            '<div class="d-flex align-items-center gap-2 mb-3 fw-semibold">' + _fa("palette") +
+            // 페이지 제목 = 헤더(본문과 보더로 구분). 사이드바 항목명과 동일 라벨(B01).
+            '<div class="u4aOptSecHdr">' + _fa("palette") +
             '<span>' + (_txt("/U4A/CL_WS_COMMON", "B01") || "Theme") + '</span></div>' +
             // 뷰포트 기준 Bootstrap col-* 대신 컨테이너 폭 기준 auto-fill 그리드 → 패널이 좁아지면
             //   자동으로 열 수가 줄어 1열까지 쌓인다(스플리터 드래그/창 리사이즈에 진짜 반응형).
             //   Chromium 93 은 컨테이너 쿼리 미지원이라 min()+auto-fill 로 처리.
-            '<div class="u4aOptGrid">';
+            '<div class="u4aOptSecBody"><div class="u4aOptGrid">';
         for (var i = 0; i < THEMES.length; i++) {
             var t = THEMES[i];
             html +=
@@ -177,7 +207,7 @@
                   '</div>' +
                 '</div>';
         }
-        html += '</div>';
+        html += '</div></div>';   // close .u4aOptGrid + .u4aOptSecBody
         el.innerHTML = html;
         el.querySelectorAll(".u4aOptCard").forEach(function (c) {
             c.addEventListener("click", function () { _applyTheme(c.getAttribute("data-key")); _markSel(c.getAttribute("data-key")); });
@@ -296,7 +326,7 @@
               '<div class="u4a-splitter flex-grow-1" id="optSplit">' +
                 '<div class="u4a-splitter__pane list-group list-group-flush" id="optNav" style="flex:0 0 13rem">' + sNav + '</div>' +
                 '<div class="u4a-splitter__bar" id="optSplitBar" role="separator" aria-orientation="vertical"></div>' +
-                '<div class="u4a-splitter__pane p-3" id="optCont" style="flex:1 1 auto"></div>' +
+                '<div class="u4a-splitter__pane" id="optCont" style="flex:1 1 auto"></div>' +
               '</div>' +
               // 푸터 — 공통 .modal-footer(48px·토큰 보더, bootstrap-skin 단일출처) + 프로젝트 버튼.
               //   다른 모든 팝업과 동일: 강조=u4a-btn--emphasized / 닫기=u4a-btn--negative(Reject 느낌)
@@ -344,6 +374,28 @@
         sOrigTheme = sTheme;
         _applyTheme(sTheme);
         _build();
+    });
+
+    /* 다른 창(같은 SYSID)이 테마를 "적용"하면 그 브로드캐스트(if-p13n-themeChange-<SYSID>, _apply 가 send)를
+       받아 이 옵션 팝업도 실시간 반영한다. ★ 구 optionS.html(ThemeSetting.js)엔 있던 구독이 신버전
+       optionMain.js 에 누락돼, 한 창에서 적용해도 다른 창의 옵션 팝업은 안 바뀌던 원인. 같은 SYSID 채널을
+       ipcMain(remote)으로 구독 → 메인 창들과 동일하게 수신. sOrigTheme 도 갱신해 Close 가 되돌리지 않게. */
+    function _onThemeChangeFromOther(event, oData) {
+        try {
+            var sKey = _norm((oData && oData.THEME) || "");
+            if (!sKey || THEMES.map(function (t) { return t.key; }).indexOf(sKey) === -1) { return; }
+            if (window.U4ATheme) { window.U4ATheme.apply(sKey); }
+            try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { }
+            sCurTheme = sKey;
+            sOrigTheme = sKey;   // 다른 창이 "적용"한 게 새 기준 → 이 팝업 Close 가 옛 테마로 되돌리지 않게
+            _markSel(sKey);      // 선택 카드 체크 갱신(카드 렌더 전이면 no-op)
+        } catch (e) { }
+    }
+    try { if (SYSID) { IPCMAIN.on("if-p13n-themeChange-" + SYSID, _onThemeChangeFromOther); } } catch (e) { }
+    // 창 닫힐 때 리스너 해제 — remote ipcMain 리스너를 안 떼면 창 파괴 후 브로드캐스트 시 메인에서 죽은
+    //   콜백 호출로 오류. beforeunload 가 _close/네이티브 X 등 모든 닫힘 경로를 덮는다.
+    window.addEventListener("beforeunload", function () {
+        try { if (SYSID) { IPCMAIN.off("if-p13n-themeChange-" + SYSID, _onThemeChangeFromOther); } } catch (e) { }
     });
 
     document.addEventListener("DOMContentLoaded", function () {

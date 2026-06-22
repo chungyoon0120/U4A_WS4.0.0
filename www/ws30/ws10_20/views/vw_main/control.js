@@ -156,6 +156,8 @@ export async function getControl() {
                         try { if (oIframe && oIframe.contentWindow && oIframe.contentWindow.U4ATheme) { oIframe.contentWindow.U4ATheme.apply(sTheme); } } catch (e3) { }
                         try { if (parent.setThemeInfo) { parent.setThemeInfo(oData); } } catch (e4) { }
                         try { if (oData.BGCOL && parent.CURRWIN) { parent.CURRWIN.setBackgroundColor(oData.BGCOL); } } catch (e5) { }
+                        // (--boot-bg 는 위 각 프레임의 U4ATheme.apply 가 테마 CSS 로드 후 --app-bg 로 중앙
+                        //   동기화한다(theme-api.js _syncBootBg) → 여기서 따로 손대지 않는다.)
                     } catch (e) { /* noop */ }
                 });
             }

@@ -731,6 +731,7 @@
                     var oWin = _currWin();
                     var sBg = (parent.WSUTIL && parent.WSUTIL.getThemeBackgroundColor) ? parent.WSUTIL.getThemeBackgroundColor(it.key) : "";
                     if (oWin && sBg && oWin.setBackgroundColor) { oWin.setBackgroundColor(sBg); }
+                    // (--boot-bg 는 위 U4ATheme.apply 가 테마 CSS 로드 후 --app-bg 로 중앙 동기화한다.)
                 } catch (e) { }
             }, "right");
         });

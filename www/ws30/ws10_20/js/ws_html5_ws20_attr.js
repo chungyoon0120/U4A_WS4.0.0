@@ -3852,18 +3852,22 @@
                 LBL.appendChild(REQ);
             }
 
-            var LTX = document.createElement("span");
+            // 라벨 = <a>(링크) — "클릭하면 설명(도움말) 팝업"이라는 의미에 맞고, shell.css 의
+            //   a:hover{text-decoration:underline} 를 그대로 타 hover 밑줄이 확실히 뜬다(span 보다 견고).
+            //   href 는 두지 않아 네비게이션 없음(클릭은 LBL 셀 위임 핸들러가 처리).
+            var LTX = document.createElement("a");
             LTX.className = "u4aWs20AttrLblTxt";
             LTX.textContent = sAttr.UIATT || "";
-            //라벨 클릭 — 구 ObjectStatus press(설명글 팝업 callAttrDescPopup).
-            //  sAttr 는 var(함수 스코프)라 루프 마지막 값이 캡처되는 것을 막기 위해 IIFE 로 행별 캡처.
-            (function (oAnchor, oAttr) {
-                oAnchor.addEventListener("click", function () {
+            LBL.appendChild(LTX);
+            //라벨 셀 클릭 — 구 ObjectStatus press(설명글 팝업 callAttrDescPopup). 짧은 라벨의
+            //  우측 여백까지 포함해 **라벨 셀 전체**를 클릭 영역으로(hover 밑줄 어포던스와 일치).
+            //  팝업 앵커는 텍스트(LTX)로 두어 위치 정확. sAttr 는 var(함수 스코프)라 행별 캡처 IIFE.
+            (function (oCell, oAnchor, oAttr) {
+                oCell.addEventListener("click", function () {
                     try { oAPP.fn.callAttrDescPopup(oAnchor, oAttr); }
                     catch (e) { console.warn("[HTML5][WS20][attr] callAttrDescPopup 오류:", e && e.message); }
                 });
-            })(LTX, sAttr);
-            LBL.appendChild(LTX);
+            })(LBL, LTX, sAttr);
 
             ROW.appendChild(LBL);
 
@@ -4084,16 +4088,29 @@
 
         document.body.appendChild(POP);
 
-        //위치 — 클릭한 라벨 기준(구 openBy). 아래쪽 우선, 화면 밖이면 위/안쪽으로 클램프.
+        //위치 — 속성 목록을 가리지 않도록 **속성 패널 왼쪽 바깥(미리보기 위)**에 띄우고, 클릭한 라벨과
+        //  세로로 정렬한다. (구: 라벨 바로 아래라 아래 속성들을 가려 위→아래 연속 클릭이 불가했음.)
         try {
             var r = oAnchor.getBoundingClientRect();
-            var iLeft = r.left;
-            var iTop = r.bottom + 4;
-            if (iLeft + POP.offsetWidth > window.innerWidth - 6) { iLeft = window.innerWidth - POP.offsetWidth - 6; }
+            var oAttrPane = document.querySelector(".u4aWsDesignAttr");
+            var rPane = oAttrPane ? oAttrPane.getBoundingClientRect() : null;
+
+            var iLeft, iTop;
+            if (rPane && (rPane.left - POP.offsetWidth - 8) >= 6) {
+                // 패널 왼쪽 바깥에 충분한 공간 → 거기에(목록 안 가림)
+                iLeft = rPane.left - POP.offsetWidth - 8;
+                iTop = r.top;                       // 클릭한 라벨과 세로 정렬
+            } else {
+                // 폴백: 왼쪽 공간 부족 → 화면 왼쪽 가장자리(여전히 속성 목록은 거의 안 가림)
+                iLeft = 6;
+                iTop = r.top;
+            }
+            // 화면 안으로 클램프
             if (iLeft < 6) { iLeft = 6; }
             if (iTop + POP.offsetHeight > window.innerHeight - 6) {
-                iTop = Math.max(6, r.top - POP.offsetHeight - 4);   // 아래 공간 부족 → 라벨 위로
+                iTop = Math.max(6, window.innerHeight - POP.offsetHeight - 6);
             }
+            if (iTop < 6) { iTop = 6; }
             POP.style.left = iLeft + "px";
             POP.style.top = iTop + "px";
         } catch (e) { }
@@ -4111,6 +4128,7 @@
 
         X.addEventListener("click", _close);
         //여는 클릭의 잔여 이벤트가 즉시 닫지 않도록 다음 틱에 바깥클릭/ESC 리스너 부착(Find 팝업과 동일).
+        //  미리보기(iframe) 클릭 닫기는 전역(u4a-ui.js _installIframeBlurClose)이 합성 mousedown 으로 처리.
         setTimeout(function () {
             document.addEventListener("mousedown", _onOutside, true);
             document.addEventListener("keydown", _onEsc, true);

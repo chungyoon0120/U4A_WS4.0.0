@@ -1056,6 +1056,7 @@
         oMenu.style.top = y + "px";
         oMenu.style.zIndex = "4000";
         _openMenu = oMenu;
+        // 미리보기(iframe) 클릭 닫기는 전역(u4a-ui.js _installIframeBlurClose)이 합성 mousedown 으로 처리.
         setTimeout(function () {
             document.addEventListener("mousedown", _onOutside, true);
             document.addEventListener("keydown", _onEsc, true);
