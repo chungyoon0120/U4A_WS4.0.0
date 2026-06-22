@@ -80,6 +80,9 @@
      ************************************************************************/
     oAPP.fn.fnSelectBrowserPopupOpen = async function () {
 
+        // busy 는 메뉴 핸들러(fnHmws)가 클릭 즉시 켠다(loadJs 지연까지 커버). 여기선 끝나거나 오류 시 해제만 담당.
+        try {
+
         // 브라우저 설치 유무 등 상태 정보 모델(/DEFBR) 갱신 (원본 그대로 — HTML5-safe).
         await oAPP.fn.fnBrowserStateModelRefresh();
 
@@ -199,6 +202,11 @@
         document.body.appendChild(oDlg);
         _syncUI();
         oDlg.showModal();
+
+        } finally {
+            // 다이얼로그가 떴거나 도중 오류가 나도 busy 는 반드시 해제(showModal 직후/예외 시 즉시).
+            oAPP.common.fnSetBusyLock("");
+        }
 
     }; // end of oAPP.fn.fnSelectBrowserPopupOpen
 

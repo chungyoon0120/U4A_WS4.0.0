@@ -85,6 +85,50 @@
     }
 
     /************************************************************************
+     * WS30 옵저버/리스너 중앙 관리 (누수·중복 방지 단일 출처)
+     * ---------------------------------------------------------------------
+     *  키별로 ResizeObserver(또는 window resize 폴백) 1개만 유지. 같은 키로 다시
+     *  observeResize 하면 이전 것을 먼저 정리한다. 셸 재구성/에디터 비움 시 키 단위로
+     *  또는 일괄(disconnectAll) 해제한다. (트리 분할바 = "treeSplit", 에디터 분할바 = "editorSplit")
+     *  ws_html5_usp_editor.js 도 동일 레지스트리(oAPP.usphtml.observeResize)를 쓴다.
+     ************************************************************************/
+    oAPP.attr.uspObservers = oAPP.attr.uspObservers || {};
+
+    function _disconnectObserver(sKey) {
+        var rec = oAPP.attr.uspObservers[sKey];
+        if (!rec) { return; }
+        try { if (rec.ro) { rec.ro.disconnect(); } } catch (e) { }
+        try { if (rec.winFn) { window.removeEventListener("resize", rec.winFn); } } catch (e) { }
+        delete oAPP.attr.uspObservers[sKey];
+    }
+
+    function _observeResize(sKey, oTarget, fnCb) {
+        _disconnectObserver(sKey);                 // 같은 키 이전 옵저버 정리(중복 방지)
+        if (!oTarget || typeof fnCb !== "function") { return; }
+        var rec = {};
+        try {
+            if (window.ResizeObserver) {
+                rec.ro = new ResizeObserver(function () { fnCb(); });
+                rec.ro.observe(oTarget);
+            } else {
+                rec.winFn = function () { fnCb(); };
+                window.addEventListener("resize", rec.winFn);
+            }
+        } catch (e) { console.error("[HTML5][WS30] observeResize error:", sKey, e); }
+        oAPP.attr.uspObservers[sKey] = rec;
+    }
+
+    function _disconnectAllObservers() {
+        var o = oAPP.attr.uspObservers || {};
+        Object.keys(o).forEach(function (k) { _disconnectObserver(k); });
+    }
+
+    // 에디터 모듈 등에서 동일 레지스트리 사용
+    oAPP.usphtml.observeResize = _observeResize;
+    oAPP.usphtml.disconnectObserver = _disconnectObserver;
+    oAPP.usphtml.disconnectAllObservers = _disconnectAllObservers;
+
+    /************************************************************************
      * 멀티파트 응답 파서 (구 _getUspMultiPartData [ws_usp.js:5626] 1:1 이식)
      *   원본은 IIFE-private 라 외부에서 못 부른다 → 동일 로직 포팅(Node 'dicer' 사용, UI5 무관).
      ************************************************************************/
@@ -166,9 +210,13 @@
         return aMenu;
     }
 
-    // WS30 메뉴 항목 선택 → 실제 핸들러 oAPP.fn.fnWS30{key} 위임(없으면 안내). WS20 패턴 동일.
+    // WS30 메뉴 항목 선택 → 핸들러 위임.
+    //   WS30(USP) 상단 메뉴는 WS10 과 동일 항목·동일 키 체계를 공유한다
+    //   (Utilities=WMENU20 / System=WMENU30 / Help=WMENU50). WS20 은 키가 다르므로(System=WMENU40,
+    //   WMENU30=Editor) 폴백 대상에서 제외 — WS30 전용 fnWS30* 가 없으면 이미 구현된 fnWS10* 로 위임한다.
+    //   (Select Browser·Options·Server Info·Help·Source Pattern·Icon List 등 전부 앱 비종속 공통 동작)
     function _ws30MenuSelect(it) {
-        var fn = oAPP.fn["fnWS30" + it.key];
+        var fn = oAPP.fn["fnWS30" + it.key] || oAPP.fn["fnWS10" + it.key];
         if (typeof fn === "function") {
             try { fn(); } catch (e) { console.error("[HTML5][WS30] menu " + it.key + " error:", e); }
             return;
@@ -286,12 +334,73 @@
         return HDR;
     }
 
-    // WS30 → WS10 뒤로가기 (1차 안전판). 다음 단계에서 미저장 변경 프롬프트(원본 ev_pressWs30Back) 이식.
-    function _uspBack() {
+    // 실제 WS10 이동 (구 fnMoveToWs10)
+    function _doBackToWs10() {
         try {
             if (oAPP.fn && typeof oAPP.fn.fnMoveToWs10 === "function") { oAPP.fn.fnMoveToWs10(); return; }
         } catch (e) { console.error("[HTML5][WS30] fnMoveToWs10 error:", e); }
         try { oAPP.fn.fnOnMoveToPage("WS10"); } catch (e) { console.error("[HTML5][WS30] back fallback error:", e); }
+    }
+
+    /************************************************************************
+     * 뒤로가기 (구 ev_pressWs30Back → fnMoveBack_Ws30_To_Ws10) — WS20 ev_pageBack 과 동일 UX.
+     *   변경분(IS_CHAG="X") + Change 모드일 때만 저장 질문(MSG_WS 118/119, Yes/No/Cancel).
+     *   그 외엔 바로 이동.
+     ************************************************************************/
+    function _uspBack() {
+
+        oAPP.common.fnSetBusyLock("X");
+
+        var oApp = _model("/WS30/APP") || {};
+        var bChag = (oApp.IS_CHAG === "X");
+        var bEdit = (oApp.IS_EDIT === "X");
+
+        // 변경 없거나 display 모드 → 묻지 않고 바로 이동
+        if (!bChag || !bEdit) { _doBackToWs10(); return; }
+
+        var sMsg = _msgWs("118") + " \n " + _msgWs("119"); // 변경됨 / 저장 후 나갈까요?
+
+        // 사용자 응답 대기 → busy 해제 + 자식 팝업 잠시 숨김(원본 동일)
+        oAPP.common.fnSetBusyLock("");
+        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+
+        if (oAPP.common && typeof oAPP.common.fnConfirmBox === "function") {
+            oAPP.common.fnConfirmBox("W", sMsg, _uspBackCb, [
+                { act: "YES", label: "Yes", emphasized: true },
+                { act: "NO", label: "No" },
+                { act: "CANCEL", label: "Cancel" }
+            ]);
+        } else {
+            _uspBackCb(window.confirm(sMsg) ? "YES" : "CANCEL");
+        }
+    }
+
+    // 저장 질문 콜백 (구 fnMoveBack_Ws30_To_Ws10Cb)
+    function _uspBackCb(ACTCD) {
+
+        // CANCEL/닫기 → 머무름 (숨긴 팝업 복원)
+        if (ACTCD == null || ACTCD === "CANCEL") {
+            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
+            return;
+        }
+
+        // YES → 저장 후 이동. 저장(ev_pressSaveBtn)은 WS30 2차 — 연결돼 있으면 위임,
+        //   아니면 안내 후 머무름(변경 유실 방지). 2차에서 저장 콜백이 ISBACK 로 이동 처리.
+        if (ACTCD === "YES") {
+            oAPP.common.fnSetBusyLock("X");
+            var fnSave = oAPP.events && oAPP.events.ev_pressSaveBtn;
+            if (typeof fnSave === "function") {
+                try { fnSave({ ISBACK: "X" }); return; }
+                catch (e) { oAPP.common.fnSetBusyLock(""); console.error("[HTML5][WS30] save(ISBACK):", e); }
+            }
+            oAPP.common.fnSetBusyLock("");
+            oAPP.common.fnShowFloatingFooterMsg("I", "WS30", _msg("A64") + " — 변환 예정"); // Save 미구현(2차)
+            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
+            return;
+        }
+
+        // NO → 변경 버리고 이동
+        _doBackToWs10();
     }
 
     /************************************************************************
@@ -311,10 +420,15 @@
         var sAppId = oApp.APPID || "";
         var sIsEdit = oApp.IS_EDIT;
         var sActst = oApp.ACTST;
+        var sIsChag = oApp.IS_CHAG;
 
         var sModeTxt = (sIsEdit === "X") ? _msg("A02") : _msg("A05");
         var sStatTxt = "";
-        if (sAppId) { sStatTxt = (sActst === "A") ? _msg("B66") : _msg("B67"); }
+        if (sAppId) {
+            // 변경분(IS_CHAG=="X")이 있으면 아직 활성 전이라 Inactive 로 표시(WS20 동일 UX).
+            if (sIsChag === "X") { sStatTxt = _msg("B67"); }            // Inactivate
+            else { sStatTxt = (sActst === "A") ? _msg("B66") : _msg("B67"); } // Activate / Inactivate
+        }
 
         if (elAppId) { elAppId.textContent = sAppId; }
         if (elMode) { elMode.textContent = sModeTxt; }
@@ -458,19 +572,21 @@
             return C;
         })()));
 
-        // Description (1차 readonly — 편집은 Change 모드 단계에서)
+        // Description (Change 모드에서 편집 — 원본 oDescInput editable {/WS30/APP/IS_EDIT})
         BODY.appendChild(_formRow(_msg("A35"), (function () {
             var I = document.createElement("input");
-            I.type = "text"; I.id = "uspPropDesc"; I.readOnly = true;
+            I.type = "text"; I.id = "uspPropDesc";
             I.className = "u4a-input u4aWs30Input";
+            I.addEventListener("change", function () { _onUspFieldChange("DESCT", I.value); });
             return I;
         })()));
 
-        // Charset (폴더면 숨김)
+        // Charset (폴더면 숨김 — Change 모드에서 편집, 원본 oCharsetInput editable)
         var oCharRow = _formRow(_msg("C20"), (function () {
             var I = document.createElement("input");
-            I.type = "text"; I.id = "uspPropCodpg"; I.readOnly = true;
+            I.type = "text"; I.id = "uspPropCodpg";
             I.className = "u4a-input u4aWs30Input";
+            I.addEventListener("change", function () { _onUspFieldChange("CODPG", I.value); });
             return I;
         })());
         oCharRow.id = "uspPropCharsetRow";
@@ -503,6 +619,68 @@
         } catch (e) { console.error("[HTML5][WS30] url copy error:", e); }
     }
 
+    // Change(편집) 모드 여부 — /WS30/APP/IS_EDIT
+    function _isEditMode() {
+        var oApp = _model("/WS30/APP") || {};
+        return oApp.IS_EDIT === "X";
+    }
+
+    // 입력 변경 → /WS30/USPDATA 갱신 + 변경 플래그 (원본 ev_UspDescInputChangeEvent → setAppChangeWs30("X"))
+    function _onUspFieldChange(sField, sValue) {
+        var oData = _model("/WS30/USPDATA") || {};
+        oData[sField] = sValue;
+        APPCOMMON.fnSetModelProperty("/WS30/USPDATA", oData);
+        try {
+            if (typeof oAPP.fn.setAppChangeWs30 === "function") { oAPP.fn.setAppChangeWs30("X"); }
+            else {
+                var oApp = _model("/WS30/APP") || {};
+                oApp.IS_CHAG = "X";
+                APPCOMMON.fnSetModelProperty("/WS30/APP", oApp);
+            }
+        } catch (e) { console.error("[HTML5][WS30] field change:", e); }
+    }
+
+    // 날짜/시간 표시 포맷 통일 (SAP raw: YYYYMMDD→YYYY-MM-DD, HHMMSS→HH:MM:SS). 형식 안 맞으면 원문.
+    function _fmtDate(s) {
+        s = String(s == null ? "" : s).trim();
+        return /^\d{8}$/.test(s) ? (s.slice(0, 4) + "-" + s.slice(4, 6) + "-" + s.slice(6, 8)) : s;
+    }
+    function _fmtTime(s) {
+        s = String(s == null ? "" : s).trim();
+        return /^\d{6}$/.test(s) ? (s.slice(0, 2) + ":" + s.slice(2, 4) + ":" + s.slice(4, 6)) : s;
+    }
+    var DOC_DATE_FIELDS = { ERDAT: 1, AEDAT: 1 };
+    var DOC_TIME_FIELDS = { ERTIM: 1, AETIM: 1 };
+
+    // /U4A/MSG_WS 메시지(118 변경됨 / 119 저장? 등) — p1 치환.
+    function _msgWs(sNum, p1) {
+        try {
+            var s = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNum, p1 == null ? "" : String(p1));
+            if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
+        } catch (e) { }
+        return sNum;
+    }
+
+    /************************************************************************
+     * [OVERRIDE] Application 변경 플래그 (구 oAPP.fn.setAppChangeWs30 [ws_usp.js:7886]).
+     *   변경 시 ACTST="I"(Inactive) — 수정하면 상태가 Inactive 로(WS20 동일 UX).
+     *   원본은 모델만 갱신(UI5 바인딩 자동반영) → HTML5 는 헤더를 즉시 다시 그린다.
+     ************************************************************************/
+    oAPP.fn.setAppChangeWs30 = function (bIsChange) {
+        if (typeof bIsChange !== "string") { return; }
+        if (bIsChange !== "X" && bIsChange !== "") { return; }
+        var oApp = _model("/WS30/APP") || {};
+        oApp.IS_CHAG = bIsChange;
+        if (bIsChange === "X") { oApp.ACTST = "I"; }   // 변경분 발생 → Inactive
+        APPCOMMON.fnSetModelProperty("/WS30/APP", oApp);
+        try { oAPP.fn.fnUpdateUspAppHeader(); } catch (e) { }
+    };
+    // 변경 플래그 조회 (구 private getAppChangeWs30)
+    function _getAppChange() {
+        var oApp = _model("/WS30/APP") || {};
+        return oApp.IS_CHAG;
+    }
+
     /************************************************************************
      * [PUBLIC] Properties 패널 값 채움 (/WS30/USPDATA)
      ************************************************************************/
@@ -516,10 +694,11 @@
         var elCod = document.getElementById("uspPropCodpg");
         var elCodRow = document.getElementById("uspPropCharsetRow");
 
+        var bEdit = _isEditMode();
         if (elUrl) { elUrl.value = oData.SPATH || ""; }
         if (elFld) { elFld.checked = bFld; }
-        if (elDesc) { elDesc.value = oData.DESCT || ""; }
-        if (elCod) { elCod.value = oData.CODPG || ""; }
+        if (elDesc) { elDesc.value = oData.DESCT || ""; elDesc.readOnly = !bEdit; }
+        if (elCod) { elCod.value = oData.CODPG || ""; elCod.readOnly = !bEdit; }
         if (elCodRow) { elCodRow.style.display = bFld ? "none" : ""; }
     };
 
@@ -528,9 +707,10 @@
      *   루트 노드 선택 시 표시되는 전체 메타데이터 폼(읽기). 모든 필드 readonly(1차).
      ************************************************************************/
     // (라벨코드, USPDATA 필드) 매핑 — 원본 순서/키 그대로
+    //   [라벨코드, USPDATA 필드, 편집가능?] — 원본에서 DESCT(App Description)만 Change 모드 편집.
     var DOC_FIELDS = [
-        ["A90", "APPID"],  // Web Application ID
-        ["A91", "DESCT"],  // Web Application Name
+        ["A90", "APPID"],         // Web Application ID
+        ["A91", "DESCT", true],   // APP Description (Change 모드 편집)
         ["C12", "REQNO"],  // Request/Task
         ["A98", "LANGU"],  // Language Key
         ["C03", "CODPG"],  // Code Page
@@ -561,10 +741,16 @@
         FORM.className = "u4aWs30Form u4aWs30DocForm";
         FORM.id = "uspDocForm";
         DOC_FIELDS.forEach(function (f) {
+            var sField = f[1], bEditable = f[2] === true;
             var I = document.createElement("input");
-            I.type = "text"; I.readOnly = true;
+            I.type = "text";
+            I.readOnly = true;   // 실제 readOnly 는 fnRenderUspDoc 가 모드에 따라 토글(편집필드만)
             I.className = "u4a-input u4aWs30Input";
-            I.setAttribute("data-doc", f[1]);
+            I.setAttribute("data-doc", sField);
+            if (bEditable) {
+                I.setAttribute("data-doc-edit", "X");
+                I.addEventListener("change", function () { _onUspFieldChange(sField, I.value); });
+            }
             FORM.appendChild(_formRow(_msg(f[0]), I));
         });
         PAGE.appendChild(FORM);
@@ -575,9 +761,18 @@
         var oData = _model("/WS30/USPDATA") || {};
         var FORM = document.getElementById("uspDocForm");
         if (!FORM) { return; }
+        var bEdit = _isEditMode();
         DOC_FIELDS.forEach(function (f) {
-            var el = FORM.querySelector('[data-doc="' + f[1] + '"]');
-            if (el) { el.value = (oData[f[1]] != null ? oData[f[1]] : ""); }
+            var sField = f[1], bEditable = f[2] === true;
+            var el = FORM.querySelector('[data-doc="' + sField + '"]');
+            if (!el) { return; }
+            var v = (oData[sField] != null ? oData[sField] : "");
+            // 날짜/시간 표시 포맷 통일
+            if (DOC_DATE_FIELDS[sField]) { v = _fmtDate(v); }
+            else if (DOC_TIME_FIELDS[sField]) { v = _fmtTime(v); }
+            el.value = v;
+            // 편집 가능 필드만 Change 모드에서 readOnly 해제
+            if (bEditable) { el.readOnly = !bEdit; }
         });
     };
 
@@ -706,14 +901,25 @@
             oAPP.attr.uspAppPath = (parent.APP && parent.APP.getAppPath && parent.APP.getAppPath()) || oAPP.attr.uspAppPath || "";
         } catch (e) { }
 
-        // 이미 셸 렌더됨 → 헤더/툴바/패널만 최신화
+        // shell 의 "변환 예정" placeholder(.u4aWsConvertNotice) 제거.
+        //   shell fnOnMoveToPage 의 placeholder 가드는 data-ws20-shell 만 검사하므로(WS30 는
+        //   data-ws30-shell 사용) WS30 재진입마다 super 가 placeholder 를 다시 붙인다.
+        //   → 렌더 진입 시 항상 제거(아래 early-return 경로 포함).
+        try {
+            var aPH = oWS30.querySelectorAll(".u4aWsConvertNotice");
+            for (var iPH = 0; iPH < aPH.length; iPH++) { aPH[iPH].parentNode.removeChild(aPH[iPH]); }
+            oWS30.removeAttribute("data-placeholder-shown");
+        } catch (e) { }
+
+        // 이미 셸 렌더됨 → 헤더/툴바/패널만 최신화 (placeholder 는 위에서 이미 제거됨)
         if (oWS30.getAttribute("data-ws30-shell") === "X") {
             try { oAPP.fn.fnUpdateUspAppHeader(); } catch (e) { }
             return;
         }
 
+        // 새 셸 구성 — 이전 셸 인스턴스의 옵저버/리스너 일괄 해제(누수 방지) 후 DOM 교체.
+        _disconnectAllObservers();
         oWS30.innerHTML = "";
-        oWS30.removeAttribute("data-placeholder-shown");
 
         var MAIN = document.createElement("div");
         MAIN.id = "WS30_MAIN";
@@ -755,7 +961,8 @@
         // 리사이저(좌우 드래그)
         var RES = document.createElement("div");
         RES.id = "ws30Resizer";
-        RES.className = "u4aWs30Resizer";
+        // 공통 스플릿바 스킨(.u4a-splitter__bar = 서버리스트 기준 그립) 소비. 드래그는 자체 JS 훅 유지.
+        RES.className = "u4aWs30Resizer u4a-splitter__bar";
         SPLIT.appendChild(RES);
 
         // 우측 NavContainer
@@ -793,13 +1000,34 @@
         } catch (e) { }
     };
 
-    // 좌측 트리 패널 폭 드래그 리사이즈 (구 SplitterLayoutData usptreeSplitLayout 500px)
+    // 좌측 트리 패널 폭 드래그 리사이즈 (구 SplitterLayoutData usptreeSplitLayout).
+    //   드래그 하한 = 패널의 CSS min-width(--ws30-tree-minw) 를 그대로 읽어 사용(단일 출처).
     function _bindResizer(oBar, oLeft, oSplit) {
         var bDrag = false, iStartX = 0, iStartW = 0;
+        function _cssMinW() {
+            try {
+                var v = parseFloat(window.getComputedStyle(oLeft).minWidth);
+                if (!isNaN(v) && v > 0) { return v; }
+            } catch (e) { }
+            return 220;
+        }
+        // 트리 최대폭 = 컨테이너 폭 − 콘텐츠 최소 가시폭(320). 항상 최소폭 이상.
+        function _maxTree() {
+            var iMax = oSplit.clientWidth - 320;
+            var iMin = _cssMinW();
+            return iMax < iMin ? iMin : iMax;
+        }
+        // 현재 트리폭이 최대폭을 넘으면 줄여서 스플릿바/콘텐츠가 화면 밖으로 밀리지 않게 한다.
+        //   (최대화 상태에서 넓게 드래그 → restore 시 컨테이너가 줄어 트리(고정폭)가 넘치던 문제)
+        function _clampWidth() {
+            var iCur = oLeft.getBoundingClientRect().width;
+            var iMax = _maxTree();
+            if (iCur > iMax) { oLeft.style.flex = "0 0 " + iMax + "px"; }
+        }
         function lf_move(e) {
             if (!bDrag) { return; }
             var iW = iStartW + (e.clientX - iStartX);
-            var iMin = 220, iMax = oSplit.clientWidth - 320;
+            var iMin = _cssMinW(), iMax = _maxTree();
             if (iW < iMin) { iW = iMin; }
             if (iW > iMax) { iW = iMax; }
             oLeft.style.flex = "0 0 " + iW + "px";
@@ -819,6 +1047,10 @@
             document.addEventListener("mouseup", lf_up);
             e.preventDefault();
         });
+
+        // 컨테이너 크기 변경(최대화↔복원/창 리사이즈) 시 트리폭 재클램프 — 스플릿바 숨음 방지.
+        //   중앙 레지스트리로 관리(같은 키 재호출 시 이전 옵저버 자동 정리).
+        _observeResize("treeSplit", oSplit, _clampWidth);
     }
 
     /************************************************************************

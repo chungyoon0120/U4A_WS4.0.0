@@ -211,9 +211,7 @@
   display: flex; flex-direction: column;
   min-height: 0; min-width: 0; overflow: hidden;
   background: var(--ws20-panel);
-  /* 패널 자체 border 제거 — 패널 사이 구분선은 공통 스플릿바(.u4a-splitter__bar: surface+좌우경계+그립)가
-     담당한다(USP/ServerList 와 동일 구조: 평면 패널 + 바가 구분). 카드 경계를 두면 바 경계와 이중선이 됨.
-     영역 구분은 surface 패널 ↔ app-bg 스플릿 바탕 대비 + 그림자로 유지. */
+  border: 1px solid var(--ws20-sep);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
 }
 .u4aWs20PanelBody {
@@ -273,11 +271,22 @@
   display: flex; align-items: center; justify-content: center;
 }
 
-/* 드래그 리사이저 바 — 공통 .u4a-splitter__bar(서버리스트 기준, shell.css) 풀스킨 그대로 소비:
-   surface 배경 + 좌우 1px 경계 + 가운데 알약 그립 + hover 배경. 자체 override 없음 →
-   USP/ServerList/옵션 팝업과 100% 동일(기본색·hover색 통일). 패널 카드 경계를 제거했으므로
-   바 경계와 이중선이 안 난다. (옛 background:transparent/border:0 중립화는 hover 배경까지 죽여
-   화면 간 불일치의 원인이었음 — 제거.) */
+/* 드래그 리사이저 바 (구 Splitter 바) — 투명 + 중앙 점 그립(⋮⋮) */
+.u4aWs20Resizer {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+}
+.u4aWs20Resizer::after {
+  content: "\22EE\22EE"; /* ⋮⋮ */
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--ws20-grip);
+  font-size: 9px; line-height: 1; letter-spacing: -1px;
+  pointer-events: none;
+}
+.u4aWs20Resizer:hover::after { color: var(--ws20-accent); }
 /* 리사이즈 중 전역 커서 고정 (드래그 중 텍스트 선택 방지) */
 .u4aWs20ResizingCursor { cursor: col-resize !important; user-select: none !important; }
 /* 리사이즈 중 iframe(가운데 미리보기 등)이 mousemove 를 가로채 드래그가 끊기는 것 방지.
@@ -369,24 +378,36 @@
 .u4aWs20TreeRow.hl-Indication02 { border-left-color: var(--state-error); }   /* Error/Negative */
 .u4aWs20TreeRow.hl-Indication04 { border-left-color: var(--state-warning); } /* Warning */
 .u4aWs20TreeRow.hl-Indication08 { border-left-color: var(--state-info); }    /* Information */
-/* Find UI 검색 결과 — 글로우 박스/점멸 없이 깔끔한 amber 좌측 바 + 좌→우로 자연스럽게 사라지는
-   그라데이션 워시(미니멀·모던). 사방 글로우/외곽선이 프레임처럼 보이던 촌스러움 제거.
-   ★ 선택=테마 accent(파랑/녹색/보라/빨강) / find=테마무관 amber(--ws20-find-hl) 로 색 분리.
-   레이아웃 시프트 없음(box-shadow/background only). 선택 inset 바(shell.css)를 덮도록 specificity 보강.
-   Indication03=매치 전체(가는 바 + 옅은 워시), Indication07=현재 라인(굵은 바 + 진한 워시 + 볼드). */
+/* Find UI 검색 결과 — 네모 박스 링 대신 amber "글로우 + 좌→우 그라데이션 워시"로 화사하게.
+   ★ 선택 행(aria-selected)은 테마 accent(파랑/녹색/보라/빨강). find 는 테마 무관 고정 amber(--ws20-find-hl)
+     라 어떤 테마에서도 색이 갈린다(선택=테마색 / find=amber). 레이아웃 시프트 없음(box-shadow/background only).
+   Indication03=매치 전체(가는 바 + 옅은 페이드 워시), Indication07=현재 라인(굵은 바 + 안쪽 글로우 +
+     착지 시 1회 플래시 펄스 + 볼드)으로 "지금 여기"가 화사하게 살아난다. */
 .u4a-tree__row.u4aWs20TreeRow.hl-Indication03 {
-  box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--ws20-find-hl) 60%, transparent);
+  box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--ws20-find-hl) 82%, transparent);
   background: linear-gradient(90deg,
-              color-mix(in srgb, var(--ws20-find-hl) 12%, transparent),
-              transparent 68%);
+              color-mix(in srgb, var(--ws20-find-hl) 20%, transparent),
+              transparent 72%);
 }
 .u4a-tree__row.u4aWs20TreeRow.hl-Indication07 {
-  box-shadow: inset 4px 0 0 0 var(--ws20-find-hl);
+  box-shadow: inset 4px 0 0 0 var(--ws20-find-hl),
+              inset 0 0 16px -5px var(--ws20-find-hl);   /* 안쪽 amber 글로우(박스 X) */
   background: linear-gradient(90deg,
-              color-mix(in srgb, var(--ws20-find-hl) 28%, transparent),
-              color-mix(in srgb, var(--ws20-find-hl) 6%, transparent) 50%,
-              transparent 82%);
+              color-mix(in srgb, var(--ws20-find-hl) 42%, transparent),
+              color-mix(in srgb, var(--ws20-find-hl) 12%, transparent) 55%,
+              transparent);
   font-weight: 600;
+  animation: ws20FindPulse 0.95s ease-out 1;   /* 매치에 "착지"할 때마다 1회 화사하게 점멸 */
+}
+/* 착지 펄스: 전체 행 amber 플래시(inset 큰 spread) → 안쪽 글로우로 가라앉음. */
+@keyframes ws20FindPulse {
+  0%   { box-shadow: inset 4px 0 0 0 var(--ws20-find-hl),
+                     inset 0 0 0 9999px color-mix(in srgb, var(--ws20-find-hl) 42%, transparent); }
+  100% { box-shadow: inset 4px 0 0 0 var(--ws20-find-hl),
+                     inset 0 0 16px -5px var(--ws20-find-hl); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .u4a-tree__row.u4aWs20TreeRow.hl-Indication07 { animation: none; }
 }
 
 /* 토글 클릭 영역 확대 — 행 높이만큼 세로로 꽉, 가로 28px (펼치기 쉽게) */
@@ -414,10 +435,9 @@
 /* UI 아이콘 (구 sap.m.Image src="{UICON}") */
 .u4aWs20TreeIcon { flex: 0 0 auto; width: 18px; height: 18px; object-fit: contain; }
 
-/* UI 이름 (구 sap.m.Text "{OBJID}") — 공통 createTree 라벨(.u4a-tree__label)에 WS20 확장.
-   trailing(우측 aggr/액션)을 오른쪽으로 밀려면 라벨이 남는 폭을 모두 차지(flex:1 1 0)해야 함. */
-.u4aWs20TreeRow .u4a-tree__label {
-  flex: 1 1 0;          /* 기준폭 0 — 길면 확실히 말줄임(행 오버플로/액션 어긋남 방지) */
+/* UI 이름 (구 sap.m.Text "{OBJID}") */
+.u4aWs20TreeName {
+  flex: 1 1 0;          /* 기준폭 0 — 내용폭을 점유하지 않아 항상 남는 공간만 차지 → 길면 확실히 말줄임(행 오버플로/액션 어긋남 방지) */
   min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;   /* 길면 말줄임(…) — 전체 이름은 행 hover 툴팁 */
 }
@@ -502,17 +522,15 @@
 /* =====================================================================
  * UI Object Select 팝업 (구 design/js/insertUIPopop.js → HTML5 .u4a-dialog)
  *   · sap.m.Dialog(resizable/draggable) + sap.ui.table.Table 1:1 재현
- *   · 헤더 드래그 이동(공통 makeDialogDraggable) + 우하단 grip 리사이즈(공통 makeDialogResizable) + 반응형
+ *   · 헤더 드래그 이동 + 우하단 리사이즈(resize:both) + 반응형
  * ===================================================================== */
 .u4aWs20InsertDlg {
   width: min(80rem, 95vw);   /* 전체 창 기준 크게 */
   height: min(52rem, 90vh);
   min-width: min(24rem, 90vw);
   min-height: 18rem;
-  overflow: hidden;          /* 둥근 모서리 클립 (본문은 자체 스크롤) */
-  /* ※ 네이티브 resize:both 제거 — showModal 다이얼로그는 margin:auto 로 중앙정렬돼
-     네이티브 리사이즈가 "가운데 기준"으로 커진다(일반 창과 반대). 공통 makeDialogResizable
-     그립(우하단 .u4a-dialog__resize)이 좌상단 고정으로 리사이즈하므로 그걸로 통일. */
+  overflow: hidden;          /* resize 핸들 활성화 전제 */
+  resize: both;              /* 우하단 코너 리사이즈 */
 }
 /* 확인 버튼 — 원본 sap.m.Button type:"Accept"(녹색) 재현 */
 .u4aWs20InsConfirm,

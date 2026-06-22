@@ -1,16 +1,67 @@
-.sapMSticky .sapMTableTH {
-    top: 0;
-    position: sticky;
-    position: -webkit-sticky;
-    z-index: 1;
+/************************************************************************
+ * errMsgPopup/index.css — 본문 에러 테이블 (화면 전용 확장).
+ * 테이블 골격·행 상태·카드 반응형·compact 밀도는 shell.css 공통(.u4a-table*).
+ * 여기엔 errMsgPopup 전용(레이아웃·컬럼 폭·정렬·설명 줄바꿈)만 둔다.
+ * 색·radius·shadow 는 theme/tokens.css 토큰만 소비(하드코딩 0).
+ ************************************************************************/
+
+html,
+body {
+    height: 100%;
 }
 
-.sapMSticky5 .sapMTableTH,
-.sapMSticky7>.sapMListInfoTBarContainer {
-    top: 2.75rem;
+.u4aErrBody {
+    margin: 0;
+    overflow: hidden;
+    background: var(--app-bg);
+    color: var(--text);
+    font-family: var(--font);
+    /* UI5 fadeIn 대체 — 렌더 완료 후 .u4aErrBody--ready 로 부드럽게 표시 */
+    opacity: 0;
+    transition: opacity var(--motion) linear;
 }
 
-.u4aWsErrMsgPopupPage .sapMObjStatus {
-    font-size: 1rem;
-    font-weight: bold;
+.u4aErrBody--ready {
+    opacity: 1;
+}
+
+#content {
+    height: 100%;
+}
+
+/* 공통 .u4a-table-wrap 에 화면별 크기만 부여(세로 스크롤) */
+.u4aErrWrap {
+    height: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--app-bg);
+}
+
+/* 컬럼 폭(테이블뷰) — Type/Line 은 짧으니 좁게, Description 이 나머지 차지 */
+.u4aErrCol--type {
+    width: 4.5rem;
+}
+
+.u4aErrCol--line {
+    width: 3.25rem;
+}
+
+.u4aErrCol--desc {
+    width: auto;
+}
+
+/* Type/Line = 가운데 정렬 (공통 thead th 좌측정렬보다 우선) */
+.u4a-table .u4a-c-etype,
+.u4a-table .u4a-c-eline {
+    text-align: center;
+}
+
+/* Description = 테이블뷰에서도 줄바꿈(잘림 금지). 원본 sap.m.Text 줄바꿈 동작 보존 */
+.u4a-table tbody td.u4a-c-edesc {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }

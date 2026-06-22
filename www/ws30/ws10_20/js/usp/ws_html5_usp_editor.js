@@ -253,8 +253,23 @@
             document.addEventListener("mouseup", lf_up);
             e.preventDefault();
         });
-        // 더블클릭 → 좌측 0px (구 _fnDoubleClickSplitbar)
-        oBar.addEventListener("dblclick", function () { oLeft.style.flex = "0 0 0px"; });
+        // 더블클릭 → 최초 위치(좌측 0px) 복귀는 공통 전역 핸들러(u4a-ui.js _installGlobalSplitterReset)가
+        //   .u4a-splitter__bar 더블클릭으로 자동 처리(좌측 초기 inline flex="0 0 0px" 를 home 으로 복귀).
+        //   → 화면별 dblclick 배선 제거(공통 단일화).
+
+        // 컨테이너 크기 변경(최대화↔복원) 시 좌측 에디터폭 재클램프 — 분할바/메인 에디터 숨음 방지.
+        function _clampLeft() {
+            var bV = _vert();
+            var iMax = (bV ? oSplit.clientHeight : oSplit.clientWidth) - 80;
+            if (iMax < 0) { iMax = 0; }
+            var r = oLeft.getBoundingClientRect();
+            var iCur = bV ? r.height : r.width;
+            if (iCur > iMax) { oLeft.style.flex = "0 0 " + iMax + "px"; }
+        }
+        // 셸 중앙 옵저버 레지스트리 사용(같은 키 재호출 시 이전 것 자동 정리 — 파일 선택마다 재바인딩되어도 1개만 유지).
+        if (oAPP.usphtml && typeof oAPP.usphtml.observeResize === "function") {
+            oAPP.usphtml.observeResize("editorSplit", oSplit, _clampLeft);
+        }
     }
 
     /* ====================================================================
@@ -276,6 +291,24 @@
             try { oCfg.press(B); } catch (e) { console.error("[HTML5][WS30] editor toolbar:", oCfg.id, e); }
         });
         return B;
+    }
+
+    // 재사용 시 툴바를 통째로 다시 만들지 않고(테마목록 재조회/콤보 재생성 회피) 정보만 갱신.
+    function _refreshToolbarInfo() {
+        var oData = _model("/WS30/USPDATA") || {};
+        var oApp = _model("/WS30/APP") || {};
+        var bEdit = (oApp.IS_EDIT === "X");
+        var bFolder = (oData.ISFLD === "X");
+        var bRoot = (oData.PUJKY === "" || oData.PUJKY == null);
+
+        var elTitle = document.querySelector("#uspEditorHost .u4aWs30EditorTitle");
+        if (elTitle) { elTitle.textContent = oData.OBDEC || ""; elTitle.title = oData.OBDEC || ""; }
+
+        var elPretty = document.getElementById("ws30_codeeditor_prettyBtn");
+        if (elPretty) { elPretty.disabled = !(bEdit && !bRoot && !bFolder); }
+
+        var oCombo = document.querySelector("#uspEditorHost .u4aWs30EditorThemeSel");
+        if (oCombo) { try { oCombo.value = _selectedTheme(); } catch (e) { } }
     }
 
     function _buildEditorToolbar() {
@@ -368,18 +401,41 @@
 
         _ensureCustomEvtDom();
 
-        // 통신 채널 (재)생성 — 원본은 선택마다 delete 후 new MessageChannel()
+        // ★ 안정성(브라우저 크래시 방지): Monaco 는 무겁다(loader+editor.main+web worker).
+        //   파일 클릭마다 iframe 을 destroy+재생성하면 매번 Monaco 전체를 다시 로드하고
+        //   워커가 누적되어(특히 단일클릭 UX 로 클릭 빈도↑) Electron 렌더러가 메모리/CPU
+        //   폭주로 뻗는다. → **에디터는 1회만 로드하고, 이후 파일 전환은 postMessage(setValue/
+        //   language_change)로 내용만 갱신**(원본 destroy+clone 대신, iframe 이 지원하는 통신 계약 사용).
+        var aFrames = oHost.querySelectorAll("iframe.MONACO_EDITOR");
+
+        // 이미 에디터 iframe 이 있으면 재로드하지 않는다(워커 누적/크래시 방지).
+        if (aFrames.length) {
+            // 헤더 툴바는 정보만 갱신(파일명/Pretty/테마콤보값) — 통째 재생성/테마목록 재조회 회피.
+            _refreshToolbarInfo();
+
+            var bReady = Array.prototype.every.call(aFrames, function (f) {
+                try { return !!(f.contentWindow && f.contentWindow.editor); } catch (e) { return false; }
+            });
+            if (bReady) {
+                // 준비된 에디터에 내용/언어만 전달(전 에디터 동기) → 즉시 busy 해제.
+                try { oAPP.usp.sendEditorPostMessageAll({ actcd: "setValue", value: (oRowData && oRowData.CONTENT) || "" }); } catch (e) { console.error("[HTML5][WS30] editor setValue:", e); }
+                try { oAPP.usp.sendEditorPostMessageAll({ actcd: "language_change", extension: (oRowData && oRowData.EXTEN) || "" }); } catch (e) { console.error("[HTML5][WS30] editor language_change:", e); }
+                _releaseBusy();
+            }
+            // 아직 로딩 중이면: 진행 중인 editor.create 가 최신 getSelectedUspLineData().CONTENT 를
+            //   읽고, EDITOR_LOAD 가 busy 를 해제한다(추가 작업/재생성 불필요).
+            return;
+        }
+
+        // ── 최초 1회: 에디터 영역(툴바 + 스플릿 + iframe) 생성 ──
         try { delete oAPP.usp.USP_EDITOR_CHANNEL; } catch (e) { }
         oAPP.usp.USP_EDITOR_CHANNEL = new MessageChannel();
 
         // 두 에디터 로드 카운터 (구 iEditorLoadCnt = 2)
         oAPP.attr.uspEditorLoadCnt = EDITOR_COUNT;
 
-        // 기존 내용 제거 후 [헤더 툴바 + 스플릿] 재구성 (원본 destroy+clone 패턴)
         oHost.innerHTML = "";
-
-        // 헤더 툴바 (파일명 + 테마콤보 + 기본폰트/분할/전체화면/Pretty)
-        oHost.appendChild(_buildEditorToolbar());
+        oHost.appendChild(_buildEditorToolbar());   // 헤더 툴바 (최초 1회 전체 생성)
 
         var SPLIT = document.createElement("div");
         SPLIT.className = "u4aWs30EditorSplit";
@@ -393,7 +449,8 @@
 
         // 분할바 (드래그/더블클릭)
         var BAR = document.createElement("div");
-        BAR.className = "u4aWs30EditorSplitBar";
+        // 공통 스플릿바 스킨(.u4a-splitter__bar = 서버리스트 기준 그립) 소비. 드래그/더블클릭·세로모드는 자체 JS/CSS 훅.
+        BAR.className = "u4aWs30EditorSplitBar u4a-splitter__bar";
         SPLIT.appendChild(BAR);
 
         // 우측(메인) 에디터 — 구 EDITPAGE2 / EDITOR_FRAME2 EDITOR_MAIN
@@ -420,6 +477,8 @@
      * [PUBLIC] 에디터 비우기 — 폴더/루트(문서 페이지) 등 파일 아닌 경우.
      ************************************************************************/
     oAPP.usphtml.editorClear = function () {
+        // 에디터 분할바 옵저버 해제(에디터 DOM 제거되므로) — 중앙 레지스트리.
+        try { if (oAPP.usphtml.disconnectObserver) { oAPP.usphtml.disconnectObserver("editorSplit"); } } catch (e) { }
         var oHost = document.getElementById("uspEditorHost");
         if (oHost) { oHost.innerHTML = ""; }
         oAPP.attr.uspEditorLoadCnt = 0;

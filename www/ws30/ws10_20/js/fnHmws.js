@@ -120,6 +120,10 @@
             return;
         }
 
+        // 메뉴 클릭 즉시 busy 표시 — JS 동적 로드(loadJs)부터 설치 브라우저 조회·팝업 렌더까지 모두 커버.
+        // 사용자는 어디서 지연되는지 모르므로 클릭 시점부터 켠다. 해제는 팝업 함수 내부 finally(fnSetBusyLock("")).
+        oAPP.common.fnSetBusyLock("X");
+
         if (oAPP.fn.fnSelectBrowserPopupOpen) {
             oAPP.fn.fnSelectBrowserPopupOpen();
             return;
@@ -380,6 +384,10 @@
         if (parent.getBusy() == 'X') {
             return;
         }
+
+        // 메뉴 클릭 즉시 busy 표시 — JS 동적 로드(loadJs)부터 설치 브라우저 조회·팝업 렌더까지 모두 커버.
+        // 사용자는 어디서 지연되는지 모르므로 클릭 시점부터 켠다. 해제는 팝업 함수 내부 finally(fnSetBusyLock("")).
+        oAPP.common.fnSetBusyLock("X");
 
         if (oAPP.fn.fnSelectBrowserPopupOpen) {
             oAPP.fn.fnSelectBrowserPopupOpen();
@@ -752,6 +760,10 @@
         if (parent.getBusy() == 'X') {
             return;
         }
+
+        // 메뉴 클릭 즉시 busy 표시 — JS 동적 로드(loadJs)부터 설치 브라우저 조회·팝업 렌더까지 모두 커버.
+        // 사용자는 어디서 지연되는지 모르므로 클릭 시점부터 켠다. 해제는 팝업 함수 내부 finally(fnSetBusyLock("")).
+        oAPP.common.fnSetBusyLock("X");
 
         if (oAPP.fn.fnSelectBrowserPopupOpen) {
             oAPP.fn.fnSelectBrowserPopupOpen();

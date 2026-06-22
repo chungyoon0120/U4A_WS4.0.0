@@ -1218,6 +1218,10 @@
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
+        // 네이티브 OS 프레임 제거 — 앱 전 창(메인/ServerList/floatingMenu/help)과 동일하게
+        // frameless + 공통 .u4a-titlebar(optionMain.js) 로 창 크롬을 그린다. (16번 §1 공통화)
+        oBrowserOptions.frame = false;
+
         oBrowserOptions.opacity = 0.0;
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
@@ -1244,6 +1248,10 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            // 흰색 플래시 방지(ServerList 동일): 창이 첫 페인트 전에 테마 배경(--boot-bg)을
+            // 동기로 깔고 활성 테마 CSS 로드를 미리 시작하도록 BGCOL/THEME 를 함께 넘긴다.
+            BGCOL: oThemeInfo.BGCOL || "",
+            THEME: oThemeInfo.THEME || "",
         };
 
         // 실행할 URL 적용
@@ -1257,7 +1265,7 @@
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
-        // }   
+        // }
 
         // 브라우저가 활성화 될 준비가 될때 타는 이벤트
         oBrowserWindow.once('ready-to-show', () => {
@@ -1271,7 +1279,7 @@
         oBrowserWindow.webContents.on('did-finish-load', function () {
 
             const oOptionData = {
-                BROWSKEY: BROWSKEY, // 브라우저 고유키 
+                BROWSKEY: BROWSKEY, // 브라우저 고유키
                 oUserInfo: parent.getUserInfo(), // 로그인 사용자 정보
                 oServerInfo: parent.getServerInfo(), // 서버 정보
                 SYSID: sSysID, // System ID
@@ -1503,7 +1511,7 @@
 
                 oIconWindow.show();
 
-                // 부모 위치 가운데 배치한다.            
+                // 부모 위치 가운데 배치한다.
                 WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
 
                 return;
@@ -1612,7 +1620,7 @@
 
             oBrowserWindow.webContents.send('if-icon-prev', oOptionData);
 
-            // 부모 위치 가운데 배치한다.            
+            // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
             // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
@@ -2561,7 +2569,18 @@
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.titleBarStyle = "hidden";
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.height = 400;
+
+        // 부모 창보다 작게(비율) 띄워 "부모 위의 다이얼로그"로 또렷이 구분되게 한다.
+        //  너비 ≈ 부모 52%, 높이 ≈ 부모 62% (최소/최대 클램프). setParentCenterBounds 가
+        //  이 크기 그대로 부모 중앙에 배치 → 부모가 주변에 보여 겹쳐보이지 않음.
+        const aParentSize = CURRWIN.getSize();
+        const iParentW = aParentSize[0] || 1000,
+            iParentH = aParentSize[1] || 700;
+
+        oBrowserOptions.width = Math.min(Math.max(Math.round(iParentW * 0.52), 460), 860);
+        oBrowserOptions.height = Math.min(Math.max(Math.round(iParentH * 0.62), 320), 720);
+        oBrowserOptions.minWidth = 360;
+        oBrowserOptions.minHeight = 240;
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.webPreferences.partition = SESSKEY;
         oBrowserOptions.webPreferences.browserkey = BROWSKEY;

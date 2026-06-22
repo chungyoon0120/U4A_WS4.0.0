@@ -109,6 +109,11 @@
 
     /* titlebar / desktop (체크리스트 H) */
     --titlebar-bg: var(--surface);
+    /* 비활성(blur) 타이틀바 위에 덮는 고정 베일 — 타이틀바에 opacity 를 주면 반투명이 되어
+       "뒤 배경"이 비치는데 그 배경이 창마다 달라(Main=본문 --app-bg / Login 호스트 프레임 등)
+       같은 비활성인데도 헤더색이 달라진다. 불투명 배경 위에 이 베일을 덮어 어느 창에서나 동일한
+       흐림으로 통일한다. 중립 회색(저채도화) — 라이트/다크 공통. */
+    --titlebar-blur-veil: rgba(130, 130, 138, 0.34);
     --close-hover-bg: var(--c-red);
     --close-hover-text: var(--c-white);
 

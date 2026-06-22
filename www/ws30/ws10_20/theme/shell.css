@@ -130,10 +130,23 @@ a:hover {
 
 /* ── 창 비활성(blur) 표시 ───────────────────────────────────────────
    현재 브라우저 창에 포커스가 없으면 u4a-ui.js 가 <body>.u4a-window-blurred 를
-   달아 타이틀바를 살짝 흐리게(opacity) 한다 → "포커스 간 창/아닌 창" 시각 구분.
-   모든 셸(index/WS10/Login/ServerList) 공통. */
+   달아 타이틀바를 흐리게 한다 → "포커스 간 창/아닌 창" 시각 구분.
+   모든 셸(index/WS10/Login/ServerList) 공통.
+   ⚠️ 예전엔 .u4a-titlebar { opacity:.6 } 로 했는데, opacity 는 타이틀바를 "반투명"하게
+   만들어 그 뒤 배경이 비친다. 그 배경이 창마다 다르다(Main=본문 --app-bg / Login 호스트
+   프레임 등) → 같은 비활성인데도 헤더색이 달라 보였다(2026-06-22 사용자 지적). 그래서 배경
+   그라데이션은 불투명 그대로 두고, 위에 고정 베일(::after)을 덮어 어느 창에서나 동일하게 흐린다.
+   (filter/backdrop-filter 가 아니라 단순 배경 레이어 → app-region 드래그에 영향 없음) */
 body.u4a-window-blurred .u4a-titlebar {
-    opacity: 0.6;
+    position: relative;
+}
+
+body.u4a-window-blurred .u4a-titlebar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--titlebar-blur-veil);
+    pointer-events: none;
 }
 
 .u4a-titlebar__logo {
@@ -493,16 +506,45 @@ button:focus-visible {
     overflow: auto;
 }
 
+/* 분할 바 — 서버리스트 기준 그립으로 통일(16번 §4.2). 표면 배경 + 좌우 1px 경계 +
+   가운데 알약 그립(::before). 색은 의미 토큰만(하드코딩 금지), 그립 형태 치수(11/5/36/50px)는
+   §4.2 가 형태값으로 허용. ServerList·WS20·USP·USP에디터 바가 모두 이 공통 스킨을 소비한다
+   (자체 점글리프/라인 스킨 금지). 평면 패널은 이 바가 구분선을 담당하므로 인접 패널의 중복
+   경계는 화면 CSS 에서 제거하고, 카드형(WS20)만 바 배경/경계를 중립화해 그립만 상속한다. */
 .u4a-splitter__bar {
-    flex: 0 0 0.5rem;
+    flex: 0 0 11px;
     cursor: col-resize;
-    background: transparent;
+    position: relative;
+    background: var(--surface);
     border-left: 0.0625rem solid var(--line);
+    border-right: 0.0625rem solid var(--line);
     transition: background-color var(--motion) linear;
+}
+
+/* 가운데 알약 그립 — 평소 뮤트색 opacity .5, hover 시 accent + opacity 1 + 길어짐 */
+.u4a-splitter__bar::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 5px;
+    height: 36px;
+    border-radius: 4px;
+    background: var(--icon-muted);
+    opacity: 0.5;
+    transition: background-color var(--motion) linear, opacity var(--motion) linear,
+        width var(--motion) linear, height var(--motion) linear;
 }
 
 .u4a-splitter__bar:hover {
     background: var(--hover-bg);
+}
+
+.u4a-splitter__bar:hover::before {
+    background: var(--accent);
+    opacity: 1;
+    height: 50px;
 }
 
 /* ── 상태 뱃지 (ObjectStatus 대체) ──────────────────────────────── */
@@ -578,6 +620,17 @@ button:focus-visible {
 @keyframes u4a-busy-card-in {
     from { opacity: 0; transform: translateY(0.625rem) scale(0.94); }
     to   { opacity: 1; transform: none; }
+}
+
+/* busy 카드 안내 문구(예: "종료 중…") — 메시지가 있을 때만 노출(비면 숨김) */
+.u4a-busy__label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    text-align: center;
+}
+.u4a-busy__label:empty {
+    display: none;
 }
 
 /* 표시를 0.3s 지연 → 짧은 busy(빠른 on/off)는 화면에 나타나지 않아 깜빡임 없음 */
@@ -1280,4 +1333,206 @@ dialog::backdrop {
     .u4a-menu {
         border: 0.0625rem solid CanvasText;
     }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   공통 테이블 (.u4a-table) + 카드 반응형  — 16.공통UX §3.3 승격
+   (ServerList 전용 → 전 화면 공통. ServerList/errMsgPopup 등이 소비)
+   ★ Chromium93 은 컨테이너쿼리 미지원 → 화면 JS 가 ResizeObserver 로
+     .u4a-table-wrap 에 data-view(table|card) 를 세팅한다(넓으면 table, 좁으면 card).
+   색·radius·shadow 는 전부 토큰. 화면별 추가(컬럼 폭·정렬메뉴·카드 순서 등)는
+   각 화면 CSS 가 확장(.u4a-c-* 등)으로 얹는다.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 테이블 본체 — fixed 레이아웃(컬럼 폭 제어 + 셀 말줄임) */
+.u4a-table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+    color: var(--text);
+    /* Bootstrap .table 의 하단 마진 제거 */
+    margin-bottom: 0;
+}
+
+/* 컬럼 헤더 — sticky (체크리스트 E) */
+.u4a-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface);
+    border-bottom: 0.0625rem solid var(--line);
+    color: var(--text-muted);
+    white-space: nowrap;
+    cursor: default;
+    user-select: none;
+}
+
+/* 데이터 셀 */
+.u4a-table tbody td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 0.0625rem solid var(--line);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 행 hover / zebra / 선택 / 포커스 (체크리스트 E/B) */
+.u4a-table tbody tr {
+    cursor: pointer;
+}
+
+.u4a-table tbody tr:hover {
+    background: var(--hover-bg);
+}
+
+.u4a-table tbody tr[data-odd="true"] {
+    background: var(--hover-bg);
+}
+
+.u4a-table tbody tr[data-odd="true"]:hover {
+    background: var(--active-bg);
+}
+
+/* 선택 행 — zebra/hover 보다 확실히 구분(강한 배경 + 좌측 강조 바 + 굵게) */
+.u4a-table tbody tr[aria-selected="true"],
+.u4a-table tbody tr[aria-selected="true"][data-odd="true"],
+.u4a-table tbody tr[aria-selected="true"]:hover,
+.u4a-table tbody tr[aria-selected="true"][data-odd="true"]:hover {
+    background: var(--selected-bg);
+}
+
+.u4a-table tbody tr[aria-selected="true"] > td {
+    font-weight: 600;
+}
+
+.u4a-table tbody tr[aria-selected="true"] > td:first-child {
+    box-shadow: inset 0.1875rem 0 0 0 var(--accent);
+}
+
+.u4a-table tbody tr:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+/* no-data 행 (체크리스트 E) */
+.u4a-table__nodata td {
+    text-align: center;
+    color: var(--text-muted);
+    cursor: default;
+    padding: 1.5rem;
+}
+
+.u4a-table__nodata:hover {
+    background: transparent;
+}
+
+/* ── 밀도 옵션: Compact (행/패딩 축소, 행높이 토큰 소비) ──────────────
+   원본 UI5 sapUiSizeCompact 대응. 토큰 미정의 시 12 §4.3 스펙값 폴백. */
+.u4a-table--compact thead th,
+.u4a-table--compact tbody td {
+    padding: 0.125rem 0.625rem;
+}
+
+.u4a-table--compact thead th {
+    height: var(--control-h-compact, 1.75rem);
+}
+
+.u4a-table--compact tbody td {
+    height: var(--row-h-compact, 1.75rem);
+    vertical-align: middle;
+    line-height: 1.4;
+}
+
+/* 터치/포인터(coarse) — 행 높이 확대 (체크리스트 J) */
+@media (pointer: coarse) {
+
+    .u4a-table--compact thead th {
+        height: var(--control-h, 2.5rem);
+    }
+
+    .u4a-table--compact tbody td {
+        height: var(--row-h, 2.5rem);
+    }
+}
+
+/* ── 카드(타일) 뷰 — data-view="card" (좁을 때 각 행을 카드로) ──────── */
+.u4a-table-wrap[data-view="card"] thead {
+    display: none;
+}
+
+.u4a-table-wrap[data-view="card"] table,
+.u4a-table-wrap[data-view="card"] tbody {
+    display: block;
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin: 0.5rem;
+    padding: 0.6rem 0.25rem;
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--elevation);
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr:hover {
+    background: var(--hover-bg);
+}
+
+.u4a-table-wrap[data-view="card"] tbody td {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.15rem 0.75rem;
+    border: 0;
+    padding: 0.25rem 0.75rem;
+    min-width: 0;
+    /* 카드 안에선 줄바꿈(가로 넘침/스크롤 방지) — 테이블뷰 말줄임 무력화 */
+    white-space: normal;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    text-align: left;
+    /* compact 행높이(고정)는 카드뷰에선 해제 */
+    height: auto;
+}
+
+/* 라벨(컬럼명) = 값 왼쪽 흐리게. data-label 있는 셀만 노출 */
+.u4a-table-wrap[data-view="card"] tbody td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    margin-right: 0.5rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* 선택 카드 — 강조 테두리 (좌측 바는 카드뷰에서 해제) */
+.u4a-table-wrap[data-view="card"] tbody tr[aria-selected="true"] {
+    border-color: var(--accent);
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr[aria-selected="true"] > td:first-child {
+    box-shadow: none;
+}
+
+/* no-data 카드 */
+.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata {
+    display: block;
+    text-align: center;
+    box-shadow: none;
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata td {
+    justify-content: center;
+}
+
+.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata td[data-label]::before {
+    display: none;
 }

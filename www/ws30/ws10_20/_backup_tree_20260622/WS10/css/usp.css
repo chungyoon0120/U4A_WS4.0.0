@@ -21,8 +21,6 @@
     --ws30-selected-bg: var(--selected-bg);
     --ws30-selected-text: var(--selected-text);
     --ws30-hover-bg: var(--hover-bg);
-    /* 좌측 트리 패널 최소=기본 폭 단일 출처(_bindResizer 가 computed min-width 로 읽어 드래그 하한과 일치) */
-    --ws30-tree-minw: 21.25rem;   /* 340px */
 
     height: 100%;
     display: flex;
@@ -83,20 +81,30 @@
 }
 
 .u4aWs30TreePane {
-    /* 기본 폭 = 최소 폭(처음부터 최소폭에서 시작). 드래그로 넓히기만 가능. */
-    flex: 0 0 var(--ws30-tree-minw, 13.75rem);
+    flex: 0 0 500px;
     display: flex;
     flex-direction: column;
-    /* 좌측 트리 영역 최소폭 — 드래그/창축소로도 밑으로 줄지 않게 CSS 로 강제.
-       (드래그 시 inline flex-basis 를 낮춰도 min-width 가 우선) → _bindResizer iMin 과 일치. */
-    min-width: var(--ws30-tree-minw, 13.75rem);
+    min-width: 0;
     min-height: 0;
     background: var(--ws30-panel);
-    /* 우측 구분선은 공통 스플릿바(.u4a-splitter__bar)가 표면+좌우경계로 담당 → 패널 자체 border-right 제거(이중선 방지) */
+    border-right: 0.0625rem solid var(--ws30-line);
 }
 
-/* 트리↔콘텐츠 분할바 — 공통 .u4a-splitter__bar(서버리스트 기준 그립, shell.css) 소비(16번 §4.2).
-   평면 패널이라 풀 스킨(표면배경+좌우경계+가운데 알약 그립) 그대로 사용. 드래그만 자체 JS 훅. */
+.u4aWs30Resizer {
+    flex: 0 0 0.375rem;
+    cursor: col-resize;
+    background: transparent;
+    position: relative;
+}
+.u4aWs30Resizer::after {
+    content: "";
+    position: absolute;
+    inset: 0 0.125rem;
+    background: var(--ws30-line);
+    opacity: 0;
+    transition: opacity var(--motion);
+}
+.u4aWs30Resizer:hover::after { opacity: 1; background: var(--ws30-accent); }
 
 .u4aWs30ContentPane {
     flex: 1 1 auto;
@@ -149,14 +157,12 @@
 /* 토글 클릭 영역 — WS20 동일(가로 1.75rem, 세로 행높이) */
 .u4aWs30TreeRow .u4a-tree__toggle { width: 1.75rem; height: 2.5rem; }
 
-/* 아이콘 — 공통 createTree 아이콘 슬롯(.u4a-tree__icon)에 USP SVG(img) 18px.
-   ※ createTree 는 .u4a-tree__icon 으로 렌더 → 옛 .u4aWs30TreeIcon 은 더 이상 안 나옴(타겟 정정). */
-.u4aWs30TreeRow .u4a-tree__icon img { width: 1.125rem; height: 1.125rem; display: block; object-fit: contain; }
+/* 아이콘 — WS20 18px */
+.u4aWs30TreeIcon { flex: 0 0 auto; }
+.u4aWs30TreeIcon img { width: 1.125rem; height: 1.125rem; display: block; object-fit: contain; }
 
-/* 이름 — 공통 createTree 라벨(.u4a-tree__label)에 USP 확장(WS20 동일).
-   trailing(우측 설명)을 오른쪽으로 밀려면 라벨이 남는 폭을 모두 차지(flex:1 1 0)해야 한다.
-   ※ 이게 빠지면 data-u4a-tree-split 의 space-between 이 토글/아이콘/라벨/설명을 가로로 흩뿌림. */
-.u4aWs30TreeRow .u4a-tree__label {
+/* 이름 — 남는 폭, 말줄임(WS20 .u4aWs20TreeName) */
+.u4aWs30TreeName {
     flex: 1 1 0;
     min-width: 0;
     overflow: hidden;
@@ -244,12 +250,6 @@
 }
 .u4aWs30FormField { min-width: 0; }
 .u4aWs30Input { width: 100%; }
-/* 읽기전용 필드는 muted(비활성톤)로 — 편집 가능 필드(Change 모드의 Description 등)와 시각 구분 */
-.u4aWs30Input:read-only {
-    background: var(--disabled-bg);
-    color: var(--ws30-text-sub);
-    cursor: default;
-}
 .u4aWs30Check { accent-color: var(--ws30-accent); }
 
 .u4aWs30UrlRow { display: flex; gap: 0.375rem; align-items: center; }
@@ -325,18 +325,28 @@
     display: block;
 }
 
-/* 좌측 에디터(분할 대상) — 초기 0px(인라인 flex 로 제어), 분할바 드래그로 넓힘.
-   구분선은 공통 스플릿바(.u4a-splitter__bar)가 담당 → 패널 자체 경계 제거(이중선 방지). */
+/* 좌측 에디터(분할 대상) — 초기 0px(인라인 flex 로 제어), 분할바 드래그로 넓힘 */
+.u4aWs30EditorPaneLeft { border-right: 0.0625rem solid var(--ws30-line); }
+.u4aWs30EditorSplit.is-vertical .u4aWs30EditorPaneLeft {
+    border-right: none;
+    border-bottom: 0.0625rem solid var(--ws30-line);
+}
 
-/* 분할바 — 공통 .u4a-splitter__bar(서버리스트 기준 그립, shell.css) 소비(16번 §4.2).
-   가로 분할은 공통 그대로(col-resize + 세로 알약 그립). 세로 분할(.is-vertical)만 아래에서
-   row-resize + 그립을 가로 알약으로 회전시킨다. 드래그/더블클릭(0px 리셋)은 자체 JS 훅. */
+/* 분할바 — 드래그 리사이즈 / 더블클릭 0px 초기화 (가로=col-resize / 세로=row-resize) */
+.u4aWs30EditorSplitBar {
+    flex: 0 0 0.375rem;
+    cursor: col-resize;
+    position: relative;
+    background: transparent;
+}
 .u4aWs30EditorSplit.is-vertical .u4aWs30EditorSplitBar { cursor: row-resize; }
-.u4aWs30EditorSplit.is-vertical .u4aWs30EditorSplitBar::before {
-    width: 36px;
-    height: 5px;
+.u4aWs30EditorSplitBar::after {
+    content: "";
+    position: absolute;
+    inset: 0 0.125rem;
+    background: var(--ws30-line);
+    opacity: 0;
+    transition: opacity var(--motion);
 }
-.u4aWs30EditorSplit.is-vertical .u4aWs30EditorSplitBar:hover::before {
-    width: 50px;
-    height: 5px;
-}
+.u4aWs30EditorSplit.is-vertical .u4aWs30EditorSplitBar::after { inset: 0.125rem 0; }
+.u4aWs30EditorSplitBar:hover::after { opacity: 1; background: var(--ws30-accent); }

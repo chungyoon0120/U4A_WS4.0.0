@@ -2,34 +2,39 @@
 <html>
 
 <head>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta charset="utf-8">
-    <!-- <link rel="stylesheet" href="../../../css/common.css"> -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- 공통 테마 토큰/베이스 (부모 창과 동일 디자인 시스템) — 06.팝업 6-2 / 12.테마 -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
     <link rel="stylesheet" href="frame.css">
 
+    <script src="../../theme/theme-api.js"></script>
 </head>
-<style>
-    html,
-    body {
-        height: 100%;
-    }
-
-    body {
-        margin: 0px;
-        overflow: hidden;
-    }
-</style>
 
 <body>
 
-    <iframe id="ws_frame" name="ws_frame" style="border:none;width:100%;height:100%;" allowfullscreen>
-    </iframe>
+    <!-- 에러 헤더 = 윈도우 드래그 핸들 겸용(타이틀바 hidden 창). 헤더 48px(16.공통UX 2.1) -->
+    <header class="u4aErrHdr u4aWsWindowHeaderDraggable" id="u4aErrHdr">
+        <i class="fa-solid fa-triangle-exclamation u4aErrHdr__icon"></i>
+        <span class="u4aErrHdr__title" id="u4aErrHdrTitle"></span>
+        <span class="u4aErrHdr__spacer"></span>
+        <button class="u4a-winbtn u4a-winbtn--close" id="u4aErrCloseBtn" data-action="close" title="Close">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </header>
+
+    <!-- 본문 = 테이블(index.html) iframe. 데이터 도착 후 src 주입 -->
+    <div id="u4aErrContent">
+        <iframe id="ws_frame" name="ws_frame" allowfullscreen></iframe>
+    </div>
 
     <!-- Page Loading Start -->
     <div id="u4a_main_load" class="u4a_loaders">
-        <!-- <span class="u4a_loader u4a_loader-bars"> <span></span> </span> Loading... -->
         <div class="cl_ring">LOADING<span class="cl_ringArea"></span></div>
     </div>
     <!-- Page Loading End -->

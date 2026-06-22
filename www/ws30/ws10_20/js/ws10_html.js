@@ -723,7 +723,16 @@
         oSwatch.addEventListener("click", function () {
             var sCur = (window.U4ATheme && window.U4ATheme.current()) || "horizon_white";
             var aItems = THEMES.map(function (t) { return { key: t.key, text: t.text, icon: "circle-half-stroke", disabled: t.key === sCur }; });
-            _openMenuAt(oSwatch, aItems, function (it) { if (window.U4ATheme) { window.U4ATheme.apply(it.key); } }, "right");
+            _openMenuAt(oSwatch, aItems, function (it) {
+                if (window.U4ATheme) { window.U4ATheme.apply(it.key); }
+                // 네이티브 창 배경색도 새 테마 배경으로 갱신 — 안 하면 화면 이동(페이지/iframe 로드) 중
+                //   창 생성 시 고정된 옛 배경(예: white)이 새서 흰색 플래시가 보인다.
+                try {
+                    var oWin = _currWin();
+                    var sBg = (parent.WSUTIL && parent.WSUTIL.getThemeBackgroundColor) ? parent.WSUTIL.getThemeBackgroundColor(it.key) : "";
+                    if (oWin && sBg && oWin.setBackgroundColor) { oWin.setBackgroundColor(sBg); }
+                } catch (e) { }
+            }, "right");
         });
         return oSwatch;
     }

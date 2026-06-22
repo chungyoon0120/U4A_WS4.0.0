@@ -84,31 +84,8 @@
     background: var(--surface);
 }
 
-.u4a-table {
-    /* fixed 레이아웃 → 컬럼이 패널 폭을 넘지 않고 셀 내용은 말줄임 */
-    table-layout: fixed;
-    width: 100%;
-    border-collapse: collapse;
-    color: var(--text);
-    /* Bootstrap .table 가 주는 하단 마진 제거(스크롤 영역에 불필요한 빈 공간 방지) */
-    margin-bottom: 0;
-}
-
-/* 컬럼 헤더 — sticky (체크리스트 E) */
-.u4a-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    text-align: left;
-    font-weight: 600;
-    padding: 0.5rem 0.75rem;
-    background: var(--surface);
-    border-bottom: 0.0625rem solid var(--line);
-    color: var(--text-muted);
-    white-space: nowrap;
-    cursor: default;
-    user-select: none;
-}
+/* 공통 테이블 본체(.u4a-table)·헤더 sticky 는 shell.css 로 승격(16 §3.3).
+   여기엔 ServerList 전용 확장(정렬/필터 메뉴 헤더·컬럼 폭·카드 순서)만 둔다. */
 
 /* 메뉴(필터/정렬) 가능한 컬럼만 클릭 가능 표시 + hover */
 .u4a-table thead th.u4a-th--menu {
@@ -183,17 +160,10 @@
     color: var(--accent);
 }
 
-.u4a-table tbody td {
-    padding: 0.5rem 0.75rem;
-    border-bottom: 0.0625rem solid var(--line);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ── 반응형 (doc 02 §8) ────────────────────────────────────────────
-   Electron(Chromium) 컨테이너쿼리 미지원 → ResizeObserver 가 .u4a-table-wrap
-   에 data-view(table|card) 를 세팅. 넓으면 테이블, 좁으면(<560px) 카드(타일). */
+/* 공통 데이터 셀(.u4a-table tbody td)·행 hover/zebra/선택/포커스/no-data·
+   카드 뷰 골격(.u4a-table-wrap[data-view="card"])은 shell.css 로 승격(16 §3.3).
+   카드 전환 토글(ResizeObserver→data-view)은 ServerList.js 가 담당.
+   아래는 ServerList 전용: 테이블뷰 서버명 말줄임 + 카드뷰 셀 순서(이름=타이틀 등). */
 
 /* 테이블 뷰: 긴 서버명은 컬럼 폭 안에서 말줄임 (fixed 레이아웃이 폭 제어) */
 .u4a-c-name {
@@ -201,59 +171,7 @@
     text-overflow: ellipsis;
 }
 
-/* ── 카드(타일) 뷰 — 좁을 때 각 행을 카드로 전환 (컬럼 숨김 대신) ───── */
-.u4a-table-wrap[data-view="card"] thead {
-    display: none;
-}
-
-.u4a-table-wrap[data-view="card"] table,
-.u4a-table-wrap[data-view="card"] tbody {
-    display: block;
-}
-
-.u4a-table-wrap[data-view="card"] tbody tr {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    margin: 0.5rem;
-    padding: 0.6rem 0.25rem;
-    border: 0.0625rem solid var(--line);
-    border-radius: var(--radius);
-    background: var(--surface);
-    box-shadow: var(--elevation);
-}
-
-.u4a-table-wrap[data-view="card"] tbody tr:hover {
-    background: var(--hover-bg);
-}
-
-.u4a-table-wrap[data-view="card"] tbody td {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.15rem 0.75rem;
-    border: 0;
-    padding: 0.25rem 0.75rem;
-    min-width: 0;
-    white-space: normal;
-    max-width: none;
-    overflow: visible;
-    text-overflow: clip;
-    /* 값(IP 등)이 길어도 카드 안에서 줄바꿈 — 가로 넘침/스크롤 방지 */
-    overflow-wrap: anywhere;
-    text-align: left;
-}
-
-/* 라벨(컬럼명): 값 왼쪽에 흐리게 */
-.u4a-table-wrap[data-view="card"] tbody td::before {
-    content: attr(data-label);
-    flex: 0 0 auto;
-    margin-right: 0.5rem;
-    color: var(--text-muted);
-    font-weight: 600;
-}
-
+/* ── 카드(타일) 뷰 — ServerList 전용 셀 순서/강조 (골격은 shell.css) ───── */
 /* 서버명 = 카드 타이틀 (맨 위, 라벨 없음) */
 .u4a-table-wrap[data-view="card"] tbody td.u4a-c-name {
     order: -2;
@@ -283,79 +201,8 @@
     flex-wrap: nowrap;
 }
 
-/* 선택 카드 = 강조 테두리 + 좌측 바 */
-.u4a-table-wrap[data-view="card"] tbody tr[aria-selected="true"] {
-    border-color: var(--accent);
-}
-
-.u4a-table-wrap[data-view="card"] tbody tr[aria-selected="true"] > td:first-child {
-    box-shadow: none;
-}
-
-/* no-data 카드 */
-.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata {
-    display: block;
-    text-align: center;
-    box-shadow: none;
-}
-
-.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata td {
-    justify-content: center;
-}
-
-.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata td::before {
-    display: none;
-}
-
-/* row hover / 선택 / zebra (체크리스트 E) */
-.u4a-table tbody tr {
-    cursor: pointer;
-}
-
-.u4a-table tbody tr:hover {
-    background: var(--hover-bg);
-}
-
-.u4a-table tbody tr[data-odd="true"] {
-    background: var(--hover-bg);
-}
-
-.u4a-table tbody tr[data-odd="true"]:hover {
-    background: var(--active-bg);
-}
-
-/* 선택 행 — zebra/hover 보다 확실히 구분되게 (강한 배경 + 좌측 강조 바 + 굵게) */
-.u4a-table tbody tr[aria-selected="true"],
-.u4a-table tbody tr[aria-selected="true"][data-odd="true"],
-.u4a-table tbody tr[aria-selected="true"]:hover,
-.u4a-table tbody tr[aria-selected="true"][data-odd="true"]:hover {
-    background: var(--selected-bg);
-}
-
-.u4a-table tbody tr[aria-selected="true"] > td {
-    font-weight: 600;
-}
-
-.u4a-table tbody tr[aria-selected="true"] > td:first-child {
-    box-shadow: inset 0.1875rem 0 0 0 var(--accent);
-}
-
-.u4a-table tbody tr:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: calc(-1 * var(--focus-ring-width));
-}
-
-/* no-data row (체크리스트 E) */
-.u4a-table__nodata td {
-    text-align: center;
-    color: var(--text-muted);
-    cursor: default;
-    padding: 1.5rem;
-}
-
-.u4a-table__nodata:hover {
-    background: transparent;
-}
+/* 카드 선택 강조/ no-data, 테이블뷰 row hover·zebra·선택·포커스·no-data 는
+   shell.css 공통(.u4a-table*)으로 승격(16 §3.3). 여기선 ServerList 전용만 유지. */
 
 /* 설정(편집) 버튼 셀 */
 .u4a-table .u4a-col-action {
@@ -747,18 +594,10 @@
 #u4aWsTreePane { border-right: 1px solid var(--sl-border); }
 
 /* ── 스플리터 그립 ────────────────────────────────────────────────── */
-.u4a-splitter__bar {
-    flex: 0 0 11px; background: var(--sl-surface);
-    border-left: 1px solid var(--sl-border); border-right: 1px solid var(--sl-border);
-    position: relative;
-}
-.u4a-splitter__bar::before {
-    content: ""; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 5px; height: 36px; border-radius: 4px; background: var(--sl-muted); opacity: .5;
-    transition: background .15s ease, opacity .15s ease, height .15s ease;
-}
-.u4a-splitter__bar:hover { background: var(--sl-surface-2); }
-.u4a-splitter__bar:hover::before { background: var(--u4a-accent); opacity: 1; height: 50px; }
+/* [토큰 단일화 — 16번 §4.4] 과거 여기서 .u4a-splitter__bar 를 --sl-* 데모 팔레트로 다시 덮어
+   ServerList 바만 다른 색이 됐다(공통 shell.css 는 의미 토큰 --surface/--line/--icon-muted/--accent).
+   화면 간 스플릿바 색 불일치의 원인이라 제거 → ServerList 도 shell.css 공통 바를 그대로 소비한다
+   (모양/치수 동일, 색만 의미 토큰으로 통일). 화면별 재정의 금지. */
 
 /* ── 트리 ─────────────────────────────────────────────────────────── */
 /* 좁은 패널에서 들여쓰기 step 축소(shell.css @container) 활성화 */
@@ -786,8 +625,11 @@
 .u4a-table thead th {
     /* 헤더는 테마 틴트가 든 surface 밴드 + 또렷한 하단 보더로 본문과 구분(밋밋함 해소) */
     background: var(--sl-surface); color: var(--sl-muted);
-    border-bottom: 2px solid var(--sl-border);
-    box-shadow: none;
+    /* border-collapse + sticky thead 조합에서 Chromium 은 collapse 된 하단 보더를
+       sticky 셀과 함께 칠하지 않아 구분선이 끊겨 보인다 → 보더 대신 셀에 붙어
+       sticky 를 따라가는 inset box-shadow 로 하단 구분선을 그린다. */
+    border-bottom: 0;
+    box-shadow: inset 0 -2px 0 var(--sl-border);
     font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
     padding: .62rem .9rem;
 }

@@ -108,24 +108,42 @@
         var bWS10 = initCond.EXPAGE === "WS10";       // 앱조회(display) 활성 조건
         var bAudit = _showAudit();
 
-        // 중복 방지(이미 떠 있으면 닫고 새로).
-        var oOld = document.getElementById("u4aAppF4Dlg");
-        if (oOld) { try { oOld.close(); } catch (e) { } oOld.remove(); }
+        // ── 싱글톤(원본 아키텍처) ───────────────────────────────────
+        //   앱 조회(display) 시 다이얼로그를 파괴하지 않고 숨겨(close, DOM 유지) 검색 상태를 보존.
+        //   다음 F4 호출에는 새로 만들지 말고 같은 인스턴스를 재표시 + 콜백/검색만 갱신.
+        var oExisting = document.getElementById("u4aAppF4Dlg");
+        if (oExisting && typeof oExisting._appf4Reopen === "function") {
+            oExisting._appf4Reopen(options, fnCallback);
+            return;
+        }
+        if (oExisting) { try { oExisting.remove(); } catch (e) { } }
 
         // 팝업 상태(스코프 변수로 보관).
+        var _fnCb = fnCallback;     // pick 콜백(재오픈 시 갱신 가능하게 mutable)
         var aResult = [];           // 탭1 검색결과
         var aTreeRoot = [];         // 탭2 트리 루트
         var oExpand = {};           // 트리 펼침 상태(노드 _uid → bool)
         var bTreeLoaded = false;
         var sTreeFilter = "";
         var _uidSeq = 0;
+        var _sortKey = null, _sortDir = null;   // 탭1 컬럼 정렬(단일) — 원본 sap.ui.table sortProperty
+        var _colFilters = {};                   // 탭1 컬럼 필터(AND·contains) — 원본 filterProperty
+
+        // ★ 메시지 텍스트는 호출마다 SQLite 조회라 비싸다 → 행 렌더 루프 밖에서 1회만 캐시.
+        var MSG_RUN = _wsTxt("436");   // 앱 실행
+        var MSG_DISP = _wsTxt("564");  // 앱 조회
+        var MSG_NOAPP = _wsTxt("435"); // 실행할 수 없는 어플리케이션
+        var MSG_SORTASC = _wsTxt("810");                        // 오름차순 정렬
+        var MSG_SORTDESC = _wsTxt("811");                       // 내림차순 정렬
+        var MSG_FILTERVAL = _txt("/U4A/CL_WS_COMMON", "A68");   // 필터 값(placeholder)
 
         /* ── 다이얼로그 골격 ─────────────────────────────────────── */
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aAppF4Dlg";
         oDlg.id = "u4aAppF4Dlg";
 
-        function lf_close() { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
+        // 닫기 = 숨김(파괴 X). 원본 싱글톤처럼 DOM 유지 → 다음 호출에 재표시(상태 보존).
+        function lf_close() { try { _closeColMenu(); } catch (e) { } try { oDlg.close(); } catch (e) { } }
 
         // 헤더
         var oHeader = _el("div", "u4a-dialog__header");
@@ -173,6 +191,12 @@
             b.type = "button"; b.title = sTip || ""; b.innerHTML = _fa(sIcon);
             b.addEventListener("click", fn);
             return b;
+        }
+        // 단일 선택 행 강조(공통 .u4a-table aria-selected).
+        function _selTr(oBody, oTr) {
+            var aSel = oBody.querySelectorAll('tr[aria-selected="true"]');
+            for (var i = 0; i < aSel.length; i++) { aSel[i].removeAttribute("aria-selected"); }
+            oTr.setAttribute("aria-selected", "true");
         }
 
         /* ── 탭 전환 ─────────────────────────────────────────────── */
@@ -252,41 +276,93 @@
             );
         }
 
-        var oT1Wrap = _el("div", "u4aAppF4TblWrap");
-        var oT1 = _el("table", "u4aAppF4Tbl");
-        var oT1Head = _el("thead");
-        var oT1Hr = _el("tr");
-        T1_COLS.forEach(function (c) {
-            var th = _el("th", c.align === "center" ? "is-center" : null,
-                c.action ? (c.action === "run" ? _wsTxt("436") : _wsTxt("564")) : c.label);
-            if (c.w) { th.style.width = c.w; }
-            if (c.action) { th.classList.add("is-action"); }
-            oT1Hr.appendChild(th);
-        });
-        oT1Head.appendChild(oT1Hr);
+        var T1_MAP = {};   // key → col (셀 텍스트/정렬·필터용)
+        T1_COLS.forEach(function (c) { if (c.key) { T1_MAP[c.key] = c; } });
+
+        var oT1Wrap = _el("div", "u4aAppF4TblWrap u4a-table-wrap");
+        var oT1 = _el("table", "u4a-table u4aAppF4Tbl");
+        var oT1Head = _el("thead");   // 헤더는 _renderT1 이 매번 재구성(정렬/필터 표시자 갱신)
         var oT1Body = _el("tbody");
         oT1.append(oT1Head, oT1Body);
         oT1Wrap.appendChild(oT1);
-        var oT1Empty = _el("div", "u4aAppF4Empty", "—");
-        oT1Empty.hidden = true;
-        oT1Wrap.appendChild(oT1Empty);
 
         oPage1.append(oForm, oSrchBar, oT1Wrap);
 
+        // ── 컬럼 정렬/필터 (원본 sap.ui.table sortProperty/filterProperty → ServerList 패턴 포팅) ──
+        function _cellText(sKey, row) {
+            var c = T1_MAP[sKey]; var v = row[sKey];
+            return (c && c.fmt) ? c.fmt(v) : (v == null ? "" : String(v));
+        }
+        function _deriveView(src) {
+            var arr = src.slice();
+            var aKeys = Object.keys(_colFilters).filter(function (k) { return _colFilters[k]; });
+            if (aKeys.length) {
+                arr = arr.filter(function (row) {
+                    return aKeys.every(function (k) { return _cellText(k, row).toLowerCase().indexOf(_colFilters[k]) !== -1; });
+                });
+            }
+            if (_sortKey) {
+                var d = _sortDir === "desc" ? -1 : 1;
+                arr.sort(function (a, b) {
+                    return _cellText(_sortKey, a).localeCompare(_cellText(_sortKey, b), undefined, { numeric: true }) * d;
+                });
+            }
+            return arr;
+        }
+        function _buildT1Th(c) {
+            var th = _el("th", c.align === "center" ? "is-center" : null);
+            if (c.w) { th.style.width = c.w; }
+            if (c.action) { th.classList.add("is-action"); }
+            var inner = _el("div", "u4a-th__inner");
+            if (c.align === "center") { inner.classList.add("u4a-th__inner--center"); }
+            inner.appendChild(_el("span", "u4a-th__label", c.action ? (c.action === "run" ? MSG_RUN : MSG_DISP) : c.label));
+            // 데이터 컬럼만 정렬/필터 메뉴(액션 컬럼 제외) — 원본도 데이터컬럼에만 sort/filterProperty.
+            if (c.key && !c.action) {
+                var bSorted = _sortKey === c.key, bFiltered = !!_colFilters[c.key];
+                if (bSorted || bFiltered) {
+                    var ind = _el("span", "u4a-th__ind");
+                    if (bSorted) { ind.innerHTML += _fa(_sortDir === "desc" ? "arrow-down" : "arrow-up"); }
+                    if (bFiltered) { ind.innerHTML += _fa("filter"); }
+                    inner.appendChild(ind);
+                }
+                th.appendChild(inner);
+                th.classList.add("u4a-th--menu");
+                th.addEventListener("click", function (e) { e.stopPropagation(); _openColMenu(c, th); });
+            } else {
+                th.appendChild(inner);
+            }
+            return th;
+        }
+
         function _renderT1() {
+            // 헤더(정렬/필터 표시자 갱신 위해 매 렌더 재구성)
+            oT1Head.textContent = "";
+            var hr = _el("tr");
+            T1_COLS.forEach(function (c) { hr.appendChild(_buildT1Th(c)); });
+            oT1Head.appendChild(hr);
+            // 바디(필터+정렬 파생 뷰)
             oT1Body.textContent = "";
-            oT1Empty.hidden = aResult.length > 0;
-            aResult.forEach(function (row) {
+            var view = _deriveView(aResult);
+            if (!view.length) {
+                var trN = _el("tr", "u4a-table__nodata");
+                var tdN = _el("td", null, "—"); tdN.colSpan = T1_COLS.length;
+                trN.appendChild(tdN); oT1Body.appendChild(trN);
+                return;
+            }
+            var frag = document.createDocumentFragment();
+            view.forEach(function (row, i) {
                 var tr = _el("tr");
+                if (i % 2 === 1) { tr.setAttribute("data-odd", "true"); }
+                tr.addEventListener("click", function () { _selTr(oT1Body, tr); });
                 tr.addEventListener("dblclick", function () { _pick(row); });
                 T1_COLS.forEach(function (c) {
                     var td = _el("td", c.align === "center" ? "is-center" : null);
                     if (c.action === "run") {
                         td.classList.add("is-action");
-                        td.appendChild(_actBtn("globe", _wsTxt("436"), function (e) { e.stopPropagation(); _doRun(row); }));
+                        td.appendChild(_actBtn("globe", MSG_RUN, function (e) { e.stopPropagation(); _doRun(row); }));
                     } else if (c.action === "disp") {
                         td.classList.add("is-action");
-                        var b = _actBtn("desktop", _wsTxt("564"), function (e) { e.stopPropagation(); _doDisplay(row); });
+                        var b = _actBtn("desktop", MSG_DISP, function (e) { e.stopPropagation(); _doDisplay(row); });
                         if (!bWS10) { b.disabled = true; }
                         td.appendChild(b);
                     } else {
@@ -295,8 +371,72 @@
                     }
                     tr.appendChild(td);
                 });
-                oT1Body.appendChild(tr);
+                frag.appendChild(tr);
             });
+            oT1Body.appendChild(frag);
+        }
+
+        // ── 컬럼 헤더 메뉴(정렬 asc/desc + 필터 input + 초기화) — 공통 .u4a-menu 소비 ──
+        var _oColMenu = null;
+        function _onColMenuOutside(e) { if (_oColMenu && !_oColMenu.contains(e.target)) { _closeColMenu(); } }
+        function _closeColMenu() {
+            if (!_oColMenu) { return; }
+            try { _oColMenu.remove(); } catch (e) { }
+            _oColMenu = null;
+            document.removeEventListener("mousedown", _onColMenuOutside, true);
+        }
+        function _openColMenu(c, th) {
+            _closeColMenu();
+            var m = _el("div", "u4a-menu u4a-colmenu");
+            m.setAttribute("role", "menu");
+            m.addEventListener("click", function (e) { e.stopPropagation(); });
+
+            // 정렬 (오름/내림 — 활성 방향 재클릭 시 해제)
+            function mkSort(sDir, sIcon, sLabel) {
+                var it = _el("div", "u4a-menu__item");
+                it.setAttribute("role", "menuitem");
+                it.innerHTML = _fa(sIcon) + "<span></span>";
+                it.querySelector("span").textContent = sLabel;
+                var bActive = (_sortKey === c.key && _sortDir === sDir);
+                if (bActive) { it.setAttribute("data-active", "true"); }
+                it.addEventListener("click", function () {
+                    if (bActive) { _sortKey = null; _sortDir = null; }
+                    else { _sortKey = c.key; _sortDir = sDir; }
+                    _renderT1(); _closeColMenu();
+                });
+                return it;
+            }
+            m.appendChild(mkSort("asc", "arrow-up", MSG_SORTASC));    // 오름차순 정렬
+            m.appendChild(mkSort("desc", "arrow-down", MSG_SORTDESC)); // 내림차순 정렬
+            m.appendChild(_el("div", "u4a-colmenu__sep"));
+
+            // 필터 (contains, Enter/blur 적용)
+            var fw = _el("div", "u4a-colmenu__filter");
+            var fi = _el("input", "u4a-input");
+            fi.type = "text"; fi.placeholder = MSG_FILTERVAL;
+            fi.value = _colFilters[c.key] || "";
+            function applyF() {
+                var v = fi.value.trim().toLowerCase(), cur = _colFilters[c.key] || "";
+                if (v === cur) { return; }
+                if (v) { _colFilters[c.key] = v; } else { delete _colFilters[c.key]; }
+                _renderT1();
+            }
+            fi.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); applyF(); _closeColMenu(); } });
+            fi.addEventListener("blur", applyF);
+            fw.appendChild(fi);
+            m.appendChild(fw);
+            // (원본 화면과 동일하게 오름/내림 정렬 + 필터 input 만. 필터 해제는 입력값을 비우면 됨.)
+
+            // top-layer 다이얼로그 안에 붙여(모달 위로) th 아래에 위치.
+            oDlg.appendChild(m);
+            var r = th.getBoundingClientRect();
+            m.style.position = "fixed";
+            m.style.top = r.bottom + "px";
+            m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)) + "px";
+            m.style.zIndex = "10";
+            _oColMenu = m;
+            setTimeout(function () { document.addEventListener("mousedown", _onColMenuOutside, true); }, 0);
+            try { fi.focus(); } catch (e) { }
         }
 
         function _doSearch() {
@@ -346,18 +486,24 @@
         var oCollapseBtn = _actBtn("angles-up", "Collapse", function () { _treeExpandAll(false); });
         oCollapseBtn.title = "Collapse";
         var oTSrch = _mkField("", { w: "16rem", ph: _wsTxt("565") }); // 어플리케이션 검색
+        var _filtT = null;
         oTSrch.input.addEventListener("input", function () {
-            sTreeFilter = oTSrch.input.value.trim().toUpperCase();
-            _renderTree();
+            if (_filtT) { clearTimeout(_filtT); }
+            // 디바운스(타이핑 중 매 글자 재렌더 방지) + 다음 프레임 비동기 렌더(입력 먼저 반영 → 멈춤처럼 안 보임).
+            _filtT = setTimeout(function () {
+                sTreeFilter = oTSrch.input.value.trim().toUpperCase();
+                _busy(true);
+                _defer(function () { _renderTree(); _busy(false); });
+            }, 200);
         });
         oTBar.append(oExpandBtn, oCollapseBtn, _el("span", "u4aAppF4TBarSep"), oTSrch.wrap);
 
-        var oT2Wrap = _el("div", "u4aAppF4TblWrap u4aAppF4TreeWrap");
-        var oT2 = _el("table", "u4aAppF4Tbl u4aAppF4Tree");
+        var oT2Wrap = _el("div", "u4aAppF4TblWrap u4a-table-wrap u4aAppF4TreeWrap");
+        var oT2 = _el("table", "u4a-table u4aAppF4Tbl u4aAppF4Tree");
         var oT2Head = _el("thead");
         var oT2Hr = _el("tr");
         T2_COLS.forEach(function (c) {
-            var th = _el("th", c.align === "center" ? "is-center" : null, c.action ? _wsTxt("564") : c.label);
+            var th = _el("th", c.align === "center" ? "is-center" : null, c.action ? MSG_DISP : c.label);
             if (c.w) { th.style.width = c.w; }
             if (c.action) { th.classList.add("is-action"); }
             oT2Hr.appendChild(th);
@@ -381,68 +527,138 @@
             return false;
         }
 
+        // 한 노드 → <tr>(전 컬럼). 토글 클릭은 "전체 재렌더 없이" 해당 서브트리만 증분 삽입/삭제.
+        function _treeRow(node, depth) {
+            var kids = node.APPF4HIER || [];
+            var bHasKids = kids.length > 0;
+            var bExp = sTreeFilter ? true : !!oExpand[node._uid];
+            var tr = _el("tr");
+            tr._node = node; tr.dataset.depth = depth;
+            if (_isRoot(node)) { tr.classList.add("is-root"); }
+            if (bHasKids) { tr.setAttribute("aria-expanded", bExp ? "true" : "false"); }
+            tr.addEventListener("click", function () { _selTr(oT2Body, tr); });
+            tr.addEventListener("dblclick", function () { if (!_isRoot(node)) { _pick(node); } });
+            T2_COLS.forEach(function (c) {
+                var td = _el("td", c.align === "center" ? "is-center" : null);
+                if (c.tree) {
+                    td.classList.add("u4aAppF4TreeCell");
+                    td.style.setProperty("--u4a-tree-depth", String(depth));
+                    var inner = _el("span", "u4aAppF4TreeInner");   // td 는 table-cell 유지(정렬), 안쪽만 flex
+                    var tog = _el("button", "u4a-tree__toggle");
+                    tog.type = "button";
+                    tog.innerHTML = _fa("chevron-right");   // 공통 트리: 우향 셰브론이 aria-expanded 로 회전
+                    if (bHasKids) {
+                        tog.addEventListener("click", function (e) {
+                            e.stopPropagation();
+                            var bNow = oExpand[node._uid] = !oExpand[node._uid];
+                            tr.setAttribute("aria-expanded", bNow ? "true" : "false");
+                            if (!bNow) { _removeDescendants(tr, depth); _restripeTree(); return; }
+                            // 펼침: 들어갈 행이 많으면 busy 켜고 다음 프레임에 비동기로 삽입(멈춤처럼 안 보이게).
+                            if (_countVisibleDesc(node) > TREE_ASYNC_THRESHOLD) {
+                                _busy(true);
+                                _defer(function () { _insertChildren(tr, node, depth); _restripeTree(); _busy(false); });
+                            } else {
+                                _insertChildren(tr, node, depth); _restripeTree();
+                            }
+                        });
+                    } else { tog.classList.add("u4a-tree__toggle--leaf"); }
+                    var lbl = _el("span", "u4aAppF4TreeLabel", _isRoot(node) ? (node.APPNM || "ROOT") : (node.APPNM || ""));
+                    inner.append(tog, lbl);
+                    td.appendChild(inner);
+                } else if (c.action === "disp") {
+                    td.classList.add("is-action");
+                    var b = _actBtn("desktop", MSG_DISP, function (e) { e.stopPropagation(); _doTreeDisplay(node); });
+                    if (!bWS10 || bHasKids || _isRoot(node)) { b.disabled = true; }
+                    td.appendChild(b);
+                } else if (c.link) {
+                    if (_isRoot(node)) { td.textContent = ""; }
+                    else {
+                        var a = _el("a", "u4aAppF4Link", node[c.key] || "");
+                        a.href = "javascript:void(0)";
+                        a.addEventListener("click", function (e) { e.stopPropagation(); _doTreeRun(node); });
+                        td.appendChild(a);
+                    }
+                } else {
+                    var v = node[c.key];
+                    if (c.nz && _isRoot(node)) { v = ""; }
+                    td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
+                }
+                tr.appendChild(td);
+            });
+            return tr;
+        }
+
+        // tr 뒤에 node 의 (펼쳐진) 자손 행들을 삽입. 반환=마지막 삽입 행.
+        function _insertChildren(tr, node, depth) {
+            var kids = node.APPF4HIER || [];
+            var ref = tr;
+            kids.forEach(function (k) {
+                if (sTreeFilter && !_subtreeHasMatch(k)) { return; }
+                var ctr = _treeRow(k, depth + 1);
+                ref.after(ctr); ref = ctr;
+                var bExp = sTreeFilter ? true : !!oExpand[k._uid];
+                if (bExp && (k.APPF4HIER || []).length) { ref = _insertChildren(ctr, k, depth + 1); }
+            });
+            return ref;
+        }
+        // tr 뒤의 depth 보다 깊은(자손) 행 제거.
+        function _removeDescendants(tr, depth) {
+            var n = tr.nextElementSibling;
+            while (n && Number(n.dataset.depth) > depth) { var nx = n.nextElementSibling; n.remove(); n = nx; }
+        }
+        // zebra(data-odd) 재계산 — 증분 삽입/삭제 후 호출.
+        function _restripeTree() {
+            var rows = oT2Body.children;
+            for (var i = 0; i < rows.length; i++) {
+                if (i % 2 === 1) { rows[i].setAttribute("data-odd", "true"); }
+                else { rows[i].removeAttribute("data-odd"); }
+            }
+        }
+
+        // busy 가 "페인트된 다음" 무거운 작업 실행(더블 rAF) → 메인스레드 멈춤처럼 안 보임.
+        function _defer(fn) {
+            requestAnimationFrame(function () { requestAnimationFrame(fn); });
+        }
+        // 펼침 시 새로 그려질 (보이는) 자손 행 수 추정 — DOM 없이 카운트.
+        function _countVisibleDesc(node) {
+            var n = 0;
+            (node.APPF4HIER || []).forEach(function (k) {
+                if (sTreeFilter && !_subtreeHasMatch(k)) { return; }
+                n++;
+                var bExp = sTreeFilter ? true : !!oExpand[k._uid];
+                if (bExp && (k.APPF4HIER || []).length) { n += _countVisibleDesc(k); }
+            });
+            return n;
+        }
+        var TREE_ASYNC_THRESHOLD = 150;   // 이 행수 넘으면 busy + 비동기 삽입
+
+        // 전체 렌더(로드/필터/Expand·Collapse all) — fragment 로 한 번에.
         function _renderTree() {
             oT2Body.textContent = "";
+            var frag = document.createDocumentFragment();
             function walk(node, depth) {
                 if (sTreeFilter && !_isRoot(node) && !_subtreeHasMatch(node)) { return; }
-                if (sTreeFilter && _isRoot(node)) {
-                    // 루트는 하위 매칭 있을 때만 표시(없으면 자식만 그릴 일도 없음)
-                }
-                var kids = node.APPF4HIER || [];
-                var bHasKids = kids.length > 0;
+                frag.appendChild(_treeRow(node, depth));
                 var bExp = sTreeFilter ? true : !!oExpand[node._uid];
-                var tr = _el("tr");
-                if (_isRoot(node)) { tr.classList.add("is-root"); }
-                tr.addEventListener("dblclick", function () { if (!_isRoot(node)) { _pick(node); } });
-                T2_COLS.forEach(function (c) {
-                    var td = _el("td", c.align === "center" ? "is-center" : null);
-                    if (c.tree) {
-                        td.classList.add("u4aAppF4TreeCell");
-                        var ind = _el("span", "u4aAppF4Indent");
-                        ind.style.width = (depth * 1.25) + "rem";
-                        var tog = _el("button", "u4aAppF4Toggle");
-                        tog.type = "button";
-                        if (bHasKids) {
-                            tog.innerHTML = _fa(bExp ? "chevron-down" : "chevron-right");
-                            tog.addEventListener("click", function (e) {
-                                e.stopPropagation();
-                                oExpand[node._uid] = !oExpand[node._uid];
-                                _renderTree();
-                            });
-                        } else { tog.classList.add("is-leaf"); }
-                        var lbl = _el("span", "u4aAppF4TreeLabel", _isRoot(node) ? (node.APPNM || "ROOT") : (node.APPNM || ""));
-                        td.append(ind, tog, lbl);
-                    } else if (c.action === "disp") {
-                        td.classList.add("is-action");
-                        var b = _actBtn("desktop", _wsTxt("564"), function (e) { e.stopPropagation(); _doTreeDisplay(node); });
-                        if (!bWS10 || bHasKids || _isRoot(node)) { b.disabled = true; }
-                        td.appendChild(b);
-                    } else if (c.link) {
-                        if (_isRoot(node)) { td.textContent = ""; }
-                        else {
-                            var a = _el("a", "u4aAppF4Link", node[c.key] || "");
-                            a.href = "javascript:void(0)";
-                            a.addEventListener("click", function (e) { e.stopPropagation(); _doTreeRun(node); });
-                            td.appendChild(a);
-                        }
-                    } else {
-                        var v = node[c.key];
-                        if (c.nz && _isRoot(node)) { v = ""; }
-                        td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
-                    }
-                    tr.appendChild(td);
-                });
-                oT2Body.appendChild(tr);
-                if (bExp && bHasKids) { kids.forEach(function (k) { walk(k, depth + 1); }); }
+                if (bExp && (node.APPF4HIER || []).length) {
+                    node.APPF4HIER.forEach(function (k) { walk(k, depth + 1); });
+                }
             }
             aTreeRoot.forEach(function (n) { walk(n, 0); });
+            oT2Body.appendChild(frag);
+            _restripeTree();
         }
 
         function _treeExpandAll(bExpand) {
-            function walkAll(n) { oExpand[n._uid] = bExpand; (n.APPF4HIER || []).forEach(walkAll); }
-            aTreeRoot.forEach(walkAll);
-            if (!bExpand) { aTreeRoot.forEach(function (n) { oExpand[n._uid] = true; }); } // 루트는 펼친 채
-            _renderTree();
+            // 전체 펼침/접힘은 무거우니 busy 켜고 다음 프레임에(멈춤처럼 안 보이게).
+            _busy(true);
+            _defer(function () {
+                function walkAll(n) { oExpand[n._uid] = bExpand; (n.APPF4HIER || []).forEach(walkAll); }
+                aTreeRoot.forEach(walkAll);
+                if (!bExpand) { aTreeRoot.forEach(function (n) { oExpand[n._uid] = true; }); } // 루트는 펼친 채
+                _renderTree();
+                _busy(false);
+            });
         }
 
         // flat T_APPL → nested(APPF4HIER), 원본 _appF4Tree 규칙.
@@ -453,9 +669,17 @@
                 n._uid = ++_uidSeq; n.APPF4HIER = [];
                 if (!mLookup[n.APPID] || n.PACKG === "" || n.PACKG === "ROOT") { mLookup[n.APPID] = n; }
             });
+            // 부모 연결 — 순환(A→B→A) 방지: par 의 조상 체인에 n 이 있으면 연결 스킵(비순환 보장).
+            function lf_wouldCycle(par, n) {
+                var cur = par, g = 0;
+                while (cur && g++ < 100000) { if (cur === n) { return true; } cur = cur._par; }
+                return false;
+            }
             arr.forEach(function (n) {
                 var par = mLookup[n.PACKG];
-                if (par && par !== n) { par.APPF4HIER.push(n); }
+                if (par && par !== n && !n._par && !lf_wouldCycle(par, n)) {
+                    par.APPF4HIER.push(n); n._par = par;
+                }
             });
             var rootNode = arr.find(function (n) { return n.APPID === "ROOT"; });
             if (rootNode) { return [rootNode]; }
@@ -484,7 +708,7 @@
 
         /* ── 행 액션 ─────────────────────────────────────────────── */
         function _pick(row) {
-            try { if (typeof fnCallback === "function") { fnCallback(row); } } catch (e) { }
+            try { if (typeof _fnCb === "function") { _fnCb(row); } } catch (e) { }
             lf_close();
         }
 
@@ -504,17 +728,26 @@
             });
         }
 
-        // WS10 Display 모드(원본 _navToWS20Display: 입력값 세팅 + Display 발화).
+        // WS10 Display 모드 — 원본 _navToWS20Display 아키텍처 1:1.
+        //   ① 필수 가드(APPID + AppNmInput + Display 핸들러)  ② 다이얼로그 숨김(파괴 X, 모달 해제)
+        //   ③ APPID 세팅 → 조회 발화(ev_AppDisplay 가 값을 동기로 읽음)  ④ 입력 초기화(부수효과 방지)
         function _doDisplay(row) {
             var sAPPID = row && row.APPID;
             if (!sAPPID || !bWS10) { return; }
             var inp = document.getElementById("AppNmInput");
-            if (inp) {
-                inp.value = sAPPID;
-                try { inp.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { }
-            }
-            lf_close();
-            try { if (oAPP.events && oAPP.events.ev_AppDisplay) { oAPP.events.ev_AppDisplay(); } } catch (e) { }
+            var fnDisp = oAPP.events && oAPP.events.ev_AppDisplay;
+            if (!inp || typeof fnDisp !== "function") { return; }   // 원본: AppNmInput + displayBtn 존재 가드
+            var fld = inp.closest ? inp.closest(".u4a-field") : null;
+
+            lf_close();                                             // ② setVisible(false) 대응(숨김·상태보존)
+            oDlg._pendingReshow = true;                             //    WS10 복귀(back) 시 자동 재표시 대상(원본 isOpen&&!visible)
+            // ③ setValue(APPID) — ★ input 이벤트를 쏘지 않는다(쏘면 WS10 attachSuggest 가 추천목록을 연다).
+            //    원본 sap setValue 도 이벤트 미발생. clear-X 노출은 data-filled 로 직접 동기.
+            inp.value = sAPPID;
+            if (fld) { fld.setAttribute("data-filled", "true"); }
+            try { fnDisp(); } catch (e) { }                         //    firePress(displayBtn) → 동기로 값 읽음
+            inp.value = "";                                         // ④ setValue("") — WS10 입력칸에 잔상 방지
+            if (fld) { fld.setAttribute("data-filled", "false"); }
         }
 
         // 트리: 실행 불가(자식 있음/ROOT/APPID 없음) 가드.
@@ -524,11 +757,11 @@
             return true;
         }
         function _doTreeRun(node) {
-            if (!_treeRunnable(node)) { _flash(); _msg("E", _wsTxt("435")); return; }
+            if (!_treeRunnable(node)) { _flash(); _msg("E", MSG_NOAPP); return; }
             _doRun(node);
         }
         function _doTreeDisplay(node) {
-            if (!_treeRunnable(node)) { _flash(); _msg("E", _wsTxt("435")); return; }
+            if (!_treeRunnable(node)) { _flash(); _msg("E", MSG_NOAPP); return; }
             _doDisplay(node);
         }
 
@@ -540,8 +773,26 @@
             try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 720, minH: 420 }); } catch (e) { }
         }
 
+        // 싱글톤 재표시 훅 — 숨겨진 인스턴스를 다음 F4 에 다시 띄울 때 사용(상태 보존, 콜백/검색 갱신).
+        oDlg._appf4Reopen = function (opt, cb) {
+            if (typeof cb === "function") { _fnCb = cb; }
+            oDlg._pendingReshow = false;
+            _selectTab("K1");
+            if (!oDlg.open) { try { oDlg.showModal(); } catch (e) { } }
+            try { oApp.input.focus(); } catch (e) { }
+            if (opt && opt.autoSearch) { _doSearch(); }
+        };
+
+        // WS20→WS10 back 복귀 시 재표시(검색/탭/상태 그대로 — 원본 setVisible(true) 대응).
+        //   호출은 셸 fnOnMoveToPage("WS10") 분기가 _pendingReshow 인 인스턴스에 한해 수행.
+        oDlg._appf4Reshow = function () {
+            oDlg._pendingReshow = false;
+            if (!oDlg.open) { try { oDlg.showModal(); } catch (e) { } }
+        };
+
         document.body.appendChild(oDlg);
         _selectTab("K1");
+        try { _renderT1(); } catch (e) { }   // 초기 헤더(+no-data) 렌더(검색 전에도 컬럼 표시)
         oDlg.showModal();
         try { oApp.input.focus(); } catch (e) { }
 
@@ -578,27 +829,38 @@
             ".u4aAppF4TreeBar{flex:0 0 auto;display:flex;align-items:center;gap:.375rem;}",
             ".u4aAppF4TBarSep{width:.0625rem;height:1.25rem;background:var(--line);margin:0 .25rem;}",
             ".u4aAppF4TblWrap{flex:1 1 auto;min-height:0;overflow:auto;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--surface);}",
-            ".u4aAppF4Tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:.8125rem;}",
-            ".u4aAppF4Tbl th,.u4aAppF4Tbl td{padding:.4375rem .625rem;text-align:left;white-space:nowrap;border-bottom:.0625rem solid var(--line);}",
-            ".u4aAppF4Tbl thead th{position:sticky;top:0;z-index:1;background:var(--surface-raised);color:var(--text-muted);font-weight:700;border-bottom:.0625rem solid var(--divider);}",
-            ".u4aAppF4Tbl th.is-center,.u4aAppF4Tbl td.is-center{text-align:center;}",
-            ".u4aAppF4Tbl th.is-action,.u4aAppF4Tbl td.is-action{text-align:center;width:5rem;}",
-            ".u4aAppF4Tbl tbody tr:hover{background:var(--hover-bg);}",
-            ".u4aAppF4Tbl tbody tr:nth-child(even){background:var(--app-bg);}",
-            ".u4aAppF4Tbl tbody tr:nth-child(even):hover{background:var(--hover-bg);}",
-            ".u4aAppF4ActBtn{width:1.75rem;height:1.75rem;}",
-            ".u4aAppF4ActBtn i{font-size:.8125rem;}",
-            ".u4aAppF4Empty{padding:2rem;text-align:center;color:var(--text-muted);}",
-            ".u4aAppF4TreeCell{display:flex;align-items:center;}",
-            ".u4aAppF4Indent{flex:0 0 auto;}",
-            ".u4aAppF4Toggle{flex:0 0 auto;width:1.25rem;height:1.25rem;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--icon-muted);cursor:pointer;border-radius:var(--radius-sm);}",
-            ".u4aAppF4Toggle:hover{background:var(--hover-bg);color:var(--text);}",
-            ".u4aAppF4Toggle.is-leaf{visibility:hidden;}",
-            ".u4aAppF4Toggle i{font-size:.6875rem;}",
-            ".u4aAppF4TreeLabel{margin-left:.25rem;overflow:hidden;text-overflow:ellipsis;}",
-            ".u4aAppF4Tbl tbody tr.is-root>td{font-weight:700;background:var(--surface-raised);}",
+            /* 공통 .u4a-table(--compact) 소비 — 다열은 컬럼폭 합만큼 늘려 가로 스크롤 */
+            ".u4aAppF4Dlg .u4aAppF4Tbl{width:max-content;min-width:100%;}",
+            ".u4aAppF4Dlg .u4aAppF4Tbl th.is-center,.u4aAppF4Dlg .u4aAppF4Tbl td.is-center{text-align:center;}",
+            ".u4aAppF4Dlg .u4aAppF4Tbl th.is-action,.u4aAppF4Dlg .u4aAppF4Tbl td.is-action{text-align:center;width:4.5rem;padding-left:.25rem;padding-right:.25rem;}",
+            /* 모든 셀 수직 중앙(액션 아이콘이 텍스트와 어긋나지 않게) */
+            ".u4aAppF4Dlg .u4aAppF4Tbl td{vertical-align:middle;}",
+            ".u4aAppF4ActBtn{width:1.5rem;height:1.5rem;}",
+            ".u4aAppF4ActBtn i{font-size:.75rem;}",
+            /* 트리 셀: td 는 table-cell 유지(다른 컬럼과 정렬), 안쪽 래퍼만 flex. 공통 토글 + --u4a-tree-depth 들여쓰기 */
+            ".u4aAppF4TreeCell{overflow:hidden;}",
+            ".u4aAppF4TreeInner{display:flex;align-items:center;gap:.125rem;min-width:0;}",
+            /* ★ 들여쓰기 padding-left 는 공통 .u4a-table td(0,1,2)보다 specificity 를 높여야 안 먹힌다. */
+            ".u4aAppF4Dlg .u4aAppF4Tbl td.u4aAppF4TreeCell{padding-left:calc(.375rem + var(--u4a-tree-depth,0) * var(--u4a-tree-indent-step,1.25rem));}",
+            ".u4aAppF4TreeInner .u4a-tree__toggle i{transition:transform var(--motion) linear;}",
+            ".u4aAppF4Dlg .u4aAppF4Tree tbody tr[aria-expanded=\"true\"] .u4a-tree__toggle i{transform:rotate(90deg);}",
+            ".u4aAppF4TreeLabel{overflow:hidden;text-overflow:ellipsis;}",
             ".u4aAppF4Link{color:var(--link);font-weight:600;cursor:pointer;}",
-            ".u4aAppF4Link:hover{text-decoration:underline;}"
+            ".u4aAppF4Link:hover{text-decoration:underline;}",
+            /* 컬럼 헤더 정렬/필터 메뉴 (ServerList 패턴 — 공통 .u4a-menu 위에 덧입힘) */
+            ".u4aAppF4Tbl thead th.u4a-th--menu{cursor:pointer;}",
+            ".u4aAppF4Tbl thead th.u4a-th--menu:hover{background:var(--hover-bg);color:var(--text);}",
+            ".u4aAppF4Tbl .u4a-th__inner{display:flex;align-items:center;gap:.35rem;min-width:0;}",
+            ".u4aAppF4Tbl .u4a-th__inner--center{justify-content:center;}",
+            ".u4aAppF4Tbl .u4a-th__label{overflow:hidden;text-overflow:ellipsis;}",
+            ".u4aAppF4Tbl .u4a-th__ind{display:inline-flex;align-items:center;gap:.25rem;flex:0 0 auto;color:var(--accent);}",
+            ".u4aAppF4Tbl .u4a-th__ind i{font-size:.8rem;line-height:1;}",
+            ".u4aAppF4Dlg .u4a-colmenu{min-width:13rem;}",
+            ".u4aAppF4Dlg .u4a-colmenu__filter{padding:.25rem;}",
+            ".u4aAppF4Dlg .u4a-colmenu__filter .u4a-input{width:100%;box-sizing:border-box;}",
+            ".u4aAppF4Dlg .u4a-colmenu__sep{height:.0625rem;margin:.25rem 0;background:var(--line);}",
+            ".u4aAppF4Dlg .u4a-colmenu .u4a-menu__item[data-active=\"true\"]{color:var(--accent);font-weight:600;}",
+            ".u4aAppF4Dlg .u4a-colmenu .u4a-menu__item[data-active=\"true\"] i{color:var(--accent);}"
         ].join("\n");
         document.head.appendChild(s);
     }

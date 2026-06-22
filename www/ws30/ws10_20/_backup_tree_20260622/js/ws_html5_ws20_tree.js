@@ -442,136 +442,210 @@
     }
 
     /* ====================================================================
-     * (B) 트리 렌더 — 공통 베이스 트리(U4AUI.createTree) 소비.
-     *   ★ UX 통일: ServerList/USP 와 동일 코어 렌더러(재귀 마크업/토글/들여쓰기/hover/선택).
-     *     WS20 부가기능(체크박스·아이콘·aggregation·+/삭제 액션·컨텍스트메뉴·상태 하이라이트)만
-     *     createTree 훅(slotLead/slotTrailing/icon/onSelect/rowHook)으로 주입.
-     *   ★ 펼침상태는 화면 소유 사이드맵(_expandedMap)이 단일 출처 → isExpanded/onToggle 로 위임
-     *     (툴바 expand/collapse-selected 등 기존 펼침 로직 그대로 동작).
+     * (B) 재귀 트리 렌더
+     *   원본 sap.ui.table.TreeTable rows 바인딩(/zTREE) 을 <ul>/<li> 재귀로 대체.
      * ==================================================================== */
 
-    function _objKey(oNode) { return (oNode && oNode.OBJID != null) ? String(oNode.OBJID) : ""; }
-    function _attrEsc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;"); }
+    /************************************************************************
+     * 트리 1개 노드(<li>) 렌더 — 행(row) + (펼침 시)자식 <ul>
+     ************************************************************************/
+    function _renderNode(oNode, oParentUl, iDepth) {
 
-    var _ws20tree = null;
-    function _ensureWs20Tree() {
-        if (_ws20tree) { return _ws20tree; }
-        if (!(window.U4AUI && U4AUI.createTree)) { return null; }
+        if (!oNode || typeof oNode !== "object") { return; }
 
-        _ws20tree = U4AUI.createTree({
-            roots: _getTreeRoot,
-            children: function (n) { return _hasChild(n) ? n.zTREE : []; },
-            key: _objKey,
-            hasChildren: _hasChild,
-            label: function (n) { return _objKey(n); },
-            tip: function (n) { return _objKey(n); },   // 행 data-tip(이름 .u4a-tree__label 말줄임 시)
+        var sObjid = oNode.OBJID != null ? oNode.OBJID : "";
+        var bHasChild = _hasChild(oNode);
+        var bExpanded = _isExpanded(oNode);
 
-            // UI 아이콘(UICON: raw OS 경로 .gif → file:// URL). icon_visible 일 때만.
-            icon: function (n) {
-                if (!(n && n.icon_visible === true && n.UICON)) { return ""; }
-                var p = n.UICON;
-                var src = /^(file:|https?:|data:|\/)/i.test(p) ? p : ("file:///" + String(p).replace(/\\/g, "/"));
-                return '<img class="u4aWs20TreeIcon" src="' + _attrEsc(src) + '" alt="" onerror="this.style.display=\'none\'">';
-            },
+        var LI = document.createElement("li");
+        LI.className = "u4aWs20TreeNode";
 
-            // 펼침상태 위임 — 화면 사이드맵(_expandedMap)이 단일 출처.
-            isExpanded: _isExpanded,
-            onToggle: function (node, bOpen) {
-                var oMap = _expandedMap();
-                if (bOpen) { oMap[node.OBJID] = true; }
-                else { _collapseSubtree(node, oMap); }   // 접기=자손까지(원본 동작)
-            },
+        // ── 행(row) ── 공통 트리 컴포넌트(shell.css .u4a-tree__row) 소비.
+        //   u4aWs20TreeRow 는 WS20 부가(높이/highlight/조회셀렉터)용으로 병기.
+        var ROW = document.createElement("div");
+        ROW.className = "u4a-tree__row u4aWs20TreeRow";
+        ROW.setAttribute("data-objid", sObjid);
+        // 툴팁: 행 전체(큰 타겟)에 data-tip. 좁아서 이름이 0폭이라 hover 못해도 행 어디서든 동작.
+        //   data-tip-trunc-sel → 이름(.u4aWs20TreeName)이 "실제로 잘렸을 때만" 표시(짧으면 생략).
+        //   위치는 매니저가 커서 옆에 띄움. (native title 제거 — OS 툴팁/오배치 방지)
+        ROW.setAttribute("data-tip", sObjid);
+        ROW.setAttribute("data-tip-trunc-sel", ".u4aWs20TreeName");
+        // 들여쓰기 = 공통 트리 변수(--u4a-tree-depth)로 전달 → padding/좁은패널 step 은 shell.css
+        //   .u4a-tree__row 가 단일 출처로 계산(ServerList/USP 와 동일). WS20 전용 --ws20-depth 제거.
+        ROW.style.setProperty("--u4a-tree-depth", iDepth);
+        if (bHasChild) {
+            ROW.setAttribute("aria-expanded", bExpanded ? "true" : "false"); // 셰브론 회전(공통 CSS)
+        }
 
-            // 체크박스(chk_visible/chk) — 토글↔아이콘 사이(lead 슬롯)
-            slotLead: function (n) {
-                if (n.chk_visible !== true) { return null; }
-                var CHK = document.createElement("input");
-                CHK.type = "checkbox";
-                CHK.className = "u4aWs20TreeChk";
-                CHK.checked = (n.chk === true);
-                CHK.addEventListener("click", function (e) { e.stopPropagation(); });
-                CHK.addEventListener("change", function (e) {
-                    e.stopPropagation();
-                    n.chk = CHK.checked;
-                    _safeCall("designTreeSelChkbox", [n]);   // parent/child 연동(원본)
-                    oAPP.fn.fnRenderDesignTree();
-                });
-                return CHK;
-            },
-
-            // 우측(aggregation 라벨 + 행 액션 +추가/삭제) — 항상 반환(액션 2슬롯 정렬 유지).
-            slotTrailing: function (n) {
-                var RIGHT = document.createElement("span");
-                RIGHT.className = "u4aWs20TreeRowRight";
-
-                if (n.UIATT) {
-                    var AGGR = document.createElement("span");
-                    AGGR.className = "u4aWs20TreeAggr";
-                    if (n.UIATT_ICON) {
-                        var AGI = document.createElement("span");
-                        AGI.className = "u4aWs20TreeAggrIcon";
-                        AGI.textContent = _aggrGlyph(n.UIATT_ICON);
-                        AGGR.appendChild(AGI);
-                    }
-                    var AGT = document.createElement("span");
-                    AGT.textContent = n.UIATT;
-                    AGGR.appendChild(AGT);
-                    RIGHT.appendChild(AGGR);
-                }
-
-                var ACT = document.createElement("span");
-                ACT.className = "u4aWs20TreeActions";
-                // 슬롯1: +(add)
-                if (n.visible_add === true) {
-                    var ADD = document.createElement("button");
-                    ADD.type = "button"; ADD.className = "u4aWs20TreeActBtn add";
-                    ADD.title = _msg("A54", "Insert Element");
-                    ADD.innerHTML = '<i class="fa-solid fa-plus"></i>';
-                    ADD.addEventListener("click", function (e) { e.stopPropagation(); _safeCall("designUIAdd", [n]); });
-                    ACT.appendChild(ADD);
-                } else {
-                    var ADD0 = document.createElement("span"); ADD0.className = "u4aWs20TreeActSlot"; ACT.appendChild(ADD0);
-                }
-                // 슬롯2: 삭제
-                if (n.visible_delete === true) {
-                    var DEL = document.createElement("button");
-                    DEL.type = "button"; DEL.className = "u4aWs20TreeActBtn del";
-                    DEL.title = _msg("A03", "Delete");
-                    DEL.innerHTML = '<i class="fa-solid fa-trash"></i>';
-                    DEL.addEventListener("click", function (e) { e.stopPropagation(); _safeCall("designUIDelete", [n]); });
-                    ACT.appendChild(DEL);
-                } else {
-                    var DEL0 = document.createElement("span"); DEL0.className = "u4aWs20TreeActSlot"; ACT.appendChild(DEL0);
-                }
-                RIGHT.appendChild(ACT);
-                return RIGHT;
-            },
-
-            // 행 클릭 → 선택 (원본 cellClick)
-            onSelect: function (n) { oAPP.fn.fnWs20TreeSelectRow(n); },
-
-            // WS20 확장 표식/동작 — 컨텍스트메뉴·선택강조·상태 하이라이트·식별자
-            rowHook: function (oRow, n) {
-                oRow.classList.add("u4aWs20TreeRow");
-                var sObjid = _objKey(n);
-                oRow.setAttribute("data-objid", sObjid);
-                // 우클릭 컨텍스트 메뉴 (구 callDesignContextMenu)
-                oRow.addEventListener("contextmenu", function (e) {
-                    e.preventDefault(); e.stopPropagation();
-                    _safeCall("setSelectTreeItem", [sObjid]);
-                    if (oAPP.fn.fnWs20ShowTreeContextMenu) { oAPP.fn.fnWs20ShowTreeContextMenu(n, e.clientX, e.clientY); }
-                });
-                // 선택 하이라이트(공통 aria-selected) — WS20 선택표시는 _getSelectedObjid
-                if (_getSelectedObjid() === sObjid) { oRow.setAttribute("aria-selected", "true"); }
-                // 상태 highlight 컬러바(None/Indication02/04/08 + find 03/07)
-                var sHi = n.highlight || "None";
-                if (sHi && sHi !== "None") { oRow.classList.add("hl-" + sHi); }
+        // 우클릭 컨텍스트 메뉴 (구 callDesignContextMenu) — ws_html5_ws20_edit.js
+        ROW.addEventListener("contextmenu", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            _safeCall("setSelectTreeItem", [sObjid]); // 우클릭 노드 선택(원본 동작)
+            if (oAPP.fn.fnWs20ShowTreeContextMenu) {
+                oAPP.fn.fnWs20ShowTreeContextMenu(oNode, e.clientX, e.clientY);
             }
         });
-        _ws20tree.el.classList.add("u4aWs20Tree");
-        return _ws20tree;
-    }
 
+        // 선택 하이라이트 — 공통 컴포넌트 규칙(aria-selected). (WS20 highlight 는 hl-* 별도)
+        if (_getSelectedObjid() === sObjid) {
+            ROW.setAttribute("aria-selected", "true");
+        }
+        // highlight 필드 (None / Indication02 / 04 / 08) → 좌측 컬러바
+        var sHi = oNode.highlight || "None";
+        if (sHi && sHi !== "None") {
+            ROW.classList.add("hl-" + sHi);
+        }
+
+        // 좌측 그룹 (토글 + 체크박스 + 아이콘 + 이름)
+        var LEFT = document.createElement("div");
+        LEFT.className = "u4aWs20TreeRowLeft";
+
+        // 펼침/접기 토글 (자식 있을 때만 ▼/▶, isLeaf면 자리만)
+        // 토글 — 공통 트리 컴포넌트(shell.css .u4a-tree__toggle). 회전은 행의 aria-expanded 가 제어.
+        var TOG = document.createElement("span");
+        TOG.className = "u4a-tree__toggle";
+        TOG.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+        if (bHasChild) {
+            TOG.addEventListener("click", function (e) {
+                e.stopPropagation();
+                _toggleNode(oNode, ROW);
+            });
+        } else {
+            TOG.classList.add("u4a-tree__toggle--leaf");
+        }
+        LEFT.appendChild(TOG);
+
+        // 체크박스 (chk_visible / chk)
+        if (oNode.chk_visible === true) {
+            var CHK = document.createElement("input");
+            CHK.type = "checkbox";
+            CHK.className = "u4aWs20TreeChk";
+            CHK.checked = (oNode.chk === true);
+            CHK.addEventListener("click", function (e) {
+                e.stopPropagation();
+            });
+            CHK.addEventListener("change", function (e) {
+                e.stopPropagation();
+                // 원본 체크박스 select 이벤트와 동일: 모델 노드의 chk 갱신 후
+                // parent/child 연동 처리 위임 (designTreeSelChkbox).
+                oNode.chk = CHK.checked;
+                _safeCall("designTreeSelChkbox", [oNode]);
+                // 모델 chk 연동 결과를 화면에 반영.
+                oAPP.fn.fnRenderDesignTree();
+            });
+            LEFT.appendChild(CHK);
+        }
+
+        // UI 아이콘 (UICON: fnGetSapIconPath 로 만든 .gif 경로, icon_visible)
+        if (oNode.icon_visible === true && oNode.UICON) {
+            var IMG = document.createElement("img");
+            IMG.className = "u4a-tree__icon u4aWs20TreeIcon";
+            // UICON 은 raw OS 경로(...\icons\x.gif) → <img> 로드되도록 file:// URL 변환.
+            IMG.src = (function (p) {
+                if (!p) { return p; }
+                if (/^(file:|https?:|data:|\/)/i.test(p)) { return p; }
+                return "file:///" + String(p).replace(/\\/g, "/");
+            })(oNode.UICON);
+            IMG.alt = "";
+            IMG.onerror = function () { this.style.display = "none"; };
+            LEFT.appendChild(IMG);
+        }
+
+        // UI 이름 (OBJID) — 길면 말줄임(…). 툴팁은 행(ROW)의 data-tip 이 담당(이름이 0폭이어도 hover 가능).
+        var NAME = document.createElement("span");
+        NAME.className = "u4a-tree__label u4aWs20TreeName";
+        NAME.textContent = sObjid;
+        LEFT.appendChild(NAME);
+
+        ROW.appendChild(LEFT);
+
+        // 우측 그룹 (aggregation 라벨 + hover 시 +추가/삭제)
+        var RIGHT = document.createElement("div");
+        RIGHT.className = "u4aWs20TreeRowRight";
+
+        // aggregation 라벨 (UIATT + UIATT_ICON) — 원본 ObjectStatus
+        if (oNode.UIATT) {
+            var AGGR = document.createElement("span");
+            AGGR.className = "u4aWs20TreeAggr";
+            if (oNode.UIATT_ICON) {
+                var AGI = document.createElement("span");
+                AGI.className = "u4aWs20TreeAggrIcon";
+                AGI.textContent = _aggrGlyph(oNode.UIATT_ICON);
+                AGGR.appendChild(AGI);
+            }
+            var AGT = document.createElement("span");
+            AGT.textContent = oNode.UIATT;
+            AGGR.appendChild(AGT);
+            RIGHT.appendChild(AGGR);
+        }
+
+        // 행 액션 (+추가 / 삭제) — 오른쪽 "고정 2슬롯 컬럼".
+        //   슬롯1 = +(add), 슬롯2 = 삭제(delete). 버튼이 없는 노드도 빈 슬롯으로 자리를 유지해
+        //   모든 행에서 + 끼리, 삭제 끼리 세로 정렬되게 한다(원본 sap.ui.table.Column 정렬 효과).
+        var ACT = document.createElement("span");
+        ACT.className = "u4aWs20TreeActions";
+
+        // 슬롯1: + (add)
+        if (oNode.visible_add === true) {
+            var ADD = document.createElement("button");
+            ADD.type = "button";
+            ADD.className = "u4aWs20TreeActBtn add";
+            ADD.title = _msg("A54", "Insert Element");
+            ADD.innerHTML = '<i class="fa-solid fa-plus"></i>';
+            ADD.addEventListener("click", function (e) {
+                e.stopPropagation();
+                _safeCall("designUIAdd", [oNode]); // 원본 add Icon press [가드]
+            });
+            ACT.appendChild(ADD);
+        } else {
+            var ADD0 = document.createElement("span");
+            ADD0.className = "u4aWs20TreeActSlot";
+            ACT.appendChild(ADD0);
+        }
+
+        // 슬롯2: 삭제 (delete)
+        if (oNode.visible_delete === true) {
+            var DEL = document.createElement("button");
+            DEL.type = "button";
+            DEL.className = "u4aWs20TreeActBtn del";
+            DEL.title = _msg("A03", "Delete");
+            DEL.innerHTML = '<i class="fa-solid fa-trash"></i>';
+            DEL.addEventListener("click", function (e) {
+                e.stopPropagation();
+                _safeCall("designUIDelete", [oNode]); // 원본 delete Icon press [가드]
+            });
+            ACT.appendChild(DEL);
+        } else {
+            var DEL0 = document.createElement("span");
+            DEL0.className = "u4aWs20TreeActSlot";
+            ACT.appendChild(DEL0);
+        }
+
+        RIGHT.appendChild(ACT);
+        ROW.appendChild(RIGHT);
+
+        // 행 클릭 → 선택 (원본 cellClick 핸들러 로직)
+        ROW.addEventListener("click", function () {
+            oAPP.fn.fnWs20TreeSelectRow(oNode);
+        });
+
+        LI.appendChild(ROW);
+
+        // 자식 — 항상 렌더 후 펼침상태로 표시/숨김. (ServerList 컨셉: 토글=aria-expanded+ul.hidden
+        //   → 셰브론 회전 애니메이션 유지. 펼칠 때만 렌더하면 전체 재렌더라 애니메이션이 안 됨)
+        if (bHasChild) {
+            var UL = document.createElement("ul");
+            UL.className = "u4aWs20TreeChildren";
+            UL.hidden = !bExpanded;
+            for (var i = 0, l = oNode.zTREE.length; i < l; i++) {
+                _renderNode(oNode.zTREE[i], UL, iDepth + 1);
+            }
+            LI.appendChild(UL);
+        }
+
+        oParentUl.appendChild(LI);
+    }
 
     /************************************************************************
      * 펼침/접힘 토글 (UI 전용 사이드맵만 변경 → 재렌더).
@@ -587,6 +661,28 @@
         }
     }
 
+    function _toggleNode(oNode, oRow) {
+        var sKey = oNode && oNode.OBJID;
+        if (sKey == null) { return; }
+        var bExpand = !_isExpanded(oNode);
+        var oMap = _expandedMap();
+
+        if (!bExpand) {
+            // 접을 때: 자손 펼침 상태까지 모두 접고(원본 동작) 재렌더 → 재펼침 시 자식들이 접힌 채 보임.
+            _collapseSubtree(oNode, oMap);   // oNode 포함 자손 전부 false
+            oAPP.fn.fnRenderDesignTree();
+            return;
+        }
+
+        // 펼칠 때: in-place(자식 ul 표시) — 자식들은 자기 map 상태(접힘)대로 이미 렌더돼 있음.
+        oMap[sKey] = true;
+        if (oRow && oRow.parentNode) {
+            oRow.setAttribute("aria-expanded", "true");
+            var oChildUl = oRow.parentNode.querySelector(":scope > ul.u4aWs20TreeChildren");
+            if (oChildUl) { oChildUl.hidden = false; return; }
+        }
+        oAPP.fn.fnRenderDesignTree(); // 폴백(행/자식 ul 못 찾으면 전체 재렌더)
+    }
 
     /************************************************************************
      * [PUBLIC] 수동 렌더 — 원본 TreeTable rows 바인딩(/zTREE) 대체.
@@ -630,29 +726,26 @@
         try { if (_treeTbOvf) { _treeTbOvf.reflow(); } } catch (e) { }
 
         var oScrollArea = oWrap.querySelector(".u4aWs20TreeScroll");
+        oScrollArea.innerHTML = "";
 
         var aRoot = _getTreeRoot();
 
         // 데이터 없음 → 빈 트리(안내 라벨). 실제 데이터는 로그인 후 앱 오픈 시 채워짐.
         if (!aRoot || aRoot.length === 0) {
-            oScrollArea.innerHTML = "";
             var EMPTY = document.createElement("div");
             EMPTY.className = "u4aWs20TreeEmpty";
             // 속성 패널과 동일한 "데이터 없음"(312) 안내 — 로그인/앱오픈 전 빈 패널이 텅 비어 보이지 않게.
             EMPTY.textContent = _wsMsg("312");
             oScrollArea.appendChild(EMPTY);
-            try { if (oAPP.fn.fnWs20UpdateUndoBtns) { oAPP.fn.fnWs20UpdateUndoBtns(); } } catch (e) { }
             return;
         }
 
-        // 공통 베이스 트리(U4AUI.createTree) 컨트롤러 — 1회 마운트 후 .render() 재사용.
-        var oTree = _ensureWs20Tree();
-        if (!oTree) { return; }
-        if (oTree.el.parentNode !== oScrollArea) {
-            oScrollArea.innerHTML = "";
-            oScrollArea.appendChild(oTree.el);
+        var UL = document.createElement("ul");
+        UL.className = "u4aWs20Tree u4a-tree"; // 공통 트리 컨테이너(shell.css) 병기
+        for (var i = 0, l = aRoot.length; i < l; i++) {
+            _renderNode(aRoot[i], UL, 0);
         }
-        oTree.render();
+        oScrollArea.appendChild(UL);
 
         // undo/redo 버튼 활성상태 동기화 (버튼이 매 렌더 재생성되므로)
         try { if (oAPP.fn.fnWs20UpdateUndoBtns) { oAPP.fn.fnWs20UpdateUndoBtns(); } } catch (e) { }

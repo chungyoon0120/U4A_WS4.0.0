@@ -495,11 +495,14 @@
         };
 
         // pick(더블클릭) 시 선택 APPID 를 입력값으로 반영(원본: fnSetModelProperty("/WS10/APPID")).
+        //   ★ input 이벤트를 쏘지 않는다 — 쏘면 WS10 attachSuggest 가 추천목록을 연다(원본 setValue 도 이벤트 X).
+        //   clear-X 노출은 감싼 .u4a-field 의 data-filled 로 직접 동기.
         function fnAppF4DataCallback(oAppData) {
             var i = document.getElementById("AppNmInput");
             if (i && oAppData && oAppData.APPID != null) {
                 i.value = oAppData.APPID;
-                try { i.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { }
+                var fld = i.closest ? i.closest(".u4a-field") : null;
+                if (fld) { fld.setAttribute("data-filled", i.value ? "true" : "false"); }
             }
         }
 
@@ -1002,6 +1005,18 @@
         //     (ws_html5_ws20_prev.js _ws20ReleasePrevBusy) / 실패·watchdog 에서 수행.
         if (sPgNm !== "WS20") {
             try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+        }
+
+        // WS10 복귀(back) 시: 앱조회(display)로 숨겨둔 App Search 팝업을 다시 표시.
+        //   (원본 ws_fn_01.js fnOnMoveToPage WS10 분기: AppF4DialogWS10 가 isOpen && !visible 이면 setVisible(true).
+        //    HTML5 는 _pendingReshow 플래그로 "조회로 숨김"만 구분 — 사용자가 X/Close 한 건 재표시하지 않음.)
+        if (sPgNm === "WS10") {
+            try {
+                var oF4Dlg = document.getElementById("u4aAppF4Dlg");
+                if (oF4Dlg && oF4Dlg._pendingReshow && !oF4Dlg.open && typeof oF4Dlg._appf4Reshow === "function") {
+                    oF4Dlg._appf4Reshow();
+                }
+            } catch (e) { }
         }
 
     }; // end of oAPP.fn.fnOnMoveToPage

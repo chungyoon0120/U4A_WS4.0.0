@@ -44,11 +44,13 @@
             min-height: 100%;
         }
 
-        /* ── 브랜드 헤더 ── */
+        /* ── 브랜드 헤더 (타이틀 성격 → 아래 본문과 구분선으로 분리) ── */
         .about__brand {
             display: flex;
             align-items: center;
             gap: 0.875rem;
+            padding-bottom: 0.875rem;
+            border-bottom: 0.0625rem solid var(--line);
         }
         .about__logo {
             /* logo.png(65×76): 마크=행 1~62, 빈칸 63~66, "anUI5 for ABAP" 태그라인=행 67~73.
@@ -86,12 +88,17 @@
             opacity: 0.95;
         }
 
-        /* ── 섹션 카드 ── */
+        /* ── 섹션 (플랫: 박스/테두리 없이 제목 + 구분선으로만 구획) ── */
         .about__card {
-            background: var(--surface-raised);
-            border: 0.0625rem solid var(--line);
-            border-radius: var(--radius);
-            padding: 0.875rem 1rem;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            padding: 0.25rem 0.125rem 0;
+        }
+        /* 섹션과 섹션 사이만 얇은 구분선 */
+        .about__card + .about__card {
+            border-top: 0.0625rem solid var(--line);
+            padding-top: 0.875rem;
         }
         .about__h {
             display: flex;

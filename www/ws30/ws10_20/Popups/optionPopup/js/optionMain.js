@@ -34,6 +34,7 @@
     // 창 준비 완료 — opener 가 opacity:0/show:false 로 만들었으니 보이게 하고, 메인 busy 해제.
     //   (원본 optionS.html: CURRWIN.show() + if-send-action-<BROWSKEY> SETBUSYLOCK ISBUSY:"")
     var _bReadySent = false;
+    var _bEscBound = false;
     function _ready() {
         if (_bReadySent) { return; }
         _bReadySent = true;
@@ -48,6 +49,50 @@
         try { return (WSMSG && WSMSG.fnGetMsgClsText(sCls, sCode, "", "", "", "")) || ""; } catch (e) { return ""; }
     }
     var _fa = function (s) { return '<i class="fa-solid fa-' + s + '"></i>'; };
+    function _toFileUrl(sPath) { return encodeURI("file:///" + String(sPath).replace(/\\/g, "/")); }
+
+    // 공통 스플리터 드래그(16번 §4.3) — 바 양옆 인접 두 패널만 재분배. 사이드바(고정 패널)를 px 로
+    //   바꾸고 콘텐츠(마지막 1 1 auto)가 잔여를 채운다. 마지막 패널 최소폭 보호 + 창 축소 재클램프.
+    //   ⚠️ _build() 가 (DOMContentLoaded 폴백 + IPC) 두 번 돌며 innerHTML 을 다시 그려 바 요소가
+    //   새로 생긴다. 그래서 mousedown 은 "매 빌드마다 현재 바"에 재배선하고(_dragState 갱신),
+    //   document/window 리스너만 1회 바인딩한다(중복/스테일 리스너 방지).
+    var _SPLIT_MIN = 120; // §4.3 min-width 폴백
+    var _dragState = { active: false, startX: 0, startW: 0, pane: null, bar: null, split: null };
+    var _splitDocBound = false;
+    function _splitMaxW() {
+        if (!_dragState.split || !_dragState.bar) { return 0; }
+        return _dragState.split.getBoundingClientRect().width - _dragState.bar.offsetWidth - _SPLIT_MIN;
+    }
+    function _attachSplitterDrag(oBar, oPane, oSplit) {
+        if (!oBar || !oPane || !oSplit) { return; }
+        // 매 빌드 최신 요소로 갱신 (리스너는 _dragState 를 통해 항상 현재 바/패널 참조)
+        _dragState.pane = oPane; _dragState.bar = oBar; _dragState.split = oSplit;
+        oBar.addEventListener("mousedown", function (e) {
+            _dragState.active = true;
+            _dragState.startX = e.clientX;
+            _dragState.startW = oPane.getBoundingClientRect().width;
+            document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none";
+            e.preventDefault();
+        });
+        if (_splitDocBound) { return; }
+        _splitDocBound = true;
+        document.addEventListener("mousemove", function (e) {
+            if (!_dragState.active) { return; }
+            var w = _dragState.startW + (e.clientX - _dragState.startX), iMax = _splitMaxW();
+            if (w < _SPLIT_MIN) { w = _SPLIT_MIN; }
+            if (iMax > _SPLIT_MIN && w > iMax) { w = iMax; }
+            _dragState.pane.style.flex = "0 0 " + w + "px";
+        });
+        document.addEventListener("mouseup", function () {
+            if (!_dragState.active) { return; }
+            _dragState.active = false; document.body.style.cursor = ""; document.body.style.userSelect = "";
+        });
+        window.addEventListener("resize", function () {
+            if (!_dragState.pane) { return; }
+            var iMax = _splitMaxW(), w = _dragState.pane.getBoundingClientRect().width;
+            if (iMax > _SPLIT_MIN && w > iMax) { _dragState.pane.style.flex = "0 0 " + iMax + "px"; }
+        });
+    }
 
     var IF_DATA = null;
     var sCurTheme = "horizon_white";
@@ -74,6 +119,9 @@
     }
     function _applyTheme(sKey) {
         try { if (window.U4ATheme) { window.U4ATheme.apply(sKey); } } catch (e) { }
+        // 첫 페인트용 --boot-bg(BGCOL) 해제 → 이후 body 배경이 활성 테마 --app-bg 를 따라
+        //   미리보기(테마 클릭)마다 갱신된다. (테마 CSS 는 did-finish-load 시점에 이미 로드됨)
+        try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { }
         sCurTheme = sKey;
     }
 
@@ -83,9 +131,23 @@
         var s = document.createElement("style");
         s.id = "u4aOptStyle";
         s.textContent = `
-        .u4aOptCard { cursor: pointer; }
-        .u4aOptCard.selected { border-color: var(--bs-primary, var(--accent)) !important;
-            box-shadow: inset 0 0 0 0.0625rem var(--bs-primary, var(--accent)); }
+        /* 마스터-디테일 영역을 표면색(--surface)으로 통일 → 공통 스플릿바(--surface)가 패널과
+           같은 면이 되어 흰 줄로 튀지 않고 경계선+그립만 보이는 깔끔한 분할이 된다.
+           (콘텐츠 패널이 --app-bg(테마 페이지색)면 바(--surface)와 대비돼 흰 막대처럼 보였음) */
+        #optSplit, #optNav, #optCont { background: var(--surface); }
+        /* 컨테이너(패널) 폭 기준 자동 reflow — 좁아지면 열 줄고 결국 1열로 쌓임(뷰포트 무관).
+           min(11rem,100%) 로 패널이 11rem 보다 좁아도 카드가 넘치지 않게 한다(Chromium93 min() OK). */
+        .u4aOptGrid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr)); align-content: start; }
+        /* overflow:hidden → 카드 둥근 모서리가 상단 컬러 바(.u4aOptPrev/.bar)의 사각 모서리를
+           깔끔히 클립(삐져나옴 방지). 선택/hover 의 box-shadow 링은 보더박스 바깥이라 안 잘림. */
+        .u4aOptCard { cursor: pointer; overflow: hidden; transition: box-shadow .12s linear, border-color .12s linear; }
+        /* hover 와 선택을 같은 계열로 단계화(점프 방지): 둘 다 accent 테두리 + 같은 옅은 후광을
+           공유하고, "선택"만 안쪽에 솔리드 accent 링을 더한다(미리보기 → 확정). */
+        .u4aOptCard:hover { border-color: var(--accent) !important;
+            box-shadow: 0 0 0 0.25rem var(--selected-bg); }
+        .u4aOptCard.selected { border-color: var(--accent) !important;
+            box-shadow: 0 0 0 0.125rem var(--accent), 0 0 0 0.25rem var(--selected-bg); }
+        .u4aOptCard .chk { color: var(--accent) !important; }
         .u4aOptPrev { position: relative; height: 3rem; border-bottom: 0.0625rem solid var(--bs-border-color, var(--line)); }
         .u4aOptPrev .bar { position: absolute; left: 0; right: 0; top: 0; height: 0.875rem; }
         .u4aOptPrev .dot { position: absolute; right: 0.5rem; bottom: 0.5rem; width: 0.875rem; height: 0.875rem; border-radius: 50%; }
@@ -98,19 +160,20 @@
         var html =
             '<div class="d-flex align-items-center gap-2 mb-3 fw-semibold">' + _fa("palette") +
             '<span>' + (_txt("/U4A/CL_WS_COMMON", "B01") || "Theme") + '</span></div>' +
-            '<div class="row g-3">';
+            // 뷰포트 기준 Bootstrap col-* 대신 컨테이너 폭 기준 auto-fill 그리드 → 패널이 좁아지면
+            //   자동으로 열 수가 줄어 1열까지 쌓인다(스플리터 드래그/창 리사이즈에 진짜 반응형).
+            //   Chromium 93 은 컨테이너 쿼리 미지원이라 min()+auto-fill 로 처리.
+            '<div class="u4aOptGrid">';
         for (var i = 0; i < THEMES.length; i++) {
             var t = THEMES[i];
             html +=
-                '<div class="col-6 col-md-4 col-lg-3">' +
-                  '<div class="card h-100 u4aOptCard" data-key="' + t.key + '" title="' + t.text + '">' +
-                    '<div class="u4aOptPrev" style="background:' + t.bg + ';">' +
-                      '<div class="bar" style="background:' + t.accent + ';"></div>' +
-                      '<div class="dot" style="background:' + t.accent + ';"></div>' +
-                    '</div>' +
-                    '<div class="card-body p-2 d-flex justify-content-between align-items-center">' +
-                      '<span class="small">' + t.text + '</span><span class="chk text-primary"></span>' +
-                    '</div>' +
+                '<div class="card u4aOptCard" data-key="' + t.key + '" title="' + t.text + '">' +
+                  '<div class="u4aOptPrev" style="background:' + t.bg + ';">' +
+                    '<div class="bar" style="background:' + t.accent + ';"></div>' +
+                    '<div class="dot" style="background:' + t.accent + ';"></div>' +
+                  '</div>' +
+                  '<div class="card-body p-2 d-flex justify-content-between align-items-center">' +
+                    '<span class="small text-truncate">' + t.text + '</span><span class="chk text-primary ms-1 flex-shrink-0"></span>' +
                   '</div>' +
                 '</div>';
         }
@@ -147,6 +210,24 @@
         try { CURRWIN.close(); } catch (e) { try { CURRWIN.destroy(); } catch (e2) { } }
     }
 
+    // 공통 토스트(shell.css .u4a-toast — ServerList 와 동일 패턴, bootstrap-skin 이 색 입힘)
+    var _iToastTimer = null;
+    function _toast(sMsg) {
+        if (!sMsg) { return; }
+        var oToast = document.getElementById("u4aOptToast");
+        if (!oToast) {
+            oToast = document.createElement("div");
+            oToast.id = "u4aOptToast";
+            oToast.className = "u4a-toast";
+            oToast.setAttribute("role", "alert");
+            document.body.appendChild(oToast);
+        }
+        oToast.textContent = sMsg;
+        oToast.dataset.show = "true";
+        clearTimeout(_iToastTimer);
+        _iToastTimer = setTimeout(function () { oToast.dataset.show = "false"; }, 3000);
+    }
+
     function _apply() {
         var sKey = sCurTheme;
         var sBg = "";
@@ -159,8 +240,28 @@
             FS.writeFileSync(PATH.join(sDir, SYSID + ".json"), JSON.stringify(sData), "utf-8");
         } catch (e) { }
         try { IPC.send("if-p13n-themeChange-" + SYSID, sData); } catch (e) { }
+
+        // ★ 열려 있는 모든 창의 "네이티브 BrowserWindow 배경색"도 새 테마 배경으로 일괄 적용한다.
+        //   내용(DOM) 재테마는 각 창의 if-p13n-themeChange 핸들러가 하지만, 네이티브 창 배경은
+        //   창 생성 시 고정(opener 의 backgroundColor)이라 안 바꾸면 화면 이동 중 옛 배경(흰색)이 샌다.
+        //   → 그 테마로 "처음 실행한 창"과 동일한 네이티브 배경 상태가 되도록 전 창을 맞춘다.
+        //   (대부분의 별도 팝업 핸들러는 setBackgroundColor 를 안 하므로 여기서 중앙 처리.)
+        if (sData.BGCOL) {
+            try {
+                REMOTE.BrowserWindow.getAllWindows().forEach(function (w) {
+                    try { if (w && !w.isDestroyed() && w.setBackgroundColor) { w.setBackgroundColor(sData.BGCOL); } } catch (e2) { }
+                });
+            } catch (e) { }
+        }
+
+        // 적용 후 origin 갱신 → 이후 Close 가 방금 적용한 테마를 되돌리지 않게.
         sOrigTheme = sKey;
-        _close(false);
+        // ★ 적용만 하고 창은 닫지 않는다. 저장 완료 메시지(원본 ThemeSetting 과 동일: MSG_WS 330
+        //    "&1 has been saved", &1 = B52(Options))만 토스트로 표시.
+        var sB52 = _txt("/U4A/CL_WS_COMMON", "B52") || "Options";
+        var sMsg = "";
+        try { sMsg = (WSMSG && WSMSG.fnGetMsgClsText("/U4A/MSG_WS", "330", sB52, "", "", "")) || ""; } catch (e) { }
+        _toast(sMsg || sB52);
     }
 
     function _build() {
@@ -174,29 +275,60 @@
                 _fa(sec.icon) + '<span>' + (_txt("/U4A/CL_WS_COMMON", sec.labelKey) || sec.code) + '</span></button>';
         });
 
+        var sTitle = _txt("/U4A/CL_WS_COMMON", "B52") || "Options";
+        var sLogo = "";
+        try { sLogo = _toFileUrl(PATHINFO.WS_LOGO); } catch (e) { }
+
         root.innerHTML =
             '<div class="d-flex flex-column" style="height:100vh">' +
-              // 헤더
-              '<div class="d-flex align-items-center gap-2 px-3 border-bottom fw-semibold" style="height:2.75rem">' +
-                '<i class="fa-solid fa-gear text-primary"></i><span>' + (_txt("/U4A/CL_WS_COMMON", "B52") || "Options") + '</span>' +
+              // 창 크롬 — 공통 .u4a-titlebar (ServerList 와 동일: 로고+제목+min/max/close,
+              //   shell.css 가 -webkit-app-region:drag 로 창 이동 처리). frameless 창의 헤더.
+              '<header class="u4a-titlebar">' +
+                '<img class="u4a-titlebar__logo" src="' + sLogo + '" alt="U4A" onerror="this.style.visibility=\'hidden\'">' +
+                '<span class="u4a-titlebar__title">' + sTitle + '</span>' +
+                '<div class="u4a-titlebar__spacer"></div>' +
+                '<button type="button" class="u4a-winbtn" id="optWinMin" title="Minimize">' + _fa("window-minimize") + '</button>' +
+                '<button type="button" class="u4a-winbtn" id="optWinMax" title="Maximize">' + _fa("window-maximize") + '</button>' +
+                '<button type="button" class="u4a-winbtn u4a-winbtn--close" id="optWinClose" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
+              '</header>' +
+              // 마스터-디테일 — 공통 스플리터(16번 §4: shell.css .u4a-splitter* 골격+그립 소비).
+              //   사이드바=고정 basis 패널, 콘텐츠=잔여(1 1 auto) 마지막 패널, 가운데 공통 그립 바.
+              '<div class="u4a-splitter flex-grow-1" id="optSplit">' +
+                '<div class="u4a-splitter__pane list-group list-group-flush" id="optNav" style="flex:0 0 13rem">' + sNav + '</div>' +
+                '<div class="u4a-splitter__bar" id="optSplitBar" role="separator" aria-orientation="vertical"></div>' +
+                '<div class="u4a-splitter__pane p-3" id="optCont" style="flex:1 1 auto"></div>' +
               '</div>' +
-              // 마스터-디테일
-              '<div class="d-flex flex-grow-1" style="min-height:0">' +
-                '<div class="list-group list-group-flush border-end overflow-auto" style="flex:0 0 13rem">' + sNav + '</div>' +
-                '<div class="flex-grow-1 overflow-auto p-3" id="optCont"></div>' +
-              '</div>' +
-              // 푸터
-              '<div class="d-flex justify-content-end gap-2 px-3 py-2 border-top">' +
-                '<button type="button" class="btn btn-primary btn-sm" id="optApply">' + _fa("check") + ' ' + (_txt("/U4A/CL_WS_COMMON", "C63") || "Apply") + '</button>' +
-                '<button type="button" class="btn btn-outline-secondary btn-sm" id="optClose">' + _fa("xmark") + ' ' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '</button>' +
+              // 푸터 — 공통 .modal-footer(48px·토큰 보더, bootstrap-skin 단일출처) + 프로젝트 버튼.
+              //   다른 모든 팝업과 동일: 강조=u4a-btn--emphasized / 닫기=u4a-btn--negative(Reject 느낌)
+              '<div class="modal-footer">' +
+                '<button type="button" class="u4a-btn u4a-btn--emphasized" id="optApply">' + _fa("check") + ' ' + (_txt("/U4A/CL_WS_COMMON", "C63") || "Apply") + '</button>' +
+                '<button type="button" class="u4a-btn u4a-btn--negative" id="optClose">' + _fa("xmark") + ' ' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '</button>' +
               '</div>' +
             '</div>';
+
+        // 창 제어 버튼 (frameless — 공통 .u4a-winbtn)
+        document.getElementById("optWinMin").addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { } });
+        document.getElementById("optWinMax").addEventListener("click", function () {
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+        });
+        document.getElementById("optWinClose").addEventListener("click", function () { _close(true); });
+
+        // 공통 스플리터 드래그 배선(사이드바 폭 조절)
+        _attachSplitterDrag(document.getElementById("optSplitBar"), document.getElementById("optNav"), document.getElementById("optSplit"));
 
         root.querySelectorAll("[data-code]").forEach(function (n) {
             n.addEventListener("click", function () { _selectSection(n.getAttribute("data-code")); });
         });
         document.getElementById("optApply").addEventListener("click", _apply);
         document.getElementById("optClose").addEventListener("click", function () { _close(true); });
+
+        // Esc = 취소(닫기) — 팝업 공통 UX. event.repeat 가드(키 꾹 누름 중복발화 방지).
+        if (!_bEscBound) {
+            _bEscBound = true;
+            document.addEventListener("keydown", function (e) {
+                if (e.key === "Escape" && !e.repeat) { _close(true); }
+            });
+        }
 
         _selectSection(SECTIONS[0] && SECTIONS[0].code);
 

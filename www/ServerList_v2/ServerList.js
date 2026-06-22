@@ -235,7 +235,7 @@
     /********************************************************************
      * Busy / Toast / MessageBox (UI5 BusyIndicator/Toast/MessageBox 대체)
      ********************************************************************/
-    oAPP.fn.setBusyIndicator = function (sIsBusy) {
+    oAPP.fn.setBusyIndicator = function (sIsBusy, sMsg) {
         const oDom = document.getElementById("u4aWsBusyIndicator");
         if (!oDom) {
             return;
@@ -243,10 +243,22 @@
         const bBusy = (sIsBusy === "X");
         document.body.style.pointerEvents = bBusy ? "none" : "";
         oDom.dataset.busy = bBusy ? "true" : "false";
+
+        // 선택적 안내 문구(예: 종료 중) — busy 카드 하단에 표시. 비면 :empty 로 자동 숨김.
+        const oCard = oDom.querySelector(".u4a-busy__card");
+        if (oCard) {
+            let oLabel = oCard.querySelector(".u4a-busy__label");
+            if (!oLabel) {
+                oLabel = document.createElement("div");
+                oLabel.className = "u4a-busy__label";
+                oCard.appendChild(oLabel);
+            }
+            oLabel.textContent = (bBusy && sMsg) ? sMsg : "";
+        }
     };
 
-    oAPP.setBusy = function (bIsBusy) {
-        oAPP.fn.setBusyIndicator(bIsBusy ? "X" : "");
+    oAPP.setBusy = function (bIsBusy, sMsg) {
+        oAPP.fn.setBusyIndicator(bIsBusy ? "X" : "", sMsg);
     };
 
     let _iToastTimer;
@@ -485,7 +497,9 @@
             // 화면 라벨(MSGNR_MAP) — 신규 키. DB(ZMSG_WS_COMMON_001) 적재 후 출력됨
             "913", "914", "915", "916", "917", "918", "919", "920", "921", "922", "923",
             "924", "925", "926", "927", "928", "929", "930", "931", "932", "933", "934",
-            "935", "936", "937", "938", "939", "940", "941", "942", "943", "944", "945", "946"];
+            "935", "936", "937", "938", "939", "940", "941", "942", "943", "944", "945", "946",
+            // busy 안내 문구(종료 중)
+            "951"];
         return aNr.map(nr => ({ ARBGB: "ZMSG_WS_COMMON_001", MSGNR: nr }));
     }
 
@@ -1739,7 +1753,9 @@
         hintMove: "937", hintClear: "938", today: "939", yesterday: "940",
         recentEmpty: "941",
         // 다이얼로그/폼 인라인 라벨
-        protocol: "942", hostShort: "943", useInternal: "944", skipCertificate: "945"
+        protocol: "942", hostShort: "943", useInternal: "944", skipCertificate: "945",
+        // busy 안내 문구
+        exiting: "951"
     };
     function L(sKey) {
         const sNr = MSGNR_MAP[sKey];
@@ -2038,7 +2054,7 @@
             { key: "name", label: L("serverName"), sortable: true, cls: "u4a-c-name" },
             { key: "systemid", label: L("sid"), sortable: true, cls: "u4a-c-sid", width: "5rem" },
             { key: "host", label: L("host"), sortable: true, cls: "u4a-c-host", width: "9rem" },
-            { key: "insno", label: L("sno"), sortable: true, align: "center", cls: "u4a-c-sno", width: "4rem" },
+            { key: "insno", label: L("sno"), sortable: true, align: "center", cls: "u4a-c-sno", width: "5.25rem" },
             // 폭: 영문 라벨("Settings")이 셀 좌우 패딩(0.75rem) 안에 들어가도록 확보.
             //  (구 3.75rem 는 아이콘 폭 기준이라 영문 헤더가 셀을 넘쳐 창 우측에 붙어 잘렸음)
             { key: "__action", label: L("settingsCol"), sortable: false, align: "center", cls: "u4a-c-action", width: "5.5rem" }
@@ -2050,6 +2066,8 @@
         for (const oCol of aCols) {
             const oTh = _el("th", oCol.cls);
             if (oCol.width) { oTh.style.width = oCol.width; }
+            // 라벨이 컬럼 폭보다 길어 말줄임될 때 전체 텍스트를 호버로 확인 가능하게
+            oTh.title = oCol.label;
 
             // 라벨 + 표시자(정렬 caret / 필터 아이콘)를 한 줄 flex 로 배치
             //  → 구: 라벨 뒤에 caret 을 그냥 붙여 컬럼 경계에 끼이던 문제 해소
@@ -3375,6 +3393,10 @@
 
         oAPP.fn.fnShowMessageBox("C", sMsg, (sAction) => {
             if (sAction !== "OK") { return; }
+
+            // 종료 진행 동안 busy 오버레이 + 안내 문구로 사용자 인지 ("종료 중…")
+            const sExiting = L("exiting");
+            oAPP.setBusy(true, sExiting ? sExiting + "…" : "");
 
             oAPP.fn.fnProgramShuttDown(); // 전체 자식 프로그램 종료 요청
 

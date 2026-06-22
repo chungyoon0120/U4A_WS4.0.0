@@ -137,6 +137,30 @@ export async function getControl() {
 
         oContr.ui.VBOX1.appendChild(oIframe);
 
+        // [로그인 전 라이브 테마 동기화] WS 셸의 if-p13n-themeChange 핸들러는 "로그인 후"에만 등록되므로
+        //   (ws_fn_ipc.js), 로그인 화면 상태의 창은 다른 창이 같은 SYSID 테마를 바꿔도 갱신을 못 받아
+        //   열린 시점 테마(예: 옛 default)에 고정된다 → 다른 창은 green 인데 이 창 헤더만 red 로 남는 증상.
+        //   → 연결 대상 SYSID 채널을 구독해 브로드캐스트 페이로드({THEME,BGCOL})로 도달 가능한 모든
+        //     프레임(최상위=타이틀바 / vw_main / 로그인 iframe)에 재적용한다. 전부 best-effort(try/catch)라
+        //     기존 로그인 흐름엔 영향 없음. (로그인 후 ws_fn_ipc 핸들러도 같은 채널을 받지만 동일 적용 → 무해)
+        try {
+            var sThemeSysID = (parent.getServerInfo && parent.getServerInfo() && parent.getServerInfo().SYSID) || "";
+            if (sThemeSysID && parent.IPCMAIN && oContr.attr._loginThemeChgBound !== sThemeSysID) {
+                oContr.attr._loginThemeChgBound = sThemeSysID;
+                parent.IPCMAIN.on("if-p13n-themeChange-" + sThemeSysID, function (event, oData) {
+                    try {
+                        var sTheme = oData && oData.THEME;
+                        if (!sTheme) { return; }
+                        try { if (parent.U4ATheme) { parent.U4ATheme.apply(sTheme); } } catch (e1) { }
+                        try { if (window.U4ATheme) { window.U4ATheme.apply(sTheme); } } catch (e2) { }
+                        try { if (oIframe && oIframe.contentWindow && oIframe.contentWindow.U4ATheme) { oIframe.contentWindow.U4ATheme.apply(sTheme); } } catch (e3) { }
+                        try { if (parent.setThemeInfo) { parent.setThemeInfo(oData); } } catch (e4) { }
+                        try { if (oData.BGCOL && parent.CURRWIN) { parent.CURRWIN.setBackgroundColor(oData.BGCOL); } } catch (e5) { }
+                    } catch (e) { /* noop */ }
+                });
+            }
+        } catch (e) { /* noop */ }
+
     } // end of _loadLoginPage
 
 

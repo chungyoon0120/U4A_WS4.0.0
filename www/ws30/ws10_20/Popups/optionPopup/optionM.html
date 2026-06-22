@@ -19,8 +19,28 @@
     <script src="../../theme/theme-api.js"></script>
     <script src="../../theme/u4a-ui.js"></script>
 
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 BGCOL 을 첫 페인트 전에 인라인 변수(--boot-bg)로
+         깔고, 활성 테마(THEME) CSS 로드를 미리 시작한다. (ServerList.html 과 동일 패턴 — 비동기
+         테마 <link> 로드 전 --app-bg 가 :root 화이트로 떨어져 생기는 깜빡임을 막는다.) -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var bg = q.get("BGCOL");
+                if (bg) { document.documentElement.style.setProperty("--boot-bg", bg); }
+                var th = q.get("THEME");
+                if (th && window.U4ATheme) { window.U4ATheme.apply(th); }
+            } catch (e) { /* 쿼리 없으면 IPC(if-ws-options-info)/기본 테마 폴백 */ }
+        })();
+    </script>
+
     <style>
-        html, body { margin: 0; height: 100%; background: var(--app-bg); color: var(--text); overflow: hidden; }
+        html, body { margin: 0; height: 100%; background: var(--boot-bg, var(--app-bg)); color: var(--text); overflow: hidden; }
+
+        /* 스플릿바 — 이 팝업은 패널이 surface 가 아니라 본문 배경(--app-bg)을 그대로 쓴다(테마 미리보기
+           카드 대비 유지). 공통 바의 surface 채움이 라벤더 패널 위에서 밝은 띠로 튀어 보이므로, 이 팝업
+           한정으로 바 배경을 패널과 동일하게(투명=--app-bg) 맞춘다. 그립/좌우 경계는 공통대로 유지. */
+        #optRoot .u4a-splitter__bar { background: transparent; }
     </style>
 </head>
 

@@ -678,7 +678,24 @@
             return;
         }
 
-        sap.ui.getCore().applyTheme(oThemeJsonData.THEME);
+        // [UI5 제거] 원본은 sap.ui.getCore().applyTheme() 로 메인 창을 재테마했으나, HTML5 변환
+        //   메인 창엔 UI5 코어가 없어(sap 안전스텁) 무효였다 → 옵션 창만 바뀌던 버그.
+        //   메인 창 자체 테마 메뉴(ws10_html.js)와 동일하게 U4ATheme.apply 로 재테마한다.
+        try {
+            var _oUT = (window.U4ATheme) || (parent && parent.U4ATheme);
+            if (_oUT && _oUT.apply) { _oUT.apply(oThemeJsonData.THEME); }
+        } catch (error) {
+            try { zconsole.error(error); } catch (e2) { }
+        }
+
+        // 일렉트론 창의 네이티브 backgroundColor 도 새 테마 배경으로 갱신한다. 안 하면 창 생성 시
+        //   고정된 옛 배경(예: white)이 남아, 화면 이동(페이지/iframe 로드) 중 콘텐츠 페인트 전에
+        //   흰색이 새 보인다(white→dark 전환 시 특히 두드러짐).
+        try {
+            if (oThemeJsonData.BGCOL && parent.CURRWIN && parent.CURRWIN.setBackgroundColor) {
+                parent.CURRWIN.setBackgroundColor(oThemeJsonData.BGCOL);
+            }
+        } catch (error) { /* noop */ }
 
 
         /*****************************************************

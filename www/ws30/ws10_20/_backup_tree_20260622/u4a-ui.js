@@ -723,54 +723,6 @@
     }
 
     /**
-     * 스플릿바 더블클릭 → 인접 패널을 "최초(드래그 전) 위치"로 복귀 — ★전역 자동★.
-     * 모든 `.u4a-splitter__bar`(서버리스트/옵션/WS20/USP트리/USP에디터)에 위임 1개로 적용.
-     *   · 최초 폭은 각 패널이 "처음 드래그되기 직전"(mousedown, capture)에 1회 기록한다.
-     *     capture 라 화면별 드래그 핸들러보다 먼저 실행 → 항상 "드래그 전" 값. 이미 기록됐으면
-     *     덮어쓰지 않으므로, 두 바가 공유하는 패널(WS20 가운데)도 최초값을 유지한다.
-     *   · 더블클릭 → 바의 좌/우 인접 패널을 기록된 home(인라인 style.flex 문자열, 없으면 ""=CSS
-     *     기본)으로 되돌린다. 기록이 없으면(드래그 안 함) 무시.
-     *   · 패널 클래스는 화면마다 다르므로(.u4a-splitter__pane/.u4aWs20Panel/.u4aWs30TreePane…)
-     *     바의 prev/next ElementSibling 을 인접 패널로 본다(바 양옆이 곧 패널).
-     */
-    let _SPLIT_RESET_ON = false;
-    function _installGlobalSplitterReset() {
-        if (_SPLIT_RESET_ON || typeof document === "undefined") { return; }
-        _SPLIT_RESET_ON = true;
-
-        function _sides(oBar) {
-            return [oBar.previousElementSibling, oBar.nextElementSibling].filter(Boolean);
-        }
-        // 드래그 시작 직전(capture) — 인접 패널의 현재 flex 를 home 으로 1회 기록(미기록 시에만)
-        document.addEventListener("mousedown", function (e) {
-            if (e.button !== 0 || !e.target.closest) { return; }
-            var oBar = e.target.closest(".u4a-splitter__bar");
-            if (!oBar) { return; }
-            _sides(oBar).forEach(function (oPane) {
-                if (oPane.dataset.u4aSplitHome == null) {
-                    oPane.dataset.u4aSplitHome = oPane.style.flex || "";
-                }
-            });
-        }, true);
-        // 더블클릭 — 인접 패널을 home 으로 복귀
-        document.addEventListener("dblclick", function (e) {
-            if (!e.target.closest) { return; }
-            var oBar = e.target.closest(".u4a-splitter__bar");
-            if (!oBar) { return; }
-            _sides(oBar).forEach(function (oPane) {
-                var sHome = oPane.dataset.u4aSplitHome;
-                if (sHome != null) { oPane.style.flex = sHome; }
-            });
-            // 화면별 후처리(예: ServerList 테이블 폭 클래스 재계산)가 있으면 트리거 — 있을 때만.
-            try {
-                if (global.oAPP && oAPP.fn && typeof oAPP.fn.fnUpdateTableWidthClass === "function") {
-                    oAPP.fn.fnUpdateTableWidthClass();
-                }
-            } catch (e2) { }
-        });
-    }
-
-    /**
      * (옵션) 표준 `.u4a-dialog__header` 는 전역 자동 처리라 호출이 필요 없다.
      * 헤더가 `.u4a-dialog__header` 가 아닌 커스텀 핸들이거나, 상단 경계를 커스텀할 때만 사용.
      * @param {HTMLDialogElement} oDlg
@@ -900,9 +852,6 @@
         const _slotTrailing = cfg.slotTrailing || null;
         const _onSelect = cfg.onSelect || null;
         const _onToggle = cfg.onToggle || null;
-        // 외부 펼침상태 위임(옵션) — 제공 시 내부 _expanded 대신 이 콜백이 펼침여부의 단일 출처.
-        //   (WS20 디자인트리처럼 펼침맵을 화면이 직접 소유/조작하는 경우. 토글=onToggle+재렌더)
-        const _extExpanded = cfg.isExpanded || null;
         const _initialExpanded = cfg.initialExpanded || function (n, lvl) { return lvl < 1; };
         const _rowHook = cfg.rowHook || null;
         const bSelectable = cfg.selectable !== false;
@@ -913,7 +862,6 @@
 
         // 펼침 상태: 한 번 본 키는 기억, 처음이면 initialExpanded 로 seed.
         function _isExpanded(node, level) {
-            if (_extExpanded) { return !!_extExpanded(node, level); } // 외부 위임 시 그쪽이 단일 출처
             const k = _key(node);
             if (k !== "" && Object.prototype.hasOwnProperty.call(_expanded, k)) { return !!_expanded[k]; }
             const b = !!_initialExpanded(node, level);
@@ -938,13 +886,6 @@
 
         function _toggle(node, oLi, oRow, level) {
             const bNowOpen = oRow.getAttribute("aria-expanded") === "true";
-            // 외부 펼침상태 모드: 외부 store 갱신(onToggle)에 위임 후 전체 재렌더.
-            //   (펼침맵 소유가 화면 쪽이라 내부 _expanded/in-place 토글 대신 단순 재렌더가 정합)
-            if (_extExpanded) {
-                if (_onToggle) { _onToggle(node, !bNowOpen, oRow); }
-                render();
-                return;
-            }
             if (bNowOpen) {
                 _collapseRec(node);
                 const oOld = oLi.querySelector(":scope > ul");
@@ -1094,9 +1035,6 @@
     // 다이얼로그 헤더 드래그 전역 1회 설치 — 모든 .u4a-dialog 가 자동으로 드래그+화면/헤더 클램프.
     //   (팝업마다 배선 불필요. 헤더는 .u4a-dialog__header / [data-u4a-draghandle] 둘 다 인식)
     try { _installGlobalDialogDrag(); } catch (e) { }
-
-    // 스플릿바 더블클릭 → 최초 위치 복귀 전역 1회 설치 — 모든 .u4a-splitter__bar 자동(배선 불필요).
-    try { _installGlobalSplitterReset(); } catch (e) { }
 
     // CommonJS(Electron nodeIntegration) 환경에서도 require 가능하게
     if (typeof module === "object" && module.exports) {

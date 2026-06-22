@@ -5,13 +5,29 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- 공통 테마 토큰/베이스 (외부 셸과 동일 디자인 시스템) -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
     <link rel="stylesheet" href="index.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script>
+        // 부모(frame.html)에 적용된 테마를 그대로 적용 → 다크/라이트 자동 일치(플래시 없음).
+        (function () {
+            try {
+                var t = (window.parent && parent.U4ATheme && parent.U4ATheme.current)
+                    ? parent.U4ATheme.current() : "horizon_white";
+                if (window.U4ATheme) { window.U4ATheme.apply(t); }
+            } catch (e) { /* 기본 라이트 토큰 */ }
+        })();
+    </script>
 </head>
 
 
-<body class="sapUiBody">
-    <div id="content" style="display: none;"></div>
+<body class="u4aErrBody">
+    <div id="content"></div>
 
     <script src="index.js"></script>
 </body>
