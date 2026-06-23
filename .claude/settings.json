@@ -1,6 +1,0 @@
-{
-  "model": "glm-5:cloud",
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://ollama.com"    
-  }
-}

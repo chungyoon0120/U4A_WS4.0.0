@@ -210,6 +210,7 @@
         chevron: _fa("chevron-right"),
         caret: _fa("chevron-down"),
         folder: _fa("folder"),
+        folderOpen: _fa("folder-open"),
         gear: _fa("gear"),
         settings: _fa("gear"),
         translate: _fa("language"),
@@ -1865,7 +1866,7 @@
                 // 트리 라벨/툴팁은 SAPUILandscape.xml 의 폴더명(사용자 데이터) — 현지화 대상 아님
                 label:    (n) => (n._attributes && n._attributes.name) || "",
                 tip:      (n) => (n._attributes && n._attributes.name) || "",
-                icon:     () => ICON.folder,
+                icon:     (n, ctx) => (ctx && ctx.expanded) ? ICON.folderOpen : ICON.folder,
                 // 기본 펼침: 루트(level0)와 그 하위(level1)까지. 그 외는 토글 기억값(uuid 맵).
                 initialExpanded: (n, lvl) => {
                     const u = n._attributes && n._attributes.uuid;

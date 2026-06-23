@@ -1040,6 +1040,15 @@
                 const oCUl = oLi.querySelector(":scope > ul");
                 if (oCUl) { oCUl.hidden = false; }
             }
+            // icon refresh on toggle (folder open/close)
+            if (_icon) {
+                const oIc = oRow.querySelector(":scope > .u4a-tree__icon");
+                if (oIc) {
+                    const _bHas = _hasChildren(node); const sIcon2 = _icon(node, { level: level, index: -1, odd: false, expanded: !bNowOpen, hasChildren: _bHas, key: _key(node) });
+                    oIc.innerHTML = sIcon2 || "";
+                    if (!sIcon2) { oIc.remove(); }
+                }
+            }
             if (_onToggle) { _onToggle(node, !bNowOpen, oRow); }
         }
 
@@ -1075,7 +1084,7 @@
 
             // 아이콘
             if (_icon) {
-                const sIcon = _icon(node);
+                const sIcon = _icon(node, oCtx);
                 if (sIcon) { const oIc = _el("span", "u4a-tree__icon"); oIc.innerHTML = sIcon; oRow.appendChild(oIc); }
             }
 
