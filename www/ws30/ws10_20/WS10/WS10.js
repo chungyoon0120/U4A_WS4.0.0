@@ -335,24 +335,12 @@
     /********************************************************************
      * 플로팅 푸터 메시지 (doc 03 §3 /FMSG/WS10 — 10초 자동 제거)
      ********************************************************************/
-    let _footerTimer = null;
+    //  공통 푸터 컴포넌트(U4AUI.footer*, shell.css .u4a-footer) 소비 — 닫기(X)/자동숨김 내장, 화면별 복제 없음.
     function _showFooter(sType, sMsg) {
-        const oFooter = document.getElementById("ws10Footer");
-        if (!oFooter) { return; }
-        oFooter.dataset.type = sType;
-        oFooter.dataset.show = "true";
-        const oIcon = oFooter.querySelector(".u4a-ws10__footer-icon");
-        const map = { E: "circle-exclamation", S: "circle-check", W: "triangle-exclamation", I: "circle-info" };
-        oIcon.innerHTML = _fa(map[sType] || "circle-info");
-        oFooter.querySelector(".u4a-ws10__footer-text").textContent = sMsg;
-        // 셸 통합 시 사운드: parent.setSoundMsg(...) (doc 03 §9) — 여기선 가드
-        if (_footerTimer) { clearTimeout(_footerTimer); }
-        _footerTimer = setTimeout(_hideFooter, 10000);
+        if (window.U4AUI) { window.U4AUI.footerShow("ws10Footer", sType || "I", sMsg || ""); }
     }
     function _hideFooter() {
-        const oFooter = document.getElementById("ws10Footer");
-        if (oFooter) { oFooter.dataset.show = "false"; }
-        if (_footerTimer) { clearTimeout(_footerTimer); _footerTimer = null; }
+        if (window.U4AUI) { window.U4AUI.footerHide("ws10Footer"); }
     }
 
     /********************************************************************
@@ -654,8 +642,7 @@
         const o = document.createElement("div");
         o.className = "u4a-ws10__content";
         o.innerHTML = _getWs10ContentHtml() + _getFooterHtml();
-
-        o.querySelector(".u4a-ws10__footer-close").addEventListener("click", _hideFooter);
+        //  푸터 닫기(X)는 공통 전역 위임(U4AUI)이 처리 — 화면별 배선 없음.
         return o;
     }
 
@@ -683,12 +670,8 @@
     }
 
     function _getFooterHtml() {
-        return `
-            <div class="u4a-ws10__footer" id="ws10Footer" data-show="false" data-type="I">
-                <span class="u4a-ws10__footer-icon">${_fa("circle-info")}</span>
-                <span class="u4a-ws10__footer-text"></span>
-                <button class="u4a-btn-icon u4a-ws10__footer-close" type="button" title="Close">${ICON.close}</button>
-            </div>`;
+        //  공통 푸터 마크업(U4AUI) — WS10/WS20/WS30 단일 소스. 닫기(X)는 공통 전역 위임.
+        return window.U4AUI ? window.U4AUI.footerMarkup("ws10Footer") : "";
     }
 
     /********************************************************************

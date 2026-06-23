@@ -336,10 +336,15 @@
 
     // 실제 WS10 이동 (구 fnMoveToWs10)
     function _doBackToWs10() {
+        // fnMoveToWs10 가 시작 시 busy+fnNaviLock(재호출 무해), 완료/실패 시 fnNaviRelease 한다.
+        //  (_uspBack 에서 이미 fnNaviLock 을 걸어둠 — 이동 도중 단축키 연타는 중앙 가드가 차단.)
         try {
             if (oAPP.fn && typeof oAPP.fn.fnMoveToWs10 === "function") { oAPP.fn.fnMoveToWs10(); return; }
-        } catch (e) { console.error("[HTML5][WS30] fnMoveToWs10 error:", e); }
-        try { oAPP.fn.fnOnMoveToPage("WS10"); } catch (e) { console.error("[HTML5][WS30] back fallback error:", e); }
+            oAPP.fn.fnOnMoveToPage("WS10");
+        } catch (e) {
+            console.error("[HTML5][WS30] back nav error:", e);
+            try { oAPP.common.fnNaviRelease(); } catch (x) { }   // 네비 실패 → 락 해제(영구 잠김 방지)
+        }
     }
 
     /************************************************************************
@@ -349,19 +354,32 @@
      ************************************************************************/
     function _uspBack() {
 
-        oAPP.common.fnSetBusyLock("X");
+        // ── F3(뒤로가기) 연타·재진입 가드 — 코드베이스 공통 메커니즘(fnNaviLock) 사용 ──────────
+        //  뒤로가기를 시작하는 순간 "페이지이동 in-flight 락"(fnNaviLock → isNaviBusy=true)을 건다.
+        //  이 락은 모든 단축키가 거치는 중앙 가드(fnShortCutExeAvaliableCheck)가 보므로, 이동/저장확인
+        //  팝업이 끝날 때까지 F3·Ctrl+F1 등 모든 단축키 연타가 통째로 막힌다(비동기 구간 내내).
+        //  ※ 직전 가드(uspNavLeaving)는 이 중앙 가드가 보지 않는 별개 플래그라 확인팝업 경로에 구멍이
+        //    있었음 → fnMoveToWs10 가 쓰는 정식 락으로 통일.
+        //   · 바로 이동   → fnMoveToWs10 완료/실패 시 fnNaviRelease (그 안에서 처리).
+        //   · 저장확인    → "머무름"(Cancel/저장미구현) 선택 시 _uspBackCb 가 fnNaviRelease, "나가기"는 유지.
+        //  (Back 버튼 클릭은 단축키 중앙 가드를 안 거치므로 여기서 직접 락 상태도 본다 — 버튼 더블클릭 방어.)
+        if (oAPP.attr.isNaviBusy === true) { return; }
+        oAPP.common.fnNaviLock();
 
         var oApp = _model("/WS30/APP") || {};
         var bChag = (oApp.IS_CHAG === "X");
         var bEdit = (oApp.IS_EDIT === "X");
 
         // 변경 없거나 display 모드 → 묻지 않고 바로 이동
-        if (!bChag || !bEdit) { _doBackToWs10(); return; }
+        if (!bChag || !bEdit) {
+            oAPP.common.fnSetBusyLock("X");
+            _doBackToWs10();
+            return;
+        }
 
         var sMsg = _msgWs("118") + " \n " + _msgWs("119"); // 변경됨 / 저장 후 나갈까요?
 
-        // 사용자 응답 대기 → busy 해제 + 자식 팝업 잠시 숨김(원본 동일)
-        oAPP.common.fnSetBusyLock("");
+        // 저장확인 팝업 — 자식 팝업 잠시 숨김(원본 동일). 팝업 동안 위 락이 단축키 연타를 막는다.
         try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
 
         if (oAPP.common && typeof oAPP.common.fnConfirmBox === "function") {
@@ -378,8 +396,9 @@
     // 저장 질문 콜백 (구 fnMoveBack_Ws30_To_Ws10Cb)
     function _uspBackCb(ACTCD) {
 
-        // CANCEL/닫기 → 머무름 (숨긴 팝업 복원)
+        // CANCEL/닫기 → 머무름: 페이지이동 락 해제(단축키 재허용) + 숨긴 팝업 복원
         if (ACTCD == null || ACTCD === "CANCEL") {
+            try { oAPP.common.fnNaviRelease(); } catch (e) { }
             try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
             return;
         }
@@ -393,10 +412,11 @@
             var fnSave = oAPP.fn && oAPP.fn.fnSaveUspWs30;
             if (typeof fnSave === "function") {
                 oAPP.common.fnSetBusyLock("X");
-                try { fnSave({ ISBACK: "X" }); return; }
-                catch (e) { oAPP.common.fnSetBusyLock(""); console.error("[HTML5][WS30] save(ISBACK):", e); }
+                try { fnSave({ ISBACK: "X" }); return; }   // 저장→이동: 락 유지(이동 완료 시 해제)
+                catch (e) { oAPP.common.fnSetBusyLock(""); try { oAPP.common.fnNaviRelease(); } catch (x) { } console.error("[HTML5][WS30] save(ISBACK):", e); }
             }
-            // 저장 미구현(2차) — 변경 유실 방지 위해 이동하지 않고 머무름 + 안내.
+            // 저장 미구현(2차) — 이동하지 않고 머무름 → 페이지이동 락 해제 + 안내.
+            try { oAPP.common.fnNaviRelease(); } catch (e) { }
             oAPP.common.fnShowFloatingFooterMsg("I", "WS30", _msg("A64") + " — 변환 예정"); // Save
             try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
             return;
@@ -415,6 +435,67 @@
     // 저장/액티브 — Change 모드에서만(버튼 숨김 규칙과 동일). 실제 로직은 fnSaveUspWs30/fnActivateUspWs30.
     function _uspSave() { if (_isEditMode() && oAPP.fn.fnSaveUspWs30) { oAPP.fn.fnSaveUspWs30(); } }
     function _uspActivate() { if (_isEditMode() && oAPP.fn.fnActivateUspWs30) { oAPP.fn.fnActivateUspWs30(); } }
+
+    /************************************************************************
+     * Application Execution (구 ev_AppExec, ws_usp.js) — ★ WS20/일반 ev_AppExec 과 다름.
+     *   일반(ws_fn_01.js) ev_AppExec 은 USP 앱을 "USP apps are not supported"(MSG_WS 189)로 거부한다.
+     *   USP 화면은 자체 실행 로직을 가진다(원본 그대로):
+     *     · 비활성(ACTST==="I") → 사운드02+플래시+푸터경고(MSG_WS 031 "Only in activity state !!!")
+     *     · 선택데이터 없음 / 폴더(ISFLD==="X") → 모달 E(MSG_WS 364 "Application cannot be execution.")+사운드02
+     *     · 파일 → fnExeBrowser(USPDATA.SPATH) (ws_fn_02.js — 서버 URL 조립 후 브라우저 실행)
+     ************************************************************************/
+    function _uspAppExec() {
+        var oAppInfo = _model("/WS30/APP") || {};
+
+        // 비활성 상태에서는 실행하지 않는다.
+        if (oAppInfo.ACTST === "I") {
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { parent.CURRWIN.flashFrame(true); } catch (e) { }
+            oAPP.common.fnShowFloatingFooterMsg("W", "WS30", _msgWs("031")); // Only in activity state !!!
+            return;
+        }
+
+        var oUspData = _model("/WS30/USPDATA");
+        var sMsg = _msgWs("364"); // Application cannot be execution.
+
+        // 선택 데이터 없음 또는 폴더 → 실행 불가.
+        if (!oUspData || oUspData.ISFLD === "X") {
+            try { parent.showMessage(null, 10, "E", sMsg); }
+            catch (e) { oAPP.common.fnShowFloatingFooterMsg("E", "WS30", sMsg); }
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            return;
+        }
+
+        // 파일 → SPATH 로 브라우저 실행.
+        try { oAPP.fn.fnExeBrowser(oUspData.SPATH); }
+        catch (e) {
+            console.error("[HTML5][WS30] Application Execution(fnExeBrowser):", e);
+            oAPP.common.fnShowFloatingFooterMsg("E", "WS30", sMsg);
+        }
+    }
+
+    /************************************************************************
+     * Controller (Class Builder) (구 ev_pressControllerBtn, ws_usp.js) — ★ 일반 핸들러와 파라미터 다름.
+     *   일반(ws_events.js) ev_pressControllerBtn 은 execControllerClass() 를 "인자 없이" 호출 → oAppInfo 누락.
+     *   USP 는 현재 앱 정보(/WS30/APP)를 4번째 인자로 넘겨야 한다(원본: execControllerClass(null,null,null,oAppInfo)).
+     *   execControllerClass(METHNM, INDEX, TCODE, oAppInfo) — ws_common.js.
+     ************************************************************************/
+    function _uspControllerClass() {
+        var oAppInfo = _model("/WS30/APP");
+        try { oAPP.common.execControllerClass(null, null, null, oAppInfo); }
+        catch (e) { console.error("[HTML5][WS30] Controller(Class Builder):", e); }
+    }
+
+    // MIME Repository (Ctrl+Shift+F12) — 버튼과 동일한 일반 핸들러(fnMimeDialogOpener) 호출.
+    function _uspMime() {
+        var fn = oAPP.events && oAPP.events.ev_pressMimeBtn;
+        if (typeof fn === "function") { try { fn(); } catch (e) { console.error("[HTML5][WS30] MIME:", e); } }
+    }
+
+    // Code Editor Pretty Print (Shift+F1) — 에디터 모듈 핸들러 위임(가드는 그쪽이 소유).
+    function _uspPrettyPrint() {
+        if (oAPP.usphtml.editorPrettyPrint) { oAPP.usphtml.editorPrettyPrint(); }
+    }
 
     /* ====================================================================
      * WS30 Display/Change 모드전환 · Save · Activate (원본 ws_usp.js 1:1 이식)
@@ -736,11 +817,18 @@
      *  공통 가드: e.repeat(꾹 누름 중복)·현재 페이지 WS30·busy.
      ************************************************************************/
     function _scGuard(e, fn) {
+        // 공통 가드(ws_common.js fnRunShortCut)에 위임 — 꾹누름·화면일치(WS30)·종합체크
+        //   (busy/메뉴열림/다이얼로그열림/isShortcutLock/페이지이동 in-flight) 단일 방어 통로.
+        if (oAPP.common && typeof oAPP.common.fnRunShortCut === "function") {
+            oAPP.common.fnRunShortCut(e, "WS30", fn);
+            return;
+        }
+        // 폴백(공통 미로드 시) — 최소 가드
         try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { }
         try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { }
-        if (e && e.repeat === true) { return; }                                  // 꾹 누름 중복 방지(필수)
-        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS30") { return; } } catch (x) { } // WS30 에서만
-        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { }            // busy 중엔 무시
+        if (e && e.repeat === true) { return; }
+        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS30") { return; } } catch (x) { }
+        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { }
         try { fn(e); } catch (err) { console.error("[HTML5][WS30] shortcut:", err); }
     }
 
@@ -752,7 +840,11 @@
             "F3": function (e) { _scGuard(e, _uspBack); },          // 뒤로가기
             "Ctrl+F1": function (e) { _scGuard(e, _uspToggleMode); }, // Display↔Change 모드전환
             "Ctrl+S": function (e) { _scGuard(e, _uspSave); },       // 저장
-            "Ctrl+F3": function (e) { _scGuard(e, _uspActivate); }   // 액티브
+            "Ctrl+F3": function (e) { _scGuard(e, _uspActivate); },  // 액티브
+            "F8": function (e) { _scGuard(e, _uspAppExec); },        // Application Execution (구 ev_AppExec)
+            "Ctrl+F12": function (e) { _scGuard(e, _uspControllerClass); }, // Controller(Class Builder) (구 ev_pressControllerBtn)
+            "Ctrl+Shift+F12": function (e) { _scGuard(e, _uspMime); },      // MIME Repository (구 ev_pressMimeBtn)
+            "Shift+F1": function (e) { _scGuard(e, _uspPrettyPrint); }      // Code Editor Pretty Print (구 prettyBtn)
         };
         aList.forEach(function (o) { if (o && oFnMap[o.KEY]) { o.fn = oFnMap[o.KEY]; } });
         return aList;
@@ -834,12 +926,12 @@
         // MIME Repository — 원본 oAPP.events.ev_pressMimeBtn (가드)
         BAR.appendChild(_txBtn({ id: "ws30_MimeBtn", fa: "image", text: _msg("A10"),
             tooltip: _msg("A10") + " (Ctrl+Shift+F12)", ev: "ev_pressMimeBtn" }));
-        // Controller (Class Builder) — WS20 와 동일 아이콘(screwdriver-wrench). 원본 ev_pressControllerBtn (가드)
+        // Controller (Class Builder) — USP 전용(일반 핸들러는 oAppInfo 누락). evFn 으로 /WS30/APP 전달.
         BAR.appendChild(_txBtn({ id: "ws30_controllerBtn", fa: "screwdriver-wrench", text: _msg("A11"),
-            tooltip: _msg("C38") + " (Ctrl+F12)", ev: "ev_pressControllerBtn" }));
-        // Application Execution — 원본 ev_AppExec (가드)
+            tooltip: _msg("C38") + " (Ctrl+F12)", evFn: _uspControllerClass }));
+        // Application Execution — USP 전용 ev_AppExec(일반 핸들러는 USP 미지원). evFn 직접 연결.
         BAR.appendChild(_txBtn({ id: "ws30_appExecBtn", fa: "globe", text: _msg("A06"),
-            tooltip: _msg("A06") + " (F8)", ev: "ev_AppExec" }));
+            tooltip: _msg("A06") + " (F8)", evFn: _uspAppExec }));
 
         return BAR;
     }
@@ -881,45 +973,31 @@
      ************************************************************************/
     function _buildUspPanel() {
 
-        var PANEL = document.createElement("section");
+        // 공통 접이식 패널(U4AUI.createPanel) 소비 — 헤더/토글/접힘은 공통, 폼 내용만 화면별.
+        //   (원본 sap.m.Panel expandable. 과거 화면 전용 u4aWs30Panel* 구현 → 2026-06-23 공통 이관.)
+        var P = window.U4AUI.createPanel({ title: _msg("C17") }); // Properties
+        var PANEL = P.el;
         PANEL.id = "uspPanel";
-        PANEL.className = "u4aWs30Panel";
+        PANEL.classList.add("u4aWs30Panel"); // USP 레이아웃(여백/flex)만 화면 CSS 확장
 
-        // 헤더(접힘/펼침) — 원본 sap.m.Panel(expandable)
-        var HEAD = document.createElement("button");
-        HEAD.type = "button";
-        HEAD.className = "u4aWs30PanelHead";
-        HEAD.setAttribute("aria-expanded", "true");
-        HEAD.innerHTML = '<span class="u4aWs30PanelTwisty">' + _fa("chevron-down") + "</span>"
-            + '<span class="u4aWs30PanelTitle">' + _esc(_msg("C17")) + "</span>"; // Properties
-        HEAD.addEventListener("click", function () {
-            var bOpen = PANEL.getAttribute("data-collapsed") !== "X";
-            PANEL.setAttribute("data-collapsed", bOpen ? "X" : "");
-            HEAD.setAttribute("aria-expanded", bOpen ? "false" : "true");
-            HEAD.querySelector(".u4aWs30PanelTwisty").innerHTML = bOpen ? _fa("chevron-right") : _fa("chevron-down");
-        });
-        PANEL.appendChild(HEAD);
+        var BODY = P.body;
+        BODY.classList.add("u4aWs30Form");
 
-        var BODY = document.createElement("div");
-        BODY.className = "u4aWs30PanelBody u4aWs30Form";
-
-        // URL (readonly) + Copy
+        // URL (readonly) + Copy — 공통 입력 팩토리(U4AUI.createField) 소비.
         BODY.appendChild(_formRow(_msg("C18"), (function () {
             var WRAP = document.createElement("div");
             WRAP.className = "u4aWs30UrlRow";
-            var I = document.createElement("input");
-            I.type = "text"; I.id = "uspPropUrl"; I.readOnly = true;
-            I.className = "u4a-input u4aWs30Input";
-            WRAP.appendChild(I);
+            var oUrl = window.U4AUI.createField({ type: "text", id: "uspPropUrl", readOnly: true, inputClassName: "u4aWs30Input" });
+            WRAP.appendChild(oUrl.el);
             var B = document.createElement("button");
             B.type = "button"; B.className = "u4a-btn u4aWs30UrlCopyBtn";
             B.textContent = _msg("C21"); // URL Copy
-            B.addEventListener("click", function () { _uspUrlCopy(I.value); });
+            B.addEventListener("click", function () { _uspUrlCopy(oUrl.getValue()); });
             WRAP.appendChild(B);
             return WRAP;
         })()));
 
-        // Is Folder? (readonly checkbox)
+        // Is Folder? (readonly checkbox) — 체크박스는 별도 컨트롤(팩토리 text 아님)
         BODY.appendChild(_formRow(_msg("C19"), (function () {
             var C = document.createElement("input");
             C.type = "checkbox"; C.id = "uspPropIsFld"; C.disabled = true;
@@ -928,26 +1006,22 @@
         })()));
 
         // Description (Change 모드에서 편집 — 원본 oDescInput editable {/WS30/APP/IS_EDIT})
-        BODY.appendChild(_formRow(_msg("A35"), (function () {
-            var I = document.createElement("input");
-            I.type = "text"; I.id = "uspPropDesc";
-            I.className = "u4a-input u4aWs30Input";
-            I.addEventListener("change", function () { _onUspFieldChange("DESCT", I.value); });
-            return I;
-        })()));
+        BODY.appendChild(_formRow(_msg("A35"), window.U4AUI.createField({
+            type: "text", id: "uspPropDesc", inputClassName: "u4aWs30Input",
+            clear: true, onClear: function () { _onUspFieldChange("DESCT", ""); },
+            onChange: function (v) { _onUspFieldChange("DESCT", v); }
+        }).el));
 
         // Charset (폴더면 숨김 — Change 모드에서 편집, 원본 oCharsetInput editable)
-        var oCharRow = _formRow(_msg("C20"), (function () {
-            var I = document.createElement("input");
-            I.type = "text"; I.id = "uspPropCodpg";
-            I.className = "u4a-input u4aWs30Input";
-            I.addEventListener("change", function () { _onUspFieldChange("CODPG", I.value); });
-            return I;
-        })());
+        var oCharRow = _formRow(_msg("C20"), window.U4AUI.createField({
+            type: "text", id: "uspPropCodpg", inputClassName: "u4aWs30Input",
+            clear: true, onClear: function () { _onUspFieldChange("CODPG", ""); },
+            onChange: function (v) { _onUspFieldChange("CODPG", v); }
+        }).el);
         oCharRow.id = "uspPropCharsetRow";
         BODY.appendChild(oCharRow);
 
-        PANEL.appendChild(BODY);
+        // BODY(=P.body)는 createPanel 이 이미 PANEL 에 넣음 → 별도 append 불필요.
         return PANEL;
     }
 
@@ -1055,6 +1129,8 @@
         if (elDesc) { elDesc.value = oData.DESCT || ""; elDesc.readOnly = !bEdit; }
         if (elCod) { elCod.value = oData.CODPG || ""; elCod.readOnly = !bEdit; }
         if (elCodRow) { elCodRow.style.display = bFld ? "none" : ""; }
+        // 프로그램적 값 세팅 후 clear(X) 노출 재동기화(입력 이벤트 미발생 → 직접 호출). readonly 면 CSS 가 X 숨김.
+        try { if (window.U4AUI && window.U4AUI.syncClear) { window.U4AUI.syncClear(elDesc); window.U4AUI.syncClear(elCod); } } catch (e) { }
     };
 
     /************************************************************************
@@ -1097,16 +1173,19 @@
         FORM.id = "uspDocForm";
         DOC_FIELDS.forEach(function (f) {
             var sField = f[1], bEditable = f[2] === true;
-            var I = document.createElement("input");
-            I.type = "text";
-            I.readOnly = true;   // 실제 readOnly 는 fnRenderUspDoc 가 모드에 따라 토글(편집필드만)
-            I.className = "u4a-input u4aWs30Input";
-            I.setAttribute("data-doc", sField);
+            // 공통 입력 팩토리(U4AUI.createField). 실제 readOnly 는 fnRenderUspDoc 가 모드에 따라 토글(편집필드만).
+            //   편집 필드만 clear(X) — readonly(Display 모드) 일 땐 공통 CSS 가 X 를 자동 숨김.
+            var oFld = window.U4AUI.createField({
+                type: "text", readOnly: true, inputClassName: "u4aWs30Input",
+                clear: bEditable,
+                onClear: bEditable ? function () { _onUspFieldChange(sField, ""); } : null
+            });
+            oFld.input.setAttribute("data-doc", sField);
             if (bEditable) {
-                I.setAttribute("data-doc-edit", "X");
-                I.addEventListener("change", function () { _onUspFieldChange(sField, I.value); });
+                oFld.input.setAttribute("data-doc-edit", "X");
+                oFld.input.addEventListener("change", function () { _onUspFieldChange(sField, oFld.input.value); });
             }
-            FORM.appendChild(_formRow(_msg(f[0]), I));
+            FORM.appendChild(_formRow(_msg(f[0]), oFld.el));
         });
         PAGE.appendChild(FORM);
         return PAGE;
@@ -1126,8 +1205,11 @@
             if (DOC_DATE_FIELDS[sField]) { v = _fmtDate(v); }
             else if (DOC_TIME_FIELDS[sField]) { v = _fmtTime(v); }
             el.value = v;
-            // 편집 가능 필드만 Change 모드에서 readOnly 해제
-            if (bEditable) { el.readOnly = !bEdit; }
+            // 편집 가능 필드만 Change 모드에서 readOnly 해제 + clear(X) 노출 재동기화(readonly 면 CSS 가 숨김).
+            if (bEditable) {
+                el.readOnly = !bEdit;
+                try { if (window.U4AUI && window.U4AUI.syncClear) { window.U4AUI.syncClear(el); } } catch (e) { }
+            }
         });
     };
 
@@ -1186,34 +1268,21 @@
     };
 
     /************************************************************************
-     * (F) 푸터 (구 floatingFooter /FMSG/WS30) — WS20 와 동일 컴포넌트(.u4aWs10__footer 재사용).
+     * (F) 푸터 (구 floatingFooter /FMSG/WS30) — 공통 컴포넌트(U4AUI.footer*, shell.css .u4a-footer).
+     *   WS10/WS20 와 단일 소스(아이콘/텍스트/닫기X/자동숨김 내장). 화면별 복제 없음.
      ************************************************************************/
-    //  WS10 푸터 컴포넌트(.u4a-ws10__footer, data-show/data-type)와 동일 마크업 → ws10.css 재사용.
     function _buildUspFooter() {
-        var F = document.createElement("div");
-        F.id = "ws30Footer";
-        F.className = "u4a-ws10__footer";
-        F.setAttribute("data-show", "false");
-        F.innerHTML =
-            '<span class="u4a-ws10__footer-icon"></span>' +
-            '<span class="u4a-ws10__footer-text"></span>';
-        return F;
+        var T = document.createElement("div");
+        T.innerHTML = window.U4AUI.footerMarkup("ws30Footer");
+        return T.firstChild;   // <div class="u4a-footer" id="ws30Footer">…</div>
     }
 
-    var FOOTER_ICON = { S: "circle-check", E: "circle-exclamation", W: "triangle-exclamation", I: "circle-info" };
     oAPP.usphtml.showFooter = function (sType, sMsg) {
-        var F = document.getElementById("ws30Footer");
-        if (!F) { return; }
-        F.dataset.type = sType || "I";
-        F.dataset.show = "true";
-        var elI = F.querySelector(".u4a-ws10__footer-icon");
-        var elM = F.querySelector(".u4a-ws10__footer-text");
-        if (elI) { elI.innerHTML = _fa(FOOTER_ICON[sType] || "circle-info"); }
-        if (elM) { elM.textContent = sMsg || ""; }
+        //  자동숨김은 아래 라우팅 래퍼(fnShowFloatingFooterMsg)가 소유(모델 /FMSG/WS30 리셋 포함) → ms=0.
+        if (window.U4AUI) { window.U4AUI.footerShow("ws30Footer", sType || "I", sMsg || "", 0); }
     };
     oAPP.usphtml.hideFooter = function () {
-        var F = document.getElementById("ws30Footer");
-        if (F) { F.dataset.show = "false"; }
+        if (window.U4AUI) { window.U4AUI.footerHide("ws30Footer"); }
     };
 
     // 셸 푸터 라우팅(fnShowFloatingFooterMsg)에 WS30 분기 추가 — shell.js 무수정(super-wrap).
@@ -1269,6 +1338,12 @@
         // 이미 셸 렌더됨 → 헤더/툴바/패널만 최신화 (placeholder 는 위에서 이미 제거됨)
         if (oWS30.getAttribute("data-ws30-shell") === "X") {
             try { oAPP.fn.fnUpdateUspAppHeader(); } catch (e) { }
+            // 재진입 시 셸을 재빌드하지 않으므로, 직전 전체화면 상태(트리/리사이저 display:none)를 해제해
+            //   좌측 트리가 사라진 채로 들어오는 것을 막는다.
+            try { if (oAPP.usphtml.editorExitFullscreen) { oAPP.usphtml.editorExitFullscreen(); } } catch (e) { }
+            // 방어: 트리/에디터 스플릿 드래그 중 화면 이탈로 전역 리사이즈 커서/선택차단 클래스가 body 에
+            //   남았을 수 있다(mouseup 미발생). 재진입 시 정리(없으면 무해).
+            try { document.body.classList.remove("u4aWs20ResizingCursor"); } catch (e) { }
             return;
         }
 
@@ -1302,8 +1377,9 @@
         // 접힘/펼침 툴바 (별도 밴드) — 원본처럼 컬럼 헤더 위에 분리.
         var THEAD = document.createElement("div");
         THEAD.className = "u4aWs30TreeToolbar";
-        THEAD.appendChild(_treeTbBtn("angles-down", "Expand All", function () { if (oAPP.fn.fnUspTreeExpandAll) { oAPP.fn.fnUspTreeExpandAll(); } }));
-        THEAD.appendChild(_treeTbBtn("angles-up", "Collapse All", function () { if (oAPP.fn.fnUspTreeCollapseAll) { oAPP.fn.fnUspTreeCollapseAll(); } }));
+        // 구 ev_UspTreeTableExpand/Collapse = "선택 노드" 서브트리 펼침/접힘(루트면 전체). 툴팁=C27/C28(컨텍스트 메뉴와 동일 동작).
+        THEAD.appendChild(_treeTbBtn("angles-down", _msg("C27"), function () { if (oAPP.fn.fnUspTreeExpandSelected) { oAPP.fn.fnUspTreeExpandSelected(); } }));
+        THEAD.appendChild(_treeTbBtn("angles-up", _msg("C28"), function () { if (oAPP.fn.fnUspTreeCollapseSelected) { oAPP.fn.fnUspTreeCollapseSelected(); } }));
         LEFT.appendChild(THEAD);
         // 트리 본문 컨테이너 (ws_html5_usp_tree.js 가 트리를 채움) — 2컬럼(이름|설명) 트리.
         var TBODY = document.createElement("div");
@@ -1429,6 +1505,16 @@
         if (typeof _fnOnMoveToPage_super === "function") { _fnOnMoveToPage_super(sPgNm); }
         if (sPgNm === "WS30") {
             try { oAPP.fn.fnRenderUspShell(); } catch (e) { console.error("[HTML5][WS30] fnOnMoveToPage render error:", e); }
+            // ★ WS30 단축키 등록은 "여기" — 셸(트리/패널) 동기 렌더 직후, WS30 진입마다 항상 실행되는
+            //   지점. (진입부 fnOnEnterDispChangeMode 에선 등록 안 함: 화면 그리기 전 등록 금지 원칙.
+            //    에디터 _releaseBusy 는 노드 선택 전엔 안 불려 부적합.) removeShortCut 선행 = 멱등(재진입
+            //    누수 방지). 직후 fnMoveToWs30 가 트리 로드까지 busy 유지 → 그 사이 F3 은 종합가드가 차단.
+            try {
+                if (oAPP.common && oAPP.common.setShortCut) {
+                    oAPP.common.removeShortCut("WS30");
+                    oAPP.common.setShortCut("WS30");
+                }
+            } catch (e) { console.error("[HTML5][WS30] setShortCut(WS30):", e); }
             try { oAPP.fn.fnMoveToWs30(); } catch (e) { console.error("[HTML5][WS30] fnMoveToWs30 error:", e); }
         }
     };
@@ -1443,6 +1529,9 @@
     oAPP.fn.fnMoveToWs30 = function () {
 
         oAPP.common.fnSetBusyLock("X");
+
+        // WS30 (재)진입 → 혹시 남아있을 페이지이동 락 해제(백스톱).
+        try { oAPP.common.fnNaviRelease(); } catch (e) { }
 
         // USP 단축키(Back/Save/Activate)는 getShortCutList("WS30") override + 셸 setShortCut("WS30")
         //   (fnOnEnterDispChangeMode)로 이미 HTML5 핸들러가 등록됨 — 여기서 별도 작업 불필요.

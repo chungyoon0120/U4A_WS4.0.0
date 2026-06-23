@@ -41,9 +41,10 @@
      * @param {Function} [fnChange] 값 변경 콜백(newValue)
      * @returns {HTMLElement} `.value` getter/setter 를 가진 combo 엘리먼트
      */
-    function createSelect(aItems, sValue, fnChange) {
+    function createSelect(aItems, sValue, fnChange, opts) {
 
         aItems = aItems || [];
+        opts = opts || {};
 
         const oCombo = _el("div", "u4a-combo");
         oCombo.tabIndex = 0;
@@ -70,6 +71,13 @@
             get() { return sCurrent; },
             set(v) { sCurrent = v; oText.textContent = _label(v); }
         });
+
+        // 항목 동적 교체 — 펼치기 직전에 서버 목록을 다시 받아 채우는 콤보(이벤트 DDLB 등)용.
+        //   (aItems 는 클로저 변수라 재할당하면 _label/_open/_select 가 새 목록을 본다.)
+        oCombo.setItems = function (aNew) {
+            aItems = aNew || [];
+            oText.textContent = _label(sCurrent);
+        };
 
         function _onOutside(ev) {
             if (!oCombo.contains(ev.target) && (!oList || !oList.contains(ev.target))) {
@@ -128,6 +136,10 @@
             _setActive(iActive < 0 ? 0 : iActive);
 
             setTimeout(() => document.addEventListener("mousedown", _onOutside), 0);
+            // 창 리사이즈/스크롤 시 닫기 — 앵커(콤보)가 옮겨가 펼침목록 위치가 어긋나는 것 방지.
+            //   scroll 은 capture 로 내부 스크롤러(속성패널 등)까지 잡는다(스크롤 이벤트는 버블 안 함).
+            window.addEventListener("resize", _close);
+            window.addEventListener("scroll", _close, true);
         }
 
         function _close() {
@@ -137,6 +149,8 @@
             oCombo.removeAttribute("data-open");
             oCombo.setAttribute("aria-expanded", "false");
             document.removeEventListener("mousedown", _onOutside);
+            window.removeEventListener("resize", _close);
+            window.removeEventListener("scroll", _close, true);
         }
 
         function _select(idx) {
@@ -152,12 +166,32 @@
             }
         }
 
-        oCombo.addEventListener("click", () => { if (oList) { _close(); } else { _open(); } });
+        // 펼치기 요청 — opts.onOpen 이 있으면 그 결과(Promise 가능)를 기다린 뒤 연다.
+        //   (이벤트 DDLB: 펼치기 직전 서버이벤트 목록을 다시 받아 setItems 로 채운다.)
+        //   onOpen 진행 중(data-loading) 재클릭은 무시해 중복 호출 방지.
+        function _requestOpen() {
+            if (oList) { _close(); return; }
+            if (oCombo.dataset.loading === "true") { return; }
+            const fnOpen = opts.onOpen;
+            if (typeof fnOpen === "function") {
+                let r;
+                try { r = fnOpen(oCombo); } catch (e) { r = null; }
+                if (r && typeof r.then === "function") {
+                    oCombo.dataset.loading = "true";
+                    const _done = function () { delete oCombo.dataset.loading; _open(); };
+                    r.then(_done, _done);
+                    return;
+                }
+            }
+            _open();
+        }
+
+        oCombo.addEventListener("click", () => { _requestOpen(); });
         oCombo.addEventListener("keydown", (ev) => {
             switch (ev.key) {
                 case "ArrowDown":
                     ev.preventDefault();
-                    if (!oList) { _open(); } else { _setActive(Math.min(iActive + 1, aItems.length - 1)); }
+                    if (!oList) { _requestOpen(); } else { _setActive(Math.min(iActive + 1, aItems.length - 1)); }
                     break;
                 case "ArrowUp":
                     ev.preventDefault();
@@ -166,7 +200,7 @@
                 case "Enter":
                 case " ":
                     ev.preventDefault();
-                    if (oList) { _select(iActive); } else { _open(); }
+                    if (oList) { _select(iActive); } else { _requestOpen(); }
                     break;
                 case "Escape":
                     if (oList) { ev.stopPropagation(); _close(); }
@@ -221,7 +255,18 @@
         function _position() {
             const r = oInput.getBoundingClientRect();
             oList.style.left = r.left + "px";
-            oList.style.top = (r.bottom + 2) + "px";
+            let iTop = r.bottom + 2;
+            // 같은 행에 value-state 메시지(.u4a-field__msg)가 떠 있으면 그 아래로 내려
+            //   겹침 방지 — 메시지 위, 제안 목록 아래로 스택(UI5 valueState + suggestion 동일).
+            const oRow = oInput.closest ? oInput.closest(".u4a-form__row") : null;
+            if (oRow) {
+                const oMsg = oRow.querySelector(":scope > .u4a-field__msg");
+                if (oMsg && oMsg.offsetParent !== null && oMsg.textContent) {
+                    const mr = oMsg.getBoundingClientRect();
+                    if (mr.height) { iTop = mr.bottom + 2; }
+                }
+            }
+            oList.style.top = iTop + "px";
             oList.style.minWidth = r.width + "px";
         }
 
@@ -234,6 +279,9 @@
                 oList.setAttribute("role", "listbox");
                 (oInput.closest("dialog") || document.body).appendChild(oList);
                 setTimeout(() => document.addEventListener("mousedown", _onOutside), 0);
+                // 창 리사이즈/스크롤 시 닫기 — 앵커(입력칸) 이동으로 위치 어긋남 방지. scroll capture=내부 스크롤러 포함.
+                window.addEventListener("resize", _close);
+                window.addEventListener("scroll", _close, true);
             }
 
             oList.innerHTML = "";
@@ -257,6 +305,8 @@
             iActive = -1;
             oInput.setAttribute("aria-expanded", "false");
             document.removeEventListener("mousedown", _onOutside);
+            window.removeEventListener("resize", _close);
+            window.removeEventListener("scroll", _close, true);
         }
 
         function _select(idx) {
@@ -406,6 +456,8 @@
             oOvf.setAttribute("aria-expanded", "false");
             document.removeEventListener("mousedown", _onOut, true);
             document.removeEventListener("keydown", _onEsc, true);
+            window.removeEventListener("resize", _closeMenu);
+            window.removeEventListener("scroll", _closeMenu, true);
         }
 
         function _items() {
@@ -445,6 +497,9 @@
             oMenu.style.left = left + "px";
             oMenu.style.top = top + "px";
             oOvf.setAttribute("aria-expanded", "true");
+            // 창 리사이즈/스크롤 시 닫기 — 앵커(⋯ 버튼) 이동으로 위치 어긋남 방지(ResizeObserver reflow 보강).
+            window.addEventListener("resize", _closeMenu);
+            window.addEventListener("scroll", _closeMenu, true);
             setTimeout(function () {
                 document.addEventListener("mousedown", _onOut, true);
                 document.addEventListener("keydown", _onEsc, true);
@@ -720,6 +775,34 @@
             document.addEventListener("mousemove", mv, true);
             document.addEventListener("mouseup", up, true);
         }, true);
+
+        // ★ 창 크기 변경 시 — 드래그/리사이즈로 px 가 박힌 "열린" 다이얼로그를 뷰포트 안으로 클램프.
+        //   (최대화 상태에서 키우거나 옮긴 팝업이 restore 후 작은 창을 넘쳐 오른쪽·아래가 잘리던 문제.
+        //    전 .u4a-dialog 공통.) 인라인 위치/크기가 없는(=CSS vw/vh + 네이티브 중앙정렬) 다이얼로그는
+        //   건드리지 않는다(그건 CSS 가 알아서 따라감).
+        window.addEventListener("resize", function () {
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const aDlg = document.querySelectorAll("dialog.u4a-dialog");
+            for (let i = 0; i < aDlg.length; i++) {
+                const d = aDlg[i];
+                if (!d.open) { continue; }
+                const bPos = d.style.position === "fixed" || d.style.left || d.style.top;
+                const bSize = d.style.width || d.style.height;
+                if (!bPos && !bSize) { continue; }
+                const maxW = Math.max(160, vw - 16), maxH = Math.max(160, vh - 16);
+                let r = d.getBoundingClientRect();
+                if (r.width > maxW) { d.style.width = maxW + "px"; }
+                if (r.height > maxH) { d.style.height = maxH + "px"; }
+                if (bPos) {
+                    r = d.getBoundingClientRect();
+                    const mt = _minTop(d);
+                    const left = Math.min(Math.max(parseFloat(d.style.left) || r.left, 0), Math.max(0, vw - r.width));
+                    const top = Math.min(Math.max(parseFloat(d.style.top) || r.top, mt), Math.max(mt, vh - r.height));
+                    d.style.left = left + "px";
+                    d.style.top = top + "px";
+                }
+            }
+        });
     }
 
     /**
@@ -884,7 +967,7 @@
      *  @param {boolean}                        [cfg.selectable=true]
      *
      * @returns {{el:HTMLUListElement, render:Function, expandAll:Function,
-     *   collapseAll:Function, expandToLevel:Function, setExpanded:Function,
+     *   collapseAll:Function, expandToLevel:Function, expandSubtree:Function, setExpanded:Function,
      *   setSelected:Function, selectByKey:Function, findRow:Function}}
      */
     function createTree(cfg) {
@@ -1046,6 +1129,18 @@
 
         function setExpanded(node, bVal) { const k = _key(node); if (k !== "") { _expanded[k] = !!bVal; } render(); }
 
+        // 한 노드의 서브트리(자신+모든 자손 폴더)를 한 번에 펼침(단일 render). 루트에 호출 시 트리 전체.
+        //   (USP 컨텍스트 메뉴 "Expand Subtree" = 구 fnCommonUspTreeTableExpand 의 재귀 펼침)
+        function expandSubtree(node) {
+            (function rec(n) {
+                if (!n) { return; }
+                if (_hasChildren(n)) { const k = _key(n); if (k !== "") { _expanded[k] = true; } }
+                const aCh = _children(n) || [];
+                for (let i = 0; i < aCh.length; i++) { rec(aCh[i]); }
+            })(node);
+            render();
+        }
+
         function findRow(sKey) {
             const aRows = oUl.querySelectorAll(".u4a-tree__row");
             for (let i = 0; i < aRows.length; i++) { if (aRows[i].__u4aKey === sKey) { return aRows[i]; } }
@@ -1064,6 +1159,7 @@
         return {
             el: oUl, render: render,
             expandAll: expandAll, collapseAll: collapseAll, expandToLevel: expandToLevel,
+            expandSubtree: expandSubtree,
             setExpanded: setExpanded, setSelected: setSelected, selectByKey: selectByKey, findRow: findRow
         };
     }
@@ -1102,8 +1198,227 @@
         });
     }
 
+    /**
+     * 공통 플로팅 푸터 메시지 — WS10/WS20/WS30(USP) 단일 소스(구 화면별 복제 제거).
+     * shell.css `.u4a-footer*` 스킨 소비. 아이콘(타입별)·텍스트·닫기(X)·자동숨김(기본 10s) 내장.
+     *   · footerMarkup(sId)            → innerHTML 문자열(화면이 자기 마크업에 삽입)
+     *   · footerShow(elOrId,type,msg,ms) → 표시(type: E/S/W/I, ms 생략=10000, 0=자동숨김 없음)
+     *   · footerHide(elOrId)           → 숨김
+     *   X(닫기)는 전역 위임 1개라 화면별 배선 불필요(data-u4a-footer-close).
+     */
+    const _FOOTER_ICON = { E: "circle-exclamation", S: "circle-check", W: "triangle-exclamation", I: "circle-info" };
+    const _footerTimers = (typeof WeakMap !== "undefined") ? new WeakMap() : null;
+    function _footerEl(elOrId) { return (typeof elOrId === "string") ? document.getElementById(elOrId) : elOrId; }
+    function footerMarkup(sId) {
+        return '' +
+            '<div class="u4a-footer" id="' + (sId || "") + '" data-show="false" data-type="I">' +
+            '<span class="u4a-footer__icon"><i class="fa-solid fa-circle-info"></i></span>' +
+            '<span class="u4a-footer__text"></span>' +
+            '<button class="u4a-btn-icon u4a-footer__close" type="button" title="Close" data-u4a-footer-close><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>';
+    }
+    function footerHide(elOrId) {
+        const oF = _footerEl(elOrId);
+        if (!oF) { return; }
+        oF.setAttribute("data-show", "false");
+        if (_footerTimers) { const t = _footerTimers.get(oF); if (t) { clearTimeout(t); _footerTimers.delete(oF); } }
+    }
+    function footerShow(elOrId, sType, sMsg, iMs) {
+        const oF = _footerEl(elOrId);
+        if (!oF) { return; }
+        oF.setAttribute("data-type", sType || "I");
+        const oIcon = oF.querySelector(".u4a-footer__icon");
+        const oText = oF.querySelector(".u4a-footer__text");
+        if (oIcon) { oIcon.innerHTML = '<i class="fa-solid fa-' + (_FOOTER_ICON[sType] || "circle-info") + '"></i>'; }
+        if (oText) { oText.textContent = sMsg || ""; }
+        oF.setAttribute("data-show", "true");
+        if (_footerTimers) {
+            const tp = _footerTimers.get(oF); if (tp) { clearTimeout(tp); _footerTimers.delete(oF); }
+            const ms = (typeof iMs === "number") ? iMs : 10000;
+            if (ms > 0) { _footerTimers.set(oF, setTimeout(function () { footerHide(oF); }, ms)); }
+        }
+    }
+    // 닫기(X) 전역 위임 — 어느 화면의 .u4a-footer 든 X 클릭 시 닫힘(배선 0).
+    if (typeof document !== "undefined" && !global.__u4aFooterCloseInit) {
+        global.__u4aFooterCloseInit = true;
+        document.addEventListener("click", function (ev) {
+            const oBtn = (ev.target && ev.target.closest) ? ev.target.closest("[data-u4a-footer-close]") : null;
+            if (!oBtn) { return; }
+            const oF = oBtn.closest(".u4a-footer");
+            if (oF) { footerHide(oF); }
+        });
+    }
+
+    /**
+     * 공통 입력 필드 팩토리 (sap.m.Input / sap.m.ComboBox 대응) — 생성+동작을 한 곳에서 단일화.
+     * 화면은 createField(opts) 만 호출하고 마크업/클리어(X)/자동완성/F4/value-state/대문자/읽기전용을
+     * 직접 짜지 않는다(두더지잡기 방지 — 색·구조는 shell.css/bootstrap-skin 공통이 단일 소유).
+     * @param {Object} opts
+     *   type      : "text"(기본)|"password"|"textarea"|"combo"|"select"
+     *   value, placeholder, id, readOnly, disabled, rows(textarea), maxLength, width
+     *   clear     : true → 값 있을 때만 X (attachClear)
+     *   suggest   : fn()->string[] → 자동완성(attachSuggest), onPick: fn(value)
+     *   f4        : fn(input) → 값도움(F4) 버튼, f4Icon(기본 magnifying-glass)
+     *   upper     : true → 대문자 강제(커서 보존)
+     *   onChange  : fn(value)  onEnter: fn(value)  onInput: fn(value)
+     *   items/onOpen : combo/select 용(createSelect 위임)
+     *   className(래퍼 추가 클래스), inputClassName(input 추가 클래스)
+     * @returns {Object} { el, input, getValue, setValue, setReadOnly, setValueState, setItems, focus }
+     */
+    function createField(opts) {
+        opts = opts || {};
+        const sType = opts.type || "text";
+
+        // ── combo / select : createSelect 위임(콤보는 .value getter/setter + setItems 보유) ──
+        if (sType === "combo" || sType === "select") {
+            const oCombo = createSelect(opts.items || [], opts.value, opts.onChange, { onOpen: opts.onOpen });
+            if (opts.id) { oCombo.id = opts.id; }
+            if (opts.className) { opts.className.split(/\s+/).forEach(c => { if (c) { oCombo.classList.add(c); } }); }
+            if (opts.width) { oCombo.style.width = opts.width; }
+            if (opts.disabled) { oCombo.setAttribute("aria-disabled", "true"); }
+            return {
+                el: oCombo, input: oCombo,
+                getValue() { return oCombo.value; },
+                setValue(v) { oCombo.value = v; },
+                setItems(a) { if (oCombo.setItems) { oCombo.setItems(a); } },
+                setReadOnly() { },
+                setValueState() { },
+                focus() { oCombo.focus(); }
+            };
+        }
+
+        // ── text / password / textarea : .u4a-field 래퍼 + .u4a-input ──
+        const oWrap = _el("div", "u4a-field" + (opts.className ? " " + opts.className : ""));
+        if (opts.width) { oWrap.style.width = opts.width; }
+
+        const oInput = _el(sType === "textarea" ? "textarea" : "input",
+            "u4a-input u4a-field__input" + (opts.inputClassName ? " " + opts.inputClassName : ""));
+        if (sType !== "textarea") { oInput.type = (sType === "password") ? "password" : "text"; }
+        if (sType === "textarea" && opts.rows) { oInput.rows = opts.rows; }
+        if (opts.id) { oInput.id = opts.id; }
+        if (opts.placeholder) { oInput.placeholder = opts.placeholder; }
+        if (opts.maxLength != null) { oInput.maxLength = opts.maxLength; }
+        oInput.value = (opts.value == null ? "" : String(opts.value));
+        if (opts.readOnly) { oInput.readOnly = true; }
+        if (opts.disabled) { oInput.disabled = true; }
+        oWrap.appendChild(oInput);
+
+        // 트레일링 슬롯(clear / F4) — data-trail 로 CSS 가 우측 패딩 계산
+        let iTrail = 0, oClear = null, _clearSync = null;
+        if (opts.clear) {
+            oClear = _el("button", "u4a-field__clear");
+            oClear.type = "button"; oClear.tabIndex = -1;
+            oClear.title = "Clear"; oClear.setAttribute("aria-label", "Clear");
+            oClear.innerHTML = _fa("xmark");
+            oWrap.appendChild(oClear); iTrail++;
+        }
+        if (opts.f4) {
+            const oVh = _el("button", "u4a-field__vh");
+            oVh.type = "button"; oVh.tabIndex = -1;
+            oVh.innerHTML = opts.f4IconHtml || _fa(opts.f4Icon || "magnifying-glass");
+            if (opts.f4Disabled) { oVh.disabled = true; }
+            oVh.addEventListener("click", () => { try { opts.f4(oInput); } catch (e) { } });
+            oWrap.appendChild(oVh); iTrail++;
+        }
+        if (iTrail) { oWrap.setAttribute("data-trail", String(iTrail)); }
+
+        // 동작 배선(기존 공통 블록 재사용). onClear: 비운 뒤 콜백(모델 반영 등).
+        if (opts.clear) { try { _clearSync = attachClear(oInput, oClear, opts.onClear || null); } catch (e) { } }
+        if (opts.suggest) { try { attachSuggest(oInput, opts.suggest, opts.onPick || null); } catch (e) { } }
+        if (opts.upper) {
+            oInput.addEventListener("input", () => {
+                const s = oInput.selectionStart, e = oInput.selectionEnd;
+                const up = oInput.value.toUpperCase();
+                if (up !== oInput.value) { oInput.value = up; try { oInput.setSelectionRange(s, e); } catch (x) { } }
+            });
+        }
+        if (opts.onInput) { oInput.addEventListener("input", () => opts.onInput(oInput.value)); }
+        if (opts.onChange) { oInput.addEventListener("change", () => opts.onChange(oInput.value)); }
+        if (opts.onEnter) {
+            oInput.addEventListener("keydown", (ev) => {
+                if (ev.key === "Enter") { ev.preventDefault(); opts.onEnter(oInput.value); }
+            });
+        }
+
+        let oMsg = null;
+        return {
+            el: oWrap, input: oInput,
+            getValue() { return oInput.value; },
+            setValue(v) {
+                oInput.value = (v == null ? "" : String(v));
+                if (typeof _clearSync === "function") { try { _clearSync(); } catch (e) { } }
+            },
+            setReadOnly(b) { oInput.readOnly = !!b; },
+            // value-state(검증) — data-vs(빨간 테두리, 상시) + 메시지(.u4a-field__msg, 포커스시 표시는 CSS).
+            setValueState(sState, sMsg) {
+                if (sState && sState !== "none") { oInput.setAttribute("data-vs", sState); }
+                else { oInput.removeAttribute("data-vs"); }
+                if (sMsg != null && sMsg !== "") {
+                    if (!oMsg) { oMsg = _el("span", "u4a-field__msg"); oWrap.appendChild(oMsg); }
+                    oMsg.textContent = sMsg;
+                    if (sState) { oMsg.setAttribute("data-vs", sState); }
+                } else if (oMsg) { oMsg.textContent = ""; }
+            },
+            setItems() { },
+            focus() { oInput.focus(); }
+        };
+    }
+
+    /**
+     * 접이식 패널 (sap.m.Panel expandable 대응) — 공통 컴포넌트.
+     * 헤더 = 토글(twisty+제목) + 액션 슬롯(검색 버튼 등). 버튼 중첩 회피 위해 head 는 div,
+     * 접기 토글만 button. 색/구조는 shell.css `.u4a-panel*` 단일 소유. USP Properties / F4 검색조건 소비.
+     * @param {Object} [cfg] title(제목) · collapsed(초기 접힘) · onToggle(fn(bCollapsed))
+     * @returns {Object} { el, head, body, actions, toggle, setCollapsed(b), isCollapsed() }
+     */
+    function createPanel(cfg) {
+        cfg = cfg || {};
+        const sec = _el("section", "u4a-panel");
+        const head = _el("div", "u4a-panel__head");
+        const tgl = _el("button", "u4a-panel__toggle");
+        tgl.type = "button";
+        tgl.setAttribute("aria-expanded", "true");
+        const tw = _el("span", "u4a-panel__twisty"); tw.innerHTML = ICON.treeChevron; // chevron-right(+CSS 90° 회전)
+        const ttl = _el("span", "u4a-panel__title"); ttl.textContent = cfg.title || "";
+        tgl.append(tw, ttl);
+        const actions = _el("div", "u4a-panel__actions");
+        head.append(tgl, actions);
+        const body = _el("div", "u4a-panel__body");
+        sec.append(head, body);
+
+        function isCollapsed() { return sec.getAttribute("data-collapsed") === "X"; }
+        function setCollapsed(b) {
+            sec.setAttribute("data-collapsed", b ? "X" : "");
+            tgl.setAttribute("aria-expanded", b ? "false" : "true");
+            if (typeof cfg.onToggle === "function") { try { cfg.onToggle(!!b); } catch (e) { } }
+        }
+        tgl.addEventListener("click", function () { setCollapsed(!isCollapsed()); });
+        if (cfg.collapsed) { setCollapsed(true); }
+
+        return { el: sec, head: head, body: body, actions: actions, toggle: tgl, setCollapsed: setCollapsed, isCollapsed: isCollapsed };
+    }
+
+    /**
+     * 프로그램적으로 값을 채운 뒤 clear(X) 노출 상태를 재동기화한다(전 화면 공통).
+     *  - attachClear 는 `input` 이벤트(타이핑)로만 data-filled 를 토글하므로, 화면 렌더가
+     *    `el.value = ...` 로 값을 넣으면 X 가 안 뜬다(이벤트 미발생). 그 직후 이 함수를 호출.
+     *  - createField 의 setValue 는 내부에서 자동 호출하지만, getElementById 로 직접 값을 넣는
+     *    렌더 경로(예: WS30 fnRenderUspProperties/Doc)는 이 함수를 명시 호출한다.
+     */
+    function syncClear(oInput) {
+        if (!oInput || !oInput.closest) { return; }
+        const oField = oInput.closest(".u4a-field");
+        if (oField) { oField.dataset.filled = oInput.value ? "true" : "false"; }
+    }
+
     const U4AUI = {
         el: _el,
+        createField: createField,
+        syncClear: syncClear,
+        createPanel: createPanel,
+        footerMarkup: footerMarkup,
+        footerShow: footerShow,
+        footerHide: footerHide,
         createTree: createTree,
         createSelect: createSelect,
         attachSuggest: attachSuggest,

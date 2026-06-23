@@ -1052,25 +1052,24 @@
                 });
             }
 
-            //C23 Full Screen — 미리보기 전체화면 스위치. (원본 71~77행:
-            // sap.m.Switch change → oAPP.fn.prevFullScreen(state))
+            //C23 Full Screen — 미리보기 전체화면 스위치(원본 sap.m.Switch change → prevFullScreen).
+            //  공통 .u4a-switch(label>input[checkbox]+span.slider) 소비 — ServerList 사운드 설정과 동일.
+            //  ★ textContent 로 "OFF/ON" 글자를 넣으면 스위치의 input/slider 가 지워지므로 절대 금지.
+            //    체크박스 change(checked)로 상태를 읽는다.
             var oTgl = document.getElementById("ws20PrevOffToggle");
             if (oTgl) {
-                oTgl = _replaceWithClone(oTgl);
+                oTgl = _replaceWithClone(oTgl);   // 기존 리스너 제거(내부 input/slider 는 복제로 보존)
                 oTgl.title = _msg("C23", "Full Screen");
-                oTgl.setAttribute("data-state", "");
-                oTgl.textContent = "OFF";
-                oTgl.addEventListener("click", function () {
-                    var bState = this.getAttribute("data-state") !== "X";
-                    this.setAttribute("data-state", bState ? "X" : "");
-                    this.textContent = bState ? "ON" : "OFF";
-                    this.classList.toggle("on", bState);
-                    try {
-                        oAPP.fn.prevFullScreen(bState);
-                    } catch (e) {
-                        console.warn("[HTML5][WS20][prev] prevFullScreen 오류:", e && e.message);
-                    }
-                });
+                var oTglIn = oTgl.querySelector('input[type="checkbox"]');
+                if (oTglIn) {
+                    oTglIn.addEventListener("change", function () {
+                        try {
+                            oAPP.fn.prevFullScreen(this.checked);
+                        } catch (e) {
+                            console.warn("[HTML5][WS20][prev] prevFullScreen 오류:", e && e.message);
+                        }
+                    });
+                }
             }
 
             //B39 Help — 도움말 버튼. (원본 82~127행 구조 보존 — 가드)

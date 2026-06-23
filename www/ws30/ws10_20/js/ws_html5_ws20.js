@@ -264,42 +264,22 @@
 
     /************************************************************************
      * WS20 플로팅 푸터 메시지 (구 sap.m.OverflowToolbar floatingFooter /FMSG/WS20)
-     *   WS10 과 동일 컴포넌트(.u4a-ws10__footer) 재사용. Change 모드 lock/저장/
+     *   공통 푸터 컴포넌트(U4AUI.footer*, shell.css .u4a-footer) 소비. Change 모드 lock/저장/
      *   활성화 등 WS20 메시지를 페이지 하단에 표시. (기존 소스의 푸터 메시지 로직)
      ************************************************************************/
-    var _ws20FooterTimer = null;
+    //  공통 푸터 컴포넌트(U4AUI.footer*, shell.css .u4a-footer) 소비 — 닫기(X)/자동숨김 내장, 화면별 복제 없음.
     function _buildWs20Footer() {
-        var F = document.createElement("div");
-        F.className = "u4a-ws10__footer";
-        F.id = "ws20Footer";
-        F.setAttribute("data-show", "false");
-        F.setAttribute("data-type", "I");
-        F.innerHTML =
-            '<span class="u4a-ws10__footer-icon">' + _fa("circle-info") + '</span>' +
-            '<span class="u4a-ws10__footer-text"></span>' +
-            '<button class="u4a-btn-icon u4a-ws10__footer-close" type="button" title="Close">' + _fa("xmark") + '</button>';
-        F.querySelector(".u4a-ws10__footer-close").addEventListener("click", function () {
-            oAPP.ws20html.hideFooter();
-        });
-        return F;
+        var T = document.createElement("div");
+        T.innerHTML = window.U4AUI.footerMarkup("ws20Footer");
+        return T.firstChild;
     }
 
     oAPP.ws20html = oAPP.ws20html || {};
     oAPP.ws20html.showFooter = function (sType, sMsg) {
-        var oF = document.getElementById("ws20Footer");
-        if (!oF) { return; }
-        var map = { E: "circle-exclamation", S: "circle-check", W: "triangle-exclamation", I: "circle-info" };
-        oF.setAttribute("data-type", sType || "I");
-        oF.setAttribute("data-show", "true");
-        oF.querySelector(".u4a-ws10__footer-icon").innerHTML = _fa(map[sType] || "circle-info");
-        oF.querySelector(".u4a-ws10__footer-text").textContent = sMsg || "";
-        if (_ws20FooterTimer) { clearTimeout(_ws20FooterTimer); }
-        _ws20FooterTimer = setTimeout(oAPP.ws20html.hideFooter, 10000);
+        if (window.U4AUI) { window.U4AUI.footerShow("ws20Footer", sType || "I", sMsg || ""); }
     };
     oAPP.ws20html.hideFooter = function () {
-        var oF = document.getElementById("ws20Footer");
-        if (oF) { oF.setAttribute("data-show", "false"); }
-        if (_ws20FooterTimer) { clearTimeout(_ws20FooterTimer); _ws20FooterTimer = null; }
+        if (window.U4AUI) { window.U4AUI.footerHide("ws20Footer"); }
     };
 
     /************************************************************************
@@ -521,6 +501,63 @@
             if (el2.classList.contains("u4a-tx-sep")) { el2.style.display = "none"; continue; }
             break;
         }
+    }
+
+    /************************************************************************
+     * [HTML5] WS20 단축키 — Back(F3) 를 HTML5 핸들러로 교체.
+     * ---------------------------------------------------------------------
+     *  구 getShortCutList("WS20") 의 F3 fn 은 sap.ui.getCore().byId("backBtn").firePress()
+     *  (UI5 결합) → HTML5 에선 backBtn 이 UI5 컨트롤이 아니라 동작 안 함. USP(ws_html5_usp.js)
+     *  와 동일하게 getShortCutList 를 super-wrap 해서 "WS20" 의 F3 fn 만 HTML5 핸들러로 바꾼다.
+     *    · 등록: WS20 진입 시 ws_fn_02.js 가 setShortCut("WS20") → oShortcut.add(KEY, fn)(document keydown).
+     *    · 미리보기 iframe 포커스: ws_html5_ws20_prev.js _attachPreviewShortcutForward 가 합성 keydown 재발송.
+     *  공통 가드(_ws20ScGuard): e.repeat(꾹 누름)·현재 페이지 WS20·busy.
+     ************************************************************************/
+    function _ws20ScGuard(e, fn) {
+        // 공통 가드(ws_common.js fnRunShortCut)에 위임 — 꾹누름·화면일치(WS20)·종합체크
+        //   (busy/메뉴열림/다이얼로그열림/isShortcutLock/페이지이동 in-flight) 단일 방어 통로.
+        if (oAPP.common && typeof oAPP.common.fnRunShortCut === "function") {
+            oAPP.common.fnRunShortCut(e, "WS20", fn);
+            return;
+        }
+        // 폴백(공통 미로드 시) — 최소 가드
+        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { }
+        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { }
+        if (e && e.repeat === true) { return; }
+        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS20") { return; } } catch (x) { }
+        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { }
+        try { fn(e); } catch (err) { console.error("[HTML5][WS20] shortcut:", err); }
+    }
+
+    //F3 — 뒤로가기(원본 ws_common.js 1281 [WS20] Back Button). ← 버튼과 동일한 ev_pageBack 수행.
+    function _ws20Back() {
+        //메뉴 팝오버 닫기(원본 fnCloseMenuPopover).
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
+        //단축키 실행 가능 여부(원본 fnShortCutExeAvaliableCheck) — "X" 면 중단.
+        try {
+            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
+                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
+        } catch (x) { }
+        //입력 중 포커스 날리기(편집값 반영 — 원본 동일).
+        try { if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); } } catch (x) { }
+        //뒤로가기 — ← 버튼과 동일.
+        if (oAPP.events && typeof oAPP.events.ev_pageBack === "function") { oAPP.events.ev_pageBack(); }
+        else { console.warn("[HTML5][WS20] ev_pageBack not available (F3)"); }
+    }
+
+    //getShortCutList(ws_common.js)가 먼저 로드된 경우에만 super-wrap(미정의면 전 페이지 단축키가
+    //  []로 깨지므로 가드). 정상 로드 순서(ws_common → ws_html5_ws20)에선 항상 통과.
+    if (typeof oAPP.common.getShortCutList === "function") {
+        var _ws20GetShortCutList_super = oAPP.common.getShortCutList;
+        oAPP.common.getShortCutList = function (sPgNo) {
+            var aList = (typeof _ws20GetShortCutList_super === "function") ? _ws20GetShortCutList_super(sPgNo) : [];
+            if (sPgNo !== "WS20" || !Array.isArray(aList)) { return aList; }
+            var oFnMap = {
+                "F3": function (e) { _ws20ScGuard(e, _ws20Back); }   // 뒤로가기
+            };
+            aList.forEach(function (o) { if (o && oFnMap[o.KEY]) { o.fn = oFnMap[o.KEY]; } });
+            return aList;
+        };
     }
 
     /************************************************************************
@@ -1170,9 +1207,14 @@
             try { POP.remove(); } catch (e) { }
             document.removeEventListener("mousedown", _out, true);
             document.removeEventListener("keydown", _esc, true);
+            window.removeEventListener("resize", _close);
+            window.removeEventListener("scroll", _close, true);
         }
         function _out(e) { if (!POP.contains(e.target) && e.target !== oAnchor && !oAnchor.contains(e.target)) { _close(); } }
         function _esc(e) { if (e.key === "Escape") { _close(); } }
+        // 창 리사이즈/스크롤 시 닫기 — 앵커(서버정보 버튼) 이동으로 위치 어긋남 방지(전체창 전환 등).
+        window.addEventListener("resize", _close);
+        window.addEventListener("scroll", _close, true);
         // 미리보기(iframe) 클릭 닫기는 전역(u4a-ui.js _installIframeBlurClose)이 합성 mousedown 으로 처리.
         setTimeout(function () {
             document.addEventListener("mousedown", _out, true);
@@ -1229,16 +1271,19 @@
         ZOOM.disabled = true;
         HDR.appendChild(ZOOM);
 
-        // OFF 토글 모양 (정적/가드)
-        var TGL = document.createElement("span");
+        // Full Screen 토글(C23) — 공통 스위치(.u4a-switch = sap.m.Switch 대체, shell.css). ServerList
+        //   사운드 설정 팝업과 동일 컴포넌트. 실제 동작(prevFullScreen) 배선은 ws_html5_ws20_prev.js.
+        var TGL = document.createElement("label");
         TGL.id = "ws20PrevOffToggle";
-        TGL.className = "u4aWs20PrevToggle";
-        TGL.textContent = "OFF";
-        TGL.addEventListener("click", function () {
-            try {
-                console.warn("[HTML5][WS20] preview action not implemented (W2 예정): ws20PrevOffToggle");
-            } catch (e) { }
-        });
+        TGL.className = "u4a-switch";   // 공통 컴포넌트 그대로(체크리스트 F)
+        TGL.title = "Full Screen";
+        var TGLIN = document.createElement("input");
+        TGLIN.type = "checkbox";
+        TGLIN.id = "ws20PrevOffInput";
+        var TGLSL = document.createElement("span");
+        TGLSL.className = "u4a-switch__slider";
+        TGL.appendChild(TGLIN);
+        TGL.appendChild(TGLSL);
         HDR.appendChild(TGL);
 
         // 도움말 (자리만)
@@ -1248,7 +1293,7 @@
         //   (트리 툴바와 동일 — U4AUI.attachOverflow). 스페이서만 isSkip, 우측정렬이라 noOvfAutoMargin.
         try {
             if (window.U4AUI && U4AUI.attachOverflow) {
-                U4AUI.attachOverflow(HDR, {
+                var oOvfCtl = U4AUI.attachOverflow(HDR, {
                     noOvfAutoMargin: true,
                     isSkip: function (el) { return el.classList.contains("u4aWs20PanelHdrSpacer"); },
                     isSep: function () { return false; },
@@ -1259,11 +1304,21 @@
                         var bDis = el.disabled === true || el.classList.contains("is-disabled");
                         var sIcon, sText;
                         if (el.id === "ws20PrevZoomSlider") { sIcon = _fa("magnifying-glass"); sText = "Zoom"; bDis = true; }
-                        else if (el.id === "ws20PrevOffToggle") { sIcon = _fa("toggle-off"); sText = el.textContent || "OFF"; }
+                        else if (el.id === "ws20PrevOffToggle") { sIcon = _fa("toggle-off"); sText = el.title || "Full Screen"; }
                         else { sIcon = oI ? oI.outerHTML : ""; sText = el.title || (window.U4AUI && U4AUI.btnLabel ? U4AUI.btnLabel(el, true) : "") || ""; }
                         return { iconHtml: sIcon, text: sText, disabled: bDis, onClick: function () { if (!bDis) { el.click(); } } };
                     }
                 });
+                // ★ 초기 reflow 명시 호출 — 헤더 폭이 "확정된 뒤" 측정한다.
+                //   (ResizeObserver 초기 콜백이 배치 전 0/좁은 폭에서 한 번 돌고 안 다시 돌면, 공간이
+                //    충분해도 ⋯ 가 떠버린다. 트리 툴바가 fnRenderDesignTree 에서 reflow 부르는 것과 동일 보강.)
+                //   폭이 0 이면(아직 미배치/숨김) 프레임마다 최대 N회 재시도 후 폭이 잡히면 reflow.
+                if (oOvfCtl && typeof oOvfCtl.reflow === "function" && typeof requestAnimationFrame === "function") {
+                    (function _tryReflow(n) {
+                        if (HDR.clientWidth > 0) { try { oOvfCtl.reflow(); } catch (e) { } return; }
+                        if (n > 0) { requestAnimationFrame(function () { _tryReflow(n - 1); }); }
+                    })(30);
+                }
             }
         } catch (e) { console.warn("[HTML5][WS20] preview header overflow attach 실패:", e && e.message); }
 

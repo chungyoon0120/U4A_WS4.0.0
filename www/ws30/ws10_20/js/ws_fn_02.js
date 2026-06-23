@@ -521,6 +521,18 @@
         // busy 키고 Lock 키기
         oAPP.common.fnSetBusyLock("X");
 
+        // [HTML5] 페이지 이동 in-flight 락 — F3 연타/재진입 시 fnMoveToWs10 중복 실행(화면 깨짐) 방지.
+        //   busy 가 비동기 이동 중(저장확인창/주석된 busy해제) 잠깐 풀려도 단축키 가드가 이 락을 본다.
+        oAPP.common.fnNaviLock();
+        // 떠나는 현재 화면(이동 완료 전) 캡쳐.
+        var sFromPage = "";
+        try { sFromPage = (parent.getCurrPage && parent.getCurrPage()) || ""; } catch (e) { }
+
+        // ★ 단축키 해제는 "가장 먼저" — 전환(서버콜·removeContent·렌더) 시작 전에 떠나는 화면의
+        //   단축키를 즉시 제거한다. 그래야 비동기 이동 도중 그 화면 단축키가 한 번 더 발화하지 않는다.
+        //   (기존엔 lf_success 끝에서 "WS20" 하드코딩으로 늦게 제거 → WS30 단축키 누수·연타 재진입 원인.)
+        try { APPCOMMON.removeShortCut(sFromPage || "WS20"); } catch (e) { }
+
         var oAppInfo = parent.getAppInfo();
 
         // 10번 페이지로 이동할때 서버 한번 콜 해준다. (서버 세션 죽이기)
@@ -557,6 +569,8 @@
 
                             // busy 끄고 Lock 끄기
                             oAPP.common.fnSetBusyLock("");
+                            // 이동 실패 → in-flight 락 해제(영구 잠김 방지)
+                            oAPP.common.fnNaviRelease();
 
                             return;
                         }
@@ -584,10 +598,8 @@
             // 10번 프로그램으로 이동한다.        
             oAPP.fn.fnOnMoveToPage("WS10");
 
-            // 20번 프로그램 단축키 삭제
-            APPCOMMON.removeShortCut("WS20");
-
-            // 10번 프로그램 단축키 설정
+            // (떠나는 화면 단축키 해제는 위에서 "가장 먼저" 수행했음 — 여기선 등록만.)
+            // WS10 단축키 설정 — 화면(fnOnMoveToPage("WS10")) 다 그린 "뒤" = 가장 마지막에 등록.
             APPCOMMON.setShortCut("WS10");
 
             // 브라우저 타이틀 변경
@@ -595,6 +607,9 @@
 
             // 윈도우 헤더 타이틀 변경
             oAPP.common.setWSHeadText("U4A Workspace - Main");
+
+            // [HTML5] 이동 완료 → in-flight 락 해제 (이제 다음 페이지 단축키 허용)
+            oAPP.common.fnNaviRelease();
 
             // // AI 서버 연결되어있을 경우 연결 해제 하기
             // // AI 서버에 요청할 데이터

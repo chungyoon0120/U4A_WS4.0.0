@@ -75,9 +75,13 @@
             },
             // 설명(Description 컬럼) — 우측 정렬(slotTrailing → 행에 data-u4a-tree-split)
             slotTrailing: function (n) {
+                // 셀(구분선 풀하이트) / 텍스트(클램프) 분리 — 셀이 텍스트를 세로 중앙정렬(usp.css).
                 var d = document.createElement("span");
                 d.className = "u4aWs30TreeDesc";
-                d.textContent = (n && n.DESCT != null) ? n.DESCT : "";
+                var t = document.createElement("span");
+                t.className = "u4aWs30TreeDescText";
+                t.textContent = (n && n.DESCT != null) ? n.DESCT : "";
+                d.appendChild(t);
                 return d;
             },
             // 기본 루트만 펼침(구 numberOfExpandedLevels:1)
@@ -93,6 +97,7 @@
                 var k = _key(n);
                 if (k !== "") { oRow.setAttribute("data-objky", k); }
                 if (n && n.ISSEL) { oRow.setAttribute("aria-selected", "true"); }
+                oRow.__uspNode = n;   // 우클릭 컨텍스트 메뉴가 행→노드 데이터 해석에 사용
             }
         });
         _tree.el.classList.add("u4aWs30Tree");
@@ -124,7 +129,7 @@
     function _applyDescTooltips() {
         var BODY = document.getElementById("uspTreeBody");
         if (!BODY) { return; }
-        var aDesc = BODY.querySelectorAll(".u4aWs30TreeDesc");
+        var aDesc = BODY.querySelectorAll(".u4aWs30TreeDescText");
         Array.prototype.forEach.call(aDesc, function (el) {
             try {
                 if (el.scrollHeight > el.clientHeight + 1) {
@@ -165,6 +170,47 @@
     oAPP.fn.fnUspTreeCollapseAll = function () {
         var oTree = _ensureTree();
         if (oTree) { oTree.collapseAll(); }
+    };
+
+    /************************************************************************
+     * 컨텍스트 메뉴 연동 — 서브트리 펼침/접힘(구 fnCommonUspTreeTableExpand/Collapse).
+     ************************************************************************/
+    // K1 Expand Subtree — 노드+자손 폴더 전부 펼침(루트면 전체). 구 PUJKY=="" → expandToLevel(99) 포함.
+    oAPP.fn.fnUspTreeExpandSubtree = function (oNode) {
+        var oTree = _ensureTree();
+        if (!oTree || !oNode) { return; }
+        oTree.expandSubtree(oNode);
+        if (oNode) { oTree.selectByKey(_key(oNode)); }   // render 후 우클릭 대상 강조 재적용
+    };
+    // K2 Collapse Subtree — 선택 노드만 접음(구 collapse(idx)).
+    oAPP.fn.fnUspTreeCollapseSubtree = function (oNode) {
+        var oTree = _ensureTree();
+        if (!oTree || !oNode) { return; }
+        oTree.setExpanded(oNode, false);
+        if (oNode) { oTree.selectByKey(_key(oNode)); }
+    };
+    // 우클릭 시 시각적 선택만(행 열기 ajax 없이) — 구 setSelectedIndex 효과.
+    oAPP.fn.fnUspTreeCtxSelect = function (oNode) {
+        if (_tree && oNode) { _tree.selectByKey(_key(oNode)); }
+    };
+
+    // 현재 선택(aria-selected) 행의 노드 — 없으면 null. 트리 툴바 펼침/접힘이 사용.
+    oAPP.fn.fnUspTreeGetSelectedNode = function () {
+        if (!_tree) { return null; }
+        var oRow = _tree.el.querySelector('.u4a-tree__row[aria-selected="true"]');
+        return oRow ? (oRow.__uspNode || null) : null;
+    };
+
+    // 트리 툴바 펼침/접힘 — 구 ev_UspTreeTableExpand/Collapse 가 gIndex 없이 호출 →
+    //   fnCommonUspTreeTableExpand/Collapse 가 getSelectedIndex() 사용 = "선택 노드" 기준(All 아님).
+    //   루트 선택 시 expandSubtree(root)=트리 전체(구 expandToLevel(99)). 선택 없으면 no-op(구 동일).
+    oAPP.fn.fnUspTreeExpandSelected = function () {
+        var oNode = oAPP.fn.fnUspTreeGetSelectedNode();
+        if (oNode) { oAPP.fn.fnUspTreeExpandSubtree(oNode); }
+    };
+    oAPP.fn.fnUspTreeCollapseSelected = function () {
+        var oNode = oAPP.fn.fnUspTreeGetSelectedNode();
+        if (oNode) { oAPP.fn.fnUspTreeCollapseSubtree(oNode); }
     };
 
     // 트리 전체 순회 콜백(모델 ISSEL 갱신용)

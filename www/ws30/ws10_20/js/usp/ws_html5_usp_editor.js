@@ -57,6 +57,14 @@
 
     // Pretty Print (구 ev_codeeditorPrettyPrint) — 두 에디터 모두 formatDocument
     function _prettyPrint() {
+        // 버튼 비활성 조건과 동일하게 자체 가드(Shift+F1 단축키는 비활성 버튼을 우회하므로 필수).
+        //   Change 모드 && 파일(루트X·폴더X)에서만 정렬.
+        var oData = _model("/WS30/USPDATA") || {};
+        var oApp = _model("/WS30/APP") || {};
+        var bEdit = (oApp.IS_EDIT === "X");
+        var bRoot = (oData.PUJKY === "" || oData.PUJKY == null);
+        var bFolder = (oData.ISFLD === "X");
+        if (!(bEdit && !bRoot && !bFolder)) { return; }
         ["EDITOR_FRAME1", "EDITOR_FRAME2"].forEach(function (cls) {
             try {
                 var ifr = document.querySelector("." + cls);
@@ -66,6 +74,8 @@
             } catch (e) { console.error("[HTML5][WS30] prettyPrint error:", e); }
         });
     }
+    // [PUBLIC] Pretty Print — 셸의 Shift+F1 단축키가 호출(에디터 toolbar 버튼과 동일 동작).
+    oAPP.usphtml.editorPrettyPrint = _prettyPrint;
 
     // 기본 폰트 크기 (구 ev_codeeditorDefaultFontSize) — 두 에디터 setDefaultFontSize
     function _defaultFont() {
@@ -86,17 +96,28 @@
         var oRes = document.getElementById("ws30Resizer");
         if (oTree) { oTree.style.display = bFull ? "none" : ""; }
         if (oRes) { oRes.style.display = bFull ? "none" : ""; }
+        // 공통 패널(.u4a-panel) 접기 — data-collapsed 는 공통 CSS 가 바디 숨김+트위스티 회전을 처리.
+        //   aria-expanded 만 공통 토글 버튼(.u4a-panel__toggle)에 동기.
         var oPanel = document.getElementById("uspPanel");
         if (oPanel) {
             oPanel.setAttribute("data-collapsed", bFull ? "X" : "");
-            var oHead = oPanel.querySelector(".u4aWs30PanelHead");
-            if (oHead) {
-                oHead.setAttribute("aria-expanded", bFull ? "false" : "true");
-                var oTw = oHead.querySelector(".u4aWs30PanelTwisty");
-                if (oTw) { oTw.innerHTML = _fa(bFull ? "chevron-right" : "chevron-down"); }
-            }
+            var oTgl = oPanel.querySelector(".u4a-panel__toggle");
+            if (oTgl) { oTgl.setAttribute("aria-expanded", bFull ? "false" : "true"); }
+        }
+        // 버튼 상태도 동기화(프로그램적 호출=재진입 리셋 시 아이콘/aria 가 안 어긋나게).
+        var oFBtn = document.getElementById("ws30_editorFullscreenBtn");
+        if (oFBtn) {
+            oFBtn.setAttribute("aria-pressed", bFull ? "true" : "false");
+            oFBtn.innerHTML = _fa(bFull ? "compress" : "expand");
+            try { oFBtn.title = bFull ? _wsMsg("370") : _wsMsg("369"); } catch (e) { }
         }
     }
+
+    // [PUBLIC] 전체화면 해제 — WS30 재진입 시 셸이 재빌드되지 않아 트리/리사이저가 display:none 으로
+    //   남는 문제 방지(셸 fnRenderUspShell 재진입 경로에서 호출). 이미 해제 상태면 사실상 no-op.
+    oAPP.usphtml.editorExitFullscreen = function () {
+        if (oAPP.attr.uspFullscreen) { _fullscreen(false); }
+    };
 
     // 분할 방향 변경 (구 ev_codeeditorSplitOrientationChange) — 가로↔세로 토글 + 좌측 0px 초기화
     function _splitOrientation() {
@@ -166,6 +187,9 @@
             delete oAPP.attr.uspEditorBusyWatch;
         }
         try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+        // (WS30 단축키 등록은 에디터가 아니라 "셸 렌더 직후"(ws_html5_usp.js fnOnMoveToPage override,
+        //   fnRenderUspShell 뒤)에서 한다 — 에디터는 노드 선택 시에만 떠서 display/문서 패널 화면에선
+        //   _releaseBusy 가 안 불려 단축키가 영영 미등록되던 회귀가 있었음.)
         // 에디터 로드 후 iframe 이 적용/세팅한 테마로 콤보 표시 동기화 (구 ComboBox 모델 바인딩 대체)
         try {
             var oCombo = document.querySelector("#uspEditorHost .u4aWs30EditorThemeSel");
@@ -511,28 +535,21 @@
 
     /************************************************************************
      * [PUBLIC] 에디터 영역 비우기 — 폴더/루트(문서 페이지) 등 파일 아닌 경우.
-     *   ★ 파괴(innerHTML="")하지 않고, host 박스(테두리+배경)는 **항상 보이게 두고 안의
-     *   내용(툴바+iframe)만 숨긴다**(.u4aWs30EditorHidden > * { display:none }).
-     *     - 영역(빈 에디터 박스) 모양이 폴더/파일·최초/재선택 모두 일관(박스가 사라졌다 생겼다 X).
-     *     - Monaco 는 무거워(loader+worker) 폴더↔파일마다 destroy+재생성하면 느리고 크래시
-     *       위험 → iframe(2개)은 DOM 에 살려두고(display:none) 파일 재선택 시 editorLoadSelected
-     *       가 숨김 해제 + setValue + layout() 으로 재로드 없이 재사용.
+     *   ★ 원본(ws_usp.js:5336 `if (!bIsFold)`)은 에디터를 '파일'에서만 붙인다 → 폴더/루트는
+     *   에디터 박스 자체가 없어야 한다(Properties 만 표시). 따라서 host 를 통째로 숨긴다
+     *   (.u4aWs30EditorHidden { display:none }).
+     *     - 단, 파괴(innerHTML="")는 하지 않는다: Monaco 는 무거워(loader+worker) 폴더↔파일마다
+     *       destroy+재생성하면 느리고 크래시 위험 → iframe(2개)은 DOM 에 살려두고(display:none)
+     *       파일 재선택 시 editorLoadSelected 가 숨김 해제 + setValue + layout() 으로 재로드 없이 재사용.
      *   (분할바 옵저버는 그대로 유지 — DOM 이 남아 있으므로 해제하지 않는다.)
      ************************************************************************/
     oAPP.usphtml.editorClear = function () {
         var oHost = document.getElementById("uspEditorHost");
         if (!oHost) { return; }
-        var aFrames = oHost.querySelectorAll("iframe.MONACO_EDITOR");
-        if (aFrames.length) {
-            // 이미 만들어진 에디터 → 파괴하지 말고 내용만 숨김(박스 유지, 재선택 시 재로드 없이 재사용).
-            oHost.classList.add("u4aWs30EditorHidden");
-            return;
-        }
-        // 아직 에디터가 없으면 잔여물만 정리(빈 박스 상태로 둠).
-        try { if (oAPP.usphtml.disconnectObserver) { oAPP.usphtml.disconnectObserver("editorSplit"); } } catch (e) { }
-        oHost.innerHTML = "";
-        oHost.classList.remove("u4aWs30EditorHidden");
-        oAPP.attr.uspEditorLoadCnt = 0;
+        // 폴더/루트 → 에디터 박스 자체를 숨긴다(원본은 파일에서만 에디터를 붙임).
+        //   에디터가 아직 안 만들어진 첫 진입 상태에서도(빈 host) 동일하게 숨겨야 빈 박스가 안 보인다.
+        //   iframe 이 이미 있으면 파괴하지 않고 host 만 숨김(파일 재선택 시 재로드 없이 재사용).
+        oHost.classList.add("u4aWs30EditorHidden");
     };
 
 })(window, jQuery, oAPP);

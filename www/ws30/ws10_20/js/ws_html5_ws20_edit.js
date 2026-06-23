@@ -898,6 +898,7 @@
         if (_openMenu) { try { _openMenu.remove(); } catch (e) { } _openMenu = null; }
         document.removeEventListener("mousedown", _onOutside, true);
         document.removeEventListener("keydown", _onEsc, true);
+        window.removeEventListener("resize", _closeMenu);
     }
     function _onOutside(ev) { if (_openMenu && !_openMenu.contains(ev.target)) { _closeMenu(); } }
     function _onEsc(ev) { if (ev.key === "Escape") { _closeMenu(); } }
@@ -1056,6 +1057,8 @@
         oMenu.style.top = y + "px";
         oMenu.style.zIndex = "4000";
         _openMenu = oMenu;
+        // 창 리사이즈 시 컨텍스트 메뉴 닫기(표준 메뉴 UX).
+        window.addEventListener("resize", _closeMenu);
         // 미리보기(iframe) 클릭 닫기는 전역(u4a-ui.js _installIframeBlurClose)이 합성 mousedown 으로 처리.
         setTimeout(function () {
             document.addEventListener("mousedown", _onOutside, true);

@@ -49,6 +49,29 @@
     function _busy(bOn) { try { APPCOMMON.fnSetBusyLock(bOn ? "X" : ""); } catch (e) { } }
 
     function _isRoot(o) { return !!(o && (o.APPID === "ROOT" || o.PACKG === "ROOT")); }
+    // 진짜 최상위 컨테이너(U4A IDE)만 — 필터 시 항상 표시 대상. (PACKG==="ROOT" 인 최상위 패키지들은
+    //  제외 → 패키지도 이름 매칭/매칭 자식이 있어야만 보임. display 용 _isRoot 와 구분.)
+    function _isTopRoot(o) { return !!(o && o.APPID === "ROOT"); }
+
+    /* ── 고정 컬럼(가로 스크롤 시 좌측 N개 sticky 고정) — 탭1/트리 공통 헬퍼 ──────────
+     *  CSS(.is-frz/.is-frz-last) 는 .u4aAppF4Tbl 스코프로 두 테이블 공유. 고정 개수·left 오프셋만
+     *  테이블별로 준다. lefts = 선행 고정컬럼 폭 누적(rem). 액션컬럼 기본폭 4.5rem(=.is-action). */
+    function _frzLefts(cols, frzn) {
+        var lefts = [], acc = 0;
+        for (var i = 0; i < frzn; i++) {
+            lefts.push(acc + "rem");
+            var c = cols[i] || {};
+            acc += c.w ? parseFloat(c.w) : (c.action ? 4.5 : 8);
+        }
+        return lefts;
+    }
+    function _applyFrz(cell, idx, frzn, lefts) {
+        if (idx < frzn) {
+            cell.classList.add("is-frz");
+            cell.style.left = lefts[idx];
+            if (idx === frzn - 1) { cell.classList.add("is-frz-last"); }
+        }
+    }
     function _fmtDate(s) {
         if (!s || s === "00000000") { return ""; }
         s = String(s); if (s.length !== 8) { return s; }
@@ -65,35 +88,22 @@
         try { return !!APPCOMMON.checkWLOList("C", "UHAK901182"); } catch (e) { return false; }
     }
 
-    /* ── 공통 입력 필드(.u4a-field + clear X) ─────────────────────── */
+    /* ── 공통 입력 필드 — 공통 팩토리(U4AUI.createField) 위임(생성/clear/대문자/Enter 단일화) ── */
     function _mkField(sVal, opt) {
         opt = opt || {};
-        var wrap = _el("div", "u4a-field u4aAppF4Field");
-        wrap.setAttribute("data-trail", "1");
-        if (opt.w) { wrap.style.width = opt.w; }
-        var inp = _el("input", "u4a-input u4a-field__input");
-        inp.type = opt.type || "text";
-        inp.value = (sVal == null ? "" : String(sVal));
-        if (opt.ph) { inp.placeholder = opt.ph; }
-        if (opt.disabled) { inp.disabled = true; }
-        var clr = _el("button", "u4a-field__clear");
-        clr.type = "button"; clr.tabIndex = -1; clr.innerHTML = _fa("xmark");
-        wrap.append(inp, clr);
-        try { if (window.U4AUI && U4AUI.attachClear) { U4AUI.attachClear(inp, clr); } } catch (e) { }
-        // 대문자 필드(패키지/사용자/웹앱ID) — 커서 보존 업서치.
-        if (opt.upper) {
-            inp.addEventListener("input", function () {
-                var s = inp.selectionStart, e = inp.selectionEnd;
-                var up = inp.value.toUpperCase();
-                if (up !== inp.value) { inp.value = up; try { inp.setSelectionRange(s, e); } catch (x) { } }
-            });
-        }
-        if (opt.onEnter) {
-            inp.addEventListener("keydown", function (ev) {
-                if (ev.key === "Enter") { ev.preventDefault(); opt.onEnter(); }
-            });
-        }
-        return { wrap: wrap, input: inp };
+        var fld = window.U4AUI.createField({
+            type: opt.type || "text",
+            value: sVal,
+            placeholder: opt.ph,
+            disabled: opt.disabled,
+            clear: true,
+            upper: opt.upper,
+            onEnter: opt.onEnter ? function () { opt.onEnter(); } : null,
+            className: "u4aAppF4Field",
+            width: opt.w
+        });
+        // 기존 호출부 계약 유지({ wrap, input }).
+        return { wrap: fld.el, input: fld.input };
     }
 
     /* ── 가상 스크롤(windowing) — 보이는 행만 DOM 에 렌더 ───────────────
@@ -122,15 +132,23 @@
             div.style.height = "0px"; div.style.width = "1px";
             td.appendChild(div);
             tr.appendChild(td);
-            tr._h = div;   // 높이 세터(div)
+            // 높이를 div + td 양쪽에 건다 — table-layout:fixed 에서 cell 자식 div 높이가
+            // 행높이로 반영 안 되는 환경 대비(둘 중 하나는 반드시 행높이로 먹는다).
+            tr._setH = function (px) { div.style.height = px + "px"; td.style.height = px + "px"; };
             return tr;
         }
         var oTop = _spacer(), oBot = _spacer();
 
         function _render() {
             var total = aData.length;
-            oTbody.textContent = "";
+            // ★ scrollTop 은 DOM 을 건드리기 전에 읽는다. tbody 를 통째로 비우면 테이블 높이가
+            //   thead 만 남아 붕괴 → 브라우저가 scrollTop 을 0 으로 클램프 → 읽으면 항상 0 이 되어
+            //   휠/드래그가 맨 위로 튕기던 핵심 버그. 그래서 (a) 먼저 읽고 (b) 스페이서를 절대
+            //   떼지 않아 높이가 붕괴하지 않게 한다.
+            var st = oWrap.scrollTop, vh = oWrap.clientHeight || 400;
+
             if (!total) {
+                oTbody.textContent = "";
                 if (opt.nodata != null) {
                     var trN = document.createElement("tr"); trN.className = "u4a-table__nodata";
                     var tdN = document.createElement("td"); tdN.colSpan = opt.colCount; tdN.textContent = opt.nodata;
@@ -138,13 +156,25 @@
                 }
                 return;
             }
-            var st = oWrap.scrollTop, vh = oWrap.clientHeight || 400;
+
             var start = Math.max(0, Math.floor(st / ROWH) - OVER);
             var cnt = Math.ceil(vh / ROWH) + OVER * 2;
             var end = Math.min(total, start + cnt);
-            oTop._h.style.height = (start * ROWH) + "px";
-            oBot._h.style.height = (Math.max(0, total - end) * ROWH) + "px";
-            oTbody.appendChild(oTop);
+
+            // 스페이서가 항상 tbody 양 끝에 존재하도록 보장(없을 때만 초기화 — 높이 붕괴 방지).
+            if (oTop.parentNode !== oTbody || oBot.parentNode !== oTbody) {
+                oTbody.textContent = "";
+                oTbody.appendChild(oTop);
+                oTbody.appendChild(oBot);
+            }
+            // 위/아래 빈 높이 먼저 갱신 → 전체 높이 = total*ROWH 유지(클램프 없음).
+            oTop._setH(start * ROWH);
+            oBot._setH(Math.max(0, total - end) * ROWH);
+
+            // 새 행을 oBot 앞에 먼저 삽입한 뒤, 이전 윈도우 행을 제거(삽입-먼저/제거-나중 →
+            // 높이가 목표 아래로 내려가는 순간이 없어 scrollTop 이 클램프되지 않는다).
+            var aOld = [];
+            for (var n = oTop.nextElementSibling; n && n !== oBot; n = n.nextElementSibling) { aOld.push(n); }
             var frag = document.createDocumentFragment();
             for (var i = start; i < end; i++) {
                 var tr = opt.buildRow(aData[i], i);
@@ -153,15 +183,24 @@
                 }
                 frag.appendChild(tr);
             }
-            oTbody.appendChild(frag);
-            oTbody.appendChild(oBot);
-            // 첫 렌더 1회 실제 행높이 측정 → 보정 재렌더(스크롤 위치 정확)
+            oTbody.insertBefore(frag, oBot);
+            for (var j = 0; j < aOld.length; j++) { oTbody.removeChild(aOld[j]); }
+
+            // 첫 렌더 1회 실제 행높이 측정 → 정수로 반올림해 ROWH 고정 + CSS 로 데이터 행높이 강제.
+            //   ★ 끝단(맨 위/아래)에서 부르르 떠는 현상 방지: 행 실제높이가 ROWH 와 소수점 단위로
+            //     다르면 스크롤할수록 scrollHeight 가 흔들리고, 끝에 닿으면 scrollTop 이 클램프되며
+            //     scroll→재렌더 피드백 루프가 생겨 떨린다. 행을 정확히 ROWH(정수)px 로 강제하면
+            //     total*ROWH 가 실제 높이와 항상 일치 → scrollHeight 불변 → 떨림 제거.
             if (!bMeasured) {
                 var oFirst = oTop.nextElementSibling;
                 if (oFirst && oFirst !== oBot) {
                     bMeasured = true;
                     var h = oFirst.getBoundingClientRect().height;
-                    if (h && Math.abs(h - ROWH) > 0.5) { ROWH = h; _render(); }
+                    if (h) {
+                        var r = Math.max(1, Math.round(h));
+                        oWrap.style.setProperty("--u4a-vsrowh", r + "px");   // CSS 가 데이터 행을 이 높이로 강제
+                        if (r !== ROWH) { ROWH = r; _render(); }
+                    }
                 }
             }
         }
@@ -170,6 +209,19 @@
             raf = requestAnimationFrame(function () { raf = 0; _render(); });
         }
         oWrap.addEventListener("scroll", _onScroll);
+
+        // ★ 휠 직접 처리 — Electron/Chromium 에서 가상 스크롤 컨테이너의 네이티브 휠→스크롤이
+        //   먹지 않는 케이스가 있어(앵커링/sticky thead/모달 top-layer 등 환경 의존), 휠 델타를
+        //   scrollTop/Left 에 수동 반영한다. scrollTop 변경이 scroll 이벤트를 발화 → _render 재계산.
+        //   - Ctrl+휠은 줌(전역 핸들러)에 양보. - 실제로 스크롤됐을 때만 preventDefault(가로/세로 양보).
+        oWrap.addEventListener("wheel", function (e) {
+            if (e.ctrlKey) { return; }
+            var unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? (oWrap.clientHeight || 1) : 1);
+            var t0 = oWrap.scrollTop, l0 = oWrap.scrollLeft;
+            oWrap.scrollTop = t0 + e.deltaY * unit;
+            oWrap.scrollLeft = l0 + e.deltaX * unit;
+            if (oWrap.scrollTop !== t0 || oWrap.scrollLeft !== l0) { e.preventDefault(); }
+        }, { passive: false });
 
         return {
             setRows: function (a, bKeepScroll) {
@@ -228,6 +280,7 @@
         var MSG_SORTDESC = _wsTxt("811");                       // 내림차순 정렬
         var MSG_FILTERVAL = _txt("/U4A/CL_WS_COMMON", "A68");   // 필터 값(placeholder)
         var MSG_CLEARFILTER = _txt("/U4A/CL_WS_COMMON", "A69"); // 필터 초기화
+        var MSG_NODATA = _wsTxt("946");                         // 데이터 없음(공통 .u4a-table__nodata — ServerList L("noData")=946 동일)
 
         /* ── 다이얼로그 골격 ─────────────────────────────────────── */
         var oDlg = document.createElement("dialog");
@@ -284,13 +337,6 @@
             b.addEventListener("click", fn);
             return b;
         }
-        // 단일 선택 행 강조(공통 .u4a-table aria-selected).
-        function _selTr(oBody, oTr) {
-            var aSel = oBody.querySelectorAll('tr[aria-selected="true"]');
-            for (var i = 0; i < aSel.length; i++) { aSel[i].removeAttribute("aria-selected"); }
-            oTr.setAttribute("aria-selected", "true");
-        }
-
         /* ── 탭 전환 ─────────────────────────────────────────────── */
         function _selectTab(sKey) {
             var b1 = sKey === "K1";
@@ -341,14 +387,20 @@
             _row(_txt("/U4A/CL_WS_COMMON", "A76"), oHits.wrap)   // Max rows
         );
 
-        var oSrchBar = _el("div", "u4aAppF4SrchBar");
-        var oSrchTitle = _el("div", "u4aAppF4SrchTitle", "[U4A] " + _txt("/U4A/CL_WS_COMMON", "B94"));
+        // 조회 조건 = 공통 접이식 패널(원본 sap.m.Panel expandable) — 헤더에 제목 + 검색 버튼, 바디에 폼.
         var oSrchBtn = _el("button", "u4a-btn u4a-btn--emphasized");
         oSrchBtn.type = "button";
         oSrchBtn.innerHTML = _fa("magnifying-glass") + "<span></span>";
         oSrchBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A75"); // Search
         oSrchBtn.addEventListener("click", _doSearch);
-        oSrchBar.append(oSrchTitle, _el("span", "u4aAppF4Spacer"), oSrchBtn);
+        var oSrchPanel = (window.U4AUI && U4AUI.createPanel)
+            ? U4AUI.createPanel({ title: "[U4A] " + _txt("/U4A/CL_WS_COMMON", "B94") })
+            : null;
+        if (oSrchPanel) {
+            oSrchPanel.el.classList.add("u4aAppF4SrchPanel");
+            oSrchPanel.actions.appendChild(oSrchBtn);
+            oSrchPanel.body.appendChild(oForm);
+        }
 
         var T1_COLS = [
             { key: "ERUSR", label: _txt("/U4A/CL_WS_COMMON", "B95"), w: "8rem", align: "center" },
@@ -371,6 +423,9 @@
         var T1_MAP = {};   // key → col (셀 텍스트/정렬·필터용)
         T1_COLS.forEach(function (c) { if (c.key) { T1_MAP[c.key] = c; } });
 
+        // 좌측 3개 컬럼 고정(User Name / Open in Browser / App Views) — 가로 스크롤 시.
+        var T1_FRZN = 3, T1_FRZ_LEFT = _frzLefts(T1_COLS, T1_FRZN);
+
         var oT1Wrap = _el("div", "u4aAppF4TblWrap u4a-table-wrap");
         var oT1 = _el("table", "u4a-table u4aAppF4Tbl");
         var oT1Head = _el("thead");   // 헤더는 _renderT1 이 매번 재구성(정렬/필터 표시자 갱신)
@@ -378,7 +433,7 @@
         oT1.append(oT1Head, oT1Body);
         oT1Wrap.appendChild(oT1);
 
-        oPage1.append(oForm, oSrchBar, oT1Wrap);
+        oPage1.append(oSrchPanel ? oSrchPanel.el : oForm, oT1Wrap);
 
         // ── 컬럼 정렬/필터 (원본 sap.ui.table sortProperty/filterProperty → ServerList 패턴 포팅) ──
         function _cellText(sKey, row) {
@@ -401,10 +456,11 @@
             }
             return arr;
         }
-        function _buildT1Th(c) {
+        function _buildT1Th(c, idx) {
             var th = _el("th", c.align === "center" ? "is-center" : null);
             if (c.w) { th.style.width = c.w; }
             if (c.action) { th.classList.add("is-action"); }
+            _applyFrz(th, idx, T1_FRZN, T1_FRZ_LEFT);
             var inner = _el("div", "u4a-th__inner");
             if (c.align === "center") { inner.classList.add("u4a-th__inner--center"); }
             inner.appendChild(_el("span", "u4a-th__label", c.action ? (c.action === "run" ? MSG_RUN : MSG_DISP) : c.label));
@@ -430,9 +486,9 @@
         function _buildT1Row(row, i) {
             var tr = _el("tr");
             if (i % 2 === 1) { tr.setAttribute("data-odd", "true"); }
-            tr.addEventListener("click", function () { _vs1.setSel(row.APPID); _selTr(oT1Body, tr); });
+            tr.addEventListener("click", function () { _vs1.setSel(row.APPID); _vs1.refresh(); });
             tr.addEventListener("dblclick", function () { _pick(row); });
-            T1_COLS.forEach(function (c) {
+            T1_COLS.forEach(function (c, idx) {
                 var td = _el("td", c.align === "center" ? "is-center" : null);
                 if (c.action === "run") {
                     td.classList.add("is-action");
@@ -446,6 +502,7 @@
                     var v = row[c.key];
                     td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
                 }
+                _applyFrz(td, idx, T1_FRZN, T1_FRZ_LEFT);
                 tr.appendChild(td);
             });
             return tr;
@@ -454,13 +511,13 @@
             // 헤더(정렬/필터 표시자 갱신 위해 매 렌더 재구성)
             oT1Head.textContent = "";
             var hr = _el("tr");
-            T1_COLS.forEach(function (c) { hr.appendChild(_buildT1Th(c)); });
+            T1_COLS.forEach(function (c, idx) { hr.appendChild(_buildT1Th(c, idx)); });
             oT1Head.appendChild(hr);
             // 바디 = 가상 스크롤(필터→정렬 파생 뷰)
             _vs1.setRows(_deriveView(aResult));
         }
         var _vs1 = _makeVScroller(oT1Wrap, oT1Body, {
-            colCount: T1_COLS.length, buildRow: _buildT1Row, nodata: "—",
+            colCount: T1_COLS.length, buildRow: _buildT1Row, nodata: MSG_NODATA,
             getSelKey: function (row) { return row.APPID; }
         });
 
@@ -472,6 +529,8 @@
             try { _oColMenu.remove(); } catch (e) { }
             _oColMenu = null;
             document.removeEventListener("mousedown", _onColMenuOutside, true);
+            window.removeEventListener("resize", _closeColMenu);
+            window.removeEventListener("scroll", _closeColMenu, true);
         }
         function _openColMenu(c, th) {
             _closeColMenu();
@@ -538,6 +597,9 @@
             m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)) + "px";
             m.style.zIndex = "10";
             _oColMenu = m;
+            // 창 리사이즈/스크롤 시 닫기 — 앵커(컬럼 헤더) 이동으로 위치 어긋남 방지.
+            window.addEventListener("resize", _closeColMenu);
+            window.addEventListener("scroll", _closeColMenu, true);
             setTimeout(function () { document.addEventListener("mousedown", _onColMenuOutside, true); }, 0);
             try { fi.focus(); } catch (e) { }
         }
@@ -583,6 +645,9 @@
             { key: "AETIM", label: _wsTxt("413"), w: "6rem", align: "center", nz: true, fmt: _fmtTime }
         ];
 
+        // 좌측 2개 컬럼 고정(트리 / App Views) — 가로 스크롤 시.
+        var T2_FRZN = 2, T2_FRZ_LEFT = _frzLefts(T2_COLS, T2_FRZN);
+
         var oTBar = _el("div", "u4aAppF4TreeBar");
         var oExpandBtn = _actBtn("angles-down", "Expand", function () { _treeExpandAll(true); });
         oExpandBtn.title = "Expand";
@@ -604,10 +669,11 @@
         var oT2 = _el("table", "u4a-table u4aAppF4Tbl u4aAppF4Tree");
         var oT2Head = _el("thead");
         var oT2Hr = _el("tr");
-        T2_COLS.forEach(function (c) {
+        T2_COLS.forEach(function (c, idx) {
             var th = _el("th", c.align === "center" ? "is-center" : null, c.action ? MSG_DISP : c.label);
             if (c.w) { th.style.width = c.w; }
             if (c.action) { th.classList.add("is-action"); }
+            _applyFrz(th, idx, T2_FRZN, T2_FRZ_LEFT);
             oT2Hr.appendChild(th);
         });
         oT2Head.appendChild(oT2Hr);
@@ -617,16 +683,25 @@
         oPage2.append(oTBar, oT2Wrap);
 
         function _matchFilter(node) {
-            if (!sTreeFilter || _isRoot(node)) { return true; }
+            if (!sTreeFilter || _isTopRoot(node)) { return true; }
             return String(node.APPID || "").toUpperCase().indexOf(sTreeFilter) > -1
                 || String(node.APPNM || "").toUpperCase().indexOf(sTreeFilter) > -1;
         }
         // 필터 시: 자신 또는 하위에 매칭이 있으면 표시.
         function _subtreeHasMatch(node) {
-            if (!_isRoot(node) && _matchFilter(node)) { return true; }
+            if (!_isTopRoot(node) && _matchFilter(node)) { return true; }
             var kids = node.APPF4HIER || [];
             for (var i = 0; i < kids.length; i++) { if (_subtreeHasMatch(kids[i])) { return true; } }
             return false;
+        }
+
+        // 공통 트리 UX(U4AUI.createTree _collapseRec 와 동일): 접을 때 하위 전체도 접는다
+        //   → 다시 펼치면 직속 자식만 보이고 손자 이하는 접힌 상태.
+        function _collapseDesc(node) {
+            (node.APPF4HIER || []).forEach(function (k) {
+                oExpand[k._uid] = false;
+                _collapseDesc(k);
+            });
         }
 
         // 한 노드 → <tr>(전 컬럼). idx=가상스크롤 절대 인덱스(zebra). 토글=펼침상태만 바꾸고 평탄목록 재세팅.
@@ -638,9 +713,9 @@
             if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }
             if (_isRoot(node)) { tr.classList.add("is-root"); }
             if (bHasKids) { tr.setAttribute("aria-expanded", bExp ? "true" : "false"); }
-            tr.addEventListener("click", function () { _vs2.setSel(node._uid); _selTr(oT2Body, tr); });
+            tr.addEventListener("click", function () { _vs2.setSel(node._uid); _vs2.refresh(); });
             tr.addEventListener("dblclick", function () { if (!_isRoot(node)) { _pick(node); } });
-            T2_COLS.forEach(function (c) {
+            T2_COLS.forEach(function (c, idx) {
                 var td = _el("td", c.align === "center" ? "is-center" : null);
                 if (c.tree) {
                     td.classList.add("u4aAppF4TreeCell");
@@ -652,7 +727,12 @@
                     if (bHasKids) {
                         tog.addEventListener("click", function (e) {
                             e.stopPropagation();
-                            oExpand[node._uid] = !oExpand[node._uid];
+                            var bOpen = !oExpand[node._uid];
+                            oExpand[node._uid] = bOpen;
+                            // 공통 트리 UX: 접으면 하위 전체도 접는다(다시 펼치면 직속 자식만).
+                            if (!bOpen) { _collapseDesc(node); }
+                            // 접기/펼치기 시 기존 선택은 해제(접힌 노드에 가려진 유령 선택 방지).
+                            _vs2.setSel(null);
                             // 가상 스크롤: 펼침상태만 바꾸고 평탄목록 재계산 → 보이는 행만 렌더(대용량도 즉시).
                             _vs2.setRows(_flattenTree(), true);
                         });
@@ -678,6 +758,7 @@
                     if (c.nz && _isRoot(node)) { v = ""; }
                     td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
                 }
+                _applyFrz(td, idx, T2_FRZN, T2_FRZ_LEFT);
                 tr.appendChild(td);
             });
             return tr;
@@ -687,7 +768,9 @@
         function _flattenTree() {
             var out = [];
             function walk(node, depth) {
-                if (sTreeFilter && !_isRoot(node) && !_subtreeHasMatch(node)) { return; }
+                // 검색 시: 자기 또는 하위에 매칭이 없으면 숨김(빈 부모 패키지·최상위 컨테이너 모두).
+                //   매칭이 하나도 없으면 root 까지 빠져 빈 목록 → 공통 no-data 문구 표시.
+                if (sTreeFilter && !_subtreeHasMatch(node)) { return; }
                 out.push({ node: node, depth: depth });
                 var bExp = sTreeFilter ? true : !!oExpand[node._uid];
                 if (bExp && (node.APPF4HIER || []).length) {
@@ -711,7 +794,7 @@
         }
 
         var _vs2 = _makeVScroller(oT2Wrap, oT2Body, {
-            colCount: T2_COLS.length, buildRow: _buildTreeRow,
+            colCount: T2_COLS.length, buildRow: _buildTreeRow, nodata: MSG_NODATA,
             getSelKey: function (item) { return item.node._uid; }
         });
 
@@ -877,14 +960,21 @@
             ".u4aAppF4FRow .u4aAppF4Field{flex:1 1 auto;min-width:0;width:auto;}",
             ".u4aAppF4FRow .u4aAppF4Sel{flex:1 1 auto;min-width:0;max-width:none;}",
             ".u4aAppF4Field .u4a-field__input{width:100%;}",
-            ".u4aAppF4SrchBar{flex:0 0 auto;display:flex;align-items:center;gap:.5rem;padding-top:.25rem;border-top:.0625rem solid var(--divider);}",
-            ".u4aAppF4SrchTitle{font-weight:700;color:var(--text);}",
-            ".u4aAppF4Spacer{flex:1 1 auto;}",
+            ".u4aAppF4SrchPanel{flex:0 0 auto;}",
             ".u4aAppF4TreeBar{flex:0 0 auto;display:flex;align-items:center;gap:.375rem;}",
             ".u4aAppF4TBarSep{width:.0625rem;height:1.25rem;background:var(--line);margin:0 .25rem;}",
-            ".u4aAppF4TblWrap{flex:1 1 auto;min-height:0;overflow:auto;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--surface);}",
+            /* overflow-anchor:none — 가상 스크롤이 뷰포트 위 DOM 을 매 틱 재생성할 때
+               Chromium scroll-anchoring 이 scrollTop 을 되돌려 휠이 안 먹는 현상 차단(Chromium93 지원). */
+            ".u4aAppF4TblWrap{flex:1 1 auto;min-height:0;overflow:auto;overflow-anchor:none;overscroll-behavior:contain;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--surface);}",
+            ".u4aAppF4Tbl,.u4aAppF4Tbl *{overflow-anchor:none;}",
             /* 공통 .u4a-table(--compact) 소비 — 다열은 컬럼폭 합만큼 늘려 가로 스크롤 */
-            ".u4aAppF4Dlg .u4aAppF4Tbl{width:max-content;min-width:100%;}",
+            /* ★ border-collapse:separate — collapse 면 Chromium 이 셀 z-index 를 무시해서
+               가로 스크롤 시 뒤 컬럼이 고정 컬럼 위에 그려져 글자가 겹친다. separate 로 바꿔야
+               sticky 고정 셀의 z-index 가 먹어 스크롤 셀을 가린다. 하단 보더만 쓰므로 모양 동일. */
+            /* 트리테이블 텍스트 크기 — 다른 트리(.u4a-tree 0.8125rem)와 동일하게(2026-06-23 트리 통일).
+               다이얼로그 기본(0.875rem) 상속 시 App-F4 트리만 14px 로 커 보였음. 행높이는 테이블(.u4a-table) 표준 유지. */
+            /* 폰트는 공통 .u4a-table(다이얼로그 14px 상속) 기준 — F4 전용 축소(font-size:.8125rem) 제거(타 테이블과 통일). */
+            ".u4aAppF4Dlg .u4aAppF4Tbl{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;}",
             ".u4aAppF4Dlg .u4aAppF4Tbl th.is-center,.u4aAppF4Dlg .u4aAppF4Tbl td.is-center{text-align:center;}",
             ".u4aAppF4Dlg .u4aAppF4Tbl th.is-action,.u4aAppF4Dlg .u4aAppF4Tbl td.is-action{text-align:center;width:4.5rem;padding-left:.25rem;padding-right:.25rem;}",
             /* 모든 셀 수직 중앙(액션 아이콘이 텍스트와 어긋나지 않게) */
@@ -893,17 +983,43 @@
             ".u4aAppF4ActBtn i{font-size:.75rem;}",
             /* 트리 셀: td 는 table-cell 유지(다른 컬럼과 정렬), 안쪽 래퍼만 flex. 공통 토글 + --u4a-tree-depth 들여쓰기 */
             ".u4aAppF4TreeCell{overflow:hidden;}",
-            ".u4aAppF4TreeInner{display:flex;align-items:center;gap:.125rem;min-width:0;}",
+            /* 토글↔텍스트 간격·들여쓰기 step 은 공통 트리 표준(shell.css .u4a-tree__row gap 0.375rem,
+               step 1rem)과 동일하게 맞춘다(2026-06-23 트리 통일). */
+            ".u4aAppF4TreeInner{display:flex;align-items:center;gap:.375rem;min-width:0;}",
             /* ★ 들여쓰기 padding-left 는 공통 .u4a-table td(0,1,2)보다 specificity 를 높여야 안 먹힌다. */
-            ".u4aAppF4Dlg .u4aAppF4Tbl td.u4aAppF4TreeCell{padding-left:calc(.375rem + var(--u4a-tree-depth,0) * var(--u4a-tree-indent-step,1.25rem));}",
+            ".u4aAppF4Dlg .u4aAppF4Tbl td.u4aAppF4TreeCell{padding-left:calc(.375rem + var(--u4a-tree-depth,0) * var(--u4a-tree-indent-step,1rem));}",
             ".u4aAppF4TreeInner .u4a-tree__toggle i{transition:transform var(--motion) linear;}",
             ".u4aAppF4Dlg .u4aAppF4Tree tbody tr[aria-expanded=\"true\"] .u4a-tree__toggle i{transform:rotate(90deg);}",
             ".u4aAppF4TreeLabel{overflow:hidden;text-overflow:ellipsis;}",
             ".u4aAppF4Link{color:var(--link);font-weight:600;cursor:pointer;}",
             ".u4aAppF4Link:hover{text-decoration:underline;}",
+            /* ── 고정 컬럼(가로 스크롤 시 좌측 N개 sticky) — 탭1(3개)·트리(2개) 공통, `.is-frz` 클래스 기반 ──
+               각 셀에 JS(_applyFrz)가 `.is-frz`(+마지막 `.is-frz-last`)와 inline `left`(누적폭)를 부여.
+               아래 머신(positioned·z-index·배경·경계선)은 .u4aAppF4Tbl 스코프로 두 테이블이 공유한다.
+               층위: 헤더 고정셀 z3 > 본문 고정셀 z2 > 일반 헤더 z1 > 일반 셀 z0. */
+            /* ★ 본문 스크롤 셀도 positioned(relative) — static 셀은 sticky 고정셀과 stacking 비교가 안 돼
+               테이블 페인트 순서상 고정셀 위에 그려져 겹친다(헤더는 전 셀 sticky라 안 겹쳤음). relative 면 z-index 먹음. */
+            ".u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td{position:relative;}",
+            ".u4aAppF4Tbl thead th.is-frz,.u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td.is-frz{position:sticky;z-index:2;}",
+            ".u4aAppF4Tbl thead th.is-frz{z-index:3;}",
+            /* ★ 고정 셀 상태별 불투명 배경 — 반투명 토큰(hover/active/selected)은 linear-gradient(단색 이미지)
+               레이어로 깔고 var(--surface)(불투명)를 최종 color 레이어로(그냥 `색,색` 은 무효 CSS→드롭).
+               → surface 위 오버레이 1회만 = 스크롤 영역과 동일 + 불투명(이중합성·비침 차단). */
+            ".u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td.is-frz{background:var(--surface);}",
+            ".u4aAppF4Tbl tbody tr[data-odd=\"true\"]>td.is-frz,.u4aAppF4Tbl tbody tr:hover>td.is-frz{background:linear-gradient(var(--hover-bg),var(--hover-bg)),var(--surface);}",
+            ".u4aAppF4Tbl tbody tr[data-odd=\"true\"]:hover>td.is-frz{background:linear-gradient(var(--active-bg),var(--active-bg)),var(--surface);}",
+            ".u4aAppF4Tbl tbody tr[aria-selected=\"true\"]>td.is-frz,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"][data-odd=\"true\"]>td.is-frz,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"]:hover>td.is-frz,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"][data-odd=\"true\"]:hover>td.is-frz{background:linear-gradient(var(--selected-bg),var(--selected-bg)),var(--surface);}",
+            /* 고정 경계선 — 마지막 고정 컬럼 우측 */
+            ".u4aAppF4Tbl thead th.is-frz-last,.u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td.is-frz-last{box-shadow:inset -0.0625rem 0 0 var(--line);}",
+            /* 트리 App Views(마지막 고정)만 폭 확보+우측 여백(헤더 텍스트가 세로 고정선에 안 붙게).
+               탭1 App Views(액션 4.5rem)는 그대로 — 트리 스코프로 한정. */
+            ".u4aAppF4Dlg .u4aAppF4Tree thead th.is-frz-last,.u4aAppF4Dlg .u4aAppF4Tree tbody tr:not(.u4aVSpacer)>td.is-frz-last{width:6.5rem;padding-right:.85rem;}",
             /* 가상 스크롤 스페이서 행 — hover/zebra/선택 표시 없음 */
             ".u4aAppF4Dlg .u4aVSpacer,.u4aAppF4Dlg .u4aVSpacer:hover{background:transparent;cursor:default;}",
             ".u4aAppF4Dlg .u4aVSpacer td{padding:0;border:0;}",
+            /* 가상 스크롤 떨림 방지 — 데이터 행(스페이서 제외)을 측정된 정수 높이로 강제.
+               total*ROWH 와 실제 높이를 정확히 일치시켜 끝단 scrollHeight 흔들림 제거. */
+            ".u4aAppF4TblWrap tbody tr:not(.u4aVSpacer)>td{height:var(--u4a-vsrowh,auto);box-sizing:border-box;}",
             /* 컬럼 헤더 정렬/필터 메뉴 (ServerList 패턴 — 공통 .u4a-menu 위에 덧입힘) */
             ".u4aAppF4Tbl thead th.u4a-th--menu{cursor:pointer;}",
             ".u4aAppF4Tbl thead th.u4a-th--menu:hover{background:var(--hover-bg);color:var(--text);}",

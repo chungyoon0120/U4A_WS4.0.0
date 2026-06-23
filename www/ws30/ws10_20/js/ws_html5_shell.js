@@ -965,14 +965,18 @@
             if (oAppInfo.APPTY === "U") {
                 oAPP.fn.fnOnSaveAppSuggestion(oAppInfo.APPID);
                 APPCOMMON.fnSetModelProperty("/WS30/APP", oAppInfo);
+                // 단축키 해제는 "가장 먼저"(전환 시작 시 이전 화면 단축키 제거).
                 APPCOMMON.removeShortCut("WS10");
-                APPCOMMON.setShortCut("WS30");
                 oAPP.fn.fnOnMoveToPage("WS30");
                 try {
                     parent.UAI.setCustomEvent_WS_30();
                 } catch (e) {
                     console.warn("[추후 변환] UAI.setCustomEvent_WS_30:", e && e.message);
                 }
+                // ★ WS30 단축키 등록은 여기서 하지 않는다 — WS30 콘텐츠(Monaco 에디터 iframe)는
+                //   비동기 로드라, 진입 즉시 F3 을 누르면 로드 중 백(fnMoveToWs10)이 실행돼 화면이 깨진다.
+                //   "화면 다 그리고 세팅 끝난 뒤 마지막에 등록" 원칙 → 에디터 준비 완료 시점
+                //   (ws_html5_usp_editor.js _releaseBusy, 두 에디터 load 또는 워치독)에서 setShortCut("WS30").
                 return;
             }
 
@@ -992,8 +996,8 @@
                 oAPP.fn.fnOnSaveAppSuggestion(oAppInfo.APPID);
             }
 
+            // 단축키 해제는 "가장 먼저".
             APPCOMMON.removeShortCut("WS10");
-            APPCOMMON.setShortCut("WS20");
 
             // WS20번 페이지로 이동한다.
             oAPP.fn.fnOnMoveToPage("WS20");
@@ -1003,6 +1007,10 @@
             } catch (e) {
                 console.warn("[추후 변환] UAI.setCustomEvent_WS_20:", e && e.message);
             }
+
+            // 등록은 "가장 마지막" — 화면 렌더·세팅 뒤. (WS20 는 미리보기 로드까지 busy 유지라
+            //   그 사이 단축키는 종합가드의 busy 체크로도 막히지만, 등록 시점도 원칙대로 뒤로 둔다.)
+            APPCOMMON.setShortCut("WS20");
 
         } // end of lf_success
 

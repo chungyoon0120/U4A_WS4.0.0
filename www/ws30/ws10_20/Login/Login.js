@@ -674,15 +674,18 @@ var oAPP = (function () {
     /************************************************************************
      * U4A R&D Staff 자동 로그인 버튼
      ************************************************************************/
+    // R&D Staff 목록(버튼/테스트 자동로그인 공용) — text=표시명, id=SAP 로그인 ID
+    oAPP.fn.fnGetStaffList = () => [
+        { text: "영선", id: "yshong" },
+        { text: "성호", id: "shhong" },
+        { text: "은섭", id: "pes" },
+        { text: "청윤", id: "soccerhs" }
+    ];
+
     oAPP.fn.fnGetStaffLoginButtons = () => {
         const oWrap = document.createElement("div");
         oWrap.className = "u4a-login__staff";
-        const aStaff = [
-            { text: "영선", id: "yshong" },
-            { text: "성호", id: "shhong" },
-            { text: "은섭", id: "pes" },
-            { text: "청윤", id: "soccerhs" }
-        ];
+        const aStaff = oAPP.fn.fnGetStaffList();
         aStaff.forEach((o) => {
             const oBtn = document.createElement("button");
             oBtn.type = "button";
@@ -2169,6 +2172,27 @@ var oAPP = (function () {
             await _handleSSOLogin();
             oAPP.events.ev_login(oServerInfo);
             return;
+        }
+
+        // 테스트 모드 자동 로그인 — ServerList 에서 전달한 TESTID 와 일치하는 스태프 계정으로 로그인.
+        //   (스태프 버튼과 동일한 fnStaffLogin 호출 = "일치하는 버튼 자동 클릭")
+        try {
+            const sTestId = oServerInfo && oServerInfo.TESTID;
+            if (sTestId && parent.isU4A_RND_SERVER && parent.isU4A_RND_SERVER(oServerInfo.SYSID)) {
+                const sKey = String(sTestId).trim().toLowerCase();
+                const oStaff = oAPP.fn.fnGetStaffList().find(
+                    (o) => o.id.toLowerCase() === sKey || o.text === sTestId.trim()
+                );
+                if (oStaff) {
+                    _fnFadeInContent();
+                    parent.setDomBusy("");
+                    oAPP.fn.fnStaffLogin(oStaff.id);
+                    return;
+                }
+                console.warn("[테스트 모드] 일치하는 스태프 계정 없음:", sTestId);
+            }
+        } catch (e) {
+            console.error("[테스트 모드] 자동 로그인 실패:", e);
         }
 
         _fnFadeInContent();

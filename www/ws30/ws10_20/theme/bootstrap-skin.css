@@ -331,8 +331,8 @@ html[data-sl-theme="dark"] .btn-close {
 .u4a-dialog .u4a-input,
 .u4a-dialog .u4a-combo,
 .u4a-dialog .u4a-select {
-    background: var(--sl-bg);
-    border-color: var(--sl-border);
+    background: var(--surface-raised);
+    border-color: var(--divider);
 }
 
 /*======================================================================
@@ -386,11 +386,15 @@ html[data-sl-theme="dark"] .btn-close {
 .u4a-menu__item:hover,
 .u4a-menu__item:focus-visible { background: var(--sl-surface-2); }
 
-/* 입력 / 셀렉트 (.u4a-input / .u4a-select) */
+/* 입력 / 셀렉트 (.u4a-input / .u4a-select) — 편집 가능 = '올라온' 톤으로 시인성 확보(전 화면 공통).
+   ★ --sl-bg(다크 #161d26)는 패널 --sl-surface(#1d2630)보다 어두워 입력칸이 가라앉아 안 띄었다.
+     --surface-raised(다크 #2a323a, 라이트 #fff)로 올리고 테두리도 또렷한 --divider 로 →
+     "활성=올라온 / 패널 / 읽기전용=들어간(--app-bg)" 3단 위계가 모든 테마에서 한눈에 보인다.
+     (이 skin 이 shell.css 보다 늦게 로드되는 색의 단일 출처라 여기서 정한다.) */
 .u4a-input,
 .u4a-select {
-    background: var(--sl-bg);
-    border-color: var(--sl-border);
+    background: var(--surface-raised);
+    border-color: var(--divider);
     color: var(--sl-fg);
 }
 
@@ -446,12 +450,17 @@ html[data-sl-theme="dark"] .btn-close {
 .u4a-empty { color: var(--sl-muted); }
 
 /*======================================================================
-  ★ 비활성/읽기전용/display 입력 — 전부 "동일한 잠긴 톤"으로 통일.
-    문제: disabled 는 opacity 0.4 로 흐려지고 display 는 opacity 1 솔리드라,
-          같은 배경색이어도 두 비활성 필드가 달라 보였다(Request No vs Request Desc).
-    해결: 직접 타이핑 불가 필드(disabled / [readonly] / .u4a-input--display)를
-          같은 배경(--sl-surface-2) + 같은 글자(--sl-muted) + opacity:1 로 일치.
-    .u4a-dialog 안에서도 이기도록 (0,2,1)/(0,3,0) 까지 명시.
+  ★ 비활성/읽기전용/display 입력 — 전 화면 공통 표준: "평문으로 물러남"(박스 없음).
+    [공통 UX 컨셉] 활성(편집 가능)=올라온 보더 박스(--surface-raised) / 비활성(직접 타이핑 불가)
+      =평문(투명 배경·보더 없음 + muted 글자). **"보더 박스 유무"가 곧 편집 가능/불가 신호.**
+    ★ 왜 평문인가(구 --app-bg '들어간 박스'에서 변경, 2026-06-23):
+      readonly 를 어두운 박스로 칠하면 **다크 테마에서 '어두운 박스=입력칸' 직관과 충돌**해
+      readonly 가 오히려 활성처럼, 편집칸(밝은 surface-raised)이 disabled 처럼 보였다(WS20
+      속성패널·Description 에서 확인). 박스 유무로 구분하면 전 테마·전 화면에서 명확하다.
+      (--sl-surface-2 가 hover 하이라이트라 떠 보이던 함정도 자연히 해소.)
+    ★ disabled(opacity 0.4)·[readonly]·--display 를 모두 같은 평문(opacity:1, muted)으로 일치.
+    ★ 이 규칙이 readonly 룩의 단일 출처(shell.css 보다 늦게 로드되어 이긴다). 화면별로 따로
+      칠하지 말 것 — 이 컨셉은 전체 공통이며 여기 한 곳에서 정한다. .u4a-dialog 까지 명시.
 ======================================================================*/
 .u4a-input:disabled,
 .u4a-input[readonly],
@@ -459,10 +468,23 @@ html[data-sl-theme="dark"] .btn-close {
 .u4a-dialog .u4a-input:disabled,
 .u4a-dialog .u4a-input[readonly],
 .u4a-dialog .u4a-input.u4a-input--display {
-    background: var(--sl-surface-2);
+    background: transparent;
     color: var(--sl-muted);
-    border-color: var(--sl-border);
+    border-color: transparent;
     opacity: 1;
 }
+
+/* 비활성 콤보(.u4a-combo) — 입력 readonly 와 동일한 평문(투명+muted). 편집 가능 콤보는 보더 박스.
+   비활성 표시는 aria-disabled(createField) 또는 .is-disabled(화면) 둘 다 인식. */
+.u4a-combo[aria-disabled="true"],
+.u4a-combo.is-disabled {
+    background: transparent;
+    border-color: transparent;
+    pointer-events: none;
+}
+.u4a-combo[aria-disabled="true"] .u4a-combo__text,
+.u4a-combo.is-disabled .u4a-combo__text { color: var(--sl-muted); }
+.u4a-combo[aria-disabled="true"] .u4a-combo__arrow,
+.u4a-combo.is-disabled .u4a-combo__arrow { color: var(--sl-muted); opacity: 0.6; }
 
 

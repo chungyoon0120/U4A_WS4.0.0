@@ -1,0 +1,138 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 190" role="img" aria-labelledby="title desc">
+  <title id="title">Animated SAPGUI loading icon</title>
+  <desc id="desc">A refined SAPGUI-style satellite dish with polished signal waves and subtle loading animation.</desc>
+  <defs>
+    <linearGradient id="dishBlue" x1="74" y1="48" x2="170" y2="138" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1688ff"/>
+      <stop offset="0.5" stop-color="#0a70e8"/>
+      <stop offset="1" stop-color="#064ea9"/>
+    </linearGradient>
+    <linearGradient id="rimFill" x1="62" y1="28" x2="177" y2="146" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.54" stop-color="#f3f9ff"/>
+      <stop offset="1" stop-color="#d9ecff"/>
+    </linearGradient>
+    <linearGradient id="mastGrad" x1="118" y1="84" x2="158" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#082f68"/>
+      <stop offset="0.48" stop-color="#0c5fc5"/>
+      <stop offset="1" stop-color="#19a0ff"/>
+    </linearGradient>
+    <linearGradient id="baseGrad" x1="91" y1="113" x2="104" y2="165" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b9cbd8"/>
+      <stop offset="1" stop-color="#8599a7"/>
+    </linearGradient>
+    <radialGradient id="ambientGlow" cx="50%" cy="48%" r="54%">
+      <stop offset="0" stop-color="#c7edff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#e6f7ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="nodeFill" cx="34%" cy="30%" r="70%">
+      <stop offset="0" stop-color="#8fd0ff"/>
+      <stop offset="0.42" stop-color="#1e91ff"/>
+      <stop offset="1" stop-color="#0562cf"/>
+    </radialGradient>
+    <pattern id="dotPattern" width="8" height="8" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.15" fill="#91caff" opacity="0.55"/>
+    </pattern>
+    <clipPath id="innerDishClip">
+      <path d="M91 35C72 57 67 88 80 112C96 142 134 151 169 128L91 35Z"/>
+    </clipPath>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#113665" flood-opacity="0.16"/>
+    </filter>
+    <filter id="nodeGlow" x="-140%" y="-140%" width="380%" height="380%">
+      <feGaussianBlur stdDeviation="3.8" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.04 0 0 0 0 0.48 0 0 0 0 1 0 0 0 0.5 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <style>
+      .ambient { animation: ambientPulse 3.4s ease-in-out infinite; transform-origin: 112px 118px; }
+      .dish { animation: dishFloat 3s ease-in-out infinite; transform-origin: 112px 104px; }
+      .scan { animation: scanSweep 2.6s ease-in-out infinite; transform-origin: 116px 92px; }
+      .signal-tip { animation: tipPulse 1.9s ease-in-out infinite; transform-origin: 148px 58px; }
+      .signal-wave { animation: waveTrace 2.25s ease-out infinite; stroke-dasharray: 1; stroke-dashoffset: 1; transform-origin: 148px 58px; }
+      .signal-wave.two { animation-delay: 0.28s; }
+      .signal-wave.three { animation-delay: 0.56s; }
+      .spark { animation: sparkle 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+      .spark.two { animation-delay: 0.7s; }
+      .cross { animation: crossBlink 2.4s ease-in-out infinite; }
+
+      @keyframes ambientPulse {
+        0%, 100% { opacity: 0.74; transform: scale(0.98); }
+        50% { opacity: 1; transform: scale(1.035); }
+      }
+      @keyframes dishFloat {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-2.8px) rotate(-0.75deg); }
+      }
+      @keyframes scanSweep {
+        0%, 100% { opacity: 0.16; transform: translateX(-4px) rotate(-5deg); }
+        48% { opacity: 0.62; transform: translateX(7px) rotate(4deg); }
+      }
+      @keyframes tipPulse {
+        0%, 100% { transform: scale(1); opacity: 0.94; }
+        44% { transform: scale(1.08); opacity: 1; }
+      }
+      @keyframes waveTrace {
+        0% { opacity: 0; stroke-dashoffset: 1; }
+        18% { opacity: 0.88; }
+        64% { opacity: 0.56; stroke-dashoffset: 0; }
+        100% { opacity: 0; stroke-dashoffset: -0.22; }
+      }
+      @keyframes sparkle {
+        0%, 100% { opacity: 0.62; transform: scale(0.86) rotate(0deg); }
+        50% { opacity: 1; transform: scale(1.1) rotate(15deg); }
+      }
+      @keyframes crossBlink {
+        0%, 100% { opacity: 0.24; }
+        46% { opacity: 0.7; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ambient, .dish, .scan, .signal-tip, .signal-wave, .spark, .cross { animation: none; }
+      }
+    </style>
+  </defs>
+
+  <ellipse class="ambient" cx="111" cy="130" rx="82" ry="39" fill="url(#ambientGlow)"/>
+
+  <g class="spark" fill="#ff9d0a">
+    <path d="M60 116c4.2 8 6 9.8 14 14c-8 4.2-9.8 6-14 14c-4.2-8-6-9.8-14-14c8-4.2 9.8-6 14-14Z"/>
+  </g>
+  <g class="cross" fill="none" stroke="#9fb3c8" stroke-linecap="round" stroke-width="1.4">
+    <path d="M172 95v7"/><path d="M172 109v7"/><path d="M161 106h7"/><path d="M177 106h7"/>
+  </g>
+
+  <g class="dish" filter="url(#softShadow)">
+    <ellipse cx="101" cy="165" rx="49" ry="3.4" fill="#0c3b75" opacity="0.22"/>
+    <path d="M96 119L84 164H121L107 119Z" fill="url(#baseGrad)"/>
+    <path d="M56 164H147" stroke="#113f76" stroke-width="3.4" stroke-linecap="round"/>
+    <circle cx="91" cy="119" r="12" fill="#9db4c4"/>
+    <circle cx="91" cy="119" r="6.2" fill="#7f98aa" opacity="0.82"/>
+
+    <path d="M90 22C62 50 56 91 76 121C97 153 142 160 180 130L90 22Z" fill="url(#rimFill)" stroke="#0b3873" stroke-width="3.8" stroke-linejoin="round"/>
+    <g clip-path="url(#innerDishClip)">
+      <path d="M91 35C72 57 67 88 80 112C96 142 134 151 169 128L91 35Z" fill="url(#dishBlue)"/>
+      <path d="M91 35C75 56 73 84 88 106C105 130 138 137 164 124" fill="none" stroke="#a8ddff" stroke-width="9" stroke-linecap="round" opacity="0.55"/>
+      <path d="M75 55C67 82 77 116 104 133" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.25"/>
+      <path d="M91 35C72 57 67 88 80 112C96 142 134 151 169 128L91 35Z" fill="url(#dotPattern)" opacity="0.88"/>
+      <path class="scan" d="M101 69L153 121" stroke="#d7efff" stroke-width="4" stroke-linecap="round" opacity="0.46"/>
+      <path d="M85 129C109 145 142 145 169 128" fill="none" stroke="#06458f" stroke-width="2.1" opacity="0.34"/>
+    </g>
+    <path d="M90 22C62 50 56 91 76 121C97 153 142 160 180 130" fill="none" stroke="#0a346c" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+  <g class="signal-tip" filter="url(#nodeGlow)">
+    <path d="M119 82L148 58" fill="none" stroke="#082f68" stroke-width="4.2" stroke-linecap="round"/>
+    <path d="M122 79.6L145.3 60.1" fill="none" stroke="#e8f7ff" stroke-width="1.45" stroke-linecap="round" opacity="0.9"/>
+    <circle cx="148" cy="58" r="6.4" fill="url(#nodeFill)"/>
+    <circle cx="145.8" cy="55.7" r="1.8" fill="#ffffff" opacity="0.96"/>
+  </g>  <g class="signal-waves" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path class="signal-wave" pathLength="1" d="M153 49.34A10 10 0 0 1 157.66 60.59" stroke="#1f8fff" stroke-width="2.35" opacity="0.82"/>
+    <path class="signal-wave two" pathLength="1" d="M157 42.41A18 18 0 0 1 165.39 62.66" stroke="#66b7ff" stroke-width="2.15" opacity="0.62"/>
+    <path class="signal-wave three" pathLength="1" d="M161 35.48A26 26 0 0 1 173.11 64.73" stroke="#add8ff" stroke-width="1.95" opacity="0.42"/>
+  </g>
+</svg>
+
+
+

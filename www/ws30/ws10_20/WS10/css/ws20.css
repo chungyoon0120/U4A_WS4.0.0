@@ -252,6 +252,10 @@
 .u4aWs20PrevHeader { overflow: hidden; flex-wrap: nowrap; }
 .u4aWs20PrevHeader > * { flex: 0 0 auto; }
 .u4aWs20PrevHeader > .u4aWs20PanelHdrSpacer { flex: 1 1 auto; min-width: 0; }
+/* ★ 오버플로로 숨긴 항목([hidden]) — 버튼/토글의 display:inline-flex 가 UA [hidden]{display:none}
+   을 덮으므로(트리 툴바와 동일 함정), 명시적으로 숨긴다. 안 그러면 "숨긴" 항목이 그대로 보여
+   폭을 차지 → reflow 가 항상 넘침 판정 → 공간이 충분해도 ⋯ 가 떠버린다. */
+.u4aWs20PrevHeader > [hidden] { display: none; }
 
 /* 미리보기 헤더의 줌 슬라이더(비활성)/OFF 토글 — 정적, W2 예정 */
 .u4aWs20PrevZoom {
@@ -375,8 +379,8 @@
    (행/hover/선택/토글 기본 스타일은 shell.css .u4a-tree* 공통 컴포넌트가 제공) */
 .u4aWs20TreeRow {
   justify-content: space-between;
-  height: 40px;
-  font-size: 13px;
+  /* 행 높이(40px)·폰트(13px)는 공통 shell.css .u4a-tree* 단일 출처가 소유 → WS20 재정의 제거
+     (2026-06-23 트리 통일). 우측 액션/aggr 배치를 위한 space-between 만 WS20 확장. */
   /* ※ 선택/상태 컬러바는 전부 box-shadow inset(아래)로 통일 — border-left 를 쓰면 그 두께만큼
      공통 선택 box-shadow(shell.css, 좌측 가장자리 flush)가 안쪽으로 밀려 USP/옵션과 선택바 위치·
      두께가 달라 보였다(2026-06-22 사용자 지적). border-left 제거 → 전 화면 선택바 flush 3px 통일. */
@@ -411,11 +415,8 @@
   font-weight: 600;
 }
 
-/* 토글 클릭 영역 확대 — 행 높이만큼 세로로 꽉, 가로 28px (펼치기 쉽게) */
-.u4aWs20TreeRow .u4a-tree__toggle {
-  width: 28px;
-  height: 40px;
-}
+/* 토글 폭/높이는 공통(shell.css .u4a-tree__toggle = 1.25rem 정사각)을 그대로 소비 → WS20 재정의 제거
+   (2026-06-23 트리 통일: 토글 폭 ServerList/USP/F4 20px 와 일치). */
 
 .u4aWs20TreeRowLeft {
   display: flex; align-items: center; gap: 4px;
@@ -675,12 +676,17 @@
   color: var(--ws20-text-strong); font-weight: 600; font-size: 13px;
 }
 .u4aWs20AttrInfoRow { display: flex; align-items: center; gap: 4px; }
+/* OBJID 행: 공통 createField 래퍼(.u4a-field)가 flex 자식 → 남는 폭 채움(복사 버튼은 고정). */
+.u4aWs20AttrInfoRow .u4a-field { flex: 1 1 auto; min-width: 0; }
 
 /* 값 입력 (구 sap.m.Input) — 공통 폼 필드 스타일(깔끔/고대비).
    · 읽기전용(Display/non-edit): 보더 없는 일반 텍스트, 본문색(--text) 으로 또렷하게.
    · 편집가능(Change & edit): "항상" 보더+입력 배경 → 어떤 게 입력 필드인지 한눈에 구분. */
 .u4aWs20AttrInp {
   flex: 1 1 auto; min-width: 0;
+  /* createField 가 공통 .u4a-input(height:2.25rem 등 '구조')을 함께 부여하므로, 밀집 속성행은
+     높이를 content 기준으로 되돌린다(ws20.css 가 shell 뒤 로드 → 이김). 색/패딩은 아래에서 유지. */
+  height: auto;
   background: transparent; color: var(--text);
   border: 1px solid transparent; border-radius: var(--radius-sm);
   padding: 6px 8px; font-size: 13px; font-family: inherit;
@@ -693,9 +699,8 @@
 }
 .u4aWs20AttrInp:not(:read-only):not(:disabled):hover { border-color: var(--accent); background: var(--hover-bg); }
 .u4aWs20AttrInp:focus { border-color: var(--accent); background: var(--surface-raised, var(--surface)); }
-/* 읽기전용/비활성 — 보더·배경 없는 평문 텍스트(입력 필드 아님을 명확히) */
-.u4aWs20AttrInp:read-only { color: var(--text); cursor: default; background: transparent; border-color: transparent; }
-.u4aWs20AttrInp:disabled { color: var(--text-muted); background: transparent; border-color: transparent; }
+/* 읽기전용/비활성 룩(평문) = 전 화면 공통(bootstrap-skin.css `.u4a-input[readonly]/:disabled`)이 소유.
+   화면별로 따로 칠하지 않는다 — 편집 가능=올라온 보더 박스 / 비활성=평문(박스 없음) 컨셉을 공통이 처리. */
 /* 에러 — 편집 가능 보더 규칙보다 우선하도록 specificity 확보 */
 .u4aWs20AttrInp.err,
 .u4aWs20AttrInp.err:not(:read-only):not(:disabled) { border-color: var(--error); color: var(--error); }
@@ -703,13 +708,17 @@
 /* Description textarea (구 sap.m.TextArea rows:4) */
 .u4aWs20AttrTxa {
   width: 100%; box-sizing: border-box; resize: vertical;
+  /* createField 가 공통 .u4a-input(height:2.25rem) 도 부여하므로 height 를 풀어 rows=4 가 높이를 정하게. */
+  height: auto;
   background: var(--surface-raised, var(--surface)); color: var(--text);
   border: 1px solid var(--line); border-radius: var(--radius-sm);
   padding: 4px 6px; font-size: 13px; font-family: inherit;
   outline: none;
 }
 .u4aWs20AttrTxa:focus { border-color: var(--accent); }
-.u4aWs20AttrTxa:disabled { color: var(--text-muted); }
+/* 비활성 Description 의 평문 배경/글자는 공통(bootstrap-skin .u4a-input:disabled)이 처리.
+   여기선 textarea 전용 디테일(리사이즈 핸들 숨김)만. */
+.u4aWs20AttrTxa:disabled { resize: none; cursor: default; }
 
 /* 작은 버튼 (⧉ 복사 / ∧ 접기 / 📌 핀) */
 .u4aWs20AttrSmBtn {
@@ -755,6 +764,15 @@
 .u4aWs20AttrTbBtn[hidden] { display: none; }
 .u4aWs20AttrTbBtn:hover { background: var(--ws20-btn-hover); }
 .u4aWs20AttrTbBtn.accept { color: var(--success); }
+/* Reset(초기화) — 원본 UI5 type:Accept(초록) 그대로: "success 채움 버튼".
+   Show Changed Items(.emph=액센트 채움)와 동일 패턴, 색만 success 로. 글자/아이콘 흰색. */
+.u4aWs20AttrTbBtn.reset {
+  background: var(--success); color: var(--c-white); font-weight: 600;
+  border-color: var(--success);
+}
+.u4aWs20AttrTbBtn.reset i { color: var(--c-white); }
+.u4aWs20AttrTbBtn.reset:hover { background: var(--success); filter: brightness(1.08); }
+.u4aWs20AttrTbBtn.reset:active { filter: brightness(0.9); }
 /* Show Changed Items 토글 (구 ToggleButton type:Emphasized).
    토글임이 분명하도록 2-상태로: 미적용(기본)=아웃라인(액센트 보더/글자, 투명 배경) → "클릭하면 필터",
    적용중(.pressed)=액센트 채움+흰 글자 → "필터 ON 활성". (항상 파란 채움이라 토글로 안 보이던 것 개선) */
@@ -852,37 +870,35 @@
 .u4aWs20AttrReqIcon { font-size: 10px; flex: 0 0 auto; }
 
 /* 변경된 행 — 구 changedDataMarker 의 .changeValue.
-   원본(ws10_20.css)의 neumorphic "움푹 들어간 입체감"을 재현:
-     파란 세로 그라데이션 + inset 그림자(어두운 위/밝은 아래) + 라운드 + 라이트블루 볼드 텍스트.
-   ★ color-mix 는 Electron14=Chromium93 에서 미지원(드롭됨) → gradient/inset box-shadow/rgba 만 사용
-     (모두 Chromium93 OK, 원본도 color-mix 안 썼음). [[no-color-mix-chromium93]] */
+   ★ 기존 풀-로우 틴트 + neumorphic inset 입체감은 "과하다"는 피드백 → 좌측 액센트 바
+     (IDE 변경 거터처럼)로만 가볍게 표시한다. 배경 채움/inset 그림자/라운드/값 투명화 모두 제거,
+     라벨만 살짝 강조해 어느 속성이 바뀌었는지 스캔 가능하게.
+   틴트색은 테마 액센트 RGB(--ws20-changed-rgb) — 테마별 자동 대응. [[no-color-mix-chromium93]] */
 .u4aWs20AttrRow.changeValue {
-  /* 틴트색은 테마 액센트의 RGB(--ws20-changed-rgb)로 — 화이트=파랑/다크=하늘/레드/퍼플/그린 자동 대응. */
+  /* neumorphic "움푹 들어간 입체감"(그라데이션 + inset 그림자 + 라운드)은 유지하되,
+     "과하다"는 피드백 반영해 강도만 한 톤 낮춘다(틴트 0.24→0.18, 그림자 어둠 0.55→0.34·번짐 10→7px). */
   background: linear-gradient(to bottom,
-              rgba(var(--ws20-changed-rgb), 0.24), rgba(var(--ws20-changed-rgb), 0.09));
-  /* 안쪽 그림자로 "눌려 들어간" 입체감 (위·왼쪽 어둡게, 아래·오른쪽 살짝 밝게) */
-  box-shadow: inset 4px 4px 10px rgba(0, 0, 0, 0.55),
-              inset -3px -3px 8px rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
+              rgba(var(--ws20-changed-rgb), 0.18), rgba(var(--ws20-changed-rgb), 0.07));
+  box-shadow: inset 3px 3px 7px rgba(0, 0, 0, 0.34),
+              inset -2px -2px 6px rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
   border-bottom-color: transparent;   /* 라운드 카드처럼 보이게 하단 구분선 제거 */
 }
-/* 변경된 행 hover — 그라데이션 한 단계 진하게(들어간 느낌 유지). */
+/* 변경된 행 hover — 그라데이션 한 단계만 진하게(들어간 느낌 유지, 역시 완화된 톤). */
 .u4aWs20AttrRow.changeValue:hover {
   background: linear-gradient(to bottom,
-              rgba(var(--ws20-changed-rgb), 0.32), rgba(var(--ws20-changed-rgb), 0.14));
+              rgba(var(--ws20-changed-rgb), 0.24), rgba(var(--ws20-changed-rgb), 0.10));
 }
-/* 글자 — 테마 액센트 강조색(--accent-strong)으로 "변경됨" 강조. 각 테마의 accent-strong 은
-   다크=밝은톤(#5dc6ff)/라이트테마=진한톤 이라 들어간 틴트 배경 위에서 자동으로 대비가 맞는다. */
+/* 글자 — 테마 액센트 강조색으로 "변경됨" 강조(들어간 틴트 위에서 대비 자동). */
 .u4aWs20AttrRow.changeValue .u4aWs20AttrLblTxt { color: var(--accent-strong); font-weight: 700; }
 .u4aWs20AttrRow.changeValue .u4aWs20AttrInp,
 .u4aWs20AttrRow.changeValue .u4aWs20AttrSel,
 .u4aWs20AttrRow.changeValue .u4aWs20AttrCombo .u4a-combo__text { color: var(--accent-strong); font-weight: 600; }
-/* ★ 값 영역 컨트롤(입력/콤보/셀렉트)의 불투명 배경이 행 틴트를 가려 행이 끊겨 보이던 문제 해결 —
-   변경된 행에서는 컨트롤 배경을 투명화해 행 색이 값 영역까지 끊김 없이 이어지게 한다.
-   보더는 유지 → 입력 어포던스(편집 가능 표시)는 그대로. */
-.u4aWs20AttrRow.changeValue .u4aWs20AttrInp:not(:read-only):not(:disabled),
-.u4aWs20AttrRow.changeValue .u4aWs20AttrCombo:not(.is-disabled),
-.u4aWs20AttrRow.changeValue .u4aWs20AttrSel:not(:disabled) {
+/* 값 컨트롤의 불투명 배경이 행 틴트를 가려 끊겨 보이지 않게 — 변경 행에선 컨트롤 배경 투명화(보더 유지).
+   편집 가능(surface-raised)·읽기전용(app-bg) 둘 다 포함 — Display 모드 변경행도 틴트가 끊김없이 이어진다. */
+.u4aWs20AttrRow.changeValue .u4aWs20AttrInp,
+.u4aWs20AttrRow.changeValue .u4aWs20AttrCombo,
+.u4aWs20AttrRow.changeValue .u4aWs20AttrSel {
   background: transparent;
 }
 
@@ -895,7 +911,7 @@
 
 /* DDLB — 공통 .u4a-combo 를 속성 그리드 행에 맞게 컴팩트/인라인화.
    폼용 기본(.u4a-combo: 36px 보더 박스)은 빽빽한 속성 행에 과하게 크다 → 컴팩트화.
-   텍스트 입력과 동일 감성으로: 편집 가능 시 항상 보더 박스, 비활성은 투명 평문. */
+   텍스트 입력과 동일 감성으로: 편집 가능=surface-raised 보더 박스 / 비활성=평문(투명+muted). */
 .u4aWs20AttrCombo {
   width: 100%;
   height: 32px;
@@ -916,7 +932,7 @@
   background: var(--surface-raised, var(--surface));
   box-shadow: none;            /* 그리드에선 포커스 링 생략(컴팩트) */
 }
-.u4aWs20AttrCombo.is-disabled { pointer-events: none; opacity: var(--disabled-opacity, 0.5); }
+/* 비활성 콤보(평문) = 전 화면 공통(bootstrap-skin.css `.u4a-combo.is-disabled`)이 소유 — 화면별 처리 없음. */
 
 /* DDLB (구 sap.m.ComboBox — 네이티브 폴백 전용, 공통 폼 보더) */
 .u4aWs20AttrSel {

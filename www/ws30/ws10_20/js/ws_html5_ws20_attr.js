@@ -405,6 +405,78 @@
         };  //attribute 항목의 DDLB 정보 구성.
     }
 
+    /************************************************************************
+     * 서버 이벤트 항목 검색 (원본 uiAttributeArea.js 7027행 getServerEventList 1:1).
+     * ----------------------------------------------------------------------
+     *  ★ 원본은 UI5 디자인영역(uiAttributeArea.js)에만 있고 HTML5 프레임엔 미로드.
+     *    UI5 의존부가 없어(ajax + designAreaLockUnlock + parent.setBusy) 그대로 이식한다.
+     *  컨트롤러 클래스(CLSID)의 서버 이벤트 메소드 목록을 받아 DDLB 형태
+     *  [{KEY,TEXT,DESC}, ...](선두 빈 라인 포함)로 콜백/Promise 전달.
+     *  bSkipUnLock=true → busy/lock 해제를 호출처에 위임(원본 동일).
+     ************************************************************************/
+    if (typeof oAPP.fn.getServerEventList !== "function") {
+        oAPP.fn.getServerEventList = function (f_cb, bSkipUnLock) {
+
+            return new Promise(function (resolve) {
+
+                //서버이벤트 호출전 lock처리.
+                oAPP.fn.designAreaLockUnlock(true);
+
+                var lt_ddlb = [{ KEY: "", TEXT: "", DESC: "" }];
+
+                //클래스명 서버 전송 데이터에 구성.
+                var oFormData = new FormData();
+                oFormData.append("CLSNM", oAPP.attr.appInfo.CLSID);
+
+                //컨트롤러 클래스의 서버 이벤트 항목 정보 검색.
+                sendAjax(oAPP.attr.servNm + "/getServerEventList", oFormData, function (param) {
+
+                    //UNLOCK SKIP FLAG 처리시 BUSY OFF 처리 금지(원본 동일).
+                    if (bSkipUnLock !== true) { parent.setBusy(""); }
+
+                    //서버이벤트 호출후 lock처리.
+                    oAPP.fn.designAreaLockUnlock(true);
+
+                    if (param.RETCD !== "S") {
+                        if (bSkipUnLock !== true) { oAPP.fn.designAreaLockUnlock(); }
+                        resolve(lt_ddlb);
+                        return;
+                    }
+
+                    var ls_evt_DDLB = {};
+                    for (var i = 0, l = (param.EVTLT || []).length; i < l; i++) {
+                        ls_evt_DDLB.KEY = ls_evt_DDLB.TEXT = param.EVTLT[i].EVTNM;
+                        ls_evt_DDLB.DESC = param.EVTLT[i].DESC;
+                        lt_ddlb.push(ls_evt_DDLB);
+                        ls_evt_DDLB = {};
+                    }
+
+                    //callback function이 존재하지 않는경우 exit.
+                    if (!f_cb) {
+                        if (bSkipUnLock !== true) { oAPP.fn.designAreaLockUnlock(); }
+                        resolve(lt_ddlb);
+                        return;
+                    }
+
+                    //callback function 수행.
+                    f_cb(lt_ddlb);
+
+                    //unlock skip flag가 없는경우 Unlock처리.
+                    if (bSkipUnLock !== true) { oAPP.fn.designAreaLockUnlock(); }
+
+                    resolve(lt_ddlb);
+
+                }, !bSkipUnLock ? "X" : "", true, "POST", function (e) {
+                    //오류 발생시 lock 해제.
+                    oAPP.fn.designAreaLockUnlock();
+                    resolve(lt_ddlb);
+                });
+
+            });
+
+        };  //서버 이벤트 항목 검색.
+    }
+
     //attribute type에 따른 desc얻기. (원본 7408행 1:1)
     if (typeof oAPP.fn.attrUIATYDesc !== "function") {
         oAPP.fn.attrUIATYDesc = function (UIATY) {
@@ -3043,6 +3115,156 @@
 
     }; // end of oAPP.fn.fnWs20AttrChange
 
+    /************************************************************************
+     * 이벤트 생성 아이콘(녹색 developer-settings) 선택 — 서버이벤트 생성 팝업 호출.
+     *   (원본 uiAttributeArea.js attrCallEventPopup 2057행 1:1. UI5 의존 없음.)
+     *   조건: 이벤트행(UIATY="2") + 편집가능(edit) + 화면편집(IS_EDIT) + 비-Trial.
+     *   createEventPopup(is_attr, attrCreateEventCallBack) — 생성 완료 시 콜백이
+     *   해당 이벤트 attr 값으로 매핑하고 attr 변경 흐름을 수행한다.
+     *   반환 true = 호출처(아이콘 핸들러)의 후속 분기 skip(원본 동일).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrCallEventPopup !== "function") {
+        oAPP.fn.attrCallEventPopup = function (is_attr) {
+
+            //해당 라인이 이벤트 라인이 아닌경우 exit.
+            if (is_attr.UIATY !== "2") { return; }
+
+            //현재 이벤트 영역이 편집 불가능하다면 exit.
+            if (is_attr.edit !== true) { return; }
+
+            //화면이 편집상태가 아닌경우 exit.
+            if (!_isEditMode()) { return; }
+
+            //trial 버전인경우 서버이벤트 메소드 생성 금지 처리.
+            if (oAPP.fn.fnOnCheckIsTrial()) { return; }
+
+            //대상 function이 존재하는경우 호출 처리.
+            if (typeof oAPP.fn.createEventPopup === "function") {
+                oAPP.fn.createEventPopup(is_attr, oAPP.fn.attrCreateEventCallBack);
+                return true;
+            }
+
+            //대상 function이 존재하지 않는경우 script 호출.
+            oAPP.fn.getScript("design/js/createEventPopup", function () {
+                oAPP.fn.createEventPopup(is_attr, oAPP.fn.attrCreateEventCallBack);
+            });
+
+            return true;
+
+        };  //이벤트 생성 아이콘 선택.
+    }
+
+    /************************************************************************
+     * 이벤트 생성 팝업 콜백 (원본 uiAttributeArea.js attrCreateEventCallBack 5302행).
+     *   생성된 이벤트명을 해당 attr 값(UIATV/comboval)으로 매핑 후 attr 변경 흐름 수행.
+     *   ※ 원본의 bindPopup BUSY_ON 브로드캐스트는 UI5 바인딩팝업 전용 — HTML5 skip.
+     *     attr 변경(원본 attrChange)은 HTML5 fnWs20AttrChange 로 대체(끝에서 행 재렌더 →
+     *     해당 이벤트 DDLB 가 새 이벤트명을 선택값으로 표시).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrCreateEventCallBack !== "function") {
+        oAPP.fn.attrCreateEventCallBack = function (is_attr, evtnm) {
+
+            //입력한 이벤트명 매핑.
+            is_attr.UIATV = evtnm;
+            is_attr.comboval = evtnm;
+
+            //attribute 입력건에 대한 변경 흐름(수집/스타일/재렌더).
+            oAPP.fn.fnWs20AttrChange(is_attr, "DDLB");
+
+        };  //이벤트 팝업 call back 이벤트.
+    }
+
+    /************************************************************************
+     * Attribute 초기화 (원본 uiAttributeArea.js attrResetAttr 2096행).
+     * ----------------------------------------------------------------------
+     *  선택 UI 의 **직접 변경한 Property** 들을 전부 기본값(DEFVL)으로 되돌린다.
+     *  · 확인 팝업(112+113, KIND 30 YES/NO) → YES 일 때만 수행.
+     *  · 대상: UIATY="1"(프로퍼티) + ISBND≠"X"(바인딩 아님).
+     *    - ISSTR(직접입력 aggregation): 값 있으면 "" 로 비움.
+     *    - 그 외: 현재값≠DEFVL 이면 DEFVL 로. (이미 기본값이면 skip)
+     *  · 값 반영은 수동 변경과 동일 경로(fnWs20AttrChange)로 — 수집(_T_0015)/변경표시/
+     *    헤더·상태(Active→Inactive)/재렌더가 그대로 처리된다(원본 attrChangeProc+refresh 대응).
+     *  ※ UI5 전용(undo getResetAttrParam·preview onAfterRendering·bindPopup broadcast)은
+     *    HTML5 미해당이라 생략(undo 는 fnWs20AttrChange 가 변경건마다 자체 기록).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrResetAttr !== "function") {
+        oAPP.fn.attrResetAttr = function () {
+
+            //편집 모드가 아니면 무시(버튼 vis02 가드와 별개 안전).
+            if (!_isEditMode()) { return; }
+
+            //112 Resets all properties to their default values. / 113 The registered value will be lost. Do you want to proceed?
+            var sMsg = (oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "112", "", "", "", "") || "") + " \n " +
+                (oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "113", "", "", "", "") || "");
+
+            //초기화 전 확인 팝업(원본 showMessage KIND 30 → HTML5 동일 라우팅).
+            parent.showMessage(null, 30, "I", sMsg, function (sAct) {
+
+                //YES 가 아니면 종료.
+                if (sAct !== "YES") { return; }
+
+                try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
+                try { oAPP.fn.setShortcutLock(true); } catch (e) { }
+
+                try {
+                    var oData = (oAPP.attr.oModel && oAPP.attr.oModel.oData) || {};
+
+                    //'Show Changed Items' 필터가 켜져 있으면 끈다 — 초기화하면 변경행이 사라져 빈 목록이 되므로.
+                    if (oData.sAttrFilt && oData.sAttrFilt.press === true) {
+                        oData.sAttrFilt.press = false;
+                        var FLT = document.getElementById("ws20AttrShowChangedBtn");
+                        if (FLT) { FLT.classList.remove("pressed"); FLT.setAttribute("aria-pressed", "false"); }
+                    }
+
+                    var aT0023 = (oAPP.DATA && oAPP.DATA.LIB && oAPP.DATA.LIB.T_0023) || [];
+                    //순회 중 fnWs20AttrChange 가 재렌더해도 배열 구조는 불변이나, 안전하게 프로퍼티만 추려 복사본 순회.
+                    var aProps = ((oData.T_ATTR) || []).filter(function (a) { return a && a.UIATY === "1" && a.ISBND !== "X"; });
+
+                    for (var i = 0; i < aProps.length; i++) {
+                        var _sAttr = aProps[i];
+
+                        //직접 입력 가능한 attribute 는 AT...._1 형식 — _ 뒤 제거 후 원본 키로 조회.
+                        var l_UIATK = _sAttr.UIATK;
+                        if (l_UIATK.indexOf("_") !== -1) { l_UIATK = l_UIATK.substr(0, l_UIATK.indexOf("_")); }
+
+                        var ls_0023 = aT0023.find(function (a) { return a.UIATK === l_UIATK; });
+                        if (!ls_0023) { continue; }
+
+                        var sDefault;
+                        if (ls_0023.ISSTR === "X") {
+                            //직접입력 aggregation — 값 있을 때만 "" 로 초기화.
+                            if (_sAttr.UIATV === "") { continue; }
+                            sDefault = "";
+                        } else {
+                            sDefault = (ls_0023.DEFVL == null) ? "" : ls_0023.DEFVL;
+                            //이미 기본값이면 skip.
+                            if (_sAttr.UIATV === sDefault) { continue; }
+                        }
+
+                        //값을 기본값으로 — 컨트롤 종류별 필드 동기화 후 동일 변경 경로 수행.
+                        _sAttr.UIATV = sDefault;
+                        _sAttr.comboval = sDefault;                 //combo
+                        _sAttr.UIATV_c = (sDefault === "true");      //checkbox
+
+                        var uityp = _sAttr.chk_visb ? "CHECK" : (_sAttr.sel_visb ? "DDLB" : "INPUT");
+                        try { oAPP.fn.fnWs20AttrChange(_sAttr, uityp); }
+                        catch (e) { console.error("[HTML5][WS20][attr] reset 변경 오류:", _sAttr.UIATT, e && e.message); }
+                    }
+
+                    //필터 끔 반영 + 변경표시 제거 확정(마지막 1회 재렌더 — fnWs20AttrChange 가 안 불린 경우 대비).
+                    oAPP.fn.fnRenderWs20AttrRows();
+
+                } catch (e) {
+                    console.error("[HTML5][WS20][attr] Attribute Reset 오류:", e && e.message);
+                } finally {
+                    try { oAPP.fn.setShortcutLock(false); } catch (e) { }
+                    try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                }
+            });
+
+        };  //attribute 초기화 기능.
+    }
+
     /* ********************************************************************
      * ★ (7) HTML5 렌더 — 우측 속성 패널 (구 sap.f.DynamicPage 구조)
      *        스크린샷 실측 스펙:
@@ -3201,20 +3423,19 @@
         var ROW1 = document.createElement("div");
         ROW1.className = "u4aWs20AttrInfoRow";
 
-        //OBJID 입력필드 (점선 밑줄 스타일) — 변경 핸들러는 attrChnageOBJID(미변환) 가드.
-        var INP = document.createElement("input");
-        INP.type = "text";
-        INP.id = "ws20AttrObjIdInp";
-        INP.className = "u4aWs20AttrInp";
-        INP.maxLength = 100;
-        INP.addEventListener("change", function () {
-            //OBJID 변경건 처리 — 원본 attrChnageOBJID(트리/미리보기/모델 연쇄 변경, UI5 의존)
-            console.warn("[W4+ 예정] UI Object ID 변경(attrChnageOBJID) 미변환 — 값 원복");
-            try {
-                INP.value = (oAPP.attr.oModel.oData.uiinfo && oAPP.attr.oModel.oData.uiinfo.OBJID) || "";
-            } catch (e) { }
+        //OBJID 입력필드 (점선 밑줄 스타일) — 공통 팩토리(U4AUI.createField), inputClassName 으로 인라인 스타일 유지.
+        var oObjFld = window.U4AUI.createField({
+            type: "text", id: "ws20AttrObjIdInp", inputClassName: "u4aWs20AttrInp", maxLength: 100,
+            onChange: function () {
+                //OBJID 변경건 처리 — 원본 attrChnageOBJID(트리/미리보기/모델 연쇄 변경, UI5 의존)
+                console.warn("[W4+ 예정] UI Object ID 변경(attrChnageOBJID) 미변환 — 값 원복");
+                try {
+                    oObjFld.input.value = (oAPP.attr.oModel.oData.uiinfo && oAPP.attr.oModel.oData.uiinfo.OBJID) || "";
+                } catch (e) { }
+            }
         });
-        ROW1.appendChild(INP);
+        var INP = oObjFld.input;   // 하위 호환(아래 Copy 버튼 등에서 참조)
+        ROW1.appendChild(oObjFld.el);
 
         //A04 Copy — OBJID 복사 버튼. (원본 oRBtn0 press: attrCopyText)
         var CPY = document.createElement("button");
@@ -3238,11 +3459,9 @@
         LBL2.textContent = _msg("A35", "Description");
         INFO.appendChild(LBL2);
 
-        //Description 입력 TextArea (원본 oRTAr1 rows:4)
-        var TXA = document.createElement("textarea");
-        TXA.id = "ws20AttrDescTxa";
-        TXA.className = "u4aWs20AttrTxa";
-        TXA.rows = 4;
+        //Description 입력 TextArea (원본 oRTAr1 rows:4) — 공통 팩토리(U4AUI.createField textarea).
+        var oDescFld = window.U4AUI.createField({ type: "textarea", id: "ws20AttrDescTxa", inputClassName: "u4aWs20AttrTxa", rows: 4 });
+        var TXA = oDescFld.input;   // 하위 호환(아래 change 핸들러에서 참조)
         TXA.addEventListener("change", function () {
 
             // busy 키고 (원본 Description 변경 이벤트 297행 보존)
@@ -3273,7 +3492,7 @@
             try { parent.setBusy && parent.setBusy(""); } catch (e) { }
 
         });
-        INFO.appendChild(TXA);
+        INFO.appendChild(oDescFld.el);
 
         SCROLLER.appendChild(INFO);
 
@@ -3357,16 +3576,18 @@
         TBR.id = "ws20AttrToolbar";
         TBR.className = "u4aWs20AttrToolbar";
 
-        //B17 Reset — attribute 초기화 버튼 (vis02 시에만 표시) [가드]
+        //B17 Reset — attribute 초기화 버튼 (vis02 시에만 표시). 변경 속성 전부 기본값 복원.
         var RST = document.createElement("button");
         RST.type = "button";
         RST.id = "ws20AttrResetBtn";
-        RST.className = "u4aWs20AttrTbBtn accept";
+        RST.className = "u4aWs20AttrTbBtn reset";
         RST.title = _msg("B17", "Reset");
-        RST.innerHTML = '<i class="fa-solid fa-rotate-left"></i> ' + _msg("B17", "Reset");
+        //아이콘/텍스트 분리(필터 버튼과 동일 구조) — 좁아지면 ⋯ 로 접힘.
+        RST.innerHTML = '<i class="fa-solid fa-rotate-left"></i><span>' + _msg("B17", "Reset") + '</span>';
         RST.style.display = "none";
         RST.addEventListener("click", function () {
-            console.warn("[W4+ 예정] Attribute Reset(attrResetAttr) 미변환");
+            try { oAPP.fn.attrResetAttr(); }
+            catch (e) { console.error("[HTML5][WS20][attr] Attribute Reset 호출 오류:", e && e.message); }
         });
         TBR.appendChild(RST);
 
@@ -3571,78 +3792,29 @@
                showValueHelp:{showF4} showClearIcon:true) */
         if (sAttr.inp_visb === true) {
 
-            var INP = document.createElement("input");
-            INP.type = "text";
-            INP.className = "u4aWs20AttrInp val u4a-field__input";
-            INP.value = sAttr.UIATV != null ? sAttr.UIATV : "";
-            INP.title = INP.value;
-            INP.readOnly = (sAttr.edit !== true);
-            INP.disabled = !bEnabled;
-            if (sAttr.valst === "Error") {
-                INP.classList.add("err");
-                INP.title = sAttr.valtx || INP.value;
-            }
-            INP.addEventListener("change", function () {
-                //attr 입력필드 이벤트 (원본 oRInp2 attachChange → attrChange(_sAttr,"INPUT"))
-                sAttr.UIATV = INP.value;
-                oAPP.fn.fnWs20AttrChange(sAttr, "INPUT");
+            // 공통 팩토리(U4AUI.createField) — clear(X)/F4/data-trail/대문자 없이 텍스트 입력 단일화.
+            //   inputClassName 으로 인라인 스타일(.u4aWs20AttrInp val) 유지, className 으로 WS20 사이즈 박스.
+            // 편집 가능 = Change 모드(bEnabled) && 이 속성 편집 허용(sAttr.edit). 그 외엔 비활성.
+            //   ★ 비활성은 disabled(흐릿/opacity) 대신 readOnly 사용 — USP/공통과 동일(공통 .u4a-input:read-only
+            //     = --app-bg 박스 + muted). Display 모드 값도 선택·복사 가능. clear/F4 는 편집 가능할 때만.
+            var bFieldEdit = (bEnabled && sAttr.edit === true);
+            var bHasClear = bFieldEdit;
+            var oValFld = window.U4AUI.createField({
+                type: "text",
+                value: sAttr.UIATV != null ? sAttr.UIATV : "",
+                readOnly: !bFieldEdit,
+                className: "u4aWs20AttrValBox",
+                inputClassName: "u4aWs20AttrInp val",
+                clear: bHasClear,
+                onClear: function () { sAttr.UIATV = ""; oAPP.fn.fnWs20AttrChange(sAttr, "INPUT"); },
+                f4: (sAttr.showF4 === true) ? function () { console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT); } : null,
+                f4IconHtml: '<i class="fa-regular fa-clone"></i>',   // F4=아웃라인 clone(복사버튼과 구분, 2026-06-17)
+                f4Disabled: !bFieldEdit,
+                onChange: function (v) { sAttr.UIATV = v; oAPP.fn.fnWs20AttrChange(sAttr, "INPUT"); }
             });
-            BOX.appendChild(INP);
-
-            // 트레일링 아이콘(X/F4) 슬롯 수 → 래퍼 data-trail (공통 CSS 가 패딩/위치 처리)
-            var bHasClear = (sAttr.edit === true && bEnabled);
-            var bHasF4 = (sAttr.showF4 === true);
-            BOX.dataset.trail = String((bHasClear ? 1 : 0) + (bHasF4 ? 1 : 0));
-
-            //X(clear) — 원본 showClearIcon:true 재현. [공통 컴포넌트] .u4a-field__clear +
-            // U4AUI.attachClear → "값 있을 때만" 노출(래퍼 data-filled). 비우면 모델 반영.
-            if (bHasClear) {
-                var CLR = document.createElement("button");
-                CLR.type = "button";
-                CLR.className = "u4a-field__clear";
-                CLR.title = "Clear";
-                CLR.tabIndex = -1;
-                CLR.innerHTML = '<i class="fa-solid fa-xmark"></i>';
-                BOX.appendChild(CLR);
-
-                if (window.U4AUI && typeof U4AUI.attachClear === "function") {
-                    U4AUI.attachClear(INP, CLR, function () {
-                        sAttr.UIATV = "";
-                        oAPP.fn.fnWs20AttrChange(sAttr, "INPUT");
-                    });
-                } else {
-                    // (폴백) U4AUI 미로드 시 — 래퍼 data-filled 직접 토글(공통 CSS 와 일관)
-                    var _syncClr = function () { BOX.dataset.filled = INP.value ? "true" : "false"; };
-                    INP.addEventListener("input", _syncClr);
-                    CLR.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
-                    CLR.addEventListener("click", function () {
-                        if (INP.value === "") { return; }
-                        INP.value = "";
-                        sAttr.UIATV = "";
-                        oAPP.fn.fnWs20AttrChange(sAttr, "INPUT");
-                        _syncClr();
-                    });
-                    _syncClr();
-                }
-            }
-
-            //F4 help (구 showValueHelp/valueHelpRequest → attrCallValueHelp) [가드]
-            if (sAttr.showF4 === true) {
-                var F4 = document.createElement("button");
-                F4.type = "button";
-                F4.className = "u4a-field__vh";
-                F4.title = "Value Help";
-                //원본 sap-icon://value-help(겹친 사각형) 재현 — F4 값도움은 아웃라인(fa-regular) clone
-                // 사용. (clone 솔리드는 클립보드 복사 버튼과 톤이 겹쳐, F4 만 regular 로 구분. 사용자 지정 2026-06-17)
-                F4.innerHTML = '<i class="fa-regular fa-clone"></i>';
-                F4.disabled = !bEnabled;
-                F4.addEventListener("click", function () {
-                    console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT);
-                });
-                BOX.appendChild(F4);
-            }
-
-            return BOX;
+            oValFld.input.title = oValFld.input.value;
+            if (sAttr.valst === "Error") { oValFld.input.classList.add("err"); oValFld.input.title = sAttr.valtx || oValFld.input.value; }
+            return oValFld.el;
         }
 
         /* (2) DDLB (구 sap.m.ComboBox items:{T_DDLB} value:{comboval}/selectedKey)
@@ -3672,8 +3844,39 @@
                 oAPP.fn.fnWs20AttrChange(sAttr, "DDLB");
             }
 
+            // 이벤트 DDLB(UIATY="2")는 "펼치기 직전" 최신 서버이벤트 목록을 받아 채운다.
+            //   (원본 uiAttributeArea.js oRSel1 combobox click 로직 — getServerEventList →
+            //    T_DDLB 매핑 → open. 다른 창/이 화면 녹색아이콘으로 추가된 이벤트가 즉시 반영.)
+            var oSelOpts = null;
+            if (sAttr.UIATY === "2" && !bDisabled) {
+                oSelOpts = {
+                    onOpen: function (oCombo) {
+                        // getServerEventList 가 반환하는 Promise 는 성공/실패/에러 전 경로에서
+                        //   lt_ddlb 로 resolve 되므로 콜백 대신 반환 Promise 를 쓴다(미해결 방지).
+                        return oAPP.fn.getServerEventList(null, false).then(function (aDdlb) {
+                            aDdlb = aDdlb || [{ KEY: "", TEXT: "", DESC: "" }];
+                            //서버이벤트 항목 매핑(원본 _sAttr.T_DDLB = _aEvent).
+                            sAttr.T_DDLB = aDdlb;
+                            var aNew = [], bHas = false;
+                            for (var k = 0; k < aDdlb.length; k++) {
+                                if (aDdlb[k].KEY === sAttr.UIATV) { bHas = true; }
+                                aNew.push({
+                                    value: aDdlb[k].KEY != null ? aDdlb[k].KEY : "",
+                                    text: aDdlb[k].TEXT != null ? aDdlb[k].TEXT : ""
+                                });
+                            }
+                            //현재 선택값이 목록에 없으면 표시 보장용 선두 추가(원본은 오류표시 — 여기선 값 유지).
+                            if (!bHas && sAttr.UIATV) { aNew.unshift({ value: sAttr.UIATV, text: sAttr.UIATV }); }
+                            oCombo.setItems(aNew);
+                        }).catch(function (e) {
+                            console.error("[HTML5][WS20][attr] 서버이벤트 목록 조회 실패:", e && e.message);
+                        });
+                    }
+                };
+            }
+
             if (window.U4AUI && typeof U4AUI.createSelect === "function") {
-                var SEL = U4AUI.createSelect(aItems, sVal, _onPick);
+                var SEL = U4AUI.createSelect(aItems, sVal, _onPick, oSelOpts);
                 SEL.classList.add("u4aWs20AttrCombo");
                 if (bDisabled) { SEL.classList.add("is-disabled"); SEL.setAttribute("aria-disabled", "true"); SEL.tabIndex = -1; }
                 BOX.appendChild(SEL);
@@ -3769,7 +3972,17 @@
         if (sColor) { BTN.style.color = sColor; }
 
         BTN.addEventListener("click", function () {
-            //구 attrIcon1Proc(바인딩 팝업/이벤트 팝업/F4 팝업 등) — W4+ 예정.
+            //이벤트 행(UIATY="2")의 icon1(녹색 developer-settings) = 서버이벤트 생성 팝업.
+            //  (원본 attrIcon1Proc → attrCallEventPopup → createEventPopup 경로 중 이벤트 케이스.)
+            if (sAttr.UIATY === "2" && iNo === 1) {
+                try {
+                    //원본 attrIcon1Proc 진입부: 오류 표현 필드 초기화 후 이벤트 팝업 호출.
+                    if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
+                    oAPP.fn.attrCallEventPopup(sAttr);
+                } catch (e) { console.error("[HTML5][WS20][attr] 서버이벤트 생성 호출 오류:", e && e.message); }
+                return;
+            }
+            //그 외(바인딩 팝업/F4/클라이언트이벤트<syntax> 등) 구 attrIcon1Proc/attrIcon2Proc — W4+ 예정.
             console.warn("[W4+ 예정] 속성 아이콘 동작 미변환:", sAttr.UIATT, "icon" + iNo, sSrc);
         });
 
@@ -4090,34 +4303,43 @@
 
         //위치 — 속성 목록을 가리지 않도록 **속성 패널 왼쪽 바깥(미리보기 위)**에 띄우고, 클릭한 라벨과
         //  세로로 정렬한다. (구: 라벨 바로 아래라 아래 속성들을 가려 위→아래 연속 클릭이 불가했음.)
-        try {
-            var r = oAnchor.getBoundingClientRect();
-            var oAttrPane = document.querySelector(".u4aWsDesignAttr");
-            var rPane = oAttrPane ? oAttrPane.getBoundingClientRect() : null;
+        //  ★ 한 번만 계산하면 창 전체화면 전환/리사이즈/스크롤 때 앵커(라벨)가 옮겨가 위치가 어긋난다 →
+        //    _position() 으로 분리해 resize/scroll 마다 앵커 기준 재계산(UI5 ResponsivePopover 동일).
+        function _position() {
+            try {
+                //앵커(라벨)가 사라졌으면(행 재렌더 등) 닫는다 — 엉뚱한 위치로 튀는 것 방지.
+                if (!oAnchor || !document.body.contains(oAnchor)) { _close(); return; }
 
-            var iLeft, iTop;
-            if (rPane && (rPane.left - POP.offsetWidth - 8) >= 6) {
-                // 패널 왼쪽 바깥에 충분한 공간 → 거기에(목록 안 가림)
-                iLeft = rPane.left - POP.offsetWidth - 8;
-                iTop = r.top;                       // 클릭한 라벨과 세로 정렬
-            } else {
-                // 폴백: 왼쪽 공간 부족 → 화면 왼쪽 가장자리(여전히 속성 목록은 거의 안 가림)
-                iLeft = 6;
-                iTop = r.top;
-            }
-            // 화면 안으로 클램프
-            if (iLeft < 6) { iLeft = 6; }
-            if (iTop + POP.offsetHeight > window.innerHeight - 6) {
-                iTop = Math.max(6, window.innerHeight - POP.offsetHeight - 6);
-            }
-            if (iTop < 6) { iTop = 6; }
-            POP.style.left = iLeft + "px";
-            POP.style.top = iTop + "px";
-        } catch (e) { }
+                var r = oAnchor.getBoundingClientRect();
+                var oAttrPane = document.querySelector(".u4aWsDesignAttr");
+                var rPane = oAttrPane ? oAttrPane.getBoundingClientRect() : null;
+
+                var iLeft, iTop;
+                if (rPane && (rPane.left - POP.offsetWidth - 8) >= 6) {
+                    // 패널 왼쪽 바깥에 충분한 공간 → 거기에(목록 안 가림)
+                    iLeft = rPane.left - POP.offsetWidth - 8;
+                    iTop = r.top;                       // 클릭한 라벨과 세로 정렬
+                } else {
+                    // 폴백: 왼쪽 공간 부족 → 화면 왼쪽 가장자리(여전히 속성 목록은 거의 안 가림)
+                    iLeft = 6;
+                    iTop = r.top;
+                }
+                // 화면 안으로 클램프
+                if (iLeft < 6) { iLeft = 6; }
+                if (iTop + POP.offsetHeight > window.innerHeight - 6) {
+                    iTop = Math.max(6, window.innerHeight - POP.offsetHeight - 6);
+                }
+                if (iTop < 6) { iTop = 6; }
+                POP.style.left = iLeft + "px";
+                POP.style.top = iTop + "px";
+            } catch (e) { }
+        }
 
         function _close() {
             document.removeEventListener("mousedown", _onOutside, true);
             document.removeEventListener("keydown", _onEsc, true);
+            window.removeEventListener("resize", _position);
+            window.removeEventListener("scroll", _position, true);
             try { POP.remove(); } catch (e) { }
         }
         function _onOutside(ev) {
@@ -4125,6 +4347,12 @@
             _close();
         }
         function _onEsc(ev) { if (ev.key === "Escape") { ev.stopPropagation(); _close(); } }
+
+        //초기 배치 + 창 리사이즈/스크롤 추적(전체화면 전환 시 위치 어긋남 방지). scroll 은 capture 로
+        //  내부 스크롤러(.u4aWs20AttrScroller)까지 잡는다(스크롤 이벤트는 버블 안 하므로 capture 필요).
+        _position();
+        window.addEventListener("resize", _position);
+        window.addEventListener("scroll", _position, true);
 
         X.addEventListener("click", _close);
         //여는 클릭의 잔여 이벤트가 즉시 닫지 않도록 다음 틱에 바깥클릭/ESC 리스너 부착(Find 팝업과 동일).

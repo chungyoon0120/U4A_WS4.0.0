@@ -653,6 +653,46 @@
      * @deprecated Deprecated as of version v3.5.7-3
      * [oAPP.common.isProcessRunning] instead.
      **************************************************************************/
+    /************************************************************************
+     * [HTML5] 단축키 공통 가드 — 모든 페이지 단축키 핸들러의 단일 방어 통로.
+     *   화면별 super-wrap(_scGuard/_ws20ScGuard 등)이 이 함수에 위임한다(중복 제거).
+     *   순서대로 방어:
+     *     (1) 꾹 누름(auto-repeat) — e.repeat
+     *     (2) 현재 화면 일치 — parent.getCurrPage() === sPage (다른 화면 단축키 오발화 방지)
+     *     (3) 종합 실행가능 체크 — fnShortCutExeAvaliableCheck(): busy / 메뉴열림(.u4a-menu) /
+     *         다이얼로그열림 / isShortcutLock / 페이지이동중(isNaviBusy) 전부 포함(원본 종합 체크).
+     *   ※ "연타/재진입"은 (3)의 isNaviBusy·busy·다이얼로그 체크가 막는다(비동기 액션이 in-flight
+     *      플래그를 들고 있는 동안 같은/다른 단축키 모두 차단). 동기 액션은 즉시 끝나 영향 없음.
+     * @param {KeyboardEvent} e
+     * @param {string} sPage  이 단축키가 유효한 화면 ("WS10"/"WS20"/"WS30")
+     * @param {Function} fnAction  실제 동작
+     ************************************************************************/
+    oAPP.common.fnRunShortCut = function (e, sPage, fnAction) {
+        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { }
+        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { }
+        if (e && e.repeat === true) { return; }                                                          // (1)
+        try { if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) { return; } } catch (x) { } // (2)
+        try { if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; } } catch (x) { } // (3)
+        try { fnAction(e); } catch (err) { console.error("[HTML5][shortcut][" + sPage + "]", err); }
+    }; // end of oAPP.common.fnRunShortCut
+
+    /************************************************************************
+     * [HTML5] 페이지 이동 in-flight 락 set/clear — 원본 sap.lock/isLocked 재진입 락 대체.
+     *   비동기 네비게이션(fnMoveToWs10 등) 시작 시 lock, 완료/실패 시 release.
+     *   release 누락으로 영구 잠김 되지 않도록 lock 시 안전 타임아웃(backstop) 자동 설정.
+     ************************************************************************/
+    oAPP.common.fnNaviLock = function () {
+        oAPP.attr.isNaviBusy = true;
+        try { clearTimeout(oAPP.attr._naviBusyTimer); } catch (x) { }
+        // backstop: 정상 경로는 완료 시 release 하지만, 서버응답 누락/예외로 release 를 놓쳐도
+        //   8초 후 자동 해제(그 이상 걸리면 이미 행 상태) → 단축키가 영구로 막히지 않게.
+        oAPP.attr._naviBusyTimer = setTimeout(function () { oAPP.attr.isNaviBusy = false; }, 8000);
+    };
+    oAPP.common.fnNaviRelease = function () {
+        oAPP.attr.isNaviBusy = false;
+        try { clearTimeout(oAPP.attr._naviBusyTimer); oAPP.attr._naviBusyTimer = null; } catch (x) { }
+    };
+
     oAPP.common.fnShortCutExeAvaliableCheck = () => {
 
         if (oAPP.attr.isShortcutLock === true) {
@@ -663,6 +703,15 @@
         // if (!oAPP.attr?.isShortcutLock) {
         //     return "X";
         // }
+
+        // [HTML5] 페이지 이동(WS10↔WS20↔WS30) 이 진행 중이면 단축키 실행 불가 — 원본의
+        //   sap.ui.getCore().lock()/isLocked() 재진입 락이 HTML5 에선 무효(sap 스텁)라, 그 역할을
+        //   네비게이션 in-flight 플래그(isNaviBusy)로 대체한다. busy 가 비동기 이동 중 잠깐 풀리는
+        //   구멍(저장확인창/주석처리된 busy 해제)으로 F3 연타 시 fnMoveToWs10 재진입→화면 깨짐 방지.
+        if (oAPP.attr.isNaviBusy === true) {
+            zconsole.log("!! 페이지 이동 중이라 단축키 실행 불가!!");
+            return "X";
+        }
 
         // Busy Indicator가 실행중인지 확인
         if (parent.getBusy() == 'X') {
@@ -3724,14 +3773,14 @@
      * illustrationSize
      */
     // [HTML5] 구 sap.m.IllustratedMessage(tnt-Radar) + sap.m.Dialog → 네이티브 <dialog>.
-    //   레이더 스윕 SVG 일러스트(테마색·회전 스윕·blip) + 제목/설명 카드. sap 의존 제거.
-    //   SAPGUI 실행 등 진행 안내 모달(IPC if-browser-interconnection 으로 호출).
+    //   위성 안테나 로딩 일러스트(www/svg/satellite-antenna-loading-animated.svg, <img> 로드) +
+    //   제목/설명 카드. sap 의존 제거. SAPGUI 실행 등 진행 안내 모달(IPC if-browser-interconnection).
     oAPP.common.fnIllustMsgDialogOpen = (oOptions) => {
         oOptions = oOptions || {};
         var sDialogId = "u4aWsIllustedMsgDialog";
 
         // 스타일 1회 주입 — 카드/텍스트는 테마 토큰(HTML 이라 var() 동작), 일러스트(위성안테나)는
-        //   고정 블루 하드코딩(원본 SAP IllustratedMessage 처럼 테마 무관 + SVG 속성 var() 미동작 회피).
+        //   외부 SVG 의 고정 블루(원본 SAP IllustratedMessage 처럼 테마 무관). 백드롭은 옅게(가독 위해).
         if (!document.getElementById("u4aWsIllustStyle")) {
             var st = document.createElement("style");
             st.id = "u4aWsIllustStyle";
@@ -3741,14 +3790,14 @@
                 //   "카드 가장자리처럼" 삐져나오던 것 차단 — 다이얼로그를 카드 크기에 딱 맞춘다.
                 ".u4aWsIllustDlg{border:0;padding:0;background:transparent;overflow:visible;" +
                 "min-width:0;max-width:none;width:fit-content;box-shadow:none;border-radius:0}" +
-                ".u4aWsIllustDlg::backdrop{background:rgba(2,6,12,.55);backdrop-filter:blur(2px)}" +
+                ".u4aWsIllustDlg::backdrop{background:rgba(15,18,28,.32);backdrop-filter:blur(1.5px)}" +
                 ".u4aWsIllustCard{display:flex;flex-direction:column;align-items:center;gap:.55rem;" +
                 "padding:1.6rem 2.1rem 1.5rem;text-align:center;min-width:16rem;max-width:21rem;" +
                 "background:var(--surface-raised,#1b2128);color:var(--text,#fff);" +
                 "border:1px solid var(--line,#33414f);border-radius:16px;" +
                 "box-shadow:var(--popover-shadow,0 18px 50px rgba(0,0,0,.55));" +
                 "animation:u4aWsIllustIn .18s ease both}" +
-                ".u4aWsIllustArt{width:7.5rem;height:auto;display:block;margin-bottom:.35rem}" +
+                ".u4aWsIllustArt{width:8.25rem;height:auto;display:block;margin-bottom:.35rem}" +
                 ".u4aWsIllustTitle{font-weight:700;font-size:1.02rem;letter-spacing:.2px}" +
                 ".u4aWsIllustDesc{font-size:.8125rem;color:var(--text-muted,#9aa3ad);line-height:1.45;min-height:1.1em}" +
                 "@keyframes u4aWsIllustIn{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}" +
@@ -3765,36 +3814,20 @@
             //   레이더 카드(.u4aWsIllustCard)가 자체 배경·보더·그림자를 다 가지므로 다이얼로그는
             //   순수 컨테이너(.u4aWsIllustDlg)면 충분.
             oDlg.className = "u4aWsIllustDlg";
+            // [HTML5] 위성 안테나 로딩 일러스트(www/svg/satellite-antenna-loading-animated.svg)를
+            //   <img> 로 로드 — SVG 내부 <style>(generic .dish/.scan/.cross 등 클래스·keyframe)이
+            //   문서 전역으로 새어 충돌하는 것을 막기 위함(인라인하면 SVG <style> 이 document 스코프).
+            //   ws_common.js 는 <script src> 가 아니라 ajax+eval 로 로드되므로(스크립트 태그 없음)
+            //   호스트 문서(window.location.href, = www/ws30/ws10_20/) 기준으로 해석한다.
+            //   www/ws30/ws10_20/ → ../../svg/ = www/svg/ (preload 의 "./js/..." 해석과 동일 규칙).
+            var sArtRel = "../../svg/satellite-antenna-loading-animated.svg";
+            var sArtUrl = sArtRel;
+            try { sArtUrl = new URL(sArtRel, window.location.href).href; } catch (e) { }
             oDlg.innerHTML =
                 '<div class="u4aWsIllustCard">' +
-                // 레이더 스코프 일러스트(동심원+십자선+회전 스윕+blip) — 고정 그린, SMIL 애니메이션
-                '<svg class="u4aWsIllustArt" viewBox="232 30 216 216" aria-hidden="true">' +
-                '<defs>' +
-                '<radialGradient id="u4aRadarGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#2fe3a0" stop-opacity=".28"/><stop offset="1" stop-color="#2fe3a0" stop-opacity="0"/></radialGradient>' +
-                '<radialGradient id="u4aRadarScreen" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#0c2019"/><stop offset="1" stop-color="#07120d"/></radialGradient>' +
-                '</defs>' +
-                '<circle cx="340" cy="138" r="104" fill="url(#u4aRadarGlow)"/>' +
-                '<circle cx="340" cy="138" r="92" fill="#0a1712" stroke="#26352f" stroke-width="5"/>' +
-                '<circle cx="340" cy="138" r="88" fill="url(#u4aRadarScreen)"/>' +
-                '<g fill="none" stroke="#2fe3a0">' +
-                '<circle cx="340" cy="138" r="86" stroke-opacity=".22"/>' +
-                '<circle cx="340" cy="138" r="60" stroke-opacity=".20"/>' +
-                '<circle cx="340" cy="138" r="32" stroke-opacity=".18"/>' +
-                '<line x1="340" y1="52" x2="340" y2="224" stroke-opacity=".16"/>' +
-                '<line x1="254" y1="138" x2="426" y2="138" stroke-opacity=".16"/>' +
-                '</g>' +
-                '<g><animateTransform attributeName="transform" type="rotate" from="0 340 138" to="360 340 138" dur="3.2s" repeatCount="indefinite"/>' +
-                '<path d="M340 138 L340 52 A86 86 0 0 0 256 110 Z" fill="#2fe3a0" fill-opacity=".16"/>' +
-                '<line x1="340" y1="138" x2="340" y2="52" stroke="#6cffd0" stroke-width="2.5" stroke-linecap="round"/></g>' +
-                '<circle cx="392" cy="104" r="3.4" fill="#8affe0"><animate attributeName="opacity" values="0;1;1;0" dur="3.2s" begin="0s" repeatCount="indefinite"/></circle>' +
-                '<circle cx="300" cy="178" r="3" fill="#8affe0"><animate attributeName="opacity" values="0;1;1;0" dur="3.2s" begin="1.4s" repeatCount="indefinite"/></circle>' +
-                '<circle cx="372" cy="186" r="2.6" fill="#8affe0"><animate attributeName="opacity" values="0;1;1;0" dur="3.2s" begin="2.3s" repeatCount="indefinite"/></circle>' +
-                '<circle cx="340" cy="138" r="3.5" fill="#6cffd0"/>' +
-                '<g fill="none" stroke="#3a554c" stroke-width="2" stroke-linecap="round">' +
-                '<line x1="340" y1="46" x2="340" y2="54"/><line x1="340" y1="222" x2="340" y2="230"/>' +
-                '<line x1="248" y1="138" x2="256" y2="138"/><line x1="424" y1="138" x2="432" y2="138"/>' +
-                '</g>' +
-                '</svg>' +
+                // 위성 안테나 로딩 일러스트(접시 + 신호파 + 부유 애니메이션) — SVG 내부 CSS 애니메이션은
+                //   <img> 로 로드해도 정상 재생되며 스타일은 이미지 문서에 샌드박스된다.
+                '<img class="u4aWsIllustArt" src="' + sArtUrl + '" alt="" aria-hidden="true"/>' +
                 '<div class="u4aWsIllustTitle"></div>' +
                 '<div class="u4aWsIllustDesc"></div>' +
                 '</div>';

@@ -946,7 +946,82 @@
         }
     };
 
+    /** 테스트 모드 상태(스위치 on/off + 자동 로그인 ID) — appdata 영속화 */
+    function _testStateFilePath() {
+        return PATH.join(USERDATA, "p13n", "serverlist_test.json");
+    }
+    function _loadTestState() {
+        try {
+            const sPath = _testStateFilePath();
+            if (FS.existsSync(sPath)) {
+                const o = JSON.parse(FS.readFileSync(sPath, "utf-8") || "{}");
+                return { testMode: !!o.testMode, testId: typeof o.testId === "string" ? o.testId : "" };
+            }
+        } catch (e) { /* 손상/누락 → 기본값 */ }
+        return { testMode: false, testId: "" };
+    }
+    function _saveTestState() {
+        try {
+            const sDir = PATH.join(USERDATA, "p13n");
+            if (!FS.existsSync(sDir)) { FS.mkdirSync(sDir, { recursive: true }); }
+            FS.writeFileSync(_testStateFilePath(), JSON.stringify({
+                testMode: !!oAPP.attr._testMode,
+                testId: oAPP.attr._testId || ""
+            }, null, 2), "utf-8");
+        } catch (e) {
+            console.error("[ServerList] 테스트 상태 저장 실패:", e);
+        }
+    }
+
     /** 서브헤더 뷰 전환 세그먼트 (Tree / Master-Detail) — Bootstrap btn-group */
+    /** 테스트 모드 스위치 + 자동 로그인 ID 입력 — 환경변수 U4A_WS_TEST_MODE='X' 일 때만 활성화.
+     *  스위치 ON → ID 입력칸 노출. 입력한 ID 는 서버 더블클릭 시 로그인 창으로 전달되어
+     *  하단 스태프 버튼 중 일치하는 계정으로 자동 로그인된다. (개발/테스트 전용, 라벨 하드코딩) */
+    function _buildTestModeToggle() {
+        const bDevHost = process.env.U4A_WS_TEST_MODE === "X";
+
+        // 마지막 입력값/스위치 상태 복원(appdata). 비-테스트 머신에선 스위치 강제 off.
+        if (oAPP.attr._testId === undefined) {
+            const oTs = _loadTestState();
+            oAPP.attr._testId = oTs.testId;
+            oAPP.attr._testMode = bDevHost ? oTs.testMode : false;
+        }
+
+        const oWrap = _el("span", "u4a-bar__testmode");
+        if (!bDevHost) { oWrap.classList.add("is-disabled"); } // :has() 미지원(Chromium93) → 클래스로 흐림
+
+        const oText = _el("span", "u4a-bar__testmode-label", "테스트 모드");
+
+        const oSwitch = _el("label", "u4a-switch");
+        const oChk = document.createElement("input");
+        oChk.type = "checkbox";
+        oChk.id = "u4aWsTestMode";
+        oChk.checked = !!oAPP.attr._testMode;
+        oChk.disabled = !bDevHost; // U4A_WS_TEST_MODE='X' 일 때만 활성화
+        oSwitch.append(oChk, _el("span", "u4a-switch__slider"));
+
+        // 자동 로그인 ID 입력칸 — 스위치 ON 일 때만 노출
+        const oIdInput = _el("input", "u4a-input u4a-bar__testmode-input");
+        oIdInput.type = "text";
+        oIdInput.placeholder = "자동 로그인 ID";
+        oIdInput.value = oAPP.attr._testId || "";
+        oIdInput.hidden = !oAPP.attr._testMode;
+        // 입력 중엔 라이브로 반영, 커밋(blur/Enter) 시점에 영속화
+        oIdInput.addEventListener("input", () => { oAPP.attr._testId = oIdInput.value; });
+        oIdInput.addEventListener("change", () => { oAPP.attr._testId = oIdInput.value; _saveTestState(); });
+
+        oChk.addEventListener("change", () => {
+            if (!bDevHost) { return; }
+            oAPP.attr._testMode = oChk.checked;
+            oIdInput.hidden = !oChk.checked;
+            _saveTestState();
+            if (oChk.checked) { setTimeout(() => oIdInput.focus(), 0); }
+        });
+
+        oWrap.append(oText, oSwitch, oIdInput);
+        return oWrap;
+    }
+
     function _buildViewSwitcher() {
         const oWrap = _el("div", "btn-group btn-group-sm");
         oWrap.id = "u4aWsViewSwitcher";
@@ -1701,7 +1776,7 @@
         const oSettingsBtn = _buildSettingsDropdown();
         // 마지막 선택 뷰 복원(appdata) 후 뷰 전환 세그먼트 배치
         if (!oAPP.attr._viewMode) { oAPP.attr._viewMode = oAPP.fn.fnLoadViewMode(); }
-        oSubBar.append(oSubTitle, oSubSpacer, _buildViewSwitcher(), oSettingsBtn);
+        oSubBar.append(oSubTitle, oSubSpacer, _buildTestModeToggle(), _buildViewSwitcher(), oSettingsBtn);
 
         // ── 본문: 활성 뷰(Tree/Master-Detail)에 따라 fnRenderActiveView 가 채운다 ──
         const oBody = _el("div", "u4a-page__body");
@@ -2379,7 +2454,7 @@
         oMenu.appendChild(oClear);
 
         document.body.appendChild(oMenu);
-        _positionMenu(oMenu, oAnchorTh);
+        _positionMenu(oMenu, oAnchorTh, "left"); // 컬럼 메뉴는 헤더 좌변 기준 정렬
         _bindOutsideClose(oMenu);
         setTimeout(() => oInput.focus(), 0);
     };
@@ -2631,6 +2706,11 @@
             SYSID: oBindData.systemid,
             SETTINGS: oBindData.settings || undefined
         };
+
+        // 테스트 모드: 입력한 ID 를 로그인 창으로 전달 → 일치하는 스태프 버튼 자동 로그인
+        if (oAPP.attr._testMode && oAPP.attr._testId && oAPP.attr._testId.trim()) {
+            oLoginInfo.TESTID = oAPP.attr._testId.trim();
+        }
 
         // 사용자 테마 정보
         const oP13nThemeInfo = await fnP13nCreateTheme(oLoginInfo.SYSID);
@@ -3110,7 +3190,7 @@
             bodyEl: oForm,
             width: "24rem",
             buttons: [
-                { text: T("002") || "OK", type: "emphasized", onClick: async (oCtl) => { oAPP.setBusy(true); await _saveWsLangu(oSel.value, oCtl); } },
+                { text: T("002") || "OK", type: "emphasized", onClick: async (oCtl) => { const v = oSel.value; oCtl.close(); oAPP.setBusy(true); await _saveWsLangu(v, oCtl); } },
                 { text: T("003") || "Cancel", onClick: (oCtl) => oCtl.close() }
             ]
         });
@@ -3171,7 +3251,7 @@
             width: "24rem",
             onCancel: (oCtl) => { oAPP.fn.fnApplyTheme(sCurrent); oCtl.close(); },
             buttons: [
-                { text: T("002") || "OK", type: "emphasized", onClick: async (oCtl) => { oAPP.setBusy(true); await _saveWsThemeInfo(oSel.value, oCtl); } },
+                { text: T("002") || "OK", type: "emphasized", onClick: async (oCtl) => { const v = oSel.value; oCtl.close(); oAPP.setBusy(true); await _saveWsThemeInfo(v, oCtl); } },
                 { text: T("003") || "Cancel", onClick: (oCtl) => { oAPP.fn.fnApplyTheme(sCurrent); oCtl.close(); } }
             ]
         });
@@ -3547,49 +3627,55 @@
      * @returns {{dlg:HTMLDialogElement, close:Function}}
      */
     function _createFormDialog(opt) {
-        // Bootstrap modal (구 native <dialog>). 반환 계약(dlg/close)·.u4a-dialog__header 훅·
-        // ESC(onCancel)·initialFocus 동작을 그대로 보존한다.
-        const oRoot = _el("div", "modal fade");
-        oRoot.tabIndex = -1;
-        oRoot.setAttribute("aria-hidden", "true");
+        // 공통 인앱 다이얼로그 — 앱 전 화면 공통인 네이티브 <dialog class="u4a-dialog"> (16 §2).
+        //   · 헤더 드래그=전역 자동(u4a-ui.js _installGlobalDialogDrag)
+        //   · 우하단 grip 리사이즈(makeDialogResizable) · 헤더 더블클릭 중앙복귀(makeDialogRecenter)
+        //   · 헤더/푸터 48px · 헤더 닫기 X · data-type 의미색 — 전부 shell.css .u4a-dialog 공통.
+        //   반환 계약(dlg/close)·opt(title/icon/bodyEl/buttons/width/onCancel/initialFocusEl/bodyFlush) 보존.
+        const oDlg = document.createElement("dialog");
+        oDlg.className = "u4a-dialog";
+        if (opt.width) { oDlg.style.width = "min(" + opt.width + ", 92vw)"; }
 
-        const oDialog = _el("div", "modal-dialog modal-dialog-centered modal-dialog-scrollable");
-        if (opt.width) { oDialog.style.maxWidth = "min(" + opt.width + ", 92vw)"; }
-        const oContent = _el("div", "modal-content");
-
-        let oModalInst = null;
         const oCtl = {
-            dlg: oRoot,
-            close() {
-                if (oModalInst) { try { oModalInst.hide(); return; } catch (e) { } }
-                oRoot.remove();
-            }
+            dlg: oDlg,
+            close() { try { oDlg.close(); } catch (e) { oDlg.remove(); } }
         };
 
-        // header (icon + title) — .u4a-dialog__header 유지(data-type 아이콘색/메시지박스 쿼리 호환)
-        const oHead = _el("div", "modal-header u4a-dialog__header");
+        const _cancel = () => {
+            if (typeof opt.onCancel === "function") { opt.onCancel(oCtl); }
+            else { oCtl.close(); }
+        };
+
+        // header: 선두 아이콘(직계 <i>) + 제목 span(flex) + 닫기 X
+        const oHead = _el("div", "u4a-dialog__header");
         if (opt.icon) {
-            const oIconSpan = document.createElement("span");
-            oIconSpan.innerHTML = opt.icon;
-            if (oIconSpan.firstChild) { oHead.appendChild(oIconSpan.firstChild); }
+            const oTmp = document.createElement("span");
+            oTmp.innerHTML = opt.icon;
+            if (oTmp.firstChild) { oHead.appendChild(oTmp.firstChild); } // <i> 를 직계로
         }
-        oHead.appendChild(_el("span", "modal-title", opt.title || ""));
-        oContent.appendChild(oHead);
+        oHead.appendChild(_el("span", null, opt.title || ""));
+        const oX = _el("button", "u4a-btn-icon");
+        oX.type = "button";
+        oX.dataset.act = "close";
+        oX.setAttribute("aria-label", T("056") || "Close");
+        oX.innerHTML = ICON.close;
+        oX.addEventListener("click", _cancel);
+        oHead.appendChild(oX);
+        oDlg.appendChild(oHead);
 
         // body
-        const oBody = _el("div", "modal-body" + (opt.bodyFlush ? " p-0" : ""));
+        const oBody = _el("div", "u4a-dialog__body" + (opt.bodyFlush ? " u4a-dialog__body--flush" : ""));
         if (opt.bodyEl) { oBody.appendChild(opt.bodyEl); }
-        oContent.appendChild(oBody);
+        oDlg.appendChild(oBody);
 
-        // footer (buttons) — Bootstrap 버튼 매핑(emphasized→primary, reject→outline-danger, 기본→outline-secondary)
+        // footer (buttons) — 공통 .u4a-btn 의미색(emphasized=accent / reject=negative / 기본=중립)
         if (opt.buttons && opt.buttons.length) {
-            const oFoot = _el("div", "modal-footer");
+            const oFoot = _el("div", "u4a-dialog__footer");
             opt.buttons.forEach(b => {
-                // btn-sm 통일 — 푸터가 본문보다 커보이던 문제 해소(전 팝업 공통)
-                let sCls = "btn btn-sm btn-outline-secondary";
-                if (b.type === "emphasized") { sCls = "btn btn-sm btn-primary"; }
-                if (b.type === "reject") { sCls = "btn btn-sm btn-outline-danger"; }
-                const oBtn = _el("button", sCls + " d-inline-flex align-items-center gap-2");
+                let sCls = "u4a-btn";
+                if (b.type === "emphasized") { sCls = "u4a-btn u4a-btn--emphasized"; }
+                if (b.type === "reject") { sCls = "u4a-btn u4a-btn--negative"; }
+                const oBtn = _el("button", sCls);
                 oBtn.type = "button";
                 if (b.icon) {
                     oBtn.innerHTML = b.icon + (b.text ? `<span>${_esc(b.text)}</span>` : "");
@@ -3599,36 +3685,30 @@
                 oBtn.addEventListener("click", () => b.onClick(oCtl));
                 oFoot.appendChild(oBtn);
             });
-            oContent.appendChild(oFoot);
+            oDlg.appendChild(oFoot);
         }
 
-        oDialog.appendChild(oContent);
-        oRoot.appendChild(oDialog);
-        document.body.appendChild(oRoot);
+        document.body.appendChild(oDlg);
 
-        // backdrop=static + keyboard=off → 자동 닫힘을 끄고 원본 cancel 동작을 직접 재현
-        oModalInst = new bootstrap.Modal(oRoot, { backdrop: "static", keyboard: false });
-
-        // ESC → 원본 cancel: onCancel 있으면 위임, 없으면 close
-        oRoot.addEventListener("keydown", (ev) => {
-            if (ev.key === "Escape") {
-                ev.preventDefault();
-                if (typeof opt.onCancel === "function") { opt.onCancel(oCtl); }
-                else { oCtl.close(); }
-            }
-        });
-
+        // ESC(native cancel) → 원본 cancel 동작
+        oDlg.addEventListener("cancel", (ev) => { ev.preventDefault(); _cancel(); });
         // 닫힘 후 DOM 제거
-        oRoot.addEventListener("hidden.bs.modal", () => { oRoot.remove(); });
+        oDlg.addEventListener("close", () => { oDlg.remove(); });
 
-        // 초기 포커스 (모달 표시 완료 후)
+        oDlg.showModal();
+
+        // 공통 동작: 우하단 grip 리사이즈 + 헤더 더블클릭 중앙복귀 (드래그는 전역 자동)
+        try {
+            if (window.U4AUI) {
+                if (U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg); }
+                if (U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHead); }
+            }
+        } catch (e) { /* 헬퍼 없으면 무시 */ }
+
+        // 초기 포커스
         if (opt.initialFocusEl) {
-            oRoot.addEventListener("shown.bs.modal", () => {
-                try { opt.initialFocusEl.focus(); } catch (e) { }
-            }, { once: true });
+            setTimeout(() => { try { opt.initialFocusEl.focus(); } catch (e) { } }, 0);
         }
-
-        oModalInst.show();
         return oCtl;
     }
 
@@ -3798,10 +3878,14 @@
         }
     }
 
-    function _positionMenu(oMenu, oAnchor) {
+    function _positionMenu(oMenu, oAnchor, sAlign) {
         const oRect = oAnchor.getBoundingClientRect();
         const iMenuW = oMenu.offsetWidth;
-        let iLeft = oRect.right - iMenuW;
+        // 기본은 우측 정렬(앵커 우변에 메뉴 우변을 맞춤). sAlign==="left" 면 앵커 좌변 기준.
+        let iLeft = (sAlign === "left") ? oRect.left : (oRect.right - iMenuW);
+        // 화면 오른쪽 밖으로 나가면 당겨 넣고, 왼쪽 최소 여백 보장
+        const iMaxLeft = window.innerWidth - iMenuW - 4;
+        if (iLeft > iMaxLeft) { iLeft = iMaxLeft; }
         if (iLeft < 4) { iLeft = 4; }
         oMenu.style.top = (oRect.bottom + 2) + "px";
         oMenu.style.left = iLeft + "px";
@@ -3816,6 +3900,9 @@
         };
         setTimeout(() => document.addEventListener("mousedown", _fnOutside), 0);
         document.addEventListener("keydown", _escClose);
+        // 창 리사이즈/스크롤 시 닫기 — 앵커(헤더/버튼) 이동으로 메뉴 위치 어긋남 방지.
+        window.addEventListener("resize", _closeAllMenus);
+        window.addEventListener("scroll", _closeAllMenus, true);
     }
     function _escClose(ev) {
         if (ev.key === "Escape") { _closeAllMenus(); }
@@ -3827,6 +3914,8 @@
             _fnOutside = null;
         }
         document.removeEventListener("keydown", _escClose);
+        window.removeEventListener("resize", _closeAllMenus);
+        window.removeEventListener("scroll", _closeAllMenus, true);
     }
 
     /********************************************************************

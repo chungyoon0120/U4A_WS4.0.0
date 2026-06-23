@@ -210,33 +210,34 @@
     text-align: center;
 }
 
-/* ── 메시지 박스(공통 다이얼로그) 타입별 헤더 아이콘 색상 ─────────── */
-/* fnShowMessageBox 가 .u4a-dialog__header 에 data-type(C/S/E/W) 을 세팅한다.
-   설정 다이얼로그와 같은 .u4a-dialog 구조를 쓰되, 타입 의미색만 아이콘에 입힌다. */
-.u4a-dialog__header[data-type="E"] i {
-    color: var(--state-error);
-}
+/* 메시지박스/다이얼로그(공통 .u4a-dialog)는 shell.css 단일 출처를 그대로 소비한다.
+   타입별 헤더 아이콘 의미색(data-type)·헤더/푸터 48px·드래그/리사이즈/리센터·닫기 X 는
+   모두 shell.css .u4a-dialog 공통 규칙. 화면 로컬 override 두지 않는다(공통화).
+   (구 Bootstrap modal 기반 .modal-* 로컬 규칙은 _createFormDialog 의 네이티브 <dialog>
+    전환으로 제거 — shell.css 의 `> i` 직계 셀렉터가 닫기 X 아이콘 오염도 막는다.) */
 
-.u4a-dialog__header[data-type="W"] i {
-    color: var(--state-warning);
-}
-
-.u4a-dialog__header[data-type="S"] i {
-    color: var(--state-success);
-}
-
-.u4a-dialog__header[data-type="C"] i {
-    color: var(--accent);
-}
-
-/* Bootstrap modal 헤더로 쓰일 때: 아이콘+제목을 좌측에 모음(기본 space-between 무력화).
-   (아이콘 색은 위 [data-type] 규칙 / 기본 inherit 유지 — 여기선 레이아웃만) */
-.modal-header.u4a-dialog__header {
-    justify-content: flex-start;
+/* 테스트 모드 스위치(서브헤더) — 개발자 머신 전용. 비활성 시 흐리게 */
+.u4a-bar__testmode {
+    display: inline-flex;
+    align-items: center;
     gap: 0.5rem;
+    white-space: nowrap;
+    font-size: 0.82rem;
+    color: var(--text-muted);
 }
-.modal-header.u4a-dialog__header .modal-title {
-    font-weight: 700;
+.u4a-bar__testmode.is-disabled {
+    opacity: var(--disabled-opacity);
+    cursor: default;
+}
+.u4a-bar__testmode.is-disabled .u4a-switch__slider {
+    cursor: default;
+}
+.u4a-bar__testmode-input {
+    width: 9rem;
+    height: 1.75rem;
+}
+.u4a-bar__testmode-input[hidden] {
+    display: none;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -603,9 +604,10 @@
 /* 좁은 패널에서 들여쓰기 step 축소(shell.css @container) 활성화 */
 #u4aWsTreePane { container-type: inline-size; }
 .u4a-tree__row {
-    /* padding-left 는 shell.css 의 들여쓰기 calc(--u4a-tree-depth) 가 소유 → 좌측은 건드리지 않는다.
-       (단축 padding 으로 좌측까지 덮으면 깊이 들여쓰기가 깨짐) */
-    gap: .4rem; padding-block: .34rem; padding-right: .5rem; margin: 1px .25rem; font-size: .85rem;
+    /* padding-left(들여쓰기)·gap·행높이·폰트는 공통 shell.css .u4a-tree* 단일 출처가 소유한다.
+       (2026-06-23 트리 통일: gap/padding-block/font-size 오버라이드 제거 → 4개 트리 동일 밀도)
+       ServerList 고유는 행 간 여백(margin)·라운드·색만 유지. */
+    padding-right: .5rem; margin: 1px .25rem;
     border-radius: var(--sl-radius-sm); color: var(--sl-fg); position: relative;
 }
 .u4a-tree__row:hover { background: var(--sl-surface-2); }

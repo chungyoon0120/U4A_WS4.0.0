@@ -359,6 +359,7 @@
         _openAnchor = null;
         document.removeEventListener("mousedown", _onOutside, true);
         document.removeEventListener("keydown", _onEsc, true);
+        window.removeEventListener("resize", _closeMenus);
     }
     function _onOutside(ev) {
         if (ev.target && ev.target.closest && !ev.target.closest(".u4a-menu") && !ev.target.closest("[data-menu-anchor]")) {
@@ -426,6 +427,9 @@
         oMenu.style.top = (r.bottom + 2) + "px";
         oAnchor.setAttribute("aria-expanded", "true");
         _openAnchor = oAnchor;
+        //창 리사이즈/전체창 전환 시 메뉴는 닫는다(표준 메뉴 UX — 따라가지 않음).
+        //  앵커가 옮겨가 어긋나는 것(특히 우측정렬 오버플로 ⋯ 메뉴) 방지.
+        window.addEventListener("resize", _closeMenus);
         setTimeout(function () {
             document.addEventListener("mousedown", _onOutside, true);
             document.addEventListener("keydown", _onEsc, true);
@@ -435,22 +439,12 @@
     /********************************************************************
      * 플로팅 푸터 메시지 (doc 03 §3 /FMSG/WS10 — 10초 자동 제거)
      ********************************************************************/
-    var _footerTimer = null;
+    //  공통 푸터 컴포넌트(U4AUI.footer*, shell.css .u4a-footer) 소비 — 닫기(X)/자동숨김 내장, 화면별 복제 없음.
     function _showFooter(sType, sMsg) {
-        var oFooter = document.getElementById("ws10Footer");
-        if (!oFooter) { return; }
-        oFooter.dataset.type = sType;
-        oFooter.dataset.show = "true";
-        var map = { E: "circle-exclamation", S: "circle-check", W: "triangle-exclamation", I: "circle-info" };
-        oFooter.querySelector(".u4a-ws10__footer-icon").innerHTML = _fa(map[sType] || "circle-info");
-        oFooter.querySelector(".u4a-ws10__footer-text").textContent = sMsg;
-        if (_footerTimer) { clearTimeout(_footerTimer); }
-        _footerTimer = setTimeout(_hideFooter, 10000);
+        if (window.U4AUI) { window.U4AUI.footerShow("ws10Footer", sType || "I", sMsg || ""); }
     }
     function _hideFooter() {
-        var oFooter = document.getElementById("ws10Footer");
-        if (oFooter) { oFooter.dataset.show = "false"; }
-        if (_footerTimer) { clearTimeout(_footerTimer); _footerTimer = null; }
+        if (window.U4AUI) { window.U4AUI.footerHide("ws10Footer"); }
     }
 
     // ws_html5_shell.js 의 fnShowFloatingFooterMsg/fnHideFloatingFooterMsg 가 호출하는 훅
@@ -767,43 +761,21 @@
         oSapLogo.addEventListener("click", function () { _runTcode("SMEN", true); });
         o.appendChild(oSapLogo);
 
-        var oTcode = document.createElement("input");
-        oTcode.className = "u4a-tcode u4a-field__input";
-        oTcode.id = "sapTcode";
-        oTcode.type = "text";
-        oTcode.placeholder = "SAP T-CODE";
-        oTcode.autocomplete = "off";
-        oTcode.addEventListener("keydown", function (e) {
-            if (e.key === "Enter") { e.preventDefault(); _runTcode(oTcode.value); }
+        // SAP T-CODE 입력 — 공통 팩토리(U4AUI.createField). 자동완성/클리어/Enter 단일화.
+        //   inputClassName 으로 헤더 전용 스타일(.u4a-tcode) 유지, className 으로 폭(.u4a-tcode-field).
+        var oTcodeFld = window.U4AUI.createField({
+            type: "text", id: "sapTcode", placeholder: "SAP T-CODE",
+            className: "u4a-tcode-field", inputClassName: "u4a-tcode",
+            clear: true,
+            // SAP T-CODE 이력 자동완성 (원본 ev_suggestSapTcode — fnReadTCodeSuggestion 의 {TCODE} 목록)
+            suggest: function () {
+                try { return (oAPP.fn.fnReadTCodeSuggestion() || []).map(function (o) { return o && o.TCODE; }).filter(Boolean); }
+                catch (e) { return []; }
+            },
+            onEnter: function (v) { _runTcode(v); }   // 선택은 채움만, 실행은 Enter(원본 동일)
         });
-        // SAP T-CODE 이력 자동완성 (원본 ev_suggestSapTcode — fnReadTCodeSuggestion 의 {TCODE} 목록)
-        if (window.U4AUI && U4AUI.attachSuggest && typeof oAPP.fn.fnReadTCodeSuggestion === "function") {
-            U4AUI.attachSuggest(oTcode,
-                function () {
-                    try { return (oAPP.fn.fnReadTCodeSuggestion() || []).map(function (o) { return o && o.TCODE; }).filter(Boolean); }
-                    catch (e) { return []; }
-                },
-                function (v) { oTcode.value = v; });   // 선택 시 채움(원본처럼 실행은 Enter)
-        }
-
-        // [공통] 클리어(X) — 값 있을 때만 노출. 다른 입력(Login/WS20/ServerList)과 동일한
-        //   shell.css .u4a-field + U4AUI.attachClear 컴포넌트 사용(data-filled 토글).
-        var oTcodeField = document.createElement("div");
-        oTcodeField.className = "u4a-field u4a-tcode-field";
-        oTcodeField.setAttribute("data-trail", "1");
-        oTcodeField.appendChild(oTcode);
-
-        var oTcodeClr = document.createElement("button");
-        oTcodeClr.type = "button";
-        oTcodeClr.className = "u4a-field__clear";
-        oTcodeClr.title = "Clear";
-        oTcodeClr.textContent = "×"; // ×
-        oTcodeField.appendChild(oTcodeClr);
-
-        if (window.U4AUI && U4AUI.attachClear) {
-            U4AUI.attachClear(oTcode, oTcodeClr);
-        }
-        o.appendChild(oTcodeField);
+        oTcodeFld.input.autocomplete = "off";
+        o.appendChild(oTcodeFld.el);
 
         o.appendChild(_iconBtn(ICON.pin, "Pin", function () { _invoke("ev_Pin", "Pin"); }));
         o.appendChild(_iconBtn(ICON.zoom, "Zoom In", function () { _invoke("ev_ZoomIn", "Zoom In"); }));
@@ -989,69 +961,38 @@
         oLabel.setAttribute("for", "AppNmInput");
         oLabel.textContent = _txt("A33");
 
-        // 공통 입력 컴포넌트(.u4a-field) 소비 — clear(X)는 값 있을 때만, 맨 우측은 Search 헬프.
-        // (doc 15 공통 입력 UX 가이드)  trail=2 : [X][검색]
-        var oField = document.createElement("div");
-        oField.className = "u4a-ws10__searchfield u4a-field";
-        oField.dataset.trail = "2";
-
-        var oInput = document.createElement("input");
-        oInput.className = "u4a-input u4a-field__input";
-        oInput.id = "AppNmInput";
-        oInput.type = "text";
+        // 앱 검색 입력 — 공통 팩토리(U4AUI.createField). clear(X)/자동완성/F4(value help) 단일화.
+        //   trail=2([X][검색])·role=combobox·대문자·특수키(F4/Enter)·dblclick 은 아래에서 보강.
+        var oSearchFld = window.U4AUI.createField({
+            type: "text", id: "AppNmInput", placeholder: "Search",
+            className: "u4a-ws10__searchfield",
+            clear: true,
+            onClear: function () { WS_STATE.WS10.APPID = ""; },
+            suggest: _loadAppSugg,
+            onPick: function (v) {
+                oSearchFld.input.value = (v || "").toUpperCase();
+                WS_STATE.WS10.APPID = oSearchFld.input.value;
+            },
+            f4: function () { _invoke("ev_AppValueHelp", "App Search Help (F4)"); },  // 맨 우측 Search Help(F4)
+            onChange: function (v) {
+                var up = (v || "").toUpperCase();
+                oSearchFld.input.value = up; WS_STATE.WS10.APPID = up;
+            }
+        });
+        var oInput = oSearchFld.input;
         oInput.autocomplete = "off";
         oInput.setAttribute("role", "combobox");
-        oInput.placeholder = "Search";
-        oInput.addEventListener("change", function () { oInput.value = (oInput.value || "").toUpperCase(); WS_STATE.WS10.APPID = oInput.value; });
+        oInput.title = "";
+        try { oSearchFld.el.querySelector(".u4a-field__vh").title = "Search Help (F4)"; } catch (e) { }
+        // F4 키 → 값도움(버튼 클릭과 동일), Enter → no-op(원본 SearchField 동일), 더블클릭 → 전체선택.
         oInput.addEventListener("keydown", function (e) {
-            // F4 → 앱 검색 도움(value help). 검색 아이콘 클릭과 동일.
             if (e.key === "F4") { e.preventDefault(); _invoke("ev_AppValueHelp", "App Search Help (F4)"); }
-            // Enter → 원본(sap.m.SearchField search → ev_AppValueHelp)은 keyCode 13 이면
-            //   즉시 return = 아무 동작 안 함(Display/팝업 X). 동일하게 no-op(기본 동작만 방지).
             else if (e.key === "Enter") { e.preventDefault(); }
         });
         oInput.addEventListener("dblclick", function () { oInput.select(); });
 
-        // 값 있을 때만 보이는 clear(X) — 공통 컴포넌트 (U4AUI.attachClear 가 노출/비우기 처리)
-        var oClearBtn = document.createElement("button");
-        oClearBtn.className = "u4a-field__clear";
-        oClearBtn.type = "button";
-        oClearBtn.title = "Clear";
-        oClearBtn.setAttribute("aria-label", "Clear");
-        oClearBtn.tabIndex = -1;
-        oClearBtn.innerHTML = ICON.clear;
-
-        // 맨 우측 : Search Help (F4) — 공통 트레일링 슬롯(.u4a-field__vh)
-        var oSearchBtn = document.createElement("button");
-        oSearchBtn.className = "u4a-field__vh";
-        oSearchBtn.type = "button";
-        oSearchBtn.title = "Search Help (F4)";
-        oSearchBtn.innerHTML = ICON.search;
-        oSearchBtn.addEventListener("click", function () { _invoke("ev_AppValueHelp", "App Search Help (F4)"); });
-
-        oField.appendChild(oInput);
-        oField.appendChild(oClearBtn);
-        oField.appendChild(oSearchBtn);
         o.appendChild(oLabel);
-        o.appendChild(oField);
-
-        // clear(X) 동작 연결 — 비운 뒤 모델(APPID)도 동기화.
-        //   반환된 _syncClear 는 "프로그램적 value set 후" 노출상태를 재계산하는 함수.
-        var _syncClear = function () {};
-        if (window.U4AUI && window.U4AUI.attachClear) {
-            _syncClear = window.U4AUI.attachClear(oInput, oClearBtn, function () { WS_STATE.WS10.APPID = ""; });
-        }
-
-        if (window.U4AUI && window.U4AUI.attachSuggest) {
-            // fnItems = 저장된 APPID 목록(매 포커스마다 P13N 에서 최신 로드 → 방금 연 앱도 노출)
-            window.U4AUI.attachSuggest(oInput, _loadAppSugg, function (v) {
-                oInput.value = (v || "").toUpperCase();
-                WS_STATE.WS10.APPID = oInput.value;
-                // suggestion 선택은 input 이벤트를 발화하지 않으므로(자동완성 재오픈 방지),
-                // clear(X) 노출 상태를 직접 재계산해 준다.
-                _syncClear();
-            });
-        }
+        o.appendChild(oSearchFld.el);
         return o;
     }
 
@@ -1059,7 +1000,7 @@
         var o = document.createElement("div");
         o.className = "u4a-ws10__content";
         o.innerHTML = _heroHtml() + _footerHtml();
-        o.querySelector(".u4a-ws10__footer-close").addEventListener("click", _hideFooter);
+        //  푸터 닫기(X)는 공통 전역 위임(U4AUI)이 처리 — 화면별 배선 없음.
         return o;
     }
 
@@ -1151,12 +1092,8 @@
     }
 
     function _footerHtml() {
-        return '' +
-            '<div class="u4a-ws10__footer" id="ws10Footer" data-show="false" data-type="I">' +
-            '  <span class="u4a-ws10__footer-icon">' + _fa("circle-info") + '</span>' +
-            '  <span class="u4a-ws10__footer-text"></span>' +
-            '  <button class="u4a-btn-icon u4a-ws10__footer-close" type="button" title="Close">' + ICON.close + '</button>' +
-            '</div>';
+        //  공통 푸터 마크업(U4AUI) — WS10/WS20/WS30 단일 소스.
+        return window.U4AUI ? window.U4AUI.footerMarkup("ws10Footer") : "";
     }
 
     function _wireShortcuts() {
