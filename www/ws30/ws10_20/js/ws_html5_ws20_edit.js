@@ -718,17 +718,18 @@
             '      </div>' +
             '    </div>' +
             '    <div class="u4aWs20InsRow"><label>' + _esc(_msg("E01", "UI Object")) + '</label>' +
-            '      <input type="text" class="u4a-input u4aWs20InsSearch" autocomplete="off"></div>' +
+            //공통 입력 clear(X) — .u4a-field[data-trail] 래퍼 + .u4a-field__clear(값 있을 때만 노출, attachClear).
+            '      <div class="u4a-field u4aWs20InsSearchWrap" data-trail="1">' +
+            '        <input type="text" class="u4a-input u4a-field__input u4aWs20InsSearch" autocomplete="off">' +
+            '        <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear"><i class="fa-solid fa-xmark"></i></button>' +
+            '      </div></div>' +
             '    <label class="u4aWs20InsChkRow"><input type="checkbox" class="u4aWs20InsP13n"><span>' + _esc(_p13nText()) + '</span></label>' +
             '  </div>' +
-            '  <div class="u4aWs20InsTableWrap">' +
-            '    <table class="u4aWs20InsTable">' +
-            '      <thead><tr>' +
-            '        <th class="u4aWs20InsThSym">' + _esc(_msg("E31", "Symbol")) + '</th>' +
-            '        <th data-sort="UIOBJ">' + _esc(_msg("E01", "UI Object")) + '<i class="fa-solid fa-sort u4aWs20InsSortIco"></i></th>' +
-            '        <th data-sort="LIBNM">' + _esc(_msg("E03", "UI Object(Fullname)")) + '<i class="fa-solid fa-sort u4aWs20InsSortIco"></i></th>' +
-            '        <th data-sort="UIOBK" class="u4aWs20InsThKey">' + _esc(_msg("E04", "UI Key")) + '<i class="fa-solid fa-sort u4aWs20InsSortIco"></i></th>' +
-            '      </tr></thead>' +
+            '  <div class="u4aWs20InsTableWrap u4a-table-wrap">' +
+            //행높이=공통 .u4a-table 기본(레퍼런스 F4 탭1·Login 동일). --compact 안 씀(혼자 좁아지지 않게).
+            '    <table class="u4aWs20InsTable u4a-table">' +
+            //헤더는 _renderHead 가 동적 구성(공통 .u4a-th--menu 클릭→U4AUI.openColumnMenu, 정렬/필터 표시자 갱신).
+            '      <thead></thead>' +
             '      <tbody></tbody>' +
             '    </table>' +
             '    <div class="u4aWs20InsEmpty" hidden></div>' +
@@ -757,8 +758,80 @@
         var oSelAgg = aAggSel[0];   // 현재 선택 aggregation row(빈 라인부터)
         var oSelUI = null;          // 현재 선택 UI(T_0022 row)
         var sSortKey = "", sSortDir = "asc";
+        var oColFilters = {};       // 컬럼별 필터(AND·contains) — 공통 컬럼메뉴(U4AUI.openColumnMenu)가 갱신
 
-        function lf_close() { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
+        // 정렬/필터 메뉴 문구(메시지 키 SSOT — 화면이 해석해 공통 헬퍼에 전달). 810/811=ZMSG_WS_COMMON_001.
+        function _wsMsgRaw(n) { try { var s = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", n); if (s) { return s; } } catch (e) { } return n; }
+        var INS_MENU_LABELS = { filter: _msg("A68"), asc: _wsMsgRaw("810"), desc: _wsMsgRaw("811"), clear: _msg("A69") };
+        // 정렬/필터 대상 데이터 컬럼(Symbol 은 아이콘 전용 — 비정렬). 라벨은 메시지 키.
+        var INS_COLS = [
+            { key: "UIOBJ", label: _msg("E01"), cls: "" },
+            { key: "LIBNM", label: _msg("E03"), cls: "" },
+            { key: "UIOBK", label: _msg("E04"), cls: "u4aWs20InsThKey" }
+        ];
+        // 공통 컬럼메뉴(U4AUI.openColumnMenu) 소비 컨트롤러 — 상태=sSortKey/sSortDir/oColFilters(ServerList/F4 동일 패턴).
+        var _insColCtl = {
+            getFilter: function (k) { return oColFilters[k] || ""; },
+            setFilter: function (k, v) { if (v) { oColFilters[k] = v; } else { delete oColFilters[k]; } },
+            getSort: function () { return sSortKey ? { key: sSortKey, dir: sSortDir } : null; },
+            setSort: function (k, d) { sSortKey = k || ""; sSortDir = d || "asc"; },
+            rerender: function () { _renderHead(); lf_renderTable(); }
+        };
+
+        // 헤더 셀(데이터 컬럼) — 공통 .u4a-th--menu, 클릭→공통 컬럼메뉴. 정렬/필터 표시자는 활성 컬럼에만.
+        function _buildInsTh(c) {
+            var th = document.createElement("th");
+            th.className = "u4a-th--menu" + (c.cls ? " " + c.cls : "");
+            var inner = document.createElement("div"); inner.className = "u4a-th__inner";
+            var lbl = document.createElement("span"); lbl.className = "u4a-th__label"; lbl.textContent = c.label;
+            inner.appendChild(lbl);
+            var bSorted = sSortKey === c.key, bFiltered = !!oColFilters[c.key];
+            if (bSorted || bFiltered) {
+                var ind = document.createElement("span"); ind.className = "u4a-th__ind";
+                if (bSorted) { ind.innerHTML += '<i class="fa-solid fa-arrow-' + (sSortDir === "desc" ? "down" : "up") + '"></i>'; }
+                if (bFiltered) { ind.innerHTML += '<i class="fa-solid fa-filter"></i>'; }
+                inner.appendChild(ind);
+            }
+            th.appendChild(inner);
+            th.addEventListener("click", function (e) {
+                e.stopPropagation();
+                if (window.U4AUI && U4AUI.openColumnMenu) {
+                    U4AUI.openColumnMenu(c, th, _insColCtl, { container: oDlg, labels: INS_MENU_LABELS });
+                }
+            });
+            return th;
+        }
+        // 헤더 전체 재구성(정렬/필터 표시자 갱신 위해 rerender 마다 호출 — ServerList _renderHead 패턴).
+        function _renderHead() {
+            var thead = oDlg.querySelector(".u4aWs20InsTable thead");
+            if (!thead) { return; }
+            thead.textContent = "";
+            var tr = document.createElement("tr");
+            // Symbol(아이콘 전용 — 비정렬, 메뉴 없음)
+            var thSym = document.createElement("th"); thSym.className = "u4aWs20InsThSym";
+            var inS = document.createElement("div"); inS.className = "u4a-th__inner u4a-th__inner--center";
+            var lbS = document.createElement("span"); lbS.className = "u4a-th__label"; lbS.textContent = _msg("E31");
+            inS.appendChild(lbS); thSym.appendChild(inS); tr.appendChild(thSym);
+            INS_COLS.forEach(function (c) { tr.appendChild(_buildInsTh(c)); });
+            thead.appendChild(tr);
+        }
+        // 표시 행 파생 — 상단 검색박스 + 컬럼필터(AND·contains) + 정렬(공통 컬럼메뉴 상태).
+        function _cellText(k, ui) { return String(ui && ui[k] != null ? ui[k] : ""); }
+        function _deriveRows(aUIs) {
+            var sQ = (oSearch.value || "").toLowerCase();
+            var aKeys = Object.keys(oColFilters).filter(function (k) { return oColFilters[k]; });
+            var arr = aUIs.filter(function (ui) {
+                if (sQ && String(ui.UIOBJ).toLowerCase().indexOf(sQ) === -1 && String(ui.LIBNM).toLowerCase().indexOf(sQ) === -1) { return false; }
+                return aKeys.every(function (k) { return _cellText(k, ui).toLowerCase().indexOf(oColFilters[k]) !== -1; });
+            });
+            if (sSortKey) {
+                var d = sSortDir === "desc" ? -1 : 1;
+                arr.sort(function (a, b) { return _cellText(sSortKey, a).localeCompare(_cellText(sSortKey, b), undefined, { numeric: true }) * d; });
+            }
+            return arr;
+        }
+
+        function lf_close() { try { U4AUI && U4AUI.closeColumnMenu && U4AUI.closeColumnMenu(); } catch (e) { } try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
 
         function lf_clampCnt() {
             var v = parseInt(oCntInp.value, 10);
@@ -773,19 +846,10 @@
             oTbody.innerHTML = "";
             // 빈(미선택) aggregation 이면 비움.
             var aUIs = oSelAgg.UIATK ? _getUIs(oSelAgg, is_tree.UIOBK) : [];
-            var sQ = (oSearch.value || "").toLowerCase();
-            var aRows = aUIs.filter(function (ui) {
-                if (!sQ) { return true; }
-                return String(ui.UIOBJ).toLowerCase().indexOf(sQ) !== -1 || String(ui.LIBNM).toLowerCase().indexOf(sQ) !== -1;
-            });
-            if (sSortKey) {
-                aRows.sort(function (a, b) {
-                    var r = String(a[sSortKey]).localeCompare(String(b[sSortKey]));
-                    return sSortDir === "asc" ? r : -r;
-                });
-            }
-            aRows.forEach(function (ui) {
+            var aRows = _deriveRows(aUIs);   // 검색박스 + 컬럼필터(AND) + 정렬(공통 컬럼메뉴 상태)
+            aRows.forEach(function (ui, idx) {
                 var tr = document.createElement("tr");
+                tr.dataset.odd = (idx % 2 === 1) ? "true" : "false";   // 공통 zebra
                 var sImg = _iconSrc(ui.UICON);
                 tr.innerHTML =
                     '<td class="u4aWs20InsTdSym">' + (sImg ? '<img src="' + _esc(sImg) + '" alt="" onerror="this.style.display=\'none\'">' : "") + '</td>' +
@@ -794,13 +858,23 @@
                     '<td class="u4aWs20InsTdKey">' + _esc(ui.UIOBK) + '</td>';
                 tr.addEventListener("click", function () {
                     oSelUI = ui; oOk.disabled = false;
-                    var s = oTbody.querySelector("tr.sel"); if (s) { s.classList.remove("sel"); }
-                    tr.classList.add("sel");
+                    // 공통 선택 표시 = aria-selected(좌측 액센트바+강조배경, .u4a-table 가 담당).
+                    var s = oTbody.querySelector('tr[aria-selected="true"]'); if (s) { s.removeAttribute("aria-selected"); }
+                    tr.setAttribute("aria-selected", "true");
                 });
                 tr.addEventListener("dblclick", function () { oSelUI = ui; lf_confirm(); });
                 oTbody.appendChild(tr);
             });
-            // 원본: 결과 없으면 빈 테이블(별도 안내 메시지 없음).
+            // 결과 0건 = 공통 .u4a-table__nodata 행("데이터 없음" = 946, ServerList/F4 동일). 빈 테이블로 두지 않음.
+            if (aRows.length === 0) {
+                var trN = document.createElement("tr");
+                trN.className = "u4a-table__nodata";
+                var tdN = document.createElement("td");
+                tdN.setAttribute("colspan", "4");
+                tdN.textContent = _wsMsgRaw("946");
+                trN.appendChild(tdN);
+                oTbody.appendChild(trN);
+            }
             oEmpty.hidden = true;
         }
 
@@ -837,18 +911,8 @@
             oAggSlot.appendChild(oNative);
         }
 
-        // 정렬 헤더
-        Array.prototype.forEach.call(oDlg.querySelectorAll(".u4aWs20InsTable th[data-sort]"), function (th) {
-            th.addEventListener("click", function () {
-                var k = th.getAttribute("data-sort");
-                if (sSortKey === k) { sSortDir = sSortDir === "asc" ? "desc" : "asc"; }
-                else { sSortKey = k; sSortDir = "asc"; }
-                Array.prototype.forEach.call(oDlg.querySelectorAll(".u4aWs20InsTable th .u4aWs20InsSortIco"), function (i) { i.className = "fa-solid fa-sort u4aWs20InsSortIco"; });
-                var ico = th.querySelector(".u4aWs20InsSortIco");
-                if (ico) { ico.className = "fa-solid fa-sort-" + (sSortDir === "asc" ? "up" : "down") + " u4aWs20InsSortIco on"; }
-                lf_renderTable();
-            });
-        });
+        // 헤더 최초 구성(클릭→공통 컬럼메뉴, 정렬/필터 표시자는 활성 컬럼에만). 이후 갱신은 컨트롤러 rerender.
+        _renderHead();
 
         // Generated Cnt 스텝퍼 +/-
         Array.prototype.forEach.call(oDlg.querySelectorAll(".u4aWs20InsStep [data-step]"), function (b) {
@@ -862,6 +926,11 @@
 
         oSearch.addEventListener("input", lf_renderTable);
         oSearch.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); lf_confirm(); } });
+
+        //공통 입력 clear(X) — 값 있을 때만 노출, 클릭 시 비우고 input 이벤트로 표 재필터(lf_renderTable).
+        if (window.U4AUI && U4AUI.attachClear) {
+            U4AUI.attachClear(oSearch, oDlg.querySelector(".u4aWs20InsSearchWrap .u4a-field__clear"));
+        }
         // UI 오브젝트 input 자동완성 (구 setUiSuggest(oInp2,"insertUiName") — 이력 기반 suggestion).
         //   이전에 추가한 UI명(insertUiName 이력)을 부분일치로 제안 → 선택 시 검색 필터 적용.
         if (window.U4AUI && U4AUI.attachSuggest && typeof oAPP.fn.fnSuggestionRead === "function") {

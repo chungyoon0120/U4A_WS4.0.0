@@ -334,16 +334,77 @@
         return HDR;
     }
 
-    // 실제 WS10 이동 (구 fnMoveToWs10)
+    // WS30 전용 WS10 복귀.
+    // ws_fn_02.js fnMoveToWs10(WS20 전용)을 직접 쓰지 않는 이유:
+    //   fnMoveToWs10 → removeContent() 가 WS20 DOM/상태를 지우므로
+    //   WS30에서 호출하면 WS20 콘텐츠가 날아간다.
     function _doBackToWs10() {
-        // fnMoveToWs10 가 시작 시 busy+fnNaviLock(재호출 무해), 완료/실패 시 fnNaviRelease 한다.
-        //  (_uspBack 에서 이미 fnNaviLock 을 걸어둠 — 이동 도중 단축키 연타는 중앙 가드가 차단.)
+
         try {
-            if (oAPP.fn && typeof oAPP.fn.fnMoveToWs10 === "function") { oAPP.fn.fnMoveToWs10(); return; }
-            oAPP.fn.fnOnMoveToPage("WS10");
+            // busy + navLock 은 _uspBack 에서 이미 걸려 있다.
+            // 단축키는 비동기 이동이 시작되기 전에 즉시 제거한다.
+            try { APPCOMMON.removeShortCut("WS30"); } catch (e) { }
+
+            // 서버 세션 종료 → lf_success 에서 잠금 해제 + WS10 이동
+            oAPP.fn.fnKillUserSession(parent.getAppInfo(), lf_success);
+
         } catch (e) {
-            console.error("[HTML5][WS30] back nav error:", e);
-            try { oAPP.common.fnNaviRelease(); } catch (x) { }   // 네비 실패 → 락 해제(영구 잠김 방지)
+            console.error("[HTML5][WS30] _doBackToWs10 error:", e);
+            try { oAPP.common.fnNaviRelease(); } catch (x) { }
+        }
+
+        async function lf_success() {
+            try {
+                var oInfo = parent.getAppInfo();
+
+                // Change 모드였다면 서버 Lock 해제
+                if (oInfo && oInfo.IS_EDIT === "X") {
+                    await new Promise(function (resolve) {
+                        ajax_unlock_app({ APPID: oInfo.APPID, ACTCD: "APP_EXIT" }, function (oReturn) {
+                            if (oReturn.RTCOD === "E") {
+                                parent.setSoundMsg("02");
+                                try { parent.CURRWIN.flashFrame(true); } catch (e) { }
+                                parent.showMessage(null, 20, oReturn.RTCOD, oReturn.RTMSG, fnCriticalError);
+                                oAPP.common.fnSetBusyLock("");
+                                oAPP.common.fnNaviRelease();
+                                return;
+                            }
+                            return resolve(oReturn);
+                        });
+                    });
+                }
+
+                // WS30 팝업·자식창 정리 (fnCloseAllWs20Dialogs 와 동일한 4가지 처리)
+                // removeContent() 는 WS20 DOM 전용이므로 호출하지 않는다 — fnMoveToWs10 에서
+                // fnCloseAllWs20Dialogs 와 removeContent 는 별도 순차 호출임에 주의.
+                try { oAPP.fn.fnChildWindowClose(); } catch (e) { }
+                try { oAPP.fn.fnCloseAllDialog(); } catch (e) { }
+                try { APPCOMMON.fnHideFloatingFooterMsg(); } catch (e) { }
+                try { APPCOMMON.fnMultiFooterMsgClose(); } catch (e) { }
+
+                // WS30 모델 초기화 — 원본과 동일하게 {} 로 초기화. WS20 모델·DOM 은 건드리지 않는다
+                try { APPCOMMON.fnSetModelProperty("/WS30", {}); } catch (e) { }
+
+                // AppInfo 초기화
+                parent.setAppInfo(undefined);
+
+                // WS10 으로 이동
+                oAPP.fn.fnOnMoveToPage("WS10");
+
+                // WS10 단축키 등록
+                APPCOMMON.setShortCut("WS10");
+
+                // 타이틀 복원
+                try { parent.CURRWIN.setTitle("U4A Workspace - Main"); } catch (e) { }
+                oAPP.common.setWSHeadText("U4A Workspace - Main");
+
+                // NavLock 해제 (이제 WS10 단축키 허용)
+                oAPP.common.fnNaviRelease();
+
+            } catch (e) {
+                console.error("[HTML5][WS30] _doBackToWs10 lf_success error:", e);
+                try { oAPP.common.fnNaviRelease(); } catch (x) { }
+            }
         }
     }
 
@@ -353,6 +414,9 @@
      *   그 외엔 바로 이동.
      ************************************************************************/
     function _uspBack() {
+
+        // Change/Display 모드 전환이 진행 중이면 F3 즉시 차단 (mousedown→click 사이 타이밍 경쟁 방어)
+        if (oAPP.attr.uspModeChanging) { return; }
 
         // ── F3(뒤로가기) 연타·재진입 가드 — 코드베이스 공통 메커니즘(fnNaviLock) 사용 ──────────
         //  뒤로가기를 시작하는 순간 "페이지이동 in-flight 락"(fnNaviLock → isNaviBusy=true)을 건다.
@@ -724,6 +788,12 @@
 
     /* === Display/Change 모드 전환 (구 ev_pressDisplayModeBtn) === */
     function _uspToggleMode() {
+        // 네비게이션 중(F3이 먼저 발화해 isNaviBusy=true)이면 토글 금지 — 두 ajax 경쟁 방지
+        if (oAPP.attr.isNaviBusy === true) { return; }
+        // 모드전환 ajax 진행 중(연타 방지) — mousedown이 미리 uspModeChanging=true를 세팅하므로
+        // 이 함수 내에서는 getBusy로 in-flight 여부를 판단한다
+        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (e) { }
+        oAPP.attr.uspModeChanging = true;   // 전환 in-flight 플래그: F3 연타 차단(mousedown→click 경쟁 포함)
         oAPP.common.fnSetBusyLock("X");
         var oAppInfo = _model("/WS30/APP") || {};
 
@@ -733,6 +803,7 @@
                 try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
                 var sMsg = _msgWs("118") + " \n " + _msgWs("119");
                 oAPP.common.fnSetBusyLock("");
+                oAPP.attr.uspModeChanging = false;  // 다이얼로그가 자체적으로 단축키 차단
                 oAPP.common.fnConfirmBox("W", sMsg, _uspModeMsgCb, [
                     { act: "YES", label: "Yes", emphasized: true },
                     { act: "NO", label: "No" },
@@ -767,6 +838,7 @@
                 try { parent.CURRWIN.flashFrame(true); } catch (e) { }
                 try { parent.showMessage(null, 20, RETURN.RTCOD, RETURN.RTMSG); }
                 catch (e) { oAPP.common.fnShowFloatingFooterMsg("E", "WS30", RETURN.RTMSG); }
+                oAPP.attr.uspModeChanging = false;
                 oAPP.common.fnSetBusyLock(""); return;
             }
             RETURN.IS_EDIT = ""; RETURN.IS_CHAG = "";
@@ -775,6 +847,7 @@
             oAPP.common.fnShowFloatingFooterMsg("S", sCurrPage, _msgWs("029")); // Switch to display mode
             _uspRefreshAfterMode();
             try { if (parent.UAI && parent.UAI.disconnect) { parent.UAI.disconnect({ CONID: parent.getBrowserKey() }); } } catch (e) { }
+            oAPP.attr.uspModeChanging = false;
             _uspInitLayout();   // 트리접기 + 최상위 루트 자동 선택(busy 는 루트 선택 콜백이 해제)
         });
     }
@@ -793,14 +866,20 @@
             if (oNew.IS_EDIT !== "X") {   // 다른 사용자가 잠금 등
                 oAPP.common.fnShowFloatingFooterMsg("E", sCurrPage, oNew.MESSAGE);
                 try { parent.setSoundMsg("02"); } catch (e) { }
+                oAPP.attr.uspModeChanging = false;
                 oAPP.common.fnSetBusyLock(""); return;
             }
             APPCOMMON.fnSetModelProperty("/WS30/APP", oNew);
             try { if (oAPP.fn.fnChildWindowClose) { oAPP.fn.fnChildWindowClose(); } } catch (e) { }
             oAPP.common.fnShowFloatingFooterMsg("S", sCurrPage, _msgWs("020")); // Switch to edit mode
-            _uspRefreshAfterMode();
+            // Change 전환: 현재 보던 파일/에디터를 그대로 유지한다.
+            //   원본(fnSetAppChangeMode)도 fnOnInitLayoutSettingsWs30()은 UI5 트리 용도라 HTML5 에선 무의미.
+            //   _uspInitLayout(루트 리셋)은 초기 진입 전용 — 여기서 호출하면 에디터가 날아가고
+            //   트리가 루트로 초기화돼 "화면이 작살나는" 원인이 됨.
+            _uspRefreshAfterMode();   // 헤더/모드 표시 + 에디터 읽기전용 해제
             try { if (parent.UAI && parent.UAI.disconnect) { parent.UAI.disconnect({ CONID: parent.getBrowserKey() }); } } catch (e) { }
-            _uspInitLayout();   // 트리접기 + 최상위 루트 자동 선택(busy 는 루트 선택 콜백이 해제)
+            oAPP.attr.uspModeChanging = false;
+            oAPP.common.fnSetBusyLock("");   // busy 직접 해제(루트 선택 콜백에 의존 않음)
         });
     }
 
@@ -910,9 +989,15 @@
         //   Display=display · Change=pen-to-square · Activate=wand-magic-sparkles ·
         //   Save=floppy-disk · MIME=image · Controller=screwdriver-wrench · App Exec=globe.
         // Display 모드 버튼 (Change 모드에서 노출 — display 아이콘으로 Display 로 전환). 단축키 Ctrl+F1 동일.
-        BAR.appendChild(_txBtn({ id: "ws30_displayModeBtn", fa: "display", tooltip: sDispChg, evFn: _uspToggleMode }));
-        // Change 모드 버튼 (Display 모드 + 개발/관리 권한에서 노출).
-        BAR.appendChild(_txBtn({ id: "ws30_changeModeBtn", fa: "pen-to-square", tooltip: sDispChg, evFn: _uspToggleMode }));
+        // mousedown 에서 플래그를 세워 click(mouseup 후) 전에 F3 가 발사되는 경쟁 조건을 막는다.
+        (function () {
+            var b1 = _txBtn({ id: "ws30_displayModeBtn", fa: "display", tooltip: sDispChg, evFn: _uspToggleMode });
+            b1.addEventListener("mousedown", function () { oAPP.attr.uspModeChanging = true; });
+            BAR.appendChild(b1);
+            var b2 = _txBtn({ id: "ws30_changeModeBtn", fa: "pen-to-square", tooltip: sDispChg, evFn: _uspToggleMode });
+            b2.addEventListener("mousedown", function () { oAPP.attr.uspModeChanging = true; });
+            BAR.appendChild(b2);
+        }());
 
         BAR.appendChild(_sep("ws30_sepEdit"));
 

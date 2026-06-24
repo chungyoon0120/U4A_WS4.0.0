@@ -235,7 +235,8 @@
                 _render();
             },
             refresh: _render,
-            setSel: function (k) { selKey = k; }
+            setSel: function (k) { selKey = k; },
+            getSel: function () { return selKey; }
         };
     }
 
@@ -269,8 +270,11 @@
         var bTreeLoaded = false;
         var sTreeFilter = "";
         var _uidSeq = 0;
+        var _bAutoSearch = !!(options && options.autoSearch);   // 재오픈 시 갱신(원본 oOptions.autoSearch)
         var _sortKey = null, _sortDir = null;   // 탭1 컬럼 정렬(단일) — 원본 sap.ui.table sortProperty
         var _colFilters = {};                   // 탭1 컬럼 필터(AND·contains) — 원본 filterProperty
+        var _treeSortKey = null, _treeSortDir = null;   // 탭2(트리) 컬럼 정렬 — 형제 노드끼리 정렬(계층 유지)
+        var _treeColFilters = {};                       // 탭2(트리) 컬럼 필터(AND·contains, 경로 유지)
 
         // ★ 메시지 텍스트는 호출마다 SQLite 조회라 비싸다 → 행 렌더 루프 밖에서 1회만 캐시.
         var MSG_RUN = _wsTxt("436");   // 앱 실행
@@ -343,7 +347,16 @@
             oPage1.hidden = !b1; oPage2.hidden = b1;
             oTab1Btn.setAttribute("aria-selected", b1 ? "true" : "false");
             oTab2Btn.setAttribute("aria-selected", b1 ? "false" : "true");
-            if (!b1 && !bTreeLoaded) { _loadTree(); }
+            if (b1) {
+                // 원본 K1: 트리 선택해제 + 패키지 입력 포커스.
+                //   ★ K1 은 탭 전환으로 재검색하지 않는다(결과는 마지막 검색 스냅샷 유지 — 사용자 요청).
+                //     autoSearch(처음 오픈) 자동검색은 오픈/재오픈 경로에서 1회만 한다(여기서 X).
+                try { _vs2.setSel(null); } catch (e) { }
+                try { oPkg.input.focus(); } catch (e) { }
+            } else {
+                // ★ 원본 K2: 선택할 때마다 매번 서버에서 계층 재조회(once 가드 없음 — fnGetAppHierList).
+                _loadTree();
+            }
         }
         oTab1Btn.addEventListener("click", function () { _selectTab("K1"); });
         oTab2Btn.addEventListener("click", function () { _selectTab("K2"); });
@@ -377,6 +390,8 @@
             ? U4AUI.createSelect(aApptyItems, sApptyDef, function () { _doSearch(); })
             : (function () { var s = _el("div"); s.value = sApptyDef; return s; })();
         oApptySel.classList.add("u4aAppF4Sel");
+        // 원본: WS10 페이지가 아니면(EXPAGE!="WS10") App Type 비활성화(enabled formatter).
+        if (!bWS10) { oApptySel.setAttribute("aria-disabled", "true"); oApptySel.tabIndex = -1; }
 
         oForm.append(
             _row(_txt("/U4A/CL_WS_COMMON", "A22"), oPkg.wrap),   // Package
@@ -404,8 +419,8 @@
 
         var T1_COLS = [
             { key: "ERUSR", label: _txt("/U4A/CL_WS_COMMON", "B95"), w: "8rem", align: "center" },
-            { action: "run" },
-            { action: "disp" },
+            { action: "run", w: "8.5rem" },   // Open in Browser — 헤더 들어갈 폭(고정 컬럼)
+            { action: "disp", w: "6.5rem" },  // App Views — 트리탭과 동일 폭
             { key: "APPID", label: _txt("/U4A/CL_WS_COMMON", "A90"), w: "14rem" },
             { key: "APPNM", label: _txt("/U4A/CL_WS_COMMON", "A91"), w: "20rem" },
             { key: "APPTY", label: _txt("/U4A/CL_WS_COMMON", "B97"), w: "6rem", align: "center" }
@@ -426,6 +441,7 @@
         // 좌측 3개 컬럼 고정(User Name / Open in Browser / App Views) — 가로 스크롤 시.
         var T1_FRZN = 3, T1_FRZ_LEFT = _frzLefts(T1_COLS, T1_FRZN);
 
+
         var oT1Wrap = _el("div", "u4aAppF4TblWrap u4a-table-wrap");
         var oT1 = _el("table", "u4a-table u4aAppF4Tbl");
         var oT1Head = _el("thead");   // 헤더는 _renderT1 이 매번 재구성(정렬/필터 표시자 갱신)
@@ -433,7 +449,14 @@
         oT1.append(oT1Head, oT1Body);
         oT1Wrap.appendChild(oT1);
 
-        oPage1.append(oSrchPanel ? oSrchPanel.el : oForm, oT1Wrap);
+        // 결과 테이블 위 툴바 — 정렬·컬럼필터 전체 해제(탭2와 동일 버튼). 검색 폼(서버 쿼리)은 건드리지 않음.
+        var oT1Bar = _el("div", "u4aAppF4TreeBar u4aAppF4T1Bar");
+        var oT1ClearBtn = _actBtn("filter-circle-xmark", MSG_CLEARFILTER, function () { _clearAllT1SF(); });
+        oT1ClearBtn.disabled = true;   // 걸린 정렬/필터 없을 땐 비활성(첫 렌더에서 _syncT1ClearBtn 가 갱신)
+        oT1ClearBtn.classList.add("u4aAppF4ClearBtn");   // 탭1·탭2 공통: 툴바 우측 끝 정렬(margin-left:auto)
+        oT1Bar.appendChild(oT1ClearBtn);
+
+        oPage1.append(oSrchPanel ? oSrchPanel.el : oForm, oT1Bar, oT1Wrap);
 
         // ── 컬럼 정렬/필터 (원본 sap.ui.table sortProperty/filterProperty → ServerList 패턴 포팅) ──
         function _cellText(sKey, row) {
@@ -456,6 +479,14 @@
             }
             return arr;
         }
+        // 탭1 컬럼 메뉴 컨트롤러 — 공유 _openColMenu 가 소비(상태=_sortKey/_sortDir/_colFilters).
+        var _t1ColCtl = {
+            getFilter: function (k) { return _colFilters[k] || ""; },
+            setFilter: function (k, v) { if (v) { _colFilters[k] = v; } else { delete _colFilters[k]; } },
+            getSort: function () { return _sortKey ? { key: _sortKey, dir: _sortDir } : null; },
+            setSort: function (k, d) { _sortKey = k; _sortDir = d; },
+            rerender: function () { _renderT1(); }
+        };
         function _buildT1Th(c, idx) {
             var th = _el("th", c.align === "center" ? "is-center" : null);
             if (c.w) { th.style.width = c.w; }
@@ -475,7 +506,7 @@
                 }
                 th.appendChild(inner);
                 th.classList.add("u4a-th--menu");
-                th.addEventListener("click", function (e) { e.stopPropagation(); _openColMenu(c, th); });
+                th.addEventListener("click", function (e) { e.stopPropagation(); _openColMenu(c, th, _t1ColCtl); });
             } else {
                 th.appendChild(inner);
             }
@@ -495,7 +526,11 @@
                     td.appendChild(_actBtn("globe", MSG_RUN, function (e) { e.stopPropagation(); _doRun(row); }));
                 } else if (c.action === "disp") {
                     td.classList.add("is-action");
-                    var b = _actBtn("desktop", MSG_DISP, function (e) { e.stopPropagation(); _doDisplay(row); });
+                    var b = _actBtn("desktop", MSG_DISP, function (e) {
+                        e.stopPropagation();
+                        _vs1.setSel(row.APPID); _vs1.refresh();   // 원본 _setUiTableSelectedRow — 복귀 시 강조 유지
+                        _doDisplay(row);
+                    });
                     if (!bWS10) { b.disabled = true; }
                     td.appendChild(b);
                 } else {
@@ -507,12 +542,24 @@
             });
             return tr;
         }
+        // 정렬·필터 전체 해제(탭1) — 컬럼 정렬·컬럼필터 초기화(검색 폼=서버 쿼리는 유지).
+        function _syncT1ClearBtn() {
+            var bFilt = Object.keys(_colFilters).some(function (k) { return _colFilters[k]; });
+            oT1ClearBtn.disabled = !(_sortKey || bFilt);
+        }
+        function _clearAllT1SF() {
+            if (!_sortKey && !Object.keys(_colFilters).some(function (k) { return _colFilters[k]; })) { return; }
+            _sortKey = null; _sortDir = null;
+            _colFilters = {};
+            _renderT1();
+        }
         function _renderT1() {
             // 헤더(정렬/필터 표시자 갱신 위해 매 렌더 재구성)
             oT1Head.textContent = "";
             var hr = _el("tr");
             T1_COLS.forEach(function (c, idx) { hr.appendChild(_buildT1Th(c, idx)); });
             oT1Head.appendChild(hr);
+            _syncT1ClearBtn();
             // 바디 = 가상 스크롤(필터→정렬 파생 뷰)
             _vs1.setRows(_deriveView(aResult));
         }
@@ -521,87 +568,17 @@
             getSelKey: function (row) { return row.APPID; }
         });
 
-        // ── 컬럼 헤더 메뉴(정렬 asc/desc + 필터 input + 초기화) — 공통 .u4a-menu 소비 ──
-        var _oColMenu = null;
-        function _onColMenuOutside(e) { if (_oColMenu && !_oColMenu.contains(e.target)) { _closeColMenu(); } }
-        function _closeColMenu() {
-            if (!_oColMenu) { return; }
-            try { _oColMenu.remove(); } catch (e) { }
-            _oColMenu = null;
-            document.removeEventListener("mousedown", _onColMenuOutside, true);
-            window.removeEventListener("resize", _closeColMenu);
-            window.removeEventListener("scroll", _closeColMenu, true);
-        }
-        function _openColMenu(c, th) {
-            _closeColMenu();
-            // ★ ServerList(fnOpenColumnMenu)와 동일 구성/순서: 필터 input → 정렬 asc/desc → 필터 초기화.
-            var m = _el("div", "u4a-menu u4a-colmenu");
-            m.setAttribute("role", "menu");
-            m.addEventListener("click", function (e) { e.stopPropagation(); });
-
-            // ── 필터 input (contains, Enter/blur 적용) ──
-            var fw = _el("div", "u4a-colmenu__filter");
-            var fi = _el("input", "u4a-input");
-            fi.type = "text"; fi.placeholder = MSG_FILTERVAL;
-            fi.value = _colFilters[c.key] || "";
-            function applyF() {
-                var v = fi.value.trim().toLowerCase(), cur = _colFilters[c.key] || "";
-                if (v === cur) { return; }
-                if (v) { _colFilters[c.key] = v; } else { delete _colFilters[c.key]; }
-                _renderT1();
-            }
-            fi.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); applyF(); _closeColMenu(); } });
-            fi.addEventListener("blur", applyF);
-            fw.appendChild(fi);
-            m.appendChild(fw);
-
-            m.appendChild(_el("div", "u4a-colmenu__sep"));
-
-            // ── 정렬 (오름/내림 — 활성 방향 재클릭 시 해제) ──
-            function mkSort(sDir, sIcon, sLabel) {
-                var it = _el("div", "u4a-menu__item");
-                it.setAttribute("role", "menuitem");
-                it.innerHTML = _fa(sIcon) + "<span></span>";
-                it.querySelector("span").textContent = sLabel;
-                var bActive = (_sortKey === c.key && _sortDir === sDir);
-                if (bActive) { it.setAttribute("data-active", "true"); }
-                it.addEventListener("click", function () {
-                    if (bActive) { _sortKey = null; _sortDir = null; }
-                    else { _sortKey = c.key; _sortDir = sDir; }
-                    _renderT1(); _closeColMenu();
+        // ── 컬럼 헤더 메뉴(정렬 asc/desc + 필터 input + 초기화) — 공통 U4AUI.openColumnMenu 소비 ──
+        //   (구: 로컬 _openColMenu 1벌 → 전 화면 공통 헬퍼로 통합. ctl 인자 동일, .u4a-colmenu CSS=shell.css.)
+        //   ctl = 탭별 컨트롤러(getFilter/setFilter/getSort/setSort/rerender) — 탭1·탭2(트리) 공유.
+        function _closeColMenu() { try { if (window.U4AUI && U4AUI.closeColumnMenu) { U4AUI.closeColumnMenu(); } } catch (e) { } }
+        function _openColMenu(c, th, ctl) {
+            if (window.U4AUI && U4AUI.openColumnMenu) {
+                U4AUI.openColumnMenu(c, th, ctl, {
+                    container: oDlg,   // top-layer 다이얼로그 안에 붙여 모달 위로
+                    labels: { filter: MSG_FILTERVAL, asc: MSG_SORTASC, desc: MSG_SORTDESC, clear: MSG_CLEARFILTER }
                 });
-                return it;
             }
-            m.appendChild(mkSort("asc", "arrow-up", MSG_SORTASC));     // 오름차순 정렬
-            m.appendChild(mkSort("desc", "arrow-down", MSG_SORTDESC)); // 내림차순 정렬
-
-            m.appendChild(_el("div", "u4a-colmenu__sep"));
-
-            // ── 필터 초기화(이 컬럼) — 활성 필터 없으면 비활성 ──
-            var clr = _el("div", "u4a-menu__item");
-            clr.setAttribute("role", "menuitem");
-            clr.innerHTML = _fa("xmark") + "<span></span>";
-            clr.querySelector("span").textContent = MSG_CLEARFILTER;
-            if (!_colFilters[c.key]) { clr.setAttribute("aria-disabled", "true"); }
-            clr.addEventListener("click", function () {
-                if (!_colFilters[c.key]) { return; }
-                delete _colFilters[c.key]; fi.value = ""; _renderT1(); _closeColMenu();
-            });
-            m.appendChild(clr);
-
-            // top-layer 다이얼로그 안에 붙여(모달 위로) th 아래에 위치.
-            oDlg.appendChild(m);
-            var r = th.getBoundingClientRect();
-            m.style.position = "fixed";
-            m.style.top = r.bottom + "px";
-            m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)) + "px";
-            m.style.zIndex = "10";
-            _oColMenu = m;
-            // 창 리사이즈/스크롤 시 닫기 — 앵커(컬럼 헤더) 이동으로 위치 어긋남 방지.
-            window.addEventListener("resize", _closeColMenu);
-            window.addEventListener("scroll", _closeColMenu, true);
-            setTimeout(function () { document.addEventListener("mousedown", _onColMenuOutside, true); }, 0);
-            try { fi.focus(); } catch (e) { }
         }
 
         function _doSearch() {
@@ -632,7 +609,7 @@
          * ========================================================== */
         var T2_COLS = [
             { tree: true, key: "APPNM", label: _txt("/U4A/CL_WS_COMMON", "B99"), w: "26rem" },
-            { action: "disp" },
+            { action: "disp", w: "6.5rem" },  // App Views — 고정 컬럼(탭1과 동일 폭)
             { key: "APPID", label: _txt("/U4A/CL_WS_COMMON", "C01"), w: "12rem", link: true },
             { key: "APPVR", label: _txt("/U4A/CL_WS_COMMON", "C02"), w: "6rem", align: "center", nz: true },
             { key: "CODPG", label: _txt("/U4A/CL_WS_COMMON", "C03"), w: "6rem", align: "center", nz: true },
@@ -645,14 +622,24 @@
             { key: "AETIM", label: _wsTxt("413"), w: "6rem", align: "center", nz: true, fmt: _fmtTime }
         ];
 
+        var T2_MAP = {};   // key → col (트리 셀 텍스트/정렬·필터용)
+        T2_COLS.forEach(function (c) { if (c.key) { T2_MAP[c.key] = c; } });
+
         // 좌측 2개 컬럼 고정(트리 / App Views) — 가로 스크롤 시.
         var T2_FRZN = 2, T2_FRZ_LEFT = _frzLefts(T2_COLS, T2_FRZN);
 
         var oTBar = _el("div", "u4aAppF4TreeBar");
-        var oExpandBtn = _actBtn("angles-down", "Expand", function () { _treeExpandAll(true); });
-        oExpandBtn.title = "Expand";
-        var oCollapseBtn = _actBtn("angles-up", "Collapse", function () { _treeExpandAll(false); });
-        oCollapseBtn.title = "Collapse";
+        // 공통(USP fnUspTreeExpand/CollapseSelected = 원본 getSelectedIndex 기준): Expand=선택 노드의
+        //   "서브트리 전체" 펼침(루트 선택이면 트리 전체=구 expandToLevel99), Collapse=선택 노드만 접음(단일).
+        //   선택 없으면 no-op. 툴팁=메시지키 C27/C28(USP 와 동일, 하드코딩 금지).
+        var oExpandBtn = _actBtn("angles-down", _txt("/U4A/CL_WS_COMMON", "C27"), function () {
+            var node = _selTreeNode();
+            if (node) { _expandSubtree(node); _renderTree(); }
+        });
+        var oCollapseBtn = _actBtn("angles-up", _txt("/U4A/CL_WS_COMMON", "C28"), function () {
+            var node = _selTreeNode();
+            if (node) { oExpand[node._uid] = false; _renderTree(); }
+        });
         var oTSrch = _mkField("", { w: "16rem", ph: _wsTxt("565") }); // 어플리케이션 검색
         var _filtT = null;
         oTSrch.input.addEventListener("input", function () {
@@ -660,39 +647,80 @@
             // 디바운스(타이핑 중 매 글자 재렌더 방지). 가상 스크롤이라 렌더는 보이는 행만 → 즉시.
             _filtT = setTimeout(function () {
                 sTreeFilter = oTSrch.input.value.trim().toUpperCase();
+                // 검색 시 매칭 경로만 자동 펼쳐 매치를 드러낸다(강제펼침 X → 이후 수동 접기 가능).
+                if (sTreeFilter) { _expandMatchPaths(); }
                 _renderTree();
             }, 200);
         });
-        oTBar.append(oExpandBtn, oCollapseBtn, _el("span", "u4aAppF4TBarSep"), oTSrch.wrap);
+        // 정렬·필터 전체 해제 — 컬럼 정렬·컬럼필터·검색박스를 한 번에 초기화(걸린 게 없으면 비활성).
+        //   per-column 초기화(A69)와 같은 의미라 툴팁도 MSG_CLEARFILTER 재사용.
+        var oClearAllBtn = _actBtn("filter-circle-xmark", MSG_CLEARFILTER, function () { _clearAllTreeSF(); });
+        oClearAllBtn.disabled = true;   // 걸린 정렬/필터/검색 없을 땐 비활성(첫 렌더에서 _syncClearAllBtn 가 갱신)
+        oClearAllBtn.classList.add("u4aAppF4ClearBtn");   // 탭1·탭2 공통: 툴바 우측 끝 정렬(margin-left:auto)
+        oTBar.append(oExpandBtn, oCollapseBtn, _el("span", "u4aAppF4TBarSep"), oTSrch.wrap, oClearAllBtn);
 
         var oT2Wrap = _el("div", "u4aAppF4TblWrap u4a-table-wrap u4aAppF4TreeWrap");
         var oT2 = _el("table", "u4a-table u4aAppF4Tbl u4aAppF4Tree");
-        var oT2Head = _el("thead");
-        var oT2Hr = _el("tr");
-        T2_COLS.forEach(function (c, idx) {
-            var th = _el("th", c.align === "center" ? "is-center" : null, c.action ? MSG_DISP : c.label);
-            if (c.w) { th.style.width = c.w; }
-            if (c.action) { th.classList.add("is-action"); }
-            _applyFrz(th, idx, T2_FRZN, T2_FRZ_LEFT);
-            oT2Hr.appendChild(th);
-        });
-        oT2Head.appendChild(oT2Hr);
+        var oT2Head = _el("thead");   // 헤더는 _renderTree 가 매번 재구성(정렬/필터 표시자 갱신, 탭1과 동일)
         var oT2Body = _el("tbody");
         oT2.append(oT2Head, oT2Body);
         oT2Wrap.appendChild(oT2);
         oPage2.append(oTBar, oT2Wrap);
 
-        function _matchFilter(node) {
+        function _matchFilter(node) {   // 검색박스(상단) — APPID/APPNM contains
             if (!sTreeFilter || _isTopRoot(node)) { return true; }
             return String(node.APPID || "").toUpperCase().indexOf(sTreeFilter) > -1
                 || String(node.APPNM || "").toUpperCase().indexOf(sTreeFilter) > -1;
         }
+
+        // ── 컬럼 정렬/필터 (탭1과 동일 UX — 트리: 정렬=형제끼리(계층 유지), 필터=경로 유지 contains·AND) ──
+        function _treeCellText(node, key) {
+            var c = T2_MAP[key], v = node[key];
+            if (c && c.nz && _isRoot(node)) { v = ""; }   // ROOT/패키지의 nz 컬럼은 빈값(렌더와 동일)
+            return (c && c.fmt) ? c.fmt(v) : (v == null ? "" : String(v));
+        }
+        function _hasTreeColFilters() {
+            return Object.keys(_treeColFilters).some(function (k) { return _treeColFilters[k]; });
+        }
+        function _anyTreeFilter() { return !!sTreeFilter || _hasTreeColFilters(); }
+        // 컬럼 필터(AND·contains) — 최상위 컨테이너(U4A IDE)는 항상 통과(자손 매칭 시 경로 표시).
+        function _matchColFilters(node) {
+            if (_isTopRoot(node)) { return true; }
+            return Object.keys(_treeColFilters).every(function (k) {
+                var val = _treeColFilters[k];
+                return !val || _treeCellText(node, k).toLowerCase().indexOf(val) !== -1;
+            });
+        }
+        // 노드 자체 매칭 = 검색박스 AND 컬럼필터.
+        function _nodeSelfMatch(node) { return _matchFilter(node) && _matchColFilters(node); }
+        // 정렬: 형제 배열을 정렬키로(계층 구조 유지) — 비파괴(원본 배열 보존).
+        function _sortArr(arr) {
+            if (!_treeSortKey || !arr || arr.length < 2) { return arr || []; }
+            var d = _treeSortDir === "desc" ? -1 : 1;
+            return arr.slice().sort(function (a, b) {
+                return _treeCellText(a, _treeSortKey).localeCompare(_treeCellText(b, _treeSortKey), undefined, { numeric: true }) * d;
+            });
+        }
+        function _sortedKids(node) { return _sortArr(node.APPF4HIER || []); }
+
         // 필터 시: 자신 또는 하위에 매칭이 있으면 표시.
         function _subtreeHasMatch(node) {
-            if (!_isTopRoot(node) && _matchFilter(node)) { return true; }
+            if (!_isTopRoot(node) && _nodeSelfMatch(node)) { return true; }
             var kids = node.APPF4HIER || [];
             for (var i = 0; i < kids.length; i++) { if (_subtreeHasMatch(kids[i])) { return true; } }
             return false;
+        }
+        // 검색/컬럼필터 적용 시 매칭 경로만 자동 펼침(매칭 자손이 있는 노드 oExpand=true). 단일 패스 O(n).
+        //   강제 펼침이 아니라 oExpand 를 세팅만 하므로, 이후 토글로 다시 접을 수 있다.
+        function _expandMatchPaths() {
+            function walk(node) {   // 반환: 이 서브트리(자신/자손)에 매칭이 있는가
+                var selfMatch = !_isTopRoot(node) && _nodeSelfMatch(node);
+                var kids = node.APPF4HIER || [], anyKid = false;
+                kids.forEach(function (k) { if (walk(k)) { anyKid = true; } });
+                if (anyKid) { oExpand[node._uid] = true; }   // 매칭 자손 있으면 펼쳐서 드러냄
+                return selfMatch || anyKid;
+            }
+            aTreeRoot.forEach(walk);
         }
 
         // 공통 트리 UX(U4AUI.createTree _collapseRec 와 동일): 접을 때 하위 전체도 접는다
@@ -703,12 +731,17 @@
                 _collapseDesc(k);
             });
         }
+        // 서브트리 전체 펼침(노드+모든 자손) — Expand 버튼/공통 expandSubtree 대응. 루트면 트리 전체.
+        function _expandSubtree(node) {
+            oExpand[node._uid] = true;
+            (node.APPF4HIER || []).forEach(_expandSubtree);
+        }
 
         // 한 노드 → <tr>(전 컬럼). idx=가상스크롤 절대 인덱스(zebra). 토글=펼침상태만 바꾸고 평탄목록 재세팅.
         function _treeRow(node, depth, idx) {
             var kids = node.APPF4HIER || [];
             var bHasKids = kids.length > 0;
-            var bExp = sTreeFilter ? true : !!oExpand[node._uid];
+            var bExp = !!oExpand[node._uid];   // 필터 중에도 oExpand 존중(검색 시 매칭경로는 _expandMatchPaths 가 미리 펼침)
             var tr = _el("tr");
             if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }
             if (_isRoot(node)) { tr.classList.add("is-root"); }
@@ -768,22 +801,80 @@
         function _flattenTree() {
             var out = [];
             function walk(node, depth) {
-                // 검색 시: 자기 또는 하위에 매칭이 없으면 숨김(빈 부모 패키지·최상위 컨테이너 모두).
+                // 검색/컬럼필터 시: 자기 또는 하위에 매칭이 없으면 숨김(빈 부모 패키지·최상위 컨테이너 모두).
                 //   매칭이 하나도 없으면 root 까지 빠져 빈 목록 → 공통 no-data 문구 표시.
-                if (sTreeFilter && !_subtreeHasMatch(node)) { return; }
+                if (_anyTreeFilter() && !_subtreeHasMatch(node)) { return; }
                 out.push({ node: node, depth: depth });
-                var bExp = sTreeFilter ? true : !!oExpand[node._uid];
+                var bExp = !!oExpand[node._uid];   // 필터 중에도 oExpand 존중(검색 시 매칭경로는 _expandMatchPaths 가 미리 펼침)
                 if (bExp && (node.APPF4HIER || []).length) {
-                    node.APPF4HIER.forEach(function (k) { walk(k, depth + 1); });
+                    _sortedKids(node).forEach(function (k) { walk(k, depth + 1); });   // 형제는 정렬 순서로
                 }
             }
-            aTreeRoot.forEach(function (n) { walk(n, 0); });
+            _sortArr(aTreeRoot).forEach(function (n) { walk(n, 0); });   // 최상위도 정렬 순서로
             return out;
         }
         function _buildTreeRow(item, i) { return _treeRow(item.node, item.depth, i); }
 
-        // 전체 렌더(로드/필터/Expand·Collapse all) = 평탄목록을 가상 스크롤러에 세팅.
-        function _renderTree() { _vs2.setRows(_flattenTree()); }
+        // 탭2(트리) 컬럼 메뉴 컨트롤러 — 공유 _openColMenu 가 소비(상태=_treeSortKey/_treeColFilters).
+        var _t2ColCtl = {
+            getFilter: function (k) { return _treeColFilters[k] || ""; },
+            setFilter: function (k, v) { if (v) { _treeColFilters[k] = v; } else { delete _treeColFilters[k]; } },
+            getSort: function () { return _treeSortKey ? { key: _treeSortKey, dir: _treeSortDir } : null; },
+            setSort: function (k, d) { _treeSortKey = k; _treeSortDir = d; },
+            rerender: function () {
+                // 필터 변경 시 매칭 경로 자동 펼침(검색박스와 동일) → 매치 드러냄.
+                if (_anyTreeFilter()) { _expandMatchPaths(); }
+                _renderTree();
+            }
+        };
+        // 헤더 셀 1개(탭1 _buildT1Th 와 동일 구성) — 데이터/트리/링크 컬럼만 정렬·필터 메뉴, action 제외.
+        function _buildT2Th(c, idx) {
+            var th = _el("th", c.align === "center" ? "is-center" : null);
+            if (c.w) { th.style.width = c.w; }
+            if (c.action) { th.classList.add("is-action"); }
+            _applyFrz(th, idx, T2_FRZN, T2_FRZ_LEFT);
+            var inner = _el("div", "u4a-th__inner");
+            if (c.align === "center") { inner.classList.add("u4a-th__inner--center"); }
+            inner.appendChild(_el("span", "u4a-th__label", c.action ? MSG_DISP : c.label));
+            if (c.key && !c.action) {
+                var bSorted = _treeSortKey === c.key, bFiltered = !!_treeColFilters[c.key];
+                if (bSorted || bFiltered) {
+                    var ind = _el("span", "u4a-th__ind");
+                    if (bSorted) { ind.innerHTML += _fa(_treeSortDir === "desc" ? "arrow-down" : "arrow-up"); }
+                    if (bFiltered) { ind.innerHTML += _fa("filter"); }
+                    inner.appendChild(ind);
+                }
+                th.appendChild(inner);
+                th.classList.add("u4a-th--menu");
+                th.addEventListener("click", function (e) { e.stopPropagation(); _openColMenu(c, th, _t2ColCtl); });
+            } else {
+                th.appendChild(inner);
+            }
+            return th;
+        }
+        function _buildT2Head() {
+            oT2Head.textContent = "";
+            var hr = _el("tr");
+            T2_COLS.forEach(function (c, idx) { hr.appendChild(_buildT2Th(c, idx)); });
+            oT2Head.appendChild(hr);
+        }
+
+        // 정렬·필터 전체 해제 버튼 활성/비활성 동기화(걸린 정렬·필터·검색이 하나라도 있을 때만 활성).
+        function _syncClearAllBtn() { oClearAllBtn.disabled = !(_treeSortKey || _anyTreeFilter()); }
+        function _clearAllTreeSF() {
+            if (!_treeSortKey && !_anyTreeFilter()) { return; }
+            _treeSortKey = null; _treeSortDir = null;
+            _treeColFilters = {};
+            sTreeFilter = "";
+            if (oTSrch.input.value) {   // 검색박스도 비우고 clear(X) 글리프 동기화(input 이벤트)
+                oTSrch.input.value = "";
+                try { oTSrch.input.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { }
+            }
+            _renderTree();
+        }
+
+        // 전체 렌더(로드/필터/Expand·Collapse all) = 헤더(정렬/필터 표시자) 재구성 + 평탄목록을 가상 스크롤러에.
+        function _renderTree() { _buildT2Head(); _syncClearAllBtn(); _vs2.setRows(_flattenTree()); }
 
         function _treeExpandAll(bExpand) {
             // 가상 스크롤이라 전체 펼침/접힘도 즉시(보이는 행만 렌더) — busy 불필요.
@@ -791,6 +882,22 @@
             aTreeRoot.forEach(walkAll);
             if (!bExpand) { aTreeRoot.forEach(function (n) { oExpand[n._uid] = true; }); } // 루트는 펼친 채
             _renderTree();
+        }
+
+        // 현재 선택된 트리 노드(없으면 null) — Expand/Collapse 버튼이 "선택 기준"으로 동작하게(원본 getSelectedIndex).
+        function _findNodeByUid(uid) {
+            var found = null;
+            (function walk(nodes) {
+                for (var i = 0; i < nodes.length && !found; i++) {
+                    if (nodes[i]._uid === uid) { found = nodes[i]; return; }
+                    walk(nodes[i].APPF4HIER || []);
+                }
+            })(aTreeRoot);
+            return found;
+        }
+        function _selTreeNode() {
+            var uid = _vs2.getSel();
+            return uid != null ? _findNodeByUid(uid) : null;
         }
 
         var _vs2 = _makeVScroller(oT2Wrap, oT2Body, {
@@ -836,7 +943,14 @@
                     }
                     aTreeRoot = _buildTree(oRes && oRes.T_APPL);
                     bTreeLoaded = true;
-                    aTreeRoot.forEach(function (n) { oExpand[n._uid] = true; }); // 최초 1레벨
+                    oExpand = {};                                                  // 재조회마다 펼침상태 초기화(원본 collapseAll→expandToLevel(1))
+                    aTreeRoot.forEach(function (n) { oExpand[n._uid] = true; });    // 최초 1레벨
+                    if (_anyTreeFilter()) {
+                        // 검색/컬럼필터가 활성이면 매칭 경로를 다시 펼친다 → 다른 탭 갔다 와도(=K2 재조회) 펼침 모습 유지.
+                        _expandMatchPaths();
+                    } else {
+                        try { _vs2.setSel(aTreeRoot[0] ? aTreeRoot[0]._uid : null); } catch (e) { } // 원본 setSelectedIndex(0)
+                    }
                     _renderTree();
                     _busy(false);
                 });
@@ -852,15 +966,17 @@
         function _doRun(row) {
             var sAPPID = row && row.APPID;
             if (!sAPPID) { return; }
+            parent.setBusy("X");                       // 원본: 존재확인(fnCheckAppExists) 전 busy on
             oAPP.fn.fnCheckAppExists(sAPPID, function (oRes) {
                 var info = (oRes && oRes.RETURN) || {};
-                if (oRes && oRes.RETCD === "E") {
+                // ★ 원본은 oResult.RETURN.RETCD 로 존재여부 판정(최상위 oRes.RETCD 아님). 세 에러경로 모두 flashFrame.
+                if (info.RETCD === "E") {
                     parent.setBusy(""); _flash();
                     _msg("E", _txt("/U4A/MSG_WS", "007", info.APPID || sAPPID));
                     return;
                 }
-                if (info.APPTY === "U") { parent.setBusy(""); _msg("E", _txt("/U4A/MSG_WS", "189")); return; }
-                if (info.ACTST === "I") { parent.setBusy(""); _msg("E", _wsTxt("434")); return; }
+                if (info.APPTY === "U") { parent.setBusy(""); _flash(); _msg("E", _txt("/U4A/MSG_WS", "189")); return; }
+                if (info.ACTST === "I") { parent.setBusy(""); _flash(); _msg("E", _wsTxt("434")); return; }
                 try { oAPP.fn.fnOnExecApp(sAPPID); } catch (e) { parent.setBusy(""); _msg("E", String(e && e.message || e)); }
             });
         }
@@ -899,6 +1015,7 @@
         }
         function _doTreeDisplay(node) {
             if (!_treeRunnable(node)) { _flash(); _msg("E", MSG_NOAPP); return; }
+            _vs2.setSel(node._uid); _vs2.refresh();   // 원본 _setUiTableSelectedRow — 복귀 시 강조 유지
             _doDisplay(node);
         }
 
@@ -914,10 +1031,10 @@
         oDlg._appf4Reopen = function (opt, cb) {
             if (typeof cb === "function") { _fnCb = cb; }
             oDlg._pendingReshow = false;
-            _selectTab("K1");
+            _bAutoSearch = !!(opt && opt.autoSearch);   // 원본 oOptions.autoSearch 갱신
             if (!oDlg.open) { try { oDlg.showModal(); } catch (e) { } }
-            try { oApp.input.focus(); } catch (e) { }
-            if (opt && opt.autoSearch) { _doSearch(); }
+            _selectTab("K1");                           // showModal 후 select(포커스)
+            if (_bAutoSearch) { _doSearch(); }          // 재오픈 요청이 autoSearch 면 1회 자동검색
         };
 
         // WS20→WS10 back 복귀 시 재표시(검색/탭/상태 그대로 — 원본 setVisible(true) 대응).
@@ -928,12 +1045,11 @@
         };
 
         document.body.appendChild(oDlg);
-        _selectTab("K1");
         try { _renderT1(); } catch (e) { }   // 초기 헤더(+no-data) 렌더(검색 전에도 컬럼 표시)
         oDlg.showModal();
-        try { oApp.input.focus(); } catch (e) { }
-
-        if (options.autoSearch) { _doSearch(); }
+        // 원본 ev_AppF4DialogAfterOpen: 열린 뒤 현재 탭으로 select 발화(포커스). autoSearch 면 1회 자동검색.
+        _selectTab("K1");
+        if (_bAutoSearch) { _doSearch(); }   // 처음 오픈 시 1회만(탭 클릭 재검색 아님)
 
     }; // end of oAPP.fn.fnAppF4PopupOpen
 
@@ -962,6 +1078,7 @@
             ".u4aAppF4Field .u4a-field__input{width:100%;}",
             ".u4aAppF4SrchPanel{flex:0 0 auto;}",
             ".u4aAppF4TreeBar{flex:0 0 auto;display:flex;align-items:center;gap:.375rem;}",
+            ".u4aAppF4ClearBtn{margin-left:auto;}",   /* 탭1·탭2 공통: 전체해제 버튼을 툴바 우측 끝으로 */
             ".u4aAppF4TBarSep{width:.0625rem;height:1.25rem;background:var(--line);margin:0 .25rem;}",
             /* overflow-anchor:none — 가상 스크롤이 뷰포트 위 DOM 을 매 틱 재생성할 때
                Chromium scroll-anchoring 이 scrollTop 을 되돌려 휠이 안 먹는 현상 차단(Chromium93 지원). */
@@ -979,8 +1096,10 @@
             ".u4aAppF4Dlg .u4aAppF4Tbl th.is-action,.u4aAppF4Dlg .u4aAppF4Tbl td.is-action{text-align:center;width:4.5rem;padding-left:.25rem;padding-right:.25rem;}",
             /* 모든 셀 수직 중앙(액션 아이콘이 텍스트와 어긋나지 않게) */
             ".u4aAppF4Dlg .u4aAppF4Tbl td{vertical-align:middle;}",
-            ".u4aAppF4ActBtn{width:1.5rem;height:1.5rem;}",
-            ".u4aAppF4ActBtn i{font-size:.75rem;}",
+            /* 행 안 액션 버튼만 컴팩트(콤팩트 행에 맞춤). 툴바(Expand/Collapse/전체해제) 버튼은
+               공통 .u4a-btn-icon 표준(2rem)을 그대로 쓴다 — 화면별로 작게 줄이지 않음. */
+            ".u4aAppF4Tbl .u4aAppF4ActBtn{width:1.5rem;height:1.5rem;}",
+            ".u4aAppF4Tbl .u4aAppF4ActBtn i{font-size:.75rem;}",
             /* 트리 셀: td 는 table-cell 유지(다른 컬럼과 정렬), 안쪽 래퍼만 flex. 공통 토글 + --u4a-tree-depth 들여쓰기 */
             ".u4aAppF4TreeCell{overflow:hidden;}",
             /* 토글↔텍스트 간격·들여쓰기 step 은 공통 트리 표준(shell.css .u4a-tree__row gap 0.375rem,
@@ -1011,29 +1130,17 @@
             ".u4aAppF4Tbl tbody tr[aria-selected=\"true\"]>td.is-frz,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"][data-odd=\"true\"]>td.is-frz,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"]:hover>td.is-frz,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"][data-odd=\"true\"]:hover>td.is-frz{background:linear-gradient(var(--selected-bg),var(--selected-bg)),var(--surface);}",
             /* 고정 경계선 — 마지막 고정 컬럼 우측 */
             ".u4aAppF4Tbl thead th.is-frz-last,.u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td.is-frz-last{box-shadow:inset -0.0625rem 0 0 var(--line);}",
-            /* 트리 App Views(마지막 고정)만 폭 확보+우측 여백(헤더 텍스트가 세로 고정선에 안 붙게).
-               탭1 App Views(액션 4.5rem)는 그대로 — 트리 스코프로 한정. */
-            ".u4aAppF4Dlg .u4aAppF4Tree thead th.is-frz-last,.u4aAppF4Dlg .u4aAppF4Tree tbody tr:not(.u4aVSpacer)>td.is-frz-last{width:6.5rem;padding-right:.85rem;}",
+            /* 마지막 고정 컬럼은 우측 여백을 줘 헤더/내용이 세로 고정선에 붙지 않게(공통). 폭은 각 컬럼 w. */
+            ".u4aAppF4Dlg .u4aAppF4Tbl thead th.is-frz-last,.u4aAppF4Dlg .u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td.is-frz-last{padding-right:.85rem;}",
             /* 가상 스크롤 스페이서 행 — hover/zebra/선택 표시 없음 */
             ".u4aAppF4Dlg .u4aVSpacer,.u4aAppF4Dlg .u4aVSpacer:hover{background:transparent;cursor:default;}",
             ".u4aAppF4Dlg .u4aVSpacer td{padding:0;border:0;}",
             /* 가상 스크롤 떨림 방지 — 데이터 행(스페이서 제외)을 측정된 정수 높이로 강제.
                total*ROWH 와 실제 높이를 정확히 일치시켜 끝단 scrollHeight 흔들림 제거. */
             ".u4aAppF4TblWrap tbody tr:not(.u4aVSpacer)>td{height:var(--u4a-vsrowh,auto);box-sizing:border-box;}",
-            /* 컬럼 헤더 정렬/필터 메뉴 (ServerList 패턴 — 공통 .u4a-menu 위에 덧입힘) */
-            ".u4aAppF4Tbl thead th.u4a-th--menu{cursor:pointer;}",
-            ".u4aAppF4Tbl thead th.u4a-th--menu:hover{background:var(--hover-bg);color:var(--text);}",
-            ".u4aAppF4Tbl .u4a-th__inner{display:flex;align-items:center;gap:.35rem;min-width:0;}",
-            ".u4aAppF4Tbl .u4a-th__inner--center{justify-content:center;}",
-            ".u4aAppF4Tbl .u4a-th__label{overflow:hidden;text-overflow:ellipsis;}",
-            ".u4aAppF4Tbl .u4a-th__ind{display:inline-flex;align-items:center;gap:.25rem;flex:0 0 auto;color:var(--accent);}",
-            ".u4aAppF4Tbl .u4a-th__ind i{font-size:.8rem;line-height:1;}",
-            ".u4aAppF4Dlg .u4a-colmenu{min-width:13rem;}",
-            ".u4aAppF4Dlg .u4a-colmenu__filter{padding:.25rem;}",
-            ".u4aAppF4Dlg .u4a-colmenu__filter .u4a-input{width:100%;box-sizing:border-box;}",
-            ".u4aAppF4Dlg .u4a-colmenu__sep{height:.0625rem;margin:.25rem 0;background:var(--line);}",
-            ".u4aAppF4Dlg .u4a-colmenu .u4a-menu__item[data-active=\"true\"]{color:var(--accent);font-weight:600;}",
-            ".u4aAppF4Dlg .u4a-colmenu .u4a-menu__item[data-active=\"true\"] i{color:var(--accent);}"
+            /* 컬럼 헤더(.u4a-th--menu/__inner/__label/__ind) + 정렬/필터 메뉴(.u4a-colmenu)
+               CSS 는 전 화면 공통(shell.css)으로 승격 — 여기 인라인 복제 제거(2026-06-24). */
+            ""
         ].join("\n");
         document.head.appendChild(s);
     }

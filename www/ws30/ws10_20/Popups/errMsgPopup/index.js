@@ -195,7 +195,8 @@ let oAPP = parent.oAPP,
         oWrap.className = "u4a-table-wrap u4aErrWrap";
 
         var oTable = document.createElement("table");
-        oTable.className = "u4a-table u4a-table--compact u4aErrTbl";
+        //행높이=공통 .u4a-table 기본(전 테이블 통일 — F4/Login/insert 동일). --compact 제거.
+        oTable.className = "u4a-table u4aErrTbl";
 
         // colgroup — fixed 레이아웃 컬럼 폭(테이블뷰)
         var oColgroup = document.createElement("colgroup");

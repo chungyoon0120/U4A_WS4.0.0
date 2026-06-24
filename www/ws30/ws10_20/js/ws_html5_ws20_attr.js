@@ -3175,6 +3175,72 @@
     }
 
     /************************************************************************
+     * 클라이언트 JS 이벤트 에디터 호출 (원본 uiAttributeArea.js attrClientEventPopup 3717행 1:1).
+     * ----------------------------------------------------------------------
+     *  이벤트 행(UIATY="2")의 syntax(</>) 아이콘 = 클라이언트 JavaScript 이벤트 에디터.
+     *   · 편집모드인데 이 이벤트행이 편집 불가(is_attr.edit≠true)면 열지 않음(return true).
+     *   · 스크립트 ID = OBJID + 이벤트명(UIASN).
+     *   · 표시(비편집)모드: 입력된 클라이언트 JS(T_CEVT, OBJTY="JS")가 없으면 열지 않음.
+     *   · 팝업(ws_html5_client_editor.fnClientJsEditorPopup)은 .analy 00§6 표준대로
+     *     별도 범용 Monaco 호스트(js/codeeditor)를 임베드한 인앱 .u4a-dialog.
+     *   · 저장/삭제 콜백 → ADDSC 매핑 + syntax 아이콘색 갱신(존재=red) + 행 재렌더.
+     *  반환 true = 호출처(아이콘 핸들러) 후속 분기 skip(원본 동일).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrClientEventPopup !== "function") {
+        oAPP.fn.attrClientEventPopup = function (is_attr) {
+
+            //이벤트 라인이 아닌경우 exit.
+            if (is_attr.UIATY !== "2") { return; }
+
+            //편집모드인데 현재 이벤트 영역이 편집 불가능하면 exit.
+            if (_isEditMode() && is_attr.edit !== true) { return true; }
+
+            //OBJID + 이벤트명(UIASN) 으로 client 이벤트 script ID 구성.
+            var l_objid = is_attr.OBJID + is_attr.UIASN;
+
+            //표시(비편집) 상태: 입력된 클라이언트 JS 이벤트가 없으면 열지 않음.
+            if (!_isEditMode()) {
+                var aCevt = (oAPP.DATA && oAPP.DATA.APPDATA && Array.isArray(oAPP.DATA.APPDATA.T_CEVT)) ? oAPP.DATA.APPDATA.T_CEVT : [];
+                if (aCevt.findIndex(function (a) { return a && a.OBJID === l_objid && a.OBJTY === "JS"; }) === -1) {
+                    return true;
+                }
+            }
+
+            //저장/삭제 후 콜백 — ADDSC 매핑 + syntax 아이콘색 갱신(원본 빌드 line 917~921 대응) + 행 재렌더.
+            function lf_cb(param) {
+                is_attr.ADDSC = (param === "X") ? "JS" : "";
+                try {
+                    var bHas = oAPP.DATA.APPDATA.T_CEVT.findIndex(function (a) { return a && a.OBJID === l_objid && a.OBJTY === "JS"; }) !== -1;
+                    is_attr.icon2_color = bHas ? "red" : "#acaba7";
+                } catch (e) { }
+                try { oAPP.fn.fnRenderWs20AttrRows(); } catch (e) { }
+                //저장/삭제로 변경분이 생기면 앱 상태 Active→Inactive 반영.
+                //  원본은 sap /WS20/APP/IS_CHAG 바인딩이 헤더를 자동 갱신했으나, HTML5 는 명시 갱신이 필요.
+                //  ★ 권위값 = appInfo.IS_CHAG(에디터 저장 lf_save 의 setAppChange 가 조건부로 세팅).
+                //    "X" 를 하드코딩하지 않고 그 값을 모델에 미러 → 변경 없는 빈 저장에서 거짓 Inactive 방지.
+                //  (속성 변경 경로 fnWs20AttrChange 의 헤더 갱신과 동일한 처리.)
+                try {
+                    var oInfo = parent.getAppInfo && parent.getAppInfo();
+                    if (oInfo) { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", oInfo.IS_CHAG || ""); }
+                } catch (e) { }
+                try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+            }
+
+            //팝업 호출(미로드 시 지연로드).
+            if (typeof oAPP.fn.fnClientJsEditorPopup === "function") {
+                oAPP.fn.fnClientJsEditorPopup("JS", l_objid, lf_cb);
+                return true;
+            }
+            oAPP.loadJs("ws_html5_client_editor", function () {
+                oAPP.fn.fnClientJsEditorPopup("JS", l_objid, lf_cb);
+            });
+
+            return true;
+
+        };  //클라이언트 JS 이벤트 에디터 호출.
+    }
+
+    /************************************************************************
      * Attribute 초기화 (원본 uiAttributeArea.js attrResetAttr 2096행).
      * ----------------------------------------------------------------------
      *  선택 UI 의 **직접 변경한 Property** 들을 전부 기본값(DEFVL)으로 되돌린다.
@@ -3982,7 +4048,17 @@
                 } catch (e) { console.error("[HTML5][WS20][attr] 서버이벤트 생성 호출 오류:", e && e.message); }
                 return;
             }
-            //그 외(바인딩 팝업/F4/클라이언트이벤트<syntax> 등) 구 attrIcon1Proc/attrIcon2Proc — W4+ 예정.
+            //이벤트 행(UIATY="2")의 icon2(syntax </>) = 클라이언트 JS 이벤트 에디터 팝업.
+            //  (원본 attrIcon2Proc → attrClientEventPopup → fnClientEditorPopupOpen 경로.)
+            if (sAttr.UIATY === "2" && iNo === 2) {
+                try {
+                    //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 클라이언트 이벤트 팝업 호출.
+                    if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
+                    oAPP.fn.attrClientEventPopup(sAttr);
+                } catch (e) { console.error("[HTML5][WS20][attr] 클라이언트 이벤트 에디터 호출 오류:", e && e.message); }
+                return;
+            }
+            //그 외(바인딩 팝업/F4 등) 구 attrIcon1Proc/attrIcon2Proc — W4+ 예정.
             console.warn("[W4+ 예정] 속성 아이콘 동작 미변환:", sAttr.UIATT, "icon" + iNo, sSrc);
         });
 

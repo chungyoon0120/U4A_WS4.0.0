@@ -467,6 +467,32 @@ button:focus-visible {
     z-index: 1000;
 }
 
+/* 줌 슬라이더 팝오버 (헤더 zoom 버튼) — 원본 sap.m.Popover{ Slider } 대응. 메뉴와 동일 표면/그림자. */
+.u4a-zoom-pop {
+    position: fixed;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    background: var(--popover-bg);
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--popover-shadow);
+}
+.u4a-zoom-pop__slider {
+    width: 11rem;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+.u4a-zoom-pop__val {
+    min-width: 2.75rem;
+    text-align: right;
+    font-size: 0.8125rem;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
 .u4a-menu[hidden] {
     display: none;
 }
@@ -1147,7 +1173,7 @@ button:focus-visible {
 .u4a-input.u4a-input--display:hover,
 .u4a-input.u4a-input--display:focus-visible {
     background: transparent;
-    border-color: transparent;
+    border-color: var(--line);
     color: var(--text-muted);
     cursor: default;
     outline: none;
@@ -1283,7 +1309,7 @@ button:focus-visible {
 .u4a-combo[aria-disabled="true"],
 .u4a-combo.is-disabled {
     background: transparent;
-    border-color: transparent;
+    border-color: var(--line);
     color: var(--text-muted);
     opacity: 1;
     cursor: default;
@@ -1575,6 +1601,31 @@ dialog::backdrop {
 .u4a-table__nodata:hover {
     background: transparent;
 }
+
+/* ── 컬럼 헤더 내부(라벨 + 정렬/필터 표시자) — 전 화면 공통 ────────────
+   (ServerList 가 쓰던 .u4a-th__* 를 전 화면 공통으로 승격. ServerList/F4/insert 등이 소비.)
+   ★ 정렬/필터 "가능"만으로는 아이콘을 달지 않는다 — idle 헤더엔 아무 표시 없음.
+     정렬/필터 가능한 컬럼은 .u4a-th--menu 로 클릭 어포던스(pointer+hover)만 주고,
+     표시자(.u4a-th__ind: 화살표/깔때기)는 **현재 정렬·필터가 걸린 컬럼에만** 노출한다. */
+.u4a-table thead th.u4a-th--menu { cursor: pointer; }
+/* ⚠ 헤더는 sticky(top:0) — hover 시 반투명 --hover-bg 로만 덮으면 뒤로 스크롤되는 데이터가
+   비쳐 "헤더 글자가 겹쳐" 보인다. 불투명 --surface 위에 hover 틴트를 얹는다(프로즌 셀과 동일 레이어 문법). */
+.u4a-table thead th.u4a-th--menu:hover { background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--surface); color: var(--text); }
+.u4a-th__inner { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+.u4a-th__inner--center { justify-content: center; }
+.u4a-th__label { overflow: hidden; text-overflow: ellipsis; }
+.u4a-th__ind { display: inline-flex; align-items: center; gap: 0.25rem; flex: 0 0 auto; color: var(--accent); }
+.u4a-th__ind i { font-size: 0.8rem; line-height: 1; }
+
+/* ── 컬럼 헤더 메뉴(.u4a-colmenu) — 전 화면 공통 ──────────────────────
+   (ServerList/AppF4 가 쓰던 컬럼 정렬·필터 메뉴를 공통으로 승격. U4AUI.openColumnMenu 가 생성.)
+   공통 .u4a-menu 위에 필터 input/구분선/활성 정렬 강조만 덧입힌다. 순서=필터 input → 오름/내림 정렬 → 필터 초기화. */
+.u4a-colmenu { min-width: 13rem; }
+.u4a-colmenu__filter { padding: 0.25rem; }
+.u4a-colmenu__filter .u4a-input { width: 100%; box-sizing: border-box; }
+.u4a-colmenu__sep { height: 0.0625rem; margin: 0.25rem 0; background: var(--line); }
+.u4a-colmenu .u4a-menu__item[data-active="true"] { color: var(--accent); font-weight: 600; }
+.u4a-colmenu .u4a-menu__item[data-active="true"] i { color: var(--accent); }
 
 /* ── 밀도 옵션: Compact (행/패딩 축소, 행높이 토큰 소비) ──────────────
    원본 UI5 sapUiSizeCompact 대응. 토큰 미정의 시 12 §4.3 스펙값 폴백. */

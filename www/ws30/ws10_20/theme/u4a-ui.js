@@ -170,6 +170,7 @@
         //   (이벤트 DDLB: 펼치기 직전 서버이벤트 목록을 다시 받아 setItems 로 채운다.)
         //   onOpen 진행 중(data-loading) 재클릭은 무시해 중복 호출 방지.
         function _requestOpen() {
+            if (oCombo.getAttribute("aria-disabled") === "true") { return; }   // 비활성 콤보는 열기 차단(클릭·키보드 공통)
             if (oList) { _close(); return; }
             if (oCombo.dataset.loading === "true") { return; }
             const fnOpen = opts.onOpen;
@@ -627,9 +628,25 @@
             }
             el.removeAttribute("title");
         }
+        // 공통 테이블(.u4a-table) 셀/헤더라벨 — 텍스트가 가로로 잘리면(말줄임) 자동으로 툴팁 대상이 된다.
+        //   ★ 화면별 title 배선 불필요 — 전 공통 테이블이 자동으로 "잘릴 때만" 전체 텍스트 툴팁(data-tip-trunc).
+        //   이미 명시 tip(title/data-tip)이 있거나 텍스트 없는 셀(아이콘/액션)은 건드리지 않는다.
+        function _autoCellTip(cell) {
+            if (!cell) { return null; }
+            if (cell.hasAttribute("data-tip") || cell.hasAttribute("title")) { return cell; }
+            const s = (cell.textContent || "").trim();
+            if (!s) { return null; }
+            cell.setAttribute("data-tip", s);
+            cell.setAttribute("data-tip-trunc", "");   // 잘렸을 때만 표시(_show 가 scrollWidth 검사)
+            return cell;
+        }
         document.addEventListener("mouseover", function (e) {
-            const el = e.target.closest && e.target.closest("[data-tip],[title]");
-            if (!el) { return; }
+            let el = e.target.closest && e.target.closest("[data-tip],[title]");
+            if (!el) {
+                const cell = e.target.closest && e.target.closest(".u4a-table tbody td, .u4a-table .u4a-th__label");
+                el = _autoCellTip(cell);
+                if (!el) { return; }
+            }
             _promote(el);
             if (el === oCur) { return; }
             oCur = el;
@@ -1411,6 +1428,99 @@
         if (oField) { oField.dataset.filled = oInput.value ? "true" : "false"; }
     }
 
+    /* ── 컬럼 헤더 정렬/필터 메뉴 (.u4a-colmenu) — 전 화면 공통 ──────────────
+     * 헤더(.u4a-th--menu) 클릭 시 공통 메뉴(필터 input → 오름/내림 정렬 → 필터 초기화)를 연다.
+     * ServerList/AppF4 가 쓰던 패턴을 공통화 — 화면은 상태 컨트롤러(ctl)만 제공:
+     *   ctl = { getFilter(key), setFilter(key,val), getSort()→{key,dir}|null, setSort(key,dir), rerender() }
+     *   opts = { container: 앵커 append 대상(top-layer 다이얼로그 등, 기본 document.body),
+     *            labels: { filter, asc, desc, clear } }  // 문구 키는 화면이 해석해 전달(메시지 SSOT 유지)
+     */
+    let _oColMenuEl = null;
+    function _onColMenuOutside(e) { if (_oColMenuEl && !_oColMenuEl.contains(e.target)) { closeColumnMenu(); } }
+    function closeColumnMenu() {
+        if (!_oColMenuEl) { return; }
+        try { _oColMenuEl.remove(); } catch (e) { }
+        _oColMenuEl = null;
+        document.removeEventListener("mousedown", _onColMenuOutside, true);
+        window.removeEventListener("resize", closeColumnMenu);
+        window.removeEventListener("scroll", closeColumnMenu, true);
+    }
+    function openColumnMenu(oCol, oTh, ctl, opts) {
+        opts = opts || {};
+        const L = opts.labels || {};
+        const oContainer = opts.container || document.body;
+        closeColumnMenu();
+
+        const m = _el("div", "u4a-menu u4a-colmenu");
+        m.setAttribute("role", "menu");
+        m.addEventListener("click", function (e) { e.stopPropagation(); });
+
+        // 필터 input (contains, Enter/blur 적용)
+        const fw = _el("div", "u4a-colmenu__filter");
+        const fi = _el("input", "u4a-input");
+        fi.type = "text";
+        fi.placeholder = L.filter || "";
+        fi.value = ctl.getFilter(oCol.key) || "";
+        function applyF() {
+            const v = fi.value.trim().toLowerCase(), cur = ctl.getFilter(oCol.key) || "";
+            if (v === cur) { return; }
+            ctl.setFilter(oCol.key, v);
+            ctl.rerender();
+        }
+        fi.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); applyF(); closeColumnMenu(); } });
+        fi.addEventListener("blur", applyF);
+        fw.appendChild(fi);
+        m.appendChild(fw);
+
+        m.appendChild(_el("div", "u4a-colmenu__sep"));
+
+        // 정렬(오름/내림 — 활성 방향 재클릭 시 해제)
+        function mkSort(sDir, sIcon, sLabel) {
+            const it = _el("div", "u4a-menu__item");
+            it.setAttribute("role", "menuitem");
+            it.innerHTML = _fa(sIcon) + "<span></span>";
+            it.querySelector("span").textContent = sLabel || "";
+            const s = ctl.getSort();
+            const bActive = (s && s.key === oCol.key && s.dir === sDir);
+            if (bActive) { it.setAttribute("data-active", "true"); }
+            it.addEventListener("click", function () {
+                if (bActive) { ctl.setSort(null, null); } else { ctl.setSort(oCol.key, sDir); }
+                ctl.rerender(); closeColumnMenu();
+            });
+            return it;
+        }
+        m.appendChild(mkSort("asc", "arrow-up", L.asc));
+        m.appendChild(mkSort("desc", "arrow-down", L.desc));
+
+        m.appendChild(_el("div", "u4a-colmenu__sep"));
+
+        // 필터 초기화(이 컬럼) — 활성 필터 없으면 비활성
+        const clr = _el("div", "u4a-menu__item");
+        clr.setAttribute("role", "menuitem");
+        clr.innerHTML = _fa("xmark") + "<span></span>";
+        clr.querySelector("span").textContent = L.clear || "";
+        if (!ctl.getFilter(oCol.key)) { clr.setAttribute("aria-disabled", "true"); }
+        clr.addEventListener("click", function () {
+            if (!ctl.getFilter(oCol.key)) { return; }
+            ctl.setFilter(oCol.key, ""); fi.value = ""; ctl.rerender(); closeColumnMenu();
+        });
+        m.appendChild(clr);
+
+        // 위치 — 앵커(헤더) 아래. container(top-layer 다이얼로그 등) 안에 붙여 모달 위로.
+        oContainer.appendChild(m);
+        const r = oTh.getBoundingClientRect();
+        m.style.position = "fixed";
+        m.style.top = r.bottom + "px";
+        m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)) + "px";
+        m.style.zIndex = "10";
+        _oColMenuEl = m;
+        // 창 리사이즈/스크롤 시 닫기 — 앵커 이동으로 위치 어긋남 방지.
+        window.addEventListener("resize", closeColumnMenu);
+        window.addEventListener("scroll", closeColumnMenu, true);
+        setTimeout(function () { document.addEventListener("mousedown", _onColMenuOutside, true); }, 0);
+        try { fi.focus(); } catch (e) { }   // 열리면 바로 필터 입력 가능
+    }
+
     const U4AUI = {
         el: _el,
         createField: createField,
@@ -1424,6 +1534,8 @@
         attachSuggest: attachSuggest,
         attachClear: attachClear,
         attachOverflow: attachOverflow,
+        openColumnMenu: openColumnMenu,
+        closeColumnMenu: closeColumnMenu,
         btnLabel: btnLabel,
         makeDialogRecenter: makeDialogRecenter,
         makeDialogResizable: makeDialogResizable,

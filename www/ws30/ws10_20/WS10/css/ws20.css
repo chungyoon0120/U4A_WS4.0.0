@@ -528,8 +528,9 @@
  *   · 헤더 드래그 이동(공통 makeDialogDraggable) + 우하단 grip 리사이즈(공통 makeDialogResizable) + 반응형
  * ===================================================================== */
 .u4aWs20InsertDlg {
-  width: min(80rem, 95vw);   /* 전체 창 기준 크게 */
-  height: min(52rem, 90vh);
+  /* 초기 크기는 화면 중앙에 아담하게(showModal=margin auto 중앙정렬). 더 보고 싶으면 우하단 grip 으로 키운다. */
+  width: min(46rem, 92vw);
+  height: min(34rem, 85vh);
   min-width: min(24rem, 90vw);
   min-height: 18rem;
   overflow: hidden;          /* 둥근 모서리 클립 (본문은 자체 스크롤) */
@@ -559,7 +560,8 @@
 .u4aWs20InsRow { display: flex; align-items: center; gap: 0.625rem; }
 .u4aWs20InsRow > label { flex: 0 0 8.75rem; font-size: 0.8125rem; font-weight: 700; color: var(--text); }
 .u4aWs20InsRow .u4aWs20InsAgg { flex: 1 1 auto; min-width: 0; display: flex; }
-.u4aWs20InsSearch { flex: 1 1 auto; min-width: 0; }
+/* 검색 입력은 공통 .u4a-field 래퍼로 감싸 clear(X) 를 갖는다 — 행을 채우는 flex 는 래퍼에. */
+.u4aWs20InsSearchWrap { flex: 1 1 auto; min-width: 0; }
 .u4aWs20InsStep { display: flex; align-items: center; gap: 0.375rem; }
 .u4aWs20InsCnt { width: 4.5rem; text-align: center; }
 .u4aWs20InsMax { font-size: 0.8125rem; color: var(--text-muted); margin-left: 0.25rem; white-space: nowrap; }
@@ -574,30 +576,12 @@
   flex: 1 1 auto; min-height: 7.5rem; overflow: auto;
   border: 0.0625rem solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
 }
-/* border-collapse:separate — collapse + sticky th 조합에서 스크롤 시 셀 내용이 헤더로
-   비쳐 보이던(겹침) 버그 회피. 하단 구분선은 box-shadow 로(헤더와 함께 고정). */
-.u4aWs20InsTable { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.8125rem; }
-.u4aWs20InsTable thead th {
-  position: sticky; top: 0; z-index: 3;
-  background: var(--surface-raised); color: var(--text); font-weight: 700;
-  text-align: left; padding: 0.5rem 0.625rem;
-  box-shadow: inset 0 -0.0625rem 0 var(--line);   /* sticky 헤더 하단선(스크롤해도 고정) */
-  white-space: nowrap;
-}
-.u4aWs20InsTable thead th[data-sort] { cursor: pointer; }
-.u4aWs20InsTable thead th[data-sort]:hover { background: var(--hover-bg); }
-.u4aWs20InsSortIco { margin-left: 0.25rem; font-size: 0.625rem; opacity: 0.45; }
-.u4aWs20InsSortIco.on { opacity: 0.9; color: var(--accent); }
-.u4aWs20InsThSym { width: 4rem; text-align: center; }
+/* 결과 표는 공통 .u4a-table(+--compact) 소비 — sticky 헤더/zebra/hover/선택(aria-selected)/
+   셀 말줄임 + 정렬헤더(.u4a-th--menu/.u4a-th__inner/__label/__ind)는 전부 shell.css 공통이 담당.
+   여기선 화면 고유분(컬럼폭·셀 강조)만 얹는다. */
+/* Symbol 컬럼 — 헤더 라벨("Symbol")이 잘리지 않게 폭 확보(아이콘은 가운데). */
+.u4aWs20InsThSym, .u4aWs20InsTdSym { width: 5rem; text-align: center; }
 .u4aWs20InsThKey { width: 7rem; }
-.u4aWs20InsTable tbody td {
-  padding: 0.3125rem 0.625rem; border-bottom: 0.0625rem solid var(--line);
-  color: var(--text); vertical-align: middle;
-}
-.u4aWs20InsTable tbody tr { cursor: pointer; }
-.u4aWs20InsTable tbody tr:hover { background: var(--hover-bg); }
-.u4aWs20InsTable tbody tr.sel { background: var(--selected-bg); }
-.u4aWs20InsTdSym { text-align: center; width: 4rem; }
 .u4aWs20InsTdSym img { width: 1.125rem; height: 1.125rem; vertical-align: middle; }
 .u4aWs20InsTdName { font-weight: 600; }
 .u4aWs20InsTdFull, .u4aWs20InsTdKey { color: var(--text-muted); }
@@ -692,9 +676,10 @@
   padding: 6px 8px; font-size: 13px; font-family: inherit;
   outline: none;
 }
-/* ★ 편집 가능 input(읽기전용/비활성 아님) — 평상시에도 보더+입력 배경으로 명확한 어포던스 */
+/* ★ 편집 가능 input — 공통/다이얼로그 입력칸과 동일하게 또렷한 보더(--divider)+올라온 배경.
+   (구 --line 은 흐려서 활성인데도 테두리가 안 쳐진 듯 보였음 → 공통(.u4a-input)과 톤 통일.) */
 .u4aWs20AttrInp:not(:read-only):not(:disabled) {
-  border-color: var(--line);
+  border-color: var(--divider);
   background: var(--surface-raised, var(--surface));
 }
 .u4aWs20AttrInp:not(:read-only):not(:disabled):hover { border-color: var(--accent); background: var(--hover-bg); }
@@ -711,7 +696,7 @@
   /* createField 가 공통 .u4a-input(height:2.25rem) 도 부여하므로 height 를 풀어 rows=4 가 높이를 정하게. */
   height: auto;
   background: var(--surface-raised, var(--surface)); color: var(--text);
-  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  border: 1px solid var(--divider); border-radius: var(--radius-sm);
   padding: 4px 6px; font-size: 13px; font-family: inherit;
   outline: none;
 }
@@ -827,15 +812,24 @@
 
 /* 속성 행 — [라벨][값][아이콘][아이콘] (구 ColumnListItem). 행 높이 키움(가독성). */
 .u4aWs20AttrRow {
-  display: flex; align-items: center;
-  min-height: 40px; box-sizing: border-box; padding: 4px 6px 4px 12px;
+  /* ★ 3영역 그리드 = [라벨 | 입력·선택(값) | 액션 2슬롯]. flex 가 아닌 grid 로 두어
+       모든 행의 열 경계(라벨 끝/값 끝/아이콘 위치)가 칼같이 정렬되게 한다(원본 UI5 정렬 재현).
+       - 라벨: 40% 상한, 최소 88px(너무 좁아 글자 사라지지 않게)
+       - 값  : 남는 폭 전부(minmax(0,1fr) 라 좁아지면 내부 컨트롤이 ellipsis 로 줄어듦)
+       - 액션: 26px×2 고정 트랙 → 아이콘 유무와 무관하게 항상 같은 자리(정렬 보장) */
+  display: grid;
+  grid-template-columns: minmax(88px, 40%) minmax(0, 1fr) 26px 26px;
+  align-items: center; column-gap: 6px;
+  /* 세로로 살짝 숨통: 패널이 좁아도 행이 빡빡하게 붙지 않도록 상하 패딩을 키운다(4→6px, 최소높이 40→42px). */
+  min-height: 42px; box-sizing: border-box; padding: 6px 8px 6px 12px;
   border-bottom: 1px solid var(--ws20-line);
 }
 .u4aWs20AttrRow:hover { background: var(--ws20-hover-bg); }
 
 /* 라벨 셀 (좌) */
 .u4aWs20AttrRowLbl {
-  flex: 0 0 42%; min-width: 0;
+  /* grid 1번 트랙(라벨 열). 폭은 .u4aWs20AttrRow 의 grid-template 이 정함. */
+  min-width: 0;
   display: flex; align-items: center; gap: 4px;
   /* ★ 셀을 행 높이(40px)로 늘린다 — 행이 align-items:center 라 셀이 "텍스트 높이(~16px)"로만 잡혀,
        셀의 overflow:hidden 이 텍스트 바로 아래 hover 밑줄을 잘라먹던 진짜 원인. stretch 로 40px 가 되면
@@ -845,10 +839,13 @@
   cursor: pointer;                  /* 라벨 셀 전체가 클릭 영역(클릭=속성 설명 도움말) */
 }
 .u4aWs20AttrLblTxt {
-  /* ★ overflow/text-overflow 를 이 요소에 두지 않는다 — 그게 hover 밑줄(박스 아래)을 클립하던 진짜 원인.
-       긴 라벨의 가로 클립은 부모 셀(.u4aWs20AttrRowLbl{overflow:hidden})이 담당하고, 부모는 행 높이
-       40px 라 밑줄(세로)은 안 잘린다. 말줄임 '…' 은 포기(짧은 라벨이 대부분) — 밑줄 가시성 우선. */
-  min-width: 0; white-space: nowrap;
+  /* 긴 라벨은 글자 중간에서 하드 클립되지 않고 말줄임('…')으로 끝나게 한다(잘린 게 의도된 듯 보이게).
+     단, overflow:hidden 이 hover 밑줄(text-decoration)을 시각적으로 잘라먹으므로([[overflow-hidden-clips-underline]])
+     padding-bottom 으로 박스를 아래로 늘려 밑줄 공간을 확보하고, 같은 양의 음수 margin-bottom 으로
+     실제 레이아웃 높이는 그대로 둔다(행이 밀리지 않음). flex:1 로 남은 폭을 채워야 ellipsis 가 동작. */
+  flex: 1 1 auto; min-width: 0; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  padding-bottom: 3px; margin-bottom: -3px;
   cursor: pointer;
   color: inherit;                   /* <a> 여도 라벨은 일반 텍스트색 (shell.css a{color:--link} 무력화) */
   text-decoration: none;            /* 평상시 밑줄 없음 (구 .u4aAttrObjectStatus) */
@@ -902,8 +899,8 @@
   background: transparent;
 }
 
-/* 값 셀 (우) */
-.u4aWs20AttrRowVal { flex: 1 1 auto; min-width: 0; }
+/* 값 셀 (가운데) — grid 2번 트랙(입력·선택 열). minmax(0,1fr) 라 내부 컨트롤이 100%+ellipsis 로 안전히 줄어듦. */
+.u4aWs20AttrRowVal { min-width: 0; }
 /* [공통 컴포넌트] 트레일링 아이콘 입력 메커니즘은 shell.css .u4a-field 가 담당.
    WS20 는 속성 그리드에 맞춰 아이콘 크기/여백만 컴팩트하게 오버라이드. */
 .u4aWs20AttrValBox { --field-icon: 22px; --field-edge: 4px; }
@@ -922,7 +919,7 @@
 .u4aWs20AttrCombo .u4a-combo__text { font-size: 13px; }
 /* ★ 편집 가능 콤보(.is-disabled 아님) — 평상시에도 보더+입력 배경으로 명확한 어포던스 */
 .u4aWs20AttrCombo:not(.is-disabled) {
-  border-color: var(--line);
+  border-color: var(--divider);
   background: var(--surface-raised, var(--surface));
 }
 .u4aWs20AttrCombo:not(.is-disabled):hover { border-color: var(--accent); background: var(--hover-bg); }
@@ -1087,18 +1084,23 @@
    CSS Link Add / JS Link Add / Web Security Settings 등) */
 .u4aWs20AttrPopBtn {
   display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-  width: 100%; height: 24px; padding: 0 8px;
+  width: 100%; height: 26px; padding: 0 6px;
   border: 1px solid var(--ws20-grip); background: transparent; color: var(--ws20-text);
   border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1;
   font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* 버튼 안 라벨(span)도 좁을 땐 말줄임 — 아이콘은 안 줄고 글자만 '…' 처리(아이콘 잘림 방지) */
+.u4aWs20AttrPopBtn > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.u4aWs20AttrPopBtn > i, .u4aWs20AttrPopBtn > svg { flex: 0 0 auto; }
 .u4aWs20AttrPopBtn.attention { border-color: var(--warning); color: var(--warning); }
 .u4aWs20AttrPopBtn:hover { background: var(--ws20-btn-hover); }
 .u4aWs20AttrPopBtn:disabled { opacity: 0.55; cursor: default; }
 
-/* 아이콘 셀 ×2 (구 40px 컬럼 — 바인딩/help) */
+/* 아이콘 셀 ×2 (구 40px 컬럼 — 바인딩/help).
+   ★ 행이 grid(라벨|값|아이콘|아이콘)라 이 두 셀은 고정 grid 트랙(26px)이 된다 — 아이콘이 있든 없든
+     항상 같은 폭을 차지해 액션 아이콘이 전 행에서 한 열로 칼같이 정렬된다(원본 3열 정렬 재현). */
 .u4aWs20AttrRowIc {
-  flex: 0 0 28px; display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
 }
 .u4aWs20AttrIcBtn {
   display: inline-flex; align-items: center; justify-content: center;

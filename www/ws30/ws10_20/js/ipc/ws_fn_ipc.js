@@ -705,13 +705,20 @@
          * @since   2025-05-06
          * @version v3.5.6-2
          * @author  soccerhs
-         * 
+         *
          * @description
          * USP의 모나코 에디터의 테마 변경 관런로직
-         * 
-         * # Workspace Theme 변경시 테마에 따른 
-         *   USP 모나코 에디터 테마 동시 변경 적용을 하지 않는 것으로 
+         *
+         * # Workspace Theme 변경시 테마에 따른
+         *   USP 모나코 에디터 테마 동시 변경 적용을 하지 않는 것으로
          *   결정하여 임시 주석처리함
+         *
+         * ★ 주의(버그 아님 = 사양): USP 에디터는 사용자가 **에디터 테마 콤보로 직접 고른
+         *   개인화 설정**이 있어, 워크스페이스 테마가 이를 덮으면 안 된다. 그래서 일부러
+         *   동기화를 끈 것이다. "테마가 안 따라간다"를 누락으로 보고 켜지 말 것.
+         *   (대조: 개인화가 없는 WS20 클라이언트 JS 에디터(ws_html5_client_editor.js)는
+         *    'u4a-theme-changed' 구독으로 테마를 추종한다.)
+         *   근거 문서: .analy/12_테마_컨버전_전략.md §5.3.
          ******************************************************/
         // // 마지막 선택한 테마 정보를 구한다.
         // let sSelectedThemeUsp = oAPP.common.fnGetModelProperty("/WS30/USP_EDITOR/sSelectedTheme");

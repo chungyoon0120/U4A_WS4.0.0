@@ -147,6 +147,16 @@ body {
     background: var(--u4a-accent-soft);
 }
 
+/* 브라우저 핀 토글 — 눌림(aria-pressed) 시 활성 강조. 원본 ToggleButton pressed 상태 대응.
+   hover 와 구분되도록 압정 아이콘을 비스듬히(꽂힌 느낌) 회전 + 상시 accent 유지(hover 는 일시적). */
+.u4a-pin-btn[aria-pressed="true"] {
+    color: var(--u4a-accent);
+    background: var(--u4a-accent-soft);
+}
+.u4a-pin-btn[aria-pressed="true"] i {
+    transform: rotate(-35deg);
+}
+
 /* Bootstrap components: demo colors + radius/shadow */
 .btn-primary {
     background-color: var(--u4a-accent);
@@ -468,18 +478,20 @@ html[data-sl-theme="dark"] .btn-close {
 .u4a-dialog .u4a-input:disabled,
 .u4a-dialog .u4a-input[readonly],
 .u4a-dialog .u4a-input.u4a-input--display {
+    /* 비활성도 "필드"로 보이게 옅은 테두리(--line)는 둔다 — 배경은 평평(transparent), 글자 muted.
+       활성(--surface-raised + 또렷한 --divider)보다 약해 한눈에 구분된다. */
     background: transparent;
     color: var(--sl-muted);
-    border-color: transparent;
+    border-color: var(--line);
     opacity: 1;
 }
 
-/* 비활성 콤보(.u4a-combo) — 입력 readonly 와 동일한 평문(투명+muted). 편집 가능 콤보는 보더 박스.
+/* 비활성 콤보(.u4a-combo) — 입력 readonly 와 동일: 평평 배경 + 옅은 테두리(--line) + muted.
    비활성 표시는 aria-disabled(createField) 또는 .is-disabled(화면) 둘 다 인식. */
 .u4a-combo[aria-disabled="true"],
 .u4a-combo.is-disabled {
     background: transparent;
-    border-color: transparent;
+    border-color: var(--line);
     pointer-events: none;
 }
 .u4a-combo[aria-disabled="true"] .u4a-combo__text,

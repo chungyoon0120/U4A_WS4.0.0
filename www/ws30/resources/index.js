@@ -141,6 +141,21 @@ oAPP.views = window?.oAPP?.views || {};
      * # MSG
      * - (string) Message
      */
+    // ★ 모달 top-layer 순서 추적 — UI5 가 팝업 z-index 를 1씩 올려 쌓듯, native `<dialog>.showModal()` 은
+    //   top-layer 라 z-index 무관하게 "showModal 호출 순서"가 위아래를 결정한다. showModal 을 1회 감싸
+    //   호출마다 증가 seq(`data-tl-seq`)를 기록 → 토스트 등이 "가장 위 모달"을 정확히 찾는다(DOM 순서는 부정확).
+    (function () {
+        try {
+            if (typeof HTMLDialogElement === "undefined" || HTMLDialogElement.prototype.__tlSeqWrapped) { return; }
+            var _orig = HTMLDialogElement.prototype.showModal, _seq = 0;
+            HTMLDialogElement.prototype.showModal = function () {
+                try { this.dataset.tlSeq = String(++_seq); } catch (e) { }
+                return _orig.apply(this, arguments);
+            };
+            HTMLDialogElement.prototype.__tlSeqWrapped = true;
+        } catch (e) { }
+    })();
+
     oWS.utill.fn.showMessage = function (oUI5, KIND, TYPE, MSG, fn_callback) {
 
         // 메시지가 Array 일 경우 개행 문자를 넣는다.
@@ -183,8 +198,18 @@ oAPP.views = window?.oAPP?.views || {};
                     oT.id = "u4aWsToast";
                     oT.className = "u4a-toast";
                     oT.setAttribute("role", "alert");
-                    document.body.appendChild(oT);
                 }
+                // ★ showModal 모달은 top-layer 라 body 의 토스트(div)가 그 뒤에 가려진다(busy 와 동일 문제).
+                //   Chromium93 은 popover API 없음 → 토스트를 "가장 위에 열린 모달 <dialog> 안"에 넣어 top-layer 에 올린다.
+                //   가장 위 = data-tl-seq(showModal 호출 순서) 최대값(busy 제외). 모달 없으면 body 폴백 = 기존 동작.
+                //   .u4a-toast 는 position:fixed + pointer-events:none 이라 어디 붙어도 뷰포트 중앙·클릭통과 유지.
+                var oHost = document.body, aDlg = document.querySelectorAll("dialog[open]"), iTop = -1;
+                for (var i = 0; i < aDlg.length; i++) {
+                    if (aDlg[i].id === "u4aWsBusyIndicator") { continue; }
+                    var iSeq = parseInt(aDlg[i].dataset.tlSeq || "0", 10);
+                    if (iSeq >= iTop) { iTop = iSeq; oHost = aDlg[i]; }
+                }
+                if (oT.parentNode !== oHost) { oHost.appendChild(oT); }
                 oT.textContent = sMsg || "";
                 oT.dataset.show = "true";
                 if (oT.__t) { clearTimeout(oT.__t); }

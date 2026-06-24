@@ -388,9 +388,12 @@
         const o = document.createElement("div");
         o.className = "u4a-ws10__menubar";
 
+        const aCatBtns = [];
+        const aVisCats = [];
         // 좌측 : 메뉴 카테고리 버튼
         _getWindowMenu().forEach((cat) => {
             if (cat.staffOnly && !WS_STATE.IS_STAFF) { return; }
+            aVisCats.push(cat);
             const b = document.createElement("button");
             b.className = "u4a-wmenu-btn";
             b.type = "button";
@@ -408,26 +411,43 @@
                 }
             });
             o.appendChild(b);
+            aCatBtns.push(b);
         });
+
+        // 메뉴 오버플로 햄버거(☰) — 폭 부족 시 카테고리를 통째로 접음(구 OverflowToolbar, 통합본과 동일).
+        const oHam = document.createElement("button");
+        oHam.className = "u4a-wmenu-btn u4a-wmenu-overflow";
+        oHam.type = "button";
+        oHam.hidden = true;
+        oHam.title = "Menu";
+        oHam.setAttribute("data-menu-anchor", "wmenu-ovf");
+        oHam.setAttribute("aria-haspopup", "true");
+        oHam.innerHTML = _fa("bars");
+        oHam.addEventListener("click", () => {
+            const aItems = aVisCats.map((cat) => ({ key: cat.key, text: cat.text, items: cat.items }));
+            _openMenuAt(oHam, aItems, (it) => _invokeMenu(it.key, it.text), "left");
+        });
+        o.appendChild(oHam);
 
         // 우측 : 공통 헤더 영역
         o.appendChild(_renderCommonHeader());
-        return o;
-    }
 
-    // 테마 스와치 버튼 (5종 테마 선택 트리거). 공통 헤더(AI 우측, SAP 로고 좌측)에 둔다.
-    function _buildThemeSwatch() {
-        const oSwatch = document.createElement("button");
-        oSwatch.className = "u4a-theme-swatch";
-        oSwatch.type = "button";
-        oSwatch.title = "Theme";
-        oSwatch.setAttribute("data-menu-anchor", "theme");
-        oSwatch.addEventListener("click", () => {
-            const sCur = (window.U4ATheme && window.U4ATheme.current()) || "horizon_white";
-            const aItems = THEMES.map((t) => Object.assign({}, t, { icon: "circle-half-stroke", disabled: t.key === sCur }));
-            _openMenuAt(oSwatch, aItems, (it) => _applyTheme(it.key), "right");
-        });
-        return oSwatch;
+        function _reflowMenubar() {
+            oHam.hidden = true;
+            aCatBtns.forEach((b) => { b.hidden = false; });
+            o.classList.remove("is-tight");
+            if (aCatBtns.length && o.scrollWidth > o.clientWidth + 1) {
+                aCatBtns.forEach((b) => { b.hidden = true; });
+                oHam.hidden = false;
+            }
+            if (o.scrollWidth > o.clientWidth + 1) { o.classList.add("is-tight"); }
+        }
+        if (window.ResizeObserver) {
+            new ResizeObserver(() => _reflowMenubar()).observe(o);
+        } else {
+            setTimeout(_reflowMenubar, 0);
+        }
+        return o;
     }
 
     function _renderCommonHeader() {
@@ -448,8 +468,7 @@
         });
         o.appendChild(oAi);
 
-        // 테마 변경 버튼(스와치) — 눈(Light/Dark) 토글을 제거하고 이 자리로 이동.
-        o.appendChild(_buildThemeSwatch());
+        // (테마 변경은 옵션 팝업으로 이관됨 → 헤더 테마 스와치 버튼 제거. 2026-06-24)
 
         // SAP 로고 (svg) — T-CODE 좌측. 클릭 시 T-CODE 실행 로직으로 SMEN(SAP 메인메뉴) 실행.
         const oSapLogo = document.createElement("img");
@@ -474,8 +493,8 @@
         o.appendChild(oTcode);
 
         // Pin / Zoom / Search / Power
-        o.appendChild(_iconBtn(ICON.pin, "Pin", () => _invoke("ev_Pin", "Pin")));
-        o.appendChild(_iconBtn(ICON.zoom, "Zoom In", () => _invoke("ev_ZoomIn", "Zoom In")));
+        o.appendChild(_buildPinBtn());
+        o.appendChild(_buildZoomBtn());
         o.appendChild(_iconBtn(ICON.search, "Search", () => _invoke("ev_GlobalSearch", "Search")));
 
         const oPower = _iconBtn(ICON.power, _txt("B53"), () => _invoke("ev_Logout", _txt("B53")));
@@ -488,8 +507,9 @@
     function _renderAiBtn(oBtn) {
         const bOn = WS_STATE.UAI.state === true;
         oBtn.dataset.state = bOn ? "on" : "off";
-        oBtn.innerHTML = (bOn ? ICON.connected : ICON.disconnected) +
-            `<span>${bOn ? _txt("M431") : _txt("M432")}</span>`;
+        const sTxt = bOn ? _txt("M431") : _txt("M432");
+        oBtn.title = sTxt;   // tight 모드에서 아이콘만일 때도 툴팁 유지
+        oBtn.innerHTML = (bOn ? ICON.connected : ICON.disconnected) + `<span>${sTxt}</span>`;
     }
 
     function _iconBtn(sIconHtml, sTitle, fnClick) {
@@ -499,6 +519,108 @@
         b.title = sTitle;
         b.innerHTML = sIconHtml;
         b.addEventListener("click", fnClick);
+        return b;
+    }
+
+    /********************************************************************
+     * 브라우저 핀(항상 위 고정) 토글 — 원본 sap.m.OverflowToolbarToggleButton
+     *   ({ pressed:"{/SETTING/ISPIN}", press:ev_windowPinBtn }) 대응.
+     *   눌림=현재 창 setAlwaysOnTop(true) + 모델 /SETTING/ISPIN(브라우저 실행부가 읽음).
+     *   (통합본 js/ws10_html.js _buildPinBtn 과 동일 — 독립 미리보기는 모델/창 부재 시 시각 토글만.)
+     ********************************************************************/
+    function _readPin() {
+        try { return !!(window.oAPP && oAPP.common && oAPP.common.fnGetModelProperty && oAPP.common.fnGetModelProperty("/SETTING/ISPIN")); }
+        catch (e) { return false; }
+    }
+    function _buildPinBtn() {
+        const b = document.createElement("button");
+        b.className = "u4a-btn-icon u4a-pin-btn";
+        b.type = "button";
+        b.title = "Browser Pin";
+        b.innerHTML = ICON.pin;
+        b.setAttribute("aria-pressed", _readPin() ? "true" : "false");
+        b.addEventListener("click", () => {
+            const bOn = !_readPin();
+            try { if (window.oAPP && oAPP.common && oAPP.common.fnSetModelProperty) { oAPP.common.fnSetModelProperty("/SETTING/ISPIN", bOn); } } catch (e) { }
+            // ★ [Electron 버그] ON=(true,"screen-saver") / OFF=(false) — 실행부(ws_fn_04/uai/dev_browser)와 동일.
+            try { if (CURRWIN && CURRWIN.setAlwaysOnTop) { if (bOn) { CURRWIN.setAlwaysOnTop(true, "screen-saver"); } else { CURRWIN.setAlwaysOnTop(false); } } } catch (e) { }
+            b.setAttribute("aria-pressed", bOn ? "true" : "false");
+        });
+        return b;
+    }
+
+    /********************************************************************
+     * 브라우저 줌 슬라이더 팝오버 (헤더 zoom 버튼) — 원본 sap.m.Popover{ Slider(-5~5,0.1) }.
+     *   슬라이더 change → WEBFRAME.setZoomLevel(value), 닫을 때 setPersonWinZoom("S") 저장.
+     *   (통합본 js/ws10_html.js 와 동일. 독립 미리보기는 WEBFRAME/저장 부재 시 시각 슬라이더만.)
+     ********************************************************************/
+    let _zoomPop = null;
+    function _webFrame() {
+        try { if (parent && parent.WEBFRAME) { return parent.WEBFRAME; } } catch (e) { }
+        try { if (window.WEBFRAME) { return window.WEBFRAME; } } catch (e) { }
+        return null;
+    }
+    function _zoomPct(nLevel) { return Math.round(Math.pow(1.2, Number(nLevel) || 0) * 100); }
+    function _closeZoomPop() {
+        if (!_zoomPop) { return; }
+        const oCtx = _zoomPop;
+        _zoomPop = null;
+        document.removeEventListener("mousedown", oCtx.onOutside, true);
+        document.removeEventListener("keydown", oCtx.onEsc, true);
+        window.removeEventListener("resize", oCtx.onWinChange);
+        try { oCtx.el.remove(); } catch (e) { }
+        if (oCtx.anchor) { oCtx.anchor.setAttribute("aria-expanded", "false"); }
+        try { if (window.oAPP && oAPP.fn && typeof oAPP.fn.setPersonWinZoom === "function") { oAPP.fn.setPersonWinZoom("S"); } } catch (e) { }
+    }
+    function _openZoomPop(oAnchor) {
+        if (_zoomPop) { _closeZoomPop(); return; }
+        const oWf = _webFrame();
+        const oPop = document.createElement("div");
+        oPop.className = "u4a-zoom-pop";
+        const oRng = document.createElement("input");
+        oRng.type = "range";
+        oRng.className = "u4a-zoom-pop__slider";
+        oRng.min = "-5"; oRng.max = "5"; oRng.step = "0.1";
+        let nCur = 0;
+        try { if (oWf && oWf.getZoomLevel) { nCur = oWf.getZoomLevel(); } } catch (e) { }
+        oRng.value = String(nCur);
+        const oValEl = document.createElement("span");
+        oValEl.className = "u4a-zoom-pop__val";
+        oValEl.textContent = _zoomPct(nCur) + "%";
+        // 드래그 중엔 % 미리보기만(input), 실제 확대/축소는 놓을 때(change) — 원본 sap.m.Slider change 동일.
+        oRng.addEventListener("input", () => {
+            oValEl.textContent = _zoomPct(parseFloat(oRng.value)) + "%";
+        });
+        oRng.addEventListener("change", () => {
+            const v = parseFloat(oRng.value);
+            try { if (oWf && oWf.setZoomLevel) { oWf.setZoomLevel(v); } } catch (e) { }
+            oValEl.textContent = _zoomPct(v) + "%";
+        });
+        oPop.appendChild(oRng);
+        oPop.appendChild(oValEl);
+        document.body.appendChild(oPop);
+        const r = oAnchor.getBoundingClientRect();
+        let left = r.right - oPop.offsetWidth;
+        if (left + oPop.offsetWidth > window.innerWidth - 4) { left = window.innerWidth - oPop.offsetWidth - 4; }
+        if (left < 4) { left = 4; }
+        oPop.style.left = left + "px";
+        oPop.style.top = (r.bottom + 2) + "px";
+        oAnchor.setAttribute("aria-expanded", "true");
+        const fnOutside = (ev) => { if (ev.target && ev.target.closest && !ev.target.closest(".u4a-zoom-pop") && !ev.target.closest("[data-zoom-anchor]")) { _closeZoomPop(); } };
+        const fnEsc = (ev) => { if (ev.key === "Escape") { _closeZoomPop(); } };
+        const fnWin = () => _closeZoomPop();
+        _zoomPop = { el: oPop, anchor: oAnchor, onOutside: fnOutside, onEsc: fnEsc, onWinChange: fnWin };
+        setTimeout(() => {
+            document.addEventListener("mousedown", fnOutside, true);
+            document.addEventListener("keydown", fnEsc, true);
+            window.addEventListener("resize", fnWin);
+        }, 0);
+        try { oRng.focus(); } catch (e) { }
+    }
+    function _buildZoomBtn() {
+        const b = _iconBtn(ICON.zoom, "Zoom", () => _openZoomPop(b));
+        b.setAttribute("data-zoom-anchor", "zoom");
+        b.setAttribute("aria-haspopup", "true");
         return b;
     }
 
