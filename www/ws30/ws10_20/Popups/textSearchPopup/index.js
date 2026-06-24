@@ -44,7 +44,10 @@ module.exports = function(REMOTE, oAPP){
 
         oBrowserOptions.frame = false;
         oBrowserOptions.thickFrame = false;
-        oBrowserOptions.transparent = false;
+        // ★ 투명 창 — 둥근 찾기 바만 떠 보이게(불투명 사각 창이면 모서리가 각져 보임, 특히 최대화 시).
+        oBrowserOptions.transparent = true;
+        oBrowserOptions.backgroundColor = "#00000000";   // Windows 투명창 검정 방지(완전 투명)
+        oBrowserOptions.hasShadow = false;               // 투명창은 OS 사각 그림자 끄고 CSS 로 처리
         oBrowserOptions.center = false;
         oBrowserOptions.resizable = false;
         oBrowserOptions.parent = CURRWIN;
@@ -57,8 +60,8 @@ module.exports = function(REMOTE, oAPP){
         // 브라우저 오픈
         let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions); 
 
-        // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
-        const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
+        // 투명 창 — 외곽(index.html) html/body 는 투명, 실제 배경은 iframe 안 찾기 바가 가진다.
+        const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: transparent; }`;
 
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
 

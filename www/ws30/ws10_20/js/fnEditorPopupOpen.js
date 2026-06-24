@@ -69,7 +69,9 @@
             oBrowserOptions = jQuery.extend(true, {}, oDefaultOption.browserWindow);
 
         oBrowserOptions.title = sBrowserTitle;
-        oBrowserOptions.autoHideMenuBar = true;        
+        oBrowserOptions.autoHideMenuBar = true;
+        // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
+        oBrowserOptions.titleBarStyle = 'hidden';
         oBrowserOptions.parent = oCurrWin;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         
@@ -99,6 +101,10 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: oEditInfo.OBJTY,
             USERINFO: parent.process.USERINFO,
+            // [HTML5] frameless 창의 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: sBrowserTitle,
         };
 
         // URL에 QueryString 파라미터를 적용한다.
@@ -182,8 +188,12 @@
         // CSS & JAVASCRIPT && HTML 각 에디터 타입별 해당 데이터 저장
         oAPP.fn.fnSetEditorData(oSaveData);
 
-        // 어플리케이션 정보에 변경 플래그 
-        parent.setAppChange(res.IS_CHAG);
+        // 어플리케이션 정보에 변경 플래그
+        try { parent.setAppChange(res.IS_CHAG); } catch (e) { console.error("[HTML5][editor] setAppChange 오류:", e && e.message); }
+
+        // 저장으로 변경분 발생 → WS20 헤더 Active→Inactive 반영(클라이언트 에디터 lf_cb 와 동일 처리).
+        //   setAppInfo 가 글로벌 oAppInfo 에 ACTST="I"/IS_CHAG="X" 를 세팅했으므로 헤더만 다시 그린다.
+        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
 
     }; // end of oAPP.fn.fnIpcMain_EditorSave
 
@@ -249,7 +259,15 @@
 
         switch (oSaveData.OBJTY) {
             case "CS":
-                oAPP.attr.ui.frame.contentWindow.setCSSSource(oSaveData.DATA);
+                // CS 라이브 프리뷰 — 디자인 미리보기 프레임에 즉시 CSS 적용.
+                //   [HTML5] 미리보기 프레임(oAPP.attr.ui.frame)이 아직 미배선이면 null 일 수 있어 방어
+                //   (없어도 저장 자체는 성공 — 라이브 반영만 skip. W2 미리보기 연동 시 동작).
+                try {
+                    var oPrevWin = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
+                    if (oPrevWin && typeof oPrevWin.setCSSSource === "function") {
+                        oPrevWin.setCSSSource(oSaveData.DATA);
+                    }
+                } catch (e) { console.error("[HTML5][editor] CS 라이브 프리뷰 오류:", e && e.message); }
                 break;
         }
 

@@ -175,9 +175,14 @@
 .u4aWs30Tree.u4a-tree {
     width: auto;
     min-width: 100%;
-    /* 행 높이(40px)·폰트(13px)는 공통 shell.css .u4a-tree* 단일 출처가 소유 → USP 재정의 제거
-       (2026-06-23 트리 통일: 기본값 --u4a-tree-row-h 2.5rem / font 0.8125rem 와 동일했음). */
+    /* 공통 .u4a-tree 의 padding-top(0.25rem)을 제거 — 컬럼 헤더 border-bottom 과 첫 행 사이 간격 방지.
+       좌측 1px(선택 인디케이터 여백)·하단 0.25rem 은 유지. */
+    padding-top: 0;
 }
+
+/* 가상 스크롤 행높이 고정은 공통 shell.css `.u4a-tree__row{height:var(--u4a-vsrowh,auto)}` 가 담당
+   (측정된 정수 px 강제 → 끝단 떨림 제거). ★ USP 별도 height 재정의 금지 — 비정수(줌 등)면 측정값과
+   어긋나 떨린다. 설명 2줄(line-clamp)도 측정높이(첫 행 min-height 40px, 2줄 32.5px<40px) 안에 들어간다. */
 
 .u4aWs30TreeNode { margin: 0; }
 

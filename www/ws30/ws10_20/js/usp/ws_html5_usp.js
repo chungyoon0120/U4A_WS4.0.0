@@ -691,7 +691,8 @@
         }
 
         var aTreeData = _model("/WS30/USPTREE") || [];
-        var aUspTreeData = _parseTree2Tab($.extend(true, [], aTreeData), "USPTREE");
+        // TREEDATA 가 직접 전달된 경우(Create: 신규 노드 포함 평면 배열) → 그대로 사용.
+        var aUspTreeData = oParams.TREEDATA || _parseTree2Tab($.extend(true, [], aTreeData), "USPTREE");
 
         var oBeforeSelectData = aUspTreeData.find(function (a) { return a.ISSEL == true; });
         if (oBeforeSelectData) {
@@ -779,8 +780,253 @@
             } catch (e) { }
         }
 
+        // AFPRC 분기 — Create: "_C"(신규 생성 후처리) / "C"(변경 저장 후 팝업 재오픈)
+        if (oParams.AFPRC === "_C") {
+            // 서버 저장 성공 → 트리 모델에 신규 노드 추가 + 선택 (busy 는 fnUspTreeTableRowSelect 콜백이 해제)
+            _fnAddCreatedNode(oParams._createNode, oParams._parentNode);
+            return;
+        }
+        if (oParams.AFPRC === "C") {
+            // 변경 저장 완료 → Create 팝업 오픈 (busy = fnCreateUspNodePopup 내부 해제)
+            try { if (oAPP.fn.fnCreateUspNodePopup) { oAPP.fn.fnCreateUspNodePopup(oParams._createNode); } } catch (e) { }
+            return;
+        }
+
         _uspRefreshAfterMode();
         oAPP.common.fnSetBusyLock("");
+    }
+
+    /************************************************************************
+     * K3 Create 팝업 + 서버 저장 (구 fnCreateUspNodePopup · ev_createUspNodeAcceptEvent · _fnCreateUspNode)
+     ************************************************************************/
+
+    // 이름 입력값 검증 (구 _fnCheckCreateNodeData 1:1)
+    function _fnCheckCreateNodeData(oCrData) {
+        var oCheck = {};
+        var sName = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C11");
+        var sReq  = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "050", sName);
+        if (!oCrData || !oCrData.NAME) { oCheck.RETCD = "E"; oCheck.RTMSG = sReq; return oCheck; }
+        try {
+            if (parent.isEmpty(oCrData.NAME) === true || parent.isBlank(oCrData.NAME) === true) {
+                oCheck.RETCD = "E"; oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "358"); return oCheck;
+            }
+        } catch (e) { }
+        if (/[\s]/gi.test(oCrData.NAME)) {
+            oCheck.RETCD = "E"; oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "358"); return oCheck;
+        }
+        if (/[\{\}\[\]\/?,;:|\)*~`!^\-+<>@\#$%&\\\=\(\'\"]/gi.test(oCrData.NAME)) {
+            oCheck.RETCD = "E"; oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "359"); return oCheck;
+        }
+        if (!/^[a-zA-Z]|^[a-zA-Z]+[a-z0-9A-Z|_]/.test(oCrData.NAME)) {
+            oCheck.RETCD = "E";
+            oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "362") + " \n " +
+                           APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "361");
+            return oCheck;
+        }
+        if (oCrData.ISFLD === true && /[.]/gi.test(oCrData.NAME)) {
+            oCheck.RETCD = "E"; oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "359"); return oCheck;
+        }
+        oCheck.RETCD = "S"; return oCheck;
+    }
+
+    // 신규 노드 데이터 초기화 (구 _fnClearNewRowData — 모든 필드 "")
+    function _fnClearNewNodeData(oData) {
+        var oNew = {};
+        if (oData && typeof oData === "object") {
+            Object.keys(oData).forEach(function (k) { oNew[k] = ""; });
+        }
+        return oNew;
+    }
+
+    // 랜덤 OBJKY (구 RANDOM.generateBase30(34))
+    function _randomKey() {
+        try { return parent.RANDOM.generateBase30(34); } catch (e) { }
+        var s = "";
+        for (var i = 0; i < 34; i++) { s += Math.floor(Math.random() * 36).toString(36); }
+        return s;
+    }
+
+    // 팝업 재사용 시 초기화 + 타이틀 갱신 + 포커스
+    function _uspCrDialogReset(oDlg, oNode) {
+        oDlg.__uspCrParent = oNode;
+        try { oDlg._fldName.setValue(""); oDlg._fldName.setValueState("none", ""); } catch (e) { }
+        try { oDlg._fldDesc.setValue(""); } catch (e) { }
+        try { oDlg._fldCodpg.setValue("utf-8"); } catch (e) { }
+        try { oDlg.querySelector(".js-usp-cr-isfld").checked = false; } catch (e) { }
+        try { oDlg.querySelector(".u4aUspCrTitle").textContent =
+            APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A01") + " [ " + _esc(oNode.OBDEC || "") + " ]"; } catch (e) { }
+        try { setTimeout(function () { oDlg._fldName.el.querySelector("input").focus(); }, 80); } catch (e) { }
+    }
+
+    // Create 팝업 열기 (구 fnCreateUspNodePopup)
+    oAPP.fn.fnCreateUspNodePopup = function (oNode) {
+        if (!oNode) { oAPP.common.fnSetBusyLock(""); return; }
+
+        // 기존 팝업 재사용
+        var oDlg = document.getElementById("uspCrNodePopup");
+        if (oDlg) {
+            _uspCrDialogReset(oDlg, oNode);
+            if (!oDlg.open) { oDlg.showModal(); }
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+
+        var sLblName    = _esc(APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C11"));  // Name
+        var sLblDesc    = _esc(APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A35"));  // Description
+        var sLblCharset = _esc(APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C20"));  // Charset
+        var sLblFolder  = _esc(APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D45"));  // Folder
+        var sTitle      = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A01") + " [ " + _esc(oNode.OBDEC || "") + " ]";
+
+        oDlg = document.createElement("dialog");
+        oDlg.id = "uspCrNodePopup";
+        oDlg.className = "u4a-dialog";
+        oDlg.style.cssText = "width:32rem;max-width:96vw";
+        oDlg.__uspCrParent = oNode;
+
+        oDlg.innerHTML =
+            '<div class="u4a-dialog__header" data-u4a-draghandle="true">' +
+            '  <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>' +
+            '  <span class="u4aUspCrTitle"></span>' +
+            '  <button type="button" class="u4a-btn-icon js-usp-cr-x" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>' +
+            '<div class="u4a-dialog__body u4aUspCrBody">' +
+            '  <div class="u4aWs30Form">' +
+            '    <div class="u4aWs30FormRow">' +
+            '      <label class="u4aWs30FormLabel">' + sLblName + ':&nbsp;<span style="color:var(--negative)">*</span></label>' +
+            '      <div class="js-usp-cr-name-wrap"></div>' +
+            '    </div>' +
+            '    <div class="u4aWs30FormRow">' +
+            '      <label class="u4aWs30FormLabel">' + sLblDesc + ':</label>' +
+            '      <div class="js-usp-cr-desc-wrap"></div>' +
+            '    </div>' +
+            '    <div class="u4aWs30FormRow">' +
+            '      <label class="u4aWs30FormLabel">' + sLblCharset + ' (ex: utf-8, euc-kr..):</label>' +
+            '      <div class="js-usp-cr-codpg-wrap"></div>' +
+            '    </div>' +
+            '    <div class="u4aWs30FormRow">' +
+            '      <label class="u4aWs30FormLabel">' + sLblFolder + ':</label>' +
+            '      <input type="checkbox" class="js-usp-cr-isfld" style="width:1.125rem;height:1.125rem;accent-color:var(--accent)">' +
+            '    </div>' +
+            '  </div>' +
+            '</div>' +
+            '<div class="u4a-dialog__footer">' +
+            '  <button type="button" class="u4a-btn u4a-btn--primary js-usp-cr-ok"><i class="fa-solid fa-check"></i></button>' +
+            '  <button type="button" class="u4a-btn u4a-btn--negative js-usp-cr-cancel"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>';
+
+        oDlg.querySelector(".u4aUspCrTitle").textContent = sTitle;
+
+        var oFldName  = U4AUI.createField({ placeholder: "" });
+        var oFldDesc  = U4AUI.createField({});
+        var oFldCodpg = U4AUI.createField({ value: "utf-8" });
+        oDlg.querySelector(".js-usp-cr-name-wrap").appendChild(oFldName.el);
+        oDlg.querySelector(".js-usp-cr-desc-wrap").appendChild(oFldDesc.el);
+        oDlg.querySelector(".js-usp-cr-codpg-wrap").appendChild(oFldCodpg.el);
+        oDlg._fldName  = oFldName;
+        oDlg._fldDesc  = oFldDesc;
+        oDlg._fldCodpg = oFldCodpg;
+
+        // Enter → Accept
+        [oFldName.el, oFldDesc.el, oFldCodpg.el].forEach(function (wrap) {
+            wrap.addEventListener("keydown", function (e) {
+                if (e.key === "Enter" && !e.repeat) { _fnCrAccept(oDlg); }
+            });
+        });
+
+        function _close() { oDlg.close(); }
+        oDlg.querySelector(".js-usp-cr-x").addEventListener("click", _close);
+        oDlg.querySelector(".js-usp-cr-cancel").addEventListener("click", _close);
+        oDlg.querySelector(".js-usp-cr-ok").addEventListener("click", function () { _fnCrAccept(oDlg); });
+        oDlg.addEventListener("close", function () {
+            try { APPCOMMON.fnSetModelProperty("/WS30/USPCRT", {}, true); } catch (e) { }
+        });
+
+        document.body.appendChild(oDlg);
+        try { U4AUI.makeDialogResizable(oDlg); } catch (e) { }
+        oDlg.showModal();
+        oAPP.common.fnSetBusyLock("");
+        try { setTimeout(function () { oFldName.el.querySelector("input").focus(); }, 80); } catch (e) { }
+    };
+
+    // Create Accept 핸들러 (구 ev_createUspNodeAcceptEvent)
+    function _fnCrAccept(oDlg) {
+        var oParent = oDlg.__uspCrParent;
+        if (!oParent) { return; }
+        oAPP.common.fnSetBusyLock("X");
+
+        var sName = "", sDesc = "", sCodpg = "utf-8", bFld = false;
+        try { sName  = oDlg._fldName.getValue().trim();     } catch (e) { }
+        try { sDesc  = oDlg._fldDesc.getValue();            } catch (e) { }
+        try { sCodpg = oDlg._fldCodpg.getValue() || "utf-8"; } catch (e) { }
+        try { bFld   = !!oDlg.querySelector(".js-usp-cr-isfld").checked; } catch (e) { }
+
+        var oCrData = { NAME: sName, DESC: sDesc, CODPG: sCodpg, ISFLD: bFld };
+
+        // 입력값 검증
+        var oCheck = _fnCheckCreateNodeData(oCrData);
+        if (oCheck.RETCD === "E") {
+            try { oDlg._fldName.setValueState("Error", oCheck.RTMSG); } catch (e) { }
+            try { oDlg._fldName.focus(); } catch (e) { }
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { parent.CURRWIN.flashFrame(true); } catch (e) { }
+            oAPP.common.fnShowFloatingFooterMsg("E", "WS30", oCheck.RTMSG);
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+        // 중복 이름 체크 (같은 부모 자식 중)
+        var aChildren = Array.isArray(oParent.USPTREE) ? oParent.USPTREE : [];
+        var oDup = aChildren.find(function (n) { return n && n.OBDEC === sName; });
+        if (oDup) {
+            var sDupMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "004");
+            try { oDlg._fldName.setValueState("Error", sDupMsg); } catch (e) { }
+            try { oDlg._fldName.focus(); } catch (e) { }
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { parent.CURRWIN.flashFrame(true); } catch (e) { }
+            oAPP.common.fnShowFloatingFooterMsg("E", "WS30", sDupMsg);
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+        try { oDlg._fldName.setValueState("none", ""); } catch (e) { }
+
+        // 신규 노드 구성 (구 oNewRowData)
+        var oAppData = _model("/WS30/APP") || {};
+        var sKey = oAppData.APPID + "|" + _randomKey();
+        var oNewRow = _fnClearNewNodeData($.extend(true, {}, oParent));
+        oNewRow.PUJKY = oParent.OBJKY;
+        oNewRow.OBJKY = sKey;
+        oNewRow.APPID = oParent.APPID || oAppData.APPID;
+        oNewRow.ISFLD = bFld ? "X" : "";
+        oNewRow.OBDEC = sName;
+        oNewRow.DESCT = sDesc;
+        oNewRow.CODPG = sCodpg;
+        oNewRow.ISSEL = false;
+        oNewRow.SPATH = (oParent.SPATH || "") + "/" + sName;
+        oNewRow.USPTREE = [];
+        if (!bFld) {
+            try { oNewRow.MIME  = parent.MIMETYPES.lookup(sName) || ""; } catch (e) { oNewRow.MIME  = ""; }
+            try { oNewRow.EXTEN = APPCOMMON.fnGetFileExt(sName)  || ""; } catch (e) { oNewRow.EXTEN = ""; }
+        } else {
+            oNewRow.MIME = ""; oNewRow.EXTEN = "";
+        }
+
+        // 평면 트리 + 신규 노드 → 서버 저장(PRCCD="01" Create, AFPRC="_C")
+        var aTree = _model("/WS30/USPTREE") || [];
+        var aFlat = _parseTree2Tab($.extend(true, [], aTree), "USPTREE");
+        aFlat.push(oNewRow);
+
+        oAPP.fn.fnSaveUspWs30({ PRCCD: "01", AFPRC: "_C", TREEDATA: aFlat, _createNode: oNewRow, _parentNode: oParent });
+    }
+
+    // 신규 노드 트리에 반영 + 선택 + 팝업 닫기 (구 _fnCreateUspNode)
+    function _fnAddCreatedNode(oNewRow, oParentNode) {
+        if (!oNewRow || !oParentNode) { oAPP.common.fnSetBusyLock(""); return; }
+        if (!Array.isArray(oParentNode.USPTREE)) { oParentNode.USPTREE = []; }
+        oParentNode.USPTREE.push(oNewRow);
+
+        var aTree = _model("/WS30/USPTREE") || [];
+        APPCOMMON.fnSetModelProperty("/WS30/USPTREE", aTree);
+        try { if (oAPP.fn.fnRenderUspTree) { oAPP.fn.fnRenderUspTree(); } } catch (e) { }
+        try { if (oAPP.fn.fnUspTreeExpandSubtree) { oAPP.fn.fnUspTreeExpandSubtree(oParentNode); } } catch (e) { }
+        // 신규 행 선택 → ajax + 우측 페이지 + busy 해제
+        try { if (oAPP.fn.fnUspTreeTableRowSelect) { oAPP.fn.fnUspTreeTableRowSelect(oNewRow); } } catch (e) { }
+        try { var d = document.getElementById("uspCrNodePopup"); if (d) { d.close(); } } catch (e) { }
     }
 
     // Activate (구 ev_pressActivateBtn = 저장 + IS_ACT)

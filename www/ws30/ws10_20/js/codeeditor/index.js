@@ -45,6 +45,20 @@ window.require(["vs/editor/editor.main"], function () {
         _toParent({ evt: "change" });
     });
 
+    // Shift+F1 = Pretty Print(포맷). ★에디터 한정★ — Monaco 키바인딩이라 에디터에 포커스가
+    //   있을 때만 발화하고 iframe 경계 안에서 처리되어 부모(워크스페이스 단축키)로 새지 않는다.
+    editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F1, function () {
+        try { editor.getAction("editor.action.formatDocument").run(); } catch (e) { }
+    });
+
+    // Ctrl/⌘+S = 저장(팝업 하단 ✓ 기능). ★에디터 한정★ — Monaco 가 Ctrl+S 를 가로채
+    //   브라우저 기본동작/전파를 막으므로, iframe 밖(WS20 화면)의 Ctrl+S 단축키와 충돌하지 않는다.
+    //   실제 저장 로직(T_CEVT/setAppChange/콜백)은 부모에 있으므로 postMessage 로 위임한다.
+    var _KEY_S = (monaco.KeyCode.KeyS != null) ? monaco.KeyCode.KeyS : monaco.KeyCode.KEY_S;
+    editor.addCommand(monaco.KeyMod.CtrlCmd | _KEY_S, function () {
+        _toParent({ evt: "save" });
+    });
+
     // 로드 완료 통지 — 부모는 이 시점에 setValue / focus 수행.
     _toParent({ evt: "ready" });
 

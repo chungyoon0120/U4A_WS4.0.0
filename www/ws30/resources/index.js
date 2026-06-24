@@ -483,7 +483,11 @@ oAPP.views = window?.oAPP?.views || {};
 
             let oWS20APP = sap.ui.getCore().byId("WSAPP");
 
-            if (!oWS20APP && oWS20APP.oToPage.sId != "WS20") {
+            // [HTML5] sap 안전스텁에서 byId→null. 원본 (!oWS20APP && oWS20APP.oToPage.sId…)는
+            //   oWS20APP 가 null 이면 null.oToPage 역참조로 크래시(setAppChange 경로 = CSS/JS/HTML
+            //   에디터 저장 등). 의도(WSAPP 없거나 WS20 페이지 아니면 /WS20/APP 모델 갱신 skip)대로
+            //   || + null 가드로 교정 — UI5(WS20 페이지)에선 기존처럼 갱신, HTML5 에선 조용히 skip.
+            if (!oWS20APP || !oWS20APP.oToPage || oWS20APP.oToPage.sId != "WS20") {
                 return;
             }
 

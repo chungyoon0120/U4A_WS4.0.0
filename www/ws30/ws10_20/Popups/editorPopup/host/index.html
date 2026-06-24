@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>U4A Code Editor</title>
+    <title>U4A Editor Host</title>
 
     <style>
         html,
@@ -18,24 +18,22 @@
             overflow: hidden;
         }
 
-        /* 첫 페인트 플래시 방지 — Monaco(loader→require→create)가 비동기로 마운트되는
-           동안 잘못된 색이 보이지 않도록, 빌트인 테마 배경과 동일한 색을 미리 깐다.
-           ★ 단일 출처 = --boot-bg(아래 인라인 스크립트가 THEME 보고 documentElement 에 세팅).
-             CSS 변수는 상속되므로 html 한 곳만 세팅해도 body/#content 까지 전파된다
-             (이전엔 세 곳에 색을 박고 JS 는 html 만 덮어 라이트 테마서 body 가 검정으로 남았음).
-             폴백(#1e1e1e)은 스크립트 실패 시에만 — 정상 경로는 항상 테마색. */
+        /* 첫 페인트 플래시 방지 — Monaco(loader→require→create)가 비동기 마운트되는 동안
+           잘못된 색이 보이지 않도록 빌트인 테마 배경을 미리 깐다. 단일 출처 = --boot-bg
+           (아래 인라인 스크립트가 THEME 보고 documentElement 에 세팅, 상속으로 전파). */
         html,
         body,
         #content {
             background: var(--boot-bg, #1e1e1e);
         }
 
-        /* 공통 스크롤바(USP 호스트와 동일 톤) — 회색 반투명, hover 시 노출 */
-        .monaco-scrollable-element>.scrollbar {
-            background: transparent !important;
-            z-index: 10;
+        /* CS 검색 하이라이트(원본 ACE cl_findLine 대체) */
+        .u4aEdFindHit {
+            background: rgba(255, 213, 0, 0.35);
+            border-radius: 2px;
         }
 
+        /* 공통 스크롤바 톤(USP/클라이언트 호스트와 동일) */
         .monaco-scrollable-element>.scrollbar>.slider {
             background: rgba(128, 128, 128, 0.3) !important;
             border-radius: 4px !important;
@@ -46,70 +44,56 @@
         .monaco-scrollable-element:hover>.scrollbar>.slider {
             opacity: 1;
         }
-
-        .monaco-scrollable-element>.scrollbar.vertical {
-            width: 6px !important;
-        }
-
-        .monaco-scrollable-element>.scrollbar.horizontal {
-            height: 6px !important;
-        }
     </style>
 
     <script>
 /****************************************************************************
- * 범용 Monaco 코드 에디터 호스트 (U4A Code Editor)
+ * 에디터 시리즈(CSS/JS/HTML) 전용 Monaco 호스트 (editorPopup/host)
  * --------------------------------------------------------------------------
- * USP 호스트(js/usp/monaco)와 **동일한 로드 방식**(loader.js → AMD require
- * (['vs/editor/editor.main']) → monaco.editor.create)을 따르되, USP 전용 상태
- * (getSelectedUspLineData / /WS30 모델 / 스니펫 / 테마콤보 / 하드코딩 IF_USP_EDITOR
- *  통신 DOM / parent.sap.getTheme)에는 **일절 의존하지 않는** 독립 모듈이다.
- *
- *  · 초기 설정은 URL PARAMS({HOSTID, LANG, THEME, READONLY})로,
- *    이후 변경은 부모(팝업)→호스트 postMessage 명령으로 받는다.
- *  · 호스트→부모 통지는 window.parent.postMessage(채널태그 __u4ace + HOSTID)로 한다.
- *  · 현재 값 읽기는 부모가 iframe.contentWindow.editor.getValue() 로 직접(동일 출처 file://).
+ *  ★ 클라이언트 이벤트 에디터의 호스트(js/codeeditor)와는 **별도 분리**된 독립 호스트다
+ *    (사용자 결정 1). 로드 방식은 동일(loader.js → require(['vs/editor/editor.main'])
+ *    → monaco.editor.create)하되, 이 창(editorFrame, BrowserWindow)에 종속된다.
+ *  · 초기 설정 = URL PARAMS({HOSTID, LANG, THEME, READONLY}).
+ *  · 부모(editorFrame)→호스트 명령 = postMessage({__u4aedh, hostId, cmd}).
+ *    setValue/setLanguage/setReadOnly/setTheme/format/focus/layout/find.
+ *  · 호스트→부모 통지 = window.parent.postMessage({__u4aedh, hostId, evt}).
+ *  · 모나코 경로는 부모(editorFrame) 전역 PATH/APPPATH 에서 해석(iframe 은 node require 비의존).
  ****************************************************************************/
-        const oAPP = {};
+        var oAPP = {};
         oAPP.attr = {};
 
-        // 할아버지(최상위) 객체 — 모나코 lib 절대경로 해석용.
-        //   (USP 호스트와 동일 깊이: iframe → WS 프레임(ws10_20) → top. parent.parent = top)
-        const GRAND_FATHER = parent.parent;
-        const PATH = GRAND_FATHER.PATH;
+        // 부모(editorFrame 창) — node 파생 경로 보유.
+        var GF = window.parent;
+        var PATH = GF.PATH;
+        var APPPATH = GF.APPPATH;
 
-        // 모나코 라이브러리 경로(USP 호스트와 동일 — APPPATH/lib/monaco/vs).
-        const MONACO_LIB_PATH = PATH.join(GRAND_FATHER.APPPATH, "lib", "monaco");
-        const MONACO_VS_ROOT_PATH = PATH.join(MONACO_LIB_PATH, "vs");
-        const MONACO_LOADER_PATH = PATH.join(MONACO_VS_ROOT_PATH, "loader.js");
+        var MONACO_VS_ROOT_PATH = PATH.join(APPPATH, "lib", "monaco", "vs");
+        var MONACO_LOADER_PATH = PATH.join(MONACO_VS_ROOT_PATH, "loader.js");
 
         // URL PARAMS 파싱 — { HOSTID, LANG, THEME, READONLY }
-        const oURL = new URL(location.href);
-        let oPARAMS = {};
+        var oURL = new URL(location.href);
+        var oPARAMS = {};
         try { oPARAMS = JSON.parse(oURL.searchParams.get("PARAMS") || "{}"); }
         catch (e) { oPARAMS = {}; }
 
-        oAPP.attr.HOSTID = oPARAMS.HOSTID || "U4ACE";
+        oAPP.attr.HOSTID = oPARAMS.HOSTID || "U4AEDH";
         oAPP.attr.LANG = oPARAMS.LANG || "javascript";
         oAPP.attr.THEME = oPARAMS.THEME || "vs-dark";
         oAPP.attr.READONLY = (oPARAMS.READONLY === true || oPARAMS.READONLY === "X");
 
-        // 첫 페인트 플래시 방지(이어서) — 실제 THEME 에 맞춰 부트 배경(--boot-bg)을 즉시 동기화.
-        //   라이트 테마(vs)면 흰색, hc-black 이면 검정, 그 외(vs-dark)는 #1e1e1e.
-        //   <html> 은 head 스크립트 시점에 이미 존재하고 CSS 변수는 상속되므로,
-        //   여기서 documentElement 에 한 번 세팅하면 body/#content 까지 첫 페인트 전에 전파된다.
+        // 첫 페인트 플래시 방지 — THEME 에 맞춰 부트 배경 즉시 동기화(이름이 dark 로 끝나면 다크).
         (function () {
-            var bg = "#1e1e1e";                                   // vs-dark
+            var bg = "#1e1e1e";
             if (/(^|-)vs$/.test(oAPP.attr.THEME) || /light/i.test(oAPP.attr.THEME)) { bg = "#ffffff"; }
             else if (/hc-black/i.test(oAPP.attr.THEME)) { bg = "#000000"; }
             try { document.documentElement.style.setProperty("--boot-bg", bg); } catch (e) { }
         })();
 
-        // 호스트 → 부모 통지(채널 태그 + HOSTID 로 식별).
+        // 호스트 → 부모 통지.
         function _toParent(oMsg) {
             try {
                 oMsg = oMsg || {};
-                oMsg.__u4ace = true;
+                oMsg.__u4aedh = true;
                 oMsg.hostId = oAPP.attr.HOSTID;
                 window.parent.postMessage(oMsg, "*");
             } catch (e) { }
@@ -118,18 +102,15 @@
         // 부모 → 호스트 명령 수신.
         window.addEventListener("message", function (oEvent) {
             var d = oEvent && oEvent.data;
-            if (!d || d.__u4ace !== true) { return; }
-            // 자기 HOSTID 대상만(여러 에디터 공존 대비).
+            if (!d || d.__u4aedh !== true) { return; }
             if (d.hostId && d.hostId !== oAPP.attr.HOSTID) { return; }
             if (!window.editor) { return; }
 
             switch (d.cmd) {
                 case "setValue":
-                    // 외부 주입 변경은 change 통지에서 제외하도록 플래그.
                     editor._u4aExternal = true;
                     editor.setValue(typeof d.value === "string" ? d.value : "");
-                    // 값 주입(=새 내용 로드/재오픈)은 뷰를 처음 위치로 리셋한다. 에디터 인스턴스를
-                    // 재사용하므로, 안 하면 이전 스크롤/커서가 남아 "처음 연 것"처럼 안 보인다.
+                    // 값 주입(=새 내용 로드) 시 뷰를 처음 위치로.
                     try {
                         editor.setPosition({ lineNumber: 1, column: 1 });
                         editor.setScrollTop(0);
@@ -161,12 +142,33 @@
                     try { editor.layout(); } catch (e) { }
                     return;
 
+                case "find":
+                    // CS 검색 하이라이트 — 공백 구분 토큰(클래스명) 전부 데코레이션(원본 ACE 마커 대체).
+                    try {
+                        var oModel = editor.getModel();
+                        var aDecos = [];
+                        var sVal = (typeof d.value === "string") ? d.value : "";
+                        var aTok = sVal.split(/\s+/);
+                        var oFirst = null;
+                        for (var i = 0; i < aTok.length; i++) {
+                            if (!aTok[i]) { continue; }
+                            var aM = oModel.findMatches(aTok[i], true, false, false, null, false);
+                            for (var j = 0; j < aM.length; j++) {
+                                aDecos.push({ range: aM[j].range, options: { inlineClassName: "u4aEdFindHit" } });
+                                if (!oFirst) { oFirst = aM[j].range; }
+                            }
+                        }
+                        editor._u4aFindDecos = editor.deltaDecorations(editor._u4aFindDecos || [], aDecos);
+                        if (oFirst) { editor.revealRangeInCenter(oFirst); }
+                    } catch (e) { }
+                    return;
+
                 default:
                     return;
             }
         });
 
-        // 로더(loader.js) 로드 완료 → 본체(index.js) 로드.
+        // 로더 로드 완료 → 본체(index.js) 로드.
         function onLoad() {
             var s = document.createElement("script");
             s.src = "index.js";

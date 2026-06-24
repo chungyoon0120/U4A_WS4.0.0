@@ -4,56 +4,46 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- Window Text Search 팝업(별도 BrowserWindow) — HTML5 변환.
+         원본 UI5(sap.m) 뷰를 공통 컴포넌트(.u4a-field/.u4a-btn-icon)로 대체.
+         스택은 최소(FA/tokens/shell/theme-api/u4a-ui) — Bootstrap 컴포넌트 미사용.
+         경로: Popup/ 기준 → theme=../../../theme, lib=../../../../../lib. theme-api 는
+         자기 script src 로 THEME_DIR 자동해석(경로 독립). -->
+    <link rel="stylesheet" href="../../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="../../../theme/tokens.css">
+    <link rel="stylesheet" href="../../../theme/shell.css">
+    <script src="../../../theme/theme-api.js"></script>
+    <script src="../../../theme/u4a-ui.js"></script>
 
     <style>
-  
-        /* 전체 Busy Indicator 테두리 없애기 */
-        .sapUiLocalBusyIndicator:focus:after {
-            border: 0px !important;
+        /* ★ 창은 투명(opener transparent:true) — html/body 도 투명이라 둥근 바만 떠 보인다.
+           바 둘레에 약간의 투명 여백을 둬서 둥근 모서리·그림자가 창 가장자리에 안 잘리게. */
+        html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+        body { box-sizing: border-box; padding: 3px 5px; }
+
+        .u4aTxtSrchWin {
+            display: flex; align-items: center; gap: .25rem;
+            height: 100%; box-sizing: border-box; padding: .25rem .5rem;
+            background: var(--surface-raised, var(--surface));
+            border: .0625rem solid var(--divider, var(--line));
+            border-radius: .5rem;
+            box-shadow: 0 .125rem .5rem rgba(0, 0, 0, .28);
         }
-
-        .sapUiTableCell:focus::before {
-            border: 0px !important;
-            outline: none !important;
-        }
-
-        .sapUiBLy {
-            background-color: transparent !important;
-        }
-
-        .u4aTextSearchToolbar {
-            /* border-radius: 0.5rem;
-            border: 1px solid #000000; */
-
-            border-bottom: 0px !important;     
-            border-radius: 0.5rem;  
-            padding-left: 0.5rem !important;     
-            
-        }
-
-        .u4aTextSearchToolbarWapper {
-            border: 1px solid #000000;
-            border-radius: 0.5rem;
-            padding: 0.1rem;
-        }
-
+        .u4aTxtSrchWin .u4aTxtSrchField { flex: 1 1 auto; min-width: 0; }
+        .u4aTxtSrchWin__count { flex: 0 0 auto; min-width: 3rem; text-align: center; font-size: .75rem; color: var(--text-muted); }
+        .u4aTxtSrchWin__sep { flex: 0 0 auto; width: .0625rem; height: 1.25rem; background: var(--line); margin: 0 .15rem; }
     </style>
 </head>
 
+<body>
 
-<body class="sapUiBody">
-
-    <div id="content" style="display: none;"></div>  
+    <div id="u4aTxtSrch"></div>
 
     <script>
-
-        let oScr = document.createElement("script");
-            oScr.src = "frame.js";
-
-            document.body.appendChild(oScr);
-
+        var oScr = document.createElement("script");
+        oScr.src = "frame.js";
+        document.body.appendChild(oScr);
     </script>
 
 </body>

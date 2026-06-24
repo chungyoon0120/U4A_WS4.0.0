@@ -81,7 +81,260 @@
   }
 
   /************************************************************************
-   * 클라이언트 이벤트 에디터 팝업 열기
+   * 단일 인스턴스(원본 UI5 동일) — 다이얼로그+Monaco 호스트를 1회 생성 후 재사용한다.
+   * ----------------------------------------------------------------------
+   *  ★ 안정성: 열 때마다 iframe+Monaco 를 새로 만들고 파기하면(구 변환) Monaco 의 워커/모듈
+   *    그래프가 매번 churn 되어 반복 open/close 시 렌더러가 행 걸린다. 원본은 sap core 에
+   *    다이얼로그 1개만 만들고 재오픈했다 → 여기서도 캐시(oUI)를 두고 재사용한다.
+   *    열기 = 값/언어/readonly 갱신 + showModal, 닫기 = close()(숨김, 제거 X).
+   *  · 버튼/메시지/테마 핸들러는 closure 가 아니라 가변 상태(oState)를 읽어 재사용에 견딘다.
+   *  · 영속 리스너(message/u4a-theme-changed)는 다이얼로그 수명과 같아 1회만 등록(누적 없음).
+   ************************************************************************/
+
+  // 단일 캐시(생성 후 세션 동안 유지) + 현재 open 의 가변 상태.
+  var oUI = null;            // { dlg, frame, headerTitle, prettyBtn, saveBtn, delBtn, ready }
+  var oState = { sObjTy: C_JS, sObjId: "", sLang: "javascript", bEdit: false, fnCallback: null };
+  var iWatch = null;         // 최초 로드 busy 워치독.
+
+  // busy/단축키 잠금(최초 로드 동안만 — 재사용 open 은 즉시라 불필요).
+  var bBusy = false;
+  function lf_busyOn() {
+    if (bBusy) { return; }
+    bBusy = true;
+    try { parent.setBusy("X"); } catch (e) { }
+    try { oAPP.fn.setShortcutLock(true); } catch (e) { }
+  }
+  function lf_busyOff() {
+    if (!bBusy) { return; }
+    bBusy = false;
+    try { parent.setBusy(""); } catch (e) { }
+    try { oAPP.fn.setShortcutLock(false); } catch (e) { }
+  }
+
+  // 호스트(iframe)로 명령 전송.
+  function lf_toHost(oMsg) {
+    try {
+      oMsg = oMsg || {};
+      oMsg.__u4ace = true;
+      oMsg.hostId = C_HOSTID;
+      if (oUI && oUI.frame && oUI.frame.contentWindow) { oUI.frame.contentWindow.postMessage(oMsg, "*"); }
+    } catch (e) { }
+  }
+
+  // 현재 스크립트 값(T_CEVT 에서 OBJID/OBJTY 매칭) — 상태는 oState 에서 읽는다.
+  function lf_getScriptData() {
+    try {
+      var a = _ensureCevt();
+      var o = a.find(function (x) { return x && x.OBJID === oState.sObjId && x.OBJTY === oState.sObjTy; });
+      return (o && typeof o.DATA === "string") ? o.DATA : "";
+    } catch (e) { return ""; }
+  }
+
+  function lf_readEditor() {
+    try { return oUI.frame.contentWindow.editor.getValue(); } catch (e) { return null; }
+  }
+
+  function lf_toastSaved() {
+    // 002 Saved success
+    try { parent.showMessage(null, 10, "S", _txt("/U4A/MSG_WS", "002")); } catch (e) { }
+  }
+
+  // 저장(원본 ev_pressClientEditorSave 1:1) — 상태는 oState 에서 읽는다.
+  function lf_save() {
+    var sVal = lf_readEditor();
+    if (sVal === null) { return; }   // 에디터 미준비.
+
+    var aCevt = _ensureCevt();
+    var iIdx = aCevt.findIndex(function (x) { return x && x.OBJID === oState.sObjId && x.OBJTY === oState.sObjTy; });
+
+    if (sVal === "") {
+      // 입력값 없음 — 기존 라인 있으면 삭제.
+      if (iIdx >= 0) {
+        aCevt.splice(iIdx, 1);
+        try { parent.setAppChange("X"); } catch (e) { }
+      }
+      lf_toastSaved();
+      if (typeof oState.fnCallback === "function") { try { oState.fnCallback(""); } catch (e) { } }
+      return;
+    }
+
+    // 입력값 있음 — upsert.
+    if (iIdx >= 0) {
+      aCevt[iIdx].DATA = sVal;
+      aCevt[iIdx].OBJTY = oState.sObjTy;
+    } else {
+      aCevt.push({ OBJID: oState.sObjId, OBJTY: oState.sObjTy, DATA: sVal });
+    }
+    try { parent.setAppChange("X"); } catch (e) { }
+    lf_toastSaved();
+    if (typeof oState.fnCallback === "function") { try { oState.fnCallback("X"); } catch (e) { } }
+  }
+
+  // 삭제(원본 ev_pressClientEditorDel) — 에디터 내용만 비움.
+  function lf_clear() { lf_toHost({ cmd: "setValue", value: "" }); }
+
+  // 팝업 닫기 — ★제거하지 않고 숨기기만★(재사용). busy 해제. 리스너/iframe 은 유지.
+  function lf_close() {
+    try { clearTimeout(iWatch); } catch (e) { }
+    lf_busyOff();
+    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+  }
+
+  // 현재 oState 를 에디터에 반영(언어/readonly/값/포커스).
+  function lf_applyContent() {
+    lf_toHost({ cmd: "setLanguage", language: oState.sLang });
+    lf_toHost({ cmd: "setReadOnly", readOnly: !oState.bEdit });
+    lf_toHost({ cmd: "setValue", value: lf_getScriptData() });
+    if (oState.bEdit) { lf_toHost({ cmd: "focus" }); }
+  }
+
+  // 호스트 → 팝업 메시지(ready/change). 자기 HOSTID 만.
+  function lf_onMessage(oEvent) {
+    var d = oEvent && oEvent.data;
+    if (!d || d.__u4ace !== true || d.hostId !== C_HOSTID) { return; }
+    if (d.evt === "ready") {
+      if (oUI) { oUI.ready = true; }
+      try { clearTimeout(iWatch); } catch (e) { }
+      lf_applyContent();   // 최초 로드 완료 → 현재 oState 기준 값/포커스 주입.
+      lf_busyOff();
+      return;
+    }
+    if (d.evt === "save") {
+      // 에디터 한정 Ctrl+S → 저장(✓) 위임. 편집모드일 때만(표시모드는 ✓ 자체가 숨김 = 저장 불가).
+      if (oState.bEdit) { lf_save(); }
+      return;
+    }
+  }
+
+  // ── 라이브 테마 변경 → Monaco 테마 동기화 ─────────────────────────
+  //   다이얼로그(.u4a-dialog)는 토큰 CSS 라 자동 재테마되지만, Monaco 는 생성 시 테마를 한 번만
+  //   받으므로 다른 곳에서 테마를 바꿔도 에디터만 안 바뀌던 문제. U4ATheme.apply 가 발행하는
+  //   'u4a-theme-changed'(detail.name)를 구독해 setTheme 전송.
+  //   ★ 테마 CSS 는 비동기 로드라 이벤트 시점의 body 휘도는 부정확 → 테마 '이름'으로 판정
+  //     (이름이 dark 로 끝나면 vs-dark, 아니면 vs).
+  //   ★ 정책 주의: 이 에디터는 개인화 설정이 없어 워크스페이스 테마를 '추종한다'(O).
+  //     반면 WS30 USP 코드 에디터는 사용자가 테마 콤보로 고른 개인화 설정이 있어
+  //     테마를 추종하지 않는다(X, 의도적 — ws_fn_ipc.js fnIpcMain_if_p13n_themeChange 주석).
+  //     근거: .analy/12_테마_컨버전_전략.md §5.3. 새 에디터 추가 시 개인화 유무로 정책 결정.
+  function lf_monacoThemeOf(sName) {
+    return (typeof sName === "string" && /dark$/i.test(sName)) ? "vs-dark" : "vs";
+  }
+  function lf_onThemeChange(oEvt) {
+    var sName = (oEvt && oEvt.detail && oEvt.detail.name) || "";
+    lf_toHost({ cmd: "setTheme", theme: lf_monacoThemeOf(sName) });
+  }
+
+  /************************************************************************
+   * 다이얼로그 + Monaco 호스트 1회 생성(이후 재사용). oState 가 현재 값을 보유한 상태에서 호출.
+   ************************************************************************/
+  function lf_build() {
+
+    lf_ensureStyle();
+
+    var oDlg = document.createElement("dialog");
+    oDlg.id = C_DLG_ID;
+    oDlg.className = "u4a-dialog u4aCliEdDlg";
+
+    // 헤더 — syntax(code) 아이콘 + "{TITLE} -- {OBJID}" + 닫기(X). 제목은 open 마다 갱신.
+    var oHeader = _el("div", "u4a-dialog__header");
+    oHeader.setAttribute("data-type", "I");
+    oHeader.innerHTML = _fa("code") + "<span></span>";
+    var oHeaderTitle = oHeader.querySelector("span");
+
+    var oXBtn = _el("button", "u4a-btn-icon");
+    oXBtn.type = "button";
+    oXBtn.setAttribute("data-act", "close");
+    oXBtn.innerHTML = _fa("xmark");
+    oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
+    oXBtn.addEventListener("click", function () { lf_close(); });
+    oHeader.appendChild(oXBtn);
+    oDlg.appendChild(oHeader);
+
+    // 바디 — Monaco 호스트 iframe(1회 로드).
+    var oBody = _el("div", "u4a-dialog__body u4aCliEdBody");
+    var oFrame = document.createElement("iframe");
+    oFrame.className = "u4aCliEdFrame";
+    oFrame.setAttribute("frameborder", "0");
+    var oQuery = encodeURIComponent(JSON.stringify({
+      HOSTID: C_HOSTID,
+      LANG: oState.sLang,
+      THEME: _editorTheme(),
+      READONLY: !oState.bEdit
+    }));
+    // iframe src — USP 호스트와 동일하게 PATHINFO(JS_ROOT) 기준 절대경로로 구성(베이스 태그/문서 URL 차이에 견고).
+    var sHostSrc;
+    try {
+      var _PATH = parent.PATH;
+      var _PATHINFO = parent.require(_PATH.join(parent.APPPATH, "ws30", "resources", "pathInfo.js"));
+      sHostSrc = _PATH.join(_PATHINFO.JS_ROOT, "codeeditor", "index.html");
+    } catch (e) {
+      sHostSrc = "./js/codeeditor/index.html";   // 폴백(상대 — 문서 base 가 ws10_20/index.html 일 때).
+    }
+    oFrame.src = sHostSrc + "?PARAMS=" + oQuery;
+    oBody.appendChild(oFrame);
+    oDlg.appendChild(oBody);
+
+    // 푸터 — 원본(UI5) 1:1: 왼쪽 "꾸밈정렬"(아이콘+텍스트) ···· 오른쪽 [Save 파랑][Delete 빨강][Close Reject](아이콘만).
+    //   원본 버튼 타입 매핑: Pretty=아이콘+텍스트(투명) / Save=Emphasized(파랑 채움) / Delete=Negative(빨강 채움) / Close=Reject(옅은 빨강).
+    //   편집모드 가시성(hidden)은 open 마다 갱신(여기선 생성만).
+    var oFoot = _el("div", "u4a-dialog__footer u4aCliEdFoot");
+
+    var oPrettyBtn = _el("button", "u4a-btn u4aCliEdPretty");
+    oPrettyBtn.type = "button";
+    oPrettyBtn.innerHTML = _fa("wand-magic-sparkles") + "<span></span>";
+    oPrettyBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "C25");   // Pretty Print(꾸밈정렬)
+    oPrettyBtn.title = _txt("/U4A/CL_WS_COMMON", "C25") + " (Shift+F1)";   // 단축키 안내(에디터 한정)
+    oPrettyBtn.addEventListener("click", function () { lf_toHost({ cmd: "format" }); });
+    oFoot.appendChild(oPrettyBtn);
+
+    oFoot.appendChild(_el("span", "u4aCliEdFootSpacer"));
+
+    var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aCliEdIcoBtn");
+    oSaveBtn.type = "button";
+    oSaveBtn.innerHTML = _fa("check");
+    oSaveBtn.title = _txt("/U4A/CL_WS_COMMON", "A64") + " (Ctrl+S)";   // Save + 단축키 안내(에디터 한정)
+    oSaveBtn.addEventListener("click", function () { lf_save(); });
+    oFoot.appendChild(oSaveBtn);
+
+    var oDelBtn = _el("button", "u4a-btn u4aCliEdIcoBtn u4aCliEdDel");
+    oDelBtn.type = "button";
+    oDelBtn.innerHTML = _fa("trash");
+    oDelBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete
+    oDelBtn.addEventListener("click", function () { lf_clear(); });
+    oFoot.appendChild(oDelBtn);
+
+    var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aCliEdIcoBtn u4aCliEdClose");
+    oCloseBtn.type = "button";
+    oCloseBtn.innerHTML = _fa("xmark");
+    oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
+    oCloseBtn.addEventListener("click", function () { lf_close(); });
+    oFoot.appendChild(oCloseBtn);
+
+    oDlg.appendChild(oFoot);
+
+    // ESC → 닫기(숨김).
+    oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
+
+    // 헤더 드래그(전역 위임) / 더블클릭 리센터 / 우하단 grip 리사이즈 — 전 팝업 공통.
+    if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
+    if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 420, minH: 280 }); }
+
+    document.body.appendChild(oDlg);
+
+    // 영속 리스너 — 다이얼로그가 세션 동안 살아있으므로 1회만 등록(누적 없음).
+    window.addEventListener("message", lf_onMessage);
+    //  발행 window 가 WS20 프레임/셸 중 어디일지 확정적이지 않아 둘 다 구독(file:// 동일 출처).
+    try { window.addEventListener("u4a-theme-changed", lf_onThemeChange); } catch (e) { }
+    try { if (window.parent) { window.parent.addEventListener("u4a-theme-changed", lf_onThemeChange); } } catch (e) { }
+
+    oUI = {
+      dlg: oDlg, frame: oFrame, headerTitle: oHeaderTitle,
+      prettyBtn: oPrettyBtn, saveBtn: oSaveBtn, delBtn: oDelBtn, ready: false
+    };
+  }
+
+  /************************************************************************
+   * 클라이언트 이벤트 에디터 팝업 열기(공개 진입점) — 캐시 재사용.
    * **********************************************************************
    * @param {String}   sObjTy    "JS"(=C_JS) 또는 "HM"(=C_HTML)
    * @param {String}   sObjId    클라이언트 스크립트 ID(= OBJID + UIASN)
@@ -105,235 +358,36 @@
       sLang = "javascript";
     }
 
-    // 이미 열려 있으면 중복 생성 방지(기존 것 제거 후 재생성 — 항상 최신 데이터로).
-    var oOld = document.getElementById(C_DLG_ID);
-    if (oOld) { try { oOld.close(); } catch (e) { } try { oOld.remove(); } catch (e) { } }
+    // 현재 open 상태 갱신(핸들러들이 여기서 읽음).
+    oState.sObjTy = sObjTy;
+    oState.sObjId = sObjId;
+    oState.sLang = sLang;
+    oState.bEdit = bEdit;
+    oState.fnCallback = fnCallback;
 
-    lf_ensureStyle();
-
-    // busy on + 단축키 잠금(에디터 로드 동안).
-    try { parent.setBusy("X"); } catch (e) { }
-    try { oAPP.fn.setShortcutLock(true); } catch (e) { }
-
-    var bReleased = false;
-    function lf_release() {
-      if (bReleased) { return; }
-      bReleased = true;
-      try { parent.setBusy(""); } catch (e) { }
-      try { oAPP.fn.setShortcutLock(false); } catch (e) { }
+    // 최초 1회만 생성(혹시 DOM 에서 사라졌으면 재생성).
+    if (!oUI || !document.body.contains(oUI.dlg)) {
+      oUI = null;
+      lf_build();
     }
 
-    // ── 다이얼로그 골격 ───────────────────────────────────────────────
-    var oDlg = document.createElement("dialog");
-    oDlg.id = C_DLG_ID;
-    oDlg.className = "u4a-dialog u4aCliEdDlg";
+    // 헤더 제목 / 편집모드 버튼 가시성 갱신.
+    oUI.headerTitle.textContent = sTitle + " -- " + sObjId;
+    oUI.prettyBtn.hidden = !bEdit;
+    oUI.saveBtn.hidden = !bEdit;
+    oUI.delBtn.hidden = !bEdit;
 
-    // 헤더 — syntax(code) 아이콘 + "{TITLE} -- {OBJID}" + 닫기(X).
-    var oHeader = _el("div", "u4a-dialog__header");
-    oHeader.setAttribute("data-type", "I");
-    oHeader.innerHTML = _fa("code") + "<span></span>";
-    oHeader.querySelector("span").textContent = sTitle + " -- " + sObjId;
-
-    var oXBtn = _el("button", "u4a-btn-icon");
-    oXBtn.type = "button";
-    oXBtn.setAttribute("data-act", "close");
-    oXBtn.innerHTML = _fa("xmark");
-    oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
-    oXBtn.addEventListener("click", function () { lf_close(); });
-    oHeader.appendChild(oXBtn);
-    oDlg.appendChild(oHeader);
-
-    // 바디 — Monaco 호스트 iframe.
-    var oBody = _el("div", "u4a-dialog__body u4aCliEdBody");
-    var oFrame = document.createElement("iframe");
-    oFrame.className = "u4aCliEdFrame";
-    oFrame.setAttribute("frameborder", "0");
-    var oQuery = encodeURIComponent(JSON.stringify({
-      HOSTID: C_HOSTID,
-      LANG: sLang,
-      THEME: _editorTheme(),
-      READONLY: !bEdit
-    }));
-    // iframe src — USP 호스트와 동일하게 PATHINFO(JS_ROOT) 기준 절대경로로 구성(베이스 태그/문서 URL 차이에 견고).
-    var sHostSrc;
-    try {
-      var _PATH = parent.PATH;
-      var _PATHINFO = parent.require(_PATH.join(parent.APPPATH, "ws30", "resources", "pathInfo.js"));
-      sHostSrc = _PATH.join(_PATHINFO.JS_ROOT, "codeeditor", "index.html");
-    } catch (e) {
-      sHostSrc = "./js/codeeditor/index.html";   // 폴백(상대 — 문서 base 가 ws10_20/index.html 일 때).
-    }
-    oFrame.src = sHostSrc + "?PARAMS=" + oQuery;
-    oBody.appendChild(oFrame);
-    oDlg.appendChild(oBody);
-
-    // 푸터 — 원본(UI5) 1:1: 왼쪽 "꾸밈정렬"(텍스트만) ···· 오른쪽 [Save 파랑][Delete 빨강][Close Reject](아이콘만).
-    //   원본 버튼 타입 매핑: Pretty=아이콘+텍스트(투명) / Save=Emphasized(파랑 채움) / Delete=Negative(빨강 채움) / Close=Reject(옅은 빨강).
-    //   아이콘 전용 3개는 title 로 의미 보강(메시지 키: A64/A03/A39).
-    var oFoot = _el("div", "u4a-dialog__footer u4aCliEdFoot");
-
-    // ── 왼쪽: Pretty Print(C25) — 아이콘 + 텍스트(투명 톤) ──
-    var oPrettyBtn = _el("button", "u4a-btn u4aCliEdPretty");
-    oPrettyBtn.type = "button";
-    oPrettyBtn.innerHTML = _fa("wand-magic-sparkles") + "<span></span>";
-    oPrettyBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "C25");   // Pretty Print(꾸밈정렬)
-    oPrettyBtn.hidden = !bEdit;
-    oPrettyBtn.addEventListener("click", function () { lf_toHost({ cmd: "format" }); });
-    oFoot.appendChild(oPrettyBtn);
-
-    // ── 왼/오 그룹 분리 스페이서 ──
-    oFoot.appendChild(_el("span", "u4aCliEdFootSpacer"));
-
-    // ── 오른쪽: 아이콘 전용 결정 버튼 3개 ──
-    // Save — Emphasized(파랑 채움).
-    var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aCliEdIcoBtn");
-    oSaveBtn.type = "button";
-    oSaveBtn.innerHTML = _fa("check");
-    oSaveBtn.title = _txt("/U4A/CL_WS_COMMON", "A64");   // Save
-    oSaveBtn.hidden = !bEdit;
-    oSaveBtn.addEventListener("click", function () { lf_save(); });
-    oFoot.appendChild(oSaveBtn);
-
-    // Delete — Negative(빨강 채움). 에디터 내용 비움(실제 T_CEVT 삭제는 빈 내용 Save 시점, 원본 동일).
-    var oDelBtn = _el("button", "u4a-btn u4aCliEdIcoBtn u4aCliEdDel");
-    oDelBtn.type = "button";
-    oDelBtn.innerHTML = _fa("trash");
-    oDelBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete
-    oDelBtn.hidden = !bEdit;
-    oDelBtn.addEventListener("click", function () { lf_clear(); });
-    oFoot.appendChild(oDelBtn);
-
-    // Close — Reject(옅은 빨강 + 빨강 X). 항상 노출.
-    var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aCliEdIcoBtn u4aCliEdClose");
-    oCloseBtn.type = "button";
-    oCloseBtn.innerHTML = _fa("xmark");
-    oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
-    oCloseBtn.addEventListener("click", function () { lf_close(); });
-    oFoot.appendChild(oCloseBtn);
-
-    oDlg.appendChild(oFoot);
-
-    // ── 호스트(iframe) ↔ 팝업 통신 ────────────────────────────────────
-    function lf_toHost(oMsg) {
-      try {
-        oMsg = oMsg || {};
-        oMsg.__u4ace = true;
-        oMsg.hostId = C_HOSTID;
-        if (oFrame.contentWindow) { oFrame.contentWindow.postMessage(oMsg, "*"); }
-      } catch (e) { }
-    }
-
-    // 호스트 → 팝업 메시지(ready/change). 자기 HOSTID 만.
-    function lf_onMessage(oEvent) {
-      var d = oEvent && oEvent.data;
-      if (!d || d.__u4ace !== true || d.hostId !== C_HOSTID) { return; }
-      if (d.evt === "ready") {
-        // 에디터 로드 완료 → 현재 스크립트 값 주입 + 포커스 + busy 해제.
-        lf_toHost({ cmd: "setValue", value: lf_getScriptData() });
-        if (bEdit) { lf_toHost({ cmd: "focus" }); }
-        lf_release();
-      }
-    }
-    window.addEventListener("message", lf_onMessage);
-
-    // ── 라이브 테마 변경 → Monaco 테마 동기화 ─────────────────────────
-    //   다이얼로그(.u4a-dialog)는 토큰 CSS 라 자동 재테마되지만, Monaco 는 생성 시 테마를 한 번만
-    //   받으므로 다른 곳에서 테마를 바꿔도 에디터만 안 바뀌던 문제. U4ATheme.apply 가 발행하는
-    //   'u4a-theme-changed'(detail.name)를 구독해 setTheme 전송.
-    //   ★ 테마 CSS 는 비동기 로드라 이벤트 시점의 body 휘도는 부정확 → 테마 '이름'으로 판정
-    //     (이름이 dark 로 끝나면 vs-dark, 아니면 vs).
-    //   ★ 정책 주의: 이 에디터는 개인화 설정이 없어 워크스페이스 테마를 '추종한다'(O).
-    //     반면 WS30 USP 코드 에디터는 사용자가 테마 콤보로 고른 개인화 설정이 있어
-    //     테마를 추종하지 않는다(X, 의도적 — ws_fn_ipc.js fnIpcMain_if_p13n_themeChange 주석).
-    //     근거: .analy/12_테마_컨버전_전략.md §5.3. 새 에디터 추가 시 개인화 유무로 정책 결정.
-    function lf_monacoThemeOf(sName) {
-      return (typeof sName === "string" && /dark$/i.test(sName)) ? "vs-dark" : "vs";
-    }
-    function lf_onThemeChange(oEvt) {
-      var sName = (oEvt && oEvt.detail && oEvt.detail.name) || "";
-      lf_toHost({ cmd: "setTheme", theme: lf_monacoThemeOf(sName) });
-    }
-    //  발행 window 가 WS20 프레임/셸 중 어디일지 확정적이지 않아 둘 다 구독(file:// 동일 출처).
-    try { window.addEventListener("u4a-theme-changed", lf_onThemeChange); } catch (e) { }
-    try { if (window.parent) { window.parent.addEventListener("u4a-theme-changed", lf_onThemeChange); } } catch (e) { }
-
-    // 에디터 로드가 지연/실패해도 busy 가 영구히 걸리지 않도록 워치독(원본엔 없던 HTML5 안전장치).
-    var iWatch = setTimeout(function () { lf_release(); }, 8000);
-
-    // ── 데이터 입출력(원본 fnGetClientJsData / Save / Del) ────────────
-    function lf_getScriptData() {
-      try {
-        var a = _ensureCevt();
-        var o = a.find(function (x) { return x && x.OBJID === sObjId && x.OBJTY === sObjTy; });
-        return (o && typeof o.DATA === "string") ? o.DATA : "";
-      } catch (e) { return ""; }
-    }
-
-    function lf_readEditor() {
-      try { return oFrame.contentWindow.editor.getValue(); } catch (e) { return null; }
-    }
-
-    // 저장(원본 ev_pressClientEditorSave 1:1).
-    function lf_save() {
-      var sVal = lf_readEditor();
-      if (sVal === null) { return; }   // 에디터 미준비.
-
-      var aCevt = _ensureCevt();
-      var iIdx = aCevt.findIndex(function (x) { return x && x.OBJID === sObjId && x.OBJTY === sObjTy; });
-
-      if (sVal === "") {
-        // 입력값 없음 — 기존 라인 있으면 삭제.
-        if (iIdx >= 0) {
-          aCevt.splice(iIdx, 1);
-          try { parent.setAppChange("X"); } catch (e) { }
-        }
-        lf_toastSaved();
-        if (typeof fnCallback === "function") { try { fnCallback(""); } catch (e) { } }
-        return;
-      }
-
-      // 입력값 있음 — upsert.
-      if (iIdx >= 0) {
-        aCevt[iIdx].DATA = sVal;
-        aCevt[iIdx].OBJTY = sObjTy;
-      } else {
-        aCevt.push({ OBJID: sObjId, OBJTY: sObjTy, DATA: sVal });
-      }
-      try { parent.setAppChange("X"); } catch (e) { }
-      lf_toastSaved();
-      if (typeof fnCallback === "function") { try { fnCallback("X"); } catch (e) { } }
-    }
-
-    // 삭제(원본 ev_pressClientEditorDel) — 에디터 내용만 비움.
-    function lf_clear() {
-      lf_toHost({ cmd: "setValue", value: "" });
-    }
-
-    function lf_toastSaved() {
-      //002	Saved success
-      try { parent.showMessage(null, 10, "S", _txt("/U4A/MSG_WS", "002")); } catch (e) { }
-    }
-
-    // 팝업 종료.
-    function lf_close() {
+    if (oUI.ready) {
+      // 재사용 — 즉시 언어/readonly/값 반영(로드 없음 → busy 불필요, 플래시 없음).
+      lf_applyContent();
+    } else {
+      // 최초 로드 — ready 메시지에서 반영. 로드 동안 busy + 워치독(영구 busy 방지).
+      lf_busyOn();
       try { clearTimeout(iWatch); } catch (e) { }
-      try { window.removeEventListener("message", lf_onMessage); } catch (e) { }
-      try { window.removeEventListener("u4a-theme-changed", lf_onThemeChange); } catch (e) { }
-      try { if (window.parent) { window.parent.removeEventListener("u4a-theme-changed", lf_onThemeChange); } } catch (e) { }
-      lf_release();
-      try { oDlg.close(); } catch (e) { }
-      try { oDlg.remove(); } catch (e) { }
+      iWatch = setTimeout(lf_busyOff, 8000);
     }
 
-    // ESC → 닫기.
-    oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
-
-    // 헤더 드래그(전역 위임) / 더블클릭 리센터 / 우하단 grip 리사이즈 — 전 팝업 공통.
-    if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
-    if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 420, minH: 280 }); }
-
-    document.body.appendChild(oDlg);
-    try { oDlg.showModal(); } catch (e) { }
+    if (!oUI.dlg.open) { try { oUI.dlg.showModal(); } catch (e) { } }
 
   }; // end of oAPP.fn.fnClientJsEditorPopup
 

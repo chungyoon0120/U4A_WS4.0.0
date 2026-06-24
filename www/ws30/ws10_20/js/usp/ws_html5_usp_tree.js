@@ -59,6 +59,8 @@
         if (!(window.U4AUI && U4AUI.createTree)) { return null; }
 
         _tree = U4AUI.createTree({
+            // 대용량 USP 소스 트리 대비 — flat+windowed 렌더(보이는 행만 DOM). 행높이는 usp.css 가 고정(균일).
+            virtual: true,
             roots: function () {
                 var a = [];
                 try { a = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { }
@@ -80,7 +82,11 @@
                 d.className = "u4aWs30TreeDesc";
                 var t = document.createElement("span");
                 t.className = "u4aWs30TreeDescText";
-                t.textContent = (n && n.DESCT != null) ? n.DESCT : "";
+                var sDesc = (n && n.DESCT != null) ? n.DESCT : "";
+                t.textContent = sDesc;
+                // 2줄 클램프로 잘릴 때만 hover 툴팁(공통 initTooltip, 세로클램프 인식). 가상스크롤서도 동작
+                //   (구 _applyDescTooltips 의 "렌더 후 1회 측정"은 윈도잉서 스크롤-인 행을 놓쳐 hover 방식으로 전환).
+                if (sDesc) { t.setAttribute("data-tip", sDesc); t.setAttribute("data-tip-trunc", ""); }
                 d.appendChild(t);
                 return d;
             },
@@ -121,25 +127,10 @@
         }
         oTree.render();
 
-        // 설명 컬럼: 2줄(-webkit-line-clamp) 초과분만 title(툴팁) 부여 — 레이아웃 후 측정.
-        try { window.requestAnimationFrame(_applyDescTooltips); } catch (e) { _applyDescTooltips(); }
+        // 설명 컬럼 툴팁은 이제 hover 기반(slotTrailing 에서 data-tip + data-tip-trunc) — 공통 initTooltip 이
+        //   세로 클램프(2줄) 잘림을 hover 시점에 판정해 표시. 가상 스크롤로 나중에 나타나는 행도 자동 동작.
+        //   (구 _applyDescTooltips 의 "렌더 후 1회 전체 측정" 방식은 윈도잉서 스크롤-인 행을 못 잡아 제거.)
     };
-
-    // 설명 셀이 2줄 클램프로 잘렸을 때만 전체 텍스트를 title 로 (마우스 오버 시 툴팁).
-    function _applyDescTooltips() {
-        var BODY = document.getElementById("uspTreeBody");
-        if (!BODY) { return; }
-        var aDesc = BODY.querySelectorAll(".u4aWs30TreeDescText");
-        Array.prototype.forEach.call(aDesc, function (el) {
-            try {
-                if (el.scrollHeight > el.clientHeight + 1) {
-                    el.title = el.textContent || "";
-                } else {
-                    el.title = "";   // 잘리지 않으면 툴팁 없음(행=이름 title 이 설명 위에서 새는 것 차단)
-                }
-            } catch (e) { }
-        });
-    }
 
     /************************************************************************
      * 선택 표시 (구 _fnUspTreeSelectedRowMark + setSelectedIndex)

@@ -905,7 +905,10 @@
 
         o.appendChild(_buildPinBtn());
         o.appendChild(_buildZoomBtn());
-        o.appendChild(_iconBtn(ICON.search, "Search", function () { _invoke("ev_GlobalSearch", "Search"); }));
+        // Window Text Search(원본 ev_winTxtSrchWS10) — 별도 창 찾기 팝업(원본 의도=같은 프레임 간섭 회피). 아이콘만.
+        o.appendChild(_iconBtn(ICON.search, "", function () {
+            try { oAPP.fn.fnTextSearchPopupOpener(); } catch (e) { console.error("[WS10] text search open", e); }
+        }));
 
         var oPower = _iconBtn(ICON.power, _txt("B53"), function () {
             // 실제 로그오프 (fnWS10WMENU30_04 → ev_Logout). 셸 부재(독립) 시 안내.

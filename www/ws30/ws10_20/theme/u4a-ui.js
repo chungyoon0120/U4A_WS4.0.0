@@ -592,7 +592,8 @@
             //   · data-tip-trunc-sel  → 지정 자식(예: 트리 이름)이 잘렸을 때만 (자식이 0폭이라 hover 못해도 행에서 동작)
             const sSel = el.getAttribute("data-tip-trunc-sel");
             const oTrunc = sSel ? el.querySelector(sSel) : (el.hasAttribute("data-tip-trunc") ? el : null);
-            if (oTrunc && oTrunc.scrollWidth <= oTrunc.clientWidth + 1) { return; }
+            // 가로(말줄임) 또는 세로(line-clamp 등) 어느 쪽도 안 잘렸으면 툴팁 생략. (USP 설명=2줄 세로클램프)
+            if (oTrunc && oTrunc.scrollWidth <= oTrunc.clientWidth + 1 && oTrunc.scrollHeight <= oTrunc.clientHeight + 1) { return; }
 
             const t = _ensure();
             t.textContent = sText;
@@ -1006,6 +1007,7 @@
         const _initialExpanded = cfg.initialExpanded || function (n, lvl) { return lvl < 1; };
         const _rowHook = cfg.rowHook || null;
         const bSelectable = cfg.selectable !== false;
+        const bVirtual = !!cfg.virtual;   // 대용량(수만 노드) 트리: flat+windowed 렌더(보이는 행만 DOM)
 
         const oUl = _el("ul", "u4a-tree");   // controller.el — role 미부착
         const _expanded = {};                // key → bool (render 간 유지; onToggle 으로 외부 영속화 동기)
@@ -1060,13 +1062,11 @@
             if (_onToggle) { _onToggle(node, !bNowOpen, oRow); }
         }
 
-        function _buildNode(node, level) {
+        // 행(.u4a-tree__row) DOM 1개 빌드 — 중첩/가상 공용. fnToggle = 토글버튼 클릭 핸들러(모드별 주입).
+        function _buildRowEl(node, level, idx, fnToggle) {
             const bHas = _hasChildren(node);
             const bExp = bHas ? _isExpanded(node, level) : false;
-            const idx = _index++;
             const oCtx = { level: level, index: idx, odd: (idx % 2 === 1), expanded: bExp, hasChildren: bHas, key: _key(node) };
-
-            const oLi = _el("li");
 
             const oRow = _el("div", "u4a-tree__row");
             oRow.style.setProperty("--u4a-tree-depth", String(level));
@@ -1082,8 +1082,8 @@
             const oTog = _el("button", "u4a-tree__toggle" + (bHas ? "" : " u4a-tree__toggle--leaf"));
             oTog.type = "button";
             oTog.innerHTML = ICON.treeChevron;
-            if (bHas) {
-                oTog.addEventListener("click", function (ev) { ev.stopPropagation(); _toggle(node, oLi, oRow, level); });
+            if (bHas && fnToggle) {
+                oTog.addEventListener("click", function (ev) { ev.stopPropagation(); fnToggle(); });
             }
             oRow.appendChild(oTog);
 
@@ -1115,13 +1115,79 @@
                     if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); _onSelect(node, oRow, oCtx); }
                 });
             }
+            return oRow;
+        }
 
+        // 중첩 li (비가상 모드 — USP 등 기존 동작 그대로).
+        function _buildNode(node, level) {
+            const bHas = _hasChildren(node);
+            const bExp = bHas ? _isExpanded(node, level) : false;
+            const idx = _index++;
+            const oLi = _el("li");
+            const oRow = _buildRowEl(node, level, idx, bHas ? function () { _toggle(node, oLi, oRow, level); } : null);
             oLi.appendChild(oRow);
             if (bHas) { oLi.appendChild(_childrenUl(node, level, bExp)); }
             return oLi;
         }
 
+        /* ── 가상(flat+windowed) 모드 — cfg.virtual 일 때. 대용량(수만 노드) 대비 보이는 행만 DOM.
+         *  중첩 ul/li 대신 "펼친 노드만 평탄화 → 공통 makeVScroller 로 윈도잉". 들여쓰기는 --u4a-tree-depth
+         *  라 시각 동일. 스크롤 컨테이너 = el(ul) 의 부모(화면이 부착). 토글=외부맵 갱신+재플래튼.
+         *  ※ 가상 모드는 외부 펼침맵(cfg.isExpanded/onToggle) 사용 화면(WS20)을 전제로 한다. */
+        let _vs = null, _vsWrap = null;
+        function _flattenVisible() {
+            const out = [];
+            (function rec(aNodes, level) {
+                if (!Array.isArray(aNodes)) { return; }
+                for (let i = 0; i < aNodes.length; i++) {
+                    const n = aNodes[i];
+                    if (!n) { continue; }
+                    out.push({ node: n, level: level });
+                    if (_hasChildren(n) && _isExpanded(n, level)) { rec(_children(n) || [], level + 1); }
+                }
+            })(_roots() || [], 0);
+            return out;
+        }
+        function _toggleVirtual(node) {
+            const bOpen = _isExpanded(node, 0);
+            if (_onToggle) { _onToggle(node, !bOpen, null); }
+            else { const k = _key(node); if (k !== "") { _expanded[k] = !bOpen; } }
+            _renderVirtual(true);
+        }
+        function _vsRowH() {
+            const w = oUl.parentNode;
+            const h = w ? parseFloat(getComputedStyle(w).getPropertyValue("--u4a-vsrowh")) : 0;
+            return h > 0 ? h : 28;
+        }
+        function _renderVirtual(bKeepScroll) {
+            const oWrap = oUl.parentNode;   // 스크롤 컨테이너(화면이 부착) — 미부착이면 부착 후 재호출됨
+            if (!oWrap) { return; }
+            if (!_vs || _vsWrap !== oWrap) {
+                _vsWrap = oWrap;
+                _vs = makeVScroller(oWrap, oUl, {
+                    buildRow: function (item, idx) {
+                        const oLi = _el("li");
+                        // 윈도잉 높이 계산이 정확하도록 li 여백 0 (행높이 = li 높이).
+                        oLi.style.listStyle = "none"; oLi.style.margin = "0"; oLi.style.padding = "0";
+                        const fn = _hasChildren(item.node) ? function () { _toggleVirtual(item.node); } : null;
+                        oLi.appendChild(_buildRowEl(item.node, item.level, idx, fn));
+                        return oLi;
+                    },
+                    getSelKey: function (item) { return _key(item.node); },
+                    makeSpacer: function () {
+                        const li = document.createElement("li");
+                        li.className = "u4aVSpacer"; li.setAttribute("aria-hidden", "true");
+                        li.style.padding = "0"; li.style.margin = "0"; li.style.height = "0px"; li.style.listStyle = "none";
+                        li._setH = function (px) { li.style.height = px + "px"; };
+                        return li;
+                    }
+                });
+            }
+            _vs.setRows(_flattenVisible(), bKeepScroll !== false);
+        }
+
         function render() {
+            if (bVirtual) { _renderVirtual(true); return; }
             _index = 0;
             oUl.innerHTML = "";
             const aRoots = _roots() || [];
@@ -1166,18 +1232,41 @@
         // (선택사항) 베이스가 선택 강조를 소유할 화면용 — 한 행만 aria-selected
         function setSelected(node) { selectByKey(_key(node)); }
         function selectByKey(sKey) {
-            const oPrev = oUl.querySelector('.u4a-tree__row[aria-selected="true"]');
-            if (oPrev) { oPrev.removeAttribute("aria-selected"); }
-            const oRow = findRow(sKey);
+            // 가상 모드: 대상이 off-screen 이면 scrollToKey 로 reveal(스크롤+윈도우 렌더) 후 강조.
+            const oRow = bVirtual ? scrollToKey(sKey) : findRow(sKey);
+            const aSel = oUl.querySelectorAll('.u4a-tree__row[aria-selected="true"]');
+            for (let i = 0; i < aSel.length; i++) { if (aSel[i] !== oRow) { aSel[i].removeAttribute("aria-selected"); } }
             if (oRow) { oRow.setAttribute("aria-selected", "true"); }
             return oRow;
+        }
+
+        // 키의 행을 화면에 보이게 — 가상 모드면 평탄 인덱스로 스크롤 후 윈도우 렌더(off-screen 행 reveal),
+        //   비가상이면 scrollIntoView. (검색 이동/선택 reveal 공용)
+        function scrollToKey(sKey) {
+            if (!bVirtual) {
+                const oRow = findRow(sKey);
+                if (oRow && oRow.scrollIntoView) { oRow.scrollIntoView({ block: "center" }); }
+                return oRow;
+            }
+            const aFlat = _flattenVisible();
+            let idx = -1;
+            for (let i = 0; i < aFlat.length; i++) { if (_key(aFlat[i].node) === sKey) { idx = i; break; } }
+            if (idx < 0) { return null; }
+            const oWrap = oUl.parentNode;
+            if (oWrap) {
+                const h = _vsRowH();
+                oWrap.scrollTop = Math.max(0, idx * h - (oWrap.clientHeight / 2) + h / 2);
+                _renderVirtual(true);
+            }
+            return findRow(sKey);
         }
 
         return {
             el: oUl, render: render,
             expandAll: expandAll, collapseAll: collapseAll, expandToLevel: expandToLevel,
             expandSubtree: expandSubtree,
-            setExpanded: setExpanded, setSelected: setSelected, selectByKey: selectByKey, findRow: findRow
+            setExpanded: setExpanded, setSelected: setSelected, selectByKey: selectByKey, findRow: findRow,
+            scrollToKey: scrollToKey
         };
     }
 
@@ -1521,6 +1610,153 @@
         try { fi.focus(); } catch (e) { }   // 열리면 바로 필터 입력 가능
     }
 
+    /* ── 가상 스크롤(windowing) — 보이는 행만 DOM 에 렌더 (전 화면 공통) ────────
+     *  대용량 테이블에서 DOM 폭증을 막는다. 보이는 구간[start,end]만 <tr> 생성, 위/아래 빈 높이는
+     *  스페이서 <tr> 로 확보(전체 높이=total*ROWH 일정 → scrollbar 안정). 행 실제높이를 1회 측정→정수
+     *  반올림해 `--u4a-vsrowh`(셸 CSS 가 데이터 행에 강제) 고정 → 끝단 떨림 제거. (AppF4 에서 검증된 코드 승격)
+     *  opt: { colCount, buildRow(item,absIdx)→<tr>, rowH?, overscan?, nodata?, getSelKey?(item) }
+     *  반환: { setRows(arr, bKeepScroll), refresh(), setSel(key), getSel() }
+     *  ※ oWrap 은 overflow:auto 스크롤 컨테이너, oTbody 는 그 안 <tbody>. 셸 공통 CSS 가
+     *    `.u4a-table-wrap tbody tr:not(.u4aVSpacer)>td{height:var(--u4a-vsrowh,...)}` 로 행높이 강제. */
+    function makeVScroller(oWrap, oTbody, opt) {
+        let ROWH = opt.rowH || 36;          // 행 높이(첫 렌더 후 실제 측정으로 보정)
+        const OVER = opt.overscan || 6;     // 위/아래 여유 행
+        let aData = [];
+        let bMeasured = false;
+        let raf = 0;
+        let selKey = null;
+
+        // 스페이서 — 기본은 테이블(tr/td/div), opt.makeSpacer 주면 그걸로(리스트/트리 모드: li 스페이서).
+        //   반환 요소는 반드시 _setH(px) 를 가져야 한다(위/아래 빈 높이 강제).
+        function _defaultSpacer() {
+            const tr = document.createElement("tr");
+            tr.className = "u4aVSpacer"; tr.setAttribute("aria-hidden", "true");
+            const td = document.createElement("td");
+            td.colSpan = opt.colCount;
+            td.style.padding = "0"; td.style.border = "0";
+            const div = document.createElement("div");
+            div.style.height = "0px"; div.style.width = "1px";
+            td.appendChild(div);
+            tr.appendChild(td);
+            // 높이를 div + td 양쪽에 — table-layout:fixed 에서 cell 자식 div 높이가 행높이로 반영 안 되는 환경 대비.
+            tr._setH = function (px) { div.style.height = px + "px"; td.style.height = px + "px"; };
+            return tr;
+        }
+        const _mkSpacer = opt.makeSpacer || _defaultSpacer;
+        const oTop = _mkSpacer(), oBot = _mkSpacer();
+
+        function _render() {
+            const total = aData.length;
+            // ★ scrollTop 은 DOM 건드리기 전에 읽는다(비우면 높이 붕괴→scrollTop 0 클램프→맨 위로 튕김).
+            const st = oWrap.scrollTop, vh = oWrap.clientHeight || 400;
+
+            // oTbody(행 컨테이너)가 oWrap(스크롤 컨테이너) 안에서 시작하는 오프셋(sticky thead / USP 컬럼헤더 등)
+            //   을 보정. 안 빼면 윈도우 시작행이 헤더 높이만큼 어긋나 양 끝에서 살짝 떠 보인다(특히 헤더>1행).
+            //   off = oTbody 의 "콘텐츠 좌표상 top"(스크롤과 무관하게 일정).
+            let off = 0;
+            try {
+                off = (oTbody.getBoundingClientRect().top - oWrap.getBoundingClientRect().top) + st;
+                if (!(off > 0)) { off = 0; }
+            } catch (e) { off = 0; }
+
+            if (!total) {
+                oTbody.textContent = "";
+                if (opt.nodata != null) {
+                    let trN;
+                    if (opt.makeNodata) { trN = opt.makeNodata(opt.nodata); }
+                    else {
+                        trN = document.createElement("tr"); trN.className = "u4a-table__nodata";
+                        const tdN = document.createElement("td"); tdN.colSpan = opt.colCount; tdN.textContent = opt.nodata;
+                        trN.appendChild(tdN);
+                    }
+                    if (trN) { oTbody.appendChild(trN); }
+                }
+                return;
+            }
+
+            // 오버스캔 = 최소 한 뷰포트 만큼 위/아래 버퍼. ★ 빠른 끝→끝 스크롤서 컴포지터가 메인스레드 행
+            //   재활용보다 앞서가 모서리에 1프레임 빈칸(부르르 뜸)이 생기는데, 버퍼를 뷰포트만큼 잡으면
+            //   그 빈칸이 화면 밖에 머물러 체감 깜빡임이 사라진다(렌더 행 수는 ~3뷰포트로 여전히 적음).
+            const over = Math.max(OVER, Math.ceil(vh / ROWH));
+            const start = Math.max(0, Math.floor((st - off) / ROWH) - over);
+            const cnt = Math.ceil(vh / ROWH) + over * 2;
+            const end = Math.min(total, start + cnt);
+
+            // 스페이서가 항상 양 끝에 존재하도록(없을 때만 초기화 — 높이 붕괴 방지).
+            if (oTop.parentNode !== oTbody || oBot.parentNode !== oTbody) {
+                oTbody.textContent = "";
+                oTbody.appendChild(oTop);
+                oTbody.appendChild(oBot);
+            }
+            oTop._setH(start * ROWH);
+            oBot._setH(Math.max(0, total - end) * ROWH);
+
+            // 새 행 먼저 삽입 후 옛 행 제거(삽입-먼저/제거-나중 → 높이 목표 밑으로 안 내려가 클램프 없음).
+            const aOld = [];
+            for (let n = oTop.nextElementSibling; n && n !== oBot; n = n.nextElementSibling) { aOld.push(n); }
+            const frag = document.createDocumentFragment();
+            for (let i = start; i < end; i++) {
+                const tr = opt.buildRow(aData[i], i);
+                if (selKey != null && opt.getSelKey && opt.getSelKey(aData[i]) === selKey) {
+                    tr.setAttribute("aria-selected", "true");
+                }
+                frag.appendChild(tr);
+            }
+            oTbody.insertBefore(frag, oBot);
+            for (let j = 0; j < aOld.length; j++) { oTbody.removeChild(aOld[j]); }
+
+            // 첫 렌더 1회 실제 행높이 측정 → 정수 반올림해 ROWH 고정 + CSS 로 데이터 행높이 강제(끝단 떨림 제거).
+            if (!bMeasured) {
+                const oFirst = oTop.nextElementSibling;
+                if (oFirst && oFirst !== oBot) {
+                    bMeasured = true;
+                    const h = oFirst.getBoundingClientRect().height;
+                    if (h) {
+                        const r = Math.max(1, Math.round(h));
+                        oWrap.style.setProperty("--u4a-vsrowh", r + "px");
+                        if (r !== ROWH) { ROWH = r; _render(); }
+                    }
+                }
+            }
+        }
+        function _onScroll() {
+            if (raf) { return; }
+            raf = requestAnimationFrame(function () { raf = 0; _render(); });
+        }
+        oWrap.addEventListener("scroll", _onScroll);
+
+        // ★ 휠 직접 처리 — 가상 스크롤 컨테이너의 네이티브 휠→스크롤이 안 먹는 환경(모달 top-layer 등) 대비.
+        oWrap.addEventListener("wheel", function (e) {
+            if (e.ctrlKey) { return; }   // Ctrl+휠=줌 양보
+            const unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? (oWrap.clientHeight || 1) : 1);
+            const t0 = oWrap.scrollTop, l0 = oWrap.scrollLeft;
+            oWrap.scrollTop = t0 + e.deltaY * unit;
+            oWrap.scrollLeft = l0 + e.deltaX * unit;
+            if (oWrap.scrollTop !== t0 || oWrap.scrollLeft !== l0) { e.preventDefault(); }
+        }, { passive: false });
+
+        // 컨테이너 크기 변경(스플리터/창 리사이즈) 시 보일 행 수가 바뀌므로 재계산(rAF 스로틀=_onScroll).
+        if (typeof ResizeObserver !== "undefined") {
+            try { new ResizeObserver(function () { _onScroll(); }).observe(oWrap); } catch (e) { }
+        }
+
+        return {
+            setRows: function (a, bKeepScroll) {
+                aData = a || [];
+                if (!bKeepScroll) {
+                    try { oWrap.scrollTop = 0; } catch (e) { }
+                } else {
+                    const maxTop = Math.max(0, aData.length * ROWH - (oWrap.clientHeight || 0));
+                    if (oWrap.scrollTop > maxTop) { try { oWrap.scrollTop = maxTop; } catch (e) { } }
+                }
+                _render();
+            },
+            refresh: _render,
+            setSel: function (k) { selKey = k; },
+            getSel: function () { return selKey; }
+        };
+    }
+
     const U4AUI = {
         el: _el,
         createField: createField,
@@ -1536,6 +1772,7 @@
         attachOverflow: attachOverflow,
         openColumnMenu: openColumnMenu,
         closeColumnMenu: closeColumnMenu,
+        makeVScroller: makeVScroller,
         btnLabel: btnLabel,
         makeDialogRecenter: makeDialogRecenter,
         makeDialogResizable: makeDialogResizable,

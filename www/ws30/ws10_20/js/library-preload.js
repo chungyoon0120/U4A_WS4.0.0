@@ -149,6 +149,12 @@
         URL: "./js/ws10_html.js",
         MIMETYPE: "script"
     },
+    // [UI5 제거] Window Text Search(Ctrl+Shift+F) 단축키 배선 — 별도 창 opener 호출.
+    //   ws_common(getShortCutList) 뒤 로드 → 해당 KEY fn super-wrap. 헤더 버튼은 ws10_html 이 직접 opener 호출.
+    {
+        URL: "./js/fnTextSearchShortcut.js",
+        MIMETYPE: "script"
+    },
     // [UI5 제거] WS20 HTML5 — 반드시 shell/ws10_html "뒤"(가장 마지막) 순서대로 로드.
     //   ws20(셸) → ws20_tree(트리) → ws20_data(데이터) → ws20_attr(속성) → ws20_prev(미리보기).
     //   각 파일은 앞 파일이 정의한 함수를 super 로 감싸 override 하므로 순서가 중요.

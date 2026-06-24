@@ -391,6 +391,14 @@ button:focus-visible {
     padding-left: calc(0.375rem + var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem));
 }
 
+/* 가상 트리(createTree virtual:true)에서만 행 높이를 "측정된 정수 px(--u4a-vsrowh)"로 강제.
+   ★ 끝단 부르르 떨림 방지: 윈도잉은 전체높이=행수×ROWH 로 계산하는데, 행 실제높이가 ROWH 와
+     미세하게(특히 줌 시 2.5rem→비정수px) 다르면 scrollHeight 가 흔들려 끝에서 클램프→재렌더 루프로 떤다.
+     makeVScroller 가 첫 행을 재서 정수로 반올림→--u4a-vsrowh(스크롤컨테이너)에 박고, 이 규칙이 데이터 행을
+     그 값으로 고정 → total×ROWH 가 실제와 정확히 일치 → 떨림 제거(테이블 .u4a-table 와 동일 기법).
+   비가상 트리는 --u4a-vsrowh 미설정 → auto(=위 min-height 자연높이) 그대로. */
+.u4a-tree__row { height: var(--u4a-vsrowh, auto); box-sizing: border-box; }
+
 /* trailing 슬롯(배지/설명/액션 등)을 우측정렬 — createTree 가 slotTrailing 반환 시 행에 부여 */
 .u4a-tree__row[data-u4a-tree-split] {
     justify-content: space-between;
@@ -1527,14 +1535,20 @@ dialog::backdrop {
     margin-bottom: 0;
 }
 
-/* 컬럼 헤더 — sticky (체크리스트 E) */
+/* 컬럼 헤더 — sticky (체크리스트 E)
+   ★ 헤더/행 높이는 공통 단일값(--control-h/--row-h, 기본 2.5rem) 고정 — 콘텐츠(아이콘/액션버튼/텍스트)에
+     따라 표마다 달라지지 않게(행높이 공통 UX). box-sizing:border-box 로 패딩 포함 높이 고정,
+     vertical-align:middle 로 콘텐츠 세로중앙. 가장 키 큰 공통 콘텐츠(액션버튼 1.5rem)도 패딩 안에 들어감. */
 .u4a-table thead th {
     position: sticky;
     top: 0;
     z-index: 1;
+    height: var(--control-h, 2.5rem);
+    box-sizing: border-box;
+    vertical-align: middle;
     text-align: left;
     font-weight: 600;
-    padding: 0.5rem 0.75rem;
+    padding: 0.25rem 0.75rem;
     background: var(--surface);
     border-bottom: 0.0625rem solid var(--line);
     color: var(--text-muted);
@@ -1543,13 +1557,24 @@ dialog::backdrop {
     user-select: none;
 }
 
-/* 데이터 셀 */
+/* 데이터 셀 — 행 높이 공통 단일(--row-h, 기본 2.5rem) 고정 */
 .u4a-table tbody td {
-    padding: 0.5rem 0.75rem;
+    height: var(--row-h, 2.5rem);
+    box-sizing: border-box;
+    vertical-align: middle;
+    padding: 0.25rem 0.75rem;
     border-bottom: 0.0625rem solid var(--line);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* 가상 스크롤(U4AUI.makeVScroller) 데이터 행 — 측정된 --u4a-vsrowh 로 행높이 강제(정수px → 끝단 scrollHeight
+   안정·떨림 제거). 가상스크롤 미사용 테이블은 --u4a-vsrowh 미설정→ --row-h(2.5rem) 폴백으로 공통 행높이 유지.
+   스페이서 행(.u4aVSpacer)은 제외(위/아래 빈 높이 확보용). */
+.u4a-table-wrap tbody tr:not(.u4aVSpacer) > td {
+    height: var(--u4a-vsrowh, var(--row-h, 2.5rem));
+    box-sizing: border-box;
 }
 
 /* 행 hover / zebra / 선택 / 포커스 (체크리스트 E/B) */
@@ -1689,6 +1714,8 @@ dialog::backdrop {
     justify-content: space-between;
     gap: 0.15rem 0.75rem;
     border: 0;
+    /* 카드 뷰에선 행높이 고정(2.5rem) 무력화 — 각 필드는 콘텐츠 높이로 */
+    height: auto;
     padding: 0.25rem 0.75rem;
     min-width: 0;
     /* 카드 안에선 줄바꿈(가로 넘침/스크롤 방지) — 테이블뷰 말줄임 무력화 */

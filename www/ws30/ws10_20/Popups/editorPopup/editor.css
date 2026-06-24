@@ -1,353 +1,110 @@
+/****************************************************************************
+ * 에디터 시리즈(CSS/JS/HTML) 창 레이아웃 — 공통 토큰만 소비(하드코딩 색 없음).
+ *  창 골격 = [공통 .u4a-titlebar] + [에디터 호스트 iframe] + [푸터(Save)].
+ *  타이틀바/버튼 모양은 shell.css + bootstrap-skin.css 가 담당. 여기선 창 전용 배치만.
+ ****************************************************************************/
+
+html,
+body {
+    height: 100%;
+}
+
 body {
     margin: 0;
     padding: 0;
-    background-color: #222;
-    width:100%;
-    overflow:auto;
+    overflow: hidden;
+    /* 타이틀바(고정) + 콘텐츠(가변) + 푸터(고정) 세로 스택 */
+    display: flex;
+    flex-direction: column;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
 }
 
-#editor {
-    margin: 0;
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
-}
-
-.loading {
-    width: 120px;
-    height: 120px;
+/* 콘텐츠 = Monaco 호스트 iframe (타이틀바와 푸터 사이 전체 채움) */
+#editorContent {
+    flex: 1 1 auto;
     position: relative;
-    z-index:10000;
-    margin: 0 auto;
-    top: 50vh;
-    -webkit-transform: translateY(-50%);
-            transform: translateY(-50%);
+    min-height: 0;
+    background: var(--boot-bg, var(--app-bg));
 }
 
-.loading__circle {
-    border-radius: 50%;
-    background-color: #979196;
-    width: 17px;
-    height: 17px;
-    display: block;
+#editorHost {
     position: absolute;
-    z-index: 1;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
 }
 
-.loading__circle:nth-child(1) {
-    top: 108px;
-    left: 86px;
-    -webkit-animation-duration: 750ms;
-            animation-duration: 750ms;
-    -webkit-animation-name: upup;
-            animation-name: upup;
-    -webkit-animation-iteration-count: infinite;
-            animation-iteration-count: infinite;
-    -webkit-animation-timing-function: ease-in-out;
-            animation-timing-function: ease-in-out;
-    -webkit-animation-delay: -62.5ms;
-            animation-delay: -62.5ms;
+/* 푸터(48px) — 공통 모달 푸터 톤. 오른쪽 정렬, Save 강조 버튼. */
+.u4aEdWinFooter {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    height: 3rem;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-top: 1px solid var(--divider);
+    background: var(--surface);
 }
 
-.loading__circle:nth-child(2) {
-    top: 86px;
-    left: 108px;
-    -webkit-animation-duration: 750ms;
-            animation-duration: 750ms;
-    -webkit-animation-name: upup;
-            animation-name: upup;
-    -webkit-animation-iteration-count: infinite;
-            animation-iteration-count: infinite;
-    -webkit-animation-timing-function: ease-in-out;
-            animation-timing-function: ease-in-out;
-    -webkit-animation-delay: -125ms;
-            animation-delay: -125ms;
+.u4aEdWinFooter .u4a-btn[hidden] {
+    display: none;
 }
 
-.loading__circle:nth-child(3) {
-    top: 56px;
-    left: 116px;
-    -webkit-animation-duration: 750ms;
-            animation-duration: 750ms;
-    -webkit-animation-name: upup;
-            animation-name: upup;
-    -webkit-animation-iteration-count: infinite;
-            animation-iteration-count: infinite;
-    -webkit-animation-timing-function: ease-in-out;
-            animation-timing-function: ease-in-out;
-    -webkit-animation-delay: -187.5ms;
-            animation-delay: -187.5ms;
+/* 로딩 오버레이 — busy 동안 입력 차단 + 스피너. */
+#editorBusy {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+    z-index: 9999;
 }
 
-.loading__circle:nth-child(4) {
-    top: 26px;
-    left: 108px;
-    -webkit-animation-duration: 750ms;
-            animation-duration: 750ms;
-    -webkit-animation-name: upup;
-            animation-name: upup;
-    -webkit-animation-iteration-count: infinite;
-            animation-iteration-count: infinite;
-    -webkit-animation-timing-function: ease-in-out;
-            animation-timing-function: ease-in-out;
-    -webkit-animation-delay: -250ms;
-            animation-delay: -250ms;
+#editorBusy.show {
+    display: flex;
 }
 
-.loading__circle:nth-child(5) {
-    top: 4px;
-    left: 86px;
-    -webkit-animation-duration: 750ms;
-            animation-duration: 750ms;
-    -webkit-animation-name: upup;
-            animation-name: upup;
-    -webkit-animation-iteration-count: infinite;
-            animation-iteration-count: infinite;
-    -webkit-animation-timing-function: ease-in-out;
-            animation-timing-function: ease-in-out;
-    -webkit-animation-delay: -312.5ms;
-            animation-delay: -312.5ms;
+#editorBusy .u4aEdSpinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 3px solid var(--divider);
+    border-top-color: var(--u4a-accent);
+    border-radius: 50%;
+    animation: u4aEdSpin 0.8s linear infinite;
 }
 
-.loading__circle:nth-child(6) {
-  top: -4px;
-  left: 56px;
-  -webkit-animation-duration: 750ms;
-          animation-duration: 750ms;
-  -webkit-animation-name: upup;
-          animation-name: upup;
-  -webkit-animation-iteration-count: infinite;
-          animation-iteration-count: infinite;
-  -webkit-animation-timing-function: ease-in-out;
-          animation-timing-function: ease-in-out;
-  -webkit-animation-delay: -375ms;
-          animation-delay: -375ms;
+@keyframes u4aEdSpin {
+    to { transform: rotate(360deg); }
 }
 
-.loading__circle:nth-child(7) {
-  top: 4px;
-  left: 26px;
-  -webkit-animation-duration: 750ms;
-          animation-duration: 750ms;
-  -webkit-animation-name: upup;
-          animation-name: upup;
-  -webkit-animation-iteration-count: infinite;
-          animation-iteration-count: infinite;
-  -webkit-animation-timing-function: ease-in-out;
-          animation-timing-function: ease-in-out;
-  -webkit-animation-delay: -437.5ms;
-          animation-delay: -437.5ms;
+/* 저장 토스트(원본 snackbar 대체) — 하단 중앙, 잠깐 노출. */
+#editorToast {
+    position: fixed;
+    left: 50%;
+    bottom: 3.75rem;
+    transform: translateX(-50%) translateY(0.5rem);
+    max-width: 80vw;
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--radius-sm, 4px);
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--divider);
+    box-shadow: var(--sl-elev, 0 4px 16px rgba(0, 0, 0, 0.25));
+    font-size: 0.875rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 10000;
 }
 
-.loading__circle:nth-child(8) {
-  top: 26px;
-  left: 4px;
-  -webkit-animation-duration: 750ms;
-          animation-duration: 750ms;
-  -webkit-animation-name: upup;
-          animation-name: upup;
-  -webkit-animation-iteration-count: infinite;
-          animation-iteration-count: infinite;
-  -webkit-animation-timing-function: ease-in-out;
-          animation-timing-function: ease-in-out;
-  -webkit-animation-delay: -500ms;
-          animation-delay: -500ms;
-}
-
-.loading__circle:nth-child(9) {
-  top: 56px;
-  left: -4px;
-  -webkit-animation-duration: 750ms;
-          animation-duration: 750ms;
-  -webkit-animation-name: upup;
-          animation-name: upup;
-  -webkit-animation-iteration-count: infinite;
-          animation-iteration-count: infinite;
-  -webkit-animation-timing-function: ease-in-out;
-          animation-timing-function: ease-in-out;
-  -webkit-animation-delay: -562.5ms;
-          animation-delay: -562.5ms;
-}
-
-.loading__circle:nth-child(10) {
-  top: 86px;
-  left: 4px;
-  -webkit-animation-duration: 750ms;
-          animation-duration: 750ms;
-  -webkit-animation-name: upup;
-          animation-name: upup;
-  -webkit-animation-iteration-count: infinite;
-          animation-iteration-count: infinite;
-  -webkit-animation-timing-function: ease-in-out;
-          animation-timing-function: ease-in-out;
-  -webkit-animation-delay: -625ms;
-          animation-delay: -625ms;
-}
-
-.loading__circle:nth-child(11) {
-  top: 108px;
-  left: 26px;
-  -webkit-animation-duration: 750ms;
-          animation-duration: 750ms;
-  -webkit-animation-name: upup;
-          animation-name: upup;
-  -webkit-animation-iteration-count: infinite;
-          animation-iteration-count: infinite;
-  -webkit-animation-timing-function: ease-in-out;
-          animation-timing-function: ease-in-out;
-  -webkit-animation-delay: -687.5ms;
-          animation-delay: -687.5ms;
-}
-
-.loading__circle:nth-child(12) {
-  top: 116px;
-  left: 56px;
-  -webkit-animation-duration: 750ms;
-          animation-duration: 750ms;
-  -webkit-animation-name: upup;
-          animation-name: upup;
-  -webkit-animation-iteration-count: infinite;
-          animation-iteration-count: infinite;
-  -webkit-animation-timing-function: ease-in-out;
-          animation-timing-function: ease-in-out;
-  -webkit-animation-delay: -750ms;
-          animation-delay: -750ms;
-}
-
-@-webkit-keyframes upup {
-  0% {
-    -webkit-transform: scale(0.2, 0.2);
-            transform: scale(0.2, 0.2);
+#editorToast.show {
     opacity: 1;
-  }
-  50% {
-    -webkit-transform: scale(1, 1);
-           transform: scale(1, 1);
-    opacity: 1;
-  }
-  100% {
-    -webkit-transform: scale(0.2, 0.2);
-            transform: scale(0.2, 0.2);
-    opacity: 1;
-  }
-}
-
-@keyframes upup {
-  0% {
-    -webkit-transform: scale(0.2, 0.2);
-            transform: scale(0.2, 0.2);
-    opacity: 1;
-  }
-  50% {
-    -webkit-transform: scale(1, 1);
-            transform: scale(1, 1);
-    opacity: 1;
-  }
-  100% {
-    -webkit-transform: scale(0.2, 0.2);
-            transform: scale(0.2, 0.2);
-    opacity: 1;
-  }
-}
-
-#snackbar {
-visibility: hidden;
-min-width: 250px;
-margin-left: -125px;
-background-color: #333;
-color: #fff;
-text-align: center;
-border-radius: 2px;
-padding: 16px;
-position: fixed;
-z-index: 1;
-left: 50%;
-bottom: 30%;
-font-size: 17px;
-}
-
-#snackbar.show {
-visibility: visible;
--webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
-animation: fadein 0.5s, fadeout 0.5s 2.5s;
-}
-
-#zzoverlay {
-position: fixed;
-display: none;
-width: 100%;
-height: 100%;
-top: 0;
-left: 0;
-right: 0;
-bottom: 0;
-background-color: rgba(0,0,0,0.5);
-z-index: 10000;
-
-}
-
-#zztext{
-position: absolute;
-top: 50%;
-left: 50%;
-font-size: 50px;
-color: white;
-transform: translate(-50%,-50%);
--ms-transform: translate(-50%,-50%);
-}
-
-#BTSAVE {
-display: block;
-position: fixed;
-bottom: 25px;
-right: 30px;
-z-index: 99;
-font-size: 18px;
-border: none;
-outline: none;
-background-color: red;
-cursor: pointer;
-padding: 12px;
-border-radius: 4px;
-color:#ffffff;
-text-shadow:0px 1px 0px #1570cd;
-background-color:#3d94f6;
-}
-
-#BTSAVE:hover {
-background-color: #555;
-}
-
-#FINDDEL {
-display: none;
-position: fixed;
-bottom: 25px;
-right: 120px;
-z-index: 99;
-font-size: 18px;
-border: none;
-outline: none;
-background-color: red;
-cursor: pointer;
-padding: 12px;
-border-radius: 4px;
-color:#ffffff;
-text-shadow:0px 1px 0px #1570cd;
-background-color:#3d94f6;
-}
-
-#FINDDEL:hover {
-background-color: #555;
-}
-
-.cl_findLine {
-position: absolute;
-background-color: blue;
-
-}
-
-.btnHidden {
-visibility: hidden;
+    transform: translateX(-50%) translateY(0);
 }

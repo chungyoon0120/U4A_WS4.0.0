@@ -193,4 +193,31 @@
     // 화면 이탈/재렌더 시 잔여 메뉴 정리(안전망).
     oAPP.usphtml.closeUspCtxMenu = _closeMenu;
 
+    /************************************************************************
+     * K3 Create — 신규 노드(파일/폴더) 생성
+     *  변경분 있으면 fnConfirmBox → YES: 먼저 저장(AFPRC="C") → 콜백에서 팝업 오픈
+     *  변경분 없으면 바로 fnCreateUspNodePopup 오픈
+     ************************************************************************/
+    oAPP.usphtml.uspCtxAction["K3"] = function (oNode) {
+        if (!oNode) { return; }
+        var IS_CHAG = (APPCOMMON.fnGetModelProperty("/WS30/APP") || {}).IS_CHAG;
+        if (IS_CHAG === "X") {
+            var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "119");
+            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+            oAPP.common.fnConfirmBox("W", sMsg, function (act) {
+                if (act === "YES") {
+                    oAPP.fn.fnSaveUspWs30({ AFPRC: "C", _createNode: oNode });
+                } else {
+                    try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
+                }
+            }, [
+                { act: "YES", label: "Yes", emphasized: true },
+                { act: "NO",  label: "No" },
+                { act: "CANCEL", label: "Cancel" }
+            ]);
+            return;
+        }
+        if (oAPP.fn.fnCreateUspNodePopup) { oAPP.fn.fnCreateUspNodePopup(oNode); }
+    };
+
 })(window, jQuery, oAPP);

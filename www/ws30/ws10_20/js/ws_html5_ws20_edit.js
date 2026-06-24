@@ -744,6 +744,7 @@
         oDlg.querySelector(".u4aWs20InsTitle").title = sTitle;
 
         var oBody = oDlg.querySelector(".u4a-dialog__body");
+        var oWrap = oDlg.querySelector(".u4aWs20InsTableWrap");   // 가상스크롤 스크롤 컨테이너(overflow:auto)
         var oTbody = oDlg.querySelector(".u4aWs20InsTable tbody");
         var oEmpty = oDlg.querySelector(".u4aWs20InsEmpty");
         var oSearch = oDlg.querySelector(".u4aWs20InsSearch");
@@ -841,41 +842,37 @@
             return v;
         }
 
+        // 결과 행 1개 빌드(가상 스크롤러가 보이는 구간만 호출). idx=절대 인덱스(zebra).
+        function _buildInsRow(ui, idx) {
+            var tr = document.createElement("tr");
+            if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }   // 공통 zebra
+            var sImg = _iconSrc(ui.UICON);
+            tr.innerHTML =
+                '<td class="u4aWs20InsTdSym">' + (sImg ? '<img src="' + _esc(sImg) + '" alt="" onerror="this.style.display=\'none\'">' : "") + '</td>' +
+                '<td class="u4aWs20InsTdName">' + _esc(ui.UIOBJ) + '</td>' +
+                '<td class="u4aWs20InsTdFull">' + _esc(ui.LIBNM) + '</td>' +
+                '<td class="u4aWs20InsTdKey">' + _esc(ui.UIOBK) + '</td>';
+            tr.addEventListener("click", function () {
+                oSelUI = ui; oOk.disabled = false;
+                _vs.setSel(ui.UIOBK); _vs.refresh();   // 공통 선택(aria-selected) — 스크롤로 행이 사라져도 유지
+            });
+            tr.addEventListener("dblclick", function () { oSelUI = ui; lf_confirm(); });
+            return tr;
+        }
+        // 공통 가상 스크롤(U4AUI.makeVScroller) — 대용량 UI 목록도 보이는 구간만 DOM. 0건=공통 no-data(946).
+        var _vs = U4AUI.makeVScroller(oWrap, oTbody, {
+            colCount: 4,
+            buildRow: _buildInsRow,
+            nodata: _wsMsgRaw("946"),
+            getSelKey: function (ui) { return ui.UIOBK; }
+        });
+
         function lf_renderTable() {
             oSelUI = null; oOk.disabled = true;
-            oTbody.innerHTML = "";
+            _vs.setSel(null);
             // 빈(미선택) aggregation 이면 비움.
             var aUIs = oSelAgg.UIATK ? _getUIs(oSelAgg, is_tree.UIOBK) : [];
-            var aRows = _deriveRows(aUIs);   // 검색박스 + 컬럼필터(AND) + 정렬(공통 컬럼메뉴 상태)
-            aRows.forEach(function (ui, idx) {
-                var tr = document.createElement("tr");
-                tr.dataset.odd = (idx % 2 === 1) ? "true" : "false";   // 공통 zebra
-                var sImg = _iconSrc(ui.UICON);
-                tr.innerHTML =
-                    '<td class="u4aWs20InsTdSym">' + (sImg ? '<img src="' + _esc(sImg) + '" alt="" onerror="this.style.display=\'none\'">' : "") + '</td>' +
-                    '<td class="u4aWs20InsTdName">' + _esc(ui.UIOBJ) + '</td>' +
-                    '<td class="u4aWs20InsTdFull">' + _esc(ui.LIBNM) + '</td>' +
-                    '<td class="u4aWs20InsTdKey">' + _esc(ui.UIOBK) + '</td>';
-                tr.addEventListener("click", function () {
-                    oSelUI = ui; oOk.disabled = false;
-                    // 공통 선택 표시 = aria-selected(좌측 액센트바+강조배경, .u4a-table 가 담당).
-                    var s = oTbody.querySelector('tr[aria-selected="true"]'); if (s) { s.removeAttribute("aria-selected"); }
-                    tr.setAttribute("aria-selected", "true");
-                });
-                tr.addEventListener("dblclick", function () { oSelUI = ui; lf_confirm(); });
-                oTbody.appendChild(tr);
-            });
-            // 결과 0건 = 공통 .u4a-table__nodata 행("데이터 없음" = 946, ServerList/F4 동일). 빈 테이블로 두지 않음.
-            if (aRows.length === 0) {
-                var trN = document.createElement("tr");
-                trN.className = "u4a-table__nodata";
-                var tdN = document.createElement("td");
-                tdN.setAttribute("colspan", "4");
-                tdN.textContent = _wsMsgRaw("946");
-                trN.appendChild(tdN);
-                oTbody.appendChild(trN);
-            }
-            oEmpty.hidden = true;
+            _vs.setRows(_deriveRows(aUIs));   // 검색박스 + 컬럼필터(AND) + 정렬(공통 컬럼메뉴 상태)
         }
 
         function lf_confirm() {

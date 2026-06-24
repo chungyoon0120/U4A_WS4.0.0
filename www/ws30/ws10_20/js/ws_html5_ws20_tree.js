@@ -459,6 +459,8 @@
         if (!(window.U4AUI && U4AUI.createTree)) { return null; }
 
         _ws20tree = U4AUI.createTree({
+            // 대용량(수만 노드) 디자인 트리 대비 — flat+windowed 렌더(보이는 행만 DOM). 펼침맵은 화면 소유(isExpanded/onToggle).
+            virtual: true,
             roots: _getTreeRoot,
             children: function (n) { return _hasChild(n) ? n.zTREE : []; },
             key: _objKey,
@@ -869,6 +871,8 @@
 
     function _findScrollTo(sObjid) {
         try {
+            // 가상 트리: off-screen 행은 DOM 에 없으므로 평탄 인덱스로 스크롤+윈도우 렌더(공통 scrollToKey).
+            if (_ws20tree && typeof _ws20tree.scrollToKey === "function") { _ws20tree.scrollToKey(sObjid); return; }
             var oRow = document.querySelector('#ws20DesignTree [data-objid="' + (sObjid || "").replace(/"/g, '\\"') + '"]');
             if (oRow && oRow.scrollIntoView) { oRow.scrollIntoView({ block: "center" }); }
         } catch (e) { }
