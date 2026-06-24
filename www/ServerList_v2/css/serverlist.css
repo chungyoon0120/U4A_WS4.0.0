@@ -287,8 +287,8 @@
     display: flex;
     flex-direction: column;
     background: var(--surface);
-    /* 가운데 목록도 가로 스크롤 금지(세로만) + 최소폭(스플리터 예약 계산에 사용) */
-    min-width: 13rem;
+    /* 가로 스크롤 금지(세로만). 최소폭은 _buildMasterDetailBody 가 인라인(px)으로 지정 —
+       WS20 디자인 영역과 동일하게 패널별 단일 min-width 가 단일 출처(doc 16 §4). */
     overflow-x: hidden;
 }
 
@@ -453,8 +453,8 @@
     gap: 0.5rem;
     padding: 1.5rem;
     background: var(--surface);
-    /* 가로 스크롤 금지 — 내용은 아래 반응형 규칙으로 리플로우(세로만 스크롤) */
-    min-width: 14rem;
+    /* 가로 스크롤 금지 — 내용은 아래 반응형 규칙으로 리플로우(세로만 스크롤).
+       최소폭은 _buildMasterDetailBody 인라인(px) 단일 출처(WS20 동일, doc 16 §4). */
     overflow-x: hidden;
     overflow-y: auto;
 }

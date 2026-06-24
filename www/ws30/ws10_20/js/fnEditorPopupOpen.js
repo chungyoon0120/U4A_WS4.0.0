@@ -75,7 +75,9 @@
         oBrowserOptions.parent = oCurrWin;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5] 네이티브 창 opacity 페이드 미사용 — OS 레벨 리컴포짓이라 무겁다. 창은 즉시
+        //   불투명하게 띄우고(show=false 로 위치 잡힌 뒤 표시), 등장 효과는 창 안 컨텐츠를
+        //   CSS opacity transition 으로 처리(editorFrame.js/editor.css). (opacity=0.0 제거)
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
         

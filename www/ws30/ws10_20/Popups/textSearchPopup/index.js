@@ -44,10 +44,9 @@ module.exports = function(REMOTE, oAPP){
 
         oBrowserOptions.frame = false;
         oBrowserOptions.thickFrame = false;
-        // ★ 투명 창 — 둥근 찾기 바만 떠 보이게(불투명 사각 창이면 모서리가 각져 보임, 특히 최대화 시).
-        oBrowserOptions.transparent = true;
-        oBrowserOptions.backgroundColor = "#00000000";   // Windows 투명창 검정 방지(완전 투명)
-        oBrowserOptions.hasShadow = false;               // 투명창은 OS 사각 그림자 끄고 CSS 로 처리
+        // 불투명 창 — 투명창은 Windows 에서 모서리가 검게 렌더되는 글리치가 있어 안 씀.
+        //   바가 창을 꽉 채우는 직사각(둥근모서리 X)이라 모서리 mismatch 없음. 창 배경=테마색(insertCSS).
+        oBrowserOptions.transparent = false;
         oBrowserOptions.center = false;
         oBrowserOptions.resizable = false;
         oBrowserOptions.parent = CURRWIN;
@@ -60,8 +59,8 @@ module.exports = function(REMOTE, oAPP){
         // 브라우저 오픈
         let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions); 
 
-        // 투명 창 — 외곽(index.html) html/body 는 투명, 실제 배경은 iframe 안 찾기 바가 가진다.
-        const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: transparent; }`;
+        // 외곽 창 배경 = 테마색(플래시 방지). 바(iframe)가 꽉 채우므로 로드 중에만 보임.
+        const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${(oThemeInfo && oThemeInfo.BGCOL) || "#ffffff"}; }`;
 
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
 
@@ -73,6 +72,9 @@ module.exports = function(REMOTE, oAPP){
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            // SYSID 를 문자열로 직접 전달 — USERINFO(객체)는 쿼리 직렬화에서 깨질 수 있어
+            //   테마 JSON 경로/테마변경 IPC 채널이 어긋난다(팝업에서 테마 미적용/미반영 원인).
+            SYSID: (parent.process.USERINFO && parent.process.USERINFO.SYSID) || "",
         };
 
         const sPopupPath = PATH.join(__dirname, "Popup", "index.html");

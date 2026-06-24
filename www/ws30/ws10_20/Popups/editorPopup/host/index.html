@@ -134,6 +134,11 @@
                     try { editor.getAction("editor.action.formatDocument").run(); } catch (e) { }
                     return;
 
+                case "fontZoomReset":
+                    // 푸터 줌 버튼 → 폰트 줌 원복(Ctrl+0 과 동일 Monaco 액션).
+                    try { editor.getAction("editor.action.fontZoomReset").run(); } catch (e) { }
+                    return;
+
                 case "focus":
                     try { editor.focus(); } catch (e) { }
                     return;

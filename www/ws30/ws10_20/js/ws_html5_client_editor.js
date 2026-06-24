@@ -188,7 +188,16 @@
     if (oState.bEdit) { lf_toHost({ cmd: "focus" }); }
   }
 
-  // 호스트 → 팝업 메시지(ready/change). 자기 HOSTID 만.
+  // 푸터 줌 표시/원복 버튼 갱신 — "NNN%" 상시 표시(숫자라 i18n 키 불필요).
+  function lf_setZoom(pct) {
+    if (!oUI || !oUI.zoomBtn) { return; }
+    var n = (typeof pct === "number" && isFinite(pct)) ? pct : 100;
+    var oSpan = oUI.zoomBtn.querySelector("span");
+    if (oSpan) { oSpan.textContent = n + "%"; }
+    oUI.zoomBtn.title = n + "% (Ctrl+0)";
+  }
+
+  // 호스트 → 팝업 메시지(ready/change/save/zoom). 자기 HOSTID 만.
   function lf_onMessage(oEvent) {
     var d = oEvent && oEvent.data;
     if (!d || d.__u4ace !== true || d.hostId !== C_HOSTID) { return; }
@@ -199,6 +208,7 @@
       lf_busyOff();
       return;
     }
+    if (d.evt === "zoom") { lf_setZoom(d.pct); return; }
     if (d.evt === "save") {
       // 에디터 한정 Ctrl+S → 저장(✓) 위임. 편집모드일 때만(표시모드는 ✓ 자체가 숨김 = 저장 불가).
       if (oState.bEdit) { lf_save(); }
@@ -287,6 +297,14 @@
     oPrettyBtn.addEventListener("click", function () { lf_toHost({ cmd: "format" }); });
     oFoot.appendChild(oPrettyBtn);
 
+    // 줌 표시/원복 — "NNN%" 상시 표시(처음부터 보여 발견성 확보). 클릭=폰트 줌 원복(Ctrl+0 동일).
+    //   편집/표시 모드 무관(읽기 중에도 줌 가능)이라 hidden 토글 안 함.
+    var oZoomBtn = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdZoom");
+    oZoomBtn.type = "button";
+    oZoomBtn.innerHTML = _fa("magnifying-glass") + "<span>100%</span>";
+    oZoomBtn.addEventListener("click", function () { lf_toHost({ cmd: "fontZoomReset" }); });
+    oFoot.appendChild(oZoomBtn);
+
     oFoot.appendChild(_el("span", "u4aCliEdFootSpacer"));
 
     var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aCliEdIcoBtn");
@@ -329,7 +347,7 @@
 
     oUI = {
       dlg: oDlg, frame: oFrame, headerTitle: oHeaderTitle,
-      prettyBtn: oPrettyBtn, saveBtn: oSaveBtn, delBtn: oDelBtn, ready: false
+      prettyBtn: oPrettyBtn, saveBtn: oSaveBtn, delBtn: oDelBtn, zoomBtn: oZoomBtn, ready: false
     };
   }
 
@@ -414,6 +432,8 @@
       // 꾸밈정렬 = 텍스트 전용(투명 버튼, 원본 sap.m.Button 기본 톤).
       ".u4aCliEdPretty { background: transparent; border-color: transparent; color: var(--sl-fg); }" +
       ".u4aCliEdPretty:hover { background: var(--sl-surface-2); }" +
+      // 줌 표시/원복 버튼 — Pretty 와 동일 투명 톤 + 숫자 폭 안정(tabular).
+      ".u4aCliEdZoom { font-variant-numeric: tabular-nums; gap: 0.375rem; }" +
       // 아이콘 전용 결정 버튼 = 정사각 컴팩트(텍스트 패딩 제거).
       ".u4aCliEdIcoBtn { min-width: 2.25rem; padding: 0.4rem 0.6rem; justify-content: center; }" +
       // Delete = Negative(빨강 채움) — 원본 sap Negative. 색 단일 출처 = --error 토큰(하드코딩 없음).

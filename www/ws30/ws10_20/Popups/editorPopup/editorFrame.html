@@ -48,16 +48,20 @@
         <iframe id="editorHost" name="editorHost" frameborder="0" allowfullscreen></iframe>
     </div>
 
-    <!-- ===== 푸터 = Save(강조) ===== -->
+    <!-- ===== 푸터 = [줌 표시/원복(왼쪽)] ···· [Save(오른쪽)] ===== -->
     <footer class="u4aEdWinFooter" id="editorFooter">
+        <!-- 줌 버튼: Ctrl+휠로 확대 시 "NNN%" 노출(클릭=원복). 100%(기본)면 자동 숨김. -->
+        <button type="button" class="u4a-btn u4aEdZoomBtn" id="editorZoomBtn" hidden>
+            <i class="fa-solid fa-magnifying-glass"></i><span></span>
+        </button>
+        <span class="u4aEdFootSpacer"></span>
         <button type="button" class="u4a-btn u4a-btn--emphasized" id="editorSaveBtn">
             <i class="fa-solid fa-check"></i><span></span>
         </button>
     </footer>
 
-    <!-- 로딩 오버레이 / 토스트 -->
+    <!-- 로딩 오버레이 (토스트는 공통 .u4a-toast 를 editorFrame.js 가 동적 생성) -->
     <div id="editorBusy"><div class="u4aEdSpinner"></div></div>
-    <div id="editorToast"></div>
 
     <script src="editorFrame.js"></script>
 

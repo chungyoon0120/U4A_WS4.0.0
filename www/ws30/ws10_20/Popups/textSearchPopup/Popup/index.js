@@ -20,6 +20,8 @@
 
     var BROWSKEY = oQueryParams.browserkey;
     var USERINFO = oQueryParams.USERINFO;
+    // SYSID 는 쿼리 문자열 우선(객체 직렬화 깨짐 방어) — 테마 JSON 경로 + 테마변경 IPC 채널에 공용.
+    var SYSID = oQueryParams.SYSID || (USERINFO && USERINFO.SYSID) || "";
 
     var WSMSG = new WSUTIL.MessageClassText(USERINFO.SYSID, USERINFO.LANGU);
 
@@ -54,9 +56,11 @@
      *************************************************************/
     oAPP.fn.getThemeInfo = function (){
 
-        let oUserInfo = USERINFO;
-        let sSysID = oUserInfo.SYSID;
-        
+        // ★ 매 호출 JSON 을 "새로" 읽는다 — 테마 변경 시 파일이 먼저 갱신되고 브로드캐스트가 오므로
+        //   재읽기로 새 테마를 반영(원본 _onIpcMain_if_p13n_themeChange 와 동일). 쿼리값으로 고정하면
+        //   변경이 무시됨(오픈 시점 테마에 묶임). SYSID 만 쿼리 문자열로 신뢰.
+        let sSysID = SYSID;
+
         // 해당 SYSID별 테마 정보 JSON을 읽는다.
         let sThemeJsonPath = PATH.join(USERDATA, "p13n", "theme", `${sSysID}.json`);
         if(FS.existsSync(sThemeJsonPath) === false){

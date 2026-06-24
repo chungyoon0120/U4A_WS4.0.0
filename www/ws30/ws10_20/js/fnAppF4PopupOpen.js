@@ -959,10 +959,9 @@
             ".u4aAppF4TreeBar{flex:0 0 auto;display:flex;align-items:center;gap:.375rem;}",
             ".u4aAppF4ClearBtn{margin-left:auto;}",   /* 탭1·탭2 공통: 전체해제 버튼을 툴바 우측 끝으로 */
             ".u4aAppF4TBarSep{width:.0625rem;height:1.25rem;background:var(--line);margin:0 .25rem;}",
-            /* overflow-anchor:none — 가상 스크롤이 뷰포트 위 DOM 을 매 틱 재생성할 때
-               Chromium scroll-anchoring 이 scrollTop 을 되돌려 휠이 안 먹는 현상 차단(Chromium93 지원). */
-            ".u4aAppF4TblWrap{flex:1 1 auto;min-height:0;overflow:auto;overflow-anchor:none;overscroll-behavior:contain;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--surface);}",
-            ".u4aAppF4Tbl,.u4aAppF4Tbl *{overflow-anchor:none;}",
+            /* overflow-anchor:none·overscroll-behavior:contain 은 공통 U4AUI.makeVScroller 가
+               스크롤컨테이너(이 wrap)에 inline 으로 설정(끝단 떨림·스크롤앵커링 방지 단일 출처). */
+            ".u4aAppF4TblWrap{flex:1 1 auto;min-height:0;overflow:auto;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--surface);}",
             /* 공통 .u4a-table(--compact) 소비 — 다열은 컬럼폭 합만큼 늘려 가로 스크롤 */
             /* ★ border-collapse:separate — collapse 면 Chromium 이 셀 z-index 를 무시해서
                가로 스크롤 시 뒤 컬럼이 고정 컬럼 위에 그려져 글자가 겹친다. separate 로 바꿔야

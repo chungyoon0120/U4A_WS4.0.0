@@ -17,18 +17,20 @@
     <script src="../../../theme/u4a-ui.js"></script>
 
     <style>
-        /* ★ 창은 투명(opener transparent:true) — html/body 도 투명이라 둥근 바만 떠 보인다.
-           바 둘레에 약간의 투명 여백을 둬서 둥근 모서리·그림자가 창 가장자리에 안 잘리게. */
-        html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
-        body { box-sizing: border-box; padding: 3px 5px; }
+        /* 불투명 창(opener transparent:false) — 바가 창을 꽉 채우는 직사각(둥근모서리/여백 없음 → Windows 투명창 글리치 회피).
+           ★ 배경 = "라이트" 바 + 테마 시그니처색(accent) 틴트 2겹 + 또렷한 accent 보더.
+             라이트라서 공통 전경(입력칸·아이콘·카운트·구분선)이 themed 색 그대로 또렷 — 어두운 바였으면 전경을
+             일일이 덮어야 해서 대비 사고가 남(카운트 안 보임 등). accent 는 _applySkin 이 전 테마 인라인 세팅(퍼플/레드/그린/블루). */
+        html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-raised, var(--surface)); }
 
         .u4aTxtSrchWin {
             display: flex; align-items: center; gap: .25rem;
             height: 100%; box-sizing: border-box; padding: .25rem .5rem;
-            background: var(--surface-raised, var(--surface));
-            border: .0625rem solid var(--divider, var(--line));
-            border-radius: .5rem;
-            box-shadow: 0 .125rem .5rem rgba(0, 0, 0, .28);
+            background:
+                linear-gradient(var(--u4a-accent-soft, transparent), var(--u4a-accent-soft, transparent)),
+                linear-gradient(var(--u4a-accent-soft, transparent), var(--u4a-accent-soft, transparent)),
+                var(--surface-raised, var(--surface));
+            border: .125rem solid var(--u4a-accent, var(--divider, var(--line)));
         }
         .u4aTxtSrchWin .u4aTxtSrchField { flex: 1 1 auto; min-width: 0; }
         .u4aTxtSrchWin__count { flex: 0 0 auto; min-width: 3rem; text-align: center; font-size: .75rem; color: var(--text-muted); }

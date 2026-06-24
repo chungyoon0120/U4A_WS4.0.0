@@ -90,17 +90,22 @@
     }
 
     // 테마 적용(공통) — 창 배경 + U4ATheme.
+    //   ★ getThemeInfo().THEME 은 UI5 테마명(sap_horizon_dark 등) → U4ATheme.normalize 로 키 변환 후 apply.
+    //     (메인 ws10_html._savedTheme 와 동일. normalize 빼면 키 불일치로 테마 CSS 미로드 → 다크에서 바만 라이트.)
     function _applyTheme() {
         try {
             var t = oAPP.fn.getThemeInfo && oAPP.fn.getThemeInfo();
-            if (t && t.BGCOL) { document.documentElement.style.setProperty("--boot-bg", t.BGCOL); }
-            if (t && t.THEME && window.U4ATheme) { window.U4ATheme.apply(t.THEME); }
+            if (!t) { return; }
+            if (t.BGCOL) { document.documentElement.style.setProperty("--boot-bg", t.BGCOL); }
+            if (t.THEME && window.U4ATheme) {
+                window.U4ATheme.apply(window.U4ATheme.normalize(t.THEME));
+            }
         } catch (e) { }
     }
 
     // 전 창 테마 실시간 동기화([[browser-window-common-ux]] 5) — 구독 + 해제.
-    var _sysid = (parent.USERINFO || {}).SYSID;
-    function _onThemeChange() { _applyTheme(); }
+    var _sysid = parent.SYSID || (parent.USERINFO || {}).SYSID;
+    function _onThemeChange() { _applyTheme(); }   // 변경 시 getThemeInfo 가 JSON 새로 읽어 새 테마 반영
     if (_sysid && parent.IPCMAIN) {
         try { parent.IPCMAIN.on("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { }
         window.addEventListener("beforeunload", function () {

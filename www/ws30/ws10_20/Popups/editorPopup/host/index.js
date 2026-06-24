@@ -40,6 +40,21 @@ window.require(["vs/editor/editor.main"], function () {
         _toParent({ evt: "change" });
     });
 
+    // 폰트 줌(%) 보고 — Ctrl+휠 줌 시 fontInfo.fontSize 가 베이스(14) 대비 변한다.
+    //   부모(editorFrame)가 푸터 줌 버튼에 "NNN%" 표시 + 100%면 숨김. (숫자라 i18n 키 불필요)
+    var C_BASE_FONT = 14;
+    function _reportZoom() {
+        try {
+            var fs = editor.getOption(monaco.editor.EditorOption.fontInfo).fontSize;
+            _toParent({ evt: "zoom", pct: Math.round((fs / C_BASE_FONT) * 100) });
+        } catch (e) { }
+    }
+    editor.onDidChangeConfiguration(function (e) {
+        try { if (e.hasChanged(monaco.editor.EditorOption.fontInfo)) { _reportZoom(); } }
+        catch (e2) { _reportZoom(); }
+    });
+    _reportZoom();   // 초기값 통지.
+
     // Shift+F1 = Pretty Print(포맷). ★에디터 한정★ — iframe 경계 안에서 처리.
     editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F1, function () {
         try { editor.getAction("editor.action.formatDocument").run(); } catch (e) { }
@@ -49,6 +64,12 @@ window.require(["vs/editor/editor.main"], function () {
     var _KEY_S = (monaco.KeyCode.KeyS != null) ? monaco.KeyCode.KeyS : monaco.KeyCode.KEY_S;
     editor.addCommand(monaco.KeyMod.CtrlCmd | _KEY_S, function () {
         _toParent({ evt: "save" });
+    });
+
+    // Ctrl/⌘+0 = 폰트 줌 원복(Ctrl+휠 확대/축소 되돌리기). Monaco 내장 액션 사용.
+    var _KEY_0 = (monaco.KeyCode.Digit0 != null) ? monaco.KeyCode.Digit0 : monaco.KeyCode.KEY_0;
+    editor.addCommand(monaco.KeyMod.CtrlCmd | _KEY_0, function () {
+        try { editor.getAction("editor.action.fontZoomReset").run(); } catch (e) { }
     });
 
     // 로드 완료 통지 — 부모(editorFrame)가 이 시점에 setValue / find / focus 수행.

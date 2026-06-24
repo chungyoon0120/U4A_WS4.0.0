@@ -125,16 +125,32 @@ function _finishOpen() {
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { }
     // 창 자체 오버레이 끄기 + 자식창 BUSY_OFF 방송.
     _setBusy(false);
+    // 컨텐츠 스르르 등장(CSS opacity transition) — 에디터가 준비된 시점에 페이드인.
+    _fadeInContent();
 }
 
-// 저장 토스트.
+// 컨텐츠 페이드인(원본 $('#maincontent').fadeIn 대체 — DOM CSS opacity, 네이티브 창 opacity 미사용).
+function _fadeInContent() {
+    var oEl = document.getElementById("editorContent");
+    if (oEl) { oEl.classList.add("u4aEdShown"); }
+}
+
+// 저장 토스트 — ★공통 컴포넌트 .u4a-toast★(shell.css 단일 출처: 화면 정중앙 = 전 화면 공통 UX).
+//   ServerList/optionPopup/showMessage 와 동일 패턴(싱글톤 div + data-show + 3초 자동 숨김).
 function _toast(sText) {
-    var oEl = document.getElementById("editorToast");
-    if (!oEl) { return; }
-    oEl.textContent = sText || "";
-    oEl.classList.add("show");
+    if (!sText) { return; }
+    var oEl = document.getElementById("u4aEdToast");
+    if (!oEl) {
+        oEl = document.createElement("div");
+        oEl.id = "u4aEdToast";
+        oEl.className = "u4a-toast";
+        oEl.setAttribute("role", "alert");
+        document.body.appendChild(oEl);
+    }
+    oEl.textContent = sText;
+    oEl.dataset.show = "true";
     try { clearTimeout(oToastTimer); } catch (e) { }
-    oToastTimer = setTimeout(function () { oEl.classList.remove("show"); }, 3000);
+    oToastTimer = setTimeout(function () { oEl.dataset.show = "false"; }, 3000);
 }
 
 // 푸터 Save 노출(편집모드에서만 — 원본 LF_SaveBtnVisible).
@@ -221,6 +237,19 @@ function _onHostMessage(oEvent) {
         return;
     }
     if (d.evt === "save") { _save(); return; }   // 에디터 한정 Ctrl+S 위임.
+    if (d.evt === "zoom") { _setZoom(d.pct); return; }
+}
+
+// 푸터 줌 표시/원복 버튼 갱신 — "NNN%" 상시 표시(처음부터 보여 발견성 확보 — 사용자 요청).
+//   숫자/%/단축키 표기라 i18n 키 불필요(줌 의미 전용 키가 없음).
+function _setZoom(pct) {
+    var oBtn = document.getElementById("editorZoomBtn");
+    if (!oBtn) { return; }
+    var n = (typeof pct === "number" && isFinite(pct)) ? pct : 100;
+    var oSpan = oBtn.querySelector("span");
+    if (oSpan) { oSpan.textContent = n + "%"; }
+    oBtn.title = n + "% (Ctrl+0)";
+    oBtn.hidden = false;   // 상시 표시.
 }
 
 // ── 메인 → 창: 에디터 정보 수신(원본 if-editor-info) ─────────────────────
@@ -273,6 +302,10 @@ function _initChrome() {
     var oClose = document.querySelector('#editorTitlebar [data-action="close"]');
     if (oClose) { oClose.addEventListener("click", function () { try { CURRWIN.close(); } catch (e) { } }); }
 
+    // 푸터 줌 표시/원복 — 클릭 시 폰트 줌 원복(호스트 fontZoomReset).
+    var oZoom = document.getElementById("editorZoomBtn");
+    if (oZoom) { oZoom.addEventListener("click", function () { _toHost({ cmd: "fontZoomReset" }); }); }
+
     // 푸터 Save.
     var oSave = document.getElementById("editorSaveBtn");
     if (oSave) {
@@ -324,9 +357,9 @@ window.addEventListener("load", function () {
     window.addEventListener("keyup", _keepSession);
     _keepSession();
 
-    // 창 표시 + 페이드인.
+    // 창은 즉시 불투명하게 표시(네이티브 opacity 페이드 미사용 — 무겁다). 등장 효과는
+    //   창 안 컨텐츠(#editorContent)를 CSS opacity transition 으로 스르르 띄운다(_fadeInContent).
     try { CURRWIN.show(); } catch (e) { }
-    try { WSUTIL.setBrowserOpacity(CURRWIN); } catch (e) { }
 
     // ★ busy 는 여기서 끄지 않는다 ★ — 오프너가 켠 WS20 busy 를 에디터가 완전히 로드될 때까지 유지.
     //   (구버전은 load 시점에 SETBUSYLOCK 해제 → if-editor-info 에서 재점등 = ON→OFF→ON 깜빡임이었음.)

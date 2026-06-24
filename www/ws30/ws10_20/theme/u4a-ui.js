@@ -1725,14 +1725,27 @@
         }
         oWrap.addEventListener("scroll", _onScroll);
 
+        // 경계(맨 위/아래)에서 네이티브 오버스크롤·스무스휠이 우리 수동 스크롤과 경합 → 끝단 "부르르" 떨림.
+        //   overscroll-behavior:contain 으로 경계 바운스/스크롤 체이닝을 끈다(Chromium 63+).
+        //   overflow-anchor:none — 윈도잉이 뷰포트 위 행을 갈아끼울 때 브라우저 스크롤 앵커링이 위치를
+        //   보정하려다 튀는 것 방지(가상스크롤은 우리가 scrollTop·스페이서로 위치를 직접 관리하므로 앵커링 불필요).
+        try { oWrap.style.overscrollBehavior = "contain"; oWrap.style.overflowAnchor = "none"; } catch (e) { }
+
         // ★ 휠 직접 처리 — 가상 스크롤 컨테이너의 네이티브 휠→스크롤이 안 먹는 환경(모달 top-layer 등) 대비.
+        //   ★ 끝단 떨림 방지: 우리가 직접 클램프하고, 스크롤 여지가 있으면 '항상' preventDefault 해서
+        //     네이티브 스무스휠/오버스크롤 애니메이션이 끼어들지 못하게 휠을 완전히 점유한다.
+        //     (예전엔 scrollTop 이 안 변할 때 prevent 를 건너뛰어 경계에서 네이티브가 다시 살아났다.)
         oWrap.addEventListener("wheel", function (e) {
             if (e.ctrlKey) { return; }   // Ctrl+휠=줌 양보
             const unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? (oWrap.clientHeight || 1) : 1);
-            const t0 = oWrap.scrollTop, l0 = oWrap.scrollLeft;
-            oWrap.scrollTop = t0 + e.deltaY * unit;
-            oWrap.scrollLeft = l0 + e.deltaX * unit;
-            if (oWrap.scrollTop !== t0 || oWrap.scrollLeft !== l0) { e.preventDefault(); }
+            const maxTop = oWrap.scrollHeight - oWrap.clientHeight;
+            const maxLeft = oWrap.scrollWidth - oWrap.clientWidth;
+            const bV = maxTop > 1 && e.deltaY;
+            const bH = maxLeft > 1 && e.deltaX;
+            if (!bV && !bH) { return; }   // 스크롤 여지 없음 → 바깥 스크롤러로 양보(체이닝 허용)
+            if (bV) { oWrap.scrollTop = Math.max(0, Math.min(maxTop, oWrap.scrollTop + e.deltaY * unit)); }
+            if (bH) { oWrap.scrollLeft = Math.max(0, Math.min(maxLeft, oWrap.scrollLeft + e.deltaX * unit)); }
+            e.preventDefault();   // 휠을 우리가 완전히 점유 → 경계에서 네이티브 경합 제거
         }, { passive: false });
 
         // 컨테이너 크기 변경(스플리터/창 리사이즈) 시 보일 행 수가 바뀌므로 재계산(rAF 스로틀=_onScroll).

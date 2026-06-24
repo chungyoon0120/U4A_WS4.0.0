@@ -1106,23 +1106,38 @@
 
     /** Master-Detail 뷰 본문 (폴더 → 서버목록 → 상세, 3컬럼) */
     function _buildMasterDetailBody(oBody) {
+        // 스플릿바 표준(doc 16 §4) — WS20 디자인 영역과 동일 거동:
+        //   · 초기 basis 는 %(고정 px 금지) → 반응형
+        //   · 패널별 **단일 min-width(px)** 가 초기 floor·드래그 클램프·리사이즈 재클램프의 단일 출처
+        //   · 각 바는 "왼쪽 패널"을 리사이즈(_attachSplitterDrag), 잔여는 fill 패널이 흡수.
+        //     → 트리(좌)·목록(가운데)은 0 1 %(min 까지 양보), 상세(우)가 1 1 auto(fill).
+        //   값 세트는 WS20 과 동일{사이드 300 / fill 200}. (창 최소폭 1000 > 300+300+200+바 ≈ 816)
         const oSplit = _el("div", "u4a-splitter");
+
         const oCol1 = _el("div", "u4a-splitter__pane");
         oCol1.id = "u4aWsTreePane";
-        oCol1.style.flex = "0 0 24%";
+        oCol1.style.flex = "0 1 25%";
+        oCol1.style.minWidth = "300px";
         const oBar1 = _el("div", "u4a-splitter__bar");
         oBar1.setAttribute("role", "separator");
         _attachSplitterDrag(oBar1, oCol1);
+
         const oCol2 = _el("div", "u4a-splitter__pane u4a-md__list");
         oCol2.id = "u4aWsMasterListPane";
-        // 축소 가능(0 1) → 공간 부족 시 가운데가 min-width 까지 줄고 상세(col3)가 안 잘림
-        oCol2.style.flex = "0 1 34%";
+        oCol2.style.flex = "0 1 30%";
+        oCol2.style.minWidth = "300px";
         const oBar2 = _el("div", "u4a-splitter__bar");
         oBar2.setAttribute("role", "separator");
         _attachSplitterDrag(oBar2, oCol2);
+
         const oCol3 = _el("div", "u4a-splitter__pane u4a-md__detail");
         oCol3.id = "u4aWsMasterDetailPane";
-        oCol3.style.flex = "1 1 auto";
+        // 상세 = 잔여 흡수(fill). basis 는 0% — 'auto' 면 상세 내용(긴 호스트 URL 등)의
+        // 본문 폭이 초기 basis 가 되어 합이 컨테이너를 넘겨 shrink 발동 → fill 이 도리어
+        // 자기 min 까지 짜부된다. basis 0 으로 두면 사이드(트리·목록) 다음의 잔여폭을 채운다.
+        oCol3.style.flex = "1 1 0%";
+        oCol3.style.minWidth = "200px";
+
         oSplit.append(oCol1, oBar1, oCol2, oBar2, oCol3);
         oBody.appendChild(oSplit);
     }
