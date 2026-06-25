@@ -2,5 +2,44 @@
   "model": "glm-5:cloud",
   "env": {
     "ANTHROPIC_BASE_URL": "https://ollama.com"    
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\pre_tool_use_mcp.py"],
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\prompt_submit.py"],
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\answer_finish.py"],
+            "async": true
+          }
+        ]
+      }
+    ]
   }
 }
