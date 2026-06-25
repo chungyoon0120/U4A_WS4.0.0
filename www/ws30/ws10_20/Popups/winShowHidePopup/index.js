@@ -1,288 +1,134 @@
-/************************************************************************
- * Copyright 2020. INFOCG Inc. all rights reserved. 
- * ----------------------------------------------------------------------
- * - file Name : winShowHidePopup/index.js
- ************************************************************************/
-
-/************************************************************************
- * 에러 감지
- ************************************************************************/
-var zconsole = parent.WSERR(window, document, console);
-
-let oAPP = parent.oAPP;
-
-(function (window, oAPP) {
+/****************************************************************************
+ * Window Hide(투명도) Slider — 팝업(별도 BrowserWindow) iframe 콘텐츠 (HTML5 변환)
+ * --------------------------------------------------------------------------
+ *  원본 UI5 뷰(winShowHidePopup/index.js 의 sap.m.Slider + 프리셋 sap.m.Button)를 대체.
+ *  기능은 원본 그대로: 부모(메인 WS) 창을 반투명 + 클릭통과(setIgnoreMouseEvents)로 만들어
+ *  뒤에 깔린 화면(예: SAP GUI) 위에 겹쳐 보며 따라 쓰는 "오버레이/트레이싱" 용도.
+ *  - 창 제어는 Electron(parent.oAPP.PARWIN / REMOTE) — UI5 무관이라 변환 없이 그대로 사용.
+ *  - parent = 외곽 frame.html(REMOTE/oAPP/PARWIN/USERINFO/IPCMAIN 셋업, frame.js).
+ *  - 테마: parent.oAPP.fn.getThemeInfo() → U4ATheme.apply + if-p13n-themeChange 구독.
+ ****************************************************************************/
+(function () {
     "use strict";
 
-    const
-        PATH = parent.PATH,
-        APP = parent.APP,
-        APPCOMMON = oAPP.common,
-        PATHINFO = parent.PATHINFO,
-        require = parent.require;
+    var oAPP = parent.oAPP;
+    var REMOTE = oAPP.REMOTE;
+    var PARWIN = oAPP.PARWIN;                         // 부모(메인 WS) 창 = 투명도/클릭통과 대상(원본 PARWIN)
+    var CURRWIN = REMOTE.getCurrentWindow();          // 이 팝업 창(닫기용)
+    var zconsole = parent.WSERR ? parent.WSERR(window, document, console) : console;
 
-    /*************************************************************
-     * @function - SYSID에 해당하는 테마 변경 IPC 이벤트
-     *************************************************************/
-    function _onIpcMain_if_p13n_themeChange(){ 
+    // 초기 투명도(원본 DEFAULT_OPACITY=0.3) — frame.js 가 if_showHidePopup IPC 로 attr 에 실어둠.
+    var DEFAULT_PCT = Math.round(((oAPP.attr && oAPP.attr.DEFAULT_OPACITY) || 0.3) * 100);
+    var _slider = null;
 
-        let oThemeInfo = oAPP.fn.getThemeInfo();
-        if(!oThemeInfo){
-            return;
-        }
+    var _fa = function (s) { return '<i class="fa-solid fa-' + s + '"></i>'; };
 
-        let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
-        let oBrowserWindow = oAPP.REMOTE.getCurrentWindow();
-            oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
-
-        sap.ui.getCore().applyTheme(oThemeInfo.THEME);
-
-    } // end of _onIpcMain_if_p13n_themeChange
-
-
-    /*************************************************************
-     * @function - IPC Event 등록
-     *************************************************************/
-    function _attachIpcEvents(){
-
-        // let oUserInfo = parent.process.USERINFO;
-        let oUserInfo = oAPP.USERINFO;
-        let sSysID = oUserInfo.SYSID;
-
-        // SYSID에 해당하는 테마 변경 IPC 이벤트를 등록한다.
-        oAPP.IPCMAIN.on(`if-p13n-themeChange-${sSysID}`, _onIpcMain_if_p13n_themeChange); 
-
-    } // end of _attachIpcEvents
-
-    /*************************************************************
-     * @function - IPC Event 해제
-     *************************************************************/
-    function _detachIpcEvents(){
-
-        // let oUserInfo = parent.process.USERINFO;
-        let oUserInfo = oAPP.USERINFO;
-        let sSysID = oUserInfo.SYSID;
-
-        // SYSID에 해당하는 테마 변경 IPC 이벤트를 등록한다.
-        oAPP.IPCMAIN.off(`if-p13n-themeChange-${sSysID}`, _onIpcMain_if_p13n_themeChange); 
-
-    } // end of _detachIpcEvents    
-
-
-    /************************************************************************
-     * ws의 설정 정보를 구한다.
-     ************************************************************************/
-    oAPP.fn.getSettingsInfo = function () {
-
-        // Browser Window option
-        var sSettingsJsonPath = PATHINFO.WSSETTINGS,
-
-            // JSON 파일 형식의 Setting 정보를 읽는다..
-            oSettings = require(sSettingsJsonPath);
-        if (!oSettings) {
-            return;
-        }
-
-        return oSettings;
-
-    }; // end of oAPP.fn.getSettingsInfo
-
-    /************************************************************************
-     * UI5 BootStrap Settings
-     ************************************************************************/
-    oAPP.fn.fnLoadBootStrapSetting = function () {
-
-        var oSettings = oAPP.fn.getSettingsInfo(),
-            oSetting_UI5 = oSettings.UI5,
-            oBootStrap = oSetting_UI5.bootstrap,
-            oUserInfo = oAPP.attr.oUserInfo,
-            // oThemeInfo = oAPP.attr.oThemeInfo,
-            oThemeInfo = oAPP.fn.getThemeInfo(),
-            sLangu = oUserInfo.LANGU;
-
-        var oScript = document.createElement("script");
-        oScript.id = "sap-ui-bootstrap";
-
-        // 공통 속성 적용
-        for (const key in oBootStrap) {
-            oScript.setAttribute(key, oBootStrap[key]);
-        }
-
-        // 로그인 Language 적용
-        oScript.setAttribute('data-sap-ui-theme', oThemeInfo.THEME);
-        oScript.setAttribute("data-sap-ui-language", sLangu);
-        oScript.setAttribute("data-sap-ui-libs", "sap.m");
-        oScript.setAttribute("src", oSetting_UI5.resourceUrl);
-        
-        document.head.appendChild(oScript);
-
-    }; // end of fnLoadBootStrapSetting
-
-    /************************************************************************
-     * Application Start!!
-     ************************************************************************/
-    oAPP.fn.onStart = () => {
-
-        sap.ui.getCore().attachInit(() => {
-
-            // IPC Event 등록
-            _attachIpcEvents();
-
-            oAPP.fn.onInitRendering();
-
-        });
-
-    }; // end of oAPP.fn.onStart    
-
-    /************************************************************************
-     * Init Rendering
-     ************************************************************************/
-    oAPP.fn.onInitRendering = () => {
-
-        let oApp = new sap.m.App({
-            autoFocus: false
-        }).addStyleClass("sapUiSizeCompact"),
-            oPage = new sap.m.Page({
-                backgroundDesign: sap.m.PageBackgroundDesign.List,
-                customHeader: new sap.m.Toolbar({
-                    content: [
-                        new sap.ui.core.Icon({
-                            src: "sap-icon://hide"
-                        }),
-                        new sap.m.Title({
-                            text: "window Hide Slider"
-                        }),
-
-                        new sap.m.ToolbarSpacer(),
-
-                        new sap.m.Button({
-                            type: sap.m.ButtonType.Negative,
-                            icon: "sap-icon://decline",
-                            press: () => {
-
-                                let oCurrWin = oAPP.REMOTE.getCurrentWindow();
-                                oCurrWin.close();
-
-                            }
-                        })
-                    ]
-                }).addStyleClass("u4aWsWinShowHideToolbar"),
-                content: [
-                    new sap.m.VBox({
-                        height: "100%",
-                        renderType: sap.m.FlexRendertype.Bare,
-                        alignItems: sap.m.FlexAlignItems.Center,
-                        items: [
-
-                            new sap.m.Slider("opaSlider", {
-                                value: oAPP.attr.DEFAULT_OPACITY * 100,
-                                liveChange: (oEvent) => {
-
-                                    oAPP.PARWIN.setIgnoreMouseEvents(true);
-
-                                    let oCurrWin = oAPP.REMOTE.getCurrentWindow(),
-                                        oParentWin = oCurrWin.getParentWindow();
-
-                                    let iValue = oEvent.getParameter("value"),
-                                        opa = iValue / 100;
-
-                                    oParentWin.setOpacity(opa);
-
-                                    if (opa == 1) {
-                                        oAPP.PARWIN.setIgnoreMouseEvents(false);
-                                        return;
-                                    }
-
-                                }
-
-                            }),
-
-                            new sap.m.HBox({
-                                renderType: sap.m.FlexRendertype.Bare,
-                                justifyContent: sap.m.FlexJustifyContent.SpaceBetween,
-                                width: "100%",
-                                items: [
-
-                                    new sap.m.Button({
-                                        text: "20",
-                                        press: _pressOpacityButton
-                                    }),
-                                    new sap.m.Button({
-                                        text: "40",
-                                        press: _pressOpacityButton
-                                    }),
-
-                                    new sap.m.Button({
-                                        text: "60",
-                                        press: _pressOpacityButton
-                                    }),
-                                    new sap.m.Button({
-                                        text: "80",
-                                        press: _pressOpacityButton
-                                    }),
-                                    new sap.m.Button({
-                                        text: "100",
-                                        press: _pressOpacityButton
-                                    }),
-                                ]
-                            })
-
-                        ] // end of vbox items
-                    }),
-
-                ] // end of page content
-
-            });
-
-        oApp.addPage(oPage);
-        oApp.placeAt("content");
-
-        oPage.addStyleClass("sapUiContentPadding");
-        // oApp.addStyleClass("sapUiSizeCompact");
-
-        oAPP.PARWIN.setOpacity(oAPP.attr.DEFAULT_OPACITY);
-
-    }; // end of oAPP.fn.onInitRendering
-
-    function _pressOpacityButton(oEvent) {
-
-        let oBtn = oEvent.getSource(),
-            sValue = oBtn.getText(),
-            iSliderValue = parseInt(sValue),
-            iValue = parseInt(iSliderValue) / 100;
-
-        let oSlider = sap.ui.getCore().byId("opaSlider");
-        if (oSlider) {
-            oSlider.setValue(iSliderValue);
-        }
-
-        oAPP.PARWIN.setOpacity(iValue);
-
-        oAPP.PARWIN.setIgnoreMouseEvents(true);
-
-        if (iValue == 1) {
-            oAPP.PARWIN.setIgnoreMouseEvents(false);
-        }
-
+    // 부모 창 투명도 적용(원본 liveChange/_pressOpacityButton 동일).
+    //   반투명이면 클릭통과 ON(뒤 화면 조작), 100%면 OFF(정상 조작 복원).
+    function _applyOpacity(iPct) {
+        var opa = iPct / 100;
+        try {
+            PARWIN.setIgnoreMouseEvents(true);
+            PARWIN.setOpacity(opa);
+            if (opa >= 1) { PARWIN.setIgnoreMouseEvents(false); }
+        } catch (e) { zconsole.error("[WINHIDE] setOpacity", e); }
     }
 
-    oAPP.fn.fnLoadBootStrapSetting();
+    // 닫기(원본 close 버튼 → currWin.close()) — 부모창 복원(투명도/클릭통과/항상위)은
+    //   opener(ws_fn_04.js) 의 'closed' 핸들러가 수행(원본 동일, 여기서 중복 처리 안 함).
+    function _close() {
+        try { if (!CURRWIN.isDestroyed()) { CURRWIN.close(); } } catch (e) { }
+    }
 
-    window.onload = () => {
+    function _build() {
+        var root = document.getElementById("u4aWinHide");
+        root.className = "u4aWinHide";
 
-        oAPP.fn.onStart();
+        // ── 타이틀바(공통 .u4a-titlebar — 프레임리스 네이티브 드래그) ──
+        var bar = document.createElement("div");
+        bar.className = "u4a-titlebar";
 
+        var icon = document.createElement("i");
+        icon.className = "fa-solid fa-eye-slash u4aWinHide__icon";   // 원본 sap-icon://hide
 
-    };
+        var title = document.createElement("span");
+        title.className = "u4a-titlebar__title";
+        title.textContent = "window Hide Slider";   // ⚠️ 원본 하드코딩 문구 — 메시지 키 수집 대상
 
-    /************************************************************************
-     * 페이지가 실제로 숨겨지거나 종료 처리될 때 호출되는 이벤트
-     ************************************************************************/
-    parent.window.addEventListener('pagehide', function(){
+        var spacer = document.createElement("span");
+        spacer.className = "u4a-titlebar__spacer";
 
-        // IPC Event 해제
-        _detachIpcEvents();
+        var btnClose = document.createElement("button");
+        btnClose.type = "button";
+        btnClose.className = "u4a-winbtn u4a-winbtn--close";   // 공통 닫기 X(빨강 hover)
+        btnClose.title = "Close";
+        btnClose.innerHTML = _fa("xmark");
+        btnClose.addEventListener("click", _close);
 
-    },{ once: true });
+        bar.append(icon, title, spacer, btnClose);
 
-})(window, oAPP);
+        // ── 본문(슬라이더 + 프리셋 20/40/60/80/100) ──
+        var body = document.createElement("div");
+        body.className = "u4aWinHide__body";
+
+        _slider = document.createElement("input");
+        _slider.type = "range";
+        _slider.className = "u4aWinHide__slider";
+        _slider.min = "0"; _slider.max = "100"; _slider.step = "1";   // 원본 sap.m.Slider(0~100)
+        _slider.value = String(DEFAULT_PCT);
+        // 원본 liveChange — 드래그 내내 실시간 반영(input).
+        _slider.addEventListener("input", function () { _applyOpacity(parseInt(_slider.value, 10)); });
+
+        var presets = document.createElement("div");
+        presets.className = "u4aWinHide__presets";
+        [20, 40, 60, 80, 100].forEach(function (n) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "u4a-btn";
+            b.textContent = String(n);
+            // 원본 _pressOpacityButton — 슬라이더 동기화 + 부모창 투명도 적용.
+            b.addEventListener("click", function () { _slider.value = String(n); _applyOpacity(n); });
+            presets.appendChild(b);
+        });
+
+        body.append(_slider, presets);
+        root.append(bar, body);
+
+        // ESC = 닫기(공통 별도창 UX).
+        document.addEventListener("keydown", function (e) {
+            if (e.keyCode === 27) { e.preventDefault(); _close(); }
+        });
+    }
+
+    // 테마 적용(공통) — 창 배경(--boot-bg) + U4ATheme.
+    //   ★ getThemeInfo().THEME 은 UI5 테마명(sap_horizon_dark 등) → U4ATheme.normalize 로 키 변환 후 apply.
+    function _applyTheme() {
+        try {
+            var t = oAPP.fn && oAPP.fn.getThemeInfo && oAPP.fn.getThemeInfo();
+            if (!t) { return; }
+            if (t.BGCOL) { document.documentElement.style.setProperty("--boot-bg", t.BGCOL); }
+            if (t.THEME && window.U4ATheme) { window.U4ATheme.apply(window.U4ATheme.normalize(t.THEME)); }
+        } catch (e) { }
+    }
+
+    // 전 창 테마 실시간 동기화([[browser-window-common-ux]]) — 구독 + 해제.
+    var _sysid = (oAPP.USERINFO || {}).SYSID;
+    function _onThemeChange() { _applyTheme(); }   // 변경 시 getThemeInfo 가 JSON 새로 읽어 새 테마 반영
+    if (_sysid && oAPP.IPCMAIN) {
+        try { oAPP.IPCMAIN.on("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { }
+        window.addEventListener("beforeunload", function () {
+            try { oAPP.IPCMAIN.off("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { }
+        });
+    }
+
+    function _start() {
+        _applyTheme();
+        _build();
+        // 원본 onInitRendering 끝: 렌더 직후 부모창에 즉시 0.3 적용 + 슬라이더 동기.
+        _applyOpacity(DEFAULT_PCT);
+    }
+
+    if (window.U4AUI) { _start(); }
+    else { window.addEventListener("load", _start); }
+
+})();

@@ -2,44 +2,60 @@
 <html>
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+    <!-- Window Hide(투명도) Slider 팝업(별도 BrowserWindow) iframe 콘텐츠 — HTML5 변환.
+         원본 UI5(sap.m.Slider + 프리셋 sap.m.Button) 뷰를 공통 컴포넌트(.u4a-titlebar/.u4a-btn)로 대체.
+         스택은 최소(FA/tokens/shell/theme-api/u4a-ui) — UI5 부트스트랩 미로드.
+         경로: index.html(Popups/winShowHidePopup) 기준 → theme=../../theme, lib=../../../../lib.
+         theme-api 는 자기 script src 로 THEME_DIR 자동해석(경로 독립). 부모창 투명도 제어=Electron(index.js). -->
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
     <style>
-        .u4aWsWinShowHideToolbar:not(.sapMBtn) {
-            -webkit-app-region: drag;
+        /* 투명 창(opener transparent:true) — 본문 투명, "카드"만 떠 보이게(둥근 모서리+그림자).
+           반투명해지는 건 부모(메인 WS) 창이고, 이 컨트롤 카드 자체는 불투명 표면. */
+        html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+
+        .u4aWinHide {
+            box-sizing: border-box;
+            height: 100%;
+            display: flex; flex-direction: column;
+            background: var(--surface-raised, var(--surface));
+            border: .0625rem solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--popover-shadow);
+            overflow: hidden;
         }
 
-        .u4aWsWinShowHideToolbar .sapMBtn {
-            -webkit-app-region: no-drag;
+        /* 타이틀바 좌측 아이콘(원본 sap-icon://hide = 눈 빗금) */
+        .u4aWinHide__icon { margin-left: .25rem; color: var(--icon-muted); font-size: .9rem; -webkit-app-region: no-drag; }
+
+        /* 본문 = 슬라이더 + 프리셋(20~100), 세로 가운데 */
+        .u4aWinHide__body {
+            flex: 1 1 auto; min-height: 0;
+            display: flex; flex-direction: column; justify-content: center; gap: .75rem;
+            padding: .75rem;
         }
-        
+        .u4aWinHide__slider { width: 100%; accent-color: var(--accent); cursor: pointer; }
+        .u4aWinHide__presets { display: flex; gap: .375rem; }
+        .u4aWinHide__presets .u4a-btn { flex: 1 1 0; min-width: 0; padding: 0 .25rem; }
     </style>
 </head>
 
-<body class="sapUiBody">
+<body>
 
-    <div id="content"></div>
+    <div id="u4aWinHide"></div>
 
     <script>
-        /************************************************************************
-         * 에러 감지
-         ************************************************************************/
-        var require = parent.require,
-            REMOTE = require('@electron/remote'),
-            PATH = REMOTE.require('path'),
-            APP = REMOTE.app,
-            APPPATH = APP.getAppPath(),
-            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
-            PATHINFO = require(PATHINFOURL),
-            WSERR = require(PATHINFO.WSTRYCATCH);
-
-        var zconsole = WSERR(window, document, console);
+        var oScr = document.createElement("script");
+        oScr.src = "index.js";
+        document.body.appendChild(oScr);
     </script>
-
-    <script src="index.js"></script>
 
 </body>
 

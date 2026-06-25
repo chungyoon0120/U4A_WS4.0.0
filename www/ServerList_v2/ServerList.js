@@ -1088,30 +1088,35 @@
         return oWrap;
     }
 
-    /** Tree 뷰 본문 (좌 트리 / 우 테이블 — 기존 레이아웃) */
+    /** Tree 뷰 본문 (좌 트리 / 우 테이블 — 2분할) */
     function _buildTreeViewBody(oBody) {
+        // 스플릿바 표준(doc 16 §4) — 마스터-디테일과 동일 기준:
+        //   좌(트리)=0 1 %(초기 basis %, 공간 부족 시 양보)+단일 min-width(px),
+        //   우(테이블)=1 1 auto(잔여 흡수)+단일 min-width(px). 드래그는 단순 인접 리사이저.
         const oSplitter = _el("div", "u4a-splitter");
         const oPaneLeft = _el("div", "u4a-splitter__pane");
         oPaneLeft.id = "u4aWsTreePane";
-        oPaneLeft.style.flex = "0 0 30%";
+        oPaneLeft.style.flex = "0 1 25%";
+        oPaneLeft.style.minWidth = "300px";
         const oBar = _el("div", "u4a-splitter__bar");
         oBar.setAttribute("role", "separator");
         _attachSplitterDrag(oBar, oPaneLeft);
         const oPaneRight = _el("div", "u4a-splitter__pane");
         oPaneRight.id = "u4aWsTablePane";
         oPaneRight.style.flex = "1 1 auto";
+        oPaneRight.style.minWidth = "300px";
         oSplitter.append(oPaneLeft, oBar, oPaneRight);
         oBody.appendChild(oSplitter);
     }
 
     /** Master-Detail 뷰 본문 (폴더 → 서버목록 → 상세, 3컬럼) */
     function _buildMasterDetailBody(oBody) {
-        // 스플릿바 표준(doc 16 §4) — WS20 디자인 영역과 동일 거동:
-        //   · 초기 basis 는 %(고정 px 금지) → 반응형
-        //   · 패널별 **단일 min-width(px)** 가 초기 floor·드래그 클램프·리사이즈 재클램프의 단일 출처
-        //   · 각 바는 "왼쪽 패널"을 리사이즈(_attachSplitterDrag), 잔여는 fill 패널이 흡수.
-        //     → 트리(좌)·목록(가운데)은 0 1 %(min 까지 양보), 상세(우)가 1 1 auto(fill).
-        //   값 세트는 WS20 과 동일{사이드 300 / fill 200}. (창 최소폭 1000 > 300+300+200+바 ≈ 816)
+        // 스플릿바 = WS20 디자인 영역과 **동일 구조/거동**(doc 16 §4, give-way):
+        //   구조: 트리(좌 사이드) | 목록(센터 fill) | 상세(우 사이드)
+        //   · 사이드(트리·상세)=0 1 %(초기 basis %)+단일 min-width(px). 센터(목록)=1 1 auto(잔여 흡수).
+        //   · 각 바는 인접 "사이드" 패널을 리사이즈(give-way): 끌면 self 확대 → 센터가 먼저 min 까지
+        //     흡수 → 센터가 min 에 닿으면 반대편 사이드가 자기 min 까지 양보(밀림). 셋 다 min=hard stop.
+        //   값 세트 WS20 동일{사이드 300 / 센터 200}. (창 최소폭 1000 > 300+200+300+바 ≈ 816)
         const oSplit = _el("div", "u4a-splitter");
 
         const oCol1 = _el("div", "u4a-splitter__pane");
@@ -1120,23 +1125,22 @@
         oCol1.style.minWidth = "300px";
         const oBar1 = _el("div", "u4a-splitter__bar");
         oBar1.setAttribute("role", "separator");
-        _attachSplitterDrag(oBar1, oCol1);
 
         const oCol2 = _el("div", "u4a-splitter__pane u4a-md__list");
         oCol2.id = "u4aWsMasterListPane";
-        oCol2.style.flex = "0 1 30%";
-        oCol2.style.minWidth = "300px";
+        oCol2.style.flex = "1 1 auto";   // 센터 = 잔여 흡수(fill)
+        oCol2.style.minWidth = "200px";
         const oBar2 = _el("div", "u4a-splitter__bar");
         oBar2.setAttribute("role", "separator");
-        _attachSplitterDrag(oBar2, oCol2);
 
         const oCol3 = _el("div", "u4a-splitter__pane u4a-md__detail");
         oCol3.id = "u4aWsMasterDetailPane";
-        // 상세 = 잔여 흡수(fill). basis 는 0% — 'auto' 면 상세 내용(긴 호스트 URL 등)의
-        // 본문 폭이 초기 basis 가 되어 합이 컨테이너를 넘겨 shrink 발동 → fill 이 도리어
-        // 자기 min 까지 짜부된다. basis 0 으로 두면 사이드(트리·목록) 다음의 잔여폭을 채운다.
-        oCol3.style.flex = "1 1 0%";
-        oCol3.style.minWidth = "200px";
+        oCol3.style.flex = "0 1 30%";
+        oCol3.style.minWidth = "300px";
+
+        // give-way 드래그: 바1=트리(좌 사이드), 바2=상세(우 사이드). 센터(목록)가 흡수.
+        _attachGiveWaySplitterDrag(oBar1, oCol1, "left");
+        _attachGiveWaySplitterDrag(oBar2, oCol3, "right");
 
         oSplit.append(oCol1, oBar1, oCol2, oBar2, oCol3);
         oBody.appendChild(oSplit);
@@ -3788,6 +3792,77 @@
      * 주고받는다. 오른쪽 이웃이 마지막(유연) 패널이면 왼쪽만 px 로 두고 flex 로 채운다.
      *  → 바2 를 옮겨도 바1 은 col2 를 줄이며 정상 이동(상식적 동작). 마지막 패널 안 사라짐.
      */
+    /**
+     * give-way 스플리터 드래그 (Master-Detail 전용) — WS20 _bindResizer 포팅.
+     *   구조: 트리(좌 사이드) | 목록(센터=#u4aWsMasterListPane, 1 1 auto) | 상세(우 사이드).
+     *   바를 끌면 self(사이드) 확대 → ① 센터가 먼저 자기 min 까지 흡수 → ② 센터가 min 에 닿으면
+     *   반대편 사이드가 자기 min 까지 양보(밀림). self 상한 = 전체 − 센터min − 반대편min(hard stop).
+     *   self·opp 는 0 0 px(JS 단일 출처), 센터는 1 1 auto 라 나머지를 자동 흡수.
+     * @param {HTMLElement} oBar   드래그 바
+     * @param {HTMLElement} oSelf  바가 리사이즈할 사이드 패널(트리=좌바 / 상세=우바)
+     * @param {"left"|"right"} sSide  좌바=+delta(우로 끌면 self 확대) / 우바=−delta
+     */
+    function _attachGiveWaySplitterDrag(oBar, oSelf, sSide) {
+        // ★ oSplit 은 setup 시점(append 전)엔 oBar.parentElement 가 null 이므로 mousedown 에서 잡는다.
+        let oSplit = null;
+        const _min = (el) => { const v = parseFloat(getComputedStyle(el).minWidth); return (v > 0) ? v : 120; };
+        const _barsW = () => {
+            let w = 0;
+            oSplit.querySelectorAll(".u4a-splitter__bar").forEach((b) => { w += b.offsetWidth || 8; });
+            return w;
+        };
+        const _center = () => oSplit.querySelector("#u4aWsMasterListPane");
+        const _opp = () => oSplit.querySelector(
+            oSelf.id === "u4aWsTreePane" ? "#u4aWsMasterDetailPane" : "#u4aWsTreePane"
+        );
+
+        let bDrag = false, iStartX = 0, iStartW = 0;
+        function lf_move(ev) {
+            if (!bDrag || !oSplit) { return; }
+            const oCenter = _center(), oOpp = _opp();
+            if (!oCenter || !oOpp) { return; }
+
+            const iCenterMin = _min(oCenter), iSelfMin = _min(oSelf), iOppMin = _min(oOpp);
+            const iTotal = oSplit.clientWidth - _barsW();
+
+            const iDelta = ev.clientX - iStartX;
+            let iSelf = (sSide === "left") ? (iStartW + iDelta) : (iStartW - iDelta);
+
+            // self 상한 = 센터·반대편이 모두 min 일 때
+            const iSelfMax = iTotal - iCenterMin - iOppMin;
+            if (iSelf > iSelfMax) { iSelf = iSelfMax; }
+            if (iSelf < iSelfMin) { iSelf = iSelfMin; }
+
+            // 반대편: 센터가 자기 min 보다 더 줄어야 할 때만 양보(자기 min 까지)
+            let iOpp = oOpp.getBoundingClientRect().width;
+            if (iTotal - iSelf - iOpp < iCenterMin) {
+                iOpp = iTotal - iSelf - iCenterMin;
+                if (iOpp < iOppMin) { iOpp = iOppMin; }
+            }
+
+            oSelf.style.flex = "0 0 " + iSelf + "px";
+            oOpp.style.flex = "0 0 " + iOpp + "px";
+        }
+        function lf_up() {
+            if (!bDrag) { return; }
+            bDrag = false;
+            document.body.style.cursor = "";
+            window.removeEventListener("mousemove", lf_move);
+            window.removeEventListener("mouseup", lf_up);
+        }
+        oBar.addEventListener("mousedown", (ev) => {
+            oSplit = oBar.parentElement; // 이 시점엔 이미 append 됨
+            if (!oSplit) { return; }
+            bDrag = true;
+            iStartX = ev.clientX;
+            iStartW = oSelf.getBoundingClientRect().width;
+            document.body.style.cursor = "col-resize";
+            window.addEventListener("mousemove", lf_move);
+            window.addEventListener("mouseup", lf_up);
+            ev.preventDefault();
+        });
+    }
+
     function _attachSplitterDrag(oBar, oLeftPane) {
         let bDrag = false;
         oBar.addEventListener("mousedown", (ev) => {

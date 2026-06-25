@@ -877,6 +877,13 @@
 
         // (테마 변경은 옵션 팝업으로 이관됨 → 헤더 테마 스와치 버튼 제거. 2026-06-24)
 
+        // 브라우저 투명도(숨김) 슬라이더 팝업 버튼 — 원본 ws_common.js:3432 BUTTON1(icon:sap-icon://hide
+        //   → fnSetHideWindow, ws_fn_04.js:757). 부모 창을 반투명+클릭통과로 만드는 별도 BrowserWindow(WINSHOWHIDE).
+        //   opener(fnSetHideWindow)·로더(frame.html/frame.js)는 원본 재사용, iframe 콘텐츠(index.html/js)만 HTML5화.
+        o.appendChild(_iconBtn(ICON.eyeSlash, "", function () {
+            try { oAPP.fn.fnSetHideWindow(); } catch (e) { console.error("[WS10] window hide popup open", e); }
+        }));
+
         // SAP 로고 (svg) — T-CODE 좌측. 클릭 시 T-CODE 실행 로직으로 SMEN(SAP 메인메뉴) 실행.
         var oSapLogo = document.createElement("img");
         oSapLogo.className = "u4a-sap-logo";
