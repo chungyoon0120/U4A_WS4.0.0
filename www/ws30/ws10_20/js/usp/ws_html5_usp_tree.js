@@ -37,10 +37,11 @@
     }
 
     // 구 트리 Name 컬럼 아이콘 formatter(ISFLD/EXTEN) 1:1 이식
-    function _iconSrc(ISFLD, EXTEN) {
+    function _iconSrc(ISFLD, EXTEN, bExpanded) {
         _ensureSvgList();
         if (!_svgFolder) { return ""; }
-        if (ISFLD === "X") { return _svgFolder + "/folder.svg"; }
+        // 폴더: 펼침=열린 폴더 / 접힘=닫힌 폴더 (펼침 상태는 createTree 가 icon 콜백 oCtx.expanded 로 전달).
+        if (ISFLD === "X") { return _svgFolder + (bExpanded ? "/folder-open.svg" : "/folder.svg"); }
         if (!EXTEN) { return _svgFolder + "/file.svg"; }
         var sLow = String(EXTEN).toLowerCase();
         var sFind = _svgList.find(function (elem) { return elem.indexOf(sLow) === 0; });
@@ -70,8 +71,8 @@
             key: _key,
             label: function (n) { return (n && n.OBDEC != null) ? n.OBDEC : ""; },
             tip: function (n) { return (n && n.OBDEC != null) ? String(n.OBDEC) : ""; },
-            icon: function (n) {
-                var src = _iconSrc(n.ISFLD, n.EXTEN);
+            icon: function (n, oCtx) {
+                var src = _iconSrc(n.ISFLD, n.EXTEN, !!(oCtx && oCtx.expanded));
                 if (!src) { return ""; }
                 return '<img src="' + _attrEsc(src) + '" alt="" onerror="this.style.display=\'none\'">';
             },
@@ -141,11 +142,10 @@
         if (oNode) { oNode.ISSEL = true; }
 
         if (!_tree) { return; }
-        var oRow = _tree.selectByKey(oNode ? _key(oNode) : "");
-        // ★ 스크롤은 명시 요청(bScroll)일 때만. 사용자가 직접 클릭한 행은 이미 보이므로 scrollIntoView 하면
-        //   가상스크롤 컨테이너가 점프해 불편하다(원본 UI5 도 클릭 시 스크롤 안 함). 신규 생성/검색 등
+        // ★ 스크롤은 명시 요청(bScroll)일 때만 — selectByKey 2번째 인자(bReveal)로 위임.
+        //   클릭 선택은 이미 보이는 행이라 스크롤 점프 금지(원본 UI5 도 클릭 시 스크롤 안 함). 신규 생성/검색 등
         //   화면 밖 노드를 프로그램으로 선택할 때만 호출처가 bScroll=true 로 보이게 한다.
-        if (bScroll && oRow) { try { oRow.scrollIntoView({ block: "nearest" }); } catch (e) { } }
+        _tree.selectByKey(oNode ? _key(oNode) : "", !!bScroll);
     };
 
     // 구 fnOnUspTreeUnSelect — 모든 노드 선택 해제(override; 셸 _fnLineSelectCb 가 호출)

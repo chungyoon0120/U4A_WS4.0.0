@@ -1105,9 +1105,9 @@
             // lead 슬롯(체크박스 등)
             if (_slotLead) { const x = _slotLead(node, oCtx); if (x) { oRow.appendChild(x); } }
 
-            // 아이콘
+            // 아이콘 — oCtx(펼침/레벨/선택 등) 전달: 폴더 열림/닫힘 아이콘 등 상태별 아이콘 지원.
             if (_icon) {
-                const sIcon = _icon(node);
+                const sIcon = _icon(node, oCtx);
                 if (sIcon) { const oIc = _el("span", "u4a-tree__icon"); oIc.innerHTML = sIcon; oRow.appendChild(oIc); }
             }
 
@@ -1246,9 +1246,11 @@
         }
         // (선택사항) 베이스가 선택 강조를 소유할 화면용 — 한 행만 aria-selected
         function setSelected(node) { selectByKey(_key(node)); }
-        function selectByKey(sKey) {
-            // 가상 모드: 대상이 off-screen 이면 scrollToKey 로 reveal(스크롤+윈도우 렌더) 후 강조.
-            const oRow = bVirtual ? scrollToKey(sKey) : findRow(sKey);
+        function selectByKey(sKey, bReveal) {
+            // bReveal(기본 true): 가상 모드에서 off-screen 행을 scrollToKey 로 reveal(스크롤). bReveal=false 면
+            //   현재 DOM 의 행만 강조(스크롤 점프 없음 — 사용자가 직접 클릭한 행은 이미 보이므로). 비가상은 원래대로 스크롤 안 함.
+            if (bReveal === undefined) { bReveal = true; }
+            const oRow = (bVirtual && bReveal) ? scrollToKey(sKey) : findRow(sKey);
             const aSel = oUl.querySelectorAll('.u4a-tree__row[aria-selected="true"]');
             for (let i = 0; i < aSel.length; i++) { if (aSel[i] !== oRow) { aSel[i].removeAttribute("aria-selected"); } }
             if (oRow) { oRow.setAttribute("aria-selected", "true"); }

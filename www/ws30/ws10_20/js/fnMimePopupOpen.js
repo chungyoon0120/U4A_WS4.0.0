@@ -118,7 +118,7 @@
      * 모듈 상태 — 다이얼로그/iframe/트리는 1회 생성 후 재사용(원본 단일 인스턴스 대응).
      ************************************************************************/
     var oUI = null;                 // { dlg, frame, tree, treeBody, img, nodata, urlField, dateField, timeField, nameField, hostReady }
-    var oState = { sAppId: "", sLazy: false, oSel: null, pendingText: null };
+    var oState = { sAppId: "", sLazy: false, oSel: null, selKey: "", pendingText: null };
     var aTreeRoots = [];            // createTree roots(계층화된 마임 트리)
     var oExpand = {};               // 펼침 맵(key=노드 CHILD) — 가상 트리 외부 펼침 단일출처
     var iWatch = null;              // Monaco 최초 로드 busy 워치독
@@ -267,8 +267,8 @@
     function lf_expandMyApp(aFlat) {
         var oMyApp = aFlat.find(function (r) { return r && r.MYAPP === "X"; });
         if (!oMyApp) {
-            // 없으면 첫 라인 선택(원본 setSelectedIndex(0)).
-            if (aTreeRoots[0]) { oUI.tree.selectByKey(aTreeRoots[0].CHILD); }
+            // 없으면 첫 라인 선택(원본 setSelectedIndex(0)) — 맨 위라 스크롤 불필요.
+            if (aTreeRoots[0]) { oState.selKey = aTreeRoots[0].CHILD; oUI.tree.render(); }
             return;
         }
         // 조상 경로(PARENT 체인) 펼침.
@@ -278,8 +278,10 @@
         while (cur) { oExpand[cur.CHILD] = true; cur = byKey[cur.PARENT]; }
         // 자신에 하위가 있으면 자신도 펼침.
         if (aFlat.some(function (r) { return r.PARENT === oMyApp.CHILD; })) { oExpand[oMyApp.CHILD] = true; }
+        // ★ 최초 진입 시에만 내 APP 폴더로 reveal(원본 setFirstVisibleRow). 이후 클릭은 스크롤 안 함.
+        oState.selKey = oMyApp.CHILD;
         oUI.tree.render();
-        oUI.tree.selectByKey(oMyApp.CHILD);   // 화면에 보이게(scroll) + 선택 강조.
+        oUI.tree.scrollToKey(oMyApp.CHILD);   // reveal(+선택은 selKey→rowHook 으로 적용).
     }
 
     /************************************************************************
@@ -386,9 +388,9 @@
                 return d;
             },
 
-            onSelect: function (n) {
+            onSelect: function (n, oRow) {
                 if (_isDummy(n)) { return; }
-                lf_onRowSelect(n);
+                lf_onRowSelect(n, oRow);
             },
 
             rowHook: function (oRow, n) {
@@ -399,6 +401,9 @@
                     return;
                 }
                 oRow.__mimeNode = n;
+                // 선택 강조는 노드 키 플래그로 유지(WS30 ISSEL 패턴) → 가상 재렌더(지연로드/펼침)에도
+                //   스크롤 점프 없이 선택이 보존된다. (selectByKey 는 스크롤하므로 클릭 경로에서 안 씀)
+                if (oState.selKey && _key(n) === oState.selKey) { oRow.setAttribute("aria-selected", "true"); }
                 // 레벨/MyApp 별 색(원본 fnMimeTreeTableRowCssApply 의미 보존 — 의미 토큰).
                 var z = n.ZLEVEL, my = n.MYAPP, myc = n.MYAPPCHILD, ty = n.TYPE;
                 if (z === 1) { /* 시스템 루트 = 기본 */ }
@@ -409,6 +414,7 @@
             }
         });
 
+        oTree.el.classList.add("u4aMimeTree");   // CSS 스코프(WS30 u4aWs30Tree 와 동일 컬럼정렬 이식).
         return oTree;
     }
 
@@ -424,12 +430,21 @@
     /************************************************************************
      * 트리 행 선택 → 속성 채우기 + 미리보기(원본 ev_MimeTreeTableRowSelect).
      ************************************************************************/
-    function lf_onRowSelect(oNode) {
+    // 클릭한 행에 선택 강조를 직접 적용(스크롤 점프 없음). 다른 행 해제.
+    function lf_markSelectedRow(oRow) {
+        if (!oUI || !oUI.treeBody) { return; }
+        var aSel = oUI.treeBody.querySelectorAll('.u4a-tree__row[aria-selected="true"]');
+        for (var i = 0; i < aSel.length; i++) { if (aSel[i] !== oRow) { aSel[i].removeAttribute("aria-selected"); } }
+        if (oRow) { oRow.setAttribute("aria-selected", "true"); }
+    }
+
+    function lf_onRowSelect(oNode, oRow) {
 
         oState.oSel = oNode;
+        oState.selKey = _key(oNode);
 
-        // 선택 강조(aria-selected) — 베이스는 클릭 시 자동선택 안 함(화면이 소유).
-        try { oUI.tree.selectByKey(_key(oNode)); } catch (e) { }
+        // 선택 강조 — 이미 보이는 클릭 행에 직접 적용(★스크롤 이동 금지, WS30 동일).
+        lf_markSelectedRow(oRow);
 
         // 속성/미리보기 초기화.
         lf_setProps({});
@@ -880,6 +895,7 @@
         aTreeRoots = [];
         oExpand = {};
         oState.oSel = null;
+        oState.selKey = "";
         oState.pendingText = null;
         lf_setProps({});
         lf_showPreview("none");
@@ -906,18 +922,29 @@
             ".u4aMimeHead span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
             ".u4aMimeBody { flex: 1 1 auto; min-height: 0; padding: 0; display: flex; }",
             ".u4aMimeSplit { flex: 1 1 auto; min-width: 0; min-height: 0; }",
-            // 트리 패널 — 툴바 + 스크롤바디(가상스크롤 wrap).
-            ".u4aMimeTreePane { display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }",
+            // 트리 패널 — 툴바 + 스크롤바디(가상스크롤 wrap). 설명 컬럼 폭 단일출처(WS30 --ws30-desc-w 동일 42%).
+            ".u4aMimeTreePane { --u4aMime-desc-w: 42%; display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }",
             ".u4aMimeTreeTool { flex: 0 0 auto; display: flex; gap: 0.25rem; padding: 0.25rem 0.375rem; border-bottom: 0.0625rem solid var(--line); }",
             ".u4aMimeToolBtn { color: var(--text); }",
-            ".u4aMimeTreeBody { flex: 1 1 auto; min-height: 0; overflow: auto; position: relative; }",
-            // sticky 컬럼 헤더(Object Name | Description).
-            ".u4aMimeTreeColHead { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; height: 2.25rem; padding: 0 0.5rem; gap: 0.5rem; background: var(--surface-raised); border-bottom: 0.0625rem solid var(--line); font-size: 0.8125rem; font-weight: 700; color: var(--text); }",
-            ".u4aMimeColName { flex: 1 1 auto; }",
-            ".u4aMimeColDesc { flex: 0 0 40%; }",
-            // 트리 — 설명 슬롯 우측, 레벨/MyApp 색(의미 토큰).
-            ".u4aMimeDesc { display: inline-flex; min-width: 0; max-width: 42%; }",
-            ".u4aMimeDescText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 0.8125rem; }",
+            ".u4aMimeTreeBody { flex: 1 1 auto; min-height: 0; overflow: hidden auto; position: relative; }",
+            // sticky 컬럼 헤더 — 행과 동일 폭 컨텍스트(padding-left 0.375rem = 행과 동일) → 설명컬럼 정렬 일치(WS30 이식).
+            ".u4aMimeTreeColHead { position: sticky; top: 0; z-index: 2; box-sizing: border-box; display: flex; align-items: stretch; height: 2.25rem; padding-left: 0.375rem; background: var(--surface-raised); border-bottom: 0.0625rem solid var(--line); font-size: 0.8125rem; font-weight: 700; color: var(--text); }",
+            ".u4aMimeColName { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding-left: 0.5rem; }",
+            ".u4aMimeColDesc { flex: 0 0 var(--u4aMime-desc-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }",
+            // 트리 — 행을 패널 폭에 맞춰 설명 컬럼 항상 보이게(공통 max-content 무력화).
+            ".u4aMimeTree.u4a-tree { width: auto; min-width: 100%; padding-top: 0; }",
+            // ★ data-u4a-tree-split(space-between) 무력화 + 라벨이 남는 폭 채움 → 토글/아이콘/라벨이 흩어지지 않고
+            //   설명은 고정폭 우측 컬럼이 된다(WS30 핵심). 이게 빠지면 라벨/설명이 가로로 흩뿌려진다.
+            ".u4aMimeTree .u4a-tree__row[data-u4a-tree-split] { justify-content: flex-start; }",
+            ".u4aMimeRow { padding-right: 0; }",
+            ".u4aMimeRow .u4a-tree__label { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }",
+            // ★ 들여쓰기를 행 padding-left → 토글 margin-left 로 이동: 행 content-box 폭을 깊이와 무관하게
+            //   일정하게 유지해야 설명 컬럼(flex-basis %)/구분선이 컬럼헤더와 정렬 일치(WS30 핵심).
+            ".u4aMimeTree .u4a-tree__row { padding-left: 0.375rem; }",
+            ".u4aMimeTree .u4a-tree__toggle { margin-left: calc(var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem)); }",
+            // 설명 셀(고정폭 우측 컬럼) + 텍스트(클램프).
+            ".u4aMimeDesc { flex: 0 0 var(--u4aMime-desc-w); min-width: 0; box-sizing: border-box; align-self: stretch; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }",
+            ".u4aMimeDescText { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 0.8125rem; }",
             ".u4aMimeMuted .u4a-tree__label { color: var(--text-muted); }",
             ".u4aMimeMyApp { background: var(--hover-bg); }",
             ".u4aMimeMyApp .u4a-tree__label { font-weight: 700; }",
