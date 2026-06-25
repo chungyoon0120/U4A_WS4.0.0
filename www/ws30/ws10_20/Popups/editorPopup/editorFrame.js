@@ -302,9 +302,13 @@ function _initChrome() {
     var oClose = document.querySelector('#editorTitlebar [data-action="close"]');
     if (oClose) { oClose.addEventListener("click", function () { try { CURRWIN.close(); } catch (e) { } }); }
 
-    // 푸터 줌 표시/원복 — 클릭 시 폰트 줌 원복(호스트 fontZoomReset).
+    // 푸터 줌 컨트롤 [−][%][+] — 축소/원복/확대(호스트 fontZoomOut/Reset/In).
     var oZoom = document.getElementById("editorZoomBtn");
     if (oZoom) { oZoom.addEventListener("click", function () { _toHost({ cmd: "fontZoomReset" }); }); }
+    var oZoomOut = document.getElementById("editorZoomOut");
+    if (oZoomOut) { oZoomOut.addEventListener("click", function () { _toHost({ cmd: "fontZoomOut" }); }); }
+    var oZoomIn = document.getElementById("editorZoomIn");
+    if (oZoomIn) { oZoomIn.addEventListener("click", function () { _toHost({ cmd: "fontZoomIn" }); }); }
 
     // 푸터 Save.
     var oSave = document.getElementById("editorSaveBtn");

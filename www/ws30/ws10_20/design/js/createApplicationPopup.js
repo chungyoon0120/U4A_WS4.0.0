@@ -319,7 +319,6 @@
         const sTitle = _txt("/U4A/CL_WS_COMMON", "B05") + " : " + appid;
 
         const oHeader = _el("div", "u4a-dialog__header");
-        oHeader.setAttribute("data-type", "I");
         // 헤더 아이콘은 메인 툴바 Create 버튼(WS10.js appCreateBtn: fa-file)과 동일하게 — 사용자 인지 통일.
         oHeader.innerHTML = _fa("file") + '<span></span>';
         oHeader.querySelector("span").textContent = sTitle;
@@ -414,8 +413,7 @@
         // B06 Local Object / B07 Create Local Application
         const oLocal = _el("button", "u4a-btn");
         oLocal.type = "button";
-        oLocal.innerHTML = _fa("desktop") + '<span></span>';
-        oLocal.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "B06");
+        oLocal.innerHTML = _fa("desktop");   // 아이콘만 (텍스트 라벨 제거)
         oLocal.title = _txt("/U4A/CL_WS_COMMON", "B07");
         oLocal.addEventListener("click", function () { lf_createApplication(oModel, oUIobj, appid, true); });
         oFoot.appendChild(oLocal);
@@ -425,8 +423,7 @@
         // A01 Create / B08 Create Application
         const oCreate = _el("button", "u4a-btn u4a-btn--emphasized");
         oCreate.type = "button";
-        oCreate.innerHTML = _fa("check") + '<span></span>';
-        oCreate.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A01");
+        oCreate.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
         oCreate.title = _txt("/U4A/CL_WS_COMMON", "B08");
         oCreate.addEventListener("click", function () { lf_createApplication(oModel, oUIobj, appid, false); });
         oFoot.appendChild(oCreate);
@@ -434,8 +431,7 @@
         // A39 Close — 원본 UI5 Reject 느낌(빨강 텍스트/아이콘 + 옅은 호버 틴트, --negative).
         const oClose = _el("button", "u4a-btn u4a-btn--negative");
         oClose.type = "button";
-        oClose.innerHTML = _fa("xmark") + '<span></span>';
-        oClose.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39");
+        oClose.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
         oClose.title = _txt("/U4A/CL_WS_COMMON", "A39");
         oClose.addEventListener("click", function () { lf_closeDialog(oDlg); });
         oFoot.appendChild(oClose);

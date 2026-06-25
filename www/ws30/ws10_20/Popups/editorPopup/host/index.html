@@ -139,6 +139,16 @@
                     try { editor.getAction("editor.action.fontZoomReset").run(); } catch (e) { }
                     return;
 
+                case "fontZoomIn":
+                    // 푸터 [+] → 폰트 확대(Ctrl+휠 업과 동일 Monaco 액션).
+                    try { editor.getAction("editor.action.fontZoomIn").run(); } catch (e) { }
+                    return;
+
+                case "fontZoomOut":
+                    // 푸터 [−] → 폰트 축소(Ctrl+휠 다운과 동일 Monaco 액션).
+                    try { editor.getAction("editor.action.fontZoomOut").run(); } catch (e) { }
+                    return;
+
                 case "focus":
                     try { editor.focus(); } catch (e) { }
                     return;

@@ -48,7 +48,7 @@ def main():
         sys.exit(0)
 
     # 2. 토스트 본문 구성: 서버 / 툴 / 인자 요약
-    title = f"🔧 MCP 툴 사용 — {project}"
+    title = f"🔧 [PreToolUse] 훅 실행됨 — MCP 툴 사용 ({project})"
     line2 = f"{server} ▸ {tool}"
     arg_summary = build_snippet(json.dumps(tool_input, ensure_ascii=False)) if tool_input else ""
 

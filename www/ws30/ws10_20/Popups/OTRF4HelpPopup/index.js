@@ -1,817 +1,522 @@
 /************************************************************************
- * Copyright 2020. INFOCG Inc. all rights reserved. 
+ * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
- * - file Name : bindPopup/index.js
+ * - file Name : OTRF4HelpPopup/index.js
+ * - file Desc : OTR Manager 본문 (UI5 sap.m.Page/Panel/Table → HTML5).
+ *               검색 패널(공통 createPanel/createField) + 결과 테이블(공통 .u4a-table) +
+ *               더블클릭 시 "$OTR:<alias>" 클립보드 복사. 외부 셸(frame.js)의 oAPP 사용.
+ *               백엔드 계약(servNm + "/f4serverData", trgubun F=필드정의 / D=데이터,
+ *               if-otr-callback / if-send-action-<BROWSKEY>)은 원본 그대로 유지(06.팝업 7.5).
  ************************************************************************/
-
-
 
 /************************************************************************
- * 에러 감지 (index.js)
+ * 에러 감지
  ************************************************************************/
-let zconsole = parent.WSERR(window, document, console);
+const zconsole = parent.WSERR(window, document, console);
 
-//var oAPP = parent.oAPP;
-var oAPP = parent.gfn_getParent();
+let oAPP = parent.oAPP,
+    APPCOMMON = oAPP.common;
 
 (function (window, oAPP) {
+    "use strict";
 
-	oAPP.settings = {};
+    // 대상 OTR Search Help (원본 callOTRListPopup 인자 고정)
+    var SHLPNAME = "/U4A/H_OTR_INF";
 
-	let PATH = oAPP.PATH,
-		APP = oAPP.APP,
-		PATHINFO = parent.PATHINFO,
-		require = parent.require;
+    // 기본 최대 검색건수
+    var DEFAULT_MAX_ROWS = 200;
 
-	/************************************************************************
-	 * 모델 데이터 set
-	 * **********************************************************************
-	 * @param {String} sModelPath  
-	 * - Model Path 명
-	 * 예) /WS10/APPDATA
-	 * @param {Object} oModelData
-	 * 
-	 * @param {Boolean} bIsRefresh 
-	 * model Refresh 유무
-	 ************************************************************************/
-	oAPP.fn.fnSetModelProperty = function (sModelPath, oModelData, bIsRefresh) {
+    var U4AUI = window.U4AUI;
 
-		var oCoreModel = sap.ui.getCore().getModel();
-		oCoreModel.setProperty(sModelPath, oModelData);
+    // ── 화면 상태 ──────────────────────────────────────────────
+    var oState = {
+        searchFields: [],   // [{ paramKey, field(createField), datatype }]
+        columns: [],        // [{ key, label }]  (key = 셀 데이터 키)
+        rows: [],           // 결과 행
+        vs: null            // 공통 가상 스크롤러(U4AUI.makeVScroller)
+    };
 
-		if (bIsRefresh) {
-			oCoreModel.refresh(true);
-		}
-
-	}; // end of oAPP.common.fnSetModelProperty
-
-	/************************************************************************
-	 * 모델 데이터 get
-	 * **********************************************************************
-	 * @param {String} sModelPath  
-	 * - Model Path 명
-	 * 예) /WS10/APPDATA
-	 ************************************************************************/
-	oAPP.fn.fnGetModelProperty = function (sModelPath) {
-
-		return sap.ui.getCore().getModel().getProperty(sModelPath);
-
-	}; // end of oAPP.fn.fnGetModelProperty
-
-	/************************************************************************
-	 * ws의 설정 정보를 구한다.
-	 ************************************************************************/
-	oAPP.fn.getSettingsInfo = function () {
-
-		// Browser Window option
-		var sSettingsJsonPath = PATHINFO.WSSETTINGS,
-
-			// JSON 파일 형식의 Setting 정보를 읽는다..
-			oSettings = require(sSettingsJsonPath);
-		if (!oSettings) {
-			return;
-		}
-
-		return oSettings;
-
-	}; // end of oAPP.fn.getSettingsInfo
-
-	// /************************************************************************
-	//  * UI5 BootStrap 
-	//  ************************************************************************/
-	oAPP.fn.fnLoadBootStrapSetting = function () {
-
-		var oSettings = oAPP.fn.getSettingsInfo(),
-			oSetting_UI5 = oSettings.UI5,
-			oBootStrap = oSetting_UI5.bootstrap,
-			oUserInfo = oAPP.attr.oUserInfo,
-			oThemeInfo = oAPP.fn.getThemeInfo(),
-			// oThemeInfo = oAPP.attr.oThemeInfo,
-			sLangu = oUserInfo.LANGU;
-
-		var oScript = document.createElement("script");
-		oScript.id = "sap-ui-bootstrap";
-
-		// 공통 속성 적용
-		for (const key in oBootStrap) {
-			oScript.setAttribute(key, oBootStrap[key]);
-		}
-
-		// 로그인 Language 적용
-		oScript.setAttribute('data-sap-ui-theme', oThemeInfo.THEME);
-		oScript.setAttribute("data-sap-ui-language", sLangu);
-		oScript.setAttribute("data-sap-ui-libs", "sap.m, sap.tnt, sap.ui.table, sap.ui.layout");
-		oScript.setAttribute("src", oSetting_UI5.resourceUrl);
-
-		document.head.appendChild(oScript);
-
-	}; // end of fnLoadBootStrapSetting
+    // ── DOM 참조(빌드 후 세팅) ──────────────────────────────────
+    var oEl = {
+        panel: null,        // createPanel 인스턴스
+        formGrid: null,     // 검색 필드 그리드
+        searchBtn: null,
+        maxRows: null,      // createField (number)
+        resultLabel: null,
+        tableWrap: null,
+        tbody: null
+    };
 
 
-	/************************************************************************
-	 * 초기 모델 바인딩
-	 ************************************************************************/
-	oAPP.fn.fnInitModelBinding = function () {
+    /************************************************************************
+     * 서버 전송 (원본 sendAjax 동일 — FormData POST, withCredentials)
+     ************************************************************************/
+    function sendAjax(sPath, oFormData, fn_success) {
 
-		// var oFind2Data = oAPP.fn.fnGetFindData2();
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === xhr.DONE) {
+                if (xhr.status === 200 || xhr.status === 201) {
+                    try {
+                        fn_success(JSON.parse(xhr.response));
+                    } catch (e) {
+                        console.error("[HTML5][OTR] 응답 파싱 오류:", e && e.message);
+                        _setSearchBusy(false);
+                    }
+                }
+            }
+        };
 
-		// var oModelData = {
-		//     SELKEY: C_FIND_MENU1_ID,
-		//     MENULIST: oAPP.fn.fnGetFindMenuList(), // find의 메뉴 리스트       
-		//     FIND1TABLE: oAPP.fn.fnGetFindData1(),
-		//     FIND2LEFT: oFind2Data.LEFT,
-		//     FIND2RIGHT: oFind2Data.RIGHT,
-		//     FIND3TABLE: oAPP.fn.fnGetFindData3(),
-		//     FIND4TABLE: oAPP.fn.fnGetFindData4(),
-		// };
+        xhr.withCredentials = true;
+        xhr.open("post", sPath, true);
+        xhr.send(oFormData);
 
-		// var oJsonModel = new sap.ui.model.json.JSONModel();
-		// oJsonModel.setData({
-		//     FIND: oModelData
-		// });
-
-		// sap.ui.getCore().setModel(oJsonModel);
-
-	}; // end of oAPP.fn.fnInitModelBinding
-
-	/************************************************************************
-	 * 화면 초기 렌더링
-	 ************************************************************************/
-	oAPP.fn.fnInitRendering = function () {
+    } // end of sendAjax
 
 
+    /************************************************************************
+     * 공통 토스트 (MessageToast 대체) — 화면 정중앙 .u4a-toast 싱글톤(3초)
+     ************************************************************************/
+    var _iToastTimer = null;
+    function _toast(sMsg) {
 
-	}; // end of oAPP.fn.fnInitRendering
-
-
-
-	function sendAjax(sPath, oFormData, fn_success) {
-
-		var xhr = new XMLHttpRequest();
-		xhr.onreadystatechange = function () { // 요청에 대한 콜백
-			if (xhr.readyState === xhr.DONE) { // 요청이 완료되면
-				if (xhr.status === 200 || xhr.status === 201) {
-
-					fn_success(JSON.parse(xhr.response));
-
-				}
-			}
-		};
-
-
-		// test..
-		xhr.withCredentials = true;
-
-		// FormData가 없으면 GET으로 전송
-		xhr.open("post", sPath, true);
-
-		xhr.send(oFormData);
-
-
-	} // end of sendAjax
-
-
-	/*************************************************************
-     * @function - SYSID에 해당하는 테마 변경 IPC 이벤트
-     *************************************************************/
-    function _onIpcMain_if_p13n_themeChange(){ 
-
-        let oThemeInfo = oAPP.fn.getThemeInfo();
-        if(!oThemeInfo){
+        if (sMsg == null || sMsg === "") {
             return;
         }
 
-        let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
-        let oBrowserWindow = oAPP.REMOTE.getCurrentWindow();
-            oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+        var oToast = document.getElementById("u4aOtrToast");
+        if (!oToast) {
+            oToast = document.createElement("div");
+            oToast.id = "u4aOtrToast";
+            oToast.className = "u4a-toast";
+            document.body.appendChild(oToast);
+        }
 
-        sap.ui.getCore().applyTheme(oThemeInfo.THEME);
+        oToast.textContent = sMsg;
+        // reflow 후 표시(transition)
+        void oToast.offsetWidth;
+        oToast.setAttribute("data-show", "true");
 
-    } // end of _onIpcMain_if_p13n_themeChange
-	
+        if (_iToastTimer) { clearTimeout(_iToastTimer); }
+        _iToastTimer = setTimeout(function () {
+            oToast.setAttribute("data-show", "false");
+        }, 3000);
 
-	/*************************************************************
-     * @function - IPC Event 등록
-     *************************************************************/
-    function _attachIpcEvents(){
-
-        let oUserInfo = parent.process.USERINFO;
-        let sSysID = oUserInfo.SYSID;
-
-        // SYSID에 해당하는 테마 변경 IPC 이벤트를 등록한다.
-        oAPP.IPCMAIN.on(`if-p13n-themeChange-${sSysID}`, _onIpcMain_if_p13n_themeChange); 
-
-    } // end of _attachIpcEvents
+    } // end of _toast
 
 
-	/*************************************************************
-     * @function - IPC Event 해제
-     *************************************************************/
-    function _detachIpcEvents(){
+    /************************************************************************
+     * 텍스트 클립보드 복사 (원본 setClipBoardTextCopy 동일 — textarea + execCommand)
+     ************************************************************************/
+    function _copyText(sText) {
 
-        let oUserInfo = parent.process.USERINFO;
-        let sSysID = oUserInfo.SYSID;
+        if (typeof sText !== "string") {
+            return;
+        }
 
-        // SYSID에 해당하는 테마 변경 IPC 이벤트를 등록한다.
-        oAPP.IPCMAIN.off(`if-p13n-themeChange-${sSysID}`, _onIpcMain_if_p13n_themeChange); 
+        var oTextArea = document.createElement("textarea");
+        oTextArea.value = sText;
+        document.body.appendChild(oTextArea);
+        oTextArea.select();
 
-    } // end of _detachIpcEvents
+        try { document.execCommand('copy'); } catch (e) { }
 
-	/************************************************************************
-	 * -- Start of Program
-	 ************************************************************************/
+        document.body.removeChild(oTextArea);
 
-	// // UI5 Boot Strap을 로드 하고 attachInit 한다.
-	oAPP.fn.fnLoadBootStrapSetting();
+    } // end of _copyText
 
-	window.onload = function () {
 
-		sap.ui.getCore().attachInit(function () {
+    /************************************************************************
+     * 검색/결과 영역 Busy 토글 (원본 table/button local busy 대체 — 경량)
+     ************************************************************************/
+    function _setSearchBusy(bBusy) {
 
-			oAPP.fn.setBusyIndicator("X");
+        if (oEl.searchBtn) { oEl.searchBtn.disabled = !!bBusy; }
+        if (oEl.tableWrap) { oEl.tableWrap.setAttribute("aria-busy", bBusy ? "true" : "false"); }
 
-			// IPC Event 등록
-            _attachIpcEvents();
+    } // end of _setSearchBusy
 
-			//oAPP.fn.callOTRListPopup("ZHU4A_OTR_INF", "ZHU4A_OTR_INF", [], []);
-			oAPP.fn.callOTRListPopup("/U4A/H_OTR_INF", "/U4A/H_OTR_INF", [], []);
 
-			// oAPP.fn.fnInitModelBinding();
+    /************************************************************************
+     * 정적 골격 빌드 — 힌트 + Selection 패널 + 결과 툴바 + 결과 테이블
+     ************************************************************************/
+    function _buildSkeleton() {
 
-			// oAPP.fn.fnInitRendering();
+        var oContent = document.getElementById("content");
+        oContent.innerHTML = "";
 
-			// 브라우저 처음 실행 시 보여지는 Busy Indicator 끄기
-			parent.oAPP.fn.setBusyLoading('');
+        var oRoot = U4AUI.el("div", "u4aOtr");
 
-		});
+        // 힌트: "Alias can be copied by double-clicking the result list." (MSG_WS 366)
+        var oHint = U4AUI.el("div", "u4aOtr__hint");
+        oHint.textContent = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "366", "", "", "", "");
+        oRoot.appendChild(oHint);
 
-		parent.oAPP.broadToChild = new BroadcastChannel(`broadcast-to-child-window_${oAPP.BROWSKEY}`);        
+        // Selection 패널 (D47) — 접이식. 헤더 액션에 Search 버튼(A75).
+        var sSelTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D47", "", "", "", "");
+        oEl.panel = U4AUI.createPanel({ title: sSelTxt });
+        oEl.panel.el.classList.add("u4aOtr__panel");
 
-        parent.oAPP.broadToChild.onmessage = function(oEvent){
+        var sSearchTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A75", "", "", "", ""); // Search
+        var oSearchBtn = U4AUI.el("button", "u4a-btn u4a-btn--emphasized u4aOtr__searchBtn");
+        oSearchBtn.type = "button";
+        oSearchBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i><span>' + sSearchTxt + '</span>';
+        oSearchBtn.title = sSearchTxt;
+        oSearchBtn.addEventListener("click", function () { LF_getServerData(); });
+        oEl.panel.actions.appendChild(oSearchBtn);
+        oEl.searchBtn = oSearchBtn;
 
-            var _PRCCD = oEvent?.data?.PRCCD || undefined;
+        // 검색 필드 그리드(필드 도착 후 채움)
+        oEl.formGrid = U4AUI.el("div", "u4aOtr__form");
+        oEl.panel.body.appendChild(oEl.formGrid);
 
-            if(typeof _PRCCD === "undefined"){
-                return;
+        oRoot.appendChild(oEl.panel.el);
+
+        // 결과 툴바: Maximum No, of Hits(A76) + 입력 + 결과건수(A73)
+        var oBar = U4AUI.el("div", "u4aOtr__bar");
+
+        var sMaxTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A76", "", "", "", ""); // Maximum No, of Hits
+        var oMaxLb = U4AUI.el("label", "u4aOtr__barLabel");
+        oMaxLb.textContent = sMaxTxt;
+        oBar.appendChild(oMaxLb);
+
+        oEl.maxRows = U4AUI.createField({ type: "text", value: String(DEFAULT_MAX_ROWS), clear: true, width: "5.5rem", className: "u4aOtr__max" });
+        oEl.maxRows.input.setAttribute("inputmode", "numeric");
+        oEl.maxRows.input.addEventListener("input", function () {
+            // 숫자만 허용(원본 sap.m.Input type=Number)
+            var s = oEl.maxRows.input.value.replace(/[^0-9]/g, "");
+            if (s !== oEl.maxRows.input.value) { oEl.maxRows.input.value = s; }
+        });
+        oBar.appendChild(oEl.maxRows.el);
+
+        var oSpacer = U4AUI.el("div", "u4aOtr__barSpacer");
+        oBar.appendChild(oSpacer);
+
+        var sResTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A73", "", "", "", ""); // Search Result
+        oEl.resultLabel = U4AUI.el("span", "u4aOtr__result");
+        oEl.resultLabel.textContent = sResTxt + " : 0";
+        oEl.resultLabel.setAttribute("data-restext", sResTxt);
+        oBar.appendChild(oEl.resultLabel);
+
+        oRoot.appendChild(oBar);
+
+        // 결과 테이블(공통 .u4a-table) — 가상 스크롤 컨테이너
+        oEl.tableWrap = U4AUI.el("div", "u4a-table-wrap u4aOtr__tableWrap");
+        var oTable = U4AUI.el("table", "u4a-table u4aOtr__table");
+        var oThead = U4AUI.el("thead");
+        oThead.appendChild(U4AUI.el("tr"));
+        var oTbody = U4AUI.el("tbody");
+        oTable.append(oThead, oTbody);
+        oEl.tableWrap.appendChild(oTable);
+        oEl.tbody = oTbody;
+        oEl.thead = oThead;
+
+        oRoot.appendChild(oEl.tableWrap);
+
+        oContent.appendChild(oRoot);
+
+    } // end of _buildSkeleton
+
+
+    /************************************************************************
+     * 검색조건 필드 구성 (원본 lf_setSearchCondition — SHLPSELPOS>0 만)
+     ************************************************************************/
+    function _buildSearchFields(aFieldDesc) {
+
+        oEl.formGrid.innerHTML = "";
+        oState.searchFields = [];
+
+        for (var i = 0, l = aFieldDesc.length; i < l; i++) {
+
+            var oFd = aFieldDesc[i];
+
+            // 검색조건 필드가 아니면 skip
+            if (oFd.SHLPSELPOS === 0) {
+                continue;
             }
 
-            //프로세스에 따른 로직분기.
-            switch (_PRCCD) {
-                case "BUSY_ON":
-
-                    //BUSY ON을 요청받은경우.
-                    parent.oAPP.fn.setBusyIndicator("X", {ISBROAD:true});
-                    break;
-
-                case "BUSY_OFF":
-                    //BUSY OFF를 요청 받은 경우.
-                    parent.oAPP.fn.setBusyIndicator("",  {ISBROAD:true});
-                    break;
-
-                default:
-                    break;
+            // 모델 path(=서버 전송 키): 필드명의 '/' 는 'x'(소문자)로 — 원본 동일
+            var sParamKey = String(oFd.FIELDNAME);
+            if (sParamKey.indexOf("/") !== -1) {
+                sParamKey = sParamKey.replace(/\//g, "x");
             }
 
-        };
+            var sLabel = oFd.SCRTEXT_M || oFd.FIELDNAME;
+            var sDfVal = (oFd.DFVAL != null) ? oFd.DFVAL : "";
+
+            // datatype 별 placeholder 힌트(원본 DatePicker/TimePicker 포맷 — OTR Help 엔 날짜/시간 필드 없음).
+            var sPlaceholder = "";
+            if (oFd.DATATYPE === "D") { sPlaceholder = "YYYYMMDD"; }
+            else if (oFd.DATATYPE === "T") { sPlaceholder = "HHMMSS"; }
+
+            var oField = U4AUI.createField({
+                type: "text",
+                value: sDfVal,
+                placeholder: sPlaceholder,
+                clear: true,
+                maxLength: (oFd.OUTPUTLEN != null && oFd.OUTPUTLEN > 0) ? oFd.OUTPUTLEN : undefined,
+                className: "u4aOtr__field",
+                onEnter: function () { LF_getServerData(); }
+            });
+
+            var oRow = U4AUI.el("div", "u4aOtr__formRow");
+            var oLb = U4AUI.el("label", "u4aOtr__formLabel");
+            oLb.textContent = sLabel;
+            oLb.title = sLabel;
+            oRow.append(oLb, oField.el);
+            oEl.formGrid.appendChild(oRow);
+
+            oState.searchFields.push({ paramKey: sParamKey, field: oField, datatype: oFd.DATATYPE });
+
+        }
+
+    } // end of _buildSearchFields
+
+
+    /************************************************************************
+     * 결과리스트 컬럼 설정 (원본 lf_setTableColumn — SHLPLISPOS>0 만)
+     ************************************************************************/
+    function _buildTableColumns(aFieldDesc) {
+
+        oState.columns = [];
+
+        for (var i = 0, l = aFieldDesc.length; i < l; i++) {
 
-	};
-   
+            var oFd = aFieldDesc[i];
+
+            // 결과리스트 필드가 아니면 skip
+            if (oFd.SHLPLISPOS === 0) {
+                continue;
+            }
+
+            // 셀 데이터 키: 필드명의 '/' 는 'X'(대문자)로 — 원본 동일
+            var sCellKey = String(oFd.FIELDNAME);
+            if (sCellKey.indexOf("/") !== -1) {
+                sCellKey = sCellKey.replace(/\//g, "X");
+            }
 
-	
+            oState.columns.push({ key: sCellKey, label: oFd.SCRTEXT_S || oFd.FIELDNAME });
 
-	//OTR 검색 팝업 호출.
-	oAPP.fn.callOTRListPopup = function (I_SHLPNAME, I_SHLP_DEF, IT_SHLP, IT_FIELDDESCR, f_clientCallbak) {
+        }
 
-		//검색조건 필드 구성.
-		function lf_setSearchCondition(SHLPNAME, it_fdesc) {
+        // thead 렌더
+        var oTr = oEl.thead.firstChild;
+        oTr.innerHTML = "";
+        oState.columns.forEach(function (oCol) {
+            var oTh = U4AUI.el("th");
+            oTh.textContent = oCol.label;
+            oTh.title = oCol.label;
+            oTr.appendChild(oTh);
+        });
 
-			//검색조건 영역 제거.
-			oForm.removeAllContent();
+        // 공통 가상 스크롤러 생성(컬럼 확정 후 1회). 보이는 구간만 DOM → 대용량 결과도 가볍게.
+        //   0건=공통 no-data(ZMSG_WS_COMMON_001/946, WS20 형제 테이블과 동일).
+        //   선택 키 = 행 고유 인덱스(__otrIdx) — ALIAS_NAME 은 빈 행이 많아 선택 키로 부적합(중복·미선택).
+        var sNoData = "";
+        try { sNoData = oAPP.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "946"); } catch (e) { }
 
-			for (var i = 0, l = it_fdesc.length; i < l; i++) {
+        oState.vs = U4AUI.makeVScroller(oEl.tableWrap, oEl.tbody, {
+            colCount: oState.columns.length || 1,
+            buildRow: _buildRow,
+            nodata: sNoData,
+            getSelKey: function (oRowData) { return oRowData ? oRowData.__otrIdx : null; }
+        });
 
-				//검색조건 필드정보가 아닌경우 skip.
-				if (it_fdesc[i].SHLPSELPOS === 0) {
-					continue;
-				}
+    } // end of _buildTableColumns
 
-				var oLb = new sap.m.Label({ design: "Bold" });
 
-				//default 검색조건 필드명.
-				var l_lbtx = it_fdesc[i].SCRTEXT_M;
+    /************************************************************************
+     * 결과 행 1개 빌드 (가상 스크롤러가 보이는 구간만 호출). idx=절대 인덱스(zebra).
+     ************************************************************************/
+    function _buildRow(oRowData, idx) {
 
+        // 행 고유 선택 키(절대 인덱스) — getSelKey 가 이걸 읽어 선택 행을 식별.
+        try { oRowData.__otrIdx = idx; } catch (e) { }
 
-				//검색조건 라벨 text 구성.
-				oLb.setText(l_lbtx);
+        var oTr = U4AUI.el("tr");
+        oTr.setAttribute("data-otr-row", "X");
+        if (idx % 2 === 1) { oTr.setAttribute("data-odd", "true"); } // 공통 zebra
 
-				//form에 label 추가.
-				oForm.addContent(oLb);
+        oState.columns.forEach(function (oCol) {
+            var oTd = U4AUI.el("td");
+            var v = oRowData[oCol.key];
+            oTd.textContent = (v == null) ? "" : String(v);
+            oTd.title = oTd.textContent;
+            oTr.appendChild(oTd);
+        });
 
-				//일반 필드의 경우 value 프로퍼티에 바인딩 처리.
-				var l_prop = "value";
+        // 단일클릭=선택(스크롤로 행이 사라져도 유지), 더블클릭=복사 — 원본 selectionMode None + dblclick
+        oTr.addEventListener("click", function () {
+            if (oState.vs) {
+                oState.vs.setSel(idx);
+                oState.vs.refresh();
+            }
+        });
+        oTr.addEventListener("dblclick", function () { _copyAlias(oRowData); });
 
-				//data type에따른 검색필드 분기.
-				switch (it_fdesc[i].DATATYPE) {
-					case "D":
-						// DATE TYPE인경우.
-						var oSFld = new sap.m.DatePicker({ valueFormat: "yyyyMMdd", displayFormat: "yyyy.MM.dd" });
-						break;
+        return oTr;
 
-					case "T":
-						// TIME인경우.
-						var oSFld = new sap.m.TimePicker({ valueFormat: "HHmmss", displayFormat: "HH:mm:ss" });
-						break;
+    } // end of _buildRow
 
-					default:
-						// DEFAULT INPUT필드.
-						var oSFld = new sap.m.Input({ type: "Text", valueLiveUpdate: true, maxLength: it_fdesc[i].OUTPUTLEN, showClearIcon : true });
 
-						//enter event
-						oSFld.attachSubmit(function () { LF_getServerData(); });
-						break;
-				}
+    /************************************************************************
+     * 결과 행 세팅 (가상 스크롤러에 위임)
+     ************************************************************************/
+    function _renderRows(aRows) {
 
+        oState.rows = aRows || [];
+        if (oState.vs) {
+            oState.vs.setSel(null);   // 새 결과 → 이전 선택 해제
+            oState.vs.setRows(oState.rows);
+        }
 
-				var l_path = it_fdesc[i].FIELDNAME;
+    } // end of _renderRows
 
-				//필드명에 /가 있다면 x로 변환 처리.
-				if (l_path.indexOf("/") !== -1) {
-					l_path = l_path.replace(/\//g, "x");
-				}
 
-				//검색조건 필드 바인딩 처리.
-				oSFld.bindProperty(l_prop, { path: "/param/" + l_path });
+    /************************************************************************
+     * 행 → "$OTR:<alias>" 클립보드 복사 (원본 dblclick 동일)
+     ************************************************************************/
+    function _copyAlias(oLine) {
 
-				//form에 검색필드 추가.
-				oForm.addContent(oSFld);
+        if (!oLine) { return; }
 
-				//PARAMETER에 설정된 default 값을 기본으로 구성.
-				var l_dfval = it_fdesc[i].DFVAL;
+        // alias 없으면 메시지 처리 후 exit (원본 동일: "Alias &1 does not exist")
+        if (!oLine.ALIAS_NAME || oLine.ALIAS_NAME === "") {
+            var sAlias = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E07", "", "", "", "");      // Alias
+            _toast(APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "196", sAlias, "", "", ""));               // &1 does not exist.
+            return;
+        }
 
-				//기본값이 구성된 경우.
-				if (l_dfval !== "") {
-					oSFld.setProperty(l_prop, l_dfval);
-					oSFld.updateProperty(l_prop, true);
-				}
+        var sOtr = "$OTR:" + oLine.ALIAS_NAME;
 
-			}
+        _copyText(sOtr);
 
-		}   //검색조건 필드 구성.
+        // "$OTR:<alias> copied" (E06 = copied)
+        _toast(sOtr + " " + APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E06", "", "", "", ""));
 
+    } // end of _copyAlias
 
-		//결과리스트 컬럼 설정.
-		function lf_setTableColumn(SHLPNAME, it_fdesc) {
 
-			for (var i = 0, l = it_fdesc.length; i < l; i++) {
+    /************************************************************************
+     * F4 필드 정보 조회 (원본 lf_getF4Field — trgubun "F")
+     ************************************************************************/
+    function lf_getF4Field() {
 
-				//결과리스트 필드정보가 아닌경우 skip.
-				if (it_fdesc[i].SHLPLISPOS === 0) {
-					continue;
-				}
+        var oFormData = new FormData();
+        oFormData.append("trgubun", "F");
+        oFormData.append("_SHLPNAME", SHLPNAME);
+        oFormData.append("_SHLPSUB", SHLPNAME);
 
-				//column UI정보.
-				var oCol = new sap.ui.table.Column({ autoResizable: true });
+        sendAjax(oAPP.attr.servNm + "/f4serverData", oFormData, function (param) {
 
-				//header text UI정보.
-				var oLab = new sap.m.Label();
+            // 패널 펼침 + 검색조건/컬럼 구성
+            oEl.panel.setCollapsed(false);
+            _buildSearchFields(param);
+            _buildTableColumns(param);
+            _renderRows([]); // 초기 no-data
 
-				//default 컬럼 텍스트.
-				var l_txt = it_fdesc[i].SCRTEXT_S;
+            // 메인(부모) 으로 로딩 완료 통지 — 원본 if-otr-callback 계약 유지
+            try {
+                var PARWIN = oAPP.CURRWIN.getParentWindow();
+                if (PARWIN) { PARWIN.webContents.send("if-otr-callback", "X"); }
+            } catch (e) { }
 
+            // 로딩 종료 + 본문 CSS 페이드인(셸) + 메인 영역 Busy Lock 해제(원본 동일)
+            parent.oAPP.setBusyLoading('');
+            try { if (oAPP.fn && oAPP.fn.fnShowContent) { oAPP.fn.fnShowContent(); } } catch (e) { }
+            oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" });
 
-				//header text 구성.
-				oLab.setText(l_txt);
+        });
 
-				//column에 header text UI추가.
-				oCol.setLabel(oLab);
+    } // end of lf_getF4Field
 
-				//table에 column정보 추가.
-				oTable.addColumn(oCol);
 
-				var l_type, l_len = 0;
+    /************************************************************************
+     * 검색 실행 (원본 LF_getServerData — trgubun "D")
+     ************************************************************************/
+    function LF_getServerData() {
 
-				// ABAP TYPE에 따른 로직 분기.
-				switch (it_fdesc[i].DATATYPE) {
-					case "DATS":  //DATE 타입인경우.
-						l_type = "D";
-						l_len = 8;
-						break;
+        // 아직 필드 미구성(F4 로딩 전)이면 무시
+        if (!oState.searchFields) { return; }
 
-					case "TIMS":  //TIME 타입인경우.
-						l_type = "T";
-						l_len = 6;
-						break;
+        _setSearchBusy(true);
 
-					default:  //DEFAULT는 STRING.
-						l_type = "STRING";
-						l_len = 0;
-						break;
+        var oFormData = new FormData();
+        oFormData.append("trgubun", "D");
+        oFormData.append("_SHLPNAME", SHLPNAME);
+        oFormData.append("_SHLPSUB", SHLPNAME);
 
-				}
+        // ~MAX ROW
+        var sMax = (oEl.maxRows && oEl.maxRows.getValue()) ? oEl.maxRows.getValue() : String(DEFAULT_MAX_ROWS);
+        oFormData.append("_MAXROWS", sMax);
 
-				var l_path = it_fdesc[i].FIELDNAME;
+        // 검색조건 입력값 수집(원본: 모델 param 키=소문자 x 치환 필드명)
+        oState.searchFields.forEach(function (oSf) {
+            oFormData.append(oSf.paramKey, oSf.field.getValue());
+        });
 
-				//필드명에 /가 있다면 x로 변환 처리.
-				if (l_path.indexOf("/") !== -1) {
-					l_path = l_path.replace(/\//g, "X");
-				}
+        sendAjax(oAPP.attr.servNm + "/f4serverData", oFormData, function (param) {
 
-				//TABLE CELL 출력 TEXT UI.
-				var oTxt = new sap.m.Text({ text: { path: l_path } });
+            var sResTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A73", "", "", "", ""); // Search Result
 
-				//column list item에 text ui 추가.
-				oCol.setTemplate(oTxt);
+            if (param.TEXT[0].NAME === "REFDATA") {
 
-			}
+                var iCnt = Number(param.TEXT[1].VALUE);
+                oEl.resultLabel.textContent = sResTxt + " : " + iCnt;
 
-		}   //결과리스트 컬럼 설정.
+                // 결과 많으면 검색 패널 접기(원본: visiRow>5 → setExpanded(false))
+                if (iCnt > 5) { oEl.panel.setCollapsed(true); }
 
+                var oData = {};
+                try { oData = JSON.parse(param.TEXT[0].VALUE); } catch (e) { oData = {}; }
+                _renderRows(oData.TF4LIST || []);
 
+            } else if (param.TEXT[0].NAME === "NOTFOUND") {
 
-		//-검색 서버 조회 전송 처리 스크립트 펑션 생성
-		function LF_getServerData() {
-
-			oAPP.fn.setBusyIndicator("X");
-
-			oTable.setBusy(true);
-			SerchBT1.setBusy(true);
-
-			//application명 서버전송 데이터 구성.
-			var oFormData = new FormData();
-			oFormData.append("trgubun", "D");
-
-			oFormData.append("_SHLPNAME", I_SHLPNAME);
-
-			//구성한 현재 F4 HELP명 수집.
-			oFormData.append("_SHLPSUB", I_SHLPNAME);
-
-			//~MAX ROW
-			oFormData.append("_MAXROWS", ZF4SH_input01.getValue());
-
-			//검색조건 입력정보 수집.
-			for (var i in ZF4searchModle.oData.param) {
-				oFormData.append(i, ZF4searchModle.oData.param[i]);
-			}
-
-
-			//검색조건에 따른 결과 리스트 검색을 위한 서버 호출.
-			sendAjax(oAPP.attr.servNm + "/f4serverData", oFormData, function (param) {
-				//~조회 정보 존재시 data 처리
-
-				//A73  Search Result
-				var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A73", "", "", "", "");
-
-				if (param.TEXT[0].NAME == "REFDATA") {
-
-					modeloTable.oData.TF4LIST = [];
-					var visiRow = Number(param.TEXT[1].VALUE);
-					var Ltext = l_txt + " : " + visiRow;
-					ZF4SH_LBresult.setText(Ltext);
-					if (visiRow > 5) { oPanel.setExpanded(false); }
-					if (visiRow > 10) { visiRow = 10; }
-					var jsonData = param.TEXT[0].VALUE;
-					modeloTable.setData(JSON.parse(jsonData));
-				}
-
-				//~조회 data 처리 누락이라면 ..
-				if (param.TEXT[0].NAME == "NOTFOUND") {
-					ZF4SH_LBresult.setText(l_txt + " : 0");
-
-					modeloTable.oData.TF4LIST = [];
-					modeloTable.refresh();
-					var Ltxt = param.TEXT[0].VALUE;
-
-					//~Message 처리
-					sap.m.MessageToast.show(Ltxt);
-
-				}
-
-				oTable.setBusy(false);
-				SerchBT1.setBusy(false);
-
-				oAPP.fn.setBusyIndicator("");
-
-			}); //검색조건에 따른 결과 리스트 검색을 위한 서버 호출.
-
-
-		}   //-검색 서버 조회 전송 처리 스크립트 펑션 생성
-
-
-
-		//f4 help 필드정보 얻기.
-		function lf_getF4Field() {
-
-			//application명 서버전송 데이터 구성.
-			var oFormData = new FormData();
-			oFormData.append("trgubun", "F");
-
-			// oFormData.append("sap-user", "PES");
-			// oFormData.append("sap-password", "dmstjq8!");
-			// oFormData.append("sap-language", "EN");
-
-			//대표 f4 help명.
-			oFormData.append("_SHLPNAME", I_SHLPNAME);
-
-			//현재 선택한 f4 help명수집.
-			oFormData.append("_SHLPSUB", I_SHLPNAME);
-
-
-			//f4 help 필드정보 검색.
-			sendAjax(oAPP.attr.servNm + "/f4serverData", oFormData, function (param) {
-
-				//~조회입력 패널 펼침
-				oPanel.setExpanded(true);
-
-				//검색조건 영역 재설정.
-				lf_setSearchCondition(I_SHLPNAME, param);
-
-				//결과리스트 컬럼 재설정.
-				lf_setTableColumn(I_SHLPNAME, param);
-
-				//ipc로 메인 호출처로 로딩 완료여부 전송.
-
-				var CURRWIN = oAPP.REMOTE.getCurrentWindow(),
-					PARWIN = CURRWIN.getParentWindow();
-
-				PARWIN.webContents.send("if-otr-callback", "X");
-
-				//~witing mode 제거
-				oPage.setBusy(false);
-
-				oAPP.fn.setBusyIndicator("");
-
-                // 화면이 다 그려지고 난 후 메인 영역 Busy 끄기
-                parent.oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); 
-
-
-			});
-
-		} //f4 help 필드정보 얻기.
-
-
-		// function lf_UIUpdated(){
-
-		// 	//호출 이후 이벤트 제거 처리.
-		// 	sap.ui.getCore().detachEvent("UIUpdated", lf_UIUpdated);
-				
-		// 	//검색조건, 결과리스트 필드 정보 얻기.
-		// 	lf_getF4Field();
-
-		// }
-
-
-		// //UI화면 갱신 이후 이벤트 처리.
-		// sap.ui.getCore().attachEvent("UIUpdated", lf_UIUpdated);
-
-
-		var oApp = new sap.m.App();
-		oApp.placeAt("content");
-
-		//366  Alias can be copied by double-clicking the result list.
-		var l_txt = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "366", "", "", "", "");
-
-		//dialog 생성.
-		var oPage = new sap.m.Page({ title: l_txt, busy:true, busyIndicatorDelay:0});
-		oApp.addPage(oPage);
-		oPage.addStyleClass("sapUiSizeCompact");
-
-
-
-		var oHbox1 = new sap.m.HBox({ height: "100%", direction: "Column", renderType: "Bare" });
-		oPage.addContent(oHbox1);
-
-		//D47  Selection
-		var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D47", "", "", "", "");
-
-		//검색조건 panel.
-		var oPanel = new sap.m.Panel({ expandable: true, expanded: true, headerText: l_txt });
-		oHbox1.addItem(oPanel);
-
-		var SerchOVtoolbar = new sap.m.OverflowToolbar({ width: "100%" });
-		oPanel.setHeaderToolbar(SerchOVtoolbar);
-
-		//D47  Selection
-		var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D47", "", "", "", "");
-
-		//검색버튼 label.
-		var SerLB = new sap.m.Label({
-			design: "Bold", required: false, text: l_txt, tooltip: l_txt
-		});
-		SerchOVtoolbar.addContent(SerLB);
-
-
-		//A75  Search
-		var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A75", "", "", "", "");
-
-		//검색 버튼.
-		var SerchBT1 = new sap.m.Button({
-			icon: "sap-icon://search",
-			text: l_txt, tooltip: l_txt, type: "Emphasized", busyIndicatorDelay: 1
-		});
-
-		//검색버튼 선택 이벤트.
-		SerchBT1.attachEvent("press", function (oEvent) {
-			LF_getServerData();
-		});
-
-		SerchOVtoolbar.addContent(SerchBT1);
-
-		//~조회필드 FORM 영역 생성
-		var oForm = new sap.ui.layout.form.SimpleForm({
-			columnsM: 1, editable: true, singleContainerFullSize: false,
-			labelSpanL: 3, labelSpanM: 3, adjustLabelSpan: false,
-			layout: "ResponsiveGridLayout"
-		});
-		oPanel.addContent(oForm);
-
-		//검색조건 model.
-		var ZF4searchModle = new sap.ui.model.json.JSONModel();
-		ZF4searchModle.oData.param = {};
-		oForm.setModel(ZF4searchModle);
-
-
-		//조회조건 필드 구성.
-		lf_setSearchCondition(I_SHLPNAME, IT_FIELDDESCR);
-
-
-
-		var ZF4SH_ovtoolbar = new sap.m.OverflowToolbar({ width: "100%" });
-
-		//A76  Maximum No, of Hits
-		var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A76", "", "", "", "");
-
-		//Maximum No, of Hits label.
-		var olb01 = new sap.m.Label({ design: "Bold", text: l_txt, tooltip: l_txt });
-		ZF4SH_ovtoolbar.addContent(olb01);
-
-		//max Hits
-		var ZF4SH_input01 = new sap.m.Input({ type: "Number", width: "60px", showClearIcon : true });
-
-		//최대 검색건수 설정.
-		ZF4SH_input01.setValue(200);
-		ZF4SH_ovtoolbar.addContent(ZF4SH_input01);
-		ZF4SH_ovtoolbar.addContent(new sap.m.ToolbarSpacer());
-
-		//A73  Search Result
-		var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A73", "", "", "", "");
-
-		//결과 건수 text
-		var ZF4SH_LBresult = new sap.m.Label({ design: "Bold", text: l_txt + " : 0" });
-		ZF4SH_ovtoolbar.addContent(ZF4SH_LBresult);
-
-
-		//★~F4 조회 리스트 테이블 ui 생성
-		var oTable = new sap.ui.table.Table({
-			selectionMode: "None", visibleRowCountMode: "Auto", alternateRowColors: true,
-			layoutData: new sap.m.FlexItemData({ growFactor: 1 })
-		});
-
-		//table 더블클릭 이벤트.
-		oTable.attachBrowserEvent("dblclick", function (oEvent) {
-
-			//이벤트 발생 UI 정보 얻기.
-			var l_ui = oAPP.fn.getUiInstanceDOM(oEvent.target, sap.ui.getCore());
-
-			//UI정보를 얻지 못한 경우 exit.
-			if (!l_ui) { return; }
-
-			//바인딩정보 얻기.
-			var l_ctxt = l_ui.getBindingContext();
-
-			//바인딩 정보를 얻지 못한 경우 exit.
-			if (!l_ctxt) { return; }
-
-			var ls_line = l_ctxt.getProperty();
-			if (!ls_line) { return; }
-
-
-			//alias가 없는경우 메시지 처리 후 exit.
-			if (!ls_line.ALIAS_NAME || ls_line.ALIAS_NAME === "") {
-				//E07  Alias
-				//196  &1 does not exist.
-				sap.m.MessageToast.show(oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "196",
-					oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E07", "", "", "", ""), "", "", ""));
-				return;
-			}
-
-			//OTR 클립보드 복사 처리.
-			oAPP.fn.setClipBoardTextCopy("$OTR:" + ls_line.ALIAS_NAME);
-
-			//E06  copied
-			//메시지 처리.
-			sap.m.MessageToast.show("$OTR:" + ls_line.ALIAS_NAME + " " + oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E06", "", "", "", ""));
-
-		}); //table 더블클릭 이벤트.
-
-
-		oHbox1.addItem(oTable);
-		oTable.setToolbar(ZF4SH_ovtoolbar);
-
-		//~table 모델 설정
-		var modeloTable = new sap.ui.model.json.JSONModel();
-		oTable.setModel(modeloTable);
-
-
-		oTable.bindAggregation("rows", { path: "/TF4LIST", template: new sap.ui.table.Row() });
-
-
-		let oDelegate = {
-            onAfterRendering : function(){
-
-                oApp.removeEventDelegate(oDelegate);
-
-				oAPP.CURRWIN.show();
-
-				oAPP.WSUTIL.setBrowserOpacity(oAPP.CURRWIN);
-
-				//검색조건, 결과리스트 필드 정보 얻기.
-				lf_getF4Field();
+                oEl.resultLabel.textContent = sResTxt + " : 0";
+                _renderRows([]);
+                _toast(param.TEXT[0].VALUE);
 
             }
-        };
 
-        oApp.addEventDelegate(oDelegate);
+            _setSearchBusy(false);
 
-	};  //OTR 검색 팝업 호출.
+        });
 
-
-
-
-	//text 클립보드 복사 처리.
-	oAPP.fn.setClipBoardTextCopy = (sText, fnCallback) => {
-
-		if (typeof sText !== "string") {
-			return;
-		}
-
-		var oTextArea = document.createElement("textarea");
-		oTextArea.value = sText;
-
-		document.body.appendChild(oTextArea);
-
-		oTextArea.select();
-
-		document.execCommand('copy');
-
-		document.body.removeChild(oTextArea);
-
-		if (typeof fnCallback === "function") {
-			fnCallback();
-		}
-
-	};	//text 클립보드 복사 처리.
+    } // end of LF_getServerData
 
 
+    /************************************************************************
+     * -- Start of Program
+     ************************************************************************/
+    document.addEventListener("DOMContentLoaded", function () {
 
-	//UI DOM을 기준으로 UI instance 정보 얻기.
-	oAPP.fn.getUiInstanceDOM = function (oDom, oCore) {
+        // 부모와 동일 테마 적용(iframe 자체 토큰 동기화)
+        try {
+            var oTheme = (oAPP.attr.oThemeInfo && oAPP.attr.oThemeInfo.THEME) ? oAPP.attr.oThemeInfo : oAPP.fn.getThemeInfo();
+            if (window.U4ATheme && oTheme && oTheme.THEME) {
+                window.U4ATheme.apply(oTheme.THEME);
+                try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { }
+            }
+        } catch (e) { }
 
-		//DOM 정보가 존재하지 않는경우 exit.
-		if (typeof oDom === "undefined") { return; }
+        // 정적 골격
+        _buildSkeleton();
 
-		//DOM id로부터 UI정보 검색.
-		var l_ui = oCore.byId(oDom.id);
+        // 창 표시(show)는 셸(frame.js)이 즉시 처리 — 네이티브 opacity 페이드 미사용(흰 플래시 방지).
+        //   본문 등장은 F4 로딩 완료 시 CSS 페이드인(fnShowContent). (16.공통UX 2.6)
 
-		//UI를 찾은경우 해당 UI정보 return
-		if (typeof l_ui !== "undefined") {
-			return l_ui;
-		}
+        // Esc = 닫기(공통 UX) — 포커스가 iframe(본문)에 있을 때 처리. 키 꾹 누름 가드.
+        document.addEventListener("keydown", function (ev) {
+            if (ev.repeat) { return; }
+            if (ev.key === "Escape") {
+                try { if (oAPP.fn && oAPP.fn.fnClose) { oAPP.fn.fnClose(); } } catch (e) { }
+            }
+        });
 
-		//UI정보를 찾지못한 경우 상위 부모를 탐색하며 UI instance정보 검색.
-		return oAPP.fn.getUiInstanceDOM(oDom.parentElement, oCore);
+        // F4 필드 정보 조회 → 검색조건/컬럼 구성 + Busy 해제
+        lf_getF4Field();
 
-
-	};  //UI DOM을 기준으로 UI instance 정보 얻기.
-
-
-
-
-	//table 컬럼 재조정 처리.
-	oAPP.fn.autoResize = function (oTab, iTime) {
-
-		if (!oTab) { return; }
-
-		setTimeout(() => {
-			for (var i = oTab.getColumns().length - 1; i >= 0; i--) {
-
-				oTab.autoResizeColumn(i);
-
-			}
-
-		}, iTime);
-
-	} //table 컬럼 재조정 처리.
-
-
-	/************************************************************************
-	 * 페이지가 실제로 숨겨지거나 종료 처리될 때 호출되는 이벤트
-	 ************************************************************************/
-	parent.window.addEventListener('pagehide', function(){
-
-		// IPC Event 해제
-		_detachIpcEvents();
-
-	},{ once: true });
-
+    });
 
 })(window, oAPP);

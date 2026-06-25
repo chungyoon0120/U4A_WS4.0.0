@@ -3023,12 +3023,18 @@
             oDefaultOption = parent.require(sSettingsJsonPath),
             oBrowserOptions = jQuery.extend(true, {}, oDefaultOption.browserWindow);
 
-        oBrowserOptions.title = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B59"); // OTR Manager
+        let sOtrTitle = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B59"); // OTR Manager
+
+        oBrowserOptions.title = sOtrTitle;
         oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
+        // [HTML5] frameless — 네이티브 OS 헤더 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
+        oBrowserOptions.titleBarStyle = "hidden";
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5] 네이티브 창 opacity 페이드 미사용(OS 리컴포짓이라 무겁고, 다크 테마서 흰 플래시) —
+        //   backgroundColor=테마 BGCOL 로 즉시 불투명하게 띄우고(show=false 로 위치 잡힌 뒤 표시),
+        //   등장 효과는 본문 CSS opacity transition 으로(editorPopup 동일, 16.공통UX 2.6). opacity=0.0 제거.
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
@@ -3056,7 +3062,11 @@
             browserkey: oBrowserOptions?.webPreferences?.browserkey,
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
-            USERINFO: parent.process.USERINFO
+            USERINFO: parent.process.USERINFO,
+            // [HTML5] frameless 창 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: sOtrTitle
         };
 
         // 실행할 URL 적용

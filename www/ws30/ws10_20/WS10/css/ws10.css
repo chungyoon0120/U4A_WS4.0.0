@@ -242,6 +242,12 @@
     display: none;
 }
 
+/* 드롭다운 메뉴 버튼(buildMenuButton, 구 sap.m.MenuButton) — 트레일링 caret 은 작고 옅게 */
+.u4a-tx-btn--menu .u4a-tx-btn__caret {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
 /* Delete (Reject) — 위험 강조 */
 .u4a-tx-btn--reject {
     color: var(--error);

@@ -794,6 +794,21 @@
 
         _uspRefreshAfterMode();
         oAPP.common.fnSetBusyLock("");
+
+        // 저장/활성화 후 에디터로 포커스 복원 (구 _fnSaveCallback 끝의 beforeActiveElement.focus()).
+        //   단축키 activate/save 로 포커스가 에디터(iframe)에서 빠진 경우, 파일 편집 중이었으면 Monaco 로
+        //   되돌린다. Monaco 는 마지막 커서/선택 위치를 그대로 유지하므로 editor.focus() 만으로 충분.
+        _refocusUspEditor();
+    }
+
+    // 메인 Monaco 에디터로 포커스 복원(파일 편집 중일 때만 — editor 인스턴스 존재 = 파일 열림).
+    function _refocusUspEditor() {
+        try {
+            var ifr = document.querySelector("#uspEditorHost iframe.EDITOR_MAIN");
+            if (ifr && ifr.contentWindow && ifr.contentWindow.editor) {
+                setTimeout(function () { try { ifr.contentWindow.editor.focus(); } catch (e) { } }, 0);
+            }
+        } catch (e) { }
     }
 
     /************************************************************************
@@ -846,144 +861,183 @@
         return s;
     }
 
+    // Create 팝업 타이틀 (구 "생성 [ 부모명 ]")
+    function _crTitle(oNode) {
+        return APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A01") + " [ " + (oNode && oNode.OBDEC || "") + " ]";
+    }
+
+    // 라벨+입력 행 — 공통 .u4a-form__row / .u4a-label(--required) / .u4a-field(+clear) / .u4a-field__msg
+    //   (createEventPopup.js 와 동일 패턴: 세로 스택, clear X, 포커스시 value-state 메시지 자동 노출)
+    function _crRow(sLabel, bReq) {
+        var oRow = document.createElement("div"); oRow.className = "u4a-form__row";
+        var oLab = document.createElement("label");
+        oLab.className = "u4a-label" + (bReq ? " u4a-label--required" : "");
+        oLab.textContent = sLabel;
+        var oField = document.createElement("div"); oField.className = "u4a-field"; oField.setAttribute("data-trail", "1");
+        var oInp = document.createElement("input");
+        oInp.className = "u4a-input u4a-field__input";
+        oInp.autocomplete = "off"; oInp.setAttribute("spellcheck", "false");
+        var oClr = document.createElement("button");
+        oClr.type = "button"; oClr.className = "u4a-field__clear"; oClr.tabIndex = -1; oClr.title = "Clear";
+        oClr.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        var oMsg = document.createElement("div"); oMsg.className = "u4a-field__msg";
+        oField.appendChild(oInp); oField.appendChild(oClr);
+        oRow.appendChild(oLab); oRow.appendChild(oField); oRow.appendChild(oMsg);
+        try { if (window.U4AUI && U4AUI.attachClear) { U4AUI.attachClear(oInp, oClr); } } catch (e) { }
+        return { row: oRow, input: oInp, msg: oMsg };
+    }
+
     // 팝업 재사용 시 초기화 + 타이틀 갱신 + 포커스
     function _uspCrDialogReset(oDlg, oNode) {
         oDlg.__uspCrParent = oNode;
-        try { oDlg._fldName.setValue(""); oDlg._fldName.setValueState("none", ""); } catch (e) { }
-        try { oDlg._fldDesc.setValue(""); } catch (e) { }
-        try { oDlg._fldCodpg.setValue("utf-8"); } catch (e) { }
-        try { oDlg.querySelector(".js-usp-cr-isfld").checked = false; } catch (e) { }
-        try { oDlg.querySelector(".u4aUspCrTitle").textContent =
-            APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A01") + " [ " + _esc(oNode.OBDEC || "") + " ]"; } catch (e) { }
-        try { setTimeout(function () { oDlg._fldName.el.querySelector("input").focus(); }, 80); } catch (e) { }
+        try { oDlg._nameInp.value = ""; oDlg._nameInp.removeAttribute("data-vs"); oDlg._nameMsg.textContent = ""; oDlg._nameInp.dispatchEvent(new Event("input")); } catch (e) { }
+        try { oDlg._descInp.value = ""; oDlg._descInp.dispatchEvent(new Event("input")); } catch (e) { }
+        try { oDlg._codpgInp.value = "utf-8"; oDlg._codpgInp.dispatchEvent(new Event("input")); } catch (e) { }
+        try { oDlg._isfldChk.checked = false; } catch (e) { }
+        try { oDlg.querySelector(".u4aUspCrTitle").textContent = _crTitle(oNode); } catch (e) { }
+        requestAnimationFrame(function () { try { oDlg._nameInp.focus(); } catch (e) { } });
     }
 
-    // Create 팝업 열기 (구 fnCreateUspNodePopup)
+    // Create 팝업 열기 (구 fnCreateUspNodePopup) — 공통 다이얼로그/폼/입력 컴포넌트 소비
     oAPP.fn.fnCreateUspNodePopup = function (oNode) {
         if (!oNode) { oAPP.common.fnSetBusyLock(""); return; }
 
-        // 기존 팝업 재사용
-        var oDlg = document.getElementById("uspCrNodePopup");
-        if (oDlg) {
-            _uspCrDialogReset(oDlg, oNode);
-            if (!oDlg.open) { oDlg.showModal(); }
-            oAPP.common.fnSetBusyLock(""); return;
-        }
+        // 잔여 팝업 제거 후 매번 새로 생성 — createEventPopup 패턴(close 만으로는 top-layer 간섭 시
+        //   안 닫히므로 close+remove 로 확실히 정리). 재사용 분기는 close 무효 시 좀비 팝업을 남겨 폐기.
+        var oOld = document.getElementById("uspCrNodePopup");
+        if (oOld) { try { oOld.close(); } catch (e) { } try { oOld.remove(); } catch (e) { } }
 
-        var sLblName    = _esc(APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C11"));  // Name
-        var sLblDesc    = _esc(APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A35"));  // Description
-        var sLblCharset = _esc(APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C20"));  // Charset
-        var sLblFolder  = _esc(APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D45"));  // Folder
-        var sTitle      = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A01") + " [ " + _esc(oNode.OBDEC || "") + " ]";
+        var oDlg = null;
+        var sLblName    = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C11");  // Name
+        var sLblDesc    = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A35");  // Description
+        var sLblCharset = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C20");  // Charset
+        var sLblFolder  = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D45");  // Folder
 
         oDlg = document.createElement("dialog");
         oDlg.id = "uspCrNodePopup";
         oDlg.className = "u4a-dialog";
-        oDlg.style.cssText = "width:32rem;max-width:96vw";
+        oDlg.style.cssText = "width:min(92vw,460px);padding:0;display:flex;flex-direction:column";
         oDlg.__uspCrParent = oNode;
 
-        oDlg.innerHTML =
-            '<div class="u4a-dialog__header" data-u4a-draghandle="true">' +
-            '  <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>' +
-            '  <span class="u4aUspCrTitle"></span>' +
-            '  <button type="button" class="u4a-btn-icon js-usp-cr-x" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>' +
-            '</div>' +
-            '<div class="u4a-dialog__body u4aUspCrBody">' +
-            '  <div class="u4aWs30Form">' +
-            '    <div class="u4aWs30FormRow">' +
-            '      <label class="u4aWs30FormLabel">' + sLblName + ':&nbsp;<span style="color:var(--negative)">*</span></label>' +
-            '      <div class="js-usp-cr-name-wrap"></div>' +
-            '    </div>' +
-            '    <div class="u4aWs30FormRow">' +
-            '      <label class="u4aWs30FormLabel">' + sLblDesc + ':</label>' +
-            '      <div class="js-usp-cr-desc-wrap"></div>' +
-            '    </div>' +
-            '    <div class="u4aWs30FormRow">' +
-            '      <label class="u4aWs30FormLabel">' + sLblCharset + ' (ex: utf-8, euc-kr..):</label>' +
-            '      <div class="js-usp-cr-codpg-wrap"></div>' +
-            '    </div>' +
-            '    <div class="u4aWs30FormRow">' +
-            '      <label class="u4aWs30FormLabel">' + sLblFolder + ':</label>' +
-            '      <input type="checkbox" class="js-usp-cr-isfld" style="width:1.125rem;height:1.125rem;accent-color:var(--accent)">' +
-            '    </div>' +
-            '  </div>' +
-            '</div>' +
-            '<div class="u4a-dialog__footer">' +
-            '  <button type="button" class="u4a-btn u4a-btn--primary js-usp-cr-ok"><i class="fa-solid fa-check"></i></button>' +
-            '  <button type="button" class="u4a-btn u4a-btn--negative js-usp-cr-cancel"><i class="fa-solid fa-xmark"></i></button>' +
-            '</div>';
+        // 헤더 — 아이콘 + 타이틀 + 닫기(공통 .u4a-btn-icon)
+        var oHeader = document.createElement("div");
+        oHeader.className = "u4a-dialog__header";
+        oHeader.innerHTML = '<i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i><span class="u4aUspCrTitle"></span>';
+        var oX = document.createElement("button");
+        oX.type = "button"; oX.className = "u4a-btn-icon"; oX.setAttribute("aria-label", "Close");
+        oX.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
+        oX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        oHeader.appendChild(oX);
+        oDlg.appendChild(oHeader);
+        oDlg.querySelector(".u4aUspCrTitle").textContent = _crTitle(oNode);
 
-        oDlg.querySelector(".u4aUspCrTitle").textContent = sTitle;
+        // 바디 — 공통 .u4a-form(세로 스택)
+        var oBody = document.createElement("div");
+        oBody.className = "u4a-dialog__body";
+        // overflow:visible — 공통 .u4a-dialog__body 의 overflow:auto 를 무력화(value-state 메시지가 absolute 라
+        //   바디 경계에서 잘리지 않게. createEventPopup.js 와 동일 이유).
+        oBody.style.cssText = "flex:1 1 auto;display:flex;flex-direction:column;padding:1.25rem 1.25rem 1.75rem;overflow:visible";
+        var oForm = document.createElement("div"); oForm.className = "u4a-form";
 
-        var oFldName  = U4AUI.createField({ placeholder: "" });
-        var oFldDesc  = U4AUI.createField({});
-        var oFldCodpg = U4AUI.createField({ value: "utf-8" });
-        oDlg.querySelector(".js-usp-cr-name-wrap").appendChild(oFldName.el);
-        oDlg.querySelector(".js-usp-cr-desc-wrap").appendChild(oFldDesc.el);
-        oDlg.querySelector(".js-usp-cr-codpg-wrap").appendChild(oFldCodpg.el);
-        oDlg._fldName  = oFldName;
-        oDlg._fldDesc  = oFldDesc;
-        oDlg._fldCodpg = oFldCodpg;
+        var oRName  = _crRow(sLblName, true);                                  // 이름(필수)
+        var oRDesc  = _crRow(sLblDesc, false);                                 // 설명
+        var oRCodpg = _crRow(sLblCharset + " (ex: utf-8, euc-kr..)", false);   // 문자세트
+        oRCodpg.input.value = "utf-8";
 
-        // Enter → Accept
-        [oFldName.el, oFldDesc.el, oFldCodpg.el].forEach(function (wrap) {
-            wrap.addEventListener("keydown", function (e) {
-                if (e.key === "Enter" && !e.repeat) { _fnCrAccept(oDlg); }
-            });
-        });
+        // 폴더 체크박스 행 (공통 .u4a-check)
+        var oRFld = document.createElement("div"); oRFld.className = "u4a-form__row";
+        var oFldLab = document.createElement("label"); oFldLab.className = "u4a-check";
+        var oFldChk = document.createElement("input"); oFldChk.type = "checkbox";
+        var oFldTxt = document.createElement("span"); oFldTxt.textContent = sLblFolder;
+        oFldLab.appendChild(oFldChk); oFldLab.appendChild(oFldTxt);
+        oRFld.appendChild(oFldLab);
 
-        function _close() { oDlg.close(); }
-        oDlg.querySelector(".js-usp-cr-x").addEventListener("click", _close);
-        oDlg.querySelector(".js-usp-cr-cancel").addEventListener("click", _close);
-        oDlg.querySelector(".js-usp-cr-ok").addEventListener("click", function () { _fnCrAccept(oDlg); });
-        oDlg.addEventListener("close", function () {
+        oForm.appendChild(oRName.row);
+        oForm.appendChild(oRDesc.row);
+        oForm.appendChild(oRCodpg.row);
+        oForm.appendChild(oRFld);
+        oBody.appendChild(oForm);
+        oDlg.appendChild(oBody);
+
+        // 푸터 — Accept(강조 파랑) / Cancel(Reject 느낌 빨강) (메모리 btn-color-semantics)
+        var oFoot = document.createElement("div");
+        oFoot.className = "u4a-dialog__footer";
+        var oOk = document.createElement("button");
+        oOk.type = "button"; oOk.className = "u4a-btn u4a-btn--emphasized";
+        oOk.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A01");
+        oOk.innerHTML = '<i class="fa-solid fa-check"></i>';
+        var oCancel = document.createElement("button");
+        oCancel.type = "button"; oCancel.className = "u4a-btn u4a-btn--negative";
+        oCancel.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
+        oCancel.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        oFoot.appendChild(oOk); oFoot.appendChild(oCancel);
+        oDlg.appendChild(oFoot);
+
+        // 입력 참조 저장(_fnCrAccept / _uspCrDialogReset 가 사용)
+        oDlg._nameInp = oRName.input; oDlg._nameMsg = oRName.msg;
+        oDlg._descInp = oRDesc.input;
+        oDlg._codpgInp = oRCodpg.input;
+        oDlg._isfldChk = oFldChk;
+
+        // 이벤트 — 닫기는 close()+remove() (createEventPopup 패턴). close() 가 top-layer 간섭으로
+        //   무효여도 remove() 로 DOM 에서 제거돼 확실히 사라진다. 모델 초기화는 직접 수행(remove 시 close 이벤트 미발화 대비).
+        function _close() {
             try { APPCOMMON.fnSetModelProperty("/WS30/USPCRT", {}, true); } catch (e) { }
-        });
+            try { oDlg.close(); } catch (e) { }
+            try { oDlg.remove(); } catch (e) { }
+        }
+        oX.addEventListener("click", _close);
+        oCancel.addEventListener("click", _close);
+        oOk.addEventListener("click", function () { _fnCrAccept(oDlg); });
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); _close(); });   // ESC
+        // Enter → Accept (IME 한글 조합 확정 Enter 는 무시 — 오submit 방지)
+        function _enter(e) {
+            if (e.key !== "Enter") { return; }
+            if (e.isComposing || e.keyCode === 229) { return; }
+            e.preventDefault(); oOk.click();
+        }
+        [oRName.input, oRDesc.input, oRCodpg.input].forEach(function (inp) { inp.addEventListener("keydown", _enter); });
 
         document.body.appendChild(oDlg);
-        try { U4AUI.makeDialogResizable(oDlg); } catch (e) { }
-        oDlg.showModal();
+        // 헤더 드래그는 공통 전역 위임. 더블클릭 리센터 / 우하단 grip 리사이즈는 공통 헬퍼(전 팝업 동일 UX).
+        try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { }
+        try { if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 360, minH: 240 }); } } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { }
         oAPP.common.fnSetBusyLock("");
-        try { setTimeout(function () { oFldName.el.querySelector("input").focus(); }, 80); } catch (e) { }
+        requestAnimationFrame(function () { try { oRName.input.focus(); } catch (e) { } });
     };
 
     // Create Accept 핸들러 (구 ev_createUspNodeAcceptEvent)
     function _fnCrAccept(oDlg) {
         var oParent = oDlg.__uspCrParent;
         if (!oParent) { return; }
-        oAPP.common.fnSetBusyLock("X");
+        // ★ 검증 전에는 busy 를 걸지 않는다 — busy 는 #u4aWsBusyIndicator <dialog>.showModal() 이라
+        //   이미 showModal 인 Create 팝업 위에 떠서 입력칸 focus() 를 가로챈다(focus-within 미발생 →
+        //   value-state 메시지 안 보임). 검증/중복은 동기 로컬 작업이라 busy 불필요. 서버 저장은
+        //   fnSaveUspWs30 가 자체적으로 busy 를 건다.
 
-        var sName = "", sDesc = "", sCodpg = "utf-8", bFld = false;
-        try { sName  = oDlg._fldName.getValue().trim();     } catch (e) { }
-        try { sDesc  = oDlg._fldDesc.getValue();            } catch (e) { }
-        try { sCodpg = oDlg._fldCodpg.getValue() || "utf-8"; } catch (e) { }
-        try { bFld   = !!oDlg.querySelector(".js-usp-cr-isfld").checked; } catch (e) { }
+        var sName  = (oDlg._nameInp.value || "").trim();
+        var sDesc  = oDlg._descInp.value || "";
+        var sCodpg = oDlg._codpgInp.value || "utf-8";
+        var bFld   = !!oDlg._isfldChk.checked;
 
-        var oCrData = { NAME: sName, DESC: sDesc, CODPG: sCodpg, ISFLD: bFld };
+        // 이름 필드 value-state(error) — 포커스시 .u4a-field__msg 자동 노출(공통 규약). 첫 오류에 focus.
+        function _err(sMsg) {
+            oDlg._nameInp.setAttribute("data-vs", "error");
+            oDlg._nameMsg.textContent = sMsg || "";
+            try { oDlg._nameInp.focus(); } catch (e) { }
+        }
 
         // 입력값 검증
-        var oCheck = _fnCheckCreateNodeData(oCrData);
-        if (oCheck.RETCD === "E") {
-            try { oDlg._fldName.setValueState("Error", oCheck.RTMSG); } catch (e) { }
-            try { oDlg._fldName.focus(); } catch (e) { }
-            try { parent.setSoundMsg("02"); } catch (e) { }
-            try { parent.CURRWIN.flashFrame(true); } catch (e) { }
-            oAPP.common.fnShowFloatingFooterMsg("E", "WS30", oCheck.RTMSG);
-            oAPP.common.fnSetBusyLock(""); return;
-        }
+        var oCheck = _fnCheckCreateNodeData({ NAME: sName, DESC: sDesc, CODPG: sCodpg, ISFLD: bFld });
+        if (oCheck.RETCD === "E") { _err(oCheck.RTMSG); return; }
+
         // 중복 이름 체크 (같은 부모 자식 중)
         var aChildren = Array.isArray(oParent.USPTREE) ? oParent.USPTREE : [];
-        var oDup = aChildren.find(function (n) { return n && n.OBDEC === sName; });
-        if (oDup) {
-            var sDupMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "004");
-            try { oDlg._fldName.setValueState("Error", sDupMsg); } catch (e) { }
-            try { oDlg._fldName.focus(); } catch (e) { }
-            try { parent.setSoundMsg("02"); } catch (e) { }
-            try { parent.CURRWIN.flashFrame(true); } catch (e) { }
-            oAPP.common.fnShowFloatingFooterMsg("E", "WS30", sDupMsg);
-            oAPP.common.fnSetBusyLock(""); return;
+        if (aChildren.find(function (n) { return n && n.OBDEC === sName; })) {
+            _err(APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "004")); return;
         }
-        try { oDlg._fldName.setValueState("none", ""); } catch (e) { }
+        oDlg._nameInp.removeAttribute("data-vs"); oDlg._nameMsg.textContent = "";
 
         // 신규 노드 구성 (구 oNewRowData)
         var oAppData = _model("/WS30/APP") || {};
@@ -1024,9 +1078,16 @@
         APPCOMMON.fnSetModelProperty("/WS30/USPTREE", aTree);
         try { if (oAPP.fn.fnRenderUspTree) { oAPP.fn.fnRenderUspTree(); } } catch (e) { }
         try { if (oAPP.fn.fnUspTreeExpandSubtree) { oAPP.fn.fnUspTreeExpandSubtree(oParentNode); } } catch (e) { }
-        // 신규 행 선택 → ajax + 우측 페이지 + busy 해제
+
+        // ★ 닫기 순서 중요: 저장 때 건 busy 는 #u4aWsBusyIndicator <dialog>.showModal() 이라 Create 팝업
+        //   위(top-layer)에 떠 있다. 그 상태로 close() 하면 Chromium93 에서 안 닫힌다. 먼저 busy 를 해제해
+        //   Create 팝업을 top-layer 최상위로 만든 뒤 close, 그 다음 신규 행을 선택(선택이 자체 busy 재설정).
+        oAPP.common.fnSetBusyLock("");
+        try { APPCOMMON.fnSetModelProperty("/WS30/USPCRT", {}, true); } catch (e) { }
+        try { var d = document.getElementById("uspCrNodePopup"); if (d) { try { d.close(); } catch (e2) { } d.remove(); } } catch (e) { }
+
+        // 신규 행 선택 → ajax + 우측 페이지(선택 콜백이 busy 해제)
         try { if (oAPP.fn.fnUspTreeTableRowSelect) { oAPP.fn.fnUspTreeTableRowSelect(oNewRow); } } catch (e) { }
-        try { var d = document.getElementById("uspCrNodePopup"); if (d) { d.close(); } } catch (e) { }
     }
 
     // Activate (구 ev_pressActivateBtn = 저장 + IS_ACT)

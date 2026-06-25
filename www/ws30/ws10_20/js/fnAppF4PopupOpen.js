@@ -175,7 +175,6 @@
 
         // 헤더
         var oHeader = _el("div", "u4a-dialog__header");
-        oHeader.setAttribute("data-type", "I");
         oHeader.innerHTML = _fa("magnifying-glass") + "<span></span>";
         oHeader.querySelector("span").textContent =
             _txt("/U4A/CL_WS_COMMON", "B96") + " " + _txt("/U4A/CL_WS_COMMON", "A26");
@@ -207,8 +206,8 @@
         var oFoot = _el("div", "u4a-dialog__footer");
         var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative");
         oCloseBtn.type = "button";
-        oCloseBtn.innerHTML = _fa("xmark") + "<span></span>";
-        oCloseBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39");
+        oCloseBtn.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
+        oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oCloseBtn.addEventListener("click", lf_close);
         oFoot.appendChild(oCloseBtn);
         oDlg.appendChild(oFoot);

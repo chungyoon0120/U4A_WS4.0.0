@@ -303,6 +303,10 @@ button:focus-visible {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    /* 아이콘 버튼은 어디서든(툴바·다이얼로그 헤더/푸터·테이블·카드행 등) 항상 같은 정사각.
+       flex 컨테이너 안에서 flex-shrink 기본(1)이면 좁을 때 2rem 밑으로 줄어 화면마다
+       크기가 달라진다 → 0 0 auto 로 grow/shrink 차단(공통 단일 출처가 크기 보장). */
+    flex: 0 0 auto;
     width: 2rem;
     height: 2rem;
     padding: 0;
@@ -493,12 +497,30 @@ button:focus-visible {
     accent-color: var(--accent);
     cursor: pointer;
 }
-.u4a-zoom-pop__val {
-    min-width: 2.75rem;
-    text-align: right;
-    font-size: 0.8125rem;
+/* − [🔍 %] + 줌 버튼 — WS20 클라이언트 에디터 푸터(.u4aEdZoom*) 1:1.
+     배경 칠하지 않는다(투명). 텍스트/아이콘 색만 테마 토큰(--text-muted→호버 --text)이라
+     테마별로 글자색만 바뀐다. accent 솔리드 칩 같은 배경 채움 금지.
+   ★ bootstrap-skin 의 .u4a-btn 이 shell 보다 늦게 로드돼 배경/색을 덮으므로(단일 클래스끼린
+     나중 파일 승) 2클래스 명세(.u4a-zoom-pop__*.u4a-btn)로 이를 이긴다. */
+.u4a-zoom-pop__btn.u4a-btn {
+    flex: 0 0 auto;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted, var(--icon-muted));
+}
+.u4a-zoom-pop__btn.u4a-btn:hover {
+    background: var(--hover-bg);
     color: var(--text);
+}
+.u4a-zoom-pop__pct.u4a-btn {           /* 🔍 % (클릭=100% 원복) */
+    gap: 0.375rem;
     font-variant-numeric: tabular-nums;
+}
+.u4a-zoom-pop__step.u4a-btn {          /* −/+ 정사각 컴팩트 */
+    min-width: 1.9rem;
+    padding: 0.4rem 0.5rem;
+    justify-content: center;
 }
 
 .u4a-menu[hidden] {
@@ -889,7 +911,8 @@ button:focus-visible {
 .u4a-dialog .u4a-combo,
 .u4a-dialog .u4a-select {
     background: var(--surface-raised);
-    border-color: var(--divider);
+    /* border-color 는 base(.u4a-input)와 동일값 중복 — 여기 두면 (0,2,0)이 .u4a-input:hover/:focus-visible
+       (0,2,0)를 덮어(skin 늦게 로드) 팝업 내 hover/focus 강조가 죽어 제거. */
 }
 
 .u4a-dialog__header,
@@ -919,14 +942,17 @@ button:focus-visible {
 }
 
 /* 헤더의 "선두 상태 아이콘"만 대상(> i, 직계). 헤더 안의 닫기 X·액션 버튼 속 아이콘(button > i)은
-   제외해야 한다 — 안 그러면 data-type 의미색이 X 버튼까지 파랗게 칠해버린다(close 의미 불일치). */
+   제외해야 한다 — 안 그러면 의미색이 X 버튼까지 칠해버린다(close 의미 불일치).
+   ★ 공통 UX(2026-06-24): 다이얼로그 선두 아이콘 = 테마 accent 가 기본. (전엔 muted 기본 + 각 팝업이
+     data-type="I" 로 accent 를 따로 얻어 일부 팝업만 색이 들어가 불일치했음 — 전수 통일.)
+     일반 팝업은 아무 것도 안 해도 accent. 메시지박스만 data-type 으로 의미색 override(아래). */
 .u4a-dialog__header > i {
     font-size: 1rem;
-    color: var(--icon-muted);
+    color: var(--accent);
 }
 
 /* fnConfirmBox/메시지박스가 .u4a-dialog__header 에 data-type(S/E/W/I/C) 을 세팅한다.
-   서버리스트 fnShowMessageBox 와 동일하게 타입 의미색만 선두 아이콘에 입혀 디자인 통일. */
+   타입 의미색만 선두 아이콘에 입힌다(E=빨강/W=주황/S=초록). I/C 는 기본(accent)과 동일. */
 .u4a-dialog__header[data-type="E"] > i {
     color: var(--state-error);
 }
@@ -1300,9 +1326,11 @@ button:focus-visible {
     width: 100%;
     height: 2.25rem;
     padding: 0 0.5rem 0 0.625rem;
-    border: 0.0625rem solid var(--line);
+    /* 콤보도 '편집 가능' 컨트롤 → 입력칸(.u4a-input)과 동일한 올라온 표면+또렷한 테두리로 통일
+       (--surface-raised + --divider). 옛 --surface/--line 은 입력보다 가라앉아 보여 폐기. */
+    border: 0.0625rem solid var(--divider);
     border-radius: var(--radius-sm);
-    background: var(--surface);
+    background: var(--surface-raised);
     color: var(--text);
     cursor: pointer;
     user-select: none;
@@ -1535,6 +1563,19 @@ dialog::backdrop {
     margin-bottom: 0;
 }
 
+/* 팝업/다이얼로그 안 테이블 = 액자형 래퍼(공통 단일 출처).
+   AppF4·Insert 등 팝업 테이블이 제각각 손으로 깔던 border/radius/bg/scroll 을 여기로 모은다.
+   (ServerList 처럼 풀페이지 보더리스 테이블은 이 모디파이어를 안 붙인다 = 테두리 없음.)
+   화면은 `.u4a-table-wrap.u4a-table-wrap--boxed` 만 붙이면 동일 외형 — 색은 전부 토큰. */
+.u4a-table-wrap--boxed {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
 /* 컬럼 헤더 — sticky (체크리스트 E)
    ★ 헤더/행 높이는 공통 단일값(--control-h/--row-h, 기본 2.5rem) 고정 — 콘텐츠(아이콘/액션버튼/텍스트)에
      따라 표마다 달라지지 않게(행높이 공통 UX). box-sizing:border-box 로 패딩 포함 높이 고정,
@@ -1575,6 +1616,12 @@ dialog::backdrop {
 .u4a-table-wrap tbody tr:not(.u4aVSpacer) > td {
     height: var(--u4a-vsrowh, var(--row-h, 2.5rem));
     box-sizing: border-box;
+}
+/* ★ 카드(타일) 뷰 예외 — 위 가상스크롤 행높이 규칙(특이도 0,2,3)이 카드뷰 td 의
+   height:auto(0,2,2)를 이겨 카드 안 필드행이 2.5rem 로 고정되던 버그. 카드뷰에선
+   더 높은 특이도로 height 를 풀어 내용 높이로(행 간격이 떠 보이던 원인). */
+.u4a-table-wrap[data-view="card"] tbody tr:not(.u4aVSpacer) > td {
+    height: auto;
 }
 
 /* 행 hover / zebra / 선택 / 포커스 (체크리스트 E/B) */
@@ -1747,15 +1794,22 @@ dialog::backdrop {
     box-shadow: none;
 }
 
-/* no-data 카드 */
+/* no-data 카드 — 가로·세로 모두 중앙. tr 을 flex 센터 박스로(td 만 center 면
+   td 폭/플로우 때문에 좌우가 안 맞던 문제 해소), td 는 전폭 블록 + text-center. */
 .u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata {
-    display: block;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 6rem;
     box-shadow: none;
 }
 
-.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata td {
-    justify-content: center;
+.u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata > td {
+    display: block;
+    width: 100%;
+    height: auto;
+    text-align: center;
+    color: var(--text-muted);
 }
 
 .u4a-table-wrap[data-view="card"] tbody tr.u4a-table__nodata td[data-label]::before {

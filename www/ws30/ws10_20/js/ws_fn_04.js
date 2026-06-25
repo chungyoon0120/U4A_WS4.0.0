@@ -1267,7 +1267,6 @@
         // 헤더 (상태 아이콘 + 제목 + 닫기 X)
         var oHeader = document.createElement("div");
         oHeader.className = "u4a-dialog__header";
-        oHeader.setAttribute("data-type", "I");                                  // 정보 → accent 색 선두 아이콘
         oHeader.innerHTML = _fa("server") + "<span></span>";                     // 원본 sap-icon://it-system ≈ server
         oHeader.querySelector("span").textContent = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C42"); // Server Information
 
@@ -1309,9 +1308,8 @@
         var oClose = document.createElement("button");
         oClose.type = "button";
         oClose.className = "u4a-btn u4a-btn--negative";
-        oClose.innerHTML = _fa("xmark") + "<span></span>";
-        oClose.querySelector("span").textContent = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39"); // Close
-        oClose.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
+        oClose.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
+        oClose.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39"); // Close
         oClose.addEventListener("click", lf_close);
         oFoot.appendChild(oClose);
         oDlg.appendChild(oFoot);
@@ -1436,36 +1434,36 @@
      ************************************************************************/
     oAPP.fn.fnAttachMouseWheelEvent = () => {
 
-        var remote = parent.REMOTE;
-
-        var web = remote.getCurrentWebContents();
-
-        oAPP.attr.scale = web.getZoomLevel();
+        // ★ 줌 카운터 단일화 — 휠 줌도 WEBFRAME(zoomLevel) 사용. 예전엔 getCurrentWebContents()
+        //   (webContents)로 줌해서, WEBFRAME 을 쓰는 헤더 줌 팝오버/저장(setPersonWinZoom)과
+        //   서로 값을 못 읽어 "휠로 확대했는데 팝오버는 100% 고정" 문제가 있었다.
+        //   매 휠마다 현재 WEBFRAME 줌을 새로 읽어 누적 → 팝오버/슬라이더와 항상 일치(별도 scale 누적 안 함).
+        var WF = parent.WEBFRAME;
 
         document.addEventListener('mousewheel', (ev) => {
 
-            if (ev.ctrlKey) {
-
-                oAPP.attr.scale += ev.deltaY * -0.01;
-                oAPP.attr.scale = Math.min(Math.max(-10, oAPP.attr.scale), 10);
-                
-                web.setZoomLevel(oAPP.attr.scale);
-
-                // zoom 정보 저장
-                if (oAPP.attr.zoomSetTimeOut) {
-                    clearTimeout(oAPP.attr.zoomSetTimeOut);
-                    delete oAPP.attr.zoomSetTimeOut;
-                }
-
-                oAPP.attr.zoomSetTimeOut = setTimeout(() => {
-
-                    oAPP.fn.setPersonWinZoom("S");                    
-
-                    zconsole.log("zoom 저장!!");
-
-                }, 500);
-
+            if (!ev.ctrlKey) {
+                return;
             }
+
+            var nLevel = WF.getZoomLevel() + ev.deltaY * -0.01;
+            nLevel = Math.min(Math.max(-5, nLevel), 5);   // 팝오버 슬라이더와 동일 범위(-5~5)
+
+            WF.setZoomLevel(nLevel);
+
+            // zoom 정보 저장(디바운스) — setPersonWinZoom("S") 도 WEBFRAME 기준이라 일치.
+            if (oAPP.attr.zoomSetTimeOut) {
+                clearTimeout(oAPP.attr.zoomSetTimeOut);
+                delete oAPP.attr.zoomSetTimeOut;
+            }
+
+            oAPP.attr.zoomSetTimeOut = setTimeout(() => {
+
+                oAPP.fn.setPersonWinZoom("S");
+
+                zconsole.log("zoom 저장!!");
+
+            }, 500);
 
         });
 

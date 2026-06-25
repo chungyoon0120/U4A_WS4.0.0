@@ -196,7 +196,7 @@
         var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39", "", "", "", "");
 
         //닫기 버튼.
-        var oClose = new sap.m.Button({text:l_txt, tooltip:l_txt, icon:"sap-icon://decline", type:"Reject"});
+        var oClose = new sap.m.Button({tooltip:l_txt, icon:"sap-icon://decline", type:"Reject"}); // X 아이콘만(텍스트 제거)
         oDlg.addButton(oClose);
 
         //닫기버튼 이벤트.

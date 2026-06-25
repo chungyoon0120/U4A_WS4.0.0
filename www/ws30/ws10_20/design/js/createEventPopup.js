@@ -422,7 +422,6 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
 
   //헤더 — 원본 icon "add-document" 과 동일 의미의 fa 아이콘.
   var oHeader = _el("div", "u4a-dialog__header");
-  oHeader.setAttribute("data-type", "I");
   oHeader.innerHTML = _fa("file-circle-plus") + "<span></span>";
   oHeader.querySelector("span").textContent = lf_setTitle();
 
@@ -476,15 +475,15 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   //A01  Create — 이벤트 생성 버튼(emphasized).
   var oOkBtn = _el("button", "u4a-btn u4a-btn--emphasized");
   oOkBtn.type = "button";
-  oOkBtn.innerHTML = _fa("check") + "<span></span>";
-  oOkBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A01");
+  oOkBtn.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
+  oOkBtn.title = _txt("/U4A/CL_WS_COMMON", "A01");
   oFoot.appendChild(oOkBtn);
 
   //A39  Close — 닫기 버튼(Reject 느낌 negative).
   var oCancelBtn = _el("button", "u4a-btn u4a-btn--negative");
   oCancelBtn.type = "button";
-  oCancelBtn.innerHTML = _fa("xmark") + "<span></span>";
-  oCancelBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39");
+  oCancelBtn.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
+  oCancelBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
   oFoot.appendChild(oCancelBtn);
   oDlg.appendChild(oFoot);
 

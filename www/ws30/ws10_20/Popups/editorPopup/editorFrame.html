@@ -48,12 +48,21 @@
         <iframe id="editorHost" name="editorHost" frameborder="0" allowfullscreen></iframe>
     </div>
 
-    <!-- ===== 푸터 = [줌 표시/원복(왼쪽)] ···· [Save(오른쪽)] ===== -->
+    <!-- ===== 푸터 = [줌 컨트롤 −/%/+(왼쪽)] ···· [Save(오른쪽)] ===== -->
     <footer class="u4aEdWinFooter" id="editorFooter">
-        <!-- 줌 버튼: Ctrl+휠로 확대 시 "NNN%" 노출(클릭=원복). 100%(기본)면 자동 숨김. -->
-        <button type="button" class="u4a-btn u4aEdZoomBtn" id="editorZoomBtn" hidden>
-            <i class="fa-solid fa-magnifying-glass"></i><span></span>
-        </button>
+        <!-- 줌 컨트롤 [−][🔍 NNN%][+] — 브라우저/VS Code 줌과 동일 패턴, 상시 표시(Ctrl+휠 몰라도 발견 가능).
+             −=축소 / %클릭=원복 / +=확대. % 는 Ctrl+휠 줌 시 실시간 갱신. -->
+        <div class="u4aEdZoom">
+            <button type="button" class="u4a-btn u4aEdZoomBtn u4aEdZoomStep" id="editorZoomOut" title="Ctrl + Wheel ↓">
+                <i class="fa-solid fa-minus"></i>
+            </button>
+            <button type="button" class="u4a-btn u4aEdZoomBtn u4aEdZoomPct" id="editorZoomBtn">
+                <i class="fa-solid fa-magnifying-glass"></i><span>100%</span>
+            </button>
+            <button type="button" class="u4a-btn u4aEdZoomBtn u4aEdZoomStep" id="editorZoomIn" title="Ctrl + Wheel ↑">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
         <span class="u4aEdFootSpacer"></span>
         <button type="button" class="u4a-btn u4a-btn--emphasized" id="editorSaveBtn">
             <i class="fa-solid fa-check"></i><span></span>

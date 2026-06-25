@@ -63,10 +63,13 @@
 
         oBrowserOptions.title = sTitle;
         oBrowserOptions.autoHideMenuBar = true;
+        // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
+        oBrowserOptions.titleBarStyle = 'hidden';
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.parent = oCurrWin;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5] 네이티브 창 opacity 페이드 미사용(OS 리컴포짓이라 무겁다) — 창은 즉시 띄우고(show=false 로
+        //   위치 잡힌 뒤 표시), 등장 효과는 창 안 컨텐츠를 CSS opacity transition 으로 처리(errorPageEditorFrame).
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
         
@@ -84,13 +87,17 @@
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
 
         // 브라우저 상단 메뉴 없애기
-        oBrowserWindow.setMenu(null);        
+        oBrowserWindow.setMenu(null);
 
         const oQueryParams = {
             browserkey: oBrowserOptions?.webPreferences?.browserkey,
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            // [HTML5] frameless 창의 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: sTitle,
         };
 
         const sUrlPath = parent.getPath(sPopupName);
@@ -173,10 +180,13 @@
         oAPP.DATA.APPDATA.S_ERHTML.HTML = oSaveData.HTML;
         oAPP.DATA.APPDATA.S_ERHTML.IS_USE = oSaveData.IS_USE;
 
-        // 어플리케이션 정보에 변경 플래그 
-        parent.setAppChange('X');
+        // 어플리케이션 정보에 변경 플래그
+        try { parent.setAppChange('X'); } catch (e) { console.error("[HTML5][errPageEditor] setAppChange 오류:", e && e.message); }
 
-    }; // end of oAPP.fn.fnIpcMain_ErrorPageEditorSave  
+        // 저장으로 변경분 발생 → WS20 헤더 Active→Inactive 반영(에디터 시리즈 fnIpcMain_EditorSave 와 동일 처리).
+        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+
+    }; // end of oAPP.fn.fnIpcMain_ErrorPageEditorSave
 
     /************************************************************************
      * Error Page Editor 팝업의 미리보기 IPCMAIN 이벤트
@@ -214,7 +224,7 @@
         // oBrowserOptions.title = "Error Page Preview";
         oBrowserOptions.title = sTitle;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5] 네이티브 창 opacity 페이드 미사용(무겁다) — 미리보기는 사용자 HTML 렌더라 즉시 표시.
         oBrowserOptions.devTools = false;
         oBrowserOptions.parent = oCurrWin;
         oBrowserOptions.closable = false;
@@ -266,21 +276,11 @@
             // 부모 위치 가운데 배치한다.
             parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);            
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            parent.WSUTIL.setBrowserOpacity(oBrowserWindow, () => {
-                    
-                if(oBrowserWindow.isDestroyed()){                        
-                    return;    
-                }
+            // [HTML5] 네이티브 opacity 페이드 제거 — 로드 완료 시 닫기 버튼만 즉시 활성화.
+            try {
+                if (!oBrowserWindow.isDestroyed()) { oBrowserWindow.closable = true; }
+            } catch (error) { }
 
-                try {
-                    oBrowserWindow.closable = true;    
-                } catch (error) {
-                    
-                }
-
-            });          
-            
             // 오류 페이지 미리보기가 로드가 되면 오류 페이지 에디터에 실행중인 Busy를 끄라고 알린다.
             parent.IPCRENDERER.send(`if-errorPageEditor-setBusy-${parent.getBrowserKey()}`, "");
 

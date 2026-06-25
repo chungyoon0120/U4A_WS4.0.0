@@ -423,12 +423,14 @@
   min-width: 0; flex: 1 1 auto; overflow: hidden;
 }
 .u4aWs20TreeRowRight {
-  /* ★ 우측 = 고정폭 "두 컬럼"([aggr | 액션]) — 원본 TreeTable 처럼 행마다 같은 x 로 정렬.
-     이름(.u4a-tree__label flex:1 1 0)이 남는 폭을 모두 먹어 이 묶음을 우측으로 밀고, 아래 두 자식이
-     각자 고정폭이라 aggr·액션 둘 다 세로로 딱 맞는다(들쭉날쭉 해소, CDP 실측 검증 2026-06-24).
-     좁을 땐 aggr 가 shrink/ellipsis, 17rem 미만이면 @container 가 aggr 컬럼을 통째 숨겨 이름에 양보. */
-  display: flex; align-items: center; gap: 8px;
-  flex: 0 1 auto; min-width: 0; overflow: hidden;
+  /* ★ 우측 "두 컬럼"([aggr 고정폭 | 액션]) 정렬의 핵심 = display:contents 로 이 래퍼 박스를 없앤다.
+     그래야 aggr·액션이 '행(.u4a-tree__row, flex)' 의 직접 항목이 되어 aggr 의 flex-basis(5rem)를
+     행이 존중 → 모든 행에서 aggr 폭=5rem 고정(좌측 가장자리 정렬) + 액션 우측 끝 정렬.
+     (CDP 실측 2026-06-25: 래퍼로 감싸면 부모가 콘텐츠폭으로 잡혀 basis 무시→aggr 가 텍스트폭 34~80px 로
+      제각각→aggr 좌측·액션 x 가 살짝 틀어짐. display:contents 후 aggr 전부 80px·단일 x 로 정렬 확인.)
+     aggr–액션 간격은 행 공통 gap(.375rem) 사용. 좁으면 aggr 가 shrink/ellipsis(0 1 5rem),
+     17rem 미만은 아래 @container 가 aggr 컬럼을 숨겨 이름에 양보. */
+  display: contents;
 }
 
 /* 체크박스 (구 sap.m.CheckBox) */

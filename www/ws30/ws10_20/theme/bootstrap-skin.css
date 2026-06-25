@@ -342,7 +342,8 @@ html[data-sl-theme="dark"] .btn-close {
 .u4a-dialog .u4a-combo,
 .u4a-dialog .u4a-select {
     background: var(--surface-raised);
-    border-color: var(--divider);
+    /* border-color 제거 — base(.u4a-input/.u4a-combo)와 동일값 중복이며, (0,2,0)으로 늦게 로드돼
+       공통 .u4a-input:hover/:focus-visible(0,2,0)를 덮어 팝업 hover/focus 강조가 사라지던 원인. */
 }
 
 /*======================================================================
@@ -408,10 +409,13 @@ html[data-sl-theme="dark"] .btn-close {
     color: var(--sl-fg);
 }
 
-/* 커스텀 콤보 (.u4a-combo) */
+/* 커스텀 콤보 (.u4a-combo) — 편집 가능 컨트롤이므로 입력칸과 '동일한' 올라온 표면으로 통일.
+   ★ 구 --sl-bg(다크 #161d26)는 입력(.u4a-input=--surface-raised #2a323a)보다 어두워 콤보만
+     가라앉아 보였다(로그인 LANGUAGE/Workspace 드롭다운이 입력보다 어둡던 원인). 입력과 같은
+     --surface-raised + --divider 로 맞춰 input↔combo 가 전 화면에서 한 몸으로 보이게 한다. */
 .u4a-combo {
-    background: var(--sl-bg);
-    border-color: var(--sl-border);
+    background: var(--surface-raised);
+    border-color: var(--divider);
     color: var(--sl-fg);
 }
 .u4a-combo__arrow { color: var(--sl-muted); }

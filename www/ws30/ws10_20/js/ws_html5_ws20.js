@@ -263,6 +263,48 @@
     } // end of _txSplitBtn
 
     /************************************************************************
+     * Icon Viewer / Icon List 툴바 엔트리 (원본 ws_fn_01 fnGetSubHeaderToolbarContentWs20
+     *   의 oIconList 분기 그대로 이식):
+     *     checkWLOList("C","UHAK900630") 참 → "Icon Viewer" 드롭다운 메뉴버튼
+     *        · Icon List (047)  → fnWS20WMENU20_04_01 (fnIconPreviewPopupOpener)
+     *        · Image Icons(067) → fnWS20WMENU20_04_02 (fnIllustedMsgPrevPopupOpener)
+     *     거짓 → 평평한 "Icon List" 버튼(A12) → ev_pressIconListBtn (fnIconListPopupOpener)
+     ************************************************************************/
+    function _iconToolEntry() {
+        var bIconViewer = false;
+        try { bIconViewer = APPCOMMON.checkWLOList("C", "UHAK900630"); } catch (e) { }
+        if (!bIconViewer) {
+            return { id: "iconListBtn", fa: "icons", text: _msg("A12"), tooltip: _msg("A12") + " (Ctrl+Shift+F10)", ev: "ev_pressIconListBtn" };
+        }
+        return {
+            id: "iconViewerBtn", menuBtn: true, fa: "icons",
+            text: _wsMsg("068"), tooltip: _wsMsg("068"),                       // Icon Viewer
+            items: [
+                { key: "WMENU20_04_01", icon: "icons", text: _wsMsg("047"), tooltip: _wsMsg("047") + " (Ctrl+Shift+F10)" },  // Icon List
+                { key: "WMENU20_04_02", icon: "image", text: _wsMsg("067"), tooltip: _wsMsg("067") }                          // Image Icons
+            ],
+            onPick: function (it) {
+                var fn = oAPP.fn["fnWS20" + it.key];
+                if (typeof fn === "function") { try { fn(); } catch (e) { console.error("[HTML5][WS20] icon menu " + it.key + " error:", e); } }
+                else { console.warn("[HTML5][WS20] icon menu not implemented:", it.key); }
+            }
+        };
+    }
+
+    // 드롭다운 메뉴버튼 — 공통 빌더(oAPP.ws10html.buildMenuButton)에 위임(_txSplitBtn 와 동형).
+    function _txMenuBtn(oCfg) {
+        if (!(oAPP.ws10html && typeof oAPP.ws10html.buildMenuButton === "function")) {
+            console.error("[HTML5][WS20] buildMenuButton 미연결 — ws10_html 로드 순서 확인");
+            return _txBtn(oCfg);   // 폴백: 평범한 버튼(드롭다운 없음)
+        }
+        return oAPP.ws10html.buildMenuButton({
+            id: oCfg.id, icon: oCfg.fa, brand: oCfg.brand, text: oCfg.text, tooltip: oCfg.tooltip,
+            getItems: function () { return oCfg.items || []; },
+            onPick: oCfg.onPick
+        });
+    } // end of _txMenuBtn
+
+    /************************************************************************
      * WS20 플로팅 푸터 메시지 (구 sap.m.OverflowToolbar floatingFooter /FMSG/WS20)
      *   공통 푸터 컴포넌트(U4AUI.footer*, shell.css .u4a-footer) 소비. Change 모드 lock/저장/
      *   활성화 등 WS20 메시지를 페이지 하단에 표시. (기존 소스의 푸터 메시지 로직)
@@ -332,8 +374,9 @@
             { id: "ws20_appExecMenuBtn", split: true, fa: "globe", text: _msg("A06"), tooltip: _msg("A06") + " (F8)", ev: "ev_pressAppExecBtn" },
             // App Multi Preview (원본 ws20_multiPrevBtn: icon desktop-mobile, text A08)
             { id: "ws20_multiPrevBtn", fa: "table-cells-large", text: _msg("A08"), tooltip: _msg("A08") + " (Ctrl+F5)", ev: "ev_pressMultiPrevBtn" },
-            // Icon List (원본 iconListBtn: icon activity-items, text A12)
-            { id: "iconListBtn", fa: "icons", text: _msg("A12"), tooltip: _msg("A12") + " (Ctrl+Shift+F10)", ev: "ev_pressIconListBtn" },
+            // Icon Viewer / Icon List — checkWLOList 조건으로 드롭다운(Icon Viewer) ↔ 평평버튼(Icon List)
+            //   분기(_iconToolEntry, 원본 oIconList 로직). 원본 모습=Icon Viewer 메뉴.
+            _iconToolEntry(),
             // Add Event Method (원본 addEventBtn: icon touch, text A13)
             { id: "addEventBtn", fa: "hand-pointer", text: _msg("A13"), tooltip: _msg("A13") + " (Shift+F1)", ev: "ev_pressAddEventBtn" },
             // Runtime Class Navigator (원본 runtimeBtn: icon functional-location, text A14)
@@ -345,6 +388,7 @@
         aBtns.forEach(function (oCfg) {
             if (oCfg.sep) { BAR.appendChild(_sep(oCfg.sepId)); return; }
             if (oCfg.split) { BAR.appendChild(_txSplitBtn(oCfg)); return; }
+            if (oCfg.menuBtn) { BAR.appendChild(_txMenuBtn(oCfg)); return; }
             BAR.appendChild(_txBtn(oCfg));
         });
 
@@ -1001,9 +1045,9 @@
             '</div>' +
             '<div class="u4a-dialog__body"><div class="u4aWs20LayoutCards"></div></div>' +
             '<div class="u4a-dialog__footer">' +
-            '  <button type="button" class="u4a-btn" data-act="default"><i class="fa-solid fa-rotate-left"></i> ' + _esc(_msg("A63")) + '</button>' +   // Default
-            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="save"><i class="fa-solid fa-floppy-disk"></i> ' + _esc(_msg("A64")) + '</button>' +   // Save
-            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="close"><i class="fa-solid fa-xmark"></i> ' + _esc(_msg("A39")) + '</button>' +   // Close (Reject 느낌)
+            '  <button type="button" class="u4a-btn" data-act="default" title="' + _esc(_msg("A63")) + '"><i class="fa-solid fa-rotate-left"></i></button>' +   // Default (아이콘만)
+            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="save" title="' + _esc(_msg("A64")) + '"><i class="fa-solid fa-floppy-disk"></i></button>' +   // Save (아이콘만)
+            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="close" title="' + _esc(_msg("A39")) + '"><i class="fa-solid fa-xmark"></i></button>' +   // Close (X 아이콘만 · Reject 느낌)
             '</div>';
 
         var CARDS = DLG.querySelector(".u4aWs20LayoutCards");

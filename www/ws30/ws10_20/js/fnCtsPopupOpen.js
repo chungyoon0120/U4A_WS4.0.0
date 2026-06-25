@@ -114,7 +114,6 @@
 
         // 헤더: 아이콘(이관/트럭) + 제목 + 닫기 X
         const oHeader = _el("div", "u4a-dialog__header");
-        oHeader.setAttribute("data-type", "I");
         oHeader.innerHTML = _fa("truck") + "<span></span>";
         // 345  Prompt for Transportable Workbench Request
         oHeader.querySelector("span").textContent = _txt("/U4A/MSG_WS", "345");
@@ -195,15 +194,15 @@
 
         const oAccept = _el("button", "u4a-btn u4a-btn--emphasized");
         oAccept.type = "button";
-        oAccept.innerHTML = _fa("check") + "<span></span>";
-        oAccept.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A40"); // Confirm
+        oAccept.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
+        oAccept.title = _txt("/U4A/CL_WS_COMMON", "A40"); // Confirm
         oAccept.addEventListener("click", function () { _accept(); });
         oFoot.appendChild(oAccept);
 
         const oCancel = _el("button", "u4a-btn u4a-btn--negative"); // 닫기 — Reject 느낌
         oCancel.type = "button";
-        oCancel.innerHTML = _fa("xmark") + "<span></span>";
-        oCancel.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
+        oCancel.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
+        oCancel.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oCancel.addEventListener("click", function () { _close(); });
         oFoot.appendChild(oCancel);
         oDlg.appendChild(oFoot);

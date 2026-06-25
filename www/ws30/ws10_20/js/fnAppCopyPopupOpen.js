@@ -129,7 +129,6 @@
 
         // 헤더 — 메인 툴바 Copy 버튼(fa-copy)과 동일 아이콘으로 인지 통일.
         const oHeader = _el("div", "u4a-dialog__header");
-        oHeader.setAttribute("data-type", "I");
         oHeader.innerHTML = _fa("copy") + '<span></span>';
         oHeader.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "B90"); // Application Copy
         const oXBtn = _el("button", "u4a-btn-icon");
@@ -189,15 +188,15 @@
         const oFoot = _el("div", "u4a-dialog__footer u4aCopyFoot");
         const oOk = _el("button", "u4a-btn u4a-btn--emphasized");
         oOk.type = "button";
-        oOk.innerHTML = _fa("check") + '<span></span>';
-        oOk.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A04"); // Copy
+        oOk.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
+        oOk.title = _txt("/U4A/CL_WS_COMMON", "A04"); // Copy
         oOk.addEventListener("click", oAPP.events.ev_AppCopyDlgOK);
         oFoot.appendChild(oOk);
 
         const oCancel = _el("button", "u4a-btn u4a-btn--negative"); // 닫기 — Reject 느낌
         oCancel.type = "button";
-        oCancel.innerHTML = _fa("xmark") + '<span></span>';
-        oCancel.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
+        oCancel.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
+        oCancel.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oCancel.addEventListener("click", oAPP.events.ev_AppCopyDlgCancel);
         oFoot.appendChild(oCancel);
         oDlg.appendChild(oFoot);

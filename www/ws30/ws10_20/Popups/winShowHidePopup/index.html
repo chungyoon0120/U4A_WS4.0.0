@@ -32,8 +32,9 @@
             overflow: hidden;
         }
 
-        /* 타이틀바 좌측 아이콘(원본 sap-icon://hide = 눈 빗금) */
-        .u4aWinHide__icon { margin-left: .25rem; color: var(--icon-muted); font-size: .9rem; -webkit-app-region: no-drag; }
+        /* 타이틀바 좌측 선두 상태 아이콘(원본 sap-icon://hide = 눈 빗금) — 인앱 다이얼로그와 동일하게
+           테마 accent(공통 UX: 팝업 선두 아이콘 = accent). 2026-06-24 통일. */
+        .u4aWinHide__icon { margin-left: .25rem; color: var(--accent); font-size: .9rem; -webkit-app-region: no-drag; }
 
         /* 본문 = 슬라이더 + 프리셋(20~100), 세로 가운데 */
         .u4aWinHide__body {
@@ -44,6 +45,10 @@
         .u4aWinHide__slider { width: 100%; accent-color: var(--accent); cursor: pointer; }
         .u4aWinHide__presets { display: flex; gap: .375rem; }
         .u4aWinHide__presets .u4a-btn { flex: 1 1 0; min-width: 0; padding: 0 .25rem; }
+
+        /* 이 창만: 포커스 잃어도 타이틀바를 흐리게 하지 않는다 — 공통 .u4a-window-blurred 베일(::after) 무력화.
+           (initWindowFocusState 는 u4a-ui.js 로드시 전 창 자동 실행 → 공통 파일 안 건드리고 여기서만 베일 끔) */
+        body.u4a-window-blurred .u4a-titlebar::after { content: none; }
     </style>
 </head>
 

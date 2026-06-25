@@ -1,910 +1,518 @@
 /************************************************************************
- * Copyright 2020. INFOCG Inc. all rights reserved. 
+ * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
  * - file Name : fnCssJsLinkAddPopupOpen.js
- * - file Desc : Document의 CSS, JS Link Add Popup
+ * - file Desc : Document의 CSS, JS Link Add Popup  (HTML5)
+ * ----------------------------------------------------------------------
+ * [컨버전 메모]
+ *  원본: sap.m.Dialog(draggable/resizable 600×500) + customHeader(APPID/Change·Display/
+ *        Active·Inactive + 닫기) + sap.ui.table.Table(멀티토글 선택) + extension OverflowToolbar
+ *        [Add/Del/MIME Repository] + footer[Save(accept)/Cancel(decline)].
+ *        컬럼 = Status(아이콘) / "{TYPE} Link MIME URL"(Input) / Exclude(Switch, 조건부).
+ *        데이터 = oAPP.DATA.APPDATA.T_CSLK(CSS) / T_JSLK(JS)  각 {LKEY,URL,INACTIVE}.
+ *
+ *  HTML5: native <dialog class="u4a-dialog"> + 공통 컴포넌트
+ *        (.u4a-table 멀티선택[체크박스 열] · U4AUI.createField[URL,value-state] ·
+ *         .u4a-switch[Exclude] · .u4a-btn · makeDialogRecenter/Resizable · 전역 헤더드래그).
+ *        ★ 이 테이블만 라인 멀티 선택(체크박스 열 + 헤더 전체선택) — 원본 SelectionMode.MultiToggle.
+ *
+ *  ★ 보존 로직(원본 그대로):
+ *    · open: T_CSLK/T_JSLK → LISTDATA(KEY=randomKey, STATUS=2). 빈 목록도 표시.
+ *    · Add: {KEY, STATUS:1(신규), URL:"", INACTIVE:""} 추가.
+ *    · Del: 선택(체크) 라인 splice.
+ *    · Save: URL 빈값 검증(빈값=value-state Error, MSG_WS 014) → 통과 시 T_* 갱신 + setAppChange('X')
+ *           + (CSS) 디자인 미리보기 setCSSLink(비-Exclude URL, true) + 콜백 publish. 빈 목록=초기화 후 닫기.
+ *    · Exclude(스위치): INACTIVE "X"/"". (패치 UHAK900822 또는 미패키징일 때만 컬럼 노출 — 원본 조건)
+ *  ★ UI5 의존부 치환: sap.ui.table → 공통 .u4a-table, JSONModel → 로컬 aRows, sap.m.Input → createField,
+ *    sap.m.Switch → .u4a-switch, EventBus publish → 가드 호출(HTML5 sap 스텁).
  ************************************************************************/
 
 (function (window, $, oAPP) {
-    "use strict";
-
-    const
-        C_LINK_ROOT_PATH = "/WS20/LINK",
-        C_LINK_LIST_DATA_ROOT_PATH = C_LINK_ROOT_PATH + "/LISTDATA",
-        C_DLG_ID = "u4aWsCssJsLinkAddDialog",
-        C_LINK_TABLE_ID = "CssJsLinkAddPopupTable";
-
-    var LINK_TYPE = "",
-        APPCOMMON = oAPP.common;
-
-    /************************************************************************
-     * CSS & JS Link add Popup Open
-     ************************************************************************/
-    oAPP.fn.fnCssJsLinkAddPopupOpen = function (TYPE) {
-
-        LINK_TYPE = TYPE;
-
-        var oBindData = {
-            ADDBTNTXT: "",
-            DELBTNTXT: "",
-            TABCOLTXT: "",
-        };
-
-        let sCSSLinkTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D49"), // CSS Link
-            sJSLinkTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D50"), // JS Link
-            sMimeUrlTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D51"), // MIME URL
-            sAddTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C98"), // Add
-            sDelTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D52"); // Del
-
-        // Type에 따라 모델을 초기화 한다.
-        switch (TYPE) {
-            case "CSS":
-                oBindData.ADDBTNTXT = `${sCSSLinkTxt} ${sAddTxt}`; // CSS Link Add
-                oBindData.DELBTNTXT = `${sCSSLinkTxt} ${sDelTxt}`; // CSS Link Del
-                oBindData.TABCOLTXT = `${sCSSLinkTxt} ${sMimeUrlTxt}`; // CSS Link MIME URL;
-
-                break;
-
-            case "JS":
-                oBindData.ADDBTNTXT = `${sJSLinkTxt} ${sAddTxt}`; // "JS Link Add";
-                oBindData.DELBTNTXT = `${sJSLinkTxt} ${sDelTxt}`; //"JS Link Del";
-                oBindData.TABCOLTXT = `${sJSLinkTxt} ${sMimeUrlTxt}`; //"JS Link MIME URL";
-
-                break;
-
-            default:
-
-                // busy 끄고 Lock 풀기
-                oAPP.common.fnSetBusyLock("");
-                return;
-        }
-
-        APPCOMMON.fnSetModelProperty(C_LINK_ROOT_PATH, oBindData);
-
-        var oCssJsLinkAddDlg = sap.ui.getCore().byId(C_DLG_ID);
-        if (oCssJsLinkAddDlg) {
-
-            // Dialog가 열려 있으면 빠져나간다.
-            if (oCssJsLinkAddDlg.isOpen() == true) {
-                
-                // busy 끄고 Lock 풀기
-                oAPP.common.fnSetBusyLock("");
-                return;
-            }
-
-            oCssJsLinkAddDlg.open();
-
-            // busy 끄고 Lock 풀기
-            oAPP.common.fnSetBusyLock("");
-            return;
-
-        }
-
-        var oCustomHeader = oAPP.fn.fnCssJsLinkAddPopupCustomHeader(),
-            oContents = oAPP.fn.fnCssJsLinkAddPopupContents();
-
-        var oCssJsLinkAddDlg = new sap.m.Dialog(C_DLG_ID, {
-            draggable: true,
-            resizable: true,
-            contentWidth: "600px",
-            contentHeight: "500px",
-            customHeader: oCustomHeader,
-            buttons: [
-                new sap.m.Button({
-                    type: sap.m.ButtonType.Emphasized,
-                    icon: "sap-icon://accept",
-                    press: oAPP.events.ev_pressCssJsLinkSave
-                }).bindProperty("visible", "/WS20/APP/IS_EDIT", oAPP.fn.fnCssJsLinkAddPopupUiVisibleBinding),
-
-                new sap.m.Button({
-                    type: sap.m.ButtonType.Reject,
-                    icon: "sap-icon://decline",
-                    press: function (oEvent) {
-                        var oDialog = oEvent.getSource().getParent();
-                        oDialog.close();
-
-                        /**
-                         * @since   2026-02-11 01:50:31
-                         * @version v3.5.9-3
-                         * @author  PES
-                         * @description
-                         * CSS, JS 링크 등록 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-                         */
-                        sap.ui.getCore().getEventBus().publish("WS20POPUP", "cssJsLinkAddPopupCallback", {
-                            ACTCD : "CANCEL",
-                            TYPE : LINK_TYPE,
-                            T_DATA  : []
-                        });
-                    }
-                }),
-            ],
-
-            content: [
-                oContents
-            ],
-            afterOpen: function () {
-
-                // 테이블에 체크박스가 체크되어 있다면 전체 해제
-                oAPP.fn.fnSetCssJsLinkTableClearSelection();
-
-                // Type에 따라 관련 데이터를 가져온다.
-                switch (LINK_TYPE) {
-                    case "CSS":
-                        oAPP.fn.fnGetCssLinkData();
-                        break;
-
-                    case "JS":
-                        oAPP.fn.fnGetJsLinkData();
-                        break;
-                }
-
-                // busy 끄고 Lock 풀기
-                oAPP.common.fnSetBusyLock("");
-
-            },
-            afterClose: function (oEvent) {
-                // var oDialog = oEvent.getSource();
-                // oDialog.destroy();
-
-            },
-            escapeHandler: function () {
-                var oDialog = sap.ui.getCore().byId(C_DLG_ID);
-                if (!oDialog) {
-                    return;
-                }
-                oDialog.close();
-
-                /**
-                 * @since   2026-02-11 01:50:31
-                 * @version v3.5.9-3
-                 * @author  PES
-                 * @description
-                 * CSS, JS 링크 등록 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-                 */
-                sap.ui.getCore().getEventBus().publish("WS20POPUP", "cssJsLinkAddPopupCallback", {
-                    ACTCD : "CANCEL",
-                    TYPE : LINK_TYPE,
-                    T_DATA  : []
-                });
-            }
-
-        }).addStyleClass(C_DLG_ID);
-
-        oCssJsLinkAddDlg.addStyleClass("sapUiSizeCompact");
-        oCssJsLinkAddDlg.open();
-
-    }; // end of oAPP.fn.fnCssJsLinkAddPopupOpen    
-
-    /************************************************************************
-     * CSS Link 정보를 구한다.
-     ************************************************************************/
-    oAPP.fn.fnGetCssLinkData = function () {
-
-        var aLinkData = [],
-            aSavedLinkData = [];
-
-        aLinkData = jQuery.extend(true, [], oAPP.DATA.APPDATA.T_CSLK);
-
-        var iLinkDataLength = aLinkData.length;
-
-        if (iLinkDataLength >= 0) {
-
-            for (var i = 0; i < iLinkDataLength; i++) {
-
-                var sKey = parent.getRandomKey(10),
-                    oLinkData = aLinkData[i];
-
-                oLinkData.KEY = sKey; // row의 내부용 randomKey
-                oLinkData.STATUS = 2; // 저장 아이콘
-
-                aSavedLinkData.push(oLinkData);
-
-            }
-
-        }
-
-        APPCOMMON.fnSetModelProperty(C_LINK_LIST_DATA_ROOT_PATH, aSavedLinkData);
-
-    }; // end of oAPP.fn.fnGetCssLinkData
-
-    /************************************************************************
-     * JS Link 정보를 구한다.
-     ************************************************************************/
-    oAPP.fn.fnGetJsLinkData = function () {
-
-        var aLinkData = [],
-            aSavedLinkData = [];
-
-        aLinkData = jQuery.extend(true, [], oAPP.DATA.APPDATA.T_JSLK);
-
-        var iLinkDataLength = aLinkData.length;
-
-        if (iLinkDataLength >= 0) {
-
-            for (var i = 0; i < iLinkDataLength; i++) {
-
-                var sKey = parent.getRandomKey(10),
-                    oLinkData = aLinkData[i];
-
-                oLinkData.LKEY = i + 1;
-                oLinkData.KEY = sKey; // row의 내부용 randomKey
-                oLinkData.STATUS = 2; // 저장 아이콘
-
-                aSavedLinkData.push(oLinkData);
-
-            }
-
-        }
-
-        APPCOMMON.fnSetModelProperty(C_LINK_LIST_DATA_ROOT_PATH, aSavedLinkData);
-
-    };
-
-    /************************************************************************
-     * CSS & JS Link add Popup의 Header
-     ************************************************************************/
-    oAPP.fn.fnCssJsLinkAddPopupCustomHeader = function () {
-
-        // Message Class Text
-        let sChangeTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A02"), // Change
-            sDispTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A05"), // Display
-            sActiveTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B66"), // Activate,
-            sInactTxt = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B67"); // Inactivate 
-
-        var oToolbarSpacer = new sap.m.ToolbarSpacer({
-            width: "20px"
-        });
-
-        return new sap.m.Toolbar({
-
-            content: [
-                new sap.m.Title({
-                    text: "{/WS20/APP/APPID}"
-                }), // APPID
-
-                oToolbarSpacer.clone(),
-
-                new sap.m.Title({
-                    // text: "{/WS20/APP/MODETXT}"
-                }).bindProperty("text", "/WS20/APP/IS_EDIT", function(IS_EDIT){
-                    return IS_EDIT == "X" ? sChangeTxt : sDispTxt;
-                }), // Change or Display Text
-
-                oToolbarSpacer.clone(),
-
-                new sap.m.Title({
-                    // text: "{/WS20/APP/ISACTTXT}"
-                }).bindProperty("text", "/WS20/APP/ACTST", function(ACTST){
-                    return ACTST == "A" ? sActiveTxt : sInactTxt;
-                }), // Activate or inactivate Text
-
-                new sap.m.ToolbarSpacer(),
-
-                new sap.m.Button({
-                    icon: "sap-icon://decline",
-                    press: function () {
-
-                        var oDialog = sap.ui.getCore().byId(C_DLG_ID);
-                        if (oDialog == null) {
-                            return;
-                        }
-
-                        if (oDialog.isOpen()) {
-                            oDialog.close();
-                        }
-
-                        /**
-                         * @since   2026-02-11 01:50:31
-                         * @version v3.5.9-3
-                         * @author  PES
-                         * @description
-                         * CSS, JS 링크 등록 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-                         */
-                        sap.ui.getCore().getEventBus().publish("WS20POPUP", "cssJsLinkAddPopupCallback", {
-                            ACTCD : "CANCEL",
-                            TYPE : LINK_TYPE,
-                            T_DATA  : []
-                        });
-
-                    }
-                })
-
-            ]
-        });
-
-    }; // end of oAPP.fn.fnCssJsLinkAddPopupCustomHeader
-
-    /************************************************************************
-     * CSS & JS Link add Popup의 Contents
-     ************************************************************************/
-    oAPP.fn.fnCssJsLinkAddPopupContents = function () {
-
-        var oTable = oAPP.fn.fnCssJsLinkAddPopupTable();
-
-        return new sap.m.Page({
-            showHeader: false,
-            content: [
-                oTable
-            ]
-        });
-
-    }; // end of oAPP.fn.fnCssJsLinkAddPopupContents
-
-    /************************************************************************
-     * CHANGE or DISPLAY 에 따른 버튼 visible 처리 공통 bind Function
-     ************************************************************************/
-    oAPP.fn.fnCssJsLinkAddPopupUiVisibleBinding = function (bIsDispMode) {
-
-        if (bIsDispMode == null) {
-            return false;
-        }
-
-        var bIsDisp = (bIsDispMode == "X" ? true : false);
-
-        return bIsDisp;
-
-    }; // end of oAPP.fn.fnCssJsLinkAddPopupUiVisibleBinding
-
-    /************************************************************************
-     * CSS & JS Link add Popup의 Contents
-     ************************************************************************/
-    oAPP.fn.fnCssJsLinkAddPopupTable = function () {
-
-        //20240903 PES -START.
-        //패치정보, 패키징 처리 정보에 따라 inactive 컬럼 활성화 여부 설정.
-        var _inactiveVisible = false;
-
-        //v3.4.2 Patch7 정보가 존재하는경우 inactive 컬럼 활성화.
-        if(oAPP.common.checkWLOList("C", "UHAK900822") === true){
-            _inactiveVisible = true;
-        }
-
-        //패키징 처리가 되지 않은경우 컬럼 활성화.
-        if(parent.APP.isPackaged === false){
-            _inactiveVisible = true;
-        }
-        //20240903 PES -END.
-
-        return new sap.ui.table.Table(C_LINK_TABLE_ID, {
-                // selectionBehavior: sap.ui.table.SelectionBehavior.Row,
-                visibleRowCountMode: sap.ui.table.VisibleRowCountMode.Auto,
-                columns: [
-                    new sap.ui.table.Column({
-                        width: "80px",
-                        hAlign: sap.ui.core.HorizontalAlign.Center,
-                        label: new sap.m.Label({
-                            text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D53"), // Status
-                            design: sap.m.LabelDesign.Bold
-                        }),
-                        template: new sap.ui.core.Icon({}).bindProperty("src", "STATUS", function (sBindValue) {
-
-                            if (!sBindValue) {
-                                return;
-                            }
-
-                            this.removeStyleClass("u4aWsCssJsLinkAddStatSuccess");
-                            this.removeStyleClass("u4aWsCssJsLinkAddStatError");
-
-                            switch (sBindValue) {
-                                case 1: // 신규
-                                    return "sap-icon://document";
-
-                                case 2: // 저장된 것
-                                    this.addStyleClass("u4aWsCssJsLinkAddStatSuccess");
-                                    return "sap-icon://color-fill";
-
-                                    // case 3: // 오류
-                                    //     this.addStyleClass("u4aWsCssJsLinkAddStatError");
-                                    //     return "sap-icon://color-fill";
-
-                                    // default:
-                                    //     return;
-                            }
-
-                        })
-                    }),
-                    new sap.ui.table.Column({
-                        label: new sap.m.Label({
-                            text: "{" + C_LINK_ROOT_PATH + "/TABCOLTXT}",
-                            design: sap.m.LabelDesign.Bold
-                        }),
-                        template: new sap.m.Input({
-                                value: "{URL}",
-                                valueState: "{VSTAT}",
-                                valueStateText: "{VTXT}"
-                            })
-                            .bindProperty("editable", "/WS20/APP/IS_EDIT", oAPP.fn.fnCssJsLinkAddPopupUiVisibleBinding)
-
-                    }),
-
-                    //20240903 PES -START.
-                    //CSS, JS LINK 활성/비활성 처리 기능 추가로
-                    //결과리스트 테이블에 비활성 여부 컬럼 추가.
-                    new sap.ui.table.Column({
-                        hAlign : "Center",
-                        width : "120px",
-                        visible : _inactiveVisible,
-                        label: new sap.m.Label({
-                            /**
-                             * @since   2026-02-10 18:38:39
-                             * @version v3.5.9-3
-                             * @author  pes
-                             * @description
-                             * CSS, JS Link의 비활성 처리 여부 Switch UI의 text 변경
-                             * 비활성(Inactive) -> 제외처리 여부(Exclude)
-                             */
-                            //text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B67"), // Inactive
-                            text: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "496"), // 제외처리 여부
-                            design: sap.m.LabelDesign.Bold
-                        }),
-                        // template: new sap.m.CheckBox({
-                        template: new sap.m.Switch({
-                            // selected: {
-                            /**
-                             * @since   2026-02-10 18:38:39
-                             * @version v3.5.9-3
-                             * @author  pes
-                             * @description
-                             * CSS, JS Link의 비활성 처리 여부 Switch UI의 text 설정.
-                             * (customTextOn : "YES", customTextOff : "NO")
-                             */
-                            customTextOn : "YES",
-                            customTextOff : "NO",
-                            state: {
-                                path : "INACTIVE",
-                                formatter : function(bSel){
-                                    
-                                    //기존 INACTIVE 처리 값이 'X' 인경우 체크박스 선택, 그렇지 않은경우 선택 해제.
-                                    return bSel === "X" ? true : false;
-
-                                }
-                            },
-                            // select : function(oEvent){
-                            change : function(oEvent){
-
-                                //checkbox UI 정보 얻기.
-                                var _oUi = oEvent.oSource || undefined;
-
-                                if(typeof _oUi === "undefined"){
-                                    return;
-                                }
-
-                                //CSS & JS Link Inactive 체크박스 선택 이벤트.
-                                oAPP.events.selectCssJsLinkInactive(_oUi);
-                               
-                            }
-                        })
-                        // .bindProperty("editable", "/WS20/APP/IS_EDIT", oAPP.fn.fnCssJsLinkAddPopupUiVisibleBinding)
-                        .bindProperty("enabled", "/WS20/APP/IS_EDIT", oAPP.fn.fnCssJsLinkAddPopupUiVisibleBinding)
-
-                    }),
-                    //20240903 PES -END.
-                ],
-
-                rows: {
-                    path: C_LINK_LIST_DATA_ROOT_PATH,
-                },
-                extension: [
-                    new sap.m.OverflowToolbar({
-                        content: [
-                            new sap.m.Button({
-                                text: "{" + C_LINK_ROOT_PATH + "/ADDBTNTXT}",
-                                icon: "sap-icon://document",
-                                press: oAPP.events.ev_pressCssJsLinkAddTableAddRowBtn
-                            }),
-                            new sap.m.Button({
-                                text: "{" + C_LINK_ROOT_PATH + "/DELBTNTXT}",
-                                icon: "sap-icon://delete",
-                                press: oAPP.events.ev_pressCssJsLinkAddTableDelRow
-                            }),
-                            new sap.m.Button({
-                                text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A10"), // MIME Repository
-                                icon: "sap-icon://picture",
-                                press: function () {
-                                    oAPP.fn.fnMimeDialogOpener();
-                                }
-                            }),
-                        ]
-                    }).bindProperty("visible", "/WS20/APP/IS_EDIT", oAPP.fn.fnCssJsLinkAddPopupUiVisibleBinding)
-                ],
-            })
-            .bindProperty("selectionMode", "/WS20/APP/IS_EDIT", function (bIsMode) {
-
-                var bIsMode = (bIsMode == "X" ? true : false);
-
-                if (bIsMode) {
-                    return sap.ui.table.SelectionMode.MultiToggle;
-                }
-
-                return sap.ui.table.SelectionMode.None;
-
-            })
-            .addStyleClass("sapUiSizeCompact")
-            .addStyleClass(C_LINK_TABLE_ID);
-
-    }; // end of oAPP.fn.fnCssJsLinkAddPopupTable
-
-    /************************************************************************
-     * CSS & JS Link Popup 닫기 메소드
-     ************************************************************************/
-    oAPP.fn.fnCssJsLinkPopupClose = function () {
-
-        var oCssJsLinkAddDlg = sap.ui.getCore().byId(C_DLG_ID);
-        if (typeof oCssJsLinkAddDlg === "undefined") {
-            return;
-        }
-
-        oCssJsLinkAddDlg.close();
-
-    }; // end of oAPP.fn.fnCssJsLinkPopupClose
-
-    /************************************************************************
-     * CSS, JS Link 테이블에 체크박스가 체크되어 있다면 전체 해제.
-     ************************************************************************/
-    oAPP.fn.fnSetCssJsLinkTableClearSelection = function () {
-
-        var oCssLinkAddTable = sap.ui.getCore().byId(C_LINK_TABLE_ID);
-        if (!oCssLinkAddTable) {
-            return;
-        }
-
-        // 테이블에 체크박스가 체크되어 있다면 전체 해제
-        oCssLinkAddTable.clearSelection();
-
-    }; // end of oAPP.fn.fnSetCssJsLinkTableClearSelection
-
-    /************************************************************************
-     * CSS Link 저장
-     ************************************************************************/
-    oAPP.fn.fnCssLinkSave = function () {
-
-        // 입력한 Link 정보를 구한다.
-        var aLinkData = APPCOMMON.fnGetModelProperty(C_LINK_LIST_DATA_ROOT_PATH),
-            iLinkDataLength = aLinkData.length;
-
-        // Link 정보가 하나도 없으면 팝업을 그냥 닫는다.
-        if (iLinkDataLength <= 0) {
-
-            oAPP.DATA.APPDATA.T_CSLK = [];
-
-            // 팝업 닫기
-            oAPP.fn.fnCssJsLinkPopupClose();
-
-            // 어플리케이션 정보에 변경 플래그 
-            parent.setAppChange('X');
-
-            // 디자인 영역에 반영
-            oAPP.attr.ui.frame.contentWindow.setCSSLink([], true);
-
-            /**
-             * @since   2026-02-11 01:50:31
-             * @version v3.5.9-3
-             * @author  PES
-             * @description
-             * CSS, JS 링크 등록 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-             */
-            sap.ui.getCore().getEventBus().publish("WS20POPUP", "cssJsLinkAddPopupCallback", {
-                ACTCD : "CANCEL",
-                TYPE : LINK_TYPE,
-                T_DATA  : []
-            });
-
-            return;
-
-        }
-
-        var sUrlType = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B74"), // CSS Link URL
-            sErrTxt = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "014", sUrlType), // & is required entry value.           
-            aSaveData = [],
-            aSaveDataString = [],
-            bIsErr = false;
-
-        for (var i = 0; i < iLinkDataLength; i++) {
-
-            var sUrl = aLinkData[i].URL,
-                oLinkData = aLinkData[i];
-
-            oLinkData.VSTAT = sap.ui.core.ValueState.None;
-            oLinkData.VTXT = "";
-
-            if (sUrl != "") {
-
-                aSaveData.push({
-                    "LKEY": i + 1,
-                    "URL": oLinkData.URL,
-
-                    //20240903 PES -START.
-                    //INACTIVE 처리 값 매핑.
-                    "INACTIVE": oLinkData.INACTIVE
-
-                });
-
-                //20240903 PES -START.
-                //INACTIVE 처리건인경우 미리보기 반영할 CSS LINK 수집 SKIP.
-                if(oLinkData.INACTIVE === "X"){
-                    continue;
-                }
-                //20240903 PES -END.
-
-                // 디자인 영역에 반영할 Link 정보를 String Table 형태로 수집
-                aSaveDataString.push(oLinkData.URL);
-
-                continue;
-            }
-
-            bIsErr = true;
-
-            oLinkData.VSTAT = sap.ui.core.ValueState.Error;
-            oLinkData.VTXT = sErrTxt;
-
-        }
-
-        APPCOMMON.fnSetModelProperty(C_LINK_LIST_DATA_ROOT_PATH, aLinkData);
-
-        if (bIsErr) {
-            aSaveData = [];
-            return;
-        }
-
-        oAPP.DATA.APPDATA.T_CSLK = aSaveData;
-
-        // 팝업 닫기
-        oAPP.fn.fnCssJsLinkPopupClose();
-
-        // 어플리케이션 정보에 변경 플래그 
-        parent.setAppChange('X');
-
-        // 디자인 영역에 반영
-        oAPP.attr.ui.frame.contentWindow.setCSSLink(aSaveDataString, true);
-
-
-        /**
-         * @since   2026-02-11 01:50:31
-         * @version v3.5.9-3
-         * @author  PES
-         * @description
-         * CSS, JS 링크 등록 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-         */
+  "use strict";
+
+  var APPCOMMON = oAPP.common;
+
+  var C_DLG_ID = "u4aWsCssJsLinkAddDlg";
+
+  var C_CSS = "CSS",
+      C_JS = "JS";
+
+  // ── 로컬 헬퍼(클라이언트 에디터와 동일 컨벤션) ───────────────────────
+  function _fa(s) { return '<i class="fa-solid fa-' + s + '"></i>'; }
+  function _txt(sCls, sCode, p1) {
+    try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); }
+    catch (e) { return ""; }
+  }
+  function _el(sTag, sClass, sText) {
+    var o = document.createElement(sTag);
+    if (sClass) { o.className = sClass; }
+    if (typeof sText !== "undefined") { o.textContent = sText; }
+    return o;
+  }
+  function _randomKey() {
+    try { return parent.getRandomKey(10); } catch (e) { return "K" + Math.round(performance.now() * 1000) + "_" + (oUI ? oUI.seq++ : 0); }
+  }
+  // ZMSG_WS_COMMON_001 클래스 텍스트(원본 getWsMsgClsTxt). Workspace 언어 사용.
+  function _wsCommon(sCode) {
+    try {
+      var sLangu = "";
+      try { sLangu = (parent.getUserInfo() || {}).LANGU || ""; } catch (e) { }
+      return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sCode) || "";
+    } catch (e) { return ""; }
+  }
+
+  // 현재 화면 편집모드(원본 /WS20/APP/IS_EDIT).
+  function _isEdit() {
+    try { var o = APPCOMMON.fnGetModelProperty("/WS20/APP"); return !!(o && o.IS_EDIT === "X"); }
+    catch (e) { return false; }
+  }
+  function _appInfo() {
+    try { return APPCOMMON.fnGetModelProperty("/WS20/APP") || {}; } catch (e) { return {}; }
+  }
+
+  // Exclude(비활성) 컬럼 노출 여부 — 원본: 패치 UHAK900822 보유 또는 미패키징.
+  function _excludeVisible() {
+    try { if (oAPP.common.checkWLOList && oAPP.common.checkWLOList("C", "UHAK900822") === true) { return true; } } catch (e) { }
+    try { if (parent.APP && parent.APP.isPackaged === false) { return true; } } catch (e) { }
+    return false;
+  }
+
+  // T_CSLK / T_JSLK 배열 보장.
+  function _ensureLinkTable(sType) {
+    if (!oAPP.DATA) { oAPP.DATA = {}; }
+    if (!oAPP.DATA.APPDATA) { oAPP.DATA.APPDATA = {}; }
+    var sKey = (sType === C_JS) ? "T_JSLK" : "T_CSLK";
+    if (!Array.isArray(oAPP.DATA.APPDATA[sKey])) { oAPP.DATA.APPDATA[sKey] = []; }
+    return oAPP.DATA.APPDATA[sKey];
+  }
+
+  /************************************************************************
+   * 단일 인스턴스(원본 sap core 다이얼로그 1개 재사용) — 닫기=숨김(제거 X).
+   ************************************************************************/
+  var oUI = null;     // { dlg, headerTitle, addBtn, delBtn, mimeBtn, saveBtn, table, tbody, headChk, colTxtTh, seq }
+  var oState = { type: C_CSS, rows: [] };   // rows = [{KEY, STATUS, URL, INACTIVE, LKEY, field}]
+
+  // ── 팝업 닫기(숨김) + 콜백 ─────────────────────────────────────────
+  function lf_close(bSkipCallback) {
+    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+    if (!bSkipCallback) { lf_publishCallback("CANCEL", []); }
+  }
+
+  // 호출처 콜백(원본 EventBus publish("WS20POPUP","cssJsLinkAddPopupCallback")). HTML5 sap 스텁이라 가드.
+  function lf_publishCallback(sActcd, aData) {
+    try {
+      if (window.sap && sap.ui && sap.ui.getCore && sap.ui.getCore().getEventBus) {
         sap.ui.getCore().getEventBus().publish("WS20POPUP", "cssJsLinkAddPopupCallback", {
-            ACTCD : "SAVE",
-            TYPE : LINK_TYPE,
-            T_DATA  : aSaveData
+          ACTCD: sActcd, TYPE: oState.type, T_DATA: aData || []
         });
+      }
+    } catch (e) { }
+  }
 
-    }; // end of oAPP.fn.fnCssLinkSave
+  // 디자인 미리보기 반영(원본 setCSSLink) — W2 미리보기 프레임 미배선 시 null 가드.
+  function lf_reflectCssPreview(aUrls) {
+    try {
+      var oPrev = oAPP.attr && oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
+      if (oPrev && typeof oPrev.setCSSLink === "function") { oPrev.setCSSLink(aUrls, true); }
+    } catch (e) { console.error("[HTML5][cssLink] 미리보기 반영 오류:", e && e.message); }
+  }
 
-    /************************************************************************
-     * JS Link 저장
-     ************************************************************************/
-    oAPP.fn.fnJsLinkSave = function () {
+  // ── 테이블 본문 렌더(aRows 기준) ─────────────────────────────────────
+  //   ※ 원본 Status 컬럼(신규/저장 아이콘)은 사용자 요청으로 제거(군더더기 — 체크박스 옆 작은 점처럼 보임).
+  //     STATUS 값은 데이터에 남겨두되(향후 필요 시 복원 용이) 화면엔 표시하지 않는다.
+  function lf_renderRows() {
+    if (!oUI) { return; }
+    var bEdit = _isEdit();
+    var bExcl = _excludeVisible();
+    oUI.tbody.innerHTML = "";
 
-        // 입력한 Link 정보를 구한다.
-        var aLinkData = APPCOMMON.fnGetModelProperty(C_LINK_LIST_DATA_ROOT_PATH),
-            iLinkDataLength = aLinkData.length;
+    if (!oState.rows.length) {
+      var oTrEmpty = _el("tr", "u4a-table__nodata");
+      var oTdEmpty = document.createElement("td");
+      oTdEmpty.colSpan = bExcl ? 3 : 2;
+      oTdEmpty.textContent = _wsCommon("946");   // 데이터 없음 (공통 .u4a-table__nodata — ServerList noData=946 동일)
+      oTrEmpty.appendChild(oTdEmpty);
+      oUI.tbody.appendChild(oTrEmpty);
+      lf_syncHeadChk();
+      return;
+    }
 
-        // Link 정보가 하나도 없으면 팝업을 그냥 닫는다.
-        if (iLinkDataLength <= 0) {
+    oState.rows.forEach(function (oRow, i) {
+      var oTr = document.createElement("tr");
+      oTr.setAttribute("data-key", oRow.KEY);
+      if (i % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
 
-            oAPP.DATA.APPDATA.T_JSLK = [];
-
-            // 팝업 닫기
-            oAPP.fn.fnCssJsLinkPopupClose();
-
-            // 어플리케이션 정보에 변경 플래그 
-            parent.setAppChange('X');
-
-            /**
-             * @since   2026-02-11 01:50:31
-             * @version v3.5.9-3
-             * @author  PES
-             * @description
-             * CSS, JS 링크 등록 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-             */
-            sap.ui.getCore().getEventBus().publish("WS20POPUP", "cssJsLinkAddPopupCallback", {
-                ACTCD : "CANCEL",
-                TYPE : LINK_TYPE,
-                T_DATA  : []
-            });
-
-            return;
-
-        }
-
-        var sUrlType = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B75"), // JS Link URL
-            sErrTxt = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "014", sUrlType), // & is required entry value.     
-            aSaveData = [],
-            bIsErr = false;
-
-        for (var i = 0; i < iLinkDataLength; i++) {
-
-            var sUrl = aLinkData[i].URL,
-                oLinkData = aLinkData[i];
-
-            oLinkData.VSTAT = sap.ui.core.ValueState.None;
-            oLinkData.VTXT = "";
-
-            if (sUrl != "") {
-
-                aSaveData.push({
-                    "LKEY": i + 1,
-                    "URL": oLinkData.URL,
-
-                    //20240903 PES -START.
-                    //INACTIVE 처리 값 매핑.
-                    "INACTIVE": oLinkData.INACTIVE
-
-                });
-
-                continue;
-            }
-
-            bIsErr = true;
-
-            oLinkData.VSTAT = sap.ui.core.ValueState.Error;
-            oLinkData.VTXT = sErrTxt;
-
-        }
-
-        APPCOMMON.fnSetModelProperty(C_LINK_LIST_DATA_ROOT_PATH, aLinkData);
-
-        if (bIsErr) {
-            aSaveData = [];
-            return;
-        }
-
-        oAPP.DATA.APPDATA.T_JSLK = aSaveData;
-
-        // 팝업 닫기
-        oAPP.fn.fnCssJsLinkPopupClose();
-
-        // 어플리케이션 정보에 변경 플래그 
-        parent.setAppChange('X');
-
-
-        /**
-         * @since   2026-02-11 01:50:31
-         * @version v3.5.9-3
-         * @author  PES
-         * @description
-         * CSS, JS 링크 등록 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-         */
-        sap.ui.getCore().getEventBus().publish("WS20POPUP", "cssJsLinkAddPopupCallback", {
-            ACTCD : "SAVE",
-            TYPE : LINK_TYPE,
-            T_DATA  : aSaveData
+      // (1) 선택 체크박스(멀티선택) — 편집모드에서만.
+      var oTdChk = _el("td", "u4aCslColChk");
+      if (bEdit) {
+        var oChk = document.createElement("input");
+        oChk.type = "checkbox";
+        oChk.className = "u4aCslRowChk";
+        oChk.setAttribute("data-key", oRow.KEY);
+        oChk.addEventListener("change", function () {
+          oTr.setAttribute("aria-selected", oChk.checked ? "true" : "false");
+          lf_syncHeadChk();
         });
+        oTdChk.appendChild(oChk);
+      }
+      oTr.appendChild(oTdChk);
 
-    }; // end of oAPP.fn.fnJsLinkSave
+      // (2) URL 입력(공통 createField, value-state) — 편집모드만 편집 가능. (원본 sap.m.Input 처럼 clear 글리프 없음)
+      var oTdUrl = _el("td", "u4aCslColUrl");
+      var oField = U4AUI.createField({
+        type: "text",
+        value: oRow.URL || "",
+        readOnly: !bEdit,
+        className: "u4aCslUrlField",
+        onInput: function (v) { oRow.URL = v; if (oField.setValueState) { oField.setValueState("none", ""); } }
+      });
+      oRow.field = oField;
+      oTdUrl.appendChild(oField.el);
+      oTr.appendChild(oTdUrl);
 
-    /************************************************************************
-     * CSS & JS Link add Popup의 CSS Link Add 이벤트
-     ************************************************************************/
-    oAPP.events.ev_pressCssJsLinkAddTableAddRowBtn = function () {
+      // (4) Exclude 스위치(조건부 컬럼).
+      if (bExcl) {
+        var oTdExc = _el("td", "u4aCslColExc");
+        var oSw = _el("label", "u4a-switch");
+        var oSwIn = document.createElement("input");
+        oSwIn.type = "checkbox";
+        oSwIn.checked = (oRow.INACTIVE === "X");
+        oSwIn.disabled = !bEdit;
+        oSwIn.addEventListener("change", function () { oRow.INACTIVE = oSwIn.checked ? "X" : ""; });
+        oSw.appendChild(oSwIn);
+        oSw.appendChild(_el("span", "u4a-switch__slider"));
+        oTdExc.appendChild(oSw);
+        oTr.appendChild(oTdExc);
+      }
 
-        var sKey = parent.getRandomKey(10),
-            oNewRow = {
-                LKEY: "",
-                KEY: sKey,
-                STATUS: 1,
-                URL: ""
-            };
+      oUI.tbody.appendChild(oTr);
+    });
 
-        //20240903 PES -START.
-        //Inactive 필드 추가.
-        oNewRow.INACTIVE = "";
-        //20240903 PES -END.
+    lf_syncHeadChk();
+  }
 
-        // 테이블에 체크박스가 체크되어 있다면 전체 해제
-        oAPP.fn.fnSetCssJsLinkTableClearSelection();
+  // 헤더 전체선택 체크박스 상태 동기화(전체/부분/없음).
+  function lf_syncHeadChk() {
+    if (!oUI || !oUI.headChk) { return; }
+    var aChk = oUI.tbody.querySelectorAll(".u4aCslRowChk");
+    var iTotal = aChk.length, iSel = 0;
+    aChk.forEach(function (c) { if (c.checked) { iSel++; } });
+    oUI.headChk.checked = (iTotal > 0 && iSel === iTotal);
+    oUI.headChk.indeterminate = (iSel > 0 && iSel < iTotal);
+    oUI.headChk.disabled = (iTotal === 0);
+  }
 
-        // 신규 Row를 추가한다.
-        var aTableData = APPCOMMON.fnGetModelProperty(C_LINK_LIST_DATA_ROOT_PATH);
-        if (!aTableData || aTableData.length <= 0) {
-            APPCOMMON.fnSetModelProperty(C_LINK_LIST_DATA_ROOT_PATH, [oNewRow]);
-            return;
-        }
+  // ── 툴바: Add / Del / MIME Repository ───────────────────────────────
+  function lf_addRow() {
+    oState.rows.push({ KEY: _randomKey(), STATUS: 1, URL: "", INACTIVE: "", LKEY: "" });
+    lf_renderRows();
+    // 새 행 URL 입력에 포커스.
+    try {
+      var aTr = oUI.tbody.querySelectorAll("tr[data-key]");
+      var oLast = aTr[aTr.length - 1];
+      var oInput = oLast && oLast.querySelector(".u4aCslUrlField input");
+      if (oInput) { oInput.focus(); }
+    } catch (e) { }
+  }
 
-        aTableData.push(oNewRow);
+  function lf_delSelected() {
+    var aChk = oUI.tbody.querySelectorAll(".u4aCslRowChk");
+    var oDel = {};
+    var bAny = false;
+    aChk.forEach(function (c) { if (c.checked) { oDel[c.getAttribute("data-key")] = true; bAny = true; } });
+    if (!bAny) { return; }   // 선택 없음 — 원본 동일(무시).
+    oState.rows = oState.rows.filter(function (r) { return !oDel[r.KEY]; });
+    lf_renderRows();
+  }
 
-        APPCOMMON.fnSetModelProperty(C_LINK_LIST_DATA_ROOT_PATH, aTableData);
+  // ── 저장(원본 fnCssLinkSave / fnJsLinkSave 1:1) ──────────────────────
+  function lf_save() {
+    if (!_isEdit()) { return; }
 
-    }; // end of oAPP.events.ev_pressCssJsLinkAddTableAddRowBtn
+    var aTbl = _ensureLinkTable(oState.type);
 
-    /************************************************************************
-     * CSS & JS Link add Popup의 CSS & JS Link Del 이벤트
-     ************************************************************************/
-    oAPP.events.ev_pressCssJsLinkAddTableDelRow = function (TYPE, oEvent) {
+    // 목록이 비면 초기화 후 닫기(원본).
+    if (!oState.rows.length) {
+      if (oState.type === C_JS) { oAPP.DATA.APPDATA.T_JSLK = []; }
+      else { oAPP.DATA.APPDATA.T_CSLK = []; lf_reflectCssPreview([]); }
+      try { parent.setAppChange("X"); } catch (e) { }
+      // 변경분 발생 → WS20 헤더 Active→Inactive 반영(에디터 시리즈/오류페이지 저장과 동일 처리).
+      try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+      lf_close(true);
+      lf_publishCallback("CANCEL", []);
+      return;
+    }
 
-        var oCssLinkAddTable = sap.ui.getCore().byId(C_LINK_TABLE_ID);
-        if (!oCssLinkAddTable) {
-            return;
-        }
+    // URL 빈값 검증.
+    var sUrlType = _txt("/U4A/CL_WS_COMMON", (oState.type === C_JS) ? "B75" : "B74");   // (CSS|JS) Link URL
+    var sErrTxt = _txt("/U4A/MSG_WS", "014", sUrlType);                                  // & is required entry value.
+    var aSaveData = [], aUrls = [], bErr = false, oFirstErr = null;
 
-        var aSelIdx = oCssLinkAddTable.getSelectedIndices(),
-            iSelLenth = aSelIdx.length;
+    oState.rows.forEach(function (oRow, i) {
+      var sUrl = (oRow.URL || "").trim();
+      if (oRow.field && oRow.field.setValueState) { oRow.field.setValueState("none", ""); }
 
-        if (iSelLenth <= 0) {
-            return;
-        }
+      if (sUrl === "") {
+        bErr = true;
+        if (oRow.field && oRow.field.setValueState) { oRow.field.setValueState("error", sErrTxt); }
+        if (!oFirstErr) { oFirstErr = oRow.field; }
+        return;
+      }
+      aSaveData.push({ LKEY: i + 1, URL: oRow.URL, INACTIVE: oRow.INACTIVE || "" });
+      // CSS 미리보기엔 비-Exclude URL 만 수집(원본).
+      if (oRow.INACTIVE !== "X") { aUrls.push(oRow.URL); }
+    });
 
-        var aTableData = jQuery.extend(true, [], APPCOMMON.fnGetModelProperty(C_LINK_LIST_DATA_ROOT_PATH));
+    if (bErr) {
+      if (oFirstErr && oFirstErr.focus) { try { oFirstErr.focus(); } catch (e) { } }
+      return;   // 다이얼로그 유지.
+    }
 
-        for (var i = 0; i < iSelLenth; i++) {
+    if (oState.type === C_JS) {
+      oAPP.DATA.APPDATA.T_JSLK = aSaveData;
+    } else {
+      oAPP.DATA.APPDATA.T_CSLK = aSaveData;
+      lf_reflectCssPreview(aUrls);
+    }
+    try { parent.setAppChange("X"); } catch (e) { }
 
-            var iSelIdx = aSelIdx[i],
-                oCtx = oCssLinkAddTable.getContextByIndex(iSelIdx),
-                sKey = oCtx.getObject("KEY"),
-                iFindIndex = aTableData.findIndex((DATA) => DATA.KEY == sKey);
+    lf_close(true);
+    lf_publishCallback("SAVE", aSaveData);
+  }
 
-            if (iFindIndex < 0) {
-                continue;
-            }
+  // ── open 시 데이터 로드(원본 fnGetCssLinkData / fnGetJsLinkData) ──────
+  function lf_loadData(sType) {
+    var aTbl = _ensureLinkTable(sType);
+    oState.rows = [];
+    aTbl.forEach(function (o, i) {
+      oState.rows.push({
+        KEY: _randomKey(),
+        STATUS: 2,                                  // 저장된 것.
+        URL: (o && typeof o.URL === "string") ? o.URL : "",
+        INACTIVE: (o && o.INACTIVE) ? o.INACTIVE : "",
+        LKEY: (sType === C_JS) ? (i + 1) : (o && o.LKEY)
+      });
+    });
+  }
 
-            aTableData.splice(iFindIndex, 1);
-        }
+  /************************************************************************
+   * 다이얼로그 1회 생성(이후 재사용).
+   ************************************************************************/
+  function lf_build() {
+    lf_ensureStyle();
 
-        APPCOMMON.fnSetModelProperty(C_LINK_LIST_DATA_ROOT_PATH, aTableData);
+    var oDlg = document.createElement("dialog");
+    oDlg.id = C_DLG_ID;
+    oDlg.className = "u4a-dialog u4aCslDlg";
 
-        oCssLinkAddTable.clearSelection();
+    // 헤더 — link 아이콘 + "APPID  ·  Change/Display  ·  Active/Inactive" + 닫기 X.
+    var oHeader = _el("div", "u4a-dialog__header");
+    oHeader.innerHTML = _fa("link") + "<span></span>";
+    var oHeaderTitle = oHeader.querySelector("span");
+    var oXBtn = _el("button", "u4a-btn-icon");
+    oXBtn.type = "button";
+    oXBtn.innerHTML = _fa("xmark");
+    oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
+    oXBtn.addEventListener("click", function () { lf_close(); });
+    oHeader.appendChild(oXBtn);
+    oDlg.appendChild(oHeader);
 
-    }; // end of oAPP.events.ev_pressCssJsLinkAddTableDelRow    
+    // 바디 — [툴바] + [공통 테이블].
+    var oBody = _el("div", "u4a-dialog__body u4aCslBody");
 
-    /************************************************************************
-     * CSS & JS Link add Popup의 CSS & JS Link 저장 이벤트
-     ************************************************************************/
-    oAPP.events.ev_pressCssJsLinkSave = function () {
+    var oToolbar = _el("div", "u4aCslToolbar");
+    // 의미색(아웃라인) — Add=accent 파랑(생성) / Del=negative 빨강(삭제) / MIME=중립. 솔리드 채움은 푸터 Save 만.
+    var oAddBtn = _el("button", "u4a-btn u4aCslToolBtn u4aCslAdd");
+    oAddBtn.type = "button";
+    oAddBtn.innerHTML = _fa("file-circle-plus") + "<span></span>";
+    oAddBtn.addEventListener("click", function () { lf_addRow(); });
+    var oDelBtn = _el("button", "u4a-btn u4aCslToolBtn u4a-btn--negative");
+    oDelBtn.type = "button";
+    oDelBtn.innerHTML = _fa("trash") + "<span></span>";
+    oDelBtn.addEventListener("click", function () { lf_delSelected(); });
+    var oMimeBtn = _el("button", "u4a-btn u4aCslToolBtn u4aCslMime");
+    oMimeBtn.type = "button";
+    oMimeBtn.innerHTML = _fa("image") + "<span></span>";
+    oMimeBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A10");   // MIME Repository
+    oMimeBtn.addEventListener("click", function () { try { oAPP.fn.fnMimeDialogOpener(); } catch (e) { } });
+    oToolbar.appendChild(oAddBtn);
+    oToolbar.appendChild(oDelBtn);
+    oToolbar.appendChild(oMimeBtn);
+    oBody.appendChild(oToolbar);
 
-        switch (LINK_TYPE) {
-            case "CSS":
+    // 공통 테이블(.u4a-table) — 헤더: [전체선택] [Status] [URL] [Exclude?].
+    //   래퍼=공통 액자형(.u4a-table-wrap--boxed, AppF4/Insert 와 동일 외형). 행높이=공통 기본(--compact 안 씀).
+    var oWrap = _el("div", "u4a-table-wrap u4a-table-wrap--boxed u4aCslTableWrap");
+    oWrap.setAttribute("data-view", "table");
+    var oTable = _el("table", "u4a-table u4aCslTable");
 
-                oAPP.fn.fnCssLinkSave();
+    var oThead = document.createElement("thead");
+    var oThRow = document.createElement("tr");
 
-                return;
+    var oThChk = _el("th", "u4aCslColChk");
+    var oHeadChk = document.createElement("input");
+    oHeadChk.type = "checkbox";
+    oHeadChk.className = "u4aCslHeadChk";
+    oHeadChk.title = "";
+    oHeadChk.addEventListener("change", function () {
+      var b = oHeadChk.checked;
+      oUI.tbody.querySelectorAll(".u4aCslRowChk").forEach(function (c) {
+        c.checked = b;
+        var tr = c.closest("tr");
+        if (tr) { tr.setAttribute("aria-selected", b ? "true" : "false"); }
+      });
+      lf_syncHeadChk();
+    });
+    oThChk.appendChild(oHeadChk);
+    oThRow.appendChild(oThChk);
 
-            case "JS":
+    var oColTxtTh = _el("th", "u4aCslColUrl");   // "{TYPE} Link MIME URL" — open 마다 갱신.
+    oThRow.appendChild(oColTxtTh);
 
-                oAPP.fn.fnJsLinkSave();
+    var oExcTh = null;
+    if (_excludeVisible()) {
+      // Exclude(제외처리 여부) — ZMSG_WS_COMMON_001/496(원본). CL_WS_COMMON B67 폴백.
+      var sExc = _wsCommon("496");
+      if (!sExc) { sExc = _txt("/U4A/CL_WS_COMMON", "B67"); }
+      oExcTh = _el("th", "u4aCslColExc", sExc);
+      oThRow.appendChild(oExcTh);
+    }
 
-                return;
+    oThead.appendChild(oThRow);
+    oTable.appendChild(oThead);
 
-        }
+    var oTbody = document.createElement("tbody");
+    oTable.appendChild(oTbody);
+    oWrap.appendChild(oTable);
+    oBody.appendChild(oWrap);
+    oDlg.appendChild(oBody);
 
-    }; // end of oAPP.events.ev_pressCssJsLinkSave
+    // 푸터 — [Save 파랑(편집모드)] [Close Reject].
+    var oFoot = _el("div", "u4a-dialog__footer u4aCslFoot");
+    oFoot.appendChild(_el("span", "u4aCslFootSpacer"));
+    var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aCslIcoBtn");
+    oSaveBtn.type = "button";
+    oSaveBtn.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
+    oSaveBtn.title = _txt("/U4A/CL_WS_COMMON", "A64");   // Save
+    oSaveBtn.addEventListener("click", function () { lf_save(); });
+    oFoot.appendChild(oSaveBtn);
+    var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aCslIcoBtn");
+    oCloseBtn.type = "button";
+    oCloseBtn.innerHTML = _fa("xmark");
+    oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
+    oCloseBtn.addEventListener("click", function () { lf_close(); });
+    oFoot.appendChild(oCloseBtn);
+    oDlg.appendChild(oFoot);
 
+    // ESC → 닫기.
+    oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
 
-    /************************************************************************
-     * CSS & JS Link Inactive 체크박스 선택 이벤트.
-     ************************************************************************/
-    oAPP.events.selectCssJsLinkInactive = function(oUi){
-        
-        if(typeof oUi === "undefined"){
-            return;
-        }
-        
-        //모델 정보 얻기.
-        var _oModel = oUi.getModel() || undefined;
+    // 헤더 드래그(전역) / 더블클릭 리센터 / grip 리사이즈 — 전 팝업 공통.
+    if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
+    if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 460, minH: 320 }); }
 
-        if(typeof _oModel === "undefined"){
-            return;
-        }
+    document.body.appendChild(oDlg);
 
-        //이벤트 발생 라인의 context 정보 얻기.
-        var _oCtxt = oUi.getBindingContext() || undefined;
-
-        if(typeof _oCtxt === "undefined"){
-            return;
-        }
-
-        //현재 checkbox 선택 값 얻기.
-        // var _sel = oUi.getSelected();
-        var _sel = oUi.getState();
-
-        //chechbox를 선택한 경우 'X', 선택하지 않은경우 ''
-        var _INACTIVE = _sel === true ? "X" : "";
-
-        //INACTIVE 처리 값 매핑.
-        _oModel.setProperty("INACTIVE", _INACTIVE, _oCtxt);
-
+    oUI = {
+      dlg: oDlg, headerTitle: oHeaderTitle,
+      addBtn: oAddBtn, delBtn: oDelBtn, mimeBtn: oMimeBtn, saveBtn: oSaveBtn,
+      toolbar: oToolbar, table: oTable, tbody: oTbody, headChk: oHeadChk,
+      colTxtTh: oColTxtTh, excTh: oExcTh, seq: 0
     };
+  }
+
+  /************************************************************************
+   * CSS & JS Link Add 팝업 열기(공개 진입점) — 캐시 재사용.
+   * @param {String} TYPE  "CSS" 또는 "JS"
+   ************************************************************************/
+  oAPP.fn.fnCssJsLinkAddPopupOpen = function (TYPE) {
+
+    if (TYPE !== C_CSS && TYPE !== C_JS) {
+      try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+      return;
+    }
+    oState.type = TYPE;
+
+    // 최초 1회 생성(DOM 에서 사라졌으면 재생성).
+    if (!oUI || !document.body.contains(oUI.dlg)) { oUI = null; lf_build(); }
+
+    // 이미 열려 있으면(중복 호출) busy 만 풀고 반환(원본).
+    if (oUI.dlg.open) {
+      try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+      return;
+    }
+
+    var bEdit = _isEdit();
+
+    // 헤더 제목(APPID · Change/Display · Active/Inactive).
+    var oApp = _appInfo();
+    var sMode = (oApp.IS_EDIT === "X") ? _txt("/U4A/CL_WS_COMMON", "A02") : _txt("/U4A/CL_WS_COMMON", "A05");   // Change / Display
+    var sAct = (oApp.ACTST === "A") ? _txt("/U4A/CL_WS_COMMON", "B66") : _txt("/U4A/CL_WS_COMMON", "B67");      // Activate / Inactivate
+    oUI.headerTitle.textContent = [(oApp.APPID || ""), sMode, sAct].filter(Boolean).join("   ·   ");
+
+    // 컬럼 헤더 "{TYPE} Link MIME URL".
+    var sLinkTxt = _txt("/U4A/CL_WS_COMMON", (TYPE === C_JS) ? "D50" : "D49");   // JS Link / CSS Link
+    var sMimeUrl = _txt("/U4A/CL_WS_COMMON", "D51");                            // MIME URL
+    oUI.colTxtTh.textContent = (sLinkTxt + " " + sMimeUrl).trim();
+
+    // 툴바 버튼 텍스트 "{TYPE} Link Add/Del".
+    var sAdd = _txt("/U4A/CL_WS_COMMON", "C98");   // Add
+    var sDel = _txt("/U4A/CL_WS_COMMON", "D52");   // Del
+    oUI.addBtn.querySelector("span").textContent = (sLinkTxt + " " + sAdd).trim();
+    oUI.delBtn.querySelector("span").textContent = (sLinkTxt + " " + sDel).trim();
+
+    // 편집모드 — 툴바/Save 노출(원본 visible=/WS20/APP/IS_EDIT).
+    oUI.toolbar.hidden = !bEdit;
+    oUI.saveBtn.hidden = !bEdit;
+
+    // 데이터 로드 + 렌더.
+    lf_loadData(TYPE);
+    lf_renderRows();
+
+    try { oUI.dlg.showModal(); } catch (e) { }
+
+    // busy 끄고 Lock 풀기(원본 afterOpen).
+    try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+
+  }; // end of oAPP.fn.fnCssJsLinkAddPopupOpen
+
+  /************************************************************************
+   * 공통 스타일 1회 주입(테마 토큰 소비 — 하드코딩 색 없음).
+   ************************************************************************/
+  function lf_ensureStyle() {
+    if (document.getElementById("u4aCslStyle")) { return; }
+    var oStyle = document.createElement("style");
+    oStyle.id = "u4aCslStyle";
+    oStyle.textContent =
+      ".u4aCslDlg { width: min(94vw, 760px); height: min(86vh, 560px); padding: 0; display: flex; flex-direction: column; }" +
+      ".u4aCslDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
+      ".u4aCslDlg .u4a-dialog__header span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
+      // 바디 = 툴바 + 테이블 세로 스택. min-height:0 으로 테이블이 줄며 스크롤.
+      ".u4aCslBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; }" +
+      ".u4aCslToolbar { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 0.5rem; }" +
+      ".u4aCslToolbar[hidden] { display: none; }" +
+      // 툴바 버튼 = 아웃라인 + 의미색. 색/보더는 의미 클래스가 소유(--negative 빨강이 덮이지 않게 ToolBtn 은 배경만).
+      ".u4aCslToolBtn { background: transparent; }" +
+      ".u4aCslToolBtn:hover { background: var(--hover-bg); }" +
+      ".u4aCslAdd { border-color: var(--accent); color: var(--accent); }" +       // Create = 파랑(아웃라인)
+      ".u4aCslMime { border-color: var(--divider); color: var(--text); }" +       // 보조 = 중립
+
+      // 테이블 래퍼 외형(border/radius/bg/scroll)은 공통 .u4a-table-wrap--boxed 가 담당. 여기선 배치만.
+      ".u4aCslTableWrap { flex: 1 1 auto; }" +
+      // 선택 체크박스 컬럼 = 컴팩트 가운데. URL 컬럼이 남은 폭 흡수.
+      ".u4aCslColChk { width: 2.5rem; text-align: center; }" +
+      ".u4aCslColExc { width: 7rem; text-align: center; }" +
+      ".u4aCslColUrl { width: auto; }" +
+      ".u4aCslColChk input, .u4aCslColExc .u4a-switch { vertical-align: middle; }" +
+      ".u4aCslColChk input { accent-color: var(--accent); margin: 0; }" +
+      // 방어 — 이 테이블 셀엔 의사요소 장식(점/프리픽스) 없음(예기치 않은 ::before/::after 글리프 차단).
+      ".u4aCslTable td::before, .u4aCslTable td::after { content: none !important; }" +
+      ".u4aCslUrlField { width: 100%; }" +
+      ".u4aCslFoot { display: flex; gap: 0.5rem; align-items: center; }" +
+      ".u4aCslFootSpacer { flex: 1 1 auto; }" +
+      ".u4aCslFoot .u4a-btn[hidden] { display: none; }" +
+      ".u4aCslIcoBtn { min-width: 2.5rem; justify-content: center; }";
+    document.head.appendChild(oStyle);
+  }
 
 })(window, $, oAPP);

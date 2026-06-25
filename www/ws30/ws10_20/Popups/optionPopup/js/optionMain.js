@@ -331,8 +331,8 @@
               // 푸터 — 공통 .modal-footer(48px·토큰 보더, bootstrap-skin 단일출처) + 프로젝트 버튼.
               //   다른 모든 팝업과 동일: 강조=u4a-btn--emphasized / 닫기=u4a-btn--negative(Reject 느낌)
               '<div class="modal-footer">' +
-                '<button type="button" class="u4a-btn u4a-btn--emphasized" id="optApply">' + _fa("check") + ' ' + (_txt("/U4A/CL_WS_COMMON", "C63") || "Apply") + '</button>' +
-                '<button type="button" class="u4a-btn u4a-btn--negative" id="optClose">' + _fa("xmark") + ' ' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '</button>' +
+                '<button type="button" class="u4a-btn u4a-btn--emphasized" id="optApply" title="' + (_txt("/U4A/CL_WS_COMMON", "C63") || "Apply") + '">' + _fa("check") + '</button>' +
+                '<button type="button" class="u4a-btn u4a-btn--negative" id="optClose" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
               '</div>' +
             '</div>';
 

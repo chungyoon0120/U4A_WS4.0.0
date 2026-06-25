@@ -1,18 +1,45 @@
 <!DOCTYPE html>
 <html>
 
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-		<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-		
-	</head>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
+    <!-- OTR Manager 본문(검색 패널 + 결과 테이블) — 공통 컴포넌트 소비:
+         입력칸=U4AUI.createField, 접이식 패널=U4AUI.createPanel, 결과표=shell.css .u4a-table(+카드 반응형),
+         토스트=공통 .u4a-toast. 색은 토큰만. 외부 셸(frame.js)의 oAPP(데이터/IPC/Busy/테마) 사용. -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <!-- 입력칸/테이블 등 색의 단일 출처(shell 뒤 로드해 이김) — 없으면 입력칸이 색·보더 없이 평평해짐(15.입력UX §1). -->
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="index.css">
 
-	<body class="sapUiBody">
-		<div id="content"></div>
-	 <script src="index.js"></script> 
-	</body>
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] frame 이 iframe src 에 넘긴 BGCOL/THEME 를 첫 페인트 전에 적용
+         (부모 frame 과 동일 패턴, 16.공통UX 2.6). body 는 background:var(--boot-bg,var(--app-bg)). -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+            } catch (e) { /* index.js 에서 재적용 */ }
+        })();
+    </script>
+</head>
+
+<body>
+    <div id="content"></div>
+    <script src="index.js"></script>
+</body>
 
 </html>

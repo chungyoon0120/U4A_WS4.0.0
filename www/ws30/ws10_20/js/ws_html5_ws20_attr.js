@@ -4002,7 +4002,15 @@
             BTN.title = sAttr.UIATT || "";
 
             BTN.addEventListener("click", function () {
-                //팝업 호출형(CSS Link Add/JS Link Add/Web Security Settings 등) — W4+ 예정.
+                // 팝업 호출형 속성 버튼 — 변환 완료분은 분기, 미변환은 W4+ 가드.
+                switch (sAttr.UIATK) {
+                    case "DH001022":   // CSS Link Add
+                        if (oAPP.fn.fnCssJsLinkAddPopupOpener) { oAPP.fn.fnCssJsLinkAddPopupOpener("CSS"); return; }
+                        break;
+                    case "DH001023":   // JS Link Add
+                        if (oAPP.fn.fnCssJsLinkAddPopupOpener) { oAPP.fn.fnCssJsLinkAddPopupOpener("JS"); return; }
+                        break;
+                }
                 console.warn("[W4+ 예정] 팝업 호출형 속성 버튼 미변환:", sAttr.UIATT, "(", sAttr.UIATK, ")");
             });
 

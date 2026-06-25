@@ -70,18 +70,35 @@ body {
     flex: 1 1 auto;
 }
 
-/* 줌 표시/원복 버튼 — 상태 인디케이터 톤(투명, 중립). 호버 시 살짝 강조. */
+/* 줌 컨트롤 묶음 [−][%][+] — 브라우저/VS Code 줌과 동일 패턴. */
+.u4aEdZoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+
+/* 공통 톤(투명, 중립) — 호버 시 살짝 강조. */
 .u4aEdZoomBtn {
     background: transparent;
     border-color: transparent;
     color: var(--text-muted, var(--icon-muted));
-    font-variant-numeric: tabular-nums;
-    gap: 0.375rem;
 }
 
 .u4aEdZoomBtn:hover {
     background: var(--hover-bg);
     color: var(--text);
+}
+
+/* % 표시(클릭=원복) — 숫자 폭 안정. 스텝(−/+)은 정사각 컴팩트. */
+.u4aEdZoomPct {
+    font-variant-numeric: tabular-nums;
+    gap: 0.375rem;
+}
+
+.u4aEdZoomStep {
+    min-width: 1.9rem;
+    padding: 0.4rem 0.5rem;
+    justify-content: center;
 }
 
 /* 로딩 오버레이 — busy 동안 입력 차단 + 스피너. */

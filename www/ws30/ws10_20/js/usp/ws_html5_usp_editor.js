@@ -215,6 +215,8 @@
                     if (typeof oAPP.attr.uspEditorLoadCnt !== "number") { oAPP.attr.uspEditorLoadCnt = 0; }
                     oAPP.attr.uspEditorLoadCnt -= 1;
                     if (oAPP.attr.uspEditorLoadCnt > 0) { return; }
+                    // 첫 로드 완료 시점에도 현재 모드(IS_EDIT) 읽기전용 적용 — Display 진입 후 첫 파일이 수정되던 회귀 방지.
+                    try { oAPP.usphtml.editorSetReadOnly((_model("/WS30/APP") || {}).IS_EDIT !== "X"); } catch (e) { }
                     _releaseBusy();
                     return;
 
@@ -454,6 +456,8 @@
                 // 준비된 에디터에 내용/언어만 전달(전 에디터 동기) → 즉시 busy 해제.
                 try { oAPP.usp.sendEditorPostMessageAll({ actcd: "setValue", value: (oRowData && oRowData.CONTENT) || "" }); } catch (e) { console.error("[HTML5][WS30] editor setValue:", e); }
                 try { oAPP.usp.sendEditorPostMessageAll({ actcd: "language_change", extension: (oRowData && oRowData.EXTEN) || "" }); } catch (e) { console.error("[HTML5][WS30] editor language_change:", e); }
+                // 파일 로드 시 현재 모드(IS_EDIT)에 따라 읽기전용 적용 — Display 모드면 수정 불가(원본 editable 바인딩 대응).
+                try { oAPP.usphtml.editorSetReadOnly((_model("/WS30/APP") || {}).IS_EDIT !== "X"); } catch (e) { }
                 // display:none 으로 숨겨져 있던 동안 Monaco 가 컨테이너 0 크기로 굳었을 수 있어 강제 relayout.
                 Array.prototype.forEach.call(aFrames, function (f) {
                     try { if (f.contentWindow && f.contentWindow.editor) { f.contentWindow.editor.layout(); } } catch (e) { }

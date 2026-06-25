@@ -100,7 +100,6 @@
 
         // ── 헤더 (구 internet-browser 아이콘 + C99 Select Default Browser) ──
         var oHeader = _el("div", "u4a-dialog__header");
-        oHeader.setAttribute("data-type", "I");
         oHeader.innerHTML = _fa("globe") + "<span></span>";
         oHeader.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "C99");
         var oX = _el("button", "u4a-btn-icon");
@@ -182,15 +181,15 @@
         var oFoot = _el("div", "u4a-dialog__footer u4aSelBrwsFoot");
         var oSave = _el("button", "u4a-btn u4a-btn--emphasized");
         oSave.type = "button";
-        oSave.innerHTML = _fa("check") + "<span></span>";
-        oSave.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A40"); // Confirm/확인
+        oSave.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
+        oSave.title = _txt("/U4A/CL_WS_COMMON", "A40"); // Confirm/확인
         oSave.addEventListener("click", oAPP.events.ev_selectBrowserSave);
         oFoot.appendChild(oSave);
 
         var oClose = _el("button", "u4a-btn u4a-btn--negative");
         oClose.type = "button";
-        oClose.innerHTML = _fa("xmark") + "<span></span>";
-        oClose.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39");
+        oClose.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
+        oClose.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oClose.addEventListener("click", oAPP.events.ev_selectBrowserClose);
         oFoot.appendChild(oClose);
         oDlg.appendChild(oFoot);

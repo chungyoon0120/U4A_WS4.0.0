@@ -135,14 +135,17 @@
     /************************************************************************
      * 선택 표시 (구 _fnUspTreeSelectedRowMark + setSelectedIndex)
      ************************************************************************/
-    oAPP.fn.fnUspTreeMarkSelected = function (oNode) {
+    oAPP.fn.fnUspTreeMarkSelected = function (oNode, bScroll) {
         // 모델 ISSEL 플래그 갱신(현재 노드만 true)
         _walkTree(function (o) { o.ISSEL = false; });
         if (oNode) { oNode.ISSEL = true; }
 
         if (!_tree) { return; }
         var oRow = _tree.selectByKey(oNode ? _key(oNode) : "");
-        if (oRow) { try { oRow.scrollIntoView({ block: "nearest" }); } catch (e) { } }
+        // ★ 스크롤은 명시 요청(bScroll)일 때만. 사용자가 직접 클릭한 행은 이미 보이므로 scrollIntoView 하면
+        //   가상스크롤 컨테이너가 점프해 불편하다(원본 UI5 도 클릭 시 스크롤 안 함). 신규 생성/검색 등
+        //   화면 밖 노드를 프로그램으로 선택할 때만 호출처가 bScroll=true 로 보이게 한다.
+        if (bScroll && oRow) { try { oRow.scrollIntoView({ block: "nearest" }); } catch (e) { } }
     };
 
     // 구 fnOnUspTreeUnSelect — 모든 노드 선택 해제(override; 셸 _fnLineSelectCb 가 호출)

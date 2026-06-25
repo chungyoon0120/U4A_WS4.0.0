@@ -239,7 +239,6 @@
 
         // 헤더 — 원본: 종이비행기 아이콘 + "System Message".
         var oHeader = _sysNotiEl("div", "u4a-dialog__header");
-        oHeader.setAttribute("data-type", "I");
         oHeader.innerHTML = _fa_sn("paper-plane") + "<span></span>";
         oHeader.querySelector("span").textContent = sHeaderTitle || "System Message";
         var oX = _sysNotiEl("button", "u4a-btn-icon");
@@ -307,8 +306,8 @@
         var oFoot = _sysNotiEl("div", "u4a-dialog__footer u4aSysNotiFoot");
         var oCloseBtn = _sysNotiEl("button", "u4a-btn u4a-btn--emphasized");
         oCloseBtn.type = "button";
-        oCloseBtn.innerHTML = _fa_sn("xmark") + "<span></span>";
-        oCloseBtn.querySelector("span").textContent = sClose;
+        oCloseBtn.innerHTML = _fa_sn("xmark");   // 아이콘만 (텍스트 라벨 제거)
+        oCloseBtn.title = sClose;
         oCloseBtn.addEventListener("click", function () { _sysNotiClose(oDlg); });
         oFoot.appendChild(oCloseBtn);
         oDlg.appendChild(oFoot);

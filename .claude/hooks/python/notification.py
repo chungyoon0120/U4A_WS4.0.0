@@ -34,7 +34,7 @@ def main():
 
         toaster = WindowsToaster("Claude Code")
         toast = Toast()
-        toast.text_fields = [f"🔔 {project}", snippet]
+        toast.text_fields = [f"🔔 [Notification] 훅 실행됨 — {project}", snippet]
         toaster.show_toast(toast)
     except Exception:
         # 알림이 실패해도 Claude를 막지 않는다

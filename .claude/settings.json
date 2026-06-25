@@ -1,8 +1,4 @@
 {
-  "model": "glm-5:cloud",
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://ollama.com"    
-  },
   "hooks": {
     "PreToolUse": [
       {
@@ -23,8 +19,7 @@
           {
             "type": "command",
             "command": "python",
-            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\prompt_submit.py"],
-            "async": true
+            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\prompt_submit.py"]
           }
         ]
       }

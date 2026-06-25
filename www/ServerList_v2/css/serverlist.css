@@ -195,10 +195,23 @@
     display: none;
 }
 
-/* 설정 버튼 = 카드 하단, 라벨+버튼 한 줄 유지 */
+/* 설정 버튼 = 카드 하단, 라벨+버튼 한 줄 유지. 버튼은 공통 .u4a-btn-icon(2rem) 그대로 —
+   카드 td 기본 align-items:baseline 이면 ⚙ 가 라벨 기준선에 맞춰 아래로 쏠려 hover 박스가
+   도드라진다 → center 로 라벨과 수직 정렬(테이블뷰와 동일한 느낌). */
 .u4a-table-wrap[data-view="card"] tbody td.u4a-c-action {
     order: 10;
     flex-wrap: nowrap;
+    align-items: center;
+}
+
+/* 카드 필드 행 위아래 간격 — 행 높이 고정은 shell.css 카드뷰 예외가 풀었고(height:auto),
+   여기선 세로 패딩/갭만 살짝 조여 촘촘하게(공통은 그대로). */
+.u4a-table-wrap[data-view="card"] tbody tr {
+    gap: 0.05rem;
+}
+.u4a-table-wrap[data-view="card"] tbody td {
+    padding-top: 0.15rem;
+    padding-bottom: 0.15rem;
 }
 
 /* 카드 선택 강조/ no-data, 테이블뷰 row hover·zebra·선택·포커스·no-data 는
@@ -209,6 +222,7 @@
     width: 2.5rem;
     text-align: center;
 }
+/* ⚙ 버튼 크기 통일은 공통 .u4a-btn-icon(flex:0 0 auto) 단일 출처가 보장 — 화면 핀 불필요. */
 
 /* 메시지박스/다이얼로그(공통 .u4a-dialog)는 shell.css 단일 출처를 그대로 소비한다.
    타입별 헤더 아이콘 의미색(data-type)·헤더/푸터 48px·드래그/리사이즈/리센터·닫기 X 는
@@ -620,6 +634,13 @@
 }
 .u4a-tree__icon { color: #e6a93a; }
 .u4a-tree__row[aria-selected="true"] .u4a-tree__icon { color: var(--u4a-accent); }
+/* 폴더 아이콘 토글 — 펼치면 열린 폴더(folder-open), 접으면 닫힌 폴더(folder).
+   트리 토글이 .u4a-tree__row[aria-expanded] 를 갱신하므로 CSS 로 FA 글리프만 교체(JS 불필요).
+   leaf(자식 없음)는 aria-expanded 속성이 없어 닫힌 폴더(\f07b) 유지.
+   (Font Awesome solid: fa-folder \f07b / fa-folder-open \f07c) */
+.u4a-tree__row[aria-expanded="true"] > .u4a-tree__icon .fa-folder::before {
+    content: "\f07c";
+}
 
 /* ── 테이블 ───────────────────────────────────────────────────────── */
 .u4a-table-wrap { padding: .35rem 0; background: var(--sl-bg); }

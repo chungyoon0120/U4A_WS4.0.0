@@ -484,40 +484,81 @@
         try { if (oWf && oWf.getZoomLevel) { nCur = oWf.getZoomLevel(); } } catch (e) { }
         oRng.value = String(nCur);
 
-        var oValEl = document.createElement("span");
-        oValEl.className = "u4a-zoom-pop__val";
-        oValEl.textContent = _zoomPct(nCur) + "%";
+        // − [🔍 %] + — 모나코 에디터 푸터(.u4aEdZoom)와 동일 패턴: 셋 다 공통 .u4a-btn 톤,
+        //   % 알약 안에 돋보기+숫자가 한 버튼(클릭=100% 원복). 별도 떠 있는 아이콘 X.
+        function _zBtn(sExtra, sInner) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "u4a-btn u4a-zoom-pop__btn " + sExtra;
+            b.innerHTML = sInner;
+            return b;
+        }
+
+        // % 알약(클릭 시 100%/레벨 0 원복) — 돋보기 아이콘 + 숫자 span 한 묶음.
+        var oValEl = _zBtn("u4a-zoom-pop__pct", '<i class="fa-solid fa-magnifying-glass"></i><span>' + _zoomPct(nCur) + '%</span>');
+        oValEl.title = "Reset (100%)";
+        var oValSpan = oValEl.querySelector("span");
+        oValEl.addEventListener("click", function () { _applyZoom(0); });
+
+        // 줌 적용 공통(슬라이더 change + −/+ 버튼 공용) — [-5,5] 클램프 후 setZoomLevel + 슬라이더/% 동기.
+        function _applyZoom(v) {
+            v = Math.max(-5, Math.min(5, Math.round(v * 10) / 10));
+            oRng.value = String(v);
+            try { if (oWf && oWf.setZoomLevel) { oWf.setZoomLevel(v); } } catch (e) { }
+            oValSpan.textContent = _zoomPct(v) + "%";
+        }
+
+        // − / + 스텝 버튼 — 한 번에 0.5 레벨(≈10%)씩, 즉시 적용(드래그 아님 → 지연 우려 없음).
+        var ZOOM_STEP = 0.5;
+        var oMinus = _zBtn("u4a-zoom-pop__step", _fa("minus"));
+        oMinus.title = "Ctrl + Wheel ↓";   // 에디터와 동일 툴팁
+        oMinus.addEventListener("click", function () { _applyZoom(parseFloat(oRng.value) - ZOOM_STEP); });
+        var oPlus = _zBtn("u4a-zoom-pop__step", _fa("plus"));
+        oPlus.title = "Ctrl + Wheel ↑";
+        oPlus.addEventListener("click", function () { _applyZoom(parseFloat(oRng.value) + ZOOM_STEP); });
 
         // % 라벨은 드래그 중 실시간 미리보기(input), 실제 확대/축소는 손 놓을 때(change) 수행.
         //   ★ 원본 sap.m.Slider 도 change(=release) 에서 setZoomLevel — 드래그 내내 창 전체를
         //     재줌하면 끊기므로 커밋 시점에만 적용한다.
         oRng.addEventListener("input", function () {
-            oValEl.textContent = _zoomPct(parseFloat(oRng.value)) + "%";
+            oValSpan.textContent = _zoomPct(parseFloat(oRng.value)) + "%";
         });
-        oRng.addEventListener("change", function () {
-            var v = parseFloat(oRng.value);
-            try { if (oWf && oWf.setZoomLevel) { oWf.setZoomLevel(v); } } catch (e) { }
-            oValEl.textContent = _zoomPct(v) + "%";
-        });
+        oRng.addEventListener("change", function () { _applyZoom(parseFloat(oRng.value)); });
 
+        oPop.appendChild(oMinus);
         oPop.appendChild(oRng);
         oPop.appendChild(oValEl);
+        oPop.appendChild(oPlus);
         document.body.appendChild(oPop);
 
         // 앵커(zoom 버튼) 기준 우측정렬·아래 배치(메뉴 _openMenuAt 와 동일).
-        var r = oAnchor.getBoundingClientRect();
-        var left = r.right - oPop.offsetWidth;
-        if (left + oPop.offsetWidth > window.innerWidth - 4) { left = window.innerWidth - oPop.offsetWidth - 4; }
-        if (left < 4) { left = 4; }
-        oPop.style.left = left + "px";
-        oPop.style.top = (r.bottom + 2) + "px";
+        function _position() {
+            var r = oAnchor.getBoundingClientRect();
+            var left = r.right - oPop.offsetWidth;
+            if (left + oPop.offsetWidth > window.innerWidth - 4) { left = window.innerWidth - oPop.offsetWidth - 4; }
+            if (left < 4) { left = 4; }
+            oPop.style.left = left + "px";
+            oPop.style.top = (r.bottom + 2) + "px";
+        }
+        _position();
         oAnchor.setAttribute("aria-expanded", "true");
+
+        // 현재 WEBFRAME 줌 → 슬라이더/% 재동기(팝오버 열린 채 Ctrl+휠 등 외부 줌 반영).
+        function _syncFromZoom() {
+            var v = 0;
+            try { if (oWf && oWf.getZoomLevel) { v = oWf.getZoomLevel(); } } catch (e) { }
+            oRng.value = String(v);   // 프로그램 set 은 input/change 미발화 → 피드백 루프 없음
+            oValSpan.textContent = _zoomPct(v) + "%";
+        }
 
         var fnOutside = function (ev) {
             if (ev.target && ev.target.closest && !ev.target.closest(".u4a-zoom-pop") && !ev.target.closest("[data-zoom-anchor]")) { _closeZoomPop(); }
         };
         var fnEsc = function (ev) { if (ev.key === "Escape") { _closeZoomPop(); } };
-        var fnWin = function () { _closeZoomPop(); };   // 창 리사이즈 → 닫기(앵커 어긋남 방지 + 저장)
+        // 창 리사이즈 → 닫지 말고 "재배치 + 값 동기". −/+/슬라이더/Ctrl+휠이 setZoomLevel 로 배율을 바꾸면
+        //   resize 가 발생하는데, 닫기로 두면 자기 줌에 팝오버가 스스로 닫혔다([[anchored-overlay-resize-reposition]]).
+        //   Ctrl+휠 줌(ws_fn_04)도 같은 resize 를 타므로 여기서 슬라이더/% 를 실시간 동기화한다.
+        var fnWin = function () { _position(); _syncFromZoom(); };
         _zoomPop = { el: oPop, anchor: oAnchor, onOutside: fnOutside, onEsc: fnEsc, onWinChange: fnWin };
         setTimeout(function () {
             document.addEventListener("mousedown", fnOutside, true);
@@ -615,6 +656,41 @@
         return wrap;
     }
     oAPP.ws10html.buildSplitButton = _buildSplitButton;
+
+    /********************************************************************
+     * 드롭다운 메뉴 버튼 (구 sap.m.MenuButton, buttonMode 기본=Regular — split 아님)
+     * ------------------------------------------------------------------
+     * 버튼 전체 클릭 → 드롭다운 메뉴(좌측정렬). 공통 _openMenuAt(토글·서브메뉴·
+     * 외부닫기·resize닫기 내장) 를 그대로 소비 → 별도 토글/닫기 배선 불필요.
+     * 트랜잭션 툴바 버튼(.u4a-tx-btn)과 동일 스킨 + 트레일링 caret.
+     * 소비처: WS20 Icon Viewer(Icon List/Image Icons) 등.
+     *   cfg: { id, icon, brand, text, tooltip,
+     *          getItems()→[{key,icon,brand,text,disabled,items,...}], items(정적 폴백),
+     *          onPick(it) }
+     ********************************************************************/
+    function _buildMenuButton(cfg) {
+        cfg = cfg || {};
+        var btn = document.createElement("button");
+        btn.type = "button";
+        if (cfg.id) { btn.id = cfg.id; }
+        btn.className = "u4a-tx-btn u4a-tx-btn--menu";
+        btn.title = cfg.tooltip || cfg.text || "";
+        btn.setAttribute("aria-haspopup", "true");
+        btn.setAttribute("data-menu-anchor", "menu");
+        btn.innerHTML =
+            (cfg.icon ? (cfg.brand ? '<i class="fa-brands fa-' + cfg.icon + '"></i>' : _fa(cfg.icon)) : "")
+            + (cfg.text ? "<span>" + cfg.text + "</span>" : "")
+            + '<i class="fa-solid fa-chevron-down u4a-tx-btn__caret"></i>';
+        btn.addEventListener("click", function () {
+            var aItems = (typeof cfg.getItems === "function") ? (cfg.getItems() || []) : (cfg.items || []);
+            // _openMenuAt 는 같은 앵커 재클릭 시 토글로 닫는다(별도 처리 불필요).
+            _openMenuAt(btn, aItems, function (it) {
+                if (typeof cfg.onPick === "function") { try { cfg.onPick(it); } catch (e) { console.error("[menuBtn] onPick", e); } }
+            }, "left");
+        });
+        return btn;
+    }
+    oAPP.ws10html.buildMenuButton = _buildMenuButton;
 
     /********************************************************************
      * 렌더 진입점 — fnOnInitRendering 이 호출

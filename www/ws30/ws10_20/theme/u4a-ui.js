@@ -85,6 +85,14 @@
             }
         }
 
+        // 스크롤 시 닫기 — 단, 펼침목록 "자기 내부"의 overflow 스크롤은 무시한다. capture scroll 이
+        //   내부 스크롤까지 잡으면(스크롤 이벤트는 버블 안 해 capture 필요) 목록을 휠로 넘기는 순간
+        //   닫혀버려 "스크롤이 안 되는" 것처럼 보인다(테마 등 항목 많은 콤보). 바깥(앵커 이동)만 닫기.
+        function _onScrollClose(ev) {
+            if (oList && (ev.target === oList || (oList.contains && oList.contains(ev.target)))) { return; }
+            _close();
+        }
+
         function _setActive(idx) {
             if (!oList) { return; }
             const aEl = oList.querySelectorAll(".u4a-combo__item");
@@ -139,7 +147,7 @@
             // 창 리사이즈/스크롤 시 닫기 — 앵커(콤보)가 옮겨가 펼침목록 위치가 어긋나는 것 방지.
             //   scroll 은 capture 로 내부 스크롤러(속성패널 등)까지 잡는다(스크롤 이벤트는 버블 안 함).
             window.addEventListener("resize", _close);
-            window.addEventListener("scroll", _close, true);
+            window.addEventListener("scroll", _onScrollClose, true);
         }
 
         function _close() {
@@ -150,7 +158,7 @@
             oCombo.setAttribute("aria-expanded", "false");
             document.removeEventListener("mousedown", _onOutside);
             window.removeEventListener("resize", _close);
-            window.removeEventListener("scroll", _close, true);
+            window.removeEventListener("scroll", _onScrollClose, true);
         }
 
         function _select(idx) {
@@ -280,9 +288,10 @@
                 oList.setAttribute("role", "listbox");
                 (oInput.closest("dialog") || document.body).appendChild(oList);
                 setTimeout(() => document.addEventListener("mousedown", _onOutside), 0);
-                // 창 리사이즈/스크롤 시 닫기 — 앵커(입력칸) 이동으로 위치 어긋남 방지. scroll capture=내부 스크롤러 포함.
+                // 창 리사이즈/스크롤 시 닫기 — 앵커(입력칸) 이동으로 위치 어긋남 방지.
+                //   단, 제안목록 자기 내부 스크롤은 무시(_onScrollClose) — 안 그러면 목록을 휠로 넘기는 순간 닫힌다.
                 window.addEventListener("resize", _close);
-                window.addEventListener("scroll", _close, true);
+                window.addEventListener("scroll", _onScrollClose, true);
             }
 
             oList.innerHTML = "";
@@ -307,7 +316,13 @@
             oInput.setAttribute("aria-expanded", "false");
             document.removeEventListener("mousedown", _onOutside);
             window.removeEventListener("resize", _close);
-            window.removeEventListener("scroll", _close, true);
+            window.removeEventListener("scroll", _onScrollClose, true);
+        }
+
+        // 제안목록 자기 내부 스크롤은 닫지 않음(바깥 앵커 이동만 닫기) — createSelect 와 동일 이유.
+        function _onScrollClose(ev) {
+            if (oList && (ev.target === oList || (oList.contains && oList.contains(ev.target)))) { return; }
+            _close();
         }
 
         function _select(idx) {

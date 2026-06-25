@@ -247,7 +247,6 @@
 
     // 헤더 — syntax(code) 아이콘 + "{TITLE} -- {OBJID}" + 닫기(X). 제목은 open 마다 갱신.
     var oHeader = _el("div", "u4a-dialog__header");
-    oHeader.setAttribute("data-type", "I");
     oHeader.innerHTML = _fa("code") + "<span></span>";
     var oHeaderTitle = oHeader.querySelector("span");
 
@@ -284,8 +283,9 @@
     oBody.appendChild(oFrame);
     oDlg.appendChild(oBody);
 
-    // 푸터 — 원본(UI5) 1:1: 왼쪽 "꾸밈정렬"(아이콘+텍스트) ···· 오른쪽 [Save 파랑][Delete 빨강][Close Reject](아이콘만).
-    //   원본 버튼 타입 매핑: Pretty=아이콘+텍스트(투명) / Save=Emphasized(파랑 채움) / Delete=Negative(빨강 채움) / Close=Reject(옅은 빨강).
+    // 푸터 — 왼쪽 줌[−][%][+] ···· 오른쪽 [꾸밈정렬][Save 파랑][Delete 빨강][Close Reject].
+    //   (Pretty 는 사용자 요청으로 우측 결정 그룹 앞으로 이동 — 아래 스페이서 뒤에서 append.)
+    //   버튼 타입: Pretty=아이콘+텍스트(투명) / Save=Emphasized(파랑 채움) / Delete=Negative(빨강 채움) / Close=Reject(옅은 빨강).
     //   편집모드 가시성(hidden)은 open 마다 갱신(여기선 생성만).
     var oFoot = _el("div", "u4a-dialog__footer u4aCliEdFoot");
 
@@ -295,17 +295,37 @@
     oPrettyBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "C25");   // Pretty Print(꾸밈정렬)
     oPrettyBtn.title = _txt("/U4A/CL_WS_COMMON", "C25") + " (Shift+F1)";   // 단축키 안내(에디터 한정)
     oPrettyBtn.addEventListener("click", function () { lf_toHost({ cmd: "format" }); });
-    oFoot.appendChild(oPrettyBtn);
+    // (append 는 스페이서 뒤 — 우측 결정 그룹 앞)
 
-    // 줌 표시/원복 — "NNN%" 상시 표시(처음부터 보여 발견성 확보). 클릭=폰트 줌 원복(Ctrl+0 동일).
-    //   편집/표시 모드 무관(읽기 중에도 줌 가능)이라 hidden 토글 안 함.
-    var oZoomBtn = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdZoom");
+    // 줌 컨트롤 — [−] [🔍 NNN%] [+] 한 묶음(브라우저/VS Code 줌과 동일 패턴, 상시 표시).
+    //   사용자가 Ctrl+휠을 몰라도 축소/확대/원복을 버튼으로 발견 가능. 편집/표시 모드 무관(읽기 중에도 줌).
+    var oZoomGrp = _el("div", "u4aCliEdZoom");
+
+    var oZoomOut = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdZoomStep");
+    oZoomOut.type = "button";
+    oZoomOut.innerHTML = _fa("minus");
+    oZoomOut.title = "Ctrl + Wheel ↓";   // 축소(단축키 안내 — 줌 전용 메시지 키 없음, 숫자/기호 표기)
+    oZoomOut.addEventListener("click", function () { lf_toHost({ cmd: "fontZoomOut" }); });
+    oZoomGrp.appendChild(oZoomOut);
+
+    var oZoomBtn = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdZoomPct");
     oZoomBtn.type = "button";
     oZoomBtn.innerHTML = _fa("magnifying-glass") + "<span>100%</span>";
-    oZoomBtn.addEventListener("click", function () { lf_toHost({ cmd: "fontZoomReset" }); });
-    oFoot.appendChild(oZoomBtn);
+    oZoomBtn.addEventListener("click", function () { lf_toHost({ cmd: "fontZoomReset" }); });   // 클릭=원복(Ctrl+0)
+    oZoomGrp.appendChild(oZoomBtn);
+
+    var oZoomIn = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdZoomStep");
+    oZoomIn.type = "button";
+    oZoomIn.innerHTML = _fa("plus");
+    oZoomIn.title = "Ctrl + Wheel ↑";   // 확대
+    oZoomIn.addEventListener("click", function () { lf_toHost({ cmd: "fontZoomIn" }); });
+    oZoomGrp.appendChild(oZoomIn);
+
+    oFoot.appendChild(oZoomGrp);
 
     oFoot.appendChild(_el("span", "u4aCliEdFootSpacer"));
+
+    oFoot.appendChild(oPrettyBtn);   // 꾸밈정렬 — 우측 결정 그룹(Save/Delete/Close) 앞으로 이동(사용자 요청)
 
     var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aCliEdIcoBtn");
     oSaveBtn.type = "button";
@@ -432,8 +452,10 @@
       // 꾸밈정렬 = 텍스트 전용(투명 버튼, 원본 sap.m.Button 기본 톤).
       ".u4aCliEdPretty { background: transparent; border-color: transparent; color: var(--sl-fg); }" +
       ".u4aCliEdPretty:hover { background: var(--sl-surface-2); }" +
-      // 줌 표시/원복 버튼 — Pretty 와 동일 투명 톤 + 숫자 폭 안정(tabular).
-      ".u4aCliEdZoom { font-variant-numeric: tabular-nums; gap: 0.375rem; }" +
+      // 줌 컨트롤 묶음 [−][%][+] — Pretty 와 동일 투명 톤. % 는 숫자 폭 안정(tabular), 스텝은 정사각 컴팩트.
+      ".u4aCliEdZoom { display: inline-flex; align-items: center; gap: 0.125rem; }" +
+      ".u4aCliEdZoomPct { font-variant-numeric: tabular-nums; gap: 0.375rem; }" +
+      ".u4aCliEdZoomStep { min-width: 1.9rem; padding: 0.4rem 0.5rem; justify-content: center; }" +
       // 아이콘 전용 결정 버튼 = 정사각 컴팩트(텍스트 패딩 제거).
       ".u4aCliEdIcoBtn { min-width: 2.25rem; padding: 0.4rem 0.6rem; justify-content: center; }" +
       // Delete = Negative(빨강 채움) — 원본 sap Negative. 색 단일 출처 = --error 토큰(하드코딩 없음).

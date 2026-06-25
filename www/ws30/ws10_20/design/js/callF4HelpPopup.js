@@ -616,7 +616,7 @@ oAPP.fn.callF4HelpPopup = function(I_SHLPNAME, I_SHLP_DEF, IT_SHLP, IT_FIELDDESC
   var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39", "", "", "", "");
 
   //~종료 버튼
-  var oClose = new sap.m.Button({icon:"sap-icon://cancel", text:l_txt, tooltip:l_txt, type:"Reject"});
+  var oClose = new sap.m.Button({icon:"sap-icon://cancel", tooltip:l_txt, type:"Reject"}); // X 아이콘만(텍스트 제거)
 
   //종료버튼 선택 이벤트.
   oClose.attachEvent("press", function(oEvent){
