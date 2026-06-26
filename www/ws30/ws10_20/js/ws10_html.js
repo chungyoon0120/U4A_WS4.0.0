@@ -848,6 +848,21 @@
             var w = _currWin(); if (!w) { return; }
             if (w.isMaximized()) { w.unmaximize(); } else { w.maximize(); }
         });
+        // 최대화 상태에 따라 아이콘/툴팁 토글(window-maximize ↔ window-restore). 원본은 sap byId 로
+        //   동기화했으나 HTML5 에선 DOM 버튼이라 maximize/unmaximize 네이티브 이벤트로 직접 갱신.
+        var oMaxBtn = o.querySelector('#maxWinBtn');
+        function _syncMaxIcon() {
+            if (!oMaxBtn) { return; }
+            var w = _currWin(); var bMax = false;
+            try { bMax = !!(w && w.isMaximized()); } catch (e) { }
+            oMaxBtn.innerHTML = bMax ? '<i class="fa-solid fa-window-restore"></i>' : '<i class="fa-solid fa-window-maximize"></i>';
+            oMaxBtn.title = bMax ? "Restore" : "Maximize";
+        }
+        try {
+            var wMax = _currWin();
+            if (wMax && wMax.on) { wMax.on("maximize", _syncMaxIcon); wMax.on("unmaximize", _syncMaxIcon); }
+        } catch (e) { }
+        _syncMaxIcon();
         o.querySelector('[data-action="close"]').addEventListener("click", function () {
             try { oAPP.attr = oAPP.attr || {}; oAPP.attr.isPressWindowClose = "X"; } catch (e) { }
             var w = _currWin(); if (w) { w.close(); }

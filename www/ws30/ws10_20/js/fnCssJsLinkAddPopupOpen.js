@@ -52,12 +52,12 @@
   function _randomKey() {
     try { return parent.getRandomKey(10); } catch (e) { return "K" + Math.round(performance.now() * 1000) + "_" + (oUI ? oUI.seq++ : 0); }
   }
-  // ZMSG_WS_COMMON_001 클래스 텍스트(원본 getWsMsgClsTxt). Workspace 언어 사용.
-  function _wsCommon(sCode) {
+  // ZMSG_WS_COMMON_001 클래스 텍스트(원본 getWsMsgClsTxt). Workspace 언어 사용. p1=&1 치환값(선택).
+  function _wsCommon(sCode, p1) {
     try {
       var sLangu = "";
       try { sLangu = (parent.getUserInfo() || {}).LANGU || ""; } catch (e) { }
-      return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sCode) || "";
+      return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sCode, p1 || "") || "";
     } catch (e) { return ""; }
   }
 
@@ -115,6 +115,19 @@
       var oPrev = oAPP.attr && oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
       if (oPrev && typeof oPrev.setCSSLink === "function") { oPrev.setCSSLink(aUrls, true); }
     } catch (e) { console.error("[HTML5][cssLink] 미리보기 반영 오류:", e && e.message); }
+  }
+
+  // 저장/전체삭제로 변경분 발생 → WS20 동기화(클라이언트 에디터 lf_cb 와 동일 3종):
+  //   ① getAppInfo().IS_CHAG 를 모델에 미러 — HTML5 에선 setAppInfo 가 byId("WSAPP") 가드로 모델 갱신을 스킵하므로 명시 동기.
+  //   ② fnRenderWs20AttrRows — 속성 패널 행 재렌더(_isChangedRow 재평가 → CSS/JS Link Add 행 변경배경 동기화. ★링크 추가/전체삭제 둘 다).
+  //   ③ fnUpdateWs20AppHeader — 상단 헤더 Active→Inactive.
+  function lf_syncWs20Changed() {
+    try {
+      var oInfo = parent.getAppInfo && parent.getAppInfo();
+      if (oInfo) { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", oInfo.IS_CHAG || ""); }
+    } catch (e) { }
+    try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+    try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
   }
 
   // ── 테이블 본문 렌더(aRows 기준) ─────────────────────────────────────
@@ -191,6 +204,13 @@
     lf_syncHeadChk();
   }
 
+  // 공통 토스트(셸 showMessage KIND 10) — _u4aToast 가 열린 최상위 모달 <dialog> 안(top-layer)에
+  //   자동 배치하므로 모달 위/메인 위 모두 보인다. sType: S(성공)/W(경고)/E(오류)/I(정보).
+  function lf_msg(sType, sText) {
+    if (!sText) { return; }
+    try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { }
+  }
+
   // 헤더 전체선택 체크박스 상태 동기화(전체/부분/없음).
   function lf_syncHeadChk() {
     if (!oUI || !oUI.headChk) { return; }
@@ -218,11 +238,23 @@
   function lf_delSelected() {
     var aChk = oUI.tbody.querySelectorAll(".u4aCslRowChk");
     var oDel = {};
-    var bAny = false;
-    aChk.forEach(function (c) { if (c.checked) { oDel[c.getAttribute("data-key")] = true; bAny = true; } });
-    if (!bAny) { return; }   // 선택 없음 — 원본 동일(무시).
-    oState.rows = oState.rows.filter(function (r) { return !oDel[r.KEY]; });
-    lf_renderRows();
+    var iCnt = 0;
+    aChk.forEach(function (c) { if (c.checked) { oDel[c.getAttribute("data-key")] = true; iCnt++; } });
+    if (iCnt === 0) { lf_msg("W", _wsCommon("240")); return; }   // 선택 없음 → "선택된 항목이 없습니다."(240).
+
+    // 삭제 확인(632 "선택한 &1개의 라인을 삭제 하시겠습니까?" &1=건수) — Yes 일 때만 삭제.
+    var sConfirm = _wsCommon("632", String(iCnt));
+    try {
+      parent.showMessage(null, 30, "W", sConfirm, function (sAct) {
+        if (sAct !== "YES") { return; }
+        oState.rows = oState.rows.filter(function (r) { return !oDel[r.KEY]; });
+        lf_renderRows();
+      });
+    } catch (e) {
+      // showMessage 불가 시 폴백 — 바로 삭제(원본 동작).
+      oState.rows = oState.rows.filter(function (r) { return !oDel[r.KEY]; });
+      lf_renderRows();
+    }
   }
 
   // ── 저장(원본 fnCssLinkSave / fnJsLinkSave 1:1) ──────────────────────
@@ -236,9 +268,9 @@
       if (oState.type === C_JS) { oAPP.DATA.APPDATA.T_JSLK = []; }
       else { oAPP.DATA.APPDATA.T_CSLK = []; lf_reflectCssPreview([]); }
       try { parent.setAppChange("X"); } catch (e) { }
-      // 변경분 발생 → WS20 헤더 Active→Inactive 반영(에디터 시리즈/오류페이지 저장과 동일 처리).
-      try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+      lf_syncWs20Changed();   // IS_CHAG 미러 + 속성행 변경배경 + 헤더 Active→Inactive.
       lf_close(true);
+      lf_msg("S", _txt("/U4A/MSG_WS", "002"));   // Saved success(전체삭제 저장 포함).
       lf_publishCallback("CANCEL", []);
       return;
     }
@@ -265,6 +297,7 @@
 
     if (bErr) {
       if (oFirstErr && oFirstErr.focus) { try { oFirstErr.focus(); } catch (e) { } }
+      lf_msg("W", sErrTxt);   // 빨간 보더(value-state)와 함께 사유 안내(모달 위 토스트). MSG_WS 014 = & 는 필수 입력값.
       return;   // 다이얼로그 유지.
     }
 
@@ -275,8 +308,10 @@
       lf_reflectCssPreview(aUrls);
     }
     try { parent.setAppChange("X"); } catch (e) { }
+    lf_syncWs20Changed();   // IS_CHAG 미러 + 속성행 변경배경 + 헤더 Active→Inactive.
 
     lf_close(true);
+    lf_msg("S", _txt("/U4A/MSG_WS", "002"));   // Saved success(저장하였습니다) — 닫힌 뒤 메인 위 토스트.
     lf_publishCallback("SAVE", aSaveData);
   }
 
@@ -321,19 +356,19 @@
     var oBody = _el("div", "u4a-dialog__body u4aCslBody");
 
     var oToolbar = _el("div", "u4aCslToolbar");
-    // 의미색(아웃라인) — Add=accent 파랑(생성) / Del=negative 빨강(삭제) / MIME=중립. 솔리드 채움은 푸터 Save 만.
-    var oAddBtn = _el("button", "u4a-btn u4aCslToolBtn u4aCslAdd");
+    // 아이콘 전용 + 의미색(아웃라인) — Add=accent 파랑(생성) / Del=negative 빨강(삭제) / MIME=중립. 이름은 툴팁.
+    var oAddBtn = _el("button", "u4a-btn u4aCslToolBtn u4aCslIcoBtn u4aCslAdd");
     oAddBtn.type = "button";
-    oAddBtn.innerHTML = _fa("file-circle-plus") + "<span></span>";
+    oAddBtn.innerHTML = _fa("file-circle-plus");   // 툴팁(title)은 open 마다 "{TYPE} Link Add" 로 갱신.
     oAddBtn.addEventListener("click", function () { lf_addRow(); });
-    var oDelBtn = _el("button", "u4a-btn u4aCslToolBtn u4a-btn--negative");
+    var oDelBtn = _el("button", "u4a-btn u4aCslToolBtn u4aCslIcoBtn u4a-btn--negative");
     oDelBtn.type = "button";
-    oDelBtn.innerHTML = _fa("trash") + "<span></span>";
+    oDelBtn.innerHTML = _fa("trash");
     oDelBtn.addEventListener("click", function () { lf_delSelected(); });
     var oMimeBtn = _el("button", "u4a-btn u4aCslToolBtn u4aCslMime");
     oMimeBtn.type = "button";
     oMimeBtn.innerHTML = _fa("image") + "<span></span>";
-    oMimeBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A10");   // MIME Repository
+    oMimeBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A10");   // MIME Repository — 텍스트 유지(아이콘 전용은 Add/Del 만, 사용자 지시).
     oMimeBtn.addEventListener("click", function () { try { oAPP.fn.fnMimeDialogOpener(); } catch (e) { } });
     oToolbar.appendChild(oAddBtn);
     oToolbar.appendChild(oDelBtn);
@@ -444,22 +479,19 @@
 
     var bEdit = _isEdit();
 
-    // 헤더 제목(APPID · Change/Display · Active/Inactive).
-    var oApp = _appInfo();
-    var sMode = (oApp.IS_EDIT === "X") ? _txt("/U4A/CL_WS_COMMON", "A02") : _txt("/U4A/CL_WS_COMMON", "A05");   // Change / Display
-    var sAct = (oApp.ACTST === "A") ? _txt("/U4A/CL_WS_COMMON", "B66") : _txt("/U4A/CL_WS_COMMON", "B67");      // Activate / Inactivate
-    oUI.headerTitle.textContent = [(oApp.APPID || ""), sMode, sAct].filter(Boolean).join("   ·   ");
-
-    // 컬럼 헤더 "{TYPE} Link MIME URL".
+    // 헤더 제목 = 기능명만(CSS Link / JS Link). APPID·모드·상태는 이미 그 앱 안에서 연 모달이라
+    //   뒤 메인 창 헤더와 전부 중복 → 생략(팝업 식별엔 기능명만 있으면 충분).
     var sLinkTxt = _txt("/U4A/CL_WS_COMMON", (TYPE === C_JS) ? "D50" : "D49");   // JS Link / CSS Link
-    var sMimeUrl = _txt("/U4A/CL_WS_COMMON", "D51");                            // MIME URL
-    oUI.colTxtTh.textContent = (sLinkTxt + " " + sMimeUrl).trim();
+    oUI.headerTitle.textContent = sLinkTxt;
 
-    // 툴바 버튼 텍스트 "{TYPE} Link Add/Del".
+    // 컬럼 헤더 = "MIME URL" 만 (팝업 제목이 이미 CSS/JS Link 라 접두 중복 제거).
+    oUI.colTxtTh.textContent = _txt("/U4A/CL_WS_COMMON", "D51");   // MIME URL
+
+    // 툴바 버튼 = 아이콘 전용(텍스트 제거) → "{TYPE} Link Add/Del" 는 툴팁으로(발견성 유지).
     var sAdd = _txt("/U4A/CL_WS_COMMON", "C98");   // Add
     var sDel = _txt("/U4A/CL_WS_COMMON", "D52");   // Del
-    oUI.addBtn.querySelector("span").textContent = (sLinkTxt + " " + sAdd).trim();
-    oUI.delBtn.querySelector("span").textContent = (sLinkTxt + " " + sDel).trim();
+    oUI.addBtn.title = (sLinkTxt + " " + sAdd).trim();
+    oUI.delBtn.title = (sLinkTxt + " " + sDel).trim();
 
     // 편집모드 — 툴바/Save 노출(원본 visible=/WS20/APP/IS_EDIT).
     oUI.toolbar.hidden = !bEdit;

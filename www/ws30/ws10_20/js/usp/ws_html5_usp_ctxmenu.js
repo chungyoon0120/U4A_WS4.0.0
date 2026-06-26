@@ -139,14 +139,24 @@
             bAny = true;
         });
 
-        // 화면 밖으로 넘치지 않게 클램프(먼저 숨겨 측정 → 위치 확정).
+        // 화면 밖으로 넘치지 않게 위치 확정(먼저 숨겨 측정).
         oWrap.style.visibility = "hidden";
         document.body.appendChild(oWrap);
         var iW = oWrap.offsetWidth, iH = oWrap.offsetHeight;
-        var iLeft = Math.min(iX, window.innerWidth - iW - 4);
-        var iTop = Math.min(iY, window.innerHeight - iH - 4);
+        var iVw = window.innerWidth, iVh = window.innerHeight;
+
+        // 가로: 우측 공간 부족하면 커서 왼쪽으로
+        var iLeft = (iX + iW + 4 <= iVw) ? iX : (iX - iW);
         if (iLeft < 4) { iLeft = 4; }
+
+        // 세로: 아래 공간이 충분하면 커서 아래로(기본), 부족하면 커서 위쪽으로 펼친다(메뉴 하단=커서).
+        //   화면 하단 근처에서 우클릭 시 메뉴가 잘리지 않고 위로 올라오게 — 표준 컨텍스트 메뉴 동작.
+        var iTop;
+        if (iY + iH + 4 <= iVh) { iTop = iY; }       // 아래로 펼침
+        else { iTop = iY - iH; }                      // 위로 펼침
         if (iTop < 4) { iTop = 4; }
+        if (iTop + iH + 4 > iVh) { iTop = Math.max(4, iVh - iH - 4); }   // 위/아래 모두 부족(작은 화면) 클램프
+
         oWrap.style.left = iLeft + "px";
         oWrap.style.top = iTop + "px";
         oWrap.style.visibility = "";
@@ -202,11 +212,15 @@
         if (!oNode) { return; }
         var IS_CHAG = (APPCOMMON.fnGetModelProperty("/WS30/APP") || {}).IS_CHAG;
         if (IS_CHAG === "X") {
+            // 변경분 있음(119) — YES: 저장 후 생성팝업 / NO: 변경 버리고 바로 생성팝업 / CANCEL: 취소 (원본 _fnCreateUspAppChangeMsgCB)
             var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "119");
             try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
             oAPP.common.fnConfirmBox("W", sMsg, function (act) {
                 if (act === "YES") {
                     oAPP.fn.fnSaveUspWs30({ AFPRC: "C", _createNode: oNode });
+                } else if (act === "NO") {
+                    try { if (oAPP.fn.fnUspSaveCancel) { oAPP.fn.fnUspSaveCancel(); } } catch (e) { }
+                    if (oAPP.fn.fnCreateUspNodePopup) { oAPP.fn.fnCreateUspNodePopup(oNode); }
                 } else {
                     try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
                 }
@@ -218,6 +232,69 @@
             return;
         }
         if (oAPP.fn.fnCreateUspNodePopup) { oAPP.fn.fnCreateUspNodePopup(oNode); }
+    };
+
+    /************************************************************************
+     * K4 Delete — 노드(+자손) 삭제. confirm(msg 003) → /usp_page_del.
+     *   (원본 fnDeleteUspNode 는 변경분 선저장 없이 바로 확인 — Create 와 달리 C 분기 없음)
+     ************************************************************************/
+    oAPP.usphtml.uspCtxAction["K4"] = function (oNode) {
+        if (!oNode) { return; }
+        // " [ 이름 ] " + "정말 삭제하시겠습니까?"(003)
+        var sMsg = " [ " + (oNode.OBDEC || "") + " ] " + APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "003");
+        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+        oAPP.common.fnConfirmBox("W", sMsg, function (act) {
+            if (act === "YES") {
+                if (oAPP.fn.fnDeleteUspNode) { oAPP.fn.fnDeleteUspNode(oNode); }
+            } else {
+                try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
+            }
+        }, [
+            { act: "YES", label: "Yes", emphasized: true },
+            { act: "NO",  label: "No" }
+        ]);
+    };
+
+    /************************************************************************
+     * K7 Rename — 이름 변경. 변경분 있으면 선저장(AFPRC="RN") 후 팝업 / 없으면 바로 팝업.
+     ************************************************************************/
+    oAPP.usphtml.uspCtxAction["K7"] = function (oNode) {
+        if (!oNode) { return; }
+        var IS_CHAG = (APPCOMMON.fnGetModelProperty("/WS30/APP") || {}).IS_CHAG;
+        if (IS_CHAG === "X") {
+            // 변경분 있음(119) — YES: 저장 후 Rename팝업 / NO: 변경 버리고 바로 Rename팝업 / CANCEL: 취소 (원본 _fnRenameUspAppChangeMsgCB)
+            var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "119");
+            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+            oAPP.common.fnConfirmBox("W", sMsg, function (act) {
+                if (act === "YES") {
+                    oAPP.fn.fnSaveUspWs30({ AFPRC: "RN", _renameNode: oNode });
+                } else if (act === "NO") {
+                    try { if (oAPP.fn.fnUspSaveCancel) { oAPP.fn.fnUspSaveCancel(); } } catch (e) { }
+                    if (oAPP.fn.fnRenameUspNodePopup) { oAPP.fn.fnRenameUspNodePopup(oNode); }
+                } else {
+                    try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
+                }
+            }, [
+                { act: "YES", label: "Yes", emphasized: true },
+                { act: "NO",  label: "No" },
+                { act: "CANCEL", label: "Cancel" }
+            ]);
+            return;
+        }
+        if (oAPP.fn.fnRenameUspNodePopup) { oAPP.fn.fnRenameUspNodePopup(oNode); }
+    };
+
+    /************************************************************************
+     * K8 Up / K9 Down / K10 Move Position — 노드 이동(형제 순서 변경). 변경분 저장 불필요(클라 모델만).
+     ************************************************************************/
+    oAPP.usphtml.uspCtxAction["K8"] = function (oNode) {
+        if (oNode && oAPP.fn.fnUspTreeNodeMoveUp) { oAPP.fn.fnUspTreeNodeMoveUp(oNode); }
+    };
+    oAPP.usphtml.uspCtxAction["K9"] = function (oNode) {
+        if (oNode && oAPP.fn.fnUspTreeNodeMoveDown) { oAPP.fn.fnUspTreeNodeMoveDown(oNode); }
+    };
+    oAPP.usphtml.uspCtxAction["K10"] = function (oNode) {
+        if (oNode && oAPP.fn.fnUspTreeNodeMovePosition) { oAPP.fn.fnUspTreeNodeMovePosition(oNode); }
     };
 
 })(window, jQuery, oAPP);

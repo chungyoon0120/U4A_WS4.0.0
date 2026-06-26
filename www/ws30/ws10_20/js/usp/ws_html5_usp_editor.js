@@ -65,14 +65,54 @@
         var bRoot = (oData.PUJKY === "" || oData.PUJKY == null);
         var bFolder = (oData.ISFLD === "X");
         if (!(bEdit && !bRoot && !bFolder)) { return; }
+
+        // 메인 에디터(EDITOR_MAIN)만 커서를 보존한다(좌측 FRAME1 은 0px 숨김+커서 1행이라 건드리면 튄다).
+        //   ★ 핵심: 정리 안 된 코드를 포맷하면 줄이 재배치돼 "절대 위치(viewState/줄번호)"가 무효가 된다
+        //     → restoreViewState 가 1행으로 떨어진다. 그래서 절대 위치 대신 "커서가 있던 줄의 텍스트"를
+        //     기억해, 포맷 후 동일 텍스트(공백 정규화)를 가진 줄로 커서를 옮긴다(코드가 위로 당겨져도 따라감).
+        var oMainIfr = document.querySelector("#uspEditorHost iframe.EDITOR_MAIN");
+        var edMain = (oMainIfr && oMainIfr.contentWindow && oMainIfr.contentWindow.editor) || null;
+        var sAnchor = "";   // 커서 줄 텍스트(공백 압축) — 포맷 후 추적 기준
+        try {
+            if (edMain) {
+                var oPos = edMain.getPosition();
+                var sLine = edMain.getModel().getLineContent(oPos.lineNumber);
+                // 공백 전부 제거 후 비교 — 포맷이 들여쓰기뿐 아니라 연산자 주위 공백(aa=1 → aa = 1)도
+                //   바꾸므로, \s+ 압축으로는 매칭 실패한다. 공백 무시해야 같은 줄로 인식된다.
+                sAnchor = (sLine || "").replace(/\s/g, "");
+            }
+        } catch (e0) { }
+
+        var pMain = null;
         ["EDITOR_FRAME1", "EDITOR_FRAME2"].forEach(function (cls) {
             try {
                 var ifr = document.querySelector("." + cls);
-                if (ifr && ifr.contentWindow && ifr.contentWindow.editor) {
-                    ifr.contentWindow.editor.getAction("editor.action.formatDocument").run();
-                }
+                if (!ifr || !ifr.contentWindow || !ifr.contentWindow.editor) { return; }
+                var ed = ifr.contentWindow.editor;
+                var p = ed.getAction("editor.action.formatDocument").run();
+                if (ed === edMain) { pMain = p; }
             } catch (e) { console.error("[HTML5][WS30] prettyPrint error:", e); }
         });
+
+        if (edMain) {
+            var _restore = function () {
+                try {
+                    if (sAnchor) {
+                        var oModel = edMain.getModel(), iLc = oModel.getLineCount(), iTarget = -1;
+                        for (var ln = 1; ln <= iLc; ln++) {
+                            if (oModel.getLineContent(ln).replace(/\s/g, "") === sAnchor) { iTarget = ln; break; }
+                        }
+                        if (iTarget > 0) {
+                            edMain.setPosition({ lineNumber: iTarget, column: oModel.getLineMaxColumn(iTarget) });
+                            edMain.revealLineInCenterIfOutsideViewport(iTarget);
+                        }
+                    }
+                } catch (e1) { }
+                try { edMain.focus(); } catch (e2) { }
+            };
+            if (pMain && typeof pMain.then === "function") { pMain.then(_restore, _restore); }
+            else { _restore(); }
+        }
     }
     // [PUBLIC] Pretty Print — 셸의 Shift+F1 단축키가 호출(에디터 toolbar 버튼과 동일 동작).
     oAPP.usphtml.editorPrettyPrint = _prettyPrint;

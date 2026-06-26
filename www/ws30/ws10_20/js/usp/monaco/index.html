@@ -191,10 +191,19 @@
 
             oAPP.MESSAGE_CHANEL_PORT.onmessage = (oEvent) => {
 
+                // 같은 값이면 setValue 를 호출하지 않는다. setValue 는 값이 동일해도 모델을 flush(ContentFlush)해
+                //   커서를 1행으로 리셋한다. 두 에디터가 양방향 동기화라 Pretty Print(양쪽 같은 값)나 일반 편집
+                //   동기화 때마다 커서가 최상단으로 튀던 원인. (값이 같으면 반영할 게 없으므로 그냥 무시)
+                if (editor.getValue() === oEvent.data) { return; }
+
                 // 외부에서 에디터 데이터 정보를 업데이트 했다는 플래그를 설정한다.
                 editor.bExternalUpdated = true;
 
+                // 다른 값(실제 외부 갱신)일 때만 반영 — 커서 위치는 보존(setValue 가 1행으로 보내므로 복원).
+                var oKeepPos = null;
+                try { oKeepPos = editor.getPosition(); } catch (e) { }
                 editor.setValue(oEvent.data);
+                try { if (oKeepPos) { editor.setPosition(oKeepPos); } } catch (e) { }
 
             };
 

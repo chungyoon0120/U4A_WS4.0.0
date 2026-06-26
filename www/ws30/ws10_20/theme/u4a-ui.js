@@ -493,15 +493,38 @@
             _items().forEach(function (el) {
                 if (!el.hidden || fnIsSep(el)) { return; } // 오버플로로 숨겨진 "버튼"만
                 const mi = fnMenuItem(el);
-                const oItem = _el("div", "u4a-menu__item");
-                oItem.setAttribute("role", "menuitem");
-                oItem.innerHTML = (mi.iconHtml || "<i></i>") + '<span class="u4a-menu__item-text"></span>';
-                oItem.querySelector(".u4a-menu__item-text").textContent = mi.text;
-                oItem.addEventListener("click", function (e) {
-                    e.stopPropagation(); _closeMenu();
-                    if (typeof mi.onClick === "function") { mi.onClick(); }
+                // menuItem 은 단일 객체 또는 객체 배열을 반환할 수 있다 — 버튼 1개를 여러 메뉴
+                //   항목으로 분해(예: range 슬라이더 → "Zoom Out / Zoom In")할 때 배열 사용.
+                const aMi = Array.isArray(mi) ? mi : [mi];
+                aMi.forEach(function (one) {
+                    if (!one) { return; }
+                    // 커스텀 노드(예: range 슬라이더) — 아이콘+텍스트 대신 노드를 그대로 배치한다.
+                    //   조작용이라 hover 강조/클릭-닫기 없음(메뉴 내부 클릭은 outside-close 에 안 잡힘).
+                    if (one.node) {
+                        const oCustom = _el("div", "u4a-menu__item u4a-menu__item--custom");
+                        oCustom.appendChild(one.node);
+                        oMenu.appendChild(oCustom);
+                        return;
+                    }
+                    // 비활성 상태: 항목이 명시(one.disabled)하면 그것을, 없으면 원본 버튼 상태를
+                    //   자동 감지(disabled / .is-disabled). 메뉴 항목에 aria-disabled 를 붙여 흐리게
+                    //   표시(shell.css)하고 클릭을 무시한다 — 툴바에서 비활성인 버튼이 ⋯ 메뉴에선
+                    //   활성처럼 보이던 버그 방지(공통 1곳 수정으로 전 소비처 적용).
+                    let bDis = one.disabled;
+                    if (bDis === undefined) { bDis = el.disabled === true || el.classList.contains("is-disabled"); }
+                    const oItem = _el("div", "u4a-menu__item");
+                    oItem.setAttribute("role", "menuitem");
+                    if (bDis) { oItem.setAttribute("aria-disabled", "true"); }
+                    oItem.innerHTML = (one.iconHtml || "<i></i>") + '<span class="u4a-menu__item-text"></span>';
+                    oItem.querySelector(".u4a-menu__item-text").textContent = one.text;
+                    oItem.addEventListener("click", function (e) {
+                        e.stopPropagation();
+                        if (bDis) { return; }   // 비활성 항목은 클릭 무시(메뉴 유지)
+                        _closeMenu();
+                        if (typeof one.onClick === "function") { one.onClick(); }
+                    });
+                    oMenu.appendChild(oItem);
                 });
-                oMenu.appendChild(oItem);
             });
             (oBar.closest("dialog") || document.body).appendChild(oMenu);
             const r = oOvf.getBoundingClientRect();

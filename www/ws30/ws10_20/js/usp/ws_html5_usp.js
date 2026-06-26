@@ -791,6 +791,16 @@
             try { if (oAPP.fn.fnCreateUspNodePopup) { oAPP.fn.fnCreateUspNodePopup(oParams._createNode); } } catch (e) { }
             return;
         }
+        if (oParams.AFPRC === "_RN") {
+            // Rename 저장 성공 → 변경 평면트리 반영 + 우측/팝업 후처리
+            _fnRenameApply(oParams);
+            return;
+        }
+        if (oParams.AFPRC === "RN") {
+            // 변경 저장 완료 → Rename 팝업 오픈
+            try { if (oAPP.fn.fnRenameUspNodePopup) { oAPP.fn.fnRenameUspNodePopup(oParams._renameNode); } } catch (e) { }
+            return;
+        }
 
         _uspRefreshAfterMode();
         oAPP.common.fnSetBusyLock("");
@@ -815,32 +825,44 @@
      * K3 Create 팝업 + 서버 저장 (구 fnCreateUspNodePopup · ev_createUspNodeAcceptEvent · _fnCreateUspNode)
      ************************************************************************/
 
-    // 이름 입력값 검증 (구 _fnCheckCreateNodeData 1:1)
+    // 이름 입력값 검증 (구 _fnCheckCreateNodeData 재설계)
+    //   원본은 "첫 글자 영문 강제 + 영문/숫자/언더바만" 이라 1.js, main-test.js 같은 정상
+    //   파일명까지 거부했다. 실제 가능한 파일명 조합을 허용하도록 화이트리스트로 변경:
+    //   허용 문자 = 영문/숫자/. _ -  (그 외 공백·경로문자·OS 금지문자는 전부 거부)
     function _fnCheckCreateNodeData(oCrData) {
         var oCheck = {};
         var sName = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C11");
         var sReq  = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "050", sName);
+
+        // 1) 필수 입력
         if (!oCrData || !oCrData.NAME) { oCheck.RETCD = "E"; oCheck.RTMSG = sReq; return oCheck; }
+        var sNm = String(oCrData.NAME);
         try {
-            if (parent.isEmpty(oCrData.NAME) === true || parent.isBlank(oCrData.NAME) === true) {
+            if (parent.isEmpty(sNm) === true || parent.isBlank(sNm) === true) {
                 oCheck.RETCD = "E"; oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "358"); return oCheck;
             }
         } catch (e) { }
-        if (/[\s]/gi.test(oCrData.NAME)) {
+
+        // 2) 공백 불가
+        if (/\s/.test(sNm)) {
             oCheck.RETCD = "E"; oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "358"); return oCheck;
         }
-        if (/[\{\}\[\]\/?,;:|\)*~`!^\-+<>@\#$%&\\\=\(\'\"]/gi.test(oCrData.NAME)) {
+
+        // 3) 허용 문자(영문/숫자/. _ -)만 — 그 외 특수문자·경로구분자(\ / : * ? " < > |)는 전부 거부
+        if (!/^[A-Za-z0-9._-]+$/.test(sNm)) {
             oCheck.RETCD = "E"; oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "359"); return oCheck;
         }
-        if (!/^[a-zA-Z]|^[a-zA-Z]+[a-z0-9A-Z|_]/.test(oCrData.NAME)) {
-            oCheck.RETCD = "E";
-            oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "362") + " \n " +
-                           APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "361");
-            return oCheck;
-        }
-        if (oCrData.ISFLD === true && /[.]/gi.test(oCrData.NAME)) {
+
+        // 4) 점(.)으로만 이루어진 이름(., .., ...)은 불가
+        if (/^\.+$/.test(sNm)) {
             oCheck.RETCD = "E"; oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "359"); return oCheck;
         }
+
+        // 5) 폴더는 점(.) 불가 (확장자 개념 없음 — 원본 규칙 유지)
+        if (oCrData.ISFLD === true && /[.]/.test(sNm)) {
+            oCheck.RETCD = "E"; oCheck.RTMSG = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "359"); return oCheck;
+        }
+
         oCheck.RETCD = "S"; return oCheck;
     }
 
@@ -1089,6 +1111,434 @@
         // 신규 행 선택 → ajax + 우측 페이지(선택 콜백이 busy 해제)
         try { if (oAPP.fn.fnUspTreeTableRowSelect) { oAPP.fn.fnUspTreeTableRowSelect(oNewRow); } } catch (e) { }
     }
+
+    /************************************************************************
+     * K4 Delete (구 fnDeleteUspNode · _fnDeleteUspNodeCb · _fnDeleteUspNodeSuccessCb)
+     *   confirm(msg 003) → /usp_page_del (T_TREE=노드+자손 평면) → 트리에서 제거.
+     ************************************************************************/
+    oAPP.fn.fnDeleteUspNode = function (oNode) {
+        if (!oNode) { oAPP.common.fnSetBusyLock(""); return; }
+        oAPP.common.fnSetBusyLock("X");
+
+        var oAppData = _model("/WS30/APP") || {};
+        var aDel = _parseTree2Tab($.extend(true, [], [oNode]), "USPTREE");   // 노드 + 자손 평면
+        var oSend = {
+            APPID: oAppData.APPID,
+            TRKORR: oAppData.REQNO || "",
+            T_TREE: aDel,
+            TU4A0010: oAppData
+        };
+        var oFd = new FormData();
+        oFd.append("APPDATA", JSON.stringify(oSend));
+        sendAjax(parent.getServerPath() + "/usp_page_del", oFd, _fnDeleteCb.bind({ _node: oNode }));
+    };
+
+    function _fnDeleteCb(oResult) {
+        var oP = this || {};
+        if (typeof oResult !== "object" || oResult == null) {
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { oAPP.fn.fnCriticalErrorWs30({ RTMSG: "[usp_page_del] JSON Parse Error" }); } catch (e) { }
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+        if (oResult.RETCD === "Z") {
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { oAPP.fn.fnCriticalErrorWs30(oResult); } catch (e) { }
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+        if (oResult.RETCD === "E") {
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { parent.CURRWIN.flashFrame(true); } catch (e) { }
+            if (oResult.SCRIPT) { _uspEvalScript(oResult.SCRIPT); oAPP.common.fnSetBusyLock(""); return; }
+            oAPP.common.fnShowFloatingFooterMsg("E", "WS30", oResult.RTMSG);
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+        // 성공
+        if (oResult.SCRIPT) { _uspEvalScript(oResult.SCRIPT); }
+        else { oAPP.common.fnShowFloatingFooterMsg("S", "WS30", oResult.RTMSG); }
+        try { parent.setSoundMsg("01"); } catch (e) { }
+        _fnRemoveNodeFromTree(oP._node);
+        oAPP.common.fnSetBusyLock("");
+    }
+
+    // 모델 트리에서 노드(+자손) 제거 + 우측이 삭제대상이면 인트로(USP10)로 (구 splice + fnOnMoveToPage)
+    function _fnRemoveNodeFromTree(oNode) {
+        if (!oNode) { return; }
+        var aTree = _model("/WS30/USPTREE") || [];
+        var oCur = _model("/WS30/USPDATA") || {};
+        // 삭제 대상(자손 포함)에 현재 우측 콘텐츠가 들어있는지
+        var aDelFlat = _parseTree2Tab($.extend(true, [], [oNode]), "USPTREE");
+        var bCurDeleted = !!(oCur && oCur.OBJKY && aDelFlat.some(function (n) { return n && n.OBJKY === oCur.OBJKY; }));
+
+        (function rec(arr) {
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i] === oNode || (arr[i] && arr[i].OBJKY === oNode.OBJKY)) { arr.splice(i, 1); return true; }
+                if (arr[i] && Array.isArray(arr[i].USPTREE) && rec(arr[i].USPTREE)) { return true; }
+            }
+            return false;
+        })(aTree);
+
+        APPCOMMON.fnSetModelProperty("/WS30/USPTREE", aTree);
+        try { if (oAPP.fn.fnRenderUspTree) { oAPP.fn.fnRenderUspTree(); } } catch (e) { }
+        // ★ 선택은 "삭제 대상이 우측에 열려 있던 것일 때만" 해제한다. 다른 노드를 삭제하면 현재 선택은
+        //   그대로 유지돼야 한다(삭제와 선택은 별개). 남은 선택 노드는 ISSEL 이 살아 있어 fnRenderUspTree 가
+        //   자동 재강조한다. (무조건 fnOnUspTreeUnSelect 호출하던 게 다른 노드 삭제 시에도 선택을 풀던 원인)
+        if (bCurDeleted) {
+            try { if (oAPP.fn.fnOnUspTreeUnSelect) { oAPP.fn.fnOnUspTreeUnSelect(); } } catch (e) { }
+            try { oAPP.fn.setAppChangeWs30(""); } catch (e) { }
+            try { if (oAPP.fn.fnUspNavTo) { oAPP.fn.fnUspNavTo("USP10"); } } catch (e) { }   // 인트로로
+        }
+    }
+
+    /************************************************************************
+     * K7 Rename (구 fnRenameUspNodePopup · fnRenameSubmit · fnRenameUspNode)
+     ************************************************************************/
+    function _rnTitle() {
+        return APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D44");   // Rename
+    }
+
+    // 읽기전용 표시 행 (URL / Old Name) — 공통 .u4a-form__row + readonly .u4a-input
+    function _roRow(sLabel, sValue) {
+        var oRow = document.createElement("div"); oRow.className = "u4a-form__row";
+        var oLab = document.createElement("label"); oLab.className = "u4a-label"; oLab.textContent = sLabel;
+        var oInp = document.createElement("input"); oInp.className = "u4a-input"; oInp.readOnly = true; oInp.value = (sValue == null ? "" : sValue);
+        oRow.appendChild(oLab); oRow.appendChild(oInp);
+        return oRow;
+    }
+
+    oAPP.fn.fnRenameUspNodePopup = function (oNode) {
+        if (!oNode) { oAPP.common.fnSetBusyLock(""); return; }
+
+        var oOld = document.getElementById("uspRnNodePopup");
+        if (oOld) { try { oOld.close(); } catch (e) { } try { oOld.remove(); } catch (e) { } }
+
+        var sLblUrl  = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C18");  // URL
+        var sLblOld  = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D92");  // Old Name
+        var sLblFold = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C19");  // Is Folder?
+        var sLblNew  = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D93");  // New Name
+
+        var oDlg = document.createElement("dialog");
+        oDlg.id = "uspRnNodePopup";
+        oDlg.className = "u4a-dialog";
+        oDlg.style.cssText = "width:min(92vw,460px);padding:0;display:flex;flex-direction:column";
+        oDlg.__uspRnNode = oNode;
+
+        var oHeader = document.createElement("div");
+        oHeader.className = "u4a-dialog__header";
+        oHeader.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i><span class="u4aUspRnTitle"></span>';
+        var oX = document.createElement("button");
+        oX.type = "button"; oX.className = "u4a-btn-icon"; oX.setAttribute("aria-label", "Close");
+        oX.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
+        oX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        oHeader.appendChild(oX);
+        oDlg.appendChild(oHeader);
+        oDlg.querySelector(".u4aUspRnTitle").textContent = _rnTitle();
+
+        var oBody = document.createElement("div");
+        oBody.className = "u4a-dialog__body";
+        oBody.style.cssText = "flex:1 1 auto;display:flex;flex-direction:column;padding:1.25rem 1.25rem 1.75rem;overflow:visible";
+        var oForm = document.createElement("div"); oForm.className = "u4a-form";
+
+        oForm.appendChild(_roRow(sLblUrl, oNode.SPATH || ""));
+        oForm.appendChild(_roRow(sLblOld, oNode.OBDEC || ""));
+
+        // 폴더 여부(읽기전용 체크박스)
+        var oRFld = document.createElement("div"); oRFld.className = "u4a-form__row";
+        var oFldLab = document.createElement("label"); oFldLab.className = "u4a-check";
+        var oFldChk = document.createElement("input"); oFldChk.type = "checkbox"; oFldChk.disabled = true; oFldChk.checked = (oNode.ISFLD === "X");
+        var oFldTxt = document.createElement("span"); oFldTxt.textContent = sLblFold;
+        oFldLab.appendChild(oFldChk); oFldLab.appendChild(oFldTxt);
+        oRFld.appendChild(oFldLab);
+        oForm.appendChild(oRFld);
+
+        // 새 이름 (필수, clear + value-state) — Create 의 _crRow 재사용
+        var oRNew = _crRow(sLblNew, true);
+        oForm.appendChild(oRNew.row);
+
+        oBody.appendChild(oForm);
+        oDlg.appendChild(oBody);
+
+        var oFoot = document.createElement("div");
+        oFoot.className = "u4a-dialog__footer";
+        var oOk = document.createElement("button");
+        oOk.type = "button"; oOk.className = "u4a-btn u4a-btn--emphasized";
+        oOk.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A66");   // Accept(없으면 코드)
+        oOk.innerHTML = '<i class="fa-solid fa-check"></i>';
+        var oCancel = document.createElement("button");
+        oCancel.type = "button"; oCancel.className = "u4a-btn u4a-btn--negative";
+        oCancel.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
+        oCancel.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        oFoot.appendChild(oOk); oFoot.appendChild(oCancel);
+        oDlg.appendChild(oFoot);
+
+        oDlg._nameInp = oRNew.input; oDlg._nameMsg = oRNew.msg;
+
+        function _close() { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
+        oX.addEventListener("click", _close);
+        oCancel.addEventListener("click", _close);
+        oOk.addEventListener("click", function () { _fnRnAccept(oDlg); });
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); _close(); });
+        oRNew.input.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); oOk.click(); }
+        });
+
+        document.body.appendChild(oDlg);
+        try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { }
+        try { if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 360, minH: 240 }); } } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { }
+        oAPP.common.fnSetBusyLock("");
+        requestAnimationFrame(function () { try { oRNew.input.focus(); } catch (e) { } });
+    };
+
+    // 트리에서 노드의 부모 찾기(PUJKY)
+    function _fnFindParentNode(oNode) {
+        if (!oNode || !oNode.PUJKY) { return null; }
+        var aTree = _model("/WS30/USPTREE") || [], oFound = null;
+        (function rec(arr) {
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i] && arr[i].OBJKY === oNode.PUJKY) { oFound = arr[i]; return; }
+                if (arr[i] && Array.isArray(arr[i].USPTREE)) { rec(arr[i].USPTREE); }
+                if (oFound) { return; }
+            }
+        })(aTree);
+        return oFound;
+    }
+
+    // Rename Accept (구 fnRenameSubmit) — 검증 → SPATH/OBDEC/MIME 재구성 → 저장(_RN, 03)
+    function _fnRnAccept(oDlg) {
+        var oNode = oDlg.__uspRnNode;
+        if (!oNode) { return; }
+        var sNew = (oDlg._nameInp.value || "").trim();
+        var bFld = (oNode.ISFLD === "X");
+
+        function _err(sMsg) {
+            oDlg._nameInp.setAttribute("data-vs", "error");
+            oDlg._nameMsg.textContent = sMsg || "";
+            try { oDlg._nameInp.focus(); } catch (e) { }
+        }
+
+        // 기존 이름과 동일
+        if (sNew === oNode.OBDEC) { _err(APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "363")); return; }
+        // 입력값 검증(Create 와 동일 규칙)
+        var oChk = _fnCheckCreateNodeData({ NAME: sNew, ISFLD: bFld });
+        if (oChk.RETCD === "E") { _err(oChk.RTMSG); return; }
+        // 같은 레벨 중복(나 제외)
+        var oParent = _fnFindParentNode(oNode);
+        var aSib = oParent ? (oParent.USPTREE || []) : (_model("/WS30/USPTREE") || []);
+        if (aSib.find(function (n) { return n && n.OBDEC === sNew && n.OBJKY !== oNode.OBJKY; })) {
+            _err(APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "004")); return;
+        }
+        oDlg._nameInp.removeAttribute("data-vs"); oDlg._nameMsg.textContent = "";
+
+        // 파일 확장자 변경 경고 (구 _checkDiffFileExtension) — 파일이고 확장자가 달라지면
+        //   "확장자가 다르면 파일이 손상될 수 있습니다 / 계속?"(497+182) 확인 후에만 진행.
+        //   YES → MIME/EXTEN 재계산(bMime=true), NO/취소 → 중단(팝업 유지). 확장자 동일·폴더면 바로 진행.
+        if (!bFld) {
+            var sExtOld = _extOf(oNode.OBDEC), sExtNew = _extOf(sNew);
+            if (sExtOld !== sExtNew) {
+                var sWarn = _wsMsg("497") + "\n\n" + _wsMsg("182");
+                oAPP.common.fnConfirmBox("W", sWarn, function (act) {
+                    if (act !== "YES") { return; }
+                    _doRenameSave(oNode, sNew, true);
+                }, [
+                    { act: "YES", label: "Yes", emphasized: true },
+                    { act: "NO",  label: "No" }
+                ]);
+                return;
+            }
+        }
+        _doRenameSave(oNode, sNew, false);
+    }
+
+    // 확장자 추출(. 포함) — PATH.extname 대응(없으면 "")
+    function _extOf(s) {
+        var t = String(s == null ? "" : s);
+        var i = t.lastIndexOf(".");
+        return (i <= 0) ? "" : t.slice(i);   // 선두 점(.gitignore 등)은 확장자로 보지 않음(i>0)
+    }
+
+    // Rename 실제 적용 — SPATH/OBDEC(+승인 시 MIME/EXTEN) 재구성 후 저장(_RN, 03)
+    function _doRenameSave(oNode, sNew, bMimeChange) {
+        oAPP.common.fnSetBusyLock("X");
+        var bFld = (oNode.ISFLD === "X");
+
+        // 노드 + 자손 평면화 → SPATH/OBDEC 재구성 (MIME/EXTEN 은 확장자 변경 승인 시에만)
+        var aChild = _parseTree2Tab($.extend(true, [], [oNode]), "USPTREE");
+        var iDepth = (oNode.SPATH || "").split("/").length;   // 변경 노드의 SPATH 세그먼트 수(빈값 포함)
+        aChild.forEach(function (it) {
+            var aSeg = (it.SPATH || "").split("/");
+            if (aSeg.length === iDepth) {   // 변경 노드 자신
+                it.OBDEC = sNew;
+                if (!bFld && bMimeChange) {
+                    try { it.MIME  = parent.MIMETYPES.lookup(sNew) || ""; } catch (e) { }
+                    try { it.EXTEN = APPCOMMON.fnGetFileExt(sNew)  || ""; } catch (e) { }
+                }
+            }
+            // SPATH 의 변경 깊이 세그먼트를 새 이름으로 교체
+            var sNewPath = "";
+            for (var j = 0; j < aSeg.length; j++) {
+                if (aSeg[j] === "") { continue; }
+                sNewPath += "/" + (j === iDepth - 1 ? sNew : aSeg[j]);
+            }
+            it.SPATH = sNewPath;
+        });
+
+        // 전체 평면트리에서 변경 노드들 교체
+        var aTree = _model("/WS30/USPTREE") || [];
+        var aFlat = _parseTree2Tab($.extend(true, [], aTree), "USPTREE");
+        aChild.forEach(function (it) {
+            var idx = aFlat.findIndex(function (e) { return e.OBJKY === it.OBJKY; });
+            if (idx >= 0) { aFlat.splice(idx, 1, it); }
+        });
+
+        oAPP.fn.fnSaveUspWs30({ PRCCD: "03", AFPRC: "_RN", TREEDATA: aFlat, CHANGEDATA: aChild, _renameNode: oNode });
+    }
+
+    // Rename 저장 콜백 (구 fnRenameUspNode) — 변경 평면트리 → 중첩 반영 + 우측/팝업 후처리
+    function _fnRenameApply(oParams) {
+        var aFlat = oParams.TREEDATA || [];
+        var aNested = oAPP.fn.fnBuildUspTree($.extend(true, [], aFlat));
+        APPCOMMON.fnSetModelProperty("/WS30/USPTREE", aNested);
+
+        // 우측 콘텐츠가 이름 변경 대상이면 갱신(+ 언어 재적용)
+        var aChg = oParams.CHANGEDATA || [];
+        var oCur = _model("/WS30/USPDATA") || {};
+        var oFound = aChg.find(function (e) { return e && oCur && e.OBJKY === oCur.OBJKY; });
+        if (oFound) {
+            APPCOMMON.fnSetModelProperty("/WS30/USPDATA", oFound);
+            try { oAPP.usp.sendEditorPostMessageAll({ actcd: "language_change", extension: oFound.EXTEN || "" }); } catch (e) { }
+        }
+        try { if (oAPP.fn.fnRenderUspTree) { oAPP.fn.fnRenderUspTree(); } } catch (e) { }
+        try { if (oAPP.fn.fnUspTreeMarkSelected && oFound) { oAPP.fn.fnUspTreeMarkSelected(oFound); } } catch (e) { }
+
+        oAPP.common.fnSetBusyLock("");
+        try { var d = document.getElementById("uspRnNodePopup"); if (d) { try { d.close(); } catch (e2) { } d.remove(); } } catch (e) { }
+    }
+
+    /************************************************************************
+     * 저장 취소(변경 버림) — 구 _fnSaveCancel. Create/Rename 의 "변경분 있음" 질문에서
+     *   NO(저장 안 함) 선택 시: 에디터 수정분을 마지막 저장 내용으로 원복 + 변경 플래그 해제.
+     *   (트리 미저장 변경 복원=구 fnResetUspTree 는 노드 이동 미구현이라 현재 불필요)
+     ************************************************************************/
+    oAPP.fn.fnUspSaveCancel = function () {
+        var oBefore = oAPP.usp.oSelectRowData;
+        if (oBefore) {
+            var oUd = _model("/WS30/USPDATA") || {};
+            oUd.CODPG = oBefore.CODPG;
+            oUd.DESCT = oBefore.DESCT;
+            oUd.CONTENT = oBefore.CONTENT;
+            APPCOMMON.fnSetModelProperty("/WS30/USPDATA", oUd);
+            // 모나코 에디터에도 변경 전 값 전송(원복) — 구 _fnSaveCancel 의 sendEditorPostMessageAll setValue.
+            try { oAPP.usp.sendEditorPostMessageAll({ actcd: "setValue", value: oUd.CONTENT }); } catch (e) { }
+        }
+        try { if (oAPP.fn.setAppChangeWs30) { oAPP.fn.setAppChangeWs30(""); } } catch (e) { }
+    };
+
+    /************************************************************************
+     * K8 Up / K9 Down / K10 Move Position — 노드 이동 (WS20 트리 이동과 동일 컨셉:
+     *   형제 배열 내 순서 변경 → 재렌더 + 변경플래그. 서버 저장은 별도 Save 버튼).
+     *   ★ 선택(우측 콘텐츠 연동)은 건드리지 않는다 — splice 는 노드 객체를 옮기므로 ISSEL 이 보존되어
+     *     fnRenderUspTree 가 현재 선택을 자동 재강조한다(이동/삭제는 선택과 별개).
+     ************************************************************************/
+    function _fnUspSiblings(oNode) {
+        var oParent = _fnFindParentNode(oNode);
+        return oParent ? (oParent.USPTREE || (oParent.USPTREE = [])) : (_model("/WS30/USPTREE") || []);
+    }
+
+    function _fnUspMove(oNode, sDir) {   // sDir: "-" 위로 / "+" 아래로
+        if (!oNode) { return; }
+        var aSib = _fnUspSiblings(oNode);
+        var idx = aSib.findIndex(function (n) { return n && n.OBJKY === oNode.OBJKY; });
+        if (idx === -1) { return; }
+        var iNew = (sDir === "-") ? idx - 1 : idx + 1;
+        if (iNew < 0 || iNew >= aSib.length) { return; }   // 경계(최상위/최하위)
+        var oMoved = aSib.splice(idx, 1)[0];
+        aSib.splice(iNew, 0, oMoved);
+        APPCOMMON.fnSetModelProperty("/WS30/USPTREE", _model("/WS30/USPTREE"));
+        try { if (oAPP.fn.fnRenderUspTree) { oAPP.fn.fnRenderUspTree(); } } catch (e) { }
+        try { if (oAPP.fn.setAppChangeWs30) { oAPP.fn.setAppChangeWs30("X"); } } catch (e) { }
+    }
+
+    oAPP.fn.fnUspTreeNodeMoveUp   = function (oNode) { _fnUspMove(oNode, "-"); };
+    oAPP.fn.fnUspTreeNodeMoveDown = function (oNode) { _fnUspMove(oNode, "+"); };
+
+    // K10 Move Position — 형제 내 임의 위치로(위치선택 다이얼로그, WS20 _moveUIPosition 식)
+    oAPP.fn.fnUspTreeNodeMovePosition = function (oNode) {
+        if (!oNode) { return; }
+        var aSib = _fnUspSiblings(oNode);
+        if (aSib.length <= 1) { return; }
+        var iCur = aSib.findIndex(function (n) { return n && n.OBJKY === oNode.OBJKY; });
+        if (iCur === -1) { return; }
+        var nTot = aSib.length;
+
+        var oDlg = document.createElement("dialog");
+        oDlg.id = "uspMovePosPopup";
+        oDlg.className = "u4a-dialog";
+        oDlg.style.cssText = "width:min(92vw,360px);padding:0;display:flex;flex-direction:column";
+
+        var sTitle = _msg("A57");   // Move Position
+        var oHeader = document.createElement("div");
+        oHeader.className = "u4a-dialog__header";
+        oHeader.innerHTML = '<i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span></span>';
+        oHeader.querySelector("span").textContent = sTitle;
+        var oX = document.createElement("button");
+        oX.type = "button"; oX.className = "u4a-btn-icon"; oX.setAttribute("aria-label", "Close");
+        oX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        oHeader.appendChild(oX);
+        oDlg.appendChild(oHeader);
+
+        var oBody = document.createElement("div");
+        oBody.className = "u4a-dialog__body";
+        oBody.style.cssText = "flex:1 1 auto;display:flex;flex-direction:column;gap:0.5rem;padding:1.25rem;overflow:visible";
+        var oRow = document.createElement("div");
+        oRow.style.cssText = "display:flex;align-items:center;gap:0.5rem";
+        var oLab = document.createElement("label"); oLab.className = "u4a-label"; oLab.style.cssText = "flex:0 0 auto;min-width:0";
+        oLab.textContent = oNode.OBDEC || "";
+        var oInp = document.createElement("input");
+        oInp.type = "number"; oInp.className = "u4a-input"; oInp.style.cssText = "flex:1 1 auto;width:auto";
+        oInp.min = "1"; oInp.max = String(nTot); oInp.value = String(iCur + 1);
+        var oMax = document.createElement("span"); oMax.style.cssText = "flex:0 0 auto;color:var(--text-muted)";
+        oMax.textContent = "/ " + nTot;
+        oRow.appendChild(oLab); oRow.appendChild(oInp); oRow.appendChild(oMax);
+        oBody.appendChild(oRow);
+        oDlg.appendChild(oBody);
+
+        var oFoot = document.createElement("div");
+        oFoot.className = "u4a-dialog__footer";
+        var oOk = document.createElement("button");
+        oOk.type = "button"; oOk.className = "u4a-btn u4a-btn--emphasized";
+        oOk.innerHTML = '<i class="fa-solid fa-check"></i>';
+        var oCancel = document.createElement("button");
+        oCancel.type = "button"; oCancel.className = "u4a-btn u4a-btn--negative";
+        oCancel.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        oFoot.appendChild(oOk); oFoot.appendChild(oCancel);
+        oDlg.appendChild(oFoot);
+
+        function _close() { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
+        function _ok() {
+            var v = parseInt(oInp.value, 10);
+            if (!(v >= 1)) { v = 1; }
+            if (v > nTot) { v = nTot; }
+            var iTarget = v - 1;
+            _close();
+            if (iTarget === iCur) { return; }
+            var oMoved = aSib.splice(iCur, 1)[0];
+            aSib.splice(iTarget, 0, oMoved);
+            APPCOMMON.fnSetModelProperty("/WS30/USPTREE", _model("/WS30/USPTREE"));
+            try { if (oAPP.fn.fnRenderUspTree) { oAPP.fn.fnRenderUspTree(); } } catch (e) { }
+            try { if (oAPP.fn.setAppChangeWs30) { oAPP.fn.setAppChangeWs30("X"); } } catch (e) { }
+        }
+        oX.addEventListener("click", _close);
+        oCancel.addEventListener("click", _close);
+        oOk.addEventListener("click", _ok);
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); _close(); });
+        oInp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); _ok(); } });
+
+        document.body.appendChild(oDlg);
+        try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { }
+        try { if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 280, minH: 160 }); } } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { }
+        requestAnimationFrame(function () { try { oInp.focus(); oInp.select(); } catch (e) { } });
+    };
 
     // Activate (구 ev_pressActivateBtn = 저장 + IS_ACT)
     oAPP.fn.fnActivateUspWs30 = function () { oAPP.fn.fnSaveUspWs30({ IS_ACT: "X" }); };

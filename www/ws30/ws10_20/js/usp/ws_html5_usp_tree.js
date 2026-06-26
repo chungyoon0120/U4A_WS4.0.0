@@ -174,19 +174,21 @@
         var oTree = _ensureTree();
         if (!oTree || !oNode) { return; }
         oTree.expandSubtree(oNode);
-        if (oNode) { oTree.selectByKey(_key(oNode)); }   // render 후 우클릭 대상 강조 재적용
+        if (oNode) { oTree.selectByKey(_key(oNode), false); }   // render 후 우클릭 대상 강조 재적용
     };
     // K2 Collapse Subtree — 선택 노드만 접음(구 collapse(idx)).
     oAPP.fn.fnUspTreeCollapseSubtree = function (oNode) {
         var oTree = _ensureTree();
         if (!oTree || !oNode) { return; }
         oTree.setExpanded(oNode, false);
-        if (oNode) { oTree.selectByKey(_key(oNode)); }
+        if (oNode) { oTree.selectByKey(_key(oNode), false); }
     };
-    // 우클릭 시 시각적 선택만(행 열기 ajax 없이) — 구 setSelectedIndex 효과.
-    oAPP.fn.fnUspTreeCtxSelect = function (oNode) {
-        if (_tree && oNode) { _tree.selectByKey(_key(oNode)); }
-    };
+    // 우클릭 시 선택(aria-selected) 을 옮기지 않는다.
+    //   ★ 선택(파란 강조)은 "우측에 열린 콘텐츠"와 연동된 상태다. 우클릭만으로는 콘텐츠를 로드하지 않으므로,
+    //     우클릭 행으로 선택을 옮기면 "선택 행 ≠ 우측 콘텐츠" 가 되어 논리가 어긋난다(원본 setSelectedIndex
+    //     도 같은 불일치가 있었음). 컨텍스트 메뉴의 대상은 우클릭한 노드(oNode)이고, 메뉴가 그 위치에 떠서
+    //     대상이 명확하므로 선택 표시는 기존(우측 콘텐츠) 그대로 둔다.
+    oAPP.fn.fnUspTreeCtxSelect = function (oNode) { /* 선택 이동 없음 — 위 주석 참고 */ };
 
     // 현재 선택(aria-selected) 행의 노드 — 없으면 null. 트리 툴바 펼침/접힘이 사용.
     oAPP.fn.fnUspTreeGetSelectedNode = function () {

@@ -832,16 +832,12 @@
                  * - 기존: 전체창(Kiosk) 모드
                  * - 변경: 브라우저 전체창 모드
                  ***************************************/
-                if (typeof sap === undefined) {
-                    return;
+                // F11 = 브라우저 최대화 토글(원본 maxWinBtn.firePress). HTML5: maxWinBtn 은 DOM 버튼이라
+                //   sap.byId 가 아닌 DOM 클릭으로 토글(아이콘 동기화는 click 핸들러 측 _syncMaxIcon 이 처리).
+                var oMaxWinBtn = document.getElementById("maxWinBtn");
+                if (oMaxWinBtn) {
+                    oMaxWinBtn.click();
                 }
-
-                let oMaxWinBtn = sap.ui.getCore().byId("maxWinBtn");
-                if (!oMaxWinBtn) {
-                    return;
-                }
-
-                oMaxWinBtn.firePress();
 
             }
         }, {
@@ -1231,16 +1227,12 @@
                     * - 기존: 전체창(Kiosk) 모드
                     * - 변경: 브라우저 전체창 모드
                     ***************************************/
-                    if (typeof sap === undefined) {
-                        return;
+                    // F11 = 브라우저 최대화 토글(원본 maxWinBtn.firePress). HTML5: maxWinBtn 은 DOM 버튼이라
+                    //   sap.byId 가 아닌 DOM 클릭으로 토글(아이콘 동기화는 click 핸들러 측 _syncMaxIcon 이 처리).
+                    var oMaxWinBtn = document.getElementById("maxWinBtn");
+                    if (oMaxWinBtn) {
+                        oMaxWinBtn.click();
                     }
-
-                    let oMaxWinBtn = sap.ui.getCore().byId("maxWinBtn");
-                    if (!oMaxWinBtn) {
-                        return;
-                    }
-
-                    oMaxWinBtn.firePress();
 
                 }
             }, {
@@ -2069,16 +2061,12 @@
                     * - 기존: 전체창(Kiosk) 모드
                     * - 변경: 브라우저 전체창 모드
                     ***************************************/
-                    if (typeof sap === undefined) {
-                        return;
+                    // F11 = 브라우저 최대화 토글(원본 maxWinBtn.firePress). HTML5: maxWinBtn 은 DOM 버튼이라
+                    //   sap.byId 가 아닌 DOM 클릭으로 토글(아이콘 동기화는 click 핸들러 측 _syncMaxIcon 이 처리).
+                    var oMaxWinBtn = document.getElementById("maxWinBtn");
+                    if (oMaxWinBtn) {
+                        oMaxWinBtn.click();
                     }
-
-                    let oMaxWinBtn = sap.ui.getCore().byId("maxWinBtn");
-                    if (!oMaxWinBtn) {
-                        return;
-                    }
-
-                    oMaxWinBtn.firePress();
 
                 }
             },

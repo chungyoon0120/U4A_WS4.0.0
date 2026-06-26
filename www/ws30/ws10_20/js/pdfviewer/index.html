@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>U4A PDF Viewer</title>
+    <style>
+        html, body { margin: 0; height: 100%; overflow: hidden; background: var(--boot-bg, #525659); }
+        /* 스크롤 컨테이너 — 세로 스크롤로 여러 페이지 */
+        #wrap { height: 100%; overflow: auto; }
+        #pages { display: flex; flex-direction: column; align-items: center; gap: 0.625rem; padding: 0.625rem; box-sizing: border-box; }
+        #pages canvas { box-shadow: 0 1px 6px rgba(0, 0, 0, .35); background: #fff; max-width: 100%; }
+        /* 안내(로딩/오류) */
+        #msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+               color: #cfd3d8; font: 0.875rem sans-serif; pointer-events: none; }
+        #msg[hidden] { display: none; }
+        /* 공통 스크롤바 톤 */
+        #wrap::-webkit-scrollbar { width: 0.5rem; height: 0.5rem; }
+        #wrap::-webkit-scrollbar-thumb { background: rgba(128,128,128,.4); border-radius: 4px; }
+    </style>
+
+    <script>
+/****************************************************************************
+ * U4A PDF 뷰어 호스트 — pdf.js(오픈소스) 코어로 PDF 페이지를 캔버스 렌더.
+ *  · Chromium plugins(PDFium) 비의존 — 100% 자체 렌더(Electron14/Chromium93 = pdfjs 레거시 v3).
+ *  · 초기설정 = URL PARAMS({HOSTID, THEME}), 본문 = 부모(MIME 팝업)→호스트 postMessage(cmd:"open", data:ArrayBuffer).
+ *  · 통신 채널 태그 = __u4apdf. 라이브러리 경로는 상위 창(APPPATH/PATH)에서 해석(monaco 호스트와 동일 컨셉).
+ ****************************************************************************/
+        (function () {
+            var oURL = new URL(location.href), P = {};
+            try { P = JSON.parse(oURL.searchParams.get("PARAMS") || "{}"); } catch (e) { P = {}; }
+            window.__HOSTID = P.HOSTID || "U4APDF";
+
+            // 부트 배경(첫 페인트 플래시 방지) — PDF 뷰어 관례의 회색 톤. 라이트 테마면 옅은 회색.
+            var bg = "#525659";
+            if (P.THEME && /light/i.test(P.THEME)) { bg = "#e9e9ed"; }
+            try { document.documentElement.style.setProperty("--boot-bg", bg); } catch (e) { }
+
+            // 상위 창(APPPATH/PATH 보유)을 찾아 lib 절대경로 → file:// URL 로 구성.
+            function _appWin() {
+                var w = window;
+                for (var i = 0; i < 6 && w; i++) {
+                    try { if (w.APPPATH && w.PATH) { return w; } } catch (e) { }
+                    w = (w.parent && w.parent !== w) ? w.parent : null;
+                }
+                return parent;
+            }
+            function _fileUrl(p) { return "file:///" + encodeURI(String(p).replace(/\\/g, "/")); }
+            var H = _appWin();
+            var sLib = H.PATH.join(H.APPPATH, "lib", "pdfjs");
+            window.__PDF_CORE = _fileUrl(H.PATH.join(sLib, "pdf.min.js"));
+            window.__PDF_WORKER = _fileUrl(H.PATH.join(sLib, "pdf.worker.min.js"));
+        })();
+    </script>
+</head>
+
+<body>
+    <div id="wrap"><div id="pages"></div></div>
+    <div id="msg" hidden></div>
+
+    <script>
+        // pdf.js 코어 로드 완료 → 본체(index.js) 로드(로드 순서 보장).
+        (function () {
+            var s = document.createElement("script");
+            s.src = window.__PDF_CORE;
+            s.onload = function () {
+                var s2 = document.createElement("script");
+                s2.src = "index.js";
+                document.head.appendChild(s2);
+            };
+            s.onerror = function () {
+                var m = document.getElementById("msg");
+                if (m) { m.hidden = false; m.textContent = "PDF library load failed"; }
+            };
+            document.head.appendChild(s);
+        })();
+    </script>
+</body>
+
+</html>

@@ -549,6 +549,15 @@ button:focus-visible {
     cursor: default;
 }
 
+/* 커스텀 노드 항목(예: 줌 슬라이더) — 조작용이라 hover 강조/포인터 커서 없음. */
+.u4a-menu__item--custom {
+    cursor: default;
+}
+.u4a-menu__item--custom:hover,
+.u4a-menu__item--custom:focus-visible {
+    background: transparent;
+}
+
 .u4a-menu__item i {
     font-size: 0.95rem;
     width: 1.1rem;

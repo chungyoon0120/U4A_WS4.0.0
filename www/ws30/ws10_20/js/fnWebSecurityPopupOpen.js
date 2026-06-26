@@ -1,849 +1,511 @@
 /************************************************************************
- * Copyright 2020. INFOCG Inc. all rights reserved. 
+ * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
  * - file Name : fnWebSecurityPopupOpen.js
- * - file Desc : WS20의 Web Security Settings Popup
+ * - file Desc : WS20의 Web Security Settings Popup  (HTML5)
+ * ----------------------------------------------------------------------
+ * [컨버전 메모]
+ *  원본: sap.m.Dialog(draggable/resizable 600×600) + customHeader([U4A] Web Security Management)
+ *        + 2 패널: ① Access-Control-Allow-Origin(라디오 3 + External Host URL 입력)
+ *                  ② X-Frame-Options(라디오 4 + White List sap.ui.table[SID/SRC] 멀티선택 Add/Del)
+ *        + footer[Save(accept)/Delete(Negative)/Close(Reject)].
+ *        데이터 = oAPP.DATA.APPDATA.S_WSO { ACA:{M01,M02,M03,EUL}, XFO:{M01..M04}, WHIT:[{KEY,SID,SRC}] },
+ *        기본값 = S_WSO_DEF. /WS20/WEBSECU 모델 바인딩.
+ *
+ *  HTML5: native <dialog class="u4a-dialog"> + 공통 컴포넌트(U4AUI.createPanel · .u4a-check[radio] ·
+ *        U4AUI.createField · .u4a-table 멀티선택[체크박스 열] · .u4a-btn · makeDialogRecenter/Resizable).
+ *        ★ 공통 파일(shell.css/u4a-ui.js) 미수정 — 화면 스코프(.u4aWsec*) 주입 스타일만.
+ *
+ *  ★ 보존 로직(원본 1:1):
+ *    · ACA 라디오(M01 Origin(*)미지정 / M02 현재호스트 / M03 특정호스트). EUL 입력 = 편집 && M03 일 때만.
+ *    · XFO 라디오(M01 SameOrigin/ M02 Deny/ M03 Allow-From/ M04 None). White List 편집·Add/Del = 편집 && M03.
+ *      XFO 가 M03 이 아니게 바뀌면 WHIT 비움(원본 동일).
+ *    · Save: 확인(MSG_WS 010) → M03 이면 SID/SRC 빈 행 제거 → S_WSO 저장 + setAppChange + 저장토스트(002) + 닫기.
+ *    · Delete: 확인(MSG_WS 003) → 폼을 기본값(S_WSO_DEF)으로 리셋(영속 X, 닫지 않음 — 원본 동일).
+ *    · 저장 후 WS20 동기화(IS_CHAG 미러 + 속성행 변경배경 + 헤더) — DH001026 _isChangedRow=S_WSO≠S_WSO_DEF.
+ *  ★ UI5 의존부 치환: sap.m.Dialog→<dialog>, JSONModel→로컬 oState, RadioButtonGroup→.u4a-check radio,
+ *    sap.ui.table→.u4a-table, sap.m.Input→createField, EventBus publish→가드 호출(sap 스텁).
  ************************************************************************/
 
-(function(window, $, oAPP) {
-    "use strict";
+(function (window, $, oAPP) {
+  "use strict";
 
-    /************************************************************************
-     * Root Variable Area..
-     ************************************************************************/
-    const
-        C_BIND_ROOT_PATH = "/WS20/WEBSECU",
-        C_DLG_ID = "u4aWsWebSecurityDialog",
-        C_WHILIST_TABLE_ID = "WebSecurityXFrameTable";
+  var APPCOMMON = oAPP.common;
 
-    var APPCOMMON = oAPP.common;
+  var C_DLG_ID = "u4aWsWebSecurityDlg";
 
-    oAPP.fn.fnWebSecurityPopupOpen = function() {
+  // ── 로컬 헬퍼(CSS/JS Link 팝업과 동일 컨벤션) ───────────────────────
+  function _fa(s) { return '<i class="fa-solid fa-' + s + '"></i>'; }
+  function _txt(sCls, sCode, p1) {
+    try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); }
+    catch (e) { return ""; }
+  }
+  function _wsCommon(sCode, p1) {
+    try {
+      var sLangu = "";
+      try { sLangu = (parent.getUserInfo() || {}).LANGU || ""; } catch (e) { }
+      return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sCode, p1 || "") || "";
+    } catch (e) { return ""; }
+  }
+  function _el(sTag, sClass, sText) {
+    var o = document.createElement(sTag);
+    if (sClass) { o.className = sClass; }
+    if (typeof sText !== "undefined") { o.textContent = sText; }
+    return o;
+  }
+  function _randomKey() {
+    try { return parent.getRandomKey(10); } catch (e) { return "K" + Math.round(performance.now() * 1000) + "_" + (oUI ? oUI.seq++ : 0); }
+  }
+  function _isEdit() {
+    try { var o = APPCOMMON.fnGetModelProperty("/WS20/APP"); return !!(o && o.IS_EDIT === "X"); }
+    catch (e) { return false; }
+  }
+  function _msg(sType, sText) {
+    if (!sText) { return; }
+    try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { }
+  }
 
-        var oWebSecuDlg = sap.ui.getCore().byId(C_DLG_ID);
-        if (oWebSecuDlg) {
-            oWebSecuDlg.open();
-            return;
-        }
+  // S_WSO / S_WSO_DEF 보장(쓰기/리셋 전 가드).
+  function _ensureData() {
+    if (!oAPP.DATA) { oAPP.DATA = {}; }
+    if (!oAPP.DATA.APPDATA) { oAPP.DATA.APPDATA = {}; }
+    var A = oAPP.DATA.APPDATA;
+    if (!A.S_WSO) { A.S_WSO = { ACA: { M01: "X", M02: "", M03: "", EUL: "" }, XFO: { M01: "X", M02: "", M03: "", M04: "" }, WHIT: [] }; }
+    if (!A.S_WSO_DEF) { A.S_WSO_DEF = JSON.parse(JSON.stringify(A.S_WSO)); }
+    return A;
+  }
 
-        var oContents = oAPP.fn.fnGetWebSecurityPopupContents(),
+  // 단일 캐시 + 현재 상태(원본 /WS20/WEBSECU 모델 대응).
+  var oUI = null;
+  var oState = { aca: null, xfo: null, whit: [], bEdit: false };
 
-            oWebSecuDlg = new sap.m.Dialog(C_DLG_ID, {
-                showHeader: false,
-                draggable: true,
-                resizable: true,
-                contentWidth: "600px",
-                contentHeight: "600px",
-                customHeader: new sap.m.Toolbar({
-                    content: [
-                        new sap.ui.core.Icon({
-                            src: "sap-icon://shield"
-                        }),
+  // ── WS20 변경 동기화(CSS/JS Link 팝업 lf_syncWs20Changed 와 동일 3종) ──
+  function lf_syncWs20Changed() {
+    try {
+      var oInfo = parent.getAppInfo && parent.getAppInfo();
+      if (oInfo) { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", oInfo.IS_CHAG || ""); }
+    } catch (e) { }
+    try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+    try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+  }
 
-                        new sap.m.Title({
-                            text: "[U4A] " + APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C86"), // Web Security Management
-                        }).addStyleClass("sapUiTinyMarginBegin"),
+  // 호출처 콜백(원본 EventBus publish). HTML5 sap 스텁이라 가드.
+  function lf_publishCallback(sActcd, oData) {
+    try {
+      if (window.sap && sap.ui && sap.ui.getCore && sap.ui.getCore().getEventBus) {
+        sap.ui.getCore().getEventBus().publish("WS20POPUP", "webSecurityPopupCallback", { ACTCD: sActcd, DATA: oData });
+      }
+    } catch (e) { }
+  }
 
-                        new sap.m.ToolbarSpacer(),
+  function lf_close(bSkipCallback) {
+    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+    if (!bSkipCallback) { lf_publishCallback("CANCEL", undefined); }
+  }
 
-                        new sap.m.Button({
-                            icon: "sap-icon://decline",
-                            press: function() {
-                                // web security Dialog를 닫는다.
-                                oAPP.fn.fnWebSecurityPopupClose();
+  // ── 라디오 선택 인덱스 ↔ 모델(M01..) ─────────────────────────────────
+  function lf_acaIdx() { var a = oState.aca || {}; return a.M03 === "X" ? 2 : (a.M02 === "X" ? 1 : 0); }
+  function lf_xfoIdx() { var x = oState.xfo || {}; return x.M04 === "X" ? 3 : (x.M03 === "X" ? 2 : (x.M02 === "X" ? 1 : 0)); }
+  function lf_setAca(iIdx) {
+    var a = oState.aca; a.M01 = a.M02 = a.M03 = "";
+    a[iIdx === 2 ? "M03" : (iIdx === 1 ? "M02" : "M01")] = "X";
+  }
+  function lf_setXfo(iIdx) {
+    var x = oState.xfo; x.M01 = x.M02 = x.M03 = x.M04 = "";
+    x[iIdx === 3 ? "M04" : (iIdx === 2 ? "M03" : (iIdx === 1 ? "M02" : "M01"))] = "X";
+  }
 
-                                /**
-                                 * @since   2026-02-11 01:50:31
-                                 * @version v3.5.9-3
-                                 * @author  PES
-                                 * @description
-                                 * Web Security Setting 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-                                 */
-                                sap.ui.getCore().getEventBus().publish("WS20POPUP", "webSecurityPopupCallback", {
-                                    ACTCD : "CANCEL",
-                                    DATA  : undefined
-                                });
-                            }
-                        })
-                    ]
-                }),
-                buttons: [
-                    new sap.m.Button({
-                        type: sap.m.ButtonType.Emphasized,
-                        icon: "sap-icon://accept",
-                        press: oAPP.events.ev_pressWebSecuritySave
-                    }).bindProperty("visible", "/WS20/APP/IS_EDIT", oAPP.fn.fnUiVisibleBinding),
+  // ── 편집 가능 상태 동기화(원본 conditional editable) ──────────────────
+  //   EUL = 편집 && ACA M03(특정 호스트). White List(편집/Add/Del) = 편집 && XFO M03(Allow-From).
+  function lf_applyEnable() {
+    var bEdit = oState.bEdit;
+    var bAcaSpecific = bEdit && oState.aca.M03 === "X";
+    var bXfoAllow = bEdit && oState.xfo.M03 === "X";
 
-                    new sap.m.Button({
-                        type: sap.m.ButtonType.Negative,
-                        icon: "sap-icon://delete",
-                        press: oAPP.events.ev_pressWebSecurityDel
-                    }).bindProperty("visible", "/WS20/APP/IS_EDIT", oAPP.fn.fnUiVisibleBinding),
+    // 라디오는 편집모드에서만.
+    [].concat(oUI.acaRadios, oUI.xfoRadios).forEach(function (r) { if (r) { r.disabled = !bEdit; } });
+    // EUL 입력.
+    if (oUI.eulField) { oUI.eulField.setReadOnly(!bAcaSpecific); }
+    // White List Add/Del.
+    if (oUI.whitAddBtn) { oUI.whitAddBtn.disabled = !bXfoAllow; }
+    if (oUI.whitDelBtn) { oUI.whitDelBtn.disabled = !bXfoAllow; }
+  }
 
-                    new sap.m.Button({
-                        type: sap.m.ButtonType.Reject,
-                        icon: "sap-icon://decline",
-                        press: function(oEvent) {
+  // ── White List 테이블 렌더 ───────────────────────────────────────────
+  function lf_renderWhit() {
+    if (!oUI) { return; }
+    var bEditCell = oState.bEdit && oState.xfo.M03 === "X";
+    oUI.whitTbody.innerHTML = "";
 
-                            // web security Dialog를 닫는다.
-                            oAPP.fn.fnWebSecurityPopupClose();
+    if (!oState.whit.length) {
+      var oTrEmpty = _el("tr", "u4a-table__nodata");
+      var oTd = document.createElement("td"); oTd.colSpan = 3;
+      oTd.textContent = _wsCommon("946");   // 데이터 없음.
+      oTrEmpty.appendChild(oTd); oUI.whitTbody.appendChild(oTrEmpty);
+      lf_syncWhitHead();
+      return;
+    }
 
-                            /**
-                             * @since   2026-02-11 01:50:31
-                             * @version v3.5.9-3
-                             * @author  PES
-                             * @description
-                             * Web Security Setting 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-                             */
-                            sap.ui.getCore().getEventBus().publish("WS20POPUP", "webSecurityPopupCallback", {
-                                ACTCD : "CANCEL",
-                                DATA  : undefined
-                            });
+    oState.whit.forEach(function (oRow, i) {
+      var oTr = document.createElement("tr");
+      oTr.setAttribute("data-key", oRow.KEY);
+      if (i % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
 
-                        }
-                    }),
-                ],
+      // 선택 체크박스(멀티선택 — 편집 && Allow-From 일 때만).
+      var oTdChk = _el("td", "u4aWsecColChk");
+      if (bEditCell) {
+        var oChk = document.createElement("input");
+        oChk.type = "checkbox"; oChk.className = "u4aWsecRowChk";
+        oChk.setAttribute("data-key", oRow.KEY);
+        oChk.addEventListener("change", function () {
+          oTr.setAttribute("aria-selected", oChk.checked ? "true" : "false");
+          lf_syncWhitHead();
+        });
+        oTdChk.appendChild(oChk);
+      }
+      oTr.appendChild(oTdChk);
 
-                content: [
-                    oContents
-                ],
+      // SID.
+      var oTdSid = _el("td", "u4aWsecColSid");
+      var oSidF = U4AUI.createField({
+        type: "text", value: oRow.SID || "", readOnly: !bEditCell, className: "u4aWsecCellField",
+        onInput: function (v) { oRow.SID = v; }
+      });
+      oTdSid.appendChild(oSidF.el); oTr.appendChild(oTdSid);
 
-                afterOpen: oAPP.events.ev_webSecurityPopupAfterOpen,
+      // Target Host URL(SRC).
+      var oTdSrc = _el("td", "u4aWsecColSrc");
+      var oSrcF = U4AUI.createField({
+        type: "text", value: oRow.SRC || "", readOnly: !bEditCell, className: "u4aWsecCellField",
+        onInput: function (v) { oRow.SRC = v; }
+      });
+      oTdSrc.appendChild(oSrcF.el); oTr.appendChild(oTdSrc);
 
-                afterClose: function(oEvent) {
+      oUI.whitTbody.appendChild(oTr);
+    });
 
-                    // white list 테이블에 체크박스 해제
-                    oAPP.fn.fnSetWhiteListTableClearSelection();
+    lf_syncWhitHead();
+  }
 
-                },
-                escapeHandler: function() {
+  function lf_syncWhitHead() {
+    if (!oUI || !oUI.whitHeadChk) { return; }
+    var aChk = oUI.whitTbody.querySelectorAll(".u4aWsecRowChk");
+    var iTotal = aChk.length, iSel = 0;
+    aChk.forEach(function (c) { if (c.checked) { iSel++; } });
+    oUI.whitHeadChk.checked = (iTotal > 0 && iSel === iTotal);
+    oUI.whitHeadChk.indeterminate = (iSel > 0 && iSel < iTotal);
+    oUI.whitHeadChk.disabled = (iTotal === 0);
+  }
 
-                    // web security Dialog를 닫는다.
-                    oAPP.fn.fnWebSecurityPopupClose();
+  // ── White List Add / Del ─────────────────────────────────────────────
+  function lf_whitAdd() {
+    oState.whit.push({ KEY: _randomKey(), SID: "", SRC: "" });
+    lf_renderWhit();
+    try {
+      var aTr = oUI.whitTbody.querySelectorAll("tr[data-key]");
+      var oLast = aTr[aTr.length - 1];
+      var oInput = oLast && oLast.querySelector(".u4aWsecColSid input");
+      if (oInput) { oInput.focus(); }
+    } catch (e) { }
+  }
+  function lf_whitDelSel() {
+    var aChk = oUI.whitTbody.querySelectorAll(".u4aWsecRowChk");
+    var oDel = {}, iCnt = 0;
+    aChk.forEach(function (c) { if (c.checked) { oDel[c.getAttribute("data-key")] = true; iCnt++; } });
+    if (iCnt === 0) { _msg("W", _wsCommon("240")); return; }   // 선택된 항목이 없습니다.
+    oState.whit = oState.whit.filter(function (r) { return !oDel[r.KEY]; });
+    lf_renderWhit();
+  }
 
-                    /**
-                     * @since   2026-02-11 01:50:31
-                     * @version v3.5.9-3
-                     * @author  PES
-                     * @description
-                     * Web Security Setting 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-                     */
-                    sap.ui.getCore().getEventBus().publish("WS20POPUP", "webSecurityPopupCallback", {
-                        ACTCD : "CANCEL",
-                        DATA  : undefined
-                    });
+  // ── 저장(원본 ev_pressWebSecuritySave + CB) ──────────────────────────
+  function lf_save() {
+    if (!_isEdit()) { return; }
+    var sMsg = _txt("/U4A/MSG_WS", "010");   // 저장하시겠습니까?
+    try {
+      parent.showMessage(null, 30, "I", sMsg, function (sAct) { if (sAct === "YES") { lf_doSave(); } });
+    } catch (e) { lf_doSave(); }
+  }
+  function lf_doSave() {
+    var A = _ensureData();
 
-                }
+    // Allow-From(M03) 이면 SID/SRC 둘 다 빈 White List 행 제거(원본).
+    var aWhit = oState.whit;
+    if (oState.xfo.M03 === "X") {
+      aWhit = aWhit.filter(function (r) { return (r.SID || "") !== "" && (r.SRC || "") !== ""; });
+    }
 
-            }).addStyleClass(`${C_DLG_ID} sapUiSizeCompact`);
-
-        oWebSecuDlg.bindElement(C_BIND_ROOT_PATH);
-
-        oWebSecuDlg.setInitialFocus(oWebSecuDlg);
-
-        oWebSecuDlg.open();
+    A.S_WSO = {
+      ACA: { M01: oState.aca.M01 || "", M02: oState.aca.M02 || "", M03: oState.aca.M03 || "", EUL: (oUI.eulField ? oUI.eulField.getValue() : (oState.aca.EUL || "")) },
+      XFO: { M01: oState.xfo.M01 || "", M02: oState.xfo.M02 || "", M03: oState.xfo.M03 || "", M04: oState.xfo.M04 || "" },
+      WHIT: aWhit.map(function (r) { return { SID: r.SID || "", SRC: r.SRC || "" }; })
     };
 
-    /************************************************************************
-     * WebSecurity Popup의 Contents
-     ************************************************************************/
-    oAPP.fn.fnGetWebSecurityPopupContents = function() {
-
-        var aPanelTopContents = oAPP.fn.fnGetWebSecurityPopupPanelTopContents(), // Access-Control-Allow-Origin
-            oPanelBottomContents = oAPP.fn.fnGetWebSecurityPopupPanelBottomContents(); // X-Frame-Options
-
-        return new sap.m.Page({
-            showHeader: false,
-            content: [
-                new sap.m.Panel({
-                    headerText: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C89"), // Access-Control-Allow-Origin
-                    content: aPanelTopContents
-                }),
-
-                new sap.m.Panel({
-                    headerText: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C87"), // X-Frame-Options
-                    content: [
-                        oPanelBottomContents
-                    ]
-                }).addStyleClass("sapUiSmallMarginTop")
-            ]
-        });
-
-    }; // end of oAPP.fn.fnGetWebSecurityPopupContents
-
-    /************************************************************************
-     * WebSecurity Popup의 Access-Control-Allow-Origin Paneld의 Contents
-     ************************************************************************/
-    oAPP.fn.fnGetWebSecurityPopupPanelTopContents = function() {
-
-        return [
-            new sap.m.RadioButtonGroup({
-                buttons: [
-                    new sap.m.RadioButton({
-                        groupName: "OriginGroup",
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C90"), // Origin: * (Origin Not Assign)
-                    }),
-                    new sap.m.RadioButton({
-                        groupName: "OriginGroup",
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C91"), // Currently Accessed Host
-                    }),
-                    new sap.m.RadioButton({
-                        groupName: "OriginGroup",
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C92"), // Specific External Host
-                    }),
-                ],
-                select: oAPP.events.ev_selectAcaRadioButton
-            })
-            .bindProperty("editable", "/WS20/APP/IS_EDIT", oAPP.fn.fnUiVisibleBinding)
-            .bindProperty("selectedIndex", {
-                parts: [
-                    "ACA"
-                ],
-                formatter: function(oACA) {
-
-                    if (typeof oACA === "undefined") {
-                        return;
-                    }
-
-                    switch ("X") {
-                        case oACA.M01:
-                            return 0;
-
-                        case oACA.M02:
-                            return 1;
-
-                        case oACA.M03:
-                            return 2;
-
-                        default:
-                            oACA.M01 = "X";
-                            return 0;
-                    }
-
-                }
-            }),
-
-            new sap.m.HBox({
-                renderType: sap.m.FlexRendertype.Bare,
-                alignItems: sap.m.FlexAlignItems.Center,
-                items: [
-                    new sap.m.Text({
-                        text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C73"), // External Host URL
-                        width: "120px"
-                    }),
-                    new sap.m.Input({
-                        value: "{ACA/EUL}"
-                    }).bindProperty("editable", {
-                        parts: [
-                            "/WS20/APP/IS_EDIT",
-                            "ACA"
-                        ],
-                        formatter: function(IS_EDIT, oACA) {
-
-                            if (IS_EDIT == null) {
-                                return false;
-                            }
-
-                            // DISPLAY 모드였을 경우 무조건 잠근다.
-                            var bIsEdit = (IS_EDIT == "X" ? true : false);
-
-                            if (!bIsEdit) {
-                                return false;
-                            }
-
-                            // Change 모드 이면서, 라디오 항목 중 'Specific External Host' 를 선택 했을 경우에만 Editable: true
-                            if (typeof oACA === "undefined") {
-                                return false;
-                            }
-
-                            if (oACA.M03 == 'X') {
-                                return true;
-                            }
-
-                            return false;
-
-                        }
-                    })
-
-                ]
-            })
-        ];
-
-    }; // end of oAPP.fn.fnGetWebSecurityPopupPanelTopContents
-
-    /************************************************************************
-     * WebSecurity Popup의 X-Frame-Options Panel의 Contents
-     ************************************************************************/
-    oAPP.fn.fnGetWebSecurityPopupPanelBottomContents = function() {
-
-        var oXframeToolbar = oAPP.fn.fnGetXframeTableToolbar(),
-            oXframeExt = oAPP.fn.fnGetXframeTableExtension();
-
-        var oXframeBindProp = {
-            parts: [
-                "/WS20/APP/IS_EDIT",
-                C_BIND_ROOT_PATH + "/XFO"
-            ],
-            formatter: function(IS_EDIT, oXfo) {
-
-                if (IS_EDIT == null) {
-                    return false;
-                }
-
-                // DISPLAY 모드였을 경우 무조건 잠근다.
-                var bIsEdit = (IS_EDIT == "X" ? true : false);
-                if (!bIsEdit) {
-                    return false;
-                }
-
-                if (oXfo != null) {
-
-                    var oTable = this.getParent().getParent();
-
-                    // Change 모드 이면서, 라디오 항목 중 'Allow-from' 를 선택 했을 경우에만 Editable: true
-                    if (oXfo.M03 == "X") {
-                        oTable.setSelectionMode(sap.ui.table.SelectionMode.MultiToggle);
-                        return true;
-                    }
-
-                    oTable.setSelectionMode(sap.ui.table.SelectionMode.None);
-
-                }
-
-                return false;
-
-            }
-        };
-
-        return new sap.ui.table.Table(C_WHILIST_TABLE_ID, {
-                // selectionMode: sap.ui.table.SelectionMode.None,
-                selectionBehavior: sap.ui.table.SelectionBehavior.Row,
-                visibleRowCountMode: sap.ui.table.VisibleRowCountMode.Fixed,
-                visibleRowCount: 5,
-                columns: [
-                    new sap.ui.table.Column({
-                        width: "150px",
-                        label: new sap.m.Label({
-                            text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D83", "", "", "", ""), // SID
-                            design: sap.m.LabelDesign.Bold
-                        }),
-                        template: new sap.m.Input({
-                            value: "{SID}"
-                        }).bindProperty("editable", oXframeBindProp)
-                    }),
-
-                    new sap.ui.table.Column({
-                        label: new sap.m.Label({
-                            text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C71"), // Target Host URL
-                            design: sap.m.LabelDesign.Bold
-                        }),
-                        template: new sap.m.Input({
-                            value: "{SRC}"
-                        }).bindProperty("editable", oXframeBindProp)
-                    }),
-                ],
-                rows: {
-                    path: "WHIT",
-                },
-                toolbar: oXframeToolbar,
-
-                extension: [
-                    oXframeExt
-                ]
-
-            }).bindProperty("selectionMode", "/WS20/APP/IS_EDIT", function(bIsMode) {
-
-                var bIsMode = (bIsMode == "X" ? true : false);
-
-                if (bIsMode) {
-                    return sap.ui.table.SelectionMode.MultiToggle;
-                }
-
-                return sap.ui.table.SelectionMode.None;
-
-            })
-            .addStyleClass("sapUiSizeCompact")
-            .addStyleClass(C_WHILIST_TABLE_ID);
-
-    }; // end of oAPP.fn.fnGetWebSecurityPopupPanelBottomContents
-
-    /************************************************************************
-     *  X-Frame-Options Table Toolbar UI
-     ************************************************************************/
-    oAPP.fn.fnGetXframeTableToolbar = function() {
-
-        return new sap.m.Toolbar({
-            content: [
-                new sap.m.RadioButtonGroup({
-                    columns: 4,
-                    buttons: [
-                        new sap.m.RadioButton({
-                            groupName: "xframeGroup",
-                            text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C93"), // SameOrigin
-                        }),
-                        new sap.m.RadioButton({
-                            groupName: "xframeGroup",
-                            text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C94"), // Deny
-                        }),
-                        new sap.m.RadioButton({
-                            groupName: "xframeGroup",
-                            text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C95"), // Allow-From
-                        }),
-                        new sap.m.RadioButton({
-                            groupName: "xframeGroup",
-                            text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C96"), // None(Not Recommend)
-                        }),
-                    ],
-                    select: oAPP.events.ev_selectXfoRadioButton
-                })
-                .bindProperty("editable", "/WS20/APP/IS_EDIT", oAPP.fn.fnUiVisibleBinding)
-                .bindProperty("selectedIndex", {
-                    parts: [
-                        "XFO",
-                        C_BIND_ROOT_PATH + "/WHIT"
-                    ],
-                    formatter: function(oXfo, aWhit) {
-
-                        if (typeof oXfo === "undefined") {
-                            return;
-                        }
-
-                        // white list가 있는 경우
-                        if (aWhit != null && Array.isArray(aWhit) == true) {
-
-                            // X-Frame-Option이 "Allow-From" 이 아니면서 white list가 있는 경우는
-                            // white list 데이터를 전부 지운다.
-                            if (oXfo.M03 != "X" && aWhit.length > 0) {
-
-                                while (aWhit.length) {
-                                    aWhit.splice(aWhit.length - 1, 1);
-                                }
-
-                                APPCOMMON.fnSetModelProperty(C_BIND_ROOT_PATH + "/WHIT", aWhit);
-
-                            }
-
-                        }
-
-                        switch ("X") {
-                            case oXfo.M01:
-                                return 0;
-
-                            case oXfo.M02:
-                                return 1;
-
-                            case oXfo.M03:
-                                return 2;
-
-                            case oXfo.M04:
-                                return 3;
-
-                            default:
-                                oXfo.M01 = "X";
-                                return 0;
-                        }
-
-                    }
-
-                })
-            ]
-        });
-
-    }; // end of oAPP.fn.fnGetXframeTableToolbar
-
-    /************************************************************************
-     *  X-Frame-Options Table Extension UI
-     ************************************************************************/
-    oAPP.fn.fnGetXframeTableExtension = function() {
-
-        var lfAddDelBtnBindProp = function(bIsDispMode, oXFO) {
-
-            if (bIsDispMode == null) {
-                return false;
-            }
-
-            var bIsDisp = (bIsDispMode == "X" ? true : false);
-
-            if (!bIsDisp) {
-                return bIsDisp;
-            }
-
-            if (oXFO == null || oXFO.M03 != "X") {
-                return false;
-            }
-
-            return true;
-
-        };
-
-        return new sap.m.Toolbar({
-            content: [
-                new sap.m.Text({
-                    text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C97"), // White List
-                }),
-
-                new sap.m.ToolbarSpacer(),
-
-                new sap.m.Button({
-                    text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C98"), // Add
-                    icon: "sap-icon://document",
-                    press: oAPP.events.ev_pressXframeOptionAdd
-                })
-                .bindProperty("enabled", {
-                    parts: [
-                        "/WS20/APP/IS_EDIT",
-                        C_BIND_ROOT_PATH + "/XFO"
-                    ],
-                    formatter: lfAddDelBtnBindProp
-                }),
-                new sap.m.Button({
-                    text: APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A03"), // Delete
-                    icon: "sap-icon://delete",
-                    type: sap.m.ButtonType.Negative,
-                    press: oAPP.events.ev_pressXframeOptionDel
-                }).bindProperty("enabled", {
-                    parts: [
-                        "/WS20/APP/IS_EDIT",
-                        C_BIND_ROOT_PATH + "/XFO"
-                    ],
-                    formatter: lfAddDelBtnBindProp
-                }),
-            ]
-        });
-
-    }; // end of oAPP.fn.fnGetXframeTableExtension
-
-    /**************************************************************************
-     * White List Table 체크 박스 선택 해제 이벤트
-     * ************************************************************************/
-    oAPP.fn.fnSetWhiteListTableClearSelection = function() {
-
-        var oTable = sap.ui.getCore().byId(C_WHILIST_TABLE_ID);
-        if (!oTable) {
-            return;
-        }
-
-        // 테이블에 체크박스가 체크되어 있다면 전체 해제
-        oTable.clearSelection();
-
-    }; // end of oAPP.fn.fnSetWhiteListTableClearSelection
-
-    /**************************************************************************
-     * Web Security popup close
-     * ************************************************************************/
-    oAPP.fn.fnWebSecurityPopupClose = function() {
-
-        var oDialog = sap.ui.getCore().byId(C_DLG_ID);
-        if (!oDialog) {
-            return;
-        }
-
-        oDialog.close();
-
-    }; // end of oAPP.fn.fnWebSecurityPopupClose
-
-    /**************************************************************************
-     * X-Frame-Options White List 추가버튼 이벤트
-     * ************************************************************************/
-    oAPP.events.ev_pressXframeOptionAdd = function() {
-
-        var sKey = parent.getRandomKey(10),
-            oNewRow = {
-                KEY: sKey,
-                SID: "",
-                SRC: ""
-            },
-            sWhiteListBindPath = C_BIND_ROOT_PATH + "/WHIT";
-
-        // 테이블에 체크박스가 체크되어 있다면 전체 해제
-        oAPP.fn.fnSetWhiteListTableClearSelection();
-
-        // 신규 Row를 추가한다.
-        var aTableData = APPCOMMON.fnGetModelProperty(sWhiteListBindPath);
-        if (!aTableData || aTableData.length <= 0) {
-            APPCOMMON.fnSetModelProperty(sWhiteListBindPath, [oNewRow]);
-            return;
-        }
-
-        aTableData.push(oNewRow);
-
-        APPCOMMON.fnSetModelProperty(sWhiteListBindPath, aTableData);
-
-    }; // end of oAPP.events.ev_pressXframeOptionAdd
-
-    /**************************************************************************
-     * X-Frame-Options White List 삭제버튼 이벤트
-     * ************************************************************************/
-    oAPP.events.ev_pressXframeOptionDel = function() {
-
-        var oWhiteListTable = sap.ui.getCore().byId(C_WHILIST_TABLE_ID);
-        if (!oWhiteListTable) {
-            return;
-        }
-
-        var aSelIdx = oWhiteListTable.getSelectedIndices(),
-            iSelLenth = aSelIdx.length;
-
-        if (iSelLenth <= 0) {
-            return;
-        }
-
-        var sWhiteListBindPath = C_BIND_ROOT_PATH + "/WHIT",
-            aTableData = jQuery.extend(true, [], APPCOMMON.fnGetModelProperty(sWhiteListBindPath));
-
-        for (var i = 0; i < iSelLenth; i++) {
-
-            var iSelIdx = aSelIdx[i],
-                oCtx = oWhiteListTable.getContextByIndex(iSelIdx),
-                sKey = oCtx.getObject("KEY"),
-                iFindIndex = aTableData.findIndex((DATA) => DATA.KEY == sKey);
-
-            if (iFindIndex < 0) {
-                continue;
-            }
-
-            aTableData.splice(iFindIndex, 1);
-        }
-
-        APPCOMMON.fnSetModelProperty(sWhiteListBindPath, aTableData);
-
-        oWhiteListTable.clearSelection();
-
-    }; // end of oAPP.events.ev_pressXframeOptionDel
-
-
-    /**************************************************************************
-     * Access-Control-Allow-Origin 영역의 라디오 버튼 그룹 선택 이벤트
-     * ************************************************************************/
-    oAPP.events.ev_selectAcaRadioButton = function(oEvent) {
-
-        var sAccessControlBindPath = C_BIND_ROOT_PATH + "/ACA",
-            iSelIdx = oEvent.getParameter("selectedIndex"),
-            oModelData = APPCOMMON.fnGetModelProperty(sAccessControlBindPath);
-
-        // 모델 데이터를 클리어 한다.
-        for (var key in oModelData) {
-
-            if (key.startsWith("M") === false) {
-                continue;
-            }
-
-            oModelData[key] = "";
-        }
-
-
-        switch (iSelIdx) {
-            case 0:
-                oModelData.M01 = "X";
-                break;
-
-            case 1:
-                oModelData.M02 = "X";
-                break;
-
-            case 2:
-                oModelData.M03 = "X";
-                break;
-
-            default:
-                break;
-        }
-
-        APPCOMMON.fnSetModelProperty(sAccessControlBindPath, oModelData, true);
-
-    }; // end of oAPP.events.ev_selectAcaRadioButton
-
-    /**************************************************************************
-     * X-Frame-Options 영역의 라디오 버튼 그룹 선택 이벤트
-     * ************************************************************************/
-    oAPP.events.ev_selectXfoRadioButton = function(oEvent) {
-
-        var sXframeOptionBindPath = C_BIND_ROOT_PATH + "/XFO",
-            iSelIdx = oEvent.getParameter("selectedIndex"),
-            oModelData = APPCOMMON.fnGetModelProperty(sXframeOptionBindPath);
-
-        // 모델 데이터 전체 클리어
-        for (var key in oModelData) {
-
-            oModelData[key] = "";
-
-        }
-
-        // 선택한 라디오 버튼에 따라 모델 데이터 변경
-        switch (iSelIdx) {
-            case 0:
-                oModelData.M01 = "X";
-                break;
-
-            case 1:
-                oModelData.M02 = "X";
-                break;
-
-            case 2:
-                oModelData.M03 = "X";
-                break;
-
-            case 3:
-                oModelData.M04 = "X";
-                break;
-
-            default:
-                break;
-        }
-
-        APPCOMMON.fnSetModelProperty(sXframeOptionBindPath, oModelData, true);
-
-    }; // end of oAPP.events.ev_selectXfoRadioButton
-
-    /**************************************************************************
-     * WebSecurityDialog 의 저장 버튼 이벤트
-     * ************************************************************************/
-    oAPP.events.ev_pressWebSecuritySave = function() {
-        
-        // busy 키고 Lock 걸기
-        oAPP.common.fnSetBusyLock("X");
-
-        var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "010"); // Do you want to save it?
-
-        // 질문 팝업?
-        parent.showMessage(sap, 30, 'I', sMsg, oAPP.events.ev_pressWebSecuritySaveCB);
-
-        // busy 끄고 Lock 풀기
-        oAPP.common.fnSetBusyLock("");
-
-    }; // end of oAPP.events.ev_pressWebSecuritySave
-
-    /**************************************************************************
-     * WebSecurityDialog 의 저장 버튼 클릭시 질문 팝업 콜백 이벤트
-     * ************************************************************************/
-    oAPP.events.ev_pressWebSecuritySaveCB = function(TYPE) {
-
-        if (TYPE == null || TYPE == "NO") {
-            return;
-        }
-
-        // 현재 바인딩된 web security 정보를 읽는다.
-        var oWsoData = APPCOMMON.fnGetModelProperty(C_BIND_ROOT_PATH),
-            oXfo = oWsoData.XFO,
-            aWhit = oWsoData.WHIT,
-            aWhitList = jQuery.extend(true, [], oWsoData.WHIT),
-            iWhitLength = aWhitList.length;
-
-        // X-Frame-Options영역에서 "Allow-From" 을 선택했을 경우 white list 테이블에 SID와 URL 값이 없는 것 삭제
-        if (oXfo.M03 == "X" && iWhitLength >= 0) {
-
-            for (var i = 0; i < iWhitLength; i++) {
-
-                var oWhitItem = aWhitList[i];
-
-                if (oWhitItem.SID != "" && oWhitItem.SRC != "") {
-                    continue;
-                }
-
-                var sKey = oWhitItem.KEY,
-                    iFindIndex = aWhit.findIndex((DATA) => DATA.KEY == sKey);
-
-                if (iFindIndex < 0) {
-                    continue;
-                }
-
-                aWhit.splice(iFindIndex, 1);
-
-            }
-
-            APPCOMMON.fnSetModelProperty(C_BIND_ROOT_PATH, oWsoData);
-
-        }
-
-        oAPP.DATA.APPDATA.S_WSO = oWsoData;
-
-        // 어플리케이션 정보에 변경 플래그 
-        parent.setAppChange('X');
-
-        // 저장 성공 메시지
-        var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "002"); // Saved success
-        parent.showMessage(sap, 10, null, sMsg);
-
-        // web security Dialog를 닫는다.
-        oAPP.fn.fnWebSecurityPopupClose();
-
-        
-        /**
-         * @since   2026-02-11 01:50:31
-         * @version v3.5.9-3
-         * @author  PES
-         * @description
-         * Web Security Setting 팝업 호출처에 CALLBACK 이벤트 호출 처리 로직 추가.
-         */
-        sap.ui.getCore().getEventBus().publish("WS20POPUP", "webSecurityPopupCallback", {
-            ACTCD : "SAVE",
-            DATA  : oWsoData
-        });
-
-    }; // end of oAPP.events.ev_pressWebSecuritySaveCB
-
-    /**************************************************************************
-     * WebSecurityDialog 의 삭제 버튼 이벤트
-     * ************************************************************************/
-    oAPP.events.ev_pressWebSecurityDel = function() {
-
-        // busy 키고 Lock 걸기
-        oAPP.common.fnSetBusyLock("X");
-
-        var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "003"); // Do you really want to delete the object?
-
-        // 질문 팝업?
-        parent.showMessage(sap, 30, 'W', sMsg, oAPP.events.ev_pressWebSecurityDelCB);
-
-        // busy 끄고 Lock 풀기
-        oAPP.common.fnSetBusyLock("");
-
-    }; // end of oAPP.events.ev_pressWebSecurityDel
-
-    /**************************************************************************
-     * WebSecurityDialog 의 삭제 버튼 질문 팝업 콜백 펑션
-     * ************************************************************************/
-    oAPP.events.ev_pressWebSecurityDelCB = function(TYPE) {
-
-        if (TYPE == null || TYPE == "NO") {
-            return;
-        }
-
-        var oWsoDef = jQuery.extend(true, {}, oAPP.DATA.APPDATA.S_WSO_DEF);
-
-        APPCOMMON.fnSetModelProperty(C_BIND_ROOT_PATH, oWsoDef, true);
-
-    }; // end of oAPP.events.ev_pressWebSecurityDelCB
-
-    /**************************************************************************
-     * WebSecurityDialog 의 AfterOpen 이벤트
-     * ************************************************************************/
-    oAPP.events.ev_webSecurityPopupAfterOpen = function() {
-
-        var oWsoData = jQuery.extend(true, {}, oAPP.DATA.APPDATA.S_WSO),
-            aWhit = oWsoData.WHIT,
-            iWhitLength = aWhit.length;
-
-        if (iWhitLength >= 0) {
-
-            for (var i = 0; i < iWhitLength; i++) {
-
-                var sKey = parent.getRandomKey(10),
-                    oWhitItem = aWhit[i];
-
-                oWhitItem.KEY = sKey;
-
-            }
-
-        }
-
-        // UI Where to Use the Event 데이터를 가지고 모델에 저장한다.
-        APPCOMMON.fnSetModelProperty(C_BIND_ROOT_PATH, oWsoData);
-
-        // busy 끄고 Lock 풀기
-        oAPP.common.fnSetBusyLock("");
-
-    }; // end of oAPP.events.ev_webSecurityPopupAfterOpen
-
+    try { parent.setAppChange("X"); } catch (e) { }
+    lf_syncWs20Changed();
+
+    lf_close(true);
+    _msg("S", _txt("/U4A/MSG_WS", "002"));   // 저장 완료.
+    lf_publishCallback("SAVE", A.S_WSO);
+  }
+
+  // ── 삭제 = 기본값 리셋(원본 ev_pressWebSecurityDel + CB) ──────────────
+  function lf_delReset() {
+    if (!_isEdit()) { return; }
+    var sMsg = _txt("/U4A/MSG_WS", "003");   // 정말 삭제하시겠습니까?
+    try {
+      parent.showMessage(null, 30, "W", sMsg, function (sAct) { if (sAct === "YES") { lf_doReset(); } });
+    } catch (e) { lf_doReset(); }
+  }
+  function lf_doReset() {
+    var A = _ensureData();
+    var oDef = JSON.parse(JSON.stringify(A.S_WSO_DEF || {}));
+    lf_loadState(oDef);   // 폼만 기본값으로(영속 X — 원본 동일, 닫지 않음).
+    lf_applyAll();
+  }
+
+  // ── oState 를 S_WSO(또는 기본값) 로 로드 ─────────────────────────────
+  function lf_loadState(oData) {
+    oData = oData || {};
+    var a = oData.ACA || {}, x = oData.XFO || {}, w = Array.isArray(oData.WHIT) ? oData.WHIT : [];
+    oState.aca = { M01: a.M01 || "", M02: a.M02 || "", M03: a.M03 || "", EUL: a.EUL || "" };
+    oState.xfo = { M01: x.M01 || "", M02: x.M02 || "", M03: x.M03 || "", M04: x.M04 || "" };
+    // 기본 선택 보정(아무것도 없으면 첫 항목).
+    if (!oState.aca.M01 && !oState.aca.M02 && !oState.aca.M03) { oState.aca.M01 = "X"; }
+    if (!oState.xfo.M01 && !oState.xfo.M02 && !oState.xfo.M03 && !oState.xfo.M04) { oState.xfo.M01 = "X"; }
+    oState.whit = w.map(function (r) { return { KEY: _randomKey(), SID: r.SID || "", SRC: r.SRC || "" }; });
+  }
+
+  // ── 현재 oState 를 화면 전체에 반영 ──────────────────────────────────
+  function lf_applyAll() {
+    // 라디오 체크.
+    var iAca = lf_acaIdx(); oUI.acaRadios.forEach(function (r, i) { if (r) { r.checked = (i === iAca); } });
+    var iXfo = lf_xfoIdx(); oUI.xfoRadios.forEach(function (r, i) { if (r) { r.checked = (i === iXfo); } });
+    // EUL 값.
+    if (oUI.eulField) { oUI.eulField.setValue(oState.aca.EUL || ""); }
+    lf_renderWhit();
+    lf_applyEnable();
+  }
+
+  /************************************************************************
+   * 다이얼로그 1회 생성(이후 재사용).
+   ************************************************************************/
+  function lf_build() {
+    lf_ensureStyle();
+
+    var oDlg = document.createElement("dialog");
+    oDlg.id = C_DLG_ID;
+    oDlg.className = "u4a-dialog u4aWsecDlg";
+
+    // 헤더 — shield 아이콘 + "[U4A] Web Security Management" + 닫기 X.
+    var oHeader = _el("div", "u4a-dialog__header");
+    oHeader.innerHTML = _fa("shield-halved") + "<span></span>";
+    oHeader.querySelector("span").textContent = "[U4A] " + _txt("/U4A/CL_WS_COMMON", "C86");
+    var oXBtn = _el("button", "u4a-btn-icon");
+    oXBtn.type = "button";
+    oXBtn.innerHTML = _fa("xmark");
+    oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
+    oXBtn.addEventListener("click", function () { lf_close(); });
+    oHeader.appendChild(oXBtn);
+    oDlg.appendChild(oHeader);
+
+    var oBody = _el("div", "u4a-dialog__body u4aWsecBody");
+
+    // ── 패널1: Access-Control-Allow-Origin ──
+    var oAcaPanel = U4AUI.createPanel({ title: _txt("/U4A/CL_WS_COMMON", "C89") });
+    oUI = oUI || {};
+    oUI.acaRadios = [];
+    var oAcaGroup = _el("div", "u4aWsecRadioCol");
+    [["C90"], ["C91"], ["C92"]].forEach(function (a, i) {
+      var oLab = _el("label", "u4a-check");
+      var oIn = document.createElement("input");
+      oIn.type = "radio"; oIn.name = "u4aWsecAca";
+      oIn.addEventListener("change", function () { if (oIn.checked) { lf_setAca(i); lf_applyEnable(); } });
+      var oSp = _el("span", "", _txt("/U4A/CL_WS_COMMON", a[0]));
+      oLab.appendChild(oIn); oLab.appendChild(oSp);
+      oAcaGroup.appendChild(oLab);
+      oUI.acaRadios.push(oIn);
+    });
+    oAcaPanel.body.appendChild(oAcaGroup);
+
+    // External Host URL 행.
+    var oEulRow = _el("div", "u4aWsecFieldRow");
+    oEulRow.appendChild(_el("span", "u4aWsecFieldLbl", _txt("/U4A/CL_WS_COMMON", "C73")));   // External Host URL
+    var oEulField = U4AUI.createField({ type: "text", value: "", className: "u4aWsecEul", onInput: function (v) { oState.aca.EUL = v; } });
+    oEulRow.appendChild(oEulField.el);
+    oAcaPanel.body.appendChild(oEulRow);
+    oUI.eulField = oEulField;
+    oBody.appendChild(oAcaPanel.el);
+
+    // ── 패널2: X-Frame-Options ──
+    var oXfoPanel = U4AUI.createPanel({ title: _txt("/U4A/CL_WS_COMMON", "C87") });
+    oUI.xfoRadios = [];
+    var oXfoGroup = _el("div", "u4aWsecRadioRow");
+    [["C93"], ["C94"], ["C95"], ["C96"]].forEach(function (a, i) {
+      var oLab = _el("label", "u4a-check");
+      var oIn = document.createElement("input");
+      oIn.type = "radio"; oIn.name = "u4aWsecXfo";
+      oIn.addEventListener("change", function () {
+        if (!oIn.checked) { return; }
+        lf_setXfo(i);
+        // Allow-From(M03) 이 아니게 바뀌면 White List 비움(원본).
+        if (oState.xfo.M03 !== "X" && oState.whit.length) { oState.whit = []; }
+        lf_renderWhit();
+        lf_applyEnable();
+      });
+      var oSp = _el("span", "", _txt("/U4A/CL_WS_COMMON", a[0]));
+      oLab.appendChild(oIn); oLab.appendChild(oSp);
+      oXfoGroup.appendChild(oLab);
+      oUI.xfoRadios.push(oIn);
+    });
+    oXfoPanel.body.appendChild(oXfoGroup);
+
+    // White List 툴바([White List] ···· [Add][Del]).
+    var oWhitBar = _el("div", "u4aWsecWhitBar");
+    oWhitBar.appendChild(_el("span", "u4aWsecWhitLbl", _txt("/U4A/CL_WS_COMMON", "C97")));   // White List
+    oWhitBar.appendChild(_el("span", "u4aWsecBarSpacer"));
+    var oAddBtn = _el("button", "u4a-btn u4aWsecToolBtn u4aWsecAdd");
+    oAddBtn.type = "button"; oAddBtn.innerHTML = _fa("file-circle-plus");
+    oAddBtn.title = _txt("/U4A/CL_WS_COMMON", "C98");   // Add
+    oAddBtn.addEventListener("click", function () { lf_whitAdd(); });
+    var oDelBtn = _el("button", "u4a-btn u4aWsecToolBtn u4a-btn--negative");
+    oDelBtn.type = "button"; oDelBtn.innerHTML = _fa("trash");
+    oDelBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete
+    oDelBtn.addEventListener("click", function () { lf_whitDelSel(); });
+    oWhitBar.appendChild(oAddBtn); oWhitBar.appendChild(oDelBtn);
+    oXfoPanel.body.appendChild(oWhitBar);
+    oUI.whitAddBtn = oAddBtn; oUI.whitDelBtn = oDelBtn;
+
+    // White List 테이블(공통 .u4a-table 액자형 + 멀티선택).
+    var oWrap = _el("div", "u4a-table-wrap u4a-table-wrap--boxed u4aWsecTableWrap");
+    oWrap.setAttribute("data-view", "table");
+    var oTable = _el("table", "u4a-table u4aWsecTable");
+    var oThead = document.createElement("thead");
+    var oThRow = document.createElement("tr");
+    var oThChk = _el("th", "u4aWsecColChk");
+    var oHeadChk = document.createElement("input");
+    oHeadChk.type = "checkbox"; oHeadChk.className = "u4aWsecHeadChk";
+    oHeadChk.addEventListener("change", function () {
+      var b = oHeadChk.checked;
+      oUI.whitTbody.querySelectorAll(".u4aWsecRowChk").forEach(function (c) {
+        c.checked = b; var tr = c.closest("tr"); if (tr) { tr.setAttribute("aria-selected", b ? "true" : "false"); }
+      });
+      lf_syncWhitHead();
+    });
+    oThChk.appendChild(oHeadChk); oThRow.appendChild(oThChk);
+    oThRow.appendChild(_el("th", "u4aWsecColSid", _txt("/U4A/CL_WS_COMMON", "D83")));   // SID
+    oThRow.appendChild(_el("th", "u4aWsecColSrc", _txt("/U4A/CL_WS_COMMON", "C71")));   // Target Host URL
+    oThead.appendChild(oThRow); oTable.appendChild(oThead);
+    var oTbody = document.createElement("tbody"); oTable.appendChild(oTbody);
+    oWrap.appendChild(oTable); oXfoPanel.body.appendChild(oWrap);
+    oUI.whitTbody = oTbody; oUI.whitHeadChk = oHeadChk;
+    oBody.appendChild(oXfoPanel.el);
+
+    oDlg.appendChild(oBody);
+
+    // 푸터 — [Save 파랑] [Delete 빨강] [Close Reject]. (Save/Delete 는 편집모드만)
+    var oFoot = _el("div", "u4a-dialog__footer u4aWsecFoot");
+    oFoot.appendChild(_el("span", "u4aWsecFootSpacer"));
+    var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aWsecIcoBtn");
+    oSaveBtn.type = "button"; oSaveBtn.innerHTML = _fa("check") + "<span></span>";
+    oSaveBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A64");   // Save
+    oSaveBtn.title = _txt("/U4A/CL_WS_COMMON", "A64");
+    oSaveBtn.addEventListener("click", function () { lf_save(); });
+    var oDelFootBtn = _el("button", "u4a-btn u4a-btn--negative u4aWsecIcoBtn");
+    oDelFootBtn.type = "button"; oDelFootBtn.innerHTML = _fa("trash") + "<span></span>";
+    oDelFootBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete(기본값 리셋)
+    oDelFootBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");
+    oDelFootBtn.addEventListener("click", function () { lf_delReset(); });
+    var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aWsecIcoBtn u4aWsecClose");
+    oCloseBtn.type = "button"; oCloseBtn.innerHTML = _fa("xmark");
+    oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
+    oCloseBtn.addEventListener("click", function () { lf_close(); });
+    oFoot.appendChild(oSaveBtn); oFoot.appendChild(oDelFootBtn); oFoot.appendChild(oCloseBtn);
+    oDlg.appendChild(oFoot);
+    oUI.saveBtn = oSaveBtn; oUI.delFootBtn = oDelFootBtn;
+
+    oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
+
+    if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
+    if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 460, minH: 360 }); }
+
+    document.body.appendChild(oDlg);
+
+    oUI.dlg = oDlg;
+    oUI.seq = 0;
+  }
+
+  /************************************************************************
+   * Web Security Settings 팝업 열기(공개 진입점) — 캐시 재사용.
+   ************************************************************************/
+  oAPP.fn.fnWebSecurityPopupOpen = function () {
+
+    _ensureData();
+
+    if (!oUI || !oUI.dlg || !document.body.contains(oUI.dlg)) { oUI = null; lf_build(); }
+
+    if (oUI.dlg.open) {
+      try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+      return;
+    }
+
+    oState.bEdit = _isEdit();
+
+    // 현재 저장값(S_WSO) 로드 + 화면 반영.
+    lf_loadState(JSON.parse(JSON.stringify(oAPP.DATA.APPDATA.S_WSO || {})));
+    lf_applyAll();
+
+    // 편집모드에서만 Save/Delete 노출(원본 visible=/WS20/APP/IS_EDIT).
+    oUI.saveBtn.hidden = !oState.bEdit;
+    oUI.delFootBtn.hidden = !oState.bEdit;
+
+    try { oUI.dlg.showModal(); } catch (e) { }
+
+    // busy 끄고 Lock 풀기(원본 afterOpen).
+    try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+
+  }; // end of oAPP.fn.fnWebSecurityPopupOpen
+
+  /************************************************************************
+   * 공통 스타일 1회 주입(테마 토큰 소비 — 공통 파일 미수정, 화면 스코프만).
+   ************************************************************************/
+  function lf_ensureStyle() {
+    if (document.getElementById("u4aWsecStyle")) { return; }
+    var oStyle = document.createElement("style");
+    oStyle.id = "u4aWsecStyle";
+    oStyle.textContent =
+      ".u4aWsecDlg { width: min(94vw, 640px); height: min(88vh, 660px); padding: 0; display: flex; flex-direction: column; }" +
+      ".u4aWsecDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
+      ".u4aWsecDlg .u4a-dialog__header span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
+      ".u4aWsecBody { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; }" +
+      // 라디오 배치(ACA=세로, XFO=가로 wrap).
+      ".u4aWsecRadioCol { display: flex; flex-direction: column; gap: 0.5rem; }" +
+      ".u4aWsecRadioRow { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }" +
+      // External Host URL 행.
+      ".u4aWsecFieldRow { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.625rem; }" +
+      ".u4aWsecFieldLbl { flex: 0 0 auto; min-width: 9rem; color: var(--text-muted, var(--text)); }" +
+      ".u4aWsecEul { flex: 1 1 auto; }" +
+      // White List 툴바.
+      ".u4aWsecWhitBar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }" +
+      ".u4aWsecWhitLbl { font-weight: 600; }" +
+      ".u4aWsecBarSpacer { flex: 1 1 auto; }" +
+      ".u4aWsecToolBtn { background: transparent; }" +
+      ".u4aWsecToolBtn:hover { background: var(--hover-bg); }" +
+      ".u4aWsecAdd { border-color: var(--accent); color: var(--accent); }" +
+      ".u4aWsecToolBtn { min-width: 2.25rem; padding: 0.4rem 0.6rem; justify-content: center; }" +
+      // 테이블 컬럼.
+      ".u4aWsecTableWrap { max-height: 14rem; }" +
+      ".u4aWsecColChk { width: 2.5rem; text-align: center; }" +
+      ".u4aWsecColSid { width: 9rem; }" +
+      ".u4aWsecColSrc { width: auto; }" +
+      ".u4aWsecColChk input { accent-color: var(--accent); margin: 0; vertical-align: middle; }" +
+      ".u4aWsecTable td::before, .u4aWsecTable td::after { content: none !important; }" +
+      ".u4aWsecCellField { width: 100%; }" +
+      // 푸터.
+      ".u4aWsecFoot { display: flex; gap: 0.5rem; align-items: center; }" +
+      ".u4aWsecFootSpacer { flex: 1 1 auto; }" +
+      ".u4aWsecFoot .u4a-btn[hidden] { display: none; }" +
+      ".u4aWsecIcoBtn { min-width: 2.5rem; justify-content: center; }";
+    document.head.appendChild(oStyle);
+  }
 
 })(window, $, oAPP);

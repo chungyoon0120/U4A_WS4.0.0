@@ -1346,9 +1346,29 @@
                     menuItem: function (el) {
                         var oI = el.querySelector("i");
                         var bDis = el.disabled === true || el.classList.contains("is-disabled");
+                        // 줌 슬라이더(range)는 메뉴 항목 안에 슬라이더를 그대로 그린다(원본 OverflowToolbar
+                        //   동일). 메뉴용 슬라이더는 원본 값으로 초기화하고, input 시 원본 el 에 값을 반영 +
+                        //   change 발화해 기존 핸들러(prev.js)의 setPreviewZoom 을 그대로 탄다.
+                        if (el.id === "ws20PrevZoomSlider") {
+                            var oRow = document.createElement("div");
+                            oRow.className = "u4aWs20PrevZoomMenuRow";
+                            oRow.innerHTML = _fa("magnifying-glass");
+                            var oS = document.createElement("input");
+                            oS.type = "range";
+                            oS.className = "u4aWs20PrevZoom";
+                            oS.min = el.min || "0.1"; oS.max = el.max || "2";
+                            oS.step = el.step || "0.1"; oS.value = el.value || "1";
+                            oS.disabled = bDis;
+                            oS.title = "Zoom";
+                            oS.addEventListener("input", function () {
+                                el.value = oS.value;
+                                el.dispatchEvent(new Event("change", { bubbles: true }));
+                            });
+                            oRow.appendChild(oS);
+                            return { node: oRow };
+                        }
                         var sIcon, sText;
-                        if (el.id === "ws20PrevZoomSlider") { sIcon = _fa("magnifying-glass"); sText = "Zoom"; bDis = true; }
-                        else if (el.id === "ws20PrevOffToggle") { sIcon = _fa("toggle-off"); sText = el.title || "Full Screen"; }
+                        if (el.id === "ws20PrevOffToggle") { sIcon = _fa("toggle-off"); sText = el.title || "Full Screen"; }
                         else { sIcon = oI ? oI.outerHTML : ""; sText = el.title || (window.U4AUI && U4AUI.btnLabel ? U4AUI.btnLabel(el, true) : "") || ""; }
                         return { iconHtml: sIcon, text: sText, disabled: bDis, onClick: function () { if (!bDis) { el.click(); } } };
                     }

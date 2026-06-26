@@ -4010,6 +4010,9 @@
                     case "DH001023":   // JS Link Add
                         if (oAPP.fn.fnCssJsLinkAddPopupOpener) { oAPP.fn.fnCssJsLinkAddPopupOpener("JS"); return; }
                         break;
+                    case "DH001026":   // Web Security Settings
+                        if (oAPP.fn.fnWebSecurityPopupOpener) { oAPP.fn.fnWebSecurityPopupOpener(); return; }
+                        break;
                 }
                 console.warn("[W4+ 예정] 팝업 호출형 속성 버튼 미변환:", sAttr.UIATT, "(", sAttr.UIATK, ")");
             });
