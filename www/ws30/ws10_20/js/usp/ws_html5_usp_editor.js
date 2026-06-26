@@ -383,6 +383,8 @@
         var oCombo = document.querySelector("#uspEditorHost .u4aWs30EditorThemeSel");
         if (oCombo) { try { oCombo.value = _selectedTheme(); } catch (e) { } }
     }
+    // 외부(예: Rename 적용)에서 에디터 헤더 파일명/상태만 갱신 — 재로드 없이.
+    oAPP.usphtml.editorRefreshToolbar = _refreshToolbarInfo;
 
     function _buildEditorToolbar() {
 

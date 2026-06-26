@@ -525,15 +525,9 @@
 /* 불가 항목 — hover 하이라이트/포인터 제거(클릭 핸들러도 미부착) */
 .u4aWs20TreeCtxMenu .u4a-menu__item[aria-disabled="true"]:hover { background: transparent; }
 
-/* Move Position 다이얼로그 (구 uiMovePosition) */
-.u4aWs20MoveDlg { width: min(22rem, 92vw); }
-.u4aWs20MoveRow { display: flex; align-items: center; gap: 0.625rem; }
-.u4aWs20MoveRow > label {
-  flex: 1 1 auto; min-width: 0; font-weight: 600; color: var(--text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.u4aWs20MovePos { width: 5rem; text-align: center; flex: 0 0 auto; }
-.u4aWs20MoveMax { flex: 0 0 auto; font-size: 0.8125rem; color: var(--text-muted); }
+/* Move Position 다이얼로그 — 모양새는 공통 .u4a-dialog(인라인) 로 WS30 위치 이동
+   팝업과 통일(_moveUIPosition). 전용 클래스 스타일 제거, 입력칸 가운데 정렬만 유지. */
+.u4aWs20MovePos { text-align: center; }
 
 /* =====================================================================
  * UI Object Select 팝업 (구 design/js/insertUIPopop.js → HTML5 .u4a-dialog)

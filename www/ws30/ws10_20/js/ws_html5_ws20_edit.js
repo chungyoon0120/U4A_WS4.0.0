@@ -981,18 +981,27 @@
         var iCur = aSib.findIndex(function (a) { return a.OBJID === oNode.OBJID; });
         var nTot = aSib.length;
 
+        // 모양새 = WS30 위치 이동 팝업(공통 표준 .u4a-dialog)과 동일하게 통일:
+        //   헤더 아이콘+타이틀+닫기X / 인라인 바디(라벨·number·"/ N") / 푸터=공통
+        //   --emphasized(파랑 ✓) + --negative(빨강 ✗) 아이콘 전용 / 드래그·리사이즈.
         var oDlg = document.createElement("dialog");
-        oDlg.className = "u4a-dialog u4aWs20MoveDlg";
+        oDlg.className = "u4a-dialog";
+        oDlg.style.cssText = "width:min(92vw,360px);padding:0;display:flex;flex-direction:column";
         oDlg.innerHTML =
-            '<div class="u4a-dialog__header"><i class="fa-solid fa-outdent"></i><span>' + _esc(_msg("A57", "Move Position")) + '</span></div>' +
-            '<div class="u4a-dialog__body">' +
-            '  <div class="u4aWs20MoveRow"><label>' + _esc(oNode.OBJID) + '</label>' +
-            '    <input type="number" class="u4a-input u4aWs20MovePos" min="1" max="' + nTot + '" value="' + (iCur + 1) + '">' +
-            '    <span class="u4aWs20MoveMax">/ ' + nTot + '</span></div>' +
+            '<div class="u4a-dialog__header">' +
+            '  <i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span>' + _esc(_msg("A57", "Move Position")) + '</span>' +
+            '  <button type="button" class="u4a-btn-icon" data-act="cancel" aria-label="Close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>' +
+            '<div class="u4a-dialog__body" style="flex:1 1 auto;display:flex;flex-direction:column;gap:0.5rem;padding:1.25rem;overflow:visible">' +
+            '  <div style="display:flex;align-items:center;gap:0.5rem">' +
+            '    <label class="u4a-label" style="flex:0 0 auto;min-width:0">' + _esc(oNode.OBJID) + '</label>' +
+            '    <input type="number" class="u4a-input u4aWs20MovePos" style="flex:1 1 auto;width:auto" min="1" max="' + nTot + '" value="' + (iCur + 1) + '">' +
+            '    <span style="flex:0 0 auto;color:var(--text-muted)">/ ' + nTot + '</span>' +
+            '  </div>' +
             '</div>' +
             '<div class="u4a-dialog__footer">' +
-            '  <button type="button" class="u4a-btn u4aWs20InsConfirm" data-act="ok"><i class="fa-solid fa-check"></i> ' + _esc(_msg("A40", "Confirm")) + '</button>' +
-            '  <button type="button" class="u4a-btn u4aWs20InsCancel" data-act="cancel"><i class="fa-solid fa-xmark"></i> ' + _esc(_msg("A41", "Cancel")) + '</button>' +
+            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="ok" title="' + _esc(_msg("A40", "Confirm")) + '"><i class="fa-solid fa-check"></i></button>' +
+            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="cancel" title="' + _esc(_msg("A41", "Cancel")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>';
         var oInp = oDlg.querySelector(".u4aWs20MovePos");
         function lf_close() { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
@@ -1010,10 +1019,14 @@
             _markChanged();
         }
         oDlg.querySelector('[data-act="ok"]').addEventListener("click", lf_ok);
-        oDlg.querySelector('[data-act="cancel"]').addEventListener("click", lf_close);
+        // 헤더 X + 푸터 ✗ 둘 다 data-act="cancel" → 닫기.
+        oDlg.querySelectorAll('[data-act="cancel"]').forEach(function (b) { b.addEventListener("click", lf_close); });
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
         oInp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); lf_ok(); } });
         document.body.appendChild(oDlg);
+        var oHeader = oDlg.querySelector(".u4a-dialog__header");
+        try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { }
+        try { if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 280, minH: 160 }); } } catch (e) { }
         try { oDlg.showModal(); } catch (e) { }
         setTimeout(function () { try { oInp.focus(); oInp.select(); } catch (e) { } }, 0);
     }
@@ -1068,7 +1081,7 @@
             { key: "M02", icon: "trash", text: _msg("A03", "Delete"), on: en.del, fn: function () { _deleteUI(oNode); } },
             { key: "M03", icon: "chevron-up", text: _msg("A55", "Up"), on: en.up, sep: true, fn: function () { _moveUI(oNode, "-"); } },
             { key: "M04", icon: "chevron-down", text: _msg("A56", "Down"), on: en.down, fn: function () { _moveUI(oNode, "+"); } },
-            { key: "M05", icon: "outdent", text: _msg("A57", "Move Position"), on: en.movepos, fn: function () { _moveUIPosition(oNode); } },
+            { key: "M05", icon: "up-down-left-right", text: _msg("A57", "Move Position"), on: en.movepos, fn: function () { _moveUIPosition(oNode); } },
             { key: "M06", icon: "copy", text: _msg("A04", "Copy"), on: en.copy, sep: true, fn: function () { _copyUI(oNode); } },
             { key: "M07", icon: "paste", text: _msg("A58", "Paste"), on: en.paste, fn: function () { _pasteUI(oNode); } },
             { key: "M08", icon: "magnifying-glass", text: _msg("A59", "UI Where use"), on: en.whereuse, sep: true, fn: function () { _ctxDelegate("contextMenuUiWhereUse"); } },

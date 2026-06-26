@@ -350,6 +350,22 @@
                 null, null, "POST", function () { resolve({ RETCD: "E" }); });
         });
     }
+    // 서버 결과(T_MIME_CHILD) → oNode.MIMETREE 구성(원본 _onMimeTreeToggleOpenState 1:1). 성공 true.
+    function _buildChildrenFromResult(oNode, oRes) {
+        if (!oRes || oRes.RETCD === "E") { return false; }
+        var aChildData = (oRes.T_MIME_CHILD || []).slice();
+        var oCopy = JSON.parse(JSON.stringify(oNode));
+        oCopy.PARENT = "";
+        aChildData.push(oCopy);
+        var aRoots = _buildTree(aChildData);
+        var oRoot = aRoots[0];
+        oNode.MIMETREE = (oRoot && oRoot.MIMETREE) ? oRoot.MIMETREE : [];
+        // 자식이 없으면 "데이터 없음" 더미 표시(원본 동일).
+        if (oNode.MIMETREE.length === 0) {
+            oNode.MIMETREE.push({ PARENT: oNode.CHILD, CHILD: "DUMMY_CHILD", NTEXT: _wsTxt("312") });
+        }
+        return true;
+    }
     function lf_lazyExpand(oNode) {
         return new Promise(function (resolve) {
             var aChild = oNode.MIMETREE || [];
@@ -376,19 +392,8 @@
                     return;
                 }
 
-                // 자식 계층 구성 — 선택 노드(부모키 제거) + 자식들을 평면화 후 계층화하여 children 추출.
-                var aChildData = (oRes.T_MIME_CHILD || []).slice();
-                var oCopy = JSON.parse(JSON.stringify(oNode));
-                oCopy.PARENT = "";
-                aChildData.push(oCopy);
-                var aRoots = _buildTree(aChildData);
-                var oRoot = aRoots[0];
-                oNode.MIMETREE = (oRoot && oRoot.MIMETREE) ? oRoot.MIMETREE : [];
-
-                // 자식이 없으면 "데이터 없음" 더미 표시(원본 동일).
-                if (oNode.MIMETREE.length === 0) {
-                    oNode.MIMETREE.push({ PARENT: oNode.CHILD, CHILD: "DUMMY_CHILD", NTEXT: _wsTxt("312") });
-                }
+                // 자식 계층 구성(공통 헬퍼).
+                _buildChildrenFromResult(oNode, oRes);
 
                 oUI.tree.render();
                 lf_busy(false);
@@ -742,25 +747,167 @@
         }
     }
     function _hasKids(n) { return !!(n && Array.isArray(n.MIMETREE) && n.MIMETREE.length > 0); }
+    // ★ "실제 로드된" 자식 보유 여부 — DUMMY_CHILD(미로드 placeholder)만 있는 폴더는 제외.
+    //   펼치기(서브트리/전체)는 이걸로 판정 → 아직 서버에서 안 받은 폴더는 펼치지 않고 닫힌 채(셰브론) 둔다.
+    //   (mass-fetch 방지 + 펼쳤을 때 "No data Found" 더미가 보이는 혼란 방지. 깊은 데이터는 토글 시 lazy 로드.)
+    function _hasRealKids(n) {
+        return !!(n && Array.isArray(n.MIMETREE) && n.MIMETREE.some(function (c) { return c && c.CHILD !== "DUMMY_CHILD"; }));
+    }
+    function _hasDummy(n) { return !!(n && Array.isArray(n.MIMETREE) && n.MIMETREE.some(function (e) { return e && e.CHILD === "DUMMY_CHILD"; })); }
+
     function lf_expandSel() {
         var n = lf_selNode();
         if (!n) { return; }
         if (n.ZLEVEL === 1 || n.ZLEVEL === 2) {
-            // 전체 펼침(로드된 노드 한정 — 원본 expandToLevel(99) 동일 의미).
-            _walkNodes(aTreeRoots, function (x) { if (_hasKids(x)) { oExpand[x.CHILD] = true; } });
-        } else {
-            // 서브트리 펼침(자신+자손 폴더).
-            (function rec(x) {
-                if (_hasKids(x)) { oExpand[x.CHILD] = true; x.MIMETREE.forEach(rec); }
-            })(n);
+            // ★ 루트/패키지 "전체 펼침" — 로드된(실자식 보유) 노드만. 저장소 전체 mass-fetch 안 함(안전).
+            _walkNodes(aTreeRoots, function (x) { if (_hasRealKids(x)) { oExpand[x.CHILD] = true; } });
+            oUI.tree.render();
+            return;
         }
-        oUI.tree.render();
+        // ★ 특정 폴더 "하위 트리 확장" — 미로드(더미) 폴더까지 lazy fetch 해서 실제로 펼침(한 폴더 한정, busy).
+        lf_expandSubtreeLazy(n);
+    }
+
+    /************************************************************************
+     * 서브트리 점진 펼침 — 선택 폴더의 서브트리를 lazy fetch(미로드 폴더만)하며 펼친다.
+     *   · 미로드(더미) 폴더 → /get_mime_children 호출 후 자식 구성 → 그 폴더 펼침 → 자손 재귀.
+     *   · 이미 로드된 폴더 → 바로 펼침 + 자손 재귀.  (루트 전체펼침엔 사용 안 함 — 저장소 대량호출 방지)
+     *   · 모든 fetch 완료 시 1회 render + busy 해제(중간 flicker 최소화).
+     ************************************************************************/
+    function lf_expandSubtreeLazy(oNode) {
+        if (!oNode) { return; }
+        lf_busy(true);
+        var iPending = 0;
+        function _done() { if (iPending === 0) { oUI.tree.render(); lf_busy(false); } }
+        function step(n) {
+            if (!n || n.CHILD === "DUMMY_CHILD") { return; }
+            if (oState.sLazy && _hasDummy(n)) {
+                // 미로드 폴더 — 자식 받아와 구성 후 펼치고 자손 재귀.
+                iPending++;
+                _getMimeChildData(n).then(function (oRes) {
+                    if (_buildChildrenFromResult(n, oRes) && _hasRealKids(n)) {
+                        oExpand[n.CHILD] = true;
+                        n.MIMETREE.forEach(step);
+                    }
+                    iPending--; _done();
+                });
+                return;
+            }
+            // 이미 로드된 노드 — 실자식 있으면 펼치고 자손 재귀.
+            if (_hasRealKids(n)) {
+                oExpand[n.CHILD] = true;
+                n.MIMETREE.forEach(step);
+            }
+        }
+        step(oNode);
+        _done();   // 동기 종료(미로드 없음) 시 즉시 마감.
     }
     function lf_collapseSel() {
         var n = lf_selNode();
         if (!n) { return; }
         oExpand[n.CHILD] = false;
         oUI.tree.render();
+    }
+
+    /************************************************************************
+     * 우클릭 컨텍스트 메뉴 — 원본 ev_MimeTreeTableContextMenu + fnGetMimeTreeDefCtxMenuList 이식.
+     *   공통 `.u4a-menu` 소비. ★모달 top-layer 위에 뜨도록 다이얼로그에 append★(body 면 모달 뒤에 깔림).
+     *   K1/K2 = 서브트리 펼침/접힘(완전 동작). K3~K6(폴더생성/삭제/Import/다운로드) = 다음 단위 → "준비중" 토스트.
+     ************************************************************************/
+    function _isEdit() { var o = _appInfo(); return !!(o && o.IS_EDIT === "X"); }
+
+    // 메뉴 정의(원본 순서/키/메시지) — K3 앞에 그룹 구분선(ISSTART).
+    function _mimeMenuDef() {
+        return [
+            { KEY: "K1", TXT: _txt("/U4A/CL_WS_COMMON", "C27"), FA: "angles-down", ISSTART: false, VISIBLE: true, ENABLED: true }, // Expand Subtree
+            { KEY: "K2", TXT: _txt("/U4A/CL_WS_COMMON", "C28"), FA: "angles-up", ISSTART: false, VISIBLE: true, ENABLED: true },   // Collapse Subtree
+            { KEY: "K3", TXT: _txt("/U4A/CL_WS_COMMON", "C29"), FA: "folder-plus", ISSTART: true, VISIBLE: true, ENABLED: true },  // Create Folder
+            { KEY: "K4", TXT: _txt("/U4A/CL_WS_COMMON", "C30"), FA: "trash", ISSTART: false, VISIBLE: true, ENABLED: true },       // Delete Object
+            { KEY: "K5", TXT: _txt("/U4A/CL_WS_COMMON", "C31"), FA: "file-import", ISSTART: false, VISIBLE: true, ENABLED: true }, // Import Mime Object
+            { KEY: "K6", TXT: _txt("/U4A/CL_WS_COMMON", "C32"), FA: "download", ISSTART: false, VISIBLE: true, ENABLED: true }     // Download Mime Object
+        ];
+    }
+
+    // 활성(ENABLED)/표시(VISIBLE) 규칙 — 원본 lf_mimeEdit / lf_mimeDisp 1:1.
+    function _applyMimeMenu(a, n) {
+        function E(k, b) { for (var i = 0; i < a.length; i++) { if (a[i].KEY === k) { a[i].ENABLED = b; return; } } }
+        function V(k, b) { for (var i = 0; i < a.length; i++) { if (a[i].KEY === k) { a[i].VISIBLE = b; return; } } }
+        var my = n.MYAPP, myc = n.MYAPPCHILD, ty = n.TYPE;
+        if (_isEdit()) {
+            if (my === "X") { E("K4", false); E("K6", false); return; }
+            if (myc === "X") {
+                if (ty === "F") { E("K6", false); return; }
+                V("K1", false); V("K2", false); E("K3", false); E("K5", false); return;
+            }
+            if (ty === "F") { E("K3", false); E("K4", false); E("K5", false); E("K6", false); return; }
+            V("K1", false); V("K2", false); E("K3", false); E("K4", false); E("K5", false); return;
+        }
+        // Display 모드 — 폴더: K1/K2 숨김+나머지 비활성 / 파일: 다운로드(K6)만 활성.
+        if (ty === "F") { V("K1", false); V("K2", false); E("K3", false); E("K4", false); E("K5", false); E("K6", false); return; }
+        V("K1", false); V("K2", false); E("K3", false); E("K4", false); E("K5", false); E("K6", true);
+    }
+
+    var _ctxEl = null;
+    function _closeMimeMenu() {
+        if (_ctxEl && _ctxEl.parentNode) { _ctxEl.parentNode.removeChild(_ctxEl); }
+        _ctxEl = null;
+        document.removeEventListener("mousedown", _onCtxDown, true);
+        document.removeEventListener("keydown", _onCtxKey, true);
+        window.removeEventListener("scroll", _closeMimeMenu, true);
+        window.removeEventListener("resize", _closeMimeMenu, true);
+    }
+    function _onCtxDown(ev) { if (_ctxEl && !_ctxEl.contains(ev.target)) { _closeMimeMenu(); } }
+    function _onCtxKey(ev) { if (ev.key === "Escape") { _closeMimeMenu(); } }
+
+    function _openMimeMenu(iX, iY, n) {
+        _closeMimeMenu();
+        var a = _mimeMenuDef();
+        _applyMimeMenu(a, n);
+
+        var oWrap = _el("div", "u4a-menu");
+        oWrap.setAttribute("role", "menu");
+        var bAny = false;
+        a.forEach(function (mi) {
+            if (!mi.VISIBLE) { return; }
+            if (mi.ISSTART && bAny) { oWrap.appendChild(_el("div", "u4a-menu__sep")); }
+            var oItem = _el("div", "u4a-menu__item");
+            oItem.setAttribute("role", "menuitem");
+            if (mi.ENABLED === false) { oItem.setAttribute("aria-disabled", "true"); }
+            oItem.innerHTML = _fa(mi.FA) + '<span class="u4a-menu__item-text"></span>';
+            oItem.querySelector(".u4a-menu__item-text").textContent = mi.TXT;
+            if (mi.ENABLED !== false) {
+                oItem.addEventListener("click", function () { _closeMimeMenu(); _ctxDispatch(mi.KEY, n); });
+            }
+            oWrap.appendChild(oItem);
+            bAny = true;
+        });
+        if (!bAny) { return; }
+
+        // ★ 다이얼로그(top-layer)에 append — body 면 모달 뒤에 깔려 안 보임. 위치는 커서 기준 뷰포트 클램프.
+        oWrap.style.visibility = "hidden";
+        (oUI && oUI.dlg ? oUI.dlg : document.body).appendChild(oWrap);
+        var iW = oWrap.offsetWidth, iH = oWrap.offsetHeight, iVw = window.innerWidth, iVh = window.innerHeight;
+        var iLeft = (iX + iW + 4 <= iVw) ? iX : (iX - iW); if (iLeft < 4) { iLeft = 4; }
+        var iTop = (iY + iH + 4 <= iVh) ? iY : (iY - iH); if (iTop < 4) { iTop = 4; }
+        if (iTop + iH + 4 > iVh) { iTop = Math.max(4, iVh - iH - 4); }
+        oWrap.style.left = iLeft + "px";
+        oWrap.style.top = iTop + "px";
+        oWrap.style.visibility = "";
+        _ctxEl = oWrap;
+
+        document.addEventListener("mousedown", _onCtxDown, true);
+        document.addEventListener("keydown", _onCtxKey, true);
+        window.addEventListener("scroll", _closeMimeMenu, true);
+        window.addEventListener("resize", _closeMimeMenu, true);
+    }
+
+    // 클릭 디스패치 — K1/K2 동작, K3~K6 "준비중" 토스트(다음 단위, ZMSG_WS_COMMON_001/498).
+    function _ctxDispatch(sKey, n) {
+        try {
+            if (sKey === "K1") { lf_expandSel(); return; }
+            if (sKey === "K2") { lf_collapseSel(); return; }
+            parent.showMessage(null, 10, "I", _wsTxt("498"));   // 준비중
+        } catch (e) { console.error("[HTML5][MIME] 컨텍스트 메뉴 오류:", sKey, e); }
     }
 
     /************************************************************************
@@ -866,6 +1013,17 @@
         var oTree = lf_buildTreeCmp();
         oTreeBody.appendChild(oTree.el);
         oTreePane.appendChild(oTreeBody);
+
+        // 트리 행 우클릭 → 선택(+미리보기) 후 컨텍스트 메뉴(원본 동일). 더미 노드는 무시.
+        oTreeBody.addEventListener("contextmenu", function (ev) {
+            var oRow = (ev.target && ev.target.closest) ? ev.target.closest(".u4aMimeRow") : null;
+            ev.preventDefault();
+            if (!oRow) { _closeMimeMenu(); return; }
+            var n = oRow.__mimeNode;
+            if (!n) { _closeMimeMenu(); return; }   // 더미(No data) 행 등
+            lf_onRowSelect(n, oRow);
+            _openMimeMenu(ev.clientX, ev.clientY, n);
+        });
 
         var oBarH = _el("div", "u4a-splitter__bar");
         oBarH.setAttribute("role", "separator");
@@ -1099,6 +1257,7 @@
     // 팝업 닫기 — 숨김(재사용). busy 해제.
     function lf_close() {
         try { clearTimeout(iWatch); } catch (e) { }
+        try { _closeMimeMenu(); } catch (e) { }
         lf_busy(false);
         try { parent.setBusy(""); } catch (e) { }
         try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }

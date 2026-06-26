@@ -643,7 +643,7 @@
         BACK.id = "ws20AppHeaderBackBtn";
         BACK.className = "u4aWs20AppHdrBtn back";
         BACK.title = "Back";
-        BACK.innerHTML = _fa("arrow-left");
+        BACK.innerHTML = _fa("chevron-left");
         BACK.addEventListener("click", function () {
             try {
                 if (oAPP.events && typeof oAPP.events.ev_pageBack === "function") {

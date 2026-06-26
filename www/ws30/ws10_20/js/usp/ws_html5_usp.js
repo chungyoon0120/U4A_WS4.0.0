@@ -293,7 +293,7 @@
         BACK.id = "ws30AppHeaderBackBtn";
         BACK.className = "u4aWs30AppHdrBtn back";
         BACK.title = "Back";
-        BACK.innerHTML = _fa("arrow-left");
+        BACK.innerHTML = _fa("chevron-left");
         BACK.addEventListener("click", _uspBack);
         HDR.appendChild(BACK);
 
@@ -1399,16 +1399,34 @@
         var aNested = oAPP.fn.fnBuildUspTree($.extend(true, [], aFlat));
         APPCOMMON.fnSetModelProperty("/WS30/USPTREE", aNested);
 
-        // 우측 콘텐츠가 이름 변경 대상이면 갱신(+ 언어 재적용)
+        // 우측 콘텐츠가 이름 변경 대상이면 갱신(+ 언어 재적용 + Properties 패널 재표시).
+        //   변경 노드 필드(SPATH/OBDEC/+MIME/EXTEN)만 기존 USPDATA 에 덮어써 CONTENT 등 보존.
         var aChg = oParams.CHANGEDATA || [];
         var oCur = _model("/WS30/USPDATA") || {};
-        var oFound = aChg.find(function (e) { return e && oCur && e.OBJKY === oCur.OBJKY; });
-        if (oFound) {
-            APPCOMMON.fnSetModelProperty("/WS30/USPDATA", oFound);
-            try { oAPP.usp.sendEditorPostMessageAll({ actcd: "language_change", extension: oFound.EXTEN || "" }); } catch (e) { }
+        var oChgSel = aChg.find(function (e) { return e && oCur && e.OBJKY === oCur.OBJKY; });
+        if (oChgSel) {
+            var oMerged = $.extend(true, {}, oCur, oChgSel);
+            APPCOMMON.fnSetModelProperty("/WS30/USPDATA", oMerged);
+            // Properties 패널(URL=SPATH·이름 등)을 새 값으로 다시 그림 — 선택 핸들러와 동일.
+            try { if (oAPP.fn.fnRenderUspProperties) { oAPP.fn.fnRenderUspProperties(); } } catch (e) { }
+            // 에디터 헤더 파일명 라벨도 새 이름으로 갱신(열린 파일이 변경 대상일 때).
+            try { if (oAPP.usphtml.editorRefreshToolbar) { oAPP.usphtml.editorRefreshToolbar(); } } catch (e) { }
+            try { oAPP.usp.sendEditorPostMessageAll({ actcd: "language_change", extension: oMerged.EXTEN || "" }); } catch (e) { }
         }
         try { if (oAPP.fn.fnRenderUspTree) { oAPP.fn.fnRenderUspTree(); } } catch (e) { }
-        try { if (oAPP.fn.fnUspTreeMarkSelected && oFound) { oAPP.fn.fnUspTreeMarkSelected(oFound); } } catch (e) { }
+        // 선택 표시는 새로 빌드된 트리(aNested) 의 "실제 노드" 에 찍어야 한다. oChgSel 은 CHANGEDATA
+        //   의 분리된 복사본이라, 그걸 넘기면 fnUspTreeMarkSelected 가 트리 노드 ISSEL 은 전부 false 로
+        //   비운 뒤 엉뚱한 복사본에만 true 를 찍어 모델 ISSEL=false → 이후 Activate 재렌더 시 선택이 풀린다.
+        if (oChgSel && oAPP.fn.fnUspTreeMarkSelected) {
+            var oRealNode = (function findByKey(arr) {
+                for (var i = 0; i < arr.length; i++) {
+                    if (arr[i] && arr[i].OBJKY === oChgSel.OBJKY) { return arr[i]; }
+                    if (arr[i] && Array.isArray(arr[i].USPTREE)) { var r = findByKey(arr[i].USPTREE); if (r) { return r; } }
+                }
+                return null;
+            })(_model("/WS30/USPTREE") || []);
+            try { if (oRealNode) { oAPP.fn.fnUspTreeMarkSelected(oRealNode); } } catch (e) { }
+        }
 
         oAPP.common.fnSetBusyLock("");
         try { var d = document.getElementById("uspRnNodePopup"); if (d) { try { d.close(); } catch (e2) { } d.remove(); } } catch (e) { }
@@ -1494,7 +1512,7 @@
         var oLab = document.createElement("label"); oLab.className = "u4a-label"; oLab.style.cssText = "flex:0 0 auto;min-width:0";
         oLab.textContent = oNode.OBDEC || "";
         var oInp = document.createElement("input");
-        oInp.type = "number"; oInp.className = "u4a-input"; oInp.style.cssText = "flex:1 1 auto;width:auto";
+        oInp.type = "number"; oInp.className = "u4a-input"; oInp.style.cssText = "flex:1 1 auto;width:auto;text-align:center";
         oInp.min = "1"; oInp.max = String(nTot); oInp.value = String(iCur + 1);
         var oMax = document.createElement("span"); oMax.style.cssText = "flex:0 0 auto;color:var(--text-muted)";
         oMax.textContent = "/ " + nTot;
@@ -1886,7 +1904,8 @@
         try {
             if (parent.REMOTE && parent.REMOTE.clipboard) { parent.REMOTE.clipboard.writeText(sUrl || ""); }
             else if (navigator.clipboard) { navigator.clipboard.writeText(sUrl || ""); }
-            oAPP.common.fnShowFloatingFooterMsg("S", "WS30", _msg("C21"));
+            // 토스트(구 MessageToast) — MIME URL Copy 와 동일 메시지(MSG_WS 303 = Clipboard Copy Success!).
+            try { parent.showMessage(null, 10, "S", _msgWs("303")); } catch (e2) { }
         } catch (e) { console.error("[HTML5][WS30] url copy error:", e); }
     }
 

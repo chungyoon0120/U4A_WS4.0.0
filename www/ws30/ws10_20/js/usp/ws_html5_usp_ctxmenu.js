@@ -53,8 +53,8 @@
             { KEY: "K3",  TXT: _msg("A01"), FA: "plus",               ISSTART: true,  VISIBLE: true },
             { KEY: "K4",  TXT: _msg("A03"), FA: "trash",              ISSTART: false, VISIBLE: true },
             { KEY: "K7",  TXT: _msg("D44"), FA: "pen",                ISSTART: false, VISIBLE: true },
-            { KEY: "K8",  TXT: _msg("A55"), FA: "arrow-up",           ISSTART: true,  VISIBLE: true },
-            { KEY: "K9",  TXT: _msg("A56"), FA: "arrow-down",         ISSTART: false, VISIBLE: true },
+            { KEY: "K8",  TXT: _msg("A55"), FA: "chevron-up",         ISSTART: true,  VISIBLE: true },
+            { KEY: "K9",  TXT: _msg("A56"), FA: "chevron-down",       ISSTART: false, VISIBLE: true },
             { KEY: "K10", TXT: _msg("A57"), FA: "up-down-left-right", ISSTART: false, VISIBLE: true },
             { KEY: "K12", TXT: _msg("D88"), FA: "upload",             ISSTART: true,  VISIBLE: false },
             { KEY: "K5",  TXT: _msg("B78"), FA: "download",           ISSTART: false, VISIBLE: true }
@@ -66,6 +66,28 @@
      *   Display(_Display) : K3/K4/K6/K7/K8/K9/K10/K11/K12 비활성. 파일만 K6/K11 활성.
      *   Change(_Change)   : 루트→K4/K6/K7/K8/K9/K10/K11 비활성 / 폴더→K6/K11 비활성 / 파일→K3/K12 비활성.
      ************************************************************************/
+    // 형제 배열 + 그 안에서의 인덱스 (이동 가용성 판정용). _fnUspSiblings(셸) 과 동일 규칙:
+    //   루트레벨=모델 최상위, 그 외=부모 노드의 USPTREE.
+    function _siblingsAndIndex(oNode) {
+        var aTree = [];
+        try { aTree = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { }
+        var aSib = null;
+        if (oNode.PUJKY === "" || oNode.PUJKY == null) {
+            aSib = aTree;
+        } else {
+            (function rec(arr) {
+                for (var i = 0; i < arr.length; i++) {
+                    if (arr[i] && arr[i].OBJKY === oNode.PUJKY) { aSib = arr[i].USPTREE || []; return; }
+                    if (arr[i] && Array.isArray(arr[i].USPTREE)) { rec(arr[i].USPTREE); }
+                    if (aSib) { return; }
+                }
+            })(aTree);
+        }
+        if (!aSib) { aSib = []; }
+        var idx = aSib.findIndex(function (n) { return n && n.OBJKY === oNode.OBJKY; });
+        return { len: aSib.length, idx: idx };
+    }
+
     function _applyEnable(aMenu, oNode) {
         var bRoot = (oNode.PUJKY === "" || oNode.PUJKY == null);
         var bFold = (oNode.ISFLD === "X");
@@ -85,6 +107,16 @@
             ["K4", "K6", "K7", "K8", "K9", "K10", "K11"].forEach(function (k) { set(k, false); });
             return;
         }
+        // 비루트 공통 — 형제 위치 기반 이동(Up/Down/Move) 가용성 (WS20 트리와 동일 UX):
+        //   형제 1개=이동 전부 불가, 첫째=Up 불가, 막내=Down 불가. (원본 USP 엔 없던 개선)
+        (function () {
+            var si = _siblingsAndIndex(oNode);
+            if (si.len <= 1) { set("K8", false); set("K9", false); set("K10", false); }
+            else {
+                if (si.idx === 0) { set("K8", false); }
+                if (si.idx === si.len - 1) { set("K9", false); }
+            }
+        })();
         if (bFold) {
             ["K6", "K11"].forEach(function (k) { set(k, false); });
             return;
