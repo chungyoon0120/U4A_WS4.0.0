@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- U4A MIME Repository(별도 BrowserWindow) — 인앱 .u4a-dialog(showModal) → 모달형 별도창으로 전환.
+         창 크롬(공통 .u4a-titlebar: 로고/제목/min·max·close)·테마·Busy·IPC = frame.js,
+         트리/속성/미리보기 본문 = mime.js(같은 창에서 #mimeRoot 에 직접 렌더, 인앱 로직 1:1 이식).
+         스택(OTR 동일): tokens → shell → bootstrap-skin(.u4a-titlebar/.u4a-winbtn 스킨) → FA → theme-api → u4a-ui.
+         경로: Popups/mimeRepository 기준 → theme=../../theme, lib=../../../../lib. (browser-window-common-ux) -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="mime.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 BGCOL/THEME/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* frame.js 에서 재적용 */ }
+        })();
+    </script>
+</head>
+
+<body>
+
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/min·max·close (OTR/CSS Editor 동일) ===== -->
+    <header class="u4a-titlebar" id="mimeTitlebar">
+        <img class="u4a-titlebar__logo" id="mimeLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="mimeTitle"></span>
+        <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="mimeWinMin" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="mimeWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="mimeWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- 본문 = 트리/속성/미리보기(mime.js 가 직접 렌더). 데이터 도착 후 페이드인 -->
+    <div id="mimeContent">
+        <div id="mimeRoot"></div>
+    </div>
+
+    <!-- Busy 오버레이(경량 스피너) — frame.js setBusy 가 토글 -->
+    <div id="mimeBusy" hidden><div class="mimeBusy__spin"></div></div>
+
+    <script>
+        /************************************************************************
+         * 에러 감지 — mime.js 가 parent.WSERR 처럼 재사용(같은 창이라 window.WSERR)
+         ************************************************************************/
+        var REMOTE = require('@electron/remote'),
+            PATH = REMOTE.require('path'),
+            APP = REMOTE.app,
+            APPPATH = APP.getAppPath(),
+            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
+            PATHINFO = require(PATHINFOURL),
+            WSERR = require(PATHINFO.WSTRYCATCH);
+
+        var zconsole = WSERR(window, document, console);
+    </script>
+
+    <script src="frame.js"></script>
+    <!-- CTS(이관요청) 선택 공통 팝업 — 폴더 생성(전송 가능 패키지) 재사용. 의존성은 mime.js 가 주입. -->
+    <script src="../../js/fnCtsPopupOpen.js"></script>
+    <script src="mime.js"></script>
+</body>
+
+</html>

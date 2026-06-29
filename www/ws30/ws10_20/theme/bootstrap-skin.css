@@ -287,7 +287,10 @@ html[data-sl-theme="dark"] .btn-close {
     background-color: var(--sl-surface);
     border-color: var(--sl-border);
     border-radius: var(--sl-radius);
-    box-shadow: var(--sl-elev);
+    /* 모달은 메뉴/팝오버(--sl-elev)보다 더 또렷이 떠 보이게 — 다이얼로그 전용 깊은 그림자
+       (넓게 퍼지는 큰 그림자 + 가까운 그림자, 라이트/다크 공통 검정). ★ 그림자 SSOT 는 이 skin
+       (shell.css 의 .u4a-dialog box-shadow 뒤에 로드돼 이김) 이므로 여기서 정한다. */
+    box-shadow: 0 1.5rem 3.5rem rgba(0, 0, 0, .5), 0 0.5rem 1.25rem rgba(0, 0, 0, .32);
     color: var(--sl-fg);
 }
 
@@ -441,11 +444,19 @@ html[data-sl-theme="dark"] .btn-close {
 }
 
 /* 토스트 / 툴팁 / busy 카드 / empty */
+/* 토스트(MessageToast)는 5종 테마 색을 따르지 않고 '다크냐 아니냐' 두 케이스로만 고정(UI5 식).
+   → 비-다크 = 흰 알약 + 어두운 글자 / 다크 = 어두운 알약 + 흰 글자. (요청: 테마색 추종 금지) */
 .u4a-toast {
-    background: var(--sl-surface);
-    border-color: var(--sl-border);
-    color: var(--sl-fg);
-    box-shadow: var(--sl-elev);
+    background: #ffffff;
+    color: #1d2d3e;
+    border-color: rgba(0, 0, 0, .12);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, .22), 0 0.125rem 0.5rem rgba(0, 0, 0, .14);
+}
+html[data-sl-theme="dark"] .u4a-toast {
+    background: #2b3038;
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, .14);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, .5), 0 0.125rem 0.5rem rgba(0, 0, 0, .3);
 }
 .u4a-tooltip {
     background: var(--sl-surface);

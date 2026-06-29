@@ -382,6 +382,9 @@
 
         var oCombo = document.querySelector("#uspEditorHost .u4aWs30EditorThemeSel");
         if (oCombo) { try { oCombo.value = _selectedTheme(); } catch (e) { } }
+
+        // 버튼 활성/표시 상태 변경(파일↔폴더 등) 후 오버플로 재계산.
+        try { if (_editorTbOvf) { _editorTbOvf.reflow(); } } catch (e) { }
     }
     // 외부(예: Rename 적용)에서 에디터 헤더 파일명/상태만 갱신 — 재로드 없이.
     oAPP.usphtml.editorRefreshToolbar = _refreshToolbarInfo;
@@ -409,16 +412,16 @@
         TB.appendChild(SPC);
 
         // 테마 콤보 (구 ComboBox aThemeList, groupName standard/custom) — U4AUI.createSelect(그룹 확장)
+        //   위치는 원본대로 컨트롤 맨 앞(스페이서 바로 뒤). 좁아지면 attachOverflow 가 ⋯ 로 접는다.
         try {
             if (window.U4AUI && U4AUI.createSelect) {
                 var aTheme = _themeList();
                 var aItems = aTheme.map(function (t) {
                     return { value: t.name, text: t.name, group: _themeGroupLabel(t.groupName) };
                 });
-                var sSel = _selectedTheme();
-                var oCombo = U4AUI.createSelect(aItems, sSel, _onThemeChange);
-                oCombo.classList.add("u4aWs30EditorThemeSel");
-                TB.appendChild(oCombo);
+                var oThemeCombo = U4AUI.createSelect(aItems, _selectedTheme(), _onThemeChange);
+                oThemeCombo.classList.add("u4aWs30EditorThemeSel");
+                TB.appendChild(oThemeCombo);
             }
         } catch (e) { console.error("[HTML5][WS30] theme combo build error:", e); }
 
@@ -460,8 +463,55 @@
             press: _prettyPrint
         }));
 
+        // 영역이 좁아지면 콤보+버튼을 ⋯ 오버플로 메뉴로 접는다(공통 U4AUI.attachOverflow).
+        //   · 제목/스페이서는 가변(축소)이라 측정·숨김 대상에서 제외(isSkip) → 콤보+버튼에 자리 양보.
+        //   · 스페이서가 우측정렬을 담당하므로 ⋯ 는 auto-margin 없이 버튼 끝에 붙인다(noOvfAutoMargin).
+        //   · 테마 콤보는 메뉴 안에서 "테마 목록"으로 펼친다 — 콤보 노드를 메뉴로 옮기면 닫힐 때 함께
+        //     파괴되는 문제가 있어, 항목 클릭 시 콤보값 동기화 + 테마 적용으로 대체(노드 이동 없음).
+        try {
+            if (window.U4AUI && U4AUI.attachOverflow) {
+                _editorTbOvf = U4AUI.attachOverflow(TB, {
+                    noOvfAutoMargin: true,
+                    // 스페이서만 측정 제외(가변). 제목(파일명)은 폭에 포함시켜 그 폭만큼 콤보/버튼이
+                    //   먼저 ⋯ 로 접히게 한다 → 제목은 끝까지 보존(핵심 정보). 제목은 DOM 첫 항목이라
+                    //   가장 마지막에야 접힘(사실상 항상 표시).
+                    isSkip: function (el) {
+                        return el.classList.contains("u4aWs30EditorTbSpacer");
+                    },
+                    menuItem: function (el) {
+                        // 테마 콤보 → 메뉴 안에 "드롭다운 그대로" 한 항목으로 그린다(목록을 통째로
+                        //   펼치지 않음). 메뉴 열 때마다 일회용 콤보를 새로 만들어 넣고(닫힐 때 메뉴와 함께
+                        //   사라져도 무방), 선택 시 실제 툴바 콤보 값 동기화 + 테마 적용한다.
+                        if (el.classList.contains("u4aWs30EditorThemeSel")) {
+                            var aThemeItems = _themeList().map(function (t) {
+                                return { value: t.name, text: t.name, group: _themeGroupLabel(t.groupName) };
+                            });
+                            var oMenuCombo = U4AUI.createSelect(aThemeItems, _selectedTheme(), function (v) {
+                                try { el.value = v; } catch (e) { }   // 실제(숨은) 툴바 콤보 값 동기화
+                                _onThemeChange(v);
+                            });
+                            oMenuCombo.classList.add("u4aWs30EditorThemeSel");
+                            oMenuCombo.style.width = "100%";
+                            return { node: oMenuCombo };
+                        }
+                        // 일반 버튼 — 라벨은 공용 btnLabel(title→data-tip→aria 폴백), 비활성이면 흐리게+무시.
+                        var oI = el.querySelector("i");
+                        var bDis = el.disabled === true || el.classList.contains("is-disabled");
+                        return {
+                            iconHtml: oI ? oI.outerHTML : "",
+                            text: window.U4AUI.btnLabel(el, true),
+                            disabled: bDis,
+                            onClick: function () { if (!bDis) { el.click(); } }
+                        };
+                    }
+                });
+            }
+        } catch (e) { console.warn("[HTML5][WS30] editor toolbar overflow attach 실패:", e && e.message); }
+
         return TB;
     }
+    // 에디터 헤더 툴바 오버플로 컨트롤러(_refreshToolbarInfo 가 갱신 후 reflow 호출).
+    var _editorTbOvf = null;
 
     /************************************************************************
      * [PUBLIC] 선택 파일을 스플릿 에디터(2개)에 표시 (읽기) — 셸 _fnLineSelectCb 가 호출.

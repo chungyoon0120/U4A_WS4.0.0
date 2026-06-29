@@ -895,6 +895,8 @@ button:focus-visible {
     border-radius: var(--radius);
     background: var(--surface-raised);
     color: var(--text);
+    /* ★ 모달 그림자(elevation)의 실제 단일 출처 = bootstrap-skin.css 의 .u4a-dialog
+       (shell.css 뒤에 로드돼 이 box-shadow 를 덮는다). 여기 값은 skin 미로드 컨텍스트용 폴백일 뿐. */
     box-shadow: var(--popover-shadow);
 }
 
@@ -948,6 +950,12 @@ button:focus-visible {
      (createApplicationPopup/AppCopy/Cts/SelectBrowser/SysNoti/WS20Layout…). 여기 한 줄로 전 팝업 공통 적용. */
 .u4a-dialog__header > span {
     flex: 1 1 auto;
+    /* 제목이 길어도(긴 서버명/언더바 연속 등) 헤더를 밀어내지 않게 말줄임 한 줄.
+       min-width:0 이라야 flex 항목이 내용보다 작아져 ellipsis 가 먹는다. 전체는 title 호버. */
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 /* 헤더의 "선두 상태 아이콘"만 대상(> i, 직계). 헤더 안의 닫기 X·액션 버튼 속 아이콘(button > i)은
@@ -1344,6 +1352,10 @@ button:focus-visible {
     cursor: pointer;
     user-select: none;
 }
+/* hidden 속성 존중 — `.u4a-combo{display:flex}` 가 UA `[hidden]{display:none}` 를 특이도로
+   이겨버려, el.hidden=true 로도 콤보가 안 숨겨졌다. 오버플로 툴바(U4AUI.attachOverflow)가
+   넘치는 콤보를 el.hidden 으로 접을 때 콤보만 안 접히고 메뉴+툴바에 중복되던 버그 → 명시적 차단. */
+.u4a-combo[hidden] { display: none !important; }
 
 .u4a-combo:hover {
     border-color: var(--text-muted);
@@ -1538,8 +1550,10 @@ button:focus-visible {
 }
 
 /* ── 모달 backdrop (체크리스트 C) ───────────────────────────────── */
+/* 배경 전체를 어둡게 하지 않는다(사용자 요청) — 모달 강조는 .u4a-dialog 의 그림자(busy 카드처럼
+   떠 보이는 입체)가 담당. backdrop 은 투명(클릭 차단/top-layer 역할만). */
 dialog::backdrop {
-    background: var(--overlay-scrim);
+    background: transparent;
 }
 
 /* ── 고대비 모드 (체크리스트 I) ─────────────────────────────────── */

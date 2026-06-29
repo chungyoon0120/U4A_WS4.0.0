@@ -72,7 +72,9 @@
     }; // end of oAPP.fn.fnFindPopupOpener
 
     /************************************************************************
-     * WS20의 MIME Dialog Opener
+     * WS20의 MIME Dialog Opener (★기존 인앱 .u4a-dialog 판 — 롤백용으로 보존)
+     *   현재 활성 경로는 fnMimeWindowOpener(별도 BrowserWindow). 되돌리려면 호출부를
+     *   다시 이 메소드로 바꾸면 된다. (ws_events / ws_html5_usp / fnCssJsLinkAddPopupOpen)
      ************************************************************************/
     oAPP.fn.fnMimeDialogOpener = function () {
 
@@ -86,6 +88,137 @@
         });
 
     }; // end of fnMimeDialogOpener
+
+    /************************************************************************
+     * WS20의 MIME Repository Opener — 별도 모달 BrowserWindow 판(★현재 활성).
+     *   본문(트리/속성/미리보기)은 Popups/mimeRepository(frame.html+frame.js+mime.js)가 자기완결로 렌더.
+     *   MIME 팝업은 WS20 로 되쓰기(상태 변경)가 없고 "현재 앱 정보"만 받아 좌측 트리를 표시 → IPC 단방향.
+     *   계약: if-mime-info { oUserInfo, oThemeInfo, oAppInfo, servNm, wloLazy }. (browser-window-common-ux)
+     *   ★ 인앱 판(fnMimeDialogOpener)은 롤백용으로 보존 — 둘은 독립.
+     ************************************************************************/
+    oAPP.fn.fnMimeWindowOpener = function () {
+
+        // busy 키고 Lock 걸기 + 전체 자식 윈도우 Busy
+        oAPP.common.fnSetBusyLock("X");
+        try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { }
+
+        let sPopupName = "MIMEPOP";
+
+        // 이미 열린 MIME 창이 있으면 새로 띄우지 말고 포커스만.
+        //   ★ 부모(parent) 미지정이라 getChildWindows 기반 getCheckAlreadyOpenWindow 로는 못 찾음
+        //     → 전체 창(getAllWindows)에서 URL OBJTY=MIMEPOP 로 검색(부모 무관).
+        try {
+            let aAll = REMOTE.BrowserWindow.getAllWindows();
+            for (let wi = 0; wi < aAll.length; wi++) {
+                let oW = aAll[wi];
+                if (!oW || oW.isDestroyed()) { continue; }
+                let sT = "";
+                try { sT = WSUTIL.QueryString.parse(oW.getURL()).OBJTY; } catch (e) { sT = ""; }
+                if (sT !== sPopupName) { continue; }
+                try { if (oW.isMinimized()) { oW.restore(); } } catch (e) { }
+                try { oW.focus(); } catch (e) { }
+                oAPP.common.fnSetBusyLock("");
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+                return;
+            }
+        } catch (e) { }
+
+        let SESSKEY2 = parent.getSessionKey(),
+            BROWSKEY2 = parent.getBrowserKey(),
+            oUserInfo = parent.getUserInfo(),
+            oThemeInfo = parent.getThemeInfo();
+
+        // WLO(UHAK901016) 지연로드 플래그 — WS20 에서 판정해 전달(별도창은 모델 비결합).
+        let bWloLazy = false;
+        try { bWloLazy = (oAPP.common.checkWLOList("C", "UHAK901016") === true); } catch (e) { bWloLazy = false; }
+
+        // 현재 편집 중인 APP 정보 — 원본 fnMimePopupOpen _appInfo() 와 동일하게 모델에서 읽어 전달.
+        //   (getAppInfo()=워크스페이스 레벨이라 WS20 편집 대상과 다를 수 있어 트리 스코프가 어긋남)
+        let oMimeAppInfo = {};
+        try { oMimeAppInfo = oAPP.common.fnGetModelProperty("/WS20/APP") || {}; } catch (e) { oMimeAppInfo = {}; }
+        try { var _w3 = oAPP.common.fnGetModelProperty("/WS30/APP"); if (_w3 && _w3.APPID) { oMimeAppInfo = _w3; } } catch (e) { }
+
+        // 브라우저 옵션
+        let sSettingsJsonPath = parent.getPath("BROWSERSETTINGS"),
+            oDefaultOption = parent.require(sSettingsJsonPath),
+            oBrowserOptions = jQuery.extend(true, {}, oDefaultOption.browserWindow);
+
+        let sMimeTitle = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C26"); // U4A MIME Repository
+
+        oBrowserOptions.title = sMimeTitle;
+        oBrowserOptions.autoHideMenuBar = true;
+        // ★ 비모달 + 부모 미지정(사용자 결정) — 메인 창을 막지 않는 독립 창.
+        //   (modal/parent 설정 제거. 되돌리려면 parent=CURRWIN; modal=true; 추가)
+        oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
+        // [HTML5] frameless — 네이티브 OS 헤더 제거(공통 .u4a-titlebar 사용).
+        oBrowserOptions.titleBarStyle = "hidden";
+        // [HTML5] 네이티브 opacity 페이드 미사용 — backgroundColor 로 즉시 불투명, show=false 로 위치 잡고 표시.
+        oBrowserOptions.show = false;
+        oBrowserOptions.closable = false;
+
+        oBrowserOptions.webPreferences.partition = SESSKEY2;
+        oBrowserOptions.webPreferences.browserkey = BROWSKEY2;
+        oBrowserOptions.webPreferences.OBJTY = sPopupName;
+        oBrowserOptions.webPreferences.USERINFO = parent.process.USERINFO;
+
+        let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
+        REMOTEMAIN.enable(oBrowserWindow.webContents);
+
+        // ★ 부모(parent) 미지정이라 getChildWindows 로 안 잡힘 → 메인의 자식창 맵에 등록해
+        //   뒤로가기/모드전환(fnCloseAllWs20Dialogs → fnChildWindowClose → _closeAllChildWindowMap)에
+        //   같은 브라우저키 팝업으로 자동 닫히게 한다. (닫힐 때 맵에서 제거)
+        let oChildMap = null;
+        try { oChildMap = parent.CURRWIN && parent.CURRWIN._aChildWinMap; } catch (e) { oChildMap = null; }
+        try { if (oChildMap) { oChildMap.set(oBrowserWindow.id, oBrowserWindow); } } catch (e) { }
+
+        let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
+        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+
+        const oQueryParams = {
+            browserkey: oBrowserOptions?.webPreferences?.browserkey,
+            sessionKey: oBrowserOptions?.webPreferences?.partition,
+            OBJTY: sPopupName,
+            USERINFO: parent.process.USERINFO,
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: sMimeTitle,
+            // 메인(WS) 창 id — 부모 미지정이라 메인이 상단 X/앱종료로 닫힐 때 따라죽도록
+            //   MIME 창이 이 창의 'closed' 를 직접 구독(frame.js)해 self-close.
+            OPENERID: CURRWIN.id
+        };
+
+        const sUrlPath = parent.getPath(sPopupName);
+        const sLoadUrl = parent.WSUTIL.QueryString.build(sUrlPath, oQueryParams);
+
+        oBrowserWindow.loadURL(sLoadUrl);
+
+        oBrowserWindow.once('ready-to-show', () => {
+            WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
+        });
+
+        oBrowserWindow.webContents.on('did-finish-load', function () {
+
+            let oSendData = {
+                oUserInfo: oUserInfo,
+                oThemeInfo: oThemeInfo,
+                oAppInfo: oMimeAppInfo,
+                servNm: parent.getServerPath(),
+                wloLazy: bWloLazy
+            };
+
+            oBrowserWindow.webContents.send('if-mime-info', oSendData);
+
+            WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
+        });
+
+        let iMimeWinId = oBrowserWindow.id;
+        oBrowserWindow.on('closed', () => {
+            try { if (oChildMap) { oChildMap.delete(iMimeWinId); } } catch (e) { }
+            oBrowserWindow = null;
+            CURRWIN.focus();
+        });
+
+    }; // end of fnMimeWindowOpener
 
     /************************************************************************
      * WS20의 CSS & JS Link Add 팝업 실행시켜 주는 메소드

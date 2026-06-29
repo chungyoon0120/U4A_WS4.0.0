@@ -317,6 +317,14 @@
     text-align: right;
 }
 .u4aWs30FormField { min-width: 0; }
+/* 반응형 — 폭이 좁으면(ResizeObserver 가 data-narrow 토글, 컨테이너 쿼리 미지원 대체)
+   라벨|필드 2열 → 라벨 위/필드 아래 1열 스택 + 라벨 좌측정렬. Properties·Document 공용. */
+.u4aWs30Form[data-narrow="1"] .u4aWs30FormRow {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 0.125rem;
+}
+.u4aWs30Form[data-narrow="1"] .u4aWs30FormLabel { text-align: left; }
 /* 입력칸 활성/비활성(readonly) 시각 구분은 공통이 담당 — shell.css `.u4a-input:read-only`
    (들어간 --app-bg + muted, 전 테마 대비 보장). WS30 별도 처리 없음. */
 .u4aWs30Input { width: 100%; }
@@ -362,6 +370,11 @@
     padding: 0.25rem 0.5rem;
     background: var(--ws30-header-bg);
     border-bottom: 0.0625rem solid var(--ws30-line);
+    /* ★ 오버플로 동작 핵심: min-width:0 이 없으면 툴바가 자식들의 min-content 폭(콤보 8rem 등)으로
+       버텨 호스트보다 넓어진다 → attachOverflow 가 보는 clientWidth 가 실제 가용폭보다 커져 "다 들어감"
+       으로 오판해 접히지 않고 흘러넘친다. 0 으로 두면 툴바가 호스트 폭에 맞춰지고 콤보/버튼이 ⋯ 로 접힘. */
+    min-width: 0;
+    overflow: hidden;
 }
 .u4aWs30EditorTitle {
     font-weight: 700;
@@ -369,7 +382,10 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 40%;
+    /* 선택 파일명 = 핵심 정보. 쪼그라들지 않게 고정(flex 0 0) — 좁아지면 콤보/버튼이 ⋯ 로 접히고
+       제목은 끝까지 유지(아주 긴 이름만 50% 한도에서 말줄임). 오버플로 측정엔 포함됨. */
+    flex: 0 0 auto;
+    max-width: 50%;
 }
 .u4aWs30EditorTbSpacer { flex: 1 1 auto; }
 /* 테마 콤보 — 공통 .u4a-combo 기본은 width:100%(폼 필드용)이라 툴바에서 전체 폭을 먹는다.

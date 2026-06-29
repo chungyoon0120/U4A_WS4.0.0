@@ -1687,10 +1687,15 @@
             // [HTML5] 앱헤더(Active/Inactive)·트랜잭션 버튼 상태 갱신
             try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
 
-            // undo, redo 이력/버튼 초기화 (design 모듈 미로드 시 skip)
+            // undo, redo 이력/버튼 초기화 (저장/활성화 후 이전 편집 히스토리 비움)
+            //  ★ HTML5 편집 undo/redo 는 스냅샷 스택(fnWs20ClearHistory)이 본체다. 원본 design
+            //    모듈 clearHistory 만 호출하면 스냅샷 스택이 안 비워져 "저장/활성화 후에도 Undo 가능"
+            //    버그가 난다(data.js setUIAreaEditable 과 동일하게 스냅샷 clear 를 함께 호출).
             try {
-                parent.require(oAPP.oDesign.pathInfo.undoRedo).clearHistory();
-                parent.require(oAPP.oDesign.pathInfo.undoRedo).setUndoRedoButtonEnable();
+                if (oAPP.fn.fnWs20ClearHistory) { oAPP.fn.fnWs20ClearHistory(); } // HTML5 스냅샷 undo/redo
+                var _oUndoRedo = parent.require(oAPP.oDesign.pathInfo.undoRedo);
+                _oUndoRedo.clearHistory();
+                _oUndoRedo.setUndoRedoButtonEnable();
             } catch (e) { console.warn("[HTML5][WS20] undoRedo skip:", e && e.message); }
 
             oAPP.attr.oModel.refresh();
@@ -2008,10 +2013,15 @@
             // [HTML5] 앱헤더(Active/Inactive)·트랜잭션 버튼 상태 갱신 (IS_CHAG="" → 저장 반영)
             try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
 
-            // undo, redo 이력/버튼 초기화 (design 모듈 미로드 시 skip)
+            // undo, redo 이력/버튼 초기화 (저장/활성화 후 이전 편집 히스토리 비움)
+            //  ★ HTML5 편집 undo/redo 는 스냅샷 스택(fnWs20ClearHistory)이 본체다. 원본 design
+            //    모듈 clearHistory 만 호출하면 스냅샷 스택이 안 비워져 "저장/활성화 후에도 Undo 가능"
+            //    버그가 난다(data.js setUIAreaEditable 과 동일하게 스냅샷 clear 를 함께 호출).
             try {
-                parent.require(oAPP.oDesign.pathInfo.undoRedo).clearHistory();
-                parent.require(oAPP.oDesign.pathInfo.undoRedo).setUndoRedoButtonEnable();
+                if (oAPP.fn.fnWs20ClearHistory) { oAPP.fn.fnWs20ClearHistory(); } // HTML5 스냅샷 undo/redo
+                var _oUndoRedo = parent.require(oAPP.oDesign.pathInfo.undoRedo);
+                _oUndoRedo.clearHistory();
+                _oUndoRedo.setUndoRedoButtonEnable();
             } catch (e) { console.warn("[HTML5][WS20] undoRedo skip:", e && e.message); }
 
             oAPP.attr.oModel.refresh();
@@ -2047,7 +2057,8 @@
             return;
         }
 
-        oAPP.fn.fnMimeDialogOpener();
+        // ★ 별도 모달 BrowserWindow 판(현재 활성). 인앱 다이얼로그로 롤백하려면 fnMimeDialogOpener 로.
+        oAPP.fn.fnMimeWindowOpener();
 
     }; // end of oAPP.events.ev_pressMimeBtn
 

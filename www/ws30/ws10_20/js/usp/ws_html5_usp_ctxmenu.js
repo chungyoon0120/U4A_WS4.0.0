@@ -329,4 +329,11 @@
         if (oNode && oAPP.fn.fnUspTreeNodeMovePosition) { oAPP.fn.fnUspTreeNodeMovePosition(oNode); }
     };
 
+    /************************************************************************
+     * K5 Download — 선택 노드 하위 파일을 zip 으로 묶어 다운로드(셸 fnDownloadUspFiles).
+     ************************************************************************/
+    oAPP.usphtml.uspCtxAction["K5"] = function (oNode) {
+        if (oNode && oAPP.fn.fnDownloadUspFiles) { oAPP.fn.fnDownloadUspFiles(oNode); }
+    };
+
 })(window, jQuery, oAPP);

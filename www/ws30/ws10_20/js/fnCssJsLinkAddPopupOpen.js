@@ -369,7 +369,7 @@
     oMimeBtn.type = "button";
     oMimeBtn.innerHTML = _fa("image") + "<span></span>";
     oMimeBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A10");   // MIME Repository — 텍스트 유지(아이콘 전용은 Add/Del 만, 사용자 지시).
-    oMimeBtn.addEventListener("click", function () { try { oAPP.fn.fnMimeDialogOpener(); } catch (e) { } });
+    oMimeBtn.addEventListener("click", function () { try { oAPP.fn.fnMimeWindowOpener(); } catch (e) { } });   // 별도창 판(롤백=fnMimeDialogOpener)
     oToolbar.appendChild(oAddBtn);
     oToolbar.appendChild(oDelBtn);
     oToolbar.appendChild(oMimeBtn);

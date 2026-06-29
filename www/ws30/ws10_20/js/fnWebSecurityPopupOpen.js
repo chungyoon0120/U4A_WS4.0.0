@@ -131,28 +131,39 @@
     if (oUI.whitDelBtn) { oUI.whitDelBtn.disabled = !bXfoAllow; }
   }
 
-  // ── White List 테이블 렌더 ───────────────────────────────────────────
+  // ── White List 그리드 렌더(USP 트리 패턴 — 헤더 sticky 가 스크롤러 안에서 행과 동일 폭 공유) ──
+  function _cell(sMod, oChild) {
+    var o = _el("div", "u4aWsecCell u4aWsecCell--" + sMod);
+    if (oChild) { o.appendChild(oChild); }
+    return o;
+  }
+  // 단순 제목 섹션(원본 sap.m.Panel headerText = 접이식 아님). createPanel(twisty) 대신 가벼운 제목+본문.
+  function _section(sTitle) {
+    var sec = _el("div", "u4aWsecSection");
+    sec.appendChild(_el("div", "u4aWsecSecTitle", sTitle));
+    var body = _el("div", "u4aWsecSecBody");
+    sec.appendChild(body);
+    return { el: sec, body: body };
+  }
   function lf_renderWhit() {
     if (!oUI) { return; }
     var bEditCell = oState.bEdit && oState.xfo.M03 === "X";
-    oUI.whitTbody.innerHTML = "";
+    oUI.whitBody.innerHTML = "";
 
     if (!oState.whit.length) {
-      var oTrEmpty = _el("tr", "u4a-table__nodata");
-      var oTd = document.createElement("td"); oTd.colSpan = 3;
-      oTd.textContent = _wsCommon("946");   // 데이터 없음.
-      oTrEmpty.appendChild(oTd); oUI.whitTbody.appendChild(oTrEmpty);
+      var oEmpty = _el("div", "u4aWsecEmpty", _wsCommon("946"));   // 데이터 없음.
+      oUI.whitBody.appendChild(oEmpty);
       lf_syncWhitHead();
       return;
     }
 
     oState.whit.forEach(function (oRow, i) {
-      var oTr = document.createElement("tr");
+      var oTr = _el("div", "u4aWsecRow");
       oTr.setAttribute("data-key", oRow.KEY);
       if (i % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
 
       // 선택 체크박스(멀티선택 — 편집 && Allow-From 일 때만).
-      var oTdChk = _el("td", "u4aWsecColChk");
+      var oChkCell = _cell("chk");
       if (bEditCell) {
         var oChk = document.createElement("input");
         oChk.type = "checkbox"; oChk.className = "u4aWsecRowChk";
@@ -161,27 +172,25 @@
           oTr.setAttribute("aria-selected", oChk.checked ? "true" : "false");
           lf_syncWhitHead();
         });
-        oTdChk.appendChild(oChk);
+        oChkCell.appendChild(oChk);
       }
-      oTr.appendChild(oTdChk);
+      oTr.appendChild(oChkCell);
 
       // SID.
-      var oTdSid = _el("td", "u4aWsecColSid");
       var oSidF = U4AUI.createField({
         type: "text", value: oRow.SID || "", readOnly: !bEditCell, className: "u4aWsecCellField",
         onInput: function (v) { oRow.SID = v; }
       });
-      oTdSid.appendChild(oSidF.el); oTr.appendChild(oTdSid);
+      oTr.appendChild(_cell("sid", oSidF.el));
 
       // Target Host URL(SRC).
-      var oTdSrc = _el("td", "u4aWsecColSrc");
       var oSrcF = U4AUI.createField({
         type: "text", value: oRow.SRC || "", readOnly: !bEditCell, className: "u4aWsecCellField",
         onInput: function (v) { oRow.SRC = v; }
       });
-      oTdSrc.appendChild(oSrcF.el); oTr.appendChild(oTdSrc);
+      oTr.appendChild(_cell("src", oSrcF.el));
 
-      oUI.whitTbody.appendChild(oTr);
+      oUI.whitBody.appendChild(oTr);
     });
 
     lf_syncWhitHead();
@@ -189,7 +198,7 @@
 
   function lf_syncWhitHead() {
     if (!oUI || !oUI.whitHeadChk) { return; }
-    var aChk = oUI.whitTbody.querySelectorAll(".u4aWsecRowChk");
+    var aChk = oUI.whitBody.querySelectorAll(".u4aWsecRowChk");
     var iTotal = aChk.length, iSel = 0;
     aChk.forEach(function (c) { if (c.checked) { iSel++; } });
     oUI.whitHeadChk.checked = (iTotal > 0 && iSel === iTotal);
@@ -202,14 +211,14 @@
     oState.whit.push({ KEY: _randomKey(), SID: "", SRC: "" });
     lf_renderWhit();
     try {
-      var aTr = oUI.whitTbody.querySelectorAll("tr[data-key]");
+      var aTr = oUI.whitBody.querySelectorAll(".u4aWsecRow[data-key]");
       var oLast = aTr[aTr.length - 1];
-      var oInput = oLast && oLast.querySelector(".u4aWsecColSid input");
+      var oInput = oLast && oLast.querySelector(".u4aWsecCell--sid input");
       if (oInput) { oInput.focus(); }
     } catch (e) { }
   }
   function lf_whitDelSel() {
-    var aChk = oUI.whitTbody.querySelectorAll(".u4aWsecRowChk");
+    var aChk = oUI.whitBody.querySelectorAll(".u4aWsecRowChk");
     var oDel = {}, iCnt = 0;
     aChk.forEach(function (c) { if (c.checked) { oDel[c.getAttribute("data-key")] = true; iCnt++; } });
     if (iCnt === 0) { _msg("W", _wsCommon("240")); return; }   // 선택된 항목이 없습니다.
@@ -225,6 +234,18 @@
       parent.showMessage(null, 30, "I", sMsg, function (sAct) { if (sAct === "YES") { lf_doSave(); } });
     } catch (e) { lf_doSave(); }
   }
+  // 변경표시 판정(_isChangedRow DH001026)은 JSON.stringify(S_WSO)===JSON.stringify(S_WSO_DEF) 바이트 비교다.
+  // 폼이 기본값과 "논리적으로" 같으면(키 순서·WHIT KEY 등 구조 차 무시) S_WSO 를 DEF 의 복사본으로 대입해
+  // 바이트 일치 → 변경표시 원복(원본 Save 가 모델=DEF 복사본을 통째로 넣던 것과 동일 효과).
+  function _wsoCanon(o) {
+    o = o || {};
+    var a = o.ACA || {}, x = o.XFO || {}, w = Array.isArray(o.WHIT) ? o.WHIT : [];
+    return JSON.stringify({
+      ACA: { M01: a.M01 || "", M02: a.M02 || "", M03: a.M03 || "", EUL: a.EUL || "" },
+      XFO: { M01: x.M01 || "", M02: x.M02 || "", M03: x.M03 || "", M04: x.M04 || "" },
+      WHIT: w.map(function (r) { return { SID: r.SID || "", SRC: r.SRC || "" }; })
+    });
+  }
   function lf_doSave() {
     var A = _ensureData();
 
@@ -234,11 +255,16 @@
       aWhit = aWhit.filter(function (r) { return (r.SID || "") !== "" && (r.SRC || "") !== ""; });
     }
 
-    A.S_WSO = {
+    var oBuilt = {
       ACA: { M01: oState.aca.M01 || "", M02: oState.aca.M02 || "", M03: oState.aca.M03 || "", EUL: (oUI.eulField ? oUI.eulField.getValue() : (oState.aca.EUL || "")) },
       XFO: { M01: oState.xfo.M01 || "", M02: oState.xfo.M02 || "", M03: oState.xfo.M03 || "", M04: oState.xfo.M04 || "" },
       WHIT: aWhit.map(function (r) { return { SID: r.SID || "", SRC: r.SRC || "" }; })
     };
+
+    // 기본값과 논리적으로 동일하면 DEF 복사본(바이트 일치) → 변경표시 원복. 아니면 빌드값 저장.
+    A.S_WSO = (_wsoCanon(oBuilt) === _wsoCanon(A.S_WSO_DEF))
+      ? JSON.parse(JSON.stringify(A.S_WSO_DEF))
+      : oBuilt;
 
     try { parent.setAppChange("X"); } catch (e) { }
     lf_syncWs20Changed();
@@ -310,8 +336,8 @@
 
     var oBody = _el("div", "u4a-dialog__body u4aWsecBody");
 
-    // ── 패널1: Access-Control-Allow-Origin ──
-    var oAcaPanel = U4AUI.createPanel({ title: _txt("/U4A/CL_WS_COMMON", "C89") });
+    // ── 섹션1: Access-Control-Allow-Origin ──
+    var oAcaPanel = _section(_txt("/U4A/CL_WS_COMMON", "C89"));
     oUI = oUI || {};
     oUI.acaRadios = [];
     var oAcaGroup = _el("div", "u4aWsecRadioCol");
@@ -336,8 +362,8 @@
     oUI.eulField = oEulField;
     oBody.appendChild(oAcaPanel.el);
 
-    // ── 패널2: X-Frame-Options ──
-    var oXfoPanel = U4AUI.createPanel({ title: _txt("/U4A/CL_WS_COMMON", "C87") });
+    // ── 섹션2: X-Frame-Options ──
+    var oXfoPanel = _section(_txt("/U4A/CL_WS_COMMON", "C87"));
     oUI.xfoRadios = [];
     var oXfoGroup = _el("div", "u4aWsecRadioRow");
     [["C93"], ["C94"], ["C95"], ["C96"]].forEach(function (a, i) {
@@ -359,6 +385,9 @@
     });
     oXfoPanel.body.appendChild(oXfoGroup);
 
+    // White List 그룹(툴바 + 테이블을 한 박스로 — 버튼은 테이블에 종속).
+    var oWhitGroup = _el("div", "u4aWsecWhitGroup");
+
     // White List 툴바([White List] ···· [Add][Del]).
     var oWhitBar = _el("div", "u4aWsecWhitBar");
     oWhitBar.appendChild(_el("span", "u4aWsecWhitLbl", _txt("/U4A/CL_WS_COMMON", "C97")));   // White List
@@ -372,32 +401,37 @@
     oDelBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete
     oDelBtn.addEventListener("click", function () { lf_whitDelSel(); });
     oWhitBar.appendChild(oAddBtn); oWhitBar.appendChild(oDelBtn);
-    oXfoPanel.body.appendChild(oWhitBar);
+    oWhitGroup.appendChild(oWhitBar);
     oUI.whitAddBtn = oAddBtn; oUI.whitDelBtn = oDelBtn;
 
-    // White List 테이블(공통 .u4a-table 액자형 + 멀티선택).
-    var oWrap = _el("div", "u4a-table-wrap u4a-table-wrap--boxed u4aWsecTableWrap");
-    oWrap.setAttribute("data-view", "table");
-    var oTable = _el("table", "u4a-table u4aWsecTable");
-    var oThead = document.createElement("thead");
-    var oThRow = document.createElement("tr");
-    var oThChk = _el("th", "u4aWsecColChk");
+    // White List 그리드(USP 트리 패턴 — 헤더를 스크롤 컨테이너 "안"에 sticky 로 두어 헤더/행이
+    //   동일 폭 컨텍스트(스크롤바 영향·box-sizing 동일)를 공유 → 컬럼 자동 정렬, JS 거터 보정 불필요).
+    var oGrid = _el("div", "u4aWsecGrid");      // 고정 height 스크롤러(원본 sap.ui.table 영역).
+
+    // 헤더(스크롤러 안 sticky — usp.css .u4aWs30TreeColHead 와 동일).
+    var oHead = _el("div", "u4aWsecHead");
+    var oHChkCell = _cell("chk");
     var oHeadChk = document.createElement("input");
     oHeadChk.type = "checkbox"; oHeadChk.className = "u4aWsecHeadChk";
     oHeadChk.addEventListener("change", function () {
       var b = oHeadChk.checked;
-      oUI.whitTbody.querySelectorAll(".u4aWsecRowChk").forEach(function (c) {
-        c.checked = b; var tr = c.closest("tr"); if (tr) { tr.setAttribute("aria-selected", b ? "true" : "false"); }
+      oUI.whitBody.querySelectorAll(".u4aWsecRowChk").forEach(function (c) {
+        c.checked = b; var tr = c.closest(".u4aWsecRow"); if (tr) { tr.setAttribute("aria-selected", b ? "true" : "false"); }
       });
       lf_syncWhitHead();
     });
-    oThChk.appendChild(oHeadChk); oThRow.appendChild(oThChk);
-    oThRow.appendChild(_el("th", "u4aWsecColSid", _txt("/U4A/CL_WS_COMMON", "D83")));   // SID
-    oThRow.appendChild(_el("th", "u4aWsecColSrc", _txt("/U4A/CL_WS_COMMON", "C71")));   // Target Host URL
-    oThead.appendChild(oThRow); oTable.appendChild(oThead);
-    var oTbody = document.createElement("tbody"); oTable.appendChild(oTbody);
-    oWrap.appendChild(oTable); oXfoPanel.body.appendChild(oWrap);
-    oUI.whitTbody = oTbody; oUI.whitHeadChk = oHeadChk;
+    oHChkCell.appendChild(oHeadChk); oHead.appendChild(oHChkCell);
+    oHead.appendChild(_cell("sid", _el("span", "", _txt("/U4A/CL_WS_COMMON", "D83"))));   // SID
+    oHead.appendChild(_cell("src", _el("span", "", _txt("/U4A/CL_WS_COMMON", "C71"))));   // Target Host URL
+    oGrid.appendChild(oHead);
+
+    // 행 컨테이너(헤더의 형제 — 헤더는 sticky 라 클리어 대상에서 보존).
+    var oList = _el("div", "u4aWsecList");
+    oGrid.appendChild(oList);
+
+    oWhitGroup.appendChild(oGrid);
+    oXfoPanel.body.appendChild(oWhitGroup);
+    oUI.whitBody = oList; oUI.whitHead = oHead; oUI.whitHeadChk = oHeadChk;
     oBody.appendChild(oXfoPanel.el);
 
     oDlg.appendChild(oBody);
@@ -406,14 +440,12 @@
     var oFoot = _el("div", "u4a-dialog__footer u4aWsecFoot");
     oFoot.appendChild(_el("span", "u4aWsecFootSpacer"));
     var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aWsecIcoBtn");
-    oSaveBtn.type = "button"; oSaveBtn.innerHTML = _fa("check") + "<span></span>";
-    oSaveBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A64");   // Save
-    oSaveBtn.title = _txt("/U4A/CL_WS_COMMON", "A64");
+    oSaveBtn.type = "button"; oSaveBtn.innerHTML = _fa("check");   // 아이콘만(텍스트 제거 — Close 와 통일)
+    oSaveBtn.title = _txt("/U4A/CL_WS_COMMON", "A64");   // Save
     oSaveBtn.addEventListener("click", function () { lf_save(); });
     var oDelFootBtn = _el("button", "u4a-btn u4a-btn--negative u4aWsecIcoBtn");
-    oDelFootBtn.type = "button"; oDelFootBtn.innerHTML = _fa("trash") + "<span></span>";
-    oDelFootBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete(기본값 리셋)
-    oDelFootBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");
+    oDelFootBtn.type = "button"; oDelFootBtn.innerHTML = _fa("trash");   // 아이콘만
+    oDelFootBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete(기본값 리셋)
     oDelFootBtn.addEventListener("click", function () { lf_delReset(); });
     var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aWsecIcoBtn u4aWsecClose");
     oCloseBtn.type = "button"; oCloseBtn.innerHTML = _fa("xmark");
@@ -476,30 +508,49 @@
       ".u4aWsecDlg { width: min(94vw, 640px); height: min(88vh, 660px); padding: 0; display: flex; flex-direction: column; }" +
       ".u4aWsecDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
       ".u4aWsecDlg .u4a-dialog__header span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
-      ".u4aWsecBody { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; }" +
+      ".u4aWsecBody { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 1.25rem; padding: 0.875rem; }" +
+      // 제목 섹션(원본 sap.m.Panel headerText = 접이식 아님) — 카드 크롬 없이 제목 + 본문 flat.
+      ".u4aWsecSection { display: flex; flex-direction: column; }" +
+      ".u4aWsecSecTitle { font-weight: 700; color: var(--text); padding-bottom: 0.5rem; margin-bottom: 0.875rem; border-bottom: 0.0625rem solid var(--line); }" +
+      ".u4aWsecSecBody { display: flex; flex-direction: column; gap: 0.875rem; }" +
       // 라디오 배치(ACA=세로, XFO=가로 wrap).
-      ".u4aWsecRadioCol { display: flex; flex-direction: column; gap: 0.5rem; }" +
-      ".u4aWsecRadioRow { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }" +
+      ".u4aWsecRadioCol { display: flex; flex-direction: column; gap: 0.625rem; }" +
+      ".u4aWsecRadioRow { display: flex; flex-wrap: wrap; gap: 0.625rem 1.5rem; }" +
+      ".u4aWsecRadioCol .u4a-check, .u4aWsecRadioRow .u4a-check { margin: 0; }" +
       // External Host URL 행.
-      ".u4aWsecFieldRow { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.625rem; }" +
+      ".u4aWsecFieldRow { display: flex; align-items: center; gap: 0.75rem; }" +
       ".u4aWsecFieldLbl { flex: 0 0 auto; min-width: 9rem; color: var(--text-muted, var(--text)); }" +
       ".u4aWsecEul { flex: 1 1 auto; }" +
-      // White List 툴바.
-      ".u4aWsecWhitBar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }" +
+      // White List 그룹 — 툴바가 그리드 상단에 붙는 한 박스.
+      ".u4aWsecWhitGroup { display: flex; flex-direction: column; }" +
+      ".u4aWsecWhitBar { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem; border: 0.0625rem solid var(--line); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; background: var(--surface); }" +
       ".u4aWsecWhitLbl { font-weight: 600; }" +
       ".u4aWsecBarSpacer { flex: 1 1 auto; }" +
-      ".u4aWsecToolBtn { background: transparent; }" +
+      ".u4aWsecToolBtn { background: transparent; min-width: 2.25rem; padding: 0.4rem 0.6rem; justify-content: center; }" +
       ".u4aWsecToolBtn:hover { background: var(--hover-bg); }" +
       ".u4aWsecAdd { border-color: var(--accent); color: var(--accent); }" +
-      ".u4aWsecToolBtn { min-width: 2.25rem; padding: 0.4rem 0.6rem; justify-content: center; }" +
-      // 테이블 컬럼.
-      ".u4aWsecTableWrap { max-height: 14rem; }" +
-      ".u4aWsecColChk { width: 2.5rem; text-align: center; }" +
-      ".u4aWsecColSid { width: 9rem; }" +
-      ".u4aWsecColSrc { width: auto; }" +
-      ".u4aWsecColChk input { accent-color: var(--accent); margin: 0; vertical-align: middle; }" +
-      ".u4aWsecTable td::before, .u4aWsecTable td::after { content: none !important; }" +
-      ".u4aWsecCellField { width: 100%; }" +
+      // ── White List 그리드(USP 트리 패턴) — .u4aWsecGrid 자체가 고정 height 스크롤러.
+      //   헤더(.u4aWsecHead)는 그 "안"에 sticky → 행과 동일 폭 컨텍스트 공유 → 컬럼 자동 정렬.
+      //   ★ 원본 sap.ui.table 처럼 영역을 기본 height 로 고정 → 적으면 빈 공간, 많으면 이 안에서만 스크롤.
+      ".u4aWsecGrid { height: 13rem; overflow-x: hidden; overflow-y: auto; border: 0.0625rem solid var(--line); border-top: 0; border-radius: 0 0 var(--radius) var(--radius); background: var(--surface); }" +
+      ".u4aWsecHead { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; height: var(--control-h, 2.5rem); box-sizing: border-box; border-bottom: 0.0625rem solid var(--line); background: var(--surface); font-weight: 600; color: var(--text-muted); }" +
+      ".u4aWsecRow { display: flex; align-items: center; min-height: var(--row-h, 2.5rem); box-sizing: border-box; border-bottom: 0.0625rem solid var(--line); }" +
+      ".u4aWsecRow:last-child { border-bottom: 0; }" +
+      ".u4aWsecRow[aria-selected=\"true\"] { background: var(--selected-bg); }" +
+      ".u4aWsecRow:hover { background: var(--hover-bg); }" +
+      // 셀 — 헤더/바디 공통 flex-basis(컬럼 정렬 단일 출처).
+      ".u4aWsecCell { box-sizing: border-box; display: flex; align-items: center; min-width: 0; padding: 0.25rem 0.5rem; }" +
+      ".u4aWsecCell--chk { flex: 0 0 2.5rem; justify-content: center; padding-left: 0; padding-right: 0; }" +
+      ".u4aWsecCell--sid { flex: 0 0 9rem; }" +
+      ".u4aWsecCell--src { flex: 1 1 auto; }" +
+      // ★ 헤더 라벨을 입력칸 텍스트 시작점에 정렬 — 입력칸 내부 패딩(.u4a-input 0.625rem)만큼
+      //   헤더 라벨을 더 들여써야 헤더가 칸 위에 정확히 얹힌다(셀 0.5rem + 입력 0.625rem).
+      ".u4aWsecHead .u4aWsecCell--sid, .u4aWsecHead .u4aWsecCell--src { padding-left: 1.125rem; }" +
+      ".u4aWsecCell input[type=\"checkbox\"] { accent-color: var(--accent); margin: 0; }" +
+      ".u4aWsecCellField { width: 100%; min-width: 0; }" +
+      ".u4aWsecCellField .u4a-input { min-width: 0; }" +
+      // 데이터 없음 — 헤더(2.5rem) 제외 잔여 영역 중앙(고정 13rem 내, 스크롤 안 생기게).
+      ".u4aWsecEmpty { min-height: 10rem; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }" +
       // 푸터.
       ".u4aWsecFoot { display: flex; gap: 0.5rem; align-items: center; }" +
       ".u4aWsecFootSpacer { flex: 1 1 auto; }" +

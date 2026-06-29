@@ -449,62 +449,24 @@
             if (typeof fnCallback === "function") { try { fnCallback(sAct); } catch (e) { } }
         }
 
-        // 네이티브 <dialog> 미지원/생성 실패 시 — 브라우저 confirm 폴백(동작 보장)
-        var oDlg;
-        try { oDlg = document.createElement("dialog"); } catch (e) { oDlg = null; }
-        if (!oDlg || typeof oDlg.showModal !== "function") {
-            var bOk = false;
-            try { bOk = window.confirm(sMsg || ""); } catch (e2) { bOk = true; }
-            lf_done(bOk ? "YES" : (bHasCancel ? "CANCEL" : "NO"));
-            return;
-        }
-
-        // 제목 텍스트 (showMessage 와 동일 메시지클래스 — 없으면 영문 폴백) +
-        //   타입별 아이콘 — 서버리스트 fnShowMessageBox(.u4a-dialog) 와 동일 디자인으로 통일.
+        // 제목 텍스트(메시지클래스 — 없으면 영문 폴백). 텍스트 현지화는 셸(호출부)이 담당,
+        //   다이얼로그 구현(.u4a-dialog 헤더/본문/푸터 + 폴백)은 공통 U4AUI.confirm 단일 소스.
         var oTypeMap = {
-            S: ["D86", "Success", "circle-check"],
-            E: ["B93", "Error", "circle-xmark"],
-            W: ["B89", "Warning", "triangle-exclamation"],
-            I: ["B86", "Information", "circle-info"],
-            C: ["B86", "Information", "circle-question"]
+            S: ["D86", "Success"], E: ["B93", "Error"], W: ["B89", "Warning"],
+            I: ["B86", "Information"], C: ["B86", "Information"]
         };
         var aT = oTypeMap[sType] || oTypeMap.I;
         var sTitle = aT[1];
         try { sTitle = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", aT[0]) || aT[1]; } catch (e) { }
 
-        // 설정/서버리스트 다이얼로그와 동일한 .u4a-dialog 구조(헤더 아이콘 + 본문 + 푸터).
-        oDlg.className = "u4a-dialog";
-        oDlg.style.width = "min(28rem, 92vw)";
-        oDlg.innerHTML =
-            '<div class="u4a-dialog__header" data-type="' + (sType || "I") + '">' +
-                '<i class="fa-solid fa-' + aT[2] + '"></i><span></span>' +
-            '</div>' +
-            '<div class="u4a-dialog__body" style="white-space:pre-wrap;line-height:1.45;"></div>' +
-            '<div class="u4a-dialog__footer"></div>';
-        oDlg.querySelector(".u4a-dialog__header span").textContent = sTitle;
-        oDlg.querySelector(".u4a-dialog__body").textContent = sMsg || "";
-
-        function lf_close(sAct) {
-            try { oDlg.close(); } catch (e) { }
-            try { oDlg.remove(); } catch (e) { }
-            lf_done(sAct);
+        // 공통 confirm 소비(SSOT). 공통 미로드 시에만 네이티브 confirm 폴백.
+        if (window.U4AUI && typeof U4AUI.confirm === "function") {
+            U4AUI.confirm({ type: sType || "I", title: sTitle, message: sMsg || "", buttons: aBtns, onClose: fnCallback });
+            return;
         }
-
-        var oFooter = oDlg.querySelector(".u4a-dialog__footer");
-        aBtns.forEach(function (b) {
-            var oBtn = document.createElement("button");
-            oBtn.type = "button";
-            oBtn.className = "u4a-btn" + (b.emphasized ? " u4a-btn--emphasized" : "");
-            oBtn.textContent = b.label || b.act;
-            oBtn.addEventListener("click", function () { lf_close(b.act); });
-            oFooter.appendChild(oBtn);
-        });
-        // ESC → CANCEL(있으면) 아니면 NO
-        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(bHasCancel ? "CANCEL" : "NO"); });
-
-        try { document.body.appendChild(oDlg); oDlg.showModal(); } catch (e) {
-            lf_close(window.confirm(sMsg || "") ? "YES" : (bHasCancel ? "CANCEL" : "NO"));
-        }
+        var bOk = false;
+        try { bOk = window.confirm(sMsg || ""); } catch (e2) { bOk = true; }
+        lf_done(bOk ? "YES" : (bHasCancel ? "CANCEL" : "NO"));
     };
 
     /************************************************************************

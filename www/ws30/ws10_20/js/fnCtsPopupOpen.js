@@ -101,9 +101,20 @@
      ************************************************************************
      * @param {Function} fnCallback  선택한 CTS 행 데이터 객체를 전달하는 콜백.
      ************************************************************************/
-    oAPP.fn.fnCtsPopupOpen = function (fnCallback) {
+    oAPP.fn.fnCtsPopupOpen = function (fnCallback, oDeps) {
 
         _ensureStyle();
+
+        // ── 런타임 의존성 어댑터 ─────────────────────────────────────────
+        //   기본값 = WS20 런타임(parent.* / 전역 sendAjax) → 기존 호출부 전부 무영향.
+        //   별도창(MIME 등)은 oDeps 로 자기 컨텍스트(oAPP.fn.* / 자체 sendAjax)를 주입해 재사용.
+        var _D = {
+            getServerPath: (oDeps && oDeps.getServerPath) ? oDeps.getServerPath : function () { return parent.getServerPath(); },
+            getUserInfo: (oDeps && oDeps.getUserInfo) ? oDeps.getUserInfo : function () { return parent.getUserInfo(); },
+            setBusy: (oDeps && oDeps.setBusy) ? oDeps.setBusy : function (s) { return parent.setBusy(s); },
+            showMessage: (oDeps && oDeps.showMessage) ? oDeps.showMessage : function () { return parent.showMessage.apply(parent, arguments); },
+            sendAjax: (oDeps && oDeps.sendAjax) ? oDeps.sendAjax : function () { return sendAjax.apply(null, arguments); }
+        };
 
         // 팝업 상태(클로저) — 행 데이터 / 선택 인덱스.
         const oState = { aRows: [], iSel: -1, fnCb: (typeof fnCallback === "function") ? fnCallback : null };
@@ -207,8 +218,8 @@
         oFoot.appendChild(oCancel);
         oDlg.appendChild(oFoot);
 
-        // busy — 전역 parent.setBusy(셸의 setDomBusy 가 모달 <dialog> 로 top-layer 표시).
-        function _setBusy(bOn) { parent.setBusy(bOn ? "X" : ""); }
+        // busy — 주입된 setBusy(WS20=parent.setBusy 셸 setDomBusy / 별도창=자체 오버레이).
+        function _setBusy(bOn) { _D.setBusy(bOn ? "X" : ""); }
 
         // ── 행 선택/렌더 헬퍼 ───────────────────────────────────────────
         function _selectRow(iIdx) {
@@ -256,11 +267,11 @@
             _setBusy(true);       // 공통 top-layer busy(모달 위에도 보임)
             oState.aRows = [];
             _renderRows();
-            const sPath = parent.getServerPath() + C_GET_CTS_URL,
-                oUserInfo = parent.getUserInfo(),
+            const sPath = _D.getServerPath() + C_GET_CTS_URL,
+                oUserInfo = _D.getUserInfo(),
                 oFormData = new FormData();
             oFormData.append("USRID", oUserInfo.ID);
-            sendAjax(sPath, oFormData, _onDataSucc, null, null, "POST", _onDataErr);
+            _D.sendAjax(sPath, oFormData, _onDataSucc, null, null, "POST", _onDataErr);
         }
 
         function _onDataSucc(oResult) {
@@ -279,13 +290,13 @@
         function _accept(bImmediate) {
             if (oState.iSel < 0) {
                 // 268  Selected line does not exists.
-                parent.showMessage(null, 10, "I", _txt("/U4A/MSG_WS", "268"));
+                _D.showMessage(null, 10, "I", _txt("/U4A/MSG_WS", "268"));
                 return;
             }
             const oRow = oState.aRows[oState.iSel];
             if (bImmediate) {
                 // 346  Do you want to choose?
-                parent.showMessage(null, 30, "I", _txt("/U4A/MSG_WS", "346"), function (sAction) {
+                _D.showMessage(null, 30, "I", _txt("/U4A/MSG_WS", "346"), function (sAction) {
                     if (sAction !== "YES") { return; }
                     _fireCallback(oRow);
                 });
@@ -323,4 +334,4 @@
 
     }; // end of oAPP.fn.fnCtsPopupOpen
 
-})(window, $, oAPP);
+})(window, window.$, oAPP);   // ★ window.$ — jQuery 없는 별도창(MIME)서 로드해도 ReferenceError 안 나게(본문 $ 미사용)

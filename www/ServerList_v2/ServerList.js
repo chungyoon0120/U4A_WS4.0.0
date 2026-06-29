@@ -1353,7 +1353,10 @@
             oChipRecent.btn.classList.toggle("is-active", sActive === "recent");
             oChipResults.btn.classList.toggle("is-active", sActive === "results");
         };
-        oBodyArea.addEventListener("scroll", _syncSpy, { passive: true });
+        oBodyArea.addEventListener("scroll", () => {
+            _syncSpy();
+            oAPP.attr._lnchScroll = oBodyArea.scrollTop; // 풀 재렌더 시 복원용(스크롤 점프 방지)
+        }, { passive: true });
 
         // ── 푸터 액션 (Connect / Edit / Delete) — 활성 결과 대상 ──
         const _activeSrv = () => {
@@ -1528,7 +1531,14 @@
         });
 
         _renderBody();
-        setTimeout(() => { try { oInput.focus(); oInput.setSelectionRange(oInput.value.length, oInput.value.length); } catch (e) { } }, 0);
+        // 풀 재렌더(접속 후 RECENT 갱신·뷰 전환 등)에서 _renderBody 의 active 행 scrollIntoView 가
+        // 이전 선택 위치로 점프시킨다 → 직전 스크롤 위치를 복원해 점프 방지(키보드 네비는 부분 렌더라 무관).
+        const iKeepScroll = oAPP.attr._lnchScroll || 0;
+        oBodyArea.scrollTop = iKeepScroll;
+        setTimeout(() => {
+            try { oInput.focus({ preventScroll: true }); oInput.setSelectionRange(oInput.value.length, oInput.value.length); } catch (e) { }
+            oBodyArea.scrollTop = iKeepScroll; // 포커스 후에도 위치 유지
+        }, 0);
     };
 
     /** [PUBLIC] 활성 뷰 렌더 (본문 재구성 + 트리/내용 채움) */
@@ -3672,7 +3682,9 @@
             oTmp.innerHTML = opt.icon;
             if (oTmp.firstChild) { oHead.appendChild(oTmp.firstChild); } // <i> 를 직계로
         }
-        oHead.appendChild(_el("span", null, opt.title || ""));
+        const oTitleSpan = _el("span", null, opt.title || "");
+        oTitleSpan.title = opt.title || ""; // 말줄임될 때 전체 제목 호버 확인
+        oHead.appendChild(oTitleSpan);
         const oX = _el("button", "u4a-btn-icon");
         oX.type = "button";
         oX.dataset.act = "close";

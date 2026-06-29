@@ -141,17 +141,45 @@
         _redoStack = [];
         _updateUndoBtns();
     };
+    // 트리 노드 총 개수(재귀) — undo/redo 가 "삭제 방향"인지 판정용.
+    function _countNodes(aTree) {
+        var n = 0;
+        (function walk(a) { if (!a) { return; } for (var i = 0; i < a.length; i++) { n++; walk(a[i].zTREE); } })(aTree);
+        return n;
+    }
     // 트리 툴바/단축키 진입점 (구 undoRedo.executeHistory("UNDO"/"REDO"))
+    //  ★ 원본 CL_DELETE_UI.executeHistory(undoRedo.js 885~931): 되돌리기/다시하기 결과
+    //    UI 가 화면에서 사라지는 경우(=삭제 방향)에는 "003 정말 삭제?" 확인 팝업을 띄우고,
+    //    취소(NO)하면 스택을 소비하지 않고 원위치로 둔다(삭제/추가가 양방향으로 변환되므로
+    //    삭제 redo 뿐 아니라 추가 undo 도 UI 가 사라지면 동일하게 확인 — 원본 1:1).
+    //    스냅샷 방식엔 액션 타입이 없으므로 "복원 결과 트리 노드 수가 줄어드는가"로 판정한다
+    //    (이동/속성변경/Rename 은 노드 수 동일 → 팝업 없음, 자동으로 원본과 일치).
     oAPP.fn.fnWs20ExecHistory = function (sMode) {
-        if (sMode === "UNDO") {
-            if (!_undoStack.length) { return; }
-            _redoStack.push(_snapshot());
-            _restoreSnap(_undoStack.pop());
-        } else {
-            if (!_redoStack.length) { return; }
-            _undoStack.push(_snapshot());
-            _restoreSnap(_redoStack.pop());
+        var aSrc = (sMode === "UNDO") ? _undoStack : _redoStack;
+        var aDst = (sMode === "UNDO") ? _redoStack : _undoStack;
+        if (!aSrc.length) { return; }
+
+        var oTarget = aSrc[aSrc.length - 1];                       // 복원될 스냅샷(아직 소비 전)
+        var nCur = _countNodes(_tree());                           // 현재 트리 노드 수
+        var nNext = (oTarget && oTarget.z) ? _countNodes(oTarget.z) : nCur;
+
+        function _doApply() {
+            aDst.push(_snapshot());
+            _restoreSnap(aSrc.pop());
         }
+
+        // 복원 결과 UI 가 사라지면(노드 감소) 원본과 동일하게 삭제 확인 팝업.
+        if (nNext < nCur) {
+            var sMsg = _msgWs("003", "Do you really want to delete?");
+            var fnConfirm = APPCOMMON.fnConfirmBox;
+            // 취소(NO)면 스택을 소비하지 않음 → 원위치(원본 903~931 의미와 동일).
+            function lf_do(act) { if (act === "YES") { _doApply(); } }
+            if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
+            else { lf_do(window.confirm(sMsg) ? "YES" : "NO"); }
+            return;
+        }
+
+        _doApply();
     };
     oAPP.fn.fnWs20ClearHistory = function () { _undoStack = []; _redoStack = []; _updateUndoBtns(); };
     oAPP.fn.fnWs20CanUndo = function () { return _undoStack.length > 0; };
@@ -989,14 +1017,18 @@
         oDlg.style.cssText = "width:min(92vw,360px);padding:0;display:flex;flex-direction:column";
         oDlg.innerHTML =
             '<div class="u4a-dialog__header">' +
-            '  <i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span>' + _esc(_msg("A57", "Move Position")) + '</span>' +
+            '  <i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span>' + _esc(_msg("A57", "Move Position") + " - " + oNode.OBJID) + '</span>' +
             '  <button type="button" class="u4a-btn-icon" data-act="cancel" aria-label="Close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
-            '<div class="u4a-dialog__body" style="flex:1 1 auto;display:flex;flex-direction:column;gap:0.5rem;padding:1.25rem;overflow:visible">' +
-            '  <div style="display:flex;align-items:center;gap:0.5rem">' +
-            '    <label class="u4a-label" style="flex:0 0 auto;min-width:0">' + _esc(oNode.OBJID) + '</label>' +
-            '    <input type="number" class="u4a-input u4aWs20MovePos" style="flex:1 1 auto;width:auto" min="1" max="' + nTot + '" value="' + (iCur + 1) + '">' +
-            '    <span style="flex:0 0 auto;color:var(--text-muted)">/ ' + nTot + '</span>' +
+            '<div class="u4a-dialog__body" style="flex:1 1 auto;display:flex;flex-direction:column;gap:1rem;padding:1.25rem 1.5rem;overflow:visible">' +
+            '  <div style="display:flex;align-items:baseline;justify-content:center;gap:0.4rem">' +
+            '    <input type="number" class="u4a-input u4aWs20MovePos" style="width:4.5rem;font-size:1.6rem;font-weight:700;text-align:center;flex:0 0 auto" min="1" max="' + nTot + '" value="' + (iCur + 1) + '">' +
+            '    <span style="color:var(--text-muted);font-size:1rem">/ ' + nTot + '</span>' +
+            '  </div>' +
+            '  <div style="display:flex;align-items:center;gap:0.75rem;width:100%">' +
+            '    <span style="color:var(--text-muted);font-size:0.8rem;flex:0 0 auto">1</span>' +
+            '    <input type="range" class="u4aWs20MovePosRange" style="flex:1 1 auto;min-width:0;accent-color:var(--accent);cursor:pointer" min="1" max="' + nTot + '" value="' + (iCur + 1) + '">' +
+            '    <span style="color:var(--text-muted);font-size:0.8rem;flex:0 0 auto">' + nTot + '</span>' +
             '  </div>' +
             '</div>' +
             '<div class="u4a-dialog__footer">' +
@@ -1019,6 +1051,11 @@
             _markChanged();
         }
         oDlg.querySelector('[data-act="ok"]').addEventListener("click", lf_ok);
+        // 슬라이더 ↔ 숫자 input 동기화(둘 다 1..nTot 클램프).
+        var oRange = oDlg.querySelector(".u4aWs20MovePosRange");
+        function lf_clamp(v) { v = parseInt(v, 10); if (!(v >= 1)) { v = 1; } if (v > nTot) { v = nTot; } return v; }
+        oRange.addEventListener("input", function () { oInp.value = String(lf_clamp(oRange.value)); });
+        oInp.addEventListener("input", function () { oRange.value = String(lf_clamp(oInp.value)); });
         // 헤더 X + 푸터 ✗ 둘 다 data-act="cancel" → 닫기.
         oDlg.querySelectorAll('[data-act="cancel"]').forEach(function (b) { b.addEventListener("click", lf_close); });
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });

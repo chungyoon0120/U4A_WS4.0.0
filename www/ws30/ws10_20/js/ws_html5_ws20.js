@@ -589,6 +589,18 @@
         else { console.warn("[HTML5][WS20] ev_pageBack not available (F3)"); }
     }
 
+    //Ctrl+Shift+F12 — MIME Repository(별도창). 원본 ws_common.js 의 sap.byId("mimeBtn").firePress(UI5)
+    //  는 HTML5 서 무동작이라, 버튼과 동일한 핸들러(ev_pressMimeBtn → fnMimeWindowOpener)로 교체.
+    function _ws20Mime() {
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
+        try {
+            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
+                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
+        } catch (x) { }
+        if (oAPP.events && typeof oAPP.events.ev_pressMimeBtn === "function") { oAPP.events.ev_pressMimeBtn(); }
+        else { console.warn("[HTML5][WS20] ev_pressMimeBtn not available (Ctrl+Shift+F12)"); }
+    }
+
     //getShortCutList(ws_common.js)가 먼저 로드된 경우에만 super-wrap(미정의면 전 페이지 단축키가
     //  []로 깨지므로 가드). 정상 로드 순서(ws_common → ws_html5_ws20)에선 항상 통과.
     if (typeof oAPP.common.getShortCutList === "function") {
@@ -597,7 +609,8 @@
             var aList = (typeof _ws20GetShortCutList_super === "function") ? _ws20GetShortCutList_super(sPgNo) : [];
             if (sPgNo !== "WS20" || !Array.isArray(aList)) { return aList; }
             var oFnMap = {
-                "F3": function (e) { _ws20ScGuard(e, _ws20Back); }   // 뒤로가기
+                "F3": function (e) { _ws20ScGuard(e, _ws20Back); },           // 뒤로가기
+                "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); } // MIME Repository(별도창)
             };
             aList.forEach(function (o) { if (o && oFnMap[o.KEY]) { o.fn = oFnMap[o.KEY]; } });
             return aList;

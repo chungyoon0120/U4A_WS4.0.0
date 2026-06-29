@@ -29,6 +29,21 @@
 
     var APPCOMMON = oAPP.common;
 
+    // 전역 onError 안전 가드 — "ResizeObserver loop limit exceeded / completed with undelivered
+    //   notifications" 는 브라우저가 던지는 무해한 경고다(레이아웃은 정상 정착). 이 앱의 window.onerror
+    //   (ws_trycatch)가 이를 Critical Error 로 띄우므로, 그 메시지만 삼키고 나머지는 원본 핸들러로
+    //   위임한다. (공통 ws_trycatch 는 수정하지 않고 1회 래핑.) rAF 지연(_observeResize)으로 발생
+    //   자체를 막지만, 공통 attachOverflow 등 다른 RO 소스 대비 안전망.
+    (function () {
+        if (window.__uspRoGuard) { return; }
+        window.__uspRoGuard = true;
+        var _prevOnError = window.onerror;
+        window.onerror = function (message) {
+            if (message && String(message).indexOf("ResizeObserver loop") !== -1) { return true; }
+            return _prevOnError ? _prevOnError.apply(this, arguments) : false;
+        };
+    })();
+
     // 네임스페이스 보장 (원본 ws_usp.js 가 먼저 만들지만 방어적)
     oAPP.usp = oAPP.usp || {};
     oAPP.ui = oAPP.ui || {};
@@ -99,6 +114,7 @@
         if (!rec) { return; }
         try { if (rec.ro) { rec.ro.disconnect(); } } catch (e) { }
         try { if (rec.winFn) { window.removeEventListener("resize", rec.winFn); } } catch (e) { }
+        try { if (rec.raf) { cancelAnimationFrame(rec.raf); rec.raf = 0; } } catch (e) { }
         delete oAPP.attr.uspObservers[sKey];
     }
 
@@ -106,12 +122,24 @@
         _disconnectObserver(sKey);                 // 같은 키 이전 옵저버 정리(중복 방지)
         if (!oTarget || typeof fnCb !== "function") { return; }
         var rec = {};
+        // ★ 콜백을 requestAnimationFrame 으로 지연 + 코얼레싱.
+        //   ResizeObserver 콜백 안에서 관찰 대상의 레이아웃을 바로 바꾸면(예: 폼 반응형이 data-narrow
+        //   토글→그리드 높이 변경) 브라우저가 "ResizeObserver loop limit exceeded" 를 던지고,
+        //   이 앱의 전역 window.onerror(ws_trycatch) 가 그걸 Critical Error 로 띄운다. rAF 로 미뤄
+        //   같은 전달 사이클 밖에서 처리 → 루프 경고 자체가 발생하지 않게 한다.
+        function _schedule() {
+            if (rec.raf) { return; }
+            rec.raf = requestAnimationFrame(function () {
+                rec.raf = 0;
+                try { fnCb(); } catch (e) { console.error("[HTML5][WS30] resize cb error:", sKey, e); }
+            });
+        }
         try {
             if (window.ResizeObserver) {
-                rec.ro = new ResizeObserver(function () { fnCb(); });
+                rec.ro = new ResizeObserver(_schedule);
                 rec.ro.observe(oTarget);
             } else {
-                rec.winFn = function () { fnCb(); };
+                rec.winFn = _schedule;
                 window.addEventListener("resize", rec.winFn);
             }
         } catch (e) { console.error("[HTML5][WS30] observeResize error:", sKey, e); }
@@ -550,7 +578,7 @@
         catch (e) { console.error("[HTML5][WS30] Controller(Class Builder):", e); }
     }
 
-    // MIME Repository (Ctrl+Shift+F12) — 버튼과 동일한 일반 핸들러(fnMimeDialogOpener) 호출.
+    // MIME Repository (Ctrl+Shift+F12) — 버튼과 동일한 일반 핸들러(ev_pressMimeBtn → fnMimeWindowOpener) 호출.
     function _uspMime() {
         var fn = oAPP.events && oAPP.events.ev_pressMimeBtn;
         if (typeof fn === "function") { try { fn(); } catch (e) { console.error("[HTML5][WS30] MIME:", e); } }
@@ -1493,7 +1521,8 @@
         oDlg.className = "u4a-dialog";
         oDlg.style.cssText = "width:min(92vw,360px);padding:0;display:flex;flex-direction:column";
 
-        var sTitle = _msg("A57");   // Move Position
+        // 타이틀에 대상 객체명 표기(원본 UI5 "위치 이동 - {name}" 동일).
+        var sTitle = _msg("A57") + " - " + (oNode.OBDEC || "");   // Move Position - {name}
         var oHeader = document.createElement("div");
         oHeader.className = "u4a-dialog__header";
         oHeader.innerHTML = '<i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span></span>';
@@ -1506,18 +1535,30 @@
 
         var oBody = document.createElement("div");
         oBody.className = "u4a-dialog__body";
-        oBody.style.cssText = "flex:1 1 auto;display:flex;flex-direction:column;gap:0.5rem;padding:1.25rem;overflow:visible";
-        var oRow = document.createElement("div");
-        oRow.style.cssText = "display:flex;align-items:center;gap:0.5rem";
-        var oLab = document.createElement("label"); oLab.className = "u4a-label"; oLab.style.cssText = "flex:0 0 auto;min-width:0";
-        oLab.textContent = oNode.OBDEC || "";
+        oBody.style.cssText = "flex:1 1 auto;display:flex;flex-direction:column;gap:1rem;padding:1.25rem 1.5rem;overflow:visible";
+        // 큰 현재값 + 슬라이더(range) + 양끝 라벨. (− 입력 + 스테퍼 → 슬라이더 UX, WS20 와 통일)
+        var oNumRow = document.createElement("div");
+        oNumRow.style.cssText = "display:flex;align-items:baseline;justify-content:center;gap:0.4rem";
         var oInp = document.createElement("input");
-        oInp.type = "number"; oInp.className = "u4a-input"; oInp.style.cssText = "flex:1 1 auto;width:auto;text-align:center";
+        oInp.type = "number"; oInp.className = "u4a-input";
+        oInp.style.cssText = "width:4.5rem;font-size:1.6rem;font-weight:700;text-align:center;flex:0 0 auto";
         oInp.min = "1"; oInp.max = String(nTot); oInp.value = String(iCur + 1);
-        var oMax = document.createElement("span"); oMax.style.cssText = "flex:0 0 auto;color:var(--text-muted)";
+        var oMax = document.createElement("span"); oMax.style.cssText = "color:var(--text-muted);font-size:1rem";
         oMax.textContent = "/ " + nTot;
-        oRow.appendChild(oLab); oRow.appendChild(oInp); oRow.appendChild(oMax);
-        oBody.appendChild(oRow);
+        oNumRow.appendChild(oInp); oNumRow.appendChild(oMax);
+
+        var oSldRow = document.createElement("div");
+        oSldRow.style.cssText = "display:flex;align-items:center;gap:0.75rem;width:100%";
+        var oLblMin = document.createElement("span");
+        oLblMin.style.cssText = "color:var(--text-muted);font-size:0.8rem;flex:0 0 auto"; oLblMin.textContent = "1";
+        var oRange = document.createElement("input");
+        oRange.type = "range"; oRange.style.cssText = "flex:1 1 auto;min-width:0;accent-color:var(--accent);cursor:pointer";
+        oRange.min = "1"; oRange.max = String(nTot); oRange.value = String(iCur + 1);
+        var oLblMax = document.createElement("span");
+        oLblMax.style.cssText = "color:var(--text-muted);font-size:0.8rem;flex:0 0 auto"; oLblMax.textContent = String(nTot);
+        oSldRow.appendChild(oLblMin); oSldRow.appendChild(oRange); oSldRow.appendChild(oLblMax);
+
+        oBody.appendChild(oNumRow); oBody.appendChild(oSldRow);
         oDlg.appendChild(oBody);
 
         var oFoot = document.createElement("div");
@@ -1545,6 +1586,10 @@
             try { if (oAPP.fn.fnRenderUspTree) { oAPP.fn.fnRenderUspTree(); } } catch (e) { }
             try { if (oAPP.fn.setAppChangeWs30) { oAPP.fn.setAppChangeWs30("X"); } } catch (e) { }
         }
+        // 슬라이더 ↔ 숫자 input 동기화(둘 다 1..nTot 클램프).
+        function _clamp(v) { v = parseInt(v, 10); if (!(v >= 1)) { v = 1; } if (v > nTot) { v = nTot; } return v; }
+        oRange.addEventListener("input", function () { oInp.value = String(_clamp(oRange.value)); });
+        oInp.addEventListener("input", function () { oRange.value = String(_clamp(oInp.value)); });
         oX.addEventListener("click", _close);
         oCancel.addEventListener("click", _close);
         oOk.addEventListener("click", _ok);
@@ -1557,6 +1602,168 @@
         try { oDlg.showModal(); } catch (e) { }
         requestAnimationFrame(function () { try { oInp.focus(); oInp.select(); } catch (e) { } });
     };
+
+    /************************************************************************
+     * K5 Download — 선택 노드 하위 파일 수집 → 서버 CONTENT 조회 → zip 생성 → 폴더 선택 저장.
+     *   구 fnOnDownloadUspFiles / fnUspTreeDownloadFileCollect / _fnGetFileContents / _fnUspFileDown.
+     *
+     *   ★ zip 라이브러리 교체(버그 수정): 구 node-zip 은 Windows 탐색기 기본 압축해제로는
+     *     안 풀리고 알집/반디집 같은 외부 도구로만 풀리는 비표준 zip 을 만든다(SR 보고 내용).
+     *     이미 의존성이며 다른 모듈(intro.js·help)에서 쓰는 adm-zip(표준 zip)으로 교체해
+     *     Windows 기본 압축해제와 호환되게 한다. (신규 npm 설치 없음.)
+     ************************************************************************/
+    // 선택 노드 + 하위 전체에서 파일(폴더 제외) 평면 수집 (구 fnUspTreeDownloadFileCollect)
+    function _fnUspCollectFiles(oNode, aOut) {
+        if (!oNode) { return; }
+        if (oNode.ISFLD !== "X") { aOut.push(oNode); }   // 선택 노드 자신이 파일이면 포함
+        (function rec(o) {
+            if (!o || !Array.isArray(o.USPTREE)) { return; }
+            for (var i = 0; i < o.USPTREE.length; i++) {
+                var c = o.USPTREE[i];
+                if (!c) { continue; }
+                if (c.ISFLD !== "X") { aOut.push(c); }
+                if (Array.isArray(c.USPTREE) && c.USPTREE.length) { rec(c); }
+            }
+        })(oNode);
+    }
+
+    oAPP.fn.fnDownloadUspFiles = function (oNode) {
+        if (!oNode) { return; }
+        oAPP.common.fnSetBusyLock("X");
+
+        var aFiles = [];
+        _fnUspCollectFiles(oNode, aFiles);
+
+        // 다운로드 대상 파일이 없는 경우 — "Download File &1 does not exist." 토스트
+        if (aFiles.length === 0) {
+            var sMsg = _msg("B78") + " " + _msg("B79");   // Download File
+            try { sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "073", sMsg); } catch (e) { }   // &1 does not exist.
+            try { parent.showMessage(null, 10, "E", sMsg); } catch (e) { }
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
+        var oFormData = new FormData();
+        oFormData.append("USPDATA", JSON.stringify(aFiles));
+        var sPath = parent.getServerPath() + "/usp_get_file_data";
+        sendAjax(sPath, oFormData, _fnUspDownloadCb);
+    };
+
+    // 서버 CONTENT 응답 → zip 생성 (구 _fnGetFileContents, node-zip → adm-zip)
+    function _fnUspDownloadCb(oResult) {
+        if (typeof oResult !== "object" || oResult == null) {
+            try { oAPP.fn.fnCriticalErrorWs30({ RTMSG: "[usp_get_file_data] JSON Parse Error" }); } catch (e) { }
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+        if (oResult.RETCD === "Z") {
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { oAPP.fn.fnCriticalErrorWs30(oResult); } catch (e) { }
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+        if (oResult.RETCD === "E") {
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { parent.CURRWIN.flashFrame(true); } catch (e) { }
+            if (oResult.SCRIPT) { _uspEvalScript(oResult.SCRIPT); oAPP.common.fnSetBusyLock(""); return; }
+            oAPP.common.fnShowFloatingFooterMsg("E", "WS30", oResult.RTMSG);
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+
+        var aUspData = oResult.USPDATA;
+        if (!Array.isArray(aUspData)) {
+            console.error("[HTML5][WS30] download: USPDATA type error");
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+
+        var oZip;
+        try {
+            var AdmZip = parent.require("adm-zip");
+            oZip = new AdmZip();
+        } catch (e) {
+            console.error("[HTML5][WS30] adm-zip load error:", e);
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+
+        for (var i = 0; i < aUspData.length; i++) {
+            var o = aUspData[i] || {};
+            // zip 내부 경로 = SPATH 에서 "/zu4a/usp" 접두 제거 + 선행 슬래시 제거(상대경로).
+            var sEntry = String(o.SPATH || "").replace("/zu4a/usp", "").replace(/^\/+/, "");
+            if (sEntry === "") { continue; }
+            try {
+                if (String(o.MIME || "").indexOf("image") === 0) {
+                    // 이미지: data URL(base64) → 바이너리 버퍼
+                    var s = String(o.CONTENT || ""), aSplit = s.split(",");
+                    if (aSplit.length > 1) { s = aSplit[1]; }
+                    oZip.addFile(sEntry, parent.Buffer.from(s, "base64"));
+                } else {
+                    oZip.addFile(sEntry, parent.Buffer.from(String(o.CONTENT || ""), "utf8"));
+                }
+            } catch (e) { console.error("[HTML5][WS30] zip add error:", sEntry, e); }
+        }
+
+        var sAppId = ((_model("/WS30/APP") || {}).APPID || "usp").toLowerCase();
+        _fnUspFileDownSave(sAppId, oZip);
+    }
+
+    // 저장 폴더 선택 → zip 파일 기록 → 완료 토스트 + 탐색기에서 파일 강조 (구 _fnUspFileDown)
+    //   ※ 노드 자원(REMOTE/FS/PATH/app/shell)은 이 모듈 스코프엔 없으므로 전부 parent.* 로 접근
+    //     (editor 모듈도 parent.FS/parent.PATH 사용). bare 참조 시 ReferenceError 로 후속처리가 통째로
+    //     날아가 "폴더 안 열림·완료 메시지 없음" 이 됐던 버그 수정.
+    function _fnUspFileDownSave(sFileName, oZip) {
+        var REMOTE = parent.REMOTE, FS = parent.FS, PATH = parent.PATH;
+        var APPRT = (REMOTE && REMOTE.app), SHELL = (REMOTE && REMOTE.shell);
+        if (!REMOTE || !FS || !PATH) {
+            console.error("[HTML5][WS30] download: node resource(parent.REMOTE/FS/PATH) unavailable");
+            oAPP.common.fnSetBusyLock(""); return;
+        }
+
+        var sDefault = "";
+        try { sDefault = oAPP.attr._uspDownFolder || (APPRT && APPRT.getPath("downloads")) || ""; } catch (e) { }
+        var oOpts = {
+            title: _msg("B78"),   // Download
+            defaultPath: sDefault,
+            properties: ["openDirectory", "dontAddToRecent"]
+        };
+        var oP;
+        try { oP = REMOTE.dialog.showOpenDialog(REMOTE.getCurrentWindow(), oOpts); }
+        catch (e) { console.error("[HTML5][WS30] showOpenDialog error:", e); oAPP.common.fnSetBusyLock(""); return; }
+
+        oP.then(function (oPaths) {
+            if (!oPaths || oPaths.canceled || !oPaths.filePaths || !oPaths.filePaths.length) {
+                oAPP.common.fnSetBusyLock(""); return;
+            }
+            var sFolder = oPaths.filePaths[0];
+            oAPP.attr._uspDownFolder = sFolder;   // 다음 다운로드 기본 경로로 기억
+            var sFull = PATH.join(sFolder, sFileName + "_" + _tsStamp() + ".zip");
+            try {
+                var oBuf = oZip.toBuffer();
+                FS.writeFile(sFull, oBuf, {}, function (err) {
+                    if (err) {
+                        try { parent.setSoundMsg("02"); } catch (e) { }
+                        try { parent.showMessage(null, 10, "E", String(err)); } catch (e) { }
+                        oAPP.common.fnSetBusyLock(""); return;
+                    }
+                    // 완료음 + 완료 토스트(MSG_WS 002 = 저장/완료) + 탐색기에서 zip 강조 표시.
+                    try { parent.setSoundMsg("01"); } catch (e) { }
+                    try { parent.showMessage(null, 10, "S", _msgWs("002")); } catch (e) { }
+                    try { if (SHELL && SHELL.showItemInFolder) { SHELL.showItemInFolder(sFull); } } catch (e) { }
+                    oAPP.common.fnSetBusyLock("");
+                });
+            } catch (e) {
+                console.error("[HTML5][WS30] zip write error:", e);
+                oAPP.common.fnSetBusyLock("");
+            }
+        }, function (e) {
+            console.error("[HTML5][WS30] download dialog error:", e);
+            oAPP.common.fnSetBusyLock("");
+        });
+    }
+
+    // 타임스탬프 yyyyMMddHHmmss (구 Date.format 의존 제거)
+    function _tsStamp() {
+        var d = new Date();
+        function p(n) { return (n < 10 ? "0" : "") + n; }
+        return "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+    }
 
     // Activate (구 ev_pressActivateBtn = 저장 + IS_ACT)
     oAPP.fn.fnActivateUspWs30 = function () { oAPP.fn.fnSaveUspWs30({ IS_ACT: "X" }); };
@@ -1882,6 +2089,7 @@
         BODY.appendChild(oCharRow);
 
         // BODY(=P.body)는 createPanel 이 이미 PANEL 에 넣음 → 별도 append 불필요.
+        _uspFormResponsive("uspPropsForm", BODY);   // 좁아지면 라벨/필드 스택
         return PANEL;
     }
 
@@ -1898,6 +2106,21 @@
         F.appendChild(oField);
         ROW.appendChild(F);
         return ROW;
+    }
+
+    // 폼 반응형 — 폭이 좁아지면 라벨|필드(2열) → 라벨 위/필드 아래(1열) 로 스택.
+    //   컨테이너 쿼리 미지원(Chromium93)이라 ResizeObserver 로 폭 감지해 data-narrow 토글
+    //   (CSS .u4aWs30Form[data-narrow="1"]). Properties·Document 폼 공용.
+    function _uspFormResponsive(sKey, oForm) {
+        if (!oForm) { return; }
+        function _apply() {
+            // 라벨 12rem(192px)+필드가 편히 들어가려면 ~380px 필요 → 그 전에 미리 1열 스택(UI5 폼 동작).
+            var w = oForm.clientWidth || oForm.getBoundingClientRect().width || 0;
+            if (w > 0 && w < 420) { oForm.setAttribute("data-narrow", "1"); }
+            else { oForm.removeAttribute("data-narrow"); }
+        }
+        _observeResize(sKey, oForm, _apply);
+        requestAnimationFrame(_apply);   // 최초 레이아웃 직후 1회
     }
 
     function _uspUrlCopy(sUrl) {
@@ -2049,6 +2272,7 @@
             FORM.appendChild(_formRow(_msg(f[0]), oFld.el));
         });
         PAGE.appendChild(FORM);
+        _uspFormResponsive("uspDocForm", FORM);   // 좁아지면 라벨/필드 스택
         return PAGE;
     }
 
@@ -2316,6 +2540,7 @@
             return 220;
         }
         // 트리 최대폭 = 컨테이너 폭 − 콘텐츠 최소 가시폭(320). 항상 최소폭 이상.
+        //   콘텐츠는 이 하한까지 줄 수 있고, 그 안에서 폼은 반응형(라벨↑/필드↓ 스택)으로 대응한다.
         function _maxTree() {
             var iMax = oSplit.clientWidth - 320;
             var iMin = _cssMinW();

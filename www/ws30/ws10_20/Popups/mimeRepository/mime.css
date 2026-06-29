@@ -1,0 +1,108 @@
+/************************************************************************
+ * U4A MIME Repository Popup(별도 BrowserWindow) — 본문 스타일.
+ *   인앱 .u4a-dialog 판(fnMimePopupOpen.js lf_ensureStyle)의 CSS 를 1:1 이식하되
+ *   다이얼로그 래퍼(.u4aMimeDlg/헤더/푸터)를 제거하고 "창 채움" 레이아웃으로 교체.
+ *   색은 의미 토큰만(하드코딩 없음). 공통 자산(shell.css/u4a-ui) 미수정, 화면 스코프만.
+ ************************************************************************/
+
+/* ── 창 기본 레이아웃(타이틀바 + 본문 세로 배치) ── */
+html, body { margin: 0; height: 100%; }
+body {
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+    font-family: var(--font-family, "Segoe UI", system-ui, sans-serif);
+    font-size: 0.875rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 본문 컨테이너 — 네이티브 opacity 페이드 대신 CSS 페이드인(흰 플래시 방지) */
+#mimeContent { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; opacity: 0; transition: opacity 0.15s linear; }
+#mimeContent.u4aMimeShown { opacity: 1; }
+#mimeRoot { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; }
+
+/* Busy 오버레이(경량 스피너) */
+#mimeBusy { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.06); }
+#mimeBusy[hidden] { display: none; }
+.mimeBusy__spin { width: 2.5rem; height: 2.5rem; border: 0.25rem solid var(--line); border-top-color: var(--accent, #4a90d9); border-radius: 50%; animation: mimeSpin 0.8s linear infinite; }
+@keyframes mimeSpin { to { transform: rotate(360deg); } }
+
+/* 오류 토스트 살짝 강조(공통 .u4a-toast 위 스코프 덧대기) */
+.u4a-toast[data-type="error"] { border-left: 0.25rem solid var(--negative, #d9534f); }
+
+/* ── 스플리터 [트리 | (속성/미리보기)] ── */
+.u4aMimeSplit { flex: 1 1 auto; width: 100%; min-width: 0; min-height: 0; }
+
+/* 트리 패널 — 툴바 + 스크롤바디(가상스크롤 wrap). 설명 컬럼 폭 단일출처(WS30 --ws30-desc-w 동일 42%). */
+.u4aMimeTreePane { --u4aMime-desc-w: 42%; display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }
+.u4aMimeTreeTool { flex: 0 0 auto; display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.375rem; border-bottom: 0.0625rem solid var(--line); }
+.u4aMimeToolBtn { color: var(--text); }
+.u4aMimeToolSpacer { flex: 1 1 auto; }
+.u4aMimeMyAppBtn { flex: 0 1 auto; min-width: 0; height: 1.75rem; padding: 0 0.625rem; white-space: nowrap; }
+.u4aMimeMyAppBtn span { overflow: hidden; text-overflow: ellipsis; }
+.u4aMimeMyAppBtn[hidden] { display: none; }
+.u4aMimeTreeBody { flex: 1 1 auto; min-height: 0; overflow: hidden auto; position: relative; }
+
+/* sticky 컬럼 헤더 — 행과 동일 폭 컨텍스트(padding-left 0.375rem = 행과 동일) → 설명컬럼 정렬 일치(WS30 이식). */
+.u4aMimeTreeColHead { position: sticky; top: 0; z-index: 2; box-sizing: border-box; display: flex; align-items: stretch; height: 2.25rem; padding-left: 0.375rem; background: var(--surface-raised); border-bottom: 0.0625rem solid var(--line); font-size: 0.8125rem; font-weight: 700; color: var(--text); }
+.u4aMimeColName { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding-left: 0.5rem; }
+.u4aMimeColDesc { flex: 0 0 var(--u4aMime-desc-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }
+
+/* 트리 — 행을 패널 폭에 맞춰 설명 컬럼 항상 보이게(공통 max-content 무력화). */
+.u4aMimeTree.u4a-tree { width: auto; min-width: 100%; padding-top: 0; }
+.u4aMimeTree .u4a-tree__row[data-u4a-tree-split] { justify-content: flex-start; }
+.u4aMimeRow { padding-right: 0; }
+.u4aMimeRow .u4a-tree__label { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.u4aMimeTree .u4a-tree__row { padding-left: 0.375rem; }
+.u4aMimeTree .u4a-tree__toggle { margin-left: calc(var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem)); }
+
+/* 설명 셀(고정폭 우측 컬럼) + 텍스트(클램프). */
+.u4aMimeDesc { flex: 0 0 var(--u4aMime-desc-w); min-width: 0; box-sizing: border-box; align-self: stretch; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }
+.u4aMimeDescText { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 0.8125rem; }
+
+/* 행별 상태 색 — 원본 fnMimeTreeTableRowCssApply 1:1. */
+.u4aMimeMuted .u4a-tree__label, .u4aMimeMuted .u4aMimeDescText { color: var(--disabled-text); }
+.u4aMimeMyApp { background: var(--selected-bg); }
+.u4aMimeNoData .u4a-tree__label { color: var(--disabled-text); font-style: italic; }
+.u4aMimeTree .u4a-tree__row[aria-selected="true"] .u4a-tree__label, .u4aMimeTree .u4a-tree__row[aria-selected="true"] .u4aMimeDescText { color: var(--selected-text); }
+
+/* 우측 = 속성 패널(상단) + 미리보기(하단), 세로 스플릿바 없음(USP 우측 패턴). 여백+카드 간격. */
+.u4aMimeRightPane { min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.5rem; overflow: hidden; background: var(--app-bg); }
+.u4aMimePropPanel { flex: 0 0 auto; }
+.u4aMimePropPanel .u4a-panel__body { padding: 0.625rem 0.75rem; max-height: 40vh; overflow: auto; }
+.u4aMimeForm { display: flex; flex-direction: column; gap: 0.5rem; }
+.u4aMimeFormRow { display: flex; align-items: center; gap: 0.625rem; }
+.u4aMimeLbl { flex: 0 0 5rem; font-size: 0.8125rem; font-weight: 700; color: var(--text); }
+.u4aMimeUrlBox { flex: 1 1 auto; min-width: 0; display: flex; gap: 0.375rem; align-items: center; }
+.u4aMimeUrlField { flex: 1 1 auto; min-width: 0; }
+.u4aMimeCopyBtn { flex: 0 0 auto; white-space: nowrap; }
+.u4aMimeCrBox { flex: 1 1 auto; min-width: 0; display: flex; gap: 0.375rem; }
+.u4aMimeCrField { flex: 1 1 0; min-width: 0; }
+.u4aMimeCrName { flex: 1.4 1 0; }
+
+/* 미리보기 = 둥근 카드(패널과 동일 컨셉), 잔여 채움. */
+.u4aMimePrevPane { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--surface); border: 0.0625rem solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.u4aMimeImg { max-width: 100%; max-height: 100%; margin: auto; object-fit: contain; }
+.u4aMimeImg[hidden] { display: none; }
+.u4aMimeFrame { flex: 1 1 auto; width: 100%; height: 100%; border: 0; display: block; background: var(--app-bg); }
+.u4aMimeFrame[hidden] { display: none; }
+.u4aMimePdf { flex: 1 1 auto; width: 100%; height: 100%; border: 0; display: block; background: var(--app-bg); }
+.u4aMimePdf[hidden] { display: none; }
+.u4aMimeAudio { width: min(90%, 32rem); margin: auto; }
+.u4aMimeAudio[hidden] { display: none; }
+.u4aMimeVideo { max-width: 100%; max-height: 100%; margin: auto; background: #000; }
+.u4aMimeVideo[hidden] { display: none; }
+.u4aMimeNoData2 { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.9375rem; }
+.u4aMimeNoData2[hidden] { display: none; }
+
+/* 드래그 중 커서 + iframe pointer-events 차단(드래그 끊김 방지). */
+.u4aMimeResizing, .u4aMimeResizing * { cursor: col-resize !important; user-select: none !important; }
+.u4aMimeResizing .u4aMimeFrame, .u4aMimeResizing .u4aMimePdf { pointer-events: none; }
+
+/* 폴더 생성 팝업 — 공통 .u4a-dialog 소비, 폭만 스코프 지정(원본 500px 대응 반응형). */
+.u4aMimeCrDlg { width: min(92vw, 31.25rem); }
+
+/* 화면 전용 툴팁(말줄임된 이름/설명/URL hover). */
+.u4aMimeTip { position: fixed; z-index: 60; max-width: 28rem; padding: 0.25rem 0.5rem; border: 0.0625rem solid var(--line); border-radius: var(--radius, 0.375rem); background: var(--surface-raised); color: var(--text); font-size: 0.75rem; line-height: 1.4; box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,.25); pointer-events: none; white-space: normal; word-break: break-all; opacity: 0; visibility: hidden; transition: opacity 0.1s linear; }
+.u4aMimeTip.u4aMimeTipShow { opacity: 1; visibility: visible; }

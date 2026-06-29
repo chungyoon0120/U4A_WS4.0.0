@@ -3041,11 +3041,18 @@
             //(원본 1780행 attrDocumentProc: ROOT 의 테마/CSS 적용 등 "미리보기" 반영 —
             // W2 미변환 → 데이터 수집(attrChgAttrVal)만 수행하고 미리보기 반영은 skip)
 
-            //UNDO HISTORY 추가 처리. (원본 1811행 — design 모듈 로드 가능시에만)
+            //UNDO HISTORY 추가 처리. (원본 1811행 saveActionHistoryData("CHANGE_ATTR"))
+            //  ★ HTML5: 원본 design 모듈(UI5 iframe/bindPopup 의존 + 별도 __ACT_UNDO_HIST 스택)을
+            //    호출하면 트리 툴바/단축키 Undo(스냅샷 스택 fnWs20ExecHistory)와 연동되지 않아
+            //    "속성 변경은 undo 불가 + 버튼도 안 켜짐" 상태가 된다. → 트리 편집(삽입/삭제/이동/
+            //    붙여넣기)과 동일한 스냅샷 스택(fnWs20PushUndo)에 변경 "직전" 상태를 적재해 통합한다.
+            //    스냅샷이 prev[OBJID]._T_0015 를 저장하므로, undo 시 _restoreSnap 이 값을 복원하고
+            //    _selectNode(setSelectTreeItem→fnWs20SelectUI) 가 속성패널까지 재구성한다.
+            //    (RESET_ATTR/속성 초기화도 이 경로를 거치므로 함께 undo 가능해진다.)
             try {
-                parent.require(oAPP.oDesign.pathInfo.undoRedo).saveActionHistoryData("CHANGE_ATTR", [sAttr]);
+                if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] undo history skip (모듈 미로드):", e && e.message);
+                console.warn("[HTML5][WS20][attr] undo push skip:", e && e.message);
             }
 
             //화면에서 UI추가, 이동, 삭제 및 attr 변경시 변경 flag 처리. (원본 attrChangeProc 1912행)

@@ -136,8 +136,18 @@
 
             const r = oCombo.getBoundingClientRect();
             oList.style.left = r.left + "px";
-            oList.style.top = (r.bottom + 2) + "px";
             oList.style.minWidth = r.width + "px";
+            // 상단 경계 = 타이틀바 하단(공통 §2.2). 아래 공간 우선, 부족하면 위로 플립하되 타이틀바 침범 금지.
+            //   목록은 .u4a-combo__list max-height 가 있으나, 화면 끝/타이틀바를 넘지 않게 동적 제한.
+            const topMin = (_topChromeBottom() || 0) + 2;
+            const h = oList.offsetHeight;
+            const below = window.innerHeight - 4 - (r.bottom + 2);
+            const above = (r.top - 2) - topMin;
+            let lTop, lMax;
+            if (h <= below || below >= above) { lTop = r.bottom + 2; lMax = below; }   // 아래로
+            else { lMax = above; lTop = Math.max(topMin, r.top - 2 - Math.min(h, lMax)); }   // 위로 플립
+            oList.style.top = lTop + "px";
+            if (h > lMax) { oList.style.maxHeight = Math.max(80, lMax) + "px"; oList.style.overflowY = "auto"; }
 
             oCombo.dataset.open = "true";
             oCombo.setAttribute("aria-expanded", "true");
@@ -531,8 +541,14 @@
             let left = r.right - oMenu.offsetWidth; // 우측 정렬
             if (left + oMenu.offsetWidth > window.innerWidth - 4) { left = window.innerWidth - oMenu.offsetWidth - 4; }
             if (left < 4) { left = 4; }
+            // 상단 경계 = 타이틀바 하단(공통 §2.2: 팝업은 .u4a-titlebar 침범 금지). 위로 펼쳐도 그 아래까지.
+            const topMin = (_topChromeBottom() || 0) + 2;
             let top = r.bottom + 2;
-            if (top + oMenu.offsetHeight > window.innerHeight - 4) { top = Math.max(4, r.top - oMenu.offsetHeight - 2); }
+            if (top + oMenu.offsetHeight > window.innerHeight - 4) { top = r.top - oMenu.offsetHeight - 2; }  // 위로 플립
+            if (top < topMin) { top = topMin; }
+            // [타이틀바~화면하단] 에 안 들어가면 높이 제한 → 내부 스크롤(타이틀바/화면밖 침범 방지).
+            const maxH = window.innerHeight - 4 - top;
+            if (oMenu.offsetHeight > maxH) { oMenu.style.maxHeight = maxH + "px"; oMenu.style.overflowY = "auto"; }
             oMenu.style.left = left + "px";
             oMenu.style.top = top + "px";
             oOvf.setAttribute("aria-expanded", "true");
@@ -1810,8 +1826,79 @@
         };
     }
 
+    /**
+     * 공통 확인/메시지 다이얼로그 (sap.m.MessageBox 대응) — 공통 .u4a-dialog 소비.
+     *   ★ 순수 UI 컴포넌트: 텍스트(제목/메시지/버튼라벨)는 호출부가 현지화해 넘긴다(메시지클래스 비결합).
+     *     셸(ws_html5_shell.js fnConfirmBox)·별도창(MIME 등)이 동일 구현을 공유(SSOT).
+     * @param {Object} opts
+     *   - type    : "S"|"E"|"W"|"I"|"C" (헤더 아이콘/색)
+     *   - title   : 헤더 제목(호출부 현지화)
+     *   - message : 본문 메시지
+     *   - buttons : [{act, label, emphasized, negative}] (미지정 시 Yes/No)
+     *   - onClose : function(sAct) — 선택한 버튼 act("YES"/"NO"/"CANCEL"/커스텀)
+     * @returns {HTMLDialogElement|undefined}
+     */
+    function confirm(opts) {
+        opts = opts || {};
+        const sType = opts.type || "I";
+        const sTitle = opts.title || "";
+        const sMsg = (opts.message == null) ? "" : String(opts.message);
+        let aBtns = (opts.buttons && opts.buttons.length) ? opts.buttons
+            : [{ act: "YES", label: opts.yesLabel || "Yes", emphasized: true }, { act: "NO", label: opts.noLabel || "No" }];
+        const fnCb = opts.onClose;
+        const bHasCancel = aBtns.some(function (b) { return b.act === "CANCEL"; });
+        const oIcon = { S: "circle-check", E: "circle-xmark", W: "triangle-exclamation", I: "circle-info", C: "circle-question" }[sType] || "circle-info";
+
+        function _done(sAct) { if (typeof fnCb === "function") { try { fnCb(sAct); } catch (e) { } } }
+
+        // 네이티브 <dialog> 미지원 시 — 브라우저 confirm 폴백(동작 보장).
+        let oDlg;
+        try { oDlg = document.createElement("dialog"); } catch (e) { oDlg = null; }
+        if (!oDlg || typeof oDlg.showModal !== "function") {
+            let bOk = false;
+            try { bOk = window.confirm(sMsg); } catch (e2) { bOk = true; }
+            _done(bOk ? "YES" : (bHasCancel ? "CANCEL" : "NO"));
+            return;
+        }
+
+        oDlg.className = "u4a-dialog";
+        oDlg.style.width = "min(28rem, 92vw)";
+        oDlg.innerHTML =
+            '<div class="u4a-dialog__header" data-type="' + sType + '">' +
+                '<i class="fa-solid fa-' + oIcon + '"></i><span></span>' +
+            '</div>' +
+            '<div class="u4a-dialog__body" style="white-space:pre-wrap;line-height:1.45;"></div>' +
+            '<div class="u4a-dialog__footer"></div>';
+        oDlg.querySelector(".u4a-dialog__header span").textContent = sTitle;
+        oDlg.querySelector(".u4a-dialog__body").textContent = sMsg;
+
+        function _close(sAct) {
+            try { oDlg.close(); } catch (e) { }
+            try { oDlg.remove(); } catch (e) { }
+            _done(sAct);
+        }
+
+        const oFooter = oDlg.querySelector(".u4a-dialog__footer");
+        aBtns.forEach(function (b) {
+            const oBtn = document.createElement("button");
+            oBtn.type = "button";
+            oBtn.className = "u4a-btn" + (b.emphasized ? " u4a-btn--emphasized" : "") + (b.negative ? " u4a-btn--negative" : "");
+            oBtn.textContent = b.label || b.act;
+            oBtn.addEventListener("click", function () { _close(b.act); });
+            oFooter.appendChild(oBtn);
+        });
+        // ESC → CANCEL(있으면) 아니면 NO
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); _close(bHasCancel ? "CANCEL" : "NO"); });
+
+        try { document.body.appendChild(oDlg); oDlg.showModal(); }
+        catch (e) { _close(window.confirm(sMsg) ? "YES" : (bHasCancel ? "CANCEL" : "NO")); }
+
+        return oDlg;
+    }
+
     const U4AUI = {
         el: _el,
+        confirm: confirm,
         createField: createField,
         syncClear: syncClear,
         createPanel: createPanel,

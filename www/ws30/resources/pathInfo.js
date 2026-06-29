@@ -83,6 +83,7 @@ module.exports = (() => {
         APPDOCU: PATH.join(POPUP_ROOT, "docPopup", "frame.html"),
         WSOPTS: PATH.join(POPUP_ROOT, "optionPopup", "optionM.html"),
         EDITPOP: PATH.join(POPUP_ROOT, "editorPopup", "editorFrame.html"),
+        MIMEPOP: PATH.join(POPUP_ROOT, "mimeRepository", "frame.html"), // U4A MIME Repository (별도 BrowserWindow)
         ERRMSGPOP: PATH.join(POPUP_ROOT, "errMsgPopup", "frame.html"),
         U4ADOCU: PATH.join(POPUP_ROOT, "u4aDocPopup", "frame.html"),
         IMPEXPPOP: PATH.join(POPUP_ROOT, "importExportPopup", "index.html"),
