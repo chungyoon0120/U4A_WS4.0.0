@@ -3205,13 +3205,9 @@
             //OBJID + 이벤트명(UIASN) 으로 client 이벤트 script ID 구성.
             var l_objid = is_attr.OBJID + is_attr.UIASN;
 
-            //표시(비편집) 상태: 입력된 클라이언트 JS 이벤트가 없으면 열지 않음.
-            if (!_isEditMode()) {
-                var aCevt = (oAPP.DATA && oAPP.DATA.APPDATA && Array.isArray(oAPP.DATA.APPDATA.T_CEVT)) ? oAPP.DATA.APPDATA.T_CEVT : [];
-                if (aCevt.findIndex(function (a) { return a && a.OBJID === l_objid && a.OBJTY === "JS"; }) === -1) {
-                    return true;
-                }
-            }
+            //표시(비편집) 모드에서도 에디터는 "보기"로 항상 연다(사용자 요청). 입력된 클라이언트 JS 가
+            //  없으면 빈 에디터가 열리며, 편집은 팝업(fnClientJsEditorPopup)이 _isEdit() 로 읽기전용 처리한다.
+            //  (원본은 비편집 && JS 없음이면 미오픈이었으나, CSS/JS Link·Web Security 버튼과 동일 정책으로 통일.)
 
             //저장/삭제 후 콜백 — ADDSC 매핑 + syntax 아이콘색 갱신(원본 빌드 line 917~921 대응) + 행 재렌더.
             function lf_cb(param) {
@@ -3880,7 +3876,21 @@
                 inputClassName: "u4aWs20AttrInp val",
                 clear: bHasClear,
                 onClear: function () { sAttr.UIATV = ""; oAPP.fn.fnWs20AttrChange(sAttr, "INPUT"); },
-                f4: (sAttr.showF4 === true) ? function () { console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT); } : null,
+                f4: (sAttr.showF4 === true) ? function (oAnchor) {
+                    // 컬러 프로퍼티 F4 = 컬러 피커(원본 attrCallValueHelpColor 1:1) — Body Background Color(DH001109) 포함.
+                    //   OK 시 #rrggbb → UIATV 반영 + 변경처리(원본 attrChange(is_attr,"INPUT") 대응).
+                    var bColor = (typeof oAPP.fn.attrIsColorProp === "function" && oAPP.fn.attrIsColorProp(sAttr) === true) || sAttr.UIATK === "DH001109";
+                    if (bColor) {
+                        var fnDone = function (sHex) {
+                            sAttr.UIATV = sHex || "";
+                            oAPP.fn.fnWs20AttrChange(sAttr, "INPUT");
+                        };
+                        if (oAPP.fn.fnColorPickerOpen) { oAPP.fn.fnColorPickerOpen(oAnchor, sAttr.UIATV, fnDone); }
+                        else { oAPP.loadJs("fnColorPickerPopover", function () { oAPP.fn.fnColorPickerOpen(oAnchor, sAttr.UIATV, fnDone); }); }
+                        return;
+                    }
+                    console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT);
+                } : null,
                 f4IconHtml: '<i class="fa-regular fa-clone"></i>',   // F4=아웃라인 clone(복사버튼과 구분, 2026-06-17)
                 f4Disabled: !bFieldEdit,
                 onChange: function (v) { sAttr.UIATV = v; oAPP.fn.fnWs20AttrChange(sAttr, "INPUT"); }
@@ -3996,7 +4006,9 @@
             BTN.type = "button";
             BTN.className = "u4aWs20AttrPopBtn" +
                 ((sAttr.btn_type === "Attention") ? " attention" : "");
-            BTN.disabled = !bEnabled;
+            // 팝업 호출형 버튼(CSS/JS Link Add·Web Security·Enable Dump Write 등)은 조회 모드에서도
+            //   클릭 가능 — 팝업을 "보기"는 허용하고, 내부 편집은 각 팝업이 _isEdit() 로 읽기전용 처리한다.
+            BTN.disabled = false;
 
             BTN.innerHTML = _iconHtml(sAttr.btn_icon, "up-right-from-square");
             var sBtnTxt = sAttr.btn_text || sAttr.UIATT || "";
@@ -4019,6 +4031,12 @@
                         break;
                     case "DH001026":   // Web Security Settings
                         if (oAPP.fn.fnWebSecurityPopupOpener) { oAPP.fn.fnWebSecurityPopupOpener(); return; }
+                        break;
+                    case "DH001091":   // Enable Dump Write
+                        if (oAPP.fn.fnDumpWritePopupOpener) { oAPP.fn.fnDumpWritePopupOpener(sAttr); return; }
+                        break;
+                    case "DH001106":   // Use init pre-screen event
+                        if (oAPP.fn.fnInitPreScreenPopupOpener) { oAPP.fn.fnInitPreScreenPopupOpener(sAttr); return; }
                         break;
                 }
                 console.warn("[W4+ 예정] 팝업 호출형 속성 버튼 미변환:", sAttr.UIATT, "(", sAttr.UIATK, ")");

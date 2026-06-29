@@ -44,24 +44,15 @@
     padding: 0 0.5rem 0 0.25rem;
     background: var(--sl-surface, var(--surface));
     border-bottom: 0.0625rem solid var(--sl-border, var(--line));
-    /* 좁아져도 줄바꿈 X — 넘치면 카테고리를 햄버거(☰)로 접고, 더 좁으면 클러스터를 축소(.is-tight).
-       구 sap.m.OverflowToolbar 동작 (JS buildMenubar _reflowMenubar). overflow:hidden 으로 클립+측정. */
+    /* 좌측 카테고리는 항상 펼쳐 고정(flex:0 0 auto). 좁아지면 우측 공통영역(.u4a-ws10__common)만
+       ⋯ 오버플로로 접힌다(JS attachOverflow). 극단적으로 좁으면 overflow:hidden 으로 좌측이 잘린다. */
     flex-wrap: nowrap;
     overflow: hidden;
 }
 
-/* 메뉴 오버플로 햄버거(☰) — 카테고리 버튼과 동일 스킨(.u4a-wmenu-btn) + 폭 고정. */
-.u4a-wmenu-overflow {
-    flex: 0 0 auto;
-}
-
-/* tight 모드(햄버거로도 부족) — 클러스터 축소: AI 텍스트 숨겨 아이콘만, T-CODE 폭 축소. */
-.u4a-ws10__menubar.is-tight .u4a-ai-btn span { display: none; }
-.u4a-ws10__menubar.is-tight .u4a-ai-btn { padding: 0 0.5rem; }
-.u4a-ws10__menubar.is-tight .u4a-tcode-field { width: 5.5rem; }
-
 /* 메뉴 카테고리 버튼 (Extras / Utilities / System / Help / Test) */
 .u4a-wmenu-btn {
+    flex: 0 0 auto;   /* 좌측 메뉴 고정 — shrink 금지(우측 공통영역이 먼저 줄어 ⋯ 로 접히게) */
     display: inline-flex;
     align-items: center;
     height: 2rem;
@@ -91,10 +82,31 @@
 
 /* ── 공통 헤더 영역 (오른쪽 끝, fnGetCommonHeaderButtons 대체) ───── */
 .u4a-ws10__common {
-    margin-left: auto;
+    /* 좌측 카테고리 다음 남는 공간을 차지하고(우측정렬), 좁아지면 줄어들어(min-width:0)
+       내부 버튼이 ⋯ 오버플로로 접히도록 한다(JS attachOverflow 가 clientWidth 로 측정). */
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 0.25rem;
+    overflow: hidden;
+}
+
+/* ★ 오버플로로 숨긴 항목([hidden]) 실제 숨김 — 버튼/입력칸의 display:inline-flex 가 UA
+   [hidden]{display:none} 을 특이도로 덮으므로 명시 필요(트리 툴바·미리보기 헤더와 동일 패턴:
+   ws20.css .u4aWs20PrevHeader>[hidden] / .u4aWs20TreeToolbar .u4a-btn-icon[hidden]).
+   이게 없으면 폭이 넉넉해도 ⋯ 가 뜨고 좁혀도 접힘이 시각화되지 않는다. */
+.u4a-ws10__common > [hidden] { display: none !important; }
+
+/* 우측 공통영역 ⋯ 오버플로 메뉴 안의 T-CODE 입력칸(좁을 때 접힌 SAP T-CODE) */
+.u4a-tcode-menurow {
+    display: flex;
+    width: 100%;
+    min-width: 12rem;
+}
+.u4a-tcode-menurow .u4a-tcode {
+    width: 100%;
 }
 
 /* AI 연결상태 버튼 (텍스트 + 아이콘) */

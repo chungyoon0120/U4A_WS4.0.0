@@ -1,167 +1,428 @@
-/* Loading Page */
-.u4a_loaders {
-    font-family: sans-serif;
+/****************************************************************************
+ * 현재 앱 기술 문서(Current App Technical Document) 에디터 창 레이아웃
+ * --------------------------------------------------------------------------
+ *  창 골격 = [공통 .u4a-titlebar] + [본체(문서목록 드로어 | 디테일)] + [푸터(줌)].
+ *  디테일 = [툴바(생성/삭제/저장 + 변경이력)] + [제목 입력] + [Monaco 호스트].
+ *  타이틀바/버튼/입력칸/패널 모양은 shell.css + bootstrap-skin.css 가 담당(색 하드코딩 없음).
+ *  에디터 시리즈(errorPageEditorFrame)와 동일 트랙 — 공통 토큰만 소비.
+ ****************************************************************************/
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+}
+
+/* ===== 본체 = [문서목록 드로어] | [디테일] ===== */
+.u4aDocBody {
+    flex: 1 1 auto;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── 문서 목록(Master) 드로어 — 기본 열림. ☰ 로 토글(원본 SplitApp Navigation). 사이드바 톤(app-bg). ── */
+.u4aDocNav {
+    flex: 0 0 clamp(14rem, 24%, 22rem);
+    min-width: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    background: var(--app-bg);
+    border-right: 1px solid var(--divider);
+    overflow: hidden;
+    transition: flex-basis 0.2s ease;
+}
+
+.u4aDocNav[data-open="false"] {
+    flex-basis: 0;
+    border-right-color: transparent;
+}
+
+/* 드로어 머리말(원본 Master Page title = Document List, D14). */
+.u4aDocNavHead {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    min-height: 3rem;
+    display: flex;
     align-items: center;
-    height: 100%;
-    font-size: 2.5rem;
-    color: rgba(2, 8, 16, 0.55);
-    position: absolute;
-    top: 0;
-    width: 100%;
-    /* background: #1d232a; */
-    box-shadow: rgba(0, 0, 0, 0.11) 0px 15px 30px 0px, rgba(0, 0, 0, 0.08) 0px 5px 15px 0px;
+    padding: 0 0.875rem;
+    font-weight: 600;
+    color: var(--text-muted, var(--text));
+    border-bottom: 1px solid var(--divider);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.u4a_loader {
-    display: inline-block;
+
+/* 문서 목록(스크롤). */
+.u4aDocList {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+/* 목록 항목 — 원본 sap.tnt.NavigationListItem(아이콘 + 제목, 선택 강조). 좌측정렬 풀폭 버튼. */
+.u4aDocItem {
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    margin-bottom: 0.125rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius, 6px);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.u4aDocItem:hover {
+    background: var(--hover-bg);
+}
+
+.u4aDocItem[aria-selected="true"] {
+    background: var(--selected-bg, var(--active-bg));
+    border-color: var(--divider);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.u4aDocItem__icon {
+    flex: 0 0 auto;
+    width: 1rem;
+    text-align: center;
+    color: var(--icon-muted, var(--text-muted));
+}
+
+.u4aDocItem[aria-selected="true"] .u4aDocItem__icon {
+    color: var(--accent);
+}
+
+.u4aDocItem__text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 제목 없는 새 문서 — 옅은 안내. */
+.u4aDocItem__text.is-empty {
+    color: var(--text-muted, var(--icon-muted));
+    font-style: italic;
+}
+
+/* 목록 빈 상태. */
+.u4aDocListEmpty {
+    padding: 1rem 0.75rem;
+    color: var(--text-muted, var(--icon-muted));
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+/* ── 디테일(Detail) = [툴바] + [제목] + [에디터] ── */
+.u4aDocDetail {
+    flex: 1 1 auto;
+    min-width: 0;
+    position: relative;          /* 치명 오류 오버레이(.u4aDocFatal absolute) 기준 */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 툴바(원본 Detail customHeader) — 48px. 좌:☰/생성/삭제/저장 · 우:변경이력. */
+.u4aDocToolbar {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-bottom: 1px solid var(--divider);
+    background: var(--surface);
+}
+
+.u4aDocToolSpacer {
+    flex: 1 1 auto;
+}
+
+/* 네비 토글(☰) — 투명 아이콘 버튼. */
+.u4aDocNavToggle {
+    min-width: 2.25rem;
+    padding: 0.4rem 0.6rem;
+    justify-content: center;
+    background: transparent;
+    border-color: transparent;
+    color: var(--text);
+}
+
+.u4aDocNavToggle:hover {
+    background: var(--hover-bg);
+}
+
+.u4aDocNavToggle[aria-pressed="true"] {
+    background: var(--active-bg);
+    color: var(--accent);
+}
+
+/* 툴바 아이콘 버튼 공통(정사각, 원본 icon-only 버튼). */
+.u4aDocToolBtn {
+    min-width: 2.25rem;
+    padding: 0.4rem 0.6rem;
+    justify-content: center;
+}
+
+/* 비활성 — 표시/빈 상태. */
+.u4aDocToolbar .u4a-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* 변경 이력(작성자/일시) — 우측 muted 텍스트(원본 oTimeStmp). */
+.u4aDocStamp {
+    color: var(--text-muted, var(--icon-muted));
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 50%;
+}
+
+/* 제목 입력 줄(원본 sap.m.Input — placeholder=Title, value-state=Information). */
+.u4aDocTitleRow {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--divider);
+    background: var(--surface);
+}
+
+.u4aDocTitleRow .u4a-field {
+    width: 100%;
+}
+
+/* 콘텐츠 = Jodit WYSIWYG. 처음 opacity:0 → 준비 시 페이드인(네이티브 창 opacity 미사용). */
+.u4aDocContent {
+    flex: 1 1 auto;
     position: relative;
-    width: 60px;
-    height: 20px;
-    text-align: center;
-    vertical-align: middle;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    background: var(--app-bg);
+    opacity: 0;
+    transition: opacity 0.3s linear;
 }
-.u4a_loadersInactive {
+
+.u4aDocContent.u4aDocShown {
+    opacity: 1;
+}
+
+/* Jodit 컨테이너가 콘텐츠 영역을 채우게(원본 RTE width/height 100%). */
+.u4aDocContent .jodit-container {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    border: 0;
+}
+
+/* ===== 푸터(48px) — 줌 컨트롤(왼쪽). 에디터 시리즈와 동일 공통 UX. ===== */
+.u4aDocFooter {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-top: 1px solid var(--divider);
+    background: var(--surface);
+}
+
+.u4aDocFootSpacer {
+    flex: 1 1 auto;
+}
+
+.u4aDocZoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+
+.u4aDocZoomBtn {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted, var(--icon-muted));
+}
+
+.u4aDocZoomBtn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+.u4aDocZoomPct {
+    font-variant-numeric: tabular-nums;
+    gap: 0.375rem;
+}
+
+.u4aDocZoomStep {
+    min-width: 1.9rem;
+    padding: 0.4rem 0.5rem;
+    justify-content: center;
+}
+
+/* ===== 치명 오류(원본 fn_setMsgMove / MessagePage) — 화면 대체 오버레이. ===== */
+.u4aDocFatal {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem;
+    text-align: center;
+    background: var(--app-bg);
+    z-index: 50;
+}
+
+.u4aDocFatal i {
+    font-size: 2.5rem;
+    color: var(--error);
+    margin-bottom: 0.5rem;
+}
+
+.u4aDocFatal__title {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+}
+
+.u4aDocFatal__desc,
+.u4aDocFatal__text {
+    color: var(--text-muted, var(--text));
+    font-size: 0.875rem;
+    line-height: 1.5;
+    max-width: 32rem;
+}
+
+/* ===== 로딩 오버레이 — busy 동안 입력 차단 + 스피너. ===== */
+#docBusy {
+    position: fixed;
+    inset: 0;
     display: none;
-}
-.u4a_loader-bars:before,
-.u4a_loader-bars:after,
-.u4a_loader-bars span {
-    content: "";
-    display: block;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 10px;
-    height: 30px;
-    background-color: rgba(2, 8, 16, 0.55);
-    -webkit-animation: u4a_grow 1.5s linear infinite;
-    animation: u4a_grow 1.5s linear infinite;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+    z-index: 9999;
 }
 
-.u4a_loader-bars:after {
-    left: 15px;
-    -webkit-animation: u4a_grow 1.5s linear -0.5s infinite;
-    animation: u4a_grow 1.5s linear -0.5s infinite;
+#docBusy.show {
+    display: flex;
 }
 
-.u4a_loader-bars span {
-    left: 30px;
-    -webkit-animation: u4a_grow 1.5s linear -1s infinite;
-    animation: u4a_grow 1.5s linear -1s infinite;
-}
-
-@-webkit-keyframes u4a_grow {
-    0% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-    50% {
-        -webkit-transform: scaleY(1);
-        transform: scaleY(1);
-        opacity: 1;
-    }
-    100% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-}
-
-@keyframes u4a_grow {
-    0% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-    50% {
-        -webkit-transform: scaleY(1);
-        transform: scaleY(1);
-        opacity: 1;
-    }
-    100% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-}
-
-
-.cl_ring {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 150px;
-    height: 150px;
-    background: transparent;
-    border: 3px solid #ff2600;
+#docBusy .u4aDocSpinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 3px solid var(--divider);
+    border-top-color: var(--u4a-accent, var(--accent));
     border-radius: 50%;
-    text-align: center;
-    line-height: 150px;
-    font-family: sans-serif;
-    font-size: 20px;
-    color: #ffbeb2;
-    letter-spacing: 4px;
-    text-shadow: 0 0 10px #ffbeb2;
-    box-shadow: 0 0 20px rgba(156, 0, 0, 0.5);
+    animation: u4aDocSpin 0.8s linear infinite;
 }
 
-.cl_ring:before {
-    content: '';
-    position: absolute;
-    top: -3px;
-    left: -3px;
-    width: 100%;
-    height: 100%;
-    border: 3px solid transparent;
-    border-top: 3px solid #ffbeb2;
-    border-right: 3px solid #ffbeb2;
-    border-radius: 50%;
-    animation: animateC 3s linear infinite;
+@keyframes u4aDocSpin {
+    to { transform: rotate(360deg); }
 }
 
-.cl_ringArea {
-    display: block;
-    position: absolute;
-    top: calc(50% - 2px);
-    left: 50%;
-    width: 50%;
-    height: 4px;
-    background: transparent;
-    transform-origin: left;
-    animation: animate 3s linear infinite;
+/* 저장 토스트는 공통 .u4a-toast(shell.css — 화면 정중앙) 를 그대로 소비. 화면별 토스트 스타일 없음. */
+
+/* ============================================================================
+ * Jodit 테마 = 공통 토큰 매핑(.jodit_theme_u4a)
+ *  Jodit 4 는 모든 색을 --jd-* CSS 변수로 그린다. 그 변수를 우리 의미 토큰(var(--*))에
+ *  매핑하면, data-theme 캐스케이드(테마 5종/라이트·다크 전환)에 **CSS 만으로 자동 추종**한다.
+ *  (이 블록은 jodit.min.css 보다 나중 로드되어 Jodit 기본값을 이김 — frame.html head 순서.)
+ *  하드코딩 hex 없음 — 전부 토큰 소비(12·16번 표준).
+ * ========================================================================== */
+.jodit_theme_u4a {
+    /* 텍스트/아이콘 */
+    --jd-color-text:            var(--text);
+    --jd-color-default:         var(--text);
+    --jd-color-text-icons:      var(--text);
+    --jd-color-icon:            var(--icon-muted);
+    --jd-color-label:           var(--text-muted);
+    --jd-color-placeholder:     var(--text-muted);
+    --jd-color-gray:            var(--text-muted);
+    --jd-color-gray-dark:       var(--text-muted);
+
+    /* 면(패널/툴바/에디터/소스) */
+    --jd-color-panel:               var(--surface);
+    --jd-color-background-default:  var(--surface);
+    --jd-color-white:               var(--surface);
+    --jd-color-background-gray:        var(--app-bg);
+    --jd-color-background-light-gray:  var(--app-bg);
+    --jd-color-source-area:            var(--app-bg);
+
+    /* 경계/구분선 */
+    --jd-color-border:          var(--divider);
+    --jd-color-border-dark:     var(--divider);
+    --jd-color-separator:       var(--divider);
+    --jd-color-border-active:   var(--accent);
+    --jd-color-border-selected: var(--accent);
+    --jd-border-radius-default: 6px;
+
+    /* 상태(hover/active/selection) */
+    --jd-color-background-button-hover:        var(--hover-bg);
+    --jd-color-button-background-hover:        var(--hover-bg);
+    --jd-color-background-button-hover-opacity30: var(--hover-bg);
+    --jd-color-button-background-hover-opacity40: var(--hover-bg);
+    --jd-color-button-background-hover-opacity60: var(--active-bg);
+    --jd-color-background-active:    var(--active-bg);
+    --jd-color-background-selection: var(--selected-bg);
+    --jd-color-selection:            var(--selected-bg);
+    --jd-color-selection-area:       var(--selected-bg);
+    --jd-color-text-selection:       var(--text);
+
+    /* 강조/오류 */
+    --jd-color-blue:        var(--accent);
+    --jd-color-light-blue:  var(--accent);
+    --jd-color-error:       var(--error);
+    --jd-color-red:         var(--error);
+    --jd-color-light-red:   var(--error);
 }
 
-.cl_ringArea:before {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #ffbeb2;
-    top: -6px;
-    right: -8px;
-    box-shadow: 0 0 20px #fff;
+/* 컨테이너/툴바/본문 — 변수로 안 잡히는 직접 색 몇 곳만 토큰으로 마감(우리 입력칸 톤에 맞춤). */
+.jodit_theme_u4a.jodit-container:not(.jodit_inline) {
+    background: var(--surface);
+    border-color: var(--divider);
+    color: var(--text);
 }
 
-@keyframes animateC {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
+.jodit_theme_u4a .jodit-toolbar__box {
+    background: var(--surface);
+    border-bottom: 1px solid var(--divider);
 }
 
-@keyframes animate {
-    0% {
-        transform: rotate(45deg);
-    }
+.jodit_theme_u4a .jodit-workplace,
+.jodit_theme_u4a .jodit-wysiwyg {
+    background: var(--surface);
+    color: var(--text);
+}
 
-    100% {
-        transform: rotate(405deg);
-    }
+.jodit_theme_u4a .jodit-wysiwyg a {
+    color: var(--accent);
 }

@@ -63,23 +63,38 @@ body {
 
 /* 행별 상태 색 — 원본 fnMimeTreeTableRowCssApply 1:1. */
 .u4aMimeMuted .u4a-tree__label, .u4aMimeMuted .u4aMimeDescText { color: var(--disabled-text); }
-.u4aMimeMyApp { background: var(--selected-bg); }
 .u4aMimeNoData .u4a-tree__label { color: var(--disabled-text); font-style: italic; }
 .u4aMimeTree .u4a-tree__row[aria-selected="true"] .u4a-tree__label, .u4aMimeTree .u4a-tree__row[aria-selected="true"] .u4aMimeDescText { color: var(--selected-text); }
+
+/* ★ 현재 앱 폴더 = 중간 톤 accent 틴트 강조(선택의 옅은 틴트 ~0.18 보다 진하게, 솔리드는 과해서 톤다운).
+   color-mix 미지원(Chromium93) → 같은 --selected-bg 를 gradient 레이어로 3겹 겹쳐 알파만 키움(≈0.45,
+   토큰/테마 추종 유지·하드코딩 없음). 선택돼도 유지되게 [aria-selected] 변형 포함 + 선택 텍스트 규칙 뒤 선언. */
+.u4aMimeTree .u4aMimeMyApp,
+.u4aMimeTree .u4aMimeMyApp[aria-selected="true"] {
+    background:
+        linear-gradient(var(--selected-bg), var(--selected-bg)),
+        linear-gradient(var(--selected-bg), var(--selected-bg)),
+        linear-gradient(var(--selected-bg), var(--selected-bg));
+    box-shadow: none;
+}
+.u4aMimeTree .u4aMimeMyApp .u4a-tree__label,
+.u4aMimeTree .u4aMimeMyApp .u4aMimeDescText,
+.u4aMimeTree .u4aMimeMyApp[aria-selected="true"] .u4a-tree__label,
+.u4aMimeTree .u4aMimeMyApp[aria-selected="true"] .u4aMimeDescText { color: var(--text); font-weight: 700; }
 
 /* 우측 = 속성 패널(상단) + 미리보기(하단), 세로 스플릿바 없음(USP 우측 패턴). 여백+카드 간격. */
 .u4aMimeRightPane { min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.5rem; overflow: hidden; background: var(--app-bg); }
 .u4aMimePropPanel { flex: 0 0 auto; }
 .u4aMimePropPanel .u4a-panel__body { padding: 0.625rem 0.75rem; max-height: 40vh; overflow: auto; }
-.u4aMimeForm { display: flex; flex-direction: column; gap: 0.5rem; }
-.u4aMimeFormRow { display: flex; align-items: center; gap: 0.625rem; }
-.u4aMimeLbl { flex: 0 0 5rem; font-size: 0.8125rem; font-weight: 700; color: var(--text); }
-.u4aMimeUrlBox { flex: 1 1 auto; min-width: 0; display: flex; gap: 0.375rem; align-items: center; }
-.u4aMimeUrlField { flex: 1 1 auto; min-width: 0; }
+/* 속성 폼 = 공통 반응형 .u4a-form(라벨 상단). 단일 입력 행은 행 전체폭(stretch) → 잘림 없음. */
+.u4aMimePropForm .u4a-form__row > .u4a-field { width: 100%; min-width: 0; }
+/* URL: 입력 + 복사 버튼(한 줄, 좁으면 줄바꿈). 생성: 날짜/시간/사용자(좁으면 줄바꿈). */
+.u4aMimeUrlBox { display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap; }
+.u4aMimeUrlField { flex: 1 1 12rem; min-width: 0; }
 .u4aMimeCopyBtn { flex: 0 0 auto; white-space: nowrap; }
-.u4aMimeCrBox { flex: 1 1 auto; min-width: 0; display: flex; gap: 0.375rem; }
-.u4aMimeCrField { flex: 1 1 0; min-width: 0; }
-.u4aMimeCrName { flex: 1.4 1 0; }
+.u4aMimeCrBox { display: flex; gap: 0.375rem; flex-wrap: wrap; }
+.u4aMimeCrField { flex: 1 1 6rem; min-width: 0; }
+.u4aMimeCrName { flex: 1.4 1 8rem; }
 
 /* 미리보기 = 둥근 카드(패널과 동일 컨셉), 잔여 채움. */
 .u4aMimePrevPane { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--surface); border: 0.0625rem solid var(--line); border-radius: var(--radius); overflow: hidden; }
@@ -103,6 +118,4 @@ body {
 /* 폴더 생성 팝업 — 공통 .u4a-dialog 소비, 폭만 스코프 지정(원본 500px 대응 반응형). */
 .u4aMimeCrDlg { width: min(92vw, 31.25rem); }
 
-/* 화면 전용 툴팁(말줄임된 이름/설명/URL hover). */
-.u4aMimeTip { position: fixed; z-index: 60; max-width: 28rem; padding: 0.25rem 0.5rem; border: 0.0625rem solid var(--line); border-radius: var(--radius, 0.375rem); background: var(--surface-raised); color: var(--text); font-size: 0.75rem; line-height: 1.4; box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,.25); pointer-events: none; white-space: normal; word-break: break-all; opacity: 0; visibility: hidden; transition: opacity 0.1s linear; }
-.u4aMimeTip.u4aMimeTipShow { opacity: 1; visibility: visible; }
+/* 툴팁은 공통 .u4a-tooltip(u4a-ui.js initTooltip)으로 일원화 — 화면 전용 툴팁 CSS 제거(이중 툴팁 버그 방지). */

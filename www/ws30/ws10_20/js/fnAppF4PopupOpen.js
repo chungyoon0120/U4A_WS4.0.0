@@ -169,6 +169,9 @@
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aAppF4Dlg";
         oDlg.id = "u4aAppF4Dlg";
+        // ★ 공통 "닫으면 DOM 제거" 위임에서 제외(opt-out). 이 팝업은 원본 아키텍처상
+        //   닫기=숨김(DOM 유지)으로 검색 상태를 보존하고 다음 호출에 재표시한다.
+        oDlg.setAttribute("data-u4a-keep", "");
 
         // 닫기 = 숨김(파괴 X). 원본 싱글톤처럼 DOM 유지 → 다음 호출에 재표시(상태 보존).
         function lf_close() { try { _closeColMenu(); } catch (e) { } try { oDlg.close(); } catch (e) { } }

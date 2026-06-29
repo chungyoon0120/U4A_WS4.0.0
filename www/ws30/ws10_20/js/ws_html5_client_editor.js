@@ -148,12 +148,12 @@
     var iIdx = aCevt.findIndex(function (x) { return x && x.OBJID === oState.sObjId && x.OBJTY === oState.sObjTy; });
 
     if (sVal === "") {
-      // 입력값 없음 — 기존 라인 있으면 삭제.
+      // 입력값 없음 — 기존 라인 있으면 삭제(원본 ev_pressClientEditorSave 1:1).
       if (iIdx >= 0) {
         aCevt.splice(iIdx, 1);
         try { parent.setAppChange("X"); } catch (e) { }
       }
-      lf_toastSaved();
+      lf_toastSaved();   // 빈 값이어도 저장 완료 토스트(사용자 지시).
       if (typeof oState.fnCallback === "function") { try { oState.fnCallback(""); } catch (e) { } }
       return;
     }
@@ -173,11 +173,64 @@
   // 삭제(원본 ev_pressClientEditorDel) — 에디터 내용만 비움.
   function lf_clear() { lf_toHost({ cmd: "setValue", value: "" }); }
 
+  // 클립보드 복사 — 현재 에디터 전체 내용을 복사(편집/표시 모드 무관, 읽기 중 코드 가져갈 때 유용).
+  //   Electron(file://)에서 안정적인 textarea+execCommand 우선(MIME URL Copy 와 동일 패턴),
+  //   실패 시 navigator.clipboard 폴백. 성공 토스트 = MSG_WS 303(Clipboard Copy Success!).
+  function lf_copyToClipboard() {
+    var sVal = lf_readEditor();
+    if (sVal === null) { return; }   // 에디터 미준비.
+    if (sVal === "") { return; }     // 복사할 내용 없음 — 토스트 없이 무시(빈 복사 성공 오인 방지).
+    var bOk = false;
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = sVal;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.opacity = "0";
+      // 모달 <dialog> 는 top-layer 라 선택/포커스가 다이얼로그 안에 있어야 안정적 → 다이얼로그에 부착.
+      (oUI && oUI.dlg ? oUI.dlg : document.body).appendChild(ta);
+      ta.focus();
+      ta.select();
+      bOk = document.execCommand("copy");
+      if (ta.parentNode) { ta.parentNode.removeChild(ta); }
+    } catch (e) { bOk = false; }
+    if (!bOk) {
+      try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(sVal); bOk = true; } } catch (e) { }
+    }
+    if (bOk) { try { parent.showMessage(null, 10, "S", _txt("/U4A/MSG_WS", "303")); } catch (e) { } }   // Clipboard Copy Success!
+  }
+
   // 팝업 닫기 — ★제거하지 않고 숨기기만★(재사용). busy 해제. 리스너/iframe 은 유지.
   function lf_close() {
     try { clearTimeout(iWatch); } catch (e) { }
+    if (oUI) { oUI._askingClose = false; }
     lf_busyOff();
     try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+  }
+
+  // 미저장 변경 여부 — 표시(읽기)모드는 항상 false. 현재 에디터 값 ≠ 저장값(T_CEVT)이면 dirty.
+  function lf_isDirty() {
+    if (!oState.bEdit) { return false; }
+    var cur = lf_readEditor();
+    if (cur === null) { return false; }   // 에디터 미준비 — 변경분 판단 불가, 그냥 닫기 허용.
+    return cur !== lf_getScriptData();
+  }
+
+  // 닫기 요청(공통 진입점) — 변경분 있으면 1회 확인 후 닫기, 없으면 즉시 닫기.
+  //   호출 경로: ESC(에디터 안=호스트 'esc' 메시지 / 다이얼로그 포커스=네이티브 cancel), 헤더 X, 푸터 Close.
+  function lf_requestClose() {
+    if (!oUI || !oUI.dlg || !oUI.dlg.open) { return; }
+    if (oUI._askingClose) { return; }   // 확인 팝업 떠있는 동안 재진입 방지(ESC 연타/중복 경로).
+    if (!lf_isDirty()) { lf_close(); return; }
+    oUI._askingClose = true;
+    // 113: The registered value will be lost. Do you want to proceed?(저장 안 한 변경분 버리고 닫기 확인)
+    var sMsg = _txt("/U4A/MSG_WS", "113");
+    try {
+      parent.showMessage(null, 30, "W", sMsg, function (sAct) {
+        if (oUI) { oUI._askingClose = false; }
+        if (sAct === "YES") { lf_close(); }
+      });
+    } catch (e) { if (oUI) { oUI._askingClose = false; } lf_close(); }
   }
 
   // 현재 oState 를 에디터에 반영(언어/readonly/값/포커스).
@@ -212,6 +265,12 @@
     if (d.evt === "save") {
       // 에디터 한정 Ctrl+S → 저장(✓) 위임. 편집모드일 때만(표시모드는 ✓ 자체가 숨김 = 저장 불가).
       if (oState.bEdit) { lf_save(); }
+      return;
+    }
+    if (d.evt === "esc") {
+      // 에디터(iframe) 안에서 ESC — 닫기 요청(변경분 있으면 1회 확인). Monaco 위젯이 열려 있으면
+      //   호스트가 esc 를 보내지 않으므로(위젯 닫기 우선) 여기 도달 시엔 닫아도 안전.
+      lf_requestClose();
       return;
     }
   }
@@ -255,7 +314,7 @@
     oXBtn.setAttribute("data-act", "close");
     oXBtn.innerHTML = _fa("xmark");
     oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
-    oXBtn.addEventListener("click", function () { lf_close(); });
+    oXBtn.addEventListener("click", function () { lf_requestClose(); });
     oHeader.appendChild(oXBtn);
     oDlg.appendChild(oHeader);
 
@@ -325,7 +384,16 @@
 
     oFoot.appendChild(_el("span", "u4aCliEdFootSpacer"));
 
-    oFoot.appendChild(oPrettyBtn);   // 꾸밈정렬 — 우측 결정 그룹(Save/Delete/Close) 앞으로 이동(사용자 요청)
+    oFoot.appendChild(oPrettyBtn);   // 꾸밈정렬 — 복사 버튼 앞(우측 결정 그룹 Save/Delete/Close 앞)에 배치(사용자 요청)
+
+    // 클립보드 복사 — 편집/표시 모드 무관 상시 노출(읽기 전용으로 코드만 볼 때 가져가기 유용).
+    //   톤 = 보조(투명 중립), 아이콘 전용 + 툴팁(A04 Copy). 꾸밈정렬 뒤·결정 그룹 앞에 배치.
+    var oCopyBtn = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdIcoBtn");
+    oCopyBtn.type = "button";
+    oCopyBtn.innerHTML = _fa("copy");
+    oCopyBtn.title = _txt("/U4A/CL_WS_COMMON", "A04");   // Copy
+    oCopyBtn.addEventListener("click", function () { lf_copyToClipboard(); });
+    oFoot.appendChild(oCopyBtn);
 
     var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aCliEdIcoBtn");
     oSaveBtn.type = "button";
@@ -345,13 +413,13 @@
     oCloseBtn.type = "button";
     oCloseBtn.innerHTML = _fa("xmark");
     oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
-    oCloseBtn.addEventListener("click", function () { lf_close(); });
+    oCloseBtn.addEventListener("click", function () { lf_requestClose(); });
     oFoot.appendChild(oCloseBtn);
 
     oDlg.appendChild(oFoot);
 
     // ESC → 닫기(숨김).
-    oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
+    oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_requestClose(); });
 
     // 헤더 드래그(전역 위임) / 더블클릭 리센터 / 우하단 grip 리사이즈 — 전 팝업 공통.
     if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }

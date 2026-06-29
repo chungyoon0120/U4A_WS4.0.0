@@ -201,6 +201,10 @@
         URL: "./js/usp/ws_html5_usp_ctxmenu.js",
         MIMETYPE: "script"
     },
+    {
+        URL: "./js/usp/ws_html5_usp_editor_ctxmenu.js",
+        MIMETYPE: "script"
+    },
     ];
 
     oAPP.loadLibrary = function (scripts, index, fnCallback) {

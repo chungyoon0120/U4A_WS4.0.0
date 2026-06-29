@@ -135,8 +135,14 @@
             oHost.appendChild(oList);
 
             const r = oCombo.getBoundingClientRect();
-            oList.style.left = r.left + "px";
             oList.style.minWidth = r.width + "px";
+            // 좌우 클램프 — 목록이 콤보보다 넓을 수 있다(긴 항목명). 오른쪽 뷰포트 밖으로 나가 잘리지
+            //   않게 left 보정(앵커 좌측 기준, 넘치면 좌측으로 당김, 최소 4px).
+            const lw = oList.offsetWidth;
+            let lLeft = r.left;
+            if (lLeft + lw > window.innerWidth - 4) { lLeft = window.innerWidth - lw - 4; }
+            if (lLeft < 4) { lLeft = 4; }
+            oList.style.left = lLeft + "px";
             // 상단 경계 = 타이틀바 하단(공통 §2.2). 아래 공간 우선, 부족하면 위로 플립하되 타이틀바 침범 금지.
             //   목록은 .u4a-combo__list max-height 가 있으나, 화면 끝/타이틀바를 넘지 않게 동적 제한.
             const topMin = (_topChromeBottom() || 0) + 2;
@@ -476,6 +482,14 @@
             }
         }
         function _onEsc(ev) { if (ev.key === "Escape") { _closeMenu(); } }
+        // 스크롤 닫기 — 단, 메뉴 자신/내부, 또는 메뉴에서 띄운 콤보 펼침목록(.u4a-combo__list) 안의
+        //   스크롤은 무시한다(휠로 목록을 넘기는 순간 뒤 메뉴가 닫혀버리던 문제 방지 — createSelect
+        //   _onScrollClose 와 동일 사상). 바깥(앵커 이동) 스크롤만 닫는다.
+        function _onScroll(ev) {
+            var t = ev.target;
+            if (t && t.closest && (t.closest(".u4a-menu") || t.closest(".u4a-combo__list"))) { return; }
+            _closeMenu();
+        }
         function _closeMenu() {
             if (!oMenu) { return; }
             oMenu.remove(); oMenu = null;
@@ -483,7 +497,7 @@
             document.removeEventListener("mousedown", _onOut, true);
             document.removeEventListener("keydown", _onEsc, true);
             window.removeEventListener("resize", _closeMenu);
-            window.removeEventListener("scroll", _closeMenu, true);
+            window.removeEventListener("scroll", _onScroll, true);
         }
 
         function _items() {
@@ -554,7 +568,7 @@
             oOvf.setAttribute("aria-expanded", "true");
             // 창 리사이즈/스크롤 시 닫기 — 앵커(⋯ 버튼) 이동으로 위치 어긋남 방지(ResizeObserver reflow 보강).
             window.addEventListener("resize", _closeMenu);
-            window.addEventListener("scroll", _closeMenu, true);
+            window.addEventListener("scroll", _onScroll, true);
             setTimeout(function () {
                 document.addEventListener("mousedown", _onOut, true);
                 document.addEventListener("keydown", _onEsc, true);
@@ -650,22 +664,20 @@
             if (oTrunc && oTrunc.scrollWidth <= oTrunc.clientWidth + 1 && oTrunc.scrollHeight <= oTrunc.clientHeight + 1) { return; }
 
             const t = _ensure();
+            // 호버 요소가 열린 모달 <dialog> 안이면 툴팁도 그 다이얼로그에 부착해야 모달 위(top-layer)에 뜬다.
+            //   (body 자식이면 showModal 모달의 top-layer 뒤로 가려 그림자에 묻힘 — z-index 로는 top-layer 못 이김.)
+            //   드래그/리사이즈가 transform 이 아닌 position:fixed+left/top 라 부모를 바꿔도 fixed 좌표계는 그대로.
+            const oTipHost = (el.closest && el.closest("dialog[open]")) || document.body;
+            if (t.parentNode !== oTipHost) { oTipHost.appendChild(t); }
             t.textContent = sText;
             t.dataset.show = "true";              // 먼저 보이게 해야 offset 측정 가능
             const tw = t.offsetWidth, th = t.offsetHeight;
-            let left, top, flipTop;
-            if (sSel) {
-                // 텍스트가 안 보일 수 있는 영역(트리 행 등) → 커서 옆에 배치
-                left = _mx + 12;
-                top = _my + 18;
-                flipTop = _my - th - 8;
-            } else {
-                // 일반(버튼/아이콘) → 요소 바로 아래 정렬
-                const r = el.getBoundingClientRect();
-                left = r.left;
-                top = r.bottom + 6;
-                flipTop = r.top - th - 6;
-            }
+            // 위치 = 항상 마우스 커서 바로 아래(네이티브 title 툴팁과 동일 감각 — 트리 행/버튼/아이콘 공통).
+            //   과거엔 버튼/아이콘만 "요소 바로 아래" 정렬이라, 모달 푸터 버튼 툴팁이 커서가 아닌
+            //   버튼 밑(모달 하단 경계 밖)에 떠 어색했다 → 커서 기준으로 통일.
+            let left = _mx + 12;
+            let top = _my + 18;
+            let flipTop = _my - th - 8;
             left = Math.min(Math.max(4, left), window.innerWidth - tw - 4);
             if (top + th > window.innerHeight - 4) { top = Math.max(4, flipTop); } // 아래 공간 부족 시 위로
             t.style.left = left + "px";
@@ -803,6 +815,27 @@
      *   · 좌/우/하: 뷰포트 안. · 상: 공통 헤더(타이틀바+메뉴바+툴바) 하단 아래로만.
      *   · 헤더 내 버튼/입력(.u4a-btn-icon/button/input…) 에서 시작한 드래그는 무시.
      */
+    /**
+     * 다이얼로그 "닫으면 DOM 제거" — ★전역 자동★. document 에 capture 단계 `close` 리스너 1개만
+     * 설치하면, 모든 `dialog.u4a-dialog` 가 close 될 때 DOM 에서 제거된다 → 각 팝업은 다음 열기 때
+     * 새로 build 되어 기본 상태로 시작(닫기 시 잔여 입력/스크롤/선택 상태가 남지 않음). 팝업마다 배선 불필요.
+     *   · close 이벤트는 버블하지 않으나 capture 단계에서 target 으로 전파되므로 위임 1개로 전부 잡힌다.
+     *   · opt-out: `[data-u4a-keep]` 가 있으면 제거하지 않는다(상태 보존 싱글톤 — 예: App F4 검색 팝업).
+     *   · busy(`#u4aWsBusyIndicator`=.u4aWsBusyIndicator)·confirm(자체 remove)은 `.u4a-dialog` 비대상/무관.
+     */
+    let _DLG_CLOSE_ON = false;
+    function _installGlobalDialogClose() {
+        if (_DLG_CLOSE_ON || typeof document === "undefined") { return; }
+        _DLG_CLOSE_ON = true;
+        document.addEventListener("close", function (e) {
+            const oDlg = e.target;
+            if (!oDlg || oDlg.nodeName !== "DIALOG" || !oDlg.classList) { return; }
+            if (!oDlg.classList.contains("u4a-dialog")) { return; }
+            if (oDlg.hasAttribute("data-u4a-keep")) { return; }   // 상태 보존 싱글톤 — 제외
+            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e2) { }
+        }, true);
+    }
+
     let _DLG_DRAG_ON = false;
     function _installGlobalDialogDrag() {
         if (_DLG_DRAG_ON || typeof document === "undefined") { return; }
@@ -1932,6 +1965,10 @@
     // 다이얼로그 헤더 드래그 전역 1회 설치 — 모든 .u4a-dialog 가 자동으로 드래그+화면/헤더 클램프.
     //   (팝업마다 배선 불필요. 헤더는 .u4a-dialog__header / [data-u4a-draghandle] 둘 다 인식)
     try { _installGlobalDialogDrag(); } catch (e) { }
+
+    // 다이얼로그 "닫으면 DOM 제거" 전역 1회 설치 — 모든 .u4a-dialog 가 close 시 자동 제거(배선 불필요).
+    //   다음 열기 = 새 build(기본 상태). 상태 보존이 필요한 팝업만 [data-u4a-keep] 로 opt-out.
+    try { _installGlobalDialogClose(); } catch (e) { }
 
     // 스플릿바 더블클릭 → 최초 위치 복귀 전역 1회 설치 — 모든 .u4a-splitter__bar 자동(배선 불필요).
     try { _installGlobalSplitterReset(); } catch (e) { }

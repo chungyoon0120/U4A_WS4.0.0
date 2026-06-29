@@ -875,12 +875,11 @@
         // Busy Indicator가 실행중이면 빠져나간다.
         if (parent.getBusy() == 'X') {
             return;
-        }        
-       
-        // let sModulePath = parent.PATH.join(PATHINFO.MODULES_ROOT, "VersionManagement", "index.js");
-        var sIndexPath = parent.PATH.join(PATHINFO.POPUP_ROOT, "versionManagement", "index.js");
+        }
 
-        parent.require(sIndexPath)(parent.REMOTE, oAPP);
+        // [HTML5] 버전 관리 = frameless 별도창(Popups/versionMng). 다른 별도창 opener 와 동일 컨벤션.
+        //   (구 UI5 판: parent.require(versionManagement/index.js)(REMOTE, oAPP) — 대체됨)
+        oAPP.fn.fnVersionManagementPopupOpener();
 
     }; // end of oAPP.fn.fnWS20WMENU20_06
 

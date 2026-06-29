@@ -80,6 +80,37 @@ window.require(["vs/editor/editor.main"], function () {
         try { editor.getAction("editor.action.fontZoomReset").run(); } catch (e) { }
     });
 
+    // ESC = 부모에 "닫기 요청" 위임(인앱 에디터 팝업 편의 — 부모가 변경분 확인 후 닫는다).
+    //   ★ Monaco 자체 이벤트 editor.onKeyDown 사용 — iframe DOM 이벤트 전파/포커스 변수에 의존하지
+    //     않고 에디터 포커스 시 키를 확실히 잡는다(raw window keydown 은 Monaco 가 가로채 안 잡혔음).
+    //   ★ 위젯(자동완성/찾기/파라미터힌트/컨텍스트메뉴/이름변경)이 열려 있으면 ESC 는 그 위젯을 닫는
+    //     데 써야 하므로 esc 를 보내지 않고 양보(Monaco 가 위젯을 닫음). 위젯이 없을 때만 닫기 요청.
+    //   호스트는 generic 이라 'esc' 를 안 쓰는 소비처는 무시.
+    function _overlayOpen() {
+        try {
+            // ★ 단순 존재(querySelector)로 판단하면 안 된다 — Monaco 는 rename-box 등 일부 위젯을
+            //   DOM 에 미리 만들어 두고 display:none 으로 숨긴다(항상 매치→esc 가 영영 안 나감 버그).
+            //   실제로 '보이는'(display≠none && visibility≠hidden) 위젯이 있을 때만 열린 것으로 본다.
+            var els = document.querySelectorAll(
+                ".monaco-editor .suggest-widget.visible," +
+                ".monaco-editor .find-widget.visible," +
+                ".monaco-editor .parameter-hints-widget.visible," +
+                ".monaco-editor .rename-box," +
+                ".context-view .monaco-menu"
+            );
+            for (var i = 0; i < els.length; i++) {
+                var cs = getComputedStyle(els[i]);
+                if (cs.display !== "none" && cs.visibility !== "hidden") { return true; }
+            }
+            return false;
+        } catch (e) { return false; }
+    }
+    editor.onKeyDown(function (e) {
+        if (e.keyCode !== monaco.KeyCode.Escape) { return; }
+        if (_overlayOpen()) { return; }   // 위젯 닫기 우선 — esc 전송 보류(Monaco 가 처리).
+        _toParent({ evt: "esc" });
+    });
+
     // 로드 완료 통지 — 부모는 이 시점에 setValue / focus 수행.
     _toParent({ evt: "ready" });
 

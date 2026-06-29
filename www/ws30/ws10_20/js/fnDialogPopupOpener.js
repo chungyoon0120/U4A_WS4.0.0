@@ -144,6 +144,7 @@
             oBrowserOptions = jQuery.extend(true, {}, oDefaultOption.browserWindow);
 
         let sMimeTitle = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C26"); // U4A MIME Repository
+        if (oMimeAppInfo && oMimeAppInfo.APPID) { sMimeTitle += " - " + oMimeAppInfo.APPID; } // 현재 앱 표시
 
         oBrowserOptions.title = sMimeTitle;
         oBrowserOptions.autoHideMenuBar = true;
@@ -259,6 +260,46 @@
     }; // end of oAPP.fn.fnWebSecurityPopupOpener
 
     /************************************************************************
+     * WS20 ROOT 속성 "Enable Dump Write"(DH001091) 팝업 실행시켜 주는 메소드
+     *   @param {object} sAttr - 대상 속성 행(is_attr). 팝업이 UIATV/edit 를 읽어 반영한다.
+     ************************************************************************/
+    oAPP.fn.fnDumpWritePopupOpener = function (sAttr) {
+
+        // busy 키고 Lock 걸기
+        oAPP.common.fnSetBusyLock("X");
+
+        if (oAPP.fn.fnDumpWritePopupOpen) {
+            oAPP.fn.fnDumpWritePopupOpen(sAttr);
+            return;
+        }
+
+        oAPP.loadJs("fnDumpWritePopupOpen", function () {
+            oAPP.fn.fnDumpWritePopupOpen(sAttr);
+        });
+
+    }; // end of oAPP.fn.fnDumpWritePopupOpener
+
+    /************************************************************************
+     * WS20 ROOT 속성 "Use init pre-screen event"(DH001106) 팝업 실행시켜 주는 메소드
+     *   @param {object} sAttr - 대상 속성 행(is_attr). 팝업이 UIATV/edit 를 읽어 반영한다.
+     ************************************************************************/
+    oAPP.fn.fnInitPreScreenPopupOpener = function (sAttr) {
+
+        // busy 키고 Lock 걸기
+        oAPP.common.fnSetBusyLock("X");
+
+        if (oAPP.fn.fnInitPreScreenPopupOpen) {
+            oAPP.fn.fnInitPreScreenPopupOpen(sAttr);
+            return;
+        }
+
+        oAPP.loadJs("fnInitPreScreenPopupOpen", function () {
+            oAPP.fn.fnInitPreScreenPopupOpen(sAttr);
+        });
+
+    }; // end of oAPP.fn.fnInitPreScreenPopupOpener
+
+    /************************************************************************
      * WS20의 Client Event 팝업 실행시켜 주는 메소드
      ************************************************************************/
     oAPP.fn.fnClientEditorPopupOpener = function (TYPE, PARAM, fnCallback) {
@@ -293,6 +334,27 @@
         });
 
     }; // end of oAPP.fn.fnErrorPageEditorPopupOpener
+
+    /************************************************************************
+     * WS20의 Version Management(버전 관리) 별도창 실행시켜 주는 메소드 (HTML5)
+     *   원본: parent.require(versionManagement/index.js)(REMOTE, oAPP) (UI5 별도창).
+     *   HTML5: 다른 별도창 opener 와 동일 컨벤션(loadJs → opener). 본문=Popups/versionMng.
+     ************************************************************************/
+    oAPP.fn.fnVersionManagementPopupOpener = function () {
+
+        // busy 키고 Lock 걸기
+        oAPP.common.fnSetBusyLock("X");
+
+        if (oAPP.fn.fnVersionManagementPopupOpen) {
+            oAPP.fn.fnVersionManagementPopupOpen();
+            return;
+        }
+
+        oAPP.loadJs("fnVersionManagementPopupOpen", function () {
+            oAPP.fn.fnVersionManagementPopupOpen();
+        });
+
+    }; // end of oAPP.fn.fnVersionManagementPopupOpener
 
     /************************************************************************
      * WS10의 Application Copy 팝업 실행시켜 주는 메소드
@@ -1229,7 +1291,11 @@
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
+        oBrowserOptions.titleBarStyle = 'hidden';
+
+        // [HTML5] 네이티브 창 opacity 페이드 미사용(OS 리컴포짓이라 무겁고 흰 번쩍) — 위치 잡힌 뒤 표시
+        //   (show=false), 등장 효과는 창 안 #docContent CSS opacity transition(frame.js) 으로 처리.
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
@@ -1255,6 +1321,10 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            // [HTML5] frameless 창의 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: oBrowserOptions.title,
         };
 
         // 실행할 URL 적용

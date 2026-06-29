@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- ===== 공통 헤더(.u4a-titlebar)·버튼·테이블·스플리터·토큰 (MIME/오류페이지 에디터 동일 스택) =====
+         원본: versionManagement(UI5 별도창: Page+Splitter+sap.ui.table.Table+Monaco diff iframe).
+         HTML5: frameless 별도창 — [공통 .u4a-titlebar] + [세로 스플리터: 버전 .u4a-table / Monaco diff 호스트].
+         경로: Popups/versionMng 기준 → theme=../../theme, lib=../../../../lib. (browser-window-common-ux) -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="versionMngFrame.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 BGCOL/THEME/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* versionMngFrame.js 에서 재적용 */ }
+        })();
+    </script>
+</head>
+
+<body>
+
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/min·max·close (MIME 동일) ===== -->
+    <header class="u4a-titlebar" id="vmTitlebar">
+        <img class="u4a-titlebar__logo" id="vmLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="vmTitle"></span>
+        <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="vmWinMin" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="vmWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="vmWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- 본문 = 세로 스플리터 [버전 목록 테이블] / [Monaco diff 호스트]. 데이터 도착 후 페이드인. -->
+    <div id="vmContent">
+        <div class="u4a-splitter u4aVmSplit" id="vmSplit">
+
+            <!-- 상단 = 버전 히스토리 목록 -->
+            <section class="u4a-splitter__pane u4aVmListPane" id="vmListPane">
+                <!-- 목록 헤더(원본 Page customHeader Title + 테이블 Toolbar 의 Compare) -->
+                <div class="u4aVmListHead">
+                    <span class="u4aVmListTitle" id="vmListTitle"></span>
+                    <span class="u4aVmListSpacer"></span>
+                    <button type="button" class="u4a-btn u4a-btn--emphasized u4aVmCompare" id="vmCompareBtn">
+                        <i class="fa-solid fa-code-compare"></i><span id="vmCompareTxt"></span>
+                    </button>
+                </div>
+                <!-- 테이블(공통 .u4a-table) — versionMngFrame.js 가 행을 동적 렌더 -->
+                <div class="u4aVmTableWrap" id="vmTableWrap"></div>
+            </section>
+
+            <!-- 가로 분할 바(세로 스플리터) — 비교 전엔 숨김 -->
+            <div class="u4a-splitter__bar u4aVmSplit__bar" id="vmSplitBar" hidden></div>
+
+            <!-- 하단 = 소스 비교(Monaco diff 호스트) — 비교 전엔 숨김 -->
+            <section class="u4a-splitter__pane u4aVmDiffPane" id="vmDiffPane" hidden>
+                <!-- 비교 툴바(원본 COMPARE_PAGE customHeader): [▼][▲] | 기준 ver | 대상 ver | 범례 | 닫기 -->
+                <div class="u4aVmDiffBar" id="vmDiffBar">
+                    <button type="button" class="u4a-btn u4aVmIconBtn" id="vmDiffNext" title=""><i class="fa-solid fa-arrow-down"></i></button>
+                    <button type="button" class="u4a-btn u4aVmIconBtn" id="vmDiffPrev" title=""><i class="fa-solid fa-arrow-up"></i></button>
+                    <span class="u4aVmDiffSep"></span>
+                    <span class="u4aVmDiffTitle" id="vmBaseTitle"></span>
+                    <span class="u4aVmVerBadge u4aVmVerBadge--base" id="vmBaseVer"></span>
+                    <span class="u4aVmDiffGap"></span>
+                    <span class="u4aVmDiffTitle" id="vmTargetTitle"></span>
+                    <span class="u4aVmVerBadge u4aVmVerBadge--target" id="vmTargetVer"></span>
+                    <span class="u4aVmDiffSpacer"></span>
+                    <button type="button" class="u4a-btn u4aVmLegendBtn" id="vmLegendBtn">
+                        <i class="fa-solid fa-list"></i><span id="vmLegendTxt"></span>
+                    </button>
+                    <button type="button" class="u4a-btn u4a-btn--negative u4aVmIconBtn" id="vmDiffClose" title=""><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <!-- Monaco diff 호스트 iframe(versionMng/host) — 등장 페이드(opacity) -->
+                <div class="u4aVmDiffHostWrap" id="vmDiffHostWrap">
+                    <iframe id="vmDiffHost" name="vmDiffHost" frameborder="0" allowfullscreen></iframe>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- 범례 팝오버(원본 ResponsivePopover legend) — 색/설명 2열. versionMngFrame.js 가 채움/토글 -->
+    <div class="u4aVmLegend" id="vmLegend" hidden></div>
+
+    <!-- Busy 오버레이(경량 스피너) -->
+    <div id="vmBusy" hidden>
+        <div class="u4aVmBusyBox">
+            <div class="u4aVmSpinner"></div>
+            <div class="u4aVmBusyText" id="vmBusyText"></div>
+        </div>
+    </div>
+
+    <script>
+        /************************************************************************
+         * 에러 감지 — versionMngFrame.js 가 window.WSERR 처럼 재사용(MIME 동일 컨벤션)
+         ************************************************************************/
+        var REMOTE = require('@electron/remote'),
+            PATH = REMOTE.require('path'),
+            APP = REMOTE.app,
+            APPPATH = APP.getAppPath(),
+            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
+            PATHINFO = require(PATHINFOURL),
+            WSERR = require(PATHINFO.WSTRYCATCH);
+
+        var zconsole = WSERR(window, document, console);
+    </script>
+
+    <script src="versionMngFrame.js"></script>
+
+</body>
+
+</html>

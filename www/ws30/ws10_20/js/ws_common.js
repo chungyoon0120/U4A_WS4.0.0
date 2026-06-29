@@ -3630,122 +3630,110 @@
 
     /**
      * ProgressDialog
-     * 
-     * @param {Object} oOptions 
-     * title
-     * description
-     * illustrationType
-     * percentValue
-     * displayValue
+     * [HTML5] 구 sap.m.Dialog + sap.m.IllustratedMessage(tnt-Systems) + sap.m.ProgressIndicator
+     *   → 네이티브 <dialog>. fnIllustMsgDialogOpen 과 동일 패턴(위성안테나 SVG <img> + 카드)에
+     *   다운로드 % 프로그레스바(div)만 추가. sap 의존 제거(WS20 HTML5 빌드는 sap 스텁이라
+     *   기존 UI5 판은 도움말 zip 최초 다운로드 시 진행 팝업이 안 떴음).
+     *   주 호출처: www/help/u4a_helpdoc/main.js(도움말 문서 다운로드 진행/압축해제 안내).
+     *
+     * @param {Object} oOptions
+     * title / description / illustrationType(미사용·호환) / percentValue / displayValue
      */
+    // ── 프로그레스바 값 갱신(공통 헬퍼) ──
+    function lf_setWsProgValue(oDlg, percent, sText) {
+        if (!oDlg) { return; }
+        var p = Number(percent);
+        if (!isFinite(p) || p < 0) { p = 0; }
+        if (p > 100) { p = 100; }
+        var oBar = oDlg.querySelector(".u4aWsProgBar");
+        var oTxt = oDlg.querySelector(".u4aWsProgBarText");
+        if (oBar) { oBar.style.width = p + "%"; }
+        if (oTxt) { oTxt.textContent = sText || ""; }
+    }
+
     oAPP.common.fnProgressDialogOpen = (oOptions) => {
+        oOptions = oOptions || {};
+        var sDialogId = "u4aWsProgressDialog";
 
-        var sDialogId = "u4aWsProgressDialog",
-            sIllustId = "u4aWsIllustMsg",
-            sPrgressId = "u4aWsProg";
-
-        var oDialog = sap.ui.getCore().byId(sDialogId),
-            oIllustMsg = sap.ui.getCore().byId(sIllustId),
-            oProgressbar = sap.ui.getCore().byId(sPrgressId);
-
-        // if (oDialog && typeof oOptions === "object") {
-
-        //     oIllustMsg.setTitle(oOptions.title || "");
-        //     oIllustMsg.setDescription(oOptions.description || "");
-        //     oIllustMsg.setIllustrationType(oOptions.illustrationType || "NoSearchResults");
-
-        //     oProgressbar.setPercentValue(oOptions.percentValue || 0);
-        //     oProgressbar.setDisplayValue(oOptions.displayValue || "");
-
-        //     oDialog.open();
-
-        //     return;
-        // }
-
-        if (oDialog) {
-
-            if(typeof oOptions === "object"){
-                oIllustMsg.setTitle(oOptions?.title || "");
-                oIllustMsg.setDescription(oOptions?.description || "");
-                oIllustMsg.setIllustrationType(oOptions?.illustrationType || "tnt-Systems");
-
-                oProgressbar.setPercentValue(oOptions?.percentValue || 0);
-                oProgressbar.setDisplayValue(oOptions?.displayValue || "");
-            }            
-
-            oDialog.open();
-
-            return;
+        // 스타일 1회 주입(테마 토큰 소비, 일러스트는 외부 SVG 고정색 — fnIllustMsgDialogOpen 과 동일 컨벤션).
+        if (!document.getElementById("u4aWsProgStyle")) {
+            var st = document.createElement("style");
+            st.id = "u4aWsProgStyle";
+            st.textContent =
+                ".u4aWsProgDlg{border:0;padding:0;background:transparent;overflow:visible;" +
+                "min-width:0;max-width:none;width:fit-content;box-shadow:none;border-radius:0}" +
+                ".u4aWsProgDlg::backdrop{background:rgba(15,18,28,.32);backdrop-filter:blur(1.5px)}" +
+                ".u4aWsProgCard{display:flex;flex-direction:column;align-items:center;gap:.55rem;" +
+                "padding:1.6rem 2.1rem 1.5rem;text-align:center;min-width:18rem;max-width:24rem;" +
+                "background:var(--surface-raised,#1b2128);color:var(--text,#fff);" +
+                "border:1px solid var(--line,#33414f);border-radius:16px;" +
+                "box-shadow:var(--popover-shadow,0 18px 50px rgba(0,0,0,.55))}" +
+                ".u4aWsProgArt{width:8.25rem;height:auto;display:block;margin-bottom:.35rem}" +
+                ".u4aWsProgTitle{font-weight:700;font-size:1.02rem;letter-spacing:.2px}" +
+                ".u4aWsProgTitle:empty{display:none}" +
+                ".u4aWsProgDesc{font-size:.8125rem;color:var(--text-muted,#9aa3ad);line-height:1.45;" +
+                "white-space:pre-line;min-height:1.1em}" +
+                ".u4aWsProgBarWrap{position:relative;width:100%;height:1.1rem;margin-top:.5rem;" +
+                "background:var(--line,#33414f);border-radius:.55rem;overflow:hidden}" +
+                ".u4aWsProgBar{height:100%;width:0%;background:var(--accent,#3b82f6);" +
+                "border-radius:.55rem;transition:width .2s ease}" +
+                ".u4aWsProgBarText{position:absolute;inset:0;display:flex;align-items:center;" +
+                "justify-content:center;font-size:.7rem;color:var(--text,#fff)}";
+            document.head.appendChild(st);
         }
 
-        var oIllustMsg = new sap.m.IllustratedMessage(sIllustId, {
-            illustrationSize: sap.m.IllustratedMessageSize.Dialog,
-        }).addStyleClass(`${sDialogId}--illustMsg`);
+        var oDlg = document.getElementById(sDialogId);
+        if (!oDlg) {
+            oDlg = document.createElement("dialog");
+            oDlg.id = sDialogId;
+            oDlg.className = "u4aWsProgDlg";
+            // 위성 안테나 로딩 일러스트(www/svg/...) — fnIllustMsgDialogOpen 과 동일 자산/경로 규칙.
+            //   ws_common.js 는 ajax+eval 로드(스크립트 태그 없음)라 host 문서(www/ws30/ws10_20/) 기준.
+            var sArtRel = "../../svg/satellite-antenna-loading-animated.svg";
+            var sArtUrl = sArtRel;
+            try { sArtUrl = new URL(sArtRel, window.location.href).href; } catch (e) { }
+            oDlg.innerHTML =
+                '<div class="u4aWsProgCard">' +
+                '<img class="u4aWsProgArt" src="' + sArtUrl + '" alt="" aria-hidden="true"/>' +
+                '<div class="u4aWsProgTitle"></div>' +
+                '<div class="u4aWsProgDesc"></div>' +
+                '<div class="u4aWsProgBarWrap"><div class="u4aWsProgBar"></div>' +
+                '<div class="u4aWsProgBarText"></div></div>' +
+                '</div>';
+            // esc 로 닫히지 않게(원본 escapeHandler 빈 함수).
+            oDlg.addEventListener("cancel", function (e) { e.preventDefault(); });
+            document.body.appendChild(oDlg);
+        }
 
-        jQuery.sap.require("sap.m.ProgressIndicator");
+        oDlg.querySelector(".u4aWsProgTitle").textContent = oOptions.title || "";
+        oDlg.querySelector(".u4aWsProgDesc").textContent = oOptions.description || "";
+        lf_setWsProgValue(oDlg, oOptions.percentValue || 0, oOptions.displayValue || "");
 
-        var oProgressbar = new sap.m.ProgressIndicator(sPrgressId, {
-            visible: true,
-            displayOnly: true,
-            state: "Success",
-        }).addStyleClass("sapUiSmallMarginBeginEnd sapUiMediumMarginBottom");
+        try { if (!oDlg.hasAttribute("open")) { oDlg.showModal(); } } catch (e) { }
 
-        new sap.m.Dialog(sDialogId, {
+    }; // end of oAPP.common.fnProgressDialogOpen
 
-            // properties
-            showHeader: false,
-            horizontalScrolling: false,
-            verticalScrolling: false,
-
-            // aggregations
-            content: [
-                oIllustMsg,
-
-                new sap.m.HBox({
-                    renderType: "Bare",
-                    items: [
-                        oProgressbar
-                    ]
-                }),
-
-            ],
-            afterClose: () => {
-
-                let oProg = new sap.ui.getCore().byId(sPrgressId);
-                if (!oProg) {
-                    return;
-                }
-
-                oProg.setPercentValue(0);
-                oProg.setDisplayValue("");
-
-            },
-            // Events
-            escapeHandler: () => { }, // esc 키 방지
-
-        }).addStyleClass(`${sDialogId} sapUiSizeCompact`).open();
-
-        var oDialog = sap.ui.getCore().byId(sDialogId),
-            oIllustMsg = sap.ui.getCore().byId(sIllustId),
-            oProgressbar = sap.ui.getCore().byId(sPrgressId);
-
-        oIllustMsg.setTitle(oOptions?.title || "");
-        oIllustMsg.setDescription(oOptions?.description || "");
-        oIllustMsg.setIllustrationType(oOptions?.illustrationType || "tnt-Systems");
-
-        oProgressbar.setPercentValue(oOptions?.percentValue || 0);
-        oProgressbar.setDisplayValue(oOptions?.displayValue || "");
-
-    }; // end of oAPP.common.fnProgressDialog
+    /**
+     * ProgressDialog 진행값 갱신
+     * [HTML5] 구 sap.ui.getCore().byId("u4aWsProg").setPercentValue/setDisplayValue 대체.
+     *   main.js gfn_setProgressbar 가 다운로드 진행률(%)·표시문구를 갱신할 때 호출.
+     * @param {number} percent  0~100
+     * @param {string} sText    바 가운데 표시 문구(예: "Download.....50%")
+     */
+    oAPP.common.fnProgressDialogSetValue = (percent, sText) => {
+        var oDlg = document.getElementById("u4aWsProgressDialog");
+        lf_setWsProgValue(oDlg, percent, sText);
+    }; // end of oAPP.common.fnProgressDialogSetValue
 
     /**
      * ProgressDialog Close
      */
     oAPP.common.fnProgressDialogClose = () => {
-
-        var oDialog = sap.ui.getCore().byId("u4aWsProgressDialog");
-        if (oDialog) {
-            oDialog.close();
+        // [HTML5] 네이티브 <dialog> 닫기 + 진행값 리셋(원본 afterClose).
+        var oDlg = document.getElementById("u4aWsProgressDialog");
+        if (oDlg) {
+            try { oDlg.close(); } catch (e) { }
+            lf_setWsProgValue(oDlg, 0, "");
         }
 
     }; // end of oAPP.common.fnProgressDialogClose

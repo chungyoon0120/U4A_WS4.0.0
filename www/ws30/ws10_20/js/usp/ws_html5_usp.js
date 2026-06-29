@@ -1765,6 +1765,23 @@
         return "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
     }
 
+    /************************************************************************
+     * K6 Test Service — 선택 파일을 브라우저로 실행 (구 fnTestServiceWs30).
+     *   Inactive(ACTST="I") 면 실행 금지: 에러음 + 작업표시줄 플래시 + 경고(MSG_WS 031).
+     *   실행은 공통 oAPP.fn.fnExeBrowser(SPATH) (URL 조립+브라우저 실행, ws_fn_02.js).
+     ************************************************************************/
+    oAPP.fn.fnTestServiceUsp = function (oNode) {
+        if (!oNode || !oNode.SPATH) { return; }
+        var oApp = _model("/WS30/APP") || {};
+        if (oApp.ACTST === "I") {
+            try { parent.setSoundMsg("02"); } catch (e) { }
+            try { parent.CURRWIN.flashFrame(true); } catch (e) { }
+            try { oAPP.common.fnShowFloatingFooterMsg("W", "WS30", _msgWs("031")); } catch (e) { }   // Only in activity state !!!
+            return;
+        }
+        try { if (oAPP.fn.fnExeBrowser) { oAPP.fn.fnExeBrowser(oNode.SPATH); } } catch (e) { console.error("[HTML5][WS30] test service error:", e); }
+    };
+
     // Activate (구 ev_pressActivateBtn = 저장 + IS_ACT)
     oAPP.fn.fnActivateUspWs30 = function () { oAPP.fn.fnSaveUspWs30({ IS_ACT: "X" }); };
 

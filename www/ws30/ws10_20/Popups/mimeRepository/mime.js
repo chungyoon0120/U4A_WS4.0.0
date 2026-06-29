@@ -290,7 +290,7 @@
         oState.myAppPath = [];
         if (oUI && oUI.myAppBtn) { oUI.myAppBtn.hidden = !oState.myAppKey; }
         if (!oMyApp) {
-            if (aTreeRoots[0]) { oState.selKey = aTreeRoots[0].CHILD; oUI.tree.render(); }
+            if (aTreeRoots[0]) { oState.selKey = aTreeRoots[0].CHILD; oUI.tree.render(); lf_autoSelect(aTreeRoots[0].CHILD); }
             return;
         }
         var byKey = {};
@@ -301,12 +301,29 @@
         lf_gotoMyApp();
     }
 
+    // 트리 데이터(aTreeRoots)에서 key 로 노드 찾기(자동 선택 시 속성 채우기용).
+    function _findNodeByKey(sKey) {
+        var oFound = null;
+        _walkNodes(aTreeRoots, function (n) { if (!oFound && n && _key(n) === sKey) { oFound = n; } });
+        return oFound;
+    }
+
+    // 자동 선택된 노드(선택표시 + selKey)에 대해 우측 속성을 채운다(클릭과 동일 효과, oRow 없으면 selKey 강조 유지).
+    function lf_autoSelect(sKey) {
+        var oNode = _findNodeByKey(sKey);
+        if (!oNode) { return; }
+        var oRow = null;
+        try { oRow = oUI.treeBody.querySelector('.u4a-tree__row[aria-selected="true"]'); } catch (e) { }
+        lf_onRowSelect(oNode, oRow);
+    }
+
     function lf_gotoMyApp() {
         if (!oState.myAppKey) { return; }
         (oState.myAppPath || []).forEach(function (k) { oExpand[k] = true; });
         oState.selKey = oState.myAppKey;
         oUI.tree.render();
         oUI.tree.scrollToKey(oState.myAppKey);
+        lf_autoSelect(oState.myAppKey);   // 우측 속성까지 자동 출력
     }
 
     /************************************************************************
@@ -406,7 +423,8 @@
                 if (_isDummy(n)) { return null; }
                 var d = _el("span", "u4aMimeDesc");
                 var t = _el("span", "u4aMimeDescText", (n && n.MDESC != null) ? n.MDESC : "");
-                if (n && n.MDESC) { t.setAttribute("data-mimetip", n.MDESC); }
+                // 설명 말줄임 시 공통 테마 툴팁(initTooltip) — data-tip + data-tip-trunc(잘렸을 때만).
+                if (n && n.MDESC) { t.setAttribute("data-tip", n.MDESC); t.setAttribute("data-tip-trunc", ""); }
                 d.appendChild(t);
                 return d;
             },
@@ -424,13 +442,12 @@
                     return;
                 }
                 oRow.__mimeNode = n;
-                var oLbl = oRow.querySelector(".u4a-tree__label");
-                if (oLbl && n.NTEXT != null) { oLbl.setAttribute("data-mimetip", String(n.NTEXT)); }
+                // 이름 말줄임 툴팁은 공통 createTree(tip) 가 행에 data-tip + data-tip-trunc-sel 로 이미 처리(중복 배선 금지).
                 if (oState.selKey && _key(n) === oState.selKey) { oRow.setAttribute("aria-selected", "true"); }
                 var z = n.ZLEVEL, my = n.MYAPP, myc = n.MYAPPCHILD, ty = n.TYPE;
                 if (z == 1) { /* 시스템 루트 = 또렷(기본) */ }
                 else if (z == 2) { oRow.classList.add("u4aMimeMuted"); }
-                else if (my === "X") { oRow.classList.add("u4aMimeMyApp"); }
+                else if (my === "X") { oRow.classList.add("u4aMimeMyApp"); }   // 행 전체 solid accent 강조(mime.css)
                 else if (myc === "X") { /* 내 APP 하위 = 또렷(기본) */ }
                 else if (ty === "F") { oRow.classList.add("u4aMimeMuted"); }
             }
@@ -458,19 +475,34 @@
         if (oRow) { oRow.setAttribute("aria-selected", "true"); }
     }
 
+    // 폴더 판별 — 원본: TYPE=='F'(폴더) 또는 FOLDER=='X'.
+    function _isFolder(n) { return !!(n && (n.TYPE === "F" || n.FOLDER === "X")); }
+
     function lf_onRowSelect(oNode, oRow) {
 
         oState.oSel = oNode;
         oState.selKey = _key(oNode);
 
-        lf_markSelectedRow(oRow);
+        // 클릭 경로는 oRow 직접 강조. 자동선택(oRow 없음)은 selKey+rowHook 가 강조하므로 건드리지 않음.
+        if (oRow) { lf_markSelectedRow(oRow); }
 
         lf_setProps({});
         lf_showPreview("none");
 
-        if (!oNode || oNode.TYPE === "F") { return; }
+        if (!oNode) { return; }
 
-        lf_setProps({ NAME: oNode.NTEXT, URL: oNode.URL, ERDAT: oNode.ERDAT, ERZET: oNode.ERZET, ERNAM: oNode.ERNAM });
+        // 유형(Type=A51) 표시 — 폴더(D45)/파일(B79). 폴더/파일 공통.
+        var bFolder = _isFolder(oNode);
+        var sType = bFolder ? _txt("/U4A/CL_WS_COMMON", "D45") : _txt("/U4A/CL_WS_COMMON", "B79"); // Folder / File
+
+        if (bFolder) {
+            // 폴더 — 유형/이름/생성정보만(URL·미리보기 없음, 원본 동일).
+            lf_setProps({ TYPE: sType, NAME: oNode.NTEXT, ERDAT: oNode.ERDAT, ERZET: oNode.ERZET, ERNAM: oNode.ERNAM });
+            return;
+        }
+
+        // 파일 — 유형/이름/URL/생성 + 미리보기.
+        lf_setProps({ TYPE: sType, NAME: oNode.NTEXT, URL: oNode.URL, ERDAT: oNode.ERDAT, ERZET: oNode.ERZET, ERNAM: oNode.ERNAM });
 
         var fnGet = function () { lf_getMimeObject(oNode.URL, lf_preview); };
         try {
@@ -630,16 +662,21 @@
         if (!v) { return ""; }
         return v.substring(0, 2) + ":" + v.substring(2, 4) + ":" + v.substring(4, 6);
     }
+    // 입력칸 말줄임 시 공통 테마 툴팁(initTooltip) — data-tip + data-tip-trunc(잘렸을 때만).
+    function _setFieldTip(oField, sVal) {
+        if (oField && oField.input) { oField.input.setAttribute("data-tip", sVal || ""); oField.input.setAttribute("data-tip-trunc", ""); }
+    }
     function lf_setProps(o) {
         if (!oUI) { return; }
+        if (oUI.typeField) { oUI.typeField.setValue(o.TYPE || ""); }   // 유형(폴더/파일)
         oUI.fileField.setValue(o.NAME || "");
-        oUI.fileField.input.setAttribute("data-mimetip", o.NAME || "");
+        _setFieldTip(oUI.fileField, o.NAME);
         oUI.urlField.setValue(o.URL || "");
-        oUI.urlField.input.setAttribute("data-mimetip", o.URL || "");
+        _setFieldTip(oUI.urlField, o.URL);
         oUI.dateField.setValue(_fmtDate(o.ERDAT));
         oUI.timeField.setValue(_fmtTime(o.ERZET));
         oUI.nameField.setValue(o.ERNAM || "");
-        oUI.nameField.input.setAttribute("data-mimetip", o.ERNAM || "");
+        _setFieldTip(oUI.nameField, o.ERNAM);
     }
 
     /************************************************************************
@@ -833,17 +870,13 @@
 
     function lf_openCreateFolder(oNode) {
         if (!oNode) { return; }
-        if (!oCrUI) { lf_buildCreateFolder(); }
-        oCrUI.target = oNode;                       // 부모 폴더 노드(FLDPATH=oNode.URL)
-        oCrUI.nameField.setValue("");
-        oCrUI.descField.setValue("");
-        oCrUI.nameField.setValueState("none", "");
-        if (oCrUI.createBtn) { oCrUI.createBtn.disabled = false; }
-        if (!oCrUI.dlg.open) { try { oCrUI.dlg.showModal(); } catch (e) { } }
-        setTimeout(function () { try { oCrUI.nameField.focus(); } catch (e) { } }, 0);
+        lf_closeCreateFolder();                 // 혹시 떠있던 이전 팝업 정리
+        lf_buildCreateFolder(oNode);            // ★ 매번 새로 생성(재사용 안 함 → 재오픈 안 되던 버그 제거)
+        try { oCrUI.dlg.showModal(); } catch (e) { console.error("[HTML5][MIME] 폴더생성 showModal:", e); }
+        setTimeout(function () { try { if (oCrUI) { oCrUI.nameField.focus(); } } catch (e) { } }, 0);
     }
 
-    function lf_buildCreateFolder() {
+    function lf_buildCreateFolder(oNode) {
 
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aMimeCrDlg";
@@ -881,15 +914,16 @@
 
         // 푸터 — Create(강조/파랑) + Cancel(negative/빨강) (원본 Emphasized/Reject).
         var oFoot = _el("div", "u4a-dialog__footer");
+        // ★ 원본(sap.m.Dialog accept/decline) = 아이콘 전용(텍스트 없음). CTS 팝업과 동일 — title 툴팁만.
         var oCreateBtn = _el("button", "u4a-btn u4a-btn--emphasized");
         oCreateBtn.type = "button";
-        oCreateBtn.innerHTML = _fa("check") + "<span></span>";
-        oCreateBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A01"); // Create
+        oCreateBtn.innerHTML = _fa("check");
+        oCreateBtn.title = _txt("/U4A/CL_WS_COMMON", "A01"); // Create
         oCreateBtn.addEventListener("click", lf_confirmCreateFolder);
         var oCancelBtn = _el("button", "u4a-btn u4a-btn--negative");
         oCancelBtn.type = "button";
-        oCancelBtn.innerHTML = _fa("xmark") + "<span></span>";
-        oCancelBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
+        oCancelBtn.innerHTML = _fa("xmark");
+        oCancelBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oCancelBtn.addEventListener("click", lf_closeCreateFolder);
         oFoot.appendChild(oCreateBtn);
         oFoot.appendChild(oCancelBtn);
@@ -902,11 +936,14 @@
 
         document.body.appendChild(oDlg);
 
-        oCrUI = { dlg: oDlg, nameField: oNameField, descField: oDescField, createBtn: oCreateBtn, target: null };
+        oCrUI = { dlg: oDlg, nameField: oNameField, descField: oDescField, createBtn: oCreateBtn, target: oNode };
     }
 
     function lf_closeCreateFolder() {
-        try { if (oCrUI && oCrUI.dlg && oCrUI.dlg.open) { oCrUI.dlg.close(); } } catch (e) { }
+        if (!oCrUI) { return; }
+        try { if (oCrUI.dlg.open) { oCrUI.dlg.close(); } } catch (e) { }
+        try { oCrUI.dlg.remove(); } catch (e) { }   // DOM 에서 제거(다음 오픈은 새로 생성)
+        oCrUI = null;
     }
 
     function lf_confirmCreateFolder() {
@@ -969,15 +1006,10 @@
             if (!oResult || oResult.RETCD === "E") {
                 try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
                 try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
-                if (oResult && oResult.RTMSG) {
-                    try { oAPP.fn.showMessage(null, 10, "", oResult.RTMSG); } catch (e) { }
-                }
-                // 서버 후속 스크립트(전송요청 필요 시 lf_createMimeCts 호출) — 원본 eval(SCRIPT) 1:1.
-                //   [guard-server-script-eval] sap 참조 등 위험 → try/catch 방어, 실패해도 창 유지.
-                //   eval 은 이 클로저 스코프라 lf_createMimeCts / _doCreate 에 접근 가능.
-                if (oResult && oResult.SCRIPT != null) {
-                    try { eval(oResult.SCRIPT); } catch (e) { console.error("[HTML5][MIME] set_mime_crud SCRIPT:", e); }
-                }
+
+                // 서버 예외 → 클라 언어 출력(공통 단일 헬퍼, .analy/17 전략 — 역현지화/SCRIPT 파싱).
+                //   onCts: 전송요청(CTS) 팝업. SCRIPT 는 헬퍼가 파싱(eval 없음)해 needCts 판정.
+                oAPP.fn.fnRenderServerError(oResult, { onCts: function () { lf_createMimeCts(); } });
                 return;
             }
 
@@ -1043,40 +1075,6 @@
         }
         oUI.tree.render();
         try { if (oNew && oNew.CHILD != null) { oUI.tree.scrollToKey(String(oNew.CHILD)); } } catch (e) { }
-    }
-
-    /************************************************************************
-     * 화면 전용 툴팁 — [data-mimetip] hover(말줄임된 경우만).
-     ************************************************************************/
-    function lf_initTip(oHostEl, oScrollEl) {
-        var oTip = _el("div", "u4aMimeTip");
-        oTip.setAttribute("aria-hidden", "true");
-        document.body.appendChild(oTip);
-
-        function hide() { oTip.classList.remove("u4aMimeTipShow"); }
-        function _pos(x, y) {
-            var w = oTip.offsetWidth, h = oTip.offsetHeight;
-            var nx = Math.min(x + 14, window.innerWidth - w - 8);
-            var ny = Math.min(y + 18, window.innerHeight - h - 8);
-            oTip.style.left = Math.max(8, nx) + "px";
-            oTip.style.top = Math.max(8, ny) + "px";
-        }
-        oHostEl.addEventListener("mouseover", function (e) {
-            var el = e.target.closest("[data-mimetip]");
-            if (!el) { hide(); return; }
-            var s = el.getAttribute("data-mimetip");
-            if (!s || el.scrollWidth <= el.clientWidth + 1) { hide(); return; }
-            oTip.textContent = s;
-            oTip.classList.add("u4aMimeTipShow");
-            _pos(e.clientX, e.clientY);
-        });
-        oHostEl.addEventListener("mousemove", function (e) {
-            if (!oTip.classList.contains("u4aMimeTipShow")) { return; }
-            if (!e.target.closest("[data-mimetip]")) { hide(); return; }
-            _pos(e.clientX, e.clientY);
-        });
-        oHostEl.addEventListener("mouseleave", hide);
-        if (oScrollEl) { oScrollEl.addEventListener("scroll", hide, true); }
     }
 
     /************************************************************************
@@ -1150,18 +1148,27 @@
         var oPanel = U4AUI.createPanel({ title: _txt("/U4A/CL_WS_COMMON", "C17") });
         oPanel.el.classList.add("u4aMimePropPanel");
 
-        var oForm = _el("div", "u4aMimeForm");
+        // ── 속성 폼 = 공통 반응형 폼(.u4a-form / .u4a-form__row, 라벨 상단). 패널이 좁아도
+        //    입력 영역이 행 전체폭을 차지해 잘리지 않음(원본 ResponsiveGridLayout 대응). ──
+        var oForm = _el("div", "u4a-form u4aMimePropForm");
 
-        var oFnRow = _el("div", "u4aMimeFormRow");
-        oFnRow.appendChild(_el("label", "u4aMimeLbl", _txt("/U4A/CL_WS_COMMON", "C35")));
-        var oFnBox = _el("div", "u4aMimeUrlBox");
-        var oFileField = U4AUI.createField({ type: "text", value: "", readOnly: true, className: "u4aMimeUrlField" });
-        oFnBox.appendChild(oFileField.el);
-        oFnRow.appendChild(oFnBox);
+        // 유형(Type=A51) — 폴더(D45)/파일(B79) 표시.
+        var oTyRow = _el("div", "u4a-form__row");
+        oTyRow.appendChild(_el("label", "u4a-label", _txt("/U4A/CL_WS_COMMON", "A51")));
+        var oTypeField = U4AUI.createField({ type: "text", value: "", readOnly: true });
+        oTyRow.appendChild(oTypeField.el);
+        oForm.appendChild(oTyRow);
+
+        // 파일 이름(C35)
+        var oFnRow = _el("div", "u4a-form__row");
+        oFnRow.appendChild(_el("label", "u4a-label", _txt("/U4A/CL_WS_COMMON", "C35")));
+        var oFileField = U4AUI.createField({ type: "text", value: "", readOnly: true });
+        oFnRow.appendChild(oFileField.el);
         oForm.appendChild(oFnRow);
 
-        var oUrlRow = _el("div", "u4aMimeFormRow");
-        oUrlRow.appendChild(_el("label", "u4aMimeLbl", _txt("/U4A/CL_WS_COMMON", "C18")));
+        // URL(C18) — 입력 + URL 복사 버튼(한 줄, 좁으면 줄바꿈).
+        var oUrlRow = _el("div", "u4a-form__row");
+        oUrlRow.appendChild(_el("label", "u4a-label", _txt("/U4A/CL_WS_COMMON", "C18")));
         var oUrlBox = _el("div", "u4aMimeUrlBox");
         var oUrlField = U4AUI.createField({ type: "text", value: "", readOnly: true, className: "u4aMimeUrlField" });
         oUrlBox.appendChild(oUrlField.el);
@@ -1174,8 +1181,9 @@
         oUrlRow.appendChild(oUrlBox);
         oForm.appendChild(oUrlRow);
 
-        var oCrRow = _el("div", "u4aMimeFormRow");
-        oCrRow.appendChild(_el("label", "u4aMimeLbl", _txt("/U4A/CL_WS_COMMON", "A01")));
+        // 생성(A01) — 날짜/시간/사용자(한 줄, 좁으면 줄바꿈).
+        var oCrRow = _el("div", "u4a-form__row");
+        oCrRow.appendChild(_el("label", "u4a-label", _txt("/U4A/CL_WS_COMMON", "A01")));
         var oCrBox = _el("div", "u4aMimeCrBox");
         var oDateField = U4AUI.createField({ type: "text", value: "", readOnly: true, className: "u4aMimeCrField" });
         var oTimeField = U4AUI.createField({ type: "text", value: "", readOnly: true, className: "u4aMimeCrField" });
@@ -1234,7 +1242,7 @@
         oSplit.appendChild(oRightPane);
         oRoot.appendChild(oSplit);
 
-        lf_initTip(oRoot, oTreeBody);
+        // 툴팁은 공통 initTooltip(u4a-ui.js)이 [data-tip] 으로 전역 처리 — 화면 전용 툴팁 불필요(별도창=top-layer 무관).
 
         _bindSplit(oBarH);
         _bindSplitResizeClamp(oSplit);
@@ -1245,7 +1253,7 @@
         oUI = {
             frame: oFrame, img: oImg, pdf: oPdf, audio: oAudio, video: oVideo, nodata: oNoData,
             tree: oTree, treeBody: oTreeBody, panel: oPanel, myAppBtn: oMyAppBtn,
-            fileField: oFileField, urlField: oUrlField, dateField: oDateField, timeField: oTimeField, nameField: oNameField,
+            typeField: oTypeField, fileField: oFileField, urlField: oUrlField, dateField: oDateField, timeField: oTimeField, nameField: oNameField,
             split: oSplit, hostReady: false
         };
     }

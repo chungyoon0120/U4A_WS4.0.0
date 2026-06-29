@@ -307,13 +307,7 @@ function gfn_setProgressbar(iValue, iTotalValue) {
         return;
     }
 
-    let sPerValue = (iValue / iTotalValue) * 100,
-        sPrgressId = "u4aWsProg",
-        oProgressbar = sap.ui.getCore().byId(sPrgressId);
-
-    if (!oProgressbar) {
-        return;
-    }
+    let sPerValue = (iValue / iTotalValue) * 100;
 
     sPerValue = sPerValue.toFixed(2);
 
@@ -322,11 +316,17 @@ function gfn_setProgressbar(iValue, iTotalValue) {
         sPerValue = 100;
     }
 
-    oProgressbar.setPercentValue(sPerValue);
-
     let sMsg = `${GS_MSG.M08}.....${sPerValue}%`;
 
-    oProgressbar.setDisplayValue(sMsg);
+    // [HTML5] 구 sap.ui.getCore().byId("u4aWsProg").setPercentValue/setDisplayValue 대체.
+    //   진행 팝업이 네이티브 <dialog> 로 변환됨 → 공통 갱신 함수 호출(parent = WS 메인 프레임).
+    //   (원본의 oProgressbar null 가드 대응 — 함수 미정의 시 워커 메시지 처리 중 크래시 방지.)
+    try {
+        if (parent.oAPP && parent.oAPP.common &&
+            typeof parent.oAPP.common.fnProgressDialogSetValue === "function") {
+            parent.oAPP.common.fnProgressDialogSetValue(sPerValue, sMsg);
+        }
+    } catch (e) { }
 
 } // end of gfn_setProgressbar
 

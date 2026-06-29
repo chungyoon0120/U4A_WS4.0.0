@@ -336,4 +336,11 @@
         if (oNode && oAPP.fn.fnDownloadUspFiles) { oAPP.fn.fnDownloadUspFiles(oNode); }
     };
 
+    /************************************************************************
+     * K6 Test Service — 선택 파일을 브라우저로 실행(셸 fnTestServiceUsp).
+     ************************************************************************/
+    oAPP.usphtml.uspCtxAction["K6"] = function (oNode) {
+        if (oNode && oAPP.fn.fnTestServiceUsp) { oAPP.fn.fnTestServiceUsp(oNode); }
+    };
+
 })(window, jQuery, oAPP);

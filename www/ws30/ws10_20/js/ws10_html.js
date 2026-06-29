@@ -885,11 +885,8 @@
     oAPP.ws10html.buildMenubar = function (aCats, fnSelect) {
         var o = document.createElement("div");
         o.className = "u4a-ws10__menubar";
-        var aCatBtns = [];   // 카테고리 버튼들(폭 부족 시 숨기고 햄버거로 접음)
-        var aVisCats = [];   // staffOnly 필터 통과한 카테고리(햄버거 서브메뉴용)
         (aCats || []).forEach(function (cat) {
             if (cat.staffOnly && !WS_STATE.IS_STAFF) { return; }
-            aVisCats.push(cat);
             var b = document.createElement("button");
             b.className = "u4a-wmenu-btn";
             b.type = "button";
@@ -906,47 +903,13 @@
                 }
             });
             o.appendChild(b);
-            aCatBtns.push(b);
         });
 
-        // 메뉴 오버플로 햄버거(☰) — 폭이 모자라면 카테고리 버튼을 통째로 여기로 접는다
-        //   (원본 sap.m.OverflowToolbar 동작 대응). 각 카테고리는 서브메뉴로 펼친다.
-        var oHam = document.createElement("button");
-        oHam.className = "u4a-wmenu-btn u4a-wmenu-overflow";
-        oHam.type = "button";
-        oHam.hidden = true;
-        oHam.title = "Menu";
-        oHam.setAttribute("data-menu-anchor", "wmenu-ovf");
-        oHam.setAttribute("aria-haspopup", "true");
-        oHam.setAttribute("aria-expanded", "false");
-        oHam.innerHTML = _fa("bars");
-        oHam.addEventListener("click", function () {
-            var aItems = aVisCats.map(function (cat) { return { key: cat.key, text: cat.text, items: cat.items }; });
-            _openMenuAt(oHam, aItems, function (it) { fnSelect(it); }, "left");
-        });
-        o.appendChild(oHam);
-
+        // 좌측 카테고리 메뉴는 항상 펼쳐 고정(요청). 좁아지면 우측 공통버튼 영역만 ⋯ 오버플로로
+        //   접는다 — _renderCommonHeader 가 .u4a-ws10__common 에 U4AUI.attachOverflow 부착.
+        //   (구: 카테고리를 햄버거 ☰ 로 접고 더 좁으면 클러스터 축소[is-tight] → 제거. 좌측은 고정.)
+        //   극단적으로 좁으면 좌측은 .u4a-ws10__menubar overflow:hidden 으로 잘린다(사용자 결정: 잘림 허용).
         o.appendChild(_renderCommonHeader());
-
-        // 폭 반응 재배치(구 OverflowToolbar) — 3단계:
-        //   ① 다 들어가면 카테고리 펼침 ② 넘치면 카테고리→햄버거 ③ 그래도 넘치면 클러스터 축소(is-tight)
-        function _reflowMenubar() {
-            oHam.hidden = true;
-            for (var i = 0; i < aCatBtns.length; i++) { aCatBtns[i].hidden = false; }
-            o.classList.remove("is-tight");
-            if (aCatBtns.length && o.scrollWidth > o.clientWidth + 1) {
-                for (var j = 0; j < aCatBtns.length; j++) { aCatBtns[j].hidden = true; }
-                oHam.hidden = false;
-            }
-            if (o.scrollWidth > o.clientWidth + 1) { o.classList.add("is-tight"); }
-        }
-        // ResizeObserver 는 관찰 시작 시 1회 호출되어 초기 레이아웃에도 반영. 줌(webFrame) 변경도
-        //   CSS px 폭이 바뀌므로 발화 → 자동 재배치.
-        if (window.ResizeObserver) {
-            new ResizeObserver(function () { _reflowMenubar(); }).observe(o);
-        } else {
-            setTimeout(_reflowMenubar, 0);
-        }
         return o;
     };
 
@@ -971,9 +934,10 @@
         // 브라우저 투명도(숨김) 슬라이더 팝업 버튼 — 원본 ws_common.js:3432 BUTTON1(icon:sap-icon://hide
         //   → fnSetHideWindow, ws_fn_04.js:757). 부모 창을 반투명+클릭통과로 만드는 별도 BrowserWindow(WINSHOWHIDE).
         //   opener(fnSetHideWindow)·로더(frame.html/frame.js)는 원본 재사용, iframe 콘텐츠(index.html/js)만 HTML5화.
-        o.appendChild(_iconBtn(ICON.eyeSlash, "", function () {
+        var oEye = _iconBtn(ICON.eyeSlash, "", function () {
             try { oAPP.fn.fnSetHideWindow(); } catch (e) { console.error("[WS10] window hide popup open", e); }
-        }));
+        });
+        o.appendChild(oEye);
 
         // SAP 로고 (svg) — T-CODE 좌측. 클릭 시 T-CODE 실행 로직으로 SMEN(SAP 메인메뉴) 실행.
         var oSapLogo = document.createElement("img");
@@ -1001,12 +965,16 @@
         oTcodeFld.input.autocomplete = "off";
         o.appendChild(oTcodeFld.el);
 
-        o.appendChild(_buildPinBtn());
-        o.appendChild(_buildZoomBtn());
-        // Window Text Search(원본 ev_winTxtSrchWS10) — 별도 창 찾기 팝업(원본 의도=같은 프레임 간섭 회피). 아이콘만.
-        o.appendChild(_iconBtn(ICON.search, "", function () {
+        var oPin = _buildPinBtn();
+        o.appendChild(oPin);
+        var oZoom = _buildZoomBtn();
+        o.appendChild(oZoom);
+        // Window Text Search(원본 ev_winTxtSrchWS10, ws_common.js BUTTON4 tooltip "window Text Search").
+        //   별도 창 찾기 팝업(원본 의도=같은 프레임 간섭 회피).
+        var oSearch = _iconBtn(ICON.search, "window Text Search", function () {
             try { oAPP.fn.fnTextSearchPopupOpener(); } catch (e) { console.error("[WS10] text search open", e); }
-        }));
+        });
+        o.appendChild(oSearch);
 
         var oPower = _iconBtn(ICON.power, _txt("B53"), function () {
             // 실제 로그오프 (fnWS10WMENU30_04 → ev_Logout). 셸 부재(독립) 시 안내.
@@ -1014,6 +982,69 @@
         });
         oPower.classList.add("u4a-btn-power");
         o.appendChild(oPower);
+
+        // 창이 좁아지면 우측 공통버튼이 잘려 사라지지 않게 ⋯ 오버플로 메뉴로 접는다(좌측 카테고리는 고정).
+        //   미리보기 패널 헤더(_buildPrevHeader)와 동일 패턴 — U4AUI.attachOverflow. 우측정렬이라 noOvfAutoMargin.
+        //   자식은 뒤(전원)부터 접히므로 T-CODE 입력칸/SAP 로고(앞쪽)는 가장 늦게 접힌다(사실상 거의 항상 표시).
+        try {
+            if (window.U4AUI && U4AUI.attachOverflow) {
+                var oOvfCtl = U4AUI.attachOverflow(o, {
+                    noOvfAutoMargin: true,
+                    isSep: function () { return false; },
+                    btnClass: "u4a-btn-icon u4a-ws10__common-ovf",
+                    btnHtml: ICON.overflow,
+                    title: "More",
+                    menuItem: function (el) {
+                        // SAP 로고(img) → SMEN(SAP 메인메뉴) 실행 항목(라벨=로고 title "SMEN")
+                        if (el === oSapLogo) {
+                            return { iconHtml: "", text: oSapLogo.title || "SMEN", onClick: function () { oSapLogo.click(); } };
+                        }
+                        // T-CODE 입력칸 → 메뉴 안 입력칸(원본 OverflowToolbar SearchField 대응). 원본 el 을
+                        //   옮기지 않고 새 input 으로 Enter 시 동일 실행(줌 슬라이더 메뉴 패턴과 동일).
+                        if (el === oTcodeFld.el) {
+                            var oRow = document.createElement("div");
+                            oRow.className = "u4a-tcode-menurow";
+                            var oMInp = document.createElement("input");
+                            oMInp.type = "text";
+                            oMInp.className = "u4a-tcode";
+                            oMInp.placeholder = "SAP T-CODE";
+                            oMInp.autocomplete = "off";
+                            var oSrc = oTcodeFld.input || el.querySelector("input");
+                            if (oSrc) { oMInp.value = oSrc.value; }
+                            oMInp.addEventListener("input", function () { oMInp.value = oMInp.value.toUpperCase(); });
+                            oMInp.addEventListener("keydown", function (e) {
+                                if (e.key === "Enter") { e.preventDefault(); _runTcode(oMInp.value); }
+                            });
+                            oRow.appendChild(oMInp);
+                            return { node: oRow };
+                        }
+                        // 줌 버튼 → ⋯ 버튼을 앵커로 줌 팝오버(원본 버튼이 접혀 rect=0 이 되는 문제 회피)
+                        if (el === oZoom) {
+                            var oZi = el.querySelector("i");
+                            return {
+                                iconHtml: oZi ? oZi.outerHTML : "", text: el.title || "Zoom",
+                                onClick: function () {
+                                    var oA = o.querySelector(".u4a-ws10__common-ovf");
+                                    _openZoomPop(oA && oA.offsetParent ? oA : el);
+                                }
+                            };
+                        }
+                        // 일반 아이콘 버튼(AI / eye / pin / search / power)
+                        var oI = el.querySelector("i");
+                        var sText = el.title || (window.U4AUI && U4AUI.btnLabel ? U4AUI.btnLabel(el, true) : "") || "";
+                        return { iconHtml: oI ? oI.outerHTML : "", text: sText, onClick: function () { el.click(); } };
+                    }
+                });
+                // 초기 reflow — 헤더 폭이 확정된 뒤 측정(폭 0 이면 프레임마다 최대 N회 재시도).
+                if (oOvfCtl && typeof oOvfCtl.reflow === "function" && typeof requestAnimationFrame === "function") {
+                    (function _tryReflow(n) {
+                        if (o.clientWidth > 0) { try { oOvfCtl.reflow(); } catch (e) { } return; }
+                        if (n > 0) { requestAnimationFrame(function () { _tryReflow(n - 1); }); }
+                    })(30);
+                }
+            }
+        } catch (e) { console.error("[WS10] common header overflow attach 실패:", e && e.message); }
+
         return o;
     }
 

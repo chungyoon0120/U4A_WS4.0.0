@@ -84,6 +84,7 @@ module.exports = (() => {
         WSOPTS: PATH.join(POPUP_ROOT, "optionPopup", "optionM.html"),
         EDITPOP: PATH.join(POPUP_ROOT, "editorPopup", "editorFrame.html"),
         MIMEPOP: PATH.join(POPUP_ROOT, "mimeRepository", "frame.html"), // U4A MIME Repository (별도 BrowserWindow)
+        VERMNG: PATH.join(POPUP_ROOT, "versionMng", "versionMngFrame.html"), // [WS20] Version Management (HTML5 별도 BrowserWindow)
         ERRMSGPOP: PATH.join(POPUP_ROOT, "errMsgPopup", "frame.html"),
         U4ADOCU: PATH.join(POPUP_ROOT, "u4aDocPopup", "frame.html"),
         IMPEXPPOP: PATH.join(POPUP_ROOT, "importExportPopup", "index.html"),

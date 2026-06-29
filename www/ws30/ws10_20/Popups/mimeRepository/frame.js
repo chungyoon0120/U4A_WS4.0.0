@@ -175,15 +175,37 @@ let oAPP = (function (window) {
 
 
     /***********************************************************
-     * 공통 토스트(원본 parent.showMessage 대체) — 화면 정중앙 .u4a-toast 싱글톤.
-     *   type S/I → 3초, E/W → 6초(오류는 좀 더 오래). 멀티라인 지원.
+     * 메시지 출력(원본 parent.showMessage 대체) — 호출형: showMessage(oUI5, KIND, "S|I|E|W", msg, fnCb).
+     *   · 콜백(fnCb) 有 → 예/아니오 확인(공통 U4AUI.confirm).
+     *   · 오류/경고(E/W) → 메시지 박스(OK, 공통 U4AUI.confirm) — 토스트보다 확실(놓치지 않게).
+     *   · 그 외(성공/정보) → 화면 정중앙 토스트(.u4a-toast 싱글톤).
      ***********************************************************/
+    function _msgTitle(sType) {
+        var m = { S: "D86", E: "B93", W: "B89", I: "B86", C: "B86" }, k = m[sType] || "B86";
+        try { return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", k) || ""; } catch (e) { return ""; }
+    }
     var _iToastTimer = null;
-    oAPP.fn.showMessage = function (a, b, sType, sMsg) {
+    oAPP.fn.showMessage = function (a, b, sType, sMsg, fnCb) {
 
-        // 원본 호출형: showMessage(null, 10/20, "S|I|E|W", msg)
+        // 확인질문(예/아니오)
+        if (typeof fnCb === "function") {
+            if (window.U4AUI && U4AUI.confirm) {
+                U4AUI.confirm({ type: sType || "I", title: _msgTitle(sType), message: sMsg || "", onClose: fnCb });
+            } else { try { fnCb(window.confirm(sMsg || "") ? "YES" : "NO"); } catch (e) { } }
+            return;
+        }
+
         if (sMsg == null || sMsg === "") { return; }
 
+        // 오류/경고 → 메시지 박스(OK). (놓치기 쉬운 토스트 대신 모달로 확실히 노출)
+        if ((sType === "E" || sType === "W") && window.U4AUI && U4AUI.confirm) {
+            var sOk = "OK";
+            try { sOk = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A40") || "OK"; } catch (e) { } // Confirm
+            U4AUI.confirm({ type: sType, title: _msgTitle(sType), message: sMsg, buttons: [{ act: "OK", label: sOk, emphasized: true }] });
+            return;
+        }
+
+        // 정보/성공 → 토스트.
         var oToast = document.getElementById("u4aMimeToast");
         if (!oToast) {
             oToast = document.createElement("div");
@@ -191,17 +213,150 @@ let oAPP = (function (window) {
             oToast.className = "u4a-toast";
             document.body.appendChild(oToast);
         }
-
-        var bErr = (sType === "E" || sType === "W");
-        oToast.setAttribute("data-type", bErr ? "error" : "info");
+        oToast.setAttribute("data-type", (sType === "E" || sType === "W") ? "error" : "info");
         oToast.textContent = sMsg;
         void oToast.offsetWidth;
         oToast.setAttribute("data-show", "true");
-
         if (_iToastTimer) { clearTimeout(_iToastTimer); }
-        _iToastTimer = setTimeout(function () { oToast.setAttribute("data-show", "false"); }, bErr ? 6000 : 3000);
+        _iToastTimer = setTimeout(function () { oToast.setAttribute("data-show", "false"); }, 3000);
 
     }; // end of oAPP.fn.showMessage
+
+    /***********************************************************
+     * 서버 예외 응답 → 클라 언어 메시지 출력(단일 헬퍼). 표준: .analy/17 (★서버 수정 불가 전제).
+     *   서버는 "서버 언어로 구운 텍스트"(RETMSG / SCRIPT 임베드)만 준다. 클라가:
+     *     ① 텍스트 + 후속동작(needCts) 추출(SCRIPT 는 eval 말고 정규식 파싱)
+     *     ② 역조회: 메인프로세스 WsMsgCls.findKeyByText(완전일치) / getParamTemplates(파라미터 템플릿)
+     *        로 (클래스,번호) 키 확보 → fnGetMsgClsText 로 **클라 언어 재렌더**
+     *     ③ DB 키 아님(SAP 프레임워크 메시지)이면 소형 패턴사전 → 키, 그래도 없으면 서버 원문
+     *     ④ needCts → CTS 팝업(opts.onCts)
+     ***********************************************************/
+    function _genericErrTxt() {
+        try { return oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.LANGU || "", "ZMSG_WS_COMMON_001", "314", ""); } catch (e) { return "Error"; }
+    }
+    var _MSG_LANGS = ["EN", "KO"];                                   // 후보 백엔드 렌더 언어(DB 폴더)
+    var _MSG_ALLOW = { "/U4A/MSG_WS": 1, "ZMSG_WS_COMMON_001": 1 };  // 역매칭 허용 클래스(오매칭 방지)
+    // SAP 프레임워크 메시지(메시지클래스 키 아님) 패턴사전 — 대표 케이스만 최소.
+    var _FW_PATTERNS = [
+        { re: /already exist/i, cls: "/U4A/MSG_WS", no: "004" },     // 중복(폴더/파일) → "중복된 파일 이름이 있습니다."
+        { re: /이미 (존재|등록)/, cls: "/U4A/MSG_WS", no: "004" }
+    ];
+
+    function _norm(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim(); }
+    function _esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+    // 파라미터 템플릿 언어별 1회 캐시(remote 대량 직렬화 반복 방지).
+    var _tplCache = {};
+    function _tplCacheGet(WC, sLang) {
+        if (_tplCache[sLang]) { return _tplCache[sLang]; }
+        var a = [];
+        try { a = WC.getParamTemplates(sLang) || []; } catch (e) { a = []; }
+        _tplCache[sLang] = a;
+        return a;
+    }
+
+    // SCRIPT 파싱(eval 금지) — showMessage(...,'텍스트') 추출 + lf_createMimeCts 토큰 감지.
+    function _parseScript(sScript) {
+        var r = { text: "", needCts: false };
+        if (!sScript) { return r; }
+        if (/lf_createMimeCts\s*\(/.test(sScript)) { r.needCts = true; }
+        var m = sScript.match(/showMessage\s*\([^,]*,[^,]*,[^,]*,\s*(['"])([\s\S]*?)\1\s*\)/);
+        if (m) { r.text = m[2]; }
+        return r;
+    }
+
+    // 파라미터(&) 템플릿 → 정규식 + & 순서.
+    function _tplToRegex(sTpl) {
+        var parts = [], order = [], last = 0, re = /&(\d)?/g, m, n = 0;
+        while ((m = re.exec(sTpl)) !== null) {
+            parts.push(_esc(sTpl.slice(last, m.index)));
+            parts.push("(.*?)");
+            n += 1;
+            order.push(m[1] ? parseInt(m[1], 10) : n);
+            last = m.index + m[0].length;
+        }
+        if (!order.length) { return null; }
+        parts.push(_esc(sTpl.slice(last)));
+        try { return { regex: new RegExp("^" + parts.join("") + "$", "i"), order: order }; } catch (e) { return null; }
+    }
+
+    // 서버 텍스트 → (클라언어 텍스트) 역현지화. 못 찾으면 null.
+    function _reverseLocalize(sServerText) {
+        var sRaw = String(sServerText || ""), sNorm = _norm(sRaw);
+        if (!sNorm) { return null; }
+        var WC; try { WC = oAPP.REMOTE.getGlobal("WsMsgCls"); } catch (e) { WC = null; }
+        if (!WC) { return null; }
+
+        // 1) 완전일치 역조회(원문/정규화 둘 다 시도).
+        for (var i = 0; i < _MSG_LANGS.length; i++) {
+            try {
+                var row = WC.findKeyByText(_MSG_LANGS[i], sRaw) || WC.findKeyByText(_MSG_LANGS[i], sNorm);
+                if (row && row.ARBGB) { return oAPP.common.fnGetMsgClsText(row.ARBGB, row.MSGNR); }
+            } catch (e) { }
+        }
+        // 2) 파라미터 템플릿 매칭(가장 리터럴 긴 것 우선). 언어별 템플릿은 1회만 remote 로 가져와 캐시.
+        for (var L = 0; L < _MSG_LANGS.length; L++) {
+            var aTpl = _tplCacheGet(WC, _MSG_LANGS[L]);
+            var best = null, bestLit = -1;
+            for (var t = 0; t < aTpl.length; t++) {
+                var o = aTpl[t];
+                if (!o || !_MSG_ALLOW[o.ARBGB]) { continue; }
+                var tpl = _norm(o.TEXT);
+                var lit = tpl.replace(/&\d?/g, "").replace(/\s+/g, "").length;
+                if (lit < 5) { continue; }   // 리터럴이 너무 짧은 템플릿(예 "&1.")은 오매칭 위험 → 제외
+                var rx = _tplToRegex(tpl);
+                if (!rx) { continue; }
+                var mm = sNorm.match(rx.regex);
+                if (mm && lit > bestLit) { bestLit = lit; best = { o: o, caps: mm.slice(1), order: rx.order }; }
+            }
+            if (best) {
+                var p = ["", "", "", ""];
+                for (var k = 0; k < best.order.length; k++) {
+                    var idx = best.order[k];
+                    if (idx >= 1 && idx <= 4) { p[idx - 1] = best.caps[k] || ""; }
+                }
+                return oAPP.common.fnGetMsgClsText(best.o.ARBGB, best.o.MSGNR, p[0], p[1], p[2], p[3]);
+            }
+        }
+        return null;
+    }
+
+    // SAP 프레임워크 메시지(키 없음) 패턴사전.
+    function _frameworkLocalize(sText) {
+        for (var i = 0; i < _FW_PATTERNS.length; i++) {
+            if (_FW_PATTERNS[i].re.test(sText)) {
+                try { return oAPP.common.fnGetMsgClsText(_FW_PATTERNS[i].cls, _FW_PATTERNS[i].no); } catch (e) { }
+            }
+        }
+        return null;
+    }
+
+    oAPP.fn.fnRenderServerError = function (oResult, opts) {
+        opts = opts || {};
+        if (!oResult) { oAPP.fn.showMessage(null, 20, "E", _genericErrTxt()); return; }
+
+        // ① 표시 텍스트 + 후속동작 추출.
+        var sText = oResult.RTMSG || oResult.RETMSG || oResult.MESSAGE || oResult.MSGTX || oResult.RETMSGTX || "";
+        var bNeedCts = false;
+        if (oResult.SCRIPT) {
+            var ps = _parseScript(oResult.SCRIPT);
+            if (ps.text && !sText) { sText = ps.text; }
+            if (ps.needCts) { bNeedCts = true; }
+        }
+
+        // ② 역현지화(완전일치/템플릿) → ③ 프레임워크 패턴 → 원문 폴백.
+        if (sText) {
+            var sLoc = null;
+            try { sLoc = _reverseLocalize(sText) || _frameworkLocalize(sText); } catch (e) { sLoc = null; }
+            oAPP.fn.showMessage(null, 20, "E", sLoc || sText);
+        }
+
+        // ④ 후속동작(전송요청 팝업).
+        if (bNeedCts && typeof opts.onCts === "function") { try { opts.onCts(); } catch (e) { } }
+
+        // 표시할 것도 후속동작도 없으면 일반 오류.
+        if (!sText && !bNeedCts) { oAPP.fn.showMessage(null, 20, "E", _genericErrTxt()); }
+    };
 
     // 사운드/로그인 체크/푸터메시지 — 별도창에선 경량 처리(원본 부작용 없음).
     oAPP.fn.setSoundMsg = function () { /* 별도창 — 사운드 생략(원본 sap sound 비결합) */ };
@@ -211,6 +366,29 @@ let oAPP = (function (window) {
     oAPP.fn.getServerPath = function () { return oAPP.attr.servNm || ""; };
     oAPP.fn.checkWLOList = function () { return oAPP.attr.wloLazy === true; };
 
+
+    /************************************************************************
+     * 창 제목 = "U4A MIME 리포지토리(C26)" + (현재 앱 APPID 있으면 " - APPID").
+     *   앱정보는 if-mime-info IPC 로 늦게 도착하므로, 초기(fnInitHeader)+도착 시 둘 다 호출.
+     ************************************************************************/
+    oAPP.fn.fnSetTitle = function () {
+        function T(k) { try { return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", k); } catch (e) { return ""; } }
+        var s = T("C26") || "U4A MIME Repository";
+        var oApp = oAPP.attr.oAppInfo || {};
+        if (oApp.APPID) {
+            s += " - " + oApp.APPID;
+            // 모드(편집 A02 / 조회 A05) + 상태(활성 B66 / 비활성 B67; 변경분 IS_CHAG="X"면 비활성) — WS20 헤더와 동일.
+            var sMode = (oApp.IS_EDIT === "X") ? T("A02") : T("A05");
+            var sStat = "";
+            if (oApp.IS_CHAG === "X") { sStat = T("B67"); }
+            else if (oApp.ACTST != null && oApp.ACTST !== "") { sStat = (oApp.ACTST === "A") ? T("B66") : T("B67"); }
+            if (sMode) { s += " " + sMode; }
+            if (sStat) { s += " " + sStat; }
+        }
+        var oT = document.getElementById("mimeTitle");
+        if (oT) { oT.textContent = s; }
+        try { document.title = s; } catch (e) { }
+    };
 
     /************************************************************************
      * 공통 .u4a-titlebar 초기화 — 로고/제목(C26)/창 제어(min/max/close).
@@ -225,10 +403,7 @@ let oAPP = (function (window) {
             }
         } catch (e) { }
 
-        var oTitle = document.getElementById("mimeTitle");
-        if (oTitle) {
-            oTitle.textContent = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C26"); // U4A MIME Repository
-        }
+        oAPP.fn.fnSetTitle();   // 제목(+현재 앱 APPID). 앱정보는 IPC 도착 시 재호출로 갱신.
 
         var oMin = document.getElementById("mimeWinMin");
         if (oMin) { oMin.addEventListener("click", function () { try { oAPP.CURRWIN.minimize(); } catch (e) { } }); }
@@ -286,6 +461,8 @@ let oAPP = (function (window) {
             oAPP.fn.applyTheme(oInfo.oThemeInfo.THEME);
         }
 
+        oAPP.fn.fnSetTitle();   // 앱정보 도착 → 제목에 APPID 반영
+
         // 본문(mime.js) 시작 — 트리/속성/미리보기 빌드 + 데이터 로드.
         try { if (typeof window.fnMimeStart === "function") { window.fnMimeStart(); } } catch (e) { console.error("[HTML5][MIME] start 오류:", e); }
 
@@ -296,6 +473,20 @@ let oAPP = (function (window) {
     });
 
     window.oAPP = oAPP;
+
+    // ─ 서버 SCRIPT(eval) 안전 전역 스텁 ──────────────────────────────────
+    //   set_mime_crud 등은 RETCD=E 와 함께 SCRIPT(예: parent.showMessage(sap,10,"",msg) / lf_createMimeCts())
+    //   를 내려주며, WS 런타임 전역(showMessage/sap/setSoundMsg…)을 참조한다. 별도창엔 그게 없어
+    //   eval 이 조용히 실패 → 중복 폴더명 등 오류가 "무반응" 이었다. 동일 이름 안전 스텁을 전역에 깔아
+    //   eval 된 SCRIPT 가 그대로 동작하게 한다(최상위 창이라 parent === window). [guard-server-script-eval]
+    try {
+        window.showMessage = function () { return oAPP.fn.showMessage.apply(oAPP.fn, arguments); };
+        window.setSoundMsg = function () { try { return oAPP.fn.setSoundMsg.apply(oAPP.fn, arguments); } catch (e) { } };
+        window.setBusy = function (s) { try { return oAPP.fn.setBusy(s); } catch (e) { } };
+        window.getServerPath = function () { return oAPP.fn.getServerPath(); };
+        window.getUserInfo = function () { return oAPP.fn.getUserInfo(); };
+        if (!window.sap) { window.sap = { ui: { getCore: function () { return { byId: function () { return null; } }; } } }; }
+    } catch (e) { }
 
     return oAPP;
 

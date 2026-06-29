@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>U4A Version Diff Host</title>
+
+    <style>
+        html,
+        body,
+        #content {
+            margin: 0;
+            height: 100%;
+        }
+
+        html,
+        body {
+            overflow: hidden;
+        }
+
+        /* 첫 페인트 플래시 방지 — Monaco(loader→require→createDiffEditor)가 비동기 마운트되는
+           동안 잘못된 색이 보이지 않도록 빌트인 테마 배경을 미리 깐다(단일 출처 --boot-bg). */
+        html,
+        body,
+        #content {
+            background: var(--boot-bg, #1e1e1e);
+        }
+
+        /* 공통 스크롤바 톤(에디터 호스트 시리즈와 동일) */
+        .monaco-scrollable-element>.scrollbar>.slider {
+            background: rgba(128, 128, 128, 0.3) !important;
+            border-radius: 4px !important;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .monaco-scrollable-element:hover>.scrollbar>.slider {
+            opacity: 1;
+        }
+    </style>
+
+    <script>
+/****************************************************************************
+ * 버전 관리 전용 Monaco "diff" 호스트 (versionMng/host)
+ * --------------------------------------------------------------------------
+ *  ★ 에디터 시리즈 호스트(editorPopup/host = 단일 createEditor)와 별도 분리된 전용 호스트.
+ *    버전 비교는 두 소스의 차이를 좌우로 보여주는 createDiffEditor 가 필요하므로 독립 모듈로 둔다.
+ *    (공통 호스트를 고치지 않는다 — "고치지 말고 덧대라" 16번 §0.5.)
+ *  · 로드 시퀀스는 동일: loader.js → require(['vs/editor/editor.main']) → createDiffEditor.
+ *  · 초기 설정 = URL PARAMS({ HOSTID, THEME, LANG }).
+ *  · 부모(versionMngFrame)→호스트 명령 = postMessage({__u4avmh, hostId, cmd}).
+ *      setCompareData / next / prev / setTheme / layout.
+ *  · 호스트→부모 통지 = window.parent.postMessage({__u4avmh, hostId, evt}).  evt: ready
+ *  · 모나코 경로는 부모(versionMngFrame) 전역 PATH/APPPATH 에서 해석(iframe 은 node require 비의존).
+ ****************************************************************************/
+        var oAPP = {};
+        oAPP.attr = {};
+
+        // 부모(versionMngFrame 창) — node 파생 경로 보유.
+        var GF = window.parent;
+        var PATH = GF.PATH;
+        var APPPATH = GF.APPPATH;
+
+        var MONACO_VS_ROOT_PATH = PATH.join(APPPATH, "lib", "monaco", "vs");
+        var MONACO_LOADER_PATH = PATH.join(MONACO_VS_ROOT_PATH, "loader.js");
+
+        // URL PARAMS 파싱 — { HOSTID, THEME, LANG }
+        var oURL = new URL(location.href);
+        var oPARAMS = {};
+        try { oPARAMS = JSON.parse(oURL.searchParams.get("PARAMS") || "{}"); }
+        catch (e) { oPARAMS = {}; }
+
+        oAPP.attr.HOSTID = oPARAMS.HOSTID || "U4AVMH";
+        oAPP.attr.THEME = oPARAMS.THEME || "vs-dark";
+        oAPP.attr.LANG = oPARAMS.LANG || "abap";
+
+        // 첫 페인트 플래시 방지 — THEME 에 맞춰 부트 배경 즉시 동기화.
+        (function () {
+            var bg = "#1e1e1e";
+            if (/(^|-)vs$/.test(oAPP.attr.THEME) || /light/i.test(oAPP.attr.THEME)) { bg = "#ffffff"; }
+            else if (/hc-black/i.test(oAPP.attr.THEME)) { bg = "#000000"; }
+            try { document.documentElement.style.setProperty("--boot-bg", bg); } catch (e) { }
+        })();
+
+        // 호스트 → 부모 통지.
+        function _toParent(oMsg) {
+            try {
+                oMsg = oMsg || {};
+                oMsg.__u4avmh = true;
+                oMsg.hostId = oAPP.attr.HOSTID;
+                window.parent.postMessage(oMsg, "*");
+            } catch (e) { }
+        }
+
+        // 부모 → 호스트 명령 수신.
+        window.addEventListener("message", function (oEvent) {
+            var d = oEvent && oEvent.data;
+            if (!d || d.__u4avmh !== true) { return; }
+            if (d.hostId && d.hostId !== oAPP.attr.HOSTID) { return; }
+            if (!window.editor) { return; }
+
+            switch (d.cmd) {
+                case "setCompareData":
+                    // 두 소스를 좌(original=비교 기준)·우(modified=비교 대상) 모델로 세팅(원본 _setCompareCode).
+                    try {
+                        var sA = (typeof d.sourceA === "string") ? d.sourceA : "";
+                        var sB = (typeof d.sourceB === "string") ? d.sourceB : "";
+                        var oOld = window.editor.getModel();
+                        var oOrigin = monaco.editor.createModel(sA, oAPP.attr.LANG);
+                        var oTarget = monaco.editor.createModel(sB, oAPP.attr.LANG);
+                        window.editor.setModel({ original: oOrigin, modified: oTarget });
+                        // 이전 모델 메모리 해제(반복 비교 시 누수 방지).
+                        try { if (oOld && oOld.original) { oOld.original.dispose(); } } catch (e) { }
+                        try { if (oOld && oOld.modified) { oOld.modified.dispose(); } } catch (e) { }
+                    } catch (e) { }
+                    return;
+
+                case "next":
+                    try { if (window.diffNavigator) { window.diffNavigator.next(); } } catch (e) { }
+                    return;
+
+                case "prev":
+                    try { if (window.diffNavigator) { window.diffNavigator.previous(); } } catch (e) { }
+                    return;
+
+                case "setTheme":
+                    try { monaco.editor.setTheme(d.theme || "vs-dark"); } catch (e) { }
+                    return;
+
+                case "layout":
+                    try { window.editor.layout(); } catch (e) { }
+                    return;
+
+                default:
+                    return;
+            }
+        });
+
+        // 로더 로드 완료 → 본체(index.js) 로드.
+        function onLoad() {
+            var s = document.createElement("script");
+            s.src = "index.js";
+            document.head.append(s);
+        }
+
+        window.addEventListener("DOMContentLoaded", function () {
+            var loader = document.createElement("script");
+            loader.src = MONACO_LOADER_PATH;
+            loader.onload = onLoad;
+            document.head.append(loader);
+        });
+    </script>
+</head>
+
+<body>
+    <div id="content" style="height:100%;"></div>
+</body>
+
+</html>

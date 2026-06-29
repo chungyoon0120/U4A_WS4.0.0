@@ -443,3 +443,26 @@
     width: 50px;
     height: 5px;
 }
+
+/* ── 에디터 우클릭 컨텍스트 메뉴(다단계) — 공통 .u4a-menu 스킨 소비, 서브메뉴 표식만 스코프 덧댐.
+      (구 sap.m.Menu "uspCDECtxMenu". 패턴 트리 + Code Editor Designer 서브메뉴.) ───── */
+.u4aWs30EditCtxMenu .u4a-menu__item-text {
+    flex: 1 1 auto;                 /* 라벨이 늘어나 caret 을 우측 끝으로 민다 */
+}
+.u4aWs30EditCtxMenu .u4aWs30EditCtxCaret {
+    flex: 0 0 auto;
+    margin-left: 0.75rem;
+    font-size: 0.7rem;             /* 서브메뉴 펼침 표식(작게) */
+}
+/* 선두 아이콘 자리(빈 자리 포함) — 라벨 정렬 일관. img/i 동일 폭. */
+.u4aWs30EditCtxMenu .u4aWs30EditCtxIcon {
+    flex: 0 0 auto;
+    width: 1.1rem;
+    text-align: center;
+}
+.u4aWs30EditCtxMenu .u4aWs30EditCtxImg {
+    flex: 0 0 auto;
+    width: 1.1rem;
+    height: 1.1rem;
+    object-fit: contain;
+}
