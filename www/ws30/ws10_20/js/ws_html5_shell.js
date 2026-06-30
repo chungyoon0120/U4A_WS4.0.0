@@ -1105,6 +1105,26 @@
             }
         } catch (e) { }
 
+        // ★ 미리보기 iframe 통째 재생성 (원본 design/js/main.js: src="" + cloneNode + remove).
+        //   호스트 상태(prev/zTREE)만 비우면 iframe(prevHTML) 안 UI5 컨트롤·UICore 레지스트리가 잔류한다
+        //   (prevHTML 은 ws_html5_ws20_prev 가 "이미 있으면 skip"으로 재사용 → WS20 innerHTML 비우기로 안 지워짐).
+        //   잔류분이 누적되면 다음 Display 의 drawPreview→removePreviewPage→destroyPreviewUiOthers(registry.all
+        //   전체 destroy)에서 깨진 참조로 'instanceof is not an object' 가 터진다(앱 조회·뒤로 2~3회 반복 후).
+        //   원본처럼 iframe 을 빈 깡통으로 갈아끼워 이전 미리보기를 contentWindow 째 파괴한다(다음 로드는 새 iframe).
+        try {
+            var oPrevFrame = (oAPP.attr.ui && oAPP.attr.ui.frame) || document.getElementById("prevHTML");
+            if (oPrevFrame && oPrevFrame.parentElement) {
+                var oPrevParent = oPrevFrame.parentElement;
+                try { oPrevFrame.src = ""; } catch (e2) { }
+                var oPrevClone = oPrevFrame.cloneNode();   // 빈 껍데기(id/name=prevHTML 유지, contentWindow 없음)
+                oPrevFrame.remove();
+                oPrevParent.appendChild(oPrevClone);
+            }
+            if (oAPP.attr.ui) { oAPP.attr.ui.frame = null; }
+        } catch (e) {
+            console.warn("[HTML5][WS20] removeContent preview iframe reset:", e && e.message);
+        }
+
         // WS20 페이지 DOM 비우기 → 다음 Display/Change 진입 시 셸 새로 렌더
         try {
             var oWS20 = (oAPP.attr.ui && oAPP.attr.ui.pages && oAPP.attr.ui.pages.WS20)
