@@ -54,10 +54,12 @@
 
             <!-- 상단 = 버전 히스토리 목록 -->
             <section class="u4a-splitter__pane u4aVmListPane" id="vmListPane">
-                <!-- 목록 헤더(원본 Page customHeader Title + 테이블 Toolbar 의 Compare) -->
+                <!-- 제목(원본 Page customHeader Title) -->
                 <div class="u4aVmListHead">
                     <span class="u4aVmListTitle" id="vmListTitle"></span>
-                    <span class="u4aVmListSpacer"></span>
+                </div>
+                <!-- 비교 툴바(원본 테이블 extension Toolbar — Compare 버튼 좌측) -->
+                <div class="u4aVmListToolbar">
                     <button type="button" class="u4a-btn u4a-btn--emphasized u4aVmCompare" id="vmCompareBtn">
                         <i class="fa-solid fa-code-compare"></i><span id="vmCompareTxt"></span>
                     </button>
@@ -82,6 +84,8 @@
                     <span class="u4aVmDiffTitle" id="vmTargetTitle"></span>
                     <span class="u4aVmVerBadge u4aVmVerBadge--target" id="vmTargetVer"></span>
                     <span class="u4aVmDiffSpacer"></span>
+                    <!-- 전체창 토글 — 목록(테이블) 숨기고 diff 가 창 전체 차지(USP 에디터 전체화면과 동일 패턴) -->
+                    <button type="button" class="u4a-btn u4aVmIconBtn" id="vmDiffFull" aria-pressed="false"><i class="fa-solid fa-expand"></i></button>
                     <button type="button" class="u4a-btn u4aVmLegendBtn" id="vmLegendBtn">
                         <i class="fa-solid fa-list"></i><span id="vmLegendTxt"></span>
                     </button>
@@ -99,11 +103,11 @@
     <!-- 범례 팝오버(원본 ResponsivePopover legend) — 색/설명 2열. versionMngFrame.js 가 채움/토글 -->
     <div class="u4aVmLegend" id="vmLegend" hidden></div>
 
-    <!-- Busy 오버레이(경량 스피너) -->
-    <div id="vmBusy" hidden>
-        <div class="u4aVmBusyBox">
-            <div class="u4aVmSpinner"></div>
-            <div class="u4aVmBusyText" id="vmBusyText"></div>
+    <!-- Busy 오버레이 — ★공통 .u4a-busy★(shell.css 단일 출처, ServerList/셸과 동일 구조).
+         data-busy 토글 + 안내문구는 .u4a-busy__label(구 BusyDialog DESC: 생성 중/실행 중). -->
+    <div id="vmBusy" class="u4a-busy" role="progressbar" aria-valuetext="Busy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
         </div>
     </div>
 

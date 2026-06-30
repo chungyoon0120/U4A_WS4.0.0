@@ -157,15 +157,28 @@ let oAPP = (function (window) {
      ***********************************************************/
     oAPP.fn.getBusy = function () { return oAPP.attr.isBusy; };
 
+    var _iBusyDelay = null;     // 0.3s 지연 표시 타이머(공통 .u4a-busy 와 동일 — 짧은 busy 깜빡임 방지)
     oAPP.fn.setBusy = function (bIsBusy) {
 
         var bOn = (bIsBusy === true || bIsBusy === "X");
         oAPP.attr.isBusy = bOn ? "X" : "";
 
+        // 공통 카드/스피너를 top-layer <dialog> 로 — 생성/가져오기 showModal 모달 위에도 보임.
         var oB = document.getElementById("mimeBusy");
-        if (oB) { oB.hidden = !bOn; }
+        if (oB) {
+            if (bOn) {
+                if (!oB.__cancelBound) { oB.addEventListener("cancel", function (e) { e.preventDefault(); }); oB.__cancelBound = true; } // ESC 닫힘 차단
+                if (_iBusyDelay) { clearTimeout(_iBusyDelay); }
+                _iBusyDelay = setTimeout(function () { try { if (!oB.open) { oB.showModal(); } } catch (e) { } }, 300); // 0.3s 지연(짧은 작업은 안 뜸)
+            } else {
+                if (_iBusyDelay) { clearTimeout(_iBusyDelay); _iBusyDelay = null; }
+                try { if (oB.open) { oB.close(); } } catch (e) { }
+            }
+        }
 
-        try { oAPP.CURRWIN.closable = !bOn; } catch (e) { }
+        // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 fnClose(setClosable→close)로만.
+        //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
+        try { oAPP.CURRWIN.closable = false; } catch (e) { }
 
     }; // end of oAPP.fn.setBusy
 
@@ -255,13 +268,18 @@ let oAPP = (function (window) {
         return a;
     }
 
-    // SCRIPT 파싱(eval 금지) — showMessage(...,'텍스트') 추출 + lf_createMimeCts 토큰 감지.
+    // SCRIPT 파싱(eval 금지) — showMessage(sap,20,'타입','텍스트') 추출 + lf_createMimeCts 토큰 감지.
+    //   원본은 eval(SCRIPT) 로 이 showMessage 를 그대로 실행하므로(표시 권위=SCRIPT),
+    //   3번째 인자(타입 E/W/S/I)와 4번째 인자(텍스트)를 함께 뽑아 타입까지 보존한다.
     function _parseScript(sScript) {
-        var r = { text: "", needCts: false };
+        var r = { text: "", type: "", needCts: false };
         if (!sScript) { return r; }
         if (/lf_createMimeCts\s*\(/.test(sScript)) { r.needCts = true; }
-        var m = sScript.match(/showMessage\s*\([^,]*,[^,]*,[^,]*,\s*(['"])([\s\S]*?)\1\s*\)/);
-        if (m) { r.text = m[2]; }
+        var m = sScript.match(/showMessage\s*\([^,]*,[^,]*,\s*(['"])([EWSI])\1\s*,\s*(['"])([\s\S]*?)\3\s*\)/);
+        if (m) { r.type = m[2]; r.text = m[4]; return r; }
+        // 타입 인자가 빈 문자열("")인 변형(원본 일부 경로) 폴백 — 텍스트만.
+        var m2 = sScript.match(/showMessage\s*\([^,]*,[^,]*,[^,]*,\s*(['"])([\s\S]*?)\1\s*\)/);
+        if (m2) { r.text = m2[2]; }
         return r;
     }
 
@@ -335,20 +353,23 @@ let oAPP = (function (window) {
         opts = opts || {};
         if (!oResult) { oAPP.fn.showMessage(null, 20, "E", _genericErrTxt()); return; }
 
-        // ① 표시 텍스트 + 후속동작 추출.
-        var sText = oResult.RTMSG || oResult.RETMSG || oResult.MESSAGE || oResult.MSGTX || oResult.RETMSGTX || "";
-        var bNeedCts = false;
+        // ① 표시 텍스트 + 타입 + 후속동작 추출.
+        //   원본은 eval(SCRIPT) 이므로 SCRIPT 안의 showMessage 가 표시 권위(타입 W/E 포함).
+        //   SCRIPT 가 표시 텍스트를 주면 그걸(타입까지) 우선 — RTMSG/RETMSG 는 SCRIPT 없는 응답
+        //   (삭제 E017/E015·폴더생성 INSERT_MIME 오류 등)에서만 사용.
+        var sText = "", sType = "E", bNeedCts = false;
         if (oResult.SCRIPT) {
             var ps = _parseScript(oResult.SCRIPT);
-            if (ps.text && !sText) { sText = ps.text; }
+            if (ps.text) { sText = ps.text; if (ps.type) { sType = ps.type; } }
             if (ps.needCts) { bNeedCts = true; }
         }
+        if (!sText) { sText = oResult.RTMSG || oResult.RETMSG || oResult.MESSAGE || oResult.MSGTX || oResult.RETMSGTX || ""; }
 
         // ② 역현지화(완전일치/템플릿) → ③ 프레임워크 패턴 → 원문 폴백.
         if (sText) {
             var sLoc = null;
             try { sLoc = _reverseLocalize(sText) || _frameworkLocalize(sText); } catch (e) { sLoc = null; }
-            oAPP.fn.showMessage(null, 20, "E", sLoc || sText);
+            oAPP.fn.showMessage(null, 20, sType, sLoc || sText);
         }
 
         // ④ 후속동작(전송요청 팝업).
@@ -469,6 +490,9 @@ let oAPP = (function (window) {
         // 본문 페이드인 + 메인 Busy Lock 해제(원본 별도창 동일).
         oAPP.fn.fnShowContent();
         try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { }
+        // ★형제 창 BUSY_OFF broadcast(opener fnMimeWindowOpener 가 oMainBroad BUSY_ON 으로 형제창 잠금 → 짝맞춤).
+        //   SETBUSYLOCK 은 "메인" busy 만 풀어 형제창(docPopup 등)은 안 풀린다 → 영구 busy+닫기차단 방지.
+        try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } catch (e) { }
 
     });
 
@@ -509,11 +533,8 @@ window.onload = function () {
     oAPP.fn.attachIpcEvents();
     oAPP.fn.attachOpenerCloseWatch();   // 메인창 닫히면 함께 종료
 
-    // Esc = 닫기(공통 UX). 키 꾹 누름(auto-repeat) 가드.
-    document.addEventListener("keydown", function (ev) {
-        if (ev.repeat) { return; }
-        if (ev.key === "Escape") { oAPP.fn.fnClose(); }
-    });
+    // ★ ESC 로 창 전체를 닫지 않는다 — 조회 창(docPopup/versionMng 동일). ESC 는 열린 하위
+    //   다이얼로그(생성/가져오기/확인)가 각자 cancel 로 자기만 닫는다. 창 닫기는 타이틀바 X/Alt+F4만.
 
     // 창 즉시 표시(네이티브 opacity 페이드 미사용 — 흰 플래시 방지). 위치는 opener ready-to-show 에서.
     try { oAPP.CURRWIN.show(); } catch (e) { }

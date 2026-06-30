@@ -123,7 +123,9 @@ function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
     var oEl = document.getElementById("errBusy");
     if (oEl) { oEl.classList.toggle("show", bBusy); }
-    try { CURRWIN.closable = !bBusy; } catch (e) { }
+    // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
+    //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
+    try { CURRWIN.closable = false; } catch (e) { }
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
         try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
     }
@@ -371,9 +373,15 @@ function _initChrome() {
     }
     _setTitle();
 
-    // 닫기(타이틀바 X).
+    // 닫기(타이틀바 X) — busy 중 차단 + 공통 closeWindow(창이 closable:false 라 직접 close() 불가).
     var oClose = document.querySelector('#errTitlebar [data-action="close"]');
-    if (oClose) { oClose.addEventListener("click", function () { try { CURRWIN.close(); } catch (e) { } }); }
+    if (oClose) {
+        oClose.addEventListener("click", function () {
+            if (bBusy) { return; }
+            if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); }
+            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { } }
+        });
+    }
 
     // 툴바 라벨 — Read me / Pretty Print / Enable Error Page / Save.
     var oReadme = document.getElementById("errReadme");

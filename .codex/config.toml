@@ -1,0 +1,20 @@
+[mcp_servers.sap-adt]
+command = "uv"
+args = [
+    "--directory",
+    "D:/workspace/sap_adt_mcp_server_py",
+    "run",
+    "sap-adt-mcp",
+]
+
+[mcp_servers.u4a-ws4-mcp]
+command = "uv"
+args = [
+    "run",
+    "--project",
+    "D:/workspace/u4a_ws4_mcp",
+    "u4a-ws4-mcp",
+]
+
+[mcp_servers.u4a-ws4-mcp.env]
+U4A_WS4_ANALY_DIR = "C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.analy"

@@ -42,6 +42,11 @@
         try { CURRWIN.setOpacity(1.0); } catch (e) { }
         try { CURRWIN.show(); } catch (e) { }
         try { if (BROWSKEY) { IPC.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } } catch (e) { }
+        // ★형제 창 busy 해제(누락 버그 수정): opener(fnWsOptionsPopupOpener)가 oMainBroad 로 BUSY_ON 을
+        //   broadcast 해 docPopup 등 형제 창을 전부 잠갔다. SETBUSYLOCK 은 "메인" busy 만 풀 뿐 형제창은
+        //   안 푼다 → 여기서 BUSY_OFF 도 broadcast 해야 형제창이 풀린다(안 하면 형제창 영구 busy+닫기차단).
+        //   BROAD_BUSY 액션 = 메인이 oMainBroad 로 중계(extopen/importExport 와 동일 패턴).
+        try { if (BROWSKEY) { IPC.send("if-send-action-" + BROWSKEY, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } } catch (e) { }
     }
 
     var WSMSG = null;

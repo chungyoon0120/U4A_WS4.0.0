@@ -75,7 +75,9 @@
     return A;
   }
 
-  // 단일 캐시 + 현재 상태(원본 /WS20/WEBSECU 모델 대응).
+  // 열려 있는 동안만 참조하는 UI 핸들 + 현재 상태(원본 /WS20/WEBSECU 모델 대응).
+  //   ※ 공통 정책상 .u4a-dialog 는 close 시 DOM 에서 제거되므로(u4a-ui.js 전역 close 위임,
+  //     data-u4a-keep 미사용) 다음 열기 때 lf_build 로 재생성된다 — 상태 보존 싱글톤이 아님.
   var oUI = null;
   var oState = { aca: null, xfo: null, whit: [], bEdit: false };
 
@@ -249,10 +251,14 @@
   function lf_doSave() {
     var A = _ensureData();
 
-    // Allow-From(M03) 이면 SID/SRC 둘 다 빈 White List 행 제거(원본).
+    // Allow-From(M03) 이면 SID/SRC 한쪽이라도 빈 White List 행 제거(원본 — 양쪽 채운 행만 보존).
+    // M03 이 아니면 WHIT 비움 — invariant("XFO≠M03 ⇒ WHIT 없음") 저장 시 최종 방어(라디오 변경
+    // 이벤트가 누락된 비정상 데이터로 열어 바로 저장해도 잔존 화이트리스트가 따라가지 않도록).
     var aWhit = oState.whit;
     if (oState.xfo.M03 === "X") {
       aWhit = aWhit.filter(function (r) { return (r.SID || "") !== "" && (r.SRC || "") !== ""; });
+    } else {
+      aWhit = [];
     }
 
     var oBuilt = {
@@ -313,7 +319,7 @@
   }
 
   /************************************************************************
-   * 다이얼로그 1회 생성(이후 재사용).
+   * 다이얼로그 생성(매 열기마다 — close 시 공통 정책으로 DOM 제거되므로 재생성).
    ************************************************************************/
   function lf_build() {
     lf_ensureStyle();
@@ -467,7 +473,7 @@
   }
 
   /************************************************************************
-   * Web Security Settings 팝업 열기(공개 진입점) — 캐시 재사용.
+   * Web Security Settings 팝업 열기(공개 진입점) — 이전 인스턴스가 DOM 에 없으면 재생성.
    ************************************************************************/
   oAPP.fn.fnWebSecurityPopupOpen = function () {
 

@@ -22,11 +22,11 @@ body {
 #mimeContent.u4aMimeShown { opacity: 1; }
 #mimeRoot { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; }
 
-/* Busy 오버레이(경량 스피너) */
-#mimeBusy { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.06); }
-#mimeBusy[hidden] { display: none; }
-.mimeBusy__spin { width: 2.5rem; height: 2.5rem; border: 0.25rem solid var(--line); border-top-color: var(--accent, #4a90d9); border-radius: 50%; animation: mimeSpin 0.8s linear infinite; }
-@keyframes mimeSpin { to { transform: rotate(360deg); } }
+/* Busy = 공통 카드/이중링 스피너(.u4a-busy__*, shell.css SSOT) 를 top-layer <dialog> 로 띄움.
+   생성/가져오기(showModal) 모달 위에도 보이게 — modal-dialog-busy-toplayer. 카드/스피너 색·모양은
+   공통(shell.css)이 단일출처, 여기선 다이얼로그 박스만 투명/무테두리로(스크림은 공통과 동일 옅게). */
+#mimeBusy.u4aMimeBusy { border: 0; padding: 0; background: transparent; box-shadow: none; max-width: 100vw; max-height: 100vh; overflow: visible; }
+#mimeBusy.u4aMimeBusy::backdrop { background: rgba(0, 0, 0, 0.06); }
 
 /* 오류 토스트 살짝 강조(공통 .u4a-toast 위 스코프 덧대기) */
 .u4a-toast[data-type="error"] { border-left: 0.25rem solid var(--negative, #d9534f); }
@@ -106,7 +106,11 @@ body {
 .u4aMimePdf[hidden] { display: none; }
 .u4aMimeAudio { width: min(90%, 32rem); margin: auto; }
 .u4aMimeAudio[hidden] { display: none; }
-.u4aMimeVideo { max-width: 100%; max-height: 100%; margin: auto; background: #000; }
+/* 비디오 박스를 부모(플렉스로 크기 확정)에 고정(width/height:100%+object-fit) — 고유크기↔부모 상호의존
+   제거. <video controls> 네이티브 미디어컨트롤(shadow DOM) 내부 ResizeObserver 가 측정 시 박스가
+   진동하면 "loop limit exceeded" 가 터지는데, 박스를 고정하면 한 번만 측정돼 루프가 안 생긴다.
+   (이미지는 내부 RO 가 없어 max-* 로 무방, 비디오만 고정 필요.) */
+.u4aMimeVideo { flex: 1 1 auto; min-width: 0; min-height: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
 .u4aMimeVideo[hidden] { display: none; }
 .u4aMimeNoData2 { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.9375rem; }
 .u4aMimeNoData2[hidden] { display: none; }
@@ -117,5 +121,15 @@ body {
 
 /* 폴더 생성 팝업 — 공통 .u4a-dialog 소비, 폭만 스코프 지정(원본 500px 대응 반응형). */
 .u4aMimeCrDlg { width: min(92vw, 31.25rem); }
+
+/* 가져오기(파일 첨부) 팝업 — 파일 선택 + 목록 테이블(세로 채움 스크롤). */
+.u4aMimeImpDlg { width: min(94vw, 38rem); height: min(85vh, 32rem); padding: 0; display: flex; flex-direction: column; }
+.u4aMimeImpBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 0.625rem; padding: 0.75rem 1rem; }
+.u4aMimeImpBar { flex: 0 0 auto; }
+.u4aMimeImpTbWrap { flex: 1 1 auto; min-height: 0; }
+.u4aMimeImpDesc { width: 100%; }
+.u4aMimeImpTb .u4aMimeImpDelCol { width: 2.75rem; text-align: center; }
+.u4aMimeImpEmpty { color: var(--text-muted); font-size: 0.875rem; padding: 0.5rem 0.25rem; }
+.u4aMimeImpEmpty[hidden] { display: none; }
 
 /* 툴팁은 공통 .u4a-tooltip(u4a-ui.js initTooltip)으로 일원화 — 화면 전용 툴팁 CSS 제거(이중 툴팁 버그 방지). */

@@ -181,7 +181,9 @@ let oAPP = (function (window) {
 
         } else {
 
-            oAPP.CURRWIN.closable = true;
+            // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 fnClose(setClosable→close)로만.
+            //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
+            oAPP.CURRWIN.closable = false;
             oAPP.setBusyLoading('');
 
             if (typeof _ISBROAD === "undefined" && oAPP.broadToChild) {

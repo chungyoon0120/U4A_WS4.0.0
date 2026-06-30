@@ -300,8 +300,8 @@
 
         var T1_COLS = [
             { key: "ERUSR", label: _txt("/U4A/CL_WS_COMMON", "B95"), w: "8rem", align: "center" },
-            { action: "run", w: "8.5rem" },   // Open in Browser — 헤더 들어갈 폭(고정 컬럼)
-            { action: "disp", w: "6.5rem" },  // App Views — 트리탭과 동일 폭
+            { action: "run", w: "8.5rem", align: "center" },   // Open in Browser — 헤더 들어갈 폭(고정 컬럼)
+            { action: "disp", w: "6.5rem", align: "center" },  // App Views — 트리탭과 동일 폭
             { key: "APPID", label: _txt("/U4A/CL_WS_COMMON", "A90"), w: "14rem" },
             { key: "APPNM", label: _txt("/U4A/CL_WS_COMMON", "A91"), w: "20rem" },
             { key: "APPTY", label: _txt("/U4A/CL_WS_COMMON", "B97"), w: "6rem", align: "center" }
@@ -490,7 +490,7 @@
          * ========================================================== */
         var T2_COLS = [
             { tree: true, key: "APPNM", label: _txt("/U4A/CL_WS_COMMON", "B99"), w: "26rem" },
-            { action: "disp", w: "6.5rem" },  // App Views — 고정 컬럼(탭1과 동일 폭)
+            { action: "disp", w: "6.5rem", align: "center" },  // App Views — 고정 컬럼(탭1과 동일 폭)
             { key: "APPID", label: _txt("/U4A/CL_WS_COMMON", "C01"), w: "12rem", link: true },
             { key: "APPVR", label: _txt("/U4A/CL_WS_COMMON", "C02"), w: "6rem", align: "center", nz: true },
             { key: "CODPG", label: _txt("/U4A/CL_WS_COMMON", "C03"), w: "6rem", align: "center", nz: true },

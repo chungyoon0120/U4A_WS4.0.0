@@ -56,8 +56,14 @@
         <div id="mimeRoot"></div>
     </div>
 
-    <!-- Busy 오버레이(경량 스피너) — frame.js setBusy 가 토글 -->
-    <div id="mimeBusy" hidden><div class="mimeBusy__spin"></div></div>
+    <!-- Busy = 공통 카드/이중링 스피너(.u4a-busy__*, shell.css SSOT) 를 top-layer <dialog> 로.
+         생성/가져오기 팝업이 showModal(top-layer)이라 일반 div busy 는 가려짐 → busy 도 모달이어야
+         그 위에 보인다(modal-dialog-busy-toplayer). frame.js setBusy 가 showModal()/close() 제어(0.3s 지연). -->
+    <dialog class="u4aMimeBusy" id="mimeBusy" role="progressbar" aria-valuetext="Busy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+        </div>
+    </dialog>
 
     <script>
         /************************************************************************

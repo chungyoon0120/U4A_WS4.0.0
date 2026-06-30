@@ -16,21 +16,23 @@ SAP UI5 기반 U4A Workspace를 **HTML5 + 바닐라 JS**로 컨버전하는 Elec
 
 ## UI5 → HTML5 변환 진행 현황
 
-> 최종 산출 **2026-06-26** · 현행화 **2026-06-29** (전 영역 재산출) · 상세 → **[변환 잔여 산출 보고서](.report/status/UI5_HTML5_변환잔여_산출보고서.md)**
+> 최종 산출 **2026-06-26** · 현행화 **2026-06-30** · 상세 → **[변환 잔여 산출 보고서](.report/status/UI5_HTML5_변환잔여_산출보고서.md)**
 
-WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 33건** (완전 미완 28 · 부분 5).
+WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 30건** (완전 미완 26 · 부분 4).
 
 | 축 | 완전 미완 | 부분 | 합계 |
 |---|:---:|:---:|:---:|
-| ① UI5 팝업 변환 (별도 UI5 코드 → HTML5) | 16 | 2 | **18** |
+| ① UI5 팝업 변환 (별도 UI5 코드 → HTML5) | 14 | 1 | **15** |
 | ② 코어 미구현 (원본 로직 → 현행 코드 이식) | 12 | 3 | **15** |
-| **합계** | **28** | **5** | **🎯 33** |
+| **합계** | **26** | **4** | **🎯 30** |
+
+> ✅ **6/29~30 완료**: 별도창 **versionMng · docPopup · optionPopup** HTML5화 · WS30 K1~K10 전부 · USP Save/Activate/모드전환 · 신규 속성 팝업 DumpWrite·InitPreScreen.
 
 ---
 
-### 🔴 잔여 작업 — ① UI5 팝업 변환 (18)
+### 🔴 잔여 작업 — ① UI5 팝업 변환 (15)
 
-**별창 팝업 미변환 (15)**
+**별창 팝업 미변환 (13)**
 
 - [ ] `bindPopup` ⭐ — 데이터 바인딩 편집 *(최우선 · 유저 대면 핵심)*
 - [ ] `findPopup` — UI 컨트롤 찾기
@@ -38,7 +40,6 @@ WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 33건**
 - [ ] `runtimeClassNavigator` — 런타임 클래스 탐색
 - [ ] `iconPrevPopup` — SAP 아이콘 미리보기
 - [ ] `illustMsgPopup` — 일러스트 메시지 선택
-- [ ] `docPopup` — Technical Document
 - [ ] `releaseNotePopup` — 릴리즈 노트
 - [ ] `uspNewPopup` — USP 신규 파일/폴더
 - [ ] `ShortCutCreator` — 앱 바로가기 생성
@@ -46,14 +47,12 @@ WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 33건**
 - [ ] `webDynConversionLog` — WebDynpro 변환 로그
 - [ ] `monacoSnippetDesigner` — 스니펫 디자이너 *(쉘 레이아웃만)*
 - [ ] `monacoThemeDesign` — 테마 디자이너 *(쉘 레이아웃만)*
-- [ ] `versionManagement` — 버전 관리 diff *(쉘 레이아웃만)*
 
 **현행 미배선 (1)** ⚠️
 - [ ] `fnUiTempWizard` — UI 템플릿 마법사 *(현행에 살아있어야 하는지 확인 필요)*
 
-**부분 변환 (2)**
+**부분 변환 (1)**
 - [ ] `mimeRepository` (별도창) — ✅뷰어·폴더생성 / ⬜ K4 삭제 · K5 업로드 · K6 다운로드
-- [ ] `optionPopup` — ✅optionM / ⬜ optionS (Server·Theme·CDN·LanguTrans, HTML5 미배선)
 
 ---
 
@@ -93,17 +92,20 @@ WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 33건**
 <details>
 <summary>✅ <b>완료 항목</b> (펼치기) — 6/26 이후 + 누적</summary>
 
-**🆕 6/26 이후 완료**
+**🆕 6/29~30 완료**
+- [x] 별도창 **versionMng**(버전 관리 diff) · **docPopup**(기술 문서, TinyMCE) · **optionPopup**(옵션) HTML5화
 - [x] WS30 트리 우클릭 **K1~K10 전부** (K5 Download · K6 Test Service 추가)
 - [x] USP **Save · Activate · 모드전환** 이식
 - [x] USP **Monaco 우클릭 메뉴 표시** HTML5화
 - [x] WS20 **트리선택 → 속성** 반영
 - [x] 신규 속성 팝업 **DumpWrite**(DH001091) · **InitPreScreen**(DH001106)
 
-**팝업 (누적)**
-- [x] OTRF4HelpPopup · editorPopup · errMsgPopup · errPageEditorPopup · textSearchPopup · winShowHidePopup
-- [x] aboutU4APopup · importExportPopup · ui5CssPopup(v1)
-- [x] fnAppCopy · fnAppF4 · fnCts · fnSelectBrowser · fnCssJsLinkAdd · fnClientEditor · fnWebSecurity
+**별도창 팝업 완료 (9)**
+- [x] OTRF4HelpPopup · editorPopup · errPageEditorPopup · errMsgPopup · textSearchPopup · winShowHidePopup · **versionMng** · **docPopup** · **optionPopup**
+
+**인앱/속성 팝업 + 원래 순수 HTML (누적)**
+- [x] fnAppCopy · fnAppF4 · fnCts · fnSelectBrowser · fnCssJsLinkAdd · fnClientEditor · fnWebSecurity · fnDumpWrite · fnInitPreScreen
+- [x] (순수 HTML) aboutU4APopup · importExportPopup · screen_record · relese_notes · ui5CssPopup(v1) · designTreeUiSearchPopup
 
 **화면 (누적)**
 - [x] **WS10** — 헤더(줌·핀·창숨김·텍스트검색·최대화·F11·메뉴바 오버플로) · 메뉴 디스패치 · 트랜잭션(Display/Change/Save/Activate)

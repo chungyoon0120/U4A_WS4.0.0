@@ -10,9 +10,6 @@
     <link rel="stylesheet" href="../../theme/shell.css">
     <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
     <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
-    <!-- Jodit(MIT, es2018, Chromium93 안전) WYSIWYG 스킨 — frame.css 보다 먼저 로드해야
-         frame.css 의 .jodit_theme_u4a(토큰 매핑)가 Jodit 기본값을 이긴다(동일 특이성=나중 로드 승). -->
-    <link rel="stylesheet" href="../../../../lib/jodit/jodit.min.css">
     <link rel="stylesheet" href="frame.css">
 
     <script src="../../theme/theme-api.js"></script>
@@ -46,40 +43,49 @@
         <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </header>
 
-    <!-- ===== 본체 = [문서목록 드로어(Master)] | [디테일(Detail)] ===== -->
+    <!-- ===== 본체 = [문서 관리자 사이드바] | [디테일(헤더+에디터)] ===== -->
     <div class="u4aDocBody" id="docBody">
 
-        <!-- 문서 목록 드로어 — 원본 SplitApp Master(NavigationList). 기본 열림, ☰ 로 토글. -->
-        <aside class="u4aDocNav" id="docNav" data-open="true">
-            <div class="u4aDocNavHead" id="docNavHead"></div>
+        <!-- 사이드바 = 문서 관리자(검색 + 메타 목록). 헤더에 새 문서(+). -->
+        <aside class="u4aDocNav" id="docNav">
+            <div class="u4aDocNavHead">
+                <span class="u4aDocNavHead__title" id="docNavHead"></span>
+                <button type="button" class="u4aDocNewBtn" id="docNewBtn">
+                    <i class="fa-solid fa-file-circle-plus"></i>
+                </button>
+            </div>
+            <div class="u4aDocSearch">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="docSearch" class="u4aDocSearch__input">
+            </div>
             <div class="u4aDocList" id="docList"></div>
         </aside>
 
-        <!-- 디테일 = 툴바 + 제목 + 에디터(원본 SplitApp Detail). -->
+        <!-- 디테일 = [문서 헤더(제목/메타/상태 + 삭제·저장)] + [에디터(자체 포맷툴바)] -->
         <section class="u4aDocDetail" id="docDetail">
 
-            <!-- 툴바(원본 Detail customHeader) — 좌:☰/생성/삭제/저장 · 우:변경이력 -->
-            <div class="u4aDocToolbar" id="docToolbar">
-                <button type="button" class="u4a-btn u4aDocNavToggle" id="docNavToggle" aria-pressed="true">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                <button type="button" class="u4a-btn u4aDocToolBtn" id="docCreateBtn">
-                    <i class="fa-solid fa-file-circle-plus"></i>
-                </button>
-                <button type="button" class="u4a-btn u4aDocToolBtn u4a-btn--negative" id="docDeleteBtn">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-                <button type="button" class="u4a-btn u4aDocToolBtn u4a-btn--emphasized" id="docSaveBtn">
-                    <i class="fa-solid fa-floppy-disk"></i>
-                </button>
-                <span class="u4aDocToolSpacer"></span>
-                <span class="u4aDocStamp" id="docStamp"></span>
+            <!-- 문서 헤더 — 좌: 제목(크게) + 메타(수정일/작성자) + 상태칩 · 우: 삭제/저장 -->
+            <div class="u4aDocHead" id="docHead">
+                <div class="u4aDocHead__main">
+                    <!-- 제목 입력 — frame.js 가 createField 로 채움(헤더 스코프에서 큰 글씨/무테두리). -->
+                    <div class="u4aDocTitleRow" id="docTitleRow"></div>
+                    <div class="u4aDocMeta" id="docMeta">
+                        <span class="u4aDocMeta__item" id="docMetaDate" hidden><i class="fa-regular fa-clock"></i><span></span></span>
+                        <span class="u4aDocMeta__item" id="docMetaUser" hidden><i class="fa-regular fa-user"></i><span></span></span>
+                        <span class="u4aDocStatus" id="docStatus" hidden><i class="fa-solid fa-circle"></i><span></span></span>
+                    </div>
+                </div>
+                <div class="u4aDocHead__actions">
+                    <button type="button" class="u4a-btn u4aDocBtnDanger" id="docDeleteBtn">
+                        <i class="fa-solid fa-trash-can"></i><span></span>
+                    </button>
+                    <button type="button" class="u4a-btn u4a-btn--emphasized" id="docSaveBtn">
+                        <i class="fa-solid fa-floppy-disk"></i><span></span>
+                    </button>
+                </div>
             </div>
 
-            <!-- 제목 입력(원본 sap.m.Input) — frame.js 가 createField 로 채움. -->
-            <div class="u4aDocTitleRow" id="docTitleRow"></div>
-
-            <!-- 콘텐츠 = Jodit WYSIWYG(textarea 를 Jodit.make 가 .jodit-container 로 승격). 등장 페이드(opacity). -->
+            <!-- 콘텐츠 = TinyMCE WYSIWYG(textarea 를 tinymce.init 가 .tox-tinymce 로 승격). 등장 페이드(opacity). -->
             <div class="u4aDocContent" id="docContent">
                 <textarea id="docEditor"></textarea>
             </div>
@@ -87,27 +93,24 @@
         </section>
     </div>
 
-    <!-- ===== 푸터 = [줌 컨트롤 −/%/+(왼쪽)] (에디터 시리즈와 동일 공통 UX) ===== -->
-    <footer class="u4aDocFooter" id="docFooter">
-        <div class="u4aDocZoom">
-            <button type="button" class="u4a-btn u4aDocZoomBtn u4aDocZoomStep" id="docZoomOut" title="Ctrl + Wheel ↓">
-                <i class="fa-solid fa-minus"></i>
-            </button>
-            <button type="button" class="u4a-btn u4aDocZoomBtn u4aDocZoomPct" id="docZoomBtn">
-                <i class="fa-solid fa-magnifying-glass"></i><span>100%</span>
-            </button>
-            <button type="button" class="u4a-btn u4aDocZoomBtn u4aDocZoomStep" id="docZoomIn" title="Ctrl + Wheel ↑">
-                <i class="fa-solid fa-plus"></i>
-            </button>
+    <!-- (푸터 줌 바 없음 — 본문 줌은 Ctrl+휠로만, 원본 fn_setZoomEvt 동작 동일) -->
+
+    <!-- 로딩 오버레이 = 공통 busy(.u4a-busy, shell.css SSOT — 카드+이중링 스피너, data-busy 토글, 0.3s 지연).
+         토스트는 공통 .u4a-toast 를 frame.js 가 동적 생성. -->
+    <div class="u4a-busy" id="docBusy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
         </div>
-        <span class="u4aDocFootSpacer"></span>
-    </footer>
+    </div>
 
-    <!-- 로딩 오버레이 (토스트는 공통 .u4a-toast 를 frame.js 가 동적 생성) -->
-    <div id="docBusy"><div class="u4aDocSpinner"></div></div>
+    <!-- TinyMCE 6(MIT) 자체호스팅. nodeIntegration 에서 UMD 가 module.exports 로 빠져 window.tinymce 가
+         비는 것을 막기 위해 로드 동안 module 을 숨긴다(index.html jQuery 패턴 동일). 이렇게 해야
+         window.tinymce 전역 + 스킨/플러그인 baseURL 자동감지(이 <script> 의 src 기준)가 동작한다.
+         스킨/콘텐츠 CSS 는 tinymce 가 baseURL 에서 동적 로드(여기서 <link> 불필요). -->
+    <script>window.__tm_m = window.module; window.__tm_e = window.exports; window.module = undefined; window.exports = undefined;</script>
+    <script src="../../../../lib/tinymce/tinymce.min.js"></script>
+    <script>window.module = window.__tm_m; window.exports = window.__tm_e; delete window.__tm_m; delete window.__tm_e;</script>
 
-    <!-- Jodit(MIT) WYSIWYG 본체는 frame.js 가 require() 로 로드한다(nodeIntegration 의 webpack UMD →
-         module.exports 경로가 결정적, 전역 등록 트릭 불필요). CSS 만 head 에서 <link>. -->
     <script src="frame.js"></script>
 
 </body>

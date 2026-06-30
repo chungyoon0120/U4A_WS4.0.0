@@ -113,45 +113,103 @@ body {
     text-overflow: ellipsis;
 }
 
-.u4aVmListSpacer {
-    flex: 1 1 auto;
+/* 비교 툴바(원본 테이블 extension Toolbar) — Compare 버튼 좌측 정렬. */
+.u4aVmListToolbar {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--divider);
+    background: var(--surface);
 }
 
 .u4aVmCompare {
     white-space: nowrap;
 }
 
-/* 테이블 래퍼 — 스크롤 영역(공통 .u4a-table-wrap 소비). */
+/* 테이블 박스 영역(persistent) — 보더+라운드+surface(App Search 2탭 톤). 내부 그리드/페인이 스크롤. */
 .u4aVmTableWrap {
     flex: 1 1 auto;
     min-height: 0;
+    padding: 0.5rem 0.75rem 0.75rem;
+    overflow: hidden;
+}
+
+.u4aVmArea {
+    height: 100%;
+    box-sizing: border-box;
+    border: 0.0625rem solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    overflow: hidden;            /* 스크롤은 내부 페인이 담당 */
+}
+
+/* ── sap.ui.table 고정컬럼 재현: [고정 테이블 | 스크롤 테이블] 2-pane ──
+   (평면 모드는 스크롤 페인 1개에 전체 컬럼) */
+.u4aVmGrid {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* 고정 페인 — 세로바 없음(스크롤 페인에 scrollTop 동기). 우측 경계선 = 사용자가 본 '고정바'. */
+.u4aVmGrid__frozen {
+    flex: 0 0 auto;
+    min-width: 0;
+    overflow: hidden;
+    border-right: 0.0625rem solid var(--line);
+}
+
+/* 스크롤 페인 — ★가로 스크롤바가 여기(=고정 영역 제외)에만★. 세로바도 여기. */
+.u4aVmGrid__scroll {
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: auto;
 }
 
-.u4aVmTableWrap .u4a-table-wrap {
-    height: 100%;
+.u4aVmGrid[data-mode="flat"] .u4aVmGrid__scroll {
+    width: 100%;
 }
 
-/* 버전 목록 테이블 컬럼 — 고정폭(원본 sap.ui.table.Column width). 가로 스크롤 유지. */
-.u4aVmTbl {
-    min-width: 64rem;          /* 컬럼 합 — 좁으면 가로 스크롤(원본 fixed width 대응) */
-}
+/* 테이블 폭 — 고정=폭 합 고정, 스크롤=내용폭(좁으면 가로스크롤·넓으면 채움), 평면=전체 컬럼 내용폭. */
+.u4aVmTbl--frozen { width: 41rem; }                          /* 상태5+App ID16+App Ver6+Compare14 */
+.u4aVmTbl--scroll { width: max-content; min-width: 100%; }
+.u4aVmTbl--flat   { width: max-content; }
 
 .u4aVmTbl th,
 .u4aVmTbl td {
     white-space: nowrap;
 }
 
-.u4a-c-vmstatus { width: 5rem; text-align: center; }
-.u4a-c-vmappid  { width: 16rem; }
-.u4a-c-vmver    { width: 6rem; text-align: center; }
-.u4a-c-vmcmp    { width: 14rem; text-align: center; }
-.u4a-c-vmreqno  { width: 8rem; text-align: center; }
-.u4a-c-vmreqtx  { width: 24rem; }
-.u4a-c-vmpkg    { width: 8rem; text-align: center; }
-.u4a-c-vmdate   { width: 8rem; text-align: center; }
-.u4a-c-vmtime   { width: 8rem; text-align: center; }
-.u4a-c-vmusr    { width: 8rem; text-align: center; }
+/* ── 컬럼 폭 + halign(헤더·데이터 동일 정렬) ──
+   ★ 반드시 `.u4aVmTbl` 로 스코프(특이도 0,2,0)해야 공통 `.u4a-table thead th{text-align:left}`(0,1,2)를
+     이겨 헤더에도 적용된다. 스코프 없이 `.u4a-c-*`(0,1,0)만 쓰면 헤더 왼쪽·데이터 가운데로 어긋남.
+     텍스트 컬럼(App ID·요청내역)=좌, 나머지=중앙. */
+.u4aVmTbl .u4a-c-vmstatus { width: 5rem;  text-align: center; }
+.u4aVmTbl .u4a-c-vmappid  { width: 16rem; text-align: left; }
+.u4aVmTbl .u4a-c-vmver    { width: 6rem;  text-align: center; }
+.u4aVmTbl .u4a-c-vmcmp    { width: 14rem; text-align: center; }
+.u4aVmTbl .u4a-c-vmreqno  { width: 8rem;  text-align: center; }
+.u4aVmTbl .u4a-c-vmreqtx  { width: 24rem; text-align: left; }
+.u4aVmTbl .u4a-c-vmpkg    { width: 8rem;  text-align: center; }
+.u4aVmTbl .u4a-c-vmdate   { width: 8rem;  text-align: center; }
+.u4aVmTbl .u4a-c-vmtime   { width: 8rem;  text-align: center; }
+.u4aVmTbl .u4a-c-vmusr    { width: 8rem;  text-align: center; }
+
+/* ── 행 hover 동기화 — 고정/스크롤 같은 행 동시 강조(JS .is-hover). 공통 hover/odd-hover 색과 동일. ── */
+.u4aVmTbl tbody tr.is-hover { background: var(--hover-bg); }
+.u4aVmTbl tbody tr[data-odd="true"].is-hover { background: var(--active-bg); }
+
+/* ── 빈 행(필러) — sap.ui.table 처럼 데이터 아래 남는 공간을 빈 행(그리드 라인)으로. hover/zebra/포인터 없음. ── */
+.u4aVmTbl tbody tr.u4aVmFiller,
+.u4aVmTbl tbody tr.u4aVmFiller:hover,
+.u4aVmTbl tbody tr.u4aVmFiller.is-hover {
+    background: transparent;
+    cursor: default;
+}
 
 /* App ID 셀 = ID 텍스트 + "새창으로 보기" 버튼(원본 HBox: Title + action 버튼). */
 .u4aVmAppId {
@@ -161,7 +219,16 @@ body {
     max-width: 100%;
 }
 
+/* ★ 좌우 페인 행높이 정합 안전망 — 인터랙티브 셀(App ID 박스/Compare 라디오) 콘텐츠를
+   행 콘텐츠 영역(≈2rem) 안으로 클램프해, 어떤 내용도 공통 행높이(--row-h)를 밀어올리지 않게. */
+.u4aVmTbl .u4aVmAppId,
+.u4aVmTbl .u4aVmCmpCell {
+    max-height: 2rem;
+    overflow: hidden;
+}
+
 .u4aVmAppIdTxt {
+    font-weight: 700;            /* 원본 sap.m.Title(굵게) 대응 */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -169,6 +236,12 @@ body {
 
 .u4aVmOpenBtn {
     flex: 0 0 auto;
+    box-sizing: border-box;
+    /* ★ 행높이(--row-h 40px - 셀 패딩 8px = 32px) 안에 확실히 들어가게 버튼을 28px 로 고정.
+       공통 .u4a-btn(height:2rem=32px+보더)을 그대로 두면 App ID 행만 40px 를 넘겨 좌/우 페인 행이 누적으로 어긋남. */
+    height: 1.75rem;
+    min-height: 0;
+    line-height: 1;
     background: transparent;
     border-color: transparent;
     color: var(--accent);
@@ -185,13 +258,15 @@ body {
     color: var(--icon-muted);
 }
 
-/* 상태 셀(원본 ObjectStatus: 현재=Success/색칠, 그외=Warning/삼각형). 공통 .u4a-status 소비. */
-.u4aVmStatus {
-    justify-content: center;
+/* 상태 셀(원본 ObjectStatus 아이콘 1:1): 현재(VPOSN 0)=녹색 사각형(color-fill),
+   과거=주황 삼각형(triangle). 의미 토큰 색만 사용. */
+.u4aVmStatusIcon {
+    font-size: 0.85rem;
+    line-height: 1;
 }
 
-.u4aVmStatus--warning { color: var(--state-warning); }
-.u4aVmStatus--warning::before { background: var(--state-warning); }
+.u4aVmStatusIcon--ok { color: var(--state-success); }
+.u4aVmStatusIcon--old { color: var(--state-warning); }
 
 /* Compare(기준/대상) 셀 = 라디오 2개(원본 RadioButton groupName g1/g2). */
 .u4aVmCmpCell {
@@ -367,55 +442,6 @@ body {
     white-space: nowrap;
 }
 
-/* ===== 로딩 오버레이 — busy 동안 입력 차단 + 스피너 + 설명문(원본 BusyDialog text). ===== */
-#vmBusy {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.25);
-    z-index: 9999;
-}
-
-#vmBusy[hidden] {
-    display: none;
-}
-
-.u4aVmBusyBox {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1.25rem 1.75rem;
-    background: var(--surface);
-    border: 1px solid var(--divider);
-    border-radius: 0.5rem;
-    box-shadow: var(--popover-shadow, 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25));
-}
-
-.u4aVmSpinner {
-    width: 2.5rem;
-    height: 2.5rem;
-    border: 3px solid var(--divider);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: u4aVmSpin 0.8s linear infinite;
-}
-
-.u4aVmBusyText {
-    color: var(--text);
-    font-size: 0.875rem;
-    text-align: center;
-    max-width: 18rem;
-}
-
-.u4aVmBusyText:empty {
-    display: none;
-}
-
-@keyframes u4aVmSpin {
-    to { transform: rotate(360deg); }
-}
-
-/* 저장/안내 토스트는 공통 .u4a-toast(shell.css — 화면 정중앙) 를 그대로 소비(화면별 토스트 없음). */
+/* 로딩 오버레이는 공통 .u4a-busy(shell.css — 카드+이중링 스피너+안내문구 .u4a-busy__label)를
+   그대로 소비(화면별 busy 스타일 없음). 토글=versionMngFrame.js _setBusy 가 data-busy + label 설정.
+   저장/안내 토스트도 공통 .u4a-toast(화면 정중앙) 그대로 소비. */

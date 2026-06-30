@@ -93,8 +93,9 @@
 
   // 단일 캐시(생성 후 세션 동안 유지) + 현재 open 의 가변 상태.
   var oUI = null;            // { dlg, frame, headerTitle, prettyBtn, saveBtn, delBtn, ready }
-  var oState = { sObjTy: C_JS, sObjId: "", sLang: "javascript", bEdit: false, fnCallback: null };
+  var oState = { sObjTy: C_JS, sObjId: "", sLang: "javascript", bEdit: false, fnCallback: null, sBaseline: "", bLoading: false };
   var iWatch = null;         // 최초 로드 busy 워치독.
+  var iLoadGuard = null;     // bLoading 안전장치('applied' ack 유실 시 ESC 영구잠김 방지).
 
   // busy/단축키 잠금(최초 로드 동안만 — 재사용 open 은 즉시라 불필요).
   var bBusy = false;
@@ -144,6 +145,8 @@
     var sVal = lf_readEditor();
     if (sVal === null) { return; }   // 에디터 미준비.
 
+    oState.sBaseline = sVal;   // 저장 시점 = 현재 내용이 저장본 → 비교 기준 갱신(저장 후 ESC 는 묻지 않음).
+
     var aCevt = _ensureCevt();
     var iIdx = aCevt.findIndex(function (x) { return x && x.OBJID === oState.sObjId && x.OBJTY === oState.sObjTy; });
 
@@ -170,7 +173,8 @@
     if (typeof oState.fnCallback === "function") { try { oState.fnCallback("X"); } catch (e) { } }
   }
 
-  // 삭제(원본 ev_pressClientEditorDel) — 에디터 내용만 비움.
+  // 삭제(원본 ev_pressClientEditorDel) — 에디터 내용만 비움. 비움도 기준값과 달라지므로(비교 방식)
+  //   저장 전 ESC 시 자동으로 변경 감지 → 확인. (별도 플래그 불필요)
   function lf_clear() { lf_toHost({ cmd: "setValue", value: "" }); }
 
   // 클립보드 복사 — 현재 에디터 전체 내용을 복사(편집/표시 모드 무관, 읽기 중 코드 가져갈 때 유용).
@@ -208,12 +212,15 @@
     try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
   }
 
-  // 미저장 변경 여부 — 표시(읽기)모드는 항상 false. 현재 에디터 값 ≠ 저장값(T_CEVT)이면 dirty.
+  // 미저장 변경 여부 — 표시(읽기)모드 항상 false. 로딩(값 주입) 중에도 false(비교 무의미).
+  //   ★ 비교 기준 = oState.sBaseline(open 시 주입한 값). 로딩이 끝난(busy off) 뒤에만 비교하므로
+  //     'open 직후 setValue 비동기 적용 전' 경합으로 허위 변경 판정되던 문제가 없다.
   function lf_isDirty() {
     if (!oState.bEdit) { return false; }
+    if (oState.bLoading) { return false; }
     var cur = lf_readEditor();
-    if (cur === null) { return false; }   // 에디터 미준비 — 변경분 판단 불가, 그냥 닫기 허용.
-    return cur !== lf_getScriptData();
+    if (cur === null) { return false; }   // 에디터 미준비 — 비교 불가, 닫기 허용.
+    return cur !== oState.sBaseline;
   }
 
   // 닫기 요청(공통 진입점) — 변경분 있으면 1회 확인 후 닫기, 없으면 즉시 닫기.
@@ -235,9 +242,11 @@
 
   // 현재 oState 를 에디터에 반영(언어/readonly/값/포커스).
   function lf_applyContent() {
+    var sInit = lf_getScriptData();
+    oState.sBaseline = sInit;   // ESC 변경 비교 기준 = 방금 주입한 값.
     lf_toHost({ cmd: "setLanguage", language: oState.sLang });
     lf_toHost({ cmd: "setReadOnly", readOnly: !oState.bEdit });
-    lf_toHost({ cmd: "setValue", value: lf_getScriptData() });
+    lf_toHost({ cmd: "setValue", value: sInit });   // 호스트가 적용 후 'applied' → busy(로딩) 해제.
     if (oState.bEdit) { lf_toHost({ cmd: "focus" }); }
   }
 
@@ -261,6 +270,7 @@
       lf_busyOff();
       return;
     }
+    if (d.evt === "applied") { oState.bLoading = false; try { clearTimeout(iLoadGuard); } catch (e) { } return; }   // 값 주입 완료 → busy(로딩) 해제.
     if (d.evt === "zoom") { lf_setZoom(d.pct); return; }
     if (d.evt === "save") {
       // 에디터 한정 Ctrl+S → 저장(✓) 위임. 편집모드일 때만(표시모드는 ✓ 자체가 숨김 = 저장 불가).
@@ -268,8 +278,9 @@
       return;
     }
     if (d.evt === "esc") {
-      // 에디터(iframe) 안에서 ESC — 닫기 요청(변경분 있으면 1회 확인). Monaco 위젯이 열려 있으면
-      //   호스트가 esc 를 보내지 않으므로(위젯 닫기 우선) 여기 도달 시엔 닫아도 안전.
+      // 에디터(iframe) 안에서 ESC — 로딩(값 주입) 중이면 무시(빠져나감). 끝났으면 닫기 요청.
+      //   Monaco 위젯이 열려 있으면 호스트가 esc 를 안 보내므로(위젯 닫기 우선) 여기 도달 시 닫아도 안전.
+      if (oState.bLoading) { return; }
       lf_requestClose();
       return;
     }
@@ -419,7 +430,7 @@
     oDlg.appendChild(oFoot);
 
     // ESC → 닫기(숨김).
-    oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_requestClose(); });
+    oDlg.addEventListener("cancel", function (e) { e.preventDefault(); if (oState.bLoading) { return; } lf_requestClose(); });
 
     // 헤더 드래그(전역 위임) / 더블클릭 리센터 / 우하단 grip 리사이즈 — 전 팝업 공통.
     if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
@@ -470,6 +481,11 @@
     oState.sLang = sLang;
     oState.bEdit = bEdit;
     oState.fnCallback = fnCallback;
+
+    // busy(로딩) ON — 값 주입 완료('applied') 까지 ESC 무시. ack 유실 대비 안전 타임아웃.
+    oState.bLoading = true;
+    try { clearTimeout(iLoadGuard); } catch (e) { }
+    iLoadGuard = setTimeout(function () { oState.bLoading = false; }, 5000);
 
     // 최초 1회만 생성(혹시 DOM 에서 사라졌으면 재생성).
     if (!oUI || !document.body.contains(oUI.dlg)) {

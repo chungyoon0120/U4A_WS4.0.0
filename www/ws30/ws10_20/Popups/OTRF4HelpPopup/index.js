@@ -425,6 +425,9 @@ let oAPP = parent.oAPP,
             parent.oAPP.setBusyLoading('');
             try { if (oAPP.fn && oAPP.fn.fnShowContent) { oAPP.fn.fnShowContent(); } } catch (e) { }
             oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" });
+            // ★형제 창 BUSY_OFF broadcast(opener 가 oMainBroad BUSY_ON 으로 형제창 잠금 → 짝맞춤).
+            //   SETBUSYLOCK 은 "메인" busy 만 풀어 형제창(docPopup 등)은 안 풀린다 → 영구 busy+닫기차단 방지.
+            try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } catch (e) { }
 
         });
 

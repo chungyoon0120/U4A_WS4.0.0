@@ -135,6 +135,8 @@
                         editor.setScrollTop(0);
                         editor.setScrollLeft(0);
                     } catch (e) { }
+                    // 값 주입 완료 통지 — 부모가 이 시점에 busy(로딩) 해제 + ESC 비교 기준 확정.
+                    _toParent({ evt: "applied" });
                     return;
 
                 case "setLanguage":

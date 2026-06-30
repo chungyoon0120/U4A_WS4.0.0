@@ -200,8 +200,9 @@ let oAPP = (function (window) {
 
         } else {
 
-            // 브라우저 닫기 버튼 활성
-            oAPP.CURRWIN.closable = true;
+            // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(setClosable→close)로만.
+            //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
+            oAPP.CURRWIN.closable = false;
 
             oAPP.setBusyLoading('');
 
@@ -230,12 +231,10 @@ let oAPP = (function (window) {
         var oClose = document.getElementById("u4aErrCloseBtn");
         if (oClose) {
             oClose.addEventListener("click", function () {
-                try {
-                    var oCurrWin = oAPP.REMOTE.getCurrentWindow();
-                    if (!oCurrWin.isDestroyed()) {
-                        oCurrWin.close();
-                    }
-                } catch (e) { /* 이미 파괴된 창 무시 */ }
+                // busy 중 닫기 차단 + 공통 closeWindow(setClosable→close) — 창은 closable:false 라 직접 close() 불가.
+                if (oAPP.fn.getBusy() === true || oAPP.fn.getBusy() === "X") { return; }
+                if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oAPP.REMOTE.getCurrentWindow()); }
+                else { try { var w = oAPP.REMOTE.getCurrentWindow(); if (!w.isDestroyed()) { w.setClosable(true); w.close(); } } catch (e) { } }
             });
         }
 

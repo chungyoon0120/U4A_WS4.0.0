@@ -1911,12 +1911,25 @@
             _done(sAct);
         }
 
+        // 공통 UX: 확인=체크 / 취소·닫기=X 아이콘만 표시(전 팝업 동일, 라벨은 title/aria 로 보존).
+        //   ★2버튼 이하일 때만 자동 아이콘 — 3버튼(예: 저장/저장안함/취소)은 NO·CANCEL 이 둘 다 X 라 모호 → 텍스트 유지.
+        //   버튼별 b.icon(FA 이름) 을 주면 개수와 무관하게 그 아이콘 사용. 매핑 없는 커스텀 act 는 텍스트 폴백.
+        const ICONMAP = { YES: "check", OK: "check", SAVE: "check", NO: "xmark", CANCEL: "xmark", CLOSE: "xmark" };
+        const bIconize = aBtns.length <= 2;
         const oFooter = oDlg.querySelector(".u4a-dialog__footer");
         aBtns.forEach(function (b) {
             const oBtn = document.createElement("button");
             oBtn.type = "button";
             oBtn.className = "u4a-btn" + (b.emphasized ? " u4a-btn--emphasized" : "") + (b.negative ? " u4a-btn--negative" : "");
-            oBtn.textContent = b.label || b.act;
+            const sLabel = b.label || b.act;
+            const sIcon = b.icon || (bIconize ? ICONMAP[b.act] : null);
+            if (sIcon) {
+                oBtn.innerHTML = '<i class="fa-solid fa-' + sIcon + '"></i>';
+                oBtn.title = sLabel;
+                oBtn.setAttribute("aria-label", sLabel);
+            } else {
+                oBtn.textContent = sLabel;
+            }
             oBtn.addEventListener("click", function () { _close(b.act); });
             oFooter.appendChild(oBtn);
         });
@@ -1929,9 +1942,28 @@
         return oDlg;
     }
 
+    /**
+     * 공통 — frameless 별도창(BrowserWindow) 안전 닫기 (SSOT).
+     *   ★ 별도창은 `closable:false` 로 열어 OS 닫기(Alt+F4 / 시스템메뉴 Close)를 차단한다.
+     *     따라서 정상 닫기는 반드시 이 함수로: setClosable(true) 직후 close().
+     *   ★ busy 토글로 `win.closable = true` 를 주면 안 된다(idle 일 때 Alt+F4 가 먹는 버그) —
+     *     busy 중 닫기 차단은 "닫기 호출부의 busy 가드 + onbeforeunload" 로 한다(closable 은 항상 false 유지).
+     *   근거: 16.공통UX 별도창 체크리스트(browser-window-common-ux).
+     * @param {Electron.BrowserWindow} oWin - 현재 창(REMOTE.getCurrentWindow()).
+     */
+    function closeWindow(oWin) {
+        try {
+            if (oWin && !oWin.isDestroyed()) {
+                oWin.setClosable(true);
+                oWin.close();
+            }
+        } catch (e) { /* 이미 파괴된 창 무시 */ }
+    }
+
     const U4AUI = {
         el: _el,
         confirm: confirm,
+        closeWindow: closeWindow,
         createField: createField,
         syncClear: syncClear,
         createPanel: createPanel,

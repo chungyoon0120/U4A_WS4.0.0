@@ -496,8 +496,8 @@
         var sType = bFolder ? _txt("/U4A/CL_WS_COMMON", "D45") : _txt("/U4A/CL_WS_COMMON", "B79"); // Folder / File
 
         if (bFolder) {
-            // 폴더 — 유형/이름/생성정보만(URL·미리보기 없음, 원본 동일).
-            lf_setProps({ TYPE: sType, NAME: oNode.NTEXT, ERDAT: oNode.ERDAT, ERZET: oNode.ERZET, ERNAM: oNode.ERNAM });
+            // 폴더 — 유형/이름/URL(폴더 경로)/생성정보. 미리보기는 없음(폴더).
+            lf_setProps({ TYPE: sType, NAME: oNode.NTEXT, URL: oNode.URL, ERDAT: oNode.ERDAT, ERZET: oNode.ERZET, ERNAM: oNode.ERNAM });
             return;
         }
 
@@ -855,7 +855,9 @@
             if (sKey === "K1") { lf_expandSel(); return; }
             if (sKey === "K2") { lf_collapseSel(); return; }
             if (sKey === "K3") { lf_openCreateFolder(n); return; }   // 폴더 생성
-            oAPP.fn.showMessage(null, 10, "I", _wsTxt("498"));   // K4~K6 준비중
+            if (sKey === "K4") { lf_deleteObject(n); return; }       // 오브젝트 삭제
+            if (sKey === "K5") { lf_openImport(n); return; }         // 마임 오브젝트 가져오기
+            oAPP.fn.showMessage(null, 10, "I", _wsTxt("498"));   // K6(다운로드) 준비중
         } catch (e) { console.error("[HTML5][MIME] 컨텍스트 메뉴 오류:", sKey, e); }
     }
 
@@ -1058,23 +1060,318 @@
     };
 
     // 생성된 폴더를 트리에 반영(원본 fnMimeFolderCreateSuccess).
-    function lf_insertCreatedFolder(oParent, oNew) {
+    // 생성된 자식(폴더 1개 또는 파일 N개)을 부모 하위에 추가 + 펼침/선택(원본 fnMimeFolderCreateSuccess/파일 동일).
+    function lf_insertCreatedFolder(oParent, oNewOrArr) {
         if (!oParent) { return; }
         oExpand[oParent.CHILD] = true;   // 부모 펼침
 
-        // 미로드(더미) 폴더면 서버 재조회로 자식 전체(새 폴더 포함) 정합 — 더미/새폴더 공존 혼란 방지.
+        // 미로드(더미) 폴더면 서버 재조회로 자식 전체 정합 — 더미/신규 공존 혼란 방지.
         if (oState.sLazy && _hasDummy(oParent)) {
             lf_lazyExpand(oParent);
             return;
         }
 
         if (!Array.isArray(oParent.MIMETREE)) { oParent.MIMETREE = []; }
-        if (oNew) {
-            oParent.MIMETREE.push(oNew);
-            if (oNew.CHILD != null) { oState.selKey = String(oNew.CHILD); }
-        }
+        var aNew = Array.isArray(oNewOrArr) ? oNewOrArr : (oNewOrArr ? [oNewOrArr] : []);
+        var sLastKey = "";
+        aNew.forEach(function (n) {
+            if (n) { oParent.MIMETREE.push(n); if (n.CHILD != null) { sLastKey = String(n.CHILD); } }
+        });
+        if (sLastKey) { oState.selKey = sLastKey; }
         oUI.tree.render();
-        try { if (oNew && oNew.CHILD != null) { oUI.tree.scrollToKey(String(oNew.CHILD)); } } catch (e) { }
+        try { if (sLastKey) { oUI.tree.scrollToKey(sLastKey); } } catch (e) { }
+    }
+
+    /************************************************************************
+     * 오브젝트 삭제(K4) — 원본 fnMimeTreeDeleteObject/Callback/fnMimeDeleteSuccess 1:1.
+     *   확인(MSG_WS 003) → POST /set_mime_crud {TRCOD:"D", OBJTYPE:FOLDER|FILE, FLDNM, FLDPATH(URL), DESC, DEVPKG, REQNO}
+     *   → 성공 시 트리에서 해당 노드 제거 + 속성/미리보기 비움.
+     ************************************************************************/
+    function lf_deleteObject(oNode) {
+        if (!oNode) { return; }
+        // 질문(003, 메시지키) + "어떤 오브젝트인지"(유형 D45/B79 메시지키 + 이름=선택 데이터) 함께 표시.
+        //   문구는 키만 사용, 이름은 사용자 데이터 echo(임의 메시지 생성 아님).
+        var sType = _isFolder(oNode) ? _txt("/U4A/CL_WS_COMMON", "D45") : _txt("/U4A/CL_WS_COMMON", "B79"); // Folder / File
+        var sMsg = _txt("/U4A/MSG_WS", "003") + "\n\n" + sType + " : " + (oNode.NTEXT || ""); // Do you really want to delete the object?
+        oAPP.fn.showMessage(null, 30, "I", sMsg, function (sAct) {
+            if (sAct !== "YES") { return; }
+            _doDeleteObject(oNode);
+        });
+    }
+
+    function _doDeleteObject(oNode, sReqNo) {
+        var oApp = _appInfo();
+        var oDel = {
+            TRCOD: "D",                                       // D: 삭제
+            OBJTYPE: _isFolder(oNode) ? "FOLDER" : "FILE",    // 폴더/파일
+            FLDNM: oNode.NTEXT,                               // 이름
+            FLDPATH: oNode.URL,                               // 경로
+            DESC: oNode.MDESC,                                // 설명
+            DEVPKG: oApp.PACKG,                               // 개발 패키지
+            REQNO: (sReqNo == null) ? (oApp.REQNO || "") : sReqNo  // Request/Task(CTS 선택 후 재시도 시 그 TR)
+        };
+
+        // 삭제도 운송요청(CTS) 선행검사를 거친다(서버 SET_MIME_CRUD: C/D 분기 前 공통 CTS 체크).
+        //   → 운송요청 필요(E205/E073/E162/E305 + lf_createMimeCts) 시 공통 CTS 팝업 후 그 TR 로 재삭제.
+        function lf_delCts() {
+            try {
+                oAPP.fn.fnCtsPopupOpener(function (oRes) {
+                    if (oRes && oRes.TRKORR) { _doDeleteObject(oNode, oRes.TRKORR); }
+                });
+            } catch (e) { console.error("[HTML5][MIME] CTS open(delete):", e); }
+        }
+
+        lf_busy(true);
+        var sPath = oAPP.fn.getServerPath() + "/set_mime_crud",
+            oFormData = new FormData();
+        oFormData.append("MIMEINFO", JSON.stringify(oDel));
+
+        sendAjax(sPath, oFormData, function (oResult) {
+            lf_busy(false);
+            if (!oResult || oResult.RETCD === "E") {
+                try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
+                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+                oAPP.fn.fnRenderServerError(oResult, { onCts: lf_delCts });
+                return;
+            }
+            lf_removeNodeFromTree(oNode);
+        }, null, null, "POST", function () {
+            lf_busy(false);
+            try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
+            try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+            oAPP.fn.fnRenderServerError(null, {});
+        });
+    }
+
+    // 삭제 성공 → aTreeRoots 에서 해당 노드를 부모 배열에서 제거 + 선택/속성 초기화(원본 fnMimeDeleteSuccess).
+    function lf_removeNodeFromTree(oNode) {
+        var sKey = _key(oNode);
+        (function rec(aNodes) {
+            if (!Array.isArray(aNodes)) { return false; }
+            for (var i = 0; i < aNodes.length; i++) {
+                if (aNodes[i] === oNode || _key(aNodes[i]) === sKey) { aNodes.splice(i, 1); return true; }
+                if (rec(aNodes[i].MIMETREE)) { return true; }
+            }
+            return false;
+        })(aTreeRoots);
+
+        oState.oSel = null;
+        oState.selKey = "";
+        lf_setProps({});
+        lf_showPreview("none");
+        oUI.tree.render();
+    }
+
+    /************************************************************************
+     * 마임 오브젝트 가져오기(K5) — 원본 fnMimeTreeAttachFiles + ev_attachMimeDlgSaveEvent 1:1.
+     *   파일 다중 첨부(파일명+설명) → multipart FormData(FILE×N: 3번째 인자 "name|desc", MIMEINFO {TRCOD:"C",OBJTYPE:"FILE",FLDPATH,DEVPKG,REQNO})
+     *   → POST /set_mime_crud → 반환 노드(들)을 부모 하위에 추가.
+     ************************************************************************/
+    var oImpUI = null;
+
+    function lf_openImport(oNode) {
+        if (!oNode) { return; }
+        lf_closeImport();
+        lf_buildImport(oNode);
+        try { oImpUI.dlg.showModal(); } catch (e) { console.error("[HTML5][MIME] import showModal:", e); }
+    }
+
+    function lf_closeImport() {
+        if (!oImpUI) { return; }
+        try { if (oImpUI.dlg.open) { oImpUI.dlg.close(); } } catch (e) { }
+        try { oImpUI.dlg.remove(); } catch (e) { }
+        oImpUI = null;
+    }
+
+    function lf_buildImport(oNode) {
+
+        var oDlg = document.createElement("dialog");
+        oDlg.className = "u4a-dialog u4aMimeImpDlg";
+
+        // 헤더 — attachment 아이콘 + "[U4A] MIME File Attach"(C33) + 닫기 X.
+        var oHeader = _el("div", "u4a-dialog__header");
+        oHeader.innerHTML = _fa("paperclip") + "<span></span>";
+        oHeader.querySelector("span").textContent = "[U4A] " + _txt("/U4A/CL_WS_COMMON", "C33");
+        var oX = _el("button", "u4a-btn-icon");
+        oX.type = "button"; oX.innerHTML = _fa("xmark");
+        oX.title = _txt("/U4A/CL_WS_COMMON", "A39");
+        oX.addEventListener("click", lf_closeImport);
+        oHeader.appendChild(oX);
+        oDlg.appendChild(oHeader);
+
+        // 바디 — 파일 선택 버튼 + 첨부 파일 목록(파일명/설명/제거).
+        var oBody = _el("div", "u4a-dialog__body u4aMimeImpBody");
+
+        var oBar = _el("div", "u4aMimeImpBar");
+        var oPick = _el("button", "u4a-btn u4a-btn--emphasized u4aMimeImpPick");
+        oPick.type = "button";
+        oPick.innerHTML = _fa("folder-open") + "<span></span>";
+        oPick.querySelector("span").textContent = _wsTxt("518"); // 파일 선택(File Selection)
+        var oFileInput = document.createElement("input");
+        oFileInput.type = "file"; oFileInput.multiple = true; oFileInput.style.display = "none";
+        oFileInput.addEventListener("change", function () {
+            var fs = oFileInput.files;
+            for (var i = 0; i < fs.length; i++) { oImpUI.files.push({ file: fs[i], desc: "" }); }
+            oFileInput.value = "";
+            lf_renderImpList();
+        });
+        oPick.addEventListener("click", function () { oFileInput.click(); });
+        oBar.appendChild(oPick);
+        oBar.appendChild(oFileInput);
+        oBody.appendChild(oBar);
+
+        // 목록 테이블(공통 .u4a-table) — 파일명(C35) / 설명(A35) / 제거.
+        var oTbWrap = _el("div", "u4a-table-wrap u4a-table-wrap--boxed u4aMimeImpTbWrap");
+        var oTb = _el("table", "u4a-table u4aMimeImpTb");
+        var oThead = _el("thead");
+        var oHr = _el("tr");
+        oHr.appendChild(_el("th", null, _txt("/U4A/CL_WS_COMMON", "C35"))); // File Name
+        oHr.appendChild(_el("th", null, _txt("/U4A/CL_WS_COMMON", "A35"))); // Description
+        oHr.appendChild(_el("th", "u4aMimeImpDelCol", ""));
+        oThead.appendChild(oHr);
+        oTb.appendChild(oThead);
+        var oTbody = _el("tbody");
+        oTb.appendChild(oTbody);
+        oTbWrap.appendChild(oTb);
+        oBody.appendChild(oTbWrap);
+
+        var oEmpty = _el("div", "u4aMimeImpEmpty");
+        oEmpty.textContent = _txt("/U4A/MSG_WS", "268"); // Selected line does not exists.(빈 목록 안내 재사용)
+        oBody.appendChild(oEmpty);
+
+        oDlg.appendChild(oBody);
+
+        // 푸터 — Save(A64) / Cancel(A41) (원본 text+icon).
+        var oFoot = _el("div", "u4a-dialog__footer");
+        var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized");
+        oSaveBtn.type = "button";
+        oSaveBtn.innerHTML = _fa("check") + "<span></span>";
+        oSaveBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A64"); // Save
+        oSaveBtn.addEventListener("click", lf_confirmImport);
+        var oCancelBtn = _el("button", "u4a-btn u4a-btn--negative");
+        oCancelBtn.type = "button";
+        oCancelBtn.innerHTML = _fa("xmark") + "<span></span>";
+        oCancelBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A41"); // Cancel
+        oCancelBtn.addEventListener("click", lf_closeImport);
+        oFoot.appendChild(oSaveBtn);
+        oFoot.appendChild(oCancelBtn);
+        oDlg.appendChild(oFoot);
+
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_closeImport(); });
+        if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
+        if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 420, minH: 300 }); }
+
+        document.body.appendChild(oDlg);
+
+        oImpUI = { dlg: oDlg, tbody: oTbody, empty: oEmpty, saveBtn: oSaveBtn, target: oNode, files: [] };
+        lf_renderImpList();
+    }
+
+    function lf_renderImpList() {
+        if (!oImpUI) { return; }
+        var oTbody = oImpUI.tbody;
+        oTbody.innerHTML = "";
+        oImpUI.empty.hidden = oImpUI.files.length > 0;
+        oImpUI.files.forEach(function (oF, iIdx) {
+            var oTr = _el("tr");
+            if (iIdx % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
+            var oTdName = _el("td", null, oF.file.name);
+            oTdName.title = oF.file.name;
+            var oTdDesc = _el("td");
+            var oDescInput = U4AUI.createField({ type: "text", value: oF.desc || "", className: "u4aMimeImpDesc" });
+            oDescInput.input.addEventListener("input", function () { oF.desc = oDescInput.getValue(); });
+            oTdDesc.appendChild(oDescInput.el);
+            var oTdDel = _el("td", "u4aMimeImpDelCol");
+            var oDel = _el("button", "u4a-btn-icon");
+            oDel.type = "button"; oDel.innerHTML = _fa("trash"); oDel.title = _txt("/U4A/CL_WS_COMMON", "C30"); // Delete
+            oDel.addEventListener("click", function () { oImpUI.files.splice(iIdx, 1); lf_renderImpList(); });
+            oTdDel.appendChild(oDel);
+            oTr.appendChild(oTdName); oTr.appendChild(oTdDesc); oTr.appendChild(oTdDel);
+            oTbody.appendChild(oTr);
+        });
+    }
+
+    function lf_confirmImport() {
+        if (!oImpUI || !oImpUI.target) { return; }
+        if (!oImpUI.files.length) { return; }   // 첨부 없으면 무시(원본 동일)
+
+        var oNode = oImpUI.target;
+        var oApp = _appInfo();
+
+        function _doImport(sReqNo) {
+            var oCrInfo = {
+                TRCOD: "C",                 // C: 생성
+                OBJTYPE: "FILE",            // 파일
+                FLDPATH: oNode.URL,         // 부모 폴더 경로
+                DEVPKG: oApp.PACKG,
+                REQNO: (sReqNo == null) ? (oApp.REQNO || "") : sReqNo
+            };
+
+            lf_busy(true);
+            if (oImpUI.saveBtn) { oImpUI.saveBtn.disabled = true; }
+
+            var sPath = oAPP.fn.getServerPath() + "/set_mime_crud",
+                oFormData = new FormData();
+            // 파일별: 3번째 인자(filename)에 "name|desc" 인코딩(원본 동일).
+            oImpUI.files.forEach(function (oF) {
+                oFormData.append("FILE", oF.file, oF.file.name + "|" + (oF.desc || ""));
+            });
+            oFormData.append("MIMEINFO", JSON.stringify(oCrInfo));
+
+            sendAjax(sPath, oFormData, lf_impSuccess, null, null, "POST", lf_impError);
+        }
+
+        function lf_createMimeCts() {
+            try {
+                oAPP.fn.fnCtsPopupOpener(function (oResult) {
+                    if (oResult && oResult.TRKORR) { _doImport(oResult.TRKORR); }
+                });
+            } catch (e) { console.error("[HTML5][MIME] CTS open:", e); }
+        }
+
+        function lf_impSuccess(oResult) {
+            lf_busy(false);
+            if (oImpUI && oImpUI.saveBtn) { oImpUI.saveBtn.disabled = false; }
+            if (!oResult || oResult.RETCD === "E") {
+                try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
+                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+                oAPP.fn.fnRenderServerError(oResult, { onCts: function () { lf_createMimeCts(); } });
+                return;
+            }
+
+            // ★ 부분 성공 감지 — 서버는 PUT 실패 파일을 RETCD=S 인 채 조용히 skip(MIMETREE 에서 누락).
+            //   보낸 파일명 중 서버 반환(MIMETREE)에 없는 것 = 등록 실패 → 사용자에게 알림(빈 파일/권한 등).
+            var aRet = Array.isArray(oResult.MIMETREE) ? oResult.MIMETREE : (oResult.MIMETREE ? [oResult.MIMETREE] : []);
+            var aSent = (oImpUI && oImpUI.files) ? oImpUI.files.map(function (f) { return f.file.name; }) : [];
+            function _present(sName) {
+                return aRet.some(function (n) {
+                    if (!n) { return false; }
+                    if (n.NTEXT === sName) { return true; }
+                    var u = String(n.URL || "");
+                    return u === sName || u.slice(-(sName.length + 1)) === ("/" + sName);
+                });
+            }
+            var aFailed = aSent.filter(function (s) { return !_present(s); });
+
+            lf_insertCreatedFolder(oNode, oResult.MIMETREE);   // 반환(성공) 파일 노드(배열) 부모에 추가
+            lf_closeImport();
+
+            // 일부 등록 실패 시 — 키(323 "처리 실패") + 실패 파일명(데이터)을 줄바꿈으로.
+            if (aFailed.length) {
+                try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
+                oAPP.fn.showMessage(null, 20, "W", _txt("/U4A/MSG_WS", "323") + "\n\n" + aFailed.join("\n"));
+            }
+        }
+
+        function lf_impError() {
+            lf_busy(false);
+            if (oImpUI && oImpUI.saveBtn) { oImpUI.saveBtn.disabled = false; }
+            try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
+            try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+            oAPP.fn.fnRenderServerError(null, {});
+        }
+
+        _doImport();
     }
 
     /************************************************************************

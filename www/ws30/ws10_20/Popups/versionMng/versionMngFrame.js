@@ -19,8 +19,9 @@
  *   · 새창보기: TAPPID/TCLSID 있는(=과거) 버전만 → 확인 → /create_temp_ver_app → IPC
  *               ${BROWSKEY}-if-version-management-new-window { TAPPID } → opener 가 WS20 새창(MOVE20).
  *   · 메시지: 전부 ZMSG_WS_COMMON_001 키(원본 control.js getWsMsgClsTxt 동일 번호) — 임의 생성 없음.
- *  ★ UI5 의존부 치환: sap.ui.table.Table→공통 .u4a-table, Vertical Splitter→공통 .u4a-splitter(세로),
- *     ObjectStatus→.u4a-status, MessageBox→공통 U4AUI.confirm, MessageToast→공통 .u4a-toast,
+ *  ★ UI5 의존부 치환: sap.ui.table.Table→공통 .u4a-table(박스형 그리드, App Search 2탭 톤),
+ *     Vertical Splitter→공통 .u4a-splitter(세로), ObjectStatus 아이콘→FA(현재=녹색 사각형/과거=주황 삼각형),
+ *     MessageBox→공통 U4AUI.confirm, MessageToast→공통 .u4a-toast,
  *     ResponsivePopover(legend)→경량 팝오버, sap.applyTheme→U4ATheme.apply(라이브 추종).
  *
  *  ※ var 선언이어야 호스트 iframe 에서 parent.PATH/APPPATH 접근 가능(에디터 호스트 시리즈와 동일).
@@ -60,11 +61,12 @@ var oState = {
     oAppInfo: null,    // 편집 중 앱 정보 { APPID, ... }
     aVerList: [],      // 버전 목록(T_APP_VER_LIST 정규화)
     hostReady: false,  // diff 호스트 로드 완료 여부
-    diffOpen: false    // 비교 패널 표시 여부
+    diffOpen: false,   // 비교 패널 표시 여부
+    diffFull: false    // 비교 패널 전체창 여부
 };
 
 var oFrame = null, bBusy = false, oToastTimer = null, bOpenDone = false;
-var oBroad = null, fnHostReadyWait = null;
+var oBroad = null, fnHostReadyWait = null, iOpenWatch = null;
 
 /* ── 메시지 헬퍼 ──────────────────────────────────────────────────────── */
 // ZMSG_WS_COMMON_001 — 원본 control.js 와 동일 번호(getWsMsgClsTxt). UI 텍스트는 키만(임의 생성 금지).
@@ -109,14 +111,29 @@ function _toHost(oMsg) {
     } catch (e) { }
 }
 
-/* ── Busy(오버레이 + 닫기 차단 + 자식창 브로드캐스트) ───────────────────── */
+/* ── Busy(★공통 .u4a-busy★ + 닫기 차단 + 자식창 브로드캐스트) ─────────────
+   ServerList setBusyIndicator 와 동일: data-busy 토글 + 안내문구는 .u4a-busy__label
+   (없으면 생성, 비면 :empty 로 자동 숨김 — 구 BusyDialog DESC). */
 function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
-    var oEl = document.getElementById("vmBusy");
-    var oTxt = document.getElementById("vmBusyText");
-    if (oTxt) { oTxt.textContent = (bOn && oOpt && oOpt.DESC) ? oOpt.DESC : ""; }
-    if (oEl) { oEl.hidden = !bBusy; }
-    try { CURRWIN.closable = !bBusy; } catch (e) { }
+    var oDom = document.getElementById("vmBusy");
+    if (oDom) {
+        oDom.dataset.busy = bBusy ? "true" : "false";
+        var oCard = oDom.querySelector(".u4a-busy__card");
+        if (oCard) {
+            var oLabel = oCard.querySelector(".u4a-busy__label");
+            if (!oLabel) {
+                oLabel = document.createElement("div");
+                oLabel.className = "u4a-busy__label";
+                oCard.appendChild(oLabel);
+            }
+            oLabel.textContent = (bBusy && oOpt && oOpt.DESC) ? oOpt.DESC : "";
+        }
+    }
+    // busy 동안 입력 차단(공통 패턴) — 오버레이가 data-busy 시 pointer-events:auto 라 카드는 살아있음.
+    document.body.style.pointerEvents = bBusy ? "none" : "";
+    // ★ 창은 항상 closable:false 유지(Alt+F4·OS X 차단) — 닫기는 _closeWindow 가 setClosable(true) 후에만.
+    //   (MIME/다른 별도창과 동일 패턴. busy 중엔 _onCloseBtn 의 busy 체크가, 평상시엔 OS closable=false 가 막는다.)
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
         try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
     }
@@ -126,10 +143,28 @@ function _setBusy(bOn, oOpt) {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
+    try { clearTimeout(iOpenWatch); } catch (e) { } iOpenWatch = null;
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { }
     _setBusy(false);
     var oC = document.getElementById("vmContent");
     if (oC) { oC.classList.add("u4aVmShown"); }
+}
+
+/* ── 창 닫기 — 항상 closable:false 로 열렸으니 풀고 닫는다. 공통 SSOT U4AUI.closeWindow 위임. ── */
+function _closeWindow() {
+    if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); return; }
+    try {
+        if (!CURRWIN.isDestroyed()) {
+            CURRWIN.setClosable(true);
+            CURRWIN.close();
+        }
+    } catch (e) { /* 이미 파괴된 창 무시 */ }
+}
+
+/* X 버튼 클릭 — busy 중이면 무시(닫기 차단), 아니면 닫는다. */
+function _onCloseBtn() {
+    if (bBusy) { return; }
+    _closeWindow();
 }
 
 /* ── 토스트(공통 .u4a-toast — 화면 정중앙. shell.css 단일 출처) ──────────── */
@@ -158,11 +193,11 @@ function _fatal(sType, sMsg) {
         U4AUI.confirm({
             type: sType || "E", title: sTitle, message: sMsg || "",
             buttons: [{ act: "OK", label: sOk, emphasized: true }],
-            onClose: function () { try { CURRWIN.close(); } catch (e) { } }
+            onClose: function () { _closeWindow(); }
         });
     } else {
         try { window.alert(sMsg || ""); } catch (e) { }
-        try { CURRWIN.close(); } catch (e) { }
+        _closeWindow();
     }
 }
 
@@ -249,145 +284,291 @@ function _loadVersionList() {
     });
 }
 
-/* ── 버전 목록 테이블 렌더(공통 .u4a-table) ──────────────────────────────── */
-function _renderTable() {
-    var oWrapHost = document.getElementById("vmTableWrap");
-    if (!oWrapHost) { return; }
-    oWrapHost.innerHTML = "";
+/* ════════════════════════════════════════════════════════════════════════
+   버전 목록 테이블 — sap.ui.table.Table 고정컬럼 재현(2-pane).
+   · 넓을 때(고정모드): [고정 테이블(상태·App ID·App Ver·Compare) | 스크롤 테이블(나머지)]
+     → 가로 스크롤바가 **스크롤 영역에만**, 세로 스크롤/휠/hover/필러/라디오선택 동기화.
+   · 창이 고정폭보다 좁을 때(평면모드): 고정 풀고 전체 컬럼을 한 컨테이너에서 가로 스크롤.
+   공통 .u4a-table(헤더/zebra/no-data) 소비 + 화면 전용 .u4aVm* 골격만 덧댐(공통 미수정).
+   ════════════════════════════════════════════════════════════════════════ */
 
-    // 컬럼 헤더(원본 Label — 메시지 키).
-    var aCol = [
-        { cls: "u4a-c-vmstatus", txt: _z("380") }, // 상태
-        { cls: "u4a-c-vmappid", txt: _z("381") },  // 어플리케이션 ID
-        { cls: "u4a-c-vmver", txt: _z("383") },    // App Version
-        { cls: "u4a-c-vmcmp", txt: _z("382") },    // Compare (Base/Target)
-        { cls: "u4a-c-vmreqno", txt: _z("384") },  // Request No.
-        { cls: "u4a-c-vmreqtx", txt: _z("385") },  // Request Desc.
-        { cls: "u4a-c-vmpkg", txt: _z("386") },    // Package
-        { cls: "u4a-c-vmdate", txt: _z("387") },   // Create Date
-        { cls: "u4a-c-vmtime", txt: _z("388") },   // Create Time
-        { cls: "u4a-c-vmusr", txt: _z("389") }     // Create User
+var C_FROZEN_REM = 41;     // 고정 컬럼 폭 합(상태5+App ID16+App Ver6+Compare14)
+var C_MIN_SCROLL = 120;    // 고정 유지에 필요한 최소 스크롤 영역(px)
+
+function _ce(sTag, sCls) { var o = document.createElement(sTag); if (sCls) { o.className = sCls; } return o; }
+function _remPx() { try { return parseFloat(getComputedStyle(document.documentElement).fontSize) || 16; } catch (e) { return 16; } }
+function _frozenPx() { return C_FROZEN_REM * _remPx(); }
+
+// 컬럼 정의(헤더 라벨=메시지 키). frozen=true 4개가 고정 테이블, 나머지가 스크롤 테이블.
+function _colDefs() {
+    return [
+        { key: "status", cls: "u4a-c-vmstatus", label: _z("380"), frozen: true },   // 상태
+        { key: "appid", cls: "u4a-c-vmappid", label: _z("381"), frozen: true },     // 어플리케이션 ID
+        { key: "ver", cls: "u4a-c-vmver", label: _z("383"), frozen: true },         // App Version
+        { key: "cmp", cls: "u4a-c-vmcmp", label: _z("382"), frozen: true },         // Compare(Base/Target)
+        { key: "reqno", cls: "u4a-c-vmreqno", label: _z("384"), frozen: false },    // Request No.
+        { key: "reqtx", cls: "u4a-c-vmreqtx", label: _z("385"), frozen: false },    // Request Desc.
+        { key: "pkg", cls: "u4a-c-vmpkg", label: _z("386"), frozen: false },        // Package
+        { key: "date", cls: "u4a-c-vmdate", label: _z("387"), frozen: false },      // Create Date
+        { key: "time", cls: "u4a-c-vmtime", label: _z("388"), frozen: false },      // Create Time
+        { key: "usr", cls: "u4a-c-vmusr", label: _z("389"), frozen: false }         // Create User
     ];
+}
 
-    var oWrap = document.createElement("div");
-    oWrap.className = "u4a-table-wrap";
+// 셀 1개 생성(컬럼 key 별) — 원본 동작 1:1.
+function _buildCell(oCol, oRow) {
+    var oTd = _ce("td", oCol.cls);
+    switch (oCol.key) {
+        case "status": {
+            // 현재(VPOSN 0)=녹색 사각형(color-fill), 과거=주황 삼각형(triangle).
+            var oIc = _ce("i", oRow.isCurrent
+                ? "fa-solid fa-square u4aVmStatusIcon u4aVmStatusIcon--ok"
+                : "fa-solid fa-triangle-exclamation u4aVmStatusIcon u4aVmStatusIcon--old");
+            oIc.setAttribute("aria-hidden", "true");
+            oTd.appendChild(oIc);
+            break;
+        }
+        case "appid": {
+            var oBox = _ce("span", "u4aVmAppId");
+            var oTxt = _ce("span", "u4aVmAppIdTxt");
+            oTxt.textContent = oRow.APPID; oTxt.title = oRow.APPID;
+            var oOpen = _ce("button", "u4a-btn u4aVmOpenBtn");
+            oOpen.type = "button";
+            oOpen.innerHTML = '<i class="fa-solid fa-up-right-from-square"></i>';
+            oOpen.title = _z("407");   // 새창으로 보기
+            // 활성 규칙(원본 formatter): TAPPID/TCLSID/VPOSN 모두 비어있으면 비활성.
+            oOpen.disabled = (oRow.TAPPID === "" && oRow.TCLSID === "" && (oRow.VPOSN === 0 || oRow.VPOSN === "0"));
+            oOpen.addEventListener("click", function () { _onOpenNewWindow(oRow); });
+            oBox.appendChild(oTxt); oBox.appendChild(oOpen);
+            oTd.appendChild(oBox);
+            break;
+        }
+        case "ver":
+            oTd.textContent = oRow.VPOSN;
+            break;
+        case "cmp": {
+            // 기준/대상 라디오 — name 공유로 전 행 중 1개만(원본 groupName g1/g2).
+            var oC = _ce("span", "u4aVmCmpCell");
+            var oLb = _ce("label", "u4aVmRadio");
+            var oRb = _ce("input"); oRb.type = "radio"; oRb.name = "vmBase"; oRb.value = String(oRow._idx);
+            var oSb = _ce("span"); oSb.textContent = _z("394");   // 비교 기준
+            oLb.appendChild(oRb); oLb.appendChild(oSb);
+            var oLt = _ce("label", "u4aVmRadio");
+            var oRt = _ce("input"); oRt.type = "radio"; oRt.name = "vmTarget"; oRt.value = String(oRow._idx);
+            var oSt = _ce("span"); oSt.textContent = _z("395");   // 비교 대상
+            oLt.appendChild(oRt); oLt.appendChild(oSt);
+            oC.appendChild(oLb); oC.appendChild(oLt);
+            oTd.appendChild(oC);
+            break;
+        }
+        case "reqno": oTd.textContent = oRow.CTSNO || ""; if (oRow.CTSNO) { oTd.title = oRow.CTSNO; } break;
+        case "reqtx": oTd.textContent = oRow.CTSTX || ""; if (oRow.CTSTX) { oTd.title = oRow.CTSTX; } break;
+        case "pkg": oTd.textContent = oRow.PACKG || ""; break;
+        case "date": oTd.textContent = _fmtDate(oRow.ERDAT); if (oRow.ERDAT) { oTd.title = oRow.ERDAT; } break;
+        case "time": oTd.textContent = _fmtTime(oRow.ERTIM); if (oRow.ERTIM) { oTd.title = oRow.ERTIM; } break;
+        case "usr": oTd.textContent = oRow.ERUSR || ""; break;
+        default: break;
+    }
+    return oTd;
+}
 
-    var oTable = document.createElement("table");
-    oTable.className = "u4a-table u4aVmTbl";
-
-    var oThead = document.createElement("thead");
-    var oTrH = document.createElement("tr");
-    aCol.forEach(function (c) {
-        var oTh = document.createElement("th");
-        oTh.className = c.cls;
-        oTh.textContent = c.txt;
+// 테이블 1개(헤더 + 데이터 행) 생성. 반환 {table, thead, tbody}.
+function _buildOneTable(aCols, sModCls) {
+    var oTable = _ce("table", "u4a-table u4aVmTbl " + sModCls);
+    var oThead = _ce("thead");
+    var oTrH = _ce("tr");
+    aCols.forEach(function (c) {
+        var oTh = _ce("th", c.cls);
+        oTh.textContent = c.label;
         oTrH.appendChild(oTh);
     });
-    oThead.appendChild(oTrH);
-    oTable.appendChild(oThead);
+    oThead.appendChild(oTrH); oTable.appendChild(oThead);
 
-    var oTbody = document.createElement("tbody");
-
-    if (!oState.aVerList.length) {
-        var oTrE = document.createElement("tr");
-        var oTdE = document.createElement("td");
-        oTdE.className = "u4a-table__nodata";
-        oTdE.colSpan = aCol.length;
-        oTdE.textContent = _z("946");   // 데이터 없음(공통 .u4a-table__nodata — ServerList noData=946 동일)
-        oTrE.appendChild(oTdE);
-        oTbody.appendChild(oTrE);
-    }
-
+    var oTbody = _ce("tbody");
     oState.aVerList.forEach(function (oRow, idx) {
-
-        var oTr = document.createElement("tr");
+        oRow._idx = idx;
+        var oTr = _ce("tr");
         oTr.dataset.odd = (idx % 2 === 1) ? "true" : "false";
-
-        // 1) 상태 — 공통 .u4a-status 색 점(현재=success, 그외=warning).
-        var oTdSt = document.createElement("td");
-        oTdSt.className = "u4a-c-vmstatus";
-        var oSt = document.createElement("span");
-        oSt.className = "u4a-status u4aVmStatus" + (oRow.isCurrent ? " u4a-status--success" : " u4aVmStatus--warning");
-        oTdSt.appendChild(oSt);
-        oTr.appendChild(oTdSt);
-
-        // 2) App ID + 새창으로 보기 버튼(원본 HBox: Title + action).
-        var oTdId = document.createElement("td");
-        oTdId.className = "u4a-c-vmappid";
-        var oIdBox = document.createElement("span");
-        oIdBox.className = "u4aVmAppId";
-        var oIdTxt = document.createElement("span");
-        oIdTxt.className = "u4aVmAppIdTxt";
-        oIdTxt.textContent = oRow.APPID;
-        oIdTxt.title = oRow.APPID;
-        var oOpen = document.createElement("button");
-        oOpen.type = "button";
-        oOpen.className = "u4a-btn u4aVmOpenBtn";
-        oOpen.innerHTML = '<i class="fa-solid fa-up-right-from-square"></i>';
-        oOpen.title = _z("407");   // 새창으로 보기
-        // 활성 규칙(원본 formatter): TAPPID/TCLSID/VPOSN 모두 비어있으면 비활성.
-        var bEnable = !(oRow.TAPPID === "" && oRow.TCLSID === "" && (oRow.VPOSN === 0 || oRow.VPOSN === "0"));
-        oOpen.disabled = !bEnable;
-        oOpen.addEventListener("click", function () { _onOpenNewWindow(oRow); });
-        oIdBox.appendChild(oIdTxt);
-        oIdBox.appendChild(oOpen);
-        oTdId.appendChild(oIdBox);
-        oTr.appendChild(oTdId);
-
-        // 3) App Version
-        var oTdVer = document.createElement("td");
-        oTdVer.className = "u4a-c-vmver";
-        oTdVer.textContent = oRow.VPOSN;
-        oTr.appendChild(oTdVer);
-
-        // 4) Compare(기준/대상 라디오) — name 공유로 전 행 중 1개만 선택(원본 groupName g1/g2).
-        var oTdCmp = document.createElement("td");
-        oTdCmp.className = "u4a-c-vmcmp";
-        var oCmpBox = document.createElement("span");
-        oCmpBox.className = "u4aVmCmpCell";
-
-        var oLblB = document.createElement("label");
-        oLblB.className = "u4aVmRadio";
-        var oRdB = document.createElement("input");
-        oRdB.type = "radio"; oRdB.name = "vmBase"; oRdB.value = String(idx);
-        var oSpB = document.createElement("span"); oSpB.textContent = _z("394");   // 비교 기준
-        oLblB.appendChild(oRdB); oLblB.appendChild(oSpB);
-
-        var oLblT = document.createElement("label");
-        oLblT.className = "u4aVmRadio";
-        var oRdT = document.createElement("input");
-        oRdT.type = "radio"; oRdT.name = "vmTarget"; oRdT.value = String(idx);
-        var oSpT = document.createElement("span"); oSpT.textContent = _z("395");   // 비교 대상
-        oLblT.appendChild(oRdT); oLblT.appendChild(oSpT);
-
-        oCmpBox.appendChild(oLblB);
-        oCmpBox.appendChild(oLblT);
-        oTdCmp.appendChild(oCmpBox);
-        oTr.appendChild(oTdCmp);
-
-        // 5~10) Request No / Request Desc / Package / Date / Time / User
-        var aCells = [
-            { cls: "u4a-c-vmreqno", txt: oRow.CTSNO, tip: oRow.CTSNO },
-            { cls: "u4a-c-vmreqtx", txt: oRow.CTSTX, tip: oRow.CTSTX },
-            { cls: "u4a-c-vmpkg", txt: oRow.PACKG },
-            { cls: "u4a-c-vmdate", txt: _fmtDate(oRow.ERDAT), tip: oRow.ERDAT },
-            { cls: "u4a-c-vmtime", txt: _fmtTime(oRow.ERTIM), tip: oRow.ERTIM },
-            { cls: "u4a-c-vmusr", txt: oRow.ERUSR }
-        ];
-        aCells.forEach(function (c) {
-            var oTd = document.createElement("td");
-            oTd.className = c.cls;
-            oTd.textContent = (c.txt == null) ? "" : c.txt;
-            if (c.tip) { oTd.title = c.tip; }
-            oTr.appendChild(oTd);
-        });
-
+        oTr.dataset.rowIdx = String(idx);
+        aCols.forEach(function (c) { oTr.appendChild(_buildCell(c, oRow)); });
         oTbody.appendChild(oTr);
     });
-
     oTable.appendChild(oTbody);
-    oWrap.appendChild(oTable);
-    oWrapHost.appendChild(oWrap);
+    return { table: oTable, thead: oThead, tbody: oTbody };
+}
+
+// 라디오 선택 상태 캡처/복원(모드 전환 재빌드 시 유지).
+function _captureSel() {
+    var b = document.querySelector('input[name="vmBase"]:checked');
+    var t = document.querySelector('input[name="vmTarget"]:checked');
+    return { base: b ? b.value : null, target: t ? t.value : null };
+}
+function _restoreSel(oSel) {
+    if (!oSel) { return; }
+    if (oSel.base != null) { var b = document.querySelector('input[name="vmBase"][value="' + oSel.base + '"]'); if (b) { b.checked = true; } }
+    if (oSel.target != null) { var t = document.querySelector('input[name="vmTarget"][value="' + oSel.target + '"]'); if (t) { t.checked = true; } }
+}
+
+// 행 hover 동기화(고정/스크롤 같은 행 동시 강조).
+function _wireHoverSync(oFb, oSb) {
+    function set(sIdx, bOn) {
+        [oFb, oSb].forEach(function (tb) {
+            if (!tb) { return; }
+            var tr = tb.querySelector('tr[data-row-idx="' + sIdx + '"]');
+            if (tr) { tr.classList.toggle("is-hover", bOn); }
+        });
+    }
+    [oFb, oSb].forEach(function (tb) {
+        if (!tb) { return; }
+        tb.addEventListener("mouseover", function (e) { var tr = e.target.closest && e.target.closest("tr[data-row-idx]"); if (tr) { set(tr.dataset.rowIdx, true); } });
+        tb.addEventListener("mouseout", function (e) { var tr = e.target.closest && e.target.closest("tr[data-row-idx]"); if (tr) { set(tr.dataset.rowIdx, false); } });
+    });
+}
+
+// 고정 유지 여부(히스테리시스 — 경계 깜빡임 방지).
+function _wantFrozen(iW) {
+    var fp = _frozenPx();
+    if (oState.tableMode === "frozen") { return iW >= fp + 60; }   // 고정 중엔 조금 좁아져도 유지
+    return iW >= fp + C_MIN_SCROLL;                                 // 평면 중엔 충분히 넓어야 고정
+}
+
+/* ── 테이블 렌더(진입) — 박스 영역(persistent) 확보 후 빌드. ── */
+function _renderTable() {
+    var oHost = document.getElementById("vmTableWrap");
+    if (!oHost) { return; }
+    var oArea = oHost.querySelector(".u4aVmArea");
+    if (!oArea) {
+        oHost.innerHTML = "";
+        oArea = _ce("div", "u4aVmArea");
+        oHost.appendChild(oArea);
+    }
+    oState.tableMode = null;   // 강제 빌드
+    _buildTable(oArea);
+}
+
+/* ── 모드 판정 + DOM 빌드(고정 2-pane / 평면 단일). ── */
+function _buildTable(oArea) {
+    var iW = oArea.clientWidth;
+    var bFrozen = oState.aVerList.length ? _wantFrozen(iW) : false;
+
+    var oSel = _captureSel();     // 재빌드 전 선택 유지
+    oArea.innerHTML = "";
+    oState._panes = null;
+
+    // 데이터 없음 — 평면 단일 테이블 + 공통 no-data 행.
+    if (!oState.aVerList.length) {
+        oState.tableMode = "flat";
+        var oGridE = _ce("div", "u4aVmGrid"); oGridE.dataset.mode = "flat";
+        var oSPE = _ce("div", "u4aVmGrid__scroll");
+        var aAllE = _colDefs();
+        var oTblE = _ce("table", "u4a-table u4aVmTbl u4aVmTbl--flat");
+        var oThE = _ce("thead"); var oTrHE = _ce("tr");
+        aAllE.forEach(function (c) { var th = _ce("th", c.cls); th.textContent = c.label; oTrHE.appendChild(th); });
+        oThE.appendChild(oTrHE); oTblE.appendChild(oThE);
+        var oTbE = _ce("tbody"); var oTrE = _ce("tr");
+        var oTdE = _ce("td", "u4a-table__nodata"); oTdE.colSpan = aAllE.length; oTdE.textContent = _z("946");
+        oTrE.appendChild(oTdE); oTbE.appendChild(oTrE); oTblE.appendChild(oTbE);
+        oSPE.appendChild(oTblE); oGridE.appendChild(oSPE); oArea.appendChild(oGridE);
+        oState._panes = { scroll: oSPE, frozen: null, sbody: oTbE, fbody: null, shead: oThE, fhead: null };
+        return;
+    }
+
+    oState.tableMode = bFrozen ? "frozen" : "flat";
+    var aCols = _colDefs();
+    var oGrid = _ce("div", "u4aVmGrid"); oGrid.dataset.mode = oState.tableMode;
+
+    if (bFrozen) {
+        var oFP = _ce("div", "u4aVmGrid__frozen");
+        var oSP = _ce("div", "u4aVmGrid__scroll");
+        var oFt = _buildOneTable(aCols.filter(function (c) { return c.frozen; }), "u4aVmTbl--frozen");
+        var oSt = _buildOneTable(aCols.filter(function (c) { return !c.frozen; }), "u4aVmTbl--scroll");
+        oFP.appendChild(oFt.table); oSP.appendChild(oSt.table);
+        oGrid.appendChild(oFP); oGrid.appendChild(oSP);
+        oArea.appendChild(oGrid);
+
+        // 세로 스크롤 동기화: 스크롤 페인(세로바 보유) → 고정 페인(overflow:hidden, scrollTop 추종).
+        oSP.addEventListener("scroll", function () { oFP.scrollTop = oSP.scrollTop; });
+        // 고정 페인 위 휠 → 스크롤 페인으로 전달(고정 페인엔 세로바가 없으므로).
+        oFP.addEventListener("wheel", function (e) {
+            oSP.scrollTop += e.deltaY; oSP.scrollLeft += e.deltaX; e.preventDefault();
+        }, { passive: false });
+
+        _wireHoverSync(oFt.tbody, oSt.tbody);
+        oState._panes = { frozen: oFP, scroll: oSP, fbody: oFt.tbody, sbody: oSt.tbody, fhead: oFt.thead, shead: oSt.thead };
+    } else {
+        // 평면 — 전체 컬럼 한 테이블, 컨테이너 가로 스크롤(고정 해제).
+        var oSP2 = _ce("div", "u4aVmGrid__scroll");
+        var oAt = _buildOneTable(aCols, "u4aVmTbl--flat");
+        oSP2.appendChild(oAt.table);
+        oGrid.appendChild(oSP2);
+        oArea.appendChild(oGrid);
+        oState._panes = { frozen: null, scroll: oSP2, fbody: null, sbody: oAt.tbody, fhead: null, shead: oAt.thead };
+    }
+
+    _restoreSel(oSel);
+    _renderFillers();
+}
+
+/* ── 빈 행 채우기 — 데이터 아래 남는 공간을 빈 행(그리드 라인)으로(sap.ui.table 느낌).
+   양쪽 페인에 동일 개수. 스크롤 페인 clientHeight(가로바 제외) 기준 → 가로바 위까지만 채워 정렬. ── */
+function _renderFillers() {
+    var p = oState._panes;
+    if (!p || !p.scroll || !p.sbody) { return; }
+
+    // ★ 고정 페인 하단을 스크롤 페인의 가로 스크롤바 높이만큼 비운다 — 고정 페인엔 가로바가 없어
+    //   스크롤 페인보다 그만큼 더 길어, 같은 행이 스크롤 쪽에선 스크롤바에 가려(침범) 좌우가 어긋난다.
+    //   marginBottom 으로 고정 페인 가시영역=스크롤 페인 콘텐츠영역(가로바 위)으로 맞춘다.
+    if (p.frozen) {
+        var hsb = p.scroll.offsetHeight - p.scroll.clientHeight;   // 가로 스크롤바 높이(없으면 0, 페인 보더 없음)
+        p.frozen.style.marginBottom = (hsb > 0 ? hsb : 0) + "px";
+    }
+
+    if (!oState.aVerList.length) { return; }
+
+    var oFirst = p.sbody.querySelector("tr:not(.u4aVmFiller)");
+    var rowH = oFirst ? Math.round(oFirst.getBoundingClientRect().height) : 0;
+    if (!rowH) { rowH = 40; }
+
+    var headH = p.shead ? p.shead.getBoundingClientRect().height : 0;
+    var avail = p.scroll.clientHeight - headH;   // 가로 스크롤바 제외 높이
+    var dataH = oState.aVerList.length * rowH;
+    var n = Math.floor((avail - dataH) / rowH);
+    if (n > 200) { n = 200; }
+
+    _fillBody(p.sbody, n);
+    if (p.fbody) { _fillBody(p.fbody, n); }
+}
+
+function _fillBody(oTbody, n) {
+    var aOld = oTbody.querySelectorAll("tr.u4aVmFiller");
+    for (var i = 0; i < aOld.length; i++) { aOld[i].remove(); }
+    if (n <= 0) { return; }
+    var oThead = oTbody.parentNode.querySelector("thead");
+    var aTh = oThead ? oThead.querySelectorAll("th") : [];
+    var oFrag = document.createDocumentFragment();
+    for (var r = 0; r < n; r++) {
+        var oTr = _ce("tr", "u4aVmFiller");
+        oTr.setAttribute("aria-hidden", "true");
+        for (var ci = 0; ci < aTh.length; ci++) {
+            var oTd = _ce("td", aTh[ci].className);   // 동일 컬럼 클래스(폭)
+            oTr.appendChild(oTd);
+        }
+        oFrag.appendChild(oTr);
+    }
+    oTbody.appendChild(oFrag);
+}
+
+/* ── 테이블 영역 리사이즈 — 모드(고정/평면) 재평가. 바뀌면 재빌드, 아니면 필러만. ── */
+function _onAreaResize() {
+    var oArea = document.querySelector("#vmTableWrap .u4aVmArea");
+    if (!oArea) { return; }
+    if (!oState.aVerList.length) { return; }
+    var bWantFrozen = _wantFrozen(oArea.clientWidth);
+    if (bWantFrozen !== (oState.tableMode === "frozen")) {
+        _buildTable(oArea);   // 모드 전환 → 재빌드(선택/스크롤 유지)
+    } else {
+        _renderFillers();     // 높이 변화 → 필러만
+    }
 }
 
 /* ── 비교하기(원본 compareSelectedApp) ──────────────────────────────────── */
@@ -416,6 +597,11 @@ function _onCompare() {
     }
 
     _setBusy(true);
+
+    // 새 비교 시작 → 이전 diff 잔상 숨김(반투명 busy 너머로 옛 결과가 비치는 것 방지).
+    //   호스트(Monaco) 자체는 setCompareData 응답 시 갱신되며, 여기서는 표시 class 만 내린다.
+    var oPrevHW = document.getElementById("vmDiffHostWrap");
+    if (oPrevHW) { oPrevHW.classList.remove("u4aVmHostShown"); }
 
     // 비교 패널/바 표시(최초 1회 호스트 로드).
     _showDiffPane();
@@ -473,14 +659,37 @@ function _showDiffPane() {
 }
 
 function _hideDiffPane() {
+    // 전체창 상태였다면 먼저 해제(목록 다시 표시) — 안 그러면 닫은 뒤 목록이 숨은 채 빈 창.
+    if (oState.diffFull) { _setDiffFull(false); }
     var oBar = document.getElementById("vmSplitBar");
     var oPane = document.getElementById("vmDiffPane");
     var oList = document.getElementById("vmListPane");
     if (oBar) { oBar.hidden = true; }
     if (oPane) { oPane.hidden = true; }
-    if (oList) { oList.style.flex = "1 1 auto"; }    // 목록이 전체 차지(원본 removeContentArea + resetContentAreasSizes)
+    if (oList) { oList.hidden = false; oList.style.flex = "1 1 auto"; }    // 목록이 전체 차지(원본 removeContentArea + resetContentAreasSizes)
     oState.diffOpen = false;
     _closeLegend();
+}
+
+/* ── 전체창 토글 — 목록(테이블)+스플리터 바 숨겨 diff 가 창 전체 차지(USP 에디터 전체화면 패턴).
+   아이콘 expand↔compress, 툴팁 ZMSG_WS_COMMON_001 369/370(USP 동일 키), aria-pressed 동기. ── */
+function _setDiffFull(bFull) {
+    oState.diffFull = !!bFull;
+    var oList = document.getElementById("vmListPane");
+    var oBar = document.getElementById("vmSplitBar");
+    if (oList) { oList.hidden = bFull; }
+    if (oBar) { oBar.hidden = bFull; }   // 전체창=숨김 / 해제=다시 표시(diff 가 열려 있을 때만 호출됨)
+    var oBtn = document.getElementById("vmDiffFull");
+    if (oBtn) {
+        oBtn.setAttribute("aria-pressed", bFull ? "true" : "false");
+        oBtn.innerHTML = '<i class="fa-solid fa-' + (bFull ? "compress" : "expand") + '"></i>';
+        try { oBtn.title = bFull ? _z("370") : _z("369"); } catch (e) { }
+    }
+    _toHost({ cmd: "layout" });
+}
+
+function _toggleDiffFull() {
+    _setDiffFull(!oState.diffFull);
 }
 
 /* ── diff 호스트 로드 / ready 대기 ──────────────────────────────────────── */
@@ -709,7 +918,7 @@ function _initChrome() {
         });
     }
     var oClose = document.getElementById("vmWinClose");
-    if (oClose) { oClose.addEventListener("click", function () { try { CURRWIN.close(); } catch (e) { } }); }
+    if (oClose) { oClose.addEventListener("click", _onCloseBtn); }
 
     // 목록 헤더 — Compare 라벨/버튼.
     var oCmpTxt = document.getElementById("vmCompareTxt");
@@ -726,12 +935,26 @@ function _initChrome() {
     if (oLegTxt) { oLegTxt.textContent = _z("408"); }   // 범례
     var oLegBtn = document.getElementById("vmLegendBtn");
     if (oLegBtn) { oLegBtn.title = _z("408"); oLegBtn.addEventListener("click", function (e) { e.stopPropagation(); _toggleLegend(); }); }
+    var oFullBtn = document.getElementById("vmDiffFull");
+    if (oFullBtn) { oFullBtn.title = _z("369"); oFullBtn.addEventListener("click", _toggleDiffFull); }   // 전체창 토글
     var oDClose = document.getElementById("vmDiffClose");
     if (oDClose) { oDClose.addEventListener("click", _hideDiffPane); }
 
     // 세로 스플리터 바 드래그.
     var oBar = document.getElementById("vmSplitBar");
     if (oBar) { _bindSplitV(oBar); }
+
+    // 테이블 영역 크기 변화(창/스플리터/diff 패널 개폐) → 모드 재평가 + 빈 행 재계산(rAF 디바운스).
+    var oTW = document.getElementById("vmTableWrap");
+    if (oTW && typeof ResizeObserver !== "undefined") {
+        var iFillRaf = null;
+        try {
+            new ResizeObserver(function () {
+                if (iFillRaf) { return; }
+                iFillRaf = requestAnimationFrame(function () { iFillRaf = null; _onAreaResize(); });
+            }).observe(oTW);
+        } catch (e) { }
+    }
 
     // 범례 = 바깥 클릭/리사이즈 시 닫기·재배치(anchored-overlay 표준).
     document.addEventListener("mousedown", function (e) {
@@ -806,14 +1029,24 @@ window.addEventListener("load", function () {
     try { CURRWIN.show(); } catch (e) { }
 
     // ★ busy 는 여기서 끄지 않는다 ★ — opener 가 켠 WS20 busy 를 목록 렌더까지 유지(_finishOpen 1회).
+    // 단, if-vermng-info 가 끝내 도착하지 않으면(opener did-finish-load 누락 등) 본문이 영원히
+    // opacity 0 + busy 로 고착되므로 20초 안전장치(docPopup 동일 정책). 정상 수신 시 _finishOpen 이 해제.
+    iOpenWatch = setTimeout(function () {
+        if (bOpenDone) { return; }
+        console.error("[HTML5][versionMng] if-vermng-info 미수신 — 오픈 fallback 발동");
+        _fatal("E", _z("314") + "\n\n" + _z("290"));   // 알 수 없는 오류 + 안내 → OK 시 창 닫기
+    }, 20000);
 });
 
 /* ── 종료 정리(누수 방지) ───────────────────────────────────────────────── */
 window.onbeforeunload = function () {
-    if (bBusy) { return false; }
+    if (bBusy) { return false; }   // busy 중에는 언로드 취소 — 아래 정리는 실제 종료 확정 후에만 수행.
     window.removeEventListener("click", _keepSession);
     window.removeEventListener("keyup", _keepSession);
     window.removeEventListener("message", _onHostMessage);
     try { IPCRENDERER.removeListener("if-vermng-info", _onVmInfo); } catch (e) { }
     try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { }
+    try { clearTimeout(iOpenWatch); } catch (e) { } iOpenWatch = null;
+    // 자식창 busy 동기화 채널 명시적 close(누수 방지).
+    if (oBroad) { try { oBroad.onmessage = null; oBroad.close(); } catch (e) { } oBroad = null; }
 };
