@@ -2,52 +2,86 @@
 <html>
 
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta charset="utf-8">
-    <link rel="stylesheet" href="frame.css">
-</head>
-<style>
-    html,
-    body {
-        height: 100%;
-    }
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
-    body {
-        margin: 0px;
-        overflow: hidden;
-    }
-</style>
+    <!-- ===== 공통 헤더(.u4a-titlebar)·테이블·입력칸·토큰 (docPopup 과 동일 짝) ===== -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="frame.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* frame.js 에서 재적용 */ }
+        })();
+    </script>
+</head>
 
 <body>
-    <iframe id="ws_frame" name="ws_frame" style="border:none;width:100%;height:100%;" allowfullscreen>
-    </iframe>
 
-    <!-- Page Loading Start -->
-    <div id="u4a_main_load" class="u4a_loaders">
-        <!-- <span class="u4a_loader u4a_loader-bars"> <span></span> </span> Loading... -->
-        <div class="cl_ring">LOADING<span class="cl_ringArea"></span></div>
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/닫기 ===== -->
+    <header class="u4a-titlebar" id="rtmTitlebar">
+        <img class="u4a-titlebar__logo" id="rtmLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="rtmTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- ===== 본체 = [검색 카드(검색행 + 드래그영역)] + [결과 카드(안내 + 테이블)] ===== -->
+    <div class="u4aRtmBody" id="rtmBody">
+
+        <!-- 상단 조회조건(원본 sap.m.Panel) — 검색행 + UX 디자인영역 드래그 드롭존 -->
+        <section class="u4aRtmCard u4aRtmSearch">
+            <div class="u4aRtmSearch__row">
+                <div class="u4aRtmSearch__field" id="rtmSrchField"></div>
+                <button type="button" class="u4a-btn u4a-btn--emphasized u4aRtmSrchBtn" id="rtmSrchBtn">
+                    <i class="fa-solid fa-magnifying-glass"></i><span></span>
+                </button>
+            </div>
+            <!-- 드롭존 — 디자인영역에서 UI 를 끌어다 놓으면 해당 라이브러리로 필터(rtmcls=LIBNM) -->
+            <div class="u4aRtmDrop" id="rtmDrop">
+                <i class="fa-solid fa-hand-pointer u4aRtmDrop__icon"></i>
+                <span class="u4aRtmDrop__text" id="rtmDropText"></span>
+            </div>
+        </section>
+
+        <!-- 결과 카드 — 헤더(info 안내) + 공통 .u4a-table(frame.js 렌더) -->
+        <section class="u4aRtmCard u4aRtmResult">
+            <div class="u4aRtmResult__head">
+                <i class="fa-solid fa-circle-info"></i>
+                <span class="u4aRtmResult__hint" id="rtmHintText"></span>
+                <span class="u4aRtmResult__count" id="rtmCount"></span>
+            </div>
+            <div class="u4a-table-wrap u4aRtmWrap" id="rtmWrap"></div>
+        </section>
+
     </div>
-    <!-- Page Loading End -->
 
-    <script>
-        /************************************************************************
-         * 에러 감지
-         ************************************************************************/
-        var REMOTE = require('@electron/remote'),
-            PATH = REMOTE.require('path'),
-            APP = REMOTE.app,
-            APPPATH = APP.getAppPath(),
-            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
-            PATHINFO = require(PATHINFOURL),
-            WSERR = require(PATHINFO.WSTRYCATCH);
-
-        var zconsole = WSERR(window, document, console);
-    </script>
-
+    <!-- 로딩 오버레이 = 공통 busy(.u4a-busy, shell.css SSOT). 토스트는 frame.js 가 동적 생성. -->
+    <div class="u4a-busy" id="rtmBusy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+        </div>
+    </div>
 
     <script src="frame.js"></script>
+
 </body>
 
 </html>

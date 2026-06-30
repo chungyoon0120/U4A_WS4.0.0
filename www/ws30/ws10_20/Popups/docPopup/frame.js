@@ -793,6 +793,45 @@ function _initChrome() {
     }
 }
 
+// 공통 스플릿바 드래그 — 사이드바(.u4aDocNav) 폭 재분배. 바 스킨/더블클릭 리셋은 공통(shell.css/u4a-ui.js).
+//   (.analy/16 §4.3 — 인접 두 패널만, nav 최소폭·디테일 최소폭 보호 + 창 축소 재클램프)
+function _initSplitter() {
+    var oBar = document.getElementById("docSplitBar");
+    var oNav = document.getElementById("docNav");
+    var oBody = document.getElementById("docBody");
+    if (!oBar || !oNav || !oBody) { return; }
+
+    var NAV_MIN = 160, DETAIL_MIN = 320;
+    var bActive = false, iStartX = 0, iStartW = 0;
+    function _maxW() { return oBody.getBoundingClientRect().width - oBar.offsetWidth - DETAIL_MIN; }
+
+    oBar.addEventListener("mousedown", function (e) {
+        bActive = true;
+        iStartX = e.clientX;
+        iStartW = oNav.getBoundingClientRect().width;
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+        e.preventDefault();
+    });
+    document.addEventListener("mousemove", function (e) {
+        if (!bActive) { return; }
+        var w = iStartW + (e.clientX - iStartX), iMax = _maxW();
+        if (w < NAV_MIN) { w = NAV_MIN; }
+        if (iMax > NAV_MIN && w > iMax) { w = iMax; }
+        oNav.style.flex = "0 0 " + w + "px";
+    });
+    document.addEventListener("mouseup", function () {
+        if (!bActive) { return; }
+        bActive = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+    });
+    window.addEventListener("resize", function () {
+        var iMax = _maxW(), w = oNav.getBoundingClientRect().width;
+        if (iMax > NAV_MIN && w > iMax) { oNav.style.flex = "0 0 " + iMax + "px"; }
+    });
+}
+
 function _keepSession() {
     try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { }
 }
@@ -814,6 +853,7 @@ window.addEventListener("load", function () {
     try { CURRWIN.setMenu(null); } catch (e) { }
 
     _initChrome();
+    _initSplitter();
     _initBroadcast();
     _initEditor();
 

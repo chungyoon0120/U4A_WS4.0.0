@@ -557,15 +557,19 @@ oAPP.views = window?.oAPP?.views || {};
     }; // end of oWS.utill.fn.getAppDataFromServer
 
     // 15. 새창 띄우기
-    oWS.utill.fn.onNewWindow = function (IF_DATA) {
+    oWS.utill.fn.onNewWindow = function (IF_DATA, fnOnLoaded) {
 
         // 새 창 생성은 무거운 로직(BrowserWindow 생성 + URL 로드)이라 진행 중 연속 클릭을 막는다.
-        //   · 이미 Busy 면 재진입 차단(중복 창 생성 방지).
+        //   · 재진입(중복 창 생성)은 ★전용 플래그★로 막는다. 공유 busy(getBusy)로 가드하면 안 된다 —
+        //     자식 팝업(버전관리 등)이 자기 작업 중 _setBusy → BUSY_ON 을 broadcast(ws_fn_broad.js:38)하면
+        //     메인 busy 도 "X"가 되는데, 바로 그 상태에서 같은 팝업이 IPC로 새창을 요청(onNewWindow)하므로
+        //     공유 busy 가드는 정상 요청을 막아 "새창이 안 뜨는" 회귀를 만든다(원본 onNewWindow 엔 가드 없음).
         //   · 진입 시 Busy ON(setBusy = pointerEvents 차단) → 로드 완료(did-finish-load)에 OFF.
         //   버튼/메뉴(fnWS10WMENU30_01)/USP/WS20 모두 이 함수로 모이므로 여기 한 곳이면 전부 커버.
-        if (oWS.utill.fn.getBusy() === "X") {
+        if (oWS.utill.attr._bNewWinInProgress === true) {
             return;
         }
+        oWS.utill.attr._bNewWinInProgress = true;
         oWS.utill.fn.setBusy("X");
 
         // Busy 안전 해제 — did-finish-load 가 끝내 안 오는 예외(생성 실패 등) 대비(창 안 떠도 busy 박힘 방지).
@@ -573,6 +577,7 @@ oAPP.views = window?.oAPP?.views || {};
         const _releaseBusy = function () {
             if (_busyReleased) { return; }
             _busyReleased = true;
+            oWS.utill.attr._bNewWinInProgress = false;
             oWS.utill.fn.setBusy("");
         };
         const _busySafetyTimer = setTimeout(_releaseBusy, 8000);
@@ -677,6 +682,11 @@ oAPP.views = window?.oAPP?.views || {};
             // 새 창 로드 완료 = 무거운 작업 끝 → 부모 Busy 해제(연타 가드 종료).
             clearTimeout(_busySafetyTimer);
             _releaseBusy();
+
+            // 새창을 요청한 호출자(예: 버전관리 팝업)에 "로드 완료" 통지(옵션). 호출자가 자기 busy 를 끈다.
+            if (typeof fnOnLoaded === "function") {
+                try { fnOnLoaded(oBrowserWindow); } catch (e) { }
+            }
 
             var oSAPServerInfo = getServerInfo();
 
@@ -1460,8 +1470,8 @@ function getAppDataFromServer(oFormData, fn_success) {
 }
 
 // 15. 새창 띄우기
-function onNewWindow(IF_DATA) {
-    oWS.utill.fn.onNewWindow(IF_DATA);
+function onNewWindow(IF_DATA, fnOnLoaded) {
+    oWS.utill.fn.onNewWindow(IF_DATA, fnOnLoaded);
 }
 
 /**

@@ -632,6 +632,9 @@ function _onCompare() {
             document.getElementById("vmBaseVer").textContent = oBase.VPOSN;
             document.getElementById("vmTargetVer").textContent = oTgt.VPOSN;
 
+            // 타이틀/뱃지 폭이 바뀌었으니 오버플로 재계산(ResizeObserver 는 콘텐츠 변경엔 안 탐).
+            try { if (oState._diffOvf) { oState._diffOvf.reflow(); } } catch (e) { }
+
             // 호스트 페이드인 + 레이아웃.
             var oHW = document.getElementById("vmDiffHostWrap");
             if (oHW) { oHW.classList.add("u4aVmHostShown"); }
@@ -692,6 +695,29 @@ function _toggleDiffFull() {
     _setDiffFull(!oState.diffFull);
 }
 
+/* ── diff 툴바 오버플로 메뉴 항목 빌더(공통 attachOverflow menuItem) ──
+   정보 텍스트(span)=메뉴 제외(null), 줌 그룹=축소/배율/확대 3항목, 그 외 버튼=아이콘+라벨(btnLabel). */
+function _diffOvfMenuItem(el) {
+    // 줌 그룹(div) — 메뉴에선 축소/현재배율(원복)/확대 3항목으로 펼친다.
+    if (el.classList && el.classList.contains("u4aVmZoom")) {
+        return [
+            { iconHtml: '<i class="fa-solid fa-minus"></i>', text: "", onClick: function () { _toHost({ cmd: "zoomOut" }); } },
+            { iconHtml: '<i class="fa-solid fa-magnifying-glass"></i>', text: (oState.zoomPct || 100) + "%", onClick: function () { _toHost({ cmd: "zoomReset" }); } },
+            { iconHtml: '<i class="fa-solid fa-plus"></i>', text: "", onClick: function () { _toHost({ cmd: "zoomIn" }); } }
+        ];
+    }
+    // 버튼만 메뉴 항목으로(정보 텍스트/뱃지 span 은 제외).
+    if (el.tagName !== "BUTTON") { return null; }
+    var oI = el.querySelector("i");
+    var bDis = el.disabled === true;
+    return {
+        iconHtml: oI ? oI.outerHTML : "",
+        text: (window.U4AUI && U4AUI.btnLabel) ? U4AUI.btnLabel(el, true) : (el.title || ""),
+        disabled: bDis,
+        onClick: function () { if (!bDis) { el.click(); } }
+    };
+}
+
 /* ── diff 호스트 로드 / ready 대기 ──────────────────────────────────────── */
 function _loadHost() {
     if (!oFrame || oFrame.getAttribute("src")) { return; }
@@ -726,6 +752,17 @@ function _onHostMessage(oEvent) {
     if (d.evt === "ready") {
         oState.hostReady = true;
         if (typeof fnHostReadyWait === "function") { fnHostReadyWait(); }
+        return;
+    }
+    if (d.evt === "zoom") {
+        // 에디터 폰트 배율(%) → 툴바 표시 갱신(Ctrl+휠/줌버튼 공통) + 오버플로 메뉴용 상태 저장.
+        var n = (typeof d.pct === "number" && isFinite(d.pct)) ? d.pct : 100;
+        oState.zoomPct = n;
+        var oZ = document.getElementById("vmZoomTxt");
+        if (oZ) { oZ.textContent = n + "%"; }
+        var oZBtn = document.getElementById("vmZoomBtn");
+        if (oZBtn) { oZBtn.title = n + "% (Ctrl+0)"; }   // editorPopup 공통 패턴(% 클릭/Ctrl+0=원복)
+        return;
     }
 }
 
@@ -774,7 +811,8 @@ function _doCreateTempApp(oRow) {
         // opener 에게 새창(WS20 MOVE20) 요청 — 원본 IPC 계약 1:1.
         try { IPCRENDERER.send(BROWSKEY + "-if-version-management-new-window", { TAPPID: sTAPPID }); } catch (e) { }
 
-        // 연속 클릭 방지(원본 5초 후 busy 해제).
+        // busy 해제는 opener 의 "if-vermng-newwin-done"(새창 did-finish-load) 신호가 1차.
+        //   신호 누락(새창 생성 실패 등) 대비 5초 안전망(원본 연타방지 타이머 = fallback).
         setTimeout(function () { _setBusy(false); }, 5000);
     });
 }
@@ -937,8 +975,29 @@ function _initChrome() {
     if (oLegBtn) { oLegBtn.title = _z("408"); oLegBtn.addEventListener("click", function (e) { e.stopPropagation(); _toggleLegend(); }); }
     var oFullBtn = document.getElementById("vmDiffFull");
     if (oFullBtn) { oFullBtn.title = _z("369"); oFullBtn.addEventListener("click", _toggleDiffFull); }   // 전체창 토글
+    // 확대/축소(에디터 줌) — 호스트로 위임(폰트 크기 조절 + % 통지). % 클릭=원복.
+    var oZoomOut = document.getElementById("vmZoomOut");
+    if (oZoomOut) { oZoomOut.addEventListener("click", function () { _toHost({ cmd: "zoomOut" }); }); }
+    var oZoomIn = document.getElementById("vmZoomIn");
+    if (oZoomIn) { oZoomIn.addEventListener("click", function () { _toHost({ cmd: "zoomIn" }); }); }
+    var oZoomBtn = document.getElementById("vmZoomBtn");
+    if (oZoomBtn) { oZoomBtn.addEventListener("click", function () { _toHost({ cmd: "zoomReset" }); }); }
     var oDClose = document.getElementById("vmDiffClose");
     if (oDClose) { oDClose.addEventListener("click", _hideDiffPane); }
+
+    // diff 툴바 오버플로 — 좁아지면 버튼이 ⋯ 메뉴로(공통 U4AUI.attachOverflow). 닫기 X 는 대상 밖(항상 표시).
+    var oTools = document.getElementById("vmDiffTools");
+    if (oTools && window.U4AUI && U4AUI.attachOverflow) {
+        try {
+            oState._diffOvf = U4AUI.attachOverflow(oTools, {
+                btnClass: "u4a-btn u4aVmIconBtn",
+                noOvfAutoMargin: true,                                 // 스페이서가 우측정렬 담당
+                isSkip: function (el) { return el.classList.contains("u4aVmDiffSpacer"); },   // flex-grow 스페이서만 측정 제외
+                isSep: function (el) { return el.classList.contains("u4aVmDiffSep"); },
+                menuItem: _diffOvfMenuItem
+            });
+        } catch (e) { console.error("[HTML5][versionMng] diff 툴바 overflow 부착 오류:", e && e.message); }
+    }
 
     // 세로 스플리터 바 드래그.
     var oBar = document.getElementById("vmSplitBar");
@@ -971,6 +1030,13 @@ function _initChrome() {
 
 /* ── 세션 유지(원본 fnKeepClientSession) ───────────────────────────────── */
 function _keepSession() { try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { } }
+
+/* ── opener → 창: "새창으로 보기" 새 WS20 창 로드 완료 통지 → busy 해제 ───────
+ *  opener(fnVersionManagementPopupOpen) 가 onNewWindow 의 did-finish-load 콜백에서 전송.
+ *  성공 흐름의 5초 blind 타이머보다 이 신호가 먼저 와서 즉시 해제(실패 시엔 5초 fallback). */
+function _onNewWinDone() {
+    if (bBusy) { _setBusy(false); }
+}
 
 /* ── 자식창 busy 동기화 채널 ────────────────────────────────────────────── */
 function _initBroadcast() {
@@ -1018,6 +1084,7 @@ window.addEventListener("load", function () {
     // 호스트 메시지 + IF 데이터 + 라이브 테마 변경 구독.
     window.addEventListener("message", _onHostMessage);
     IPCRENDERER.on("if-vermng-info", _onVmInfo);
+    IPCRENDERER.on("if-vermng-newwin-done", _onNewWinDone);
     IPCMAIN.on("if-p13n-themeChange-" + SYSID, _onThemeChange);
 
     // 세션 유지.
@@ -1045,6 +1112,7 @@ window.onbeforeunload = function () {
     window.removeEventListener("keyup", _keepSession);
     window.removeEventListener("message", _onHostMessage);
     try { IPCRENDERER.removeListener("if-vermng-info", _onVmInfo); } catch (e) { }
+    try { IPCRENDERER.removeListener("if-vermng-newwin-done", _onNewWinDone); } catch (e) { }
     try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { }
     try { clearTimeout(iOpenWatch); } catch (e) { } iOpenWatch = null;
     // 자식창 busy 동기화 채널 명시적 close(누수 방지).

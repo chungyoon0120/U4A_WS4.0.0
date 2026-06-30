@@ -131,6 +131,18 @@
                     try { window.editor.layout(); } catch (e) { }
                     return;
 
+                case "zoomIn":
+                    try { if (window._vmFont) { window._vmFont.zoomIn(); } } catch (e) { }
+                    return;
+
+                case "zoomOut":
+                    try { if (window._vmFont) { window._vmFont.zoomOut(); } } catch (e) { }
+                    return;
+
+                case "zoomReset":
+                    try { if (window._vmFont) { window._vmFont.zoomReset(); } } catch (e) { }
+                    return;
+
                 default:
                     return;
             }

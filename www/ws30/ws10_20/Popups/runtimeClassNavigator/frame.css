@@ -1,167 +1,189 @@
-/* Loading Page */
-.u4a_loaders {
-    font-family: sans-serif;
+/****************************************************************************
+ * 런타임 클래스 탐색기(Runtime Class Navigator) 창 — 스코프 스타일
+ * --------------------------------------------------------------------------
+ *  창 골격 = [공통 .u4a-titlebar] + [본체(검색 카드 + 결과 카드)].
+ *  "정리정돈" 느낌 = 검색부/결과부를 각각 surface 카드로 그루핑(섹션 분리) + 넉넉한 여백.
+ *  색/모양은 theme 토큰만 소비(하드코딩 없음). 공통 .u4a-btn/.u4a-field/.u4a-table/.u4a-titlebar 소비.
+ *  여기 규칙은 이 창 전용 레이아웃(스코프)만 — 공통 컴포넌트 색/구조는 건드리지 않는다.
+ ****************************************************************************/
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+}
+
+/* ===== 본체 ===== */
+.u4aRtmBody {
+    flex: 1 1 auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 1rem;
+    gap: 1rem;
+    /* 데이터 도착 전엔 숨김 → _finishOpen 에서 페이드 인(흰 번쩍 방지). */
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.u4aRtmShown {
+    opacity: 1;
+}
+
+/* ── 공통 카드(섹션 컨테이너) — surface 배경 + 옅은 보더 + 둥근모서리 + 미세 그림자 ─── */
+.u4aRtmCard {
+    box-sizing: border-box;
+    background: var(--surface);
+    border: 0.0625rem solid var(--divider);
+    border-radius: var(--radius);
+    box-shadow: var(--elevation);
+}
+
+/* ── 검색 카드 = 검색행 + 드롭존 ─────────────────────────────────────────── */
+.u4aRtmSearch {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 1rem;
+}
+
+.u4aRtmSearch__row {
+    display: flex;
     align-items: center;
-    height: 100%;
-    font-size: 2.5rem;
-    color: rgba(2, 8, 16, 0.55);
-    position: absolute;
-    top: 0;
+    gap: 0.625rem;
+}
+
+/* 검색 입력칸이 남은 폭을 채운다(버튼은 고정). */
+.u4aRtmSearch__field {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.u4aRtmSearch__field .u4a-field {
     width: 100%;
-    /* background: #1d232a; */
-    box-shadow: rgba(0, 0, 0, 0.11) 0px 15px 30px 0px, rgba(0, 0, 0, 0.08) 0px 5px 15px 0px;
 }
-.u4a_loader {
-    display: inline-block;
-    position: relative;
-    width: 60px;
-    height: 20px;
+
+.u4aRtmSrchBtn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* ── 드롭존 — 디자인영역에서 UI 드래그하여 라이브러리 필터(시원하게 키운 점선 박스) ──── */
+.u4aRtmDrop {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    min-height: 7.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 1rem 1.25rem;
+    border: 0.125rem dashed var(--line);
+    border-radius: var(--radius);
+    /* app-bg 로 살짝 가라앉혀 surface 카드 안에서 "투입 영역"임을 시각적으로 분리. */
+    background: var(--app-bg);
+    color: var(--text-muted);
     text-align: center;
-    vertical-align: middle;
-}
-.u4a_loadersInactive {
-    display: none;
-}
-.u4a_loader-bars:before,
-.u4a_loader-bars:after,
-.u4a_loader-bars span {
-    content: "";
-    display: block;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 10px;
-    height: 30px;
-    background-color: rgba(2, 8, 16, 0.55);
-    -webkit-animation: u4a_grow 1.5s linear infinite;
-    animation: u4a_grow 1.5s linear infinite;
+    transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
 
-.u4a_loader-bars:after {
-    left: 15px;
-    -webkit-animation: u4a_grow 1.5s linear -0.5s infinite;
-    animation: u4a_grow 1.5s linear -0.5s infinite;
+.u4aRtmDrop__icon {
+    font-size: 1.75rem;
+    opacity: 0.65;
 }
 
-.u4a_loader-bars span {
-    left: 30px;
-    -webkit-animation: u4a_grow 1.5s linear -1s infinite;
-    animation: u4a_grow 1.5s linear -1s infinite;
+.u4aRtmDrop__text {
+    font-size: 0.875rem;
 }
 
-@-webkit-keyframes u4a_grow {
-    0% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-    50% {
-        -webkit-transform: scaleY(1);
-        transform: scaleY(1);
-        opacity: 1;
-    }
-    100% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
+/* 드래그가 위로 올라온 상태 — accent 강조(점선/배경/글자색 동시 전환). */
+.u4aRtmDrop.is-dragover {
+    border-color: var(--accent);
+    border-style: solid;
+    background: var(--state-info-bg);
+    color: var(--accent);
 }
 
-@keyframes u4a_grow {
-    0% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-    50% {
-        -webkit-transform: scaleY(1);
-        transform: scaleY(1);
-        opacity: 1;
-    }
-    100% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
+.u4aRtmDrop.is-dragover .u4aRtmDrop__icon {
+    opacity: 1;
 }
 
-
-.cl_ring {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 150px;
-    height: 150px;
-    background: transparent;
-    border: 3px solid #ff2600;
-    border-radius: 50%;
-    text-align: center;
-    line-height: 150px;
-    font-family: sans-serif;
-    font-size: 20px;
-    color: #ffbeb2;
-    letter-spacing: 4px;
-    text-shadow: 0 0 10px #ffbeb2;
-    box-shadow: 0 0 20px rgba(156, 0, 0, 0.5);
+/* ── 결과 카드 = 헤더(안내 + 카운트) + 테이블 ─────────────────────────────── */
+.u4aRtmResult {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;          /* 카드 둥근모서리로 테이블 헤더 클리핑 */
 }
 
-.cl_ring:before {
-    content: '';
-    position: absolute;
-    top: -3px;
-    left: -3px;
-    width: 100%;
-    height: 100%;
-    border: 3px solid transparent;
-    border-top: 3px solid #ffbeb2;
-    border-right: 3px solid #ffbeb2;
-    border-radius: 50%;
-    animation: animateC 3s linear infinite;
+.u4aRtmResult__head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 0.0625rem solid var(--divider);
+    font-size: 0.8125rem;
+    color: var(--text-muted);
 }
 
-.cl_ringArea {
-    display: block;
-    position: absolute;
-    top: calc(50% - 2px);
-    left: 50%;
-    width: 50%;
-    height: 4px;
-    background: transparent;
-    transform-origin: left;
-    animation: animate 3s linear infinite;
+.u4aRtmResult__head > i {
+    opacity: 0.85;
 }
 
-.cl_ringArea:before {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #ffbeb2;
-    top: -6px;
-    right: -8px;
-    box-shadow: 0 0 20px #fff;
+.u4aRtmResult__hint {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-@keyframes animateC {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
+/* 결과 건수 배지 — 우측 정렬, 옅은 알약. */
+.u4aRtmResult__count {
+    flex: 0 0 auto;
+    padding: 0.0625rem 0.5rem;
+    border-radius: 999px;
+    background: var(--hover-bg);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
 }
 
-@keyframes animate {
-    0% {
-        transform: rotate(45deg);
-    }
+/* ── 결과 테이블 래퍼 — 남은 높이 채우고 스크롤 ───────────────────────────── */
+.u4aRtmWrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
 
-    100% {
-        transform: rotate(405deg);
-    }
+/* 컬럼 폭(테이블 뷰) — UI Object ID / Module 은 고정, 클래스명은 가변. */
+.u4aRtmWrap[data-view="table"] .u4aRtmCol--obj {
+    width: 26%;
+}
+
+.u4aRtmWrap[data-view="table"] .u4aRtmCol--lib {
+    width: 30%;
+}
+
+.u4aRtmWrap[data-view="table"] .u4aRtmCol--cls {
+    width: auto;
+}
+
+/* 클래스명은 길어서 줄바꿈 허용(잘림 방지). 더블클릭 복사 대상이라 전체가 보이는 편이 유용. */
+.u4aRtmTbl td.u4a-c-rcls {
+    word-break: break-all;
 }

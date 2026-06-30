@@ -182,6 +182,12 @@
         URL: "./js/ws_html5_ws20_edit.js",
         MIMETYPE: "script"
     },
+    // [UI5 제거] WS20 디자인 트리 D&D(이동/복사) — edit "뒤" 로드해 prev.js 의
+    //   designTreeDragStart/designDragEnd/UIDrop 가드 스텁을 실제 구현으로 override.
+    {
+        URL: "./js/ws_html5_ws20_dnd.js",
+        MIMETYPE: "script"
+    },
     // [UI5 제거] WS30 USP 코드에디터 HTML5 — shell/원본 ws_usp*.js "뒤"에 순서대로 로드.
     //   usp(셸+나브+속성+문서+overrides) → usp_tree(트리) → usp_editor(Monaco iframe).
     //   shell 의 fnOnMoveToPage("WS30") 와 원본 UI5 빌더(fnMoveToWs30/fnUspTreeTableRowSelect)를 override.

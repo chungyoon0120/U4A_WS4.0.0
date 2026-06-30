@@ -165,16 +165,98 @@
         var MSG_CLEARFILTER = _txt("/U4A/CL_WS_COMMON", "A69"); // 필터 초기화
         var MSG_NODATA = _wsTxt("946");                         // 데이터 없음(공통 .u4a-table__nodata — ServerList L("noData")=946 동일)
 
+        // ── 2-pane 테이블 골격(sap.ui.table 고정컬럼 재현) — CSS Grid [고정|스크롤 / 본문|하단가로바] ──────────
+        //   고정/스크롤 페인 모두 공통 가상 스크롤(makeVScroller) 독립 인스턴스. 행높이는 양쪽 공통 --row-h 강제로
+        //   동일 → scrollTop 양방향 동기로 행 정렬(보이는 행만 렌더). 가로 스크롤은 하단 별도 트랙(hsb)으로 분리
+        //   → 행과 안 겹치고 '고정바 이후'에만(UI5 HSb 방식). hover 는 마우스 위치 기반 양쪽 동시 적용.
+        function _build2Pane() {
+            var grid = _el("div", "u4aAppF4Grid");
+            var frzPane = _el("div", "u4aAppF4Pane u4aAppF4Pane--frozen u4a-table-wrap");   // u4a-table-wrap=공통 행높이(--u4a-vsrowh) 규칙 적용
+            var scrPane = _el("div", "u4aAppF4Pane u4aAppF4Pane--scroll u4a-table-wrap");
+            var frzTbl = _el("table", "u4a-table u4aAppF4Tbl u4aAppF4Tbl--frozen");
+            var scrTbl = _el("table", "u4a-table u4aAppF4Tbl u4aAppF4Tbl--scroll");
+            var frzHead = _el("thead"), frzBody = _el("tbody");
+            var scrHead = _el("thead"), scrBody = _el("tbody");
+            frzTbl.append(frzHead, frzBody); scrTbl.append(scrHead, scrBody);
+            frzPane.appendChild(frzTbl); scrPane.appendChild(scrTbl);
+            // ★ 가로 스크롤바는 테이블 하단 별도 트랙(UI5 sap.ui.table HSb)으로 분리 — 행과 안 겹친다.
+            //   CSS Grid 로 hsb 를 스크롤 컬럼(col2) 아래(row2)에 둬 고정 컬럼(col1) 영역은 자동 제외(=고정바 이후).
+            var hsb = _el("div", "u4aAppF4HSb");
+            var hsbSpacer = _el("div", "u4aAppF4HSbSpacer");
+            hsb.appendChild(hsbSpacer);
+            grid.append(frzPane, scrPane, hsb);
+
+            var _hoverIdx = null, _lastY = null, _syncing = false;
+
+            // 세로 동기(양방향, guard) — 두 페인 독립 가상스크롤. 한쪽 스크롤 → 다른쪽 scrollTop 추종.
+            function _syncTop(from, to) {
+                if (_syncing) { return; }
+                _syncing = true;
+                if (to.scrollTop !== from.scrollTop) { to.scrollTop = from.scrollTop; }
+                _syncing = false;
+            }
+            // 가로 동기 — 스크롤 페인 ↔ 하단 가로바(hsb). 고정 페인은 가로 스크롤 안 함(컬럼 고정).
+            function _syncLeft(from, to) {
+                if (_syncing) { return; }
+                _syncing = true;
+                if (to.scrollLeft !== from.scrollLeft) { to.scrollLeft = from.scrollLeft; }
+                _syncing = false;
+            }
+            scrPane.addEventListener("scroll", function () { _syncTop(scrPane, frzPane); _syncLeft(scrPane, hsb); _reHover(); });
+            frzPane.addEventListener("scroll", function () { _syncTop(frzPane, scrPane); _reHover(); });
+            hsb.addEventListener("scroll", function () { _syncLeft(hsb, scrPane); });   // 하단바 드래그 → 스크롤 페인 가로
+
+            // 하단 가로바 트랙 폭 = 스크롤 페인 콘텐츠(테이블) 실제 폭. setRows/리사이즈 시 갱신.
+            function _sync() { hsbSpacer.style.width = (scrTbl.scrollWidth || scrPane.scrollWidth) + "px"; }
+            try { new ResizeObserver(_sync).observe(scrPane); } catch (e) { }
+
+            // ── 같은 행 hover 동기 — ★마우스 위치 기반★. 두 페인 행 DOM 이 비동기로 갈려, mouseover 만으론 스크롤 직후
+            //   한쪽(마우스 있는 페인)만 떠서 어긋난다. → 마우스 y 아래 스크롤 페인 행 idx 를 elementFromPoint 로 구해
+            //   두 페인에 동시 적용. 스크롤/렌더 후에도 같은 마우스 위치로 재계산(_reHover=렌더 완료 보장 2-rAF 뒤).
+            function _hoverApply(idx, on) {
+                [frzBody, scrBody].forEach(function (tb) {
+                    var tr = tb.querySelector('tr[data-row-idx="' + idx + '"]');
+                    if (tr) { tr.classList.toggle("is-hover", on); }
+                });
+            }
+            function _clearHover() { if (_hoverIdx != null) { _hoverApply(_hoverIdx, false); _hoverIdx = null; } }
+            function _hoverAtMouse() {
+                if (_lastY == null) { _clearHover(); return; }
+                var r = scrPane.getBoundingClientRect();
+                if (_lastY < r.top || _lastY >= r.bottom) { _clearHover(); return; }   // 페인(본문) 밖
+                var el = document.elementFromPoint(r.left + 8, _lastY);                 // 좌측 근처 x(세로바·셀경계 회피)
+                var tr = el && el.closest ? el.closest("tr[data-row-idx]") : null;       // 헤더/스페이서면 null
+                var idx = tr ? tr.getAttribute("data-row-idx") : null;
+                if (idx === _hoverIdx) { return; }
+                _clearHover();
+                if (idx != null) { _hoverIdx = idx; _hoverApply(idx, true); }
+            }
+            // 스크롤/렌더 후 hover 재계산 — makeVScroller 가 rAF 로 행을 갈므로 렌더 완료(2-rAF) 뒤 적용.
+            function _reHover() { requestAnimationFrame(function () { requestAnimationFrame(_hoverAtMouse); }); }
+            grid.addEventListener("mousemove", function (e) { _lastY = e.clientY; _hoverAtMouse(); });
+            grid.addEventListener("mouseleave", function () { _lastY = null; _clearHover(); });
+
+            // ★ buildRow 안전망 — 행 생성 시 _hoverIdx 를 반영(선택 getSelKey 와 동일 방식). 어느 페인이 언제
+            //   렌더되든 그 행이 자동으로 hover 를 가지므로, 두 페인 가상스크롤 렌더 타이밍 경합과 무관하게 양쪽 정합.
+            function _isHovered(idx) { return _hoverIdx != null && String(idx) === _hoverIdx; }
+
+            return { grid: grid, frzPane: frzPane, scrPane: scrPane, frzHead: frzHead, frzBody: frzBody, scrHead: scrHead, scrBody: scrBody, sync: _sync, isHovered: _isHovered };
+        }
+
         /* ── 다이얼로그 골격 ─────────────────────────────────────── */
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aAppF4Dlg";
         oDlg.id = "u4aAppF4Dlg";
-        // ★ 공통 "닫으면 DOM 제거" 위임에서 제외(opt-out). 이 팝업은 원본 아키텍처상
-        //   닫기=숨김(DOM 유지)으로 검색 상태를 보존하고 다음 호출에 재표시한다.
+        // ★ 공통 "닫으면 DOM 제거" 위임에서 제외(opt-out). 이 팝업은 닫기 경로를 직접 구분한다:
+        //   · 앱 조회(_doDisplay) = lf_hide() 숨김(DOM 유지) → WS10 복귀/다음 F4 에 재표시(원본 setVisible 상태보존)
+        //   · 명시적 닫기(X·푸터·ESC·선택완료) = lf_close() 숨긴 뒤 DOM 제거 → 다음 열기는 새 build(상태 폐기)
+        //   공통 위임에 맡기면 _doDisplay 숨김의 close 이벤트에서도 제거돼 보존이 깨지므로 keep + 직접 제거.
         oDlg.setAttribute("data-u4a-keep", "");
 
-        // 닫기 = 숨김(파괴 X). 원본 싱글톤처럼 DOM 유지 → 다음 호출에 재표시(상태 보존).
-        function lf_close() { try { _closeColMenu(); } catch (e) { } try { oDlg.close(); } catch (e) { } }
+        // 숨김(파괴 X) — 앱 조회 시 검색 상태 보존용(다음 호출/복귀에 재표시).
+        function lf_hide() { try { _closeColMenu(); } catch (e) { } try { oDlg.close(); } catch (e) { } }
+        // 명시적 닫기(X·푸터·ESC·선택완료) — 숨긴 뒤 DOM 제거(상태 폐기). 다음 열기 = 새 build.
+        function lf_close() { lf_hide(); try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { } }
 
         // 헤더
         var oHeader = _el("div", "u4a-dialog__header");
@@ -232,7 +314,7 @@
                 // 원본 K1: 트리 선택해제 + 패키지 입력 포커스.
                 //   ★ K1 은 탭 전환으로 재검색하지 않는다(결과는 마지막 검색 스냅샷 유지 — 사용자 요청).
                 //     autoSearch(처음 오픈) 자동검색은 오픈/재오픈 경로에서 1회만 한다(여기서 X).
-                try { _vs2.setSel(null); } catch (e) { }
+                try { _vs2.setSel(null); _vs2f.setSel(null); _vs2.refresh(); _vs2f.refresh(); } catch (e) { }
                 try { oPkg.input.focus(); } catch (e) { }
             } else {
                 // ★ 원본 K2: 선택할 때마다 매번 서버에서 계층 재조회(once 가드 없음 — fnGetAppHierList).
@@ -319,16 +401,15 @@
         var T1_MAP = {};   // key → col (셀 텍스트/정렬·필터용)
         T1_COLS.forEach(function (c) { if (c.key) { T1_MAP[c.key] = c; } });
 
-        // 좌측 3개 컬럼 고정(User Name / Open in Browser / App Views) — 가로 스크롤 시.
-        var T1_FRZN = 3, T1_FRZ_LEFT = _frzLefts(T1_COLS, T1_FRZN);
+        // 좌측 3개 컬럼 고정(User Name / Open in Browser / App Views) — 2-pane 의 고정 페인.
+        var T1_FRZN = 3;
+        var T1_FRZ_COLS = T1_COLS.slice(0, T1_FRZN);   // 고정 페인 컬럼
+        var T1_SCR_COLS = T1_COLS.slice(T1_FRZN);      // 스크롤 페인 컬럼
 
-
-        var oT1Wrap = _el("div", "u4aAppF4TblWrap u4a-table-wrap");
-        var oT1 = _el("table", "u4a-table u4aAppF4Tbl");
-        var oT1Head = _el("thead");   // 헤더는 _renderT1 이 매번 재구성(정렬/필터 표시자 갱신)
-        var oT1Body = _el("tbody");
-        oT1.append(oT1Head, oT1Body);
-        oT1Wrap.appendChild(oT1);
+        var oT1G = _build2Pane();
+        var oT1Wrap = oT1G.grid;        // oPage1 에 들어갈 컨테이너(그리드)
+        var oT1FrzHead = oT1G.frzHead, oT1FrzBody = oT1G.frzBody;   // 고정 페인(일반 렌더)
+        var oT1ScrHead = oT1G.scrHead, oT1ScrBody = oT1G.scrBody;   // 스크롤 페인(가상 스크롤)
 
         // 결과 테이블 위 툴바 — 정렬·컬럼필터 전체 해제(탭2와 동일 버튼). 검색 폼(서버 쿼리)은 건드리지 않음.
         var oT1Bar = _el("div", "u4aAppF4TreeBar u4aAppF4T1Bar");
@@ -368,11 +449,10 @@
             setSort: function (k, d) { _sortKey = k; _sortDir = d; },
             rerender: function () { _renderT1(); }
         };
-        function _buildT1Th(c, idx) {
+        function _buildT1Th(c) {
             var th = _el("th", c.align === "center" ? "is-center" : null);
             if (c.w) { th.style.width = c.w; }
             if (c.action) { th.classList.add("is-action"); }
-            _applyFrz(th, idx, T1_FRZN, T1_FRZ_LEFT);
             var inner = _el("div", "u4a-th__inner");
             if (c.align === "center") { inner.classList.add("u4a-th__inner--center"); }
             inner.appendChild(_el("span", "u4a-th__label", c.action ? (c.action === "run" ? MSG_RUN : MSG_DISP) : c.label));
@@ -394,13 +474,16 @@
             return th;
         }
 
-        // 결과 행 1개 빌드(가상 스크롤러가 보이는 구간만 호출). i=절대 인덱스(zebra).
-        function _buildT1Row(row, i) {
+        // 결과 행 1개 빌드(cols=고정/스크롤 페인별 컬럼 부분집합). i=절대 인덱스(zebra·hover/선택 동기 키).
+        function _buildT1Row(row, i, cols) {
             var tr = _el("tr");
             if (i % 2 === 1) { tr.setAttribute("data-odd", "true"); }
-            tr.addEventListener("click", function () { _vs1.setSel(row.APPID); _vs1.refresh(); });
+            tr.setAttribute("data-row-idx", String(i));               // 고정/스크롤 페인 행 hover 동기 키
+            tr.setAttribute("data-appid", row.APPID == null ? "" : String(row.APPID));   // 선택 동기 키
+            if (oT1G.isHovered(i)) { tr.classList.add("is-hover"); }  // 렌더 시 hover 상태 반영(타이밍 경합 무관)
+            tr.addEventListener("click", function () { _selectT1(row.APPID); });
             tr.addEventListener("dblclick", function () { _pick(row); });
-            T1_COLS.forEach(function (c, idx) {
+            cols.forEach(function (c) {
                 var td = _el("td", c.align === "center" ? "is-center" : null);
                 if (c.action === "run") {
                     td.classList.add("is-action");
@@ -409,7 +492,7 @@
                     td.classList.add("is-action");
                     var b = _actBtn("desktop", MSG_DISP, function (e) {
                         e.stopPropagation();
-                        _vs1.setSel(row.APPID); _vs1.refresh();   // 원본 _setUiTableSelectedRow — 복귀 시 강조 유지
+                        _selectT1(row.APPID);   // 원본 _setUiTableSelectedRow — 복귀 시 강조 유지
                         _doDisplay(row);
                     });
                     if (!bWS10) { b.disabled = true; }
@@ -418,7 +501,6 @@
                     var v = row[c.key];
                     td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
                 }
-                _applyFrz(td, idx, T1_FRZN, T1_FRZ_LEFT);
                 tr.appendChild(td);
             });
             return tr;
@@ -434,19 +516,39 @@
             _colFilters = {};
             _renderT1();
         }
-        function _renderT1() {
-            // 헤더(정렬/필터 표시자 갱신 위해 매 렌더 재구성)
-            oT1Head.textContent = "";
-            var hr = _el("tr");
-            T1_COLS.forEach(function (c, idx) { hr.appendChild(_buildT1Th(c, idx)); });
-            oT1Head.appendChild(hr);
-            _syncT1ClearBtn();
-            // 바디 = 가상 스크롤(필터→정렬 파생 뷰)
-            _vs1.setRows(_deriveView(aResult));
+        // 헤더(정렬/필터 표시자 갱신 위해 매 렌더 재구성) — 고정/스크롤 페인 각각.
+        function _renderT1Head() {
+            oT1FrzHead.textContent = "";
+            var fr = _el("tr");
+            T1_FRZ_COLS.forEach(function (c) { fr.appendChild(_buildT1Th(c)); });
+            oT1FrzHead.appendChild(fr);
+            oT1ScrHead.textContent = "";
+            var sr = _el("tr");
+            T1_SCR_COLS.forEach(function (c) { sr.appendChild(_buildT1Th(c)); });
+            oT1ScrHead.appendChild(sr);
         }
-        var _vs1 = _makeVScroller(oT1Wrap, oT1Body, {
-            colCount: T1_COLS.length, buildRow: _buildT1Row, nodata: MSG_NODATA,
+        // 선택 강조 동기 — 두 페인 각 makeVScroller getSelKey 가 보이는 행에 aria-selected 자동 부여.
+        function _selectT1(appid) { _vs1f.setSel(appid); _vs1f.refresh(); _vs1.setSel(appid); _vs1.refresh(); }
+        function _renderT1() {
+            _renderT1Head();
+            _syncT1ClearBtn();
+            // 바디 = 필터→정렬 파생 뷰: 고정 페인·스크롤 페인 모두 가상 스크롤(보이는 행만)
+            var view = _deriveView(aResult);
+            _vs1f.setRows(view);
+            _vs1.setRows(view);
+            oT1G.sync();   // 가로바 하단 보정
+        }
+        // 고정 페인(좌측 컬럼) 가상 스크롤 인스턴스.
+        var _vs1f = _makeVScroller(oT1G.frzPane, oT1FrzBody, {
+            colCount: T1_FRZ_COLS.length,
+            buildRow: function (row, i) { return _buildT1Row(row, i, T1_FRZ_COLS); },
             getSelKey: function (row) { return row.APPID; }
+        });
+        // 스크롤 페인(나머지 컬럼) 가상 스크롤 인스턴스 — no-data 문구는 이쪽(넓은 영역)에만.
+        var _vs1 = _makeVScroller(oT1G.scrPane, oT1ScrBody, {
+            colCount: T1_SCR_COLS.length,
+            buildRow: function (row, i) { return _buildT1Row(row, i, T1_SCR_COLS); },
+            nodata: MSG_NODATA, getSelKey: function (row) { return row.APPID; }
         });
 
         // ── 컬럼 헤더 메뉴(정렬 asc/desc + 필터 input + 초기화) — 공통 U4AUI.openColumnMenu 소비 ──
@@ -506,8 +608,10 @@
         var T2_MAP = {};   // key → col (트리 셀 텍스트/정렬·필터용)
         T2_COLS.forEach(function (c) { if (c.key) { T2_MAP[c.key] = c; } });
 
-        // 좌측 2개 컬럼 고정(트리 / App Views) — 가로 스크롤 시.
-        var T2_FRZN = 2, T2_FRZ_LEFT = _frzLefts(T2_COLS, T2_FRZN);
+        // 좌측 2개 컬럼 고정(트리 / App Views) — 2-pane 의 고정 페인.
+        var T2_FRZN = 2;
+        var T2_FRZ_COLS = T2_COLS.slice(0, T2_FRZN);   // 고정 페인(트리 컬럼 + 앱 조회)
+        var T2_SCR_COLS = T2_COLS.slice(T2_FRZN);      // 스크롤 페인(나머지)
 
         var oTBar = _el("div", "u4aAppF4TreeBar");
         // 공통(USP fnUspTreeExpand/CollapseSelected = 원본 getSelectedIndex 기준): Expand=선택 노드의
@@ -540,12 +644,12 @@
         oClearAllBtn.classList.add("u4aAppF4ClearBtn");   // 탭1·탭2 공통: 툴바 우측 끝 정렬(margin-left:auto)
         oTBar.append(oExpandBtn, oCollapseBtn, _el("span", "u4aAppF4TBarSep"), oTSrch.wrap, oClearAllBtn);
 
-        var oT2Wrap = _el("div", "u4aAppF4TblWrap u4a-table-wrap u4aAppF4TreeWrap");
-        var oT2 = _el("table", "u4a-table u4aAppF4Tbl u4aAppF4Tree");
-        var oT2Head = _el("thead");   // 헤더는 _renderTree 가 매번 재구성(정렬/필터 표시자 갱신, 탭1과 동일)
-        var oT2Body = _el("tbody");
-        oT2.append(oT2Head, oT2Body);
-        oT2Wrap.appendChild(oT2);
+        var oT2G = _build2Pane();
+        var oT2Wrap = oT2G.grid;        // oPage2 에 들어갈 컨테이너(그리드)
+        // 트리 컬럼이 고정 페인에 들어가므로 트리 식별 클래스를 고정 테이블에 부여(셰브론 회전 CSS 스코프).
+        oT2G.frzPane.querySelector("table").classList.add("u4aAppF4Tree");
+        var oT2FrzHead = oT2G.frzHead, oT2FrzBody = oT2G.frzBody;   // 고정 페인(일반 렌더)
+        var oT2ScrHead = oT2G.scrHead, oT2ScrBody = oT2G.scrBody;   // 스크롤 페인(가상 스크롤)
         oPage2.append(oTBar, oT2Wrap);
 
         function _matchFilter(node) {   // 검색박스(상단) — APPID/APPNM contains
@@ -619,17 +723,20 @@
         }
 
         // 한 노드 → <tr>(전 컬럼). idx=가상스크롤 절대 인덱스(zebra). 토글=펼침상태만 바꾸고 평탄목록 재세팅.
-        function _treeRow(node, depth, idx) {
+        function _treeRow(node, depth, idx, cols) {
             var kids = node.APPF4HIER || [];
             var bHasKids = kids.length > 0;
             var bExp = !!oExpand[node._uid];   // 필터 중에도 oExpand 존중(검색 시 매칭경로는 _expandMatchPaths 가 미리 펼침)
             var tr = _el("tr");
             if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }
+            tr.setAttribute("data-row-idx", String(idx));     // 고정/스크롤 페인 행 hover 동기 키
+            tr.setAttribute("data-uid", String(node._uid));   // 선택 동기 키
+            if (oT2G.isHovered(idx)) { tr.classList.add("is-hover"); }   // 렌더 시 hover 상태 반영(타이밍 경합 무관)
             if (_isRoot(node)) { tr.classList.add("is-root"); }
             if (bHasKids) { tr.setAttribute("aria-expanded", bExp ? "true" : "false"); }
-            tr.addEventListener("click", function () { _vs2.setSel(node._uid); _vs2.refresh(); });
+            tr.addEventListener("click", function () { _selectTree(node._uid); });
             tr.addEventListener("dblclick", function () { if (!_isRoot(node)) { _pick(node); } });
-            T2_COLS.forEach(function (c, idx) {
+            cols.forEach(function (c) {
                 var td = _el("td", c.align === "center" ? "is-center" : null);
                 if (c.tree) {
                     td.classList.add("u4aAppF4TreeCell");
@@ -645,10 +752,10 @@
                             oExpand[node._uid] = bOpen;
                             // 공통 트리 UX: 접으면 하위 전체도 접는다(다시 펼치면 직속 자식만).
                             if (!bOpen) { _collapseDesc(node); }
-                            // 접기/펼치기 시 기존 선택은 해제(접힌 노드에 가려진 유령 선택 방지).
-                            _vs2.setSel(null);
-                            // 가상 스크롤: 펼침상태만 바꾸고 평탄목록 재계산 → 보이는 행만 렌더(대용량도 즉시).
-                            _vs2.setRows(_flattenTree(), true);
+                            // 접기/펼치기 시 기존 선택은 해제(접힌 노드에 가려진 유령 선택 방지) — 두 페인 모두.
+                            _vs2.setSel(null); _vs2f.setSel(null);
+                            // 가상 스크롤: 펼침상태만 바꾸고 평탄목록 재계산 → 고정/스크롤 페인 동시 재세팅(보이는 행만).
+                            _setTreeRows(_flattenTree(), true);
                         });
                     } else { tog.classList.add("u4a-tree__toggle--leaf"); }
                     var lbl = _el("span", "u4aAppF4TreeLabel", _isRoot(node) ? (node.APPNM || "ROOT") : (node.APPNM || ""));
@@ -672,7 +779,6 @@
                     if (c.nz && _isRoot(node)) { v = ""; }
                     td.textContent = c.fmt ? c.fmt(v) : (v == null ? "" : String(v));
                 }
-                _applyFrz(td, idx, T2_FRZN, T2_FRZ_LEFT);
                 tr.appendChild(td);
             });
             return tr;
@@ -694,7 +800,7 @@
             _sortArr(aTreeRoot).forEach(function (n) { walk(n, 0); });   // 최상위도 정렬 순서로
             return out;
         }
-        function _buildTreeRow(item, i) { return _treeRow(item.node, item.depth, i); }
+        function _buildTreeRow(item, i, cols) { return _treeRow(item.node, item.depth, i, cols); }
 
         // 탭2(트리) 컬럼 메뉴 컨트롤러 — 공유 _openColMenu 가 소비(상태=_treeSortKey/_treeColFilters).
         var _t2ColCtl = {
@@ -709,11 +815,10 @@
             }
         };
         // 헤더 셀 1개(탭1 _buildT1Th 와 동일 구성) — 데이터/트리/링크 컬럼만 정렬·필터 메뉴, action 제외.
-        function _buildT2Th(c, idx) {
+        function _buildT2Th(c) {
             var th = _el("th", c.align === "center" ? "is-center" : null);
             if (c.w) { th.style.width = c.w; }
             if (c.action) { th.classList.add("is-action"); }
-            _applyFrz(th, idx, T2_FRZN, T2_FRZ_LEFT);
             var inner = _el("div", "u4a-th__inner");
             if (c.align === "center") { inner.classList.add("u4a-th__inner--center"); }
             inner.appendChild(_el("span", "u4a-th__label", c.action ? MSG_DISP : c.label));
@@ -734,10 +839,14 @@
             return th;
         }
         function _buildT2Head() {
-            oT2Head.textContent = "";
-            var hr = _el("tr");
-            T2_COLS.forEach(function (c, idx) { hr.appendChild(_buildT2Th(c, idx)); });
-            oT2Head.appendChild(hr);
+            oT2FrzHead.textContent = "";
+            var fr = _el("tr");
+            T2_FRZ_COLS.forEach(function (c) { fr.appendChild(_buildT2Th(c)); });
+            oT2FrzHead.appendChild(fr);
+            oT2ScrHead.textContent = "";
+            var sr = _el("tr");
+            T2_SCR_COLS.forEach(function (c) { sr.appendChild(_buildT2Th(c)); });
+            oT2ScrHead.appendChild(sr);
         }
 
         // 정렬·필터 전체 해제 버튼 활성/비활성 동기화(걸린 정렬·필터·검색이 하나라도 있을 때만 활성).
@@ -754,8 +863,12 @@
             _renderTree();
         }
 
-        // 전체 렌더(로드/필터/Expand·Collapse all) = 헤더(정렬/필터 표시자) 재구성 + 평탄목록을 가상 스크롤러에.
-        function _renderTree() { _buildT2Head(); _syncClearAllBtn(); _vs2.setRows(_flattenTree()); }
+        // 고정/스크롤 페인 모두 가상스크롤 동시 세팅(토글/필터/정렬 공통 경로).
+        function _setTreeRows(view, keep) { _vs2f.setRows(view, keep); _vs2.setRows(view, keep); oT2G.sync(); }
+        // 선택 강조 동기 — 두 페인 각 makeVScroller getSelKey 가 보이는 행에 aria-selected 자동 부여.
+        function _selectTree(uid) { _vs2f.setSel(uid); _vs2f.refresh(); _vs2.setSel(uid); _vs2.refresh(); }
+        // 전체 렌더(로드/필터/Expand·Collapse all) = 헤더(정렬/필터 표시자) 재구성 + 평탄목록을 두 페인에.
+        function _renderTree() { _buildT2Head(); _syncClearAllBtn(); _setTreeRows(_flattenTree()); }
 
         function _treeExpandAll(bExpand) {
             // 가상 스크롤이라 전체 펼침/접힘도 즉시(보이는 행만 렌더) — busy 불필요.
@@ -781,9 +894,17 @@
             return uid != null ? _findNodeByUid(uid) : null;
         }
 
-        var _vs2 = _makeVScroller(oT2Wrap, oT2Body, {
-            colCount: T2_COLS.length, buildRow: _buildTreeRow, nodata: MSG_NODATA,
+        // 고정 페인(트리 컬럼 + 앱 조회) 가상 스크롤 인스턴스.
+        var _vs2f = _makeVScroller(oT2G.frzPane, oT2FrzBody, {
+            colCount: T2_FRZ_COLS.length,
+            buildRow: function (item, i) { return _buildTreeRow(item, i, T2_FRZ_COLS); },
             getSelKey: function (item) { return item.node._uid; }
+        });
+        // 스크롤 페인(나머지 컬럼) 가상 스크롤 인스턴스 — no-data 문구는 이쪽(넓은 영역)에만.
+        var _vs2 = _makeVScroller(oT2G.scrPane, oT2ScrBody, {
+            colCount: T2_SCR_COLS.length,
+            buildRow: function (item, i) { return _buildTreeRow(item, i, T2_SCR_COLS); },
+            nodata: MSG_NODATA, getSelKey: function (item) { return item.node._uid; }
         });
 
         // flat T_APPL → nested(APPF4HIER), 원본 _appF4Tree 규칙.
@@ -830,7 +951,7 @@
                         // 검색/컬럼필터가 활성이면 매칭 경로를 다시 펼친다 → 다른 탭 갔다 와도(=K2 재조회) 펼침 모습 유지.
                         _expandMatchPaths();
                     } else {
-                        try { _vs2.setSel(aTreeRoot[0] ? aTreeRoot[0]._uid : null); } catch (e) { } // 원본 setSelectedIndex(0)
+                        try { var _u0 = aTreeRoot[0] ? aTreeRoot[0]._uid : null; _vs2.setSel(_u0); _vs2f.setSel(_u0); } catch (e) { } // 원본 setSelectedIndex(0)
                     }
                     _renderTree();
                     _busy(false);
@@ -873,7 +994,7 @@
             if (!inp || typeof fnDisp !== "function") { return; }   // 원본: AppNmInput + displayBtn 존재 가드
             var fld = inp.closest ? inp.closest(".u4a-field") : null;
 
-            lf_close();                                             // ② setVisible(false) 대응(숨김·상태보존)
+            lf_hide();                                              // ② setVisible(false) 대응(숨김·상태보존)
             oDlg._pendingReshow = true;                             //    WS10 복귀(back) 시 자동 재표시 대상(원본 isOpen&&!visible)
             // ③ setValue(APPID) — ★ input 이벤트를 쏘지 않는다(쏘면 WS10 attachSuggest 가 추천목록을 연다).
             //    원본 sap setValue 도 이벤트 미발생. clear-X 노출은 data-filled 로 직접 동기.
@@ -896,7 +1017,7 @@
         }
         function _doTreeDisplay(node) {
             if (!_treeRunnable(node)) { _flash(); _msg("E", MSG_NOAPP); return; }
-            _vs2.setSel(node._uid); _vs2.refresh();   // 원본 _setUiTableSelectedRow — 복귀 시 강조 유지
+            _selectTree(node._uid);   // 원본 _setUiTableSelectedRow — 복귀 시 강조 유지(고정/스크롤 페인 동기)
             _doDisplay(node);
         }
 
@@ -963,17 +1084,25 @@
             ".u4aAppF4TBarSep{width:.0625rem;height:1.25rem;background:var(--line);margin:0 .25rem;}",
             /* overflow-anchor:none·overscroll-behavior:contain 은 공통 U4AUI.makeVScroller 가
                스크롤컨테이너(이 wrap)에 inline 으로 설정(끝단 떨림·스크롤앵커링 방지 단일 출처). */
-            ".u4aAppF4TblWrap{flex:1 1 auto;min-height:0;overflow:auto;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--surface);}",
-            /* 공통 .u4a-table(--compact) 소비 — 다열은 컬럼폭 합만큼 늘려 가로 스크롤 */
-            /* ★ border-collapse:separate — collapse 면 Chromium 이 셀 z-index 를 무시해서
-               가로 스크롤 시 뒤 컬럼이 고정 컬럼 위에 그려져 글자가 겹친다. separate 로 바꿔야
-               sticky 고정 셀의 z-index 가 먹어 스크롤 셀을 가린다. 하단 보더만 쓰므로 모양 동일. */
-            /* 트리테이블 텍스트 크기 — 다른 트리(.u4a-tree 0.8125rem)와 동일하게(2026-06-23 트리 통일).
-               다이얼로그 기본(0.875rem) 상속 시 App-F4 트리만 14px 로 커 보였음. 행높이는 테이블(.u4a-table) 표준 유지. */
-            /* 폰트는 공통 .u4a-table(다이얼로그 14px 상속) 기준 — F4 전용 축소(font-size:.8125rem) 제거(타 테이블과 통일). */
-            ".u4aAppF4Dlg .u4aAppF4Tbl{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;}",
+            /* ── 2-pane 그리드(CSS Grid): 박스(보더+라운드+surface)=그리드. col1=고정,col2=스크롤 / row1=본문,row2=하단 가로바.
+               가로바(hsb)를 col2/row2 에 둬 고정 컬럼(col1) 영역 자동 제외 → '고정바 이후'가 폭 동기 없이 성립. ── */
+            ".u4aAppF4Grid{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;overflow:hidden;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--surface);}",
+            /* 고정 페인 — col1/row1. 세로바 없음(스크롤 페인 scrollTop 추종). 우측 경계선 = '고정바'. */
+            ".u4aAppF4Pane--frozen{grid-column:1;grid-row:1;min-width:0;overflow:hidden;border-right:.0625rem solid var(--line);}",
+            /* 스크롤 페인 — col2/row1. ★가로 스크롤바는 여기서 제거(하단 hsb 로 분리)★ → 가로바가 행과 안 겹침. 세로바만. */
+            ".u4aAppF4Pane--scroll{grid-column:2;grid-row:1;min-width:0;overflow-x:hidden;overflow-y:auto;}",
+            /* 하단 별도 가로 스크롤바(UI5 sap.ui.table HSb) — col2/row2. 트랙 폭(spacer)=스크롤 페인 콘텐츠 폭(JS 동기). */
+            ".u4aAppF4HSb{grid-column:2;grid-row:2;overflow-x:auto;overflow-y:hidden;}",
+            ".u4aAppF4HSbSpacer{height:.0625rem;}",
+            /* 공통 .u4a-table(--compact) 소비. 고정=컬럼폭 합 고정, 스크롤=내용폭(좁으면 가로스크롤·넓으면 채움). */
+            ".u4aAppF4Dlg .u4aAppF4Tbl{border-collapse:separate;border-spacing:0;}",
+            ".u4aAppF4Dlg .u4aAppF4Tbl--frozen{width:max-content;}",
+            ".u4aAppF4Dlg .u4aAppF4Tbl--scroll{width:max-content;min-width:100%;}",
             ".u4aAppF4Dlg .u4aAppF4Tbl th.is-center,.u4aAppF4Dlg .u4aAppF4Tbl td.is-center{text-align:center;}",
             ".u4aAppF4Dlg .u4aAppF4Tbl th.is-action,.u4aAppF4Dlg .u4aAppF4Tbl td.is-action{text-align:center;width:4.5rem;padding-left:.25rem;padding-right:.25rem;}",
+            /* ★ 2-pane 행높이 정합 핵심 — 셀 줄바꿈 금지. 좁혀도 줄바꿈으로 행이 커지지 않음(넘치면 가로스크롤=고정바 이후).
+               고정/스크롤 페인 행이 항상 1줄·동일 높이라 scrollTop 동기 정렬이 어긋나지 않는다. */
+            ".u4aAppF4Dlg .u4aAppF4Tbl th,.u4aAppF4Dlg .u4aAppF4Tbl td{white-space:nowrap;}",
             /* 모든 셀 수직 중앙(액션 아이콘이 텍스트와 어긋나지 않게) */
             ".u4aAppF4Dlg .u4aAppF4Tbl td{vertical-align:middle;}",
             /* 행 안 액션 버튼만 컴팩트(콤팩트 행에 맞춤). 툴바(Expand/Collapse/전체해제) 버튼은
@@ -992,32 +1121,17 @@
             ".u4aAppF4TreeLabel{overflow:hidden;text-overflow:ellipsis;}",
             ".u4aAppF4Link{color:var(--link);font-weight:600;cursor:pointer;}",
             ".u4aAppF4Link:hover{text-decoration:underline;}",
-            /* ── 고정 컬럼(가로 스크롤 시 좌측 N개 sticky) — 탭1(3개)·트리(2개) 공통, `.is-frz` 클래스 기반 ──
-               각 셀에 JS(_applyFrz)가 `.is-frz`(+마지막 `.is-frz-last`)와 inline `left`(누적폭)를 부여.
-               아래 머신(positioned·z-index·배경·경계선)은 .u4aAppF4Tbl 스코프로 두 테이블이 공유한다.
-               층위: 헤더 고정셀 z3 > 본문 고정셀 z2 > 일반 헤더 z1 > 일반 셀 z0. */
-            /* ★ 본문 스크롤 셀도 positioned(relative) — static 셀은 sticky 고정셀과 stacking 비교가 안 돼
-               테이블 페인트 순서상 고정셀 위에 그려져 겹친다(헤더는 전 셀 sticky라 안 겹쳤음). relative 면 z-index 먹음. */
-            ".u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td{position:relative;}",
-            ".u4aAppF4Tbl thead th.is-frz,.u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td.is-frz{position:sticky;z-index:2;}",
-            ".u4aAppF4Tbl thead th.is-frz{z-index:3;}",
-            /* ★ 고정 셀 상태별 불투명 배경 — 반투명 토큰(hover/active/selected)은 linear-gradient(단색 이미지)
-               레이어로 깔고 var(--surface)(불투명)를 최종 color 레이어로(그냥 `색,색` 은 무효 CSS→드롭).
-               → surface 위 오버레이 1회만 = 스크롤 영역과 동일 + 불투명(이중합성·비침 차단). */
-            ".u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td.is-frz{background:var(--surface);}",
-            ".u4aAppF4Tbl tbody tr[data-odd=\"true\"]>td.is-frz,.u4aAppF4Tbl tbody tr:hover>td.is-frz{background:linear-gradient(var(--hover-bg),var(--hover-bg)),var(--surface);}",
-            ".u4aAppF4Tbl tbody tr[data-odd=\"true\"]:hover>td.is-frz{background:linear-gradient(var(--active-bg),var(--active-bg)),var(--surface);}",
-            ".u4aAppF4Tbl tbody tr[aria-selected=\"true\"]>td.is-frz,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"][data-odd=\"true\"]>td.is-frz,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"]:hover>td.is-frz,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"][data-odd=\"true\"]:hover>td.is-frz{background:linear-gradient(var(--selected-bg),var(--selected-bg)),var(--surface);}",
-            /* 고정 경계선 — 마지막 고정 컬럼 우측 */
-            ".u4aAppF4Tbl thead th.is-frz-last,.u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td.is-frz-last{box-shadow:inset -0.0625rem 0 0 var(--line);}",
-            /* 마지막 고정 컬럼은 우측 여백을 줘 헤더/내용이 세로 고정선에 붙지 않게(공통). 폭은 각 컬럼 w. */
-            ".u4aAppF4Dlg .u4aAppF4Tbl thead th.is-frz-last,.u4aAppF4Dlg .u4aAppF4Tbl tbody tr:not(.u4aVSpacer)>td.is-frz-last{padding-right:.85rem;}",
+            /* ── zebra(공통 data-odd 배경) off — 사용자 요청(눈 피로). 행 구분은 hover/선택으로만(.analy 16 §6.1 기본은 zebra). ── */
+            ".u4aAppF4Tbl tbody tr[data-odd=\"true\"]{background:transparent;}",
+            /* hover 동기(JS .is-hover) + 공통 :hover — 짝/홀 동일색(2-pane 라 마우스 없는 페인도 동시 강조). */
+            ".u4aAppF4Tbl tbody tr:hover,.u4aAppF4Tbl tbody tr.is-hover,.u4aAppF4Tbl tbody tr[data-odd=\"true\"]:hover,.u4aAppF4Tbl tbody tr[data-odd=\"true\"].is-hover{background:var(--hover-bg);}",
+            /* 선택행 우선(hover/zebra 보다 강하게 — 공통 selected 색 유지). */
+            ".u4aAppF4Tbl tbody tr[aria-selected=\"true\"],.u4aAppF4Tbl tbody tr[aria-selected=\"true\"][data-odd=\"true\"],.u4aAppF4Tbl tbody tr[aria-selected=\"true\"]:hover,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"].is-hover,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"][data-odd=\"true\"]:hover,.u4aAppF4Tbl tbody tr[aria-selected=\"true\"][data-odd=\"true\"].is-hover{background:var(--selected-bg);}",
+            /* 선택 좌측 accent bar(공통 td:first-child)는 고정 페인 첫 컬럼에만 — 스크롤 페인 첫 컬럼(테이블 중간)엔 끔. */
+            ".u4aAppF4Tbl--scroll tbody tr[aria-selected=\"true\"]>td:first-child{box-shadow:none;}",
             /* 가상 스크롤 스페이서 행 — hover/zebra/선택 표시 없음 */
             ".u4aAppF4Dlg .u4aVSpacer,.u4aAppF4Dlg .u4aVSpacer:hover{background:transparent;cursor:default;}",
             ".u4aAppF4Dlg .u4aVSpacer td{padding:0;border:0;}",
-            /* 가상 스크롤 떨림 방지 — 데이터 행(스페이서 제외)을 측정된 정수 높이로 강제.
-               total*ROWH 와 실제 높이를 정확히 일치시켜 끝단 scrollHeight 흔들림 제거. */
-            ".u4aAppF4TblWrap tbody tr:not(.u4aVSpacer)>td{height:var(--u4a-vsrowh,auto);box-sizing:border-box;}",
             /* 컬럼 헤더(.u4a-th--menu/__inner/__label/__ind) + 정렬/필터 메뉴(.u4a-colmenu)
                CSS 는 전 화면 공통(shell.css)으로 승격 — 여기 인라인 복제 제거(2026-06-24). */
             ""

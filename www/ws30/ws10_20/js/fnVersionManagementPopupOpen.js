@@ -124,9 +124,17 @@
         });
 
         // 과거 버전 "새창으로 보기" → WS20 새창 이동(원본 _fnNewWindow + onNewWindow MOVE20).
+        //   새창 로드 완료(did-finish-load) 콜백에서 버전관리 팝업으로 "완료" 통지 → 팝업이 busy 해제.
+        //   (팝업은 5초 안전망도 두지만, 이 신호가 먼저 오면 즉시 해제 = blind 타이머 개선.)
         function _fnNewWindow(event, res) {
             const TAPPID = (res && res.TAPPID) || "";
-            parent.onNewWindow({ ACTCD: "MOVE20", APPID: TAPPID });
+            parent.onNewWindow({ ACTCD: "MOVE20", APPID: TAPPID }, function () {
+                try {
+                    if (oBrowserWindow && !oBrowserWindow.isDestroyed()) {
+                        oBrowserWindow.webContents.send("if-vermng-newwin-done");
+                    }
+                } catch (e) { }
+            });
         }
         IPCMAIN.on(`${BROWSKEY}-if-version-management-new-window`, _fnNewWindow);
 

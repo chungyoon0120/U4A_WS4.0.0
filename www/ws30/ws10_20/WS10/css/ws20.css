@@ -467,7 +467,7 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--ws20-aggr); font-size: 13px;
 }
-.u4aWs20TreeAggrIcon { font-size: 10px; color: var(--ws20-aggr); vertical-align: middle; margin-right: 3px; }
+.u4aWs20TreeAggrIcon { font-size: 11px; color: var(--ws20-aggr); vertical-align: middle; margin-right: 3px; }
 
 /* 행 액션 (구 add/delete Icon) — 원본은 Change 모드에서 항상 노출(visible:{/IS_EDIT}).
    버튼은 designSetActionIcon 이 visible_add/delete 로 노드별 렌더를 이미 제어하므로,
@@ -507,6 +507,30 @@
   /* 들여쓰기 step 축소(16px→10px)는 shell.css 공통 @container 가 --u4a-tree-indent-step 으로
      동일 분기점(17rem)에서 처리 → WS20 전용 step override 제거(중복). */
 }
+
+/* =====================================================================
+ * 디자인 트리 드래그&드롭(이동/복사) — ws_html5_ws20_dnd.js
+ *   원본 UI5 TreeTable DnD 대응. draggable 행 + 드래그 중 드롭가능/불가 표시 +
+ *   드롭 위치 인디케이터(On=링/Before=상단선/After=하단선). box-shadow 로
+ *   레이아웃 시프트 0, color-mix 미사용(Chromium93). 색은 의미 토큰만.
+ * ===================================================================== */
+.u4aWs20TreeRow[draggable="true"] { cursor: grab; }
+.u4aWs20TreeRow[draggable="true"]:active { cursor: grabbing; }
+/* 드래그 중인 원본 행 — 흐리게(원본 sapUiDnDDragging). */
+.u4aWs20TreeRow.u4aWs20TreeDragging { opacity: 0.5; }
+/* 드롭 불가 행 — 흐리게 + no-drop(원본 u4aWsDisableTreeDrop). */
+.u4aWs20TreeRow.u4aWs20TreeDropNo { opacity: 0.45; cursor: no-drop; }
+/* 드롭 위치 표시 */
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropOn {
+  background: var(--hover-bg);
+  box-shadow: inset 0 0 0 0.125rem var(--accent);
+}
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropBefore { box-shadow: inset 0 0.125rem 0 0 var(--accent); }
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropAfter { box-shadow: inset 0 -0.125rem 0 0 var(--accent); }
+
+/* aggregation 선택 다이얼로그(2+ 후보) — 공통 .u4a-dialog 소비, 폭만 보강. */
+.u4aWs20AggrDlg { width: min(92vw, 24rem); }
+.u4aWs20AggrDlg .u4aWs20AggrSel { width: 100%; }
 
 /* =====================================================================
  * 디자인 트리 컨텍스트 메뉴 (구 callDesignContextMenu)

@@ -2490,7 +2490,11 @@
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
+        oBrowserOptions.titleBarStyle = 'hidden';
+
+        // [HTML5] 네이티브 창 opacity 페이드 미사용(OS 리컴포짓이라 무겁고 흰 번쩍) — 위치 잡힌 뒤 표시
+        //   (show=false), 등장 효과는 창 안 .u4aRtmBody CSS opacity transition(frame.js _finishOpen) 으로 처리.
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
@@ -2515,6 +2519,10 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            // [HTML5] frameless 창의 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: oBrowserOptions.title,
         };
 
         let sUrlPath = parent.getPath(sPopupName);

@@ -1208,11 +1208,20 @@
                                 break;
                             }
 
-                            // [HTML5] AppNmInput = DOM input. displayBtn(WS20 진입)은 WS20 셸(S3) 전까지 보류.
+                            // [HTML5] 원본(ws_main copy.js:946~951): AppNmInput 에 APPID 세팅 →
+                            //   displayBtn(Display=읽기전용) firePress → 입력칸 비움.
+                            //   WS20 셸 변환 완료로 보류 해제 — displayBtn 이벤트(ev_AppDisplay) 직접 호출.
                             try {
                                 let oInp = oAPP.fn.fnGetWs10AppInputDom && oAPP.fn.fnGetWs10AppInputDom();
                                 if (oInp) { oInp.value = APPID; }
-                            } catch (e) { }
+                                if (oAPP.events && typeof oAPP.events.ev_AppDisplay === "function") {
+                                    oAPP.events.ev_AppDisplay();   // = 원본 displayBtn.firePress() (Display WS20 진입)
+                                }
+                                // 진입 트리거 후 입력칸 비움(원본 950행).
+                                if (oInp) { setTimeout(function () { oInp.value = ""; }, 0); }
+                            } catch (e) {
+                                console.error("[HTML5][MOVE20] 새창 WS20 자동진입 오류:", e && e.message);
+                            }
 
                             break;
 

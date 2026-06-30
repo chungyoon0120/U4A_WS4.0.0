@@ -73,22 +73,34 @@
 
             <!-- 하단 = 소스 비교(Monaco diff 호스트) — 비교 전엔 숨김 -->
             <section class="u4a-splitter__pane u4aVmDiffPane" id="vmDiffPane" hidden>
-                <!-- 비교 툴바(원본 COMPARE_PAGE customHeader): [▼][▲] | 기준 ver | 대상 ver | 범례 | 닫기 -->
+                <!-- 비교 툴바(원본 COMPARE_PAGE customHeader): [▼][▲] | 기준 ver | 대상 ver | 줌 | 전체창 | 범례 | 닫기.
+                     좁아지면 #vmDiffTools 안 버튼이 ⋯ 오버플로 메뉴로 접힘(공통 U4AUI.attachOverflow). 닫기 X 는 항상 표시(오버플로 밖). -->
                 <div class="u4aVmDiffBar" id="vmDiffBar">
-                    <button type="button" class="u4a-btn u4aVmIconBtn" id="vmDiffNext" title=""><i class="fa-solid fa-arrow-down"></i></button>
-                    <button type="button" class="u4a-btn u4aVmIconBtn" id="vmDiffPrev" title=""><i class="fa-solid fa-arrow-up"></i></button>
-                    <span class="u4aVmDiffSep"></span>
-                    <span class="u4aVmDiffTitle" id="vmBaseTitle"></span>
-                    <span class="u4aVmVerBadge u4aVmVerBadge--base" id="vmBaseVer"></span>
-                    <span class="u4aVmDiffGap"></span>
-                    <span class="u4aVmDiffTitle" id="vmTargetTitle"></span>
-                    <span class="u4aVmVerBadge u4aVmVerBadge--target" id="vmTargetVer"></span>
-                    <span class="u4aVmDiffSpacer"></span>
-                    <!-- 전체창 토글 — 목록(테이블) 숨기고 diff 가 창 전체 차지(USP 에디터 전체화면과 동일 패턴) -->
-                    <button type="button" class="u4a-btn u4aVmIconBtn" id="vmDiffFull" aria-pressed="false"><i class="fa-solid fa-expand"></i></button>
-                    <button type="button" class="u4a-btn u4aVmLegendBtn" id="vmLegendBtn">
-                        <i class="fa-solid fa-list"></i><span id="vmLegendTxt"></span>
-                    </button>
+                    <div class="u4aVmDiffTools" id="vmDiffTools">
+                        <button type="button" class="u4a-btn u4aVmIconBtn" id="vmDiffNext" title=""><i class="fa-solid fa-arrow-down"></i></button>
+                        <button type="button" class="u4a-btn u4aVmIconBtn" id="vmDiffPrev" title=""><i class="fa-solid fa-arrow-up"></i></button>
+                        <span class="u4aVmDiffSep"></span>
+                        <span class="u4aVmDiffTitle" id="vmBaseTitle"></span>
+                        <span class="u4aVmVerBadge u4aVmVerBadge--base" id="vmBaseVer"></span>
+                        <span class="u4aVmDiffGap"></span>
+                        <span class="u4aVmDiffTitle" id="vmTargetTitle"></span>
+                        <span class="u4aVmVerBadge u4aVmVerBadge--target" id="vmTargetVer"></span>
+                        <span class="u4aVmDiffSpacer"></span>
+                        <!-- 확대/축소 컨트롤(에디터 팝업 공통 패턴): [−][🔍 NNN%][+]. % 클릭=원복, Ctrl+휠도 동일. -->
+                        <div class="u4aVmZoom">
+                            <button type="button" class="u4a-btn u4aVmIconBtn" id="vmZoomOut" title="Ctrl + Wheel ↓"><i class="fa-solid fa-minus"></i></button>
+                            <button type="button" class="u4a-btn u4aVmZoomPct" id="vmZoomBtn"><i class="fa-solid fa-magnifying-glass"></i><span id="vmZoomTxt">100%</span></button>
+                            <button type="button" class="u4a-btn u4aVmIconBtn" id="vmZoomIn" title="Ctrl + Wheel ↑"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                        <!-- 확대/축소 ↔ 보기(전체창/범례) 역할 구분 막대 -->
+                        <span class="u4aVmDiffSep"></span>
+                        <!-- 전체창 토글 — 목록(테이블) 숨기고 diff 가 창 전체 차지(USP 에디터 전체화면과 동일 패턴) -->
+                        <button type="button" class="u4a-btn u4aVmIconBtn" id="vmDiffFull" aria-pressed="false"><i class="fa-solid fa-expand"></i></button>
+                        <button type="button" class="u4a-btn u4aVmLegendBtn" id="vmLegendBtn">
+                            <i class="fa-solid fa-list"></i><span id="vmLegendTxt"></span>
+                        </button>
+                    </div>
+                    <!-- 닫기 X — 오버플로 대상 밖(항상 표시). -->
                     <button type="button" class="u4a-btn u4a-btn--negative u4aVmIconBtn" id="vmDiffClose" title=""><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <!-- Monaco diff 호스트 iframe(versionMng/host) — 등장 페이드(opacity) -->

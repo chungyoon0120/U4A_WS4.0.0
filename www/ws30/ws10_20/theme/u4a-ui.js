@@ -861,6 +861,7 @@
         }
         function up() {
             oCur = null;
+            document.body.classList.remove("u4a-dragging");   // 드래그 종료 → iframe 포인터 복구
             document.removeEventListener("mousemove", mv, true);
             document.removeEventListener("mouseup", up, true);
         }
@@ -872,6 +873,7 @@
             const oDlg = oHandle.closest(".u4a-dialog");
             if (!oDlg) { return; }
             oCur = oDlg;
+            document.body.classList.add("u4a-dragging");   // 드래그 동안 iframe 마우스 차단(끊김 방지)
             const r = oDlg.getBoundingClientRect();
             oDlg.style.margin = "0"; oDlg.style.position = "fixed";
             oDlg.style.left = r.left + "px"; oDlg.style.top = r.top + "px";
@@ -934,12 +936,15 @@
             if (e.button !== 0 || !e.target.closest) { return; }
             var oBar = e.target.closest(".u4a-splitter__bar");
             if (!oBar) { return; }
+            document.body.classList.add("u4a-dragging");   // 드래그 동안 iframe 마우스 차단(끊김 방지)
             _sides(oBar).forEach(function (oPane) {
                 if (oPane.dataset.u4aSplitHome == null) {
                     oPane.dataset.u4aSplitHome = oPane.style.flex || "";
                 }
             });
         }, true);
+        // 스플릿바 드래그 종료 → iframe 포인터 복구(어디서 떼든). 화면별 드래그 핸들러와 무관하게 항상 해제.
+        document.addEventListener("mouseup", function () { document.body.classList.remove("u4a-dragging"); }, true);
         // 더블클릭 — 인접 패널을 home 으로 복귀
         document.addEventListener("dblclick", function (e) {
             if (!e.target.closest) { return; }

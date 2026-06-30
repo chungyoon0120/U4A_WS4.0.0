@@ -24,6 +24,7 @@ window.require(["vs/editor/editor.main"], function () {
         renderSideBySide: true,
         automaticLayout: true,            // 창/스플리터 리사이즈 자동 대응
         readOnly: true,
+        mouseWheelZoom: true,             // Ctrl(⌘)+휠 = 폰트 확대/축소 (Monaco 내장, editorPopup 공통 패턴)
         scrollbar: {
             verticalScrollbarSize: 7,
             horizontalScrollbarSize: 7,
@@ -39,37 +40,57 @@ window.require(["vs/editor/editor.main"], function () {
     });
 
     // 좌/우 모두 입력 막기(원본 동일 — 버전 비교는 읽기 전용).
-    try { window.editor.getOriginalEditor().updateOptions({ readOnly: true }); } catch (e) { }
-    try { window.editor.getModifiedEditor().updateOptions({ readOnly: true }); } catch (e) { }
+    var oOrig = window.editor.getOriginalEditor();
+    var oModf = window.editor.getModifiedEditor();
+    try { oOrig.updateOptions({ readOnly: true }); } catch (e) { }
+    try { oModf.updateOptions({ readOnly: true }); } catch (e) { }
 
     /***********************************************************************
-     * Ctrl + 마우스휠 = 폰트 크기 확대/축소(원본 _waitForEditorDomNode 휠 핸들러 이관).
-     *   두 에디터(원본/수정) DOM 에 각각 휠 리스너를 달아 동시에 폰트를 조절한다.
+     * 폰트 확대/축소 — ★Monaco 내장(EditorZoom) 사용 (editorPopup 호스트와 동일한 공통 패턴/국룰).
+     *   - Ctrl(⌘)+휠 : 생성옵션 mouseWheelZoom:true 가 처리(자체 wheel 핸들러 불필요).
+     *   - Ctrl+'='/'-' : 내장 fontZoomIn/Out 액션의 기본 키바인딩.
+     *   - Ctrl+0 : 내장 reset 키바인딩은 Numpad0 뿐이라 Digit0 를 양 에디터에 추가.
+     *   - 툴바 줌 버튼(부모 cmd) : 동일한 내장 액션을 호출.
+     *   EditorZoom 은 전역이라 한쪽 에디터에서 실행해도 양쪽 폰트가 같이 바뀐다.
+     *   현재 배율(%)은 fontInfo.fontSize/베이스로 계산해 부모에 통지(툴바 표시용).
      ***********************************************************************/
-    var MIN_FONT_SIZE = 10, MAX_FONT_SIZE = 50, iCurFont = DEFAULT_FONT_SIZE;
-
-    function _bindWheelZoom(oEditor) {
-        var oDom = oEditor.getDomNode();
-        if (!oDom) { return false; }
-        oDom.addEventListener("wheel", function (e) {
-            if (!e.ctrlKey) { return; }
-            if (e.deltaY < 0 && iCurFont < MAX_FONT_SIZE) { iCurFont++; }
-            else if (e.deltaY > 0 && iCurFont > MIN_FONT_SIZE) { iCurFont--; }
-            try { window.editor.getOriginalEditor().updateOptions({ fontSize: iCurFont }); } catch (e2) { }
-            try { window.editor.getModifiedEditor().updateOptions({ fontSize: iCurFont }); } catch (e2) { }
-        }, { passive: true });
-        return true;
+    var C_BASE_FONT = DEFAULT_FONT_SIZE;
+    function _runZoom(sAct) {
+        try { var a = oModf.getAction(sAct) || oOrig.getAction(sAct); if (a) { a.run(); } } catch (e) { }
     }
+    // 부모(versionMngFrame)의 줌 버튼이 호출(index.html cmd 핸들러 → 이 전역) — 내장 액션 위임.
+    window._vmFont = {
+        zoomIn: function () { _runZoom("editor.action.fontZoomIn"); },
+        zoomOut: function () { _runZoom("editor.action.fontZoomOut"); },
+        zoomReset: function () { _runZoom("editor.action.fontZoomReset"); }
+    };
 
-    // DiffEditor 의 내부 에디터 DOM 은 약간 늦게 생성될 수 있어, 준비될 때까지 폴링(원본 _waitForEditorDomNode).
-    (function _waitDom() {
-        var iLeft = _bindWheelZoom(window.editor.getOriginalEditor());
-        var iRight = _bindWheelZoom(window.editor.getModifiedEditor());
-        if (iLeft && iRight) { return; }
-        setTimeout(_waitDom, 50);
-    })();
+    function _reportZoom() {
+        try {
+            var fs = oModf.getOption(monaco.editor.EditorOption.fontInfo).fontSize;
+            _toParent({ evt: "zoom", pct: Math.round((fs / C_BASE_FONT) * 100) });
+        } catch (e) { }
+    }
+    // 폰트(줌) 변경 시마다 % 재통지 — Ctrl+휠/키/버튼 모두 fontInfo 변경을 거친다.
+    function _watchFont(oEd) {
+        try {
+            oEd.onDidChangeConfiguration(function (e) {
+                try { if (e.hasChanged(monaco.editor.EditorOption.fontInfo)) { _reportZoom(); } }
+                catch (e2) { _reportZoom(); }
+            });
+        } catch (e) { }
+    }
+    _watchFont(oOrig); _watchFont(oModf);
 
-    // 로드 완료 통지 — 부모(versionMngFrame)가 이 시점에 setCompareData 전송.
+    // Ctrl/⌘+0 = 폰트 줌 원복(내장 reset 은 Numpad0 만 바인딩 → Digit0 보강). 양 에디터에 등록.
+    var _KEY_0 = (monaco.KeyCode.Digit0 != null) ? monaco.KeyCode.Digit0 : monaco.KeyCode.KEY_0;
+    function _bindReset(oEd) {
+        try { oEd.addCommand(monaco.KeyMod.CtrlCmd | _KEY_0, function () { _runZoom("editor.action.fontZoomReset"); }); } catch (e) { }
+    }
+    _bindReset(oOrig); _bindReset(oModf);
+
+    // 로드 완료 통지 + 초기 배율(100%) 통지 — 부모가 이 시점에 setCompareData 전송 / 툴바 % 표시.
     _toParent({ evt: "ready" });
+    _reportZoom();
 
 });

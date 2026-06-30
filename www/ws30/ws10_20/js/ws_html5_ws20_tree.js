@@ -185,16 +185,17 @@
     }
 
     /************************************************************************
-     * sap-icon URI → 표시용 글리프 매핑 (UIATT_ICON 등).
-     *   원본은 sap.ui.core.Icon(아이콘 폰트). HTML5 단계에선 대체 글리프 사용.
+     * sap-icon URI → aggregation cardinality 아이콘(FontAwesome 7).
+     *   원본 sap.ui.core.Icon(color-fill=0:1 / dimension=0:N) 대응 FA 아이콘.
+     *   (구 ◇/◆ 유니코드 글리프 → FA 로 교체: 렌더 일관성/가독성)
      ************************************************************************/
-    var _GLYPH = {
-        "sap-icon://color-fill": "◇",  // 0:1 aggregation
-        "sap-icon://dimension": "◆"    // 0:N aggregation
+    var _AGGR_ICON = {
+        "sap-icon://color-fill": "fa-regular fa-square",   // 0:1 (단일) — 사각형 1개
+        "sap-icon://dimension": "fa-regular fa-clone"      // 0:N (다중) — 겹친 사각형(원본과 동일)
     };
-    function _aggrGlyph(sIcon) {
+    function _aggrIconClass(sIcon) {
         if (!sIcon) { return ""; }
-        return _GLYPH[sIcon] || "◆";
+        return _AGGR_ICON[sIcon] || "fa-regular fa-clone";
     }
 
     /************************************************************************
@@ -509,10 +510,10 @@
                 if (n.UIATT) {
                     var AGGR = document.createElement("span");
                     AGGR.className = "u4aWs20TreeAggr";
-                    if (n.UIATT_ICON) {
-                        var AGI = document.createElement("span");
-                        AGI.className = "u4aWs20TreeAggrIcon";
-                        AGI.textContent = _aggrGlyph(n.UIATT_ICON);
+                    var sAgiCls = _aggrIconClass(n.UIATT_ICON);
+                    if (sAgiCls) {
+                        var AGI = document.createElement("i");
+                        AGI.className = "u4aWs20TreeAggrIcon " + sAgiCls;
                         AGGR.appendChild(AGI);
                     }
                     var AGT = document.createElement("span");
@@ -568,6 +569,8 @@
                 // 상태 highlight 컬러바(None/Indication02/04/08 + find 03/07)
                 var sHi = n.highlight || "None";
                 if (sHi && sHi !== "None") { oRow.classList.add("hl-" + sHi); }
+                // 드래그&드롭 데코(draggable + 드롭가능/불가 표시) — ws_html5_ws20_dnd.js.
+                try { if (typeof oAPP.fn.fnWs20DndDecorateRow === "function") { oAPP.fn.fnWs20DndDecorateRow(oRow, n); } } catch (e) { }
             }
         });
         _ws20tree.el.classList.add("u4aWs20Tree");

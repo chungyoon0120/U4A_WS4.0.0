@@ -46,6 +46,19 @@
     }
 
     /************************************************************************
+     * 편집(Change) 모드 여부 — 원본 ws_fn_01.js 메뉴 enabled formatter(2703~2714) 1:1.
+     *   parent.getAppInfo().IS_EDIT === "X" → 편집. appInfo 미조회면 기존(enabled) 유지.
+     *   (메뉴는 fnRenderWs20Shell 에서 빌드되고, 모드 전환도 그 경로를 재호출 → 재평가됨)
+     ************************************************************************/
+    function _isEditMode() {
+        try {
+            var oInfo = parent.getAppInfo && parent.getAppInfo();
+            if (oInfo == null) { return true; }     // 원본: appInfo null → 기존 enabled 유지
+            return oInfo.IS_EDIT === "X";
+        } catch (e) { return true; }
+    }
+
+    /************************************************************************
      * WS20 윈도우 메뉴 데이터 (구 fnGetWindowMenuListWS20 / fnGetWindowMenuWS20 미러)
      *   sap-icon → FontAwesome 매핑. ws10_html.js 의 공유 buildMenubar 가 소비.
      ************************************************************************/
@@ -72,7 +85,10 @@
                 { key: "WMENU30_02", icon: "js", brand: true, text: _msg("B61") },
                 { key: "WMENU30_03", icon: "html5", brand: true, text: _msg("B62") },
                 { key: "WMENU30_04", icon: "file-lines", text: _msg("B63") },
-                { key: "WMENU30_05", icon: "sliders", text: _msg("B64") }
+                // 스켈레톤 화면 설정 — 조회(Display) 모드면 비활성(원본 enabled formatter).
+                //   getter 로 두어 메뉴를 열 때마다(buildMenubar→_buildMenuEl 가 it.disabled 라이브 읽음)
+                //   현재 모드를 재평가 → 모드 전환 시 메뉴 재빌드 없이 양방향 자동 반영.
+                { key: "WMENU30_05", icon: "sliders", text: _msg("B64"), get disabled() { return !_isEditMode(); } }
             ] },
             { key: "WMENU40", text: _msg("B36"), items: [
                 { key: "WMENU40_01", icon: "plus", text: _msg("A09") },
@@ -1610,6 +1626,15 @@
         } catch (e) {
             console.warn("[HTML5][WS20] setUIAreaEditable error:", e && e.message);
         }
+
+        // 새창(버전관리 등) MOVE20 자동진입 1회 소비 후 IF_DATA 제거(원본 ws_fn_02.js:668~676).
+        //   (창 opacity 복구는 library-preload fnWindowOnInitLoad 에서 이미 처리 → 여기선 IF_DATA 만 클리어.)
+        try {
+            var oNewWin_IF_DATA = parent.getNewBrowserIF_DATA && parent.getNewBrowserIF_DATA();
+            if (oNewWin_IF_DATA && oNewWin_IF_DATA.ACTCD === "MOVE20" && parent.setNewBrowserIF_DATA) {
+                parent.setNewBrowserIF_DATA(undefined);
+            }
+        } catch (e) { }
     }; // end of oAPP.fn.fnMoveToWs20
 
     /************************************************************************

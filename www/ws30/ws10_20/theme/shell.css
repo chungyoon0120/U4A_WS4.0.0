@@ -673,6 +673,14 @@ button:focus-visible {
     height: 50px;
 }
 
+/* ★드래그 중 iframe 마우스 가로채기 차단 (전 화면 공통 — 반복 함정) ──────────────
+   스플릿바/다이얼로그 헤더 드래그 중 마우스가 화면 안 <iframe>(미리보기·에디터 등) 위로 가면,
+   iframe 이 mousemove 를 자기 문서로 먹어 부모의 드래그가 "끊긴다". 드래그 동안 모든 iframe 의
+   포인터 이벤트를 꺼서(부모 document 가 계속 받게) 매끄럽게 드래그된다.
+   토글은 u4a-ui.js 전역 드래그 핸들러(_installGlobalDialogDrag/_installGlobalSplitterReset)가
+   body 에 .u4a-dragging 을 붙였다 뗀다 → 화면별 배선 불필요. (.analy/16 §4.3) */
+body.u4a-dragging iframe { pointer-events: none; }
+
 /* ── 상태 뱃지 (ObjectStatus 대체) ──────────────────────────────── */
 .u4a-status {
     display: inline-flex;
@@ -1749,6 +1757,37 @@ dialog::backdrop {
     .u4a-table--compact tbody td {
         height: var(--row-h, 2.5rem);
     }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   밀도(Density) — sapUiSizeCompact 사상의 컨테이너 스코프 클래스 `.u4a-compact`
+   --------------------------------------------------------------------
+   임의의 컨테이너(다이얼로그/패널/페이지/폼)에 `.u4a-compact` 를 붙이면 그 하위
+   공통 컨트롤·테이블 행이 함께 compact 높이로 줄어든다(UI5 의 sapUiSizeCompact 동일 사상).
+   · "높이만" 축소 — 폰트/아이콘 글리프는 그대로(가독성 유지).
+   · 전역 강제가 아니라 **필요한 영역에만 부분 적용**(컨테이너에 클래스 부여).
+   · 단독 테이블 `.u4a-table--compact`(혼자 좁아 이질감, §6.1)와 달리, 영역 전체를
+     함께 줄여 일관성을 지키는 게 이 클래스의 목적이다.
+   · 테이블 행은 토큰(--control-h/--row-h)만 재정의 → 일반/가상스크롤 모두 자동 반영
+     (가상스크롤은 첫 렌더 측정 시 td 가 이미 compact 높이라 --u4a-vsrowh 가 작게 잡힘).
+   ════════════════════════════════════════════════════════════════════ */
+.u4a-compact {
+    --control-h: 1.75rem;   /* 테이블 헤더 th */
+    --row-h: 1.75rem;       /* 테이블 데이터 행 td(+가상스크롤 폴백) */
+    --field-icon: 1.5rem;   /* clear/F4 아이콘 — 작아진 입력칸 안에 들어가도록 동반 축소 */
+}
+/* 하드코딩 높이 컨트롤(버튼/입력/셀렉트/콤보) — descendant 셀렉터로 override(토큰화 안 됨) */
+.u4a-compact .u4a-btn { height: 1.625rem; }
+.u4a-compact .u4a-input,
+.u4a-compact .u4a-select,
+.u4a-compact .u4a-combo { height: 1.625rem; }
+/* 터치/포인터(coarse)에서는 밀도 완화(체크리스트 J — 터치 타깃 확보) */
+@media (pointer: coarse) {
+    .u4a-compact { --control-h: 2.5rem; --row-h: 2.5rem; --field-icon: 1.75rem; }
+    .u4a-compact .u4a-btn { height: 2rem; }
+    .u4a-compact .u4a-input,
+    .u4a-compact .u4a-select,
+    .u4a-compact .u4a-combo { height: 2.25rem; }
 }
 
 /* ── 카드(타일) 뷰 — data-view="card" (좁을 때 각 행을 카드로) ──────── */

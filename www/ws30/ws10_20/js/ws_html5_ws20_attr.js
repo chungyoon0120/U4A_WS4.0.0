@@ -3889,6 +3889,33 @@
                         else { oAPP.loadJs("fnColorPickerPopover", function () { oAPP.fn.fnColorPickerOpen(oAnchor, sAttr.UIATV, fnDone); }); }
                         return;
                     }
+                    // ── DDIC 검색 도움말(F4) — ROOT 속성(Code Page=DH001040 / Authorization Group=DH001100 등) ──
+                    //   원본 attrCallValueHelpDOC: 코드마스터 UA003 에서 SHLPNAME(FLD05) → callF4HelpPopup,
+                    //   선택 행의 반환 필드를 UIATK 별로 매핑(DH001040→CPATTR / DH001100→P_GROUP).
+                    var sShlp = "";
+                    try {
+                        var aUA003 = (oAPP.attr.S_CODE && Array.isArray(oAPP.attr.S_CODE.UA003)) ? oAPP.attr.S_CODE.UA003
+                            : ((oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011))
+                                ? oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA003"; }) : []);
+                        // SHLPNAME(FLD05) 보유 행 = F4 대상 행(중복 ITMCD 중 default-value 행 회피).
+                        var oUA = aUA003.find(function (a) { return a.ITMCD === sAttr.UIATK && a.FLD05; });
+                        if (oUA) { sShlp = oUA.FLD05; }
+                    } catch (e) { }
+
+                    if (sShlp) {
+                        var sRetFld = (sAttr.UIATK === "DH001040") ? "CPATTR"
+                            : (sAttr.UIATK === "DH001100") ? "P_GROUP" : "";
+                        var fnPickF4 = function (oRow) {
+                            if (!sRetFld) { return; }   // 원본: 반환 매핑 없는 속성은 무동작
+                            sAttr.UIATV = (oRow && oRow[sRetFld] != null) ? oRow[sRetFld] : "";
+                            oAPP.fn.fnWs20AttrChange(sAttr, "INPUT");
+                        };
+                        var fnOpenF4 = function () { oAPP.fn.fnF4SearchHelpOpen({ shlpname: sShlp, onPick: fnPickF4 }); };
+                        if (oAPP.fn.fnF4SearchHelpOpen) { fnOpenF4(); }
+                        else { oAPP.loadJs("fnF4SearchHelpPopup", fnOpenF4); }
+                        return;
+                    }
+
                     console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT);
                 } : null,
                 f4IconHtml: '<i class="fa-regular fa-clone"></i>',   // F4=아웃라인 clone(복사버튼과 구분, 2026-06-17)

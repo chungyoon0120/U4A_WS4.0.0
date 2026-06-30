@@ -38,8 +38,8 @@ body {
     display: flex;
     flex-direction: column;
     background: var(--app-bg);
-    border-right: 1px solid var(--divider);
     overflow: hidden;
+    /* 구분선은 공통 스플릿바(.u4a-splitter__bar) 의 좌우 경계가 담당(중복 border 제거). */
 }
 
 /* 헤더 = "문서 목록"(D14) + 새 문서(+) */

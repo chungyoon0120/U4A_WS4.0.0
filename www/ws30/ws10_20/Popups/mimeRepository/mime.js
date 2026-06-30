@@ -122,6 +122,15 @@
         return "";
     }
 
+    // 비디오 Content-Type 보정(iframe 미디어문서 렌더 판정용) — 서버 타입이 video/* 면 그대로, 아니면 확장자로.
+    function _videoMime(sName, sMime) {
+        var m = String(sMime || "").toLowerCase();
+        if (m.indexOf("video/") === 0) { return m; }
+        var ext = String(sName || "").split(".").pop().toLowerCase();
+        var map = { mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm", ogv: "video/ogg", mov: "video/quicktime" };
+        return map[ext] || "video/mp4";
+    }
+
     function _isBinaryMime(m) {
         m = String(m || "").toLowerCase();
         if (/^(audio|video|font|model)\//.test(m)) { return true; }
@@ -538,8 +547,17 @@
         }
 
         var sMedia = _mediaKind(sName, sMime);
-        if (sMedia === "audio" || sMedia === "video") {
-            lf_showPreview(sMedia, URL.createObjectURL(oBlob));
+        if (sMedia === "video") {
+            // iframe(미디어 문서)는 blob 의 Content-Type 으로 렌더를 판정하므로 video/* 로 보정
+            // (서버가 octet-stream 으로 줄 때 대비). 타입이 이미 맞으면 그대로(불필요 복사 방지).
+            var sVType = _videoMime(sName, sMime);
+            var oVBlob = (String(oBlob.type).toLowerCase() === sVType) ? oBlob : new Blob([oBlob], { type: sVType });
+            lf_showPreview("video", URL.createObjectURL(oVBlob));
+            try { oAPP.fn.setBusy(""); } catch (e2) { }
+            return;
+        }
+        if (sMedia === "audio") {
+            lf_showPreview("audio", URL.createObjectURL(oBlob));
             try { oAPP.fn.setBusy(""); } catch (e2) { }
             return;
         }
@@ -615,7 +633,7 @@
 
         if (!bImg) { oUI.img.src = ""; }
         if (!bAudio) { try { oUI.audio.pause(); } catch (e) { } oUI.audio.removeAttribute("src"); }
-        if (!bVideo) { try { oUI.video.pause(); } catch (e) { } oUI.video.removeAttribute("src"); }
+        if (!bVideo) { try { if (oUI.video.getAttribute("src")) { oUI.video.src = "about:blank"; } } catch (e) { } } // iframe 언로드(재생 정지)
         if (!bPdf && oUI.pdf && oUI.pdf.contentWindow && oUI.pdfReady) {
             try { oUI.pdf.contentWindow.postMessage({ __u4apdf: true, hostId: C_PDFHOST, cmd: "clear" }, "*"); } catch (e) { }
         }
@@ -857,7 +875,7 @@
             if (sKey === "K3") { lf_openCreateFolder(n); return; }   // 폴더 생성
             if (sKey === "K4") { lf_deleteObject(n); return; }       // 오브젝트 삭제
             if (sKey === "K5") { lf_openImport(n); return; }         // 마임 오브젝트 가져오기
-            oAPP.fn.showMessage(null, 10, "I", _wsTxt("498"));   // K6(다운로드) 준비중
+            if (sKey === "K6") { lf_downloadObject(n); return; }     // 마임 오브젝트 다운로드
         } catch (e) { console.error("[HTML5][MIME] 컨텍스트 메뉴 오류:", sKey, e); }
     }
 
@@ -1363,15 +1381,91 @@
             }
         }
 
-        function lf_impError() {
+        function lf_impError(arg) {
             lf_busy(false);
             if (oImpUI && oImpUI.saveBtn) { oImpUI.saveBtn.disabled = false; }
             try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
             try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+            // HTTP 413(Request Entity Too Large) = 업로드 파일이 서버(nginx/ICF) 허용 용량 초과. 응답이
+            //   우리 JSON 이 아니라 nginx HTML 이라 fnRenderServerError 가 "알 수 없는 오류" 로 떨어짐
+            //   → 상태코드로 직접 판정해 용량 초과 안내.
+            //   문구: 신규 키 ZMSG_WS_COMMON_001 967("업로드 파일 크기가 너무 큽니다.") 등록 후 그 문구,
+            //   미등록(미동기화) 시 기존 /U4A/MSG_WS 140("업로드 파일 크기를 확인하세요.")로 폴백(빈 메시지 방지).
+            if (arg && typeof arg.status === "number" && arg.status === 413) {
+                oAPP.fn.showMessage(null, 20, "E", _wsTxt("967") || _txt("/U4A/MSG_WS", "140"));
+                return;
+            }
             oAPP.fn.fnRenderServerError(null, {});
         }
 
         _doImport();
+    }
+
+    /************************************************************************
+     * 마임 오브젝트 다운로드(K6) — 원본 fnMimeTreeFileDown + fnFileDown 1:1 이식.
+     *   파일만(폴더 비활성) → 로그인유지 체크 → /getmimeobj blob → 폴더선택 다이얼로그 →
+     *   FS.writeFile(폴더\파일명) → 저장 폴더에서 파일 보이기(showItemInFolder). 폴더경로 기억.
+     ************************************************************************/
+    function lf_downloadObject(oNode) {
+        if (!oNode || _isFolder(oNode)) { return; }   // 파일만(폴더는 K6 비활성)
+
+        var fnGet = function () {
+            lf_getMimeObject(oNode.URL, function (oBlob) {   // lf_getMimeObject 가 busy("X") 처리
+                try { oAPP.fn.setBusy(""); } catch (e) { }
+                if (!oBlob || oBlob.size <= 0) { return; }   // 원본 동일(빈 오브젝트는 무동작)
+                _saveBlobToDisk(oNode.NTEXT, oBlob);
+            });
+        };
+
+        // 로그인 유지 체크 후 다운로드(원본/미리보기 경로 동일 패턴).
+        try {
+            if (oAPP.fn.sendAjaxLoginChk) {
+                oAPP.fn.sendAjaxLoginChk(function (oReturn) {
+                    if (!oReturn || oReturn.RETCD !== "S") { try { oAPP.fn.setBusy(""); } catch (e) { } return; }
+                    fnGet();
+                });
+            } else { fnGet(); }
+        } catch (e) { fnGet(); }
+    }
+
+    // blob → 디스크 저장(원본 fnFileDown). 폴더 선택 다이얼로그 + FS.writeFile + 폴더에서 보이기.
+    function _saveBlobToDisk(sFileName, oBlob) {
+        var REMOTE = oAPP.REMOTE, FS = oAPP.FS, PATH = oAPP.PATH;
+        var DIALOG = REMOTE.dialog || REMOTE.require("electron").dialog;
+        var SHELL = REMOTE.require("electron").shell;
+        var B = (typeof Buffer !== "undefined") ? Buffer : REMOTE.require("buffer").Buffer;
+
+        var sDefault = oAPP.attr._filedownFolderPath || "";
+        if (!sDefault) { try { sDefault = oAPP.APP.getPath("downloads"); } catch (e) { sDefault = ""; } }
+
+        var sTitle = (_txt("/U4A/CL_WS_COMMON", "B79") + " " + _txt("/U4A/CL_WS_COMMON", "B78")).trim(); // File Download
+
+        var p;
+        try {
+            p = DIALOG.showOpenDialog(oAPP.CURRWIN, {
+                title: sTitle, defaultPath: sDefault, properties: ["openDirectory", "dontAddToRecent"]
+            });
+        } catch (e) { console.error("[HTML5][MIME] download dialog:", e); return; }
+
+        Promise.resolve(p).then(function (oPaths) {
+            if (!oPaths || oPaths.canceled || !oPaths.filePaths || !oPaths.filePaths.length) { return; }
+            var sFolder = oPaths.filePaths[0];
+            var sFilePath = PATH.join(sFolder, sFileName);
+            oAPP.attr._filedownFolderPath = sFolder;   // 다음 다운로드 기본 경로로 기억(원본 동일)
+
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                try {
+                    var buf = B.from(ev.target.result);
+                    FS.writeFile(sFilePath, buf, {}, function (err) {
+                        if (err) { console.error("[HTML5][MIME] download write:", err); return; }
+                        try { SHELL.showItemInFolder(sFilePath); } catch (e) { }   // 저장 폴더에서 파일 보이기
+                    });
+                } catch (e) { console.error("[HTML5][MIME] download buffer:", e); }
+            };
+            reader.onerror = function () { console.error("[HTML5][MIME] download read 실패"); };
+            reader.readAsArrayBuffer(oBlob);
+        }).catch(function (e) { console.error("[HTML5][MIME] download:", e); });
     }
 
     /************************************************************************
@@ -1506,8 +1600,13 @@
 
         var oAudio = document.createElement("audio");
         oAudio.className = "u4aMimeAudio"; oAudio.controls = true; oAudio.preload = "metadata"; oAudio.hidden = true;
-        var oVideo = document.createElement("video");
-        oVideo.className = "u4aMimeVideo"; oVideo.controls = true; oVideo.preload = "metadata"; oVideo.hidden = true;
+        // ★ 비디오는 <video> 직접 렌더 대신 iframe(미디어 문서)로 격리한다.
+        //   <video controls> 의 네이티브 미디어컨트롤(shadow DOM) 내부 ResizeObserver 가 표시 즉시
+        //   "loop limit exceeded" 를 내는데(브라우저 내부 거동, CSS 박스 고정으로도 회피 불가),
+        //   iframe 안에서 미디어 문서로 렌더하면 그 RO 는 ws_trycatch 가 없는 iframe 창에서만 돌고
+        //   부모 창으로 전파되지 않는다(오류를 삼키는 게 아니라, 브라우저 내부 렌더를 격리 — PDF/Monaco 동일).
+        var oVideo = document.createElement("iframe");
+        oVideo.className = "u4aMimeVideo"; oVideo.setAttribute("frameborder", "0"); oVideo.hidden = true;
 
         var oFrame = document.createElement("iframe");
         oFrame.className = "u4aMimeFrame";
