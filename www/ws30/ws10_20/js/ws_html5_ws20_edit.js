@@ -1106,6 +1106,22 @@
         console.warn("[HTML5][WS20] context action not available in this context:", sFn);
     }
 
+    // My Pattern(내 패턴, M11) — HTML5 인앱 팝업(fnP13nDesignPopupOpen.js) 진입.
+    //   ★런타임에 UI5 원본(callDesignContextMenu/callP13nDesignDataPopup)이 이미 로드돼
+    //     UI5 contextMenuP13nDesignPopup(→ new sap.m.Dialog, HTML5 스텁이라 오류)이 존재할 수 있음.
+    //     따라서 "함수 존재"가 아니라 "내 HTML5 파일(고유 fnP13nDesignPopupOpen) 로드 여부"로 판단해,
+    //     미로드면 먼저 loadJs 하여 UI5 정의(contextMenuP13nDesignPopup/callP13nDesignDataPopup)를 덮어쓴다.
+    //   HTML5 컨텍스트 메뉴는 /lcmenu/OBJID 미세팅 → 선택 노드(oNode)를 직접 전달.
+    function _openMyPattern(oNode) {
+        var run = function () {
+            try { oAPP.fn.contextMenuP13nDesignPopup(oNode); }
+            catch (e) { console.error("[HTML5][WS20] My Pattern:", e && e.message ? e.message : e); }
+        };
+        if (typeof oAPP.fn.fnP13nDesignPopupOpen === "function") { run(); return; }
+        try { oAPP.loadJs("fnP13nDesignPopupOpen", run); }
+        catch (e) { console.error("[HTML5][WS20] My Pattern load:", e && e.message ? e.message : e); }
+    }
+
     // 노드/모드별 메뉴 항목 enable 규칙 (구 enableDesignContextMenu — 1:1 이식)
     //   원본과 동일하게 "모든 항목을 항상 노출하고, 불가 항목은 disable" 한다.
     function _buildItems(oNode) {
@@ -1151,7 +1167,7 @@
             { key: "M06", icon: "copy", text: _msg("A04", "Copy"), on: en.copy, sep: true, fn: function () { _copyUI(oNode); } },
             { key: "M07", icon: "paste", text: _msg("A58", "Paste"), on: en.paste, fn: function () { _pasteUI(oNode); } },
             { key: "M08", icon: "magnifying-glass", text: _msg("A59", "UI Where use"), on: en.whereuse, sep: true, fn: function () { _ctxDelegate("contextMenuUiWhereUse"); } },
-            { key: "M11", icon: "floppy-disk", text: _msg("E19", "My Pattern"), on: en.pattern, sep: true, fn: function () { _ctxDelegate("contextMenuP13nDesignPopup"); } }
+            { key: "M11", icon: "floppy-disk", text: _msg("E19", "My Pattern"), on: en.pattern, sep: true, fn: function () { _openMyPattern(oNode); } }
         ];
     }
 

@@ -188,7 +188,11 @@
         { key: "horizon_dark", text: "Horizon Dark" },
         { key: "horizon_purple", text: "Horizon Purple" },
         { key: "horizon_red", text: "Horizon Red" },
-        { key: "horizon_green", text: "Horizon Green" }
+        { key: "horizon_green", text: "Horizon Green" },
+        { key: "horizon_xp", text: "Windows XP" },
+        { key: "horizon_95", text: "Windows 95" },
+        { key: "horizon_7", text: "Windows 7" },
+        { key: "horizon_signature", text: "SAP Signature" }
     ];
 
     /********************************************************************

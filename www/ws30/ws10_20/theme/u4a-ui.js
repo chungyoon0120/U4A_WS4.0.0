@@ -670,6 +670,12 @@
             const oTipHost = (el.closest && el.closest("dialog[open]")) || document.body;
             if (t.parentNode !== oTipHost) { oTipHost.appendChild(t); }
             t.textContent = sText;
+            // ★ 측정 전 중립 위치(0,0)로 리셋 — 이전 표시 위치(예: 뷰포트 우측 끝)에 둔 채로 재면
+            //   브라우저가 오른쪽 경계에 맞춰 텍스트를 미리 개행해 offsetWidth 가 좁게 잡히고
+            //   (white-space:normal + overflow-wrap:anywhere 라 "More"→"Mo/re" 처럼 짧은 단어도 쪼개짐),
+            //   그 좁은 폭으로 위치를 재계산해 개행이 고정된다. 0,0(전폭 가용)에서 자연 폭으로 측정.
+            t.style.left = "0px";
+            t.style.top = "0px";
             t.dataset.show = "true";              // 먼저 보이게 해야 offset 측정 가능
             const tw = t.offsetWidth, th = t.offsetHeight;
             // 위치 = 항상 마우스 커서 바로 아래(네이티브 title 툴팁과 동일 감각 — 트리 행/버튼/아이콘 공통).

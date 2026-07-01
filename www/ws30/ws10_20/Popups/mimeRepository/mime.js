@@ -1311,7 +1311,11 @@
 
     function lf_confirmImport() {
         if (!oImpUI || !oImpUI.target) { return; }
-        if (!oImpUI.files.length) { return; }   // 첨부 없으면 무시(원본 동일)
+        if (!oImpUI.files.length) {   // 첨부 없이 저장 → 안내(신규 968 "첨부된 파일이 없습니다.", 미동기화 시 639 폴백)
+            // ★ 가져오기 팝업이 showModal(top-layer)이라 정보 토스트는 모달 뒤에 가림 → "W"(박스)로 띄워 모달 위 노출.
+            oAPP.fn.showMessage(null, 20, "W", _wsTxt("968") || _wsTxt("639"));
+            return;
+        }
 
         var oNode = oImpUI.target;
         var oApp = _appInfo();

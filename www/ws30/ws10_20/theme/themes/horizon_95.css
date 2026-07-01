@@ -1,0 +1,274 @@
+/************************************************************************
+ * 테마: 95 — Windows 95 "Classic" 스킨
+ * ----------------------------------------------------------------------
+ * ⚠ doc 12 §2.1 예외(사용자 명시 승인, 2026-07-01). horizon_xp 와 동일 트랙.
+ *   실제 Win95 룩(회색 #C0C0C0 크롬 · 각진 모서리 · 하드 3D 베벨 · navy 단색
+ *   타이틀바 · MS Sans Serif)이라 shape 토큰까지 override 한다. 되돌리지 말 것.
+ *
+ * Win95 시스템 팔레트:
+ *   ButtonFace #C0C0C0 · Highlight(밝은엣지) #FFFFFF · Light #DFDFDF ·
+ *   Shadow #808080 · DkShadow #000000 · ActiveTitle #000080 · Window #FFFFFF ·
+ *   WindowText #000000 · Highlight(선택) #000080 · GrayText #808080
+ *
+ * 색 계층은 tokens.css(:root) 와 bootstrap-skin.css(--sl-*) 둘 다 덮는다.
+ * accent/타이틀바색/회색 팔레트(--sl-bg 계열)는 theme-api.js SKIN_MAP 이 인라인 세팅.
+ ************************************************************************/
+[data-theme="horizon_95"] {
+    color-scheme: light;
+
+    /* ── 배경 / 표면 / 텍스트 / 경계 (실버 크롬) ────────────────────── */
+    --app-bg: #c0c0c0;          /* Win95 회색 크롬 */
+    --surface: #c0c0c0;         /* 패널/바 = 회색 */
+    --surface-raised: #ffffff;  /* 입력·리스트·트리 콘텐츠 = 흰색(Window) */
+    --text: #000000;
+    --text-muted: #404040;
+    --line: #808080;            /* Shadow */
+    --divider: #808080;
+
+    /* ── 강조(선택/포커스/링크) — navy ────────────────────────────── */
+    --accent: #000080;
+    --accent-strong: #0000a8;
+
+    /* ── 상호작용 표면 ─────────────────────────────────────────────── */
+    --hover-bg: rgba(0, 0, 128, .10);
+    --active-bg: rgba(0, 0, 128, .18);
+    /* Win95 리스트/트리 선택 = solid navy + 흰 글자 */
+    --selected-bg: #000080;
+    --selected-text: #ffffff;
+
+    --disabled-bg: #c0c0c0;
+    --disabled-text: #808080;   /* GrayText */
+    --switch-off: #808080;
+
+    /* ── value states ─────────────────────────────────────────────── */
+    --state-info-bg: #d8d8f0;
+
+    /* ── 스크롤바 (회색) ───────────────────────────────────────────── */
+    --scrollbar-thumb: #c0c0c0;
+    --scrollbar-thumb-hover: #c0c0c0;
+    --scrollbar-track: #c0c0c0;
+
+    /* ── 오버레이 / 팝업 ───────────────────────────────────────────── */
+    --overlay-scrim: rgba(0, 0, 0, .40);
+    --busy-scrim: rgba(192, 192, 192, .6);
+    --popover-bg: #c0c0c0;
+    --popover-shadow: 2px 2px 0 rgba(0, 0, 0, .45);
+
+    /* ── 폼 / 텍스트 표면 ──────────────────────────────────────────── */
+    --placeholder: #808080;
+    --selection-bg: #000080;
+    --caret: #000000;
+
+    /* ── 타이틀바 토큰 = 회색(WS20 App헤더/사이드바로 전파되므로 navy 금지) ──
+       실제 창 타이틀바 navy 는 아래 .u4a-titlebar 직접 규칙이 담당한다. */
+    --titlebar-bg: var(--surface);
+
+    /* ── shape — ★ §2.1 예외: Win95 각진 모서리 + MS Sans Serif ────── */
+    --radius: 0;
+    --radius-sm: 0;
+    --elevation: 1px 1px 0 rgba(0, 0, 0, .35);
+    --font: "MS Sans Serif", "Tahoma", "Segoe UI", Arial, sans-serif;
+
+    /* ── bootstrap-skin.css(--sl-*) 계층 override ─────────────────── */
+    --sl-fg: #000000;
+    --sl-muted: #404040;
+    --sl-radius: 0;
+    --sl-radius-sm: 0;
+    --sl-elev: 2px 2px 0 rgba(0, 0, 0, .4);
+    --sl-elev-sm: 1px 1px 0 rgba(0, 0, 0, .35);
+}
+
+/*======================================================================
+  Windows 95 "Classic" 컴포넌트 모양 (shape override) — §2.1 예외
+  ----------------------------------------------------------------------
+  Win95 3D 베벨 = 하드 엣지 테두리(밝은 위/왼 + 어두운 아래/오른) + inset 보조선.
+  outset(볼록): border-color #fff #808080 #808080 #fff + inset(#dfdfdf/#000)
+  inset(눌림/필드): 반대 방향. 셀렉터 [data-theme="horizon_95"] .u4a-*(0,2,0)가
+  bootstrap-skin .u4a-*(0,1,0)를 나중 로드+높은 명세로 이긴다(공통 파일 안 건드림).
+======================================================================*/
+
+/* ── 버튼 (회색 3D outset, 각짐) ───────────────────────────────────── */
+[data-theme="horizon_95"] .u4a-btn {
+    background: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    border-radius: 0;
+    box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #000000;
+    color: #000000;
+}
+/* Win95 버튼은 hover 시 외형 변화 없음 — 공통 hover 배경 무력화 */
+[data-theme="horizon_95"] .u4a-btn:hover {
+    background: #c0c0c0;
+}
+[data-theme="horizon_95"] .u4a-btn:active {
+    /* 눌림 = 베벨 반전(들어감) */
+    border-color: #808080 #ffffff #ffffff #808080;
+    box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf;
+    background: #c0c0c0;
+}
+[data-theme="horizon_95"] .u4a-btn:disabled {
+    background: #c0c0c0;
+    color: #808080;
+    /* Win95 disabled 텍스트 = 회색 + 흰 그림자(엠보스) */
+    text-shadow: 1px 1px 0 #ffffff;
+}
+
+/* 강조/기본 버튼 — Win95 엔 파란 버튼이 없다. 회색 3D 동일 + default 외곽 검정 링 */
+[data-theme="horizon_95"] .u4a-btn--emphasized,
+[data-theme="horizon_95"] .btn-primary {
+    background: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    border-radius: 0;
+    box-shadow: inset 0 0 0 1px #000000, inset 1px 1px 0 #dfdfdf, inset -2px -2px 0 #808080;
+    color: #000000;
+}
+[data-theme="horizon_95"] .u4a-btn--emphasized:hover,
+[data-theme="horizon_95"] .btn-primary:hover {
+    background: #c0c0c0;
+    color: #000000;
+}
+[data-theme="horizon_95"] .u4a-btn--emphasized:active,
+[data-theme="horizon_95"] .btn-primary:active {
+    border-color: #808080 #ffffff #ffffff #808080;
+    box-shadow: inset 0 0 0 1px #000000, inset 1px 1px 0 #000000;
+}
+
+/* ── 입력칸 / 콤보 / 셀렉트 (흰 배경 sunken, 각짐) ─────────────────── */
+[data-theme="horizon_95"] .u4a-input,
+[data-theme="horizon_95"] .u4a-select,
+[data-theme="horizon_95"] .u4a-combo,
+[data-theme="horizon_95"] .form-control,
+[data-theme="horizon_95"] .form-select {
+    background: #ffffff;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    border-radius: 0;
+    box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf;
+    color: #000000;
+}
+/* Win95 입력 focus 는 외형 변화 없음(캐럿만) — 테두리 유지 */
+
+/* ── 타이틀바 (navy 단색, 그라데이션 없음) ────────────────────────── */
+[data-theme="horizon_95"] .u4a-titlebar {
+    background: #000080;
+    box-shadow: none;
+}
+
+/* ── 창 버튼 (회색 3D, 검정 심볼, 닫기도 회색) ────────────────────── */
+[data-theme="horizon_95"] .u4a-winbtn {
+    width: 26px;
+    height: 22px;
+    margin: 2px 1px;
+    background: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    border-radius: 0;
+    box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #000000;
+    color: #000000;
+}
+[data-theme="horizon_95"] .u4a-winbtn:hover {
+    background: #c0c0c0;
+    color: #000000;
+}
+[data-theme="horizon_95"] .u4a-winbtn:active {
+    border-color: #808080 #ffffff #ffffff #808080;
+    box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf;
+}
+/* 닫기 = Win95 는 빨강 아님(회색 3D 동일). 우측 여백만. */
+[data-theme="horizon_95"] .u4a-winbtn--close {
+    margin-right: 6px;
+    background: #c0c0c0;
+    color: #000000;
+}
+[data-theme="horizon_95"] .u4a-winbtn--close:hover {
+    background: #c0c0c0;
+    color: #000000;
+}
+
+/* ── 스크롤바 (회색 3D) ───────────────────────────────────────────── */
+[data-theme="horizon_95"] ::-webkit-scrollbar-track {
+    background: #c0c0c0;
+}
+[data-theme="horizon_95"] ::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    border-radius: 0;
+}
+[data-theme="horizon_95"] ::-webkit-scrollbar-thumb:hover {
+    background: #c0c0c0;
+}
+
+/* ── 체크박스 (흰 sunken + 검정 체크) ─────────────────────────────── */
+[data-theme="horizon_95"] .u4a-check input[type="checkbox"],
+[data-theme="horizon_95"] .form-check-input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    border-radius: 0;
+    background: #ffffff;
+    box-shadow: inset 1px 1px 0 #000000;
+    cursor: pointer;
+}
+[data-theme="horizon_95"] .u4a-check input[type="checkbox"]:checked,
+[data-theme="horizon_95"] .form-check-input[type="checkbox"]:checked {
+    background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' d='M3 8.5l3.2 3.3L13 4.2'/%3E%3C/svg%3E") center/11px no-repeat,
+        #ffffff;
+}
+
+/* ── 라디오 (흰 원 + 검정 점) ─────────────────────────────────────── */
+[data-theme="horizon_95"] .u4a-check input[type="radio"],
+[data-theme="horizon_95"] .form-check-input[type="radio"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: inset 1px 1px 0 #000000;
+    cursor: pointer;
+}
+[data-theme="horizon_95"] .u4a-check input[type="radio"]:checked,
+[data-theme="horizon_95"] .form-check-input[type="radio"]:checked {
+    background: radial-gradient(circle at center, #000000 0 2.6px, transparent 3.2px), #ffffff;
+}
+[data-theme="horizon_95"] .u4a-check input:disabled,
+[data-theme="horizon_95"] .form-check-input:disabled {
+    background-color: #c0c0c0;
+}
+
+/* ── 메뉴 (회색 3D outset + navy hover) ───────────────────────────── */
+[data-theme="horizon_95"] .u4a-menu {
+    padding: 2px;
+    background: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    border-radius: 0;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, .4);
+}
+[data-theme="horizon_95"] .u4a-menu__item {
+    padding: 3px 20px 3px 22px;
+    border-radius: 0;
+    color: #000000;
+}
+[data-theme="horizon_95"] .u4a-menu__item i {
+    color: #000000;
+}
+/* Win95 메뉴 hover = navy solid + 흰 글자. 활성 항목만(비활성/타이틀/커스텀 제외 — XP 와 동일 버그 방지) */
+[data-theme="horizon_95"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover,
+[data-theme="horizon_95"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible {
+    background: #000080;
+    color: #ffffff;
+    border-radius: 0;
+}
+[data-theme="horizon_95"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover i,
+[data-theme="horizon_95"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible i {
+    color: #ffffff;
+}

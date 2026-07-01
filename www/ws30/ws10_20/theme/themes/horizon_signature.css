@@ -1,0 +1,341 @@
+/************************************************************************
+ * 테마: signature — SAP GUI "Signature" 스킨
+ * ----------------------------------------------------------------------
+ * ⚠ doc 12 §2.1 예외(사용자 명시 승인, 2026-07-01). horizon_xp/95/7 와 동일 트랙.
+ *   실제 SAP GUI Options(Signature Theme) 스크린샷 기준 재현(사용자 첨부).
+ *   핵심: ①진파랑 타이틀바 + 흰 텍스트  ②★버튼=연노란색 둥근 버튼(Signature
+ *   시그니처)  ③선택 하이라이트=연노랑  ④연파랑 그룹/컬럼 헤더  ⑤흰 배경.
+ *   shape 토큰까지 override.
+ ************************************************************************/
+[data-theme="horizon_signature"] {
+    color-scheme: light;
+
+    /* 진파랑 타이틀바 → 타이틀/창버튼 아이콘 흰색 */
+    --u4a-titlebar-fg: #ffffff;
+
+    /* ── 배경 / 표면 / 텍스트 / 경계 (흰색 기반) ───────────────────── */
+    --app-bg: #eef2f7;
+    --surface: #eef2f7;
+    --surface-raised: #ffffff;
+    --text: #1a1a1a;
+    --text-muted: #566573;
+    --line: #b5c6d8;
+    --divider: #c6d5e4;
+
+    /* ── 강조(포커스/링크) — SAP 파랑 ────────────────────────────── */
+    --accent: #3a6ea5;
+    --accent-strong: #2c568a;
+
+    /* ── 상호작용 표면 ─────────────────────────────────────────────── */
+    --hover-bg: rgba(58, 110, 165, .10);
+    --active-bg: rgba(58, 110, 165, .18);
+    /* ★ SAP 선택색 = 연노란색 + 검정 텍스트 */
+    --selected-bg: #ffe9a8;
+    --selected-text: #1a1a1a;
+
+    --disabled-bg: #eef2f7;
+    --disabled-text: #9aa7b4;
+    --switch-off: #a9b7c6;
+
+    --state-info-bg: #e2ecf7;
+
+    /* ── 스크롤바 (연파랑) ─────────────────────────────────────────── */
+    --scrollbar-thumb: #c3d2e2;
+    --scrollbar-thumb-hover: #9bbad9;
+    --scrollbar-track: #eef2f7;
+
+    /* ── 오버레이 / 팝업 ───────────────────────────────────────────── */
+    --overlay-scrim: rgba(0, 0, 0, .40);
+    --busy-scrim: rgba(238, 242, 247, .6);
+    --popover-bg: #ffffff;
+    --popover-shadow: 0 6px 20px rgba(28, 55, 90, .22);
+
+    /* ── 폼 / 텍스트 표면 ──────────────────────────────────────────── */
+    --placeholder: #8794a2;
+    --selection-bg: rgba(58, 110, 165, .26);
+    --caret: #1a1a1a;
+
+    /* ── 타이틀바 토큰 = 연파랑(WS20 App헤더/사이드바 전파, 진파랑 금지) ──
+       실제 창 타이틀바 진파랑+흰텍스트는 아래 .u4a-titlebar 직접 규칙이 담당. */
+    --titlebar-bg: #cdddee;
+
+    /* ── shape — ★ §2.1 예외: 둥근 컨트롤 + Arial(SAP GUI 기본) ────── */
+    --radius: 4px;
+    --radius-sm: 3px;
+    --elevation: 0 2px 6px rgba(28, 55, 90, .16);
+    --font: "Arial", "Segoe UI", "Malgun Gothic", "맑은 고딕", sans-serif;
+
+    /* ── bootstrap-skin.css(--sl-*) 계층 override ─────────────────── */
+    --sl-fg: #1a1a1a;
+    --sl-muted: #566573;
+    --sl-radius: 5px;
+    --sl-radius-sm: 3px;
+    --sl-elev: 0 6px 20px rgba(28, 55, 90, .22);
+    --sl-elev-sm: 0 2px 8px rgba(28, 55, 90, .15);
+}
+
+/*======================================================================
+  SAP GUI "Signature" 컴포넌트 모양 (shape override) — §2.1 예외
+  ----------------------------------------------------------------------
+  실측(SAP GUI Options 스크린샷): 진파랑 타이틀바(흰 텍스트) · 연노랑 둥근 버튼 ·
+  연노랑 선택 · 연파랑 그룹/컬럼 헤더 · 흰 입력칸(파란 테두리).
+  셀렉터 [data-theme="horizon_signature"] .u4a-*(0,2,0)가 bootstrap-skin .u4a-*(0,1,0)를
+  나중 로드 + 높은 명세로 이긴다(공통 파일 안 건드림).
+======================================================================*/
+
+/* ── 버튼 (★ SAP Signature 연노란색 둥근 버튼) ────────────────────── */
+[data-theme="horizon_signature"] .u4a-btn {
+    background: linear-gradient(180deg, #fdf6dc 0%, #f8e9a6 48%, #f3dd85 52%, #edcf66 100%);
+    border: 1px solid #c2a24e;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+    color: #1a1a1a;
+}
+[data-theme="horizon_signature"] .u4a-btn:hover {
+    background: linear-gradient(180deg, #fffbe8 0%, #fcf1bc 48%, #f8e79a 52%, #f2da78 100%);
+    border-color: #b08d2f;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 0 4px rgba(210, 175, 70, .55);
+}
+[data-theme="horizon_signature"] .u4a-btn:active {
+    background: linear-gradient(180deg, #f0d878 0%, #e4c65a 100%);
+    border-color: #9a7826;
+    box-shadow: inset 0 1px 3px rgba(120, 90, 20, .3);
+}
+[data-theme="horizon_signature"] .u4a-btn:disabled {
+    background: #eef2f7;
+    border-color: #cdd9e6;
+    box-shadow: none;
+    color: #9aa7b4;
+}
+
+/* 강조/기본 버튼 — SAP 기본(Enter) 버튼: 같은 노랑 + 더 진한 골드 테두리로 강조 */
+[data-theme="horizon_signature"] .u4a-btn--emphasized,
+[data-theme="horizon_signature"] .btn-primary {
+    background: linear-gradient(180deg, #fdf6dc 0%, #f8e9a6 48%, #f3dd85 52%, #edcf66 100%);
+    border: 2px solid #a67f22;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7);
+    color: #4a3808;
+}
+[data-theme="horizon_signature"] .u4a-btn--emphasized:hover,
+[data-theme="horizon_signature"] .btn-primary:hover {
+    background: linear-gradient(180deg, #fffbe8 0%, #fcf1bc 48%, #f8e79a 52%, #f2da78 100%);
+    border-color: #8c6a1c;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), 0 0 5px rgba(210, 175, 70, .6);
+}
+[data-theme="horizon_signature"] .u4a-btn--emphasized:active,
+[data-theme="horizon_signature"] .btn-primary:active {
+    background: linear-gradient(180deg, #f0d878 0%, #e4c65a 100%);
+    box-shadow: inset 0 1px 3px rgba(120, 90, 20, .32);
+}
+
+/* ── 입력칸 / 콤보 / 셀렉트 (흰 배경 + 파란 테두리, focus 파랑) ────── */
+[data-theme="horizon_signature"] .u4a-input,
+[data-theme="horizon_signature"] .u4a-select,
+[data-theme="horizon_signature"] .u4a-combo,
+[data-theme="horizon_signature"] .form-control,
+[data-theme="horizon_signature"] .form-select {
+    background: #ffffff;
+    border: 1px solid #a5b8ce;
+    border-radius: 2px;
+    box-shadow: inset 0 1px 1px rgba(28, 55, 90, .06);
+    color: #1a1a1a;
+}
+[data-theme="horizon_signature"] .u4a-input:hover,
+[data-theme="horizon_signature"] .u4a-combo:hover,
+[data-theme="horizon_signature"] .form-control:hover {
+    border-color: #5b8bc0;
+}
+[data-theme="horizon_signature"] .u4a-input:focus-visible,
+[data-theme="horizon_signature"] .u4a-combo:focus-within,
+[data-theme="horizon_signature"] .form-control:focus {
+    border-color: #3a6ea5;
+    box-shadow: inset 0 1px 1px rgba(28, 55, 90, .06), 0 0 4px rgba(58, 110, 165, .5);
+}
+
+/* ── 타이틀바 (SAP Signature 진파랑 그라데이션 + 흰 텍스트) ────────── */
+[data-theme="horizon_signature"] .u4a-titlebar {
+    background: linear-gradient(180deg, #5389c1 0%, #3f74af 45%, #2d5f98 55%, #3a6ba5 100%);
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -1px 0 rgba(20, 45, 75, .5);
+}
+[data-theme="horizon_signature"] .u4a-titlebar__title {
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(20, 45, 75, .5);
+}
+
+/* ── 창 버튼 (진파랑 위 반투명 유리, 흰 심볼, 닫기 hover 빨강) ─────── */
+[data-theme="horizon_signature"] .u4a-winbtn {
+    width: 29px;
+    height: 20px;
+    margin: 0 1px;
+    border: 1px solid rgba(255, 255, 255, .45);
+    border-radius: 3px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .32) 0%, rgba(255, 255, 255, .12) 50%, rgba(255, 255, 255, .04) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4);
+    color: #ffffff;
+}
+[data-theme="horizon_signature"] .u4a-winbtn:hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .5) 0%, rgba(255, 255, 255, .22) 100%);
+    border-color: rgba(255, 255, 255, .7);
+    color: #ffffff;
+}
+[data-theme="horizon_signature"] .u4a-winbtn:active {
+    background: rgba(20, 45, 75, .25);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, .3);
+}
+[data-theme="horizon_signature"] .u4a-winbtn--close {
+    margin-right: 6px;
+}
+[data-theme="horizon_signature"] .u4a-winbtn--close:hover {
+    background: linear-gradient(180deg, #f2a196 0%, #e26550 50%, #cf4632 100%);
+    border-color: #a83726;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 0 5px rgba(215, 85, 65, .8);
+    color: #ffffff;
+}
+
+/* ── 컬럼/그룹 헤더 (SAP 연파랑 그라데이션 + 세로 구분선) ──────────── */
+[data-theme="horizon_signature"] .u4a-table thead th {
+    background: linear-gradient(180deg, #dce9f5 0%, #c3d9ee 100%);
+    color: #16334f;
+    border-right: 1px solid #a8c0d8;
+    border-bottom: 1px solid #a8c0d8;
+}
+
+/* ── 스크롤바 (★ 실제 SAP GUI = 화살표 버튼 + 3D 볼록 thumb) ───────── */
+[data-theme="horizon_signature"] ::-webkit-scrollbar {
+    width: 17px;
+    height: 17px;
+}
+[data-theme="horizon_signature"] ::-webkit-scrollbar-track {
+    background: #e8edf3;
+}
+[data-theme="horizon_signature"] ::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, #f0f6fc 0%, #d6e3f1 50%, #bcd0e4 100%);
+    border: 1px solid #7f9cbc;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55);
+}
+[data-theme="horizon_signature"] ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #f6faff 0%, #dcedf8 50%, #c6def4 100%);
+    border-color: #5f8abd;
+}
+/* 가로 스크롤바 thumb 는 위→아래 방향 그라데이션(볼록) */
+[data-theme="horizon_signature"] ::-webkit-scrollbar-thumb:horizontal {
+    background: linear-gradient(180deg, #f0f6fc 0%, #d6e3f1 50%, #bcd0e4 100%);
+}
+/* 화살표 버튼 — 3D 회색 버튼 + 방향 삼각형(SAP 클래식) */
+[data-theme="horizon_signature"] ::-webkit-scrollbar-button {
+    display: block;
+    background: linear-gradient(180deg, #f2f6fb 0%, #e0e8f1 50%, #cfdbe8 100%);
+    border: 1px solid #7f9cbc;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+[data-theme="horizon_signature"] ::-webkit-scrollbar-button:hover {
+    background-color: #e8f0f8;
+}
+[data-theme="horizon_signature"] ::-webkit-scrollbar-button:vertical:decrement {
+    height: 17px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 3L8 7H2z' fill='%23334455'/%3E%3C/svg%3E");
+}
+[data-theme="horizon_signature"] ::-webkit-scrollbar-button:vertical:increment {
+    height: 17px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2 3h6L5 7z' fill='%23334455'/%3E%3C/svg%3E");
+}
+[data-theme="horizon_signature"] ::-webkit-scrollbar-button:horizontal:decrement {
+    width: 17px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M3 5L7 2v6z' fill='%23334455'/%3E%3C/svg%3E");
+}
+[data-theme="horizon_signature"] ::-webkit-scrollbar-button:horizontal:increment {
+    width: 17px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M7 5L3 2v6z' fill='%23334455'/%3E%3C/svg%3E");
+}
+/* 코너(가로+세로 교차) = track 톤 */
+[data-theme="horizon_signature"] ::-webkit-scrollbar-corner {
+    background: #e8edf3;
+}
+
+/* ── 체크박스 (흰 배경 + 파란 체크, focus 글로우) ─────────────────── */
+[data-theme="horizon_signature"] .u4a-check input[type="checkbox"],
+[data-theme="horizon_signature"] .form-check-input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border: 1px solid #a5b8ce;
+    border-radius: 2px;
+    background: #ffffff;
+    box-shadow: inset 0 1px 1px rgba(28, 55, 90, .06);
+    cursor: pointer;
+}
+[data-theme="horizon_signature"] .u4a-check input[type="checkbox"]:hover,
+[data-theme="horizon_signature"] .form-check-input[type="checkbox"]:hover {
+    border-color: #5b8bc0;
+    box-shadow: inset 0 1px 1px rgba(28, 55, 90, .06), 0 0 3px rgba(58, 110, 165, .45);
+}
+[data-theme="horizon_signature"] .u4a-check input[type="checkbox"]:checked,
+[data-theme="horizon_signature"] .form-check-input[type="checkbox"]:checked {
+    background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%232c568a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M3 8.5l3.2 3.3L13 4.2'/%3E%3C/svg%3E") center/12px no-repeat,
+        #ffffff;
+}
+
+/* ── 라디오 (흰 원 + 파란 점) ─────────────────────────────────────── */
+[data-theme="horizon_signature"] .u4a-check input[type="radio"],
+[data-theme="horizon_signature"] .form-check-input[type="radio"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border: 1px solid #a5b8ce;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: inset 0 1px 1px rgba(28, 55, 90, .06);
+    cursor: pointer;
+}
+[data-theme="horizon_signature"] .u4a-check input[type="radio"]:hover,
+[data-theme="horizon_signature"] .form-check-input[type="radio"]:hover {
+    border-color: #5b8bc0;
+    box-shadow: inset 0 1px 1px rgba(28, 55, 90, .06), 0 0 3px rgba(58, 110, 165, .45);
+}
+[data-theme="horizon_signature"] .u4a-check input[type="radio"]:checked,
+[data-theme="horizon_signature"] .form-check-input[type="radio"]:checked {
+    background: radial-gradient(circle at center, #3a6ea5 0 2.6px, transparent 3.2px), #ffffff;
+}
+[data-theme="horizon_signature"] .u4a-check input:disabled,
+[data-theme="horizon_signature"] .form-check-input:disabled {
+    background-color: #eef2f7;
+    border-color: #cdd9e6;
+}
+
+/* ── 메뉴 (흰 배경 + 좌측 거터 + 연노랑 hover — SAP 선택색 통일) ──── */
+[data-theme="horizon_signature"] .u4a-menu {
+    padding: 2px;
+    border: 1px solid #9ab0c6;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #eef2f7 0, #eef2f7 26px, #ffffff 26px);
+    box-shadow: 0 6px 18px rgba(28, 55, 90, .22);
+}
+[data-theme="horizon_signature"] .u4a-menu__item {
+    padding: 5px 20px 5px 30px;
+    border-radius: 2px;
+    color: #1a1a1a;
+}
+[data-theme="horizon_signature"] .u4a-menu__item i {
+    margin-left: -22px;
+    width: 18px;
+    color: #48586a;
+}
+/* SAP 메뉴 hover = 연노랑 박스 + 옅은 골드 테두리(선택색 통일). 활성 항목만(비활성/타이틀/커스텀 제외 — 버그 방지) */
+[data-theme="horizon_signature"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover,
+[data-theme="horizon_signature"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible {
+    background: #ffe9a8;
+    box-shadow: inset 0 0 0 1px #e6c471;
+    color: #1a1a1a;
+    border-radius: 2px;
+}
+[data-theme="horizon_signature"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover i,
+[data-theme="horizon_signature"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible i {
+    color: #6a5518;
+}

@@ -1,0 +1,304 @@
+/************************************************************************
+ * 테마: xp — Windows XP "Luna Blue" 스킨
+ * ----------------------------------------------------------------------
+ * ⚠ doc 12 §2.1 예외(사용자 명시 승인, 2026-07-01).
+ *   기존 5종은 "모양은 horizon 공통, 색만 교체"가 규칙이지만, XP 는
+ *   사용자가 요청한 실제 XP 룩(각진 모서리·Luna 블루 타이틀바 그라데이션·
+ *   Tahoma·베이지 크롬)이라 shape 토큰(radius/elevation/font)까지 override 한다.
+ *   → "누락"이 아니라 의도된 예외. 이후 작업자/AI 는 horizon 규칙으로 되돌리지 말 것.
+ *
+ * 색·shape 는 tokens.css(:root) 와 bootstrap-skin.css(--sl-*) 두 계층을 모두 덮는다.
+ * (이 파일은 런타임에 <head> 마지막으로 주입되어 :root 를 이긴다. doc 12 §6.1 cascade)
+ * accent/titlebar 그라데이션/베이지 팔레트(--sl-bg 계열)는 theme-api.js SKIN_MAP 이
+ * 인라인으로 세팅한다(인라인이 이김) — 여기선 SKIN_MAP 이 손대지 않는 나머지를 덮는다.
+ ************************************************************************/
+[data-theme="horizon_xp"] {
+    color-scheme: light;
+
+    /* ── 배경 / 표면 / 텍스트 / 경계 (Luna 베이지 크롬) ────────────── */
+    --app-bg: #ece9d8;          /* XP Luna 컨트롤 페이스(베이지/탄) */
+    --surface: #f4f3ea;         /* 패널/바 표면 */
+    --surface-raised: #ffffff;  /* 리스트·입력 등 콘텐츠 표면 = 흰색 */
+    --text: #000000;
+    --text-muted: #4a4a42;
+    --line: #aca899;            /* 클래식 XP 회갈색 보더 */
+    --divider: #9b978a;
+
+    /* ── 강조(선택/포커스/링크) — Luna 하이라이트 블루 ─────────────── */
+    --accent: #0a5fdb;
+    --accent-strong: #0846a8;
+
+    /* ── 상호작용 표면 ─────────────────────────────────────────────── */
+    --hover-bg: rgba(49, 106, 197, .10);
+    --active-bg: rgba(49, 106, 197, .20);
+    --selected-bg: rgba(49, 106, 197, .26);
+    --selected-text: var(--accent);
+
+    --disabled-bg: #e6e3d4;
+    --disabled-text: #9a978c;
+    --switch-off: #b3af9f;
+
+    /* ── value states (배경만 XP 톤으로 살짝) ──────────────────────── */
+    --state-info-bg: #dfeaff;
+
+    /* ── 스크롤바 (XP 블루 톤) ─────────────────────────────────────── */
+    --scrollbar-thumb: #c3d3ec;
+    --scrollbar-thumb-hover: #9fbce6;
+    --scrollbar-track: #ece9d8;
+
+    /* ── 오버레이 / 팝업 ───────────────────────────────────────────── */
+    --overlay-scrim: rgba(0, 0, 0, .40);
+    --busy-scrim: rgba(236, 233, 216, .6);
+    --popover-bg: #ffffff;
+    --popover-shadow: 0 3px 12px rgba(0, 0, 0, .32);
+
+    /* ── 폼 / 텍스트 표면 ──────────────────────────────────────────── */
+    --placeholder: #7d7a6f;
+    --selection-bg: rgba(49, 106, 197, .28);
+    --caret: var(--accent);
+
+    /* ── 타이틀바 토큰 = 베이지 표면 ──────────────────────────────────
+       ★ 이 토큰은 실제 창 타이틀바(.u4a-titlebar, 파란 글로시 그라데이션은 아래 직접 규칙이
+         담당)뿐 아니라 WS20 App헤더(.u4aWs20AppHdr)·좌측 사이드바(.u4aWs20Side)의
+         --ws20-header-bg 로도 전파된다. 진한 파랑을 주면 그 큰 면들이 촌스러운 솔리드
+         파랑이 되므로(사용자 지적), 베이지 표면으로 둔다 — 파랑은 타이틀바 그라데이션에만. */
+    --titlebar-bg: var(--surface);
+
+    /* ── shape — ★ §2.1 예외: XP 는 각진 모서리 + Tahoma ──────────── */
+    --radius: 3px;
+    --radius-sm: 2px;
+    --elevation: 0 1px 3px rgba(0, 0, 0, .35);
+    --font: "Tahoma", "Segoe UI", Arial, Helvetica, sans-serif;
+
+    /* ── bootstrap-skin.css(--sl-*) 계층 override (공통 컴포넌트 모양) ─ */
+    --sl-fg: #000000;
+    --sl-muted: #4a4a42;
+    --sl-radius: 4px;
+    --sl-radius-sm: 3px;
+    --sl-elev: 0 4px 14px rgba(0, 0, 0, .30);
+    --sl-elev-sm: 0 1px 5px rgba(0, 0, 0, .25);
+}
+
+/*======================================================================
+  Windows XP "Luna" 컴포넌트 모양 (shape override) — §2.1 예외
+  ----------------------------------------------------------------------
+  색 토큰만으론 XP 특유의 입체 베벨/그라데이션이 안 나오므로, 공통 컴포넌트
+  (.u4a-btn/.u4a-input/.u4a-titlebar/스크롤바 …)에 XP Luna 외형을 테마 스코프로
+  덧댄다. 셀렉터 [data-theme="horizon_xp"] .u4a-*(0,2,0) 는 bootstrap-skin
+  .u4a-*(0,1,0) 보다 나중 로드 + 높은 명세라 이긴다(공통 파일은 안 건드림).
+  ★ 되돌리지 말 것 — 사용자 승인 XP 스킨(doc 12 §2.1 예외).
+======================================================================*/
+
+/* ── 일반 버튼 (Luna 은회색 볼록 버튼) ────────────────────────────── */
+[data-theme="horizon_xp"] .u4a-btn {
+    border: 1px solid #7f9db9;                 /* XP 버튼 파란빛 회색 테두리 */
+    border-radius: 3px;
+    background: linear-gradient(180deg, #fefefe 0%, #f4f2e8 48%, #ece9d8 100%);
+    /* 안쪽 밝은 하이라이트 = XP 이중 베벨(볼록) */
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .75);
+    color: #000;
+}
+[data-theme="horizon_xp"] .u4a-btn:hover {
+    /* XP hover = 노랑/주황 발광 테두리 */
+    border-color: #e5a01a;
+    background: linear-gradient(180deg, #ffffff 0%, #fbf3dc 48%, #f6e9c2 100%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .85), 0 0 4px rgba(255, 193, 60, .7);
+}
+[data-theme="horizon_xp"] .u4a-btn:active {
+    /* 눌림 = 그라데이션 반전 + 안쪽 그림자(들어간 느낌) */
+    background: linear-gradient(180deg, #dedbcb 0%, #ecebe1 100%);
+    box-shadow: inset 1px 1px 2px rgba(0, 0, 0, .22);
+    border-color: #6d8aa6;
+}
+[data-theme="horizon_xp"] .u4a-btn:disabled {
+    background: #ece9d8;
+    box-shadow: none;
+    border-color: #c6c3b6;
+    color: #a0a0a0;
+}
+
+/* ── 강조/기본 버튼 (Luna 파란 default 버튼) ──────────────────────── */
+[data-theme="horizon_xp"] .u4a-btn--emphasized,
+[data-theme="horizon_xp"] .btn-primary {
+    border: 1px solid #0846a8;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #5aa7ff 0%, #1a72e6 46%, #0a5fdb 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55);
+    color: #fff;
+}
+[data-theme="horizon_xp"] .u4a-btn--emphasized:hover,
+[data-theme="horizon_xp"] .btn-primary:hover {
+    background: linear-gradient(180deg, #7bbaff 0%, #2f83f2 46%, #1a6fe0 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 0 4px rgba(90, 167, 255, .8);
+    border-color: #0846a8;
+}
+[data-theme="horizon_xp"] .u4a-btn--emphasized:active,
+[data-theme="horizon_xp"] .btn-primary:active {
+    background: linear-gradient(180deg, #0a5fdb 0%, #1a72e6 100%);
+    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .3);
+}
+
+/* ── 입력칸 / 콤보 / 셀렉트 (XP sunken 흰 필드, 각진 모서리) ───────── */
+[data-theme="horizon_xp"] .u4a-input,
+[data-theme="horizon_xp"] .u4a-select,
+[data-theme="horizon_xp"] .u4a-combo,
+[data-theme="horizon_xp"] .form-control,
+[data-theme="horizon_xp"] .form-select {
+    background: #ffffff;
+    border: 1px solid #7f9db9;                 /* XP 필드 테두리 */
+    border-radius: 2px;
+    box-shadow: inset 1px 1px 1px rgba(0, 0, 0, .06);
+    color: #000;
+}
+[data-theme="horizon_xp"] .u4a-input:focus-visible,
+[data-theme="horizon_xp"] .u4a-combo:focus-within,
+[data-theme="horizon_xp"] .form-control:focus {
+    border-color: #0a5fdb;
+    box-shadow: inset 1px 1px 1px rgba(0, 0, 0, .06), 0 0 3px rgba(10, 95, 219, .5);
+}
+
+/* ── 타이틀바 (Luna 글로시 하이라이트 밴드) ───────────────────────── */
+[data-theme="horizon_xp"] .u4a-titlebar {
+    /* 상단 밝은 하이라이트 → 중간 → 하단 진한 파랑: XP 특유의 유리 광택 */
+    background:
+        linear-gradient(180deg,
+            #4f9dff 0%, #2f86f5 9%, #0a5fdb 44%,
+            #0a5fdb 88%, #0a54c4 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .55),   /* 상단 광택선 */
+        inset 0 -1px 0 rgba(0, 0, 0, .25),
+        0 1px 0 rgba(0, 0, 0, .25);
+}
+
+/* ── 창 버튼 (XP 볼록 3D — ★ 상시 표시, hover 전용 아님) ──────────────
+   실제 XP 는 최소/최대/닫기가 항상 볼록 버튼(닫기=상시 빨강)이다. 기존엔 hover
+   때만 배경이 떠서 밋밋했음 → 상시 그라데이션 볼록으로 교체. */
+[data-theme="horizon_xp"] .u4a-winbtn {
+    /* 기존(36×32)에서 살짝만 축소 + 버튼 사이·위아래 여백 → XP 느낌이 더 산다. */
+    width: 30px;
+    height: 26px;
+    margin: 0 2px;
+    border: 1px solid rgba(255, 255, 255, .5);
+    border-radius: 3px;
+    /* 최소/최대 = 상시 파란 볼록(타이틀바보다 밝게 떠 보이도록) */
+    background: linear-gradient(180deg, #68a6f4 0%, #3480e8 45%, #1e6ad9 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 2px rgba(0, 0, 0, .22);
+    color: #fff;
+}
+[data-theme="horizon_xp"] .u4a-winbtn:hover {
+    background: linear-gradient(180deg, #8bbdf8 0%, #4f95ef 45%, #2f7fe4 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 0 4px rgba(150, 195, 255, .85);
+    color: #fff;
+}
+[data-theme="horizon_xp"] .u4a-winbtn:active {
+    background: linear-gradient(180deg, #1e6ad9 0%, #3480e8 100%);
+    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .35);
+}
+/* 닫기 = 상시 빨강 볼록. 타이틀바 우측 끝과 여백(창 모서리에 붙지 않게). */
+[data-theme="horizon_xp"] .u4a-winbtn--close {
+    margin-right: 8px;
+    background: linear-gradient(180deg, #f4967f 0%, #e2542f 46%, #c8341c 100%);
+    border-color: rgba(255, 255, 255, .5);
+    color: #fff;
+}
+[data-theme="horizon_xp"] .u4a-winbtn--close:hover {
+    background: linear-gradient(180deg, #f9ab96 0%, #eb6244 46%, #d63c22 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 0 5px rgba(255, 120, 90, .9);
+    color: #fff;
+}
+[data-theme="horizon_xp"] .u4a-winbtn--close:active {
+    background: linear-gradient(180deg, #c8341c 0%, #e2542f 100%);
+    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .4);
+}
+
+/* ── 스크롤바 (XP 3D 볼록 thumb) ──────────────────────────────────── */
+[data-theme="horizon_xp"] ::-webkit-scrollbar-track {
+    background: #d4e0f2;
+}
+[data-theme="horizon_xp"] ::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, #eef3fb 0%, #cdd9ee 50%, #aec3e6 100%);
+    border: 1px solid #7f9db9;
+    border-radius: 2px;
+}
+[data-theme="horizon_xp"] ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #f4f7fd 0%, #d8e2f4 50%, #bcceee 100%);
+}
+
+/* ── 체크박스 (XP sunken 흰 박스 + 검정 체크마크) ─────────────────── */
+[data-theme="horizon_xp"] .u4a-check input[type="checkbox"],
+[data-theme="horizon_xp"] .form-check-input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border: 1px solid #7f9db9;
+    border-radius: 2px;
+    background: #ffffff;
+    box-shadow: inset 1px 1px 1px rgba(0, 0, 0, .12);
+    cursor: pointer;
+}
+[data-theme="horizon_xp"] .u4a-check input[type="checkbox"]:checked,
+[data-theme="horizon_xp"] .form-check-input[type="checkbox"]:checked {
+    background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23204d20' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' d='M3 8.5l3.2 3.3L13 4.2'/%3E%3C/svg%3E") center/11px no-repeat,
+        #ffffff;
+    border-color: #7f9db9;
+}
+
+/* ── 라디오 (XP sunken 흰 원 + 파란 점) ───────────────────────────── */
+[data-theme="horizon_xp"] .u4a-check input[type="radio"],
+[data-theme="horizon_xp"] .form-check-input[type="radio"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border: 1px solid #7f9db9;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: inset 1px 1px 1px rgba(0, 0, 0, .12);
+    cursor: pointer;
+}
+[data-theme="horizon_xp"] .u4a-check input[type="radio"]:checked,
+[data-theme="horizon_xp"] .form-check-input[type="radio"]:checked {
+    background: radial-gradient(circle at center, #0a5fdb 0 2.6px, transparent 3.2px), #ffffff;
+    border-color: #7f9db9;
+}
+[data-theme="horizon_xp"] .u4a-check input:disabled,
+[data-theme="horizon_xp"] .form-check-input:disabled {
+    background-color: #e6e3d4;
+    border-color: #c6c3b6;
+}
+
+/* ── 메뉴 (XP 흰 배경 + 좌측 아이콘 거터 + 파란 하이라이트) ────────── */
+[data-theme="horizon_xp"] .u4a-menu {
+    padding: 2px;
+    border: 1px solid #8c8878;
+    border-radius: 0;
+    /* 왼쪽 26px = 연회색 아이콘 거터, 나머지 = 흰색(XP 클래식 메뉴) */
+    background: linear-gradient(90deg, #ece9d8 0, #ece9d8 26px, #ffffff 26px);
+    box-shadow: 2px 2px 3px rgba(0, 0, 0, .28);
+}
+[data-theme="horizon_xp"] .u4a-menu__item {
+    padding: 4px 18px 4px 30px;                /* 좌측 거터 위로 텍스트 밀기 */
+    border-radius: 0;
+    color: #000;
+}
+[data-theme="horizon_xp"] .u4a-menu__item i {
+    margin-left: -22px;                        /* 아이콘을 거터 안으로 */
+    width: 18px;
+    color: #4a4a42;
+}
+/* XP 메뉴 hover = 파란 하이라이트(거터까지) + 흰 글자.
+   ★ 단, 비활성(aria-disabled)·타이틀(CtxTitle)·커스텀 노드는 제외한다 — 이들은 hover 배경이
+     transparent 라(공통/ws20.css), 흰 글자만 주면 배경에 묻혀 글자가 사라진다(사용자 지적 버그). */
+[data-theme="horizon_xp"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover,
+[data-theme="horizon_xp"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible {
+    background: #0a5fdb;
+    color: #fff;
+    border-radius: 3px;
+}
+[data-theme="horizon_xp"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover i,
+[data-theme="horizon_xp"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible i {
+    color: #fff;
+}
+

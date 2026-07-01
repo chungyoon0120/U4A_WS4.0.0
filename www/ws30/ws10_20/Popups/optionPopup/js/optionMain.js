@@ -109,7 +109,11 @@
         { key: "horizon_dark",   text: "Horizon Dark",   accent: "#1c93f2", bg: "#1c2228" },
         { key: "horizon_purple", text: "Horizon Purple", accent: "#7f77dd", bg: "#faf8ff" },
         { key: "horizon_red",    text: "Horizon Red",    accent: "#e24b4a", bg: "#fff7f7" },
-        { key: "horizon_green",  text: "Horizon Green",  accent: "#639922", bg: "#f4fcf4" }
+        { key: "horizon_green",  text: "Horizon Green",  accent: "#639922", bg: "#f4fcf4" },
+        { key: "horizon_xp",     text: "Windows XP",     accent: "#0a5fdb", bg: "#ece9d8" },
+        { key: "horizon_95",     text: "Windows 95",     accent: "#000080", bg: "#c0c0c0" },
+        { key: "horizon_7",      text: "Windows 7",      accent: "#0078d7", bg: "#f0f0f0" },
+        { key: "horizon_signature", text: "SAP Signature", accent: "#3a6ea5", bg: "#eef2f7" }
     ];
 
     // 확장 지점 — 한 줄 추가하면 좌측 list-group + 우측 render 자동.

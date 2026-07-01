@@ -1,6 +1,6 @@
 # U4A Workspace — UI5 → HTML5 변환 잔여 산출 보고서
 
-> **조사일** 2026-06-26 · **현행화** 2026-06-30 · **대상** WS10 / WS20 / WS30 전체 화면 단위기능
+> **조사일** 2026-06-26 · **현행화** 2026-06-30 (오후 변환분 반영) · **대상** WS10 / WS20 / WS30 전체 화면 단위기능
 > **방법** 현행 소스 전수 분석 (`_` 백업폴더 제외) + 호출경로 1:1 추적(iframe src·pathInfo까지) + 미구현 스텁 전수 발굴
 
 ---
@@ -9,17 +9,18 @@
 
 | 구분 | 완전 미완 | 부분 | 합계 |
 |---|:---:|:---:|:---:|
-| **① UI5 팝업 변환** (별도 UI5 코드 → HTML5) | 14 | 1 | **15** |
-| **② 코어 미구현** (원본 로직 → 현행 코드 이식) | 12 | 3 | **15** |
-| **합계 (단위기능)** | **26** | **4** | **≈ 30** |
+| **① UI5 팝업 변환** (별도 UI5 코드 → HTML5) | 13 | 1 | **14** |
+| **② 코어 미구현** (원본 로직 → 현행 코드 이식) | 9 | 3 | **12** |
+| **합계 (단위기능)** | **22** | **4** | **≈ 26** |
 
 ```
-①  UI5 팝업 변환 ███████████████░░░  15
-②  코어 미구현   ███████████████░░░  15
+①  UI5 팝업 변환 ██████████████░░░░  14
+②  코어 미구현   ████████████░░░░░░  12
 ```
 
-> **6/29~30 완료**: 별도창 **versionMng**(버전 관리 diff) · **docPopup**(기술 문서, TinyMCE) · **optionPopup**(옵션, optionMain.js) HTML5화 · WS30 **K5/K6**(트리 K1~K10 전부) · USP **Save·Activate·모드전환** · Monaco 우클릭 메뉴 **표시** · WS20 트리선택→속성 · 신규 속성 팝업 **DumpWrite·InitPreScreen**.
-> **세분화/이동**: MIME → **별도창(mimeRepository) 전환**(뷰어+폴더생성 완료, K4~K6 CRUD 미구현) · USP Monaco 우클릭 **클릭 동작 4종**(표시는 됨, 클릭 미구현).
+> **6/30 완료**: 별도창 **runtimeClassNavigator**(런타임 클래스 탐색) · WS20 **트리 D&D**(이동/복사, `ws_html5_ws20_dnd.js`) · **F4 검색도움말 제네릭 모듈**(Code Page·Authorization Group) · **스켈레톤 화면 설정 팝업** · **versionMng·docPopup·optionPopup** HTML5화.
+> **6/29 완료**: WS30 K1~K10 전부 · USP Save·Activate·모드전환 · Monaco 우클릭 메뉴 표시 · 속성 팝업 DumpWrite·InitPreScreen.
+> **세분화**: MIME → 별도창(mimeRepository) 전환(뷰어+폴더생성 완료, K4~K6 CRUD 미구현) · USP Monaco 우클릭 **클릭 동작 4종**(표시는 됨, 클릭 미구현).
 
 > **두 축의 차이**
 > - **① 변환**: `Popups/` 폴더 등에 *별도 UI5 코드*가 살아있어, 그 UI를 HTML5로 다시 그려야 함.
@@ -40,7 +41,7 @@
 
 # ① UI5 팝업 변환 대상
 
-## 1-A. 미변환 별창 팝업 (13) — 현행에서 실제로 열림
+## 1-A. 미변환 별창 팝업 (11) — 현행에서 실제로 열림
 
 | # | 팝업 | 기능 | 진입(현행) | 규모 |
 |:--:|---|---|---|:--:|
@@ -49,26 +50,26 @@
 | 3 | iconPrevPopup | SAP 아이콘 미리보기 | `fnWS20WMENU20_04_01` | 大 |
 | 4 | illustMsgPopup | 일러스트 메시지 선택 | `fnWS20WMENU20_04_02` | 中 |
 | 5 | patternPopup | 소스 패턴 관리 | `fnWS20WMENU20_05` | 中 |
-| 6 | runtimeClassNavigator | 런타임 클래스 탐색 | `ev_pressRuntimeBtn` | 中 |
-| 7 | uspNewPopup | USP 신규 파일/폴더 | WS30 트리 | 中 |
-| 8 | releaseNotePopup | 릴리즈 노트 | `fnHmws.js:621` | 中 |
-| 9 | ShortCutCreator | 앱 바로가기 생성 | `fnHmws.js:703` | 中 |
-| 10 | ui5CssPopup_v2 | UI5 Predefined CSS | `fnHmws.js:746/750` (WLO 분기) | 中 |
-| 11 | webDynConversionLog | WebDynpro 변환 로그 | 모듈 require | 中 |
-| 12 | monacoSnippetDesigner | 스니펫 디자이너 | 모듈 require | 中* |
-| 13 | monacoThemeDesign | 테마 디자이너 | 모듈 require | 中* |
+| 6 | releaseNotePopup | 릴리즈 노트 | `fnHmws.js:621` | 中 |
+| 7 | ShortCutCreator | 앱 바로가기 생성 | `fnHmws.js:703` | 中 |
+| 8 | ui5CssPopup_v2 | UI5 Predefined CSS | `fnHmws.js:746/750` (WLO 분기) | 中 |
+| 9 | webDynConversionLog | WebDynpro 변환 로그 | 모듈 require | 中 |
+| 10 | monacoSnippetDesigner | 스니펫 디자이너 | 모듈 require | 中* |
+| 11 | monacoThemeDesign | 테마 디자이너 | 모듈 require | 中* |
 
 > `*` Monaco 2종은 **에디터는 유지, UI5 쉘 레이아웃만** 교체하면 되어 비교적 수월.
-> ✅ 완료 전환: **docPopup**(기술 문서), **versionManagement**→`versionMng`(버전 관리 diff), **optionPopup**(옵션) — §완료 참고.
+> ✅ 완료 전환: **runtimeClassNavigator · docPopup · versionMng · optionPopup** — §완료 참고.
 
-## 1-B. 미변환 + 현행 미배선 (1) — ⚠️ 확인 필요
+## 1-B. 미변환 + 현행 미배선 (2) — ⚠️ 확인 필요
 
 | 팝업 | 기능 | 상태 |
 |---|---|---|
 | fnUiTempWizardPopupOpen | UI 템플릿 마법사 | 순수 UI5. 호출처가 **죽은 `design/*`에만** 존재 → 현행 메뉴에서 안 열림 |
+| **uspNewPopup** | 선택 USP를 **새 창으로 열기** | 여는 함수 `fnUspNewWindow`(`ws_usp_01.js:407`) **정의만·호출부 0**. UI5 트리(getContextByIndex) 의존. 폴더(frame.html)는 있으나 화면 미연결 |
 
-> 변환 전, **이 기능이 현행에 살아있어야 하는지** 사용자 확인 필요 (변환 + 신규 배선 둘 다 필요).
-> ✅ ~~fnWebSecurityPopupOpen~~ — **완료** (native `<dialog>` 변환 + 속성패널 DH001026에서 정상 배선).
+> 둘 다 **파일(와꾸)만 있고 현행 트리거 없음** → 변환 전 "이 기능이 현행에 살아있어야 하는지" 확인 필요.
+> 주의: uspNewPopup ≠ USP 신규 생성(그건 K3 Create `fnCreateUspNodePopup` 완료). uspNewPopup은 "USP 새 창 열기"로 별개.
+> ✅ ~~fnWebSecurityPopupOpen~~ — **완료** (native `<dialog>` 변환 + 속성패널 DH001026 배선).
 
 ## 1-C. 부분 변환 (1)
 
@@ -83,26 +84,25 @@
 
 # ② 코어 미구현 (현행 코드 내 스텁)
 
-## 2-A. WS20 디자인영역 — 5 완전 + 3 부분
+## 2-A. WS20 디자인영역 — 2 완전 + 3 부분
 
-**완전 미완 (5)**
+**완전 미완 (2)**
 
 | # | 미구현 기능 | 위치 | 현재 상태 |
 |:--:|---|---|---|
-| 1~3 | **트리 D&D** (드래그시작 / 종료 / Drop) | `ws20_prev.js:808~` | warn만, drop 무시 (W3+) |
-| 4 | **OBJID 변경** | `ws20_attr.js:3498` | 입력해도 **값 원복**되어 변경 불가 |
-| 5 | UI Sample 팝업 | `ws20_attr.js:3460` | warn만, 버튼 display:none |
+| 1 | **OBJID 변경** | `ws20_attr.js:3498` | 입력해도 **값 원복**되어 변경 불가 |
+| 2 | UI Sample 팝업 | `ws20_attr.js:3460` | warn만, 버튼 display:none |
 
 **부분 (3) — 조건부 동작(모듈 로드 의존)**
 
 | # | 기능 | 위치 | 상태 |
 |:--:|---|---|---|
-| 6 | 미리보기 우클릭 컨텍스트메뉴 | `ws20_prev.js:1216` | `callDesignContextMenu` 지연로드 배선됨, 미로드 시 warn 폴백 |
-| 7 | 미리보기 속성 실시간 반영(previewUIsetProp) | `ws20_attr.js:3108` | `uiPreviewArea.js`에 정의, 미리보기 모듈 로드 시 활성 |
-| 8 | 앱 헤더 Find UI 버튼 | `ws20.js:697` | New Window·Back은 배선 완료, Find 버튼만 미배선 |
+| 3 | 미리보기 우클릭 컨텍스트메뉴 | `ws20_prev.js:1216` | `callDesignContextMenu` 지연로드 배선됨, 미로드 시 warn 폴백 |
+| 4 | 미리보기 속성 실시간 반영(previewUIsetProp) | `ws20_attr.js:3108` | `uiPreviewArea.js`에 정의, 미리보기 모듈 로드 시 활성 |
+| 5 | 앱 헤더 Find UI 버튼 | `ws20.js:697` | New Window·Back은 배선 완료, Find 버튼만 미배선 |
 
-> ✅ **완료 전환**: 트리선택→속성(`fnWs20SelectUI` 도입). **신규 속성 팝업**: DumpWrite(DH001091)·InitPreScreen(DH001106) → §1 완료.
-> **팝업 의존(별도·①에서 해결)**: F4 Value Help, 색상/아이콘 picker, 바인딩, Attr Help 팝업.
+> ✅ **완료 전환**: **트리 D&D**(이동/복사, 신규 `ws_html5_ws20_dnd.js` — `prev.js` 스텁 대체) · 트리선택→속성(`fnWs20SelectUI`) · **F4 검색도움말 제네릭 모듈**(Code Page·Auth Group) · 속성 팝업 DumpWrite·InitPreScreen.
+> **팝업 의존(별도·①에서 해결)**: 나머지 F4 Value Help, 색상/아이콘 picker, 바인딩, Attr Help 팝업.
 
 ## 2-B. WS30 USP — 4 (Monaco 에디터 우클릭 *클릭 동작*)
 
@@ -134,8 +134,8 @@
 |:--:|---|---|
 | **1** | **mimeRepository CRUD** (K4 삭제·K5 업로드·K6 다운로드) | 뷰어 완성, 서버 `/set_mime_crud` 패턴 존재 → 이식 |
 | **2** | **USP Monaco 우클릭 클릭 동작 4종** | 메뉴 표시 완성, `uspEditorCtxAction` 등록만 하면 됨 |
-| **3** | WS20 **트리 D&D + OBJID 변경** | 디자인 편집의 핵심 결손 |
-| **4** | **bindPopup** → WS20 F4 / 색상 / 아이콘 picker | 가장 중요한 유저 대면 팝업 + 연쇄 해결 |
+| **3** | WS20 **OBJID 변경 + UI Sample** | 디자인 편집 잔여 결손 |
+| **4** | **bindPopup** → WS20 색상 / 아이콘 picker | 가장 중요한 유저 대면 팝업 + 연쇄 해결 |
 | **5** | **setConnectionAI 버그** | 한 줄 수정으로 즉시 해결 |
 | **6** | 나머지 별창 팝업 (Monaco Designer 2종은 쉘 레이아웃만) | |
 
@@ -143,11 +143,11 @@
 
 # 📁 참고 — 변환/구현 완료 (작업 불요)
 
-- **별도창 팝업 완료 (9)**: OTRF4HelpPopup · editorPopup · errPageEditorPopup · errMsgPopup · textSearchPopup · winShowHidePopup · **versionMng** · **docPopup** · **optionPopup**
+- **별도창 팝업 완료 (10)**: OTRF4HelpPopup · editorPopup · errPageEditorPopup · errMsgPopup · textSearchPopup · winShowHidePopup · versionMng · docPopup · optionPopup · **runtimeClassNavigator**
 - **원래 순수 HTML (변환 대상 아님)**: aboutU4APopup · importExportPopup · screen_record · relese_notes · ui5CssPopup(v1) · designTreeUiSearchPopup
-- **인앱 Dialog/속성 팝업 완료**: fnAppCopy · fnAppF4 · fnCts · fnSelectBrowser · fnCssJsLinkAdd · **fnClientEditor** · **fnWebSecurity** · **fnDumpWrite(DH001091)** · **fnInitPreScreen(DH001106)** · mimeRepository 뷰어
+- **인앱 Dialog/속성 팝업 완료**: fnAppCopy · fnAppF4 · fnCts · fnSelectBrowser · fnCssJsLinkAdd · fnClientEditor · fnWebSecurity · fnDumpWrite(DH001091) · fnInitPreScreen(DH001106) · **fnF4SearchHelp**(Code Page·Auth Group) · **스켈레톤 화면 설정** · mimeRepository 뷰어
 - **WS10**: 헤더(줌/핀/창숨김/텍스트검색/최대화·F11/메뉴바 오버플로) · 상단 메뉴 디스패치 · 트랜잭션(Display/Change/Save/Activate) — 전면 완료
-- **WS20**: 텍스트/콤보/체크박스/이벤트/Aggregation 편집기 · 트리 렌더·컨텍스트(M01~M11)·선택→속성 · Insert/Delete/Move/Copy/Undo·Redo · 미리보기 줌(슬라이더)/전체화면
+- **WS20**: 텍스트/콤보/체크박스/이벤트/Aggregation 편집기 · 트리 렌더·컨텍스트(M01~M11)·선택→속성·**D&D(이동/복사)** · Insert/Delete/Move/Copy/Undo·Redo · 미리보기 줌(슬라이더)/전체화면
 - **WS30**: 트리(가상스크롤·아이콘·펼침/접힘·선택) · Monaco 2분할 · Save/Activate/모드전환 · Properties · **트리 우클릭 K1~K10 전부** · Monaco 우클릭 메뉴 표시
 
 ---

@@ -82,6 +82,16 @@
         // "sap-icon://xxx" → "xxx" (커스텀 폰트 "u4a-fw-solid/Icons" 는 경로째 유지).
         return String(s || "").replace(/^sap-icon:\/\//, "");
     }
+    // 일부 CODE 의 text/tooltip 은 UI5 모델 바인딩 문자열 "{/WSLANGU/<클래스>/<코드>}" (원본은 JSONModel
+    //   /WSLANGU 트리로 렌더 시 해석). shim 은 이를 리터럴로 잡으므로 여기서 메시지 클래스로 직접 치환한다.
+    //   (아이콘 목록 047, Undo 247, Redo 248 — 원본 getShortCutList 확인.)
+    function _resolveBinding(sVal) {
+        if (!sVal || String(sVal).indexOf("{/WSLANGU/") === -1) { return sVal || ""; }
+        return String(sVal).replace(/\{\/WSLANGU\/([^/{}]+)\/([^/{}]+)\}/g, function (m, sCls, sCode) {
+            try { return WSUTIL.getWsMsgClsTxt(_langu(), sCls, sCode) || m; }
+            catch (e) { return m; }
+        });
+    }
 
     // 닫기 = close() 만(DOM 제거는 공통 u4a-ui.js _installGlobalDialogClose 가 .u4a-dialog 전역 처리).
     function lf_close() {
@@ -156,6 +166,8 @@
         if (!oCap) { return null; }
 
         var sFa = KBD_ICON[_stripIcon(oCap.icon)] || null;
+        var sText = _resolveBinding(oCap.text);   // 바인딩 "{/WSLANGU/...}" → 실제 메시지
+        var sTip = _resolveBinding(oCap.tooltip);
 
         var oBtn = _el("span", "u4a-btn u4aKbdPrevBtn");
         if (oCap.type === "Reject" || oCap.type === "Negative") {
@@ -163,12 +175,12 @@
         }
         var sHtml = "";
         if (sFa) { sHtml += '<i class="fa-solid fa-' + sFa + '"></i>'; }
-        if (oCap.text) { sHtml += '<span class="u4aKbdPrevTxt"></span>'; }
+        if (sText) { sHtml += '<span class="u4aKbdPrevTxt"></span>'; }
         oBtn.innerHTML = sHtml;
-        if (oCap.text) { oBtn.querySelector(".u4aKbdPrevTxt").textContent = oCap.text; }
-        if (oCap.tooltip) { oBtn.title = oCap.tooltip; }
+        if (sText) { oBtn.querySelector(".u4aKbdPrevTxt").textContent = sText; }
+        if (sTip) { oBtn.title = sTip; }
         // 아이콘/텍스트 둘 다 없으면(이례) 표시할 게 없어 null.
-        return (sFa || oCap.text) ? oBtn : null;
+        return (sFa || sText) ? oBtn : null;
     }
 
     /************************************************************************
@@ -263,6 +275,7 @@
 
                 // 설명 DESC(getShortCutList 에서 이미 현지화된 문자열).
                 var tdDesc = document.createElement("td");
+                tdDesc.className = "u4aKbdDescCell";
                 tdDesc.setAttribute("data-label", sColDesc);
                 tdDesc.textContent = o.DESC || "";
                 tr.appendChild(tdDesc);
@@ -321,19 +334,24 @@
             ".u4aKbdDlg { width: min(94vw, 760px); height: min(86vh, 640px); padding: 0; display: flex; flex-direction: column; }" +
             ".u4aKbdDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
             ".u4aKbdDlg .u4a-dialog__header span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
-            ".u4aKbdBody { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0.75rem 1rem; }" +
-            ".u4aKbdWrap { height: 100%; }" +
-            // 컬럼 폭 — 3열, 여백 넉넉(점점점 없이 줄바꿈).
-            ".u4aKbdCol--key { width: 30%; }" +
-            ".u4aKbdCol--prev { width: 24%; }" +
-            ".u4aKbdTbl tbody td { vertical-align: middle; white-space: normal; word-break: break-word; }" +
+            // 본문은 스크롤 안 함(패딩만) — 스크롤러는 테이블 래퍼 하나로 통일(스티키 헤더가 표 상단에 밀착).
+            ".u4aKbdBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 0.75rem 1rem; }" +
+            ".u4aKbdWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }" +
+            // 컬럼 폭 — 단축키/미리보기는 내용 폭(1% + nowrap 축소 트릭), 설명이 나머지(100%)를 흡수.
+            //   → 미리보기 버튼 라벨이 절대 잘리지 않음(점점점 X). 공통 .u4a-table 는 table-layout:auto.
+            ".u4aKbdTbl { table-layout: auto; }" +
+            ".u4aKbdCol--key { width: 1%; }" +
+            ".u4aKbdCol--prev { width: 1%; }" +
+            ".u4aKbdTbl tbody td, .u4aKbdTbl thead th { vertical-align: middle; white-space: nowrap; overflow: visible; text-overflow: clip; }" +
+            // 설명 셀만 줄바꿈 허용(긴 설명이 미리보기/단축키 폭을 밀어내지 않게 나머지 폭 흡수).
+            ".u4aKbdDescCell { white-space: normal; word-break: break-word; width: 100%; }" +
             // 단축키 kbd 키캡 칩.
             ".u4aKbdKeys { display: inline-flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }" +
             ".u4aKbdKey { display: inline-flex; align-items: center; justify-content: center; min-width: 1.5rem; height: 1.5rem; padding: 0 0.4rem; font-family: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1; color: var(--text); background: var(--surface); border: 0.0625rem solid var(--divider); border-bottom-width: 0.1875rem; border-radius: 0.375rem; }" +
             ".u4aKbdPlus { color: var(--text-muted); font-size: 0.75rem; }" +
-            // 미리보기 버튼 — 실제 버튼 모양(비상호작용, 시각용).
-            ".u4aKbdPrevBtn { pointer-events: none; cursor: default; max-width: 100%; }" +
-            ".u4aKbdPrevBtn .u4aKbdPrevTxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
+            // 미리보기 버튼 — 실제 버튼 모양(비상호작용, 시각용). 라벨 전체 표시(줄임 없음, 단일행).
+            ".u4aKbdPrevBtn { pointer-events: none; cursor: default; white-space: nowrap; }" +
+            ".u4aKbdPrevBtn .u4aKbdPrevTxt { white-space: nowrap; }" +
             // 푸터.
             ".u4aKbdFoot { display: flex; gap: 0.5rem; align-items: center; }" +
             ".u4aKbdFootSpacer { flex: 1 1 auto; }" +

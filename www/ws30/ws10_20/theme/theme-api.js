@@ -87,7 +87,15 @@
         horizon_dark: { mode: "dark", accent: "#3c93f5", hover: "#5aa6f7", soft: "rgba(60,147,245,.18)", bar: "#1b2a3a", bar2: "#22405e" },
         horizon_purple: { mode: "light", accent: "#7a3ff2", hover: "#6a2fe0", soft: "rgba(122,63,242,.16)", bar: "#4a2a6f", bar2: "#5e3491", bg: "#f6f2fe", surface: "#efe8fd", surface2: "#e7dcfb", border: "#e3d8f6" },
         horizon_red: { mode: "light", accent: "#e23b3b", hover: "#c92f2f", soft: "rgba(226,59,59,.15)", bar: "#6f2a2a", bar2: "#8c3030", bg: "#fdf4f4", surface: "#fbeaea", surface2: "#f7dcdc", border: "#f2d6d6" },
-        horizon_green: { mode: "light", accent: "#1f9d57", hover: "#178047", soft: "rgba(31,157,87,.15)", bar: "#244d2c", bar2: "#2c6639", bg: "#f1faf4", surface: "#e6f5ec", surface2: "#d6eede", border: "#d3ead9" }
+        horizon_green: { mode: "light", accent: "#1f9d57", hover: "#178047", soft: "rgba(31,157,87,.15)", bar: "#244d2c", bar2: "#2c6639", bg: "#f1faf4", surface: "#e6f5ec", surface2: "#d6eede", border: "#d3ead9" },
+        // Windows XP "Luna Blue" — doc 12 §2.1 예외(사용자 승인). 타이틀바=Luna 블루 그라데이션, 크롬=베이지.
+        horizon_xp: { mode: "light", accent: "#0a5fdb", hover: "#0846a8", soft: "rgba(49,106,197,.20)", bar: "#0a5ede", bar2: "#3f97ff", bg: "#ece9d8", surface: "#f4f3ea", surface2: "#e1ddc9", border: "#aca899" },
+        // Windows 95 "Classic" — doc 12 §2.1 예외. 타이틀바=navy 단색(bar=bar2), 크롬=실버 #c0c0c0.
+        horizon_95: { mode: "light", accent: "#000080", hover: "#0000a8", soft: "rgba(0,0,128,.18)", bar: "#000080", bar2: "#000080", bg: "#c0c0c0", surface: "#c0c0c0", surface2: "#b8b8b8", border: "#808080" },
+        // Windows 7 "Aero" — doc 12 §2.1 예외. 밝은 유리 타이틀바(검정 텍스트) + Aero 파랑 강조.
+        horizon_7: { mode: "light", accent: "#0078d7", hover: "#005a9e", soft: "rgba(0,120,215,.15)", bar: "#eaf3fb", bar2: "#cfe4f5", bg: "#f0f0f0", surface: "#f0f0f0", surface2: "#e4ecf3", border: "#d5d9dd" },
+        // SAP GUI "Signature" — doc 12 §2.1 예외(실제 SAP GUI Options 스크린샷 기준). 진파랑 타이틀바(흰 텍스트) + 노란 버튼 + 흰 기반.
+        horizon_signature: { mode: "light", accent: "#3a6ea5", hover: "#2c568a", soft: "rgba(58,110,165,.15)", bar: "#5389c1", bar2: "#2d5f98", bg: "#eef2f7", surface: "#eef2f7", surface2: "#dce6f0", border: "#b5c6d8" }
     };
 
     function _applySkin(sKey) {
@@ -105,7 +113,7 @@
 
     var U4ATheme = {
 
-        THEMES: ["horizon_white", "horizon_dark", "horizon_purple", "horizon_red", "horizon_green"],
+        THEMES: ["horizon_white", "horizon_dark", "horizon_purple", "horizon_red", "horizon_green", "horizon_xp", "horizon_95", "horizon_7", "horizon_signature"],
 
         /**
          * UI5 테마명 / 레거시 키 / 정식 키를 받아 data-theme 키로 정규화.

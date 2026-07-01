@@ -16,55 +16,55 @@ SAP UI5 기반 U4A Workspace를 **HTML5 + 바닐라 JS**로 컨버전하는 Elec
 
 ## UI5 → HTML5 변환 진행 현황
 
-> 최종 산출 **2026-06-26** · 현행화 **2026-06-30** · 상세 → **[변환 잔여 산출 보고서](.report/status/UI5_HTML5_변환잔여_산출보고서.md)**
+> 최종 산출 **2026-06-26** · 현행화 **2026-06-30** (오후 변환분 반영) · 상세 → **[변환 잔여 산출 보고서](.report/status/UI5_HTML5_변환잔여_산출보고서.md)**
 
-WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 30건** (완전 미완 26 · 부분 4).
+WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 26건** (완전 미완 22 · 부분 4).
 
 | 축 | 완전 미완 | 부분 | 합계 |
 |---|:---:|:---:|:---:|
-| ① UI5 팝업 변환 (별도 UI5 코드 → HTML5) | 14 | 1 | **15** |
-| ② 코어 미구현 (원본 로직 → 현행 코드 이식) | 12 | 3 | **15** |
-| **합계** | **26** | **4** | **🎯 30** |
+| ① UI5 팝업 변환 (별도 UI5 코드 → HTML5) | 13 | 1 | **14** |
+| ② 코어 미구현 (원본 로직 → 현행 코드 이식) | 9 | 3 | **12** |
+| **합계** | **22** | **4** | **🎯 26** |
 
-> ✅ **6/29~30 완료**: 별도창 **versionMng · docPopup · optionPopup** HTML5화 · WS30 K1~K10 전부 · USP Save/Activate/모드전환 · 신규 속성 팝업 DumpWrite·InitPreScreen.
+> ✅ **6/30 완료**: 별도창 **runtimeClassNavigator** · WS20 **트리 D&D**(이동/복사) · **F4 검색도움말 모듈** · **스켈레톤 팝업** · versionMng · docPopup · optionPopup HTML5화.
 
 ---
 
-### 🔴 잔여 작업 — ① UI5 팝업 변환 (15)
+### 🔴 잔여 작업 — ① UI5 팝업 변환 (14)
 
-**별창 팝업 미변환 (13)**
+**별창 팝업 미변환 (11)**
 
 - [ ] `bindPopup` ⭐ — 데이터 바인딩 편집 *(최우선 · 유저 대면 핵심)*
 - [ ] `findPopup` — UI 컨트롤 찾기
 - [ ] `patternPopup` — 소스 패턴 관리
-- [ ] `runtimeClassNavigator` — 런타임 클래스 탐색
 - [ ] `iconPrevPopup` — SAP 아이콘 미리보기
 - [ ] `illustMsgPopup` — 일러스트 메시지 선택
 - [ ] `releaseNotePopup` — 릴리즈 노트
-- [ ] `uspNewPopup` — USP 신규 파일/폴더
 - [ ] `ShortCutCreator` — 앱 바로가기 생성
 - [ ] `ui5CssPopup_v2` — UI5 Predefined CSS
 - [ ] `webDynConversionLog` — WebDynpro 변환 로그
 - [ ] `monacoSnippetDesigner` — 스니펫 디자이너 *(쉘 레이아웃만)*
 - [ ] `monacoThemeDesign` — 테마 디자이너 *(쉘 레이아웃만)*
 
-**현행 미배선 (1)** ⚠️
-- [ ] `fnUiTempWizard` — UI 템플릿 마법사 *(현행에 살아있어야 하는지 확인 필요)*
+**현행 미배선 (2)** ⚠️ *(파일만 있고 화면 연결 없음)*
+- [ ] `fnUiTempWizard` — UI 템플릿 마법사
+- [ ] `uspNewPopup` — USP 새 창 열기 *(`fnUspNewWindow` 정의만·호출 0. ≠ K3 신규생성)*
 
 **부분 변환 (1)**
 - [ ] `mimeRepository` (별도창) — ✅뷰어·폴더생성 / ⬜ K4 삭제 · K5 업로드 · K6 다운로드
 
 ---
 
-### 🔴 잔여 작업 — ② 코어 미구현 (15)
+### 🔴 잔여 작업 — ② 코어 미구현 (12)
 
-**WS20 디자인영역 (5완전 + 3부분)**
-- [ ] 트리 D&D — 드래그 시작 / 종료 / Drop
+**WS20 디자인영역 (2완전 + 3부분)**
 - [ ] OBJID 변경 *(현재 입력해도 값 원복)*
 - [ ] UI Sample 팝업
 - [ ] 〰️ 미리보기 우클릭 컨텍스트메뉴 *(부분 · 모듈 로드 의존)*
 - [ ] 〰️ 미리보기 속성 실시간 반영 *(부분 · 모듈 로드 의존)*
 - [ ] 〰️ 앱 헤더 Find UI 버튼 *(부분 · New Window·Back은 완료)*
+
+  ✅ 트리 D&D 완료(`ws_html5_ws20_dnd.js`)
 
 **WS30 USP — Monaco 우클릭 *클릭 동작* (4)** · *메뉴 표시는 완료*
 - [ ] 패턴 삽입 (executeEdits)
@@ -83,8 +83,8 @@ WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 30건**
 
 1. **mimeRepository CRUD** (K4·K5·K6) — 뷰어 완성, 서버 패턴 존재
 2. **USP Monaco 우클릭 클릭 동작 4종** — 메뉴 표시 완성, 핸들러 등록만
-3. **WS20 트리 D&D + OBJID 변경** — 디자인 편집의 핵심 결손
-4. **bindPopup** → WS20 F4 / 색상 / 아이콘 picker
+3. **WS20 OBJID 변경 + UI Sample** — 디자인 편집 잔여 결손
+4. **bindPopup** → WS20 색상 / 아이콘 picker
 5. **setConnectionAI 버그** — 한 줄 수정으로 즉시 해결
 
 ---
@@ -92,16 +92,20 @@ WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 30건**
 <details>
 <summary>✅ <b>완료 항목</b> (펼치기) — 6/26 이후 + 누적</summary>
 
-**🆕 6/29~30 완료**
-- [x] 별도창 **versionMng**(버전 관리 diff) · **docPopup**(기술 문서, TinyMCE) · **optionPopup**(옵션) HTML5화
-- [x] WS30 트리 우클릭 **K1~K10 전부** (K5 Download · K6 Test Service 추가)
-- [x] USP **Save · Activate · 모드전환** 이식
-- [x] USP **Monaco 우클릭 메뉴 표시** HTML5화
-- [x] WS20 **트리선택 → 속성** 반영
-- [x] 신규 속성 팝업 **DumpWrite**(DH001091) · **InitPreScreen**(DH001106)
+**🆕 6/30 완료**
+- [x] 별도창 **runtimeClassNavigator**(런타임 클래스 탐색) HTML5화
+- [x] WS20 **트리 D&D**(이동/복사) — 신규 `ws_html5_ws20_dnd.js`
+- [x] **F4 검색도움말 제네릭 모듈**(Code Page · Authorization Group)
+- [x] **스켈레톤 화면 설정 팝업** HTML5화
+- [x] 별도창 **versionMng · docPopup · optionPopup** HTML5화
 
-**별도창 팝업 완료 (9)**
-- [x] OTRF4HelpPopup · editorPopup · errPageEditorPopup · errMsgPopup · textSearchPopup · winShowHidePopup · **versionMng** · **docPopup** · **optionPopup**
+**6/29 완료**
+- [x] WS30 트리 우클릭 **K1~K10 전부** (K5 Download · K6 Test Service 추가)
+- [x] USP **Save · Activate · 모드전환** 이식 · **Monaco 우클릭 메뉴 표시**
+- [x] WS20 **트리선택 → 속성** · 신규 속성 팝업 **DumpWrite** · **InitPreScreen**
+
+**별도창 팝업 완료 (10)**
+- [x] OTRF4HelpPopup · editorPopup · errPageEditorPopup · errMsgPopup · textSearchPopup · winShowHidePopup · **versionMng** · **docPopup** · **optionPopup** · **runtimeClassNavigator**
 
 **인앱/속성 팝업 + 원래 순수 HTML (누적)**
 - [x] fnAppCopy · fnAppF4 · fnCts · fnSelectBrowser · fnCssJsLinkAdd · fnClientEditor · fnWebSecurity · fnDumpWrite · fnInitPreScreen

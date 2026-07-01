@@ -3258,7 +3258,11 @@
             { KEY: "horizon_dark", TXT: "Horizon Dark" },
             { KEY: "horizon_purple", TXT: "Horizon Purple" },
             { KEY: "horizon_red", TXT: "Horizon Red" },
-            { KEY: "horizon_green", TXT: "Horizon Green" }
+            { KEY: "horizon_green", TXT: "Horizon Green" },
+            { KEY: "horizon_xp", TXT: "Windows XP" },
+            { KEY: "horizon_95", TXT: "Windows 95" },
+            { KEY: "horizon_7", TXT: "Windows 7" },
+            { KEY: "horizon_signature", TXT: "SAP Signature" }
         ];
         const sCurrent = U4ATheme.current();
 

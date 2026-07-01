@@ -1375,7 +1375,7 @@
       // sticky 컬럼 헤더(MIME .u4aMimeTreeColHead) — 행과 동일 padding-left 로 컬럼 정렬.
       ".u4aBindColHead { position: sticky; top: 0; z-index: 2; box-sizing: border-box; display: flex; align-items: stretch; height: 2.25rem; padding-left: 0.375rem; background: var(--surface-raised); border-bottom: 0.0625rem solid var(--line); font-size: 0.8125rem; font-weight: 700; color: var(--text); }",
       ".u4aBindColName { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding-left: 0.5rem; }",
-      ".u4aBindColType { flex: 0 0 var(--u4aBind-type-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }",
+      ".u4aBindColType { flex: 0 0 var(--u4aBind-type-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; gap: 0.375rem; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }",
       ".u4aBindColDesc { flex: 0 0 var(--u4aBind-desc-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }",
       // 트리 — 행을 패널 폭에 맞춰 우측 컬럼 항상 보이게(공통 max-content 무력화, MIME 이식).
       ".u4aBindTree.u4a-tree { width: auto; min-width: 100%; padding-top: 0; }",
@@ -1385,11 +1385,11 @@
       // ★ 들여쓰기를 행 padding-left → 토글 margin-left 로 이동(행 content-box 폭 고정 → 컬럼 정렬 일치, MIME 핵심).
       ".u4aBindTree .u4a-tree__row { padding-left: 0.375rem; }",
       ".u4aBindTree .u4a-tree__toggle { margin-left: calc(var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem)); }",
-      // 트레일링 컨테이너(유형+설명 우측 고정폭 셀).
-      ".u4aBindTrail { display: flex; align-self: stretch; flex: 0 0 auto; }",
+      // 트레일링(유형+설명) — ★display:contents 로 래퍼를 없애 두 셀이 행의 "직계 flex 자식"이 되게 한다.
+      //   (래퍼로 감싸면 퍼센트 flex-basis 가 래퍼 기준이라 우측으로 쏠려 헤더와 어긋남 — MIME 는 단일 셀
+      //    직계 반환. 여기선 2열이라 display:contents 로 동일 효과.) → 유형/설명 폭이 행 기준=헤더와 정렬.
+      ".u4aBindTrail { display: contents; }",
       ".u4aBindCell { box-sizing: border-box; align-self: stretch; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); min-width: 0; }",
-      ".u4aBindTrail .u4aBindColType { flex: 0 0 var(--u4aBind-type-w); gap: 0.375rem; }",
-      ".u4aBindTrail .u4aBindColDesc { flex: 0 0 var(--u4aBind-desc-w); }",
       ".u4aBindTypeTxt, .u4aBindTrail .u4aBindColDesc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }",
       ".u4aBindTrail .u4aBindColDesc { color: var(--text); }",
       // 상태 아이콘 색(시맨틱 토큰).

@@ -90,6 +90,10 @@ module.exports = function(REMOTE, oAPP){
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            // [HTML5] frameless 창의 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: oBrowserOptions.title,
         };
 
         // URL에 QueryString 파라미터를 적용한다.

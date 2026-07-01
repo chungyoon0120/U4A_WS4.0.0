@@ -1767,6 +1767,34 @@ parent.oAPP.fn.exceptionRespGridLayout = function(UIOBK) {
 	};
 };
 
+// 실측(서버 소스 확인): u4a.charts.am.SingleDonutChart 의 init() 자신이
+//   if(typeof window.AmCharts === "undefined") jQuery.u4aJSloadAsync(".../amcharts.js", cb);
+//   if(typeof window.AmCharts.AmPieChart === "undefined") jQuery.u4aJSloadAsync(".../pie.js", cb2);
+// 로 벤더 스크립트 로드를 "그 자리에서" 트리거하고 콜백을 기다리지 않은 채 바로 다음 줄에서
+// AmCharts.AmPieChart 를 참조 — u4aJSloadAsync 가 CORS 로 막혀 콜백이 영영 안 오면
+// (jQuery.u4aJSloadAsync 자체 수정으로 해결) 여기서 크래시. init() 은 new l_class() 호출
+// "그 순간"에 실행되므로, 생성 전에는 로드가 트리거조차 안 돼 있다 — 그래서 먼저 생성을
+// 시도(=트리거)하고, 실패하면 이제 실제로 트리거된 로드가 끝날 때까지 기다렸다가 재시도한다.
+function _waitForAmChartsReady() {
+	if (typeof AmCharts !== "undefined") {
+		return Promise.resolve();
+	}
+	return new Promise(function (resolve) {
+		var iWaited = 0;
+		var iTick = setInterval(function () {
+			if (typeof AmCharts !== "undefined") {
+				clearInterval(iTick);
+				resolve();
+				return;
+			}
+			iWaited += 50;
+			if (iWaited % 3000 === 0) {
+				console.warn("[U4A preview] AmCharts 전역 대기 중(" + (iWaited / 1000) + "s) — 벤더 스크립트 로딩 지연/실패 의심.");
+			}
+		}, 50);
+	});
+}
+
 function createUIInstance(is_tree, it_0015) {
 	if (isSkip0014(is_tree) === true) {
 		return;
@@ -1811,6 +1839,17 @@ function createUIInstance(is_tree, it_0015) {
 	parent.oAPP.fn.exceptionRespGridLayout(is_tree.UIOBK);
 	var lt_0015 = it_0015 || parent.oAPP.DATA.APPDATA.T_0015.filter(a => a.OBJID === is_tree.OBJID);
 	var l_class = getUIClassInstance(ls_0022.LIBNM);
+	/* ===== [임시 진단] AmCharts 크래시 원인 확정용 — 확인 후 제거 예정. ===== */
+	if (ls_0022.LIBNM.indexOf("u4a.charts.am") === 0) {
+		console.warn("[U4A preview][DIAG] " + ls_0022.LIBNM + " 생성 직전 상태 — "
+			+ "l_class=" + typeof l_class
+			+ ", AmCharts=" + typeof (typeof AmCharts !== "undefined" ? AmCharts : undefined)
+			+ ", u4a=" + typeof window.u4a
+			+ ", u4a.charts=" + typeof (window.u4a && window.u4a.charts)
+			+ ", u4a.charts.am=" + typeof (window.u4a && window.u4a.charts && window.u4a.charts.am)
+			+ ", u4a.charts.am.AmCharts=" + typeof (window.u4a && window.u4a.charts && window.u4a.charts.am && window.u4a.charts.am.AmCharts));
+	}
+	/* ===== [임시 진단] 끝 ===== */
 	try {
 		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid(), setUIProperty(is_tree, lt_0015));
 	} catch (e) {
@@ -1869,7 +1908,7 @@ async function drawPreview() {
 		setPreviewUiTheme(l_theme.UIATV);
 	}
 	setPreviewCSS();
-	setUIScript(parent.oAPP.attr.oModel.oData.zTREE);
+	await setUIScript(parent.oAPP.attr.oModel.oData.zTREE);
 	parent.oAPP.attr.UA015UI = parent.oAPP.attr.prev["APP"];
 	parent.oAPP.attr.UA015UI.__UIFND = "SAP.M.APP";
 
@@ -2061,14 +2100,30 @@ function setUIPropertyDirectly(OBJID, it_0015) {
 	}
 }
 
-function setUIScript(it_tree) {
+async function setUIScript(it_tree) {
 	if (it_tree.length === 0) {
 		return;
 	}
 	for (var i = 0, l = it_tree.length; i < l; i++) {
+		// createUIInstance 자체는 동기 유지(addUIObjPreView 등 다른 호출부가 반환 직후
+		// parent.oAPP.attr.prev[OBJID] 가 이미 채워져 있다고 가정 — async 로 바꾸면 그 호출부들이
+		// 깨진다). u4a.charts.am 계열의 init() 은 new l_class() 실행 "그 순간" AmCharts 벤더
+		// 스크립트 로드를 트리거하므로, 생성 전에는 기다릴 대상이 없다 — 먼저 생성을 시도하고,
+		// (기존 원본 코드에도 있던 "속성 없이 재시도" catch 마저 실패하면) 방금 트리거된 로드가
+		// 실제로 끝날 때까지 기다렸다가 한 번 더 시도한다(스탠드인 대체 아님 — 진짜로 다시 만듦).
 		var _aT0015 = parent.oAPP.DATA.APPDATA.T_0015.filter(a => a.OBJID === it_tree[i].OBJID);
-		createUIInstance(it_tree[i], _aT0015);
-		setUIScript(it_tree[i].zTREE);
+		try {
+			createUIInstance(it_tree[i], _aT0015);
+		} catch (e) {
+			var ls_0022 = parent.oAPP.DATA.LIB.T_0022.find(a => a.UIOBK === it_tree[i].UIOBK);
+			if (!ls_0022 || !ls_0022.LIBNM || ls_0022.LIBNM.indexOf("u4a.charts.am") !== 0) {
+				throw e;
+			}
+			console.warn("[U4A preview] " + ls_0022.LIBNM + " 최초 생성 실패(벤더 스크립트 로딩 중) — 로딩 완료 대기 후 재시도:", e && e.message);
+			await _waitForAmChartsReady();
+			createUIInstance(it_tree[i], _aT0015);
+		}
+		await setUIScript(it_tree[i].zTREE);
 		setUIParent(it_tree[i]);
 	}
 }
@@ -2521,14 +2576,31 @@ function start() {
 			};
 			window._loaded = true;
 			jQuery.u4aJSloadAsync = function(url, callback, s) {
-				var a = s || false;
-				jQuery.ajax({
-					'url': url,
-					'dataType': 'script',
-					'cache': false,
-					'async': a,
-					'success': callback || jQuery.noop
-				});
+				// 원본은 jQuery.ajax(dataType:'script') 로 XHR 기반 스크립트 로드. 이 iframe 은
+				// HTML5/Electron 구조상 로컬 file:// 로 로드되므로, 루트상대경로(예: u4a.charts.am
+				// SingleDonutChart.init() 의 "/zu4a_imp/tools/amchart/.../amcharts.js")로 SAP
+				// 서버 리소스를 요청하면 file://→https:// 크로스오리진 XHR 이 되어 CORS 로 막힌다
+				// (정적 .js 서버라 CORS 헤더가 없음) → window.AmCharts 가 끝내 생기지 않아
+				// 'Cannot read properties of undefined (reading AmPieChart)' 로 크래시.
+				// <script src> 태그는 CORS 제약 없는 리소스 로드라 이 경로가 안전하다.
+				var sUrl = url;
+				if (sUrl.indexOf("://") === -1) {
+					var sHost = "";
+					try { sHost = u4aRootParent.getHost(); } catch (e) { }
+					if (sHost) {
+						sUrl = sHost.replace(/\/+$/, "") + (sUrl.charAt(0) === "/" ? sUrl : "/" + sUrl);
+					}
+				}
+				var oScript = document.createElement("script");
+				oScript.src = sUrl + (sUrl.indexOf("?") === -1 ? "?" : "&") + "_ts=" + new Date().getTime();
+				oScript.onload = function () {
+					if (typeof callback === "function") { callback(); }
+				};
+				oScript.onerror = function () {
+					console.error("[U4A preview] u4aJSloadAsync 스크립트 로드 실패:", sUrl);
+					if (typeof callback === "function") { callback(); }
+				};
+				document.head.appendChild(oScript);
 			};
 			sap.ui.getCore().loadLibrary("sap.m");
 			await drawPreview();

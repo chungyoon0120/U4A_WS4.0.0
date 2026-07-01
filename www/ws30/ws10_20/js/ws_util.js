@@ -651,6 +651,10 @@ const WSUTIL = {
             "horizon_purple":    "#f6f2fe",
             "horizon_red":       "#fdf4f4",
             "horizon_green":     "#f1faf4",
+            "horizon_xp":        "#ece9d8",
+            "horizon_95":        "#c0c0c0",
+            "horizon_7":         "#f0f0f0",
+            "horizon_signature": "#eef2f7",
         };
 
         return _oThemeColorMap[sTheme] || "#ffffff";

@@ -1,38 +1,125 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">        
-    <meta name="google" content="notranslate">        
-    <title>U4A Test</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="google" content="notranslate">
+    <title>UI Attribute</title>
     <link rel="icon" href="data:,">
+
+    <!-- ===== 공통 헤더(.u4a-titlebar)·버튼·테이블·스플리터·입력칸·토큰 (runtimeClassNav/versionMng 동일 스택) =====
+         원본: attrPresetPopup(UI5 별도창: App/Page + Splitter + sap.ui.table.Table + sap.m.Table).
+         HTML5: frameless 별도창 — [공통 .u4a-titlebar] + [상단 툴바] + [가로 스플리터].
+         경로: design/attrPresetPopup/list 기준 → theme=../../../theme, lib=../../../../../lib. (browser-window-common-ux) -->
+    <link rel="stylesheet" href="../../../theme/tokens.css">
+    <link rel="stylesheet" href="../../../theme/shell.css">
+    <link rel="stylesheet" href="../../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../../lib/fontawesome/7.2.0/css/all.min.css">
     <link rel="stylesheet" href="./css/index.css">
+
+    <script src="../../../theme/theme-api.js"></script>
+    <script src="../../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 BGCOL/THEME/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* index.js 에서 재적용 */ }
+        })();
+    </script>
 </head>
 
-<body class="sapUiBody">
+<body>
 
-    <div id="content"></div>
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고 / 제목 / min·max·close (versionMng 동일) ===== -->
+    <header class="u4a-titlebar" id="apTitlebar">
+        <img class="u4a-titlebar__logo" id="apLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="apTitle"></span>
+        <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="apWinMin" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="apWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="apWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
 
-    <script>
+    <!-- 본체 = [상단 툴바] + [가로 스플리터: 좌 UI 목록 / 우 속성 목록]. 데이터 도착 후 페이드인. -->
+    <div class="u4aApBody" id="apBody">
 
-        const _style = `
-            font-size: 22px;
-            color: #e6e2da;
-            background: blue;
-            padding: 10px;
-            font-family: monospace;
-            `;
+        <!-- 상단 툴바(원본 Page customHeader Toolbar) -->
+        <div class="u4aApToolbar" id="apToolbar">
+            <button type="button" class="u4a-btn u4aApReset" id="apResetBtn">
+                <i class="fa-solid fa-table-columns"></i><span id="apResetTxt"></span>
+            </button>
+            <span class="u4aApToolbar__spacer"></span>
+            <button type="button" class="u4a-btn u4aApTool" id="apDownloadBtn">
+                <i class="fa-solid fa-download"></i><span id="apDownloadTxt"></span>
+            </button>
+            <button type="button" class="u4a-btn u4aApTool" id="apUploadBtn">
+                <i class="fa-solid fa-upload"></i><span id="apUploadTxt"></span>
+            </button>
+            <span class="u4aApToolbar__sep"></span>
+            <button type="button" class="u4a-btn u4aApTool" id="apHelpBtn" title="Help"><i class="fa-solid fa-circle-question"></i></button>
+        </div>
 
-        console.warn(`%c UI Attribute 개인화 팝업` , _style);
-        
-        let oScr = document.createElement("script");
-            oScr.src = "index.js";
+        <!-- 가로 스플리터 -->
+        <div class="u4a-splitter u4aApSplit" id="apSplit">
 
-            document.body.appendChild(oScr);
-   
-    </script>
+            <!-- 좌 = UI 목록(원본 PAGE1 sap.ui.table.Table) -->
+            <section class="u4a-splitter__pane u4aApLeft" id="apLeftPane">
+                <!-- 검색 툴바(원본 OverflowToolbar: UI 검색 라벨 + Input) -->
+                <div class="u4aApPaneTb">
+                    <span class="u4aApPaneTb__label" id="apHeadSrchLabel"></span>
+                    <div class="u4aApField" id="apHeadSrchField"></div>
+                </div>
+                <!-- UI 목록 테이블(공통 .u4a-table) -->
+                <div class="u4aApWrap" id="apHeadWrap"></div>
+            </section>
+
+            <!-- 세로 분할 바 -->
+            <div class="u4a-splitter__bar u4aApSplit__bar" id="apSplitBar"></div>
+
+            <!-- 우 = 속성 목록(원본 PAGE2 sap.m.Table) -->
+            <section class="u4a-splitter__pane u4aApRight" id="apRightPane">
+                <!-- 선택한 UI 정보(원본 PAGE2 customHeader) -->
+                <div class="u4aApSelHead" id="apSelHead">
+                    <img class="u4aApSelHead__icon" id="apSelHeadIcon" src="" alt="" hidden>
+                    <div class="u4aApSelHead__txt">
+                        <span class="u4aApSelHead__name" id="apSelHeadName"></span>
+                        <span class="u4aApSelHead__lib" id="apSelHeadLib"></span>
+                    </div>
+                </div>
+                <!-- 삭제 + 검색 툴바(원본 sap.m.Table headerToolbar) -->
+                <div class="u4aApPaneTb">
+                    <button type="button" class="u4a-btn u4a-btn--negative u4aApDelete" id="apDeleteBtn">
+                        <i class="fa-solid fa-trash"></i><span id="apDeleteTxt"></span>
+                    </button>
+                    <div class="u4aApField" id="apItemSrchField"></div>
+                </div>
+                <!-- 속성 목록 테이블(공통 .u4a-table) -->
+                <div class="u4aApWrap" id="apItemWrap"></div>
+            </section>
+
+        </div>
+
+    </div>
+
+    <!-- Busy 오버레이 — ★공통 .u4a-busy★(shell.css 단일 출처). data-busy 토글. -->
+    <div id="apBusy" class="u4a-busy" role="progressbar" aria-valuetext="Busy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
 
 </body>
 

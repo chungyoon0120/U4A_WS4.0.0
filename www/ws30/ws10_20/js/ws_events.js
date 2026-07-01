@@ -1718,11 +1718,15 @@
 
             APPCOMMON.fnShowFloatingFooterMsg('S', sCurrPage, sMsg);
 
-            parent.setAppInfo(oAppInfo);
-
-            oAppInfo = jQuery.extend(true, {}, parent.getAppInfo());
-
-            APPCOMMON.fnSetModelProperty("/WS20/APP", oAppInfo);
+            // ★[HTML5] APP 정보 3원화 통일 — ①전역 getAppInfo · ②모델 /WS20/APP · ③로컬 oAPP.attr.appInfo
+            //   를 "동일 객체 참조"로 커밋한다. 원본은 setAppInfo 직후 getAppInfo()를 한 번 더 deep-extend 해
+            //   모델에 넣어(①≠②) 세 저장소가 각각 별개 객체로 갈라졌고, ③은 재지정조차 안 돼 옛 객체로 남았다.
+            //   그 결과 이 커밋 이후 중간에 한 곳만 바뀌면(예: attrUpdateDocAttr 이 ③) ①/②를 읽는 소비처
+            //   (MIME 등)가 옛 값을 봤다. 재-extend 를 제거하고 세 곳이 같은 oAppInfo 를 가리키게 하면, 이후
+            //   어떤 필드를 in-place 로 바꿔도 세 저장소에 자동 반영된다(오픈/모드전환은 이미 동일 참조 유지).
+            parent.setAppInfo(oAppInfo);                        // ① 전역
+            APPCOMMON.fnSetModelProperty("/WS20/APP", oAppInfo); // ② 모델(동일 참조)
+            oAPP.attr.appInfo = oAppInfo;                        // ③ WS20 로컬(동일 참조)
 
             // [HTML5] 앱헤더(Active/Inactive)·트랜잭션 버튼 상태 갱신
             try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
@@ -2049,11 +2053,11 @@
             /**
              * APP 정보 갱신
              */
-            parent.setAppInfo(oAppInfo);
-
-            oAppInfo = jQuery.extend(true, {}, parent.getAppInfo());
-
-            APPCOMMON.fnSetModelProperty("/WS20/APP", oAppInfo);
+            // ★[HTML5] APP 정보 3원화 통일(활성 흐름과 동일 — 재-extend 제거로 ①=②=③ 동일 참조 커밋).
+            //   상세 근거는 ev_pressActivateBtn 성공 콜백의 동일 블록 주석 참조.
+            parent.setAppInfo(oAppInfo);                        // ① 전역
+            APPCOMMON.fnSetModelProperty("/WS20/APP", oAppInfo); // ② 모델(동일 참조)
+            oAPP.attr.appInfo = oAppInfo;                        // ③ WS20 로컬(동일 참조)
 
             // [HTML5] 앱헤더(Active/Inactive)·트랜잭션 버튼 상태 갱신 (IS_CHAG="" → 저장 반영)
             try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }

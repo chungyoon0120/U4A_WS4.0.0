@@ -1958,6 +1958,16 @@
             //ROOT 수집본(prev 스탠드인) — 안전 초기화.
             var lt_0015 = _ensurePrev("ROOT")._T_0015 || [];
 
+            // ★[HTML5] APP 정보 3원화 주의. 같은 APP 레코드가 세 곳에 있다:
+            //     ① 전역 parent.getAppInfo() (oWS.utill.attr.oAppInfo)
+            //     ② JSON 모델 /WS20/APP (oAPP.common.fnGetModelProperty)
+            //     ③ WS20 로컬 oAPP.attr.appInfo
+            //   오픈/모드전환/저장/활성 커밋 시 세 곳이 "동일 객체 참조"로 통일되도록 맞춰 두었다
+            //   (ev_pressActivateBtn/ev_pressSaveBtn 성공 콜백의 재-extend 제거 참조). 따라서 여기서는
+            //   ③(oAPP.attr.appInfo)만 in-place 로 바꿔도 ①/②에 자동 반영된다(원본 UI5 와 동일한 단일 변경).
+            //   ※ 통일 불변식이 깨지면 ①/②를 읽는 소비처(예: MIME fnMimePopupOpen 이 /WS20/APP 의 REQNO 사용)가
+            //     중간 변경(CTS 등)을 못 봐 옛 값을 쓰게 되므로, 위 커밋 지점의 동일-참조 유지가 전제다.
+
             //갱신 대상건 기준으로 ROOT 수집 attribute 갱신.
             for (var i = 0, l = it_attr.length; i < l; i++) {
 

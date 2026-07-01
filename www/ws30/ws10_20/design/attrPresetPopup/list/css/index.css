@@ -1,50 +1,314 @@
-.u4aWsBrowserDraggable {
-  -webkit-app-region: drag !important;
-  /* -webkit-user-select: none; */
+/****************************************************************************
+ * UI Attribute 개인화 항목 팝업 — 창 스코프 스타일
+ * --------------------------------------------------------------------------
+ *  원본: UI5 별도창(sap.m.App/Page + sap.ui.layout.Splitter + sap.ui.table.Table
+ *        + sap.m.Table). HTML5: frameless 별도창 — [공통 .u4a-titlebar] + [상단 툴바]
+ *        + [가로 스플리터: 좌 UI 목록(.u4a-table) / 우 속성 목록(.u4a-table)].
+ *  · 색/모양은 theme 토큰만 소비(하드코딩 없음). 공통 .u4a-btn/.u4a-field/.u4a-table/
+ *    .u4a-titlebar/.u4a-splitter/.u4a-busy/.u4a-toast 를 그대로 소비한다.
+ *  · 여기 규칙은 이 창 전용 레이아웃(스코프)만 — 공통 컴포넌트 색/구조는 건드리지 않는다.
+ *    (SSOT: .analy/16 §0.5 "고치지 말고 덧대라")
+ ****************************************************************************/
+
+html,
+body {
+    height: 100%;
 }
 
-.u4aWsBrowserDraggable .sapMBtn,
-.u4aWsBrowserDraggable .sapMSlt {
-  -webkit-app-region: no-drag;
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
 }
 
-
-
-
-/* 디자인 영역의 Attribute 영역 */
-
-.u4aWsDesignAttr .sapMInputBaseDisabled {
-	opacity: 0.8;
+/* ===== 본체 — 데이터 도착 전엔 숨김 → _finishOpen 에서 페이드 인(흰 번쩍 방지) ===== */
+.u4aApBody {
+    flex: 1 1 auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    opacity: 0;
+    transition: opacity 0.25s ease;
 }
 
-
-.u4aFontBold{
-    font-weight: bold;
+.u4aApShown {
+    opacity: 1;
 }
 
-
-/* 1. 배경/그림자 (원본 유지) */
-html[class*=sapUiTheme][class*="dark"] .u4aWs20Page .u4aWsDesignAttr .changeValue {
-    background: linear-gradient(to bottom,#1f2630,#161c24);
-    box-shadow: inset 6px 6px 12px rgba(0,0,0,.6), inset -6px -6px 12px rgba(255,255,255,.06);
-    border-radius: 8px;
+/* ── 상단 툴바(원본 Page customHeader Toolbar) — 레이아웃 초기화 | ↔ | 다운/업로드 · 도움말 ─── */
+.u4aApToolbar {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 0.0625rem solid var(--divider);
+    background: var(--surface);
 }
 
-/* 2. 글자색 및 볼드체 (버튼 영역만 침범하지 않게 방어) */
-/* .sapMBtnBase 자체와 .sapMBtnBase 내부에 있는 모든 요소(*)를 제외시킵니다. */
-html[class*=sapUiTheme][class*="dark"] .u4aWs20Page .u4aWsDesignAttr .changeValue td *:not(.sapMBtnBase):not(.sapMBtnBase *) {
-    color: #6aa9ff;
-    font-weight: bold;
-}
-/* 1. 행(Row) 배경/그림자 - 라이트 테마 원본 유지 */
-html[class*=sapUiTheme]:not([class*="dark"]) .u4aWs20Page .u4aWsDesignAttr .changeValue {
-    background: linear-gradient(to bottom,#f4f6f8,#e9edf1);
-    box-shadow: inset 6px 6px 12px rgba(0,0,0,.12), inset -6px -6px 12px rgba(255,255,255,.9);
-    border-radius: 8px;
+.u4aApToolbar__spacer {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
-/* 2. 글자색 및 볼드체 - 버튼 영역(본체 및 자식들)만 제외하고 적용 */
-html[class*=sapUiTheme]:not([class*="dark"]) .u4aWs20Page .u4aWsDesignAttr .changeValue td *:not(.sapMBtnBase):not(.sapMBtnBase *) {
-    color: #0066ff;
-    font-weight: bold;
+/* 상단 툴바 세로 구분선(원본 ToolbarSeparator) */
+.u4aApToolbar__sep {
+    flex: 0 0 auto;
+    width: 0.0625rem;
+    align-self: stretch;
+    margin: 0.125rem 0.25rem;
+    background: var(--divider);
+}
+
+/* ── 스플리터(좌 UI 목록 / 우 속성 목록) — 기본 가로 분할(공통 .u4a-splitter row) ────── */
+.u4aApSplit {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* 좌/우 패널 — 공통 .u4a-splitter__pane 의 overflow:auto 를 이 창에서만 해제하고
+   flex column(툴바 고정 + 테이블 스크롤) 로 만든다(스코프 덧대기). */
+.u4a-splitter__pane.u4aApLeft {
+    flex: 0 0 38%;         /* 홈(원본 SplitterLayoutData size 40% 근사) — 리사이즈/초기화 기준 */
+    display: flex;
+    flex-direction: column;
+    min-width: 12.5rem;    /* 원본 minSize 200 */
+    overflow: hidden;
+}
+
+.u4a-splitter__pane.u4aApRight {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 12.5rem;
+    overflow: hidden;
+}
+
+/* ── 패널 내부 툴바(좌: UI 검색 / 우: 삭제 + 검색) ──────────────────────────── */
+.u4aApPaneTb {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    border-bottom: 0.0625rem solid var(--divider);
+}
+
+.u4aApPaneTb__label {
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    color: var(--text);
+}
+
+/* 검색 입력칸이 남은 폭을 채운다. */
+.u4aApField {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.u4aApField .u4a-field {
+    width: 100%;
+}
+
+/* ── 우측 상단: 선택한 UI 정보(원본 PAGE2 customHeader) ─────────────────────── */
+.u4aApSelHead {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0.375rem 0.75rem;
+    border-bottom: 0.0625rem solid var(--divider);
+    background: var(--app-bg);
+}
+
+.u4aApSelHead__icon {
+    flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
+    object-fit: contain;
+}
+
+.u4aApSelHead__txt {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.u4aApSelHead__name {
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.u4aApSelHead__lib {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── 테이블 래퍼 — 남은 높이 채우고 스크롤 ─────────────────────────────────── */
+.u4aApWrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* ── 좌측 UI 목록(단일 컬럼: 아이콘 + UI명 + 라이브러리명) ──────────────────── */
+.u4aApUiCell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.u4aApUiCell__icon {
+    flex: 0 0 auto;
+    width: 1.25rem;
+    height: 1.25rem;
+    object-fit: contain;
+}
+
+.u4aApUiCell__txt {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.u4aApUiCell__name {
+    font-size: 0.8125rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.u4aApUiCell__lib {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── 우측 속성 목록 컬럼 폭(테이블 뷰) — 체크박스 / 속성명 / 값 ───────────────── */
+.u4aApChkCol {
+    width: 2.5rem;
+    text-align: center;
+}
+
+.u4aApTbl[data-view="table"] .u4aApAttrCol {
+    width: 42%;
+}
+
+/* 체크박스 셀 — 가운데 정렬 */
+.u4aApTbl td.u4aApChkCell,
+.u4aApTbl th.u4aApChkCol {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.u4aApChk {
+    cursor: pointer;
+    width: 1rem;
+    height: 1rem;
+    vertical-align: middle;
+    accent-color: var(--accent);
+}
+
+/* 속성명 셀(아이콘 + UIATT + UIADT) */
+.u4aApAttrCell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.u4aApAttrCell__icon {
+    flex: 0 0 auto;
+    width: 1rem;
+    text-align: center;
+    color: var(--icon-muted);
+}
+
+.u4aApAttrCell__txt {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.u4aApAttrCell__name {
+    font-size: 0.8125rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.u4aApAttrCell__type {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 값 셀 — 공통 createField(readonly) 를 담는다(읽기전용 구분은 공통 CSS 가 담당) */
+.u4aApValCell .u4a-field {
+    width: 100%;
+}
+
+/* 그룹 헤더 행(원본 Sorter 그룹핑: Properties/Events/Aggregations…) — 옅은 밴드 */
+.u4aApTbl tbody tr.u4aApGroup td {
+    background: var(--app-bg);
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding-top: 0.4375rem;
+    padding-bottom: 0.4375rem;
+}
+
+/* 카드(반응형) 뷰에서 그룹 행은 전체 폭 밴드 유지 */
+.u4aApTbl[data-view="card"] tbody tr.u4aApGroup td {
+    display: block;
+    width: 100%;
+}
+
+/* 선택(하이라이트) 행 — 좌측 accent 바(원본 RowSettings highlight:Information) */
+.u4aApTbl tbody tr[aria-selected="true"] td:first-child,
+.u4aApUiTbl tbody tr[aria-selected="true"] td:first-child {
+    box-shadow: inset 0.1875rem 0 0 0 var(--accent);
+}
+
+/* 좌측 UI 행은 클릭 가능(포인터) */
+.u4aApUiTbl tbody tr[data-ap-row] {
+    cursor: pointer;
+}
+
+/* ── 스플릿바 드래그 중 — (미리보기 iframe 없지만) 텍스트 선택 방지 ─────────────── */
+body.u4aApResizing {
+    user-select: none;
 }
