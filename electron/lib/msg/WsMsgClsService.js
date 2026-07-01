@@ -130,6 +130,103 @@ class WsMsgClsService {
     }
 
     /**
+     * ★공통 역현지화(baked 텍스트 → 접속언어) — 앱복사/MIME/WS20 활성·저장 등 전 화면 단일출처.
+     *   백엔드가 메시지번호 없이 "백엔드 로그온 언어로 구운 텍스트"만 showMessage/RTMSG 로 내려줄 때,
+     *   그 텍스트를 백엔드 언어 DB 에서 역조회(완전일치→키, 파라미터는 템플릿 역매칭)해 키를 얻고,
+     *   워크스페이스(접속) 언어로 재렌더한다. 못 찾으면 원문 그대로 반환(graceful).
+     *
+     * @param {string} sText   - 서버가 구워 내려준 표시 텍스트
+     * @param {string} [beLangu] - 백엔드 로그온 언어(구운 언어). 모르면 falsy → 후보(EN/KO)로 시도.
+     * @param {string} [wsLangu] - 워크스페이스(화면/접속) 언어. 없으면 원문 반환.
+     * @returns {string} 접속언어 텍스트(또는 원문)
+     */
+    relocalize(sText, beLangu, wsLangu) {
+
+        if (typeof sText !== 'string' || sText === '') return sText;
+        const wsL = wsLangu || '';
+        if (!wsL) return sText;
+
+        // 후보 백엔드 언어(모르면 구워질 수 있는 언어 EN/KO 시도).
+        const aCand = beLangu ? [beLangu] : ['EN', 'KO'];
+
+        for (let c = 0; c < aCand.length; c++) {
+            const beL = aCand[c];
+            if (!beL || beL === wsL) continue;
+
+            // 1) 완전일치(파라미터 없는 메시지).
+            try {
+                const oKey = this.findKeyByText(beL, sText);
+                if (oKey && oKey.ARBGB) {
+                    const oRow = this.getRow(wsL, oKey.ARBGB, oKey.MSGNR);
+                    if (oRow && oRow.TEXT && oRow.TEXT.indexOf('&') === -1) return oRow.TEXT;
+                }
+            } catch (e) { /* 다음 후보 */ }
+
+            // 2) 템플릿 역매칭(파라미터 있는 메시지).
+            const sLoc = this._relocalizeByTemplate(sText, beL, wsL);
+            if (sLoc != null) return sLoc;
+        }
+
+        return sText;
+    }
+
+    /** (Private) 파라미터(&) 템플릿 역매칭 — 리터럴 가장 긴 템플릿 우선. 못 찾으면 null. */
+    _relocalizeByTemplate(sText, beLangu, wsLangu) {
+
+        const _norm = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+        const _esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const sNorm = _norm(sText);
+        if (!sNorm) return null;
+
+        let aTpl = [];
+        try { aTpl = this.getParamTemplates(beLangu) || []; } catch (e) { aTpl = []; }
+
+        let best = null, bestLit = -1;
+        for (let t = 0; t < aTpl.length; t++) {
+            const o = aTpl[t];
+            if (!o || !o.TEXT) continue;
+            const tpl = _norm(o.TEXT);
+            const lit = tpl.replace(/&\d?/g, '').replace(/\s+/g, '').length;
+            if (lit < 5) continue;              // 리터럴 너무 짧은 템플릿 = 오매칭 위험 → 제외
+
+            const parts = [], order = [];
+            let last = 0, n = 0, m; const re = /&(\d)?/g;
+            while ((m = re.exec(tpl)) !== null) {
+                parts.push(_esc(tpl.slice(last, m.index)));
+                parts.push('(.*?)');
+                n += 1;
+                order.push(m[1] ? parseInt(m[1], 10) : n);
+                last = m.index + m[0].length;
+            }
+            if (!order.length) continue;
+            parts.push(_esc(tpl.slice(last)));
+
+            let rx;
+            try { rx = new RegExp('^' + parts.join('') + '$', 'i'); } catch (e) { continue; }
+            const mm = sNorm.match(rx);
+            if (mm && lit > bestLit) { bestLit = lit; best = { o: o, caps: mm.slice(1), order: order }; }
+        }
+
+        if (!best) return null;
+
+        const p = ['', '', '', ''];
+        for (let k = 0; k < best.order.length; k++) {
+            const idx = best.order[k];
+            if (idx >= 1 && idx <= 4) { p[idx - 1] = best.caps[k] || ''; }
+        }
+
+        const oRow = this.getRow(wsLangu, best.o.ARBGB, best.o.MSGNR);
+        if (!oRow || !oRow.TEXT) return null;
+
+        // 접속언어 템플릿의 &/&n 을 추출 파라미터로 치환.
+        let seq = 0;
+        return String(oRow.TEXT).replace(/&(\d)?/g, (mt, d) => {
+            if (d) { const i = parseInt(d, 10); return (i >= 1 && i <= 4) ? p[i - 1] : ''; }
+            return p[seq++] || '';
+        });
+    }
+
+    /**
      * DB 연결을 닫고 캐시에서 제거합니다.
      * - langu 지정 시 : 해당 언어만 해제
      * - 생략 시       : 전체 해제 (app before-quit 시 호출)

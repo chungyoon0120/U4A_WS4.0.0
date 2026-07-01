@@ -6,8 +6,8 @@
  *  [공통 .u4a-titlebar + 검색패널 + 공통 .u4a-table] 를 직접 둔다.
  *
  *  ★ 원본 보존(1:1, index.js 기준):
- *   · 데이터 = T_0022(OBJTY="1" 만 수집). CLASS = 네임스페이스 접두(ZCL_U4A_ / /U4A/CL_) + UIOBK.
- *     접두 분기 = oMetadata.IS_NAME_SPACE === "X".  행 = { UIOBJ, LIBNM, CLASS }.
+ *   · 데이터 = T_0022(소스 전달 단계에서 OBJTY∈{1,2,4}+ISDEP≠X+T_0020.NUSED≠X 필터, opener 담당).
+ *     CLASS = 네임스페이스 접두(ZCL_U4A_ / /U4A/CL_) + UIOBK. 접두 분기 = oMetadata.IS_NAME_SPACE === "X".
  *   · 검색 = UIOBJ/LIBNM/CLASS contains(라이브 + Enter + 버튼). 드롭 검색 = LIBNM 정확일치.
  *   · UX 디자인영역에서 UI 드래그(dataTransfer "rtmcls"=LIBNM) → 드롭존에 놓으면 LIBNM 필터.
  *   · 행 더블클릭 → ABAP 클래스 선언문(DATA LO_xxx TYPE REF TO <CLASS>...) 클립보드 복사 + 토스트.
@@ -70,7 +70,7 @@ function _zmsg(sNo) {
 
 function _getThemeInfo() {
     try {
-        var sPath = PATH.join(USERDATA, "p13n", "theme", SYSID + ".json");
+        var sPath = PATH.join(USERDATA, "p13n", "theme_ws4", SYSID + ".json");
         if (!FS.existsSync(sPath)) { return null; }
         return JSON.parse(FS.readFileSync(sPath, "utf-8"));
     } catch (e) { return null; }
@@ -129,8 +129,9 @@ function _processRuntime(aRuntimeData, oMetadata) {
 
     for (var i = 0; i < aRuntimeData.length; i++) {
         var oRuntime = aRuntimeData[i];
-        // Object Type "1"(UI Object) 만 수집.
-        if (!oRuntime || oRuntime.OBJTY !== "1") { continue; }
+        if (!oRuntime) { continue; }
+        // ★ OBJTY(1/2/4)·ISDEP(폐기)·T_0020.NUSED(미사용 라이브러리) 필터는 소스 전달 단계
+        //   (fnDialogPopupOpener.js did-finish-load, WS3 원본 d1a02d65 동일)에서 이미 처리됨 → 여기선 안 함.
         aOut.push({
             UIOBJ: oRuntime.UIOBJ || "",       // UI 명
             LIBNM: oRuntime.LIBNM || "",       // UI5 Library 명

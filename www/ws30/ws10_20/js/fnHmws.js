@@ -681,8 +681,15 @@
 
         // busy 키고 Lock 걸기
         oAPP.common.fnSetBusyLock("X");
-        
-        oAPP.fn.fnShowKeyboardShortcuts();
+
+        // 키보드 단축키 리스트 팝업(HTML5) — 지연 로드 후 호출(원본 fnShowKeyboardShortcuts 대체).
+        if (oAPP.fn.fnKeyboardShortcutPopupOpen) {
+            oAPP.fn.fnKeyboardShortcutPopupOpen();
+            return;
+        }
+        oAPP.loadJs("fnKeyboardShortcutPopupOpen", function () {
+            oAPP.fn.fnKeyboardShortcutPopupOpen();
+        });
 
     }; // end of oAPP.fn.fnWS10WMENU50_04
 
@@ -1170,9 +1177,16 @@
         // busy 키고 Lock 걸기
         oAPP.common.fnSetBusyLock("X");
 
-        oAPP.fn.fnShowKeyboardShortcuts();
+        // 키보드 단축키 리스트 팝업(HTML5) — 지연 로드 후 호출(원본 fnShowKeyboardShortcuts 대체).
+        if (oAPP.fn.fnKeyboardShortcutPopupOpen) {
+            oAPP.fn.fnKeyboardShortcutPopupOpen();
+            return;
+        }
+        oAPP.loadJs("fnKeyboardShortcutPopupOpen", function () {
+            oAPP.fn.fnKeyboardShortcutPopupOpen();
+        });
 
-    }; // end of oAPP.fn.fnWS10WMENU50_04
+    }; // end of oAPP.fn.fnWS20WMENU50_04
 
 
 

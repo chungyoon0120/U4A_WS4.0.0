@@ -6,7 +6,7 @@
  * 으로 마스터-디테일 옵션 UI 를 그린다.
  *   · 구조: 헤더(옵션) + 좌측 섹션 list-group(SECTIONS=확장 지점) + 우측 콘텐츠 + 푸터(Apply/Close)
  *   · 테마 섹션: Bootstrap card 그리드(원본 ThemeSetting). 언어/CDN 은 원본도 미완성 → 골격만.
- *   · 적용: ${USERDATA}/p13n/theme/${SYSID}.json 기록 + IPC if-p13n-themeChange-${SYSID}
+ *   · 적용: ${USERDATA}/p13n/theme_ws4/${SYSID}.json 기록 + IPC if-p13n-themeChange-${SYSID}
  *           (메인 창이 받아 적용·영속). 창 미리보기: U4ATheme.apply (취소 시 원복).
  **************************************************************************/
 (function () {
@@ -270,7 +270,7 @@
         if (!sBg) { try { sBg = getComputedStyle(document.documentElement).getPropertyValue("--app-bg").trim(); } catch (e) { } }
         var sData = { THEME: sKey, BGCOL: sBg || "" };
         try {
-            var sDir = PATH.join(USERDATA, "p13n", "theme");
+            var sDir = PATH.join(USERDATA, "p13n", "theme_ws4");
             try { FS.mkdirSync(sDir, { recursive: true }); } catch (e2) { }
             FS.writeFileSync(PATH.join(sDir, SYSID + ".json"), JSON.stringify(sData), "utf-8");
         } catch (e) { }

@@ -67,7 +67,7 @@ module.exports = (() => {
 
         // User Data Paths..
         CLIPBOARD: PATH.join(USERDATA, "clipboard.json"),
-        THEME: PATH.join(P13N_ROOT, "theme"),
+        THEME: PATH.join(P13N_ROOT, "theme_ws4"),
         P13N: PATH.join(P13N_ROOT, "p13n.json"),
         P13N_ROOT: P13N_ROOT,
         P13N_ICONFAV: PATH.join(P13N_ROOT, "iconFavorite"),
@@ -76,7 +76,7 @@ module.exports = (() => {
         // Popup Paths..        
         ERRPAGE: PATH.join(POPUP_ROOT, "errPageEditorPopup", "errorPageEditorFrame.html"),
         ERRPAGEPREV: PATH.join(POPUP_ROOT, "errPageEditorPopup", "errorPageEditorPreview.html"),
-        UIFIND: PATH.join(POPUP_ROOT, "findPopup", "frame.html"),
+        UIFIND: PATH.join(POPUP_ROOT, "findPopup", "findFrame.html"),
         RTMCLS: PATH.join(POPUP_ROOT, "runtimeClassNavigator", "frame.html"), // runtime class navigator  
         BINDPOPUP: PATH.join(POPUP_ROOT, "bindPopup", "frame.html"), // bind popup
         TXTSRCH: PATH.join(POPUP_ROOT, "textSearchPopup", "index.html"),

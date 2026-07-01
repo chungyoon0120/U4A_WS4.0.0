@@ -414,12 +414,27 @@
         if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { return; }
         var clone;
         try { clone = JSON.parse(JSON.stringify(oNode)); } catch (e) { return; }
-        // 각 노드의 속성(_T_0015) 동봉 (prev 에서 수집)
+        // 각 노드의 속성(_T_0015) + 클라이언트 이벤트(T_CEVT) + 설명(T_DESC) 동봉 (붙여넣기 시 새 OBJID 로 복원)
         (function attach(n) {
             try {
                 var p = oAPP.attr.prev && oAPP.attr.prev[n.OBJID];
                 n._T_0015 = (p && p._T_0015) ? JSON.parse(JSON.stringify(p._T_0015)) : [];
             } catch (e) { n._T_0015 = []; }
+            // 클라이언트 이벤트(HM/CS/JS) — 원본 _T_0015(ADDSC≠"") 기준 T_CEVT(키=OBJID+UIASN) 수집.
+            n._T_CEVT = [];
+            try {
+                var _A = oAPP.DATA.APPDATA;
+                if (_A && Array.isArray(_A.T_CEVT) && Array.isArray(n._T_0015)) {
+                    for (var c = 0; c < n._T_0015.length; c++) {
+                        if (n._T_0015[c].ADDSC === "") { continue; }
+                        var _k = n._T_0015[c].OBJID + n._T_0015[c].UIASN;
+                        var _aCe = _A.T_CEVT.filter(function (a) { return a.OBJID === _k; });
+                        for (var d = 0; d < _aCe.length; d++) { n._T_CEVT.push({ UIASN: n._T_0015[c].UIASN, OBJTY: _aCe[d].OBJTY, DATA: _aCe[d].DATA }); }
+                    }
+                }
+            } catch (e) { }
+            // 설명(T_DESC)
+            try { n._DESC = (typeof oAPP.fn.getDesc === "function") ? (oAPP.fn.getDesc(n.OBJID) || "") : ""; } catch (e) { n._DESC = ""; }
             if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { attach(n.zTREE[i]); } }
         })(clone);
         try {
@@ -450,8 +465,11 @@
         try { clone = JSON.parse(JSON.stringify(src)); } catch (e) { return; }
 
         // OBJID 재채번(재귀) + 부모관계 재설정
+        //   ★ setOBJID 는 "숫자 없는 베이스"를 받아 다음 번호를 붙인다(designCopyUI 와 동일).
+        //     숫자 미제거 시 BUTTON1→setOBJID("BUTTON1")→"BUTTON11" 이 되던 버그 수정
+        //     (BUTTON1 붙여넣기 → BUTTON2 가 정상).
         (function regen(n, sPobid, sPuiok) {
-            n.OBJID = oAPP.fn.setOBJID(n.UIOBJ || n.OBJID || "UI");
+            n.OBJID = oAPP.fn.setOBJID(String(n.UIOBJ || n.OBJID || "UI").replace(/\d/g, ""));
             n.POBID = sPobid;
             if (sPuiok != null) { n.PUIOK = sPuiok; }
             if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { regen(n.zTREE[i], n.OBJID, n.UIOBK); } }
@@ -461,7 +479,7 @@
         if (!oTarget.zTREE) { oTarget.zTREE = []; }
         oTarget.zTREE.push(clone);
 
-        // 복사해온 속성을 prev 에 반영(가드)
+        // 복사해온 속성 + 클라이언트 이벤트 + 설명을 새 OBJID 로 복원(가드)
         (function restore(n) {
             try {
                 if (oAPP.attr.prev && n._T_0015) {
@@ -469,7 +487,18 @@
                     oAPP.attr.prev[n.OBJID]._T_0015 = n._T_0015;
                 }
             } catch (e) { }
-            delete n._T_0015;
+            // 클라이언트 이벤트(HM/CS/JS) 복원 — 새 OBJID+UIASN 로 재키잉해 T_CEVT push.
+            try {
+                var _A = oAPP.DATA.APPDATA;
+                if (_A && Array.isArray(_A.T_CEVT) && Array.isArray(n._T_CEVT)) {
+                    for (var e2 = 0; e2 < n._T_CEVT.length; e2++) {
+                        _A.T_CEVT.push({ OBJID: n.OBJID + n._T_CEVT[e2].UIASN, OBJTY: n._T_CEVT[e2].OBJTY, DATA: n._T_CEVT[e2].DATA });
+                    }
+                }
+            } catch (e) { }
+            // 설명(T_DESC) 복원.
+            try { if (n._DESC && typeof oAPP.fn.setDesc === "function") { oAPP.fn.setDesc(n.OBJID, n._DESC); } } catch (e) { }
+            delete n._T_0015; delete n._T_CEVT; delete n._DESC;
             if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { restore(n.zTREE[i]); } }
         })(clone);
 

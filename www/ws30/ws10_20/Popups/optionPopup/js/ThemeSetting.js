@@ -179,7 +179,7 @@
 
 
 			var Lfname = oAPP.IF_DATA.SYSID + ".json",
-				Lpath = oAPP.path.join(oAPP.USERDATA_PATH, "p13n", "theme", Lfname);
+				Lpath = oAPP.path.join(oAPP.USERDATA_PATH, "p13n", "theme_ws4", Lfname);
 
 			var SaveData = JSON.stringify(sData);
 

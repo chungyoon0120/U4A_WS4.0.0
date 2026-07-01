@@ -1516,7 +1516,7 @@ var oAPP = (function () {
         return new Promise((resolve, reject) => {
             let oLogInData = oModel.getProperty("/LOGIN"),
                 sSysID = oLogInData.SYSID,
-                sThemeJsonPath = PATH.join(USERDATA, "p13n", "theme", `${sSysID}.json`);
+                sThemeJsonPath = PATH.join(USERDATA, "p13n", "theme_ws4", `${sSysID}.json`);
 
             let oWsSettings = oAPP.fn.fnGetSettingsInfo(),
                 oDefThemeInfo = {
@@ -1866,7 +1866,7 @@ var oAPP = (function () {
     oAPP.fn.onIpcMain_if_p13n_themeChange = function () {
         let oLogInData = oModel.getProperty("/LOGIN");
         let sSysID = oLogInData.SYSID;
-        let sThemeJsonPath = PATH.join(USERDATA, "p13n", "theme", `${sSysID}.json`);
+        let sThemeJsonPath = PATH.join(USERDATA, "p13n", "theme_ws4", `${sSysID}.json`);
         if (FS.existsSync(sThemeJsonPath) === false) { return; }
         try {
             var oThemeJsonData = JSON.parse(FS.readFileSync(sThemeJsonPath, "utf-8"));

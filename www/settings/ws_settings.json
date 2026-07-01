@@ -35,7 +35,7 @@
     "defaultBackgroundColor": "#12171c",
     "requireFolders": [
         "p13n",
-        "p13n\\theme",
+        "p13n\\theme_ws4",
         "p13n\\monaco\\snippet",
         "p13n\\monaco\\theme",
         "p13n\\suggestion",

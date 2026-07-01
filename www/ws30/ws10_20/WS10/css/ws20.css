@@ -324,7 +324,7 @@
 .u4aWsDesignTree .u4aWs20PanelBody { align-items: stretch; justify-content: flex-start; }
 .u4aWs20TreeWrap {
   display: flex; flex-direction: column;
-  width: 100%; height: 100%; min-height: 0;
+  width: 100%; height: 100%; min-height: 0; min-width: 0;
 }
 
 /* (A) 트리 툴바 (구 OverflowToolbar) — 헤더 배경 + 연파랑 버튼 (삭제만 빨강) */
@@ -333,6 +333,11 @@
   display: flex; align-items: center;
   flex-wrap: nowrap;          /* 좁아져도 줄바꿈 X — 넘치면 ⋯ 메뉴로 접는다(U4AUI.attachOverflow) */
   overflow: hidden;
+  /* ★ min-width:0 필수 — 없으면 nowrap+비축소 아이콘의 min-content(자연폭)로 툴바가 스스로 늘어나
+     패널(overflow:hidden)을 넘어 클리핑되고, attachOverflow 는 툴바 clientWidth(=자연폭)로 측정해
+     "다 들어감"으로 오판→⋯ 미생성. min-width:0 이면 컨테이너 폭으로 줄어 clientWidth 가 실제 가용폭이
+     되어 오버플로가 정상 감지된다(교과서적 flexbox min-width:0). */
+  min-width: 0;
   gap: 2px; padding: 4px 6px;
   background: var(--surface-raised);   /* 본문 위로 한 단계 떠 보이게 (헤더↔본문 구분) */
   border-bottom: 1px solid var(--ws20-sep);
@@ -528,9 +533,11 @@
 .u4a-tree__row.u4aWs20TreeRow.u4aWs20DropBefore { box-shadow: inset 0 0.125rem 0 0 var(--accent); }
 .u4a-tree__row.u4aWs20TreeRow.u4aWs20DropAfter { box-shadow: inset 0 -0.125rem 0 0 var(--accent); }
 
-/* aggregation 선택 다이얼로그(2+ 후보) — 공통 .u4a-dialog 소비, 폭만 보강. */
+/* aggregation 선택 다이얼로그(2+ 후보) — 공통 .u4a-dialog(__header/__body/__footer) 소비.
+   폭·콤보 전폭·푸터 spacer(버튼 우측정렬)만 스코프 보강. */
 .u4aWs20AggrDlg { width: min(92vw, 24rem); }
 .u4aWs20AggrDlg .u4aWs20AggrSel { width: 100%; }
+.u4aWs20AggrFootSpacer { flex: 1 1 auto; }
 
 /* =====================================================================
  * 디자인 트리 컨텍스트 메뉴 (구 callDesignContextMenu)

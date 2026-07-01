@@ -3078,7 +3078,7 @@
 
     function fnP13nCreateTheme(SYSID) {
         return new Promise((resolve) => {
-            const sThemeJsonPath = PATH.join(USERDATA, "p13n", "theme", `${SYSID}.json`);
+            const sThemeJsonPath = PATH.join(USERDATA, "p13n", "theme_ws4", `${SYSID}.json`);
             const oDefThemeInfo = {
                 THEME: SETTINGS.defaultTheme,
                 BGCOL: SETTINGS.defaultBackgroundColor

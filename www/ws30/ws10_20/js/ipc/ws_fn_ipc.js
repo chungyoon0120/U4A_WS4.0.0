@@ -660,7 +660,7 @@
         let sSysID = oServerInfo.SYSID;
 
         // 해당 SYSID별 테마 정보 JSON을 읽는다.
-        let sThemeJsonPath = parent.PATH.join(parent.USERDATA, "p13n", "theme", `${sSysID}.json`);
+        let sThemeJsonPath = parent.PATH.join(parent.USERDATA, "p13n", "theme_ws4", `${sSysID}.json`);
         if (parent.FS.existsSync(sThemeJsonPath) === false) {
             return;
         }

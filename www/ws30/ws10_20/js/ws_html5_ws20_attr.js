@@ -363,6 +363,12 @@
 
             oAPP.attr.oModel.refresh();
 
+            // ★[HTML5 필수] 원본 UI5 는 refresh() 가 바인딩된 속성 테이블을 재렌더해 valueState(err) 표시가
+            //   같이 지워졌으나, HTML5 refresh() 훅은 좌측 트리만 재렌더한다. 오류 표시(valst→input.err
+            //   클래스, 라인 3961)는 fnRenderWs20AttrRows 가 그리므로 여기서 명시 재렌더해야 빨간 테두리가
+            //   실제로 사라진다(오류 "설정" 경로 setAttrFocus 는 이미 fnRenderWs20AttrRows 를 호출 — 대칭 유지).
+            try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+
         };  //오류 필드 초기화 처리.
     }
 
@@ -2002,6 +2008,15 @@
 
             if (oAPP.attr.oModel.refresh) { oAPP.attr.oModel.refresh(); }
 
+            // ★[HTML5 필수] 원본 UI5 는 oModel.refresh() 가 바인딩된 속성 테이블까지 재렌더했지만,
+            //   HTML5 변환 시 oModel.refresh() 훅은 좌측 디자인 트리(fnRenderDesignTree)만 재렌더한다
+            //   (fnHookWs20TreeModelRefresh, ws_html5_ws20_tree.js). 속성 패널은 별도 DOM 렌더라
+            //   여기서 명시적으로 다시 그려야 값이 반영된다. 안 그리면 위 T_ATTR 데이터만 바뀌고
+            //   우측 Request/Task(DH001025) 등 입력칸 DOM 은 옛 값 그대로 남는다
+            //   (활성/저장 시 CTS 선택 후 요청번호 미갱신 증상). 다른 속성 변경 팝업
+            //   (fnBindPopup / fnCssJsLinkAdd / fnWebSecurity)도 동일하게 명시 재렌더한다.
+            try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+
         }; // end of [OVERRIDE] oAPP.fn.attrUpdateDocAttr
     }
 
@@ -3372,22 +3387,39 @@
         return '<i class="fa-solid fa-' + sFa + '"></i>';
     }
 
-    // 클립보드 복사 (원본 attrCopyText — UI5 무관 단순 동작 대체)
+    // 클립보드 복사 (원본 attrCopyText 1:1 — 복사 후 "&1 복사됨" 토스트로 피드백)
     function _copyText(sText) {
+        //text 정보가 없는경우 exit(원본 attrCopyText 가드).
+        if (!sText) { return; }
+
+        var bOk = false;
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(sText || "");
-                return;
+                navigator.clipboard.writeText(sText);
+                bOk = true;
             }
         } catch (e) { }
-        try {
-            var TA = document.createElement("textarea");
-            TA.value = sText || "";
-            document.body.appendChild(TA);
-            TA.select();
-            document.execCommand("copy");
-            TA.remove();
-        } catch (e) { }
+        if (!bOk) {
+            try {
+                var TA = document.createElement("textarea");
+                TA.value = sText;
+                document.body.appendChild(TA);
+                TA.select();
+                document.execCommand("copy");
+                TA.remove();
+                bOk = true;
+            } catch (e) { }
+        }
+
+        //메시지 처리: 303 "클립보드 복사 성공!" — KIND 10 공통 토스트, TYPE S(성공).
+        //   전 코드베이스 클립보드 복사 성공 토스트 표준 키(mime/usp/client_editor 동일).
+        //   피드백 없으면 사용자가 복사 동작을 인지 못함(무동작으로 오인).
+        if (bOk) {
+            try {
+                parent.showMessage(null, 10, "S",
+                    oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "303", "", "", "", ""));
+            } catch (e) { }
+        }
     }
 
     function _isEditMode() {
@@ -3741,7 +3773,16 @@
         HLP.title = _msg("B39", "Help");
         HLP.innerHTML = '<i class="fa-solid fa-circle-question"></i>';
         HLP.addEventListener("click", function () {
-            console.warn("[W4+ 예정] Attribute Help 팝업(callTooltipsPopup/U4A Help) 미변환");
+            //원본(uiAttributeArea.js 599행): 패치(UHAK901369) 서버면 U4A Help Document 팝업(startMenuId 000271)
+            //   호출. fnU4AHelpDocuPopupOpener 는 HTML5 구현 완료(도움말 문서 워커/뷰어 재사용).
+            try {
+                if (oAPP.common.checkWLOList("C", "UHAK901369") === true) {
+                    oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000271" });
+                    return;
+                }
+            } catch (e) { console.error("[HTML5][WS20] Attribute Help(U4A Help Document) 오픈 실패:", e); }
+            //미패치 서버 폴백 = 구 callTooltipsPopup(attrTooltip/E23) — UI5 툴팁 팝업 미변환(W4+ 예정).
+            console.warn("[W4+ 예정] Attribute Help 폴백(callTooltipsPopup) 미변환 — 패치(UHAK901369) 서버에서 U4A Help Document 사용");
         });
         TBR.appendChild(HLP);
 
@@ -4121,7 +4162,24 @@
                 } catch (e) { console.error("[HTML5][WS20][attr] 클라이언트 이벤트 에디터 호출 오류:", e && e.message); }
                 return;
             }
-            //그 외(바인딩 팝업/F4 등) 구 attrIcon1Proc/attrIcon2Proc — W4+ 예정.
+            //프로퍼티(UIATY="1")/애그리게이션(UIATY="3")의 바인딩 아이콘(sap-icon://fallback=link) 클릭.
+            //  → 데이터 바인딩/바인딩 해제 팝업(fnBindPopupOpen). 온디맨드 로드(다른 WS20 속성 팝업 동일).
+            //  ※ 특수키(App F4/selectOption F4 등)는 아이콘이 inspection/delete 라 여기 미도달 — 별도 기능.
+            if (iNo === 1 && sSrc === "sap-icon://fallback" &&
+                (sAttr.UIATY === "1" || sAttr.UIATY === "3")) {
+                var _runBind = function () {
+                    try {
+                        //원본 attrIcon1Proc 진입부: 오류 표현 필드 초기화 후 바인딩 팝업 게이트 호출.
+                        if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
+                        oAPP.fn.attrBindIcon1Proc(sAttr);
+                    } catch (e) { console.error("[HTML5][WS20][attr] 바인딩 팝업 호출 오류:", e && e.message); }
+                };
+                if (typeof oAPP.fn.attrBindIcon1Proc === "function") { _runBind(); }
+                else { oAPP.loadJs("fnBindPopupOpen", _runBind); }
+                return;
+            }
+
+            //그 외(F4/App 상세보기 등) 구 attrIcon1Proc/attrIcon2Proc — W4+ 예정.
             console.warn("[W4+ 예정] 속성 아이콘 동작 미변환:", sAttr.UIATT, "icon" + iNo, sSrc);
         });
 

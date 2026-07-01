@@ -62,7 +62,7 @@ let oAPP = (function (window) {
      *************************************************************/
     oAPP.fn.getThemeInfo = function () {
 
-        let sThemeJsonPath = oAPP.PATH.join(oAPP.USERDATA, "p13n", "theme", `${SYSID}.json`);
+        let sThemeJsonPath = oAPP.PATH.join(oAPP.USERDATA, "p13n", "theme_ws4", `${SYSID}.json`);
         if (oAPP.FS.existsSync(sThemeJsonPath) === false) {
             return;
         }
@@ -247,26 +247,11 @@ let oAPP = (function (window) {
     function _genericErrTxt() {
         try { return oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.LANGU || "", "ZMSG_WS_COMMON_001", "314", ""); } catch (e) { return "Error"; }
     }
-    var _MSG_LANGS = ["EN", "KO"];                                   // 후보 백엔드 렌더 언어(DB 폴더)
-    var _MSG_ALLOW = { "/U4A/MSG_WS": 1, "ZMSG_WS_COMMON_001": 1 };  // 역매칭 허용 클래스(오매칭 방지)
     // SAP 프레임워크 메시지(메시지클래스 키 아님) 패턴사전 — 대표 케이스만 최소.
     var _FW_PATTERNS = [
         { re: /already exist/i, cls: "/U4A/MSG_WS", no: "004" },     // 중복(폴더/파일) → "중복된 파일 이름이 있습니다."
         { re: /이미 (존재|등록)/, cls: "/U4A/MSG_WS", no: "004" }
     ];
-
-    function _norm(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim(); }
-    function _esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
-
-    // 파라미터 템플릿 언어별 1회 캐시(remote 대량 직렬화 반복 방지).
-    var _tplCache = {};
-    function _tplCacheGet(WC, sLang) {
-        if (_tplCache[sLang]) { return _tplCache[sLang]; }
-        var a = [];
-        try { a = WC.getParamTemplates(sLang) || []; } catch (e) { a = []; }
-        _tplCache[sLang] = a;
-        return a;
-    }
 
     // SCRIPT 파싱(eval 금지) — showMessage(sap,20,'타입','텍스트') 추출 + lf_createMimeCts 토큰 감지.
     //   원본은 eval(SCRIPT) 로 이 showMessage 를 그대로 실행하므로(표시 권위=SCRIPT),
@@ -283,60 +268,16 @@ let oAPP = (function (window) {
         return r;
     }
 
-    // 파라미터(&) 템플릿 → 정규식 + & 순서.
-    function _tplToRegex(sTpl) {
-        var parts = [], order = [], last = 0, re = /&(\d)?/g, m, n = 0;
-        while ((m = re.exec(sTpl)) !== null) {
-            parts.push(_esc(sTpl.slice(last, m.index)));
-            parts.push("(.*?)");
-            n += 1;
-            order.push(m[1] ? parseInt(m[1], 10) : n);
-            last = m.index + m[0].length;
-        }
-        if (!order.length) { return null; }
-        parts.push(_esc(sTpl.slice(last)));
-        try { return { regex: new RegExp("^" + parts.join("") + "$", "i"), order: order }; } catch (e) { return null; }
-    }
-
-    // 서버 텍스트 → (클라언어 텍스트) 역현지화. 못 찾으면 null.
+    // 서버 텍스트 → (클라언어 텍스트) 역현지화 — 공통 WsMsgCls.relocalize(SSOT) 위임. 못 찾으면 null.
+    //   MIME 별도창은 백엔드 로그온 언어를 몰라 beLangu=null(공통이 EN/KO 후보로 시도).
     function _reverseLocalize(sServerText) {
-        var sRaw = String(sServerText || ""), sNorm = _norm(sRaw);
-        if (!sNorm) { return null; }
-        var WC; try { WC = oAPP.REMOTE.getGlobal("WsMsgCls"); } catch (e) { WC = null; }
-        if (!WC) { return null; }
-
-        // 1) 완전일치 역조회(원문/정규화 둘 다 시도).
-        for (var i = 0; i < _MSG_LANGS.length; i++) {
-            try {
-                var row = WC.findKeyByText(_MSG_LANGS[i], sRaw) || WC.findKeyByText(_MSG_LANGS[i], sNorm);
-                if (row && row.ARBGB) { return oAPP.common.fnGetMsgClsText(row.ARBGB, row.MSGNR); }
-            } catch (e) { }
-        }
-        // 2) 파라미터 템플릿 매칭(가장 리터럴 긴 것 우선). 언어별 템플릿은 1회만 remote 로 가져와 캐시.
-        for (var L = 0; L < _MSG_LANGS.length; L++) {
-            var aTpl = _tplCacheGet(WC, _MSG_LANGS[L]);
-            var best = null, bestLit = -1;
-            for (var t = 0; t < aTpl.length; t++) {
-                var o = aTpl[t];
-                if (!o || !_MSG_ALLOW[o.ARBGB]) { continue; }
-                var tpl = _norm(o.TEXT);
-                var lit = tpl.replace(/&\d?/g, "").replace(/\s+/g, "").length;
-                if (lit < 5) { continue; }   // 리터럴이 너무 짧은 템플릿(예 "&1.")은 오매칭 위험 → 제외
-                var rx = _tplToRegex(tpl);
-                if (!rx) { continue; }
-                var mm = sNorm.match(rx.regex);
-                if (mm && lit > bestLit) { bestLit = lit; best = { o: o, caps: mm.slice(1), order: rx.order }; }
-            }
-            if (best) {
-                var p = ["", "", "", ""];
-                for (var k = 0; k < best.order.length; k++) {
-                    var idx = best.order[k];
-                    if (idx >= 1 && idx <= 4) { p[idx - 1] = best.caps[k] || ""; }
-                }
-                return oAPP.common.fnGetMsgClsText(best.o.ARBGB, best.o.MSGNR, p[0], p[1], p[2], p[3]);
-            }
-        }
-        return null;
+        try {
+            var WC = oAPP.REMOTE.getGlobal("WsMsgCls");
+            if (!WC || !WC.relocalize) { return null; }
+            var sRaw = String(sServerText || "");
+            var sLoc = WC.relocalize(sRaw, null, oAPP.attr.LANGU || "");
+            return (sLoc && sLoc !== sRaw) ? sLoc : null;   // 원문 그대로면 못 찾은 것 → null(프레임워크 패턴/원문 폴백)
+        } catch (e) { return null; }
     }
 
     // SAP 프레임워크 메시지(키 없음) 패턴사전.
@@ -365,18 +306,25 @@ let oAPP = (function (window) {
         }
         if (!sText) { sText = oResult.RTMSG || oResult.RETMSG || oResult.MESSAGE || oResult.MSGTX || oResult.RETMSGTX || ""; }
 
+        // ★ CTS(전송요청) 필요 + 처리기 있음 → 오류 메시지는 띄우지 않고 CTS 선택 팝업만 연다.
+        //   서버는 "CTS 선택하세요/수정불가/미존재"(E205/E162/E073/E305) 오류와 lf_createMimeCts() 를
+        //   함께 내리는데, CTS 팝업이 곧 그 해결 수단이므로 오류 박스는 잡음이다. 특히 사용자가 CTS 팝업을
+        //   "취소" 하면 아래 깔린 오류만 남아 "취소인데 오류" 로 보였다(원본 eval 이 둘 다 실행한 잘못된 UX).
+        //   → 취소=조용히 종료, 선택=재시도. (CTS 처리기 없을 때만 아래에서 오류 메시지 표시)
+        if (bNeedCts && typeof opts.onCts === "function") {
+            try { opts.onCts(); } catch (e) { }
+            return;
+        }
+
         // ② 역현지화(완전일치/템플릿) → ③ 프레임워크 패턴 → 원문 폴백.
         if (sText) {
             var sLoc = null;
             try { sLoc = _reverseLocalize(sText) || _frameworkLocalize(sText); } catch (e) { sLoc = null; }
             oAPP.fn.showMessage(null, 20, sType, sLoc || sText);
+        } else {
+            // 표시할 것도 후속동작도 없으면 일반 오류.
+            oAPP.fn.showMessage(null, 20, "E", _genericErrTxt());
         }
-
-        // ④ 후속동작(전송요청 팝업).
-        if (bNeedCts && typeof opts.onCts === "function") { try { opts.onCts(); } catch (e) { } }
-
-        // 표시할 것도 후속동작도 없으면 일반 오류.
-        if (!sText && !bNeedCts) { oAPP.fn.showMessage(null, 20, "E", _genericErrTxt()); }
     };
 
     // 사운드/로그인 체크/푸터메시지 — 별도창에선 경량 처리(원본 부작용 없음).

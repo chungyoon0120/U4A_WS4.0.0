@@ -61,7 +61,7 @@ let oAPP = (function (window) {
      *************************************************************/
     oAPP.fn.getThemeInfo = function () {
 
-        let sThemeJsonPath = oAPP.PATH.join(oAPP.USERDATA, "p13n", "theme", `${SYSID}.json`);
+        let sThemeJsonPath = oAPP.PATH.join(oAPP.USERDATA, "p13n", "theme_ws4", `${SYSID}.json`);
         if (oAPP.FS.existsSync(sThemeJsonPath) === false) {
             return;
         }

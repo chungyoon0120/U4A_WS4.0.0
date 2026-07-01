@@ -28,6 +28,23 @@ body {
     user-select: none;
 }
 
+/* ── 텍스트 선택/복사 정책 (공통, .analy/16 §2.3) ─────────────────────────
+   앱 전역(body)은 user-select:none — 버튼/아이콘/드래그 오작동 방지(데스크톱 앱 느낌).
+   단 "데이터로 보여지는 텍스트"(테이블 셀 값, 입력칸 값, 코드/문서 본문 등)는 사용자가
+   마우스로 드래그해 선택·복사할 수 있어야 한다 → 데이터 표면에만 text 로 되살린다.
+   인터랙티브 크롬(버튼/타이틀바/메뉴/툴바/트리 토글/패널·테이블 헤더)은 계속 none.
+   임의 텍스트 블록을 선택가능하게 하려면 .u4a-selectable 을 붙인다. */
+input,
+textarea,
+.u4a-input,
+.u4a-field__input,
+.u4a-table tbody td,
+.u4a-selectable,
+.u4a-selectable * {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
 /* 색 트랜지션 (테마 전환 플래시 방지 — 체크리스트 I) */
 body,
 .u4a-bar,

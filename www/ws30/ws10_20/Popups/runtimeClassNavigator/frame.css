@@ -170,20 +170,28 @@ body {
     overflow: auto;
 }
 
-/* 컬럼 폭(테이블 뷰) — UI Object ID / Module 은 고정, 클래스명은 가변. */
+/* 컬럼 폭(테이블 뷰) — 클래스명은 고정 길이(/U4A/CL_UO#####)라 좁게, 모듈명이 가장 길어
+   나머지 공간을 차지하게 auto. UI ID 는 중간. */
 .u4aRtmWrap[data-view="table"] .u4aRtmCol--obj {
     width: 26%;
 }
 
 .u4aRtmWrap[data-view="table"] .u4aRtmCol--lib {
-    width: 30%;
-}
-
-.u4aRtmWrap[data-view="table"] .u4aRtmCol--cls {
     width: auto;
 }
 
-/* 클래스명은 길어서 줄바꿈 허용(잘림 방지). 더블클릭 복사 대상이라 전체가 보이는 편이 유용. */
-.u4aRtmTbl td.u4a-c-rcls {
-    word-break: break-all;
+.u4aRtmWrap[data-view="table"] .u4aRtmCol--cls {
+    width: 22%;
+}
+
+/* ★ 컬럼이 3개뿐이고 공간이 넉넉하므로 셀 말줄임(…)을 쓰지 않는다 — 공통 .u4a-table td 의
+   overflow:hidden/ellipsis/nowrap 를 이 화면 스코프에서만 풀어 전체 텍스트를 표시(긴 값은 줄바꿈).
+   (더블클릭 복사 대상이라 잘리면 불편) */
+.u4aRtmTbl tbody td {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+    height: auto;
+    min-height: var(--row-h, 2.5rem);
 }

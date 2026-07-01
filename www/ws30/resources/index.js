@@ -572,7 +572,6 @@ oAPP.views = window?.oAPP?.views || {};
         oWS.utill.attr._bNewWinInProgress = true;
         oWS.utill.fn.setBusy("X");
 
-        // Busy 안전 해제 — did-finish-load 가 끝내 안 오는 예외(생성 실패 등) 대비(창 안 떠도 busy 박힘 방지).
         let _busyReleased = false;
         const _releaseBusy = function () {
             if (_busyReleased) { return; }
@@ -580,7 +579,6 @@ oAPP.views = window?.oAPP?.views || {};
             oWS.utill.attr._bNewWinInProgress = false;
             oWS.utill.fn.setBusy("");
         };
-        const _busySafetyTimer = setTimeout(_releaseBusy, 8000);
 
         const WINDOWSTATE = REMOTE.getGlobal("mainRequire")('electron-window-state');
 
@@ -677,10 +675,16 @@ oAPP.views = window?.oAPP?.views || {};
         });
 
         // 브라우저가 오픈이 다 되면 타는 이벤트
+        // 로드 실패시(네트워크 단절/잘못된 URL 등) 에도 did-finish-load 는 오지 않으므로,
+        //   실패를 타임아웃으로 추측하지 않고 Electron 이 주는 실제 실패 이벤트로 해제한다.
+        oBrowserWindow.webContents.on('did-fail-load', function (e, errorCode, errorDescription) {
+            console.warn("[HTML5][onNewWindow] did-fail-load:", errorCode, errorDescription);
+            _releaseBusy();
+        });
+
         oBrowserWindow.webContents.on('did-finish-load', function () {
 
             // 새 창 로드 완료 = 무거운 작업 끝 → 부모 Busy 해제(연타 가드 종료).
-            clearTimeout(_busySafetyTimer);
             _releaseBusy();
 
             // 새창을 요청한 호출자(예: 버전관리 팝업)에 "로드 완료" 통지(옵션). 호출자가 자기 busy 를 끈다.
@@ -733,7 +737,6 @@ oAPP.views = window?.oAPP?.views || {};
             oBrowserWindow = null;
 
             // 로드 완료 전에 닫힌 예외 상황에서도 Busy 가 박히지 않게 해제.
-            clearTimeout(_busySafetyTimer);
             _releaseBusy();
 
             // if (oWS.utill.attr.oBusyIndicator) {

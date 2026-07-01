@@ -617,6 +617,18 @@
         else { console.warn("[HTML5][WS20] ev_pressMimeBtn not available (Ctrl+Shift+F12)"); }
     }
 
+    //Ctrl+F — WS20 Find(별도창). 원본 ws_common.js 의 sap.byId("ws20_findBtn").firePress(UI5)
+    //  는 HTML5 서 무동작이라, 헤더 Find 버튼과 동일 핸들러(fnFindPopupOpen → 별도창)로 교체.
+    function _ws20Find() {
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
+        try {
+            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
+                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
+        } catch (x) { }
+        if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") { oAPP.fn.fnFindPopupOpener(); }
+        else { console.warn("[HTML5][WS20] fnFindPopupOpener not available (Ctrl+F)"); }
+    }
+
     //getShortCutList(ws_common.js)가 먼저 로드된 경우에만 super-wrap(미정의면 전 페이지 단축키가
     //  []로 깨지므로 가드). 정상 로드 순서(ws_common → ws_html5_ws20)에선 항상 통과.
     if (typeof oAPP.common.getShortCutList === "function") {
@@ -626,6 +638,7 @@
             if (sPgNo !== "WS20" || !Array.isArray(aList)) { return aList; }
             var oFnMap = {
                 "F3": function (e) { _ws20ScGuard(e, _ws20Back); },           // 뒤로가기
+                "Ctrl+F": function (e) { _ws20ScGuard(e, _ws20Find); },        // Find(별도창)
                 "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); } // MIME Repository(별도창)
             };
             aList.forEach(function (o) { if (o && oFnMap[o.KEY]) { o.fn = oFnMap[o.KEY]; } });
@@ -710,7 +723,11 @@
         //   · New Window : WS10 새창 버튼과 동일하게 통일 — 아이콘 window-restore(WS10 newWindowBtn 과
         //               동일) + oAPP.events.ev_NewWindow(→ parent.onNewWindow(), Electron 메인프레임
         //               새 창, sap 무관). 라벨도 WS10 과 같은 A09("새 창/New Window") 사용.
-        HDR.appendChild(_appHdrIconBtn("ws20AppHeaderFindBtn", _fa("binoculars"), _msg("A70") + " (Ctrl+F)"));
+        HDR.appendChild(_appHdrIconBtn("ws20AppHeaderFindBtn", _fa("binoculars"), _msg("A70") + " (Ctrl+F)", function () {
+            // 원본 ws20_findBtn.firePress → HTML5 별도창 opener(지연로드 래퍼, sap 무관).
+            if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") { oAPP.fn.fnFindPopupOpener(); return; }
+            console.warn("[HTML5][WS20] fnFindPopupOpener not available");
+        }));
         HDR.appendChild(_appHdrIconBtn("ws20AppHeaderExportBtn", _fa("window-restore"), _msg("A09") + " (Ctrl+N)", function () {
             // WS10 ev_NewWindow 와 동일 경로 호출 (ws_events.js:966 → parent.onNewWindow())
             if (oAPP.events && typeof oAPP.events.ev_NewWindow === "function") {

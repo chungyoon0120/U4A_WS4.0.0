@@ -4333,7 +4333,10 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
         var sCleanHtml = parent.setCleanHtml(oXHR.response);
         if (!sCleanHtml || sCleanHtml === "") {
-            sCleanHtml = "Server connection fail!!"; // [MSG]
+            //391 통신 오류가 발생하였습니다. 네트워크 상태를 확인하시고 문제가 지속 될 경우 U4A 솔루션 팀에 문의하세요.
+            //304 프로그램이 종료됩니다.
+            sCleanHtml = oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "391") + "\n" +
+                oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "304");
         }
 
         // HTML5(UI5 제거) 메인 컨텍스트에선 sap 미정의 → 1번째 인자 가드(있으면 sap, 없으면 null).

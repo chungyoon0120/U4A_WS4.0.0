@@ -95,7 +95,7 @@ function _monacoThemeFromBg(sBg) {
 
 function _getThemeInfo() {
     try {
-        var sPath = PATH.join(USERDATA, "p13n", "theme", SYSID + ".json");
+        var sPath = PATH.join(USERDATA, "p13n", "theme_ws4", SYSID + ".json");
         if (!FS.existsSync(sPath)) { return null; }
         return JSON.parse(FS.readFileSync(sPath, "utf-8"));
     } catch (e) { return null; }

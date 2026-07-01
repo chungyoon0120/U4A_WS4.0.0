@@ -594,11 +594,34 @@
 
 
     /************************************************************************
+     * 트리 툴바 오버플로(⋯) 폭 제약 — JS 주입으로 강제 적용.
+     * ----------------------------------------------------------------------
+     *  ★ 원인: 툴바(.u4aWs20TreeToolbar)는 flex-wrap:nowrap + 비축소 아이콘이라
+     *    자기 콘텐츠 자연폭으로 늘어나 패널(overflow:hidden)을 넘어 "클리핑"만 되고,
+     *    attachOverflow 는 툴바 clientWidth(=자연폭)로 측정해 "다 들어감"으로 오판→⋯ 미생성.
+     *    해결은 툴바/랩에 min-width:0(교과서적 flexbox) 이지만, ws20.css 는 index.html 에서
+     *    쿼리 없는 <link> 로 로드돼 Electron 캐시로 갱신이 늦다(외부 CSS). 그래서 이 규칙을
+     *    #id 고특이도로 "JS 주입"(tree.js 는 매 로드 최신) 해 캐시와 무관하게 즉시 적용한다.
+     ************************************************************************/
+    function _ensureTreeToolbarWidthFix() {
+        if (document.getElementById("ws20TreeToolbarWidthFix")) { return; }
+        var oSt = document.createElement("style");
+        oSt.id = "ws20TreeToolbarWidthFix";
+        oSt.textContent =
+            "#ws20DesignTree .u4aWs20TreeWrap{min-width:0;}" +
+            "#ws20DesignTree .u4aWs20TreeToolbar{min-width:0;}";
+        (document.head || document.documentElement).appendChild(oSt);
+    }
+
+    /************************************************************************
      * [PUBLIC] 수동 렌더 — 원본 TreeTable rows 바인딩(/zTREE) 대체.
      *   /zTREE 가 갱신되면(designAddTreeData/undoRedo 등 → 모델 set) 이 함수를
      *   호출하여 다시 그린다. 데이터가 비어있어도 안전하게 빈 트리 렌더.
      ************************************************************************/
     oAPP.fn.fnRenderDesignTree = function () {
+
+        // 툴바 오버플로 폭 제약(캐시 무관 JS 주입) — 1회.
+        _ensureTreeToolbarWidthFix();
 
         var oTreePane = document.getElementById("ws20DesignTree");
         if (!oTreePane) {
@@ -661,6 +684,15 @@
 
         // undo/redo 버튼 활성상태 동기화 (버튼이 매 렌더 재생성되므로)
         try { if (oAPP.fn.fnWs20UpdateUndoBtns) { oAPP.fn.fnWs20UpdateUndoBtns(); } } catch (e) { }
+
+        // 툴바 폭 제약(주입 CSS)이 적용된 뒤 오버플로 재측정 강제 — 레이아웃 확정 후 rAF 로 reflow.
+        //   (min-width:0 로 툴바가 패널폭으로 줄어든 상태에서 attachOverflow 가 다시 판정 → ⋯ 생성)
+        try {
+            if (_treeTbOvf && typeof _treeTbOvf.reflow === "function") {
+                if (typeof requestAnimationFrame === "function") { requestAnimationFrame(function () { try { _treeTbOvf.reflow(); } catch (e) { } }); }
+                else { _treeTbOvf.reflow(); }
+            }
+        } catch (e) { }
 
     }; // end of oAPP.fn.fnRenderDesignTree
 

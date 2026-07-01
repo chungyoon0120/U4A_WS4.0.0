@@ -236,9 +236,10 @@ body {
 .u4aDocTitleRow .u4a-field { width: 100%; }
 
 .u4aDocTitleRow .u4a-input {
-    border: 0;
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-sm);
     background: transparent;
-    padding: 0.125rem 0;
+    padding: 0.125rem 0.5rem;
     font-size: 1.25rem;
     font-weight: 700;
     box-shadow: none;

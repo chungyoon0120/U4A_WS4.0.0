@@ -93,7 +93,7 @@ oAPP.fn.getThemeInfo = function (){
     let sSysID = oUserInfo.SYSID;
     
     // 해당 SYSID별 테마 정보 JSON을 읽는다.
-    let sThemeJsonPath = oAPP.PATH.join(oAPP.USERDATA, "p13n", "theme", `${sSysID}.json`);
+    let sThemeJsonPath = oAPP.PATH.join(oAPP.USERDATA, "p13n", "theme_ws4", `${sSysID}.json`);
     if(oAPP.FS.existsSync(sThemeJsonPath) === false){
         return;
     }

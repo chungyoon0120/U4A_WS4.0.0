@@ -1461,6 +1461,41 @@
     }
 
     /************************************************************************
+     * [HTML5] 서버 SCRIPT(활성/저장 시 CTS 필요)가 참조하는 oNewEvent 복원.
+     *   서버는 RETCD=E 응답 SCRIPT 로 `lf_saveActiveCtsPopup(oNewEvent);parent.showMessage(...)` 를 내리고
+     *   클라가 eval 한다. oNewEvent 는 원본 sap.ui.base.Event 였는데 변환 때 "사장 코드"로 제거돼
+     *   eval 시 "oNewEvent is not defined" 크래시(→ws_trycatch→치명적). lf_saveActiveCtsPopup 이 쓰는
+     *   getParameter("IS_ACT"/"TRKORR") + mParameters(TRKORR 재기록) 만 갖춘 최소 이벤트 셰임을 되살린다.
+     ************************************************************************/
+    function _mkActEvent(sIsAct) {
+        var m = { IS_ACT: sIsAct || "" };
+        return { mParameters: m, getParameter: function (k) { return this.mParameters[k]; } };
+    }
+
+    /************************************************************************
+     * [HTML5] 서버가 "백엔드 로그온 언어로 구운" showMessage 텍스트(CTS 205/305/209/193/213…)를
+     *   접속(워크스페이스) 언어로 재현지화 — 공통 WsMsgCls.relocalize(SSOT) 위임. 실패 시 원문.
+     ************************************************************************/
+    function _ws20RelocalizeBaked(sText) {
+        try {
+            var wsL = (parent.getUserInfo() || {}).LANGU || "";
+            var beL = (parent.getServerInfo && parent.getServerInfo()) ? (parent.getServerInfo().LANGU || "") : "";
+            if (!wsL || (beL && beL === wsL)) { return sText; }
+            var WC = REMOTE.getGlobal("WsMsgCls");
+            return (WC && WC.relocalize) ? WC.relocalize(sText, beL, wsL) : sText;
+        } catch (e) { return sText; }
+    }
+    // eval(SCRIPT) 동안만 parent.showMessage 를 역현지화로 감싼다(원본 반환값=복원용). eval 은 반드시
+    //   인라인 유지 — 서버 스크립트가 참조하는 지역 oNewEvent/모듈 lf_saveActiveCtsPopup 스코프 보존.
+    function _beginRelocalizeSM() {
+        var oOrig = parent.showMessage;
+        parent.showMessage = function (oUI5, kind, type, sMsg, fnCb) {
+            return oOrig.call(parent, oUI5, kind, type, _ws20RelocalizeBaked(sMsg), fnCb);
+        };
+        return oOrig;
+    }
+
+    /************************************************************************
      * [HTML5] 작업표시줄 깜빡임 안전 호출 — CURRWIN/REMOTE 미정의 렌더러 대비.
      ************************************************************************/
     function _ws20FlashFrame() {
@@ -1576,6 +1611,9 @@
             var oCurrWin = REMOTE.getCurrentWindow(),
                 sCurrPage = parent.getCurrPage();
 
+            // 서버 SCRIPT(CTS 필요 시)가 참조하는 oNewEvent — 활성화 흐름(IS_ACT="X"). eval 스코프에서 참조됨.
+            var oNewEvent = _mkActEvent("X");
+
             if (typeof oResult == "string" || typeof oResult != "object") {
 
                 try {
@@ -1639,13 +1677,14 @@
                     // 자식 윈도우 활성화
                     oAPP.fn.fnChildWindowShow(true);
                     
-                    eval(oResult.SCRIPT);
+                    var _smA = _beginRelocalizeSM();
+                    try { eval(oResult.SCRIPT); } finally { parent.showMessage = _smA; }
 
                     return;
                 }
 
-                // Footer Msg 출력
-                APPCOMMON.fnShowFloatingFooterMsg("E", "WS20", oResult.RTMSG);
+                // Footer Msg 출력 (SCRIPT 없는 오류 = RTMSG 도 접속언어로 재현지화)
+                APPCOMMON.fnShowFloatingFooterMsg("E", "WS20", _ws20RelocalizeBaked(oResult.RTMSG));
 
                 // busy 끄고 Lock 풀기
                 oAPP.common.fnSetBusyLock("");
@@ -1659,7 +1698,8 @@
 
             // 서버에서 만든 스크립트가 있다면 eval 처리.
             if (oResult.SCRIPT) {
-                eval(oResult.SCRIPT);
+                var _smA2 = _beginRelocalizeSM();
+                try { eval(oResult.SCRIPT); } finally { parent.showMessage = _smA2; }
             }
 
             // change Flag 초기화
@@ -1920,6 +1960,9 @@
             var oCurrWin = REMOTE.getCurrentWindow(),
                 sCurrPage = parent.getCurrPage();
 
+            // 서버 SCRIPT(CTS 필요 시)가 참조하는 oNewEvent — 저장 흐름(IS_ACT=""). eval 스코프에서 참조됨.
+            var oNewEvent = _mkActEvent("");
+
             // 푸터 메시지가 있을 경우 닫기
             APPCOMMON.fnHideFloatingFooterMsg();
 
@@ -1944,13 +1987,14 @@
                     // 자식 윈도우 활성화
                     oAPP.fn.fnChildWindowShow(true);
 
-                    eval(oResult.SCRIPT);                    
+                    var _smS = _beginRelocalizeSM();
+                    try { eval(oResult.SCRIPT); } finally { parent.showMessage = _smS; }                    
 
                     return;
                 }
 
-                // Footer Msg 출력
-                APPCOMMON.fnShowFloatingFooterMsg("E", "WS20", oResult.RTMSG);
+                // Footer Msg 출력 (SCRIPT 없는 오류 = RTMSG 도 접속언어로 재현지화)
+                APPCOMMON.fnShowFloatingFooterMsg("E", "WS20", _ws20RelocalizeBaked(oResult.RTMSG));
 
                 // busy 끄고 Lock 풀기
                 oAPP.common.fnSetBusyLock("");
@@ -1964,7 +2008,8 @@
 
             // 서버에서 만든 스크립트가 있다면 eval 처리.
             if (oResult.SCRIPT) {
-                eval(oResult.SCRIPT);
+                var _smS2 = _beginRelocalizeSM();
+                try { eval(oResult.SCRIPT); } finally { parent.showMessage = _smS2; }
             }
 
             // 저장후 10번 페이지로 이동이면..

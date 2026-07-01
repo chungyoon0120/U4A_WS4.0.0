@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- ===== 공통 헤더(.u4a-titlebar)·테이블·입력칸·토큰 (runtimeClassNavigator/docPopup 동일 스택) ===== -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="findFrame.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* findFrame.js 에서 재적용 */ }
+        })();
+    </script>
+</head>
+
+<body>
+
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/축소·확대·닫기(공통 3버튼 고정, MIME/versionMng 동일) ===== -->
+    <header class="u4a-titlebar" id="findTitlebar">
+        <img class="u4a-titlebar__logo" id="findLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="findTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button type="button" class="u4a-winbtn" id="findWinMin" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="findWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="findWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- ===== 본체 = 공통 .u4a-splitter [좌측 네비] | [우측 모드 콘텐츠] (드래그로 네비 폭 조절) ===== -->
+    <div class="u4aFindBody" id="findBody">
+        <div class="u4a-splitter u4aFindSplit" id="findSplit">
+
+            <!-- 좌측 네비 — findFrame.js 가 메뉴 항목을 렌더(M001~M004 + 조건부 M005) -->
+            <section class="u4a-splitter__pane u4aFindNavPane">
+                <nav class="u4aFindNav" id="findNav" aria-label="Find categories"></nav>
+            </section>
+
+            <!-- 세로 분할 바(공통) -->
+            <div class="u4a-splitter__bar" id="findSplitBar"></div>
+
+            <!-- 우측 = 현재 모드의 콘텐츠(제목 + 검색툴바 + 공통 .u4a-table). findFrame.js 가 렌더 -->
+            <section class="u4a-splitter__pane u4aFindMainPane">
+                <section class="u4aFindMain" id="findMain"></section>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- 로딩 오버레이 = 공통 busy(.u4a-busy, shell.css SSOT). 토스트/도움말 모달은 findFrame.js 가 동적 생성. -->
+    <div class="u4a-busy" id="findBusy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+        </div>
+    </div>
+
+    <script>
+        /************************************************************************
+         * 에러 감지 — findFrame.js 가 window.WSERR 처럼 재사용(runtimeClassNavigator 동일 컨벤션)
+         ************************************************************************/
+        var REMOTE = require('@electron/remote'),
+            PATH = REMOTE.require('path'),
+            APP = REMOTE.app,
+            APPPATH = APP.getAppPath(),
+            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
+            PATHINFO = require(PATHINFOURL),
+            WSERR = require(PATHINFO.WSTRYCATCH);
+
+        var zconsole = WSERR(window, document, console);
+    </script>
+
+    <script src="findFrame.js"></script>
+
+</body>
+
+</html>

@@ -1332,7 +1332,6 @@
      *     트리를 렌더하는 시점(fnRenderDesignTree)에 1회/APPDATA 단위로 호출.
      * ******************************************************************** */
 
-    var _iPrevBusyWatchdog = null;
     var _bPrevBusyOn = false;
 
     function _ws20ReleasePrevBusy() {
@@ -1340,10 +1339,6 @@
         //(성공시: prev 에 실제 UI 인스턴스가 채워져 있어 스탠드인은 더이상 생성되지 않음 /
         // 실패시: 헤드리스와 동일하게 스탠드인 모드로 복귀 — 속성 패널 정상 동작)
         oAPP.attr.__ws20PrevBooting = false;
-        if (_iPrevBusyWatchdog) {
-            clearTimeout(_iPrevBusyWatchdog);
-            _iPrevBusyWatchdog = null;
-        }
         if (!_bPrevBusyOn) { return; }
         _bPrevBusyOn = false;
         try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
@@ -1352,14 +1347,6 @@
     function _ws20EngagePrevBusy() {
         _bPrevBusyOn = true;
         try { oAPP.common.fnSetBusyLock("X"); } catch (e) { }
-
-        //안전장치 — 미리보기 로드 실패(UI5 bootstrap 실패/서버 단절 등)시에도
-        //busy 가 풀리도록 watchdog. (원본엔 없음 — W2 명세의 안전장치)
-        if (_iPrevBusyWatchdog) { clearTimeout(_iPrevBusyWatchdog); }
-        _iPrevBusyWatchdog = setTimeout(function () {
-            console.warn("[HTML5][WS20][prev] 미리보기 로드 60s 초과 — busy 안전 해제(미리보기는 백그라운드 계속).");
-            _ws20ReleasePrevBusy();
-        }, 60000);
     }
 
     //[PUBLIC] 미리보기 로드 — 원본 loadPreviewFrame 호출부(getAppData 588행) 대응.

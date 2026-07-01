@@ -357,6 +357,27 @@
     }; // end of oAPP.fn.fnVersionManagementPopupOpener
 
     /************************************************************************
+     * WS20의 Find(찾기) 별도창 실행시켜 주는 메소드 (HTML5)
+     *   원본: ws20_findBtn.firePress → fnFindPopupOpen (UI5 별도창).
+     *   HTML5: 다른 별도창 opener 와 동일 컨벤션(loadJs → opener). 본문=Popups/findPopup.
+     ************************************************************************/
+    oAPP.fn.fnFindPopupOpener = function () {
+
+        // busy 키고 Lock 걸기 (async loadJs 구간 커버 — versionMng 동일)
+        oAPP.common.fnSetBusyLock("X");
+
+        if (oAPP.fn.fnFindPopupOpen) {
+            oAPP.fn.fnFindPopupOpen();
+            return;
+        }
+
+        oAPP.loadJs("fnFindPopupOpen", function () {
+            oAPP.fn.fnFindPopupOpen();
+        });
+
+    }; // end of oAPP.fn.fnFindPopupOpener
+
+    /************************************************************************
      * WS10의 Application Copy 팝업 실행시켜 주는 메소드
      * **********************************************************************
      * @param {String} sAppId  
@@ -2548,10 +2569,28 @@
         // 브라우저가 오픈이 다 되면 타는 이벤트
         oBrowserWindow.webContents.on('did-finish-load', function () {
 
+            // Runtime Class Navigator 로 전달하는 T_0022 데이터를 소스 단계에서 필터링한다(WS3 원본 d1a02d65 동일).
+            //   - OBJTY 가 1, 2, 4 인 것만
+            //   - ISDEP 가 "X" 가 아닌 것 (폐기 제외)
+            //   - UILIK 기준 T_0020 을 조회하여 NUSED 가 "X" 가 아닌 것 (미사용 라이브러리 제외)
+            var aOBJTY = ["1", "2", "4"],
+                aT0020 = (oAPP.DATA.LIB && oAPP.DATA.LIB.T_0020) || [],
+                aT0022 = (oAPP.DATA.LIB && oAPP.DATA.LIB.T_0022) || [];
+
+            var aFilteredT0022 = aT0022.filter(function (o) {
+                if (aOBJTY.indexOf(o.OBJTY) === -1) { return false; }
+                if (o.ISDEP === "X") { return false; }
+
+                var oLib = aT0020.find(function (l) { return l.UILIK === o.UILIK; });
+                if (oLib && oLib.NUSED === "X") { return false; }
+
+                return true;
+            });
+
             var oRuntimeInfo = {
                 oUserInfo: oUserInfo,
                 oThemeInfo: oThemeInfo,
-                aRuntimeData: oAPP.DATA.LIB.T_0022,
+                aRuntimeData: aFilteredT0022,
                 oMetadata: parent.getMetadata()
             };
 

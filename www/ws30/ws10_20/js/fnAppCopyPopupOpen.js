@@ -367,9 +367,6 @@
         }
     }
 
-    // 백엔드 언어별 "파라미터(&) 템플릿" 캐시(REMOTE 왕복 1회 후 정규식 컴파일 보관).
-    var _oParamTmplCache = {};
-
     /************************************************************************
      * (Local) baked 메시지 재현지화 — 백엔드가 메시지번호 없이 텍스트만 구워 보낼 때,
      *   그 텍스트를 백엔드 언어 DB 에서 역조회 → 키 확보 → 워크스페이스 언어로 재현지화.
@@ -386,82 +383,12 @@
         try {
             var sWsLangu = (parent.getUserInfo() || {}).LANGU;        // 워크스페이스(화면) 언어
             var sBeLangu = (parent.getServerInfo() || {}).LANGU;      // 백엔드 로그온 언어(구운 언어)
-            if (!sBeLangu || sBeLangu === sWsLangu) { return sText; } // 언어 같으면 손댈 필요 없음
-
-            // 1) 완전일치(파라미터 없는 메시지).
-            var oKey = REMOTE.getGlobal("WsMsgCls").findKeyByText(sBeLangu, sText);
-            if (oKey && oKey.ARBGB) {
-                var sLocal = APPCOMMON.fnGetMsgClsText(oKey.ARBGB, oKey.MSGNR);
-                if (sLocal && sLocal.indexOf("|") === -1) { return sLocal; }
-            }
-
-            // 2) 템플릿 역매칭(파라미터 있는 메시지).
-            var aTmpl = _getParamTemplates(sBeLangu);
-            for (var i = 0; i < aTmpl.length; i++) {
-                var m = aTmpl[i].re.exec(sText);
-                if (!m) { continue; }
-                // 캡처값(텍스트 순서) → 자리표시자 번호(&n) 슬롯에 배치 → p1..p4.
-                var p = ["", "", "", ""];
-                var aSlots = aTmpl[i].slots;
-                for (var g = 1; g < m.length; g++) {
-                    var slot = aSlots[g - 1];
-                    if (slot >= 1 && slot <= 4) { p[slot - 1] = m[g]; }
-                }
-                var sLoc = APPCOMMON.fnGetMsgClsText(aTmpl[i].ARBGB, aTmpl[i].MSGNR, p[0], p[1], p[2], p[3]);
-                if (sLoc && sLoc.indexOf("|") === -1) { return sLoc; }
-            }
-
-            return sText; // 어느 것도 못 잡음(예: SAP 시스템 메시지) → 원문.
+            // ★공통 역현지화 단일출처(WsMsgCls.relocalize) 위임 — 앱복사/MIME/WS20 동일 로직.
+            var WC = REMOTE.getGlobal("WsMsgCls");
+            return (WC && WC.relocalize) ? WC.relocalize(sText, sBeLangu, sWsLangu) : sText;
         } catch (e) {
             return sText;
         }
-    }
-
-    /************************************************************************
-     * (Local) 백엔드 언어 "파라미터 템플릿" 목록을 정규식으로 컴파일해 캐시 반환.
-     *   리터럴 많은(=구체적인) 템플릿이 먼저 매칭되도록 정렬 → 오매칭 최소화.
-     ************************************************************************/
-    function _getParamTemplates(sLangu) {
-        if (_oParamTmplCache[sLangu]) { return _oParamTmplCache[sLangu]; }
-
-        var aRows = [];
-        try { aRows = REMOTE.getGlobal("WsMsgCls").getParamTemplates(sLangu) || []; } catch (e) { aRows = []; }
-
-        var aCompiled = [];
-        aRows.forEach(function (r) {
-            var re = _tmplToRegex(r.TEXT);
-            if (!re) { return; }
-            aCompiled.push({
-                ARBGB: r.ARBGB, MSGNR: r.MSGNR, re: re,
-                slots: _tmplSlots(r.TEXT),
-                litLen: r.TEXT.replace(/&[1-4]|&/g, "").length // 리터럴 길이(구체성)
-            });
-        });
-        // 구체적인(리터럴 긴) 템플릿 우선.
-        aCompiled.sort(function (a, b) { return b.litLen - a.litLen; });
-
-        _oParamTmplCache[sLangu] = aCompiled;
-        return aCompiled;
-    }
-
-    // 템플릿 TEXT → 앵커 정규식(리터럴 이스케이프 + &/&n → 캡처그룹).
-    function _tmplToRegex(sText) {
-        try {
-            var sEsc = sText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // 정규식 특수문자 이스케이프(& 는 비특수 → 보존)
-            sEsc = sEsc.replace(/&[1-4]/g, "(.+?)").replace(/&/g, "(.+?)"); // &n 먼저(긴 토큰 우선)
-            return new RegExp("^" + sEsc + "$");
-        } catch (e) { return null; }
-    }
-
-    // 템플릿 자리표시자 등장순서 → 파라미터 슬롯번호 배열(&n→n, 바깥 &→1부터 순차).
-    function _tmplSlots(sText) {
-        var aTokens = sText.match(/&[1-4]|&/g) || [];
-        var iPos = 0, aSlots = [];
-        aTokens.forEach(function (t) {
-            if (t.length === 2) { aSlots.push(parseInt(t.charAt(1), 10)); }
-            else { iPos += 1; aSlots.push(iPos); }
-        });
-        return aSlots;
     }
 
     /************************************************************************

@@ -184,7 +184,11 @@
             var hsb = _el("div", "u4aAppF4HSb");
             var hsbSpacer = _el("div", "u4aAppF4HSbSpacer");
             hsb.appendChild(hsbSpacer);
-            grid.append(frzPane, scrPane, hsb);
+            // ★ no-data 문구는 두 페인에 걸친 단일 오버레이(그리드 본문 전폭 중앙). 페인별 nodata 로 하면
+            //   스크롤 페인에만 떠서 고정 페인이 빈 박스로 갈라져 보인다 → 전체 폭 중앙 1개로 통일.
+            var noData = _el("div", "u4aAppF4NoData", MSG_NODATA);
+            noData.hidden = true;
+            grid.append(frzPane, scrPane, hsb, noData);
 
             var _hoverIdx = null, _lastY = null, _syncing = false;
 
@@ -239,8 +243,9 @@
             // ★ buildRow 안전망 — 행 생성 시 _hoverIdx 를 반영(선택 getSelKey 와 동일 방식). 어느 페인이 언제
             //   렌더되든 그 행이 자동으로 hover 를 가지므로, 두 페인 가상스크롤 렌더 타이밍 경합과 무관하게 양쪽 정합.
             function _isHovered(idx) { return _hoverIdx != null && String(idx) === _hoverIdx; }
+            function _setNoData(bShow) { noData.hidden = !bShow; }
 
-            return { grid: grid, frzPane: frzPane, scrPane: scrPane, frzHead: frzHead, frzBody: frzBody, scrHead: scrHead, scrBody: scrBody, sync: _sync, isHovered: _isHovered };
+            return { grid: grid, frzPane: frzPane, scrPane: scrPane, frzHead: frzHead, frzBody: frzBody, scrHead: scrHead, scrBody: scrBody, sync: _sync, isHovered: _isHovered, setNoData: _setNoData };
         }
 
         /* ── 다이얼로그 골격 ─────────────────────────────────────── */
@@ -536,6 +541,7 @@
             var view = _deriveView(aResult);
             _vs1f.setRows(view);
             _vs1.setRows(view);
+            oT1G.setNoData(view.length === 0);   // 두 페인 전폭 중앙 no-data
             oT1G.sync();   // 가로바 하단 보정
         }
         // 고정 페인(좌측 컬럼) 가상 스크롤 인스턴스.
@@ -544,11 +550,11 @@
             buildRow: function (row, i) { return _buildT1Row(row, i, T1_FRZ_COLS); },
             getSelKey: function (row) { return row.APPID; }
         });
-        // 스크롤 페인(나머지 컬럼) 가상 스크롤 인스턴스 — no-data 문구는 이쪽(넓은 영역)에만.
+        // 스크롤 페인(나머지 컬럼) 가상 스크롤 인스턴스 — no-data 는 페인별이 아니라 그리드 전폭 오버레이(oT1G.setNoData).
         var _vs1 = _makeVScroller(oT1G.scrPane, oT1ScrBody, {
             colCount: T1_SCR_COLS.length,
             buildRow: function (row, i) { return _buildT1Row(row, i, T1_SCR_COLS); },
-            nodata: MSG_NODATA, getSelKey: function (row) { return row.APPID; }
+            getSelKey: function (row) { return row.APPID; }
         });
 
         // ── 컬럼 헤더 메뉴(정렬 asc/desc + 필터 input + 초기화) — 공통 U4AUI.openColumnMenu 소비 ──
@@ -864,7 +870,7 @@
         }
 
         // 고정/스크롤 페인 모두 가상스크롤 동시 세팅(토글/필터/정렬 공통 경로).
-        function _setTreeRows(view, keep) { _vs2f.setRows(view, keep); _vs2.setRows(view, keep); oT2G.sync(); }
+        function _setTreeRows(view, keep) { _vs2f.setRows(view, keep); _vs2.setRows(view, keep); oT2G.setNoData(view.length === 0); oT2G.sync(); }
         // 선택 강조 동기 — 두 페인 각 makeVScroller getSelKey 가 보이는 행에 aria-selected 자동 부여.
         function _selectTree(uid) { _vs2f.setSel(uid); _vs2f.refresh(); _vs2.setSel(uid); _vs2.refresh(); }
         // 전체 렌더(로드/필터/Expand·Collapse all) = 헤더(정렬/필터 표시자) 재구성 + 평탄목록을 두 페인에.
@@ -900,11 +906,11 @@
             buildRow: function (item, i) { return _buildTreeRow(item, i, T2_FRZ_COLS); },
             getSelKey: function (item) { return item.node._uid; }
         });
-        // 스크롤 페인(나머지 컬럼) 가상 스크롤 인스턴스 — no-data 문구는 이쪽(넓은 영역)에만.
+        // 스크롤 페인(나머지 컬럼) 가상 스크롤 인스턴스 — no-data 는 페인별이 아니라 그리드 전폭 오버레이(oT2G.setNoData).
         var _vs2 = _makeVScroller(oT2G.scrPane, oT2ScrBody, {
             colCount: T2_SCR_COLS.length,
             buildRow: function (item, i) { return _buildTreeRow(item, i, T2_SCR_COLS); },
-            nodata: MSG_NODATA, getSelKey: function (item) { return item.node._uid; }
+            getSelKey: function (item) { return item.node._uid; }
         });
 
         // flat T_APPL → nested(APPF4HIER), 원본 _appF4Tree 규칙.
@@ -1094,6 +1100,9 @@
             /* 하단 별도 가로 스크롤바(UI5 sap.ui.table HSb) — col2/row2. 트랙 폭(spacer)=스크롤 페인 콘텐츠 폭(JS 동기). */
             ".u4aAppF4HSb{grid-column:2;grid-row:2;overflow-x:auto;overflow-y:hidden;}",
             ".u4aAppF4HSbSpacer{height:.0625rem;}",
+            /* no-data — 두 페인 전폭(col1~2) 본문(row1) 중앙 단일 오버레이. 공통 .u4a-table__nodata 색/톤 재현. */
+            ".u4aAppF4NoData{grid-column:1 / -1;grid-row:1;align-self:center;justify-self:center;padding:1rem;color:var(--text-muted);pointer-events:none;}",
+            ".u4aAppF4NoData[hidden]{display:none;}",
             /* 공통 .u4a-table(--compact) 소비. 고정=컬럼폭 합 고정, 스크롤=내용폭(좁으면 가로스크롤·넓으면 채움). */
             ".u4aAppF4Dlg .u4aAppF4Tbl{border-collapse:separate;border-spacing:0;}",
             ".u4aAppF4Dlg .u4aAppF4Tbl--frozen{width:max-content;}",

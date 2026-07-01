@@ -218,6 +218,7 @@
     // design tree item drag 시작. (원본 3905행 1:1)
     oAPP.fn.designTreeDragStart = function (is_tree) {
         _dnd.active = true;
+        _dnd.effect = "";   // 이 드래그의 Copy/Move 는 이후 dragover/drop 에서 결정(새 드래그마다 초기화)
         if (is_tree && is_tree.OBJID) { _dnd.dragObjid = is_tree.OBJID; }
         oAPP.fn.setTreeDnDEnable(_root());          // 기본 가능여부
         if (is_tree) { oAPP.fn.setDropEnable(is_tree); }  // drag 기준 drop 가능 라인 판정
@@ -225,11 +226,14 @@
     };
 
     // drag 종료. (원본 1679행 — UI5 InstanceManager/insert popup 잔상부는 HTML5 무관 제거)
+    //   ★ _dnd.effect 는 절대 여기서 비우지 않는다(원본 designDragEnd 도 __dropEffect 미초기화).
+    //     네이티브 dragend 는 drop 직후 발생하는데, aggregation 선택 팝업(비동기)이 뜬 사이
+    //     effect 를 지우면 사용자가 팝업 확정 후 drop_cb 가 Copy 를 Move 로 오판한다.
+    //     effect 는 drop_cb 가 읽으면서 스스로 비운다(초기화는 designTreeDragStart).
     oAPP.fn.designDragEnd = function () {
         oAPP.fn.setTreeDnDEnable(_root());
         oAPP.fn.designSetDropStyle(true);           // 잔상 css 제거
         _dnd.active = false;
-        _dnd.effect = "";
         _dnd.dragObjid = "";
         _dnd.dropObjid = "";
         _dnd.dropPos = "";
@@ -370,6 +374,7 @@
         var oOld = document.getElementById("ws20AggrSelDlg");
         if (oOld) { try { oOld.remove(); } catch (e) { } }
 
+        // 공통 .u4a-dialog 규격(DumpWrite 등과 동일 구조: __header/__body/__footer + 드래그리센터).
         var DLG = document.createElement("dialog");
         DLG.id = "ws20AggrSelDlg";
         DLG.className = "u4a-dialog u4aWs20AggrDlg";
@@ -379,34 +384,62 @@
         var sConfirm = _msg("/U4A/CL_WS_COMMON", "A40");   // Confirm
         var sClose = _msg("/U4A/CL_WS_COMMON", "A39");     // Close
 
-        var sOpts = "";
-        for (var i = 0; i < lt_sel.length; i++) {
-            var k = String(lt_sel[i].UIATK == null ? "" : lt_sel[i].UIATK);
-            var t = String(lt_sel[i].UIATT == null ? "" : lt_sel[i].UIATT);
-            sOpts += '<option value="' + k.replace(/"/g, "&quot;") + '"' + (i === 0 ? " selected" : "") + '>' +
-                t.replace(/&/g, "&amp;").replace(/</g, "&lt;") + '</option>';
-        }
+        // ── 헤더(아이콘 + 제목 + 닫기 X, 직계) ──
+        var oHeader = document.createElement("div");
+        oHeader.className = "u4a-dialog__header";
+        oHeader.innerHTML = '<i class="fa-solid fa-sitemap"></i><span></span>';
+        oHeader.querySelector("span").textContent = sTitle;
+        var oX = document.createElement("button");
+        oX.type = "button"; oX.className = "u4a-btn-icon";
+        oX.title = sClose;
+        oX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        oHeader.appendChild(oX);
+        DLG.appendChild(oHeader);
 
-        DLG.innerHTML =
-            '<div class="u4a-dialog__head">' +
-            '  <span class="u4a-dialog__title"><i class="fa-solid fa-sitemap"></i> ' +
-            String(sTitle).replace(/&/g, "&amp;").replace(/</g, "&lt;") + '</span>' +
-            '  <button type="button" class="u4a-btn-icon u4aWs20AggrX" title="' + String(sClose).replace(/"/g, "&quot;") + '" aria-label="' + String(sClose).replace(/"/g, "&quot;") + '"><i class="fa-solid fa-xmark"></i></button>' +
-            '</div>' +
-            '<div class="u4a-dialog__body">' +
-            '  <select class="u4a-input u4aWs20AggrSel">' + sOpts + '</select>' +
-            '</div>' +
-            '<div class="u4a-dialog__foot">' +
-            '  <span class="u4a-dialog__foot-spacer"></span>' +
-            '  <button type="button" class="u4a-btn u4a-btn--negative u4aWs20AggrCancel" title="' + String(sClose).replace(/"/g, "&quot;") + '"><i class="fa-solid fa-xmark"></i></button>' +
-            '  <button type="button" class="u4a-btn u4a-btn--emphasized u4aWs20AggrOk" title="' + String(sConfirm).replace(/"/g, "&quot;") + '"><i class="fa-solid fa-check"></i></button>' +
-            '</div>';
+        // ── 본문(공통 콤보 U4AUI.createSelect — 원본 Select item key=UIATK/text=UIATT) ──
+        var oBody = document.createElement("div");
+        oBody.className = "u4a-dialog__body u4aWs20AggrBody";
+
+        var sSelKey = String(lt_sel[0].UIATK == null ? "" : lt_sel[0].UIATK);
+        var aItems = lt_sel.map(function (r) {
+            return { value: String(r.UIATK == null ? "" : r.UIATK), text: String(r.UIATT == null ? "" : r.UIATT) };
+        });
+        function _onPick(v) { sSelKey = v; }
+        if (window.U4AUI && U4AUI.createSelect) {
+            var oSel = U4AUI.createSelect(aItems, sSelKey, _onPick);
+            oSel.classList.add("u4aWs20AggrSel");
+            oBody.appendChild(oSel);
+        } else {
+            var oNative = document.createElement("select");
+            oNative.className = "u4a-input u4aWs20AggrSel";
+            aItems.forEach(function (it) { var o = document.createElement("option"); o.value = it.value; o.textContent = it.text; oNative.appendChild(o); });
+            oNative.value = sSelKey;
+            oNative.addEventListener("change", function () { sSelKey = oNative.value; });
+            oBody.appendChild(oNative);
+        }
+        DLG.appendChild(oBody);
+
+        // ── 푸터(spacer + 확인 파랑 / 닫기 Reject, 아이콘) ──
+        var oFoot = document.createElement("div");
+        oFoot.className = "u4a-dialog__footer u4aWs20AggrFoot";
+        var oSpacer = document.createElement("span");
+        oSpacer.className = "u4aWs20AggrFootSpacer";
+        oFoot.appendChild(oSpacer);
+        var oOk = document.createElement("button");
+        oOk.type = "button"; oOk.className = "u4a-btn u4a-btn--emphasized";
+        oOk.title = sConfirm;
+        oOk.innerHTML = '<i class="fa-solid fa-check"></i>';
+        var oCancel = document.createElement("button");
+        oCancel.type = "button"; oCancel.className = "u4a-btn u4a-btn--negative";
+        oCancel.title = sClose;
+        oCancel.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        oFoot.appendChild(oOk);
+        oFoot.appendChild(oCancel);
+        DLG.appendChild(oFoot);
 
         document.body.appendChild(DLG);
 
-        var oSel = DLG.querySelector(".u4aWs20AggrSel");
         var bDone = false;
-
         function _cleanup() {
             try { document.removeEventListener("keydown", _onKey, true); } catch (e) { }
             try { if (DLG.open) { DLG.close(); } } catch (e) { }
@@ -432,28 +465,25 @@
         function _confirm() {
             if (bDone) { return; }
             bDone = true;
-            var sKey = oSel ? oSel.value : "";
-            var ls_0023 = oAPP.DATA.LIB.T_0023.find(function (a) { return a.UIATK === sKey; });
+            var ls_0023 = oAPP.DATA.LIB.T_0023.find(function (a) { return a.UIATK === sSelKey; });
             _cleanup();
             retfunc(ls_0023, i_drag, i_drop);
         }
-        function _onKey(ev) {
-            if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); _cancel(); }
-            else if (ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); _confirm(); }
-        }
+        function _onKey(ev) { if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); _cancel(); } }
 
-        DLG.querySelector(".u4aWs20AggrX").addEventListener("click", _cancel);
-        DLG.querySelector(".u4aWs20AggrCancel").addEventListener("click", _cancel);
-        DLG.querySelector(".u4aWs20AggrOk").addEventListener("click", _confirm);
+        oX.addEventListener("click", _cancel);
+        oCancel.addEventListener("click", _cancel);
+        oOk.addEventListener("click", _confirm);
+        // ESC = 취소(공통 dialog cancel 이벤트).
+        DLG.addEventListener("cancel", function (e) { e.preventDefault(); _cancel(); });
         document.addEventListener("keydown", _onKey, true);
 
         try { DLG.showModal(); } catch (e) { try { DLG.show(); } catch (e2) { } }
-        // 공통 다이얼로그 드래그/리센터(있으면).
-        _safe(function () { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(DLG); } });
+        // 공통 다이얼로그 드래그/리센터(헤더 핸들).
+        _safe(function () { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(DLG, oHeader); } });
         // 팝업 떴으니 busy 해제(원본 afterOpen: parent.setBusy("")).
         try { parent.setBusy(""); } catch (e) { }
         oAPP.fn.setShortcutLock(false);
-        try { if (oSel) { oSel.focus(); } } catch (e) { }
     }
 
 
@@ -876,6 +906,36 @@
     };
 
 
+    // 클라이언트 이벤트(HTML/CSS/JS) 복사. (원본 uiDesignArea.js 2130행 대응 —
+    //   원본 _T_0015(ADDSC≠"") 기준 → T_CEVT(키=OBJID+UIASN) 에서 이벤트를 찾아 새 UI OBJID 로
+    //   재키잉해 push. 원본은 find(1건)이나 HM/CS/JS 다건 보존 위해 filter 로 전건 복사.)
+    if (typeof oAPP.fn.copyUiClientEvent !== "function") {
+        oAPP.fn.copyUiClientEvent = function (OBJID, is_tree) {
+            var A = oAPP.DATA.APPDATA;
+            if (!A || !Array.isArray(A.T_CEVT) || A.T_CEVT.length === 0) { return; }
+            var oPrev = oAPP.attr.prev[OBJID];
+            if (!oPrev || !Array.isArray(oPrev._T_0015)) { return; }
+            var lt_event = oPrev._T_0015.filter(function (a) { return a.ADDSC !== ""; });
+            for (var i = 0; i < lt_event.length; i++) {
+                var sKey = lt_event[i].OBJID + lt_event[i].UIASN;
+                var aCe = A.T_CEVT.filter(function (a) { return a.OBJID === sKey; });
+                for (var j = 0; j < aCe.length; j++) {
+                    A.T_CEVT.push({ OBJID: is_tree.OBJID + lt_event[i].UIASN, OBJTY: aCe[j].OBJTY, DATA: aCe[j].DATA });
+                }
+            }
+        };
+    }
+
+    // Description 복사. (원본 uiAttributeArea.js 7814행 1:1 — getDesc/setDesc 는 HTML5 존재)
+    if (typeof oAPP.fn.copyDesc !== "function") {
+        oAPP.fn.copyDesc = function (ORG_OBJID, OBJID) {
+            if (typeof oAPP.fn.getDesc !== "function" || typeof oAPP.fn.setDesc !== "function") { return; }
+            var l_desc = oAPP.fn.getDesc(ORG_OBJID);
+            if (l_desc === "" || l_desc == null) { return; }
+            oAPP.fn.setDesc(OBJID, l_desc);
+        };
+    }
+
     /* ====================================================================
      * 7) 복사 (원본 designCopyUI 2453행 1:1)
      * ==================================================================== */
@@ -1113,6 +1173,9 @@
 
             var sObjid = oRow.getAttribute("data-objid");
             var sPos = _dnd.dropPos || _calcDropPos(oRow, ev.clientY);
+
+            // 드롭 순간 Ctrl 상태로 복사/이동 확정(마지막 dragover 이후 변경 대비).
+            _dnd.effect = ev.ctrlKey ? "Copy" : "Move";
 
             // 편집모드 아니면 무시(drop 불가).
             if (!_isEdit()) { oAPP.fn.designDragEnd(); return; }

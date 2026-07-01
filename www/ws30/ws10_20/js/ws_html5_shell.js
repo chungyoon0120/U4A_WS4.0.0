@@ -1125,6 +1125,22 @@
             console.warn("[HTML5][WS20] removeContent preview iframe reset:", e && e.message);
         }
 
+        // ★ 죽은 iframe(위에서 파괴됨)에 속했던 UI5 프리뷰 인스턴스 참조 정리.
+        //   이걸 안 지우면 design/preview/index.js:drawPreview()→removePreviewPage() 의
+        //   가드(if (!attr.ui._page1) return)가 "아직 정리 안 됨"으로 오판해, 이미 파괴된
+        //   iframe 소속 객체를 새 iframe 컨텍스트에서 destroy() 시도 →
+        //   "Right-hand side of 'instanceof' is not an object" 크래시(앱 조회·뒤로 반복 시 빈번).
+        //   removePreviewPage()(index.js:1250~1254)가 정상 흐름에서 지우는 필드와 동일 목록.
+        try {
+            if (oAPP.attr.ui) {
+                delete oAPP.attr.ui._page1;
+                delete oAPP.attr.ui.prevRootPage;
+                delete oAPP.attr.ui._hbox1;
+                delete oAPP.attr.ui.prevPopupArea;
+                delete oAPP.attr.ui.oMenu;
+            }
+        } catch (e) { }
+
         // WS20 페이지 DOM 비우기 → 다음 Display/Change 진입 시 셸 새로 렌더
         try {
             var oWS20 = (oAPP.attr.ui && oAPP.attr.ui.pages && oAPP.attr.ui.pages.WS20)

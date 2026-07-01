@@ -53,6 +53,7 @@ var oState = {
     gotInfo: false,      // opener if-appdocu-info 수신
     loadStarted: false,  // 서버 GET 시작
     silent: false,       // 프로그램적 setContent 중(변경 이벤트 무시)
+    origHtml: "",        // 현재 선택 문서의 로드 시점 본문(dirty 오탐 방지용 실제비교 기준)
     zoom: 100,
     filter: "",          // 사이드바 검색 필터(제목)
     _reselectKey: undefined,  // 재init 후 다시 선택할 DOCKY(테마 변경)
@@ -72,7 +73,7 @@ function _msg(sCls, sCode, p1) {
 
 function _getThemeInfo() {
     try {
-        var sPath = PATH.join(USERDATA, "p13n", "theme", SYSID + ".json");
+        var sPath = PATH.join(USERDATA, "p13n", "theme_ws4", SYSID + ".json");
         if (!FS.existsSync(sPath)) { return null; }
         return JSON.parse(FS.readFileSync(sPath, "utf-8"));
     } catch (e) { return null; }
@@ -140,6 +141,7 @@ function _setEditorValue(sHtml) {
     try {
         oTiny.setContent((typeof sHtml === "string") ? sHtml : "");
         oTiny.setDirty(false);   // clean 으로 리셋 → 다음 "실제 편집" 때만 dirty 발화
+        oState.origHtml = oTiny.getContent();   // 로드 직후 실제 정규화값 = dirty 오탐 비교 기준
     } catch (e) { }
     setTimeout(function () { oState.silent = false; }, 50);
 }
@@ -369,7 +371,9 @@ function _commitCurrent() {
         _renderHead(oLine);
     }
     // 값 캡처 후 에디터 dirty 리셋 → 같은 문서 계속 편집 시 다음 변경에 dirty 재발화(isChang 재설정).
-    try { if (oTiny) { oTiny.setDirty(false); } } catch (e) { }
+    //   비교기준(origHtml)도 방금 캡처값으로 갱신 — 안 하면 이후 단순 클릭이 "커밋 전" 원본과
+    //   비교돼 다시 오탐 dirty 로 잡힘.
+    try { if (oTiny) { oTiny.setDirty(false); oState.origHtml = sVal !== null ? sVal : oState.origHtml; } } catch (e) { }
 }
 
 function _applyEditorState() {
@@ -636,10 +640,14 @@ function _initEditor() {
         toolbar: "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | "
             + "alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image table | removeformat code",
         setup: function (ed) {
-            // 본문 "실제 내용 변경"일 때만 변경표시 — TinyMCE dirty 이벤트(클릭/포커스/선택은 안 침).
+            // 본문 "실제 내용 변경"일 때만 변경표시.
+            //   TinyMCE 자체 dirty 이벤트는 클릭만으로도 오탐 발화될 수 있음(빈 문단 클릭 시
+            //   caret 유지용 bogus <br> 삽입 등 내부 정규화가 undo 레벨을 만드는 경우) → 이벤트
+            //   신호로만 쓰고, 로드 시점 원본(oState.origHtml)과 실제 내용을 비교해 확정.
             //   프로그램적 setContent 는 _setEditorValue 가 setDirty(false)+silent 로 흡수.
             ed.on("dirty", function () {
                 if (oState.silent) { return; }
+                if (ed.getContent() === oState.origHtml) { ed.setDirty(false); return; }   // 오탐 — clean 유지
                 _markDirty();   // isChang + 현재라인 _dirty + 상태칩
             });
             // 본문 클릭/타이핑 시 더보기 드로어 닫기(다른 곳 클릭=본문). null=무조건 닫기.
