@@ -134,7 +134,10 @@
     display: flex;
     align-items: stretch;
     height: 2.75rem;        /* 트랜잭션 툴바(.u4a-ws10__subheader min-height 2.75rem)와 동일 두께 */
-    padding-left: 0.375rem; /* 행(.u4a-tree__row) padding-left 과 동일 → 설명 컬럼 기준폭 일치 */
+    /* 행과 "동일 콘텐츠 박스" — 0.375rem(행 패딩) + 1px(공통 .u4a-tree ul 좌측 1px 패딩·선택바 여백).
+       1px 누락 시 설명(42%) 기준폭이 1px 어긋나 구분선이 0.42px 밀려 헤더/행 라인이 픽셀 틀어짐
+       (MIME 실측 확정 2026-07-02, mime.css 동일 보정). */
+    padding-left: calc(0.375rem + 1px);
     font-size: 0.8125rem;
     font-weight: 700;
     color: var(--ws30-text-sub);

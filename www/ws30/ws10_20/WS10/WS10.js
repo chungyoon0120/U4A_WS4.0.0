@@ -192,7 +192,9 @@
         { key: "horizon_xp", text: "Windows XP" },
         { key: "horizon_95", text: "Windows 95" },
         { key: "horizon_7", text: "Windows 7" },
-        { key: "horizon_signature", text: "SAP Signature" }
+        { key: "horizon_signature", text: "SAP Signature" },
+        { key: "horizon_mac", text: "macOS" },
+        { key: "horizon_suse", text: "SUSE Linux" }
     ];
 
     /********************************************************************

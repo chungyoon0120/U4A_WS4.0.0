@@ -200,7 +200,7 @@
             { id: "appExecMenuBtn", icon: "globe", text: _txt("A06"), sc: "F8", ev: "ev_AppExec", split: true },
             { sep: true },
             { id: "examBtn", icon: "graduation-cap", text: _txt("A07"), sc: "Ctrl+F1", ev: "ev_AppExam" },
-            { id: "multiPrevBtn", icon: "table-cells-large", text: _txt("A08"), sc: "Ctrl+F3", ev: "ev_MultiPrev" },
+            { id: "multiPrevBtn", icon: "mobile-screen-button", text: _txt("A08"), sc: "Ctrl+F3", ev: "ev_MultiPrev" },
             { sep: true },
             { id: "newWindowBtn", icon: "window-restore", text: _txt("A09"), sc: "Ctrl+N", ev: "ev_NewWindow" }
         ];
@@ -255,7 +255,9 @@
         { key: "horizon_xp", text: "Windows XP" },
         { key: "horizon_95", text: "Windows 95" },
         { key: "horizon_7", text: "Windows 7" },
-        { key: "horizon_signature", text: "SAP Signature" }
+        { key: "horizon_signature", text: "SAP Signature" },
+        { key: "horizon_mac", text: "macOS" },
+        { key: "horizon_suse", text: "SUSE Linux" }
     ];
 
     /********************************************************************
@@ -931,6 +933,9 @@
             _renderAiBtn(oAi);
             _invoke("setConnectionAI", WS_STATE.UAI.state ? _txt("M431") : _txt("M432"));
         });
+        // ── [임시] AI 연결/해제 버튼 우선 숨김(사용자 지시). 상태/클릭 로직·DOM 은 그대로 두고 화면에서만 감춘다.
+        //   재노출 시 아래 한 줄만 제거. (WS10/WS20/WS30 공통 헤더 — 한 곳에서 전 화면 적용)
+        oAi.style.display = "none";
         o.appendChild(oAi);
 
         // (테마 변경은 옵션 팝업으로 이관됨 → 헤더 테마 스와치 버튼 제거. 2026-06-24)

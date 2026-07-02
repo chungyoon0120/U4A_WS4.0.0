@@ -389,7 +389,7 @@
             //   split:true → 본체=기본 실행(ev_pressAppExecBtn) + 화살표=브라우저 선택 메뉴(/DEFBR)
             { id: "ws20_appExecMenuBtn", split: true, fa: "globe", text: _msg("A06"), tooltip: _msg("A06") + " (F8)", ev: "ev_pressAppExecBtn" },
             // App Multi Preview (원본 ws20_multiPrevBtn: icon desktop-mobile, text A08)
-            { id: "ws20_multiPrevBtn", fa: "table-cells-large", text: _msg("A08"), tooltip: _msg("A08") + " (Ctrl+F5)", ev: "ev_pressMultiPrevBtn" },
+            { id: "ws20_multiPrevBtn", fa: "mobile-screen-button", text: _msg("A08"), tooltip: _msg("A08") + " (Ctrl+F5)", ev: "ev_pressMultiPrevBtn" },
             // Icon Viewer / Icon List — checkWLOList 조건으로 드롭다운(Icon Viewer) ↔ 평평버튼(Icon List)
             //   분기(_iconToolEntry, 원본 oIconList 로직). 원본 모습=Icon Viewer 메뉴.
             _iconToolEntry(),

@@ -1,0 +1,16 @@
+.selPreviewUI {
+        background-color: #ff7f50 !important;
+}
+
+.u4aWsDisplayNone {
+    display: none !important;
+}
+
+.u4aSelOpt3 {
+    display: flex !important;
+    align-items: center;
+}
+
+.u4a_ws_prev_mark {
+    box-shadow: 0 0 0 1px red, 0 0 0 1px red inset !important;
+}

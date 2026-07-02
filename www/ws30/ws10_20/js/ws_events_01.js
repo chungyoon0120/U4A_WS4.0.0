@@ -271,27 +271,30 @@
      * [WS20] Binding Popup 버튼 이벤트
      ************************************************************************/
     oAPP.events.ev_pressBindPopupBtn = (oEvent) => {
-   
-        var _sOption = {
-            TITLE: "",
-            DESC : "",
-        };
 
-        //218  바인딩 팝업을 호출하고 있습니다.
-        _sOption.DESC = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "218"); 
+        // ── [임시] 대형 별창 bindPopup HTML5 미변환 — 작업 완료 전까지 안내 토스트만 노출.
+        //   TODO(i18n): "아직 작업중입니다" 는 임시 하드코딩 → 변환 완료 시 아래 원본 로직 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
 
+        /* eslint-disable no-unreachable */
+        // var _sOption = {
+        //     TITLE: "",
+        //     DESC : "",
+        // };
 
-        parent.setBusy("X", _sOption);
+        // //218  바인딩 팝업을 호출하고 있습니다.
+        // _sOption.DESC = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "218");
 
-        // Trial Version Check
-        if (oAPP.fn.fnOnCheckIsTrial()) {
-            
-            parent.setBusy("", {});
+        // parent.setBusy("X", _sOption);
 
-            return;
-        }
+        // // Trial Version Check
+        // if (oAPP.fn.fnOnCheckIsTrial()) {
+        //     parent.setBusy("", {});
+        //     return;
+        // }
 
-        oAPP.fn.fnBindWindowPopupOpener();
+        // oAPP.fn.fnBindWindowPopupOpener();
 
     }; // end of oAPP.events.ev_pressBindPopupBtn
 

@@ -414,6 +414,13 @@
             tip: function (n) { return (n && n.NTEXT != null) ? String(n.NTEXT) : ""; },
             hasChildren: function (n) { return !!(n && Array.isArray(n.MIMETREE) && n.MIMETREE.length > 0); },
 
+            // 폴더 아이콘 — 항상 fa-folder 만 렌더(서버리스트 동일). 열림 전환(\f07c)·앰버색·선택 액센트는
+            //   공통 표준 CSS(shell.css .u4a-tree__icon .fa-folder)가 aria-expanded/selected 로 처리.
+            icon: function (n) {
+                if (_isDummy(n) || !_isFolder(n)) { return ""; }
+                return _fa("folder");
+            },
+
             isExpanded: function (n) {
                 var k = _key(n);
                 return oExpand[k] === true;
@@ -919,13 +926,13 @@
 
         var oR1 = _el("div", "u4a-form__row");
         oR1.appendChild(_el("label", "u4a-label u4a-label--required", _txt("/U4A/CL_WS_COMMON", "D01"))); // Folder Name
-        var oNameField = U4AUI.createField({ type: "text", value: "", onEnter: function () { lf_confirmCreateFolder(); } });
+        var oNameField = U4AUI.createField({ type: "text", value: "", clear: true, onEnter: function () { lf_confirmCreateFolder(); } });
         oR1.appendChild(oNameField.el);
         oForm.appendChild(oR1);
 
         var oR2 = _el("div", "u4a-form__row");
         oR2.appendChild(_el("label", "u4a-label", _txt("/U4A/CL_WS_COMMON", "A35"))); // Description
-        var oDescField = U4AUI.createField({ type: "text", value: "", onEnter: function () { lf_confirmCreateFolder(); } });
+        var oDescField = U4AUI.createField({ type: "text", value: "", clear: true, onEnter: function () { lf_confirmCreateFolder(); } });
         oR2.appendChild(oDescField.el);
         oForm.appendChild(oR2);
 
@@ -1228,10 +1235,8 @@
         var oFileInput = document.createElement("input");
         oFileInput.type = "file"; oFileInput.multiple = true; oFileInput.style.display = "none";
         oFileInput.addEventListener("change", function () {
-            var fs = oFileInput.files;
-            for (var i = 0; i < fs.length; i++) { oImpUI.files.push({ file: fs[i], desc: "" }); }
+            _addImportFiles(oFileInput.files);
             oFileInput.value = "";
-            lf_renderImpList();
         });
         oPick.addEventListener("click", function () { oFileInput.click(); });
         oBar.appendChild(oPick);
@@ -1244,7 +1249,8 @@
         var oThead = _el("thead");
         var oHr = _el("tr");
         oHr.appendChild(_el("th", null, _txt("/U4A/CL_WS_COMMON", "C35"))); // File Name
-        oHr.appendChild(_el("th", null, _txt("/U4A/CL_WS_COMMON", "A35"))); // Description
+        oHr.appendChild(_el("th", "u4aMimeImpSizeCol", _wsTxt("736"))); // File Size(파일크기)
+        oHr.appendChild(_el("th", "u4aMimeImpDescCol", _txt("/U4A/CL_WS_COMMON", "A35"))); // Description(폭 미지정 — 파일이름과 남는 폭 균등 분배)
         oHr.appendChild(_el("th", "u4aMimeImpDelCol", ""));
         oThead.appendChild(oHr);
         oTb.appendChild(oThead);
@@ -1253,9 +1259,12 @@
         oTbWrap.appendChild(oTb);
         oBody.appendChild(oTbWrap);
 
+        // 빈 목록 = 드래그&드롭 가이드(아이콘 + 269 "파일을 여기에 놓아주세요"). 목록 박스 안 중앙 오버레이.
+        //   드롭 이벤트가 통과하도록 pointer-events:none(CSS). 파일 있으면 lf_renderImpList 가 숨김.
         var oEmpty = _el("div", "u4aMimeImpEmpty");
-        oEmpty.textContent = _txt("/U4A/MSG_WS", "268"); // Selected line does not exists.(빈 목록 안내 재사용)
-        oBody.appendChild(oEmpty);
+        oEmpty.innerHTML = '<i class="fa-solid fa-cloud-arrow-up u4aMimeImpEmptyIcon"></i><span></span>';
+        oEmpty.querySelector("span").textContent = _wsTxt("269"); // 파일을 여기에 놓아주세요 (Drop the File)
+        oTbWrap.appendChild(oEmpty);   // 테이블 박스 안에 표시(사용자가 인지하는 빈 영역)
 
         oDlg.appendChild(oBody);
 
@@ -1282,7 +1291,69 @@
         document.body.appendChild(oDlg);
 
         oImpUI = { dlg: oDlg, tbody: oTbody, empty: oEmpty, saveBtn: oSaveBtn, target: oNode, files: [] };
+        lf_bindImportDrop(oDlg, oTbWrap);   // OS 파일 드래그&드롭 → 목록 추가(파일 선택 버튼과 동일)
         lf_renderImpList();
+    }
+
+    // 가져오기 팝업 파일 드롭 — 다이얼로그 전체가 드롭영역, 목록 테이블에 하이라이트. 파일 선택과 동일 처리.
+    //   ★ 드롭 시 브라우저 기본동작(파일로 창 네비게이션) 방지 위해 dragover/drop 모두 preventDefault.
+    function lf_bindImportDrop(oZone, oHi) {
+        function _stop(e) { e.preventDefault(); e.stopPropagation(); }
+        ["dragenter", "dragover"].forEach(function (t) {
+            oZone.addEventListener(t, function (e) {
+                _stop(e);
+                try { if (e.dataTransfer) { e.dataTransfer.dropEffect = "copy"; } } catch (x) { }
+                if (oHi) { oHi.classList.add("u4aMimeImpDrag"); }
+            });
+        });
+        ["dragleave", "dragend"].forEach(function (t) {
+            oZone.addEventListener(t, function (e) { _stop(e); if (oHi) { oHi.classList.remove("u4aMimeImpDrag"); } });
+        });
+        oZone.addEventListener("drop", function (e) {
+            _stop(e);
+            if (oHi) { oHi.classList.remove("u4aMimeImpDrag"); }
+            if (!oImpUI) { return; }
+            _addImportFiles((e.dataTransfer && e.dataTransfer.files) ? e.dataTransfer.files : null);
+        });
+    }
+
+    // 파일 목록 추가(파일 선택·드롭 공통). ★0KB(빈) 파일은 서버 PUT 거부되므로 클라에서 첨부 차단 + 안내.
+    function _addImportFiles(fs) {
+        if (!oImpUI || !fs || !fs.length) { return; }
+        var C_NAME_MAX = 60;   // 파일명(확장자 포함) 최대 길이 — 초과 시 첨부 불가
+        var aZero = [], aLong = [];
+        for (var i = 0; i < fs.length; i++) {
+            var f = fs[i];
+            if (!f) { continue; }
+            if (!(f.size > 0)) { aZero.push(f.name); continue; }                    // 0KB → 제외
+            if (String(f.name).length > C_NAME_MAX) { aLong.push(f.name); continue; } // 60자 초과 → 제외
+            oImpUI.files.push({ file: f, desc: "" });
+        }
+        lf_renderImpList();
+
+        // 제외 사유별 안내(키 문구 + 파일명 데이터).
+        //   가져오기 팝업=showModal(top-layer) → 정보 토스트는 가림 → "W"(박스)로 노출(.analy/16 §2.10).
+        var aMsg = [];
+        if (aZero.length) {
+            // 0KB(빈) 파일 첨부 불가 — 969, 미동기화 시 140("업로드 파일 크기를 확인하세요") 폴백.
+            aMsg.push((_wsTxt("969") || _txt("/U4A/MSG_WS", "140")) + "\n" + aZero.join("\n"));
+        }
+        if (aLong.length) {
+            // 파일명 60자 초과 첨부 불가 — 신규 970, 미동기화 시 339("업로드한 파일에 문제가 있습니다") 폴백.
+            aMsg.push((_wsTxt("970") || _txt("/U4A/MSG_WS", "339")) + "\n" + aLong.join("\n"));
+        }
+        if (aMsg.length) {
+            oAPP.fn.showMessage(null, 20, "W", aMsg.join("\n\n"));
+        }
+    }
+
+    // 파일 크기 표기(B/KB/MB/GB).
+    function _fmtSize(n) {
+        n = Number(n) || 0;
+        if (n < 1024) { return n + " B"; }
+        if (n < 1048576) { return (n / 1024).toFixed(1) + " KB"; }
+        if (n < 1073741824) { return (n / 1048576).toFixed(1) + " MB"; }
+        return (n / 1073741824).toFixed(1) + " GB";
     }
 
     function lf_renderImpList() {
@@ -1295,8 +1366,9 @@
             if (iIdx % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
             var oTdName = _el("td", null, oF.file.name);
             oTdName.title = oF.file.name;
-            var oTdDesc = _el("td");
-            var oDescInput = U4AUI.createField({ type: "text", value: oF.desc || "", className: "u4aMimeImpDesc" });
+            var oTdSize = _el("td", "u4aMimeImpSizeCol", _fmtSize(oF.file.size));
+            var oTdDesc = _el("td", "u4aMimeImpDescCol");
+            var oDescInput = U4AUI.createField({ type: "text", value: oF.desc || "", clear: true, className: "u4aMimeImpDesc" });
             oDescInput.input.addEventListener("input", function () { oF.desc = oDescInput.getValue(); });
             oTdDesc.appendChild(oDescInput.el);
             var oTdDel = _el("td", "u4aMimeImpDelCol");
@@ -1304,7 +1376,7 @@
             oDel.type = "button"; oDel.innerHTML = _fa("trash"); oDel.title = _txt("/U4A/CL_WS_COMMON", "C30"); // Delete
             oDel.addEventListener("click", function () { oImpUI.files.splice(iIdx, 1); lf_renderImpList(); });
             oTdDel.appendChild(oDel);
-            oTr.appendChild(oTdName); oTr.appendChild(oTdDesc); oTr.appendChild(oTdDel);
+            oTr.appendChild(oTdName); oTr.appendChild(oTdSize); oTr.appendChild(oTdDesc); oTr.appendChild(oTdDel);
             oTbody.appendChild(oTr);
         });
     }

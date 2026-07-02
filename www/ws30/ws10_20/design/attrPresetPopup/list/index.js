@@ -420,7 +420,7 @@ function _renderItems() {
         oTrNo.appendChild(oTdNo);
         oTbody.appendChild(oTrNo);
     } else {
-        var sPrevGrp = null;
+        var sPrevGrp = null, iData = 0;
         aRows.forEach(function (oRow) {
             // 그룹 헤더 행(UIATY 바뀔 때).
             if (oRow.UIATY !== sPrevGrp) {
@@ -436,6 +436,8 @@ function _renderItems() {
 
             var oTr = document.createElement("tr");
             oTr.dataset.uiatk = oRow.UIATK;
+            oTr.dataset.odd = (iData % 2 === 1) ? "true" : "false";
+            iData++;
 
             // 체크박스 셀
             var oTdChk = document.createElement("td");
@@ -777,10 +779,9 @@ function _applyView() {
     if (!oWrap || !oWrap.isConnected) { return; }
     var iW = oWrap.getBoundingClientRect().width;
     if (!iW) { return; }
-    var oTable = oWrap.querySelector(".u4aApTbl");
-    if (!oTable) { return; }
+    // 카드뷰 CSS 는 공통 `.u4a-table-wrap[data-view]` 를 대상으로 하므로 wrap 에 세팅.
     var sView = (iW < CARD_VIEW_MAX) ? "card" : "table";
-    if (oTable.dataset.view !== sView) { oTable.dataset.view = sView; }
+    if (oWrap.dataset.view !== sView) { oWrap.dataset.view = sView; }
 }
 function _observeView() {
     var oWrap = document.getElementById("apItemWrap");

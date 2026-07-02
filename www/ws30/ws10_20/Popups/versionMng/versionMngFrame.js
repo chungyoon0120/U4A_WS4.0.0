@@ -917,6 +917,37 @@ function _bindSplitV(oBar) {
     });
 }
 
+/* ── 창 리사이즈 재클램프(세로판) — doc 16 §4.3 / 레퍼런스 ServerList·WS20 _bindSplitterResizeClamp.
+   목록 패널이 드래그로 px 고정(flex:0 0 <px>)된 상태에서 창(특히 최대화→축소)을 줄이면, 그 고정
+   높이가 컨테이너를 넘쳐 스플릿 바·비교 패널이 overflow:hidden 에 잘려 숨는 문제 방지.
+   → 목록 px 를 (컨테이너 − 바 − 비교패널 최소)로 재클램프해 바/비교 패널이 항상 보이게 한다.
+   (드래그 중 lf_move 는 이미 clamp 하지만, 리사이즈로 컨테이너가 줄면 고정 px 는 그대로라 넘침.) */
+function _clampSplitV() {
+    // 비교 패널이 닫혔거나(목록=flex 유연) 전체창이면 고정 px 가 없으니 대상 아님.
+    if (!oState.diffOpen || oState.diffFull) { return; }
+    var oSplit = document.getElementById("vmSplit");
+    var oBar = document.getElementById("vmSplitBar");
+    var oList = document.getElementById("vmListPane");
+    var oDiff = document.getElementById("vmDiffPane");
+    if (!oSplit || !oBar || !oList || !oDiff) { return; }
+
+    // 목록 패널이 px 고정(0 0 <px>)일 때만 — 유연(%/auto)이면 CSS flex+min-height 가 알아서 줄어든다.
+    var m = (oList.style.flex || "").match(/(\d+(?:\.\d+)?)px/);
+    if (!m) { return; }
+    var iCur = parseFloat(m[1]);
+
+    var iAvail = oSplit.clientHeight;
+    if (!iAvail) { return; }
+    var iBarH = oBar.getBoundingClientRect().height;
+    var iMaxA = iAvail - iBarH - _paneMinH(oDiff);   // 바 + 비교패널 최소 확보
+    var iMinA = _paneMinH(oList);
+    if (iMaxA < iMinA) { iMaxA = iMinA; }
+    if (iCur > iMaxA) {
+        oList.style.flex = "0 0 " + iMaxA + "px";
+        _toHost({ cmd: "layout" });
+    }
+}
+
 /* ── 라이브 테마 변경(워크스페이스 추종 — 에디터 시리즈 동일 정책) ───────── */
 function _onThemeChange() {
     var oTheme = _getThemeInfo();
@@ -1023,6 +1054,7 @@ function _initChrome() {
         _closeLegend();
     }, true);
     window.addEventListener("resize", function () {
+        _clampSplitV();     // 드래그 고정 px 목록 패널이 축소된 창을 넘쳐 바/비교 패널이 숨는 것 방지
         _positionLegend();
         _toHost({ cmd: "layout" });
     });

@@ -1,0 +1,282 @@
+/************************************************************************
+ * 테마: suse — SUSE Linux "Chameleon Green" 스킨
+ * ----------------------------------------------------------------------
+ * ⚠ doc 12 §2.1 예외(사용자 명시 승인, 2026-07-01). horizon_xp/95/7/mac 와 동일 트랙.
+ *   SUSE 브랜드 정체성 = 제이드/에메랄드 그린(#30ba78). 리눅스 데스크톱(GNOME/KDE)
+ *   감성 — 밝은 회색 flat · 살짝 둥근 모서리 · 그린 강조/타이틀바 · Noto/Cantarell.
+ *   (기존 horizon_green 과 색조·모양·그린 타이틀바로 구분.) shape 토큰까지 override.
+ ************************************************************************/
+[data-theme="horizon_suse"] {
+    color-scheme: light;
+
+    /* 진한 그린 타이틀바 → 타이틀/창버튼 아이콘 흰색 */
+    --u4a-titlebar-fg: #ffffff;
+
+    /* ── 배경 / 표면 / 텍스트 / 경계 (밝은 회녹) ───────────────────── */
+    --app-bg: #eef2f0;
+    --surface: #eef2f0;
+    --surface-raised: #ffffff;
+    --text: #17251d;
+    --text-muted: #56695e;
+    --line: #c8d4cc;
+    --divider: #d2ddd6;
+
+    /* ── 강조(포커스/링크) — SUSE 제이드 그린 ────────────────────── */
+    --accent: #30ba78;
+    --accent-strong: #259e63;
+
+    /* ── 상호작용 표면 ─────────────────────────────────────────────── */
+    --hover-bg: rgba(48, 186, 120, .10);
+    --active-bg: rgba(48, 186, 120, .18);
+    /* 리스트 선택 = 그린 채움 + 흰 텍스트 */
+    --selected-bg: #30ba78;
+    --selected-text: #ffffff;
+
+    --disabled-bg: #eef2f0;
+    --disabled-text: #a3b0a8;
+    --switch-off: #b6c3ba;
+
+    --state-info-bg: #e0f3ea;
+
+    /* ── 스크롤바 (flat 회녹) ──────────────────────────────────────── */
+    --scrollbar-thumb: #a8bfb2;
+    --scrollbar-thumb-hover: #6fbd93;
+    --scrollbar-track: #e4ebe7;
+
+    /* ── 오버레이 / 팝업 ───────────────────────────────────────────── */
+    --overlay-scrim: rgba(0, 0, 0, .40);
+    --busy-scrim: rgba(238, 242, 240, .6);
+    --popover-bg: #ffffff;
+    --popover-shadow: 0 8px 24px rgba(23, 50, 37, .20);
+
+    /* ── 폼 / 텍스트 표면 ──────────────────────────────────────────── */
+    --placeholder: #8a988f;
+    --selection-bg: rgba(48, 186, 120, .26);
+    --caret: #259e63;
+
+    /* ── 타이틀바 토큰 = 연녹(WS20 App헤더/사이드바 전파, 진녹 금지) ──
+       실제 창 타이틀바 진한 그린은 아래 .u4a-titlebar 직접 규칙이 담당. */
+    --titlebar-bg: #d8ece1;
+
+    /* ── shape — ★ §2.1 예외: flat 살짝 둥근 + 리눅스 폰트 ─────────── */
+    --radius: 4px;
+    --radius-sm: 3px;
+    --elevation: 0 2px 6px rgba(23, 50, 37, .14);
+    --font: "Noto Sans", "Cantarell", "Ubuntu", "Segoe UI", "Malgun Gothic", "맑은 고딕", sans-serif;
+
+    /* ── bootstrap-skin.css(--sl-*) 계층 override ─────────────────── */
+    --sl-fg: #17251d;
+    --sl-muted: #56695e;
+    --sl-radius: 5px;
+    --sl-radius-sm: 4px;
+    --sl-elev: 0 8px 24px rgba(23, 50, 37, .20);
+    --sl-elev-sm: 0 2px 8px rgba(23, 50, 37, .13);
+}
+
+/*======================================================================
+  SUSE Linux "Chameleon Green" 컴포넌트 모양 (shape override) — §2.1 예외
+  ----------------------------------------------------------------------
+  리눅스 flat 룩 — 밝은 회색 버튼(그린 강조 채움) · 흰 입력칸(그린 focus 링) ·
+  진한 그린 타이틀바 · 그린 선택/메뉴 하이라이트 · flat 얇은 스크롤바.
+  셀렉터 [data-theme="horizon_suse"] .u4a-*(0,2,0)가 bootstrap-skin .u4a-*(0,1,0)를
+  나중 로드 + 높은 명세로 이긴다(공통 파일 안 건드림).
+======================================================================*/
+
+/* ── 버튼 (flat 밝은 회색 + 그린 hover 테두리) ────────────────────── */
+[data-theme="horizon_suse"] .u4a-btn {
+    background: #f7f9f8;
+    border: 1px solid #c2cec6;
+    border-radius: 4px;
+    box-shadow: none;
+    color: #17251d;
+}
+[data-theme="horizon_suse"] .u4a-btn:hover {
+    background: #e8f4ed;
+    border-color: #30ba78;
+}
+[data-theme="horizon_suse"] .u4a-btn:active {
+    background: #d8ebe0;
+    border-color: #259e63;
+}
+[data-theme="horizon_suse"] .u4a-btn:disabled {
+    background: #eef2f0;
+    border-color: #d5ddd8;
+    color: #a3b0a8;
+}
+
+/* 강조/기본 버튼 — SUSE 그린 채움 */
+[data-theme="horizon_suse"] .u4a-btn--emphasized,
+[data-theme="horizon_suse"] .btn-primary {
+    background: #30ba78;
+    border: 1px solid #259e63;
+    border-radius: 4px;
+    box-shadow: none;
+    color: #ffffff;
+}
+[data-theme="horizon_suse"] .u4a-btn--emphasized:hover,
+[data-theme="horizon_suse"] .btn-primary:hover {
+    background: #2aab6d;
+    border-color: #218a57;
+}
+[data-theme="horizon_suse"] .u4a-btn--emphasized:active,
+[data-theme="horizon_suse"] .btn-primary:active {
+    background: #259e63;
+    border-color: #1c7a4d;
+}
+
+/* ── 입력칸 / 콤보 / 셀렉트 (흰 배경 + 그린 focus 링) ─────────────── */
+[data-theme="horizon_suse"] .u4a-input,
+[data-theme="horizon_suse"] .u4a-select,
+[data-theme="horizon_suse"] .u4a-combo,
+[data-theme="horizon_suse"] .form-control,
+[data-theme="horizon_suse"] .form-select {
+    background: #ffffff;
+    border: 1px solid #bcc9c1;
+    border-radius: 4px;
+    box-shadow: none;
+    color: #17251d;
+}
+[data-theme="horizon_suse"] .u4a-input:hover,
+[data-theme="horizon_suse"] .u4a-combo:hover,
+[data-theme="horizon_suse"] .form-control:hover {
+    border-color: #6fbd93;
+}
+[data-theme="horizon_suse"] .u4a-input:focus-visible,
+[data-theme="horizon_suse"] .u4a-combo:focus-within,
+[data-theme="horizon_suse"] .form-control:focus {
+    border-color: #30ba78;
+    box-shadow: 0 0 0 3px rgba(48, 186, 120, .22);
+}
+
+/* ── 타이틀바 (SUSE 진한 그린 그라데이션 + 흰 텍스트) ─────────────── */
+[data-theme="horizon_suse"] .u4a-titlebar {
+    background: linear-gradient(180deg, #34c483 0%, #2aa96c 55%, #259e63 100%);
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), inset 0 -1px 0 rgba(10, 60, 40, .35);
+}
+[data-theme="horizon_suse"] .u4a-titlebar__title {
+    color: #ffffff;
+    text-shadow: 0 1px 1px rgba(10, 60, 40, .35);
+}
+
+/* ── 창 버튼 (진녹 위 반투명 흰, 닫기 hover 빨강) ─────────────────── */
+[data-theme="horizon_suse"] .u4a-winbtn {
+    border-radius: 4px;
+    color: #ffffff;
+    background: transparent;
+}
+[data-theme="horizon_suse"] .u4a-winbtn:hover {
+    background: rgba(255, 255, 255, .2);
+    color: #ffffff;
+}
+[data-theme="horizon_suse"] .u4a-winbtn--close {
+    margin-right: 6px;
+}
+[data-theme="horizon_suse"] .u4a-winbtn--close:hover {
+    background: #e0443e;
+    color: #ffffff;
+}
+
+/* ── 스크롤바 (flat 얇은 회녹 pill) ───────────────────────────────── */
+[data-theme="horizon_suse"] ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+[data-theme="horizon_suse"] ::-webkit-scrollbar-track {
+    background: #e4ebe7;
+}
+[data-theme="horizon_suse"] ::-webkit-scrollbar-thumb {
+    background: #a8bfb2;
+    border: 3px solid transparent;
+    border-radius: 6px;
+    background-clip: content-box;
+}
+[data-theme="horizon_suse"] ::-webkit-scrollbar-thumb:hover {
+    background: #6fbd93;
+    background-clip: content-box;
+}
+[data-theme="horizon_suse"] ::-webkit-scrollbar-button {
+    display: none;
+}
+[data-theme="horizon_suse"] ::-webkit-scrollbar-corner {
+    background: #e4ebe7;
+}
+
+/* ── 체크박스 (흰 → checked 그린 채움 + 흰 체크) ──────────────────── */
+[data-theme="horizon_suse"] .u4a-check input[type="checkbox"],
+[data-theme="horizon_suse"] .form-check-input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1px solid #bcc9c1;
+    border-radius: 3px;
+    background: #ffffff;
+    cursor: pointer;
+}
+[data-theme="horizon_suse"] .u4a-check input[type="checkbox"]:hover,
+[data-theme="horizon_suse"] .form-check-input[type="checkbox"]:hover {
+    border-color: #30ba78;
+}
+[data-theme="horizon_suse"] .u4a-check input[type="checkbox"]:checked,
+[data-theme="horizon_suse"] .form-check-input[type="checkbox"]:checked {
+    background:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3L13 4.5'/%3E%3C/svg%3E") center/12px no-repeat,
+        #30ba78;
+    border-color: #259e63;
+}
+
+/* ── 라디오 (원형, checked 그린 채움 + 흰 점) ─────────────────────── */
+[data-theme="horizon_suse"] .u4a-check input[type="radio"],
+[data-theme="horizon_suse"] .form-check-input[type="radio"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1px solid #bcc9c1;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+}
+[data-theme="horizon_suse"] .u4a-check input[type="radio"]:hover,
+[data-theme="horizon_suse"] .form-check-input[type="radio"]:hover {
+    border-color: #30ba78;
+}
+[data-theme="horizon_suse"] .u4a-check input[type="radio"]:checked,
+[data-theme="horizon_suse"] .form-check-input[type="radio"]:checked {
+    background: radial-gradient(circle at center, #ffffff 0 2.6px, transparent 3.2px), #30ba78;
+    border-color: #259e63;
+}
+[data-theme="horizon_suse"] .u4a-check input:disabled,
+[data-theme="horizon_suse"] .form-check-input:disabled {
+    background-color: #eef2f0;
+    border-color: #d5ddd8;
+}
+
+/* ── 메뉴 (흰 배경 + 그린 hover) ──────────────────────────────────── */
+[data-theme="horizon_suse"] .u4a-menu {
+    padding: 4px;
+    border: 1px solid #c2cec6;
+    border-radius: 5px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(23, 50, 37, .2);
+}
+[data-theme="horizon_suse"] .u4a-menu__item {
+    padding: 5px 14px;
+    border-radius: 4px;
+    color: #17251d;
+}
+[data-theme="horizon_suse"] .u4a-menu__item i {
+    color: #56695e;
+}
+/* SUSE 메뉴 hover = 그린 채움 + 흰 글자. 활성 항목만(비활성/타이틀/커스텀 제외 — 버그 방지) */
+[data-theme="horizon_suse"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover,
+[data-theme="horizon_suse"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible {
+    background: #30ba78;
+    color: #ffffff;
+    border-radius: 4px;
+}
+[data-theme="horizon_suse"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover i,
+[data-theme="horizon_suse"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible i {
+    color: #ffffff;
+}

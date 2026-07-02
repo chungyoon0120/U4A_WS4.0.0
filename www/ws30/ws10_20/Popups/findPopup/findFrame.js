@@ -197,10 +197,10 @@ function _buildModes() {
         panes: [{
             id: "M001", deriveFn: _deriveM1, search: ["UIATV", "EVTXT", "UIATT", "OBJID"],
             cols: [
-                { label: _c("C49"), field: "UIATV", link: "controller" }, // Event ID
-                { label: _c("C52"), field: "EVTXT" },                       // Event Text
-                { label: _c("C50"), field: "UIATT", link: "find" },        // Event Target Properties
-                { label: _c("C51"), field: "OBJID" }                        // UI OBJ ID
+                { label: _c("C49"), field: "UIATV", link: "controller", w: "20%" }, // Event ID
+                { label: _c("C52"), field: "EVTXT", w: "40%" },                      // Event Text(넓게)
+                { label: _c("C50"), field: "UIATT", link: "find", w: "18%" },       // Event Target Properties
+                { label: _c("C51"), field: "OBJID", w: "22%" }                       // UI OBJ ID
             ]
         }]
     });
@@ -215,7 +215,7 @@ function _buildModes() {
                 cols: [
                     { label: _c("C53"), field: "OBJID", link: "find" }, // UI ID
                     { label: _c("C54"), field: "UIATT" },               // UI Attribute ID
-                    { label: _c("C57"), field: "UIATV" },               // Model full Path
+                    { label: _c("C57"), field: "UIATV", w: "30%" },     // Model full Path(넓게)
                     { label: _c("C55"), field: _bindingField },         // Binding Field
                     { label: _c("C56"), field: "UIADT" }                // Data Type
                 ]
@@ -226,7 +226,7 @@ function _buildModes() {
                 cols: [
                     { label: _c("C53"), field: "OBJID", link: "find" }, // UI ID
                     { label: _c("C58"), field: "UIATT" },               // Aggregations ID
-                    { label: _c("C59"), field: "UIATV" }                // Binding Model
+                    { label: _c("C59"), field: "UIATV", w: "40%" }      // Binding Model(넓게)
                 ]
             }
         ]
@@ -238,8 +238,8 @@ function _buildModes() {
         panes: [{
             id: "M003", deriveFn: _deriveM3, search: ["OBJID", "UIATV"],
             cols: [
-                { label: _c("C51"), field: "OBJID", link: "find" }, // UI OBJ ID
-                { label: _c("C60"), field: "UIATV" }                // Style Class Name
+                { label: _c("C51"), field: "OBJID", link: "find", w: "45%" }, // UI OBJ ID
+                { label: _c("C60"), field: "UIATV", w: "55%" }                // Style Class Name(넓게)
             ]
         }]
     });
@@ -267,7 +267,7 @@ function _buildModes() {
                     { label: _z("479"), field: "HOTKEY" },              // 단축키
                     { label: _z("480"), field: "UIATT", link: "find" }, // 대상 이벤트 속성
                     { label: _z("481"), field: "UIATV", link: "controller" }, // 이벤트 ID
-                    { label: _z("482"), field: "EVTXT" },               // 이벤트 텍스트
+                    { label: _z("482"), field: "EVTXT", w: "30%" },     // 이벤트 텍스트(넓게)
                     { label: _z("190"), field: "OBJID" }                // UI 오브젝트 ID
                 ]
             }]
@@ -288,7 +288,7 @@ function _renderNav() {
     if (!oNav) { return; }
     oNav.innerHTML = "";
     aModes.forEach(function (m) {
-        var oBtn = _el("button", "u4aFindNav__item");
+        var oBtn = _el("button", "u4a-navlist__item");
         oBtn.type = "button";
         oBtn.setAttribute("data-mode", m.key);
         oBtn.setAttribute("aria-selected", (m.key === oState.mode) ? "true" : "false");
@@ -303,7 +303,7 @@ function _renderNav() {
 function _updateNavSelection() {
     var oNav = document.getElementById("findNav");
     if (!oNav) { return; }
-    Array.prototype.forEach.call(oNav.querySelectorAll(".u4aFindNav__item"), function (b) {
+    Array.prototype.forEach.call(oNav.querySelectorAll(".u4a-navlist__item"), function (b) {
         b.setAttribute("aria-selected", (b.getAttribute("data-mode") === oState.mode) ? "true" : "false");
     });
 }
@@ -429,7 +429,17 @@ function _renderTableInto(oCtx) {
 }
 
 function _renderTable(aCols, aRows) {
-    var oTable = _el("table", "u4a-table u4aFindTbl");
+    // compact 밀도(원본 sapUiSizeCompact) — 밋밋/헐렁 방지, 원본처럼 조밀하게.
+    var oTable = _el("table", "u4a-table u4a-table--compact u4aFindTbl");
+
+    // 컬럼 폭(colgroup) — table-layout:fixed 라 텍스트 컬럼(w 지정)에 폭을 주고 나머진 자동 분배.
+    var oColgroup = document.createElement("colgroup");
+    aCols.forEach(function (c) {
+        var oCol = document.createElement("col");
+        if (c.w) { oCol.style.width = c.w; }
+        oColgroup.appendChild(oCol);
+    });
+    oTable.appendChild(oColgroup);
 
     var oThead = _el("thead");
     var oTrHead = _el("tr");
@@ -453,6 +463,7 @@ function _renderTable(aCols, aRows) {
                 oTd.dataset.label = c.label; // 카드뷰 라벨
                 var val = (typeof c.field === "function") ? c.field(oRow) : oRow[c.field];
                 val = (val == null) ? "" : String(val);
+                if (val) { oTd.title = val; } // 잘린 데이터 hover 로 전체 표시
                 if (c.link) {
                     var oLink = _el("span", "u4aFindLink", val);
                     oLink.setAttribute("role", "link");

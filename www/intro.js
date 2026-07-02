@@ -520,9 +520,9 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
-        if (!APP.isPackaged) {
-            oBrowserWindow.webContents.openDevTools();
-        }
+        // if (!APP.isPackaged) {
+        //     oBrowserWindow.webContents.openDevTools();
+        // }
 
         oBrowserWindow.webContents.on('did-finish-load', async function() {
             

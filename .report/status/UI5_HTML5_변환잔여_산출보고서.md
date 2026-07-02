@@ -9,14 +9,16 @@
 
 | 구분 | 완전 미완 | 부분 | 합계 |
 |---|:---:|:---:|:---:|
-| **① UI5 팝업 변환** (별도 UI5 코드 → HTML5) | 13 | 1 | **14** |
+| **① UI5 팝업 변환** (별도 UI5 코드 → HTML5) | 11 | 1 | **12** |
 | **② 코어 미구현** (원본 로직 → 현행 코드 이식) | 9 | 3 | **12** |
-| **합계 (단위기능)** | **22** | **4** | **≈ 26** |
+| **합계 (단위기능)** | **20** | **4** | **≈ 24** |
 
 ```
-①  UI5 팝업 변환 ██████████████░░░░  14
+①  UI5 팝업 변환 ████████████░░░░░░  12
 ②  코어 미구현   ████████████░░░░░░  12
 ```
+
+> ※「UI 템플릿 마법사」·「USP 새 창 열기」는 현행 미사용으로 **전환 대상 제외 확정**(잔여에서 제외).
 
 > **6/30 완료**: 별도창 **runtimeClassNavigator**(런타임 클래스 탐색) · WS20 **트리 D&D**(이동/복사, `ws_html5_ws20_dnd.js`) · **F4 검색도움말 제네릭 모듈**(Code Page·Authorization Group) · **스켈레톤 화면 설정 팝업** · **versionMng·docPopup·optionPopup** HTML5화.
 > **6/29 완료**: WS30 K1~K10 전부 · USP Save·Activate·모드전환 · Monaco 우클릭 메뉴 표시 · 속성 팝업 DumpWrite·InitPreScreen.
@@ -60,16 +62,15 @@
 > `*` Monaco 2종은 **에디터는 유지, UI5 쉘 레이아웃만** 교체하면 되어 비교적 수월.
 > ✅ 완료 전환: **runtimeClassNavigator · docPopup · versionMng · optionPopup** — §완료 참고.
 
-## 1-B. 미변환 + 현행 미배선 (2) — ⚠️ 확인 필요
+## 1-B. 전환 대상 제외 확정 (2) — 🚫 변환 안 함
 
-| 팝업 | 기능 | 상태 |
+| 팝업 | 기능 | 사유 |
 |---|---|---|
-| fnUiTempWizardPopupOpen | UI 템플릿 마법사 | 순수 UI5. 호출처가 **죽은 `design/*`에만** 존재 → 현행 메뉴에서 안 열림 |
-| **uspNewPopup** | 선택 USP를 **새 창으로 열기** | 여는 함수 `fnUspNewWindow`(`ws_usp_01.js:407`) **정의만·호출부 0**. UI5 트리(getContextByIndex) 의존. 폴더(frame.html)는 있으나 화면 미연결 |
+| fnUiTempWizardPopupOpen | UI 템플릿 마법사 | 현행 미사용(죽은 `design/*`에서만 호출) → **제외 확정** |
+| uspNewPopup | 선택 USP를 새 창으로 열기 | `fnUspNewWindow` 정의만·호출부 0, 현행 미사용 → **제외 확정** |
 
-> 둘 다 **파일(와꾸)만 있고 현행 트리거 없음** → 변환 전 "이 기능이 현행에 살아있어야 하는지" 확인 필요.
-> 주의: uspNewPopup ≠ USP 신규 생성(그건 K3 Create `fnCreateUspNodePopup` 완료). uspNewPopup은 "USP 새 창 열기"로 별개.
-> ✅ ~~fnWebSecurityPopupOpen~~ — **완료** (native `<dialog>` 변환 + 속성패널 DH001026 배선).
+> 2026-07-01 결정: 두 기능은 현행 화면에서 사용되지 않아 전환하지 않으며, **잔여 집계에서 제외**한다.
+> (참고: uspNewPopup ≠ USP 신규 생성 — 신규 생성은 K3 Create `fnCreateUspNodePopup`로 완료.)
 
 ## 1-C. 부분 변환 (1)
 

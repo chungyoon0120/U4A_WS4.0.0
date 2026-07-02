@@ -329,13 +329,22 @@
             {
                 icon: "sap-icon://responsive", fa: "display", accept: true, editOnly: true,
                 tooltip: _msg("B24", "UI Template Wizard"),
-                press: function () { _safeCall("designCallWizardPopup", []); }
+                // [임시] UI Template Wizard 미완 — 안내 토스트만(사용자 지시). TODO(i18n) + 재개 시 원본 복원.
+                press: function () { try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { } /* _safeCall("designCallWizardPopup", []); */ }
             },
-            // E28 UI Personalization List (원본 callP13nDesignDataPopup) — 아이콘 user-settings→FA user-gear [가드]
+            // E28 UI Personalization List — HTML5 인앱 팝업(fnP13nDesignPopupOpen "R" 리스트) 지연 로드.
             {
                 icon: "sap-icon://user-settings", fa: "user-gear",
                 tooltip: _msg("E28"),
-                press: function () { _safeCall("callP13nDesignDataPopup", ["R"]); }
+                press: function () {
+                    var run = function () {
+                        try { oAPP.fn.fnP13nDesignPopupOpen("R"); }
+                        catch (e) { console.error("[HTML5][WS20] UI Personalization List:", e && e.message ? e.message : e); }
+                    };
+                    try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
+                    if (typeof oAPP.fn.fnP13nDesignPopupOpen === "function") { run(); }
+                    else { try { oAPP.loadJs("fnP13nDesignPopupOpen", run); } catch (e) { console.error("[HTML5][WS20] p13n load:", e && e.message ? e.message : e); } }
+                }
             },
             { sep: true },
             // 247 Undo (원본 undoRedo.executeHistory("UNDO")) [가드]
@@ -358,13 +367,17 @@
                 tooltip: _wsMsg("469"),
                 disabled: !_hasWdrPlugin(),
                 press: function () {
-                    try {
-                        var oSet = parent.getSettingsInfo();
-                        var sPath = parent.PATH.join(oSet.path.POPUP_ROOT, "webDynConversionLog", "index.js");
-                        parent.require(sPath)(parent.REMOTE, oAPP);
-                    } catch (e) {
-                        console.error("[HTML5][WS20][tree] Web Dynpro Conversion Log 오픈 실패:", e);
-                    }
+                    // [임시] Web Dynpro 변환 로그 미완 — 안내 토스트만(사용자 지시). TODO(i18n) + 재개 시 원본 복원.
+                    try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+                    return;
+
+                    // try {
+                    //     var oSet = parent.getSettingsInfo();
+                    //     var sPath = parent.PATH.join(oSet.path.POPUP_ROOT, "webDynConversionLog", "index.js");
+                    //     parent.require(sPath)(parent.REMOTE, oAPP);
+                    // } catch (e) {
+                    //     console.error("[HTML5][WS20][tree] Web Dynpro Conversion Log 오픈 실패:", e);
+                    // }
                 }
             },
             { sep: true },

@@ -287,32 +287,37 @@
      ************************************************************************/
     oAPP.fn.fnWS10WMENU10_01 = () => {
 
-        // Trial Version Check
-        if (oAPP.fn.fnOnCheckIsTrial()) {
-            return;
-        }
-
         // Busy Indicator가 실행중이면 빠져나간다.
         if (parent.getBusy() == 'X') {
             return;
         }
 
-        // application명 정합성 체크
-        let bCheckAppNm = oAPP.fn.fnCheckAppName();
-        if (!bCheckAppNm) {
-            return;
-        }
+        // ── [임시] 앱 패키지 변경(changeAppPackagePopup) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 로직 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
 
-        let sAppId = APPCOMMON.fnGetModelProperty("/WS10/APPID");
+        // // Trial Version Check
+        // if (oAPP.fn.fnOnCheckIsTrial()) {
+        //     return;
+        // }
 
-        if (oAPP.fn.changeAppPackagePopup) {
-            oAPP.fn.changeAppPackagePopup(sAppId);
-            return;
-        }
+        // // application명 정합성 체크
+        // let bCheckAppNm = oAPP.fn.fnCheckAppName();
+        // if (!bCheckAppNm) {
+        //     return;
+        // }
 
-        $.getScript("design/js/changeAppPackagePopup.js", function () {
-            oAPP.fn.changeAppPackagePopup(sAppId);
-        });
+        // let sAppId = APPCOMMON.fnGetModelProperty("/WS10/APPID");
+
+        // if (oAPP.fn.changeAppPackagePopup) {
+        //     oAPP.fn.changeAppPackagePopup(sAppId);
+        //     return;
+        // }
+
+        // $.getScript("design/js/changeAppPackagePopup.js", function () {
+        //     oAPP.fn.changeAppPackagePopup(sAppId);
+        // });
 
     }; // end of oAPP.fn.fnWS10WMENU10_01
 
@@ -439,9 +444,14 @@
         // Busy Indicator가 실행중이면 빠져나간다.
         if (parent.getBusy() == 'X') {
             return;
-        }        
+        }
 
-        oAPP.fn.fnIconPreviewPopupOpener();
+        // ── [임시] iconPrevPopup(아이콘 목록) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   Main(WS10) + WS30(메뉴 fnWS10 위임) 공통 경로. TODO(i18n) + 변환 완료 시 아래 원본 호출 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
+
+        // oAPP.fn.fnIconPreviewPopupOpener();
 
     }; // end of oAPP.fn.fnWS10WMENU20_04_01
 
@@ -455,7 +465,12 @@
             return;
         }
 
-        oAPP.fn.fnIllustedMsgPrevPopupOpener();
+        // ── [임시] illustMsgPopup(이미지 아이콘) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   Main(WS10) + WS30(메뉴 fnWS10 위임) 공통 경로. TODO(i18n) + 변환 완료 시 아래 원본 호출 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
+
+        // oAPP.fn.fnIllustedMsgPrevPopupOpener();
 
     }; // end of oAPP.fn.fnWS10WMENU20_04_02
 
@@ -469,10 +484,16 @@
             return;
         }
 
-        // busy 키고 Lock 걸기
-        oAPP.common.fnSetBusyLock("X");
+        // ── [임시] patternPopup(소스 패턴) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   Main(WS10) + WS30(메뉴 fnWS10 위임) 공통 경로. busy Lock 은 걸지 않는다(토스트만·해제 짝 없음).
+        //   TODO(i18n) + 변환 완료 시 아래 원본 호출 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
 
-        oAPP.fn.fnSourcePatternPopupOpener(); // [async]
+        // // busy 키고 Lock 걸기
+        // oAPP.common.fnSetBusyLock("X");
+
+        // oAPP.fn.fnSourcePatternPopupOpener(); // [async]
 
     }; // end of oAPP.fn.fnWS10WMENU20_05
 
@@ -702,12 +723,17 @@
         // Busy Indicator가 실행중이면 빠져나간다.
         if (parent.getBusy() == 'X') {
             return;
-        }   
+        }
 
-        // busy 키고 Lock 걸기
-        oAPP.common.fnSetBusyLock("X");
+        // ── [임시] U4A 숏컷 링크 생성(fnAppShortCutDownPopupOpener) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   busy Lock 은 걸지 않는다(토스트만·해제 짝 없음). TODO(i18n) + 변환 완료 시 아래 원본 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
 
-        oAPP.fn.fnAppShortCutDownPopupOpener();
+        // // busy 키고 Lock 걸기
+        // oAPP.common.fnSetBusyLock("X");
+
+        // oAPP.fn.fnAppShortCutDownPopupOpener();
 
     }; // end of oAPP.fn.fnWS10WMENU10_04_01
 
@@ -747,14 +773,19 @@
             return;
         }
 
-        // u4a workspace 3.4.2 - sp2 이상일 경우는 신규 CSS 팝업을 띄운다
-        if(oAPP.common.checkWLOList("C", "UHAK900788")){
+        // ── [임시] UI5 미리 정의된 CSS 팝업 HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 호출 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
 
-            oAPP.fn.fnUI5PreCssPopupOpener();
-            return;
-        }
+        // // u4a workspace 3.4.2 - sp2 이상일 경우는 신규 CSS 팝업을 띄운다
+        // if(oAPP.common.checkWLOList("C", "UHAK900788")){
 
-        oAPP.fn.fnUI5PredefinedCssPopupOpener();
+        //     oAPP.fn.fnUI5PreCssPopupOpener();
+        //     return;
+        // }
+
+        // oAPP.fn.fnUI5PredefinedCssPopupOpener();
 
     }; // end of oAPP.fn.fnWS20WMENU10_03
 
@@ -838,7 +869,12 @@
             return;
         }
 
-        oAPP.fn.fnIconPreviewPopupOpener();
+        // ── [임시] iconPrevPopup(아이콘 목록) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 호출 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
+
+        // oAPP.fn.fnIconPreviewPopupOpener();
 
     }; // end of oAPP.fn.fnWS20WMENU20_04_01
 
@@ -852,7 +888,12 @@
             return;
         }
 
-        oAPP.fn.fnIllustedMsgPrevPopupOpener();
+        // ── [임시] illustMsgPopup(이미지 아이콘) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 호출 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
+
+        // oAPP.fn.fnIllustedMsgPrevPopupOpener();
 
     }; // end of oAPP.fn.fnWS20WMENU20_04_02
 
@@ -866,10 +907,16 @@
             return;
         }
 
-        // busy 키고 Lock 걸기
-        oAPP.common.fnSetBusyLock("X");
+        // ── [임시] patternPopup(소스 패턴) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 호출 복원.
+        //   (busy Lock 은 걸지 않는다 — 토스트만 띄우고 즉시 반환하므로 해제 짝이 없음)
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
 
-        oAPP.fn.fnSourcePatternPopupOpener(); // [async]
+        // // busy 키고 Lock 걸기
+        // oAPP.common.fnSetBusyLock("X");
+
+        // oAPP.fn.fnSourcePatternPopupOpener(); // [async]
 
     }; // end of oAPP.fn.fnWS20WMENU20_05
 
@@ -1085,7 +1132,12 @@
             return;
         }
 
-        oAPP.fn.fnOpenDevTool();
+        // ── [임시] 관리자 개발툴(fnOpenDevTool=sap.m.Dialog) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 호출 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
+
+        // oAPP.fn.fnOpenDevTool();
 
     }; // end of oAPP.fn.fnWS20WMENU40_06_01
 

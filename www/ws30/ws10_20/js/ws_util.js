@@ -655,6 +655,8 @@ const WSUTIL = {
             "horizon_95":        "#c0c0c0",
             "horizon_7":         "#f0f0f0",
             "horizon_signature": "#eef2f7",
+            "horizon_mac":       "#ececec",
+            "horizon_suse":      "#eef2f0",
         };
 
         return _oThemeColorMap[sTheme] || "#ffffff";

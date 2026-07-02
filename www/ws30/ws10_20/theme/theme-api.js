@@ -95,7 +95,11 @@
         // Windows 7 "Aero" — doc 12 §2.1 예외. 밝은 유리 타이틀바(검정 텍스트) + Aero 파랑 강조.
         horizon_7: { mode: "light", accent: "#0078d7", hover: "#005a9e", soft: "rgba(0,120,215,.15)", bar: "#eaf3fb", bar2: "#cfe4f5", bg: "#f0f0f0", surface: "#f0f0f0", surface2: "#e4ecf3", border: "#d5d9dd" },
         // SAP GUI "Signature" — doc 12 §2.1 예외(실제 SAP GUI Options 스크린샷 기준). 진파랑 타이틀바(흰 텍스트) + 노란 버튼 + 흰 기반.
-        horizon_signature: { mode: "light", accent: "#3a6ea5", hover: "#2c568a", soft: "rgba(58,110,165,.15)", bar: "#5389c1", bar2: "#2d5f98", bg: "#eef2f7", surface: "#eef2f7", surface2: "#dce6f0", border: "#b5c6d8" }
+        horizon_signature: { mode: "light", accent: "#3a6ea5", hover: "#2c568a", soft: "rgba(58,110,165,.15)", bar: "#5389c1", bar2: "#2d5f98", bg: "#eef2f7", surface: "#eef2f7", surface2: "#dce6f0", border: "#b5c6d8" },
+        // macOS "Aqua/Big Sur" — doc 12 §2.1 예외. 밝은 회색 타이틀바 + 파랑 강조 + 신호등 창버튼.
+        horizon_mac: { mode: "light", accent: "#007aff", hover: "#0060df", soft: "rgba(0,122,255,.14)", bar: "#ededed", bar2: "#dcdcde", bg: "#ffffff", surface: "#f5f5f7", surface2: "#ececec", border: "#d2d2d7" },
+        // SUSE Linux "Chameleon Green" — doc 12 §2.1 예외. 진한 그린 타이틀바(흰 텍스트) + 제이드 그린 강조 + flat.
+        horizon_suse: { mode: "light", accent: "#30ba78", hover: "#259e63", soft: "rgba(48,186,120,.15)", bar: "#34c483", bar2: "#259e63", bg: "#ffffff", surface: "#eef2f0", surface2: "#e0e8e3", border: "#c8d4cc" }
     };
 
     function _applySkin(sKey) {
@@ -113,7 +117,7 @@
 
     var U4ATheme = {
 
-        THEMES: ["horizon_white", "horizon_dark", "horizon_purple", "horizon_red", "horizon_green", "horizon_xp", "horizon_95", "horizon_7", "horizon_signature"],
+        THEMES: ["horizon_white", "horizon_dark", "horizon_purple", "horizon_red", "horizon_green", "horizon_xp", "horizon_95", "horizon_7", "horizon_signature", "horizon_mac", "horizon_suse"],
 
         /**
          * UI5 테마명 / 레거시 키 / 정식 키를 받아 data-theme 키로 정규화.

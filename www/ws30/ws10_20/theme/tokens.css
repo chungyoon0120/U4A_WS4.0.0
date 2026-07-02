@@ -106,6 +106,8 @@
     /* 아이콘색 = 본문색(--text). 회색(muted)은 disable 처럼 보인다는 피드백 →
        활성 아이콘은 본문과 같은 또렷한 색으로. (실제 disabled 는 별도 --disabled-text 가 덮음) */
     --icon-muted: var(--text);
+    /* 트리 폴더 아이콘(앰버) — 서버리스트 기준을 공통 표준으로 승격(2026-07-02). 테마별 override 가능. */
+    --folder-icon: #e6a93a;
 
     /* titlebar / desktop (체크리스트 H) */
     --titlebar-bg: var(--surface);

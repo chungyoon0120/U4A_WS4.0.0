@@ -216,8 +216,8 @@ body {
     text-align: center;
 }
 
-.u4aApTbl[data-view="table"] .u4aApAttrCol {
-    width: 42%;
+.u4aApTbl .u4aApAttrCol {
+    width: 42%;   /* 카드뷰(data-view=card)에서는 table 이 block 이 되어 무시됨 */
 }
 
 /* 체크박스 셀 — 가운데 정렬 */
@@ -291,8 +291,8 @@ body {
     padding-bottom: 0.4375rem;
 }
 
-/* 카드(반응형) 뷰에서 그룹 행은 전체 폭 밴드 유지 */
-.u4aApTbl[data-view="card"] tbody tr.u4aApGroup td {
+/* 카드(반응형) 뷰에서 그룹 행은 전체 폭 밴드 유지 (data-view 는 공통 .u4a-table-wrap 에 세팅됨) */
+.u4a-table-wrap[data-view="card"] .u4aApTbl tbody tr.u4aApGroup td {
     display: block;
     width: 100%;
 }

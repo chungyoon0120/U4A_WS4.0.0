@@ -34,32 +34,34 @@
 
     var C_DLG_ID = "u4aKbdDlg";
 
-    // sap-icon:// 이름(접두 제거 후) → FontAwesome(fa-solid) 아이콘. 실제 HTML5 헤더 버튼 매핑과 정합.
+    // sap-icon:// 이름(접두 제거 후) → FontAwesome(fa-solid). ★값은 추측이 아니라 실제 HTML5 툴바 버튼
+    //   정의(ws_html5_ws20.js _buildWs20Toolbar / _buildWs20AppHeader, ws_html5_ws20_tree.js _G2FA)에서
+    //   그대로 가져온 것 — 화면에 보이는 버튼과 아이콘이 정확히 일치해야 함.
+    //   ※ 실제 툴바에 대응 버튼이 없는 sap-icon(F11 전체화면 "header" 등)은 매핑에서 제외 → 미리보기 비움.
     var KBD_ICON = {
-        "header": "expand",                       // F11 Fullscreen
-        "search": "magnifying-glass",             // Text Search
-        "sys-find": "binoculars",                 // Find (원본 헤더 Find = binoculars)
-        "document": "file",                       // App Create
-        "edit": "pen",                            // App Change
-        "delete": "trash",                        // App Delete
-        "copy": "copy",                           // App Copy
-        "display": "eye",                         // Display
-        "internet-browser": "globe",              // App Execution
-        "learning-assistant": "graduation-cap",   // Example Open
-        "desktop-mobile": "table-cells-large",    // Multi Preview (헤더 multiPrev)
-        "validate": "check-double",               // Syntax Check (헤더 syntaxCheck)
-        "nav-back": "arrow-left",                 // Back
-        "activate": "wand-magic-sparkles",        // Activate (헤더 activate)
-        "save": "floppy-disk",                    // Save
-        "picture": "image",                       // MIME
-        "developer-settings": "gears",            // Controller
-        "functional-location": "diagram-project", // Runtime Class Navigator (헤더 runtime)
-        "touch": "hand-pointer",                  // Add Server Event
-        "indent": "indent",                       // Pretty Print
-        "undo": "rotate-left",                    // Undo
-        "redo": "rotate-right",                   // Redo
-        "u4a-fw-brands/DEV": "flask",             // U4A Developer Browser (헤더 DEV_BROWSER)
-        "u4a-fw-solid/Icons": "icons",            // Icon List
+        "search": "magnifying-glass",             // Text Search (타이틀바 검색)
+        "sys-find": "binoculars",                 // Find (앱헤더 Find = binoculars)
+        "document": "file",                       // App Create (WS10)
+        "edit": "pen-to-square",                  // App Change / Change 모드(changeModeBtn)
+        "delete": "trash",                        // App Delete (WS10)
+        "copy": "copy",                           // App Copy (WS10)
+        "display": "display",                     // Display 모드(displayModeBtn)
+        "internet-browser": "globe",              // App Execution(ws20_appExecMenuBtn)
+        "learning-assistant": "graduation-cap",   // Example Open (WS10)
+        "desktop-mobile": "mobile-screen-button", // Multi Preview(ws20_multiPrevBtn)
+        "validate": "check-double",               // Syntax Check(syntaxCheckBtn)
+        "nav-back": "chevron-left",               // Back(앱헤더 back = chevron-left)
+        "activate": "wand-magic-sparkles",        // Activate(activateBtn)
+        "save": "floppy-disk",                    // Save(saveBtn)
+        "picture": "image",                       // MIME(mimeBtn)
+        "developer-settings": "screwdriver-wrench", // Controller(controllerBtn)
+        "functional-location": "diagram-project", // Runtime Class Navigator(runtimeBtn)
+        "touch": "hand-pointer",                  // Add Event Method(addEventBtn)
+        "indent": "indent",                       // Pretty Print (WS30)
+        "undo": "rotate-left",                    // Undo(트리 툴바 ↶ = rotate-left)
+        "redo": "rotate-right",                   // Redo(트리 툴바 ↷ = rotate-right)
+        "u4a-fw-brands/DEV": "flask",             // U4A Developer Browser (DEV_BROWSER, 가용 시)
+        "u4a-fw-solid/Icons": "icons",            // Icon List(iconViewer/iconListBtn)
         "u4a-fw-solid/Keyboard": "keyboard"
     };
 
@@ -81,6 +83,18 @@
     function _stripIcon(s) {
         // "sap-icon://xxx" → "xxx" (커스텀 폰트 "u4a-fw-solid/Icons" 는 경로째 유지).
         return String(s || "").replace(/^sap-icon:\/\//, "");
+    }
+    // DEV Browser(F12) 존재 여부 — WS20 실행 메뉴(_buildAppExecMenuItems)와 동일 판정:
+    //   /DEFBR 모델에 NAME==="DEV_BROWSER" 항목이 있고 ENABLED!==false 이며 패키징(운영) 환경이 아닐 때만 true.
+    function _isDevBrowserAvailable() {
+        try {
+            var aDefBr = oAPP.common.fnGetModelProperty("/DEFBR");
+            if (!Array.isArray(aDefBr)) { return false; }
+            var oDev = aDefBr.find(function (b) { return b && b.NAME === "DEV_BROWSER"; });
+            if (!oDev || oDev.ENABLED === false) { return false; }
+            if (parent.APP && parent.APP.isPackaged) { return false; }
+            return true;
+        } catch (e) { return false; }
     }
     // 일부 CODE 의 text/tooltip 은 UI5 모델 바인딩 문자열 "{/WSLANGU/<클래스>/<코드>}" (원본은 JSONModel
     //   /WSLANGU 트리로 렌더 시 해석). shim 은 이를 리터럴로 잡으므로 여기서 메시지 클래스로 직접 치환한다.
@@ -201,9 +215,24 @@
 
         // 현재 실행 중인 화면 + 그 화면의 단축키 목록(원본과 동일 소스).
         var sCurrPage = parent.getCurrPage();
+        var bDevBr = _isDevBrowserAvailable();
         var aList = (oAPP.common.getShortCutList(sCurrPage) || []).filter(function (e) {
-            return e && e.VISIBLE !== false;
+            if (!e || e.VISIBLE === false) { return false; }
+            // F12 "U4A DEV Browser" 단축키는 실행 메뉴(/DEFBR)에 DEV_BROWSER 옵션이 실제 있고 활성일 때만 노출.
+            //   (개발용 옵션 — 없는 환경에선 죽은 단축키라 리스트에서도 감춘다. 실행 메뉴와 동일 판정.)
+            if (!bDevBr && String(e.CODE || "").indexOf("u4a-fw-brands/DEV") !== -1) { return false; }
+            return true;
         });
+
+        // KEY 중복 제거 — getShortCutList 는 UI5/HTML5 혼재라 같은 KEY 가 2개 있을 수 있음(예: F8 은
+        //   CODE 없는 HTML5용 + CODE 있는 원본 UI5용). 표시는 1행만 — 미리보기(CODE) 가진 쪽을 우선한다.
+        var _byKey = {}, _order = [];
+        aList.forEach(function (o) {
+            var k = (o && o.KEY) || "";
+            if (!(k in _byKey)) { _byKey[k] = o; _order.push(k); return; }
+            if (!_byKey[k].CODE && o.CODE) { _byKey[k] = o; }   // 무 CODE → 유 CODE 로 대체
+        });
+        aList = _order.map(function (k) { return _byKey[k]; });
 
         // KEY 오름차순 정렬(원본 Sorter path:'KEY').
         aList.sort(function (a, b) {
@@ -335,7 +364,7 @@
             ".u4aKbdDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
             ".u4aKbdDlg .u4a-dialog__header span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
             // 본문은 스크롤 안 함(패딩만) — 스크롤러는 테이블 래퍼 하나로 통일(스티키 헤더가 표 상단에 밀착).
-            ".u4aKbdBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 0.75rem 1rem; }" +
+            ".u4aKbdBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 0; }" +
             ".u4aKbdWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }" +
             // 컬럼 폭 — 단축키/미리보기는 내용 폭(1% + nowrap 축소 트릭), 설명이 나머지(100%)를 흡수.
             //   → 미리보기 버튼 라벨이 절대 잘리지 않음(점점점 X). 공통 .u4a-table 는 table-layout:auto.
@@ -346,7 +375,8 @@
             // 설명 셀만 줄바꿈 허용(긴 설명이 미리보기/단축키 폭을 밀어내지 않게 나머지 폭 흡수).
             ".u4aKbdDescCell { white-space: normal; word-break: break-word; width: 100%; }" +
             // 단축키 kbd 키캡 칩.
-            ".u4aKbdKeys { display: inline-flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }" +
+            // 칩은 줄바꿈 없음 → 단축키 컬럼이 최대 조합(3키, 예: Ctrl+Shift+F10) 폭에 맞춰 자동으로 늘어남.
+            ".u4aKbdKeys { display: inline-flex; align-items: center; gap: 0.25rem; flex-wrap: nowrap; white-space: nowrap; }" +
             ".u4aKbdKey { display: inline-flex; align-items: center; justify-content: center; min-width: 1.5rem; height: 1.5rem; padding: 0 0.4rem; font-family: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1; color: var(--text); background: var(--surface); border: 0.0625rem solid var(--divider); border-bottom-width: 0.1875rem; border-radius: 0.375rem; }" +
             ".u4aKbdPlus { color: var(--text-muted); font-size: 0.75rem; }" +
             // 미리보기 버튼 — 실제 버튼 모양(비상호작용, 시각용). 라벨 전체 표시(줄임 없음, 단일행).

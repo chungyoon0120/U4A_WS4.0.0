@@ -84,6 +84,19 @@
     function _lock() { try { oAPP.fn.setShortcutLock(true); } catch (e) { } }
     function _esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
 
+    // aggregation cardinality 아이콘: sap-icon:// → FontAwesome 클래스(원본/WS20 트리와 동일).
+    //   ★ sap-icon://* 는 <img src> 로 쓰면 ERR_UNKNOWN_URL_SCHEME → 반드시 FA 폰트 클래스로 매핑.
+    var _AGGR_ICON = {
+        "sap-icon://color-fill": "fa-regular fa-square",   // 0:1 단일
+        "sap-icon://dimension": "fa-regular fa-clone"      // 0:N 다중
+    };
+    function _aggrIconClass(s) { return (s && _AGGR_ICON[s]) || ""; }
+    // UI 아이콘(UICON) src 정규화 — WS20 트리와 동일(.gif OS경로 → file:// URL). sap-icon:// 등은 제외(빈값).
+    function _uiconSrc(p) {
+        if (!p || /^sap-icon:/i.test(p)) { return ""; }
+        return /^(file:|https?:|data:|\/)/i.test(p) ? p : ("file:///" + String(p).replace(/\\/g, "/"));
+    }
+
     // ── 모듈 상태 ─────────────────────────────────────────────────────────
     var oUI = null;   // 다이얼로그/DOM 참조(1회 build 후 재사용, 닫으면 공통이 DOM 제거)
     var oS = {};      // 세션: mode/is_tree/HTML/frameID/theme/bootPath/T_THEME/lock/lockFile/
@@ -658,9 +671,14 @@
 
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_closeCancel(); });
 
-        // 스플리터 드래그(좌우 + 미리보기/트리).
-        lf_wireSplitter(oUI.barL, oBody, "--u4aP13nLeftW", 20, 60, true);
-        lf_wireSplitter(oUI.barR, oUI.detail, "--u4aP13nTreeW", 20, 70, false);
+        // 스플리터 드래그(좌우 + 미리보기/트리) — §4.3: 인접 패널 min-width(px) 기준 클램프.
+        lf_wireSplitters();
+
+        // §4.3 리사이즈 재클램프 — 창 resize + 다이얼로그 grip/최대화(바디 크기 변화)를 모두 커버.
+        //   px 고정된 패널만 손댐(%/flex 패널은 CSS 가 알아서 줄어듦). 클램프는 초과 시 1회 축소라 RO 루프 없음.
+        window.removeEventListener("resize", lf_clampSplit);
+        window.addEventListener("resize", lf_clampSplit);
+        try { oUI.ro = new ResizeObserver(function () { lf_clampSplit(); }); oUI.ro.observe(oBody); } catch (e) { }
 
         if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
         if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 720, minH: 460 }); }
@@ -675,15 +693,34 @@
         var oPage = _el("div", "u4aP13nRegPage");
         oPage.hidden = true;
 
+        // 원본 oTool4 1:1 — [뒤로(아이콘)] [구분선] [저장(아이콘)] [삭제(아이콘)].
+        //   좌측정렬·아이콘 전용. 삭제=원본 visible:{/is_head/visible_delete} — 신규 등록(컨텍스트
+        //   메뉴 진입)에선 숨김, 리스트→기존건 편집일 때만 표시(.u4aP13nRegTool>[hidden] override 로 실숨김).
         var oTool = _el("div", "u4aP13nRegTool");
-        oUI.btnBack = _mkToolBtn("chevron-left", _cl("E30"), function () { lf_back(); });          // E30 Back
-        oUI.btnSave = _mkActBtn("floppy-disk", _cl("A64"), "u4a-btn--emphasized", function () { lf_saveP13nData(); }); // A64 Save
-        oUI.btnRegDel = _mkActBtn("trash", _cl("A03"), "u4a-btn--negative", function () {
+        oUI.btnBack = _el("button", "u4a-btn-icon u4aP13nRegBack");
+        oUI.btnBack.type = "button";
+        oUI.btnBack.innerHTML = _fa("chevron-left");
+        oUI.btnBack.title = _cl("E30");   // E30 Back
+        oUI.btnBack.addEventListener("click", function () { lf_back(); });
+        oTool.appendChild(oUI.btnBack);
+
+        oTool.appendChild(_el("span", "u4aP13nTbSep"));   // 원본 ToolbarSeparator.
+
+        oUI.btnSave = _el("button", "u4a-btn u4a-btn--emphasized u4aP13nIcoBtn");
+        oUI.btnSave.type = "button";
+        oUI.btnSave.innerHTML = _fa("floppy-disk");
+        oUI.btnSave.title = _cl("A64");   // A64 Save
+        oUI.btnSave.addEventListener("click", function () { lf_saveP13nData(); });
+        oTool.appendChild(oUI.btnSave);
+
+        oUI.btnRegDel = _el("button", "u4a-btn u4a-btn--negative u4aP13nIcoBtn");
+        oUI.btnRegDel.type = "button";
+        oUI.btnRegDel.innerHTML = _fa("trash");
+        oUI.btnRegDel.title = _cl("A03");   // A03 Delete
+        oUI.btnRegDel.hidden = true;
+        oUI.btnRegDel.addEventListener("click", function () {
             lf_setHeaderLineDelete(oS.is_head ? oS.is_head.fileName : "");
         });
-        oTool.appendChild(oUI.btnBack);
-        oTool.appendChild(_el("span", "u4aP13nToolSpacer"));
-        oTool.appendChild(oUI.btnSave);
         oTool.appendChild(oUI.btnRegDel);
         oPage.appendChild(oTool);
 
@@ -707,10 +744,13 @@
         var oPage = _el("div", "u4aP13nListPage");
         oPage.hidden = true;
 
+        // 원본 oTool3 1:1 — 갱신(Emphasized 아이콘) 하나뿐(제목 없음, 좌측정렬).
         var oTool = _el("div", "u4aP13nListTool");
-        oTool.appendChild(_el("span", "u4aP13nListTitle", _cl("E28") || _cl("E24")));   // E28 UI Personalization List
-        oTool.appendChild(_el("span", "u4aP13nToolSpacer"));
-        oUI.btnRefresh = _mkToolBtn("rotate", _cl("A48"), function () { lf_refresh(); }); // A48 Refresh
+        oUI.btnRefresh = _el("button", "u4a-btn u4a-btn--emphasized u4aP13nIcoBtn");
+        oUI.btnRefresh.type = "button";
+        oUI.btnRefresh.innerHTML = _fa("rotate");
+        oUI.btnRefresh.title = _cl("A48");   // A48 Refresh
+        oUI.btnRefresh.addEventListener("click", function () { lf_refresh(); });
         oTool.appendChild(oUI.btnRefresh);
         oPage.appendChild(oTool);
 
@@ -756,23 +796,67 @@
 
         // 미리보기 패널.
         var oPrev = _el("div", "u4aP13nPrevPane");
+        oUI.prevPane = oPrev;   // 스플리터 클램프(min-width 실측)용.
         var oPTool = _el("div", "u4aP13nPrevTool");
-        oPTool.appendChild(_el("span", "u4aP13nPrevTitle", _cl("E25")));   // E25 Personalization Preview
+        oUI.prevTitle = _el("span", "u4aP13nPrevTitle", _cl("E25"));   // E25 Personalization Preview
+        oPTool.appendChild(oUI.prevTitle);
         oPTool.appendChild(_el("span", "u4aP13nToolSpacer"));
-        oPTool.appendChild(_el("label", "u4aP13nThemeLbl", _cl("E27")));   // E27 Choose Theme
 
-        // 테마 콤보(공통 createSelect).
+        // 테마선택 = [라벨 "테마 선택"] + [콤보] 를 한 요소(wrapper)로 묶는다 → attachOverflow 가
+        //   "한 항목"으로 취급해 좁아지면 라벨·콤보가 **함께** ⋯ 메뉴로 접힌다(라벨만 남는 문제 방지).
+        oUI.themeWrap = _el("div", "u4aP13nThemeWrap");
+        oUI.themeLbl = _el("label", "u4aP13nThemeLbl", _cl("E27"));    // E27 Choose Theme
+        oUI.themeWrap.appendChild(oUI.themeLbl);
         oUI.themeCombo = U4AUI.createSelect(oS.T_THEME || [], oS.theme, function (v) {
             oS.theme = v;
             oAPP.fn.P13nChangeTheme(v);
         });
         oUI.themeCombo.classList.add("u4aP13nThemeCombo");
-        oPTool.appendChild(oUI.themeCombo);
+        oUI.themeWrap.appendChild(oUI.themeCombo);
+        oPTool.appendChild(oUI.themeWrap);
         oPrev.appendChild(oPTool);
+        oUI.prevTool = oPTool;
 
-        // iframe(랜덤 id).
+        // 좁아지면 테마선택(라벨+콤보 wrapper)을 통째로 ⋯ 오버플로 메뉴로(공통 attachOverflow).
+        //   콤보는 원본 el 을 옮기지 않고 메뉴 안에 "새 콤보"를 만들어 동일 핸들러 실행(T-CODE 입력칸 패턴).
+        try {
+            if (window.U4AUI && U4AUI.attachOverflow) {
+                oUI.prevOvf = U4AUI.attachOverflow(oPTool, {
+                    noOvfAutoMargin: true,
+                    btnClass: "u4a-btn-icon u4aP13nPrevOvf",
+                    btnHtml: _fa("ellipsis"),
+                    isSep: function () { return false; },
+                    isSkip: function (el) { return el.classList.contains("u4aP13nToolSpacer"); },
+                    menuItem: function (el) {
+                        if (el === oUI.themeWrap) {
+                            var oRow = _el("div", "u4aP13nThemeMenuRow");
+                            oRow.appendChild(_el("span", "u4aP13nThemeLbl", _cl("E27")));
+                            var oCmb = U4AUI.createSelect(oS.T_THEME || [], oS.theme, function (v) {
+                                oS.theme = v;
+                                oAPP.fn.P13nChangeTheme(v);
+                                if (oUI.themeCombo) { oUI.themeCombo.value = v; }
+                            });
+                            oCmb.classList.add("u4aP13nThemeCombo");
+                            oRow.appendChild(oCmb);
+                            return { node: oRow };
+                        }
+                        return null;   // 제목은 접힘 대상 아님(축소 금지 flex:0 0 auto).
+                    }
+                });
+                // 초기 reflow — 폭 확정 후 측정(ws10 헤더와 동일 재시도 패턴).
+                if (oUI.prevOvf && typeof requestAnimationFrame === "function") {
+                    (function _tryReflow(n) {
+                        if (oPTool.clientWidth > 0) { try { oUI.prevOvf.reflow(); } catch (e) { } return; }
+                        if (n > 0) { requestAnimationFrame(function () { _tryReflow(n - 1); }); }
+                    })(30);
+                }
+            }
+        } catch (e) { console.warn("[HTML5][WS20][p13n] preview toolbar overflow attach 실패:", e && e.message); }
+
+        // iframe(랜덤 id). 랩에 원본 u4aP13nPreview(design/css/common.css — index.html 로드) 소비
+        //   → :after "PREVIEW" 워터마크(45도 회전+blink) 원본 1:1.
         oS.frameID = "u4aP13nPrev" + (oAPP.fn.getRandomKey ? oAPP.fn.getRandomKey() : String(Date.now()));
-        var oFrameWrap = _el("div", "u4aP13nFrameWrap");
+        var oFrameWrap = _el("div", "u4aP13nFrameWrap u4aP13nPreview");
         var oFrame = document.createElement("iframe");
         oFrame.id = oS.frameID;
         oFrame.name = oS.frameID;
@@ -788,11 +872,14 @@
 
         // 트리 패널.
         var oTreePane = _el("div", "u4aP13nTreePane");
-        var oTTool = _el("div", "u4aP13nTreeTool");
-        oTTool.appendChild(_el("span", "u4aP13nTreeTitle", _cl("A84")));   // A84 UI Object ID
-        oTTool.appendChild(_el("span", "u4aP13nToolSpacer"));
-        oUI.btnExpand = _mkIconBtn("angles-down", _cl("A46"), function () { if (oUI.tree) { oUI.tree.expandToLevel(99999); } });
-        oUI.btnCollapse = _mkIconBtn("angles-up", _cl("A47"), function () {
+        oUI.treePane = oTreePane;   // 스플리터 클램프(min-width 실측)용.
+        // 트리 툴바 — WS20 디자인트리 툴바 스킨 통째 재사용(.u4aWs20TreeToolbar 바 +
+        //   .u4a-btn-icon/u4aWs20TreeTbIcon 플랫 아이콘 버튼, ws_html5_ws20_tree.js _tbBtn 동일 모양).
+        var oTTool = _el("div", "u4aWs20TreeToolbar u4aP13nTreeTool");
+        oUI.btnExpand = _mkTreeTbBtn("angles-down", _cl("A46"), function () {   // A46 Expand All
+            if (oUI.tree) { oUI.tree.expandToLevel(99999); }
+        });
+        oUI.btnCollapse = _mkTreeTbBtn("angles-up", _cl("A47"), function () {   // A47 Collapse All
             if (oUI.tree) { oUI.tree.collapseAll(); if (oS.zTREE[0]) { oUI.tree.setExpanded(oS.zTREE[0], true); } }
         });
         oTTool.appendChild(oUI.btnExpand);
@@ -807,59 +894,109 @@
         oUI.detail = oDetail;
     }
 
-    // 툴바 라벨 버튼(아이콘+텍스트) — 중립.
-    function _mkToolBtn(sFa, sTip, fn) {
-        var b = _el("button", "u4a-btn u4aP13nToolBtn");
-        b.type = "button";
-        b.innerHTML = _fa(sFa) + "<span></span>";
-        b.querySelector("span").textContent = sTip || "";
-        b.title = sTip || "";
-        b.addEventListener("click", fn);
-        return b;
-    }
-    // 액션 버튼(의미색).
-    function _mkActBtn(sFa, sTip, sMod, fn) {
-        var b = _el("button", "u4a-btn " + sMod + " u4aP13nActBtn");
-        b.type = "button";
-        b.innerHTML = _fa(sFa) + "<span></span>";
-        b.querySelector("span").textContent = sTip || "";
-        b.title = sTip || "";
-        b.addEventListener("click", fn);
-        return b;
-    }
-    // 아이콘 전용 버튼.
-    function _mkIconBtn(sFa, sTip, fn) {
-        var b = _el("button", "u4a-btn-icon u4aP13nIconBtn");
-        b.type = "button";
-        b.innerHTML = _fa(sFa);
-        b.title = sTip || "";
-        b.addEventListener("click", fn);
-        return b;
+    // WS20 트리 툴바 버튼(ws_html5_ws20_tree.js _tbBtn 1:1 모양) — .u4a-btn-icon +
+    //   <span class="u4aWs20TreeTbIcon"><i class="fa-..."></i></span> (플랫 아이콘, ws20.css 스킨).
+    function _mkTreeTbBtn(sFa, sTip, fn) {
+        var BTN = _el("button", "u4a-btn-icon");
+        BTN.type = "button";
+        BTN.title = sTip || "";
+        var GLY = _el("span", "u4aWs20TreeTbIcon");
+        GLY.innerHTML = _fa(sFa);
+        BTN.appendChild(GLY);
+        BTN.addEventListener("click", fn);
+        return BTN;
     }
 
-    // 스플리터 드래그(좌우/미리보기·트리) — 공통 .u4a-dragging + CSS var.
-    function lf_wireSplitter(oBar, oContainer, sVar, iMin, iMax, bLeft) {
-        if (!oBar) { return; }
-        var bDrag = false;
-        oBar.addEventListener("mousedown", function (ev) {
-            bDrag = true;
-            document.body.classList.add("u4a-dragging");
-            if (oUI.dlg) { oUI.dlg.classList.add("u4aP13nResizing"); }
-            ev.preventDefault();
-        });
-        document.addEventListener("mousemove", function (ev) {
-            if (!bDrag || !oContainer) { return; }
-            var r = oContainer.getBoundingClientRect();
+    // 스플릿바 폭(공통 .u4a-splitter__bar flex:0 0 11px).
+    var C_BAR_W = 11;
+
+    // 패널의 실효 최소폭(px) — CSS min-width(rem) 실측, 없으면 §4.3 폴백 120px.
+    function _paneMin(oEl) {
+        try {
+            var v = parseFloat(getComputedStyle(oEl).minWidth);
+            if (isFinite(v) && v > 0) { return v; }
+        } catch (e) { }
+        return 120;
+    }
+
+    /************************************************************************
+     * 스플리터 드래그(§4.3) — 인접 패널 min-width(px) 기준 클램프.
+     *   · 고정 패널(좌 리스트/우 트리)에 인라인 flex-basis(px) 직접 지정,
+     *     가운데 미리보기는 flex 1 1 auto 잔여(마지막 유연 패널 보호).
+     *   · 인라인 flex 방식이라 공통 더블클릭 복귀(_installGlobalSplitterReset,
+     *     data-u4aSplitHome=최초 style.flex)도 자동 동작(CSS var 방식은 복귀 불가였음).
+     *   · iframe 위 드래그 끊김은 body.u4a-dragging(공통) 처리.
+     ************************************************************************/
+    function lf_wireSplitters() {
+        function wire(oBar, fnMove) {
+            if (!oBar) { return; }
+            var bDrag = false;
+            oBar.addEventListener("mousedown", function (ev) {
+                bDrag = true;
+                document.body.classList.add("u4a-dragging");
+                if (oUI.dlg) { oUI.dlg.classList.add("u4aP13nResizing"); }
+                ev.preventDefault();
+            });
+            document.addEventListener("mousemove", function (ev) { if (bDrag) { fnMove(ev); } });
+            document.addEventListener("mouseup", function () {
+                if (bDrag) {
+                    bDrag = false;
+                    document.body.classList.remove("u4a-dragging");
+                    if (oUI.dlg) { oUI.dlg.classList.remove("u4aP13nResizing"); }
+                    // 미리보기 패널 폭이 바뀌었으니 툴바 오버플로(⋯) 재측정.
+                    try { if (oUI.prevOvf) { oUI.prevOvf.reflow(); } } catch (e) { }
+                }
+            });
+        }
+        // 좌(리스트/등록) ↔ 우(디테일): 좌측=px 고정, 우측=flex 잔여.
+        //   최대 = 바디 − 바 − (미리보기min + 바 + 트리min) → 어느 패널도 최소폭 아래로 찌부되지 않음.
+        wire(oUI.barL, function (ev) {
+            var r = oUI.body.getBoundingClientRect();
             if (r.width <= 0) { return; }
-            var pct;
-            if (bLeft) { pct = ((ev.clientX - r.left) / r.width) * 100; }
-            else { pct = ((r.right - ev.clientX) / r.width) * 100; }   // 우측(트리) 기준 폭
-            pct = Math.max(iMin, Math.min(iMax, pct));
-            oContainer.style.setProperty(sVar, pct + "%");
+            var px = ev.clientX - r.left;
+            var iMax = r.width - C_BAR_W - (_paneMin(oUI.prevPane) + C_BAR_W + _paneMin(oUI.treePane));
+            px = Math.max(_paneMin(oUI.left), Math.min(iMax, px));
+            oUI.left.style.flex = "0 0 " + Math.round(px) + "px";
         });
-        document.addEventListener("mouseup", function () {
-            if (bDrag) { bDrag = false; document.body.classList.remove("u4a-dragging"); if (oUI.dlg) { oUI.dlg.classList.remove("u4aP13nResizing"); } }
+        // 미리보기 ↔ 트리: 트리=px 고정(우측 기준), 미리보기=flex 잔여.
+        wire(oUI.barR, function (ev) {
+            var r = oUI.detail.getBoundingClientRect();
+            if (r.width <= 0) { return; }
+            var px = r.right - ev.clientX;
+            var iMax = r.width - C_BAR_W - _paneMin(oUI.prevPane);
+            px = Math.max(_paneMin(oUI.treePane), Math.min(iMax, px));
+            oUI.treePane.style.flex = "0 0 " + Math.round(px) + "px";
         });
+    }
+
+    /************************************************************************
+     * 창/다이얼로그 리사이즈 재클램프(§4.3 필수) — 드래그로 px 고정된 패널이
+     *   축소된 컨테이너를 넘쳐 overflow:hidden 에 바/패널이 잘리는 것 방지.
+     *   px 고정분만 처리(%/flex 패널은 CSS 가 알아서 줄어듦).
+     ************************************************************************/
+    function lf_clampSplit() {
+        if (!oUI || !oUI.body || !document.body.contains(oUI.body)) { return; }
+        var w = oUI.body.clientWidth;
+        if (w <= 0) { return; }
+        var pMin = _paneMin(oUI.prevPane), tMin = _paneMin(oUI.treePane), lMin = _paneMin(oUI.left);
+
+        // ① 좌측 px 고정분 — 우측(미리보기+바+트리) 최소가 들어갈 자리 확보.
+        var l = parseFloat(oUI.left.style.flexBasis);
+        if (isFinite(l)) {
+            var lMax = w - C_BAR_W - (pMin + C_BAR_W + tMin);
+            if (l > lMax) { oUI.left.style.flex = "0 0 " + Math.round(Math.max(lMin, lMax)) + "px"; }
+        }
+        // ② 트리 px 고정분 — 디테일 안에서 미리보기 최소 확보.
+        var t = parseFloat(oUI.treePane.style.flexBasis);
+        if (isFinite(t)) {
+            var dw = oUI.detail.clientWidth;
+            if (dw > 0) {
+                var tMax = dw - C_BAR_W - pMin;
+                if (t > tMax) { oUI.treePane.style.flex = "0 0 " + Math.round(Math.max(tMin, tMax)) + "px"; }
+            }
+        }
+        // 미리보기 툴바 오버플로(⋯) 재측정 — 패널 폭 변동 반영.
+        try { if (oUI.prevOvf) { oUI.prevOvf.reflow(); } } catch (e) { }
     }
 
     // 다이얼로그 상단 경계 = 창 타이틀바(.u4a-titlebar) 하단 y.
@@ -875,29 +1012,47 @@
         return 0;
     }
 
-    // 전체화면 토글(원본 lf_setPopupResize) — 타이틀바 하단부터 뷰포트 끝까지(헤더 미침범).
+    // 최대화 크기 적용 — 타이틀바 하단부터 현재 뷰포트 끝까지 채운다(호출 시점 창 크기 기준).
+    function lf_applyMaxSize() {
+        var d = oUI && oUI.dlg;
+        if (!d) { return; }
+        var iTop = lf_topChromeBottom();
+        d.style.position = "fixed";
+        d.style.margin = "0";
+        d.style.left = "0px";
+        d.style.top = iTop + "px";
+        d.style.width = "100vw";
+        d.style.maxWidth = "100vw";
+        d.style.height = (window.innerHeight - iTop) + "px";
+        d.style.maxHeight = (window.innerHeight - iTop) + "px";
+    }
+
+    // 창 리사이즈 추종 — 최대화 상태면 새 창 크기로 다시 채운다(px 고정이 안 따라오는 문제 해결).
+    function lf_onWinResizeFull() {
+        if (oS.fullSize && oUI && oUI.dlg && oUI.dlg.open) { lf_applyMaxSize(); }
+        else { try { window.removeEventListener("resize", lf_onWinResizeFull); } catch (e) { } }
+    }
+
+    // 전체화면 토글(원본 lf_setPopupResize) — 타이틀바 하단부터 뷰포트 끝까지(헤더 미침범 + 창 추종).
     function lf_toggleFull() {
         if (!oUI.dlg) { return; }
         var d = oUI.dlg;
         if (oS.fullSize) {
             oS.fullSize = false;
             oUI.btnFull.innerHTML = _fa("expand");
+            window.removeEventListener("resize", lf_onWinResizeFull);
             // 인라인 최대화 스타일 해제 → CSS 기본(중앙 배치) 복귀.
             d.style.position = ""; d.style.margin = ""; d.style.left = ""; d.style.top = "";
             d.style.width = ""; d.style.height = ""; d.style.maxWidth = ""; d.style.maxHeight = "";
         } else {
             oS.fullSize = true;
             oUI.btnFull.innerHTML = _fa("compress");
-            var iTop = lf_topChromeBottom();
-            d.style.position = "fixed";
-            d.style.margin = "0";
-            d.style.left = "0px";
-            d.style.top = iTop + "px";
-            d.style.width = "100vw";
-            d.style.maxWidth = "100vw";
-            d.style.height = (window.innerHeight - iTop) + "px";
-            d.style.maxHeight = (window.innerHeight - iTop) + "px";
+            lf_applyMaxSize();
+            // 최대화 동안 창 크기 변화 추종(같은 함수 참조라 중복 add 无해).
+            window.addEventListener("resize", lf_onWinResizeFull);
         }
+        // 크기 급변 직후 스플리터 px 고정분 재클램프(§4.3 — RO 와 별개로 즉시 1회).
+        lf_clampSplit();
     }
 
 
@@ -917,22 +1072,27 @@
             label: function (n) { return n.OBJID; },
             tip: function (n) { return n.OBJID; },
             selectable: false,
+            // UI 아이콘 — WS20 트리와 동일(.gif OS경로 → file:// URL, sap-icon:// 등은 제외).
             icon: function (n) {
-                if (!n.UICON) { return ""; }
-                return '<img class="u4aP13nTreeIco" src="' + _esc(n.UICON) + '" onerror="this.style.display=\'none\'">';
+                var src = _uiconSrc(n && n.UICON);
+                if (!src) { return ""; }
+                return '<img class="u4aWs20TreeIcon" src="' + _esc(src) + '" alt="" onerror="this.style.display=\'none\'">';
             },
+            // aggregation 라벨 — WS20 트리와 동일(sap-icon:// → FA 클래스 + UIATT 텍스트, img 아님).
             slotTrailing: function (n) {
                 if (!n.UIATT) { return null; }
-                var oT = _el("span", "u4aP13nTreeStat");
-                if (n.UIATT_ICON) {
-                    var oI = _el("span", "u4aP13nTreeStatIco");
-                    oI.innerHTML = '<img src="' + _esc(n.UIATT_ICON) + '" onerror="this.style.display=\'none\'">';
-                    oT.appendChild(oI);
-                }
-                oT.appendChild(_el("span", "u4aP13nTreeStatTxt", n.UIATT));
-                return oT;
-            }
+                var RIGHT = _el("span", "u4aWs20TreeRowRight");
+                var AGGR = _el("span", "u4aWs20TreeAggr");
+                var sCls = _aggrIconClass(n.UIATT_ICON);
+                if (sCls) { AGGR.appendChild(_el("i", "u4aWs20TreeAggrIcon " + sCls)); }
+                AGGR.appendChild(_el("span", null, n.UIATT));
+                RIGHT.appendChild(AGGR);
+                return RIGHT;
+            },
+            // WS20 트리와 동일 행 클래스 — 라벨 flex:1(남는 폭 채움)로 aggregation 우측 정렬.
+            rowHook: function (oRow) { oRow.classList.add("u4aWs20TreeRow"); }
         });
+        oUI.tree.el.classList.add("u4aWs20Tree");
         oUI.tree.el.classList.add("u4aP13nTree");
         oUI.treeWrap.appendChild(oUI.tree.el);
         oUI.tree.collapseAll();
@@ -956,7 +1116,8 @@
 
         aHead.forEach(function (h) {
             var oTr = _el("tr", "u4aP13nRow");
-            if (h.notAllow === true) { oTr.classList.add("u4aP13nRow--deny"); }
+            // 처리 불가(라이브러리 버전 불일치) — 원본 u4aP13nNegativeLine(취소선+옅게) 1:1.
+            if (h.notAllow === true) { oTr.classList.add("u4aP13nNegativeLine"); }
             if (h.fileName === oS.selFileName) { oTr.setAttribute("aria-selected", "true"); }
             oTr.setAttribute("data-file", h.fileName);
             oTr.title = h.tooltip || h.title || "";
@@ -966,17 +1127,18 @@
             oTr.addEventListener("dragstart", function (ev) { lf_rowDragStart(ev, h); });
             oTr.addEventListener("dragend", function () { try { oAPP.fn.designDragEnd(); } catch (e) { } });
 
-            // Description 셀.
+            // Description 셀 — 빈 설명은 원본 u4aP13nPreviewNoText(:after "NO TEXT" 오버레이) 1:1.
             var oTdDesc = _el("td", "u4aP13nCellDesc");
             var sTxt = h.title || "";
-            if (sTxt === "") { oTdDesc.classList.add("u4aP13nNoText"); }
+            if (sTxt === "") { oTdDesc.classList.add("u4aP13nPreviewNoText"); }
             oTdDesc.textContent = sTxt;
             oTr.appendChild(oTdDesc);
 
-            // 액션 셀(편집/삭제).
+            // 액션 셀(편집/삭제) — WS20 디자인트리 행 액션 버튼(.u4aWs20TreeActBtn 22×22) 재사용.
+            //   (구 .u4a-btn-icon 은 커서 td 4.5rem 을 넘쳐 공통 td 말줄임에 삭제버튼이 "…"로 잘리던 원인)
             var oTdAct = _el("td", "u4aP13nCellAct");
             if (h.visible_edit) {
-                var oEdit = _el("button", "u4a-btn-icon u4aP13nRowAct");
+                var oEdit = _el("button", "u4aWs20TreeActBtn add u4aP13nRowAct");
                 oEdit.type = "button";
                 oEdit.innerHTML = _fa("pen");
                 oEdit.title = _cl("B38");   // B38 Edit
@@ -984,7 +1146,7 @@
                 oTdAct.appendChild(oEdit);
             }
             if (h.visible_delete) {
-                var oDel = _el("button", "u4a-btn-icon u4aP13nRowAct u4aP13nRowAct--del");
+                var oDel = _el("button", "u4aWs20TreeActBtn del u4aP13nRowAct");
                 oDel.type = "button";
                 oDel.innerHTML = _fa("trash");
                 oDel.title = _cl("A03");   // A03 Delete
@@ -1052,9 +1214,12 @@
             oS.is_head = { title: "", fileName: "", UIOBK: "", UILIB: "", THEME: "", bootPath: "", LibraryVersion: "", isNew: true };
         }
 
-        // 등록 페이지 Description + 삭제버튼 노출.
+        // 등록 페이지 Description + 삭제버튼 표시(원본 visible_delete — 기존건 편집시만).
         if (oUI.descInput) { oUI.descInput.setValue(oS.is_head.title); }
         if (oUI.btnRegDel) { oUI.btnRegDel.hidden = !is_head; }
+        // 뒤로가기: 신규 등록(context menu "C", isNew)에선 돌아갈 리스트 컨텍스트가 없어 비활성.
+        //   기존 항목 편집(리스트→편집, is_head 존재)일 때만 활성(리스트로 복귀). 저장하면 "R"로 자동 이동.
+        if (oUI.btnBack) { oUI.btnBack.disabled = !is_head; }
 
         if (is_tree) { oS.zTREE = [is_tree]; lf_renderTree(); }
 
@@ -1160,6 +1325,10 @@
      * ==================================================================== */
 
     function lf_close() {
+        try { window.removeEventListener("resize", lf_onWinResizeFull); } catch (e) { }
+        try { window.removeEventListener("resize", lf_clampSplit); } catch (e) { }
+        try { if (oUI && oUI.ro) { oUI.ro.disconnect(); oUI.ro = null; } } catch (e) { }
+        oS.fullSize = false;
         try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
     }
 
@@ -1318,15 +1487,24 @@
             ".u4aP13nDlg .u4a-dialog__header span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
             // 바디 = 가로 스플리터.
             ".u4aP13nBody { flex: 1 1 auto; min-height: 0; display: flex; padding: 0; overflow: hidden; }" +
-            ".u4aP13nLeft { flex: 0 0 var(--u4aP13nLeftW, 33%); min-width: 12rem; display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--surface); }" +
+            // 기본 30% — 드래그 시 인라인 flex(px)가 덮음(더블클릭=인라인 제거→이 기본으로 복귀).
+            ".u4aP13nLeft { flex: 0 0 30%; min-width: 13rem; display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--surface); }" +
             ".u4aP13nRight { flex: 1 1 auto; min-width: 0; display: flex; min-height: 0; }" +
-            // ★[hidden] 강제 — 아래 페이지들은 display:flex 라 [hidden]의 display:none 을 덮어씀(공통 함정).
-            //   이 override 없으면 등록/리스트·init/detail 이 동시에 떠서 겹쳐 보인다.
+            // ★[hidden] 강제 — 페이지(display:flex)·버튼(.u4a-btn display:inline-flex)이 UA [hidden]을
+            //   덮어써 안 숨겨지는 공통 함정. 등록툴바 삭제버튼(hidden=true 인데 계속 보이던 버그) 포함.
             ".u4aP13nRegPage[hidden], .u4aP13nListPage[hidden], .u4aP13nInitPage[hidden], .u4aP13nDetail[hidden] { display: none !important; }" +
+            ".u4aP13nRegTool > [hidden] { display: none !important; }" +
             // 좌측 페이지 공통.
             ".u4aP13nRegPage, .u4aP13nListPage { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }" +
             ".u4aP13nRegTool, .u4aP13nListTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; border-bottom: 0.0625rem solid var(--line); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; }" +
-            ".u4aP13nListTitle, .u4aP13nPrevTitle, .u4aP13nTreeTitle { font-weight: 600; color: var(--text); font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }" +
+            // 제목은 축소/말줄임 금지(flex:0 0 auto) — 좁아지면 제목이 "..."로 찌그러지는 대신
+            //   뒤쪽 UI(테마 콤보→라벨)가 attachOverflow 로 먼저 ⋯ 메뉴에 접힌다.
+            ".u4aP13nPrevTitle { font-weight: 600; color: var(--text); font-size: 0.8125rem; white-space: nowrap; flex: 0 0 auto; }" +
+            // 아이콘 전용 버튼(원본 sap.m.Button icon-only) — 정사각 시각.
+            ".u4aP13nIcoBtn { min-width: 2.25rem; justify-content: center; }" +
+            // 원본 ToolbarSeparator.
+            ".u4aP13nTbSep { flex: 0 0 auto; width: 0.0625rem; height: 1.25rem; background: var(--line); margin: 0 0.25rem; }" +
+            ".u4aP13nRegBack[disabled] { opacity: 0.4; pointer-events: none; }" +
             ".u4aP13nToolSpacer { flex: 1 1 auto; }" +
             ".u4aP13nRegBody { flex: 1 1 auto; min-height: 0; padding: 0.5rem; display: flex; align-items: stretch; }" +
             ".u4aP13nDescField { flex: 1 1 auto; min-height: 0; display: flex; }" +
@@ -1335,10 +1513,9 @@
             ".u4aP13nTableWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }" +
             ".u4aP13nColAct, .u4aP13nCellAct { width: 4.5rem; text-align: right; white-space: nowrap; }" +
             ".u4aP13nRow { cursor: pointer; }" +
-            ".u4aP13nRow--deny .u4aP13nCellDesc { color: var(--negative); text-decoration: line-through; }" +
-            ".u4aP13nNoText::before { content: '—'; color: var(--text-muted); }" +
+            // 빈 설명 "NO TEXT" 오버레이(원본 u4aP13nPreviewNoText :after absolute)의 기준 좌표.
+            ".u4aP13nCellDesc { position: relative; }" +
             ".u4aP13nRowAct { vertical-align: middle; }" +
-            ".u4aP13nRowAct--del { color: var(--negative); }" +
             ".u4aP13nListHint { flex: 0 0 auto; padding: 0.375rem 0.625rem; font-size: 0.6875rem; color: var(--text-muted); border-top: 0.0625rem solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
             // 우측 init.
             ".u4aP13nInitPage { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-width: 0; }" +
@@ -1347,24 +1524,32 @@
             ".u4aP13nInitInner span { font-size: 0.8125rem; }" +
             // 우측 detail = 미리보기 | 트리.
             ".u4aP13nDetail { flex: 1 1 auto; min-width: 0; display: flex; min-height: 0; }" +
-            ".u4aP13nPrevPane { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; min-height: 0; }" +
-            ".u4aP13nTreePane { flex: 0 0 var(--u4aP13nTreeW, 30%); min-width: 10rem; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }" +
-            ".u4aP13nPrevTool, .u4aP13nTreeTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; border-bottom: 0.0625rem solid var(--line); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; }" +
+            ".u4aP13nPrevPane { flex: 1 1 auto; min-width: 15rem; display: flex; flex-direction: column; min-height: 0; }" +
+            ".u4aP13nTreePane { flex: 0 0 28%; min-width: 16rem; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }" +
+            // min-width:0+overflow:hidden = attachOverflow 폭 측정 전제(자연폭으로 늘어나 오판 방지 — 트리툴바 fix 동일).
+            ".u4aP13nPrevTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; border-bottom: 0.0625rem solid var(--line); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; min-width: 0; overflow: hidden; }" +
+            // 트리 툴바 = WS20 .u4aWs20TreeToolbar 스킨 소유(padding/gap/배경/보더) — 여기선 이웃(미리보기
+            //   툴바 2.5rem)과 높이 정렬만 확장.
+            ".u4aP13nTreeTool { min-height: 2.5rem; box-sizing: border-box; }" +
+            // 테마선택 wrapper(라벨+콤보) — 한 항목으로 접히게 축소 금지(flex:0 0 auto).
+            ".u4aP13nThemeWrap { display: flex; align-items: center; gap: 0.375rem; flex: 0 0 auto; }" +
             ".u4aP13nThemeLbl { font-weight: 600; color: var(--text); font-size: 0.75rem; white-space: nowrap; flex: 0 0 auto; }" +
-            ".u4aP13nThemeCombo { flex: 0 0 auto; min-width: 8rem; }" +
-            ".u4aP13nFrameWrap { flex: 1 1 auto; min-height: 0; overflow: hidden; background: var(--surface); }" +
+            // 공통 .u4a-combo 는 width:100% → 툴바 안에서 전체로 늘어난다. 이 인스턴스만 고정폭으로 override.
+            ".u4aP13nThemeCombo { flex: 0 0 auto; width: 12rem; }" +
+            // position:relative = 원본 u4aP13nPreview :after "PREVIEW" 워터마크(absolute)의 기준 좌표.
+            ".u4aP13nFrameWrap { flex: 1 1 auto; min-height: 0; overflow: hidden; background: var(--surface); position: relative; }" +
             ".u4aP13nFrame { width: 100%; height: 100%; border: none; overflow: hidden; }" +
             ".u4aP13nTreeWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }" +
             ".u4aP13nTree { min-height: 0; }" +
-            ".u4aP13nTreeIco { width: 1.1875rem; height: 1.1875rem; vertical-align: middle; }" +
-            ".u4aP13nTreeStat { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--text-muted); font-size: 0.75rem; }" +
-            ".u4aP13nTreeStatIco img { width: 0.9375rem; height: 0.9375rem; vertical-align: middle; }" +
             // 스플리터 바 = 공통 .u4a-splitter__bar(flex:0 0 11px + 가운데 알약 그립) 그대로 소비.
             //   ★flex 오버라이드 금지(0 0 auto 주면 폭 붕괴 → 얇은 선 됨). 화면 스코프는 배경만 손대지 않는다.
             ".u4aP13nDlg.u4aP13nResizing { cursor: col-resize; }" +
             ".u4aP13nDlg.u4aP13nResizing * { cursor: col-resize !important; }" +
-            // 툴바 버튼(아이콘+텍스트).
-            ".u4aP13nToolBtn span:empty, .u4aP13nActBtn span:empty { display: none; }" +
+            // 오버플로(⋯) — attachOverflow 가 el.hidden 으로 접을 때 span/label 도 확실히 숨김([hidden] 함정).
+            ".u4aP13nPrevTool > [hidden] { display: none !important; }" +
+            // ⋯ 메뉴 안 테마선택 행(라벨+새 콤보 — T-CODE 입력칸 패턴).
+            ".u4aP13nThemeMenuRow { display: flex; align-items: center; gap: 0.375rem; padding: 0.125rem 0.25rem; }" +
+            ".u4aP13nThemeMenuRow .u4a-combo { width: 11rem; }" +
             ".u4aP13nFoot { display: flex; justify-content: flex-end; }";
         document.head.appendChild(oStyle);
     }

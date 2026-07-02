@@ -3035,9 +3035,9 @@
         const sLoadUrl = WSUTIL.QueryString.build(PATHINFO.MAINFRAME, oQueryParams);
         oBrowserWindow.loadURL(sLoadUrl);
 
-        if (!APP.isPackaged) {
-            oBrowserWindow.webContents.openDevTools();
-        }
+        // if (!APP.isPackaged) {
+        //     oBrowserWindow.webContents.openDevTools();
+        // }
 
         oBrowserWindow.webContents.on('did-finish-load', function () {
             oAPP.setBusy(false);
@@ -3262,7 +3262,9 @@
             { KEY: "horizon_xp", TXT: "Windows XP" },
             { KEY: "horizon_95", TXT: "Windows 95" },
             { KEY: "horizon_7", TXT: "Windows 7" },
-            { KEY: "horizon_signature", TXT: "SAP Signature" }
+            { KEY: "horizon_signature", TXT: "SAP Signature" },
+            { KEY: "horizon_mac", TXT: "macOS" },
+            { KEY: "horizon_suse", TXT: "SUSE Linux" }
         ];
         const sCurrent = U4ATheme.current();
 

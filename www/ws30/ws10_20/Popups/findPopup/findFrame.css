@@ -63,62 +63,18 @@ body {
     overflow: hidden;
 }
 
-/* ── 좌측 네비(원본 SideNavigation) ─────────────────────────────────────── */
+/* ── 좌측 네비(원본 SideNavigation) = surface 카드 껍데기(스코프) + 공통 .u4a-navlist 소비 ──
+      선택/hover/항목 스타일은 전부 공통 .u4a-navlist__item(shell.css) 이 담당(스코프 재정의 금지).
+      풀폭 하이라이트가 카드 좌우 끝까지 닿도록 좌우 패딩 0(세로만) + radius 로 모서리 클립. */
 .u4aFindNav {
     flex: 1 1 auto;
     box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.5rem;
+    padding: 0.375rem 0;
     overflow: auto;
     background: var(--surface);
     border: 0.0625rem solid var(--divider);
     border-radius: var(--radius);
     box-shadow: var(--elevation);
-}
-
-.u4aFindNav__item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    border: none;
-    border-left: 0.1875rem solid transparent;
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-size: 0.875rem;
-    text-align: left;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.u4aFindNav__item:hover {
-    background: var(--hover-bg);
-}
-
-.u4aFindNav__item[aria-selected="true"] {
-    background: var(--surface-raised);
-    border-left-color: var(--accent);
-    color: var(--accent);
-    font-weight: 600;
-}
-
-.u4aFindNav__item > i {
-    flex: 0 0 auto;
-    width: 1rem;
-    text-align: center;
-    opacity: 0.8;
-}
-
-.u4aFindNav__item > span {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 /* ── 우측 메인 = 하나의 surface 카드(좌 네비와 동일 톤) — [검색 툴바(구분선)] + [테이블].
@@ -200,18 +156,19 @@ body {
     width: 100%;
 }
 
-/* 테이블 래퍼 — 카드 안(프레임=카드). 남은 높이 채우고 스크롤. */
+/* 테이블 래퍼 — 카드 안(프레임=카드). 남은 높이 채우고 스크롤(테이블/카드뷰 공통). */
 .u4aFindWrap {
     flex: 1 1 auto;
     min-height: 0;
+    overflow: auto;
 }
 
-/* 링크 셀(원본 sap.m.Link emphasized) — 트리 선택/컨트롤러 실행 트리거 */
+/* 링크 셀(원본 sap.m.Link emphasized) — 굵게 + accent. 트리 선택/컨트롤러 실행 트리거. */
 .u4aFindLink {
     color: var(--accent);
+    font-weight: 600;
     cursor: pointer;
     text-decoration: none;
-    /* overflow:hidden 이 밑줄 클리핑하는 문제 회피 위해 셀에서 처리 */
 }
 
 .u4aFindLink:hover {

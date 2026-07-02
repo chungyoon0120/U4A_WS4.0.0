@@ -3500,7 +3500,8 @@
         SMP.innerHTML = '<i class="fa-solid fa-table-cells"></i>';
         SMP.style.display = "none";
         SMP.addEventListener("click", function () {
-            console.warn("[W4+ 예정] UI Sample 팝업(attrCallUiSample) 미변환");
+            // [임시] UI Sample 팝업(attrCallUiSample) 미변환 — 안내 토스트만(사용자 지시). TODO(i18n).
+            try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
         });
         HDR.appendChild(SMP);
 
@@ -3766,12 +3767,17 @@
         PRE.title = _wsMsg("652", "UI Attribute Personalization List");
         PRE.innerHTML = '<i class="fa-solid fa-user-gear"></i><span>' + _wsMsg("652", "UI Attribute Personalization List") + '</span>';
         PRE.addEventListener("click", function () {
-            try {
-                var sPath = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "attrPresetPopup", "index.js");
-                parent.require(sPath)(parent.REMOTE, oAPP);
-            } catch (e) {
-                console.error("[HTML5][WS20] UI Attribute Personalization List 오픈 실패:", e);
-            }
+            // ── [임시] UI Attribute 개인화 항목 — 완료 전까지 안내 토스트만(사용자 지시).
+            //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 재개 시 아래 원본 오픈 로직 복원.
+            try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+            return;
+
+            // try {
+            //     var sPath = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "attrPresetPopup", "index.js");
+            //     parent.require(sPath)(parent.REMOTE, oAPP);
+            // } catch (e) {
+            //     console.error("[HTML5][WS20] UI Attribute Personalization List 오픈 실패:", e);
+            // }
         });
         TBR.appendChild(PRE);
 
@@ -3821,6 +3827,12 @@
         try {
             requestAnimationFrame(function () { _attrSyncSticky(); _attrSyncChevron(); });
             setTimeout(_attrSyncSticky, 250);
+            //웹폰트(FontAwesome 아이콘/텍스트) 로드 전에 초기 reflow 가 돌면 버튼 폭이 실제보다
+            //  좁게 측정돼(아이콘 0폭+폴백폰트) "다 들어감"으로 오판 → 첫 진입에 ⋯ 로 안 접히던 문제.
+            //  폰트 준비가 끝나면 실측 폭으로 한 번 더 재계산해 첫 화면에서도 자동 오버플로되게 한다.
+            if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === "function") {
+                document.fonts.ready.then(function () { _attrSyncSticky(); }).catch(function () { });
+            }
         } catch (e) { _attrSyncSticky(); }
 
         /* ── (e) 속성 행 스크롤 영역 ──
@@ -4189,8 +4201,10 @@
                 return;
             }
 
-            //그 외(F4/App 상세보기 등) 구 attrIcon1Proc/attrIcon2Proc — W4+ 예정.
+            //그 외(App F4 상세보기/selectOption F4 등) 구 attrIcon1Proc/attrIcon2Proc — 미변환.
+            //  [임시] 완료 전까지 안내 토스트만(사용자 지시 — AppID F4 등). TODO(i18n) + 재개 시 각 동작 배선.
             console.warn("[W4+ 예정] 속성 아이콘 동작 미변환:", sAttr.UIATT, "icon" + iNo, sSrc);
+            try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
         });
 
         CELL.appendChild(BTN);
