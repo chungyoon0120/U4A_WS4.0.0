@@ -114,7 +114,7 @@
         { key: "horizon_95",     text: "Windows 95",     accent: "#000080", bg: "#c0c0c0" },
         { key: "horizon_7",      text: "Windows 7",      accent: "#0078d7", bg: "#f0f0f0" },
         { key: "horizon_signature", text: "SAP Signature", accent: "#3a6ea5", bg: "#eef2f7" },
-        { key: "horizon_mac",    text: "macOS",          accent: "#007aff", bg: "#ececec" },
+        { key: "horizon_mac",    text: "macOS",          accent: "#0a6cff", bg: "#ececec" },
         { key: "horizon_suse",   text: "SUSE Linux",     accent: "#30ba78", bg: "#eef2f0" }
     ];
 

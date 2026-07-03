@@ -670,6 +670,8 @@
         oDlg.appendChild(oFoot);
 
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_closeCancel(); });
+        // 비모달(show)은 ESC 에 cancel 이벤트가 안 뜬다 → keydown 으로 ESC 닫기 직접 처리.
+        oDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") { e.preventDefault(); lf_closeCancel(); } });
 
         // 스플리터 드래그(좌우 + 미리보기/트리) — §4.3: 인접 패널 min-width(px) 기준 클램프.
         lf_wireSplitters();
@@ -880,7 +882,10 @@
             if (oUI.tree) { oUI.tree.expandToLevel(99999); }
         });
         oUI.btnCollapse = _mkTreeTbBtn("angles-up", _cl("A47"), function () {   // A47 Collapse All
-            if (oUI.tree) { oUI.tree.collapseAll(); if (oS.zTREE[0]) { oUI.tree.setExpanded(oS.zTREE[0], true); } }
+            // 전체 접힘 — 루트까지 접는다(루트 행은 남고 ">"만, 하위 전부 숨김). 원본은 collapseAll 후
+            //   루트를 재펼침(expand(0))했으나, 그러면 루트 하위가 leaf 뿐인 트리에선 접어도 변화가 없어
+            //   "동작 안함"으로 보임 → "전체 접힘" 의미대로 완전 접힘.
+            if (oUI.tree) { oUI.tree.collapseAll(); }
         });
         oTTool.appendChild(oUI.btnExpand);
         oTTool.appendChild(oUI.btnCollapse);
@@ -1125,7 +1130,7 @@
             // 드래그 소스(패턴 적용 — dataTransfer 세팅. 수신부는 별도 항목).
             oTr.setAttribute("draggable", "true");
             oTr.addEventListener("dragstart", function (ev) { lf_rowDragStart(ev, h); });
-            oTr.addEventListener("dragend", function () { try { oAPP.fn.designDragEnd(); } catch (e) { } });
+            oTr.addEventListener("dragend", function () { lf_rowDragEnd(); });
 
             // Description 셀 — 빈 설명은 원본 u4aP13nPreviewNoText(:after "NO TEXT" 오버레이) 1:1.
             var oTdDesc = _el("td", "u4aP13nCellDesc");
@@ -1180,6 +1185,11 @@
         } catch (e) {
             console.error("[HTML5][WS20][p13n] 드래그 시작 오류:", e && e.message);
         }
+    }
+
+    // 드래그 종료 — 디자인영역 드래그 종료(잔상/드롭가능표시 정리).
+    function lf_rowDragEnd() {
+        try { oAPP.fn.designDragEnd(); } catch (e) { }
     }
 
 
@@ -1297,15 +1307,21 @@
 
     // 헤더 라인 선택 반영(원본 lf_setHeadLineSelect). 없으면 init.
     function lf_setHeadLineSelect(sFileName) {
-        if (!sFileName || !(oS.T_HEAD && oS.T_HEAD.length) ||
-            oS.T_HEAD.findIndex(function (a) { return a.fileName === sFileName; }) === -1) {
+        var ls_head = (sFileName && oS.T_HEAD && oS.T_HEAD.length)
+            ? oS.T_HEAD.find(function (a) { return a.fileName === sFileName; }) : null;
+
+        // 이전 선택 라인 없음/미발견 → 선택 해제 + 초기(빈) 미리보기(원본 oPrevNav.to(oInitPage)).
+        if (!ls_head) {
             oS.selFileName = "";
             lf_renderList();
             lf_showRight(false);
+            _busy(false);
             return;
         }
-        oS.selFileName = sFileName;
-        lf_renderList();
+
+        // 라인 재선택 → 원본 setSelectedIndex 가 발화시키는 선택 이벤트(lf_selHeaderLine)와 동일하게
+        //   미리보기/트리를 다시 렌더(리스트 하이라이트만 하면 미리보기가 빈 채로 남음 — 갱신/뒤로 후 검은화면 원인).
+        lf_rowSelect(ls_head);
     }
 
     // 미리보기 화면 표시(원본 lf_setPrevNav) — iframe 최초 1회 서버로드, 이후 HTML 주입.
@@ -1407,7 +1423,10 @@
         // 초기 표시 상태.
         lf_showRight(false);
 
-        try { oUI.dlg.showModal(); } catch (e) { }
+        // ★비모달(show) 로 연다 — 개인화 리스트 항목을 뒤(배경)의 디자인 트리로 드래그해 적용해야 하는데,
+        //   showModal 이면 배경이 inert 라 drop 이 안 걸린다. 비모달이라 배경 트리가 계속 상호작용 가능
+        //   + 팝업은 스코프 z-index 로 WS20 위에 상시 표시. busy/confirm(showModal=top-layer)은 그 위로 정상.
+        try { oUI.dlg.show(); } catch (e) { }
 
         // afterOpen 처리.
         lf_afterOpen();
@@ -1482,7 +1501,17 @@
         var oStyle = document.createElement("style");
         oStyle.id = "u4aP13nStyle";
         oStyle.textContent =
-            ".u4aP13nDlg { width: min(94vw, 1040px); height: min(88vh, 720px); padding: 0; display: flex; flex-direction: column; }" +
+            // ★재사용한 WS20 트리 클래스(.u4aWs20TreeToolbar/Aggr/ActBtn 등)는 --ws20-* 토큰을 참조하는데,
+            //   그 토큰은 .u4aWs20MainPage 스코프에만 정의됨. 이 다이얼로그는 body 직속이라 스코프 밖 →
+            //   토큰 미정의로 툴바 보더/aggr색/삭제색이 투명해진다. .u4aWs20MainPage 매핑을 여기 복제(1:1).
+            ".u4aP13nDlg { --ws20-bg: var(--app-bg); --ws20-header-bg: var(--titlebar-bg); --ws20-panel: var(--surface);" +
+            "  --ws20-line: var(--line); --ws20-sep: var(--divider); --ws20-accent: var(--accent); --ws20-btn: var(--icon);" +
+            "  --ws20-btn-hover: var(--hover-bg); --ws20-text: var(--text); --ws20-text-strong: var(--text);" +
+            "  --ws20-text-sub: var(--text-muted); --ws20-aggr: var(--accent); --ws20-danger: var(--error);" +
+            "  --ws20-sel-bg: var(--selected-bg); --ws20-hover-bg: var(--hover-bg); --ws20-grip: var(--text-muted); }" +
+            // 비모달(show)이라 top-layer 가 아니므로 직접 중앙 고정 + z-index. 메뉴(1000)/콤보리스트(1100)
+            //   위, busy/confirm(showModal=top-layer)은 그 위로 자동. 드래그/리사이즈 인라인 위치가 이를 덮음.
+            ".u4aP13nDlg { position: fixed; inset: 0; margin: auto; z-index: 1500; width: min(94vw, 1040px); height: min(88vh, 720px); padding: 0; display: flex; flex-direction: column; }" +
             ".u4aP13nDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
             ".u4aP13nDlg .u4a-dialog__header span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
             // 바디 = 가로 스플리터.
@@ -1496,7 +1525,9 @@
             ".u4aP13nRegTool > [hidden] { display: none !important; }" +
             // 좌측 페이지 공통.
             ".u4aP13nRegPage, .u4aP13nListPage { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }" +
-            ".u4aP13nRegTool, .u4aP13nListTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; border-bottom: 0.0625rem solid var(--line); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; }" +
+            // 좌측 툴바 = 우측 트리 툴바(.u4aWs20TreeToolbar: surface-raised 밴드 + --ws20-sep 보더)와 동일 밴드로 통일.
+            //   (평평 배경 + 옅은 --line 은 경계선이 안 보여 트리 툴바만 밴드처럼 튀던 문제 해결.)
+            ".u4aP13nRegTool, .u4aP13nListTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; background: var(--surface-raised); border-bottom: 0.0625rem solid var(--ws20-sep); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; }" +
             // 제목은 축소/말줄임 금지(flex:0 0 auto) — 좁아지면 제목이 "..."로 찌그러지는 대신
             //   뒤쪽 UI(테마 콤보→라벨)가 attachOverflow 로 먼저 ⋯ 메뉴에 접힌다.
             ".u4aP13nPrevTitle { font-weight: 600; color: var(--text); font-size: 0.8125rem; white-space: nowrap; flex: 0 0 auto; }" +
@@ -1527,7 +1558,7 @@
             ".u4aP13nPrevPane { flex: 1 1 auto; min-width: 15rem; display: flex; flex-direction: column; min-height: 0; }" +
             ".u4aP13nTreePane { flex: 0 0 28%; min-width: 16rem; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }" +
             // min-width:0+overflow:hidden = attachOverflow 폭 측정 전제(자연폭으로 늘어나 오판 방지 — 트리툴바 fix 동일).
-            ".u4aP13nPrevTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; border-bottom: 0.0625rem solid var(--line); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; min-width: 0; overflow: hidden; }" +
+            ".u4aP13nPrevTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; background: var(--surface-raised); border-bottom: 0.0625rem solid var(--ws20-sep); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; min-width: 0; overflow: hidden; }" +
             // 트리 툴바 = WS20 .u4aWs20TreeToolbar 스킨 소유(padding/gap/배경/보더) — 여기선 이웃(미리보기
             //   툴바 2.5rem)과 높이 정렬만 확장.
             ".u4aP13nTreeTool { min-height: 2.5rem; box-sizing: border-box; }" +

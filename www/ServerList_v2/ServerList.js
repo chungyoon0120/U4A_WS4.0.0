@@ -2297,7 +2297,10 @@
         _observeTableWidth(oWrap);
     };
 
-    // 현재 테이블 폭으로 data-w(lg/md/sm/xs) 갱신 — 폭은 엘리먼트에서 직접 읽는다.
+    // 테이블/카드 전환 — 고정 폭이 아니라 "이름 컬럼이 실제로 말줄임되면" 카드로 전환한다.
+    //   테이블 뷰에서 이름 헤더/데이터의 넘친 양(scrollWidth-clientWidth)을 재서, 넘치면 카드로
+    //   바꾸고 "안 잘리는 최소 폭"(_tableFitW)을 기억. 카드 뷰에선 그 폭 이상으로 넓어지면 복귀.
+    //   (카드 뷰에선 셀이 줄바꿈돼 말줄임 측정이 안 되므로 기억한 폭으로 판정)
     function _setTableWidthClass() {
         const oWrap = oAPP.attr._tblWrap;
         if (!oWrap || !oWrap.isConnected) {
@@ -2307,8 +2310,24 @@
         if (!iWidth) {
             return;
         }
-        // 일정 폭(560px) 미만이면 컬럼을 숨기지 않고 카드(타일) 뷰로 전환.
-        const sView = (iWidth < 560) ? "card" : "table";
+
+        let sView = oWrap.dataset.view || "table";
+
+        if (sView !== "card") {
+            // 기준은 **컬럼 헤더 라벨**(리스트 데이터 텍스트 아님). 헤더 라벨이 하나라도
+            // 말줄임되면 카드로. 넘친 양의 최대치로 "안 잘리는 최소 폭" 계산.
+            let iOverflow = 0;
+            const _ov = (el) => { if (el) { const o = el.scrollWidth - el.clientWidth; if (o > iOverflow) { iOverflow = o; } } };
+            oWrap.querySelectorAll("thead th .u4a-th__label").forEach(_ov);
+            if (iOverflow > 1) {
+                oWrap._tableFitW = iWidth + iOverflow + 8; // 이 폭 이상이면 안 잘림(여유 8px)
+                sView = "card";
+            }
+        } else if (iWidth >= (oWrap._tableFitW || 560)) {
+            // 카드 → 테이블: 기억한 "안 잘리는 최소 폭" 이상으로 넓어졌을 때만 복귀
+            sView = "table";
+        }
+
         // 값이 바뀔 때만 기록 (불필요한 레이아웃 무효화/루프 방지)
         if (oWrap.dataset.view !== sView) {
             oWrap.dataset.view = sView;

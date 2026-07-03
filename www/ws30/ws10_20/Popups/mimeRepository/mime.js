@@ -1090,21 +1090,29 @@
         if (!oParent) { return; }
         oExpand[oParent.CHILD] = true;   // 부모 펼침
 
-        // 미로드(더미) 폴더면 서버 재조회로 자식 전체 정합 — 더미/신규 공존 혼란 방지.
+        // 새로 추가된 노드 중 마지막 키(=선택 대상) — 경로 무관 공통(서버가 준 CHILD=KW OBJID).
+        var aNew = Array.isArray(oNewOrArr) ? oNewOrArr : (oNewOrArr ? [oNewOrArr] : []);
+        var sLastKey = "";
+        aNew.forEach(function (n) { if (n && n.CHILD != null) { sLastKey = String(n.CHILD); } });
+
+        // 미로드(더미) 폴더면 서버 재조회로 자식 전체 정합 — 재조회 후 새 노드 선택(키 동일=OBJID).
         if (oState.sLazy && _hasDummy(oParent)) {
-            lf_lazyExpand(oParent);
+            lf_lazyExpand(oParent).then(function () { lf_selectNewNode(sLastKey); });
             return;
         }
 
         if (!Array.isArray(oParent.MIMETREE)) { oParent.MIMETREE = []; }
-        var aNew = Array.isArray(oNewOrArr) ? oNewOrArr : (oNewOrArr ? [oNewOrArr] : []);
-        var sLastKey = "";
-        aNew.forEach(function (n) {
-            if (n) { oParent.MIMETREE.push(n); if (n.CHILD != null) { sLastKey = String(n.CHILD); } }
-        });
+        aNew.forEach(function (n) { if (n) { oParent.MIMETREE.push(n); } });
+        lf_selectNewNode(sLastKey);
+    }
+
+    // 새로 추가된 노드를 좌측 선택(트리 강조/스크롤) + 우측 속성·미리보기까지(클릭과 동일 효과).
+    //   추가하자마자 그 파일이 선택되고 우측에 내용이 뜨게 — lf_autoSelect 가 lf_onRowSelect(파일=미리보기 로드) 호출.
+    function lf_selectNewNode(sLastKey) {
         if (sLastKey) { oState.selKey = sLastKey; }
         oUI.tree.render();
         try { if (sLastKey) { oUI.tree.scrollToKey(sLastKey); } } catch (e) { }
+        if (sLastKey) { lf_autoSelect(sLastKey); }
     }
 
     /************************************************************************

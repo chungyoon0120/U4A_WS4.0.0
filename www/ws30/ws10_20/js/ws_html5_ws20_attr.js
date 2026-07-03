@@ -35,7 +35,9 @@
  *  ────────────────────────────────────────────────────────────────────
  *   · 미리보기 반영(previewUIsetProp/selPreviewUI/redrawUIScript) — W2
  *   · 팝업류: CSS/JS Link Add, Web Security, F4 Help, 바인딩/이벤트 팝업,
- *     preset(개인화), 도움말, OBJID 변경(attrChnageOBJID) — W4+ (console.warn)
+ *     도움말 — W4+ (console.warn)
+ *     (preset(개인화 항목)=attrPresetPopup 별창 HTML5 변환 완료 — 위 ws20AttrPresetBtn)
+ *     (OBJID 변경(attrChnageOBJID)=HTML5 변환 완료 — attrChnageOBJID/attrChgClientEventOBJID/changeDescOBJID)
  *   · chkValidProp — 미리보기 frame 의 sap.ui.base.DataType 의존 → skip 가드.
  *   · setExcepAttr / attrSetAutoGrowingException / attrSetDropAbleException —
  *     UI 타입별 아이콘/잠금 예외(데이터성이지만 분량 큼) → 원본 함수가 정의되어
@@ -1381,6 +1383,245 @@
             return l_txt;
 
         }; //Description 검색.
+    }
+
+    /************************************************************************
+     * UI Object ID(OBJID) 변경 연쇄 처리 — 원본 uiAttributeArea.js
+     *   attrChnageOBJID(4128행) / attrChgClientEventOBJID(4367행) /
+     *   changeDescOBJID(7832행) 1:1 이식.
+     *
+     *   UI Object ID 를 바꾸면 아래를 연쇄로 매핑해야 원본과 동일하게 동작한다.
+     *     ① 수집된 ATTR(oAPP.attr.prev[OBJID]._T_0015) 의 OBJID
+     *     ② prev 저장소 키 자체(prev[old] → prev[new]) 및 _OBJID
+     *     ③ 디자인 트리 노드 OBJID + 자식 노드 POBID
+     *     ④ 클라이언트 이벤트(T_CEVT) OBJID
+     *     ⑤ Description(T_DESC) OBJID
+     *     ⑥ 현재 출력된 속성 리스트(T_ATTR) 의 OBJID
+     *
+     *   ★UI5 의존 대체:
+     *     · Input value="{/uiinfo/OBJID}" 두방향 바인딩 부재 → 호출측(onChange)이
+     *       입력값을 /uiinfo/OBJID 에 먼저 주입한 뒤 이 함수를 호출한다.
+     *     · valueState(빨간 테두리/메시지)는 공통 필드(oAPP.attr.uiObjIdField)로 표시.
+     *     · bindPopup BUSY_ON/OFF 브로드캐스트는 UI5 별창 전용 → HTML5 skip
+     *       (라인 3222 주석과 동일 정책).
+     *     · UNDO 는 원본 saveActionHistoryData("CHANGE_OBJID") 대신 단일 스냅샷
+     *       스택(fnWs20PushUndo)으로 통일(WS20 undo/redo 단일스택 규칙).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrChnageOBJID !== "function") {
+        oAPP.fn.attrChnageOBJID = async function () {
+
+            var oField = oAPP.attr.uiObjIdField;
+
+            var ls_uiinfo = oAPP.attr.oModel.getProperty("/uiinfo");
+            if (!ls_uiinfo) {
+                try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                return;
+            }
+
+            //대문자 변환 처리. (원본 4136행)
+            ls_uiinfo.OBJID = (ls_uiinfo.OBJID || "").toUpperCase();
+
+            ls_uiinfo.OBJID_stat = "None";
+            ls_uiinfo.OBJID_stxt = "";
+
+            //대문자 변환값을 입력 필드에 즉시 반영.
+            try { if (oField) { oField.setValue(ls_uiinfo.OBJID); } } catch (e) { }
+
+            var _OBJID = ls_uiinfo.OBJID || "";
+
+            //검증 오류 표시 + busy 해제 공통 처리.
+            //  ★빨간 테두리 = 이 화면 전용 방식 `.u4aWs20AttrInp.err`(WS10/css/ws20.css 728행, 특정도 0,4,0).
+            //   공통 setValueState(data-vs, 0,2,0)는 shell 뒤 로드되는 편집보더 규칙
+            //   `.u4aWs20AttrInp:not(:read-only):not(:disabled)`(0,3,0, border-color:--divider)에 밀려
+            //   빨간색이 안 나온다 → 속성 값 필드와 동일하게 input 에 `.err` 클래스로 표시(4250행 패턴).
+            function _fail(sTxt) {
+                ls_uiinfo.OBJID_stat = "Error";
+                ls_uiinfo.OBJID_stxt = sTxt;
+                oAPP.attr.oModel.setProperty("/uiinfo", ls_uiinfo);
+                try {
+                    if (oField && oField.input) {
+                        oField.input.classList.add("err");   // 빨간 테두리(+글자색) — 오류 해소 전까지 상시.
+                        oField.input.title = sTxt;            // 마우스오버로 오류 사유 확인(속성 값 필드와 동일).
+                    }
+                } catch (e) { }
+                try { parent.showMessage(null, 10, "E", sTxt); } catch (e) { }
+                try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+            }
+            //검증 통과/해소 시 오류 표시 제거.
+            function _clearErr() {
+                try {
+                    if (oField && oField.input) {
+                        oField.input.classList.remove("err");
+                        oField.input.title = oField.input.value || "";
+                    }
+                } catch (e) { }
+            }
+
+            //UI OBJECT ID를 입력하지 않은경우. (원본 4194행 — 014 & is required entry value.)
+            if (_OBJID === "") {
+                //A84 UI Object ID
+                _fail(APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "014",
+                    APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A84", "", "", "", ""), "", "", ""));
+                return;
+            }
+
+            var _aError = [];
+
+            //맨 앞자리를 숫자로 입력시 오류. (원본 4220행 — 091 Can not start with a numeric value.)
+            if (isNaN(_OBJID.substr(0, 1)) !== true) {
+                _aError.push(APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "091", "", "", "", ""));
+            }
+
+            //특수문자(대문자·숫자 외) 입력시 오류. (원본 4228행 — 278 Special characters are not allowed.)
+            var reg = /[^A-Z0-9]/;
+            if (reg.test(_OBJID) === true) {
+                _aError.push(APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "278", "", "", "", ""));
+            }
+
+            //이전 OBJID와 다른데 트리에 중복 OBJID 존재시 오류. (원본 4238행 — 069 Duplicate values exist.)
+            if (_OBJID !== ls_uiinfo.OBJID_bf) {
+                if (typeof oAPP.fn.getTreeData(_OBJID) !== "undefined") {
+                    _aError.push(APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "069", "", "", "", ""));
+                }
+            }
+
+            //오류 존재시 종료. (원본 4250행)
+            if (_aError.length > 0) {
+                _fail(_aError.join("\r\n"));
+                return;
+            }
+
+            //이전에 입력한 이름과 지금 입력한 이름이 같으면 exit. (원본 4271행)
+            if (ls_uiinfo.OBJID === ls_uiinfo.OBJID_bf) {
+                _clearErr();
+                try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                return;
+            }
+
+            //검증 통과 — 오류 표시 해제.
+            _clearErr();
+
+            //OBJECT ID 변경전 UNDO 이력 추가. (원본 4288행 saveActionHistoryData("CHANGE_OBJID") → 단일 스냅샷 스택)
+            try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } } catch (e) { }
+
+            oAPP.attr.prev = oAPP.attr.prev || {};
+
+            var sBf = ls_uiinfo.OBJID_bf;
+            var sNew = ls_uiinfo.OBJID;
+
+            //① 이전 UI OBJECT에 수집된 ATTR 의 OBJID를 변경건으로 매핑. (원본 4292행)
+            if (oAPP.attr.prev[sBf] && oAPP.attr.prev[sBf]._T_0015 && oAPP.attr.prev[sBf]._T_0015.length !== 0) {
+                for (var i = 0, l = oAPP.attr.prev[sBf]._T_0015.length; i < l; i++) {
+                    oAPP.attr.prev[sBf]._T_0015[i].OBJID = sNew;
+                }
+            }
+
+            //② 변경된 이름으로 UI 수집건 이관 + _OBJID 매핑 + 이전 이름 제거. (원본 4302~4308행)
+            if (oAPP.attr.prev[sBf]) {
+                oAPP.attr.prev[sNew] = oAPP.attr.prev[sBf];
+                oAPP.attr.prev[sNew]._OBJID = sNew;
+                delete oAPP.attr.prev[sBf];
+            }
+
+            //③ DESIGN영역 트리의 변경전 OBJID 노드 검색 후 OBJID 매핑 + 자식 POBID 변경. (원본 4311~4322행)
+            var l_tree = oAPP.fn.getTreeData(sBf);
+            if (l_tree) {
+                l_tree.OBJID = sNew;
+                if (l_tree.zTREE && l_tree.zTREE.length !== 0) {
+                    for (var j = 0, m = l_tree.zTREE.length; j < m; j++) {
+                        l_tree.zTREE[j].POBID = sNew;
+                    }
+                }
+            }
+
+            //④ 클라이언트 이벤트 수집건 OBJID 변경. (원본 4325행)
+            oAPP.fn.attrChgClientEventOBJID(sNew, sBf);
+
+            //⑤ Description 입력건 OBJID 변경. (원본 4328행)
+            oAPP.fn.changeDescOBJID(sNew, sBf);
+
+            //⑥ 현재 출력된 attribute 리스트의 OBJID 변경. (원본 4331행)
+            try {
+                var aT = (oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
+                for (var k = 0, n = aT.length; k < n; k++) { aT[k].OBJID = sNew; }
+            } catch (e) { }
+
+            //바인딩 팝업의 디자인 영역 갱신. (원본 4337행)
+            try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
+
+            //이전 OBJID를 변경된 ID로 업데이트. (원본 4340행)
+            ls_uiinfo.OBJID_bf = sNew;
+
+            //MODEL 갱신. (원본 4351행)
+            oAPP.attr.oModel.setProperty("/uiinfo", ls_uiinfo);
+
+            //디자인 영역(트리) 재렌더. (원본 4354행 designRefershModel)
+            try { await oAPP.fn.designRefershModel(); } catch (e) { }
+
+            //헤더(UI명)/입력영역 갱신 — 원본은 UI5 바인딩이 자동 갱신, HTML5는 명시 호출.
+            try { _renderAttrHeader(); } catch (e) { }
+
+            //화면 변경 flag. (원본 4357행)
+            try { oAPP.fn.setChangeFlag(); } catch (e) { }
+
+            // busy off (원본 4360행)
+            try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+
+        };  //OBJID 입력건 처리.
+    }
+
+    //클라이언트 이벤트의 OBJECT ID 변경 처리. (원본 uiAttributeArea.js 4367행 1:1)
+    if (typeof oAPP.fn.attrChgClientEventOBJID !== "function") {
+        oAPP.fn.attrChgClientEventOBJID = function (OBJID, OLDOBJID) {
+
+            //클라이언트 이벤트가 존재하지 않는경우 exit.
+            if (!oAPP.DATA || !oAPP.DATA.APPDATA || !oAPP.DATA.APPDATA.T_CEVT ||
+                oAPP.DATA.APPDATA.T_CEVT.length === 0) { return; }
+
+            //대상 OBJID의 ATTR 변경건이 존재하지 않는경우 EXIT.
+            if (!oAPP.attr.prev[OBJID] || !oAPP.attr.prev[OBJID]._T_0015 ||
+                oAPP.attr.prev[OBJID]._T_0015.length === 0) { return; }
+
+            //이벤트 입력건(UIATY=2), sap.ui.core.HTML의 content 프로퍼티(AT000011858) 입력건 확인.
+            var lt_attr = oAPP.attr.prev[OBJID]._T_0015.filter(function (a) {
+                return a.UIATY === "2" || a.UIATK === "AT000011858";
+            });
+
+            //이벤트, HTML content프로퍼티 입력건이 존재하지 않는경우 exit.
+            if (lt_attr.length === 0) { return; }
+
+            for (var i = 0, l = lt_attr.length; i < l; i++) {
+
+                //이전 OBJECTID로 입력된 클라이언트 이벤트, HTML CONTENT 입력건 존재여부 확인.
+                var l_cevt = oAPP.DATA.APPDATA.T_CEVT.find(function (a) {
+                    return a.OBJID === OLDOBJID + lt_attr[i].UIASN;
+                });
+
+                //존재하지 않는경우 다음건.
+                if (typeof l_cevt === "undefined") { continue; }
+
+                //존재하는경우 변경된 OBJECT ID로 매핑.
+                l_cevt.OBJID = OBJID + lt_attr[i].UIASN;
+            }
+
+        };  //클라이언트 이벤트의 OBJECT ID 변경 처리.
+    }
+
+    //Description의 OBJECT ID 변경 처리. (원본 uiAttributeArea.js 7832행 1:1)
+    if (typeof oAPP.fn.changeDescOBJID !== "function") {
+        oAPP.fn.changeDescOBJID = function (OBJID, OLDOBJID) {
+
+            //원본 OBJID에 해당하는 Description 정보 존재 여부 확인.
+            if (!oAPP.DATA || !oAPP.DATA.APPDATA || !oAPP.DATA.APPDATA.T_DESC) { return; }
+            var l_desc = oAPP.DATA.APPDATA.T_DESC.find(function (a) { return a.OBJID === OLDOBJID; });
+
+            //Description 정보가 존재하지 않는경우 exit.
+            if (typeof l_desc === "undefined") { return; }
+
+            //변경하고자 하는 OBJECT ID로 매핑.
+            l_desc.OBJID = OBJID;
+
+        };  //Description OBJECT ID 변경 처리.
     }
 
     //OTR 입력건인경우 ALIAS 대문자 변환 처리. (원본 5507행 1:1)
@@ -3148,6 +3389,35 @@
     }; // end of oAPP.fn.fnWs20AttrChange
 
     /************************************************************************
+     * 클라이언트 이벤트(수집 JS/HM) 라인 삭제 — 원본 uiAttributeArea.js attrDelClientEvent 3360행 1:1.
+     *   UI5 의존 없는 순수 데이터 함수(T_CEVT 라인 splice)라 HTML5 그대로 이식.
+     *   소비처: 속성 컨텍스트 메뉴 M04(클라이언트 이벤트 해제) + fnBindPopupOpen.js 바인딩 시
+     *   sap.ui.core.HTML content(AT000011858) 수집 이벤트 정리(그동안 typeof 가드로 no-op 이던 것).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrDelClientEvent !== "function") {
+        oAPP.fn.attrDelClientEvent = function (is_attr, OBJTY) {
+
+            var aCevt = null;
+            try { aCevt = oAPP.DATA.APPDATA.T_CEVT; } catch (e) { aCevt = null; }
+
+            //수집된 클라이언트 이벤트가 존재하지 않는경우 exit.
+            if (!aCevt || aCevt.length === 0) { return; }
+
+            //클라이언트 이벤트 존재여부 확인.
+            var l_index = aCevt.findIndex(function (a) {
+                return a.OBJID === is_attr.OBJID + is_attr.UIASN && a.OBJTY === OBJTY;
+            });
+
+            //클라이언트 이벤트가 존재하지 않는경우 EXIT.
+            if (l_index === -1) { return; }
+
+            //클라이언트 이벤트 존재시 해당 라인 삭제 처리.
+            aCevt.splice(l_index, 1);
+
+        };  //클라이언트 이벤트 삭제 처리.
+    }
+
+    /************************************************************************
      * 이벤트 생성 아이콘(녹색 developer-settings) 선택 — 서버이벤트 생성 팝업 호출.
      *   (원본 uiAttributeArea.js attrCallEventPopup 2057행 1:1. UI5 의존 없음.)
      *   조건: 이벤트행(UIATY="2") + 편집가능(edit) + 화면편집(IS_EDIT) + 비-Trial.
@@ -3536,17 +3806,29 @@
         ROW1.className = "u4aWs20AttrInfoRow";
 
         //OBJID 입력필드 (점선 밑줄 스타일) — 공통 팩토리(U4AUI.createField), inputClassName 으로 인라인 스타일 유지.
+        //  upper: 입력 즉시 대문자(원본 UI Object ID 대문자 정책). onChange = 원본 attachChange(234행).
         var oObjFld = window.U4AUI.createField({
-            type: "text", id: "ws20AttrObjIdInp", inputClassName: "u4aWs20AttrInp", maxLength: 100,
+            type: "text", id: "ws20AttrObjIdInp", inputClassName: "u4aWs20AttrInp", maxLength: 100, upper: true,
             onChange: function () {
-                //OBJID 변경건 처리 — 원본 attrChnageOBJID(트리/미리보기/모델 연쇄 변경, UI5 의존)
-                console.warn("[W4+ 예정] UI Object ID 변경(attrChnageOBJID) 미변환 — 값 원복");
+                //OBJID 변경건 처리 — 원본 attrChnageOBJID 연쇄(트리/prev/T_ATTR/이벤트/Description).
                 try {
-                    oObjFld.input.value = (oAPP.attr.oModel.oData.uiinfo && oAPP.attr.oModel.oData.uiinfo.OBJID) || "";
-                } catch (e) { }
+                    var oUi = oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.uiinfo;
+                    if (!oUi) { return; }
+                    //ROOT/APP 등 편집 불가건은 무시(입력필드도 readOnly 지만 방어).
+                    if (oUi.edit01 === false) { return; }
+                    // busy 켜기(원본 attachChange 236행). 종료는 attrChnageOBJID 내부에서.
+                    try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
+                    //UI5 두방향 바인딩 대체: 입력값을 /uiinfo/OBJID 에 먼저 주입.
+                    oUi.OBJID = oObjFld.getValue();
+                    oAPP.fn.attrChnageOBJID();
+                } catch (e) {
+                    console.warn("[HTML5][WS20][attr] UI Object ID 변경 처리 오류:", e && e.message);
+                    try { parent.setBusy && parent.setBusy(""); } catch (e2) { }
+                }
             }
         });
         var INP = oObjFld.input;   // 하위 호환(아래 Copy 버튼 등에서 참조)
+        oAPP.attr.uiObjIdField = oObjFld;   // attrChnageOBJID 의 valueState 표시/값 반영용 참조.
         ROW1.appendChild(oObjFld.el);
 
         //A04 Copy — OBJID 복사 버튼. (원본 oRBtn0 press: attrCopyText)
@@ -3767,17 +4049,13 @@
         PRE.title = _wsMsg("652", "UI Attribute Personalization List");
         PRE.innerHTML = '<i class="fa-solid fa-user-gear"></i><span>' + _wsMsg("652", "UI Attribute Personalization List") + '</span>';
         PRE.addEventListener("click", function () {
-            // ── [임시] UI Attribute 개인화 항목 — 완료 전까지 안내 토스트만(사용자 지시).
-            //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 재개 시 아래 원본 오픈 로직 복원.
-            try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
-            return;
-
-            // try {
-            //     var sPath = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "attrPresetPopup", "index.js");
-            //     parent.require(sPath)(parent.REMOTE, oAPP);
-            // } catch (e) {
-            //     console.error("[HTML5][WS20] UI Attribute Personalization List 오픈 실패:", e);
-            // }
+            //클릭 시 attrPresetPopup(별도 Electron 창, sap 무관) 을 직접 연다(원본 uiAttributeArea.js 573행 동일).
+            try {
+                var sPath = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "attrPresetPopup", "index.js");
+                parent.require(sPath)(parent.REMOTE, oAPP);
+            } catch (e) {
+                console.error("[HTML5][WS20] UI Attribute Personalization List 오픈 실패:", e);
+            }
         });
         TBR.appendChild(PRE);
 
@@ -4148,6 +4426,8 @@
 
         var CELL = document.createElement("div");
         CELL.className = "u4aWs20AttrRowIc";
+        //우클릭 컨텍스트 메뉴 매핑 — icon1=바인딩아이콘(구 oRIcon1 AT03), icon2=클라이언트이벤트(구 oRIcon2 AT04).
+        CELL.setAttribute("data-ctx-key", iNo === 1 ? "AT03" : "AT04");
 
         var bVisb = sAttr["icon" + iNo + "_visb"] === true;
         var sSrc = sAttr["icon" + iNo + "_src"];
@@ -4272,11 +4552,15 @@
             ROW.className = "u4aWs20AttrRow" + (bChanged ? " changeValue" : "");
             ROW.setAttribute("data-uiatk", sAttr.UIATK || "");
             ROW.setAttribute("data-uiaty", sAttr.UIATY || "");
+            //우클릭 컨텍스트 메뉴(ws_html5_ws20_attr_ctxmenu.js)가 이 행의 attr 원본을 참조.
+            //  (원본 attrBeforeContextMenu 는 바인딩 컨텍스트로 is_attr 를 얻는다 — HTML5 는 행에 직접 보관.)
+            ROW.__attrData = sAttr;
 
             //── 라벨 셀 (구 oRObjStat1 + 필수 아이콘 oRIcon0) ──
             var LBL = document.createElement("div");
             LBL.className = "u4aWs20AttrRowLbl";
             LBL.title = sAttr.UIATT || "";
+            LBL.setAttribute("data-ctx-key", "AT01");   //구 oRObjStat1.data("CONTEXT_MENU","AT01")
 
             if (sAttr.icon0_visb === true) {
                 var REQ = document.createElement("span");
@@ -4308,6 +4592,7 @@
             //── 값 셀 ──
             var VAL = document.createElement("div");
             VAL.className = "u4aWs20AttrRowVal";
+            VAL.setAttribute("data-ctx-key", "AT02");   //구 oRInp2/oRSel1.data("CONTEXT_MENU","AT02")
             VAL.appendChild(_buildValueControl(sAttr));
             ROW.appendChild(VAL);
 

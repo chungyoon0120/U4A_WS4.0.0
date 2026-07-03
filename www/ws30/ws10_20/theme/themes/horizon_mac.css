@@ -1,175 +1,167 @@
 /************************************************************************
- * 테마: mac — macOS "Aqua/Big Sur" 스킨
+ * 테마: mac — macOS 스킨 (가이드 기반 재작성)
  * ----------------------------------------------------------------------
- * ⚠ doc 12 §2.1 예외(사용자 명시 승인, 2026-07-01). horizon_xp/95/7 와 동일 트랙.
- *   macOS 감성 — 깨끗한 흰/연회색 · 큼직한 둥근 모서리 · 파란(#007aff) 강조 ·
- *   ★신호등 창버튼(빨/노/초 원형) · 얇은 오버레이 스크롤바 · SF 폰트.
- *   shape 토큰까지 override.
+ * ⚠ doc 12 §2.1 예외(사용자 승인). shape 토큰까지 override.
+ * ★ 값 출처 = .works/theme/macos/guides/MACOS_THEME_GUIDE.md 디자인 토큰.
+ *   임의 색·반경·그림자 생성 금지 — 가이드 수치를 그대로 이식.
+ *
+ * 창버튼(신호등): 가이드 §5 는 "실제 macOS 빌드는 네이티브 신호등"이지만, 본 앱은
+ *   Windows Electron 에서 테마로 macOS 룩을 흉내내므로 네이티브 신호등이 불가.
+ *   → 커스텀 창버튼(우측 min/max/close)에 신호등 색을 그린다(색값은 가이드 동일).
  ************************************************************************/
 [data-theme="horizon_mac"] {
     color-scheme: light;
 
-    /* 밝은 회색 타이틀바 → 텍스트/심볼 진회색 */
-    --u4a-titlebar-fg: #3a3a3c;
+    /* 밝은 타이틀바 → 타이틀/심볼 진한 텍스트 */
+    --u4a-titlebar-fg: #1d1d1f;
 
-    /* ── 배경 / 표면 / 텍스트 / 경계 (macOS 밝은 톤) ──────────────── */
-    --app-bg: #ececec;
-    --surface: #f5f5f7;
-    --surface-raised: #ffffff;
+    /* ── 표면 (가이드 §2 Surfaces) ─────────────────────────────────── */
+    --app-bg: #ececec;          /* bg-window */
+    --surface: #f5f5f7;         /* bg-content */
+    --surface-raised: #ffffff;  /* bg-card */
     --text: #1d1d1f;
     --text-muted: #6e6e73;
-    --line: #d2d2d7;
-    --divider: #d2d2d7;
+    --line: rgba(0, 0, 0, .16);
+    --divider: rgba(0, 0, 0, .12);
 
-    /* ── 강조(포커스/링크) — macOS 파랑 ──────────────────────────── */
-    --accent: #007aff;
-    --accent-strong: #0060df;
+    /* ── 강조 = 시스템 블루 하나 (가이드 §2 Accent) ─────────────────── */
+    --accent: #0a6cff;
+    --accent-strong: #0857cc;
 
     /* ── 상호작용 표면 ─────────────────────────────────────────────── */
-    --hover-bg: rgba(0, 122, 255, .08);
-    --active-bg: rgba(0, 122, 255, .16);
-    /* macOS 리스트 선택 = 파란 채움 + 흰 텍스트 */
-    --selected-bg: #007aff;
+    --hover-bg: rgba(10, 108, 255, .08);
+    --active-bg: rgba(10, 108, 255, .16);
+    --selected-bg: #0a6cff;
     --selected-text: #ffffff;
 
-    --disabled-bg: #f5f5f7;
-    --disabled-text: #b0b0b5;
-    --switch-off: #c7c7cc;
+    --disabled-bg: #f0f0f2;
+    --disabled-text: #b9b9bd;
+    --switch-off: #e4e4e7;
 
-    --state-info-bg: #e5f1ff;
+    --state-info-bg: #e5f0ff;
 
-    /* ── 스크롤바 (얇은 오버레이) ─────────────────────────────────── */
+    /* ── 스크롤바 (가이드 §6: 얇은 오버레이) ──────────────────────── */
     --scrollbar-thumb: rgba(0, 0, 0, .28);
     --scrollbar-thumb-hover: rgba(0, 0, 0, .45);
     --scrollbar-track: transparent;
 
-    /* ── 오버레이 / 팝업 (부드러운 큰 그림자) ─────────────────────── */
-    --overlay-scrim: rgba(0, 0, 0, .35);
+    /* ── 오버레이 / 팝업 (가이드 material + shadow) ───────────────── */
+    --overlay-scrim: rgba(0, 0, 0, .28);
     --busy-scrim: rgba(236, 236, 236, .6);
-    --popover-bg: #ffffff;
-    --popover-shadow: 0 12px 32px rgba(0, 0, 0, .22);
+    --popover-bg: rgba(250, 250, 252, .98);
+    --popover-shadow: 0 8px 28px rgba(0, 0, 0, .24), 0 0 0 0.5px rgba(0, 0, 0, .14);
 
     /* ── 폼 / 텍스트 표면 ──────────────────────────────────────────── */
-    --placeholder: #a0a0a5;
-    --selection-bg: rgba(0, 122, 255, .25);
-    --caret: #007aff;
+    --placeholder: #9a9a9e;
+    --selection-bg: rgba(10, 108, 255, .25);
+    --caret: #0a6cff;
 
     /* ── 타이틀바 토큰 = 밝은 회색(WS20 App헤더/사이드바 전파) ─────── */
-    --titlebar-bg: #e3e3e5;
+    --titlebar-bg: #ededed;
 
-    /* ── shape — ★ §2.1 예외: 큼직한 둥근 모서리 + SF 폰트 ─────────── */
-    --radius: 6px;
-    --radius-sm: 4px;
-    --elevation: 0 4px 14px rgba(0, 0, 0, .12);
-    --font: -apple-system, "SF Pro Text", "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif;
+    /* ── shape (가이드 §2 Radii/Shadows/Typography) ───────────────── */
+    --radius: 7px;              /* r-md 기본 버튼 */
+    --radius-sm: 6px;           /* r-sm */
+    --elevation: 0 1px 3px rgba(0, 0, 0, .06), 0 0 0 0.5px rgba(0, 0, 0, .06);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, "Malgun Gothic", Arial, sans-serif;
 
     /* ── bootstrap-skin.css(--sl-*) 계층 override ─────────────────── */
     --sl-fg: #1d1d1f;
     --sl-muted: #6e6e73;
-    --sl-radius: 8px;
-    --sl-radius-sm: 6px;
-    --sl-elev: 0 12px 32px rgba(0, 0, 0, .20);
-    --sl-elev-sm: 0 4px 12px rgba(0, 0, 0, .12);
+    --sl-radius: 12px;          /* r-card (다이얼로그 카드) */
+    --sl-radius-sm: 7px;
+    --sl-elev: 0 8px 28px rgba(0, 0, 0, .24), 0 0 0 0.5px rgba(0, 0, 0, .14);
+    --sl-elev-sm: 0 1px 3px rgba(0, 0, 0, .06), 0 0 0 0.5px rgba(0, 0, 0, .06);
 }
 
 /*======================================================================
-  macOS "Aqua" 컴포넌트 모양 (shape override) — §2.1 예외
-  ----------------------------------------------------------------------
-  깨끗한 흰 버튼(파란 강조 버튼) · 둥근 입력칸(파란 focus 링) · 밝은 회색 타이틀바
-  · ★신호등 창버튼 · 얇은 오버레이 스크롤바 · 파란 메뉴 하이라이트.
-  셀렉터 [data-theme="horizon_mac"] .u4a-*(0,2,0)가 bootstrap-skin .u4a-*(0,1,0)를
-  나중 로드 + 높은 명세로 이긴다(공통 파일 안 건드림).
+  macOS 컴포넌트 스펙 (가이드 §3) — §2.1 예외
+  값은 MACOS_THEME_GUIDE.md 에서 이식. [data-theme="horizon_mac"] .u4a-*(0,2,0)가
+  bootstrap-skin .u4a-*(0,1,0)를 나중 로드 + 높은 명세로 이긴다(공통 파일 안 건드림).
 ======================================================================*/
 
-/* ── 버튼 (흰 배경 + 얇은 테두리 + 둥근 + 미묘한 그림자) ──────────── */
+/* ── 버튼 Default (흰→회 그라데이션 + 0.5px 테두리) ───────────────── */
 [data-theme="horizon_mac"] .u4a-btn {
-    background: #ffffff;
-    border: 1px solid #d2d2d7;
-    border-radius: 6px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
+    background: linear-gradient(#ffffff, #f4f4f4);
+    border: 0.5px solid rgba(0, 0, 0, .16);
+    border-radius: 7px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .05);
     color: #1d1d1f;
 }
 [data-theme="horizon_mac"] .u4a-btn:hover {
-    background: #f5f5f7;
-    border-color: #c7c7cc;
+    background: #fafafa;
 }
 [data-theme="horizon_mac"] .u4a-btn:active {
-    background: #e8e8ed;
+    background: #ededed;
 }
 [data-theme="horizon_mac"] .u4a-btn:disabled {
-    background: #f5f5f7;
-    border-color: #e2e2e6;
+    background: #f0f0f2;
+    border-color: rgba(0, 0, 0, .08);
     box-shadow: none;
-    color: #b0b0b5;
+    color: #b9b9bd;
 }
 
-/* 강조/기본 버튼 — macOS 파란 채움 버튼 */
+/* 버튼 Primary (블루 그라데이션 + inset 하이라이트) */
 [data-theme="horizon_mac"] .u4a-btn--emphasized,
 [data-theme="horizon_mac"] .btn-primary {
-    background: #007aff;
-    border: 1px solid #007aff;
-    border-radius: 6px;
-    box-shadow: 0 1px 2px rgba(0, 122, 255, .3);
+    background: linear-gradient(#3b91ff, #0a6cff);
+    border: none;
+    border-radius: 7px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .12), inset 0 0.5px 0 rgba(255, 255, 255, .3);
     color: #ffffff;
 }
 [data-theme="horizon_mac"] .u4a-btn--emphasized:hover,
 [data-theme="horizon_mac"] .btn-primary:hover {
-    background: #0071eb;
-    border-color: #0071eb;
+    background: linear-gradient(#3b91ff, #0a6cff);
+    filter: brightness(1.06);
 }
 [data-theme="horizon_mac"] .u4a-btn--emphasized:active,
 [data-theme="horizon_mac"] .btn-primary:active {
-    background: #0060df;
-    border-color: #0060df;
+    filter: brightness(0.94);
 }
 
-/* ── 입력칸 / 콤보 / 셀렉트 (흰 배경 + 둥근 + 파란 focus 링) ──────── */
+/* ── 입력칸 / 콤보 / 셀렉트 (inset 그림자 + 파란 포커스 링) ───────── */
 [data-theme="horizon_mac"] .u4a-input,
 [data-theme="horizon_mac"] .u4a-select,
 [data-theme="horizon_mac"] .u4a-combo,
 [data-theme="horizon_mac"] .form-control,
 [data-theme="horizon_mac"] .form-select {
     background: #ffffff;
-    border: 1px solid #d2d2d7;
+    border: 0.5px solid rgba(0, 0, 0, .2);
     border-radius: 6px;
-    box-shadow: none;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .05);
     color: #1d1d1f;
-}
-[data-theme="horizon_mac"] .u4a-input:hover,
-[data-theme="horizon_mac"] .u4a-combo:hover,
-[data-theme="horizon_mac"] .form-control:hover {
-    border-color: #b8b8be;
 }
 [data-theme="horizon_mac"] .u4a-input:focus-visible,
 [data-theme="horizon_mac"] .u4a-combo:focus-within,
-[data-theme="horizon_mac"] .form-control:focus {
-    border-color: #007aff;
-    box-shadow: 0 0 0 3px rgba(0, 122, 255, .25);
+[data-theme="horizon_mac"] .form-control:focus,
+[data-theme="horizon_mac"] .form-select:focus {
+    border-color: #0a6cff;
+    box-shadow: 0 0 0 3px rgba(10, 108, 255, .3);
+    outline: none;
 }
 
-/* ── 타이틀바 (macOS 밝은 회색) ───────────────────────────────────── */
+/* ── 타이틀바 (가이드 §3: linear-gradient(#f6f6f6,#e8e8e8) + 헤어라인) ── */
 [data-theme="horizon_mac"] .u4a-titlebar {
-    background: linear-gradient(180deg, #ededed 0%, #dcdcde 100%);
-    color: #3a3a3c;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), inset 0 -1px 0 rgba(0, 0, 0, .12);
+    background: linear-gradient(#f6f6f6, #e8e8e8);
+    color: #1d1d1f;
+    box-shadow: inset 0 -0.5px 0 rgba(0, 0, 0, .12);
 }
 [data-theme="horizon_mac"] .u4a-titlebar__title {
-    color: #3a3a3c;
+    color: #1d1d1f;
     font-weight: 600;
 }
 
-/* ── 창 버튼 = ★ macOS 신호등(원형 빨/노/초) ──────────────────────
-   순서 min → max → close(.u4a-winbtn--close). 인접 선택자로 색 구분:
-   min=노랑(기본) / max=min 다음(초록) / close=빨강(--close, max 규칙 뒤라 이김). */
+/* ── 창 버튼 = 신호등 (12px 원, 빨/노/초) ──────────────────────────
+   순서 min → max → close(.u4a-winbtn--close). 인접 선택자로 색 구분. */
 [data-theme="horizon_mac"] .u4a-winbtn {
-    width: 13px;
-    height: 13px;
+    width: 12px;
+    height: 12px;
     margin: 0 4px;
     padding: 0;
     border-radius: 50%;
-    border: 0.5px solid rgba(0, 0, 0, .18);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, .5);
-    /* 심볼(_□X)은 평소 숨김 — macOS 는 색 원만 노출 */
+    border: none;
+    box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, .15);
     font-size: 0;
     background: #febc2e;            /* min = 노랑 */
     color: transparent;
@@ -178,7 +170,7 @@
     display: none;
 }
 [data-theme="horizon_mac"] .u4a-winbtn + .u4a-winbtn {
-    background: #28c840;            /* max = 초록(min 다음) */
+    background: #28c840;            /* max = 초록 */
 }
 [data-theme="horizon_mac"] .u4a-winbtn.u4a-winbtn--close {
     background: #ff5f57;            /* close = 빨강 */
@@ -193,10 +185,9 @@
 }
 [data-theme="horizon_mac"] .u4a-winbtn.u4a-winbtn--close:hover {
     background-color: #ff5f57;
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, .5);
 }
 
-/* ── 스크롤바 (얇은 오버레이 pill, 화살표 없음) ───────────────────── */
+/* ── 스크롤바 (가이드 §6: 얇게 8px, 둥근 반투명 thumb, 화살표 없음) ── */
 [data-theme="horizon_mac"] ::-webkit-scrollbar {
     width: 12px;
     height: 12px;
@@ -221,67 +212,66 @@
     background: transparent;
 }
 
-/* ── 체크박스 (흰 → checked 파란 채움 + 흰 체크) ──────────────────── */
+/* ── 체크박스 (16px, r4, OFF 흰+inset / ON 블루그라데이션+흰체크) ──── */
 [data-theme="horizon_mac"] .u4a-check input[type="checkbox"],
 [data-theme="horizon_mac"] .form-check-input[type="checkbox"] {
     -webkit-appearance: none;
     appearance: none;
-    width: 14px;
-    height: 14px;
-    border: 1px solid #c7c7cc;
+    width: 16px;
+    height: 16px;
+    border: 0.5px solid rgba(0, 0, 0, .25);
     border-radius: 4px;
     background: #ffffff;
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, .05);
     cursor: pointer;
-}
-[data-theme="horizon_mac"] .u4a-check input[type="checkbox"]:hover,
-[data-theme="horizon_mac"] .form-check-input[type="checkbox"]:hover {
-    border-color: #007aff;
 }
 [data-theme="horizon_mac"] .u4a-check input[type="checkbox"]:checked,
 [data-theme="horizon_mac"] .form-check-input[type="checkbox"]:checked {
     background:
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3L13 4.5'/%3E%3C/svg%3E") center/12px no-repeat,
-        #007aff;
-    border-color: #007aff;
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3L13 4.5'/%3E%3C/svg%3E") center/13px no-repeat,
+        linear-gradient(#3b91ff, #0a6cff);
+    border-color: transparent;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .12);
 }
 
-/* ── 라디오 (원형, checked 파란 채움 + 흰 점) ─────────────────────── */
+/* ── 라디오 (원형, 선택 시 중앙 6px 흰 점 + 블루그라데이션) ───────── */
 [data-theme="horizon_mac"] .u4a-check input[type="radio"],
 [data-theme="horizon_mac"] .form-check-input[type="radio"] {
     -webkit-appearance: none;
     appearance: none;
-    width: 14px;
-    height: 14px;
-    border: 1px solid #c7c7cc;
+    width: 16px;
+    height: 16px;
+    border: 0.5px solid rgba(0, 0, 0, .25);
     border-radius: 50%;
     background: #ffffff;
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, .05);
     cursor: pointer;
-}
-[data-theme="horizon_mac"] .u4a-check input[type="radio"]:hover,
-[data-theme="horizon_mac"] .form-check-input[type="radio"]:hover {
-    border-color: #007aff;
 }
 [data-theme="horizon_mac"] .u4a-check input[type="radio"]:checked,
 [data-theme="horizon_mac"] .form-check-input[type="radio"]:checked {
-    background: radial-gradient(circle at center, #ffffff 0 2.6px, transparent 3.2px), #007aff;
-    border-color: #007aff;
+    background: radial-gradient(circle at center, #ffffff 0 3px, transparent 3.5px), linear-gradient(#3b91ff, #0a6cff);
+    border-color: transparent;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .12);
 }
 [data-theme="horizon_mac"] .u4a-check input:disabled,
 [data-theme="horizon_mac"] .form-check-input:disabled {
-    background-color: #f5f5f7;
-    border-color: #e2e2e6;
+    background: #f0f0f2;
+    border-color: rgba(0, 0, 0, .08);
+    box-shadow: none;
 }
 
-/* ── 메뉴 (흰 배경 + 큼직한 둥근 + 파란 hover) ────────────────────── */
+/* ── 메뉴 (가이드 §3: material + blur, r8, 파란 hover) ────────────── */
 [data-theme="horizon_mac"] .u4a-menu {
-    padding: 4px;
-    border: 1px solid rgba(0, 0, 0, .08);
+    padding: 5px;
+    border: 0.5px solid rgba(0, 0, 0, .14);
     border-radius: 8px;
-    background: #ffffff;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, .22);
+    background: rgba(250, 250, 252, .98);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .24);
 }
 [data-theme="horizon_mac"] .u4a-menu__item {
-    padding: 5px 14px;
+    padding: 5px 10px;
     border-radius: 5px;
     color: #1d1d1f;
 }
@@ -291,11 +281,70 @@
 /* macOS 메뉴 hover = 파란 채움 + 흰 글자. 활성 항목만(비활성/타이틀/커스텀 제외 — 버그 방지) */
 [data-theme="horizon_mac"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover,
 [data-theme="horizon_mac"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible {
-    background: #007aff;
+    background: #0a6cff;
     color: #ffffff;
     border-radius: 5px;
 }
 [data-theme="horizon_mac"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):hover i,
 [data-theme="horizon_mac"] .u4a-menu__item:not([aria-disabled="true"]):not(.u4aWs20CtxTitle):not(.u4a-menu__item--custom):focus-visible i {
     color: #ffffff;
+}
+
+/* ── 다이얼로그 (가이드 §3: 반투명 재질 + blur, r14, 깊은 그림자) ──── */
+[data-theme="horizon_mac"] .u4a-dialog {
+    border: none;
+    border-radius: 14px;
+    background: rgba(246, 246, 248, .96);
+    -webkit-backdrop-filter: blur(30px);
+    backdrop-filter: blur(30px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .4), 0 0 0 0.5px rgba(0, 0, 0, .14);
+    color: #1d1d1f;
+}
+/* 헤더/바디/푸터 = 다이얼로그 재질 그대로(투명) + 얇은 헤어라인 구분 */
+[data-theme="horizon_mac"] .u4a-dialog__header {
+    background: transparent;
+    border-bottom: 0.5px solid rgba(0, 0, 0, .1);
+}
+[data-theme="horizon_mac"] .u4a-dialog__footer {
+    background: transparent;
+    border-top: 0.5px solid rgba(0, 0, 0, .1);
+}
+[data-theme="horizon_mac"] .u4a-dialog__body {
+    background: transparent;
+}
+/* 오버레이(backdrop) = 어둡게 + 살짝 blur (가이드 오버레이) */
+[data-theme="horizon_mac"] .u4a-dialog::backdrop {
+    background: rgba(0, 0, 0, .28);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+
+/* ── 테이블 (가이드 §3/§6: 연회색 헤더 + zebra + 파란 선택) ────────── */
+[data-theme="horizon_mac"] .u4a-table thead th {
+    background: #f5f5f7;
+    color: #6e6e73;
+    font-weight: 600;
+    border-bottom: 0.5px solid rgba(0, 0, 0, .12);
+}
+[data-theme="horizon_mac"] .u4a-table tbody tr:nth-child(even) {
+    background: rgba(0, 0, 0, .025);
+}
+[data-theme="horizon_mac"] .u4a-table tbody tr:hover {
+    background: rgba(10, 108, 255, .06);
+}
+/* 선택 행은 공통 --selected-bg(#0a6cff)+--selected-text(#fff) 를 그대로 소비 */
+
+/* ── 토글 스위치 (가이드 §3: 초록 트랙 + 흰 노브 그림자) ─────────── */
+[data-theme="horizon_mac"] .u4a-switch__slider {
+    background: #e4e4e7;
+    border-color: transparent;
+    border-radius: 13px;
+    box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, .08);
+}
+[data-theme="horizon_mac"] .u4a-switch__slider::before {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+}
+[data-theme="horizon_mac"] .u4a-switch input:checked + .u4a-switch__slider {
+    background: #34c759;            /* mac-green = 토글 ON */
+    border-color: transparent;
 }

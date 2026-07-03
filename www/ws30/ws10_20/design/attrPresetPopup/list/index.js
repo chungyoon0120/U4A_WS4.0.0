@@ -113,6 +113,14 @@ function _setBusy(bOn, oOpt) {
     }
 }
 
+// 창 표시 + 투명도 복원 — ★opener 가 opacity:0/show:false 로 열기 때문에 콘텐츠가 반드시 되돌려야
+//   화면에 보인다(원본 list/index.js _window_onload 의 show()+setOpacity(1) 대응). 누락 시 작업표시줄엔
+//   뜨지만 창이 완전 투명해 안 보인다.
+function _showWindow() {
+    try { CURRWIN.show(); } catch (e) { }
+    try { CURRWIN.setOpacity(1); } catch (e) { }
+}
+
 // 로드 완료 — 메인 busy lock 해제(opener 의 webContents 'load-finish' 리스너) + 본문 표시(1회만).
 function _finishOpen() {
     if (bOpenDone) { return; }
@@ -123,7 +131,7 @@ function _finishOpen() {
     _setBusy(false);
     var oBody = document.getElementById("apBody");
     if (oBody) { oBody.classList.add("u4aApShown"); }
-    try { CURRWIN.show(); } catch (e) { }
+    _showWindow();
 }
 
 // 공통 .u4a-toast(화면 정중앙) — 싱글톤 div + data-show + 3초.
@@ -748,6 +756,70 @@ async function _onUpload() {
     }
 }
 
+// ── 도구모음(654) 드롭다운(원본 sap.m.MenuButton) — 공통 .u4a-menu 소비, 앵커 하단 배치.
+//    바깥클릭/ESC/리사이즈/스크롤 시 닫기(anchored-overlay 표준). openColumnMenu 패턴 준용.
+var _oToolsMenu = null;
+
+function _onToolsOutside(e) {
+    if (!_oToolsMenu) { return; }
+    if (_oToolsMenu.contains(e.target)) { return; }
+    if (e.target.closest && e.target.closest("#apToolsBtn")) { return; }
+    _closeToolsMenu();
+}
+function _onToolsKey(e) {
+    if (e.key === "Escape") { _closeToolsMenu(); }
+}
+function _closeToolsMenu() {
+    if (!_oToolsMenu) { return; }
+    try { _oToolsMenu.remove(); } catch (e) { }
+    _oToolsMenu = null;
+    var oBtn = document.getElementById("apToolsBtn");
+    if (oBtn) { oBtn.setAttribute("aria-expanded", "false"); }
+    document.removeEventListener("mousedown", _onToolsOutside, true);
+    document.removeEventListener("keydown", _onToolsKey, true);
+    window.removeEventListener("resize", _closeToolsMenu);
+    window.removeEventListener("scroll", _closeToolsMenu, true);
+}
+function _openToolsMenu(anchor) {
+    if (_oToolsMenu) { _closeToolsMenu(); return; }   // 토글
+
+    var m = document.createElement("div");
+    m.className = "u4a-menu";
+    m.setAttribute("role", "menu");
+
+    function _item(sIcon, sText, fn) {
+        var it = document.createElement("div");
+        it.className = "u4a-menu__item";
+        it.setAttribute("role", "menuitem");
+        it.innerHTML = '<i class="fa-solid fa-' + sIcon + '"></i><span></span>';
+        it.querySelector("span").textContent = sText;
+        it.addEventListener("click", function () { _closeToolsMenu(); fn(); });
+        return it;
+    }
+    m.appendChild(_item("download", _zmsg("644"), _onDownload)); // 다운로드
+    m.appendChild(_item("upload", _zmsg("645"), _onUpload));     // 업로드
+
+    document.body.appendChild(m);
+
+    // 앵커 하단·우측정렬(메뉴 우변을 버튼 우변에 맞춤) + 화면 클램프.
+    var r = anchor.getBoundingClientRect();
+    var mw = m.offsetWidth, mh = m.offsetHeight;
+    var left = Math.max(6, Math.min(r.right - mw, window.innerWidth - mw - 6));
+    var top = r.bottom + 4;
+    if (top + mh > window.innerHeight - 6) { top = Math.max(6, r.top - mh - 4); }
+    m.style.position = "fixed";
+    m.style.left = left + "px";
+    m.style.top = top + "px";
+
+    _oToolsMenu = m;
+    anchor.setAttribute("aria-expanded", "true");
+
+    document.addEventListener("mousedown", _onToolsOutside, true);
+    document.addEventListener("keydown", _onToolsKey, true);
+    window.addEventListener("resize", _closeToolsMenu);
+    window.addEventListener("scroll", _closeToolsMenu, true);
+}
+
 
 /* ══════════════════════ 데이터 로드 ══════════════════════ */
 
@@ -870,23 +942,18 @@ function _initChrome() {
     }
 
     // 상단 툴바 버튼/라벨.
+    //   레이아웃 초기화(655) — 아이콘 전용(원본 icon-only). 텍스트 없음, tooltip 만.
     var oReset = document.getElementById("apResetBtn");
     if (oReset) {
         oReset.title = _zmsg("655");
-        var oRT = document.getElementById("apResetTxt"); if (oRT) { oRT.textContent = _zmsg("655"); }
         oReset.addEventListener("click", _onResetLayout);
     }
-    var oDown = document.getElementById("apDownloadBtn");
-    if (oDown) {
-        oDown.title = _zmsg("644");
-        var oDT = document.getElementById("apDownloadTxt"); if (oDT) { oDT.textContent = _zmsg("644"); }
-        oDown.addEventListener("click", _onDownload);
-    }
-    var oUp = document.getElementById("apUploadBtn");
-    if (oUp) {
-        oUp.title = _zmsg("645");
-        var oUT = document.getElementById("apUploadTxt"); if (oUT) { oUT.textContent = _zmsg("645"); }
-        oUp.addEventListener("click", _onUpload);
+    //   도구모음(654) 드롭다운(원본 sap.m.MenuButton) — 클릭 시 다운로드/업로드 메뉴.
+    var oTools = document.getElementById("apToolsBtn");
+    if (oTools) {
+        oTools.title = _zmsg("654");
+        var oTT = document.getElementById("apToolsTxt"); if (oTT) { oTT.textContent = _zmsg("654"); }
+        oTools.addEventListener("click", function () { _openToolsMenu(oTools); });
     }
     var oHelp = document.getElementById("apHelpBtn");
     if (oHelp) { oHelp.addEventListener("click", _onHelp); }
@@ -965,7 +1032,7 @@ async function _onIpcRender(events, data) {
             _setBusy(true);
             try { await _loadData(); } catch (e) { console.error("[UI_ATTR] ATTR_CHANGE 갱신 오류:", e); }
             _setBusy(false);
-            try { CURRWIN.show(); } catch (e) { }
+            _showWindow();
             break;
 
         case "U4A_HELP_DOCUMENT_OPEN":
@@ -988,6 +1055,9 @@ async function _onload() {
     try { CURRWIN.setMenu(null); } catch (e) { }
 
     _setBusy(true);
+
+    // 창을 즉시 표시(busy 스피너 상태) — opener 가 opacity:0/show:false 로 열었으므로 여기서 되돌린다.
+    _showWindow();
 
     _initChrome();
     _initBroadcast();
@@ -1039,7 +1109,7 @@ IPCRENDERER.once("HANDLE_ON_INIT", _ipcHandleOnInit);
 iBusyWatch = setTimeout(function () {
     if (oState.gotInit) { return; }
     console.error("[HTML5][attrPresetPopup] 초기화 정보 수신 지연 — busy 강제 해제");
-    try { CURRWIN.show(); } catch (e) { }
+    _showWindow();
     _finishOpen();
 }, 20000);
 
@@ -1049,6 +1119,7 @@ iBusyWatch = setTimeout(function () {
 // busy 중 창 닫기 차단(원본 onbeforeunload). 정상 종료 시 리스너/IPC 해제.
 window.onbeforeunload = function () {
     if (bBusy) { return false; }
+    try { _closeToolsMenu(); } catch (e) { }
     window.removeEventListener("click", _keepSession);
     window.removeEventListener("keyup", _keepSession);
     window.removeEventListener("resize", _applyView);

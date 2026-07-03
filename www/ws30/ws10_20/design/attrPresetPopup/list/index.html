@@ -56,18 +56,15 @@
 
         <!-- 상단 툴바(원본 Page customHeader Toolbar) -->
         <div class="u4aApToolbar" id="apToolbar">
-            <button type="button" class="u4a-btn u4aApReset" id="apResetBtn">
-                <i class="fa-solid fa-table-columns"></i><span id="apResetTxt"></span>
-            </button>
+            <!-- 레이아웃 초기화(655) — 원본 icon-only Button(screen-split-one). -->
+            <button type="button" class="u4a-btn u4aApReset u4aApIcoBtn" id="apResetBtn" title=""><i class="fa-solid fa-table-columns"></i></button>
             <span class="u4aApToolbar__spacer"></span>
-            <button type="button" class="u4a-btn u4aApTool" id="apDownloadBtn">
-                <i class="fa-solid fa-download"></i><span id="apDownloadTxt"></span>
-            </button>
-            <button type="button" class="u4a-btn u4aApTool" id="apUploadBtn">
-                <i class="fa-solid fa-upload"></i><span id="apUploadTxt"></span>
+            <!-- 도구모음(654) — 원본 sap.m.MenuButton. 클릭 시 다운로드/업로드 드롭다운(.u4a-menu). -->
+            <button type="button" class="u4a-btn u4aApTool u4aApToolsBtn" id="apToolsBtn" aria-haspopup="menu" aria-expanded="false">
+                <span id="apToolsTxt"></span><i class="fa-solid fa-chevron-down u4aApCaret"></i>
             </button>
             <span class="u4aApToolbar__sep"></span>
-            <button type="button" class="u4a-btn u4aApTool" id="apHelpBtn" title="Help"><i class="fa-solid fa-circle-question"></i></button>
+            <button type="button" class="u4a-btn u4aApTool u4aApIcoBtn" id="apHelpBtn" title="Help"><i class="fa-solid fa-circle-question"></i></button>
         </div>
 
         <!-- 가로 스플리터 -->

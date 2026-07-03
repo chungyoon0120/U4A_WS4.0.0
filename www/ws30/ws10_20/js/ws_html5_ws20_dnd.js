@@ -254,6 +254,23 @@
         }
     };
 
+    // 앱당 1개만 허용되는 UI(UA039) 중복 점검. (원본 designChkUnique 1555행 1:1)
+    if (typeof oAPP.fn.designChkUnique !== "function") {
+        oAPP.fn.designChkUnique = function (UIOBK, iCnt) {
+            var ls_UA039 = oAPP.DATA.LIB.T_9011.find(function (a) { return a.CATCD === "UA039" && a.FLD02 === UIOBK && a.FLD04 === "X"; });
+            if (!ls_UA039) { return; }                                    // 중복관리 대상 아님.
+            if (typeof iCnt !== "undefined" && iCnt >= 2) {
+                // 130 Target API and UI &1 does not allow one or more assign.
+                _toast("E", _msg("/U4A/MSG_WS", "130", ls_UA039.FLD01)); return true;
+            }
+            var lt_tree = (typeof oAPP.fn.parseTree2Tab === "function") ? oAPP.fn.parseTree2Tab(oAPP.attr.oModel.oData.zTREE) : null;
+            if (!lt_tree) { return; }
+            if (lt_tree.findIndex(function (a) { return a.UIOBK === UIOBK; }) !== -1) {
+                _toast("E", _msg("/U4A/MSG_WS", "130", ls_UA039.FLD01)); return true;   // 이미 존재.
+            }
+        };
+    }
+
     // 특정 부모에만 허용되는 UI 점검. (원본 1614행 1:1)
     oAPP.fn.designChkFixedParentUI = function (UIOBK, PUIOK, UIATT) {
         var _uw03 = (oAPP.attr.S_CODE && oAPP.attr.S_CODE.UW03) ? oAPP.attr.S_CODE.UW03 : [];
@@ -662,6 +679,10 @@
         var lt_dragInfo = oAPP.fn.getDragParam(oEvent);
         if (!lt_dragInfo || lt_dragInfo.length !== 3) { _bindBusy("BUSY_OFF"); return; }
 
+        // 내 패턴(UI 개인화) 리스트에서 드래그한 경우 — 저장 패턴을 대상 UI 에 적용(원본 uiDesignArea.js 5658).
+        //   drop 위치(On/Before/After)를 넘겨 getDropTargetLine 이 실제 대상/삽입위치를 재해석하도록 함.
+        if (lt_dragInfo[0] === "P13nUIData") { return oAPP.fn.applyP13nPatternDrop(lt_dragInfo, i_OBJID, _dropPosition); }
+
         if (lt_dragInfo[0] !== "designTree" && lt_dragInfo[0] !== "previewArea") { _bindBusy("BUSY_OFF"); return; }
 
         // 다른 세션 drag 정보 차단.
@@ -716,6 +737,278 @@
         oAPP.fn.aggrSelectPopup(l_drag, l_drop, oAPP.fn.drop_cb, l_pos.x, l_pos.y);
         return true;
     };
+
+
+    /* ====================================================================
+     * 5-b) 내 패턴(UI 개인화) drop 적용 (원본 uiDesignArea.js designP13nUIData 5658 + designAddTreeData).
+     *   개인화 리스트에서 드래그한 저장 패턴(파일)을 읽어 대상 UI 의 aggregation 에 붙여넣는다.
+     *   재구성은 검증된 붙여넣기 경로(_pasteUI)와 동일 방식 재사용 — OBJID 재채번 + 속성/이벤트/설명
+     *   복원 + 미리보기 createUIInstance. aggregation 선택은 공통 aggrSelectPopup.
+     * ==================================================================== */
+    oAPP.fn.applyP13nPatternDrop = function (lt_dragInfo, i_OBJID, i_dropPosition) {
+
+        function _exit() { _bindBusy("BUSY_OFF"); _safe(function () { oAPP.fn.setShortcutLock(false); }); try { parent.setBusy(""); } catch (e) { } }
+
+        // 편집 불가면 무시(디자인 추가 불가).
+        if (!_isEdit()) { _exit(); return; }
+
+        // 단축키 잠금(원본 designAddTreeData 6479). 트리 native drop 경로는 이미 잠갔지만(멱등),
+        //   미리보기 iframe drop 경로엔 없어 aggr 팝업 async 구간 보호 위해 진입부에서 확정.
+        _safe(function () { oAPP.fn.setShortcutLock(true); });
+
+        // 다른 세션 drag 차단(원본 102).
+        if (lt_dragInfo[2] !== oAPP.attr.DnDRandKey) { _toast("E", _wsc("102")); _exit(); return; }
+
+        var l_itemKey = lt_dragInfo[1];
+        var l_sysid = _safe(function () { return parent.getUserInfo().SYSID; });
+        if (!l_itemKey || !l_sysid) { _exit(); return; }
+
+        // 개인화 파일 경로(원본 5686) = P13N_ROOT/U4A_UI_PATTERN/{SYSID}/{fileName}.
+        var l_path = _safe(function () { return parent.PATH.join(parent.getPath("P13N_ROOT"), "U4A_UI_PATTERN", l_sysid, l_itemKey); });
+        if (!l_path || parent.FS.existsSync(l_path) !== true) { _toast("E", _wsc("017")); _exit(); return; }  // 017 저장 파일 없음.
+
+        var ls_item;
+        try { ls_item = JSON.parse(parent.FS.readFileSync(l_path, "utf-8")); } catch (e) { _toast("E", e && e.message ? e.message : e); _exit(); return; }
+        if (!ls_item || !ls_item.is_tree) { _exit(); return; }
+
+        // drop 대상 UI.
+        var l_drop = oAPP.fn.getTreeData(i_OBJID);
+        if (!l_drop) { _exit(); return; }
+
+        // 드롭 위치(On/Before/After) 기준 실제 대상 라인/삽입위치 재해석(원본 designUIDropP13nList 5727~5762).
+        //   sDrag=undefined(신규 추가). getDropTargetLine 이 대상 노드에 dropLineInfo(dropIndex) 를 심는다.
+        var _sDNDInfo = { sDrag: undefined, sDrop: l_drop, sDropLineInfo: { dropPosition: i_dropPosition, dropIndex: (l_drop.zTREE ? l_drop.zTREE.length : 0) } };
+        var l_target = _safe(function () { return oAPP.oDesign.fn.getDropTargetLine(_sDNDInfo); });
+        if (!l_target) { _toast("E", _wsc("245")); _exit(); return; }   // 245 DROP 처리 UI 를 찾을 수 없습니다.
+        l_drop = l_target;
+
+        var l_data = ls_item.is_tree;   // 붙여넣을 패턴 최상위(원본 is_data).
+
+        // ── designAddTreeData 전반부 가드(원본 6501~6544) ──
+        // ① UA039 앱당 1개만 허용 UI 중복(designChkUnique) → skip.
+        if (oAPP.fn.designChkUnique(l_data.UIOBK) === true) { _exit(); return; }
+        // ② UA040 HIDDEN_AREA 전용 UI 위치 점검(designChkHiddenAreaUi).
+        if (oAPP.fn.designChkHiddenAreaUi(l_data.UIOBK, l_drop.UIOBK) === true) { _exit(); return; }
+
+        // 트리 아이콘 구성(가드).
+        _safe(function () { if (typeof oAPP.fn.setTreeUiIcon === "function") { oAPP.fn.setTreeUiIcon(l_data); } });
+
+        // aggregation 선택 팝업 → 선택된 aggregation 으로 패턴 적용.
+        var l_pos = oAPP.fn.getMousePosition();
+        oAPP.fn.aggrSelectPopup(l_data, l_drop, async function (param) {
+
+            // ── lf_aggrPopup_cb 가드(원본 6236~6352) = 일반 drop_cb 검증 사슬(982~998)과 동일 ──
+            // ③ 이동 가능한 aggregation 없음(원본 269).
+            if (typeof param === "undefined") { _toast("I", _wsc("269")); _exit(); return; }
+            // ④ 카디널리티(0:1 aggr 중복 방지).
+            if (oAPP.fn.chkUiCardinality(l_drop, param.UIATK, param.ISMLB) === true) { _exit(); return; }
+            // ⑤ 특정 부모 전용 UI.
+            if (oAPP.fn.designChkFixedParentUI(l_data.UIOBK, l_drop.UIOBK, param.UIATT) === true) { _exit(); return; }
+            // ⑥ 예외 aggregation 추가 불가/허용(exceptionUI.js).
+            var _exMod = null;
+            _safe(function () { _exMod = parent.require(parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "js", "exception", "exceptionUI.js")); });
+            if (_exMod) {
+                var _deny = false; _safe(function () { _deny = _exMod.checkDenyChildAggr({ UIOBK: l_drop.UIOBK, UIATT: param.UIATT, CHILD_UIOBK: l_data.UIOBK }); });
+                if (_deny === true) { _toast("E", _wsc("214", l_data.OBJID, l_drop.OBJID, param.UIATT)); _exit(); return; }
+                var _allow = true; _safe(function () { _allow = _exMod.checkAllowChildAggr({ PUIOK: l_drop.UIOBK, UIATT: param.UIATT, UIOBK: l_data.UIOBK }); });
+                if (_allow !== true) { _toast("E", _wsc("214", l_data.OBJID, l_drop.OBJID, param.UIATT)); _exit(); return; }
+            }
+
+            // ⑦ 패턴의 $OTR: alias 서버조회로 T_OTR 채운 뒤 적용(원본 lf_getOTRtext 6149).
+            //    미리보기(uiPreviewArea.js 1118)가 T_OTR 로 $OTR 텍스트를 해석하므로 붙여넣기 전 필요.
+            //    ※ keep-binding 확인(원본 lf_chkBindNEvent+116/117)은 저장 시 바인딩/서버이벤트를
+            //      걸러내므로(fnP13nDesignPopupOpen.js 337) 이 경로에선 항상 미도달 → bKeep=false 고정.
+            try { await _fetchP13nOtr(l_data); }
+            catch (e) { console.error("[HTML5][WS20][dnd] getOTRTextsAlias", e); }
+
+            try { await _applyP13nPattern(l_data, l_drop, param); }
+            catch (e) { console.error("[HTML5][WS20][dnd] applyP13nPattern", e); }
+            _exit();
+        }, l_pos.x, l_pos.y, function () { _exit(); });
+
+        return true;
+    };
+
+    // 패턴 트리의 $OTR: alias(프로퍼티·미바인딩) 재귀 수집 → 서버조회로 T_OTR 갱신(원본 lf_getOTRtext).
+    function _fetchP13nOtr(is_data) {
+        var aAlias = [];
+        (function _walk(n) {
+            if (!n) { return; }
+            if (n.zTREE && n.zTREE.length) { for (var i = 0; i < n.zTREE.length; i++) { _walk(n.zTREE[i]); } }
+            var a15 = n._T_0015 || [];
+            for (var j = 0; j < a15.length; j++) {
+                var s = a15[j];
+                if (s.UIATY === "1" && s.ISBND !== "X" && String(s.UIATV || "").substr(0, 5) === "$OTR:") { aAlias.push(s.UIATV.substr(5)); }
+            }
+        })(is_data);
+
+        if (aAlias.length === 0) { return Promise.resolve(); }   // 수집 alias 없으면 서버조회 생략.
+
+        return new Promise(function (resolve) {
+            var fd; try { fd = new FormData(); fd.append("ALIAS", JSON.stringify(aAlias)); } catch (e) { resolve(); return; }
+            sendAjax(oAPP.attr.servNm + "/getOTRTextsAlias", fd, function (oRet) {
+                if (oRet && oRet.RETCD === "E") { _toast("W", oRet.RTMSG); }
+                if (oRet && typeof oRet.T_OTR !== "undefined") { oAPP.DATA.APPDATA.T_OTR = oRet.T_OTR; }   // 원본 6213 동일(대체).
+                resolve();
+            }, "X", true, "POST", function () { resolve(); });
+        });
+    }
+
+    /* 패턴(파일에 저장된 트리)을 대상 UI 자식으로 붙여넣기.
+     *   원본 designAddTreeData → lf_setPasteCopiedData + lf_paste_cb(uiDesignArea.js 5808~) 1:1 포트.
+     *   ★검증된 designCopyUI(위 7절) 구조를 그대로 따르되, 속성/이벤트/설명의 출처만 다르다:
+     *     copy = 라이브 저장소(oAPP.attr.prev/getDesc/T_CEVT) / 패턴 = 파일 노드에 **박제된**
+     *     _T_0015·_DESC·_CEVT 를 읽는다(원본 lf_copyAttrData/lf_copyClientEvent + setDesc 가 그 필드 사용).
+     *   미리보기 반영(addUIObjPreView/createUIInstance/moveUIObjPreView/prevDrawExceptionUi) + 클라이언트
+     *   이벤트 배선(_CEVT→T_CEVT) 이 한 쌍으로 수행되고, 부모 rerender → 모델갱신 → 선택까지 원본대로 처리. */
+    async function _applyP13nPattern(is_pattern, is_target, aggrParam) {
+
+        var w = _frameWin();
+
+        _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } });
+
+        if (!is_target.zTREE) { is_target.zTREE = []; }
+
+        // 공통코드(원본 lf_setPasteCopiedData 인자 · designCopyUI 와 동일 필터).
+        var lt_ua018 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA018"; });
+        var lt_ua026 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA026" && a.FLD02 !== "X"; });
+        var lt_ua030 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA030" && a.FLD06 !== "X"; });
+        var lt_ua032 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA032" && a.FLD06 !== "X"; });
+        var lt_ua050 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA050" && a.FLD08 !== "X"; });
+
+        // top 노드 drop index — getDropTargetLine 이 심은 dropLineInfo.dropIndex 우선(원본 6483~6494),
+        //   없으면 대상 zTREE 끝. 사용 후 원본처럼 제거.
+        var _dropIndex = (is_target.dropLineInfo && typeof is_target.dropLineInfo.dropIndex === "number")
+            ? is_target.dropLineInfo.dropIndex : is_target.zTREE.length;
+        try { delete is_target.dropLineInfo; } catch (e) { }
+
+        // 속성 복사 — 파일 박제 _T_0015 사용(원본 lf_copyAttrData, bKeep=false: 바인딩/서버이벤트값 제외).
+        function _copyAttr(is_14, is_copied, i_aggr) {
+            if (!is_copied._T_0015 || is_copied._T_0015.length === 0) { return []; }
+            var lt = [];
+            for (var i = 0, l = is_copied._T_0015.length; i < l; i++) {
+                var s = is_copied._T_0015[i];
+                if (s.ISBND === "X" && s.UIATV !== "") { continue; }   // 바인딩값 제외.
+                if (s.UIATY === "2" && s.UIATV !== "") { continue; }   // 서버이벤트값 제외.
+                var ls_15 = oAPP.fn.crtStru0015();
+                oAPP.fn.moveCorresponding(s, ls_15);
+                ls_15.APPID = oAPP.attr.appInfo.APPID;
+                ls_15.GUINR = oAPP.attr.appInfo.GUINR;
+                ls_15.OBJID = is_14.OBJID;
+                if (i_aggr && ls_15.UIATY === "6") {
+                    ls_15.UIATK = i_aggr.UIATK; ls_15.UIATT = i_aggr.UIATT; ls_15.UIASN = i_aggr.UIASN;
+                    ls_15.UIADT = i_aggr.UIADT; ls_15.UIADS = i_aggr.UIADS; ls_15.ISMLB = i_aggr.ISMLB;
+                }
+                lt.push(ls_15);
+            }
+            return lt;
+        }
+
+        // 클라이언트 이벤트 복사(원본 lf_copyClientEvent) — 파일 박제 _CEVT 의 OBJID 접두를 신규로 치환 후 T_CEVT 수집.
+        //   ★이게 "UI 선택표시 + 클릭이벤트" 한 쌍의 후자 — 미리보기의 press 등 이벤트가 살아서 붙는다.
+        function _copyClientEvent(OBJID, is_copied) {
+            if (typeof is_copied._CEVT === "undefined") { return; }
+            var _A = oAPP.DATA.APPDATA;
+            if (!_A || !Array.isArray(_A.T_CEVT)) { return; }
+            var arr = JSON.parse(JSON.stringify(is_copied._CEVT));
+            for (var i = 0, l = arr.length; i < l; i++) {
+                if (arr[i].OBJID && is_copied.OBJID) { arr[i].OBJID = arr[i].OBJID.replace(is_copied.OBJID, OBJID); }
+            }
+            _A.T_CEVT = _A.T_CEVT.concat(arr);
+        }
+
+        // 노드 재구성 재귀(원본 lf_setPasteCopiedData) — designCopyUI.lf_copy0014 와 동일 골격.
+        function _rebuild(is_copied, is_parent, i_aggr) {
+            var ls_14 = oAPP.fn.crtStru0014();
+            oAPP.fn.crtTreeBindField(ls_14);
+            oAPP.fn.moveCorresponding(is_copied, ls_14);
+            ls_14.zTREE = [];
+
+            ls_14.APPID = oAPP.attr.appInfo.APPID;
+            ls_14.GUINR = oAPP.attr.appInfo.GUINR;
+
+            if (i_aggr) {
+                ls_14.UIATK = i_aggr.UIATK; ls_14.UIATT = i_aggr.UIATT; ls_14.UIASN = i_aggr.UIASN;
+                ls_14.UIATY = i_aggr.UIATY; ls_14.UIADT = i_aggr.UIADT; ls_14.UIADS = i_aggr.UIADS;
+                ls_14.ISMLB = i_aggr.ISMLB; ls_14.PUIATK = i_aggr.UIATK;
+            }
+
+            // OBJID 재채번 — 부모/이미 push된 형제가 트리에 있으므로 유일번호(원본 replace \d → setOBJID).
+            ls_14.OBJID = ls_14.OBJID.replace(/\d/g, "");
+            ls_14.OBJID = oAPP.fn.setOBJID(ls_14.OBJID);
+            ls_14.POBID = is_parent.OBJID;
+            ls_14.PUIOK = is_parent.UIOBK;
+
+            ls_14.chk = false; ls_14.chk_visible = true;   // 원본 5907~5908. 트리 데코(DnD/체크박스/아이콘/액션)는
+            //   원본 5932~5941처럼 세팅하되, HTML5 데코는 재귀형이라 서브트리 완성 후 top 노드에 1회 호출(아래) — 여기선 생략.
+
+            var lt_0015 = _copyAttr(ls_14, is_copied, i_aggr);
+
+            // 설명(원본 setDesc(ls_14.OBJID, is_copied._DESC)) + 클라이언트 이벤트.
+            _safe(function () { if (typeof is_copied._DESC !== "undefined" && typeof oAPP.fn.setDesc === "function") { oAPP.fn.setDesc(ls_14.OBJID, is_copied._DESC); } });
+            _safe(function () { _copyClientEvent(ls_14.OBJID, is_copied); });
+
+            // 부모 zTREE 반영 — top 은 drop index splice, 자식은 push(원본).
+            if (typeof i_aggr === "undefined") { is_parent.zTREE.push(ls_14); }
+            else { is_parent.zTREE.splice(_dropIndex, 0, ls_14); }
+
+            var l_UILIB = ls_14.UILIB;
+            var ls_0022 = oAPP.DATA.LIB.T_0022.find(function (a) { return a.UOBK === ls_14.UIOBK; });
+            if (ls_0022) { l_UILIB = ls_0022.LIBNM; }
+
+            // 미리보기 반영(원본 5983~6027) — top(aggr) 은 create+move+예외, 자식은 add.
+            if (typeof i_aggr === "undefined") {
+                _safe(function () { if (w && w.addUIObjPreView) { w.addUIObjPreView(ls_14.OBJID, ls_14.UIOBK, l_UILIB, ls_14.UIFND, ls_14.POBID, ls_14.PUIOK, ls_14.UIATT, lt_0015, lt_ua018, lt_ua032, lt_ua030, lt_ua026, lt_ua050); } });
+            } else {
+                _safe(function () { if (w && w.createUIInstance) { w.createUIInstance(ls_14, lt_0015); } });
+                _safe(function () { if (w && w.setRichTextEditorException) { w.setRichTextEditorException(ls_14.UIOBK, ls_14.OBJID); } });
+                _safe(function () { if (w && w.setChildUiException) { w.setChildUiException(ls_14.UIOBK, ls_14.OBJID, ls_14.zTREE, oAPP.attr.S_CODE.UA050); } });
+
+                var _aIndex = is_parent.zTREE.filter(function (a) { return a.UIATT === ls_14.UIATT; });
+                var _dragPos = _aIndex.findIndex(function (item) { return item.OBJID === ls_14.OBJID; });
+                var _cnt = 0;
+                for (var i = 0; i < _dragPos; i++) {
+                    var _sTree = is_parent.zTREE[i];
+                    if (_isUa026(_sTree.UILIB)) { continue; }
+                    _cnt++;
+                }
+                _safe(function () { if (w && w.moveUIObjPreView) { w.moveUIObjPreView(ls_14.OBJID, ls_14.UILIB, ls_14.POBID, ls_14.PUIOK, ls_14.UIATT, _cnt, ls_14.ISMLB, ls_14.UIOBK, true); } });
+                _safe(function () { if (typeof oAPP.fn.prevDrawExceptionUi === "function") { oAPP.fn.prevDrawExceptionUi(ls_14.UIOBK, ls_14.OBJID); } });
+            }
+
+            // file uploader UI 의 uploaderUrl 프로퍼티 예외처리(원본 6032).
+            _safe(function () { if (typeof oAPP.fn.attrUploadUrlException === "function") { oAPP.fn.attrUploadUrlException(ls_14.OBJID, ls_14.UIOBK); } });
+
+            // 자식 재귀(각 자식 push 후 다음 자식 채번 — 형제 충돌 방지).
+            if (is_copied.zTREE && is_copied.zTREE.length !== 0) {
+                for (var ci = 0, cl = is_copied.zTREE.length; ci < cl; ci++) { _rebuild(is_copied.zTREE[ci], ls_14); }
+            }
+            if (i_aggr) { return ls_14; }
+        }
+
+        // 파일 원본 보호 위해 1회 클론(치환이 _CEVT 등 in-place 발생).
+        var oPattern; try { oPattern = JSON.parse(JSON.stringify(is_pattern)); } catch (e) { oPattern = is_pattern; }
+
+        var ls_top = _rebuild(oPattern, is_target, aggrParam);
+
+        // 트리 행 데코 — 원본 designAddTreeData 5932~5941: setTreeDnDEnable(drag/drop_enable) /
+        //   setTreeChkBoxEnable(chk_visible, ROOT·APP·비편집 제외) / setTreeUiIcon(UICON+aggr아이콘 내부호출) /
+        //   designSetActionIcon(visible_add·delete). HTML5 데코는 재귀형이라 top 노드 1회 호출로 서브트리 전체 적용.
+        //   (직접 visible_add=true 세팅은 leaf/ROOT 규칙을 무시하므로 금지 — 반드시 공통 데코 경유.)
+        if (ls_top) {
+            _safe(function () { if (typeof oAPP.fn.setTreeDnDEnable === "function") { oAPP.fn.setTreeDnDEnable(ls_top); } });
+            _safe(function () { if (typeof oAPP.fn.setTreeChkBoxEnable === "function") { oAPP.fn.setTreeChkBoxEnable(ls_top); } });
+            _safe(function () { if (typeof oAPP.fn.setTreeUiIcon === "function") { oAPP.fn.setTreeUiIcon(ls_top); } });
+            _safe(function () { if (typeof oAPP.fn.designSetActionIcon === "function") { oAPP.fn.designSetActionIcon(ls_top); } });
+        }
+
+        // 부모 미리보기 rerender 대기 → 모델/트리/속성 갱신 → 선택 → 변경플래그(원본 lf_paste_cb 후반 1:1, designCopyUI 동일).
+        await _rerenderParent(is_target);
+        await oAPP.fn.designRefershModel();
+        _safe(function () { if (typeof oAPP.fn.setChangeFlag === "function") { oAPP.fn.setChangeFlag(); } });
+        _safe(function () { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } });
+        if (ls_top) { _safe(function () { if (typeof oAPP.fn.setSelectTreeItem === "function") { return oAPP.fn.setSelectTreeItem(ls_top.OBJID); } }); }
+    }
 
 
     /* ====================================================================

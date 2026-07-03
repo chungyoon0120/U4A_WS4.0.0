@@ -57,6 +57,19 @@ body {
     min-width: 0;
 }
 
+/* 아이콘 전용 툴바 버튼(원본 icon-only Button: 레이아웃초기화·도움말) — 정사각 시각. */
+.u4aApIcoBtn {
+    min-width: 2.25rem;
+    justify-content: center;
+}
+
+/* 도구모음 드롭다운 캐럿(원본 MenuButton ▾) */
+.u4aApCaret {
+    font-size: 0.7em;
+    opacity: 0.7;
+    margin-left: 0.15rem;
+}
+
 /* 상단 툴바 세로 구분선(원본 ToolbarSeparator) */
 .u4aApToolbar__sep {
     flex: 0 0 auto;
@@ -80,6 +93,8 @@ body {
     flex-direction: column;
     min-width: 12.5rem;    /* 원본 minSize 200 */
     overflow: hidden;
+    /* 테이블 바디가 회색 app-bg 로 비치지 않게 패널을 surface(흰) 로 — 공통 팝업 테이블 표준. */
+    background: var(--surface);
 }
 
 .u4a-splitter__pane.u4aApRight {
@@ -88,6 +103,7 @@ body {
     flex-direction: column;
     min-width: 12.5rem;
     overflow: hidden;
+    background: var(--surface);
 }
 
 /* ── 패널 내부 툴바(좌: UI 검색 / 우: 삭제 + 검색) ──────────────────────────── */
@@ -311,4 +327,10 @@ body {
 /* ── 스플릿바 드래그 중 — (미리보기 iframe 없지만) 텍스트 선택 방지 ─────────────── */
 body.u4aApResizing {
     user-select: none;
+}
+
+/* busy 를 버튼 누르자마자 즉시 표시 — 공통 .u4a-busy 의 0.3s 표시지연(깜빡임 방지용)을
+   이 창에서만 해제한다(사용자 요청). ID(#apBusy)로 특이도 확보 → 공통 규칙만 이김(§0.5 스코프 override). */
+#apBusy.u4a-busy[data-busy="true"] {
+    transition-delay: 0s;
 }

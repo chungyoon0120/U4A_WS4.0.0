@@ -6,3 +6,22 @@
 [data-theme="horizon_white"] {
     /* white = :root 기본값 그대로 */
 }
+
+/* ── 비활성/읽기전용 입력 시인성 (화이트 전용 예외) ──────────────────────
+   공통 개념(doc 15 §3.6): 활성=올라온 --surface-raised + 또렷한 --divider /
+   비활성=평평 transparent + 옅은 --line + muted. 이 구분은 실제로 "배경 채널"
+   (흰 활성칸 vs 틴트된 --app-bg 가 비치는 비활성칸)에 기댄다.
+   그런데 화이트만 --app-bg(#f5f6f7)가 활성칸 --surface-raised(#fff)와 거의 같고
+   --divider === --line 이라 배경·테두리 두 채널이 모두 무너져, 빈 disabled 칸이
+   활성칸과 시각적으로 구분되지 않는다(다른 테마는 app-bg 틴트로 살아있음).
+   → 화이트에서만 비활성칸에 또렷한 회색 배경을 줘 "회색 = 편집 불가"를 복구한다.
+   개념(muted 글자·박스·옅은 테두리)은 유지하고 배경 채널만 보강. 테두리는 손대지
+   않아 "옅은 line" 규칙 유지. 근거: doc 12 §6.1(테마 스코프 예외, XP 선례),
+   doc 15 §3.6. 색 SSOT=bootstrap-skin 이나 이 값은 화이트 한정이라 여기서 정의. */
+[data-theme="horizon_white"] .u4a-input:disabled,
+[data-theme="horizon_white"] .u4a-input[readonly],
+[data-theme="horizon_white"] .u4a-input.u4a-input--display,
+[data-theme="horizon_white"] .u4a-combo[aria-disabled="true"],
+[data-theme="horizon_white"] .u4a-combo.is-disabled {
+    background: #e8eaed;
+}

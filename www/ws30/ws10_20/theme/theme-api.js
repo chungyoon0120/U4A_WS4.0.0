@@ -97,7 +97,7 @@
         // SAP GUI "Signature" — doc 12 §2.1 예외(실제 SAP GUI Options 스크린샷 기준). 진파랑 타이틀바(흰 텍스트) + 노란 버튼 + 흰 기반.
         horizon_signature: { mode: "light", accent: "#3a6ea5", hover: "#2c568a", soft: "rgba(58,110,165,.15)", bar: "#5389c1", bar2: "#2d5f98", bg: "#eef2f7", surface: "#eef2f7", surface2: "#dce6f0", border: "#b5c6d8" },
         // macOS "Aqua/Big Sur" — doc 12 §2.1 예외. 밝은 회색 타이틀바 + 파랑 강조 + 신호등 창버튼.
-        horizon_mac: { mode: "light", accent: "#007aff", hover: "#0060df", soft: "rgba(0,122,255,.14)", bar: "#ededed", bar2: "#dcdcde", bg: "#ffffff", surface: "#f5f5f7", surface2: "#ececec", border: "#d2d2d7" },
+        horizon_mac: { mode: "light", accent: "#0a6cff", hover: "#0857cc", soft: "rgba(10,108,255,.14)", bar: "#f6f6f6", bar2: "#e8e8e8", bg: "#ffffff", surface: "#f5f5f7", surface2: "#ececec", border: "#d6d6da" },
         // SUSE Linux "Chameleon Green" — doc 12 §2.1 예외. 진한 그린 타이틀바(흰 텍스트) + 제이드 그린 강조 + flat.
         horizon_suse: { mode: "light", accent: "#30ba78", hover: "#259e63", soft: "rgba(48,186,120,.15)", bar: "#34c483", bar2: "#259e63", bg: "#ffffff", surface: "#eef2f0", surface2: "#e0e8e3", border: "#c8d4cc" }
     };

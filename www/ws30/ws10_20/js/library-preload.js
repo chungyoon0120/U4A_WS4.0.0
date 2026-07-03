@@ -188,6 +188,12 @@
         URL: "./js/ws_html5_ws20_dnd.js",
         MIMETYPE: "script"
     },
+    // [UI5 제거] WS20 속성(Properties) 영역 우클릭 컨텍스트 메뉴 — attr.js "뒤" 로드
+    //   (구 design/js/callAttrContextMenu.js sap.m.Menu → 공통 .u4a-menu, USP ctxmenu 패턴).
+    {
+        URL: "./js/ws_html5_ws20_attr_ctxmenu.js",
+        MIMETYPE: "script"
+    },
     // [UI5 제거] WS30 USP 코드에디터 HTML5 — shell/원본 ws_usp*.js "뒤"에 순서대로 로드.
     //   usp(셸+나브+속성+문서+overrides) → usp_tree(트리) → usp_editor(Monaco iframe).
     //   shell 의 fnOnMoveToPage("WS30") 와 원본 UI5 빌더(fnMoveToWs30/fnUspTreeTableRowSelect)를 override.
