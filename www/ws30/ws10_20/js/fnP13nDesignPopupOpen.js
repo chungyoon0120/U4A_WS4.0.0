@@ -1197,11 +1197,47 @@
      * 8. 화면 상태 전환 (원본 lf_setModelData/lf_selHeaderLine/lf_setHeaderLineEdit/back/refresh)
      * ==================================================================== */
 
-    // 좌측 등록/리스트 페이지 토글.
+    // 좌측 등록/리스트 페이지 토글 — 페이지 전환 애니메이션(.analy/16 §9, 원본 fnNavTo 구조 이식).
+    //   리스트(R)=상위, 등록/편집(C)=하위. R→C=forward(우측 진입), C→R=back(좌측 진입).
     function lf_showLeftPage(sPage) {
-        if (!oUI.regPage) { return; }
-        oUI.regPage.hidden = (sPage !== "C");
-        oUI.listPage.hidden = (sPage !== "R");
+        if (!oUI.regPage || !oUI.listPage) { return; }
+
+        var oTo = (sPage === "C") ? oUI.regPage : oUI.listPage;
+        var oFrom = (sPage === "C") ? oUI.listPage : oUI.regPage;
+
+        // 최초 표시(나가는 화면 없음) 또는 이미 목표가 보임 → 애니메이션 없이 확정 토글.
+        if (oFrom.hidden || oTo === oFrom) {
+            oTo.hidden = false;
+            oFrom.hidden = true;
+            return;
+        }
+
+        // 방향 판정 + 공통 전환 클래스(ws20.css .u4aWsNav* 소비).
+        var bFwd = (sPage === "C");
+        var sIn = bFwd ? "u4aWsNavInFwd" : "u4aWsNavInBack";
+        var sOut = bFwd ? "u4aWsNavOutFwd" : "u4aWsNavOutBack";
+
+        var gen = (oS._leftNavGen = (oS._leftNavGen || 0) + 1);   // 연타 stale animationend 차단(원본 _navGen).
+        // 이전 전환 잔여 클래스 정리(연타 시 In/Out 클래스 누적·충돌 방지).
+        ["u4aWsNavInFwd", "u4aWsNavInBack", "u4aWsNavOutFwd", "u4aWsNavOutBack"].forEach(function (c) {
+            oTo.classList.remove(c); oFrom.classList.remove(c);
+        });
+        if (oUI.left) { oUI.left.classList.add("u4aP13nNaving"); }   // 전환 중 두 페이지 겹침(absolute).
+        oTo.hidden = false;
+        oTo.classList.add(sIn);
+        oFrom.classList.add(sOut);
+
+        var _done = function (ev) {
+            if (ev && ev.target !== oFrom) { return; }   // 자식 animationend 무시.
+            oFrom.removeEventListener("animationend", _done);
+            if (oS._leftNavGen !== gen) { return; }       // 더 최신 전환이 시작됨 → 이 정리 취소.
+            oFrom.hidden = true;
+            oFrom.classList.remove(sOut);
+            oTo.classList.remove(sIn);
+            if (oUI.left) { oUI.left.classList.remove("u4aP13nNaving"); }
+        };
+        oFrom.addEventListener("animationend", _done);
+        setTimeout(_done, 400);   // 폴백(prefers-reduced-motion=animation:none 시 animationend 미발화 대비).
     }
 
     // 우측 init/detail 토글.
@@ -1525,6 +1561,10 @@
             ".u4aP13nRegTool > [hidden] { display: none !important; }" +
             // 좌측 페이지 공통.
             ".u4aP13nRegPage, .u4aP13nListPage { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }" +
+            // 페이지 전환 애니메이션(.analy/16 §9) — 전환 중에만 두 페이지를 겹쳐(absolute) 슬라이드.
+            //   .u4aP13nLeft 는 이미 overflow:hidden(삐짐 클립). 전환 클래스(.u4aWsNav*)는 ws20.css 공통 소비.
+            ".u4aP13nLeft { position: relative; }" +
+            ".u4aP13nLeft.u4aP13nNaving > .u4aP13nRegPage, .u4aP13nLeft.u4aP13nNaving > .u4aP13nListPage { position: absolute; inset: 0; }" +
             // 좌측 툴바 = 우측 트리 툴바(.u4aWs20TreeToolbar: surface-raised 밴드 + --ws20-sep 보더)와 동일 밴드로 통일.
             //   (평평 배경 + 옅은 --line 은 경계선이 안 보여 트리 툴바만 밴드처럼 튀던 문제 해결.)
             ".u4aP13nRegTool, .u4aP13nListTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; background: var(--surface-raised); border-bottom: 0.0625rem solid var(--ws20-sep); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; }" +

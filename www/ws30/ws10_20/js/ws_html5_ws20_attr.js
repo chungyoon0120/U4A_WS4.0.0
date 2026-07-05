@@ -3294,7 +3294,10 @@
      *     · undoRedo.saveActionHistoryData — design 모듈(parent.require) 시도 후 실패시 warn.
      *     · checkPropertyValue(designTreeData.js)/previewUIsetProp/selPreviewUI — W2/미변환.
      ************************************************************************/
-    oAPP.fn.fnWs20AttrChange = function (sAttr, uityp) {
+    //  @param {boolean} [bSkipUndo] true 면 undo 스냅샷 push 를 생략한다. 동일속성 동기화(M03)처럼
+    //    "여러 대상 + 소스"를 한 번의 편집으로 묶어 되돌리고 싶을 때, 호출부가 변경 "직전" 상태를
+    //    fnWs20PushUndo 로 1회만 적재하고 소스 커밋 refresh 는 이 함수로 재사용하기 위한 스위치.
+    oAPP.fn.fnWs20AttrChange = function (sAttr, uityp, bSkipUndo) {
 
         try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
         try { oAPP.fn.setShortcutLock(true); } catch (e) { }
@@ -3316,7 +3319,7 @@
             //    _selectNode(setSelectTreeItem→fnWs20SelectUI) 가 속성패널까지 재구성한다.
             //    (RESET_ATTR/속성 초기화도 이 경로를 거치므로 함께 undo 가능해진다.)
             try {
-                if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
+                if (bSkipUndo !== true && typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
             } catch (e) {
                 console.warn("[HTML5][WS20][attr] undo push skip:", e && e.message);
             }

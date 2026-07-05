@@ -1090,20 +1090,23 @@
         if (!oParent) { return; }
         oExpand[oParent.CHILD] = true;   // 부모 펼침
 
-        // 새로 추가된 노드 중 마지막 키(=선택 대상) — 경로 무관 공통(서버가 준 CHILD=KW OBJID).
+        // 새로 추가된 노드 중 첫 번째 키(=선택 대상) — 여러 개 추가 시 첫 파일 선택(사용자 요청).
+        //   경로 무관 공통(서버가 준 CHILD=KW OBJID).
         var aNew = Array.isArray(oNewOrArr) ? oNewOrArr : (oNewOrArr ? [oNewOrArr] : []);
-        var sLastKey = "";
-        aNew.forEach(function (n) { if (n && n.CHILD != null) { sLastKey = String(n.CHILD); } });
+        var sFirstKey = "";
+        for (var i = 0; i < aNew.length; i++) {
+            if (aNew[i] && aNew[i].CHILD != null) { sFirstKey = String(aNew[i].CHILD); break; }
+        }
 
         // 미로드(더미) 폴더면 서버 재조회로 자식 전체 정합 — 재조회 후 새 노드 선택(키 동일=OBJID).
         if (oState.sLazy && _hasDummy(oParent)) {
-            lf_lazyExpand(oParent).then(function () { lf_selectNewNode(sLastKey); });
+            lf_lazyExpand(oParent).then(function () { lf_selectNewNode(sFirstKey); });
             return;
         }
 
         if (!Array.isArray(oParent.MIMETREE)) { oParent.MIMETREE = []; }
         aNew.forEach(function (n) { if (n) { oParent.MIMETREE.push(n); } });
-        lf_selectNewNode(sLastKey);
+        lf_selectNewNode(sFirstKey);
     }
 
     // 새로 추가된 노드를 좌측 선택(트리 강조/스크롤) + 우측 속성·미리보기까지(클릭과 동일 효과).

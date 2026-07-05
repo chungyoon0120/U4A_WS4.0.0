@@ -113,26 +113,90 @@
             var p = oAPP.attr.prev || {};
             for (var k in p) { if (p[k] && p[k]._T_0015) { try { t15[k] = JSON.parse(JSON.stringify(p[k]._T_0015)); } catch (e2) { } } }
         } catch (e) { }
+        // ★ 클라이언트 이벤트(T_CEVT)·설명(T_DESC) 도 편집 대상이므로 스냅샷에 포함(원본 undoRedo 는 삽입/
+        //   삭제/DND/ATTR 모든 액션에서 이 둘을 저장·복원함 — 미포함이 원본 대비 회귀였다).
+        //   전역 배열 통째 clone — prev 처럼 키 병합이 아니라 배열 전체 교체라 부작용 국소적.
+        var cevt = null, desc = null;
+        try {
+            var A = oAPP.DATA && oAPP.DATA.APPDATA;
+            if (A && Array.isArray(A.T_CEVT)) { cevt = JSON.parse(JSON.stringify(A.T_CEVT)); }
+            if (A && Array.isArray(A.T_DESC)) { desc = JSON.parse(JSON.stringify(A.T_DESC)); }
+        } catch (e) { }
         var chag = ""; try { chag = (parent.getAppInfo() || {}).IS_CHAG || ""; } catch (e) { }
         var sel = ""; try { sel = (oAPP.attr.oModel.oData.uiinfo && oAPP.attr.oModel.oData.uiinfo.OBJID) || ""; } catch (e) { }
-        return { z: z, t15: t15, chag: chag, sel: sel };
+        return { z: z, t15: t15, chag: chag, sel: sel, cevt: cevt, desc: desc };
+    }
+    // objid 의 첫 leaf 자손 OBJID (없으면 자신). refreshPreview 로 "그 노드의 페이지"를 강제
+    //  재구성할 때 사용 — 페이지(UA015) 자신을 넘기면 "현재 페이지"라 early-return 되므로, leaf 를
+    //  넘겨 refreshPreview 가 상위 페이지를 destroy→recreate 하게 만든다.
+    function _leafOf(objid) {
+        var n = _node(objid), g = 0;
+        while (n && n.zTREE && n.zTREE.length && g++ < 500) { n = n.zTREE[0]; }
+        return (n && n.OBJID) || objid;
     }
     function _restoreSnap(s) {
         if (!s) { return; }
+        // 구조 변경 여부 = 복원 전/후 노드 수 차이(삽입/삭제 vs 속성·이름·이동). zTREE 덮기 "전" 판정.
+        var bStructChange = false;
+        try { bStructChange = _countNodes(_tree()) !== _countNodes(s.z); } catch (e) { }
+        // 선택 노드가 복원 후 사라질 경우(예: 삭제 redo)의 대체 앵커 = 그 부모(영향 페이지).
+        var sSelParent = "";
+        try { var oSelCur = s.sel ? _node(s.sel) : null; if (oSelCur) { sSelParent = oSelCur.POBID || ""; } } catch (e) { }
+
+        // ── 데이터 복원 ──
         try { oAPP.attr.oModel.oData.zTREE = JSON.parse(JSON.stringify(s.z)); } catch (e) { }
         try {
             oAPP.attr.prev = oAPP.attr.prev || {};
             for (var k in s.t15) { oAPP.attr.prev[k] = oAPP.attr.prev[k] || {}; oAPP.attr.prev[k]._T_0015 = JSON.parse(JSON.stringify(s.t15[k])); }
         } catch (e) { }
+        // T_CEVT/T_DESC 복원 — 배열 참조 유지 위해 in-place 교체(구버전 스냅샷/미로딩 가드).
+        try {
+            var _A = oAPP.DATA && oAPP.DATA.APPDATA;
+            if (_A) {
+                if (Array.isArray(s.cevt) && Array.isArray(_A.T_CEVT)) { _A.T_CEVT.length = 0; Array.prototype.push.apply(_A.T_CEVT, JSON.parse(JSON.stringify(s.cevt))); }
+                if (Array.isArray(s.desc) && Array.isArray(_A.T_DESC)) { _A.T_DESC.length = 0; Array.prototype.push.apply(_A.T_DESC, JSON.parse(JSON.stringify(s.desc))); }
+            }
+        } catch (e) { }
         _refreshTree();
-        // 프리뷰 전체 재구성(UI5 iframe 가드 — 부재 시 트리만)
-        _prev("drawPreview", []);
-        // IS_CHAG/상태 복원
-        try { var oi = parent.getAppInfo(); if (oi) { oi.IS_CHAG = s.chag; parent.setAppInfo(oi); } } catch (e) { }
-        try { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", s.chag); } catch (e) { }
-        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
-        if (s.sel) { _selectNode(s.sel); }
-        _updateUndoBtns();
+
+        // 복원 트리에 존재하는 유효 앵커(선택 대상).
+        var sAnchor = "";
+        if (s.sel && _node(s.sel)) { sAnchor = s.sel; }
+        else if (sSelParent && _node(sSelParent)) { sAnchor = sSelParent; }
+
+        // IS_CHAG 는 스냅샷 값으로 되돌리지 않고 항상 dirty("X") 유지 — undo/redo 도 "변경 행위"라
+        //  한 번이라도 편집했으면 계속 dirty 여야 뒤로가기 변경감지 팝업이 뜬다(원본은 IS_CHAG 미변경).
+        function _commitState() {
+            try { var oi = parent.getAppInfo(); if (oi) { oi.IS_CHAG = "X"; parent.setAppInfo(oi); } } catch (e) { }
+            try { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { }
+            try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+            _updateUndoBtns();
+        }
+
+        // ★ 미리보기 반영 = "값 복원 후 화면 다시그리기"(원본 사상).
+        //   스냅샷은 "무슨 노드가 바뀌었는지"를 안 가지므로(노드별 setter 는 앵커가 페이지면 엉뚱한 곳에
+        //   적용됨 — redo 실패 원인) 미리보기를 복원 데이터로 재구성한다.
+        if (!bStructChange) {
+            // 속성/이름/이동(구조 동일): 그 페이지만 in-place 재구성.
+            //  refreshPreview 가 대상 페이지를 destroy→recreate 하며 모든 자식을 복원된 _T_0015 로 다시
+            //  생성(createUIInstance) → 어느 노드가 바뀌었든 정확히 복원. 페이지 자신은 early-return 하므로
+            //  leaf 자식을 재선택해 강제 재구성(PAGE1 리셋 없음, undo/redo 동일 경로 = 대칭).
+            _commitState();
+            var sTrig = _leafOf(sAnchor);
+            if (sTrig) { try { _selectNode(sTrig); } catch (e) { } }
+            return;
+        }
+
+        // 삽입/삭제(구조 변경): 재추가 노드·차트/RTE 등 모든 UI타입 안전 위해 전체 재구성 후 재선택
+        //  (원본 초기로드 패턴 uiPreviewArea:155 drawPreview().then(select)).
+        var oDrawPromise = null;
+        try {
+            var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
+            if (w && typeof w.drawPreview === "function") { oDrawPromise = w.drawPreview(); }
+        } catch (e) { console.warn("[HTML5][WS20] undo/redo drawPreview:", e && e.message); }
+        function _afterStruct() { _commitState(); if (sAnchor) { try { _selectNode(sAnchor); } catch (e) { } } }
+        if (oDrawPromise && typeof oDrawPromise.then === "function") { oDrawPromise.then(_afterStruct, _afterStruct); }
+        else { _afterStruct(); }
     }
     // 편집 직전 호출 — 현재 상태를 undo 스택에 적재(+redo 비움).
     oAPP.fn.fnWs20PushUndo = function () {
@@ -1097,13 +1161,18 @@
         setTimeout(function () { try { oInp.focus(); oInp.select(); } catch (e) { } }, 0);
     }
 
-    // UI Where use / My Pattern — 디자인영역(UI5) 실함수가 로드돼 있으면 위임,
-    //   디자인영역(UI5) 실함수가 로드된 환경이면 위임, 아니면 무동작(개발자 콘솔만).
-    function _ctxDelegate(sFn) {
-        if (typeof oAPP.fn[sFn] === "function") {
-            try { oAPP.fn[sFn](); return; } catch (e) { }
-        }
-        console.warn("[HTML5][WS20] context action not available in this context:", sFn);
+    // UI Where use(M08) — 원본(contextMenuUiWhereUse)은 선택 UI 를 "전체 애플리케이션"
+    //   대상으로 전수 검색한다. 다수가 동시에 쓰면 서버에 과도한 검색 부하 → 장애 위험이
+    //   큰 설계라, HTML5 에서는 원본 호출을 막고 경고 토스트만 노출한다(사용자 지시).
+    //   ★i18n: 아래 KO/EN 문구는 하드코딩 — 메시지 클래스 키화 필요 항목으로 보고
+    //     (원본 A59 는 메뉴 라벨 전용 키라 본문 문구가 없음).
+    function _whereUseNotice() {
+        var bKo = false;
+        try { bKo = ((parent.getUserInfo && parent.getUserInfo().LANGU) || "EN") === "KO"; } catch (e) { }
+        var sMsg = bKo
+            ? "‘UI 사용 위치’는 전체 애플리케이션을 전수 조회하는 기능으로, 서버에 큰 부하를 줄 수 있어 현재 비활성화되어 있습니다."
+            : "‘UI Where-Used’ scans every application and can put heavy load on the server, so it is currently disabled.";
+        try { parent.showMessage(null, 10, "W", sMsg); } catch (e) { }
     }
 
     // My Pattern(내 패턴, M11) — HTML5 인앱 팝업(fnP13nDesignPopupOpen.js) 진입.
@@ -1166,7 +1235,7 @@
             { key: "M05", icon: "up-down-left-right", text: _msg("A57", "Move Position"), on: en.movepos, fn: function () { _moveUIPosition(oNode); } },
             { key: "M06", icon: "copy", text: _msg("A04", "Copy"), on: en.copy, sep: true, fn: function () { _copyUI(oNode); } },
             { key: "M07", icon: "paste", text: _msg("A58", "Paste"), on: en.paste, fn: function () { _pasteUI(oNode); } },
-            { key: "M08", icon: "magnifying-glass", text: _msg("A59", "UI Where use"), on: en.whereuse, sep: true, fn: function () { _ctxDelegate("contextMenuUiWhereUse"); } },
+            { key: "M08", icon: "magnifying-glass", text: _msg("A59", "UI Where use"), on: en.whereuse, sep: true, fn: function () { _whereUseNotice(); } },
             { key: "M11", icon: "floppy-disk", text: _msg("E19", "My Pattern"), on: en.pattern, sep: true, fn: function () { _openMyPattern(oNode); } }
         ];
     }
@@ -1228,25 +1297,14 @@
     };
 
     /********************************************************************
-     * Undo/Redo 단축키 (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z) — WS20 편집모드 한정.
-     *   입력 필드 포커스/모달 다이얼로그 열림 시에는 가로채지 않음.
+     * Undo/Redo 단축키 — 원본 정식 KEY(Ctrl+Shift+Z=Undo/247, Ctrl+Shift+X=Redo/248,
+     *   ws_common.js getShortCutList)로 통일. 기존 raw keydown(Ctrl+Z/Ctrl+Y) 리스너는
+     *    ① 정식 KEY 와 어긋나 "단축키 리스트" 팝업 표기(247/248)와 실제 동작이 불일치하고
+     *       (특히 Ctrl+Shift+Z 를 Redo 로 처리 — 원본은 Undo),
+     *    ② 공통 가드(fnRunShortCut: busy/락/isShortcutLock/다이얼로그/미리보기 iframe 포커스 전달)를
+     *       우회한다 → 제거.
+     *   실제 배선은 ws_html5_ws20.js 의 getShortCutList super-wrap 이 두 KEY fn 을
+     *   fnWs20ExecHistory("UNDO"/"REDO") 로 교체(버튼 ↶↷ 와 동일 스택·활성·초기화).
      ********************************************************************/
-    document.addEventListener("keydown", function (e) {
-        if (!(e.ctrlKey || e.metaKey)) { return; }
-        var k = (e.key || "").toLowerCase();
-        if (k !== "z" && k !== "y") { return; }
-        // WS20 편집모드만
-        var bEdit = false;
-        try { bEdit = oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e2) { }
-        if (!bEdit) { return; }
-        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS20") { return; } } catch (e2) { }
-        // 입력 중/모달 열림이면 무시
-        var t = e.target;
-        if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) { return; }
-        if (document.querySelector("dialog[open]")) { return; }
-        var bRedo = (k === "y") || (k === "z" && e.shiftKey);
-        e.preventDefault();
-        if (oAPP.fn.fnWs20ExecHistory) { oAPP.fn.fnWs20ExecHistory(bRedo ? "REDO" : "UNDO"); }
-    }, true);
 
 })(window, (window.oAPP = window.oAPP || {}));

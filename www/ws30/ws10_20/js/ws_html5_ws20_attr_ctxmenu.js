@@ -11,10 +11,10 @@
  *              로 AT01(라벨)/AT02(값)/AT03(바인딩아이콘)/AT04(클라이언트이벤트아이콘) 결정
  *              (구 l_ui.data("CONTEXT_MENU")). 편집모드(IS_EDIT)·비ROOT 에서만.
  *   - 닫기   : 바깥 mousedown / ESC / 스크롤 / 리사이즈(USP ctxmenu 공통 패턴).
- *   - 동작   : M01 WAIT on/off · M02 Unbind · M04 클라이언트이벤트 해제 = 완전 동작
- *              (attrSetUnbindProp/attrUnbindAggr/attrDelClientEvent/fnWs20AttrChange 재사용).
- *              M03 동일속성 동기화 · M05 단축키 등록 · M06 개인화 팝업 = 별창 미변환 →
- *              임시 안내 토스트(구 attrPresetPopup 토글 버튼과 동일 처리). TODO(i18n)+재개시 배선.
+ *   - 동작   : M01 WAIT on/off · M02 Unbind · M03 동일속성 동기화 · M04 클라이언트이벤트 해제 ·
+ *              M06 UI Attribute 개인화 = 완전 동작(attrSetUnbindProp/attrUnbindAggr/attrDelClientEvent/
+ *              fnWs20AttrChange/fnSameAttrSyncPopupOpen/fnAttrPresetSettingsOpen 재사용/온디맨드 로드).
+ *              M05 단축키 등록 = 별창(eventShortcutReg) 미변환 → 임시 안내 토스트. TODO(i18n)+재개시 배선.
  ************************************************************************/
 
 (function (window, $, oAPP) {
@@ -238,9 +238,9 @@
             switch (sKey) {
                 case "M01": _waitOnOff(is_attr); break;              //서버이벤트 WAIT on/off
                 case "M02": _unbind(is_attr); break;                 //unbind
+                case "M03": _openSameAttrSync(is_attr); break;       //동일속성 동기화
                 case "M04": _removeClientEvent(is_attr); break;      //클라이언트 이벤트 해제
                 case "M06": _openPresetSettings(is_attr); break;     //UI Attribute 개인화 팝업
-                case "M03":                                          //동일속성 동기화(별창 미변환)
                 case "M05":                                          //단축키 등록(별창 미변환)
                     console.warn("[W4+ 예정] 속성 컨텍스트 메뉴 미변환:", sKey, is_attr && is_attr.UIATT);
                     _todoToast();
@@ -250,6 +250,20 @@
             }
         } catch (e) {
             console.error("[HTML5][WS20][attr] 컨텍스트 메뉴 실행 오류:", sKey, e);
+        }
+    }
+
+    /* ── M03 동일 속성 동기화 — 구 callSetSameAttrPopup(design/js) ──
+     *   인앱 다이얼로그 fnSameAttrSyncPopupOpen 온디맨드 로드 후 호출. */
+    function _openSameAttrSync(is_attr) {
+        var fn = function () {
+            if (typeof oAPP.fn.fnSameAttrSyncPopupOpen === "function") { oAPP.fn.fnSameAttrSyncPopupOpen(is_attr); }
+            else { console.warn("[HTML5][WS20][attr] fnSameAttrSyncPopupOpen 미로드"); _todoToast(); }
+        };
+        try { oAPP.loadJs("fnSameAttrSyncPopupOpen", fn); }
+        catch (e) {
+            console.error("[HTML5][WS20][attr] fnSameAttrSyncPopupOpen 로드 실패:", e && e.message);
+            fn();
         }
     }
 
@@ -333,6 +347,12 @@
                 l_OBJTY = "HM";
                 is_attr.UIATV = "";   //프로퍼티 초기화
             }
+            //★ UNDO: T_CEVT 삭제 "전" 에 스냅샷 1회. 삭제 후(=fnWs20AttrChange 내부) push 하면
+            //  스냅샷이 이미 지워진 T_CEVT 를 담아 UNDO 로 이벤트 소스가 복원되지 않는다.
+            //  → 여기서 먼저 push 하고, fnWs20AttrChange 는 bSkipUndo=true 로 재-push 방지(M03 과 동일 패턴).
+            try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } }
+            catch (e) { console.warn("[HTML5][WS20][attr] undo push skip:", e && e.message); }
+
             try { oAPP.fn.attrDelClientEvent(is_attr, l_OBJTY); }
             catch (e) { console.error("[HTML5][WS20][attr] attrDelClientEvent:", e && e.message); }
 
@@ -340,7 +360,7 @@
             var cd = _actcd("DEL_CLIENT_EVENT");
             if (cd !== undefined) { is_attr.ACTCD = cd; }
 
-            oAPP.fn.fnWs20AttrChange(is_attr, "");
+            oAPP.fn.fnWs20AttrChange(is_attr, "", true);   //bSkipUndo — 위에서 1회 push 함
             _doneToast();
         });
     }

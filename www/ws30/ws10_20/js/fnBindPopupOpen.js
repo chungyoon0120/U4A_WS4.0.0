@@ -394,6 +394,14 @@
     // 트리(행) 컨테이너 — 스크롤은 TreeBody 담당. 가로 행 구분선을 다이얼로그 바닥까지 잇기 위해
     //   min-height 로 헤더 아래 남는 높이를 채우고, 배경 반복 그라디언트로 빈 영역에도 같은 간격 가로선.
     oUI.treeWrap = _el("div", "u4aBindTreeWrap");
+    // ★ 세로 컬럼 그리드라인 레이어 — 헤더/행과 동일 flex 구조(padding-left+gap+같은 폭변수)로 유형/설명
+    //   경계선을 treeWrap 풀하이트(빈 영역 포함)로 긋는다. 절대배치·pointer-events:none, 행 밑(z-index:0).
+    oUI.grid = _el("div", "u4aBindGridLines");
+    oUI.grid.setAttribute("aria-hidden", "true");
+    oUI.grid.appendChild(_el("span", "u4aBindGL u4aBindGL--name"));
+    oUI.grid.appendChild(_el("span", "u4aBindGL u4aBindGL--type"));
+    oUI.grid.appendChild(_el("span", "u4aBindGL u4aBindGL--desc"));
+    oUI.treeWrap.appendChild(oUI.grid);
     oTreeBody.appendChild(oUI.treeWrap);
     oTreePane.appendChild(oTreeBody);
     oSplit.appendChild(oTreePane);
@@ -694,6 +702,7 @@
   function lf_renderTree() {
 
     oUI.treeWrap.innerHTML = "";
+    oUI.treeWrap.appendChild(oUI.grid);   // 세로 그리드라인 레이어 보존(재렌더로 지워지지 않게)
 
     if (!oS.zTREE || oS.zTREE.length === 0) {
       var oEmpty = _el("div", "u4a-empty", _wsTxt("312") || "");   // 312(ZMSG_WS_COMMON_001) No data Found — 공통 빈상태(MIME 동일 키)
@@ -1398,11 +1407,20 @@
       //   로 헤더 아래 남는 높이를 채우고(헤더+이 블록 = 컨테이너 → 데이터 적어도 팬텀 세로스크롤 없음),
       //   배경 반복 그라디언트로 행 높이(2.5rem)마다 가로선 → 행 없는 빈 영역도 다이얼로그 바닥까지 같은
       //   간격 가로 구분선이 이어짐. (행 영역=각 행 border-bottom, 빈 영역=이 배경. 세로 컬럼선=헤더/행 셀 border-left.)
-      ".u4aBindTreeWrap { min-height: calc(100% - 2.25rem); box-sizing: border-box; background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(2.5rem - 0.0625rem), var(--line) calc(2.5rem - 0.0625rem), var(--line) 2.5rem); }",
+      ".u4aBindTreeWrap { position: relative; min-height: calc(100% - 2.25rem); box-sizing: border-box; background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(2.5rem - 0.0625rem), var(--line) calc(2.5rem - 0.0625rem), var(--line) 2.5rem); }",
+      // ★ 세로 컬럼 그리드라인 레이어 — 헤더/행과 동일 flex(padding-left calc(0.375rem+1px)+gap 0.375rem+같은 폭변수)
+      //   → 유형/설명 경계선 x 가 헤더·행과 픽셀 일치. treeWrap 풀하이트(top/bottom 0)로 빈 영역까지 세로선 연장.
+      //   행 밑(z-index:0)에 깔려 행 셀 border-left(있는 행)와 겹치고, 빈 영역엔 이 레이어만 보인다.
+      ".u4aBindGridLines { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 0; display: flex; gap: 0.375rem; box-sizing: border-box; padding-left: calc(0.375rem + 1px); padding-right: 0; pointer-events: none; }",
+      ".u4aBindGL { min-width: 0; box-sizing: border-box; }",
+      ".u4aBindGL--name { flex: 1 1 auto; }",
+      ".u4aBindGL--type { flex: 0 0 var(--u4aBind-type-w); border-left: 0.0625rem solid var(--line); }",
+      ".u4aBindGL--desc { flex: 0 0 var(--u4aBind-desc-w); border-left: 0.0625rem solid var(--line); }",
       // 트리 — 행을 패널 폭에 맞춰 우측 컬럼 항상 보이게(공통 max-content 무력화, USP/MIME 이식).
       //   min-height:0 = 공통 100% 무력화(높이 채움은 treeWrap 담당). padding 상/하 0 = 그라디언트 가로선
       //   위상이 첫 행 상단과 정확히 맞도록(좌측 1px 은 선택바 여백 유지).
-      ".u4aBindTree.u4a-tree { width: auto; min-width: 100%; padding: 0 0 0 1px; min-height: 0; }",
+      ".u4aBindTree.u4a-tree { width: auto; min-width: 100%; padding: 0 0 0 1px; min-height: 0; position: relative; z-index: 1; }",
+      ".u4aBindTreeWrap > .u4a-empty { position: relative; z-index: 1; }",
       // data-u4a-tree-split(space-between) 무력화 → 라벨이 남는 폭 채우고 유형/설명은 고정폭 우측 컬럼.
       ".u4aBindTree .u4a-tree__row[data-u4a-tree-split] { justify-content: flex-start; }",
       ".u4aBindTree .u4a-tree__label { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",

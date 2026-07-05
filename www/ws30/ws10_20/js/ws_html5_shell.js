@@ -1076,6 +1076,12 @@
      ************************************************************************/
     oAPP.fn.removeContent = function () {
 
+        // undo, redo 스냅샷 이력/버튼 초기화 (원본 main.js removeContent 928행 clearHistory 이식 누락분).
+        //  ★ WS20→WS10 이탈 시 스냅샷 스택(_undoStack/_redoStack, edit.js 클로저)을 여기서 비운다.
+        //    안 비우면 재진입 setUIAreaEditable 이 (LIB 삭제 WLO UHAK901369 등으로) 4.3 로 빠져
+        //    clear 를 건너뛸 때, 이전 앱의 편집 히스토리가 새 앱에 남는 크로스-앱 잔상이 생긴다.
+        try { if (oAPP.fn.fnWs20ClearHistory) { oAPP.fn.fnWs20ClearHistory(); } } catch (e) { }
+
         try {
             oAPP.attr.prev = {};
             oAPP.attr.popup = [];

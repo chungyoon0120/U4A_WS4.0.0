@@ -629,6 +629,33 @@
         else { console.warn("[HTML5][WS20] fnFindPopupOpener not available (Ctrl+F)"); }
     }
 
+    //Ctrl+Shift+Z — [WS20] Undo(247). 원본 ws_common.js fn 은 require(undoRedo).executeHistory("UNDO")
+    //  (UI5 iframe/bindPopup 의존 design 모듈) → HTML5 스냅샷 스택 진입점 fnWs20ExecHistory 로 교체.
+    //  트리 툴바 버튼(↶)과 동일 함수라 활성/이력유무/초기화가 완전히 일치한다.
+    function _ws20Undo() {
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
+        //편집모드에서만 (원본 fn: IS_EDIT !== "X" 면 중단).
+        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { return; }
+        try {
+            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
+                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
+        } catch (x) { }
+        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("UNDO"); }
+        else { console.warn("[HTML5][WS20] fnWs20ExecHistory not available (Undo)"); }
+    }
+
+    //Ctrl+Shift+X — [WS20] Redo(248). (Undo 와 동일 정책 — REDO 수행)
+    function _ws20Redo() {
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
+        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { return; }
+        try {
+            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
+                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
+        } catch (x) { }
+        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("REDO"); }
+        else { console.warn("[HTML5][WS20] fnWs20ExecHistory not available (Redo)"); }
+    }
+
     //getShortCutList(ws_common.js)가 먼저 로드된 경우에만 super-wrap(미정의면 전 페이지 단축키가
     //  []로 깨지므로 가드). 정상 로드 순서(ws_common → ws_html5_ws20)에선 항상 통과.
     if (typeof oAPP.common.getShortCutList === "function") {
@@ -639,7 +666,9 @@
             var oFnMap = {
                 "F3": function (e) { _ws20ScGuard(e, _ws20Back); },           // 뒤로가기
                 "Ctrl+F": function (e) { _ws20ScGuard(e, _ws20Find); },        // Find(별도창)
-                "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); } // MIME Repository(별도창)
+                "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); }, // MIME Repository(별도창)
+                "Ctrl+Shift+Z": function (e) { _ws20ScGuard(e, _ws20Undo); }, // Undo(247)
+                "Ctrl+Shift+X": function (e) { _ws20ScGuard(e, _ws20Redo); }  // Redo(248)
             };
             aList.forEach(function (o) { if (o && oFnMap[o.KEY]) { o.fn = oFnMap[o.KEY]; } });
             return aList;

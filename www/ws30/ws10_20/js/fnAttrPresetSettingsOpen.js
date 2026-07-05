@@ -11,13 +11,13 @@
  * ★ 보존 로직(원본 1:1):
  *   · clone = JSON deep copy(sParam.sAttr) — 편집은 clone 에서(원본 JSONModel /attr 복제).
  *   · 값 컨트롤 = 행과 동일 분기(inp_visb/sel_visb/chk_visb/btn_visb). 편집가능=IS_EDIT&&clone.edit.
- *   · 입력 변경 → _checkAttrValue(검증) + previewUIsetProp(미리보기, W2 미변환→가드).
+ *   · 입력 변경 → _checkAttrValue(검증) + previewUIsetProp(미리보기 반영, 원본 _onChangeAttr 1:1).
  *   · Apply(OK, IS_EDIT 시만) = _checkAttrValue → _savePresetAttrData(SQLite upsert)
  *       → previewUIsetProp(원본값 복원) → 완료토스트(628) → 열린 list 창에 ATTR_CHANGE 브로드캐스트 → 닫기.
  *   · Cancel/Close = previewUIsetProp(원본값 복원) → 닫기(저장 안함).
  *   · 저장 DB = {P13N_ROOT}/UI_ATTR/UI_ATTR_PRESET.db (PK[LIBVER,SYSID,UNAME,UIATK]) — list 팝업과 동일.
- * ★ UI5 의존부 치환: dialogViewer→<dialog>, sap.m.*→공통 컴포넌트, previewUIsetProp→W2 가드.
- *   F4/컬러피커(값도움말)는 이 팝업에선 생략(개인화=값 입력, 필요시 W4+ 추가) — 행 입력칸에서 사용.
+ *   · attrChange/setChangeFlag/undo 는 원본도 호출 안 함(앱을 dirty 로 안 만듦) → 본 팝업도 미호출.
+ * ★ UI5 의존부 치환: dialogViewer→<dialog>, sap.m.*→공통 컴포넌트. F4/컬러피커는 이 팝업 생략(행에서 사용).
  ************************************************************************/
 
 (function (window, $, oAPP) {
@@ -48,8 +48,10 @@
     function _isEdit() {
         try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { return false; }
     }
+    // 미리보기 반영 — 원본 settings/index.js 1:1(_onChangeAttr 는 previewUIsetProp(clone) 로 편집 중
+    //   미리보기를 바꾸고, OK/CANCEL 에서 previewUIsetProp(sParam.sAttr) 로 원본값 복원). 원본 previewUIsetProp
+    //   미로드/미변환(W2)이면 no-op.
     function _preview(sAttr) {
-        //미리보기 반영(원본 previewUIsetProp) — W2 미변환이면 no-op.
         if (typeof oAPP.fn.previewUIsetProp === "function") {
             try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[HTML5][WS20][preset] previewUIsetProp:", e && e.message); }
         }
@@ -112,7 +114,7 @@
         return (sIcon && M[sIcon]) || "";
     }
 
-    // 입력 변경 공통(원본 _onChangeAttr) — 검증 후 미리보기 반영.
+    // 입력 변경(원본 _onChangeAttr) — 검증 후 미리보기 반영.
     function lf_onChange() {
         var _sRes = _checkAttrValue(oCtx.clone);
         lf_showValState(_sRes);
@@ -304,7 +306,7 @@
         }
     }
 
-    /* ── Cancel/Close(원본 CANCEL 콜백) — 미리보기 원본 복원 후 닫기 ── */
+    /* ── Cancel/Close(원본 CANCEL 콜백) — 미리보기 원본값 복원 후 닫기. ── */
     function lf_cancel() {
         _preview(oCtx.orig);
         lf_close();
