@@ -92,6 +92,8 @@ window.require([
             value: "",
             language: "text",
             readOnly: true,
+            //domReadOnly: 숨은 textarea 에 readonly 부여 → readOnly 만으론 뚫리는 IME(한글) 조합 입력 차단(Chromium93).
+            domReadOnly: true,
             theme: 'vs-dark',
             glyphMargin: true,
             automaticLayout: true,

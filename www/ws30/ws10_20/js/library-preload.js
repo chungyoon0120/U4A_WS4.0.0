@@ -188,6 +188,13 @@
         URL: "./js/ws_html5_ws20_dnd.js",
         MIMETYPE: "script"
     },
+    // [UI5 제거] WS20 UI Template Wizard 디자인 통합(트리거 designCallWizardPopup +
+    //   Stage 4 designWizardCallback/Finish) — dnd "뒤" 로드해 design/js/designCallWizardPopup.js
+    //   의 UI5(oLTree1) 버전을 override. 팝업 본문은 fnUiTempWizardPopupOpen.js(온디맨드).
+    {
+        URL: "./js/ws_html5_ws20_wizard.js",
+        MIMETYPE: "script"
+    },
     // [UI5 제거] WS20 속성(Properties) 영역 우클릭 컨텍스트 메뉴 — attr.js "뒤" 로드
     //   (구 design/js/callAttrContextMenu.js sap.m.Menu → 공통 .u4a-menu, USP ctxmenu 패턴).
     {

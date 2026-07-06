@@ -144,7 +144,8 @@
                     return;
 
                 case "setReadOnly":
-                    try { editor.updateOptions({ readOnly: !!d.readOnly }); } catch (e) { }
+                    //domReadOnly 동반 설정 — readOnly 만으로는 IME(한글) 조합 입력이 뚫리므로 textarea 도 잠금.
+                    try { editor.updateOptions({ readOnly: !!d.readOnly, domReadOnly: !!d.readOnly }); } catch (e) { }
                     return;
 
                 case "setTheme":

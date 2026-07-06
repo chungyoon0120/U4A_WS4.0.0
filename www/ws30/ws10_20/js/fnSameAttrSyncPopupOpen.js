@@ -406,6 +406,12 @@
                     //입력값이 default → 수집건 제거 + 미리보기 반영.
                     if (ls_0023.DEFVL === l_UIATV) {
                         aTgt.splice(_pos, 1);
+                        //★ 미리보기를 "기본값(DEFVL)" 으로 리셋. 원본은 splice 한 옛 값 라인을 그대로
+                        //  previewUIsetProp 에 넘겨(setter 가 옛 값 재적용) 미리보기가 기본값으로 안
+                        //  돌아가던 것 → ls_0015(이미 배열서 제거돼 안전)의 UIATV 를 DEFVL 로 바꿔 넘긴다.
+                        //  (소스 BUTTON 은 is_attr.UIATV=Default 로 이미 리셋되나, 동기화 타겟이 옛 값에
+                        //   남던 비대칭 증상 수정.)
+                        ls_0015.UIATV = ls_0023.DEFVL;
                         _preview(ls_0015);
                         continue;
                     }

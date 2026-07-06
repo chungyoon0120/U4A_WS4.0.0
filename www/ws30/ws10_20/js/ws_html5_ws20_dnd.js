@@ -302,6 +302,12 @@
         is_0014.UIATT_ICON = "";
         is_0014.icon_visible = false;
         is_0014.highlight = "None";
+        // ★ 행 액션(+추가/삭제) 플래그도 공통 초기화에서 함께 세팅 — 원본/구 HTML5 는 이 둘을 빠뜨려,
+        //   crtTreeBindField 로 만든 노드를 각 생성 경로(위자드 createUiLine 등)가 designSetActionIcon
+        //   또는 인라인으로 따로 세팅해야 했고, 누락 시 +/삭제 버튼이 안 나오는 회귀가 반복됐다.
+        //   신규 노드는 항상 non-ROOT/APP leaf 라 _isEdit() 이 정답(designSetActionIcon 규칙과 동일).
+        is_0014.visible_add = _isEdit();
+        is_0014.visible_delete = _isEdit();
         if (typeof is_0014.zTREE === "undefined") { is_0014.zTREE = []; }
     };
 
@@ -380,12 +386,12 @@
         // 후보 1 → 자동 선택.
         if (lt_sel.length === 1) { retfunc(lt_sel[0], i_drag, i_drop); return; }
 
-        // 후보 2+ → 선택 팝업(.u4a-dialog).
-        _aggrSelectDialog(i_drag, i_drop, lt_sel, retfunc, cancelFunc);
+        // 후보 2+ → 선택 팝업(.u4a-dialog). 드롭 좌표(i_x,i_y)를 넘겨 드롭 위치에 띄운다(원본 편의성).
+        _aggrSelectDialog(i_drag, i_drop, lt_sel, retfunc, cancelFunc, i_x, i_y);
     };
 
-    // aggregation 선택 다이얼로그(HTML5). 원본 sap.m.Dialog+Select 대응.
-    function _aggrSelectDialog(i_drag, i_drop, lt_sel, retfunc, cancelFunc) {
+    // aggregation 선택 다이얼로그(HTML5). 원본 sap.m.Dialog+Select 대응. i_x,i_y=드롭 위치(있으면 그곳에 표시).
+    function _aggrSelectDialog(i_drag, i_drop, lt_sel, retfunc, cancelFunc, i_x, i_y) {
 
         // 기존 잔존 제거.
         var oOld = document.getElementById("ws20AggrSelDlg");
@@ -498,6 +504,17 @@
         try { DLG.showModal(); } catch (e) { try { DLG.show(); } catch (e2) { } }
         // 공통 다이얼로그 드래그/리센터(헤더 핸들).
         _safe(function () { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(DLG, oHeader); } });
+        // 드롭 위치에 팝업 표시(원본 편의성 — 드롭한 자리에서 aggregation 선택). 좌표 없으면 중앙 유지.
+        //   showModal 기본 중앙정렬(margin:auto)을 인라인 fixed+left/top 으로 덮음. 화면 밖으로 안 나가게 클램프.
+        _safe(function () {
+            if (typeof i_x !== "number" || typeof i_y !== "number") { return; }
+            var w = DLG.offsetWidth, h = DLG.offsetHeight, M = 8;
+            var left = Math.max(M, Math.min(i_x, window.innerWidth - w - M));
+            var top = Math.max(M, Math.min(i_y, window.innerHeight - h - M));
+            DLG.style.position = "fixed"; DLG.style.margin = "0";
+            DLG.style.left = Math.round(left) + "px";
+            DLG.style.top = Math.round(top) + "px";
+        });
         // 팝업 떴으니 busy 해제(원본 afterOpen: parent.setBusy("")).
         try { parent.setBusy(""); } catch (e) { }
         oAPP.fn.setShortcutLock(false);
@@ -677,7 +694,12 @@
         _bindBusy("BUSY_ON", _busyOption("215"));
 
         var lt_dragInfo = oAPP.fn.getDragParam(oEvent);
-        if (!lt_dragInfo || lt_dragInfo.length !== 3) { _bindBusy("BUSY_OFF"); return; }
+        if (!lt_dragInfo) { _bindBusy("BUSY_OFF"); return; }
+
+        // UI 삽입 팝업(카탈로그)에서 드래그 → 신규 UI 추가(원본 designUIDropInsertPopup). 5-파트 포맷이라 length 검사 앞.
+        if (lt_dragInfo[0] === "callUIInsertPopup") { return oAPP.fn.designUIDropInsertPopup(oEvent, i_OBJID); }
+
+        if (lt_dragInfo.length !== 3) { _bindBusy("BUSY_OFF"); return; }
 
         // 내 패턴(UI 개인화) 리스트에서 드래그한 경우 — 저장 패턴을 대상 UI 에 적용(원본 uiDesignArea.js 5658).
         //   drop 위치(On/Before/After)를 넘겨 getDropTargetLine 이 실제 대상/삽입위치를 재해석하도록 함.
@@ -735,6 +757,57 @@
 
         var l_pos = oAPP.fn.getMousePosition();
         oAPP.fn.aggrSelectPopup(l_drag, l_drop, oAPP.fn.drop_cb, l_pos.x, l_pos.y);
+        return true;
+    };
+
+
+    /* ====================================================================
+     * 5-a) UI 삽입 팝업(카탈로그)에서 드래그한 신규 UI drop 처리.
+     *      (원본 uiDesignArea.js designUIDropInsertPopup 5510 1:1)
+     *      dataTransfer = "callUIInsertPopup|UIOBK|개수|DnDRandKey|개인화여부".
+     *      대상 노드의 aggregation 을 aggrSelectPopup 으로 선택(후보1 자동/2+ 팝업) → designAddUIObject.
+     * ==================================================================== */
+    oAPP.fn.designUIDropInsertPopup = function (oEvent, i_OBJID) {
+        var _dropPosition = oEvent && oEvent.mParameters ? oEvent.mParameters.dropPosition : undefined;
+
+        _bindBusy("BUSY_ON", _busyOption("215"));
+
+        var lt_dragInfo = oAPP.fn.getDragParam(oEvent);
+        if (!lt_dragInfo || lt_dragInfo.length !== 5 || lt_dragInfo[0] !== "callUIInsertPopup") {
+            _bindBusy("BUSY_OFF"); oAPP.fn.designDragEnd(); return;
+        }
+        // 다른 세션 drag 정보 차단.
+        if (lt_dragInfo[3] !== oAPP.attr.DnDRandKey) {
+            _toast("E", _wsc("102")); _bindBusy("BUSY_OFF"); oAPP.fn.designDragEnd(); return;   // 102 다른 영역 drag
+        }
+
+        var _isPresetAttr = lt_dragInfo[4] === "true";
+        var l_UIOBK = lt_dragInfo[1];
+        var l_cnt = parseInt(lt_dragInfo[2], 10); if (!(l_cnt > 0)) { l_cnt = 1; }
+
+        var ls_drop = oAPP.fn.getTreeData(i_OBJID);
+        if (!ls_drop) { _bindBusy("BUSY_OFF"); oAPP.fn.designDragEnd(); return; }
+
+        // drop 대상/삽입위치 재해석(dropPosition 기준 dropIndex 매핑).
+        var _sDNDInfo = { sDrag: undefined, sDrop: ls_drop, sDropLineInfo: { dropPosition: _dropPosition, dropIndex: ls_drop.zTREE.length } };
+        ls_drop = oAPP.oDesign.fn.getDropTargetLine(_sDNDInfo);
+        if (typeof ls_drop === "undefined") {
+            _toast("E", _wsc("245")); _bindBusy("BUSY_OFF"); oAPP.fn.designDragEnd(); return;   // 245 DROP 대상 없음
+        }
+
+        // aggregation 선택 후 UI 추가(구 lf_setChild). aggrSelectPopup 콜백 = (is_0023, i_drag, i_drop).
+        async function lf_setChild(is_0023) {
+            var ls_0022 = oAPP.DATA.LIB.T_0022.find(function (a) { return a.UIOBK === l_UIOBK && a.ISDEP !== "X" && a.ISSTP !== "X"; });
+            if (!ls_0022 || !is_0023) { _bindBusy("BUSY_OFF"); oAPP.fn.designDragEnd(); return; }
+            try { await oAPP.fn.designAddUIObject(ls_drop, ls_0022, is_0023, l_cnt, _isPresetAttr); }
+            catch (e) { console.error("[HTML5][WS20] insert drop add:", e && e.message ? e.message : e); }
+            _bindBusy("BUSY_OFF");
+            oAPP.fn.designDragEnd();
+        }
+
+        var l_pos = oAPP.fn.getMousePosition();
+        // 후보 0 → aggrSelectPopup 이 262 토스트+BUSY_OFF, 취소 → 기본 처리(BUSY_OFF).
+        oAPP.fn.aggrSelectPopup({ UIOBK: l_UIOBK }, ls_drop, lf_setChild, l_pos.x, l_pos.y);
         return true;
     };
 

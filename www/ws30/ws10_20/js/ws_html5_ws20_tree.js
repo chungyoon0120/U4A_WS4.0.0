@@ -329,8 +329,19 @@
             {
                 icon: "sap-icon://responsive", fa: "display", accept: true, editOnly: true,
                 tooltip: _msg("B24", "UI Template Wizard"),
-                // [임시] UI Template Wizard 미완 — 안내 토스트만(사용자 지시). TODO(i18n) + 재개 시 원본 복원.
-                press: function () { try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { } /* _safeCall("designCallWizardPopup", []); */ }
+                // UI Template Wizard(HTML5) — 원본 uiDesignArea.js 729~748행 press 재현:
+                //   busy ON + 단축키 잠금 → designCallWizardPopup(HTML5, ws_html5_ws20_wizard.js).
+                //   (선택 노드 검사 → 서버 WZD_CHKER → fnUiTempWizardPopupOpener → 팝업)
+                press: function () {
+                    try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
+                    try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { }
+                    try { oAPP.fn.designCallWizardPopup(); }
+                    catch (e) {
+                        console.error("[HTML5][WS20] UI Template Wizard:", e && e.message ? e.message : e);
+                        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e2) { }
+                        try { parent.setBusy && parent.setBusy(""); } catch (e2) { }
+                    }
+                }
             },
             // E28 UI Personalization List — HTML5 인앱 팝업(fnP13nDesignPopupOpen "R" 리스트) 지연 로드.
             {

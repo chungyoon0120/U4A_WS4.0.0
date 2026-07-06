@@ -105,7 +105,7 @@ function _readHost() {
 function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
     var oEl = document.getElementById("editorBusy");
-    if (oEl) { oEl.classList.toggle("show", bBusy); }
+    if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }   // 공통 .u4a-busy 토글
     try { CURRWIN.closable = !bBusy; } catch (e) { }
     // 자식창 busy 동기화(원본 broadToChild). ISBROAD 면 내가 수신측이라 재발송 안 함.
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {

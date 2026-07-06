@@ -17,6 +17,8 @@ window.require(["vs/editor/editor.main"], function () {
         value: "",
         language: oAPP.attr.LANG,
         readOnly: oAPP.attr.READONLY,
+        //domReadOnly: 숨은 textarea 에 readonly 부여 → readOnly 만으론 뚫리는 IME(한글) 조합 입력 차단(Chromium93).
+        domReadOnly: oAPP.attr.READONLY,
         theme: oAPP.attr.THEME,         // 빌트인 vs / vs-dark
         automaticLayout: true,          // 창 리사이즈 자동 대응
         glyphMargin: false,

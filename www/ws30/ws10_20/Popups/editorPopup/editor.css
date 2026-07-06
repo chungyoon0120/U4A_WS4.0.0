@@ -101,32 +101,6 @@ body {
     justify-content: center;
 }
 
-/* 로딩 오버레이 — busy 동안 입력 차단 + 스피너. */
-#editorBusy {
-    position: fixed;
-    inset: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.25);
-    z-index: 9999;
-}
-
-#editorBusy.show {
-    display: flex;
-}
-
-#editorBusy .u4aEdSpinner {
-    width: 2.5rem;
-    height: 2.5rem;
-    border: 3px solid var(--divider);
-    border-top-color: var(--u4a-accent);
-    border-radius: 50%;
-    animation: u4aEdSpin 0.8s linear infinite;
-}
-
-@keyframes u4aEdSpin {
-    to { transform: rotate(360deg); }
-}
-
-/* 저장 토스트는 공통 .u4a-toast(shell.css — 화면 정중앙) 를 그대로 소비. 화면별 토스트 스타일 없음. */
+/* 로딩 오버레이 = 공통 .u4a-busy(shell.css SSOT — 카드+이중링 스피너, data-busy 토글, 0.3s 지연,
+   스크림 없음). 화면별 스피너/오버레이 CSS 제거 — editorFrame.html 이 .u4a-busy 마크업을 소비.
+   저장 토스트도 공통 .u4a-toast(shell.css — 화면 정중앙). 화면별 스타일 없음. */

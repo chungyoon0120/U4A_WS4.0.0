@@ -150,6 +150,13 @@
       // 애그리게이션 바인딩 팝업 호출.
       if (oAPP.fn.attrBindAggr(is_attr)) { return; }
 
+      // 여기까지 왔다 = 어떤 바인딩 분기도 처리하지 않음 → 미구현 특수 액션
+      //   (AppID F4=앱 검색 팝업 EXT00000030 / selectOption2·3 F4HelpID·ReturnField /
+      //    sap.ui.core.HTML content 바인딩 — attrAppf4Popup 등 HTML5 미정의라 가드 skip).
+      //   기존엔 조용히 종료돼 "먹통"으로 보였으므로 작업중 안내 토스트(구 attr.js _wipToast 와 동일 문구).
+      console.warn("[W4+ 예정] 바인딩 아이콘 미구현 특수 액션:", is_attr && is_attr.UIATT, "(", is_attr && is_attr.UIATK, ")");
+      _msg(10, "I", "아직 작업중입니다");
+
     } catch (e) {
       console.error("[HTML5][WS20][bind] 바인딩 아이콘 처리 오류:", e && e.message);
     }
@@ -158,6 +165,254 @@
     _busy(false);
 
   }; // end of attrBindIcon1Proc
+
+  /************************************************************************
+   * u4a.m.UsageArea 의 AppID(EXT00000030) icon1(돋보기 inspection) = 앱 검색 팝업(App F4).
+   *   원본 uiAttributeArea.js attrAppf4Popup(5619행) 1:1 이식.
+   *   · 팝업 컴포넌트 fnAppF4PopupOpen(options, callback) 은 WS10 앱검색과 동일 계약(HTML5 변환 완료).
+   *   · 콜백: 선택 앱의 APPID → AppID 프로퍼티, APPNM → AppDescript(EXT00000031) 프로퍼티에 매핑 후
+   *     attrChangeProc(=HTML5 fnWs20AttrChange) 로 반영.
+   *   · UNDO 는 원본 saveActionHistoryData("CHANGE_ATTR", [AppID, AppDesc]) → 단일 스냅샷 스택
+   *     (fnWs20PushUndo) 1회로 통합하고 두 변경은 bSkipUndo=true 로 호출(WS20 undo 단일스택 규칙).
+   *   · 원본 bindPopupBroadCast("BUSY_ON") = oMainBroad 로 열린 전체 자식 윈도우(앱 멀티 미리보기 등) 잠금.
+   *     이 콜백은 직접 브로드캐스트하지 않고, 호출하는 공통 fnWs20AttrChange 가 시작/finally 에서
+   *     _broadChildBusy(BUSY_ON/OFF) 로 처리한다(모든 attr 변경 공통 배선 — attr.js). 바인딩 팝업 별창
+   *     전송분은 인앱화로 불요.
+   ************************************************************************/
+  oAPP.fn.attrAppf4Popup = function (is_attr) {
+
+    //appcontainer 의 AppID 프로퍼티가 아닌경우 exit(하위 로직 계속).
+    if (is_attr.UIATK !== "EXT00000030") { return; }
+
+    //선택 앱 콜백(원본 lf_appCallback).
+    function lf_appCallback(param) {
+
+      //편집상태가 아닌경우 exit(원본 5628행).
+      if (!_isEdit()) { return; }
+      if (!param) { return; }
+
+      try {
+        //UNDO 1회(원본 5646행 CHANGE_ATTR — AppID+AppDesc 를 한 스텝으로).
+        if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
+
+        //APPLICATION ID 매핑 + ATTR 변경(undo 는 위에서 1회 → skip).
+        is_attr.UIATV = param.APPID != null ? param.APPID : "";
+        oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+
+        //AppDescript(EXT00000031) 프로퍼티에 APPNM 매핑(원본 5656행).
+        var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
+        var ls_desc = aAttr.find(function (a) { return a.UIATK === "EXT00000031"; });
+        if (ls_desc) {
+          ls_desc.UIATV = param.APPNM != null ? param.APPNM : "";
+          oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true);
+        }
+
+        //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 5669·5673행).
+        if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
+        if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
+
+      } catch (e) {
+        console.error("[HTML5][WS20][bind] AppID F4 콜백 처리 오류:", e && e.message);
+      }
+    }
+
+    //앱 검색 팝업 옵션(원본 5678행 l_opt 동일).
+    var l_opt = { autoSearch: true, initCond: { PACKG: "", APPID: "", APPNM: "", ERUSR: "", HITS: 500 } };
+
+    //앱 검색 팝업 호출 — 로드되어 있으면 즉시, 아니면 loadJs 후(원본 5681~5690).
+    if (typeof oAPP.fn.fnAppF4PopupOpen === "function") {
+      oAPP.fn.fnAppF4PopupOpen(l_opt, lf_appCallback);
+    } else {
+      oAPP.loadJs("fnAppF4PopupOpen", function () { oAPP.fn.fnAppF4PopupOpen(l_opt, lf_appCallback); });
+    }
+
+    //하위 로직 skip flag return.
+    return true;
+
+  }; // end of attrAppf4Popup
+
+  /************************************************************************
+   * u4a.m.SelectOption2 의 F4HelpID(EXT00001188) icon1(돋보기 inspection) = DDIC 검색도움 선택 F4.
+   *   원본 uiAttributeArea.js attrSelOption2F4HelpID(5825행) 1:1 이식(selectOption2 경로만 — selectOption3
+   *   F4HelpID 는 값도움 ⧉ 경로라 별도).
+   *   · 원본 callF4HelpPopup("DD_SHLP","DD_SHLP",[],[],cb) → HTML5 공통 fnF4SearchHelpOpen({shlpname:"DD_SHLP"}).
+   *   · 콜백: 선택 SHLPNAME → F4HelpID 값. 짝인 F4HelpReturnField(EXT00001189)는 초기화(SearchHelp 가
+   *     바뀌면 이전 반환필드는 무효 — 단, 바인딩(ISBND="X")된 경우는 건드리지 않음).
+   *   · UNDO 는 단일 스냅샷 스택 1회 + 변경 bSkipUndo. 자식창 busy 브로드캐스트는 공통 fnWs20AttrChange
+   *     가 담당(이 콜백은 그걸 거쳐 자동 적용 — 위 attrAppf4Popup 주석 참고).
+   ************************************************************************/
+  oAPP.fn.attrSelOption2F4HelpID = function (is_attr, bSelOpt3) {
+
+    //★ bSelOpt3 로 selOpt2/selOpt3 진입을 분리(원본 5828·5833행). 이걸 UIATK 단독판별로 바꾸면
+    //  바인딩 아이콘 흐름(attrBindIcon1Proc, bSelOpt3 없이 호출)이 selOpt3(2534)를 잘못 잡아 F4 를 열게 됨.
+    //  selOpt3 F4 는 입력칸 F4 버튼(값도움) 경로에서만 bSelOpt3=true 로 호출한다.
+    //selectOption2 의 F4HelpID 가 아니고 bSelOpt3 도 아니면 exit(원본 5828행).
+    if (is_attr.UIATK !== "EXT00001188" && !bSelOpt3) { return; }
+    //selectOption3 의 F4HelpID 가 아닌데 bSelOpt3 면 exit(원본 5833행).
+    if (is_attr.UIATK !== "EXT00002534" && bSelOpt3 === true) { return; }
+
+    //DDIC 검색도움 선택 콜백(원본 lf_returnDOC).
+    function lf_returnDOC(param) {
+
+      //편집상태가 아닌경우/선택값 없는경우 exit.
+      if (!_isEdit()) { return; }
+      if (!param) { return; }
+
+      try {
+        //UNDO 1회(원본 5865행 CHANGE_ATTR — F4HelpID+ReturnField 한 스텝).
+        if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
+
+        //F4 HELP 선택 SHLPNAME 매핑 + ATTR 변경(undo skip).
+        is_attr.UIATV = param.SHLPNAME != null ? param.SHLPNAME : "";
+        oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+
+        //짝인 F4HelpReturnField 초기화(원본 5876행 — 바인딩건은 제외). selOpt2=1189 / selOpt3=2535(원본 5850·5854행).
+        var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
+        var sRetKey = (is_attr.UIATK === "EXT00002534") ? "EXT00002535" : "EXT00001189";
+        var ls_ret = aAttr.find(function (a) { return a.UIATK === sRetKey; });
+        if (ls_ret && ls_ret.ISBND !== "X") {
+          ls_ret.UIATV = "";
+          ls_ret.ISBND = "";
+          oAPP.fn.fnWs20AttrChange(ls_ret, "INPUT", true);
+        }
+
+        //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 5892·5896행).
+        if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
+        if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
+
+      } catch (e) {
+        console.error("[HTML5][WS20][bind] selectOption2 F4HelpID 콜백 오류:", e && e.message);
+      }
+    }
+
+    //편집 모드에서만 콜백 연결(원본 5903행 — display 면 선택해도 반영 안 함).
+    var fnCb = (_isEdit() === true) ? lf_returnDOC : null;
+
+    //DDIC SearchHelp 선택 F4 팝업 호출(원본 callF4HelpPopup("DD_SHLP","DD_SHLP",[],[],cb)).
+    var _open = function () {
+      oAPP.fn.fnF4SearchHelpOpen({ shlpname: "DD_SHLP", shlpDef: "DD_SHLP", onPick: fnCb });
+    };
+    if (typeof oAPP.fn.fnF4SearchHelpOpen === "function") { _open(); }
+    else { oAPP.loadJs("fnF4SearchHelpPopup", _open); }
+
+    //하위 로직 skip flag return.
+    return true;
+
+  }; // end of attrSelOption2F4HelpID
+
+  /************************************************************************
+   * u4a.m.SelectOption2 의 F4HelpReturnField(EXT00001189) icon1(돋보기 inspection) = 필드 리스트 선택.
+   *   원본 uiAttributeArea.js attrSelOption2F4HelpReturnFIeld(5932행) 1:1 이식(selectOption2 경로만).
+   *   · 짝인 F4HelpID(EXT00001188)에 SearchHelp 가 지정돼 있어야 함(없으면 053, 바인딩이면 050 오류).
+   *   · 원본 callDynListPopup("GETF4HELPFIELD", …, [{SHLPNAME}], cb) → HTML5 동적 리스트 팝업(fnDynListPopup).
+   *   · 콜백: 선택 FIELDNAME → F4HelpReturnField 값(attrChange=fnWs20AttrChange, undo 1회).
+   ************************************************************************/
+  oAPP.fn.attrSelOption2F4HelpReturnFIeld = function (is_attr, bSelOpt3) {
+
+    //★ bSelOpt3 로 selOpt2/selOpt3 진입 분리(원본 5964·5969행) — 위 attrSelOption2F4HelpID 와 동일한 함정 회피.
+    //  바인딩 아이콘(attrBindIcon1Proc, bSelOpt3 없이 호출)은 selOpt3(2535)를 안 잡고 attrCheckSelOpt3F4ReturnField
+    //  → attrBindProp 로 흘러야 한다. selOpt3 필드리스트 F4 는 입력칸 F4 버튼에서만 bSelOpt3=true 로 호출.
+    //selectOption2 의 F4HelpReturnField 가 아니고 bSelOpt3 도 아니면 exit(원본 5964행).
+    if (is_attr.UIATK !== "EXT00001189" && !bSelOpt3) { return; }
+    //selectOption3 의 F4HelpReturnField 가 아닌데 bSelOpt3 면 exit(원본 5969행).
+    if (is_attr.UIATK !== "EXT00002535" && bSelOpt3 === true) { return; }
+
+    //편집상태가 아닌경우 skip(원본 5975행).
+    if (!_isEdit()) { return true; }
+
+    var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
+
+    //짝인 F4HelpID 프로퍼티 — selOpt2=1188 / selOpt3=2534(원본 5988·5992행).
+    var sIdKey = (is_attr.UIATK === "EXT00002535") ? "EXT00002534" : "EXT00001188";
+    var ls_attr = aAttr.find(function (a) { return a.UIATK === sIdKey; });
+
+    //F4HelpID 값이 없으면 오류(원본 5999행 — 053 Value & is missing / & = A37 Search Help ID).
+    if (!ls_attr || ls_attr.UIATV === "") {
+      var sMiss = _mw("053", _cl("A37"));
+      if (ls_attr) {
+        ls_attr.valst = "Error";
+        ls_attr.valtx = sMiss;
+        try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+      }
+      _msg(10, "E", sMiss);
+      return true;
+    }
+
+    //F4HelpID 가 바인딩된 경우 오류(원본 6022행 — 050 필드리스트 팝업 호출 불가).
+    if (ls_attr.ISBND === "X") {
+      ls_attr.valtx = _wsTxt("050");
+      try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+      _msg(10, "E", ls_attr.valtx);
+      return true;
+    }
+
+    //A28 Field List — 제목 = F4HelpID값 + " " + Field List(원본 6041행).
+    var l_title = ls_attr.UIATV + " " + _cl("A28");
+
+    //선택 콜백(원본 lf_callback).
+    function lf_callback(param) {
+      if (!_isEdit()) { return; }
+      if (!param) { return; }
+      try {
+        //리스트에서 선택한 필드명 매핑(원본 5952행).
+        is_attr.UIATV = param.FIELDNAME != null ? param.FIELDNAME : "";
+        //오류 표현 필드 초기화(원본 5955행).
+        if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(); }
+        //ATTR 변경(원본 5958행은 attrChange=FULL — fnWs20AttrChange(=attrChangeProc)+undo 1회).
+        oAPP.fn.fnWs20AttrChange(is_attr, "INPUT");
+        //원본 attrChange 는 내부에서 아래 두 갱신까지 수행 → fnWs20AttrChange 는 안 하므로 명시 호출
+        //  (#1/#3/#4 콜백과 동일 패턴 — 트리 재렌더 + 바인딩 팝업 디자인 동기화).
+        if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
+        if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
+      } catch (e) {
+        console.error("[HTML5][WS20][bind] selectOption2 F4HelpReturnField 콜백 오류:", e && e.message);
+      }
+    }
+
+    //동적 리스트 팝업 호출 — 로드되어 있으면 즉시, 아니면 loadJs 후(원본 6044~6055).
+    var _open = function () {
+      oAPP.fn.callDynListPopup("GETF4HELPFIELD", l_title,
+        [{ NAME: "SHLPNAME", VALUE: ls_attr.UIATV }], lf_callback);
+    };
+    if (typeof oAPP.fn.callDynListPopup === "function") { _open(); }
+    else { oAPP.loadJs("fnDynListPopup", _open); }
+
+    return true;
+
+  }; // end of attrSelOption2F4HelpReturnFIeld
+
+  /************************************************************************
+   * selectOption3 UI 의 F4HelpReturnField(EXT00002535) 바인딩 전 필요값 점검.
+   *   원본 uiAttributeArea.js attrCheckSelOpt3F4ReturnField(6194행) 1:1 이식.
+   *   · 바인딩 아이콘(icon1) 흐름(attrBindIcon1Proc 145행)에서 attrBindProp 전에 호출.
+   *   · 짝인 F4HelpID(EXT00002534)에 값이 없으면 053(Value & is missing / & = A37 Search Help ID) 오류 후 skip.
+   *   · F4HelpID 값이 있거나 프로퍼티가 없으면 통과(return undefined → 상위가 다음 분기로).
+   *   반환 true = 호출처 후속 분기 skip(원본 동일).
+   ************************************************************************/
+  oAPP.fn.attrCheckSelOpt3F4ReturnField = function (is_attr) {
+
+    //selectOption3 의 F4HelpReturnField 가 아닌경우 exit(원본 6197행).
+    if (is_attr.UIATK !== "EXT00002535") { return; }
+
+    var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
+
+    //짝인 F4HelpID(EXT00002534) 프로퍼티.
+    var ls_attr = aAttr.find(function (a) { return a.UIATK === "EXT00002534"; });
+
+    //F4HelpID 가 없거나 값이 있으면 통과(원본 6204행).
+    if (!ls_attr || ls_attr.UIATV !== "") { return; }
+
+    //F4HelpID 값이 없으면 053 오류 표현(원본 6209행 — 053 Value & is missing / & = A37 Search Help ID).
+    var sMiss = _mw("053", _cl("A37"));
+    ls_attr.valst = "Error";
+    ls_attr.valtx = sMiss;
+    try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+    _msg(10, "E", sMiss);
+
+    //하위 로직 skip flag return(원본 6222행).
+    return true;
+
+  }; // end of attrCheckSelOpt3F4ReturnField
 
   /************************************************************************
    * Tree parent/child 프로퍼티 바인딩 점검 (원본 uiAttributeArea.js 5767행 1:1 — UI5 치환).
@@ -387,10 +642,25 @@
     var oTreePane = _el("div", "u4a-splitter__pane u4aBindTreePane");
     var oTreeBody = _el("div", "u4aBindTreeBody");
     var oColHead = _el("div", "u4aBindColHead");
-    oColHead.appendChild(_el("span", "u4aBindColName", _cl("A50")));   // A50 Object Name
-    oColHead.appendChild(_el("span", "u4aBindColType", _cl("A51")));   // A51 Type
-    oColHead.appendChild(_el("span", "u4aBindColDesc", _cl("A35")));   // A35 Description
+    var oColName = _el("span", "u4aBindColName", _cl("A50"));   // A50 Object Name
+    var oColType = _el("span", "u4aBindColType", _cl("A51"));   // A51 Type
+    var oColDesc = _el("span", "u4aBindColDesc", _cl("A35"));   // A35 Description
+    // ★ 컬럼 리사이즈 그립(원본 sap.ui.table.TreeTable 이식) — 이름/유형 우측 경계(=보이는 세로 구분선)에
+    //   얹혀 드래그하면 ★그 컬럼만★ 넓히/좁힌다. 설명은 마지막 "채움" 컬럼이라 남는 공간을 흡수(빈칸 없음,
+    //   탐색기 등 표준). 즉 유형|설명 끌면 유형만 변하고 이름은 불변(설명이 흡수). 첫 드래그 때 이름·유형을
+    //   현재폭(px)으로 고정(_ensureColsFixed)한 뒤 개별 조절. 더블클릭=반응형 기본폭 복귀.
+    oColType.appendChild(_buildColGrip("name"));    // 이름 우측 경계(이름|유형 구분선) → 이름 폭
+    oColDesc.appendChild(_buildColGrip("type"));    // 유형 우측 경계(유형|설명 구분선) → 유형 폭
+    oColHead.appendChild(oColName);
+    oColHead.appendChild(oColType);
+    oColHead.appendChild(oColDesc);
     oTreeBody.appendChild(oColHead);
+    oUI.treePane = oTreePane;      // 폭 변수(--u4aBind-*-w) 소유 엘리먼트(리사이즈 시 갱신)
+    oUI.treeBody = oTreeBody;      // 스크롤 컨테이너
+    oUI.colHead  = oColHead;       // 컬럼 헤더(고정 진입 시 overhead=padding+gap 실측용)
+    oUI.colNameHead = oColName;    // 오브젝트이름 헤더 셀(폭 실측용)
+    oUI.colTypeHead = oColType;    // 유형 헤더 셀
+    oUI.colDescHead = oColDesc;    // 설명 헤더 셀
     // 트리(행) 컨테이너 — 스크롤은 TreeBody 담당. 가로 행 구분선을 다이얼로그 바닥까지 잇기 위해
     //   min-height 로 헤더 아래 남는 높이를 채우고, 배경 반복 그라디언트로 빈 영역에도 같은 간격 가로선.
     oUI.treeWrap = _el("div", "u4aBindTreeWrap");
@@ -697,6 +967,86 @@
     }
   } // end of lf_setBindEnable
 
+  /* ── 컬럼 리사이즈 (원본 TreeTable 컬럼 리사이즈 — CSS 폭 변수만 갱신, 헤더/행/세로선 동기화) ── */
+
+  // 현재 컬럼 렌더 폭(px) — 헤더 셀 실측.
+  function _colPx(sCol) {
+    var oCell = (sCol === "type") ? oUI.colTypeHead : (sCol === "desc") ? oUI.colDescHead : oUI.colNameHead;
+    return (oCell && oCell.getBoundingClientRect().width) || (sCol === "type" ? 144 : 200);
+  }
+
+  // 이름/유형 폭(px) 반영 — 설명은 마지막 "채움" 컬럼이라 남는 공간을 자동 흡수(빈칸 없음). 다른 컬럼은
+  //   안 건드림. 패널에 맞도록 clamp: 이 컬럼 ≥ 4rem, 그리고 설명 ≥ 4rem 남기게 상한(넘침/가로 스크롤 없음).
+  function _applyColW(sCol, px) {
+    var iPanel = (oUI.treeBody && oUI.treeBody.clientWidth) || 0;
+    var iAvail = iPanel - (oUI.colsOverhead || 19);
+    var iOther = (sCol === "name") ? oUI.wType : oUI.wName;
+    var iMax = iAvail - iOther - 64;               // 설명 최소 4rem 확보
+    if (px < 64) { px = 64; }
+    if (iMax > 64 && px > iMax) { px = iMax; }
+    if (sCol === "name") { oUI.wName = px; } else { oUI.wType = px; }
+    oUI.treePane.style.setProperty("--u4aBind-" + sCol + "-w", px + "px");
+  }
+
+  // 첫 리사이즈 때 1회 — 이름·유형을 현재 렌더폭(px)으로 고정(.u4aBindColsFixed: 이름 flex→고정폭, 설명→채움).
+  //   overhead = 헤더 전체폭 − 세 컬럼합 = padding+gap 실측(clamp 기준). 이후 이름/유형만 조절, 설명이 흡수.
+  function _ensureColsFixed() {
+    if (oUI.colsFixed) { return; }
+    oUI.wName = _colPx("name"); oUI.wType = _colPx("type");
+    var headW = (oUI.colHead && oUI.colHead.getBoundingClientRect().width) || 0;
+    oUI.colsOverhead = Math.max(0, Math.round(headW - (oUI.wName + oUI.wType + _colPx("desc"))));
+    oUI.treePane.style.setProperty("--u4aBind-name-w", oUI.wName + "px");
+    oUI.treePane.style.setProperty("--u4aBind-type-w", oUI.wType + "px");
+    oUI.treePane.classList.add("u4aBindColsFixed");
+    oUI.colsFixed = true;
+  }
+
+  // 컬럼 경계 그립 — 셀 좌측 경계(=보이는 세로 구분선)에 절대배치. sCol=이 그립이 조절할 컬럼("name"|"type").
+  //   ★그 컬럼만 조절(다른 고정 컬럼 불변, 설명=채움이 남는 공간 흡수 → 빈칸 없음). 더블클릭=반응형 기본폭 복귀.
+  function _buildColGrip(sCol) {
+    var oGrip = _el("div", "u4aBindColGrip");
+    oGrip.setAttribute("aria-hidden", "true");
+    var bDrag = false, bHover = false, iStartX = 0, iStart0 = 0;
+    // hover/드래그 시 강조할 경계 세로선 = 이 그립 오른쪽 컬럼의 좌측 border(이름그립→유형선, 유형그립→설명선).
+    var sHl = (sCol === "name") ? "u4aBindHlType" : "u4aBindHlDesc";
+    function lf_move(e) {
+      if (!bDrag) { return; }
+      _applyColW(sCol, iStart0 + (e.clientX - iStartX));   // 오른쪽 드래그 = 이 컬럼 확대(설명이 남는 공간 흡수)
+    }
+    function lf_up() {
+      bDrag = false;
+      document.body.classList.remove("u4aBindResizing");
+      if (!bHover) { oUI.treePane.classList.remove(sHl); }   // 드래그 끝 + 그립 밖이면 강조 해제
+      document.removeEventListener("mousemove", lf_move);
+      document.removeEventListener("mouseup", lf_up);
+    }
+    // 경계 세로선 전체(헤더+행+빈 영역 = 컬럼 좌측 border 일체)를 accent 로 강조 — 그립 hover / 드래그 중.
+    oGrip.addEventListener("mouseenter", function () { bHover = true; oUI.treePane.classList.add(sHl); });
+    oGrip.addEventListener("mouseleave", function () { bHover = false; if (!bDrag) { oUI.treePane.classList.remove(sHl); } });
+    oGrip.addEventListener("mousedown", function (e) {
+      _ensureColsFixed();
+      bDrag = true;
+      iStartX = e.clientX;
+      iStart0 = _colPx(sCol);
+      oUI.treePane.classList.add(sHl);
+      document.body.classList.add("u4aBindResizing");
+      document.addEventListener("mousemove", lf_move);
+      document.addEventListener("mouseup", lf_up);
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    // 더블클릭 = 반응형 기본폭 복귀(고정 해제 → 이름 flex 28%, 유형 30%, 설명 42% — 초기 비율).
+    oGrip.addEventListener("dblclick", function (e) {
+      oUI.colsFixed = false;
+      oUI.treePane.classList.remove("u4aBindColsFixed");
+      oUI.treePane.style.removeProperty("--u4aBind-name-w");
+      oUI.treePane.style.setProperty("--u4aBind-type-w", "30%");
+      oUI.treePane.style.setProperty("--u4aBind-desc-w", "42%");
+      e.preventDefault(); e.stopPropagation();
+    });
+    return oGrip;
+  }
+
   /* ── 트리 렌더 (공통 createTree — 3열 트리테이블) ── */
 
   function lf_renderTree() {
@@ -738,13 +1088,23 @@
         oT.appendChild(oDesc);
         return oT;
       },
-      // 행 후크: 행 스코프 클래스 + 상태바 색 + 선택가능 dim + 노드 stash.
+      // 행 후크: 행 스코프 클래스 + 상태바 색 + 선택가능 dim + 노드 stash + 이름셀 래핑.
       rowHook: function (oRow, n) {
         oRow.classList.add("u4aBindRow");
         var sHl = _rowHl(n.highlight);
         if (sHl) { oRow.classList.add(sHl); }
         if (n.enable !== true) { oRow.classList.add("u4aBindRow--disabled"); }
         oRow.__u4aBindNode = n;
+        // ★ 이름 컬럼 셀 — 토글+아이콘+라벨을 고정폭 셀로 묶어 행을 [이름|유형|설명] 3-flex 로(헤더와 동일
+        //   구조). 이래야 이름 고정폭 시 라벨이 정확히 이름폭만 채우고, 설명(채움)과 정렬이 견고하다.
+        var oNameCell = _el("div", "u4aBindNameCell");
+        var oTog = oRow.querySelector(".u4a-tree__toggle");
+        var oIco = oRow.querySelector(".u4a-tree__icon");
+        var oLbl = oRow.querySelector(".u4a-tree__label");
+        if (oTog) { oNameCell.appendChild(oTog); }
+        if (oIco) { oNameCell.appendChild(oIco); }
+        if (oLbl) { oNameCell.appendChild(oLbl); }
+        oRow.insertBefore(oNameCell, oRow.firstChild);
       },
       onSelect: function (n, oRow) { lf_selRow(n); }
     });
@@ -1380,7 +1740,7 @@
   function lf_ensureStyle() {
     var sCss = [
       // 다이얼로그 — 반응형 크기 + 세로 flex(바디가 늘어 푸터 하단 고정). 헤더/푸터 48px=공통.
-      ".u4aBindDlg { width: min(94vw, 1040px); height: min(90vh, 720px); padding: 0; display: flex; flex-direction: column; }",
+      ".u4aBindDlg { width: 80vw; height: min(90vh, 720px); padding: 0; display: flex; flex-direction: column; }",
       ".u4aBindDlg .u4a-dialog__header { cursor: move; user-select: none; }",
       ".u4aBindHead span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
       // 툴바(MIME .u4aMimeTreeTool 컨벤션) — 아이콘/라벨 버튼 한 줄, 하단 경계.
@@ -1392,7 +1752,7 @@
       ".u4aBindBody { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 0; display: flex; }",
       ".u4aBindSplit { flex: 1 1 auto; width: 100%; min-width: 0; min-height: 0; --u4aBindTreeW: 100%; }",
       // 트리 패널(좌).
-      ".u4aBindTreePane { --u4aBind-type-w: 9rem; --u4aBind-desc-w: 30%; flex: 1 1 var(--u4aBindTreeW); display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }",
+      ".u4aBindTreePane { --u4aBind-type-w: 30%; --u4aBind-desc-w: 42%; flex: 1 1 var(--u4aBindTreeW); display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }",
       // ★ TreeBody = 스크롤 컨테이너(overflow:hidden auto). 헤더(sticky)+트리가 모두 이 안에 들어가
       //   같은 폭 컨텍스트를 공유 → 세로 스크롤바가 떠도 컬럼이 안 어긋남(MIME .u4aMimeTreeBody / USP 동일).
       ".u4aBindTreeBody { flex: 1 1 auto; min-height: 0; overflow: hidden auto; position: relative; background: var(--surface); }",
@@ -1403,6 +1763,19 @@
       ".u4aBindColName { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding-left: 0.5rem; }",
       ".u4aBindColType { flex: 0 0 var(--u4aBind-type-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; gap: 0.375rem; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }",
       ".u4aBindColDesc { flex: 0 0 var(--u4aBind-desc-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }",
+      // ★ 컬럼 리사이즈 그립 — 유형/설명 헤더 셀의 좌측 경계(=세로 구분선 위)에 얹혀 드래그로 폭 변수 갱신.
+      //   헤더 셀에만 position:relative(그립 absolute 앵커) — 행 셀엔 그립 없음. z-index로 헤더 텍스트 위.
+      ".u4aBindColHead .u4aBindColType, .u4aBindColHead .u4aBindColDesc { position: relative; }",
+      ".u4aBindColGrip { position: absolute; top: 0; bottom: 0; left: -0.1875rem; width: 0.4375rem; cursor: col-resize; z-index: 4; }",
+      // 리사이즈 경계 강조 — 그립 hover/드래그 시 그 경계의 세로선(헤더+행+빈 영역의 컬럼 좌측 border 일체)을
+      //   accent 로. 이름그립=유형 컬럼 좌측선(이름|유형), 유형그립=설명 컬럼 좌측선(유형|설명). JS 가 treePane 토글.
+      ".u4aBindHlType .u4aBindColType, .u4aBindHlType .u4aBindGL--type, .u4aBindHlDesc .u4aBindColDesc, .u4aBindHlDesc .u4aBindGL--desc { border-left-color: var(--accent); box-shadow: inset 0.1875rem 0 0 var(--accent); }",
+      // 이름 컬럼 셀(rowHook 이 토글+아이콘+라벨을 여기 묶음) — 기본은 채움(flex), 고정 모드서 고정폭.
+      ".u4aBindNameCell { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0.375rem; overflow: hidden; }",
+      // ★ 컬럼 고정 모드(리사이즈 시작 후) — 이름/유형 고정폭, 설명=채움(남는 공간 흡수 → 빈칸 없음, 가로 스크롤 X).
+      //   행 이름부는 .u4aBindNameCell 로 묶여 [이름|유형|설명] 3-flex(헤더와 동일)라 정렬 견고.
+      ".u4aBindColsFixed .u4aBindColName, .u4aBindColsFixed .u4aBindNameCell, .u4aBindColsFixed .u4aBindGL--name { flex: 0 0 var(--u4aBind-name-w); }",
+      ".u4aBindColsFixed .u4aBindColDesc, .u4aBindColsFixed .u4aBindGL--desc { flex: 1 1 0; }",
       // 트리(행) 컨테이너 — 스크롤은 TreeBody 가 담당(여긴 일반 블록). ★ min-height:calc(100% - 헤더 2.25rem)
       //   로 헤더 아래 남는 높이를 채우고(헤더+이 블록 = 컨테이너 → 데이터 적어도 팬텀 세로스크롤 없음),
       //   배경 반복 그라디언트로 행 높이(2.5rem)마다 가로선 → 행 없는 빈 영역도 다이얼로그 바닥까지 같은
@@ -1454,6 +1827,10 @@
       ".u4aBindAdditPane { display: none; flex: 1 1 0; min-width: 0; background: var(--surface); overflow: hidden; }",
       ".u4aBindSplitBar { display: none; }",
       ".u4aBindShowAddit .u4aBindTreePane { flex: 0 0 var(--u4aBindTreeW); }",
+      // ★ 스플릿(MPROP) 표시로 트리가 좁아지면 컬럼이 잘리지 않게 가로 스크롤 — 콘텐츠 최소폭 max(100%,36rem)
+      //   유지(패널이 36rem 보다 좁아지면 그 폭 유지+스크롤). 헤더/트리/세로선 다 같은 min-width 라 정렬 유지.
+      ".u4aBindShowAddit .u4aBindTreeBody { overflow: auto; }",
+      ".u4aBindShowAddit .u4aBindColHead, .u4aBindShowAddit .u4aBindTreeWrap, .u4aBindShowAddit .u4aBindTree.u4a-tree { min-width: max(100%, 36rem); }",
       ".u4aBindShowAddit .u4aBindAdditPane { display: flex; }",
       ".u4aBindShowAddit .u4aBindSplitBar { display: flex; }",
       ".u4aBindAdditWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }",

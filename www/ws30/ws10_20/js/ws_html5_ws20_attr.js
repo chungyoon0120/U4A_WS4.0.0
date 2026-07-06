@@ -99,6 +99,22 @@
         return sNr;
     }
 
+    // 미변환(작업중) 기능 클릭 시 공통 안내 토스트 — 완료 전까지 "진행중"임을 사용자에게 알린다.
+    //  ★문구는 기존 코드(구 아이콘 셀 4523행)와 동일 문자열을 재사용해 통일. showMessage 정중앙 토스트(type "I").
+    //  기존엔 F4 값도움/팝업버튼 미변환이 console.warn 만 남기고 사용자 피드백이 없어 "먹통"처럼 보였던 것을 보완.
+    //  TODO(i18n): "아직 작업중입니다" 는 임시 하드코딩 → 메시지 클래스 키 확보 시 이 한 곳만 교체.
+    function _wipToast() {
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+    }
+
+    // 열려있는 형제(자식) 윈도우 busy 브로드캐스트 — 원본은 모든 디자인 변경 콜백이
+    //   bindPopupBroadCast("BUSY_ON"/"BUSY_OFF") 로 oMainBroad 에 뿌려 전체 자식 윈도우(앱 멀티
+    //   미리보기 등)를 잠갔다 푼다. 개별 콜백(원본 19곳) 대신 공통 변경 경로에서 이 헬퍼로 호출.
+    //   (수신부 broadcast/ws_fn_broad.js: BUSY_ON→parent.setBusy("X"), BUSY_OFF→parent.setBusy(""))
+    function _broadChildBusy(bOn) {
+        try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: bOn ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
+    }
+
     /************************************************************************
      * 원본 미변환(UI5 의존) 함수 안전 호출 — W3 트리 파일과 동일 패턴.
      ************************************************************************/
@@ -1402,19 +1418,24 @@
      *     · Input value="{/uiinfo/OBJID}" 두방향 바인딩 부재 → 호출측(onChange)이
      *       입력값을 /uiinfo/OBJID 에 먼저 주입한 뒤 이 함수를 호출한다.
      *     · valueState(빨간 테두리/메시지)는 공통 필드(oAPP.attr.uiObjIdField)로 표시.
-     *     · bindPopup BUSY_ON/OFF 브로드캐스트는 UI5 별창 전용 → HTML5 skip
-     *       (라인 3222 주석과 동일 정책).
+     *     · 자식창 busy 브로드캐스트: 이 함수는 fnWs20AttrChange 를 안 거치므로 시작/모든 종료 지점에
+     *       _broadChildBusy(BUSY_ON/OFF) 직접 배선(원본 OBJID onChange 244행 bindPopupBroadCast 대응).
      *     · UNDO 는 원본 saveActionHistoryData("CHANGE_OBJID") 대신 단일 스냅샷
      *       스택(fnWs20PushUndo)으로 통일(WS20 undo/redo 단일스택 규칙).
      ************************************************************************/
     if (typeof oAPP.fn.attrChnageOBJID !== "function") {
         oAPP.fn.attrChnageOBJID = async function () {
 
+            //열려있는 형제(자식) 윈도우 BUSY_ON. (원본 OBJID onChange 244행 bindPopupBroadCast("BUSY_ON").
+            //  이 함수의 모든 종료 지점에서 짝 BUSY_OFF.)
+            _broadChildBusy(true);
+
             var oField = oAPP.attr.uiObjIdField;
 
             var ls_uiinfo = oAPP.attr.oModel.getProperty("/uiinfo");
             if (!ls_uiinfo) {
                 try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                _broadChildBusy(false);
                 return;
             }
 
@@ -1446,6 +1467,7 @@
                 } catch (e) { }
                 try { parent.showMessage(null, 10, "E", sTxt); } catch (e) { }
                 try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                _broadChildBusy(false);   // BUSY_ON 짝(오류 종료).
             }
             //검증 통과/해소 시 오류 표시 제거.
             function _clearErr() {
@@ -1495,6 +1517,7 @@
             if (ls_uiinfo.OBJID === ls_uiinfo.OBJID_bf) {
                 _clearErr();
                 try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                _broadChildBusy(false);   // BUSY_ON 짝(변경 없음 종료).
                 return;
             }
 
@@ -1566,6 +1589,7 @@
 
             // busy off (원본 4360행)
             try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+            _broadChildBusy(false);   // BUSY_ON 짝(정상 종료).
 
         };  //OBJID 입력건 처리.
     }
@@ -3301,6 +3325,9 @@
 
         try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
         try { oAPP.fn.setShortcutLock(true); } catch (e) { }
+        //열려있는 형제(자식) 윈도우 BUSY_ON. (원본: 모든 attr 변경 콜백이 bindPopupBroadCast("BUSY_ON")
+        //  → 전체 자식 윈도우 잠금. 개별 콜백 19곳 대신 공통 변경 경로 1곳에 배선. 짝 BUSY_OFF 는 아래 finally.)
+        _broadChildBusy(true);
 
         try {
 
@@ -3387,9 +3414,271 @@
         } finally {
             try { oAPP.fn.setShortcutLock(false); } catch (e) { }
             try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+            //형제(자식) 윈도우 BUSY_OFF — 위 BUSY_ON 짝. (원본: updateBindPopupDesignData→sendBindPopupBusyOff)
+            _broadChildBusy(false);
         }
 
     }; // end of oAPP.fn.fnWs20AttrChange
+
+    /************************************************************************
+     * u4a.m.UsageArea 의 AppID(EXT00000030) icon2(빨간 휴지통 delete) = AppID/AppDesc 삭제(초기화).
+     *   원본 uiAttributeArea.js attrAppF4Del(5700행) 1:1 이식.
+     *   · AppID 와 AppDescript(EXT00000031)는 "한 몸"이라 함께 비운다(icon1 앱검색 F4 의 짝).
+     *   · 팝업 의존 없는 순수 데이터(값 "" + attrChangeProc) → attr.js 에 직접 정의(온디맨드 로드 불필요).
+     *   · UNDO 는 원본 saveActionHistoryData("CHANGE_ATTR", [AppID, AppDesc]) → 단일 스냅샷 스택 1회 +
+     *     두 변경 bSkipUndo=true. 자식창 busy 브로드캐스트는 fnWs20AttrChange 가 담당(이 함수는 그걸 거침).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrAppF4Del !== "function") {
+        oAPP.fn.attrAppF4Del = function (is_attr) {
+
+            //appcontainer 의 AppID 프로퍼티가 아닌경우 exit.
+            if (is_attr.UIATK !== "EXT00000030") { return; }
+
+            //편집상태가 아닌경우 skip(원본 5706행).
+            if (!_isEditMode()) { return true; }
+
+            try {
+                //UNDO 1회(원본 5727행 CHANGE_ATTR — AppID+AppDesc 한 스텝).
+                if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
+
+                //AppID 입력값 초기화 + ATTR 변경(undo 는 위에서 1회 → skip).
+                is_attr.UIATV = "";
+                oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+
+                //AppDescript(EXT00000031) 프로퍼티 초기화(원본 5737행).
+                var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
+                var ls_desc = aAttr.find(function (a) { return a.UIATK === "EXT00000031"; });
+                if (ls_desc) {
+                    ls_desc.UIATV = "";
+                    oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true);
+                }
+
+                //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 5750·5754행).
+                if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
+                if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
+
+            } catch (e) {
+                console.error("[HTML5][WS20][attr] AppID 삭제(attrAppF4Del) 오류:", e && e.message);
+            }
+
+            //하위 로직 skip flag return.
+            return true;
+        };
+    }
+
+    /************************************************************************
+     * selectOption2/3 의 F4HelpID·F4HelpReturnField icon2(휴지통 delete) = F4 값도움 삭제(초기화).
+     *   원본 uiAttributeArea.js attrSelOption2F4HelpIDDel(6067행) 1:1 이식.
+     *   · 대상 UIATK: EXT00001188(selOpt2 F4HelpID) / EXT00001189(selOpt2 ReturnField) /
+     *                 EXT00002534(selOpt3 F4HelpID) / EXT00002535(selOpt3 ReturnField).
+     *   · F4HelpID 삭제 시: 짝인 ReturnField(1189/2535)도 "바인딩 안 됐으면" 함께 초기화(원본 6124행)
+     *     — 원본은 F4HelpID + ReturnField 를 한 UNDO 스텝(saveActionHistoryData CHANGE_ATTR [id, ret])
+     *     → HTML5 는 fnWs20PushUndo 1회 + 각 변경 fnWs20AttrChange(,,bSkipUndo=true).
+     *   · ReturnField 단독 삭제 시: 자기만 초기화(원본 6150행, undo 1회).
+     *   · 값/바인딩 초기화(UIATV=""·ISBND="") 후 attrChangeProc → HTML5 fnWs20AttrChange(,"INPUT",true).
+     *     이어서 designRefershModel + updateBindPopupDesignData(원본 full attrChange 대응).
+     *   · 자식창 busy 브로드캐스트는 fnWs20AttrChange 가 담당(이 함수는 그걸 거침).
+     *   반환 true = 호출처(아이콘 핸들러) 후속 분기 skip(원본 동일).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrSelOption2F4HelpIDDel !== "function") {
+        oAPP.fn.attrSelOption2F4HelpIDDel = function (is_attr) {
+
+            //selectOption2/3 의 F4HelpID·F4HelpReturnField 가 아닌경우 exit(원본 6069행).
+            if (is_attr.UIATK !== "EXT00001188" && is_attr.UIATK !== "EXT00001189" &&
+                is_attr.UIATK !== "EXT00002534" && is_attr.UIATK !== "EXT00002535") { return; }
+
+            //편집상태가 아닌경우 skip(원본 6075행).
+            if (!_isEditMode()) { return true; }
+
+            var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
+
+            try {
+                //F4HelpID 인 경우 — 짝인 ReturnField 도 함께 정리(원본 6082행).
+                if (is_attr.UIATK === "EXT00001188" || is_attr.UIATK === "EXT00002534") {
+
+                    //짝 ReturnField UIATK 결정(selOpt2=1189 / selOpt3=2535, 원본 6094·6099행).
+                    var l_UIATK = (is_attr.UIATK === "EXT00002534") ? "EXT00002535" : "EXT00001189";
+
+                    //UNDO 1회(원본은 F4HelpID + ReturnField 한 스텝 saveActionHistoryData).
+                    if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
+
+                    //F4HelpID 입력값·바인딩 초기화 후 변경(undo 는 위 1회 → skip).
+                    is_attr.UIATV = "";
+                    is_attr.ISBND = "";
+                    oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+
+                    //짝 ReturnField — 바인딩 안 됐으면 함께 초기화(원본 6124행).
+                    var ls_attr = aAttr.find(function (a) { return a.UIATK === l_UIATK; });
+                    if (ls_attr && ls_attr.ISBND !== "X") {
+                        ls_attr.UIATV = "";
+                        ls_attr.ISBND = "";
+                        oAPP.fn.fnWs20AttrChange(ls_attr, "INPUT", true);
+                    }
+
+                    //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 6138·6142행).
+                    if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
+                    if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
+
+                    return true;
+                }
+
+                //F4HelpReturnField 인 경우 — 자기만 초기화(원본 6150행).
+                if (is_attr.UIATK === "EXT00001189" || is_attr.UIATK === "EXT00002535") {
+
+                    if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
+
+                    is_attr.UIATV = "";
+                    is_attr.ISBND = "";
+                    oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+
+                    if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
+                    if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
+
+                    return true;
+                }
+
+            } catch (e) {
+                console.error("[HTML5][WS20][attr] F4 값 삭제(attrSelOption2F4HelpIDDel) 오류:", e && e.message);
+                return true;
+            }
+        };
+    }
+
+    /************************************************************************
+     * sap.ui.core.HTML content(AT000011858) 의 바인딩/HTML Source 진입 전 점검 게이트.
+     *   원본 uiAttributeArea.js attrChkHTMLContent(3513행) 1:1 이식.
+     *   · bFlag=true  (icon1 바인딩 전 — fnBindPopupOpen.attrBindIcon1Proc 142행에서 호출):
+     *       HTML 에디터 입력(T_CEVT OBJTY="HM")이 존재하면 284 확인("HTML Editor 입력 존재, 바인딩 진행?")
+     *       → YES 시 fnCallback(=attrBindProp) 실행. 없으면 확인 없이 곧장 바인딩.
+     *   · bFlag=false (icon2 HTML Source 전 — _buildIconCell icon2 에서 호출):
+     *       바인딩건(ISBND="X" & UIATV≠"")이면 285 확인("바인딩 정보 존재, HTML Source 입력 진행?")
+     *       → YES 시 fnCallback(=attrHTMLConentPopup) 실행. 없으면 곧장 에디터 오픈.
+     *   반환 true = 호출처 후속 분기 skip(원본 동일).
+     *   ※ 원본의 자식창 BUSY_ON/OFF 브로드캐스트는 후속 변경(fnWs20AttrChange/에디터)이 담당 → 게이트 자체선 생략.
+     ************************************************************************/
+    if (typeof oAPP.fn.attrChkHTMLContent !== "function") {
+        oAPP.fn.attrChkHTMLContent = function (is_attr, bFlag, fnCallback) {
+
+            //HTML content 프로퍼티가 아니면 게이트 미해당(호출처가 다음 분기로 — 원본 3516행 return undefined).
+            if (is_attr.UIATK !== "AT000011858") { return; }
+
+            var l_chk = false, l_msg = "";
+
+            //바인딩 팝업 전(icon1) — HTML 에디터 입력(HM) 존재여부 확인(원본 3521행).
+            if (bFlag === true) {
+                var l_objid = is_attr.OBJID + is_attr.UIASN;
+                var aCevt = (oAPP.DATA && oAPP.DATA.APPDATA && oAPP.DATA.APPDATA.T_CEVT) || [];
+                l_chk = aCevt.findIndex(function (a) { return a && a.OBJTY === "HM" && a.OBJID === l_objid; }) !== -1;
+                //284 HTML Editor에 입력한 정보가 존재합니다. 바인딩 처리를 진행하시겠습니까?
+                l_msg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "284", "", "", "", "");
+
+            //HTML editor 전(icon2) — 바인딩건 존재여부 확인(원본 3534행).
+            } else if (bFlag === false) {
+                if (is_attr.ISBND === "X" && is_attr.UIATV !== "") { l_chk = true; }
+                //285 바인딩 정보가 존재합니다. HTML Source 입력처리를 진행하시겠습니까?
+                l_msg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "285", "", "", "", "");
+            }
+
+            //확인 불필요(입력/바인딩 없음)면 콜백 실행 후 skip flag return(원본 3547행).
+            if (l_chk !== true) {
+                try { fnCallback(is_attr); }
+                catch (e) { console.error("[HTML5][WS20][attr] HTML content 게이트 콜백 오류:", e && e.message); }
+                return true;
+            }
+
+            //확인 필요 — YES/NO 팝업(원본 showMessage KIND 30). YES 일 때만 콜백 실행.
+            parent.showMessage(null, 30, "I", l_msg, function (param) {
+                if (param !== "YES") { return; }
+                try { fnCallback(is_attr); }
+                catch (e) { console.error("[HTML5][WS20][attr] HTML content 게이트 콜백 오류:", e && e.message); }
+            });
+
+            //하위 로직 skip flag return(원본 3586행).
+            return true;
+        };
+    }
+
+    /************************************************************************
+     * sap.ui.core.HTML content(AT000011858) icon2(inspection) = HTML Source 편집 팝업.
+     *   원본 uiAttributeArea.js attrHTMLConentPopup(3596행) 1:1 이식.
+     *   · script ID = OBJID + 프로퍼티명(UIASN), 수집 저장소 = T_CEVT(OBJTY="HM").
+     *   · 표시(비편집)모드 + 입력된 HTML 없음 → 열지 않음(원본 3605행). 있으면 보기로 오픈.
+     *   · 에디터는 JS 이벤트(attrClientEventPopup)와 동일한 공통 Monaco 호스트
+     *     (ws_html5_client_editor.fnClientJsEditorPopup)를 TYPE="HM"(HTML)로 재사용
+     *     — 원본 fnClientEditorPopupOpener("HM",…)의 HTML5 대체(레거시 fnClientEditorPopupOpen 은 미사용).
+     *   · 저장/삭제 콜백(param "X"=HTML 존재 / ""=없음) → UIATV/ADDSC/MPROP/ISBND 매핑 후
+     *     attr 변경(원본 attrChange(is_attr,"INPUT")). 원본 ACTCD=HTML_CONTENT_EDITOR(undo/이력 생략)
+     *     → HTML5 는 fnWs20AttrChange(,"INPUT",true)로 undo skip. content 변경은 디자인 트리에
+     *     반영되므로 designRefershModel + updateBindPopupDesignData 도 호출(원본 full attrChange 대응).
+     *   · 자식창 busy 브로드캐스트는 fnWs20AttrChange 가 담당(이 함수는 그걸 거침).
+     *   반환 true = 호출처(아이콘 핸들러)의 후속 분기 skip(원본 동일).
+     ************************************************************************/
+    if (typeof oAPP.fn.attrHTMLConentPopup !== "function") {
+        oAPP.fn.attrHTMLConentPopup = function (is_attr) {
+
+            //HTML UI 의 content 프로퍼티가 아닌경우 exit.
+            if (is_attr.UIATK !== "AT000011858") { return; }
+
+            //UI명 + 프로퍼티명으로 script OBJID 구성.
+            var l_objid = is_attr.OBJID + is_attr.UIASN;
+
+            //현재 display(비편집) 상태 + 입력된 HTML 이 없으면 열지 않음(원본 3605행).
+            var bDisplay = false;
+            try { bDisplay = oAPP.attr.oModel.oData.IS_EDIT === false; } catch (e) { }
+            if (bDisplay) {
+                var aCevt0 = (oAPP.DATA && oAPP.DATA.APPDATA && oAPP.DATA.APPDATA.T_CEVT) || [];
+                if (aCevt0.findIndex(function (a) { return a && a.OBJID === l_objid && a.OBJTY === "HM"; }) === -1) {
+                    return true;
+                }
+            }
+
+            //저장/삭제 후 콜백 — 원본 attrHTMLConentPopup 내부 콜백(3618행) 대응.
+            function lf_cb(param) {
+                try {
+                    //값을 삭제한 경우(빈 HTML) — 입력값/추가소스타입 초기화(원본 3631행).
+                    if (param === "") {
+                        is_attr.UIATV = "";
+                        is_attr.ADDSC = "";
+
+                    //값을 입력한 경우 — 수집된 HTML 앞 30자 미리보기 + 추가소스타입 매핑(원본 3646행).
+                    } else if (param === "X") {
+                        var aCevt = (oAPP.DATA && oAPP.DATA.APPDATA && oAPP.DATA.APPDATA.T_CEVT) || [];
+                        var l_cevt = aCevt.find(function (a) { return a && a.OBJID === l_objid && a.OBJTY === "HM"; });
+                        is_attr.UIATV = (l_cevt && typeof l_cevt.DATA === "string") ? (l_cevt.DATA.substr(0, 30) + "..") : "";
+                        is_attr.ADDSC = "HM";
+                        is_attr.MPROP = "";
+                        is_attr.ISBND = "";
+
+                    //그 외(변경 없이 닫음) — 반영 없음.
+                    } else {
+                        return;
+                    }
+
+                    //ATTR 변경처리(원본 attrChange(is_attr,"INPUT") — undo 는 원본 ACTCD 로 생략 → skip).
+                    oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+
+                    //content 변경은 디자인 트리/바인딩 팝업 데이터에 반영(원본 full attrChange 대응).
+                    if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
+                    if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
+
+                } catch (e) {
+                    console.error("[HTML5][WS20][attr] HTML Source 콜백 오류:", e && e.message);
+                }
+            }
+
+            //HTML 에디터 팝업 호출(미로드 시 지연로드) — JS 이벤트 에디터와 동일 opener, TYPE="HM".
+            if (typeof oAPP.fn.fnClientJsEditorPopup === "function") {
+                oAPP.fn.fnClientJsEditorPopup("HM", l_objid, lf_cb);
+                return true;
+            }
+            oAPP.loadJs("ws_html5_client_editor", function () {
+                oAPP.fn.fnClientJsEditorPopup("HM", l_objid, lf_cb);
+            });
+
+            //하위 로직 skip flag return.
+            return true;
+        };
+    }
 
     /************************************************************************
      * 클라이언트 이벤트(수집 JS/HM) 라인 삭제 — 원본 uiAttributeArea.js attrDelClientEvent 3360행 1:1.
@@ -3462,7 +3751,7 @@
     /************************************************************************
      * 이벤트 생성 팝업 콜백 (원본 uiAttributeArea.js attrCreateEventCallBack 5302행).
      *   생성된 이벤트명을 해당 attr 값(UIATV/comboval)으로 매핑 후 attr 변경 흐름 수행.
-     *   ※ 원본의 bindPopup BUSY_ON 브로드캐스트는 UI5 바인딩팝업 전용 — HTML5 skip.
+     *   ※ 자식창 busy 브로드캐스트는 공통 fnWs20AttrChange 가 담당(아래 attrChange 흐름이 그걸 거침).
      *     attr 변경(원본 attrChange)은 HTML5 fnWs20AttrChange 로 대체(끝에서 행 재렌더 →
      *     해당 이벤트 DDLB 가 새 이벤트명을 선택값으로 표시).
      ************************************************************************/
@@ -3773,8 +4062,41 @@
         SMP.innerHTML = '<i class="fa-solid fa-table-cells"></i>';
         SMP.style.display = "none";
         SMP.addEventListener("click", function () {
-            // [임시] UI Sample 팝업(attrCallUiSample) 미변환 — 안내 토스트만(사용자 지시). TODO(i18n).
-            try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+            //UI Sample — 서버 /getLibSampleInfo 로 샘플 PATH/PARAM 받아 브라우저 실행(원본 attrCallUiSample 1:1).
+            //   버튼 누르자마자 busy ON(원본 oRLibBtn2 press 129행), 응답/오류 시 OFF.
+            try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
+            try {
+                var oUiInfo = (oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.uiinfo) || {};
+
+                //UI5 bootstrap 활성 라이브러리(UA025/APP/FLD06=X) 검색. 없으면 종료.
+                var ls_UA025 = (oAPP.DATA.LIB.T_9011 || []).find(function (a) {
+                    return a.CATCD === "UA025" && a.FLD01 === "APP" && a.FLD06 === "X";
+                });
+                if (!ls_UA025) {
+                    try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                    return;
+                }
+
+                var oFormData = new FormData();
+                oFormData.append("UIVER", ls_UA025.FLD07);      //활성 라이브러리 버전
+                oFormData.append("UILIB", oUiInfo.UILIB || ""); //라이브러리명
+                oFormData.append("UIFND", oUiInfo.UIFND || ""); //UI 대문자
+
+                //서버에서 SAMPLE 정보(PATH/PARAM) 검색 → 브라우저 실행.
+                sendAjax(oAPP.attr.servNm + "/getLibSampleInfo", oFormData, function (param) {
+                    if (param.RETCD === "E") {
+                        try { parent.showMessage(null, 10, "E", param.RTMSG); } catch (e) { }
+                        try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                        return;
+                    }
+                    try { oAPP.fn.fnExeBrowser(param.PATH, param.PARAM); }
+                    catch (e) { console.error("[HTML5][WS20] UI Sample fnExeBrowser 오류:", e); }
+                    try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                });
+            } catch (e) {
+                console.error("[HTML5][WS20] UI Sample(attrCallUiSample) 오류:", e);
+                try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+            }
         });
         HDR.appendChild(SMP);
 
@@ -4080,6 +4402,7 @@
             } catch (e) { console.error("[HTML5][WS20] Attribute Help(U4A Help Document) 오픈 실패:", e); }
             //미패치 서버 폴백 = 구 callTooltipsPopup(attrTooltip/E23) — UI5 툴팁 팝업 미변환(W4+ 예정).
             console.warn("[W4+ 예정] Attribute Help 폴백(callTooltipsPopup) 미변환 — 패치(UHAK901369) 서버에서 U4A Help Document 사용");
+            _wipToast();
         });
         TBR.appendChild(HLP);
 
@@ -4260,7 +4583,24 @@
                         return;
                     }
 
+                    // selectOption3 UI 의 F4 값도움(원본 attrIcon2Proc 값도움 4084·4091행) —
+                    //   F4HelpID(EXT00002534)=DDIC SearchHelp 선택 / F4HelpReturnField(EXT00002535)=필드 리스트.
+                    //   처리 로직은 selOpt2 와 공유(fnBindPopupOpen 의 attrSelOption2F4HelpID/ReturnFIeld, UIATK 로 분기).
+                    if (sAttr.UIATK === "EXT00002534" || sAttr.UIATK === "EXT00002535") {
+                        var _fnNm = (sAttr.UIATK === "EXT00002534") ? "attrSelOption2F4HelpID" : "attrSelOption2F4HelpReturnFIeld";
+                        var _runF4 = function () {
+                            //★ bSelOpt3=true 로 호출(원본 4084·4091행) — selOpt3 진입 게이트. 안 넘기면 함수가 selOpt3 를 거부함.
+                            try { oAPP.fn[_fnNm](sAttr, true); }
+                            catch (e) { console.error("[HTML5][WS20][attr] selectOption3 F4 호출 오류:", e && e.message); }
+                        };
+                        if (typeof oAPP.fn[_fnNm] === "function") { _runF4(); }
+                        else { oAPP.loadJs("fnBindPopupOpen", _runF4); }
+                        return;
+                    }
+
+                    //F4 값도움 미변환(아이콘 선택 F4·styleClass CSS클래스 선택 등 컬러/DDIC 외 전부) — 작업중 안내.
                     console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT);
+                    _wipToast();
                 } : null,
                 f4IconHtml: '<i class="fa-regular fa-clone"></i>',   // F4=아웃라인 clone(복사버튼과 구분, 2026-06-17)
                 f4Disabled: !bFieldEdit,
@@ -4410,7 +4750,9 @@
                         if (oAPP.fn.fnInitPreScreenPopupOpener) { oAPP.fn.fnInitPreScreenPopupOpener(sAttr); return; }
                         break;
                 }
+                //팝업 호출형 속성 버튼 미변환(구현 5종 외) — 작업중 안내.
                 console.warn("[W4+ 예정] 팝업 호출형 속성 버튼 미변환:", sAttr.UIATT, "(", sAttr.UIATK, ")");
+                _wipToast();
             });
 
             BOX.appendChild(BTN);
@@ -4467,11 +4809,18 @@
                 } catch (e) { console.error("[HTML5][WS20][attr] 클라이언트 이벤트 에디터 호출 오류:", e && e.message); }
                 return;
             }
-            //프로퍼티(UIATY="1")/애그리게이션(UIATY="3")의 바인딩 아이콘(sap-icon://fallback=link) 클릭.
-            //  → 데이터 바인딩/바인딩 해제 팝업(fnBindPopupOpen). 온디맨드 로드(다른 WS20 속성 팝업 동일).
-            //  ※ 특수키(App F4/selectOption F4 등)는 아이콘이 inspection/delete 라 여기 미도달 — 별도 기능.
-            if (iNo === 1 && sSrc === "sap-icon://fallback" &&
-                (sAttr.UIATY === "1" || sAttr.UIATY === "3")) {
+            //프로퍼티(UIATY="1")/애그리게이션(UIATY="3")의 icon1 클릭 = 원본 attrIcon1Proc 디스패처
+            //  → attrBindIcon1Proc(fnBindPopupOpen) 가 내부 분기: AppID F4(inspection)·Tree parent/child·
+            //    프로퍼티/애그리게이션 바인딩(fallback) 등. 온디맨드 로드.
+            //  ※ 통과 조건: fallback(바인딩) 아이콘 + 구현완료된 inspection 아이콘:
+            //    AppID(EXT00000030=앱검색 F4), selectOption2 F4HelpID(EXT00001188=검색도움 선택 F4),
+            //    selectOption2 F4HelpReturnField(EXT00001189=필드 리스트 선택, 동적 리스트 팝업).
+            //    (미구현 inspection 아이콘을 통과시키면 attrBindProp 가 잘못 잡아 바인딩 팝업이 뜨므로,
+            //     핸들러 이식과 통과조건 추가는 반드시 세트로 — 미구현분은 아래 작업중 안내로 보낸다.)
+            if (iNo === 1 && (sAttr.UIATY === "1" || sAttr.UIATY === "3") &&
+                (sSrc === "sap-icon://fallback" || sAttr.UIATK === "EXT00000030" ||
+                    sAttr.UIATK === "EXT00001188" || sAttr.UIATK === "EXT00001189" ||
+                    sAttr.UIATK === "AT000011858")) {   //HTML content: attrBindIcon1Proc→attrChkHTMLContent(284)→attrBindProp
                 var _runBind = function () {
                     try {
                         //원본 attrIcon1Proc 진입부: 오류 표현 필드 초기화 후 바인딩 팝업 게이트 호출.
@@ -4483,11 +4832,43 @@
                 else { oAPP.loadJs("fnBindPopupOpen", _runBind); }
                 return;
             }
+            //u4a.m.UsageArea AppID(EXT00000030)의 icon2(빨간 휴지통 delete) = AppID/AppDesc 삭제(초기화).
+            //  원본 attrIcon2Proc → attrAppF4Del. icon1 앱검색 F4 와 한 쌍(순수 데이터 → attr.js 직접 정의).
+            if (iNo === 2 && sAttr.UIATK === "EXT00000030") {
+                try {
+                    //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 삭제 처리.
+                    if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
+                    oAPP.fn.attrAppF4Del(sAttr);
+                } catch (e) { console.error("[HTML5][WS20][attr] AppID 삭제 호출 오류:", e && e.message); }
+                return;
+            }
+            //selectOption2/3 의 F4HelpID·ReturnField(EXT00001188/1189/2534/2535)의 icon2(휴지통) = F4값 삭제.
+            //  원본 attrIcon2Proc(2483행) → attrSelOption2F4HelpIDDel. icon1 F4 검색/동적리스트와 한 쌍.
+            if (iNo === 2 && (sAttr.UIATK === "EXT00001188" || sAttr.UIATK === "EXT00001189" ||
+                sAttr.UIATK === "EXT00002534" || sAttr.UIATK === "EXT00002535")) {
+                try {
+                    //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 F4값 삭제 처리.
+                    if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
+                    oAPP.fn.attrSelOption2F4HelpIDDel(sAttr);
+                } catch (e) { console.error("[HTML5][WS20][attr] F4 값 삭제 호출 오류:", e && e.message); }
+                return;
+            }
+            //sap.ui.core.HTML content(AT000011858)의 icon2(inspection) = HTML Source 편집 팝업.
+            //  원본 attrIcon2Proc(2476행): attrChkHTMLContent(is_attr, false, attrHTMLConentPopup) 게이트 경유
+            //  — 바인딩건이면 285 확인 후 진행. 게이트가 곧장/YES 시 attrHTMLConentPopup(TYPE="HM") 실행.
+            if (iNo === 2 && sAttr.UIATK === "AT000011858") {
+                try {
+                    //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 285 게이트 경유 HTML Source 호출.
+                    if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
+                    oAPP.fn.attrChkHTMLContent(sAttr, false, oAPP.fn.attrHTMLConentPopup);
+                } catch (e) { console.error("[HTML5][WS20][attr] HTML Source 호출 오류:", e && e.message); }
+                return;
+            }
 
             //그 외(App F4 상세보기/selectOption F4 등) 구 attrIcon1Proc/attrIcon2Proc — 미변환.
             //  [임시] 완료 전까지 안내 토스트만(사용자 지시 — AppID F4 등). TODO(i18n) + 재개 시 각 동작 배선.
             console.warn("[W4+ 예정] 속성 아이콘 동작 미변환:", sAttr.UIATT, "icon" + iNo, sSrc);
-            try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+            _wipToast();
         });
 
         CELL.appendChild(BTN);

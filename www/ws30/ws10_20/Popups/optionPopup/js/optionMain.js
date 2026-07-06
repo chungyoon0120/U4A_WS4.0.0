@@ -49,6 +49,46 @@
         try { if (BROWSKEY) { IPC.send("if-send-action-" + BROWSKEY, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } } catch (e) { }
     }
 
+    // ── 자식창 busy 동기화 채널 (원본 optionS.html _attachBroadCastEvent + setBusy 1:1 이식) ─────────
+    //   원본 옵션 팝업은 broadcast-to-child-window 채널의 "양방향" 참여자였다:
+    //     · 수신: 메인/형제창이 BUSY_ON/OFF 를 뿌리면 이 팝업도 자체 busy 로 잠금/해제.
+    //     · 발신: 이 팝업이 자체 busy(예: Apply 저장)를 켜면 형제창도 BUSY_ON/OFF 로 잠근다.
+    //   신버전 optionMain.js 에 통째로 누락돼(로드시 BROAD_BUSY OFF 단발만 있었음) 여기서 복원.
+    //   busy 표시는 공통 .u4a-busy 오버레이(shell.css + bootstrap-skin.css, optionM.html 이 이미 로드) 소비.
+    var oBroad = null, bBusy = false, _bBroadInit = false;
+    function _setBusy(bOn, oOpt) {
+        bBusy = !!bOn;
+        var oEl = document.getElementById("optBusy");
+        if (!oEl) {   // _toast 와 동일하게 body 에 1회 지연 생성 → _build 의 innerHTML 재작성에 안 지워진다.
+            oEl = document.createElement("div");
+            oEl.id = "optBusy";
+            oEl.className = "u4a-busy";
+            oEl.innerHTML = '<div class="u4a-busy__card"><div class="u4a-busy__spinner"></div><div class="u4a-busy__label"></div></div>';
+            document.body.appendChild(oEl);
+        }
+        oEl.setAttribute("data-busy", bBusy ? "true" : "false");
+        // 닫기 차단은 closable 을 항상 false 로 유지 + _close/onbeforeunload 의 busy 가드로(공통 browser-window-common-ux).
+        try { CURRWIN.closable = false; } catch (e) { }
+        // 수신(ISBROAD)으로 켠 건 되쏘지 않는다(수신↔발신 무한 루프 방지). 자체 busy 만 형제창에 전파.
+        if (oBroad && !(oOpt && oOpt.ISBROAD)) {
+            try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
+        }
+    }
+    function _initBroadcast() {
+        if (_bBroadInit || !BROWSKEY) { return; }
+        _bBroadInit = true;
+        try {
+            oBroad = new BroadcastChannel("broadcast-to-child-window_" + BROWSKEY);
+            oBroad.onmessage = function (oEvent) {
+                var sPrc = oEvent && oEvent.data && oEvent.data.PRCCD;
+                if (sPrc === "BUSY_ON") { _setBusy(true, { ISBROAD: true }); }
+                else if (sPrc === "BUSY_OFF") { _setBusy(false, { ISBROAD: true }); }
+            };
+        } catch (e) { }
+    }
+    // busy(자체/형제창 잠금) 중에는 창을 닫지 못하게 한다(원본 setBusy 의 closable=false 대응).
+    window.onbeforeunload = function () { if (bBusy) { return false; } };
+
     var WSMSG = null;
     try { WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU); } catch (e) { }
     function _txt(sCls, sCode) {
@@ -246,6 +286,7 @@
     }
 
     function _close(bRevert) {
+        if (bBusy) { return; }   // busy(자체/형제창 잠금) 중 닫기 무시(원본 closable=false 대응).
         if (bRevert) { _applyTheme(sOrigTheme); }
         try { CURRWIN.setClosable && CURRWIN.setClosable(true); } catch (e) { }
         try { CURRWIN.close(); } catch (e) { try { CURRWIN.destroy(); } catch (e2) { } }
@@ -270,6 +311,9 @@
     }
 
     function _apply() {
+        // 저장 중 형제창 잠금(원본 setBusy(true)→broadcast). 동기 작업이라 .u4a-busy 의 0.3s 지연으로 깜빡임 없음.
+        _setBusy(true);
+        try {
         var sKey = sCurTheme;
         var sBg = "";
         try { sBg = WSUTIL.getThemeBackgroundColor ? WSUTIL.getThemeBackgroundColor(sKey) : ""; } catch (e) { }
@@ -303,6 +347,7 @@
         var sMsg = "";
         try { sMsg = (WSMSG && WSMSG.fnGetMsgClsText("/U4A/MSG_WS", "330", sB52, "", "", "")) || ""; } catch (e) { }
         _toast(sMsg || sB52);
+        } finally { _setBusy(false); }
     }
 
     function _build() {
@@ -376,6 +421,9 @@
         // UI 준비 완료 → 창 표시 + 메인 busy 해제 (안 하면 메인이 계속 busy 스피너)
         _ready();
     }
+
+    // 자식창 busy 브로드캐스트 채널 구독 개시(원본 optionS.html 은 boot 시 _attachBroadCastEvent 호출).
+    _initBroadcast();
 
     IPC.on('if-ws-options-info', function (event, data) {
         IF_DATA = data || {};

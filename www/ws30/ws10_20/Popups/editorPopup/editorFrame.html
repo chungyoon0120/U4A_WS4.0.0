@@ -69,8 +69,14 @@
         </button>
     </footer>
 
-    <!-- 로딩 오버레이 (토스트는 공통 .u4a-toast 를 editorFrame.js 가 동적 생성) -->
-    <div id="editorBusy"><div class="u4aEdSpinner"></div></div>
+    <!-- 로딩 오버레이 = 공통 busy(.u4a-busy, shell.css SSOT — 카드+이중링 스피너, data-busy 토글, 0.3s 지연).
+         (토스트는 공통 .u4a-toast 를 editorFrame.js 가 동적 생성) -->
+    <div class="u4a-busy" id="editorBusy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+            <div class="u4a-busy__label"></div>
+        </div>
+    </div>
 
     <script src="editorFrame.js"></script>
 

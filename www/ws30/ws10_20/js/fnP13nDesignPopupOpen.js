@@ -669,9 +669,15 @@
         oFoot.appendChild(oCloseBtn);
         oDlg.appendChild(oFoot);
 
-        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_closeCancel(); });
-        // 비모달(show)은 ESC 에 cancel 이벤트가 안 뜬다 → keydown 으로 ESC 닫기 직접 처리.
-        oDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") { e.preventDefault(); lf_closeCancel(); } });
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_closeCancel(); }); // (모달 폴백)
+        // ★비모달(show)은 cancel 이벤트가 안 뜨고 oDlg keydown 은 포커스가 밖이면 안 잡힘 → document capture 로 ESC 처리.
+        //   제안목록이 열려 있으면 그쪽 먼저 닫히게 양보. 핸들러는 oUI 에 보관해 lf_close 에서 제거.
+        oUI.onEsc = function (e) {
+            if (e.key !== "Escape") { return; }
+            if (document.querySelector(".u4a-combo__list")) { return; }
+            e.preventDefault(); lf_closeCancel();
+        };
+        document.addEventListener("keydown", oUI.onEsc, true);
 
         // 스플리터 드래그(좌우 + 미리보기/트리) — §4.3: 인접 패널 min-width(px) 기준 클램프.
         lf_wireSplitters();
@@ -1182,13 +1188,22 @@
 
             ev.dataTransfer.setData("rtmcls", is_head.UILIB || "");
             ev.dataTransfer.setData("text/plain", "P13nUIData|" + is_head.fileName + "|" + (oAPP.attr.DnDRandKey || ""));
+            // ★비모달 전환은 setTimeout 으로 미룸 — dragstart 중 동기 pointer-events:none 는 드래그를 취소시킴.
+            setTimeout(function () { _setModalLook(false); }, 0);   // 드래그 순간 비모달(배경 트리 drop 가능).
         } catch (e) {
             console.error("[HTML5][WS20][p13n] 드래그 시작 오류:", e && e.message);
         }
     }
 
-    // 드래그 종료 — 디자인영역 드래그 종료(잔상/드롭가능표시 정리).
+    // 가짜 백드롭 토글 + 드래그 중 다이얼로그 클릭통과/반투명 — 팝업에 가린 뒤 트리가 drop 수신. (삽입 팝업과 동일 방식)
+    function _setModalLook(bModal) {
+        if (oUI && oUI.backdrop) { oUI.backdrop.style.display = bModal ? "" : "none"; }
+        if (oUI && oUI.dlg) { oUI.dlg.classList.toggle("u4aP13nDragThru", !bModal); }
+    }
+
+    // 드래그 종료 — 디자인영역 드래그 종료(잔상/드롭가능표시 정리) + 모달 복귀.
     function lf_rowDragEnd() {
+        _setModalLook(true);   // 놓으면 다시 모달 — 원본 setModal(true) 대응.
         try { oAPP.fn.designDragEnd(); } catch (e) { }
     }
 
@@ -1381,6 +1396,8 @@
         try { window.removeEventListener("resize", lf_clampSplit); } catch (e) { }
         try { if (oUI && oUI.ro) { oUI.ro.disconnect(); oUI.ro = null; } } catch (e) { }
         oS.fullSize = false;
+        try { if (oUI && oUI.onEsc) { document.removeEventListener("keydown", oUI.onEsc, true); oUI.onEsc = null; } } catch (e) { }
+        try { if (oUI && oUI.backdrop) { oUI.backdrop.remove(); oUI.backdrop = null; } } catch (e) { }
         try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
     }
 
@@ -1462,6 +1479,14 @@
         // ★비모달(show) 로 연다 — 개인화 리스트 항목을 뒤(배경)의 디자인 트리로 드래그해 적용해야 하는데,
         //   showModal 이면 배경이 inert 라 drop 이 안 걸린다. 비모달이라 배경 트리가 계속 상호작용 가능
         //   + 팝업은 스코프 z-index 로 WS20 위에 상시 표시. busy/confirm(showModal=top-layer)은 그 위로 정상.
+        //   가짜 백드롭(투명 클릭차단, 공통 dialog::backdrop 규약과 동일)으로 원본 모달 동작 재현:
+        //   평소 모달 → 라인 드래그 순간 백드롭 off(비모달, 배경 트리 drop) → 놓으면 백드롭 on(모달). (삽입 팝업과 통일)
+        try {
+            if (oUI.backdrop) { oUI.backdrop.remove(); }
+            oUI.backdrop = document.createElement("div");
+            oUI.backdrop.className = "u4aP13nBackdrop";
+            document.body.appendChild(oUI.backdrop);
+        } catch (e) { }
         try { oUI.dlg.show(); } catch (e) { }
 
         // afterOpen 처리.
@@ -1548,6 +1573,10 @@
             // 비모달(show)이라 top-layer 가 아니므로 직접 중앙 고정 + z-index. 메뉴(1000)/콤보리스트(1100)
             //   위, busy/confirm(showModal=top-layer)은 그 위로 자동. 드래그/리사이즈 인라인 위치가 이를 덮음.
             ".u4aP13nDlg { position: fixed; inset: 0; margin: auto; z-index: 1500; width: min(94vw, 1040px); height: min(88vh, 720px); padding: 0; display: flex; flex-direction: column; }" +
+            // 가짜 백드롭(투명 클릭차단) — 다이얼로그(1500) 바로 아래. 평소 모달, 드래그 중 JS 가 display:none 으로 끔.
+            ".u4aP13nBackdrop { position: fixed; inset: 0; z-index: 1499; background: transparent; }" +
+            // 드래그 중 — 팝업이 뒤 트리를 덮으므로 클릭 통과(뒤 트리 drop 수신). 원본처럼 투명도는 그대로.
+            ".u4aP13nDlg.u4aP13nDragThru { pointer-events: none; }" +
             ".u4aP13nDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
             ".u4aP13nDlg .u4a-dialog__header span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
             // 바디 = 가로 스플리터.

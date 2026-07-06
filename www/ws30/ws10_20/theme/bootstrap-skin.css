@@ -389,6 +389,19 @@ html[data-sl-theme="dark"] .btn-close {
     border-color: var(--error);
     color: var(--error);
 }
+/* 비활성 — 원색 계열(파랑/빨강) 유지 + 공통 .u4a-btn:disabled 의 opacity 로만 흐리게(회색으로 죽이지 않음).
+   ★ 공통 .u4a-btn:disabled 가 bg/color 를 disabled-* 로 덮으므로 여기서 원색을 재지정한다(specificity 더 높음).
+   opacity/cursor 는 공통 :disabled 것이 그대로 적용돼 "흐린 파랑/빨강" 이 된다. */
+.u4a-btn--emphasized:disabled {
+    background: var(--u4a-accent);
+    border-color: var(--u4a-accent);
+    color: #fff;
+}
+.u4a-btn--negative:disabled {
+    background: transparent;
+    border-color: var(--error);
+    color: var(--error);
+}
 
 /* 드롭다운 메뉴 (.u4a-menu) */
 .u4a-menu {

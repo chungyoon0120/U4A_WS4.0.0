@@ -24,6 +24,8 @@ window.require(["vs/editor/editor.main"], function () {
         renderSideBySide: true,
         automaticLayout: true,            // 창/스플리터 리사이즈 자동 대응
         readOnly: true,
+        //domReadOnly: 숨은 textarea 에 readonly 부여 → readOnly 만으론 뚫리는 IME(한글) 조합 입력 차단(Chromium93).
+        domReadOnly: true,
         mouseWheelZoom: true,             // Ctrl(⌘)+휠 = 폰트 확대/축소 (Monaco 내장, editorPopup 공통 패턴)
         scrollbar: {
             verticalScrollbarSize: 7,
@@ -42,8 +44,8 @@ window.require(["vs/editor/editor.main"], function () {
     // 좌/우 모두 입력 막기(원본 동일 — 버전 비교는 읽기 전용).
     var oOrig = window.editor.getOriginalEditor();
     var oModf = window.editor.getModifiedEditor();
-    try { oOrig.updateOptions({ readOnly: true }); } catch (e) { }
-    try { oModf.updateOptions({ readOnly: true }); } catch (e) { }
+    try { oOrig.updateOptions({ readOnly: true, domReadOnly: true }); } catch (e) { }
+    try { oModf.updateOptions({ readOnly: true, domReadOnly: true }); } catch (e) { }
 
     /***********************************************************************
      * 폰트 확대/축소 — ★Monaco 내장(EditorZoom) 사용 (editorPopup 호스트와 동일한 공통 패턴/국룰).
