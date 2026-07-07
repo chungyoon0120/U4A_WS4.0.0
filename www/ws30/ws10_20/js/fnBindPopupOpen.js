@@ -74,6 +74,19 @@
       return parent.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", sCode, p1 || "");
     } catch (e) { return ""; }
   }
+  // ★ 서버가 "백엔드 로그온 언어(getServerInfo().LANGU)"로 구워 내려준 메시지(RTMSG)를 접속(워크스페이스)
+  //   언어(getUserInfo().LANGU)로 재현지화 — 앱 공통 SSOT `WsMsgCls.relocalize` 위임(앱복사 _relocalizeBakedMsg /
+  //   WS20 _ws20RelocalizeBaked 와 동일). 두 언어 같거나 못 찾으면 원문 폴백. (예: 백엔드 EN, 워크스페이스 KO)
+  function _relocalize(sText) {
+    if (typeof sText !== "string" || sText === "") { return sText; }
+    try {
+      var wsL = (parent.getUserInfo && parent.getUserInfo() || {}).LANGU || "";
+      var beL = (parent.getServerInfo && parent.getServerInfo() || {}).LANGU || "";
+      if (!wsL || (beL && beL === wsL)) { return sText; }
+      var WC = parent.REMOTE && parent.REMOTE.getGlobal("WsMsgCls");
+      return (WC && WC.relocalize) ? WC.relocalize(sText, beL, wsL) : sText;
+    } catch (e) { return sText; }
+  }
   // WS20 편집모드 여부(원본 oAPP.attr.oModel.oData.IS_EDIT 대응).
   function _isEdit() {
     try { var o = APPCOMMON.fnGetModelProperty("/WS20/APP"); return !!(o && o.IS_EDIT === "X"); }
@@ -784,7 +797,7 @@
         // 오류.
         if (!param || param.RETCD === "E") {
           _fail();
-          if (param && param.RTMSG) { _msg(10, "E", param.RTMSG); }
+          if (param && param.RTMSG) { _msg(10, "E", _relocalize(param.RTMSG)); }
           return;
         }
 
@@ -975,21 +988,30 @@
     return (oCell && oCell.getBoundingClientRect().width) || (sCol === "type" ? 144 : 200);
   }
 
-  // 이름/유형 폭(px) 반영 — 설명은 마지막 "채움" 컬럼이라 남는 공간을 자동 흡수(빈칸 없음). 다른 컬럼은
-  //   안 건드림. 패널에 맞도록 clamp: 이 컬럼 ≥ 4rem, 그리고 설명 ≥ 4rem 남기게 상한(넘침/가로 스크롤 없음).
+  // 설명(채움) 컬럼의 최소폭(px, ≈6rem) — 이보다 좁아지면 부풀지 않고 가로 스크롤이 뜬다.
+  var C_DESC_MIN = 96;
+
+  // 콘텐츠(헤더/트리/세로선) 최소폭 = 이름 + 유형 + 설명최소 + overhead(패딩·gap 실측).
+  //   CSS 가 max(100%, var(--u4aBindContentMinW)) 로 소비 → 넓으면 채움, 좁으면 이 폭에서 가로 스크롤.
+  //   ★고정 매직값(구 36rem) 금지: 그러면 채움 컬럼(desc)이 그 폭까지 부풀어 빈 컬럼이 된다.
+  //   ★min-width:100% 만으로도 안 됨: flex 컨테이너는 자식 때문에 안 늘어나 스크롤이 안 생긴다(명시 폭 필요).
+  function _updateContentMinW() {
+    if (!oUI.treePane) { return; }
+    var w = (oUI.wName || 0) + (oUI.wType || 0) + C_DESC_MIN + (oUI.colsOverhead || 19);
+    oUI.treePane.style.setProperty("--u4aBindContentMinW", w + "px");
+  }
+
+  // 이름/유형 폭(px) 반영 — 설명은 마지막 "채움" 컬럼이라 남는 공간을 흡수(넓으면 채움). 다른 컬럼 불변.
+  //   ★상한 clamp 제거: 컬럼을 패널보다 넓혀도 되고(가로 스크롤로 대응), 하한(≥4rem)만 둔다.
   function _applyColW(sCol, px) {
-    var iPanel = (oUI.treeBody && oUI.treeBody.clientWidth) || 0;
-    var iAvail = iPanel - (oUI.colsOverhead || 19);
-    var iOther = (sCol === "name") ? oUI.wType : oUI.wName;
-    var iMax = iAvail - iOther - 64;               // 설명 최소 4rem 확보
-    if (px < 64) { px = 64; }
-    if (iMax > 64 && px > iMax) { px = iMax; }
+    if (px < 64) { px = 64; }                      // 이 컬럼 최소 4rem
     if (sCol === "name") { oUI.wName = px; } else { oUI.wType = px; }
     oUI.treePane.style.setProperty("--u4aBind-" + sCol + "-w", px + "px");
+    _updateContentMinW();                          // 콘텐츠 최소폭 재계산(가로 스크롤 기준)
   }
 
   // 첫 리사이즈 때 1회 — 이름·유형을 현재 렌더폭(px)으로 고정(.u4aBindColsFixed: 이름 flex→고정폭, 설명→채움).
-  //   overhead = 헤더 전체폭 − 세 컬럼합 = padding+gap 실측(clamp 기준). 이후 이름/유형만 조절, 설명이 흡수.
+  //   overhead = 헤더 전체폭 − 세 컬럼합 = padding+gap 실측. 이후 이름/유형만 조절, 설명이 흡수.
   function _ensureColsFixed() {
     if (oUI.colsFixed) { return; }
     oUI.wName = _colPx("name"); oUI.wType = _colPx("type");
@@ -999,6 +1021,7 @@
     oUI.treePane.style.setProperty("--u4aBind-type-w", oUI.wType + "px");
     oUI.treePane.classList.add("u4aBindColsFixed");
     oUI.colsFixed = true;
+    _updateContentMinW();                          // 고정 진입 시 콘텐츠 최소폭 확정
   }
 
   // 컬럼 경계 그립 — 셀 좌측 경계(=보이는 세로 구분선)에 절대배치. sCol=이 그립이 조절할 컬럼("name"|"type").
@@ -1040,6 +1063,7 @@
       oUI.colsFixed = false;
       oUI.treePane.classList.remove("u4aBindColsFixed");
       oUI.treePane.style.removeProperty("--u4aBind-name-w");
+      oUI.treePane.style.removeProperty("--u4aBindContentMinW"); // 고정 해제 → 기본(36rem) floor 로 복귀
       oUI.treePane.style.setProperty("--u4aBind-type-w", "30%");
       oUI.treePane.style.setProperty("--u4aBind-desc-w", "42%");
       e.preventDefault(); e.stopPropagation();
@@ -1067,7 +1091,7 @@
       hasChildren: function (n) { return !!(n.zTREE && n.zTREE.length); },
       key: function (n) { return n.CHILD; },
       label: function (n) { return n.NTEXT; },
-      tip: function (n) { return n.CHILD; },
+      tip: function (n) { return n.NTEXT; },   // 이름 말줄임 시 툴팁=전체 이름(공통 createTree 가 data-tip-trunc-sel 로 라벨 잘림만 표시)
       selectable: true,
       // 유형·설명 열(우측 정렬 트레일링) — 상태아이콘 + 유형텍스트 / 설명.
       slotTrailing: function (n) {
@@ -1080,11 +1104,11 @@
           oType.appendChild(oI);
         }
         var oTypeTxt = _el("span", "u4aBindTypeTxt", n.TYPE || "");
-        if (n.DATATYPE) { oTypeTxt.title = n.DATATYPE; }
+        if (n.TYPE) { oTypeTxt.setAttribute("data-tip", n.TYPE); oTypeTxt.setAttribute("data-tip-trunc", ""); }   // 말줄임 시에만 전체 유형값 툴팁(공통 initTooltip)
         oType.appendChild(oTypeTxt);
         oT.appendChild(oType);
         var oDesc = _el("span", "u4aBindCell u4aBindColDesc", n.DESCR || "");
-        if (n.DESCR) { oDesc.title = n.DESCR; }
+        if (n.DESCR) { oDesc.setAttribute("data-tip", n.DESCR); oDesc.setAttribute("data-tip-trunc", ""); }   // 말줄임 시에만 전체 설명 툴팁(공통 initTooltip)
         oT.appendChild(oDesc);
         return oT;
       },
@@ -1179,8 +1203,11 @@
   function lf_setAdditLayout(bFirst) {
     // aggregation(T) 은 추가속성 비활성.
     if (oS.CARDI === "T" || oS.CARDI === "R" || oS.CARDI === "ST") { lf_showAddit(false); return; }
-    // 프로퍼티(F): 최초엔 비활성(필드 선택 시 활성).
-    if (bFirst === true && oS.CARDI === "F") { lf_showAddit(false); return; }
+    // 프로퍼티(F): ★이전 바인딩이 없을 때(ISBND!=="X")만 최초 비활성(필드 선택 시 활성). 이미 바인딩된 경우
+    //   (ISBND==="X")엔 lf_setSelectTree 가 그 라인을 lf_selRow 로 선택해 속성 패널을 이미 켰으므로 끄지 않는다
+    //   → 재오픈 시 선택+우측 스플릿 함께 표시(원본 lf_setBindPopupLayout 628행 is_frist && F && ISBND!=="X" 조건).
+    var bBound = !!(oS.is_attr && oS.is_attr.ISBND === "X");
+    if (bFirst === true && oS.CARDI === "F" && !bBound) { lf_showAddit(false); return; }
   }
 
   // 추가속성 패널 show/hide (원본 width 65%/100% + resize 토글).
@@ -1314,12 +1341,11 @@
     for (var i = 0; i < oS.T_MPROP.length; i++) {
       (function (ls, idx) {
         var oTr = _el("tr");
-        if (idx % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
+        // 지브라(교대 배경) 제거 — 속성/값 폼형 테이블이라 줄무늬 대신 라인 구분만(사용자 요청). data-odd 미설정.
         if (ls.stat === "Error") { oTr.setAttribute("data-state", "error"); }
 
         // Property 셀.
-        var oTdP = _el("td", "u4aBindAdditProp", ls.prop || "");
-        oTdP.title = ls.prop || "";
+        var oTdP = _el("td", "u4aBindAdditProp", ls.prop || "");   // 툴팁=공통 .u4a-table 자동(_autoCellTip: 잘릴 때만)
         oTr.appendChild(oTdP);
 
         // Value 셀 — 읽기전용 텍스트 / 입력 / 콤보.
@@ -1327,8 +1353,7 @@
 
         if (ls.txt_vis) {
           oTdV.textContent = ls.val || "";
-          oTdV.title = ls.val || "";
-          oTdV.classList.add("u4aBindAdditText");
+          oTdV.classList.add("u4aBindAdditText");   // 값 툴팁=공통 .u4a-table 자동(잘릴 때만 전체값)
 
         } else if (ls.inp_vis) {
           // Conversion Routine — 대문자 입력.
@@ -1353,7 +1378,11 @@
           oTdV.appendChild(oSel.el);
         }
 
-        if (ls.stat === "Error" && ls.statTxt) { oTdV.title = ls.statTxt; }
+        // ★ 오류 표시 = 필드 밸류스테이트(원본 callBindPopup valueState:"{stat}"/valueStateText:"{statTxt}" 1:1).
+        //   라벨/텍스트 빨강 아님 — 필드에 빨간 테두리 + 메시지(포커스 시 표시). txt 셀(필드없음)은 오류 대상 아님.
+        // ★ 공통 createField 는 소문자 value-state("error"/"none")로 data-vs 를 세팅(shell.css .u4a-input[data-vs="error"]
+        //   빨간 테두리). ls.stat 은 UI5식 "Error"/"None" 이라 소문자로 매핑해야 빨간 테두리가 걸린다.
+        if (ls._field && ls._field.setValueState) { ls._field.setValueState(ls.stat === "Error" ? "error" : "none", ls.statTxt || ""); }
 
         oTr.appendChild(oTdV);
         oTbody.appendChild(oTr);
@@ -1426,9 +1455,10 @@
         oFormData.append("CONVEXIT", ls_P06.val);
         sendAjax(oAPP.attr.servNm + "/chkConvExit", oFormData, function (param) {
           if (param && param.RETCD === "E") {
-            ls_P06.stat = "Error"; ls_P06.statTxt = param.RTMSG;
+            var sMsg = _relocalize(param.RTMSG);   // 서버가 백엔드 언어로 구운 메시지 → 접속 언어로 재현지화
+            ls_P06.stat = "Error"; ls_P06.statTxt = sMsg;
             lf_renderAddit();
-            _msg(10, "E", param.RTMSG);
+            _msg(10, "E", sMsg);
             return resolve(true);
           }
           return resolve(false);
@@ -1440,6 +1470,8 @@
   // Bind 버튼 이벤트 (원본 lf_bindBtnEvt 979행).
   async function lf_bindBtnEvt(oNode) {
 
+    _busy(true);   // ★ 바인드 시작 = 팝업 busy 잠금(원본 바인드 버튼 parent.setBusy("X")). 비동기 검증(chkConvExit) 중
+                   //   중복 클릭/재진입 방지. 오류/성공 모든 경로에서 _busy(false) 로 해제(원본 setBusy("") 대응).
     lf_resetMPROPMsg();
 
     // 편집 불가면 종료.
@@ -1477,6 +1509,7 @@
     try { oS.fnCallback(true, ls_tree, oS.is_attr); }
     catch (e) { console.error("[HTML5][WS20][bind] bind 콜백 오류:", e && e.message); }
 
+    _busy(false);   // 적용 완료 → busy 해제(성공 경로). (형제창 busy 는 fnWs20AttrChange 가 짝맞춰 처리)
     lf_close();
   }
 
@@ -1740,7 +1773,7 @@
   function lf_ensureStyle() {
     var sCss = [
       // 다이얼로그 — 반응형 크기 + 세로 flex(바디가 늘어 푸터 하단 고정). 헤더/푸터 48px=공통.
-      ".u4aBindDlg { width: min(80vw, 1040px); height: min(90vh, 720px); padding: 0; display: flex; flex-direction: column; }",
+      ".u4aBindDlg { width: 80vw; height: 80vh; padding: 0; display: flex; flex-direction: column; }",
       ".u4aBindDlg .u4a-dialog__header { cursor: move; user-select: none; }",
       ".u4aBindHead span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
       // 툴바(MIME .u4aMimeTreeTool 컨벤션) — 아이콘/라벨 버튼 한 줄, 하단 경계.
@@ -1827,19 +1860,27 @@
       ".u4aBindAdditPane { display: none; flex: 1 1 0; min-width: 0; background: var(--surface); overflow: hidden; }",
       ".u4aBindSplitBar { display: none; }",
       ".u4aBindShowAddit .u4aBindTreePane { flex: 0 0 var(--u4aBindTreeW); }",
-      // ★ 스플릿(MPROP) 표시로 트리가 좁아지면 컬럼이 잘리지 않게 가로 스크롤 — 콘텐츠 최소폭 max(100%,36rem)
-      //   유지(패널이 36rem 보다 좁아지면 그 폭 유지+스크롤). 헤더/트리/세로선 다 같은 min-width 라 정렬 유지.
+      // ★ 스플릿(MPROP) 표시로 트리가 좁아지면 컬럼이 잘리지 않게 가로 스크롤 — 콘텐츠에 "명시적" 최소폭이 필요.
+      //   (min-width:100% 만으론 flex 컨테이너가 자식 때문에 안 늘어나 스크롤이 안 생긴다.)
       ".u4aBindShowAddit .u4aBindTreeBody { overflow: auto; }",
+      //   기본(비고정, % 컬럼) : 좁아지면 36rem 유지+스크롤(% 컬럼이라 채움 balloon 없음).
       ".u4aBindShowAddit .u4aBindColHead, .u4aBindShowAddit .u4aBindTreeWrap, .u4aBindShowAddit .u4aBindTree.u4a-tree { min-width: max(100%, 36rem); }",
+      //   고정(리사이즈) 모드 : 콘텐츠 최소폭 = JS 실측 컬럼폭 합(--u4aBindContentMinW = 이름+유형+설명최소+overhead).
+      //   → 넓으면 채움(100%), 좁으면 딱 그 폭에서 가로 스크롤 → 채움 컬럼(desc)이 부풀지 않고 컬럼 폭 유지.
+      //   ※과거 고정 36rem 은 리사이즈로 컬럼이 작아진 상태에서 좁히면 desc 가 36rem 까지 부풀어 "빈 컬럼" 되던 버그.
+      ".u4aBindShowAddit .u4aBindColsFixed .u4aBindColHead, .u4aBindShowAddit .u4aBindColsFixed .u4aBindTreeWrap, .u4aBindShowAddit .u4aBindColsFixed .u4aBindTree.u4a-tree { min-width: max(100%, var(--u4aBindContentMinW, 36rem)); }",
+      // ★ 채움 컬럼(desc)이 0 으로 짜부되지 않게 min-width(콘텐츠 최소폭의 desc 몫과 동일). 헤더/행/세로선 다 정렬.
+      ".u4aBindShowAddit .u4aBindColDesc, .u4aBindShowAddit .u4aBindGL--desc { min-width: 6rem; }",
       ".u4aBindShowAddit .u4aBindAdditPane { display: flex; }",
       ".u4aBindShowAddit .u4aBindSplitBar { display: flex; }",
       ".u4aBindAdditWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }",
       ".u4aBindAdditTable td { vertical-align: middle; }",
+      // 컬럼 경계 세로선 — 좌측 트리와 동일한 그리드 느낌으로 속성|값 사이 세로 구분선(헤더+행 전체).
+      ".u4aBindAdditTable td:first-child, .u4aBindAdditTable th:first-child { border-right: 0.0625rem solid var(--line); }",
       ".u4aBindAdditColProp, .u4aBindAdditProp { width: 42%; }",
       ".u4aBindAdditProp { font-weight: 700; }",
       ".u4aBindAdditText { color: var(--text-muted); }",
       ".u4aBindAdditVal .u4aBindAdditField { width: 100%; }",
-      ".u4aBindAdditTable tr[data-state=\"error\"] .u4aBindAdditProp { color: var(--state-error); }",
       // 드래그 중 iframe(미리보기) 위 끊김 방지는 공통(body.u4a-dragging).
       ".u4aBindResizing, .u4aBindResizing * { cursor: col-resize !important; user-select: none !important; }"
     ].join("");

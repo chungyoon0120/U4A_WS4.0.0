@@ -49,23 +49,12 @@
         var oScript = document.createElement("script");
         oScript.id = "sap-ui-bootstrap";
 
-        // ★ UI5 부트 소스 = 원본 그대로 UI5LIB_WSSRC(=resourceUrl).
-        //   dev(APP.isPackaged=false)에서는 resourceUrl=testResource(원격 UI5 CDN, sap-ui-core.js)라 검증된 URL.
-        //   ※ 한때 UI5LIB_SSRC(sServerHost+LIBPATH)로 바꿨더니 sap 이 안 떠서 frame.js 크래시 → 바깥 프레임까지
-        //     백지가 됐음(200 오응답이면 onerror 도 안 떠 오류 다이얼로그도 없음). 원본 설계=frame.js:WSSRC /
-        //     selectSAP:SSRC 분리 로 원복. (selectSAP.html 은 원본대로 SSRC 유지 = KEEP-UI5)
         oScript.setAttribute("src", oAPP.UI5LIB_WSSRC);
         oScript.setAttribute('data-sap-ui-theme', oAPP.UI5_THEME);
         oScript.setAttribute("data-sap-ui-language", oAPP.UI5_LANGU);
         oScript.setAttribute("data-sap-ui-preload", "async");
         oScript.setAttribute("data-sap-ui-noduplicateids", "true");
         oScript.setAttribute("data-sap-ui-libs", "sap.m, sap.ui.core, sap.f, sap.ui.table");
-
-        // UI5 로드 실패(통신/경로/서버다운) 즉시 감지 → 셸(index.js)의 공통 오류 안내 후 창 닫기(안전망).
-        //   oAPP === parent.gfn_parent() 라 셸의 _onUi5LoadFail 을 직접 호출.
-        oScript.onerror = function () {
-            try { oAPP.fn && oAPP.fn._onUi5LoadFail && oAPP.fn._onUi5LoadFail("ui5-script-error(WSSRC)"); } catch (e) { }
-        };
 
         document.head.appendChild(oScript);
 

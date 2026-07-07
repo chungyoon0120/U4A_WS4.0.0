@@ -36,6 +36,27 @@
     }
     const _fa = (sName) => '<i class="fa-solid fa-' + sName + '"></i>';
 
+    // 서버가 백엔드 로그온 언어(EN 등)로 이미 렌더해 내려준 텍스트(RTMSG/ERMSG)를 워크스페이스(화면) 언어로
+    //   역현지화 — 공통 단일출처 WsMsgCls.relocalize 위임(텍스트→키 역매핑→클라 언어 재렌더, 실패 시 원문 폴백).
+    //   ★서버 ABAP 수정 불가 전제. SSOT=.analy/17, 소비처 통일(앱복사/MIME/WS20 과 동일 로직).
+    function _relocalizeBakedMsg(sText) {
+        if (typeof sText !== "string" || sText === "") { return sText; }
+        try {
+            const sWsLangu = (parent.getUserInfo() || {}).LANGU;    // 워크스페이스(화면) 언어
+            const sBeLangu = (parent.getServerInfo() || {}).LANGU;  // 백엔드 로그온 언어(구운 언어)
+            const WC = (parent.REMOTE && parent.REMOTE.getGlobal) ? parent.REMOTE.getGlobal("WsMsgCls") : null;
+            return (WC && WC.relocalize) ? WC.relocalize(sText, sBeLangu, sWsLangu) : sText;
+        } catch (e) { return sText; }
+    }
+
+    // 오류 필드 자동 포커스 — blur/change/click 처리 '도중' 동기 focus() 는 진행 중인 포커스 이동에 밀려
+    //   무시될 수 있다(Chromium93). 다음 매크로태스크로 미뤄 확실히 안착시킨다. 포커스가 붙어야
+    //   .u4a-form__row:focus-within 로 밸류스테이트 메시지(.u4a-field__msg)가 노출된다(.analy/15 §3.5).
+    function _refocus(oEl) {
+        if (!oEl || typeof oEl.focus !== "function") { return; }
+        setTimeout(function () { try { oEl.focus(); } catch (e) { } }, 0);
+    }
+
 
     /************************************************************************
      * 공통 스타일 1회 주입 (테마 토큰 소비 — 하드코딩 색 없음)
@@ -45,7 +66,9 @@
         const oStyle = document.createElement("style");
         oStyle.id = "u4aCapStyle";
         oStyle.textContent = `
-        .u4aCapDlg { width: min(72vw, 1080px); height: min(82vh, 720px); padding: 0; display: flex; flex-direction: column; }
+        /* 폭은 DataSet 탭(폼+미리보기 2단)에 맞춘 상한, 높이는 고정하지 않고 내용에 맞춰(General 처럼
+           짧은 탭에서 하단이 텅 비지 않게) — 상한만 둔다. 리사이즈 그립은 rect 기반이라 무관. */
+        .u4aCapDlg { width: min(76vw, 980px); max-height: min(86vh, 780px); padding: 0; display: flex; flex-direction: column; }
         .u4aCapDlg .u4a-dialog__header { cursor: move; user-select: none; }
         .u4aCapDlg .u4a-dialog__header span { flex: 1 1 auto; }
         /* 닫기 X 스타일은 공통 .u4a-btn-icon(+data-act=close hover 빨강)으로 통일 — 개별 .u4aCapX 스타일 제거 */
@@ -60,17 +83,64 @@
         .u4aCapBody { flex: 1 1 auto; overflow: auto; padding: 1.25rem 1.25rem 1.75rem; }
         .u4aCapPage[hidden] { display: none; }
         .u4aCapGrid { display: grid; grid-template-columns: 1fr; gap: 1rem 1.5rem; }
-        .u4aCapGrid.u4aCap2col { grid-template-columns: 1fr 1fr; }
-        @media (max-width: 720px) { .u4aCapGrid.u4aCap2col { grid-template-columns: 1fr; } }
+        /* ── General 탭: 원본 ResponsiveGridLayout(labelSpanL:3, columnsL:1) 재현 ──
+           라벨=왼쪽(우측정렬) · 필드=오른쪽 가로 배치, 단일 컬럼. (라벨-위 stacked 로 하면
+           필드가 전폭 100% 로 늘어나 "쓸데없이 길다" + 원본과 이질감 → 원본대로 라벨-왼쪽으로.) */
+        .u4aCapFormLeft .u4aCapRow { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr);
+                                     align-items: center; column-gap: 0.75rem; }
+        .u4aCapFormLeft .u4aCapRow > .u4a-label { text-align: right; }
+        .u4aCapFormLeft .u4aCapControl { display: flex; min-width: 0; }
+        .u4aCapFormLeft .u4aCapControl > * { flex: 1 1 auto; min-width: 0; }
+        /* 컨트롤 안에 [필드 + 부가설명]을 세로로 쌓는 행(Object Name: 입력 밑에 view/table desc).
+           라벨-왼쪽 그리드에서 desc 를 행(row)에 직접 붙이면 라벨 컬럼 아래로 떨어짐 → 컨트롤(col2) 안에 세로 스택. */
+        .u4aCapFormLeft .u4aCapCtrlCol { flex-direction: column; align-items: stretch; }
+        .u4aCapFormLeft .u4aCapCtrlCol > * { flex: 0 0 auto; width: 100%; }
+        /* 검증 메시지는 라벨 폭(10.5rem)+gap(0.75rem) 만큼 우측으로 밀어 필드 아래 정렬. */
+        .u4aCapFormLeft .u4aCapRow .u4a-field__msg { left: 11.25rem; }
+        /* 좁을 때(원본 labelSpanS:12) 라벨을 위로 접어 스택. */
+        @media (max-width: 560px) {
+            .u4aCapFormLeft .u4aCapRow { grid-template-columns: 1fr; }
+            .u4aCapFormLeft .u4aCapRow > .u4a-label { text-align: left; }
+            .u4aCapFormLeft .u4aCapRow .u4a-field__msg { left: 0; }
+        }
+        /* General(단일 컬럼) 필드는 짧은 값이 다이얼로그 전폭으로 늘어나지 않게 상한 — 라벨-왼쪽은 유지. */
+        .u4aCapFormCap .u4aCapControl { max-width: 28rem; }
+        /* ── DataSet 탭: 원본 ResponsiveGridLayout(columnsL:2) 재현 ──
+           넓으면 2단(좌=폼 / 우=검색레이아웃+미리보기), 좁으면 1단 스택(원본 반응형=image3 과 동일). */
+        /* ★ 2단↔1단 전환은 '뷰포트'가 아니라 '다이얼로그(컨테이너) 폭' 기준이어야 한다(원본 UI5
+           ResponsiveGridLayout 과 동일). 다이얼로그는 리사이즈 가능 → 뷰포트 media query 로 하면
+           창은 넓은데 팝업만 줄였을 때 2단이 그대로 남아 찌그러진다. Chromium93 은 CSS container query
+           미지원 → ResizeObserver 로 그리드 폭을 재서 .u4aCapDsWide 를 토글(아래 JS). */
+        .u4aCapDsGrid { display: grid; grid-template-columns: 1fr; gap: 1.25rem 2rem; align-items: start; }
+        .u4aCapDsGrid.u4aCapDsWide { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
+        /* 미리보기 이미지 행 = 라벨 없이 전폭(원본: label 없는 FormElement) → 라벨 그리드 해제. */
+        .u4aCapFormLeft .u4aCapRow.u4aCapImgRow { display: block; }
+        /* 값도움 전용(F4/valueHelpOnly) 입력 — readOnly 지만 '활성(비-disabled)' 이면 편집 가능 외관 유지
+           (올라온 표면+또렷한 테두리+포인터). 비활성(패키지 로컬 등)이면 :disabled 라 이 규칙이 빠지고
+           공통 muted 룩 그대로. background 는 non-focus 로만(변경행 규칙 충돌 방지 §3.8.2). 공통
+           .u4a-input:read-only(=muted) 를 이기도록 특이도 상향(.u4aCapDlg + .u4a-input.u4aCapVho + 의사클래스). */
+        .u4aCapDlg .u4a-input.u4aCapVho:read-only:not(:disabled) {
+            background: var(--surface-raised);
+            border-color: var(--divider);
+            color: var(--text);
+            cursor: pointer;
+        }
+        /* (vho 활성이라도 에러면 위 §3.5.2 !important 규칙이 이 divider 테두리를 덮어 빨강 유지) */
         /* 2단 그리드의 각 컬럼(Dataset 좌/우) — 내부 행 간격을 General 단일그리드(row-gap 1rem)와 동일하게.
            (이게 없으면 컬럼 안 행들이 gap 없이 붙어 빽빽하게 보임) */
         .u4aCapCol { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
         .u4aCapRow { position: relative; display: flex; flex-direction: column; gap: 0.3125rem; }
         .u4aCapRow .u4a-field__msg { white-space: nowrap; }
         .u4aCapDesc { font-size: 0.8125rem; color: var(--text-muted); margin-top: 0.125rem; min-height: 1em; }
-        /* 셀렉트(콤보) 에러 상태 — 입력 .u4a-input[data-vs=error] 와 동일하게 빨강 테두리.
-           (.u4aCapDlg 스코프로 다이얼로그 필드 위계 규칙(.u4a-dialog .u4a-combo)을 이김) */
-        .u4aCapDlg .u4aCapErr { border-color: var(--state-error); }
+        /* 설명(뷰/테이블 desc)이 비었을 땐 자리 예약(min-height) 없이 접어 — 그 행만 키가 커져 아래 행과
+           간격이 벌어지는 것 방지. 뷰 선택으로 desc 가 채워질 때만 노출된다. */
+        .u4aCapDesc:empty { display: none; }
+        /* ★ ValueState.Error 테두리(빨강)는 어떤 테마의 활성-테두리 규칙보다도 무조건 이겨야 한다
+           (.analy/15 §3.5.2 "빨간 테두리는 포커스 무관 항상 유지"). 테마마다 특이도를 쫓는 대신 !important
+           로 못박는다 — input(vho 포함)·콤보 공통. 이 규칙은 팝업 주입 스타일이라 JS 리로드로 즉시 반영
+           (외부 CSS 캐시와 무관). */
+        .u4aCapDlg .u4a-input[data-vs="error"] { border-color: var(--state-error) !important; }
+        .u4aCapDlg .u4a-combo.u4aCapErr { border-color: var(--state-error) !important; }
         .u4aCapRadios { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; align-items: center; min-height: 2.25rem; }
         .u4aCapRadio { display: inline-flex; align-items: center; gap: 0.375rem; cursor: pointer; color: var(--text); }
         .u4aCapRadio input { accent-color: var(--accent); width: 1rem; height: 1rem; cursor: pointer; }
@@ -187,7 +257,12 @@
         }
 
         if (cfg.maxLength) { oInput.maxLength = cfg.maxLength; }
-        if (cfg.readOnly) { oInput.readOnly = true; }
+        if (cfg.readOnly) {
+            oInput.readOnly = true;
+            // 값도움 전용(valueHelpOnly/F4) 필드 — readOnly 로 타이핑만 막고, 활성일 땐 비활성(muted)
+            //   이 아니라 '편집 가능' 외관(올라온 표면+또렷한 테두리) 유지(.analy/15 §3.8). vho 클래스로 표시.
+            if (bVh) { oInput.classList.add("u4aCapVho"); }
+        }
         // 읽기 전용 표시 필드 — 편집 가능 필드와 구분되게 '잠긴' 톤(.u4a-input--display, shell.css).
         if (cfg.display) {
             oInput.classList.add("u4a-input--display");
@@ -200,7 +275,8 @@
             let v = oInput.value;
             if (cfg.upper) { v = v.toUpperCase(); oInput.value = v; }
             oModel.setProperty(cfg.valPath, v);
-            if (typeof cfg.onChange === "function") { cfg.onChange(oModel); }
+            // oInput 을 함께 넘겨 onChange(예: 패키지 검증)가 오류 시 그 필드에 focus() 를 줄 수 있게.
+            if (typeof cfg.onChange === "function") { cfg.onChange(oModel, oInput); }
         });
 
         // 입력 중(live) 부수효과 — 예: 패키지 수정 즉시 Request No 비활성(blur 까지 안 기다림).
@@ -225,7 +301,7 @@
                 }
                 // 값 지움도 "변경"이다 — 예: 패키지 X 로 지우면 onChange(lf_packageChangeEvent)가
                 //   돌아 Request No 가 비활성/초기화된다(타이핑 change 와 동일 경로).
-                if (typeof cfg.onChange === "function") { cfg.onChange(oModel); }
+                if (typeof cfg.onChange === "function") { cfg.onChange(oModel, oInput); }
             });
         }
 
@@ -462,7 +538,9 @@
     function lf_createGenUI(oModel, oUIobj) {
 
         const oPage = _el("div", "u4aCapPage");
-        const oGrid = _el("div", "u4aCapGrid");
+        // 원본대로 단일 컬럼 + 라벨-왼쪽(.u4aCapFormLeft) — 라벨이 왼쪽을 차지해 필드가 오른쪽 ~75% 로
+        // 짧아지고(전폭 stacked 대비), 원본 UI5(labelSpanL:3, columnsL:1) 와 동일한 UX 가 된다.
+        const oGrid = _el("div", "u4aCapGrid u4aCapFormLeft u4aCapFormCap");
         oPage.appendChild(oGrid);
 
         // APP Description (A91)
@@ -537,11 +615,27 @@
     function lf_createDatasetUI(oModel, oUIobj) {
 
         const oPage = _el("div", "u4aCapPage");
-        const oGrid = _el("div", "u4aCapGrid u4aCap2col");
+        // 원본 ResponsiveGridLayout(columnsL:2) 재현 — 넓으면 좌(폼)|우(검색레이아웃) 2단, 좁으면 1단 스택.
+        const oGrid = _el("div", "u4aCapDsGrid");
         oPage.appendChild(oGrid);
 
-        // ── 좌측 컨테이너 ──────────────────────────────────────────────
-        const oLeft = _el("div", "u4aCapCol");
+        // 2단↔1단 전환은 '그리드(=다이얼로그) 실제 폭' 기준 — 다이얼로그 리사이즈/좁힘에도 원본처럼 반응.
+        //   원본 UI5 ResponsiveGridLayout(columnsL:2) 도 뷰포트가 아니라 폼(컨테이너) 폭 기준(L=1024 에서 2단).
+        //   뷰포트 media query 로 하면 창은 넓고 팝업만 좁을 때 2단이 남아 찌그러짐 → ResizeObserver 로 처리.
+        //   (Chromium93 = CSS container query 미지원이라 JS. 임계 DS_2COL_W = 2단 각 열이 편안한 최소폭 기준.)
+        const DS_2COL_W = 880;
+        if (typeof ResizeObserver !== "undefined") {
+            const oDsRo = new ResizeObserver(function (aEntries) {
+                for (let i = 0; i < aEntries.length; i++) {
+                    // contentRect.width 는 그리드 내용폭(2단이어도 부모 폭에 고정) → 토글로 진동 없음.
+                    oGrid.classList.toggle("u4aCapDsWide", aEntries[i].contentRect.width >= DS_2COL_W);
+                }
+            });
+            oDsRo.observe(oGrid);
+        }
+
+        // ── 좌측 컨테이너(원본 oCont1) — 라벨-왼쪽 ─────────────────────
+        const oLeft = _el("div", "u4aCapCol u4aCapFormLeft");
         oGrid.appendChild(oLeft);
 
         // Object Type radio (B27): Database View(B28) / Transparent Table(B29)
@@ -575,15 +669,21 @@
 
         // Object Name (OBJNM 라벨은 모델 바인딩) — view/table 입력 + F4
         oR = _row("", true);
-        oModel.bind(function () { oR.label.textContent = oModel.getProperty("/DATASET/OBJNM") || ""; });
+        // ★ oR 은 이후 행마다 재할당되는 let 이라, 바인딩 클로저에서 oR.label 을 그대로 참조하면
+        //   refresh 시점의 oR(=마지막 행=검색 레이아웃)에 OBJNM 이 찍힌다(라벨 뒤바뀜 버그).
+        //   → 이 행의 라벨을 전용 const 로 박제해서 바인딩한다.
+        const oObjLabel = oR.label;
+        oModel.bind(function () { oObjLabel.textContent = oModel.getProperty("/DATASET/OBJNM") || ""; });
+        // 입력 밑에 desc 를 세로로 붙이므로 컨트롤(col2)을 세로 스택으로.
+        oR.control.classList.add("u4aCapCtrlCol");
         oUIobj.dataset.oInp1 = _buildInput(oModel, oR, {
             valPath: "/DATASET/TABNM", statPath: "/DATASET/TABNM_stat", stxtPath: "/DATASET/TABNM_stxt",
             maxLength: 16, upper: true, clear: true, vh: lf_ObjNameF4Help
         });
-        // view(table) desc
+        // view(table) desc — 라벨 아래가 아니라 입력 필드(col2) 밑에 오도록 컨트롤 안에 append.
         const oObjDesc = _el("div", "u4aCapDesc");
         oModel.bind(function () { oObjDesc.textContent = oModel.getProperty("/DATASET/TABTX") || ""; });
-        oR.row.appendChild(oObjDesc);
+        oR.control.appendChild(oObjDesc);
         oLeft.appendChild(oR.row);
 
         // APP Description (A91)
@@ -642,8 +742,8 @@
         oUIobj.dataset.oInpReqTx = _buildInput(oModel, oR, { valPath: "/DATASET/REQTX", display: true });
         oLeft.appendChild(oR.row);
 
-        // ── 우측 컨테이너: Search Layout ───────────────────────────────
-        const oRight = _el("div", "u4aCapCol");
+        // ── 우측 컨테이너(원본 oCont2): Search Layout — 라벨-왼쪽 ──────
+        const oRight = _el("div", "u4aCapCol u4aCapFormLeft");
         oGrid.appendChild(oRight);
 
         // Search Layout radio (E09): One/Two/Three/Four columns (E12~E15)
@@ -674,8 +774,8 @@
         });
         oRight.appendChild(oR.row);
 
-        // 미리보기 이미지
-        const oImgRow = _el("div", "u4a-form__row u4aCapRow");
+        // 미리보기 이미지 — 원본은 라벨 없는 FormElement(전폭). 라벨 그리드 해제(.u4aCapImgRow).
+        const oImgRow = _el("div", "u4a-form__row u4aCapRow u4aCapImgRow");
         const oImg = _el("img", "u4aCapImg");
         oModel.bind(function () { oImg.src = oModel.getProperty("/DATASET/imgsrc") || ""; });
         oImgRow.appendChild(oImg);
@@ -770,18 +870,18 @@
 
         if (l_err === true) {
             oModel.setProperty(l_stru, ls_appl);
-            // 274 Check input value.
-            parent.showMessage(null, 20, "E", _txt("/U4A/MSG_WS", "274"), function () {
-                if (oFocusUI && oFocusUI.focus) { oFocusUI.focus(); }
-            });
-            return l_err;
+            // [UX 통일] 인라인 value-state(빨간 테두리 + 필드별 메시지)로 충분 → 별도 "274 Check input value"
+            //   요약 모달은 제거(패키지 점검 lf_chkPackage 와 동일 사상). 첫 오류 필드에 자동 포커스는 호출측이
+            //   준다 — 여기선 busy(showModal) 가 떠 있어 focus() 가 top-layer 트랩으로 안 먹으므로 대상만 반환.
+            //   (반환값 truthy = 오류. 엘리먼트면 그 필드, 없으면 true.)
+            return oFocusUI || true;
         }
 
         oModel.setProperty(l_stru, ls_appl);
     }
 
-    // 입력 package 점검 function.
-    function lf_chkPackage(oModel, is_create) {
+    // 입력 package 점검 function. (oInput = 패키지 입력칸 — 서버 오류 시 자동 포커스용)
+    function lf_chkPackage(oModel, is_create, oInput) {
 
         // busy dialog open.
         parent.setBusy("X");
@@ -803,16 +903,18 @@
             //   (메시지 내용 ret.ERMSG 는 인라인에 그대로 표시 → 정보 손실 없음)
             if (ret.ERFLG === "X") {
                 is_create.PACKG_stat = "Error";
-                is_create.PACKG_stxt = ret.ERMSG;
+                is_create.PACKG_stxt = _relocalizeBakedMsg(ret.ERMSG);
                 oModel.setProperty(ls_stru, is_create);
+                _refocus(oInput);   // 오류 필드 자동 포커스(다음 틱 — 메시지 노출)
                 return;
             }
 
             // 점검 중 오류 — 동일하게 인라인 에러로만 표시(팝업 제거).
             if (ret.ERFLG === "E") {
                 is_create.PACKG_stat = "Error";
-                is_create.PACKG_stxt = ret.ERMSG;
+                is_create.PACKG_stxt = _relocalizeBakedMsg(ret.ERMSG);
                 oModel.setProperty(ls_stru, is_create);
+                _refocus(oInput);   // 오류 필드 자동 포커스(다음 틱 — 메시지 노출)
                 return;
             }
 
@@ -832,8 +934,8 @@
         }, "", true, "POST", function () { /* 오류 시 별도 처리 없음 */ });
     }
 
-    // package 입력값 변경 이벤트.
-    function lf_packageChangeEvent(oModel) {
+    // package 입력값 변경 이벤트. (oInput = 패키지 입력칸 — 오류 시 자동 포커스용)
+    function lf_packageChangeEvent(oModel, oInput) {
 
         const ls_stru = lf_getStruName(oModel);
         if (!ls_stru) { return; }
@@ -863,14 +965,16 @@
             return;
         }
 
-        // standard package.
+        // standard package(예: SAP 표준) — 오류 필드에 자동 포커스(메시지도 focus-within 이라 함께 노출).
+        //   ★ 동기 검증이라 change(blur) 처리 도중이므로 _refocus(다음 틱)로 확실히 안착시켜야 메시지가 뜬다.
         if (lf_chkPackageStandard(l_create) === true) {
             oModel.setProperty(ls_stru, l_create);
+            _refocus(oInput);
             return;
         }
 
-        // Y,Z 패키지 정합성 점검(서버).
-        lf_chkPackage(oModel, l_create);
+        // Y,Z 패키지 정합성 점검(서버) — 오류 시 콜백에서 자동 포커스.
+        lf_chkPackage(oModel, l_create, oInput);
     }
 
     // 패키지 입력 중(live) — Request No 즉시 비활성 + 초기화. (정합성 재검은 blur 의 lf_packageChangeEvent)
@@ -1107,7 +1211,7 @@
 
             // 생성중 오류.
             if (ret.RETCD === "E") {
-                parent.showMessage(null, 20, "E", ret.RTMSG);
+                parent.showMessage(null, 20, "E", _relocalizeBakedMsg(ret.RTMSG));
                 parent.setBusy("");
                 return;
             }
@@ -1162,9 +1266,11 @@
             oModel.setProperty(l_stru, l_create);
         }
 
-        // 입력값 점검.
-        if (lf_chkValue(oModel, oUIobj) === true) {
-            parent.setBusy("");
+        // 입력값 점검. 오류면 truthy(포커스 대상 엘리먼트 or true) 반환.
+        const oErrFocus = lf_chkValue(oModel, oUIobj);
+        if (oErrFocus) {
+            parent.setBusy("");   // ★ busy(showModal) 를 먼저 닫고
+            _refocus(oErrFocus);   // 그 다음(다음 틱) 오류 필드 포커스 — busy top-layer 트랩 회피 + 확실 안착
             return;
         }
 
@@ -1181,16 +1287,15 @@
             const ls_return = await oAPP.fn._DATASET.callDataSetFieldListPopop(oModel.getProperty("/DATASET"), oAPP);
 
             if (ls_return.RETCD === "C") {
-                parent.showMessage(null, 10, "I", ls_return.RTMSG);
+                parent.showMessage(null, 10, "I", _relocalizeBakedMsg(ls_return.RTMSG));
                 return;
             }
 
             if (ls_return.RETCD === "E") {
+                // [UX 통일] 인라인 value-state(TABNM 빨간 테두리 + 메시지)로 충분 → 별도 모달 제거, 즉시 자동 포커스.
                 oModel.setProperty("/DATASET/TABNM_stat", "Error");
-                oModel.setProperty("/DATASET/TABNM_stxt", ls_return.RTMSG);
-                parent.showMessage(null, 20, "E", ls_return.RTMSG, function () {
-                    if (oUIobj.dataset.oInp1 && oUIobj.dataset.oInp1.focus) { oUIobj.dataset.oInp1.focus(); }
-                });
+                oModel.setProperty("/DATASET/TABNM_stxt", _relocalizeBakedMsg(ls_return.RTMSG));
+                _refocus(oUIobj.dataset.oInp1);
                 return;
             }
 
@@ -1212,17 +1317,10 @@
     /************************************************************************
      * 값도움 / 보조 (원본 호출부 위임 — 별도 팝업)
      ************************************************************************/
-    // object name f4 help 이벤트.
+    // object name f4 help 이벤트 — Object Type(Database View/Transparent Table)에 따른 DDIC 검색도움말.
+    //   원본 UI5 callF4HelpPopup → 공통 HTML5 모듈 fnF4SearchHelpOpen(= callF4HelpPopup 의 HTML5 대체) 재사용.
+    //   /f4serverData 백엔드 계약 동일이라 결과 행 셀키(VIEWNAME/TABNAME/DDTEXT)도 그대로.
     function lf_ObjNameF4Help(oModel, oUi) {
-
-        function lf_callback(param) {
-            if (!param) { return; }
-            oModel.setProperty("/DATASET/TABNM", param[l_fldnm]);
-            oModel.setProperty("/DATASET/TABTX", param["DDTEXT"]);
-            if (oModel.getProperty("/DATASET/APPNM") === "" && param["DDTEXT"] && param["DDTEXT"] !== "") {
-                oModel.setProperty("/DATASET/APPNM", param["DDTEXT"]);
-            }
-        }
 
         const ls_data = oModel.getProperty("/DATASET");
         let l_f4help = "";
@@ -1233,14 +1331,25 @@
             case ls_data.RB02: l_f4help = "SGENCLP_SRC_TAB"; l_fldnm = "TABNAME"; break;
         }
 
-        try {
-            if (typeof oAPP.fn.callF4HelpPopup !== "undefined") {
-                oAPP.fn.callF4HelpPopup(l_f4help, l_f4help, [], [], lf_callback);
-                return true;
+        // 선택/더블클릭한 결과 행 → VIEW(TABLE)명 + 설명 반영. APP 설명 비어있으면 DDTEXT 로 채움(원본 동일).
+        function lf_callback(param) {
+            if (!param) { return; }
+            oModel.setProperty("/DATASET/TABNM", param[l_fldnm] || "");
+            oModel.setProperty("/DATASET/TABTX", param["DDTEXT"] || "");
+            if (oModel.getProperty("/DATASET/APPNM") === "" && param["DDTEXT"] && param["DDTEXT"] !== "") {
+                oModel.setProperty("/DATASET/APPNM", param["DDTEXT"]);
             }
-            lf_getScript("design/js/callF4HelpPopup", function () {
-                oAPP.fn.callF4HelpPopup(l_f4help, l_f4help, [], [], lf_callback);
-            });
+        }
+
+        function _openF4() {
+            oAPP.fn.fnF4SearchHelpOpen({ shlpname: l_f4help, onPick: lf_callback });
+        }
+
+        try {
+            if (typeof oAPP.fn.fnF4SearchHelpOpen === "function") { _openF4(); return true; }
+            // 공통 F4 모듈(ws10_20/js/fnF4SearchHelpPopup) 미로드 시 지연 로드 후 오픈.
+            lf_getScript("js/fnF4SearchHelpPopup", _openF4);
+            return true;
         } catch (e) {
             parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "949")); // Value help is not available.
         }

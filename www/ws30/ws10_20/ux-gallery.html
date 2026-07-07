@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>U4A 공통 UX 컴포넌트 갤러리 (Living Style Guide)</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ===================================================================
+         이 페이지는 개발 참조용(리빙 스타일가이드)이다. 배포 화면 아님.
+         ★ 실제 공통 자산을 그대로 로드한다(인라인 복붙 금지) → 공통을 고치면
+           이 갤러리가 같이 변한다 = 드리프트가 눈에 보인다.
+         로드 순서는 index.html 과 동일: tokens → shell → bootstrap-skin → FA.
+         근거: .analy/16_공통_화면UX_표준.md §0.1(컨닝시트)
+         ==================================================================== -->
+    <link rel="stylesheet" href="./theme/tokens.css">
+    <link rel="stylesheet" href="./theme/shell.css">
+    <link rel="stylesheet" href="./theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../lib/fontawesome/7.2.0/css/all.min.css">
+
+    <script src="./theme/theme-api.js"></script>
+    <script src="./theme/u4a-ui.js"></script>
+
+    <!-- 갤러리 자체 스캐폴딩 CSS — 컴포넌트가 아니라 페이지 골격만. 색은 의미 토큰만 사용(하드코딩 0). -->
+    <style>
+        html, body { margin: 0; height: 100%; }
+        body {
+            background: var(--boot-bg, var(--app-bg));
+            color: var(--text);
+            font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px;
+        }
+        .gxTop {
+            position: sticky; top: 0; z-index: 10;
+            display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+            padding: .6rem 1rem;
+            background: var(--surface); border-bottom: 1px solid var(--line);
+        }
+        .gxTop h1 { font-size: 1rem; margin: 0; font-weight: 700; }
+        .gxTop .gxSpacer { flex: 1 1 auto; }
+        .gxTop label { display: inline-flex; align-items: center; gap: .35rem; color: var(--text-muted, var(--text)); }
+        .gxWrap { padding: 1.25rem; max-width: 1180px; margin: 0 auto; display: grid; gap: 1.25rem; }
+        .gxCard {
+            background: var(--surface); border: 1px solid var(--line);
+            border-radius: var(--radius, 8px); padding: 1rem 1.15rem 1.2rem;
+        }
+        .gxCard > h2 { font-size: .95rem; margin: 0 0 .15rem; display: flex; align-items: baseline; gap: .5rem; }
+        .gxCard > h2 .gxRef {
+            font-size: .72rem; font-weight: 600; color: var(--accent);
+            border: 1px solid var(--line); border-radius: 999px; padding: .05rem .5rem;
+        }
+        .gxCard > .gxHint { font-size: .78rem; color: var(--text-muted, var(--text)); opacity: .8; margin: 0 0 .8rem; }
+        .gxCard > .gxHint code { font-family: ui-monospace, monospace; }
+        .gxRow { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+        .gxCol { display: flex; flex-direction: column; gap: .6rem; }
+        .gxDemoSplit { height: 160px; border: 1px solid var(--line); border-radius: var(--radius, 8px); overflow: hidden; }
+        .gxPane { padding: .6rem .8rem; overflow: auto; }
+    </style>
+</head>
+
+<body>
+    <div class="gxTop">
+        <h1><i class="fa-solid fa-swatchbook" style="color:var(--accent)"></i> U4A 공통 UX 갤러리</h1>
+        <span class="gxSpacer"></span>
+        <label>테마 <span id="gxThemeHost"></span></label>
+        <label><input type="checkbox" id="gxCompact"> compact(밀도)</label>
+    </div>
+
+    <div class="gxWrap" id="gxWrap">
+        <!-- 각 섹션은 JS 가 실제 공통 팩토리로 채운다 -->
+
+        <section class="gxCard" id="gxColors">
+            <h2>색 토큰 <span class="gxRef">§1</span></h2>
+            <p class="gxHint">모든 색은 <code>tokens.css</code> 의미 토큰만 사용. 하드코딩 hex·<code>color-mix</code> 금지.</p>
+            <div class="gxRow" id="gxSwatches"></div>
+        </section>
+
+        <section class="gxCard">
+            <h2>버튼 <span class="gxRef">§1.1</span></h2>
+            <p class="gxHint">정본 = <code>.u4a-btn</code> + 변형. Close/Cancel = <code>--negative</code>, 주 액션 = <code>--emphasized</code>. disabled 는 원색+opacity.</p>
+            <div class="gxRow">
+                <button class="u4a-btn">중립</button>
+                <button class="u4a-btn u4a-btn--emphasized">주 액션(Save)</button>
+                <button class="u4a-btn u4a-btn--negative">Close/Cancel</button>
+                <button class="u4a-btn u4a-btn--emphasized" disabled>주(비활성)</button>
+                <button class="u4a-btn u4a-btn--negative" disabled>Close(비활성)</button>
+                <button class="u4a-btn-icon" title="아이콘 버튼"><i class="fa-solid fa-gear"></i></button>
+            </div>
+        </section>
+
+        <section class="gxCard">
+            <h2>입력칸 <span class="gxRef">15번 · §2.9</span></h2>
+            <p class="gxHint">정본 = <code>U4AUI.createField(opts)</code>. clear(X)/suggest/F4/value-state/readonly 를 직접 짜지 말 것.</p>
+            <div class="gxCol" id="gxFields" style="max-width:340px"></div>
+        </section>
+
+        <section class="gxCard">
+            <h2>셀렉트 / 콤보 <span class="gxRef">§0.1</span></h2>
+            <p class="gxHint">정본 = <code>U4AUI.createSelect(items, value, onChange)</code>. 네이티브 <code>&lt;select&gt;</code> 대체(펼침목록까지 테마).</p>
+            <div class="gxRow" id="gxSelect" style="max-width:340px"></div>
+        </section>
+
+        <section class="gxCard">
+            <h2>테이블 / 그리드 <span class="gxRef">§6</span></h2>
+            <p class="gxHint">정본 = <code>.u4a-table</code>. 팝업 안은 액자형 <code>.u4a-table-wrap--boxed</code>. 선택=<code>aria-selected</code>, zebra=<code>data-odd</code>.</p>
+            <div class="u4a-table-wrap u4a-table-wrap--boxed" style="max-height:220px">
+                <table class="u4a-table">
+                    <thead><tr><th>시스템</th><th>클라이언트</th><th>상태</th></tr></thead>
+                    <tbody>
+                        <tr data-odd="false" aria-selected="true"><td>DEV</td><td>100</td><td>활성</td></tr>
+                        <tr data-odd="true"><td>QAS</td><td>200</td><td>활성</td></tr>
+                        <tr data-odd="false"><td>PRD</td><td>300</td><td>잠금</td></tr>
+                        <tr data-odd="true"><td>SBX</td><td>400</td><td>활성</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="gxCard">
+            <h2>트리 <span class="gxRef">§3</span></h2>
+            <p class="gxHint">정본 = <code>U4AUI.createTree(cfg)</code>. 화면별 재귀 렌더러 금지. 추가기능은 slot/hook.</p>
+            <div id="gxTree" style="max-width:340px; border:1px solid var(--line); border-radius:var(--radius,8px); max-height:240px; overflow:auto"></div>
+        </section>
+
+        <section class="gxCard">
+            <h2>접이식 패널 <span class="gxRef">§8</span></h2>
+            <p class="gxHint">정본 = <code>U4AUI.createPanel(cfg)</code>. 헤더=토글+액션 슬롯 / 바디. 화면별 골격 금지.</p>
+            <div id="gxPanel" style="max-width:420px"></div>
+        </section>
+
+        <section class="gxCard">
+            <h2>사이드 네비게이션(계층 없음) <span class="gxRef">§3.7</span></h2>
+            <p class="gxHint">정본 = <code>.u4a-navlist</code>. 선택=좌측 accent 바(트리와 동일). 알약형 스킨 금지.</p>
+            <nav class="u4a-navlist" id="gxNav" style="max-width:240px; border:1px solid var(--line); border-radius:var(--radius,8px); overflow:hidden"></nav>
+        </section>
+
+        <section class="gxCard">
+            <h2>스플릿바 <span class="gxRef">§4</span></h2>
+            <p class="gxHint">정본 = <code>.u4a-splitter*</code> + 서버리스트 그립. 바를 드래그해 인접 패널 재분배(색/그립은 공통 스킨).</p>
+            <div class="u4a-splitter gxDemoSplit" id="gxSplit">
+                <div class="u4a-splitter__pane gxPane" style="flex:0 0 40%">좌측 패널</div>
+                <div class="u4a-splitter__bar" role="separator"></div>
+                <div class="u4a-splitter__pane gxPane" style="flex:1 1 auto">우측 패널(잔여 채움)</div>
+            </div>
+        </section>
+
+        <section class="gxCard">
+            <h2>다이얼로그 · 확인 · 토스트 · 푸터 <span class="gxRef">§2.7 · §2.4 · §7</span></h2>
+            <p class="gxHint">확인=<code>U4AUI.confirm</code>(아이콘 버튼), 토스트=<code>.u4a-toast</code>(화면 정중앙), 푸터=<code>U4AUI.footer*</code>. 모달=헤더/푸터 48px·드래그·리사이즈(전역 자동).</p>
+            <div class="gxRow">
+                <button class="u4a-btn u4a-btn--emphasized" id="gxBtnDlg">모달 다이얼로그 열기</button>
+                <button class="u4a-btn" id="gxBtnConfirm">확인 다이얼로그(W)</button>
+                <button class="u4a-btn" id="gxBtnToast">토스트</button>
+                <button class="u4a-btn" id="gxBtnFooter">플로팅 푸터</button>
+            </div>
+            <div id="gxFooterHost" style="position:relative; margin-top:.6rem; min-height:1px"></div>
+        </section>
+
+        <section class="gxCard">
+            <h2>툴팁 / 잘리는 텍스트 <span class="gxRef">§2.9a</span></h2>
+            <p class="gxHint">정본 = <code>initTooltip</code>. 잘릴 때만 <code>data-tip + data-tip-trunc</code>, 아이콘성은 <code>title</code>. 자체 툴팁 금지.</p>
+            <div class="gxRow">
+                <span style="display:inline-block;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid var(--line);border-radius:6px;padding:.3rem .5rem"
+                      data-tip="이것은 잘릴 때만 툴팁으로 전체가 보이는 아주 긴 텍스트입니다" data-tip-trunc>이것은 잘릴 때만 툴팁으로 전체가 보이는 아주 긴 텍스트입니다</span>
+                <button class="u4a-btn-icon" title="설정(아이콘성 title)"><i class="fa-solid fa-sliders"></i></button>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        (function () {
+            "use strict";
+            var U = window.U4AUI, T = window.U4ATheme;
+
+            // ── 테마 스위처 (실제 U4ATheme 소비) ──
+            try {
+                var items = (T.THEMES || ["horizon_white"]).map(function (k) { return { value: k, text: k.replace("horizon_", "") }; });
+                var sel = U.createSelect(items, T.current(), function (v) { T.apply(v); });
+                document.getElementById("gxThemeHost").appendChild(sel);
+                T.apply(T.current()); // 스킨 변수(--u4a-/--sl-) 초기 세팅
+            } catch (e) { console.error("[gallery] theme switcher:", e); }
+
+            // ── compact 토글 ──
+            document.getElementById("gxCompact").addEventListener("change", function () {
+                document.getElementById("gxWrap").classList.toggle("u4a-compact", this.checked);
+            });
+
+            // ── 색 토큰 스와치 ──
+            try {
+                var toks = ["--accent", "--surface", "--surface-raised", "--app-bg", "--line", "--text",
+                    "--state-error", "--state-warning", "--state-success", "--hover-bg", "--selected-bg", "--folder-icon"];
+                var host = document.getElementById("gxSwatches");
+                toks.forEach(function (name) {
+                    var chip = document.createElement("div");
+                    chip.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:.25rem;font-size:.68rem;width:78px";
+                    var sw = document.createElement("div");
+                    sw.style.cssText = "width:100%;height:34px;border-radius:6px;border:1px solid var(--line);background:var(" + name + ")";
+                    var lbl = document.createElement("code"); lbl.textContent = name;
+                    chip.append(sw, lbl); host.appendChild(chip);
+                });
+            } catch (e) { console.error("[gallery] swatches:", e); }
+
+            // ── 입력칸 (createField) ──
+            try {
+                var fh = document.getElementById("gxFields");
+                fh.appendChild(U.createField({ placeholder: "일반 입력", clear: true, value: "지울 수 있음" }).el);
+                fh.appendChild(U.createField({ type: "password", placeholder: "비밀번호" }).el);
+                fh.appendChild(U.createField({ placeholder: "F4 값도움", f4: function () { toast("F4 값도움 호출 (예시)"); }, f4Icon: "magnifying-glass" }).el);
+                var err = U.createField({ value: "" , placeholder: "필수" });
+                err.setValueState("error", "필수 항목입니다"); fh.appendChild(err.el);
+                fh.appendChild(U.createField({ value: "읽기전용 값", readOnly: true }).el);
+                fh.appendChild(U.createField({ type: "textarea", rows: 2, placeholder: "여러 줄" }).el);
+            } catch (e) { console.error("[gallery] fields:", e); }
+
+            // ── 셀렉트 ──
+            try {
+                var sh = document.getElementById("gxSelect");
+                sh.appendChild(U.createSelect(
+                    [{ value: "F", text: "Function" }, { value: "D", text: "Development" }, { value: "T", text: "Test" }],
+                    "F", function () { }));
+            } catch (e) { console.error("[gallery] select:", e); }
+
+            // ── 트리 (createTree) ──
+            try {
+                var data = [{
+                    id: "r", name: "서버 그룹", children: [
+                        { id: "d", name: "DEV 시스템", children: [{ id: "d1", name: "클라이언트 100" }, { id: "d2", name: "클라이언트 200" }] },
+                        { id: "q", name: "QAS 시스템", children: [{ id: "q1", name: "클라이언트 300" }] },
+                        { id: "p", name: "PRD 시스템 (leaf)" }
+                    ]
+                }];
+                var tree = U.createTree({
+                    roots: function () { return data; },
+                    children: function (n) { return n.children || []; },
+                    key: function (n) { return n.id; },
+                    hasChildren: function (n) { return !!(n.children && n.children.length); },
+                    label: function (n) { return n.name; },
+                    icon: function (n) { return (n.children && n.children.length) ? '<i class="fa-solid fa-folder"></i>' : ''; },
+                    onSelect: function () { },
+                    onToggle: function () { },
+                    initialExpanded: function (n, level) { return level < 1; }
+                });
+                document.getElementById("gxTree").appendChild(tree.el);
+                if (tree.render) { tree.render(); }
+            } catch (e) { console.error("[gallery] tree:", e); }
+
+            // ── 패널 (createPanel) ──
+            try {
+                var p = U.createPanel({ title: "조회 조건", collapsed: false });
+                p.body.style.padding = ".7rem .9rem";
+                p.body.appendChild(U.createField({ placeholder: "검색어", clear: true }).el);
+                var act = document.createElement("button"); act.className = "u4a-btn-icon"; act.title = "검색";
+                act.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
+                p.actions.appendChild(act);
+                document.getElementById("gxPanel").appendChild(p.el);
+            } catch (e) { console.error("[gallery] panel:", e); }
+
+            // ── 네비리스트 ──
+            try {
+                var nav = document.getElementById("gxNav");
+                [["house", "홈", true], ["server", "서버", false], ["gear", "설정", false], ["circle-info", "정보", false]]
+                    .forEach(function (it) {
+                        var b = document.createElement("button");
+                        b.className = "u4a-navlist__item";
+                        b.setAttribute("aria-selected", it[2] ? "true" : "false");
+                        b.innerHTML = '<i class="fa-solid fa-' + it[0] + '"></i><span>' + it[1] + '</span>';
+                        b.addEventListener("click", function () {
+                            nav.querySelectorAll(".u4a-navlist__item").forEach(function (x) { x.setAttribute("aria-selected", "false"); });
+                            b.setAttribute("aria-selected", "true");
+                        });
+                        nav.appendChild(b);
+                    });
+            } catch (e) { console.error("[gallery] navlist:", e); }
+
+            // ── 스플릿바 최소 드래그(공통 스킨 소비 시연용 — 실제 화면은 §4.3 재분배/재클램프까지) ──
+            try {
+                var split = document.getElementById("gxSplit");
+                var bar = split.querySelector(".u4a-splitter__bar");
+                var left = split.querySelector(".u4a-splitter__pane");
+                bar.addEventListener("mousedown", function (ev) {
+                    ev.preventDefault();
+                    document.body.classList.add("u4a-dragging");
+                    var rect = split.getBoundingClientRect();
+                    function mv(e) {
+                        var pct = Math.min(80, Math.max(15, (e.clientX - rect.left) / rect.width * 100));
+                        left.style.flex = "0 0 " + pct + "%";
+                    }
+                    function up() {
+                        document.body.classList.remove("u4a-dragging");
+                        document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
+                    }
+                    document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+                });
+            } catch (e) { console.error("[gallery] splitter:", e); }
+
+            // ── 토스트(공통 .u4a-toast 싱글톤) ──
+            function toast(msg) {
+                var t = document.querySelector(".u4a-toast");
+                if (!t) { t = document.createElement("div"); t.className = "u4a-toast"; t.setAttribute("role", "alert"); document.body.appendChild(t); }
+                t.textContent = msg; t.dataset.show = "true";
+                clearTimeout(t._h); t._h = setTimeout(function () { t.dataset.show = "false"; }, 3000);
+            }
+
+            // ── 확인 다이얼로그 ──
+            document.getElementById("gxBtnConfirm").addEventListener("click", function () {
+                U.confirm({
+                    type: "W", title: "삭제 확인", message: "선택한 항목을 삭제할까요?",
+                    buttons: [{ act: "YES", label: "예", emphasized: true }, { act: "NO", label: "아니오", negative: true }],
+                    onClose: function (a) { toast("선택: " + a); }
+                });
+            });
+            document.getElementById("gxBtnToast").addEventListener("click", function () { toast("저장되었습니다 (예시 토스트)"); });
+
+            // ── 커스텀 모달 다이얼로그(프레임 + 드래그[전역자동] + 리사이즈 grip) ──
+            document.getElementById("gxBtnDlg").addEventListener("click", function () {
+                var dlg = document.createElement("dialog");
+                dlg.className = "u4a-dialog";
+                dlg.style.width = "min(30rem,92vw)";
+                dlg.innerHTML =
+                    '<div class="u4a-dialog__header"><i class="fa-solid fa-window-maximize"></i><span>예제 다이얼로그</span>' +
+                    '<span style="flex:1"></span><button class="u4a-btn-icon" data-action="close" title="닫기"><i class="fa-solid fa-xmark"></i></button></div>' +
+                    '<div class="u4a-dialog__body" style="padding:1rem;line-height:1.5">헤더를 잡고 드래그하면 이동(전역 자동), 우하단 grip 으로 리사이즈됩니다.<br>헤더/푸터 48px, 닫을 때 DOM 제거는 공통 처리입니다.</div>' +
+                    '<div class="u4a-dialog__footer"><button class="u4a-btn u4a-btn--negative" data-action="close">닫기</button><button class="u4a-btn u4a-btn--emphasized">저장</button></div>';
+                document.body.appendChild(dlg);
+                dlg.querySelectorAll('[data-action="close"]').forEach(function (b) { b.addEventListener("click", function () { dlg.close(); dlg.remove(); }); });
+                try { if (U.makeDialogResizable) { U.makeDialogResizable(dlg); } } catch (e) { console.error(e); }
+                dlg.showModal();
+            });
+
+            // ── 플로팅 푸터 ──
+            try {
+                var fhost = document.getElementById("gxFooterHost");
+                fhost.innerHTML = U.footerMarkup("gxFooter");
+                document.getElementById("gxBtnFooter").addEventListener("click", function () {
+                    U.footerShow("gxFooter", "S", "3개 항목이 처리되었습니다 (예시)", 4000);
+                });
+            } catch (e) { console.error("[gallery] footer:", e); }
+        })();
+    </script>
+</body>
+
+</html>

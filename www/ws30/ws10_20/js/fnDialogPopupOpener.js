@@ -1956,12 +1956,19 @@
 
         oBrowserWindow.setMenu(null);
 
+        // 공통 셸(.u4a-titlebar) 제목 = Image Icons - SYSID (원본 frame.js Title 이 그렸던 문구, 뷰어=SYSID 표기).
+        let sIllustPopTitle = oBrowserOptions.title + " - " + sSysID;
+
         // 브라우저 실행 경로에 붙일 QueryString 정보
+        //   BGCOL/THEME/TITLE = 흰색 플래시 방지 + 공통 타이틀바 초기 표시(index.html 부트 스크립트가 소비).
         const oQueryParams = {
             browserkey: oBrowserOptions?.webPreferences?.browserkey,
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            BGCOL: oThemeInfo.BGCOL,
+            THEME: oThemeInfo.THEME,
+            TITLE: sIllustPopTitle,
         };
 
         let sUrlPath = parent.getPath("ILLUST_MSG_PREV");

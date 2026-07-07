@@ -859,6 +859,9 @@
             var st = a[i], f = nav.els.full[i];
             if (f) {
                 f.lbl.textContent = st.label;
+                // 라벨이 말줄임(잘림)일 때만 공통 툴팁으로 전체 텍스트 — .u4a-table 과 동일한 data-tip-trunc 패턴(.analy/16 §2.9a)
+                f.root.setAttribute("data-tip", st.label);
+                f.root.setAttribute("data-tip-trunc-sel", ".u4aTplWiz__navLbl");
                 f.root.classList.toggle("is-avail", st.avail);
                 f.root.classList.toggle("is-current", st.current);
             }
@@ -879,55 +882,61 @@
         if (bOver) { _renderMiniCollapsed(nav); }       // 축소 시 폭에 맞춰 그룹 접기 재계산
     }
 
-    /* ---- 축소(mini) 재배치 : 현재 스텝을 중심으로 들어가는 만큼 개별 원, 나머지는 "겹친 원(그룹)" 하나로.
+    /* ---- 축소(mini) 재배치 [측정 기반] : 전부 개별로 그려 보고, 실제로 넘치면 현재에서 먼 쪽부터
+     *   바깥 스텝을 "겹친 원(그룹)"으로 접는다. 매직 폭 상수 없이 scrollWidth 로 판정(정확).
      *   (원본 WizardProgressNavigator : 넘치는 스텝 → 그룹 앵커, 클릭 시 그 구간만 팝오버) */
     function _renderMiniCollapsed(nav) {
         var a = _navSteps(nav), N = a.length;
         var oMini = nav.els.navMini;
-        oMini.innerHTML = "";
-        if (!N) { return; }
+        if (!N) { oMini.innerHTML = ""; return; }
 
         var cur = 0;
         for (var i = 0; i < N; i++) { if (a[i].current) { cur = i; } }
 
-        // 폭 예산(px, 근사) — 원 28 / 그룹 40 / 연결선 26 / 현재 라벨은 길이 근사.
-        var BARE = 28, GROUP = 40, CONN = 26;
-        var W = (nav.els.nav.clientWidth || 0) - 24;
-        var curLabelW = Math.min((a[cur].label || "").length * 7.5 + 14, 220);
-
-        var lo = cur, hi = cur, used = BARE + curLabelW;
-        if (cur < N - 1) { used += CONN + GROUP; } // 트레일링 그룹 예약
-        if (cur > 0) { used += CONN + GROUP; }      // 리딩 그룹 예약
-
-        var bGrow = true;
-        while (bGrow) {
-            bGrow = false;
-            if (hi < N - 1) { // 트레일링 개별 확장 (남으면 그룹 유지, 마지막까지면 그룹 해제)
-                var net = CONN + BARE + (((N - 1 - (hi + 1)) > 0) ? (CONN + GROUP) : 0) - (CONN + GROUP);
-                if (used + net <= W) { used += net; hi++; bGrow = true; }
+        // [lo..hi] = 개별로 보일 구간(항상 cur 포함). 그 바깥은 앞/뒤 그룹.
+        function paint(lo, hi) {
+            oMini.innerHTML = "";
+            if (lo > 0) { oMini.appendChild(_miniGroup(nav, a, 0, lo - 1)); oMini.appendChild(_miniConn(a, lo)); }
+            for (var s = lo; s <= hi; s++) {
+                if (s > lo) { oMini.appendChild(_miniConn(a, s)); }
+                oMini.appendChild(_miniChip(nav, a, s, s === cur));
             }
-            if (lo > 0) { // 리딩 개별 확장
-                var netL = CONN + BARE + (((lo - 1) > 0) ? (CONN + GROUP) : 0) - (CONN + GROUP);
-                if (used + netL <= W) { used += netL; lo--; bGrow = true; }
-            }
+            if (hi < N - 1) { oMini.appendChild(_miniConn(a, hi + 1)); oMini.appendChild(_miniGroup(nav, a, hi + 1, N - 1)); }
+        }
+        function overflow() { return oMini.scrollWidth > oMini.clientWidth + 1; }
+
+        var lo = 0, hi = N - 1;
+        paint(lo, hi);                                   // 우선 전부 개별
+        var guard = 0;
+        while (overflow() && guard++ < N * 2) {          // 넘치면 cur 에서 먼 쪽부터 한 스텝씩 접기
+            var canHi = hi > cur, canLo = lo < cur;
+            if (!canHi && !canLo) { break; }             // 현재 + 양옆 그룹만 남음(더 못 줄임)
+            if (canHi && (!canLo || (hi - cur) >= (cur - lo))) { hi--; } else { lo++; }
+            paint(lo, hi);
         }
 
-        // 1개짜리 그룹은 무의미(개별 원이 더 좁음) → 개별로 편다.
-        if (lo === 1) { lo = 0; }
-        if (hi === N - 2) { hi = N - 1; }
+        // 1개짜리 그룹은 개별 원이 더 좁으니 다시 펴준다(개별이 항상 더 작아 재측정 불필요).
+        var bChanged = false;
+        if (lo === 1) { lo = 0; bChanged = true; }
+        if (hi === N - 2) { hi = N - 1; bChanged = true; }
+        if (bChanged) { paint(lo, hi); }
 
-        if (lo > 0) {                                       // 리딩 그룹 [0..lo-1]
-            oMini.appendChild(_miniGroup(nav, a, 0, lo - 1));
-            oMini.appendChild(_miniConn(a, lo));
+        _compressMini(nav); // 창=현재만 남았는데도 넘치면(라벨이 아주 길 때) 원들을 겹쳐 폭 축소
+    }
+
+    // 넘침 보정 — 현재 칩(라벨)을 제외한 원/그룹/연결선에 음수 마진을 줘 겹치게 해서 폭을 줄인다.
+    function _compressMini(nav) {
+        var mini = nav.els.navMini;
+        for (var k = 0; k < mini.children.length; k++) { mini.children[k].style.marginLeft = ""; } // 리셋
+        var over = mini.scrollWidth - mini.clientWidth;
+        if (over <= 2) { return; } // 미세 초과는 무시(불필요한 겹침 방지) — 실제로 넘칠 때만 겹친다
+        var aShrink = [];
+        for (var i = 1; i < mini.children.length; i++) { // 첫 항목 제외(음수 마진이 왼쪽으로 잘림)
+            if (!mini.children[i].classList.contains("is-current")) { aShrink.push(mini.children[i]); }
         }
-        for (var s = lo; s <= hi; s++) {                    // 개별 원 구간
-            if (s > lo) { oMini.appendChild(_miniConn(a, s)); }
-            oMini.appendChild(_miniChip(nav, a, s, s === cur));
-        }
-        if (hi < N - 1) {                                   // 트레일링 그룹 [hi+1..N-1]
-            oMini.appendChild(_miniConn(a, hi + 1));
-            oMini.appendChild(_miniGroup(nav, a, hi + 1, N - 1));
-        }
+        if (!aShrink.length) { return; }
+        var per = Math.min(Math.ceil(over / aShrink.length) + 1, 14); // 항목당 겹침(과도 방지)
+        for (var j = 0; j < aShrink.length; j++) { aShrink[j].style.marginLeft = (-per) + "px"; }
     }
 
     // 축소 개별 원(번호+현재만 라벨). 클릭=available 이면 해당 카드로 이동(선택 표시는 is-current).
@@ -940,6 +949,7 @@
         var oLbl = _el("span", "u4aTplWiz__navLbl");
         if (bCur) { oLbl.textContent = st.label; }
         oStep.appendChild(oLbl);
+        oStep.title = (idx + 1) + ". " + st.label; // 라벨 없는 원/겹칠 때도 hover 로 스텝명(.analy/16 §2.9a)
         oStep.addEventListener("click", function () { _navGo(nav, idx); });
         return oStep;
     }
@@ -951,7 +961,9 @@
         for (var i = iFrom; i <= iTo; i++) { if (a[i].avail) { bAny = true; break; } }
         if (bAny) { oG.classList.add("is-avail"); }         // 하나라도 도달 시 accent(선택 표시)
         oG.appendChild(_el("div", "u4aTplWiz__navNum", String(iFrom + 1))); // 첫 스텝 번호
-        oG.setAttribute("title", (iFrom + 1) + "–" + (iTo + 1));
+        var aTip = [];                                       // 접힌 스텝명 hover 로(클릭=팝오버, .analy/16 §2.9a)
+        for (var t = iFrom; t <= iTo; t++) { aTip.push((t + 1) + ". " + a[t].label); }
+        oG.setAttribute("title", aTip.join("\n"));
         oG.addEventListener("click", function (ev) { ev.stopPropagation(); _wzOpenStepPopover(nav, ev.currentTarget, iFrom, iTo); });
         return oG;
     }
@@ -1118,7 +1130,8 @@
         sec.els.tbl = oTbl;
 
         // 컬럼 폭 — sec.colW 에 영속(리사이즈/재렌더에도 유지). 최초/컬럼수 변동 시 기본폭.
-        var iCols = sec.treevisi ? 10 : 8;
+        // TreeTable = Parent/Child(+2) 표시 & Position(-1) 숨김(원본 visible:!TREEVISI) ⇒ 9열, 그 외 8열.
+        var iCols = sec.treevisi ? 9 : 8;
         if (!sec.colW || sec.colW.length !== iCols) { sec.colW = _wzDefaultColW(sec.treevisi); }
 
         var oCg = document.createElement("colgroup");
@@ -1147,8 +1160,8 @@
 
         function th(sTxt) { var t = _el("th", "u4a-th", sTxt); oTrH.appendChild(t); }
         th(_cl("D68")); // Field Name
-        if (sec.treevisi) { th(_cl("D69")); th(_cl("D70")); } // Is Parent / Is Child
-        th(_cl("D71")); // Position (Order)
+        if (sec.treevisi) { th(_cl("D69")); th(_cl("D70")); } // Is Parent / Is Child (TreeTable)
+        if (!sec.treevisi) { th(_cl("D71")); } // Position (Order) — TreeTable 이면 숨김(원본 visible:!TREEVISI)
         th(_cl("D72")); // UI Type Select
         th(_cl("D73")); // Label Text
         th(_cl("D74")); // Field Type
@@ -1171,11 +1184,13 @@
         _wzSyncHeadChk(sec);
     }
 
-    // 기본 컬럼폭(px) — 순서: chk, Field Name, [Parent, Child], Position, UI Type, Label, Field Type, Field Length, Conv.
+    // 기본 컬럼폭(px) — 순서: chk, Field Name, [Parent, Child | Position], UI Type, Label, Field Type, Field Length, Conv.
+    // TreeTable = Parent/Child 표시 + Position 숨김(원본 visible:!TREEVISI). 그 외 = Position 표시.
     function _wzDefaultColW(bTree) {
         var w = [36, 200];
-        if (bTree) { w.push(100, 100); }
-        w.push(112, 208, 208, 150, 112, 150);
+        if (bTree) { w.push(100, 100); } // Parent, Child
+        else { w.push(112); }            // Position
+        w.push(208, 208, 150, 112, 150); // UI Type, Label, Field Type, Field Length, Conv.
         return w;
     }
 
@@ -1250,14 +1265,16 @@
             tr.appendChild(_wzChkTd(r.CHILD === "X", r.enabled_cchk !== false, function (b) { _wzChildChk(sec, r, b); }));
         }
 
-        // Position (숫자)
-        var tdP = document.createElement("td");
-        var fP = U4AUI.createField({
-            type: "text", value: (r.POSIT != null ? r.POSIT : ""), disabled: !bEn,
-            onChange: function (v) { r.POSIT = parseInt(v, 10) || 0; }
-        });
-        tdP.appendChild(fP.el);
-        tr.appendChild(tdP);
+        // Position (숫자) — TreeTable 이면 숨김(원본 visible:!TREEVISI)
+        if (!sec.treevisi) {
+            var tdP = document.createElement("td");
+            var fP = U4AUI.createField({
+                type: "text", value: (r.POSIT != null ? r.POSIT : ""), disabled: !bEn,
+                onChange: function (v) { r.POSIT = parseInt(v, 10) || 0; }
+            });
+            tdP.appendChild(fP.el);
+            tr.appendChild(tdP);
+        }
 
         // UI Type Select
         var tdU = document.createElement("td");
@@ -1617,13 +1634,14 @@
             ".u4aTplWiz__wz{display:flex;flex-direction:column;min-height:100%;}",
             ".u4aTplWiz__wzNav{position:sticky;top:0;z-index:2;display:flex;align-items:center;padding:.75rem 1.25rem;background:var(--surface);border-bottom:.0625rem solid var(--line);}",
             ".u4aTplWiz__navFull{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;}",
-            ".u4aTplWiz__navMini{display:none;align-items:center;flex:1 1 auto;min-width:0;gap:.15rem;}",
+            ".u4aTplWiz__navMini{display:none;align-items:center;flex:1 1 auto;min-width:0;gap:0;}",
             ".u4aTplWiz__wzNav.is-collapsed .u4aTplWiz__navFull{display:none;}",
             ".u4aTplWiz__wzNav.is-collapsed .u4aTplWiz__navMini{display:flex;}",
-            ".u4aTplWiz__navMiniStep{cursor:pointer;min-width:0;flex:0 1 auto;gap:0;}",
-            ".u4aTplWiz__navMiniStep.is-current{min-width:0;flex:1 1 auto;}",
+            ".u4aTplWiz__navMiniStep{cursor:pointer;min-width:0;flex:0 0 auto;gap:0;}",
+            ".u4aTplWiz__navMiniStep.is-current{flex:0 0 auto;}",
             /* 축소 연결선 : 고정폭(짧은 선) */
-            ".u4aTplWiz__navConnMini{flex:0 0 auto;width:1rem;min-width:1rem;margin:0;}",
+            /* 축소 연결선 : 짧은 선 + 양옆 마진(원/텍스트와 안 붙게). footprint = 1rem + .5rem = 1.5rem(=CONN 예산) */
+            ".u4aTplWiz__navConnMini{flex:0 0 auto;width:1rem;min-width:1rem;margin:0 .25rem;}",
             /* 겹친 원(그룹) — 넘치는 스텝 묶음. 뒤로 반투명 원 2개가 살짝 겹쳐 스택처럼 보인다. 클릭=구간 팝오버 */
             ".u4aTplWiz__navGroup{position:relative;display:flex;align-items:center;flex:0 0 auto;cursor:pointer;padding-right:.9rem;}",
             ".u4aTplWiz__navGroup .u4aTplWiz__navNum{position:relative;z-index:2;}",
@@ -1640,7 +1658,8 @@
             ".u4aTplWiz__navStep.is-current .u4aTplWiz__navNum{background:var(--accent);border-color:var(--accent);color:#fff;transform:scale(1.08);}", // 현재 스텝 번호 원 살짝 확대(강조)
             /* 축소형(mini) : 현재 스텝 라벨만 부드럽게 펼침 */
             ".u4aTplWiz__navMiniStep .u4aTplWiz__navLbl{max-width:0;opacity:0;margin-left:0;transition:max-width .3s ease,opacity .3s ease,margin-left .3s ease;}",
-            ".u4aTplWiz__navMiniStep.is-current .u4aTplWiz__navLbl{max-width:16rem;opacity:1;margin-left:.5rem;}",
+            /* 현재 스텝 라벨은 축소에서도 최대한 살린다 — 잘림(ellipsis) 없이 전체 표시(폭은 _renderMiniCollapsed 가 실측 확보) */
+            ".u4aTplWiz__navMiniStep.is-current .u4aTplWiz__navLbl{max-width:none;opacity:1;margin-left:.5rem;flex:0 0 auto;overflow:visible;text-overflow:clip;}",
             /* 연결선 — is-done(뒤 스텝 도달) 시 좌→우로 accent 채움 */
             ".u4aTplWiz__navConn{position:relative;overflow:hidden;flex:1 1 auto;height:.0625rem;background:var(--line);margin:0 1rem;min-width:1.5rem;}",
             ".u4aTplWiz__navConn::after{content:\"\";position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);transition:width .35s ease;}",
@@ -1675,13 +1694,15 @@
             ".u4aTplWiz__tbl{width:100%;}",
             ".u4aTplWiz__tbl th,.u4aTplWiz__tbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
             ".u4aTplWiz__tbl td{padding:.1875rem .375rem;vertical-align:middle;}",
-            /* 세로 컬럼 구분선 (원본 sap.ui.table.Table 셀 보더) — 마지막 컬럼 제외 */
-            ".u4aTplWiz__tbl tbody td{border-right:.0625rem solid var(--line);}",
-            ".u4aTplWiz__tbl tbody td:last-child{border-right:none;}",
-            /* 헤더 th = static — sticky+collapse 에서 우측 보더 미렌더(Chromium) 회피 + 진행바 sticky 와 충돌 방지.
-               static 이면 border-right 가 바디 border 와 같은 컬럼 경계에서 정확히 정렬된다. */
-            ".u4aTplWiz__tbl thead th{position:static;border-right:.0625rem solid var(--line);}",
-            ".u4aTplWiz__tbl thead th:last-child{border-right:none;}",
+            /* 세로 컬럼 구분선 (원본 sap.ui.table.Table 셀 보더) — 마지막 컬럼 제외.
+               ★border-right(collapse 보더) 대신 box-shadow inset : 공통 .u4a-table 은 table-layout:fixed+
+               border-collapse:collapse 라, 리사이즈로 컬럼 x 가 소수px 가 되면 collapse 1px 보더가 픽셀 스냅에
+               걸려 나왔다 사라졌다 한다(떨림). box-shadow 는 셀 자기 박스에 그려 스냅에 안 사라진다. */
+            ".u4aTplWiz__tbl tbody td{box-shadow:inset -1px 0 0 var(--line);}",
+            ".u4aTplWiz__tbl tbody td:last-child{box-shadow:none;}",
+            /* 헤더 th = static (진행바 sticky 와 충돌 방지) + 동일 box-shadow 세로선(바디와 같은 컬럼 경계 정렬) */
+            ".u4aTplWiz__tbl thead th{position:static;box-shadow:inset -1px 0 0 var(--line);}",
+            ".u4aTplWiz__tbl thead th:last-child{box-shadow:none;}",
             /* 컬럼 리사이즈 그립 (원본 바인딩 팝업 .u4aBindColGrip) — 컬럼 우측 경계에 절대배치 */
             ".u4aTplWiz__colGrip{position:absolute;top:0;bottom:0;right:-0.1875rem;width:0.4375rem;cursor:col-resize;z-index:2;}",
             ".u4aTplWiz__tbl .u4a-field,.u4aTplWiz__tbl .u4a-combo{margin:0;width:100%;}",

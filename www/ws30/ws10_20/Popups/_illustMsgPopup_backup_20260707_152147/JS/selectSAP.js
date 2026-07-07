@@ -21,13 +21,7 @@ function _onIpcMain_if_p13n_themeChange(){
     let oBrowserWindow = oAPP.REMOTE.getCurrentWindow();
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
 
-    // ★ oThemeInfo.THEME 은 HTML5 WS4 키 → UI5 테마명 매핑(frame.js 동일, 셸 oAPP.fn.toUI5Theme).
-    let sUI5Theme = (oAPP.fn && oAPP.fn.toUI5Theme) ? oAPP.fn.toUI5Theme(oThemeInfo.THEME) : oThemeInfo.THEME;
-
-    oAPP.THEME = sUI5Theme;
-    oAPP.FRAMETHEME = sUI5Theme;
-
-    sap.ui.getCore().applyTheme(sUI5Theme);
+    sap.ui.getCore().applyTheme(oThemeInfo.THEME);
 
 } // end of _onIpcMain_if_p13n_themeChange
 
@@ -258,15 +252,6 @@ oAPP.FN.SETTING_THEME = () => {
 
     };
 
-    // ★ 레이스 방어: 서버 UI5 로드 순서에 따라 frame.js 가 아직 oAPP.THEME(=getTheme) 를 세팅하기 전에
-    //   selectSAP 이 먼저 여기 도달할 수 있음 → undefined 로 applyTheme 하면 "sThemeName must be a string" 어설션.
-    //   미설정이면 selectSAP 자신의 UI5 core 에 부트된 테마(data-sap-ui-theme=oAPP.UI5_THEME)로 폴백.
-    if(!oAPP.THEME) {
-
-        oAPP.THEME = sap.ui.getCore().getConfiguration().getTheme();
-
-    };
-
     sap.ui.getCore().applyTheme(oAPP.THEME);                                // ▶ 현재 적용 테마 세팅
 
 };
@@ -277,12 +262,6 @@ function CHANGE_CONTENT(){
     let LO_NAVCONT      = sap.ui.getCore().byId('iconNavCont'),
         LO_GRIDPAGE     = sap.ui.getCore().byId('GRID'),
         LO_DETAILPAGE   = sap.ui.getCore().byId('DETAILS');
-
-    // ★ 레이스 방어: frame.js 가 아직 oAPP.TABKEY(=TABBAR 기본 선택키) 를 세팅하기 전에 도달하면
-    //   default 로 빠져 페이지가 안 붙음(아이콘 미표시) → 기본 탭 GRID 로 보정.
-    if(!oAPP.TABKEY) {
-        oAPP.TABKEY = 'GRID';
-    };
 
     switch(oAPP.TABKEY) {
         case 'DETAILS':
@@ -646,9 +625,8 @@ function createUi() {
         }
     }).addEventDelegate({
         onAfterRendering: function(){
-            // oAPP.TABBAR 는 frame.js(별도 core)가 세팅하는 공유 참조 — 방어 가드(근본은 frame.js 로드순서 정정).
-            if (oAPP.UI.LO_DETAILBOX) { oAPP.UI.LO_DETAILBOX.setVisible(false); }
-            if (oAPP.TABBAR) { oAPP.TABBAR.setBusy(false); }
+            oAPP.UI.LO_DETAILBOX.setVisible(false);
+            oAPP.TABBAR.setBusy(false);
         }
     }).addStyleClass("sapUiContentPadding");
 
@@ -768,9 +746,7 @@ function createUi() {
         onAfterRendering: function(){
             // debugger;
             // oAPP.UI.LO_GRIDBOX.setVisible(false);
-            // oAPP.TABBAR 는 frame.js(별도 core)가 세팅하는 공유 참조 — GRID(위)와 동일 방어 가드.
-            //   미설정(로드순서 레이스)이면 undefined.setBusy 크래시로 렌더가 깨져 백지가 됨.
-            if (oAPP.TABBAR) { oAPP.TABBAR.setBusy(false); }
+            oAPP.TABBAR.setBusy(false);
         }
     });
 

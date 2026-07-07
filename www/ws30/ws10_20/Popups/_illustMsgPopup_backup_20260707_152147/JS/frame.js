@@ -18,17 +18,11 @@ function _onIpcMain_if_p13n_themeChange(){
     let oBrowserWindow = oAPP.REMOTE.getCurrentWindow();
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
 
-    // ★ oThemeInfo.THEME 은 HTML5 WS4 키 → UI5 테마명으로 매핑(그대로 넘기면 UI5 가 못 찾고 기본 폴백).
-    //   frame.js 의 oAPP 은 parent.gfn_parent() 라 셸(index.js)의 toUI5Theme 를 직접 사용.
-    let sUI5Theme = (oAPP.fn && oAPP.fn.toUI5Theme) ? oAPP.fn.toUI5Theme(oThemeInfo.THEME) : oThemeInfo.THEME;
-
-    sap.ui.getCore().applyTheme(sUI5Theme);
+    sap.ui.getCore().applyTheme(oThemeInfo.THEME);
 
     let LO_THEMESELECT      = sap.ui.getCore().byId("themeSelect");         // ▶ MENUBUTTON UI => THEME
 
-    if (LO_THEMESELECT) {
-        LO_THEMESELECT.setText(sUI5Theme);
-    }
+    LO_THEMESELECT.setText(oThemeInfo.THEME);
 
 } // end of _onIpcMain_if_p13n_themeChange
 
@@ -476,9 +470,16 @@ function createUi() {
     }).addStyleClass("sapUiSizeCompact"),
         LO_FPAGE = new sap.m.Page("u4aFPAGE",{
             enableScrolling: false,
-            // ★ 창 크롬(로고/제목/min·max·close)은 공통 .u4a-titlebar(index.html)로 외부화 —
-            //    여기선 콘텐츠 컨트롤(SAP ICONS 아이콘세트 선택 메뉴버튼)만 가운데 배치로 남긴다. (iconPrevPopup 동일)
             customHeader: new sap.m.Bar({
+                contentLeft: [
+                    new sap.m.Image({
+                        width: "25px",
+                        src: PATHINFO.WS_LOGO
+                    }),
+                    new sap.m.Title({
+                        text: oAPP.ICON_MSG.M018 + " - " + oAPP.attr.USERINFO.SYSID // Image Icons
+                    }),
+                ],
                 contentMiddle: [
                     new sap.m.HBox({
                         width: "100%",
@@ -504,8 +505,46 @@ function createUi() {
                             })
                         ]
                     })
+                ],
+                contentRight: [
+                    new sap.m.Button({
+                        icon: "sap-icon://less",
+                        press: function () {
+
+                            CURRWIN.minimize();
+
+                        }
+                    }),
+                    new sap.m.Button("maxWinBtn", {
+                        icon: "sap-icon://header",
+                        press: function () {
+
+                            let bIsMax = CURRWIN.isMaximized();
+
+                            if (bIsMax) {
+                                CURRWIN.unmaximize();
+                                return;
+                            }
+
+                            CURRWIN.maximize();
+
+                        }
+                    }),
+                    new sap.m.Button({
+                        icon: "sap-icon://decline",
+                        press: function () {
+
+                            if (CURRWIN.isDestroyed()) {
+                                return;
+                            }
+
+                            CURRWIN.hide();
+
+                        }
+                    }),
+
                 ]
-            })
+            }).addStyleClass("u4aWsBrowserDraggable")
         }),
         LO_TABBAR = new sap.m.IconTabBar('tabBar',{
             expandable: false,

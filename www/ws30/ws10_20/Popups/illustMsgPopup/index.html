@@ -2,420 +2,85 @@
 <html>
 
 <head>
-    <meta charset="UTF-8">
-    <title></title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- ===== 공통 헤더(.u4a-titlebar)·버튼·토큰 (iconPrevPopup/versionMng 동일 스택) =====
+         원본: illustMsgPopup(Image Icons, UI5 별도창) — index.html 바깥 셸 + frame.html(로컬 UI5 부트) iframe,
+               frame.js sap.m.Page customHeader Bar 가 창 크롬(로고/제목/min·max·close)까지 그림.
+         HTML5: 창 크롬만 [공통 .u4a-titlebar] 로 외부화(frameless). 본문(IllustratedMessage 뷰어)은
+                frame.html(로컬 UI5) 을 로드하는 iframe = KEEP-UI5(frame.js 그대로 iframe 안에서 동작).
+         경로: Popups/illustMsgPopup 기준 → theme=../../theme, lib=../../../../lib. (browser-window-common-ux) -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 BGCOL/THEME/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* index.js 에서 재적용 */ }
+        })();
+    </script>
+
     <style>
-         /* BusyIndicator */
-         #u4aWsBusyIndicator {
-            right: 0;
+        html, body { margin: 0; height: 100%; }
+        body {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--boot-bg, var(--app-bg));
         }
-
-        .u4aWsBusyIndicator {
-            z-index: 2000000;
-        }
-
-        .sapUiUserSelectable {
-            -webkit-touch-callout: text;
-            -webkit-user-select: text;
-            -khtml-user-select: text;
-            -moz-user-select: text;
-            -ms-user-select: text;
-            user-select: text;
-        }
-
-        .sapUiBusy {
-            display: block;
-            width: 48px;
-            height: 48px;
-            outline: none;
-            cursor: wait;
-            top: 0 !important;
-        }
-
-        #u4aWsBusyIndicator>.sapUiLocalBusyIndicatorFade {
-            cursor: wait;
-        }
-
-        .sapUiLocalBusyIndicatorSizeBig {
-            font-size: 2rem;
-            background-color: transparent;
-        }
-
-        .sapUiLocalBusyIndicatorFade {
-            opacity: 1;
-        }
-
-        .sapUiLocalBusyIndicator {
-            opacity: 0;
-            transition: opacity .3s ease-in;
-            outline: none;
-        }
-
-        .sapUiLocalBusyIndicator {
-            background-color: rgba(247, 247, 247, 0.72);
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation {
-            position: absolute;
-            width: 3em;
-            top: 50%;
-            left: 50%;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div:nth-child(1) {
-            animation-delay: -0.32s;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div:nth-child(2) {
-            animation-delay: -0.16s;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div {
-            animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div,
-        .sapUiLocalBusyIndicatorAnimation>div::before,
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            animation-fill-mode: both;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div {
-            width: 1em;
-            height: 1em;
-            border-radius: 100%;
-            display: block;
-            float: left;
-            margin: 0px;
-            position: relative;
-            top: -0.5em;
-            left: -1.5em;
-            text-indent: 1px;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div {
-            animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::before {
-            background: #0854a0;
-            animation-duration: 0ms;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div::before {
-            animation: sapUiBusyAnimationStandardBackground 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::before {
-            background: #0a6ed1;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::before,
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            content: "";
-            opacity: 1;
-            position: absolute;
-            z-index: -1;
-            top: 0;
-            left: 0;
+        /* 본문 = 로컬 UI5 IllustratedMessage 뷰어 iframe (타이틀바 아래 나머지 전부) */
+        #floatFrame {
+            flex: 1 1 auto;
             width: 100%;
-            height: 100%;
-            border-radius: 100%;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            box-shadow: inset 0 0 0 0 #0854a0;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div::after {
-            animation: sapUiBusyAnimationStandardShadow 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            box-shadow: inset 0 0 2px 1px rgb(10 110 209 / 80%);
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div {
-            width: 1em;
-            height: 1em;
-            border-radius: 100%;
+            min-height: 0;
+            border: 0;
             display: block;
-            float: left;
-            margin: 0px;
-            position: relative;
-            top: -0.5em;
-            left: -1.5em;
-            text-indent: 1px;
-        }
-
-        .sapUiLocalBusyIndicatorSizeBig {
-            font-size: 2rem;
-            background-color: transparent;
-        }
-
-        .sapUiLocalBusyIndicator {
-            opacity: 0;
-            transition: opacity .3s ease-in;
-            outline: none;
-        }
-
-        .sapUiLocalBusyIndicatorFade {
-            opacity: 1;
-        }
-
-        @keyframes sapUiBusyAnimationStandard {
-
-            0%,
-            80%,
-            100% {
-                transform: scale(.4);
-            }
-
-            40% {
-                transform: scale(1);
-            }
         }
     </style>
 </head>
 
 <body>
 
-    <!-- Busy Indicator Start -->
-    <div id="u4aWsBusyIndicator" class="u4aWsBusyIndicator sapUiUserSelectable"
-        style="position: absolute;  display: block; top: 0px; height: 100%; width: 100%; left: 0px;">
-        <div class="sapUiBusy" tabindex="0" role="progressbar" alt="" title="Please wait"></div>
-        <div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig sapUiLocalBusyIndicatorFade"
-            role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="Busy" alt="" tabindex="0"
-            title="Please wait">
-            <div class="sapUiLocalBusyIndicatorAnimation sapUiLocalBusyIndicatorAnimStandard">
-                <div></div>
-                <div></div>
-                <div></div>
-            </div>
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/min·max·close (iconPrevPopup·versionMng 동일) ===== -->
+    <header class="u4a-titlebar" id="illustpTitlebar">
+        <img class="u4a-titlebar__logo" id="illustpLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="illustpTitle"></span>
+        <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="illustpWinMin" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="illustpWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="illustpWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- 본문 = frame.html(로컬 UI5 부트스트랩) 을 로드하는 iframe. src 는 index.js fnInitLoad 가 세팅. 콘텐츠=KEEP-UI5(frame.js). -->
+    <iframe id="floatFrame" frameborder="0"></iframe>
+
+    <!-- Busy 오버레이 — ★공통 .u4a-busy★(shell.css 단일 출처). 초기 로컬 UI5 로드 중 표시,
+         frame.js 부팅 완료 시 parent.setBusy("") 로 해제(index.js setBusy 가 이 요소 토글). -->
+    <div id="illustpBusy" class="u4a-busy" data-busy="true" role="progressbar" aria-valuetext="Busy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
         </div>
     </div>
-    <!-- Busy Indicator End -->
 
-    <iframe id="floatFrame" frameborder="0"
-        style="overflow:hidden;height:100%;width:100%;position:absolute;top:0px;left:0px;right:0px;bottom:0px;">
-    </iframe>
-
-    <script>
-
-        let oAPP = {};
-        oAPP.fn = {};
-        oAPP.attr = {};
-        oAPP.ICON_MSG = {};
-        oAPP.require = require;
-        oAPP.remote = require('@electron/remote');
-        oAPP.path = oAPP.remote.require('path');
-        oAPP.__dirname = __dirname;
-        oAPP.fs = oAPP.remote.require('fs');
-        oAPP.convert = require('xml-js');
-
-        const
-            REMOTE = oAPP.remote,
-            APP = oAPP.remote.app,
-            PATH = oAPP.remote.require('path'),
-            APPPATH = APP.getAppPath(),
-            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
-            PATHINFO = require(PATHINFOURL),
-            WSERR = require(PATHINFO.WSTRYCATCH),
-            zconsole = WSERR(window, document, console),
-            WSUTIL = require(PATHINFO.WSUTIL),
-            CURRWIN = REMOTE.getCurrentWindow(),
-            PARWIN = CURRWIN.getParentWindow(),
-            IPCRENDERER = require('electron').ipcRenderer;
-
-        oAPP.REMOTE = require('@electron/remote');
-        oAPP.IPCRENDERER = require('electron').ipcRenderer;
-        oAPP.IPCMAIN = oAPP.REMOTE.require('electron').ipcMain,
-        oAPP.PATH = oAPP.REMOTE.require('path');
-        oAPP.FS = oAPP.REMOTE.require('fs');
-        oAPP.APP = oAPP.REMOTE.app;
-        oAPP.USERDATA = oAPP.APP.getPath("userData");
-
-
-        IPCRENDERER.on("if-illust-prev", async function (events, oInfo) {
-
-            // 테마 정보를 구한다.
-            let oThemeInfo = oAPP.fn.getThemeInfo();
-
-            oAPP.attr.sServerPath = oInfo.sServerPath;  // 서버 경로
-            oAPP.attr.sServerHost = oInfo.sServerHost;  // 서버 호스트 경로
-            // oAPP.attr.sDefTheme = oInfo.sDefTheme;   // 기본 테마 정보
-            oAPP.attr.sDefTheme = oThemeInfo.THEME;     // 기본 테마 정보
-            oAPP.attr.sServerLibPath = oInfo.sServerLibPath; // 서버 라이브러리 경로
-            oAPP.attr.USERINFO = process.USERINFO; // 접속 사용자 정보  
-
-            // let oSettingInfo = WSUTIL.getWsSettingsInfo();
-
-            // ws 글로벌 언어 설정정보
-            // oAPP.attr.WS_LANGU = oSettingInfo.globalLanguage;
-            oAPP.attr.WS_LANGU = oAPP.attr.USERINFO.LANGU;
-
-            CURRWIN.setParentWindow(null);
-
-            fnInitLoad();
-
-        });
-
-        /************************************************************************
-         * 부모 윈도우 관련 이벤트 --- start 
-         ************************************************************************/
-
-        oAPP.fn.getUserInfo = function(){
-
-            return process.USERINFO;
-
-        };
-
-         /*************************************************************
-         * @function - 테마 정보를 구한다.
-         *************************************************************/
-        oAPP.fn.getThemeInfo = function (){
-
-            let oUserInfo = parent.process.USERINFO;
-            let sSysID = oUserInfo.SYSID;
-
-            // 해당 SYSID별 테마 정보 JSON을 읽는다.
-            let sThemeJsonPath = oAPP.PATH.join(oAPP.USERDATA, "p13n", "theme_ws4", `${sSysID}.json`);
-            if(oAPP.FS.existsSync(sThemeJsonPath) === false){
-                return;
-            }
-
-            let sThemeJson = oAPP.FS.readFileSync(sThemeJsonPath, "utf-8");
-
-            try {
-
-                var oThemeJsonData = JSON.parse(sThemeJson);    
-
-            } catch (error) {
-                return;
-            }
-
-            return oThemeJsonData;
-
-        } // end of oAPP.fn.getThemeInfo
-
-        // 부모창 닫기 이벤트
-        oAPP.fn.fnOnParentWindowClosedEvent = () => {
-
-            if (!CURRWIN || CURRWIN.isDestroyed()) {
-                return;
-            }
-
-            oAPP.attr.isPressWindowClose = "X";
-
-            try {
-            
-                CURRWIN.close();
-                
-            } catch (error) {
-                
-            }
-            
-
-        }; // end of oAPP.fn.fnOnParentWindowClosedEvent
-
-        /************************************************************************
-        * 부모 윈도우 관련 이벤트 --- End
-        ************************************************************************/
-
-        if (PARWIN && !PARWIN.isDestroyed()) {
-            PARWIN.on("closed", oAPP.fn.fnOnParentWindowClosedEvent);
-        }
-
-        function fnInitLoad() {
-
-            let sGlobalLangu = oAPP.attr.WS_LANGU;
-
-            oAPP.ICON_MSG.M072 = WSUTIL.getWsMsgClsTxt(sGlobalLangu, "ZMSG_WS_COMMON_001", "072"); // Icon            
-
-            oAPP.ICON_MSG.M001 = WSUTIL.getWsMsgClsTxt(sGlobalLangu, "ZMSG_WS_COMMON_001", "031"); // Clipboard Copy Success!     
-            oAPP.ICON_MSG.M002 = "SAP " + oAPP.ICON_MSG.M072; //SAP ICONS       
-            oAPP.ICON_MSG.M003 = WSUTIL.getWsMsgClsTxt(sGlobalLangu, "ZMSG_WS_COMMON_001", "069"); // Grid
-            oAPP.ICON_MSG.M004 = WSUTIL.getWsMsgClsTxt(sGlobalLangu, "ZMSG_WS_COMMON_001", "070"); // List
-            oAPP.ICON_MSG.M006 = WSUTIL.getWsMsgClsTxt(sGlobalLangu, "ZMSG_WS_COMMON_001", "076"); // Dark Mode
-            oAPP.ICON_MSG.M007 = WSUTIL.getWsMsgClsTxt(sGlobalLangu, "ZMSG_WS_COMMON_001", "077"); // Light Mode
-            oAPP.ICON_MSG.M008 = WSUTIL.getWsMsgClsTxt(sGlobalLangu, "ZMSG_WS_COMMON_001", "075"); // Copy
-
-            oAPP.ICON_MSG.M018 = WSUTIL.getWsMsgClsTxt(sGlobalLangu, "ZMSG_WS_COMMON_001", "067"); // Image Icons     
-
-            /*********************************************************
-             * 번역 대상 아님 --- start
-             *********************************************************/
-            oAPP.ICON_MSG.M011 = "title"
-            oAPP.ICON_MSG.M009 = "IllustratedMessage";
-            oAPP.ICON_MSG.M010 = "illustrationType";
-            oAPP.ICON_MSG.M012 = "illustrationSize";
-            /*********************************************************
-            * 번역 대상 아님 --- end
-            *********************************************************/
-
-            let oSettings = WSUTIL.getWsSettingsInfo(),
-                oSetting_UI5 = oSettings.UI5;
-
-            oAPP.UI5LIB_WSSRC = oSetting_UI5.resourceUrl;
-            oAPP.UI5LIB_SSRC = oAPP.attr.sServerHost + oAPP.attr.sServerLibPath;
-
-            // 임시로직!!!
-            // 서버 라이브러리 경로가 시작이 '/zu4a_imp/' 가 아닐 경우에는
-            // 경로 앞에 접속 서버 호스트를 붙이지 말고
-            // 서버 경로 전체를 바라본다.
-            if(oAPP.attr.sServerLibPath.substring(0,10) !== "/zu4a_imp/"){
-                oAPP.UI5LIB_SSRC = oAPP.attr.sServerLibPath;
-            }
-  
-            oAPP.UI5_LANGU = oAPP.attr.WS_LANGU;
-            oAPP.UI5_THEME = oAPP.attr.sDefTheme;
-
-            let oFrame = document.getElementById("floatFrame");
-            oFrame.src = "frame.html";
-
-        }
-
-        // document.addEventListener('DOMContentLoaded', fnInitLoad);
-
-        function gfn_parent() {
-
-            return oAPP;
-
-        };
-
-        
-        function setBusy(bIsBusy) {            
-
-            var oBusy = document.getElementById("u4aWsBusyIndicator");
-
-            if (!oBusy) {
-                return;
-            }
-
-            if (bIsBusy) {
-                oBusy.style.visibility = "visible";
-            } else {
-                oBusy.style.visibility = "hidden";
-            }
-
-        }
-
-        window.onbeforeunload = () => {
-/*
-            // 브라우저의 닫기 버튼을 누른게 아니라면 종료 하지 않음
-            if (oAPP.attr.isPressWindowClose !== "X") {
-                return false;
-            }
-*/                
-
-        }; // end of window.onbeforeunload
-        
-    </script>
+    <script src="index.js"></script>
 
 </body>
 

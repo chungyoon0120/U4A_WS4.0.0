@@ -53,8 +53,9 @@ var
 oAPP.fn.setShellBusy = function (bBusy) {
     var oDom = document.getElementById("iconpBusy");
     if (!oDom) { return; }
-    if (bBusy) { oDom.setAttribute("data-busy", ""); }
-    else { oDom.removeAttribute("data-busy"); }
+    // 공통 .u4a-busy 표시 트리거 = data-busy="true" (shell.css). 빈값/removeAttribute 는 안 뜸(전 소비처 규약).
+    if (bBusy) { oDom.setAttribute("data-busy", "true"); }
+    else { oDom.setAttribute("data-busy", "false"); }
 }; // end of oAPP.fn.setShellBusy
 
 /************************************************************************

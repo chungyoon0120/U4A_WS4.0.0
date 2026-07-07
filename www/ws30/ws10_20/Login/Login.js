@@ -774,6 +774,50 @@ var oAPP = (function () {
 
     }; // end of fnOnInitModelBinding
 
+    // 로그인 인증 요청(/wsloginchk) 타임아웃(ms).
+    //  서버가 응답 없이 연결만 pending 으로 잡고 있으면 ontimeout 이 발화하지 않아
+    //  busy 가 무한히 돈다(초기 증상). ontimeout(_onError)/M294 안내는 이미 배선돼
+    //  있으므로 timeout 값만 지정하면 실제 timeout 이벤트로 정상 종료된다.
+    const LOGIN_XHR_TIMEOUT = 30000;
+
+    /********************************************************************
+     * 로그인 통신 대기 중, busy 팝업에 타임아웃까지 남은 시간(초) 카운트다운.
+     *   공통 setDomBusy 는 스피너만 띄우므로(미변경), 호스트 busy 다이얼로그의
+     *   기존 텍스트 슬롯(#u4aWsBusyText)에 남은 초만 덧대어 쓴다.
+     *   요청 send 직전 시작 → 응답 도착/busy 닫힘 시 정지·청소.
+     ********************************************************************/
+    let _iLoginCountdownTimer = null;
+    function _getBusyTextDom() {
+        try { return parent.document.getElementById("u4aWsBusyText"); } catch (e) { return null; }
+    }
+    function _stopLoginCountdown() {
+        if (_iLoginCountdownTimer) { clearInterval(_iLoginCountdownTimer); _iLoginCountdownTimer = null; }
+        const oText = _getBusyTextDom();
+        if (oText) { oText.textContent = ""; }
+    }
+    function _startLoginCountdown(iMs) {
+        _stopLoginCountdown();
+        const oText = _getBusyTextDom();
+        if (!oText) { return; }
+        const iDeadline = Date.now() + iMs;
+        const _tick = () => {
+            const iSecLeft = Math.max(0, Math.ceil((iDeadline - Date.now()) / 1000));
+            // 서버리스트 종료 대기(fnShowShutdownAskPopup)와 동일 표기 — 스피너 + "(Ns)", 1초 간격.
+            oText.textContent = "(" + iSecLeft + "s)";
+            if (iSecLeft <= 0 && _iLoginCountdownTimer) { clearInterval(_iLoginCountdownTimer); _iLoginCountdownTimer = null; }
+        };
+        _tick();
+        _iLoginCountdownTimer = setInterval(_tick, 1000);
+        // busy 다이얼로그가 닫히면(성공/실패 모든 종료 경로가 setDomBusy("") 호출) 자동 정지.
+        try {
+            const oBusy = parent.document.getElementById("u4aWsBusyIndicator");
+            if (oBusy && !oBusy.__loginCountdownHook) {
+                oBusy.__loginCountdownHook = true;
+                oBusy.addEventListener("close", _stopLoginCountdown);
+            }
+        } catch (e) { /* noop */ }
+    }
+
     /************************************************************************
      * 로그인 버튼 클릭 — 인증/세션 흐름 보존 (doc 02 §9.4)
      ************************************************************************/
@@ -792,7 +836,8 @@ var oAPP = (function () {
         if (typeof oPARAM?.SSO_TICKET === "undefined") {
             var oResult = oAPP.fn.fnLoginCheck(oLogInData.ID, oLogInData.PW, oLogInData.CLIENT, oLogInData.LANGU);
             if (oResult.RETCD == 'E') {
-                oAPP.fn.showToast(oResult.MSG);
+                // 검증 실패 안내는 해당 입력칸의 공통 value-state 메시지(fnLoginCheck 에서
+                // _fnSetFieldState 로 설정)로 표시한다 — 중앙 토스트와 이중 표시되지 않도록 토스트는 생략.
                 parent.setDomBusy("");
                 _showContentDom("X");
                 return;
@@ -824,6 +869,8 @@ var oAPP = (function () {
         var xhr = new XMLHttpRequest();
 
         xhr.onload = async function (e) {
+
+            _stopLoginCountdown(); // 응답 도착 — 남은시간 표시 종료(성공 시 다음 단계가 다시 시작)
 
             let u4a_status = xhr.getResponseHeader("u4a_status");
             if (u4a_status) {
@@ -950,6 +997,9 @@ var oAPP = (function () {
         xhr.ontimeout = _onError;
         xhr.open('POST', sServicePath);
         xhr.withCredentials = true;
+        // 응답 없이 pending 으로 멈추는 것을 방지 — 초과 시 ontimeout(_onError)→M294 + busy 해제
+        xhr.timeout = LOGIN_XHR_TIMEOUT;
+        _startLoginCountdown(LOGIN_XHR_TIMEOUT); // busy 팝업에 남은시간 표시
         xhr.send(oFormData);
 
     }; // end of ev_login
@@ -1049,6 +1099,11 @@ var oAPP = (function () {
             var xhr = new XMLHttpRequest();
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === xhr.DONE) {
+                    _stopLoginCountdown(); // 응답 도착 — 남은시간 표시 종료
+                    // 타임아웃/중단/네트워크 오류(status 0)는 onerror/ontimeout 에서 처리한다.
+                    //   readystatechange 도 DONE 으로 함께 발화하므로, 여기서 막지 않으면
+                    //   빈 응답으로 showMessage 가 호출돼 M294 위에 빈 네이티브 팝업이 겹쳐 뜬다.
+                    if (xhr.status === 0) { return; }
                     if (xhr.status === 200 || xhr.status === 201) {
                         var oResult;
                         try {
@@ -1070,8 +1125,18 @@ var oAPP = (function () {
                     }
                 }
             };
+            // 연결이 응답 없이 pending 으로 멈추거나 통신 오류일 때 busy 무한 방지
+            //   (기존엔 onerror/ontimeout 미배선 → 성공 직후 이 단계에서 busy 가 계속 돌았음)
+            xhr.onerror = xhr.ontimeout = function (ev) {
+                console.error(ev);
+                oAPP.fn.fnMessageBox("E", (ev && ev.type === "timeout") ? oAPP.msg.M294 : oAPP.msg.M283);
+                parent.setDomBusy("");
+                _showContentDom("X");
+            };
             xhr.open('POST', sServicePath);
             xhr.withCredentials = true;
+            xhr.timeout = LOGIN_XHR_TIMEOUT;
+            _startLoginCountdown(LOGIN_XHR_TIMEOUT); // busy 팝업에 남은시간 표시
             xhr.send(oFormData);
         });
     }; // end of fnCheckAuthority
@@ -1097,6 +1162,9 @@ var oAPP = (function () {
             var xhr = new XMLHttpRequest();
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === xhr.DONE) {
+                    _stopLoginCountdown(); // 응답 도착 — 남은시간 표시 종료
+                    // 타임아웃/중단/네트워크 오류(status 0)는 onerror/ontimeout 에서 처리(중복 팝업 방지).
+                    if (xhr.status === 0) { return; }
                     if (xhr.status === 200 || xhr.status === 201) {
                         try {
                             resolve(JSON.parse(xhr.response));
@@ -1114,8 +1182,18 @@ var oAPP = (function () {
                     }
                 }
             };
+            // 연결이 응답 없이 pending 으로 멈추거나 통신 오류일 때 busy 무한 방지
+            //   (기존엔 onerror/ontimeout 미배선 → 이 단계에서 busy 가 계속 돌았음)
+            xhr.onerror = xhr.ontimeout = function (ev) {
+                console.error(ev);
+                oAPP.fn.fnMessageBox("E", (ev && ev.type === "timeout") ? oAPP.msg.M294 : oAPP.msg.M283);
+                parent.setDomBusy("");
+                _showContentDom("X");
+            };
             xhr.open('POST', sServicePath);
             xhr.withCredentials = true;
+            xhr.timeout = LOGIN_XHR_TIMEOUT;
+            _startLoginCountdown(LOGIN_XHR_TIMEOUT); // busy 팝업에 남은시간 표시
             xhr.send(oFormData);
         });
     }; // end of fnCheckCustomerLisence
@@ -1552,28 +1630,28 @@ var oAPP = (function () {
         if (isEmpty(CLIENT) === true || isBlank(CLIENT) === true) {
             oCheck.RETCD = "E";
             oCheck.MSG = oAPP.msg.M0271;
-            _fnSetFieldState("ws_client", "error");
+            _fnSetFieldState("ws_client", "error", oCheck.MSG);
             setTimeout(() => { document.getElementById("ws_client")?.focus(); }, 0);
             return oCheck;
         }
         if (isEmpty(ID) === true || isBlank(ID) === true) {
             oCheck.RETCD = "E";
             oCheck.MSG = oAPP.msg.M0272;
-            _fnSetFieldState("ws_id", "error");
+            _fnSetFieldState("ws_id", "error", oCheck.MSG);
             setTimeout(() => { document.getElementById("ws_id")?.focus(); }, 0);
             return oCheck;
         }
         if (isEmpty(PW) === true || isBlank(PW) === true) {
             oCheck.RETCD = "E";
             oCheck.MSG = oAPP.msg.M0273;
-            _fnSetFieldState("ws_pw", "error");
+            _fnSetFieldState("ws_pw", "error", oCheck.MSG);
             setTimeout(() => { document.getElementById("ws_pw")?.focus(); }, 0);
             return oCheck;
         }
         if (isEmpty(LANGU) === true || isBlank(LANGU) === true) {
             oCheck.RETCD = "E";
             oCheck.MSG = oAPP.msg.M0274;
-            _fnSetFieldState("ws_langu", "error");
+            _fnSetFieldState("ws_langu", "error", oCheck.MSG);
             setTimeout(() => { document.getElementById("ws_langu")?.focus(); }, 0);
             return oCheck;
         }
@@ -2090,7 +2168,15 @@ var oAPP = (function () {
             let oFormData = new FormData();
             oFormData.append("SSO_TICKET", SSO_TICKET);
             try {
-                await fetch(sServerPath, { headers: { "sso_hdr": SSO_HDR }, method: "POST", body: oFormData });
+                // 응답 없이 pending 으로 멈추면 _onViewReady 의 await 가 걸려 초기화(런치 busy)가
+                // 무한히 돈다 → AbortController 로 타임아웃 걸어 실제 실패(AbortError)로 종료시킨다.
+                const oCtrl = new AbortController();
+                const iTimer = setTimeout(() => oCtrl.abort(), LOGIN_XHR_TIMEOUT);
+                try {
+                    await fetch(sServerPath, { headers: { "sso_hdr": SSO_HDR }, method: "POST", body: oFormData, signal: oCtrl.signal });
+                } finally {
+                    clearTimeout(iTimer);
+                }
             } catch (error) {
                 console.error(error);
                 console.error("[_handleSSOLogin] 통신오류 — SSO 로그인 처리 실패");
