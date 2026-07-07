@@ -2258,8 +2258,26 @@ window.addEventListener("load", () => {
 });
 
 window.onbeforeunload = () => {
+
+    /**
+     * [증상] No Auth 팝업의 OK 버튼을 눌러도 로그인 창이 닫히지 않음.
+     *
+     * [배경] 개편 전에는 main 이 iframe 태그의 src 로 Login.html 을 로드했다가, 로그인 성공 시 같은 iframe 에
+     *        ws10_20(WS10) 페이지를 다시 로드하는 구조였다. 이때 본 onbeforeunload 가드는 로컬 oAPP.attr.isPressWindowClose 를
+     *        검사했고, Login 내 close 트리거들의 세터와 같은 객체라 정상 동작했다.
+     *
+     * [원인] 메인 프레임 개편(커밋 e0f4d0735) 으로 WS30 메인 페이지 로딩 방식이 바뀌면서
+     *        (parent.oAPP.views.VW_MAIN.fn.loadWS30MainPage() 등) 본 가드의 검사 대상도 oAPP -> parent.oAPP 로 변경되었다.
+     *        그러나 Login.js 는 여전히 자체 oAPP(let oAPP = {}) 를 선언하여 부모(셸)의 parent.oAPP 와 서로 다른 객체이고,
+     *        OK 버튼 핸들러(ev_attachIllustMsgOkBtn)를 비롯한 Login 내 close 트리거들은 로컬 oAPP.attr.isPressWindowClose 에 "X" 를 세팅한다.
+     *        결국 가드가 parent.oAPP 만 검사하여 로컬에 세팅된 "X" 를 보지 못해 항상 return false 로 종료를 막게 된 회귀였다.
+     *
+     * [수정] 로컬 oAPP 와 부모 parent.oAPP 의 플래그를 모두 확인하여, 둘 중 하나라도 "X" 이면 정상 종료로 간주해 닫는다.
+     *        (둘 다 "X" 가 아닐 때만 종료를 막는다.)
+     *
+     */
     // 브라우저의 닫기 버튼을 누른게 아니라면 종료 하지 않음
-    if (parent.oAPP.attr.isPressWindowClose !== "X" && oAPP.attr.isPressWindowClose !== "X") {
+    if (oAPP.attr.isPressWindowClose !== "X" && parent.oAPP.attr.isPressWindowClose !== "X") {
         return false;
     }
     window.removeEventListener("online", oAPP.fn.fnNetworkCheckerOnline);

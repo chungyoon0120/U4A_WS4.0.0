@@ -149,11 +149,7 @@ let oAPP = (function (window) {
             return;
         }
 
-        if (bIsShow === 'X') {
-            oLoadPg.classList.remove("u4a_loadersInactive");
-        } else {
-            oLoadPg.classList.add("u4a_loadersInactive");
-        }
+        oLoadPg.setAttribute("data-busy", bIsShow === 'X' ? "true" : "false");   // 공통 .u4a-busy 토글
 
     };
 
@@ -347,8 +343,10 @@ window.onload = function () {
         if (ev.key === "Escape") { oAPP.fn.fnClose(); }
     });
 
-    // 데이터 도착 전까지 로딩 표시
-    oAPP.setBusyLoading('X');
+    // [초기 로드] 대형 링 로더는 켜지 않는다 — editorPopup/optionPopup 과 동일하게
+    //   배경색(BGCOL) + 본문 CSS 페이드인(fnShowContent)만으로 등장(16.공통UX 2.6).
+    //   창이 뜨자마자 풀스크린 LOADING 링이 잠깐 번쩍이던 문제 제거. (형제창 broadcast busy 시에는
+    //   setBusy → setBusyLoading 으로 링을 그대로 사용하므로 요소/함수는 유지)
 
     // 창 즉시 표시(네이티브 opacity 페이드 미사용 — 흰 플래시 방지). 위치는 opener ready-to-show 에서 잡힘.
     //   backgroundColor=BGCOL 로 이미 불투명·테마 배경이라 흰 번쩍 없음(16.공통UX 2.6).

@@ -1797,14 +1797,24 @@
         // // 브라우저 상단 메뉴 없애기.    
         oBrowserWindow.setMenu(null);
 
+        // 공통 셸(.u4a-titlebar) 제목 = Icon List [ - SYSID](콜백 아닐 때 SYSID 표기 — 원본 runtime POP_TITLE 동일).
+        let sIconPopTitle = oBrowserOptions.title;
+        if (isCallback !== "X") {
+            sIconPopTitle += " - " + sSysID;
+        }
+
         // 브라우저 실행 경로에 붙일 QueryString 정보
+        //   BGCOL/THEME/TITLE = 흰색 플래시 방지 + 공통 타이틀바 초기 표시(index.html 부트 스크립트가 소비).
         const oQueryParams = {
             browserkey: oBrowserOptions?.webPreferences?.browserkey,
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            BGCOL: oThemeInfo.BGCOL,
+            THEME: oThemeInfo.THEME,
+            TITLE: sIconPopTitle,
         };
-        
+
         const sUrlPath = parent.getPath("ICONPREV");
 
         // URL에 QueryString 파라미터를 적용한다.

@@ -823,6 +823,21 @@
 .u4aWs20AttrInp:focus { border-color: var(--accent); background: var(--surface-raised, var(--surface)); }
 /* 읽기전용/비활성 룩(평문) = 전 화면 공통(bootstrap-skin.css `.u4a-input[readonly]/:disabled`)이 소유.
    화면별로 따로 칠하지 않는다 — 편집 가능=올라온 보더 박스 / 비활성=평문(박스 없음) 컨셉을 공통이 처리. */
+/* ★ valueHelpOnly(F4Only, 구 sap.m.Input valueHelpOnly=true — selectOption3 F4HelpID/ReturnField):
+   직접 타이핑만 막고(input readOnly) 외관은 '편집 가능'(올라온 보더+배경) 유지 → 값은 F4 버튼으로만 설정.
+   공통 readonly 무음영 룩(.u4a-input:read-only / [readonly], 모두 (0,2,0))을 덮어야 하므로 클래스 2개로
+   (0,3,0) 확보(로드 순서 무관하게 이김). cursor=default 로 '직접 입력 불가' 신호. */
+/* ★ :focus 변형을 넣지 않는다 — 넣으면 (0,4,0) 이 돼 변경행(.changeValue)의 배경 transparent
+   (0,3,0)을 이겨, 값 입력 후 클릭(focus)하면 배경이 흰색(--surface-raised)으로 튀고 blur 시 복귀했다.
+   비-focus 규칙은 (0,3,0) 이라 변경행 transparent 에 양보(틴트 유지) + 일반행에선 활성 외관 유지. */
+.u4aWs20AttrInp.u4aWs20AttrInp--vho:read-only {
+  border-color: var(--divider);
+  background: var(--surface-raised, var(--surface));
+  color: var(--text);
+  /* 직접 입력은 안 되지만 클릭하면 F4 값도움이 열리므로 pointer 로 '클릭 가능' 신호. */
+  cursor: pointer;
+}
+.u4aWs20AttrInp.u4aWs20AttrInp--vho:read-only:hover { border-color: var(--text-muted); }
 /* 에러 — 편집 가능 보더 규칙보다 우선하도록 specificity 확보 */
 .u4aWs20AttrInp.err,
 .u4aWs20AttrInp.err:not(:read-only):not(:disabled) { border-color: var(--error); color: var(--error); }

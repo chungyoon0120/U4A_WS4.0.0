@@ -122,7 +122,7 @@ function _curSaveData() {
 function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
     var oEl = document.getElementById("errBusy");
-    if (oEl) { oEl.classList.toggle("show", bBusy); }
+    if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }   // 공통 .u4a-busy 토글
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
     //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
     try { CURRWIN.closable = false; } catch (e) { }

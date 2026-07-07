@@ -446,12 +446,9 @@
             return;
         }
 
-        // ── [임시] iconPrevPopup(아이콘 목록) HTML5 미변환 — 완료 전까지 안내 토스트만.
-        //   Main(WS10) + WS30(메뉴 fnWS10 위임) 공통 경로. TODO(i18n) + 변환 완료 시 아래 원본 호출 복원.
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
-        return;
-
-        // oAPP.fn.fnIconPreviewPopupOpener();
+        // iconPrevPopup(아이콘 목록) — 공통 .u4a-titlebar 셸 + 서버 UI5(KEEP-UI5) 아이콘 리스트.
+        //   Main(WS10) + WS30(메뉴 fnWS10 위임) 공통 경로. 콜백 없음 = SYSID당 1개 상주 뷰어 창.
+        oAPP.fn.fnIconPreviewPopupOpener();
 
     }; // end of oAPP.fn.fnWS10WMENU20_04_01
 
@@ -869,12 +866,9 @@
             return;
         }
 
-        // ── [임시] iconPrevPopup(아이콘 목록) HTML5 미변환 — 완료 전까지 안내 토스트만.
-        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 호출 복원.
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
-        return;
-
-        // oAPP.fn.fnIconPreviewPopupOpener();
+        // iconPrevPopup(아이콘 목록) — 공통 .u4a-titlebar 셸 + 서버 UI5(KEEP-UI5) 아이콘 리스트.
+        //   콜백 없음 = SYSID당 1개 상주 뷰어 창(fnDialogPopupOpener.js fnIconPreviewPopupOpener).
+        oAPP.fn.fnIconPreviewPopupOpener();
 
     }; // end of oAPP.fn.fnWS20WMENU20_04_01
 

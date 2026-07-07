@@ -6,212 +6,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <!-- <link rel="stylesheet" href="index.css"> -->
+
+    <!-- ===== 공통 헤더(.u4a-titlebar)·버튼·토큰 (versionMng/MIME 동일 스택) =====
+         원본: iconPrevPopup(UI5 별도창) — sap.m.App 안 customHeader Toolbar 가 창 크롬(로고/제목/min·max·close)까지 그림.
+         HTML5: 창 크롬만 [공통 .u4a-titlebar] 로 외부화(frameless). 본문(아이콘 리스트)은 서버 getP13nPreviewHTML(UI5)
+                을 로드하는 iframe = KEEP-UI5(runtime.js 그대로 iframe 안에서 동작).
+         경로: Popups/iconPrevPopup 기준 → theme=../../theme, lib=../../../../lib. (browser-window-common-ux) -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 BGCOL/THEME/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* index.js 에서 재적용 */ }
+        })();
+    </script>
 
     <style>
-        /* BusyIndicator */
-        #u4aWsBusyIndicator {
-            right: 0;
+        html, body { margin: 0; height: 100%; }
+        body {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--boot-bg, var(--app-bg));
         }
-
-        .u4aWsBusyIndicator {
-            z-index: 2000000;
-        }
-
-        .sapUiUserSelectable {
-            -webkit-touch-callout: text;
-            -webkit-user-select: text;
-            -khtml-user-select: text;
-            -moz-user-select: text;
-            -ms-user-select: text;
-            user-select: text;
-        }
-
-        .sapUiBusy {
-            display: block;
-            width: 48px;
-            height: 48px;
-            outline: none;
-            cursor: wait;
-            top: 0 !important;
-        }
-
-        #u4aWsBusyIndicator>.sapUiLocalBusyIndicatorFade {
-            cursor: wait;
-        }
-
-        .sapUiLocalBusyIndicatorSizeBig {
-            font-size: 2rem;
-            background-color: transparent;
-        }
-
-        .sapUiLocalBusyIndicatorFade {
-            opacity: 1;
-        }
-
-        .sapUiLocalBusyIndicator {
-            opacity: 0;
-            transition: opacity .3s ease-in;
-            outline: none;
-        }
-
-        .sapUiLocalBusyIndicator {
-            background-color: rgba(247, 247, 247, 0.72);
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation {
-            position: absolute;
-            width: 3em;
-            top: 50%;
-            left: 50%;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div:nth-child(1) {
-            animation-delay: -0.32s;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div:nth-child(2) {
-            animation-delay: -0.16s;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div {
-            animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div,
-        .sapUiLocalBusyIndicatorAnimation>div::before,
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            animation-fill-mode: both;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div {
-            width: 1em;
-            height: 1em;
-            border-radius: 100%;
-            display: block;
-            float: left;
-            margin: 0px;
-            position: relative;
-            top: -0.5em;
-            left: -1.5em;
-            text-indent: 1px;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div {
-            animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::before {
-            background: #0854a0;
-            animation-duration: 0ms;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div::before {
-            animation: sapUiBusyAnimationStandardBackground 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::before {
-            background: #0a6ed1;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::before,
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            content: "";
-            opacity: 1;
-            position: absolute;
-            z-index: -1;
-            top: 0;
-            left: 0;
+        /* 본문 = 서버 UI5 아이콘 리스트 iframe (타이틀바 아래 나머지 전부) */
+        #ws_frame {
+            flex: 1 1 auto;
             width: 100%;
-            height: 100%;
-            border-radius: 100%;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            box-shadow: inset 0 0 0 0 #0854a0;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div::after {
-            animation: sapUiBusyAnimationStandardShadow 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            box-shadow: inset 0 0 2px 1px rgb(10 110 209 / 80%);
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div {
-            width: 1em;
-            height: 1em;
-            border-radius: 100%;
+            min-height: 0;
+            border: 0;
             display: block;
-            float: left;
-            margin: 0px;
-            position: relative;
-            top: -0.5em;
-            left: -1.5em;
-            text-indent: 1px;
         }
-
-        .sapUiLocalBusyIndicatorSizeBig {
-            font-size: 2rem;
-            background-color: transparent;
-        }
-
-        .sapUiLocalBusyIndicator {
-            opacity: 0;
-            transition: opacity .3s ease-in;
-            outline: none;
-        }
-
-        .sapUiLocalBusyIndicatorFade {
-            opacity: 1;
-        }
-
-        @keyframes sapUiBusyAnimationStandard {
-
-            0%,
-            80%,
-            100% {
-                transform: scale(.4);
-            }
-
-            40% {
-                transform: scale(1);
-            }
-        }
+        /* 초기 로드 페이드인(원본 $('#content').fadeIn 대체 — iframe 은 runtime 이 준비되면 자연 표시) */
     </style>
 </head>
 
-<body style="margin:0px;padding:0px;overflow:hidden">
+<body>
 
-    <!-- Busy Indicator Start -->
-    <div id="u4aWsBusyIndicator" class="u4aWsBusyIndicator sapUiUserSelectable"
-        style="position: absolute;  display: block; top: 0px; height: 100%; width: 100%; left: 0px;">
-        <div class="sapUiBusy" tabindex="0" role="progressbar" alt="" title="Please wait"></div>
-        <div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig sapUiLocalBusyIndicatorFade"
-            role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="Busy" alt="" tabindex="0"
-            title="Please wait">
-            <div class="sapUiLocalBusyIndicatorAnimation sapUiLocalBusyIndicatorAnimStandard">
-                <div></div>
-                <div></div>
-                <div></div>
-            </div>
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/min·max·close (versionMng·MIME 동일) ===== -->
+    <header class="u4a-titlebar" id="iconpTitlebar">
+        <img class="u4a-titlebar__logo" id="iconpLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="iconpTitle"></span>
+        <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="iconpWinMin" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="iconpWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="iconpWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- 본문 = 서버 getP13nPreviewHTML(UI5 부트스트랩) 을 로드하는 iframe. 콘텐츠=KEEP-UI5(runtime.js). -->
+    <iframe id="ws_frame" src="" frameborder="0" name="u4aForm"></iframe>
+
+    <form method="post" id="u4asendform" target="u4aForm"></form>
+
+    <!-- Busy 오버레이 — ★공통 .u4a-busy★(shell.css 단일 출처). 초기 서버 UI5 로드 중 표시,
+         runtime.js 부팅 완료(attachInit) 시 oAPP.fn.setShellBusy(false) 로 해제. -->
+    <div id="iconpBusy" class="u4a-busy" data-busy role="progressbar" aria-valuetext="Busy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
         </div>
     </div>
-    <!-- Busy Indicator End -->
-
-    <iframe id="ws_frame" src="" frameborder="0" name="u4aForm"
-        style="overflow:hidden;overflow-x:hidden;overflow-y:hidden;height:100%;width:100%;position:absolute;top:0px;left:0px;right:0px;bottom:0px;">
-    </iframe>
-
-    <form method="post" id="u4asendform" target="u4aForm">
-
-    </form>
 
     <script src="index.js"></script>
 

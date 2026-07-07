@@ -4534,11 +4534,16 @@
             //   ★ 비활성은 disabled(흐릿/opacity) 대신 readOnly 사용 — USP/공통과 동일(공통 .u4a-input:read-only
             //     = --app-bg 박스 + muted). Display 모드 값도 선택·복사 가능. clear/F4 는 편집 가능할 때만.
             var bFieldEdit = (bEnabled && sAttr.edit === true);
+            //valueHelpOnly(F4Only, 구 sap.m.Input valueHelpOnly=true — selectOption3 F4HelpID/ReturnField):
+            //  편집모드여도 키보드 직접 입력 금지. readOnly 로 처리(IME 조합 입력까지 DOM 차원 차단 — 이벤트
+            //  가로채기는 Chromium93 IME 를 못 막음, Monaco domReadOnly 픽스와 동일 사상). 값은 F4 버튼으로만.
+            //  외관은 '편집 가능'(올라온 보더+배경) 유지 → 아래 u4aWs20AttrInp--vho 클래스(readonly 무음영 덮음).
+            var bF4Only = (sAttr.F4Only === true);
             var bHasClear = bFieldEdit;
             var oValFld = window.U4AUI.createField({
                 type: "text",
                 value: sAttr.UIATV != null ? sAttr.UIATV : "",
-                readOnly: !bFieldEdit,
+                readOnly: (!bFieldEdit || bF4Only),
                 className: "u4aWs20AttrValBox",
                 inputClassName: "u4aWs20AttrInp val",
                 clear: bHasClear,
@@ -4598,7 +4603,31 @@
                         return;
                     }
 
-                    //F4 값도움 미변환(아이콘 선택 F4·styleClass CSS클래스 선택 등 컬러/DDIC 외 전부) — 작업중 안내.
+                    // ── 아이콘 프로퍼티 F4 값도움(원본 attrCallValueHelpIcon 3953) — 전체 아이콘 목록 팝업(iconPrevPopup)을
+                    //    콜백 모드로 열어 사용자가 고른 아이콘 src 를 값에 반영. 게이트=attrIsIconProp + WLO(UHAK900630=신규 아이콘 팝업).
+                    //    가드는 원본 3990~4002 1:1(프로퍼티·非바인딩·非DDLB·非ENUM·아이콘 프로퍼티).
+                    //    ※ 원본 4009 parent.setBusy 잠금은 유지(팝업 여는 동안)하되 콜백 진입 시 즉시 해제.
+                    //      setShortcutLock 은 별창이라 WS keydown 이 안 와 불필요 → 색/DDIC F4 와 동일하게 생략.
+                    if (typeof oAPP.fn.attrIsIconProp === "function"
+                        && sAttr.UIATY === "1" && sAttr.ISBND !== "X" && sAttr.ISLST !== "X"
+                        && !(sAttr.T_DDLB && sAttr.T_DDLB.length)
+                        && oAPP.fn.attrIsIconProp(sAttr) === true
+                        && oAPP.common.checkWLOList("C", "UHAK900630") === true
+                        && typeof oAPP.fn.fnIconPreviewPopupOpener === "function") {
+
+                        try { parent.setBusy && parent.setBusy("X"); } catch (e) { }   // 팝업 여는 동안 WS busy(원본 4009)
+                        oAPP.fn.fnIconPreviewPopupOpener(function (e) {
+                            try { parent.setBusy && parent.setBusy(""); } catch (er) { }
+                            if (!e || e.RETCD === "C") { return; }          // 취소(원본 4018)
+                            var sIcon = e.RTDATA;
+                            if (sIcon == null || sIcon === "") { return; }  // 빈 값(원본 3969)
+                            sAttr.UIATV = sIcon;                             // 아이콘 매핑(원본 3980)
+                            oAPP.fn.fnWs20AttrChange(sAttr, "INPUT");        // 변경처리(원본 attrChange INPUT)
+                        });
+                        return;
+                    }
+
+                    //F4 값도움 미변환(styleClass CSS클래스 선택 등 컬러/DDIC/아이콘 외) — 작업중 안내.
                     console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT);
                     _wipToast();
                 } : null,
@@ -4607,6 +4636,22 @@
                 onChange: function (v) { sAttr.UIATV = v; oAPP.fn.fnWs20AttrChange(sAttr, "INPUT"); }
             });
             oValFld.input.title = oValFld.input.value;
+            //F4Only + 편집모드 = readOnly 지만 '편집 가능' 외관 유지(직접 타이핑만 차단, F4·clear 는 동작).
+            //  display 모드(bFieldEdit=false)는 일반 readonly(평문) 룩 그대로 → vho 미부여.
+            if (bF4Only && bFieldEdit) {
+                oValFld.input.classList.add("u4aWs20AttrInp--vho");
+                //★ valueHelpOnly 정상 동작: 타이핑이 안 되므로 입력칸 클릭만으로도 F4 값도움을 연다
+                //  (sap.m.Input valueHelpOnly=true 시 클릭=valueHelpRequest). F4 버튼을 프로그램 클릭 →
+                //  기존 f4 핸들러(색/DDIC/selOpt3) 그대로 재사용(중복 로직 없음).
+                if (sAttr.showF4 === true) {
+                    var oVhBtn = oValFld.el.querySelector(".u4a-field__vh");
+                    if (oVhBtn) {
+                        oValFld.input.addEventListener("click", function () {
+                            if (!oVhBtn.disabled) { oVhBtn.click(); }
+                        });
+                    }
+                }
+            }
             if (sAttr.valst === "Error") { oValFld.input.classList.add("err"); oValFld.input.title = sAttr.valtx || oValFld.input.value; }
             return oValFld.el;
         }

@@ -157,11 +157,7 @@ let oAPP = (function (window) {
             return;
         }
 
-        if (bIsShow === 'X') {
-            oLoadPg.classList.remove("u4a_loadersInactive");
-        } else {
-            oLoadPg.classList.add("u4a_loadersInactive");
-        }
+        oLoadPg.setAttribute("data-busy", bIsShow === 'X' ? "true" : "false");   // 공통 .u4a-busy 토글
 
     };
 
@@ -315,8 +311,9 @@ window.onload = function () {
     oAPP.fn.fnInitHeader();
     oAPP.fn.attachIpcEvents();
 
-    // 데이터 도착 전까지 로딩 표시
-    oAPP.setBusyLoading('X');
+    // [초기 로드] 대형 링 로더는 켜지 않는다 — 창 뜰 때 풀스크린 LOADING 링 번쩍임 제거.
+    //   등장은 opener 의 네이티브 opacity 페이드로 처리(setBrowserOpacity). 형제창 broadcast busy 시에는
+    //   setBusy → setBusyLoading 으로 링을 그대로 사용하므로 요소/함수는 유지.
 
 };
 

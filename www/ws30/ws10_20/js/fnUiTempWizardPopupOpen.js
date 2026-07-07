@@ -75,6 +75,27 @@
         try { parent.showMessage(window.sap || null, iKind, sType, sMsg, fnCb); }
         catch (e) { console.warn("[HTML5][WS20][tplwiz] showMessage:", e && e.message); }
     }
+    // 원본 MessageToast 대응 — 자동 사라짐·버튼 없음·중앙. 공통 .u4a-toast 스타일을 소비하되,
+    //   위자드가 showModal(top-layer) 이라 body 토스트는 뒤로 가려짐(§2.10) → 위자드 다이얼로그 "안"에
+    //   append 해 top-layer 안에서 모달 위에 표시(공통 툴팁이 모달 안에 붙는 것과 동일 사상).
+    function _alert(sType, sMsg) {
+        try {
+            if (oUI && oUI.dlg && document.body.contains(oUI.dlg)) {
+                var oT = oUI.dlg.querySelector(".u4aTplWizToast");
+                if (!oT) {
+                    oT = _el("div", "u4a-toast u4aTplWizToast");
+                    oT.setAttribute("role", "alert");
+                    oUI.dlg.appendChild(oT);
+                }
+                oT.textContent = sMsg || "";
+                oT.setAttribute("data-show", "true");
+                clearTimeout(oUI._toastT);
+                oUI._toastT = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { } }, 3000);
+                return;
+            }
+        } catch (e) { }
+        _msg(10, sType, sMsg); // 폴백(다이얼로그 부재 시 공통 토스트)
+    }
     function _busy(bOn) {
         try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { }
     }
@@ -139,7 +160,8 @@
                 A: { selS: "", selT: "" } // Report Template (Form=S / Table=T)
             },
             sec: {},     // 위자드 섹션 런타임 상태 (sid -> {model, outab, treevisi, treeflg, els, cfg})
-            menuCfg: {}  // 메뉴키 -> 섹션 cfg (푸터 생성 버튼 dispatch)
+            menuCfg: {}, // 메뉴키 -> 섹션 cfg (푸터 생성 버튼 dispatch)
+            navs: []     // 진행 내비게이터 목록(섹션 자체 + WZD3 통합) — lf_close 정리 대상
         };
 
         // UI Choice 콤보 데이터 구성 (CANDTY: T / S) — 원본 306~321행
@@ -356,6 +378,59 @@
                 getSel: function () { return oS.UICHOICE.T.sel; },
                 setSel: function (v) { oS.UICHOICE.T.sel = v; }
             }));
+        } else if (m.key === K_WZD2) {
+            // Stage 3 : Forms Ui Create 위자드 (트리 없음, UICHOICE.S) — WZD1 표준 재사용
+            oPage.appendChild(_buildWizardSection({
+                sid: "WZD2",
+                menuKey: K_WZD2,
+                treeCapable: false,       // Form 은 TreeTable 없음(Parent/Child 컬럼 없음)
+                bindCardi: "S",           // 구조(Structure) cardinality
+                getItems: function () { return oS.UICHOICE.S.ITEM; },
+                getSel: function () { return oS.UICHOICE.S.sel; },
+                setSel: function (v) { oS.UICHOICE.S.sel = v; }
+            }));
+        } else if (m.key === K_WZD3) {
+            // Stage 3 : Report Template = 원본 단일 sap.m.Wizard 6스텝.
+            //   Form(3): Form UI 선택(D78)/모델선택(D79)/모델정보(D80) — UICHOICE.S / selS.
+            //   Table(3): Table UI 선택(D84)/모델선택(D81)/모델정보(D82) — UICHOICE.T / selT(트리).
+            //   진행 내비게이터는 두 섹션을 통합한 1개(6스텝). 프리뷰는 메뉴(ReportTemplate) 고정 → noPreview.
+            var oWz3 = _el("div", "u4aTplWiz__wz3");
+
+            var oCardsF = _buildWizardSection({
+                sid: "WZD3F", menuKey: "WZD3F", treeCapable: false, bindCardi: "S", noPreview: true,
+                sharedNav: true, numOffset: 0,
+                stepTitles: [_cl("D78"), _cl("D79"), _cl("D80")], // Form UI Choice / Model Select / Model Information
+                getItems: function () { return oS.UICHOICE.S.ITEM; },
+                getSel: function () { return oS.UICHOICE.A.selS; },
+                setSel: function (v) { oS.UICHOICE.A.selS = v; }
+            });
+            var oCardsT = _buildWizardSection({
+                sid: "WZD3T", menuKey: "WZD3T", treeCapable: true, bindCardi: "T", noPreview: true,
+                sharedNav: true, numOffset: 3,
+                stepTitles: [_cl("D84"), _cl("D81"), _cl("D82")], // Table UI Choice / Model Select / Model Information
+                getItems: function () { return oS.UICHOICE.T.ITEM; },
+                getSel: function () { return oS.UICHOICE.A.selT; },
+                setSel: function (v) { oS.UICHOICE.A.selT = v; }
+            });
+
+            var secF = oS.sec.WZD3F, secT = oS.sec.WZD3T;
+            secT.gate = function () { return !!secF.model; }; // 원본: Table 스텝은 Form 모델 로드 후 진입
+
+            // 통합 진행 내비게이터(6스텝) — Form 3 + Table(게이트) 3.
+            var oSharedNav = _buildNav(function () {
+                var a = _navStepsForSec(secF, true).concat(_navStepsForSec(secT, !!secF.model));
+                _navMarkCurrent(a);
+                return a;
+            });
+            secF.shared = oSharedNav; secT.shared = oSharedNav; // _wzSyncSteps 갱신 대상
+            oS.sharedNav = { nav: oSharedNav, secs: [secF, secT] }; // 형제 카드 재게이트 대상
+
+            oWz3.appendChild(oSharedNav.els.nav);
+            oWz3.appendChild(oCardsF);
+            oWz3.appendChild(oCardsT);
+            oPage.appendChild(oWz3);
+
+            _wzSyncSteps(secF); _wzSyncSteps(secT); // 카드 게이트 + 통합 내비 초기 반영
         } else if (m.key === K_WZD4) {
             // WZD4 : 임베드 모듈(conversionWebdynpro)이 순수 UI5·미변환 → 준비중 안내.
             // TODO(i18n): 안내 문구 메시지 키 수집 필요(현재 임시 KO/EN 하드코딩).
@@ -415,8 +490,14 @@
     function _syncCreateForMenu(sKey) {
         if (!oUI || !oUI.createBtn) { return; }
         var bShow = false;
-        var cfg = oS.menuCfg && oS.menuCfg[sKey];
-        if (cfg) { var sec = oS.sec[cfg.sid]; bShow = !!(sec && sec.model); }
+        if (sKey === K_WZD3) {
+            // Report Template : Form·Table 두 섹션 모두 모델 로드 시 노출.
+            var f = oS.sec.WZD3F, t = oS.sec.WZD3T;
+            bShow = !!(f && f.model && t && t.model);
+        } else {
+            var cfg = oS.menuCfg && oS.menuCfg[sKey];
+            if (cfg) { var sec = oS.sec[cfg.sid]; bShow = !!(sec && sec.model); }
+        }
         oUI.createBtn.hidden = !bShow;
     }
 
@@ -525,8 +606,9 @@
      * 완료(생성) — Stage 4 에서 designWizardCallback 연결.
      * ================================================================== */
     function lf_onCreate() {
-        // 현재 메뉴 섹션의 Complete → oComplete 구성 → designWizardCallback(생성 통합).
-        //   (원본 ev_tmplWzdComplete : SELKEY 로 위자드별 Complete dispatch)
+        // 원본 ev_tmplWzdComplete : 현재 메뉴(SELKEY)로 위자드별 Complete dispatch.
+        if (oS && oS.cur === K_WZD3) { _wz3Complete(); return; } // Report Template = Form+Table 통합
+
         var cfg = oS && oS.menuCfg && oS.menuCfg[oS.cur];
         if (!cfg) { return; }
 
@@ -538,7 +620,8 @@
         if (typeof oAPP.fn.designWizardCallback === "function") {
             oAPP.fn.designWizardCallback(oComplete, function (oRet) {
                 _busy(false);
-                if (oRet && oRet.SUBRC === "E") { _msg(10, "E", oRet.MSG); return; }
+                // 에러는 위자드(showModal) 위 top-layer 박스로(토스트는 뒤로 가려짐). 성공 토스트는 닫힘 후 노출.
+                if (oRet && oRet.SUBRC === "E") { _alert("E", oRet.MSG); return; }
                 if (oRet && oRet.MSG) { _msg(10, "S", oRet.MSG); }
                 lf_close();
             });
@@ -561,61 +644,40 @@
             outab: [],             // 필드 정보(서버 T_OTAB, 각 row +UILIST)
             treevisi: false,       // TreeTable → Parent/Child 컬럼 표시
             treeflg: { bIsPChk: false, bIsCChk: false },
-            els: { navSteps: [], navLbls: [], cards: [], cardHeads: [] }
+            els: { cards: [], cardHeads: [] }
         };
         oS.sec[cfg.sid] = sec;
         oS.menuCfg[cfg.menuKey] = cfg; // 푸터 생성 버튼 dispatch
 
         // 스텝 메타 (원본 sap.m.WizardStep title) — 동적 key 접미 포함.
+        //   기본(WZD1/2) = UI Choice / Model Select / Model Information.
+        //   WZD3 는 cfg.stepTitles 로 Form/Table 별 원본 제목(D78~D82) 주입.
+        var aTitles = cfg.stepTitles || [_cl("D77"), _cl("D66"), _cl("D67")];
         sec.steps = [
-            { base: _cl("D77"), suffix: function () { var k = cfg.getSel(); return k ? " [ " + k + " ] " : ""; } }, // UI Choice
-            { base: _cl("D66"), suffix: function () { return ""; } },                                                  // Model Select
-            { base: _cl("D67"), suffix: function () { return sec.model ? " [ " + sec.model + " ] " : ""; } }           // Model Information
+            { base: aTitles[0], suffix: function () { var k = cfg.getSel(); return k ? " [ " + k + " ] " : ""; } }, // UI Choice
+            { base: aTitles[1], suffix: function () { return ""; } },                                               // Model Select
+            { base: aTitles[2], suffix: function () { return sec.model ? " [ " + sec.model + " ] " : ""; } }        // Model Information
         ];
 
-        var oWrap = _el("div", "u4aTplWiz__wz");
-
-        /* ---- 진행 내비게이터 (원본 WizardProgressNavigator, 반응형) ----
-         *   넓으면 full(전체 스텝+연결선), 좁으면 mini(현재 스텝 + 숫자버튼→팝오버). */
-        var oNav = _el("div", "u4aTplWiz__wzNav");
-
-        // full : 전체 스텝
-        var oFull = _el("div", "u4aTplWiz__navFull");
-        for (var i = 0; i < sec.steps.length; i++) {
-            if (i > 0) { oFull.appendChild(_el("div", "u4aTplWiz__navConn")); }
-            var oStep = _el("div", "u4aTplWiz__navStep");
-            oStep.appendChild(_el("div", "u4aTplWiz__navNum", String(i + 1)));
-            var oLbl = _el("span", "u4aTplWiz__navLbl");
-            oStep.appendChild(oLbl);
-            oStep.addEventListener("click", (function (idx) {
-                return function () { _wzScrollToCard(sec, idx); };
-            })(i));
-            oFull.appendChild(oStep);
-            sec.els.navSteps.push(oStep);
-            sec.els.navLbls.push(oLbl);
-        }
-        oNav.appendChild(oFull);
-
-        // mini(축소형) : 스텝을 "순서대로" 렌더(번호 원, 현재 스텝만 라벨 펼침).
-        //   _wzSyncSteps 가 매번 채운다(현재/available 이 바뀌므로).
-        var oMini = _el("div", "u4aTplWiz__navMini");
-        oNav.appendChild(oMini);
-
-        oWrap.appendChild(oNav);
-        sec.els.nav = oNav;
-        sec.els.navFull = oFull;
-        sec.els.navMini = oMini;
-
-        // 반응형 토글 — full 이 넘치면 mini 로. (페이지 표시/리사이즈에 반응)
-        if (window.ResizeObserver) {
-            try {
-                sec.ro = new ResizeObserver(function () { _wzNavResize(sec); });
-                sec.ro.observe(oNav);
-            } catch (e) { }
+        /* ---- 진행 내비게이터 ----
+         *   WZD1/2 = 섹션마다 자체 3스텝 내비게이터.
+         *   WZD3   = 두 섹션(Form+Table)을 하나의 6스텝 내비게이터로 통합(cfg.sharedNav) →
+         *            내비게이터는 _buildMainPage(WZD3) 에서 한 번만 만든다(여기선 생략). */
+        var oWrap;
+        if (cfg.sharedNav) {
+            oWrap = _el("div", "u4aTplWiz__steps"); // 카드만(내비게이터는 통합본이 상단에)
+        } else {
+            oWrap = _el("div", "u4aTplWiz__wz");
+            sec.nav = _buildNav(function () {
+                var a = _navStepsForSec(sec, true);
+                _navMarkCurrent(a);
+                return a;
+            });
+            oWrap.appendChild(sec.nav.els.nav);
         }
 
         /* ---- 스텝 카드 컨테이너 ---- */
-        var oSteps = _el("div", "u4aTplWiz__steps");
+        var oSteps = cfg.sharedNav ? oWrap : _el("div", "u4aTplWiz__steps");
 
         function _card(idx) {
             var oCard = _el("div", "u4aTplWiz__stepCard");
@@ -645,7 +707,7 @@
         var oBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aTplWiz__modelBtn");
         oBtn.type = "button";
         oBtn.innerHTML = _fa("table-list") + "<span></span>";
-        oBtn.querySelector("span").textContent = _cl("D66"); // Model Select
+        oBtn.querySelector("span").textContent = aTitles[1]; // Model Select(WZD3=Form/Table Model Select)
         oBtn.addEventListener("click", function () { _wzModelSelect(cfg); });
         oB2.appendChild(oBtn);
 
@@ -655,7 +717,7 @@
         oB3.appendChild(oTblWrap);
         sec.els.tableWrap = oTblWrap;
 
-        oWrap.appendChild(oSteps);
+        if (oSteps !== oWrap) { oWrap.appendChild(oSteps); }
 
         _wzSyncSteps(sec); // 초기 상태(Step1 만 available)
         return oWrap;
@@ -663,7 +725,8 @@
 
     /* ---- 스텝 available/current 동기화 + 라벨 갱신 (원본 Wizard step 진행) ----
      *   available : step1=항상 / step2=UI Choice 선택됨 / step3=모델 로드됨.
-     *   current   : available 중 가장 마지막(진행 위치). 카드 hidden = !available. */
+     *   카드 hidden = !available. WZD3 는 sec.gate() 로 Table 섹션을 Form 모델 로드 후 노출.
+     *   내비게이터(라벨/현재/축소)는 provider 를 읽는 _syncNav 가 담당(WZD1/2=자체, WZD3=통합). */
     function _wzSyncSteps(sec) {
         var cfg = sec.cfg;
         var aAvail = [true, !!cfg.getSel(), !!sec.model];
@@ -672,64 +735,253 @@
         sec.avail = aAvail;
         sec.iCur = iCur;
 
-        for (var j = 0; j < sec.steps.length; j++) {
-            var sSuffix = sec.steps[j].suffix();
-            var sBase = sec.steps[j].base;
-            sec.els.navLbls[j].textContent = sBase + sSuffix;
-            sec.els.cardHeads[j].textContent = (j + 1) + ". " + sBase + sSuffix;
-            sec.els.cards[j].hidden = !aAvail[j];
-            sec.els.navSteps[j].classList.toggle("is-avail", aAvail[j]);
-            sec.els.navSteps[j].classList.toggle("is-current", j === iCur);
+        _wzGateCards(sec);
+
+        // WZD3 통합 그룹 : 형제 섹션의 gate 가 이 섹션 model 에 의존(Table=Form 모델 로드 후) →
+        //   내 model 이 바뀌면 형제 카드 노출도 재평가한다.
+        if (sec.shared && oS.sharedNav && oS.sharedNav.secs) {
+            var aGrp = oS.sharedNav.secs;
+            for (var g = 0; g < aGrp.length; g++) {
+                if (aGrp[g] !== sec && aGrp[g].avail) { _wzGateCards(aGrp[g]); }
+            }
         }
 
-        // mini(축소형) : 스텝을 "순서대로" 렌더(번호 원 + 현재 스텝만 라벨). 숫자 클릭→팝오버.
-        //   ★번호 순서 유지(원본 WizardProgressNavigator) — 현재 스텝을 앞으로 빼지 않는다.
-        sec.els.navMini.innerHTML = "";
-        for (var k = 0; k < sec.steps.length; k++) {
-            var oM = _el("div", "u4aTplWiz__navStep u4aTplWiz__navMiniStep");
-            if (aAvail[k]) { oM.classList.add("is-avail"); }
-            if (k === iCur) { oM.classList.add("is-current"); }
-            oM.appendChild(_el("div", "u4aTplWiz__navNum", String(k + 1)));
-            if (k === iCur) { oM.appendChild(_el("span", "u4aTplWiz__navLbl", sec.steps[k].base + sec.steps[k].suffix())); }
-            oM.addEventListener("click", function (ev) { ev.stopPropagation(); _wzOpenStepPopover(sec, ev.currentTarget); });
-            sec.els.navMini.appendChild(oM);
-        }
-
-        _wzNavResize(sec);
+        // 상태 변화(선택/모델 로드) = 진행 위치가 바뀐 것 → 수동 선택 해제해 current 를 다시 "가장 마지막 도달"로.
+        var nv = sec.nav || sec.shared;
+        if (nv) { nv.selIdx = null; }
+        _syncNav(nv); // 섹션 자체 내비 or 통합 내비 갱신(provider 가 live 값 읽음)
     }
 
-    // 카드로 스크롤(available 일 때만) — full/mini/팝오버 공용.
+    // 카드 제목(번호) + 노출(available && gate) 갱신. gate=WZD3 Table 은 Form 모델 로드 후.
+    function _wzGateCards(sec) {
+        var iOff = sec.cfg.numOffset || 0;             // WZD3 Table 섹션은 카드 번호 4~6
+        var bGate = sec.gate ? !!sec.gate() : true;    // WZD3 Table = Form 모델 로드 후 노출
+        for (var j = 0; j < sec.steps.length; j++) {
+            var sTitle = sec.steps[j].base + sec.steps[j].suffix();
+            sec.els.cardHeads[j].textContent = (j + 1 + iOff) + ". " + sTitle;
+            sec.els.cards[j].hidden = !((sec.avail && sec.avail[j]) && bGate);
+        }
+    }
+
+    // 카드로 스크롤(available/gate 통과 시) — full/mini/팝오버 공용.
     function _wzScrollToCard(sec, idx) {
         var c = sec.els.cards[idx];
         if (c && !c.hidden) { try { c.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { } }
     }
 
-    // 반응형 : full 이 컨테이너를 넘치면 mini 로 전환(원본 WizardProgressNavigator collapse).
-    function _wzNavResize(sec) {
-        var oNav = sec.els.nav, oFull = sec.els.navFull;
+    /* ================================================================
+     * 진행 내비게이터 공통 (원본 sap.m.WizardProgressNavigator)
+     *   provider() → [{ label, avail, current, scroll }]. full/mini/팝오버가 동일 소비.
+     *   WZD1/2 = 섹션 1개(3스텝), WZD3 = 두 섹션 통합(6스텝) 모두 이 하나로 렌더.
+     * ================================================================ */
+    //   ★full(전체 표시) 스텝 DOM 은 한 번만 만들고 _syncNav 는 클래스/텍스트만 바꾼다(in-place) →
+    //     번호 원 채움·연결선 진행이 CSS transition 으로 부드럽게 애니메이션.
+    //   ★mini(축소) 는 폭에 따라 넘치는 스텝을 "겹친 원(그룹)" 하나로 접어 매 리사이즈마다 재배치.
+    function _buildNav(fnProvider) {
+        var nav = { provider: fnProvider, els: { full: [], conns: [] } };
+        var oNav = _el("div", "u4aTplWiz__wzNav");
+        var oFull = _el("div", "u4aTplWiz__navFull");
+        var oMini = _el("div", "u4aTplWiz__navMini");
+        var n = fnProvider().length; // 스텝 수 고정(WZD1/2=3, WZD3=6)
+        for (var i = 0; i < n; i++) {
+            if (i > 0) { var oConn = _el("div", "u4aTplWiz__navConn"); oFull.appendChild(oConn); nav.els.conns[i] = oConn; }
+            oFull.appendChild(_navMakeStep(nav, i));
+        }
+        oNav.appendChild(oFull);
+        oNav.appendChild(oMini);
+        nav.els.nav = oNav; nav.els.navFull = oFull; nav.els.navMini = oMini;
+        if (window.ResizeObserver) {
+            try { nav.ro = new ResizeObserver(function () { _wzNavResize(nav); }); nav.ro.observe(oNav); } catch (e) { }
+        }
+        if (oS) { (oS.navs = oS.navs || []).push(nav); } // lf_close 정리 대상
+        _syncNav(nav);
+        return nav;
+    }
+
+    // full 스텝 DOM 1개(번호 원 + 라벨). 클릭 시 available 이면 해당 카드로 스크롤.
+    function _navMakeStep(nav, idx) {
+        var oStep = _el("div", "u4aTplWiz__navStep");
+        oStep.appendChild(_el("div", "u4aTplWiz__navNum", String(idx + 1)));
+        var oLbl = _el("span", "u4aTplWiz__navLbl");
+        oStep.appendChild(oLbl);
+        oStep.addEventListener("click", function () { _navGo(nav, idx); });
+        nav.els.full[idx] = { root: oStep, lbl: oLbl };
+        return oStep;
+    }
+
+    // 섹션 → 스텝 디스크립터. bGate=false 면 그 섹션 스텝 전부 비활성(WZD3 Table 게이트).
+    function _navStepsForSec(sec, bGate) {
+        var out = [];
+        for (var i = 0; i < sec.steps.length; i++) {
+            (function (idx) {
+                out.push({
+                    label: sec.steps[idx].base + sec.steps[idx].suffix(),
+                    avail: !!(sec.avail && sec.avail[idx]) && (bGate !== false),
+                    current: false,
+                    scroll: function () { _wzScrollToCard(sec, idx); }
+                });
+            })(i);
+        }
+        return out;
+    }
+
+    // 현재(진행 위치) = available 중 가장 마지막(원본 Wizard current step).
+    function _navMarkCurrent(a) {
+        var cur = -1;
+        for (var i = 0; i < a.length; i++) { if (a[i].avail) { cur = i; } }
+        if (cur >= 0) { a[cur].current = true; }
+    }
+
+    // provider() + 수동 선택(nav.selIdx) 반영 — 사용자가 특정 스텝을 고르면 그 원이 current(선택 표시).
+    //   상태 변화(_wzSyncSteps) 시 selIdx=null 로 리셋되어 다시 "가장 마지막 도달"이 current 가 된다.
+    function _navSteps(nav) {
+        var a = nav.provider();
+        if (nav.selIdx != null && a[nav.selIdx] && a[nav.selIdx].avail) {
+            for (var i = 0; i < a.length; i++) { a[i].current = (i === nav.selIdx); }
+        }
+        return a;
+    }
+
+    // 스텝 선택(원본 setCurrentStep) — 해당 카드로 스크롤 + 그 원에 선택 표시 유지.
+    function _navGo(nav, idx) {
+        var a = _navSteps(nav);
+        if (!a[idx] || !a[idx].avail) { return; }
+        nav.selIdx = idx;
+        a[idx].scroll();
+        _syncNav(nav);
+    }
+
+    // in-place 갱신(full) — 라벨/available/current + 연결선 진행(is-done)만 토글. mini 는 _wzNavResize 가 재배치.
+    function _syncNav(nav) {
+        if (!nav) { return; }
+        var a = _navSteps(nav);
+        for (var i = 0; i < a.length; i++) {
+            var st = a[i], f = nav.els.full[i];
+            if (f) {
+                f.lbl.textContent = st.label;
+                f.root.classList.toggle("is-avail", st.avail);
+                f.root.classList.toggle("is-current", st.current);
+            }
+            // 연결선(스텝 i 앞) — 스텝 i 에 도달(available)하면 accent 로 채워진다.
+            if (i > 0 && nav.els.conns[i]) { nav.els.conns[i].classList.toggle("is-done", st.avail); }
+        }
+        _wzNavResize(nav);
+    }
+
+    // 반응형 : full 이 컨테이너를 넘치면 mini(축소)로 전환(원본 WizardProgressNavigator collapse).
+    function _wzNavResize(nav) {
+        var oNav = nav.els.nav, oFull = nav.els.navFull;
         if (!oNav || !oFull || !document.body.contains(oNav)) { return; }
         oNav.classList.remove("is-collapsed");          // 측정 위해 full 표시
         if (oNav.clientWidth <= 0) { return; }          // 페이지 숨김 상태 — 표시 시 RO 재측정
         var bOver = oFull.scrollWidth > oFull.clientWidth + 1;
         oNav.classList.toggle("is-collapsed", bOver);
+        if (bOver) { _renderMiniCollapsed(nav); }       // 축소 시 폭에 맞춰 그룹 접기 재계산
     }
 
-    // 스텝 팝오버 (원본 narrow WizardProgressNavigator popover) — 전체 스텝 목록.
-    function _wzOpenStepPopover(sec, oAnchor) {
-        _wzClosePop(sec);
+    /* ---- 축소(mini) 재배치 : 현재 스텝을 중심으로 들어가는 만큼 개별 원, 나머지는 "겹친 원(그룹)" 하나로.
+     *   (원본 WizardProgressNavigator : 넘치는 스텝 → 그룹 앵커, 클릭 시 그 구간만 팝오버) */
+    function _renderMiniCollapsed(nav) {
+        var a = _navSteps(nav), N = a.length;
+        var oMini = nav.els.navMini;
+        oMini.innerHTML = "";
+        if (!N) { return; }
+
+        var cur = 0;
+        for (var i = 0; i < N; i++) { if (a[i].current) { cur = i; } }
+
+        // 폭 예산(px, 근사) — 원 28 / 그룹 40 / 연결선 26 / 현재 라벨은 길이 근사.
+        var BARE = 28, GROUP = 40, CONN = 26;
+        var W = (nav.els.nav.clientWidth || 0) - 24;
+        var curLabelW = Math.min((a[cur].label || "").length * 7.5 + 14, 220);
+
+        var lo = cur, hi = cur, used = BARE + curLabelW;
+        if (cur < N - 1) { used += CONN + GROUP; } // 트레일링 그룹 예약
+        if (cur > 0) { used += CONN + GROUP; }      // 리딩 그룹 예약
+
+        var bGrow = true;
+        while (bGrow) {
+            bGrow = false;
+            if (hi < N - 1) { // 트레일링 개별 확장 (남으면 그룹 유지, 마지막까지면 그룹 해제)
+                var net = CONN + BARE + (((N - 1 - (hi + 1)) > 0) ? (CONN + GROUP) : 0) - (CONN + GROUP);
+                if (used + net <= W) { used += net; hi++; bGrow = true; }
+            }
+            if (lo > 0) { // 리딩 개별 확장
+                var netL = CONN + BARE + (((lo - 1) > 0) ? (CONN + GROUP) : 0) - (CONN + GROUP);
+                if (used + netL <= W) { used += netL; lo--; bGrow = true; }
+            }
+        }
+
+        // 1개짜리 그룹은 무의미(개별 원이 더 좁음) → 개별로 편다.
+        if (lo === 1) { lo = 0; }
+        if (hi === N - 2) { hi = N - 1; }
+
+        if (lo > 0) {                                       // 리딩 그룹 [0..lo-1]
+            oMini.appendChild(_miniGroup(nav, a, 0, lo - 1));
+            oMini.appendChild(_miniConn(a, lo));
+        }
+        for (var s = lo; s <= hi; s++) {                    // 개별 원 구간
+            if (s > lo) { oMini.appendChild(_miniConn(a, s)); }
+            oMini.appendChild(_miniChip(nav, a, s, s === cur));
+        }
+        if (hi < N - 1) {                                   // 트레일링 그룹 [hi+1..N-1]
+            oMini.appendChild(_miniConn(a, hi + 1));
+            oMini.appendChild(_miniGroup(nav, a, hi + 1, N - 1));
+        }
+    }
+
+    // 축소 개별 원(번호+현재만 라벨). 클릭=available 이면 해당 카드로 이동(선택 표시는 is-current).
+    function _miniChip(nav, a, idx, bCur) {
+        var st = a[idx];
+        var oStep = _el("div", "u4aTplWiz__navStep u4aTplWiz__navMiniStep");
+        if (st.avail) { oStep.classList.add("is-avail"); }
+        if (bCur) { oStep.classList.add("is-current"); }
+        oStep.appendChild(_el("div", "u4aTplWiz__navNum", String(idx + 1)));
+        var oLbl = _el("span", "u4aTplWiz__navLbl");
+        if (bCur) { oLbl.textContent = st.label; }
+        oStep.appendChild(oLbl);
+        oStep.addEventListener("click", function () { _navGo(nav, idx); });
+        return oStep;
+    }
+
+    // 겹친 원(그룹) — [iFrom..iTo] 를 하나로 접어 표시. 클릭 시 그 구간만 팝오버.
+    function _miniGroup(nav, a, iFrom, iTo) {
+        var oG = _el("div", "u4aTplWiz__navGroup");
+        var bAny = false;
+        for (var i = iFrom; i <= iTo; i++) { if (a[i].avail) { bAny = true; break; } }
+        if (bAny) { oG.classList.add("is-avail"); }         // 하나라도 도달 시 accent(선택 표시)
+        oG.appendChild(_el("div", "u4aTplWiz__navNum", String(iFrom + 1))); // 첫 스텝 번호
+        oG.setAttribute("title", (iFrom + 1) + "–" + (iTo + 1));
+        oG.addEventListener("click", function (ev) { ev.stopPropagation(); _wzOpenStepPopover(nav, ev.currentTarget, iFrom, iTo); });
+        return oG;
+    }
+
+    // 축소 연결선(고정폭) — 오른쪽 스텝 도달 시 accent 채움.
+    function _miniConn(a, iRight) {
+        var oC = _el("div", "u4aTplWiz__navConn u4aTplWiz__navConnMini");
+        if (a[iRight] && a[iRight].avail) { oC.classList.add("is-done"); }
+        return oC;
+    }
+
+    // 스텝 팝오버 (원본 grouped step popover) — [iFrom..iTo] 구간만(그룹 클릭 시 그 구간).
+    function _wzOpenStepPopover(nav, oAnchor, iFrom, iTo) {
+        _wzClosePop(nav);
+        var aSteps = _navSteps(nav);
+        var lo = (iFrom == null) ? 0 : iFrom;
+        var hi = (iTo == null) ? aSteps.length - 1 : iTo;
 
         var oPop = _el("div", "u4aTplWiz__navPop");
-        for (var i = 0; i < sec.steps.length; i++) {
-            var bAvail = !!(sec.avail && sec.avail[i]);
+        for (var i = lo; i <= hi; i++) {
+            var st = aSteps[i];
             var oRow = _el("div", "u4aTplWiz__navPopRow");
-            if (i === sec.iCur) { oRow.classList.add("is-current"); }
-            if (!bAvail) { oRow.classList.add("is-disabled"); }
+            if (st.current) { oRow.classList.add("is-current"); }
+            if (!st.avail) { oRow.classList.add("is-disabled"); }
             oRow.appendChild(_el("span", "u4aTplWiz__navPopNum", String(i + 1)));
-            oRow.appendChild(_el("span", "u4aTplWiz__navPopLbl", sec.steps[i].base + sec.steps[i].suffix()));
-            if (bAvail) {
-                oRow.addEventListener("click", (function (idx) {
-                    return function () { _wzClosePop(sec); _wzScrollToCard(sec, idx); };
-                })(i));
+            oRow.appendChild(_el("span", "u4aTplWiz__navPopLbl", st.label));
+            if (st.avail) {
+                (function (idx) {
+                    oRow.addEventListener("click", function () { _wzClosePop(nav); _navGo(nav, idx); });
+                })(i);
             }
             oPop.appendChild(oRow);
         }
@@ -745,25 +997,26 @@
             oPop.style.left = Math.round(Math.max(8, window.innerWidth - 8 - pr.width)) + "px";
         }
 
-        sec.els.pop = oPop;
+        nav.els.pop = oPop;
         // 바깥 클릭/스크롤/리사이즈 시 닫기.
-        sec._popClose = function () { _wzClosePop(sec); };
+        nav._popClose = function () { _wzClosePop(nav); };
         setTimeout(function () {
-            document.addEventListener("mousedown", sec._popOutside = function (ev) {
+            document.addEventListener("mousedown", nav._popOutside = function (ev) {
                 if (oPop.contains(ev.target)) { return; }
-                _wzClosePop(sec);
+                _wzClosePop(nav);
             }, true);
         }, 0);
-        window.addEventListener("resize", sec._popClose);
-        var oScroller = sec.els.nav.closest(".u4aTplWiz__page");
-        if (oScroller) { oScroller.addEventListener("scroll", sec._popClose, true); }
-        sec._popScroller = oScroller;
+        window.addEventListener("resize", nav._popClose);
+        var oScroller = nav.els.nav.closest(".u4aTplWiz__page");
+        if (oScroller) { oScroller.addEventListener("scroll", nav._popClose, true); }
+        nav._popScroller = oScroller;
     }
 
-    function _wzClosePop(sec) {
-        if (sec._popOutside) { try { document.removeEventListener("mousedown", sec._popOutside, true); } catch (e) { } sec._popOutside = null; }
-        if (sec._popClose) { try { window.removeEventListener("resize", sec._popClose); } catch (e) { } if (sec._popScroller) { try { sec._popScroller.removeEventListener("scroll", sec._popClose, true); } catch (e) { } } sec._popClose = null; sec._popScroller = null; }
-        if (sec.els && sec.els.pop) { try { sec.els.pop.remove(); } catch (e) { } sec.els.pop = null; }
+    function _wzClosePop(nav) {
+        if (!nav) { return; }
+        if (nav._popOutside) { try { document.removeEventListener("mousedown", nav._popOutside, true); } catch (e) { } nav._popOutside = null; }
+        if (nav._popClose) { try { window.removeEventListener("resize", nav._popClose); } catch (e) { } if (nav._popScroller) { try { nav._popScroller.removeEventListener("scroll", nav._popClose, true); } catch (e) { } } nav._popClose = null; nav._popScroller = null; }
+        if (nav.els && nav.els.pop) { try { nav.els.pop.remove(); } catch (e) { } nav.els.pop = null; }
     }
 
     // UI Choice 변경 (원본 ev_tmplWzd1SelectChangeEvent)
@@ -778,8 +1031,11 @@
         sec.els.tableWrap.innerHTML = "";
         sec.treevisi = (cfg.treeCapable && key === "sap.ui.table.TreeTable");
 
-        if (!key) { _prevInit(); }   // 미리보기 P1
-        else { _prevImage(key); }    // 미리보기 이미지
+        // 프리뷰 갱신 — WZD3(Report) 섹션은 메뉴 프리뷰(ReportTemplate) 고정이라 건드리지 않음(원본 동일).
+        if (!cfg.noPreview) {
+            if (!key) { _prevInit(); }   // 미리보기 P1
+            else { _prevImage(key); }    // 미리보기 이미지
+        }
 
         _wzSyncSteps(sec);           // 스텝 available/라벨 갱신 (step2 노출/숨김 포함)
         _syncCreateForMenu(oS.cur);
@@ -1148,7 +1404,7 @@
         for (var i = 0; i < sec.outab.length; i++) { if (sec.outab[i].enabled === true) { rows.push(sec.outab[i]); } }
 
         if (rows.length <= 0) {
-            _msg(10, "E", _mw("268")); // Selected line does not exists.
+            _alert("E", _mw("268")); // Selected line does not exists. (top-layer 박스)
             _busy(false);
             return null;
         }
@@ -1159,7 +1415,7 @@
             var bP = false, bC = false;
             for (var j = 0; j < rows.length; j++) { if (rows[j].PARENT === "X") { bP = true; } if (rows[j].CHILD === "X") { bC = true; } }
             if (!bP || !bC) {
-                _msg(10, "E", _mw("050", _cl("B76") + ", " + _cl("B77"))); // & is required.
+                _alert("E", _mw("050", _cl("B76") + ", " + _cl("B77"))); // & is required. (top-layer 박스)
                 _busy(false);
                 return null;
             }
@@ -1175,18 +1431,60 @@
         };
     }
 
+    /* ---- Report Template : 섹션 수집(원본 fnGetTmplWzd3Form/TableComplete) ----
+     *   행 미선택 = 348 "Please select a row of &1"(&1=D80 Form / D82 Table).
+     *   반환: oComplete(uName/mName/selTab/uiDDLB) 또는 { RETCD:"E", RTMSG }. */
+    function _wzGather(sid, sInfoKey) {
+        var sec = oS.sec[sid];
+        if (!sec || !sec.model) { return { RETCD: "E", RTMSG: _mw("348", _cl(sInfoKey)) }; }
+
+        var rows = [];
+        for (var i = 0; i < sec.outab.length; i++) { if (sec.outab[i].enabled === true) { rows.push(sec.outab[i]); } }
+        if (rows.length <= 0) { return { RETCD: "E", RTMSG: _mw("348", _cl(sInfoKey)) }; }
+
+        if (sec.treevisi) {
+            var bP = false, bC = false;
+            for (var j = 0; j < rows.length; j++) { if (rows[j].PARENT === "X") { bP = true; } if (rows[j].CHILD === "X") { bC = true; } }
+            if (!bP || !bC) { return { RETCD: "E", RTMSG: _mw("050", _cl("B76") + ", " + _cl("B77")) }; }
+        } else {
+            rows = rows.slice().sort(function (a, b) { return (a.POSIT - b.POSIT); });
+        }
+        return {
+            uName: sec.cfg.getSel(), mName: sec.model, selTab: rows,
+            uiDDLB: (oS.MASTER && oS.MASTER.T_UIDDLB) || []
+        };
+    }
+
+    /* ---- Report Template 통합 완료 (원본 ev_tmplWzd3Complete) ---- */
+    function _wz3Complete() {
+        _busy(true);
+        var oForm = _wzGather("WZD3F", "D80");  // Form Ui Model Information
+        if (oForm.RETCD === "E") { _alert("E", oForm.RTMSG); _busy(false); return; }
+        var oTable = _wzGather("WZD3T", "D82"); // Table Ui Model Information
+        if (oTable.RETCD === "E") { _alert("E", oTable.RTMSG); _busy(false); return; }
+
+        var oResult = { uName: "ReportTemplate", oSearch: oForm, oList: oTable };
+        if (typeof oAPP.fn.designWizardCallback === "function") {
+            oAPP.fn.designWizardCallback(oResult, function (oRet) {
+                _busy(false);
+                if (oRet && oRet.SUBRC === "E") { _alert("E", oRet.MSG); return; }
+                if (oRet && oRet.MSG) { _msg(10, "S", oRet.MSG); }
+                lf_close();
+            });
+        } else { _busy(false); }
+    }
+
     /* ==================================================================
      * 닫기 (원본 pressUiTempWizardDialogClose + afterClose 초기화)
      * ================================================================== */
     function lf_close() {
-        // 위자드 섹션 정리 — ResizeObserver + 열린 팝오버.
+        // 위자드 내비게이터 정리 — ResizeObserver + 열린 팝오버(섹션 자체 내비 + WZD3 통합 내비).
         try {
-            if (oS && oS.sec) {
-                for (var sid in oS.sec) {
-                    if (!Object.prototype.hasOwnProperty.call(oS.sec, sid)) { continue; }
-                    var s = oS.sec[sid];
-                    _wzClosePop(s);
-                    if (s.ro) { try { s.ro.disconnect(); } catch (e) { } s.ro = null; }
+            if (oS && oS.navs) {
+                for (var n = 0; n < oS.navs.length; n++) {
+                    var nv = oS.navs[n];
+                    _wzClosePop(nv);
+                    if (nv.ro) { try { nv.ro.disconnect(); } catch (e) { } nv.ro = null; }
                 }
             }
         } catch (e) { }
@@ -1319,18 +1617,34 @@
             ".u4aTplWiz__wz{display:flex;flex-direction:column;min-height:100%;}",
             ".u4aTplWiz__wzNav{position:sticky;top:0;z-index:2;display:flex;align-items:center;padding:.75rem 1.25rem;background:var(--surface);border-bottom:.0625rem solid var(--line);}",
             ".u4aTplWiz__navFull{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;}",
-            ".u4aTplWiz__navMini{display:none;align-items:center;flex:1 1 auto;min-width:0;gap:.625rem;}",
+            ".u4aTplWiz__navMini{display:none;align-items:center;flex:1 1 auto;min-width:0;gap:.15rem;}",
             ".u4aTplWiz__wzNav.is-collapsed .u4aTplWiz__navFull{display:none;}",
             ".u4aTplWiz__wzNav.is-collapsed .u4aTplWiz__navMini{display:flex;}",
-            ".u4aTplWiz__navMiniStep{cursor:pointer;min-width:0;flex:0 1 auto;}",
+            ".u4aTplWiz__navMiniStep{cursor:pointer;min-width:0;flex:0 1 auto;gap:0;}",
             ".u4aTplWiz__navMiniStep.is-current{min-width:0;flex:1 1 auto;}",
-            ".u4aTplWiz__navStep{display:flex;align-items:center;gap:.5rem;color:var(--text-muted);flex:0 0 auto;min-width:0;}",
-            ".u4aTplWiz__navNum{width:1.75rem;height:1.75rem;border-radius:50%;border:.125rem solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.8125rem;background:var(--surface);flex:0 0 auto;box-sizing:border-box;}",
+            /* 축소 연결선 : 고정폭(짧은 선) */
+            ".u4aTplWiz__navConnMini{flex:0 0 auto;width:1rem;min-width:1rem;margin:0;}",
+            /* 겹친 원(그룹) — 넘치는 스텝 묶음. 뒤로 반투명 원 2개가 살짝 겹쳐 스택처럼 보인다. 클릭=구간 팝오버 */
+            ".u4aTplWiz__navGroup{position:relative;display:flex;align-items:center;flex:0 0 auto;cursor:pointer;padding-right:.9rem;}",
+            ".u4aTplWiz__navGroup .u4aTplWiz__navNum{position:relative;z-index:2;}",
+            ".u4aTplWiz__navGroup::before,.u4aTplWiz__navGroup::after{content:\"\";position:absolute;top:50%;left:0;width:1.75rem;height:1.75rem;border-radius:50%;border:.125rem solid var(--line);background:var(--surface);box-sizing:border-box;}",
+            ".u4aTplWiz__navGroup::before{transform:translate(.3rem,-50%);z-index:1;opacity:.7;}",
+            ".u4aTplWiz__navGroup::after{transform:translate(.6rem,-50%);z-index:0;opacity:.4;}",
+            ".u4aTplWiz__navGroup.is-avail .u4aTplWiz__navNum{border-color:var(--accent);color:var(--accent);}",
+            ".u4aTplWiz__navGroup.is-avail::before,.u4aTplWiz__navGroup.is-avail::after{border-color:var(--accent);}",
+            ".u4aTplWiz__navStep{display:flex;align-items:center;gap:.5rem;color:var(--text-muted);flex:0 0 auto;min-width:0;transition:color .26s ease;}",
+            ".u4aTplWiz__navNum{width:1.75rem;height:1.75rem;border-radius:50%;border:.125rem solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.8125rem;background:var(--surface);flex:0 0 auto;box-sizing:border-box;transition:background-color .26s ease,border-color .26s ease,color .26s ease,transform .26s ease;}",
             ".u4aTplWiz__navLbl{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
             ".u4aTplWiz__navStep.is-avail{color:var(--text);cursor:pointer;}",
             ".u4aTplWiz__navStep.is-avail .u4aTplWiz__navNum{border-color:var(--accent);color:var(--accent);}",
-            ".u4aTplWiz__navStep.is-current .u4aTplWiz__navNum{background:var(--accent);border-color:var(--accent);color:#fff;}",
-            ".u4aTplWiz__navConn{flex:1 1 auto;height:.0625rem;background:var(--line);margin:0 1rem;min-width:1.5rem;}",
+            ".u4aTplWiz__navStep.is-current .u4aTplWiz__navNum{background:var(--accent);border-color:var(--accent);color:#fff;transform:scale(1.08);}", // 현재 스텝 번호 원 살짝 확대(강조)
+            /* 축소형(mini) : 현재 스텝 라벨만 부드럽게 펼침 */
+            ".u4aTplWiz__navMiniStep .u4aTplWiz__navLbl{max-width:0;opacity:0;margin-left:0;transition:max-width .3s ease,opacity .3s ease,margin-left .3s ease;}",
+            ".u4aTplWiz__navMiniStep.is-current .u4aTplWiz__navLbl{max-width:16rem;opacity:1;margin-left:.5rem;}",
+            /* 연결선 — is-done(뒤 스텝 도달) 시 좌→우로 accent 채움 */
+            ".u4aTplWiz__navConn{position:relative;overflow:hidden;flex:1 1 auto;height:.0625rem;background:var(--line);margin:0 1rem;min-width:1.5rem;}",
+            ".u4aTplWiz__navConn::after{content:\"\";position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);transition:width .35s ease;}",
+            ".u4aTplWiz__navConn.is-done::after{width:100%;}",
             /* 스텝 팝오버(반응형 축소 시 숫자버튼→목록) — 모달 top-layer 안 append */
             ".u4aTplWiz__navPop{position:fixed;z-index:5;min-width:12rem;background:var(--surface-raised);border:.0625rem solid var(--line);border-radius:var(--radius);box-shadow:var(--popover-shadow);padding:.25rem;}",
             ".u4aTplWiz__navPopRow{display:flex;align-items:center;gap:.5rem;padding:.375rem .625rem;border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap;color:var(--text);}",
@@ -1343,10 +1657,19 @@
             ".u4aTplWiz__steps{display:flex;flex-direction:column;gap:1rem;padding:1.25rem;}",
             /* scroll-margin-top = 스티키 진행바 높이 여유 → 스텝 이동 시 카드 제목이 진행바에 안 가려짐 */
             ".u4aTplWiz__stepCard{background:var(--surface-raised);border:.0625rem solid var(--line);border-radius:var(--radius);padding:1rem 1.25rem;scroll-margin-top:4rem;box-sizing:border-box;max-width:100%;}",
+            /* 스텝 카드 등장 — 숨김([hidden])이 풀릴 때 아래에서 위로 페이드인(원본 Wizard step reveal) */
+            "@keyframes u4aTplWizCardIn{from{opacity:0;transform:translateY(.5rem);}to{opacity:1;transform:none;}}",
+            ".u4aTplWiz__steps .u4aTplWiz__stepCard:not([hidden]){animation:u4aTplWizCardIn .28s ease both;}",
             ".u4aTplWiz__cardHead{font-weight:700;font-size:.9375rem;margin-bottom:.875rem;color:var(--text);}",
             ".u4aTplWiz__cardBody{min-width:0;}",
+            /* WZD3 Report Template — 원본 단일 위저드 6스텝. 통합 진행바 1개(sticky) + Form/Table 카드 스택 */
+            ".u4aTplWiz__wz3{display:flex;flex-direction:column;min-height:100%;}",
+            /* 통합 내비게이터 바로 아래 Form 카드묶음과 Table 카드묶음이 이어지므로 위쪽 카드묶음의 하단 패딩 제거(이중 여백 방지) */
+            ".u4aTplWiz__wz3 > .u4aTplWiz__steps:not(:last-child){padding-bottom:0;}",
             /* 반응형 — 좁은 폭에서 패딩 축소(고정 px 폭 지양, .analy 12 §7) */
             "@media (max-width:52rem){.u4aTplWiz__steps{padding:.75rem;}.u4aTplWiz__wzNav{padding:.5rem .75rem;}.u4aTplWiz__stepCard{padding:.75rem .875rem;}.u4aTplWiz__mainHead,.u4aTplWiz__paneHead{padding-left:.75rem;padding-right:.75rem;}}",
+            /* 모션 최소화 선호 시 애니메이션/트랜지션 해제 (.analy/16 §9 · ws20.css 페이지전환과 동일 정책) */
+            "@media (prefers-reduced-motion: reduce){.u4aTplWiz__navNum,.u4aTplWiz__navStep,.u4aTplWiz__navConn::after,.u4aTplWiz__navMiniStep .u4aTplWiz__navLbl{transition:none;}.u4aTplWiz__navStep.is-current .u4aTplWiz__navNum{transform:none;}.u4aTplWiz__steps .u4aTplWiz__stepCard:not([hidden]){animation:none;}}",
             ".u4aTplWiz__tblWrap{width:100%;max-width:100%;overflow-x:auto;}",
             /* 컬럼 폭 보장 — colgroup 고정폭 + 테이블 min-width, 좁으면 tblWrap 가로 스크롤 */
             ".u4aTplWiz__tbl{width:100%;}",

@@ -85,7 +85,8 @@ oAPP.fn.attachInit = async () => {
 
     jQuery.sap.require("sap.m.MessageBox");
 
-    parent.document.getElementById("u4aWsBusyIndicator").style.visibility = "hidden";
+    // 셸 공통 .u4a-busy 해제(초기 서버 UI5 로드 인디케이터) — 이후 콘텐츠 busy 는 oAPP.setBusy(UI5).
+    try { parent.oAPP.fn.setShellBusy(false); } catch (e) { }
 
     oAPP.setBusy("X");
 
@@ -766,16 +767,19 @@ function _onIpcMain_if_p13n_themeChange(){
 
     let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
     let oBrowserWindow = oAPP.REMOTE.getCurrentWindow();
-        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);    
+        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
 
-    sap.ui.getCore().applyTheme(oThemeInfo.THEME);
+    // 워크스페이스 테마(HTML5 키) → iframe UI5 테마명(셸 헬퍼). applyTheme/모델키 둘 다 UI5명이어야 함.
+    let sUI5Theme = (parent.oAPP.fn.toUI5Theme ? parent.oAPP.fn.toUI5Theme(oThemeInfo.THEME) : oThemeInfo.THEME);
+
+    sap.ui.getCore().applyTheme(sUI5Theme);
 
     let oModel = sap.ui.getCore().getModel();
     if(!oModel){
         return;
     }
 
-    oModel.setProperty("/THEME/THEME_KEY", oThemeInfo.THEME);
+    oModel.setProperty("/THEME/THEME_KEY", sUI5Theme);
 
 } // end of _onIpcMain_if_p13n_themeChange
 
@@ -1139,19 +1143,12 @@ oAPP.fn.fnInitRendering = function () {
         // properties
         showHeader: true,
         enableScrolling: false,
+        // ★ 창 크롬(로고/제목/min·max·close)은 셸 공통 .u4a-titlebar 로 외부화(index.html/index.js _initChrome).
+        //   여기 customHeader 에는 콘텐츠 컨트롤(아이콘 세트 SAP/U4A 전환 메뉴)만 남긴다.
         customHeader: new sap.m.Toolbar({
             content: [
-                new sap.m.Image({
-                    width: "25px",
-                    src: PATHINFO.WS_LOGO
-                }),
-                new sap.m.Title({
-                    text: "{/PRC/POP_TITLE}"
-                    // text: oAPP.msg.M047 + " - " + oAPP.attr.USERINFO.SYSID // Icon List
-                }),
-
+                // 양옆 스페이서로 아이콘 세트 메뉴(SAP/U4A)를 툴바 가운데 정렬.
                 new sap.m.ToolbarSpacer(),
-
                 new sap.m.MenuButton("hdMenuBtn", {
                     text: oAPP.msg.M0721, // "SAP Icons",
                     menu: new sap.m.Menu("hdMenu", {
@@ -1168,67 +1165,9 @@ oAPP.fn.fnInitRendering = function () {
                         ]
                     })
                 }),
-
                 new sap.m.ToolbarSpacer(),
-
-                new sap.m.Button({
-                    icon: "sap-icon://less",
-                    press: function () {
-
-                        CURRWIN.minimize();
-
-                    }
-                }).bindProperty("visible", "/PRC/MINI_INVISI", function (MINI_INVISI) {
-
-                    return (MINI_INVISI === "X" ? false : true);
-
-                }),
-                new sap.m.Button("maxWinBtn", {
-                    icon: "sap-icon://header",
-                    press: function (oEvent) {
-
-                        let bIsMax = CURRWIN.isMaximized();
-
-                        if (bIsMax) {
-                            CURRWIN.unmaximize();
-                            return;
-                        }
-
-                        CURRWIN.maximize();
-
-                    }
-                }),
-                new sap.m.Button({
-                    icon: "sap-icon://decline",
-                    press: function () {
-
-                        if (CURRWIN.isDestroyed()) {
-                            return;
-                        }
-
-                        CURRWIN.hide();
-
-                        // 콜백 메소드가 있는지 확인
-                        if (oAPP.attr.isCallback !== "X") {
-                            return;
-                        }
-
-                        // Parent가 존재하는지 확인
-                        if (!PARWIN || PARWIN.isDestroyed()) {
-                            return;
-                        }
-
-                        PARWIN.webContents.send("if-icon-url-callback", {
-                            RETCD: "C",
-                            RTDATA: ""
-                        });
-
-                        CURRWIN.setParentWindow(null);
-
-                    }
-                }),
             ]
-        }).addStyleClass("u4aWsBrowserDraggable"),
+        }),
 
         content: fnGetMainPageContents()
 
@@ -2234,9 +2173,12 @@ function _sendIconSrc(sIconSrc) {
             RTDATA: sIconSrc
         });
 
-        CURRWIN.hide();
-
+        // 콜백(F4 값도움) 창은 매번 새로 뜨므로 선택 후 파괴(숨은 창 누적 방지, index.js _onCloseBtn 과 짝).
         CURRWIN.setParentWindow(null);
+
+        if (!CURRWIN.isDestroyed()) {
+            CURRWIN.close();
+        }
 
         return;
     }

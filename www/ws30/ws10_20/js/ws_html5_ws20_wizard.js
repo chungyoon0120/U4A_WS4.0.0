@@ -106,11 +106,25 @@
      * ================================================================== */
     function _wizCallback(oReturn, fnCallback) {
 
-        // 바인딩 팝업 형제창 BUSY_ON (원본 broadcast) — 가드.
-        _bindBusy("BUSY_ON");
+        // 바인딩 팝업 형제창 BUSY_ON (원본 broadcast + DESC 215 메시지) — 가드.
+        _bindBusy("BUSY_ON", _busyOpt());
 
         var ls_tree = _selNode();
         if (!ls_tree) { _bindBusy("BUSY_OFF"); _fail(fnCallback, _mw("268")); return; }
+
+        // 대상에 UI 추가 가능한 aggregation 존재여부 점검 (원본 designChkSelLine — uiDesignArea.js 1357).
+        //   원본은 chkAggrRelation(...).length===0 이면 280 "입력 가능한 Aggregation이 존재하지 않습니다".
+        //   (designChkSelLine 은 oLTree1 의존이라 HTML5 선택노드로 재현. aggrSelectPopup 은 dnd 컨텍스트라
+        //    262 메시지를 내므로, 원본과 동일 메시지(280)를 여기서 먼저 낸다.)
+        if (oReturn.uName !== "ReportTemplate") {
+            var _cUIOBK = _uiobkOf(oReturn.uName);
+            if (_cUIOBK && typeof oAPP.fn.chkAggrRelation === "function" &&
+                oAPP.fn.chkAggrRelation(ls_tree.UIOBK, ls_tree.OBJID, _cUIOBK).length === 0) {
+                _bindBusy("BUSY_OFF");
+                _fail(fnCallback, _mw("280")); // 입력 가능한 Aggregation이 존재하지 않습니다.
+                return;
+            }
+        }
 
         // crtStru0014 + uName → UI OBJECT KEY 매핑 (원본 297~333).
         var ls_0014 = oAPP.fn.crtStru0014();
@@ -121,9 +135,11 @@
         try {
             oAPP.fn.aggrSelectPopup(ls_0014, ls_tree, function (aggr) {
                 _aggrCb(oReturn, ls_tree, aggr, fnCallback);
-            }, undefined, undefined, function () {
+            }, undefined, undefined, function (oCancel) {
+                // 후보 aggregation 0(대상에 추가 불가) 등 취소 사유를 팝업으로 전달 →
+                //   팝업이 top-layer 박스로 표시(토스트는 위자드 showModal 뒤로 가려짐). 262=이동 가능 aggregation 없음.
                 _bindBusy("BUSY_OFF");
-                try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                _fail(fnCallback, (oCancel && oCancel.RTMSG) || _mw("262"));
             });
         } catch (e) {
             console.error("[HTML5][WS20][tplwiz] aggrSelectPopup:", e && e.message ? e.message : e);
@@ -245,11 +261,20 @@
     function _fail(fnCallback, sMsg) {
         try { if (typeof fnCallback === "function") { fnCallback({ SUBRC: "E", MSG: sMsg }); } } catch (e) { }
     }
-    function _bindBusy(sPrccd) {
+    function _bindBusy(sPrccd, oOpt) {
         try {
             var sPath = oAPP.oDesign && oAPP.oDesign.pathInfo && oAPP.oDesign.pathInfo.bindPopupBroadCast;
-            if (sPath && typeof parent.require === "function") { parent.require(sPath)(sPrccd); }
+            if (sPath && typeof parent.require === "function") { parent.require(sPath)(sPrccd, oOpt); }
         } catch (e) { }
+    }
+    // BUSY_ON 옵션(형제창 busy 메시지) — 원본 _sOption.DESC=215 "디자인 화면에서 UI 추가 처리 작업을 진행하고 있습니다".
+    function _busyOpt() {
+        try {
+            var o = JSON.parse(JSON.stringify(oAPP.oDesign.types.TY_BUSY_OPTION));
+            var L = (oAPP.oDesign.settings && oAPP.oDesign.settings.GLANGU) || "";
+            o.DESC = parent.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", "215");
+            return o;
+        } catch (e) { return undefined; }
     }
     function _cl(sCode, p1) {
         try { return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", sCode, p1 || "", "", "", ""); }

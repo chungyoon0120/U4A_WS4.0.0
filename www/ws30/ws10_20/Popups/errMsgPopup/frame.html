@@ -33,11 +33,14 @@
         <iframe id="ws_frame" name="ws_frame" allowfullscreen></iframe>
     </div>
 
-    <!-- Page Loading Start -->
-    <div id="u4a_main_load" class="u4a_loaders">
-        <div class="cl_ring">LOADING<span class="cl_ringArea"></span></div>
+    <!-- 로딩 오버레이 = 공통 busy(.u4a-busy, shell.css SSOT — 카드+이중링 스피너, data-busy 토글, 0.3s 지연).
+         기본 숨김(data-busy 없음). 형제창 broadcast busy 시 setBusy→setBusyLoading('X')로 표시. -->
+    <div class="u4a-busy" id="u4a_main_load">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+            <div class="u4a-busy__label"></div>
+        </div>
     </div>
-    <!-- Page Loading End -->
 
     <script>
         /************************************************************************
