@@ -440,8 +440,38 @@
             oPage.appendChild(oNote);
         }
         // else (WZD2/WZD3): Stage 3 에서 위자드 스텝 UI 로 채움.
+
+        // ★스크롤 하단 가상 여백 — 스텝 클릭 시 마지막 섹션도 페이지 최상단으로 올라오게(그 아래 스크롤 공간 확보).
+        //   높이 = 페이지 높이 − 마지막 보이는 카드 높이(그만큼 뒤에 여백 → 마지막 카드가 top 까지 도달).
+        //   페이지 크기·콘텐츠(카드 등장/테이블 로드) 변화에 ResizeObserver 로 재계산.
+        var oPad = _el("div", "u4aTplWiz__scrollPad");
+        oPad.setAttribute("aria-hidden", "true");
+        oPage.appendChild(oPad);
+        oPage.__pad = oPad;
+        if (window.ResizeObserver) {
+            try {
+                var oContent = oPage.firstElementChild; // wz/wz3/note (pad 앞)
+                var roPad = new ResizeObserver(function () { _updateScrollPad(oPage); });
+                roPad.observe(oPage);
+                if (oContent) { roPad.observe(oContent); }
+                oPg.__ro = roPad; // 정리 대상: oUI.pages[key] = oPg (외부 래퍼)
+            } catch (e) { }
+        }
+
         oPg.appendChild(oPage);
         return oPg;
+    }
+
+    // 스크롤 하단 가상 여백 갱신 — 마지막 보이는 스텝 카드가 페이지 최상단까지 스크롤될 만큼 뒤 공간 확보.
+    function _updateScrollPad(oPage) {
+        if (!oPage || !oPage.__pad || !document.body.contains(oPage)) { return; }
+        var aCards = oPage.querySelectorAll(".u4aTplWiz__stepCard");
+        var oLast = null;
+        for (var i = aCards.length - 1; i >= 0; i--) { if (!aCards[i].hidden) { oLast = aCards[i]; break; } }
+        var iH = 0;
+        var iPageH = oPage.clientHeight;
+        if (oLast && iPageH > 0) { iH = Math.max(0, iPageH - oLast.offsetHeight - 8); } // 8 = 상단 여유
+        oPage.__pad.style.height = iH + "px";
     }
 
     /* ==================================================================
@@ -521,13 +551,22 @@
         if (!oTo) { return; }
         var oFrom = oUI.curPage;
 
+        // ★연타 방어 : 진행 중이던(또는 잔여) 전환을 즉시 정리 — 모든 페이지의 애니 클래스 제거 +
+        //   현재 페이지(oFrom)만 남기고 전부 hidden. (이전 전환의 _done 이 gen 으로 취소되며 남긴
+        //    "hidden=false + 잔여 클래스 + absolute" 잔여 페이지들이 겹쳐 그려지던 버그 제거)
+        for (var kc in oUI.pages) {
+            if (!Object.prototype.hasOwnProperty.call(oUI.pages, kc)) { continue; }
+            var pc = oUI.pages[kc];
+            pc.classList.remove("u4aWsNavInFwd", "u4aWsNavInBack", "u4aWsNavOutFwd", "u4aWsNavOutBack");
+            if (pc !== oFrom) { pc.hidden = true; }
+        }
+
         // 최초 표시(나가는 페이지 없음) 또는 동일 페이지 → 애니메이션 없이 확정.
         if (!oFrom || oFrom === oTo) {
-            for (var k in oUI.pages) {
-                if (Object.prototype.hasOwnProperty.call(oUI.pages, k)) { oUI.pages[k].hidden = (oUI.pages[k] !== oTo); }
-            }
+            oTo.hidden = false;
             oUI.curPage = oTo;
             oUI.curPageKey = sKey;
+            oUI.main.classList.remove("u4aTplWizNaving");
             return;
         }
 
@@ -535,10 +574,7 @@
         var sIn = bFwd ? "u4aWsNavInFwd" : "u4aWsNavInBack";
         var sOut = bFwd ? "u4aWsNavOutFwd" : "u4aWsNavOutBack";
 
-        var gen = (oS._mainNavGen = (oS._mainNavGen || 0) + 1); // 연타 stale animationend 차단
-        ["u4aWsNavInFwd", "u4aWsNavInBack", "u4aWsNavOutFwd", "u4aWsNavOutBack"].forEach(function (c) {
-            oTo.classList.remove(c); oFrom.classList.remove(c);
-        });
+        var gen = (oS._mainNavGen = (oS._mainNavGen || 0) + 1); // 연타 stale animationend 차단 (클래스 정리는 상단 루프가 이미 수행)
 
         oUI.main.classList.add("u4aTplWizNaving"); // 전환 중 두 페이지 겹침(absolute)
         oTo.hidden = false;
@@ -606,15 +642,16 @@
      * 완료(생성) — Stage 4 에서 designWizardCallback 연결.
      * ================================================================== */
     function lf_onCreate() {
+        _busy(true); // ★버튼 이벤트 진입 즉시 busy (첫 라인) — 이후 분기/검증/생성. 조기 return 은 각자 busy off.
+
         // 원본 ev_tmplWzdComplete : 현재 메뉴(SELKEY)로 위자드별 Complete dispatch.
-        if (oS && oS.cur === K_WZD3) { _wz3Complete(); return; } // Report Template = Form+Table 통합
+        if (oS && oS.cur === K_WZD3) { _wz3Complete(); return; } // Report Template = Form+Table 통합(자체 검증·busy off)
 
         var cfg = oS && oS.menuCfg && oS.menuCfg[oS.cur];
-        if (!cfg) { return; }
+        if (!cfg) { _busy(false); return; }
 
-        _busy(true);
         var oComplete = _wzComplete(cfg);
-        if (!oComplete) { return; } // 검증 실패 — _wzComplete 가 메시지/busy 처리
+        if (!oComplete) { return; } // 검증 실패 — _wzComplete 가 메시지 + _busy(false) 처리
 
         // Stage 4 : 생성 통합(ws_html5_ws20_wizard.js). 아직 미연결이면 무동작(대기).
         if (typeof oAPP.fn.designWizardCallback === "function") {
@@ -1505,6 +1542,16 @@
                 }
             }
         } catch (e) { }
+        // 페이지 스크롤 스페이서 ResizeObserver 정리.
+        try {
+            if (oUI && oUI.pages) {
+                for (var pk in oUI.pages) {
+                    if (!Object.prototype.hasOwnProperty.call(oUI.pages, pk)) { continue; }
+                    var op = oUI.pages[pk];
+                    if (op && op.__ro) { try { op.__ro.disconnect(); } catch (e) { } op.__ro = null; }
+                }
+            }
+        } catch (e) { }
         // 리사이즈 재클램프 리스너 정리 (§4.3).
         try { window.removeEventListener("resize", lf_clampSplit); } catch (e) { }
         try { if (oUI && oUI.ro) { oUI.ro.disconnect(); oUI.ro = null; } } catch (e) { }
@@ -1631,7 +1678,9 @@
             ".u4aTplWiz__note{display:flex;align-items:center;gap:.5rem;color:var(--text-muted);padding:1rem;}",
             ".u4aTplWiz__note i{font-size:1.25rem;opacity:.6;}",
             /* 위자드 (원본 sap.m.Wizard) — 진행 내비게이터(스티키) + 번호 스텝 카드 */
-            ".u4aTplWiz__wz{display:flex;flex-direction:column;min-height:100%;}",
+            ".u4aTplWiz__wz{display:flex;flex-direction:column;}",
+            /* 스크롤 하단 가상 여백 — 마지막 스텝 카드도 페이지 최상단까지 스크롤되게(높이는 _updateScrollPad 가 실측) */
+            ".u4aTplWiz__scrollPad{width:100%;flex:0 0 auto;pointer-events:none;}",
             ".u4aTplWiz__wzNav{position:sticky;top:0;z-index:2;display:flex;align-items:center;padding:.75rem 1.25rem;background:var(--surface);border-bottom:.0625rem solid var(--line);}",
             ".u4aTplWiz__navFull{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;}",
             ".u4aTplWiz__navMini{display:none;align-items:center;flex:1 1 auto;min-width:0;gap:0;}",
@@ -1682,7 +1731,7 @@
             ".u4aTplWiz__cardHead{font-weight:700;font-size:.9375rem;margin-bottom:.875rem;color:var(--text);}",
             ".u4aTplWiz__cardBody{min-width:0;}",
             /* WZD3 Report Template — 원본 단일 위저드 6스텝. 통합 진행바 1개(sticky) + Form/Table 카드 스택 */
-            ".u4aTplWiz__wz3{display:flex;flex-direction:column;min-height:100%;}",
+            ".u4aTplWiz__wz3{display:flex;flex-direction:column;}",
             /* 통합 내비게이터 바로 아래 Form 카드묶음과 Table 카드묶음이 이어지므로 위쪽 카드묶음의 하단 패딩 제거(이중 여백 방지) */
             ".u4aTplWiz__wz3 > .u4aTplWiz__steps:not(:last-child){padding-bottom:0;}",
             /* 반응형 — 좁은 폭에서 패딩 축소(고정 px 폭 지양, .analy 12 §7) */

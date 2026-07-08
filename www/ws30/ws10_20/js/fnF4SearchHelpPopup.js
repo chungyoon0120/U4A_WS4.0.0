@@ -173,10 +173,15 @@
         oFoot.appendChild(oCloseBtn);
         oDlg.appendChild(oFoot);
 
-        /* ── 검색/결과 Busy 토글(원본 table/button local busy 대체 — 경량) ── */
+        /* ── 검색/결과 Busy 토글 ──
+         *   ★공통 top-layer busy 사용(showModal <dialog id=u4aWsBusyIndicator> → setDomBusy).
+         *   자체 z-index/오버레이 하드코딩 금지 — 이 모달 팝업(showModal) 위에도 busy 가 보이려면
+         *   busy 도 top-layer 모달이어야 한다(부모 createApplicationPopup 과 동일한 parent.setBusy 경로).
+         *   (기존 aria-busy 흐림은 결과영역 시각 보조로 유지, 검색버튼 중복클릭 방지 disable 도 유지) */
         function _setSearchBusy(bBusy) {
             oSearchBtn.disabled = !!bBusy;
             oTableWrap.setAttribute("aria-busy", bBusy ? "true" : "false");
+            try { parent.setBusy(bBusy ? "X" : ""); } catch (e) { }
         }
 
         /* ── 행 빌드(가상 스크롤러가 보이는 구간만 호출). idx=절대 인덱스(zebra·선택키) ── */
@@ -322,7 +327,9 @@
             fd.append("_SHLPNAME", sShlpName);
             fd.append("_SHLPSUB", sShlpDef);
 
-            var sMax = (oMaxFld.getValue && oMaxFld.getValue()) ? oMaxFld.getValue() : String(DEFAULT_MAX_ROWS);
+            // ★원본(callF4HelpPopup.js) 계약: _MAXROWS 는 입력값을 그대로 전송(fallback 금지).
+            //   비우면 빈 값이 가고 서버가 전체 조회한다 — 여기서 기본값으로 대체하면 전체조회가 불가.
+            var sMax = (oMaxFld.getValue ? oMaxFld.getValue() : "");
             fd.append("_MAXROWS", sMax);
 
             // 검색조건 입력값 수집(키 = 소문자 x 치환 필드명).

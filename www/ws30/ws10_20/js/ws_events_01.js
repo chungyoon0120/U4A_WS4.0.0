@@ -272,29 +272,24 @@
      ************************************************************************/
     oAPP.events.ev_pressBindPopupBtn = (oEvent) => {
 
-        // ── [임시] 대형 별창 bindPopup HTML5 미변환 — 작업 완료 전까지 안내 토스트만 노출.
-        //   TODO(i18n): "아직 작업중입니다" 는 임시 하드코딩 → 변환 완료 시 아래 원본 로직 복원.
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
-        return;
+        var _sOption = {
+            TITLE: "",
+            DESC : "",
+        };
 
-        /* eslint-disable no-unreachable */
-        // var _sOption = {
-        //     TITLE: "",
-        //     DESC : "",
-        // };
+        //218  바인딩 팝업을 호출하고 있습니다.
+        _sOption.DESC = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "218");
 
-        // //218  바인딩 팝업을 호출하고 있습니다.
-        // _sOption.DESC = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "218");
+        parent.setBusy("X", _sOption);
 
-        // parent.setBusy("X", _sOption);
+        // Trial Version Check
+        if (oAPP.fn.fnOnCheckIsTrial()) {
+            parent.setBusy("", {});
+            return;
+        }
 
-        // // Trial Version Check
-        // if (oAPP.fn.fnOnCheckIsTrial()) {
-        //     parent.setBusy("", {});
-        //     return;
-        // }
-
-        // oAPP.fn.fnBindWindowPopupOpener();
+        // [HTML5] frameless 별창(bindPopup) 오픈 — 원본 opener 복원(fnDialogPopupOpener.js).
+        oAPP.fn.fnBindWindowPopupOpener();
 
     }; // end of oAPP.events.ev_pressBindPopupBtn
 

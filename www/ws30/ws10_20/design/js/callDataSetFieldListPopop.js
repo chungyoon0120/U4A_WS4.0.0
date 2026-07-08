@@ -1,690 +1,392 @@
-/* ================================================================= */
-// 설치 npm 
-// npm install mime-types
-/* ================================================================= */
-
-
-/* ================================================================= */
-// I/F 필드 정의 
-/* ================================================================= */
-/*
-
-*/
-/* ================================================================= */
-
-
-/* ================================================================= */
-// 사용 예시 
-// var ret = require(oAPP.path.join(__dirname, 'js/DataSet.js'));
-//     ret.send(p1);
-//                     
-/* ================================================================= */
-
-
-/* ================================================================= */
-/* 내부 펑션 
-/* ================================================================= */
-
-
-/* ================================================================= */
-/* Export Module Function 
-/* ================================================================= */
-
-
-var sap = global[0].sap;
-
-var oAPP = global[0].oAPP;
-
-//dataset의 view(table)명을 입력한 경우 입력 tab에 해당하는 검색조건 리스트 출력.
-async function lf_chkdataset(is_dataSet){
-
-    return new Promise((resolve, reject) => {
-        
-        // VIEW(TABLE)명이 입력되지 않은경우 EXIT.
-        if(!is_dataSet || !is_dataSet.TABNM || is_dataSet.TABNM === ""){
-            resolve({RETCD:"E"});
-            return;
-        }
-
-        //서버에서 호출전 화면 잠금 처리.
-        sap.ui.getCore().lock();
-
-        //busy dialog open.
-        parent.setBusy("X");
-
-        //VIEW(TABLE)명 서버전송 데이터 구성.
-        var oFormData = new FormData();
-        oFormData.append("TABNM", is_dataSet.TABNM);
-        
-        var l_TABTY = "";
-
-        switch (true) {
-            case is_dataSet.RB01:
-                //DATABASE VIEW를 선택한 경우.
-                l_TABTY = "V";
-                break;
-            
-            case is_dataSet.RB02:
-                //TRASNPARENT TABLE을 선택한 경우.
-                l_TABTY = "T";
-                break;
-        
-            default:
-                break;
-        }
-
-        oFormData.append("TABTY", l_TABTY);
-
-        //application 생성을 위한 서버 호출.
-        global[0].sendAjax(parent.getServerPath() + "/getDataSetSearchList", oFormData, function(ret){
-
-            //서버에서 클라이언트 도착 후 화면 잠금 해제 처리.
-            sap.ui.getCore().unlock();
-
-            //busy dialog close.
-            parent.setBusy("");
-
-            //wait off 처리.
-            parent.setBusy("");
-            
-            //async function 결과 return.
-            resolve(ret);
-
-
-        }); //application 생성을 위한 서버 호출.
-
-
-    });
-
-}  //dataset의 view(table)명을 입력한 경우 입력 tab에 해당하는 검색조건 리스트 출력.
-
-
-
-//DATASET의 VIEW(TABLE)명에 해당하는 검색조건 필드 선택 팝업.
-exports.callDataSetFieldListPopop = async function(is_dataSet, oAPP){
-    
-    return new Promise( async(resolve, reject) => {
-
-        //입력 TABLE명에 해당하는 필드정보 얻기.
-        var ls_ret = await lf_chkdataset(is_dataSet);
-
-        //필드정보를 얻지 못한 경우 EXIT.
-        if(ls_ret.RETCD === "E"){
-            //async function 결과 return.
-            resolve(ls_ret);
-            return;
-        }
-
-        sap.ui.getCore().loadLibrary("sap.m");
-        sap.ui.getCore().loadLibrary("sap.ui.table");
-
-        //검색조건 필드 선택 리스트 팝업.
-        var oDlg = new sap.m.Dialog({resizable:true, draggable:true, 
-            contentWidth:"40%", contentHeight:"50%", escapeHandler:function(){}});
-        oDlg.addStyleClass("sapUiSizeCompact");
-
-        var oModel = new sap.ui.model.json.JSONModel();
-        oDlg.setModel(oModel);
-
-        //팝업 상단 툴바.
-        var oTool = new sap.m.Toolbar();
-        oDlg.setCustomHeader(oTool);
-
-        //B30  Choose Search Field
-        var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B30", "", "", "", "");
-
-        //검색조건 컬럼 radio 선택건에 따른 title 추가.
-        switch(is_dataSet.SCCNT){
-            case 0:
-                //E12	One Column
-                l_txt = l_txt + " - " + oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E12", "", "", "", "");
-                break;
-            case 1:
-                //E13	Two Columns
-                l_txt = l_txt + " - " + oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E13", "", "", "", "");
-                break;
-            case 2:
-                //E14	Three Columns
-                l_txt = l_txt + " - " + oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E14", "", "", "", "");;
-                break;
-            case 3:
-                //E15	Four Columns
-                l_txt = l_txt + " - " + oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E15", "", "", "", "");
-                break;
-        }
-
-        //팝업 상단 타이틀.
-        var oTitle = new sap.m.Title({text:l_txt, tooltip:l_txt});
-        oTitle.addStyleClass("sapUiTinyMarginBegin");
-        oTool.addContent(oTitle);
-
-        oTool.addContent(new sap.m.ToolbarSpacer());
-
-        //A39  Close
-        //팝업 상단 닫기버튼.
-        var oBtn0 = new sap.m.Button({type:"Reject", icon:"sap-icon://decline", 
-            tooltip:oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39", "", "", "", "")});
-        oTool.addContent(oBtn0);
-
-        //팝업 상단 닫기버튼 선택 이벤트.
-        oBtn0.attachPress(function(){
-            //팝업 종료 처리.
-            lf_close(oDlg);
-
-            //001	Cancel operation
-            resolve({RETCD:"C", RTMSG:oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "001", "", "", "", "")});
-
-        }); //팝업 상단 닫기버튼 선택 이벤트.
-
-
-        //A40  Confirm
-        //확인버튼.
-        var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A40", "", "", "", "");
-        var oBtn1 = new sap.m.Button({type:"Accept", icon:"sap-icon://accept", text:l_txt, tooltip:l_txt});
-        oDlg.addButton(oBtn1);
-
-        //확인버튼 선택 이벤트.
-        oBtn1.attachPress(function(){
-
-            //리스트 입력건 점검.
-            if(lf_chkList(oModel) === true){return;}
-
-            //팝업 종료 처리.
-            lf_close(oDlg, true);
-            
-            //검색조건으로 사용할 필드 리스트를 return 처리.
-            resolve({RETCD:"S", TDESC:ls_ret.TDESC, FLIST: lf_getSelectedList(oModel)});
-
-
-        }); //확인버튼 선택 이벤트.
-        
-
-        //A41  Cancel
-        //취소버튼.
-        var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A41", "", "", "", "");
-        var oBtn2 = new sap.m.Button({type:"Reject", icon:"sap-icon://decline", text:l_txt, tooltip:l_txt});
-        oDlg.addButton(oBtn2);
-
-        //취소버튼버튼 선택 이벤트.
-        oBtn2.attachPress(function(){
-            //팝업 종료 처리.
-            lf_close(oDlg);
-
-            //001	Cancel operation
-            resolve({RETCD:"C", RTMSG:oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "001", "", "", "", "")});
-
-        }); //취소버튼 선택 이벤트.
-
-        
-        var oPage = new sap.m.Page({showHeader:false});
-        oDlg.addContent(oPage);
-
-        var oVbox = new sap.m.VBox({height:"100%", width:"100%", renderType:"Bare"});
-        oPage.addContent(oVbox);
-
-
-        //검색조건 리스트 table.
-        var oTab = new sap.ui.table.Table({selectionMode:"None", visibleRowCountMode:"Auto",
-            layoutData: new sap.m.FlexItemData({growFactor:1})});
-        oVbox.addItem(oTab);
-
-        oTab.addStyleClass("sapUiTinyMarginBeginEnd");
-
-        //테이블 toolbar.
-        var oTool1 = new sap.m.Toolbar();
-        oTab.setToolbar(oTool1);
-
-
-        //B33  Select All
-        var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B33", "", "", "", "");
-
-        //전체선택 버튼.
-        var oBtn3 = new sap.m.Button({type:"Emphasized", icon:"sap-icon://multiselect-all", text:l_txt, tooltip:l_txt});
-        oTool1.addContent(oBtn3);
-
-        //전체선택 버튼 이벤트.
-        oBtn3.attachPress(function(){
-            //table 전체 선택 처리.
-            lf_selectionAll(oModel, oTab, true);
-
-            //token update 처리.
-            lf_tokenUpdate(oModel);
-
-        }); //전체선택 버튼 이벤트.
-
-
-        //B23  Clear selection
-        var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B23", "", "", "", "");
-
-        //전체선택 해제 버튼.
-        var oBtn4 = new sap.m.Button({type:"Emphasized", icon:"sap-icon://multiselect-none", text:l_txt, tooltip:l_txt});
-        oTool1.addContent(oBtn4);
-
-        //전체선택 해제 버튼 이벤트.
-        oBtn4.attachPress(function(){
-            //전체 선택 해제 처리.
-            lf_selectionAll(oModel, oTab, false);
-
-            //token update 처리.
-            lf_tokenUpdate(oModel);
-
-        }); //전체선택 해제 버튼 이벤트.
-
-
-        oTool1.addContent(new sap.m.ToolbarSeparator());
-
-        //라인 선택건 표현 TEXT.
-        oTool1.addContent(new sap.m.Title({text:"{/SEL_CNT}"}));
-
-        oTool1.addContent(new sap.m.ToolbarSpacer());
-        
-        //전체 라인수 표현 TEXT.
-        oTool1.addContent(new sap.m.Label({design:"Bold", text:"{/TOT_CNT}"}).addStyleClass("sapUiTinyMarginEnd"));
-
-
-        //체크박스 컬럼.
-        var oCol1 = new sap.ui.table.Column({width:"60px", hAlign:"Center"});
-        oTab.addColumn(oCol1);
-
-        //라인별 선택 CHECKBOX.
-        var oChk1 = new sap.m.CheckBox({selected:"{SEL}", enabled:"{ENAB_SEL}"});
-        oCol1.setTemplate(oChk1);
-
-        //체크박스 선택 이벤트.
-        oChk1.attachSelect(function(oEvent){
-
-            //체크박스 선택에 따른 표현 처리.
-            lf_setHighlightLine(this, oModel);
-
-            //체크박스 선택건 카운팅.
-            lf_checkboxSelectedCount(oModel);
-
-            //token update 처리.
-            lf_tokenUpdate(oModel);
-
-        }); //체크박스 선택 이벤트.
-
-
-        //D68  Field Name
-        var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D68", "", "", "", "");
-
-        //필드명 컬럼.
-        var oCol2 = new sap.ui.table.Column({
-            label:new sap.m.Label({design:"Bold", text:l_txt, tooltip:l_txt}),
-            template:new sap.m.Text({text:"{FLDNM}", tooltip:"{FLDNM}"}),
-            sortProperty:"FLDNM", filterProperty:"FLDNM"
+/**************************************************************************
+ * callDataSetFieldListPopop.js  (HTML5)
+ * ------------------------------------------------------------------------
+ * [컨버전 메모]
+ *  원본: Node CJS 모듈(global[0].sap/oAPP/sendAjax) + sap.m.Dialog + sap.ui.table.Table
+ *        (DataSet "검색조건 필드 선택" B30 — MultiToggle 체크박스 멀티선택 + Token + 전체선택/해제).
+ *  HTML5: design 컨텍스트 스크립트(createApplicationPopup 의 lf_getScript 로 eval 로드) →
+ *        oAPP.fn._DATASET = { callDataSetFieldListPopop }. native <dialog class="u4a-dialog"> +
+ *        공통 .u4a-table 멀티선택(체크박스 열 + 헤더 전체선택 + 토큰칩, CSS/JS Link Add §4-14 패턴)
+ *        + makeDialogDraggable/Resizable/Recenter. sap.* / global[0] 의존 전부 제거.
+ *
+ *  ★ 로직/반환 계약 보존(원본 1:1):
+ *   - _chkDataset: POST {servNm}/getDataSetSearchList (TABNM, TABTY=V|T) → {RETCD, TDESC, T_LIST:[
+ *        {TABNM,FLDNM,FLDTX,FLDTT,ISKEY("X"),ENAB01("")}]}.
+ *   - 반환: {RETCD:"E"}(TABNM 없음/서버 E) / {RETCD:"C",RTMSG:001}(닫기·취소) /
+ *          {RETCD:"S",TDESC,FLIST(선택 FLDNM 을 "|" 로 조인)}.
+ *   - 확인 검증(원본 lf_chkList): 결과 없음(227) / 미선택(268) / 30건 초과(300).
+ *   - sap.ui.getCore().lock/unlock 은 제거(부모 setBusy 가 시각 잠금 담당).
+ **************************************************************************/
+(function () {
+    "use strict";
+
+    var _fa = function (s) { return '<i class="fa-solid fa-' + s + '"></i>'; };
+
+    function _el(tag, cls, txt) {
+        var o = document.createElement(tag);
+        if (cls) { o.className = cls; }
+        if (txt != null) { o.textContent = txt; }
+        return o;
+    }
+
+    // 메시지 텍스트(원본 fnGetMsgClsText). oAPP 는 호출 시 전달(디자인 컨텍스트).
+    function _txt(oAPP, sCls, sCode, p1) {
+        try { return oAPP.common.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); } catch (e) { return sCode; }
+    }
+    // 공통 no-data(946) — ZMSG_WS_COMMON_001, 워크스페이스 언어.
+    function _wsTxt(sNo) {
+        try {
+            var sLangu = (parent.getUserInfo() || {}).LANGU;
+            return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sNo);
+        } catch (e) { return sNo; }
+    }
+    // 공통 토스트(셸 showMessage KIND 10) — 형제 멀티선택 팝업(CssJsLink/동일속성동기화)과 동일 전달.
+    function _toast(sType, sText) { try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { } }
+
+
+    /* ── 스코프 스타일 1회 주입(토큰 기반, 공통 컴포넌트와 일관) ── */
+    function _ensureStyle() {
+        if (document.getElementById("u4aDsFldStyle")) { return; }
+        var s = document.createElement("style");
+        s.id = "u4aDsFldStyle";
+        s.textContent = [
+            ".u4aDsFldDlg{width:min(92vw,720px);height:min(84vh,600px);padding:0;display:flex;flex-direction:column;}",
+            ".u4aDsFldDlg .u4a-dialog__header{cursor:move;user-select:none;}",
+            ".u4aDsFldDlg .u4a-dialog__header span{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+            ".u4aDsFldBody{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:.5rem;padding:.75rem;}",
+            /* 툴바 */
+            ".u4aDsFldBar{flex:0 0 auto;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;}",
+            ".u4aDsFldSep{width:.0625rem;height:1.25rem;background:var(--line);margin:0 .25rem;}",
+            ".u4aDsFldSpacer{flex:1 1 auto;}",
+            ".u4aDsFldSel{color:var(--text);font-weight:600;white-space:nowrap;}",
+            ".u4aDsFldTot{color:var(--text-muted);font-weight:700;white-space:nowrap;}",
+            /* 멀티선택 테이블 */
+            ".u4aDsFldTableWrap{flex:1 1 auto;min-height:0;overflow:auto;}",
+            /* 체크박스·키필드 열=가운데. ★공통 .u4a-table thead th{text-align:left}(0,1,2)를 이기려 특이도 상향
+               (.u4aDsFldTable 선행 → 0,2,0) — 안 그러면 헤더 체크박스/"키필드"는 좌측, 바디는 가운데로 어긋남. */
+            ".u4aDsFldTable .u4aDsFldColChk{width:2.75rem;text-align:center;}",
+            ".u4aDsFldTable .u4aDsFldColKey{width:5rem;text-align:center;}",
+            /* 셀 말줄임/툴팁은 공통 .u4a-table(tbody td nowrap+ellipsis + 자동 data-tip-trunc)에 위임 — 커스텀 override 안 함 */
+            ".u4aDsFldTable tr[data-disabled=\"true\"]{opacity:.55;}",
+            ".u4aDsFldRowChk,.u4aDsFldHeadChk,.u4aDsFldKeyChk{width:1rem;height:1rem;accent-color:var(--accent);margin:0;}",
+            ".u4aDsFldRowChk,.u4aDsFldHeadChk{cursor:pointer;}",
+            /* ★방어 — 이 테이블 셀에 예기치 않은 ::before/::after 글리프(점/프리픽스)가 붙는 것 차단.
+               형제 CssJsLink(.u4aCslTable td::before/::after{content:none})와 동일 이슈 — 체크박스 옆 "점"의 정체. */
+            ".u4aDsFldTable td::before,.u4aDsFldTable td::after{content:none !important;}",
+            /* 선택 필드 토큰(칩) */
+            ".u4aDsFldTokens{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:.375rem;max-height:5.5rem;overflow:auto;}",
+            ".u4aDsFldTokens:empty{display:none;}",
+            ".u4aDsFldTok{display:inline-flex;align-items:center;gap:.375rem;padding:.1875rem .5rem;border:.0625rem solid var(--divider);border-radius:1rem;background:var(--surface-raised);color:var(--text);font-size:.8125rem;}",
+            ".u4aDsFldTokX{border:0;background:transparent;color:var(--text-muted);cursor:pointer;padding:0;line-height:1;font-size:.75rem;}",
+            ".u4aDsFldTokX:hover{color:var(--state-error);}",
+            ""
+        ].join("\n");
+        document.head.appendChild(s);
+    }
+
+    /* ── 서버 조회: view(table)명의 검색조건 필드 리스트 (원본 lf_chkdataset) ── */
+    function _chkDataset(is_dataSet) {
+        return new Promise(function (resolve) {
+            // VIEW(TABLE)명 미입력이면 EXIT.
+            if (!is_dataSet || !is_dataSet.TABNM || is_dataSet.TABNM === "") {
+                resolve({ RETCD: "E" });
+                return;
+            }
+            parent.setBusy("X");
+            var fd = new FormData();
+            fd.append("TABNM", is_dataSet.TABNM);
+            var l_TABTY = is_dataSet.RB01 ? "V" : (is_dataSet.RB02 ? "T" : "");   // V=Database View / T=Transparent Table
+            fd.append("TABTY", l_TABTY);
+            try {
+                sendAjax(parent.getServerPath() + "/getDataSetSearchList", fd, function (ret) {
+                    parent.setBusy("");
+                    resolve(ret || { RETCD: "E" });
+                });
+            } catch (e) { parent.setBusy(""); resolve({ RETCD: "E" }); }
         });
-        oTab.addColumn(oCol2);
-
-        //E16  Key Field
-        var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E16", "", "", "", "");
-
-        //key 여부 컬럼.
-        var oCol3 = new sap.ui.table.Column({
-            width:"80px", hAlign:"Center",
-            label:new sap.m.Label({design:"Bold", text:l_txt, tooltip:l_txt}),
-            template:new sap.m.CheckBox({selected:"{isKey}", enabled:false})
-        });
-        oTab.addColumn(oCol3);
-
-        //A35  Description
-        var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A35", "", "", "", "");
-
-        //필드내역 컬럼.
-        var oCol4 = new sap.ui.table.Column({
-            label:new sap.m.Label({design:"Bold", text:l_txt, tooltip:l_txt}),
-            template:new sap.m.Text({text:"{FLDTX}", tooltip:"{FLDTT}"}),
-            sortProperty:"FLDTX", filterProperty:"FLDTX"
-        });
-        oTab.addColumn(oCol4);
-
-        //필드 리스트 테이블 바인딩 처리.
-        oTab.bindAggregation("rows", {path:"/T_LIST", template:new sap.ui.table.Row()});
-
-        //row 선택에 관련된 표현을 위한 UI 추가.
-        oTab.setRowSettingsTemplate(new sap.ui.table.RowSettings({highlight:"{highlight}"}));
-
-
-        //필드 선택건 표시 token.
-        var oHbox = new sap.m.HBox({wrap:"Wrap"});
-        oVbox.addItem(oHbox);
-
-        oHbox.addStyleClass("sapUiTinyMarginBegin");
-
-        var oToken = new sap.m.Token({key:"{KEY}", text:"{TEXT}"});
-        oToken.addStyleClass("sapUiTinyMarginEnd");
-
-        //token 삭제 이벤트.
-        oToken.attachDelete(function(oEvent){
-            //token 삭제 및 체크박스 해제 처리.
-            lf_delToken(this, oModel);
-
-            //체크박스 선택건 카운팅.
-            lf_checkboxSelectedCount(oModel);
-
-        }); //token 삭제 이벤트.
-
-
-        //필드 선택건 표시 token 바인딩 처리.
-        oHbox.bindAggregation("items", {path:"/T_TOKEN", template:oToken});
-
-        //model data 구성.
-        oModel.setData({T_LIST:lf_setBindList(ls_ret.T_LIST)});
-
-        //체크박스 선택건 카운팅.
-        lf_checkboxSelectedCount(oModel);
-
-        //필드 검색건수 카운팅.
-        lf_setTotalCount(oModel);
-
-        //팝업 호출.
-        oDlg.open();
-
-
-    });
-
-
-};  //DATASET의 VIEW(TABLE)명에 해당하는 검색조건 필드 선택 팝업.
-
-
-
-//리스트 입력건 점검.
-function lf_chkList(oModel){
-
-    var lt_list = oModel.getProperty("/T_LIST");
-    if(!lt_list || lt_list.length === 0){
-        //227  Result not found.
-        parent.showMessage(sap, 20, "E", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "227", "", "", "", ""));
-        return true;
     }
 
-    //선택 라인정보 얻기.
-    var lt_filt = lt_list.filter( a=> a.SEL === true );
-
-    //체크박스 선택건이 존재하지 않는경우.
-    if(lt_filt.length === 0){
-        //268  Selected line does not exists.
-        parent.showMessage(sap, 20, "E", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "268", "", "", "", ""));
-        return true;
+    /* ── T_LIST → 렌더 행(원본 lf_setBindList) ── */
+    function _setBindList(T_LIST) {
+        if (!T_LIST || !T_LIST.length) { return []; }
+        var out = [];
+        for (var i = 0; i < T_LIST.length; i++) {
+            var r = T_LIST[i];
+            out.push({
+                TABNM: r.TABNM, FLDNM: r.FLDNM, FLDTX: r.FLDTX, FLDTT: r.FLDTT,
+                isKey: r.ISKEY === "X",
+                ENAB_SEL: r.ENAB01 !== "",   // ENAB01==="" 면 선택 불가(원본 동일)
+                SEL: false
+            });
+        }
+        return out;
     }
 
-    //체크박스 선택건이 30건을 초과하는 경우.
-    if(lt_filt.length > 30 ){
-        //300	Choose no more than 30 entries
-        parent.showMessage(sap, 20, "E", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "300", "", "", "", ""));
-        return true;
-    }
+    /* ====================================================================
+     * 메인 — 검색조건 필드 선택 팝업(원본 exports.callDataSetFieldListPopop)
+     * ================================================================== */
+    async function _run(is_dataSet, oAPP, resolve) {
 
-}   //리스트 입력건 점검.
+        _ensureStyle();
 
+        // 입력 TABLE명에 해당하는 필드정보 얻기. 못 얻으면 EXIT(원본 동일).
+        var ls_ret = await _chkDataset(is_dataSet);
+        if (ls_ret.RETCD === "E") { resolve(ls_ret); return; }
 
+        var aRows = _setBindList(ls_ret.T_LIST);
 
-//필드 리스트 바인딩정보 구성.
-function lf_setBindList(T_LIST){
+        var bResolved = false;
+        function _resolveOnce(o) { if (bResolved) { return; } bResolved = true; resolve(o); }
 
-    if(!T_LIST || T_LIST.length === 0){return [];}
-
-    var lt_list=[], ls_list = {};
-
-    for(var i=0, l=T_LIST.length; i<l; i++){
-
-        //VIEW(TABLE)명.
-        ls_list.TABNM = T_LIST[i].TABNM;
-
-        //필드명.
-        ls_list.FLDNM = T_LIST[i].FLDNM;
-
-        //필드 내역.
-        ls_list.FLDTX = T_LIST[i].FLDTX;
-
-        //필드 내역 tooltip.
-        ls_list.FLDTT = T_LIST[i].FLDTT;
-
-        //default keyfield 여부 false.
-        ls_list.isKey = false;
-
-        //KEY FIELD인경우.
-        if(T_LIST[i].ISKEY === "X"){
-            ls_list.isKey = true;
+        // ── 다이얼로그 골격 ──
+        var oDlg = _el("dialog", "u4a-dialog u4aDsFldDlg");
+        function _close() { try { oDlg.close(); } catch (e) { } try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { } }
+        function _cancel() {
+            _close();
+            // 001 Cancel operation
+            _resolveOnce({ RETCD: "C", RTMSG: _txt(oAPP, "/U4A/MSG_WS", "001") });
         }
 
-        //default checkbox 선택 가능 처리.
-        ls_list.ENAB_SEL = true;
+        // 제목: B30(Choose Search Field) + " - " + 컬럼수(E12~E15, SCCNT).
+        var sTitle = _txt(oAPP, "/U4A/CL_WS_COMMON", "B30");
+        var sColKey = ["E12", "E13", "E14", "E15"][is_dataSet.SCCNT || 0];
+        if (sColKey) { sTitle += " - " + _txt(oAPP, "/U4A/CL_WS_COMMON", sColKey); }
 
-        //default 선택 해제 처리.
-        ls_list.SEL = false;
+        var oHeader = _el("div", "u4a-dialog__header");
+        oHeader.innerHTML = _fa("list-check") + "<span></span>";
+        oHeader.querySelector("span").textContent = sTitle;
+        var oXBtn = _el("button", "u4a-btn-icon");
+        oXBtn.type = "button"; oXBtn.setAttribute("data-act", "close");
+        oXBtn.title = _txt(oAPP, "/U4A/CL_WS_COMMON", "A39"); oXBtn.innerHTML = _fa("xmark");  // Close
+        oXBtn.addEventListener("click", _cancel);
+        oHeader.appendChild(oXBtn);
+        oDlg.appendChild(oHeader);
 
-        //checkbox 선택 불가능건인경우.
-        if(T_LIST[i].ENAB01 === ""){
-            //checkbox 선택 불가 처리.
-            ls_list.ENAB_SEL = false;
+        var oBody = _el("div", "u4a-dialog__body u4aDsFldBody");
+        oDlg.appendChild(oBody);
 
+        // ── 툴바: [전체선택][해제] | 선택수 … 총건수 ──
+        var oBar = _el("div", "u4aDsFldBar");
+
+        var oSelAllBtn = _el("button", "u4a-btn");   // 툴바 보조액션 → 기본 톤(강조=주요 액션[확인]만, btn-color-semantics)
+        oSelAllBtn.type = "button";
+        oSelAllBtn.innerHTML = _fa("check-double") + "<span></span>";
+        oSelAllBtn.querySelector("span").textContent = _txt(oAPP, "/U4A/CL_WS_COMMON", "B33"); // Select All
+        oSelAllBtn.addEventListener("click", function () { _selectAll(true); });
+        oBar.appendChild(oSelAllBtn);
+
+        var oClrBtn = _el("button", "u4a-btn");
+        oClrBtn.type = "button";
+        oClrBtn.innerHTML = _fa("xmark") + "<span></span>";
+        oClrBtn.querySelector("span").textContent = _txt(oAPP, "/U4A/CL_WS_COMMON", "B23"); // Clear selection
+        oClrBtn.addEventListener("click", function () { _selectAll(false); });
+        oBar.appendChild(oClrBtn);
+
+        oBar.appendChild(_el("span", "u4aDsFldSep"));
+        var oSelLb = _el("span", "u4aDsFldSel");
+        oBar.appendChild(oSelLb);
+        oBar.appendChild(_el("span", "u4aDsFldSpacer"));
+        var oTotLb = _el("span", "u4aDsFldTot");
+        oBar.appendChild(oTotLb);
+        oBody.appendChild(oBar);
+
+        // ── 테이블(공통 .u4a-table + 멀티선택 체크박스 열) ──
+        var oWrap = _el("div", "u4a-table-wrap u4a-table-wrap--boxed u4aDsFldTableWrap");
+        var oTable = _el("table", "u4a-table u4aDsFldTable");
+        var oThead = _el("thead");
+        var oHtr = _el("tr");
+        var oThChk = _el("th", "u4aDsFldColChk");
+        var oHeadChk = _el("input"); oHeadChk.type = "checkbox"; oHeadChk.className = "u4aDsFldHeadChk";
+        oHeadChk.title = _txt(oAPP, "/U4A/CL_WS_COMMON", "B33");
+        oHeadChk.addEventListener("change", function () { _selectAll(oHeadChk.checked); });
+        oThChk.appendChild(oHeadChk);
+        oHtr.appendChild(oThChk);
+        oHtr.appendChild(_el("th", null, _txt(oAPP, "/U4A/CL_WS_COMMON", "D68")));                 // Field Name
+        oHtr.appendChild(_el("th", "u4aDsFldColKey", _txt(oAPP, "/U4A/CL_WS_COMMON", "E16")));      // Key Field
+        oHtr.appendChild(_el("th", null, _txt(oAPP, "/U4A/CL_WS_COMMON", "A35")));                  // Description
+        oThead.appendChild(oHtr);
+        var oTbody = _el("tbody");
+        oTable.append(oThead, oTbody);
+        oWrap.appendChild(oTable);
+        oBody.appendChild(oWrap);
+
+        // ── 선택 필드 토큰(칩) ──
+        var oTokens = _el("div", "u4aDsFldTokens");
+        oBody.appendChild(oTokens);
+
+        // ── 푸터: 확인 / 취소(아이콘, 원본 Accept/Reject 톤) ──
+        var oFoot = _el("div", "u4a-dialog__footer");
+        oFoot.appendChild(_el("span", "u4aDsFldSpacer"));
+        var oOkBtn = _el("button", "u4a-btn u4a-btn--emphasized");
+        oOkBtn.type = "button"; oOkBtn.innerHTML = _fa("check");
+        oOkBtn.title = _txt(oAPP, "/U4A/CL_WS_COMMON", "A40"); // Confirm
+        oOkBtn.addEventListener("click", function () { _confirm(); });
+        oFoot.appendChild(oOkBtn);
+        var oCancelBtn = _el("button", "u4a-btn u4a-btn--negative");
+        oCancelBtn.type = "button"; oCancelBtn.innerHTML = _fa("xmark");
+        oCancelBtn.title = _txt(oAPP, "/U4A/CL_WS_COMMON", "A41"); // Cancel
+        oCancelBtn.addEventListener("click", _cancel);
+        oFoot.appendChild(oCancelBtn);
+        oDlg.appendChild(oFoot);
+
+        /* ── 렌더/상태 함수 ─────────────────────────────────────── */
+        function _selCount() { return aRows.filter(function (r) { return r.SEL === true; }).length; }
+
+        function _buildRow(r, idx) {
+            var oTr = _el("tr");
+            if (idx % 2 === 1) { oTr.setAttribute("data-odd", "true"); }   // zebra — 공통 [data-odd](형제 팝업 동일)
+            if (!r.ENAB_SEL) { oTr.setAttribute("data-disabled", "true"); }
+            oTr.setAttribute("aria-selected", r.SEL ? "true" : "false");
+
+            // (1) 선택 체크박스
+            var oTdChk = _el("td", "u4aDsFldColChk");
+            var oChk = _el("input"); oChk.type = "checkbox"; oChk.className = "u4aDsFldRowChk";
+            oChk.checked = r.SEL === true;
+            oChk.disabled = !r.ENAB_SEL;
+            oChk.addEventListener("change", function () {
+                r.SEL = oChk.checked;
+                oTr.setAttribute("aria-selected", r.SEL ? "true" : "false");
+                _afterSelChange();
+            });
+            r.__chk = oChk;
+            oTdChk.appendChild(oChk);
+            oTr.appendChild(oTdChk);
+
+            // (2) 필드명 — 말줄임 시 공통 .u4a-table 자동 툴팁(data-tip-trunc). 네이티브 title 금지.
+            var oTdNm = _el("td", null, r.FLDNM);
+            oTr.appendChild(oTdNm);
+
+            // (3) Key 여부(읽기전용 체크박스)
+            var oTdKey = _el("td", "u4aDsFldColKey");
+            var oKey = _el("input"); oKey.type = "checkbox"; oKey.className = "u4aDsFldKeyChk";
+            oKey.checked = r.isKey === true; oKey.disabled = true;
+            oTdKey.appendChild(oKey);
+            oTr.appendChild(oTdKey);
+
+            // (4) 설명 — 부가설명(FLDTT)이 있으면 공통 툴팁(data-tip, 항상). 없으면 셀 자동 말줄임 툴팁.
+            var oTdTx = _el("td", null, r.FLDTX || "");
+            if (r.FLDTT) { oTdTx.setAttribute("data-tip", r.FLDTT); }
+            oTr.appendChild(oTdTx);
+
+            return oTr;   // 선택은 체크박스로만(원본 selectionMode:"None" + 체크박스 템플릿과 동일)
         }
 
-        //체크박스 선택 가능 여부 표현.
-        ls_list.highlight = lf_setHighlight(ls_list);
+        function _renderTable() {
+            oTbody.innerHTML = "";
+            if (!aRows.length) {
+                var oTrN = _el("tr", "u4a-table__nodata");
+                var oTdN = _el("td", null, _wsTxt("946"));   // 데이터 없음(공통)
+                oTdN.colSpan = 4;
+                oTrN.appendChild(oTdN);
+                oTbody.appendChild(oTrN);
+                return;
+            }
+            var oFrag = document.createDocumentFragment();
+            for (var i = 0; i < aRows.length; i++) { oFrag.appendChild(_buildRow(aRows[i], i)); }
+            oTbody.appendChild(oFrag);
+        }
 
-        lt_list.push(ls_list);
-        ls_list = {};
+        function _renderTokens() {
+            oTokens.innerHTML = "";
+            aRows.forEach(function (r) {
+                if (r.SEL !== true) { return; }
+                var oTok = _el("span", "u4aDsFldTok");
+                oTok.appendChild(_el("span", null, r.FLDNM));
+                var oXt = _el("button", "u4aDsFldTokX");
+                oXt.type = "button"; oXt.title = r.FLDNM; oXt.innerHTML = _fa("xmark");
+                oXt.addEventListener("click", function () {
+                    r.SEL = false;
+                    if (r.__chk) { r.__chk.checked = false; var tr = r.__chk.closest("tr"); if (tr) { tr.setAttribute("aria-selected", "false"); } }
+                    _afterSelChange();
+                });
+                oTok.appendChild(oXt);
+                oTokens.appendChild(oTok);
+            });
+        }
 
+        function _updCounts() {
+            // E08 Selected lines : n
+            oSelLb.textContent = _txt(oAPP, "/U4A/CL_WS_COMMON", "E08") + " : " + _selCount();
+            // D94 Results : n D90 Rows
+            oTotLb.textContent = _txt(oAPP, "/U4A/CL_WS_COMMON", "D94") + " : " + aRows.length
+                + " " + _txt(oAPP, "/U4A/CL_WS_COMMON", "D90");
+        }
+
+        function _syncHead() {
+            var aSelectable = aRows.filter(function (r) { return r.ENAB_SEL; });
+            var iSel = aSelectable.filter(function (r) { return r.SEL; }).length;
+            oHeadChk.checked = aSelectable.length > 0 && iSel === aSelectable.length;
+            oHeadChk.indeterminate = iSel > 0 && iSel < aSelectable.length;
+            oHeadChk.disabled = aSelectable.length === 0;   // 선택 가능 행 없으면 비활성(형제 팝업 동일)
+        }
+
+        // 선택 상태 변화 후 공통 후처리(토큰/카운트/헤더).
+        function _afterSelChange() { _renderTokens(); _updCounts(); _syncHead(); }
+
+        // 전체선택/해제(선택 불가 행 skip — 원본 lf_selectionAll).
+        function _selectAll(bSel) {
+            aRows.forEach(function (r) {
+                if (!r.ENAB_SEL) { return; }
+                r.SEL = bSel;
+                if (r.__chk) { r.__chk.checked = bSel; var tr = r.__chk.closest("tr"); if (tr) { tr.setAttribute("aria-selected", bSel ? "true" : "false"); } }
+            });
+            _afterSelChange();
+        }
+
+        // 확인 — 입력건 점검(원본 lf_chkList) 후 선택 필드 반환.
+        function _confirm() {
+            if (!aRows.length) {
+                _toast("E", _txt(oAPP, "/U4A/MSG_WS", "227"));   // 227 Result not found.
+                return;
+            }
+            var aSel = aRows.filter(function (r) { return r.SEL === true; });
+            if (aSel.length === 0) {
+                _toast("W", _txt(oAPP, "/U4A/MSG_WS", "268"));   // 268 Selected line does not exists.
+                return;
+            }
+            if (aSel.length > 30) {
+                _toast("W", _txt(oAPP, "/U4A/MSG_WS", "300"));   // 300 Choose no more than 30 entries
+                return;
+            }
+            _close();
+            _resolveOnce({
+                RETCD: "S",
+                TDESC: ls_ret.TDESC,
+                FLIST: aSel.map(function (r) { return r.FLDNM; }).join("|")
+            });
+        }
+
+        // ── 초기 렌더 ──
+        _renderTable();
+        _afterSelChange();
+
+        // ESC 무동작 — 원본 escapeHandler:function(){} 와 동일(실수 닫힘 방지, 닫기는 X/취소 버튼으로만).
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); });
+
+        // 헤더 드래그 / 더블클릭 리센터 / grip 리사이즈 — 공통 U4AUI.
+        if (window.U4AUI) {
+            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { }
+            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { }
+            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 440, minH: 320 }); } catch (e) { }
+        }
+
+        document.body.appendChild(oDlg);
+        try { oDlg.showModal(); } catch (e) { }
     }
 
-    //결과리스트 return.
-    return lt_list;
-
-}   //필드 리스트 바인딩정보 구성.
-
-
-
-//checkbox 전체선택 처리.
-function lf_selectionAll(oModel, oTab, bSel){
-
-    var l_bind = oTab.getBinding();
-    if(!l_bind){return;}
-
-    var lt_ctxt = l_bind.getAllCurrentContexts();
-
-    if(lt_ctxt.length === 0){return;}
-
-    for(var i=0, l=lt_ctxt.length; i<l; i++){
-
-        //체크박스 선택 불가능건은 SKIP.
-        if(lt_ctxt[i].getProperty("ENAB_SEL") === false){continue;}
-
-        var ls_list = lt_ctxt[i].getProperty();
-
-        ls_list.SEL = bSel;
-
-        //체크박스 선택 표현 처리.
-        ls_list.highlight = lf_setHighlight(ls_list);
-
-        //라인 선택 처리.
-        oModel.setProperty("", ls_list, lt_ctxt[i]);
-
-    }
-
-    //체크박스 선택건 카운팅.
-    lf_checkboxSelectedCount(oModel);
-
-
-}   //checkbox 전체선택 처리.
-
-
-
-//checkbox 선택건의 필드 정보 얻기.
-function lf_getSelectedList(oModel){
-
-    var lt_list = oModel.getProperty("/T_LIST");
-    
-    if(!lt_list || lt_list.length === 0){return;}
-
-    var lt_fld = [];
-
-    for(var i=0, l= lt_list.length; i<l; i++){
-
-        //checkbox 선택 안된건은 수집 skip.
-        if(lt_list[i].SEL !== true){continue;}
-
-        //checkbox 선택건의 필드정보 수집.
-        lt_fld.push(lt_list[i].FLDNM);
-
-    }
-
-    //수집한 필드정보 return.
-    return lt_fld.join("|");
-
-
-}   //checkbox 선택건의 필드 정보 얻기.
-
-
-
-//팝업 종료 처리.
-function lf_close(oDialog, bSkipMsg){
-
-    if(!oDialog){return;}
-
-    //dialog 종료 처리.
-    oDialog.close();
-
-    //메시지 skip 처리건인경우 exit.
-    if(bSkipMsg){return;}
-    
-    //001  Cancel operation
-    //메시지 출력.
-    parent.showMessage(sap, 10, "I", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "001", "", "", "", ""));
-
-}   //팝업 종료 처리.
-
-
-
-//체크박스 선택건 카운팅.
-function lf_checkboxSelectedCount(oModel){
-
-    var lt_list = oModel.getProperty("/T_LIST");
-
-    var lt_selected = lt_list.filter( a => a.SEL === true);
-
-    //E08  Selected lines
-    var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E08", "", "", "", "");
-    
-    oModel.setProperty("/SEL_CNT", l_txt + " : " + lt_selected.length);
-
-}   //체크박스 선택건 카운팅.
-
-
-
-//필드명 선택건 token 업데이트.
-function lf_tokenUpdate(oModel){
-
-    var lt_list = oModel.getProperty("/T_LIST");
-
-    var lt_token = [];
-
-    for(var i=0, l=lt_list.length; i<l; i++){
-        //선택되지 않은건은 수집 SKIP.
-        if(lt_list[i].SEL === false){continue;}
-    
-        //선택건 수집처리.
-        lt_token.push({KEY:lt_list[i].FLDNM, TEXT:lt_list[i].FLDNM});
-
-    }
-
-    oModel.setProperty("/T_TOKEN", lt_token);
-
-}   //필드명 선택건 token 업데이트.
-
-
-
-//token 삭제 이벤트.
-function lf_delToken(oUi, oModel){
-
-    //이벤트 발생 라인 정보 얻기.
-    var l_ctxt = oUi.getBindingContext();
-    if(!l_ctxt){return;}
-
-    //이벤트 발생 라인의 KEY얻기.
-    var l_key = l_ctxt.getProperty("KEY");
-    
-
-    //token에서 삭제 대상 라인 index 얻기.
-    var l_indx = oModel.oData.T_TOKEN.findIndex( a=> a.KEY === l_key );
-
-    //삭제 대상 라인을 찾은경우 해당 라인 삭제 처리.
-    if(l_indx !== -1){
-        oModel.oData.T_TOKEN.splice(l_indx, 1);
-    }
-
-    //필드 리스트에서 KEY에 해당하는 라인 정보 얻기.
-    var ls_list = oModel.oData.T_LIST.find( a=> a.FLDNM === l_key );
-    
-    if(ls_list){
-        //대상 라인 선택 해제 처리.
-        ls_list.SEL = false;
-
-        //체크박스 선택 표현 처리.
-        ls_list.highlight = lf_setHighlight(ls_list);
-
-    }
-
-    //모델 갱신.
-    oModel.refresh();
-
-}   //token 삭제 이벤트.
-
-
-
-//체크박스 선택에 따른 표현 처리.
-function lf_setHighlightLine(oUi, oModel){
-
-    //이벤트 발생 라인 정보 얻기.
-    var l_ctxt = oUi.getBindingContext();
-    if(!l_ctxt){return;}
-
-    //라인 정보얻기.
-    var ls_list = l_ctxt.getProperty();
-
-    //체크박스 선택에 따른 선택 표현 처리 정보 바인딩.
-    oModel.setProperty("highlight", lf_setHighlight(ls_list), l_ctxt);
-
-}   //체크박스 선택에 따른 표현 처리.
-
-
-
-//체크박스 선택 표현 정보 구성.
-function lf_setHighlight(is_line){
-
-    //선택불가능건인경우.
-    if(is_line.ENAB_SEL === false){
-        return "Warning";
-    }
-
-    //선택된경우.
-    if(is_line.SEL === true){
-        return "Success";
-    }
-
-    //default 선택 가능 표현.
-    return "Information";
-
-}   //체크박스 선택 표현 정보 구성.
-
-
-
-//필드 검색건수 카운팅.
-function lf_setTotalCount(oModel){
-    
-    if(!oModel.oData || !oModel.oData.T_LIST || typeof oModel.oData.T_LIST.length === "undefined"){return;}
-
-    //결과리스트 라인수.
-    var l_len = oModel.oData.T_LIST.length;
-
-    //D94  Results    
-    var l_txt1 = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D94", "", "", "", "");
-
-    //D90  Rows
-    var l_txt2 = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D90", "", "", "", "");
-
-    //결과리스트 총 필드수 매핑(Results : 100 Rows)
-    oModel.setProperty("/TOT_CNT", l_txt1 + " : " + l_len + " " + l_txt2);    
-
-}   //필드 검색건수 카운팅.
+    /* ── 공개 API(원본 exports 대체 — 디자인 컨텍스트 oAPP.fn 에 부착) ── */
+    oAPP.fn = oAPP.fn || {};
+    oAPP.fn._DATASET = {
+        callDataSetFieldListPopop: function (is_dataSet, oAPPx) {
+            return new Promise(function (resolve) {
+                // _run 은 async — 초기 구성 중 예외로 거부되면 호출측 await 가 멈추므로 E 로 폴백(스크립트 오류는 콘솔로 표면화).
+                Promise.resolve(_run(is_dataSet, oAPPx, resolve)).catch(function (e) {
+                    try { parent.setBusy(""); } catch (e2) { }
+                    console.error("[HTML5][DsFld] 팝업 오류:", e && (e.stack || e.message) || e);
+                    resolve({ RETCD: "E" });
+                });
+            });
+        }
+    };
+
+})();

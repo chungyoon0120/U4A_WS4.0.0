@@ -3,232 +3,103 @@
 
 <head>
     <meta charset="utf-8">
-    <style>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
-        /* BusyIndicator */
-        #u4aWsBusyIndicator {
-            right: 0;
-        }
+    <!-- ===== 공통 헤더(.u4a-titlebar)·버튼·트리·스플리터·패널·토큰 (errorPageEditorFrame 과 동일 짝) ===== -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="frame.css">
 
-        .u4aWsBusyIndicator {
-            z-index: 2000000;
-        }
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
 
-        .sapUiUserSelectable {
-            -webkit-touch-callout: text;
-            -webkit-user-select: text;
-            -khtml-user-select: text;
-            -moz-user-select: text;
-            -ms-user-select: text;
-            user-select: text;
-        }
-
-        /* .sapUiBLy */
-
-        .sapUiBLy {
-            background: transparent;
-        }
-
-        .sapUiBusy {
-            display: block;
-            width: 48px;
-            height: 48px;
-            outline: none;
-            cursor: wait;
-            top: 0 !important;
-        }
-
-        #u4aWsBusyIndicator>.sapUiLocalBusyIndicatorFade {
-            cursor: wait;
-        }
-
-        .sapUiLocalBusyIndicatorSizeBig {
-            font-size: 2rem;
-            background-color: transparent;
-        }
-
-        .sapUiLocalBusyIndicatorFade {
-            opacity: 1;
-        }
-
-        .sapUiLocalBusyIndicator {
-            opacity: 0;
-            transition: opacity .3s ease-in;
-            outline: none;
-        }
-
-        .sapUiLocalBusyIndicator {
-            background-color: rgba(247, 247, 247, 0.72);
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation {
-            position: absolute;
-            width: 3em;
-            top: 50%;
-            left: 50%;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div:nth-child(1) {
-            animation-delay: -0.32s;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div:nth-child(2) {
-            animation-delay: -0.16s;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div {
-            animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div,
-        .sapUiLocalBusyIndicatorAnimation>div::before,
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            animation-fill-mode: both;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div {
-            width: 1em;
-            height: 1em;
-            border-radius: 100%;
-            display: block;
-            float: left;
-            margin: 0px;
-            position: relative;
-            top: -0.5em;
-            left: -1.5em;
-            text-indent: 1px;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div {
-            animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::before {
-            background: #0854a0;
-            animation-duration: 0ms;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div::before {
-            animation: sapUiBusyAnimationStandardBackground 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::before {
-            background: #0a6ed1;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::before,
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            content: "";
-            opacity: 1;
-            position: absolute;
-            z-index: -1;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 100%;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            box-shadow: inset 0 0 0 0 #0854a0;
-        }
-
-        .sapUiLocalBusyIndicatorAnimStandard>div::after {
-            animation: sapUiBusyAnimationStandardShadow 1.8s infinite ease-in-out;
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div::after {
-            box-shadow: inset 0 0 2px 1px rgb(10 110 209 / 80%);
-        }
-
-        .sapUiLocalBusyIndicatorAnimation>div {
-            width: 1em;
-            height: 1em;
-            border-radius: 100%;
-            display: block;
-            float: left;
-            margin: 0px;
-            position: relative;
-            top: -0.5em;
-            left: -1.5em;
-            text-indent: 1px;
-        }
-
-        .sapUiLocalBusyIndicatorSizeBig {
-            font-size: 2rem;
-            background-color: transparent;
-        }
-
-        .sapUiLocalBusyIndicator {
-            opacity: 0;
-            transition: opacity .3s ease-in;
-            outline: none;
-        }
-
-        .sapUiLocalBusyIndicatorFade {
-            opacity: 1;
-        }
-
-        @keyframes sapUiBusyAnimationStandard {
-
-            0%,
-            80%,
-            100% {
-                transform: scale(.4);
-            }
-
-            40% {
-                transform: scale(1);
-            }
-        }
-    </style>
-
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* frame.js 에서 재적용 */ }
+        })();
+    </script>
 </head>
 
-<body style="margin:0px;padding:0px;overflow:hidden">
+<body>
 
-    <iframe id="ws_frame" src="" frameborder="0"
-        style="overflow:hidden;overflow-x:hidden;overflow-y:hidden;height:100%;width:100%;position:absolute;top:0px;left:0px;right:0px;bottom:0px;">
-    </iframe>
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/닫기 ===== -->
+    <header class="u4a-titlebar" id="pattTitlebar">
+        <img class="u4a-titlebar__logo" id="pattLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="pattTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
 
-    <!-- Busy Indicator Start -->
-    <!-- <div id="u4aWsBusyIndicator" class="u4aWsBusyIndicator sapUiUserSelectable"
-        style="position: absolute;  display: block; top: 0px; height: 100%; width: 100%; left: 0px;">
-        <div class="sapUiBusy" tabindex="0" role="progressbar" alt="" title="Please wait"></div>
-        <div class="sapUiLocalBusyIndicator sapUiLocalBusyIndicatorSizeBig sapUiLocalBusyIndicatorFade"
-            role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuetext="Busy" alt="" tabindex="0"
-            title="Please wait">
-            <div class="sapUiLocalBusyIndicatorAnimation sapUiLocalBusyIndicatorAnimStandard">
-                <div></div>
-                <div></div>
-                <div></div>
+    <!-- ===== 본체 = [좌: 기본/커스텀 트리 세로분할] | [우: 코드 뷰어] ===== -->
+    <div class="u4aPattBody" id="pattBody">
+        <div class="u4a-splitter" id="pattOuterSplit">
+
+            <!-- 좌측(트리 영역) — 내부에 세로 스플릿(기본 | 커스텀) -->
+            <div class="u4a-splitter__pane u4aPattLeft">
+                <div class="u4a-splitter u4aPattVert" id="pattVertSplit">
+
+                    <!-- 기본 패턴 트리(읽기전용) — 컬럼헤더[기본 패턴] + tree.el 은 frame.js 가 채운다 -->
+                    <div class="u4a-splitter__pane u4aPattTreePane u4aPattTreePane--def">
+                        <div class="u4aPattTreeBody" id="pattDefBody"></div>
+                    </div>
+
+                    <div class="u4a-splitter__bar u4aPattVBar" role="separator" aria-orientation="horizontal"></div>
+
+                    <!-- 커스텀 패턴 트리 — 컬럼헤더[커스텀 패턴 | Content Type] + tree.el (CRUD 는 다음 단계) -->
+                    <div class="u4a-splitter__pane u4aPattTreePane u4aPattTreePane--cust">
+                        <div class="u4aPattTreeBody" id="pattCustBody"></div>
+                    </div>
+
+                </div>
             </div>
+
+            <div class="u4a-splitter__bar" role="separator" aria-orientation="vertical"></div>
+
+            <!-- 우측(코드 뷰어) — 선택 패턴 코드(읽기전용 Monaco) + 제목 + 복사 / 빈 상태 -->
+            <div class="u4a-splitter__pane u4aPattRight">
+                <div class="u4aPattViewHead" id="pattViewHead" hidden>
+                    <span class="u4aPattViewTitle" id="pattViewTitle"></span>
+                    <button type="button" class="u4a-btn u4aPattCopyBtn" id="pattCopyBtn">
+                        <i class="fa-solid fa-copy"></i>
+                    </button>
+                </div>
+                <div class="u4aPattViewBody">
+                    <!-- 빈 상태(원본 IllustratedMessage) -->
+                    <div class="u4aPattEmpty" id="pattEmpty">
+                        <i class="fa-regular fa-rectangle-list u4aPattEmpty__icon"></i>
+                        <div class="u4aPattEmpty__title" id="pattEmptyTitle"></div>
+                        <div class="u4aPattEmpty__desc" id="pattEmptyDesc"></div>
+                    </div>
+                    <!-- 코드 뷰어 = 공통 Monaco 호스트(editorPopup/host 재사용) iframe -->
+                    <div class="u4aPattHostWrap" id="pattHostWrap" hidden>
+                        <iframe id="pattHost" name="pattHost" frameborder="0"></iframe>
+                    </div>
+                </div>
+            </div>
+
         </div>
-    </div> -->
-    <!-- Busy Indicator End -->
+    </div>
 
-
-    <script>
-        /************************************************************************
-         * 에러 감지
-         ************************************************************************/
-        var REMOTE = require('@electron/remote'),
-            PATH = REMOTE.require('path'),
-            APP = REMOTE.app,
-            APPPATH = APP.getAppPath(),
-            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
-            PATHINFO = require(PATHINFOURL),
-            WSERR = require(PATHINFO.WSTRYCATCH),
-            WSUTIL = require(PATHINFO.WSUTIL);
-
-        var zconsole = WSERR(window, document, console);
-        
-    </script>
+    <!-- 로딩 오버레이 = 공통 busy(.u4a-busy, shell.css SSOT). 토스트는 공통 .u4a-toast 를 frame.js 가 동적 생성. -->
+    <div class="u4a-busy" id="pattBusy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+            <div class="u4a-busy__label"></div>
+        </div>
+    </div>
 
     <script src="frame.js"></script>
 

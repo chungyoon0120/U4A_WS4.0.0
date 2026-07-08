@@ -132,7 +132,15 @@
 
         window.onload = () => {
 
-            //2 사용 JS 생성 
+            // ★ sap 미생성 방어(case 2, 내부 콘텐츠=SSRC 부트): sap 없으면 selectSAP.js 가 sap.ui... 접근 시
+            //   ReferenceError → ws_trycatch 크리티컬(APP.exit). 그 전에 공통 오류 안내 후 뷰어만 닫도록 선제 처리.
+            //   oAPP=parent.gfn_parent() 체인으로 셸(index.js)의 _onUi5LoadFail 직접 호출.
+            if (typeof sap === "undefined" || !sap.ui || !sap.ui.getCore) {
+                try { oAPP.fn && oAPP.fn._onUi5LoadFail && oAPP.fn._onUi5LoadFail("no-sap-after-onload(SSRC)"); } catch (e) { }
+                return;
+            }
+
+            //2 사용 JS 생성
 
             let LV_UI5JS = document.createElement("script");
 

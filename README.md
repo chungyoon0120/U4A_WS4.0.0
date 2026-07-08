@@ -16,77 +16,84 @@ SAP UI5 기반 U4A Workspace를 **HTML5 + 바닐라 JS**로 컨버전하는 Elec
 
 ## UI5 → HTML5 변환 진행 현황
 
-> 최종 산출 **2026-06-26** · 현행화 **2026-07-06** · 상세 → **[변환 잔여 산출 보고서](.report/status/UI5_HTML5_변환잔여_산출보고서.md)**
+> 최종 산출 **2026-06-26** · 전면 재검증 **2026-07-08** · 상세 → **[변환 잔여 산출 보고서](.report/status/UI5_HTML5_변환잔여_산출보고서.md)**
 
-WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 22건** (완전 미완 18 · 부분 4). *(UI 템플릿 마법사·USP 새 창 열기 = 전환 대상 제외 확정)*
+WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 21건** (완전 미완 18 · 부분 3, 그중 🚧 변환 중 1). *(USP 새 창 열기·WS10 셸 3건 = 제외)*
 
-| 축 | 완전 미완 | 부분 | 합계 |
+| 축 | 완전 미완 | 부분/진행 | 합계 |
 |---|:---:|:---:|:---:|
-| ① UI5 팝업 변환 (별도 UI5 코드 → HTML5) | 10 | 1 | **11** |
-| ② 코어 미구현 (원본 로직 → 현행 코드 이식) | 8 | 3 | **11** |
-| **합계** | **18** | **4** | **🎯 22** |
+| ① UI5 팝업 변환 (별도 UI5 코드 → HTML5) | 7 | 1 🚧 | **8** |
+| ② WS20 코어 (속성 편집기·미리보기 스텁) | 7 | 2 | **9** |
+| ② WS30 USP (Monaco 우클릭 클릭 동작) | 4 | 0 | **4** |
+| **합계** | **18** | **3** | **🎯 21** |
 
-> ✅ **7/1~7/6 완료**: **Find**(Ctrl+F) · 속성 **데이터 바인딩** · **키보드 단축키 리스트** · **OBJID 변경** · **속성 우클릭 컨텍스트 메뉴**(M01~M06) · **동일 속성 동기화 팝업** · **UI Attribute 개인화**.
-> ✅ **6/30 완료**: 별도창 **runtimeClassNavigator** · WS20 **트리 D&D** · **F4 검색도움말 모듈** · **스켈레톤 팝업** · versionMng · docPopup · optionPopup HTML5화.
+> 🔎 **7/8 재검증 정정**: ✅ 완료 확인(잔여↓) — `patternPopup`·**UI Sample**·**앱 헤더 Find 버튼**. 🆕 잔여 명세화(잔여↑) — 속성 F4/Attr Help/팝업버튼/아이콘동작/M05 · 미리보기 영역 D&D · 미리보기 도움말.
+> ✅ **7/1~7/6 완료**: iconPrevPopup · illustMsgPopup · Find(Ctrl+F) · 속성 데이터 바인딩 · 키보드 단축키 리스트 · OBJID 변경 · 속성 우클릭 컨텍스트 메뉴(M01~M06) · 동일 속성 동기화 · UI Attribute 개인화.
+> ✅ **6/30 완료**: runtimeClassNavigator · 트리 D&D · F4 검색도움말 모듈 · 스켈레톤 팝업 · versionMng · docPopup · optionPopup.
 
 ---
 
-### 🔴 잔여 작업 — ① UI5 팝업 변환 (11)
+### 🔴 잔여 작업 — ① UI5 팝업 변환 (8)
 
-**별창 팝업 미변환 (10)**
+**별창 팝업 미변환 (7)**
 
 - [ ] `bindPopup` ⭐ — 툴바 데이터 바인딩(대형 별창) *(속성 아이콘 바인딩은 완료)*
-- [ ] `patternPopup` — 소스 패턴 관리
-- [ ] `iconPrevPopup` — SAP 아이콘 미리보기
-- [ ] `illustMsgPopup` — 일러스트 메시지 선택
-- [ ] `releaseNotePopup` — 릴리즈 노트
-- [ ] `ShortCutCreator` — 앱 바로가기 생성
-- [ ] `ui5CssPopup_v2` — UI5 Predefined CSS
+- [ ] `releaseNotePopup` — 릴리즈 노트 *(라이선스 미보유 시 UI5)*
+- [ ] `ShortCutCreator` — 앱 바로가기 생성 *(현재 오프너 주석·토스트 대체)*
+- [ ] `ui5CssPopup_v2` — UI5 Predefined CSS *(현재 오프너 주석·토스트 대체)*
 - [ ] `webDynConversionLog` — WebDynpro 변환 로그
 - [ ] `monacoSnippetDesigner` — 스니펫 디자이너 *(쉘 레이아웃만)*
 - [ ] `monacoThemeDesign` — 테마 디자이너 *(쉘 레이아웃만)*
 
+**🚧 변환 작업 중 (1)**
+- [ ] `fnUiTempWizard` — **UI 템플릿 마법사** *(WS20 디자인 트리 툴바 모니터 아이콘 버튼 · 인앱 마법사)* — HTML5 재작성 진행 중, **Stage 1 완료 · 2~4 미완**
+
 **🚫 전환 대상 제외 확정** *(현행 미사용, 변환 안 함)*
-- ~~`fnUiTempWizard` — UI 템플릿 마법사~~
 - ~~`uspNewPopup` — USP 새 창 열기~~
 
-**부분 변환 (1)**
-- [ ] `mimeRepository` (별도창) — ✅뷰어·폴더생성 / ⬜ K4 삭제 · K5 업로드 · K6 다운로드
+  ✅ `patternPopup` 완료 (7/8 재검증) — 오프너 활성·HTML5 렌더
+  ✅ `mimeRepository` 완료 — 뷰어 + K3 폴더생성·K4 삭제·K5 업로드·K6 다운로드 전부 구현
 
 ---
 
-### 🔴 잔여 작업 — ② 코어 미구현 (11)
+### 🔴 잔여 작업 — ② WS20 코어 (9)
 
-**WS20 디자인영역 (1완전 + 3부분)**
-- [ ] UI Sample 팝업
-- [ ] 〰️ 미리보기 우클릭 컨텍스트메뉴 *(부분 · 모듈 로드 의존)*
-- [ ] 〰️ 미리보기 속성 실시간 반영 *(부분 · 모듈 로드 의존)*
-- [ ] 〰️ 앱 헤더 Find UI 버튼 *(부분 · New Window·Back은 완료)*
+**속성 편집기 팝업/동작 (5 완전미완)** — `console.warn "[W4+ 예정]"`
+- [ ] F4 Value Help (`attrCallValueHelp`) — `attr.js:4648`
+- [ ] Attribute Help (`callTooltipsPopup`) — `attr.js:4421`
+- [ ] 팝업 호출형 속성 버튼 — `attr.js:4816`
+- [ ] 속성 아이콘 동작 — `attr.js:4932`
+- [ ] M05 속성 컨텍스트 단축키 등록(별창) — `attr_ctxmenu.js:245`
 
-  ✅ OBJID 변경 완료(attrChnageOBJID) · 속성 우클릭 컨텍스트 메뉴(M01~M06) 완료
+**미리보기 (2 완전미완 + 2 부분)**
+- [ ] 미리보기 **영역** D&D — `prev.js:810/815/820` *(트리 D&D와 별개)*
+- [ ] 미리보기 도움말 팝업 — `prev.js:1141`
+- [ ] 〰️ 미리보기 우클릭 컨텍스트메뉴 *(부분 · 원본 UI5 모듈 위임)*
+- [ ] 〰️ previewUIsetProp 실시간 반영 *(부분 · 원본 UI5 모듈 위임)*
 
-  ✅ 트리 D&D 완료(`ws_html5_ws20_dnd.js`)
+  ✅ **UI Sample 팝업**·**앱 헤더 Find 버튼**·OBJID 변경·속성 우클릭 M01~M04·M06·동일속성동기화 M03·개인화 M06·트리 D&D 완료
 
-**WS30 USP — Monaco 우클릭 *클릭 동작* (4)** · *메뉴 표시는 완료*
+---
+
+### 🔴 잔여 작업 — ② WS30 USP (4)
+
+**Monaco 우클릭 *클릭 동작* (4)** · *메뉴 표시는 완료*
 - [ ] 패턴 삽입 (executeEdits)
-- [ ] Theme Designer 호출
-- [ ] Snippet Designer 호출
+- [ ] Theme Designer 호출 *(Test 메뉴 경로는 동작)*
+- [ ] Snippet Designer 호출 *(Test 메뉴 경로는 동작)*
 - [ ] Ctrl+우클릭 전체 패턴 팝업
 
-**WS10 / 공통 셸 (3)**
-- [ ] `setConnectionAI` 버튼 무동작 *(라이브 버그 · 한 줄 수정)*
-- [ ] `fnOnInitP13nSettings` 빈 스텁
-- [ ] UAI 커스텀이벤트 배선
+> 🚫 **WS10 셸 3건 제외**: setConnectionAI(AI 미공개) · fnOnInitP13nSettings(개인화 초기화) · UAI 배선 — 잔여 아님
 
 ---
 
 ### 🗺️ 착수 우선순위
 
-1. **mimeRepository CRUD** (K4·K5·K6) — 뷰어 완성, 서버 패턴 존재
+1. **UI 템플릿 마법사** Stage 2~4 완성 — 이미 착수, 마무리가 가장 가까움
 2. **USP Monaco 우클릭 클릭 동작 4종** — 메뉴 표시 완성, 핸들러 등록만
-3. **WS20 OBJID 변경 + UI Sample** — 디자인 편집 잔여 결손
-4. **bindPopup** → WS20 색상 / 아이콘 picker
-5. **setConnectionAI 버그** — 한 줄 수정으로 즉시 해결
+3. **WS20 속성 F4 Value Help + Attr Help** — 속성 편집 핵심 잔여
+4. **bindPopup**(툴바 대형 별창) → 색상 / 아이콘 picker
+5. 미리보기 영역 D&D + 나머지 별창 팝업(releaseNote·ShortCut·ui5Css_v2·webDynLog·Monaco Designer 2종)
 
 ---
 

@@ -151,6 +151,21 @@
             }
         }
     }
+    // undo/redo(구조 동일=속성 복원) 후 ROOT UI Theme(DH001021)를 미리보기에 재적용.
+    //   _reapplyAllPreviewProps 는 previewUIsetProp 기반이라 ROOT 를 스킵(uiPreviewArea.js:486)하므로
+    //   테마 변경의 undo/redo 가 DDLB 값만 되돌리고 미리보기 테마는 안 바뀌던 문제를 막는다.
+    //   (원본 undoRedo.js:2269 setPreviewUiTheme 이식. 구조변경 분기는 drawPreview 가 _T_0015 로
+    //    테마를 재적용하므로 여기선 속성-복원 분기에서만 호출.)
+    function _reapplyRootTheme() {
+        try {
+            var aRoot15 = oAPP.attr.prev && oAPP.attr.prev.ROOT && oAPP.attr.prev.ROOT._T_0015;
+            if (!Array.isArray(aRoot15)) { return; }
+            var oThm = aRoot15.find(function (a) { return a && a.UIATK === "DH001021"; });
+            if (oThm && oThm.UIATV && typeof oAPP.fn.fnWs20ApplyPrevTheme === "function") {
+                oAPP.fn.fnWs20ApplyPrevTheme(oThm.UIATV);
+            }
+        } catch (e) { console.warn("[HTML5][WS20] undo/redo ROOT 테마 재적용 skip:", e && e.message); }
+    }
     function _restoreSnap(s) {
         if (!s) { return; }
         // 구조 변경 여부 = 복원 전/후 노드 수 차이(삽입/삭제 vs 속성·이름·이동). zTREE 덮기 "전" 판정.
@@ -208,6 +223,7 @@
             //  redo 때 sel 이 페이지로 잡혀도 편집 버튼까지 정확히 복원). 그 뒤 재선택으로 선택/하이라이트/
             //  속성패널 갱신(refreshPreview 가 재구성해도 값은 _T_0015 로 동일 → 일관).
             _reapplyAllPreviewProps();
+            _reapplyRootTheme();          // ROOT 테마(DH001021)는 previewUIsetProp 가 스킵 → 별도 재적용.
             _commitState();
             if (sAnchor) { try { _selectNode(sAnchor); } catch (e) { } }
             return;

@@ -398,7 +398,7 @@
     var oWhitBar = _el("div", "u4aWsecWhitBar");
     oWhitBar.appendChild(_el("span", "u4aWsecWhitLbl", _txt("/U4A/CL_WS_COMMON", "C97")));   // White List
     oWhitBar.appendChild(_el("span", "u4aWsecBarSpacer"));
-    var oAddBtn = _el("button", "u4a-btn u4aWsecToolBtn u4aWsecAdd");
+    var oAddBtn = _el("button", "u4a-btn u4aWsecToolBtn u4a-btn--accent-outline");
     oAddBtn.type = "button"; oAddBtn.innerHTML = _fa("file-circle-plus");
     oAddBtn.title = _txt("/U4A/CL_WS_COMMON", "C98");   // Add
     oAddBtn.addEventListener("click", function () { lf_whitAdd(); });
@@ -532,9 +532,9 @@
       ".u4aWsecWhitBar { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem; border: 0.0625rem solid var(--line); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; background: var(--surface); }" +
       ".u4aWsecWhitLbl { font-weight: 600; }" +
       ".u4aWsecBarSpacer { flex: 1 1 auto; }" +
-      ".u4aWsecToolBtn { background: transparent; min-width: 2.25rem; padding: 0.4rem 0.6rem; justify-content: center; }" +
-      ".u4aWsecToolBtn:hover { background: var(--hover-bg); }" +
-      ".u4aWsecAdd { border-color: var(--accent); color: var(--accent); }" +
+      // 툴바 버튼 레이아웃만 화면 스코프(크기/패딩). 색·hover·비활성은 공통 변형 소비:
+      //   Add=.u4a-btn--accent-outline(흐린 accent 아웃라인), Del=.u4a-btn--negative(빨강). 색 재지정 없음.
+      ".u4aWsecToolBtn { min-width: 2.25rem; padding: 0.4rem 0.6rem; justify-content: center; }" +
       // ── White List 그리드(USP 트리 패턴) — .u4aWsecGrid 자체가 고정 height 스크롤러.
       //   헤더(.u4aWsecHead)는 그 "안"에 sticky → 행과 동일 폭 컨텍스트 공유 → 컬럼 자동 정렬.
       //   ★ 원본 sap.ui.table 처럼 영역을 기본 height 로 고정 → 적으면 빈 공간, 많으면 이 안에서만 스크롤.

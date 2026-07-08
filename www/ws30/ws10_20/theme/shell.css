@@ -311,6 +311,28 @@ button:focus-visible {
     color: var(--error);
 }
 
+/* Accent 아웃라인 버튼 — 툴바/보조 액션용(예: 리스트 Add). 투명 배경 + accent 테두리·텍스트·아이콘.
+   negative 와 동일 컨셉: hover/active 는 accent 를 정적 유지하고 배경만 공통 중립 하이라이트.
+   ★ 색 버튼이므로 disabled 는 bootstrap-skin 에서 원색+opacity 로 재지정한다(공통 .u4a-btn:disabled 가
+     bg/color 만 회색으로 덮고 border-color 는 안 덮어 "테두리만 accent" 로 남는 것 방지 — btn-color-semantics). */
+.u4a-btn--accent-outline {
+    background: transparent;
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.u4a-btn--accent-outline:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.u4a-btn--accent-outline:active {
+    background: var(--active-bg);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 .u4a-btn i {
     font-size: 0.9rem;
 }

@@ -1971,10 +1971,92 @@
         } catch (e) { /* 이미 파괴된 창 무시 */ }
     }
 
+    /**
+     * 공통 — 컬럼 리사이즈 그립(가이드 라인 + 놓을 때 적용, UI5 sap.ui.table 방식) SSOT.
+     *   드래그 중엔 마우스를 따라 "세로 가이드 라인"만 이동하고, mouseup 때 한 번만 폭을 적용한다
+     *   (실시간 컬럼 갱신은 매 프레임 리플로우로 무겁고 잔상). 근거: 16 §3.4.2.
+     *   ★ 컬럼 리사이즈 바가 있는 모든 트리테이블(makeColumnTree / callBindPopup 등)은 이걸 소비한다.
+     * @param {HTMLElement} oGrip 그립 엘리먼트(컬럼 우측 경계에 얹힌 핸들).
+     * @param {Object} cfg
+     *   - host {HTMLElement} 가이드 세로 범위 기준(스크롤 컨테이너).
+     *   - getWidth {function():number} 현재 컬럼 폭(px) 반환.
+     *   - setWidth {function(number)} 새 컬럼 폭(px) 적용(놓을 때 1회 호출).
+     *   - min {number=} 최소 폭 px(기본 64).
+     *   - onReset {function()=} 더블클릭 시(기본폭 복귀 등).
+     *   - hoverEl {HTMLElement=} / hoverClass {string=} 그립 hover 시 경계 강조 토글(드래그 중엔 끔).
+     */
+    function attachColumnResize(oGrip, cfg) {
+        if (!oGrip || !cfg || typeof cfg.getWidth !== "function" || typeof cfg.setWidth !== "function") { return; }
+        var iMin = cfg.min || 64;
+        var bDrag = false, bHover = false, iColLeft = 0, iGuideX = 0;
+
+        function _guideEl() {
+            var g = document.getElementById("u4aColResizeGuide");
+            if (!g) {
+                g = document.createElement("div");
+                g.id = "u4aColResizeGuide";
+                g.style.cssText = "position:fixed;width:2px;background:var(--accent);z-index:9999;pointer-events:none;display:none;";
+                document.body.appendChild(g);
+            }
+            return g;
+        }
+        function _showGuide(iX) {
+            var r = (cfg.host || oGrip).getBoundingClientRect();
+            var g = _guideEl();
+            g.style.top = r.top + "px"; g.style.height = r.height + "px"; g.style.left = iX + "px"; g.style.display = "block";
+        }
+        function _moveGuide(iX) { var g = document.getElementById("u4aColResizeGuide"); if (g) { g.style.left = iX + "px"; } }
+        function _hideGuide() { var g = document.getElementById("u4aColResizeGuide"); if (g) { g.style.display = "none"; } }
+        function _hoverOn() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.add(cfg.hoverClass); } }
+        function _hoverOff() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.remove(cfg.hoverClass); } }
+
+        function lf_move(e) {
+            if (!bDrag) { return; }
+            iGuideX = Math.max(iColLeft + iMin, e.clientX);   // 컬럼 최소폭 clamp(가이드만 이동)
+            _moveGuide(iGuideX);
+        }
+        function lf_up() {
+            if (!bDrag) { return; }
+            bDrag = false;
+            try { document.body.classList.remove("u4a-dragging"); } catch (e) { }
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+            _hideGuide();
+            if (bHover) { _hoverOn(); }   // 드래그 끝 + 그립 위면 hover 강조 복귀
+            try { cfg.setWidth(iGuideX - iColLeft); } catch (e) { }   // ★ 놓을 때 실제 폭 적용
+            document.removeEventListener("mousemove", lf_move);
+            document.removeEventListener("mouseup", lf_up);
+        }
+
+        oGrip.addEventListener("mouseenter", function () { bHover = true; if (!bDrag) { _hoverOn(); } });
+        oGrip.addEventListener("mouseleave", function () { bHover = false; if (!bDrag) { _hoverOff(); } });
+        oGrip.addEventListener("mousedown", function (e) {
+            bDrag = true;
+            var iW = cfg.getWidth();
+            iColLeft = e.clientX - iW;   // 컬럼 좌측 경계(뷰포트 x) = 그립(우측 경계) − 현재 폭
+            iGuideX = e.clientX;
+            _hoverOff();   // 드래그 중엔 헤더 강조 끄고 가이드 라인만
+            try { document.body.classList.add("u4a-dragging"); } catch (e2) { }   // iframe 위 드래그 끊김 방지(공통)
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+            _showGuide(e.clientX);
+            document.addEventListener("mousemove", lf_move);
+            document.addEventListener("mouseup", lf_up);
+            e.preventDefault(); e.stopPropagation();
+        });
+        if (typeof cfg.onReset === "function") {
+            oGrip.addEventListener("dblclick", function (e) {
+                try { cfg.onReset(); } catch (e2) { }
+                e.preventDefault(); e.stopPropagation();
+            });
+        }
+    }
+
     const U4AUI = {
         el: _el,
         confirm: confirm,
         closeWindow: closeWindow,
+        attachColumnResize: attachColumnResize,
         createField: createField,
         syncClear: syncClear,
         createPanel: createPanel,

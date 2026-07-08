@@ -71,6 +71,15 @@
 
         window.onload = () => {
 
+            // ★ sap 미생성 방어(case 2): 부트 <script> 가 로드는 됐으나(200 오응답/부분로드 등) 실제 UI5(sap)가
+            //   없으면, frame.js 가 sap.ui... 접근 시 ReferenceError → ws_trycatch 크리티컬(APP.exit, 앱 전체 종료).
+            //   그 전에 공통 오류 안내 후 창(뷰어)만 닫도록 선제 처리(아이콘 목록 onFrameLoadSuccess 의 sap 체크와 동일 취지).
+            //   실체크(타임아웃 추측 아님)라 [[no-timeout-busy-fallback]] 위배 아님.
+            if (typeof sap === "undefined" || !sap.ui || !sap.ui.getCore) {
+                try { oAPP.fn && oAPP.fn._onUi5LoadFail && oAPP.fn._onUi5LoadFail("no-sap-after-onload(WSSRC)"); } catch (e) { }
+                return;
+            }
+
             let LV_UI5JS = document.createElement("script");
 
             LV_UI5JS.setAttribute('src', 'JS/frame.js');

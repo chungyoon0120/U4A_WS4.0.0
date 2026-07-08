@@ -99,6 +99,12 @@
   }
   function _busy(bOn) { try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { } }
 
+  // 오류 필드 자동 포커스 — 다음 틱 defer(공통 _refocus 패턴, createApplicationPopup 55).
+  //   ★동기 focus 는 ①Chromium93 이 change/blur/서버콜백 처리 도중이면 무시 ②busy/모달 top-layer 트랩에 막힘 →
+  //   다음 틱(setTimeout 0)에 focus 해야 값-스테이트 메시지(.u4a-field__msg, :focus-within)가 확실히 뜬다.
+  //   (마이크로태스크인 await 재개=busy(false) 가 먼저, 매크로태스크 focus 가 뒤 → busy 꺼진 뒤 포커스.)
+  function _refocus(oEl) { if (!oEl) { return; } setTimeout(function () { try { oEl.focus(); } catch (e) { } }, 0); }
+
   // 원본 sap-icon 상태 아이콘 → FA 아이콘 + 시맨틱 상태색 클래스(--state-* 토큰).
   //   status-positive(녹색 Success) / accept(파랑 Information=바인딩됨/선택) / share-2(노랑 Warning=n건 파생).
   function _statIcon(sSrc) {
@@ -1024,50 +1030,30 @@
     _updateContentMinW();                          // 고정 진입 시 콘텐츠 최소폭 확정
   }
 
-  // 컬럼 경계 그립 — 셀 좌측 경계(=보이는 세로 구분선)에 절대배치. sCol=이 그립이 조절할 컬럼("name"|"type").
-  //   ★그 컬럼만 조절(다른 고정 컬럼 불변, 설명=채움이 남는 공간 흡수 → 빈칸 없음). 더블클릭=반응형 기본폭 복귀.
+  // 컬럼 경계 그립 — 공통 U4AUI.attachColumnResize(가이드 라인 + 놓을 때 적용, UI5 방식) 소비. 16 §3.4.2
+  //   sCol=이 그립이 조절할 컬럼("name"|"type"). 첫 드래그 시 _ensureColsFixed 로 고정모드 전환(px).
+  //   hover 강조=treePane 경계선(sHl). 더블클릭=반응형 기본폭 복귀. ★대형 별창 makeColumnTree 와 동일 동작.
   function _buildColGrip(sCol) {
     var oGrip = _el("div", "u4aBindColGrip");
     oGrip.setAttribute("aria-hidden", "true");
-    var bDrag = false, bHover = false, iStartX = 0, iStart0 = 0;
-    // hover/드래그 시 강조할 경계 세로선 = 이 그립 오른쪽 컬럼의 좌측 border(이름그립→유형선, 유형그립→설명선).
     var sHl = (sCol === "name") ? "u4aBindHlType" : "u4aBindHlDesc";
-    function lf_move(e) {
-      if (!bDrag) { return; }
-      _applyColW(sCol, iStart0 + (e.clientX - iStartX));   // 오른쪽 드래그 = 이 컬럼 확대(설명이 남는 공간 흡수)
+    if (window.U4AUI && U4AUI.attachColumnResize) {
+      U4AUI.attachColumnResize(oGrip, {
+        host: oUI.treeBody,
+        getWidth: function () { _ensureColsFixed(); return _colPx(sCol); },   // 첫 드래그 시 고정모드 전환 후 현재폭
+        setWidth: function (px) { _applyColW(sCol, px); },                    // 놓을 때 1회 적용
+        hoverEl: oUI.treePane,
+        hoverClass: sHl,
+        onReset: function () {   // 더블클릭 = 기본폭 복귀
+          oUI.colsFixed = false;
+          oUI.treePane.classList.remove("u4aBindColsFixed");
+          oUI.treePane.style.removeProperty("--u4aBind-name-w");
+          oUI.treePane.style.removeProperty("--u4aBindContentMinW");
+          oUI.treePane.style.setProperty("--u4aBind-type-w", "30%");
+          oUI.treePane.style.setProperty("--u4aBind-desc-w", "42%");
+        }
+      });
     }
-    function lf_up() {
-      bDrag = false;
-      document.body.classList.remove("u4aBindResizing");
-      if (!bHover) { oUI.treePane.classList.remove(sHl); }   // 드래그 끝 + 그립 밖이면 강조 해제
-      document.removeEventListener("mousemove", lf_move);
-      document.removeEventListener("mouseup", lf_up);
-    }
-    // 경계 세로선 전체(헤더+행+빈 영역 = 컬럼 좌측 border 일체)를 accent 로 강조 — 그립 hover / 드래그 중.
-    oGrip.addEventListener("mouseenter", function () { bHover = true; oUI.treePane.classList.add(sHl); });
-    oGrip.addEventListener("mouseleave", function () { bHover = false; if (!bDrag) { oUI.treePane.classList.remove(sHl); } });
-    oGrip.addEventListener("mousedown", function (e) {
-      _ensureColsFixed();
-      bDrag = true;
-      iStartX = e.clientX;
-      iStart0 = _colPx(sCol);
-      oUI.treePane.classList.add(sHl);
-      document.body.classList.add("u4aBindResizing");
-      document.addEventListener("mousemove", lf_move);
-      document.addEventListener("mouseup", lf_up);
-      e.preventDefault();
-      e.stopPropagation();
-    });
-    // 더블클릭 = 반응형 기본폭 복귀(고정 해제 → 이름 flex 28%, 유형 30%, 설명 42% — 초기 비율).
-    oGrip.addEventListener("dblclick", function (e) {
-      oUI.colsFixed = false;
-      oUI.treePane.classList.remove("u4aBindColsFixed");
-      oUI.treePane.style.removeProperty("--u4aBind-name-w");
-      oUI.treePane.style.removeProperty("--u4aBindContentMinW"); // 고정 해제 → 기본(36rem) floor 로 복귀
-      oUI.treePane.style.setProperty("--u4aBind-type-w", "30%");
-      oUI.treePane.style.setProperty("--u4aBind-desc-w", "42%");
-      e.preventDefault(); e.stopPropagation();
-    });
     return oGrip;
   }
 
@@ -1441,6 +1427,7 @@
           ls_P05.stat = "Error";
           ls_P05.statTxt = _mw("267");   // 267 Bind type 선택 시 Reference Field name 필수.
           lf_renderAddit();
+          _refocus(ls_P05._field && ls_P05._field.input);   // (select 는 공통 setValueState no-op 라 메시지 미표시 — 별도 이슈)
           _msg(10, "E", ls_P05.statTxt);
           return resolve(true);
         }
@@ -1458,6 +1445,8 @@
             var sMsg = _relocalize(param.RTMSG);   // 서버가 백엔드 언어로 구운 메시지 → 접속 언어로 재현지화
             ls_P06.stat = "Error"; ls_P06.statTxt = sMsg;
             lf_renderAddit();
+            // 오류 필드 포커스(다음 틱) → 값-스테이트 메시지 즉시 노출(원본 valueState/valueStateText 포커스시 표시).
+            _refocus(ls_P06._field && ls_P06._field.input);
             _msg(10, "E", sMsg);
             return resolve(true);
           }
@@ -1773,7 +1762,7 @@
   function lf_ensureStyle() {
     var sCss = [
       // 다이얼로그 — 반응형 크기 + 세로 flex(바디가 늘어 푸터 하단 고정). 헤더/푸터 48px=공통.
-      ".u4aBindDlg { width: 80vw; height: 80vh; padding: 0; display: flex; flex-direction: column; }",
+      ".u4aBindDlg { width: min(62vw, 980px); height: 80vh; padding: 0; display: flex; flex-direction: column; }",
       ".u4aBindDlg .u4a-dialog__header { cursor: move; user-select: none; }",
       ".u4aBindHead span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
       // 툴바(MIME .u4aMimeTreeTool 컨벤션) — 아이콘/라벨 버튼 한 줄, 하단 경계.
@@ -1881,6 +1870,15 @@
       ".u4aBindAdditProp { font-weight: 700; }",
       ".u4aBindAdditText { color: var(--text-muted); }",
       ".u4aBindAdditVal .u4aBindAdditField { width: 100%; }",
+      // ★ 값-스테이트 메시지(원본 valueState/valueStateText). MPROP 은 테이블 셀(폼-행 없음)이라 공통 focus 규칙
+      //   (.u4a-form__row:focus-within, shell.css 1262)이 안 걸리고, 게다가 검증 재렌더+토스트로 포커스가 흔들려
+      //   focus-within 은 이 컨텍스트에서 불안정 → ★"에러 상태(data-vs=error)면 항상" 인라인 표시(포커스 무관, 확실).
+      //   공통 .u4a-field__msg 요소를 그대로 소비하되 위치만 스코프로 인라인화: 텍스트 필드(.u4a-field)를 flex-wrap 해
+      //   메시지를 입력칸 '아래 줄'에 정적 배치(absolute 플로팅 아님 → 아래 행 안 가림 + overflow 클리핑 없음).
+      //   (.u4aBindAdditField 는 select 콤보에도 붙으므로 .u4a-field 동시선택으로 텍스트 필드에만 한정.)
+      ".u4aBindAdditField.u4a-field { flex-wrap: wrap; }",
+      ".u4aBindAdditField.u4a-field .u4a-field__msg { position: static; flex: 0 0 100%; margin-top: 0.25rem; box-shadow: none; }",
+      ".u4aBindAdditField.u4a-field .u4a-input[data-vs=\"error\"] ~ .u4a-field__msg:not(:empty) { display: inline-flex; }",
       // 드래그 중 iframe(미리보기) 위 끊김 방지는 공통(body.u4a-dragging).
       ".u4aBindResizing, .u4aBindResizing * { cursor: col-resize !important; user-select: none !important; }"
     ].join("");

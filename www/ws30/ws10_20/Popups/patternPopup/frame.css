@@ -1,342 +1,377 @@
+/****************************************************************************
+ * 소스 패턴(Source Pattern) 창 레이아웃 — 공통 토큰만 소비(하드코딩 색 없음).
+ *  창 골격 = [공통 .u4a-titlebar] + [본체: 좌(기본/커스텀 트리 세로분할) | 우(코드 뷰어)] + [.u4a-busy].
+ *  타이틀바/버튼/트리/스플리터 모양은 shell.css + bootstrap-skin.css 가 담당(여기선 창 전용 배치만).
+ *  원본(index.js): 좌 Splitter[DefTreeTable | CustTreeTable] · 우 NavContainer[빈상태 | 코드에디터].
+ ****************************************************************************/
 
-/* BusyIndicator */
-#u4aWsBusyIndicator {
-    right: 0;
-}
-
-.u4aWsBusyIndicator {
-    z-index: 2000000;
-}
-.sapUiUserSelectable {
-    -webkit-touch-callout: text;
-    -webkit-user-select: text;
-    -khtml-user-select: text;
-    -moz-user-select: text;
-    -ms-user-select: text;
-    user-select: text;
-}
-.sapUiBusy {
-    display: block;
-    width: 48px;
-    height: 48px;
-    outline: none;
-    cursor: wait;
-    top: 0 !important;
-}
-
-#u4aWsBusyIndicator>.sapUiLocalBusyIndicatorFade {
-    cursor: wait;
-}
-
-.sapUiLocalBusyIndicatorSizeBig {
-    font-size: 2rem;
-    background-color: transparent;
-}
-
-.sapUiLocalBusyIndicatorFade {
-    opacity: 1;
-}
-
-.sapUiLocalBusyIndicator {
-    opacity: 0;
-    transition: opacity .3s ease-in;
-    outline: none;
-}
-
-.sapUiLocalBusyIndicator {
-    background-color: rgba(247, 247, 247, 0.72);
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-}
-
-.sapUiLocalBusyIndicatorAnimation {
-    position: absolute;
-    width: 3em;
-    top: 50%;
-    left: 50%;
-}
-
-.sapUiLocalBusyIndicatorAnimStandard>div:nth-child(1) {
-    animation-delay: -0.32s;
-}
-
-.sapUiLocalBusyIndicatorAnimStandard>div:nth-child(2) {
-    animation-delay: -0.16s;
-}
-
-.sapUiLocalBusyIndicatorAnimStandard>div {
-    animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
-}
-
-.sapUiLocalBusyIndicatorAnimation>div,
-.sapUiLocalBusyIndicatorAnimation>div::before,
-.sapUiLocalBusyIndicatorAnimation>div::after {
-    animation-fill-mode: both;
-}
-
-.sapUiLocalBusyIndicatorAnimation>div {
-    width: 1em;
-    height: 1em;
-    border-radius: 100%;
-    display: block;
-    float: left;
-    margin: 0px;
-    position: relative;
-    top: -0.5em;
-    left: -1.5em;
-    text-indent: 1px;
-}
-
-.sapUiLocalBusyIndicatorAnimStandard>div {
-    animation: sapUiBusyAnimationStandard 1.8s infinite ease-in-out;
-}
-
-.sapUiLocalBusyIndicatorAnimation>div::before {
-    background: #0854a0;
-    animation-duration: 0ms;
-}
-
-.sapUiLocalBusyIndicatorAnimStandard>div::before {
-    animation: sapUiBusyAnimationStandardBackground 1.8s infinite ease-in-out;
-}
-
-.sapUiLocalBusyIndicatorAnimation>div::before {
-    background: #0a6ed1;
-}
-
-.sapUiLocalBusyIndicatorAnimation>div::before,
-.sapUiLocalBusyIndicatorAnimation>div::after {
-    content: "";
-    opacity: 1;
-    position: absolute;
-    z-index: -1;
-    top: 0;
-    left: 0;
-    width: 100%;
+html,
+body {
     height: 100%;
-    border-radius: 100%;
 }
 
-.sapUiLocalBusyIndicatorAnimation>div::after {
-    box-shadow: inset 0 0 0 0 #0854a0;
-}
-
-.sapUiLocalBusyIndicatorAnimStandard>div::after {
-    animation: sapUiBusyAnimationStandardShadow 1.8s infinite ease-in-out;
-}
-
-.sapUiLocalBusyIndicatorAnimation>div::after {
-    box-shadow: inset 0 0 2px 1px rgb(10 110 209 / 80%);
-}
-
-.sapUiLocalBusyIndicatorAnimation>div {
-    width: 1em;
-    height: 1em;
-    border-radius: 100%;
-    display: block;
-    float: left;
-    margin: 0px;
-    position: relative;
-    top: -0.5em;
-    left: -1.5em;
-    text-indent: 1px;
-}
-
-.sapUiLocalBusyIndicatorSizeBig {
-    font-size: 2rem;
-    background-color: transparent;
-}
-
-.sapUiLocalBusyIndicator {
-    opacity: 0;
-    transition: opacity .3s ease-in;
-    outline: none;
-}
-
-.sapUiLocalBusyIndicatorFade {
-    opacity: 1;
-}
-
-@keyframes sapUiBusyAnimationStandard {
-
-    0%,
-    80%,
-    100% {
-        transform: scale(.4);
-    }
-
-    40% {
-        transform: scale(1);
-    }
-}
-
-/* Loading Page */
-.u4a_loaders {
-    font-family: sans-serif;
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+}
+
+/* ===== 본체(등장 페이드 — 네이티브 창 opacity 미사용, §2.6) ===== */
+.u4aPattBody {
+    flex: 1 1 auto;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.3s linear;
+}
+
+body.u4aPattShown .u4aPattBody {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .u4aPattBody {
+        transition: none;
+    }
+}
+
+/* ===== 외곽 수평 스플릿(좌 트리영역 | 우 코드 뷰어) — .u4a-splitter 공통 ===== */
+/* 좌측 = 세로 스플릿 컨테이너를 담는 패널(스크롤은 내부 트리가 담당 → 여기선 hidden). */
+.u4aPattLeft {
+    flex: 0 0 42%;
+    min-width: 15rem;
+    display: flex;
+    overflow: hidden;
+}
+
+/* 우측 = 코드 뷰어(마지막 유연 패널 — 잔여 채움, §4.1). */
+.u4aPattRight {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface);
+}
+
+/* ===== 좌측 세로 스플릿(기본 패턴 트리 / 커스텀 패턴 트리) ===== */
+.u4aPattVert {
+    flex-direction: column;
+}
+
+.u4aPattTreePane {
+    display: flex;
+    flex-direction: column;
+    min-height: 4rem;
+    overflow: hidden;
+    background: var(--surface);
+}
+
+.u4aPattTreePane--def {
+    flex: 0 0 46%;
+}
+
+.u4aPattTreePane--cust {
+    flex: 1 1 0;
+    /* Content Type 컬럼 폭 단일출처(헤더/행 셀/세로선 공유) */
+    --u4aPatt-cont-w: 32%;
+}
+
+/* 세로 스플릿바 — 공통 그립을 가로형으로 회전(§4.2 형태값 허용). 색/배경은 공통 상속. */
+.u4aPattVBar {
+    cursor: row-resize;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0.0625rem solid var(--line);
+    border-bottom: 0.0625rem solid var(--line);
+}
+
+.u4aPattVBar::before {
+    width: 36px;
+    height: 5px;
+}
+
+.u4aPattVBar:hover::before {
+    width: 50px;
+    height: 5px;
+}
+
+/* ===== 트리테이블(컬럼헤더 + 정렬) — 다열 트리테이블 표준(§3.4.1 / tree-table-column-alignment) =====
+   구조 = .u4aPattTreeBody(스크롤 컨테이너) 안에 .u4aPattTreeColHead(sticky) + tree ul 나란히.
+   원본 sap.ui.table.TreeTable 컬럼: 기본=[기본 패턴] / 커스텀=[커스텀 패턴 | Content Type]. MIME 이식. */
+
+/* 스크롤 바디 — 컬럼헤더와 행이 같은 폭 컨텍스트 공유(세로 스크롤바 떠도 함께 줄어 자동 정렬, rule 7) */
+.u4aPattTreeBody {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden auto;   /* 가로 스크롤 금지(행폭=헤더폭), 세로만 auto */
+    position: relative;
+}
+
+/* sticky 컬럼 헤더 — 스크롤 컨테이너 "안". padding-left = 행패딩(0.375rem) + ul 좌측 1px 보정(rule 1) */
+.u4aPattTreeColHead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    display: flex;
+    align-items: stretch;
+    height: 2.25rem;
+    padding-left: calc(0.375rem + 1px);
+    background: var(--surface-raised, var(--surface));
+    border-bottom: 0.0625rem solid var(--line);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.u4aPattColName {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
     align-items: center;
-    height: 100%;
-    font-size: 2.5rem;
-    color: rgba(2, 8, 16, 0.55);
+    padding-left: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Content Type 컬럼 헤더(고정폭 + 좌측 세로구분선) */
+.u4aPattColCont {
+    flex: 0 0 var(--u4aPatt-cont-w);
+    min-width: 0;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    padding-left: 0.5rem;
+    border-left: 0.0625rem solid var(--line);
+}
+
+/* ── 세로/가로 그리드선 레이어 (rule 7 심화 — 빈 영역까지 컬럼 경계선 연장, bindPopup 이식) ──
+   구조: treeBody{overflow} > colHead(sticky) + treeWrap(relative){ gridLines(absolute) + tree(z1) }.
+   세로선=gridLines GL 셀 border-left(헤더와 동일 flex/폭/padding → x 픽셀 일치, treeWrap 풀하이트).
+   가로선=treeWrap 배경 반복 그라디언트(행높이 2.5rem 주기 → 빈 행 영역까지). */
+.u4aPattTreeWrap {
+    position: relative;
+    min-height: calc(100% - 2.25rem);   /* colHead(2.25rem) 제외한 잔여 채움 → 경계선이 바닥까지 */
+    box-sizing: border-box;
+    background: repeating-linear-gradient(to bottom,
+            transparent 0,
+            transparent calc(2.5rem - 0.0625rem),
+            var(--line) calc(2.5rem - 0.0625rem),
+            var(--line) 2.5rem);
+}
+
+.u4aPattGridLines {
     position: absolute;
     top: 0;
-    width: 100%;
-    /* background: #1d232a; */
-    box-shadow: rgba(0, 0, 0, 0.11) 0px 15px 30px 0px, rgba(0, 0, 0, 0.08) 0px 5px 15px 0px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    display: flex;
+    box-sizing: border-box;
+    padding-left: calc(0.375rem + 1px);   /* 헤더와 동일 → 세로선 x 픽셀 일치(rule 1) */
+    padding-right: 0;
+    pointer-events: none;
 }
-.u4a_loader {
-    display: inline-block;
+
+.u4aPattGL {
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.u4aPattGL--name {
+    flex: 1 1 auto;
+}
+
+.u4aPattGL--cont {
+    flex: 0 0 var(--u4aPatt-cont-w);
+    border-left: 0.0625rem solid var(--line);
+}
+
+/* 트리 — 행폭을 패널 폭에 맞춰 Content Type 컬럼 항상 보이게(공통 max-content 무력화). 비가상=min-height:0(rule 4).
+   ★세로선 레이어(z:0) 위에 올린다(z:1). */
+.u4aPattTree.u4a-tree {
     position: relative;
-    width: 60px;
-    height: 20px;
-    text-align: center;
-    vertical-align: middle;
+    z-index: 1;
+    width: auto;
+    min-width: 100%;
+    min-height: 0;
+    padding-top: 0;
+    background: transparent;   /* 아래 그리드선(가로/세로)이 비쳐 보이게 */
 }
-.u4a_loadersInactive {
+
+/* data-u4a-tree-split(space-between) 무력화 → 토글/아이콘/라벨이 흩어지지 않고 Content Type 은 고정폭 우측 컬럼(rule 5) */
+.u4aPattTree .u4a-tree__row[data-u4a-tree-split] {
+    justify-content: flex-start;
+}
+
+.u4aPattRow {
+    padding-right: 0;   /* 공통 padding-right 제거 → 본문 content-box 가 헤더와 동일 폭(rule 5) */
+}
+
+.u4aPattRow .u4a-tree__label {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 들여쓰기를 행 padding-left → 토글 margin-left 로 이동(행 content-box 폭 일정, rule 2) */
+.u4aPattTree .u4a-tree__row {
+    padding-left: 0.375rem;
+}
+
+.u4aPattTree .u4a-tree__toggle {
+    margin-left: calc(var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem));
+}
+
+/* Content Type 셀(고정폭 우측 컬럼 + 세로구분선 풀하이트) — slotTrailing 단일 셀 직접 반환(MIME 방식) */
+.u4aPattCont {
+    flex: 0 0 var(--u4aPatt-cont-w);
+    min-width: 0;
+    box-sizing: border-box;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    padding-left: 0.5rem;
+    border-left: 0.0625rem solid var(--line);
+}
+
+.u4aPattContText {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    color: var(--text-muted, var(--icon-muted));
+}
+
+/* 선택 행은 공통 선택 텍스트색이 Content Type 도 이기게(명시색이라 inherit 안 됨) */
+.u4aPattTree .u4a-tree__row[aria-selected="true"] .u4aPattContText {
+    color: var(--selected-text);
+}
+
+/* ===== 우측 코드 뷰어 ===== */
+/* 헤더(선택 패턴 제목 + 복사) — 48px. */
+.u4aPattViewHead {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0.375rem 0.75rem;
+    border-bottom: 1px solid var(--divider);
+    background: var(--surface);
+}
+
+.u4aPattViewHead[hidden] {
     display: none;
 }
-.u4a_loader-bars:before,
-.u4a_loader-bars:after,
-.u4a_loader-bars span {
-    content: "";
-    display: block;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 10px;
-    height: 30px;
-    background-color: rgba(2, 8, 16, 0.55);
-    -webkit-animation: u4a_grow 1.5s linear infinite;
-    animation: u4a_grow 1.5s linear infinite;
+
+.u4aPattViewTitle {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--text);
 }
 
-.u4a_loader-bars:after {
-    left: 15px;
-    -webkit-animation: u4a_grow 1.5s linear -0.5s infinite;
-    animation: u4a_grow 1.5s linear -0.5s infinite;
-}
-
-.u4a_loader-bars span {
-    left: 30px;
-    -webkit-animation: u4a_grow 1.5s linear -1s infinite;
-    animation: u4a_grow 1.5s linear -1s infinite;
-}
-
-@-webkit-keyframes u4a_grow {
-    0% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-    50% {
-        -webkit-transform: scaleY(1);
-        transform: scaleY(1);
-        opacity: 1;
-    }
-    100% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-}
-
-@keyframes u4a_grow {
-    0% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-    50% {
-        -webkit-transform: scaleY(1);
-        transform: scaleY(1);
-        opacity: 1;
-    }
-    100% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-}
-
-
-.cl_ring {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 150px;
-    height: 150px;
+/* 복사 버튼 — 투명 중립 아이콘. */
+.u4aPattCopyBtn {
+    flex: 0 0 auto;
+    min-width: 2.25rem;
+    padding: 0.4rem 0.6rem;
+    justify-content: center;
     background: transparent;
-    border: 3px solid #ff2600;
-    border-radius: 50%;
-    text-align: center;
-    line-height: 150px;
-    font-family: sans-serif;
-    font-size: 20px;
-    color: #ffbeb2;
-    letter-spacing: 4px;
-    text-shadow: 0 0 10px #ffbeb2;
-    box-shadow: 0 0 20px rgba(156, 0, 0, 0.5);
+    border-color: transparent;
+    color: var(--text-muted, var(--icon-muted));
 }
 
-.cl_ring:before {
-    content: '';
+.u4aPattCopyBtn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+.u4aPattViewBody {
+    flex: 1 1 auto;
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--boot-bg, var(--app-bg));
+}
+
+/* 빈 상태(원본 sap.m.IllustratedMessage — 276/277) */
+.u4aPattEmpty {
     position: absolute;
-    top: -3px;
-    left: -3px;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    text-align: center;
+    padding: 1.5rem;
+    background: var(--surface);
+    color: var(--text-muted, var(--icon-muted));
+}
+
+.u4aPattEmpty[hidden] {
+    display: none;
+}
+
+.u4aPattEmpty__icon {
+    font-size: 2.75rem;
+    opacity: 0.5;
+    margin-bottom: 0.25rem;
+}
+
+.u4aPattEmpty__title {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.u4aPattEmpty__desc {
+    font-size: 0.8125rem;
+    max-width: 22rem;
+    line-height: 1.5;
+}
+
+/* Monaco 호스트 래퍼 — 처음 opacity:0 → 코드 표시 시 페이드인. */
+.u4aPattHostWrap {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.25s linear;
+    background: var(--boot-bg, var(--app-bg));
+}
+
+.u4aPattHostWrap[hidden] {
+    display: none;
+}
+
+.u4aPattHostWrap.u4aPattHostShown {
+    opacity: 1;
+}
+
+#pattHost {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
-    border: 3px solid transparent;
-    border-top: 3px solid #ffbeb2;
-    border-right: 3px solid #ffbeb2;
-    border-radius: 50%;
-    animation: animateC 3s linear infinite;
-}
-
-.cl_ringArea {
+    border: 0;
     display: block;
-    position: absolute;
-    top: calc(50% - 2px);
-    left: 50%;
-    width: 50%;
-    height: 4px;
-    background: transparent;
-    transform-origin: left;
-    animation: animate 3s linear infinite;
 }
 
-.cl_ringArea:before {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #ffbeb2;
-    top: -6px;
-    right: -8px;
-    box-shadow: 0 0 20px #fff;
-}
-
-@keyframes animateC {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
-@keyframes animate {
-    0% {
-        transform: rotate(45deg);
-    }
-
-    100% {
-        transform: rotate(405deg);
-    }
-}
+/* 로딩 오버레이 = 공통 .u4a-busy(shell.css SSOT). 토스트 = 공통 .u4a-toast(정중앙). 화면별 스타일 없음. */

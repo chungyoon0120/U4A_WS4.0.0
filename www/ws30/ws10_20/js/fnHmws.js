@@ -478,16 +478,9 @@
             return;
         }
 
-        // ── [임시] patternPopup(소스 패턴) HTML5 미변환 — 완료 전까지 안내 토스트만.
-        //   Main(WS10) + WS30(메뉴 fnWS10 위임) 공통 경로. busy Lock 은 걸지 않는다(토스트만·해제 짝 없음).
-        //   TODO(i18n) + 변환 완료 시 아래 원본 호출 복원.
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
-        return;
-
-        // // busy 키고 Lock 걸기
-        // oAPP.common.fnSetBusyLock("X");
-
-        // oAPP.fn.fnSourcePatternPopupOpener(); // [async]
+        // patternPopup(소스 패턴) — frameless HTML5 변환 완료. 공통 Monaco 호스트(editorPopup/host) 재사용.
+        //   Main(WS10) + WS30(메뉴 fnWS10 위임) 공통 경로. opener 가 busyLock/broadcast 를 건다.
+        oAPP.fn.fnSourcePatternPopupOpener();
 
     }; // end of oAPP.fn.fnWS10WMENU20_05
 
@@ -894,16 +887,8 @@
             return;
         }
 
-        // ── [임시] patternPopup(소스 패턴) HTML5 미변환 — 완료 전까지 안내 토스트만.
-        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 호출 복원.
-        //   (busy Lock 은 걸지 않는다 — 토스트만 띄우고 즉시 반환하므로 해제 짝이 없음)
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
-        return;
-
-        // // busy 키고 Lock 걸기
-        // oAPP.common.fnSetBusyLock("X");
-
-        // oAPP.fn.fnSourcePatternPopupOpener(); // [async]
+        // patternPopup(소스 패턴) — frameless HTML5 변환 완료. WS20 경로도 동일 opener 사용.
+        oAPP.fn.fnSourcePatternPopupOpener();
 
     }; // end of oAPP.fn.fnWS20WMENU20_05
 

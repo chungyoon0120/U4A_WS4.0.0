@@ -1,1364 +1,763 @@
 /********************************************************************
- *📝 CONTROL.JS
-    내역 : 웹딘 컨버전 내부 로직 영역
-********************************************************************/
-export async function createControl(oParam){
+ *📝 CONTROL.JS  (UI5 → HTML5)
+ *   내역 : 웹딘(Web Dynpro) 컨버전 내부 로직 영역.
+ *
+ *   [컨버전 메모]
+ *   - 원본: sap.ui.model.json.JSONModel(two-way) + sap.ui.getCore().lock/unlock.
+ *     → HTML5: 플레인 상태(oData) + view.js 가 주입한 render()(oModel.refresh 대체) + parent.setBusy.
+ *   - 서버 계약/엔드포인트/메시지 키는 원본 그대로 보존.
+ *       /u4a_cvt_wdr/getWebDynCompData · /chkPackage · /u4a_cvt_wdr/checkAppData
+ *       /u4a_cvt_wdr/createAppData · /u4a_cvt_wdr/convWebdynUI
+ *   - F4: 원본 callF4HelpPopup(UI5) → 공통 HTML5 fnF4SearchHelpOpen(YYUAWDH0010 / DEVCLASS).
+ *   - 값검증 표기: 프로젝트 표준(인라인 value-state + 오류필드 포커스, 중복 요약 모달 제거)로 통일
+ *     (생성옵션 팝업 General/DataSet 탭과 동일 UX). 서버 SCRIPT eval 은 방어(guard-server-script-eval).
+ *   - 인터페이스(createControl → oContr{ ui, fn, oData, onEvt, onViewReady }) 는 원본과 동일하게 유지
+ *     (소비처 createApplicationPopup CREATE_APP + 위자드 CREATE_WIZARD 공용).
+ ********************************************************************/
+export async function createControl(oParam) {
 
     /********************************************************************
      *📝 constant 선언부
     ********************************************************************/
-
-    //프로세스 코드 항목.
     const CS_PRCCD = {
-        CREATE_APP      : "CREATE_APP",     //APP 생성.
-        CREATE_WIZARD   : "CREATE_WIZARD"   //위자드.
+        CREATE_APP: "CREATE_APP",       // APP 생성.
+        CREATE_WIZARD: "CREATE_WIZARD"  // 위자드.
     };
 
-    //위자드 템플릿 팜업 sid.
+    // 위자드 템플릿 팝업 sid(원본 유지 — 위자드 경로에서만 참조).
     const C_TMPL_WZD_DLG_ID = "u4aWsTmplWzdDlg";
 
-    //웹딘 컨버전 관련 구조.
-    const TY_UAWD = {
-        APPID       : "",     //U4A APP ID.
-        COMP_NAME   : "",     //WEBDYN 컴포넌트명.
-        COMP_DESC   : "",     //WEBDYN 컴포넌트 DESC.
-        PACKG       : "",     //U4A 생성 패키지명.
-        REQNR       : "",     //U4A 생성시 CTS명.        
-        REQTX       : "",     //U4A 생성시 CTS DESC.
-        REQNR_REQ   : false,  //REQNR 필수 여부.
-    };
-
-    //RETURN 처리 구조
-    const TY_RES = {
-        RETCD : "",
-        RTMSG : ""
-    };
-
-    //VIEW 선택 구조.
-    const TY_VLIST = {
-        VIEW_NAME : "", //WEBDYN VIEW 명.
-        VIEW_DESC : ""  //WEBDYN VIEW DESC.
-    };
-
-
-    //화면 활성/비활성 관련 구조.
-    const TY_VIS = {
-        PACKG         : false,  //U4A 생성 패키지명.
-        REQNR         : false,  //U4A 생성시 CTS명.
-        REQTX         : false,  //U4A 생성시 CTS DESC.
-        VLIST         : false,  //VIEW 선택 TABLE
-        CREATE_WIZARD : false   //위자드 생성 툴바 영역.
-    };
-
-
-    //화면 오류 표현 구조.
-    const TY_VALST = {
-        COMP_NAME : undefined,
-        PACKG     : undefined,
-        REQNR     : undefined
-    };
-
-    //화면 오류 표현 구조.
-    const TY_VALTX = {
-        COMP_NAME : "",
-        PACKG     : "",        
-        REQNR     : ""
-    };
-
-
-    //화면 EDIT/DISP 관련 구조.
-    const TY_EDIT = {
-        REQNR : false,  //U4A 생성시 CTS명.
-    };
+    const TY_UAWD = { APPID: "", COMP_NAME: "", COMP_DESC: "", PACKG: "", REQNR: "", REQTX: "", REQNR_REQ: false };
+    const TY_RES = { RETCD: "", RTMSG: "" };
+    const TY_VIS = { PACKG: false, REQNR: false, REQTX: false, VLIST: false, CREATE_WIZARD: false };
+    const TY_VALST = { COMP_NAME: undefined, PACKG: undefined, REQNR: undefined };
+    const TY_VALTX = { COMP_NAME: "", PACKG: "", REQNR: "" };
+    const TY_EDIT = { REQNR: false };
 
 
     /********************************************************************
      *📝 DATA / ATTRIBUTE 선언부
     ********************************************************************/
-    var oContr = {};
-        oContr.ui = {};
-        oContr.fn = {};
-        oContr.attr = {};
-        
-        oContr.path = {};
+    const oContr = {};
+    oContr.ui = {};
+    oContr.fn = {};
+    oContr.attr = {};
+    oContr.path = {};
 
+    // 플레인 상태(원본 JSONModel 대체). view.js render() 가 이 값을 DOM 에 반영.
+    oContr.oData = {
+        S_UAWD: { ...TY_UAWD },
+        S_VIS: { ...TY_VIS },
+        S_EDIT: { ...TY_EDIT },
+        S_VALST: { ...TY_VALST },
+        S_VALTX: { ...TY_VALTX },
+        T_VLIST: [],
+        _vlistSel: -1   // VIEW 리스트 선택 인덱스(위자드).
+    };
 
-
-    //바인딩 추가 속성 정보 모델.
-    oContr.oModel = new sap.ui.model.json.JSONModel({
-        S_UAWD   : {...TY_UAWD},
-        S_VIS    : {...TY_VIS},
-        S_EDIT   : {...TY_EDIT},
-        S_VALST  : {...TY_VALST},
-        S_VALTX  : {...TY_VALTX},
-        T_VLIST  : []
-    });
-    
-
-    /********************************************************************
-     *📝 CUSTOM EVENT.
-    ********************************************************************/
+    // 커스텀 이벤트(원본 유지 — 소비처가 conversionWebdynpro 를 dispatch).
     oContr.onEvt = new EventTarget();
 
+    // 화면 동기(view.js 가 oContr.fn.render 주입). 상태 변경 후 호출(원본 oModel.refresh 대체).
+    function _render() { if (typeof oContr.fn.render === "function") { try { oContr.fn.render(); } catch (e) { console.error("[UAWD] render", e); } } }
+
+    // 서버 메시지 클라 언어 역현지화(생성옵션 팝업과 동일 정책 — 서버가 접속언어로 굽는 텍스트를 WS 언어로).
+    function _reloc(sText) {
+        try {
+            if (!sText) { return sText; }
+            const ws = (parent.getUserInfo() || {}).LANGU;
+            const be = (parent.getServerInfo() || {}).LANGU;
+            if (!ws || !be || ws === be) { return sText; }
+            const cls = parent.REMOTE.getGlobal("WsMsgCls");
+            return (cls && cls.relocalize) ? cls.relocalize(sText, be, ws) : sText;
+        } catch (e) { return sText; }
+    }
+
+    // 서버 SCRIPT eval 방어(SCRIPT 는 sap 등 참조 다수 → 실패해도 앱 안 죽고 busy 는 호출부가 해제).
+    function _evalServerScript(sScript) {
+        if (!sScript) { return false; }
+        try { eval(sScript); return true; }
+        catch (e) { console.error("[UAWD] server SCRIPT eval failed", e); return false; }
+    }
+    oContr.fn._reloc = _reloc;
+
 
     /********************************************************************
-     *📝 VIEW READY.
+     *📝 VIEW READY — PRCCD 별 화면 활성/비활성 초기화.
     ********************************************************************/
-    oContr.onViewReady = async function(oEvent){
-        
-        //default 비활성 처리.
-        //(패키지, CTS번호, CTS DESC, VIEW LIST)
-        var _sVis = {...TY_VIS};
+    oContr.onViewReady = async function () {
 
-        switch (oParam?.PRCCD) {
+        const _sVis = { ...TY_VIS };
+
+        switch (oParam && oParam.PRCCD) {
             case CS_PRCCD.CREATE_APP:
-                //어플리케이션 생성.
-
-                //패키지 입력란 활성.
+                // 어플리케이션 생성 — 패키지/CTS번호/CTS설명 입력란 활성.
                 _sVis.PACKG = true;
-
-                //CTS 번호 입력란 활성.
                 _sVis.REQNR = true;
-
-                //CTS DESC 입력란 활성.
                 _sVis.REQTX = true;
-
                 break;
 
             case CS_PRCCD.CREATE_WIZARD:
-                //위자드 생성.
-
-                //VIEW LIST 활성.
+                // 위자드 — VIEW 선택 리스트 + 생성 툴바 활성.
                 _sVis.VLIST = true;
-
-                //생성 TOOLBAR 활성화.
                 _sVis.CREATE_WIZARD = true;
-                
                 break;
 
             default:
-            //정해진 프로세스코드가 전달되지 않은경우 크리티컬 오류 처리.
-                
+                break;
         }
 
-        
-        //ui 갱신 대기 module path.
-        oContr.path.UIUpdated = parent.PATH.join(parent.getPath("WS10_20_ROOT"), "design", 
-            "util", "UIUpdated.js");
+        // 공통 F4(fnF4SearchHelpPopup) 지연로드 경로(원본 callF4HelpPopup → HTML5 대체).
+        oContr.path.callF4HelpPopup = parent.PATH.join(parent.getPath("WS10_20_ROOT"), "js", "fnF4SearchHelpPopup.js");
 
-        //f4 help 팝업 module path.
-        oContr.path.callF4HelpPopup = parent.PATH.join(parent.getPath("WS10_20_ROOT"), "design", 
-            "js", "callF4HelpPopup.js");
+        oContr.oData.S_VIS = _sVis;
+        oContr.oData.S_UAWD.APPID = oParam.APPID;
 
-
-        //화면 활성 여부.
-        oContr.oModel.oData.S_VIS = _sVis;
-
-        //어플리케이션 ID.
-        oContr.oModel.oData.S_UAWD.APPID     = oParam.APPID;
-
-        var _oPromise = undefined;
-
-        try {
-            const _oMudule = await import(oContr.path.UIUpdated);
-
-            _oPromise = _oMudule.UIUpdated();
-
-        } catch (e) {
-        
-        }
-
-        
-        oContr.oModel.refresh(true);
-
-        //화면 갱신 대기 처리.
-        await _oPromise;
-
+        _render();
 
         parent.setBusy("");
-
     };
-
-
 
 
     /********************************************************************
      *📝 VIEW EXIT.
     ********************************************************************/
-    oContr.onViewExit = async function(oEvent){
-
-    };
-
+    oContr.onViewExit = async function () { };
 
 
     /********************************************************************
      *📝 WEB DYNPRO 컴포넌트명 변경 이벤트.
     ********************************************************************/
-    oContr.fn.onChangeWebdynComp = async function (oEvent) {
+    oContr.fn.onChangeWebdynComp = async function (sValue) {
 
         parent.setBusy("X");
 
-        //결과 테이블 sort, filter 초기화.
-        oContr.fn.resetUiTableFilterSort(oContr.ui.VLIST);
+        const D = oContr.oData;
 
-        var _oUi = oEvent?.oSource;
+        // 오류 표현 필드 / DESC / view 리스트 초기화.
+        D.S_VALST.COMP_NAME = undefined;
+        D.S_VALTX.COMP_NAME = "";
+        D.S_UAWD.COMP_DESC = "";
+        D.T_VLIST = [];
+        D._vlistSel = -1;
 
-        var _WD_COMP_NAME = oEvent.getParameter("value");
-        
-        //오류 표현 필드 초기화.
-        oContr.oModel.oData.S_VALST.COMP_NAME = undefined;
-        oContr.oModel.oData.S_VALTX.COMP_NAME = "";
+        const _name = (sValue == null ? "" : String(sValue));
+        D.S_UAWD.COMP_NAME = _name;
 
-        //웹딘 DESC 초기화.
-        oContr.oModel.oData.S_UAWD.COMP_DESC = "";
+        // 컴포넌트명 미입력이면 EXIT.
+        if (_name === "") { _render(); parent.setBusy(""); return; }
 
-        //view 리스트 초기화.
-        oContr.oModel.oData.T_VLIST = [];
+        // WEB DYNPRO 컴포넌트정보 검색.
+        const _sRes = await oContr.fn.getWebDynCompData();
 
-        //웹딘 컴포넌트명 입력건이 존재하지 않는경우 EXIT.
-        if(_WD_COMP_NAME === ""){
-            oContr.oModel.refresh();
+        if (_sRes.RETCD === "E") {
 
-            sap.ui.getCore().unlock();
-
-            parent.setBusy("");
-            return;
-        }
-
-        //WEB DYNPRO 컴포넌트정보 검색.
-        var _sRes = await oContr.fn.getWebDynCompData();
-
-        if(_sRes.RETCD === "E"){
-            
-            if(_sRes?.SCRIPT){
-                eval(_sRes.SCRIPT);
-
-                //WEB DYNPRO 컴포넌트 DESC 초기화.
-                oContr.oModel.oData.S_UAWD.COMP_DESC = "";
-
-                oContr.oModel.refresh(true);
-
-                //wait off 처리.
+            if (_sRes.SCRIPT) {
+                if (!_evalServerScript(_sRes.SCRIPT) && _sRes.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRes.RTMSG)); }
+                D.S_UAWD.COMP_DESC = "";
+                _render();
                 parent.setBusy("");
-
                 return;
             }
 
-            //오류 표현 필드처리.
-            oContr.oModel.oData.S_VALST.COMP_NAME = "Error";
-            oContr.oModel.oData.S_VALTX.COMP_NAME = _sRes.RTMSG;
-
-            //WEB DYNPRO 컴포넌트 DESC 초기화.
-            oContr.oModel.oData.S_UAWD.COMP_DESC = "";
-
-            oContr.oModel.refresh(true);
-           
-
+            // [UX 통일] 인라인 value-state + 오류필드 포커스(중복 모달 제거).
+            D.S_VALST.COMP_NAME = "Error";
+            D.S_VALTX.COMP_NAME = _reloc(_sRes.RTMSG);
+            D.S_UAWD.COMP_DESC = "";
+            _render();
             parent.setBusy("");
-
-            //오류  메시지 출력.
-            parent.showMessage(sap, 20, "E", _sRes.RTMSG, function(){
-                _oUi?.focus?.();
-            });           
-
+            oContr.fn._focus("compField");
             return;
-
         }
 
-        //WEB DYNPRO 컴포넌트명 값 세팅.
-        oContr.oModel.oData.S_UAWD.COMP_NAME = _sRes.COMP_NAME;
+        D.S_UAWD.COMP_NAME = _sRes.COMP_NAME;
+        D.S_UAWD.COMP_DESC = _sRes.COMP_DESC;
+        D.T_VLIST = _sRes.T_VLIST || [];
+        D._vlistSel = -1;
 
-        //WEB DYNPRO 컴포넌트 DESC 값 세팅.
-        oContr.oModel.oData.S_UAWD.COMP_DESC = _sRes.COMP_DESC;
-
-        //view 리스트 정보 매핑.
-        oContr.oModel.oData.T_VLIST = _sRes?.T_VLIST || [];
-
-        //잠금 해제 처리.
-        sap.ui.getCore().unlock();
-
-        oContr.oModel.refresh(true);        
-
+        _render();
         parent.setBusy("");
-
-
     };
 
 
     /********************************************************************
-     *📝 패키지 변경 에벤트.
+     *📝 패키지 변경 이벤트.
     ********************************************************************/
-    oContr.fn.onChangePackage = async function (oEvent) {
+    oContr.fn.onChangePackage = async function (sValue) {
 
         parent.setBusy("X");
 
-        var _oUi = oEvent?.oSource;
-        
-        //오류 표현 필드 초기화.
-        oContr.oModel.oData.S_VALST.PACKG = undefined;
-        oContr.oModel.oData.S_VALTX.PACKG = "";
+        const D = oContr.oData;
 
-        var _PACKG = oEvent.getParameter("value");
+        D.S_VALST.PACKG = undefined;
+        D.S_VALTX.PACKG = "";
 
-        //패키지 입력건이 존재하지 않는경우 EXIT.
-        if(_PACKG === ""){
-            oContr.oModel.refresh();
+        const _p = (sValue == null ? "" : String(sValue)).toUpperCase();
+        D.S_UAWD.PACKG = _p;
 
-            sap.ui.getCore().unlock();
+        // 패키지 미입력이면 EXIT.
+        if (_p === "") { _render(); parent.setBusy(""); return; }
 
+        const _sRes = await oContr.fn.checkPackage();
+
+        if (_sRes.RETCD === "E") {
+            D.S_VALST.PACKG = "Error";
+            D.S_VALTX.PACKG = _reloc(_sRes.RTMSG);
+            _render();
             parent.setBusy("");
+            oContr.fn._focus("packField");
             return;
         }
 
+        // default REQNR 비활성.
+        D.S_EDIT.REQNR = false;
+        D.S_UAWD.REQNR_REQ = false;
 
-        //패키지 입력건 점검.
-        var _sRes = await oContr.fn.checkPackage();
-
-        if(_sRes.RETCD === "E"){
-
-            //오류 표현 필드 초기화.
-            oContr.oModel.oData.S_VALST.PACKG = "Error";
-            oContr.oModel.oData.S_VALTX.PACKG = _sRes.RTMSG;
-
-            oContr.oModel.refresh(true);
-
-            parent.setBusy("");
-
-            //오류  메시지 출력.
-            parent.showMessage(sap, 20, "E", _sRes.RTMSG, function(){
-                _oUi?.focus?.();
-            });           
-
-            return;
-
+        // 로컬($TMP) 이 아니면 REQNR 활성 + 필수.
+        if (D.S_UAWD.PACKG !== "$TMP") {
+            D.S_EDIT.REQNR = true;
+            D.S_UAWD.REQNR_REQ = true;
         }
 
-        //default REQNR 입력필드 비활성.
-        oContr.oModel.oData.S_EDIT.REQNR     = false;
-        oContr.oModel.oData.S_UAWD.REQNR_REQ = false;
-
-        //입력한 패키지가 로컬 패키지가 아닌 경우.
-        if(oContr.oModel.oData.S_UAWD.PACKG !== "$TMP"){
-            //REQNR 입력필드 활성.
-            oContr.oModel.oData.S_EDIT.REQNR = true;
-
-            //REQNR 필수 처리.
-            oContr.oModel.oData.S_UAWD.REQNR_REQ = true;
-
-        }
-
-        //잠금 해제 처리.
-        sap.ui.getCore().unlock();
-
-        oContr.oModel.refresh(true);
-
+        _render();
         parent.setBusy("");
-
-        
     };
 
 
-
     /********************************************************************
-     *📝 webdyn 컴포넌트 f4 help.
+     *📝 webdyn 컴포넌트 F4 help (원본 callF4HelpPopup YYUAWDH0010 → fnF4SearchHelpOpen).
     ********************************************************************/
-    oContr.fn.onValueHelpWDCompName = async function(oEvent){
+    oContr.fn.onValueHelpWDCompName = async function () {
 
-        parent.setBusy("X");
+        const D = oContr.oData;
 
-        //F4 HELP CALLBACK FUNCTION.
-        async function _callback(sRes){
+        async function _callback(row) {
+            if (!row) { return; }
 
             parent.setBusy("X");
-            
-            //오류 표현 필드 초기화.
-            oContr.oModel.oData.S_VALST.COMP_NAME = undefined;
-            oContr.oModel.oData.S_VALTX.COMP_NAME = "";
 
-            //view 리스트 초기화.
-            oContr.oModel.oData.T_VLIST = [];
+            D.S_VALST.COMP_NAME = undefined;
+            D.S_VALTX.COMP_NAME = "";
+            D.T_VLIST = [];
+            D._vlistSel = -1;
 
-            //WD 컴포넌트명.
-            oContr.oModel.oData.S_UAWD.COMP_NAME = sRes.COMPONENT_NAME;
+            // 결과 셀 키 = FIELDNAME(대문자) — 원본 callback 의 COMPONENT_NAME/DESCRIPTION 동일.
+            D.S_UAWD.COMP_NAME = row.COMPONENT_NAME || "";
+            D.S_UAWD.COMP_DESC = row.DESCRIPTION || "";
 
-            //WD 컴포넌트 desc.
-            oContr.oModel.oData.S_UAWD.COMP_DESC = sRes.DESCRIPTION;
-            
+            // 위자드에서 호출된 경우 컴포넌트 정보 재조회(원본 동일).
+            if (oParam.PRCCD === CS_PRCCD.CREATE_WIZARD) {
 
-            //웹딘 위자드에서 호출된 경우.
-            if(oParam.PRCCD === "CREATE_WIZARD"){
+                const _sRes = await oContr.fn.getWebDynCompData();
 
-                //WEB DYNPRO 컴포넌트정보 검색.
-                var _sRes = await oContr.fn.getWebDynCompData();
-
-                if(_sRes.RETCD === "E"){
-
-                    if(_sRes?.SCRIPT){
-                        eval(_sRes?.SCRIPT);
-
-                        //WEB DYNPRO 컴포넌트 DESC 초기화.
-                        oContr.oModel.oData.S_UAWD.COMP_DESC = "";
-
-                        oContr.oModel.refresh(true);
-
-                        //wait off 처리.
+                if (_sRes.RETCD === "E") {
+                    if (_sRes.SCRIPT) {
+                        if (!_evalServerScript(_sRes.SCRIPT) && _sRes.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRes.RTMSG)); }
+                        D.S_UAWD.COMP_DESC = "";
+                        _render();
                         parent.setBusy("");
-
                         return;
                     }
-
-                    //오류 표현 필드 처리.
-                    oContr.oModel.oData.S_VALST.COMP_NAME = "Error";
-                    oContr.oModel.oData.S_VALTX.COMP_NAME = _sRes.RTMSG;
-
-                    //WEB DYNPRO 컴포넌트 DESC 초기화.
-                    oContr.oModel.oData.S_UAWD.COMP_DESC = "";
-
-                    oContr.oModel.refresh(true);
-
+                    D.S_VALST.COMP_NAME = "Error";
+                    D.S_VALTX.COMP_NAME = _reloc(_sRes.RTMSG);
+                    D.S_UAWD.COMP_DESC = "";
+                    _render();
                     parent.setBusy("");
-
-                    //오류  메시지 출력.
-                    parent.showMessage(sap, 20, "E", _sRes.RTMSG);           
-
+                    oContr.fn._focus("compField");
                     return;
-
                 }
 
-                //WEB DYNPRO 컴포넌트명 값 세팅.
-                oContr.oModel.oData.S_UAWD.COMP_NAME = _sRes.COMP_NAME;
-
-                //WEB DYNPRO 컴포넌트 DESC 값 세팅.
-                oContr.oModel.oData.S_UAWD.COMP_DESC = _sRes.COMP_DESC;
-
-                //view 리스트 정보 매핑.
-                oContr.oModel.oData.T_VLIST = _sRes?.T_VLIST || [];
-
+                D.S_UAWD.COMP_NAME = _sRes.COMP_NAME;
+                D.S_UAWD.COMP_DESC = _sRes.COMP_DESC;
+                D.T_VLIST = _sRes.T_VLIST || [];
             }
 
-            
-            oContr.oModel.refresh(true);
-
-
+            _render();
             parent.setBusy("");
-
-
         }
 
+        parent.setBusy("X");
+        await oContr.fn._ensureF4();
+        parent.setBusy("");
 
-        //f4 help팝업을 load한경우.
-        if(typeof oAPP.fn.callF4HelpPopup !== "undefined"){
-            //f4 help 팝업 호출.
-            // oAPP.fn.callF4HelpPopup("WD_COMPONENT", "WD_COMPONENT", [], [], _callback);
-            oAPP.fn.callF4HelpPopup("YYUAWDH0010", "YYUAWDH0010", [], [], _callback);
-
+        if (oAPP.fn && typeof oAPP.fn.fnF4SearchHelpOpen === "function") {
+            oAPP.fn.fnF4SearchHelpOpen({ shlpname: "YYUAWDH0010", onPick: _callback });
             return;
         }
-
-        var _sRes = await fetch(oContr.path.callF4HelpPopup);
-
-        var _source = await _sRes.text();
-
-        eval(_source);
-
-        //f4 help 팝업 function load 이후 팝업 호출.
-        // oAPP.fn.callF4HelpPopup("WD_COMPONENT", "WD_COMPONENT", [], [], _callback);
-        oAPP.fn.callF4HelpPopup("YYUAWDH0010", "YYUAWDH0010", [], [], _callback);
-
+        // Value help is not available.
+        parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "949"));
     };
 
 
-
-
     /********************************************************************
-     *📝 package f4 help.
+     *📝 package F4 help (원본 callF4HelpPopup DEVCLASS → fnF4SearchHelpOpen).
     ********************************************************************/
-    oContr.fn.onValueHelpPackage = async function(oEvent){
+    oContr.fn.onValueHelpPackage = async function () {
 
-        parent.setBusy("X");
+        const D = oContr.oData;
 
-        //F4 HELP CALLBACK FUNCTION.
-        function _callback(sRes){
+        function _callback(row) {
+            if (!row) { return; }
 
-            //패키지명.
-            oContr.oModel.oData.S_UAWD.PACKG = sRes.DEVCLASS;
+            D.S_UAWD.PACKG = row.DEVCLASS || "";
 
-            //CTS 번호 입력 비활성 처리.
-            oContr.oModel.oData.S_EDIT.REQNR     = false;
-            oContr.oModel.oData.S_UAWD.REQNR_REQ = false;
+            D.S_EDIT.REQNR = false;
+            D.S_UAWD.REQNR_REQ = false;
 
-            //로컬 패키지를 입력한 경우.
-            if(oContr.oModel.oData.S_UAWD.PACKG === "$TMP"){
-
-                //CTS 번호 초기화.
-                oContr.oModel.oData.S_UAWD.REQNR = "";
-                oContr.oModel.refresh(true);
-
+            // 로컬($TMP) 이면 CTS 초기화 후 EXIT.
+            if (D.S_UAWD.PACKG === "$TMP") {
+                D.S_UAWD.REQNR = "";
+                _render();
                 return;
             }
 
-            //CTS 번호 입력 활성화.
-            oContr.oModel.oData.S_EDIT.REQNR     = true;
-
-            //CTS 번호 필수 입력 처리.
-            oContr.oModel.oData.S_UAWD.REQNR_REQ = true;
-
-            oContr.oModel.refresh(true);
-            
-
+            // CTS 활성 + 필수.
+            D.S_EDIT.REQNR = true;
+            D.S_UAWD.REQNR_REQ = true;
+            _render();
         }
-
-
-        //f4 help팝업을 load한경우.
-        if(typeof oAPP.fn.callF4HelpPopup !== "undefined"){
-            //f4 help 팝업 호출.
-            oAPP.fn.callF4HelpPopup("DEVCLASS", "DEVCLASS", [], [], _callback);
-
-            return;
-        }
-
-        var _sRes = await fetch(oContr.path.callF4HelpPopup);
-
-        var _source = await _sRes.text();
-
-        eval(_source);
-
-        //f4 help 팝업 function load 이후 팝업 호출.
-        oAPP.fn.callF4HelpPopup("DEVCLASS", "DEVCLASS", [], [], _callback);
-
-    };
-
-
-
-
-    /********************************************************************
-     *📝 Request No F4 HELP 이벤트.
-    ********************************************************************/
-    oContr.fn.onValueHelpReqNumber = function(){
-
-        //Request No 팝업 호출.
-        oAPP.fn.fnCtsPopupOpener(function(param){
-            
-            oContr.oModel.oData.S_UAWD.REQNR = param.TRKORR;
-            oContr.oModel.oData.S_UAWD.REQTX = param.AS4TEXT;
-
-            oContr.oModel.oData.S_VALST.REQNR = undefined;
-            oContr.oModel.oData.S_VALTX.REQNR = "";
-
-            oContr.oModel.refresh(true);
-        
-        });
-
-    };
-
-
-
-
-    /********************************************************************
-     *📝 웹딘 컨버전 생성 버튼 이벤트.
-    ********************************************************************/
-    oContr.fn.onCreateWebdynConvUI = function(oEvent){
-
-        switch (oParam.PRCCD) {
-            case CS_PRCCD.CREATE_APP:
-                //어플리케이션 생성.
-                break;
-
-            case CS_PRCCD.CREATE_WIZARD:
-                //위자드 - WEBDYN UI 컨버전
-                oContr.fn.convWebdynUI();
-                break;
-        
-            default:
-                break;
-        }
-
-    };
-
-
-
-
-    /********************************************************************
-     *📝 테이블 sort, filter 초기화.
-    ********************************************************************/
-    oContr.fn.resetUiTableFilterSort = function(oTable) {
-
-      if (typeof oTable === "undefined") { return; }
-
-      //table 바인딩 sort 해제 처리.
-      oTable.sort();
-
-      //table의 컬럼 정보 얻기.
-      var _aCol = oTable.getColumns();
-
-      for (var i = 0, l = _aCol.length; i < l; i++) {
-
-        var _oCol = _aCol[i];
-
-        //필터 초기화.
-        oTable.filter(_oCol);
-
-        //sort 초기화.
-        _oCol.setSorted(false);
-      }
-
-    };
-
-
-
-
-    /********************************************************************
-     *📝 view list 테이블 더블클릭 이벤트.
-    ********************************************************************/
-    oContr.fn.onDblClickViewTable = function(oEvent){
 
         parent.setBusy("X");
-        
-        //이벤트 발생 UI 정보 얻기.
-        var _oUi = oAPP.fn.getUiInstanceDOM(oEvent.target, sap.ui.getCore());
+        await oContr.fn._ensureF4();
+        parent.setBusy("");
 
-        //UI정보를 얻지 못한 경우 exit.
-        if(!_oUi){
-            parent.setBusy("");
+        if (oAPP.fn && typeof oAPP.fn.fnF4SearchHelpOpen === "function") {
+            oAPP.fn.fnF4SearchHelpOpen({ shlpname: "DEVCLASS", onPick: _callback });
             return;
         }
-        
-        //바인딩정보 얻기.
-        var _oCtxt = _oUi.getBindingContext();
-
-        //바인딩 정보를 얻지 못한 경우 exit.
-        if(!_oCtxt){
-            parent.setBusy("");
-            return;
-        }
-
-        var _oBind = oContr.ui.VLIST.getBinding("rows");
-
-        if(!_oBind){
-            parent.setBusy("");
-            return;
-        }
-        
-        var _aContext = _oBind.getContexts();
-
-        var _pos = _aContext.findIndex( item => item === _oCtxt);
-
-        if(_pos === -1){
-            parent.setBusy("");
-            return;
-        }
-
-        oContr.ui.VLIST.setSelectedIndex(_pos);
-
-        //위자드 - WEBDYN UI 컨버전
-        oContr.fn.convWebdynUI();
-
+        parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "949"));
     };
 
 
-
+    /********************************************************************
+     *📝 Request No F4 HELP 이벤트 (공통 CTS 팝업 — 원본 유지).
+    ********************************************************************/
+    oContr.fn.onValueHelpReqNumber = function () {
+        oAPP.fn.fnCtsPopupOpener(function (param) {
+            const D = oContr.oData;
+            D.S_UAWD.REQNR = param.TRKORR;
+            D.S_UAWD.REQTX = param.AS4TEXT;
+            D.S_VALST.REQNR = undefined;
+            D.S_VALTX.REQNR = "";
+            _render();
+        });
+    };
 
 
     /********************************************************************
-     *📝 CUSTOM EVENT.
+     *📝 공통 F4(fnF4SearchHelpOpen) 지연 로드 보장.
     ********************************************************************/
-    oContr.onEvt.addEventListener("conversionWebdynpro", (oEvent)=>{ 
+    oContr.fn._ensureF4 = function () {
+        return new Promise(function (resolve) {
+            if (oAPP.fn && typeof oAPP.fn.fnF4SearchHelpOpen === "function") { return resolve(true); }
+            const _x = new XMLHttpRequest();
+            _x.onreadystatechange = function () {
+                if (this.readyState === 4) {
+                    if (this.status === 200) { try { eval(this.responseText); } catch (e) { console.error("[UAWD] F4 load", e); } }
+                    resolve(!!(oAPP.fn && typeof oAPP.fn.fnF4SearchHelpOpen === "function"));
+                }
+            };
+            _x.open("GET", oContr.path.callF4HelpPopup, true);
+            _x.send();
+        });
+    };
 
-        switch (oEvent?.detail?.ACTCD) {
-            case "CREATE_APP":
-                //어플리케이션 생성.
-                oContr.fn.createApp(oEvent.detail);
-                
-                break;
+    // 오류 필드 포커스(busy top-layer 트랩 회피 — 다음 틱).
+    oContr.fn._focus = function (sKey) {
+        const oF = oContr.ui[sKey];
+        if (!oF || typeof oF.focus !== "function") { return; }
+        setTimeout(function () { try { oF.focus(); } catch (e) { } }, 0);
+    };
 
-            case "WIZARD_CONV":
-                //위자드 - WEBDYN UI 컨버전
-                oContr.fn.convWebdynUI();
-                break;
 
-            default:
-                //정해진 액션코드가 전달되지 않은경우 크리티컬 오류 처리.
-                
+    /********************************************************************
+     *📝 웹딘 컨버전 생성 버튼 이벤트(위자드 툴바 버튼).
+    ********************************************************************/
+    oContr.fn.onCreateWebdynConvUI = function () {
+        if (oParam.PRCCD === CS_PRCCD.CREATE_WIZARD) { oContr.fn.convWebdynUI(); }
+    };
+
+
+    /********************************************************************
+     *📝 테이블 sort/filter 초기화 — HTML5 테이블은 정렬/필터 UI 미제공(원본 sap.ui.table 대체) → no-op.
+    ********************************************************************/
+    oContr.fn.resetUiTableFilterSort = function () { };
+
+
+    /********************************************************************
+     *📝 view list 더블클릭(위자드) → 선택 후 컨버전.
+    ********************************************************************/
+    oContr.fn.onDblClickViewTable = function (iIdx) {
+        oContr.oData._vlistSel = iIdx;
+        _render();
+        oContr.fn.convWebdynUI();
+    };
+
+
+    /********************************************************************
+     *📝 CUSTOM EVENT — 소비처가 dispatch (CREATE_APP=생성 / WIZARD_CONV=위자드 컨버전).
+    ********************************************************************/
+    oContr.onEvt.addEventListener("conversionWebdynpro", function (oEvent) {
+        const _act = oEvent && oEvent.detail && oEvent.detail.ACTCD;
+        switch (_act) {
+            case "CREATE_APP": oContr.fn.createApp(oEvent.detail); break;
+            case "WIZARD_CONV": oContr.fn.convWebdynUI(); break;
+            default: break;
         }
-
     });
 
 
-
-
     /********************************************************************
-     *📝 위자드 - WEBDYN UI 컨버전 전 입력값 점검.
+     *📝 위자드 컨버전 전 입력값 점검(인라인 value-state).
     ********************************************************************/
-    oContr.fn.checkWizardConvData = function(){
+    oContr.fn.checkWizardConvData = function () {
 
-        var _sRes = {...TY_RES};
+        const _sRes = { ...TY_RES };
+        const D = oContr.oData;
 
-        var _sUAWD = oContr.oModel.oData.S_UAWD;
+        // 오류 필드 초기화.
+        D.S_VALST = { ...TY_VALST };
+        D.S_VALTX = { ...TY_VALTX };
 
-        var _sVALST = {...TY_VALST};
-        var _sVALTX = {...TY_VALTX};
-
-        //오류 필드 초기화.
-        oContr.oModel.oData.S_VALST = _sVALST;
-        oContr.oModel.oData.S_VALTX = _sVALTX;
-
-        //웹딘 컴포넌트명이 존재하지 않는경우.
-        if(_sUAWD.COMP_NAME === ""){
-
+        // 웹딘 컴포넌트명 미입력.
+        if (D.S_UAWD.COMP_NAME === "") {
             _sRes.RETCD = "E";
-            
-            //274	Check input value.
-            _sRes.RTMSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "274", "", "", "", ""); 
-
-            //Web Dynpro Component Name 오류 표현.
-            _sVALST.COMP_NAME = "Error";
-
-            //447	Web Dynpro Component Name is required.
-            _sVALTX.COMP_NAME = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "447");
-
-        }
-
-        //입력값 점검 오류건 존재시 EXIT.
-        if(_sRes.RETCD === "E"){
+            D.S_VALST.COMP_NAME = "Error";
+            // 447 Web Dynpro Component Name is required.
+            D.S_VALTX.COMP_NAME = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "447");
             return _sRes;
         }
 
-
-        //선택한 라인의 view 정보 매핑.
-        var _aVList = oContr.fn.getSelectedViewData();
-
-        //선택한 라인이 존재하지 않는 경우 오류 메시지 처리.
-        if(_aVList.length === 0){
-
+        // 선택한 VIEW 미존재.
+        if (oContr.fn.getSelectedViewData().length === 0) {
             _sRes.RETCD = "E";
-            
-            //448	Select the View list to convert
+            // 448 Select the View list to convert.
             _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "448");
-
         }
 
         return _sRes;
-
     };
 
 
     /********************************************************************
-     *📝 위자드 - WEBDYN UI 컨버전
+     *📝 위자드 - WEBDYN UI 컨버전 (위자드 경로 전용).
+     *   ※ 소비처(위자드)는 현재 "준비중" 스텁 상태 — 이 경로는 위자드 HTML5 배선 후 활성.
+     *   서버 계약/흐름은 원본 유지, sap 참조만 제거·design 헬퍼는 존재 가드.
     ********************************************************************/
-    oContr.fn.convWebdynUI = async function(){
+    oContr.fn.convWebdynUI = async function () {
 
         parent.setBusy("X");
 
-
-        //웹딘 컨버전 전 입력값 점검.
-        var _sRes = oContr.fn.checkWizardConvData();
-        
-        if(_sRes.RETCD === "E"){
-
-            //오류  메시지 출력.
-            parent.showMessage(sap, 20, "E", _sRes.RTMSG);
-
-            oContr.oModel.refresh(true);
-
+        // 컨버전 전 입력값 점검.
+        const _sRes = oContr.fn.checkWizardConvData();
+        if (_sRes.RETCD === "E") {
+            _render();
             parent.setBusy("");
-
-            return;
-
-        }        
-
-
-        //컨버전 처리 전 확인팝업 호출.
-        var _res = await new Promise((resolve) => {
-
-            //449	Do you want to proceed with the conversion for the selected view?
-            parent.showMessage(sap, 30, "I", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "449"), function(param){
-                return resolve(param);
-            });
-
-            parent.setBusy("");
-
-        });
-
-        if(_res !== "YES"){
+            if (_sRes.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRes.RTMSG)); }
+            else { oContr.fn._focus("compField"); }
             return;
         }
 
+        // 컨버전 확인 팝업 (449 Do you want to proceed with the conversion for the selected view?).
+        const _res = await new Promise(function (resolve) {
+            parent.showMessage(null, 30, "I", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "449"), function (param) { resolve(param); });
+            parent.setBusy("");
+        });
+        if (_res !== "YES") { return; }
 
-        parent.setBusy("X"); 
+        parent.setBusy("X");
 
+        const _sAppData = {};
+        _sAppData.COMP_NAME = oContr.oData.S_UAWD.COMP_NAME;
+        _sAppData.APPID = oContr.oData.S_UAWD.APPID;
+        _sAppData.T_VLIST = oContr.fn.getSelectedViewData();
 
-        var _oFormData = new FormData();
-
-
-        var _sAppData = {};
-
-        //Web Dynpro Component Name.
-        _sAppData.COMP_NAME = oContr.oModel.oData.S_UAWD.COMP_NAME;
-
-        //U4A APP ID.
-        _sAppData.APPID     = oContr.oModel.oData.S_UAWD.APPID;
-
-        //선택한 라인의 view 정보 매핑.
-        _sAppData.T_VLIST   = oContr.fn.getSelectedViewData();
-        
-        
+        const _oFormData = new FormData();
         _oFormData.append("APPDATA", JSON.stringify(_sAppData));
 
-
-        //웹딘 컨버전 작업 처리 진행.
-        var _sRet = await new Promise((resolve) => {
-
-            sendAjax(parent.getServerPath() + "/u4a_cvt_wdr/convWebdynUI", _oFormData, function(sRet){
-                return resolve(sRet);
-
-            },"", true, "POST", function(e){
-                //A communication error has occurred. 
-                //Please check your network status and contact the U4A Solution Team if the issue persists.
-                return resolve({RETCD:"E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391")});
-
+        const _sRet = await new Promise(function (resolve) {
+            sendAjax(parent.getServerPath() + "/u4a_cvt_wdr/convWebdynUI", _oFormData, function (sRet) {
+                resolve(sRet);
+            }, "", true, "POST", function () {
+                resolve({ RETCD: "E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391") });
             });
-
         });
 
-
-        //WEBDYN 컨버전 처리중 오류가 발생한 경우.
-        if(_sRet.RETCD === "E"){
-
-            if(_sRet?.SCRIPT){
-                eval(_sRet?.SCRIPT);
-
-                //wait off 처리.
+        if (_sRet.RETCD === "E") {
+            if (_sRet.SCRIPT) {
+                if (!_evalServerScript(_sRet.SCRIPT) && _sRet.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG)); }
                 parent.setBusy("");
+                return;
+            }
+            parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG));
+            parent.setBusy("");
+            return;
+        }
 
+        try {
+            // 컨버전 UI 정보를 TREE 로 변환 → attr 병합 → 디자인 선택 라인에 추가(design 헬퍼 존재 가드).
+            const _aConvUIData = oAPP.fn.setTreeData(_sRet.T_0014, "POBID", "OBJID", "zTREE");
+            const _sConvUIData = _aConvUIData[0];
+            oContr.fn.setUiAttrData(_sConvUIData, _sRet.T_0015);
+
+            const _sDesignUI = oAPP.fn.designGetSelectedTreeItem();
+            const _sPos = oAPP.fn.getMousePosition();
+
+            const _sAggr = await oAPP.fn.aggrSelectPopupOpener(_sConvUIData, _sDesignUI, _sPos);
+            if (_sAggr.RETCD === "E") {
+                const _KIND = (_sAggr.RCODE === "02") ? 20 : 10;
+                parent.showMessage(null, _KIND, "I", _reloc(_sAggr.RTMSG));
+                if (oAPP.fn.setShortcutLock) { oAPP.fn.setShortcutLock(false); }
+                parent.setBusy("");
                 return;
             }
 
-            //오류 메시지 출력.
-            parent.showMessage(sap, 20, "E", _sRet.RTMSG);
-
-            //wait off 처리.
+            oAPP.fn.designAddTreeData(_sConvUIData, _sDesignUI, _sAggr.sAggr);
+        } catch (e) {
+            console.error("[UAWD] convWebdynUI design integration", e);
             parent.setBusy("");
-
             return;
         }
 
-
-        //컨버전 처리된 UI 정보를 TREE로 변환 처리.
-        var _aConvUIData = oAPP.fn.setTreeData(_sRet.T_0014, "POBID", "OBJID", "zTREE");
-
-        //최상위 UI 정보 얻기.
-        //(N개의 VIEW를 선택하는 경우 VBOX를 최상위로 설정하기에 최상위는 언제나 1개만 존재함)
-        var _sConvUIData = _aConvUIData[0];
-
-
-        //구성한 ui 계층 정보에 attr 정보 추가 처리.
-        oContr.fn.setUiAttrData(_sConvUIData, _sRet.T_0015);
-
-
-        //선택한 라인의 tree 정보 얻기.
-        var _sDesignUI = oAPP.fn.designGetSelectedTreeItem();
-
-
-        //이벤트 발생 x, y 좌표값 얻기.
-        var _sPos = oAPP.fn.getMousePosition();
-
-
-        //대상 UI의 추가될 aggregation 정보 얻기.
-        var _sRes = await oAPP.fn.aggrSelectPopupOpener(_sConvUIData, _sDesignUI, _sPos);
-        
-        if(_sRes.RETCD === "E"){
-
-            //default 메시지 유형(messageToast)
-            var _KIND = 10;
-
-            //aggregation 선택 건이 존재하지 않는 return code를 받은경우.
-            if(_sRes.RCODE === "02"){
-                //messageBox로 처리.
-                _KIND = 20;
-            }
-
-            //편집 모드인 경우.
-            parent.showMessage(sap, _KIND, "I", _sRes.RTMSG);
-
-            //단축키 잠금 해제처리.
-            oAPP.fn.setShortcutLock(false);
-                
-            parent.setBusy("");
-
-            return;
-
-        }
-
-
-        //선택한 라인에 컨버전 처리된 UI를 추가.
-        oAPP.fn.designAddTreeData(_sConvUIData, _sDesignUI, _sRes.sAggr);
-
-
-        //위자드 템플릿 팝업 UI 정보 얻기.
-        var _oWizardPopup = sap.ui.getCore().byId(C_TMPL_WZD_DLG_ID);
-
-        //팝업이 호출되어 있지 않는경우 exit.
-        //(팝업정보를 얻지 못한 경우도 exit)
-        if(_oWizardPopup?.isOpen?.() !== true){
-            return;
-        }
-
-        //팝업 종료 처리.
-        _oWizardPopup.close();
-
-
+        parent.setBusy("");
     };
 
 
-
-
     /********************************************************************
-     *📝 ui에 해당하는 attr 정보 구성.
+     *📝 ui 에 해당하는 attr 정보 구성(재귀 — 원본 유지).
     ********************************************************************/
-    oContr.fn.setUiAttrData = function(sDesignUI, aT_0015){
-
-        sDesignUI._T_0015 = aT_0015.filter( item => item.OBJID === sDesignUI.OBJID ) || [];
-
-        if(sDesignUI.zTREE.length === 0){
-            return;
-        }
-
+    oContr.fn.setUiAttrData = function (sDesignUI, aT_0015) {
+        sDesignUI._T_0015 = aT_0015.filter(function (item) { return item.OBJID === sDesignUI.OBJID; }) || [];
+        if (!sDesignUI.zTREE || sDesignUI.zTREE.length === 0) { return; }
         for (let i = 0, l = sDesignUI.zTREE.length; i < l; i++) {
-
-            var _sDesignUI = sDesignUI.zTREE[i];
-
-            oContr.fn.setUiAttrData(_sDesignUI, aT_0015);
-            
+            oContr.fn.setUiAttrData(sDesignUI.zTREE[i], aT_0015);
         }
-
     };
 
 
-
-
     /********************************************************************
-     *📝 선택한 라인의 view 정보 얻기.
+     *📝 선택한 라인의 view 정보(위자드).
     ********************************************************************/
-    oContr.fn.getSelectedViewData = function(){
-
-        var _aVLIST = [];
-
-        //table의 선택한 라인 정보 얻기.
-        var _aIndx = oContr.ui.VLIST.getSelectedIndices();
-
-        if(_aIndx.length === 0){
-            return _aVLIST;
-        }
-
-        var _oBind = oContr.ui.VLIST.getBinding("rows");
-        
-
-        //선택한 라인에 해당하는 
-        for (let i = 0, l = _aIndx.length; i < l; i++) {
-
-            var _indx = _oBind.aIndices[_aIndx[i]];            
-
-            var _sVList = oContr.oModel.oData.T_VLIST[_indx];
-
-            _aVLIST.push(_sVList.VIEW_NAME);
-            
-        }
-
-        return _aVLIST;
-
+    oContr.fn.getSelectedViewData = function () {
+        const D = oContr.oData;
+        const _i = D._vlistSel;
+        if (_i == null || _i < 0 || !D.T_VLIST[_i]) { return []; }
+        return [D.T_VLIST[_i].VIEW_NAME];
     };
 
 
-
     /********************************************************************
-     *📝 패키지 입력값 점검.
+     *📝 패키지 입력값 점검(원본 유지 — 275 + /chkPackage).
     ********************************************************************/
-    oContr.fn.checkPackage = function(){
+    oContr.fn.checkPackage = function () {
+        return new Promise(function (resolve) {
+            const _sRes = { ...TY_RES };
+            const _sUAWD = oContr.oData.S_UAWD;
 
-        return new Promise((resolve) => {
-
-            var _sRes = {...TY_RES};
-            
-            var _sUAWD = oContr.oModel.oData.S_UAWD;
-
-            //패키지를 입력하지 않은경우.
-            if(_sUAWD.PACKG === ""){
-                return resolve(_sRes);
-            }
+            if (_sUAWD.PACKG === "") { return resolve(_sRes); }
 
             _sUAWD.PACKG = _sUAWD.PACKG.toUpperCase();
 
-            //로컬 패키지를 입력한 경우.
-            if(_sUAWD.PACKG === "$TMP"){
-                return resolve(_sRes);
-            }
+            // 로컬 패키지.
+            if (_sUAWD.PACKG === "$TMP") { return resolve(_sRes); }
 
-            //Y, Z 로 시작하는 패키지인지 점검.
-            if("YZ".indexOf(_sUAWD.PACKG.substring(0,1)) === -1){
+            // Y, Z 이외 표준 패키지 금지.
+            if ("YZ".indexOf(_sUAWD.PACKG.substring(0, 1)) === -1) {
                 _sRes.RETCD = "E";
-                //275	Standard package cannot be entered.
+                // 275 Standard package cannot be entered.
                 _sRes.RTMSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "275", "", "", "", "");
                 return resolve(_sRes);
             }
 
-
-            var _oFormData = new FormData();
+            const _oFormData = new FormData();
             _oFormData.append("PACKG", _sUAWD.PACKG);
 
-            sendAjax(parent.getServerPath() + "/chkPackage", _oFormData, function(sRet){
-
-                //잘못된 PACKAGE를 입력한 경우.
-                if(sRet.ERFLG === "X"){
-                    _sRes.RETCD = "E";
-                    _sRes.RTMSG = sRet.ERMSG;
-                    return resolve(_sRes);
-                }
-
-
-                //패키지 입력건 점검 중 오류가 발생한 경우.
-                if(sRet.ERFLG === "E"){
-                    _sRes.RETCD = "E";
-                    _sRes.RTMSG = sRet.ERMSG;
-                    return resolve(_sRes);
-                    
-                }
-
+            sendAjax(parent.getServerPath() + "/chkPackage", _oFormData, function (sRet) {
+                if (sRet.ERFLG === "X") { _sRes.RETCD = "E"; _sRes.RTMSG = sRet.ERMSG; return resolve(_sRes); }
+                if (sRet.ERFLG === "E") { _sRes.RETCD = "E"; _sRes.RTMSG = sRet.ERMSG; return resolve(_sRes); }
                 return resolve(_sRes);
-
-            },"", true, "POST", function(e){
-                
-                return resolve({RETCD:"E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391")});
-
+            }, "", true, "POST", function () {
+                resolve({ RETCD: "E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391") });
             });
-
         });
-
     };
 
 
-
     /********************************************************************
-     *📝 WEB DYNPRO 컴포넌트정보 검색.
+     *📝 WEB DYNPRO 컴포넌트정보 검색(원본 유지).
     ********************************************************************/
-    oContr.fn.getWebDynCompData = function(){
-
-        return new Promise((resolve) => {
-
-            var _sRes = {...TY_RES};
-
-            //컴포넌트명.
-            _sRes.COMP_NAME = oContr.oModel.oData.S_UAWD.COMP_NAME;
-
-            //WEB DYNPRO 컴포넌트 DESC 필드.
+    oContr.fn.getWebDynCompData = function () {
+        return new Promise(function (resolve) {
+            const _sRes = { ...TY_RES };
+            _sRes.COMP_NAME = oContr.oData.S_UAWD.COMP_NAME;
             _sRes.COMP_DESC = "";
 
-            
-            //WEB DYNPRO 컴포넌트명을 입력하지 않은경우.
-            if(_sRes.COMP_NAME === ""){
-                return resolve(_sRes);
-            }
+            if (_sRes.COMP_NAME === "") { return resolve(_sRes); }
 
-            //컴포넌트명 대문자 변환.
             _sRes.COMP_NAME = _sRes.COMP_NAME.toUpperCase();
 
-            
-            var _oFormData = new FormData();
-
-            //WEBDYN 컴포넌트명 입력.
+            const _oFormData = new FormData();
             _oFormData.append("WD_COMP_NAME", _sRes.COMP_NAME);
 
-            sendAjax(parent.getServerPath() + "/u4a_cvt_wdr/getWebDynCompData", _oFormData, function(sRes){
-
-                return resolve(sRes);
-
-            },"", true, "POST", function(e){
-                
-                return resolve({RETCD:"E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391")});
-
+            sendAjax(parent.getServerPath() + "/u4a_cvt_wdr/getWebDynCompData", _oFormData, function (sRes) {
+                resolve(sRes);
+            }, "", true, "POST", function () {
+                resolve({ RETCD: "E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391") });
             });
-
         });
-
     };
 
 
     /********************************************************************
-     *📝 어플리케이션 생성전 입력값 점검.
+     *📝 어플리케이션 생성전 입력값 점검(원본 유지 — 인라인 value-state).
     ********************************************************************/
-    oContr.fn.checkAppData = function(sParmas){
+    oContr.fn.checkAppData = function () {
+        return new Promise(function (resolve) {
 
-        return new Promise(async (resolve) => {
+            const _sRes = { ...TY_RES };
+            const D = oContr.oData;
+            const _sUAWD = D.S_UAWD;
 
-            var _sRes = {...TY_RES};
+            // 오류 필드 초기화.
+            D.S_VALST = { ...TY_VALST };
+            D.S_VALTX = { ...TY_VALTX };
 
-            var _sAppData = {};
-            
-            var _sUAWD = oContr.oModel.oData.S_UAWD;
-
-            var _sVALST = {...TY_VALST};
-            var _sVALTX = {...TY_VALTX};
-
-            //오류 필드 초기화.
-            oContr.oModel.oData.S_VALST = _sVALST;
-            oContr.oModel.oData.S_VALTX = _sVALTX;
-
-            //웹딘 컴포넌트명이 존재하지 않는경우.
-            if(_sUAWD.COMP_NAME === ""){
-
+            // 웹딘 컴포넌트명 미입력.
+            if (_sUAWD.COMP_NAME === "") {
                 _sRes.RETCD = "E";
-                
-                //274	Check input value.
-                _sRes.RTMSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "274", "", "", "", ""); 
-
-                //Web Dynpro Component Name 오류 표현.
-                _sVALST.COMP_NAME = "Error";
-
-                //447	Web Dynpro Component Name is required.
-                _sVALTX.COMP_NAME = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "447");
-
-
+                D.S_VALST.COMP_NAME = "Error";
+                // 447 Web Dynpro Component Name is required.
+                D.S_VALTX.COMP_NAME = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "447");
             }
 
-            //패키지 명이 입력되지 않은경우.
-            if(_sUAWD.PACKG === ""){
-
+            // 패키지 미입력.
+            if (_sUAWD.PACKG === "") {
                 _sRes.RETCD = "E";
-                
-                //274	Check input value.
-                _sRes.RTMSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "274", "", "", "", ""); 
-
-                _sVALST.PACKG = "Error";
-
-                //451	Package is required.
-                _sVALTX.PACKG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "451");
-
+                D.S_VALST.PACKG = "Error";
+                // 451 Package is required.
+                D.S_VALTX.PACKG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "451");
             }
 
-
-            //Y, Z 로 시작하는 패키지인지 점검.
-            if(_sUAWD.PACKG !== "$TMP" && "YZ".indexOf(_sUAWD.PACKG.substring(0,1)) === -1){
+            // Y, Z 이외 표준 패키지 금지.
+            if (_sUAWD.PACKG !== "$TMP" && "YZ".indexOf(_sUAWD.PACKG.substring(0, 1)) === -1) {
                 _sRes.RETCD = "E";
-
-                //274	Check input value.
-                _sRes.RTMSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "274", "", "", "", ""); 
-
-                _sVALST.PACKG = "Error";
-
-                //275	Standard package cannot be entered.
-                _sVALTX.PACKG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "275", "", "", "", "");
-                
+                D.S_VALST.PACKG = "Error";
+                // 275 Standard package cannot be entered.
+                D.S_VALTX.PACKG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "275", "", "", "", "");
             }
 
-
-            //로컬 패키지가 아닌경우 REQNR를 입력하지 않은경우.
-            if(_sUAWD.PACKG !== "$TMP" && _sUAWD.REQNR === ""){
-
+            // 로컬이 아닌데 CTS 미입력.
+            if (_sUAWD.PACKG !== "$TMP" && _sUAWD.REQNR === "") {
                 _sRes.RETCD = "E";
-                
-                //274	Check input value.
-                _sRes.RTMSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "274", "", "", "", ""); 
-
-                _sVALST.REQNR = "Error";
-
-                //450	CTS 번호는 필수로 입력되야 합니다.
-                _sVALTX.REQNR = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "450");
-
+                D.S_VALST.REQNR = "Error";
+                // 450 CTS 번호는 필수로 입력되어야 합니다.
+                D.S_VALTX.REQNR = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "450");
             }
 
-            //입력값 점검 오류건이 존재하는경우.
-            if(_sRes.RETCD === "E"){
-                return resolve(_sRes);
-            }
+            // 클라 점검 오류 → 인라인 표기만(중복 요약 모달 제거) 후 반환.
+            if (_sRes.RETCD === "E") { return resolve(_sRes); }
 
+            // 서버 점검.
+            const _sAppData = {
+                APPID: _sUAWD.APPID,
+                COMP_NAME: _sUAWD.COMP_NAME,
+                PACKG: _sUAWD.PACKG,
+                REQNR: (_sUAWD.REQNR !== "") ? _sUAWD.REQNR : ""
+            };
+            const _oFormData = new FormData();
+            _oFormData.append("APPDATA", JSON.stringify(_sAppData));
 
-            //U4A APP ID
-            _sAppData.APPID = _sUAWD.APPID;
-
-            //Web Dynpro Component Name.
-            _sAppData.COMP_NAME = _sUAWD.COMP_NAME;
-
-            //Package
-            _sAppData.PACKG = _sUAWD.PACKG;
-
-            _sAppData.REQNR = "";
-
-            //Request/Task
-            if(_sUAWD.REQNR !== ""){
-                _sAppData.REQNR = _sUAWD.REQNR;
-            }
-            
-
-            var _oFormData = new FormData();
-
-            _oFormData.append("APPDATA",  JSON.stringify(_sAppData));
-
-            //서버에서 입력한 값 점검.
-            sendAjax(parent.getServerPath() + "/u4a_cvt_wdr/checkAppData", _oFormData, function(sRet){
-                
+            sendAjax(parent.getServerPath() + "/u4a_cvt_wdr/checkAppData", _oFormData, function (sRet) {
                 resolve(sRet);
-
-            },"", true, "POST", function(e){
-                                
-                return resolve({RETCD:"E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391")});
-
+            }, "", true, "POST", function () {
+                resolve({ RETCD: "E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391") });
             });
-
         });
-
     };
 
 
-
-
     /********************************************************************
-     *📝 어플리케이션 생성 처리.
+     *📝 어플리케이션 생성 처리 (원본 createApp — 생성옵션 CREATE_APP 위임 경로).
+     *   ★[표준] 로직 시작 = 입력값 점검부터. 통과해야 확인/서버생성.
     ********************************************************************/
-    oContr.fn.createApp = async function(sParmas){
-        
+    oContr.fn.createApp = async function (sParmas) {
+
+        const D = oContr.oData;
+
+        // 로컬 생성 — 패키지 $TMP 강제(점검 전 세팅).
+        if (sParmas && sParmas.ISLOCAL === true) {
+            D.S_UAWD.PACKG = "$TMP";
+            D.S_UAWD.REQNR = "";
+            D.S_EDIT.REQNR = false;
+            D.S_UAWD.REQNR_REQ = false;
+            _render();
+        }
+
+        // 입력값 점검(클라 + 서버). 서버콜 동안 busy.
         parent.setBusy("X");
-
-
-        var _sUAWD = oContr.oModel.oData.S_UAWD;
-
-        //로컬로 생성하는 경우.
-        if(sParmas?.ISLOCAL === true){
-            _sUAWD.PACKG = "$TMP";
-            _sUAWD.REQNR = "";
-            oContr.oModel.oData.S_EDIT.REQNR = false;
-        }
-
-        
-        //어플리케이션 생성전 입력값 점검.
-        var _sRes = await oContr.fn.checkAppData();
-
-        if(_sRes.RETCD === "E"){
-
-            if(_sRes?.SCRIPT){
-                eval(_sRes?.SCRIPT);
-
-                oContr.oModel.refresh(true);
-                
-                //wait off 처리.
-                parent.setBusy("");
-
-                parent.setBusy("");
-
-                return;
-            }
-
-            //오류  메시지 출력.
-            parent.showMessage(sap, 20, "E", _sRes.RTMSG);
-
-            oContr.oModel.refresh(true);
-
-            parent.setBusy("");
-
-            parent.setBusy("");
-
-            return;
-
-        }
-        
-        
-        oContr.oModel.refresh(true);
-
-
-        //생성전 확인팝업 호출.
-        var _res = await new Promise((resolve) => {
-
-            //276	Create &1 application?
-            parent.showMessage(sap, 30, "I", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "276", sParmas?.APPID, "", "", ""), function(param){
-                return resolve(param);
-            });
-
-            parent.setBusy("");
-
-            parent.setBusy("");
-
-        });
-        
-
-        if(_res !== "YES"){
-            return;
-        }
-
-
-        parent.setBusy("X");        
-
-
-        //화면 바인딩 정보 매핑.
-        var _sAppData = {};
-
-        //Web Application ID
-        _sAppData.APPID     = _sUAWD?.APPID;
-
-        //Web Dynpro Component Name.
-        _sAppData.COMP_NAME = _sUAWD.COMP_NAME;
-
-        //Package
-        _sAppData.PACKG     = _sUAWD.PACKG;
-
-        //Request/Task
-        _sAppData.REQNR     = _sUAWD.REQNR;
-
-
-        var _oFormData = new FormData();
-
-        _oFormData.append("APPDATA", JSON.stringify(_sAppData));
-
-
-        //APP 생성 처리.
-        var _sRet = await new Promise((resolve) => {
-
-            sendAjax(parent.getServerPath() + "/u4a_cvt_wdr/createAppData", _oFormData, function(sRet){
-                return resolve(sRet);
-            },"", true, "POST", function(e){
-                //A communication error has occurred. 
-                //Please check your network status and contact the U4A Solution Team if the issue persists.
-                return resolve({RETCD:"E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391")});
-
-            });
-
-        });
-
-        //application 생성중 오류가 발생한 경우.
-        if(_sRet.RETCD === "E"){
-
-            if(_sRet?.SCRIPT){
-                eval(_sRet?.SCRIPT);
-                
-                //wait off 처리.
-                parent.setBusy("");
-
-                parent.setBusy("");
-
-                return;
-            }
-
-            //오류 메시지 출력.
-            parent.showMessage(sap, 20, "E", _sRet.RTMSG);
-
-            //wait off 처리.
-            parent.setBusy("");
-
-            return;
-        }
-
-        //busy dialog close.
+        const _chk = await oContr.fn.checkAppData();
         parent.setBusy("");
 
+        if (_chk.RETCD === "E") {
+            if (_chk.SCRIPT) {
+                if (!_evalServerScript(_chk.SCRIPT) && _chk.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_chk.RTMSG)); }
+                _render();
+                return;
+            }
+            _render();
+            // 첫 오류 필드 포커스.
+            const _key = D.S_VALST.COMP_NAME === "Error" ? "compField"
+                : D.S_VALST.PACKG === "Error" ? "packField"
+                    : D.S_VALST.REQNR === "Error" ? "reqnrField" : null;
+            if (_key) { oContr.fn._focus(_key); }
+            return;
+        }
 
-        //생성 처리 성공 이후 work space UI editor 화면으로 이동 처리.
-        onAppCrAndChgMode(sParmas?.APPID);
+        // 생성 확인 (276 Create &1 application?).
+        const _res = await new Promise(function (resolve) {
+            parent.showMessage(null, 30, "I", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "276", (sParmas && sParmas.APPID) || "", "", "", ""), function (param) { resolve(param); });
+        });
+        if (_res !== "YES") { return; }
 
+        parent.setBusy("X");
 
-        sParmas.oUIobj.oCreateDialog.close();
-        sParmas.oUIobj.oCreateDialog.destroy();
+        const _sAppData = {
+            APPID: D.S_UAWD.APPID,
+            COMP_NAME: D.S_UAWD.COMP_NAME,
+            PACKG: D.S_UAWD.PACKG,
+            REQNR: D.S_UAWD.REQNR
+        };
+        const _oFormData = new FormData();
+        _oFormData.append("APPDATA", JSON.stringify(_sAppData));
 
+        const _sRet = await new Promise(function (resolve) {
+            sendAjax(parent.getServerPath() + "/u4a_cvt_wdr/createAppData", _oFormData, function (sRet) {
+                resolve(sRet);
+            }, "", true, "POST", function () {
+                resolve({ RETCD: "E", RTMSG: parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "391") });
+            });
+        });
 
+        parent.setBusy("");
+
+        if (_sRet.RETCD === "E") {
+            if (_sRet.SCRIPT) {
+                if (!_evalServerScript(_sRet.SCRIPT) && _sRet.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG)); }
+                return;
+            }
+            parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG));
+            return;
+        }
+
+        // 성공 → 에디터 화면으로 이동 + 생성옵션 다이얼로그 종료(원본 동일 경로).
+        try { onAppCrAndChgMode(sParmas && sParmas.APPID); } catch (e) { console.error("[UAWD] onAppCrAndChgMode", e); }
+
+        try {
+            const _dlg = sParmas && sParmas.oUIobj && sParmas.oUIobj.oCreateDialog;
+            if (_dlg) { try { _dlg.close(); } catch (e) { } try { _dlg.remove(); } catch (e) { } }
+        } catch (e) { }
     };
 
+
     return oContr;
-
-
-};
+}

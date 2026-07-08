@@ -144,7 +144,9 @@
         .u4aCapRadios { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; align-items: center; min-height: 2.25rem; }
         .u4aCapRadio { display: inline-flex; align-items: center; gap: 0.375rem; cursor: pointer; color: var(--text); }
         .u4aCapRadio input { accent-color: var(--accent); width: 1rem; height: 1rem; cursor: pointer; }
-        .u4aCapImg { width: 100%; height: 250px; object-fit: contain; background: var(--surface-raised);
+        /* 미리보기는 원본 sap.m.Image(width:100%,height:250px)처럼 박스를 꽉 채운다(object-fit:fill).
+           contain 은 가로로 넓은 원본을 레터박스해 가운데 얇은 띠로 작아 보였음. */
+        .u4aCapImg { width: 100%; height: 250px; object-fit: fill; background: var(--surface-raised);
                      border: 0.0625rem solid var(--line); border-radius: var(--radius-sm); }
         .u4aCapFoot { display: flex; gap: 0.5rem; align-items: center; }
         .u4aCapFoot .u4aCapSpacer { flex: 1 1 auto; }
@@ -654,7 +656,8 @@
             oRb.addEventListener("change", function () {
                 oModel.setProperty("/DATASET/RB01", idx === 0);
                 oModel.setProperty("/DATASET/RB02", idx === 1);
-                lf_setObjectNameDesc(oModel); // object name desc 갱신
+                lf_resetDatasetObj(oModel);   // ★유형 변경 시 오브젝트명/설명/앱 설명 등 연관 필드 초기화
+                lf_setObjectNameDesc(oModel); // object name(OBJNM 라벨) 갱신
             });
             aObjRb.push(oRb);
             oLab.append(oRb, _el("span", null, o.txt));
@@ -674,16 +677,15 @@
         //   → 이 행의 라벨을 전용 const 로 박제해서 바인딩한다.
         const oObjLabel = oR.label;
         oModel.bind(function () { oObjLabel.textContent = oModel.getProperty("/DATASET/OBJNM") || ""; });
-        // 입력 밑에 desc 를 세로로 붙이므로 컨트롤(col2)을 세로 스택으로.
-        oR.control.classList.add("u4aCapCtrlCol");
+        // ★ 원본 sap.m.Input description(TABTX 인라인 표시)은 사용자 요청으로 제거 — 입력칸만 노출.
+        //   (TABTX 모델값은 앱 설명 자동채움 근거로 계속 보존, 화면 표시만 삭제)
         oUIobj.dataset.oInp1 = _buildInput(oModel, oR, {
             valPath: "/DATASET/TABNM", statPath: "/DATASET/TABNM_stat", stxtPath: "/DATASET/TABNM_stxt",
-            maxLength: 16, upper: true, clear: true, vh: lf_ObjNameF4Help
+            maxLength: 16, upper: true, clear: true, vh: lf_ObjNameF4Help,
+            // ★오브젝트명 X(clear) → 이 값에서 파생된 앱 설명(APPNM)·설명(TABTX)도 함께 초기화(연관 필드).
+            //   value-state("" → Error 해제)도 같이 비워 잔여 에러 테두리 방지.
+            clearAlso: ["/DATASET/APPNM", "/DATASET/APPNM_stat", "/DATASET/APPNM_stxt", "/DATASET/TABTX"]
         });
-        // view(table) desc — 라벨 아래가 아니라 입력 필드(col2) 밑에 오도록 컨트롤 안에 append.
-        const oObjDesc = _el("div", "u4aCapDesc");
-        oModel.bind(function () { oObjDesc.textContent = oModel.getProperty("/DATASET/TABTX") || ""; });
-        oR.control.appendChild(oObjDesc);
         oLeft.appendChild(oR.row);
 
         // APP Description (A91)
@@ -829,8 +831,9 @@
             oFocusUI = ls_ui.oInp1;
         }
 
-        // Web Application Name 미입력 (K01).
-        if (ls_appl.APPNM === "" && l_selHKey === "K01") {
+        // 앱 설명(Web Application Name) 미입력. ★[보완] 원본은 K01(일반)만 검증했으나, DataSet 탭도
+        //   앱 설명이 필수(*) 표시이므로 K01/K02 공통 검증(lf_chkValue 는 K01/K02 에서만 호출).
+        if (ls_appl.APPNM === "") {
             ls_appl.APPNM_stat = "Error";
             ls_appl.APPNM_stxt = _txt("/U4A/MSG_WS", "014", _txt("/U4A/CL_WS_COMMON", "A33"));
             l_err = true;
@@ -1231,9 +1234,8 @@
      ************************************************************************/
     async function lf_createApplication(oModel, oUIobj, appid, bIsLocal) {
 
-        parent.setBusy("X");
-
-        // WEBDYNPRO → U4A 컨버전 생성.
+        // WEBDYNPRO → U4A 컨버전 생성. (별도 위임 흐름 — 공유 입력점검 lf_chkValue 대상 아님)
+        //   busy·입력점검·서버생성은 위임 모듈(conversionWebdynpro control.createApp)이 자체 관리.
         if (oModel.oData.selHKey === "UAWD") {
             const _sParam = {};
             _sParam.ACTCD = "CREATE_APP";
@@ -1244,19 +1246,18 @@
                 const _oCEvt = new CustomEvent("conversionWebdynpro", { detail: _sParam });
                 oUIobj.UAWD.oContr.onEvt.dispatchEvent(_oCEvt);
             } catch (e) {
-                parent.setBusy("");
                 parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "948")); // Web Dynpro Conversion is not available.
             }
             return;
         }
 
         const l_stru = lf_getStruName(oModel);
-        if (!l_stru) { parent.setBusy(""); return; }
+        if (!l_stru) { return; }
 
         const l_create = oModel.getProperty(l_stru);
-        if (!l_create) { parent.setBusy(""); return; }
+        if (!l_create) { return; }
 
-        // 로컬로 생성.
+        // 로컬로 생성 — 패키지 $TMP 강제. ★입력 점검보다 먼저 세팅해야 로컬 버튼에서 PACKG 미입력 오류가 안 뜬다.
         if (bIsLocal === true) {
             l_create.PACKG = "$TMP";
             l_create.REQNR_edit = false;
@@ -1266,22 +1267,21 @@
             oModel.setProperty(l_stru, l_create);
         }
 
-        // 입력값 점검. 오류면 truthy(포커스 대상 엘리먼트 or true) 반환.
+        // ★[보완, 원본 없음] 하단 버튼 로직은 '입력값 점검부터' 시작한다 — busy 켜기 전에 검증.
+        //   오류면 truthy(첫 오류 필드 or true) 반환 → 즉시 그 필드 포커스 후 중단. busy(showModal
+        //   top-layer)를 아직 안 켰으므로 포커스가 트랩되지 않아 바로 안착한다.
         const oErrFocus = lf_chkValue(oModel, oUIobj);
-        if (oErrFocus) {
-            parent.setBusy("");   // ★ busy(showModal) 를 먼저 닫고
-            _refocus(oErrFocus);   // 그 다음(다음 틱) 오류 필드 포커스 — busy top-layer 트랩 회피 + 확실 안착
-            return;
-        }
-
-        parent.setBusy("");
+        if (oErrFocus) { _refocus(oErrFocus); return; }
 
         // DataSet: VIEW(TABLE)명을 입력했다면 검색필드 선택 팝업 호출.
         if (oModel.getProperty("/selHKey") === "K02") {
 
-            if (typeof oAPP.fn._DATASET === "undefined") {
-                oAPP.fn._DATASET = parent.require(parent.PATH.join(parent.REMOTE.app.getAppPath(),
-                    "ws30", "ws10_20", "design", "js", "callDataSetFieldListPopop.js"));
+            // HTML5 변환: 원본 parent.require(CJS, global[0].sap) → design 컨텍스트 스크립트 지연 로드(eval).
+            //   비동기 XHR 로드 구간은 공통 top-layer busy 로 감싼다(자체 busy 금지).
+            if (!oAPP.fn._DATASET || !oAPP.fn._DATASET.callDataSetFieldListPopop) {
+                parent.setBusy("X");
+                await new Promise(function (res) { lf_getScript("design/js/callDataSetFieldListPopop", res); });
+                parent.setBusy("");
             }
 
             const ls_return = await oAPP.fn._DATASET.callDataSetFieldListPopop(oModel.getProperty("/DATASET"), oAPP);
@@ -1405,6 +1405,19 @@
             case "K02": return "/DATASET";
             default: return;
         }
+    }
+
+    // Object Type(Database View↔Transparent Table) 변경 시 연관 필드 초기화.
+    //   오브젝트명(TABNM)·설명(TABTX)·앱 설명(APPNM) 값 + 각 value-state 리셋
+    //   (value-state 초기화 규약 = null, lf_resetValueStateField 동일).
+    function lf_resetDatasetObj(oModel) {
+        oModel.setProperty("/DATASET/TABNM", "");
+        oModel.setProperty("/DATASET/TABTX", "");
+        oModel.setProperty("/DATASET/APPNM", "");
+        oModel.setProperty("/DATASET/TABNM_stat", null);
+        oModel.setProperty("/DATASET/TABNM_stxt", null);
+        oModel.setProperty("/DATASET/APPNM_stat", null);
+        oModel.setProperty("/DATASET/APPNM_stxt", null);
     }
 
     // Object Type radio 선택에 따른 object name desc.

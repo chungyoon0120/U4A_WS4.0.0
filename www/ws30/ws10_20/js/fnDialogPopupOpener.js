@@ -697,9 +697,16 @@
         oBrowserOptions.minHeight = 650;
         oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.opacity = 0;
         oBrowserOptions.closable = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
+
+        // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
+        //   (docPopup/editorPopup/runtimeClassNav 선례와 동일 트랙)
+        oBrowserOptions.titleBarStyle = 'hidden';
+
+        // [HTML5] 네이티브 창 opacity 페이드 미사용(OS 리컴포짓 무겁고 흰 번쩍) — 위치 잡힌 뒤 show(frame.js).
+        oBrowserOptions.show = false;
+
         oBrowserOptions.webPreferences.partition = SESSKEY;
         oBrowserOptions.webPreferences.browserkey = BROWSKEY;
         oBrowserOptions.webPreferences.OBJTY = sPopupName;
@@ -721,7 +728,11 @@
             browserkey: oBrowserOptions?.webPreferences?.browserkey,
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
-            USERINFO: parent.process.USERINFO
+            USERINFO: parent.process.USERINFO,
+            // [HTML5] frameless 창 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: oBrowserOptions.title
         };
 
         // 실행할 URL 적용
@@ -757,11 +768,8 @@
         // 브라우저가 오픈이 다 되면 타는 이벤트
         oBrowserWindow.webContents.on('did-finish-load', function () {
 
-            // 부모 위치 가운데 배치한다.
+            // 부모 위치 가운데 배치한다.(표시는 frame.js 가 위치 확정 후 CURRWIN.show — frameless 흰 번쩍 방지)
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
-
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
 
 
             var lt_0014 = [];
@@ -776,10 +784,17 @@
             lt_0023 = oAPP.DATA.LIB.T_0023;
 
 
-            //디자인상세화면(20화면) <-> BINDPOPUP 통신 모듈 PATH 구성.
-            _channelPath = oAPP.fn.getBindingPopupBroadcastModulePath();
-            //디자인상세화면(20화면) <-> BINDPOPUP 통신 채널 키 얻기.
-            var _channelKey = parent.require(_channelPath)("GET-CHANNEL-ID");
+            //디자인상세화면(20화면) <-> BINDPOPUP 통신 모듈 PATH.
+            //  ★ SSOT = oAPP.oDesign.pathInfo.bindPopupBroadCast (ws_html5_ws20_prev.js 가 구성,
+            //    ws_html5_ws20_attr.js selectBindingPopupOBJID 도 동일 경로 사용). 원본 main.js
+            //    getBindingPopupBroadcastModulePath 는 UI5 전용이라 HTML5 ROOT 에 없음.
+            //  · 아직 미구성(헤드리스/부트 이전)이면 prev.js 와 동일 공식으로 폴백 구성.
+            _channelPath = (oAPP.oDesign && oAPP.oDesign.pathInfo && oAPP.oDesign.pathInfo.bindPopupBroadCast)
+                ? oAPP.oDesign.pathInfo.bindPopupBroadCast
+                : PATH.join(parent.getPath("WS10_20_ROOT"), "design", "bindPopupHandler", "broadcastChannelBindPopup.js");
+            //디자인상세화면(20화면) <-> BINDPOPUP 통신 채널 키 = `${browserkey}_ws20_bindpop`
+            //  (WS20측 핸들러 C_CHID 공식과 동일 — GET-CHANNEL-ID 를 require 없이 직접 산출해 채널키 전달을 보장).
+            var _channelKey = BROWSKEY + "_ws20_bindpop";
 
             var oBindPopupData = {
                 oUserInfo: parent.getUserInfo(), // 로그인 사용자 정보 (필수)
@@ -799,8 +814,14 @@
             oBrowserWindow.webContents.send('if_modelBindingPopup', oBindPopupData);
 
 
-            //디자인상세화면(20화면) <-> BINDPOPUP 통신을 위한 채널 생성.
-            parent.require(_channelPath)("CHANNEL-CREATE");
+            //디자인상세화면(20화면) <-> BINDPOPUP 통신을 위한 WS20측 수신 채널 생성.
+            //  · 검증(스코프): parent.require 는 모듈을 mainframe realm 에서 로드 — APP(전역)/parent.REMOTE/
+            //    parent.PATHINFO 모두 해소되고 createChannel 은 oAPP 를 안 쓰므로 채널 생성은 정상/무해.
+            //  · 단, 핸들러의 `const oAPP=parent.oAPP` 는 mainframe oAPP 로 바인딩돼 메시지 핸들러
+            //    (updateAppData 등)는 아직 WS20 디자인 앱과 안 맞음 → 메시지가 흐르는 Stage6 에서 정합 배선.
+            //    (attr.js selectBindingPopupOBJID 와 동일하게 try/catch 로 방어 — 헤드리스/미가용 시 skip.)
+            try { parent.require(_channelPath)("CHANNEL-CREATE"); }
+            catch (e) { console.warn("[HTML5][bindWindow] WS20 수신채널 생성 보류(Stage6):", e && e.message); }
 
 
             // no build 일 경우에는 개발자 툴을 실행한다.
@@ -820,7 +841,8 @@
             oBrowserWindow = null;
 
             //디자인상세화면(20화면) <-> BINDPOPUP 통신 채널 종료.
-            parent.require(_channelPath)("CHANNEL-CLOSE");
+            try { parent.require(_channelPath)("CHANNEL-CLOSE"); }
+            catch (e) { console.warn("[HTML5][bindWindow] WS20 수신채널 종료 보류(Stage6):", e && e.message); }
 
             // Binding Popup 에서 콜백 이벤트 해제
             IPCRENDERER.off("if-bindPopup-callback", oAPP.fn.fnBindPopupIpcCallBack);
@@ -1581,10 +1603,14 @@
 
         oBrowserOptions.title = oAPP.msg.M059; // Source Pattern
         oBrowserOptions.autoHideMenuBar = true;
+        // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
+        oBrowserOptions.titleBarStyle = 'hidden';
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL; //테마별 색상 처리
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5] 네이티브 창 opacity 페이드 미사용(errorPageEditor 트랙) — 창은 boot-bg 로 처음부터 불투명,
+        //   등장 효과는 창 안 본체를 CSS opacity 로 처리(frame.js). ★opacity=0 을 주면 frame.js 가 네이티브
+        //   opacity 를 되돌리지 않아 창 전체가 안 보인다(원본 UI5 는 setBrowserOpacity 로 복원했음).
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
@@ -1602,7 +1628,7 @@
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
 
         // 브라우저 상단 메뉴 없애기
-        oBrowserWindow.setMenu(null);        
+        oBrowserWindow.setMenu(null);
 
         // 브라우저 실행 경로에 붙일 QueryString 정보
         const oQueryParams = {
@@ -1610,6 +1636,10 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            // [HTML5] frameless 창의 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: oAPP.msg.M059, // Source Pattern
         };
 
         const sUrlPath = parent.getPath(sPopupName);

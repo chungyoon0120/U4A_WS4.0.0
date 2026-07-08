@@ -3402,10 +3402,27 @@
             try { oAPP.fn.setAttrEditable(sAttr); } catch (e) { }
 
             //(원본 1953행 previewUIsetProp + 1884행 selPreviewUI: 미리보기 반영 — W2 예정)
+            //  ※ previewUIsetProp 은 원본도 ROOT(OBJID==="ROOT")를 즉시 스킵(uiPreviewArea.js:486)하므로
+            //    ROOT 테마 반영은 아래 별도 분기(원본 attrDocumentProc 상당)에서 처리한다.
             if (typeof oAPP.fn.previewUIsetProp !== "function") {
                 console.warn("[HTML5][WS20][attr] 미리보기 반영 skip (W2 예정):", sAttr.UIATT);
             } else {
                 _safeCall("previewUIsetProp", [sAttr]);
+            }
+
+            //[HTML5] ROOT DOCUMENT 속성의 미리보기 라이브 반영 (원본 attrDocumentProc 이식분).
+            //  UI Theme(DH001021): 원본 uiAttributeArea.js attrDocumentProc(2664행)이
+            //  setPreviewUiTheme 로 iframe 테마를 즉시 바꾸던 경로가 HTML5 변환시 누락돼(위 3337~3338 주석)
+            //  테마를 바꿔도 미리보기가 안 바뀌던 문제 → 프레임에 재적용한다.
+            //  (CSS/JS Link·Web Security 는 원본도 미리보기 직접반영이 아니라 팝업 저장→designRefershModel
+            //   경로라 여기 대상 아님. undo/redo 는 스냅샷 복원 경로에서 별도 처리.)
+            try {
+                if (sAttr && sAttr.OBJID === "ROOT" && sAttr.UIATK === "DH001021"
+                    && typeof oAPP.fn.fnWs20ApplyPrevTheme === "function") {
+                    oAPP.fn.fnWs20ApplyPrevTheme(sAttr.UIATV);
+                }
+            } catch (e) {
+                console.warn("[HTML5][WS20][attr] ROOT 테마 미리보기 반영 skip:", e && e.message);
             }
 
             //모델 갱신 처리. (원본 1959행 — HTML5: 속성 행 재렌더)

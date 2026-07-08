@@ -851,6 +851,36 @@
     }
 
     /************************************************************************
+     * [HTML5][PUBLIC] ROOT UI Theme(DH001021) 변경 → 미리보기 iframe 즉시 재적용.
+     * ---------------------------------------------------------------------
+     *  원본 UI5 는 attrChange→attrDocumentProc(uiAttributeArea.js:2664 DH001021)에서
+     *  oAPP.attr.ui.frame.contentWindow.setPreviewUiTheme(is_attr.UIATV) 로 테마를
+     *  즉시 미리보기에 입혔다. HTML5 변환시 attrDocumentProc 자체가 미이식되어
+     *  (ws_html5_ws20_attr.js fnWs20AttrChange 3337~3338 주석 참조) 테마를 바꿔도
+     *  미리보기가 안 바뀌었다 → 이 헬퍼로 그 경로를 복원한다.
+     *
+     *  iframe 내부: design/preview/index.js:7314 setPreviewUiTheme → applyTheme(비동기).
+     *  테마 CSS 로드 완료시 iframe 의 attachThemeChanged(index.js:9744)가 busy off 를
+     *  담당하므로(실제 완료 이벤트 기반 — 타임아웃/눈속임 아님) 여기선 호출만 한다.
+     ************************************************************************/
+    oAPP.fn.fnWs20ApplyPrevTheme = function (sTheme) {
+        var oWin = _getFrameWin();
+        if (!oWin || typeof oWin.setPreviewUiTheme !== "function") {
+            //미리보기 미로드/미완료 — 다음 미리보기 빌드시 drawPreview(index.js:8552)가
+            //_T_0015 의 DH001021 값을 읽어 반영하므로, 여기선 조용히 skip.
+            console.warn("[HTML5][WS20][prev] setPreviewUiTheme 미가용(미리보기 미로드) — 테마 라이브반영 skip:", sTheme);
+            return false;
+        }
+        try {
+            oWin.setPreviewUiTheme(sTheme);
+            return true;
+        } catch (e) {
+            console.error("[HTML5][WS20][prev] setPreviewUiTheme 오류:", e && e.message);
+            return false;
+        }
+    };
+
+    /************************************************************************
      * [HTML5] 미리보기 iframe 에 포커스가 가도 WS20 단축키가 동작하도록 keydown 포워딩
      * ---------------------------------------------------------------------
      *  미리보기 iframe 에 포커스가 있으면 keydown 이 iframe 문서로만 들어가, 메인 문서에

@@ -1,167 +1,211 @@
-/* Loading Page */
-.u4a_loaders {
-    font-family: sans-serif;
+/****************************************************************************
+ * Binding Popup(대형 별창) frameless 창 셸 스타일 — HTML5
+ *  ★ 색·그림자·테두리는 tokens.css/shell.css/bootstrap-skin.css 의 의미 토큰만 소비(하드코딩 hex 금지).
+ *  ★ 공통 컴포넌트(.u4a-titlebar/.u4a-splitter/.u4a-tree/.u4a-table/.u4a-busy)는 화면에서 수정하지 않고
+ *    화면 스코프(.u4aBwp*)만 덧댄다(dont-modify-common-override-scoped).
+ *  Stage1 = 셸 레이아웃(타이틀바 + 3영역 스플리터 + busy + 등장). 트리/테이블 상세는 후속 단계에서 확장.
+ ****************************************************************************/
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+    /* 전역: 데이터 표면 외 선택 금지(text-select-copy-policy). 트리/테이블/입력은 개별 허용. */
+    user-select: none;
+}
+
+/* 공통 타이틀바(shell.css SSOT) — 셸 상단 고정. */
+.u4a-titlebar { flex: 0 0 auto; }
+
+/* ===== 본체 셸 = 3영역 가로 스플리터(좌|중|우), 중앙은 세로 2분할 ===== */
+.u4aBwpShell {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    /* 등장(frameless — 위치 확정 후 창 표시 + 본문 페이드인). */
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+.u4aBwpShell.u4aBwpShown { opacity: 1; }
+
+/* 패널(영역 컨테이너). 좌/우 고정폭(변수), 중앙 채움. */
+.u4aBwpPane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+.u4aBwpLeft  { flex: 0 0 var(--bwp-left-w, 22rem); min-width: 15rem; }
+.u4aBwpRight { flex: 0 0 var(--bwp-right-w, 22rem); min-width: 15rem; }
+.u4aBwpCenter { flex: 1 1 auto; min-width: 18.75rem; }
+
+/* 중앙 세로 2분할(디자인 트리 | 추가속성 적용). */
+.u4aBwpDesign { flex: 0 0 var(--bwp-design-h, 56%); min-height: 0; display: flex; flex-direction: column; }
+.u4aBwpAdditApply { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* ★ 기본 상태 = 좌(모델트리) + 중(디자인트리)만. 원본 setAdditLayout(index.js:3010): vis_addit=false 기본,
+   ★일반 필드(KIND="E") 선택 시에만★ 중앙 하단 "추가속성 적용" + 우측 "추가속성 정보"가 나타난다(Stage4).
+   → 셸에 u4aBwpShowAddit 클래스가 붙기 전엔 추가속성 영역/스플리터를 숨기고 디자인 트리가 중앙을 채운다. */
+.u4aBwpShell:not(.u4aBwpShowAddit) #bwpSplit2,
+.u4aBwpShell:not(.u4aBwpShowAddit) .u4aBwpAdditApply,
+.u4aBwpShell:not(.u4aBwpShowAddit) #bwpSplit3,
+.u4aBwpShell:not(.u4aBwpShowAddit) .u4aBwpRight { display: none; }
+.u4aBwpShell:not(.u4aBwpShowAddit) .u4aBwpDesign { flex: 1 1 auto; }
+
+/* 영역 카드 프레임 — 툴바(상) + 콘텐츠(채움). */
+.u4aBwpArea {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    overflow: hidden;
+}
+
+/* 영역 툴바(트리/테이블 상단 액션 행). 콘텐츠는 후속 단계 모듈이 채운다. */
+.u4aBwpTool {
+    flex: 0 0 auto;
+    display: flex;
     align-items: center;
-    height: 100%;
-    font-size: 2.5rem;
-    color: rgba(2, 8, 16, 0.55);
-    position: absolute;
-    top: 0;
-    width: 100%;
-    /* background: #1d232a; */
-    box-shadow: rgba(0, 0, 0, 0.11) 0px 15px 30px 0px, rgba(0, 0, 0, 0.08) 0px 5px 15px 0px;
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    min-height: 2.25rem;
+    box-sizing: border-box;
+    border-bottom: 0.0625rem solid var(--line);
+    flex-wrap: wrap;
 }
-.u4a_loader {
-    display: inline-block;
+.u4aBwpTool:empty { display: none; }
+.u4aBwpToolSpacer { flex: 1 1 auto; }
+
+/* 트리/테이블 호스트 — 스크롤 컨테이너. */
+.u4aBwpTreeHost,
+.u4aBwpTableHost {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
     position: relative;
-    width: 60px;
-    height: 20px;
-    text-align: center;
-    vertical-align: middle;
-}
-.u4a_loadersInactive {
-    display: none;
-}
-.u4a_loader-bars:before,
-.u4a_loader-bars:after,
-.u4a_loader-bars span {
-    content: "";
-    display: block;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 10px;
-    height: 30px;
-    background-color: rgba(2, 8, 16, 0.55);
-    -webkit-animation: u4a_grow 1.5s linear infinite;
-    animation: u4a_grow 1.5s linear infinite;
 }
 
-.u4a_loader-bars:after {
-    left: 15px;
-    -webkit-animation: u4a_grow 1.5s linear -0.5s infinite;
-    animation: u4a_grow 1.5s linear -0.5s infinite;
+/* ===== 스플리터 바 = 공통 .u4a-splitter__bar 스킨(11px + 가운데 알약 그립) 그대로 소비 =====
+   세로 바(좌|중, 중|우)는 공통 그대로(col-resize + 세로 그립). 가로 바(디자인|추가속성)만 방향 전환. */
+.u4aBwpSplitBar--h {
+    cursor: row-resize;
+    border-left: none; border-right: none;
+    border-top: 0.0625rem solid var(--line);
+    border-bottom: 0.0625rem solid var(--line);
 }
+.u4aBwpSplitBar--h::before { width: 36px; height: 5px; }
+.u4aBwpSplitBar--h:hover::before { width: 50px; height: 5px; }
 
-.u4a_loader-bars span {
-    left: 30px;
-    -webkit-animation: u4a_grow 1.5s linear -1s infinite;
-    animation: u4a_grow 1.5s linear -1s infinite;
+/* 드래그 중 커서 고정(iframe 위 끊김 방지는 공통 body.u4a-dragging). */
+.u4aBwpResizingV, .u4aBwpResizingV * { cursor: col-resize !important; user-select: none !important; }
+.u4aBwpResizingH, .u4aBwpResizingH * { cursor: row-resize !important; user-select: none !important; }
+
+/* busy 오버레이는 공통 .u4a-busy(shell.css) 소비 — data-busy 로 표시 토글. */
+
+/* ==========================================================================
+ * 레퍼런스 컬럼 트리(.u4aColTree*) — 다열 그리드 트리테이블(makeColumnTree).
+ *   ★ 소형 callBindPopup "그리드 트리"(그리드라인 레이어 + 행라인 그라디언트) + App-F4 고정컬럼/가로스크롤.
+ *   구조 = [스크롤 컨테이너 > sticky 헤더 + 본문(> 세로 그리드라인 레이어 + 공통 .u4a-tree)].
+ *   ★ 헤더/본문/트리 = 같은 명시적 총폭(--u4act-total-w = 컬럼폭 합) → 가로 스크롤 시 안 어긋남
+ *     (요소별 max-content 는 값이 달라 깨짐 — 2026-07-08 실측).
+ *   전체 그리드 = 행라인(행 border-bottom + 빈영역 그라디언트) + 컬럼라인(셀 border-left + 그리드라인 레이어).
+ *   컬럼 고정폭(16 §3.4.2). 정렬 16 §3.4.1. 행밀도 shell.css 단일출처(§3.2). 색=의미 토큰만.
+ * ======================================================================== */
+.u4aColTree { position: relative; overflow: auto; height: 100%; background: var(--surface); }
+
+/* 헤더/본문/트리 공통 폭 = 컬럼폭 합(팬보다 넓으면 가로 스크롤, 좁으면 100% 채움 — 셋 다 동일 폭이라 정렬). */
+.u4aColTreeHead, .u4aColTreeBody, .u4aColTreeTree.u4a-tree { width: max(100%, var(--u4act-total-w, 100%)); }
+
+/* sticky 컬럼 헤더 — 행과 동일 콘텐츠 박스(padding-left = 행 0.375rem + 공통 ul 좌측 1px). */
+.u4aColTreeHead {
+    position: sticky; top: 0; z-index: 2;
+    box-sizing: border-box;
+    display: flex; align-items: stretch; gap: 0.375rem;
+    height: 2.25rem;
+    padding-left: calc(0.375rem + 1px);
+    background: var(--surface-raised);
+    border-bottom: 0.0625rem solid var(--line);
+    font-size: 0.8125rem; font-weight: 700; color: var(--text-muted);
 }
+.u4aColTreeCol { min-width: 0; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; }
+/* 전 컬럼 고정폭(App-F4) — 팬(스플릿 바) 리사이즈에 불변, 초과분은 가로 스크롤. */
+.u4aColTreeC1 { flex: 0 0 var(--u4act-c1-w, 15rem); }
+.u4aColTreeC2 { flex: 0 0 var(--u4act-c2-w, 8rem); border-left: 0.0625rem solid var(--line); position: relative; }
+.u4aColTreeC3 { flex: 0 0 var(--u4act-c3-w, 14rem); border-left: 0.0625rem solid var(--line); position: relative; }
 
-@-webkit-keyframes u4a_grow {
-    0% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-    50% {
-        -webkit-transform: scaleY(1);
-        transform: scaleY(1);
-        opacity: 1;
-    }
-    100% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
+/* 컬럼 리사이즈 그립(각 컬럼 우측 경계) + 경계선 강조(헤더+그리드라인+행 셀 동시). */
+.u4aColTreeGrip { position: absolute; top: 0; bottom: 0; left: -0.1875rem; width: 0.4375rem; cursor: col-resize; z-index: 4; }
+.u4aColTreeGrip--right { left: auto; right: -0.1875rem; }
+.u4aColTreeHl2 .u4aColTreeC2, .u4aColTreeHl2 .u4aColTreeGL--c2,
+.u4aColTreeHl3 .u4aColTreeC3, .u4aColTreeHl3 .u4aColTreeGL--c3 { border-left-color: var(--accent); box-shadow: inset 0.1875rem 0 0 var(--accent); }
+.u4aColTreeHl3r .u4aColTreeC3 { box-shadow: inset -0.1875rem 0 0 var(--accent); }
+/* 컬럼 리사이즈 가이드 라인·드래그 커서는 공통 U4AUI.attachColumnResize(가이드 fixed 인라인 + body 커서) 담당. */
+
+/* 본문 — 헤더 아래 남는 높이 채움 + 빈 영역 가로 행라인(반복 그라디언트, 행 2.5rem 주기). */
+.u4aColTreeBody {
+    position: relative; box-sizing: border-box;
+    min-height: calc(100% - 2.25rem);
+    background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(2.5rem - 0.0625rem), var(--line) calc(2.5rem - 0.0625rem), var(--line) 2.5rem);
 }
+/* 세로 컬럼 그리드라인 레이어(빈 영역까지 컬럼 경계선 연장) — 헤더와 동일 flex 구조. 행 밑(z-index:0), pointer 통과. */
+.u4aColTreeGrid { position: absolute; inset: 0; z-index: 0; display: flex; gap: 0.375rem; box-sizing: border-box; padding-left: calc(0.375rem + 1px); pointer-events: none; }
+.u4aColTreeGL { min-width: 0; box-sizing: border-box; }
+.u4aColTreeGL--c1 { flex: 0 0 var(--u4act-c1-w, 15rem); }
+.u4aColTreeGL--c2 { flex: 0 0 var(--u4act-c2-w, 8rem); border-left: 0.0625rem solid var(--line); }
+.u4aColTreeGL--c3 { flex: 0 0 var(--u4act-c3-w, 14rem); border-left: 0.0625rem solid var(--line); }
 
-@keyframes u4a_grow {
-    0% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-    50% {
-        -webkit-transform: scaleY(1);
-        transform: scaleY(1);
-        opacity: 1;
-    }
-    100% {
-        -webkit-transform: scaleY(0);
-        transform: scaleY(0);
-        opacity: 0;
-    }
-}
+/* 트리(공통 createTree) — 그리드라인 위(z-index:1), 배경 투명(그라디언트 행라인 비침). */
+.u4aColTreeTree.u4a-tree { padding-top: 0; min-height: 0; position: relative; z-index: 1; background: transparent; }
+.u4aColTreeTree .u4a-tree__row[data-u4a-tree-split] { justify-content: flex-start; }
+.u4aColTreeRow.u4a-tree__row { padding-left: 0.375rem; padding-right: 0; border-bottom: 0.0625rem solid var(--line); }
+.u4aColTreeTree .u4a-tree__toggle { margin-left: calc(var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem)); }
+.u4aColTreeTree .u4a-tree__label { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* 이름 셀(토글+아이콘+라벨 묶음, 고정폭) + 트레일링(C2/C3 display:contents → 행 직계 flex 자식). */
+.u4aColTreeNameCell { flex: 0 0 var(--u4act-c1-w, 15rem); min-width: 0; display: flex; align-items: center; gap: 0.375rem; overflow: hidden; }
+.u4aColTreeTrail { display: contents; }
+.u4aColTreeCell { align-self: stretch; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); min-width: 0; overflow: hidden; }
+.u4aColTreeTree .u4aColTreeC2 { flex: 0 0 var(--u4act-c2-w, 8rem); }
+.u4aColTreeTree .u4aColTreeC3 { flex: 0 0 var(--u4act-c3-w, 14rem); }
 
-.cl_ring {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 150px;
-    height: 150px;
-    background: transparent;
-    border: 3px solid #ff2600;
-    border-radius: 50%;
-    text-align: center;
-    line-height: 150px;
-    font-family: sans-serif;
-    font-size: 20px;
-    color: #ffbeb2;
-    letter-spacing: 4px;
-    text-shadow: 0 0 10px #ffbeb2;
-    box-shadow: 0 0 20px rgba(156, 0, 0, 0.5);
-}
+.u4aColTreeEmpty { position: relative; z-index: 1; padding: 0.75rem; }
 
-.cl_ring:before {
-    content: '';
-    position: absolute;
-    top: -3px;
-    left: -3px;
-    width: 100%;
-    height: 100%;
-    border: 3px solid transparent;
-    border-top: 3px solid #ffbeb2;
-    border-right: 3px solid #ffbeb2;
-    border-radius: 50%;
-    animation: animateC 3s linear infinite;
-}
+/* 드래그(리사이즈) 중 커서 고정. */
+.u4aColTreeResizing, .u4aColTreeResizing * { cursor: col-resize !important; user-select: none !important; }
 
-.cl_ringArea {
-    display: block;
-    position: absolute;
-    top: calc(50% - 2px);
-    left: 50%;
-    width: 50%;
-    height: 4px;
-    background: transparent;
-    transform-origin: left;
-    animation: animate 3s linear infinite;
-}
+/* 선택 행 텍스트색(공통 선택강조와 함께). 좌측 상태바는 rowHook 이 box-shadow inset(§3.3). */
+.u4aColTreeTree .u4a-tree__row[aria-selected="true"] .u4a-tree__label { color: var(--selected-text); }
 
-.cl_ringArea:before {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #ffbeb2;
-    top: -6px;
-    right: -8px;
-    box-shadow: 0 0 20px #fff;
-}
+/* ===== 공유 상태 표현(모델·디자인 트리 공통) ===== */
+.u4aBwpStat { flex: 0 0 auto; }
+.u4aBwpStat--success { color: var(--state-success); }
+.u4aBwpStat--info { color: var(--state-info, var(--accent)); }
+.u4aBwpStat--warning { color: var(--state-warning); }
+.u4aBwpRow--success { box-shadow: inset 0.1875rem 0 0 var(--state-success); }
+.u4aBwpRow--info { box-shadow: inset 0.1875rem 0 0 var(--state-info, var(--accent)); }
+.u4aBwpRow--warning { box-shadow: inset 0.1875rem 0 0 var(--state-warning); }
+.u4aBwpRow--error { box-shadow: inset 0.1875rem 0 0 var(--state-error); }
 
-@keyframes animateC {
-    0% {
-        transform: rotate(0deg);
-    }
+/* 유형(아이콘+텍스트)/설명 셀 콘텐츠 — 말줄임. */
+.u4aBwpTypeWrap { display: flex; align-items: center; gap: 0.375rem; min-width: 0; overflow: hidden; }
+.u4aBwpTypeTxt, .u4aBwpDescTxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }
 
-    100% {
-        transform: rotate(360deg);
-    }
-}
+/* 툴바 아이콘 버튼. */
+.u4aBwpToolBtn { flex: 0 0 auto; }
 
-@keyframes animate {
-    0% {
-        transform: rotate(45deg);
-    }
-
-    100% {
-        transform: rotate(405deg);
-    }
-}
+/* 디자인 트리 — 체크박스(멀티 선택) + 바인딩 경로(Link 색). */
+.u4aBwpDesignChk { flex: 0 0 auto; margin: 0; cursor: pointer; }
+.u4aBwpDesignPath { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: var(--accent); }

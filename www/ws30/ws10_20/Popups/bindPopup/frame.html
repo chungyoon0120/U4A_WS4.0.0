@@ -2,68 +2,109 @@
 <html>
 
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta charset="utf-8">
-    <link rel="stylesheet" href="frame.css">
-</head>
-<style>
-    html,
-    body {
-        height: 100%;
-    }
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
-    body {
-        margin: 0px;
-        overflow: hidden;
-    }
-</style>
+    <!-- ===== 공통 헤더(.u4a-titlebar)·트리·테이블·입력칸·토큰 (docPopup/runtimeClassNav 과 동일 짝) ===== -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="frame.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* frame.js 에서 재적용 */ }
+        })();
+    </script>
+</head>
 
 <body>
-   
-    <!-- Page Loading Start -->
-    <div id="u4a_main_load" class="u4a_loaders">
-        <!-- <span class="u4a_loader u4a_loader-bars"> <span></span> </span> Loading... -->
-        <div class="cl_ring">LOADING<span class="cl_ringArea"></span></div>
+
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/닫기 ===== -->
+    <header class="u4a-titlebar" id="bwpTitlebar">
+        <img class="u4a-titlebar__logo" id="bwpLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="bwpTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- ===== 본체 = [좌: 모델필드 트리] | [중: 디자인 트리(상) + 추가속성 적용(하)] | [우: 추가속성 정보] =====
+         원본 sap.ui.layout.Splitter(가로 3영역, 중앙은 세로 2분할) 대응. 기본 모드 = BULK(3분할).
+         각 영역 콘텐츠(툴바/트리/테이블)는 frame.js + 영역 모듈이 렌더한다. -->
+    <main class="u4aBwpShell" id="bwpShell">
+
+        <!-- 좌: 모델 필드 트리 -->
+        <section class="u4aBwpPane u4aBwpLeft" id="bwpLeftPane">
+            <div class="u4aBwpArea" id="bwpModelArea">
+                <div class="u4aBwpTool" id="bwpModelTool"></div>
+                <div class="u4aBwpTreeHost" id="bwpModelTree"></div>
+            </div>
+        </section>
+
+        <!-- 세로 스플리터 바(좌|중) -->
+        <div class="u4a-splitter__bar u4aBwpSplitBar u4aBwpSplitBar--v" id="bwpSplit1" role="separator" aria-orientation="vertical"></div>
+
+        <!-- 중: 디자인 트리(상) + 추가속성 적용(하) -->
+        <section class="u4aBwpPane u4aBwpCenter" id="bwpCenterPane">
+
+            <div class="u4aBwpArea u4aBwpDesign" id="bwpDesignArea">
+                <div class="u4aBwpTool" id="bwpDesignTool"></div>
+                <div class="u4aBwpTreeHost" id="bwpDesignTree"></div>
+            </div>
+
+            <!-- 가로 스플리터 바(디자인 트리 | 추가속성 적용) -->
+            <div class="u4a-splitter__bar u4aBwpSplitBar u4aBwpSplitBar--h" id="bwpSplit2" role="separator" aria-orientation="horizontal"></div>
+
+            <div class="u4aBwpArea u4aBwpAdditApply" id="bwpAdditApplyArea">
+                <div class="u4aBwpTool" id="bwpAdditApplyTool"></div>
+                <div class="u4aBwpTableHost" id="bwpAdditApply"></div>
+            </div>
+
+        </section>
+
+        <!-- 세로 스플리터 바(중|우) -->
+        <div class="u4a-splitter__bar u4aBwpSplitBar u4aBwpSplitBar--v" id="bwpSplit3" role="separator" aria-orientation="vertical"></div>
+
+        <!-- 우: 추가속성(MPROP) 정보 -->
+        <section class="u4aBwpPane u4aBwpRight" id="bwpRightPane">
+            <div class="u4aBwpArea" id="bwpAdditInfoArea">
+                <div class="u4aBwpTool" id="bwpAdditInfoTool"></div>
+                <div class="u4aBwpTableHost" id="bwpAdditInfo"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 로딩 오버레이 = 공통 busy(.u4a-busy, shell.css SSOT). 토스트는 frame.js 가 동적 생성. -->
+    <div class="u4a-busy" id="bwpBusy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+        </div>
     </div>
-    <!-- Page Loading End -->
-     
-    <iframe id="ws_frame" name="ws_frame" style="border:none;width:100%;height:100%;" allowfullscreen>
-    </iframe>
 
-
-    <script>
-        /************************************************************************
-        * 에러 감지  (Frame.html)
-        ************************************************************************/
-        var REMOTE = require('@electron/remote'),
-        PATH = REMOTE.require('path'),
-        APP = REMOTE.app,
-        APPPATH = APP.getAppPath(),
-        PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
-        PATHINFO = require(PATHINFOURL),
-        WSERR = require(PATHINFO.WSTRYCATCH);
-
-        var zconsole = WSERR(window, document, console);
-
-
-        var _style = `
-            font-size: 22px;
-            color: #e6e2da;
-            background: blue;
-            padding: 10px;
-            font-family: monospace;
-            `;
-
-        console.log(`%c 바인딩팝업 콘솔 영역` , _style);
-        console.warn(`%c 바인딩팝업 콘솔 영역` , _style);
-
-    </script>
-
-
-    <!-- <script src="../../cordova.js"></script> -->
+    <!-- 부트/셸(frameless) — 전역 oAPP/헬퍼 구성. 이후 영역 모듈이 이 전역을 소비한다. -->
     <script src="frame.js"></script>
+    <!-- 공용 헬퍼(sendAjax/setTreeData) + 레퍼런스 컬럼트리 + 영역 모듈(로드 순서 = 의존 순서). -->
+    <script src="bindShared.js"></script>
+    <script src="bindColumnTree.js"></script>
+    <script src="modelFieldArea/modelFieldArea.js"></script>
+    <script src="designArea/designArea.js"></script>
+
 </body>
 
 </html>
