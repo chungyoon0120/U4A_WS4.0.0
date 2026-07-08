@@ -563,8 +563,12 @@
         var oResult = APPCOMMON.getCheckAlreadyOpenWindow(sPopupName);
         if (oResult.ISOPEN === true && oResult.WINDOW.isDestroyed() === false) {
 
+            // ★ errMsgPopup 창은 closable:false(항상 유지)라 raw close() 가 무시된다.
+            //   반드시 공통 U4AUI.closeWindow(setClosable(true)+close())로 닫는다(원본은 idle 시 closable=true
+            //   라 raw close 가 먹었으나, 크롬 외부화로 always-false 가 되며 이 부모측 닫기가 회귀했었음).
             try {
-                oResult.WINDOW.close();
+                if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oResult.WINDOW); }
+                else { oResult.WINDOW.setClosable(true); oResult.WINDOW.close(); }
             } catch (error) {
 
             }

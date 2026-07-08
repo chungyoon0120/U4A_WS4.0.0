@@ -95,6 +95,10 @@ export async function createView(oParam) {
         }
     });
     fReq.input.classList.add("u4aUawdVho");
+    // 값도움 전용(vho) — 활성일 때 입력칸 아무데나 클릭해도 F4 열림(데이터세트 탭 _buildInput 과 동일).
+    fReq.input.addEventListener("click", function () {
+        if (!fReq.input.disabled) { oContr.fn.onValueHelpReqNumber(); }
+    });
     r4.ctl.appendChild(fReq.el);
     oContr.ui.reqnrField = fReq;
     oContr.ui.reqnrRow = r4.row;

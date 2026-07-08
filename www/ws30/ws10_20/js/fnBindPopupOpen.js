@@ -1645,7 +1645,7 @@
   function lf_ensureStyle() {
     var sCss = [
       // 다이얼로그 — 반응형 크기 + 세로 flex(바디가 늘어 푸터 하단 고정). 헤더/푸터 48px=공통.
-      ".u4aBindDlg { width: min(62vw, 980px); height: 80vh; padding: 0; display: flex; flex-direction: column; }",
+      ".u4aBindDlg { width: min(60vw, 880px); height: min(84vh, 820px); padding: 0; display: flex; flex-direction: column; }",
       ".u4aBindDlg .u4a-dialog__header { cursor: move; user-select: none; }",
       ".u4aBindHead span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
       // 툴바(MIME .u4aMimeTreeTool 컨벤션) — 아이콘/라벨 버튼 한 줄, 하단 경계.

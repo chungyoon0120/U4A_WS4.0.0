@@ -248,48 +248,79 @@ function _loadHost() {
     oFrame.src = "../editorPopup/host/index.html?PARAMS=" + encodeURIComponent(JSON.stringify(oPARAMS));
 }
 
+/* ── 뷰어 서브페이지 전환(빈상태 ↔ 코드) — §9 슬라이드+페이드(0.26s±32px). 실제 페이지 바뀔 때만 애니메이션. ── */
+var _A_NAV = ["u4aPattNavInFwd", "u4aPattNavInBack", "u4aPattNavOutFwd", "u4aPattNavOutBack"];
+function _navPages(oShow, oHide, bForward) {
+    if (!oShow) { return; }
+    oShow.classList.remove.apply(oShow.classList, _A_NAV);
+    oShow.classList.remove("u4aPattPageHidden");
+    if (!oHide) { return; }   // 최초 표시 = 애니메이션 없이 노출
+    oShow.classList.add(bForward ? "u4aPattNavInFwd" : "u4aPattNavInBack");
+
+    oHide.classList.remove.apply(oHide.classList, _A_NAV);
+    var sOut = bForward ? "u4aPattNavOutFwd" : "u4aPattNavOutBack";
+    oHide.classList.add(sOut);
+    var bDone = false;
+    var _done = function () {                       // 완료 후 정리(§9.3) — animationend + 400ms 폴백.
+        if (bDone) { return; }
+        bDone = true;
+        oHide.classList.remove(sOut);
+        oHide.classList.add("u4aPattPageHidden");
+        oHide.removeEventListener("animationend", _done);
+    };
+    oHide.addEventListener("animationend", _done);
+    setTimeout(_done, 400);
+}
+
 /* ── 우측 뷰어 표시/빈 상태 ───────────────────────────────────────────────── */
 function _showEmpty() {
     oState.cur = null;
     var oHead = document.getElementById("pattViewHead");
     if (oHead) { oHead.hidden = true; }
-    var oWrap = document.getElementById("pattHostWrap");
-    if (oWrap) { oWrap.hidden = true; oWrap.classList.remove("u4aPattHostShown"); }
     var oEmpty = document.getElementById("pattEmpty");
-    if (oEmpty) { oEmpty.hidden = false; }
+    var oWrap = document.getElementById("pattHostWrap");
+    // 코드가 보이던 상태에서만 전환(빈상태가 이미 보이면 no-op = 최초 포함).
+    if (oEmpty && oEmpty.classList.contains("u4aPattPageHidden")) {
+        _navPages(oEmpty, oWrap, false);   // 코드→빈 = back
+    }
 }
 
 function _showCode(oNode) {
     oState.cur = oNode;
-    var oEmpty = document.getElementById("pattEmpty");
-    if (oEmpty) { oEmpty.hidden = true; }
     var oHead = document.getElementById("pattViewHead");
     if (oHead) { oHead.hidden = false; }
     var oTitle = document.getElementById("pattViewTitle");
     if (oTitle) { oTitle.textContent = oNode.DESC || ""; }
+    var oEmpty = document.getElementById("pattEmpty");
     var oWrap = document.getElementById("pattHostWrap");
-    if (oWrap) { oWrap.hidden = false; }
+    // 빈상태에서 올 때만 전환(코드→코드는 애니메이션 없이 setValue 만 — Monaco 1회 로드 원칙).
+    if (oWrap && oWrap.classList.contains("u4aPattPageHidden")) {
+        _navPages(oWrap, oEmpty, true);   // 빈→코드 = forward
+    }
 
     if (oState.ready) {
         _toHost({ cmd: "setReadOnly", readOnly: true });
         _toHost({ cmd: "setLanguage", language: _langOf(oNode) });
-        _toHost({ cmd: "setValue", value: (typeof oNode.DATA === "string") ? oNode.DATA : "" });
-        if (oWrap) { oWrap.classList.add("u4aPattHostShown"); }
+        _toHost({ cmd: "setValue", value: (typeof oNode.DATA === "string") ? oNode.DATA : "" });   // 텍스트만 set(재로드 X)
     } else {
-        oState.pending = oNode;   // 준비되면 반영
+        oState.pending = oNode;   // 호스트 준비되면 반영
     }
 }
 
+// makeColumnTree 래퍼면 내부 createTree(.tree)를, createTree 면 자신을 반환(선택 API 공용화).
+function _tof(t) { return (t && t.tree) ? t.tree : t; }
+
 // 트리 노드 선택(원본 ev_DefPattRowSelectionChange / ev_CustPattRowSelectionChange — 상호배타 + ROOT/무DATA 처리).
 function _selectPattern(oOwnTree, oOtherTree, oNode) {
-    if (oOtherTree) { oOtherTree.selectByKey(""); }   // 다른 트리 선택 해제
+    var own = _tof(oOwnTree), other = _tof(oOtherTree);
+    if (other) { other.selectByKey(""); }   // 다른 트리 선택 해제
     // ROOT / DATA 없음 → 원본은 clearSelection(선택 표시 없이 빈 상태). 하이라이트 남기지 않는다.
     if (!oNode || oNode.TYPE === "ROOT" || !oNode.DATA) {
-        if (oOwnTree) { oOwnTree.selectByKey(""); }
+        if (own) { own.selectByKey(""); }
         _showEmpty();
         return;
     }
-    if (oOwnTree) { oOwnTree.setSelected(oNode); }
+    if (own) { own.setSelected(oNode); }
     _showCode(oNode);
 }
 
@@ -352,53 +383,7 @@ function _buildTrees() {
         roots: function () { return oState.aDefRoots; },
         onSelect: function (n) { oState.selCustKey = ""; _selectPattern(oDefTree, oCustTree, n); }
     });
-    // 커스텀 패턴 트리(이름 | Content Type). Content Type 셀은 모든 행에 반환(세로구분선 연속 — MIME 방식 단일 셀).
-    oCustTree = _mkTree({
-        roots: function () { return oState.aCustRoots; },
-        slotTrailing: function (n) {
-            var cell = document.createElement("span");
-            cell.className = "u4aPattCont";
-            var txt = document.createElement("span");
-            txt.className = "u4aPattContText";
-            var sVal = (n && n.TYPE !== "ROOT" && n.CONT_TYPE) ? n.CONT_TYPE : "";
-            txt.textContent = sVal;
-            if (sVal) { txt.setAttribute("data-tip", sVal); txt.setAttribute("data-tip-trunc", ""); }
-            cell.appendChild(txt);
-            return cell;
-        },
-        // 행 hover 액션(원본 RowAction: 수정/삭제) — ROOT 제외. 절대배치라 컬럼 정렬 불변.
-        rowHook: function (oRow, n) {
-            oRow.classList.add("u4aPattRow");
-            if (!n || n.TYPE === "ROOT") { return; }
-            var oActs = document.createElement("span");
-            oActs.className = "u4aPattRowActs";
-            var oEdit = document.createElement("button");
-            oEdit.type = "button";
-            oEdit.className = "u4aPattRowAct";
-            oEdit.title = _m("030");   // Change
-            oEdit.innerHTML = '<i class="fa-solid fa-pen"></i>';
-            oEdit.addEventListener("click", function (ev) {
-                ev.stopPropagation();
-                _openCreateDlg({ PRCCD: "U", CKEY: n.CKEY, DESC: n.DESC, DATA: n.DATA, CONT_TYPE: n.CONT_TYPE });
-            });
-            var oDel = document.createElement("button");
-            oDel.type = "button";
-            oDel.className = "u4aPattRowAct u4aPattRowAct--del";
-            oDel.title = _m("029");   // Delete
-            oDel.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-            oDel.addEventListener("click", function (ev) {
-                ev.stopPropagation();
-                _deleteCust(n);
-            });
-            oActs.appendChild(oEdit);
-            oActs.appendChild(oDel);
-            oRow.appendChild(oActs);
-        },
-        onSelect: function (n) {
-            oState.selCustKey = (n && n.TYPE !== "ROOT" && n.DATA) ? n.CKEY : "";
-            _selectPattern(oCustTree, oDefTree, n);
-        }
-    });
+    // 커스텀 패턴 트리는 아래 oCustBody 에서 공통 makeColumnTree(3열 리사이즈 트리테이블)로 생성한다.
 
     var oDefBody = document.getElementById("pattDefBody");
     if (oDefBody) {
@@ -409,16 +394,73 @@ function _buildTrees() {
         oDefBody.appendChild(oDefWrap);
     }
     var oCustBody = document.getElementById("pattCustBody");
-    if (oCustBody) {
-        oCustBody.appendChild(_colHead([
-            { cls: "u4aPattColName", text: _m("022") },   // Custom Pattern
-            { cls: "u4aPattColCont", text: _m("023") }    // Content Type
-        ]));
-        oCustTree.el.classList.add("u4aPattTree");
-        var oCustWrap = _treeWrap(_gridLines(["u4aPattGL u4aPattGL--name", "u4aPattGL u4aPattGL--cont"]));
-        oCustWrap.appendChild(oCustTree.el);
-        oCustBody.appendChild(oCustWrap);
+    if (oCustBody && window.U4AUI && U4AUI.makeColumnTree) {
+        // makeColumnTree 는 host 를 .u4aColTree(height:100%/overflow:auto)로 채운다 → 내 .u4aPattTreeBody 와
+        //   겹치지 않게 깨끗한 자식 host 를 넘긴다(스크롤/높이 충돌 방지).
+        oCustBody.innerHTML = "";
+        var oColHost = document.createElement("div");
+        oCustBody.appendChild(oColHost);
+        // 커스텀 = 공통 3열 리사이즈 트리테이블(이름 | Content Type | 액션). 모든 컬럼 그립·가이드·그리드선·가로스크롤 내장.
+        oCustTree = U4AUI.makeColumnTree(oColHost, {
+            columns: [
+                { label: _m("022"), width: "10rem" },   // 개인화 패턴(이름)
+                { label: _m("023"), width: "7rem" },     // 콘텐츠 유형
+                { label: "", width: "4rem" }              // 액션(수정/삭제)
+            ],
+            roots: function () { return oState.aCustRoots; },
+            children: function (n) { return n._ch || []; },
+            hasChildren: function (n) { return (n._ch || []).length > 0; },
+            key: function (n) { return n.CKEY || ""; },
+            label: function (n) { return (n.TYPE === "ROOT") ? ((n.DESC || "") + " Root") : (n.DESC || ""); },
+            tip: function (n) { return (n.TYPE === "ROOT") ? ((n.DESC || "") + " Root") : (n.DESC || ""); },
+            icon: function (n) { return _iconHtml(n.ICON); },
+            cell: function (n) { return { c2: _custCellType(n), c3: _custCellActs(n) }; },
+            onSelect: function (n) {
+                oState.selCustKey = (n && n.TYPE !== "ROOT" && n.DATA) ? n.CKEY : "";
+                _selectPattern(oCustTree, oDefTree, n);
+            },
+            emptyText: ""
+        });
+        oCustTree.rerender(false);   // 첫행 자동선택 안 함
     }
+}
+
+// 커스텀 c2 셀 = Content Type 텍스트(말줄임 툴팁).
+function _custCellType(n) {
+    var sVal = (n && n.TYPE !== "ROOT" && n.CONT_TYPE) ? n.CONT_TYPE : "";
+    var oTxt = document.createElement("span");
+    oTxt.className = "u4aPattContText";
+    oTxt.textContent = sVal;
+    if (sVal) { oTxt.setAttribute("data-tip", sVal); oTxt.setAttribute("data-tip-trunc", ""); }
+    return oTxt;
+}
+
+// 커스텀 c3 셀 = 액션(수정/삭제 "항상 표시" — 원본 rowActionCount:2). ROOT 는 버튼 없음.
+function _custCellActs(n) {
+    var oActs = document.createElement("span");
+    oActs.className = "u4aPattActs";
+    if (!n || n.TYPE === "ROOT") { return oActs; }
+    var oEdit = document.createElement("button");
+    oEdit.type = "button";
+    oEdit.className = "u4aPattActBtn u4aPattActBtn--edit";
+    oEdit.title = _m("030");   // Change
+    oEdit.innerHTML = '<i class="fa-solid fa-pen"></i>';
+    oEdit.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        _openCreateDlg({ PRCCD: "U", CKEY: n.CKEY, DESC: n.DESC, DATA: n.DATA, CONT_TYPE: n.CONT_TYPE });
+    });
+    var oDel = document.createElement("button");
+    oDel.type = "button";
+    oDel.className = "u4aPattActBtn u4aPattActBtn--del";
+    oDel.title = _m("029");   // Delete
+    oDel.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+    oDel.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        _deleteCust(n);
+    });
+    oActs.appendChild(oEdit);
+    oActs.appendChild(oDel);
+    return oActs;
 }
 
 // 패턴 데이터 로드 + 트리 렌더(원본 fnInitModelBinding).
@@ -426,7 +468,7 @@ function _loadData() {
     oState.aDefRoots = _buildTree(_readPatternJson(PATHINFO.DEF_PATT));
     oState.aCustRoots = _buildTree(_readPatternJson(PATHINFO.CUST_PATT));
     if (oDefTree) { oDefTree.render(); }
-    if (oCustTree) { oCustTree.render(); }
+    if (oCustTree) { oCustTree.rerender(false); }   // makeColumnTree
 }
 
 /* ── 커스텀 패턴 CRUD (원본 ev_pressCustomPatternCreateUpdate / ev_CustCreateDlgSave / ev_pressCustomPatternDelete) ── */
@@ -449,12 +491,12 @@ function _findNode(aRoots, sKey) {
 // 커스텀 트리 재로드(파일 fresh) + 렌더 + (선택키 있으면) 재선택·스크롤. selCustKey 동기(watch 정합).
 function _reloadCust(sSelKey) {
     oState.aCustRoots = _buildTree(_readPatternJson(PATHINFO.CUST_PATT));
-    if (oCustTree) { oCustTree.render(); }
+    if (oCustTree) { oCustTree.rerender(false); }   // makeColumnTree 재렌더(첫행 자동선택 안 함)
     var oNode = sSelKey ? _findNode(oState.aCustRoots, sSelKey) : null;
     if (oNode) {
         oState.selCustKey = sSelKey;
         _selectPattern(oCustTree, oDefTree, oNode);
-        try { oCustTree.scrollToKey(sSelKey); } catch (e) { }
+        try { oCustTree.selectKey(sSelKey, true); } catch (e) { }   // 스크롤 reveal
     } else {
         oState.selCustKey = "";   // 선택 대상 없음 → 보존 키 해제
     }
@@ -697,7 +739,7 @@ function _deleteCust(oNode) {
             aFlat.splice(iF, 1);
             if (!_writeCust(aFlat)) { return; }
             _reloadCust("");
-            if (oCustTree) { oCustTree.selectByKey(""); }
+            if (oCustTree) { _tof(oCustTree).selectByKey(""); }
             _showEmpty();
             _toast(_m("008"));   // Delete success
         }

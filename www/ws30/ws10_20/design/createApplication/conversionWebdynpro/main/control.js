@@ -52,7 +52,11 @@ export async function createControl(oParam) {
         S_VALST: { ...TY_VALST },
         S_VALTX: { ...TY_VALTX },
         T_VLIST: [],
-        _vlistSel: -1   // VIEW 리스트 선택 인덱스(위자드).
+        _vlistSel: -1,     // VIEW 리스트 선택 인덱스(위자드).
+        _compResolved: false, // ★컴포넌트명이 서버에서 '존재 확정'됐는지(생성 시 존재검증 근거). 미입력/오류/변경 중=false
+        _compErrTx: "",    // 마지막 컴포넌트 오류 메시지(존재하지 않음 등) — 생성 차단 시 재사용
+        _packOk: false,    // ★패키지 서버 존재검사 통과 여부(생성 시 존재검증 근거). $TMP=true
+        _packErrTx: ""     // 마지막 패키지 오류 메시지 — 생성 차단 시 재사용
     };
 
     // 커스텀 이벤트(원본 유지 — 소비처가 conversionWebdynpro 를 dispatch).
@@ -73,12 +77,8 @@ export async function createControl(oParam) {
         } catch (e) { return sText; }
     }
 
-    // 서버 SCRIPT eval 방어(SCRIPT 는 sap 등 참조 다수 → 실패해도 앱 안 죽고 busy 는 호출부가 해제).
-    function _evalServerScript(sScript) {
-        if (!sScript) { return false; }
-        try { eval(sScript); return true; }
-        catch (e) { console.error("[UAWD] server SCRIPT eval failed", e); return false; }
-    }
+    // ★서버 SCRIPT 는 eval 하지 않는다 — 이 화면의 서버 오류 SCRIPT 는 정체가 '모달로 메시지 띄우기'라
+    //   실행하면 팝업이 뜬다(오류 UX=인라인/모달을 우리가 직접 통제). 메시지는 항상 RTMSG 사용.
     oContr.fn._reloc = _reloc;
 
 
@@ -134,12 +134,14 @@ export async function createControl(oParam) {
 
         const D = oContr.oData;
 
-        // 오류 표현 필드 / DESC / view 리스트 초기화.
+        // 오류 표현 필드 / DESC / view 리스트 / 존재확정 플래그 초기화.
         D.S_VALST.COMP_NAME = undefined;
         D.S_VALTX.COMP_NAME = "";
         D.S_UAWD.COMP_DESC = "";
         D.T_VLIST = [];
         D._vlistSel = -1;
+        D._compResolved = false;
+        D._compErrTx = "";
 
         const _name = (sValue == null ? "" : String(sValue));
         D.S_UAWD.COMP_NAME = _name;
@@ -151,19 +153,15 @@ export async function createControl(oParam) {
         const _sRes = await oContr.fn.getWebDynCompData();
 
         if (_sRes.RETCD === "E") {
-
-            if (_sRes.SCRIPT) {
-                if (!_evalServerScript(_sRes.SCRIPT) && _sRes.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRes.RTMSG)); }
-                D.S_UAWD.COMP_DESC = "";
-                _render();
-                parent.setBusy("");
-                return;
-            }
-
-            // [UX 통일] 인라인 value-state + 오류필드 포커스(중복 모달 제거).
+            // ★[UX 통일] 존재하지 않는 컴포넌트 등 = 인라인 value-state + 포커스(모달 금지 — 옆 필드와 동일).
+            //   ★서버 SCRIPT 는 절대 eval 하지 않는다 — SCRIPT 의 정체가 '모달로 메시지 띄우기'라
+            //   실행하는 순간 팝업이 튀어나온다(장군님 지적). 메시지는 RTMSG 에 이미 있으니 인라인으로만.
+            const _msg = _reloc(_sRes.RTMSG) || parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "447");
             D.S_VALST.COMP_NAME = "Error";
-            D.S_VALTX.COMP_NAME = _reloc(_sRes.RTMSG);
+            D.S_VALTX.COMP_NAME = _msg;
+            D._compErrTx = _msg;      // 생성 시 차단 메시지로 재사용
             D.S_UAWD.COMP_DESC = "";
+            D._compResolved = false;
             _render();
             parent.setBusy("");
             oContr.fn._focus("compField");
@@ -174,7 +172,7 @@ export async function createControl(oParam) {
         D.S_UAWD.COMP_DESC = _sRes.COMP_DESC;
         D.T_VLIST = _sRes.T_VLIST || [];
         D._vlistSel = -1;
-
+        D._compResolved = true;   // ★서버에서 존재 확정
         _render();
         parent.setBusy("");
     };
@@ -196,11 +194,13 @@ export async function createControl(oParam) {
         D.S_VALTX.REQNR = "";
         D.S_EDIT.REQNR = false;
         D.S_UAWD.REQNR_REQ = false;
+        D._packOk = false;        // ★변경 시 존재검사 미확정으로 리셋($TMP/서버통과에서 true)
+        D._packErrTx = "";
 
         const _p = (sValue == null ? "" : String(sValue)).toUpperCase();
         D.S_UAWD.PACKG = _p;
 
-        // 패키지를 비우면 CTS 값/설명도 비운다(비활성 필드 잔값 방지).
+        // 패키지를 비우면 CTS 값/설명도 비운다(비활성 필드 잔값 방지). (빈값=미입력 검사가 별도)
         if (_p === "") {
             D.S_UAWD.REQNR = "";
             D.S_UAWD.REQTX = "";
@@ -208,10 +208,11 @@ export async function createControl(oParam) {
             return;
         }
 
-        // 로컬($TMP) — CTS 불필요(값/설명 비움, 비활성 유지).
+        // 로컬($TMP) — 존재검사 불필요(확정). CTS 값/설명 비움, 비활성 유지.
         if (_p === "$TMP") {
             D.S_UAWD.REQNR = "";
             D.S_UAWD.REQTX = "";
+            D._packOk = true;
             _render();
             return;
         }
@@ -222,14 +223,18 @@ export async function createControl(oParam) {
         parent.setBusy("");
 
         if (_sRes.RETCD === "E") {
+            const _pmsg = _reloc(_sRes.RTMSG);
             D.S_VALST.PACKG = "Error";
-            D.S_VALTX.PACKG = _reloc(_sRes.RTMSG);
+            D.S_VALTX.PACKG = _pmsg;
+            D._packOk = false;
+            D._packErrTx = _pmsg;
             _render();
             oContr.fn._focus("packField");
             return;
         }
 
-        // 비로컬 정상 → CTS 활성 + 필수.
+        // 비로컬 정상(존재 확정) → CTS 활성 + 필수.
+        D._packOk = true;
         D.S_EDIT.REQNR = true;
         D.S_UAWD.REQNR_REQ = true;
         _render();
@@ -268,10 +273,13 @@ export async function createControl(oParam) {
             D.S_VALTX.COMP_NAME = "";
             D.T_VLIST = [];
             D._vlistSel = -1;
+            D._compErrTx = "";
 
             // 결과 셀 키 = FIELDNAME(대문자) — 원본 callback 의 COMPONENT_NAME/DESCRIPTION 동일.
+            //   F4 검색도움말은 '존재하는' 컴포넌트만 반환 → 선택 = 존재 확정.
             D.S_UAWD.COMP_NAME = row.COMPONENT_NAME || "";
             D.S_UAWD.COMP_DESC = row.DESCRIPTION || "";
+            D._compResolved = true;
 
             // 위자드에서 호출된 경우 컴포넌트 정보 재조회(원본 동일).
             if (oParam.PRCCD === CS_PRCCD.CREATE_WIZARD) {
@@ -279,15 +287,12 @@ export async function createControl(oParam) {
                 const _sRes = await oContr.fn.getWebDynCompData();
 
                 if (_sRes.RETCD === "E") {
-                    if (_sRes.SCRIPT) {
-                        if (!_evalServerScript(_sRes.SCRIPT) && _sRes.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRes.RTMSG)); }
-                        D.S_UAWD.COMP_DESC = "";
-                        _render();
-                        parent.setBusy("");
-                        return;
-                    }
+                    // ★인라인 통일(모달 금지) — SCRIPT 는 eval 금지(모달 띄우는 스크립트라 팝업 발생). RTMSG 인라인만.
+                    const _emsg = _reloc(_sRes.RTMSG) || parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "447");
+                    D._compResolved = false;
+                    D._compErrTx = _emsg;
                     D.S_VALST.COMP_NAME = "Error";
-                    D.S_VALTX.COMP_NAME = _reloc(_sRes.RTMSG);
+                    D.S_VALTX.COMP_NAME = _emsg;
                     D.S_UAWD.COMP_DESC = "";
                     _render();
                     parent.setBusy("");
@@ -330,12 +335,15 @@ export async function createControl(oParam) {
             D.S_UAWD.PACKG = row.DEVCLASS || "";
 
             // ★유효 패키지 선택 시 PACKG·REQNR 오류 필드 리셋(onChangePackage 와 동일 — 이전 오류 잔존 방지).
+            //   F4(DEVCLASS)는 '존재하는' 패키지만 반환 → 선택 = 존재 확정.
             D.S_VALST.PACKG = undefined;
             D.S_VALTX.PACKG = "";
             D.S_VALST.REQNR = undefined;
             D.S_VALTX.REQNR = "";
             D.S_EDIT.REQNR = false;
             D.S_UAWD.REQNR_REQ = false;
+            D._packOk = true;
+            D._packErrTx = "";
 
             // 로컬($TMP) 이면 CTS 값·설명 초기화 후 EXIT(onChangePackage 와 동일).
             if (D.S_UAWD.PACKG === "$TMP") {
@@ -518,12 +526,8 @@ export async function createControl(oParam) {
         });
 
         if (_sRet.RETCD === "E") {
-            if (_sRet.SCRIPT) {
-                if (!_evalServerScript(_sRet.SCRIPT) && _sRet.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG)); }
-                parent.setBusy("");
-                return;
-            }
-            parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG));
+            // 최종 변환 실패(operation) → RTMSG 모달(옆 탭 동일). SCRIPT 는 eval 금지(모달 스크립트라 중복 팝업).
+            if (_sRet.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG)); }
             parent.setBusy("");
             return;
         }
@@ -662,6 +666,13 @@ export async function createControl(oParam) {
                 D.S_VALST.COMP_NAME = "Error";
                 // 447 Web Dynpro Component Name is required.
                 D.S_VALTX.COMP_NAME = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "447");
+            } else if (D._compResolved !== true) {
+                // ★컴포넌트명은 입력됐지만 서버에서 '존재 확정'되지 않음(예: "D" = 없는 컴포넌트).
+                //   원본은 empty 만 봐서 없는 컴포넌트여도 통과→패키지로 넘어가는 게 문제였음 → 존재검증으로 차단.
+                //   메시지는 변경 시점에 서버가 준 오류(_compErrTx, "…존재하지 않습니다")를 재사용, 없으면 447.
+                _sRes.RETCD = "E";
+                D.S_VALST.COMP_NAME = "Error";
+                D.S_VALTX.COMP_NAME = D._compErrTx || parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "447");
             }
 
             // 패키지 미입력.
@@ -673,17 +684,23 @@ export async function createControl(oParam) {
             }
 
             // Y, Z 이외 표준 패키지 금지.
-            if (_sUAWD.PACKG !== "$TMP" && "YZ".indexOf(_sUAWD.PACKG.substring(0, 1)) === -1) {
+            if (_sUAWD.PACKG !== "$TMP" && _sUAWD.PACKG !== "" && "YZ".indexOf(_sUAWD.PACKG.substring(0, 1)) === -1) {
                 _sRes.RETCD = "E";
                 D.S_VALST.PACKG = "Error";
                 // 275 Standard package cannot be entered.
                 D.S_VALTX.PACKG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "275", "", "", "", "");
             }
+            // ★존재하지 않는 패키지 — blur 존재검사(checkPackage) 미통과(_packOk!==true)면 생성 시에도 인라인 차단.
+            //   (없는 패키지 오류가 사라지고 CTS 로 새는 것 방지 — General 탭 lf_chkValue 와 동일 사상)
+            else if (_sUAWD.PACKG !== "" && _sUAWD.PACKG !== "$TMP" && D._packOk !== true) {
+                _sRes.RETCD = "E";
+                D.S_VALST.PACKG = "Error";
+                D.S_VALTX.PACKG = D._packErrTx || parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "451");
+            }
 
-            // 로컬이 아닌데(그리고 패키지가 입력됐는데) CTS 미입력.
-            //   ★데이터세트 lf_chkValue 와 동일하게 PACKG !== "" 가드 — 패키지 미입력 시엔 CTS 를 따로
-            //   에러로 잡지 않는다(패키지 에러로 충분, 비활성 CTS 에 빨간줄 방지).
-            if (_sUAWD.PACKG !== "$TMP" && _sUAWD.PACKG !== "" && _sUAWD.REQNR === "") {
+            // 개발 패키지인데 CTS 미입력 — ★CTS 활성(S_EDIT.REQNR=유효 비로컬 패키지 확정)일 때만.
+            //   비활성 CTS(패키지 미확정/로컬)엔 빨간줄 금지.
+            if (D.S_EDIT.REQNR === true && _sUAWD.REQNR === "") {
                 _sRes.RETCD = "E";
                 D.S_VALST.REQNR = "Error";
                 // 450 CTS 번호는 필수로 입력되어야 합니다.
@@ -720,12 +737,15 @@ export async function createControl(oParam) {
 
         const D = oContr.oData;
 
-        // 로컬 생성 — 패키지 $TMP 강제(점검 전 세팅).
+        // 로컬 생성 — 패키지 $TMP 강제(점검 전 세팅). CTS 번호·내역 모두 초기화(데이터세트 탭 동일 — REQTX 도).
         if (sParmas && sParmas.ISLOCAL === true) {
             D.S_UAWD.PACKG = "$TMP";
             D.S_UAWD.REQNR = "";
+            D.S_UAWD.REQTX = "";
             D.S_EDIT.REQNR = false;
             D.S_UAWD.REQNR_REQ = false;
+            D._packOk = true;      // 로컬 $TMP = 존재 확정
+            D._packErrTx = "";
             _render();
         }
 
@@ -735,19 +755,19 @@ export async function createControl(oParam) {
         parent.setBusy("");
 
         if (_chk.RETCD === "E") {
-            if (_chk.SCRIPT) {
-                if (!_evalServerScript(_chk.SCRIPT) && _chk.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_chk.RTMSG)); }
-                _render();
-                return;
-            }
-            _render();
-            // 첫 오류 필드 포커스.
-            const _key = D.S_VALST.COMP_NAME === "Error" ? "compField"
+            // ★서버 SCRIPT eval 금지(모달 띄우는 스크립트라 팝업 발생). 메시지는 RTMSG 인라인으로.
+            // ★오류 UX 통일: 입력 검증 오류는 전부 인라인 value-state + 포커스(모달 금지).
+            //   클라가 세팅한 필드 오류가 있으면 그 필드로, 없으면(서버 전용 오류) 주 입력=컴포넌트에 인라인.
+            let _key = D.S_VALST.COMP_NAME === "Error" ? "compField"
                 : D.S_VALST.PACKG === "Error" ? "packField"
                     : D.S_VALST.REQNR === "Error" ? "reqnrField" : null;
+            if (!_key && _chk.RTMSG) {
+                D.S_VALST.COMP_NAME = "Error";
+                D.S_VALTX.COMP_NAME = _reloc(_chk.RTMSG);
+                _key = "compField";
+            }
+            _render();
             if (_key) { oContr.fn._focus(_key); }
-            // ★서버 전용 오류(클라 인라인 필드 없음) → RTMSG 를 모달로(원본 동일). 안 그러면 busy만 꺼지고 무피드백.
-            else if (_chk.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_chk.RTMSG)); }
             return;
         }
 
@@ -779,11 +799,8 @@ export async function createControl(oParam) {
         parent.setBusy("");
 
         if (_sRet.RETCD === "E") {
-            if (_sRet.SCRIPT) {
-                if (!_evalServerScript(_sRet.SCRIPT) && _sRet.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG)); }
-                return;
-            }
-            parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG));
+            // 최종 생성 실패(operation) → RTMSG 모달(옆 탭 동일). SCRIPT 는 eval 금지(모달 스크립트라 중복 팝업).
+            if (_sRet.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_sRet.RTMSG)); }
             return;
         }
 

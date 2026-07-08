@@ -856,14 +856,24 @@
             if (!oFocusUI) { oFocusUI = ls_ui.oInpPack; }
         }
 
-        // Y, Z 이외 패키지명.
+        // Y, Z 이외 표준 패키지.
         if (lf_chkPackageStandard(ls_appl) === true) {
             l_err = true;
             if (!oFocusUI) { oFocusUI = ls_ui.oInpPack; }
         }
+        // ★존재하지 않는 패키지 — blur 존재검사(lf_chkPackage)를 통과하지 못한(PACKG_ok!==true) 상태면
+        //   생성 시에도 패키지 필드에 인라인 차단. 안 그러면 lf_chkValue 의 value-state 리셋으로 "없는 패키지"
+        //   오류가 사라지고 체크가 CTS 로 새어간다(장군님 지적 — 위에서부터 하나씩 돌면 안 새야 정상).
+        else if (ls_appl.PACKG !== "" && ls_appl.PACKG !== "$TMP" && ls_appl.PACKG_ok !== true) {
+            ls_appl.PACKG_stat = "Error";
+            ls_appl.PACKG_stxt = ls_appl.PACKG_errtx || _txt("/U4A/MSG_WS", "014", _txt("/U4A/CL_WS_COMMON", "A22"));
+            l_err = true;
+            if (!oFocusUI) { oFocusUI = ls_ui.oInpPack; }
+        }
 
-        // 개발 패키지인데 CTS 미입력.
-        if (ls_appl.PACKG !== "$TMP" && ls_appl.PACKG !== "" && ls_appl.REQNR === "") {
+        // 개발 패키지인데 CTS 미입력 — ★CTS 활성(REQNR_edit=유효 비로컬 패키지 확정)일 때만 검사.
+        //   비활성 CTS(패키지 미확정/로컬)엔 빨간줄 금지 — 원본은 활성 무관하게 걸어 비활성 필드에 오류가 떴다.
+        if (ls_appl.REQNR_edit === true && ls_appl.REQNR === "") {
             ls_appl.REQNR_stat = "Error";
             // 277 If not a local object, Request No. is required entry value.
             ls_appl.REQNR_stxt = _txt("/U4A/MSG_WS", "277");
@@ -907,6 +917,8 @@
             if (ret.ERFLG === "X") {
                 is_create.PACKG_stat = "Error";
                 is_create.PACKG_stxt = _relocalizeBakedMsg(ret.ERMSG);
+                is_create.PACKG_ok = false;                     // ★존재검사 실패 → 생성 시 재차단 근거
+                is_create.PACKG_errtx = is_create.PACKG_stxt;   // 생성 차단 메시지 재사용(value-state 리셋 후에도 보존)
                 oModel.setProperty(ls_stru, is_create);
                 _refocus(oInput);   // 오류 필드 자동 포커스(다음 틱 — 메시지 노출)
                 return;
@@ -916,10 +928,16 @@
             if (ret.ERFLG === "E") {
                 is_create.PACKG_stat = "Error";
                 is_create.PACKG_stxt = _relocalizeBakedMsg(ret.ERMSG);
+                is_create.PACKG_ok = false;
+                is_create.PACKG_errtx = is_create.PACKG_stxt;
                 oModel.setProperty(ls_stru, is_create);
                 _refocus(oInput);   // 오류 필드 자동 포커스(다음 틱 — 메시지 노출)
                 return;
             }
+
+            // 여기 도달 = 서버 존재검사 통과.
+            is_create.PACKG_ok = true;
+            is_create.PACKG_errtx = "";
 
             // 로컬 PACKAGE.
             if (ret.ISLOCAL === "X") {
@@ -949,9 +967,11 @@
 
         l_create.REQNR_edit = false;
         l_create.REQNR_requ = false;
+        l_create.PACKG_ok = false;       // ★변경 시 존재검사 미확정으로 리셋(서버통과/$TMP 에서 true)
+        l_create.PACKG_errtx = "";
 
         if (l_create.PACKG === "") {
-            // 패키지를 비우면 Request No 값/설명도 비운다(비활성 필드에 잔값 방지).
+            // 패키지를 비우면 Request No 값/설명도 비운다(비활성 필드에 잔값 방지). (빈값=미입력 검사가 별도)
             l_create.REQNR = "";
             l_create.REQTX = "";
             oModel.setProperty(ls_stru, l_create);
@@ -960,10 +980,11 @@
 
         l_create.PACKG = l_create.PACKG.toUpperCase();
 
-        // 로컬 패키지.
+        // 로컬 패키지 — 존재검사 불필요(확정).
         if (l_create.PACKG === "$TMP") {
             l_create.REQNR = "";
             l_create.REQTX = "";
+            l_create.PACKG_ok = true;
             oModel.setProperty(ls_stru, l_create);
             return;
         }
@@ -971,6 +992,8 @@
         // standard package(예: SAP 표준) — 오류 필드에 자동 포커스(메시지도 focus-within 이라 함께 노출).
         //   ★ 동기 검증이라 change(blur) 처리 도중이므로 _refocus(다음 틱)로 확실히 안착시켜야 메시지가 뜬다.
         if (lf_chkPackageStandard(l_create) === true) {
+            l_create.PACKG_ok = false;
+            l_create.PACKG_errtx = l_create.PACKG_stxt;
             oModel.setProperty(ls_stru, l_create);
             _refocus(oInput);
             return;
@@ -1080,7 +1103,9 @@
 
         ls_appl.PACKG = "";
         ls_appl.PACKG_edit = true;
-        if (parent.getIsTrial()) { ls_appl.PACKG = "$TMP"; ls_appl.PACKG_edit = false; }
+        ls_appl.PACKG_ok = false;    // ★패키지 서버 존재검사 통과 여부(생성 시 존재검증 근거)
+        ls_appl.PACKG_errtx = "";
+        if (parent.getIsTrial()) { ls_appl.PACKG = "$TMP"; ls_appl.PACKG_edit = false; ls_appl.PACKG_ok = true; }
 
         ls_appl.REQNR = "";
         ls_appl.REQTX = "";
@@ -1110,7 +1135,9 @@
 
         ls_appl.PACKG = "";
         ls_appl.PACKG_edit = true;
-        if (parent.getIsTrial()) { ls_appl.PACKG = "$TMP"; ls_appl.PACKG_edit = false; }
+        ls_appl.PACKG_ok = false;    // ★패키지 서버 존재검사 통과 여부(생성 시 존재검증 근거)
+        ls_appl.PACKG_errtx = "";
+        if (parent.getIsTrial()) { ls_appl.PACKG = "$TMP"; ls_appl.PACKG_edit = false; ls_appl.PACKG_ok = true; }
 
         ls_appl.REQNR = "";
         ls_appl.REQTX = "";

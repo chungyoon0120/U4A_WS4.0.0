@@ -78,8 +78,9 @@ body.u4aPattShown .u4aPattBody {
 
 .u4aPattTreePane--cust {
     flex: 1 1 0;
-    /* Content Type 컬럼 폭 단일출처(헤더/행 셀/세로선 공유) */
-    --u4aPatt-cont-w: 32%;
+    /* WS20 디자인트리 모델: 이름=채움, Content Type=고정(리사이즈 px 갱신), 액션=고정 항상표시 컬럼. */
+    --u4aPatt-cont-w: 7rem;     /* Content Type 컬럼 폭(리사이즈) */
+    --u4aPatt-acts-w: 3.5rem;   /* 액션 컬럼(2슬롯) 고정폭 */
 }
 
 /* 세로 스플릿바 — 공통 그립을 가로형으로 회전(§4.2 형태값 허용). 색/배경은 공통 상속. */
@@ -187,11 +188,16 @@ body.u4aPattShown .u4aPattBody {
 }
 
 .u4aPattGL--name {
-    flex: 1 1 auto;
+    flex: 1 1 auto;   /* 이름 채움(WS20) — Content Type/액션 세로선이 우측 앵커로 행과 정렬 */
 }
 
 .u4aPattGL--cont {
     flex: 0 0 var(--u4aPatt-cont-w);
+    border-left: 0.0625rem solid var(--line);
+}
+
+.u4aPattGL--acts {
+    flex: 0 0 var(--u4aPatt-acts-w);
     border-left: 0.0625rem solid var(--line);
 }
 
@@ -213,8 +219,7 @@ body.u4aPattShown .u4aPattBody {
 }
 
 .u4aPattRow {
-    padding-right: 0;   /* 공통 padding-right 제거 → 본문 content-box 가 헤더와 동일 폭(rule 5) */
-    position: relative;   /* 행 hover 액션(수정/삭제) 절대배치 기준 */
+    padding-right: 0;   /* 공통 padding-right 제거 → 본문 content-box 가 헤더/세로선 레이어와 동일 폭 */
 }
 
 .u4aPattRow .u4a-tree__label {
@@ -259,6 +264,97 @@ body.u4aPattShown .u4aPattBody {
 /* 선택 행은 공통 선택 텍스트색이 Content Type 도 이기게(명시색이라 inherit 안 됨) */
 .u4aPattTree .u4a-tree__row[aria-selected="true"] .u4aPattContText {
     color: var(--selected-text);
+}
+
+/* ===== 커스텀 트리 = WS20 디자인 트리 모델(이름 채움 | Content Type 고정컬럼 | 액션 항상표시 컬럼) ===== */
+
+/* slotTrailing 래퍼 = display:contents → Content Type·액션이 행(flex)의 직계 항목이 되어 컬럼 정렬(WS20 핵심). */
+.u4aPattTrail {
+    display: contents;
+}
+
+/* ★ 헤더·세로선 레이어 컬럼 gap = 공통 행 gap(.u4a-tree__row 0.375rem)과 일치(rule 6).
+   안 맞추면 헤더/GL 세로선과 행 세로선이 6px 어긋나 "두 겹"으로 보인다. */
+.u4aPattTreePane--cust .u4aPattTreeColHead,
+.u4aPattTreePane--cust .u4aPattGridLines {
+    gap: 0.375rem;
+}
+
+/* 액션 컬럼 헤더(라벨 없음, 정렬용) — Content Type 우측 고정폭 컬럼. */
+.u4aPattColActs {
+    flex: 0 0 var(--u4aPatt-acts-w);
+    min-width: 0;
+    box-sizing: border-box;
+    border-left: 0.0625rem solid var(--line);
+}
+
+/* Content Type 컬럼 헤더 = 리사이즈 그립 기준. */
+.u4aPattColCont {
+    position: relative;
+}
+
+/* 액션 = makeColumnTree C3 셀 안 버튼 정렬(항상 표시 — 원본 rowActionCount:2). 셀 폭/구분선은 .u4aColTreeC3 담당. */
+.u4aPattActs {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.125rem;
+    width: 100%;
+}
+
+.u4aPattActBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.375rem;
+    height: 1.375rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    border-radius: 0.1875rem;
+    cursor: pointer;
+    color: var(--text-muted, var(--icon-muted));
+}
+
+.u4aPattActBtn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+.u4aPattActBtn--del:hover {
+    color: var(--negative, var(--text));
+}
+
+/* 빈 슬롯(버튼과 동일 크기 — ROOT 행 정렬 유지). WS20 u4aWs20TreeActSlot 동일. */
+.u4aPattActSlot {
+    display: inline-block;
+    width: 1.375rem;
+    height: 1.375rem;
+}
+
+/* 컬럼 리사이즈 그립(Content Type 우측 경계 = Content Type|액션) — 공통 U4AUI.attachColumnResize 소비. */
+.u4aPattColGrip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 9px;
+    transform: translateX(-50%);
+    cursor: col-resize;
+    z-index: 3;
+}
+
+.u4aPattColGrip--right {
+    left: auto;
+    right: 0;
+    transform: translateX(50%);
+}
+
+/* 경계 강조(Content Type|액션 그립 hover/드래그) — 그 경계선(헤더+세로선+행 액션셀)을 accent 로. */
+.u4aPattTreePane--cust.u4aPattHlCont .u4aPattColActs,
+.u4aPattTreePane--cust.u4aPattHlCont .u4aPattGL--acts,
+.u4aPattTreePane--cust.u4aPattHlCont .u4aPattActs {
+    box-shadow: inset 0.125rem 0 0 var(--accent);
 }
 
 /* ===== 우측 코드 뷰어 ===== */
@@ -328,10 +424,6 @@ body.u4aPattShown .u4aPattBody {
     color: var(--text-muted, var(--icon-muted));
 }
 
-.u4aPattEmpty[hidden] {
-    display: none;
-}
-
 .u4aPattEmpty__icon {
     font-size: 2.75rem;
     opacity: 0.5;
@@ -353,17 +445,38 @@ body.u4aPattShown .u4aPattBody {
 .u4aPattHostWrap {
     position: absolute;
     inset: 0;
-    opacity: 0;
-    transition: opacity 0.25s linear;
     background: var(--boot-bg, var(--app-bg));
 }
 
-.u4aPattHostWrap[hidden] {
+/* ── 뷰어 서브페이지 전환(빈상태 ↔ 코드) = §9 슬라이드+페이드.
+   별창은 ws20.css(.u4aWsNav*) 미로드 → §9.2 고정 사양(0.26s ease both, translateX ±32px + opacity 0↔1,
+   방향 자동판정, 들어오는 z-index:2, 완료 후 정리, reduced-motion)을 화면 스코프로 복제(§9.1 원칙). ── */
+.u4aPattPage {
+    position: absolute;
+    inset: 0;
+}
+
+.u4aPattPageHidden {
     display: none;
 }
 
-.u4aPattHostWrap.u4aPattHostShown {
-    opacity: 1;
+.u4aPattNavInFwd { animation: u4aPattNavInFwd 0.26s ease both; z-index: 2; }
+.u4aPattNavOutFwd { animation: u4aPattNavOutFwd 0.26s ease both; }
+.u4aPattNavInBack { animation: u4aPattNavInBack 0.26s ease both; z-index: 2; }
+.u4aPattNavOutBack { animation: u4aPattNavOutBack 0.26s ease both; }
+
+@keyframes u4aPattNavInFwd { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes u4aPattNavOutFwd { from { transform: none; opacity: 1; } to { transform: translateX(-32px); opacity: 0; } }
+@keyframes u4aPattNavInBack { from { transform: translateX(-32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes u4aPattNavOutBack { from { transform: none; opacity: 1; } to { transform: translateX(32px); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .u4aPattNavInFwd,
+    .u4aPattNavOutFwd,
+    .u4aPattNavInBack,
+    .u4aPattNavOutBack {
+        animation: none;
+    }
 }
 
 #pattHost {
@@ -397,46 +510,7 @@ body.u4aPattShown .u4aPattBody {
     gap: 0.375rem;
 }
 
-/* ===== 커스텀 행 hover 액션(수정/삭제) — 절대배치라 컬럼 정렬 불변 ===== */
-.u4aPattRowActs {
-    position: absolute;
-    right: 0.25rem;
-    top: 50%;
-    transform: translateY(-50%);
-    display: none;
-    align-items: center;
-    gap: 0.125rem;
-    z-index: 2;
-}
-
-.u4aPattRow:hover .u4aPattRowActs,
-.u4aPattRow[aria-selected="true"] .u4aPattRowActs {
-    display: flex;
-}
-
-.u4aPattRowAct {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    border: 0;
-    border-radius: 0.25rem;
-    background: var(--surface-raised, var(--surface));
-    color: var(--text-muted, var(--icon-muted));
-    cursor: pointer;
-    box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.u4aPattRowAct:hover {
-    background: var(--hover-bg);
-    color: var(--text);
-}
-
-.u4aPattRowAct--del:hover {
-    color: var(--negative, var(--text));
-}
+/* (행 수정/삭제 액션 = 항상표시 컬럼 .u4aPattActs — 위 WS20 컬럼 섹션에서 정의) */
 
 /* ===== 생성/수정 다이얼로그(.u4a-dialog 공통 소비 + 편집 Monaco 호스트) ===== */
 .u4aPattDlg {

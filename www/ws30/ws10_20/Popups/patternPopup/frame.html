@@ -82,15 +82,16 @@
                         <i class="fa-solid fa-copy"></i>
                     </button>
                 </div>
+                <!-- 두 서브페이지(빈상태 / 코드 뷰어) 전환 = §9 슬라이드+페이드(0.26s±32px). Monaco 는 1회 로드 후 setValue 만. -->
                 <div class="u4aPattViewBody">
                     <!-- 빈 상태(원본 IllustratedMessage) -->
-                    <div class="u4aPattEmpty" id="pattEmpty">
+                    <div class="u4aPattEmpty u4aPattPage" id="pattEmpty">
                         <i class="fa-regular fa-rectangle-list u4aPattEmpty__icon"></i>
                         <div class="u4aPattEmpty__title" id="pattEmptyTitle"></div>
                         <div class="u4aPattEmpty__desc" id="pattEmptyDesc"></div>
                     </div>
-                    <!-- 코드 뷰어 = 공통 Monaco 호스트(editorPopup/host 재사용) iframe -->
-                    <div class="u4aPattHostWrap" id="pattHostWrap" hidden>
+                    <!-- 코드 뷰어 = 공통 Monaco 호스트(editorPopup/host 재사용) iframe. 초기 숨김. -->
+                    <div class="u4aPattHostWrap u4aPattPage u4aPattPageHidden" id="pattHostWrap">
                         <iframe id="pattHost" name="pattHost" frameborder="0"></iframe>
                     </div>
                 </div>

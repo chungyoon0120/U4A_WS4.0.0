@@ -2842,10 +2842,8 @@
         const oResult = WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
         if (oResult.ISOPEN === true && oResult.WINDOW.isDestroyed() === false) {
 
-            // ★ errMsgPopup 창은 closable:false(항상 유지)라 raw close() 가 무시된다 → 공통 헬퍼로 닫는다.
             try {
-                if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oResult.WINDOW); }
-                else { oResult.WINDOW.setClosable(true); oResult.WINDOW.close(); }
+                oResult.WINDOW.close();
             } catch (error) {
 
             }
@@ -3467,28 +3465,13 @@
             IS_EDIT: IS_EDIT
         };
 
-        // ★ start(창 생성/셋업) 실패 시 메인 busy lock 이 영구 잠기지 않도록 방어(guard-server-script-eval).
-        //   정상 오픈되면 busy 해제는 자식 프레임(frame.js fnFinishOpen)이 IPC 로 수행 → 여기선 실패만 처리.
-        try {
+        oCSS.start(parent.require, IF_DATA, function (oRes) {
 
-            await oCSS.start(parent.require, IF_DATA, function (oRes) {
+            // CSS를 미리보기에 적용
+            oAPP.fn.prevStyleClassApply(oRes.DATA, oRes.PRCCD);
 
-                // CSS를 미리보기에 적용
-                oAPP.fn.prevStyleClassApply(oRes.DATA, oRes.PRCCD);
 
-            });
-
-        } catch (e) {
-
-            console.error("[WS20] UI5 Predefined CSS 팝업 오픈 실패:", e && e.message);
-
-            // busy 끄고 Lock 풀기
-            oAPP.common.fnSetBusyLock("");
-
-            // 전체 자식 윈도우에 Busy 끈다.
-            oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
-
-        }
+        });
 
     }; // end of oAPP.fn.fnUI5PreCssPopupOpener
 

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta charset="utf-8">
+</head>
+<style>
+    html,
+    body {
+        height: 100%;
+        margin: 8px;
+    }
+  
+</style>
+
+<body>
+
+<div class="note" style="border-left: 0.6rem solid rgb(40, 110, 180); background-color: rgb(235, 235, 235);
+    padding: 0.6em 0.75em; margin: 1.5em 0px; color: rgb(50, 54, 58); font-family: '72', '72full', Arial, Helvetica,
+    sans-serif; font-size: 14px;">
+      <div class="collapsible-icon sap-icon">
+        <div class="title" style="display: block; background-repeat: no-repeat; background-position: 0% 0%; font-weight: 300;"><strong style="font-weight: 600;">Note</strong></div>
+      </div>
+      <div class="fig">
+        <p style="line-height: 1.6em; padding: 0px; margin: 0.4em 0px; font-size: 1em;">You can enable the responsive paddings
+          based on the width of the control only
+          for the SAP Horizon and Quartz themes.</p>
+      </div>
+    </div>
+    <section id="section_d2f_1pv_jjb" style="color: rgb(50, 54, 58); font-family: '72', '72full', Arial, Helvetica, sans-serif; font-size:
+    14px; background-color: rgb(247, 247, 247);">
+      <h2 class="title" style="break-after: avoid; break-inside: avoid; font-weight: 600; font-size: 1.25rem; line-height: 1.25rem; margin:
+    2.125rem 0px 1.25rem; overflow-wrap: break-word;">Usage</h2>
+      <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;">Application developers can now apply responsive
+        paddings over separate parts of the controls
+        and align the space distribution properly,
+        according to the width of the control
+        (and not the whole screen). This can
+        be done by using a set of classes, which
+        are available for the different controls.</p>
+      <section>
+        <h3 class="title">Applied Paddings</h3>
+        <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;">Based on the container&rsquo;s size,
+          one of the following classes is added,
+          and the corresponding padding-left
+          and padding-right are applied:</p>
+        <div class="tableWrapper" style="overflow-x: auto;">
+          <div class="fig">
+            <table id="table_pmt_hpv_jjb" style="border-width: 0px; border-color: rgb(191, 191, 191); border-collapse: collapse; width:auto; text-align: left; table-layout: fixed;" border="1">
+              <colgroup>
+                <col width="33.33333333333333%">
+                  <col width="33.33333333333333%">
+                    <col width="33.33333333333333%">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th style="background-color: rgb(227, 227, 227); font-weight: bold; border-collapse: collapse; padding: 0.6em;"
+                  colspan="1" rowspan="1">Container Size (pixels)</th>
+                  <th style="background-color: rgb(227, 227, 227); font-weight: bold; border-collapse: collapse; padding: 0.6em;"
+                  colspan="1" rowspan="1">Class</th>
+                  <th style="background-color: rgb(227, 227, 227); font-weight: bold; border-collapse: collapse; padding: 0.6em;"
+                  colspan="1" rowspan="1">Padding-Left and Padding-Right
+                    Applied</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+
+
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">&lt;= 600</td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">sapUi-Std-PaddingS</td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">1rem</td>
+                </tr>
+                <tr>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">&gt;600</td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">sapUi-Std-PaddingM</td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">2rem</td>
+                </tr>
+                <tr>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">&gt;1024</td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">sapUi-Std-PaddingL</td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">2rem</td>
+                </tr>
+                <tr>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">&gt;1440</td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">sapUi-Std-PaddingXL</td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1">3rem</td>
+                </tr>
+            </tbody>
+            </table>
+        </div>
+        </div>
+        <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;">&nbsp;</p>
+    </section>
+    <section>
+        <h3 class="title">Supported Controls</h3>
+        <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;">The following table shows the controls
+        that support responsive paddings. To
+        enable this concept and to add responsive
+        paddings to an element of the controls,
+        add the corresponding classes to the
+        controls, depending on your use case:</p>
+        <div class="tableWrapper" style="overflow-x: auto;">
+        <div class="fig">
+            <table id="table_uzb_zmy_vs" style="border-width: 0px; border-color: rgb(191, 191, 191); border-collapse: collapse; width:
+    auto; text-align: left; table-layout: fixed;"
+            border="1">
+            <colgroup>
+                <col width="16.666666666666664%">
+                <col width="16.666666666666664%">
+                    <col width="16.666666666666664%">
+                    <col width="16.666666666666664%">
+                        <col width="16.666666666666664%">
+                        <col width="16.666666666666664%">
+            </colgroup>
+            <thead>
+                <tr>
+                <th style="background-color: rgb(227, 227, 227); font-weight: bold; border-collapse: collapse; padding: 0.6em;"
+                colspan="1" rowspan="1">
+                    <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;">Supported Controls</p>
+                </th>
+                <th style="background-color: rgb(227, 227, 227); font-weight: bold; border-collapse: collapse; padding: 0.6em;"
+                colspan="1" rowspan="1">
+                    <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;"><code style="font-family: Menlo,
+    Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sapUiResponsivePadding--header</code></p>
+                </th>
+                <th style="background-color: rgb(227, 227, 227); font-weight: bold; border-collapse: collapse; padding: 0.6em;"
+                colspan="1" rowspan="1">
+                    <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;"><code style="font-family: Menlo,
+    Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sapUiResponsivePadding--subHeader</code></p>
+                </th>
+                <th style="background-color: rgb(227, 227, 227); font-weight: bold; border-collapse: collapse; padding: 0.6em;"
+                colspan="1" rowspan="1">
+                    <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;"><code style="font-family: Menlo,
+    Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sapUiResponsivePadding--content</code></p>
+                </th>
+                <th style="background-color: rgb(227, 227, 227); font-weight: bold; border-collapse: collapse; padding: 0.6em;"
+                colspan="1" rowspan="1">
+                    <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;"><code style="font-family: Menlo,
+    Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sapUiResponsivePadding--footer</code></p>
+                </th>
+                <th style="background-color: rgb(227, 227, 227); font-weight: bold; border-collapse: collapse; padding: 0.6em;"
+                colspan="1" rowspan="1">
+                    <p style="line-height: 1.6em; padding: 0px; margin: 1.5em 0px; font-size: 1em;">
+    <code style="font-family: Menlo, Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">
+    sapUiResponsivePadding--floatingFooter</code></p>
+                </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><code style="font-family: Menlo,
+      Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.Dialog</code></p>
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;">(<code style="font-family: Menlo,
+      Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.MessageBox</code>,</p>
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><code style="font-family: Menlo,
+      Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.SelectDialog</code>,</p>
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><code style="font-family: Menlo,
+      Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.TableSelectDialog</code>)</p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                        src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_RED.gif"
+                        usemap="#"></p>
+                    </td>
+
+                  </tr>
+                  <tr>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><code style="font-family: Menlo,
+      Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.IconTabBar</code></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_RED.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_RED.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_RED.gif"
+                        usemap="#"></p>
+                    </td>
+                  </tr>   
+                  
+                  
+                  <tr>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><code style="font-family: Menlo,
+      Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.ObjectHeader</code></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_RED.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_RED.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_RED.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_RED.gif"
+                        usemap="#"></p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><code style="font-family: Menlo,
+      Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.Page</code></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+                    <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                    colspan="1" rowspan="1" valign="middle">
+                      <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                         src="./img/ICON_LED_GREEN.gif"
+                        usemap="#"></p>
+                    </td>
+
+               <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+               colspan="1" rowspan="1" valign="middle">
+                 <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                    src="./img/ICON_LED_GREEN.gif"
+                   usemap="#"></p>
+               </td>
+               <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+               colspan="1" rowspan="1" valign="middle">
+                 <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                    src="./img/ICON_LED_GREEN.gif"
+                   usemap="#"></p>
+               </td>
+             </tr>
+             <tr>
+               <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+               colspan="1" rowspan="1" valign="middle">
+                 <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><code style="font-family: Menlo,
+ Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.Popover</code></p>
+               </td>
+               <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+               colspan="1" rowspan="1" valign="middle">
+                 <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                    src="./img/ICON_LED_GREEN.gif"
+                   usemap="#"></p>
+               </td>
+               <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+               colspan="1" rowspan="1" valign="middle">
+                 <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                    src="./img/ICON_LED_GREEN.gif"
+                   usemap="#"></p>
+               </td>
+               <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+               colspan="1" rowspan="1" valign="middle">
+                 <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                    src="./img/ICON_LED_GREEN.gif"
+                   usemap="#"></p>
+               </td>
+               <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+               colspan="1" rowspan="1" valign="middle">
+                 <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                    src="./img/ICON_LED_GREEN.gif"
+                   usemap="#"></p>
+               </td>
+               <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+               colspan="1" rowspan="1" valign="middle">
+                 <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                    src="./img/ICON_LED_RED.gif"
+                   usemap="#"></p>
+               </td>
+             </tr>
+
+
+             <tr>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><code style="font-family: Menlo,
+  Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.TabContainer</code></p>
+                </td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                     src="./img/ICON_LED_GREEN.gif"
+                    usemap="#"></p>
+                </td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                     src="./img/ICON_LED_RED.gif"
+                    usemap="#"></p>
+                </td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                     src="./img/ICON_LED_RED.gif"
+                    usemap="#"></p>
+                </td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                     src="./img/ICON_LED_RED.gif"
+                    usemap="#"></p>
+                </td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                     src="./img/ICON_LED_RED.gif"
+                    usemap="#"></p>
+                </td>
+              </tr>
+              <tr>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><code style="font-family: Menlo,
+  Monaco, Consolas, 'Courier New', monospace; font-size: 0.875rem;">sap.m.Wizard</code></p>
+                </td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                     src="./img/ICON_LED_RED.gif"
+                    usemap="#"></p>
+                </td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                     src="./img/ICON_LED_RED.gif"
+                    usemap="#"></p>
+                </td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                  <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                     src="./img/ICON_LED_GREEN.gif"
+                    usemap="#"></p>
+                </td>
+                <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+                colspan="1" rowspan="1" valign="middle">
+                
+                
+                <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                    src="./img/ICON_LED_RED.gif"
+                   usemap="#"></p>
+               </td>
+               <td style="border-collapse: collapse; padding: 0.5rem; vertical-align: top; text-align: left; line-height: 1.75rem;"
+               colspan="1" rowspan="1" valign="middle">
+                 <p style="line-height: 1.6em; padding: 0px; margin: 0px; font-size: 1em;"><img style="max-width: 100%;"
+                    src="./img/ICON_LED_RED.gif"
+                   usemap="#"></p>
+               </td>
+             </tr>
+           </tbody>
+         </table>
+       </div>
+     </div>
+   </section>
+ </section>
+
+ <script src="index.js"></script>
+
+</body>
+
+</html>
