@@ -3,7 +3,7 @@
  * --------------------------------------------------------------------------
  *  원본: index.js callBindPopup 의 oModelFieldTree(sap.ui.table.TreeTable, 3열
  *        Object Name/Type/Description) + getBindFieldInfo(서버 /getBindAttrData 로드).
- *  HTML5: 공통 레퍼런스 컴포넌트 oAPP.fn.makeColumnTree(다열 리사이즈 트리) 소비 +
+ *  HTML5: 공통 컴포넌트 U4AUI.makeColumnTree(다열 리사이즈 트리, theme/u4a-ui.js) 소비 +
  *         공유 헬퍼 oAPP.H(el/fa/iconBtn/statIcon/rowHl/cl/z) 소비 — 화면 로컬 헬퍼 복붙 없음.
  *
  *  ★ 데이터 = /getBindAttrData(CLSNM=oAppInfo.CLSID, APPID=oAppInfo.APPID) → T_ATTR(평면 모델필드).
@@ -41,8 +41,8 @@
             oAPP.fn.loadBindData();
         }));
 
-        // ── 레퍼런스 다열 트리(makeColumnTree) — 고정폭 컬럼 + 가로 스크롤(16 §3.4.2) ──
-        oM.ctrl = oAPP.fn.makeColumnTree(oM.host, {
+        // ── 공통 다열 트리(U4AUI.makeColumnTree) — 고정폭 컬럼 + 가로 스크롤(16 §3.4.2) ──
+        oM.ctrl = U4AUI.makeColumnTree(oM.host, {
             columns: [
                 { label: H.z("174"), width: "16rem" },  // 174 Object Name
                 { label: H.z("175"), width: "8rem" },   // 175 Type

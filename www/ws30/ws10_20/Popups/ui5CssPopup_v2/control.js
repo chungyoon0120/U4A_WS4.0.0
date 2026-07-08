@@ -33,11 +33,10 @@ export async function start(require, IF_DATA, fnCallback){
     let BROWSKEY = IF_DATA.BROWSKEY;
     let oUserLoginInfo = await WSUTIL.getSysInfoIPC({ PRCCD: "USER_LOGIN_INFO", BROWSKEY: BROWSKEY });
     
-    // 테마 관련 정보
-    let sTheme = sap.ui.getCore().getConfiguration().getTheme();
-    let oThemeColors = sap.ui.core.theming.Parameters.get();
-    let sThemeBgColor = oThemeColors.sapBackgroundColor;    
-    let oThemeInfo = { THEME: sTheme, BGCOL: sThemeBgColor };
+    // 테마 관련 정보 — HTML5 WS4 메인 셸의 테마 정보(parent.getThemeInfo → {THEME, BGCOL}).
+    //   ★ 원본은 sap.ui.core.theming.Parameters 사용 → HTML5 메인 셸엔 UI5 미로드라 크래시.
+    //     다른 별창 opener(bindPopup/mimeRepo 등)와 동일하게 셸 테마 JSON 소스로 교체.
+    let oThemeInfo = (typeof parent.getThemeInfo === "function" ? parent.getThemeInfo() : null) || { THEME: "", BGCOL: "" };
 
     IF_DATA.SESSKEY          = SESSKEY;
     IF_DATA.BROWSKEY         = BROWSKEY;
@@ -64,12 +63,16 @@ export async function start(require, IF_DATA, fnCallback){
         oBrowserOptions = jQuery.extend(true, {}, oDefaultOption.browserWindow);
 
         oBrowserOptions.title = fnGetMsgClsText("/U4A/CL_WS_COMMON", "B58"); // UI5 Predefined CSS
-        oBrowserOptions.autoHideMenuBar = true;        
+        oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.width = 1200;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
+        oBrowserOptions.titleBarStyle = "hidden";
+
+        // [HTML5] 네이티브 opacity 페이드 미사용(흰 번쩍/OS 리컴포짓) — backgroundColor 로 즉시 불투명,
+        //   위치 확정 후 frame.js 가 CURRWIN.show(). (frameless-opener-no-native-opacity)
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
@@ -95,6 +98,10 @@ export async function start(require, IF_DATA, fnCallback){
         sessionKey: oBrowserOptions?.webPreferences?.partition,
         OBJTY: sPopupName,
         USERINFO: parent.process.USERINFO,
+        // [HTML5] frameless 창 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+        THEME: oThemeInfo.THEME,
+        BGCOL: oThemeInfo.BGCOL,
+        TITLE: oBrowserOptions.title,
     };
 
     const sUrlPath = parent.getPath(sPopupName);

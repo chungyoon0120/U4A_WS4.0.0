@@ -183,44 +183,72 @@ export async function createControl(oParam) {
     /********************************************************************
      *📝 패키지 변경 이벤트.
     ********************************************************************/
+    //   ★데이터세트/일반 탭 lf_packageChangeEvent 와 동일한 package↔CTS 연계 동작(그대로 이식).
     oContr.fn.onChangePackage = async function (sValue) {
-
-        parent.setBusy("X");
 
         const D = oContr.oData;
 
+        // 오류 필드 초기화(PACKG+REQNR — 레퍼런스 lf_packageChangeEvent 의 lf_resetValueStateField 사상.
+        //   ★REQNR 도 리셋 안 하면 CTS 재활성 시 낡은 Error 가 유령처럼 재노출됨) + CTS 기본 비활성.
         D.S_VALST.PACKG = undefined;
         D.S_VALTX.PACKG = "";
+        D.S_VALST.REQNR = undefined;
+        D.S_VALTX.REQNR = "";
+        D.S_EDIT.REQNR = false;
+        D.S_UAWD.REQNR_REQ = false;
 
         const _p = (sValue == null ? "" : String(sValue)).toUpperCase();
         D.S_UAWD.PACKG = _p;
 
-        // 패키지 미입력이면 EXIT.
-        if (_p === "") { _render(); parent.setBusy(""); return; }
+        // 패키지를 비우면 CTS 값/설명도 비운다(비활성 필드 잔값 방지).
+        if (_p === "") {
+            D.S_UAWD.REQNR = "";
+            D.S_UAWD.REQTX = "";
+            _render();
+            return;
+        }
 
+        // 로컬($TMP) — CTS 불필요(값/설명 비움, 비활성 유지).
+        if (_p === "$TMP") {
+            D.S_UAWD.REQNR = "";
+            D.S_UAWD.REQTX = "";
+            _render();
+            return;
+        }
+
+        // 정합성 점검(표준패키지 275=클라, Y/Z=서버 /chkPackage).
+        parent.setBusy("X");
         const _sRes = await oContr.fn.checkPackage();
+        parent.setBusy("");
 
         if (_sRes.RETCD === "E") {
             D.S_VALST.PACKG = "Error";
             D.S_VALTX.PACKG = _reloc(_sRes.RTMSG);
             _render();
-            parent.setBusy("");
             oContr.fn._focus("packField");
             return;
         }
 
-        // default REQNR 비활성.
+        // 비로컬 정상 → CTS 활성 + 필수.
+        D.S_EDIT.REQNR = true;
+        D.S_UAWD.REQNR_REQ = true;
+        _render();
+    };
+
+
+    /********************************************************************
+     *📝 패키지 입력 중(live) — CTS 즉시 비활성 + 초기화 (데이터세트 lf_packageLiveReset 동일).
+    ********************************************************************/
+    oContr.fn.onPackageLiveReset = function (sValue) {
+        const D = oContr.oData;
+        D.S_UAWD.PACKG = (sValue == null ? "" : String(sValue));
+        // 이미 CTS 비활성+빈값이면 skip(키 입력마다 불필요한 render 방지).
+        if (D.S_EDIT.REQNR === false && !D.S_UAWD.REQNR && !D.S_UAWD.REQTX) { return; }
         D.S_EDIT.REQNR = false;
         D.S_UAWD.REQNR_REQ = false;
-
-        // 로컬($TMP) 이 아니면 REQNR 활성 + 필수.
-        if (D.S_UAWD.PACKG !== "$TMP") {
-            D.S_EDIT.REQNR = true;
-            D.S_UAWD.REQNR_REQ = true;
-        }
-
+        D.S_UAWD.REQNR = "";
+        D.S_UAWD.REQTX = "";
         _render();
-        parent.setBusy("");
     };
 
 
@@ -301,12 +329,18 @@ export async function createControl(oParam) {
 
             D.S_UAWD.PACKG = row.DEVCLASS || "";
 
+            // ★유효 패키지 선택 시 PACKG·REQNR 오류 필드 리셋(onChangePackage 와 동일 — 이전 오류 잔존 방지).
+            D.S_VALST.PACKG = undefined;
+            D.S_VALTX.PACKG = "";
+            D.S_VALST.REQNR = undefined;
+            D.S_VALTX.REQNR = "";
             D.S_EDIT.REQNR = false;
             D.S_UAWD.REQNR_REQ = false;
 
-            // 로컬($TMP) 이면 CTS 초기화 후 EXIT.
+            // 로컬($TMP) 이면 CTS 값·설명 초기화 후 EXIT(onChangePackage 와 동일).
             if (D.S_UAWD.PACKG === "$TMP") {
                 D.S_UAWD.REQNR = "";
+                D.S_UAWD.REQTX = "";
                 _render();
                 return;
             }
@@ -646,8 +680,10 @@ export async function createControl(oParam) {
                 D.S_VALTX.PACKG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "275", "", "", "", "");
             }
 
-            // 로컬이 아닌데 CTS 미입력.
-            if (_sUAWD.PACKG !== "$TMP" && _sUAWD.REQNR === "") {
+            // 로컬이 아닌데(그리고 패키지가 입력됐는데) CTS 미입력.
+            //   ★데이터세트 lf_chkValue 와 동일하게 PACKG !== "" 가드 — 패키지 미입력 시엔 CTS 를 따로
+            //   에러로 잡지 않는다(패키지 에러로 충분, 비활성 CTS 에 빨간줄 방지).
+            if (_sUAWD.PACKG !== "$TMP" && _sUAWD.PACKG !== "" && _sUAWD.REQNR === "") {
                 _sRes.RETCD = "E";
                 D.S_VALST.REQNR = "Error";
                 // 450 CTS 번호는 필수로 입력되어야 합니다.
@@ -710,6 +746,8 @@ export async function createControl(oParam) {
                 : D.S_VALST.PACKG === "Error" ? "packField"
                     : D.S_VALST.REQNR === "Error" ? "reqnrField" : null;
             if (_key) { oContr.fn._focus(_key); }
+            // ★서버 전용 오류(클라 인라인 필드 없음) → RTMSG 를 모달로(원본 동일). 안 그러면 busy만 꺼지고 무피드백.
+            else if (_chk.RTMSG) { parent.showMessage(null, 20, "E", _reloc(_chk.RTMSG)); }
             return;
         }
 

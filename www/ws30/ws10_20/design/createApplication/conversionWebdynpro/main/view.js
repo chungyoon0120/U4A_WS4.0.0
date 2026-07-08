@@ -71,6 +71,7 @@ export async function createView(oParam) {
     const fPack = U.createField({
         type: "text", clear: true, upper: true,
         f4: function () { oContr.fn.onValueHelpPackage(); },
+        onInput: function (v) { oContr.fn.onPackageLiveReset(v); }, // 입력 중 CTS 즉시 비활성(데이터세트 동일)
         onChange: function (v) { oContr.fn.onChangePackage(v); },
         onClear: function () { oContr.fn.onChangePackage(""); }
     });
@@ -149,10 +150,12 @@ export async function createView(oParam) {
         fReq.setValue(D.S_UAWD.REQNR);
         fReqTx.setValue(D.S_UAWD.REQTX);
 
-        // value-state(인라인).
+        // value-state(인라인). ★REQNR 은 비활성(disabled)이면 표시 안 함 — 원본 UI5 editable:false 필드는
+        //   valueState 를 렌더하지 않는다(패키지 미입력 시 REQNR 도 모델상 Error 지만 비활성이라 화면엔 X).
+        const _reqEnabled = (D.S_EDIT.REQNR === true);
         fComp.setValueState(D.S_VALST.COMP_NAME === "Error" ? "error" : "none", D.S_VALTX.COMP_NAME || "");
         fPack.setValueState(D.S_VALST.PACKG === "Error" ? "error" : "none", D.S_VALTX.PACKG || "");
-        fReq.setValueState(D.S_VALST.REQNR === "Error" ? "error" : "none", D.S_VALTX.REQNR || "");
+        fReq.setValueState((_reqEnabled && D.S_VALST.REQNR === "Error") ? "error" : "none", _reqEnabled ? (D.S_VALTX.REQNR || "") : "");
 
         // REQNR 필수(*) 동적.
         r4.label.classList.toggle("u4a-label--required", D.S_UAWD.REQNR_REQ === true);
@@ -165,12 +168,10 @@ export async function createView(oParam) {
         oTableWrap.hidden = !D.S_VIS.VLIST;
         oWzdBar.hidden = !D.S_VIS.CREATE_WIZARD;
 
-        // REQNR 활성 여부(로컬이면 비활성 — 입력·F4 차단).
-        const _reqEnabled = (D.S_EDIT.REQNR === true);
+        // REQNR 활성 여부(로컬이면 비활성 — 입력·F4 차단). (_reqEnabled 는 위 value-state 에서 선언됨)
         fReq.input.disabled = !_reqEnabled;
         const _vhBtn = fReq.el.querySelector(".u4a-field__vh");
         if (_vhBtn) { _vhBtn.disabled = !_reqEnabled; }
-        fReq.el.setAttribute("data-vho-active", _reqEnabled ? "true" : "false");
 
         _renderRows();
     };
@@ -192,7 +193,7 @@ export async function createView(oParam) {
         for (let i = 0; i < rows.length; i++) {
             const rec = rows[i];
             const tr = _el("tr");
-            if (i % 2 === 1) { tr.setAttribute("data-odd", ""); }
+            if (i % 2 === 1) { tr.setAttribute("data-odd", "true"); } // ★공통 shell.css 는 [data-odd="true"] 매치
             if (D._vlistSel === i) { tr.setAttribute("aria-selected", "true"); }
             tr.append(_el("td", null, rec.VIEW_NAME || ""), _el("td", null, rec.VIEW_DESC || ""));
             (function (idx) {
@@ -226,7 +227,13 @@ function _ensureStyle() {
         ".u4aUawdForm{display:flex;flex-direction:column;gap:1rem;flex:0 0 auto;}",
         ".u4aUawdRow{display:grid;grid-template-columns:10.5rem minmax(0,1fr);align-items:center;column-gap:.75rem;}",
         ".u4aUawdRow[hidden]{display:none;}",
+        /* ★value-state 메시지 표시 트리거 — 공통 .u4a-field__msg 는 display:none 이라
+           .u4a-form__row:focus-within 로만 노출(shell.css). 이 폼은 .u4aUawdRow 라 공통 셀렉터가
+           안 먹으므로 동일 규칙을 스코프로 깐다(빨간 테두리는 뜨는데 메시지 안 나오던 원인). */
+        ".u4aUawdRow:focus-within .u4a-field__msg:not(:empty){display:inline-flex;}",
         ".u4aUawdRow > .u4a-label{text-align:right;}",
+        /* 좁을 때(옆 General/DataSet 탭 @media 560 과 동일) 라벨을 위로 접어 1열 스택. */
+        "@media (max-width:560px){.u4aUawdRow{grid-template-columns:1fr;}.u4aUawdRow > .u4a-label{text-align:left;}}",
         ".u4aUawdCtl{min-width:0;}",
         ".u4aUawdCtl .u4a-field{width:100%;max-width:28rem;}",
         /* 읽기전용 표시필드 = 평평/옅은/muted(입력 아님을 구분). */

@@ -760,19 +760,16 @@
             return;
         }
 
-        // ── [임시] UI5 미리 정의된 CSS 팝업 HTML5 미변환 — 완료 전까지 안내 토스트만.
-        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 호출 복원.
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
-        return;
+        // u4a workspace 3.4.2 - sp2 이상일 경우는 신규 CSS 팝업(V2)을 띄운다.
+        //   V2(UI5CSSPOP_V2) = HTML5 창 크롬 외부화(frameless .u4a-titlebar) 완료본.
+        //   구버전 서버는 V1(UI5CSSPOP) 그대로 사용(미변환).
+        if (oAPP.common.checkWLOList("C", "UHAK900788")) {
 
-        // // u4a workspace 3.4.2 - sp2 이상일 경우는 신규 CSS 팝업을 띄운다
-        // if(oAPP.common.checkWLOList("C", "UHAK900788")){
+            oAPP.fn.fnUI5PreCssPopupOpener();
+            return;
+        }
 
-        //     oAPP.fn.fnUI5PreCssPopupOpener();
-        //     return;
-        // }
-
-        // oAPP.fn.fnUI5PredefinedCssPopupOpener();
+        oAPP.fn.fnUI5PredefinedCssPopupOpener();
 
     }; // end of oAPP.fn.fnWS20WMENU10_03
 

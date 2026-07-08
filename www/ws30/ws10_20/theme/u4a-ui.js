@@ -1996,14 +1996,35 @@
                 g = document.createElement("div");
                 g.id = "u4aColResizeGuide";
                 g.style.cssText = "position:fixed;width:2px;background:var(--accent);z-index:9999;pointer-events:none;display:none;";
-                document.body.appendChild(g);
             }
+            // ★ 모달 <dialog>(showModal) 안이면 그 top-layer 안에 붙여야 보인다(body 에 붙이면 모달 뒤로 가려짐 — 16 §2.10).
+            var oLayer = (oGrip.closest && oGrip.closest("dialog[open]")) || document.body;
+            if (g.parentNode !== oLayer) { oLayer.appendChild(g); }
             return g;
         }
+        // 가이드 세로 범위 = "보이는 테이블 영역"만. host 로 아무거나(테이블 전체/스크롤 컨테이너) 넘겨도
+        //   그립의 실제 세로 스크롤 뷰포트 ∩ host ∩ 화면으로 클램프한다 → 화면 밖까지 뻗는 잔상 방지(호출부 실수 흡수).
+        function _viewRect() {
+            var n = oGrip.parentNode;
+            while (n && n.nodeType === 1) {
+                var st;
+                try { st = getComputedStyle(n); } catch (e) { st = null; }
+                if (st && /(auto|scroll|overlay)/.test(st.overflowY) && n.scrollHeight > n.clientHeight + 1) {
+                    return n.getBoundingClientRect();
+                }
+                n = n.parentNode;
+            }
+            return { top: 0, bottom: (window.innerHeight || document.documentElement.clientHeight) };
+        }
         function _showGuide(iX) {
-            var r = (cfg.host || oGrip).getBoundingClientRect();
+            var rh = (cfg.host || oGrip).getBoundingClientRect();
+            var rv = _viewRect();
+            var vh = window.innerHeight || document.documentElement.clientHeight;
+            var iTop = Math.max(rh.top, rv.top, 0);
+            var iBot = Math.min(rh.bottom, rv.bottom, vh);
+            if (iBot < iTop) { iBot = iTop; }
             var g = _guideEl();
-            g.style.top = r.top + "px"; g.style.height = r.height + "px"; g.style.left = iX + "px"; g.style.display = "block";
+            g.style.top = iTop + "px"; g.style.height = (iBot - iTop) + "px"; g.style.left = iX + "px"; g.style.display = "block";
         }
         function _moveGuide(iX) { var g = document.getElementById("u4aColResizeGuide"); if (g) { g.style.left = iX + "px"; } }
         function _hideGuide() { var g = document.getElementById("u4aColResizeGuide"); if (g) { g.style.display = "none"; } }
@@ -2052,11 +2073,191 @@
         }
     }
 
+    /**
+     * 공통 — 다열 그리드 트리테이블(고정폭 컬럼 3열 + 가로 스크롤 + 컬럼 리사이즈 가이드). 16 §3.4.1/§3.4.2 SSOT.
+     *   ★ 컬럼 리사이즈 바가 있는 3열 트리테이블은 화면마다 새로 짜지 말고 전부 이걸 소비한다
+     *     (소비처: 대형 바인딩 별창 modelField/design, 소형 callBindPopup — 2026-07-08 통일).
+     *   구조: [sticky 컬럼헤더] + [본문(가로 행라인) > [세로 그리드라인 레이어] + [공통 createTree]].
+     *   헤더/본문/트리를 동일 총폭(--u4act-total-w=컬럼폭 합)으로 묶어 가로 스크롤 어긋남 방지.
+     *   CSS 단일출처 = shell.css `.u4aColTree*`. 색은 의미 토큰만.
+     * @param {HTMLElement} oHost 스크롤 컨테이너(비워지고 .u4aColTree 로 채워짐).
+     * @param {Object} oCfg columns:[{label,width?}×3], roots(), children(n), hasChildren(n)?, key(n),
+     *   label(n), tip(n)?, selectable, icon(n)?, slotLead(n)?, cell(n)→{c2,c3}, rowHook(row,n)?, onSelect(n,row)?, emptyText?
+     * @returns {Object} { host, tree, rerender(bSelectFirst), expandSelected(), collapseSelected(), getSelected(), selectKey(key,bScroll) }
+     */
+    function makeColumnTree(oHost, oCfg) {
+        if (!oHost) { return null; }
+        oCfg = oCfg || {};
+        var aCols = oCfg.columns || [{ label: "" }, { label: "" }, { label: "" }];
+        var C1_DEF = (aCols[0] && aCols[0].width) || "15rem";   // 고정폭 기본(rem — 줌 대응). % 금지(16 §3.4.2).
+        var C2_DEF = (aCols[1] && aCols[1].width) || "8rem";
+        var C3_DEF = (aCols[2] && aCols[2].width) || "14rem";
+
+        function _fill(oCell, vContent) {
+            if (vContent == null) { return; }
+            if (typeof vContent === "string") { oCell.textContent = vContent; }
+            else { oCell.appendChild(vContent); }
+        }
+
+        oHost.classList.add("u4aColTree");
+        oHost.innerHTML = "";
+        oHost.style.setProperty("--u4act-c1-w", C1_DEF);
+        oHost.style.setProperty("--u4act-c2-w", C2_DEF);
+        oHost.style.setProperty("--u4act-c3-w", C3_DEF);
+
+        var oHead = _el("div", "u4aColTreeHead");
+        var oC1H = _el("span", "u4aColTreeCol u4aColTreeC1"); oC1H.textContent = (aCols[0] && aCols[0].label) || "";
+        var oC2H = _el("span", "u4aColTreeCol u4aColTreeC2"); oC2H.textContent = (aCols[1] && aCols[1].label) || "";
+        var oC3H = _el("span", "u4aColTreeCol u4aColTreeC3"); oC3H.textContent = (aCols[2] && aCols[2].label) || "";
+        oHead.appendChild(oC1H); oHead.appendChild(oC2H); oHead.appendChild(oC3H);
+        oHost.appendChild(oHead);
+
+        var oBody = _el("div", "u4aColTreeBody");
+        var oGrid = _el("div", "u4aColTreeGrid");
+        oGrid.setAttribute("aria-hidden", "true");
+        oGrid.appendChild(_el("span", "u4aColTreeGL u4aColTreeGL--c1"));
+        oGrid.appendChild(_el("span", "u4aColTreeGL u4aColTreeGL--c2"));
+        oGrid.appendChild(_el("span", "u4aColTreeGL u4aColTreeGL--c3"));
+        oBody.appendChild(oGrid);
+        oHost.appendChild(oBody);
+
+        function _colPx(iIdx) {
+            var oCell = (iIdx === 0) ? oC1H : (iIdx === 1) ? oC2H : oC3H;
+            return (oCell && oCell.getBoundingClientRect().width) || 120;
+        }
+        function _overheadPx() {
+            var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+            return rem * 0.375 * 3 + 1;   // padding-left(0.375rem) + gap×2(0.375rem) + ul 좌측 1px
+        }
+        function _syncTotal() {
+            var total = _colPx(0) + _colPx(1) + _colPx(2) + _overheadPx();
+            oHost.style.setProperty("--u4act-total-w", total + "px");
+        }
+        function _applyColW(sVar, px) {
+            oHost.style.setProperty(sVar, Math.max(64, px) + "px");   // 최소 4rem, 상한 없음
+            _syncTotal();
+        }
+        function _resetCols() {
+            oHost.style.setProperty("--u4act-c1-w", C1_DEF);
+            oHost.style.setProperty("--u4act-c2-w", C2_DEF);
+            oHost.style.setProperty("--u4act-c3-w", C3_DEF);
+            _syncTotal();
+        }
+        function _buildGrip(sVar, iColIdx, sHl, bRight) {
+            var oGrip = _el("div", "u4aColTreeGrip" + (bRight ? " u4aColTreeGrip--right" : ""));
+            oGrip.setAttribute("aria-hidden", "true");
+            attachColumnResize(oGrip, {
+                host: oHost,
+                getWidth: function () { return _colPx(iColIdx); },
+                setWidth: function (px) { _applyColW(sVar, px); },
+                onReset: _resetCols,
+                hoverEl: oHost,
+                hoverClass: sHl
+            });
+            return oGrip;
+        }
+        oC2H.appendChild(_buildGrip("--u4act-c1-w", 0, "u4aColTreeHl2"));         // C1|C2 → C1
+        oC3H.appendChild(_buildGrip("--u4act-c2-w", 1, "u4aColTreeHl3"));         // C2|C3 → C2
+        oC3H.appendChild(_buildGrip("--u4act-c3-w", 2, "u4aColTreeHl3r", true));  // C3 우단 → C3
+
+        var selNode = null;
+        var oTree = createTree({
+            roots: function () { return (typeof oCfg.roots === "function") ? (oCfg.roots() || []) : []; },
+            children: function (n) { return (typeof oCfg.children === "function") ? (oCfg.children(n) || []) : []; },
+            hasChildren: function (n) {
+                if (typeof oCfg.hasChildren === "function") { return !!oCfg.hasChildren(n); }
+                var c = (typeof oCfg.children === "function") ? oCfg.children(n) : null;
+                return !!(c && c.length);
+            },
+            key: function (n) { return oCfg.key(n); },
+            label: function (n) { return oCfg.label(n); },
+            tip: function (n) { return (typeof oCfg.tip === "function") ? oCfg.tip(n) : oCfg.label(n); },
+            icon: (typeof oCfg.icon === "function") ? oCfg.icon : undefined,
+            slotLead: (typeof oCfg.slotLead === "function") ? function (n, ctx) {
+                var x = oCfg.slotLead(n, ctx);
+                if (!x) { return null; }
+                var w = _el("span", "u4aColTreeLead");
+                w.appendChild(x);
+                return w;
+            } : undefined,
+            selectable: oCfg.selectable !== false,
+            slotTrailing: function (n) {
+                var oWrap = _el("span", "u4aColTreeTrail");
+                var oCell2 = _el("span", "u4aColTreeCell u4aColTreeC2");
+                var oCell3 = _el("span", "u4aColTreeCell u4aColTreeC3");
+                if (typeof oCfg.cell === "function") {
+                    var oC = oCfg.cell(n) || {};
+                    _fill(oCell2, oC.c2);
+                    _fill(oCell3, oC.c3);
+                }
+                oWrap.appendChild(oCell2);
+                oWrap.appendChild(oCell3);
+                return oWrap;
+            },
+            rowHook: function (oRow, n) {
+                oRow.classList.add("u4aColTreeRow");
+                oRow.__bwpNode = n;
+                var oNameCell = _el("div", "u4aColTreeNameCell");
+                var oLead = oRow.querySelector(".u4aColTreeLead");
+                var oTog = oRow.querySelector(".u4a-tree__toggle");
+                var oIco = oRow.querySelector(".u4a-tree__icon");
+                var oLbl = oRow.querySelector(".u4a-tree__label");
+                if (oLead) { oNameCell.appendChild(oLead); }
+                if (oTog) { oNameCell.appendChild(oTog); }
+                if (oIco) { oNameCell.appendChild(oIco); }
+                if (oLbl) { oNameCell.appendChild(oLbl); }
+                oRow.insertBefore(oNameCell, oRow.firstChild);
+                if (typeof oCfg.rowHook === "function") { try { oCfg.rowHook(oRow, n); } catch (e) { } }
+            },
+            onSelect: function (n, oRow) {
+                selNode = n;
+                if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(n, oRow); } catch (e) { } }
+            }
+        });
+        oTree.el.classList.add("u4aColTreeTree");
+        oBody.appendChild(oTree.el);
+
+        function _showEmpty(bShow) {
+            var oExist = oBody.querySelector(".u4aColTreeEmpty");
+            if (bShow) {
+                oTree.el.style.display = "none";
+                if (!oExist) {
+                    oExist = _el("div", "u4a-empty u4aColTreeEmpty");
+                    oExist.textContent = oCfg.emptyText || "";
+                    oBody.appendChild(oExist);
+                }
+            } else {
+                oTree.el.style.display = "";
+                if (oExist) { oExist.remove(); }
+            }
+        }
+
+        return {
+            host: oHost,
+            tree: oTree,
+            getSelected: function () { return selNode; },
+            rerender: function (bSelectFirst) {
+                var aRoots = (typeof oCfg.roots === "function") ? (oCfg.roots() || []) : [];
+                if (!aRoots.length) { _showEmpty(true); selNode = null; _syncTotal(); return; }
+                _showEmpty(false);
+                oTree.render();
+                _syncTotal();
+                if (bSelectFirst !== false && aRoots[0]) {
+                    try { oTree.selectByKey(oCfg.key(aRoots[0]), false); selNode = aRoots[0]; } catch (e) { }
+                }
+            },
+            expandSelected: function () { if (selNode) { try { oTree.expandSubtree(selNode); } catch (e) { } } },
+            collapseSelected: function () { if (selNode) { try { oTree.setExpanded(selNode, false); } catch (e) { } } },
+            selectKey: function (sKey, bScroll) { try { oTree.selectByKey(sKey, bScroll === true); } catch (e) { } }
+        };
+    }
+
     const U4AUI = {
         el: _el,
         confirm: confirm,
         closeWindow: closeWindow,
         attachColumnResize: attachColumnResize,
+        makeColumnTree: makeColumnTree,
         createField: createField,
         syncClear: syncClear,
         createPanel: createPanel,

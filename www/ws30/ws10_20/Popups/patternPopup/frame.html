@@ -58,8 +58,14 @@
 
                     <div class="u4a-splitter__bar u4aPattVBar" role="separator" aria-orientation="horizontal"></div>
 
-                    <!-- 커스텀 패턴 트리 — 컬럼헤더[커스텀 패턴 | Content Type] + tree.el (CRUD 는 다음 단계) -->
+                    <!-- 커스텀 패턴 트리 — 툴바[Create] + 컬럼헤더[커스텀 패턴 | Content Type] + tree.el -->
                     <div class="u4a-splitter__pane u4aPattTreePane u4aPattTreePane--cust">
+                        <div class="u4aPattTreeTool">
+                            <span class="u4aPattTreeTool__spacer"></span>
+                            <button type="button" class="u4a-btn u4a-btn--emphasized u4aPattCreateBtn" id="pattCustCreateBtn">
+                                <i class="fa-solid fa-plus"></i><span></span>
+                            </button>
+                        </div>
                         <div class="u4aPattTreeBody" id="pattCustBody"></div>
                     </div>
 

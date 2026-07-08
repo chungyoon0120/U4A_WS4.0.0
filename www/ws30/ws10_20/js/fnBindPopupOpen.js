@@ -655,48 +655,18 @@
     var oBody = _el("div", "u4a-dialog__body u4aBindBody");
     var oSplit = _el("div", "u4a-splitter u4aBindSplit");
 
-    // 좌: 트리 패널(공통 .u4a-splitter__pane). ★ TreeBody 가 스크롤 컨테이너이고 그 "안"에 컬럼헤더를
-    //   position:sticky 로 둔다(=MIME/USP 트리 패턴). 이래야 세로 스크롤바가 떠도 헤더·행이 같은 폭
-    //   컨텍스트(스크롤바가 둘 다 동일하게 줄임)를 공유해 컬럼 구분선이 어긋나지 않는다.
+    // 좌: 트리 패널(공통 .u4a-splitter__pane). ★ 다열 트리테이블 = 공통 U4AUI.makeColumnTree(host, cfg) 소비
+    //   — sticky 컬럼헤더 / 세로 그리드라인 / 컬럼 리사이즈(가이드 라인) / 가로 스크롤을 컴포넌트가 전담한다.
+    //   대형 바인딩 별창과 "같은 컴포넌트"라 트리 손볼 일은 U4AUI.makeColumnTree 한 곳(16 §3.4.2, 2026-07-08 통일).
     var oTreePane = _el("div", "u4a-splitter__pane u4aBindTreePane");
-    var oTreeBody = _el("div", "u4aBindTreeBody");
-    var oColHead = _el("div", "u4aBindColHead");
-    var oColName = _el("span", "u4aBindColName", _cl("A50"));   // A50 Object Name
-    var oColType = _el("span", "u4aBindColType", _cl("A51"));   // A51 Type
-    var oColDesc = _el("span", "u4aBindColDesc", _cl("A35"));   // A35 Description
-    // ★ 컬럼 리사이즈 그립(원본 sap.ui.table.TreeTable 이식) — 이름/유형 우측 경계(=보이는 세로 구분선)에
-    //   얹혀 드래그하면 ★그 컬럼만★ 넓히/좁힌다. 설명은 마지막 "채움" 컬럼이라 남는 공간을 흡수(빈칸 없음,
-    //   탐색기 등 표준). 즉 유형|설명 끌면 유형만 변하고 이름은 불변(설명이 흡수). 첫 드래그 때 이름·유형을
-    //   현재폭(px)으로 고정(_ensureColsFixed)한 뒤 개별 조절. 더블클릭=반응형 기본폭 복귀.
-    oColType.appendChild(_buildColGrip("name"));    // 이름 우측 경계(이름|유형 구분선) → 이름 폭
-    oColDesc.appendChild(_buildColGrip("type"));    // 유형 우측 경계(유형|설명 구분선) → 유형 폭
-    oColHead.appendChild(oColName);
-    oColHead.appendChild(oColType);
-    oColHead.appendChild(oColDesc);
-    oTreeBody.appendChild(oColHead);
-    oUI.treePane = oTreePane;      // 폭 변수(--u4aBind-*-w) 소유 엘리먼트(리사이즈 시 갱신)
-    oUI.treeBody = oTreeBody;      // 스크롤 컨테이너
-    oUI.colHead  = oColHead;       // 컬럼 헤더(고정 진입 시 overhead=padding+gap 실측용)
-    oUI.colNameHead = oColName;    // 오브젝트이름 헤더 셀(폭 실측용)
-    oUI.colTypeHead = oColType;    // 유형 헤더 셀
-    oUI.colDescHead = oColDesc;    // 설명 헤더 셀
-    // 트리(행) 컨테이너 — 스크롤은 TreeBody 담당. 가로 행 구분선을 다이얼로그 바닥까지 잇기 위해
-    //   min-height 로 헤더 아래 남는 높이를 채우고, 배경 반복 그라디언트로 빈 영역에도 같은 간격 가로선.
-    oUI.treeWrap = _el("div", "u4aBindTreeWrap");
-    // ★ 세로 컬럼 그리드라인 레이어 — 헤더/행과 동일 flex 구조(padding-left+gap+같은 폭변수)로 유형/설명
-    //   경계선을 treeWrap 풀하이트(빈 영역 포함)로 긋는다. 절대배치·pointer-events:none, 행 밑(z-index:0).
-    oUI.grid = _el("div", "u4aBindGridLines");
-    oUI.grid.setAttribute("aria-hidden", "true");
-    oUI.grid.appendChild(_el("span", "u4aBindGL u4aBindGL--name"));
-    oUI.grid.appendChild(_el("span", "u4aBindGL u4aBindGL--type"));
-    oUI.grid.appendChild(_el("span", "u4aBindGL u4aBindGL--desc"));
-    oUI.treeWrap.appendChild(oUI.grid);
-    oTreeBody.appendChild(oUI.treeWrap);
-    oTreePane.appendChild(oTreeBody);
+    var oTreeHost = _el("div", "u4aBindTreeHost");   // makeColumnTree 가 비우고 .u4aColTree 로 채운다(스크롤 컨테이너)
+    oTreePane.appendChild(oTreeHost);
+    oUI.treePane = oTreePane;
+    oUI.treeHost = oTreeHost;
     oSplit.appendChild(oTreePane);
 
     // 트리 더블클릭 = 바인딩 — 컨테이너에 1회 위임(재렌더로 중복 배선 방지).
-    oTreeBody.addEventListener("dblclick", function (ev) {
+    oTreeHost.addEventListener("dblclick", function (ev) {
       var oRow = ev.target && ev.target.closest ? ev.target.closest(".u4a-tree__row") : null;
       if (!oRow || !oRow.__u4aBindNode) { return; }
       if (oRow.__u4aBindNode.enable !== true) { return; }
@@ -986,142 +956,55 @@
     }
   } // end of lf_setBindEnable
 
-  /* ── 컬럼 리사이즈 (원본 TreeTable 컬럼 리사이즈 — CSS 폭 변수만 갱신, 헤더/행/세로선 동기화) ── */
-
-  // 현재 컬럼 렌더 폭(px) — 헤더 셀 실측.
-  function _colPx(sCol) {
-    var oCell = (sCol === "type") ? oUI.colTypeHead : (sCol === "desc") ? oUI.colDescHead : oUI.colNameHead;
-    return (oCell && oCell.getBoundingClientRect().width) || (sCol === "type" ? 144 : 200);
-  }
-
-  // 설명(채움) 컬럼의 최소폭(px, ≈6rem) — 이보다 좁아지면 부풀지 않고 가로 스크롤이 뜬다.
-  var C_DESC_MIN = 96;
-
-  // 콘텐츠(헤더/트리/세로선) 최소폭 = 이름 + 유형 + 설명최소 + overhead(패딩·gap 실측).
-  //   CSS 가 max(100%, var(--u4aBindContentMinW)) 로 소비 → 넓으면 채움, 좁으면 이 폭에서 가로 스크롤.
-  //   ★고정 매직값(구 36rem) 금지: 그러면 채움 컬럼(desc)이 그 폭까지 부풀어 빈 컬럼이 된다.
-  //   ★min-width:100% 만으로도 안 됨: flex 컨테이너는 자식 때문에 안 늘어나 스크롤이 안 생긴다(명시 폭 필요).
-  function _updateContentMinW() {
-    if (!oUI.treePane) { return; }
-    var w = (oUI.wName || 0) + (oUI.wType || 0) + C_DESC_MIN + (oUI.colsOverhead || 19);
-    oUI.treePane.style.setProperty("--u4aBindContentMinW", w + "px");
-  }
-
-  // 이름/유형 폭(px) 반영 — 설명은 마지막 "채움" 컬럼이라 남는 공간을 흡수(넓으면 채움). 다른 컬럼 불변.
-  //   ★상한 clamp 제거: 컬럼을 패널보다 넓혀도 되고(가로 스크롤로 대응), 하한(≥4rem)만 둔다.
-  function _applyColW(sCol, px) {
-    if (px < 64) { px = 64; }                      // 이 컬럼 최소 4rem
-    if (sCol === "name") { oUI.wName = px; } else { oUI.wType = px; }
-    oUI.treePane.style.setProperty("--u4aBind-" + sCol + "-w", px + "px");
-    _updateContentMinW();                          // 콘텐츠 최소폭 재계산(가로 스크롤 기준)
-  }
-
-  // 첫 리사이즈 때 1회 — 이름·유형을 현재 렌더폭(px)으로 고정(.u4aBindColsFixed: 이름 flex→고정폭, 설명→채움).
-  //   overhead = 헤더 전체폭 − 세 컬럼합 = padding+gap 실측. 이후 이름/유형만 조절, 설명이 흡수.
-  function _ensureColsFixed() {
-    if (oUI.colsFixed) { return; }
-    oUI.wName = _colPx("name"); oUI.wType = _colPx("type");
-    var headW = (oUI.colHead && oUI.colHead.getBoundingClientRect().width) || 0;
-    oUI.colsOverhead = Math.max(0, Math.round(headW - (oUI.wName + oUI.wType + _colPx("desc"))));
-    oUI.treePane.style.setProperty("--u4aBind-name-w", oUI.wName + "px");
-    oUI.treePane.style.setProperty("--u4aBind-type-w", oUI.wType + "px");
-    oUI.treePane.classList.add("u4aBindColsFixed");
-    oUI.colsFixed = true;
-    _updateContentMinW();                          // 고정 진입 시 콘텐츠 최소폭 확정
-  }
-
-  // 컬럼 경계 그립 — 공통 U4AUI.attachColumnResize(가이드 라인 + 놓을 때 적용, UI5 방식) 소비. 16 §3.4.2
-  //   sCol=이 그립이 조절할 컬럼("name"|"type"). 첫 드래그 시 _ensureColsFixed 로 고정모드 전환(px).
-  //   hover 강조=treePane 경계선(sHl). 더블클릭=반응형 기본폭 복귀. ★대형 별창 makeColumnTree 와 동일 동작.
-  function _buildColGrip(sCol) {
-    var oGrip = _el("div", "u4aBindColGrip");
-    oGrip.setAttribute("aria-hidden", "true");
-    var sHl = (sCol === "name") ? "u4aBindHlType" : "u4aBindHlDesc";
-    if (window.U4AUI && U4AUI.attachColumnResize) {
-      U4AUI.attachColumnResize(oGrip, {
-        host: oUI.treeBody,
-        getWidth: function () { _ensureColsFixed(); return _colPx(sCol); },   // 첫 드래그 시 고정모드 전환 후 현재폭
-        setWidth: function (px) { _applyColW(sCol, px); },                    // 놓을 때 1회 적용
-        hoverEl: oUI.treePane,
-        hoverClass: sHl,
-        onReset: function () {   // 더블클릭 = 기본폭 복귀
-          oUI.colsFixed = false;
-          oUI.treePane.classList.remove("u4aBindColsFixed");
-          oUI.treePane.style.removeProperty("--u4aBind-name-w");
-          oUI.treePane.style.removeProperty("--u4aBindContentMinW");
-          oUI.treePane.style.setProperty("--u4aBind-type-w", "30%");
-          oUI.treePane.style.setProperty("--u4aBind-desc-w", "42%");
-        }
-      });
-    }
-    return oGrip;
-  }
-
-  /* ── 트리 렌더 (공통 createTree — 3열 트리테이블) ── */
+  /* ── 트리 렌더 (공통 U4AUI.makeColumnTree — 3열 그리드 트리테이블) ──
+   *   헤더/세로 그리드라인/컬럼 리사이즈(가이드 라인)/가로 스크롤을 컴포넌트가 전담(대형 바인딩 별창과 동일).
+   *   화면은 데이터 매핑(cell/rowHook/onSelect)만 제공. 트리 손볼 일은 U4AUI.makeColumnTree 한 곳(16 §3.4.2). */
 
   function lf_renderTree() {
-
-    oUI.treeWrap.innerHTML = "";
-    oUI.treeWrap.appendChild(oUI.grid);   // 세로 그리드라인 레이어 보존(재렌더로 지워지지 않게)
-
-    if (!oS.zTREE || oS.zTREE.length === 0) {
-      var oEmpty = _el("div", "u4a-empty", _wsTxt("312") || "");   // 312(ZMSG_WS_COMMON_001) No data Found — 공통 빈상태(MIME 동일 키)
-      oUI.treeWrap.appendChild(oEmpty);
-      oUI.tree = null;
-      return;
+    if (!oUI.ctrl) {
+      oUI.ctrl = U4AUI.makeColumnTree(oUI.treeHost, {
+        columns: [
+          { label: _cl("A50"), width: "16rem" },   // A50 Object Name
+          { label: _cl("A51"), width: "8rem" },     // A51 Type
+          { label: _cl("A35"), width: "16rem" }      // A35 Description
+        ],
+        roots: function () { return oS.zTREE || []; },
+        children: function (n) { return n.zTREE || []; },
+        hasChildren: function (n) { return !!(n.zTREE && n.zTREE.length); },
+        key: function (n) { return n.CHILD; },
+        label: function (n) { return n.NTEXT; },
+        tip: function (n) { return n.NTEXT; },   // 이름 말줄임 시 툴팁=전체 이름
+        selectable: true,
+        emptyText: _wsTxt("312") || "",           // 312 No data Found(ZMSG_WS_COMMON_001)
+        // C2 = 상태아이콘 + 유형텍스트, C3 = 설명(둘 다 말줄임 시에만 툴팁).
+        cell: function (n) {
+          var oType = _el("span", "u4aBindTypeCell");
+          var oIc = _statIcon(n.stat_src);
+          if (oIc) {
+            var oI = _el("span", "u4aBindStat " + oIc.cls);
+            oI.innerHTML = _fa(oIc.fa);
+            oType.appendChild(oI);
+          }
+          var oTypeTxt = _el("span", "u4aBindTypeTxt", n.TYPE || "");
+          if (n.TYPE) { oTypeTxt.setAttribute("data-tip", n.TYPE); oTypeTxt.setAttribute("data-tip-trunc", ""); }
+          oType.appendChild(oTypeTxt);
+          var oDesc = _el("span", "u4aBindDescTxt", n.DESCR || "");
+          if (n.DESCR) { oDesc.setAttribute("data-tip", n.DESCR); oDesc.setAttribute("data-tip-trunc", ""); }
+          return { c2: oType, c3: oDesc };
+        },
+        // 행 후크: 행 스코프 클래스 + 상태바 색 + 비활성 표시 + 노드 stash(더블클릭/선택용).
+        rowHook: function (oRow, n) {
+          oRow.classList.add("u4aBindRow");
+          var sHl = _rowHl(n.highlight);
+          if (sHl) { oRow.classList.add(sHl); }
+          if (n.enable !== true) { oRow.classList.add("u4aBindRow--disabled"); }
+          oRow.__u4aBindNode = n;
+        },
+        onSelect: function (n) { lf_selRow(n); }
+      });
+      oUI.tree = oUI.ctrl.tree;   // 기존 oUI.tree.*(펼침/접기/선택/el) 호출을 그대로 유지
     }
-
-    oUI.tree = U4AUI.createTree({
-      roots: function () { return oS.zTREE; },
-      children: function (n) { return n.zTREE || []; },
-      hasChildren: function (n) { return !!(n.zTREE && n.zTREE.length); },
-      key: function (n) { return n.CHILD; },
-      label: function (n) { return n.NTEXT; },
-      tip: function (n) { return n.NTEXT; },   // 이름 말줄임 시 툴팁=전체 이름(공통 createTree 가 data-tip-trunc-sel 로 라벨 잘림만 표시)
-      selectable: true,
-      // 유형·설명 열(우측 정렬 트레일링) — 상태아이콘 + 유형텍스트 / 설명.
-      slotTrailing: function (n) {
-        var oT = _el("span", "u4aBindTrail");
-        var oType = _el("span", "u4aBindCell u4aBindColType");
-        var oIc = _statIcon(n.stat_src);
-        if (oIc) {
-          var oI = _el("span", "u4aBindStat " + oIc.cls);
-          oI.innerHTML = _fa(oIc.fa);
-          oType.appendChild(oI);
-        }
-        var oTypeTxt = _el("span", "u4aBindTypeTxt", n.TYPE || "");
-        if (n.TYPE) { oTypeTxt.setAttribute("data-tip", n.TYPE); oTypeTxt.setAttribute("data-tip-trunc", ""); }   // 말줄임 시에만 전체 유형값 툴팁(공통 initTooltip)
-        oType.appendChild(oTypeTxt);
-        oT.appendChild(oType);
-        var oDesc = _el("span", "u4aBindCell u4aBindColDesc", n.DESCR || "");
-        if (n.DESCR) { oDesc.setAttribute("data-tip", n.DESCR); oDesc.setAttribute("data-tip-trunc", ""); }   // 말줄임 시에만 전체 설명 툴팁(공통 initTooltip)
-        oT.appendChild(oDesc);
-        return oT;
-      },
-      // 행 후크: 행 스코프 클래스 + 상태바 색 + 선택가능 dim + 노드 stash + 이름셀 래핑.
-      rowHook: function (oRow, n) {
-        oRow.classList.add("u4aBindRow");
-        var sHl = _rowHl(n.highlight);
-        if (sHl) { oRow.classList.add(sHl); }
-        if (n.enable !== true) { oRow.classList.add("u4aBindRow--disabled"); }
-        oRow.__u4aBindNode = n;
-        // ★ 이름 컬럼 셀 — 토글+아이콘+라벨을 고정폭 셀로 묶어 행을 [이름|유형|설명] 3-flex 로(헤더와 동일
-        //   구조). 이래야 이름 고정폭 시 라벨이 정확히 이름폭만 채우고, 설명(채움)과 정렬이 견고하다.
-        var oNameCell = _el("div", "u4aBindNameCell");
-        var oTog = oRow.querySelector(".u4a-tree__toggle");
-        var oIco = oRow.querySelector(".u4a-tree__icon");
-        var oLbl = oRow.querySelector(".u4a-tree__label");
-        if (oTog) { oNameCell.appendChild(oTog); }
-        if (oIco) { oNameCell.appendChild(oIco); }
-        if (oLbl) { oNameCell.appendChild(oLbl); }
-        oRow.insertBefore(oNameCell, oRow.firstChild);
-      },
-      onSelect: function (n, oRow) { lf_selRow(n); }
-    });
-
-    // 행/들여쓰기 셀렉터 스코프(MIME .u4aMimeTree 컨벤션).
-    oUI.tree.el.classList.add("u4aBindTree");
-    oUI.treeWrap.appendChild(oUI.tree.el);
+    oUI.ctrl.rerender(false);     // 첫행 자동선택 안 함(lf_setSelectTree 가 선택 담당)
   }
 
   // 라인선택 이벤트 (원본 lf_selTabRow 458행).
@@ -1773,93 +1656,29 @@
       // 바디 + 가로 스플리터(MIME .u4aMimeBody/.u4aMimeSplit).
       ".u4aBindBody { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 0; display: flex; }",
       ".u4aBindSplit { flex: 1 1 auto; width: 100%; min-width: 0; min-height: 0; --u4aBindTreeW: 100%; }",
-      // 트리 패널(좌).
-      ".u4aBindTreePane { --u4aBind-type-w: 30%; --u4aBind-desc-w: 42%; flex: 1 1 var(--u4aBindTreeW); display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }",
-      // ★ TreeBody = 스크롤 컨테이너(overflow:hidden auto). 헤더(sticky)+트리가 모두 이 안에 들어가
-      //   같은 폭 컨텍스트를 공유 → 세로 스크롤바가 떠도 컬럼이 안 어긋남(MIME .u4aMimeTreeBody / USP 동일).
-      ".u4aBindTreeBody { flex: 1 1 auto; min-height: 0; overflow: hidden auto; position: relative; background: var(--surface); }",
-      // 컬럼 헤더 — ★스크롤 컨테이너(TreeBody) 안에 position:sticky;top:0 (MIME/USP 트리 컨벤션).
-      //   ★padding-left = calc(0.375rem + 1px): 공통 .u4a-tree <ul> 좌측 1px 패딩(선택바 여백)만큼 밀어야
-      //   헤더/행 구분선이 픽셀 정렬. ★gap:0.375rem — 본문 행 공통 gap 과 동일(유형↔설명 간격 보정).
-      ".u4aBindColHead { position: sticky; top: 0; z-index: 2; box-sizing: border-box; display: flex; align-items: stretch; gap: 0.375rem; height: 2.25rem; padding-left: calc(0.375rem + 1px); background: var(--surface-raised); border-bottom: 0.0625rem solid var(--line); font-size: 0.8125rem; font-weight: 700; color: var(--text); }",
-      ".u4aBindColName { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding-left: 0.5rem; }",
-      ".u4aBindColType { flex: 0 0 var(--u4aBind-type-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; gap: 0.375rem; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }",
-      ".u4aBindColDesc { flex: 0 0 var(--u4aBind-desc-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }",
-      // ★ 컬럼 리사이즈 그립 — 유형/설명 헤더 셀의 좌측 경계(=세로 구분선 위)에 얹혀 드래그로 폭 변수 갱신.
-      //   헤더 셀에만 position:relative(그립 absolute 앵커) — 행 셀엔 그립 없음. z-index로 헤더 텍스트 위.
-      ".u4aBindColHead .u4aBindColType, .u4aBindColHead .u4aBindColDesc { position: relative; }",
-      ".u4aBindColGrip { position: absolute; top: 0; bottom: 0; left: -0.1875rem; width: 0.4375rem; cursor: col-resize; z-index: 4; }",
-      // 리사이즈 경계 강조 — 그립 hover/드래그 시 그 경계의 세로선(헤더+행+빈 영역의 컬럼 좌측 border 일체)을
-      //   accent 로. 이름그립=유형 컬럼 좌측선(이름|유형), 유형그립=설명 컬럼 좌측선(유형|설명). JS 가 treePane 토글.
-      ".u4aBindHlType .u4aBindColType, .u4aBindHlType .u4aBindGL--type, .u4aBindHlDesc .u4aBindColDesc, .u4aBindHlDesc .u4aBindGL--desc { border-left-color: var(--accent); box-shadow: inset 0.1875rem 0 0 var(--accent); }",
-      // 이름 컬럼 셀(rowHook 이 토글+아이콘+라벨을 여기 묶음) — 기본은 채움(flex), 고정 모드서 고정폭.
-      ".u4aBindNameCell { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0.375rem; overflow: hidden; }",
-      // ★ 컬럼 고정 모드(리사이즈 시작 후) — 이름/유형 고정폭, 설명=채움(남는 공간 흡수 → 빈칸 없음, 가로 스크롤 X).
-      //   행 이름부는 .u4aBindNameCell 로 묶여 [이름|유형|설명] 3-flex(헤더와 동일)라 정렬 견고.
-      ".u4aBindColsFixed .u4aBindColName, .u4aBindColsFixed .u4aBindNameCell, .u4aBindColsFixed .u4aBindGL--name { flex: 0 0 var(--u4aBind-name-w); }",
-      ".u4aBindColsFixed .u4aBindColDesc, .u4aBindColsFixed .u4aBindGL--desc { flex: 1 1 0; }",
-      // 트리(행) 컨테이너 — 스크롤은 TreeBody 가 담당(여긴 일반 블록). ★ min-height:calc(100% - 헤더 2.25rem)
-      //   로 헤더 아래 남는 높이를 채우고(헤더+이 블록 = 컨테이너 → 데이터 적어도 팬텀 세로스크롤 없음),
-      //   배경 반복 그라디언트로 행 높이(2.5rem)마다 가로선 → 행 없는 빈 영역도 다이얼로그 바닥까지 같은
-      //   간격 가로 구분선이 이어짐. (행 영역=각 행 border-bottom, 빈 영역=이 배경. 세로 컬럼선=헤더/행 셀 border-left.)
-      ".u4aBindTreeWrap { position: relative; min-height: calc(100% - 2.25rem); box-sizing: border-box; background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(2.5rem - 0.0625rem), var(--line) calc(2.5rem - 0.0625rem), var(--line) 2.5rem); }",
-      // ★ 세로 컬럼 그리드라인 레이어 — 헤더/행과 동일 flex(padding-left calc(0.375rem+1px)+gap 0.375rem+같은 폭변수)
-      //   → 유형/설명 경계선 x 가 헤더·행과 픽셀 일치. treeWrap 풀하이트(top/bottom 0)로 빈 영역까지 세로선 연장.
-      //   행 밑(z-index:0)에 깔려 행 셀 border-left(있는 행)와 겹치고, 빈 영역엔 이 레이어만 보인다.
-      ".u4aBindGridLines { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 0; display: flex; gap: 0.375rem; box-sizing: border-box; padding-left: calc(0.375rem + 1px); padding-right: 0; pointer-events: none; }",
-      ".u4aBindGL { min-width: 0; box-sizing: border-box; }",
-      ".u4aBindGL--name { flex: 1 1 auto; }",
-      ".u4aBindGL--type { flex: 0 0 var(--u4aBind-type-w); border-left: 0.0625rem solid var(--line); }",
-      ".u4aBindGL--desc { flex: 0 0 var(--u4aBind-desc-w); border-left: 0.0625rem solid var(--line); }",
-      // 트리 — 행을 패널 폭에 맞춰 우측 컬럼 항상 보이게(공통 max-content 무력화, USP/MIME 이식).
-      //   min-height:0 = 공통 100% 무력화(높이 채움은 treeWrap 담당). padding 상/하 0 = 그라디언트 가로선
-      //   위상이 첫 행 상단과 정확히 맞도록(좌측 1px 은 선택바 여백 유지).
-      ".u4aBindTree.u4a-tree { width: auto; min-width: 100%; padding: 0 0 0 1px; min-height: 0; position: relative; z-index: 1; }",
-      ".u4aBindTreeWrap > .u4a-empty { position: relative; z-index: 1; }",
-      // data-u4a-tree-split(space-between) 무력화 → 라벨이 남는 폭 채우고 유형/설명은 고정폭 우측 컬럼.
-      ".u4aBindTree .u4a-tree__row[data-u4a-tree-split] { justify-content: flex-start; }",
-      ".u4aBindTree .u4a-tree__label { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }",
-      // ★ 들여쓰기를 행 padding-left → 토글 margin-left 로 이동(행 content-box 폭 고정 → 컬럼 정렬 일치, MIME 핵심).
-      //   ★ padding-right:0 — 공통 .u4a-tree__row 의 우측 0.5rem 패딩 제거. 안 지우면 본문 행 content-box 가
-      //     헤더보다 0.5rem 좁아져 유형/설명(고정폭·%) 컬럼이 헤더와 어긋난다(USP/MIME 동일 보정).
-      ".u4aBindTree .u4a-tree__row { padding-left: 0.375rem; padding-right: 0; }",
-      ".u4aBindTree .u4a-tree__toggle { margin-left: calc(var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem)); }",
-      // 트레일링(유형+설명) — ★display:contents 로 래퍼를 없애 두 셀이 행의 "직계 flex 자식"이 되게 한다.
-      //   (래퍼로 감싸면 퍼센트 flex-basis 가 래퍼 기준이라 우측으로 쏠려 헤더와 어긋남 — MIME 는 단일 셀
-      //    직계 반환. 여기선 2열이라 display:contents 로 동일 효과.) → 유형/설명 폭이 행 기준=헤더와 정렬.
-      ".u4aBindTrail { display: contents; }",
-      ".u4aBindCell { box-sizing: border-box; align-self: stretch; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); min-width: 0; }",
-      ".u4aBindTypeTxt, .u4aBindTrail .u4aBindColDesc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }",
-      ".u4aBindTrail .u4aBindColDesc { color: var(--text); }",
+      // 트리 패널(좌) — 공통 U4AUI.makeColumnTree(.u4aColTree)를 담는 컨테이너. 폭/스크롤/그리드/리사이즈는 컴포넌트가 담당.
+      ".u4aBindTreePane { flex: 1 1 var(--u4aBindTreeW); display: flex; min-width: 0; min-height: 0; background: var(--surface); overflow: hidden; }",
+      ".u4aBindTreeHost { flex: 1 1 auto; min-width: 0; min-height: 0; }",
+      // 셀 내용(공통 .u4aColTreeCell 안) — C2=상태아이콘+유형텍스트, C3=설명. 말줄임 시에만 툴팁.
+      ".u4aBindTypeCell { display: flex; align-items: center; gap: 0.375rem; min-width: 0; overflow: hidden; }",
+      ".u4aBindTypeTxt, .u4aBindDescTxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }",
+      ".u4aBindDescTxt { color: var(--text); }",
       // 상태 아이콘 색(시맨틱 토큰).
       ".u4aBindStat { flex: 0 0 auto; }",
       ".u4aBindStat--success { color: var(--state-success); }",
       ".u4aBindStat--info { color: var(--state-info, var(--accent)); }",
       ".u4aBindStat--warning { color: var(--state-warning); }",
-      // 행 좌측 상태바(inset box-shadow) + 비활성 dim(선택가능 아님).
-      ".u4aBindRow.u4a-tree__row { position: relative; border-bottom: 0.0625rem solid var(--line); }",
+      // 행 좌측 상태바(inset box-shadow, 하이라이트 레벨) — 행 골격/구분선은 공통 .u4aColTreeRow 담당.
       ".u4aBindRow--success { box-shadow: inset 0.1875rem 0 0 var(--state-success); }",
       ".u4aBindRow--info { box-shadow: inset 0.1875rem 0 0 var(--state-info, var(--accent)); }",
       ".u4aBindRow--warning { box-shadow: inset 0.1875rem 0 0 var(--state-warning); }",
       ".u4aBindRow--error { box-shadow: inset 0.1875rem 0 0 var(--state-error); }",
-      // (원본은 비선택 행 이름을 흐리게 처리하지 않음 — 선택가능 여부는 좌측 상태바+유형 아이콘으로만 표현. dim 제거.)
-      // 선택 행 텍스트색(공통 선택색이 레벨색 이기게 명시).
-      ".u4aBindTree .u4a-tree__row[aria-selected=\"true\"] .u4a-tree__label, .u4aBindTree .u4a-tree__row[aria-selected=\"true\"] .u4aBindColDesc { color: var(--selected-text); }",
-      // 우: 추가속성(MPROP) 패널 — 공통 .u4a-table. 기본 숨김, showAddit 시 표시.
+      // 선택 행 설명 텍스트색(공통은 라벨만 처리 → 설명도 명시). 이름 라벨은 공통 shell.css 가 처리.
+      ".u4aColTreeTree .u4a-tree__row[aria-selected=\"true\"] .u4aBindDescTxt { color: var(--selected-text); }",
+      // 우: 추가속성(MPROP) 패널 — 공통 .u4a-table. 기본 숨김, showAddit 시 표시. (트리 가로 스크롤은 .u4aColTree 자체 담당.)
       ".u4aBindAdditPane { display: none; flex: 1 1 0; min-width: 0; background: var(--surface); overflow: hidden; }",
       ".u4aBindSplitBar { display: none; }",
       ".u4aBindShowAddit .u4aBindTreePane { flex: 0 0 var(--u4aBindTreeW); }",
-      // ★ 스플릿(MPROP) 표시로 트리가 좁아지면 컬럼이 잘리지 않게 가로 스크롤 — 콘텐츠에 "명시적" 최소폭이 필요.
-      //   (min-width:100% 만으론 flex 컨테이너가 자식 때문에 안 늘어나 스크롤이 안 생긴다.)
-      ".u4aBindShowAddit .u4aBindTreeBody { overflow: auto; }",
-      //   기본(비고정, % 컬럼) : 좁아지면 36rem 유지+스크롤(% 컬럼이라 채움 balloon 없음).
-      ".u4aBindShowAddit .u4aBindColHead, .u4aBindShowAddit .u4aBindTreeWrap, .u4aBindShowAddit .u4aBindTree.u4a-tree { min-width: max(100%, 36rem); }",
-      //   고정(리사이즈) 모드 : 콘텐츠 최소폭 = JS 실측 컬럼폭 합(--u4aBindContentMinW = 이름+유형+설명최소+overhead).
-      //   → 넓으면 채움(100%), 좁으면 딱 그 폭에서 가로 스크롤 → 채움 컬럼(desc)이 부풀지 않고 컬럼 폭 유지.
-      //   ※과거 고정 36rem 은 리사이즈로 컬럼이 작아진 상태에서 좁히면 desc 가 36rem 까지 부풀어 "빈 컬럼" 되던 버그.
-      ".u4aBindShowAddit .u4aBindColsFixed .u4aBindColHead, .u4aBindShowAddit .u4aBindColsFixed .u4aBindTreeWrap, .u4aBindShowAddit .u4aBindColsFixed .u4aBindTree.u4a-tree { min-width: max(100%, var(--u4aBindContentMinW, 36rem)); }",
-      // ★ 채움 컬럼(desc)이 0 으로 짜부되지 않게 min-width(콘텐츠 최소폭의 desc 몫과 동일). 헤더/행/세로선 다 정렬.
-      ".u4aBindShowAddit .u4aBindColDesc, .u4aBindShowAddit .u4aBindGL--desc { min-width: 6rem; }",
       ".u4aBindShowAddit .u4aBindAdditPane { display: flex; }",
       ".u4aBindShowAddit .u4aBindSplitBar { display: flex; }",
       ".u4aBindAdditWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }",

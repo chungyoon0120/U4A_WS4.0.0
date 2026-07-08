@@ -42,10 +42,19 @@ var USERINFO = oQueryParams.USERINFO,
     SYSID = USERINFO.SYSID,
     LANGU = USERINFO.LANGU;
 
+// ABAP 클래스 텍스트(/U4A/CL_WS_COMMON) — Save(A64)/Close(A39) 버튼 툴팁용(errorPage 동일 방식).
+var WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU);
+
 var zconsole = WSERR(window, document, console);
 
 // 공통 Monaco 호스트(editorPopup/host) 채널 태그=__u4aedh, HOSTID 는 화면별 식별자.
-var C_HOSTID = "U4APATT";
+var C_HOSTID = "U4APATT";          // 우측 읽기전용 뷰어 호스트
+var C_EDIT_HOSTID = "U4APATTEDIT"; // 생성/수정 다이얼로그 편집 호스트
+
+// 커스텀 패턴 컨텐츠 유형(원본 _getWsCustomPatternContentTypes). value=Monaco 언어와 (abap 제외) 동일.
+var A_CONT_TYPES = ["text", "abap", "html", "javascript", "css", "json", "xml"];
+
+var oDlgUI = null;   // 생성/수정 다이얼로그 UI refs(지연 생성 싱글톤). {dlg,host,title,icon,titleField,typeSel,save,ready,pending,PRCCD,CKEY}
 
 // 현재 상태.
 var oState = {
@@ -53,16 +62,24 @@ var oState = {
     aCustRoots: [],     // 커스텀 패턴 트리
     cur: null,          // 우측에 표시 중인 노드
     pending: null,      // 호스트 준비 전 선택된 노드(준비 후 반영)
-    ready: false        // Monaco 호스트 ready
+    ready: false,       // Monaco 호스트 ready
+    selCustKey: ""      // 현재 선택된 커스텀 노드 CKEY(watch 재로드 시 선택 보존)
 };
 var oDefTree = null, oCustTree = null;
 var oFrame = null, bBusy = false, oToastTimer = null, iBusyWatch = null, bOpenDone = false, oBroad = null;
+var bSelfWrite = false, oCustWatcher = null, iWatchTimer = null;   // 커스텀 파일 watch(라이브 반영) + 자기저장 가드
 
 /* ── 로컬 헬퍼 ──────────────────────────────────────────────────────────── */
 
 // 메시지(ZMSG_WS_COMMON_001) — 원본 getWsMessageList 와 동일 키. 임의 문구 생성 없음.
 function _m(sCode, p1) {
     try { return WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sCode, p1 || "") || ""; }
+    catch (e) { return ""; }
+}
+
+// ABAP 클래스 메시지(/U4A/CL_WS_COMMON 등) — A64 Save / A39 Close.
+function _mc(sCls, sCode) {
+    try { return WSMSG.fnGetMsgClsText(sCls, sCode, "", "", "", "") || ""; }
     catch (e) { return ""; }
 }
 
@@ -90,7 +107,7 @@ function _getThemeInfo() {
     } catch (e) { return null; }
 }
 
-// 커스텀 패턴 CONT_TYPE → Monaco 언어(USP monaco getMonacoLanguage 매핑 참조). 기본패턴은 CONT_TYPE 없음→plaintext.
+// CONT_TYPE/확장자 문자열 → Monaco 언어(USP monaco getMonacoLanguage 매핑 참조).
 function _lang(sCont) {
     var s = String(sCont || "").toLowerCase();
     switch (s) {
@@ -102,6 +119,29 @@ function _lang(sCont) {
         case "svg": return "xml";
         default: return "plaintext";   // text, abap(모나코 미지원) 등 → 평문(안전 폴백)
     }
+}
+
+// ROOT 직계 카테고리(HTML/JS/CSS/UI5…)의 DESC — 기본 패턴 언어 유추용(리프에서 부모 체인 상승).
+function _catDesc(oNode) {
+    var n = oNode;
+    while (n && n._parent && n._parent._parent) { n = n._parent; }   // 부모의 부모가 없으면 n = ROOT 직계(카테고리)
+    return (n && n.DESC) || "";
+}
+
+// 노드 → Monaco 언어. 커스텀=CONT_TYPE / 기본=카테고리 DESC(우선) + ACTCD(01=HTML,02=JS 폴백).
+//   (원본 뷰어는 하이라이트 없었음 — 언어별 강조는 개선. UI5=HTML 계열, CSS 카테고리는 css.)
+function _langOf(oNode) {
+    if (!oNode) { return "plaintext"; }
+    if (oNode.CONT_TYPE) { return _lang(oNode.CONT_TYPE); }   // 커스텀 패턴
+    var cat = _catDesc(oNode).toLowerCase();
+    if (cat.indexOf("html") >= 0 || cat.indexOf("ui5") >= 0) { return "html"; }
+    if (cat === "js" || cat.indexOf("javascript") >= 0) { return "javascript"; }
+    if (cat.indexOf("css") >= 0) { return "css"; }
+    if (cat.indexOf("json") >= 0) { return "json"; }
+    if (cat.indexOf("xml") >= 0) { return "xml"; }
+    if (oNode.ACTCD === "01") { return "html"; }         // ACTCD 폴백(01=HTML 계열)
+    if (oNode.ACTCD === "02") { return "javascript"; }   // 02=JS 계열
+    return "plaintext";
 }
 
 /* ── 아이콘 — 원본 ICON: sap-icon:// 또는 svg 파일 경로(ws_html5_usp_editor_ctxmenu 의 _iconHtml 차용) ── */
@@ -127,11 +167,11 @@ function _iconHtml(sIcon) {
 /* ── 평면 배열(CKEY/PKEY) → 트리(순서 보존) — 원본 parseArrayToTree 대체(UI5 모델 비의존) ── */
 function _buildTree(aFlat) {
     var oByKey = {}, aRoots = [];
-    (aFlat || []).forEach(function (o) { if (o && o.CKEY) { o._ch = []; oByKey[o.CKEY] = o; } });
+    (aFlat || []).forEach(function (o) { if (o && o.CKEY) { o._ch = []; o._parent = null; oByKey[o.CKEY] = o; } });
     (aFlat || []).forEach(function (o) {
         if (!o || !o.CKEY) { return; }
         var sPk = o.PKEY || "";
-        if (sPk && oByKey[sPk]) { oByKey[sPk]._ch.push(o); }
+        if (sPk && oByKey[sPk]) { oByKey[sPk]._ch.push(o); o._parent = oByKey[sPk]; }   // 언어 유추용 부모 링크
         else { aRoots.push(o); }
     });
     return aRoots;
@@ -232,7 +272,7 @@ function _showCode(oNode) {
 
     if (oState.ready) {
         _toHost({ cmd: "setReadOnly", readOnly: true });
-        _toHost({ cmd: "setLanguage", language: _lang(oNode.CONT_TYPE) });
+        _toHost({ cmd: "setLanguage", language: _langOf(oNode) });
         _toHost({ cmd: "setValue", value: (typeof oNode.DATA === "string") ? oNode.DATA : "" });
         if (oWrap) { oWrap.classList.add("u4aPattHostShown"); }
     } else {
@@ -242,9 +282,14 @@ function _showCode(oNode) {
 
 // 트리 노드 선택(원본 ev_DefPattRowSelectionChange / ev_CustPattRowSelectionChange — 상호배타 + ROOT/무DATA 처리).
 function _selectPattern(oOwnTree, oOtherTree, oNode) {
+    if (oOtherTree) { oOtherTree.selectByKey(""); }   // 다른 트리 선택 해제
+    // ROOT / DATA 없음 → 원본은 clearSelection(선택 표시 없이 빈 상태). 하이라이트 남기지 않는다.
+    if (!oNode || oNode.TYPE === "ROOT" || !oNode.DATA) {
+        if (oOwnTree) { oOwnTree.selectByKey(""); }
+        _showEmpty();
+        return;
+    }
     if (oOwnTree) { oOwnTree.setSelected(oNode); }
-    if (oOtherTree) { oOtherTree.selectByKey(""); }   // 다른 트리 선택 해제(빈 키 → 전체 해제)
-    if (!oNode || oNode.TYPE === "ROOT" || !oNode.DATA) { _showEmpty(); return; }
     _showCode(oNode);
 }
 
@@ -259,7 +304,7 @@ function _mkTree(cfg) {
         icon: function (n) { return _iconHtml(n.ICON); },
         tip: function (n) { return (n.TYPE === "ROOT") ? ((n.DESC || "") + " Root") : (n.DESC || ""); },
         slotTrailing: cfg.slotTrailing || null,
-        rowHook: function (oRow) { oRow.classList.add("u4aPattRow"); },   // 행 스코프(정렬 CSS)
+        rowHook: cfg.rowHook || function (oRow) { oRow.classList.add("u4aPattRow"); },   // 행 스코프(정렬 CSS)
         onSelect: cfg.onSelect,
         initialExpanded: function (n, lvl) { return lvl < 1; }   // 원본 expandToLevel(1)
     });
@@ -305,7 +350,7 @@ function _buildTrees() {
     // 기본 패턴 트리(단일 컬럼[기본 패턴], 읽기전용).
     oDefTree = _mkTree({
         roots: function () { return oState.aDefRoots; },
-        onSelect: function (n) { _selectPattern(oDefTree, oCustTree, n); }
+        onSelect: function (n) { oState.selCustKey = ""; _selectPattern(oDefTree, oCustTree, n); }
     });
     // 커스텀 패턴 트리(이름 | Content Type). Content Type 셀은 모든 행에 반환(세로구분선 연속 — MIME 방식 단일 셀).
     oCustTree = _mkTree({
@@ -321,7 +366,38 @@ function _buildTrees() {
             cell.appendChild(txt);
             return cell;
         },
-        onSelect: function (n) { _selectPattern(oCustTree, oDefTree, n); }
+        // 행 hover 액션(원본 RowAction: 수정/삭제) — ROOT 제외. 절대배치라 컬럼 정렬 불변.
+        rowHook: function (oRow, n) {
+            oRow.classList.add("u4aPattRow");
+            if (!n || n.TYPE === "ROOT") { return; }
+            var oActs = document.createElement("span");
+            oActs.className = "u4aPattRowActs";
+            var oEdit = document.createElement("button");
+            oEdit.type = "button";
+            oEdit.className = "u4aPattRowAct";
+            oEdit.title = _m("030");   // Change
+            oEdit.innerHTML = '<i class="fa-solid fa-pen"></i>';
+            oEdit.addEventListener("click", function (ev) {
+                ev.stopPropagation();
+                _openCreateDlg({ PRCCD: "U", CKEY: n.CKEY, DESC: n.DESC, DATA: n.DATA, CONT_TYPE: n.CONT_TYPE });
+            });
+            var oDel = document.createElement("button");
+            oDel.type = "button";
+            oDel.className = "u4aPattRowAct u4aPattRowAct--del";
+            oDel.title = _m("029");   // Delete
+            oDel.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+            oDel.addEventListener("click", function (ev) {
+                ev.stopPropagation();
+                _deleteCust(n);
+            });
+            oActs.appendChild(oEdit);
+            oActs.appendChild(oDel);
+            oRow.appendChild(oActs);
+        },
+        onSelect: function (n) {
+            oState.selCustKey = (n && n.TYPE !== "ROOT" && n.DATA) ? n.CKEY : "";
+            _selectPattern(oCustTree, oDefTree, n);
+        }
     });
 
     var oDefBody = document.getElementById("pattDefBody");
@@ -351,6 +427,281 @@ function _loadData() {
     oState.aCustRoots = _buildTree(_readPatternJson(PATHINFO.CUST_PATT));
     if (oDefTree) { oDefTree.render(); }
     if (oCustTree) { oCustTree.render(); }
+}
+
+/* ── 커스텀 패턴 CRUD (원본 ev_pressCustomPatternCreateUpdate / ev_CustCreateDlgSave / ev_pressCustomPatternDelete) ── */
+
+// 트리에서 CKEY 로 노드 찾기(재귀).
+function _findNode(aRoots, sKey) {
+    var oFound = null;
+    (function rec(aNodes) {
+        if (oFound || !aNodes) { return; }
+        for (var i = 0; i < aNodes.length; i++) {
+            var n = aNodes[i];
+            if (!n) { continue; }
+            if (n.CKEY === sKey) { oFound = n; return; }
+            if (n._ch && n._ch.length) { rec(n._ch); if (oFound) { return; } }
+        }
+    })(aRoots || []);
+    return oFound;
+}
+
+// 커스텀 트리 재로드(파일 fresh) + 렌더 + (선택키 있으면) 재선택·스크롤. selCustKey 동기(watch 정합).
+function _reloadCust(sSelKey) {
+    oState.aCustRoots = _buildTree(_readPatternJson(PATHINFO.CUST_PATT));
+    if (oCustTree) { oCustTree.render(); }
+    var oNode = sSelKey ? _findNode(oState.aCustRoots, sSelKey) : null;
+    if (oNode) {
+        oState.selCustKey = sSelKey;
+        _selectPattern(oCustTree, oDefTree, oNode);
+        try { oCustTree.scrollToKey(sSelKey); } catch (e) { }
+    } else {
+        oState.selCustKey = "";   // 선택 대상 없음 → 보존 키 해제
+    }
+}
+
+// 커스텀 파일 저장 — 자기저장 가드(watch 자기이벤트 무시). 성공 여부 반환.
+function _writeCust(aFlat) {
+    bSelfWrite = true;
+    var bOk = true;
+    try { FS.writeFileSync(PATHINFO.CUST_PATT, JSON.stringify(aFlat), "utf-8"); }
+    catch (e) { bOk = false; console.error("[HTML5][WS30][patternPopup] 커스텀 패턴 저장 오류:", e && e.message); }
+    setTimeout(function () { bSelfWrite = false; }, 300);   // watch 이벤트(rename+change) 소진 후 해제
+    return bOk;
+}
+
+// 커스텀 파일 외부 변경 감시(원본 fnSetPatternFileWatch/fnPatternFileWatchEvent) — 선택 보존하며 재로드.
+function _initCustWatch() {
+    try {
+        oCustWatcher = FS.watch(PATHINFO.CUST_PATT, function () {
+            if (bSelfWrite) { return; }   // 내 저장은 직접 반영하므로 무시
+            try { clearTimeout(iWatchTimer); } catch (e) { }
+            iWatchTimer = setTimeout(function () {
+                _reloadCust(oState.selCustKey || "");   // 외부 변경 → 선택 보존 재로드
+            }, 120);   // 짧은 디바운스(rename+change 다중 이벤트 합침)
+        });
+    } catch (e) {
+        console.error("[HTML5][WS30][patternPopup] 커스텀 패턴 watch 설정 오류:", e && e.message);
+    }
+}
+
+// 편집 호스트 통신.
+function _toEditHost(oMsg) {
+    try {
+        if (!oDlgUI || !oDlgUI.host || !oDlgUI.host.contentWindow) { return; }
+        oMsg = oMsg || {};
+        oMsg.__u4aedh = true;
+        oMsg.hostId = C_EDIT_HOSTID;
+        oDlgUI.host.contentWindow.postMessage(oMsg, "*");
+    } catch (e) { }
+}
+function _readEditHost() {
+    try { return oDlgUI.host.contentWindow.editor.getValue(); } catch (e) { return null; }
+}
+function _applyEditor(oParam) {
+    _toEditHost({ cmd: "setReadOnly", readOnly: false });
+    _toEditHost({ cmd: "setLanguage", language: _lang(oParam.CONT_TYPE || "text") });
+    _toEditHost({ cmd: "setValue", value: (typeof oParam.DATA === "string") ? oParam.DATA : "" });
+}
+
+// 다이얼로그 폼 행(라벨 + 컨트롤).
+function _dlgRow(sLabel, oControl) {
+    var r = document.createElement("div");
+    r.className = "u4aPattDlgRow";
+    var l = document.createElement("label");
+    l.className = "u4aPattDlgLbl";
+    l.textContent = sLabel;
+    var c = document.createElement("div");
+    c.className = "u4aPattDlgCtl";
+    c.appendChild(oControl);
+    r.appendChild(l);
+    r.appendChild(c);
+    return r;
+}
+
+// 생성/수정 다이얼로그 1회 생성(싱글톤, data-u4a-keep 로 유지 → Monaco 재로드 방지).
+function _ensureCreateDlg() {
+    if (oDlgUI) { return; }
+
+    var oDlg = document.createElement("dialog");
+    oDlg.className = "u4a-dialog u4aPattDlg";
+    oDlg.setAttribute("data-u4a-keep", "");   // 전역 자동 닫기(_installGlobalDialogClose) 제외 → 호스트 유지
+
+    // 헤더(48px) — 아이콘 + 제목.
+    var oHead = document.createElement("div");
+    oHead.className = "u4a-dialog__header";
+    var oIcon = document.createElement("i");
+    oIcon.className = "fa-solid fa-square-plus";
+    var oTitle = document.createElement("span");
+    oTitle.className = "u4a-dialog__title";
+    oHead.appendChild(oIcon);
+    oHead.appendChild(oTitle);
+    oDlg.appendChild(oHead);
+
+    // 본체 — 폼(Title, Content Type) + Pretty Print 툴바 + 편집 호스트.
+    var oBody = document.createElement("div");
+    oBody.className = "u4a-dialog__body u4aPattDlgBody";
+
+    var oForm = document.createElement("div");
+    oForm.className = "u4aPattDlgForm";
+    var oTitleField = U4AUI.createField({ type: "text", value: "", className: "u4aPattDlgTitle" });
+    var oTypeSel = U4AUI.createSelect(
+        A_CONT_TYPES.map(function (t) { return { value: t, text: t }; }),
+        "text",
+        function (sVal) { _toEditHost({ cmd: "setLanguage", language: _lang(sVal) }); }
+    );
+    oForm.appendChild(_dlgRow(_m("024"), oTitleField.el));   // Title
+    oForm.appendChild(_dlgRow(_m("023"), oTypeSel));         // Content Type
+    oBody.appendChild(oForm);
+
+    var oTool = document.createElement("div");
+    oTool.className = "u4aPattDlgTool";
+    var oPretty = document.createElement("button");
+    oPretty.type = "button";
+    oPretty.className = "u4a-btn u4aPattPrettyBtn";
+    oPretty.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i><span></span>';
+    oPretty.querySelector("span").textContent = _m("025");   // Pretty Print
+    oPretty.title = _m("025") + " (Shift+F1)";
+    oPretty.addEventListener("click", function () { _toEditHost({ cmd: "format" }); });
+    oTool.appendChild(oPretty);
+    oBody.appendChild(oTool);
+
+    var oEdWrap = document.createElement("div");
+    oEdWrap.className = "u4aPattDlgEditor";
+    var oHost = document.createElement("iframe");
+    oHost.id = "pattEditHost";
+    oHost.setAttribute("frameborder", "0");
+    var oEPARAMS = { HOSTID: C_EDIT_HOSTID, LANG: "plaintext", THEME: _monacoThemeFromBg(BGCOL), READONLY: false };
+    oHost.src = "../editorPopup/host/index.html?PARAMS=" + encodeURIComponent(JSON.stringify(oEPARAMS));
+    oEdWrap.appendChild(oHost);
+    oBody.appendChild(oEdWrap);
+
+    oDlg.appendChild(oBody);
+
+    // 푸터(48px) — 저장 / 취소(아이콘, §2.1.1).
+    var oFoot = document.createElement("div");
+    oFoot.className = "u4a-dialog__footer";
+    var oSave = document.createElement("button");
+    oSave.type = "button";
+    oSave.className = "u4a-btn u4a-btn--emphasized";
+    oSave.innerHTML = '<i class="fa-solid fa-check"></i>';
+    oSave.title = _mc("/U4A/CL_WS_COMMON", "A64");   // Save
+    oSave.addEventListener("click", function () { _saveCreateDlg(); });
+    var oCancel = document.createElement("button");
+    oCancel.type = "button";
+    oCancel.className = "u4a-btn u4a-btn--negative";
+    oCancel.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    oCancel.title = _mc("/U4A/CL_WS_COMMON", "A39");   // Close
+    oCancel.addEventListener("click", function () { _closeCreateDlg(); });
+    oFoot.appendChild(oSave);
+    oFoot.appendChild(oCancel);
+    oDlg.appendChild(oFoot);
+
+    // ESC 무시(원본 escapeHandler:{} — 편집 중 실수로 닫혀 입력 손실되는 것 방지. 닫기는 취소 버튼으로만).
+    oDlg.addEventListener("cancel", function (e) { e.preventDefault(); });
+
+    try { if (U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHead); } } catch (e) { }
+    try { if (U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 480, minH: 360 }); } } catch (e) { }
+
+    document.body.appendChild(oDlg);
+
+    oDlgUI = {
+        dlg: oDlg, host: oHost, icon: oIcon, title: oTitle,
+        titleField: oTitleField, typeSel: oTypeSel, prettyBtn: oPretty,
+        ready: false, pending: null, PRCCD: "C", CKEY: ""
+    };
+}
+
+// 생성/수정 다이얼로그 열기.
+function _openCreateDlg(oParam) {
+    _ensureCreateDlg();
+    oParam = oParam || { PRCCD: "C" };
+    oDlgUI.PRCCD = oParam.PRCCD || "C";
+    oDlgUI.CKEY = oParam.CKEY || "";
+
+    var bU = (oDlgUI.PRCCD === "U");
+    oDlgUI.icon.className = "fa-solid " + (bU ? "fa-pen-to-square" : "fa-square-plus");
+    oDlgUI.title.textContent = _m("022") + " " + (bU ? _m("030") : _m("026"));   // Custom Pattern Change / Create
+
+    oDlgUI.titleField.setValue(oParam.DESC || "");
+    oDlgUI.titleField.setValueState("none");
+    var sType = oParam.CONT_TYPE || "text";
+    oDlgUI.typeSel.value = sType;
+
+    var oApply = { CONT_TYPE: sType, DATA: oParam.DATA };
+    if (oDlgUI.ready) { _applyEditor(oApply); }
+    else { oDlgUI.pending = oApply; }
+
+    if (!oDlgUI.dlg.open) { try { oDlgUI.dlg.showModal(); } catch (e) { } }
+    setTimeout(function () {
+        try { oDlgUI.titleField.focus(); } catch (e) { }
+        _toEditHost({ cmd: "layout" });   // 다이얼로그 표시 후 에디터 레이아웃 재계산
+    }, 0);
+}
+
+function _closeCreateDlg() {
+    if (oDlgUI && oDlgUI.dlg && oDlgUI.dlg.open) { try { oDlgUI.dlg.close(); } catch (e) { } }
+}
+
+// 저장(원본 ev_CustCreateDlgSave) — 검증 먼저(validate-first) → CUST_PATT fresh 갱신 → 재로드·재선택.
+function _saveCreateDlg() {
+    if (!oDlgUI) { return; }
+
+    var sDesc = (oDlgUI.titleField.getValue() || "").trim();
+    if (!sDesc) {
+        oDlgUI.titleField.setValueState("error", _m("027", _m("024")));   // title is required entry value(&1=Title)
+        try { oDlgUI.titleField.focus(); } catch (e) { }
+        return;
+    }
+    oDlgUI.titleField.setValueState("none");
+
+    var sData = _readEditHost();
+    if (sData === null) { sData = ""; }
+    var sType = oDlgUI.typeSel.value || "text";
+
+    // 원본과 동일 — 파일 fresh 읽기(트리 노드의 _ch/_parent 오염 회피).
+    var aFlat = _readPatternJson(PATHINFO.CUST_PATT);
+    var sSelKey = "";
+    if (oDlgUI.PRCCD === "C") {
+        var sKey = WSUTIL.getRandomKey();
+        sSelKey = sKey;
+        aFlat.push({ PKEY: "PATT002", CKEY: sKey, DESC: sDesc, DATA: sData, CONT_TYPE: sType });   // 커스텀 루트 하위
+    } else {
+        sSelKey = oDlgUI.CKEY;
+        var iF = aFlat.findIndex(function (e) { return e && e.CKEY === oDlgUI.CKEY; });
+        if (iF >= 0) { aFlat[iF] = Object.assign({}, aFlat[iF], { DESC: sDesc, DATA: sData, CONT_TYPE: sType }); }
+    }
+
+    if (!_writeCust(aFlat)) { return; }
+
+    _closeCreateDlg();
+    _reloadCust(sSelKey);
+    _toast(_m("007"));   // Saved success
+}
+
+// 삭제(원본 ev_pressCustomPatternDelete) — 확인 후 splice.
+function _deleteCust(oNode) {
+    if (!oNode || !oNode.CKEY) { return; }
+    _selectPattern(oCustTree, oDefTree, oNode);   // 삭제 전 해당 행 선택 표시(원본)
+    U4AUI.confirm({
+        type: "W",
+        title: _m("022") + " " + _m("029"),                          // Custom Pattern Delete
+        message: "[" + (oNode.DESC || "") + "]\n\n" + _m("028"),      // Do you really want to delete the object?
+        yesLabel: _m("038"),   // YES
+        noLabel: _m("039"),    // NO
+        onClose: function (sAct) {
+            if (sAct !== "YES") { return; }
+            var aFlat = _readPatternJson(PATHINFO.CUST_PATT);
+            var iF = aFlat.findIndex(function (e) { return e && e.CKEY === oNode.CKEY; });
+            if (iF < 0) { return; }
+            aFlat.splice(iF, 1);
+            if (!_writeCust(aFlat)) { return; }
+            _reloadCust("");
+            if (oCustTree) { oCustTree.selectByKey(""); }
+            _showEmpty();
+            _toast(_m("008"));   // Delete success
+        }
+    });
 }
 
 /* ── 스플리터 드래그(가로/세로) — 공통 CSS(.u4a-splitter*) 소비, 폭 계산만 화면별(§4.3, MIME 미러).
@@ -438,7 +789,9 @@ function _onThemeChange() {
     } catch (e) { }
     try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { }
     if (oTheme.BGCOL) { BGCOL = oTheme.BGCOL; }
-    _toHost({ cmd: "setTheme", theme: _monacoThemeFromBg(oTheme.BGCOL) });
+    var sMon = _monacoThemeFromBg(oTheme.BGCOL);
+    _toHost({ cmd: "setTheme", theme: sMon });
+    _toEditHost({ cmd: "setTheme", theme: sMon });   // 생성 다이얼로그 편집기도 동기(있을 때)
 }
 
 // 원본 opener 가 did-finish-load 에 보내는 테마정보(IPC 계약 유지) — 받으면 테마 재적용.
@@ -450,14 +803,29 @@ function _onPatternInfo(event, oInfo) {
     _toHost({ cmd: "setTheme", theme: _monacoThemeFromBg(BGCOL) });
 }
 
-/* ── 호스트 → 창 메시지(ready / zoom) ───────────────────────────────────── */
+/* ── 호스트 → 창 메시지(뷰어 U4APATT / 편집기 U4APATTEDIT) ─────────────────── */
 function _onHostMessage(oEvent) {
     var d = oEvent && oEvent.data;
-    if (!d || d.__u4aedh !== true || d.hostId !== C_HOSTID) { return; }
-    if (d.evt === "ready") {
-        oState.ready = true;
-        if (oState.pending) { var n = oState.pending; oState.pending = null; _showCode(n); }
-        _finishOpen();
+    if (!d || d.__u4aedh !== true) { return; }
+
+    // 우측 읽기전용 뷰어 호스트.
+    if (d.hostId === C_HOSTID) {
+        if (d.evt === "ready") {
+            oState.ready = true;
+            if (oState.pending) { var n = oState.pending; oState.pending = null; _showCode(n); }
+            _finishOpen();
+        }
+        return;
+    }
+
+    // 생성/수정 다이얼로그 편집 호스트.
+    if (d.hostId === C_EDIT_HOSTID && oDlgUI) {
+        if (d.evt === "ready") {
+            oDlgUI.ready = true;
+            if (oDlgUI.pending) { var p = oDlgUI.pending; oDlgUI.pending = null; _applyEditor(p); }
+        } else if (d.evt === "save") {
+            if (oDlgUI.dlg && oDlgUI.dlg.open) { _saveCreateDlg(); }   // 에디터 Ctrl+S
+        }
         return;
     }
 }
@@ -505,6 +873,15 @@ function _initChrome() {
             }
             _toast(_m("031"));   // Clipboard Copy Success!
         });
+    }
+
+    // 커스텀 패턴 Create 버튼(원본 커스텀 트리 footer Create).
+    var oCreateBtn = document.getElementById("pattCustCreateBtn");
+    if (oCreateBtn) {
+        var oCBS = oCreateBtn.querySelector("span");
+        if (oCBS) { oCBS.textContent = _m("026"); }   // Create
+        oCreateBtn.title = _m("026");
+        oCreateBtn.addEventListener("click", function () { _openCreateDlg({ PRCCD: "C", CONT_TYPE: "text" }); });
     }
 }
 
@@ -559,6 +936,7 @@ window.addEventListener("load", function () {
     // 데이터 로드 + 트리 렌더(FS 직접 — 호스트 준비와 무관).
     _loadData();
     _showEmpty();
+    _initCustWatch();   // 커스텀 패턴 파일 외부 변경 라이브 반영(원본 fnSetPatternFileWatch)
 
     // busy 는 오프너가 켠 상태 유지 → 호스트 완전 로드 시 1회 해제(중간 깜빡임 없음).
     _setBusy(true);
@@ -582,4 +960,5 @@ window.onbeforeunload = function () {
     window.removeEventListener("message", _onHostMessage);
     try { IPCRENDERER.removeListener("if-usp-pattern-info", _onPatternInfo); } catch (e) { }
     try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { }
+    try { if (oCustWatcher) { oCustWatcher.close(); oCustWatcher = null; } } catch (e) { }   // watch 정리(누수 방지)
 };

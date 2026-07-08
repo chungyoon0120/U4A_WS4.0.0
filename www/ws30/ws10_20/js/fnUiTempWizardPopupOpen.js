@@ -458,8 +458,40 @@
             } catch (e) { }
         }
 
+        // ★스크롤스파이 — 스크롤하면 최상단에 걸린 섹션 카드에 맞춰 진행바 선택 표시(nav.selIdx)를 따라 이동.
+        //   (스텝 클릭/자동스크롤의 부드러운 스크롤 중에도 선택이 함께 움직인다). rAF 스로틀.
+        oPage.addEventListener("scroll", function () {
+            if (oPage.__spyRaf) { return; }
+            oPage.__spyRaf = requestAnimationFrame(function () { oPage.__spyRaf = 0; _scrollSpy(oPage); });
+        }, { passive: true });
+
         oPg.appendChild(oPage);
         return oPg;
+    }
+
+    // 스크롤스파이 — 스크롤 컨테이너(page) 최상단(스티키 진행바 아래)에 걸린 스텝 카드를 찾아 그 스텝을 진행바 current 로.
+    function _scrollSpy(oPage) {
+        if (!oPage || !document.body.contains(oPage)) { return; }
+        var oNavEl = oPage.querySelector(".u4aTplWiz__wzNav");
+        var iNavH = oNavEl ? oNavEl.offsetHeight : 0;
+        // 활성 기준선 — 카드 scroll-margin-top(4rem=64px, 스크롤 도착 위치)보다 살짝 아래여야 도착 카드가 선택된다.
+        var iLine = oPage.getBoundingClientRect().top + Math.max(iNavH, 56) + 16;
+        var aCards = oPage.querySelectorAll(".u4aTplWiz__stepCard");
+        var oActive = null;
+        for (var i = 0; i < aCards.length; i++) {
+            if (aCards[i].hidden) { continue; }
+            var iTop = aCards[i].getBoundingClientRect().top;
+            if (iTop <= iLine + 2) { oActive = aCards[i]; }   // 기준선 위/근처면 후보(더 아래로 갈수록 마지막이 현재)
+            else if (oActive) { break; }                       // 기준선 아래 카드 도달 → 확정
+        }
+        if (!oActive) { // 맨 위 : 첫 보이는 카드
+            for (var j = 0; j < aCards.length; j++) { if (!aCards[j].hidden) { oActive = aCards[j]; break; } }
+        }
+        if (!oActive || !oActive.__sec) { return; }
+        var sec = oActive.__sec, nav = sec.nav || sec.shared;
+        if (!nav) { return; }
+        var idx = oActive.__local + (sec.cfg.numOffset || 0);
+        if (nav.selIdx !== idx) { nav.selIdx = idx; _syncNav(nav); } // 스크롤 위치의 스텝을 선택 표시
     }
 
     // 스크롤 하단 가상 여백 갱신 — 마지막 보이는 스텝 카드가 페이지 최상단까지 스크롤될 만큼 뒤 공간 확보.
@@ -724,6 +756,7 @@
             oCard.appendChild(oBody);
             sec.els.cards[idx] = oCard;
             sec.els.cardHeads[idx] = oHead;
+            oCard.__sec = sec; oCard.__local = idx; // 스크롤스파이 : 카드 → (섹션, 로컬 스텝 인덱스)
             oSteps.appendChild(oCard);
             return oBody;
         }
@@ -787,6 +820,14 @@
         var nv = sec.nav || sec.shared;
         if (nv) { nv.selIdx = null; }
         _syncNav(nv); // 섹션 자체 내비 or 통합 내비 갱신(provider 가 live 값 읽음)
+
+        // ★카드 게이팅(스텝 노출/숨김)이 바뀌면 하단 가상 여백을 즉시 재계산 — "현재 보이는 마지막 카드" 기준.
+        //   (RO 비동기 타이밍 의존 제거. 예: 스텝4가 마지막이면 스텝6 기준의 과다 여백이 남아 과다 스크롤되던 것 방지)
+        try {
+            var oCard0 = sec.els.cards[0];
+            var oPageEl = oCard0 && oCard0.closest ? oCard0.closest(".u4aTplWiz__page") : null;
+            if (oPageEl) { _updateScrollPad(oPageEl); }
+        } catch (e) { }
     }
 
     // 카드 제목(번호) + 노출(available && gate) 갱신. gate=WZD3 Table 은 Form 모델 로드 후.
@@ -883,9 +924,9 @@
     function _navGo(nav, idx) {
         var a = _navSteps(nav);
         if (!a[idx] || !a[idx].avail) { return; }
-        nav.selIdx = idx;
+        // 스크롤만 — 선택 표시(current)는 스크롤스파이가 스크롤을 따라 이동시킨다(즉시 selIdx 박으면 목표로 튀었다
+        //   스파이가 되돌려 깜빡임). 스크롤이 실제로 일어나면 scroll 이벤트→_scrollSpy 가 selIdx 갱신.
         a[idx].scroll();
-        _syncNav(nav);
     }
 
     // in-place 갱신(full) — 라벨/available/current + 연결선 진행(is-done)만 토글. mini 는 _wzNavResize 가 재배치.
@@ -1088,6 +1129,10 @@
 
         _wzSyncSteps(sec);           // 스텝 available/라벨 갱신 (step2 노출/숨김 포함)
         _syncCreateForMenu(oS.cur);
+
+        // 스텝1(UI 선택) 값 지정 → 새로 나타난 스텝2(모델 선택) 카드를 페이지 상단으로 스크롤(모델정보=step3 로드시 처리와 동일 UX).
+        //   값 비움/게이트로 카드 숨김이면 _wzScrollToCard 가 no-op.
+        if (key) { _wzScrollToCard(sec, 1); }
     }
 
     // Model Select 버튼 → Bind 팝업(모델 피커) 재사용 (원본 ev_tmplWzd1ModelSelectBtn)
@@ -1181,8 +1226,11 @@
             sec.els.cols.push(oCol);
             iSum += sec.colW[c];
         }
+        // ★ 채움(trailing filler) 컬럼 — 폭 미지정(auto). table-layout:fixed 에서 폭 지정된 데이터 컬럼은
+        //   고정되고, 나머지 공간은 이 컬럼 하나가 흡수한다(원본 UI5 처럼 격자가 우측 끝까지 이어짐, 데이터 컬럼 stretch 없음).
+        oCg.appendChild(document.createElement("col"));
         oTbl.appendChild(oCg);
-        oTbl.style.minWidth = iSum + "px";
+        oTbl.style.minWidth = iSum + "px";   // 데이터 컬럼 합(채움 제외) — 이보다 좁아지면 가로 스크롤
 
         var oThead = document.createElement("thead");
         var oTrH = document.createElement("tr");
@@ -1204,6 +1252,7 @@
         th(_cl("D74")); // Field Type
         th(_cl("D75")); // Field Length
         th(_cl("D76")); // Conv. Routine
+        oTrH.appendChild(_el("th", "u4a-th u4aTplWiz__fillCol"));   // 채움 헤더(빈 셀, 나머지 폭 흡수)
         oThead.appendChild(oTrH);
         oTbl.appendChild(oThead);
 
@@ -1231,8 +1280,8 @@
         return w;
     }
 
-    // 컬럼 리사이즈 그립 (원본 바인딩 팝업 _buildColGrip 1:1 — 그립 드래그로 해당 col 폭 조절,
-    //   body.u4a-dragging(iframe 위 끊김 방지), 더블클릭=기본폭 복귀). 마지막 컬럼 제외.
+    // 컬럼 리사이즈 그립 — 공통 SSOT U4AUI.attachColumnResize(가이드 라인 + 놓을 때 적용, 16 §3.4.2)
+    //   소비. 마지막 컬럼 제외. 폭 적용 시 sec.colW 영속 + 테이블 minWidth 재계산(가로 스크롤).
     function _wzAddColResize(sec, oTrH) {
         var aTh = oTrH.children;
         for (var i = 0; i < aTh.length - 1; i++) {
@@ -1243,36 +1292,25 @@
     function _wzColGrip(sec, idx) {
         var oGrip = _el("div", "u4aTplWiz__colGrip");
         oGrip.setAttribute("aria-hidden", "true");
-        var bDrag = false, iStartX = 0, iStart0 = 0;
-        function lf_move(e) {
-            if (!bDrag) { return; }
-            var w = Math.max(48, iStart0 + (e.clientX - iStartX));
-            sec.colW[idx] = w;
-            if (sec.els.cols[idx]) { sec.els.cols[idx].style.width = w + "px"; }
-            _wzApplyTblMinW(sec);
-        }
-        function lf_up() {
-            bDrag = false;
-            document.body.classList.remove("u4a-dragging");
-            document.removeEventListener("mousemove", lf_move);
-            document.removeEventListener("mouseup", lf_up);
-        }
-        oGrip.addEventListener("mousedown", function (e) {
-            bDrag = true;
-            iStartX = e.clientX;
-            iStart0 = sec.colW[idx];
-            document.body.classList.add("u4a-dragging");
-            document.addEventListener("mousemove", lf_move);
-            document.addEventListener("mouseup", lf_up);
-            e.preventDefault();
-            e.stopPropagation();
-        });
-        // 더블클릭 = 기본폭 복귀.
-        oGrip.addEventListener("dblclick", function (e) {
-            e.stopPropagation();
-            sec.colW = _wzDefaultColW(sec.treevisi);
-            for (var c = 0; c < sec.colW.length; c++) { if (sec.els.cols[c]) { sec.els.cols[c].style.width = sec.colW[c] + "px"; } }
-            _wzApplyTblMinW(sec);
+        U4AUI.attachColumnResize(oGrip, {
+            host: sec.els.tbl,   // 가이드 세로 범위 = 테이블 높이(공통 함수가 보이는 영역으로 클램프)
+            min: 48,
+            // ★ 실제 렌더폭 실측(그립이 얹힌 헤더 셀) — 저장폭 대신(§3.4.2 트리 소비처와 동일). 어긋남 방지.
+            getWidth: function () {
+                var oTh = oGrip.parentNode;
+                return (oTh && oTh.getBoundingClientRect().width) || sec.colW[idx];
+            },
+            setWidth: function (px) {
+                sec.colW[idx] = px;
+                if (sec.els.cols[idx]) { sec.els.cols[idx].style.width = px + "px"; }
+                _wzApplyTblMinW(sec);
+            },
+            // 더블클릭 = 기본폭 복귀.
+            onReset: function () {
+                sec.colW = _wzDefaultColW(sec.treevisi);
+                for (var c = 0; c < sec.colW.length; c++) { if (sec.els.cols[c]) { sec.els.cols[c].style.width = sec.colW[c] + "px"; } }
+                _wzApplyTblMinW(sec);
+            }
         });
         return oGrip;
     }
@@ -1335,6 +1373,7 @@
         tr.appendChild(_wzTextTd(r.FTYPE)); // Field Type
         tr.appendChild(_wzTextTd(r.FLEN));  // Field Length
         tr.appendChild(_wzTextTd(r.CONVE)); // Conv. Routine
+        tr.appendChild(_el("td", "u4aTplWiz__fillCol"));   // 채움 셀(빈, 나머지 폭)
         return tr;
     }
 
@@ -1739,8 +1778,12 @@
             /* 모션 최소화 선호 시 애니메이션/트랜지션 해제 (.analy/16 §9 · ws20.css 페이지전환과 동일 정책) */
             "@media (prefers-reduced-motion: reduce){.u4aTplWiz__navNum,.u4aTplWiz__navStep,.u4aTplWiz__navConn::after,.u4aTplWiz__navMiniStep .u4aTplWiz__navLbl{transition:none;}.u4aTplWiz__navStep.is-current .u4aTplWiz__navNum{transform:none;}.u4aTplWiz__steps .u4aTplWiz__stepCard:not([hidden]){animation:none;}}",
             ".u4aTplWiz__tblWrap{width:100%;max-width:100%;overflow-x:auto;}",
-            /* 컬럼 폭 보장 — colgroup 고정폭 + 테이블 min-width, 좁으면 tblWrap 가로 스크롤 */
+            /* ★ 데이터 컬럼 = 고정폭(§3.4.2), 마지막에 폭 미지정 "채움 컬럼" 하나로 나머지 흡수(원본 UI5 동일).
+               table-layout:fixed 는 폭 지정 컬럼을 고정하고 남는 폭을 폭 미지정 컬럼(채움)에만 준다 →
+               데이터 컬럼 stretch 없음(리사이즈 정확), 격자는 우측 끝까지 채움. 데이터 폭 합 > 랩이면 채움=0 + 가로 스크롤. */
             ".u4aTplWiz__tbl{width:100%;}",
+            /* 채움 컬럼(빈 헤더/셀) — 최소폭 0(데이터 컬럼 폭 보호), 좌측 구분선은 앞 셀 box-shadow 가 그린다. */
+            ".u4aTplWiz__tbl th.u4aTplWiz__fillCol,.u4aTplWiz__tbl td.u4aTplWiz__fillCol{min-width:0;padding:0;}",
             ".u4aTplWiz__tbl th,.u4aTplWiz__tbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
             ".u4aTplWiz__tbl td{padding:.1875rem .375rem;vertical-align:middle;}",
             /* 세로 컬럼 구분선 (원본 sap.ui.table.Table 셀 보더) — 마지막 컬럼 제외.

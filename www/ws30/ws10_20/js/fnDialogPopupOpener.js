@@ -3465,13 +3465,28 @@
             IS_EDIT: IS_EDIT
         };
 
-        oCSS.start(parent.require, IF_DATA, function (oRes) {
+        // ★ start(창 생성/셋업) 실패 시 메인 busy lock 이 영구 잠기지 않도록 방어(guard-server-script-eval).
+        //   정상 오픈되면 busy 해제는 자식 프레임(frame.js fnFinishOpen)이 IPC 로 수행 → 여기선 실패만 처리.
+        try {
 
-            // CSS를 미리보기에 적용
-            oAPP.fn.prevStyleClassApply(oRes.DATA, oRes.PRCCD);
+            await oCSS.start(parent.require, IF_DATA, function (oRes) {
 
+                // CSS를 미리보기에 적용
+                oAPP.fn.prevStyleClassApply(oRes.DATA, oRes.PRCCD);
 
-        });
+            });
+
+        } catch (e) {
+
+            console.error("[WS20] UI5 Predefined CSS 팝업 오픈 실패:", e && e.message);
+
+            // busy 끄고 Lock 풀기
+            oAPP.common.fnSetBusyLock("");
+
+            // 전체 자식 윈도우에 Busy 끈다.
+            oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
+
+        }
 
     }; // end of oAPP.fn.fnUI5PreCssPopupOpener
 

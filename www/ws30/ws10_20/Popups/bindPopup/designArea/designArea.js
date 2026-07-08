@@ -3,7 +3,7 @@
  * --------------------------------------------------------------------------
  *  원본: uiModule/designTree.js — 현재 앱 전체 UI 계층(TreeTable) + 각 UI 의 Property/Aggregation
  *        자식 노드 + 기존 바인딩 표시 + 드래그드롭 바인딩 + 멀티/동기화 + 행 액션.
- *  HTML5: 공통 레퍼런스 oAPP.fn.makeColumnTree(다열 그리드 트리) + 공유 oAPP.H 소비.
+ *  HTML5: 공통 컴포넌트 U4AUI.makeColumnTree(다열 그리드 트리, theme/u4a-ui.js) + 공유 oAPP.H 소비.
  *
  *  ★ 이 단계(Stage3-a) = 트리 데이터 변환(원본 setDesignTreeData + 4 빌더 1:1) + 툴바 + 렌더.
  *    데이터(T_0014/T_0015)는 WS20 브로드캐스트(UPDATE_DESIGN_DATA)로 채워진다(Stage6) — 그 전엔 빈 트리.
@@ -187,8 +187,8 @@
         oD.tool.appendChild(H.iconBtn("angles-up", H.cl("C28"), function () { if (oD.ctrl) { oD.ctrl.collapseSelected(); } }));   // Collapse
         oD.tool.appendChild(H.iconBtn("xmark", H.z("187"), function () { _clearChecks(); }));   // 187 Clear selection
 
-        // ── 다열 그리드 트리(Object Name / 바인딩 경로 / MPROP) ──
-        oD.ctrl = oAPP.fn.makeColumnTree(oD.host, {
+        // ── 공통 다열 그리드 트리(U4AUI.makeColumnTree — Object Name / 바인딩 경로 / MPROP) ──
+        oD.ctrl = U4AUI.makeColumnTree(oD.host, {
             columns: [
                 { label: H.z("174"), width: "18rem" },   // 174 Object Name
                 { label: H.z("165"), width: "14rem" },   // 165 바인딩 경로
