@@ -29,6 +29,33 @@
     // Nozero 불가 타입(원본 l_nozero) / number format 가능 타입(원본 l_numfmt).
     var CS_NOZERO_NG = "Cg", CS_NUMFMT_OK = "IP";
 
+    // 161 컬럼최적화 — 속성 컬럼을 라벨 최대폭에 맞춤(원본 setUiTableAutoResizeColumn 대응). 실패 무해.
+    //   ★ Range 로 실제 텍스트폭 측정(컬럼폭 무관·항상 동일). scrollWidth 는 grow-only 버그라 안 씀.
+    function _textW(el) {
+        try {
+            var r = document.createRange();
+            r.selectNodeContents(el);
+            var w = r.getBoundingClientRect().width;
+            if (w) { return w; }
+        } catch (e) { }
+        return el.offsetWidth;
+    }
+    function _fitCols() {
+        if (!oA.host) { return; }
+        try {
+            var oTbl = oA.host.querySelector(".u4aBwpAdditTbl");
+            if (!oTbl) { return; }
+            var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+            var mx = 0, aProp = oTbl.querySelectorAll("th:first-child, .u4aBwpAdditProp");
+            for (var i = 0; i < aProp.length; i++) { var w = _textW(aProp[i]); if (w > mx) { mx = w; } }
+            if (mx > 0) {
+                var sW = Math.max(6 * rem, Math.ceil(mx) + 1.5 * rem) + "px";
+                var aFirst = oTbl.querySelectorAll("tr > :first-child");
+                for (var j = 0; j < aFirst.length; j++) { aFirst[j].style.width = sW; }
+            }
+        } catch (e) { console.error("[HTML5][bindWindow] additFitCols:", e && e.message); }
+    }
+
     /* ── 영역 초기화(frame.js _bootApp → initAdditArea) ─────────────────────── */
     oAPP.fn.initAdditArea = function () {
         oA.tool = document.getElementById("bwpAdditInfoTool");
@@ -52,6 +79,13 @@
         });
         oA.tool.appendChild(oBind);
         oA.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
+        // 161 컬럼최적화 — 속성 컬럼을 라벨 콘텐츠 폭에 맞춤(원본 resize-horizontal).
+        oA.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () { _fitCols(); }));
+        // 957 화면 커스터마이징 — 원본 bindAdditInfo.js:1164 createBindLayoutCustomizingButton(좌·중·우 공통).
+        oA.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {
+            if (oAPP.attr.editable === false) { return; }
+            if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
+        }));
         oA.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
             if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
         }));

@@ -133,6 +133,77 @@
     };
 
     /************************************************************************
+     * 빈 트리 표식 — 데이터가 없으면 host 에 .u4aBwpTreeEmpty 를 붙여 그리드/행라인을 끈다.
+     *   ★ 공통 makeColumnTree 는 .u4aColTreeBody(반복 그라디언트=가로 행라인)+.u4aColTreeGrid(세로 컬럼라인)를
+     *     데이터 없어도 그린다. 원본 sap.ui.table 은 빈 경우 선을 안 그리므로(사용자 지적), 빈 트리에선 스코프로 끈다.
+     ************************************************************************/
+    oAPP.fn.setTreeEmptyMark = function (oHost, bEmpty) {
+        if (oHost) { oHost.classList.toggle("u4aBwpTreeEmpty", !!bEmpty); }
+    };
+
+    /************************************************************************
+     * 컬럼 자동맞춤(autofit) — 원본 161 setUiTableAutoResizeColumn 대응.
+     *   공통 makeColumnTree host 의 각 컬럼을 "콘텐츠 자연폭"에 정확히 맞춘다(넓힘·줄임 모두).
+     *   ★핵심: 셀 박스의 scrollWidth 는 콘텐츠가 들어차면 현재 폭과 같아 줄이질 못한다.
+     *     → 리프(텍스트/아이콘) 요소의 scrollWidth(=말줄임과 무관한 전체 텍스트폭) + 셀 내 좌측 오프셋
+     *       (들여쓰기+토글+아이콘+패딩)으로 자연폭을 구한다. 측정만 하고(레이아웃 1회) 끝에 변수 기록.
+     ************************************************************************/
+    oAPP.fn.fitTreeColumns = function (oHost) {
+        if (!oHost) { return; }
+        try {
+            var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+            var slack = Math.round(0.75 * rem), minPx = Math.round(4 * rem);
+
+            // ★ 요소의 "실제 콘텐츠 폭" — 텍스트는 Range 로 글자폭 측정(컬럼폭과 무관·항상 동일 = autofit 안정),
+            //   비텍스트(아이콘)는 offsetWidth. scrollWidth 는 내용이 넘칠 때만 정확해 grow-only 버그라 쓰지 않음.
+            function _contentW(el) {
+                if (el.textContent && el.textContent.trim()) {
+                    try {
+                        var r = document.createRange();
+                        r.selectNodeContents(el);
+                        var w = r.getBoundingClientRect().width;
+                        if (w) { return w; }
+                    } catch (e) { }
+                }
+                return el.offsetWidth;
+            }
+            // 셀의 자연 콘텐츠 폭 = max( 리프.left - 셀.left + 리프 콘텐츠폭 ). 리프=자식 없는 텍스트/아이콘.
+            function _cellNat(oCell) {
+                var oR = oCell.getBoundingClientRect();
+                if (!oR.width) { return 0; }   // display:contents 등 방어.
+                var base = oR.left, nat = 0, bLeaf = false, aEl = oCell.querySelectorAll("*");
+                for (var i = 0; i < aEl.length; i++) {
+                    var el = aEl[i];
+                    if (el.children.length) { continue; }      // 리프만.
+                    bLeaf = true;
+                    var w = (el.getBoundingClientRect().left - base) + _contentW(el);
+                    if (w > nat) { nat = w; }
+                }
+                if (!bLeaf) { nat = _contentW(oCell); }   // 셀 자체가 텍스트(헤더 라벨 등).
+                return nat;
+            }
+            function _colMax(aSel) {
+                var mx = 0;
+                for (var i = 0; i < aSel.length; i++) {
+                    var aCell = oHost.querySelectorAll(aSel[i]);
+                    for (var j = 0; j < aCell.length; j++) { var w = _cellNat(aCell[j]); if (w > mx) { mx = w; } }
+                }
+                return mx;
+            }
+            // C1=헤더 라벨+이름셀(들여쓰기/토글/아이콘/라벨), C2/C3=헤더+본문 셀.
+            var c1 = Math.max(minPx, Math.ceil(_colMax([".u4aColTreeHead .u4aColTreeC1", ".u4aColTreeNameCell"])) + slack);
+            var c2 = Math.max(minPx, Math.ceil(_colMax([".u4aColTreeHead .u4aColTreeC2", ".u4aColTreeBody .u4aColTreeC2"])) + slack);
+            var c3 = Math.max(minPx, Math.ceil(_colMax([".u4aColTreeHead .u4aColTreeC3", ".u4aColTreeBody .u4aColTreeC3"])) + slack);
+
+            oHost.style.setProperty("--u4act-c1-w", c1 + "px");
+            oHost.style.setProperty("--u4act-c2-w", c2 + "px");
+            oHost.style.setProperty("--u4act-c3-w", c3 + "px");
+            // 가로 스크롤 총폭 동기화(원본 makeColumnTree _syncTotal 과 동일: 컬럼합 + overhead).
+            oHost.style.setProperty("--u4act-total-w", (c1 + c2 + c3 + (rem * 0.375 * 3 + 1)) + "px");
+        } catch (e) { console.error("[HTML5][bindWindow] fitTreeColumns:", e && e.message); }
+    };
+
+    /************************************************************************
      * oAPP.H — 바인딩 팝업 전 영역(모델필드/디자인/추가속성/동기화)이 공유하는 UI 헬퍼.
      *   ★ 화면마다 _el/_fa/_statIcon 을 복붙하지 말고 이걸 소비한다(중복 제거).
      ************************************************************************/

@@ -129,6 +129,8 @@ function _finishOpen() {
 }
 
 // 공통 .u4a-toast(화면 정중앙) — 싱글톤 div + data-show + 3초.
+//   ★ top-layer(16 §2.10): showModal() 모달이 열려 있으면 토스트를 그 <dialog>(top layer) 안으로
+//     옮겨 붙인다. body 에 두면 모달 top-layer 뒤로 가려져 안 보인다(툴팁/컬럼메뉴와 동일 처리).
 function _toast(sText) {
     if (!sText) { return; }
     var oEl = document.getElementById("u4aBwpToast");
@@ -137,8 +139,10 @@ function _toast(sText) {
         oEl.id = "u4aBwpToast";
         oEl.className = "u4a-toast";
         oEl.setAttribute("role", "alert");
-        document.body.appendChild(oEl);
     }
+    // 열린 모달 <dialog> 있으면 그 안(top layer), 없으면 body — 매 표시마다 재배치.
+    var oHost = document.querySelector("dialog[open]") || document.body;
+    if (oEl.parentNode !== oHost) { oHost.appendChild(oEl); }
     oEl.textContent = sText;
     oEl.dataset.show = "true";
     try { clearTimeout(oToastTimer); } catch (e) { }
@@ -218,8 +222,14 @@ function _wireSplitters() {
             var r = oShell.getBoundingClientRect();
             var px = (sSide === "left") ? (ev.clientX - r.left) : (r.right - ev.clientX);
             var iMin = (sSide === "left") ? C_LEFT_MIN : C_RIGHT_MIN;
-            // 반대편·중앙 최소폭 확보(전체 - 이쪽 - 반대편 - 바들 ≥ 중앙 최소).
-            var iMax = r.width - C_CENTER_MIN - ((sSide === "left") ? C_RIGHT_MIN : C_LEFT_MIN) - 16;
+            // ★ 반대편 고정 패널의 "실제 폭"(최소값 아님)과 중앙 최소·바 폭을 빼서 이쪽 최대폭 산출.
+            //   반대편을 최소값으로 잡으면(옛 버그) 반대편이 넓을 때 이쪽을 과도하게 키워 전체가 창을 넘쳐
+            //   우측 패널·툴바가 화면 밖으로 밀린다. 숨김 패널은 offsetWidth 0 → 그만큼 여유.
+            var oOpp = document.getElementById(sSide === "left" ? "bwpRightPane" : "bwpLeftPane");
+            var iOpp = (oOpp && oOpp.offsetWidth) || 0;
+            var oS1 = document.getElementById("bwpSplit1"), oS3 = document.getElementById("bwpSplit3");
+            var iBars = ((oS1 && oS1.offsetWidth) || 0) + ((oS3 && oS3.offsetWidth) || 0);
+            var iMax = r.width - C_CENTER_MIN - iOpp - iBars;
             px = Math.max(iMin, Math.min(px, Math.max(iMin, iMax)));
             _shellVar(sVar, px + "px");
         });
@@ -262,6 +272,41 @@ function _wireSplitters() {
         });
         oBar.addEventListener("dblclick", function () { oCenter.style.removeProperty("--bwp-design-h"); });
     })();
+
+    // ── 창 리사이즈 재클램프(16 §4.3 필수, WS20 _bindWs20SplitResizeClamp 패턴) ──────────
+    //   창이 줄면 고정폭 패널(좌/우) 합 + 바 + 중앙 최소가 컨테이너를 넘지 않도록 큰 고정패널부터
+    //   min 까지 자동 축소한다(안 하면 최대화→축소 시 뒤쪽 패널/버튼이 overflow:hidden 에 잘려 사라짐).
+    //   유연 패널(중앙 flex, 또는 커스터마이징으로 채움 .u4aBwpFill)은 CSS 가 알아서 줄어 대상 제외.
+    function _reclampSplitters() {
+        var iAvail = oShell.getBoundingClientRect().width;
+        if (!iAvail) { return; }
+        var oS1 = document.getElementById("bwpSplit1"), oS3 = document.getElementById("bwpSplit3");
+        var iBars = ((oS1 && oS1.offsetWidth) || 0) + ((oS3 && oS3.offsetWidth) || 0);
+
+        // 고정폭 패널 = 표시 중이고 채움(.u4aBwpFill) 아닌 좌/우. 유연 = 중앙(표시 중이면 최소폭 확보).
+        var aFixed = [];
+        [["bwpLeftPane", "--bwp-left-w", C_LEFT_MIN], ["bwpRightPane", "--bwp-right-w", C_RIGHT_MIN]].forEach(function (a) {
+            var el = document.getElementById(a[0]);
+            if (el && el.style.display !== "none" && !el.classList.contains("u4aBwpFill")) {
+                aFixed.push({ el: el, v: a[1], min: a[2], cur: el.offsetWidth });
+            }
+        });
+        var iFlexMin = (oCenter && oCenter.style.display !== "none" && !oCenter.classList.contains("u4aBwpFill")) ? C_CENTER_MIN : 0;
+        var iFixedW = 0; aFixed.forEach(function (f) { iFixedW += f.cur; });
+
+        var iNeed = (iFixedW + iBars + iFlexMin) - iAvail;
+        if (iNeed <= 0) { return; }
+        // 큰 고정 패널부터 min 까지 축소.
+        aFixed.sort(function (a, b) { return b.cur - a.cur; }).forEach(function (f) {
+            if (iNeed <= 0) { return; }
+            var iCut = Math.min(Math.max(0, f.cur - f.min), iNeed);
+            if (iCut > 0) { _shellVar(f.v, (f.cur - iCut) + "px"); iNeed -= iCut; }
+        });
+    }
+    if (!oShell.__bwpReclampBound) {
+        oShell.__bwpReclampBound = true;
+        window.addEventListener("resize", _reclampSplitters);
+    }
 }
 
 /* ── 공용 busy 브로드캐스트(형제 자식창) ──────────────────────────────────
@@ -316,6 +361,8 @@ function _bootApp() {
         if (typeof oAPP.fn.initModelArea === "function") { oAPP.fn.initModelArea(); }
         if (typeof oAPP.fn.initDesignArea === "function") { oAPP.fn.initDesignArea(); }
         if (typeof oAPP.fn.initAdditArea === "function") { oAPP.fn.initAdditArea(); }
+        // 화면 커스터마이징 — 저장된 영역 표시상태 로드+적용(원본 BIND_LAYOUT). 영역 렌더 뒤 1회.
+        if (typeof oAPP.fn.initBindLayout === "function") { oAPP.fn.initBindLayout(); }
         // [Stage6] WS20 동기화 주채널 생성 + 초기 데이터 로드.
         if (typeof oAPP.fn.createBindChannel === "function") { oAPP.fn.createBindChannel(); }
         if (typeof oAPP.fn.loadBindData === "function") { oAPP.fn.loadBindData(); }

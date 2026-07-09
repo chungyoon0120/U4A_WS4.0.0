@@ -51,7 +51,7 @@ var zconsole = WSERR(window, document, console);
 var C_HOSTID = "U4APATT";          // 우측 읽기전용 뷰어 호스트
 var C_EDIT_HOSTID = "U4APATTEDIT"; // 생성/수정 다이얼로그 편집 호스트
 
-// 커스텀 패턴 컨텐츠 유형(원본 _getWsCustomPatternContentTypes). value=Monaco 언어와 (abap 제외) 동일.
+// 커스텀 패턴 컨텐츠 유형(원본 _getWsCustomPatternContentTypes). value=Monaco 언어와 동일(text→plaintext, 나머지 그대로).
 var A_CONT_TYPES = ["text", "abap", "html", "javascript", "css", "json", "xml"];
 
 var oDlgUI = null;   // 생성/수정 다이얼로그 UI refs(지연 생성 싱글톤). {dlg,host,title,icon,titleField,typeSel,save,ready,pending,PRCCD,CKEY}
@@ -117,7 +117,8 @@ function _lang(sCont) {
         case "json": return "json";
         case "xml": return "xml";
         case "svg": return "xml";
-        default: return "plaintext";   // text, abap(모나코 미지원) 등 → 평문(안전 폴백)
+        case "abap": return "abap";   // Monaco 기본언어 abap 지원(lib/monaco/vs/basic-languages/abap) — 지연 로드 하이라이팅
+        default: return "plaintext";   // text 등 → 평문(안전 폴백)
     }
 }
 
@@ -1021,9 +1022,7 @@ function _initChrome() {
     // 커스텀 패턴 Create 버튼(원본 커스텀 트리 footer Create).
     var oCreateBtn = document.getElementById("pattCustCreateBtn");
     if (oCreateBtn) {
-        var oCBS = oCreateBtn.querySelector("span");
-        if (oCBS) { oCBS.textContent = _m("026"); }   // Create
-        oCreateBtn.title = _m("026");
+        oCreateBtn.title = _m("026");   // Create — 아이콘 전용(원본 텍스트 없음), 툴팁만(§2.9a 아이콘화=툴팁)
         oCreateBtn.addEventListener("click", function () { _openCreateDlg({ PRCCD: "C", CONT_TYPE: "text" }); });
     }
 }

@@ -50,6 +50,13 @@ body {
 .u4aBwpLeft  { flex: 0 0 var(--bwp-left-w, 22rem); min-width: 15rem; }
 .u4aBwpRight { flex: 0 0 var(--bwp-right-w, 22rem); min-width: 15rem; }
 .u4aBwpCenter { flex: 1 1 auto; min-width: 18.75rem; }
+/* 화면 커스터마이징으로 중앙(DESIGN)이 숨겨진 조합에서 마지막 활성 영역이 잔여 폭을 채운다. */
+.u4aBwpFill { flex: 1 1 auto !important; }
+
+/* ★ 데이터 없는 트리는 경계선(가로 행라인·세로 컬럼라인)을 그리지 않는다(원본 sap.ui.table 동일, 사용자 지적).
+   공통 makeColumnTree 의 .u4aColTreeBody(반복 그라디언트)·.u4aColTreeGrid 를 빈 트리에서만 끈다(스코프). */
+.u4aBwpTreeEmpty .u4aColTreeBody { background: none; }
+.u4aBwpTreeEmpty .u4aColTreeGrid { display: none; }
 
 /* 중앙 세로 2분할(디자인 트리 | 추가속성 적용). */
 .u4aBwpDesign { flex: 0 0 var(--bwp-design-h, 56%); min-height: 0; display: flex; flex-direction: column; }
@@ -105,6 +112,44 @@ body {
 .u4a-menu__item i.u4aBwpMenuIco--success { color: var(--state-success); }
 .u4a-menu__item i.u4aBwpMenuIco--info { color: var(--state-info, var(--accent)); }
 .u4a-menu__item i.u4aBwpMenuIco--error { color: var(--state-error); }
+
+/* ===== 화면 커스터마이징 팝업(.u4aBwpLcDlg) — 공통 .u4a-dialog 골격 + 영역 3행 스위치 리스트 ===== */
+.u4aBwpLcDlg { min-width: 24rem; max-width: 32rem; }
+.u4aBwpLcBody { display: flex; flex-direction: column; gap: 0.75rem; }
+.u4aBwpLcList { display: flex; flex-direction: column; }
+.u4aBwpLcRow {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.625rem 0.25rem;
+    border-bottom: 0.0625rem solid var(--line);
+}
+.u4aBwpLcRow:last-child { border-bottom: none; }
+.u4aBwpLcIco {
+    flex: 0 0 auto; width: 2rem; height: 2rem;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 0.375rem;
+    background: var(--surface-2, var(--surface)); color: var(--accent);
+    font-size: 1rem;
+}
+.u4aBwpLcTexts { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.125rem; }
+.u4aBwpLcTitleWrap { display: flex; align-items: center; gap: 0.5rem; }
+.u4aBwpLcTitle { font-weight: 600; font-size: 0.875rem; }
+/* 상태 배지 — 표시(성공색)/숨김(옅음). */
+.u4aBwpLcStat {
+    font-size: 0.75rem; padding: 0.0625rem 0.375rem; border-radius: 0.75rem;
+    background: var(--line); color: var(--text-muted, var(--text));
+}
+.u4aBwpLcStat--on { background: var(--state-success); color: var(--state-success-contrast, #fff); }
+.u4aBwpLcDesc { font-size: 0.75rem; color: var(--text-muted, var(--text)); overflow: hidden; text-overflow: ellipsis; }
+.u4aBwpLcSwitch { flex: 0 0 auto; }
+/* 안내 스트립(정보). */
+.u4aBwpLcNotice {
+    display: flex; align-items: flex-start; gap: 0.375rem;
+    padding: 0.5rem 0.625rem; border-radius: 0.375rem;
+    background: var(--surface-2, var(--surface));
+    border: 0.0625rem solid var(--line);
+    font-size: 0.75rem; color: var(--text-muted, var(--text));
+}
+.u4aBwpLcNotice i { color: var(--state-info, var(--accent)); margin-top: 0.125rem; }
 
 /* 트리/테이블 호스트 — 스크롤 컨테이너. */
 .u4aBwpTreeHost,

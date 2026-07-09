@@ -181,7 +181,11 @@
             oAPP.attr.designTree = oAPP.fn.setTreeData(aTree, "CHILD", "PARENT", "zTREE_DESIGN");
         }
 
-        if (oD.ctrl) { oD.ctrl.rerender(true); }
+        if (oD.ctrl) {
+            oD.ctrl.rerender(true);
+            // 디자인 트리는 브로드캐스트 전엔 빈 트리 → 경계선 끔(데이터 도착 시 해제).
+            oAPP.fn.setTreeEmptyMark(oD.host, !(oAPP.attr.designTree || []).length);
+        }
     };
 
     /* ── 영역 UI ──────────────────────────────────────────────────────────── */
@@ -214,6 +218,15 @@
         oD.tool.appendChild(_btn("link", H.z("130"), H.z("130"), "u4a-btn--emphasized", bRO, function () { _call("onMultiBind"); }));
         oD.tool.appendChild(_btn("link-slash", H.z("186"), H.z("186"), "u4a-btn--negative", bRO, function () { _call("onMultiUnbind"); }));
         oD.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
+        // 161 컬럼최적화 — 컬럼 폭을 콘텐츠에 맞춤(원본 resize-horizontal → setUiTableAutoResizeColumn).
+        oD.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () {
+            oAPP.fn.fitTreeColumns(oD.host);
+        }));
+        // 957 화면 커스터마이징 — 원본 designTree.js:4025 createBindLayoutCustomizingButton(좌·중·우 공통).
+        oD.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {
+            if (oAPP.attr.editable === false) { return; }
+            if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
+        }));
         oD.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
             if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
         }));

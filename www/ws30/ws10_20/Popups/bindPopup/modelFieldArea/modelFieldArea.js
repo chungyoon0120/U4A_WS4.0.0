@@ -55,12 +55,21 @@
             oAPP.fn.loadBindData();
         }));
         oM.tool.appendChild(_spacer());
+        // 161 컬럼최적화 — 컬럼 폭을 콘텐츠에 맞춤(원본 resize-horizontal → setUiTableAutoResizeColumn).
+        oM.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () {
+            oAPP.fn.fitTreeColumns(oM.host);
+        }));
         // 168 분할 영역 초기화 — 셸 스플리터 폭/높이 변수 제거(frame.js 가 CSS 변수로 관리).
         oM.tool.appendChild(H.iconBtn("table-columns", H.z("168"), function () {  // 168 분할 영역 초기화
             var oShell = document.getElementById("bwpShell");
             var oCenter = document.getElementById("bwpCenterPane");
             if (oShell) { oShell.style.removeProperty("--bwp-left-w"); oShell.style.removeProperty("--bwp-right-w"); }
             if (oCenter) { oCenter.style.removeProperty("--bwp-design-h"); }
+        }));
+        // 957 화면 커스터마이징 — 3영역(바인딩필드/DESIGN TREE/추가속성) 표시·숨김 팝업(원본 좌측 툴바).
+        oM.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {
+            if (oAPP.attr.editable === false) { return; }   // 원본 enabled="{/edit_layout_customizing}"
+            if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
         }));
         // 198 Help — 도움말 문서(원본 onHelp = U4A_HELP_DOC_OPEN 브로드캐스트)는 통신 단계(Stage6)에서 배선.
         oM.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {  // 198 Help
@@ -109,6 +118,9 @@
             },
             onSelect: function (n) { oAPP.attr.selModelNode = n; }
         });
+
+        // 초기(데이터 로드 전) = 빈 트리 → 경계선 끔(로드 성공 시 loadBindData 가 해제).
+        oAPP.fn.setTreeEmptyMark(oM.host, true);
     };
 
     /************************************************************************
@@ -194,6 +206,7 @@
                 // 평면 → 중첩(zTREE).
                 oAPP.attr.modelTree = oAPP.fn.setTreeData(aTree, "CHILD", "PARENT", "zTREE");
                 oM.ctrl.rerender(true);   // 첫 루트 선택 → Expand=전체(16 §3.2)
+                oAPP.fn.setTreeEmptyMark(oM.host, !(oAPP.attr.modelTree || []).length);
 
             } catch (e) {
                 console.error("[HTML5][bindWindow] 모델필드 로드 처리 오류:", e && e.message);

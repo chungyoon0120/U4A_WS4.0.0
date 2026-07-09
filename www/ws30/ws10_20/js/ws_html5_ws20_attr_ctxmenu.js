@@ -12,9 +12,10 @@
  *              (구 l_ui.data("CONTEXT_MENU")). 편집모드(IS_EDIT)·비ROOT 에서만.
  *   - 닫기   : 바깥 mousedown / ESC / 스크롤 / 리사이즈(USP ctxmenu 공통 패턴).
  *   - 동작   : M01 WAIT on/off · M02 Unbind · M03 동일속성 동기화 · M04 클라이언트이벤트 해제 ·
- *              M06 UI Attribute 개인화 = 완전 동작(attrSetUnbindProp/attrUnbindAggr/attrDelClientEvent/
- *              fnWs20AttrChange/fnSameAttrSyncPopupOpen/fnAttrPresetSettingsOpen 재사용/온디맨드 로드).
- *              M05 단축키 등록 = 별창(eventShortcutReg) 미변환 → 임시 안내 토스트. TODO(i18n)+재개시 배선.
+ *              M05 단축키 등록 · M06 UI Attribute 개인화 = 완전 동작(attrSetUnbindProp/attrUnbindAggr/
+ *              attrDelClientEvent/fnWs20AttrChange/fnSameAttrSyncPopupOpen/fnEventShortcutRegOpen/
+ *              fnAttrPresetSettingsOpen 재사용/온디맨드 로드).
+ *              (M05 = 구 eventShortcutReg + keybindingPopup → fnEventShortcutRegOpen.js 로 이식.)
  ************************************************************************/
 
 (function (window, $, oAPP) {
@@ -241,10 +242,7 @@
                 case "M03": _openSameAttrSync(is_attr); break;       //동일속성 동기화
                 case "M04": _removeClientEvent(is_attr); break;      //클라이언트 이벤트 해제
                 case "M06": _openPresetSettings(is_attr); break;     //UI Attribute 개인화 팝업
-                case "M05":                                          //단축키 등록(별창 미변환)
-                    console.warn("[W4+ 예정] 속성 컨텍스트 메뉴 미변환:", sKey, is_attr && is_attr.UIATT);
-                    _todoToast();
-                    break;
+                case "M05": _openEventShortcutReg(is_attr); break;   //단축키 등록
                 default:
                     break;
             }
@@ -263,6 +261,20 @@
         try { oAPP.loadJs("fnSameAttrSyncPopupOpen", fn); }
         catch (e) {
             console.error("[HTML5][WS20][attr] fnSameAttrSyncPopupOpen 로드 실패:", e && e.message);
+            fn();
+        }
+    }
+
+    /* ── M05 단축키 등록 — 구 eventShortcutReg + keybindingPopup(원본 attrContextMenu/utils) ──
+     *   인앱 다이얼로그 fnEventShortcutRegOpen 온디맨드 로드 후 호출(M03 과 동일 패턴). */
+    function _openEventShortcutReg(is_attr) {
+        var fn = function () {
+            if (typeof oAPP.fn.fnEventShortcutRegOpen === "function") { oAPP.fn.fnEventShortcutRegOpen(is_attr); }
+            else { console.warn("[HTML5][WS20][attr] fnEventShortcutRegOpen 미로드"); _todoToast(); }
+        };
+        try { oAPP.loadJs("fnEventShortcutRegOpen", fn); }
+        catch (e) {
+            console.error("[HTML5][WS20][attr] fnEventShortcutRegOpen 로드 실패:", e && e.message);
             fn();
         }
     }
