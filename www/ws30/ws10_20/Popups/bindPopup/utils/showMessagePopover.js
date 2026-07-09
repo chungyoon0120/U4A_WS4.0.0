@@ -33,11 +33,17 @@ export default async function(oTarget, aMessage){
                     _oPopover._oPopover._oControl.setShowArrow(true);
                 }
 
+
             },
             afterOpen:function() {
                 resolve();
             }
         });
+
+        if(typeof _oPopover.data === "function"){
+            //메시지 팝업 호출건 구분값.
+            _oPopover.data("msg_popover", true);
+        }
 
         
         if(typeof _oPopover._oPopover !== "undefined" && _oPopover._oPopover !== null){
@@ -97,6 +103,11 @@ export default async function(oTarget, aMessage){
  * @function - 오류 표현 초기화 처리.
  *************************************************************/
 function clearError(){
+
+    if(typeof oAPP.fn.clearMessagePopoverErrorState === "function"){
+        oAPP.fn.clearMessagePopoverErrorState();
+        return;
+    }
 
     //DESIGN TREE의 오류 표현 필드 정보 초기화.
     oAPP.attr.oDesign.fn.resetErrorField();

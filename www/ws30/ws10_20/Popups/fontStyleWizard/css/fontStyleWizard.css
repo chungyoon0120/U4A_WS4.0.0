@@ -182,11 +182,19 @@ body {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.5rem;
-    min-height: 2.5rem;
-    padding: 0 0.875rem;
+    min-height: 2.75rem;
+    padding: 0 0.5rem 0 0.875rem;
     border-bottom: 0.0625rem solid var(--divider);
     background: var(--surface-raised);
+}
+
+.fwx-out__title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
     font-weight: 700;
     font-size: 0.75rem;
     text-transform: uppercase;
@@ -194,7 +202,7 @@ body {
     color: var(--text-muted);
 }
 
-.fwx-out__head i {
+.fwx-out__title i {
     color: var(--accent);
 }
 
@@ -387,9 +395,10 @@ body {
 }
 
 .fwx-iconbtn[aria-pressed="true"] {
-    background: var(--accent);
+    background: var(--selected-bg);
     border-color: var(--accent);
-    color: var(--selected-text);
+    box-shadow: inset 0 0 0 0.0625rem var(--accent);
+    color: var(--accent);
 }
 
 /* ---------- custom 입력 (공통 createField 호스트) ---------- */

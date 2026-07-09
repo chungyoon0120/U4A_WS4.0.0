@@ -1,15 +1,28 @@
 /********************************************************************
  *📝 바인딩 추가속성 정보 구성.
 ********************************************************************/
-export async function start(oArea, oTable){
+/**
+* @since   2026-06-12 01:36:51
+* @version v3.6.4-3
+* @author  PES
+* @description
+*  바인딩 추가 속성 영역 module start 시 화면 커스터마이징 상태를 전달받아 rendering wait 여부를 제어한다.
+*  ADDIT 영역이 비활성화된 상태라도 내부 controller와 table 구성은 기존 흐름대로 생성하여
+*  바인딩 필드 또는 DESIGN TREE 선택 후 추가 속성 영역을 다시 표시했을 때 상태가 자연스럽게 이어지도록 한다.
+*  단, 화면에 보이지 않는 table의 UI update 완료를 기다리지 않도록 skipRenderingWait 옵션을 사용하여
+*  popup 재호출 시 busy가 계속 유지되는 문제와 불필요한 rendering 대기를 방지한다.
+*/
+export async function start(oArea, oTable, oOption){
 
     return new Promise(async (res) => {
 
         //바인딩 추가속성 정보 화면 구성.
-        var _oContr = await designView(oArea, oTable);
+        var bSkipRenderingWait = oOption?.skipRenderingWait === true;
+
+        var _oContr = await designView(oArea, oTable, oOption);
 
         
-        var _oPromise = _oContr.fn.uiUpdateComplate(oArea);
+        var _oPromise = bSkipRenderingWait === true ? Promise.resolve() : _oContr.fn.uiUpdateComplate(oArea);
 
         oArea.invalidate();
 
@@ -77,7 +90,9 @@ function designControl(oArea){
 
             //바인딩 추가 속성 정보 모델.
             oContr.oModel = new sap.ui.model.json.JSONModel({
-                T_MPROP  : []
+                T_MPROP  : [],
+
+                edit_layout_customizing : true
             });
 
 
@@ -839,16 +854,42 @@ function designControl(oArea){
                     return res();
                 }
 
+                var _oTimer = null,
+                    _bDone = false,
+                    _fnDone = function(){
+
+                        if(_bDone === true){
+                            return;
+                        }
+
+                        _bDone = true;
+
+                        if(_oTimer){
+                            clearTimeout(_oTimer);
+                        }
+
+                        if(typeof oUI.removeEventDelegate === "function"){
+                            oUI.removeEventDelegate(_oDelegate);
+                        }
+
+                        if(typeof oUI.data === "function"){
+                            oUI.data("_onAfterRendering", null);
+                        }
+
+                        return res();
+
+                    };
+
                 var _oDelegate = {
                     onAfterRendering:(oEvent)=>{
 
                         //onAfterRendering 이벤트 제거.
-                        oUI.removeEventDelegate(_oDelegate);
+                        _fnDone();
 
                         //onAfterRendering 정보 초기화.
-                        oUI.data("_onAfterRendering", null);
+                        // oUI.data("_onAfterRendering", null);
 
-                        return res();
+                        return;
 
                     }
                 };
@@ -858,6 +899,8 @@ function designControl(oArea){
                 
                 //onAfterRendering 정보 매핑.
                 oUI.data("_onAfterRendering", _oDelegate);
+
+                _oTimer = setTimeout(_fnDone, 1000);
 
             });
 
@@ -1005,6 +1048,13 @@ function designControl(oArea){
         /*******************************************************
         * @function - 화면 잠금 / 잠금해제 처리.
         *******************************************************/  
+        oContr.fn.setLayoutCustomizingEditable = function(bEnable){
+
+            oContr.oModel.setProperty("/edit_layout_customizing", bEnable);
+
+        };
+
+
         oContr.fn.setViewEditable = function(bLock){
 
 
@@ -1016,6 +1066,7 @@ function designControl(oArea){
 
             //추가속성 화면 입력 필드 잠금 / 잠금 해제 처리.
             oContr.oModel.oData.edit = bLock;
+            oContr.oModel.oData.edit_layout_customizing = bLock;
 
 
             //추가속성 바인딩 버튼 활성처리.
@@ -1038,11 +1089,13 @@ function designControl(oArea){
 /********************************************************************
  *📝 바인딩 추가속성 정보 화면 구성.
 ********************************************************************/
-function designView(oArea, oTable){
+function designView(oArea, oTable, oOption){
 
     return new Promise(async (res)=>{
 
         //control 정보 구성.
+        var bSkipRenderingWait = oOption?.skipRenderingWait === true;
+
         let oContr = await designControl(oArea);
 
 
@@ -1098,6 +1151,17 @@ function designView(oArea, oTable){
                             oAPP.fn.setUiTableAutoResizeColumn(oContr.ui.ROOT);
                         }
                     }),
+                    /**
+                    * @since   2026-06-12 01:36:51
+                    * @version v3.6.4-3
+                    * @author  PES
+                    * @description
+                    *  우측 바인딩 추가 속성 영역 toolbar에서도 화면 커스터마이징 popup을 호출할 수 있도록
+                    *  공통 버튼을 배치한다.
+                    *  추가 속성 영역은 단독 표시가 불가능하므로 popup 내부에서 MODEL 또는 DESIGN 중 하나 이상과
+                    *  함께 표시되도록 보정하며, 이 버튼 자체는 기존 추가 속성 바인딩/column resize/help 로직을 변경하지 않는다.
+                    */
+                    oAPP.fn.createBindLayoutCustomizingButton(),
                     new sap.m.OverflowToolbarButton({
                         icon:"sap-icon://question-mark", 
                         text : _txt3,    //198	Help
@@ -1121,6 +1185,7 @@ function designView(oArea, oTable){
 
         //추가바인딩 속성의 Property 컬럼.
         var oTabCol1 = new sap.ui.table.Column({
+            width:"40%",
             autoResizable:true,
             label: new sap.m.Label({
                 text: l_txt,
@@ -1138,6 +1203,7 @@ function designView(oArea, oTable){
 
         //추가바인딩 속성의 value 컬럼.
         var oTabCol2 = new sap.ui.table.Column({
+            width:"60%",
             autoResizable:true,
             label: new sap.m.Label({
                 text: l_txt,
@@ -1223,7 +1289,7 @@ function designView(oArea, oTable){
 
         
 
-        var _oPromise = oContr.fn.uiUpdateComplate(oArea);
+        var _oPromise = bSkipRenderingWait === true ? Promise.resolve() : oContr.fn.uiUpdateComplate(oArea);
 
         oArea.addAggregation("content", oContr.ui.ROOT, true);
 
@@ -1238,6 +1304,3 @@ function designView(oArea, oTable){
     });
 
 }
-
-
-

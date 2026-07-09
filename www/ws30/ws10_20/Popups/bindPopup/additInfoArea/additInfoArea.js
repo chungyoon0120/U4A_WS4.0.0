@@ -56,6 +56,9 @@
             if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
         }));
 
+        // 패널 좁아질 때 넘치는 버튼(추가 속성 바인딩/도움말)을 ⋯ 오버플로 메뉴로(16 §11, 공통 attachOverflow).
+        oAPP.fn.attachToolOverflow(oA.tool);
+
         // ── 속성|값 2열 테이블(원본 2열 Property/Value) ──
         oA.host.innerHTML = "";
         var oTbl = H.el("table", "u4aBwpAdditTbl u4a-table");

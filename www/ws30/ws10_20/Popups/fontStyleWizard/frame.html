@@ -64,9 +64,6 @@
                     <button type="button" class="u4a-btn" id="fwxResetBtn" title="Reset to defaults">
                         <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span>Reset</span>
                     </button>
-                    <button type="button" class="u4a-btn u4a-btn--emphasized" id="fwxCopyBtn" title="Copy CSS Source">
-                        <i class="fa-regular fa-copy" aria-hidden="true"></i><span>Copy</span>
-                    </button>
                 </div>
             </div>
 
@@ -82,7 +79,10 @@
 
             <section class="fwx-out" aria-labelledby="fwxOutHead">
                 <div class="fwx-out__head" id="fwxOutHead">
-                    <i class="fa-solid fa-code" aria-hidden="true"></i><span>CSS Source</span>
+                    <div class="fwx-out__title"><i class="fa-solid fa-code" aria-hidden="true"></i><span>CSS Source</span></div>
+                    <button type="button" class="u4a-btn u4a-btn--emphasized" id="fwxCopyBtn" title="Copy CSS Source">
+                        <i class="fa-regular fa-copy" aria-hidden="true"></i><span>Copy</span>
+                    </button>
                 </div>
                 <pre class="fwx-out__code u4a-selectable" id="fwxSource" tabindex="0"></pre>
             </section>

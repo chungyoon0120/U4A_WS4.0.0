@@ -309,17 +309,13 @@ body.u4aPattShown .u4aPattBody {
     justify-content: center;
 }
 
-/* 본문(행/빈영역)만 컬럼 합(--u4act-total-w)에 맞춰 마지막 컬럼 오른쪽을 세로선으로 "닫음"(sap.ui.table 격자 우측 경계).
-   → 행 가로줄·세로줄은 닫음선 안쪽까지만, 그 오른쪽 빈 띠는 표 밖(판 배경, 깨끗).
-   ★ 헤더는 폭 제한 안 함 → 판 끝까지 채워 헤더 밴드+바닥 가로선이 끝까지 이어짐(sap.ui.table 헤더). */
-.u4aPattTreePane--cust .u4aColTreeBody,
-.u4aPattTreePane--cust .u4aColTreeTree.u4a-tree {
-    width: var(--u4act-total-w, 100%);
-}
-/* 우측 닫음 세로선 = 헤더 C3 + 행 C3 셀 + 빈영역 그리드 GL--c3 우측 보더(전 높이 연속). */
-.u4aPattTreePane--cust .u4aColTreeC3,
-.u4aPattTreePane--cust .u4aColTreeGL--c3 {
-    border-right: 0.0625rem solid var(--line);
+/* 첫 컬럼(개인화 패턴/이름)을 "채움 컬럼"으로 → 표가 판 폭을 꽉 채운다(마지막 컬럼 오른쪽 빈 띠 없음, 닫음선 불필요).
+   콘텐츠유형·액션은 고정폭, 이름이 잔여 폭을 흡수. 헤더셀+행 이름셀+빈영역 그리드라인 3요소를 동시에 grow 시켜 정렬 유지.
+   (표폭은 공통 max(100%,합)로 100% 채움 — 별도 폭 제한/닫음 보더 없음. 사용자 결정 2026-07-09.) */
+.u4aPattTreePane--cust .u4aColTreeC1,
+.u4aPattTreePane--cust .u4aColTreeNameCell,
+.u4aPattTreePane--cust .u4aColTreeGL--c1 {
+    flex: 1 1 var(--u4act-c1-w, 15rem);
 }
 
 .u4aPattActBtn {
@@ -425,6 +421,30 @@ body.u4aPattShown .u4aPattBody {
 .u4aPattCopyBtn:hover {
     background: var(--hover-bg);
     color: var(--text);
+}
+
+/* 코드 뷰어 줌 [−][🔍%][+] — 투명 중립 톤(복사 버튼과 동일 결), 에디터 폰트 줌 따라감. 다이얼로그 푸터 줌과 동일 룩. */
+.u4aPattViewZoom {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+.u4aPattViewZoomBtn {
+    min-width: 1.9rem;
+    padding: 0.4rem 0.5rem;
+    justify-content: center;
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted, var(--icon-muted));
+}
+.u4aPattViewZoomBtn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+.u4aPattViewZoomPct {
+    gap: 0.375rem;
+    font-variant-numeric: tabular-nums;
 }
 
 .u4aPattViewBody {
@@ -585,21 +605,66 @@ body.u4aPattShown .u4aPattBody {
     width: 100%;
 }
 
-.u4aPattDlgTool {
-    flex: 0 0 auto;
+/* 푸터 = [줌(왼쪽)] ···· [꾸밈정렬·복사·Save·Delete·Close(오른쪽)] — 공통 JS 에디터(ws_html5_client_editor) 미러. */
+.u4aPattDlgFoot {
     display: flex;
+    gap: 0.5rem;
     align-items: center;
 }
+.u4aPattDlgFootSpacer {
+    flex: 1 1 auto;
+}
+.u4aPattDlgFoot .u4a-btn[hidden] {
+    display: none;
+}
 
-.u4aPattPrettyBtn {
-    gap: 0.375rem;
+/* 꾸밈정렬·줌 = 텍스트/투명 중립 톤(원본 sap.m.Button 기본). */
+.u4aPattDlgFlat {
     background: transparent;
     border-color: transparent;
     color: var(--text);
 }
-
-.u4aPattPrettyBtn:hover {
+.u4aPattDlgFlat:hover {
     background: var(--hover-bg);
+}
+.u4aPattPrettyBtn {
+    gap: 0.375rem;
+}
+
+/* 줌 [−][🔍 %][+] — % 숫자 폭 안정(tabular), 스텝은 정사각 컴팩트. */
+.u4aPattDlgZoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+.u4aPattDlgZoomPct {
+    gap: 0.375rem;
+    font-variant-numeric: tabular-nums;
+}
+.u4aPattDlgZoomStep {
+    min-width: 1.9rem;
+    padding: 0.4rem 0.5rem;
+    justify-content: center;
+}
+
+/* 아이콘 전용 결정 버튼(복사/Save/Delete/Close) = 정사각 컴팩트. */
+.u4aPattDlgIcoBtn {
+    min-width: 2.25rem;
+    padding: 0.4rem 0.6rem;
+    justify-content: center;
+}
+
+/* Delete = Negative 솔리드 빨강(원본 sap Negative). 색 단일출처=--error 토큰. */
+.u4aPattDlgDel {
+    background: var(--error);
+    border-color: var(--error);
+    color: #fff;
+}
+.u4aPattDlgDel:hover {
+    background: var(--error);
+    border-color: var(--error);
+    color: #fff;
+    filter: brightness(0.92);
 }
 
 .u4aPattDlgEditor {

@@ -1,10 +1,6 @@
 //BIND POPUP <-> 디자인상세화면(20화면) 통신을 위한 broadcast Channel instance.
 let oChannel = undefined;
 
-let oFrame = document.getElementById('ws_frame');
-
-let sap = oFrame.contentWindow.sap;
-
 /*************************************************************
  * @function - 디자인상세화면(20화면) <-> BINDPOPUP 통신을 위한 
  *             broadcast Channel생성.
@@ -140,6 +136,41 @@ function isCreateChannel(){
 };
 
 
+function waitTableRowsUpdated(oTable, iTimeout){
+
+    return new Promise((resolve)=>{
+
+        if(!oTable || typeof oTable.attachEventOnce !== "function"){
+            return resolve();
+        }
+
+        var _oTimer = null,
+            _bDone = false,
+            _fnDone = function(){
+
+                if(_bDone === true){
+                    return;
+                }
+
+                _bDone = true;
+
+                if(_oTimer){
+                    clearTimeout(_oTimer);
+                }
+
+                resolve();
+
+            };
+
+        oTable.attachEventOnce("rowsUpdated", _fnDone);
+
+        _oTimer = setTimeout(_fnDone, iTimeout || 1000);
+
+    });
+
+}
+
+
 /************************************************************************
  * busy off 요청건에 대한 처리.
  ************************************************************************/
@@ -158,6 +189,17 @@ function responseBindPopupBusyOff(oEvent){
     //(다른 영역에 BUSY 요청을 보내게 되면 WS20에도 BUSY 요청을 보내게 되어 
     //WS20 화면을 제어 할 수 없음)
     oAPP.fn.setBusy(false, {ISBROAD:true});
+
+    /**
+        * @since   2026-06-26 17:04:08
+        * @version v3.6.4-4
+        * @author  PES
+        * @description
+        * 화면 커스터마이징 dialog에서 도움말 호출로 표시한 dialog busy 상태를 WS20 busy off 응답 시 함께 해제한다.
+        */
+    if(typeof oAPP?.fn?.setBindLayoutCustomizingDialogBusy === "function"){
+        oAPP.fn.setBindLayoutCustomizingDialogBusy(false);
+    }
 
     
     //busy off 요청임 flag return.
@@ -228,7 +270,8 @@ async function updateDesignData(oEvent){
 
 
     //추가속성 정보 화면 비활성 처리.
-    oAPP.fn.setAdditLayout("");
+    //UPDATE_DESIGN_DATA 갱신 중에는 현재 Splitter 영역 크기를 유지한다.
+    oAPP.fn.setAdditLayout("", {KEEP_SPLITTER_SIZE:true});
 
     
     //디자인 영역으로 화면 이동 처리
@@ -267,11 +310,7 @@ async function updateDesignData(oEvent){
     sendDesignAreaBusyOff();
 
 
-    await new Promise((resolve)=>{
-        oAPP.attr.oDesign.ui.TREE.attachEventOnce("rowsUpdated", ()=>{
-            resolve();
-        });
-    });
+    await waitTableRowsUpdated(oAPP.attr.oDesign.ui.TREE, 1000);
 
     //tree table 컬럼길이 재조정 처리.
     oAPP.fn.setUiTableAutoResizeColumn(oAPP.attr.oDesign.ui.TREE);

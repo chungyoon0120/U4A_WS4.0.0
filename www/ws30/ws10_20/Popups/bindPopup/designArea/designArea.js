@@ -218,6 +218,9 @@
             if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
         }));
 
+        // 패널 좁아질 때 넘치는 버튼(동일속성/멀티/Unbind 등)을 ⋯ 오버플로 메뉴로(16 §11, 공통 attachOverflow).
+        oAPP.fn.attachToolOverflow(oD.tool);
+
         // ── 공통 다열 그리드 트리(U4AUI.makeColumnTree — Object Name / 바인딩 경로 / MPROP) ──
         oD.ctrl = U4AUI.makeColumnTree(oD.host, {
             columns: [

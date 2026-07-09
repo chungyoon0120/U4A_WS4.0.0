@@ -973,14 +973,18 @@ export async function getControl() {
         // 테마 정보를 구한다
         const oThemeInfo = oParentAPP.fn.getThemeInfo();
 
-        const oBrowserOptions = {          
+        const oBrowserOptions = {
             width: 1000,
             height: 800,
-            opacity: 0.0,          
             icon: "www/img/logo.png",
             autoHideMenuBar: true,
             title: oMenuData.TITLE,
             backgroundColor: oThemeInfo.BGCOL,
+            // [HTML5] frameless 공통 타이틀바(.analy/16 §2.6) — 네이티브 창틀 제거, opacity 페이드 미사용.
+            //   표시는 페이지(winChrome.js)가 크롬 준비 후 CURRWIN.show(). 닫기=closable:false+U4AUI.closeWindow(§2.6.1).
+            titleBarStyle: "hidden",
+            show: false,
+            closable: false,
             webPreferences: {
                 devTools: true,
                 nodeIntegration: true,
@@ -1015,12 +1019,16 @@ export async function getControl() {
         jQuery.extend(true, IF_DATA, oContr.IF_DATA);
 
         const oQueryParams = {
-            browskey: sBrowsKey, 
+            browskey: sBrowsKey,
             mid: IF_DATA.KEY,
             browserkey: oBrowserOptions?.webPreferences?.browserkey,
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sChildKey,
             USERINFO: oContr.IF_DATA.USER_LOGIN_INFO,
+            // [HTML5] frameless 공통 헤더(winChrome.js) — 첫 페인트 플래시 방지 + 제목.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: oMenuData.TITLE,
         };
 
         // URL에 QueryString 파라미터를 적용한다.
@@ -1042,12 +1050,10 @@ export async function getControl() {
 
             let oBroadCast = new BroadcastChannel(sChennalId);
                 oBroadCast.postMessage(IF_DATA);
-                oBroadCast.close();            
+                oBroadCast.close();
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            parent.WSUTIL.setBrowserOpacity(oBrowserWindow);
-
-            // 부모 위치 가운데 배치한다.
+            // [HTML5] 네이티브 opacity 페이드 미사용(.analy/16 §2.6) — 표시는 페이지(winChrome.js)가 크롬 준비 후 show().
+            //   부모 위치 가운데 배치한다.
             parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow, oBrowserOptions);
 
             oContr.fn.setBusy(false);

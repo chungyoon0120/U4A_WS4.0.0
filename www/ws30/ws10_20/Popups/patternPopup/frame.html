@@ -78,6 +78,12 @@
             <div class="u4a-splitter__pane u4aPattRight">
                 <div class="u4aPattViewHead" id="pattViewHead" hidden>
                     <span class="u4aPattViewTitle" id="pattViewTitle"></span>
+                    <!-- 코드 뷰어 줌 [−][🔍%][+] — 뷰어 Monaco(호스트) 폰트 줌 따라감(공통 fontZoom*·evt:zoom). 다이얼로그 푸터 줌과 동일 룩. -->
+                    <div class="u4aPattViewZoom" id="pattViewZoom">
+                        <button type="button" class="u4a-btn u4aPattViewZoomBtn u4aPattViewZoomStep" id="pattViewZoomOut" title="Ctrl + Wheel ↓"><i class="fa-solid fa-minus"></i></button>
+                        <button type="button" class="u4a-btn u4aPattViewZoomBtn u4aPattViewZoomPct" id="pattViewZoomBtn"><i class="fa-solid fa-magnifying-glass"></i><span>100%</span></button>
+                        <button type="button" class="u4a-btn u4aPattViewZoomBtn u4aPattViewZoomStep" id="pattViewZoomIn" title="Ctrl + Wheel ↑"><i class="fa-solid fa-plus"></i></button>
+                    </div>
                     <button type="button" class="u4a-btn u4aPattCopyBtn" id="pattCopyBtn">
                         <i class="fa-solid fa-copy"></i>
                     </button>

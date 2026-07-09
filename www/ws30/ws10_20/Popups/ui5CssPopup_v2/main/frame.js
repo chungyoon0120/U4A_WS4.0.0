@@ -141,17 +141,18 @@ function _setShellBusy(bOn) {
 }
 
 /************************************************************************
- * 자식창 busy 동기화 채널 (broadcast-to-child-window_{BROWSKEY}).
- *   메인/형제창의 BUSY_ON/OFF 브로드캐스트에 맞춰 이 창 오버레이도 토글.
+ * 자식창 busy 브로드캐스트 채널 (broadcast-to-child-window_{BROWSKEY}) — ★송신 전용★.
+ *   fnFinishOpen/fnOnUi5LoadFail 이 형제창에 BUSY_OFF 를 쏘기 위해 채널만 만든다.
+ *   ★수신(onmessage)으로 이 호스트 오버레이(.u4a-busy)를 토글하지 않는다:
+ *     - iframe UI5(control.js setBusy)가 자체 busy(sap.ui...lock + ROOT.setBusy)로 시각 처리하고,
+ *       프레임의 oAPP.attr.isBusy(닫기차단)·CURRWIN.closable 도 직접 동기한다.
+ *     - iframe 이 형제창 잠그려 BUSY_ON 을 쏠 때(예: 확인 다이얼로그 표시 중 onUnselectAll) 호스트가
+ *       반응해 오버레이를 띄우면, iframe 이 로컬 언락(setBusy false·ISBROAD)한 다이얼로그를 덮어 조작 불가.
+ *   호스트 오버레이는 초기 로드 전용(HTML data-busy 기본 표시 → fnFinishOpen/실패에서 해제).
  ************************************************************************/
 function _initBroadcast() {
     try {
         oBroad = new BroadcastChannel("broadcast-to-child-window_" + oAPP.BROWSKEY);
-        oBroad.onmessage = function (oEvent) {
-            var sPrc = oEvent && oEvent.data && oEvent.data.PRCCD;
-            if (sPrc === "BUSY_ON") { _setShellBusy(true); }
-            else if (sPrc === "BUSY_OFF") { _setShellBusy(false); }
-        };
     } catch (e) { }
 }
 

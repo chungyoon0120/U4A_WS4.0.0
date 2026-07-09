@@ -13,8 +13,10 @@
            · minimize 버튼 제외(장군님 지시) — 로고/제목/최대화/닫기만.
          ================================================================================== -->
     <script>
-        // 창 크롬 배선 — 공통 자산(theme-api/u4a-ui) 로드 완료 후 호출.
+        // 창 크롬 배선 — 공통 자산(theme-api/u4a-ui) 로드 완료 후 호출. (안전망에서도 호출되므로 1회 가드)
         window._u4aInitWinChrome = function () {
+            if (window.__u4aChromeDone) { return; }   // 정상경로/안전망 중복 호출 방지
+            window.__u4aChromeDone = true;
             try {
                 var REMOTE = require('@electron/remote');
                 var CURRWIN = REMOTE.getCurrentWindow();
@@ -83,9 +85,14 @@
                     _js("../../../theme/u4a-ui.js", function () { window._u4aInitWinChrome(); });
                 });
 
-                // 안전망: 크롬 배선이 지연/실패해도 창은 표시(숨김 방지). 실제 load 이벤트 기반(타이머 아님).
+                // 안전망: 공통 자산(theme-api/u4a-ui) 로드 실패로 정상 배선(onload 콜백)이 안 됐어도,
+                //   여기서 크롬 배선을 수행해 ★닫기 버튼을 반드시 살린다★ — closable:false 인데 배선 안 되면
+                //   타이틀바 닫기도 Alt+F4 도 안 먹는 영구 잠금이 됨. _u4aInitWinChrome 은 require(remote)만 있으면
+                //   동작하고 U4AUI 는 선택적(없으면 setClosable+close 폴백)이라 스크립트 실패시에도 닫기 가능.
+                //   (1회 가드가 있어 정상경로와 중복 호출돼도 안전). 실제 load 이벤트 기반(타이머 아님).
                 window.addEventListener("load", function () {
-                    try { require('@electron/remote').getCurrentWindow().show(); } catch (e) { }
+                    try { window._u4aInitWinChrome(); }
+                    catch (e) { try { require('@electron/remote').getCurrentWindow().show(); } catch (e2) { } }
                 });
             } catch (e) { }
         })();

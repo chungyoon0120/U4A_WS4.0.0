@@ -236,6 +236,16 @@ function _toHost(oMsg) {
     } catch (e) { }
 }
 
+// 뷰어 헤더 줌 % 갱신(뷰어 호스트 evt:zoom). 숫자라 i18n 키 불필요.
+function _setViewZoom(pct) {
+    var oBtn = document.getElementById("pattViewZoomBtn");
+    if (!oBtn) { return; }
+    var n = (typeof pct === "number" && isFinite(pct)) ? pct : 100;
+    var oSpan = oBtn.querySelector("span");
+    if (oSpan) { oSpan.textContent = n + "%"; }
+    oBtn.title = n + "% (Ctrl+0)";
+}
+
 // 호스트 최초 1회 로드(공통 Monaco 호스트 editorPopup/host 재사용 — 읽기전용 뷰어).
 function _loadHost() {
     if (!oFrame || oFrame.getAttribute("src")) { return; }
@@ -546,6 +556,42 @@ function _applyEditor(oParam) {
     _toEditHost({ cmd: "setValue", value: (typeof oParam.DATA === "string") ? oParam.DATA : "" });
 }
 
+// 푸터 줌 % 갱신(호스트 evt:zoom). 숫자라 i18n 키 불필요.
+function _setDlgZoom(pct) {
+    if (!oDlgUI || !oDlgUI.zoomBtn) { return; }
+    var n = (typeof pct === "number" && isFinite(pct)) ? pct : 100;
+    var oSpan = oDlgUI.zoomBtn.querySelector("span");
+    if (oSpan) { oSpan.textContent = n + "%"; }
+    oDlgUI.zoomBtn.title = n + "% (Ctrl+0)";
+}
+
+// 다이얼로그 삭제(수정 모드) — 확인 후 현재 커스텀 패턴 제거 + 닫기(원본 ev_pressCustomPatternDelete 흐름).
+function _deleteFromDlg() {
+    if (!oDlgUI || oDlgUI.PRCCD !== "U" || !oDlgUI.CKEY) { return; }
+    var sKey = oDlgUI.CKEY;
+    var sDesc = (oDlgUI.titleField.getValue() || "");
+    U4AUI.confirm({
+        type: "W",
+        title: _m("022") + " " + _m("029"),                          // Custom Pattern Delete
+        message: "[" + sDesc + "]\n\n" + _m("028"),                  // Do you really want to delete the object?
+        yesLabel: _m("038"),   // YES
+        noLabel: _m("039"),    // NO
+        onClose: function (sAct) {
+            if (sAct !== "YES") { return; }
+            var aFlat = _readPatternJson(PATHINFO.CUST_PATT);
+            var iF = aFlat.findIndex(function (e) { return e && e.CKEY === sKey; });
+            if (iF < 0) { _closeCreateDlg(); return; }
+            aFlat.splice(iF, 1);
+            if (!_writeCust(aFlat)) { return; }
+            _closeCreateDlg();
+            _reloadCust("");
+            if (oCustTree) { _tof(oCustTree).selectByKey(""); }
+            _showEmpty();
+            _toast(_m("008"));   // Delete success
+        }
+    });
+}
+
 // 다이얼로그 폼 행(라벨 + 컨트롤).
 function _dlgRow(sLabel, oControl) {
     var r = document.createElement("div");
@@ -586,7 +632,7 @@ function _ensureCreateDlg() {
 
     var oForm = document.createElement("div");
     oForm.className = "u4aPattDlgForm";
-    var oTitleField = U4AUI.createField({ type: "text", value: "", className: "u4aPattDlgTitle" });
+    var oTitleField = U4AUI.createField({ type: "text", value: "", clear: true, className: "u4aPattDlgTitle" });   // X(clear)=값 있을 때만(§15 §2)
     var oTypeSel = U4AUI.createSelect(
         A_CONT_TYPES.map(function (t) { return { value: t, text: t }; }),
         "text",
@@ -595,18 +641,6 @@ function _ensureCreateDlg() {
     oForm.appendChild(_dlgRow(_m("024"), oTitleField.el));   // Title
     oForm.appendChild(_dlgRow(_m("023"), oTypeSel));         // Content Type
     oBody.appendChild(oForm);
-
-    var oTool = document.createElement("div");
-    oTool.className = "u4aPattDlgTool";
-    var oPretty = document.createElement("button");
-    oPretty.type = "button";
-    oPretty.className = "u4a-btn u4aPattPrettyBtn";
-    oPretty.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i><span></span>';
-    oPretty.querySelector("span").textContent = _m("025");   // Pretty Print
-    oPretty.title = _m("025") + " (Shift+F1)";
-    oPretty.addEventListener("click", function () { _toEditHost({ cmd: "format" }); });
-    oTool.appendChild(oPretty);
-    oBody.appendChild(oTool);
 
     var oEdWrap = document.createElement("div");
     oEdWrap.className = "u4aPattDlgEditor";
@@ -620,23 +654,76 @@ function _ensureCreateDlg() {
 
     oDlg.appendChild(oBody);
 
-    // 푸터(48px) — 저장 / 취소(아이콘, §2.1.1).
+    // 푸터 = [줌 −/%/+ (왼쪽)] ···· [꾸밈정렬 · 복사 · Save · Delete(수정) · Close (오른쪽)].
+    //   공통 JS 에디터(ws_html5_client_editor) 크롬 미러. 줌은 공통 호스트 fontZoom* 명령·evt:zoom.
     var oFoot = document.createElement("div");
-    oFoot.className = "u4a-dialog__footer";
+    oFoot.className = "u4a-dialog__footer u4aPattDlgFoot";
+
+    // 줌 컨트롤 [−][🔍 NNN%][+] — 상시표시(Ctrl+휠 몰라도 발견 가능). %클릭=원복(Ctrl+0).
+    var oZoom = document.createElement("div");
+    oZoom.className = "u4aPattDlgZoom";
+    var oZoomOut = document.createElement("button");
+    oZoomOut.type = "button";
+    oZoomOut.className = "u4a-btn u4aPattDlgFlat u4aPattDlgZoomStep";
+    oZoomOut.innerHTML = '<i class="fa-solid fa-minus"></i>';
+    oZoomOut.title = "Ctrl + Wheel ↓";
+    oZoomOut.addEventListener("click", function () { _toEditHost({ cmd: "fontZoomOut" }); });
+    var oZoomBtn = document.createElement("button");
+    oZoomBtn.type = "button";
+    oZoomBtn.className = "u4a-btn u4aPattDlgFlat u4aPattDlgZoomPct";
+    oZoomBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i><span>100%</span>';
+    oZoomBtn.addEventListener("click", function () { _toEditHost({ cmd: "fontZoomReset" }); });
+    var oZoomIn = document.createElement("button");
+    oZoomIn.type = "button";
+    oZoomIn.className = "u4a-btn u4aPattDlgFlat u4aPattDlgZoomStep";
+    oZoomIn.innerHTML = '<i class="fa-solid fa-plus"></i>';
+    oZoomIn.title = "Ctrl + Wheel ↑";
+    oZoomIn.addEventListener("click", function () { _toEditHost({ cmd: "fontZoomIn" }); });
+    oZoom.appendChild(oZoomOut); oZoom.appendChild(oZoomBtn); oZoom.appendChild(oZoomIn);
+    oFoot.appendChild(oZoom);
+
+    var oFootSpacer = document.createElement("span");
+    oFootSpacer.className = "u4aPattDlgFootSpacer";
+    oFoot.appendChild(oFootSpacer);
+
+    // 꾸밈정렬(Pretty Print) — 텍스트 버튼(투명 중립), 결정 그룹 앞.
+    var oPretty = document.createElement("button");
+    oPretty.type = "button";
+    oPretty.className = "u4a-btn u4aPattDlgFlat u4aPattPrettyBtn";
+    oPretty.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i><span></span>';
+    oPretty.querySelector("span").textContent = _mc("/U4A/CL_WS_COMMON", "C25");   // 꾸밈정렬(Pretty Print)
+    oPretty.title = _mc("/U4A/CL_WS_COMMON", "C25") + " (Shift+F1)";
+    oPretty.addEventListener("click", function () { _toEditHost({ cmd: "format" }); });
+    oFoot.appendChild(oPretty);
+
+    // Save(✓, 파랑 emphasized)
     var oSave = document.createElement("button");
     oSave.type = "button";
-    oSave.className = "u4a-btn u4a-btn--emphasized";
+    oSave.className = "u4a-btn u4a-btn--emphasized u4aPattDlgIcoBtn";
     oSave.innerHTML = '<i class="fa-solid fa-check"></i>';
     oSave.title = _mc("/U4A/CL_WS_COMMON", "A64");   // Save
     oSave.addEventListener("click", function () { _saveCreateDlg(); });
+    oFoot.appendChild(oSave);
+
+    // Delete(🗑, 빨강 solid) — 수정 모드에서만 표시(생성 모드 hidden). 현재 커스텀 패턴 삭제 후 닫기.
+    var oDel = document.createElement("button");
+    oDel.type = "button";
+    oDel.className = "u4a-btn u4aPattDlgIcoBtn u4aPattDlgDel";
+    oDel.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+    oDel.title = _m("029");   // Delete
+    oDel.hidden = true;
+    oDel.addEventListener("click", function () { _deleteFromDlg(); });
+    oFoot.appendChild(oDel);
+
+    // Close(✗, negative)
     var oCancel = document.createElement("button");
     oCancel.type = "button";
-    oCancel.className = "u4a-btn u4a-btn--negative";
+    oCancel.className = "u4a-btn u4a-btn--negative u4aPattDlgIcoBtn";
     oCancel.innerHTML = '<i class="fa-solid fa-xmark"></i>';
     oCancel.title = _mc("/U4A/CL_WS_COMMON", "A39");   // Close
     oCancel.addEventListener("click", function () { _closeCreateDlg(); });
-    oFoot.appendChild(oSave);
     oFoot.appendChild(oCancel);
+
     oDlg.appendChild(oFoot);
 
     // ESC 무시(원본 escapeHandler:{} — 편집 중 실수로 닫혀 입력 손실되는 것 방지. 닫기는 취소 버튼으로만).
@@ -650,6 +737,7 @@ function _ensureCreateDlg() {
     oDlgUI = {
         dlg: oDlg, host: oHost, icon: oIcon, title: oTitle,
         titleField: oTitleField, typeSel: oTypeSel, prettyBtn: oPretty,
+        zoomBtn: oZoomBtn, delBtn: oDel,
         ready: false, pending: null, PRCCD: "C", CKEY: ""
     };
 }
@@ -664,6 +752,7 @@ function _openCreateDlg(oParam) {
     var bU = (oDlgUI.PRCCD === "U");
     oDlgUI.icon.className = "fa-solid " + (bU ? "fa-pen-to-square" : "fa-square-plus");
     oDlgUI.title.textContent = _m("022") + " " + (bU ? _m("030") : _m("026"));   // Custom Pattern Change / Create
+    if (oDlgUI.delBtn) { oDlgUI.delBtn.hidden = !bU; }   // 삭제 = 수정 모드만(생성 모드엔 삭제 대상 없음)
 
     oDlgUI.titleField.setValue(oParam.DESC || "");
     oDlgUI.titleField.setValueState("none");
@@ -856,6 +945,8 @@ function _onHostMessage(oEvent) {
             oState.ready = true;
             if (oState.pending) { var n = oState.pending; oState.pending = null; _showCode(n); }
             _finishOpen();
+        } else if (d.evt === "zoom") {
+            _setViewZoom(d.pct);   // 뷰어 헤더 줌 % 실시간 갱신(Ctrl+휠/버튼)
         }
         return;
     }
@@ -867,6 +958,8 @@ function _onHostMessage(oEvent) {
             if (oDlgUI.pending) { var p = oDlgUI.pending; oDlgUI.pending = null; _applyEditor(p); }
         } else if (d.evt === "save") {
             if (oDlgUI.dlg && oDlgUI.dlg.open) { _saveCreateDlg(); }   // 에디터 Ctrl+S
+        } else if (d.evt === "zoom") {
+            _setDlgZoom(d.pct);   // 푸터 줌 % 실시간 갱신(Ctrl+휠/버튼)
         }
         return;
     }
@@ -903,10 +996,18 @@ function _initChrome() {
         });
     }
 
+    // 코드 뷰어 줌 [−][🔍%][+] — 뷰어 호스트 폰트 줌 명령(공통 fontZoom*), evt:zoom 으로 % 실시간 갱신(Ctrl+휠/버튼).
+    var oVZOut = document.getElementById("pattViewZoomOut");
+    var oVZBtn = document.getElementById("pattViewZoomBtn");
+    var oVZIn = document.getElementById("pattViewZoomIn");
+    if (oVZOut) { oVZOut.addEventListener("click", function () { _toHost({ cmd: "fontZoomOut" }); }); }
+    if (oVZBtn) { oVZBtn.title = "100% (Ctrl+0)"; oVZBtn.addEventListener("click", function () { _toHost({ cmd: "fontZoomReset" }); }); }
+    if (oVZIn) { oVZIn.addEventListener("click", function () { _toHost({ cmd: "fontZoomIn" }); }); }
+
     // 복사 버튼(원본 우측 헤더 copy — clipboard.writeText + 031 토스트).
     var oCopy = document.getElementById("pattCopyBtn");
     if (oCopy) {
-        oCopy.title = _m("031");
+        oCopy.title = _mc("/U4A/CL_WS_COMMON", "A04");   // Copy (동작 라벨 — 성공 토스트 031 "복사 완료!"를 툴팁에 쓰면 안 됨)
         oCopy.addEventListener("click", function () {
             if (!oState.cur || typeof oState.cur.DATA !== "string") { return; }
             try { REMOTE.clipboard.writeText(oState.cur.DATA); }

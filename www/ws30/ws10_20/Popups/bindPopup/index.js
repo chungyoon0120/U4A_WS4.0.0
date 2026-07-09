@@ -1,6 +1,1268 @@
 /************************************************************************
  * Copyright 2020. INFOCG Inc. all rights reserved. 
  * ----------------------------------------------------------------------
+ * - merged frame logic into bindPopup/index.js
+ ************************************************************************/
+
+window.oAPP = (function(window) {
+    "use strict";
+
+    const
+        REMOTE = require('@electron/remote'),
+        PATH = REMOTE.require('path'),
+        APP = REMOTE.app,
+        APPPATH = APP.getAppPath(),
+        PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")),
+        CURRWIN = REMOTE.getCurrentWindow(),
+        WSUTIL = require(PATHINFO.WSUTIL);
+
+    window.PATHINFO = PATHINFO;
+    window.WSERR = require(PATHINFO.WSTRYCATCH);
+
+    // 브라우저의 쿼리 스트링 정보
+    const oQueryParams = WSUTIL.QueryString.parse(location.href);
+
+    const 
+        USERINFO = oQueryParams.USERINFO,
+        LANGU = USERINFO.LANGU,
+        SYSID = USERINFO.SYSID,
+        WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU);
+
+    let oAPP = {};
+    oAPP.fn = {};
+    oAPP.ui = {};
+    oAPP.attr = {};
+    oAPP.events = {};
+    oAPP.common = {};
+
+    oAPP.PES_DEV = process?.env?.PES_DEV || undefined;
+
+    oAPP.REMOTE = require('@electron/remote');
+    oAPP.IPCRENDERER = require('electron').ipcRenderer;
+    oAPP.IPCMAIN = oAPP.REMOTE.require('electron').ipcMain,
+    oAPP.PATH = oAPP.REMOTE.require('path');
+    oAPP.FS = oAPP.REMOTE.require('fs');
+    oAPP.APP = oAPP.REMOTE.app;
+    oAPP.USERDATA = oAPP.APP.getPath("userData");
+
+    oAPP.common.fnGetMsgClsText = WSMSG.fnGetMsgClsText.bind(WSMSG);
+    oAPP.WSUTIL = WSUTIL;
+
+    oAPP.attr.GLANGU = oAPP.WSUTIL.getWsSettingsInfo().globalLanguage;
+
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  바인딩 팝업은 OS 기본 title bar를 사용하지 않고 popup 내부에서 직접 그린 custom title bar를 사용한다.
+    *  현재 workspace theme가 light/dark로 변경되어도 title bar, button hover, icon 색상이 기존 화면과
+    *  이질감 없이 맞춰지도록 CSS variable 기준 색상 정보를 이곳에서 관리한다.
+    *  window control icon은 option popup과 동일한 U4A icon font를 사용하며,
+    *  font json 또는 font file을 찾지 못하는 경우에도 최소한의 fallback text가 표시되도록 구성한다.
+    */
+    const C_TITLEBAR_THEME = {
+        light: {
+            "--u4a-bind-bg-color": "#f5f6f7",
+            "--u4a-bind-panel-color": "#ffffff",
+            "--u4a-bind-border-color": "#c6d0dc",
+            "--u4a-bind-titlebar-color": "#f7fafd",
+            "--u4a-bind-titlebar-text-color": "#10283f",
+            "--u4a-bind-titlebar-icon-color": "#0070f2",
+            "--u4a-bind-titlebar-hover-bg": "#e5f1ff",
+            "--u4a-bind-titlebar-active-bg": "#d8ecff",
+            "--u4a-bind-danger-hover-bg": "#d13438",
+            "--u4a-bind-danger-hover-text": "#ffffff"
+        },
+        dark: {
+            "--u4a-bind-bg-color": "#12171c",
+            "--u4a-bind-panel-color": "#1b242d",
+            "--u4a-bind-border-color": "#33414f",
+            "--u4a-bind-titlebar-color": "#1b242d",
+            "--u4a-bind-titlebar-text-color": "#f1f5f9",
+            "--u4a-bind-titlebar-icon-color": "#36a9ff",
+            "--u4a-bind-titlebar-hover-bg": "#253340",
+            "--u4a-bind-titlebar-active-bg": "#2d3d4b",
+            "--u4a-bind-danger-hover-bg": "#d13438",
+            "--u4a-bind-danger-hover-text": "#ffffff"
+        }
+    };
+
+    const C_WINDOW_ICONS = {
+        minimize: "sap-icon://u4a-fw-regular/Window Minimize",
+        maximize: "sap-icon://u4a-fw-regular/Window Maximize",
+        restore: "sap-icon://u4a-fw-regular/Window Restore",
+        close: "sap-icon://u4a-fw-solid/Xmark"
+    };
+
+    const C_U4A_FONT_SETS = {
+        "u4a-fw-regular": {
+            fontFamily: "u4a_fw_regular",
+            fileName: "u4a_fw_regular",
+            jsonName: "u4a_fw_regular.json"
+        },
+        "u4a-fw-solid": {
+            fontFamily: "u4a_fw_solid",
+            fileName: "u4a_fw_solid",
+            jsonName: "u4a_fw_solid.json"
+        }
+    };
+
+    const C_U4A_ICON_CODE_FALLBACK = {
+        "u4a-fw-regular": {
+            "Window Maximize": "f2d0",
+            "Window Minimize": "f2d1",
+            "Window Restore": "f2d2"
+        },
+        "u4a-fw-solid": {
+            Xmark: "f00d"
+        }
+    };
+
+    const C_U4A_ICON_TEXT_FALLBACK = {
+        "Window Minimize": "-",
+        "Window Maximize": "[]",
+        "Window Restore": "[]",
+        Xmark: "x"
+    };
+
+    const oU4AIconMaps = {};
+    const oLoadedU4AFonts = {};
+
+
+    function isDarkTheme(oThemeInfo) {
+
+        return String(oThemeInfo?.THEME || "").toLowerCase().indexOf("dark") !== -1;
+
+    }
+
+
+    function setCssVariables(oVariables) {
+
+        var oRoot = document.documentElement;
+
+        Object.keys(oVariables || {}).forEach(function (sName) {
+            oRoot.style.setProperty(sName, oVariables[sName]);
+        });
+
+    }
+
+
+    function applyFrameTheme(oThemeInfo) {
+
+        var oTheme = oThemeInfo || {},
+            bDark = isDarkTheme(oTheme),
+            oVariables = Object.assign({}, C_TITLEBAR_THEME[bDark === true ? "dark" : "light"]),
+            sBgColor = oTheme.BGCOL || oVariables["--u4a-bind-bg-color"];
+
+        oVariables["--u4a-bind-bg-color"] = sBgColor;
+
+        setCssVariables(oVariables);
+        document.body.style.backgroundColor = sBgColor;
+        document.body.classList.toggle("u4a_bind_theme_dark", bDark);
+        document.body.classList.toggle("u4a_bind_theme_light", !bDark);
+
+        try {
+            CURRWIN.webContents.insertCSS(`html, body { margin: 0px; height: 100%; background-color: ${sBgColor}; }`);
+        } catch (error) {}
+
+    }
+
+
+    function onFrameThemeChange() {
+
+        var oThemeInfo = oAPP.fn.getThemeInfo();
+
+        if(!oThemeInfo){
+            return;
+        }
+
+        oAPP.attr.oThemeInfo = oThemeInfo;
+        applyFrameTheme(oThemeInfo);
+
+    }
+
+
+    function attachFrameThemeEvent() {
+
+        try {
+            oAPP.IPCMAIN.on(`if-p13n-themeChange-${SYSID}`, onFrameThemeChange);
+        } catch (error) {
+            return;
+        }
+
+        window.addEventListener("pagehide", function () {
+            try {
+                oAPP.IPCMAIN.off(`if-p13n-themeChange-${SYSID}`, onFrameThemeChange);
+            } catch (error) {}
+        }, { once: true });
+
+    }
+
+
+    function pathToFileUrl(filePath) {
+
+        if (!filePath) {
+            return "";
+        }
+
+        return encodeURI(`file:///${String(filePath).replace(/\\/g, "/")}`);
+
+    }
+
+
+    function getU4AIconFileRoot() {
+
+        var aCandidates = [];
+
+        if (PATHINFO?.U4AICON_ROOT) {
+            aCandidates.push(PATHINFO.U4AICON_ROOT);
+        }
+
+        if (PATHINFO?.WS10_20_ROOT) {
+            aCandidates.push(PATH.join(PATHINFO.WS10_20_ROOT, "icons", "u4a"));
+        }
+
+        aCandidates.push(PATH.join(APPPATH, "ws30", "ws10_20", "icons", "u4a"));
+
+        for (var i = 0, l = aCandidates.length; i < l; i += 1) {
+
+            try {
+
+                if (oAPP.FS.existsSync(aCandidates[i]) === true) {
+                    return aCandidates[i];
+                }
+
+            } catch (error) {
+                continue;
+            }
+
+        }
+
+        return "";
+
+    }
+
+
+    function getU4AIconUrlRoot() {
+
+        var sFileRoot = getU4AIconFileRoot();
+
+        if (sFileRoot) {
+            return pathToFileUrl(sFileRoot);
+        }
+
+        return new URL("../../icons/u4a/", location.href).href.replace(/\/$/, "");
+
+    }
+
+
+    function parseU4AIconSrc(src) {
+
+        var sIcon = String(src || "").replace(/^sap-icon:\/\//, ""),
+            aParts = sIcon.split("/");
+
+        if (aParts.length > 1) {
+            return {
+                collection: aParts[0],
+                name: aParts.slice(1).join("/")
+            };
+        }
+
+        return {
+            collection: "",
+            name: sIcon
+        };
+
+    }
+
+
+    function readU4AIconMap(collection) {
+
+        var oSet = C_U4A_FONT_SETS[collection],
+            sFileRoot = getU4AIconFileRoot(),
+            oMap;
+
+        if (!oSet) {
+            return;
+        }
+
+        if (oU4AIconMaps[collection]) {
+            return oU4AIconMaps[collection];
+        }
+
+        try {
+
+            if (sFileRoot) {
+
+                var sJsonPath = PATH.join(sFileRoot, oSet.jsonName);
+
+                if (oAPP.FS.existsSync(sJsonPath) === true) {
+                    oMap = JSON.parse(oAPP.FS.readFileSync(sJsonPath, "utf-8"));
+                }
+
+            }
+
+        } catch (error) {
+            oMap = null;
+        }
+
+        oU4AIconMaps[collection] = Object.assign({}, C_U4A_ICON_CODE_FALLBACK[collection] || {}, oMap || {});
+
+        return oU4AIconMaps[collection];
+
+    }
+
+
+    function getU4AIconContent(src) {
+
+        var oParsed = parseU4AIconSrc(src),
+            oMap = readU4AIconMap(oParsed.collection),
+            sCode = oMap?.[oParsed.name];
+
+        if (!sCode) {
+            return;
+        }
+
+        sCode = String(sCode).replace(/^\\u/i, "").replace(/^0x/i, "");
+
+        var iCode = parseInt(sCode, 16);
+
+        if (Number.isNaN(iCode) === true) {
+            return;
+        }
+
+        return String.fromCodePoint(iCode);
+
+    }
+
+
+    function ensureU4AFontFace(fontFamily) {
+
+        if (!fontFamily || oLoadedU4AFonts[fontFamily] === true) {
+            return;
+        }
+
+        var oSet = Object.keys(C_U4A_FONT_SETS).map(function (key) {
+            return C_U4A_FONT_SETS[key];
+        }).find(function (set) {
+            return set.fontFamily === fontFamily;
+        });
+
+        if (!oSet) {
+            return;
+        }
+
+        var sStyleId = `u4a-bind-icon-face-${fontFamily.replace(/[^a-z0-9_-]/gi, "-")}`;
+
+        if (document.getElementById(sStyleId)) {
+            oLoadedU4AFonts[fontFamily] = true;
+            return;
+        }
+
+        var sBaseUrl = getU4AIconUrlRoot();
+
+        if (!sBaseUrl) {
+            return;
+        }
+
+        var oStyle = document.createElement("style");
+
+        oStyle.id = sStyleId;
+        oStyle.textContent = `
+            @font-face {
+                font-family: "${fontFamily}";
+                src: url("${sBaseUrl}/${oSet.fileName}.woff2") format("woff2");
+                font-weight: normal;
+                font-style: normal;
+            }
+        `;
+        document.head.appendChild(oStyle);
+        oLoadedU4AFonts[fontFamily] = true;
+
+    }
+
+
+    function applyU4AIcon(node, src) {
+
+        if (!node) {
+            return;
+        }
+
+        var sSrc = src || node.dataset.sapIcon || "",
+            oParsed = parseU4AIconSrc(sSrc),
+            oSet = C_U4A_FONT_SETS[oParsed.collection],
+            sContent = getU4AIconContent(sSrc);
+
+        node.setAttribute("aria-hidden", "true");
+        node.dataset.sapIcon = sSrc;
+
+        if (oSet && sContent) {
+            ensureU4AFontFace(oSet.fontFamily);
+            node.classList.remove("is-unresolved");
+            node.style.fontFamily = `"${oSet.fontFamily}"`;
+            node.textContent = sContent;
+            return;
+        }
+
+        node.classList.add("is-unresolved");
+        node.style.fontFamily = "";
+        node.textContent = C_U4A_ICON_TEXT_FALLBACK[oParsed.name] || "";
+
+    }
+
+
+    function refreshU4AIcons(root) {
+
+        Array.prototype.forEach.call((root || document).querySelectorAll("[data-sap-icon]"), function (node) {
+            applyU4AIcon(node);
+        });
+
+    }
+
+
+    function setWindowControlIcon(button, iconSrc) {
+
+        if (!button) {
+            return;
+        }
+
+        applyU4AIcon(button.querySelector(".u4a_bind_window_icon"), iconSrc);
+
+    }
+
+
+    /*************************************************************
+     * @function - frame titlebar window control.
+     *************************************************************/
+    function isDestroyedWindow(oWin) {
+
+        if (!oWin) {
+            return true;
+        }
+
+        try {
+            return typeof oWin.isDestroyed === "function" && oWin.isDestroyed() === true;
+        } catch (error) {
+            return true;
+        }
+
+    }
+
+
+    function getCurrentWindow() {
+
+        if (isDestroyedWindow(CURRWIN) === true) {
+            return;
+        }
+
+        return CURRWIN;
+
+    }
+
+
+    function getElectronScreenModule() {
+
+        try {
+
+            if (oAPP?.REMOTE?.screen) {
+                return oAPP.REMOTE.screen;
+            }
+
+            if (typeof oAPP?.REMOTE?.require === "function") {
+                var oElectron = oAPP.REMOTE.require("electron");
+
+                return oElectron?.screen;
+            }
+
+        } catch (error) {
+            return;
+        }
+
+    }
+
+
+    function getFrameTitlebarPointerPoint(oEvent, aWinPos, sPointMode) {
+
+        var oRawPoint = {
+                x: Number(oEvent.screenX) || 0,
+                y: Number(oEvent.screenY) || 0
+            },
+            oDipPoint;
+
+        try {
+            var oScreen = getElectronScreenModule();
+
+            if (oScreen && typeof oScreen.screenToDipPoint === "function") {
+                oDipPoint = oScreen.screenToDipPoint(oRawPoint);
+
+                if (!oDipPoint || Number.isFinite(oDipPoint.x) !== true || Number.isFinite(oDipPoint.y) !== true) {
+                    oDipPoint = undefined;
+                }
+            }
+        } catch (error) {
+            oDipPoint = undefined;
+        }
+
+        if (sPointMode === "dip" && oDipPoint) {
+            return {x: oDipPoint.x, y: oDipPoint.y, mode: "dip"};
+        }
+
+        if (sPointMode === "raw" || !oDipPoint) {
+            return {x: oRawPoint.x, y: oRawPoint.y, mode: "raw"};
+        }
+
+        if (
+            Array.isArray(aWinPos) !== true ||
+            Number.isFinite(oEvent.clientX) !== true ||
+            Number.isFinite(oEvent.clientY) !== true
+        ) {
+            return {x: oRawPoint.x, y: oRawPoint.y, mode: "raw"};
+        }
+
+        var nExpectX = aWinPos[0] + oEvent.clientX,
+            nExpectY = aWinPos[1] + oEvent.clientY,
+            nRawScore = Math.abs(oRawPoint.x - nExpectX) + Math.abs(oRawPoint.y - nExpectY),
+            nDipScore = Math.abs(oDipPoint.x - nExpectX) + Math.abs(oDipPoint.y - nExpectY);
+
+        if (nDipScore + 1 < nRawScore) {
+            return {x: oDipPoint.x, y: oDipPoint.y, mode: "dip"};
+        }
+
+        return {x: oRawPoint.x, y: oRawPoint.y, mode: "raw"};
+
+    }
+
+
+    function callWindowMethod(methodName) {
+
+        var oWin = getCurrentWindow();
+
+        if (!oWin) {
+            return;
+        }
+
+        try {
+            if (typeof oWin[methodName] === "function") {
+                return oWin[methodName]();
+            }
+        } catch (error) {
+            return;
+        }
+
+    }
+
+
+    function setFrameTitle() {
+
+        var oTitle = document.getElementById("u4a_bind_title_text");
+
+        if (!oTitle) {
+            return;
+        }
+
+        var sTitle = "",
+            sDefaultTitle = "";
+
+        try {
+            sTitle = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "/U4A/CL_WS_COMMON", "A15");
+        } catch (error) {
+            sTitle = "";
+        }
+
+        try {
+            sDefaultTitle = oAPP.WSUTIL.getWsMsgClsTxt("", "/U4A/CL_WS_COMMON", "A15");
+        } catch (error) {
+            sDefaultTitle = "";
+        }
+
+        oTitle.innerText = sTitle || document.title || sDefaultTitle;
+        document.title = oTitle.innerText;
+
+    }
+
+
+    function updateWindowState() {
+
+        var oWin = getCurrentWindow(),
+            oButton = document.getElementById("u4a_bind_maximize"),
+            oTitlebar = document.querySelector(".u4a_bind_titlebar");
+
+        if (!oWin || !oButton) {
+            return;
+        }
+
+        var bIsMaximized = false;
+
+        try {
+            bIsMaximized = typeof oWin.isMaximized === "function" && oWin.isMaximized() === true;
+        } catch (error) {
+            return;
+        }
+
+        var sButtonTitle = bIsMaximized === true ? 
+            oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "955") :
+            oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "954");
+
+        oButton.classList.toggle("is_maximized", bIsMaximized);
+        oTitlebar?.classList?.toggle("u4a_bind_titlebar_maximized", bIsMaximized);
+        oTitlebar?.classList?.add("u4a_bind_titlebar_native_drag");
+        oButton.title = sButtonTitle;
+        oButton.setAttribute("aria-label", oButton.title);
+        setWindowControlIcon(oButton, bIsMaximized === true ? C_WINDOW_ICONS.restore : C_WINDOW_ICONS.maximize);
+
+    }
+
+
+    function minimizeWindow() {
+
+        callWindowMethod("minimize");
+
+    }
+
+
+    function toggleMaximizeWindow() {
+
+        var oWin = getCurrentWindow();
+
+        if (!oWin) {
+            return;
+        }
+
+        try {
+
+            if (typeof oWin.isMaximized === "function" && oWin.isMaximized() === true) {
+                oWin.unmaximize();
+                return;
+            }
+
+            oWin.maximize();
+
+        } catch (error) {
+            return;
+        }
+
+    }
+
+
+    function closeWindow() {
+
+        if (oAPP?.oMain?.attr?.isBusy === true) {
+            return;
+        }
+
+        callWindowMethod("close");
+
+    }
+
+
+    var oFrameTitlebarDragState = null;
+    var bFrameTitlebarManualDragActive = false;
+
+
+    function isFrameTitlebarInteractiveTarget(oTarget) {
+
+        if (!oTarget || typeof oTarget.closest !== "function") {
+            return true;
+        }
+
+        return !!oTarget.closest("button, input, select, textarea, a, label, [role='button'], [role='link'], .u4a_bind_window_controls");
+
+    }
+
+
+    function canStartFrameTitlebarDrag(oEvent) {
+
+        if (!oEvent || oEvent.button !== 0) {
+            return false;
+        }
+
+        if (isFrameTitlebarInteractiveTarget(oEvent.target) === true) {
+            return false;
+        }
+
+        return !!oEvent.target.closest(".u4a_bind_titlebar");
+
+    }
+
+
+    function isFrameToolbarDragTarget(oTarget) {
+
+        if (!oTarget || typeof oTarget.closest !== "function") {
+            return false;
+        }
+
+        if (!oTarget.closest(".u4a_bind_body .sapMTB")) {
+            return false;
+        }
+
+        if (oTarget.closest("button, input, select, textarea, a, label, [role='button'], [role='link'], .sapMBtn, .sapMBtnBase, .sapMSlt, .sapMInputBase, .sapUiLoSplitterBar, .sapUiLoSplitterOverlayBar")) {
+            return false;
+        }
+
+        return true;
+
+    }
+
+
+    function isCurrentWindowMaximized(oWin) {
+
+        try {
+            return typeof oWin?.isMaximized === "function" && oWin.isMaximized() === true;
+        } catch (error) {
+            return false;
+        }
+
+    }
+
+
+    function isScaledDisplay() {
+
+        var nScale = Number(window.devicePixelRatio) || 1;
+
+        if (Math.abs(nScale - 1) > 0.01) {
+            return true;
+        }
+
+        try {
+
+            var oWin = getCurrentWindow(),
+                oScreen = getElectronScreenModule();
+
+            if (
+                oWin &&
+                oScreen &&
+                typeof oWin.getBounds === "function" &&
+                typeof oScreen.getDisplayMatching === "function"
+            ) {
+                var oDisplay = oScreen.getDisplayMatching(oWin.getBounds());
+
+                return Math.abs((Number(oDisplay?.scaleFactor) || 1) - 1) > 0.01;
+            }
+
+        } catch (error) {
+            return false;
+        }
+
+        return false;
+
+    }
+
+
+    function endFrameTitlebarDrag() {
+
+        oFrameTitlebarDragState = null;
+        bFrameTitlebarManualDragActive = false;
+        window.removeEventListener("mousemove", moveFrameTitlebarDrag, true);
+        window.removeEventListener("mouseup", endFrameTitlebarDrag, true);
+        window.removeEventListener("blur", endFrameTitlebarDrag, true);
+        updateWindowState();
+
+    }
+
+
+    function moveFrameTitlebarDrag(oEvent) {
+
+        if (!oFrameTitlebarDragState) {
+            return;
+        }
+
+        var oWin = getCurrentWindow();
+
+        if (!oWin || typeof oWin.setPosition !== "function") {
+            endFrameTitlebarDrag();
+            return;
+        }
+
+        try {
+
+            var oPoint = getFrameTitlebarPointerPoint(oEvent, [oFrameTitlebarDragState.x, oFrameTitlebarDragState.y], oFrameTitlebarDragState.pointMode),
+                iX = Math.round(oFrameTitlebarDragState.x + oPoint.x - oFrameTitlebarDragState.screenX),
+                iY = Math.round(oFrameTitlebarDragState.y + oPoint.y - oFrameTitlebarDragState.screenY);
+
+            if (
+                typeof oWin.setBounds === "function" &&
+                Number.isFinite(oFrameTitlebarDragState.width) === true &&
+                Number.isFinite(oFrameTitlebarDragState.height) === true
+            ) {
+                oWin.setBounds({
+                    x: iX,
+                    y: iY,
+                    width: oFrameTitlebarDragState.width,
+                    height: oFrameTitlebarDragState.height
+                });
+
+                return;
+            }
+
+            oWin.setPosition(iX, iY);
+
+        } catch (error) {
+            endFrameTitlebarDrag();
+        }
+
+    }
+
+
+    function startFrameTitlebarDrag(oEvent, bAllowToolbarArea) {
+
+        if (canStartFrameTitlebarDrag(oEvent) !== true && (bAllowToolbarArea !== true || isFrameToolbarDragTarget(oEvent?.target) !== true)) {
+            return;
+        }
+
+        var oWin = getCurrentWindow();
+
+        if (!oWin || typeof oWin.getPosition !== "function") {
+            return;
+        }
+
+        try {
+
+            var aPos = oWin.getPosition();
+
+            if (Array.isArray(aPos) !== true) {
+                return;
+            }
+
+            var oPoint = getFrameTitlebarPointerPoint(oEvent, aPos);
+
+            if (typeof oWin.isFullScreen === "function" && oWin.isFullScreen() === true) {
+                return;
+            }
+
+            var bIsMaximized = isCurrentWindowMaximized(oWin);
+
+            if (oEvent.currentTarget?.classList?.contains("u4a_bind_titlebar_native_drag") === true && bIsMaximized !== true) {
+                return;
+            }
+
+            if (bIsMaximized === true) {
+
+                if (typeof oWin.unmaximize !== "function" || typeof oWin.setPosition !== "function") {
+                    return;
+                }
+
+            }
+
+            bFrameTitlebarManualDragActive = true;
+
+            if (bIsMaximized === true) {
+
+                var nRatioX = oEvent.clientX / Math.max(window.innerWidth || 1, 1);
+
+                oWin.unmaximize();
+
+                if (typeof oWin.getSize === "function") {
+                    var aSize = oWin.getSize();
+
+                    if (Array.isArray(aSize) === true) {
+                        var iX = Math.round(oPoint.x - (aSize[0] * nRatioX)),
+                            iY = Math.round(oPoint.y - Math.min(oEvent.clientY, 20));
+
+                        if (typeof oWin.setBounds === "function") {
+                            oWin.setBounds({x: iX, y: iY, width: aSize[0], height: aSize[1]});
+                        } else {
+                            oWin.setPosition(iX, iY);
+                        }
+                    }
+                }
+
+            }
+
+            aPos = oWin.getPosition();
+
+            if (Array.isArray(aPos) !== true) {
+                return;
+            }
+
+            oPoint = getFrameTitlebarPointerPoint(oEvent, aPos, oPoint.mode);
+
+            var aSize = typeof oWin.getSize === "function" ? oWin.getSize() : undefined;
+
+            oFrameTitlebarDragState = {
+                screenX: oPoint.x,
+                screenY: oPoint.y,
+                pointMode: oPoint.mode,
+                x: aPos[0],
+                y: aPos[1],
+                width: Array.isArray(aSize) === true ? aSize[0] : undefined,
+                height: Array.isArray(aSize) === true ? aSize[1] : undefined
+            };
+
+            window.addEventListener("mousemove", moveFrameTitlebarDrag, true);
+            window.addEventListener("mouseup", endFrameTitlebarDrag, true);
+            window.addEventListener("blur", endFrameTitlebarDrag, true);
+
+            oEvent.preventDefault();
+
+        } catch (error) {
+            bFrameTitlebarManualDragActive = false;
+            endFrameTitlebarDrag();
+        }
+
+    }
+
+
+    function startFrameToolbarMaximizedDrag(oEvent) {
+
+        var oWin = getCurrentWindow();
+
+        if (isCurrentWindowMaximized(oWin) !== true) {
+            return;
+        }
+
+        startFrameTitlebarDrag(oEvent, true);
+
+    }
+
+
+    function onFrameTitlebarDoubleClick(oEvent) {
+
+        if (canStartFrameTitlebarDrag(oEvent) !== true) {
+            return;
+        }
+
+        toggleMaximizeWindow();
+
+    }
+
+
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  custom title bar의 최소화, 최대화/복원, 닫기 버튼 이벤트를 현재 Electron BrowserWindow에 연결한다.
+    *  OS 기본 title bar를 숨긴 상태에서도 기존 popup 사용에 필요한 window control 기능을 유지하기 위한 처리이며,
+    *  maximize/unmaximize 이벤트를 감지해 버튼 icon과 aria-label을 복원/최대화 상태에 맞게 갱신한다.
+    *  close 버튼은 기존 busy 상태 보호 로직을 존중하여 작업 중에는 popup이 닫히지 않도록 한다.
+    */
+    function attachFrameTitlebarEvents() {
+
+        var oTitlebar = document.querySelector(".u4a_bind_titlebar"),
+            oBody = document.querySelector(".u4a_bind_body"),
+            oWindowControls = document.querySelector(".u4a_bind_window_controls"),
+            oMinimize = document.getElementById("u4a_bind_minimize"),
+            oMaximize = document.getElementById("u4a_bind_maximize"),
+            oClose = document.getElementById("u4a_bind_close");
+
+        refreshU4AIcons(document);
+        setWindowControlIcon(oMinimize, C_WINDOW_ICONS.minimize);
+        setWindowControlIcon(oClose, C_WINDOW_ICONS.close);
+
+        if (oWindowControls) {
+            oWindowControls.setAttribute("aria-label", oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "952"));
+        }
+
+        if (oMinimize) {
+            oMinimize.title = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "953");
+            oMinimize.setAttribute("aria-label", oMinimize.title);
+            oMinimize.addEventListener("click", minimizeWindow);
+        }
+
+        if (oMaximize) {
+            oMaximize.title = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "954");
+            oMaximize.setAttribute("aria-label", oMaximize.title);
+            oMaximize.addEventListener("click", toggleMaximizeWindow);
+        }
+
+        if (oClose) {
+            oClose.title = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "056");
+            oClose.setAttribute("aria-label", oClose.title);
+            oClose.addEventListener("click", closeWindow);
+        }
+
+        if (oTitlebar) {
+            oTitlebar.classList.add("u4a_bind_titlebar_native_drag");
+        }
+
+        var oWin = getCurrentWindow();
+
+        if (!oWin || typeof oWin.on !== "function") {
+            return;
+        }
+
+        oWin.on("maximize", updateWindowState);
+        oWin.on("unmaximize", updateWindowState);
+
+        window.addEventListener("pagehide", function () {
+
+            if (oTitlebar) {
+                oTitlebar.classList.remove("u4a_bind_titlebar_native_drag");
+            }
+
+            endFrameTitlebarDrag();
+
+            try {
+                oWin.off("maximize", updateWindowState);
+                oWin.off("unmaximize", updateWindowState);
+            } catch (error) {
+                try {
+                    oWin.removeListener("maximize", updateWindowState);
+                    oWin.removeListener("unmaximize", updateWindowState);
+                } catch (e) {}
+            }
+
+        }, { once: true });
+
+        updateWindowState();
+
+    }
+
+
+    /*************************************************************
+     * @function - 테마 정보를 구한다.
+     *************************************************************/
+    oAPP.fn.getThemeInfo = function (){
+
+        let oUserInfo = parent.process.USERINFO;
+        let sSysID = oUserInfo.SYSID;
+        
+        // 해당 SYSID별 테마 정보 JSON을 읽는다.
+        let sThemeJsonPath = oAPP.PATH.join(oAPP.USERDATA, "p13n", "theme", `${sSysID}.json`);
+        if(oAPP.FS.existsSync(sThemeJsonPath) === false){
+            return;
+        }
+
+        let sThemeJson = oAPP.FS.readFileSync(sThemeJsonPath, "utf-8");
+
+        try {
+        
+            var oThemeJsonData = JSON.parse(sThemeJson);    
+
+        } catch (error) {
+            return;
+        }
+
+        return oThemeJsonData;
+
+    } // end of oAPP.fn.getThemeInfo
+
+
+    /*************************************************************
+     * @function - White List Object 유무 확인 
+     *************************************************************/
+    oAPP.common.checkWLOList = function(REGTYP = "", CHGOBJ = ""){
+
+        return oAPP.attr.oUserInfo.META.T_REG_WLO.some( item => item.REGTYP === REGTYP && item.CHGOBJ === CHGOBJ );
+
+    };
+    
+
+    /*******************************************************
+     * 메시지클래스 텍스트 작업 관련 Object -- end
+     *******************************************************/
+
+    oAPP.setBusy = function() {
+        return;
+    };
+
+
+    function loadBindPopupContent(){
+
+        initBindPopupContent();
+
+    }
+
+
+    oAPP.fn.setBindPopupWithinArea = function(){
+
+        var oBindBodyDom = document.querySelector(".u4a_bind_body");
+
+        if(!oBindBodyDom || typeof window?.sap?.ui?.core?.Popup?.setWithinArea !== "function"){
+            return;
+        }
+
+        // 모든 UI5 popup의 위치 가능 영역을 custom titlebar 아래 본문으로 제한한다.
+        window.sap.ui.core.Popup.setWithinArea(oBindBodyDom);
+
+    };
+
+
+    function getBindPopupWindowSizeKey(oBounds){
+
+        if(
+            oBounds &&
+            Number.isFinite(oBounds.width) === true &&
+            Number.isFinite(oBounds.height) === true
+        ){
+            return `${Math.round(oBounds.width)}x${Math.round(oBounds.height)}`;
+        }
+
+        try {
+
+            var oWin = getCurrentWindow();
+
+            if(oWin && typeof oWin.getSize === "function"){
+                var aSize = oWin.getSize();
+
+                if(Array.isArray(aSize) === true){
+                    return `${Math.round(aSize[0])}x${Math.round(aSize[1])}`;
+                }
+            }
+
+        } catch (error) {}
+
+        return `${Math.round(window.innerWidth || 0)}x${Math.round(window.innerHeight || 0)}`;
+
+    }
+
+
+    oAPP.fn.setResizeSensitivePopoverWindowSize = function(){
+
+        oAPP.attr.sResizeSensitivePopoverWindowSize = getBindPopupWindowSizeKey();
+
+    };
+
+
+    function isMessagePopoverControl(oPopover){
+
+        if(typeof oPopover?.data === "function" && oPopover.data("msg_popover") === true){
+            return true;
+        }
+
+        if(typeof oPopover?.oParent?.data === "function" && oPopover.oParent.data("msg_popover") === true){
+            return true;
+        }
+
+        return false;
+
+    }
+
+
+    function closeMessagePopoverControl(oPopover){
+
+        if(isMessagePopoverControl(oPopover) !== true){
+            return false;
+        }
+
+        if(typeof oAPP.fn.clearMessagePopoverErrorState === "function"){
+            oAPP.fn.clearMessagePopoverErrorState();
+        }
+
+        try {
+            if(typeof oPopover?.oParent?.close === "function"){
+                oPopover.oParent.close();
+                return true;
+            }
+
+            if(typeof oPopover?.close === "function"){
+                oPopover.close();
+                return true;
+            }
+
+            if(typeof oPopover?.destroy === "function"){
+                oPopover.destroy();
+                return true;
+            }
+
+        } catch (error) {}
+
+        return true;
+
+    }
+
+
+    oAPP.fn.closeMessagePopoverControl = closeMessagePopoverControl;
+
+
+    function isActualWindowResize(oNextBounds){
+
+        var sCurrentSize = getBindPopupWindowSizeKey(),
+            sNextSize = getBindPopupWindowSizeKey(oNextBounds),
+            sPrevSize = oAPP.attr.sResizeSensitivePopoverWindowSize;
+
+        if(typeof sPrevSize === "undefined"){
+            oAPP.attr.sResizeSensitivePopoverWindowSize = sNextSize || sCurrentSize;
+            return false;
+        }
+
+        if(sNextSize === sCurrentSize && sCurrentSize === sPrevSize){
+            return false;
+        }
+
+        oAPP.attr.sResizeSensitivePopoverWindowSize = sNextSize || sCurrentSize;
+
+        return true;
+
+    }
+
+
+    oAPP.fn.closeResizeSensitivePopovers = function(oEvent, oNextBounds){
+
+        if(isActualWindowResize(oNextBounds) !== true){
+            return;
+        }
+
+        if(typeof window?.sap?.m?.InstanceManager?.getOpenPopovers !== "function"){
+            return;
+        }
+
+        var aPopovers = window.sap.m.InstanceManager.getOpenPopovers() || [];
+
+        for(var i = 0, l = aPopovers.length; i < l; i++){
+
+            var oPopover = aPopovers[i];
+
+            oAPP.fn.closeMessagePopoverControl(oPopover);
+
+        }
+
+    };
+
+
+    applyFrameTheme(oAPP.fn.getThemeInfo());
+    attachFrameTitlebarEvents();
+    attachFrameThemeEvent();
+
+    /************************************************************************
+     * IPCRENDERER Events..
+     ************************************************************************/
+    oAPP.IPCRENDERER.on('if_modelBindingPopup', (events, oInfo) => {
+
+        oAPP.attr.oUserInfo = oInfo.oUserInfo; // User 정보(필수)
+        oAPP.attr.oThemeInfo = oInfo.oThemeInfo; // User 정보(필수)
+
+        oAPP.attr.T_9011 = oInfo.T_9011;
+        oAPP.attr.T_0022 = oInfo.T_0022;
+        oAPP.attr.T_0023 = oInfo.T_0023;
+
+        oAPP.attr.T_0014 = oInfo.T_0014;
+        oAPP.attr.T_0015 = oInfo.T_0015;
+        oAPP.attr.T_CEVT = oInfo.T_CEVT;
+        oAPP.attr.oAppInfo = oInfo.oAppInfo;
+        oAPP.attr.servNm = oInfo.servNm;
+        oAPP.attr.DnDRandKey = oInfo.SSID;
+        oAPP.attr.SSID       = oInfo.SSID;
+        oAPP.attr.channelKey = oInfo.channelKey;
+        oAPP.attr.browserkey = oQueryParams.browserkey;
+
+        applyFrameTheme(oInfo.oThemeInfo);
+        setFrameTitle();
+        loadBindPopupContent();
+
+    });
+    
+
+    window.oAPP = oAPP;
+
+    return oAPP;
+
+})(window);
+
+
+
+function initBindPopupContent(){
+
+    if(initBindPopupContent._started === true){
+        return;
+    }
+
+    initBindPopupContent._started = true;
+
+/************************************************************************
+ * Copyright 2020. INFOCG Inc. all rights reserved. 
+ * ----------------------------------------------------------------------
  * - file Name : bindPopup/index.js
  ************************************************************************/
 
@@ -107,8 +1369,79 @@ let oAPP = parent.oAPP,
         APP = oAPP.APP,
         require = parent.require;
 
+
+    function isolateNodeGlobalsForUi5Bootstrap(){
+
+        if(typeof window.require !== "function" || typeof window.module !== "object"){
+            return;
+        }
+
+        if(window.__u4aBindNode){
+            return;
+        }
+
+        window.__u4aBindNode = {
+            require : window.require,
+            module  : window.module,
+            exports : window.exports
+        };
+
+        window.require = undefined;
+        window.module  = undefined;
+        window.exports = undefined;
+
+    }
+
+
+    function restoreNodeGlobalsAfterUi5Bootstrap(){
+
+        if(!window.__u4aBindNode){
+            return;
+        }
+
+        window.require = window.__u4aBindNode.require;
+        window.module  = window.__u4aBindNode.module;
+        window.exports = window.__u4aBindNode.exports;
+
+        delete window.__u4aBindNode;
+
+    }
+
     //default 바인딩 모드.
     oAPP.attr.BIND_MODE = CS_BIND_MODE.BULK;
+
+
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  바인딩 팝업의 화면 커스터마이징 기능에서 제어할 영역 코드를 정의한다.
+    *  MODEL은 좌측 바인딩 필드 영역, DESIGN은 가운데 DESIGN TREE 영역,
+    *  ADDIT은 우측 바인딩 추가 속성 영역을 의미한다.
+    *  각 영역의 표시 여부는 저장된 사용자 설정과 현재 parent window 기준 상태에 따라
+    *  독립적으로 관리되며, 영역 수에 맞춰 popup width/minWidth 및 splitter layout이
+    *  다시 계산될 수 있도록 공통 기준값을 함께 둔다.
+    */
+    const CS_BIND_LAYOUT_AREA = {
+        MODEL  : "MODEL",
+        DESIGN : "DESIGN",
+        ADDIT  : "ADDIT"
+    };
+
+
+    const CS_BIND_LAYOUT_MIN_WIDTH = {
+        1: 360,
+        2: 650,
+        3: 900
+    };
+
+
+    const CS_BIND_LAYOUT_WIDTH = {
+        1: 560,
+        2: 900,
+        3: 1280
+    };
 
 
     //메인 관련 오브젝트.
@@ -121,6 +1454,42 @@ let oAPP = parent.oAPP,
     oAPP.oMain.fn = {};
 
     oAPP.oMain.attr = {};
+
+
+    function lf_setCurrentWindowClosable(bClosable){
+
+        try {
+
+            var _oWin = oAPP.REMOTE.getCurrentWindow();
+
+            if(!_oWin){
+                return;
+            }
+
+            if(typeof _oWin.isDestroyed === "function" && _oWin.isDestroyed() === true){
+                return;
+            }
+
+            _oWin.closable = bClosable;
+
+        } catch (error) {}
+
+    }
+
+
+    function lf_postBusyToChild(oParam){
+
+        try {
+
+            if(!oAPP.oMain.broadToChild || typeof oAPP.oMain.broadToChild.postMessage !== "function"){
+                return;
+            }
+
+            oAPP.oMain.broadToChild.postMessage(oParam);
+
+        } catch (error) {}
+
+    }
     
 
     /*************************************************************
@@ -180,16 +1549,42 @@ let oAPP = parent.oAPP,
                 return res();
             }
 
+            var _oTimer = null,
+                _bDone = false,
+                _fnDone = function(){
+
+                    if(_bDone === true){
+                        return;
+                    }
+
+                    _bDone = true;
+
+                    if(_oTimer){
+                        clearTimeout(_oTimer);
+                    }
+
+                    if(typeof oUI.removeEventDelegate === "function"){
+                        oUI.removeEventDelegate(_oDelegate);
+                    }
+
+                    if(typeof oUI.data === "function"){
+                        oUI.data("_onAfterRendering", null);
+                    }
+
+                    return res();
+
+                };
+
             var _oDelegate = {
                 onAfterRendering:(oEvent)=>{
 
                     //onAfterRendering 이벤트 제거.
-                    oUI.removeEventDelegate(_oDelegate);
+                    _fnDone();
 
                     //onAfterRendering 정보 초기화.
-                    oUI.data("_onAfterRendering", null);
+                    // oUI.data("_onAfterRendering", null);
 
-                    return res();
+                    return;
 
                 }
             };
@@ -199,6 +1594,43 @@ let oAPP = parent.oAPP,
             
             //onAfterRendering 정보 매핑.
             oUI.data("_onAfterRendering", _oDelegate);
+
+            _oTimer = setTimeout(_fnDone, 1000);
+
+        });
+
+    }
+
+
+    function waitTableRowsUpdated(oTable, iTimeout){
+
+        return new Promise((resolve)=>{
+
+            if(!oTable || typeof oTable.attachEventOnce !== "function"){
+                return resolve();
+            }
+
+            var _oTimer = null,
+                _bDone = false,
+                _fnDone = function(){
+
+                    if(_bDone === true){
+                        return;
+                    }
+
+                    _bDone = true;
+
+                    if(_oTimer){
+                        clearTimeout(_oTimer);
+                    }
+
+                    resolve();
+
+                };
+
+            oTable.attachEventOnce("rowsUpdated", _fnDone);
+
+            _oTimer = setTimeout(_fnDone, iTimeout || 500);
 
         });
 
@@ -406,7 +1838,7 @@ let oAPP = parent.oAPP,
         _aT_0015 = _aT_0015.filter( item => item.ISBND !== "" );
 
         if(_aT_0015.length === 0){
-            sap.m.MessageToast.show("바인딩 정보가 존재하지 않습니다.", 
+            sap.m.MessageToast.show(oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "956"), 
                 {my:"center center", at:"center center"});
             return;
         }
@@ -419,7 +1851,7 @@ let oAPP = parent.oAPP,
                 new sap.m.OverflowToolbar({
                     content:[
                         new sap.m.Button({
-                            text:"auto resize",
+                            text: oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "161"),
                             press:function(){
                                 oAPP.fn.setUiTableAutoResizeColumn(_oTab);
                             }
@@ -467,7 +1899,7 @@ let oAPP = parent.oAPP,
             ],
             buttons:[
                 new sap.m.Button({
-                    text:"close",
+                    text: oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "056"),
                     press:function(){
                         oDialog.close();
                     }
@@ -525,6 +1957,22 @@ let oAPP = parent.oAPP,
             setResizeCol(oTable, _oColumn, i);
 
         }
+
+        if(isFitColumnTargetTable(oTable) === true){
+            /**
+            * @since   2026-06-12 01:36:51
+            * @version v3.6.4-3
+            * @author  PES
+            * @description
+            *  화면 커스터마이징으로 특정 영역만 표시되는 경우 sap.ui.table의 기본 auto resize만으로는
+            *  table 전체 폭을 채우지 못하고 우측에 빈 영역이 남을 수 있다.
+            *  기존 column resize 흐름은 유지하되, 커스터마이징 layout에서 보정 대상인 table에 한해서
+            *  rendering 이후 남은 폭을 마지막 표시 column에 분배하도록 예약 처리한다.
+            *  이 보정은 바인딩 필드 단독 화면, DESIGN TREE 영역, 바인딩 추가 속성 영역처럼
+            *  popup layout 변경으로 column 폭 재계산이 필요한 경우에만 수행된다.
+            */
+            scheduleFitTableColumns(oTable);
+        }
         
     };   //table의 컬럼 resize 처리.
 
@@ -543,6 +1991,1351 @@ let oAPP = parent.oAPP,
      * @param {Boolean} bIsRefresh 
      * model Refresh 유무
      ************************************************************************/
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  바인딩 팝업 본문 3개 영역의 표시 상태를 관리하기 위한 helper 영역이다.
+    *  저장된 layout 상태를 읽어오고, 유효하지 않은 조합을 보정하며, 현재 JSONModel에 반영한다.
+    *  ADDIT 영역은 보조 정보 영역이므로 MODEL 또는 DESIGN 중 하나 이상과 함께 표시되어야 하며,
+    *  세 영역이 모두 비활성화되는 상태는 허용하지 않고 기본 전체 표시 상태로 되돌린다.
+    *  또한 비활성 영역은 visible false로 처리하여 화면에는 보이지 않게 하고,
+    *  이후 module start 시 rendering wait를 생략할 수 있는 옵션을 제공한다.
+    */
+    function getBindLayoutDefaultState(){
+
+        return {
+            MODEL  : true,
+            DESIGN : true,
+            ADDIT  : true
+        };
+
+    }
+
+
+    function getBindLayoutActiveCount(oState){
+
+        var iCount = 0;
+
+        if(oState?.MODEL === true){
+            iCount++;
+        }
+
+        if(oState?.DESIGN === true){
+            iCount++;
+        }
+
+        if(oState?.ADDIT === true){
+            iCount++;
+        }
+
+        return iCount;
+
+    }
+
+
+    function normalizeBindLayoutState(oState){
+
+        var oDefault = getBindLayoutDefaultState(),
+            oResult = {};
+
+        oResult.MODEL  = typeof oState?.MODEL  === "boolean" ? oState.MODEL  : oDefault.MODEL;
+        oResult.DESIGN = typeof oState?.DESIGN === "boolean" ? oState.DESIGN : oDefault.DESIGN;
+        oResult.ADDIT  = typeof oState?.ADDIT  === "boolean" ? oState.ADDIT  : oDefault.ADDIT;
+
+        if(oResult.ADDIT === true && oResult.MODEL !== true && oResult.DESIGN !== true){
+            oResult.MODEL = true;
+        }
+
+        if(getBindLayoutActiveCount(oResult) === 0){
+            oResult = oDefault;
+        }
+
+        return oResult;
+
+    }
+
+
+    function getBindLayoutStorageKey(){
+
+        var sParentKey = oAPP.attr.browserkey || oAPP.attr.SSID || "default";
+
+        return `U4A_BIND_POPUP_LAYOUT_${sParentKey}`;
+
+    }
+
+
+    function loadBindLayoutState(){
+
+        try {
+
+            var sState = localStorage.getItem(getBindLayoutStorageKey());
+
+            if(!sState){
+                return getBindLayoutDefaultState();
+            }
+
+            return normalizeBindLayoutState(JSON.parse(sState));
+
+        } catch (error) {
+            return getBindLayoutDefaultState();
+        }
+
+    }
+
+
+    function saveBindLayoutState(oState){
+
+        try {
+            localStorage.setItem(getBindLayoutStorageKey(), JSON.stringify(normalizeBindLayoutState(oState)));
+        } catch (error) {}
+
+    }
+
+
+    function setBindLayoutModelState(oState){
+
+        if(!oAPP.attr.oModel){
+            return;
+        }
+
+        oAPP.attr.oModel.oData.BIND_LAYOUT = JSON.parse(JSON.stringify(normalizeBindLayoutState(oState)));
+        oAPP.attr.oModel.refresh(true);
+
+    }
+
+
+    function getCurrentBindLayoutState(){
+
+        return normalizeBindLayoutState(oAPP.attr.oBindLayoutState || oAPP.attr.oModel?.oData?.BIND_LAYOUT);
+
+    }
+
+
+    function isBindLayoutAreaActive(sAreaKey){
+
+        return getCurrentBindLayoutState()[sAreaKey] === true;
+
+    }
+
+
+    function getBindLayoutRenderOption(sAreaKey){
+
+        return {
+            skipRenderingWait: isBindLayoutAreaActive(sAreaKey) !== true
+        };
+
+    }
+
+
+    function isDesignAdditInfoVisible(oState){
+
+        oState = normalizeBindLayoutState(oState || oAPP.attr.oBindLayoutState || oAPP.attr.oModel?.oData?.BIND_LAYOUT);
+
+        return oState.DESIGN === true && oAPP.attr.oModel?.oData?.vis_addit === true;
+
+    }
+
+
+    function setDesignAdditInfoVisible(oState){
+
+        if(!oAPP.ui.oPageAdit){
+            return;
+        }
+
+        oAPP.ui.oPageAdit.setVisible(isDesignAdditInfoVisible(oState));
+
+    }
+
+
+    function setBindLayoutPageVisible(oState){
+
+        oState = normalizeBindLayoutState(oState || oAPP.attr.oBindLayoutState || oAPP.attr.oModel?.oData?.BIND_LAYOUT);
+
+        if(oAPP.ui.oPageLeft){
+            oAPP.ui.oPageLeft.setVisible(oState.MODEL === true);
+        }
+
+        if(oAPP.ui.oPageCenter){
+            oAPP.ui.oPageCenter.setVisible(oState.DESIGN === true);
+
+            var oDesignArea = oAPP.ui.oPageCenter.data("area1");
+            if(oDesignArea){
+                oDesignArea.setVisible(oState.DESIGN === true);
+            }
+        }
+
+        if(oAPP.ui.oPageRight){
+            oAPP.ui.oPageRight.setVisible(oState.ADDIT === true);
+        }
+
+        setDesignAdditInfoVisible(oState);
+
+    }
+
+
+    function setBindLayoutData(oArea, sSize, iMinSize, bResizable){
+
+        if(!oArea || typeof oArea.getLayoutData !== "function"){
+            return;
+        }
+
+        var oLayoutData = oArea.getLayoutData();
+
+        if(!oLayoutData){
+            return;
+        }
+
+        if(typeof oLayoutData.setSize === "function"){
+            oLayoutData.setSize(sSize);
+        }
+
+        if(typeof oLayoutData.setMinSize === "function"){
+            oLayoutData.setMinSize(iMinSize);
+        }
+
+        if(typeof oLayoutData.setResizable === "function"){
+            oLayoutData.setResizable(bResizable);
+        }
+
+    }
+
+
+    function getCurrentWindowBoundsSnapshot(){
+
+        try {
+
+            var oWin = oAPP.REMOTE?.getCurrentWindow?.();
+
+            if(!oWin || oWin.isDestroyed?.() === true || typeof oWin.getBounds !== "function"){
+                return;
+            }
+
+            var oBounds = oWin.getBounds();
+
+            return {
+                width  : oBounds.width,
+                height : oBounds.height
+            };
+
+        } catch (error) {
+            return;
+        }
+
+    }
+
+
+    function restoreCurrentWindowBoundsSnapshot(oSnapshot){
+
+        if(!oSnapshot?.windowBounds){
+            return;
+        }
+
+        try {
+
+            var oWin = oAPP.REMOTE?.getCurrentWindow?.();
+
+            if(!oWin || oWin.isDestroyed?.() === true || typeof oWin.getBounds !== "function" || typeof oWin.setBounds !== "function"){
+                return;
+            }
+
+            if(typeof oWin.isMaximized === "function" && oWin.isMaximized() === true){
+                return;
+            }
+
+            if(typeof oWin.isFullScreen === "function" && oWin.isFullScreen() === true){
+                return;
+            }
+
+            var oBounds = oWin.getBounds();
+
+            if(oBounds.width === oSnapshot.windowBounds.width && oBounds.height === oSnapshot.windowBounds.height){
+                return;
+            }
+
+            oWin.setBounds({
+                x      : oBounds.x,
+                y      : oBounds.y,
+                width  : oSnapshot.windowBounds.width,
+                height : oSnapshot.windowBounds.height
+            });
+
+        } catch (error) {}
+
+    }
+
+
+    function getMainSplitterLayoutSnapshot(){
+
+        var oSplitter = oAPP.ui.oSptMain;
+
+        if(!oSplitter || typeof oSplitter.getContentAreas !== "function"){
+            return;
+        }
+
+        var aArea = oSplitter.getContentAreas();
+
+        if(Array.isArray(aArea) !== true || aArea.length === 0){
+            return;
+        }
+
+        return {
+            layoutState  : JSON.stringify(getCurrentBindLayoutState()),
+            layoutData   : JSON.parse(JSON.stringify(getCurrentBindLayoutState())),
+            windowBounds : getCurrentWindowBoundsSnapshot(),
+            areas        : aArea.map(function(oArea){
+
+                var oLayoutData = oArea?.getLayoutData?.();
+
+                return {
+                    area      : oArea,
+                    size      : oLayoutData?.getSize?.(),
+                    minSize   : oLayoutData?.getMinSize?.(),
+                    resizable : oLayoutData?.getResizable?.()
+                };
+
+            })
+        };
+
+    }
+
+
+    function getBindLayoutSnapshotState(oSnapshot){
+
+        if(oSnapshot?.layoutData){
+            return normalizeBindLayoutState(oSnapshot.layoutData);
+        }
+
+        try {
+            return normalizeBindLayoutState(JSON.parse(oSnapshot?.layoutState || "{}"));
+        } catch (error) {
+            return getCurrentBindLayoutState();
+        }
+
+    }
+
+
+    function getBindLayoutSnapshotArea(oSnapshot, oArea){
+
+        if(Array.isArray(oSnapshot?.areas) !== true){
+            return;
+        }
+
+        return oSnapshot.areas.find(function(oAreaInfo){
+            return oAreaInfo.area === oArea;
+        });
+
+    }
+
+
+    function getDefaultMainSplitterAreaSize(iIndex, iActiveCount){
+
+        if(iActiveCount === 2 && iIndex === 0){
+            return "50%";
+        }
+
+        if(iActiveCount === 3){
+            return iIndex === 0 ? "30%" : (iIndex === 1 ? "40%" : "auto");
+        }
+
+        return "auto";
+
+    }
+
+
+    function rebuildMainSplitterLayoutFromSnapshot(oSnapshot){
+
+        var oSplitter = oAPP.ui.oSptMain;
+
+        if(!oSplitter){
+            return false;
+        }
+
+        var oState = getBindLayoutSnapshotState(oSnapshot),
+            aAreaInfo = getBindLayoutAreaInfo(),
+            aActiveArea = aAreaInfo.filter(function(oAreaInfo){
+                return oState[oAreaInfo.KEY] === true && !!oAreaInfo.UI;
+            }),
+            iActiveCount = aActiveArea.length,
+            oAreaSize = {};
+
+        if(iActiveCount === 0){
+            return false;
+        }
+
+        oAPP.attr.oBindLayoutState = JSON.parse(JSON.stringify(oState));
+        setBindLayoutPageVisible(oState);
+        oSplitter.removeAllAggregation("contentAreas", true);
+
+        for(var i = 0, l = aAreaInfo.length; i < l; i++){
+            if(!aAreaInfo[i].UI){
+                continue;
+            }
+
+            aAreaInfo[i].UI.setVisible(oState[aAreaInfo[i].KEY] === true);
+        }
+
+        for(var i = 0, l = aActiveArea.length; i < l; i++){
+
+            var oAreaInfo = aActiveArea[i],
+                oSnapshotArea = getBindLayoutSnapshotArea(oSnapshot, oAreaInfo.UI),
+                sSize = typeof oSnapshotArea?.size !== "undefined" ? oSnapshotArea.size : getDefaultMainSplitterAreaSize(i, iActiveCount),
+                iMinSize = typeof oSnapshotArea?.minSize !== "undefined" ? oSnapshotArea.minSize : oAreaInfo.MIN_SIZE,
+                bResizable = typeof oSnapshotArea?.resizable !== "undefined" ? oSnapshotArea.resizable : iActiveCount > 1;
+
+            setBindLayoutData(oAreaInfo.UI, sSize, iMinSize, bResizable);
+            oAreaSize[oAreaInfo.KEY] = sSize;
+            oSplitter.addContentArea(oAreaInfo.UI);
+
+        }
+
+        if(oAPP.attr.oModel){
+            oAPP.attr.oModel.oData.BIND_LAYOUT = JSON.parse(JSON.stringify(oState));
+            oAPP.attr.oModel.oData.width = oAreaSize.MODEL || "auto";
+            oAPP.attr.oModel.oData.width_c = oAreaSize.DESIGN || "auto";
+            oAPP.attr.oModel.oData.width_r = oAreaSize.ADDIT || "auto";
+            oAPP.attr.oModel.refresh(true);
+        }
+
+        oAPP.attr.iBindLayoutActiveCount = iActiveCount;
+        oAPP.attr.oBindLayoutAppliedState = JSON.parse(JSON.stringify(oState));
+        applyBindLayoutMinimumWidth(iActiveCount, false);
+        restoreCurrentWindowBoundsSnapshot(oSnapshot);
+        refreshBindLayoutTables(oState);
+        oSplitter.invalidate();
+        scheduleFitModelFieldTableColumns();
+
+        if(oState.MODEL === true){
+            scheduleExpandModelFieldTree();
+        }
+
+        return true;
+
+    }
+
+
+    function syncMainSplitterSnapshotToModel(oSnapshot){
+
+        var oModel = oAPP.attr.oModel;
+
+        if(!oModel || !oModel.oData || Array.isArray(oSnapshot?.areas) !== true){
+            return;
+        }
+
+        var bChanged = false;
+
+        for(var i = 0, l = oSnapshot.areas.length; i < l; i++){
+
+            var oAreaInfo = oSnapshot.areas[i],
+                sPath;
+
+            if(oAreaInfo.area === oAPP.ui.oPageLeft){
+                sPath = "width";
+            }
+
+            if(oAreaInfo.area === oAPP.ui.oPageCenter){
+                sPath = "width_c";
+            }
+
+            if(oAreaInfo.area === oAPP.ui.oPageRight){
+                sPath = "width_r";
+            }
+
+            if(!sPath || typeof oAreaInfo.size === "undefined"){
+                continue;
+            }
+
+            if(oModel.oData[sPath] === oAreaInfo.size){
+                continue;
+            }
+
+            oModel.oData[sPath] = oAreaInfo.size;
+            bChanged = true;
+
+        }
+
+        if(bChanged === true){
+            oModel.refresh(true);
+        }
+
+    }
+
+
+    function restoreMainSplitterLayoutSnapshot(oSnapshot){
+
+        var oSplitter = oAPP.ui.oSptMain;
+
+        if(!oSplitter || Array.isArray(oSnapshot?.areas) !== true){
+            return;
+        }
+
+        if(oSnapshot.layoutState !== JSON.stringify(getCurrentBindLayoutState())){
+            rebuildMainSplitterLayoutFromSnapshot(oSnapshot);
+            return;
+        }
+
+        var aArea = oSplitter.getContentAreas();
+
+        if(Array.isArray(aArea) !== true || aArea.length !== oSnapshot.areas.length){
+            rebuildMainSplitterLayoutFromSnapshot(oSnapshot);
+            return;
+        }
+
+        for(var i = 0, l = aArea.length; i < l; i++){
+            if(aArea[i] !== oSnapshot.areas[i].area){
+                rebuildMainSplitterLayoutFromSnapshot(oSnapshot);
+                return;
+            }
+        }
+
+        syncMainSplitterSnapshotToModel(oSnapshot);
+
+        for(var i = 0, l = oSnapshot.areas.length; i < l; i++){
+
+            var oAreaInfo = oSnapshot.areas[i],
+                oLayoutData = oAreaInfo.area?.getLayoutData?.();
+
+            if(!oLayoutData){
+                continue;
+            }
+
+            if(typeof oLayoutData.setSize === "function" && typeof oAreaInfo.size !== "undefined"){
+                oLayoutData.setSize(oAreaInfo.size);
+            }
+
+            if(typeof oLayoutData.setMinSize === "function" && typeof oAreaInfo.minSize !== "undefined"){
+                oLayoutData.setMinSize(oAreaInfo.minSize);
+            }
+
+            if(typeof oLayoutData.setResizable === "function" && typeof oAreaInfo.resizable !== "undefined"){
+                oLayoutData.setResizable(oAreaInfo.resizable);
+            }
+
+        }
+
+        restoreCurrentWindowBoundsSnapshot(oSnapshot);
+        oSplitter.invalidate();
+        scheduleFitModelFieldTableColumns();
+
+    }
+
+
+    function clearBindFieldDragLayoutRestoreTimers(){
+
+        var aTimer = oAPP.attr.aBindFieldDragLayoutRestoreTimer;
+
+        if(Array.isArray(aTimer) !== true){
+            oAPP.attr.aBindFieldDragLayoutRestoreTimer = [];
+            return;
+        }
+
+        for(var i = 0, l = aTimer.length; i < l; i++){
+            clearTimeout(aTimer[i]);
+        }
+
+        oAPP.attr.aBindFieldDragLayoutRestoreTimer = [];
+
+    }
+
+
+    oAPP.fn.captureBindFieldDragLayout = function(){
+
+        clearBindFieldDragLayoutRestoreTimers();
+        oAPP.attr.oBindFieldDragLayoutSnapshot = getMainSplitterLayoutSnapshot();
+
+    };
+
+
+    oAPP.fn.scheduleRestoreBindFieldDragLayout = function(){
+
+        var oSnapshot = oAPP.attr.oBindFieldDragLayoutSnapshot;
+
+        if(!oSnapshot){
+            return;
+        }
+
+        clearBindFieldDragLayoutRestoreTimers();
+
+        var aDelay = [0, 80, 250, 700, 1200];
+
+        for(var i = 0, l = aDelay.length; i < l; i++){
+
+            oAPP.attr.aBindFieldDragLayoutRestoreTimer.push(setTimeout(function(){
+                restoreMainSplitterLayoutSnapshot(oSnapshot);
+            }, aDelay[i]));
+
+        }
+
+        oAPP.attr.aBindFieldDragLayoutRestoreTimer.push(setTimeout(function(){
+            oAPP.attr.oBindFieldDragLayoutSnapshot = null;
+            clearBindFieldDragLayoutRestoreTimers();
+        }, 1500));
+
+    };
+
+
+    function applyBindLayoutMinimumWidth(iActiveCount, bResizeWindow){
+
+        var oWin = oAPP.REMOTE.getCurrentWindow(),
+            iMinWidth = CS_BIND_LAYOUT_MIN_WIDTH[iActiveCount] || CS_BIND_LAYOUT_MIN_WIDTH[3],
+            iWidth = Math.max(iMinWidth, CS_BIND_LAYOUT_WIDTH[iActiveCount] || iMinWidth),
+            iMinHeight = 650;
+
+        try {
+
+            if(!oWin){
+                return;
+            }
+
+            if(typeof oWin.isDestroyed === "function" && oWin.isDestroyed() === true){
+                return;
+            }
+
+            if(typeof oWin.getMinimumSize === "function"){
+                var aMinSize = oWin.getMinimumSize();
+
+                if(Array.isArray(aMinSize) === true && aMinSize[1] > 0){
+                    iMinHeight = aMinSize[1];
+                }
+            }
+
+            if(typeof oWin.setMinimumSize === "function"){
+                oWin.setMinimumSize(iMinWidth, iMinHeight);
+            }
+
+            if(typeof oWin.isMaximized === "function" && oWin.isMaximized() === true){
+                return;
+            }
+
+            if(typeof oWin.isFullScreen === "function" && oWin.isFullScreen() === true){
+                return;
+            }
+
+            if(typeof oWin.getSize !== "function" || typeof oWin.setSize !== "function"){
+                return;
+            }
+
+            var aSize = oWin.getSize();
+
+            if(Array.isArray(aSize) === false){
+                return;
+            }
+
+            if(bResizeWindow === true){
+                oWin.setSize(iWidth, aSize[1]);
+                return;
+            }
+
+            if(aSize[0] < iMinWidth){
+                oWin.setSize(iMinWidth, aSize[1]);
+            }
+
+        } catch (error) {}
+
+    }
+
+
+    function getBindLayoutAreaInfo(){
+
+        return [
+            {
+                KEY     : CS_BIND_LAYOUT_AREA.MODEL,
+                UI      : oAPP.ui.oPageLeft,
+                MIN_SIZE: 260
+            },
+            {
+                KEY     : CS_BIND_LAYOUT_AREA.DESIGN,
+                UI      : oAPP.ui.oPageCenter,
+                MIN_SIZE: 300
+            },
+            {
+                KEY     : CS_BIND_LAYOUT_AREA.ADDIT,
+                UI      : oAPP.ui.oPageRight,
+                MIN_SIZE: 260
+            }
+        ];
+
+    }
+
+
+    function refreshBindLayoutTables(oState){
+
+        setTimeout(function(){
+
+            if(oState.MODEL === true){
+                if(isBindLayoutAreaActive(CS_BIND_LAYOUT_AREA.MODEL) === true){
+                    oAPP.fn.setUiTableAutoResizeColumn(oAPP.ui.oModelFieldTree);
+                }
+            }
+
+            if(oState.DESIGN === true && oAPP.attr?.oDesign?.ui?.TREE){
+                oAPP.fn.setUiTableAutoResizeColumn(oAPP.attr.oDesign.ui.TREE);
+            }
+
+            if(oState.ADDIT === true || isDesignAdditInfoVisible(oState) === true){
+                oAPP.fn.setUiTableAutoResizeColumn(oAPP.ui.oAdditTab);
+            }
+
+            if(oState.ADDIT === true){
+                if(oAPP.attr?.oAddit?.ui?.ROOT){
+                    oAPP.fn.setUiTableAutoResizeColumn(oAPP.attr.oAddit.ui.ROOT);
+                }
+            }
+
+        }, 0);
+
+    }
+
+
+    function expandModelFieldTree(){
+
+        var oTree = oAPP.ui.oModelFieldTree;
+
+        if(!oTree || typeof oTree.expandToLevel !== "function"){
+            return;
+        }
+
+        if(isBindLayoutAreaActive(CS_BIND_LAYOUT_AREA.MODEL) !== true){
+            return;
+        }
+
+        oTree.expandToLevel(99999);
+
+    }
+
+
+    function scheduleExpandModelFieldTree(){
+
+        var oTree = oAPP.ui.oModelFieldTree;
+
+        if(!oTree){
+            return;
+        }
+
+        if(isBindLayoutAreaActive(CS_BIND_LAYOUT_AREA.MODEL) !== true){
+            return;
+        }
+
+        if(typeof oTree.attachEventOnce === "function"){
+            oTree.attachEventOnce("rowsUpdated", expandModelFieldTree);
+        }
+
+        setTimeout(expandModelFieldTree, 0);
+        setTimeout(expandModelFieldTree, 100);
+        setTimeout(expandModelFieldTree, 300);
+
+    }
+
+
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  커스터마이징 layout 적용 후 table column이 실제 표시 영역을 끝까지 채우도록 보정한다.
+    *  UI5 table은 column auto resize 이후에도 splitter 폭, 세로 scrollbar, 비활성 영역 제거 시점에 따라
+    *  마지막 column 뒤에 빈 공간이 남을 수 있으므로 실제 DOM 폭을 기준으로 남는 폭을 계산한다.
+    *  보정 대상은 현재 표시 중인 영역의 table로 제한하여 기존 바인딩 처리, 선택 이벤트,
+    *  drag & drop 흐름에는 영향을 주지 않고 화면 표시 품질만 보완한다.
+    */
+    function isOnlyModelFieldLayout(){
+
+        var oState = normalizeBindLayoutState(oAPP.attr.oBindLayoutState || oAPP.attr.oModel?.oData?.BIND_LAYOUT);
+
+        return oState.MODEL === true && oState.DESIGN !== true && oState.ADDIT !== true;
+
+    }
+
+
+    function getTableColumnAreaWidth(oTable){
+
+        if(!oTable || !oTable.getDomRef()){
+            return 0;
+        }
+
+        var $Table = oTable.$(),
+            $ScrollArea = $Table.find(".sapUiTableCtrlScr").first(),
+            iWidth = $ScrollArea.length > 0 ? $ScrollArea.innerWidth() : $Table.innerWidth();
+
+        if(!$ScrollArea.length){
+            var $VerticalScroll = $Table.find(".sapUiTableVSb:visible").first();
+
+            if($VerticalScroll.length > 0){
+                iWidth -= $VerticalScroll.outerWidth();
+            }
+        }
+
+        return Math.max(Math.floor(iWidth || 0) - 2, 0);
+
+    }
+
+
+    function getTableColumnRenderedWidth(oTable, oColumn){
+
+        if(!oTable || !oColumn){
+            return 0;
+        }
+
+        var $Cell = oTable.$().find(`td[data-sap-ui-colid="${oColumn.getId()}"]`).filter(":visible").first();
+
+        if($Cell.length > 0){
+            return Math.ceil($Cell.outerWidth());
+        }
+
+        var sWidth = oColumn.getWidth && oColumn.getWidth(),
+            iWidth = parseInt(sWidth, 10);
+
+        return Number.isNaN(iWidth) === true ? 0 : iWidth;
+
+    }
+
+
+    function isFitColumnTargetTable(oTable){
+
+        if(!oTable){
+            return false;
+        }
+
+        if(oTable === oAPP.ui.oModelFieldTree){
+            return isOnlyModelFieldLayout() === true;
+        }
+
+        if(oTable === oAPP.attr?.oDesign?.ui?.TREE){
+            return isBindLayoutAreaActive(CS_BIND_LAYOUT_AREA.DESIGN) === true;
+        }
+
+        if(oTable === oAPP.attr?.oAddit?.ui?.ROOT){
+            return isBindLayoutAreaActive(CS_BIND_LAYOUT_AREA.ADDIT) === true;
+        }
+
+        if(oTable === oAPP.ui.oAdditTab){
+            return oTable.getVisible && oTable.getVisible() === true;
+        }
+
+        return false;
+
+    }
+
+
+    function isAdditBindInfoTable(oTable){
+
+        if(!oTable || typeof oTable.data !== "function"){
+            return false;
+        }
+
+        var sTabName = oTable.data("TAB_NAME");
+
+        return sTabName === "DESIGN_ADDIT" || sTabName === "MAIN_ADDIT";
+
+    }
+
+
+    function fitAdditBindInfoTableColumns(oTable, aColumn, iAreaWidth){
+
+        if(isAdditBindInfoTable(oTable) !== true || aColumn.length !== 2){
+            return false;
+        }
+
+        var iMinValueWidth = iAreaWidth < 360 ? 120 : 180,
+            iMaxPropertyWidth = iAreaWidth < 600 ? 220 : 280,
+            iPropertyWidth = Math.floor(iAreaWidth * (iAreaWidth < 460 ? 0.44 : 0.4));
+
+        iPropertyWidth = Math.max(iPropertyWidth, iAreaWidth < 360 ? 120 : 160);
+        iPropertyWidth = Math.min(iPropertyWidth, iMaxPropertyWidth, iAreaWidth - iMinValueWidth);
+
+        if(iPropertyWidth <= 0){
+            return false;
+        }
+
+        aColumn[0].setWidth(`${iPropertyWidth}px`);
+        aColumn[1].setWidth(`${iAreaWidth - iPropertyWidth}px`);
+
+        return true;
+
+    }
+
+
+    function fitTableColumns(oTable, iDelay){
+
+        setTimeout(function(){
+
+            if(!oTable || !oTable.getDomRef()){
+                return;
+            }
+
+            var aColumn = oTable.getColumns().filter(function(oColumn){
+                return typeof oColumn.getVisible !== "function" || oColumn.getVisible() === true;
+            });
+
+            if(aColumn.length === 0){
+                return;
+            }
+
+            var iAreaWidth = getTableColumnAreaWidth(oTable);
+
+            if(iAreaWidth <= 0){
+                return;
+            }
+
+            if(fitAdditBindInfoTableColumns(oTable, aColumn, iAreaWidth) === true){
+                return;
+            }
+
+            var iColumnWidth = 0;
+
+            for(var i = 0, l = aColumn.length; i < l; i++){
+                iColumnWidth += getTableColumnRenderedWidth(oTable, aColumn[i]);
+            }
+
+            var iRemainWidth = iAreaWidth - iColumnWidth;
+
+            if(iRemainWidth <= 1){
+                return;
+            }
+
+            var oTargetColumn = aColumn[aColumn.length - 1],
+                iTargetWidth = getTableColumnRenderedWidth(oTable, oTargetColumn);
+
+            if(iTargetWidth <= 0){
+                return;
+            }
+
+            oTargetColumn.setWidth(`${iTargetWidth + iRemainWidth}px`);
+
+        }, iDelay || 0);
+
+    }
+
+
+    function scheduleFitTableColumns(oTable){
+
+        if(isFitColumnTargetTable(oTable) !== true){
+            return;
+        }
+
+        fitTableColumns(oTable, 0);
+        fitTableColumns(oTable, 100);
+        fitTableColumns(oTable, 300);
+
+    }
+
+
+    function scheduleFitModelFieldTableColumns(){
+
+        scheduleFitTableColumns(oAPP.ui.oModelFieldTree);
+
+    }
+
+
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  사용자가 선택한 바인딩 팝업 영역 구성을 실제 Splitter layout에 반영한다.
+    *  비활성 영역은 contentAreas에서 제외하고 visible false로 숨겨 빈 공간이 남지 않게 하며,
+    *  활성 영역 수에 따라 splitter size/resizable/minSize와 BrowserWindow minWidth를 재계산한다.
+    *  저장 옵션이 전달된 경우 현재 parent window 기준 저장소에 상태를 보관하여
+    *  같은 편집 창에서 팝업을 다시 열 때 마지막 화면 구성을 유지한다.
+    *  layout 변경 후에는 표시 중인 table만 다시 column 최적화를 수행하여 기존 데이터/이벤트 흐름은 유지한다.
+    */
+    oAPP.fn.applyBindLayoutCustomizing = function(bSave){
+
+        var oSplitter = oAPP.ui.oSptMain;
+
+        if(!oSplitter){
+            return;
+        }
+
+        var oPrevState = normalizeBindLayoutState(oAPP.attr.oBindLayoutAppliedState || oAPP.attr.oBindLayoutState || oAPP.attr.oModel?.oData?.BIND_LAYOUT),
+            oState = normalizeBindLayoutState(oAPP.attr.oBindLayoutState || oAPP.attr.oModel?.oData?.BIND_LAYOUT),
+            bReactivateModelArea = oPrevState.MODEL !== true && oState.MODEL === true;
+
+        oAPP.attr.oBindLayoutState = oState;
+        setBindLayoutModelState(oState);
+        setBindLayoutPageVisible(oState);
+
+        if(bSave === true){
+            saveBindLayoutState(oState);
+        }
+
+        var aAreaInfo = getBindLayoutAreaInfo(),
+            iPrevActiveCount = oAPP.attr.iBindLayoutActiveCount,
+            aActiveArea = aAreaInfo.filter(function(oAreaInfo){
+                return oState[oAreaInfo.KEY] === true && !!oAreaInfo.UI;
+            }),
+            iActiveCount = aActiveArea.length;
+
+        if(iActiveCount === 0){
+            return;
+        }
+
+        oSplitter.removeAllAggregation("contentAreas", true);
+
+        for(var i = 0, l = aAreaInfo.length; i < l; i++){
+            if(!aAreaInfo[i].UI){
+                continue;
+            }
+
+            aAreaInfo[i].UI.setVisible(oState[aAreaInfo[i].KEY] === true);
+        }
+
+        var oAreaSize = {};
+
+        for(var i = 0, l = aActiveArea.length; i < l; i++){
+
+            var oAreaInfo = aActiveArea[i],
+                bLast = i === l - 1,
+                sSize = "auto";
+
+            if(iActiveCount === 2 && bLast === false){
+                sSize = "50%";
+            }
+
+            if(iActiveCount === 3){
+                sSize = i === 0 ? "30%" : (i === 1 ? "40%" : "auto");
+            }
+
+            setBindLayoutData(oAreaInfo.UI, sSize, oAreaInfo.MIN_SIZE, iActiveCount > 1);
+            oAreaSize[oAreaInfo.KEY] = sSize;
+            oSplitter.addContentArea(oAreaInfo.UI);
+
+        }
+
+        if(oAPP.attr.oModel){
+            oAPP.attr.oModel.oData.width = oAreaSize.MODEL || "auto";
+            oAPP.attr.oModel.oData.width_c = oAreaSize.DESIGN || "auto";
+            oAPP.attr.oModel.oData.width_r = oAreaSize.ADDIT || "auto";
+            oAPP.attr.oModel.refresh(true);
+        }
+
+        applyBindLayoutMinimumWidth(iActiveCount, typeof iPrevActiveCount === "undefined" || iPrevActiveCount !== iActiveCount);
+        oAPP.attr.iBindLayoutActiveCount = iActiveCount;
+        refreshBindLayoutTables(oState);
+        oSplitter.invalidate();
+        scheduleFitModelFieldTableColumns();
+
+        if(bReactivateModelArea === true){
+            scheduleExpandModelFieldTree();
+        }
+
+        oAPP.attr.oBindLayoutAppliedState = JSON.parse(JSON.stringify(oState));
+
+    };
+
+
+    /**
+        * @since   2026-06-26 17:04:08
+        * @version v3.6.4-4
+        * @author  PES
+        * @description
+        * 화면 커스터마이징 dialog에서 도움말 문서 호출 중인 상태를 사용자가 확인할 수 있도록 dialog 자체 busy 상태를 제어한다.
+        */
+    oAPP.fn.setBindLayoutCustomizingDialogBusy = function(bBusy){
+
+        var oDialog = oAPP.attr.oBindLayoutCustomizingDialog;
+
+        if(typeof oDialog?.setBusy !== "function"){
+            return;
+        }
+
+        if(bBusy === true && typeof oDialog?.setBusyIndicatorDelay === "function"){
+            oDialog.setBusyIndicatorDelay(1);
+        }
+
+        oDialog.setBusy(bBusy);
+
+    };
+
+
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  바인딩 필드, DESIGN TREE, 바인딩 추가 속성 각 영역의 toolbar에서 공통으로 사용할
+    *  화면 커스터마이징 버튼을 생성한다.
+    *  어느 영역에서 호출하더라도 동일한 설정 popup을 열도록 하여 사용자가 현재 위치와 관계없이
+    *  표시 영역 조합을 즉시 변경할 수 있게 한다.
+    */
+    oAPP.fn.createBindLayoutCustomizingButton = function(){
+
+        var sText = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "957");
+
+        return new sap.m.OverflowToolbarButton({
+            icon: "sap-icon://action-settings",
+            text: sText,
+            tooltip: sText,
+            enabled: "{/edit_layout_customizing}",
+            busyIndicatorDelay: 1,
+            press: oAPP.fn.openBindLayoutCustomizingPopup
+        });
+
+    };
+
+
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  화면 커스터마이징 popup을 호출하여 바인딩 필드, DESIGN TREE, 바인딩 추가 속성 영역의
+    *  표시 여부를 사용자가 직접 선택할 수 있게 한다.
+    *  단순 텍스트 대신 icon, ObjectStatus, Switch, 안내 MessageStrip을 함께 배치하여
+    *  현재 표시/숨김 상태와 영역의 의미를 직관적으로 확인하도록 구성한다.
+    *  추가 속성 영역만 단독으로 표시되는 조합은 허용하지 않으며,
+    *  MODEL 또는 DESIGN 중 하나가 항상 함께 선택되도록 switch 변경 시점에 상호 보정한다.
+    */
+    oAPP.fn.openBindLayoutCustomizingPopup = function(){
+
+        var oState = normalizeBindLayoutState(oAPP.attr.oBindLayoutState || oAPP.attr.oModel?.oData?.BIND_LAYOUT),
+            oDialogModel = new sap.ui.model.json.JSONModel(JSON.parse(JSON.stringify(oState))),
+            sTitle = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "957"),
+            sHelp = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "198"),
+            sClose = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "056"),
+            bHelpVisible = oAPP.common.checkWLOList("C", "UHAK901435") === true,
+            sMsg = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "958"),
+            sShow = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "959"),
+            sHide = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "960");
+
+        function fnOpenHelpDocument(){
+
+            /**
+                * @since   2026-06-26 17:04:08
+                * @version v3.6.4-4
+                * @author  PES
+                * @description
+                * 도움말 버튼 선택 시 먼저 busy를 표시한 뒤, 도움말 문서 호출 대상이 아닌 경우 busy를 해제하고 종료한다.
+                */
+            oAPP.fn.setBindLayoutCustomizingDialogBusy(true);
+            oAPP.fn.setBusy(true, {ISBROAD:true});
+
+            if(oAPP.common.checkWLOList("C", "UHAK901435") !== true){
+                oAPP.fn.setBindLayoutCustomizingDialogBusy(false);
+                oAPP.fn.setBusy(false, {ISBROAD:true});
+                return;
+            }
+
+            parent.require("./wsDesignHandler/broadcastChannelBindPopup.js")("U4A_HELP_DOC_OPEN", 
+                {opstion:{startMenuId:"000281"}});
+
+        }
+
+
+        function fnGetStatusText(bVisible){
+
+            return bVisible === true ? sShow : sHide;
+
+        }
+
+
+        function fnGetStatusState(bVisible){
+
+            return bVisible === true ? "Success" : "None";
+
+        }
+
+
+        function fnMakeAreaItem(oInfo){
+
+            var oSwitch = new sap.m.Switch({
+                state: `{/${oInfo.PATH}}`,
+                change: function(oEvent){
+
+                    var bState = oEvent.getParameter("state");
+
+                    if(oInfo.PATH === "ADDIT"){
+
+                        if(bState !== true){
+                            return;
+                        }
+
+                        if(oDialogModel.getProperty("/MODEL") === true || oDialogModel.getProperty("/DESIGN") === true){
+                            return;
+                        }
+
+                        oDialogModel.setProperty("/MODEL", true);
+                        oDialogModel.refresh(true);
+                        return;
+
+                    }
+
+                    if(bState !== false || oDialogModel.getProperty("/ADDIT") !== true){
+                        return;
+                    }
+
+                    if(oInfo.PATH === "MODEL" && oDialogModel.getProperty("/DESIGN") !== true){
+                        oDialogModel.setProperty("/DESIGN", true);
+                    }
+
+                    if(oInfo.PATH === "DESIGN" && oDialogModel.getProperty("/MODEL") !== true){
+                        oDialogModel.setProperty("/MODEL", true);
+                    }
+
+                    oDialogModel.refresh(true);
+
+                }
+            }).addStyleClass("u4aWsLayoutOptionSwitch");
+
+            return new sap.m.CustomListItem({
+                content: [
+                    new sap.m.HBox({
+                        width: "100%",
+                        alignItems: "Center",
+                        items: [
+                            new sap.ui.core.Icon({
+                                src: oInfo.ICON,
+                                decorative: true
+                            }).addStyleClass("u4aWsLayoutOptionIcon"),
+                            new sap.m.VBox({
+                                layoutData: new sap.m.FlexItemData({
+                                    growFactor: 1
+                                }),
+                                items: [
+                                    new sap.m.HBox({
+                                        alignItems: "Center",
+                                        items: [
+                                            new sap.m.Title({
+                                                text: oInfo.TITLE,
+                                                level: "H5"
+                                            }),
+                                            new sap.m.ObjectStatus({
+                                                text: {
+                                                    path: `/${oInfo.PATH}`,
+                                                    formatter: fnGetStatusText
+                                                },
+                                                state: {
+                                                    path: `/${oInfo.PATH}`,
+                                                    formatter: fnGetStatusState
+                                                }
+                                            }).addStyleClass("u4aWsLayoutOptionStatus")
+                                        ]
+                                    }).addStyleClass("u4aWsLayoutOptionTitle"),
+                                    new sap.m.Text({
+                                        text: oInfo.DESC,
+                                        wrapping: true
+                                    }).addStyleClass("u4aWsLayoutOptionDesc")
+                                ]
+                            }).addStyleClass("u4aWsLayoutOptionText"),
+                            oSwitch
+                        ]
+                    }).addStyleClass("u4aWsLayoutOption")
+                ]
+            });
+
+        }
+
+
+        var aLayoutOption = [
+            {
+                PATH : "MODEL",
+                TITLE: oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "193"),
+                DESC : oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "961"),
+                ICON : "sap-icon://table-view"
+            },
+            {
+                PATH : "DESIGN",
+                TITLE: oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "962"),
+                DESC : oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "963"),
+                ICON : "sap-icon://tree"
+            },
+            {
+                PATH : "ADDIT",
+                TITLE: oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "964"),
+                DESC : oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "965"),
+                ICON : "sap-icon://form"
+            }
+        ];
+
+        var oDialog = new sap.m.Dialog({
+            draggable: true,
+            resizable: true,
+            contentWidth: "460px",
+            customHeader: new sap.m.Toolbar({
+                content: [
+                    new sap.m.Title({
+                        text: sTitle,
+                        tooltip: sTitle
+                    }).addStyleClass("sapUiTinyMarginBegin"),
+                    new sap.m.ToolbarSpacer(),
+                    new sap.m.Button({
+                        icon: "sap-icon://question-mark",
+                        tooltip: sHelp,
+                        type: "Transparent",
+                        visible: bHelpVisible,
+                        enabled: bHelpVisible,
+                        press: fnOpenHelpDocument
+                    }),
+                    new sap.m.Button({
+                        icon: "sap-icon://decline",
+                        tooltip: sClose,
+                        type: "Reject",
+                        press: function(){
+                            oDialog.close();
+                        }
+                    })
+                ]
+            }),
+            content: [
+                new sap.m.VBox({
+                    width: "100%",
+                    items: [
+                        new sap.m.List({
+                            showSeparators: "Inner",
+                            items: aLayoutOption.map(fnMakeAreaItem)
+                        }).addStyleClass("u4aWsLayoutCustomizingList"),
+                        new sap.m.MessageStrip({
+                            type: "Information",
+                            showIcon: true,
+                            text: oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "966")
+                        }).addStyleClass("u4aWsLayoutCustomizingNotice")
+                    ]
+                }).addStyleClass("u4aWsLayoutCustomizingBox")
+            ],
+            buttons: [
+                new sap.m.Button({
+                    text: oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "232"),
+                    type: "Emphasized",
+                    press: function(){
+
+                        var oNewState = oDialogModel.getData();
+
+                        if(getBindLayoutActiveCount(oNewState) === 0){
+                            sap.m.MessageToast.show(sMsg, {duration: 2000, at:"center center", my:"center center"});
+                            return;
+                        }
+
+                        oAPP.attr.oBindLayoutState = normalizeBindLayoutState(oNewState);
+                        oAPP.fn.applyBindLayoutCustomizing(true);
+                        oDialog.close();
+
+                    }
+                }),
+                new sap.m.Button({
+                    text: sClose,
+                    press: function(){
+                        oDialog.close();
+                    }
+                })
+            ],
+            afterClose: function(){
+                if(oAPP.attr.oBindLayoutCustomizingDialog === oDialog){
+                    delete oAPP.attr.oBindLayoutCustomizingDialog;
+                }
+
+                oDialog.destroy();
+            }
+        }).addStyleClass("sapUiSizeCompact");
+
+        oAPP.attr.oBindLayoutCustomizingDialog = oDialog;
+
+        oDialog.setModel(oDialogModel);
+        oDialog.open();
+
+    };
+
+
     oAPP.fn.fnSetModelProperty = function (sModelPath, oModelData, bIsRefresh) {
 
         var oCoreModel = sap.ui.getCore().getModel();
@@ -599,6 +3392,8 @@ let oAPP = parent.oAPP,
             oThemeInfo = oAPP.fn.getThemeInfo(),            
             sLangu = oUserInfo.LANGU;
 
+        isolateNodeGlobalsForUi5Bootstrap();
+
         var oScript = document.createElement("script");
         oScript.id = "sap-ui-bootstrap";
 
@@ -649,6 +3444,17 @@ let oAPP = parent.oAPP,
     /*************************************************************
      * @function - 화면 busy 처리.
      *************************************************************/
+    function lf_setAppBusy(bBusy){
+
+        if(typeof oAPP?.ui?.APP?.setBusy !== "function"){
+            return;
+        }
+
+        oAPP.ui.APP.setBusy(bBusy);
+
+    }
+
+
     oAPP.fn.setBusy = function(bBusy, sOption){
 
         //BUSY ON/OFF 정보 광역화.
@@ -661,36 +3467,32 @@ let oAPP = parent.oAPP,
                 //busy on.
                 sap.ui.getCore().lock();
 
-                oAPP.ui.APP.setBusy(true);
-
-                var _oWin = oAPP.REMOTE.getCurrentWindow();
+                lf_setAppBusy(true);
 
                 //윈도우 닫기버튼 비활성화 처리.
-                _oWin.closable = false;
+                lf_setCurrentWindowClosable(false);
 
                 //다른 팝업의 BUSY ON 요청 처리.
                 //(다른 팝업에서 이벤트가 발생될 경우 WS20 화면의 BUSY를 먼저 종료 시키는 문제를 방지하기 위함)
                 if(typeof _ISBROAD === "undefined"){
-                    oAPP.oMain.broadToChild.postMessage({PRCCD:"BUSY_ON"});
+                    lf_postBusyToChild({PRCCD:"BUSY_ON"});
                 }
                 
                 break;
         
             case false:
                 //busy off.
-                oAPP.ui.APP.setBusy(false);
-
-                var _oWin = oAPP.REMOTE.getCurrentWindow();
+                lf_setAppBusy(false);
 
                 //윈도우 닫기버튼 활성화 처리.
-                _oWin.closable = true;
+                lf_setCurrentWindowClosable(true);
 
                 sap.ui.getCore().unlock();
 
                 //다른 팝업의 BUSY OFF 요청 처리.
                 //(다른 팝업에서 이벤트가 발생될 경우 WS20 화면의 BUSY를 먼저 종료 시키는 문제를 방지하기 위함)
                 if(typeof _ISBROAD === "undefined"){
-                    oAPP.oMain.broadToChild.postMessage({PRCCD:"BUSY_OFF"});
+                    lf_postBusyToChild({PRCCD:"BUSY_OFF"});
                 }
 
                 break;
@@ -713,12 +3515,10 @@ let oAPP = parent.oAPP,
                 //busy on.
                 sap.ui.getCore().lock();
 
-                oAPP.ui.APP.setBusy(true);
-
-                var _oWin = oAPP.REMOTE.getCurrentWindow();
+                lf_setAppBusy(true);
 
                 //윈도우 닫기버튼 비활성화 처리.
-                _oWin.closable = false;
+                lf_setCurrentWindowClosable(false);
 
 
                 //WS20의 BUSY 요청 처리 정보가 존재하는경우.
@@ -732,19 +3532,17 @@ let oAPP = parent.oAPP,
                     _sOption.TYPE  = "DIALOG";
 
                     //WS 3.0 DESIGN 영역에 BUSY ON 요청 처리.
-                    oAPP.oMain.broadToChild.postMessage(_sOption);
+                    lf_postBusyToChild(_sOption);
                 }
                 
                 break;
         
             case false:
                 //busy off.
-                oAPP.ui.APP.setBusy(false);
-
-                var _oWin = oAPP.REMOTE.getCurrentWindow();
+                lf_setAppBusy(false);
 
                 //윈도우 닫기버튼 활성화 처리.
-                _oWin.closable = true;
+                lf_setCurrentWindowClosable(true);
 
                 sap.ui.getCore().unlock();
                 
@@ -756,7 +3554,7 @@ let oAPP = parent.oAPP,
                     _sOption.PRCCD = "BUSY_OFF";
 
                     //WS 3.0 DESIGN 영역에 BUSY OFF 요청 처리.
-                    oAPP.oMain.broadToChild.postMessage(_sOption);
+                    lf_postBusyToChild(_sOption);
 
                 }
 
@@ -766,6 +3564,35 @@ let oAPP = parent.oAPP,
 
 
     };
+
+
+    function lf_finishInitialBusy(){
+
+        try {
+            oAPP.fn.setBusy(false);
+        } catch (error) {
+
+            try {
+                oAPP.oMain.attr.isBusy = false;
+            } catch (e) {}
+
+            try {
+                lf_setAppBusy(false);
+            } catch (e) {}
+
+            try {
+                sap.ui.getCore().unlock();
+            } catch (e) {}
+
+            try {
+                lf_postBusyToChild({PRCCD:"BUSY_OFF"});
+            } catch (e) {}
+
+        }
+
+        lf_setCurrentWindowClosable(true);
+
+    }
 
 
     /*************************************************************
@@ -795,34 +3622,34 @@ let oAPP = parent.oAPP,
 
         setTimeout(async () => {
 
-            //path 정보 구성.
-            getPathInfo();
+            try {
+
+                //path 정보 구성.
+                getPathInfo();
 
 
-            //추가속성 table layout 설정.
-            oAPP.fn.setAdditLayout('');
+                //추가속성 table layout 설정.
+                oAPP.fn.setAdditLayout('');
 
 
-            //바인딩 모드 변경.
-            await oAPP.fn.changeBindingMode(oAPP.attr.BIND_MODE);
+                //바인딩 모드 변경.
+                await oAPP.fn.changeBindingMode(oAPP.attr.BIND_MODE);
 
 
-            //서버에서 바인딩 정보 얻기.
-            await oAPP.fn.getBindFieldInfo();
+                //서버에서 바인딩 정보 얻기.
+                await oAPP.fn.getBindFieldInfo();
 
-            
-            // //WS 3.0 DESIGN 영역에 BUSY OFF 요청 처리.
-            // parent.require("./wsDesignHandler/broadcastChannelBindPopup.js")("BUSY_OFF");
+                oAPP.fn.applyBindLayoutCustomizing(false);
 
+                
+                // //WS 3.0 DESIGN 영역에 BUSY OFF 요청 처리.
+                // parent.require("./wsDesignHandler/broadcastChannelBindPopup.js")("BUSY_OFF");
 
-            oAPP.fn.setBusy(false);
-
-
-            var _oWin = oAPP.REMOTE.getCurrentWindow();
-
-            //윈도우 닫기버튼 활성화 처리.
-            _oWin.closable = true;
-
+            } catch (error) {
+                console.error(error);
+            } finally {
+                lf_finishInitialBusy();
+            }
 
         }, 0);
 
@@ -833,9 +3660,24 @@ let oAPP = parent.oAPP,
     /*************************************************************
      * @function - //바인딩 팝업 화면 layout 변경.
      *************************************************************/
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  바인딩 모드 전환 시 저장된 화면 커스터마이징 상태를 먼저 확인하여
+    *  DESIGN TREE 영역과 바인딩 추가 속성 영역의 visible 상태를 반영한다.
+    *  비활성 영역은 기존 UI aggregation 정리 과정에서 오류가 발생하지 않도록 content를 비우되,
+    *  rendering 완료 대기 대상에서는 제외하여 popup 재호출 시 불필요한 wait로 busy가 유지되지 않게 한다.
+    *  실제 데이터와 controller 초기화 흐름은 유지하고 화면 표시 여부만 layout 단계에서 분리 처리한다.
+    */
     oAPP.fn.changeDesignLayout = function(bindMode){
 
         return new Promise(async (res)=>{
+
+            var oLayoutState = getCurrentBindLayoutState();
+
+            setBindLayoutPageVisible(oLayoutState);
 
             let _aPromise = [];
 
@@ -843,7 +3685,9 @@ let oAPP = parent.oAPP,
             // _aPromise.push(uiUpdateComplate(oAPP.ui.oSptCenter));
 
             //right page 
-            _aPromise.push(uiUpdateComplate(oAPP.ui.oPageRight));
+            if(oLayoutState.ADDIT === true){
+                _aPromise.push(uiUpdateComplate(oAPP.ui.oPageRight));
+            }
 
 
             //추가속성정보 페이지 content 초기화.
@@ -856,11 +3700,17 @@ let oAPP = parent.oAPP,
 
             var _oArea1 = oAPP.ui.oPageCenter.data("area1");
 
+            _oArea1.setVisible(oLayoutState.DESIGN === true);
             _oArea1.removeAllAggregation("content", true);
 
             var _oArea2 = oAPP.ui.oPageCenter.data("area2");
             
+            _oArea2.setVisible(oLayoutState.ADDIT === true);
             _oArea2.removeAllAggregation("content", true);
+
+            if(oAPP.ui.oPageAdit){
+                setDesignAdditInfoVisible(oLayoutState);
+            }
 
 
             //우측 페이지 content 초기화.
@@ -883,7 +3733,9 @@ let oAPP = parent.oAPP,
             // _aPromise.push(uiUpdateComplate(oAPP.ui.oSptCenter));
 
             //right page 
-            _aPromise.push(uiUpdateComplate(oAPP.ui.oPageRight));
+            if(oLayoutState.ADDIT === true){
+                _aPromise.push(uiUpdateComplate(oAPP.ui.oPageRight));
+            }
 
 
             
@@ -980,15 +3832,27 @@ let oAPP = parent.oAPP,
     /*************************************************************
      * @function - 바인딩 모드 변경.
      *************************************************************/
+    /**
+    * @since   2026-06-12 01:36:51
+    * @version v3.6.4-3
+    * @author  PES
+    * @description
+    *  바인딩 팝업의 화면 구성 모듈은 기존과 동일하게 import/start 하되,
+    *  저장된 커스터마이징 상태에서 비활성화된 영역은 start 옵션으로 rendering wait를 skip 한다.
+    *  이를 통해 영역을 숨긴 상태로 팝업을 다시 호출할 때 모든 화면이 먼저 표시된 뒤 재배치되는 현상을 줄이고,
+    *  비활성 영역의 UI update 완료를 기다리느라 busy가 해제되지 않는 문제를 방지한다.
+    *  controller와 내부 데이터 상태는 생성해 두므로 이후 영역을 다시 활성화해도 기존 처리 흐름을 이어갈 수 있다.
+    */
     oAPP.fn.changeBindingMode = async function(bindMode){
         
         // oAPP.fn.setBusy(true);
+
+        var oLayoutState = getCurrentBindLayoutState();
 
         //추가 속성 정보 초기화.
         oAPP.fn.clearSelectAdditBind();
 
         oAPP.attr.oModel.refresh();
-        
 
         //디자인 영역의 레이아웃 변경 처리.
         let _sArea = await oAPP.fn.changeDesignLayout(bindMode);
@@ -999,7 +3863,7 @@ let oAPP = parent.oAPP,
                 //일반 바인딩 모드.
 
                 //right page.
-                var _oPromise = uiUpdateComplate(_sArea.area1);
+                var _oPromise = oLayoutState.ADDIT === true ? uiUpdateComplate(_sArea.area1) : Promise.resolve();
 
                 _sArea.area1.addAggregation("content", oAPP.ui.oAdditTab, true);
 
@@ -1017,19 +3881,19 @@ let oAPP = parent.oAPP,
                 var _oContrArea1 = await import(CS_PATH_INFO.DESIGN);
 
                 //design tree start.
-                oAPP.attr.oDesign = await _oContrArea1.start(_sArea.area1);
+                oAPP.attr.oDesign = await _oContrArea1.start(_sArea.area1, getBindLayoutRenderOption(CS_BIND_LAYOUT_AREA.DESIGN));
 
 
                 //module js 얻기.
                 var _oContrArea2 = await import(CS_PATH_INFO.ADDIT);
 
                 //바인딩 추가 속성  start.
-                oAPP.attr.oAddit = await _oContrArea2.start(_sArea.area2, oAPP.ui.oAdditTab);
+                oAPP.attr.oAddit = await _oContrArea2.start(_sArea.area2, oAPP.ui.oAdditTab, getBindLayoutRenderOption(CS_BIND_LAYOUT_AREA.ADDIT));
 
 
 
                 //좌측 하단 페이지.
-                var _oPromise = uiUpdateComplate(oAPP.ui.oPageAdit);
+                var _oPromise = oLayoutState.ADDIT === true ? uiUpdateComplate(oAPP.ui.oPageAdit) : Promise.resolve();
 
                 oAPP.ui.oPageAdit.addAggregation("content", oAPP.ui.oAdditTab, true);
 
@@ -1040,6 +3904,8 @@ let oAPP = parent.oAPP,
                 break;
         }
 
+
+        oAPP.fn.applyBindLayoutCustomizing(false);
 
         // oAPP.fn.setBusy(false);
 
@@ -1085,6 +3951,20 @@ let oAPP = parent.oAPP,
         //모델 정보 세팅.
         oAPP.attr.oModel = new sap.ui.model.json.JSONModel();
         oApp.setModel(oAPP.attr.oModel);
+        oAPP.attr.oModel.oData.edit_layout_customizing = true;
+
+        /**
+        * @since   2026-06-12 01:36:51
+        * @version v3.6.4-3
+        * @author  PES
+        * @description
+        *  바인딩 팝업 최초 구성 시 현재 parent window 기준으로 저장된 화면 커스터마이징 상태를 읽어
+        *  JSONModel의 BIND_LAYOUT에 반영한다.
+        *  각 Page의 visible binding과 Splitter 재배치 로직은 이 값을 기준으로 동작하므로,
+        *  popup을 닫았다가 다시 열어도 이전 영역 구성 상태를 유지할 수 있다.
+        */
+        oAPP.attr.oBindLayoutState = loadBindLayoutState();
+        oAPP.attr.oModel.oData.BIND_LAYOUT = JSON.parse(JSON.stringify(oAPP.attr.oBindLayoutState));
 
 
         //바인딩 팝업 table 출력 page.
@@ -1183,6 +4063,7 @@ let oAPP = parent.oAPP,
             //서버에서 바인딩 정보 얻기.
             await oAPP.fn.getBindFieldInfo();
 
+            oAPP.fn.applyBindLayoutCustomizing(false);
 
             // oAPP.fn.setBusy(false);
 
@@ -1233,6 +4114,17 @@ let oAPP = parent.oAPP,
         });
         oTool.addContent(oToolBtn5);
 
+        /**
+        * @since   2026-06-12 01:36:51
+        * @version v3.6.4-3
+        * @author  PES
+        * @description
+        *  좌측 바인딩 필드 영역 toolbar에서 바로 화면 커스터마이징 popup을 호출할 수 있도록
+        *  공통 버튼을 추가한다.
+        *  버튼은 영역 표시 상태만 변경하며, 바인딩 필드 조회/선택/refresh 처리 로직은 기존 흐름을 유지한다.
+        */
+        oTool.addContent(oAPP.fn.createBindLayoutCustomizingButton());
+
         //198	Help
         var _txt = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "ZMSG_WS_COMMON_001", "198");
 
@@ -1251,20 +4143,35 @@ let oAPP = parent.oAPP,
         var oSpt1 = new sap.ui.layout.Splitter();
         oPage.addContent(oSpt1);
 
+        oSpt1.attachBrowserEvent("mousedown", oAPP.fn.onMainSplitterResizeStart);
+        oSpt1.attachBrowserEvent("touchstart", oAPP.fn.onMainSplitterResizeStart);
+
         oSpt1.attachResize(oAPP.fn.onMainSplitResize);
 
         oAPP.ui.oSptMain = oSpt1;
 
 
         //좌측 페이지.
+        /**
+        * @since   2026-06-12 01:36:51
+        * @version v3.6.4-3
+        * @author  PES
+        * @description
+        *  좌측 바인딩 필드, 가운데 DESIGN TREE, 우측 바인딩 추가 속성 Page는
+        *  BIND_LAYOUT 모델 값을 visible 속성에 바인딩한다.
+        *  단순히 DOM을 숨기는 방식이 아니라 Splitter contentAreas 재구성과 함께 사용하여,
+        *  비활성 영역이 화면에 빈 공간으로 남지 않고 활성 영역만 자연스럽게 재분배되도록 한다.
+        */
         var oPageLeft = new sap.m.Page({
             showHeader:false,
+            visible: "{/BIND_LAYOUT/MODEL}",
             layoutData:  new sap.ui.layout.SplitterLayoutData({
                 size: "{/width}",
                 resizable: "{/resize}",
                 minSize: 300
             })
         });
+        oAPP.ui.oPageLeft = oPageLeft;
         oSpt1.addContentArea(oPageLeft);
 
 
@@ -1277,6 +4184,7 @@ let oAPP = parent.oAPP,
         //가운데 페이지.
         oAPP.ui.oPageCenter = new sap.m.Page({
             showHeader:false,
+            visible: "{/BIND_LAYOUT/DESIGN}",
             layoutData: new sap.ui.layout.SplitterLayoutData({
                 size:"{/width_c}",
                 minSize:300
@@ -1288,6 +4196,7 @@ let oAPP = parent.oAPP,
         //우측 페이지.
         oAPP.ui.oPageRight = new sap.m.Page({
             showHeader:false,
+            visible: "{/BIND_LAYOUT/ADDIT}",
             layoutData: new sap.ui.layout.SplitterLayoutData({
                 size:"{/width_r}",
                 minSize:300
@@ -1312,6 +4221,7 @@ let oAPP = parent.oAPP,
         //가운데 트리 영역.
         var oPageArea1 = new sap.m.Page({
             showHeader: false,
+            visible: "{/BIND_LAYOUT/DESIGN}",
             layoutData: new sap.ui.layout.SplitterLayoutData({
                 // size:"60%"
                 minSize:300,
@@ -1355,6 +4265,7 @@ let oAPP = parent.oAPP,
 
         //바인딩 추가속성 정보 페이지.
         var oPageAdit = new sap.m.Page({
+            visible: false,
             layoutData: new sap.ui.layout.SplitterLayoutData({
                 size:"auto",
                 minSize:200
@@ -1410,6 +4321,7 @@ let oAPP = parent.oAPP,
             
         });
         oAPP.ui.oPageAdit = oPageAdit;
+        setBindLayoutPageVisible(oAPP.attr.oBindLayoutState);
 
         // //!!!!!!!!!
         // oAPP.ui.oSptCenter.addContentArea(oAPP.ui.oPageAdit);
@@ -1594,6 +4506,7 @@ let oAPP = parent.oAPP,
 
         //추가바인딩 속성의 Property 컬럼.
         var oTabCol1 = new sap.ui.table.Column({
+            width:"40%",
             autoResizable:true,
             label: new sap.m.Label({
                 text: l_txt,
@@ -1611,6 +4524,7 @@ let oAPP = parent.oAPP,
 
         //추가바인딩 속성의 value 컬럼.
         var oTabCol2 = new sap.ui.table.Column({
+            width:"60%",
             autoResizable:true,
             label: new sap.m.Label({
                 text: l_txt,
@@ -1707,11 +4621,67 @@ let oAPP = parent.oAPP,
     };  //바인딩 팝업 화면 구성.
 
 
+    function isMainSplitterBarTarget(oTarget){
+
+        if(!oTarget || typeof oTarget.closest !== "function"){
+            return false;
+        }
+
+        var oBar = oTarget.closest(".sapUiLoSplitterBar, .sapUiLoSplitterOverlayBar");
+
+        if(!oBar){
+            return false;
+        }
+
+        var oMainSplitterDom = oAPP.ui.oSptMain?.getDomRef?.();
+
+        if(oMainSplitterDom && oMainSplitterDom.contains(oBar) !== true){
+            return false;
+        }
+
+        return true;
+
+    }
+
+
+    function scheduleMainSplitterResizeEnd(){
+
+        clearTimeout(oAPP.attr.iMainSplitterResizeEndTimer);
+
+        oAPP.attr.iMainSplitterResizeEndTimer = setTimeout(function(){
+            oAPP.attr.bMainSplitterResizeByUser = false;
+        }, 150);
+
+    }
+
+
+    oAPP.fn.onMainSplitterResizeStart = function(oEvent){
+
+        if(isMainSplitterBarTarget(oEvent?.target) !== true){
+            return;
+        }
+
+        oAPP.attr.bMainSplitterResizeByUser = true;
+
+        clearTimeout(oAPP.attr.iMainSplitterResizeEndTimer);
+
+        window.addEventListener("mouseup", scheduleMainSplitterResizeEnd, {once:true, capture:true});
+        window.addEventListener("touchend", scheduleMainSplitterResizeEnd, {once:true, capture:true});
+        window.addEventListener("touchcancel", scheduleMainSplitterResizeEnd, {once:true, capture:true});
+        window.addEventListener("blur", scheduleMainSplitterResizeEnd, {once:true, capture:true});
+
+    };
+
+
 
     /*************************************************************
      * @function - splitter resize시 area size 재조정 처리.(px -> %)
      *************************************************************/
     oAPP.oMain.fn.resizeSplitter = function(oEvent){
+
+        if(oAPP.attr.bMainSplitterResizeByUser !== true){
+            return;
+        }
 
         var _oUi = oEvent.oSource || undefined;
         
@@ -2597,6 +5567,39 @@ let oAPP = parent.oAPP,
     }; //바인딩 추가속성정보 메시지 초기화.
 
 
+    oAPP.fn.clearMessagePopoverErrorState = function(){
+
+        try {
+            if(typeof oAPP.attr?.oDesign?.fn?.resetErrorField === "function"){
+                oAPP.attr.oDesign.fn.resetErrorField();
+            }
+
+            if(typeof oAPP.attr?.oDesign?.oModel?.refresh === "function"){
+                oAPP.attr.oDesign.oModel.refresh();
+            }
+        } catch (error) {}
+
+        try {
+            if(typeof oAPP.attr?.oAddit?.fn?.resetErrorField === "function"){
+                oAPP.attr.oAddit.fn.resetErrorField();
+            }
+
+            if(typeof oAPP.attr?.oAddit?.oModel?.refresh === "function"){
+                oAPP.attr.oAddit.oModel.refresh(true);
+            }
+        } catch (error) {}
+
+        try {
+            oAPP.fn.resetMPROPMsg();
+
+            if(typeof oAPP.attr?.oModel?.refresh === "function"){
+                oAPP.attr.oModel.refresh(true);
+            }
+        } catch (error) {}
+
+    };
+
+
     //tree -> tab으로 변환.
     oAPP.fn.parseTree2Tab = function(aTree, childName) {
         var a = [];
@@ -2764,7 +5767,18 @@ let oAPP = parent.oAPP,
     // // UI5 Boot Strap을 로드 하고 attachInit 한다.
     oAPP.fn.fnLoadBootStrapSetting();
 
-    window.onload = function () {
+    function startBindPopup(){
+
+        if(startBindPopup._started === true){
+            return;
+        }
+
+        if(typeof window.sap === "undefined" || !window.sap.ui || typeof window.sap.ui.getCore !== "function"){
+            setTimeout(startBindPopup, 50);
+            return;
+        }
+
+        startBindPopup._started = true;
 
         // //바인딩 팝업, WS3.0 디자인화면
         // //각 화면에서 순간적으로 이벤트를 발생하면서 생기는 문제를 처리하기위해
@@ -2821,7 +5835,9 @@ let oAPP = parent.oAPP,
             }
 
             // oAPP.ui.APP.focus();
-            oAPP.attr.oDesign.ui.TREE.focus();
+            if(oAPP.attr?.oBindLayoutState?.DESIGN !== false && oAPP.attr?.oDesign?.ui?.TREE){
+                oAPP.attr.oDesign.ui.TREE.focus();
+            }
         }
 
         
@@ -2833,6 +5849,22 @@ let oAPP = parent.oAPP,
 
         _oWin.on('minimize', _onVisibilitychange);
         //20240818 PES -END.
+
+        oAPP.fn.setResizeSensitivePopoverWindowSize();
+
+        var _fnCloseResizeSensitivePopovers = oAPP.fn.closeResizeSensitivePopovers;
+
+        _oWin.on("will-resize", _fnCloseResizeSensitivePopovers);
+        _oWin.on("resize", _fnCloseResizeSensitivePopovers);
+
+        window.addEventListener("pagehide", function(){
+
+            try {
+                _oWin.off("will-resize", _fnCloseResizeSensitivePopovers);
+                _oWin.off("resize", _fnCloseResizeSensitivePopovers);
+            } catch (error) {}
+
+        }, {once: true});
 
         // //20240726 PES.
         // //바인딩 팝업, WS3.0 디자인화면
@@ -2897,12 +5929,15 @@ let oAPP = parent.oAPP,
 
         sap.ui.getCore().attachInit(function () {
 
+            restoreNodeGlobalsAfterUi5Bootstrap();
+
             // IPC Event 등록
             _attachIpcEvents();
 
             //UI TABLE 라이브러리 예외처리.
             excepUiTableLibrary();
 
+            oAPP.fn.setBindPopupWithinArea();
 
             //바인딩 팝업 화면 구성.
             oAPP.fn.callBindPopup();
@@ -2992,7 +6027,14 @@ let oAPP = parent.oAPP,
 
         };
 
-    };
+    }
+
+
+    if(document.readyState === "loading"){
+        window.addEventListener("load", startBindPopup, {once:true});
+    }else{
+        startBindPopup();
+    }
 
 
     //window 종료처리전 이벤트.
@@ -3007,21 +6049,30 @@ let oAPP = parent.oAPP,
 
 
     //추가속성 table layout 설정.
-    oAPP.fn.setAdditLayout = function(KIND){
-        
+    oAPP.fn.setAdditLayout = function(KIND, oOption){
+
+        var bShowAdditTable = false,
+            bKeepSplitterSize = oOption?.KEEP_SPLITTER_SIZE === true;
+
         switch (oAPP.attr.BIND_MODE) {
             case CS_BIND_MODE.DEFAULT:
                 //일반 바인딩 모드.
 
                 //DEFAULT 화면 크기 설정.
-                oAPP.attr.oModel.oData.width = "100%";
-                oAPP.attr.oModel.oData.height = "100%";
-                oAPP.attr.oModel.oData.resize = false;
+                if(bKeepSplitterSize !== true){
+                    oAPP.attr.oModel.oData.width = "100%";
+                    oAPP.attr.oModel.oData.height = "100%";
+                    oAPP.attr.oModel.oData.resize = false;
+                }
 
                 //선택한 라인의 데이터 유형이 일반 필드면 추가속성 정보 활성화.
                 if(KIND === "E"){
-                    oAPP.attr.oModel.oData.width = "65%";
-                    oAPP.attr.oModel.oData.resize = true;
+                    if(bKeepSplitterSize !== true){
+                        oAPP.attr.oModel.oData.width = "65%";
+                        oAPP.attr.oModel.oData.resize = true;
+                    }
+
+                    bShowAdditTable = true;
                 }
                 
                 break;
@@ -3030,23 +6081,28 @@ let oAPP = parent.oAPP,
                 //바인딩 일괄적용 모드.
 
                 //DEFAULT 화면 크기 설정.
-                oAPP.attr.oModel.oData.width = "30%";
-                oAPP.attr.oModel.oData.resize = true;
+                if(bKeepSplitterSize !== true){
+                    oAPP.attr.oModel.oData.width = "30%";
+                    oAPP.attr.oModel.oData.resize = true;
 
-                oAPP.attr.oModel.oData.height = "100%";
-                oAPP.attr.oModel.oData.resize_v = false;
+                    oAPP.attr.oModel.oData.height = "100%";
+                    oAPP.attr.oModel.oData.resize_v = false;
+                }
 
 
                 oAPP.attr.oModel.oData.vis_addit = false;
 
                 //선택한 라인의 데이터 유형이 일반 필드면 추가속성 정보 활성화.
                 if(KIND === "E"){
-                    oAPP.attr.oModel.oData.resize_v = true;
-                    oAPP.attr.oModel.oData.height = "60%";
+                    if(bKeepSplitterSize !== true){
+                        oAPP.attr.oModel.oData.resize_v = true;
+                        oAPP.attr.oModel.oData.height = "60%";
+                    }
 
                     oAPP.attr.oModel.oData.vis_addit = true;
+                    bShowAdditTable = true;
                 }
-                
+
                 break;
 
             default:
@@ -3054,6 +6110,13 @@ let oAPP = parent.oAPP,
         }
 
         oAPP.attr.oModel.refresh();
+        setDesignAdditInfoVisible(getCurrentBindLayoutState());
+
+        if(bShowAdditTable === true && oAPP.ui.oAdditTab){
+            setTimeout(function(){
+                oAPP.fn.setUiTableAutoResizeColumn(oAPP.ui.oAdditTab);
+            }, 0);
+        }
 
     };  //추가속성 table layout 설정.
 
@@ -4658,6 +7721,11 @@ let oAPP = parent.oAPP,
 
 
         oAPP.attr.oModel.refresh();
+        setDesignAdditInfoVisible(getCurrentBindLayoutState());
+
+        if(oAPP.attr.oDesign && oAPP.attr.oAddit){
+            oAPP.fn.applyBindLayoutCustomizing(false);
+        }
 
     };
 
@@ -4957,6 +8025,9 @@ let oAPP = parent.oAPP,
         //모델 tree 갱신버튼 잠금/ 잠금 해제 처리.
         oAPP.attr.oModel.oData.edit_refresh = bLock;
 
+        //화면 개인화 버튼 잠금/ 잠금 해제 처리.
+        oAPP.attr.oModel.oData.edit_layout_customizing = bLock;
+
         oAPP.attr.oModel.refresh();
 
     };
@@ -5079,11 +8150,18 @@ let oAPP = parent.oAPP,
                 //화면 잠금 해제 처리.
                 l_model.oData.busy = false;
 
-                var _oPromise = new Promise((resolveTree)=>{
-                    oAPP.ui.oModelFieldTree.attachEventOnce("rowsUpdated", function(){
-                        resolveTree();
-                    });
-                });
+                /**
+                * @since   2026-06-12 01:36:51
+                * @version v3.6.4-3
+                * @author  PES
+                * @description
+                *  바인딩 필드 영역이 비활성화된 상태에서는 table row rendering 완료를 기다리지 않는다.
+                *  화면에 표시되지 않는 table의 rowsUpdated 이벤트를 기다리면 popup 재호출 시 busy가 유지될 수 있으므로,
+                *  MODEL 영역이 활성화된 경우에만 기존 waitTableRowsUpdated 흐름을 수행한다.
+                *  데이터 모델 갱신과 선택 상태 초기화는 그대로 수행하여 영역을 다시 활성화했을 때 기존 상태 흐름을 유지한다.
+                */
+                var _oPromise = isBindLayoutAreaActive(CS_BIND_LAYOUT_AREA.MODEL) === true ?
+                    waitTableRowsUpdated(oAPP.ui.oModelFieldTree, 1000) : Promise.resolve();
 
                 //모델 정보 바인딩 처리.
                 l_model.refresh(true);
@@ -5092,6 +8170,10 @@ let oAPP = parent.oAPP,
 
                 //모델 tree 첫번째 라인 선택 처리.
                 oAPP.ui.oModelFieldTree.setSelectedIndex(0);
+
+                if(isBindLayoutAreaActive(CS_BIND_LAYOUT_AREA.MODEL) === true){
+                    oAPP.fn.setUiTableAutoResizeColumn(oAPP.ui.oModelFieldTree);
+                }
                 
                 //20240729 PES -START.
                 //WS 3.0 디자인 영역과 바인딩 팝업 통신을 BROADCAST로 변경함에 따른 IPC 통신 주석처리.
@@ -5102,10 +8184,12 @@ let oAPP = parent.oAPP,
                 //20240729 PES -END.
 
 
-                oAPP.ui.oModelFieldTree.attachEventOnce("rowsUpdated", ()=>{
-                    // //tree table 컬럼길이 재조정 처리.
-                    oAPP.fn.setUiTableAutoResizeColumn(oAPP.ui.oModelFieldTree);
-                });
+                if(isBindLayoutAreaActive(CS_BIND_LAYOUT_AREA.MODEL) === true){
+                    oAPP.ui.oModelFieldTree.attachEventOnce("rowsUpdated", ()=>{
+                        // //tree table 컬럼길이 재조정 처리.
+                        oAPP.fn.setUiTableAutoResizeColumn(oAPP.ui.oModelFieldTree);
+                    });
+                }
             
                 return resolve();
 
@@ -5334,7 +8418,11 @@ let oAPP = parent.oAPP,
      *************************************************************/
     oAPP.fn.closeMessagePopover = function(){
 
-        var _aPopOver = sap.m.InstanceManager.getOpenPopovers();
+        if(typeof window?.sap?.m?.InstanceManager?.getOpenPopovers !== "function"){
+            return;
+        }
+
+        var _aPopOver = window.sap.m.InstanceManager.getOpenPopovers();
 
         if(_aPopOver.length === 0){
             return;
@@ -5344,15 +8432,9 @@ let oAPP = parent.oAPP,
             
             var _oPopOver = _aPopOver[i];
 
-            if(typeof _oPopOver?.oParent?.data === "undefined"){
-                continue;
-            }
-
-            //메시지 팝업호 호출건인경우 종료 처리.
-            if(_oPopOver.oParent.data("msg_popover") === true){
-
-                _oPopOver.destroy();
-
+            //메시지 팝업 호출건인경우 종료 처리.
+            if(typeof oAPP.fn.closeMessagePopoverControl === "function"){
+                oAPP.fn.closeMessagePopoverControl(_oPopOver);
             }
             
         }
@@ -5380,6 +8462,10 @@ let oAPP = parent.oAPP,
         if (!ls_drag) {
             return;
         }
+
+        //외부 attribute 영역 drop 후에도 바인딩 팝업 레이아웃을 유지하기 위한 스냅샷.
+        //복원 로직 제외 테스트를 위해 임시 비활성.
+        // oAPP.fn.captureBindFieldDragLayout();
 
         //바인딩 필드 정보에서 drag 시작처리.
         oAPP.attr.oDesign.ui.ROOT.data("dragStart", true);
@@ -5465,7 +8551,7 @@ let oAPP = parent.oAPP,
      * @function - 호출된 모든 팝업 종료 처리.
      *************************************************************/
     oAPP.fn.closeAllPopups = function(){
-        
+
         //호출된 모든 팝업 종료.
         sap.m.InstanceManager.closeAllDialogs();
 
@@ -5479,7 +8565,7 @@ let oAPP = parent.oAPP,
     /*************************************************************
      * @event - drag 종료 이벤트.
      *************************************************************/
-    oAPP.fn.onBindFieldDragEnd = function(oEvent){
+    oAPP.fn.cleanupBindFieldDragState = function(){
 
         //바인딩 필드 정보에서 drag 종료처리.
         oAPP.attr.oDesign.ui.ROOT.data("dragStart", null);
@@ -5494,6 +8580,18 @@ let oAPP = parent.oAPP,
 
         //design tree의 drop 타겟 aggregation 초기화.
         oAPP.attr.oDesign.fn.setDropTargetAggregation();
+
+    };
+
+
+    /*************************************************************
+     * @event - drag 종료 이벤트.
+     *************************************************************/
+    oAPP.fn.onBindFieldDragEnd = function(oEvent){
+
+        oAPP.fn.cleanupBindFieldDragState();
+        //복원 로직 제외 테스트를 위해 임시 비활성.
+        // oAPP.fn.scheduleRestoreBindFieldDragLayout();
 
     };
 
@@ -5589,6 +8687,13 @@ let oAPP = parent.oAPP,
 
     //drag 종료시 css 잔상 제거.
     window.ondragend = function(){
+
+        if(oAPP.attr.oBindFieldDragLayoutSnapshot){
+            oAPP.fn.cleanupBindFieldDragState();
+            //복원 로직 제외 테스트를 위해 임시 비활성.
+            // oAPP.fn.scheduleRestoreBindFieldDragLayout();
+        }
+
         oAPP.IPCRENDERER.send("if-dragEnd");
     };  //drag 종료시 css 잔상 제거.
 
@@ -5612,7 +8717,7 @@ let oAPP = parent.oAPP,
     /************************************************************************
      * 페이지가 실제로 숨겨지거나 종료 처리될 때 호출되는 이벤트
      ************************************************************************/
-    parent.window.addEventListener('pagehide', function(){
+    window.addEventListener('pagehide', function(){
 
         // IPC Event 해제
         _detachIpcEvents();
@@ -5620,3 +8725,6 @@ let oAPP = parent.oAPP,
     },{ once: true });
 
 })(window, oAPP);
+
+
+}

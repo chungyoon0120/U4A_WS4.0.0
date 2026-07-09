@@ -76,7 +76,9 @@ body {
     overflow: hidden;
 }
 
-/* 영역 툴바(트리/테이블 상단 액션 행). 콘텐츠는 후속 단계 모듈이 채운다. */
+/* 영역 툴바(트리/테이블 상단 액션 행) — 반응형 오버플로(⋯) 대상(16 §11).
+   ★ 단일 행(nowrap) + overflow:hidden 이 attachOverflow 폭 측정의 전제(줄바꿈/자연폭 확장 시 오판).
+     좁아지면 공통 U4AUI.attachOverflow(oAPP.fn.attachToolOverflow)가 넘치는 버튼을 ⋯ 메뉴로 접는다. */
 .u4aBwpTool {
     flex: 0 0 auto;
     display: flex;
@@ -86,10 +88,23 @@ body {
     min-height: 2.25rem;
     box-sizing: border-box;
     border-bottom: 0.0625rem solid var(--line);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    min-width: 0;
 }
 .u4aBwpTool:empty { display: none; }
 .u4aBwpToolSpacer { flex: 1 1 auto; }
+/* ★ [hidden] 함정 — attachOverflow 는 넘치는 버튼에 el.hidden=true 를 준다. .u4a-btn/.u4a-btn-icon 은
+   display:inline-flex 라 UA 의 [hidden]{display:none} 을 이겨 ⋯ 가 항상 뜬다 → 명시적으로 숨긴다. */
+.u4aBwpTool > [hidden] { display: none !important; }
+/* ⋯ 오버플로 버튼 — 다른 아이콘 버튼과 동일 크기, 축소 금지. */
+.u4aBwpOvfBtn { flex: 0 0 auto; }
+
+/* ⋯ 오버플로 메뉴 항목 아이콘에 원본 버튼 시맨틱 색 유지(원본 UI5 OverflowToolbar 대응).
+   공통 .u4a-menu__item i(--icon-muted, 0,1,1)를 이기도록 i+클래스(0,2,1) 2-클래스 선택자. 의미 토큰만. */
+.u4a-menu__item i.u4aBwpMenuIco--success { color: var(--state-success); }
+.u4a-menu__item i.u4aBwpMenuIco--info { color: var(--state-info, var(--accent)); }
+.u4a-menu__item i.u4aBwpMenuIco--error { color: var(--state-error); }
 
 /* 트리/테이블 호스트 — 스크롤 컨테이너. */
 .u4aBwpTreeHost,

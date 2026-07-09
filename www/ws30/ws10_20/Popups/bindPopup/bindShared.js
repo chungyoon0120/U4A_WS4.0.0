@@ -80,6 +80,59 @@
     };
 
     /************************************************************************
+     * 패널 헤더 툴바 반응형 오버플로(⋯) — 공통 U4AUI.attachOverflow 소비.
+     *   ★ 각 스플릿 영역(모델/디자인/추가속성) 헤더 툴바는 패널이 좁아지면 버튼이 잘리거나 삐져나오면
+     *     안 된다(16 §11). 넘치는 액션은 우측 ⋯ 메뉴로 접는다.
+     *   ★ 기존 동일 패턴: WS10/20 공통헤더(buildMenubar, .u4a-ws10__common), 미리보기 패널 헤더
+     *     (_buildPrevHeader), 개인화 미리보기 툴바(fnP13nDesignPopupOpen.js:831). 새로 만들지 말고 이걸 소비.
+     *   · 세퍼레이터 = .u4aBwpToolSep, 스페이서(flex-grow) = .u4aBwpToolSpacer(측정 제외 isSkip).
+     *   · noOvfAutoMargin:true — 스페이서가 이미 우측으로 밀므로 ⋯ 를 보이는 버튼 끝에 붙인다.
+     ************************************************************************/
+    // 원본 버튼의 시맨틱 변형 → ⋯ 메뉴 아이콘 색 클래스(원본 UI5 OverflowToolbar 가 접힌 버튼 색을
+    //   유지하던 것 대응). 없으면 기본색(--icon-muted).
+    function _menuIcoColor(el) {
+        if (el.classList.contains("u4aBwpBtn--sync")) { return "u4aBwpMenuIco--success"; }   // 동일속성(녹)
+        if (el.classList.contains("u4a-btn--emphasized")) { return "u4aBwpMenuIco--info"; }   // 멀티(파)
+        if (el.classList.contains("u4a-btn--negative")) { return "u4aBwpMenuIco--error"; }     // Unbind(빨)
+        return "";
+    }
+
+    oAPP.fn.attachToolOverflow = function (oTool) {
+        if (!oTool || !window.U4AUI || typeof U4AUI.attachOverflow !== "function") { return null; }
+        var oOvf = U4AUI.attachOverflow(oTool, {
+            noOvfAutoMargin: true,
+            btnClass: "u4a-btn-icon u4aBwpOvfBtn",
+            isSep: function (el) { return el.classList.contains("u4aBwpToolSep"); },
+            isSkip: function (el) { return el.classList.contains("u4aBwpToolSpacer"); },
+            // ⋯ 메뉴 항목에 원본 버튼 색을 입힌다(아이콘 클론 + 색 클래스). 비활성/클릭은 공통이 자동 처리.
+            menuItem: function (el) {
+                var sColor = _menuIcoColor(el);
+                var oI = el.querySelector("i");
+                var sIcon = "";
+                if (oI) {
+                    var oClone = oI.cloneNode(true);
+                    if (sColor) { oClone.classList.add(sColor); }
+                    sIcon = oClone.outerHTML;
+                }
+                return {
+                    iconHtml: sIcon,
+                    text: (typeof U4AUI.btnLabel === "function") ? U4AUI.btnLabel(el, true) : (el.title || ""),
+                    onClick: function () { el.click(); }
+                };
+            }
+        });
+        // 초기 reflow — 스플리터 레이아웃으로 폭이 확정된 뒤 측정(폭 0이면 항상 오버플로로 오판).
+        if (oOvf && typeof requestAnimationFrame === "function") {
+            (function _try(n) {
+                if (oTool.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { } return; }
+                if (n <= 0) { return; }
+                requestAnimationFrame(function () { _try(n - 1); });
+            })(30);
+        }
+        return oOvf;
+    };
+
+    /************************************************************************
      * oAPP.H — 바인딩 팝업 전 영역(모델필드/디자인/추가속성/동기화)이 공유하는 UI 헬퍼.
      *   ★ 화면마다 _el/_fa/_statIcon 을 복붙하지 말고 이걸 소비한다(중복 제거).
      ************************************************************************/

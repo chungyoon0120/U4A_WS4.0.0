@@ -1,14 +1,27 @@
 /********************************************************************
  *📝 design 영역 구성.
 ********************************************************************/
-export async function start(oArea){
+/**
+* @since   2026-06-12 01:36:51
+* @version v3.6.4-3
+* @author  PES
+* @description
+*  DESIGN TREE 영역 module start 시 화면 커스터마이징 상태를 전달받아 rendering wait 여부를 제어한다.
+*  영역이 비활성화된 상태로 popup이 호출되더라도 controller, model, event handler는 기존처럼 생성하여
+*  이후 영역을 다시 활성화했을 때 기존 바인딩 처리 흐름을 그대로 이어갈 수 있게 한다.
+*  단, 화면에 보이지 않는 DESIGN TREE의 rendering 완료를 기다리지는 않도록 skipRenderingWait 옵션을 사용하여
+*  popup 재호출 시 busy가 해제되지 않는 현상과 불필요한 초기 화면 재배치를 방지한다.
+*/
+export async function start(oArea, oOption){
 
     return new Promise(async (res) => {
 
         //design 영역 화면 구성.
+        var bSkipRenderingWait = oOption?.skipRenderingWait === true;
+
         var _oContr = await designView(oArea);
 
-        var _oPromise = _oContr.fn.uiUpdateComplate(oArea);
+        var _oPromise = bSkipRenderingWait === true ? Promise.resolve() : _oContr.fn.uiUpdateComplate(oArea);
 
         oArea.invalidate();
 
@@ -51,6 +64,16 @@ function designControl(oArea){
             oContr.ui.ROOT = undefined;
             oContr.fn      = {};
             oContr.attr    = {};
+
+
+            /**
+             * @since   2026-04-27 11:08:22
+             * @version v3.6.4-3 
+             * @author  pes
+             * @description
+             * 수정내용
+             */
+            oContr.attr.S_FILTER_UI = undefined;
 
 
             oContr.types   = {};
@@ -158,7 +181,11 @@ function designControl(oArea){
             oContr.oModel = new sap.ui.model.json.JSONModel({
                 TREE_DESIGN  : [],
 
-                zTREE_DESIGN : []
+                zTREE_DESIGN : [],
+
+                edit_sync_dialog_interaction : true,
+
+                edit_layout_customizing : true
             });
 
 
@@ -710,6 +737,104 @@ function designControl(oArea){
             /*******************************************************
             * @function - drag 데이터 점검.
             *******************************************************/
+            /**
+             * @since   2026-04-27 11:08:22
+             * @version v3.6.4-3 
+             * @author  pes
+             * @description
+             * 수정내용
+            */
+            function _getDesignTreeFilterUi(){
+
+                if(typeof oContr.ui.TREE === "undefined"){
+                    oContr.attr.S_FILTER_UI = undefined;
+                    return;
+                }
+
+                var _indx = oContr.ui.TREE.getSelectedIndex();
+
+                if(_indx < 0){
+                    oContr.attr.S_FILTER_UI = undefined;
+                    return;
+                }
+
+                var _oCtxt = oContr.ui.TREE.getContextByIndex(_indx);
+
+                if(typeof _oCtxt === "undefined" || _oCtxt === null){
+                    oContr.attr.S_FILTER_UI = undefined;
+                    return;
+                }
+
+                var _sTree = _oCtxt.getProperty();
+
+                if(_sTree?.DATYP !== CS_DATYP.UOBJ){
+                    oContr.attr.S_FILTER_UI = undefined;
+                    return;
+                }
+
+                oContr.attr.S_FILTER_UI = _sTree;
+
+                return _sTree;
+
+            }
+
+
+            /**
+             * @since   2026-04-27 11:08:22
+             * @version v3.6.4-3 
+             * @author  pes
+             * @description
+             * 수정내용
+             */
+            function _getDesignTreeColumnFilters(oColumn, value){
+
+                var _aFilter = [];
+
+                var _aCol = oContr.ui.TREE.getColumns();
+
+                for (let i = 0, l = _aCol.length; i < l; i++) {
+                    
+                    var _oCol = _aCol[i];
+
+                    var _sValue = _oCol === oColumn ? value : _oCol.getFilterValue();
+
+                    if(typeof _sValue === "undefined" || _sValue === null){
+                        _sValue = "";
+                    }
+
+                    _sValue = String(_sValue);
+
+                    if(_oCol === oColumn){
+                        _oCol.setFilterValue(_sValue);
+                    }
+
+                    _oCol.setFiltered(_sValue !== "");
+
+                    if(_sValue === ""){
+                        continue;
+                    }
+
+                    var _sPath = _oCol.getFilterProperty();
+
+                    if(typeof _sPath === "undefined" || _sPath === null || _sPath === ""){
+                        continue;
+                    }
+
+                    var _sOper = _oCol.getFilterOperator();
+
+                    if(typeof _sOper === "undefined" || _sOper === null || _sOper === ""){
+                        _sOper = "Contains";
+                    }
+
+                    _aFilter.push(new sap.ui.model.Filter({path:_sPath, operator:_sOper, value1:_sValue}));
+
+                }
+
+                return _aFilter;
+
+            }
+
+
             function _checkDragData(oData){
 
                 let _sRes = {RETCD:"", RTMSG:"", IF_DATA:{}};
@@ -1723,6 +1848,11 @@ function designControl(oArea){
          *************************************************************/
         oContr.fn.onSelDesignTreeLine = async function(oEvent){
 
+            if(oContr.oModel.oData.edit_sync_dialog_interaction === false){
+                oContr.ui.TREE.clearSelection();
+                return;
+            }
+
             oAPP.fn.setBusy(true);
 
             var _oUi = oEvent?.mParameters?.cellControl;
@@ -1745,6 +1875,19 @@ function designControl(oArea){
 
 
             //UI 라인인 경우 WS 디자인 영역의 라인 선택 처리.
+            /**
+             * @since   2026-04-27 11:08:22
+             * @version v3.6.4-3 
+             * @author  pes
+             * @description
+             * 수정내용
+             */
+            oContr.attr.S_FILTER_UI = undefined;
+
+            if(_sTree.DATYP === CS_DATYP.UOBJ){
+                oContr.attr.S_FILTER_UI = _sTree;
+            }
+
             if(_sTree.DATYP === "01"){
                 //바인딩 팝업 디자인 영역에 그려진 최상위 UI 정보 전송.
                 parent.require("./wsDesignHandler/broadcastChannelBindPopup.js")("DESIGN-TREE-SELECT-OBJID", _sTree.OBJID);
@@ -1762,6 +1905,10 @@ function designControl(oArea){
          * @event - 바인딩 추가 속성 정보 보기 이벤트.
          *************************************************************/
         oContr.fn.onShowBindAdditInfo = function(oEvent){
+
+            if(oContr.oModel.oData.edit_sync_dialog_interaction === false){
+                return;
+            }
 
             oAPP.fn.setBusy(true);
 
@@ -1863,6 +2010,62 @@ function designControl(oArea){
         /*************************************************************
          * @event - 바인딩 데이터 변경시 메인에 해당 내용 전달 처리 이벤트.
          *************************************************************/
+        /**
+         * @since   2026-04-27 11:08:22
+         * @version v3.6.4-3 
+         * @author  pes
+         * @description
+         * 수정내용
+         */
+        oContr.fn.onFilterDesignTree = function(oEvent){
+
+            var _sFilterUi = _getDesignTreeFilterUi();
+
+            if(typeof _sFilterUi === "undefined"){
+                oContr.ui.TREE.expandToLevel(99999);
+                return;
+            }
+
+            var _oBind = oContr.ui.TREE.getBinding("rows");
+
+            if(typeof _oBind === "undefined" || _oBind === null){
+                return;
+            }
+
+            if(typeof oEvent?.preventDefault === "function"){
+                oEvent.preventDefault();
+            }
+
+            var _oCol = typeof oEvent?.getParameter === "function" ? oEvent.getParameter("column") : oEvent?.mParameters?.column;
+            var _val  = typeof oEvent?.getParameter === "function" ? oEvent.getParameter("value") : oEvent?.mParameters?.value;
+
+            var _aFilter = _getDesignTreeColumnFilters(_oCol, _val);
+
+            if(_aFilter.length === 0){
+                _oBind.filter([]);
+                oContr.ui.TREE.expandToLevel(99999);
+                return;
+            }
+
+            var _uiObk = _sFilterUi.UIOBK || _sFilterUi.S_14_UIOBK;
+
+            if(_uiObk !== ""){
+                _aFilter.push(new sap.ui.model.Filter({path:"UIOBK", operator:"EQ", value1:_uiObk}));
+
+            }else{
+                _aFilter.push(new sap.ui.model.Filter({path:"UILIB", operator:"EQ", value1:_sFilterUi.UILIB}));
+
+            }
+
+            _aFilter.push(new sap.ui.model.Filter({path:"DATYP", operator:"EQ", value1:CS_DATYP.ATTR}));
+
+            _oBind.filter(new sap.ui.model.Filter(_aFilter, true));
+
+            oContr.ui.TREE.expandToLevel(99999);
+
+        };
+
+
         oContr.fn.onModelDataChanged = async function(oEvent){
 
             oAPP.fn.setBusy(true);
@@ -2451,6 +2654,8 @@ function designControl(oArea){
 
             //추가속성 바인딩 버튼 비활성 처리.
             oAPP.attr.oAddit.fn.setAdditBindButtonEnable(false);
+            oAPP.attr.oAddit.fn.setLayoutCustomizingEditable(false);
+            oAPP.attr.bSyncEqualityScreenActive = true;
 
 
             //바인딩 추가속성 정보 초기화.
@@ -2560,6 +2765,8 @@ function designControl(oArea){
 
             //design tree 입력 필드 잠금 / 잠금 해제 처리.
             oContr.oModel.oData.edit = bLock;
+            oContr.oModel.oData.edit_sync_dialog_interaction = bLock;
+            oContr.oModel.oData.edit_layout_customizing = bLock;
 
             oContr.oModel.refresh();
 
@@ -2632,16 +2839,42 @@ function designControl(oArea){
                     return res();
                 }
 
+                var _oTimer = null,
+                    _bDone = false,
+                    _fnDone = function(){
+
+                        if(_bDone === true){
+                            return;
+                        }
+
+                        _bDone = true;
+
+                        if(_oTimer){
+                            clearTimeout(_oTimer);
+                        }
+
+                        if(typeof oUI.removeEventDelegate === "function"){
+                            oUI.removeEventDelegate(_oDelegate);
+                        }
+
+                        if(typeof oUI.data === "function"){
+                            oUI.data("_onAfterRendering", null);
+                        }
+
+                        return res();
+
+                    };
+
                 var _oDelegate = {
                     onAfterRendering:(oEvent)=>{
 
                         //onAfterRendering 이벤트 제거.
-                        oUI.removeEventDelegate(_oDelegate);
+                        _fnDone();
 
                         //onAfterRendering 정보 초기화.
-                        oUI.data("_onAfterRendering", null);
+                        // oUI.data("_onAfterRendering", null);
 
-                        return res();
+                        return;
 
                     }
                 };
@@ -2651,6 +2884,8 @@ function designControl(oArea){
                 
                 //onAfterRendering 정보 매핑.
                 oUI.data("_onAfterRendering", _oDelegate);
+
+                _oTimer = setTimeout(_fnDone, 1000);
 
             });
 
@@ -3088,6 +3323,15 @@ function designControl(oArea){
 
             //UI 수집 오브젝트 초기화.
             oAPP.attr.prev = {};
+
+            /**
+             * @since   2026-04-27 11:08:22
+             * @version v3.6.4-3 
+             * @author  pes
+             * @description
+             * 수정내용
+             */
+            oContr.attr.S_FILTER_UI = undefined;
 
             var _aT_0014 = oAPP.attr.T_0014 || [];
 
@@ -3768,6 +4012,17 @@ function designView(oArea){
                                 oAPP.fn.setUiTableAutoResizeColumn(oContr.ui.TREE);
                             }
                         }),
+                        /**
+                        * @since   2026-06-12 01:36:51
+                        * @version v3.6.4-3
+                        * @author  PES
+                        * @description
+                        *  DESIGN TREE 영역 toolbar에서도 화면 커스터마이징 popup을 호출할 수 있도록
+                        *  공통 버튼을 배치한다.
+                        *  버튼은 영역 표시 조합만 변경하며, DESIGN TREE의 drag & drop, multi binding,
+                        *  unbind, help, column resize 등의 기존 기능 동작에는 영향을 주지 않는다.
+                        */
+                        oAPP.fn.createBindLayoutCustomizingButton(),
                         new sap.m.OverflowToolbarButton({
                             icon:"sap-icon://question-mark", 
                             text : _txt12,    //198	Help
@@ -3780,7 +4035,7 @@ function designView(oArea){
             columns: [
                 new sap.ui.table.Column({
                     filterProperty:"DESCR",
-                    filterOperator: "EQ",
+                    filterOperator: "Contains",
                     width: "50%",
                     autoResizable:true,
                     label: new sap.m.Label({
@@ -3863,6 +4118,7 @@ function designView(oArea){
                                     new sap.m.Link({
                                         text:"{UIATV}",
                                         tooltip:"{UIATV}",
+                                        enabled:"{/edit_sync_dialog_interaction}",
                                         wrapping: false,
                                         press: oContr.fn.onShowBindAdditInfo
                                     })
@@ -3928,6 +4184,15 @@ function designView(oArea){
                 }).data("DROP_TYPE", "DROP01")
             ]
         });
+        /**
+         * @since   2026-04-27 11:08:22
+         * @version v3.6.4-3 
+         * @author  pes
+         * @description
+         * 수정내용
+         */
+        oContr.ui.TREE.attachFilter(oContr.fn.onFilterDesignTree);
+
         oContr.ui.PG_MAIN.addContent(oContr.ui.TREE);
 
 

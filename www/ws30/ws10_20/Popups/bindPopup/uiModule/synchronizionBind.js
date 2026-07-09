@@ -316,6 +316,12 @@ function designControl(is_attr){
                                         
                     //추가속성 바인딩 버튼 활성 처리.
                     oAPP.attr.oAddit.fn.setAdditBindButtonEnable(true);
+                    oAPP.attr.oAddit.fn.setLayoutCustomizingEditable(true);
+                    oAPP.attr.bSyncEqualityScreenActive = false;
+
+
+                    //메인의 model tree 영역 활성 처리.
+                    oAPP.fn.setViewEditable(true);
 
                     
                     //tree table 컬럼길이 재조정 처리.
@@ -616,6 +622,8 @@ function designControl(is_attr){
          *************************************************************/
         oContr.fn.onMoveDesignPage = async function(){
 
+            oAPP.fn.closeMessagePopover();
+
             oAPP.fn.setBusy(true);
 
             document.activeElement.blur();
@@ -626,6 +634,8 @@ function designControl(is_attr){
                                 
             //추가속성 바인딩 버튼 활성 처리.
             oAPP.attr.oAddit.fn.setAdditBindButtonEnable(true);
+            oAPP.attr.oAddit.fn.setLayoutCustomizingEditable(true);
+            oAPP.attr.bSyncEqualityScreenActive = false;
 
 
             //메인의 model tree 영역 활성 처리.
@@ -825,6 +835,10 @@ function designControl(is_attr){
 
             //추가속성 화면 잠금 / 잠금해제 처리.
             oAPP.attr.oAddit.fn.setViewEditable(bLock);
+
+            if(oAPP.attr.bSyncEqualityScreenActive === true){
+                oAPP.attr.oAddit.fn.setLayoutCustomizingEditable(false);
+            }
             
 
         };

@@ -789,7 +789,8 @@
         // Form Items append
         function createFormItem(sLabel, oFieldInstance, bRequired) {
             const oItem = document.createElement("div");
-            oItem.className = "u4aFormItem";
+            // 공통 .u4a-form__row 병기 — value-state 메시지(.u4a-field__msg)는 shell.css 상 .u4a-form__row:focus-within 일 때만 노출되므로 필수.
+            oItem.className = "u4a-form__row u4aFormItem";
             const oLabel = document.createElement("label");
             oLabel.className = "u4aFormLabel";
             oLabel.textContent = sLabel;
@@ -843,7 +844,11 @@
             disabled: true,
             placeholder: getMsgText("/U4A/CL_WS_COMMON", "D13", "Host or Domain")
         });
-        oHostWrap.appendChild(oHostInputField.el);
+        // 호스트 입력만 공통 .u4a-form__row 로 감싼다(라디오와 분리) — value-state 메시지가 이 입력 아래에 focus 시 뜨도록.
+        const oHostFieldRow = document.createElement("div");
+        oHostFieldRow.className = "u4a-form__row w-100";
+        oHostFieldRow.appendChild(oHostInputField.el);
+        oHostWrap.appendChild(oHostFieldRow);
 
         oHostRadioGroup.querySelectorAll('input[name="hostType"]').forEach(radio => {
             radio.addEventListener("change", fn_select_Host);
