@@ -523,7 +523,7 @@ button:focus-visible {
  *   전체 그리드 = 행라인(행 border-bottom + 빈영역 그라디언트) + 컬럼라인(셀 border-left + 그리드라인 레이어).
  *   컬럼 고정폭(§3.4.2). 정렬 §3.4.1. 행밀도 .u4a-tree* 단일출처(§3.2). 색=의미 토큰만.
  * ======================================================================== */
-.u4aColTree { position: relative; overflow: auto; height: 100%; background: var(--surface); }
+.u4aColTree { position: relative; overflow: auto; height: 100%; background: var(--surface); display: flex; flex-direction: column; }
 
 /* 헤더/본문/트리 공통 폭 = 컬럼폭 합(팬보다 넓으면 가로 스크롤, 좁으면 100% 채움 — 셋 다 동일 폭이라 정렬). */
 .u4aColTreeHead, .u4aColTreeBody, .u4aColTreeTree.u4a-tree { width: max(100%, var(--u4act-total-w, 100%)); }
@@ -531,11 +531,13 @@ button:focus-visible {
 /* sticky 컬럼 헤더 — 행과 동일 콘텐츠 박스(padding-left = 행 0.375rem + 공통 ul 좌측 1px). */
 .u4aColTreeHead {
     position: sticky; top: 0; z-index: 2;
+    flex: 0 0 auto;
     box-sizing: border-box;
     display: flex; align-items: stretch; gap: 0.375rem;
     height: 2.25rem;
     padding-left: calc(0.375rem + 1px);
-    background: var(--surface-raised);
+    /* 헤더 밴드 = 페이지 배경 톤(surface 보다 은은히 리세스) → 행과 또렷이 구분(--surface-raised 는 white 테마에서 surface 동색). 테마 대응. */
+    background: var(--app-bg);
     border-bottom: 0.0625rem solid var(--line);
     font-size: 0.8125rem; font-weight: 700; color: var(--text-muted);
 }
@@ -550,12 +552,15 @@ button:focus-visible {
 .u4aColTreeGrip--right { left: auto; right: -0.1875rem; }
 .u4aColTreeHl2 .u4aColTreeC2, .u4aColTreeHl2 .u4aColTreeGL--c2,
 .u4aColTreeHl3 .u4aColTreeC3, .u4aColTreeHl3 .u4aColTreeGL--c3 { border-left-color: var(--accent); box-shadow: inset 0.1875rem 0 0 var(--accent); }
-.u4aColTreeHl3r .u4aColTreeC3 { box-shadow: inset -0.1875rem 0 0 var(--accent); }
+.u4aColTreeHl3r .u4aColTreeC3, .u4aColTreeHl3r .u4aColTreeGL--c3 { box-shadow: inset -0.1875rem 0 0 var(--accent); }
 /* 컬럼 리사이즈 가이드 라인·드래그 커서는 공통 U4AUI.attachColumnResize(가이드 fixed 인라인 + body 커서) 담당. */
 
 /* 본문 — 헤더 아래 남는 높이 채움 + 빈 영역 가로 행라인(반복 그라디언트, 행 2.5rem 주기). */
 .u4aColTreeBody {
     position: relative; box-sizing: border-box;
+    /* flex 컬럼 채움: 콘텐츠 짧으면 남는 높이 채우고(grow), 길면 콘텐츠따라 늘어 세로 스크롤(shrink 안 함).
+       → 그리드라인/컬럼 hover accent 가 항상 테이블 전 높이를 커버(빈 영역까지 연속). */
+    flex: 1 0 auto;
     min-height: calc(100% - 2.25rem);
     background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(2.5rem - 0.0625rem), var(--line) calc(2.5rem - 0.0625rem), var(--line) 2.5rem);
 }

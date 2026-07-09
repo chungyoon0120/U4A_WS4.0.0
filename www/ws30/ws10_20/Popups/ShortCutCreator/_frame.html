@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+            }
+        </style>
+
+    </head>
+    <body class="sapUiBody">
+
+        <div id="content" style="display:none;"></div>
+        <script>
+            /************************************************************************
+            * 에러 감지
+            ************************************************************************/
+            var zconsole = parent.WSERR(window, document, console);
+        </script>
+
+        <script>
+
+            let oAPP;
+
+            document.addEventListener('DOMContentLoaded', function () { 
+
+                oAPP = parent.gfn_remote();
+                
+                // 테마 정보를 구한다.
+                let oThemeInfo = oAPP.fn.getThemeInfo();
+
+                var oHead = document.getElementsByTagName('head').item(0);
+                var oScript = document.createElement('script');
+                oScript.setAttribute('id', 'sap-ui-bootstrap');
+                oScript.setAttribute('src', oAPP.config.UI5_INFO.src );
+                oScript.setAttribute('data-sap-ui-language', oAPP.config.UI5_INFO.language );
+                oScript.setAttribute('data-sap-ui-preload', 'sync');
+                // oScript.setAttribute('data-sap-ui-theme', oAPP.config.UI5_INFO.theme );
+                oScript.setAttribute('data-sap-ui-theme', oThemeInfo.THEME );
+                oScript.setAttribute('data-sap-ui-libs', 'sap.m, sap.ui.core, sap.ui.layout');
+                oScript.setAttribute('data-sap-ui-noduplicateids', 'true');
+
+                oHead.appendChild(oScript);
+
+                oScript.onload = ()=>{
+
+                    var oScript = document.createElement('script');
+                    oScript.setAttribute('src', 'js/frame.js');
+
+                    oHead.appendChild(oScript);
+
+                };
+
+            });
+
+        </script>
+    </body>
+
+    </html>

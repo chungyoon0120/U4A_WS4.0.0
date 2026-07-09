@@ -36,8 +36,10 @@ var oAPP = {};
 oAPP.fn = {};
 oAPP.attr = {};
 
-// 현재 비지 상태
-oAPP.attr.isBusy = false;
+// 현재 비지 상태 — ★오픈 로드 중에는 true(닫기 차단). opener 가 이미 메인 busy lock 을 켠 상태이므로,
+//   fnFinishOpen/fnOnUi5LoadFail(=lock 해제 지점) 전에 사용자가 닫으면 메인 lock 이 영구 잠긴다.
+//   로드 중 isBusy=true 로 닫기를 막아 그 누수를 차단(fnFinishOpen/fnOnUi5LoadFail 에서 false 로 해제).
+oAPP.attr.isBusy = true;
 
 oAPP.REMOTE = require('@electron/remote');
 oAPP.IPCRENDERER = require('electron').ipcRenderer;
@@ -105,12 +107,37 @@ oAPP.fn.getThemeInfo = function () {
 } // end of oAPP.fn.getThemeInfo
 
 /************************************************************************
+ * HTML5 WS4 테마 키(예: horizon_white/horizon_dark) → UI5 표준 테마명으로 단순화.
+ *   ★ raw 키를 iframe UI5 부트스트랩(data-sap-ui-theme)/applyTheme 에 그대로 넘기면 서버에 해당
+ *     테마 CSS 가 없어 .../themes/<key>/library.css 404 → sap.ui.core.theming.Parameters 실패 → 색 깨짐.
+ *   UI5 는 sap_horizon / sap_horizon_dark 만 로드 → 다크/라이트로만 단순화(iconPrev/illustMsg 동일).
+ *   판정: 키에 "dark" 포함 or 배경색(BGCOL) 휘도가 어두우면 dark. (.analy/12 §5.3)
+ ************************************************************************/
+oAPP.fn.toUI5Theme = function (sKey, sBgCol) {
+    var bDark = String(sKey || "").toLowerCase().indexOf("dark") !== -1;
+    if (!bDark && sBgCol) {
+        var s = String(sBgCol).trim().replace(/^#/, ""), r, g, b;
+        if (/^[0-9a-f]{3}$/i.test(s)) { s = s.replace(/(.)/g, "$1$1"); }   // 3자리 단축 hex(#abc)→6자리
+        var mHex = s.match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+        if (mHex) { r = parseInt(mHex[1], 16); g = parseInt(mHex[2], 16); b = parseInt(mHex[3], 16); }
+        else {
+            var mRgb = s.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+            if (mRgb) { r = +mRgb[1]; g = +mRgb[2]; b = +mRgb[3]; }
+        }
+        if (typeof r === "number") { bDark = (0.299 * r + 0.587 * g + 0.114 * b) < 128; }
+    }
+    return bDark ? "sap_horizon_dark" : "sap_horizon";
+}; // end of oAPP.fn.toUI5Theme
+
+/************************************************************************
  * 공통 .u4a-busy 오버레이 토글 (shell.css 단일 출처). data-busy="true" 만 표시.
  ************************************************************************/
 function _setShellBusy(bOn) {
+    // busy 상태를 창 닫기 차단(oAPP.attr.isBusy) + 오버레이(.u4a-busy) 에 동시 반영.
+    //   → 로드 중 닫기로 인한 메인 busy lock 누수 방지(닫기 핸들러가 isBusy 를 검사).
+    oAPP.attr.isBusy = !!bOn;
     var oEl = document.getElementById("ui5cssBusy");
-    if (!oEl) { return; }
-    oEl.setAttribute("data-busy", bOn ? "true" : "false");
+    if (oEl) { oEl.setAttribute("data-busy", bOn ? "true" : "false"); }
 }
 
 /************************************************************************

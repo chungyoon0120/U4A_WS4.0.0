@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="css/fontStyleWizard.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { console.error("[HTML5][fontStyleWizard] boot theme apply failed", e); }
+        })();
+    </script>
+</head>
+
+<body>
+    <!-- 공통 프레임리스 타이틀바 -->
+    <header class="u4a-titlebar" id="fwxTitlebar">
+        <img class="u4a-titlebar__logo" id="fwxLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="fwxTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button class="u4a-winbtn" data-action="min" title="Minimize" aria-label="Minimize">
+            <i class="fa-solid fa-window-minimize"></i>
+        </button>
+        <button class="u4a-winbtn" data-action="max" title="Maximize" aria-label="Maximize">
+            <i class="fa-solid fa-window-maximize"></i>
+        </button>
+        <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </header>
+
+    <!-- 본체: 좌 스테이지(결과: 스페시멘 + CSS) | 우 인스펙터(자기시연 컨트롤) -->
+    <main class="fwx" id="fwxRoot">
+
+        <!-- ── 좌: 스테이지 ── -->
+        <section class="fwx-stage" aria-label="Live preview">
+            <div class="fwx-stage__bar">
+                <div class="fwx-stage__title">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                    <span id="fwxStageTitle">Preview</span>
+                    <span class="fwx-editbadge"><i class="fa-solid fa-pen" aria-hidden="true"></i>편집 가능</span>
+                </div>
+                <div class="fwx-stage__actions">
+                    <button type="button" class="u4a-btn" id="fwxResetBtn" title="Reset to defaults">
+                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span>Reset</span>
+                    </button>
+                    <button type="button" class="u4a-btn u4a-btn--emphasized" id="fwxCopyBtn" title="Copy CSS Source">
+                        <i class="fa-regular fa-copy" aria-hidden="true"></i><span>Copy</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="fwx-paper">
+                <p class="sample fwx-sample" id="fwxSample" contenteditable="true" spellcheck="false"></p>
+                <div class="fwx-inline" aria-label="vertical-align sample">
+                    <span class="sample" id="fwxInlineSample">sample</span>
+                    <img class="sample fwx-imgsample" id="fwxImgSample" alt="">
+                </div>
+            </div>
+
+            <div class="fwx-caption" id="fwxCaption" aria-live="polite"></div>
+
+            <section class="fwx-out" aria-labelledby="fwxOutHead">
+                <div class="fwx-out__head" id="fwxOutHead">
+                    <i class="fa-solid fa-code" aria-hidden="true"></i><span>CSS Source</span>
+                </div>
+                <pre class="fwx-out__code u4a-selectable" id="fwxSource" tabindex="0"></pre>
+            </section>
+        </section>
+
+        <!-- ── 우: 인스펙터 ── -->
+        <aside class="fwx-inspector" id="fwxInspector" aria-label="Font and Text controls">
+            <div class="fwx-groups" id="fwxGroups"></div>
+        </aside>
+    </main>
+
+    <div class="u4a-busy" id="fwxBusy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+        </div>
+    </div>
+
+    <script src="frame.js"></script>
+</body>
+
+</html>

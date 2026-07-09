@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="css/fontStyleWizard.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { console.error("[HTML5][fontStyleWizard] boot theme apply failed", e); }
+        })();
+    </script>
+</head>
+
+<body>
+    <header class="u4a-titlebar" id="fw2Titlebar">
+        <img class="u4a-titlebar__logo" id="fw2Logo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="fw2Title"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button class="u4a-winbtn" data-action="min" title="Minimize" aria-label="Minimize">
+            <i class="fa-solid fa-minus"></i>
+        </button>
+        <button class="u4a-winbtn" data-action="max" title="Maximize" aria-label="Maximize">
+            <i class="fa-regular fa-square"></i>
+        </button>
+        <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </header>
+
+    <main class="fw2" id="fw2Root">
+        <section class="fw2-canvas" aria-labelledby="fw2CanvasTitle">
+            <div class="fw2-canvas__toolbar">
+                <div class="fw2-canvas__title" id="fw2CanvasTitle">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                    <span id="fw2CanvasLabel">Preview</span>
+                </div>
+                <div class="fw2-canvas__actions">
+                    <button type="button" class="u4a-btn" id="fw2ResetBtn" title="Reset">
+                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                        <span id="fw2ResetLabel">Reset</span>
+                    </button>
+                    <button type="button" class="u4a-btn u4a-btn--emphasized" id="fw2CopyBtn" title="Copy CSS Source">
+                        <i class="fa-regular fa-copy" aria-hidden="true"></i>
+                        <span id="fw2CopyLabel">Copy</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="fw2-paper">
+                <p class="sample fw2-sample" id="fw2Sample" contenteditable="true" spellcheck="false"></p>
+                <div class="fw2-inline" aria-label="vertical-align sample">
+                    <span class="sample" id="fw2InlineSample">sample</span>
+                    <img class="sample fw2-imgsample" id="fw2ImgSample" alt="">
+                </div>
+            </div>
+
+            <div class="fw2-status" id="fw2Status" aria-live="polite"></div>
+        </section>
+
+        <section class="fw2-deck" aria-labelledby="fw2DeckTitle">
+            <div class="fw2-deck__head">
+                <div class="fw2-deck__title" id="fw2DeckTitle">
+                    <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                    <span id="fw2DeckLabel">Font Style Wizard</span>
+                </div>
+                <div class="fw2-tabs" id="fw2Tabs" role="tablist"></div>
+            </div>
+
+            <div class="fw2-tray" id="fw2Tray"></div>
+        </section>
+    </main>
+
+    <div class="u4a-busy" id="fw2Busy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+        </div>
+    </div>
+
+    <script src="frame.js"></script>
+</body>
+
+</html>

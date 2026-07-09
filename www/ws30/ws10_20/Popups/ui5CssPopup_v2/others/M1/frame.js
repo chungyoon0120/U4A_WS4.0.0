@@ -12,7 +12,8 @@ var oAPP = {};
 let oThemeInfo = oParentAPP.fn.getThemeInfo();
 
 // let sTheme = oAPP.IF_DATA.THEME_INFO.THEME;
-let sTheme = oThemeInfo.THEME;
+// HTML5 WS4 테마 키 → UI5 표준 테마명(sap_horizon/sap_horizon_dark). raw 키는 서버 테마 CSS 404.
+let sTheme = oParentAPP.fn.toUI5Theme(oThemeInfo.THEME, oThemeInfo.BGCOL);
 
 // 로그인 언어 정보
 let sLangu = oAPP.IF_DATA.USER_INFO.LANGU;
@@ -54,7 +55,7 @@ function _onIpcMain_if_p13n_themeChange(){
     let oBrowserWindow = oParentAPP.REMOTE.getCurrentWindow();
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
 
-    sap.ui.getCore().applyTheme(oThemeInfo.THEME);
+    sap.ui.getCore().applyTheme(oParentAPP.fn.toUI5Theme(oThemeInfo.THEME, oThemeInfo.BGCOL));
 
 } // end of _onIpcMain_if_p13n_themeChange
 

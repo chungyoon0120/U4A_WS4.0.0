@@ -1982,7 +1982,9 @@
      *   - getWidth {function():number} 현재 컬럼 폭(px) 반환.
      *   - setWidth {function(number)} 새 컬럼 폭(px) 적용(놓을 때 1회 호출).
      *   - min {number=} 최소 폭 px(기본 64).
-     *   - onReset {function()=} 더블클릭 시(기본폭 복귀 등).
+     *   - getAutoWidth {function():number=} 더블클릭 auto-fit(엑셀/sap.ui.table autoResize) — 그 컬럼 내용 중
+     *       최장 폭(px)을 반환하면 그 폭으로 맞춘다. 제공 시 더블클릭 = auto-fit(onReset 보다 우선).
+     *   - onReset {function()=} getAutoWidth 미제공 시 더블클릭 동작(기본폭 복귀 등).
      *   - hoverEl {HTMLElement=} / hoverClass {string=} 그립 hover 시 경계 강조 토글(드래그 중엔 끔).
      */
     function attachColumnResize(oGrip, cfg) {
@@ -2065,9 +2067,14 @@
             document.addEventListener("mouseup", lf_up);
             e.preventDefault(); e.stopPropagation();
         });
-        if (typeof cfg.onReset === "function") {
+        if (typeof cfg.getAutoWidth === "function" || typeof cfg.onReset === "function") {
             oGrip.addEventListener("dblclick", function (e) {
-                try { cfg.onReset(); } catch (e2) { }
+                if (typeof cfg.getAutoWidth === "function") {
+                    // ★ auto-fit(엑셀/sap.ui.table) — 콘텐츠 최장 폭으로. 최소폭 clamp.
+                    try { var iW = cfg.getAutoWidth(); if (iW > 0) { cfg.setWidth(Math.max(iMin, iW)); } } catch (e2) { }
+                } else {
+                    try { cfg.onReset(); } catch (e2) { }
+                }
                 e.preventDefault(); e.stopPropagation();
             });
         }

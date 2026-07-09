@@ -77,7 +77,8 @@ module.exports = (() => {
         ERRPAGE: PATH.join(POPUP_ROOT, "errPageEditorPopup", "errorPageEditorFrame.html"),
         ERRPAGEPREV: PATH.join(POPUP_ROOT, "errPageEditorPopup", "errorPageEditorPreview.html"),
         UIFIND: PATH.join(POPUP_ROOT, "findPopup", "findFrame.html"),
-        RTMCLS: PATH.join(POPUP_ROOT, "runtimeClassNavigator", "frame.html"), // runtime class navigator  
+        RTMCLS: PATH.join(POPUP_ROOT, "runtimeClassNavigator", "frame.html"), // runtime class navigator
+        FONTSTYLE: PATH.join(POPUP_ROOT, "fontStyleWizard", "frame.html"), // Font Style Wizard (opener getPath("FONTSTYLE"))
         BINDPOPUP: PATH.join(POPUP_ROOT, "bindPopup", "frame.html"), // bind popup
         TXTSRCH: PATH.join(POPUP_ROOT, "textSearchPopup", "index.html"),
         APPDOCU: PATH.join(POPUP_ROOT, "docPopup", "frame.html"),

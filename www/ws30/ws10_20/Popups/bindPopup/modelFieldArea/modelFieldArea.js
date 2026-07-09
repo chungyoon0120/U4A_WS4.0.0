@@ -21,6 +21,18 @@
 
     var oM = { tool: null, host: null, ctrl: null };
 
+    // 텍스트+아이콘 액션 버튼(공통 .u4a-btn) — 라벨 있는 툴바 버튼(원본 sap.m.Button).
+    function _btn(sFa, sText, sTip, sVariant, fn) {
+        var b = H.el("button", "u4a-btn" + (sVariant ? " " + sVariant : ""));
+        b.type = "button";
+        if (sFa) { b.innerHTML = H.fa(sFa); }
+        if (sText) { b.appendChild(document.createTextNode(sText)); }
+        if (sTip) { b.title = sTip; b.setAttribute("aria-label", sTip); }
+        if (typeof fn === "function") { b.addEventListener("click", fn); }
+        return b;
+    }
+    function _spacer() { return H.el("span", "u4aBwpToolSpacer"); }
+
     /************************************************************************
      * 영역 초기화(frame.js _bootApp 호출) — 툴바 + 레퍼런스 컬럼트리 생성.
      ************************************************************************/
@@ -29,16 +41,30 @@
         oM.host = document.getElementById("bwpModelTree");
         if (!oM.tool || !oM.host) { return; }
 
-        // ── 툴바: 펼침(선택 서브트리) / 접힘(선택 노드) / 새로고침 — 16 §3.2 선택기준 ──
+        // ── 툴바(원본 index.js:1099 oTool 1:1) — 펼침/접힘 · 새로고침(강조) · 분할초기화 · 도움말 ──
+        //    펼침/접힘은 공통 트리 표준(16 §3.2 선택기준). 새로고침은 원본과 동일한 라벨 버튼(Emphasized).
         oM.tool.innerHTML = "";
-        oM.tool.appendChild(H.iconBtn("angles-down", H.cl("C27"), function () {   // C27 Expand
+        oM.tool.appendChild(H.iconBtn("angles-down", H.z("169"), function () {   // 169 Expand All
             if (oM.ctrl) { oM.ctrl.expandSelected(); }
         }));
-        oM.tool.appendChild(H.iconBtn("angles-up", H.cl("C28"), function () {     // C28 Collapse
+        oM.tool.appendChild(H.iconBtn("angles-up", H.z("170"), function () {     // 170 Collapse All
             if (oM.ctrl) { oM.ctrl.collapseSelected(); }
         }));
-        oM.tool.appendChild(H.iconBtn("rotate", H.cl("A48"), function () {        // A48 Refresh
+        oM.tool.appendChild(H.el("span", "u4aBwpToolSep"));
+        oM.tool.appendChild(_btn("rotate", H.z("171"), H.z("171"), "u4a-btn--emphasized", function () {  // 171 Refresh
             oAPP.fn.loadBindData();
+        }));
+        oM.tool.appendChild(_spacer());
+        // 168 분할 영역 초기화 — 셸 스플리터 폭/높이 변수 제거(frame.js 가 CSS 변수로 관리).
+        oM.tool.appendChild(H.iconBtn("table-columns", H.z("168"), function () {  // 168 분할 영역 초기화
+            var oShell = document.getElementById("bwpShell");
+            var oCenter = document.getElementById("bwpCenterPane");
+            if (oShell) { oShell.style.removeProperty("--bwp-left-w"); oShell.style.removeProperty("--bwp-right-w"); }
+            if (oCenter) { oCenter.style.removeProperty("--bwp-design-h"); }
+        }));
+        // 198 Help — 도움말 문서(원본 onHelp = U4A_HELP_DOC_OPEN 브로드캐스트)는 통신 단계(Stage6)에서 배선.
+        oM.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {  // 198 Help
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
         }));
 
         // ── 공통 다열 트리(U4AUI.makeColumnTree) — 고정폭 컬럼 + 가로 스크롤(16 §3.4.2) ──
@@ -83,6 +109,41 @@
     };
 
     /************************************************************************
+     * 바인딩 가능여부(상태 아이콘) 계산 — 원본 index.js:5121 setBindEnable 1:1.
+     *   KIND(백엔드 RTTI 분류): T=테이블 / S=구조체 / E=일반필드.
+     *   · T, E → 녹색 체크(status-positive) = 바인딩(드래그) 가능.
+     *   · S    → 아이콘 없음(구조체 자체는 드래그 불가), 하위로 재귀.
+     *   ★ 첫 실행(디자인 선택 없음)에도 전 모델필드에 표시 — image1(첫 실행) 과 동일.
+     *   ★ 원본의 chkRangeTable/enable(드래그 활성) 은 드래그드롭 단계(Stage3)에서 배선. 여기선 표시색만.
+     ************************************************************************/
+    function _applyBindEnable(aFlat) {
+        if (!Array.isArray(aFlat) || aFlat.length === 0) { return; }
+        var aRoots = aFlat.filter(function (n) { return !n.PARENT; });
+        _walk(aRoots, "", "");
+
+        function _walk(aLevel, sKindPath, sKind) {
+            for (var i = 0; i < aLevel.length; i++) {
+                var n = aLevel[i];
+                n.isTabField = (sKind === "T");
+                n.KIND_PATH = (sKindPath === "") ? n.KIND : (sKindPath + "-" + n.KIND);
+                var aChild = aFlat.filter(function (a) { return a.PARENT === n.CHILD; });
+                switch (n.KIND) {
+                    case "T":   // 테이블 — 녹색 + 하위(파생필드)까지 재귀(KIND="T" 전파).
+                        n.stat_src = "sap-icon://status-positive";
+                        _walk(aChild, n.KIND_PATH, "T");
+                        break;
+                    case "S":   // 구조체 — 아이콘 없음, 하위 필드로 재귀(부모 KIND 유지).
+                        _walk(aChild, n.KIND_PATH, sKind);
+                        break;
+                    case "E":   // 일반 필드 — 녹색.
+                        n.stat_src = "sap-icon://status-positive";
+                        break;
+                }
+            }
+        }
+    }
+
+    /************************************************************************
      * 모델 필드 데이터 로드(원본 getBindFieldInfo 1:1 — 서버 /getBindAttrData).
      ************************************************************************/
     oAPP.fn.loadBindData = function () {
@@ -123,6 +184,9 @@
                     oAPP.fn.toast(H.z("184"));   // 184 Binding attributes does not exist.
                     return;
                 }
+
+                // 바인딩 가능여부(상태 아이콘) 계산 — setTreeData 깊은복사 전 평면에 반영.
+                _applyBindEnable(aTree);
 
                 // 평면 → 중첩(zTREE).
                 oAPP.attr.modelTree = oAPP.fn.setTreeData(aTree, "CHILD", "PARENT", "zTREE");

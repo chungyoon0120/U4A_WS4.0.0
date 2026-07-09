@@ -124,11 +124,12 @@ body.u4aPattShown .u4aPattBody {
     align-items: stretch;
     height: 2.25rem;
     padding-left: calc(0.375rem + 1px);
-    background: var(--surface-raised, var(--surface));
+    /* 헤더 밴드 = 공통 .u4aColTreeHead 와 동일 톤(페이지 배경, 행과 또렷이 구분·테마대응) */
+    background: var(--app-bg);
     border-bottom: 0.0625rem solid var(--line);
     font-size: 0.8125rem;
     font-weight: 700;
-    color: var(--text);
+    color: var(--text-muted);
 }
 
 .u4aPattColName {
@@ -302,6 +303,25 @@ body.u4aPattShown .u4aPattBody {
     width: 100%;
 }
 
+/* 액션 셀만 정중앙 — 공통 셀 좌패딩(0.5rem)이 버튼을 우측으로 밀어 정중앙서 빗나감 → 좌패딩 상쇄. 콘텐츠유형(C2) 셀은 좌패딩 유지. */
+.u4aPattTreePane--cust .u4aColTreeCell.u4aColTreeC3 {
+    padding-left: 0;
+    justify-content: center;
+}
+
+/* 본문(행/빈영역)만 컬럼 합(--u4act-total-w)에 맞춰 마지막 컬럼 오른쪽을 세로선으로 "닫음"(sap.ui.table 격자 우측 경계).
+   → 행 가로줄·세로줄은 닫음선 안쪽까지만, 그 오른쪽 빈 띠는 표 밖(판 배경, 깨끗).
+   ★ 헤더는 폭 제한 안 함 → 판 끝까지 채워 헤더 밴드+바닥 가로선이 끝까지 이어짐(sap.ui.table 헤더). */
+.u4aPattTreePane--cust .u4aColTreeBody,
+.u4aPattTreePane--cust .u4aColTreeTree.u4a-tree {
+    width: var(--u4act-total-w, 100%);
+}
+/* 우측 닫음 세로선 = 헤더 C3 + 행 C3 셀 + 빈영역 그리드 GL--c3 우측 보더(전 높이 연속). */
+.u4aPattTreePane--cust .u4aColTreeC3,
+.u4aPattTreePane--cust .u4aColTreeGL--c3 {
+    border-right: 0.0625rem solid var(--line);
+}
+
 .u4aPattActBtn {
     display: inline-flex;
     align-items: center;
@@ -321,8 +341,14 @@ body.u4aPattShown .u4aPattBody {
     color: var(--text);
 }
 
+/* 삭제(휴지통) = 상시 destructive 색(--error, 공통 .u4a-btn--negative 와 동일 토큰). 수정(연필)은 중립(--text-muted) 유지로 위계.
+   레퍼런스 = WS20 트리 액션 .u4aWs20TreeActBtn.del. hover 도 red 유지(공통 :hover 의 --text 를 덮음). */
+.u4aPattActBtn--del {
+    color: var(--error);
+}
+
 .u4aPattActBtn--del:hover {
-    color: var(--negative, var(--text));
+    color: var(--error);
 }
 
 /* 빈 슬롯(버튼과 동일 크기 — ROOT 행 정렬 유지). WS20 u4aWs20TreeActSlot 동일. */

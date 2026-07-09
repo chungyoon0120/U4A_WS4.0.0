@@ -33,21 +33,19 @@
                 }
                 var sTitle = q.get("TITLE");
                 if (sTitle) { document.title = sTitle; }
-            } catch (e) { }
+            } catch (e) { /* index.js 에서 재적용 */ }
         })();
     </script>
 </head>
 
 <body class="u4aShortcutBody">
 
-    <!-- ===== frameless 타이틀바 (공통 .u4a-titlebar 표준 높이 소비) ===== -->
+    <!-- ===== frameless 타이틀바 ===== -->
     <header class="u4a-titlebar" id="u4aShortcutTitlebar">
         <img class="u4a-titlebar__logo" id="u4aShortcutLogo" src="" alt="U4A">
         <span class="u4a-titlebar__title" id="u4aShortcutTitle"></span>
         <div class="u4a-titlebar__spacer"></div>
-        <button type="button" class="u4a-winbtn" id="u4aShortcutWinMin" data-action="min" title="Minimize" aria-label="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
-        <button type="button" class="u4a-winbtn" id="u4aShortcutWinMax" data-action="max" title="Maximize" aria-label="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
-        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="u4aShortcutWinClose" data-action="close" title="Close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="u4aShortcutWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </header>
 
     <!-- ===== 메인 스크롤 콘텐츠 영역 ===== -->
@@ -70,27 +68,26 @@
         </div>
     </main>
 
-    <!-- ===== 하단 푸터 (높이 48px 표준) ===== -->
+    <!-- ===== 하단 푸터 (에러/성공 메시지 바 & 버튼그룹) ===== -->
     <footer class="u4aShortcutFooter">
         <div id="u4aFooterMessage"></div>
         <div class="u4aShortcutFooter__buttons">
-            <button type="button" class="u4a-btn u4a-btn--emphasized" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> <span id="btnSaveText"></span></button>
-            <button type="button" class="u4a-btn u4a-btn--negative" id="btnCancel"><i class="fa-solid fa-xmark"></i> <span id="btnCancelText"></span></button>
+            <button type="button" class="u4a-btn u4a-btn--emphasized" id="btnSave"><i class="fa-solid fa-floppy-disk"></i> <span id="btnSaveText">Save ShortCut</span></button>
+            <button type="button" class="u4a-btn u4a-btn--negative" id="btnCancel"><i class="fa-solid fa-xmark"></i> <span id="btnCancelText">Cancel</span></button>
         </div>
     </footer>
 
-    <!-- ===== Top-layer Busy 로딩 오버레이 (dialog 태그 사용) ===== -->
-    <dialog class="u4a-busy" id="u4aShortcutBusy" role="progressbar" aria-valuetext="Busy">
+    <!-- ===== Busy 로딩 오버레이 ===== -->
+    <div class="u4a-busy" id="u4aShortcutBusy" role="progressbar" aria-valuetext="Busy">
         <div class="u4a-busy__card">
             <div class="u4a-busy__spinner"></div>
             <div class="u4a-busy__label" id="u4aBusyLabel">Loading...</div>
         </div>
-    </dialog>
+    </div>
 
     <!-- ===== JS 리소스 스택 (끝) ===== -->
     <script src="../../../../lib/bootstrap/5.0.2/js/bootstrap.bundle.min.js"></script>
     <script src="js/index.js"></script>
-    <script src="../../js/fnAppF4PopupOpen.js"></script>
 
 </body>
 

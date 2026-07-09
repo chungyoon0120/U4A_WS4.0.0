@@ -1214,7 +1214,8 @@
         // 컬럼 폭 — sec.colW 에 영속(리사이즈/재렌더에도 유지). 최초/컬럼수 변동 시 기본폭.
         // TreeTable = Parent/Child(+2) 표시 & Position(-1) 숨김(원본 visible:!TREEVISI) ⇒ 9열, 그 외 8열.
         var iCols = sec.treevisi ? 9 : 8;
-        if (!sec.colW || sec.colW.length !== iCols) { sec.colW = _wzDefaultColW(sec.treevisi); }
+        var bFirst = (!sec.colW || sec.colW.length !== iCols);   // 최초 렌더(=auto-fit 대상). 이후엔 colW 유지(수동조절/자동폭 보존).
+        if (bFirst) { sec.colW = _wzDefaultColW(sec.treevisi); }
 
         var oCg = document.createElement("colgroup");
         sec.els.cols = [];
@@ -1268,6 +1269,29 @@
         wrap.appendChild(oTblWrap);
 
         _wzSyncHeadChk(sec);
+        // ★ 최초 렌더 = auto-fit 초기폭(콘텐츠 최장 폭). 더블클릭 auto-fit 과 동일 측정. 재렌더/수동조절 폭은 보존.
+        if (bFirst) { _wzAutoFitAll(sec); }
+    }
+
+    // 전 데이터 컬럼(체크박스·채움 제외)을 콘텐츠 최장 폭으로 초기화(처음 그릴 때).
+    //   ★텍스트 셀 측정을 scrollWidth 로 하므로 반드시 "표시된(렌더된)" 상태에서 측정해야 정확(hidden 이면 0).
+    //     _wzRenderTable 은 _wzSyncSteps(카드 표시) 앞에 불려 최초엔 카드 hidden(offsetParent=null) → 표시될 때까지
+    //     다음 프레임 재시도. 표시되면 scrollWidth 로 정확 측정·적용(헤더도 안 잘림).
+    function _wzAutoFitAll(sec) {
+        if (!sec.els.tbl) { return; }
+        if (sec.els.tbl.offsetParent === null) {   // 아직 안 보임 → 다음 프레임 재시도(최대 10회 ≒ 표시+레이아웃 안정)
+            if ((sec._autofitTry = (sec._autofitTry || 0) + 1) <= 10) {
+                requestAnimationFrame(function () { _wzAutoFitAll(sec); });
+            }
+            return;
+        }
+        sec._autofitTry = 0;
+        for (var i = 1; i < sec.colW.length; i++) {   // i=0 은 체크박스(고정폭) 제외
+            var w = _wzAutoW(sec, i);
+            sec.colW[i] = w;
+            if (sec.els.cols[i]) { sec.els.cols[i].style.width = w + "px"; }
+        }
+        _wzApplyTblMinW(sec);
     }
 
     // 기본 컬럼폭(px) — 순서: chk, Field Name, [Parent, Child | Position], UI Type, Label, Field Type, Field Length, Conv.
@@ -1305,12 +1329,8 @@
                 if (sec.els.cols[idx]) { sec.els.cols[idx].style.width = px + "px"; }
                 _wzApplyTblMinW(sec);
             },
-            // 더블클릭 = 기본폭 복귀.
-            onReset: function () {
-                sec.colW = _wzDefaultColW(sec.treevisi);
-                for (var c = 0; c < sec.colW.length; c++) { if (sec.els.cols[c]) { sec.els.cols[c].style.width = sec.colW[c] + "px"; } }
-                _wzApplyTblMinW(sec);
-            }
+            // ★ 더블클릭 = auto-fit(엑셀/sap.ui.table autoResize) — 그 컬럼 내용 중 최장 폭으로 자동 조절.
+            getAutoWidth: function () { return _wzAutoW(sec, idx); }
         });
         return oGrip;
     }
@@ -1318,6 +1338,61 @@
         var s = 0;
         for (var i = 0; i < sec.colW.length; i++) { s += sec.colW[i]; }
         if (sec.els.tbl) { sec.els.tbl.style.minWidth = s + "px"; }
+    }
+    // 텍스트 실측용 오프스크린 span — 참조 요소의 폰트로 텍스트 잉크폭 측정(input/콤보는 폭이 100% 라 박스 측정 불가).
+    function _wzMeasTxt(sText, oRef) {
+        var span = document.createElement("span");
+        span.style.cssText = "position:absolute;left:-9999px;top:-9999px;white-space:pre;visibility:hidden;";
+        if (oRef) {
+            var cs = getComputedStyle(oRef);
+            span.style.fontFamily = cs.fontFamily; span.style.fontSize = cs.fontSize;
+            span.style.fontWeight = cs.fontWeight; span.style.fontStyle = cs.fontStyle;
+            span.style.letterSpacing = cs.letterSpacing;
+        }
+        span.textContent = sText || "";
+        document.body.appendChild(span);
+        var w = span.getBoundingClientRect().width;
+        span.remove();
+        return w;
+    }
+
+    // 셀이 필요로 하는 폭(px, 셀 패딩 포함). 편집칸(콤보/입력)은 폭 100% 라 "안의 텍스트"를, 텍스트 셀(헤더/본문)은
+    //   그 텍스트를 오프스크린 span 으로 잉크폭 실측(자연폭=축소 가능) + 그 셀의 ★실측 좌우 패딩. ★_wzAutoFitAll 이
+    //   카드 "표시된(visible)" 뒤 측정하므로 getComputedStyle 폰트가 정확 → 헤더가 본문보다 좁게 잡히던 버그 해소.
+    //   (구 버전은 Range 로 잰 데다 hidden 시점 폰트라 헤더가 작게 나와 "필드 ..." 잘림)
+    function _wzCellNatW(oCell) {
+        if (!oCell) { return 0; }
+        var cs = getComputedStyle(oCell);
+        var iPad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+        var oCombo = oCell.querySelector(".u4a-combo");           // UI 유형 선택(커스텀 콤보)
+        if (oCombo) {
+            var oTxt = oCombo.querySelector(".u4a-combo__text");
+            return _wzMeasTxt(oTxt ? oTxt.textContent : "", oTxt || oCombo) + 36 + iPad;   // 텍스트 + 화살표 + 셀 패딩
+        }
+        var oInp = oCell.querySelector("input:not([type=checkbox])");   // 위치/레이블 입력
+        if (oInp) {
+            return _wzMeasTxt(oInp.value || oInp.getAttribute("placeholder") || "", oInp) + 18 + iPad; // 텍스트+보더+셀패딩
+        }
+        // 텍스트 셀(헤더 th/본문 td) — span 잉크폭(자연폭) + 실측 셀 패딩 + 2 슬랙. (그립 absolute·텍스트 없음→textContent 무섞임)
+        return _wzMeasTxt((oCell.textContent || "").trim(), oCell) + iPad + 2;
+    }
+
+    // 컬럼 auto-fit 폭(px) — 헤더 + 본문 셀 콘텐츠(편집칸 텍스트 포함)의 최장 폭 + 셀 패딩 여유. 채움 컬럼 제외.
+    function _wzAutoW(sec, idx) {
+        var tbl = sec.els.tbl;
+        if (!tbl) { return sec.colW[idx]; }
+        var iMax = 0;
+        var oHr = tbl.tHead && tbl.tHead.rows[0];
+        if (oHr && oHr.cells[idx]) { iMax = Math.max(iMax, _wzCellNatW(oHr.cells[idx])); }
+        var oTb = tbl.tBodies[0];
+        if (oTb) {
+            for (var r = 0; r < oTb.rows.length; r++) {
+                var oC = oTb.rows[r].cells[idx];
+                if (oC && !oC.classList.contains("u4aTplWiz__fillCol")) { iMax = Math.max(iMax, _wzCellNatW(oC)); }
+            }
+        }
+        // iMax 는 이미 셀 패딩 포함(scrollWidth/컨트롤+패딩). +4 미세 슬랙만. 최소 48 / 상한 800(과도 확장 방지).
+        return Math.max(48, Math.min(Math.ceil(iMax) + 4, 800));
     }
 
     function _wzRow(sec, r) {
@@ -1782,8 +1857,10 @@
                table-layout:fixed 는 폭 지정 컬럼을 고정하고 남는 폭을 폭 미지정 컬럼(채움)에만 준다 →
                데이터 컬럼 stretch 없음(리사이즈 정확), 격자는 우측 끝까지 채움. 데이터 폭 합 > 랩이면 채움=0 + 가로 스크롤. */
             ".u4aTplWiz__tbl{width:100%;}",
-            /* 채움 컬럼(빈 헤더/셀) — 최소폭 0(데이터 컬럼 폭 보호), 좌측 구분선은 앞 셀 box-shadow 가 그린다. */
+            /* 채움 컬럼(빈 헤더/셀) — 최소폭 0(데이터 컬럼 폭 보호), 좌측 구분선은 앞 셀(변환루틴) box-shadow 가 그린다. */
             ".u4aTplWiz__tbl th.u4aTplWiz__fillCol,.u4aTplWiz__tbl td.u4aTplWiz__fillCol{min-width:0;padding:0;}",
+            /* ★ 채움 컬럼 본문 셀엔 가로 행 경계선 없음(빈 영역은 매끈하게 — 원본 UI5 동일). 헤더 밑줄은 유지(td 만). */
+            ".u4aTplWiz__tbl tbody td.u4aTplWiz__fillCol{border-bottom:0;}",
             ".u4aTplWiz__tbl th,.u4aTplWiz__tbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}",
             ".u4aTplWiz__tbl td{padding:.1875rem .375rem;vertical-align:middle;}",
             /* 세로 컬럼 구분선 (원본 sap.ui.table.Table 셀 보더) — 마지막 컬럼 제외.

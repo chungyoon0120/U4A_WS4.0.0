@@ -2690,16 +2690,9 @@
         }
 
         var SESSKEY = parent.getSessionKey(),
-            oMeta = APPCOMMON.fnGetModelProperty("/METADATA"),
-            oServerInfo = parent.getServerInfo(),
-            oServerHost = parent.getServerHost(),
-            oUserInfo = parent.getUserInfo();
-
-        // 실행시킬 호스트명 + U4A URL 만들기
-
-        var sHost = oServerHost,
-            // sUrl = encodeURI(`${sHost}/zu4a_imp/cssfontstylewizrd?sap-user=${oUserInfo.ID}&sap-password=${oUserInfo.PW}`);
-            sUrl = encodeURI(`${sHost}/zu4a_imp/cssfontstylewizrd?ws-platform=3.0`);
+            BROWSKEY = parent.getBrowserKey(),
+            oUserInfo = parent.getUserInfo(),
+            oThemeInfo = parent.getThemeInfo();
 
         // 브라우저 옵션 설정
         var sSettingsJsonPath = parent.getPath("BROWSERSETTINGS"),
@@ -2709,22 +2702,43 @@
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B57"); // Font Style Wizard
         oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.webPreferences.partition = SESSKEY;
-        oBrowserOptions.webPreferences.nodeIntegration = false;
-        oBrowserOptions.webPreferences.OBJTY = sPopupName;
-
-        oBrowserOptions.opacity = 0.0;
+        oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
+        oBrowserOptions.titleBarStyle = "hidden";
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
+        oBrowserOptions.webPreferences.partition = SESSKEY;
+        oBrowserOptions.webPreferences.browserkey = BROWSKEY;
+        oBrowserOptions.webPreferences.OBJTY = sPopupName;
+        oBrowserOptions.webPreferences.USERINFO = parent.process.USERINFO;
 
         // 브라우저 오픈
         var oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
+
+        // 자식 창(frame.js)이 @electron/remote 를 사용하므로 반드시 enable (누락 시 remote 호출 차단→크래시)
         REMOTEMAIN.enable(oBrowserWindow.webContents);
+
+        // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
+        let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
+        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
 
         // 브라우저 상단 메뉴 없애기
         oBrowserWindow.setMenu(null);
 
-        oBrowserWindow.loadURL(sUrl);
+        // 브라우저 실행 경로에 붙일 QueryString 정보
+        const oQueryParams = {
+            browserkey: oBrowserOptions?.webPreferences?.browserkey,
+            sessionKey: oBrowserOptions?.webPreferences?.partition,
+            OBJTY: sPopupName,
+            USERINFO: parent.process.USERINFO,
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: oBrowserOptions.title,
+        };
+
+        const sUrlPath = parent.getPath(sPopupName);
+        const sLoadUrl = parent.WSUTIL.QueryString.build(sUrlPath, oQueryParams);
+
+        oBrowserWindow.loadURL(sLoadUrl);
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -2744,29 +2758,6 @@
 
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
-
-            oBrowserWindow.show();
-
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow, () => {
-
-                if (oBrowserWindow.isDestroyed()) {
-                    return;
-                }
-
-                try {
-                    oBrowserWindow.closable = true;
-                } catch (error) {
-
-                }
-
-                // 전체 자식 윈도우에 Busy 끈다.
-                oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
-
-                // busy 끄고 Lock 풀기
-                oAPP.common.fnSetBusyLock("");
-
-            });
 
         });
 
@@ -3627,6 +3618,7 @@
      * [WS20] Application ShortCut Download
      ************************************************************************/
     oAPP.fn.fnAppShortCutDownPopupOpener = () => {
+        try {
 
         // busy 키고 Lock 걸기
         oAPP.common.fnSetBusyLock("X");
@@ -3655,27 +3647,12 @@
             return;
         }
 
-        // Chrome 브라우저 설치 유무 확인
+        // Chrome / Edge 브라우저 설치 유무 확인
         let oChrome = aDefBr.find(elem => elem.NAME === "CHROME") || {};
-        if (!oChrome || !oChrome.ENABLED) {
-
-            // 전체 자식 윈도우에 Busy 끈다.
-            oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
-
-            // busy 끄고 Lock 풀기
-            oAPP.common.fnSetBusyLock("");
-
-            //sMsg = "Chrome Browser가 설치 되어 있는지 확인하세요!";
-            sMsg = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C75"); // Chrome Browser
-            sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "334", sMsg); // &1 is not installed.            
-
-            parent.showMessage(sap, 20, 'E', sMsg);
-
-            return;
-        }
-
         let oMsEdge = aDefBr.find(elem => elem.NAME === "MSEDGE") || {};
-        if (!oMsEdge || !oMsEdge.ENABLED) {
+
+        // 둘 다 설치되어 있지 않을 때만 오류 처리 후 종료
+        if ((!oChrome || !oChrome.ENABLED) && (!oMsEdge || !oMsEdge.ENABLED)) {
 
             // 전체 자식 윈도우에 Busy 끈다.
             oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
@@ -3683,9 +3660,8 @@
             // busy 끄고 Lock 풀기
             oAPP.common.fnSetBusyLock("");
 
-            //sMsg = "MS Edge Browser가 설치 되어 있는지 확인하세요!";
-            sMsg = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C76"); // IE edge Browser
-            sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "334", sMsg); // &1 is not installed.
+            // "설치된 브라우저 정보를 찾을 수 없습니다."
+            sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "333"); // Installed browser information not found.
 
             parent.showMessage(sap, 20, 'E', sMsg);
 
@@ -3726,15 +3702,14 @@
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D31"); // ShortCut Creator    
         oBrowserOptions.skipTaskbar = false;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.modal = true;
-        oBrowserOptions.minimizable = false;
-        oBrowserOptions.maximizable = false;
+        oBrowserOptions.minimizable = true;   // 타이틀바 최소화 버튼(u4aShortcutWinMin) 동작 위해 허용
+        oBrowserOptions.maximizable = true;   // 타이틀바 최대화 버튼(u4aShortcutWinMax) 동작 위해 허용
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL; //테마별 색상 처리               
-        oBrowserOptions.height = 900;
-        oBrowserOptions.width = 800;
+        oBrowserOptions.height = 760;
+        oBrowserOptions.width = 650;
 
-        oBrowserOptions.opacity = 0.0;
+        oBrowserOptions.frame = false;
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
@@ -3769,19 +3744,23 @@
         //==*브라우져 설처 경로 
         let T_info = [];
 
-        var S_info = {};
-        S_info.TYPE = "CR";
-        S_info.PATH = oChrome.INSPATH;
-        T_info.push(S_info);
+        if (oChrome && oChrome.ENABLED) {
+            let S_info = {};
+            S_info.TYPE = "CR";
+            S_info.PATH = oChrome.INSPATH;
+            T_info.push(S_info);
+        }
 
-
-        var S_info = {};
-        S_info.TYPE = "MS_EDGE";
-        S_info.PATH = oMsEdge.INSPATH;
-        T_info.push(S_info);
+        if (oMsEdge && oMsEdge.ENABLED) {
+            let S_info = {};
+            S_info.TYPE = "MS_EDGE";
+            S_info.PATH = oMsEdge.INSPATH;
+            T_info.push(S_info);
+        }
 
         // 브라우저 오픈
         let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);        
+        parent.REMOTEMAIN.enable(oBrowserWindow.webContents);
 
         // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
         let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
@@ -3796,6 +3775,9 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            BGCOL: oThemeInfo.BGCOL,
+            THEME: oThemeInfo.THEME,
+            TITLE: oBrowserOptions.title
         };
 
         const sUrlPath = parent.getPath(sPopupName);
@@ -3806,9 +3788,9 @@
         oBrowserWindow.loadURL(sLoadUrl);
 
         // no build 일 경우에는 개발자 툴을 실행한다.
-        // if (!APP.isPackaged) {
-        //     oBrowserWindow.webContents.openDevTools();
-        // }
+        if (!REMOTE.app.isPackaged) {
+            // oBrowserWindow.webContents.openDevTools();
+        }
 
         // 브라우저가 활성화 될 준비가 될때 타는 이벤트
         oBrowserWindow.once('ready-to-show', () => {
@@ -3835,14 +3817,63 @@
 
         });
 
+        // F4 팝업 요청 IPCMAIN 리스너 정의
+        const fnIpcF4OpenListener = (event, res) => {
+            if (res.BROWSKEY !== BROWSKEY) {
+                return;
+            }
+
+            const oUserInfo = parent.getUserInfo();
+
+            const oOptions = {
+                autoSearch: true,
+                initCond: {
+                    PACKG: "",
+                    APPNM: "",
+                    APPTY: "M",
+                    ERUSR: oUserInfo.ID,
+                    HITS: 500
+                }
+            };
+
+            // App F4 는 메인창에 .u4a-dialog 로 뜬다 → 자식창 뒤에 가리지 않게 메인창을 앞으로.
+            try { CURRWIN.focus(); } catch (e) { console.error('[숏컷] F4 전 메인창 포커스 실패:', e); }
+
+            oAPP.fn.fnAppF4PopupOpener(oOptions, function (oRow) {
+                try {
+                    if (oBrowserWindow && !oBrowserWindow.isDestroyed()) {
+                        oBrowserWindow.webContents.send('if-shortcut-f4-select', oRow); // oRow.APPID 포함
+                        oBrowserWindow.focus();
+                    }
+                } catch (e) { console.error('[숏컷] F4 결과 회신 실패:', e); }
+            });
+        };
+
+        // IPC 리스너 등록
+        IPCMAIN.on("if-shortcut-f4-open", fnIpcF4OpenListener);
+
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
-
+            // IPC 리스너 해제
+            IPCMAIN.removeListener("if-shortcut-f4-open", fnIpcF4OpenListener);
             oBrowserWindow = null;
 
             CURRWIN.focus();
 
         });
+
+        } catch (e) {
+            console.error("[숏컷] U4A 숏컷 링크 생성 오류:", e);
+
+            // 전체 자식 윈도우에 Busy 끈다.
+            oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
+
+            // busy 끄고 Lock 풀기
+            oAPP.common.fnSetBusyLock("");
+
+            let sMsg = "U4A 숏컷 링크 생성 오류: " + (e.message || e.toString());
+            parent.showMessage(sap, 20, 'E', sMsg);
+        }
 
     }; // end of oAPP.fn.fnAppShortCutDownPopupOpener
 

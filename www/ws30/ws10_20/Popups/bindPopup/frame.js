@@ -296,6 +296,9 @@ function _onModelBindingPopup(events, oInfo) {
     oAPP.attr.T_0015 = oInfo.T_0015 || [];
     oAPP.attr.T_CEVT = oInfo.T_CEVT || [];
     oAPP.attr.oAppInfo = oInfo.oAppInfo || {};
+    // 편집 가능여부(IS_EDIT="X") — 영역 툴바(바인딩 버튼 enabled="{/edit}")가 초기화 시점에 참조하므로
+    //   비동기 loadBindData 이전에 부트에서 확정한다(원본 oAPP.attr.oAppInfo.IS_EDIT).
+    oAPP.attr.editable = (oAPP.attr.oAppInfo.IS_EDIT === "X");
     oAPP.attr.servNm = oInfo.servNm || "";
     oAPP.attr.DnDRandKey = oInfo.SSID;
     oAPP.attr.SSID = oInfo.SSID;

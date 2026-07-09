@@ -712,15 +712,10 @@
             return;
         }
 
-        // ── [임시] U4A 숏컷 링크 생성(fnAppShortCutDownPopupOpener) HTML5 미변환 — 완료 전까지 안내 토스트만.
-        //   busy Lock 은 걸지 않는다(토스트만·해제 짝 없음). TODO(i18n) + 변환 완료 시 아래 원본 복원.
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
-        return;
+        // busy 키고 Lock 걸기
+        oAPP.common.fnSetBusyLock("X");
 
-        // // busy 키고 Lock 걸기
-        // oAPP.common.fnSetBusyLock("X");
-
-        // oAPP.fn.fnAppShortCutDownPopupOpener();
+        oAPP.fn.fnAppShortCutDownPopupOpener();
 
     }; // end of oAPP.fn.fnWS10WMENU10_04_01
 

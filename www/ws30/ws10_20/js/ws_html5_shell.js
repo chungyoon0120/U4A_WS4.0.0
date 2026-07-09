@@ -366,7 +366,17 @@
      * 개인화 설정 (구 fnOnInitP13nSettings) — 추후 변환 스텁(WS20 영역)
      ************************************************************************/
     oAPP.fn.fnOnInitP13nSettings = function () {
-        // [추후 변환] WS20/디자인 개인화. 메인 셸/WS10 렌더엔 영향 없음.
+        // 로그인 init 개인화 설정. 각 기능은 개별 가드하되 오류를 삼키지 말고 로깅한다(억제 금지).
+        // 개인화 폴더 생성
+        try { oAPP.fn.fnOnP13nFolderCreate(); } catch (e) { console.warn("[HTML5] fnOnP13nFolderCreate skip:", e && e.message); }
+        // 브라우저 zoom 정보
+        try { oAPP.fn.fnOnP13nBrowserZoom(); } catch (e) { console.warn("[HTML5] fnOnP13nBrowserZoom skip:", e && e.message); }
+        // Default Browser 개인화(/DEFBR 적재) — 숏컷/실행 팝업 전제. 실패 시 오류로 노출해 진단 가능하게 한다.
+        try { oAPP.fn.fnOnP13nExeDefaultBrowser(); } catch (e) { console.error("[HTML5] fnOnP13nExeDefaultBrowser error(/DEFBR 미적재):", e); }
+        // WS10 AppName Suggestion
+        try { oAPP.fn.fnGetP13nWs10AppSuggetion(); } catch (e) { console.warn("[HTML5] fnGetP13nWs10AppSuggetion skip:", e && e.message); }
+        // T-Code Suggestion
+        try { oAPP.fn.fnOnInitTCodeSuggestion(); } catch (e) { console.warn("[HTML5] fnOnInitTCodeSuggestion skip:", e && e.message); }
     };
 
     /************************************************************************

@@ -5,3 +5,6 @@ node_modules/
 
 # 로컬 MCP 서버 설정 (머신 종속 경로 / 개인 환경) — 커밋 제외
 .mcp.json
+
+# 에이전트 스킬 번들 node.exe 런타임 (82MB 바이너리) — 저장소 비대화 방지, 로컬 전용
+**/scripts/node_runtime/

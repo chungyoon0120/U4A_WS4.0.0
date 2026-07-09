@@ -515,8 +515,9 @@ export async function getControl() {
                 
                 // 디테일 영역의 기본 테마 설정
                 let THEME_INFO = oContr.IF_DATA.THEME_INFO;
-                if(THEME_INFO){            
-                    oContr.oModel.oData.S_DETAIL.selectedTheme = oContr.IF_DATA.THEME_INFO.THEME; 
+                if(THEME_INFO){
+                    // HTML5 WS4 테마 키 → UI5 표준 테마명(sap_horizon/sap_horizon_dark). raw 키는 서버 테마 CSS 404.
+                    oContr.oModel.oData.S_DETAIL.selectedTheme = oParentAPP.fn.toUI5Theme(THEME_INFO.THEME, THEME_INFO.BGCOL);
                 }
 
                 // 화면 처음 로드 시 첫번째 메뉴를 선택한 효과를 준다
@@ -815,14 +816,18 @@ export async function getControl() {
         // 테마 정보를 구한다
         let oThemeInfo = oParentAPP.fn.getThemeInfo();
 
-        let oBrowserOptions = {      
+        let oBrowserOptions = {
             width: 1000,
             height: 800,
-            opacity: 0.0,            
             icon: "www/img/logo.png",
             title: oMenuData.TITLE,
             autoHideMenuBar: true,
             backgroundColor: oThemeInfo.BGCOL,
+            // [HTML5] frameless 공통 타이틀바 — 네이티브 창틀 제거, opacity 페이드 미사용(.analy/16 §2.6).
+            //   표시는 페이지(detail/frame.html win 모드)가 크롬 준비 후 CURRWIN.show(). 닫기=closable:false+U4AUI.closeWindow(§2.6.1).
+            titleBarStyle: "hidden",
+            show: false,
+            closable: false,
             webPreferences: {
                 devTools: true,
                 nodeIntegration: true,
@@ -863,14 +868,20 @@ export async function getControl() {
         // let sDetailUrl = `${C_DETAIL_HTML_PATH}?browskey=${sBrowsKey}&mid=${IF_DATA.KEY}`;
 
         const oQueryParams = {
-            browskey: sBrowsKey, 
+            browskey: sBrowsKey,
             mid: IF_DATA.KEY,
             browserkey: oBrowserOptions?.webPreferences?.browserkey,
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sChildKey,
             USERINFO: parent.process.USERINFO,
+            // [HTML5] 별도창 모드 플래그(win) + frameless 첫 페인트 플래시 방지(테마/배경/제목).
+            //   ★ 이 페이지(detail/frame.html)는 인팝업 미리보기로도 겸용 → win 없으면 크롬 미표시(기존 유지).
+            win: "X",
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: oMenuData.TITLE,
         };
-   
+
         // URL에 QueryString 파라미터를 적용한다.
         const sLoadUrl = parent.WSUTIL.QueryString.build(sUrlPath, oQueryParams);
 
@@ -889,12 +900,10 @@ export async function getControl() {
 
             let oBroadCast = new BroadcastChannel(sChennalId);
                 oBroadCast.postMessage(IF_DATA);
-                oBroadCast.close();            
+                oBroadCast.close();
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            parent.WSUTIL.setBrowserOpacity(oBrowserWindow);
-
-            // 부모 위치 가운데 배치한다.
+            // [HTML5] 네이티브 opacity 페이드 미사용(.analy/16 §2.6) — 표시는 페이지(detail/frame.html win 모드)가
+            //   공통 크롬 준비 후 CURRWIN.show() 로 수행. 여기선 위치만 잡는다.
             parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow, oBrowserOptions);
 
             oContr.fn.setBusy(false);
@@ -1614,11 +1623,14 @@ export async function getControl() {
             }
 
             try {
-                oChild.close();    
+                // ★ frameless 자식창(openNewBrowserMenu)은 closable:false 라 close() 가 무시됨.
+                //   공통 closeWindow 와 동일하게 닫기 전에 setClosable(true) 로 허용해야 실제로 닫힌다.
+                try { oChild.setClosable(true); } catch (e) { }
+                oChild.close();
             } catch (error) {
-                
+
             }
-            
+
         }
 
     }; // end of oContr.fn.clearAllChildWindow

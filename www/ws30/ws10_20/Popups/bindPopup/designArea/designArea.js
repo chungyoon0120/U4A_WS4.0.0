@@ -47,6 +47,24 @@
 
     var oD = { tool: null, host: null, ctrl: null };
 
+    // 텍스트+아이콘 액션 버튼(공통 .u4a-btn) — 원본 sap.m.Button(type Accept/Emphasized/Reject).
+    function _btn(sFa, sText, sTip, sVariant, bDisabled, fn) {
+        var b = H.el("button", "u4a-btn" + (sVariant ? " " + sVariant : ""));
+        b.type = "button";
+        if (sFa) { b.innerHTML = H.fa(sFa); }
+        if (sText) { b.appendChild(document.createTextNode(sText)); }
+        if (sTip) { b.title = sTip; b.setAttribute("aria-label", sTip); }
+        if (bDisabled) { b.disabled = true; }
+        if (typeof fn === "function") { b.addEventListener("click", fn); }
+        return b;
+    }
+    // Stage5(멀티/동기화/Unbind) 핸들러 호출 — 아직 미배선이면 안전 무시(정의되면 자동 배선).
+    function _call(sFn) {
+        if (typeof oAPP.fn[sFn] === "function") {
+            try { oAPP.fn[sFn](); } catch (e) { console.error("[HTML5][bindWindow] " + sFn + ":", e && e.message); }
+        }
+    }
+
     /* ── 트리 데이터 빌더(원본 designTree.js 360~687 1:1) ─────────────────── */
 
     // UI 노드(원본 _setDesignTreeData0014).
@@ -181,11 +199,24 @@
         oD.host = document.getElementById("bwpDesignTree");
         if (!oD.tool || !oD.host) { return; }
 
-        // ── 툴바(펼침/접힘 = 선택기준 16 §3.2, 선택해제). 바인딩 액션(동일속성/멀티/Unbind)은 후속 스텝. ──
+        // ── 툴바(원본 designTree.js:3703 1:1) — 펼침/접힘 · 선택해제 · [동일속성 바인딩 · 멀티 바인딩 ·
+        //    Unbind] · 도움말. 바인딩 3버튼은 원본 색(Accept 녹색 / Emphasized 파랑 / Reject 빨강)을 유지.
+        //    실제 일괄 적용 로직(onSynchronizionBind/onMultiBind/onMultiUnbind)은 통신·적용 단계(Stage5)에서 배선. ──
+        var bRO = !oAPP.attr.editable;   // IS_EDIT !== "X" → 편집 불가(원본 enabled="{/edit}").
         oD.tool.innerHTML = "";
-        oD.tool.appendChild(H.iconBtn("angles-down", H.cl("C27"), function () { if (oD.ctrl) { oD.ctrl.expandSelected(); } }));  // Expand
-        oD.tool.appendChild(H.iconBtn("angles-up", H.cl("C28"), function () { if (oD.ctrl) { oD.ctrl.collapseSelected(); } }));   // Collapse
-        oD.tool.appendChild(H.iconBtn("xmark", H.z("187"), function () { _clearChecks(); }));   // 187 Clear selection
+        oD.tool.appendChild(H.iconBtn("angles-down", H.z("169"), function () { if (oD.ctrl) { oD.ctrl.expandSelected(); } }));  // 169 Expand All
+        oD.tool.appendChild(H.iconBtn("angles-up", H.z("170"), function () { if (oD.ctrl) { oD.ctrl.collapseSelected(); } }));   // 170 Collapse All
+        oD.tool.appendChild(H.el("span", "u4aBwpToolSep"));
+        oD.tool.appendChild(H.iconBtn("ban", H.z("187"), function () { _clearChecks(); }));   // 187 Clear selection
+        oD.tool.appendChild(H.el("span", "u4aBwpToolSep"));
+        // 129 동일속성 바인딩 일괄적용(Accept, 녹색) / 130 멀티 바인딩(Emphasized, 파랑) / 186 Unbind(Reject, 빨강).
+        oD.tool.appendChild(_btn("check-double", H.z("129"), H.z("129"), "u4aBwpBtn--sync", bRO, function () { _call("onSynchronizionBind"); }));
+        oD.tool.appendChild(_btn("link", H.z("130"), H.z("130"), "u4a-btn--emphasized", bRO, function () { _call("onMultiBind"); }));
+        oD.tool.appendChild(_btn("link-slash", H.z("186"), H.z("186"), "u4a-btn--negative", bRO, function () { _call("onMultiUnbind"); }));
+        oD.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
+        oD.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+        }));
 
         // ── 공통 다열 그리드 트리(U4AUI.makeColumnTree — Object Name / 바인딩 경로 / MPROP) ──
         oD.ctrl = U4AUI.makeColumnTree(oD.host, {

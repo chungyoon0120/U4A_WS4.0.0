@@ -1,0 +1,466 @@
+/****************************************************************************
+ * Font Style Wizard — "Living Controls" (Claude original redesign)
+ * --------------------------------------------------------------------------
+ * 좌 스테이지(대형 라이브 스페시멘 + 실시간 CSS) | 우 인스펙터(자기시연 컨트롤).
+ * 각 옵션 칩은 자기 효과를 스스로 렌더한다(serif=serif, 900=굵게, italic=기울임,
+ * uppercase=UPPERCASE, line-through=취소선). 정렬은 아이콘 버튼.
+ * 반응형: 좁아지면 1단 스택, 칩은 자동 줄바꿈 → 가로 스크롤 0.
+ * 공통 자산이 크롬/버튼/입력/토스트를 소유하고, 이 파일은 레이아웃/스코프만.
+ * 의미 토큰만 소비(hex 0), 고정 px 폭 0.
+ ****************************************************************************/
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+}
+
+/* ===== 본체 2단 ===== */
+.fwx {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(19rem, 34%, 26rem);
+    gap: 0.875rem;
+    padding: 0.875rem;
+    box-sizing: border-box;
+    background:
+        radial-gradient(90% 60% at 0% 0%, var(--hover-bg) 0%, transparent 45%),
+        var(--app-bg);
+}
+
+/* ===== 좌: 스테이지 (결과) ===== */
+.fwx-stage {
+    grid-column: 1;
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto minmax(5rem, 0.5fr);
+    gap: 0.75rem;
+    opacity: 0;
+    transform: translateY(0.375rem);
+    transition:
+        opacity var(--motion-fast, 0.2s) ease,
+        transform var(--motion-fast, 0.2s) ease;
+}
+
+.fwx-stage__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.fwx-stage__title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    font-weight: 700;
+    font-size: 0.9375rem;
+}
+
+.fwx-stage__title > i {
+    color: var(--accent);
+}
+
+.fwx-stage__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex: 0 0 auto;
+}
+
+.fwx-editbadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.0625rem 0.5rem;
+    border-radius: 999px;
+    background: var(--hover-bg);
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+}
+
+/* ---------- 미리보기 종이 (히어로) ---------- */
+.fwx-paper {
+    min-height: 0;
+    overflow: auto;
+    padding: 1.25rem;
+    background: var(--surface);
+    border: 0.0625rem solid var(--divider);
+    border-radius: var(--radius);
+    box-shadow: var(--elevation);
+}
+
+.fwx-paper .sample {
+    color: var(--text);
+}
+
+.fwx-paper p.sample {
+    box-sizing: border-box;
+    margin: 0;
+    min-height: 100%;
+    padding: 0.25rem;
+    outline: none;
+    white-space: pre-line;
+    word-break: break-word;
+}
+
+.fwx-paper p.sample:focus-visible {
+    outline: var(--focus-ring-width, 0.125rem) solid var(--focus-ring);
+    outline-offset: 0.25rem;
+    border-radius: 0.25rem;
+}
+
+.fwx-inline {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 0.0625rem dashed var(--line);
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+}
+
+.fwx-imgsample {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-inline-start: 0.375rem;
+    vertical-align: baseline;
+    background: var(--divider);
+    border-radius: 0.1875rem;
+}
+
+/* ---------- 라이브 shorthand 캡션 ---------- */
+.fwx-caption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.5rem;
+    padding: 0.4375rem 0.625rem;
+    border: 0.0625rem solid var(--divider);
+    border-radius: var(--radius);
+    background: var(--surface-raised);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.fwx-caption b {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.fwx-caption .fwx-caption__sep {
+    opacity: 0.5;
+}
+
+/* ---------- CSS Source ---------- */
+.fwx-out {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 0.0625rem solid var(--divider);
+    border-radius: var(--radius);
+    box-shadow: var(--elevation);
+    overflow: hidden;
+}
+
+.fwx-out__head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.875rem;
+    border-bottom: 0.0625rem solid var(--divider);
+    background: var(--surface-raised);
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.fwx-out__head i {
+    color: var(--accent);
+}
+
+.fwx-out__code {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    overflow: auto;
+    padding: 0.75rem 0.875rem;
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.76rem;
+    line-height: 1.5;
+    white-space: pre;
+    tab-size: 2;
+}
+
+.fwx-out__code:focus-visible {
+    outline: var(--focus-ring-width, 0.125rem) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width, 0.125rem));
+}
+
+/* ===== 우: 인스펙터 (컨트롤) ===== */
+.fwx-inspector {
+    grid-column: 2;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    background: var(--surface);
+    border: 0.0625rem solid var(--divider);
+    border-radius: var(--radius);
+    box-shadow: var(--elevation);
+    opacity: 0;
+    transform: translateY(0.375rem);
+    transition:
+        opacity var(--motion-fast, 0.2s) ease,
+        transform var(--motion-fast, 0.2s) ease;
+}
+
+.fwx-groups {
+    display: flex;
+    flex-direction: column;
+}
+
+.fwx-group {
+    min-width: 0;
+}
+
+.fwx-group__head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    background: var(--surface-raised);
+    border-bottom: 0.0625rem solid var(--divider);
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.fwx-group__head i {
+    color: var(--accent);
+}
+
+/* ---------- 속성 필드 ---------- */
+.fwx-field {
+    min-width: 0;
+    padding: 0.75rem 0.875rem;
+    border-bottom: 0.0625rem solid var(--line);
+}
+
+.fwx-field__top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    min-width: 0;
+}
+
+.fwx-field__prop {
+    min-width: 0;
+    color: var(--text);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fwx-field__val {
+    flex: 0 0 auto;
+    max-width: 55%;
+    color: var(--accent);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.72rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fwx-field__ctl {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+/* ---------- 자기시연 칩 ---------- */
+.fwx-chip {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    min-height: 1.875rem;
+    padding: 0 0.625rem;
+    border: 0.0625rem solid var(--line);
+    border-radius: 0.5rem;
+    background: var(--surface-raised);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.8125rem;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition:
+        border-color var(--motion-fast, 0.15s) ease,
+        box-shadow var(--motion-fast, 0.15s) ease,
+        transform var(--motion-fast, 0.12s) ease;
+}
+
+.fwx-chip:hover {
+    border-color: var(--accent);
+}
+
+.fwx-chip:active {
+    transform: scale(0.95);
+}
+
+.fwx-chip:focus-visible {
+    outline: var(--focus-ring-width, 0.125rem) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset, 0.125rem);
+}
+
+.fwx-chip[aria-pressed="true"] {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 0.0625rem var(--accent);
+    background: var(--selected-bg);
+    color: var(--selected-text);
+    font-weight: 600;
+}
+
+/* ---------- 정렬 아이콘 버튼 ---------- */
+.fwx-iconbtn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 1.875rem;
+    border: 0.0625rem solid var(--line);
+    border-radius: 0.5rem;
+    background: var(--surface-raised);
+    color: var(--text);
+    cursor: pointer;
+    transition:
+        border-color var(--motion-fast, 0.15s) ease,
+        background-color var(--motion-fast, 0.15s) ease,
+        color var(--motion-fast, 0.15s) ease;
+}
+
+.fwx-iconbtn:hover {
+    border-color: var(--accent);
+}
+
+.fwx-iconbtn:focus-visible {
+    outline: var(--focus-ring-width, 0.125rem) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset, 0.125rem);
+}
+
+.fwx-iconbtn[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--selected-text);
+}
+
+/* ---------- custom 입력 (공통 createField 호스트) ---------- */
+.fwx-custom {
+    flex: 1 1 100%;
+    min-width: 0;
+    margin-top: 0.125rem;
+}
+
+.fwx-custom .u4a-field {
+    width: 100%;
+}
+
+/* ===== 등장 페이드인 ===== */
+.fwx.is-ready .fwx-stage,
+.fwx.is-ready .fwx-inspector {
+    opacity: 1;
+    transform: none;
+}
+
+.fwx.is-ready .fwx-inspector {
+    transition-delay: 0.05s;
+}
+
+/* ===== 반응형: 좁아지면 1단(스테이지 위, 인스펙터 아래) ===== */
+@media (max-width: 60rem) {
+    .fwx {
+        grid-template-columns: 1fr;
+        grid-auto-rows: min-content;
+        overflow: auto;
+    }
+
+    .fwx-stage {
+        grid-column: 1;
+        grid-template-rows: auto minmax(9rem, 40vh) auto minmax(5rem, 24vh);
+    }
+
+    .fwx-inspector {
+        grid-column: 1;
+        max-height: none;
+    }
+}
+
+@media (max-width: 34rem) {
+    .fwx {
+        padding: 0.625rem;
+        gap: 0.625rem;
+    }
+
+    .fwx-stage {
+        gap: 0.5rem;
+    }
+}
+
+/* 터치 hit-area */
+@media (pointer: coarse) {
+
+    .fwx-chip,
+    .fwx-iconbtn {
+        min-height: var(--hit-area, 2.5rem);
+        height: auto;
+    }
+}
+
+/* 모션 최소화 */
+@media (prefers-reduced-motion: reduce) {
+
+    .fwx-stage,
+    .fwx-inspector,
+    .fwx-chip,
+    .fwx-iconbtn {
+        transition: none;
+    }
+}

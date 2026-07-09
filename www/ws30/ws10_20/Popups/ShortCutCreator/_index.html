@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title></title>
+</head>
+
+<body style="margin:0px;padding:0px;overflow:hidden">
+
+    <iframe id="mainFRAME" src="" frameborder="0"
+        style="overflow:hidden;overflow-x:hidden;overflow-y:hidden;height:100%;width:100%;position:absolute;top:0px;left:0px;right:0px;bottom:0px;">
+    </iframe>
+
+    <script>
+        /************************************************************************
+         * 에러 감지
+         ************************************************************************/
+        var REMOTE = require('@electron/remote'),
+            PATH = REMOTE.require('path'),
+            APP = REMOTE.app,
+            APPPATH = APP.getAppPath(),
+            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
+            PATHINFO = require(PATHINFOURL),
+            WSERR = require(PATHINFO.WSTRYCATCH);
+
+        var zconsole = WSERR(window, document, console);
+    </script>
+
+    <script>
+        const oAPP = {
+            fn: {},            
+            attr: {    
+                isBusy : false // 현재 비지 상태 
+            },
+            common: {},
+            onStart: function () {
+            
+                const
+                     REMOTE = require('@electron/remote'),
+                     PATH = REMOTE.require('path'),
+                     APP = REMOTE.app,
+                     APPPATH = APP.getAppPath(),                    
+                     PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")),
+                     WSUTIL = require(PATHINFO.WSUTIL),
+                     CURRWIN = REMOTE.getCurrentWindow();
+
+                // 브라우저의 쿼리 스트링 정보
+                const oQueryParams = WSUTIL.QueryString.parse(location.href);
+
+                const                    
+                    USERINFO = oQueryParams.USERINFO,
+                    LANGU = USERINFO.LANGU,
+                    SYSID = USERINFO.SYSID;
+
+                this.remote = REMOTE;
+                this.ipcMain = this.remote.require('electron').ipcMain;
+                this.ipcRenderer = require('electron').ipcRenderer;
+                this.fs = this.remote.require('fs');
+                this.path = this.remote.require('path');
+                this.SHELL = oAPP.remote.require('electron').shell;
+                this.browserInfo = [];
+                this.config = {};
+
+                oAPP.IPCRENDERER = this.ipcRenderer;
+                oAPP.CURRWIN = this.remote.getCurrentWindow();
+                oAPP.BROWSKEY = oQueryParams.browserkey;
+                oAPP.IPCMAIN = this.ipcMain;
+                oAPP.WSUTIL = WSUTIL;
+                oAPP.WSMSG = new oAPP.WSUTIL.MessageClassText(SYSID, LANGU);
+
+                oAPP.REMOTE = REMOTE;
+                oAPP.PATH = oAPP.REMOTE.require('path');
+                oAPP.FS = oAPP.REMOTE.require('fs');
+                oAPP.APP = oAPP.REMOTE.app;
+                oAPP.USERDATA = oAPP.APP.getPath("userData");
+
+                oAPP.common.fnGetMsgClsText = oAPP.WSMSG.fnGetMsgClsText.bind(oAPP.WSMSG);
+
+                //호출처 I/F Data 추출 
+                this.ipcRenderer.on('if_APP_shortcutCreator', (event, data) => {
+
+                    //I/F Data 
+                    oAPP.browserInfo = data.browserInfo;
+                    oAPP.config = data.config;
+                    oAPP.attr.oMetadata = data.oMetadata;
+                    oAPP.attr.oUserInfo = process.USERINFO;
+
+                    document.getElementById("mainFRAME").src = "frame.html";
+
+                });
+
+            }
+        };
+
+        /*************************************************************
+         * @function - 테마 정보를 구한다.
+         *************************************************************/
+        oAPP.fn.getThemeInfo = function (){
+
+            let oUserInfo = parent.process.USERINFO;
+            let sSysID = oUserInfo.SYSID;
+
+            // 해당 SYSID별 테마 정보 JSON을 읽는다.
+            let sThemeJsonPath = oAPP.PATH.join(oAPP.USERDATA, "p13n", "theme_ws4", `${sSysID}.json`);
+            if(oAPP.FS.existsSync(sThemeJsonPath) === false){
+                return;
+            }
+
+            let sThemeJson = oAPP.FS.readFileSync(sThemeJsonPath, "utf-8");
+
+            try {
+
+                var oThemeJsonData = JSON.parse(sThemeJson);    
+
+            } catch (error) {
+                return;
+            }
+
+            return oThemeJsonData;
+
+        } // end of oAPP.fn.getThemeInfo
+
+        function getMetadata() {
+
+            return oAPP.attr.oMetadata;
+
+        }
+
+        //Stat 
+        oAPP.onStart();
+
+        //부모 -> 자식 자원할당
+        function gfn_remote() {
+
+            return oAPP;
+
+        }
+
+        /***********************************************************
+         * Busy 실행 여부 정보 리턴
+         ***********************************************************/
+        oAPP.fn.getBusy = function(){
+
+            return oAPP.attr.isBusy;
+
+        };
+
+    </script>
+
+</body>
+
+</html>

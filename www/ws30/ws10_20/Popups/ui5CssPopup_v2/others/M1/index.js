@@ -67,6 +67,26 @@ oAPP.fn.getThemeInfo = function () {
 
 } // end of oAPP.fn.getThemeInfo
 
+/************************************************************************
+ * HTML5 WS4 테마 키 → UI5 표준 테마명(sap_horizon/sap_horizon_dark)으로 단순화(다크/라이트).
+ *   raw 키를 UI5 부트스트랩/applyTheme 에 넘기면 서버에 테마 CSS 없어 404 → 색 깨짐. (main 동일)
+ ************************************************************************/
+oAPP.fn.toUI5Theme = function (sKey, sBgCol) {
+    var bDark = String(sKey || "").toLowerCase().indexOf("dark") !== -1;
+    if (!bDark && sBgCol) {
+        var s = String(sBgCol).trim().replace(/^#/, ""), r, g, b;
+        if (/^[0-9a-f]{3}$/i.test(s)) { s = s.replace(/(.)/g, "$1$1"); }   // 3자리 단축 hex(#abc)→6자리
+        var mHex = s.match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+        if (mHex) { r = parseInt(mHex[1], 16); g = parseInt(mHex[2], 16); b = parseInt(mHex[3], 16); }
+        else {
+            var mRgb = s.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+            if (mRgb) { r = +mRgb[1]; g = +mRgb[2]; b = +mRgb[3]; }
+        }
+        if (typeof r === "number") { bDark = (0.299 * r + 0.587 * g + 0.114 * b) < 128; }
+    }
+    return bDark ? "sap_horizon_dark" : "sap_horizon";
+}; // end of oAPP.fn.toUI5Theme
+
 document.addEventListener('DOMContentLoaded', function () {
 
     var oURL = new URL(location.href);

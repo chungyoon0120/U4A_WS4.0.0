@@ -6,6 +6,90 @@
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta charset="utf-8">
+
+    <!-- ==================================================================================
+         [HTML5] 별도창(win=X)일 때만 공통 frameless 크롬 활성화. (browser-window-common-ux / .analy/16 §2.6)
+           · 이 페이지는 인팝업 미리보기 iframe 으로도 겸용 → win 없으면 아무것도 안 함(기존 동작 100% 보존).
+           · minimize 버튼 제외(장군님 지시) — 로고/제목/최대화/닫기만.
+         ================================================================================== -->
+    <script>
+        // 창 크롬 배선 — 공통 자산(theme-api/u4a-ui) 로드 완료 후 호출.
+        window._u4aInitWinChrome = function () {
+            try {
+                var REMOTE = require('@electron/remote');
+                var CURRWIN = REMOTE.getCurrentWindow();
+                var PATH = REMOTE.require('path');
+                var APPPATH = REMOTE.app.getAppPath();
+
+                try { CURRWIN.setMenu(null); } catch (e) { }
+                try { if (window.U4AUI && U4AUI.initWindowFocusState) { U4AUI.initWindowFocusState(); } } catch (e) { }
+
+                // 로고
+                var oLogo = document.getElementById("dtlLogo");
+                if (oLogo) { try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { } }
+                // 제목(opener 가 넘긴 TITLE → document.title)
+                var oTitle = document.getElementById("dtlTitle");
+                if (oTitle) { oTitle.textContent = document.title || ""; }
+
+                // 최대화/복원 토글 + 아이콘 스왑 (minimize 없음)
+                var oMax = document.getElementById("dtlWinMax");
+                function _syncMax() {
+                    var i = oMax && oMax.querySelector("i");
+                    if (!i) { return; }
+                    var m = false; try { m = CURRWIN.isMaximized(); } catch (e) { }
+                    i.className = m ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
+                }
+                if (oMax) { oMax.addEventListener("click", function () { try { CURRWIN.isMaximized() ? CURRWIN.unmaximize() : CURRWIN.maximize(); } catch (e) { } }); }
+                try { CURRWIN.on("maximize", _syncMax); CURRWIN.on("unmaximize", _syncMax); } catch (e) { }
+                _syncMax();
+
+                // 닫기 — closable:false 라 직접 close 불가 → 공통 U4AUI.closeWindow(.analy/16 §2.6.1)
+                var oClose = document.getElementById("dtlWinClose");
+                if (oClose) {
+                    oClose.addEventListener("click", function () {
+                        if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); }
+                        else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { } }
+                    });
+                }
+
+                // 위치는 opener 가 잡음 → 스타일/배선 끝났으니 표시(흰 플래시 없음).
+                try { CURRWIN.show(); } catch (e) { }
+            } catch (e) {
+                console.error("[ui5CssPopup detail win] 크롬 배선 오류:", e && e.message);
+                try { require('@electron/remote').getCurrentWindow().show(); } catch (e2) { }
+            }
+        };
+
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                if (q.get("win") !== "X") { return; }   // 임베드 미리보기 = 크롬 없음(기존 유지)
+
+                var d = document.documentElement;
+                d.setAttribute("data-u4a-win", "X");
+                var bg = q.get("BGCOL"); if (bg) { d.style.setProperty("--boot-bg", bg); }   // 흰 플래시 방지(동기)
+                var t = q.get("TITLE"); if (t) { document.title = t; }
+
+                var head = document.getElementsByTagName("head")[0];
+                function _css(h) { var l = document.createElement("link"); l.rel = "stylesheet"; l.href = h; head.appendChild(l); }
+                _css("../../../theme/tokens.css");
+                _css("../../../theme/shell.css");
+                _css("../../../theme/bootstrap-skin.css");
+                _css("../../../../../lib/fontawesome/7.2.0/css/all.min.css");
+
+                function _js(s, cb) { var el = document.createElement("script"); el.src = s; el.onload = cb || null; head.appendChild(el); }
+                _js("../../../theme/theme-api.js", function () {
+                    try { var th = q.get("THEME"); if (th && window.U4ATheme) { U4ATheme.apply(U4ATheme.normalize ? U4ATheme.normalize(th) : th); } } catch (e) { }
+                    _js("../../../theme/u4a-ui.js", function () { window._u4aInitWinChrome(); });
+                });
+
+                // 안전망: 크롬 배선이 지연/실패해도 창은 표시(숨김 방지). 실제 load 이벤트 기반(타이머 아님).
+                window.addEventListener("load", function () {
+                    try { require('@electron/remote').getCurrentWindow().show(); } catch (e) { }
+                });
+            } catch (e) { }
+        })();
+    </script>
 </head>
 <style>
     html,
@@ -17,15 +101,49 @@
         margin: 0px;
         overflow: hidden;
     }
-  
+
+    /* 본문 iframe — 임베드(미리보기): 100% 채움 (기존 동작). */
+    #detail_frame {
+        border: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    /* ── 별도창 전용 공통 타이틀바 — 임베드(미리보기)에선 숨김, win 모드에서만 표시 ── */
+    #dtlTitlebar {
+        display: none;
+    }
+    html[data-u4a-win="X"] body {
+        display: flex;
+        flex-direction: column;
+        background: var(--boot-bg, var(--app-bg));
+    }
+    html[data-u4a-win="X"] #dtlTitlebar {
+        display: flex;
+    }
+    /* 별도창: 타이틀바 아래 나머지 전부 */
+    html[data-u4a-win="X"] #detail_frame {
+        height: auto;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
 </style>
 
 <body>
 
+    <!-- 별도창 전용 공통 타이틀바(frameless) — minimize 제외: 로고/제목/최대화/닫기. 임베드 미리보기에선 CSS로 숨김. -->
+    <header class="u4a-titlebar" id="dtlTitlebar">
+        <img class="u4a-titlebar__logo" id="dtlLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="dtlTitle"></span>
+        <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="dtlWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="dtlWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
     <div id="mm"></div>
 
-    <iframe id="detail_frame" name="detail_frame" style="border:none;width:100%;height:100%;" allowfullscreen>
-    </iframe>
+    <iframe id="detail_frame" name="detail_frame" allowfullscreen></iframe>
 
 
     <script>
