@@ -292,32 +292,34 @@
             return;
         }
 
-        // ── [임시] 앱 패키지 변경(changeAppPackagePopup) HTML5 미변환 — 완료 전까지 안내 토스트만.
-        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 로직 복원.
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
-        return;
+        // Trial Version Check
+        if (oAPP.fn.fnOnCheckIsTrial()) {
+            return;
+        }
 
-        // // Trial Version Check
-        // if (oAPP.fn.fnOnCheckIsTrial()) {
-        //     return;
-        // }
+        // application명 정합성 체크(길이체크 제외 — 원본 fnCheckAppName())
+        let bCheckAppNm = oAPP.fn.fnCheckAppName();
+        if (!bCheckAppNm) {
+            return;
+        }
 
-        // // application명 정합성 체크
-        // let bCheckAppNm = oAPP.fn.fnCheckAppName();
-        // if (!bCheckAppNm) {
-        //     return;
-        // }
+        // 대상 APPID — 모델 우선, 비어있으면 검증 통과한 입력값(AppNmInput)으로 폴백.
+        //   ([HTML5] /WS10/APPID 모델이 비어있을 수 있음 — Export 경로와 동일 처리.)
+        let sAppId = APPCOMMON.fnGetModelProperty("/WS10/APPID");
+        if (!sAppId || sAppId === "") {
+            let oAppNmInput = document.getElementById("AppNmInput");
+            sAppId = oAppNmInput ? oAppNmInput.value : "";
+        }
 
-        // let sAppId = APPCOMMON.fnGetModelProperty("/WS10/APPID");
+        // 패키지 변경 팝업 호출(미로드 시 $.getScript 로 로드 후 호출).
+        if (oAPP.fn.changeAppPackagePopup) {
+            oAPP.fn.changeAppPackagePopup(sAppId);
+            return;
+        }
 
-        // if (oAPP.fn.changeAppPackagePopup) {
-        //     oAPP.fn.changeAppPackagePopup(sAppId);
-        //     return;
-        // }
-
-        // $.getScript("design/js/changeAppPackagePopup.js", function () {
-        //     oAPP.fn.changeAppPackagePopup(sAppId);
-        // });
+        $.getScript("design/js/changeAppPackagePopup.js", function () {
+            oAPP.fn.changeAppPackagePopup(sAppId);
+        });
 
     }; // end of oAPP.fn.fnWS10WMENU10_01
 

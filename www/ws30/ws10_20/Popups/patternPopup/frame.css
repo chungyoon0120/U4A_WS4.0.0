@@ -41,9 +41,12 @@ body.u4aPattShown .u4aPattBody {
 }
 
 /* ===== 외곽 수평 스플릿(좌 트리영역 | 우 코드 뷰어) — .u4a-splitter 공통 ===== */
-/* 좌측 = 세로 스플릿 컨테이너를 담는 패널(스크롤은 내부 트리가 담당 → 여기선 hidden). */
+/* 좌측 = 세로 스플릿 컨테이너를 담는 패널(스크롤은 내부 트리가 담당 → 여기선 hidden).
+   폭 = clamp(최소, 선호%, 최대) — 고정 %(구 42%)면 최대화 시 그 비율이 그대로 커져 스플릿바가 가운데로
+   밀리고 우측 코드영역이 낭비된다(장군님 지적). 최대 32rem 캡으로 넓은 창에서도 트리는 적당히·코드영역이 잔여를 먹는다.
+   레퍼런스=errPageEditor `.u4aErrNav`(clamp(15rem,30%,24rem)) 동일 패턴. 사용자가 스플릿바를 끌면 그때부터 px 로 고정(드래그 우선). */
 .u4aPattLeft {
-    flex: 0 0 42%;
+    flex: 0 0 clamp(20rem, 38%, 32rem);
     min-width: 15rem;
     display: flex;
     overflow: hidden;
@@ -309,15 +312,18 @@ body.u4aPattShown .u4aPattBody {
     justify-content: center;
 }
 
-/* 첫 컬럼(개인화 패턴/이름)을 "채움 컬럼"으로 → 표가 판 폭을 꽉 채운다(마지막 컬럼 오른쪽 빈 띠 없음, 닫음선 불필요).
-   콘텐츠유형·액션은 고정폭, 이름이 잔여 폭을 흡수. 헤더셀+행 이름셀+빈영역 그리드라인 3요소를 동시에 grow 시켜 정렬 유지.
-   (표폭은 공통 max(100%,합)로 100% 채움 — 별도 폭 제한/닫음 보더 없음. 사용자 결정 2026-07-09.) */
-.u4aPattTreePane--cust .u4aColTreeC1,
-.u4aPattTreePane--cust .u4aColTreeNameCell,
-.u4aPattTreePane--cust .u4aColTreeGL--c1 {
-    flex: 1 1 var(--u4act-c1-w, 15rem);
+/* 액션(C3)도 하나의 온전한 컬럼으로 = 우측 닫음선. 공통 makeColumnTree 는 컬럼 경계를 border-left(좌구분)로만 그려
+   마지막 컬럼(액션)의 오른쪽이 열려 "컬럼"으로 안 보인다(장군님 지적 2026-07-10). 이 화면 스코프로 c3 우측 경계선 추가:
+   헤더 칸(.u4aColTreeCol.u4aColTreeC3) + 본문 셀(.u4aColTreeCell.u4aColTreeC3) 은 둘 다 .u4aColTreeC3 라 한 셀렉터로,
+   빈 영역 그리드선(.u4aColTreeGL--c3)까지 함께 그어 상하로 끊김 없이 연속. border-box 라 폭·정렬 불변(_fitCustCols 자동보정). */
+.u4aPattTreePane--cust .u4aColTreeC3,
+.u4aPattTreePane--cust .u4aColTreeGL--c3 {
+    border-right: 0.0625rem solid var(--line);
 }
 
+/* 컬럼 폭 = 공통 makeColumnTree 고정폭 그대로(전 컬럼 리사이즈 그립 정상 동작). 채움(flex-grow)은 그립을 무력화하므로 안 씀.
+   대신 첫 렌더·판 리사이즈 시 frame.js `_fitCustCols()` 가 이름 컬럼(c1) 폭을 판 폭에 맞춰 자동 확장(빈영역 없이 채움).
+   수동 리사이즈는 App-F4 표준(초과=가로스크롤). 사용자 결정 2026-07-10(전 컬럼 고정+첫화면 자동채움). */
 .u4aPattActBtn {
     display: inline-flex;
     align-items: center;

@@ -1621,12 +1621,15 @@ sap.ui.getCore().attachInit(function(){
             var l_page = lt_page[0];
 
             var ls_userInfo = parent.getUserInfo();
+            // 실제 앱(컨트롤러 클래스) 실행 언어 = 서버 로그온 언어(fnOnExecApp/fnGetAppUrl 과 동일 기준).
+            //   getUserInfo().LANGU 는 로그인 후 WSLANGU(Workspace 화면언어)로 덮인 값이라 실행 URL 에 던지면 안 됨.
+            var ls_serverInfo = parent.getServerInfo();
 
             var l_theme = loAPP.oModel.getProperty("/theme");
 
             //APPLICATION 호출 URL 정보 구성.
-            var l_url = parent.getServerHost() + "/zu4a/" + oAPP.attr.APPID + 
-                "?sap-language=" + ls_userInfo.LANGU + 
+            var l_url = parent.getServerHost() + "/zu4a/" + oAPP.attr.APPID +
+                "?sap-language=" + ls_serverInfo.LANGU +
                 "&sap-user=" + ls_userInfo.ID + 
                 "&sap-password=" + ls_userInfo.PW +
                 "&sap-ui-theme=" + l_theme;

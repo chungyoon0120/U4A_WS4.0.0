@@ -64,6 +64,14 @@
             </button>
         </div>
         <span class="u4aEdFootSpacer"></span>
+        <!-- 꾸밈정렬(Pretty Print) / 클립보드 복사 — 클라이언트 이벤트 에디터(ws_html5_client_editor)와
+             동일 모습으로 통일. 꾸밈정렬=텍스트+아이콘(편집모드 전용), 복사=아이콘 전용(상시 노출). -->
+        <button type="button" class="u4a-btn u4aEdPretty" id="editorPrettyBtn" hidden>
+            <i class="fa-solid fa-wand-magic-sparkles"></i><span></span>
+        </button>
+        <button type="button" class="u4a-btn u4aEdPretty u4aEdIcoBtn" id="editorCopyBtn">
+            <i class="fa-solid fa-copy"></i>
+        </button>
         <button type="button" class="u4a-btn u4a-btn--emphasized" id="editorSaveBtn">
             <i class="fa-solid fa-check"></i><span></span>
         </button>

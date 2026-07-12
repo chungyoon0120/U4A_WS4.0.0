@@ -185,6 +185,7 @@
             oD.ctrl.rerender(true);
             // 디자인 트리는 브로드캐스트 전엔 빈 트리 → 경계선 끔(데이터 도착 시 해제).
             oAPP.fn.setTreeEmptyMark(oD.host, !(oAPP.attr.designTree || []).length);
+            oAPP.fn.fitTreeColumns(oD.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
         }
     };
 
@@ -274,6 +275,9 @@
             },
             onSelect: function (n) { oAPP.attr.selDesignNode = n; }
         });
+
+        // 컬럼 자동맞춤(원본 setUiTableAutoResizeColumn = 콘텐츠+마지막 컬럼 채움). 레이아웃 확정 후 1회.
+        setTimeout(function () { oAPP.fn.fitTreeColumns(oD.host); }, 0);
 
         // 초기 렌더(현재 T_0014 로 — 브로드캐스트 전엔 빈 트리). Stage6 에서 데이터 도착 시 재호출.
         oAPP.fn.setDesignTreeData();

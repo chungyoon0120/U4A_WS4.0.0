@@ -433,7 +433,51 @@ function _buildTrees() {
             emptyText: ""
         });
         oCustTree.rerender(false);   // 첫행 자동선택 안 함
+        _fitCustCols();              // 이름 컬럼을 판 폭에 맞춰 자동 확장(빈영역 없이 채움) — 최초 1회
+        // ★ "첫화면 자동채움"만: 팝업이 처음 유효 폭을 가질 때 딱 1회 맞추고 관측을 끊는다.
+        //   그 뒤 스플릿바(판 리사이즈)로는 컬럼폭을 절대 건드리지 않는다(전 컬럼 고정 = App-F4 표준:
+        //   판을 넓히면 우측 빈영역, 좁히면 가로스크롤. 컬럼 폭은 사용자가 그립으로만 바꾼다).
+        //   (여는 순간 clientWidth=0(숨김/미확정)일 수 있어 옵저버로 첫 유효 폭을 잡되, 1회 후 disconnect.)
+        try {
+            if (oColHost.clientWidth <= 0 && window.ResizeObserver) {
+                var oRO = new ResizeObserver(function () {
+                    if (oColHost.clientWidth > 0) {
+                        oRO.disconnect();   // 최초 유효 폭에서 1회만 → 이후 판 리사이즈 무반응
+                        _fitCustCols();
+                    }
+                });
+                oRO.observe(oColHost);
+            }
+        } catch (e) { }
     }
+}
+
+// 이름(c1) 컬럼을 "판 폭 − 콘텐츠유형 − 액션 − overhead"로 확장 → 표가 판을 꽉 채움(빈영역 없음).
+//   전 컬럼은 고정폭이라 그립 리사이즈 정상. 여기선 c1 폭만 자동 계산해 판을 채운다(첫 렌더·판 리사이즈 시).
+function _fitCustCols() {
+    if (!oCustTree || !oCustTree.host) { return; }
+    var oHost = oCustTree.host;
+    var oC2 = oHost.querySelector(".u4aColTreeHead .u4aColTreeC2");
+    var oC3 = oHost.querySelector(".u4aColTreeHead .u4aColTreeC3");
+    var iAvail = oHost.clientWidth;
+    if (!oC2 || !oC3 || iAvail <= 0) { return; }
+    var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    var iOverhead = rem * 0.375 * 3 + 1;   // padding-left(0.375rem) + gap×2(0.375rem) + ul 좌측 1px (추정치 — 아래서 실측 보정)
+    var iC2 = oC2.getBoundingClientRect().width;
+    var iC3 = oC3.getBoundingClientRect().width;
+    var iMin = rem * 6;   // 이름 최소 6rem
+    var iC1 = Math.floor(iAvail - iC2 - iC3 - iOverhead);
+    if (iC1 < iMin) { iC1 = iMin; }
+    var _apply = function (c1) {
+        oHost.style.setProperty("--u4act-c1-w", c1 + "px");
+        oHost.style.setProperty("--u4act-total-w", (c1 + iC2 + iC3 + iOverhead) + "px");
+    };
+    _apply(iC1);
+    // ★가로스크롤 원천차단(첫 실행 하단 스크롤 — 장군님 지적): overhead/보더/gap 추정이 몇 px 어긋나도,
+    //   브라우저 실측(scrollWidth−clientWidth)으로 "실제 넘친 만큼" 이름폭을 깎아 컬럼합을 판폭에 딱 맞춘다.
+    //   (이름이 최소폭이라 더 못 줄이면 그건 진짜 좁은 것 → 그때만 정상 가로스크롤.)
+    var iOver = oHost.scrollWidth - oHost.clientWidth;
+    if (iOver > 0 && iC1 - iOver >= iMin) { _apply(iC1 - iOver); }
 }
 
 // 커스텀 c2 셀 = Content Type 텍스트(말줄임 툴팁).
@@ -1091,6 +1135,10 @@ window.addEventListener("load", function () {
 
     // 창은 즉시 불투명 표시(네이티브 opacity 페이드 미사용). 등장 효과는 본체 CSS opacity.
     try { CURRWIN.show(); } catch (e) { }
+
+    // 창이 최종 크기로 자리잡은 뒤 이름 컬럼 폭 1회 재보정(빌드 시점 판폭이 미확정이면 첫 실행 가로스크롤 원인).
+    //   ★1회성 — 상주 관측이 아니라 스플릿바 드래그엔 재확장 안 함(전 컬럼 고정 결정 유지).
+    requestAnimationFrame(function () { requestAnimationFrame(function () { try { _fitCustCols(); } catch (e) { } }); });
 });
 
 // busy 중에는 창 닫기 차단(원본 onbeforeunload). 정상 종료 시 리스너/IPC 해제(누수 방지).

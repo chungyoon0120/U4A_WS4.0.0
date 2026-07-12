@@ -2497,6 +2497,27 @@
         var COLDESC = document.createElement("div");
         COLDESC.className = "u4aWs30TreeColDesc";
         COLDESC.textContent = _msg("A35");
+        // 컬럼 리사이즈 바 — 이름|설명 분리선(설명 셀 좌측 경계)에 공통 그립. 드래그=이름 컬럼(고정폭 --ws30-name-w) 리사이즈,
+        //   설명은 나머지 채움. 공통 U4AUI.attachColumnResize(가이드라인+놓을때 1회 적용, §3.4.2) 소비(그립 로직 복붙 금지).
+        try {
+            if (window.U4AUI && typeof U4AUI.attachColumnResize === "function") {
+                var GRIP = document.createElement("div");
+                GRIP.className = "u4aColTreeGrip";   // 공통 그립 스킨(shell.css) — 셀 좌측 경계(-0.1875rem)에 위치
+                GRIP.setAttribute("aria-hidden", "true");
+                COLDESC.appendChild(GRIP);
+                U4AUI.attachColumnResize(GRIP, {
+                    host: TBODY,   // 가이드 세로범위 = 본문(스크롤 컨테이너) 뷰포트로 클램프
+                    getWidth: function () { return COLNAME.getBoundingClientRect().width; },
+                    setWidth: function (px) {
+                        var avail = (TBODY.clientWidth || 400) - 96;   // 설명 최소 ~96px 확보(이름 상한)
+                        var w = Math.max(64, Math.min(px, Math.max(64, avail)));
+                        LEFT.style.setProperty("--ws30-name-w", w + "px");
+                    },
+                    onReset: function () { LEFT.style.removeProperty("--ws30-name-w"); },   // 더블클릭=기본폭(11.25rem) 복귀
+                    hoverEl: TBODY, hoverClass: "is-col-hover"   // 본문 전체에 클래스 → 헤더+행+빈영역 세로선 동시 강조
+                });
+            }
+        } catch (e) { console.error("[HTML5][WS30] tree column resize wire:", e && e.message ? e.message : e); }
         TCOL.appendChild(COLNAME);
         TCOL.appendChild(COLDESC);
         TBODY.appendChild(TCOL);

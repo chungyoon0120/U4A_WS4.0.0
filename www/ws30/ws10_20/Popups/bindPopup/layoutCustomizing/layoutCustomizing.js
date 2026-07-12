@@ -26,8 +26,9 @@
 
     var H = oAPP.H;
 
-    // 활성 수별 창 최소폭(원본 CS_BIND_LAYOUT_MIN_WIDTH).
+    // 활성 수별 창 최소폭 / 기본폭(원본 CS_BIND_LAYOUT_MIN_WIDTH / CS_BIND_LAYOUT_WIDTH).
     var CS_MIN_WIDTH = { 1: 360, 2: 650, 3: 900 };
+    var CS_WIDTH = { 1: 560, 2: 900, 3: 1280 };
 
     /* ── 상태(정규화/영속) ─────────────────────────────────────────────────── */
     function _default() { return { MODEL: true, DESIGN: true, ADDIT: true }; }
@@ -73,19 +74,26 @@
         };
     }
 
-    // 활성 수별 창 최소폭 반영(원본 applyBindLayoutMinimumWidth 축약 — 강제 리사이즈는 생략, 최소폭만).
-    function _applyMinSize(iCount) {
+    // 활성 수별 창 크기 반영(원본 applyBindLayoutMinimumWidth 1:1).
+    //   최소폭 = CS_MIN_WIDTH[count], 기본폭 = max(최소폭, CS_WIDTH[count]).
+    //   bResizeWindow=true(활성 수 변경/최초 적용)면 창을 기본폭으로 강제 리사이즈, 아니면 최소폭 미만일 때만 보정.
+    //   최대화/전체화면이면 최소폭만 설정하고 크기조작 skip.
+    function _applyMinSize(iCount, bResizeWindow) {
         try {
             var win = oAPP.REMOTE && oAPP.REMOTE.getCurrentWindow && oAPP.REMOTE.getCurrentWindow();
             if (!win || (win.isDestroyed && win.isDestroyed())) { return; }
-            if (win.isMinimized && win.isMinimized()) { return; }   // 최소화 상태면 크기조작 skip(방어).
-            var minW = CS_MIN_WIDTH[iCount] || CS_MIN_WIDTH[3], minH = 650;
+            var minW = CS_MIN_WIDTH[iCount] || CS_MIN_WIDTH[3];
+            var iWidth = Math.max(minW, CS_WIDTH[iCount] || minW);
+            var minH = 650;
             if (win.getMinimumSize) { var m = win.getMinimumSize(); if (Array.isArray(m) && m[1] > 0) { minH = m[1]; } }
             if (win.setMinimumSize) { win.setMinimumSize(minW, minH); }
             if (win.isMaximized && win.isMaximized()) { return; }
             if (win.isFullScreen && win.isFullScreen()) { return; }
-            var s = win.getSize && win.getSize();
-            if (Array.isArray(s) && s[0] < minW && win.setSize) { win.setSize(minW, s[1]); }
+            if (typeof win.getSize !== "function" || typeof win.setSize !== "function") { return; }
+            var s = win.getSize();
+            if (!Array.isArray(s)) { return; }
+            if (bResizeWindow === true) { win.setSize(iWidth, s[1]); return; }
+            if (s[0] < minW) { win.setSize(minW, s[1]); }
         } catch (e) { }
     }
 
@@ -115,7 +123,17 @@
 
         // 영속 저장(원본 saveBindLayoutState) — Apply 시 localStorage 에 저장 → 다음 창 오픈 때 복원.
         if (bSave === true) { _save(st); }
-        _applyMinSize(_count(st));
+
+        // 창 크기 반영(원본) — 활성 수가 바뀌거나 최초 적용이면 프리셋 폭으로 리사이즈, 아니면 최소폭만.
+        var iCount = _count(st);
+        var iPrev = oAPP.attr.iBindLayoutActiveCount;
+        _applyMinSize(iCount, (typeof iPrev === "undefined" || iPrev !== iCount));
+        oAPP.attr.iBindLayoutActiveCount = iCount;
+
+        // 패널 표시/숨김으로 폭 구성이 바뀌었으니 공통 재클램프(드래그로 px 고정된 패널이 넘치지 않게).
+        try { if (window.U4AUI && U4AUI.reclampSplitters) { U4AUI.reclampSplitters(); } } catch (e) { }
+        // 레이아웃 변경 후 표시 중인 트리 컬럼 재적합(원본 refreshBindLayoutTables — 마지막 컬럼이 잔여폭 흡수).
+        try { if (typeof oAPP.fn.refitBindTables === "function") { oAPP.fn.refitBindTables(); } } catch (e) { }
     };
 
     // 부트 초기 상태 로드 + 적용(frame.js _bootApp 에서 호출) — 저장된 영역 표시상태 복원(원본 loadBindLayoutState).

@@ -190,123 +190,17 @@ function _onThemeChange() {
     oAPP.attr.oThemeInfo = oTheme;
 }
 
-/* ── 스플리터(3개: 좌|중, 중|우, 디자인|추가속성) ─────────────────────────
- *   원본 sap.ui.layout.Splitter 대응. 폭/높이는 셸 CSS 변수로 관리, 드래그로 clamp.
- *   더블클릭 = 기본값 복귀. (16 §4.3: 최대화→축소 시 재클램프는 window resize 에서.)
+/* ── 스플리터(공통 U4AUI.wireSplitter 소비) ────────────────────────────────
+ *   원본 sap.ui.layout.Splitter 대응. 좌|중|우 가로 3분할(axis:x) + 중앙 세로 2분할(axis:y).
+ *   드래그 리사이즈·창 리사이즈 재클램프·더블클릭 최초복귀·iframe 차단은 전부 공통이 담당(16 §4.3/§4.4).
+ *   바=.u4a-splitter__bar / 패널=그 외 자식(유연=.u4a-splitter__pane--flex 또는 flex-grow>0). 최소=CSS min-*.
  * ------------------------------------------------------------------------ */
-var C_LEFT_MIN = 240, C_RIGHT_MIN = 240, C_CENTER_MIN = 300, C_DESIGN_MIN = 200, C_ADDIT_MIN = 160;
-
-function _shellVar(sName, sVal) {
-    var oShell = document.getElementById("bwpShell");
-    if (oShell) { oShell.style.setProperty(sName, sVal); }
-}
-
 function _wireSplitters() {
     var oShell = document.getElementById("bwpShell");
     var oCenter = document.getElementById("bwpCenterPane");
-    if (!oShell) { return; }
-
-    // 세로 바(가로 폭 조절) — 좌측 폭 / 우측 폭.
-    function _wireV(sBarId, sVar, sSide) {
-        var oBar = document.getElementById(sBarId);
-        if (!oBar) { return; }
-        var bDrag = false;
-        oBar.addEventListener("mousedown", function (ev) {
-            bDrag = true;
-            document.body.classList.add("u4a-dragging");
-            oShell.classList.add("u4aBwpResizingV");
-            ev.preventDefault();
-        });
-        document.addEventListener("mousemove", function (ev) {
-            if (!bDrag) { return; }
-            var r = oShell.getBoundingClientRect();
-            var px = (sSide === "left") ? (ev.clientX - r.left) : (r.right - ev.clientX);
-            var iMin = (sSide === "left") ? C_LEFT_MIN : C_RIGHT_MIN;
-            // ★ 반대편 고정 패널의 "실제 폭"(최소값 아님)과 중앙 최소·바 폭을 빼서 이쪽 최대폭 산출.
-            //   반대편을 최소값으로 잡으면(옛 버그) 반대편이 넓을 때 이쪽을 과도하게 키워 전체가 창을 넘쳐
-            //   우측 패널·툴바가 화면 밖으로 밀린다. 숨김 패널은 offsetWidth 0 → 그만큼 여유.
-            var oOpp = document.getElementById(sSide === "left" ? "bwpRightPane" : "bwpLeftPane");
-            var iOpp = (oOpp && oOpp.offsetWidth) || 0;
-            var oS1 = document.getElementById("bwpSplit1"), oS3 = document.getElementById("bwpSplit3");
-            var iBars = ((oS1 && oS1.offsetWidth) || 0) + ((oS3 && oS3.offsetWidth) || 0);
-            var iMax = r.width - C_CENTER_MIN - iOpp - iBars;
-            px = Math.max(iMin, Math.min(px, Math.max(iMin, iMax)));
-            _shellVar(sVar, px + "px");
-        });
-        document.addEventListener("mouseup", function () {
-            if (!bDrag) { return; }
-            bDrag = false;
-            document.body.classList.remove("u4a-dragging");
-            oShell.classList.remove("u4aBwpResizingV");
-        });
-        oBar.addEventListener("dblclick", function () { _shellVar(sVar, ""); });
-    }
-
-    _wireV("bwpSplit1", "--bwp-left-w", "left");
-    _wireV("bwpSplit3", "--bwp-right-w", "right");
-
-    // 가로 바(중앙 세로 높이 조절) — 디자인 트리 높이.
-    (function () {
-        var oBar = document.getElementById("bwpSplit2");
-        if (!oBar || !oCenter) { return; }
-        var bDrag = false;
-        oBar.addEventListener("mousedown", function (ev) {
-            bDrag = true;
-            document.body.classList.add("u4a-dragging");
-            oShell.classList.add("u4aBwpResizingH");
-            ev.preventDefault();
-        });
-        document.addEventListener("mousemove", function (ev) {
-            if (!bDrag) { return; }
-            var r = oCenter.getBoundingClientRect();
-            var px = ev.clientY - r.top;
-            var iMax = r.height - C_ADDIT_MIN - 8;
-            px = Math.max(C_DESIGN_MIN, Math.min(px, Math.max(C_DESIGN_MIN, iMax)));
-            oCenter.style.setProperty("--bwp-design-h", px + "px");
-        });
-        document.addEventListener("mouseup", function () {
-            if (!bDrag) { return; }
-            bDrag = false;
-            document.body.classList.remove("u4a-dragging");
-            oShell.classList.remove("u4aBwpResizingH");
-        });
-        oBar.addEventListener("dblclick", function () { oCenter.style.removeProperty("--bwp-design-h"); });
-    })();
-
-    // ── 창 리사이즈 재클램프(16 §4.3 필수, WS20 _bindWs20SplitResizeClamp 패턴) ──────────
-    //   창이 줄면 고정폭 패널(좌/우) 합 + 바 + 중앙 최소가 컨테이너를 넘지 않도록 큰 고정패널부터
-    //   min 까지 자동 축소한다(안 하면 최대화→축소 시 뒤쪽 패널/버튼이 overflow:hidden 에 잘려 사라짐).
-    //   유연 패널(중앙 flex, 또는 커스터마이징으로 채움 .u4aBwpFill)은 CSS 가 알아서 줄어 대상 제외.
-    function _reclampSplitters() {
-        var iAvail = oShell.getBoundingClientRect().width;
-        if (!iAvail) { return; }
-        var oS1 = document.getElementById("bwpSplit1"), oS3 = document.getElementById("bwpSplit3");
-        var iBars = ((oS1 && oS1.offsetWidth) || 0) + ((oS3 && oS3.offsetWidth) || 0);
-
-        // 고정폭 패널 = 표시 중이고 채움(.u4aBwpFill) 아닌 좌/우. 유연 = 중앙(표시 중이면 최소폭 확보).
-        var aFixed = [];
-        [["bwpLeftPane", "--bwp-left-w", C_LEFT_MIN], ["bwpRightPane", "--bwp-right-w", C_RIGHT_MIN]].forEach(function (a) {
-            var el = document.getElementById(a[0]);
-            if (el && el.style.display !== "none" && !el.classList.contains("u4aBwpFill")) {
-                aFixed.push({ el: el, v: a[1], min: a[2], cur: el.offsetWidth });
-            }
-        });
-        var iFlexMin = (oCenter && oCenter.style.display !== "none" && !oCenter.classList.contains("u4aBwpFill")) ? C_CENTER_MIN : 0;
-        var iFixedW = 0; aFixed.forEach(function (f) { iFixedW += f.cur; });
-
-        var iNeed = (iFixedW + iBars + iFlexMin) - iAvail;
-        if (iNeed <= 0) { return; }
-        // 큰 고정 패널부터 min 까지 축소.
-        aFixed.sort(function (a, b) { return b.cur - a.cur; }).forEach(function (f) {
-            if (iNeed <= 0) { return; }
-            var iCut = Math.min(Math.max(0, f.cur - f.min), iNeed);
-            if (iCut > 0) { _shellVar(f.v, (f.cur - iCut) + "px"); iNeed -= iCut; }
-        });
-    }
-    if (!oShell.__bwpReclampBound) {
-        oShell.__bwpReclampBound = true;
-        window.addEventListener("resize", _reclampSplitters);
-    }
+    if (!oShell || !window.U4AUI || typeof U4AUI.wireSplitter !== "function") { return; }
+    U4AUI.wireSplitter(oShell, { axis: "x" });                 // 좌|중|우
+    if (oCenter) { U4AUI.wireSplitter(oCenter, { axis: "y" }); } // 디자인|추가속성적용
 }
 
 /* ── 공용 busy 브로드캐스트(형제 자식창) ──────────────────────────────────

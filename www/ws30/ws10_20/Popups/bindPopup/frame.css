@@ -47,8 +47,10 @@ body {
     box-sizing: border-box;
     overflow: hidden;
 }
-.u4aBwpLeft  { flex: 0 0 var(--bwp-left-w, 22rem); min-width: 15rem; }
-.u4aBwpRight { flex: 0 0 var(--bwp-right-w, 22rem); min-width: 15rem; }
+/* 좌/우 = 고정 사이드(초기 basis=rem, 공간 부족 시 shrink). 드래그하면 공통 wireSplitter 가
+   flex:0 0 <px> 로 확정. 중앙 = 유연(잔여 흡수). 최소폭 단일 출처(min-width) — 16 §4.3. */
+.u4aBwpLeft  { flex: 0 1 22rem; min-width: 15rem; }
+.u4aBwpRight { flex: 0 1 22rem; min-width: 15rem; }
 .u4aBwpCenter { flex: 1 1 auto; min-width: 18.75rem; }
 /* 화면 커스터마이징으로 중앙(DESIGN)이 숨겨진 조합에서 마지막 활성 영역이 잔여 폭을 채운다. */
 .u4aBwpFill { flex: 1 1 auto !important; }
@@ -58,9 +60,16 @@ body {
 .u4aBwpTreeEmpty .u4aColTreeBody { background: none; }
 .u4aBwpTreeEmpty .u4aColTreeGrid { display: none; }
 
-/* 중앙 세로 2분할(디자인 트리 | 추가속성 적용). */
-.u4aBwpDesign { flex: 0 0 var(--bwp-design-h, 56%); min-height: 0; display: flex; flex-direction: column; }
-.u4aBwpAdditApply { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+/* ★ 헤더 라벨이 좁은 컬럼을 넘쳐 가로 스크롤을 만들지 않게 말줄임 클립(스코프 override, 공통 미수정).
+   컬럼폭은 fitTreeColumnsToContainer 가 컨테이너에 맞춰 채우므로 이름 헤더는 안 잘리고, 넘칠 때만 … 처리. */
+.u4aBwpShell .u4aColTreeHead .u4aColTreeCol {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+
+/* 중앙 세로 2분할(디자인 트리 | 추가속성 적용) — 공통 wireSplitter(axis:y) 소비.
+   디자인=고정 높이(초기 basis %), 추가속성적용=유연(잔여 흡수). 최소높이 단일 출처(min-height). */
+.u4aBwpDesign { flex: 0 1 56%; min-height: 6rem; display: flex; flex-direction: column; }
+.u4aBwpAdditApply { flex: 1 1 auto; min-height: 5rem; display: flex; flex-direction: column; }
 
 /* ★ 원본 BULK 모드(기본) 첫 실행 = 좌(모델트리) + 중(디자인트리) + 우("추가 속성 바인딩")의 3분할.
    ★ 우측 패널(oPageRight = bindAdditInfo, index.js:1289 / start 1046)은 BULK 3번째 스플리터 영역이라
@@ -171,9 +180,7 @@ body {
 .u4aBwpSplitBar--h::before { width: 36px; height: 5px; }
 .u4aBwpSplitBar--h:hover::before { width: 50px; height: 5px; }
 
-/* 드래그 중 커서 고정(iframe 위 끊김 방지는 공통 body.u4a-dragging). */
-.u4aBwpResizingV, .u4aBwpResizingV * { cursor: col-resize !important; user-select: none !important; }
-.u4aBwpResizingH, .u4aBwpResizingH * { cursor: row-resize !important; user-select: none !important; }
+/* 드래그 중 커서/iframe 차단은 공통 wireSplitter(body.style.cursor) + 전역 body.u4a-dragging 이 담당. */
 
 /* busy 오버레이는 공통 .u4a-busy(shell.css) 소비 — data-busy 로 표시 토글. */
 

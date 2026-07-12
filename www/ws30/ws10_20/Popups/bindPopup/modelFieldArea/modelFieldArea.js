@@ -59,12 +59,13 @@
         oM.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () {
             oAPP.fn.fitTreeColumns(oM.host);
         }));
-        // 168 분할 영역 초기화 — 셸 스플리터 폭/높이 변수 제거(frame.js 가 CSS 변수로 관리).
+        // 168 분할 영역 초기화 — 드래그로 고정된 패널 인라인 flex 를 비워 CSS 기본 폭/높이로 복귀 + 재클램프.
         oM.tool.appendChild(H.iconBtn("table-columns", H.z("168"), function () {  // 168 분할 영역 초기화
             var oShell = document.getElementById("bwpShell");
-            var oCenter = document.getElementById("bwpCenterPane");
-            if (oShell) { oShell.style.removeProperty("--bwp-left-w"); oShell.style.removeProperty("--bwp-right-w"); }
-            if (oCenter) { oCenter.style.removeProperty("--bwp-design-h"); }
+            if (oShell) {
+                oShell.querySelectorAll(".u4a-splitter__pane").forEach(function (p) { p.style.flex = ""; });
+            }
+            if (window.U4AUI && U4AUI.reclampSplitters) { U4AUI.reclampSplitters(); }
         }));
         // 957 화면 커스터마이징 — 3영역(바인딩필드/DESIGN TREE/추가속성) 표시·숨김 팝업(원본 좌측 툴바).
         oM.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {
@@ -121,6 +122,8 @@
 
         // 초기(데이터 로드 전) = 빈 트리 → 경계선 끔(로드 성공 시 loadBindData 가 해제).
         oAPP.fn.setTreeEmptyMark(oM.host, true);
+        // 컬럼 자동맞춤(원본 setUiTableAutoResizeColumn = 콘텐츠+마지막 컬럼 채움). 레이아웃 확정 후 1회.
+        setTimeout(function () { oAPP.fn.fitTreeColumns(oM.host); }, 0);
     };
 
     /************************************************************************
@@ -207,6 +210,7 @@
                 oAPP.attr.modelTree = oAPP.fn.setTreeData(aTree, "CHILD", "PARENT", "zTREE");
                 oM.ctrl.rerender(true);   // 첫 루트 선택 → Expand=전체(16 §3.2)
                 oAPP.fn.setTreeEmptyMark(oM.host, !(oAPP.attr.modelTree || []).length);
+                oAPP.fn.fitTreeColumns(oM.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
 
             } catch (e) {
                 console.error("[HTML5][bindWindow] 모델필드 로드 처리 오류:", e && e.message);

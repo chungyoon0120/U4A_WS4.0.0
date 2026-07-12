@@ -21,6 +21,11 @@ window.require(["vs/editor/editor.main"], function () {
         domReadOnly: oAPP.attr.READONLY,
         theme: oAPP.attr.THEME,         // 빌트인 vs / vs-dark
         automaticLayout: true,          // 창 리사이즈 자동 대응
+        //contextmenu:false — Monaco 기본 우클릭 메뉴(.context-view)가 iframe 안에 -webkit-app-region 요소를
+        //  등록하면, Electron 이 서브프레임 드래그영역 뒤처리를 못 해 부모 프레임리스 창의 타이틀바 드래그가
+        //  (한 번 뜬 뒤부터) 창 리사이즈 전까지 죽는다. 메뉴 자체를 안 만들어 근본차단(USP/스니펫/버전관리 동일 선례).
+        //  복사/포맷/명령팔레트는 Ctrl+C·Shift+F1·Ctrl+Shift+O 키보드로 유지.
+        contextmenu: false,
         glyphMargin: false,
         minimap: { enabled: true },
         fontSize: 14,

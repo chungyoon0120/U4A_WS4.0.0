@@ -371,7 +371,7 @@
   overflow: hidden auto;   /* 세로만 스크롤(가로 스크롤 없음) → 액션 버튼 항상 우측 고정 */
   container-type: inline-size;  /* 좁아지면 보조요소 접기 위한 컨테이너 쿼리 기준 */
   padding: 0;
-  background: var(--ws20-panel); /* ServerList 트리 컨셉 — 스트라이프 제거, 깔끔한 행 */
+  background: var(--ws20-panel); /* 행/컬럼 격자선은 아래 트리 ul 배경에 얹음(스크롤 동기화 위해) */
 }
 .u4aWs20TreeEmpty {
   padding: 16px; text-align: center; color: var(--ws20-text-sub); font-size: 13px;
@@ -382,8 +382,18 @@
   list-style: none; margin: 0; padding: 0;
 }
 /* 공유 .u4a-tree(width:max-content) 무력화 — 행을 패널 폭에 맞춰 트리 전체가 가로로 밀리지 않게.
-   (긴 이름은 행의 "이름 영역"에서만 스크롤 → 우측 액션 버튼은 항상 고정·노출) */
-.u4aWs20TreeScroll .u4aWs20Tree { width: auto; min-width: 100%; }
+   (긴 이름은 행의 "이름 영역"에서만 스크롤 → 우측 액션 버튼은 항상 고정·노출)
+   ★ 격자(가로 행선+빈영역 채움+세로 컬럼선)는 공통 .u4a-tree--grid(shell.css) 가 그린다(createTree grid:true).
+     - ul 은 min-height:100%(스크롤영역 채움)+min-width:100%+패딩0 → 첫 행 y=0, 빈영역까지 격자 연속.
+     - WS20 세로 컬럼선 = 우측 액션컬럼 경계. 위치·색만 변수로 공통에 넘긴다(공통이 실제 렌더):
+         --u4a-tree-grid-vx  = 우측에서 [row padding-right 0.5rem + 액션버튼 22px×2 + gap 2px + padding-left 6px] = calc(0.5rem + 52px)
+                               → 액션 박스 border-left(.u4aWs20TreeActions) 위치와 정확히 겹침.
+         --u4a-tree-grid-vcolor = --line (행 border-bottom·공통 격자와 동일 색). */
+.u4aWs20TreeScroll .u4aWs20Tree {
+  width: auto; min-width: 100%;
+  --u4a-tree-grid-vcolor: var(--line);
+  --u4a-tree-grid-vx: right calc(0.5rem + 52px);
+}
 .u4aWs20TreeNode { margin: 0; padding: 0; }
 
 /* WS20 트리 행 — 공통 .u4a-tree__row(shell.css) 위에 WS20 확장만:
@@ -465,11 +475,13 @@
 /* aggregation 라벨 (구 sap.m.ObjectStatus text="{UIATT}" icon="{UIATT_ICON}")
  *   — 행 우측 정렬, 작은 글씨(12px) */
 .u4aWs20TreeAggr {
-  /* aggr "컬럼" = 고정폭 5rem → 모든 행에서 좌/우 가장자리가 정렬(원본 TreeTable 컬럼 느낌).
-     base 5rem 이되 shrink 허용(0 1 5rem)+min-width:0+ellipsis → 아주 좁을 땐 잘려서 액션을 밀지 않음.
-     긴 aggregation 명(예: dependents)은 5rem 안에서 "…" 로 말줄임. 17rem 미만은 아래 @container 가 숨김. */
-  display: block; flex: 0 1 5rem; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* ★ aggregation 명 표시 규칙(2026-07-10 장군 지시):
+     - 공간 충분: 콘텐츠 폭(basis auto)으로 **전체 표시**(말줄임 … 금지) — contentLeft/contentRight 등 긴 명도 온전히.
+     - 공간 부족(스플릿바로 좁힘): 원본 UI5 처럼 **그냥 잘려서 가려짐**(shrink 허용 + overflow:hidden + text-overflow:clip → 점 없이 잘림).
+       이래야 aggr 가 우측 버튼/세로선을 밀지 않아 버튼·세로선이 우측에 고정된다(세로선 관통 버그 해결).
+     - 아주 좁으면 아래 @container 가 통째로 숨김. */
+  display: block; flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: clip; white-space: nowrap;
   color: var(--ws20-aggr); font-size: 13px;
 }
 .u4aWs20TreeAggrIcon { font-size: 11px; color: var(--ws20-aggr); vertical-align: middle; margin-right: 3px; }
@@ -481,13 +493,33 @@
    모든 행에서 +/삭제가 세로로 정렬된다. 좌측 구분선으로 "트랜잭션 컬럼"처럼 분리. */
 .u4aWs20TreeActions {
   flex: 0 0 auto;
+  /* ★ 우측 "고정 컬럼"(frozen column) — 원본 UI5 TreeTable 처럼 깊은 들여쓰기/좁은 폭으로 행이 넘쳐도
+     액션(+/삭제)·세로선을 스크롤 뷰포트 우측에 항상 고정한다(2026-07-10 장군: 깊이 깊어지면 액션이 계단식 밀림).
+     position:sticky + right:0.5rem(=행 padding-right) → flex 가 어떻게 밀든 우측에 클램프. 넘친 이름은 아래로
+     흘러가고, 아래 배경(불투명 패널)이 가려 원본처럼 "이름은 잘리고 버튼은 고정"이 된다. z-index 로 이름 위. */
+  position: sticky; right: 0.5rem; z-index: 1;
+  background: var(--ws20-panel);
+  /* align-self:stretch → 액션 박스를 행 높이까지 늘려 border-left(컬럼 구분선)가 행마다
+     끊기지 않고 연속선으로 이어진다(공통 컬럼트리 .u4aColTreeCell 과 동일 패턴, shell.css).
+     버튼은 align-items:center 로 여전히 세로 중앙. (2026-07-10 사용자 지적: 세로선 중간 끊김) */
+  align-self: stretch;
   display: inline-flex; align-items: center; gap: 2px;
   padding-left: 6px; margin-left: 4px;
   border-left: 1px solid var(--ws20-line);
   visibility: visible;
-  opacity: 0.85;
 }
-.u4aWs20TreeRow:hover .u4aWs20TreeActions { opacity: 1; }
+/* 고정 액션 컬럼 배경 = 행 상태(hover/선택)와 동일하게 겹쳐 넘친 이름을 확실히 가림
+   (토큰이 반투명이어도 패널 위에 얹어 행과 색이 일치). */
+.u4aWs20TreeRow:hover .u4aWs20TreeActions {
+  background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--ws20-panel);
+}
+.u4aWs20TreeRow[aria-selected="true"] .u4aWs20TreeActions {
+  background: linear-gradient(var(--selected-bg), var(--selected-bg)), var(--ws20-panel);
+}
+/* 구분선(border)은 항상 실선으로 두고, 흐림/hover 강조는 버튼에만 적용해
+   행마다 선 밝기가 달라 보이는 현상 방지. */
+.u4aWs20TreeActBtn { opacity: 0.85; }
+.u4aWs20TreeRow:hover .u4aWs20TreeActBtn { opacity: 1; }
 /* 빈 슬롯 — 버튼과 동일 너비로 자리만 차지(정렬 유지) */
 .u4aWs20TreeActSlot {
   display: inline-block; width: 22px; height: 22px; flex: 0 0 auto;

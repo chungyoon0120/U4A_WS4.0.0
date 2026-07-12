@@ -159,6 +159,39 @@ function _setSaveVisible(bVisi) {
     if (oBtn) { oBtn.hidden = !bVisi; }
 }
 
+// 푸터 꾸밈정렬(Pretty Print) 노출 — 편집모드에서만(포맷은 내용 변경 → 표시모드 불필요).
+//   클라이언트 이벤트 에디터(ws_html5_client_editor)와 동일 정책.
+function _setPrettyVisible(bVisi) {
+    var oBtn = document.getElementById("editorPrettyBtn");
+    if (oBtn) { oBtn.hidden = !bVisi; }
+}
+
+// 클립보드 복사 — 현재 에디터 전체 내용을 복사(편집/표시 모드 무관, 읽기 중 코드 가져갈 때 유용).
+//   Electron(file://)에서 안정적인 textarea+execCommand 우선, 실패 시 navigator.clipboard 폴백.
+//   성공 토스트 = MSG_WS 303(Clipboard Copy Success!). (클라이언트 이벤트 에디터 lf_copyToClipboard 와 동일)
+function _copyToClipboard() {
+    var sVal = _readHost();
+    if (sVal === null) { return; }   // 에디터 미준비.
+    if (sVal === "") { return; }     // 복사할 내용 없음 — 토스트 없이 무시(빈 복사 성공 오인 방지).
+    var bOk = false;
+    try {
+        var ta = document.createElement("textarea");
+        ta.value = sVal;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        bOk = document.execCommand("copy");
+        if (ta.parentNode) { ta.parentNode.removeChild(ta); }
+    } catch (e) { bOk = false; }
+    if (!bOk) {
+        try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(sVal); bOk = true; } } catch (e) { }
+    }
+    if (bOk) { _toast(_msg("/U4A/MSG_WS", "303")); }   // Clipboard Copy Success!
+}
+
 // ── 현재 상태를 호스트에 반영 ───────────────────────────────────────────
 function _applyToHost() {
     var info = oState.EDITORINFO || {};
@@ -171,6 +204,7 @@ function _applyToHost() {
         _toHost({ cmd: "find", value: String(oState.SRCHVAL) });
     }
     _setSaveVisible(bEdit);
+    _setPrettyVisible(bEdit);
     if (bEdit) { _toHost({ cmd: "focus" }); }
 }
 
@@ -309,6 +343,23 @@ function _initChrome() {
     if (oZoomOut) { oZoomOut.addEventListener("click", function () { _toHost({ cmd: "fontZoomOut" }); }); }
     var oZoomIn = document.getElementById("editorZoomIn");
     if (oZoomIn) { oZoomIn.addEventListener("click", function () { _toHost({ cmd: "fontZoomIn" }); }); }
+
+    // 푸터 꾸밈정렬(Pretty Print) — 에디터 포맷(호스트 format). 편집모드에서만 노출.
+    var oPretty = document.getElementById("editorPrettyBtn");
+    if (oPretty) {
+        var oPSpan = oPretty.querySelector("span");
+        if (oPSpan) { oPSpan.textContent = _msg("/U4A/CL_WS_COMMON", "C25"); }   // Pretty Print(꾸밈정렬)
+        oPretty.title = _msg("/U4A/CL_WS_COMMON", "C25") + " (Shift+F1)";        // 단축키 안내(에디터 한정)
+        oPretty.hidden = true;        // 편집모드 확인 전까지 숨김.
+        oPretty.addEventListener("click", function () { _toHost({ cmd: "format" }); });
+    }
+
+    // 푸터 클립보드 복사 — 편집/표시 모드 무관 상시 노출(읽기 중 코드 가져가기).
+    var oCopy = document.getElementById("editorCopyBtn");
+    if (oCopy) {
+        oCopy.title = _msg("/U4A/CL_WS_COMMON", "A04");   // Copy
+        oCopy.addEventListener("click", function () { _copyToClipboard(); });
+    }
 
     // 푸터 Save.
     var oSave = document.getElementById("editorSaveBtn");

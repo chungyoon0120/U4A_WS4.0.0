@@ -1263,9 +1263,158 @@ window.require([
         })();
 
 
-        // [정리 2026-07-13] 개발용 실험/디버그 코드 제거 — 테스트 대문자 HTML 포맷터 등록,
-        //   init 시 formatDocument 자동실행, setModelLanguage 강제 javascript(파일언어 무시 원인),
-        //   샘플 코드액션/hover, 디버그 위젯(outputWidget) 일괄 삭제. 언어는 파일 확장자대로 유지한다.
+        // ✅ 꾸밈프린트
+        editor.getAction('editor.action.formatDocument').run();
+
+
+        // ✅ 꾸밈프린트 - 커스텀 ? 확인 다시 해야함!!!!!!!!!!!
+        monaco.languages.register({ id: 'html' });
+        monaco.languages.registerDocumentFormattingEditProvider('html', {
+            provideDocumentFormattingEdits: function(model, options, token) {
+              console.log('📦 포맷 요청 들어옴!');
+              const original = model.getValue();
+              const formatted = original.toUpperCase(); // 그냥 대문자로 바꾸는 테스트
+          
+              return [
+                {
+                  range: model.getFullModelRange(),
+                  text: formatted
+                }
+              ];
+            }
+        });
+
+
+        // ✅ 언어 변경 방법 (실행 중에 변경)
+        monaco.editor.setModelLanguage(editor.getModel(), 'javascript');
+
+
+   
+
+
+        // ✅ 코드 액션이 동작하는 설정
+        editor.updateOptions({
+            lightbulb: {
+              enabled: true
+            }
+        });
+
+        // ✅ 코드 액션 - 에디터 상에 전구아이콘 클릭시 callback 메뉴 팝업처리
+        monaco.languages.registerCodeActionProvider('javascript', {
+            provideCodeActions: function(model, range, context, token) {
+              return {
+                actions: [
+                  {
+                    title: '💡 이 줄을 콘솔로 출력하기',
+                    kind: 'quickfix',
+                    diagnostics: [],
+                    edit: {
+                      edits: [
+                        {
+                          resource: model.uri,
+                          edit: {
+                            range: range,
+                            text: `console.log(${model.getValueInRange(range)});`
+                          }
+                        }
+                      ]
+                    },
+                    isPreferred: true
+                  }
+                ],
+                dispose: () => {}
+              };
+            }
+        });
+
+
+        // ✅ 예제: 특정 키워드에 툴팁 달기
+        monaco.languages.registerHoverProvider('javascript', {
+            provideHover: function(model, position) {
+              const wordInfo = model.getWordAtPosition(position);
+              if (!wordInfo) return;
+          
+              const word = wordInfo.word;
+          
+              // 예시: 특정 단어에만 툴팁 표시
+              if (word === 'ttt') {
+                return {
+                  range: new monaco.Range(position.lineNumber, wordInfo.startColumn, position.lineNumber, wordInfo.endColumn),
+                  contents: [
+                    { value: '**ttt 변수**' },
+                    { value: '메롱메롱메롱' }
+                  ]
+                };
+              }
+            }
+        });
+          
+
+        //✅ Monaco Hover UI를 끄고, 직접 HTML 요소로 툴팁을 만들기"
+        // function showCustomTooltip(x, y, html) {
+        //     const tooltip = document.getElementById('custom-tooltip');
+        //     tooltip.innerHTML = html;
+        //     tooltip.style.left = `${x + 10}px`;
+        //     tooltip.style.top = `${y + 10}px`;
+        //     tooltip.style.display = 'block';
+        // }
+
+        // function hideCustomTooltip() {
+        //     document.getElementById('custom-tooltip').style.display = 'none';
+        // }
+
+        // editor.onMouseMove((e) => {
+        //     const pos = e.target.position;
+        //     const word = editor.getModel().getWordAtPosition(pos);
+          
+        //     if (word?.word === 'ttt') {
+        //       showCustomTooltip(e.event.browserEvent.pageX, e.event.browserEvent.pageY, '<b>HTML 툴팁</b>');
+        //     } else {
+        //       hideCustomTooltip();
+        //     }
+        // });
+
+
+        //Monaco Editor 내부에 결과 박스 삽입하기
+        const outputWidget = {
+            domNode: null,
+          
+            getId: function () {
+              return 'my.custom.inline.output';
+            },
+          
+            getDomNode: function () {
+              if (!this.domNode) {
+                this.domNode = document.createElement('div');
+                this.domNode.style.background = '#222';
+                // this.domNode.style.border = '2px solid black';
+                // this.domNode.style.border = '3px dashed red'; // 점선 빨간색 테두리
+                this.domNode.style.border = '3px solid red'; // 점선 빨간색 테두리
+                // this.domNode.style.width = "100%";
+                this.domNode.style.color = 'white';
+                this.domNode.style.padding = '6px 12px';
+                this.domNode.style.borderRadius = '6px';
+                this.domNode.style.marginTop = '1px';
+                this.domNode.innerText = '📤 FIX 라인 ==================================';
+              }
+              return this.domNode;
+            },
+          
+            getPosition: function () {
+              return {
+                position: {
+                  lineNumber: 1,
+                  column: 50
+                },
+                preference: [
+                  monaco.editor.ContentWidgetPositionPreference.BELOW
+                ]
+              };
+            }
+          };
+
+
+        editor.addContentWidget(outputWidget);
 
 
 

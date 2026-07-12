@@ -610,14 +610,22 @@
             if (!bAny) { oOvf.hidden = true; }
         }
 
-        let oRO = null;
-        if (window.ResizeObserver) { oRO = new ResizeObserver(function () { reflow(); }); oRO.observe(oBar); }
+        // ★ reflow 는 버튼 hidden 을 토글해 바 레이아웃을 바꾸므로, RO 콜백에서 동기로 부르면
+        //   같은 프레임에 RO 가 재발화 → "ResizeObserver loop limit exceeded" 무해 경고가 뜬다
+        //   (툴바 여러 개일수록 빈번). rAF 로 한 프레임에 1회만 코얼레싱해 루프 자체를 끊는다.
+        let oRO = null, iRafOvf = 0;
+        function _scheduleReflow() {
+            if (iRafOvf) { return; }
+            iRafOvf = requestAnimationFrame(function () { iRafOvf = 0; reflow(); });
+        }
+        if (window.ResizeObserver) { oRO = new ResizeObserver(_scheduleReflow); oRO.observe(oBar); }
         else { setTimeout(reflow, 0); }
 
         return {
             reflow: reflow,
             destroy: function () {
                 _closeMenu();
+                if (iRafOvf) { cancelAnimationFrame(iRafOvf); iRafOvf = 0; }
                 if (oRO) { oRO.disconnect(); oRO = null; }
                 if (oOvf.parentNode) { oOvf.parentNode.removeChild(oOvf); }
             }
@@ -969,6 +977,211 @@
         });
     }
 
+    /* ======================================================================
+     * [공통] 스플리터 배선 — 드래그 리사이즈 + 창 리사이즈 재클램프 (doc 16 §4.3/§4.4).
+     *   대상 컨테이너의 직계 자식 중 `.u4a-splitter__bar` = 바, 그 외 엘리먼트 = 패널.
+     *   패널 유연/고정 판정: `.u4a-splitter__pane--flex` 클래스 또는 (인라인 px 미지정 &
+     *   계산된 flex-grow>0) = 유연(잔여 흡수), 그 외 = 고정. 최소폭/높이는 CSS
+     *   min-width/min-height 단일 출처. 드래그 결과는 대상 패널에 `flex:0 0 <px>` 로 확정.
+     *   더블클릭 최초복귀·드래그 home 기록·iframe 포인터 차단은 전역 _installGlobalSplitterReset 담당.
+     *
+     *   @param {HTMLElement} oSplit  스플리터 컨테이너
+     *   @param {object} [opts]
+     *     opts.axis  "x"(기본,가로 폭)|"y"(세로 높이)
+     *     opts.mode  "adjacent"(기본, 인접 2패널 주고받기)|"giveway"(3분할: 가운데 흡수 후 반대편 양보)
+     *     opts.onResize  드래그/재클램프 후 콜백(예: 테이블 폭 클래스 갱신)
+     *   @return {{reclamp:function, panes:function}}
+     * ==================================================================== */
+    var _SPLIT_REGISTRY = [];
+    var _SPLIT_RESIZE_ON = false;
+
+    function _splitAxis(sAxis) {
+        return (sAxis === "y")
+            ? { pos: "clientY", rect: "height", off: "offsetHeight", min: "minHeight", client: "clientHeight", cur: "row-resize", fb: 80 }
+            : { pos: "clientX", rect: "width", off: "offsetWidth", min: "minWidth", client: "clientWidth", cur: "col-resize", fb: 120 };
+    }
+    function _splitIsBar(el) { return el.classList && el.classList.contains("u4a-splitter__bar"); }
+    function _splitBars(oSplit) {
+        return Array.prototype.filter.call(oSplit.children, _splitIsBar);
+    }
+    function _splitPanes(oSplit) {
+        return Array.prototype.filter.call(oSplit.children, function (el) {
+            return el.nodeType === 1 && !_splitIsBar(el);
+        });
+    }
+    function _splitBarsSize(oSplit, AX) {
+        var w = 0;
+        _splitBars(oSplit).forEach(function (b) { w += b[AX.off] || 11; });
+        return w;
+    }
+    function _splitPaneMin(el, AX) {
+        var v = parseFloat(getComputedStyle(el)[AX.min]);
+        return (v && v > 0) ? v : AX.fb;
+    }
+    // 유연(잔여 흡수) 패널 판정 — 명시 클래스 또는 (px 미고정 & flex-grow>0).
+    function _splitIsFlex(el) {
+        if (el.classList && el.classList.contains("u4a-splitter__pane--flex")) { return true; }
+        if (/\d(?:\.\d+)?px/.test(el.style.flex || "")) { return false; }   // 드래그로 px 고정됨
+        return (parseFloat(getComputedStyle(el).flexGrow) > 0);
+    }
+    function _splitPrevPane(oBar) {
+        var el = oBar.previousElementSibling;
+        while (el && _splitIsBar(el)) { el = el.previousElementSibling; }
+        return el;
+    }
+    function _splitNextPane(oBar) {
+        var el = oBar.nextElementSibling;
+        while (el && _splitIsBar(el)) { el = el.nextElementSibling; }
+        return el;
+    }
+    // oA·oB 를 뺀 나머지 패널의 현재 크기 합(단일 패널 조절 시 상한 계산용).
+    function _splitOtherSize(oSplit, AX, oA, oB) {
+        var s = 0;
+        _splitPanes(oSplit).forEach(function (p) {
+            if (p !== oA && p !== oB) { s += p.getBoundingClientRect()[AX.rect]; }
+        });
+        return s;
+    }
+    function _splitPxFlex(el, px) { el.style.flex = "0 0 " + Math.round(px) + "px"; }
+
+    function _splitBindBar(oSplit, oBar, AX, sMode, fnAfter) {
+        if (oBar.__u4aSplitWired) { return; }
+        oBar.__u4aSplitWired = true;
+
+        var bDrag = false, iStart = 0, oA = null, oB = null, iAStart = 0, iBStart = 0;
+        var oSelf = null, oCenter = null, oOpp = null, sSide = "left";  // giveway 전용
+
+        function lf_move(ev) {
+            if (!bDrag) { return; }
+            var d = ev[AX.pos] - iStart;
+            var iAvail = oSplit[AX.client] - _splitBarsSize(oSplit, AX);
+
+            if (sMode === "giveway" && oSelf && oCenter && oOpp) {
+                var iCMin = _splitPaneMin(oCenter, AX), iSMin = _splitPaneMin(oSelf, AX), iOMin = _splitPaneMin(oOpp, AX);
+                var iSelf = (sSide === "left") ? (iAStart + d) : (iAStart - d);
+                var iSelfMax = iAvail - iCMin - iOMin;
+                if (iSelf > iSelfMax) { iSelf = iSelfMax; }
+                if (iSelf < iSMin) { iSelf = iSMin; }
+                var iOpp = oOpp.getBoundingClientRect()[AX.rect];
+                if (iAvail - iSelf - iOpp < iCMin) {
+                    iOpp = iAvail - iSelf - iCMin;
+                    if (iOpp < iOMin) { iOpp = iOMin; }
+                }
+                _splitPxFlex(oSelf, iSelf);
+                _splitPxFlex(oOpp, iOpp);
+            } else {
+                var flexA = _splitIsFlex(oA), flexB = _splitIsFlex(oB);
+                if (!flexA && flexB) {                 // A 고정 조절, B(유연) 흡수
+                    var minA = _splitPaneMin(oA, AX);
+                    var maxA = iAvail - _splitPaneMin(oB, AX) - _splitOtherSize(oSplit, AX, oA, oB);
+                    var a = iAStart + d;
+                    if (a > maxA) { a = maxA; }
+                    if (a < minA) { a = minA; }
+                    _splitPxFlex(oA, a);
+                } else if (flexA && !flexB) {           // B 고정 조절, A(유연) 흡수
+                    var minB = _splitPaneMin(oB, AX);
+                    var maxB = iAvail - _splitPaneMin(oA, AX) - _splitOtherSize(oSplit, AX, oA, oB);
+                    var b = iBStart - d;
+                    if (b > maxB) { b = maxB; }
+                    if (b < minB) { b = minB; }
+                    _splitPxFlex(oB, b);
+                } else {                                 // 둘 다 고정 → 인접쌍(합 보존)
+                    var am = _splitPaneMin(oA, AX), bm = _splitPaneMin(oB, AX);
+                    var na = iAStart + d, nb = iBStart - d;
+                    if (na < am) { nb -= (am - na); na = am; }
+                    if (nb < bm) { na -= (bm - nb); nb = bm; }
+                    if (na < am) { na = am; }
+                    _splitPxFlex(oA, na);
+                    _splitPxFlex(oB, nb);
+                }
+            }
+            if (fnAfter) { try { fnAfter(); } catch (e) { } }
+        }
+        function lf_up() {
+            if (!bDrag) { return; }
+            bDrag = false;
+            try { document.body.style.cursor = ""; } catch (e) { }
+            document.removeEventListener("mousemove", lf_move);
+            document.removeEventListener("mouseup", lf_up);
+        }
+        oBar.addEventListener("mousedown", function (ev) {
+            oA = _splitPrevPane(oBar); oB = _splitNextPane(oBar);
+            if (!oA || !oB) { return; }
+            bDrag = true;
+            iStart = ev[AX.pos];
+            iAStart = oA.getBoundingClientRect()[AX.rect];
+            iBStart = oB.getBoundingClientRect()[AX.rect];
+            if (sMode === "giveway") {
+                // self=인접 고정 패널, center=유연 패널, opp=반대 고정 패널(3분할 give-way).
+                if (!_splitIsFlex(oA)) { oSelf = oA; sSide = "left"; }
+                else { oSelf = oB; sSide = "right"; }
+                iAStart = oSelf.getBoundingClientRect()[AX.rect];
+                oCenter = null; oOpp = null;
+                _splitPanes(oSplit).forEach(function (p) {
+                    if (p === oSelf) { return; }
+                    if (_splitIsFlex(p)) { if (!oCenter) { oCenter = p; } }
+                    else if (!oOpp) { oOpp = p; }
+                });
+            }
+            try { document.body.style.cursor = AX.cur; } catch (e) { }
+            document.addEventListener("mousemove", lf_move);
+            document.addEventListener("mouseup", lf_up);
+            ev.preventDefault();
+        });
+    }
+
+    // 창 리사이즈 재클램프(축별) — 드래그로 px 고정된 패널 합 + 바 + 유연패널 최소가 컨테이너를
+    //   넘으면 큰 고정패널부터 min 까지 축소해 overflow:hidden 에 잘려 숨는 것 방지.
+    function _splitReclampOne(rec) {
+        var oSplit = rec.el, AX = rec.AX;
+        if (!oSplit || (oSplit.isConnected === false)) { return; }
+        var iAvail = oSplit.getBoundingClientRect()[AX.rect];
+        if (!iAvail) { return; }
+        var iBars = _splitBarsSize(oSplit, AX);
+        function _px(p) { var m = (p.style.flex || "").match(/(\d+(?:\.\d+)?)px/); return m ? parseFloat(m[1]) : null; }
+        var aFixed = [], iFlexMin = 0;
+        _splitPanes(oSplit).forEach(function (p) {
+            if (getComputedStyle(p).display === "none") { return; }   // 숨김 패널 제외(커스터마이징)
+            if (_px(p) != null) { aFixed.push(p); } else { iFlexMin += _splitPaneMin(p, AX); }
+        });
+        if (!aFixed.length) { return; }
+        var iFixedW = 0; aFixed.forEach(function (p) { iFixedW += _px(p); });
+        var iNeed = (iFixedW + iBars + iFlexMin) - iAvail;
+        if (iNeed <= 0) { return; }
+        aFixed.slice().sort(function (a, b) { return _px(b) - _px(a); }).forEach(function (p) {
+            if (iNeed <= 0) { return; }
+            var iCur = _px(p), iMin = _splitPaneMin(p, AX);
+            var iCut = Math.min(Math.max(0, iCur - iMin), iNeed);
+            if (iCut > 0) { p.style.flex = "0 0 " + (iCur - iCut) + "px"; iNeed -= iCut; }
+        });
+        if (rec.onResize) { try { rec.onResize(); } catch (e) { } }
+    }
+    function _splitReclampAll() { _SPLIT_REGISTRY.forEach(_splitReclampOne); }
+
+    function wireSplitter(oSplit, opts) {
+        if (!oSplit) { return { reclamp: function () { }, panes: function () { return []; } }; }
+        opts = opts || {};
+        var AX = _splitAxis(opts.axis);
+        var sMode = (opts.mode === "giveway") ? "giveway" : "adjacent";
+        _splitBars(oSplit).forEach(function (oBar) { _splitBindBar(oSplit, oBar, AX, sMode, opts.onResize); });
+
+        var rec = null;
+        for (var i = 0; i < _SPLIT_REGISTRY.length; i++) {
+            if (_SPLIT_REGISTRY[i].el === oSplit) { rec = _SPLIT_REGISTRY[i]; break; }
+        }
+        if (rec) { rec.AX = AX; rec.mode = sMode; rec.onResize = opts.onResize || rec.onResize; }
+        else { rec = { el: oSplit, AX: AX, mode: sMode, onResize: opts.onResize || null }; _SPLIT_REGISTRY.push(rec); }
+
+        if (!_SPLIT_RESIZE_ON) {
+            _SPLIT_RESIZE_ON = true;
+            window.addEventListener("resize", _splitReclampAll);
+        }
+        return {
+            reclamp: function () { _splitReclampOne(rec); },
+            panes: function () { return _splitPanes(oSplit); }
+        };
+    }
+
     /**
      * (옵션) 표준 `.u4a-dialog__header` 는 전역 자동 처리라 호출이 필요 없다.
      * 헤더가 `.u4a-dialog__header` 가 아닌 커스텀 핸들이거나, 상단 경계를 커스텀할 때만 사용.
@@ -1108,6 +1321,10 @@
         const bVirtual = !!cfg.virtual;   // 대용량(수만 노드) 트리: flat+windowed 렌더(보이는 행만 DOM)
 
         const oUl = _el("ul", "u4a-tree");   // controller.el — role 미부착
+        // 격자(표형) 옵션 — 켜면 shell.css .u4a-tree--grid 가 [가로 행선 + 빈영역 채움] 공통 격자를 그린다.
+        //   세로 컬럼선은 화면이 CSS 변수(--u4a-tree-grid-vcolor / --u4a-tree-grid-vx)로 위치·색만 지정(옵션).
+        //   (16 §3.4.1 — 화면별로 격자 CSS 를 복제하지 말고 이 공통 격자를 소비한다.)
+        if (cfg.grid) { oUl.classList.add("u4a-tree--grid"); }
         const _expanded = {};                // key → bool (render 간 유지; onToggle 으로 외부 영속화 동기)
         let _index = 0;                       // full render 마다 0 → 행 홀짝(ctx.odd)
 
@@ -2283,6 +2500,8 @@
         makeDialogRecenter: makeDialogRecenter,
         makeDialogResizable: makeDialogResizable,
         makeDialogDraggable: makeDialogDraggable,
+        wireSplitter: wireSplitter,
+        reclampSplitters: _splitReclampAll,
         initTooltip: initTooltip,
         initWindowFocusState: initWindowFocusState
     };

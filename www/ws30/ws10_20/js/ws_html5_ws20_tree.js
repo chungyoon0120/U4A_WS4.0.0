@@ -486,6 +486,9 @@
         _ws20tree = U4AUI.createTree({
             // 대용량(수만 노드) 디자인 트리 대비 — flat+windowed 렌더(보이는 행만 DOM). 펼침맵은 화면 소유(isExpanded/onToggle).
             virtual: true,
+            // 표형 격자(공통) — 가로 행선+빈영역 채움은 공통 .u4a-tree--grid 가 담당. 세로 컬럼선(액션컬럼 경계)은
+            //   아래 ws20.css 가 --u4a-tree-grid-vcolor/-vx 로 위치·색만 지정. (16 §3.4.1 — 격자 CSS 복제 금지)
+            grid: true,
             roots: _getTreeRoot,
             children: function (n) { return _hasChild(n) ? n.zTREE : []; },
             key: _objKey,

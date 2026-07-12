@@ -861,7 +861,7 @@
 
         // 좌: UI 트리 (구 designTree)
         var LEFT = _buildPanel("ws20DesignTree", "u4aWsDesignTree", "UI 트리 — W3 예정");
-        LEFT.style.flex = "0 1 25%";     // 초기 basis=%(반응형). 드래그하면 _bindResizerSimple 가 0 0 <px> 로 고정.
+        LEFT.style.flex = "0 1 25%";     // 초기 basis=%(반응형). 드래그하면 공통 wireSplitter 가 0 0 <px> 로 고정.
         LEFT.style.minWidth = "300px";   // 단일 최소폭(트리 내용). 초기 25%<300 이면 min-width 가 300 으로 floor.
 
         // 중: 미리보기 (구 designPreview) — 유연(잔여 흡수) 패널.
@@ -882,9 +882,7 @@
         SPLIT.__ws20Panels = { designTree: LEFT, designPreview: CENTER, designAttr: RIGHT };
         _ws20ArrangeSplit(SPLIT, _ws20SavedLayoutOrder());
 
-        // 창 리사이즈 재클램프(doc 16 §4.3) 1회 바인딩 — 드래그로 px 고정된 패널이 줄어든 창을 넘쳐
-        //   overflow:hidden 에 잘리는 것 방지.
-        _bindWs20SplitResizeClamp();
+        // 창 리사이즈 재클램프는 공통 wireSplitter 가 _ws20ArrangeSplit 에서 자동 등록(별도 배선 불필요, 16 §4.4).
 
         return SPLIT;
 
@@ -948,142 +946,14 @@
             SPLIT.appendChild(oP);
         });
 
-        // 리사이저 바인딩.
-        //   · 기본 순서[tree,preview,attr]: give-way(_bindResizer) — 슬랙을 가운데(preview)가 먼저
-        //       흡수하고, 닿으면 반대편 패널이 **자기 min-width 까지** 양보(사용자 선호 거동).
-        //       (구버전의 "min 밑으로 빨려들어가던" 버그는 _bindResizer 안에서 0 0+단일 min 으로 교정.)
-        //   · 그 외(재정렬) 순서: 인접-쌍(_bindResizerSimple) — give-way 는 preview=가운데 전제라 깨짐.
+        // 공통 스플리터 배선(16 §4.4) — 드래그/재클램프/더블클릭/iframe차단 전부 공통 소비.
+        //   · 기본 순서[tree,preview,attr] = give-way(센터=preview 가 먼저 흡수→닿으면 반대편이 자기 min 까지 양보).
+        //   · 그 외(재정렬) 순서 = 인접쌍(adjacent). self/center/opp·min·재클램프는 전부 공통이 계산.
         var bDefault = aOrder.length === 3 &&
             aOrder[0] === "designTree" && aOrder[1] === "designPreview" && aOrder[2] === "designAttr";
-        aBars.forEach(function (oBar) {
-            if (bDefault) {
-                var oLeft = oBar.previousElementSibling;
-                if (oLeft && oLeft.classList.contains("u4aWsDesignTree")) { _bindResizer(oBar, oLeft, SPLIT, "left"); }
-                else { _bindResizer(oBar, oBar.nextElementSibling, SPLIT, "right"); } // preview|attr → attr
-            } else {
-                _bindResizerSimple(oBar, SPLIT);
-            }
-        });
-    }
-
-    /************************************************************************
-     * 표준 인접-쌍 리사이저 (doc 16 §4.3 / 레퍼런스 ServerList _attachSplitterDrag).
-     *   바 양옆 두 패널만 폭을 주고받는다(나머지 패널 불변):
-     *    · 한쪽이 미리보기(flex:1 유연)면 → 반대쪽 '고정' 패널만 px 로 조절, 미리보기가 슬랙 흡수.
-     *      이때 미리보기가 자기 min-width 밑으로 짜부되지 않도록 **max-clamp**(컨테이너 − 바 −
-     *      미리보기 min − 나머지 패널 현재폭) 로 상한을 둔다.
-     *    · 둘 다 고정이면 → 인접쌍(좌 +delta / 우 −delta, 합 보존).
-     *   최소폭은 **CSS min-width 단일 출처**(dataset.dragMin 제거). 드래그 결과는 0 0 <px> 로 고정.
-     ************************************************************************/
-    // 패널 최소폭 — CSS min-width 단일 출처(폴백 120, doc 16 §4.3).
-    function _ws20PaneMin(el) {
-        var v = parseFloat(getComputedStyle(el).minWidth);
-        return (v && v > 0) ? v : 120;
-    }
-    // 스플릿 안 바 폭 합.
-    function _ws20BarsW(oSplit) {
-        var w = 0;
-        oSplit.querySelectorAll(".u4aWs20Resizer").forEach(function (b) { w += b.offsetWidth || 11; });
-        return w;
-    }
-    // oSplit 의 패널들(트리/미리보기/속성).
-    function _ws20Panes(oSplit) {
-        return oSplit.querySelectorAll(".u4aWsDesignTree, .u4aWsDesignPreview, .u4aWsDesignAttr");
-    }
-    // oExclude·oPreview 를 뺀 나머지 패널들의 현재폭 합(고정 px 단일 조절 시 상한 계산용).
-    function _ws20OtherPanesW(oSplit, oExclude, oPreview) {
-        var s = 0;
-        _ws20Panes(oSplit).forEach(function (p) {
-            if (p !== oExclude && p !== oPreview) { s += p.getBoundingClientRect().width; }
-        });
-        return s;
-    }
-
-    function _bindResizerSimple(oBar, oSplit) {
-        var bDrag = false, iStartX = 0, oA = null, oB = null, iAStart = 0, iBStart = 0;
-        function _isPrev(el) { return el && el.classList.contains("u4aWsDesignPreview"); }
-
-        function lf_move(e) {
-            if (!bDrag) { return; }
-            var d = e.clientX - iStartX;
-            var iAvail = oSplit.clientWidth - _ws20BarsW(oSplit);
-
-            if (_isPrev(oA)) {                       // 좌가 미리보기 → 우 고정 패널(oB)만 조절(미리보기 흡수)
-                var mb = _ws20PaneMin(oB);
-                var maxB = iAvail - _ws20PaneMin(oA) - _ws20OtherPanesW(oSplit, oB, oA); // 미리보기 min 보호
-                var ib = iBStart - d;                // 드래그 우 → oB 축소(미리보기 확대)
-                if (ib > maxB) { ib = maxB; }
-                if (ib < mb) { ib = mb; }
-                oB.style.flex = "0 0 " + ib + "px";
-            } else if (_isPrev(oB)) {                // 우가 미리보기 → 좌 고정 패널(oA)만 조절(미리보기 흡수)
-                var ma = _ws20PaneMin(oA);
-                var maxA = iAvail - _ws20PaneMin(oB) - _ws20OtherPanesW(oSplit, oA, oB); // 미리보기 min 보호
-                var ia = iAStart + d;                // 드래그 우 → oA 확대(미리보기 축소)
-                if (ia > maxA) { ia = maxA; }
-                if (ia < ma) { ia = ma; }
-                oA.style.flex = "0 0 " + ia + "px";
-            } else {                                  // 둘 다 고정 → 인접쌍(합 보존)
-                var a = iAStart + d, b = iBStart - d, am = _ws20PaneMin(oA), bm = _ws20PaneMin(oB);
-                if (a < am) { b -= (am - a); a = am; }
-                if (b < bm) { a -= (bm - b); b = bm; }
-                if (a < am) { a = am; }
-                oA.style.flex = "0 0 " + a + "px";
-                oB.style.flex = "0 0 " + b + "px";
-            }
+        if (window.U4AUI && U4AUI.wireSplitter) {
+            U4AUI.wireSplitter(SPLIT, { axis: "x", mode: bDefault ? "giveway" : "adjacent" });
         }
-        function lf_up() {
-            bDrag = false;
-            document.body.classList.remove("u4aWs20ResizingCursor");
-            document.removeEventListener("mousemove", lf_move);
-            document.removeEventListener("mouseup", lf_up);
-        }
-        oBar.addEventListener("mousedown", function (e) {
-            oA = oBar.previousElementSibling;
-            oB = oBar.nextElementSibling;
-            if (!oA || !oB) { return; }
-            bDrag = true;
-            iStartX = e.clientX;
-            iAStart = oA.getBoundingClientRect().width;
-            iBStart = oB.getBoundingClientRect().width;
-            document.body.classList.add("u4aWs20ResizingCursor");
-            document.addEventListener("mousemove", lf_move);
-            document.addEventListener("mouseup", lf_up);
-            e.preventDefault();
-        });
-    }
-
-    /************************************************************************
-     * 창 리사이즈 재클램프 (doc 16 §4.3 / 레퍼런스 ServerList _bindSplitterResizeClamp).
-     *   드래그로 px 고정(0 0 <px>)된 패널 합 + 바 + 유연패널(미리보기) 최소폭이 줄어든 창을 넘으면,
-     *   **큰 고정 패널부터 자기 min-width 까지 자동 축소**해 overflow:hidden 에 잘려 패널/바가 숨는 것 방지.
-     *   리스너는 1회만 바인딩(뷰 전환으로 스플릿이 새로 그려져도 querySelector 로 현재 것을 처리).
-     ************************************************************************/
-    var _ws20SplitResizeBound = false;
-    function _bindWs20SplitResizeClamp() {
-        if (_ws20SplitResizeBound) { return; }
-        _ws20SplitResizeBound = true;
-        window.addEventListener("resize", function () {
-            var oSplit = document.getElementById("ws20DesignSplit");
-            if (!oSplit) { return; }
-            var iAvail = oSplit.getBoundingClientRect().width;
-            if (!iAvail) { return; }
-            var aPanes = Array.prototype.slice.call(_ws20Panes(oSplit));
-            if (!aPanes.length) { return; }
-            var iBars = _ws20BarsW(oSplit);
-            function _px(p) { var m = (p.style.flex || "").match(/(\d+(?:\.\d+)?)px/); return m ? parseFloat(m[1]) : null; }
-            // px 고정 패널 vs 유연(%/auto) 패널 분리. 유연패널은 CSS flex+min-width 가 알아서 줄어든다.
-            var aFixed = [], iFlexMin = 0;
-            aPanes.forEach(function (p) { if (_px(p) != null) { aFixed.push(p); } else { iFlexMin += _ws20PaneMin(p); } });
-            var iFixedW = 0; aFixed.forEach(function (p) { iFixedW += _px(p); });
-            var iNeed = (iFixedW + iBars + iFlexMin) - iAvail;
-            if (iNeed <= 0) { return; }
-            aFixed.slice().sort(function (a, b) { return _px(b) - _px(a); }).forEach(function (p) {
-                if (iNeed <= 0) { return; }
-                var iCur = _px(p), iMin = _ws20PaneMin(p);
-                var iCut = Math.min(Math.max(0, iCur - iMin), iNeed);
-                if (iCut > 0) { p.style.flex = "0 0 " + (iCur - iCut) + "px"; iNeed -= iCut; }
-            });
-        });
     }
 
     // [PUBLIC] 구 setDesignLayout — 저장된 순서로 현재 SPLIT 재배치(셸 렌더/모드전환 시 호출).
@@ -1494,72 +1364,6 @@
         R.className = "u4aWs20Resizer u4aWs20Resizer-" + sSide + " u4a-splitter__bar";
         return R;
     }
-
-    /************************************************************************
-     * give-way 리사이저 (기본 레이아웃[tree·preview·attr] 전용) — 사용자 선호 거동.
-     *   바를 끌면 대상(self) 패널이 커지고, 슬랙은 ① 가운데(preview)가 먼저 흡수(min 까지),
-     *   ② 가운데가 min 에 닿으면 그 다음 "반대편 패널"이 **자기 min-width 까지** 양보한다.
-     *   셋 다 min 이 되면 hard stop → 합이 항상 컨테이너 이내라 가로 스크롤/overflow 없음.
-     *
-     *   ★ 버그 수정: 구버전은 self/opp 를 `0 1`(shrink=1)+CSS min 96 으로 둬서, 브라우저 flex
-     *     축소가 JS 가 정한 폭을 덮어 **반대편 패널이 min(300) 밑(=96)까지 빨려들어갔다**.
-     *     → `0 0`(shrink=0, JS 가 단일 출처) + **단일 min-width(CSS) 클램프**로 교정.
-     *   (preview 가 가운데가 아닌 재정렬 레이아웃은 give-way 전제가 깨지므로 _bindResizerSimple 사용.)
-     ************************************************************************/
-    function _bindResizer(oBar, oPanel, oSplit, sSide) {
-        var bDragging = false, iStartX = 0, iStartW = 0;
-
-        function lf_opp() {   // 반대편 '고정' 패널(트리/속성 중 oPanel 아닌 쪽) — 패널 순서 무관
-            return oSplit.querySelector(oPanel.classList.contains("u4aWsDesignTree") ? ".u4aWsDesignAttr" : ".u4aWsDesignTree");
-        }
-        function lf_center() { return oSplit.querySelector(".u4aWsDesignPreview"); }
-
-        function lf_onMove(e) {
-            if (!bDragging) { return; }
-            var oOpp = lf_opp(), oCenter = lf_center();
-            if (!oOpp) { return; }
-
-            var iCenterMin = oCenter ? _ws20PaneMin(oCenter) : 200;
-            var iSelfMin = _ws20PaneMin(oPanel), iOppMin = _ws20PaneMin(oOpp);
-            var iTotal = oSplit.clientWidth - _ws20BarsW(oSplit);
-
-            var iDelta = e.clientX - iStartX;
-            // 좌측 바는 +delta(우로 끌면 self 확대), 우측 바는 -delta(좌로 끌면 self 확대)
-            var iSelf = (sSide === "left") ? (iStartW + iDelta) : (iStartW - iDelta);
-
-            // self 상한 = 가운데·반대편이 모두 min 일 때 (그 이상은 hard stop)
-            var iSelfMax = iTotal - iCenterMin - iOppMin;
-            if (iSelf > iSelfMax) { iSelf = iSelfMax; }
-            if (iSelf < iSelfMin) { iSelf = iSelfMin; }
-
-            // 반대편 폭: 가운데가 min 보다 더 줄어야 할 때만 양보(자기 min 까지), 아니면 현재폭 유지
-            var iOpp = oOpp.getBoundingClientRect().width;
-            if (iTotal - iSelf - iOpp < iCenterMin) {
-                iOpp = iTotal - iSelf - iCenterMin;
-                if (iOpp < iOppMin) { iOpp = iOppMin; }
-            }
-
-            // self·opp 는 0 0(JS 단일 출처), 가운데(preview)는 1 1 auto 라 나머지를 자동 흡수
-            oPanel.style.flex = "0 0 " + iSelf + "px";
-            oOpp.style.flex = "0 0 " + iOpp + "px";
-        }
-        function lf_onUp() {
-            if (!bDragging) { return; }
-            bDragging = false;
-            document.body.classList.remove("u4aWs20ResizingCursor");
-            document.removeEventListener("mousemove", lf_onMove);
-            document.removeEventListener("mouseup", lf_onUp);
-        }
-        oBar.addEventListener("mousedown", function (e) {
-            bDragging = true;
-            iStartX = e.clientX;
-            iStartW = oPanel.getBoundingClientRect().width;
-            document.body.classList.add("u4aWs20ResizingCursor");
-            document.addEventListener("mousemove", lf_onMove);
-            document.addEventListener("mouseup", lf_onUp);
-            e.preventDefault();
-        });
-    } // end of _bindResizer
 
     /************************************************************************
      * WS20 셸 렌더 (1회) — #WS20 컨테이너에 [툴바 + 3분할] 을 그린다.

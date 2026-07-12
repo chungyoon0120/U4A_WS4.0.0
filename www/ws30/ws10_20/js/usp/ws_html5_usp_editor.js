@@ -55,16 +55,63 @@
      * (헤더 툴바) 핸들러 — 구 ws_usp.js 이식. iframe(.EDITOR_FRAME1/2) 직접 제어 = UI5 무관.
      * ==================================================================== */
 
+    // 메인 에디터(현재 파일 언어가 적용된 인스턴스) 참조 — 좌측 FRAME1 은 0px 숨김이라 EDITOR_MAIN 만.
+    function _mainEditor() {
+        try {
+            var ifr = document.querySelector("#uspEditorHost iframe.EDITOR_MAIN");
+            return (ifr && ifr.contentWindow && ifr.contentWindow.editor) || null;
+        } catch (e) { return null; }
+    }
+
+    // 현재 파일 언어가 꾸밈정렬(포맷)을 지원하는지 = Monaco 공식 신호(formatDocument 액션 isSupported).
+    //   ★ 언어 하드코딩 금지 — 문서/range 포맷 provider 중 하나라도 등록돼 있고 편집 가능하면 true.
+    //     이 번들 지원 언어(JS/TS·JSON·HTML 계열·CSS 계열[등록패치 후])만 활성, python/abap 등은 자동 false.
+    //     isSupported() 는 precondition(writable && hasDocumentFormattingProvider)을 그대로 평가한다.
+    function _canFormatMain() {
+        try {
+            var ed = _mainEditor();
+            if (!ed) { return false; }
+            var oAct = ed.getAction("editor.action.formatDocument");
+            return !!(oAct && oAct.isSupported());
+        } catch (e) { return false; }
+    }
+
+    // Pretty Print 버튼 활성/비활성 = (편집모드 && 파일 && 비루트 && 언어가 포맷 지원).
+    //   죽은 버튼(눌러도 무동작) 방지 — 미지원 언어에선 회색 비활성(사용자 지시 2026-07-12).
+    function _applyPrettyEnabled() {
+        var elPretty = document.getElementById("ws30_codeeditor_prettyBtn");
+        if (!elPretty) { return; }
+        var oData = _model("/WS30/USPDATA") || {};
+        var oApp = _model("/WS30/APP") || {};
+        var bEdit = (oApp.IS_EDIT === "X");
+        var bRoot = (oData.PUJKY === "" || oData.PUJKY == null);
+        var bFolder = (oData.ISFLD === "X");
+        elPretty.disabled = !(bEdit && !bRoot && !bFolder && _canFormatMain());
+    }
+
+    // 메인 에디터 언어 변경 시 Pretty 버튼 재평가 — 파일 전환은 editorLoadSelected 가 _refreshToolbarInfo
+    //   (언어 적용 前)를 먼저 부르므로, 언어가 실제 바뀌는 이 이벤트에서 한 번 더 갱신해야 정확하다.
+    //   에디터 인스턴스는 1회 생성 후 재사용 → 준비 시점에 1회만 구독(중복 방지 플래그).
+    function _hookMainFormatWatch() {
+        try {
+            var ed = _mainEditor();
+            if (!ed || ed._u4aFmtHooked) { return; }
+            ed._u4aFmtHooked = true;
+            ed.onDidChangeModelLanguage(function () { _applyPrettyEnabled(); });
+        } catch (e) { }
+    }
+
     // Pretty Print (구 ev_codeeditorPrettyPrint) — 두 에디터 모두 formatDocument
     function _prettyPrint() {
         // 버튼 비활성 조건과 동일하게 자체 가드(Shift+F1 단축키는 비활성 버튼을 우회하므로 필수).
-        //   Change 모드 && 파일(루트X·폴더X)에서만 정렬.
+        //   Change 모드 && 파일(루트X·폴더X) && 언어가 포맷 지원일 때만 정렬.
         var oData = _model("/WS30/USPDATA") || {};
         var oApp = _model("/WS30/APP") || {};
         var bEdit = (oApp.IS_EDIT === "X");
         var bRoot = (oData.PUJKY === "" || oData.PUJKY == null);
         var bFolder = (oData.ISFLD === "X");
         if (!(bEdit && !bRoot && !bFolder)) { return; }
+        if (!_canFormatMain()) { return; }   // 미지원 언어(포맷 provider 없음) — Shift+F1 우회 차단.
 
         // 메인 에디터(EDITOR_MAIN)만 커서를 보존한다(좌측 FRAME1 은 0px 숨김+커서 1행이라 건드리면 튄다).
         //   ★ 핵심: 정리 안 된 코드를 포맷하면 줄이 재배치돼 "절대 위치(viewState/줄번호)"가 무효가 된다
@@ -257,6 +304,8 @@
                     if (oAPP.attr.uspEditorLoadCnt > 0) { return; }
                     // 첫 로드 완료 시점에도 현재 모드(IS_EDIT) 읽기전용 적용 — Display 진입 후 첫 파일이 수정되던 회귀 방지.
                     try { oAPP.usphtml.editorSetReadOnly((_model("/WS30/APP") || {}).IS_EDIT !== "X"); } catch (e) { }
+                    // 메인 에디터 언어변경 감시 구독(1회) + Pretty 버튼 활성상태 최초 보정(포맷 지원언어만 활성).
+                    try { _hookMainFormatWatch(); _applyPrettyEnabled(); } catch (e) { }
                     _releaseBusy();
                     return;
 
@@ -377,8 +426,9 @@
         var elTitle = document.querySelector("#uspEditorHost .u4aWs30EditorTitle");
         if (elTitle) { elTitle.textContent = oData.OBDEC || ""; elTitle.title = oData.OBDEC || ""; }
 
-        var elPretty = document.getElementById("ws30_codeeditor_prettyBtn");
-        if (elPretty) { elPretty.disabled = !(bEdit && !bRoot && !bFolder); }
+        // Pretty 활성 = 편집·파일·비루트 + 언어 포맷 지원까지(미지원 언어 죽은버튼 방지). 언어는 이 시점
+        //   아직 이전 파일 것일 수 있어(language_change 前), 언어변경 이벤트(_hookMainFormatWatch)가 최종 보정.
+        _applyPrettyEnabled();
 
         var oCombo = document.querySelector("#uspEditorHost .u4aWs30EditorThemeSel");
         if (oCombo) { try { oCombo.value = _selectedTheme(); } catch (e) { } }
@@ -455,11 +505,13 @@
         });
         TB.appendChild(FBTN);
 
-        // Pretty Print (구 ws30_codeeditor_prettyBtn, C25 + Shift+F1) — Change모드 && 비루트 && 파일
+        // Pretty Print (구 ws30_codeeditor_prettyBtn, C25 + Shift+F1) — Change모드 && 비루트 && 파일 && 포맷지원언어.
+        //   최초 빌드 시점엔 에디터가 아직 없어(canFormat=false) 비활성으로 시작 → 에디터 준비/언어적용 시
+        //   _hookMainFormatWatch·EDITOR_LOAD 가 활성 보정(비활성→활성은 안전, 죽은 활성버튼 없음).
         TB.appendChild(_tbBtn({
             id: "ws30_codeeditor_prettyBtn", fa: "indent",
             tooltip: _msg("C25") + " (Shift+F1)",
-            disabled: !(bEdit && !bRoot && !bFolder),
+            disabled: !(bEdit && !bRoot && !bFolder && _canFormatMain()),
             press: _prettyPrint
         }));
 

@@ -101,6 +101,25 @@ body {
     justify-content: center;
 }
 
+/* 꾸밈정렬(텍스트+아이콘) / 복사(아이콘) = 보조 버튼(투명 톤) —
+   클라이언트 이벤트 에디터(ws_html5_client_editor .u4aCliEdPretty)와 동일 모습으로 통일. */
+.u4aEdPretty {
+    background: transparent;
+    border-color: transparent;
+    color: var(--sl-fg);
+}
+
+.u4aEdPretty:hover {
+    background: var(--sl-surface-2);
+}
+
+/* 아이콘 전용(복사) = 정사각 컴팩트(텍스트 패딩 제거). */
+.u4aEdIcoBtn {
+    min-width: 2.25rem;
+    padding: 0.4rem 0.6rem;
+    justify-content: center;
+}
+
 /* 로딩 오버레이 = 공통 .u4a-busy(shell.css SSOT — 카드+이중링 스피너, data-busy 토글, 0.3s 지연,
    스크림 없음). 화면별 스피너/오버레이 CSS 제거 — editorFrame.html 이 .u4a-busy 마크업을 소비.
    저장 토스트도 공통 .u4a-toast(shell.css — 화면 정중앙). 화면별 스타일 없음. */

@@ -429,6 +429,11 @@ button:focus-visible {
     cursor: pointer;
     white-space: nowrap;
     color: var(--text);
+    /* 행별 가로 구분선(전 트리 공통) — 원본 UI5 TreeTable 처럼 각 행을 경계선으로 구분.
+       2026-07-10 사용자(장군) 지시로 공통 승격: ServerList·USP·MIME·WS20 전 트리 동일 적용.
+       색은 의미 토큰(--line)만, 굵기는 컬럼트리(.u4aColTreeRow)와 동일 0.0625rem. box-sizing:border-box(아래)라 행 높이 불변.
+       ※ HTML5 트리는 실제 노드만 렌더 → 노드 끝난 아래 빈영역엔 선 없음(UI5 는 빈행까지 격자). */
+    border-bottom: 0.0625rem solid var(--line);
     /* 들여쓰기 표준(전 트리 공통) — 깊이(--u4a-tree-depth)는 createTree 가 행에 부여,
        padding 은 여기서 계산. 좁은 패널에선 아래 컨테이너 쿼리가 step 을 줄여 이름 공간 확보. */
     padding-left: calc(0.375rem + var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem));
@@ -441,6 +446,28 @@ button:focus-visible {
      그 값으로 고정 → total×ROWH 가 실제와 정확히 일치 → 떨림 제거(테이블 .u4a-table 와 동일 기법).
    비가상 트리는 --u4a-vsrowh 미설정 → auto(=위 min-height 자연높이) 그대로. */
 .u4a-tree__row { height: var(--u4a-vsrowh, auto); box-sizing: border-box; }
+
+/* ==========================================================================
+ * 표형 격자(옵션) — createTree({grid:true}) 가 부여하는 .u4a-tree--grid. 16 §3.4.1 공통 SSOT.
+ *   화면마다 격자 CSS 를 복제하지 말고 이 한 곳을 소비한다(2026-07-10 통일 — WS20/USP 가 각자 넣던 중복 제거).
+ *   · [가로 행선 + 빈영역 채움] = 완전 공통. ul(=행과 함께 스크롤)에 얹어 세로 스크롤 시 행과 안 어긋남
+ *     (고정배경 금지). 주기 = 가상스크롤 실제 행높이 var(--u4a-vsrowh)(리터럴 금지 — 어긋남). 색 = 행
+ *     border-bottom 과 동일 --line. 빈 영역까지 채우려면 ul 이 스크롤영역을 채워야 함(min-height 는 화면 소유:
+ *     WS20=100% / USP=calc(100% - 헤더)).
+ *   · [세로 컬럼선] = 컬럼 구조가 화면마다 달라(WS20=버튼 컬럼 / USP=설명 42%) 화면이 변수 2개로 위치·색만 지정:
+ *       --u4a-tree-grid-vcolor (기본 transparent = 세로선 없음), --u4a-tree-grid-vx (background-position-x, 예 'right calc(...)').
+ * ========================================================================== */
+.u4a-tree.u4a-tree--grid {
+    background-color: transparent;   /* 공통 .u4a-tree{background:var(--surface)} 무력화 — 뒤 패널색이 transparent 구간으로 비침 */
+    background-image:
+        linear-gradient(var(--u4a-tree-grid-vcolor, transparent), var(--u4a-tree-grid-vcolor, transparent)),
+        repeating-linear-gradient(to bottom,
+            transparent 0, transparent calc(var(--u4a-vsrowh, 2.5rem) - 0.0625rem),
+            var(--line) calc(var(--u4a-vsrowh, 2.5rem) - 0.0625rem), var(--line) var(--u4a-vsrowh, 2.5rem));
+    background-size: 0.0625rem 100%, auto auto;
+    background-position: var(--u4a-tree-grid-vx, right 0) top, left top;
+    background-repeat: no-repeat, repeat;
+}
 
 /* trailing 슬롯(배지/설명/액션 등)을 우측정렬 — createTree 가 slotTrailing 반환 시 행에 부여 */
 .u4a-tree__row[data-u4a-tree-split] {

@@ -62,6 +62,9 @@
         _tree = U4AUI.createTree({
             // 대용량 USP 소스 트리 대비 — flat+windowed 렌더(보이는 행만 DOM). 행높이는 usp.css 가 고정(균일).
             virtual: true,
+            // 표형 격자(공통) — 가로 행선+빈영역 채움은 공통 .u4a-tree--grid 가 담당(격자 CSS 복제 금지, 16 §3.4.1).
+            //   세로선은 설명 컬럼폭이 42%(비율)라 공통 세로선 변수 미지정 → 세로선은 노드행 .u4aWs30TreeDesc border-left 만.
+            grid: true,
             roots: function () {
                 var a = [];
                 try { a = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { }
@@ -101,6 +104,19 @@
             // WS30 확장 식별/선택표시
             rowHook: function (oRow, n) {
                 oRow.classList.add("u4aWs30TreeRow");
+                // 이름(토글+아이콘+라벨)을 고정폭 "이름 셀"로 묶는다 — 리사이즈 대상 컬럼(설명은 채움).
+                //   makeColumnTree rowHook 과 동일 패턴. 없으면 라벨(flex:1)이 남는폭을 먹어 컬럼 경계가 안 잡힘.
+                if (!oRow.querySelector(".u4aWs30TreeNameCell")) {
+                    var oNameCell = document.createElement("div");
+                    oNameCell.className = "u4aWs30TreeNameCell";
+                    var oTog = oRow.querySelector(".u4a-tree__toggle");
+                    var oIco = oRow.querySelector(".u4a-tree__icon");
+                    var oLbl = oRow.querySelector(".u4a-tree__label");
+                    if (oTog) { oNameCell.appendChild(oTog); }
+                    if (oIco) { oNameCell.appendChild(oIco); }
+                    if (oLbl) { oNameCell.appendChild(oLbl); }
+                    oRow.insertBefore(oNameCell, oRow.firstChild);
+                }
                 var k = _key(n);
                 if (k !== "") { oRow.setAttribute("data-objky", k); }
                 if (n && n.ISSEL) { oRow.setAttribute("aria-selected", "true"); }
@@ -121,6 +137,7 @@
         var oTree = _ensureTree();
         if (!oTree) { return; }
 
+        // (세로 컬럼선은 공통 격자 배경 변수로 그린다 — usp.css --u4a-tree-grid-vx. 옛 flex 레이어는 스크롤 밀림 버그로 폐기.)
         // BODY 에는 컬럼 헤더(.u4aWs30TreeColHead, sticky)가 먼저 들어 있으므로 통째로 비우지 않고
         //   트리 el 만 헤더 뒤에 1회 붙인다(헤더 보존 → 행과 동일 폭 컨텍스트 유지).
         if (oTree.el.parentNode !== BODY) {

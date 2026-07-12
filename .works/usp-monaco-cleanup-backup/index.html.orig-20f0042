@@ -278,22 +278,28 @@
          */
         function getMonacoLanguage(sExtension) {
 
-            // ★ 손으로 만든 확장자표(오타 위험) 대신 Monaco 내장 언어 목록으로 판정한다.
-            //   monaco.languages.getLanguages() = { id, extensions:[".js",...], aliases, ... } 전체.
-            //   확장자가 매칭되는 언어가 있으면 그 id, 없으면(미지원) 기본 "plaintext" 로 폴백(장군님 지시 2026-07-13).
-            //   반환 형태는 기존 호출부(oLanguage.langu / oMonacoLangu?.langu)와 호환되게 { ext, langu } 유지.
-            var sExt = "." + String(sExtension || "").toLowerCase().replace(/^\.+/, "");
-            var sLangu = "plaintext";   // Monaco 미지원 확장자 = 기본 텍스트(포맷터 없음 → 꾸밈정렬 버튼 자동 비활성)
+            let aLanguConv = [
+                { ext: "js", langu: "javascript" },
+                { ext: "mjs", langu: "javascript" },
+                { ext: "cjs", langu: "javascript" },
+                { ext: "ts", langu: "typescript" },
+                { ext: "tsx", langu: "typescript" },
+                { ext: "css", langu: "css" },
+                { ext: "scss", langu: "scss" },
+                { ext: "less", langu: "less" },
+                { ext: "markdown", langu: "md" },
+                { ext: "shell", langu: "sh" },
+                { ext: "bash", langu: "bash" },
+                { ext: "htm", langu: "html" },
+                { ext: "html", langu: "html" },
+                { ext: "xml", langu: "xml" },
+                { ext: "svg", langu: "svg" },
+                { ext: "txt", langu: "text" },
+                { ext: "json", langu: "json" },
+                { ext: "py", langu: "python" }
+            ];
 
-            try {
-                var aLangs = (monaco && monaco.languages && monaco.languages.getLanguages) ? monaco.languages.getLanguages() : [];
-                for (var i = 0; i < aLangs.length; i++) {
-                    var L = aLangs[i];
-                    if (L && L.extensions && L.extensions.indexOf(sExt) !== -1) { sLangu = L.id; break; }
-                }
-            } catch (e) { /* monaco 미로드 등 → plaintext 유지 */ }
-
-            return { ext: sExtension, langu: sLangu };
+            return aLanguConv.find(e => e.ext === (sExtension || "").toLowerCase()) || undefined;
 
         }
 

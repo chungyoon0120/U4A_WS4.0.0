@@ -42,6 +42,7 @@
     }
 
     function _esc(s) { return (oAPP.usphtml._esc ? oAPP.usphtml._esc(s) : String(s == null ? "" : s)); }
+    function _model(p) { try { var v = APPCOMMON.fnGetModelProperty(p); return v == null ? null : v; } catch (e) { return null; } }
 
     // 공통 헤더(타이틀바) 하단 y — 팝업이 브라우저 타이틀바(클릭 불가 영역)를 덮지 않게 클램프(16번 §2.2).
     //   (u4a-ui.js 의 _topChromeBottom 은 비공개 → 동일 로직 인라인. 공통 미변경.)
@@ -135,6 +136,27 @@
      *   (타이밍 없는 방식 — 플리커 없음). 바깥 클릭/ESC/스크롤/리사이즈에 전체 닫기(공통 패턴).
      * ==================================================================== */
     var _panels = [];
+    var _boundDocs = [];   // mousedown 리스너를 건 에디터 iframe 문서들(닫을 때 해제용)
+
+    // 에디터 iframe 내부 클릭도 메뉴를 닫는다 — 메뉴는 부모 document 에 그려지지만 모나코 편집영역은
+    //   iframe 안이라 그 내부 mousedown 은 부모 document 까지 전파되지 않는다(_onDocDown 미포착).
+    //   같은 출처(file://)라 contentDocument 에 직접 캡처 리스너를 걸어 Monaco 핸들러보다 먼저 닫는다.
+    function _bindEditorDocClose() {
+        _boundDocs = [];
+        try {
+            var aIfr = document.querySelectorAll("#uspEditorHost iframe.MONACO_EDITOR");
+            Array.prototype.forEach.call(aIfr, function (ifr) {
+                try {
+                    var oDoc = ifr.contentDocument;
+                    if (oDoc) { oDoc.addEventListener("mousedown", _closeAll, true); _boundDocs.push(oDoc); }
+                } catch (e) { }
+            });
+        } catch (e) { }
+    }
+    function _unbindEditorDocClose() {
+        _boundDocs.forEach(function (oDoc) { try { oDoc.removeEventListener("mousedown", _closeAll, true); } catch (e) { } });
+        _boundDocs = [];
+    }
 
     function _closeAll() {
         _panels.forEach(function (p) { if (p && p.parentNode) { p.parentNode.removeChild(p); } });
@@ -143,6 +165,7 @@
         document.removeEventListener("keydown", _onKey, true);
         window.removeEventListener("scroll", _closeAll, true);
         window.removeEventListener("resize", _closeAll, true);
+        _unbindEditorDocClose();
     }
     function _closeFrom(iLevel) {
         for (var i = _panels.length - 1; i >= iLevel; i--) {
@@ -179,6 +202,11 @@
                 + '<span class="u4a-menu__item-text"></span>'
                 + (bHasCh ? '<i class="u4aWs30EditCtxCaret fa-solid fa-chevron-right"></i>' : '');
             oItem.querySelector(".u4a-menu__item-text").textContent = (mi.DESC || "");
+            // 긴 라벨은 CSS 말줄임(…) → 잘렸을 때만 전체명 공통 툴팁(자식 텍스트 span 기준).
+            if (mi.DESC) {
+                oItem.setAttribute("data-tip", mi.DESC);
+                oItem.setAttribute("data-tip-trunc-sel", ".u4a-menu__item-text");
+            }
 
             if (bHasCh) {
                 oItem.addEventListener("mouseenter", function () { _closeFrom(iDepth + 1); _openSub(oItem, mi._ch, iDepth + 1); });
@@ -193,15 +221,32 @@
         return oWrap;
     }
 
-    // 패널 높이 제한(타이틀바~뷰포트 안) — 패턴이 많을 때 화면 밖으로 넘치지 않게.
-    function _clampHeight(oWrap, iTop) {
-        var iMax = window.innerHeight - iTop - 8;
-        if (iMax < 80) { iMax = 80; }
-        oWrap.style.maxHeight = iMax + "px";
-        oWrap.style.overflowY = "auto";
+    // 세로 배치 확정 — ★핵심: 메뉴가 열(타이틀바~뷰포트)에 "전부 들어가면" 스크롤을 만들지 않는다.
+    //   아래로 넘치면 위로 당겨 전체를 보여주고(스크롤 X), 열 전체보다 진짜 클 때만 상단고정+스크롤.
+    //   (이전 버그: maxHeight 여백이 위치 여백과 안 맞아, 다 들어가는데도 스크롤이 생겼음.)
+    function _finalizeVert(oWrap, iPreferTop) {
+        var iVh = window.innerHeight;
+        var iTop0 = _topChromeBottom() + 2;
+        var iH = oWrap.offsetHeight;
+        var iAvail = iVh - iTop0 - 8;   // 사용 가능한 세로 높이
+
+        if (iH <= iAvail) {
+            // 전부 표시 — 스크롤 없음. 아래로 넘치면 위로만 당긴다.
+            var iTop = iPreferTop;
+            if (iTop + iH + 4 > iVh) { iTop = iVh - iH - 4; }
+            if (iTop < iTop0) { iTop = iTop0; }
+            oWrap.style.top = iTop + "px";
+            oWrap.style.maxHeight = "";
+            oWrap.style.overflowY = "";
+        } else {
+            // 열 전체보다 큼 — 상단 고정 + 스크롤(불가피).
+            oWrap.style.top = iTop0 + "px";
+            oWrap.style.maxHeight = iAvail + "px";
+            oWrap.style.overflowY = "auto";
+        }
     }
 
-    // 루트 패널 — 커서 좌표에 배치(좌우/상하 클램프, 상단=타이틀바 아래).
+    // 루트 패널 — 커서 좌표에 배치(좌우 클램프, 세로는 _finalizeVert).
     function _openRoot(aItems, iX, iY) {
         var oWrap = _buildPanel(aItems, 0);
         oWrap.style.visibility = "hidden";
@@ -209,43 +254,34 @@
 
         var iW = oWrap.offsetWidth, iH = oWrap.offsetHeight;
         var iVw = window.innerWidth, iVh = window.innerHeight;
-        var iTop0 = _topChromeBottom() + 2;
 
         var iLeft = (iX + iW + 4 <= iVw) ? iX : (iX - iW);
         if (iLeft < 4) { iLeft = 4; }
-
-        var iTop = (iY + iH + 4 <= iVh) ? iY : (iY - iH);
-        if (iTop < iTop0) { iTop = iTop0; }
-        if (iTop + iH + 4 > iVh) { iTop = Math.max(iTop0, iVh - iH - 4); }
-
         oWrap.style.left = iLeft + "px";
-        oWrap.style.top = iTop + "px";
-        _clampHeight(oWrap, iTop);
+
+        // 아래 공간 충분하면 커서 아래로, 아니면 위로 펼침을 선호 top 으로.
+        var iPreferTop = (iY + iH + 4 <= iVh) ? iY : (iY - iH);
+        _finalizeVert(oWrap, iPreferTop);
         oWrap.style.visibility = "";
         _panels.push(oWrap);
     }
 
-    // 서브 패널 — 부모 항목 우측에 배치(오른쪽 공간 부족하면 좌측으로 플립).
+    // 서브 패널 — 부모 항목 우측에 배치(오른쪽 공간 부족하면 좌측으로 플립), 세로는 _finalizeVert.
     function _openSub(oAnchorItem, aItems, iDepth) {
         var oWrap = _buildPanel(aItems, iDepth);
         oWrap.style.visibility = "hidden";
         document.body.appendChild(oWrap);
 
         var r = oAnchorItem.getBoundingClientRect();
-        var iW = oWrap.offsetWidth, iH = oWrap.offsetHeight;
-        var iVw = window.innerWidth, iVh = window.innerHeight;
-        var iTop0 = _topChromeBottom() + 2;
+        var iW = oWrap.offsetWidth;
+        var iVw = window.innerWidth;
 
         var iLeft = (r.right + iW + 4 <= iVw) ? (r.right - 2) : (r.left - iW + 2);
         if (iLeft < 4) { iLeft = 4; }
-
-        var iTop = r.top - 4;
-        if (iTop < iTop0) { iTop = iTop0; }
-        if (iTop + iH + 4 > iVh) { iTop = Math.max(iTop0, iVh - iH - 4); }
-
         oWrap.style.left = iLeft + "px";
-        oWrap.style.top = iTop + "px";
-        _clampHeight(oWrap, iTop);
+
+        // 부모 항목 상단에 맞춰 시작(넘치면 _finalizeVert 가 위로 당김).
+        _finalizeVert(oWrap, r.top - 4);
         oWrap.style.visibility = "";
         _panels.push(oWrap);
     }
@@ -262,17 +298,53 @@
         document.addEventListener("keydown", _onKey, true);
         window.addEventListener("scroll", _closeAll, true);
         window.addEventListener("resize", _closeAll, true);
+        _bindEditorDocClose();   // 에디터 iframe 내부 클릭도 닫히게(부모 document 미포착 보완)
     }
 
     /* ====================================================================
-     * 클릭 디스패치 — ★다음 단계★. 등록 핸들러 있으면 실행, 없으면 미구현 로그.
+     * 소스 패턴 삽입 — 구 _setCtxPatternMenuClick 이식(UI5 모델/바인딩 제거).
+     *   · 코드(DATA) 있는 잎만 대상(폴더/루트/디자이너는 DATA 없음 → false 반환).
+     *   · Change 모드(IS_EDIT="X")에서만 실제 삽입(Display 는 원본대로 조용히 no-op).
+     *   · 우클릭 시점에 보관한 oSelectedCtxInfo(oEditor/oMonaco)로 현재 커서 위치에 executeEdits.
+     * ==================================================================== */
+    function _insertPattern(mi) {
+        var sData = (mi && typeof mi.DATA === "string") ? mi.DATA : "";
+        if (!sData) { return false; }   // 코드 없는 항목(디자이너 등)은 여기서 처리 안 함
+
+        // Change 모드에서만 삽입(원본 bIsEdit 게이트). Display 면 패턴으로는 처리됐으나 삽입만 생략.
+        if ((_model("/WS30/APP") || {}).IS_EDIT !== "X") { return true; }
+
+        var oInfo = oAPP.usp.oSelectedCtxInfo || {};
+        var oEditor = oInfo.oEditor, oMonaco = oInfo.oMonaco;
+        if (!oEditor || !oMonaco) { return true; }
+
+        try {
+            var oPos = oEditor.getPosition();
+            oEditor.executeEdits("", [{
+                range: new oMonaco.Range(oPos.lineNumber, oPos.column, oPos.lineNumber, oPos.column),
+                text: sData
+            }]);
+            // 삽입 끝 위치로 커서 이동(선택 없이) + 포커스 + 변경표시(원본 동일).
+            oEditor.setPosition(oEditor.getPosition());
+            oEditor.focus();
+            if (oAPP.fn.setAppChangeWs30) { oAPP.fn.setAppChangeWs30("X"); }
+        } catch (e) {
+            console.error("[HTML5][WS30] 패턴 삽입 오류:", e);
+        }
+        return true;
+    }
+
+    /* ====================================================================
+     * 클릭 디스패치 — 등록 핸들러 → 패턴 삽입 → (그 외) 미구현 로그 순.
      * ==================================================================== */
     function _dispatch(mi) {
         try {
             var sCKEY = (mi && mi.CKEY) || "";
             var fn = oAPP.usphtml.uspEditorCtxAction[sCKEY];
             if (typeof fn === "function") { fn(mi); return; }
-            // 소스 패턴 삽입(PAT*/PTN*) · Theme/Snippet Designer(M001_C*) — 다음 단계.
+            // 소스 패턴 삽입(DATA 있는 잎).
+            if (_insertPattern(mi)) { return; }
+            // 그 외(Theme/Snippet Designer 등) — 다음 단계.
             console.warn("[HTML5][WS30] 에디터 컨텍스트 메뉴 미구현(다음 단계):", sCKEY, (mi && mi.DESC) || "");
         } catch (e) {
             console.error("[HTML5][WS30] 에디터 컨텍스트 메뉴 실행 오류:", e);

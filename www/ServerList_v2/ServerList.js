@@ -1100,13 +1100,14 @@
         oPaneLeft.style.minWidth = "300px";
         const oBar = _el("div", "u4a-splitter__bar");
         oBar.setAttribute("role", "separator");
-        _attachSplitterDrag(oBar, oPaneLeft);
         const oPaneRight = _el("div", "u4a-splitter__pane");
         oPaneRight.id = "u4aWsTablePane";
         oPaneRight.style.flex = "1 1 auto";
         oPaneRight.style.minWidth = "300px";
         oSplitter.append(oPaneLeft, oBar, oPaneRight);
         oBody.appendChild(oSplitter);
+        // 공통 스플리터 배선(인접) — 드래그/재클램프/더블클릭 전부 공통 소비(16 §4.4).
+        window.U4AUI.wireSplitter(oSplitter, { axis: "x", onResize: function () { if (oAPP.fn.fnUpdateTableWidthClass) { oAPP.fn.fnUpdateTableWidthClass(); } } });
     }
 
     /** Master-Detail 뷰 본문 (폴더 → 서버목록 → 상세, 3컬럼) */
@@ -1138,12 +1139,10 @@
         oCol3.style.flex = "0 1 30%";
         oCol3.style.minWidth = "300px";
 
-        // give-way 드래그: 바1=트리(좌 사이드), 바2=상세(우 사이드). 센터(목록)가 흡수.
-        _attachGiveWaySplitterDrag(oBar1, oCol1, "left");
-        _attachGiveWaySplitterDrag(oBar2, oCol3, "right");
-
         oSplit.append(oCol1, oBar1, oCol2, oBar2, oCol3);
         oBody.appendChild(oSplit);
+        // 공통 스플리터 배선(give-way 3분할) — self 확대→센터 흡수→반대편 min 양보(16 §4.4).
+        window.U4AUI.wireSplitter(oSplit, { axis: "x", mode: "giveway", onResize: function () { if (oAPP.fn.fnUpdateTableWidthClass) { oAPP.fn.fnUpdateTableWidthClass(); } } });
     }
 
     /** 선택 폴더 내용 렌더 — 활성 뷰에 맞게 분기 */
@@ -1817,8 +1816,7 @@
         // 활성 뷰 렌더 (초기엔 데이터 비어있음 — fnOnListupSapLogon 이후 재렌더됨)
         oAPP.fn.fnRenderActiveView();
 
-        // 창 리사이즈 시 스플리터 폭 재클램프 (드래그로 고정된 px 가 창 축소 시 넘치는 문제)
-        _bindSplitterResizeClamp();
+        // 창 리사이즈 재클램프는 공통 wireSplitter 가 자동 등록(별도 배선 불필요, 16 §4.4).
 
         // 페이드 인
         setTimeout(() => { oContent.dataset.show = "true"; }, 50);
@@ -3780,208 +3778,6 @@
         return window.U4AUI.createSelect(aItems, sValue, fnChange);
     }
 
-    /** 드래그 대상 패널 오른쪽으로 확보해야 할 폭 — 뒤 형제(패널 min-width + 바)를 합산.
-     *  2컬럼/3컬럼 모두 정확(마지막 패널이 짜부되어 사라지는 문제 방지). */
-    function _splitterReserve(oPane) {
-        let iReserve = 0;
-        let el = oPane.nextElementSibling;
-        while (el) {
-            if (el.classList && el.classList.contains("u4a-splitter__bar")) {
-                iReserve += el.offsetWidth || 11;
-            } else if (el.classList && el.classList.contains("u4a-splitter__pane")) {
-                // 뒤 패널이 px 고정(드래그됨, 축소 불가)이면 '실제 폭'을, 유연(1 1 auto)이면
-                // 최소폭을 예약 → 고정 패널들 합이 커도 마지막 유연 패널이 잘려 사라지지 않음.
-                const bFixed = /\dpx/.test(el.style.flex || "");
-                if (bFixed) {
-                    iReserve += el.offsetWidth || 160;
-                } else {
-                    const mw = parseFloat(getComputedStyle(el).minWidth);
-                    iReserve += (mw && mw > 0) ? mw : 160;
-                }
-            }
-            el = el.nextElementSibling;
-        }
-        return iReserve > 0 ? iReserve : 248; // 폴백(뒤 형제 없을 때)
-    }
-
-    function _minPaneW(oPane) {
-        const mw = parseFloat(getComputedStyle(oPane).minWidth);
-        return (mw && mw > 0) ? mw : 120;
-    }
-    // 바 바로 오른쪽의 인접 패널
-    function _rightPaneOf(oBar) {
-        let el = oBar.nextElementSibling;
-        while (el && !(el.classList && el.classList.contains("u4a-splitter__pane"))) { el = el.nextElementSibling; }
-        return el;
-    }
-    // 해당 패널이 (뒤에 다른 패널이 없는) 마지막 유연 패널인가
-    function _isLastPane(oPane) {
-        let el = oPane && oPane.nextElementSibling;
-        while (el) {
-            if (el.classList && el.classList.contains("u4a-splitter__pane")) { return false; }
-            el = el.nextElementSibling;
-        }
-        return true;
-    }
-
-    /**
-     * 표준 스플리터(인접 재분배): 바를 드래그하면 "양 옆 인접 패널" 사이에서만 폭을
-     * 주고받는다. 오른쪽 이웃이 마지막(유연) 패널이면 왼쪽만 px 로 두고 flex 로 채운다.
-     *  → 바2 를 옮겨도 바1 은 col2 를 줄이며 정상 이동(상식적 동작). 마지막 패널 안 사라짐.
-     */
-    /**
-     * give-way 스플리터 드래그 (Master-Detail 전용) — WS20 _bindResizer 포팅.
-     *   구조: 트리(좌 사이드) | 목록(센터=#u4aWsMasterListPane, 1 1 auto) | 상세(우 사이드).
-     *   바를 끌면 self(사이드) 확대 → ① 센터가 먼저 자기 min 까지 흡수 → ② 센터가 min 에 닿으면
-     *   반대편 사이드가 자기 min 까지 양보(밀림). self 상한 = 전체 − 센터min − 반대편min(hard stop).
-     *   self·opp 는 0 0 px(JS 단일 출처), 센터는 1 1 auto 라 나머지를 자동 흡수.
-     * @param {HTMLElement} oBar   드래그 바
-     * @param {HTMLElement} oSelf  바가 리사이즈할 사이드 패널(트리=좌바 / 상세=우바)
-     * @param {"left"|"right"} sSide  좌바=+delta(우로 끌면 self 확대) / 우바=−delta
-     */
-    function _attachGiveWaySplitterDrag(oBar, oSelf, sSide) {
-        // ★ oSplit 은 setup 시점(append 전)엔 oBar.parentElement 가 null 이므로 mousedown 에서 잡는다.
-        let oSplit = null;
-        const _min = (el) => { const v = parseFloat(getComputedStyle(el).minWidth); return (v > 0) ? v : 120; };
-        const _barsW = () => {
-            let w = 0;
-            oSplit.querySelectorAll(".u4a-splitter__bar").forEach((b) => { w += b.offsetWidth || 8; });
-            return w;
-        };
-        const _center = () => oSplit.querySelector("#u4aWsMasterListPane");
-        const _opp = () => oSplit.querySelector(
-            oSelf.id === "u4aWsTreePane" ? "#u4aWsMasterDetailPane" : "#u4aWsTreePane"
-        );
-
-        let bDrag = false, iStartX = 0, iStartW = 0;
-        function lf_move(ev) {
-            if (!bDrag || !oSplit) { return; }
-            const oCenter = _center(), oOpp = _opp();
-            if (!oCenter || !oOpp) { return; }
-
-            const iCenterMin = _min(oCenter), iSelfMin = _min(oSelf), iOppMin = _min(oOpp);
-            const iTotal = oSplit.clientWidth - _barsW();
-
-            const iDelta = ev.clientX - iStartX;
-            let iSelf = (sSide === "left") ? (iStartW + iDelta) : (iStartW - iDelta);
-
-            // self 상한 = 센터·반대편이 모두 min 일 때
-            const iSelfMax = iTotal - iCenterMin - iOppMin;
-            if (iSelf > iSelfMax) { iSelf = iSelfMax; }
-            if (iSelf < iSelfMin) { iSelf = iSelfMin; }
-
-            // 반대편: 센터가 자기 min 보다 더 줄어야 할 때만 양보(자기 min 까지)
-            let iOpp = oOpp.getBoundingClientRect().width;
-            if (iTotal - iSelf - iOpp < iCenterMin) {
-                iOpp = iTotal - iSelf - iCenterMin;
-                if (iOpp < iOppMin) { iOpp = iOppMin; }
-            }
-
-            oSelf.style.flex = "0 0 " + iSelf + "px";
-            oOpp.style.flex = "0 0 " + iOpp + "px";
-        }
-        function lf_up() {
-            if (!bDrag) { return; }
-            bDrag = false;
-            document.body.style.cursor = "";
-            window.removeEventListener("mousemove", lf_move);
-            window.removeEventListener("mouseup", lf_up);
-        }
-        oBar.addEventListener("mousedown", (ev) => {
-            oSplit = oBar.parentElement; // 이 시점엔 이미 append 됨
-            if (!oSplit) { return; }
-            bDrag = true;
-            iStartX = ev.clientX;
-            iStartW = oSelf.getBoundingClientRect().width;
-            document.body.style.cursor = "col-resize";
-            window.addEventListener("mousemove", lf_move);
-            window.addEventListener("mouseup", lf_up);
-            ev.preventDefault();
-        });
-    }
-
-    function _attachSplitterDrag(oBar, oLeftPane) {
-        let bDrag = false;
-        oBar.addEventListener("mousedown", (ev) => {
-            bDrag = true;
-            ev.preventDefault();
-            document.body.style.cursor = "col-resize";
-        });
-        window.addEventListener("mousemove", (ev) => {
-            if (!bDrag) { return; }
-            const oLRect = oLeftPane.getBoundingClientRect();
-            const iMinL = _minPaneW(oLeftPane);
-            const oRight = _rightPaneOf(oBar);
-
-            if (oRight && !_isLastPane(oRight)) {
-                // 인접 재분배 — 왼쪽/오른쪽 패널 폭 합은 보존(그 뒤 패널은 불변)
-                const iTotal = oLeftPane.offsetWidth + oRight.offsetWidth;
-                const iMinR = _minPaneW(oRight);
-                let newL = ev.clientX - oLRect.left;
-                newL = Math.max(iMinL, Math.min(iTotal - iMinR, newL));
-                oLeftPane.style.flex = `0 0 ${newL}px`;
-                oRight.style.flex = `0 0 ${iTotal - newL}px`;
-            } else {
-                // 오른쪽이 마지막(유연) 패널 → 왼쪽만 px, 오른쪽은 flex 로 잔여폭 채움
-                const oSplitRect = oBar.parentElement.getBoundingClientRect();
-                const iReserve = oRight ? (oBar.offsetWidth + _minPaneW(oRight)) : 0;
-                let newL = ev.clientX - oLRect.left;
-                newL = Math.max(iMinL, Math.min(oSplitRect.right - oLRect.left - iReserve, newL));
-                oLeftPane.style.flex = `0 0 ${newL}px`;
-            }
-
-            if (oAPP.fn.fnUpdateTableWidthClass) {
-                oAPP.fn.fnUpdateTableWidthClass();
-            }
-        });
-        window.addEventListener("mouseup", () => {
-            if (bDrag) {
-                bDrag = false;
-                document.body.style.cursor = "";
-            }
-        });
-    }
-
-    /**
-     * 창 리사이즈 시: 드래그로 고정된 px 폭의 스플리터 패널이 줄어든 창을 넘쳐
-     * 다른 패널/스플릿 바가 overflow:hidden 에 잘려 숨는 문제 방지.
-     *  → 현재 화면의 모든 .u4a-splitter 패널(px 고정분)을 컨테이너에 맞게 재클램프.
-     *  (한 번만 바인딩 — 뷰 전환으로 스플리터가 새로 그려져도 querySelector 로 현재 것 처리)
-     */
-    let _splitterResizeBound = false;
-    function _bindSplitterResizeClamp() {
-        if (_splitterResizeBound) { return; }
-        _splitterResizeBound = true;
-        window.addEventListener("resize", () => {
-            document.querySelectorAll(".u4a-splitter").forEach((oSplitter) => {
-                const iAvail = oSplitter.getBoundingClientRect().width;
-                if (!iAvail) { return; }
-                const aKids = Array.prototype.slice.call(oSplitter.children);
-                const aPanes = aKids.filter((el) => el.classList && el.classList.contains("u4a-splitter__pane"));
-                if (!aPanes.length) { return; }
-                const iBars = aKids.filter((el) => el.classList && el.classList.contains("u4a-splitter__bar"))
-                    .reduce((s, b) => s + b.offsetWidth, 0);
-                const _minOf = (p) => { const m = parseFloat(getComputedStyle(p).minWidth); return (m && m > 0) ? m : 120; };
-                const _pxOf = (p) => { const m = (p.style.flex || "").match(/(\d+(?:\.\d+)?)px/); return m ? parseFloat(m[1]) : null; };
-                // px 고정 패널 vs 유연 패널 분리
-                const aFixed = [], aFlex = [];
-                aPanes.forEach((p) => { (_pxOf(p) != null ? aFixed : aFlex).push(p); });
-                const iFixedW = aFixed.reduce((s, p) => s + _pxOf(p), 0);
-                const iFlexMin = aFlex.reduce((s, p) => s + _minOf(p), 0);
-                // 고정폭 합 + 바 + 유연패널 최소 가 창을 넘으면, 큰 고정 패널부터 min 까지 줄여 확보
-                //  → 마지막(유연) 패널(상세 등)이 화면 밖으로 밀려 잘리는 것 방지
-                let iNeed = (iFixedW + iBars + iFlexMin) - iAvail;
-                if (iNeed <= 0) { return; }
-                aFixed.slice().sort((a, b) => _pxOf(b) - _pxOf(a)).forEach((p) => {
-                    if (iNeed <= 0) { return; }
-                    const iCur = _pxOf(p), iMin = _minOf(p);
-                    const iCut = Math.min(Math.max(0, iCur - iMin), iNeed);
-                    if (iCut > 0) { p.style.flex = `0 0 ${iCur - iCut}px`; iNeed -= iCut; }
-                });
-            });
-            if (oAPP.fn.fnUpdateTableWidthClass) { oAPP.fn.fnUpdateTableWidthClass(); }
-        });
-    }
 
     /**
      * 창 리사이즈(특히 최대화→restore) 시, 드래그로 고정 px 가 된 트리 패널이

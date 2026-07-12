@@ -23,8 +23,11 @@
     --ws30-hover-bg: var(--hover-bg);
     /* 좌측 트리 패널 최소=기본 폭 단일 출처(_bindResizer 가 computed min-width 로 읽어 드래그 하한과 일치) */
     --ws30-tree-minw: 21.25rem;   /* 340px */
-    /* 트리 설명(Description) 컬럼 폭 단일 출처 — 컬럼 헤더와 각 행 설명 셀이 공유(정렬 일치) */
-    --ws30-desc-w: 42%;
+    /* 트리 컬럼 폭 — 리사이즈 대상 = 이름 컬럼(고정폭, §3.4.2: 리사이즈 컬럼은 고정 px/rem·% 금지),
+       설명 컬럼은 나머지 채움(flex:1). 이름 폭 단일 출처(헤더/이름셀/세로선레이어 공유) → 리사이즈 시 --ws30-name-w 만 갱신.
+       (그립을 이름|설명 분리선에 두면 공통 attachColumnResize 가 왼쪽=이름 컬럼을 리사이즈: setWidth=원폭+드래그델타.) */
+    --ws30-name-w: 11.25rem;   /* 180px 기본 — 더블클릭 시 복귀 */
+    /* (구 --ws30-desc-w:42% 는 리사이즈 도입으로 폐기 — 설명은 flex:1 채움) */
 
     height: 100%;
     display: flex;
@@ -125,7 +128,7 @@
 /* ── 트리 컬럼 헤더(이름 | 설명) — 원본 TreeTable 2컬럼(Name C11 / Description A35).
    ★ 본문(스크롤 영역) 안에 sticky 로 둔다 → 행과 동일한 폭 컨텍스트(스크롤바 영향 동일,
      box-sizing/padding 동일)를 공유해야 컬럼 구분선이 행 구분선과 정확히 정렬된다.
-   두께는 트랜잭션 툴바(.u4a-ws10__subheader)와 동일. 설명 컬럼 폭은 --ws30-desc-w 단일 출처. */
+   두께는 트랜잭션 툴바(.u4a-ws10__subheader)와 동일. 이름 컬럼=고정폭(--ws30-name-w, 리사이즈 대상)·설명=채움. */
 .u4aWs30TreeColHead {
     position: sticky;
     top: 0;
@@ -145,21 +148,32 @@
     border-bottom: 0.0625rem solid var(--ws30-line);
 }
 .u4aWs30TreeColName {
-    flex: 1 1 auto;
+    flex: 0 0 var(--ws30-name-w);    /* 이름 = 고정폭(리사이즈 대상) */
     min-width: 0;
     display: flex;
     align-items: center;
     padding-left: 0.5rem;
 }
 .u4aWs30TreeColDesc {
-    flex: 0 0 var(--ws30-desc-w);
+    flex: 1 1 auto;                  /* 설명 = 나머지 채움 */
     min-width: 0;
     box-sizing: border-box;          /* 행 설명셀과 동일 박스모델 → 구분선 위치 일치 */
+    position: relative;              /* 컬럼 리사이즈 그립(.u4aColTreeGrip)의 배치 기준(좌측 경계=분리선) */
     display: flex;
     align-items: center;
     padding-left: 0.5rem;
     border-left: 0.0625rem solid var(--ws30-line);
 }
+/* 컬럼 경계 hover 강조(리사이즈 그립 위 → 함수가 본문에 is-col-hover 토글, 드래그 중엔 끔).
+   ★ 공통 makeColumnTree(.u4aColTreeHl2/Hl3, shell.css)와 "동일 방식" 차용 = border-left accent + box-shadow inset 3px accent 바.
+     1px 색만 바꾸면 약해서 안 보인다(2026-07-13 장군 지적) → 검증된 3px 바로 헤더 구분선+행 설명셀 구분선을 또렷이,
+     빈영역 배경 세로선은 --u4a-tree-grid-vcolor accent 로 이어 컬럼 경계 전체를 강조. */
+.u4aWs30TreeBody.is-col-hover .u4aWs30TreeColDesc,
+.u4aWs30TreeBody.is-col-hover .u4aWs30TreeDesc {
+    border-left-color: var(--ws30-accent);
+    box-shadow: inset 0.1875rem 0 0 var(--ws30-accent);
+}
+.u4aWs30TreeBody.is-col-hover .u4aWs30Tree.u4a-tree { --u4a-tree-grid-vcolor: var(--ws30-accent); }
 
 /* ── 트리 본문 (공통 .u4a-tree 컴포넌트 + USP 확장 — WS20 트리와 동일 UX) ──
    hover/선택(aria-selected)/셰브론 회전(aria-expanded)/토글/아이콘/라벨은
@@ -171,6 +185,11 @@
     overflow: hidden auto;        /* 세로만 스크롤(WS20 동일) — 설명 라벨 우측 고정 */
     background: var(--ws30-panel);
 }
+/* 세로 컬럼선(설명 경계)은 이제 이름 컬럼이 "고정 px"(--ws30-name-w)이므로 공통 격자 세로선 변수로 그린다
+   (아래 .u4aWs30Tree.u4a-tree 의 --u4a-tree-grid-vcolor/-vx — WS20 과 동일 메커니즘으로 통일).
+   ★ 구 flex 레이어(.u4aWs30TreeGridV) 방식은 abs inset:0 가 스크롤과 함께 뷰포트 밖으로 밀려
+     긴 트리 스크롤 시 세로선이 사라지는 버그가 있어 폐기(2026-07-13 안티 지적 + 실측 확인).
+     배경 방식은 x 가 고정이라 스크롤 무관, ul min-height 로 빈 영역까지 연속. */
 
 /* 공통 트리 설정(행 높이·폰트·간격 재정의 X — shell.css .u4a-tree* 가 단일 출처):
    - width:auto/min-width:100% : 행을 패널 폭에 맞춰 설명 컬럼이 항상 보이게(공통 max-content 무력화)
@@ -178,14 +197,22 @@
 .u4aWs30Tree.u4a-tree {
     width: auto;
     min-width: 100%;
+    /* 세로 컬럼선 = 공통 격자(shell.css .u4a-tree--grid) 배경. 이름이 고정 px 라 x 가 고정 → 스크롤 무관·정렬 정확.
+       x = 좌측에서 [ul 좌측 1px + 행 padding 0.375rem + 이름 컬럼폭] = 설명셀 border-left(.u4aWs30TreeDesc) 위치.
+       리사이즈로 --ws30-name-w 가 바뀌면 이 x 도 따라 이동(calc 가 var 를 use 시점에 치환). WS20 과 동일 메커니즘. */
+    --u4a-tree-grid-vcolor: var(--line);
+    --u4a-tree-grid-vx: left calc(0.375rem + 1px + var(--ws30-name-w));
     /* 공통 .u4a-tree 의 padding-top(0.25rem)을 제거 — 컬럼 헤더 border-bottom 과 첫 행 사이 간격 방지.
        좌측 1px(선택 인디케이터 여백)·하단 0.25rem 은 유지. */
     padding-top: 0;
-    /* ★ 공통 .u4a-tree 의 min-height:100% 무력화 — USP 트리만은 스크롤 컨테이너(uspTreeBody) 안에
-       sticky 컬럼 헤더(2.75rem)가 ul 의 형제로 함께 들어있다. min-height:100% 면 ul 이 컨테이너 높이만큼
-       늘어나 [헤더 + ul(100%)] 가 컨테이너를 항상 헤더 높이만큼 초과 → 데이터가 없어도 세로 스크롤이 생긴다.
-       USP 는 컨테이너(uspTreeBody)가 이미 같은 --ws30-panel(surface) 배경을 칠하므로 ul 을 늘릴 필요가 없다. */
-    min-height: 0;
+    /* ★ 빈 영역까지 "가로 행선" 격자 = 공통 .u4a-tree--grid(shell.css) 가 그린다(createTree grid:true).
+       ul 을 sticky 헤더(2.75rem) 아래 "남는 높이"만큼 채워(min-height:calc(100% - 2.75rem)) 공통 격자가 빈 영역까지 연속.
+       · [헤더 2.75rem + ul(100%-2.75rem)] = 컨테이너 정확히 → 데이터 없어도 빈 스크롤 안 생김
+         (옛 min-height:0 이 막던 그 문제를, 100% 대신 정확한 계산값으로 채워 해결).
+       ※ 세로 설명컬럼선은 노드 행마다 .u4aWs30TreeDesc border-left(풀하이트)로 이미 그려짐. 빈 영역 연장은
+          설명 컬럼폭이 % (--ws30-desc-w:42%) 라 공통 격자의 세로선 변수(--u4a-tree-grid-vx)로는 flex 기준과
+          어긋나 미지정(세로선 변수 안 줌 = 공통 격자가 세로선 생략). 배경은 공통이 담당하므로 여기선 안 그림. */
+    min-height: calc(100% - 2.75rem);
 }
 
 /* 가상 스크롤 행높이 고정은 공통 shell.css `.u4a-tree__row{height:var(--u4a-vsrowh,auto)}` 가 담당
@@ -200,9 +227,17 @@
 /* 아이콘↔이름 간격은 공통 행 gap(0.375rem) 단일 출처가 소유 → USP 전용 margin-right 제거
    (2026-06-23 트리 통일: 공통 gap 을 0.25→0.375 로 올려 USP 가 더하던 여백이 불필요해짐). */
 
-/* 이름 — 공통 createTree 라벨(.u4a-tree__label)에 USP 확장(WS20 동일).
-   trailing(우측 설명)을 오른쪽으로 밀려면 라벨이 남는 폭을 모두 차지(flex:1 1 0)해야 한다.
-   ※ 이게 빠지면 data-u4a-tree-split 의 space-between 이 토글/아이콘/라벨/설명을 가로로 흩뿌림. */
+/* 이름 셀(토글+아이콘+라벨 고정폭 묶음) — 리사이즈 대상 컬럼. rowHook 이 이 셀로 감싼다.
+   설명 컬럼(채움)과 분리되어 헤더 ColName(고정폭)·세로선레이어 gvName 과 동일 폭 컨텍스트를 가진다. */
+.u4aWs30TreeNameCell {
+    flex: 0 0 var(--ws30-name-w);
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;               /* 공통 행 gap 과 동일 */
+    overflow: hidden;
+}
+/* 이름 라벨 — 이름 셀 안에서 남는 폭 채우고 말줄임. */
 .u4aWs30TreeRow .u4a-tree__label {
     flex: 1 1 0;
     min-width: 0;
@@ -211,14 +246,15 @@
     white-space: nowrap;
 }
 
-/* 설명 컬럼 — 고정 폭(--ws30-desc-w)으로 헤더와 정렬, 좌측 구분선, 최대 2줄 클램프(초과 시 …),
+/* 설명 컬럼 — 채움(flex:1, 이름 고정폭 뒤 나머지)으로 헤더와 정렬, 좌측 구분선, 최대 2줄 클램프(초과 시 …),
    2줄 초과분은 트리 모듈이 overflow 감지해 title(툴팁) 부여. */
 /* 설명 '셀' — 행 전체 높이(stretch)로 좌측 구분선을 풀하이트로 긋고, 안의 텍스트를
    세로 중앙(vAlign center)으로 정렬한다. (클램프와 중앙정렬을 한 요소에 같이 걸면
    -webkit-box 가 stretch 되어 텍스트가 상단에 붙으므로, 셀/텍스트를 분리한다.) */
 .u4aWs30TreeDesc {
-    flex: 0 0 var(--ws30-desc-w);
+    flex: 1 1 auto;              /* 설명 = 나머지 채움(이름 고정폭 뒤) */
     min-width: 0;
+    overflow: hidden;           /* 채움 컬럼 방어 — 긴 내용이 레이아웃을 밀지 않게(안티 권고 2026-07-13) */
     align-self: stretch;
     box-sizing: border-box;
     padding: 0.15rem 0.5rem;
@@ -262,7 +298,14 @@
    설명은 고정폭 우측 컬럼이 되도록 좌측정렬. */
 .u4aWs30Tree .u4a-tree__row[data-u4a-tree-split] { justify-content: flex-start; }
 /* 공통 행의 우측 padding 제거 — 설명 셀이 우측 끝까지 채워 컬럼 구분선이 닿게 */
-.u4aWs30TreeRow { padding-right: 0; }
+.u4aWs30TreeRow {
+    padding-right: 0;
+    /* ★ 행 배경 불투명(패널색) — 세로/가로 격자(ul 배경)가 "행 뒤"로 비쳐 셀 border 와 겹쳐
+       Chromium93 서브픽셀에서 이중선(장군 지적 2026-07-13)으로 보이는 걸 원천 차단.
+       불투명이면 배경 격자는 "빈 영역"에만 보이고, 행 구간은 셀 자체 border(가로 border-bottom·세로 .u4aWs30TreeDesc)만
+       그려 겹침 자체가 없음. hover/선택은 더 구체적 셀렉터라 이 위에 그대로 얹힘. (WS20 은 액션 sticky 가 불투명이라 무해) */
+    background: var(--ws30-panel);
+}
 
 /* 들여쓰기를 행 padding-left → 토글 margin-left 로 이동.
    이유: 설명 컬럼 폭이 flex-basis(%)라 행 content box 폭이 기준인데, 들여쓰기가 행
@@ -449,8 +492,16 @@
 
 /* ── 에디터 우클릭 컨텍스트 메뉴(다단계) — 공통 .u4a-menu 스킨 소비, 서브메뉴 표식만 스코프 덧댐.
       (구 sap.m.Menu "uspCDECtxMenu". 패턴 트리 + Code Editor Designer 서브메뉴.) ───── */
+/* 패턴명이 매우 길어도 화면을 뚫지 않게 폭 상한 — 넘치면 라벨은 말줄임(전체는 공통 툴팁). */
+.u4aWs30EditCtxMenu {
+    max-width: 22rem;
+}
 .u4aWs30EditCtxMenu .u4a-menu__item-text {
     flex: 1 1 auto;                 /* 라벨이 늘어나 caret 을 우측 끝으로 민다 */
+    min-width: 0;                   /* flex 자식 말줄임 필수 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .u4aWs30EditCtxMenu .u4aWs30EditCtxCaret {
     flex: 0 0 auto;

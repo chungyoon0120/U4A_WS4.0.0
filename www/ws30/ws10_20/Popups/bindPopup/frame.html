@@ -49,7 +49,7 @@
     <main class="u4aBwpShell" id="bwpShell">
 
         <!-- 좌: 모델 필드 트리 -->
-        <section class="u4aBwpPane u4aBwpLeft" id="bwpLeftPane">
+        <section class="u4aBwpPane u4a-splitter__pane u4aBwpLeft" id="bwpLeftPane">
             <div class="u4aBwpArea" id="bwpModelArea">
                 <div class="u4aBwpTool" id="bwpModelTool"></div>
                 <div class="u4aBwpTreeHost" id="bwpModelTree"></div>
@@ -59,10 +59,10 @@
         <!-- 세로 스플리터 바(좌|중) -->
         <div class="u4a-splitter__bar u4aBwpSplitBar u4aBwpSplitBar--v" id="bwpSplit1" role="separator" aria-orientation="vertical"></div>
 
-        <!-- 중: 디자인 트리(상) + 추가속성 적용(하) -->
-        <section class="u4aBwpPane u4aBwpCenter" id="bwpCenterPane">
+        <!-- 중: 디자인 트리(상) + 추가속성 적용(하) — 자체가 세로 스플리터(axis:y) -->
+        <section class="u4aBwpPane u4a-splitter__pane u4a-splitter__pane--flex u4aBwpCenter" id="bwpCenterPane">
 
-            <div class="u4aBwpArea u4aBwpDesign" id="bwpDesignArea">
+            <div class="u4aBwpArea u4a-splitter__pane u4aBwpDesign" id="bwpDesignArea">
                 <div class="u4aBwpTool" id="bwpDesignTool"></div>
                 <div class="u4aBwpTreeHost" id="bwpDesignTree"></div>
             </div>
@@ -70,7 +70,7 @@
             <!-- 가로 스플리터 바(디자인 트리 | 추가속성 적용) -->
             <div class="u4a-splitter__bar u4aBwpSplitBar u4aBwpSplitBar--h" id="bwpSplit2" role="separator" aria-orientation="horizontal"></div>
 
-            <div class="u4aBwpArea u4aBwpAdditApply" id="bwpAdditApplyArea">
+            <div class="u4aBwpArea u4a-splitter__pane u4a-splitter__pane--flex u4aBwpAdditApply" id="bwpAdditApplyArea">
                 <div class="u4aBwpTool" id="bwpAdditApplyTool"></div>
                 <div class="u4aBwpTableHost" id="bwpAdditApply"></div>
             </div>
@@ -81,7 +81,7 @@
         <div class="u4a-splitter__bar u4aBwpSplitBar u4aBwpSplitBar--v" id="bwpSplit3" role="separator" aria-orientation="vertical"></div>
 
         <!-- 우: 추가속성(MPROP) 정보 -->
-        <section class="u4aBwpPane u4aBwpRight" id="bwpRightPane">
+        <section class="u4aBwpPane u4a-splitter__pane u4aBwpRight" id="bwpRightPane">
             <div class="u4aBwpArea" id="bwpAdditInfoArea">
                 <div class="u4aBwpTool" id="bwpAdditInfoTool"></div>
                 <div class="u4aBwpTableHost" id="bwpAdditInfo"></div>

@@ -142,65 +142,87 @@
     };
 
     /************************************************************************
-     * 컬럼 자동맞춤(autofit) — 원본 161 setUiTableAutoResizeColumn 대응.
-     *   공통 makeColumnTree host 의 각 컬럼을 "콘텐츠 자연폭"에 정확히 맞춘다(넓힘·줄임 모두).
-     *   ★핵심: 셀 박스의 scrollWidth 는 콘텐츠가 들어차면 현재 폭과 같아 줄이질 못한다.
-     *     → 리프(텍스트/아이콘) 요소의 scrollWidth(=말줄임과 무관한 전체 텍스트폭) + 셀 내 좌측 오프셋
-     *       (들여쓰기+토글+아이콘+패딩)으로 자연폭을 구한다. 측정만 하고(레이아웃 1회) 끝에 변수 기록.
+     * 컬럼 폭 계산 헬퍼 — makeColumnTree host 각 컬럼의 "콘텐츠 자연폭"(좌우 패딩 포함).
+     *   ★ 글자폭 = canvas measureText(el 계산 폰트). Range.selectNodeContents 는 el 이 flex/block(헤더 셀)
+     *     이면 글자폭이 아니라 "셀 레이아웃 폭"을 돌려줘 측정이 순환참조가 된다([[coltree-fit-container-and-range-trap]]).
+     *   ★ 자연폭 = 가장 넓은 리프의 (셀좌측 기준 우측끝) + 우측 패딩. 텍스트만 있는 셀(헤더)은 좌패딩+글자폭+우패딩.
+     *     (fallback 으로 flex 셀 offsetWidth 를 쓰면 현재폭을 되돌려 값이 튄다 — 안 씀.)
+     ************************************************************************/
+    var _bwpMeasCtx = null;   // 글자폭 측정용 canvas 2d 컨텍스트(1회 생성).
+    function _bwpGlyphW(el) {
+        try {
+            if (!_bwpMeasCtx) { _bwpMeasCtx = document.createElement("canvas").getContext("2d"); }
+            var cs = getComputedStyle(el);
+            _bwpMeasCtx.font = cs.fontStyle + " " + cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+            return Math.ceil(_bwpMeasCtx.measureText(el.textContent || "").width);
+        } catch (e) { return 0; }
+    }
+    function _bwpCellNat(oCell) {
+        var cr = oCell.getBoundingClientRect();
+        if (!cr.width) { return 0; }
+        var cs = getComputedStyle(oCell);
+        var padL = parseFloat(cs.paddingLeft) || 0, padR = parseFloat(cs.paddingRight) || 0, bdL = parseFloat(cs.borderLeftWidth) || 0;
+        // ★ 셀 전체 텍스트 기준 후보(좌패딩+글자폭). 헤더 셀은 라벨이 직접 텍스트라 이게 정답.
+        var natural = padL + _bwpGlyphW(oCell);
+        // 리프(자식없는) 요소 중 콘텐츠(텍스트/아이콘)의 우측끝도 후보 — 단, 컬럼 리사이즈 그립은
+        //   셀 우측 끝에 있어 셀 폭을 되돌리므로 제외(안 하면 순환참조로 값이 튐 — 그립·데코 스킵).
+        var aEl = oCell.querySelectorAll("*");
+        for (var i = 0; i < aEl.length; i++) {
+            var el = aEl[i];
+            if (el.children.length) { continue; }
+            if (el.classList && el.classList.contains("u4aColTreeGrip")) { continue; }
+            var lr = el.getBoundingClientRect();
+            var w = (el.textContent && el.textContent.trim()) ? _bwpGlyphW(el) : el.offsetWidth;
+            var right = (lr.left - cr.left) + w;
+            if (right > natural) { natural = right; }
+        }
+        return natural + padR + bdL;
+    }
+
+    /************************************************************************
+     * [161 버튼] 컬럼 자동맞춤(autofit) — 콘텐츠 자연폭에 맞춤(넘치면 가로 스크롤 = 사용자 의도).
      ************************************************************************/
     oAPP.fn.fitTreeColumns = function (oHost) {
         if (!oHost) { return; }
         try {
             var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-            var slack = Math.round(0.75 * rem), minPx = Math.round(4 * rem);
-
-            // ★ 요소의 "실제 콘텐츠 폭" — 텍스트는 Range 로 글자폭 측정(컬럼폭과 무관·항상 동일 = autofit 안정),
-            //   비텍스트(아이콘)는 offsetWidth. scrollWidth 는 내용이 넘칠 때만 정확해 grow-only 버그라 쓰지 않음.
-            function _contentW(el) {
-                if (el.textContent && el.textContent.trim()) {
-                    try {
-                        var r = document.createRange();
-                        r.selectNodeContents(el);
-                        var w = r.getBoundingClientRect().width;
-                        if (w) { return w; }
-                    } catch (e) { }
-                }
-                return el.offsetWidth;
-            }
-            // 셀의 자연 콘텐츠 폭 = max( 리프.left - 셀.left + 리프 콘텐츠폭 ). 리프=자식 없는 텍스트/아이콘.
-            function _cellNat(oCell) {
-                var oR = oCell.getBoundingClientRect();
-                if (!oR.width) { return 0; }   // display:contents 등 방어.
-                var base = oR.left, nat = 0, bLeaf = false, aEl = oCell.querySelectorAll("*");
-                for (var i = 0; i < aEl.length; i++) {
-                    var el = aEl[i];
-                    if (el.children.length) { continue; }      // 리프만.
-                    bLeaf = true;
-                    var w = (el.getBoundingClientRect().left - base) + _contentW(el);
-                    if (w > nat) { nat = w; }
-                }
-                if (!bLeaf) { nat = _contentW(oCell); }   // 셀 자체가 텍스트(헤더 라벨 등).
-                return nat;
-            }
-            function _colMax(aSel) {
+            var slack = Math.round(0.5 * rem), minPx = Math.round(4 * rem);
+            var overhead = Math.round(rem * 0.375 * 3 + 1);
+            function colMax(aSel) {
                 var mx = 0;
                 for (var i = 0; i < aSel.length; i++) {
-                    var aCell = oHost.querySelectorAll(aSel[i]);
-                    for (var j = 0; j < aCell.length; j++) { var w = _cellNat(aCell[j]); if (w > mx) { mx = w; } }
+                    var a = oHost.querySelectorAll(aSel[i]);
+                    for (var j = 0; j < a.length; j++) { var w = _bwpCellNat(a[j]); if (w > mx) { mx = w; } }
                 }
                 return mx;
             }
-            // C1=헤더 라벨+이름셀(들여쓰기/토글/아이콘/라벨), C2/C3=헤더+본문 셀.
-            var c1 = Math.max(minPx, Math.ceil(_colMax([".u4aColTreeHead .u4aColTreeC1", ".u4aColTreeNameCell"])) + slack);
-            var c2 = Math.max(minPx, Math.ceil(_colMax([".u4aColTreeHead .u4aColTreeC2", ".u4aColTreeBody .u4aColTreeC2"])) + slack);
-            var c3 = Math.max(minPx, Math.ceil(_colMax([".u4aColTreeHead .u4aColTreeC3", ".u4aColTreeBody .u4aColTreeC3"])) + slack);
-
+            var c1 = Math.max(minPx, Math.ceil(colMax([".u4aColTreeHead .u4aColTreeC1", ".u4aColTreeNameCell"])) + slack);
+            var c2 = Math.max(minPx, Math.ceil(colMax([".u4aColTreeHead .u4aColTreeC2", ".u4aColTreeBody .u4aColTreeC2"])) + slack);
+            var c3 = Math.max(minPx, Math.ceil(colMax([".u4aColTreeHead .u4aColTreeC3", ".u4aColTreeBody .u4aColTreeC3"])) + slack);
+            // ★ 원본 setUiTableAutoResizeColumn + scheduleFitTableColumns 1:1 —
+            //   각 컬럼을 콘텐츠 자연폭에 맞추고, 컨테이너보다 좁으면 "마지막(설명/MPROP) 컬럼이 잔여폭 흡수"해 채운다.
+            //   콘텐츠가 컨테이너보다 넓으면 자연폭 유지(가로 스크롤 = 원본 거동).
+            //   ★ 스플리터 드래그로는 이 함수를 재호출하지 않는다(원본은 레이아웃 변경 refreshBindLayoutTables 때만 재적합).
+            var avail = oHost.clientWidth - overhead;
+            if (avail > c1 + c2 + c3) { c3 = avail - c1 - c2; }
             oHost.style.setProperty("--u4act-c1-w", c1 + "px");
             oHost.style.setProperty("--u4act-c2-w", c2 + "px");
             oHost.style.setProperty("--u4act-c3-w", c3 + "px");
-            // 가로 스크롤 총폭 동기화(원본 makeColumnTree _syncTotal 과 동일: 컬럼합 + overhead).
-            oHost.style.setProperty("--u4act-total-w", (c1 + c2 + c3 + (rem * 0.375 * 3 + 1)) + "px");
+            oHost.style.setProperty("--u4act-total-w", (c1 + c2 + c3 + overhead) + "px");
         } catch (e) { console.error("[HTML5][bindWindow] fitTreeColumns:", e && e.message); }
+    };
+
+    /************************************************************************
+     * 표시 중인 트리 컬럼 재적합 — 원본 refreshBindLayoutTables 대응(화면 커스터마이징 등 레이아웃 변경 후).
+     *   ★ 스플리터 드래그로는 호출하지 않는다(원본과 동일 — 드래그 시 컬럼 재계산 없음).
+     ************************************************************************/
+    oAPP.fn.refitBindTables = function () {
+        setTimeout(function () {
+            ["bwpModelTree", "bwpDesignTree"].forEach(function (sId) {
+                var oHost = document.getElementById(sId);
+                if (oHost && oHost.offsetParent !== null) { oAPP.fn.fitTreeColumns(oHost); }
+            });
+        }, 0);
     };
 
     /************************************************************************
