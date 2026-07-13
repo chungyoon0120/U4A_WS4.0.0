@@ -402,10 +402,19 @@
     function _key(n) { return (n && n.CHILD != null) ? String(n.CHILD) : ""; }
     function _isDummy(n) { return n && n.CHILD === "DUMMY_CHILD"; }
 
-    function lf_buildTreeCmp() {
+    function lf_buildTreeCmp(oHost) {
 
-        var oTree = U4AUI.createTree({
+        // ★ 공통 컬럼 트리테이블(U4AUI.makeColumnTree)로 통합(2026-07-13, USP 와 동일 모델).
+        //   2열 [이름(고정폭·드래그 리사이즈·더블클릭 auto-fit) | 설명(채움 fillLast)]. 가상 스크롤(대용량 MIME).
+        //   헤더·격자·세로선·리사이즈·hover 강조는 공통 makeColumnTree/shell.css 가 단일 담당(화면 재발명 제거, 16 §3.4.2).
+        //   지연로딩(DUMMY_CHILD)·펼침영속(oExpand)은 isExpanded/onToggle pass-through 로 그대로 유지.
+        var oCtrl = U4AUI.makeColumnTree(oHost, {
             virtual: true,
+            fillLast: true,
+            columns: [
+                { label: _txt("/U4A/CL_WS_COMMON", "A50"), width: "11rem" },   // A50 이름(고정폭·리사이즈 대상)
+                { label: _txt("/U4A/CL_WS_COMMON", "A35") }                     // A35 설명(채움)
+            ],
 
             roots: function () { return aTreeRoots; },
             children: function (n) { return (n && Array.isArray(n.MIMETREE)) ? n.MIMETREE : []; },
@@ -435,14 +444,14 @@
                 }
             },
 
-            slotTrailing: function (n) {
-                if (_isDummy(n)) { return null; }
-                var d = _el("span", "u4aMimeDesc");
+            // 설명 셀 — makeColumnTree 가 .u4aColTreeCell.u4aColTreeC2(좌측 구분선·세로중앙·overflow)로 감쌈.
+            //   안의 텍스트(말줄임/공통 툴팁)만 제공. 더미(빈 폴더 자리표시)는 설명 없음.
+            cell: function (n) {
+                if (_isDummy(n)) { return {}; }
                 var t = _el("span", "u4aMimeDescText", (n && n.MDESC != null) ? n.MDESC : "");
                 // 설명 말줄임 시 공통 테마 툴팁(initTooltip) — data-tip + data-tip-trunc(잘렸을 때만).
                 if (n && n.MDESC) { t.setAttribute("data-tip", n.MDESC); t.setAttribute("data-tip-trunc", ""); }
-                d.appendChild(t);
-                return d;
+                return { c2: t };
             },
 
             onSelect: function (n, oRow) {
@@ -469,8 +478,9 @@
             }
         });
 
-        oTree.el.classList.add("u4aMimeTree");
-        return oTree;
+        // 행 상태 색 스코프(.u4aMimeTree .u4aMimeMyApp/.u4aMimeMuted 등) 유지 — 내부 ul 에 화면 클래스 부여.
+        if (oCtrl && oCtrl.tree && oCtrl.tree.el) { oCtrl.tree.el.classList.add("u4aMimeTree"); }
+        return oCtrl;
     }
 
     function lf_selNode() {
@@ -1595,14 +1605,11 @@
         oTreeTool.appendChild(oMyAppBtn);
         oTreePane.appendChild(oTreeTool);
 
+        // 트리 = 공통 makeColumnTree host(헤더/격자/세로선/리사이즈를 공통이 채움). 수동 컬럼 헤더 제거.
+        //   oTree = 내부 createTree 컨트롤러(기존 oUI.tree.render()/.scrollToKey() 그대로 호환).
         var oTreeBody = _el("div", "u4aMimeTreeBody");
-        var oColHead = _el("div", "u4aMimeTreeColHead");
-        oColHead.appendChild(_el("span", "u4aMimeColName", _txt("/U4A/CL_WS_COMMON", "A50")));
-        oColHead.appendChild(_el("span", "u4aMimeColDesc", _txt("/U4A/CL_WS_COMMON", "A35")));
-        oTreeBody.appendChild(oColHead);
-
-        var oTree = lf_buildTreeCmp();
-        oTreeBody.appendChild(oTree.el);
+        var oCtrl = lf_buildTreeCmp(oTreeBody);
+        var oTree = oCtrl.tree;
         oTreePane.appendChild(oTreeBody);
 
         oTreeBody.addEventListener("contextmenu", function (ev) {

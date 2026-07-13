@@ -591,6 +591,24 @@ button:focus-visible {
     min-height: calc(100% - 2.25rem);
     background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(2.5rem - 0.0625rem), var(--line) calc(2.5rem - 0.0625rem), var(--line) 2.5rem);
 }
+/* 가상 트리테이블(makeColumnTree({virtual})) — 가로 행선 주기 = 리터럴 2.5rem 이 아니라 가상 스크롤이 강제하는
+   실제 행높이 var(--u4a-vsrowh)(makeVScroller 가 host 에 설정→상속). 리터럴이면 스크롤 시 행과 어긋나 겹침(WS20/USP 실측).
+   비가상(--u4a-vsrowh 미설정)은 2.5rem 폴백 → 기존 소비처 동일. */
+.u4aColTree--virtual .u4aColTreeBody {
+    background: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--u4a-vsrowh, 2.5rem) - 0.0625rem), var(--line) calc(var(--u4a-vsrowh, 2.5rem) - 0.0625rem), var(--line) var(--u4a-vsrowh, 2.5rem));
+}
+/* 마지막 컬럼 채움(makeColumnTree({fillLast})) — 앞 컬럼 고정폭 + 마지막 컬럼 flex:1 채움. host 폭=100%(가로 스크롤 없음).
+   "이름 고정 + 설명 채움" 2열(USP)용 — 판(스플릿바) 넓히면 채움 컬럼이 늘어남(구 42% 반응형 대체). 채움 컬럼은 리사이즈 없음. */
+.u4aColTree--fill .u4aColTreeHead,
+.u4aColTree--fill .u4aColTreeBody,
+.u4aColTree--fill .u4aColTreeTree.u4a-tree { width: 100%; }
+.u4aColTree--fill .u4aColTreeHead > .u4aColTreeCol:last-child,
+.u4aColTree--fill .u4aColTreeGrid > .u4aColTreeGL:last-child,
+/* ★ 행의 마지막 셀은 .u4aColTreeTrail(display:contents) '안'에 있어 행의 직계 DOM 자식이 아니다.
+   `>`(직계) 로는 안 잡혀 채움이 안 먹고 고정폭(8rem)에 묶여 텍스트가 일찍 잘렸다(설명 컬럼 "…" 버그).
+   후손 선택자로 바꿔 Trail 안의 마지막 .u4aColTreeCell 에도 flex:1 적용 → 설명 셀이 실제로 채워짐.
+   (display:contents 라 flex 레이아웃상 셀은 행의 직계 flex 자식이므로 flex:1 이 정상 작동.) */
+.u4aColTree--fill .u4aColTreeRow .u4aColTreeCell:last-child { flex: 1 1 auto; }
 /* 세로 컬럼 그리드라인 레이어(빈 영역까지 컬럼 경계선 연장) — 헤더와 동일 flex 구조. 행 밑(z-index:0), pointer 통과. */
 .u4aColTreeGrid { position: absolute; inset: 0; z-index: 0; display: flex; gap: 0.375rem; box-sizing: border-box; padding-left: calc(0.375rem + 1px); pointer-events: none; }
 .u4aColTreeGL { min-width: 0; box-sizing: border-box; }

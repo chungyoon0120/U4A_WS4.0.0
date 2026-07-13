@@ -409,6 +409,9 @@
   /* Find UI 하이라이트 색 — 테마 accent(파랑/녹색/보라/빨강)와 항상 구분되도록 "테마 무관 고정 amber"
      (검색=노랑/금 관습색). 어떤 테마든 선택=accent / find=amber 로 색이 갈린다. */
   --ws20-find-hl: #e3a008;
+  /* color-mix(Chromium93 미지원) 회피용 RGB 채널 — rgba(var(--ws20-find-hl-rgb), 알파)로 반투명 워시/바 표현
+     (이 파일 --ws20-changed-rgb 와 동일 패턴). [[no-color-mix-chromium93]] */
+  --ws20-find-hl-rgb: 227, 160, 8;
   /* 들여쓰기 padding 은 shell.css .u4a-tree__row 가 공통 --u4a-tree-depth 로 단일 계산
      (ServerList/USP 와 동일 출처). WS20 전용 --ws20-depth/--ws20-indent-step override 제거. */
 }
@@ -423,16 +426,16 @@
    레이아웃 시프트 없음(box-shadow/background only). 선택 inset 바(shell.css)를 덮도록 specificity 보강.
    Indication03=매치 전체(가는 바 + 옅은 워시), Indication07=현재 라인(굵은 바 + 진한 워시 + 볼드). */
 .u4a-tree__row.u4aWs20TreeRow.hl-Indication03 {
-  box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--ws20-find-hl) 60%, transparent);
+  box-shadow: inset 3px 0 0 0 rgba(var(--ws20-find-hl-rgb), 0.6);
   background: linear-gradient(90deg,
-              color-mix(in srgb, var(--ws20-find-hl) 12%, transparent),
+              rgba(var(--ws20-find-hl-rgb), 0.12),
               transparent 68%);
 }
 .u4a-tree__row.u4aWs20TreeRow.hl-Indication07 {
   box-shadow: inset 4px 0 0 0 var(--ws20-find-hl);
   background: linear-gradient(90deg,
-              color-mix(in srgb, var(--ws20-find-hl) 28%, transparent),
-              color-mix(in srgb, var(--ws20-find-hl) 6%, transparent) 50%,
+              rgba(var(--ws20-find-hl-rgb), 0.28),
+              rgba(var(--ws20-find-hl-rgb), 0.06) 50%,
               transparent 82%);
   font-weight: 600;
 }
@@ -1191,11 +1194,12 @@
 .u4aWs20FindChk { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
 .u4aWs20FindChk input { accent-color: var(--accent); cursor: pointer; }
 .u4aWs20FindSpacer { flex: 1 1 auto; }
-/* 결과 메시지 — 굵게 + 상태색을 텍스트색과 블렌딩해 어느 테마/배경에서도 또렷하게.
-   (구 --state-success(#107e3e) 단독은 다크 surface 위 대비가 낮아 잘 안 보였음.) */
+/* 결과 메시지 — 굵게 + 의미 상태색. (구 color-mix(상태색+텍스트) 블렌딩은 Chromium93 미지원이라
+   선언이 무효화돼 색이 아예 안 먹었음 → 의미 상태색 직접 사용으로 교체. 굵게(600)로 가독 보강.
+   [[no-color-mix-chromium93]]) */
 .u4aWs20FindMsg { font-size: 13px; min-height: 1em; font-weight: 600; }
-.u4aWs20FindMsg.is-warn { color: color-mix(in srgb, var(--state-warning) 70%, var(--text)); }
-.u4aWs20FindMsg.is-ok { color: color-mix(in srgb, var(--state-success) 55%, var(--text)); }
+.u4aWs20FindMsg.is-warn { color: var(--state-warning); }
+.u4aWs20FindMsg.is-ok { color: var(--state-success); }
 
 /* 속성 설명글 팝업 (구 callAttrDescPopup 의 sap.m.ResponsivePopover).
    라벨 클릭 시 앵커 위치에 뜨는 비-모달 팝오버 — Find 팝업과 톤 통일(표면/보더/그림자). */

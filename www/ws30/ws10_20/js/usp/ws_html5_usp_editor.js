@@ -77,7 +77,9 @@
     }
 
     // Pretty Print 버튼 활성/비활성 = (편집모드 && 파일 && 비루트 && 언어가 포맷 지원).
-    //   죽은 버튼(눌러도 무동작) 방지 — 미지원 언어에선 회색 비활성(사용자 지시 2026-07-12).
+    //   ★ 버튼은 항상 보이되(숨김 X), 미지원 확장자(예: 이 Monaco 버전 CSS·txt·abap)에선 **회색 비활성**으로 표시
+    //     (장군 지시 2026-07-13: 숨기지 말고 활성/비활성으로 파일별 상태를 눈에 보이게). 선택 파일 확장자에 따라
+    //     editorLoadSelected→_refreshToolbarInfo + 언어변경(onDidChangeModelLanguage)에서 재평가.
     function _applyPrettyEnabled() {
         var elPretty = document.getElementById("ws30_codeeditor_prettyBtn");
         if (!elPretty) { return; }
@@ -86,6 +88,7 @@
         var bEdit = (oApp.IS_EDIT === "X");
         var bRoot = (oData.PUJKY === "" || oData.PUJKY == null);
         var bFolder = (oData.ISFLD === "X");
+        elPretty.hidden = false;   // 항상 노출 — 상태는 disabled 로만 표현.
         elPretty.disabled = !(bEdit && !bRoot && !bFolder && _canFormatMain());
     }
 
@@ -505,9 +508,10 @@
         });
         TB.appendChild(FBTN);
 
-        // Pretty Print (구 ws30_codeeditor_prettyBtn, C25 + Shift+F1) — Change모드 && 비루트 && 파일 && 포맷지원언어.
-        //   최초 빌드 시점엔 에디터가 아직 없어(canFormat=false) 비활성으로 시작 → 에디터 준비/언어적용 시
-        //   _hookMainFormatWatch·EDITOR_LOAD 가 활성 보정(비활성→활성은 안전, 죽은 활성버튼 없음).
+        // Pretty Print (구 ws30_codeeditor_prettyBtn, C25 + Shift+F1) — Change모드 && 비루트 && 파일 && 포맷지원언어일 때 활성.
+        //   버튼은 항상 보이고 상태는 활성/비활성(회색)으로만 표현(장군 지시 2026-07-13). 최초 빌드 시점엔 에디터가
+        //   아직 없어(canFormat=false) 회색 비활성으로 시작 → 에디터 준비/언어적용 시 _hookMainFormatWatch·
+        //   EDITOR_LOAD 의 _applyPrettyEnabled 가 활성 보정(비활성→활성은 안전, 죽은 활성버튼 없음).
         TB.appendChild(_tbBtn({
             id: "ws30_codeeditor_prettyBtn", fa: "indent",
             tooltip: _msg("C25") + " (Shift+F1)",

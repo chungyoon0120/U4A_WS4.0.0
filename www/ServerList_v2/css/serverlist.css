@@ -617,30 +617,12 @@
 /* ── 트리 ─────────────────────────────────────────────────────────── */
 /* 좁은 패널에서 들여쓰기 step 축소(shell.css @container) 활성화 */
 #u4aWsTreePane { container-type: inline-size; }
-.u4a-tree__row {
-    /* padding-left(들여쓰기)·gap·행높이·폰트는 공통 shell.css .u4a-tree* 단일 출처가 소유한다.
-       (2026-06-23 트리 통일: gap/padding-block/font-size 오버라이드 제거 → 4개 트리 동일 밀도)
-       ServerList 고유는 행 간 여백(margin)·라운드·색만 유지. */
-    padding-right: .5rem; margin: 1px .25rem;
-    border-radius: var(--sl-radius-sm); color: var(--sl-fg); position: relative;
-}
-.u4a-tree__row:hover { background: var(--sl-surface-2); }
-.u4a-tree__row[aria-selected="true"] {
-    background: var(--u4a-accent-soft); color: var(--u4a-accent); font-weight: 600; box-shadow: none;
-}
-.u4a-tree__row[aria-selected="true"]::before {
-    content: ""; position: absolute; left: -.05rem; top: 18%; bottom: 18%;
-    width: 3px; border-radius: 3px; background: var(--u4a-accent);
-}
-.u4a-tree__icon { color: #e6a93a; }
-.u4a-tree__row[aria-selected="true"] .u4a-tree__icon { color: var(--u4a-accent); }
-/* 폴더 아이콘 토글 — 펼치면 열린 폴더(folder-open), 접으면 닫힌 폴더(folder).
-   트리 토글이 .u4a-tree__row[aria-expanded] 를 갱신하므로 CSS 로 FA 글리프만 교체(JS 불필요).
-   leaf(자식 없음)는 aria-expanded 속성이 없어 닫힌 폴더(\f07b) 유지.
-   (Font Awesome solid: fa-folder \f07b / fa-folder-open \f07c) */
-.u4a-tree__row[aria-expanded="true"] > .u4a-tree__icon .fa-folder::before {
-    content: "\f07c";
-}
+/* 행 모양·hover·선택·행 구분선·폴더 아이콘(앰버/열림토글)은 전부 공통 shell.css .u4a-tree__row*/.u4a-tree__icon 이 담당.
+   ★2026-07-13 장군 지시 "서버리스트도 다른 트리와 동일하게"(둥글둥글 지적): ServerList 가 덧대던
+     margin(1px .25rem)+border-radius(둥근 알약)·자체 hover(--sl-surface-2)·자체 선택(--u4a-accent-soft + 둥근 ::before 바)·
+     하드코딩 아이콘색(#e6a93a)·folder-open 중복 규칙을 전부 제거 → WS20/USP/MIME 와 동일한
+     "평평한 꽉 찬 행 + --line 행 구분선 + --hover-bg + --selected-bg + inset 3px accent 바 + --folder-icon 앰버"로 통일.
+     (화면별 재정의 금지 — [[dont-modify-common-override-scoped]] 역방향: 공통이 이미 소유하므로 스코프 override 도 불필요.) */
 
 /* ── 테이블 ───────────────────────────────────────────────────────── */
 .u4a-table-wrap { padding: .35rem 0; background: var(--sl-bg); }

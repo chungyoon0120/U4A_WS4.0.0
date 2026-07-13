@@ -1469,13 +1469,17 @@
             else { const k = _key(node); if (k !== "") { _expanded[k] = !bOpen; } }
             _renderVirtual(true);
         }
+        // 가상 스크롤 컨테이너 = 명시 지정(cfg.scrollContainer) 우선, 미지정 시 기존대로 ul 부모(하위호환).
+        //   makeColumnTree 처럼 [스크롤 host > 헤더(sticky) + 본문(grow) > 트리 ul] 구조에선 ul 부모(본문)가
+        //   스크롤하지 않으므로 host 를 넘겨야 윈도잉(scrollTop/clientHeight)이 맞는다. (기존 가상 소비처는 미전달=무영향)
+        function _vsHost() { return (cfg.scrollContainer && cfg.scrollContainer.nodeType === 1) ? cfg.scrollContainer : oUl.parentNode; }
         function _vsRowH() {
-            const w = oUl.parentNode;
+            const w = _vsHost();
             const h = w ? parseFloat(getComputedStyle(w).getPropertyValue("--u4a-vsrowh")) : 0;
             return h > 0 ? h : 28;
         }
         function _renderVirtual(bKeepScroll) {
-            const oWrap = oUl.parentNode;   // 스크롤 컨테이너(화면이 부착) — 미부착이면 부착 후 재호출됨
+            const oWrap = _vsHost();   // 스크롤 컨테이너(cfg.scrollContainer 우선, 없으면 ul 부모) — 미부착이면 부착 후 재호출됨
             if (!oWrap) { return; }
             if (!_vs || _vsWrap !== oWrap) {
                 _vsWrap = oWrap;
@@ -1569,7 +1573,7 @@
             let idx = -1;
             for (let i = 0; i < aFlat.length; i++) { if (_key(aFlat[i].node) === sKey) { idx = i; break; } }
             if (idx < 0) { return null; }
-            const oWrap = oUl.parentNode;
+            const oWrap = _vsHost();   // ★ 스크롤 컨테이너 = cfg.scrollContainer 우선(makeColumnTree=host). oUl.parentNode 고정 시 컬럼트리(body=비스크롤)서 reveal 무동작.
             if (oWrap) {
                 const h = _vsRowH();
                 oWrap.scrollTop = Math.max(0, idx * h - (oWrap.clientHeight / 2) + h / 2);
@@ -2313,9 +2317,11 @@
         if (!oHost) { return null; }
         oCfg = oCfg || {};
         var aCols = oCfg.columns || [{ label: "" }, { label: "" }, { label: "" }];
-        var C1_DEF = (aCols[0] && aCols[0].width) || "15rem";   // 고정폭 기본(rem — 줌 대응). % 금지(16 §3.4.2).
-        var C2_DEF = (aCols[1] && aCols[1].width) || "8rem";
-        var C3_DEF = (aCols[2] && aCols[2].width) || "14rem";
+        var nCol = aCols.length;                 // 가변 컬럼(2~3열). 기존 소비처는 3열 → 완전 동일 동작.
+        var bVirtual = !!oCfg.virtual;           // 대용량 가상 트리테이블(USP/MIME). host 를 스크롤 컨테이너로 넘김.
+        var bFill = !!oCfg.fillLast;             // 마지막 컬럼 채움(고정폭 아님) — USP 설명 등. 그 컬럼은 리사이즈 안 함(grow 흡수 §3.4.2).
+        var DEF_W = ["15rem", "8rem", "14rem"];  // 앞 3열 기본폭(고정 rem, % 금지 §3.4.2). 그 외 10rem.
+        function _defW(i) { return (aCols[i] && aCols[i].width) || DEF_W[i] || "10rem"; }
 
         function _fill(oCell, vContent) {
             if (vContent == null) { return; }
@@ -2324,37 +2330,40 @@
         }
 
         oHost.classList.add("u4aColTree");
+        if (bVirtual) { oHost.classList.add("u4aColTree--virtual"); }
+        if (bFill) { oHost.classList.add("u4aColTree--fill"); }   // 마지막 컬럼 flex:1 채움(shell.css). host 폭=100%(가로스크롤 없음)
         oHost.innerHTML = "";
-        oHost.style.setProperty("--u4act-c1-w", C1_DEF);
-        oHost.style.setProperty("--u4act-c2-w", C2_DEF);
-        oHost.style.setProperty("--u4act-c3-w", C3_DEF);
+        for (var _ci = 0; _ci < nCol; _ci++) { oHost.style.setProperty("--u4act-c" + (_ci + 1) + "-w", _defW(_ci)); }
 
+        // 헤더 — 컬럼 수만큼 셀(u4aColTreeC1..CnCol). 폭/보더는 기존 CSS(.u4aColTreeC1/2/3) 그대로 소비.
         var oHead = _el("div", "u4aColTreeHead");
-        var oC1H = _el("span", "u4aColTreeCol u4aColTreeC1"); oC1H.textContent = (aCols[0] && aCols[0].label) || "";
-        var oC2H = _el("span", "u4aColTreeCol u4aColTreeC2"); oC2H.textContent = (aCols[1] && aCols[1].label) || "";
-        var oC3H = _el("span", "u4aColTreeCol u4aColTreeC3"); oC3H.textContent = (aCols[2] && aCols[2].label) || "";
-        oHead.appendChild(oC1H); oHead.appendChild(oC2H); oHead.appendChild(oC3H);
+        var aHeadCells = [];
+        for (var _ci = 0; _ci < nCol; _ci++) {
+            var _h = _el("span", "u4aColTreeCol u4aColTreeC" + (_ci + 1));
+            _h.textContent = (aCols[_ci] && aCols[_ci].label) || "";
+            oHead.appendChild(_h); aHeadCells.push(_h);
+        }
         oHost.appendChild(oHead);
 
+        // 본문 + 세로 그리드라인 레이어(컬럼 수만큼). ★host 가 스크롤·body 가 grow → 레이어가 전체높이 덮음(가상서도 안전, 실측 검증).
         var oBody = _el("div", "u4aColTreeBody");
         var oGrid = _el("div", "u4aColTreeGrid");
         oGrid.setAttribute("aria-hidden", "true");
-        oGrid.appendChild(_el("span", "u4aColTreeGL u4aColTreeGL--c1"));
-        oGrid.appendChild(_el("span", "u4aColTreeGL u4aColTreeGL--c2"));
-        oGrid.appendChild(_el("span", "u4aColTreeGL u4aColTreeGL--c3"));
+        for (var _ci = 0; _ci < nCol; _ci++) { oGrid.appendChild(_el("span", "u4aColTreeGL u4aColTreeGL--c" + (_ci + 1))); }
         oBody.appendChild(oGrid);
         oHost.appendChild(oBody);
 
         function _colPx(iIdx) {
-            var oCell = (iIdx === 0) ? oC1H : (iIdx === 1) ? oC2H : oC3H;
+            var oCell = aHeadCells[iIdx];
             return (oCell && oCell.getBoundingClientRect().width) || 120;
         }
         function _overheadPx() {
             var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-            return rem * 0.375 * 3 + 1;   // padding-left(0.375rem) + gap×2(0.375rem) + ul 좌측 1px
+            return rem * 0.375 * nCol + 1;   // padding-left(0.375rem) + gap×(nCol-1) + ul 좌측 1px = 0.375rem×nCol + 1
         }
         function _syncTotal() {
-            var total = _colPx(0) + _colPx(1) + _colPx(2) + _overheadPx();
+            var total = _overheadPx();
+            for (var i = 0; i < nCol; i++) { total += _colPx(i); }
             oHost.style.setProperty("--u4act-total-w", total + "px");
         }
         function _applyColW(sVar, px) {
@@ -2362,10 +2371,65 @@
             _syncTotal();
         }
         function _resetCols() {
-            oHost.style.setProperty("--u4act-c1-w", C1_DEF);
-            oHost.style.setProperty("--u4act-c2-w", C2_DEF);
-            oHost.style.setProperty("--u4act-c3-w", C3_DEF);
+            for (var i = 0; i < nCol; i++) { oHost.style.setProperty("--u4act-c" + (i + 1) + "-w", _defW(i)); }
             _syncTotal();
+        }
+        // ── 더블클릭 auto-fit(엑셀/sap.ui.table autoResize) 폭 측정 (§3.4.2 · 마법사 _wzAutoW 패턴 차용) ──
+        //   그 컬럼의 [헤더 + 보이는 행 셀] 콘텐츠 중 최장 잉크폭(오프스크린 span 실측) + 셀 패딩. 최소 48 / 상한 800(과확장 방지).
+        //   ★가상: DOM 에 보이는 행만 측정(윈도잉) — 화면에 보이는 콘텐츠 기준 auto-fit.
+        function _measTxt(sText, oRef) {
+            var span = document.createElement("span");
+            span.style.cssText = "position:absolute;left:-9999px;top:-9999px;white-space:pre;visibility:hidden;";
+            if (oRef) {
+                var cs = getComputedStyle(oRef);
+                span.style.fontFamily = cs.fontFamily; span.style.fontSize = cs.fontSize;
+                span.style.fontWeight = cs.fontWeight; span.style.fontStyle = cs.fontStyle; span.style.letterSpacing = cs.letterSpacing;
+            }
+            span.textContent = sText || "";
+            document.body.appendChild(span);
+            var w = span.getBoundingClientRect().width;
+            span.remove();
+            return w;
+        }
+        function _px(v) { return parseFloat(v) || 0; }
+        // 셀 자연폭(px, 패딩 포함). iCol 0=이름셀(토글 들여쓰기+아이콘+라벨잉크), 그 외=텍스트 잉크(+아이콘류)+패딩.
+        function _cellNatW(oCell, iCol) {
+            if (!oCell) { return 0; }
+            var cs = getComputedStyle(oCell);
+            var iPad = _px(cs.paddingLeft) + _px(cs.paddingRight);
+            if (iCol === 0) {
+                var iGap = _px(cs.columnGap || cs.gap);
+                var w = iPad, n = 0;
+                for (var k = 0; k < oCell.children.length; k++) {
+                    var ch = oCell.children[k]; n++;
+                    if (ch.classList && ch.classList.contains("u4a-tree__label")) {
+                        w += _measTxt((ch.textContent || "").trim(), ch);   // 라벨=잉크폭(자연폭)
+                    } else {
+                        var ccs = getComputedStyle(ch);
+                        w += ch.getBoundingClientRect().width + _px(ccs.marginLeft) + _px(ccs.marginRight);   // 토글(들여쓰기 margin 포함)·아이콘=실측
+                    }
+                }
+                if (n > 1) { w += iGap * (n - 1); }
+                return w + 2;
+            }
+            var iTxt = _measTxt((oCell.textContent || "").trim(), oCell);
+            var iEl = 0;   // 텍스트 없는 요소(상태 아이콘 등) 폭 가산
+            for (var e = 0; e < oCell.children.length; e++) {
+                var el = oCell.children[e];
+                if (!(el.textContent || "").trim()) { iEl += el.getBoundingClientRect().width; }
+            }
+            return iTxt + iEl + iPad + 4;
+        }
+        function _autoW(iCol) {
+            var oH = aHeadCells[iCol];
+            var hcs = oH ? getComputedStyle(oH) : null;
+            var iMax = oH ? (_measTxt((oH.textContent || "").trim(), oH) + (hcs ? _px(hcs.paddingLeft) + _px(hcs.paddingRight) : 0) + 4) : 0;
+            var sSel = (iCol === 0) ? ".u4aColTreeNameCell" : (".u4aColTreeCell.u4aColTreeC" + (iCol + 1));
+            var aRows = oTree.el.querySelectorAll(".u4aColTreeRow");
+            for (var r = 0; r < aRows.length; r++) {
+                iMax = Math.max(iMax, _cellNatW(aRows[r].querySelector(sSel), iCol));
+            }
+            return Math.max(48, Math.min(Math.round(iMax), 800));
         }
         function _buildGrip(sVar, iColIdx, sHl, bRight) {
             var oGrip = _el("div", "u4aColTreeGrip" + (bRight ? " u4aColTreeGrip--right" : ""));
@@ -2374,18 +2438,27 @@
                 host: oHost,
                 getWidth: function () { return _colPx(iColIdx); },
                 setWidth: function (px) { _applyColW(sVar, px); },
-                onReset: _resetCols,
+                // ★ 더블클릭 = auto-fit(내용 최장폭). onReset(기본폭 복귀) 아님 — 장군 지적 2026-07-13.
+                getAutoWidth: function () { return _autoW(iColIdx); },
                 hoverEl: oHost,
                 hoverClass: sHl
             });
             return oGrip;
         }
-        oC2H.appendChild(_buildGrip("--u4act-c1-w", 0, "u4aColTreeHl2"));         // C1|C2 → C1
-        oC3H.appendChild(_buildGrip("--u4act-c2-w", 1, "u4aColTreeHl3"));         // C2|C3 → C2
-        oC3H.appendChild(_buildGrip("--u4act-c3-w", 2, "u4aColTreeHl3r", true));  // C3 우단 → C3
+        // 컬럼 경계 리사이즈 그립: 헤더 i(1..nCol-1) 좌측경계 = 컬럼(i-1) 우측 → 컬럼(i-1) 리사이즈.
+        //   (3열: C2에 C1그립, C3에 C2그립 — 기존과 동일)
+        for (var _gi = 1; _gi < nCol; _gi++) {
+            aHeadCells[_gi].appendChild(_buildGrip("--u4act-c" + _gi + "-w", _gi - 1, "u4aColTreeHl" + (_gi + 1)));
+        }
+        // 마지막 컬럼 우측 그립(고정폭 컬럼 = 넓히면 가로 스크롤). 채움 컬럼(bFill)이거나 lastColResize:false 면 생략.
+        if (!bFill && oCfg.lastColResize !== false) {
+            aHeadCells[nCol - 1].appendChild(_buildGrip("--u4act-c" + nCol + "-w", nCol - 1, "u4aColTreeHl" + nCol + "r", true));
+        }
 
         var selNode = null;
         var oTree = createTree({
+            virtual: bVirtual,
+            scrollContainer: bVirtual ? oHost : null,   // 가상: host 가 스크롤 컨테이너(body 는 grow, 스크롤 안 함)
             roots: function () { return (typeof oCfg.roots === "function") ? (oCfg.roots() || []) : []; },
             children: function (n) { return (typeof oCfg.children === "function") ? (oCfg.children(n) || []) : []; },
             hasChildren: function (n) {
@@ -2397,6 +2470,11 @@
             label: function (n) { return oCfg.label(n); },
             tip: function (n) { return (typeof oCfg.tip === "function") ? oCfg.tip(n) : oCfg.label(n); },
             icon: (typeof oCfg.icon === "function") ? oCfg.icon : undefined,
+            // 펼침 상태 위임/영속화 pass-through(§3.4) — 외부 펼침맵·지연로딩(lazy expand) 화면(MIME 등)용.
+            //   미지정 소비처는 undefined → createTree 기본(내부 펼침맵, initialExpanded level<1) 그대로 = 하위호환.
+            isExpanded: (typeof oCfg.isExpanded === "function") ? oCfg.isExpanded : undefined,
+            onToggle: (typeof oCfg.onToggle === "function") ? oCfg.onToggle : undefined,
+            initialExpanded: (typeof oCfg.initialExpanded === "function") ? oCfg.initialExpanded : undefined,
             slotLead: (typeof oCfg.slotLead === "function") ? function (n, ctx) {
                 var x = oCfg.slotLead(n, ctx);
                 if (!x) { return null; }
@@ -2407,15 +2485,13 @@
             selectable: oCfg.selectable !== false,
             slotTrailing: function (n) {
                 var oWrap = _el("span", "u4aColTreeTrail");
-                var oCell2 = _el("span", "u4aColTreeCell u4aColTreeC2");
-                var oCell3 = _el("span", "u4aColTreeCell u4aColTreeC3");
-                if (typeof oCfg.cell === "function") {
-                    var oC = oCfg.cell(n) || {};
-                    _fill(oCell2, oC.c2);
-                    _fill(oCell3, oC.c3);
+                var oC = (typeof oCfg.cell === "function") ? (oCfg.cell(n) || {}) : {};
+                // 컬럼 1..nCol-1 = 트레일링 셀(이름 컬럼 제외). cell()의 c2/c3/... → 컬럼 순서.
+                for (var ti = 1; ti < nCol; ti++) {
+                    var oCell = _el("span", "u4aColTreeCell u4aColTreeC" + (ti + 1));
+                    _fill(oCell, oC["c" + (ti + 1)]);
+                    oWrap.appendChild(oCell);
                 }
-                oWrap.appendChild(oCell2);
-                oWrap.appendChild(oCell3);
                 return oWrap;
             },
             rowHook: function (oRow, n) {

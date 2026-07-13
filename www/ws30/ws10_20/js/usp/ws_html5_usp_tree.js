@@ -53,101 +53,92 @@
     function _hasChildren(o) { return o && Array.isArray(o.USPTREE) && o.USPTREE.length > 0; }
     function _key(o) { return (o && o.OBJKY != null) ? String(o.OBJKY) : ""; }
 
-    // 공통 베이스 트리 컨트롤러(1회 생성, 이후 .render() 재사용)
-    var _tree = null;
-    function _ensureTree() {
-        if (_tree) { return _tree; }
-        if (!(window.U4AUI && U4AUI.createTree)) { return null; }
+    // 메시지 텍스트(컬럼 헤더/빈 데이터) — usp.js _msg/_wsMsg 와 동일 소스.
+    function _msg(sNum) {
+        try { var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum); if (s != null && s !== "" && s.indexOf("|") === -1) { return s; } } catch (e) { }
+        return sNum;
+    }
+    function _wsMsg(sNr) {
+        try {
+            var lg = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
+            var s = parent.WSUTIL.getWsMsgClsTxt(lg, "ZMSG_WS_COMMON_001", sNr);
+            if (s && s.indexOf("|") === -1) { return s; }
+        } catch (e) { }
+        return sNr;
+    }
 
-        _tree = U4AUI.createTree({
-            // 대용량 USP 소스 트리 대비 — flat+windowed 렌더(보이는 행만 DOM). 행높이는 usp.css 가 고정(균일).
+    // 공통 컬럼 트리테이블(U4AUI.makeColumnTree) 컨트롤러(1회 생성). _tree = 내부 createTree 컨트롤러(기존 _tree.* 호출 호환).
+    var _ctrl = null, _tree = null;
+    function _ensureTree() {
+        if (_ctrl) { return _ctrl; }
+        var BODY = document.getElementById("uspTreeBody");
+        if (!(window.U4AUI && U4AUI.makeColumnTree && BODY)) { return null; }
+
+        // ★ 공통 컬럼 트리테이블로 통합(2026-07-13) — 헤더·격자·세로선·컬럼 리사이즈·더블클릭 auto-fit·hover 강조를
+        //   전부 makeColumnTree 가 담당(화면별 재발명 제거, 16 §3.4.2). 화면은 데이터 매핑만.
+        //   2열 = [이름(고정폭·리사이즈 대상) | 설명(채움 fillLast)]. 가상 스크롤(대용량 소스 트리).
+        _ctrl = U4AUI.makeColumnTree(BODY, {
             virtual: true,
-            // 표형 격자(공통) — 가로 행선+빈영역 채움은 공통 .u4a-tree--grid 가 담당(격자 CSS 복제 금지, 16 §3.4.1).
-            //   세로선은 설명 컬럼폭이 42%(비율)라 공통 세로선 변수 미지정 → 세로선은 노드행 .u4aWs30TreeDesc border-left 만.
-            grid: true,
+            fillLast: true,
+            columns: [
+                { label: _msg("C11"), width: "11rem" },   // C11 이름
+                { label: _msg("A35") }                     // A35 설명(채움)
+            ],
             roots: function () {
                 var a = [];
                 try { a = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { }
                 return Array.isArray(a) ? a : [];
             },
             children: function (n) { return _hasChildren(n) ? n.USPTREE : []; },
+            hasChildren: _hasChildren,
             key: _key,
             label: function (n) { return (n && n.OBDEC != null) ? n.OBDEC : ""; },
             tip: function (n) { return (n && n.OBDEC != null) ? String(n.OBDEC) : ""; },
+            selectable: true,
+            emptyText: _wsMsg("312"),   // 312 No data Found
+            // 아이콘(SVG, ISFLD/EXTEN) — 폴더 펼침/접힘은 oCtx.expanded.
             icon: function (n, oCtx) {
                 var src = _iconSrc(n.ISFLD, n.EXTEN, !!(oCtx && oCtx.expanded));
                 if (!src) { return ""; }
                 return '<img src="' + _attrEsc(src) + '" alt="" onerror="this.style.display=\'none\'">';
             },
-            // 설명(Description 컬럼) — 우측 정렬(slotTrailing → 행에 data-u4a-tree-split)
-            slotTrailing: function (n) {
-                // 셀(구분선 풀하이트) / 텍스트(클램프) 분리 — 셀이 텍스트를 세로 중앙정렬(usp.css).
-                var d = document.createElement("span");
-                d.className = "u4aWs30TreeDesc";
+            // 설명 셀 — 2줄 클램프 + 잘릴 때 hover 툴팁(공통 initTooltip 세로클램프 인식). makeColumnTree 가 .u4aColTreeCell 로 감쌈.
+            cell: function (n) {
                 var t = document.createElement("span");
                 t.className = "u4aWs30TreeDescText";
                 var sDesc = (n && n.DESCT != null) ? n.DESCT : "";
                 t.textContent = sDesc;
-                // 2줄 클램프로 잘릴 때만 hover 툴팁(공통 initTooltip, 세로클램프 인식). 가상스크롤서도 동작
-                //   (구 _applyDescTooltips 의 "렌더 후 1회 측정"은 윈도잉서 스크롤-인 행을 놓쳐 hover 방식으로 전환).
                 if (sDesc) { t.setAttribute("data-tip", sDesc); t.setAttribute("data-tip-trunc", ""); }
-                d.appendChild(t);
-                return d;
+                return { c2: t };
             },
-            // 기본 루트만 펼침(구 numberOfExpandedLevels:1)
-            initialExpanded: function (n, lvl) { return lvl < 1; },
-            // 단일 클릭 = 열기(우측 페이지 + Monaco 연동) — WS20 fnWs20TreeSelectRow 와 동일 UX.
+            // 단일 클릭 = 열기(우측 페이지 + Monaco).
             onSelect: function (n) {
                 try { oAPP.fn.fnUspTreeTableRowSelect(n); }
                 catch (e) { console.error("[HTML5][WS30] tree click open error:", e); }
             },
-            // WS30 확장 식별/선택표시
+            // WS30 확장 — 컨텍스트메뉴 트리거 클래스(.u4aWs30TreeRow)·식별(data-objky)·선택표시(ISSEL)·노드 stash.
+            //   (이름 셀 래핑·컬럼 정렬은 makeColumnTree 가 담당 → USP 는 손대지 않음)
             rowHook: function (oRow, n) {
                 oRow.classList.add("u4aWs30TreeRow");
-                // 이름(토글+아이콘+라벨)을 고정폭 "이름 셀"로 묶는다 — 리사이즈 대상 컬럼(설명은 채움).
-                //   makeColumnTree rowHook 과 동일 패턴. 없으면 라벨(flex:1)이 남는폭을 먹어 컬럼 경계가 안 잡힘.
-                if (!oRow.querySelector(".u4aWs30TreeNameCell")) {
-                    var oNameCell = document.createElement("div");
-                    oNameCell.className = "u4aWs30TreeNameCell";
-                    var oTog = oRow.querySelector(".u4a-tree__toggle");
-                    var oIco = oRow.querySelector(".u4a-tree__icon");
-                    var oLbl = oRow.querySelector(".u4a-tree__label");
-                    if (oTog) { oNameCell.appendChild(oTog); }
-                    if (oIco) { oNameCell.appendChild(oIco); }
-                    if (oLbl) { oNameCell.appendChild(oLbl); }
-                    oRow.insertBefore(oNameCell, oRow.firstChild);
-                }
                 var k = _key(n);
                 if (k !== "") { oRow.setAttribute("data-objky", k); }
                 if (n && n.ISSEL) { oRow.setAttribute("aria-selected", "true"); }
-                oRow.__uspNode = n;   // 우클릭 컨텍스트 메뉴가 행→노드 데이터 해석에 사용
+                oRow.__uspNode = n;
             }
         });
-        _tree.el.classList.add("u4aWs30Tree");
-        return _tree;
+        if (!_ctrl) { return null; }
+        _tree = _ctrl.tree;   // 내부 createTree 컨트롤러 — 기존 _tree.selectByKey/expandAll/expandSubtree/setExpanded/el/scrollToKey 호환
+        return _ctrl;
     }
 
     /************************************************************************
-     * 트리 렌더 (구 fnGetUspTreeTableWs30 + rows binding)
+     * 트리 렌더 (구 fnGetUspTreeTableWs30 + rows binding) — makeColumnTree.rerender 로 위임.
      ************************************************************************/
     oAPP.fn.fnRenderUspTree = function () {
-        var BODY = document.getElementById("uspTreeBody");
-        if (!BODY) { return; }
-
-        var oTree = _ensureTree();
-        if (!oTree) { return; }
-
-        // (세로 컬럼선은 공통 격자 배경 변수로 그린다 — usp.css --u4a-tree-grid-vx. 옛 flex 레이어는 스크롤 밀림 버그로 폐기.)
-        // BODY 에는 컬럼 헤더(.u4aWs30TreeColHead, sticky)가 먼저 들어 있으므로 통째로 비우지 않고
-        //   트리 el 만 헤더 뒤에 1회 붙인다(헤더 보존 → 행과 동일 폭 컨텍스트 유지).
-        if (oTree.el.parentNode !== BODY) {
-            BODY.appendChild(oTree.el);
-        }
-        oTree.render();
-
-        // 설명 컬럼 툴팁은 이제 hover 기반(slotTrailing 에서 data-tip + data-tip-trunc) — 공통 initTooltip 이
-        //   세로 클램프(2줄) 잘림을 hover 시점에 판정해 표시. 가상 스크롤로 나중에 나타나는 행도 자동 동작.
-        //   (구 _applyDescTooltips 의 "렌더 후 1회 전체 측정" 방식은 윈도잉서 스크롤-인 행을 못 잡아 제거.)
+        var oCtrl = _ensureTree();
+        if (!oCtrl) { return; }
+        // 자동 첫선택 안 함(false) — 선택은 우측 콘텐츠와 연동(클릭/프로그램 선택만).
+        oCtrl.rerender(false);
     };
 
     /************************************************************************
@@ -175,12 +166,12 @@
      * 전체 펼침/접힘 (구 fnCommonUspTreeTableExpand / Collapse)
      ************************************************************************/
     oAPP.fn.fnUspTreeExpandAll = function () {
-        var oTree = _ensureTree();
-        if (oTree) { oTree.expandAll(); }
+        _ensureTree();
+        if (_tree) { _tree.expandAll(); }
     };
     oAPP.fn.fnUspTreeCollapseAll = function () {
-        var oTree = _ensureTree();
-        if (oTree) { oTree.collapseAll(); }
+        _ensureTree();
+        if (_tree) { _tree.collapseAll(); }
     };
 
     /************************************************************************
@@ -188,17 +179,17 @@
      ************************************************************************/
     // K1 Expand Subtree — 노드+자손 폴더 전부 펼침(루트면 전체). 구 PUJKY=="" → expandToLevel(99) 포함.
     oAPP.fn.fnUspTreeExpandSubtree = function (oNode) {
-        var oTree = _ensureTree();
-        if (!oTree || !oNode) { return; }
-        oTree.expandSubtree(oNode);
-        if (oNode) { oTree.selectByKey(_key(oNode), false); }   // render 후 우클릭 대상 강조 재적용
+        _ensureTree();
+        if (!_tree || !oNode) { return; }
+        _tree.expandSubtree(oNode);
+        _tree.selectByKey(_key(oNode), false);   // render 후 우클릭 대상 강조 재적용
     };
     // K2 Collapse Subtree — 선택 노드만 접음(구 collapse(idx)).
     oAPP.fn.fnUspTreeCollapseSubtree = function (oNode) {
-        var oTree = _ensureTree();
-        if (!oTree || !oNode) { return; }
-        oTree.setExpanded(oNode, false);
-        if (oNode) { oTree.selectByKey(_key(oNode), false); }
+        _ensureTree();
+        if (!_tree || !oNode) { return; }
+        _tree.setExpanded(oNode, false);
+        _tree.selectByKey(_key(oNode), false);
     };
     // 우클릭 시 선택(aria-selected) 을 옮기지 않는다.
     //   ★ 선택(파란 강조)은 "우측에 열린 콘텐츠"와 연동된 상태다. 우클릭만으로는 콘텐츠를 로드하지 않으므로,

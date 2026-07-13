@@ -34,35 +34,36 @@ body {
 /* ── 스플리터 [트리 | (속성/미리보기)] ── */
 .u4aMimeSplit { flex: 1 1 auto; width: 100%; min-width: 0; min-height: 0; }
 
-/* 트리 패널 — 툴바 + 스크롤바디(가상스크롤 wrap). 설명 컬럼 폭 단일출처(WS30 --ws30-desc-w 동일 42%). */
-.u4aMimeTreePane { --u4aMime-desc-w: 42%; display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }
+/* 트리 패널 — 툴바 + 공통 컬럼 트리테이블 host. (설명 컬럼폭은 공통 makeColumnTree 가 관리 → 화면 토큰 제거.) */
+.u4aMimeTreePane { display: flex; flex-direction: column; background: var(--surface); overflow: hidden; }
 .u4aMimeTreeTool { flex: 0 0 auto; display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.375rem; border-bottom: 0.0625rem solid var(--line); }
 .u4aMimeToolBtn { color: var(--text); }
 .u4aMimeToolSpacer { flex: 1 1 auto; }
 .u4aMimeMyAppBtn { flex: 0 1 auto; min-width: 0; height: 1.75rem; padding: 0 0.625rem; white-space: nowrap; }
 .u4aMimeMyAppBtn span { overflow: hidden; text-overflow: ellipsis; }
 .u4aMimeMyAppBtn[hidden] { display: none; }
-.u4aMimeTreeBody { flex: 1 1 auto; min-height: 0; overflow: hidden auto; position: relative; }
+/* 트리 host = 공통 makeColumnTree(.u4aColTree). 헤더/격자/세로선/리사이즈/hover 는 공통이 담당.
+   ★ 공통 .u4aColTree{height:100%} 를 flex 로 덮어 툴바와 공존(USP #uspTreeBody 동일). overflow/position 은 공통 host 소유. */
+.u4aMimeTreeBody { flex: 1 1 auto; min-height: 0; height: auto; }
 
-/* sticky 컬럼 헤더 — 행과 "동일 콘텐츠 박스" 필수 → 설명컬럼(42%) 구분선이 픽셀 단위로 일치(WS30 이식).
-   ★ padding-left = 0.375rem(행 패딩) + 1px(공통 .u4a-tree ul 의 좌측 1px 패딩 — 선택바 여백).
-     1px 을 빼먹으면 42% 기준폭이 1px 어긋나 구분선이 0.42px 밀림 → 보더가 다른 픽셀에 찍혀
-     "약간 틀어져" 보임(줌 시 확대). 실측으로 확정(2026-07-02). */
-.u4aMimeTreeColHead { position: sticky; top: 0; z-index: 2; box-sizing: border-box; display: flex; align-items: stretch; height: 2.25rem; padding-left: calc(0.375rem + 1px); background: var(--surface-raised); border-bottom: 0.0625rem solid var(--line); font-size: 0.8125rem; font-weight: 700; color: var(--text); }
-.u4aMimeColName { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding-left: 0.5rem; }
-.u4aMimeColDesc { flex: 0 0 var(--u4aMime-desc-w); min-width: 0; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }
+/* (옛 수동 컬럼 헤더 .u4aMimeTreeColHead/ColName/ColDesc·트리 width/split/indent 오버라이드·설명 wrapper .u4aMimeDesc 는
+    공통 makeColumnTree(.u4aColTreeHead/Cell/NameCell)+createTree(.u4aColTreeTree .u4a-tree__toggle/label, shell.css)가
+    동일 대체 → 겨냥 요소 사라져 제거. 2026-07-13 USP 와 동일 통합.) */
 
-/* 트리 — 행을 패널 폭에 맞춰 설명 컬럼 항상 보이게(공통 max-content 무력화). */
-.u4aMimeTree.u4a-tree { width: auto; min-width: 100%; padding-top: 0; }
-.u4aMimeTree .u4a-tree__row[data-u4a-tree-split] { justify-content: flex-start; }
-.u4aMimeRow { padding-right: 0; }
-.u4aMimeRow .u4a-tree__label { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.u4aMimeTree .u4a-tree__row { padding-left: 0.375rem; }
-.u4aMimeTree .u4a-tree__toggle { margin-left: calc(var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem)); }
-
-/* 설명 셀(고정폭 우측 컬럼) + 텍스트(클램프). */
-.u4aMimeDesc { flex: 0 0 var(--u4aMime-desc-w); min-width: 0; box-sizing: border-box; align-self: stretch; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); }
-.u4aMimeDescText { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 0.8125rem; }
+/* 설명 '텍스트'(공통 .u4aColTreeCell.u4aColTreeC2 안) — 최대 2줄 클램프(USP 동일), 초과 시 … + 공통 툴팁(data-tip-trunc).
+   가상 행 높이(--u4a-vsrowh≈40px) 안에 2줄(0.8125rem×1.25×2≈32.5px) 수용. 색/글꼴은 공통 셀 미지정이라 여기서 유지. */
+.u4aMimeDescText {
+    min-width: 0;
+    white-space: normal;         /* 공통 행 nowrap 무력화 — 설명은 줄바꿈 허용 */
+    word-break: break-word;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;       /* 최대 2줄 */
+    color: var(--text);
+    font-size: 0.8125rem;
+    line-height: 1.25;
+}
 
 /* 폴더 아이콘(앰버/열림전환/선택 액센트) = 공통 표준(shell.css .u4a-tree__icon .fa-folder, 승격 2026-07-02) — 화면 스코프 없음. */
 

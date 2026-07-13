@@ -2483,44 +2483,11 @@
         THEAD.appendChild(_treeTbBtn("angles-down", _msg("C27"), function () { if (oAPP.fn.fnUspTreeExpandSelected) { oAPP.fn.fnUspTreeExpandSelected(); } }));
         THEAD.appendChild(_treeTbBtn("angles-up", _msg("C28"), function () { if (oAPP.fn.fnUspTreeCollapseSelected) { oAPP.fn.fnUspTreeCollapseSelected(); } }));
         LEFT.appendChild(THEAD);
-        // 트리 본문 컨테이너 (ws_html5_usp_tree.js 가 트리를 채움) — 2컬럼(이름|설명) 트리.
+        // 트리 본문 host — 공통 U4AUI.makeColumnTree(ws_html5_usp_tree.js)가 [헤더 + 격자 + 세로선 + 컬럼 리사이즈
+        //   + 더블클릭 auto-fit + hover 강조]를 전부 채운다. 화면은 빈 host div 만 제공한다.
+        //   (2026-07-13 공통 컬럼 트리테이블로 통합 — 수동 헤더/그립/리사이즈 배선·화면별 CSS 제거)
         var TBODY = document.createElement("div");
         TBODY.id = "uspTreeBody";
-        TBODY.className = "u4aWs30TreeBody";
-        // 컬럼 헤더(이름 | 설명)를 본문(스크롤 영역) 안에 sticky 로 둔다 — 행과 동일한 폭
-        //   컨텍스트(스크롤바 유무 영향 동일)를 공유해야 컬럼 구분선이 행 구분선과 정확히 정렬된다.
-        var TCOL = document.createElement("div");
-        TCOL.className = "u4aWs30TreeColHead";
-        var COLNAME = document.createElement("div");
-        COLNAME.className = "u4aWs30TreeColName";
-        COLNAME.textContent = _msg("C11");
-        var COLDESC = document.createElement("div");
-        COLDESC.className = "u4aWs30TreeColDesc";
-        COLDESC.textContent = _msg("A35");
-        // 컬럼 리사이즈 바 — 이름|설명 분리선(설명 셀 좌측 경계)에 공통 그립. 드래그=이름 컬럼(고정폭 --ws30-name-w) 리사이즈,
-        //   설명은 나머지 채움. 공통 U4AUI.attachColumnResize(가이드라인+놓을때 1회 적용, §3.4.2) 소비(그립 로직 복붙 금지).
-        try {
-            if (window.U4AUI && typeof U4AUI.attachColumnResize === "function") {
-                var GRIP = document.createElement("div");
-                GRIP.className = "u4aColTreeGrip";   // 공통 그립 스킨(shell.css) — 셀 좌측 경계(-0.1875rem)에 위치
-                GRIP.setAttribute("aria-hidden", "true");
-                COLDESC.appendChild(GRIP);
-                U4AUI.attachColumnResize(GRIP, {
-                    host: TBODY,   // 가이드 세로범위 = 본문(스크롤 컨테이너) 뷰포트로 클램프
-                    getWidth: function () { return COLNAME.getBoundingClientRect().width; },
-                    setWidth: function (px) {
-                        var avail = (TBODY.clientWidth || 400) - 96;   // 설명 최소 ~96px 확보(이름 상한)
-                        var w = Math.max(64, Math.min(px, Math.max(64, avail)));
-                        LEFT.style.setProperty("--ws30-name-w", w + "px");
-                    },
-                    onReset: function () { LEFT.style.removeProperty("--ws30-name-w"); },   // 더블클릭=기본폭(11.25rem) 복귀
-                    hoverEl: TBODY, hoverClass: "is-col-hover"   // 본문 전체에 클래스 → 헤더+행+빈영역 세로선 동시 강조
-                });
-            }
-        } catch (e) { console.error("[HTML5][WS30] tree column resize wire:", e && e.message ? e.message : e); }
-        TCOL.appendChild(COLNAME);
-        TCOL.appendChild(COLDESC);
-        TBODY.appendChild(TCOL);
         LEFT.appendChild(TBODY);
         SPLIT.appendChild(LEFT);
 
