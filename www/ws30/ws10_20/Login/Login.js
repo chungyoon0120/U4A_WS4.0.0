@@ -5,8 +5,11 @@
  * - file Desc : WS Login Page (HTML5 컨버전)
  * ----------------------------------------------------------------------
  * doc 02 §8(B-1)/§9, doc 12 테마 전략 기반 SAP UI5 → 순수 HTML5 컨버전.
- *   · Electron/Node 자원(REMOTE/FS/regedit/XHR/autoUpdater/GlobalShortCut)은
+ *   · Electron/Node 자원(REMOTE/FS/regedit/XHR/autoUpdater)은
  *     호출부를 그대로 유지한다 (doc 02 §9.4 불변 제약).
+ *     ※ 단, F11 전체화면은 전역 단축키(globalShortcut)를 폐지하고 셸(resources/index.js)의
+ *       앱 창 webContents before-input-event 로 이관 — 창 포커스 시 전 화면(로그인·WS20·WS30·
+ *       미리보기 iframe 등)에서 동작하되 OS 전역 선점은 없음(사용자 요청). 로그인 화면 별도 배선 불필요.
  *   · 인증/세션 흐름(ev_login XHR /wsloginchk, withCredentials, 권한·라이선스·
  *     버전체크, fnOnLoginSuccess → loadWS30MainPage)은 로직 그대로 보존하고
  *     UI5 UI 레이어(렌더·Dialog·MessageBox·Model·byId)만 HTML5 로 교체한다.
@@ -38,8 +41,7 @@ var oAPP = (function () {
         SERVPATH = parent.getServerPath(),
         autoUpdaterServerUrl = `${SERVPATH}/update_check`,
         OCTOKIT = REMOTE.require("@octokit/core").Octokit,
-        WSLOG = require(PATH.join(PATHINFO.WS10_20_ROOT, "js", "ws_log.js")),
-        GlobalShortCut = REMOTE.globalshortcut || REMOTE.globalShortcut;
+        WSLOG = require(PATH.join(PATHINFO.WS10_20_ROOT, "js", "ws_log.js"));
 
     let oAPP = {};
     oAPP.fn = {};
@@ -1756,18 +1758,12 @@ var oAPP = (function () {
     };
 
     /************************************************************************
-     * 단축키 (GlobalShortCut 유지)
+     * 단축키 — F11 전체화면 토글은 셸(resources/index.js)의 앱 창 webContents
+     *   before-input-event 한 곳에서 전 화면 공통 처리한다(창 포커스 시에만, OS 전역 아님).
+     *   → 로그인 화면은 별도 배선이 필요 없다. 아래 두 훅은 호출부 유지를 위한 no-op.
      ************************************************************************/
-    oAPP.fn.fnSetShortCut = () => {
-        if (!GlobalShortCut) { return; }
-        GlobalShortCut.register('F11', () => {
-            var oCurrWin = REMOTE.getCurrentWindow();
-            oCurrWin.setFullScreen(!oCurrWin.isFullScreen());
-        });
-    };
-    oAPP.fn.fnOnBeforeUnload = () => {
-        if (GlobalShortCut) { GlobalShortCut.unregisterAll(); }
-    };
+    oAPP.fn.fnSetShortCut = () => { /* F11 은 셸에서 전 화면 공통 처리 — no-op */ };
+    oAPP.fn.fnOnBeforeUnload = () => { /* F11 셸 이관으로 로그인 화면서 정리할 것 없음 — no-op */ };
 
     /************************************************************************
      * WS Support Package Version Check (SP autoUpdater 유지)

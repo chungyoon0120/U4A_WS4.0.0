@@ -271,7 +271,7 @@
         var oOptions = { autoSearch: true, pickOnly: true, initCond: { PACKG:'', APPNM:'', APPTY:'M', ERUSR: oUserInfo.ID, HITS: 500 } };
         if (oAPP.fn && typeof oAPP.fn.fnAppF4PopupOpen === 'function') {
             oAPP.fn.fnAppF4PopupOpen(oOptions, function (oRow) {
-                if (oRow && oRow.APPID) { oAppIdField.setValue(oRow.APPID); oAppIdField.setValueState('none'); fn_Check_value(); }
+                if (oRow && oRow.APPID) { oAppIdField.setValue(oRow.APPID); oAppIdField.setValueState('none'); fn_CheckAppId(); }
             });
         } else { console.error('[숏컷] fnAppF4PopupOpen 미로드'); }
     }
@@ -342,7 +342,8 @@
     }
 
     // APP ID 서버 검증 및 파라미터 유효성 검사
-    async function fn_Check_value() {
+    // 앱 ID 존재 검사 + 앱 Name 채움. blur/Enter/F4/제출 공통. 성공="", 실패="E".
+    async function fn_CheckAppId() {
         fn_setBusy(true);
 
         // App Name 라벨 초기화
@@ -402,11 +403,18 @@
             const Lmsg = err.message || err.responseText || "";
             U4AUI.confirm({
                 type: "E",
-                title: "Error",
+                title: getMsgText("/U4A/CL_WS_COMMON", "B93", "Error"),
                 message: Lmsg
             });
             return "E";
         }
+
+        return "";   // 앱 ID 존재 확인 성공(앱 Name 채움 완료)
+    }
+
+    // 제출 전 전체 검증 — 앱 ID 존재검사(fn_CheckAppId) + 추가 파라미터 검증
+    async function fn_Check_value() {
+        if (await fn_CheckAppId() === "E") { return "E"; }
 
         // 파라미터 값 검증
         let Lreturn = "";
@@ -667,15 +675,27 @@
         }
 
         const chromeMode = document.querySelector('input[name="chromeMode"]:checked').value;
+
+        // ★ 전체화면(--start-fullscreen)/키오스크(--kiosk)는 Chrome '시작 모드' 플래그라, Chrome 이 이미 실행 중이면
+        //   무시되고 기존 창에 '일반 탭'으로 열린다(Chrome 자체 동작). → 전용 프로파일(--user-data-dir)로 '별도 인스턴스'를
+        //   강제해야 플래그가 실제로 먹는다. 숏컷(앱ID)별 폴더로 격리(둘이 안 섞이게). Chrome 이 --user-data-dir 폴더는 자동 생성.
+        //   (--app= 은 Chrome 실행 여부와 무관하게 항상 별도 앱창이라 프로파일 강제 불필요.)
+        function _dedicatedProfileArg() {
+            var sId = (oAppIdField.getValue() || "u4a").replace(/[^A-Za-z0-9_-]/g, "_");
+            var sDir = PATH.join(APP.getPath("temp"), "u4a_shortcut_profile", sId);
+            return '--user-data-dir="' + sDir + '"';
+        }
+
         switch (chromeMode) {
             case "app":
                 Loption = (Loption !== "" ? Loption + " " : "") + "--app=" + U4Apath;
                 break;
             case "fullscreen":
-                Loption = (Loption !== "" ? Loption + " " : "") + "--start-maximized " + U4Apath;
+                // 원본은 --start-maximized(=최대화, 전체화면 아님) 오표기였음 → 진짜 전체화면 --start-fullscreen 로 교정 + 전용 프로파일.
+                Loption = (Loption !== "" ? Loption + " " : "") + _dedicatedProfileArg() + " --start-fullscreen " + U4Apath;
                 break;
             case "kiosk":
-                Loption = (Loption !== "" ? Loption + " " : "") + "--kiosk " + U4Apath;
+                Loption = (Loption !== "" ? Loption + " " : "") + _dedicatedProfileArg() + " --kiosk " + U4Apath;
                 break;
         }
 
@@ -789,7 +809,10 @@
             clear: true,
             upper: true,
             placeholder: getMsgText("/U4A/CL_WS_COMMON", "D09", "U4A Application ID"),
-            f4: fn_AppId_F4Help
+            f4: fn_AppId_F4Help,
+            // 포커스 이동(change=blur) 또는 Enter 시 앱 존재검사 + 앱 Name 채움. 빈 값이면 이름만 비운다.
+            onChange: function (sVal) { if (sVal && sVal.trim()) { fn_CheckAppId(); } else if (oAppNmField) { oAppNmField.setValue(""); } },
+            onEnter: function (sVal) { if (sVal && sVal.trim()) { fn_CheckAppId(); } }
         });
 
         let sFileNamePlaceholder = getMsgText("/U4A/CL_WS_COMMON", "D10", "Shortcut") + " " + getMsgText("/U4A/CL_WS_COMMON", "C35", "File Name");
@@ -987,7 +1010,7 @@
 
         oTableContainer.innerHTML = `
             <div class="u4aShortcutTableToolbar">
-                <button type="button" class="u4a-btn u4a-btn--accent-outline" id="btnParamAdd">
+                <button type="button" class="u4a-btn u4a-btn--emphasized" id="btnParamAdd">
                     <i class="fa-solid fa-plus"></i>
                 </button>
                 <button type="button" class="u4a-btn u4a-btn--negative" id="btnParamDelete">

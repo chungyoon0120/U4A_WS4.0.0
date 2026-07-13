@@ -127,6 +127,9 @@ html, body {
     gap: 0.5rem;
 }
 
+/* 매개변수 툴바 버튼: +(행 추가)=`u4a-btn--emphasized`(solid 파랑=생성) / −(삭제)=`u4a-btn--negative`(빨강 아웃라인).
+   fill(채움)+색 둘 다 달라 확실히 구분됨. 별도 override 불필요(둘 다 bootstrap-skin 에 색 정의됨). */
+
 /* Grid layout for form fields */
 .u4aFormGrid {
     display: grid;

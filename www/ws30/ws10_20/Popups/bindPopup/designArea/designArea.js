@@ -284,9 +284,62 @@
         }
     }
 
-    // 드롭 처리(원본 onDropBindField 1:1 — 프로퍼티/aggregation) — 편집모드 + 검증 통과 시 쓰기 후 재렌더.
+    // WS20 캔버스 드래그(prc002) 데이터 점검(원본 _chkDesignTreeDragData 1:1 — msg 100/103/104).
+    function _chkDesignTreeDragData(sDragData) {
+        var _sRes = { RETCD: "", RTMSG: "" };
+        function _bad100() { _sRes.RETCD = "E"; _sRes.RTMSG = oAPP.common.zmsg("100"); return _sRes; }   // 100 잘못된 Drag 정보.
+        if (typeof sDragData.RETCD === "undefined") { return _bad100(); }
+        if (typeof sDragData.RTMSG === "undefined") { return _bad100(); }
+        if (typeof sDragData.DnDRandKey === "undefined") { return _bad100(); }
+        if (typeof sDragData.T_0014 === "undefined") { return _bad100(); }
+        if (typeof sDragData.T_0015 === "undefined") { return _bad100(); }
+        if (typeof sDragData.T_CEVT === "undefined") { return _bad100(); }
+        if (sDragData.RETCD === "E") { _sRes.RETCD = "E"; _sRes.RTMSG = sDragData.RTMSG; return _sRes; }   // WS20 drop 불가 메시지 전달.
+        if (sDragData.T_0014.length === 0) { _sRes.RETCD = "E"; _sRes.RTMSG = oAPP.common.zmsg("103"); return _sRes; }   // 103 Drag UI 없음.
+        if (sDragData.DnDRandKey !== oAPP.attr.DnDRandKey) { _sRes.RETCD = "E"; _sRes.RTMSG = oAPP.common.zmsg("104"); return _sRes; }   // 104 같은 세션만.
+        return _sRes;
+    }
+
+    // WS20 캔버스에서 끌어온 UI(prc002) → 디자인 트리 전체 재구성(원본 dropDesignArea 1:1).
+    //   ★ 별창은 별도 BrowserWindow — 원본과 동일하게 native dataTransfer("prc002") 를 소비한다.
+    //   반환: true=WS20 드래그로 처리됨(또는 검증오류 표시) / false=prc002 없음 → 프로퍼티 드롭(prc001)으로 폴백.
+    oAPP.fn.dropDesignArea = function (oData) {
+        if (oAPP.attr.editable === false) { return false; }
+        if (typeof oData === "undefined" || oData === null || oData === "") { return false; }
+        var _sDragData;
+        try { _sDragData = JSON.parse(oData); } catch (e) { return false; }
+
+        var _sRes = _chkDesignTreeDragData(_sDragData);
+        if (_sRes.RETCD === "E") { oAPP.fn.toast(_sRes.RTMSG); return true; }
+
+        // 광역변수 갱신(원본) — 이후 setDesignTreeData 가 이걸로 트리 재구성.
+        oAPP.attr.T_0014 = _sDragData.T_0014;
+        oAPP.attr.T_0015 = _sDragData.T_0015;
+        oAPP.attr.T_CEVT = _sDragData.T_CEVT;
+
+        // 추가속성 선택/레이아웃 초기화(P3 도착 전 가드).
+        if (typeof oAPP.fn.clearSelectAdditBind === "function") { try { oAPP.fn.clearSelectAdditBind(); } catch (e) { } }
+        if (typeof oAPP.fn.setAdditLayout === "function") { try { oAPP.fn.setAdditLayout(""); } catch (e) { } }
+
+        // 디자인 영역 데이터 구성(재렌더 + 컬럼맞춤 포함).
+        oAPP.fn.setDesignTreeData();
+
+        // 추가속성 리스트 재구성(P3 가드).
+        if (oAPP.attr.oAddit && oAPP.attr.oAddit.fn && typeof oAPP.attr.oAddit.fn.setAdditialListData === "function") {
+            try { oAPP.attr.oAddit.fn.setAdditialListData(); } catch (e) { }
+        }
+
+        return true;
+    };
+
+    // 드롭 처리(원본 onDropBindField 1:1 — WS20 캔버스(prc002) 우선 → 프로퍼티/aggregation(prc001)) — 편집모드 + 검증 통과 시 쓰기 후 재렌더.
     async function _onDesignDrop(ev) {
         if (oAPP.attr.editable === false) { return; }
+
+        // ① WS20 디자인 트리 드래그(prc002) → 디자인 트리 전체 재구성(원본 우선 분기).
+        if (oAPP.fn.dropDesignArea(ev.dataTransfer.getData("prc002")) === true) { return; }
+
+        // ② 좌측 모델필드 드래그(prc001) → 바인딩 쓰기.
         var _sRes = _checkDragData(ev.dataTransfer.getData("prc001"));   // ★ dataTransfer 는 await 前 동기 판독.
         if (_sRes.RETCD === "E") { if (_sRes.RTMSG) { oAPP.fn.toast(_sRes.RTMSG); } return; }
 
@@ -312,13 +365,33 @@
     function _wireDesignDrop(oHost) {
         if (!oHost || oHost.__bwpDropWired) { return; }
         oHost.__bwpDropWired = true;
+
+        // WS20 디자인 트리 드래그(외부 창)인지 = dataTransfer 에 prc002 존재(dragover 시 getData 불가 → types 로 판별).
+        function _hasPrc002(dt) { return !!(dt && dt.types && Array.prototype.indexOf.call(dt.types, "prc002") !== -1); }
+        // 드롭존 표시 토글(마우스 뗄 때까지 유지 — dragenter/over 유지, leave/drop 해제).
+        //   ★ 클래스는 비스크롤 래퍼(.u4aBwpDesign)에 — 스크롤 호스트에 걸면 ::after 오버레이 기준이 어긋남.
+        var oZone = (oHost.closest && oHost.closest(".u4aBwpDesign")) || oHost;
+        function _dropZone(b) { oZone.classList.toggle("u4aBwpDropZone", !!b); }
+
+        oHost.addEventListener("dragenter", function (ev) {
+            if (_hasPrc002(ev.dataTransfer)) { ev.preventDefault(); _dropZone(true); }   // enter 에서 안 막으면 일부 브라우저 drop 거부.
+        });
         oHost.addEventListener("dragover", function (ev) {
+            var dt = ev.dataTransfer;
+            // ① WS20 디자인 트리 드래그(외부 창) — 트리 전체가 드롭 타겟 + 드롭존 표시.
+            if (_hasPrc002(dt)) { ev.preventDefault(); try { dt.dropEffect = "copy"; } catch (e) { } _dropZone(true); return; }
+            // ② 좌측 모델필드 드래그(로컬) — drop 가능행 위에서만 허용(행 하이라이트는 _applyDropStyle).
             if (!oAPP.attr.dragModelNode) { return; }
             var oNode = _dropNodeOf(ev);
             if (oNode && oNode._drop_enable === true) { ev.preventDefault(); ev.dataTransfer.dropEffect = "copy"; }
         });
+        oHost.addEventListener("dragleave", function (ev) {
+            // 호스트를 완전히 벗어날 때만 해제(자식 요소로 이동 시 relatedTarget 이 호스트 내부면 유지 — 깜빡임 방지).
+            if (!ev.relatedTarget || !oHost.contains(ev.relatedTarget)) { _dropZone(false); }
+        });
         oHost.addEventListener("drop", async function (ev) {
             ev.preventDefault();   // ★ preventDefault 는 await 前 동기 호출.
+            _dropZone(false);
             try { await _onDesignDrop(ev); }
             catch (e) { console.error("[HTML5][bindWindow] 디자인트리 drop:", e && e.message); }
         });

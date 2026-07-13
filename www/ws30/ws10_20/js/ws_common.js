@@ -4447,7 +4447,7 @@ function fn_logoff_success(TYPE) {
         let sTitle = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D85"), // Session Timeout
             sDesc = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "349"), // Please Try Login Again!
             sIllustType = "tnt-SessionExpired",
-            sIllustSize = sap.m.IllustratedMessageSize.Dialog;
+            sIllustSize = "Dialog"; // [HTML5] sap 제거 — 구 enum 값=문자열
 
         parent.IPCRENDERER.send('if-browser-close', {
             ACTCD: "A", // 나를 제외한 나머지는 다 죽인다.

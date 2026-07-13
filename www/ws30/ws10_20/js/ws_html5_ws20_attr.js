@@ -4644,7 +4644,19 @@
                         return;
                     }
 
-                    //F4 값도움 미변환(styleClass CSS클래스 선택 등 컬러/DDIC/아이콘 외) — 작업중 안내.
+                    // styleClass 프로퍼티 F4 → 미리 정의된 CSS 클래스 선택 팝업(원본 styleClassPopup).
+                    //   목록에서 더블클릭한 클래스를 styleClass 값에 이어붙인다. 인앱 .u4a-dialog(fnStyleClassPopupOpen).
+                    if (sAttr.UIATT === "styleClass") {
+                        var _runSC = function () {
+                            if (typeof oAPP.fn.fnStyleClassPopupOpen === "function") { oAPP.fn.fnStyleClassPopupOpen(sAttr); }
+                            else { console.warn("[HTML5][WS20][attr] fnStyleClassPopupOpen 미로드"); _wipToast(); }
+                        };
+                        if (oAPP.fn.fnStyleClassPopupOpen) { _runSC(); }
+                        else { oAPP.loadJs("fnStyleClassPopupOpen", _runSC); }
+                        return;
+                    }
+
+                    //F4 값도움 미변환(컬러/DDIC/아이콘/styleClass 외) — 작업중 안내.
                     console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT);
                     _wipToast();
                 } : null,

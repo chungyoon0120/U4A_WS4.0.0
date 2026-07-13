@@ -75,6 +75,72 @@
     // 토스트(원본 showMessage(sap,10,...) / MessageToast → KIND 10).
     function _toast(type, text) { try { parent.showMessage(null, 10, type, text); } catch (e) { } }
 
+    /* ── 바인딩 팝업(별창) prc002 드래그 데이터(원본 design/bindPopupHandler/setDragBindPopupData.js 1:1) ──
+       WS20 디자인 트리 → 바인딩 팝업 가운데(디자인 트리) drop 시 소비하는 native dataTransfer.
+       별창은 별도 BrowserWindow — 원본과 동일하게 dataTransfer("prc002") 로 전송한다. */
+    var _BP_K14 = ["APPID", "GUINR", "OBJID", "POSIT", "POBID", "UIOBK", "PUIOK", "ISAGR", "AGRID", "ISDFT",
+        "OBDEC", "AGTYP", "UIATK", "UIATT", "UIASN", "UIATY", "UIADT", "UIADS", "VALKY", "ISLST", "ISMLB",
+        "TOOLB", "UIFND", "PUIATK", "UILIB", "ISEXT", "TGLIB", "DEL_UOK", "DEL_POK", "ISECP"];
+    var _BP_K15 = ["APPID", "GUINR", "OBJID", "UIATK", "UIATV", "ISBND", "UILIK", "UIOBK", "UIATT", "UIASN",
+        "UIADT", "RVALU", "BPATH", "ADDSC", "UIATY", "ISMLB", "ISEMB", "DEL_LIB", "DEL_UOK", "DEL_ATT",
+        "ISWIT", "ISSPACE", "FTYPE", "REFFD", "CONVR", "MPROP", "SHCUT"];
+
+    // 전송 전 drag 라인 점검(원본 checkBindPopupDragAppData). 부모 N건 바인딩이면 UI 구성 불가.
+    function _chkBindPopupDragAppData(is_drag) {
+        var _sRes = { RETCD: "", RTMSG: "" };
+        if (typeof is_drag === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = _wsc("099"); return _sRes; }   // 099 Drag 정보 없음.
+        if (is_drag.OBJID === "ROOT") { return _sRes; }
+        var _UIATT, _OBJID = is_drag.OBJID;
+        // sap.ui.table.Column 이며 CHILD 에 template 이 있으면 부모(Table/TreeTable)의 rows 로 점검.
+        if (is_drag.UILIB === "sap.ui.table.Column" && (is_drag.zTREE || []).findIndex(function (i) { return i.UIATT === "template"; }) !== -1) {
+            _OBJID = is_drag.POBID; _UIATT = "rows";
+        }
+        var l_path = oAPP.fn.getParentAggrBind(oAPP.attr.prev[_OBJID], _UIATT);
+        if (typeof l_path !== "undefined" && l_path !== "") { _sRes.RETCD = "E"; _sRes.RTMSG = _wsc("163"); return _sRes; }   // 163 부모 MODEL BINDING → UI 구성 불가.
+        return _sRes;
+    }
+
+    // 바인딩 팝업 UI 구성용 design tree 데이터 구성(원본 setBindPopupDragAppData).
+    function _setBindPopupDragAppData(is_drag) {
+        var _aTree = JSON.parse(JSON.stringify([is_drag]));
+        oAPP.attr.POSIT = 0;
+        oAPP.fn.setUIPOSIT(_aTree);
+        oAPP.attr.POSIT = 0;
+        _aTree = oAPP.fn.parseTree2Tab(_aTree);
+        _aTree.sort(function (a, b) { return a.POSIT - b.POSIT; });
+
+        var _sRes = { T_0014: [], T_0015: [], T_CEVT: [] };
+        for (var i = 0, l = _aTree.length; i < l; i++) {
+            var _sTree = _aTree[i];
+            var _s0014 = oAPP.fn.crtStru0014();
+            for (var k = 0; k < _BP_K14.length; k++) { _s0014[_BP_K14[k]] = _sTree[_BP_K14[k]]; }
+            _sRes.T_0014.push(_s0014);
+
+            var _aT0015 = (oAPP.attr.prev[_s0014.OBJID] && oAPP.attr.prev[_s0014.OBJID]._T_0015) || [];
+            for (var j = 0, jl = _aT0015.length; j < jl; j++) {
+                var _s0015 = oAPP.fn.crtStru0015();
+                for (var k2 = 0; k2 < _BP_K15.length; k2++) { _s0015[_BP_K15[k2]] = _aT0015[j][_BP_K15[k2]]; }
+                _sRes.T_0015.push(_s0015);
+            }
+        }
+        _sRes.T_CEVT = JSON.parse(JSON.stringify((oAPP.DATA && oAPP.DATA.APPDATA && oAPP.DATA.APPDATA.T_CEVT) || []));
+        return _sRes;
+    }
+
+    // dragstart 에서 prc002 세팅(원본 setDragAppData → setDragBindPopupData). 별창 미오픈이어도 무해(팝업이 소비).
+    function _setDragBindPopupData(is_drag, ev) {
+        var _sParam = { RETCD: "", RTMSG: "", DnDRandKey: oAPP.attr.DnDRandKey, T_0014: [], T_0015: [], T_CEVT: [] };
+        var _sRes = _chkBindPopupDragAppData(is_drag);
+        if (_sRes.RETCD === "E") {
+            _sParam.RETCD = _sRes.RETCD; _sParam.RTMSG = _sRes.RTMSG;
+            try { ev.dataTransfer.setData("prc002", JSON.stringify(_sParam)); } catch (e) { }
+            return;
+        }
+        var _sData = _setBindPopupDragAppData(is_drag);
+        _sParam.T_0014 = _sData.T_0014; _sParam.T_0015 = _sData.T_0015; _sParam.T_CEVT = _sData.T_CEVT;
+        try { ev.dataTransfer.setData("prc002", JSON.stringify(_sParam)); } catch (e) { }
+    }
+
     function _frameWin() {
         try {
             var f = oAPP.attr.ui && oAPP.attr.ui.frame;
@@ -1502,6 +1568,9 @@
                 if (ls_0022) { ev.dataTransfer.setData("rtmcls", ls_0022.LIBNM); }
             });
             try { ev.dataTransfer.setData("text/plain", "designTree|" + oNode.OBJID + "|" + oAPP.attr.DnDRandKey); } catch (e) { }
+
+            // 바인딩 팝업(별창) 가운데 디자인 트리로 drop 시 소비할 prc002 데이터(원본 setDragAppData 1:1).
+            _safe(function () { _setDragBindPopupData(oNode, ev); });
 
             oAPP.fn.designTreeDragStart(oNode);
         }, false);

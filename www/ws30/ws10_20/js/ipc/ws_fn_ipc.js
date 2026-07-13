@@ -367,7 +367,7 @@
                 let sTitle = "Session Timeout",
                     sDesc = "Please Try Login Again!",
                     sIllustType = "tnt-SessionExpired",
-                    sIllustSize = sap.m.IllustratedMessageSize.Dialog;
+                    sIllustSize = "Dialog"; // [HTML5] sap 제거 — 구 enum 값=문자열
 
                 oAPP.fn.fnShowIllustMsgDialog(sTitle, sDesc, sIllustType, sIllustSize, fnSessionTimeOutDialogOk);
 

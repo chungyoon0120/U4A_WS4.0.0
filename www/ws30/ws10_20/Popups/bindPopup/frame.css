@@ -68,7 +68,7 @@ body {
 
 /* 중앙 세로 2분할(디자인 트리 | 추가속성 적용) — 공통 wireSplitter(axis:y) 소비.
    디자인=고정 높이(초기 basis %), 추가속성적용=유연(잔여 흡수). 최소높이 단일 출처(min-height). */
-.u4aBwpDesign { flex: 0 1 56%; min-height: 6rem; display: flex; flex-direction: column; }
+.u4aBwpDesign { flex: 0 1 56%; min-height: 6rem; display: flex; flex-direction: column; position: relative; }
 .u4aBwpAdditApply { flex: 1 1 auto; min-height: 5rem; display: flex; flex-direction: column; }
 
 /* ★ 원본 BULK 모드(기본) 첫 실행 = 좌(모델트리) + 중(디자인트리) + 우("추가 속성 바인딩")의 3분할.
@@ -209,8 +209,43 @@ body {
 .u4aBwpDropOk { background: var(--hover-bg); box-shadow: inset 0.1875rem 0 0 var(--state-success); }
 .u4aBwpDropNo { opacity: 0.4; }
 
+/* WS20 디자인 트리 → 가운데로 드래그 중 드롭존 표시(호스트 전체, 마우스 뗄 때까지 유지).
+   효과 표준 = .analy/16 §4.3a(레퍼런스 runtimeClassNav .u4aRtmDrop.is-dragover — 실선 accent + state-info-bg + 0.15s 전환).
+   호스트는 콘텐츠+overflow 라 border 대신 outline(레이아웃 시프트 방지)로 동일 룩 구현. */
+/* 드래그 중 드롭존 = 비스크롤 래퍼(.u4aBwpDesign)에 ::after 오버레이로 네모박스를 콘텐츠 위에 덮는다.
+   ★ 스크롤되는 호스트(#bwpDesignTree)에 outline/border 를 걸면 스크롤·sticky헤더·행배경에 사방이 가려짐
+     → 콘텐츠 위(z-index) + pointer-events:none 오버레이라야 4변이 항상 온전히 보인다(장군님 지적 2026-07-13). */
+.u4aBwpDesign.u4aBwpDropZone::before,
+.u4aBwpDesign.u4aBwpDropZone::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;   /* 드롭 이벤트는 아래 호스트로 통과 */
+    border-radius: var(--radius);
+}
+/* 채움 = 반투명 wash(콘텐츠 위로 은은히 덮음). opacity 로 투명도 + 숨쉬듯 미세 오실레이션. */
+.u4aBwpDesign.u4aBwpDropZone::before {
+    background: var(--state-info-bg);
+    z-index: 4;
+    opacity: 0.4;
+    animation: u4aBwpDropBreathe 1.6s ease-in-out infinite;
+}
+/* 테두리 = 실선 accent 네모박스(wash·콘텐츠 위). 등장 시 페이드인. */
+.u4aBwpDesign.u4aBwpDropZone::after {
+    border: 0.125rem solid var(--accent);
+    z-index: 5;
+    animation: u4aBwpDropIn 0.18s ease-out;
+}
+@keyframes u4aBwpDropIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes u4aBwpDropBreathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.5; } }
+/* 접근성 — 모션 최소화 사용자는 애니메이션 끔(정적 wash+테두리만). */
+@media (prefers-reduced-motion: reduce) {
+    .u4aBwpDesign.u4aBwpDropZone::before { animation: none; opacity: 0.4; }
+    .u4aBwpDesign.u4aBwpDropZone::after { animation: none; }
+}
+
 /* 디자인 트리 — 체크박스(멀티 선택) + 바인딩 경로(Link 색). */
-.u4aBwpDesignChk { flex: 0 0 auto; margin: 0; cursor: pointer; }
+.u4aBwpDesignChk { flex: 0 0 auto; margin: 0; cursor: pointer; width: 1.05rem; height: 1.05rem; accent-color: var(--accent); }
 .u4aBwpDesignPath { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: var(--accent); }
 
 /* 디자인 트리 바인딩경로 셀 = 경로(신축) + 행 액션(우측 고정). 원본 rowActionTemplate(accept/disconnected). */

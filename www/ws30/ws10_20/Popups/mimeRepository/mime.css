@@ -132,7 +132,27 @@ body {
 .u4aMimeImpBar { flex: 0 0 auto; }
 .u4aMimeImpTbWrap { flex: 1 1 auto; min-height: 0; position: relative; }
 /* 파일 드래그&드롭 중 목록 영역 강조(의미 토큰만). */
-.u4aMimeImpTbWrap.u4aMimeImpDrag { outline: 0.125rem dashed var(--accent, var(--focus-ring)); outline-offset: -0.125rem; background: var(--selected-bg); }
+/* 드롭존 강조 = 공통 표준(.analy/16 §4.3a). .u4aMimeImpTbWrap 은 비스크롤 position:relative 래퍼라
+   2겹 오버레이(반투명 wash ::before + 실선 accent 테두리 ::after)를 콘텐츠 위에 덮는다(bindPopup 과 동일 느낌).
+   ::before=숨쉬는 반투명 wash / ::after=페이드인 테두리. color-mix 금지 — 토큰+opacity. */
+.u4aMimeImpTbWrap.u4aMimeImpDrag::before,
+.u4aMimeImpTbWrap.u4aMimeImpDrag::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: var(--radius);
+}
+.u4aMimeImpTbWrap.u4aMimeImpDrag::before {
+    background: var(--state-info-bg); z-index: 4; opacity: 0.4;
+    animation: u4aMimeDropBreathe 1.6s ease-in-out infinite;
+}
+.u4aMimeImpTbWrap.u4aMimeImpDrag::after {
+    border: 0.125rem solid var(--accent); z-index: 5;
+    animation: u4aMimeDropIn 0.18s ease-out;
+}
+@keyframes u4aMimeDropIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes u4aMimeDropBreathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) {
+    .u4aMimeImpTbWrap.u4aMimeImpDrag::before { animation: none; opacity: 0.4; }
+    .u4aMimeImpTbWrap.u4aMimeImpDrag::after { animation: none; }
+}
 .u4aMimeImpDesc { width: 100%; }
 /* 컬럼 폭 — 공통 .u4a-table 은 table-layout:fixed(헤더 th 폭이 기준).
    파일크기/삭제만 고정폭, 파일이름·설명은 미지정 → 남는 폭 균등 분배(파일명 짜부라짐 없음).

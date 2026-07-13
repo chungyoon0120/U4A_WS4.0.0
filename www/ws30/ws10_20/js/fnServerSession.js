@@ -48,7 +48,7 @@
         let sTitle = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "147"), // The session has terminated.
             sDesc = oData.RTMSG,
             sIllustType = "tnt-SessionExpired",
-            sIllustSize = sap.m.IllustratedMessageSize.Dialog;
+            sIllustSize = "Dialog"; // [HTML5] sap 제거 — 구 enum 값=문자열
 
         oAPP.fn.fnShowIllustMsgDialog(sTitle, sDesc, sIllustType, sIllustSize, lfSessionTimeOutDialogOk);
 

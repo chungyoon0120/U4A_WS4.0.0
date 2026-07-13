@@ -76,7 +76,7 @@
         let sTitle = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D85"), // Session Timeout
             sDesc = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "349"), // Please Try Login Again!
             sIllustType = "tnt-SessionExpired",
-            sIllustSize = sap.m.IllustratedMessageSize.Dialog;
+            sIllustSize = "Dialog"; // [HTML5] sap 제거 — 구 enum 값=문자열(ws_common.js §2798 동일 컨벤션)
 
         oAPP.fn.fnShowIllustMsgDialog(sTitle, sDesc, sIllustType, sIllustSize, fnSessionTimeOutDialogOk);
 
@@ -549,71 +549,95 @@
      ************************************************************************/
     oAPP.fn.fnShowIllustMsgDialog = (sTitle, sDesc, sIllustType, sIllustSize, fnCallback) => {
 
-        let sIllustMsgId = "u4aWsIllustMessage";
-        let sIllustMsgDlg = "illustMsgDialog";
+        // [HTML5] 구 sap.m.IllustratedMessage + sap.m.Button + sap.m.Dialog → 네이티브 <dialog>.
+        //   WS20 HTML5 빌드엔 실제 UI5 가 없고 sap 은 스텁(ws_html5_shell.js)이라 sap.m.* 생성자가
+        //   존재하지 않아 `new sap.m.Button` 이 "is not a constructor" 로 크래시했다(세션 타임아웃/Trial 경로).
+        //   → sap 의존을 전부 제거하고 동일 UX(중앙 일러스트 카드 + 확인)로 재현한다.
+        //   진행/대기 카드(§16 2.3 fnIllustMsgDialogOpen)와 같은 테마 토큰·백드롭 컨벤션을 소비하되,
+        //   여긴 '확인 버튼 + 콜백'이 필요한 경고 모달이라 푸터 버튼을 둔다(§2.1 헤더/푸터 규칙의 예외).
+        //   sIllustSize(구 UI5 크기 enum)는 HTML5 에선 미사용(시그니처만 유지 — 호출부 무변경).
+        var sDlgId = "illustMsgDialog";
 
-        let oIllustMsg = sap.ui.getCore().byId(sIllustMsgId),
-            oDialog = sap.ui.getCore().byId(sIllustMsgDlg);
-
-        if (oDialog) {
-
-            if (!oDialog.isOpen()) {
-                oDialog.open();
-
-                let oIllustMeta = oIllustMsg.getMetadata(),
-                    oIllustProperties = oIllustMeta.getProperties();
-
-                oIllustMsg.setTitle(sTitle || (oIllustProperties.title && oIllustProperties.title.defaultValue));
-                oIllustMsg.setDescription(sDesc || (oIllustProperties.description && oIllustProperties.description.defaultValue));
-                oIllustMsg.setIllustrationType(sIllustType || (oIllustProperties.illustrationType && oIllustProperties.illustrationType.defaultValue));
-                oIllustMsg.setIllustrationSize(sIllustSize || (oIllustProperties.illustrationSize && oIllustProperties.illustrationSize.defaultValue));
-
+        // illustType(구 UI5 tnt-*) → Font Awesome 아이콘(프로젝트 공통 아이콘 시스템).
+        function _icon(sType) {
+            switch (sType) {
+                case "tnt-SessionExpired": return "fa-hourglass-end";
+                case "tnt-Lock": return "fa-lock";
+                case "tnt-NoData":
+                case "tnt-NoEntries": return "fa-inbox";
+                default: return "fa-circle-exclamation";
             }
+        }
 
+        // 스타일 1회 주입(§16 2.3 컨벤션 — 카드/텍스트는 테마 토큰, 백드롭은 옅은 중립).
+        if (!document.getElementById("u4aWsSessStyle")) {
+            var st = document.createElement("style");
+            st.id = "u4aWsSessStyle";
+            st.textContent =
+                ".u4aWsSessDlg{border:0;padding:0;background:transparent;overflow:visible;" +
+                "min-width:0;max-width:none;width:fit-content;box-shadow:none;border-radius:0}" +
+                ".u4aWsSessDlg::backdrop{background:rgba(15,18,28,.32);backdrop-filter:blur(1.5px)}" +
+                ".u4aWsSessCard{display:flex;flex-direction:column;align-items:center;gap:.55rem;" +
+                "padding:1.6rem 2.1rem 1.35rem;text-align:center;min-width:17rem;max-width:23rem;" +
+                "background:var(--surface-raised,#1b2128);color:var(--text,#fff);" +
+                "border:1px solid var(--line,#33414f);border-radius:16px;" +
+                "box-shadow:var(--popover-shadow,0 18px 50px rgba(0,0,0,.55));" +
+                "animation:u4aWsSessIn .18s ease both}" +
+                ".u4aWsSessIcon{font-size:2.55rem;line-height:1;color:var(--state-error,#d9534f);margin-bottom:.1rem}" +
+                ".u4aWsSessTitle{font-weight:700;font-size:1.04rem;letter-spacing:.2px}" +
+                ".u4aWsSessTitle:empty{display:none}" +
+                ".u4aWsSessDesc{font-size:.8125rem;color:var(--text-muted,#9aa3ad);line-height:1.5;" +
+                "white-space:pre-line;min-height:1.1em}" +
+                ".u4aWsSessFoot{margin-top:.65rem;display:flex;justify-content:center}" +
+                ".u4aWsSessOk{min-width:5rem}" +
+                "@keyframes u4aWsSessIn{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}" +
+                "@media(prefers-reduced-motion:reduce){.u4aWsSessCard{animation:none}}";
+            document.head.appendChild(st);
+        }
+
+        // 이미 존재하면: 닫혀있을 때만 내용 갱신 후 재오픈(원본 동일), 열려있으면 무시(중복 방지).
+        var oExist = document.getElementById(sDlgId);
+        if (oExist) {
+            if (!oExist.open) {
+                oExist.querySelector(".u4aWsSessIcon").className = "u4aWsSessIcon fa-solid " + _icon(sIllustType);
+                oExist.querySelector(".u4aWsSessTitle").textContent = sTitle || "";
+                oExist.querySelector(".u4aWsSessDesc").textContent = sDesc || "";
+                try { oExist.showModal(); } catch (e) { }
+            }
             return;
         }
 
-        let oMsg = new sap.m.IllustratedMessage(sIllustMsgId, {
-            title: sTitle,
-            description: sDesc,
-            illustrationSize: sIllustSize,
-            illustrationType: sIllustType,
-            additionalContent: new sap.m.Button({
-                text: "OK",
-                press: function () {
+        // 확인 버튼 라벨(A40 Confirm, 없으면 OK).
+        var sOk = "OK";
+        try { sOk = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A40") || "OK"; } catch (e) { }
 
-                    let oIllustMsg = sap.ui.getCore().byId(sIllustMsgDlg);
-                    if (oIllustMsg) {
-                        oIllustMsg.close();
-                    }
+        var oDlg = document.createElement("dialog");
+        oDlg.id = sDlgId;
+        oDlg.className = "u4aWsSessDlg";
+        oDlg.innerHTML =
+            '<div class="u4aWsSessCard">' +
+            '<i class="u4aWsSessIcon fa-solid ' + _icon(sIllustType) + '" aria-hidden="true"></i>' +
+            '<div class="u4aWsSessTitle"></div>' +
+            '<div class="u4aWsSessDesc"></div>' +
+            '<div class="u4aWsSessFoot">' +
+            '<button type="button" class="u4a-btn u4a-btn--emphasized u4aWsSessOk"></button>' +
+            '</div></div>';
+        oDlg.querySelector(".u4aWsSessTitle").textContent = sTitle || "";
+        oDlg.querySelector(".u4aWsSessDesc").textContent = sDesc || "";
+        oDlg.querySelector(".u4aWsSessOk").textContent = sOk;
 
-                    if (typeof fnCallback == "function") {
-                        fnCallback();
-                    }
+        // ESC 로 닫히지 않게(원본 escapeHandler 빈 함수).
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); });
 
-                }
-            })
+        // 확인 → 닫고 제거(원본 afterClose destroy) 후 콜백.
+        oDlg.querySelector(".u4aWsSessOk").addEventListener("click", function () {
+            try { oDlg.close(); } catch (e) { }
+            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { }
+            if (typeof fnCallback === "function") { fnCallback(); }
         });
 
-        new sap.m.Dialog(sIllustMsgDlg, {
-            title: sTitle,
-            state: sap.ui.core.ValueState.Error,
-            content: [
-                oMsg
-            ],
-            escapeHandler: () => { }, // esc 키 방지
-            afterClose: function () {
-
-                let oIllustMsg = sap.ui.getCore().byId(sIllustMsgDlg);
-                if (oIllustMsg) {
-                    oIllustMsg.destroy();
-                }
-
-            }
-
-        })
-        .addStyleClass("sapUiSizeCompact")
-        .open();
+        document.body.appendChild(oDlg);
+        try { oDlg.showModal(); } catch (e) { }
 
     }; // end of oAPP.fn.fnShowIllustMsgDialog
 
@@ -634,7 +658,7 @@
         var sTitle = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "C85"), // Trial Version
             sDesc = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "311"), // Does not Support in this Trial Version.
             sIllustType = "tnt-Lock",
-            sIllustSize = sap.m.IllustratedMessageSize.Spot;
+            sIllustSize = "Spot"; // [HTML5] sap 제거 — 구 enum 값=문자열
 
         oAPP.fn.fnShowIllustMsgDialog(sTitle, sDesc, sIllustType, sIllustSize);
 
