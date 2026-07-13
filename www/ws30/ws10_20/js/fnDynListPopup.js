@@ -73,7 +73,7 @@
 
         // ── 상태 ──────────────────────────────────────────────────
         var aColumns = [];   // [{ key, label }]
-        var oVs = null;      // 공통 가상 스크롤러
+        var _dt = null;      // 공통 평면 데이터 테이블(U4AUI.makeDataTable)
 
         // ── 다이얼로그 골격 ───────────────────────────────────────
         var oDlg = document.createElement("dialog");
@@ -101,16 +101,21 @@
         oHeader.appendChild(oX);
         oDlg.appendChild(oHeader);
 
-        // 바디(결과 테이블만 — 원본 HBox + sap.ui.table)
+        // 바디(결과 테이블만 — 원본 HBox + sap.ui.table) = 공통 U4AUI.makeDataTable(.u4a-table + 가상 스크롤).
+        //   골격/헤더/행/zebra/선택/no-data/windowing 은 공통이 담당. 컬럼은 서버 응답 후 setColumns.
+        //   단일클릭=행선택(내장), 더블클릭=확정(_pick, 편집상태 가드는 _pick 내부).
         var oBody = _el("div", "u4a-dialog__body u4a-dialog__body--flush u4aDynLBody");
         var oTableWrap = _el("div", "u4a-table-wrap u4aDynLTableWrap");
-        var oTable = _el("table", "u4a-table u4aDynLTable");
-        var oThead = _el("thead"); oThead.appendChild(_el("tr"));
-        var oTbody = _el("tbody");
-        oTable.append(oThead, oTbody);
-        oTableWrap.appendChild(oTable);
         oBody.appendChild(oTableWrap);
         oDlg.appendChild(oBody);
+        _dt = window.U4AUI.makeDataTable(oTableWrap, {
+            virtual: true,
+            columns: [],
+            emptyText: _wsTxt("946"),
+            tableClass: "u4aDynLTable",
+            rowKey: function (oRow, idx) { return idx; },
+            onActivate: function (oRow) { _pick(oRow); }
+        });
 
         // 푸터(닫기 — X 아이콘만, Reject 톤)
         var oFoot = _el("div", "u4a-dialog__footer");
@@ -122,25 +127,8 @@
         oFoot.appendChild(oCloseBtn);
         oDlg.appendChild(oFoot);
 
-        /* ── 행 빌드(가상 스크롤러가 보이는 구간만 호출). idx=절대 인덱스(zebra·선택키) ── */
-        function _buildRow(oRowData, idx) {
-            try { oRowData.__dynIdx = idx; } catch (e) { }
-            var oTr = _el("tr");
-            if (idx % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
-            aColumns.forEach(function (oCol) {
-                var oTd = _el("td");
-                var v = oRowData[oCol.key];
-                oTd.textContent = (v == null) ? "" : String(v);
-                oTd.title = oTd.textContent;
-                oTr.appendChild(oTd);
-            });
-            // 단일클릭=선택 강조, 더블클릭=선택 확정(원본은 dblclick 확정).
-            oTr.addEventListener("click", function () {
-                if (oVs) { oVs.setSel(idx); oVs.refresh(); }
-            });
-            oTr.addEventListener("dblclick", function () { _pick(oRowData); });
-            return oTr;
-        }
+        // (행 빌드·zebra·단일클릭 선택·더블클릭 확정은 공통 makeDataTable 이 담당 —
+        //  컬럼 key 로 셀 렌더, onActivate=_pick. 원본 __dynIdx 선택키는 rowKey:idx 로 대체.)
 
         // 선택 확정(원본 lf_tabDblClick): 편집(IS_EDIT)일 때만 콜백 + 닫기 + 005.
         function _pick(oRowData) {
@@ -167,30 +155,18 @@
             aColumns = [];
 
             var aList = (param && Array.isArray(param.T_LIST)) ? param.T_LIST : [];
-            var oTr = oThead.firstChild;
-            oTr.innerHTML = "";
-
             aList.forEach(function (oL) {
                 var sLabel = (oL.TEXT != null && oL.TEXT !== "") ? oL.TEXT : oL.FIELD;
                 aColumns.push({ key: oL.FIELD, label: sLabel });
-                var oTh = _el("th", null, sLabel);
-                oTh.title = sLabel;
-                oTr.appendChild(oTh);
             });
 
-            // 공통 가상 스크롤러(컬럼 확정 후 1회). 0건 = 공통 no-data(946).
-            var sNoData = _wsTxt("946");
-            oVs = (window.U4AUI && U4AUI.makeVScroller)
-                ? U4AUI.makeVScroller(oTableWrap, oTbody, {
-                    colCount: aColumns.length || 1,
-                    buildRow: _buildRow,
-                    nodata: sNoData,
-                    getSelKey: function (oRowData) { return oRowData ? oRowData.__dynIdx : null; }
-                })
-                : null;
-
-            var aData = (param && Array.isArray(param.T_DATA)) ? param.T_DATA : [];
-            if (oVs) { oVs.setSel(null); oVs.setRows(aData); }
+            // 공통 테이블: 컬럼 지정(헤더 재렌더 + vs 재생성) → 행 세팅.
+            if (_dt) {
+                _dt.setColumns(aColumns);
+                var aData = (param && Array.isArray(param.T_DATA)) ? param.T_DATA : [];
+                _dt.setSel(null);
+                _dt.setRows(aData);
+            }
         }
 
         /* ── 동적 테이블 구성 정보 조회(원본 lf_getDynLayout — /getDynList) ── */

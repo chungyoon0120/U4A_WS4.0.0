@@ -33,7 +33,7 @@ let oAPP = parent.oAPP,
         searchFields: [],   // [{ paramKey, field(createField), datatype }]
         columns: [],        // [{ key, label }]  (key = 셀 데이터 키)
         rows: [],           // 결과 행
-        vs: null            // 공통 가상 스크롤러(U4AUI.makeVScroller)
+        dt: null            // 공통 평면 데이터 테이블(U4AUI.makeDataTable)
     };
 
     // ── DOM 참조(빌드 후 세팅) ──────────────────────────────────
@@ -200,16 +200,21 @@ let oAPP = parent.oAPP,
 
         oRoot.appendChild(oBar);
 
-        // 결과 테이블(공통 .u4a-table) — 가상 스크롤 컨테이너
+        // 결과 테이블 = 공통 U4AUI.makeDataTable(.u4a-table + 가상 스크롤 단일화).
+        //   골격/헤더/행/zebra/선택/no-data/windowing 을 공통이 담당. 컬럼은 서버 응답 후 setColumns.
+        //   단일클릭=행선택(내장), 더블클릭=복사(_copyAlias). 선택키=행 인덱스(ALIAS 빈행 많아 부적합 → rowKey:idx).
         oEl.tableWrap = U4AUI.el("div", "u4a-table-wrap u4aOtr__tableWrap");
-        var oTable = U4AUI.el("table", "u4a-table u4aOtr__table");
-        var oThead = U4AUI.el("thead");
-        oThead.appendChild(U4AUI.el("tr"));
-        var oTbody = U4AUI.el("tbody");
-        oTable.append(oThead, oTbody);
-        oEl.tableWrap.appendChild(oTable);
-        oEl.tbody = oTbody;
-        oEl.thead = oThead;
+        var sNoData0 = "";
+        try { sNoData0 = oAPP.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "946"); } catch (e) { }
+        oState.dt = U4AUI.makeDataTable(oEl.tableWrap, {
+            virtual: true,
+            columns: [],
+            emptyText: sNoData0,
+            tableClass: "u4aOtr__table",
+            rowKey: function (oRow, idx) { return idx; },
+            onActivate: function (oRow) { _copyAlias(oRow); },
+            rowHook: function (oTr) { oTr.setAttribute("data-otr-row", "X"); }
+        });
 
         oRoot.appendChild(oEl.tableWrap);
 
@@ -299,75 +304,22 @@ let oAPP = parent.oAPP,
 
         }
 
-        // thead 렌더
-        var oTr = oEl.thead.firstChild;
-        oTr.innerHTML = "";
-        oState.columns.forEach(function (oCol) {
-            var oTh = U4AUI.el("th");
-            oTh.textContent = oCol.label;
-            oTh.title = oCol.label;
-            oTr.appendChild(oTh);
-        });
-
-        // 공통 가상 스크롤러 생성(컬럼 확정 후 1회). 보이는 구간만 DOM → 대용량 결과도 가볍게.
-        //   0건=공통 no-data(ZMSG_WS_COMMON_001/946, WS20 형제 테이블과 동일).
-        //   선택 키 = 행 고유 인덱스(__otrIdx) — ALIAS_NAME 은 빈 행이 많아 선택 키로 부적합(중복·미선택).
-        var sNoData = "";
-        try { sNoData = oAPP.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "946"); } catch (e) { }
-
-        oState.vs = U4AUI.makeVScroller(oEl.tableWrap, oEl.tbody, {
-            colCount: oState.columns.length || 1,
-            buildRow: _buildRow,
-            nodata: sNoData,
-            getSelKey: function (oRowData) { return oRowData ? oRowData.__otrIdx : null; }
-        });
+        // 공통 테이블에 컬럼 지정 → 헤더 재렌더 + 가상 스크롤러 재생성(colCount 반영).
+        //   (행 빌드·zebra·단일클릭 선택·더블클릭 복사는 makeDataTable 이 담당. 선택키=rowKey:idx.)
+        if (oState.dt) { oState.dt.setColumns(oState.columns); }
 
     } // end of _buildTableColumns
 
 
     /************************************************************************
-     * 결과 행 1개 빌드 (가상 스크롤러가 보이는 구간만 호출). idx=절대 인덱스(zebra).
-     ************************************************************************/
-    function _buildRow(oRowData, idx) {
-
-        // 행 고유 선택 키(절대 인덱스) — getSelKey 가 이걸 읽어 선택 행을 식별.
-        try { oRowData.__otrIdx = idx; } catch (e) { }
-
-        var oTr = U4AUI.el("tr");
-        oTr.setAttribute("data-otr-row", "X");
-        if (idx % 2 === 1) { oTr.setAttribute("data-odd", "true"); } // 공통 zebra
-
-        oState.columns.forEach(function (oCol) {
-            var oTd = U4AUI.el("td");
-            var v = oRowData[oCol.key];
-            oTd.textContent = (v == null) ? "" : String(v);
-            oTd.title = oTd.textContent;
-            oTr.appendChild(oTd);
-        });
-
-        // 단일클릭=선택(스크롤로 행이 사라져도 유지), 더블클릭=복사 — 원본 selectionMode None + dblclick
-        oTr.addEventListener("click", function () {
-            if (oState.vs) {
-                oState.vs.setSel(idx);
-                oState.vs.refresh();
-            }
-        });
-        oTr.addEventListener("dblclick", function () { _copyAlias(oRowData); });
-
-        return oTr;
-
-    } // end of _buildRow
-
-
-    /************************************************************************
-     * 결과 행 세팅 (가상 스크롤러에 위임)
+     * 결과 행 세팅 (공통 테이블에 위임)
      ************************************************************************/
     function _renderRows(aRows) {
 
         oState.rows = aRows || [];
-        if (oState.vs) {
-            oState.vs.setSel(null);   // 새 결과 → 이전 선택 해제
-            oState.vs.setRows(oState.rows);
+        if (oState.dt) {
+            oState.dt.setSel(null);   // 새 결과 → 이전 선택 해제
+            oState.dt.setRows(oState.rows);
         }
 
     } // end of _renderRows
