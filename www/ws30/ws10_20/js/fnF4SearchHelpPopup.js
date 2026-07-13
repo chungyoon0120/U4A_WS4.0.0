@@ -161,6 +161,7 @@
         _dt = window.U4AUI.makeDataTable(oTableWrap, {
             virtual: true,
             columns: [],
+            tableClass: "u4aF4ShTable",                        // 원본 테이블 CSS(width:max-content·셀 nowrap) 유지
             emptyText: _wsTxt("946"),                          // 0건 = 공통 no-data
             rowKey: function (oRow, idx) { return idx; },      // 결과 셀 빈값 많아 인덱스 키(원본 __f4Idx)
             onActivate: function (oRow) { _pick(oRow); }       // 더블클릭=확정(pick+닫기). 단일클릭 선택은 내장.

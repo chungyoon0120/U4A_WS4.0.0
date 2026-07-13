@@ -2695,12 +2695,15 @@
         function _applyColumns(aNewCols) {
             aCols = aNewCols || [];
             _renderHead();
-            if (bVirtual) { _makeVs(); }   // colCount(스페이서 colspan) 재설정 → vs 재생성
+            // ★ vs 는 컬럼이 실제로 생겼을 때 "딱 1회만" 생성. 빈 컬럼으로 미리 만들면(동적 컬럼 화면 F4/OTR/DynList)
+            //   그 stale 인스턴스(aData=[])가 스크롤/휠 때마다 tbody 를 비워 높이 붕괴→스크롤 튕김(휠 안 먹힘).
+            //   재호출 시엔 재생성 안 함(리스너 중복 방지) — 헤더만 갱신, buildRow 는 최신 aCols 사용.
+            if (bVirtual && !_vs && aCols.length) { _makeVs(); }
         }
 
-        // 초기 컬럼(주어졌으면) 적용.
+        // 초기 컬럼(주어졌을 때만 vs 생성 — 빈 컬럼이면 setColumns 시점까지 미룸).
         _renderHead();
-        if (bVirtual) { _makeVs(); }
+        if (bVirtual && aCols.length) { _makeVs(); }
 
         return {
             el: oHost, table: oTable, thead: oThead, tbody: oTbody,
