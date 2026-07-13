@@ -99,6 +99,34 @@
             } catch (e) { }
         }
 
+        // 현재 모델 언어의 꾸밈정렬(포맷) 지원 여부를 부모에 통지.
+        //   ★판정은 언어를 실제 반영한 이 호스트에서만(부모가 자기 타이밍에 isSupported 추측하면 레이스로 샌다).
+        //   특수 에디터 부모는 이 evt 를 모르면 무시(무해).
+        function _reportFmtCap() {
+            var bSup = false;
+            try {
+                var oAct = editor.getAction("editor.action.formatDocument");
+                bSup = !!(oAct && oAct.isSupported());
+            } catch (e) { }
+            _toParent({ evt: "fmtcap", supported: bSup });
+            return bSup;
+        }
+
+        // ★ 언어 첫 활성화(모드 setup)는 비동기 → setModelLanguage 직후엔 포맷 provider 가 아직 미등록일 수
+        //   있어 isSupported 가 일시 false(=처음엔 안 뜨다 두번째부터 뜨는 간헐 버그의 원인). 지원으로 켜질
+        //   때까지 몇 프레임 재통지해 정확히 수렴시킨다. 미지원 언어(css/text 등)는 상한까지만.
+        //   그 사이 언어가 또 바뀌면(_fmtTk 증가) 이전 루프는 스스로 폐기 → 드롭다운 연타에도 마지막이 승리.
+        var _fmtTk = 0;
+        function _reportFmtCapSettled() {
+            _fmtTk++;
+            var tk = _fmtTk, iTry = 0;
+            (function loop() {
+                if (tk !== _fmtTk) { return; }              // 더 최근 언어변경 발생 → 이 루프 폐기
+                if (_reportFmtCap() || iTry++ >= 10) { return; }   // 지원 확정 or 상한 도달 시 종료
+                requestAnimationFrame(loop);
+            })();
+        }
+
         // 부모 → 호스트 명령 수신.
         window.addEventListener("message", function (oEvent) {
             var d = oEvent && oEvent.data;
@@ -120,6 +148,7 @@
 
                 case "setLanguage":
                     try { monaco.editor.setModelLanguage(editor.getModel(), d.language || "javascript"); } catch (e) { }
+                    _reportFmtCapSettled();   // 언어 반영 후 포맷 지원 여부 통지(비동기 활성화까지 수렴, 단일 소스).
                     return;
 
                 case "setReadOnly":

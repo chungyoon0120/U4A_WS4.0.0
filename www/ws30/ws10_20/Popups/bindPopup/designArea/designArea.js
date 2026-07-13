@@ -160,6 +160,194 @@
         }
     }
 
+    /* ── 좌측 필드 → 디자인트리 드롭(원본 onDropBindField/_setBindAttribute) ──────── */
+
+    // 드래그 데이터 정합성(원본 _checkDragData 축약) — DnDRandKey(=SSID) 일치 + 사전 오류 없음.
+    function _checkDragData(sPrc001) {
+        var r = { RETCD: "", RTMSG: "", IF_DATA: null };
+        if (!sPrc001) { r.RETCD = "E"; return r; }
+        var o;
+        try { o = JSON.parse(sPrc001); } catch (e) { r.RETCD = "E"; return r; }
+        if (!o || o.PRCCD !== "PRC001") { r.RETCD = "E"; return r; }
+        if (o.DnDRandKey !== oAPP.attr.DnDRandKey) { r.RETCD = "E"; return r; }   // 다른 팝업 인스턴스 드래그 차단.
+        if (o.RETCD === "E") { r.RETCD = "E"; r.RTMSG = o.RTMSG || ""; return r; } // 추가속성 검증 오류.
+        r.IF_DATA = o.IF_DATA;
+        return r;
+    }
+
+    // 드롭 위치 tree 노드(원본 _getContextData) — 이벤트 target 의 행에서 __bwpNode.
+    function _dropNodeOf(ev) {
+        var oRow = (ev.target && ev.target.closest) ? ev.target.closest(".u4a-tree__row") : null;
+        return oRow ? oRow.__bwpNode : undefined;
+    }
+
+    // design tree 라인 오류 필드 초기화(원본 _resetErrorFieldLine 1:1).
+    function _resetErrorFieldLine(sTree) {
+        sTree._bind_error = false;
+        sTree._check_vs = null;
+        sTree._style = "";
+        sTree._error_tooltip = null;
+    }
+
+    // dropAble 프로퍼티 unbind 예외처리(원본 excepUnbindDropAbleProperty 1:1).
+    //   DATYP02·UIATY1·UIASN==="DROPABLE"·UIATV="" 일 때 prev._T_0015 의 DNDDROP 수집건 제거.
+    function _excepUnbindDropAbleProperty(is_tree) {
+        if (is_tree.DATYP !== "02") { return; }
+        if (is_tree.UIATY !== "1") { return; }
+        if (is_tree.UIASN !== "DROPABLE") { return; }
+        if (is_tree.UIATV !== "") { return; }
+        var _oUi = oAPP.attr.prev[is_tree.OBJID];
+        if (typeof (_oUi && _oUi._T_0015) === "undefined") { return; }
+        var _found = _oUi._T_0015.findIndex(function (item) { return item.UIASN === "DNDDROP"; });
+        if (_found === -1) { return; }
+        _oUi._T_0015.splice(_found, 1);
+    }
+
+    // 디자인 트리 재렌더 + 컬럼 재적합(해제/바인딩 후 공통 후속).
+    function _refreshDesignTree() {
+        if (oD.ctrl) { oD.ctrl.rerender(false); }
+        if (typeof oAPP.fn.fitTreeColumns === "function") { oAPP.fn.fitTreeColumns(oD.host); }
+    }
+
+    /************************************************************************
+     * 행 액션 - 바인딩 해제(원본 onUnbind 1:1). 대상 노드 n 을 직접 받음.
+     *   ★ WS20 busy 핸드셰이크(setBusyWS20Interaction)는 P6 — 로컬 해제는 동기이므로 busy 생략.
+     *   ★ 참조필드/추가속성 후속(setRefFieldList/clearSelectAdditBind/setAdditLayout)은 P3 — 가드 호출.
+     ************************************************************************/
+    oAPP.fn.onUnbind = function (n) {
+        if (!n) { return; }
+        // 185 Do you want to continue unbind?
+        U4AUI.confirm({
+            type: "C",
+            message: H.z("185"),
+            buttons: [{ act: "YES", label: H.cl("A03"), emphasized: true }, { act: "NO", label: H.cl("A39") }],
+            onClose: function (sAct) {
+                if (sAct !== "YES") { return; }
+
+                if (typeof oAPP.fn.resetErrorField === "function") { try { oAPP.fn.resetErrorField(); } catch (e) { } }
+
+                switch (n.UIATY) {
+                    case "1":
+                        oAPP.fn.attrSetUnbindProp(n);
+                        _excepUnbindDropAbleProperty(n);   // dropAble 프로퍼티 예외.
+                        break;
+                    case "3":
+                        oAPP.fn.attrUnbindAggr(oAPP.attr.prev[n.OBJID], n.UIATT, n.UIATV);
+                        oAPP.fn.attrSetUnbindProp(n);
+                        oAPP.fn.attrUnbindTree(n);   // Tree/TreeTable PARENT·CHILD 예외.
+                        break;
+                    default: break;
+                }
+
+                _refreshDesignTree();
+
+                // 후속(P3 도착 전 가드): 참조필드/추가속성/좌측 재판정.
+                if (typeof oAPP.attr.oAddit === "object" && oAPP.attr.oAddit && oAPP.attr.oAddit.fn
+                    && typeof oAPP.attr.oAddit.fn.setRefFieldList === "function") { try { oAPP.attr.oAddit.fn.setRefFieldList(); } catch (e) { } }
+                if (typeof oAPP.fn.clearSelectAdditBind === "function") { try { oAPP.fn.clearSelectAdditBind(); } catch (e) { } }
+                if (typeof oAPP.fn.setAdditLayout === "function") { try { oAPP.fn.setAdditLayout(""); } catch (e) { } }
+                if (typeof oAPP.fn.bindPossibleRecompute === "function") { try { oAPP.fn.bindPossibleRecompute(n); } catch (e) { } }
+
+                // 153 바인딩 해제 처리를 완료 했습니다.
+                oAPP.fn.toast(H.z("153"));
+            }
+        });
+    };
+
+    // 행 액션 - 추가속성 정보 적용(원본 onAdditionalBind). 우측 추가속성 위젯 = P3, 지금은 준비중 안내.
+    oAPP.fn.onAdditionalBind = function (n) {
+        if (!n) { return; }
+        oAPP.fn.toast("바인딩 추가속성 정보 적용은 준비 중입니다.");
+    };
+
+    // 바인딩 쓰기 디스패처(원본 _setBindAttribute 1:1 — UIATK _1 제거 + T_0023/0022 가드 + 오류초기화 + switch).
+    //   ★ aggregation(UIATY "3")은 confirm(181/182)이 있어 async — 원본 await 흐름 그대로.
+    async function _setBindAttribute(is_drag, is_drop) {
+        var _UIATK = is_drop.UIATK;
+        if (_UIATK.endsWith("_1") === true) { _UIATK = _UIATK.substr(0, _UIATK.lastIndexOf("_1")); }   // 직접입력 aggregation 예외 KEY 제거.
+        var _s0023 = (oAPP.attr.T_0023 || []).find(function (item) { return item.UIATK === _UIATK; });
+        if (typeof _s0023 === "undefined") { return false; }
+        var _s0022 = (oAPP.attr.T_0022 || []).find(function (item) { return item.UIOBK === _s0023.UIOBK; });
+        if (typeof _s0022 === "undefined") { return false; }
+
+        _resetErrorFieldLine(is_drop);   // 오류 표현 초기화.
+
+        switch (is_drop.UIATY) {
+            case "1":
+                oAPP.fn.attrSetBindProp(is_drop, is_drag);   // 프로퍼티 바인딩.
+                return true;
+            case "3":
+                await oAPP.fn.attrBindCallBackAggr(true, is_drag, is_drop);   // aggregation 바인딩(재바인딩 confirm 포함).
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // 드롭 처리(원본 onDropBindField 1:1 — 프로퍼티/aggregation) — 편집모드 + 검증 통과 시 쓰기 후 재렌더.
+    async function _onDesignDrop(ev) {
+        if (oAPP.attr.editable === false) { return; }
+        var _sRes = _checkDragData(ev.dataTransfer.getData("prc001"));   // ★ dataTransfer 는 await 前 동기 판독.
+        if (_sRes.RETCD === "E") { if (_sRes.RTMSG) { oAPP.fn.toast(_sRes.RTMSG); } return; }
+
+        var _sDrop = _dropNodeOf(ev);
+        if (typeof _sDrop === "undefined") { return; }
+
+        // 드롭 가능 검증(원본 checkValidBind) — 불가 시 메시지.
+        var _chk = oAPP.fn.checkValidBind(_sDrop, _sRes.IF_DATA);
+        if (_chk.RETCD === "E") { oAPP.fn.toast(oAPP.common.zmsg(_chk.MSGNO) || ""); return; }
+
+        // DESIGN TREE 드롭은 추가속성 미적용(원본 §4.8-b) — MPROP 초기화.
+        _sRes.IF_DATA.MPROP = "";
+
+        if ((await _setBindAttribute(_sRes.IF_DATA, _sDrop)) === false) { return; }
+        _sDrop.chk_seleced = false;
+
+        // 재렌더(바인딩 경로 표시) + 컬럼 재적합.
+        if (oD.ctrl) { oD.ctrl.rerender(false); }
+        oAPP.fn.fitTreeColumns(oD.host);
+    }
+
+    // 디자인트리 호스트에 native 드롭 배선(1회).
+    function _wireDesignDrop(oHost) {
+        if (!oHost || oHost.__bwpDropWired) { return; }
+        oHost.__bwpDropWired = true;
+        oHost.addEventListener("dragover", function (ev) {
+            if (!oAPP.attr.dragModelNode) { return; }
+            var oNode = _dropNodeOf(ev);
+            if (oNode && oNode._drop_enable === true) { ev.preventDefault(); ev.dataTransfer.dropEffect = "copy"; }
+        });
+        oHost.addEventListener("drop", async function (ev) {
+            ev.preventDefault();   // ★ preventDefault 는 await 前 동기 호출.
+            try { await _onDesignDrop(ev); }
+            catch (e) { console.error("[HTML5][bindWindow] 디자인트리 drop:", e && e.message); }
+        });
+    }
+
+    // 현재 렌더된 행에 drop 가능/불가 표시 토글(원본 setDropStyle/resetDropStyle 의 HTML5 대응).
+    function _applyDropStyle(bDragging) {
+        if (!oD.host) { return; }
+        var aRows = oD.host.querySelectorAll(".u4a-tree__row");
+        for (var i = 0; i < aRows.length; i++) {
+            var oRow = aRows[i], n = oRow.__bwpNode;
+            if (!bDragging || !n) { oRow.classList.remove("u4aBwpDropOk", "u4aBwpDropNo"); continue; }
+            oRow.classList.toggle("u4aBwpDropOk", n._drop_enable === true);
+            oRow.classList.toggle("u4aBwpDropNo", n.DATYP === "02" && n._drop_enable !== true);
+        }
+    }
+
+    // [PUBLIC] 좌측 드래그 시작 시 drop 가능행 표시(원본 setDropFlag+setDropStyle) — 드래그 소스가 호출.
+    oAPP.fn.designSetDropFlag = function (sField) {
+        oAPP.fn._bwpResetDropFlag(oAPP.attr.designTree);
+        oAPP.fn._bwpSetDropFlag(oAPP.attr.designTree, sField);
+        _applyDropStyle(true);
+    };
+    // [PUBLIC] 드래그 종료 시 표시 초기화(원본 resetDropFlag+resetDropStyle).
+    oAPP.fn.designResetDropFlag = function () {
+        oAPP.fn._bwpResetDropFlag(oAPP.attr.designTree);
+        _applyDropStyle(false);
+    };
+
     /************************************************************************
      * 디자인 트리 데이터 구성(원본 setDesignTreeData 1:1) — T_0014 → 트리 → 렌더.
      ************************************************************************/
@@ -168,6 +356,7 @@
         var aTree = [];
         oAPP.attr.designFlat = [];
         oAPP.attr.designTree = [];
+        oAPP.attr.prev = {};   // 미리보기/바인딩 캐시 초기화(원본 setDesignTreeData 진입부).
 
         if (a0014.length !== 0) {
             for (var i = 0; i < a0014.length; i++) {
@@ -175,7 +364,8 @@
                 _buildProp(a0014[i], aTree);
                 _buildAggr(a0014[i], aTree);
                 _bindAttr(a0014[i], aTree);
-                // _setPrevData(미리보기 구조)·SEND-ROOT-OBJID(브로드캐스트)는 상호작용/Stage6 스텝.
+                // prev[OBJID] 캐시 구성(원본 _setPrevData) — 부모→자식 순서라 부모 prev 가 먼저 존재.
+                if (typeof oAPP.fn._bwpSetPrevData === "function") { oAPP.fn._bwpSetPrevData(a0014[i]); }
             }
             oAPP.attr.designFlat = aTree;
             oAPP.attr.designTree = oAPP.fn.setTreeData(aTree, "CHILD", "PARENT", "zTREE_DESIGN");
@@ -261,20 +451,38 @@
                 oChk.addEventListener("change", function () { n.chk_seleced = oChk.checked; });
                 return oChk;
             },
-            // C2 = 바인딩 경로(UIATV), C3 = MPROP.
+            // C2 = 바인딩 경로(UIATV) + 행 액션(추가속성적용/해제), C3 = MPROP.
             cell: function (n) {
+                var oC2 = H.el("span", "u4aBwpPathCell");
                 var oPath = H.el("span", "u4aBwpDesignPath", n.UIATV || "");
                 if (n.UIATV) { oPath.setAttribute("data-tip", n.UIATV); oPath.setAttribute("data-tip-trunc", ""); }
+                oC2.appendChild(oPath);
+                // 행 액션(원본 rowActionTemplate visible="{/edit}") — 편집 상태 + 계산된 가시 플래그일 때만.
+                if (oAPP.attr.editable) {
+                    var oAct = H.el("span", "u4aBwpRowAct");
+                    if (n._bind_visible) { oAct.appendChild(H.iconBtn("circle-check", H.z("132"), function (e) { e.stopPropagation(); oAPP.fn.onAdditionalBind(n); }, "u4aBwpRowActBtn")); }   // 132 추가속성 적용
+                    if (n._unbind_visible) { oAct.appendChild(H.iconBtn("link-slash", H.z("186"), function (e) { e.stopPropagation(); oAPP.fn.onUnbind(n); }, "u4aBwpRowActBtn u4aBwpRowActBtn--unbind")); }   // 186 Unbind
+                    if (oAct.childNodes.length) { oC2.appendChild(oAct); }
+                }
                 var oMp = H.el("span", "u4aBwpDescTxt", n.MPROP || "");
                 if (n.MPROP) { oMp.setAttribute("data-tip", n.MPROP); oMp.setAttribute("data-tip-trunc", ""); }
-                return { c2: oPath, c3: oMp };
+                return { c2: oC2, c3: oMp };
             },
             rowHook: function (oRow, n) {
                 var sHl = H.rowHl(n._highlight);
                 if (sHl) { oRow.classList.add(sHl); }
+                oRow.__bwpNode = n;   // 드롭 대상 조회용(좌측 필드 → 이 행).
+                // 드래그 진행 중이면 현재 drop 가능여부 표시 유지(재렌더 대비).
+                if (oAPP.attr.dragModelNode) {
+                    oRow.classList.toggle("u4aBwpDropOk", n._drop_enable === true);
+                    oRow.classList.toggle("u4aBwpDropNo", n.DATYP === "02" && n._drop_enable !== true);
+                }
             },
             onSelect: function (n) { oAPP.attr.selDesignNode = n; }
         });
+
+        // 좌측 필드 → 디자인트리 드롭(원본 onDropBindField/_setBindAttribute) 배선.
+        _wireDesignDrop(oD.host);
 
         // 컬럼 자동맞춤(원본 setUiTableAutoResizeColumn = 콘텐츠+마지막 컬럼 채움). 레이아웃 확정 후 1회.
         setTimeout(function () { oAPP.fn.fitTreeColumns(oD.host); }, 0);

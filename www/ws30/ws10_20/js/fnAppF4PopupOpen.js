@@ -130,7 +130,7 @@
         var initCond = options.initCond || {};
         var bWS10 = initCond.EXPAGE === "WS10";       // 앱조회(display) 활성 조건
         var bAudit = _showAudit();
-        var bPickOnly = !!options.pickOnly;           // 순수 '선택' 모드 — 행 액션(앱실행/앱조회) 컬럼 숨김(기본 false=기존 동작 불변)
+        var bPickOnly = !!options.pickOnly;           // 순수 '선택' 모드 — 행 액션(앱실행/앱조회) 컬럼만 제거(생성/변경 이력 등 나머지 데이터 컬럼은 유지). 기본 false=기존 동작 불변
 
         // ── 싱글톤(원본 아키텍처) ───────────────────────────────────
         //   앱 조회(display) 시 다이얼로그를 파괴하지 않고 숨겨(close, DOM 유지) 검색 상태를 보존.
@@ -404,9 +404,9 @@
             );
         }
 
-        // pickOnly: 행 액션(앱실행/앱조회) 컬럼을 제거 — F4 를 순수 '선택'(더블클릭 pick) 용도로 쓰는 호출자용.
-        //   (액션 핸들러 _doRun/_doDisplay 는 parent.setBusy/getCurrPage·oAPP.fn.fnCheckAppExists 등 메인셸 전용
-        //    API 를 요구 → 자식 BrowserWindow 컨텍스트에서 열 때 이 컬럼이 있으면 클릭 시 크래시. 컬럼째 제거해 원천 차단.)
+        // pickOnly: 행 액션(앱실행/앱조회) 컬럼을 제거 — F4 를 순수 '선택'(더블클릭 pick) 용도로 쓰는 호출자(숏컷 등)용.
+        //   (액션 핸들러 _doRun 은 parent.setBusy·oAPP.fn.fnCheckAppExists/fnOnExecApp 등 메인셸 전용 API 를 요구 →
+        //    자식 BrowserWindow 서 클릭 시 크래시. 컬럼째 제거해 원천 차단. 나머지 데이터 컬럼(생성/변경 이력 포함)은 그대로.)
         if (bPickOnly) {
             T1_COLS = T1_COLS.filter(function (c) { return !c.action; });
         }
@@ -414,7 +414,7 @@
         var T1_MAP = {};   // key → col (셀 텍스트/정렬·필터용)
         T1_COLS.forEach(function (c) { if (c.key) { T1_MAP[c.key] = c; } });
 
-        // 좌측 컬럼 고정 — 기본 3개(User Name / Open in Browser / App Views). pickOnly 면 액션 2컬럼이 빠져 User Name 1개만 고정.
+        // 좌측 컬럼 고정 — 기본 3(User Name/Run/Display). pickOnly 면 액션 2컬럼 빠져 User Name 1개만 고정.
         var T1_FRZN = bPickOnly ? 1 : 3;
         var T1_FRZ_COLS = T1_COLS.slice(0, T1_FRZN);   // 고정 페인 컬럼
         var T1_SCR_COLS = T1_COLS.slice(T1_FRZN);      // 스크롤 페인 컬럼
@@ -627,7 +627,7 @@
         var T2_MAP = {};   // key → col (트리 셀 텍스트/정렬·필터용)
         T2_COLS.forEach(function (c) { if (c.key) { T2_MAP[c.key] = c; } });
 
-        // 좌측 컬럼 고정 — 기본 2개(트리 / App Views). pickOnly 면 액션 컬럼이 빠져 트리 1개만 고정.
+        // 좌측 컬럼 고정 — 기본 2(트리 / App Views). pickOnly 면 액션 컬럼 빠져 트리 1개만 고정.
         var T2_FRZN = bPickOnly ? 1 : 2;
         var T2_FRZ_COLS = T2_COLS.slice(0, T2_FRZN);   // 고정 페인(트리 컬럼 + 앱 조회)
         var T2_SCR_COLS = T2_COLS.slice(T2_FRZN);      // 스크롤 페인(나머지)

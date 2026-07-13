@@ -3702,9 +3702,10 @@
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D31"); // ShortCut Creator    
         oBrowserOptions.skipTaskbar = false;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.minimizable = true;   // 타이틀바 최소화 버튼(u4aShortcutWinMin) 동작 위해 허용
+        oBrowserOptions.minimizable = false;  // 최소화 비활성(모달 창 — 최소화 버튼도 disabled 처리)
         oBrowserOptions.maximizable = true;   // 타이틀바 최대화 버튼(u4aShortcutWinMax) 동작 위해 허용
         oBrowserOptions.parent = CURRWIN;
+        oBrowserOptions.modal = true;         // 모달 — 부모(메인) 창 비활성화. F4/confirm 은 자식창 내부 .u4a-dialog 라 영향 없음.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL; //테마별 색상 처리               
         oBrowserOptions.height = 760;
         oBrowserOptions.width = 650;

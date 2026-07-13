@@ -80,7 +80,7 @@
         // ── 상태 ──────────────────────────────────────────────────
         var aSearchFields = [];   // [{ paramKey, field, datatype }]
         var aColumns = [];        // [{ key, label }]
-        var oVs = null;           // 공통 가상 스크롤러
+        var _dt = null;           // 공통 평면 데이터 테이블(U4AUI.makeDataTable)
 
         // ── 다이얼로그 골격 ───────────────────────────────────────
         var oDlg = document.createElement("dialog");
@@ -154,14 +154,17 @@
         oBar.appendChild(oResLabel);
         oBody.appendChild(oBar);
 
-        /* ── 결과 테이블(공통 .u4a-table + 가상 스크롤) ── */
+        /* ── 결과 테이블 = 공통 U4AUI.makeDataTable(.u4a-table + 가상 스크롤 단일화). 골격/헤더/행/zebra/
+             선택/no-data/windowing 을 공통이 담당. 컬럼은 서버 F4 필드정보 응답 후 setColumns 로 지정. ── */
         var oTableWrap = _el("div", "u4a-table-wrap u4aF4ShTableWrap");
-        var oTable = _el("table", "u4a-table u4aF4ShTable");
-        var oThead = _el("thead"); oThead.appendChild(_el("tr"));
-        var oTbody = _el("tbody");
-        oTable.append(oThead, oTbody);
-        oTableWrap.appendChild(oTable);
         oBody.appendChild(oTableWrap);
+        _dt = window.U4AUI.makeDataTable(oTableWrap, {
+            virtual: true,
+            columns: [],
+            emptyText: _wsTxt("946"),                          // 0건 = 공통 no-data
+            rowKey: function (oRow, idx) { return idx; },      // 결과 셀 빈값 많아 인덱스 키(원본 __f4Idx)
+            onActivate: function (oRow) { _pick(oRow); }       // 더블클릭=확정(pick+닫기). 단일클릭 선택은 내장.
+        });
 
         // 푸터(닫기 — X 아이콘만, 원본 Reject 톤)
         var oFoot = _el("div", "u4a-dialog__footer");
@@ -184,27 +187,8 @@
             try { parent.setBusy(bBusy ? "X" : ""); } catch (e) { }
         }
 
-        /* ── 행 빌드(가상 스크롤러가 보이는 구간만 호출). idx=절대 인덱스(zebra·선택키) ── */
-        function _buildRow(oRowData, idx) {
-            try { oRowData.__f4Idx = idx; } catch (e) { }   // 고유 선택 키(결과 셀에 빈값 많아 인덱스 사용)
-            var oTr = _el("tr");
-            if (idx % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
-            aColumns.forEach(function (oCol) {
-                var oTd = _el("td");
-                var v = oRowData[oCol.key];
-                oTd.textContent = (v == null) ? "" : String(v);
-                oTd.title = oTd.textContent;
-                oTr.appendChild(oTd);
-            });
-            // 단일클릭=선택 강조, 더블클릭=선택 확정(pick + 닫기).
-            //   ※ 원본 sap.ui.table 은 rowSelectionChange(단일클릭)에 바로 콜백+닫기지만,
-            //     HTML5 공통 F4 UX(fnAppF4PopupOpen)와 동일하게 더블클릭 확정으로 통일(오선택 방지).
-            oTr.addEventListener("click", function () {
-                if (oVs) { oVs.setSel(idx); oVs.refresh(); }
-            });
-            oTr.addEventListener("dblclick", function () { _pick(oRowData); });
-            return oTr;
-        }
+        // (행 빌드·zebra·단일클릭 선택·더블클릭 확정은 공통 makeDataTable 이 담당 —
+        //  컬럼 정의(key)로 셀 렌더, onActivate=_pick 로 확정. 원본 __f4Idx 선택키는 rowKey:idx 로 대체.)
 
         // 선택 확정 → 콜백 + 닫기(원본 f_clientCallbak 후 close/destroy).
         function _pick(oRowData) {
@@ -269,29 +253,12 @@
                 aColumns.push({ key: sCellKey, label: oFd.SCRTEXT_S || oFd.FIELDNAME });
             }
 
-            // thead 렌더
-            var oTr = oThead.firstChild;
-            oTr.innerHTML = "";
-            aColumns.forEach(function (oCol) {
-                var oTh = _el("th", null, oCol.label);
-                oTh.title = oCol.label;
-                oTr.appendChild(oTh);
-            });
-
-            // 공통 가상 스크롤러(컬럼 확정 후 1회). 0건 = 공통 no-data(946).
-            var sNoData = _wsTxt("946");
-            oVs = (window.U4AUI && U4AUI.makeVScroller)
-                ? U4AUI.makeVScroller(oTableWrap, oTbody, {
-                    colCount: aColumns.length || 1,
-                    buildRow: _buildRow,
-                    nodata: sNoData,
-                    getSelKey: function (oRowData) { return oRowData ? oRowData.__f4Idx : null; }
-                })
-                : null;
+            // 공통 테이블에 컬럼 지정 → 헤더 재렌더 + 가상 스크롤러 재생성(colCount 반영).
+            if (_dt) { _dt.setColumns(aColumns); }
         }
 
         function _renderRows(aRows) {
-            if (oVs) { oVs.setSel(null); oVs.setRows(aRows || []); }
+            if (_dt) { _dt.setSel(null); _dt.setRows(aRows || []); }
         }
 
         /* ── F4 필드정보 조회(원본 lf_getF4Field — trgubun "F") ── */

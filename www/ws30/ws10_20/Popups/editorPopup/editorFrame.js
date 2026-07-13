@@ -159,11 +159,36 @@ function _setSaveVisible(bVisi) {
     if (oBtn) { oBtn.hidden = !bVisi; }
 }
 
-// 푸터 꾸밈정렬(Pretty Print) 노출 — 편집모드에서만(포맷은 내용 변경 → 표시모드 불필요).
-//   클라이언트 이벤트 에디터(ws_html5_client_editor)와 동일 정책.
+// 현재 에디터 언어가 꾸밈정렬(포맷)을 지원하는지 = Monaco 공식 신호(formatDocument isSupported).
+//   ★ 언어 하드코딩 금지 — 이 번들(0.33.0)은 CSS 워커에 format 이 없어 CS 에디터는 미지원 → 자동 비활성.
+//     JS/HTML 은 지원 → 활성. (문서/range provider 존재 && 편집가능이면 true)
+function _canFormat() {
+    try {
+        var ed = oFrame && oFrame.contentWindow && oFrame.contentWindow.editor;
+        if (!ed) { return false; }
+        var oAct = ed.getAction("editor.action.formatDocument");
+        return !!(oAct && oAct.isSupported());
+    } catch (e) { return false; }
+}
+
+// 푸터 꾸밈정렬(Pretty Print) — 편집모드 && 포맷 지원언어일 때만 노출, 그 외엔 **아예 숨김**.
+//   미지원 언어(예: 이 Monaco 버전의 CSS)에서 회색 비활성은 "조건 되면 됨"처럼 오인돼(사용자 지시
+//   2026-07-13) 버튼 자체를 숨긴다.
 function _setPrettyVisible(bVisi) {
     var oBtn = document.getElementById("editorPrettyBtn");
-    if (oBtn) { oBtn.hidden = !bVisi; }
+    if (!oBtn) { return; }
+    oBtn.hidden = !bVisi || !_canFormat();
+}
+
+// 에디터 언어 변경 시 꾸밈정렬 버튼 재평가 — 재오픈(다른 타입)에도 정확. 에디터 1회 생성 후 재사용이라
+//   준비 시 1회만 구독(중복 방지 플래그).
+function _hookFormatWatch() {
+    try {
+        var ed = oFrame && oFrame.contentWindow && oFrame.contentWindow.editor;
+        if (!ed || ed._u4aFmtHooked) { return; }
+        ed._u4aFmtHooked = true;
+        ed.onDidChangeModelLanguage(function () { _setPrettyVisible(_isEdit()); });
+    } catch (e) { }
 }
 
 // 클립보드 복사 — 현재 에디터 전체 내용을 복사(편집/표시 모드 무관, 읽기 중 코드 가져갈 때 유용).
@@ -267,6 +292,7 @@ function _onHostMessage(oEvent) {
     if (d.evt === "ready") {
         oState.ready = true;
         _applyToHost();
+        _hookFormatWatch();      // 언어 변경 시 꾸밈정렬 버튼 활성상태 재평가 구독.
         _finishOpen();           // 에디터 완전 로드 → busy 1회 해제(중간 깜빡임 없음).
         return;
     }

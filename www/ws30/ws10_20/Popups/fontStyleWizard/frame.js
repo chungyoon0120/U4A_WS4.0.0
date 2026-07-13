@@ -72,11 +72,11 @@ var aGroups = [
             { prop: "line-height", key: "lineHeight", css: "lineHeight", def: "100%", custom: true, values: ["100%", "200%", "80%", "2em", "1em", "0.8em", "custom"] },
             { prop: "word-spacing", key: "wordSpacing", css: "wordSpacing", def: "normal", values: ["normal", "1ex", "1.5ex", "2ex", "5ex"] },
             { prop: "letter-spacing", key: "letterSpacing", css: "letterSpacing", def: "normal", values: ["normal", "0.1ex", "0.3ex", "0.75ex", "1ex"] },
-            { prop: "text-decoration", key: "textDecoration", css: "textDecoration", def: "none", values: ["none", "underline", "overline", "line-through", "blink"] },
+            { prop: "text-decoration", key: "textDecoration", css: "textDecoration", def: "none", multi: true, values: ["none", "underline", "overline", "line-through", "blink"] },
             { prop: "text-transform", key: "textTransform", css: "textTransform", def: "none", values: ["none", "capitalize", "uppercase", "lowercase"] },
             { prop: "text-align", key: "textAlign", css: "textAlign", def: "left", control: "align", values: ["left", "right", "center", "justify"] },
             { prop: "text-indent", key: "textIndent", css: "textIndent", def: "0ex", values: ["0ex", "1ex", "2ex", "5ex", "10ex", "10%", "20%"] },
-            { prop: "vertical-align", key: "verticalAlign", css: "verticalAlign", def: "baseline", target: "inline", values: ["baseline", "sub", "super", "top", "text-top", "middle", "bottom", "text-bottom"] }
+            { prop: "vertical-align", key: "verticalAlign", css: "verticalAlign", def: "baseline", target: "inline", demoInline: true, values: ["baseline", "sub", "super", "top", "text-top", "middle", "bottom", "text-bottom"] }
         ]
     }
 ];
@@ -85,8 +85,12 @@ var aGroups = [
 var CAPTION_KEYS = ["fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "textAlign", "verticalAlign"];
 
 var oState = {};
+var oRowByKey = {};
 
 function _err(sText, e) { console.error(sText, e); }
+
+// 다중선택(multi) 속성의 초기 배열 — "none"/빈값은 빈 배열
+function _multiInit(sDef) { return (!sDef || sDef === "none") ? [] : sDef.split(/\s+/); }
 
 function _msg(sCls, sCode, p1) {
     if (!WSMSG) { return ""; }
@@ -148,10 +152,18 @@ function _toast(sText) {
 }
 
 function _initState() {
-    _eachRow(function (oRow) { oState[oRow.key] = oRow.def; });
+    _eachRow(function (oRow) {
+        oRowByKey[oRow.key] = oRow;
+        oState[oRow.key] = oRow.multi ? _multiInit(oRow.def) : oRow.def;
+    });
 }
 
 function _valueOf(sKey) {
+    var oRow = oRowByKey[sKey];
+    if (oRow && oRow.multi) {
+        var aSel = oState[sKey];
+        return (Array.isArray(aSel) && aSel.length) ? aSel.join(" ") : "none";
+    }
     if (oState[sKey] !== "custom") { return oState[sKey]; }
     var oField = oCustomFields[sKey];
     return oField ? (oField.getValue() || "") : "";
@@ -230,25 +242,46 @@ function _update() {
     _renderCaption();
 }
 
+// 어떤 값이 '켜짐'인지 판정 — 다중이면 배열 포함(none=배열 빔), 단일이면 값 일치
+function _isPressed(oRow, sValue) {
+    if (oRow && oRow.multi) {
+        var aSel = Array.isArray(oState[oRow.key]) ? oState[oRow.key] : [];
+        return (sValue === "none") ? (aSel.length === 0) : (aSel.indexOf(sValue) >= 0);
+    }
+    return sValue === oState[oRow.key];
+}
+
 function _syncField(sKey) {
     var oField = document.querySelector('[data-fwx-row="' + sKey + '"]');
     if (!oField) { return; }
+    var oRow = oRowByKey[sKey];
     Array.prototype.forEach.call(oField.querySelectorAll("[data-value]"), function (oBtn) {
-        oBtn.setAttribute("aria-pressed", oBtn.dataset.value === oState[sKey] ? "true" : "false");
+        oBtn.setAttribute("aria-pressed", _isPressed(oRow, oBtn.dataset.value) ? "true" : "false");
     });
     var oVal = oField.querySelector(".fwx-field__val");
     if (oVal) { oVal.textContent = _valueOf(sKey); }
 }
 
 function _select(oRow, sValue) {
-    oState[oRow.key] = sValue;
+    if (oRow.multi) {
+        var aSel = Array.isArray(oState[oRow.key]) ? oState[oRow.key].slice() : [];
+        if (sValue === "none") {
+            aSel = [];                       // none = 전체 해제
+        } else {
+            var iAt = aSel.indexOf(sValue);
+            if (iAt >= 0) { aSel.splice(iAt, 1); } else { aSel.push(sValue); }  // 토글
+        }
+        oState[oRow.key] = aSel;
+    } else {
+        oState[oRow.key] = sValue;
+    }
     _syncField(oRow.key);
     _update();
 }
 
 function _reset() {
     _eachRow(function (oRow) {
-        oState[oRow.key] = oRow.def;
+        oState[oRow.key] = oRow.multi ? _multiInit(oRow.def) : oRow.def;
         var oField = oCustomFields[oRow.key];
         if (oField && oField.setValue) {
             try { oField.setValue(""); } catch (e) { _err("[HTML5][fontStyleWizard] custom reset failed", e); }
@@ -268,9 +301,10 @@ function _chipLabel(oRow, sValue) {
 function _makeChip(oRow, sValue) {
     var oBtn = document.createElement("button");
     oBtn.type = "button";
-    oBtn.className = "fwx-chip";
+    // 다중선택 속성(none 제외)은 체크박스형 칩 → 여러 개 동시 선택 가능함이 시각적으로 드러남
+    oBtn.className = (oRow.multi && sValue !== "none") ? "fwx-chip fwx-chip--multi" : "fwx-chip";
     oBtn.dataset.value = sValue;
-    oBtn.setAttribute("aria-pressed", sValue === oRow.def ? "true" : "false");
+    oBtn.setAttribute("aria-pressed", _isPressed(oRow, sValue) ? "true" : "false");
     oBtn.textContent = _chipLabel(oRow, sValue);
     // 자기시연: 이 칩에 자기 값을 직접 스타일로 입힌다(custom 제외)
     if (DEMO_CSS[oRow.css] && sValue !== "custom") {
@@ -339,6 +373,29 @@ function _buildField(oRow) {
         }
     });
     oField.appendChild(oCtl);
+
+    // 컨텍스트 데모 — 블록 <p> 엔 안 먹는 속성(vertical-align)을 그 컨트롤 바로 아래 인라인 샘플로 시연
+    if (oRow.demoInline) {
+        var oDemo = document.createElement("div");
+        oDemo.className = "fwx-vademo";
+        oDemo.setAttribute("aria-label", oRow.prop + " preview");
+        oDemo.appendChild(document.createTextNode("Ag "));
+        var oInSpan = document.createElement("span");
+        oInSpan.className = "sample";
+        oInSpan.id = "fwxInlineSample";
+        oInSpan.textContent = "Sample";
+        oDemo.appendChild(oInSpan);
+        oDemo.appendChild(document.createTextNode(" "));
+        var oInImg = document.createElement("i");
+        oInImg.className = "fa-regular fa-image fwx-imgsample";
+        oInImg.id = "fwxImgSample";
+        oInImg.setAttribute("role", "img");
+        oInImg.setAttribute("aria-label", "image");
+        oDemo.appendChild(oInImg);
+        oDemo.appendChild(document.createTextNode(" Ag"));
+        oField.appendChild(oDemo);
+    }
+
     return oField;
 }
 

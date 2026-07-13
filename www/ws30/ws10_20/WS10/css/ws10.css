@@ -245,6 +245,18 @@
     background: var(--active-bg);
 }
 
+/* 비활성(disabled) — 회색(옅게) + 기본 커서 + 호버 무효.
+   (없으면 disabled 여도 활성과 똑같이 보여 "눌러도 안 되는 버튼"이 버그처럼 오인됨.
+    예: Pretty Print 는 편집모드 && 포맷 지원언어에서만 활성 → 그 외엔 회색이어야 함) */
+.u4a-tx-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.u4a-tx-btn:disabled:hover {
+    background: transparent;
+}
+
 .u4a-tx-btn i {
     font-size: 0.95rem;
     color: var(--icon-muted);

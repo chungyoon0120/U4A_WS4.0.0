@@ -116,6 +116,7 @@
             rowHook: function (oRow, n) {
                 var sHl = H.rowHl(n.highlight);
                 if (sHl) { oRow.classList.add(sHl); }
+                _wireModelDrag(oRow, n);   // 좌측 필드 → 중앙 디자인트리 드래그 소스(원본 setDragStart).
             },
             onSelect: function (n) { oAPP.attr.selModelNode = n; }
         });
@@ -159,6 +160,60 @@
                 }
             }
         }
+    }
+
+    /************************************************************************
+     * 좌측 바인딩 필드 드래그 시작(원본 index.js setDragStart 1:1) — 편집모드에서 행을 native 드래그 소스로.
+     *   payload prc001 = {PRCCD:"PRC001", RETCD/RTMSG/T_ERMSG, DnDRandKey(=SSID), IF_DATA:{필드 + MPROP}}.
+     *   ★ 원본과 달리 IF_DATA 에서 자식(zTREE) 은 제외한다(드롭측은 필드 자체 속성만 소비 — payload 경량화).
+     *   중앙 디자인트리의 drop 가능표시(designSetDropFlag)·drop 처리·checkValidBind 는 증분2(중앙 드롭)에서 배선.
+     ************************************************************************/
+    // 드래그 payload 필드 = 노드에서 자식(zTREE) 제외한 얕은 복사.
+    function _dragField(n) {
+        var o = {};
+        for (var k in n) { if (Object.prototype.hasOwnProperty.call(n, k) && k !== "zTREE") { o[k] = n[k]; } }
+        return o;
+    }
+    function _wireModelDrag(oRow, n) {
+        if (!oRow || !n) { return; }
+        oRow.__bwpNode = n;
+        var bEdit = (oAPP.attr.editable !== false);   // 원본 DragInfo enabled:{IS_EDIT==="X"} — 편집모드 전체 행.
+        oRow.draggable = bEdit;
+        if (!bEdit || oRow.__bwpDragWired) { return; }
+        oRow.__bwpDragWired = true;
+
+        oRow.addEventListener("dragstart", function (ev) {
+            try {
+                var oNode = oRow.__bwpNode || n;
+                var oObj = {
+                    PRCCD: "PRC001", RETCD: "", RTMSG: "", T_ERMSG: [],
+                    DnDRandKey: oAPP.attr.DnDRandKey,
+                    IF_DATA: _dragField(oNode)
+                };
+                // 추가속성(MPROP) — 우측 패널 미확정값. 아직 미배선(P3)이면 "".
+                oObj.IF_DATA.MPROP = (typeof oAPP.fn.setAdditBindData === "function")
+                    ? (oAPP.fn.setAdditBindData(oAPP.attr.oAddit && oAPP.attr.oAddit.oModel && oAPP.attr.oAddit.oModel.oData.T_MPROP) || "")
+                    : "";
+                // 추가속성 검증(있으면) — 오류 시 payload 에 실어 드롭측이 차단(원본 checkAdditData).
+                try {
+                    if (typeof oAPP.fn.checkAdditData === "function") {
+                        var r = oAPP.fn.checkAdditData();
+                        if (r && r.RETCD === "E") { oObj.RETCD = "E"; oObj.RTMSG = r.RTMSG || ""; oObj.T_ERMSG = r.T_ERMSG || []; }
+                    }
+                } catch (e2) { }
+                ev.dataTransfer.setData("prc001", JSON.stringify(oObj));
+                ev.dataTransfer.effectAllowed = "copy";
+                oAPP.attr.dragModelNode = oNode;
+                document.body.classList.add("u4a-dragging");   // iframe 위 드래그 끊김 방지(공통).
+                // 중앙 트리 drop 가능표시(증분2에서 구현되면 자동 배선).
+                try { if (typeof oAPP.fn.designSetDropFlag === "function") { oAPP.fn.designSetDropFlag(oNode); } } catch (e3) { }
+            } catch (e) { console.error("[HTML5][bindWindow] 모델필드 dragstart:", e && e.message); }
+        });
+        oRow.addEventListener("dragend", function () {
+            oAPP.attr.dragModelNode = null;
+            document.body.classList.remove("u4a-dragging");
+            try { if (typeof oAPP.fn.designResetDropFlag === "function") { oAPP.fn.designResetDropFlag(); } } catch (e) { }
+        });
     }
 
     /************************************************************************

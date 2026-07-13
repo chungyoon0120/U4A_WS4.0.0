@@ -2552,12 +2552,180 @@
         };
     }
 
+    /**
+     * 공통 평면 데이터 테이블 (sap.ui.table / sap.m.Table 대응) — 단일 페인 가상 스크롤 표.
+     *   ★ 소비처(F4검색도움·OTR·동적리스트·WS20편집)가 각자 손으로 반복하던 [.u4a-table-wrap>table.u4a-table>
+     *     thead(tr)+tbody + 컬럼→th + 행→td + zebra + 클릭선택/더블클릭확정 + makeVScroller 윈도잉 + no-data]
+     *     를 한 함수로 수렴. 색/스킨/sticky/zebra/선택은 공통 shell.css .u4a-table 가 단일 담당(재발명 금지).
+     *   ★ 2페인 고정컬럼(App-F4)은 별도 오케스트레이션이 필요한 특수 케이스라 대상 아님 — App-F4 는
+     *     공통 makeVScroller·.u4a-table 를 그대로 소비(자체 유지). 정적 소형표는 .u4a-table 스킨만으로 충분.
+     *   컬럼은 생성 시 또는 setColumns()로 나중에(서버 응답 후) 지정 — F4 처럼 동적 컬럼 지원.
+     *
+     * @param {HTMLElement} oHost  테이블을 채울 컨테이너(=.u4a-table-wrap 스크롤 컨테이너가 됨)
+     * @param {Object} oCfg
+     *   - columns : [{ key, label, width?, align?('center'|'right'..), cell?(row,idx)→string|Node, className?, cellClass? }]
+     *   - virtual : 기본 true(makeVScroller 윈도잉). false 면 전 행 직접 렌더(소형표).
+     *   - zebra   : 기본 true(홀수행 data-odd). shell.css .u4a-table 가 색 담당.
+     *   - compact : true 면 .u4a-compact(밀도)
+     *   - rowKey(row,idx) : 선택 키(기본 idx). 선택 강조 동기·getSel 에 사용.
+     *   - onSelect(row,idx)   : 단일 클릭(행 선택 강조 + 콜백)
+     *   - onActivate(row,idx) : 더블 클릭(확정 — 예: F4 pick+닫기)
+     *   - rowHook(tr,row,idx)  : 행 커스텀(data-attr/클래스 등)
+     *   - emptyText : 0건 표시(공통 .u4a-table__nodata)
+     *   - rowH, tableClass
+     * @returns {{el,table,thead,tbody, setColumns(cols), setRows(rows,keepScroll), setSel(key), getSel(), refresh(), renderHead()}}
+     */
+    function makeDataTable(oHost, oCfg) {
+        if (!oHost) { return null; }
+        oCfg = oCfg || {};
+        var aCols = oCfg.columns || [];
+        var bVirtual = oCfg.virtual !== false;
+        var bZebra = oCfg.zebra !== false;
+
+        // 골격 — 공통 .u4a-table(shell.css) + 스크롤 래퍼(호스트). 색/sticky/zebra/선택은 공통이 담당.
+        oHost.classList.add("u4a-table-wrap");
+        if (oCfg.compact) { oHost.classList.add("u4a-compact"); }
+        oHost.innerHTML = "";
+        var oTable = _el("table", "u4a-table");
+        if (oCfg.tableClass) { oTable.classList.add(oCfg.tableClass); }
+        var oThead = _el("thead");
+        var oHeadTr = _el("tr");
+        oThead.appendChild(oHeadTr);
+        var oTbody = _el("tbody");
+        oTable.appendChild(oThead);
+        oTable.appendChild(oTbody);
+        oHost.appendChild(oTable);
+
+        function _rowKey(oRow, iIdx) {
+            return (typeof oCfg.rowKey === "function") ? oCfg.rowKey(oRow, iIdx) : iIdx;
+        }
+
+        function _renderHead() {
+            oHeadTr.innerHTML = "";
+            for (var i = 0; i < aCols.length; i++) {
+                var c = aCols[i];
+                var th = _el("th", null, (c.label != null) ? c.label : "");
+                if (c.label) { th.title = c.label; }
+                if (c.align) { th.style.textAlign = c.align; }
+                if (c.width) { th.style.width = c.width; }
+                if (c.className) { th.classList.add(c.className); }
+                oHeadTr.appendChild(th);
+            }
+        }
+
+        // 행 1개 빌드(가상 스크롤러가 보이는 구간만 호출). idx=절대 인덱스(zebra·선택키).
+        function _buildRow(oRow, iIdx) {
+            var oTr = _el("tr");
+            if (bZebra && (iIdx % 2 === 1)) { oTr.setAttribute("data-odd", "true"); }
+            var sKey = _rowKey(oRow, iIdx);
+            try { if (oRow && typeof oRow === "object") { oRow.__dtKey = sKey; } } catch (e) { }   // getSelKey 용 스태시(F4 __f4Idx 패턴)
+            for (var i = 0; i < aCols.length; i++) {
+                var c = aCols[i];
+                var td = _el("td");
+                if (typeof c.cell === "function") {
+                    var v = null;
+                    try { v = c.cell(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] cell 오류:", e); }
+                    if (v == null) { /* 빈 셀 */ }
+                    else if (typeof v === "string") { td.textContent = v; td.title = v; }
+                    else { td.appendChild(v); }
+                } else {
+                    var raw = oRow ? oRow[c.key] : null;
+                    td.textContent = (raw == null) ? "" : String(raw);
+                    td.title = td.textContent;
+                }
+                if (c.align) { td.style.textAlign = c.align; }
+                if (c.cellClass) { td.classList.add(c.cellClass); }
+                oTr.appendChild(td);
+            }
+            oTr.addEventListener("click", function () {
+                if (_vs) { _vs.setSel(sKey); _vs.refresh(); }
+                else { _markSel(sKey); }
+                if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onSelect 오류:", e); } }
+            });
+            if (typeof oCfg.onActivate === "function") {
+                oTr.addEventListener("dblclick", function () { try { oCfg.onActivate(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onActivate 오류:", e); } });
+            }
+            if (typeof oCfg.rowHook === "function") { try { oCfg.rowHook(oTr, oRow, iIdx); } catch (e) { } }
+            return oTr;
+        }
+
+        // ── 비가상(소형표) 경로 — 전 행 직접 렌더 + 선택 강조 ──
+        var _aRows = [];
+        var _selKey = null;
+        function _markSel(sKey) {
+            _selKey = sKey;
+            var aTr = oTbody.querySelectorAll("tr[data-dt-row]");
+            for (var i = 0; i < aTr.length; i++) {
+                var bSel = String(aTr[i].getAttribute("data-dt-key")) === String(sKey);
+                if (bSel) { aTr[i].setAttribute("aria-selected", "true"); } else { aTr[i].removeAttribute("aria-selected"); }
+            }
+        }
+        function _renderAll() {
+            oTbody.innerHTML = "";
+            if (!_aRows.length) {
+                if (oCfg.emptyText != null) {
+                    var trN = _el("tr", "u4a-table__nodata");
+                    var tdN = _el("td", null, oCfg.emptyText);
+                    tdN.colSpan = aCols.length || 1;
+                    trN.appendChild(tdN); oTbody.appendChild(trN);
+                }
+                return;
+            }
+            for (var i = 0; i < _aRows.length; i++) {
+                var tr = _buildRow(_aRows[i], i);
+                tr.setAttribute("data-dt-row", "");
+                tr.setAttribute("data-dt-key", String(_rowKey(_aRows[i], i)));
+                if (_selKey != null && String(_rowKey(_aRows[i], i)) === String(_selKey)) { tr.setAttribute("aria-selected", "true"); }
+                oTbody.appendChild(tr);
+            }
+        }
+
+        var _vs = null;
+        function _makeVs() {
+            if (!(bVirtual && window.U4AUI && U4AUI.makeVScroller)) { return; }
+            _vs = makeVScroller(oHost, oTbody, {
+                colCount: aCols.length || 1,
+                buildRow: _buildRow,
+                nodata: oCfg.emptyText,
+                rowH: oCfg.rowH,
+                getSelKey: function (oRow) { return oRow ? oRow.__dtKey : null; }
+            });
+        }
+
+        function _applyColumns(aNewCols) {
+            aCols = aNewCols || [];
+            _renderHead();
+            if (bVirtual) { _makeVs(); }   // colCount(스페이서 colspan) 재설정 → vs 재생성
+        }
+
+        // 초기 컬럼(주어졌으면) 적용.
+        _renderHead();
+        if (bVirtual) { _makeVs(); }
+
+        return {
+            el: oHost, table: oTable, thead: oThead, tbody: oTbody,
+            setColumns: function (aNewCols) { _applyColumns(aNewCols); },
+            renderHead: _renderHead,
+            setRows: function (aRows, bKeepScroll) {
+                if (bVirtual && _vs) { _vs.setRows(aRows || [], bKeepScroll); }
+                else { _aRows = aRows || []; _renderAll(); }
+            },
+            setSel: function (sKey) {
+                if (bVirtual && _vs) { _vs.setSel(sKey); _vs.refresh(); }
+                else { _markSel(sKey); }
+            },
+            getSel: function () { return (bVirtual && _vs) ? _vs.getSel() : _selKey; },
+            refresh: function () { if (bVirtual && _vs) { _vs.refresh(); } else { _renderAll(); } }
+        };
+    }
+
     const U4AUI = {
         el: _el,
         confirm: confirm,
         closeWindow: closeWindow,
         attachColumnResize: attachColumnResize,
         makeColumnTree: makeColumnTree,
+        makeDataTable: makeDataTable,
         createField: createField,
         syncClear: syncClear,
         createPanel: createPanel,

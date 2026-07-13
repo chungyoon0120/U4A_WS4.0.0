@@ -56,9 +56,31 @@
     // 다국어 메시지 헬퍼 바인딩
     oAPP.common.fnGetMsgClsText = oAPP.WSMSG.fnGetMsgClsText.bind(oAPP.WSMSG);
 
+    // WLO(White List Object) — 공통 fnAppF4PopupOpen 의 _showAudit(=checkWLOList("C","UHAK901182"))가 참조.
+    //   메인셸(ws_common/ws_html5_shell)은 모델 /METADATA/T_REG_WLO 를 보는데, 자식창엔 없다 → opener 가 넘긴
+    //   oMetadata(=parent.getMetadata()) 안의 T_REG_WLO 로 동일 판정 재현(안하면 audit 컬럼[생성일/변경일 등] 미표시).
+    oAPP.common.getWsWLOList = function () {
+        var oMeta = oAPP.attr.oMetadata || {};
+        var aWLO = oMeta.T_REG_WLO || (oMeta.METADATA && oMeta.METADATA.T_REG_WLO);
+        return Array.isArray(aWLO) ? aWLO : [];
+    };
+    oAPP.common.checkWLOList = function (REGTYP, CHGOBJ) {
+        REGTYP = REGTYP || ""; CHGOBJ = CHGOBJ || "";
+        var aWLO = oAPP.common.getWsWLOList();
+        return Array.isArray(aWLO) && !!aWLO.find(function (e) { return e.REGTYP == REGTYP && e.CHGOBJ == CHGOBJ; });
+    };
+
     function getMsgText(sMsgCls, sMsgNo, sFallback) {
         let sTxt = oAPP.common.fnGetMsgClsText(sMsgCls, sMsgNo);
         return (sTxt && sTxt.trim()) ? sTxt : sFallback;
+    }
+
+    // 워크스페이스 메시지(ZMSG_WS_COMMON_001) — 번호 기준. 공통 빈상태("데이터 없음"=946) 등. getMsgText(SAP 메시지클래스)와 별개 채널.
+    function getWsText(sNo, sFallback) {
+        try {
+            let sTxt = oAPP.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo);
+            return (sTxt && sTxt.trim()) ? sTxt : (sFallback || sNo);
+        } catch (e) { console.error("[숏컷] 워크스페이스 메시지 조회 실패:", e); return (sFallback || sNo); }
     }
 
     // window 전역 노출 / shim 추가 (fnAppF4PopupOpen.js 의존성 대비)
@@ -198,12 +220,14 @@
     // 브라우저 타입 선택에 따른 브라우저 옵션 영역 전환
     function fn_select_BROWSER() {
         const browserType = document.querySelector('input[name="browserType"]:checked').value;
+        // ★ display 는 인라인 flex/none 으로 토글한다. (base className 에서 Bootstrap .d-flex(=display:flex !important)를
+        //   빼야 인라인 none 이 먹는다 — d-flex 를 두면 !important 가 인라인 none 을 눌러 숨김이 무효화됨.)
         if (browserType === "chrome") {
-            document.getElementById("chromeOptions").style.display = "";
+            document.getElementById("chromeOptions").style.display = "flex";
             document.getElementById("edgeOptions").style.display = "none";
         } else {
             document.getElementById("chromeOptions").style.display = "none";
-            document.getElementById("edgeOptions").style.display = "";
+            document.getElementById("edgeOptions").style.display = "flex";
         }
     }
 
@@ -272,6 +296,13 @@
         } catch (e) { console.error("[숏컷] 서버오류 역현지화 실패:", e); return sText; }
     }
 
+    // MSG_WS 014 = "&1 은(는) 필수 입력값입니다" — 필드명(&1)을 반드시 넘긴다(안 넘기면 주어 없이 "은 필수 입력값입니다"로 뜸).
+    //   fnGetMsgClsText(cls,no,p1) 의 p1=&1 치환(레퍼런스 createApplicationPopup 동일). 못 찾으면 영문 폴백.
+    function _msgRequired(sFieldLabel) {
+        var sTxt = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "014", sFieldLabel);
+        return (sTxt && sTxt.trim()) ? sTxt : (sFieldLabel + " is required.");
+    }
+
     // 필수 입력 필드 유효성 점검 — 오류 시 첫 오류 필드 자동 포커스(공통 §3.5.4)
     function fn_Check_required() {
         let Lret = "";
@@ -279,7 +310,7 @@
 
         if (oAppIdField.getValue() === "") {
             Lret = "E";
-            oAppIdField.setValueState("error", getMsgText("/U4A/MSG_WS", "014", "Input value is required."));
+            oAppIdField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C67", "APP ID")));
             if (!oFirstBad) { oFirstBad = oAppIdField; }
         } else {
             oAppIdField.setValueState("none");
@@ -287,7 +318,7 @@
 
         if (oSavePathField.getValue() === "") {
             Lret = "E";
-            oSavePathField.setValueState("error", getMsgText("/U4A/MSG_WS", "014", "Input value is required."));
+            oSavePathField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C69", "Save As Path")));
             if (!oFirstBad) { oFirstBad = oSavePathField; }
         } else {
             oSavePathField.setValueState("none");
@@ -295,7 +326,7 @@
 
         if (oHostInputField.getValue() === "") {
             Lret = "E";
-            oHostInputField.setValueState("error", getMsgText("/U4A/MSG_WS", "014", "Input value is required."));
+            oHostInputField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C71", "Target Host URL")));
             if (!oFirstBad) { oFirstBad = oHostInputField; }
         } else {
             oHostInputField.setValueState("none");
@@ -686,7 +717,7 @@
             tbody.innerHTML = `
                 <tr>
                     <td colspan="3" class="text-center text-muted" style="padding: 1.5rem;">
-                        No optional parameters.
+                        ${getWsText("946", "No data")}
                     </td>
                 </tr>
             `;
@@ -710,7 +741,6 @@
             const oNameField = U4AUI.createField({
                 value: param.name,
                 className: "w-100",
-                upper: true,
                 onChange: function (val) {
                     aParams[index].name = val;
                 }
@@ -892,7 +922,7 @@
         // Chrome Options
         const oChromeOpts = document.createElement("div");
         oChromeOpts.id = "chromeOptions";
-        oChromeOpts.className = "d-flex flex-column gap-3 w-100";
+        oChromeOpts.className = "flex-column gap-3 w-100";   // d-flex 제외 — 표시는 fn_select_BROWSER 가 인라인 display:flex 로(그래야 인라인 none 숨김이 !important 에 안 눌림)
         oChromeOpts.style.display = "none";
         oBrowserOptPanel.body.appendChild(oChromeOpts);
 
@@ -926,7 +956,7 @@
         // Edge Options
         const oEdgeOpts = document.createElement("div");
         oEdgeOpts.id = "edgeOptions";
-        oEdgeOpts.className = "d-flex flex-column gap-3 w-100";
+        oEdgeOpts.className = "flex-column gap-3 w-100";   // d-flex 제외 — 위 chromeOptions 와 동일 이유(인라인 none 이 !important 에 안 눌리게)
         oEdgeOpts.style.display = "none";
         oBrowserOptPanel.body.appendChild(oEdgeOpts);
 
@@ -1121,15 +1151,6 @@
         document.getElementById("u4aShortcutWinClose").addEventListener("click", fn_close);
         document.getElementById("btnCancel").addEventListener("click", fn_close);
         document.getElementById("btnSave").addEventListener("click", fn_CreateShortcut);
-
-        // 최소화 버튼 — 공통 .u4a-winbtn(fontStyleWizard 동일 패턴)
-        (function () {
-            var oMin = document.getElementById("u4aShortcutWinMin");
-            if (!oMin) { return; }
-            oMin.addEventListener("click", function () {
-                try { oAPP.CURRWIN.minimize(); } catch (e) { console.error("[숏컷] 최소화 오류:", e); }
-            });
-        })();
 
         // 최대화 버튼 — 토글 + 아이콘 동기(공통 .u4a-winbtn, fontStyleWizard 동일 패턴)
         (function () {

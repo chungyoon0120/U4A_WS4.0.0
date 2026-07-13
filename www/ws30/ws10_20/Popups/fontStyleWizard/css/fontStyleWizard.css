@@ -81,18 +81,6 @@ body {
     flex: 0 0 auto;
 }
 
-.fwx-editbadge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.0625rem 0.5rem;
-    border-radius: 999px;
-    background: var(--hover-bg);
-    color: var(--text-muted);
-    font-size: 0.6875rem;
-    font-weight: 600;
-}
-
 /* ---------- 미리보기 종이 (히어로) ---------- */
 .fwx-paper {
     min-height: 0;
@@ -124,22 +112,32 @@ body {
     border-radius: 0.25rem;
 }
 
-.fwx-inline {
-    margin-top: 1rem;
-    padding-top: 0.75rem;
-    border-top: 0.0625rem dashed var(--line);
+/* vertical-align 컨텍스트 데모 — 해당 컨트롤 바로 아래 인라인 샘플(밑줄=기준선) */
+.fwx-vademo {
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.625rem;
+    border: 0.0625rem dashed var(--line);
+    border-radius: var(--radius);
+    background: var(--app-bg);
     color: var(--text-muted);
-    font-size: 0.8125rem;
+    font-size: 0.9375rem;
+    line-height: 2.2;
+    word-break: break-word;
 }
 
+.fwx-vademo .sample {
+    padding: 0 0.1875rem;
+    color: var(--accent);
+    font-weight: 700;
+}
+
+/* vertical-align 시연용 "이미지" 인라인 요소 — 아이콘으로 표현(깨진 img 방지) */
 .fwx-imgsample {
     display: inline-block;
-    width: 1em;
-    height: 1em;
-    margin-inline-start: 0.375rem;
+    margin-inline: 0.125rem;
+    font-size: 1.15em;
+    color: var(--accent);
     vertical-align: baseline;
-    background: var(--divider);
-    border-radius: 0.1875rem;
 }
 
 /* ---------- 라이브 shorthand 캡션 ---------- */
@@ -300,6 +298,7 @@ body {
     white-space: nowrap;
 }
 
+/* 다중선택 가능 표시 배지 */
 .fwx-field__val {
     flex: 0 0 auto;
     max-width: 55%;
@@ -364,6 +363,35 @@ body {
     background: var(--selected-bg);
     color: var(--selected-text);
     font-weight: 600;
+}
+
+/* ---------- 다중선택 칩 = 체크박스형 (여러 개 동시 선택 가능함을 시각화) ---------- */
+.fwx-chip--multi {
+    padding-inline-start: 0.5rem;
+}
+
+.fwx-chip--multi::before {
+    content: "";
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 0.875rem;
+    height: 0.875rem;
+    margin-inline-end: 0.4375rem;
+    border: 0.09375rem solid var(--text-muted);
+    border-radius: 0.25rem;
+    background: var(--surface);
+}
+
+/* 체크되면 박스 채움 + accent 테두리 (여러 칩이 동시에 채워짐) */
+.fwx-chip--multi[aria-pressed="true"] {
+    box-shadow: none;
+    background: var(--surface-raised);
+    color: var(--text);
+}
+
+.fwx-chip--multi[aria-pressed="true"]::before {
+    border-color: var(--accent);
+    background: var(--accent);
 }
 
 /* ---------- 정렬 아이콘 버튼 ---------- */

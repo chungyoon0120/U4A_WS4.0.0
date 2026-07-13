@@ -18,7 +18,7 @@
  *  [범위]  ★우선 "컨텍스트 메뉴 표시"까지만★. 클릭 동작은 다음 단계:
  *   · 소스 패턴 삽입(CKEY PAT../PTN.. → editor.executeEdits)  → 추후예정
  *   · Theme/Snippet Designer(MENU_MODULES/{CKEY}/index.js)  → 추후예정
- *   · Ctrl+우클릭 전체 패턴 팝업(fnSourcePatternPopupOpener) → 추후예정
+ *   · Ctrl+우클릭 전체 패턴 팝업(fnSourcePatternPopupOpener) → 배선 완료(frameless patternPopup 별창)
  *   미구현 클릭은 console.warn(임의 UI 문구/토스트 금지 — 메시지 키 정책). 단계 핸들러는
  *   oAPP.usphtml.uspEditorCtxAction[CKEY] 에 등록(트리 ctx 의 uspCtxAction 패턴과 동일).
  ************************************************************************/
@@ -366,9 +366,14 @@
                 sPageId: oParams && oParams.sPageId
             };
 
-            // Ctrl+우클릭 = 전체 소스 패턴 팝업(fnSourcePatternPopupOpener) — 다음 단계.
+            // Ctrl+우클릭 = 전체 소스 패턴 팝업(fnSourcePatternPopupOpener). 원본 ws_usp.js 와 동일 배선.
+            //   opener 는 frameless HTML5 별창(patternPopup) — 무인자 호출(원본도 무인자).
             if (oEvent.ctrlKey) {
-                console.warn("[HTML5][WS30] 에디터 Ctrl+우클릭 전체 패턴 팝업 — 다음 단계");
+                if (typeof oAPP.fn.fnSourcePatternPopupOpener === "function") {
+                    oAPP.fn.fnSourcePatternPopupOpener();
+                } else {
+                    console.error("[HTML5][WS30] fnSourcePatternPopupOpener 미로드 — 소스 패턴 팝업 열 수 없음");
+                }
                 return;
             }
 

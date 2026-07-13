@@ -21,7 +21,8 @@ html, body {
     opacity: 1;
 }
 
-/* 타이틀바 = 공통 .u4a-titlebar 표준 높이(36px, bootstrap-skin) 그대로 소비 — 높이 override 하지 않음 */
+/* 타이틀바 = 공통 .u4a-titlebar 표준 높이(36px, bootstrap-skin) 그대로 소비 — 높이 override 하지 않음.
+   창버튼 = 최대화 + 닫기(모달 창이라 최소화 버튼은 미노출). */
 
 /* 메인 영역 스크롤 */
 .u4aShortcutMain {
@@ -173,8 +174,12 @@ html, body {
     vertical-align: middle;
 }
 
-.chk-param-row {
+/* 매개변수 테이블 체크박스 — 헤더(전체선택)·행 동일 크기로 통일(헤더는 클래스 없어 네이티브 기본크기라 어긋났음) */
+.u4aShortcutTableContainer input[type="checkbox"] {
     width: 1rem;
     height: 1rem;
+    margin: 0;
+    vertical-align: middle;
     cursor: pointer;
+    accent-color: var(--accent);
 }

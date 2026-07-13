@@ -599,6 +599,8 @@ function _applyEditor(oParam) {
     _toEditHost({ cmd: "setReadOnly", readOnly: false });
     _toEditHost({ cmd: "setLanguage", language: _lang(oParam.CONT_TYPE || "text") });
     _toEditHost({ cmd: "setValue", value: (typeof oParam.DATA === "string") ? oParam.DATA : "" });
+    // 꾸밈정렬 버튼 노출은 setLanguage 를 받은 호스트가 evt:"fmtcap" 로 통지 → _onHostMessage 가 결정.
+    //   부모가 여기서 isSupported 를 추측하지 않는다(언어 비동기 반영 → 레이스로 새던 원인 제거).
 }
 
 // 푸터 줌 % 갱신(호스트 evt:zoom). 숫자라 i18n 키 불필요.
@@ -681,7 +683,7 @@ function _ensureCreateDlg() {
     var oTypeSel = U4AUI.createSelect(
         A_CONT_TYPES.map(function (t) { return { value: t, text: t }; }),
         "text",
-        function (sVal) { _toEditHost({ cmd: "setLanguage", language: _lang(sVal) }); }
+        function (sVal) { _toEditHost({ cmd: "setLanguage", language: _lang(sVal) }); }   // 버튼은 호스트 evt:"fmtcap" 로 결정
     );
     oForm.appendChild(_dlgRow(_m("024"), oTitleField.el));   // Title
     oForm.appendChild(_dlgRow(_m("023"), oTypeSel));         // Content Type
@@ -738,6 +740,7 @@ function _ensureCreateDlg() {
     oPretty.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i><span></span>';
     oPretty.querySelector("span").textContent = _mc("/U4A/CL_WS_COMMON", "C25");   // 꾸밈정렬(Pretty Print)
     oPretty.title = _mc("/U4A/CL_WS_COMMON", "C25") + " (Shift+F1)";
+    oPretty.hidden = true;   // 기본 숨김 — 호스트 evt:"fmtcap" 통지로 포맷 지원 언어일 때만 노출.
     oPretty.addEventListener("click", function () { _toEditHost({ cmd: "format" }); });
     oFoot.appendChild(oPretty);
 
@@ -1001,6 +1004,9 @@ function _onHostMessage(oEvent) {
         if (d.evt === "ready") {
             oDlgUI.ready = true;
             if (oDlgUI.pending) { var p = oDlgUI.pending; oDlgUI.pending = null; _applyEditor(p); }
+        } else if (d.evt === "fmtcap") {
+            // 꾸밈정렬 버튼 노출 = 호스트가 언어 반영 직후 통지한 포맷 지원 여부(단일 소스, 레이스 없음).
+            if (oDlgUI.prettyBtn) { oDlgUI.prettyBtn.hidden = !d.supported; }
         } else if (d.evt === "save") {
             if (oDlgUI.dlg && oDlgUI.dlg.open) { _saveCreateDlg(); }   // 에디터 Ctrl+S
         } else if (d.evt === "zoom") {
