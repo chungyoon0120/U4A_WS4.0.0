@@ -576,56 +576,87 @@
         }
         oOvf.addEventListener("click", function () { if (oMenu) { _closeMenu(); } else { _openMenu(); } });
 
-        function reflow() {
+        // ★ 성능 — 항목 "자연폭"은 내용이 바뀔 때만 변한다(리사이즈로는 안 변함).
+        //   과거 reflow 는 매번 [전 항목 hidden 해제 → 항목마다 offsetWidth 읽기 → 다시 숨김] 을 했는데,
+        //   이 되살리기(쓰기)+측정(읽기) 반복이 레이아웃 스래싱이라, 스플리터 드래그처럼 폭이 매 프레임
+        //   변하는 상황에서 툴바 수만큼 곱해져 버벅였다(이 팝업 툴바 4개). → 자연폭을 1회 실측해 캐시하고,
+        //   리사이즈(RO)에선 캐시만 써서 "읽기 0". 내용 변경은 MutationObserver 로 감지해 캐시를 버린다.
+        //   (hidden/style.display 는 속성 변경이라 MO(childList·characterData)를 건드리지 않음 → 자기유발 무효화 없음.)
+        //   장군님 지적 2026-07-14.
+        let C = null;   // { w:Map(el→px), gap, padL, padR, ovfW }
+        function _measure() {
+            const aAll = _items();
+            aAll.forEach(function (el) { if (!fnIsSkip(el)) { el.hidden = false; } });   // 측정 위해 숨김 해제(스페이서 제외)
+            oOvf.hidden = false;
+            const cs = getComputedStyle(oBar);
+            const m = new Map();
+            aAll.forEach(function (el) { if (!fnIsSkip(el)) { m.set(el, el.offsetWidth); } });
+            C = {
+                w: m,
+                gap: parseFloat(cs.columnGap || cs.gap) || 0,
+                padL: parseFloat(cs.paddingLeft) || 0,
+                padR: parseFloat(cs.paddingRight) || 0,
+                ovfW: oOvf.offsetWidth
+            };
+        }
+        // 캐시 기반 적용 — 레이아웃 읽기는 oBar.clientWidth 단 1회(쓰기 前).
+        function _apply() {
             if (!oBar.isConnected) { return; }
             _closeMenu();
-            const aAll = _items();
-            aAll.forEach(function (el) { if (!fnIsSkip(el)) { el.hidden = false; } }); // 측정 위해 오버플로 숨김 해제(스페이서 제외)
-            oOvf.hidden = false;
+            if (!C) { _measure(); }
             // 모드 가시(style.display!=="none") 항목만 대상 + skip(스페이서) 제외
-            const aVis = aAll.filter(function (el) { return !fnIsSkip(el) && el.style.display !== "none"; });
-            const cs = getComputedStyle(oBar);
-            const gap = parseFloat(cs.columnGap || cs.gap) || 0;
-            let avail = oBar.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+            const aVis = _items().filter(function (el) { return !fnIsSkip(el) && el.style.display !== "none"; });
+            let avail = oBar.clientWidth - C.padL - C.padR;
             // 우측정렬(skip 스페이서) 모드: 스페이서 주변 gap 만큼 보수적으로 차감(폭 측정에서 스페이서를
             //   뺐으므로 실제 행 gap 1개가 누락 — 1~몇 px 차이로 버튼이 살짝 잘리는 것 방지).
-            if (opt.isSkip) { avail -= gap; }
-            const ovfW = oOvf.offsetWidth;
-            const aW = aVis.map(function (el) { return el.offsetWidth; });
-            const total = aW.reduce(function (a, b) { return a + b; }, 0) + gap * Math.max(0, aVis.length - 1);
-            if (total <= avail) { oOvf.hidden = true; return; }
+            if (opt.isSkip) { avail -= C.gap; }
+            const aW = aVis.map(function (el) { return C.w.get(el) || 0; });
+            const total = aW.reduce(function (a, b) { return a + b; }, 0) + C.gap * Math.max(0, aVis.length - 1);
+            if (total <= avail) {   // 다 들어감 → 전부 표시 + ⋯ 숨김
+                aVis.forEach(function (el) { el.hidden = false; });
+                oOvf.hidden = true;
+                return;
+            }
             let used = 0, iCut = aVis.length;
             for (let i = 0; i < aVis.length; i++) {
-                const w = aW[i] + (i > 0 ? gap : 0);
-                if (used + w + gap + ovfW > avail) { iCut = i; break; }
+                const w = aW[i] + (i > 0 ? C.gap : 0);
+                if (used + w + C.gap + C.ovfW > avail) { iCut = i; break; }
                 used += w;
             }
-            for (let j = iCut; j < aVis.length; j++) { aVis[j].hidden = true; }
+            for (let i = 0; i < aVis.length; i++) { aVis[i].hidden = (i >= iCut); }
             // 보이는 영역 끝에 매달린 구분선 정리
             for (let k = iCut - 1; k >= 0; k--) {
                 if (fnIsSep(aVis[k])) { aVis[k].hidden = true; } else { break; }
             }
             // 숨겨진 "버튼"(비구분선)이 없으면 ⋯ 불필요
             const bAny = aVis.some(function (el) { return el.hidden && !fnIsSep(el); });
-            if (!bAny) { oOvf.hidden = true; }
+            oOvf.hidden = !bAny;
         }
+        // 공개 reflow = 내용이 바뀌었을 수 있으니 캐시 버리고 재측정.
+        function reflow() { C = null; _apply(); }
 
-        // ★ reflow 는 버튼 hidden 을 토글해 바 레이아웃을 바꾸므로, RO 콜백에서 동기로 부르면
+        // ★ _apply 는 버튼 hidden 을 토글해 바 레이아웃을 바꾸므로, RO 콜백에서 동기로 부르면
         //   같은 프레임에 RO 가 재발화 → "ResizeObserver loop limit exceeded" 무해 경고가 뜬다
         //   (툴바 여러 개일수록 빈번). rAF 로 한 프레임에 1회만 코얼레싱해 루프 자체를 끊는다.
-        let oRO = null, iRafOvf = 0;
+        let oRO = null, oMO = null, iRafOvf = 0;
         function _scheduleReflow() {
             if (iRafOvf) { return; }
-            iRafOvf = requestAnimationFrame(function () { iRafOvf = 0; reflow(); });
+            iRafOvf = requestAnimationFrame(function () { iRafOvf = 0; _apply(); });   // 리사이즈 = 캐시 사용(재측정 X)
         }
         if (window.ResizeObserver) { oRO = new ResizeObserver(_scheduleReflow); oRO.observe(oBar); }
         else { setTimeout(reflow, 0); }
+        // 항목 추가/삭제·라벨(텍스트) 변경 시에만 캐시 무효화 → 다음 적용에서 재측정.
+        if (window.MutationObserver) {
+            oMO = new MutationObserver(function () { C = null; _scheduleReflow(); });
+            oMO.observe(oBar, { childList: true, characterData: true, subtree: true });
+        }
 
         return {
             reflow: reflow,
             destroy: function () {
                 _closeMenu();
                 if (iRafOvf) { cancelAnimationFrame(iRafOvf); iRafOvf = 0; }
+                if (oMO) { oMO.disconnect(); oMO = null; }
                 if (oRO) { oRO.disconnect(); oRO = null; }
                 if (oOvf.parentNode) { oOvf.parentNode.removeChild(oOvf); }
             }
@@ -1050,56 +1081,66 @@
 
         var bDrag = false, iStart = 0, oA = null, oB = null, iAStart = 0, iBStart = 0;
         var oSelf = null, oCenter = null, oOpp = null, sSide = "left";  // giveway 전용
+        // ★ 성능 — 드래그 중 "불변값"은 mousedown 에서 1회만 실측해 캐시한다(D).
+        //   과거엔 mousemove 마다 clientWidth·바크기·패널 min(getComputedStyle)·나머지패널 rect 를 읽고
+        //   곧바로 style.flex 를 써서 [읽기→쓰기→읽기…] 레이아웃 스래싱이 났다. 이 팝업처럼 DOM 이 큰
+        //   화면(트리 수백 행+그리드층+sticky)에선 매 mousemove 마다 전체 동기 재계산 = 버벅임.
+        //   컨테이너 폭·바 크기·패널 min·건드리지 않는 패널 크기는 드래그 내내 안 변하므로 캐시가 안전하다.
+        //   (giveway 의 opp 크기만 우리가 바꾸므로 JS 로 추적 — 역시 읽기 불필요.) 장군님 지적 2026-07-14.
+        var D = null;
+        // mousemove 는 프레임보다 자주 온다(고폴링 마우스) → rAF 로 프레임당 1회만 적용(코얼레싱).
+        var iRaf = 0, iLastPos = 0;
 
-        function lf_move(ev) {
-            if (!bDrag) { return; }
-            var d = ev[AX.pos] - iStart;
-            var iAvail = oSplit[AX.client] - _splitBarsSize(oSplit, AX);
+        function _applyMove() {
+            if (!bDrag || !D) { return; }
+            var d = iLastPos - iStart;
 
             if (sMode === "giveway" && oSelf && oCenter && oOpp) {
-                var iCMin = _splitPaneMin(oCenter, AX), iSMin = _splitPaneMin(oSelf, AX), iOMin = _splitPaneMin(oOpp, AX);
                 var iSelf = (sSide === "left") ? (iAStart + d) : (iAStart - d);
-                var iSelfMax = iAvail - iCMin - iOMin;
+                var iSelfMax = D.avail - D.cMin - D.oMin;
                 if (iSelf > iSelfMax) { iSelf = iSelfMax; }
-                if (iSelf < iSMin) { iSelf = iSMin; }
-                var iOpp = oOpp.getBoundingClientRect()[AX.rect];
-                if (iAvail - iSelf - iOpp < iCMin) {
-                    iOpp = iAvail - iSelf - iCMin;
-                    if (iOpp < iOMin) { iOpp = iOMin; }
+                if (iSelf < D.sMin) { iSelf = D.sMin; }
+                var iOpp = D.oppCur;   // 실측 대신 추적값(우리가 쓴 값) — 렌더 결과와 동일
+                if (D.avail - iSelf - iOpp < D.cMin) {
+                    iOpp = D.avail - iSelf - D.cMin;
+                    if (iOpp < D.oMin) { iOpp = D.oMin; }
                 }
+                D.oppCur = iOpp;
                 _splitPxFlex(oSelf, iSelf);
                 _splitPxFlex(oOpp, iOpp);
-            } else {
-                var flexA = _splitIsFlex(oA), flexB = _splitIsFlex(oB);
-                if (!flexA && flexB) {                 // A 고정 조절, B(유연) 흡수
-                    var minA = _splitPaneMin(oA, AX);
-                    var maxA = iAvail - _splitPaneMin(oB, AX) - _splitOtherSize(oSplit, AX, oA, oB);
-                    var a = iAStart + d;
-                    if (a > maxA) { a = maxA; }
-                    if (a < minA) { a = minA; }
-                    _splitPxFlex(oA, a);
-                } else if (flexA && !flexB) {           // B 고정 조절, A(유연) 흡수
-                    var minB = _splitPaneMin(oB, AX);
-                    var maxB = iAvail - _splitPaneMin(oA, AX) - _splitOtherSize(oSplit, AX, oA, oB);
-                    var b = iBStart - d;
-                    if (b > maxB) { b = maxB; }
-                    if (b < minB) { b = minB; }
-                    _splitPxFlex(oB, b);
-                } else {                                 // 둘 다 고정 → 인접쌍(합 보존)
-                    var am = _splitPaneMin(oA, AX), bm = _splitPaneMin(oB, AX);
-                    var na = iAStart + d, nb = iBStart - d;
-                    if (na < am) { nb -= (am - na); na = am; }
-                    if (nb < bm) { na -= (bm - nb); nb = bm; }
-                    if (na < am) { na = am; }
-                    _splitPxFlex(oA, na);
-                    _splitPxFlex(oB, nb);
-                }
+            } else if (!D.flexA && D.flexB) {          // A 고정 조절, B(유연) 흡수
+                var maxA = D.avail - D.bMin - D.other;
+                var a = iAStart + d;
+                if (a > maxA) { a = maxA; }
+                if (a < D.aMin) { a = D.aMin; }
+                _splitPxFlex(oA, a);
+            } else if (D.flexA && !D.flexB) {          // B 고정 조절, A(유연) 흡수
+                var maxB = D.avail - D.aMin - D.other;
+                var b = iBStart - d;
+                if (b > maxB) { b = maxB; }
+                if (b < D.bMin) { b = D.bMin; }
+                _splitPxFlex(oB, b);
+            } else {                                   // 둘 다 고정 → 인접쌍(합 보존)
+                var na = iAStart + d, nb = iBStart - d;
+                if (na < D.aMin) { nb -= (D.aMin - na); na = D.aMin; }
+                if (nb < D.bMin) { na -= (D.bMin - nb); nb = D.bMin; }
+                if (na < D.aMin) { na = D.aMin; }
+                _splitPxFlex(oA, na);
+                _splitPxFlex(oB, nb);
             }
             if (fnAfter) { try { fnAfter(); } catch (e) { } }
+        }
+        function lf_move(ev) {
+            if (!bDrag) { return; }
+            iLastPos = ev[AX.pos];
+            if (iRaf) { return; }
+            iRaf = requestAnimationFrame(function () { iRaf = 0; _applyMove(); });
         }
         function lf_up() {
             if (!bDrag) { return; }
             bDrag = false;
+            if (iRaf) { cancelAnimationFrame(iRaf); iRaf = 0; }
+            D = null;
             try { document.body.style.cursor = ""; } catch (e) { }
             document.removeEventListener("mousemove", lf_move);
             document.removeEventListener("mouseup", lf_up);
@@ -1109,6 +1150,7 @@
             if (!oA || !oB) { return; }
             bDrag = true;
             iStart = ev[AX.pos];
+            iLastPos = iStart;
             iAStart = oA.getBoundingClientRect()[AX.rect];
             iBStart = oB.getBoundingClientRect()[AX.rect];
             if (sMode === "giveway") {
@@ -1123,6 +1165,19 @@
                     else if (!oOpp) { oOpp = p; }
                 });
             }
+            // ★ 드래그 불변값 1회 실측 → 이후 mousemove 는 읽기 0(순수 계산+쓰기).
+            D = {
+                avail: oSplit[AX.client] - _splitBarsSize(oSplit, AX),
+                aMin: _splitPaneMin(oA, AX),
+                bMin: _splitPaneMin(oB, AX),
+                flexA: _splitIsFlex(oA),
+                flexB: _splitIsFlex(oB),
+                other: _splitOtherSize(oSplit, AX, oA, oB),
+                cMin: oCenter ? _splitPaneMin(oCenter, AX) : 0,
+                sMin: oSelf ? _splitPaneMin(oSelf, AX) : 0,
+                oMin: oOpp ? _splitPaneMin(oOpp, AX) : 0,
+                oppCur: oOpp ? oOpp.getBoundingClientRect()[AX.rect] : 0
+            };
             try { document.body.style.cursor = AX.cur; } catch (e) { }
             document.addEventListener("mousemove", lf_move);
             document.addEventListener("mouseup", lf_up);
@@ -1749,6 +1804,18 @@
         }
         if (iTrail) { oWrap.setAttribute("data-trail", String(iTrail)); }
 
+        // valueHelpOnly(값도움 전용, .analy/15 §3.8): 직접 타이핑은 막되(readOnly — IME 회피, 이벤트 가로채기 금지)
+        //   '활성(편집 가능)' 외관 유지(.u4a-input--vho, shell.css) + 입력칸 아무 곳 클릭 = F4 오픈(트레일링 F4 버튼
+        //   프로그램 클릭 → 기존 opts.f4 핸들러 재사용). 값은 F4 로만 설정. (WS20 selectOption3·숏컷 저장/아이콘경로 공용)
+        if (opts.valueHelpOnly) {
+            oInput.readOnly = true;
+            oInput.classList.add("u4a-input--vho");
+            const oVhBtn = oWrap.querySelector(".u4a-field__vh");
+            if (oVhBtn) {
+                oInput.addEventListener("click", () => { if (!oVhBtn.disabled) { oVhBtn.click(); } });
+            }
+        }
+
         // 동작 배선(기존 공통 블록 재사용). onClear: 비운 뒤 콜백(모델 반영 등).
         if (opts.clear) { try { _clearSync = attachClear(oInput, oClear, opts.onClear || null); } catch (e) { } }
         if (opts.suggest) { try { attachSuggest(oInput, opts.suggest, opts.onPick || null); } catch (e) { } }
@@ -2320,6 +2387,10 @@
         var nCol = aCols.length;                 // 가변 컬럼(2~3열). 기존 소비처는 3열 → 완전 동일 동작.
         var bVirtual = !!oCfg.virtual;           // 대용량 가상 트리테이블(USP/MIME). host 를 스크롤 컨테이너로 넘김.
         var bFill = !!oCfg.fillLast;             // 마지막 컬럼 채움(고정폭 아님) — USP 설명 등. 그 컬럼은 리사이즈 안 함(grow 흡수 §3.4.2).
+        // autofit(더블클릭·161버튼 공용) 정책. 기본 = 현행(slack 0 / 최소 3rem=48px / 상한 800px) → 기존 소비처 무영향.
+        //   대형 바인딩(원본 setUiTableAutoResizeColumn 1:1)만 {slackRem:0.5, minRem:4, max:Infinity} 주입해
+        //   상단 161 버튼(fitTreeColumns)과 리사이즈바 더블클릭이 ★동일 폭★을 내도록 단일화. (장군님 지적 2026-07-14)
+        var oFit = oCfg.autofit || {};
         var DEF_W = ["15rem", "8rem", "14rem"];  // 앞 3열 기본폭(고정 rem, % 금지 §3.4.2). 그 외 10rem.
         function _defW(i) { return (aCols[i] && aCols[i].width) || DEF_W[i] || "10rem"; }
 
@@ -2377,19 +2448,19 @@
         // ── 더블클릭 auto-fit(엑셀/sap.ui.table autoResize) 폭 측정 (§3.4.2 · 마법사 _wzAutoW 패턴 차용) ──
         //   그 컬럼의 [헤더 + 보이는 행 셀] 콘텐츠 중 최장 잉크폭(오프스크린 span 실측) + 셀 패딩. 최소 48 / 상한 800(과확장 방지).
         //   ★가상: DOM 에 보이는 행만 측정(윈도잉) — 화면에 보이는 콘텐츠 기준 auto-fit.
+        // ★ 글자폭 = canvas measureText(DOM 변형·reflow 없음). 구현: off-screen span 을 body 에
+        //   append→getBoundingClientRect→remove 했는데, 그 DOM 변형이 셀마다 레이아웃을 무효화해
+        //   auto-fit(전 행 순회) 시 셀마다 강제 리플로우 + 루프 내 다른 getBoundingClientRect 까지 오염 = 느림.
+        //   canvas 는 순수 계산이라 리플로우 0. (letterSpacing 은 통상 0 이라 생략 — _bwpGlyphW 와 동일 정책.)
+        var _mCtx = null;
         function _measTxt(sText, oRef) {
-            var span = document.createElement("span");
-            span.style.cssText = "position:absolute;left:-9999px;top:-9999px;white-space:pre;visibility:hidden;";
+            if (!_mCtx) { try { _mCtx = document.createElement("canvas").getContext("2d"); } catch (e) { _mCtx = null; } }
+            if (!_mCtx) { return (sText || "").length * 7; }   // canvas 미지원 폴백(대략폭).
             if (oRef) {
                 var cs = getComputedStyle(oRef);
-                span.style.fontFamily = cs.fontFamily; span.style.fontSize = cs.fontSize;
-                span.style.fontWeight = cs.fontWeight; span.style.fontStyle = cs.fontStyle; span.style.letterSpacing = cs.letterSpacing;
+                _mCtx.font = (cs.fontStyle || "normal") + " " + (cs.fontWeight || "400") + " " + (cs.fontSize || "13px") + " " + (cs.fontFamily || "sans-serif");
             }
-            span.textContent = sText || "";
-            document.body.appendChild(span);
-            var w = span.getBoundingClientRect().width;
-            span.remove();
-            return w;
+            return _mCtx.measureText(sText || "").width;
         }
         function _px(v) { return parseFloat(v) || 0; }
         // 셀 자연폭(px, 패딩 포함). iCol 0=이름셀(토글 들여쓰기+아이콘+라벨잉크), 그 외=텍스트 잉크(+아이콘류)+패딩.
@@ -2429,7 +2500,12 @@
             for (var r = 0; r < aRows.length; r++) {
                 iMax = Math.max(iMax, _cellNatW(aRows[r].querySelector(sSel), iCol));
             }
-            return Math.max(48, Math.min(Math.round(iMax), 800));
+            // 정책(oFit) 적용 — slack(여유) 가산 후 [minRem, max] clamp. 기본 = slack 0 / 48px / 800px(현행).
+            var _rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+            var _slack = (oFit.slackRem != null ? oFit.slackRem : 0) * _rem;
+            var _minW = Math.round((oFit.minRem != null ? oFit.minRem : 3) * _rem);
+            var _maxW = (oFit.max != null ? oFit.max : 800);
+            return Math.max(_minW, Math.min(Math.round(iMax + _slack), _maxW));
         }
         function _buildGrip(sVar, iColIdx, sHl, bRight) {
             var oGrip = _el("div", "u4aColTreeGrip" + (bRight ? " u4aColTreeGrip--right" : ""));
@@ -2502,8 +2578,11 @@
                 var oTog = oRow.querySelector(".u4a-tree__toggle");
                 var oIco = oRow.querySelector(".u4a-tree__icon");
                 var oLbl = oRow.querySelector(".u4a-tree__label");
-                if (oLead) { oNameCell.appendChild(oLead); }
+                // 순서 = 토글(들여쓰기) → 리드(체크박스) → 아이콘 → 라벨. 리드를 토글 뒤에 둬야
+                //   체크박스가 트리 들여쓰기를 따라가 아이콘/이름 바로 앞에 붙는다(원본 UI5 TreeTable 셀 구조 = [indent][chk+icon+name]).
+                //   (리드를 앞에 두면 체크박스가 좌측 고정되고 이름만 들여써져 사이가 벌어짐 — 장군님 지적 2026-07-14.)
                 if (oTog) { oNameCell.appendChild(oTog); }
+                if (oLead) { oNameCell.appendChild(oLead); }
                 if (oIco) { oNameCell.appendChild(oIco); }
                 if (oLbl) { oNameCell.appendChild(oLbl); }
                 oRow.insertBefore(oNameCell, oRow.firstChild);
@@ -2532,9 +2611,12 @@
             }
         }
 
-        return {
+        var oRet = {
             host: oHost,
             tree: oTree,
+            // ★ per-컬럼 autofit 폭(px) — 리사이즈바 더블클릭과 동일 계산. 161버튼(fitTreeColumns)이 이걸 소비해
+            //   두 경로가 완전히 같은 폭을 내도록 단일화(중복 측정 로직 제거).
+            autoWidth: function (iCol) { try { return _autoW(iCol); } catch (e) { return 0; } },
             getSelected: function () { return selNode; },
             rerender: function (bSelectFirst) {
                 var aRoots = (typeof oCfg.roots === "function") ? (oCfg.roots() || []) : [];
@@ -2550,6 +2632,8 @@
             collapseSelected: function () { if (selNode) { try { oTree.setExpanded(selNode, false); } catch (e) { } } },
             selectKey: function (sKey, bScroll) { try { oTree.selectByKey(sKey, bScroll === true); } catch (e) { } }
         };
+        try { oHost.__u4aColTreeCtrl = oRet; } catch (e) { }   // fitTreeColumns(161) 등이 host→ctrl 역참조로 autoWidth 소비
+        return oRet;
     }
 
     /**

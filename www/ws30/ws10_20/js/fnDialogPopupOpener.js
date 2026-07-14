@@ -3705,7 +3705,7 @@
         oBrowserOptions.minimizable = false;  // 최소화 비활성(모달 창 — 최소화 버튼도 disabled 처리)
         oBrowserOptions.maximizable = true;   // 타이틀바 최대화 버튼(u4aShortcutWinMax) 동작 위해 허용
         oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.modal = true;         // 모달 — 부모(메인) 창 비활성화. F4/confirm 은 자식창 내부 .u4a-dialog 라 영향 없음.
+        oBrowserOptions.modal = false;        // 비모달 — 부모(메인) 창 계속 사용 가능. parent 지정으로 항상 위에는 유지.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL; //테마별 색상 처리               
         oBrowserOptions.height = 760;
         oBrowserOptions.width = 650;
@@ -3818,49 +3818,25 @@
 
         });
 
-        // F4 팝업 요청 IPCMAIN 리스너 정의
-        const fnIpcF4OpenListener = (event, res) => {
-            if (res.BROWSKEY !== BROWSKEY) {
-                return;
-            }
-
-            const oUserInfo = parent.getUserInfo();
-
-            const oOptions = {
-                autoSearch: true,
-                initCond: {
-                    PACKG: "",
-                    APPNM: "",
-                    APPTY: "M",
-                    ERUSR: oUserInfo.ID,
-                    HITS: 500
-                }
-            };
-
-            // App F4 는 메인창에 .u4a-dialog 로 뜬다 → 자식창 뒤에 가리지 않게 메인창을 앞으로.
-            try { CURRWIN.focus(); } catch (e) { console.error('[숏컷] F4 전 메인창 포커스 실패:', e); }
-
-            oAPP.fn.fnAppF4PopupOpener(oOptions, function (oRow) {
-                try {
-                    if (oBrowserWindow && !oBrowserWindow.isDestroyed()) {
-                        oBrowserWindow.webContents.send('if-shortcut-f4-select', oRow); // oRow.APPID 포함
-                        oBrowserWindow.focus();
-                    }
-                } catch (e) { console.error('[숏컷] F4 결과 회신 실패:', e); }
-            });
-        };
-
-        // IPC 리스너 등록
-        IPCMAIN.on("if-shortcut-f4-open", fnIpcF4OpenListener);
+        // (구) F4 IPC 위임 리스너 제거됨 — F4 는 이제 자식창(index.js)이 공통 fnAppF4PopupOpen 을 로컬로 직접 연다.
+        //   자식이 if-shortcut-f4-open 을 더는 송신하지 않으므로 opener 측 리스너는 잔재였음(코덱스 검토로 정리).
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
-            // IPC 리스너 해제
-            IPCMAIN.removeListener("if-shortcut-f4-open", fnIpcF4OpenListener);
             oBrowserWindow = null;
+            // 자식이 정상 초기화(IPC)로 busy 를 못 풀고 닫힌 경우(초기화 예외·조기 close) 대비 — 여기서 해제 보장(멱등).
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { console.error('[숏컷] closed busy-off 실패:', e); }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error('[숏컷] closed lock 해제 실패:', e); }
+            try { CURRWIN.focus(); } catch (e) { console.error('[숏컷] closed 포커스 실패:', e); }
+        });
 
-            CURRWIN.focus();
-
+        // 페이지 메인 로드 실패 시 busy 잔류 방지 + 창 정리(로드 실패면 타이틀바가 안 그려져 사용자가 못 닫음).
+        oBrowserWindow.webContents.on('did-fail-load', (event, errCode, errDesc, validatedURL, isMainFrame) => {
+            if (!isMainFrame || errCode === -3) { return; }   // 서브리소스/사용자취소(-3)는 무시
+            console.error('[숏컷] 자식창 메인 로드 실패:', errCode, errDesc);
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+            try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { console.error('[숏컷] 로드실패 창 정리 실패:', e); }
         });
 
         } catch (e) {

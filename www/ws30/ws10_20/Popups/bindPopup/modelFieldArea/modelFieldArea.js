@@ -87,6 +87,8 @@
                 { label: H.z("175"), width: "8rem" },   // 175 Type
                 { label: H.z("176"), width: "16rem" }    // 176 Description
             ],
+            // autofit(더블클릭·161버튼 공용) = 원본 정책(여유 0.5rem/최소 4rem/상한 없음) — 디자인트리와 동일.
+            autofit: { slackRem: 0.5, minRem: 4, max: Infinity },
             roots: function () { return oAPP.attr.modelTree || []; },
             children: function (n) { return n.zTREE || []; },
             hasChildren: function (n) { return !!(n.zTREE && n.zTREE.length); },
@@ -156,6 +158,13 @@
                         break;
                     case "E":   // 일반 필드 — 녹색.
                         n.stat_src = "sap-icon://status-positive";
+                        break;
+                    default:
+                        // ★ 컨테이너(앱/모델 루트 등 KIND이 T/S/E 아님) — 아이콘·경로 없이 하위로만 재귀.
+                        //   원본 setBindEnable 은 ZLEVEL===2 구조/테이블부터 진입해 이 케이스가 없었으나, HTML5 좌측 트리는
+                        //   앱 루트가 최상위라 여기서 끊기면 하위 구조/필드에 KIND_PATH 가 안 붙어 checkValidBind(115)로 전부 거부됨
+                        //   (장군님 지적 2026-07-14). 하위(구조/테이블)부터 KIND_PATH 를 다시 시작하도록 sKindPath="" 로 재귀.
+                        _walk(aChild, "", sKind);
                         break;
                 }
             }

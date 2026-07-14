@@ -188,27 +188,42 @@
             var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
             var slack = Math.round(0.5 * rem), minPx = Math.round(4 * rem);
             var overhead = Math.round(rem * 0.375 * 3 + 1);
-            function colMax(aSel) {
+            // ★ per-컬럼 폭은 공통 makeColumnTree 의 autoWidth(=리사이즈바 더블클릭과 완전 동일 계산)를 소비한다.
+            //   과거엔 여기서 _bwpCellNat 로 따로 측정해 더블클릭과 폭이 어긋났음 → 단일화(장군님 지적 2026-07-14).
+            //   대형 바인딩 트리는 makeColumnTree(autofit:{slackRem:0.5,minRem:4,max:Infinity}) 로 생성돼
+            //   slack/최소/상한 정책까지 원본 setUiTableAutoResizeColumn 과 일치.
+            var oCtrl = oHost.__u4aColTreeCtrl;
+            function colFit(i) {   // i = 0-기반 컬럼 인덱스
+                if (oCtrl && typeof oCtrl.autoWidth === "function") { return oCtrl.autoWidth(i); }
+                // 폴백(ctrl 미부착 — 이론상 없음): 옛 측정 유지.
+                var aSel = (i === 0)
+                    ? [".u4aColTreeHead .u4aColTreeC1", ".u4aColTreeNameCell"]
+                    : [".u4aColTreeHead .u4aColTreeC" + (i + 1), ".u4aColTreeBody .u4aColTreeC" + (i + 1)];
                 var mx = 0;
-                for (var i = 0; i < aSel.length; i++) {
-                    var a = oHost.querySelectorAll(aSel[i]);
+                for (var s = 0; s < aSel.length; s++) {
+                    var a = oHost.querySelectorAll(aSel[s]);
                     for (var j = 0; j < a.length; j++) { var w = _bwpCellNat(a[j]); if (w > mx) { mx = w; } }
                 }
-                return mx;
+                return Math.max(minPx, Math.ceil(mx) + slack);
             }
-            var c1 = Math.max(minPx, Math.ceil(colMax([".u4aColTreeHead .u4aColTreeC1", ".u4aColTreeNameCell"])) + slack);
-            var c2 = Math.max(minPx, Math.ceil(colMax([".u4aColTreeHead .u4aColTreeC2", ".u4aColTreeBody .u4aColTreeC2"])) + slack);
-            var c3 = Math.max(minPx, Math.ceil(colMax([".u4aColTreeHead .u4aColTreeC3", ".u4aColTreeBody .u4aColTreeC3"])) + slack);
-            // ★ 원본 setUiTableAutoResizeColumn + scheduleFitTableColumns 1:1 —
-            //   각 컬럼을 콘텐츠 자연폭에 맞추고, 컨테이너보다 좁으면 "마지막(설명/MPROP) 컬럼이 잔여폭 흡수"해 채운다.
-            //   콘텐츠가 컨테이너보다 넓으면 자연폭 유지(가로 스크롤 = 원본 거동).
-            //   ★ 스플리터 드래그로는 이 함수를 재호출하지 않는다(원본은 레이아웃 변경 refreshBindLayoutTables 때만 재적합).
+            // ★ 원본 setUiTableAutoResizeColumn + scheduleFitTableColumns 1:1 — 각 컬럼을 콘텐츠 자연폭에 맞추고,
+            //   컨테이너보다 좁으면 지정 컬럼(data-bwp-fill)이 잔여폭 흡수. 넓으면 자연폭 유지(가로 스크롤 = 원본).
+            //   ★ 스플리터 드래그로는 재호출 안 함(원본 refreshBindLayoutTables 때만).
+            //   ★ N컬럼 대응: data-col-count(기본 3). 디자인트리 = 4(이름/경로/MPROP/액션) 또는 3(패키징=MPROP숨김).
+            var nCol = parseInt(oHost.getAttribute("data-col-count") || "3", 10);
+            if (!(nCol >= 2 && nCol <= 8)) { nCol = 3; }
+            var aCol = [];
+            for (var k = 0; k < nCol; k++) { aCol[k] = colFit(k); }
+            // 잔여폭 흡수 컬럼 = data-bwp-fill(기본 마지막). 디자인트리는 "2"(바인딩경로) → 액션(마지막)은 고정폭.
+            var iFill = parseInt(oHost.getAttribute("data-bwp-fill") || String(nCol), 10);
+            if (!(iFill >= 1 && iFill <= nCol)) { iFill = nCol; }
+            overhead = Math.round(rem * 0.375 * nCol + 1);
+            var natTotal = 0; for (var i = 0; i < nCol; i++) { natTotal += aCol[i]; }
             var avail = oHost.clientWidth - overhead;
-            if (avail > c1 + c2 + c3) { c3 = avail - c1 - c2; }
-            oHost.style.setProperty("--u4act-c1-w", c1 + "px");
-            oHost.style.setProperty("--u4act-c2-w", c2 + "px");
-            oHost.style.setProperty("--u4act-c3-w", c3 + "px");
-            oHost.style.setProperty("--u4act-total-w", (c1 + c2 + c3 + overhead) + "px");
+            if (avail > natTotal) { aCol[iFill - 1] += (avail - natTotal); }
+            var total = 0;
+            for (var m = 1; m <= nCol; m++) { oHost.style.setProperty("--u4act-c" + m + "-w", aCol[m - 1] + "px"); total += aCol[m - 1]; }
+            oHost.style.setProperty("--u4act-total-w", (total + overhead) + "px");
         } catch (e) { console.error("[HTML5][bindWindow] fitTreeColumns:", e && e.message); }
     };
 

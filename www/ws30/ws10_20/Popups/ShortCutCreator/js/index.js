@@ -75,6 +75,24 @@
         return (sTxt && sTxt.trim()) ? sTxt : sFallback;
     }
 
+    // 공통 메시지 토스트(.u4a-toast) — 화면 정중앙·싱글톤·3초 자동사라짐(원본 sap.m.MessageToast 대응, 하단 footer 아님).
+    let _toastTimer = null;
+    function _toast(sMsg) {
+        if (!sMsg) { return; }
+        let oT = document.getElementById("u4aShortcutToast");
+        if (!oT) {
+            oT = document.createElement("div");
+            oT.id = "u4aShortcutToast";
+            oT.className = "u4a-toast";
+            oT.setAttribute("role", "alert");
+            document.body.appendChild(oT);
+        }
+        oT.textContent = sMsg;
+        oT.setAttribute("data-show", "true");
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { console.error("[숏컷] 토스트 숨김 오류:", e); } }, 3000);
+    }
+
     // 워크스페이스 메시지(ZMSG_WS_COMMON_001) — 번호 기준. 공통 빈상태("데이터 없음"=946) 등. getMsgText(SAP 메시지클래스)와 별개 채널.
     function getWsText(sNo, sFallback) {
         try {
@@ -197,8 +215,7 @@
         if (isFnd !== "") {
             const radio = document.querySelector(`input[name="browserType"][value="${isFnd}"]`);
             if (radio) {
-                radio.checked = true;
-                fn_select_BROWSER();
+                radio.checked = true;   // 옵션 블록은 통합돼 브라우저 무관 — 별도 토글 불필요.
             }
         }
     }
@@ -217,19 +234,7 @@
         }
     }
 
-    // 브라우저 타입 선택에 따른 브라우저 옵션 영역 전환
-    function fn_select_BROWSER() {
-        const browserType = document.querySelector('input[name="browserType"]:checked').value;
-        // ★ display 는 인라인 flex/none 으로 토글한다. (base className 에서 Bootstrap .d-flex(=display:flex !important)를
-        //   빼야 인라인 none 이 먹는다 — d-flex 를 두면 !important 가 인라인 none 을 눌러 숨김이 무효화됨.)
-        if (browserType === "chrome") {
-            document.getElementById("chromeOptions").style.display = "flex";
-            document.getElementById("edgeOptions").style.display = "none";
-        } else {
-            document.getElementById("chromeOptions").style.display = "none";
-            document.getElementById("edgeOptions").style.display = "flex";
-        }
-    }
+    // (구) fn_select_BROWSER(브라우저별 옵션 영역 토글) 제거 — 옵션이 하나로 통합돼 브라우저와 무관하게 항상 동일.
 
     // 저장 폴더 및 아이콘 파일 선택 다이얼로그 호출
     function fn_select_Path(mtype) {
@@ -342,8 +347,16 @@
     }
 
     // APP ID 서버 검증 및 파라미터 유효성 검사
+    let _appIdCheckSeq = 0;   // 앱ID 검사 요청 순번 — 비동기 레이스 방지(늦게 도착한 이전 응답을 폐기)
+
     // 앱 ID 존재 검사 + 앱 Name 채움. blur/Enter/F4/제출 공통. 성공="", 실패="E".
     async function fn_CheckAppId() {
+        const mySeq = ++_appIdCheckSeq;   // 이번 요청 순번(응답 적용 전 최신인지 확인)
+
+        // ★검사 시작 시 이전 밸류스테이트(오류 테두리+메시지)를 먼저 지운다.
+        //   정상값이면 이미 지워져 안 뜨고, 아래 검사에서 걸리면 그때 다시 세팅한다.
+        oAppIdField.setValueState("none");
+
         fn_setBusy(true);
 
         // App Name 라벨 초기화
@@ -367,6 +380,10 @@
             }
 
             const e = await response.json();
+
+            // ★레이스 방지: 이 요청 이후 더 최신 검사(다른 앱ID 입력)가 시작됐으면 이 응답은 폐기한다.
+            //   (안 그러면 늦게 온 이전 응답이 현재 앱ID 아닌 이름/APPTY 로 덮어써 잘못된 경로 생성.)
+            if (mySeq !== _appIdCheckSeq) { return ""; }
 
             if (typeof e.RETCD === "undefined") {
                 return "E";
@@ -466,13 +483,13 @@
             sMsg = getMsgText("/U4A/CL_WS_COMMON", "C11", "Name");
             sMsg = "'" + sMsg + "'";
             sMsg = getMsgText("/U4A/MSG_WS", "319", "value does not exist in the &1 Field").replace("&1", sMsg);
-            U4AUI.footerShow("u4aFooterMessage", "E", sMsg, 5000);
+            _toast(sMsg);
             return "E";
         }
 
         if (Lreturn === "02") {
             sMsg = getMsgText("/U4A/MSG_WS", "320", "Only English and numbers are accepted");
-            U4AUI.footerShow("u4aFooterMessage", "E", sMsg, 5000);
+            _toast(sMsg);
             return "E";
         }
 
@@ -502,14 +519,14 @@
 
         U4AUI.confirm({
             type: "C",
-            title: "Confirm",
+            title: getMsgText("/U4A/CL_WS_COMMON", "A40", "Confirm"),
             message: sMsg,
             onClose: function (sAct) {
                 if (sAct === "YES") {
                     fn_CreateShortcutRUN();
                 } else {
                     const sCancelMsg = getMsgText("/U4A/MSG_WS", "161", "Job canceled.");
-                    U4AUI.footerShow("u4aFooterMessage", "I", sCancelMsg, 3000);
+                    _toast(sCancelMsg);
                     fn_setBusy(false);
                 }
             }
@@ -519,7 +536,7 @@
             fn_setBusy(false);
             U4AUI.confirm({
                 type: "E",
-                title: "Error",
+                title: getMsgText("/U4A/CL_WS_COMMON", "B93", "Error"),
                 message: e.message || e.toString()
             });
         }
@@ -535,13 +552,25 @@
         let Loption = "";
         let U4Apath = "";
 
-        const reg = /\s/g;
-        let LFname_X = LFname.replace(reg, "");
+        // 파일명 정리 — 공백만이거나 미입력이면 앱ID 로 대체.
+        let LFname_X = LFname.replace(/\s/g, "");
         if (LFname_X.length === 0) {
             LFname = Lappid;
         }
 
-        LFname = LFname.replace(".lnk", "");
+        // 기존 .lnk 확장자 제거(대소문자 무관 — 원본은 case-sensitive 라 .LNK 중복 붙던 버그).
+        LFname = LFname.replace(/\.lnk$/i, "");
+
+        // Windows 파일명 금지문자(\ / : * ? " < > |)·제어문자 또는 예약 파일명(CON/PRN/AUX/NUL/COM1-9/LPT1-9) → 오류로 차단.
+        //   (안 막으면 writeShortcutLink 가 원인 불명으로 실패한다.) MSG_WS 278 = "Special characters are not allowed."
+        if (/[\\\/:*?"<>|\x00-\x1f]/.test(LFname) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(LFname)) {
+            fn_setBusy(false);
+            oFileNameField.setValueState("error", getMsgText("/U4A/MSG_WS", "278", "Special characters are not allowed."));
+            _refocus(oFileNameField);
+            return;
+        }
+        oFileNameField.setValueState("none");
+
         LFname = LFname + ".lnk";
         LsPath = oAPP.path.join(LsPath, LFname);
 
@@ -563,15 +592,13 @@
 
         U4Apath = Lhost + U4AbasePath + Lappid.toLowerCase();
 
-        let Lparam = "";
+        // 파라미터 → 쿼리스트링. 값에 &, =, 공백, 한글 등이 들어가도 URL 이 안 깨지게 인코딩(URLSearchParams).
+        const oSearch = new URLSearchParams();
         aParams.forEach(p => {
             if (p.name === "" && p.value === "") { return; }
-            if (Lparam !== "") {
-                Lparam = Lparam + "&" + p.name + "=" + p.value;
-            } else {
-                Lparam = p.name + "=" + p.value;
-            }
+            oSearch.append(p.name, p.value);
         });
+        const Lparam = oSearch.toString();
 
         if (Lparam !== "") {
             U4Apath = U4Apath + "?" + Lparam;
@@ -594,7 +621,7 @@
                 return;
             }
             Ltarget = oFound.PATH;
-            Loption = fn_setShorCutOptionCR(U4Apath);
+            Loption = fn_setShortcutOption(U4Apath, "chrome");
         } else {
             let oFound = oAPP.browserInfo.find(b => b.TYPE === "MS_EDGE");
             if (!oFound) {
@@ -609,7 +636,7 @@
                 return;
             }
             Ltarget = oFound.PATH;
-            Loption = fn_setShorCutOptionIE(U4Apath);
+            Loption = fn_setShortcutOption(U4Apath, "edge");
         }
 
         // 바로가기 생성 API 호출
@@ -626,7 +653,7 @@
             const sSuccessMsg = getMsgText("/U4A/MSG_WS", "322", "processing is complete");
             U4AUI.confirm({
                 type: "S",
-                title: "Success",
+                title: getMsgText("/U4A/CL_WS_COMMON", "D86", "Success"),
                 message: sSuccessMsg,
                 onClose: function () {
                     // 다운 폴더 탐색기 실행
@@ -650,69 +677,61 @@
             fn_setBusy(false);
             U4AUI.confirm({
                 type: "E",
-                title: "Error",
+                title: getMsgText("/U4A/CL_WS_COMMON", "B93", "Error"),
                 message: e.message || e.toString()
             });
         }
     }
 
-    // Chrome 숏컷 명령 옵션 텍스트 생성
-    function fn_setShorCutOptionCR(U4Apath) {
+    // 숏컷 실행 옵션(커맨드라인 플래그) 생성 — Chrome/Edge 공통.
+    //   둘 다 Chromium 이라 모드 플래그(--app / --start-maximized / --start-fullscreen / --kiosk)와 --disable-translate 는 동일.
+    //   ★비밀 모드만 다름: Chrome=--incognito, Edge=--inprivate.
+    function fn_setShortcutOption(U4Apath, sBrowserType) {
         let Loption = "";
-        const Lchk1 = document.getElementById("chkChromeDisableTranslate").checked;
-        const Lchk2 = document.getElementById("chkChromeSecret").checked;
+        const bDisableTranslate = document.getElementById("chkDisableTranslate").checked;
+        const bSecret = document.getElementById("chkSecret").checked;
 
-        if (Lchk2) {
-            Loption = "--incognito";
+        if (bSecret) {
+            Loption = (sBrowserType === "chrome") ? "--incognito" : "--inprivate";
+        }
+        if (bDisableTranslate) {
+            // ★원본의 --disable-translate 는 현행 Chromium 스위치 목록에서 제거돼 no-op 다(구버전 잔재).
+            //   현행 번역 비활성화 = --disable-features=Translate.
+            Loption = (Loption !== "" ? Loption + " " : "") + "--disable-features=Translate";
         }
 
-        if (Lchk1) {
-            if (Loption !== "") {
-                Loption = Loption + " --disable-translate";
-            } else {
-                Loption = "--disable-translate";
-            }
-        }
+        const sMode = document.querySelector('input[name="browserMode"]:checked').value;
 
-        const chromeMode = document.querySelector('input[name="chromeMode"]:checked').value;
-
-        // ★ 전체화면(--start-fullscreen)/키오스크(--kiosk)는 Chrome '시작 모드' 플래그라, Chrome 이 이미 실행 중이면
-        //   무시되고 기존 창에 '일반 탭'으로 열린다(Chrome 자체 동작). → 전용 프로파일(--user-data-dir)로 '별도 인스턴스'를
-        //   강제해야 플래그가 실제로 먹는다. 숏컷(앱ID)별 폴더로 격리(둘이 안 섞이게). Chrome 이 --user-data-dir 폴더는 자동 생성.
-        //   (--app= 은 Chrome 실행 여부와 무관하게 항상 별도 앱창이라 프로파일 강제 불필요.)
-        function _dedicatedProfileArg() {
+        // ★ 전체화면(--start-fullscreen)/키오스크(--kiosk)는 '시작 모드' 플래그라, 브라우저가 이미 실행 중이면
+        //   무시되고 기존 창에 '일반 탭'으로 열린다(Chromium 자체 동작). → 전용 프로파일(--user-data-dir)로 '별도 인스턴스'를
+        //   강제해야 플래그가 실제로 먹는다. 폴더는 브라우저가 자동 생성.
+        //   ★프로파일은 '앱ID + 모드'별로 분리 — 같은 앱의 전체화면/키오스크가 같은 폴더를 쓰면 한쪽 인스턴스에 붙어(탭)
+        //     플래그가 무시돼 '차이 없어' 보인다. 모드별 폴더면 항상 별도 인스턴스.
+        //   (--app= 은 실행 여부와 무관하게 항상 별도 앱창, 일반 모드는 사용자의 기본 프로파일을 써야 하므로 강제 안 함.)
+        function _dedicatedProfileArg(sM) {
             var sId = (oAppIdField.getValue() || "u4a").replace(/[^A-Za-z0-9_-]/g, "_");
-            var sDir = PATH.join(APP.getPath("temp"), "u4a_shortcut_profile", sId);
+            var sDir = PATH.join(APP.getPath("temp"), "u4a_shortcut_profile", sId + "_" + sM);
             return '--user-data-dir="' + sDir + '"';
         }
 
-        switch (chromeMode) {
+        switch (sMode) {
             case "app":
                 Loption = (Loption !== "" ? Loption + " " : "") + "--app=" + U4Apath;
                 break;
+            case "normal":
+                // 일반 모드 = 모드 플래그 없이 URL 만 전달(브라우저 기본 창). 원본은 여기에 --start-maximized(=최대화)를
+                //   붙여놨으나, 이는 '일반'이 아니라 '최대화 시작'이라 선택 옵션과 결과가 불일치 → 제거.
+                Loption = (Loption !== "" ? Loption + " " : "") + U4Apath;
+                break;
             case "fullscreen":
-                // 원본은 --start-maximized(=최대화, 전체화면 아님) 오표기였음 → 진짜 전체화면 --start-fullscreen 로 교정 + 전용 프로파일.
-                Loption = (Loption !== "" ? Loption + " " : "") + _dedicatedProfileArg() + " --start-fullscreen " + U4Apath;
+                // 원본은 --start-maximized(=최대화, 전체화면 아님) 오표기였음 → 진짜 전체화면 --start-fullscreen + 전용 프로파일.
+                Loption = (Loption !== "" ? Loption + " " : "") + _dedicatedProfileArg("fullscreen") + " --start-fullscreen " + U4Apath;
                 break;
             case "kiosk":
-                Loption = (Loption !== "" ? Loption + " " : "") + _dedicatedProfileArg() + " --kiosk " + U4Apath;
-                break;
-        }
-
-        return Loption;
-    }
-
-    // IE Edge 숏컷 명령 옵션 텍스트 생성
-    function fn_setShorCutOptionIE(U4Apath) {
-        let Loption = "";
-        const edgeMode = document.querySelector('input[name="edgeMode"]:checked').value;
-
-        switch (edgeMode) {
-            case "app":
-                Loption = "--app=" + U4Apath;
-                break;
-            case "normal":
-                Loption = "--start-maximized " + U4Apath;
+                // Edge 는 --kiosk 만으로는 공식 키오스크가 아니며 --edge-kiosk-type 을 요구한다(MS 문서).
+                //   fullscreen = 단일 앱 전체화면 키오스크(브라우저 UI 없음).
+                Loption = (Loption !== "" ? Loption + " " : "") + _dedicatedProfileArg("kiosk") + " --kiosk "
+                    + (sBrowserType === "edge" ? "--edge-kiosk-type=fullscreen " : "") + U4Apath;
                 break;
         }
 
@@ -810,9 +829,18 @@
             upper: true,
             placeholder: getMsgText("/U4A/CL_WS_COMMON", "D09", "U4A Application ID"),
             f4: fn_AppId_F4Help,
+            // 입력 중(live) 부수효과 — 앱ID 글자가 바뀌는 순간(타이핑/백스페이스/X) 이미 채워진 앱 Name 은
+            //   더 이상 그 ID 의 것이 아니므로 즉시 비우고 밸류스테이트도 해제한다(blur 까지 기다리지 않음).
+            //   createApplicationPopup 의 패키지→Request No 라이브 리셋(lf_packageLiveReset)과 동일 컨셉.
+            onInput: function () {
+                if (oAppNmField && oAppNmField.getValue()) { oAppNmField.setValue(""); }
+                oAppIdField.setValueState("none");
+            },
             // 포커스 이동(change=blur) 또는 Enter 시 앱 존재검사 + 앱 Name 채움. 빈 값이면 이름만 비운다.
             onChange: function (sVal) { if (sVal && sVal.trim()) { fn_CheckAppId(); } else if (oAppNmField) { oAppNmField.setValue(""); } },
-            onEnter: function (sVal) { if (sVal && sVal.trim()) { fn_CheckAppId(); } }
+            onEnter: function (sVal) { if (sVal && sVal.trim()) { fn_CheckAppId(); } },
+            // 클리어(X) 클릭 = 앱ID 비움 → 앱 Name 도 함께 비우고 오류 밸류스테이트 해제(앱ID가 비면 명칭도 무효).
+            onClear: function () { if (oAppNmField) { oAppNmField.setValue(""); } oAppIdField.setValueState("none"); }
         });
 
         let sFileNamePlaceholder = getMsgText("/U4A/CL_WS_COMMON", "D10", "Shortcut") + " " + getMsgText("/U4A/CL_WS_COMMON", "C35", "File Name");
@@ -824,7 +852,7 @@
         let sSavePathPlaceholder = sFileNamePlaceholder + " " + getMsgText("/U4A/CL_WS_COMMON", "D11", "Shortcut Download Path");
         oSavePathField = U4AUI.createField({
             id: "FORM1_INPUT4",
-            readOnly: true,
+            valueHelpOnly: true,   // 값도움 전용 — 직접 타이핑 불가·활성 외관·클릭=폴더선택 F4(.analy/15 §3.8)
             placeholder: sSavePathPlaceholder,
             f4: function () { fn_select_Path("01"); },
             f4Icon: "folder-open"
@@ -833,7 +861,7 @@
         let sIconPathPlaceholder = sFileNamePlaceholder + " " + getMsgText("/U4A/CL_WS_COMMON", "C70", "Shortcut Icon Path");
         oIconPathField = U4AUI.createField({
             id: "FORM1_INPUT5",
-            readOnly: true,
+            valueHelpOnly: true,   // 값도움 전용 — 직접 타이핑 불가·활성 외관·클릭=아이콘선택 F4(.analy/15 §3.8)
             placeholder: sIconPathPlaceholder,
             f4: function () { fn_select_Path("02"); },
             f4Icon: "image"
@@ -930,9 +958,7 @@
             </label>
         `;
 
-        oBrowserTypeRadioGroup.querySelectorAll('input[name="browserType"]').forEach(radio => {
-            radio.addEventListener("change", fn_select_BROWSER);
-        });
+        // (구) 브라우저 타입 변경 시 옵션 블록 토글(fn_select_BROWSER) 제거 — 옵션이 통합돼 브라우저와 무관하게 동일하다.
 
 
         // 4. Browser Option Panel
@@ -942,56 +968,41 @@
         });
         browserOptionPanel.appendChild(oBrowserOptPanel.el);
 
-        // Chrome Options
-        const oChromeOpts = document.createElement("div");
-        oChromeOpts.id = "chromeOptions";
-        oChromeOpts.className = "flex-column gap-3 w-100";   // d-flex 제외 — 표시는 fn_select_BROWSER 가 인라인 display:flex 로(그래야 인라인 none 숨김이 !important 에 안 눌림)
-        oChromeOpts.style.display = "none";
-        oBrowserOptPanel.body.appendChild(oChromeOpts);
+        // 브라우저 옵션 — Chrome/Edge 둘 다 Chromium 이라 지원 플래그가 동일 → 옵션을 하나로 통합(브라우저 전환해도 유지).
+        //   ★비밀 모드만 브라우저별 플래그가 다름(Chrome=--incognito / Edge=--inprivate) → 빌더(fn_setShortcutOption)에서 분기.
+        //   토글이 없어 display 조작이 없으므로 d-flex 사용 안전(구 chrome/edge 분리 블록의 !important 함정 소멸).
+        const oBrowserOpts = document.createElement("div");
+        oBrowserOpts.id = "browserOptions";
+        oBrowserOpts.className = "d-flex flex-column gap-3 w-100";
+        oBrowserOptPanel.body.appendChild(oBrowserOpts);
 
-        oChromeOpts.innerHTML = `
+        oBrowserOpts.innerHTML = `
             <div class="u4aShortcutOptionGroup">
                 <label class="u4aShortcutOptionItem">
-                    <input type="radio" name="chromeMode" value="app" checked>
+                    <input type="radio" name="browserMode" value="normal" checked>
+                    <span>${getMsgText("/U4A/CL_WS_COMMON", "D38", "Normal Mode")}</span>
+                </label>
+                <label class="u4aShortcutOptionItem">
+                    <input type="radio" name="browserMode" value="app">
                     <span>${getMsgText("/U4A/CL_WS_COMMON", "C78", "App Mode")}</span>
                 </label>
                 <label class="u4aShortcutOptionItem">
-                    <input type="radio" name="chromeMode" value="fullscreen">
+                    <input type="radio" name="browserMode" value="fullscreen">
                     <span>${getMsgText("/U4A/CL_WS_COMMON", "C79", "Full Screen Mode")}</span>
                 </label>
                 <label class="u4aShortcutOptionItem">
-                    <input type="radio" name="chromeMode" value="kiosk">
+                    <input type="radio" name="browserMode" value="kiosk">
                     <span>${getMsgText("/U4A/CL_WS_COMMON", "C80", "Kiosk Mode")}</span>
                 </label>
             </div>
             <div class="u4aShortcutOptionGroup" style="border-top: 0.0625rem solid var(--line); padding-top: 0.5rem;">
                 <label class="u4aShortcutOptionItem">
-                    <input type="checkbox" id="chkChromeDisableTranslate">
+                    <input type="checkbox" id="chkDisableTranslate">
                     <span>${getMsgText("/U4A/CL_WS_COMMON", "C81", "Displble Translate Mode")}</span>
                 </label>
                 <label class="u4aShortcutOptionItem">
-                    <input type="checkbox" id="chkChromeSecret">
+                    <input type="checkbox" id="chkSecret">
                     <span>${getMsgText("/U4A/CL_WS_COMMON", "C82", "Secret Mode")}</span>
-                </label>
-            </div>
-        `;
-
-        // Edge Options
-        const oEdgeOpts = document.createElement("div");
-        oEdgeOpts.id = "edgeOptions";
-        oEdgeOpts.className = "flex-column gap-3 w-100";   // d-flex 제외 — 위 chromeOptions 와 동일 이유(인라인 none 이 !important 에 안 눌리게)
-        oEdgeOpts.style.display = "none";
-        oBrowserOptPanel.body.appendChild(oEdgeOpts);
-
-        oEdgeOpts.innerHTML = `
-            <div class="u4aShortcutOptionGroup">
-                <label class="u4aShortcutOptionItem">
-                    <input type="radio" name="edgeMode" value="app" checked>
-                    <span>${getMsgText("/U4A/CL_WS_COMMON", "C78", "App Mode")}</span>
-                </label>
-                <label class="u4aShortcutOptionItem">
-                    <input type="radio" name="edgeMode" value="normal">
-                    <span>${getMsgText("/U4A/CL_WS_COMMON", "D38", "Normal Mode")}</span>
                 </label>
             </div>
         `;
@@ -1033,9 +1044,7 @@
             </div>
         `;
 
-        // Footer Message Bar 구성
-        const oFooterMsgBox = document.getElementById("u4aFooterMessage");
-        oFooterMsgBox.outerHTML = U4AUI.footerMarkup("u4aFooterMessage");
+        // (구) 하단 Footer 메시지 바 제거 — 메시지는 공통 .u4a-toast(화면 정중앙) _toast() 로 출력(원본 MessageToast 대응).
 
         // Param Event 바인딩
         document.getElementById("btnParamAdd").addEventListener("click", function () {
@@ -1049,7 +1058,7 @@
             const checkedRows = document.querySelectorAll(".chk-param-row:checked");
             if (checkedRows.length === 0) {
                 const sMsg = getMsgText("/U4A/MSG_WS", "268", "Selected line does not exists.");
-                U4AUI.footerShow("u4aFooterMessage", "W", sMsg, 5000);
+                _toast(sMsg);
                 return;
             }
 

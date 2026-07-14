@@ -354,6 +354,20 @@ function attachBeforeInputEvent(contents) {
             return;
         }
 
+        // F11 = 앱 창 전체화면 토글 (창 포커스 시에만, 전 프레임 커버).
+        //   ★ 메인 프로세스의 before-input-event 는 "창당 1회 등록 + 입력당 1회 발화"라,
+        //     렌더러(@electron/remote)에서 CURRWIN.webContents.on 으로 붙일 때 생기던 다중발화·중복
+        //     바인딩(→ 단일 F11 에 2~3번 토글돼 "커졌다 작아졌다")이 없다. Alt+F4 와 동일한 정석 위치.
+        //     OS 전역(globalShortcut)이 아니라 이 창이 포커스일 때만 동작 → 타 앱 F11 선점 없음.
+        if (input.type === 'keyDown' && input.code === 'F11' && !input.isAutoRepeat) {
+            event.preventDefault();
+            const oFsWin = BrowserWindow.fromWebContents(event.sender);
+            if (oFsWin && !oFsWin.isDestroyed()) {
+                oFsWin.setFullScreen(!oFsWin.isFullScreen());
+            }
+            return;
+        }
+
         // 브라우저 단축키(Alt + F4 막기)
         if (!isAltF4KeyDown(input)) {
             return;

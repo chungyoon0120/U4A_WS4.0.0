@@ -1339,21 +1339,18 @@
         for (var i = 0; i < sec.colW.length; i++) { s += sec.colW[i]; }
         if (sec.els.tbl) { sec.els.tbl.style.minWidth = s + "px"; }
     }
-    // 텍스트 실측용 오프스크린 span — 참조 요소의 폰트로 텍스트 잉크폭 측정(input/콤보는 폭이 100% 라 박스 측정 불가).
+    // 텍스트 잉크폭 = canvas measureText(DOM 변형·reflow 0). 참조 요소 폰트로 측정(input/콤보는 폭 100%라 박스 측정 불가).
+    //   ★ 구현: 오프스크린 span 을 body.append→getBoundingClientRect→remove 했는데, 그 DOM 변형이 컬럼 autofit(전 셀 순회)
+    //   시 셀마다 강제 리플로우로 느림 → canvas 로 교체(공통 makeColumnTree _measTxt 와 동일 정책, .analy/16 §3.4.2).
+    var _wzMCtx = null;
     function _wzMeasTxt(sText, oRef) {
-        var span = document.createElement("span");
-        span.style.cssText = "position:absolute;left:-9999px;top:-9999px;white-space:pre;visibility:hidden;";
+        if (!_wzMCtx) { try { _wzMCtx = document.createElement("canvas").getContext("2d"); } catch (e) { _wzMCtx = null; } }
+        if (!_wzMCtx) { return (sText || "").length * 7; }
         if (oRef) {
             var cs = getComputedStyle(oRef);
-            span.style.fontFamily = cs.fontFamily; span.style.fontSize = cs.fontSize;
-            span.style.fontWeight = cs.fontWeight; span.style.fontStyle = cs.fontStyle;
-            span.style.letterSpacing = cs.letterSpacing;
+            _wzMCtx.font = (cs.fontStyle || "normal") + " " + (cs.fontWeight || "400") + " " + (cs.fontSize || "13px") + " " + (cs.fontFamily || "sans-serif");
         }
-        span.textContent = sText || "";
-        document.body.appendChild(span);
-        var w = span.getBoundingClientRect().width;
-        span.remove();
-        return w;
+        return _wzMCtx.measureText(sText || "").width;
     }
 
     // 셀이 필요로 하는 폭(px, 셀 패딩 포함). 편집칸(콤보/입력)은 폭 100% 라 "안의 텍스트"를, 텍스트 셀(헤더/본문)은

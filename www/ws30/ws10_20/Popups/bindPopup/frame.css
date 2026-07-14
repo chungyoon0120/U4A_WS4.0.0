@@ -208,6 +208,14 @@ body {
    color-mix 금지(Chromium93) → 배경은 공통 --hover-bg(솔리드 틴트), 강조는 성공색 inset 바. */
 .u4aBwpDropOk { background: var(--hover-bg); box-shadow: inset 0.1875rem 0 0 var(--state-success); }
 .u4aBwpDropNo { opacity: 0.4; }
+/* 좌측(prc001) 드래그 시 커서가 올라간 드롭 가능 행 = 드롭존 테두리(§4.3a 표준: 실선 accent + state-info-bg). DropOk 뒤라 배경 이김. */
+.u4aBwpDropRow {
+    outline: 0.125rem solid var(--accent);
+    /* 플러시(0) — 아래 액션셀 이음선(inset box-shadow 상·하)이 행 outline 과 정확히 같은 선상에 오게 한다. */
+    outline-offset: 0;
+    background: var(--state-info-bg);
+    box-shadow: none;
+}
 
 /* WS20 디자인 트리 → 가운데로 드래그 중 드롭존 표시(호스트 전체, 마우스 뗄 때까지 유지).
    효과 표준 = .analy/16 §4.3a(레퍼런스 runtimeClassNav .u4aRtmDrop.is-dragover — 실선 accent + state-info-bg + 0.15s 전환).
@@ -248,12 +256,65 @@ body {
 .u4aBwpDesignChk { flex: 0 0 auto; margin: 0; cursor: pointer; width: 1.05rem; height: 1.05rem; accent-color: var(--accent); }
 .u4aBwpDesignPath { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: var(--accent); }
 
-/* 디자인 트리 바인딩경로 셀 = 경로(신축) + 행 액션(우측 고정). 원본 rowActionTemplate(accept/disconnected). */
-.u4aBwpPathCell { display: flex; align-items: center; gap: 0.25rem; min-width: 0; width: 100%; }
-.u4aBwpPathCell .u4aBwpDesignPath { flex: 1 1 auto; }
-.u4aBwpRowAct { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 0.125rem; }
-.u4aBwpRowActBtn { width: 1.5rem; height: 1.5rem; padding: 0; font-size: 0.8125rem; }
+/* 행 액션 컬럼(원본 rowActionTemplate = WS20 트리 +/휴지통과 동일한 2슬롯 — 빈슬롯으로 세로 정렬 유지). */
+.u4aBwpRowActions { display: flex; align-items: center; justify-content: center; gap: 0.125rem; }
+.u4aBwpRowActSlot { display: inline-block; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; }
+.u4aBwpRowActBtn { flex: 0 0 auto; width: 1.5rem; height: 1.5rem; padding: 0; font-size: 0.8125rem; }
 .u4aBwpRowActBtn--unbind { color: var(--negative); }
+
+/* ★ 액션 컬럼 = 우측 고정(원본 sap.ui.table rowActionCount 거터). 데이터 컬럼(이름/경로/MPROP)이 가로 스크롤돼도
+   액션 컬럼은 항상 우측에 붙어있고 스크롤 콘텐츠를 불투명 배경으로 가린다.
+   ★ 세로선(좌측 경계)은 공통 .u4aColTreeCell/.u4aColTreeC4 의 border-left 로 이미 그려짐 → box-shadow 중복 금지.
+   ★ 컬럼 폭(--u4act-c4-w)은 공통 shell.css(.u4aColTreeC4)로 승격 완료 — 여기선 고정 동작만. */
+.u4aBwpTreeHost[data-act-col="3"] .u4aColTreeBody .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4aColTreeBody .u4aColTreeC4 {
+    position: sticky; right: 0; z-index: 3;
+    background-color: var(--surface);   /* ★ 불투명 base — 스크롤 콘텐츠 가림(반투명 선택/hover 틴트는 아래서 겹침) */
+}
+/* 헤더의 액션 컬럼 — 헤더 sticky top(z2) → top+right 코너 고정(z 더 높게). 헤더 밴드색. */
+.u4aBwpTreeHost[data-act-col="3"] .u4aColTreeHead .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4aColTreeHead .u4aColTreeC4 {
+    position: sticky; right: 0; z-index: 4;
+    background-color: var(--app-bg);
+}
+/* ★ 행이 없는 하단 빈 영역까지 고정 연장 — 고정은 각 '행 셀' 단위라 빈 영역엔 셀이 없어 끊긴다.
+   전체 높이를 덮는 그리드층의 액션 그리드라인(GL--cN)도 sticky-right + 불투명으로 만들어 빈 영역을 메운다.
+   (그리드층 z0 < 행 z1 → 행 영역은 행 셀이 이기고, 빈 영역만 이 GL 이 보인다.) */
+.u4aBwpTreeHost[data-act-col="3"] .u4aColTreeGL--c3,
+.u4aBwpTreeHost[data-act-col="4"] .u4aColTreeGL--c4 {
+    position: sticky; right: 0; z-index: 1;
+    background-color: var(--surface);
+    /* ★ 불투명 surface 가 본문 가로 행선(그라디언트)을 덮어 빈 영역에서 줄이 끊겨 보임 → 동일 행선을 얹어 끝까지 연장.
+       주기·색은 shell.css .u4aColTreeBody 와 동일(비가상=2.5rem, 가상=--u4a-vsrowh). 원점=그리드 top=본문 top → 정렬 일치. */
+    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--u4a-vsrowh, 2.5rem) - 0.0625rem), var(--line) calc(var(--u4a-vsrowh, 2.5rem) - 0.0625rem), var(--line) var(--u4a-vsrowh, 2.5rem));
+}
+/* 고정 액션 셀이 행 상태색(hover/선택)을 따라가되 불투명 유지 = surface(base) 위에 반투명 틴트를 background-image 로 겹침.
+   (선택/hover 색은 반투명 → background-color 로 덮으면 고정컬럼이 투명해져 스크롤 콘텐츠 비침. 틴트는 image 레이어로.)
+   선택 규칙을 뒤에 둬 hover+선택 동시엔 선택색이 이김. */
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row:hover .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row:hover .u4aColTreeC4 { background-image: linear-gradient(var(--hover-bg), var(--hover-bg)); }
+/* ★★ 드래그 내내 "드롭 가능 행 전체"에 붙는 .u4aBwpDropOk(_applyDropStyle → 행 background:--hover-bg)도
+   불투명 sticky 액션셀엔 안 먹어, C1~C3만 물들고 액션 컬럼만 무채색으로 남아 세로 "무인도" 띠가 생긴다.
+   → hover/선택과 동일하게 액션셀에도 hover-bg 를 background-image 로 겹쳐 행 전체가 균일하게 물들게 한다.
+   ★ 순서 = hover → DropOk → 선택 → DropRow. 선택 규칙을 DropOk 뒤에 둬야 "선택+드롭가능" 동시 행에서
+   C1~C3(선택색)와 C4 가 같은 선택색으로 일치(반대로 두면 C4 만 hover-bg 로 어긋나 그 행에서 다시 섬).
+   진짜 주범, 장군님 지적 2026-07-14. */
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row.u4aBwpDropOk .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row.u4aBwpDropOk .u4aColTreeC4 { background-image: linear-gradient(var(--hover-bg), var(--hover-bg)); }
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row[aria-selected="true"] .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row[aria-selected="true"] .u4aColTreeC4 { background-image: linear-gradient(var(--selected-bg), var(--selected-bg)); }
+/* ★ 드롭 가능 행(prc001, .u4aBwpDropRow) 강조가 우측 고정 액션 컬럼에서 끊기지 않게 — 불투명 sticky 셀이
+   행 outline/배경(§4.3a: 실선 accent + state-info-bg)을 덮으므로, hover/선택 틴트와 동일하게
+   state-info-bg 를 background-image 로 겹치고 행 outline의 상·하·우 변을 inset box-shadow 로 셀 안에 이어붙인다.
+   ★ 상·하 변만 이어붙인다. 좌변은 액션셀의 border-left(컬럼 구분선)와 겹치고, ★우변은 절대 그리면 안 된다★ —
+   행은 액션 컬럼보다 넓게(호스트 폭까지) 뻗으므로 액션셀의 우측 경계는 "행의 오른쪽 끝"이 아니라 행 한가운데다.
+   여기에 accent 선을 그으면 행 중간에 뜬금없는 세로줄이 생긴다(장군님 지적 2026-07-14).
+   선택 규칙 뒤에 둬 드롭 상태가 선택색을 이긴다. */
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row.u4aBwpDropRow .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row.u4aBwpDropRow .u4aColTreeC4 {
+    background-image: linear-gradient(var(--state-info-bg), var(--state-info-bg));
+    box-shadow: inset 0 0.125rem 0 var(--accent), inset 0 -0.125rem 0 var(--accent);
+}
 
 /* ===== 툴바 텍스트+아이콘 버튼(공통 .u4a-btn 소비) — 라벨 있는 액션 =====
    원본 sap.m.Button(type Accept/Emphasized/Reject). 파랑(Emphasized)·빨강(Reject/negative)은 공통

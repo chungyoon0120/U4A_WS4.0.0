@@ -203,10 +203,11 @@
         _oUi._T_0015.splice(_found, 1);
     }
 
-    // 디자인 트리 재렌더 + 컬럼 재적합(해제/바인딩 후 공통 후속).
+    // 디자인 트리 재렌더(해제/바인딩 후 공통 후속).
+    //   ★ 컬럼 재적합(fitTreeColumns) 안 함 — 바인딩/해제는 레이아웃 변경이 아니다(원본은 refreshBindLayoutTables=패널 표시/숨김 때만 재적합).
+    //     여기서 재적합하면 사용자가 수동으로 조절한 컬럼 폭이 autofit 으로 덮여 기본폭으로 튄다(장군님 지적 2026-07-14).
     function _refreshDesignTree() {
         if (oD.ctrl) { oD.ctrl.rerender(false); }
-        if (typeof oAPP.fn.fitTreeColumns === "function") { oAPP.fn.fitTreeColumns(oD.host); }
     }
 
     /************************************************************************
@@ -356,9 +357,8 @@
         if ((await _setBindAttribute(_sRes.IF_DATA, _sDrop)) === false) { return; }
         _sDrop.chk_seleced = false;
 
-        // 재렌더(바인딩 경로 표시) + 컬럼 재적합.
+        // 재렌더(바인딩 경로 표시). ★컬럼 재적합 안 함 — 바인딩은 레이아웃 변경 아님(수동 폭 보존, 위 _refreshDesignTree 주석 참고).
         if (oD.ctrl) { oD.ctrl.rerender(false); }
-        oAPP.fn.fitTreeColumns(oD.host);
     }
 
     // 디자인트리 호스트에 native 드롭 배선(1회).
@@ -372,6 +372,14 @@
         //   ★ 클래스는 비스크롤 래퍼(.u4aBwpDesign)에 — 스크롤 호스트에 걸면 ::after 오버레이 기준이 어긋남.
         var oZone = (oHost.closest && oHost.closest(".u4aBwpDesign")) || oHost;
         function _dropZone(b) { oZone.classList.toggle("u4aBwpDropZone", !!b); }
+        // 좌측(prc001) 드래그: 커서가 올라간 "드롭 가능 행"에만 드롭존 테두리(§4.3a). 한 행만 유지.
+        var oCurDropRow = null;
+        function _setDropRow(oRowEl) {
+            if (oCurDropRow === oRowEl) { return; }
+            if (oCurDropRow) { oCurDropRow.classList.remove("u4aBwpDropRow"); }
+            oCurDropRow = oRowEl;
+            if (oCurDropRow) { oCurDropRow.classList.add("u4aBwpDropRow"); }
+        }
 
         oHost.addEventListener("dragenter", function (ev) {
             if (_hasPrc002(ev.dataTransfer)) { ev.preventDefault(); _dropZone(true); }   // enter 에서 안 막으면 일부 브라우저 drop 거부.
@@ -380,18 +388,24 @@
             var dt = ev.dataTransfer;
             // ① WS20 디자인 트리 드래그(외부 창) — 트리 전체가 드롭 타겟 + 드롭존 표시.
             if (_hasPrc002(dt)) { ev.preventDefault(); try { dt.dropEffect = "copy"; } catch (e) { } _dropZone(true); return; }
-            // ② 좌측 모델필드 드래그(로컬) — drop 가능행 위에서만 허용(행 하이라이트는 _applyDropStyle).
-            if (!oAPP.attr.dragModelNode) { return; }
-            var oNode = _dropNodeOf(ev);
-            if (oNode && oNode._drop_enable === true) { ev.preventDefault(); ev.dataTransfer.dropEffect = "copy"; }
+            // ② 좌측 모델필드 드래그(로컬) — drop 가능행 위에서만 허용 + 그 행에 드롭존 테두리.
+            if (!oAPP.attr.dragModelNode) { _setDropRow(null); return; }
+            var oRowEl = (ev.target && ev.target.closest) ? ev.target.closest(".u4a-tree__row") : null;
+            var oNode = oRowEl ? oRowEl.__bwpNode : undefined;
+            if (oNode && oNode._drop_enable === true) {
+                ev.preventDefault(); ev.dataTransfer.dropEffect = "copy";
+                _setDropRow(oRowEl);
+            } else {
+                _setDropRow(null);
+            }
         });
         oHost.addEventListener("dragleave", function (ev) {
             // 호스트를 완전히 벗어날 때만 해제(자식 요소로 이동 시 relatedTarget 이 호스트 내부면 유지 — 깜빡임 방지).
-            if (!ev.relatedTarget || !oHost.contains(ev.relatedTarget)) { _dropZone(false); }
+            if (!ev.relatedTarget || !oHost.contains(ev.relatedTarget)) { _dropZone(false); _setDropRow(null); }
         });
         oHost.addEventListener("drop", async function (ev) {
             ev.preventDefault();   // ★ preventDefault 는 await 前 동기 호출.
-            _dropZone(false);
+            _dropZone(false); _setDropRow(null);
             try { await _onDesignDrop(ev); }
             catch (e) { console.error("[HTML5][bindWindow] 디자인트리 drop:", e && e.message); }
         });
@@ -403,7 +417,7 @@
         var aRows = oD.host.querySelectorAll(".u4a-tree__row");
         for (var i = 0; i < aRows.length; i++) {
             var oRow = aRows[i], n = oRow.__bwpNode;
-            if (!bDragging || !n) { oRow.classList.remove("u4aBwpDropOk", "u4aBwpDropNo"); continue; }
+            if (!bDragging || !n) { oRow.classList.remove("u4aBwpDropOk", "u4aBwpDropNo", "u4aBwpDropRow"); continue; }   // DropRow=hover 행 테두리(드래그 종료 시 정리).
             oRow.classList.toggle("u4aBwpDropOk", n._drop_enable === true);
             oRow.classList.toggle("u4aBwpDropNo", n.DATYP === "02" && n._drop_enable !== true);
         }
@@ -462,6 +476,22 @@
         return "";   // Properties/Aggregations 그룹(아이콘 없음)
     }
 
+    // 행 액션 컬럼(원본 rowActionTemplate — accept=추가속성적용 / disconnected=해제).
+    //   WS20 디자인 트리의 +/휴지통과 동일한 2슬롯 구조(빈슬롯으로 세로 정렬 유지). 편집 상태 + 가시 플래그일 때만 버튼.
+    function _rowActions(n) {
+        var oAct = H.el("span", "u4aBwpRowActions");
+        var bEdit = !!oAPP.attr.editable;
+        // 슬롯1: 추가속성 정보 적용(accept, 132)
+        if (bEdit && n._bind_visible) {
+            oAct.appendChild(H.iconBtn("circle-check", H.z("132"), function (e) { e.stopPropagation(); oAPP.fn.onAdditionalBind(n); }, "u4aBwpRowActBtn u4aBwpRowActBtn--bind"));
+        } else { oAct.appendChild(H.el("span", "u4aBwpRowActSlot")); }
+        // 슬롯2: 바인딩 해제(disconnected, 186)
+        if (bEdit && n._unbind_visible) {
+            oAct.appendChild(H.iconBtn("link-slash", H.z("186"), function (e) { e.stopPropagation(); oAPP.fn.onUnbind(n); }, "u4aBwpRowActBtn u4aBwpRowActBtn--unbind"));
+        } else { oAct.appendChild(H.el("span", "u4aBwpRowActSlot")); }
+        return oAct;
+    }
+
     oAPP.fn.initDesignArea = function () {
         oD.tool = document.getElementById("bwpDesignTool");
         oD.host = document.getElementById("bwpDesignTree");
@@ -498,13 +528,26 @@
         // 패널 좁아질 때 넘치는 버튼(동일속성/멀티/Unbind 등)을 ⋯ 오버플로 메뉴로(16 §11, 공통 attachOverflow).
         oAPP.fn.attachToolOverflow(oD.tool);
 
-        // ── 공통 다열 그리드 트리(U4AUI.makeColumnTree — Object Name / 바인딩 경로 / MPROP) ──
+        // ── 공통 다열 그리드 트리(원본 순서: Object Name / 바인딩 경로 / MPROP / 행 액션) ──
+        //   ★ MPROP = 개발 전용 디버그(추가속성 원시 직렬화값) — 원본 visible:!isPackaged 라 배포빌드에선 숨김. 원본대로 gate.
+        //   ★ 행 액션(추가속성적용/해제) = 원본 rowActionCount:2 = 우측 고정 거터. WS20 트리 +/휴지통과 동일 패턴.
+        //     스플리터 좁힐 때 데이터 컬럼은 가로 스크롤, 액션 컬럼은 우측 고정(sticky) — 원본 sap.ui.table.RowAction 거동.
+        var bDevCol = !(oAPP.REMOTE && oAPP.REMOTE.app && oAPP.REMOTE.app.isPackaged);   // 개발(비패키징)에서만 MPROP 표시.
+        var aCols = [
+            { label: H.z("174"), width: "18rem" },   // 174 Object Name
+            { label: H.z("165"), width: "14rem" }     // 165 바인딩 경로(잔여 흡수)
+        ];
+        if (bDevCol) { aCols.push({ label: "MPROP", width: "10rem" }); }   // 개발 전용(원본 1:1).
+        aCols.push({ label: "", width: "4.5rem" });   // 행 액션(우측 고정).
+        var iActCol = aCols.length;   // 액션 = 마지막 컬럼(sticky 대상).
+        oD.host.setAttribute("data-col-count", String(aCols.length));
+        oD.host.setAttribute("data-bwp-fill", "2");   // 바인딩 경로(c2)가 잔여폭 흡수.
+        oD.host.setAttribute("data-act-col", String(iActCol));   // 액션 컬럼 인덱스 → sticky CSS 대상.
         oD.ctrl = U4AUI.makeColumnTree(oD.host, {
-            columns: [
-                { label: H.z("174"), width: "18rem" },   // 174 Object Name
-                { label: H.z("165"), width: "14rem" },   // 165 바인딩 경로
-                { label: "MPROP", width: "10rem" }        // MPROP(원본 하드코딩)
-            ],
+            columns: aCols,
+            // autofit(더블클릭·161버튼 공용) = 원본 setUiTableAutoResizeColumn 정책(여유 0.5rem/최소 4rem/상한 없음).
+            autofit: { slackRem: 0.5, minRem: 4, max: Infinity },
+            lastColResize: false,   // 액션 컬럼(마지막)은 고정 거터 — 우측 리사이즈 그립(||) 제거.
             roots: function () { return oAPP.attr.designTree || []; },
             children: function (n) { return n.zTREE_DESIGN || []; },
             hasChildren: function (n) { return !!(n.zTREE_DESIGN && n.zTREE_DESIGN.length); },
@@ -524,22 +567,18 @@
                 oChk.addEventListener("change", function () { n.chk_seleced = oChk.checked; });
                 return oChk;
             },
-            // C2 = 바인딩 경로(UIATV) + 행 액션(추가속성적용/해제), C3 = MPROP.
+            // C2 = 바인딩 경로(UIATV) / (개발) C3 = MPROP / 마지막 = 행 액션 컬럼.
             cell: function (n) {
-                var oC2 = H.el("span", "u4aBwpPathCell");
                 var oPath = H.el("span", "u4aBwpDesignPath", n.UIATV || "");
                 if (n.UIATV) { oPath.setAttribute("data-tip", n.UIATV); oPath.setAttribute("data-tip-trunc", ""); }
-                oC2.appendChild(oPath);
-                // 행 액션(원본 rowActionTemplate visible="{/edit}") — 편집 상태 + 계산된 가시 플래그일 때만.
-                if (oAPP.attr.editable) {
-                    var oAct = H.el("span", "u4aBwpRowAct");
-                    if (n._bind_visible) { oAct.appendChild(H.iconBtn("circle-check", H.z("132"), function (e) { e.stopPropagation(); oAPP.fn.onAdditionalBind(n); }, "u4aBwpRowActBtn")); }   // 132 추가속성 적용
-                    if (n._unbind_visible) { oAct.appendChild(H.iconBtn("link-slash", H.z("186"), function (e) { e.stopPropagation(); oAPP.fn.onUnbind(n); }, "u4aBwpRowActBtn u4aBwpRowActBtn--unbind")); }   // 186 Unbind
-                    if (oAct.childNodes.length) { oC2.appendChild(oAct); }
+                var out = { c2: oPath };
+                if (bDevCol) {
+                    var oMp = H.el("span", "u4aBwpDescTxt", n.MPROP || "");
+                    if (n.MPROP) { oMp.setAttribute("data-tip", n.MPROP); oMp.setAttribute("data-tip-trunc", ""); }
+                    out.c3 = oMp;
                 }
-                var oMp = H.el("span", "u4aBwpDescTxt", n.MPROP || "");
-                if (n.MPROP) { oMp.setAttribute("data-tip", n.MPROP); oMp.setAttribute("data-tip-trunc", ""); }
-                return { c2: oC2, c3: oMp };
+                out["c" + iActCol] = _rowActions(n);   // 액션 = 마지막 컬럼.
+                return out;
             },
             rowHook: function (oRow, n) {
                 var sHl = H.rowHl(n._highlight);

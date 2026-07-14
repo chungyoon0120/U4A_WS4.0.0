@@ -119,7 +119,8 @@
     var oCtx = null;   // { attr, edit }
     var oModel = null; // 해석된 구획/행(설명=현지화 — 검색 대상)
     var sQuery = "";
-    var bSpyOff = false;   // 앵커 클릭 스크롤 중 scroll-spy 일시 정지
+    var bSpyOff = false;        // 앵커 클릭 스크롤 중 scroll-spy 일시 정지(중간 섹션 주르륵 방지)
+    var _spyResumeTimer = null; // 스크롤 정지 감지(디바운스)로 spy 재개 — scrollend 미지원(Ch93) 대체
 
     function _close() {
         try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
@@ -145,10 +146,20 @@
         return v.split(/\s+/).filter(Boolean);
     }
     function _commit(aCls) {
+        //추가/삭제로 목록을 재구성해도 보던 구획을 잃지 않게 스크롤 위치 보존.
+        var iY = (oUI && oUI.content) ? oUI.content.scrollTop : 0;
+        var sPrev = (oCtx.attr.UIATV != null) ? oCtx.attr.UIATV : "";   // 커밋 실패 시 롤백용
         oCtx.attr.UIATV = aCls.join(" ");
-        try { oAPP.fn.fnWs20AttrChange(oCtx.attr, "INPUT"); }
-        catch (e) { console.error("[HTML5][WS20][styleClass] 커밋 오류:", e && e.message); }
+        try {
+            oAPP.fn.fnWs20AttrChange(oCtx.attr, "INPUT");
+        } catch (e) {
+            //★ 커밋(undo/미리보기/모델동기화) 실패 시 값 롤백 — 안 하면 화면만 성공처럼 보이고
+            //  실제 저장(prev._T_0015)엔 반영 안 돼 UI-데이터 불일치가 남는다(코덱스 검수 지적).
+            oCtx.attr.UIATV = sPrev;
+            console.error("[HTML5][WS20][styleClass] 커밋 실패 — 값 롤백:", e && e.message);
+        }
         _renderAll();
+        if (oUI && oUI.content) { oUI.content.scrollTop = iY; _spy(); }
     }
     function _addClass(sCls) {
         if (!sCls || !oCtx || oCtx.edit !== true) { return; }
@@ -160,13 +171,15 @@
     }
     function _removeClass(sCls) {
         if (!sCls || !oCtx || oCtx.edit !== true) { return; }
+        if (oCtx.attr.ISBND === "X") { return; }   // 바인딩 보호(_addClass 와 대칭) — 바인딩 표현식 손상 방지
         _commit(_curArr().filter(function (c) { return c !== sCls; }));
     }
 
     /* ── 적용 값 바 ── */
     function _updateValueBar() {
         if (!oUI || !oUI.valueBar) { return; }
-        if (!oCtx || oCtx.edit !== true) { oUI.valueBar.hidden = true; return; }
+        //조회모드 또는 바인딩(UIATV=바인딩 표현식)이면 값 바 숨김(칩/삭제 노출 금지).
+        if (!oCtx || oCtx.edit !== true || oCtx.attr.ISBND === "X") { oUI.valueBar.hidden = true; return; }
         oUI.valueBar.hidden = false;
 
         var a = _curArr();
@@ -257,11 +270,17 @@
             oUI.content.appendChild(oNo);
         }
 
+        //마지막 구획도 최상단 정렬되도록 콘텐츠 끝 스페이서(높이는 _fitSpacer 가 레이아웃 확정 후 계산).
+        oUI.content.appendChild(_el("div", "u4aScsSpacer"));
+
         _updateValueBar();
+        _fitSpacer();
         _spy();   // 현재 스크롤 위치 기준 앵커 활성 초기화
     }
 
-    /* ── 앵커 클릭 → 해당 구획으로 스크롤 ── */
+    /* ── 앵커 클릭 → 해당 구획으로 스크롤 ──
+     *   클릭한 구획을 즉시 활성 + 스크롤 중엔 spy 억제(앵커가 중간 섹션들로 주르륵 따라 움직이지 않게).
+     *   스크롤이 "멈추면" spy 재개해 최종 위치를 정확히 반영(고정 타이머 대신 스크롤 정지 디바운스 + 백스톱). */
     function _scrollTo(gi) {
         var oSec = oUI.content.querySelector('.u4aScsSec[data-gi="' + gi + '"]');
         if (!oSec) { return; }
@@ -269,16 +288,50 @@
         _setActive(gi);
         try { oUI.content.scrollTo({ top: oSec.offsetTop, behavior: "smooth" }); }
         catch (e) { oUI.content.scrollTop = oSec.offsetTop; }
-        //smooth 스크롤 애니 중엔 spy 억제(끝나면 재개) — scrollend 이벤트 미지원 대비 시간 재개.
-        window.setTimeout(function () { bSpyOff = false; }, 450);
+        //스크롤이 시작조차 안 될 수 있으니(이미 그 위치) 백스톱으로도 재개 예약. 스크롤이 오면 아래 디바운스가 갱신.
+        _armSpyResume(600);
     }
 
-    /* ── scroll-spy: 현재 최상단 구획을 앵커 활성 ── */
+    /* ── 스크롤 정지 감지(디바운스) → spy 재개 ── */
+    function _armSpyResume(iMs) {
+        window.clearTimeout(_spyResumeTimer);
+        _spyResumeTimer = window.setTimeout(function () { bSpyOff = false; _spy(); }, iMs);
+    }
+
+    /* ── 콘텐츠 끝 스페이서: 마지막(짧은) 구획도 뷰포트 최상단까지 스크롤되도록 여백 확보 ──
+     *   "검색으로 목록이 짧아져 콘텐츠가 뷰포트에 다 들어가 스크롤이 아예 안 생기던" 상황을 근본 제거.
+     *   스페이서 높이 = clientHeight − 마지막 섹션 높이 → 마지막 섹션을 정확히 최상단까지 스크롤 가능.
+     *   이러면 어떤 구획을 앵커에서 클릭해도 실제로 그 구획이 최상단에 정렬되고 scroll-spy 도 클릭과
+     *   일치한다(클릭 의도 존중). SAP ObjectPageLayout 이 쓰는 방식. */
+    function _fitSpacer() {
+        if (!oUI || !oUI.content) { return; }
+        var sp = oUI.content.querySelector(".u4aScsSpacer");
+        if (!sp) { return; }
+        var aSec = oUI.content.querySelectorAll(".u4aScsSec");
+        if (!aSec.length) { sp.style.height = "0px"; return; }
+        var oLast = aSec[aSec.length - 1];
+        var iH = oUI.content.clientHeight - oLast.offsetHeight;
+        sp.style.height = (iH > 0 ? iH : 0) + "px";
+    }
+
+    /* ── content 스크롤 핸들러 ── */
+    function _onContentScroll() {
+        //클릭 이동 중이면 목표 고정 + 스크롤이 멈추면(디바운스) 재개. 수동 스크롤이면 즉시 spy.
+        if (bSpyOff) { _armSpyResume(140); return; }
+        _spy();
+    }
+
+    /* ── scroll-spy: 현재 스크롤 위치의 구획을 앵커 활성 ── */
     function _spy() {
         if (bSpyOff || !oUI || !oUI.content) { return; }
-        var aSec = oUI.content.querySelectorAll(".u4aScsSec");
+        var ct = oUI.content;
+        var aSec = ct.querySelectorAll(".u4aScsSec");
         if (!aSec.length) { return; }
-        var iTop = oUI.content.scrollTop + 8, sGi = aSec[0].getAttribute("data-gi");
+
+        //콘텐츠 끝 스페이서(_fitSpacer) 덕에 마지막 짧은 구획도 뷰포트 최상단까지 스크롤된다 →
+        //바닥 특수판정 없이 offsetTop 기준 단일 로직으로 어떤 구획이든(마지막 포함) 정확히 활성.
+        var iTop = ct.scrollTop + 8;
+        var sGi = aSec[0].getAttribute("data-gi");
         for (var i = 0; i < aSec.length; i++) {
             if (aSec[i].offsetTop <= iTop) { sGi = aSec[i].getAttribute("data-gi"); }
         }
@@ -321,7 +374,7 @@
         oHint.querySelector(".u4aScsHintTxt").textContent = _wsC("567");
         oBody.appendChild(oHint);
 
-        //(2) 적용 값 바.
+        //적용 값 바(정의만 — 실제 배치는 최하단, 아래 (5)에서 body 에 append).
         var oValueBar = _el("div", "u4aScsValueBar");
         oValueBar.hidden = true;
         var oValLbl = _el("span", "u4aScsValLbl");
@@ -332,7 +385,7 @@
         var oValEmpty = _el("span", "u4aScsValEmpty", "—");
         oValEmpty.hidden = true;
         oValueBar.appendChild(oValEmpty);
-        oBody.appendChild(oValueBar);
+        //※ 적용 값 바는 하단(푸터 바로 위)에 배치 — 아래 split append 뒤에서 body 에 붙인다(사용자 지정 UX).
 
         //(3) 검색.
         var oSearch = _el("div", "u4aScsSearch");
@@ -346,6 +399,8 @@
         var oSClr = _el("button", "u4aScsSearchClr");
         oSClr.type = "button"; oSClr.innerHTML = _fa("xmark"); oSClr.hidden = true;
         function _applyQuery() {
+            //검색은 스크롤 추적보다 우선 — 진행 중이던 앵커 클릭 스크롤의 spy 억제를 즉시 해제.
+            bSpyOff = false;
             sQuery = (oSInp.value || "").trim().toLowerCase();
             oSClr.hidden = (oSInp.value === "");
             _renderAll();
@@ -362,10 +417,22 @@
         var oSplit = _el("div", "u4aScsSplit");
         var oNav = _el("nav", "u4a-navlist u4aScsNav");
         var oContent = _el("div", "u4aScsContent");
-        oContent.addEventListener("scroll", _spy);
+        oContent.addEventListener("scroll", _onContentScroll);
+        //팝업 리사이즈로 뷰포트 높이가 바뀌면 스페이서 재계산(rAF 디바운스 — ResizeObserver loop 방지).
+        if (window.ResizeObserver) {
+            var bRoPending = false;
+            new ResizeObserver(function () {
+                if (bRoPending) { return; }
+                bRoPending = true;
+                window.requestAnimationFrame(function () { bRoPending = false; _fitSpacer(); _spy(); });
+            }).observe(oContent);
+        }
         oSplit.appendChild(oNav);
         oSplit.appendChild(oContent);
         oBody.appendChild(oSplit);
+
+        //(5) 적용 값 바 — 하단(푸터 바로 위). 목록(split) 다음에 붙여 최하단에 고정(flex:0 0 auto).
+        oBody.appendChild(oValueBar);
 
         oDlg.appendChild(oBody);
 
@@ -414,9 +481,13 @@
         //설명 미리 해석(검색 대상 확보) → 렌더.
         _resolveModel();
         _renderAll();
-        try { oUI.content.scrollTop = 0; } catch (e) { }
 
+        //★ showModal 로 레이아웃(높이)이 생긴 "후"에 최상단 정렬 + spy 를 잡는다.
+        //  showModal 전엔 content 높이=0 → _spy 바닥감지(0+0>=0-2)가 참이 돼 마지막 구획이 오판 활성됐다.
         try { oUI.dlg.showModal(); } catch (e) { }
+        _fitSpacer();   // showModal 로 높이(clientHeight)가 생긴 뒤 스페이서 확정(그전엔 0이라 계산 불가).
+        try { oUI.content.scrollTop = 0; } catch (e) { }
+        bSpyOff = false; _spy();
     };
 
     /************************************************************************

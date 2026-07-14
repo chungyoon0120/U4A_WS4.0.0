@@ -558,15 +558,36 @@
         //   sIllustSize(구 UI5 크기 enum)는 HTML5 에선 미사용(시그니처만 유지 — 호출부 무변경).
         var sDlgId = "illustMsgDialog";
 
-        // illustType(구 UI5 tnt-*) → Font Awesome 아이콘(프로젝트 공통 아이콘 시스템).
+        // illustType(구 UI5 tnt-*) → ① 삽화 SVG 파일(www/svg, <img> 로드) ② 폴백 FA 아이콘.
+        //   ★ SVG 삽화가 이 모달의 UX 앵커 — §16 2.3 규칙: <img> 로 로드(인라인 금지, SVG 내부
+        //     <style> 전역 누수 방지), 배경 투명(다크에서 흰블록 방지), 호스트 문서
+        //     (www/ws30/ws10_20/) 기준 ../../svg/ 로 해석. 삽화 파일이 아직 없거나 로드 실패하면
+        //     폴백 FA 아이콘(톤다운)으로 자동 대체 — 파일이 들어오는 즉시 그대로 표시된다.
+        //   ※ 삽화 에셋 배치 위치: www/svg/session-expired.svg (세션만료) / www/svg/trial-lock.svg (Trial).
+        function _artFile(sType) {
+            switch (sType) {
+                case "tnt-SessionExpired": return "session-expired.svg";
+                case "tnt-Lock": return "trial-lock.svg";
+                default: return "";
+            }
+        }
         function _icon(sType) {
             switch (sType) {
-                case "tnt-SessionExpired": return "fa-hourglass-end";
+                case "tnt-SessionExpired": return "fa-hourglass-half";
                 case "tnt-Lock": return "fa-lock";
                 case "tnt-NoData":
                 case "tnt-NoEntries": return "fa-inbox";
-                default: return "fa-circle-exclamation";
+                default: return "fa-circle-info";
             }
+        }
+
+        // 삽화 SVG 절대 URL(§16 2.3 — new URL(rel, location.href)). 매핑 없으면 "".
+        var sArtUrl = "";
+        var sArtFile = _artFile(sIllustType);
+        if (sArtFile) {
+            var sRel = "../../svg/" + sArtFile;
+            sArtUrl = sRel;
+            try { sArtUrl = new URL(sRel, window.location.href).href; } catch (e) { }
         }
 
         // 스타일 1회 주입(§16 2.3 컨벤션 — 카드/텍스트는 테마 토큰, 백드롭은 옅은 중립).
@@ -577,29 +598,51 @@
                 ".u4aWsSessDlg{border:0;padding:0;background:transparent;overflow:visible;" +
                 "min-width:0;max-width:none;width:fit-content;box-shadow:none;border-radius:0}" +
                 ".u4aWsSessDlg::backdrop{background:rgba(15,18,28,.32);backdrop-filter:blur(1.5px)}" +
-                ".u4aWsSessCard{display:flex;flex-direction:column;align-items:center;gap:.55rem;" +
-                "padding:1.6rem 2.1rem 1.35rem;text-align:center;min-width:17rem;max-width:23rem;" +
+                ".u4aWsSessCard{display:flex;flex-direction:column;align-items:center;gap:.5rem;" +
+                "padding:1.7rem 2.2rem 1.45rem;text-align:center;min-width:18rem;max-width:24rem;" +
                 "background:var(--surface-raised,#1b2128);color:var(--text,#fff);" +
                 "border:1px solid var(--line,#33414f);border-radius:16px;" +
                 "box-shadow:var(--popover-shadow,0 18px 50px rgba(0,0,0,.55));" +
                 "animation:u4aWsSessIn .18s ease both}" +
-                ".u4aWsSessIcon{font-size:2.55rem;line-height:1;color:var(--state-error,#d9534f);margin-bottom:.1rem}" +
-                ".u4aWsSessTitle{font-weight:700;font-size:1.04rem;letter-spacing:.2px}" +
+                // 삽화 슬롯(UX 앵커) — 실제 SVG 삽화 <img> 가 오면 채우고, 없/실패 시 폴백 아이콘.
+                ".u4aWsSessArt{width:8.5rem;height:8.5rem;display:flex;align-items:center;" +
+                "justify-content:center;margin-bottom:.2rem}" +
+                ".u4aWsSessArtImg{max-width:100%;max-height:100%;display:block}" +
+                ".u4aWsSessArtFb{font-size:3rem;line-height:1;color:var(--text-muted,#9aa3ad)}" +
+                ".u4aWsSessTitle{font-weight:700;font-size:1.06rem;letter-spacing:.2px}" +
                 ".u4aWsSessTitle:empty{display:none}" +
                 ".u4aWsSessDesc{font-size:.8125rem;color:var(--text-muted,#9aa3ad);line-height:1.5;" +
                 "white-space:pre-line;min-height:1.1em}" +
-                ".u4aWsSessFoot{margin-top:.65rem;display:flex;justify-content:center}" +
-                ".u4aWsSessOk{min-width:5rem}" +
+                ".u4aWsSessFoot{margin-top:.75rem;display:flex;justify-content:center}" +
+                ".u4aWsSessOk{min-width:5.5rem}" +
                 "@keyframes u4aWsSessIn{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}" +
                 "@media(prefers-reduced-motion:reduce){.u4aWsSessCard{animation:none}}";
             document.head.appendChild(st);
+        }
+
+        // 삽화 적용 — 기본은 폴백 아이콘 표시(깨진 이미지 깜빡임 방지), SVG 로드 성공 시 스왑.
+        //   삽화 파일이 없거나 404 여도 안전하게 폴백. 재진입 갱신에도 사용.
+        function _applyArt(oNode) {
+            var oImg = oNode.querySelector(".u4aWsSessArtImg");
+            var oFb = oNode.querySelector(".u4aWsSessArtFb");
+            oFb.className = "u4aWsSessArtFb fa-solid " + _icon(sIllustType);
+            oFb.style.display = "";
+            oImg.style.display = "none";
+            oImg.onload = null; oImg.onerror = null;
+            if (sArtUrl) {
+                oImg.onload = function () { oImg.style.display = ""; oFb.style.display = "none"; };
+                oImg.onerror = function () { oImg.style.display = "none"; oFb.style.display = ""; };
+                oImg.src = sArtUrl;
+            } else {
+                oImg.removeAttribute("src");
+            }
         }
 
         // 이미 존재하면: 닫혀있을 때만 내용 갱신 후 재오픈(원본 동일), 열려있으면 무시(중복 방지).
         var oExist = document.getElementById(sDlgId);
         if (oExist) {
             if (!oExist.open) {
-                oExist.querySelector(".u4aWsSessIcon").className = "u4aWsSessIcon fa-solid " + _icon(sIllustType);
+                _applyArt(oExist);
                 oExist.querySelector(".u4aWsSessTitle").textContent = sTitle || "";
                 oExist.querySelector(".u4aWsSessDesc").textContent = sDesc || "";
                 try { oExist.showModal(); } catch (e) { }
@@ -607,7 +650,8 @@
             return;
         }
 
-        // 확인 버튼 라벨(A40 Confirm, 없으면 OK).
+        // 확인 버튼 라벨(A40 Confirm, 없으면 OK). 색은 공통 u4a-btn--emphasized(=테마 accent) 소비
+        //   — 하드코딩 금지(테마마다 주요색 다름). 확인=주요 액션이라 emphasized 가 규약상 맞다.
         var sOk = "OK";
         try { sOk = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A40") || "OK"; } catch (e) { }
 
@@ -616,12 +660,16 @@
         oDlg.className = "u4aWsSessDlg";
         oDlg.innerHTML =
             '<div class="u4aWsSessCard">' +
-            '<i class="u4aWsSessIcon fa-solid ' + _icon(sIllustType) + '" aria-hidden="true"></i>' +
+            '<div class="u4aWsSessArt">' +
+            '<img class="u4aWsSessArtImg" alt="" aria-hidden="true"/>' +
+            '<i class="u4aWsSessArtFb fa-solid" aria-hidden="true"></i>' +
+            '</div>' +
             '<div class="u4aWsSessTitle"></div>' +
             '<div class="u4aWsSessDesc"></div>' +
             '<div class="u4aWsSessFoot">' +
             '<button type="button" class="u4a-btn u4a-btn--emphasized u4aWsSessOk"></button>' +
             '</div></div>';
+        _applyArt(oDlg);
         oDlg.querySelector(".u4aWsSessTitle").textContent = sTitle || "";
         oDlg.querySelector(".u4aWsSessDesc").textContent = sDesc || "";
         oDlg.querySelector(".u4aWsSessOk").textContent = sOk;

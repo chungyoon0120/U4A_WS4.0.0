@@ -573,6 +573,10 @@ button:focus-visible {
 .u4aColTreeC1 { flex: 0 0 var(--u4act-c1-w, 15rem); }
 .u4aColTreeC2 { flex: 0 0 var(--u4act-c2-w, 8rem); border-left: 0.0625rem solid var(--line); position: relative; }
 .u4aColTreeC3 { flex: 0 0 var(--u4act-c3-w, 14rem); border-left: 0.0625rem solid var(--line); position: relative; }
+/* N컬럼(4~6) — makeColumnTree JS 는 임의 컬럼수를 지원하므로 폭 규칙도 확장(bindPopup 디자인트리 4컬럼 승격, 2026-07-14). */
+.u4aColTreeC4 { flex: 0 0 var(--u4act-c4-w, 8rem); border-left: 0.0625rem solid var(--line); position: relative; }
+.u4aColTreeC5 { flex: 0 0 var(--u4act-c5-w, 8rem); border-left: 0.0625rem solid var(--line); position: relative; }
+.u4aColTreeC6 { flex: 0 0 var(--u4act-c6-w, 8rem); border-left: 0.0625rem solid var(--line); position: relative; }
 
 /* 컬럼 리사이즈 그립(각 컬럼 우측 경계) + 경계선 강조(헤더+그리드라인+행 셀 동시). */
 .u4aColTreeGrip { position: absolute; top: 0; bottom: 0; left: -0.1875rem; width: 0.4375rem; cursor: col-resize; z-index: 4; }
@@ -615,6 +619,9 @@ button:focus-visible {
 .u4aColTreeGL--c1 { flex: 0 0 var(--u4act-c1-w, 15rem); }
 .u4aColTreeGL--c2 { flex: 0 0 var(--u4act-c2-w, 8rem); border-left: 0.0625rem solid var(--line); }
 .u4aColTreeGL--c3 { flex: 0 0 var(--u4act-c3-w, 14rem); border-left: 0.0625rem solid var(--line); }
+.u4aColTreeGL--c4 { flex: 0 0 var(--u4act-c4-w, 8rem); border-left: 0.0625rem solid var(--line); }
+.u4aColTreeGL--c5 { flex: 0 0 var(--u4act-c5-w, 8rem); border-left: 0.0625rem solid var(--line); }
+.u4aColTreeGL--c6 { flex: 0 0 var(--u4act-c6-w, 8rem); border-left: 0.0625rem solid var(--line); }
 
 /* 트리(공통 createTree) — 그리드라인 위(z-index:1), 배경 투명(그라디언트 행라인 비침). */
 .u4aColTreeTree.u4a-tree { padding-top: 0; min-height: 0; position: relative; z-index: 1; background: transparent; }
@@ -629,6 +636,9 @@ button:focus-visible {
 .u4aColTreeCell { align-self: stretch; box-sizing: border-box; display: flex; align-items: center; padding-left: 0.5rem; border-left: 0.0625rem solid var(--line); min-width: 0; overflow: hidden; }
 .u4aColTreeTree .u4aColTreeC2 { flex: 0 0 var(--u4act-c2-w, 8rem); }
 .u4aColTreeTree .u4aColTreeC3 { flex: 0 0 var(--u4act-c3-w, 14rem); }
+.u4aColTreeTree .u4aColTreeC4 { flex: 0 0 var(--u4act-c4-w, 8rem); }
+.u4aColTreeTree .u4aColTreeC5 { flex: 0 0 var(--u4act-c5-w, 8rem); }
+.u4aColTreeTree .u4aColTreeC6 { flex: 0 0 var(--u4act-c6-w, 8rem); }
 
 .u4aColTreeEmpty { position: relative; z-index: 1; padding: 0.75rem; }
 
@@ -1472,6 +1482,23 @@ body.u4a-dragging iframe { pointer-events: none; }
     cursor: default;
     outline: none;
     box-shadow: none;
+}
+
+/* valueHelpOnly(값도움 전용, .analy/15 §3.8) — readOnly 로 타이핑만 막고 '활성(편집 가능)' 외관 유지 + 클릭=F4.
+   위 공통 readonly muted 룩(.u4a-input:read-only, (0,2,0))을 로드 순서 무관하게 이기도록 (0,3,0) 명시도.
+   ★:focus 변형에 background 넣지 말 것(§3.8.2 — 변경행 transparent 규칙을 focus 때만 이겨 배경 튐). */
+.u4a-input--vho:read-only:not(:disabled) {
+    background: var(--surface-raised, var(--surface));
+    border-color: var(--divider);
+    color: var(--text);
+    cursor: pointer;
+}
+.u4a-input--vho:read-only:not(:disabled):hover {
+    border-color: var(--text-muted);
+}
+/* ★vho 여도 ValueState.Error 테두리(빨강)는 활성 테두리보다 무조건 이긴다(§3.8.2) — (0,3,0)+뒤에 로드돼 vho border override, 배경은 유지. */
+.u4a-input--vho:read-only[data-vs="error"] {
+    border-color: var(--state-error);
 }
 
 /* ValueState.Error (체크리스트 F) */

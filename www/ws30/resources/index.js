@@ -1384,36 +1384,10 @@ REGEDIT.setExternalVBSLocation(vbsDirectory);
 // 자식 윈도우를 관리하는 용도
 CURRWIN._aChildWinMap = new Map();
 
-/* ── F11 = 앱 창 전체화면 토글 (전역 globalShortcut 폐지 → 창 포커스 시에만) ──────────────
- *  before-input-event 는 이 앱 창 webContents 의 "전 프레임"(로그인·ws10_20·WS20·WS30·미리보기
- *  iframe 등) 키 입력을 잡되, "이 창이 포커스일 때만" 발화한다 → OS 전역 선점(타 앱 F11 가로채기)
- *  없이 어느 화면에서든 F11 동작. (단순 window keydown 은 자식 iframe 포커스 시 못 잡아 전역 커버 불가.)
- *  ★ 원래 Login.js 의 globalShortcut.register('F11') 을 대체 — 셸에 1회 등록해 앱 생명주기 내내 유지.
- *
- *  ★ 연타 시 "제각각" 방지: setFullScreen(!isFullScreen()) 처럼 매번 상태를 즉석에서 읽으면,
- *    전환 애니메이션이 끝나기 전 다음 F11 이 아직 옛 상태를 읽어 같은 방향으로 또 토글되거나 씹힌다.
- *    → 실제 창 상태는 enter/leave-full-screen 이벤트로 추적(bFs)하고, 전환 중(bFsBusy)엔 재입력을
- *      무시한다. 이렇게 하면 무엇이 바꾸든(F11·Esc·OS) 항상 실제 상태 기준으로 깔끔히 교대 토글된다.
- *      (busy 해제는 setTimeout 눈속임이 아니라 실제 완료 이벤트로만 — 프로젝트 표준.)
- */
-if (!CURRWIN._f11Bound) {
-    CURRWIN._f11Bound = true;
-
-    var bFs = CURRWIN.isFullScreen();   // 실제 전체화면 상태(이벤트로 계속 동기화)
-    var bFsBusy = false;                // 전환 진행 중 플래그(연타 desync 방지)
-
-    CURRWIN.on("enter-full-screen", function () { bFs = true;  bFsBusy = false; });
-    CURRWIN.on("leave-full-screen", function () { bFs = false; bFsBusy = false; });
-
-    CURRWIN.webContents.on("before-input-event", function (oEvent, oInput) {
-        if (oInput.type !== "keyDown") { return; }
-        if (oInput.key !== "F11") { return; }
-        if (oInput.isAutoRepeat) { return; }   // 꾹누름 중복발화 방지
-        if (bFsBusy) { return; }               // 전환 중이면 무시 → 연타에도 상태 안 꼬임
-        bFsBusy = true;
-        try { CURRWIN.setFullScreen(!bFs); } catch (e) { bFsBusy = false; }
-    });
-}
+/* ── F11 = 앱 창 전체화면 토글 → 메인 프로세스(electron/main.js attachBeforeInputEvent)로 이관.
+ *  렌더러에서 @electron/remote 로 CURRWIN.webContents.on('before-input-event') 를 붙이면 다중발화·
+ *  중복바인딩으로 "커졌다 작아졌다" 가 났다(코덱스 진단). 메인 프로세스는 창당 1회·입력당 1회라 안정.
+ *  → 여기서는 아무것도 등록하지 않는다(Alt+F4 와 같은 자리에서 함께 처리됨). */
 
 POWERMONITOR.setMaxListeners(100);
 IPCMAIN.setMaxListeners(100);
