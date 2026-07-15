@@ -272,6 +272,263 @@
         _renderRows();
     };
 
+    /************************************************************************
+     * [P3-A 검증] 추가속성 바인딩 가능여부 점검 — 원본 bindAdditInfo.js chkPossibleAdditBind(440) 1:1.
+     *   대상 = 디자인트리 선택라인(ATTR: DATYP/UIATY/UIATV/ISBND). 반환 {RETCD:""|"E", RTMSG}.
+     *   데이터 매핑: 원본 oContr.oModel.oData.T_MPROP → HTML5 oAPP.attr.additRows,
+     *               oAPP.attr.oModel.oData.zTREE → oAPP.attr.modelTree, getModelBindData 그대로.
+     ************************************************************************/
+    oAPP.fn.chkPossibleAdditBind = function (is_attr) {
+        var _sRes = { RETCD: "", RTMSG: "" };
+        // ATTRIBUTE 가 프로퍼티(DATYP 02)가 아니면 불가 — 148 Property 라인만 적용 가능.
+        if (is_attr.DATYP !== "02") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("148"); return _sRes; }
+        if (is_attr.UIATY !== "1") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("148"); return _sRes; }
+        // 바인딩 안 된 라인은 추가속성 적용 불가 — 149 바인딩 정보 없음.
+        if (is_attr.UIATV === "" || is_attr.ISBND === "") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("149"); return _sRes; }
+        // 모델필드 기준 상세 점검 위임.
+        _sRes = oAPP.fn.chkModelFiendAdditData(is_attr.UIATV);
+        return _sRes;
+    };
+
+    /************************************************************************
+     * [P3-A 검증] 모델필드 기준 추가속성 가능여부 — 원본 chkModelFiendAdditData(495) 1:1.
+     ************************************************************************/
+    oAPP.fn.chkModelFiendAdditData = function (modelField) {
+        var _sRes = { RETCD: "", RTMSG: "" };
+
+        var _sField = oAPP.fn.getModelBindData(modelField, oAPP.attr.modelTree);
+        // 150 &1 필드가 모델 항목에 존재하지 않음.
+        if (typeof _sField === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("150", modelField); return _sRes; }
+        // 151 일반유형 ABAP TYPE(E)만 가능.
+        if (_sField.KIND !== "E") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("151"); return _sRes; }
+
+        var _aMPROP = oAPP.attr.additRows || [];
+
+        // P04 Bind type — 092 없음 / 093 P 유형만.
+        var _sP04 = _aMPROP.find(function (i) { return i.ITMCD === "P04"; });
+        if (typeof _sP04 === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("092"); return _sRes; }
+        if (_sP04.val !== "" && _sField.TYPE_KIND !== "P") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("093"); return _sRes; }
+
+        // P05 Reference Field — 136 없음 / 152 부모 path 다름.
+        var _sP05 = _aMPROP.find(function (i) { return i.ITMCD === "P05"; });
+        if (typeof _sP05 === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("136"); return _sRes; }
+        if (_sP05.val !== "") {
+            if (_sP05.val.substr(0, _sP05.val.lastIndexOf("-")) !== _sField.CHILD.substr(0, _sField.CHILD.lastIndexOf("-"))) {
+                _sRes.RETCD = "E"; _sRes.RTMSG = H.z("152"); return _sRes;
+            }
+        }
+
+        // P07 Nozero — 094 없음 / 095 CHAR(C)·STRING(g) 불가.
+        var _sP07 = _aMPROP.find(function (i) { return i.ITMCD === "P07"; });
+        if (typeof _sP07 === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("094"); return _sRes; }
+        if (_sP07.val === "true" && "Cg".indexOf(_sField.TYPE_KIND) !== -1) { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("095"); return _sRes; }
+
+        // P08 Is number format — 096 없음 / 097 INT(I)·P 만.
+        var _sP08 = _aMPROP.find(function (i) { return i.ITMCD === "P08"; });
+        if (typeof _sP08 === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("096"); return _sRes; }
+        if (_sP08.val === "true" && "IP".indexOf(_sField.TYPE_KIND) === -1) { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("097"); return _sRes; }
+
+        return _sRes;
+    };
+
+    /************************************************************************
+     * [P3-B 서버검증] Conversion Routine(P06) — 원본 checkConversion(index.js:5276) /
+     *   convChangeInput / clearConvError(bindAdditInfo.js:361/386) 1:1.
+     *   서버콜 = POST {servNm}/chkConvExit (FormData CONVEXIT). 실패 시 value-state Error.
+     *   HTML5: 원본 oContr.oModel.refresh() → 해당 입력칸 ctrl.setValueState 직접 갱신(재렌더 없이 포커스 유지).
+     ************************************************************************/
+    function _clearRowErr(r) { r.stat = null; r.statTxt = ""; r._error = false; r._error_msg = ""; }
+
+    oAPP.fn.checkConversion = function (convName) {
+        return new Promise(function (resolve) {
+            var _sRes = { RETCD: "", RTMSG: "" };
+            if (convName === "") { return resolve(_sRes); }   // 미입력 = 서버콜 안 함(원본).
+            var oFormData = new FormData();
+            oFormData.append("CONVEXIT", convName);
+            oAPP.fn.sendAjax(oAPP.attr.servNm + "/chkConvExit", oFormData, function (param) {
+                if (param && param.RETCD === "E") { _sRes.RETCD = param.RETCD; _sRes.RTMSG = param.RTMSG; }
+                resolve(_sRes);
+            });
+        });
+    };
+
+    // P06 값 변경 완료(change) — 대문자(createField upper)·서버검증·오류표시. oInp = 그 입력칸 ctrl.
+    oAPP.fn.convChangeInput = async function (r, oInp) {
+        oAPP.fn.setBusy(true);
+        if (!r || r.ITMCD !== "P06") { oAPP.fn.setBusy(false); return; }
+        if (r.val === "") { _clearRowErr(r); if (oInp) { oInp.setValueState("none", ""); } oAPP.fn.setBusy(false); return; }
+        var _sRes = await oAPP.fn.checkConversion(r.val);
+        if (_sRes.RETCD === "E") {
+            r.stat = "Error"; r.statTxt = _sRes.RTMSG; r._error = true; r._error_msg = _sRes.RTMSG;
+            if (oInp) { oInp.setValueState("error", _sRes.RTMSG); }
+            oAPP.fn.setBusy(false); return;
+        }
+        _clearRowErr(r);
+        if (oInp) { oInp.setValueState("none", ""); }
+        oAPP.fn.setBusy(false);
+    };
+
+    // P06 입력 중(liveChange) — 오류 표시 즉시 해제(원본 clearConvError).
+    oAPP.fn.clearConvError = function (r, oInp) {
+        if (!r || r.ITMCD !== "P06") { return; }
+        _clearRowErr(r);
+        if (oInp) { oInp.setValueState("none", ""); }
+    };
+
+    /************************************************************************
+     * [P3-C 상호배타] Bind type(P04) ↔ Reference Field(P05) / Conversion(P06)
+     *   — 원본 setAddtBindInfoDDLB(index.js:8276) 1:1.
+     *   · P04 빈값 → P05 초기화+잠금, P06 활성.
+     *   · P04 값 선택 → P05 활성, P06 잠금+초기화(오류도 클리어).
+     *   HTML5: 원본 refresh() → _renderRows()(edit 변경=위젯 활성/잠금 반영).
+     ************************************************************************/
+    oAPP.fn.setAddtBindInfoDDLB = function (r) {
+        var _aMPROP = oAPP.attr.additRows || [];
+        // 변경행 오류 표현 초기화(원본).
+        r.stat = null; r.statTxt = "";
+        if (r.ITMCD !== "P04" && r.ITMCD !== "P05") { _renderRows(); return; }
+
+        var ls_P04 = _aMPROP.find(function (a) { return a.ITMCD === "P04"; });
+        var ls_P05 = _aMPROP.find(function (a) { return a.ITMCD === "P05"; });
+        var ls_P06 = _aMPROP.find(function (a) { return a.ITMCD === "P06"; });
+        if (!ls_P04 || !ls_P05 || !ls_P06) { return; }
+
+        if (r.ITMCD === "P04" && r.val === "") { ls_P05.val = ""; }   // Bind type 비움 → 참조필드 비움.
+        if (r.ITMCD === "P05" && r.val === "") { ls_P04.val = ""; }   // 참조필드 비움 → Bind type 비움.
+
+        if (ls_P04.val === "") {
+            ls_P05.edit = false; ls_P05.val = ""; ls_P06.edit = true;              // 참조필드 잠금·비움 / Conversion 활성.
+        } else if (r.val !== "") {
+            ls_P05.edit = true; ls_P06.edit = false; ls_P06.val = "";               // 참조필드 활성 / Conversion 잠금·비움.
+            _clearRowErr(ls_P06);                                                   // Conversion 오류 초기화.
+        }
+        _renderRows();
+    };
+
+    /************************************************************************
+     * [P3-C 참조필드] Reference Field(P05) DDLB 구성/초기화
+     *   — 원본 setRefFieldList(bindAdditInfo.js:706) / clearRefField(672) 1:1.
+     *   디자인트리 체크선택 + 모델선택의 부모경로가 단일 구조일 때만, 그 형제 중
+     *   DATATYPE CUKY/UNIT 필드로 P05 목록 구성. 섞이거나 없으면 초기화(잠금).
+     ************************************************************************/
+    oAPP.fn.clearRefField = function () {
+        var _aMPROP = oAPP.attr.additRows || [];
+        if (_aMPROP.length === 0) { return; }
+        var _sP05 = _aMPROP.find(function (i) { return i.ITMCD === "P05"; });
+        if (!_sP05) { return; }
+        _sP05.val = ""; _sP05.T_DDLB = [];
+        _renderRows();
+    };
+
+    oAPP.fn.setRefFieldList = function () {
+        var _aTree = (typeof oAPP.fn.getSelectedDesignTree === "function") ? (oAPP.fn.getSelectedDesignTree() || []) : [];
+        var _aField = [];
+        for (var i = 0; i < _aTree.length; i++) {
+            var _sTree = _aTree[i];
+            if (_sTree.UIATV === "" || _sTree.ISBND === "") { continue; }      // 미바인딩 skip.
+            if (_sTree.UIATY !== "1") { oAPP.fn.clearRefField(); return; }      // 프로퍼티 아님 → 초기화.
+            var _field = _sTree.UIATV.substr(0, _sTree.UIATV.lastIndexOf("-"));
+            if (_aField.indexOf(_field) === -1) { _aField.push(_field); }
+        }
+        // 모델트리 선택라인의 부모경로도 수집.
+        var _sMField = (typeof oAPP.fn.getSelectedModelLine === "function") ? oAPP.fn.getSelectedModelLine() : undefined;
+        if (_sMField && _aField.indexOf(_sMField.PARENT) === -1) { _aField.push(_sMField.PARENT); }
+
+        if (_aField.length > 1) { oAPP.fn.clearRefField(); return; }           // 서로 다른 구조 섞임 → 초기화.
+
+        var _sField = oAPP.fn.getModelBindData(_aField[0], oAPP.attr.modelTree);
+        if (typeof _sField === "undefined") { oAPP.fn.clearRefField(); return; }
+
+        // 구조 형제 중 CUKY/UNIT 만.
+        var _aFilt = (_sField.zTREE || []).filter(function (it) { return it.DATATYPE === "CUKY" || it.DATATYPE === "UNIT"; });
+        if (_aFilt.length === 0) { oAPP.fn.clearRefField(); return; }
+
+        var _aMPROP = oAPP.attr.additRows || [];
+        if (_aMPROP.length === 0) { return; }
+        var _sP05 = _aMPROP.find(function (i) { return i.ITMCD === "P05"; });
+        if (!_sP05) { return; }
+
+        _sP05.T_DDLB = [{ KEY: "", TEXT: "" }];   // 공란 + CUKY/UNIT.
+        for (var j = 0; j < _aFilt.length; j++) { _sP05.T_DDLB.push({ KEY: _aFilt[j].CHILD, TEXT: _aFilt[j].CHILD }); }
+        // 기존 선택값이 새 목록에 없으면 초기화.
+        if (_sP05.T_DDLB.findIndex(function (it) { return it.KEY === _sP05.val; }) === -1) { _sP05.val = ""; }
+        _renderRows();
+    };
+
+    /************************************************************************
+     * [P3-D 적용] MPROP 직렬화 — 원본 setAdditBindData(index.js:5316) 1:1.
+     *   isFieldInfo(P01~P03) 제외 → ITMCD 정렬 → val 을 "|" 조인 = "P04|P05|P06|P07|P08".
+     ************************************************************************/
+    oAPP.fn.setAdditBindData = function (aMPROP) {
+        if (typeof aMPROP === "undefined") { return; }
+        var _a = aMPROP.filter(function (i) { return i.isFieldInfo === false; });
+        _a.sort(function (a, b) { return a.ITMCD.localeCompare(b.ITMCD); });
+        return _a.map(function (i) { return i.val; }).join("|");
+    };
+
+    /************************************************************************
+     * [P3-D 검증] 우측 입력 완결성 — 원본 chkAdditBindData(index.js:4886, MAIN_ADDIT) 간이판.
+     *   ★ P6 경계: 원본의 TY_BIND_ERROR/ACTCD 라우팅·showMessagePopover 는 P6 → 여기선 {RETCD,RTMSG}(첫 오류)만.
+     *   반환 {RETCD:""|"E", RTMSG}.
+     ************************************************************************/
+    oAPP.fn.chkAdditBindData = function () {
+        var a = oAPP.attr.additRows || [];
+        if (a.length === 0) { return { RETCD: "E", RTMSG: H.z("133") }; }                 // 133 추가속성 정보 없음.
+        if (a.findIndex(function (i) { return i.val !== ""; }) === -1) { return { RETCD: "E", RTMSG: H.z("134") }; }  // 134 입력건 없음.
+        var p04 = a.find(function (i) { return i.ITMCD === "P04"; });
+        if (!p04) { return { RETCD: "E", RTMSG: H.z("135") }; }                           // 135 Bind type 없음.
+        var p05 = a.find(function (i) { return i.ITMCD === "P05"; });
+        if (!p05) { return { RETCD: "E", RTMSG: H.z("136") }; }                           // 136 Reference Field 없음.
+        var _res = { RETCD: "", RTMSG: "" };
+        if (p04.val !== "" && p05.val === "") { _res = { RETCD: "E", RTMSG: H.z("137") }; }   // 137 Bind type 선택 시 참조필드 필수.
+        var p06 = a.find(function (i) { return i.ITMCD === "P06"; });
+        if (!p06) { return { RETCD: "E", RTMSG: H.z("138") }; }                           // 138 Conversion 없음.
+        if (p06._error === true) { _res = { RETCD: "E", RTMSG: p06._error_msg || H.z("138") }; }   // P06 서버검증 오류.
+        return _res;
+    };
+
+    /************************************************************************
+     * [P3-D 멀티 적용] 098 "추가 속성 바인딩" — 원본 onMultiAdditionalBind(bindAdditInfo.js:162) 이식.
+     *   ★ P6 경계: busy 왕복·UPDATE-DESIGN-DATA 방송·showMessagePopover 정교 라우팅 = P6.
+     *   ★ 부분적용 방지(간이 all-or-nothing): 체크행 하나라도 chkPossibleAdditBind E 면 전체 중단.
+     ************************************************************************/
+    oAPP.fn.onMultiAdditionalBind = async function () {
+        // 우측 입력 완결성.
+        var _r1 = oAPP.fn.chkAdditBindData();
+        if (_r1.RETCD === "E") { oAPP.fn.toast(_r1.RTMSG); return; }
+
+        var _aTree = (typeof oAPP.fn.getSelectedDesignTree === "function") ? (oAPP.fn.getSelectedDesignTree() || []) : [];
+        if (_aTree.length === 0) { oAPP.fn.toast(H.z("142")); return; }   // 142 디자인 라인 선택 필요.
+
+        // 간이 all-or-nothing — 하나라도 불가면 전체 차단(원본 checkMultiAdditBind 취지).
+        for (var i = 0; i < _aTree.length; i++) {
+            var _rr = oAPP.fn.chkPossibleAdditBind(_aTree[i]);
+            if (_rr.RETCD === "E") {
+                oAPP.fn.toast(H.z("143", (_aTree[i].OBJID || "") + " - " + (_aTree[i].UIATT || "")) + " : " + _rr.RTMSG);
+                return;
+            }
+        }
+
+        // 166 &1건 선택 + 089 적용 확인.
+        var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("089"));
+        if (!_ok) { return; }
+
+        var _MPROP = oAPP.fn.setAdditBindData(oAPP.attr.additRows);
+        oAPP.fn.additionalBindMulti(_MPROP);   // designArea — 체크행 일괄 stamp + _T_0015 갱신.
+        oAPP.fn.toast(H.z("090"));             // 090 적용 완료.
+    };
+
+    // 적용 확인창(원본 MessageBox.confirm 166+089) — 공통 U4AUI.confirm 로. Promise<bool>.
+    function _confirmAdditApply(sMsg) {
+        return new Promise(function (resolve) {
+            U4AUI.confirm({
+                type: "C", message: sMsg,
+                buttons: [{ act: "YES", label: H.cl("A03"), emphasized: true }, { act: "NO", label: H.cl("A39") }],
+                onClose: function (sAct) { resolve(sAct === "YES"); }
+            });
+        });
+    }
+
     /* ── 행 렌더(값 셀 = 텍스트 / 입력 / 선택) ─────────────────────────────── */
     function _renderRows() {
         if (!oA.tbody) { return; }
@@ -298,20 +555,27 @@
                 var aItems = (r.T_DDLB || []).map(function (d) { return { value: d.KEY, text: d.TEXT }; });
                 // ★ onChange 로 선택값을 행(r.val)에 되쓴다 — 원본 selectedKey:"{val}" 양방향 바인딩 대응.
                 //   (이후 MPROP 조립/검증 단계가 r.val 을 읽으므로 미배선 시 입력값 유실.)
+                // P04(Bind type)/P05(Reference Field) 변경 = 상호배타 보정(setAddtBindInfoDDLB). 그 외 콤보는 값만.
+                var bDdlbSync = (r.ITMCD === "P04" || r.ITMCD === "P05");
                 var oSel = U4AUI.createField({
                     type: "combo", items: aItems, value: r.val || "", disabled: !bEnabled,
-                    onChange: (function (row) { return function (v) { row.val = v; }; })(r)
+                    onChange: (function (row) { return function (v) { row.val = v; if (bDdlbSync) { oAPP.fn.setAddtBindInfoDDLB(row); } }; })(r)
                 });
                 oTdV.appendChild(oSel.el);
             } else if (r.inp_vis) {
+                // P06 Conversion Routine — 대문자(upper) + change=서버검증(convChangeInput) + 입력중=오류해제(clearConvError).
+                var bConv = (r.ITMCD === "P06");
                 var oInp = U4AUI.createField({
                     type: "text", value: r.val || "",
                     maxLength: (r.maxlen != null ? r.maxlen : undefined),
-                    disabled: !bEnabled, clear: bEnabled,
-                    // ★ 입력값을 행(r.val)에 되쓴다 — 원본 value:"{val}" 양방향 바인딩 대응.
-                    onChange: (function (row) { return function (v) { row.val = v; }; })(r),
-                    onClear: (function (row) { return function () { row.val = ""; }; })(r)
+                    disabled: !bEnabled, clear: bEnabled, upper: bConv,
+                    // ★ 입력값을 행(r.val)에 되쓰고(원본 value:"{val}") P06 이면 서버검증.
+                    onChange: (function (row) { return function (v) { row.val = v; if (bConv) { oAPP.fn.convChangeInput(row, oInp); } }; })(r),
+                    onInput: bConv ? (function (row) { return function () { oAPP.fn.clearConvError(row, oInp); }; })(r) : undefined,
+                    onClear: (function (row) { return function () { row.val = ""; if (bConv) { oAPP.fn.clearConvError(row, oInp); } }; })(r)
                 });
+                // 재구성 시 기존 오류 상태 복원(원본 stat/_error).
+                if (bConv && r.stat === "Error") { try { oInp.setValueState("error", r.statTxt || ""); } catch (e) { } }
                 oTdV.appendChild(oInp.el);
             } else {
                 // txt_vis(또는 기본) — 읽기전용 텍스트(값 표면이라 선택 허용).

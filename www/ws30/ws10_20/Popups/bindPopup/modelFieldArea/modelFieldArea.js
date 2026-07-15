@@ -36,6 +36,13 @@
     /************************************************************************
      * 영역 초기화(frame.js _bootApp 호출) — 툴바 + 레퍼런스 컬럼트리 생성.
      ************************************************************************/
+    // 모델트리 선택 라인 얻기(원본 getSelectedModelLine 1:1) — 참조필드(P3-C setRefFieldList) 공용.
+    //   선택 없으면 undefined(원본 계약 — null.PARENT 접근 방지).
+    oAPP.fn.getSelectedModelLine = function () {
+        var s = (oM.ctrl && typeof oM.ctrl.getSelected === "function") ? oM.ctrl.getSelected() : null;
+        return s || undefined;
+    };
+
     oAPP.fn.initModelArea = function () {
         oM.tool = document.getElementById("bwpModelTool");
         oM.host = document.getElementById("bwpModelTree");
@@ -55,9 +62,10 @@
             oAPP.fn.loadBindData();
         }));
         oM.tool.appendChild(_spacer());
-        // 161 컬럼최적화 — 컬럼 폭을 콘텐츠에 맞춤(원본 resize-horizontal → setUiTableAutoResizeColumn).
+        // 161 컬럼최적화 — 리사이즈바 더블클릭과 ★완전 동일★한 순수 autofit(잔여폭 흡수 없음).
+        //   원본 setUiTableAutoResizeColumn 1:1. 채움(fitTreeColumns)은 레이아웃 변경 전용.
         oM.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () {
-            oAPP.fn.fitTreeColumns(oM.host);
+            oAPP.fn.autofitTreeColumns(oM.host);
         }));
         // 168 분할 영역 초기화 — 드래그로 고정된 패널 인라인 flex 를 비워 CSS 기본 폭/높이로 복귀 + 재클램프.
         oM.tool.appendChild(H.iconBtn("table-columns", H.z("168"), function () {  // 168 분할 영역 초기화
@@ -120,7 +128,11 @@
                 if (sHl) { oRow.classList.add(sHl); }
                 _wireModelDrag(oRow, n);   // 좌측 필드 → 중앙 디자인트리 드래그 소스(원본 setDragStart).
             },
-            onSelect: function (n) { oAPP.attr.selModelNode = n; }
+            onSelect: function (n) {
+                oAPP.attr.selModelNode = n;
+                // 모델필드 선택 변경 → 우측 참조필드(P05) 재구성(원본 onSelTabRow → setRefFieldList, P3-C).
+                if (typeof oAPP.fn.setRefFieldList === "function") { try { oAPP.fn.setRefFieldList(); } catch (e) { } }
+            }
         });
 
         // 초기(데이터 로드 전) = 빈 트리 → 경계선 끔(로드 성공 시 loadBindData 가 해제).

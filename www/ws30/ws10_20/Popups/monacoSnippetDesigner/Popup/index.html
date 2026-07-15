@@ -3,26 +3,111 @@
 
 <head>
     <meta charset="utf-8">
-    <style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
-    </style>
+    <!-- ===== CSS 리소스 스택 (tokens → shell → bootstrap-bridge → bootstrap-skin → 화면) ===== -->
+    <link rel="stylesheet" href="../../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="../../../../../lib/bootstrap/5.0.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../../../theme/tokens.css">
+    <link rel="stylesheet" href="../../../theme/shell.css">
+    <link rel="stylesheet" href="../../../theme/bootstrap-bridge.css">
+    <link rel="stylesheet" href="../../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="css/index.css">
 
+    <!-- ===== JS 리소스 스택 (동기) ===== -->
+    <script src="../../../theme/theme-api.js"></script>
+    <script src="../../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 BGCOL/THEME/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { }
+        })();
+    </script>
 </head>
 
-<body style="margin:0px;padding:0px;overflow:hidden">
+<body class="u4aSnipBody">
 
-    <iframe id="ws_frame" src="" frameborder="0"
-        style="overflow:hidden;overflow-x:hidden;overflow-y:hidden;height:100%;width:100%;position:absolute;top:0px;left:0px;right:0px;bottom:0px;">
-    </iframe>
-    
-    <script>
+    <!-- ===== frameless 타이틀바 (공통 .u4a-titlebar) ===== -->
+    <header class="u4a-titlebar" id="snipTitlebar">
+        <img class="u4a-titlebar__logo" id="snipLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="snipTitle"></span>
+        <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="snipWinMax" data-action="max" title="Maximize" aria-label="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="snipWinClose" data-action="close" title="Close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
 
-        let oScr = document.createElement("script");
-            oScr.src = "index.js";
+    <!-- ===== 본문 : 좌(스니펫 리스트) | 우(편집/빈상태) 스플리터 ===== -->
+    <main class="u4aSnipMain">
+        <div class="u4a-splitter u4aSnipSplit" id="snipSplit" data-axis="x">
 
-            document.body.appendChild(oScr);
+            <!-- 좌측 : 스니펫 리스트 -->
+            <section class="u4a-splitter__pane u4aSnipLeft" id="snipLeftPane">
+                <div class="u4aSnipListPanel" id="snipListPanel"></div>
+            </section>
 
-    </script>
+            <div class="u4a-splitter__bar" id="snipSplitBar" role="separator" aria-orientation="vertical"></div>
+
+            <!-- 우측 : 빈상태 / 편집 -->
+            <section class="u4a-splitter__pane u4aSnipRight" id="snipRightPane">
+
+                <!-- 빈상태(선택 없음) -->
+                <div class="u4aSnipEmpty" id="snipEmpty">
+                    <i class="fa-solid fa-file-code u4aSnipEmpty__icon" aria-hidden="true"></i>
+                    <div class="u4aSnipEmpty__title" id="snipEmptyTitle"></div>
+                    <div class="u4aSnipEmpty__desc" id="snipEmptyDesc"></div>
+                </div>
+
+                <!-- 편집(스니펫 기본정보 + 코드 + 저장/취소) -->
+                <div class="u4aSnipEdit" id="snipEdit" hidden>
+                    <div class="u4aSnipEdit__body">
+                        <div class="u4aSnipInfoPanel" id="snipInfoPanel"></div>
+
+                        <div class="u4aSnipCode">
+                            <div class="u4aSnipCode__head">
+                                <i class="fa-solid fa-code" aria-hidden="true"></i>
+                                <span id="snipCodeTitle"></span>
+                            </div>
+                            <div class="u4aSnipCode__body">
+                                <iframe id="snipEditor" class="u4aSnipEditorFrame MONACO_EDITOR" src="about:blank" frameborder="0"></iframe>
+                            </div>
+                        </div>
+                    </div>
+
+                    <footer class="u4aSnipFooter">
+                        <div class="u4aSnipFooter__spacer"></div>
+                        <button type="button" class="u4a-btn u4a-btn--emphasized" id="snipBtnSave"><i class="fa-solid fa-floppy-disk"></i> <span id="snipBtnSaveText"></span></button>
+                        <button type="button" class="u4a-btn u4a-btn--negative" id="snipBtnCancel"><i class="fa-solid fa-xmark"></i> <span id="snipBtnCancelText"></span></button>
+                    </footer>
+                </div>
+
+            </section>
+        </div>
+    </main>
+
+    <!-- ===== Top-layer Busy 오버레이 ===== -->
+    <dialog class="u4a-busy" id="snipBusy" role="progressbar" aria-valuetext="Busy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+            <div class="u4a-busy__label" id="snipBusyLabel">Loading...</div>
+        </div>
+    </dialog>
+
+    <!-- ===== JS 리소스 스택 (끝) ===== -->
+    <script src="../../../../../lib/bootstrap/5.0.2/js/bootstrap.bundle.min.js"></script>
+    <script src="js/index.js"></script>
 
 </body>
 

@@ -94,11 +94,15 @@
     }
 
     // 워크스페이스 메시지(ZMSG_WS_COMMON_001) — 번호 기준. 공통 빈상태("데이터 없음"=946) 등. getMsgText(SAP 메시지클래스)와 별개 채널.
-    function getWsText(sNo, sFallback) {
+    //   p1 = &1 치환값. ★넘기지 않으면 유틸이 &1 을 '빈 문자열'로 치환해 주어가 사라진다(주의).
+    function getWsText(sNo, sFallback, p1) {
+        var sP1 = (p1 == null) ? "" : String(p1);
         try {
-            let sTxt = oAPP.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo);
-            return (sTxt && sTxt.trim()) ? sTxt : (sFallback || sNo);
-        } catch (e) { console.error("[숏컷] 워크스페이스 메시지 조회 실패:", e); return (sFallback || sNo); }
+            let sTxt = oAPP.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo, sP1);
+            if (sTxt && sTxt.trim()) { return sTxt; }
+        } catch (e) { console.error("[숏컷] 워크스페이스 메시지 조회 실패:", e); }
+        // 폴백 문구에도 동일하게 &1 치환.
+        return (sFallback || sNo).replace(/&1/g, sP1);
     }
 
     // window 전역 노출 / shim 추가 (fnAppF4PopupOpen.js 의존성 대비)
@@ -308,6 +312,27 @@
         return (sTxt && sTxt.trim()) ? sTxt : (sFieldLabel + " is required.");
     }
 
+    // 파일 이름 형식 검사 — Windows 금지문자(\ / : * ? " < > |)·제어문자 또는 예약 파일명(CON/PRN/AUX/NUL/COM1-9/LPT1-9).
+    //   (안 막으면 writeShortcutLink 가 원인 불명으로 실패한다.) 값이 없으면 앱ID 로 대체되므로 통과.
+    //   ★.lnk 확장자는 대소문자 무관하게 떼고 본체만 검사한다(원본은 case-sensitive 라 .LNK 가 중복으로 붙던 버그).
+    function fn_Check_fileName() {
+        const sRaw = (oFileNameField.getValue() || "");
+        const sName = sRaw.replace(/\.lnk$/i, "");
+
+        if (sName.replace(/\s/g, "") === "") {   // 미입력/공백만 → 앱ID 로 대체되므로 검사 대상 아님
+            oFileNameField.setValueState("none");
+            return "";
+        }
+
+        if (/[\\\/:*?"<>|\x00-\x1f]/.test(sName) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(sName)) {
+            oFileNameField.setValueState("error", getMsgText("/U4A/MSG_WS", "278", "Special characters are not allowed."));
+            return "E";
+        }
+
+        oFileNameField.setValueState("none");
+        return "";
+    }
+
     // 필수 입력 필드 유효성 점검 — 오류 시 첫 오류 필드 자동 포커스(공통 §3.5.4)
     function fn_Check_required() {
         let Lret = "";
@@ -333,8 +358,23 @@
             Lret = "E";
             oHostInputField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C71", "Target Host URL")));
             if (!oFirstBad) { oFirstBad = oHostInputField; }
+        } else if (!/^https?:\/\/[^\s/?#]+/i.test(oHostInputField.getValue().trim())) {
+            // ★외부 호스트 URL 은 사용자가 직접 타이핑한다(내부는 읽기전용). 형식 검사가 없으면 "uha.u4aide.com" 처럼
+            //   스킴 없는 값이 그대로 URL 로 붙어, 브라우저가 이를 '주소'가 아니라 '검색어'로 처리해 엉뚱한 페이지가 뜬다.
+            //   MSG_WS 109 = "유효성 문제. ( &1 )"
+            Lret = "E";
+            oHostInputField.setValueState("error",
+                oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "109", getMsgText("/U4A/CL_WS_COMMON", "C71", "Target Host URL")));
+            if (!oFirstBad) { oFirstBad = oHostInputField; }
         } else {
             oHostInputField.setValueState("none");
+        }
+
+        // 파일 이름 — 필수는 아니지만(비면 앱ID로 대체) 값이 있으면 여기서 형식까지 검사한다.
+        //   ★확인 팝업 '이후'가 아니라 '이전'에 걸러야 한다(§ 핸들러 = 검증 먼저).
+        if (fn_Check_fileName() === "E") {
+            Lret = "E";
+            if (!oFirstBad) { oFirstBad = oFileNameField; }
         }
 
         if (Lret === "E") {
@@ -433,14 +473,20 @@
     async function fn_Check_value() {
         if (await fn_CheckAppId() === "E") { return "E"; }
 
-        // 파라미터 값 검증
+        // 파라미터 검증
+        //   ★이름(name) 허용문자 = URI 표준(RFC 3986) 의 'unreserved' 집합: A-Z a-z 0-9 - . _ ~
+        //     원본은 /^[A-Za-z0-9]*$/ 라 하이픈을 막아, 정작 SAP 표준 파라미터(sap-client / sap-language / sap-user)
+        //     조차 입력 불가였다 → 표준 집합으로 교정.
+        //   ★값(value)은 제한하지 않는다 — URLSearchParams 가 퍼센트 인코딩하므로 &, =, 공백, 한글이 와도 URL 이 안 깨진다.
         let Lreturn = "";
-        const regType1 = /^[A-Za-z0-9]*$/;
+        const regParamName = /^[A-Za-z0-9._~-]+$/;
 
         // 이전 오류 상태 초기화
         aParams.forEach(p => { p.state = "None"; });
 
         let errorIndex = -1;
+        const oSeenName = new Set();   // 이름 중복 검출용
+
         for (let index = 0; index < aParams.length; index++) {
             const sLine = aParams[index];
 
@@ -452,14 +498,25 @@
                 break;
             }
 
-            // Name에 영문/숫자 이외의 문자가 있는 경우
+            // Name에 표준 허용문자 이외의 문자가 있는 경우(공백, &, =, ?, #, 한글 등)
+            if (sLine.name !== "" && !regParamName.test(sLine.name)) {
+                sLine.state = "Error";
+                Lreturn = "02";
+                errorIndex = index;
+                break;
+            }
+
+            // ★이름 중복 — 같은 이름을 두 번 넣으면 URLSearchParams 가 "a=1&a=2" 로 둘 다 실어, 서버가 어느 값을
+            //   쓸지는 구현마다 다르다(대개 마지막 것). 사용자 의도와 어긋나므로 생성 전에 막는다.
             if (sLine.name !== "") {
-                if (!regType1.test(sLine.name)) {
+                const sKey = sLine.name.toLowerCase();
+                if (oSeenName.has(sKey)) {
                     sLine.state = "Error";
-                    Lreturn = "02";
+                    Lreturn = "03";
                     errorIndex = index;
                     break;
                 }
+                oSeenName.add(sKey);
             }
         }
 
@@ -488,12 +545,31 @@
         }
 
         if (Lreturn === "02") {
-            sMsg = getMsgText("/U4A/MSG_WS", "320", "Only English and numbers are accepted");
+            // ★메시지는 '실제 허용 규칙'을 그대로 말해야 한다.
+            //   - 320("알파벳 또는 숫자만") → 이제 - . _ ~ 도 되므로 거짓.
+            //   - 278("특수 문자는 허용되지 않습니다") → 한글이 걸렸을 때 "한글=특수문자"가 되어 거짓.
+            //   → ZMSG_WS_COMMON_001 / 971 (신규): 허용 집합을 명시.
+            sMsg = getWsText("971", "Only letters, numbers, and -._~ are allowed.");
+            _toast(sMsg);
+            return "E";
+        }
+
+        if (Lreturn === "03") {
+            sMsg = getMsgText("/U4A/MSG_WS", "069", "A duplicate value exists.");
             _toast(sMsg);
             return "E";
         }
 
         return "S";
+    }
+
+    // 생성될 .lnk 최종 경로 — 저장경로 + 파일명(.lnk). 파일명이 비면 앱ID 로 대체.
+    //   중복 검사(확인 팝업 전)와 실제 생성(fn_CreateShortcutRUN) 이 '동일 경로'를 쓰도록 단일 계산.
+    function fn_getTargetLnkPath() {
+        let sName = (oFileNameField.getValue() || "");
+        if (sName.replace(/\s/g, "") === "") { sName = oAppIdField.getValue(); }
+        sName = sName.replace(/\.lnk$/i, "") + ".lnk";
+        return oAPP.path.join(oSavePathField.getValue(), sName);
     }
 
     // 숏컷 생성 프로세스 진행전 확인 및 검증
@@ -515,10 +591,19 @@
             return;
         }
 
-        const sMsg = getMsgText("/U4A/MSG_WS", "321", "Are you sure you want to proceed with creating a shortcut?");
+        // ★확인 팝업은 '한 번'만. 파일 중복이면 그 사실을 확인 문구에 함께 담고, 없으면 일반 진행 문구.
+        //   (기존엔 진행확인 → YES → 중복확인 → YES 로 팝업이 두 번 떴다.)
+        const sProceed = getMsgText("/U4A/MSG_WS", "321", "Are you sure you want to proceed with creating a shortcut?");
+        let sMsg = sProceed;
+        let sType = "C";
+        if (oAPP.FS.existsSync(fn_getTargetLnkPath())) {
+            // 중복 있음 → "중복된 파일 이름이 있습니다." + 진행 확인
+            sMsg = getMsgText("/U4A/MSG_WS", "004", "A duplicate file name exists.") + " " + sProceed;
+            sType = "W";
+        }
 
         U4AUI.confirm({
-            type: "C",
+            type: sType,
             title: getMsgText("/U4A/CL_WS_COMMON", "A40", "Confirm"),
             message: sMsg,
             onClose: function (sAct) {
@@ -552,27 +637,9 @@
         let Loption = "";
         let U4Apath = "";
 
-        // 파일명 정리 — 공백만이거나 미입력이면 앱ID 로 대체.
-        let LFname_X = LFname.replace(/\s/g, "");
-        if (LFname_X.length === 0) {
-            LFname = Lappid;
-        }
-
-        // 기존 .lnk 확장자 제거(대소문자 무관 — 원본은 case-sensitive 라 .LNK 중복 붙던 버그).
-        LFname = LFname.replace(/\.lnk$/i, "");
-
-        // Windows 파일명 금지문자(\ / : * ? " < > |)·제어문자 또는 예약 파일명(CON/PRN/AUX/NUL/COM1-9/LPT1-9) → 오류로 차단.
-        //   (안 막으면 writeShortcutLink 가 원인 불명으로 실패한다.) MSG_WS 278 = "Special characters are not allowed."
-        if (/[\\\/:*?"<>|\x00-\x1f]/.test(LFname) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(LFname)) {
-            fn_setBusy(false);
-            oFileNameField.setValueState("error", getMsgText("/U4A/MSG_WS", "278", "Special characters are not allowed."));
-            _refocus(oFileNameField);
-            return;
-        }
-        oFileNameField.setValueState("none");
-
-        LFname = LFname + ".lnk";
-        LsPath = oAPP.path.join(LsPath, LFname);
+        // 최종 .lnk 경로 — 중복 검사(fn_CreateShortcut)와 동일 계산을 재사용.
+        //   파일명 형식 검증(금지문자/예약어)·중복 확인은 '확인 팝업 이전'에 이미 끝났다.
+        LsPath = fn_getTargetLnkPath();
 
         const LicoPath = oIconPathField.getValue();
         const Lhost = oHostInputField.getValue();
@@ -639,7 +706,7 @@
             Loption = fn_setShortcutOption(U4Apath, "edge");
         }
 
-        // 바로가기 생성 API 호출
+        // 실제 파일 쓰기 — 중복 확인은 fn_CreateShortcut 의 단일 확인 팝업에서 이미 끝났다(여기선 덮어쓰기 진행).
         const res = oAPP.SHELL.writeShortcutLink(LsPath, "create", {
             target: Ltarget,
             args: Loption,
@@ -656,9 +723,8 @@
                 title: getMsgText("/U4A/CL_WS_COMMON", "D86", "Success"),
                 message: sSuccessMsg,
                 onClose: function () {
-                    // 다운 폴더 탐색기 실행
+                    // 다운 폴더 탐색기 실행. (창은 닫지 않는다 — 연속으로 여러 바로가기를 만들 수 있게)
                     oAPP.SHELL.showItemInFolder(LsPath);
-                    fn_close();
                 }
             });
             fn_setBusy(false);
@@ -683,36 +749,59 @@
         }
     }
 
+    // 'startup 전용' 플래그 안내문 동기화 — 전체화면/키오스크/번역해제는 브라우저가 이미 실행 중이면
+    //   Chromium 이 기존 인스턴스로 URL 만 넘겨 플래그를 무시한다(그냥 새 탭). 사용자가 "안 먹는다"고 오인하지
+    //   않도록, 해당 옵션을 고르는 즉시 조건을 알린다(해제하면 사라짐).
+    function fn_syncStartupNote() {
+        const oNote = document.getElementById("browserOptNote");
+        if (!oNote) { return; }
+
+        const oChecked = document.querySelector('input[name="browserMode"]:checked');
+        const sMode = oChecked ? oChecked.value : "";
+        const aNames = [];
+
+        if (sMode === "fullscreen") { aNames.push(getMsgText("/U4A/CL_WS_COMMON", "C79", "Full Screen Mode")); }
+        if (sMode === "kiosk") { aNames.push(getMsgText("/U4A/CL_WS_COMMON", "C80", "Kiosk Mode")); }
+
+        if (aNames.length === 0) {
+            oNote.hidden = true;
+            return;
+        }
+
+        // ZMSG_WS_COMMON_001 / 970 = "&1 은(는) 브라우저가 이미 실행 중이면 적용되지 않습니다. 브라우저를 완전히
+        //   종료한 후 바로가기를 실행하십시오." — &1 = 해당 옵션 이름(C79/C80)을 p1 로 넘겨 치환.
+        oNote.querySelector(".u4aShortcutNote__text").textContent = getWsText(
+            "970",
+            "&1 is not applied if the browser is already running. Close the browser completely, then run the shortcut.",
+            aNames.join(", ")
+        );
+        oNote.hidden = false;
+    }
+
     // 숏컷 실행 옵션(커맨드라인 플래그) 생성 — Chrome/Edge 공통.
-    //   둘 다 Chromium 이라 모드 플래그(--app / --start-maximized / --start-fullscreen / --kiosk)와 --disable-translate 는 동일.
-    //   ★비밀 모드만 다름: Chrome=--incognito, Edge=--inprivate.
+    //   둘 다 Chromium 이라 모드 플래그(--app / --start-fullscreen / --kiosk)와 번역 비활성화는 동일.
+    //   ★브라우저별로 다른 것: 비밀 모드(Chrome=--incognito / Edge=--inprivate), 키오스크(Edge 는 --edge-kiosk-type 추가).
+    //
+    //   ★★사용자 기본 프로파일 사용(--user-data-dir 미사용) — 로그인/쿠키 세션을 평소 브라우저와 공유하기 위함.
+    //     대가: --start-fullscreen / --kiosk 는 'startup 전용' 플래그라, 해당 브라우저가
+    //     이미 실행 중이면 Chromium 이 기존 인스턴스로 URL 만 넘겨 플래그를 무시한다(그냥 새 탭으로 열림).
+    //     → 전체화면/키오스크/번역해제는 '브라우저를 완전히 종료한 상태'에서 실행해야 적용된다.
+    //     (--app= 과 --incognito/--inprivate 는 실행 중이어도 항상 새 창으로 뜬다.)
     function fn_setShortcutOption(U4Apath, sBrowserType) {
         let Loption = "";
-        const bDisableTranslate = document.getElementById("chkDisableTranslate").checked;
         const bSecret = document.getElementById("chkSecret").checked;
 
         if (bSecret) {
             Loption = (sBrowserType === "chrome") ? "--incognito" : "--inprivate";
         }
-        if (bDisableTranslate) {
-            // ★원본의 --disable-translate 는 현행 Chromium 스위치 목록에서 제거돼 no-op 다(구버전 잔재).
-            //   현행 번역 비활성화 = --disable-features=Translate.
-            Loption = (Loption !== "" ? Loption + " " : "") + "--disable-features=Translate";
-        }
+
+        // ★원본의 '번역 모드 해제'(--disable-translate) 옵션은 제거했다.
+        //   해당 스위치는 현행 Chromium 에서 삭제됐고, 대체 후보(--disable-features=Translate / TranslateUI)도
+        //   Chrome 150 실측 결과 번역 버블이 그대로 떠 전부 no-op 이었다(크롬은 모르는 feature 이름을 조용히 무시).
+        //   현행 브라우저에서 번역 차단은 페이지 측(<meta name="google" content="notranslate">,
+        //   <html translate="no">) 또는 관리자 정책으로만 가능하며, 바로가기 인자로는 구현 불가.
 
         const sMode = document.querySelector('input[name="browserMode"]:checked').value;
-
-        // ★ 전체화면(--start-fullscreen)/키오스크(--kiosk)는 '시작 모드' 플래그라, 브라우저가 이미 실행 중이면
-        //   무시되고 기존 창에 '일반 탭'으로 열린다(Chromium 자체 동작). → 전용 프로파일(--user-data-dir)로 '별도 인스턴스'를
-        //   강제해야 플래그가 실제로 먹는다. 폴더는 브라우저가 자동 생성.
-        //   ★프로파일은 '앱ID + 모드'별로 분리 — 같은 앱의 전체화면/키오스크가 같은 폴더를 쓰면 한쪽 인스턴스에 붙어(탭)
-        //     플래그가 무시돼 '차이 없어' 보인다. 모드별 폴더면 항상 별도 인스턴스.
-        //   (--app= 은 실행 여부와 무관하게 항상 별도 앱창, 일반 모드는 사용자의 기본 프로파일을 써야 하므로 강제 안 함.)
-        function _dedicatedProfileArg(sM) {
-            var sId = (oAppIdField.getValue() || "u4a").replace(/[^A-Za-z0-9_-]/g, "_");
-            var sDir = PATH.join(APP.getPath("temp"), "u4a_shortcut_profile", sId + "_" + sM);
-            return '--user-data-dir="' + sDir + '"';
-        }
 
         switch (sMode) {
             case "app":
@@ -724,13 +813,13 @@
                 Loption = (Loption !== "" ? Loption + " " : "") + U4Apath;
                 break;
             case "fullscreen":
-                // 원본은 --start-maximized(=최대화, 전체화면 아님) 오표기였음 → 진짜 전체화면 --start-fullscreen + 전용 프로파일.
-                Loption = (Loption !== "" ? Loption + " " : "") + _dedicatedProfileArg("fullscreen") + " --start-fullscreen " + U4Apath;
+                // 원본은 --start-maximized(=최대화, 전체화면 아님) 오표기였음 → 진짜 전체화면 = --start-fullscreen.
+                Loption = (Loption !== "" ? Loption + " " : "") + "--start-fullscreen " + U4Apath;
                 break;
             case "kiosk":
                 // Edge 는 --kiosk 만으로는 공식 키오스크가 아니며 --edge-kiosk-type 을 요구한다(MS 문서).
                 //   fullscreen = 단일 앱 전체화면 키오스크(브라우저 UI 없음).
-                Loption = (Loption !== "" ? Loption + " " : "") + _dedicatedProfileArg("kiosk") + " --kiosk "
+                Loption = (Loption !== "" ? Loption + " " : "") + "--kiosk "
                     + (sBrowserType === "edge" ? "--edge-kiosk-type=fullscreen " : "") + U4Apath;
                 break;
         }
@@ -997,15 +1086,21 @@
             </div>
             <div class="u4aShortcutOptionGroup" style="border-top: 0.0625rem solid var(--line); padding-top: 0.5rem;">
                 <label class="u4aShortcutOptionItem">
-                    <input type="checkbox" id="chkDisableTranslate">
-                    <span>${getMsgText("/U4A/CL_WS_COMMON", "C81", "Displble Translate Mode")}</span>
-                </label>
-                <label class="u4aShortcutOptionItem">
                     <input type="checkbox" id="chkSecret">
                     <span>${getMsgText("/U4A/CL_WS_COMMON", "C82", "Secret Mode")}</span>
                 </label>
             </div>
+            <div id="browserOptNote" class="u4aShortcutNote" hidden>
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                <span class="u4aShortcutNote__text"></span>
+            </div>
         `;
+
+        // 시작(startup) 전용 플래그 안내 — 선택 즉시 노출/해제 즉시 숨김(A안).
+        oBrowserOpts.querySelectorAll('input[name="browserMode"]').forEach(function (oRadio) {
+            oRadio.addEventListener("change", fn_syncStartupNote);
+        });
+        fn_syncStartupNote();
 
 
         // 5. Additional Parameter Panel

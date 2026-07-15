@@ -56,6 +56,14 @@ oAPP.fn.setShellBusy = function (bBusy) {
     // 공통 .u4a-busy 표시 트리거 = data-busy="true" (shell.css). 빈값/removeAttribute 는 안 뜸(전 소비처 규약).
     if (bBusy) { oDom.setAttribute("data-busy", "true"); }
     else { oDom.setAttribute("data-busy", "false"); }
+
+    // [흰색 플래시 방지] 본문 iframe(KEEP-UI5)은 초기에 숨김(index.html #ws_frame). 서버 UI5 부팅이
+    // 실제로 끝났을 때(bBootOk + busy 해제)만 노출한다 → 그 전까지는 호스트 --boot-bg(테마색)만 보인다.
+    // 로드 실패(_onUi5LoadFail)는 bBootOk 가 안 서므로 흰 프레임이 드러나지 않는다.
+    if (!bBusy && oAPP.attr.bBootOk === true) {
+        var oFrame = document.getElementById("ws_frame");
+        if (oFrame) { oFrame.classList.add("is-ready"); }
+    }
 }; // end of oAPP.fn.setShellBusy
 
 /************************************************************************
@@ -117,6 +125,8 @@ oAPP.fn._msgCommon = function (sNo) {
 oAPP.fn._startLoadGuards = function () {
     oAPP.attr.bBootOk = false;
     oAPP.attr.bLoadFailed = false;
+    // 재로드(창 재사용) 시에도 새 서버 문서의 흰 캔버스가 노출되지 않도록 다시 숨김.
+    try { document.getElementById("ws_frame").classList.remove("is-ready"); } catch (e) { }
     try { CURRWIN.webContents.on("did-fail-load", oAPP.fn._onFrameFailLoad); } catch (e) { }
     oAPP.attr._loadWatchTimer = setTimeout(function () {
         if (oAPP.attr.bBootOk) { return; }
@@ -470,7 +480,13 @@ oAPP.fn.onFrameLoadSuccess = () => {
         sCssData = FS.readFileSync(sCssLinkPath, "utf-8");
 
     let oStyle = oContentDocu.createElement("style");
-    oStyle.innerHTML = sCssData;
+
+    // [흰색 플래시 방지 — iframe 문서 배경] 서버 UI5 문서는 자체 배경이 없어 Chromium 기본 흰 캔버스가
+    // 그려진다(다크 테마에서 번쩍임). 테마 BGCOL(_onShellThemeChange 와 동일 출처)을 문서 배경으로 고정.
+    let sBgCol = (oAPP.attr.oThemeInfo && oAPP.attr.oThemeInfo.BGCOL) || "";
+    let sBgCss = sBgCol ? ("html, body { background-color: " + sBgCol + "; }\n") : "";
+
+    oStyle.innerHTML = sBgCss + sCssData;
 
     oContentDocu.head.appendChild(oStyle);
 

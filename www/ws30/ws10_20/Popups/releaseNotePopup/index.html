@@ -5,6 +5,20 @@
     <meta charset="utf-8">
     <title></title>
 
+    <!-- [흰 플래시 방지] opener 가 넘긴 BGCOL 을 첫 페인트 전 배경으로(셸 html/body + 본문 iframe 요소).
+         이 셸은 tokens.css/테마 인프라가 없어 BGCOL 직접 적용. 본문(mainFRAME) 로드 전까지 흰색 차단. -->
+    <script>
+        (function () {
+            try {
+                var bg = new URLSearchParams(location.search).get("BGCOL");
+                if (bg) {
+                    var s = document.createElement("style");
+                    s.textContent = "html,body,#mainFRAME{background:" + bg + ";}";
+                    document.head.appendChild(s);
+                }
+            } catch (e) { }
+        })();
+    </script>
 </head>
 
 <body style="margin:0px;padding:0px;overflow:hidden">

@@ -335,7 +335,36 @@
     }
 
     /* ====================================================================
-     * 클릭 디스패치 — 등록 핸들러 → 패턴 삽입 → (그 외) 미구현 로그 순.
+     * 추가 메뉴 모듈 실행 — 원본 ws_usp_01.js fnUspPatternContextMenuClick 과 동일 계약.
+     *   Code Editor Designer ▸ Theme(M001_C001)/Snippet(M001_C002) Designer 처럼 DATA 없는
+     *   잎은 contextMenu/MENU_MODULES/{CKEY}/index.js 를 동적 import 해 exports({MENU_INFO}) 실행.
+     *   (모듈이 oAPP.fn.openMonaco*Designer 를 호출 → fnDialogPopupOpener.js 의 별창 오픈)
+     *   모듈 파일이 없는 잎은 false 반환 → 상위에서 미구현 로그.
+     * ==================================================================== */
+    function _runMenuModule(mi) {
+        var sCKEY = (mi && mi.CKEY) || "";
+        if (!sCKEY || !PATHINFO || !PATH) { return false; }
+        try {
+            var sPath = PATH.join(PATHINFO.USP_ROOT, "contextMenu", "MENU_MODULES", sCKEY, "index.js");
+            if (FS && !FS.existsSync(sPath)) { return false; }   // 모듈 없는 잎 → 상위 미구현 로그
+            import(sPath).then(function (oMod) {
+                try {
+                    if (oMod && typeof oMod.exports === "function") {
+                        oMod.exports({ MENU_INFO: mi });
+                    } else {
+                        console.error("[HTML5][WS30] 메뉴 모듈 exports 없음:", sCKEY);
+                    }
+                } catch (e) { console.error("[HTML5][WS30] 메뉴 모듈 실행 오류:", sCKEY, e); }
+            }).catch(function (e) { console.error("[HTML5][WS30] 메뉴 모듈 import 오류:", sCKEY, e); });
+            return true;
+        } catch (e) {
+            console.error("[HTML5][WS30] 메뉴 모듈 디스패치 오류:", sCKEY, e);
+            return false;
+        }
+    }
+
+    /* ====================================================================
+     * 클릭 디스패치 — 등록 핸들러 → 패턴 삽입 → 추가 메뉴 모듈 → 미구현 로그 순.
      * ==================================================================== */
     function _dispatch(mi) {
         try {
@@ -344,8 +373,10 @@
             if (typeof fn === "function") { fn(mi); return; }
             // 소스 패턴 삽입(DATA 있는 잎).
             if (_insertPattern(mi)) { return; }
-            // 그 외(Theme/Snippet Designer 등) — 다음 단계.
-            console.warn("[HTML5][WS30] 에디터 컨텍스트 메뉴 미구현(다음 단계):", sCKEY, (mi && mi.DESC) || "");
+            // 추가 메뉴 모듈(Theme/Snippet Designer 등) — 원본과 동일하게 동적 import 실행.
+            if (_runMenuModule(mi)) { return; }
+            // 그 외 미구현.
+            console.warn("[HTML5][WS30] 에디터 컨텍스트 메뉴 미구현:", sCKEY, (mi && mi.DESC) || "");
         } catch (e) {
             console.error("[HTML5][WS30] 에디터 컨텍스트 메뉴 실행 오류:", e);
         }

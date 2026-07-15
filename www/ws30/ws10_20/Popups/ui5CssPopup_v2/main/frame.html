@@ -52,6 +52,8 @@
             min-height: 0;
             border: 0;
             display: block;
+            /* [흰 플래시 방지] src 로드 전/중 흰 캔버스 차단 — 요소 배경을 테마색으로. */
+            background: var(--boot-bg, var(--app-bg));
         }
     </style>
 </head>

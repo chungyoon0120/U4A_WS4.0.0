@@ -821,10 +821,11 @@
             oDlg.style.width = w + "px";
             oDlg.style.height = h + "px";
         }
-        function up() { on = false; document.removeEventListener("mousemove", mv, true); document.removeEventListener("mouseup", up, true); }
+        function up() { on = false; document.body.classList.remove("u4a-dragging"); document.removeEventListener("mousemove", mv, true); document.removeEventListener("mouseup", up, true); }
         grip.addEventListener("mousedown", function (e) {
             if (e.button !== 0) { return; }
             on = true;
+            document.body.classList.add("u4a-dragging");   // 리사이즈 동안 iframe 마우스 차단(끊김 방지 — 헤더 드래그와 동일)
             const r = oDlg.getBoundingClientRect();
             sx = e.clientX; sy = e.clientY; sw = r.width; sh = r.height;
             // 좌상단을 고정하고 우하단만 늘리도록 현재 위치 박제(드래그와 동일 방식).
@@ -2498,6 +2499,11 @@
             var sSel = (iCol === 0) ? ".u4aColTreeNameCell" : (".u4aColTreeCell.u4aColTreeC" + (iCol + 1));
             var aRows = oTree.el.querySelectorAll(".u4aColTreeRow");
             for (var r = 0; r < aRows.length; r++) {
+                // ★ 접힌(collapsed) 하위 노드는 DOM 에 남되 부모 ul.hidden=true 로만 토글된다(createTree 비가상 §토글).
+                //   그래서 querySelectorAll 은 "화면에 안 보이는 행"까지 잡는다 → autofit 이 접힌 긴 자식 텍스트로
+                //   컬럼을 과대하게 키움(사용자 눈엔 안 보이는데 컬럼만 넓어짐). getClientRects().length===0(렌더 안 됨)
+                //   인 행은 제외해 "실제 보이는 데이터 최장폭"에만 맞춘다. (코덱스 진단, 장군님 지적 2026-07-15)
+                if (!aRows[r].getClientRects().length) { continue; }
                 iMax = Math.max(iMax, _cellNatW(aRows[r].querySelector(sSel), iCol));
             }
             // 정책(oFit) 적용 — slack(여유) 가산 후 [minRem, max] clamp. 기본 = slack 0 / 48px / 800px(현행).

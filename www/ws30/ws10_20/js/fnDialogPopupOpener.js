@@ -2405,12 +2405,17 @@
 
         };
 
-        oBrowserOptions.opacity = 0.0;
         oBrowserOptions.autoHideMenuBar = true;
         // [공통 헤더] 네이티브 타이틀바 제거 → index.html 공통 .u4a-titlebar(메인창과 동일)로 대체.
         oBrowserOptions.titleBarStyle = "hidden";
-        // 로드 전 배경 깜빡임 방지 + 둥근 모서리 밖 배경을 테마색으로(다른 공통헤더 창과 동일).
-        try { oBrowserOptions.backgroundColor = (parent.getThemeInfo && parent.getThemeInfo().BGCOL) || undefined; } catch (e) { }
+        // 테마 정보 1회 조회(창 배경 + 쿼리 전달 공용).
+        let oAboutTheme = {};
+        try { oAboutTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { oAboutTheme = {}; }
+        // [흰 플래시 방지 ①] BrowserWindow 배경을 테마색으로 → 첫 OS 페인트부터 흰색이 아니라 테마색.
+        if (oAboutTheme.BGCOL) { oBrowserOptions.backgroundColor = oAboutTheme.BGCOL; }
+        // [HTML5 표준] 네이티브 opacity 페이드(setBrowserOpacity) 미사용 — 저사양 PC 성능부하 이슈.
+        //   show:false 로 만들고 콘텐츠 준비 시 index.html 이 CURRWIN.show(). (MIME 등 표준 별창 동일)
+        oBrowserOptions.show = false;
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B48"); // About U4A WS IDE
         oBrowserOptions.webPreferences.partition = SESSKEY;
         oBrowserOptions.webPreferences.browserkey = BROWSKEY;
@@ -2426,9 +2431,13 @@
         // 브라우저 상단 메뉴 없애기
         oBrowserWindow.setMenu(null);
 
-        // 공통 헤더가 첫 페인트부터 테마/제목 반영하도록 전달(index.html head 조기 적용 스크립트가 소비).
-        let oAboutTheme = {};
-        try { oAboutTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { oAboutTheme = {}; }
+        // webContents(창) 배경을 테마색으로 즉시 — iframe(mainFRAME) 이 about:blank 인 짧은 구간에도
+        //   창 자체는 흰색이 아니라 테마색. (MIME 등 표준 별창 동일)
+        try {
+            if (oAboutTheme.BGCOL) {
+                oBrowserWindow.webContents.insertCSS("html, body { margin:0; height:100%; background-color:" + oAboutTheme.BGCOL + "; }");
+            }
+        } catch (e) { }
 
         // 브라우저 실행 경로에 붙일 QueryString 정보
         const oQueryParams = {
@@ -2478,20 +2487,8 @@
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow, () => {
-
-                if (oBrowserWindow.isDestroyed()) {
-                    return;
-                }
-
-                try {
-                    oBrowserWindow.closable = true;
-                } catch (error) {
-
-                }
-
-            });
+            // 콘텐츠(frame.html) 준비 후 index.html 이 CURRWIN.show() 로 표시(setBrowserOpacity 페이드 미사용).
+            try { oBrowserWindow.closable = true; } catch (error) { }
 
         });
 
@@ -3181,6 +3178,8 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
         };
 
         const sUrlPath = parent.getPath(sPopupName);
@@ -3537,6 +3536,8 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
         };
 
         const sUrlPath = parent.getPath(sPopupName);

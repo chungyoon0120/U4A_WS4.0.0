@@ -7,6 +7,21 @@
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta charset="utf-8">
     <link rel="stylesheet" href="frame.css">
+
+    <!-- [흰 플래시 방지] opener 가 넘긴 BGCOL 을 첫 페인트 전 배경으로(셸 html/body + 본문 iframe 요소).
+         테마 인프라가 없어 BGCOL 직접 적용. 본문(ws_frame) 로드 전까지 흰색 차단. -->
+    <script>
+        (function () {
+            try {
+                var bg = new URLSearchParams(location.search).get("BGCOL");
+                if (bg) {
+                    var s = document.createElement("style");
+                    s.textContent = "html,body,#ws_frame{background:" + bg + ";}";
+                    document.head.appendChild(s);
+                }
+            } catch (e) { }
+        })();
+    </script>
 </head>
 <style>
     html,

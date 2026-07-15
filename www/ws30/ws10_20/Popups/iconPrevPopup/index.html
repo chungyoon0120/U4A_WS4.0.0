@@ -53,7 +53,20 @@
             border: 0;
             display: block;
         }
-        /* 초기 로드 페이드인(원본 $('#content').fadeIn 대체 — iframe 은 runtime 이 준비되면 자연 표시) */
+        /* [흰색 플래시 방지 — iframe]
+           본문은 KEEP-UI5(서버 문서)라 --boot-bg 가 안 먹고, Chromium 이 서브프레임 캔버스를 흰색으로
+           먼저 그린다(다크 테마에서 흰 배경이 번쩍임). 서버 UI5 부팅 완료(runtime.js attachInit →
+           parent.oAPP.fn.setShellBusy(false)) 전까지 숨겨 호스트 --boot-bg 만 보이게 한다.
+           원본 $('#content').fadeIn(300) 과 동일한 계층의 처리. */
+        #ws_frame {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity .2s linear;
+        }
+        #ws_frame.is-ready {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 

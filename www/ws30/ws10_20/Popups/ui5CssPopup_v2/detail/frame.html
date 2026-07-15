@@ -115,6 +115,8 @@
         width: 100%;
         height: 100%;
         display: block;
+        /* [흰 플래시 방지] src 로드 전/중 흰 캔버스 차단 — 요소 배경을 테마색으로. */
+        background: var(--boot-bg, var(--app-bg));
     }
 
     /* ── 별도창 전용 공통 타이틀바 — 임베드(미리보기)에선 숨김, win 모드에서만 표시 ── */

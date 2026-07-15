@@ -186,3 +186,32 @@ html, body {
     cursor: pointer;
     accent-color: var(--accent);
 }
+
+/* startup 전용 플래그 안내문 — 전체화면/키오스크/번역해제 선택 시에만 노출.
+   의미 토큰(state-info)만 사용, 고정 px 없음. hidden 속성으로 토글(.d-flex 금지 — !important 함정). */
+.u4aShortcutNote {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 0.0625rem solid var(--state-info);
+    border-radius: var(--radius);
+    background: var(--state-info-bg);
+    color: var(--text);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+.u4aShortcutNote[hidden] {
+    display: none;
+}
+
+.u4aShortcutNote i {
+    flex: 0 0 auto;
+    margin-top: 0.125rem;
+    color: var(--state-info);
+}
+
+.u4aShortcutNote__text {
+    flex: 1 1 auto;
+}

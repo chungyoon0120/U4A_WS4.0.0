@@ -1,149 +1,249 @@
-/* 공통 테이블 스타일 */
+/* =======================================================================
+ * 즐겨찾기 아이콘 목록 화면 (favIconPopup iframe)
+ *   - SAP Horizon 룩 아이콘 타일 그리드 + 상단 고정 검색/카운트(즐겨찾기 다수 대비).
+ *   - 로직/이벤트 I/F(index.js) 유지. 화면(마크업·스타일)만 개편.
+ *   - 문구(검색 placeholder/결과없음)는 부모 팝오버가 메시지키로 전달 → 신규 하드코딩 없음.
+ *   - 테마는 body.light-theme / body.dark-theme (index.js setTheme).
+ *   - 상단 검색은 고정(flex 0), 그리드만 세로 스크롤(이중 스크롤 방지).
+ * ===================================================================== */
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
 body {
-    font-family: "Arial", sans-serif;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    font-family: "72", "72full", Arial, Helvetica, sans-serif;
+    font-size: 0.8125rem;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.ui5-table {
-    width: 100%;
-    border-collapse: collapse;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-    border: 1px solid #333;
-}
-
-.table-header,
-.table-cell {
-    padding: 12px 15px;
-    text-align: left;
+/* ── 상단 고정(검색 + 카운트) ─────────────────────────────────── */
+.favTop {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
     border-bottom: 1px solid;
 }
 
-.table-row:nth-child(even) {
-    transition: background-color 0.3s ease;
+.favSearch {
+    flex: 1 1 auto;
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
 }
 
-.table-row:hover {
-    transition: background-color 0.3s ease;
+.favSearch__ico {
+    position: absolute;
+    left: 0.5rem;
+    width: 0.875rem;
+    height: 0.875rem;
+    pointer-events: none;
+    opacity: 0.7;
 }
 
-/* 밝은 테마 */
-.light-theme {
-    background-color: #f5f5f5;
-    color: #333;
+.favSearch__inp {
+    width: 100%;
+    height: 1.875rem;
+    padding: 0 1.75rem 0 1.75rem;
+    border: 1px solid;
+    border-radius: 0.375rem;
+    font: inherit;
+    outline: none;
+    background: transparent;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.light-theme .ui5-table {
-    background-color: #ffffff;
-    border-color: #ddd;
-}
-
-.light-theme .table-header {
-    background-color: #f0f3f5;
-    color: #333;
-    border-color: #d9dde2;
-}
-
-.light-theme .table-cell {
-    color: #555;
-    border-color: #d9dde2;
-}
-
-.light-theme .table-row:nth-child(even) {
-    background-color: #f9f9f9;
-}
-
-.light-theme .table-row:hover {
-    background-color: #eef1f3;
-}
-
-/* 어두운 테마 */
-.dark-theme {
-    background-color: #121212;
-    color: #e0e0e0;
-}
-
-.dark-theme .ui5-table {
-    background-color: #1e1e1e;
-    border-color: #333;
-}
-
-.dark-theme .table-header {
-    background-color: #292929;
-    color: #ffffff;
-    border-color: #444;
-}
-
-.dark-theme .table-cell {
-    color: #d0d0d0;
-    border-color: #444;
-}
-
-.dark-theme .table-row:nth-child(even) {
-    background-color: #242424;
-}
-
-.dark-theme .table-row:hover {
-    background-color: #333333;
-}
-
-/* 버튼 스타일 */
-.theme-button {
-    padding: 10px 20px;
-    font-size: 16px;
+.favSearch__clr {
+    position: absolute;
+    right: 0.375rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
     cursor: pointer;
+}
+
+/* display:flex 가 [hidden] 속성(display:none)을 specificity 로 이기므로 명시 override. */
+.favSearch__clr[hidden] { display: none; }
+
+.favSearch__clr svg { width: 0.75rem; height: 0.75rem; }
+
+.favCount {
+    flex: 0 0 auto;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    opacity: 0.75;
+}
+
+/* ── 타일 그리드(그리드만 스크롤) ─────────────────────────────── */
+.favGrid {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    gap: 0.625rem;
+    align-content: start;
+    padding: 0.75rem;
+}
+
+/* display:grid 가 [hidden](display:none)을 이기므로 명시 override 필요.
+   안 하면 결과없음 시 빈 그리드가 공간을 차지해 favEmpty 문구가 하단으로 밀린다. */
+.favGrid[hidden] { display: none; }
+
+/* ── 아이콘 타일 ─────────────────────────────────────────────── */
+.favTile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    padding: 0.875rem 0.5rem 0.625rem;
+    min-height: 6rem;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease,
+                box-shadow 0.15s ease, transform 0.05s ease;
+}
+
+.favTile[hidden] { display: none; }
+
+.favTile:active { transform: scale(0.98); }
+
+/* 아이콘 글리프 (SAP UI5 아이콘 폰트 — .sapUiIcon 은 서버 library.css 가 렌더) */
+.favTile__glyph.sapUiIcon {
+    font-size: 2rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.5rem;
+    transition: color 0.15s ease;
+}
+
+/* 아이콘 이름 (넘치면 말줄임 — 전체 이름은 타일 title 로 확인) */
+.favTile__name {
+    max-width: 100%;
+    text-align: center;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+}
+
+/* 복사 버튼 (타일 hover/focus 시 우상단 노출 — 키보드/터치 대응) */
+.favTile__copy {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
     border: none;
-    border-radius: 5px;
-    background-color: #0078d7;
-    color: #fff;
-    transition: background-color 0.3s ease;
+    border-radius: 0.375rem;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
 
-.theme-button:hover {
-    background-color: #005bb5;
+.favTile:hover .favTile__copy,
+.favTile:focus .favTile__copy,
+.favTile:focus-visible .favTile__copy,
+.favTile:focus-within .favTile__copy { opacity: 1; }
+
+.favTile__copy .sapUiIcon { font-size: 0.875rem; line-height: 1; pointer-events: none; }
+
+/* ── 검색 결과 없음 ──────────────────────────────────────────── */
+.favEmpty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    text-align: center;
+    opacity: 0.7;
 }
+.favEmpty[hidden] { display: none; }
 
+/* =======================================================================
+ * 밝은 테마 (SAP Horizon)
+ * ===================================================================== */
+.light-theme { background-color: #f5f6f7; color: #1d2d3e; }
 
-/* html ::-webkit-scrollbar-thumb  {
-	border-radius: .75rem;
-    border: .125rem solid #1d232a;
-}
+.light-theme .favTop { border-bottom-color: #d9dde2; background-color: #ffffff; }
+.light-theme .favSearch__inp { border-color: #c4ccd4; color: #1d2d3e; }
+.light-theme .favSearch__inp::placeholder { color: #8a99a8; }
+.light-theme .favSearch__inp:focus { border-color: #0070f2; box-shadow: 0 0 0 2px rgba(0, 112, 242, 0.18); }
+.light-theme .favSearch__ico { color: #5b738b; }
+.light-theme .favSearch__clr { color: #5b738b; }
+.light-theme .favSearch__clr:hover { background-color: #eaeef2; color: #0064d9; }
+.light-theme .favCount { color: #5b738b; }
 
-html ::-webkit-scrollbar-corner {
-	background-color: #1d232a;
-}
+.light-theme .favTile { background-color: #ffffff; border-color: #d9dde2; box-shadow: 0 1px 2px rgba(34, 54, 84, 0.06); }
+.light-theme .favTile__glyph.sapUiIcon { color: #475e75; }
+.light-theme .favTile__name { color: #556b82; }
+.light-theme .favTile:hover,
+.light-theme .favTile:focus-visible { background-color: #f2f8ff; border-color: #0070f2; box-shadow: 0 2px 6px rgba(0, 112, 242, 0.18); }
+.light-theme .favTile:hover .favTile__glyph.sapUiIcon,
+.light-theme .favTile:focus-visible .favTile__glyph.sapUiIcon { color: #0064d9; }
+.light-theme .favTile:hover .favTile__name,
+.light-theme .favTile:focus-visible .favTile__name { color: #1d2d3e; }
+.light-theme .favTile__copy { color: #5b738b; }
+.light-theme .favTile__copy:hover { background-color: #e3f0ff; color: #0064d9; }
 
-html ::-webkit-scrollbar {
-	background-color: #1d232a;
-	width: 16px;
-} */
+/* =======================================================================
+ * 어두운 테마 (SAP Horizon Dark)
+ * ===================================================================== */
+.dark-theme { background-color: #1c2228; color: #e4e9ef; }
 
-/* 스크롤바 내부 막대기 */
-.dark-theme::-webkit-scrollbar-thumb  {
-	/* border-radius: .75rem;
-    border: .125rem solid #0e8891; */
-    border-radius: 1rem;
-    background-color: #647891;
-}
+.dark-theme .favTop { border-bottom-color: #3a434e; background-color: #232a31; }
+.dark-theme .favSearch__inp { border-color: #46515d; color: #e4e9ef; }
+.dark-theme .favSearch__inp::placeholder { color: #7d8b99; }
+.dark-theme .favSearch__inp:focus { border-color: #4db1ff; box-shadow: 0 0 0 2px rgba(77, 177, 255, 0.22); }
+.dark-theme .favSearch__ico { color: #9fb0c2; }
+.dark-theme .favSearch__clr { color: #9fb0c2; }
+.dark-theme .favSearch__clr:hover { background-color: #34424f; color: #7cc4ff; }
+.dark-theme .favCount { color: #9fb0c2; }
 
+.dark-theme .favTile { background-color: #29313a; border-color: #3a434e; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+.dark-theme .favTile__glyph.sapUiIcon { color: #b0bcc9; }
+.dark-theme .favTile__name { color: #a7b4c2; }
+.dark-theme .favTile:hover,
+.dark-theme .favTile:focus-visible { background-color: #2f3b48; border-color: #4db1ff; box-shadow: 0 2px 6px rgba(77, 177, 255, 0.22); }
+.dark-theme .favTile:hover .favTile__glyph.sapUiIcon,
+.dark-theme .favTile:focus-visible .favTile__glyph.sapUiIcon { color: #7cc4ff; }
+.dark-theme .favTile:hover .favTile__name,
+.dark-theme .favTile:focus-visible .favTile__name { color: #f0f4f8; }
+.dark-theme .favTile__copy { color: #9fb0c2; }
+.dark-theme .favTile__copy:hover { background-color: #34424f; color: #7cc4ff; }
 
-/* 전체 스크롤바 */
-.dark-theme::-webkit-scrollbar {
-	background-color: #1d232a;
-	width: 12px;
-}
-
-
-/* 스크롤바 내부 막대기 */
-.light-theme::-webkit-scrollbar-thumb  {
-	/* border-radius: .75rem;
-    border: .125rem solid #0e8891; */
-    border-radius: 1rem;
-    background-color: #7b91a8;
-}
-
-
-/* 전체 스크롤바 */
-.light-theme::-webkit-scrollbar {
-	background-color: #fff;
-	width: 12px;
-}
+/* =======================================================================
+ * 스크롤바
+ * ===================================================================== */
+.dark-theme .favGrid::-webkit-scrollbar { background-color: #1c2228; width: 12px; }
+.dark-theme .favGrid::-webkit-scrollbar-thumb { border-radius: 1rem; background-color: #4a5a6e; }
+.light-theme .favGrid::-webkit-scrollbar { background-color: #f5f6f7; width: 12px; }
+.light-theme .favGrid::-webkit-scrollbar-thumb { border-radius: 1rem; background-color: #b9c4d0; }

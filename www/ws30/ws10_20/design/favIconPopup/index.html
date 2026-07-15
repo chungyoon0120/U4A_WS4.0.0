@@ -1,20 +1,36 @@
 <!DOCTYPE html>
-<html lang="en" style="box-sizing: border-box; overflow-y: auto; overflow-x: hidden; display:none;">
+<html lang="en" style="box-sizing: border-box; overflow: hidden; display:none;">
 <head>
     <meta charset="UTF-8">
     <meta name="google" content="notranslate">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>테마 전환 UI5 스타일 테이블</title>
+    <title>Favorite Icon List</title>
     <link rel="stylesheet" href="index.css">
-  
+
 </head>
 <body class="light-theme">
 
-    <table id="favList" class="ui5-table">
-        <tbody>
-        
-        </tbody>
-    </table>
+    <!-- 상단 고정: 검색 + 결과 카운트(즐겨찾기 다수 대비) -->
+    <div class="favTop">
+        <div class="favSearch">
+            <svg class="favSearch__ico" viewBox="0 0 16 16" aria-hidden="true">
+                <path fill="currentColor" d="M11.7 10.3a5 5 0 1 0-1.4 1.4l3 3a1 1 0 0 0 1.4-1.4l-3-3zM7 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/>
+            </svg>
+            <input id="favSearchInp" class="favSearch__inp" type="text" autocomplete="off" spellcheck="false" />
+            <button id="favSearchClr" class="favSearch__clr" type="button" tabindex="-1" hidden>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path fill="currentColor" d="M9.4 8l3.3-3.3a1 1 0 1 0-1.4-1.4L8 6.6 4.7 3.3a1 1 0 0 0-1.4 1.4L6.6 8l-3.3 3.3a1 1 0 1 0 1.4 1.4L8 9.4l3.3 3.3a1 1 0 0 0 1.4-1.4L9.4 8z"/>
+                </svg>
+            </button>
+        </div>
+        <span id="favCount" class="favCount" aria-live="polite"></span>
+    </div>
+
+    <!-- 즐겨찾기 아이콘 타일 그리드 (JS 에서 favTile 을 채운다) -->
+    <div id="favGrid" class="favGrid"></div>
+
+    <!-- 검색 결과 없음 (문구는 부모가 메시지키로 전달) -->
+    <div id="favEmpty" class="favEmpty" hidden></div>
 
     <script src="index.js"></script>
 </body>

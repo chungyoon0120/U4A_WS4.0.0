@@ -180,10 +180,47 @@
     }
 
     /************************************************************************
-     * [161 버튼] 컬럼 자동맞춤(autofit) — 콘텐츠 자연폭에 맞춤(넘치면 가로 스크롤 = 사용자 의도).
+     * [161 버튼] 컬럼 자동맞춤 = 리사이즈바 더블클릭과 ★완전 동일★ — 각 컬럼을 콘텐츠 자연폭에 맞춘다.
+     *   ★ 잔여폭 흡수(fill) 안 함 ★ — 원본도 161 버튼은 setUiTableAutoResizeColumn(순수 autofit)이고,
+     *     컨테이너 채움은 별개 경로(refreshBindLayoutTables = 레이아웃 변경)였다. 아래 fitTreeColumns 가
+     *     채움까지 하는 바람에 "버튼 결과 ≠ 더블클릭 결과" 였다(장군님 지적 2026-07-14).
+     *   폭 계산은 공통 makeColumnTree 의 autoWidth(i) 소비 = 더블클릭이 부르는 그 함수 그대로.
+     ************************************************************************/
+    oAPP.fn.autofitTreeColumns = function (oHost) {
+        if (!oHost) { return; }
+        // ★ 호스트가 숨김(display:none = offsetParent null)이면 skip — 이 상태에서 autoWidth 는 전 행이
+        //   getClientRects()=0 이라 헤더폭/최소폭으로 붕괴한다. 폭 계산은 보일 때만(refitBindTables 패턴).
+        //   (code-reviewer 지적 2026-07-15 — 접힌행 제외 가드가 "호스트 전체 숨김"까지 배제하는 회귀 방지.)
+        if (oHost.offsetParent === null) { return; }
+        try {
+            var oCtrl = oHost.__u4aColTreeCtrl;
+            if (!oCtrl || typeof oCtrl.autoWidth !== "function") { return oAPP.fn.fitTreeColumns(oHost); }   // 폴백
+            var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+            var nCol = parseInt(oHost.getAttribute("data-col-count") || "3", 10);
+            if (!(nCol >= 2 && nCol <= 8)) { nCol = 3; }
+            var overhead = Math.round(rem * 0.375 * nCol + 1);
+            var total = 0;
+            for (var i = 0; i < nCol; i++) {
+                var w = oCtrl.autoWidth(i);   // = 더블클릭과 동일 계산(정책 slack/min/max 포함)
+                oHost.style.setProperty("--u4act-c" + (i + 1) + "-w", w + "px");
+                total += w;
+            }
+            oHost.style.setProperty("--u4act-total-w", (total + overhead) + "px");
+        } catch (e) { console.error("[HTML5][bindWindow] autofitTreeColumns:", e && e.message); }
+    };
+
+    /************************************************************************
+     * [레이아웃 변경용] 컬럼 재적합 — 각 컬럼 콘텐츠 자연폭 + 컨테이너보다 좁으면 지정 컬럼이 잔여폭 흡수.
+     *   원본 refreshBindLayoutTables/scheduleFitTableColumns 대응. 초기 렌더·데이터 적재·패널 표시/숨김 때만.
+     *   ★ 161 버튼은 이걸 쓰지 않는다(위 autofitTreeColumns) — 버튼은 "채움 없는 순수 autofit".
      ************************************************************************/
     oAPP.fn.fitTreeColumns = function (oHost) {
         if (!oHost) { return; }
+        // ★ 호스트 숨김(display:none = offsetParent null)이면 skip — autoWidth 가 전 행 rect 0 으로 붕괴(위 참조).
+        if (oHost.offsetParent === null) { return; }
+        // ★ 빈 트리(데이터 없음 = 초기 "Drag하여 Drop" 안내 상태)면 채움 skip — 컬럼을 억지로 늘리지 않는다.
+        //   (채움은 콘텐츠 있을 때만 의미. 빈 상태에서 잔여폭 흡수하면 바인딩경로 컬럼만 과대해짐. 장군님 지적 2026-07-15.)
+        if (!oHost.querySelector(".u4aColTreeRow")) { return; }
         try {
             var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
             var slack = Math.round(0.5 * rem), minPx = Math.round(4 * rem);

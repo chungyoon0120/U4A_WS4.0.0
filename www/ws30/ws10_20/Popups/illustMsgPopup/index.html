@@ -54,6 +54,19 @@
             border: 0;
             display: block;
         }
+        /* [흰색 플래시 방지 — iframe] (iconPrevPopup 동일 처리)
+           본문은 KEEP-UI5(frame.html) 라 --boot-bg 가 안 먹고, Chromium 이 서브프레임 캔버스를 흰색으로
+           먼저 그린다(다크 테마에서 흰 배경이 번쩍임). UI5 부팅 완료(frame.js → parent.setBusy("")) 전까지
+           숨겨 호스트 --boot-bg 만 보이게 한다. 원본 #content(opacity:0)→fadeIn 과 같은 계층의 처리. */
+        #floatFrame {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity .2s linear;
+        }
+        #floatFrame.is-ready {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 

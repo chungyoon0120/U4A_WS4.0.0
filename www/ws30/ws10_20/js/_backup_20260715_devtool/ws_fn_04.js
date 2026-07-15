@@ -892,210 +892,227 @@
     }; // end of oAPP.fn.fnSetToggleFrameWindow
 
     /************************************************************************
-     * [Admin] OpenDevTool Popup Open (UI5 sap.m.Dialog → HTML5 공통 .u4a-dialog)
-     *   · 관리자 권한 게이트: Key In(수기 암호문) / File Drag(암호파일 드롭) / Attach File(네이티브 첨부)
-     *     3택 → ADMIN/DevToolsPermission 모듈(excute01/02) 복호화·검증 통과 시 openDevTools.
-     *   · 공통 다이얼로그 UX(.u4a-dialog: 헤더/푸터 48px, 드래그·리센터·grip 리사이즈, 닫기 X, ESC).
-     *   · 입력칸=createField, 드롭존=§16 4.3a 표준(scoped .u4aDevToolDrop), 색=토큰·문구=메시지키.
+     * [Admin] OpenDevTool Popup Open
      ************************************************************************/
-    const DEVTOOL_DIALOG_ID = "u4aAdminDevToolDlg";
-
-    // 다이얼로그 DOM 접근자(구 sap model.getData 대체) — helper 들이 공유.
-    oAPP.fn.fnGetAdminDevToolDlg = () => document.getElementById(DEVTOOL_DIALOG_ID);
-
-    oAPP.fn.fnCloseAdminDevToolDlg = () => {
-        let oDlg = oAPP.fn.fnGetAdminDevToolDlg();
-        if (!oDlg) { return; }
-        try { oDlg.close(); } catch (e) { }
-        try { oDlg.remove(); } catch (e) { }
-    };
-
     oAPP.fn.fnOpenDevTool = () => {
 
-        // 이미 떠 있으면 제거 후 재오픈(중복 방지).
-        oAPP.fn.fnCloseAdminDevToolDlg();
+        const
+            DIALOG_ID = "u4aAdminDevToolDlg";
 
-        // 스코프 스타일 1회 주입(공통 shell.css/bootstrap-skin 직접수정 금지 — .analy/12 §6.1).
-        if (!document.getElementById("u4aDevToolStyle")) {
-            let oStyle = document.createElement("style");
-            oStyle.id = "u4aDevToolStyle";
-            oStyle.textContent =
-                ".u4aDevToolDlg { min-width: 26rem; }" +
-                ".u4aDevToolDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
-                ".u4aDevToolBody { display: flex; flex-direction: column; gap: 0.75rem; }" +
-                ".u4aDevToolModes { display: flex; flex-wrap: wrap; gap: 1.25rem; }" +
-                ".u4aDevToolField { width: 100%; }" +
-                // 드롭존 — §16 4.3a 표준(레퍼런스 runtimeClassNavigator .u4aRtmDrop). idle dashed / dragover solid accent.
-                ".u4aDevToolDrop { box-sizing: border-box; min-height: 7.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.625rem; padding: 1rem 1.25rem; border: 0.125rem dashed var(--line); border-radius: var(--radius); background: var(--app-bg); color: var(--text-muted); text-align: center; transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease; }" +
-                ".u4aDevToolDrop__icon { font-size: 1.75rem; opacity: 0.65; }" +
-                ".u4aDevToolDrop__text { font-size: 0.875rem; }" +
-                ".u4aDevToolDrop.is-dragover { border-color: var(--accent); border-style: solid; background: var(--state-info-bg); color: var(--accent); }" +
-                ".u4aDevToolDrop.is-dragover .u4aDevToolDrop__icon { opacity: 1; }";
-            document.head.appendChild(oStyle);
+        // 초기 모델 설정
+        let oModelData = {
+                KEY: "",
+                RDBTNINDEX: 0,
+                FNAME: "",
+                RDLIST: [{
+                        text: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "266"), // Key In
+                    },
+                    {
+                        text: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "267"), // File Drag
+                    },
+                    {
+                        text: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "268") // Attach File
+                    },
+                ]
+            },
+            oJsonModel = new sap.ui.model.json.JSONModel();
+
+        oJsonModel.setData(oModelData);
+
+        // 이미 Dialog가 그려진게 있다면 Open한다.
+        var oDialog = sap.ui.getCore().byId(DIALOG_ID);
+        if (oDialog) {
+
+            oDialog.setModel(oJsonModel);
+
+            oDialog.open();
+
+            return;
         }
 
-        let _fa = (s) => '<i class="fa-solid fa-' + s + '"></i>';
-        let _wsmsg = (n) => WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", n);
-        let sClose = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39"); // Close
+        var oDialog = new sap.m.Dialog(DIALOG_ID, {
+            title: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "265"), // Administrator DevTool
+            icon: "sap-icon://key-user-settings",
+            contentWidth: "500px",
+            draggable: true,
+            resizable: true,
+            customHeader: new sap.m.Bar({
+                contentLeft: [
+                    new sap.ui.core.Icon({
+                        src: "sap-icon://key-user-settings",
+                    }),
+                    new sap.m.Title({
+                        text: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "265"), // Administrator DevTool
+                    })
+                ],
+                contentRight: [
 
-        // ── 다이얼로그 골격 ──
-        let oDlg = document.createElement("dialog");
-        oDlg.className = "u4a-dialog u4aDevToolDlg";
-        oDlg.id = DEVTOOL_DIALOG_ID;
+                    new sap.m.Button({
+                        type: sap.m.ButtonType.Reject,
+                        icon: "sap-icon://decline",
+                        press: function(oEvent) {
 
-        // 헤더 (아이콘 + 제목 + 닫기 X)
-        let oHeader = document.createElement("div");
-        oHeader.className = "u4a-dialog__header";
-        oHeader.innerHTML = _fa("user-gear") + "<span></span>";            // 원본 sap-icon://key-user-settings ≈ user-gear
-        oHeader.querySelector("span").textContent = _wsmsg("265");         // Administrator DevTool
+                            var oDialog = sap.ui.getCore().byId(DIALOG_ID);
+                            if (oDialog) {
+                                oDialog.close();
+                            }
 
-        let oX = document.createElement("button");
-        oX.type = "button";
-        oX.className = "u4a-btn-icon";
-        oX.setAttribute("data-act", "close");
-        oX.innerHTML = _fa("xmark");
-        oX.title = sClose;
-        oX.addEventListener("click", oAPP.fn.fnCloseAdminDevToolDlg);
-        oHeader.appendChild(oX);
-        oDlg.appendChild(oHeader);
+                        }
+                    }),
+                ]
+            }),
+            content: [
 
-        // ── 바디 ──
-        let oBody = document.createElement("div");
-        oBody.className = "u4a-dialog__body u4aDevToolBody";
+                new sap.m.RadioButtonGroup({
+                    columns: 3,
+                    selectedIndex: "{/RDBTNINDEX}",
+                    buttons: {
+                        path: "/RDLIST",
+                        template: new sap.m.RadioButton({
+                            text: "{text}"
+                        })
+                    },
+                    // buttons: [
+                    //     new sap.m.RadioButton({
+                    //         text: "Key In"
+                    //     }),
+                    //     new sap.m.RadioButton({
+                    //         text: "File Drag"
+                    //     }),
+                    //     new sap.m.RadioButton({
+                    //         text: "Attach File"
+                    //     }),
+                    // ],
+                    select: (oEvent) => {
 
-        // 모드 3택(라디오) — 공통 .u4a-check
-        let aModes = [
-            { idx: 0, text: _wsmsg("266") }, // Key In
-            { idx: 1, text: _wsmsg("267") }, // File Drag
-            { idx: 2, text: _wsmsg("268") }  // Attach File
-        ];
-        let oModes = document.createElement("div");
-        oModes.className = "u4aDevToolModes";
-        aModes.forEach((m) => {
-            let oLab = document.createElement("label");
-            oLab.className = "u4a-check";
-            let oRb = document.createElement("input");
-            oRb.type = "radio";
-            oRb.name = "u4aDevToolMode";
-            oRb.value = String(m.idx);
-            if (m.idx === 0) { oRb.checked = true; }
-            oRb.addEventListener("change", () => { if (oRb.checked) { oAPP.fn.fnDevToolModeChange(m.idx); } });
-            let oTx = document.createElement("span");
-            oTx.textContent = m.text;
-            oLab.appendChild(oRb);
-            oLab.appendChild(oTx);
-            oModes.appendChild(oLab);
+                        let iSelectedIndex = oEvent.getParameter("selectedIndex");
+                        if (iSelectedIndex == 2) {
+                            oAPP.fn.fnOpenDevToolFileAttach();
+                            return;
+                        }
+
+                    }
+                }),
+
+                // 수기 입력 
+                new sap.m.Input({
+                    value: "{/KEY}",
+                    submit: () => {
+                        oAPP.fn.fnSetOpenDevToolSubmit();
+                    }
+                }).bindProperty("visible", "/RDBTNINDEX", function(INDEX) {
+
+                    if (INDEX !== 0) {
+                        return false;
+                    }
+
+                    this.getModel().setProperty("/FNAME", "");
+
+                    return true;
+
+                }),
+                // 파일 드래그 앤 드롭 영역
+                new sap.m.HBox({
+                    renderType: sap.m.FlexRendertype.Bare,
+                    height: "100px",
+                    alignItems: sap.m.FlexAlignItems.Center,
+                    justifyContent: sap.m.FlexAlignItems.Center,
+                    dragDropConfig: [
+                        new sap.ui.core.dnd.DropInfo({
+                            drop: (oEvent) => {
+                                oAPP.fn.fnOpenDevToolFileDrop(oEvent);
+                            }
+                        }),
+                    ],
+                    items: [
+                        new sap.m.Text({
+                            text: WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "269") + "!" // Drop the File!
+                        })
+                    ]
+                }).bindProperty("visible", "/RDBTNINDEX", function(INDEX) {
+
+                    if (INDEX !== 1) {
+                        return false;
+                    }
+
+                    this.getModel().setProperty("/KEY", "");
+
+                    return true;
+
+                }).addEventDelegate({
+                    ondragover: () => {
+
+                        var l_dom = document.getElementsByClassName("sapUiDnDIndicator");
+                        if (l_dom === null || l_dom.length === 0) {
+                            return;
+                        }
+
+                        let oDom = l_dom[0];
+
+                        let iLastZIndex = sap.ui.core.Popup.getLastZIndex() + 1;
+                        oDom.style.zIndex = iLastZIndex;
+
+                        oDom.classList.remove("u4aWsDisplayNone");
+
+                    },
+                    ondragleave: () => {
+
+                        var l_dom = document.getElementsByClassName("sapUiDnDIndicator");
+                        if (l_dom === null || l_dom.length === 0) {
+                            return;
+                        }
+
+                        let oDom = l_dom[0];
+
+                        oDom.classList.remove("u4aWsDisplayNone");
+                        oDom.classList.add("u4aWsDisplayNone");
+
+                    }
+                }).addStyleClass("u4aWsDropArea")
+
+            ],
+            buttons: [
+
+                new sap.m.Button({
+                    type: sap.m.ButtonType.Reject,
+                    icon: "sap-icon://decline",
+                    press: function(oEvent) {
+
+                        var oDialog = sap.ui.getCore().byId(DIALOG_ID);
+                        if (oDialog) {
+                            oDialog.close();
+                        }
+
+                    }
+                }),
+
+            ]
+
         });
-        oBody.appendChild(oModes);
 
-        // Key In 입력칸 (idx0) — 공통 createField, Enter 제출
-        let oField = U4AUI.createField({
-            id: "u4aDevToolKey",
-            className: "u4aDevToolField",
-            placeholder: _wsmsg("266"),
-            onEnter: (v) => { oAPP.fn.fnSetOpenDevTool(v); }
-        });
-        oBody.appendChild(oField.el);
+        oDialog.addStyleClass("sapUiContentPadding sapUiSizeCompact");
 
-        // File Drag 드롭존 (idx1) — §16 4.3a
-        let oDrop = document.createElement("div");
-        oDrop.className = "u4aDevToolDrop";
-        oDrop.style.display = "none";
-        oDrop.innerHTML =
-            '<i class="fa-solid fa-file-arrow-up u4aDevToolDrop__icon"></i>' +
-            '<span class="u4aDevToolDrop__text"></span>';
-        oDrop.querySelector(".u4aDevToolDrop__text").textContent = _wsmsg("269") + "!"; // Drop the File!
-        oDrop.addEventListener("dragover", (e) => {
-            e.preventDefault();
-            oDrop.classList.add("is-dragover");
-        });
-        oDrop.addEventListener("dragleave", (e) => {
-            // 영역 내부 자식으로 이동 시 유지(깜빡임 방지 — §16 4.3a).
-            if (e.relatedTarget && oDrop.contains(e.relatedTarget)) { return; }
-            oDrop.classList.remove("is-dragover");
-        });
-        oDrop.addEventListener("drop", (e) => {
-            e.preventDefault();
-            oDrop.classList.remove("is-dragover");
-            oAPP.fn.fnOpenDevToolFileDrop(e);
-        });
-        oBody.appendChild(oDrop);
-        oDlg.appendChild(oBody);
+        oDialog.setModel(oJsonModel);
 
-        // ── 푸터 (닫기 — 아이콘만, negative) ──
-        let oFoot = document.createElement("div");
-        oFoot.className = "u4a-dialog__footer";
-        let oCloseBtn = document.createElement("button");
-        oCloseBtn.type = "button";
-        oCloseBtn.className = "u4a-btn u4a-btn--negative";
-        oCloseBtn.innerHTML = _fa("xmark");
-        oCloseBtn.title = sClose;
-        oCloseBtn.addEventListener("click", oAPP.fn.fnCloseAdminDevToolDlg);
-        oFoot.appendChild(oCloseBtn);
-        oDlg.appendChild(oFoot);
-
-        // ESC → 닫기
-        oDlg.addEventListener("cancel", (e) => { e.preventDefault(); oAPP.fn.fnCloseAdminDevToolDlg(); });
-
-        // 헤더 드래그 / 더블클릭 리센터 / grip 리사이즈 — 공통 U4AUI.
-        if (window.U4AUI && U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHeader); }
-        if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
-        if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 360, minH: 220 }); }
-
-        document.body.appendChild(oDlg);
-        oDlg.showModal();
-
-        // 초기 모드 = Key In
-        oAPP.fn.fnDevToolModeChange(0);
-        try { oField.focus(); } catch (e) { }
+        oDialog.open();
 
     }; // end of oAPP.fn.fnOpenDevTool
 
     /************************************************************************
-     * [Admin] OpenDevTool 모드 전환 (0=Key In / 1=File Drag / 2=Attach File)
-     *   원본 RadioButtonGroup.select 동작: idx2 는 즉시 네이티브 첨부(excute01),
-     *   idx0/1 은 입력칸↔드롭존 토글(전환 시 반대편 값 초기화 — 원본 bindProperty 부작용 재현).
-     ************************************************************************/
-    oAPP.fn.fnDevToolModeChange = (iIndex) => {
-
-        let oDlg = oAPP.fn.fnGetAdminDevToolDlg();
-        if (!oDlg) { return; }
-
-        // Attach File — 즉시 네이티브 파일 첨부 후 다이얼로그 종료(원본 select idx2).
-        if (iIndex === 2) {
-            oAPP.fn.fnOpenDevToolFileAttach();
-            return;
-        }
-
-        let oField = oDlg.querySelector(".u4aDevToolField");
-        let oDrop = oDlg.querySelector(".u4aDevToolDrop");
-        let oKey = oDlg.querySelector("#u4aDevToolKey");
-
-        if (iIndex === 0) {
-            // Key In
-            if (oField) { oField.style.display = ""; }
-            if (oDrop) { oDrop.style.display = "none"; }
-            try { if (oKey) { oKey.focus(); } } catch (e) { }
-        } else {
-            // File Drag — 입력값 초기화(원본: /KEY = "").
-            if (oKey) { oKey.value = ""; }
-            if (oField) { oField.style.display = "none"; }
-            if (oDrop) { oDrop.style.display = "flex"; }
-        }
-
-    }; // end of oAPP.fn.fnDevToolModeChange
-
-    /************************************************************************
-     * [Admin] OpenDevTool 팝업의 파일 Drop (native drop event)
+     * [Admin] OpenDevTool 팝업의 파일 Drop
      ************************************************************************/
     oAPP.fn.fnOpenDevToolFileDrop = (oEvent) => {
 
-        let oDataTransfer = oEvent.dataTransfer;
-        if (!oDataTransfer || !oDataTransfer.files || oDataTransfer.files.length === 0) {
+        let oBrowserEvent = oEvent.getParameter("browserEvent"),
+            oDataTransfer = oBrowserEvent.dataTransfer,
+            aFiles = oDataTransfer.files,
+            iFileLength = aFiles.length;
+
+        if (iFileLength == 0) {
             return;
         }
 
-        let oFile = oDataTransfer.files[0];
+        let oFile = aFiles[0];
 
         let oFileReader = new FileReader();
         oFileReader.onload = (event) => {
@@ -1111,56 +1128,75 @@
     }; // end of oAPP.fn.fnOpenDevToolFileDrop
 
     /************************************************************************
-     * [Admin] OpenDevTool의 파일 첨부 (excute01 — 네이티브 파일 다이얼로그)
+     * [Admin] OpenDevTool Key In
      ************************************************************************/
-    oAPP.fn.fnOpenDevToolFileAttach = async () => {
+    oAPP.fn.fnSetOpenDevToolSubmit = () => {
 
-        let oDlg = oAPP.fn.fnGetAdminDevToolDlg();
-        if (!oDlg) {
+        const
+            DIALOG_ID = "u4aAdminDevToolDlg";
+
+        let oDialog = sap.ui.getCore().byId(DIALOG_ID);
+        if (!oDialog) {
             return;
         }
 
-        try {
-            let oDEVTOOL = parent.require(PATH.join(APPPATH, "ADMIN", "DevToolsPermission", "index.js")),
-                sRETURN = await oDEVTOOL.excute01(REMOTE);
-
-            if (sRETURN.RETCD !== "S") {
-                parent.showMessage(null, 20, sRETURN.RETCD, sRETURN.RTMSG);
-            }
-        } catch (e) {
-            // 권한 모듈(파일 다이얼로그/fs/복호화) 예외는 삼키지 말고 표면화 — 다이얼로그가 조용히 멈추지 않도록.
-            console.error("[Admin DevTool] 파일 첨부 처리 오류:", e);
-            try { parent.showMessage(null, 20, "E", String((e && e.message) || e)); } catch (x) { }
+        let oDialogModel = oDialog.getModel();
+        if (!oDialogModel) {
+            return;
         }
 
-        oAPP.fn.fnCloseAdminDevToolDlg();
+        let oModelData = oDialogModel.getData(),
+            sKeyIn = oModelData.KEY;
+
+        oAPP.fn.fnSetOpenDevTool(sKeyIn);
+
+    }; // end of oAPP.fn.fnSetOpenDevToolSubmit
+
+    /************************************************************************
+     * [Admin] OpenDevTool의 파일 첨부
+     ************************************************************************/
+    oAPP.fn.fnOpenDevToolFileAttach = async () => {
+
+        const
+            DIALOG_ID = "u4aAdminDevToolDlg";
+
+        let oDialog = sap.ui.getCore().byId(DIALOG_ID);
+        if (!oDialog) {
+            return;
+        }
+
+        let oDEVTOOL = parent.require(PATH.join(APPPATH, "ADMIN", "DevToolsPermission", "index.js")),
+            sRETURN = await oDEVTOOL.excute01(REMOTE);
+
+        if (sRETURN.RETCD !== "S") {
+            parent.showMessage(sap, 20, sRETURN.RETCD, sRETURN.RTMSG);
+        }
+
+        oDialog.close();
 
     }; // end of oAPP.fn.fnOpenDevToolFileAttach
 
     /************************************************************************
-     * [Admin] 입력한 Key/파일 텍스트 유효성 점검 후 OpenDevTool 열기 (excute02 — 암호문)
+     * [Admin] 입력한 Key 의 유효성 점검 후 OpenDevTool 열기
      ************************************************************************/
     oAPP.fn.fnSetOpenDevTool = async (sText) => {
 
-        let oDlg = oAPP.fn.fnGetAdminDevToolDlg();
-        if (!oDlg) {
+        const
+            DIALOG_ID = "u4aAdminDevToolDlg";
+
+        let oDialog = sap.ui.getCore().byId(DIALOG_ID);
+        if (!oDialog) {
             return;
         }
 
-        try {
-            let oDEVTOOL = parent.require(PATH.join(APPPATH, "ADMIN", "DevToolsPermission", "index.js")),
-                sRETURN = await oDEVTOOL.excute02(REMOTE, sText);
+        let oDEVTOOL = parent.require(PATH.join(APPPATH, "ADMIN", "DevToolsPermission", "index.js")),
+            sRETURN = await oDEVTOOL.excute02(REMOTE, sText);
 
-            if (sRETURN.RETCD !== "S") {
-                parent.showMessage(null, 20, sRETURN.RETCD, sRETURN.RTMSG);
-            }
-        } catch (e) {
-            // 복호화/검증 예외는 삼키지 말고 표면화 — 다이얼로그가 조용히 멈추지 않도록.
-            console.error("[Admin DevTool] 키/파일 검증 처리 오류:", e);
-            try { parent.showMessage(null, 20, "E", String((e && e.message) || e)); } catch (x) { }
+        if (sRETURN.RETCD !== "S") {
+            parent.showMessage(sap, 20, sRETURN.RETCD, sRETURN.RTMSG);
         }
 
-        oAPP.fn.fnCloseAdminDevToolDlg();
+        oDialog.close();
 
     }; // end of oAPP.fn.fnSetOpenDevTool
 

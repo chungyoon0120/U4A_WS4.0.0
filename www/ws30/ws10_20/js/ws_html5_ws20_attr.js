@@ -4939,6 +4939,29 @@
                 return;
             }
 
+            //아이콘 프로퍼티의 icon2(★ favorite) = "078 Icon favorite list" 즐겨찾기 값도움.
+            //  원본 attrIcon2Proc → callFavIconPopup(UI5 팝오버) → HTML5 는 공통 .u4a-dialog 모달로 이관.
+            //  선택 아이콘 src 를 UIATV 에 반영(색/DDIC F4 와 동일한 콜백 패턴). 온디맨드 로드.
+            if (iNo === 2 && sSrc === "sap-icon://favorite") {
+                var fnPickFav = function (sIcon) {
+                    //조회(비편집) 모드에서는 값 변경 금지(원본 lf_selLine: !IS_EDIT → return).
+                    if (!_isEditMode()) { return; }
+                    if (sIcon == null || sIcon === "") { return; }   //취소/빈 값(원본 lf_selLine)
+                    sAttr.UIATV = sIcon;                             //아이콘 매핑
+                    oAPP.fn.fnWs20AttrChange(sAttr, "INPUT");        //변경처리
+                };
+                var _runFav = function () {
+                    try {
+                        //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 즐겨찾기 팝업 호출.
+                        if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
+                        oAPP.fn.fnFavIconPopupOpen(sAttr, fnPickFav);
+                    } catch (e) { console.error("[HTML5][WS20][attr] 즐겨찾기 아이콘 팝업 호출 오류:", e && e.message); }
+                };
+                if (typeof oAPP.fn.fnFavIconPopupOpen === "function") { _runFav(); }
+                else { oAPP.loadJs("fnFavIconPopupOpen", _runFav); }
+                return;
+            }
+
             //그 외(App F4 상세보기/selectOption F4 등) 구 attrIcon1Proc/attrIcon2Proc — 미변환.
             //  [임시] 완료 전까지 안내 토스트만(사용자 지시 — AppID F4 등). TODO(i18n) + 재개 시 각 동작 배선.
             console.warn("[W4+ 예정] 속성 아이콘 동작 미변환:", sAttr.UIATT, "icon" + iNo, sSrc);

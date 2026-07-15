@@ -8,6 +8,21 @@
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
+    <!-- [흰 플래시 방지] UI5 콘텐츠라 테마 인프라가 없어 로드 전 흰색. 부모(frame.html)의 --boot-bg 를
+         첫 페인트 전 문서 배경으로 상속(동일 origin). UI5 렌더 완료되면 UI5 배경이 덮는다. -->
+    <script>
+        (function () {
+            try {
+                var bg = parent.document.documentElement.style.getPropertyValue("--boot-bg");
+                if (bg) {
+                    var s = document.createElement("style");
+                    s.textContent = "html,body{background:" + bg + ";}";
+                    document.head.appendChild(s);
+                }
+            } catch (e) { }
+        })();
+    </script>
+
     <style>
         .sapUiBlockLayer, .sapUiLocalBusyIndicator {
             background-color: transparent !important;   

@@ -31,11 +31,11 @@ window.addEventListener("load", async function(){
             clearInterval(_oIntv);
 
             let _PARENT_DOM_ID = window.PARENT_DOM_ID;
-
+            
             delete window.PARENT_DOM_ID;
-
+            
             resolve(_PARENT_DOM_ID);
-
+            
         }, 50);
     });
 
@@ -45,10 +45,10 @@ window.addEventListener("load", async function(){
         return;
     }
 
-
+    
     oAPP.attr.PARENT_DOM_ID = _PARENT_DOM_ID;
-
-
+            
+    
     //커스텀 이벤트 등록 처리.
     document.body.addEventListener(C_IF_FAV_ICON_EVT, oAPP.fn.favIconCustomEvent);
 
@@ -70,7 +70,7 @@ oAPP.fn.sendDataToParent = function(oData){
     if(typeof _oParentDom === "undefined"){
         return;
     }
-
+    
     let _oCustomEvt = new CustomEvent(C_IF_FAV_ICON_EVT, {detail: oData});
 
     //즐겨찾기 팝업으로 데이터 전송 처리.
@@ -86,10 +86,10 @@ oAPP.fn.sendDataToParent = function(oData){
  * @function - //즐겨찾기 팝업과 즐겨찾기 리스트(iframe)과의 I/F를 위한 커스텀 이벤트 callback function.
  ********************************************************/
 oAPP.fn.favIconCustomEvent = function(oEvent){
-
+    
     switch (oEvent?.detail?.ACTCD) {
         case "SET_INIT_FAV_LIST":
-
+            
             //즐겨찾기 아이콘 화면 초기 구성.
             oAPP.fn.setInitFavIconData(oEvent.detail);
             break;
@@ -145,14 +145,10 @@ oAPP.fn.setInitFavIconData = function(oData){
     oAPP.fn.removeFavList();
 
 
-    //검색 placeholder/결과없음 문구 적용(부모가 메시지키로 전달).
-    oAPP.fn.applyTexts(oData?.S_TXT);
-
-
     //테마 적용 처리.
     oAPP.fn.setTheme(oData?.S_THEME);
 
-
+    
     //즐겨찾기 아이콘 CSS Link 추가 처리.
     oAPP.fn.createIconCSSLink(oData?.T_CSS);
 
@@ -163,15 +159,10 @@ oAPP.fn.setInitFavIconData = function(oData){
 
     //즐겨찾기 아이콘 리스트 데이터 출력 body 생성.
     oAPP.fn.createFavListBody();
-
+    
 
     //즐겨찾기 아이콘 리스트 구성 처리.
     oAPP.fn.setFavList(oData?.T_ICON_LIST);
-
-
-    //검색 이벤트 1회 배선 + 현재 검색어 기준 필터/카운트 갱신.
-    oAPP.fn.wireSearchOnce();
-    oAPP.fn.refreshFilter();
 
 
     let _oHTML = document.getElementsByTagName("html");
@@ -186,7 +177,7 @@ oAPP.fn.setInitFavIconData = function(oData){
 
     //BUSY OFF 액션코드 매핑.
     _sParam.ACTCD = "BUSY_OFF";
-
+    
     //아이콘 즐겨찾기 팝업에 BOSY OFF 요청 처리.
     oAPP.fn.sendDataToParent(_sParam);
 
@@ -225,7 +216,7 @@ oAPP.fn.setTheme = function(sTheme){
 
     //테마명 대문자 변환 처리.
     let _theme = String(sTheme.THEME).toUpperCase();
-
+    
     //다크 테마 키워드가 존재하는경우.
     if(_theme.indexOf("DARK") !== -1){
         //즐겨찾기 리스트를 다크 테마로 적용.
@@ -263,7 +254,7 @@ oAPP.fn.createIconStyle = function(aFont = []){
 
         let _sFont = aFont[i];
 
-        _style +=
+        _style += 
                 `@font-face {` +
                     `font-family: '${_sFont.fontFamily}';` +
                     `src: url('${_sFont.fontURI}') format('woff2');` +
@@ -272,7 +263,7 @@ oAPP.fn.createIconStyle = function(aFont = []){
                 `}`;
     }
 
-
+    
     _oStyle.innerHTML = _style;
 
 
@@ -298,11 +289,11 @@ oAPP.fn.removeIconCSSLink = function(){
 
     //폰트 사용 테마 링크 정보 제거 처리.
     for (let i = 0, l = _aLink.length; i < l; i++) {
-
+        
         let _oLink = _aLink[i];
 
         document.head.removeChild(_oLink);
-
+        
     }
 
 };
@@ -321,7 +312,7 @@ oAPP.fn.createIconCSSLink = function(aLinkPath = []){
 
     //폰트 사용 테마 링크 정보 추가 처리.
     for (let i = 0, l = aLinkPath.length; i < l; i++) {
-
+        
         let _sLinkPath = aLinkPath[i];
 
         let _oLink = document.createElement("link");
@@ -331,10 +322,10 @@ oAPP.fn.createIconCSSLink = function(aLinkPath = []){
         _oLink.setAttribute("href", _sLinkPath.href);
 
         _oLink.setAttribute("id", _sLinkPath.id);
-
+            
 
         document.head.appendChild(_oLink);
-
+        
     }
 
 };
@@ -347,14 +338,20 @@ oAPP.fn.createIconCSSLink = function(aLinkPath = []){
  ********************************************************/
 oAPP.fn.removeFavList = function(){
 
-    let _oGrid = document.getElementById("favGrid") || undefined;
+    let _oList = document.getElementById("favList") || undefined;
 
-    if(typeof _oGrid === "undefined"){
+    if(typeof _oList === "undefined"){
         return;
     }
 
-    //그리드 내 타일 전체 제거.
-    _oGrid.replaceChildren();
+
+    let _oTBody = _oList.querySelector("tbody") || undefined;
+
+    if(typeof _oTBody === "undefined"){
+        return;
+    }
+
+    _oList.removeChild(_oTBody);
 
 };
 
@@ -363,11 +360,19 @@ oAPP.fn.removeFavList = function(){
 
 /*********************************************************
  * @function - 즐겨찾기 아이콘 리스트 데이터 출력 body 생성.
- *   개편: 출력 컨테이너(#favGrid)는 index.html 에 정적으로 존재하므로
- *   별도 body 생성이 필요 없다(초기화는 removeFavList 가 담당).
  ********************************************************/
 oAPP.fn.createFavListBody = function(){
-    //정적 그리드 사용 — 생성 불필요.
+    
+    let _oList = document.getElementById("favList") || undefined;
+
+    if(typeof _oList === "undefined"){
+        return;
+    }
+
+    let _oTBody = document.createElement("tbody");
+
+    _oList.appendChild(_oTBody);
+    
 };
 
 
@@ -377,9 +382,15 @@ oAPP.fn.createFavListBody = function(){
  * @function - 즐겨찾기 아이콘 리스트 데이터 출력 body 정보 얻기.
  ********************************************************/
 oAPP.fn.getFavListBody = function(){
+    
+    let _oList = document.getElementById("favList") || undefined;
 
-    return document.getElementById("favGrid") || undefined;
+    if(typeof _oList === "undefined"){
+        return;
+    }
 
+    return _oList.querySelector("tbody") || undefined;    
+    
 };
 
 
@@ -387,8 +398,6 @@ oAPP.fn.getFavListBody = function(){
 
 /*********************************************************
  * @function - 즐겨찾기 아이콘 리스트 구성 처리.
- *   개편: 밋밋한 <table> 행 → SAP Horizon 룩의 아이콘 타일 그리드.
- *   (아이콘 글리프 렌더·이벤트 I/F·데이터 매핑은 원본 그대로)
  ********************************************************/
 oAPP.fn.setFavList = function(aFavIconList = []){
 
@@ -398,83 +407,95 @@ oAPP.fn.setFavList = function(aFavIconList = []){
     }
 
 
-    //즐겨찾기 아이콘 리스트 데이터 출력 그리드 정보 얻기.
-    let _oGrid = oAPP.fn.getFavListBody();
+    //즐겨찾기 아이콘 리스트 데이터 출력 body 정보 얻기.
+    let _oTBody = oAPP.fn.getFavListBody();
 
-    if(typeof _oGrid === "undefined"){
+    if(typeof _oTBody === "undefined"){
         return;
     }
+    
 
-
-    //즐겨찾기 아이콘 항목을 기준으로 타일 그리드 구성.
+    //즐겨찾기 아이콘 항목을 기준으로 list 구성.
     for (let i = 0, l = aFavIconList.length; i < l; i++) {
 
         let _sFavIconList = aFavIconList[i];
-
-        //── 아이콘 타일(더블클릭 = 선택) ──────────────────────────
-        let _oTile = document.createElement("div");
+        
+        let _oRow = document.createElement("tr");
 
         //현재 아이콘 라인 데이터를 dom에 매핑 처리.
-        _oTile._sFavIconList = _sFavIconList;
+        _oRow._sFavIconList = _sFavIconList;
 
-        _oTile.classList.add("favTile");
+        
+        _oRow.classList.add("table-row");
 
-        //말줄임된 아이콘 이름 전체는 타일 title 로 확인(독립 iframe — 네이티브 title 허용).
-        _oTile.title = _sFavIconList.ICON_NAME || "";
+        //더블클릭 이벤트 등록.
+        // _oRow.addEventListener("dblclick", oAPP.onDblclickFavList);
 
-        //검색 필터용 소문자 이름 캐시.
-        _oTile._name = String(_sFavIconList.ICON_NAME || "").toLowerCase();
+        _oRow.ondblclick = oAPP.onDblclickFavList;
 
-        //키보드 접근성 — 타일 포커스 가능 + Enter/Space 선택(더블클릭과 동일).
-        _oTile.tabIndex = 0;
-        _oTile.setAttribute("role", "button");
-        _oTile.onkeydown = oAPP.onKeydownFavTile;
-
-        //더블클릭 = 아이콘 선택(원본 로직 유지).
-        _oTile.ondblclick = oAPP.onDblclickFavList;
+        _oTBody.appendChild(_oRow);
 
 
-        //── 아이콘 글리프(SAP UI5 아이콘 폰트) ────────────────────
-        let _oGlyph = document.createElement("span");
+        //아이콘 이미지 출력 TD 생성.
+        let _oIconImgCell = document.createElement("td");
 
-        //아이콘 출력(서버 library.css 의 .sapUiIcon 이 content 렌더).
-        _oGlyph.setAttribute("data-sap-ui-icon-content", _sFavIconList.content);
+        _oIconImgCell.classList.add("table-cell");
 
-        _oGlyph.classList.add("sapUiIcon", "favTile__glyph");
+        _oRow.appendChild(_oIconImgCell);
+
+
+        let _oIConImgSpan = document.createElement("span");
+
+        //아이콘 출력 
+        _oIConImgSpan.setAttribute("data-sap-ui-icon-content", _sFavIconList.content);
+
+        //아이콘 출력을 위한 css 설정.
+        _oIConImgSpan.classList.add("sapUiIcon");
 
         //아이콘 출력 font family 구성.
-        _oGlyph.style.fontFamily = _sFavIconList.fontFamily;
+        _oIConImgSpan.style.fontFamily = _sFavIconList.fontFamily;
 
-        _oTile.appendChild(_oGlyph);
+        //아이콘 크기 설정.
+        _oIConImgSpan.style.fontSize = "35px";
 
-
-        //── 아이콘 이름(말줄임) ───────────────────────────────────
-        let _oName = document.createElement("span");
-
-        _oName.classList.add("favTile__name");
-
-        _oName.innerText = _sFavIconList.ICON_NAME;
-
-        _oTile.appendChild(_oName);
+        _oIconImgCell.appendChild(_oIConImgSpan);
 
 
-        //── 이름 복사 버튼(타일 hover 시 우상단 노출) ─────────────
+
+
+        //아이콘 명 출력 TD 생성.
+        let _oIconTextCell = document.createElement("td");
+
+        _oIconTextCell.classList.add("table-cell");
+
+        _oIconTextCell.innerText = _sFavIconList.ICON_NAME;
+
+        _oRow.appendChild(_oIconTextCell);
+
+
+
+        //아이콘 복사 cell 생성.
+        let _oIconCopyCell = document.createElement("td");
+
+        _oIconCopyCell.classList.add("table-cell");
+
+        _oIconCopyCell.style.width = "50px";
+
+        _oRow.appendChild(_oIconCopyCell);
+
+
+        //아이콘 명 복사 버튼 생성.
         let _oCopyButton = document.createElement("button");
-
-        _oCopyButton.type = "button";
-
-        //타일 자체 Tab 순서만 유지(복사버튼은 Tab 스톱 제외 — focus-within/hover 로 노출).
-        _oCopyButton.tabIndex = -1;
 
         //현재 아이콘 라인 데이터를 dom에 매핑 처리.
         _oCopyButton._sFavIconList = _sFavIconList;
 
-        _oCopyButton.classList.add("favTile__copy");
+        _oCopyButton.classList.add("theme-button");
 
-        //버튼 클릭 = 이름 복사(원본 로직 유지).
+        //버튼 클릭 이벤트 등록.
         _oCopyButton.onclick = oAPP.onClipBoardTextCopy;
 
-        //타일 더블클릭(선택)과의 전파 충돌 방지.
+        //TR 태그에 구성된 더블클릭과 이벤트 전파 방지를 위해 DUMMY 더블클릭 이벤트 등록 처리.
         _oCopyButton.ondblclick = function(){
             event.stopPropagation();
         };
@@ -482,158 +503,23 @@ oAPP.fn.setFavList = function(aFavIconList = []){
 
         let _oCopyIcon = document.createElement("span");
 
-        //복사 버튼 아이콘.
-        _oCopyIcon.setAttribute("data-sap-ui-icon-content", "");
-
+        //버튼 아이콘 생성.
+        _oCopyIcon.setAttribute("data-sap-ui-icon-content", "\ue245");
+        
         _oCopyIcon.classList.add("sapUiIcon");
 
         _oCopyIcon.style.fontFamily = "SAP-icons";
 
-        _oCopyButton.appendChild(_oCopyIcon);
+        _oCopyIcon.style.cursor = "pointer";
 
+        _oCopyButton.appendChild(_oCopyIcon);        
 
-        _oTile.appendChild(_oCopyButton);
+        
 
+        _oIconCopyCell.appendChild(_oCopyButton);
 
-        _oGrid.appendChild(_oTile);
-
+        
     }
-
-};
-
-
-
-
-/*********************************************************
- * @function - 화면 문구 적용(검색 placeholder / 결과없음). 부모가 메시지키로 전달.
- ********************************************************/
-oAPP.fn.applyTexts = function(oTxt){
-
-    oAPP.attr.TXT = oTxt || {};
-
-    let _inp = document.getElementById("favSearchInp");
-    if(_inp){
-        let _ph = oAPP.attr.TXT.search || "";
-        //오픈(재오픈)마다 검색어 초기화 — stale 필터 방지.
-        _inp.value = "";
-        _inp.placeholder = _ph;
-        _inp.setAttribute("aria-label", _ph);
-    }
-
-    //clear 버튼 숨김(빈 값 기준).
-    let _clr = document.getElementById("favSearchClr");
-    if(_clr){ _clr.hidden = true; }
-
-};
-
-
-
-
-/*********************************************************
- * @function - 검색 이벤트 1회 배선(입력 debounce 필터 + clear + ESC).
- ********************************************************/
-oAPP.fn.wireSearchOnce = function(){
-
-    if(oAPP.attr._searchWired){ return; }
-
-    let _inp = document.getElementById("favSearchInp");
-    let _clr = document.getElementById("favSearchClr");
-    if(!_inp){ return; }
-
-    let _timer;
-
-    //입력 → 경량 debounce 후 필터.
-    _inp.addEventListener("input", function(){
-        if(_clr){ _clr.hidden = (_inp.value === ""); }
-        clearTimeout(_timer);
-        _timer = setTimeout(oAPP.fn.refreshFilter, 80);
-    });
-
-    //ESC = 검색어 지우기(모달 닫힘과 충돌 방지 위해 전파 중단).
-    _inp.addEventListener("keydown", function(ev){
-        if(ev.key === "Escape" && _inp.value !== ""){
-            ev.stopPropagation();
-            _inp.value = "";
-            if(_clr){ _clr.hidden = true; }
-            oAPP.fn.refreshFilter();
-        }
-    });
-
-    if(_clr){
-        _clr.addEventListener("click", function(){
-            _inp.value = "";
-            _clr.hidden = true;
-            oAPP.fn.refreshFilter();
-            _inp.focus();
-        });
-    }
-
-    oAPP.attr._searchWired = true;
-
-};
-
-
-
-
-/*********************************************************
- * @function - 현재 검색어로 타일 필터 + 카운트/결과없음 갱신.
- ********************************************************/
-oAPP.fn.refreshFilter = function(){
-
-    let _grid = document.getElementById("favGrid");
-    if(!_grid){ return; }
-
-    let _inp = document.getElementById("favSearchInp");
-    let _q = (_inp && _inp.value ? _inp.value : "").trim().toLowerCase();
-
-    let _tiles = _grid.children;
-    let _total = _tiles.length;
-    let _shown = 0;
-
-    for(let i = 0; i < _total; i++){
-        let _t = _tiles[i];
-        let _match = (_q === "" || (_t._name && _t._name.indexOf(_q) !== -1));
-        _t.hidden = !_match;
-        if(_match){ _shown++; }
-    }
-
-    //카운트: 검색 중이면 'n / total', 아니면 total.
-    let _cnt = document.getElementById("favCount");
-    if(_cnt){
-        _cnt.textContent = (_q === "") ? String(_total) : (_shown + " / " + _total);
-    }
-
-    //결과 없음 안내.
-    let _empty = document.getElementById("favEmpty");
-    if(_empty){
-        let _none = (_shown === 0);
-        _empty.textContent = _none ? ((oAPP.attr.TXT && oAPP.attr.TXT.noResult) ? oAPP.attr.TXT.noResult : "") : "";
-        _empty.hidden = !_none;
-        _grid.hidden = _none;
-    }
-
-};
-
-
-
-
-/*********************************************************
- * @event - 타일 키보드 선택(Enter/Space = 더블클릭 선택과 동일).
- ********************************************************/
-oAPP.onKeydownFavTile = function(oEvent){
-
-    if(oEvent.key !== "Enter" && oEvent.key !== " " && oEvent.key !== "Spacebar"){ return; }
-
-    oEvent.preventDefault();
-
-    let _t = oEvent.currentTarget;
-    if(!_t || typeof _t._sFavIconList === "undefined"){ return; }
-
-    let _p = {};
-    _p.ACTCD = "FAV_ICON_LIST_SEL_LINE";
-    _p.sList = _t._sFavIconList;
-
-    oAPP.fn.sendDataToParent(_p);
 
 };
 
@@ -670,7 +556,7 @@ oAPP.onDblclickFavList = function(oEvent){
 
     //즐겨찾기 팝업으로 데이터 전송 처리.
     oAPP.fn.sendDataToParent(_sParam);
-
+    
 
 };
 
@@ -679,11 +565,11 @@ oAPP.onDblclickFavList = function(oEvent){
  * @event - 아이콘 이름 복사 버튼 선택 이벤트.
  ********************************************************/
 oAPP.onClipBoardTextCopy = async function(oEvent){
-
+    
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
-
+    
     let _sFavIconList = oEvent?.currentTarget?._sFavIconList;
 
     // await new Promise(function(resolve){
@@ -692,7 +578,7 @@ oAPP.onClipBoardTextCopy = async function(oEvent){
     //         resolve();
     //     },300);
     // });
-
+       
     //라인 데이터가 존재하지 않는경우 exit.
     if(typeof _sFavIconList === "undefined"){
         return;

@@ -66,6 +66,14 @@ function setBusy(bIsBusy) {
     // 공통 .u4a-busy 표시 트리거 = data-busy="true" (shell.css). 빈값/removeAttribute 는 안 뜸(전 소비처 규약).
     if (bIsBusy) { oBusy.setAttribute("data-busy", "true"); }
     else { oBusy.setAttribute("data-busy", "false"); }
+
+    // [흰색 플래시 방지] 본문 iframe(KEEP-UI5)은 초기에 숨김(index.html #floatFrame). UI5 부팅 완료로
+    // busy 가 해제될 때만 노출한다 → 그 전까지는 호스트 --boot-bg(테마색)만 보인다.
+    // 로드 실패(_onUi5LoadFail)는 오류 안내 후 창을 닫으므로 흰 프레임이 드러나지 않는다.
+    if (!bIsBusy && !oAPP.attr.bLoadFailed) {
+        var oFrame = document.getElementById("floatFrame");
+        if (oFrame) { oFrame.classList.add("is-ready"); }
+    }
 } // end of setBusy
 
 // 셸 busy 별칭(다른 소비처 대비, 동일 대상).
@@ -388,6 +396,8 @@ function fnInitLoad() {
     oAPP.UI5_THEME = oAPP.fn.toUI5Theme(oAPP.attr.sDefTheme);
 
     let oFrame = document.getElementById("floatFrame");
+    // 재로드(창 재사용) 시에도 새 문서의 흰 캔버스가 노출되지 않도록 다시 숨김.
+    oFrame.classList.remove("is-ready");
     oFrame.src = "frame.html";
 
 } // end of fnInitLoad

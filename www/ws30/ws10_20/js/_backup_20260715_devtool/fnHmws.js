@@ -1098,7 +1098,12 @@
             return;
         }
 
-        oAPP.fn.fnOpenDevTool();
+        // ── [임시] 관리자 개발툴(fnOpenDevTool=sap.m.Dialog) HTML5 미변환 — 완료 전까지 안내 토스트만.
+        //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 변환 완료 시 아래 원본 호출 복원.
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        return;
+
+        // oAPP.fn.fnOpenDevTool();
 
     }; // end of oAPP.fn.fnWS20WMENU40_06_01
 

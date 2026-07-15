@@ -69,8 +69,14 @@
         try { APPCOMMON.fnSetModelProperty && APPCOMMON.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { }
         try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
     }
+    // 재선택 = setSelectTreeItem(→fnWs20SelectUI, async: refreshPreview+selPreviewUI 대기).
+    //  ★ Promise 를 반환한다 — undo/redo 가 이 완료(=편집하던 페이지 복원)까지 await 해야
+    //    BUSY 를 그 전에 풀지 않고, PAGE1 이 잠깐 노출되는 깜빡임도 막는다.
     function _selectNode(sObjid) {
-        try { if (typeof oAPP.fn.setSelectTreeItem === "function") { oAPP.fn.setSelectTreeItem(sObjid); } } catch (e) { }
+        try {
+            if (typeof oAPP.fn.setSelectTreeItem === "function") { return oAPP.fn.setSelectTreeItem(sObjid); }
+        } catch (e) { }
+        return Promise.resolve();
     }
     // 열려있는 형제(자식) 윈도우 busy 브로드캐스트 — 원본 uiDesignArea.js 의 디자인 변경(삭제/이동/붙여넣기/삽입)이
     //  bindPopupBroadCast("BUSY_ON"/"BUSY_OFF")로 전체 자식 윈도우(앱 멀티 미리보기 등)를 잠갔다 푼다.
@@ -110,6 +116,7 @@
      *   재렌더 + 프리뷰 drawPreview(가드). 삽입/삭제/이동/복사붙여넣기에 균일 적용.
      ********************************************************************/
     var _undoStack = [], _redoStack = [], _UNDO_MAX = 50;
+    var _bHistBusy = false;   // undo/redo 복원(async drawPreview+재선택) 진행 중 재진입 차단 플래그.
 
     function _snapshot() {
         var z = [];
@@ -132,45 +139,10 @@
         var sel = ""; try { sel = (oAPP.attr.oModel.oData.uiinfo && oAPP.attr.oModel.oData.uiinfo.OBJID) || ""; } catch (e) { }
         return { z: z, t15: t15, chag: chag, sel: sel, cevt: cevt, desc: desc };
     }
-    // 복원된 "모든 노드"의 프로퍼티를 미리보기 컨트롤에 setter(previewUIsetProp)로 재적용.
-    //  ★ 스냅샷은 "무슨 노드가 바뀌었는지"를 안 가지고 선택노드(sel)만 가진다. redo 때 sel 이 편집버튼이
-    //    아니라 페이지로 잡히면(다중편집 후 드리프트) anchor 1개에만 setter 하면 엉뚱한 곳(PAGE.title)에
-    //    적용돼 정작 버튼 값이 안 바뀐다(=redo 미반영 원인). → prev 전체를 돌며 프로퍼티(UIATY="1")·
-    //    비바인딩(ISBND≠"X")만 재적용하면 어느 노드가 바뀌었든 정확히 복원(undo/redo 대칭).
-    //    previewUIsetProp = 살아있는 컨트롤에 setText 등 setter 호출(UI5 정석, 현재 페이지 유지).
-    function _reapplyAllPreviewProps() {
-        if (typeof oAPP.fn.previewUIsetProp !== "function") { return; }   // 미리보기 모듈 미로드 — skip
-        var oPrev = oAPP.attr.prev || {};
-        for (var objid in oPrev) {
-            var aT15 = oPrev[objid] && oPrev[objid]._T_0015;
-            if (!Array.isArray(aT15)) { continue; }
-            for (var i = 0; i < aT15.length; i++) {
-                var r = aT15[i];
-                if (!r || r.UIATY !== "1" || r.ISBND === "X") { continue; }
-                try { oAPP.fn.previewUIsetProp(r); } catch (e) { }
-            }
-        }
-    }
-    // undo/redo(구조 동일=속성 복원) 후 ROOT UI Theme(DH001021)를 미리보기에 재적용.
-    //   _reapplyAllPreviewProps 는 previewUIsetProp 기반이라 ROOT 를 스킵(uiPreviewArea.js:486)하므로
-    //   테마 변경의 undo/redo 가 DDLB 값만 되돌리고 미리보기 테마는 안 바뀌던 문제를 막는다.
-    //   (원본 undoRedo.js:2269 setPreviewUiTheme 이식. 구조변경 분기는 drawPreview 가 _T_0015 로
-    //    테마를 재적용하므로 여기선 속성-복원 분기에서만 호출.)
-    function _reapplyRootTheme() {
-        try {
-            var aRoot15 = oAPP.attr.prev && oAPP.attr.prev.ROOT && oAPP.attr.prev.ROOT._T_0015;
-            if (!Array.isArray(aRoot15)) { return; }
-            var oThm = aRoot15.find(function (a) { return a && a.UIATK === "DH001021"; });
-            if (oThm && oThm.UIATV && typeof oAPP.fn.fnWs20ApplyPrevTheme === "function") {
-                oAPP.fn.fnWs20ApplyPrevTheme(oThm.UIATV);
-            }
-        } catch (e) { console.warn("[HTML5][WS20] undo/redo ROOT 테마 재적용 skip:", e && e.message); }
-    }
-    function _restoreSnap(s) {
+    // async — drawPreview·재선택(refreshPreview/selPreviewUI)이 async 라, 호출측(_doApply)이
+    //  이 완료까지 await 해야 BUSY 해제/재진입이 재구성 도중에 끼어들지 않는다.
+    async function _restoreSnap(s) {
         if (!s) { return; }
-        // 구조 변경 여부 = 복원 전/후 노드 수 차이(삽입/삭제 vs 속성·이름·이동). zTREE 덮기 "전" 판정.
-        var bStructChange = false;
-        try { bStructChange = _countNodes(_tree()) !== _countNodes(s.z); } catch (e) { }
         // 선택 노드가 복원 후 사라질 경우(예: 삭제 redo)의 대체 앵커 = 그 부모(영향 페이지).
         var sSelParent = "";
         try { var oSelCur = s.sel ? _node(s.sel) : null; if (oSelCur) { sSelParent = oSelCur.POBID || ""; } } catch (e) { }
@@ -188,7 +160,19 @@
         try { (function w(a) { if (!a) { return; } for (var i = 0; i < a.length; i++) { a[i].chk = (oChkMap[a[i].OBJID] === true); w(a[i].zTREE); } })(oAPP.attr.oModel.oData.zTREE); } catch (e) { }
         try {
             oAPP.attr.prev = oAPP.attr.prev || {};
+            // (1) 스냅샷에 담긴 키 복원.
             for (var k in s.t15) { oAPP.attr.prev[k] = oAPP.attr.prev[k] || {}; oAPP.attr.prev[k]._T_0015 = JSON.parse(JSON.stringify(s.t15[k])); }
+            // (2) ★ 스냅샷에 "없는" 키의 _T_0015 는 편집으로 새로 생긴 잔재이므로 [] 로 비운다.
+            //   drawPreview 는 getAttrChangedData()로 현재 prev "전체"를 훑어 T_0015 를 다시 만든다
+            //   (preview/index.js:8496). 스냅샷 키만 덮고 잔재를 안 지우면, 어떤 속성을 "처음" 바꾼 뒤
+            //   undo 해도 그 노드의 편집 _T_0015 가 남아 T_0015 에 실려 편집값이 되살아난다(=undo 미반영).
+            //   _snapshot 은 push 시점 _T_0015 가 있던 키만 담으므로, 스냅샷에 없다=push 당시 변경 없음
+            //   → [] 가 정확한 복원값(빈 배열도 스냅샷에 담기니 오검출 없음).
+            for (var pk in oAPP.attr.prev) {
+                if (!oAPP.attr.prev[pk]) { continue; }
+                if (Object.prototype.hasOwnProperty.call(s.t15, pk)) { continue; }
+                if (Array.isArray(oAPP.attr.prev[pk]._T_0015)) { oAPP.attr.prev[pk]._T_0015 = []; }
+            }
         } catch (e) { }
         // T_CEVT/T_DESC 복원 — 배열 참조 유지 위해 in-place 교체(구버전 스냅샷/미로딩 가드).
         try {
@@ -214,31 +198,26 @@
             _updateUndoBtns();
         }
 
-        // ★ 미리보기 반영 = "값 복원 후 화면 다시그리기"(원본 사상).
-        //   스냅샷은 "무슨 노드가 바뀌었는지"를 안 가지므로(노드별 setter 는 앵커가 페이지면 엉뚱한 곳에
-        //   적용됨 — redo 실패 원인) 미리보기를 복원 데이터로 재구성한다.
-        if (!bStructChange) {
-            // 속성/이름/이동(구조 동일): 미리보기 전면 재구성(drawPreview) 없이 — 현재 페이지 유지.
-            //  복원된 값을 setter(previewUIsetProp)로 "모든 컨트롤"에 재적용(anchor 에 의존하지 않아
-            //  redo 때 sel 이 페이지로 잡혀도 편집 버튼까지 정확히 복원). 그 뒤 재선택으로 선택/하이라이트/
-            //  속성패널 갱신(refreshPreview 가 재구성해도 값은 _T_0015 로 동일 → 일관).
-            _reapplyAllPreviewProps();
-            _reapplyRootTheme();          // ROOT 테마(DH001021)는 previewUIsetProp 가 스킵 → 별도 재적용.
-            _commitState();
-            if (sAnchor) { try { _selectNode(sAnchor); } catch (e) { } }
-            return;
-        }
-
-        // 삽입/삭제(구조 변경): 재추가 노드·차트/RTE 등 모든 UI타입 안전 위해 전체 재구성 후 재선택
-        //  (원본 초기로드 패턴 uiPreviewArea:155 drawPreview().then(select)).
-        var oDrawPromise = null;
+        // ★ 미리보기 반영 = "값 복원 후 화면 전면 재구성"(원본 사상 그대로 — 삽입/삭제/이동/속성/이름/테마 균일).
+        //   [WHY 노드별 setter 가 아니라 전면 재구성인가]
+        //   스냅샷은 "무슨 노드의 무슨 속성이 바뀌었는지"를 갖지 않고 전체 _T_0015 만 담는다.
+        //   노드별 setter(previewUIsetProp) 재적용 방식은 두 빈틈이 있어 undo 미반영을 낳았다:
+        //     (1) 어떤 속성을 "처음" 바꾼 경우 편집 直前 스냅샷에 그 속성 행이 없어 되돌릴 setter 자체가
+        //         없다 → 살아있는 컨트롤이 편집값을 그대로 유지(데이터는 되돌아가는데 미리보기만 안 바뀜).
+        //     (2) previewUIsetProp 은 내부가 async(prevGetOTRText().then)라 직후의 재선택과 경쟁한다.
+        //   → 복원된 모델(zTREE + prev._T_0015 + ROOT 테마)로 drawPreview 가 모든 컨트롤을 새로 그리면
+        //     (uiPreviewArea 초기로드와 동일 경로: setUIScript(zTREE) + 테마 재적용) 위 빈틈 없이 항상
+        //     "데이터 = 미리보기" 가 보장된다. 페이지 위치는 이어지는 _selectNode(sAnchor) 가 그 노드의
+        //     페이지로 재이동시켜 보존한다(원본 초기로드 패턴 uiPreviewArea:155 drawPreview().then(select)).
+        //  ★ drawPreview → (완료 대기) → _selectNode 순서로 await. drawPreview 가 root 를 APP 기본
+        //    페이지로 재구성하므로, 그 "완료 뒤"에 앵커를 재선택해야 편집하던 페이지로 정확히 복귀한다
+        //    (fire-and-forget 이면 PAGE1 이 잠깐 노출되거나 재선택이 재구성과 경쟁).
         try {
             var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
-            if (w && typeof w.drawPreview === "function") { oDrawPromise = w.drawPreview(); }
+            if (w && typeof w.drawPreview === "function") { await w.drawPreview(); }
         } catch (e) { console.warn("[HTML5][WS20] undo/redo drawPreview:", e && e.message); }
-        function _afterStruct() { _commitState(); if (sAnchor) { try { _selectNode(sAnchor); } catch (e) { } } }
-        if (oDrawPromise && typeof oDrawPromise.then === "function") { oDrawPromise.then(_afterStruct, _afterStruct); }
-        else { _afterStruct(); }
+        _commitState();
+        if (sAnchor) { try { await _selectNode(sAnchor); } catch (e) { } }
     }
     // 편집 직전 호출 — 현재 상태를 undo 스택에 적재(+redo 비움).
     oAPP.fn.fnWs20PushUndo = function () {
@@ -261,6 +240,9 @@
     //    스냅샷 방식엔 액션 타입이 없으므로 "복원 결과 트리 노드 수가 줄어드는가"로 판정한다
     //    (이동/속성변경/Rename 은 노드 수 동일 → 팝업 없음, 자동으로 원본과 일치).
     oAPP.fn.fnWs20ExecHistory = function (sMode) {
+        // ★ 재진입 차단 — 복원(_restoreSnap)이 async(drawPreview+재선택)라 완료 전에 또 undo/redo 를
+        //   누르면 재구성이 겹쳐 히스토리/미리보기가 엉킨다. 진행 중이면 무시(코덱스 지적).
+        if (_bHistBusy) { return; }
         var aSrc = (sMode === "UNDO") ? _undoStack : _redoStack;
         var aDst = (sMode === "UNDO") ? _redoStack : _undoStack;
         if (!aSrc.length) { return; }
@@ -269,17 +251,23 @@
         var nCur = _countNodes(_tree());                           // 현재 트리 노드 수
         var nNext = (oTarget && oTarget.z) ? _countNodes(oTarget.z) : nCur;
 
-        function _doApply() {
+        async function _doApply() {
             //열려있는 형제(자식) 윈도우 BUSY_ON/OFF — 원본 undoRedo.js executeHistory(143·156행)가
             //  bindPopupBroadCast("BUSY_ON")/("BUSY_OFF")로 전체 자식 윈도우(앱 멀티 미리보기 등)를 잠금.
-            //  실제 복원(_restoreSnap = 공유 데이터 변경)만 감싼다(빈 히스토리/취소는 변경 없어 불요).
+            //  ★ _restoreSnap 을 await 해 drawPreview + 재선택(페이지 복원)까지 끝난 "뒤"에 BUSY_OFF·
+            //    재진입 해제 — 재구성 도중 잠금이 풀려 다른 undo 가 끼어들던 race 를 막는다(코덱스 지적).
             //  ※ attr.js _broadChildBusy 와 동일 채널 — edit.js 는 oMainBroad 미사용이라 인라인.
+            _bHistBusy = true;
             try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { }
             try {
                 aDst.push(_snapshot());
-                _restoreSnap(aSrc.pop());
+                await _restoreSnap(aSrc.pop());
+            } catch (e) {
+                console.error("[HTML5][WS20] undo/redo 복원 오류:", e && e.message);
+            } finally {
+                try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+                _bHistBusy = false;
             }
-            finally { try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { } }
         }
 
         // 복원 결과 UI 가 사라지면(노드 감소) 원본과 동일하게 삭제 확인 팝업.

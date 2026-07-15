@@ -282,31 +282,12 @@ function buildPrompt(opts, cwd) {
     return { prompt, needsDirAccess: false };
 }
 
-async function runAgy(agyArgs, cwd, timeoutMs) {
+async function runAgy(agyArgs, prompt, cwd, timeoutMs) {
     return new Promise((resolve) => {
-        // agy `--print` takes the prompt as the VALUE of the flag (`--print "<text>"`),
-        // NOT via stdin. If the prompt is piped to stdin and `--print` is left bare, agy
-        // consumes the *next* flag as its prompt and answers about that flag instead.
-        // So the prompt is passed inline (built into agyArgs right after "--print").
-        //
-        // We spawn with shell:false and agy's resolved full path, because:
-        //   · A multi-line prompt (e.g. a diff) passed through cmd.exe (shell:true) gets
-        //     truncated at the first newline — cmd treats it as a command separator.
-        //     shell:false hands argv straight to CreateProcessW, so newlines survive.
-        //   · shell:false won't do PATH/extension lookup on a bare "agy", so we resolve
-        //     the first PATH match (the same copy a terminal would run) up front.
-        //   · Bonus: no shell quoting/injection surface (fixes Node's shell+args warning).
-        let agyCmd = "agy";
-        try {
-            const finder = process.platform === "win32" ? "where" : "which";
-            const w = spawnSync(finder, ["agy"], { encoding: "utf8" });
-            const first = (w.stdout || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0];
-            if (first) { agyCmd = first; }
-        } catch (e) { /* fall back to bare "agy" */ }
-
-        const child = spawn(agyCmd, agyArgs, {
+        const isWin = process.platform === "win32";
+        const child = spawn("agy", isWin ? agyArgs.map(winCmdQuote) : agyArgs, {
             cwd,
-            shell: false,
+            shell: isWin,
             stdio: ["pipe", "pipe", "pipe"],
         });
 
@@ -320,9 +301,10 @@ async function runAgy(agyArgs, cwd, timeoutMs) {
             }
         }, timeoutMs);
 
-        // Prompt is passed inline via agyArgs (--print value), not stdin. Close stdin
-        // so agy doesn't wait on it.
-        child.stdin.end();
+        // The prompt goes over stdin rather than as a command-line argument —
+        // a real diff can easily be tens of thousands of characters, well
+        // past what Windows (and most shells) allow on a single command line.
+        child.stdin.end(prompt);
 
         child.stdout.on("data", (chunk) => {
             stdout += chunk;
@@ -376,8 +358,7 @@ async function main() {
         console.error(`[anti] ${built.note}`);
     }
 
-    // ★ prompt is the VALUE of --print (inline), not stdin — see runAgy for why.
-    const agyArgs = ["--print", built.prompt, "--dangerously-skip-permissions"];
+    const agyArgs = ["--print", "--dangerously-skip-permissions"];
     if (!opts.write) {
         agyArgs.push("--sandbox");
     }
@@ -391,9 +372,9 @@ async function main() {
 
     console.error(`[anti] cwd: ${cwd}`);
     console.error(`[anti] mode: ${opts.write ? "write (real filesystem access)" : "read-only"}`);
-    console.error(`[anti] running agy --print (prompt: ${built.prompt.length} chars, inline)`);
+    console.error(`[anti] running agy --print (prompt: ${built.prompt.length} chars via stdin)`);
 
-    let { code, timedOut, launchError, stdout, stderr } = await runAgy(agyArgs, cwd, opts.timeoutMs);
+    let { code, timedOut, launchError, stdout, stderr } = await runAgy(agyArgs, built.prompt, cwd, opts.timeoutMs);
 
     // A piped-stdio child process (which is what this always is, so the
     // response text can be captured programmatically) has no real terminal
@@ -405,7 +386,7 @@ async function main() {
     // (or a manual "agy --print ..." run) already resolved the refresh.
     if (!launchError && !timedOut && isAuthFailure(stderr)) {
         console.error("[anti] Antigravity auth check failed — retrying once in case a token refresh just completed elsewhere.");
-        ({ code, timedOut, launchError, stdout, stderr } = await runAgy(agyArgs, cwd, opts.timeoutMs));
+        ({ code, timedOut, launchError, stdout, stderr } = await runAgy(agyArgs, built.prompt, cwd, opts.timeoutMs));
     }
 
     if (!launchError && !timedOut && !stdout.trim() && isAuthFailure(stderr)) {

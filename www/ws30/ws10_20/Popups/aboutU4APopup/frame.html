@@ -14,6 +14,14 @@
     <script>
         // 부모(index.html)에 적용된 테마를 그대로 적용 → 다크/라이트 자동 일치(플래시 없음).
         (function () {
+            // [흰 플래시 방지 ③] iframe 문서 body 배경 = 첫 페인트부터 테마색.
+            //   tokens.css 로드 전엔 --app-bg 가 미정의라 body 가 흰색이 된다. 부모(셸)의 --boot-bg 를
+            //   이 문서에도 심어두고, <style> 에서 body 배경을 var(--app-bg, var(--boot-bg)) 로 준다 →
+            //   로드 전엔 --boot-bg(테마색)로, 로드 후엔 정확한 --app-bg 로. (index.html 셸과 동일 패턴)
+            try {
+                var sBoot = parent.document.documentElement.style.getPropertyValue("--boot-bg");
+                if (sBoot) { document.documentElement.style.setProperty("--boot-bg", sBoot); }
+            } catch (e) { /* 부모 배경 미확보 시 아래 테마 apply 로 커버 */ }
             try {
                 var t = (window.parent && parent.U4ATheme && parent.U4ATheme.current)
                     ? parent.U4ATheme.current() : "horizon_white";
@@ -26,9 +34,12 @@
         html, body {
             height: 100%;
             margin: 0;
+            /* ★ --app-bg 기본값은 라이트(tokens.css --c-bg-light)라, 테마 apply 전 첫 페인트에 흰색이 된다.
+               부모가 넘긴 --boot-bg(다크 BGCOL, 항상 정의)를 우선으로 → apply 전/후 모두 다크. (셸 index.html 동일 순서) */
+            background: var(--boot-bg, var(--app-bg));
         }
         body {
-            background: var(--app-bg);
+            background: var(--boot-bg, var(--app-bg));
             color: var(--text);
             font-family: var(--font);
             overflow-x: hidden;

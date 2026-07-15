@@ -255,10 +255,67 @@
         });
     };
 
-    // 행 액션 - 추가속성 정보 적용(원본 onAdditionalBind). 우측 추가속성 위젯 = P3, 지금은 준비중 안내.
-    oAPP.fn.onAdditionalBind = function (n) {
+    // 디자인트리 체크선택 행 수집(원본 getSelectedDesignTree 1:1) — 멀티/참조필드(P3-C) 공용.
+    oAPP.fn.getSelectedDesignTree = function () {
+        var aSel = [];
+        (function rec(a) {
+            if (!a) { return; }
+            for (var i = 0; i < a.length; i++) { if (a[i].chk_seleced === true) { aSel.push(a[i]); } rec(a[i].zTREE_DESIGN); }
+        })(oAPP.attr.designTree || []);
+        return aSel;
+    };
+
+    // 적용 확인창(원본 MessageBox.confirm 089) — 공통 U4AUI.confirm. Promise<bool>.
+    function _confirmAdditApply(sMsg) {
+        return new Promise(function (resolve) {
+            U4AUI.confirm({
+                type: "C", message: sMsg,
+                buttons: [{ act: "YES", label: H.cl("A03"), emphasized: true }, { act: "NO", label: H.cl("A39") }],
+                onClose: function (sAct) { resolve(sAct === "YES"); }
+            });
+        });
+    }
+
+    // 행 액션 - 추가속성 정보 적용(단건, 원본 onAdditionalBind: designTree.js:1633). ★로컬 적용까지(P3-D).
+    //   busy 왕복·UPDATE-DESIGN-DATA 방송 = P6. 검증 오류표시는 간이 toast(정교 showMessagePopover = P6).
+    oAPP.fn.onAdditionalBind = async function (n) {
         if (!n) { return; }
-        oAPP.fn.toast("바인딩 추가속성 정보 적용은 준비 중입니다.");
+        // ① 우측 입력 완결성.
+        var _r1 = (typeof oAPP.fn.chkAdditBindData === "function") ? oAPP.fn.chkAdditBindData() : { RETCD: "" };
+        if (_r1.RETCD === "E") { oAPP.fn.toast(_r1.RTMSG); return; }
+        // ② 라인 가능여부.
+        var _r2 = (typeof oAPP.fn.chkPossibleAdditBind === "function") ? oAPP.fn.chkPossibleAdditBind(n) : { RETCD: "" };
+        if (_r2.RETCD === "E") { oAPP.fn.toast(_r2.RTMSG); return; }
+        // ③ UI 정보(_T_0015) 확인.
+        var _oUi = oAPP.attr.prev && oAPP.attr.prev[n.OBJID];
+        if (!_oUi || !_oUi._T_0015) { oAPP.fn.toast(H.z("106", n.OBJID)); return; }   // 106 UI 정보 없음.
+        // ④ 기존 MPROP 있으면 재적용 확인(089).
+        if (n.MPROP !== "") {
+            var _ok = await _confirmAdditApply(H.z("089"));
+            if (!_ok) { return; }
+        }
+        // ⑤ 로컬 적용: 트리행 + _T_0015 stamp.
+        n.MPROP = oAPP.fn.setAdditBindData(oAPP.attr.additRows);
+        var _s15 = _oUi._T_0015.find(function (it) { return it.UIATK === n.UIATK; });
+        if (_s15) { _s15.MPROP = n.MPROP; }
+        oAPP.fn.toast(H.z("154"));   // 154 적용 완료.
+        _refreshDesignTree();
+    };
+
+    // 멀티 적용 stamp(원본 additionalBindMulti: designTree.js:2936) — 체크행 전부 동일 MPROP + _T_0015 갱신.
+    oAPP.fn.additionalBindMulti = function (MPROP) {
+        var _aTree = oAPP.fn.getSelectedDesignTree();
+        if (_aTree.length === 0) { return; }
+        for (var i = 0; i < _aTree.length; i++) {
+            var n = _aTree[i];
+            n.chk_seleced = false;   // 선택 해제.
+            n.MPROP = MPROP;
+            var _oUi = oAPP.attr.prev && oAPP.attr.prev[n.OBJID];
+            if (!_oUi || !_oUi._T_0015) { continue; }
+            var _s15 = _oUi._T_0015.find(function (it) { return it.UIATK === n.UIATK; });
+            if (_s15) { _s15.MPROP = MPROP; }
+        }
+        _refreshDesignTree();
     };
 
     // 바인딩 쓰기 디스패처(원본 _setBindAttribute 1:1 — UIATK _1 제거 + T_0023/0022 가드 + 오류초기화 + switch).
@@ -512,9 +569,10 @@
         oD.tool.appendChild(_btn("link", H.z("130"), H.z("130"), "u4a-btn--emphasized", bRO, function () { _call("onMultiBind"); }));
         oD.tool.appendChild(_btn("link-slash", H.z("186"), H.z("186"), "u4a-btn--negative", bRO, function () { _call("onMultiUnbind"); }));
         oD.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
-        // 161 컬럼최적화 — 컬럼 폭을 콘텐츠에 맞춤(원본 resize-horizontal → setUiTableAutoResizeColumn).
+        // 161 컬럼최적화 — 리사이즈바 더블클릭과 ★완전 동일★한 순수 autofit(잔여폭 흡수 없음).
+        //   원본 setUiTableAutoResizeColumn 1:1. 채움(fitTreeColumns)은 레이아웃 변경 전용.
         oD.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () {
-            oAPP.fn.fitTreeColumns(oD.host);
+            oAPP.fn.autofitTreeColumns(oD.host);
         }));
         // 957 화면 커스터마이징 — 원본 designTree.js:4025 createBindLayoutCustomizingButton(좌·중·우 공통).
         oD.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {
@@ -564,7 +622,11 @@
                 oChk.type = "checkbox";
                 oChk.checked = !!n.chk_seleced;
                 oChk.addEventListener("click", function (e) { e.stopPropagation(); });
-                oChk.addEventListener("change", function () { n.chk_seleced = oChk.checked; });
+                oChk.addEventListener("change", function () {
+                    n.chk_seleced = oChk.checked;
+                    // 체크 선택 변경 → 우측 참조필드(P05) 재구성(원본 setRefFieldList, P3-C).
+                    if (typeof oAPP.fn.setRefFieldList === "function") { try { oAPP.fn.setRefFieldList(); } catch (e2) { } }
+                });
                 return oChk;
             },
             // C2 = 바인딩 경로(UIATV) / (개발) C3 = MPROP / 마지막 = 행 액션 컬럼.

@@ -28,6 +28,15 @@
 
     <script>
 
+        // [흰색 플래시 방지 — 문서 배경] 이 문서(KEEP-UI5)는 자체 배경이 없어 Chromium 기본 흰 캔버스가
+        //   그려진다(다크 테마에서 번쩍임). 셸(index.html)이 첫 페인트 전 세팅한 --boot-bg 를 첫 스크립트
+        //   실행 시점에 문서 배경으로 즉시 상속(동일 origin=file:// 이라 parent 접근 가능). UI5 테마 CSS 가
+        //   붙기 전까지의 흰 캔버스를 원천 제거. index.html #floatFrame 숨김 처리와 이중 안전.
+        try {
+            var _sBoot = parent.document.documentElement.style.getPropertyValue("--boot-bg");
+            if (_sBoot) { document.documentElement.style.backgroundColor = _sBoot; }
+        } catch (e) { /* 셸 배경 미확보 시 무시 — #floatFrame 숨김이 커버 */ }
+
         let oAPP = {};
 
         oAPP = parent.gfn_parent();

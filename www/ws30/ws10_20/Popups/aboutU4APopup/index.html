@@ -35,6 +35,8 @@
     <style>
         html, body {
             height: 100%;
+            /* html 에도 배경 — apply 전 --app-bg 기본값(라이트)이 documentElement 에 뜨는 흰 순간 차단. */
+            background: var(--boot-bg, var(--app-bg));
         }
         body {
             margin: 0;
@@ -59,6 +61,8 @@
             height: 100%;
             border: 0;
             overflow: hidden;
+            /* [흰 플래시 방지 ②] iframe 요소 자체 배경을 테마색으로 → frame.html 로드 전(about:blank)에도 흰색이 안 보인다. */
+            background: var(--boot-bg, var(--app-bg));
         }
     </style>
 
@@ -152,6 +156,12 @@
                 WSPATCH_LEVEL = IF_DATA.WSPATCH_LEVEL;
 
                 let oFrame = document.getElementById("mainFRAME");
+
+                // [HTML5 표준] opener 는 show:false. 콘텐츠(frame.html) 로드 완료 후 창을 표시 →
+                //   opacity 페이드(저사양 부하) 없이, 흰 순간 없이 바로 나타난다. (MIME 등 동일)
+                oFrame.addEventListener("load", function () {
+                    try { if (CURRWIN && !CURRWIN.isVisible()) { CURRWIN.show(); CURRWIN.focus(); } } catch (e) { }
+                }, { once: true });
 
                 oFrame.src = "frame.html";
 

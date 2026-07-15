@@ -53,8 +53,6 @@ var zconsole = WSERR(window, document, console);
 
 // 반응형 카드 전환 폭(px) — 이보다 좁으면 행을 카드로(공통 .u4a-table-wrap[data-view]). Chromium93 컨테이너쿼리 미지원.
 var CARD_VIEW_MAX = 560;
-// 메인 영역이 이보다 좁으면 M002 좌우 분할을 세로로(좌 네비는 항상 좌측 고정). RO 로 data-w 토글.
-var MAIN_NARROW_MAX = 620;
 
 // ── 상태 ─────────────────────────────────────────────────────────────────
 var oData = { attr: [], serv: [], t0022: [], user: null, theme: null };
@@ -195,7 +193,7 @@ function _buildModes() {
 
     // M001 — UI Where to Use the Event
     M.push({
-        key: "M001", icon: "bolt", title: _c("D03"),
+        key: "M001", title: _c("D03"),
         panes: [{
             id: "M001", deriveFn: _deriveM1, search: ["UIATV", "EVTXT", "UIATT", "OBJID"],
             cols: [
@@ -209,7 +207,7 @@ function _buildModes() {
 
     // M002 — Model Binding Usage For UI (좌우 분할)
     M.push({
-        key: "M002", icon: "arrow-right-arrow-left", title: _c("D04"), split: true,
+        key: "M002", title: _c("D04"), split: true,
         panes: [
             {
                 id: "M002L", head: _c("D07"), headIcon: "list", deriveFn: _deriveM2L,
@@ -236,7 +234,7 @@ function _buildModes() {
 
     // M003 — CSS Style Class Where to Use
     M.push({
-        key: "M003", icon: "palette", title: _c("D05"),
+        key: "M003", title: _c("D05"),
         panes: [{
             id: "M003", deriveFn: _deriveM3, search: ["OBJID", "UIATV"],
             cols: [
@@ -248,7 +246,7 @@ function _buildModes() {
 
     // M004 — Event JS Where to Use
     M.push({
-        key: "M004", icon: "code", title: _c("D06"),
+        key: "M004", title: _c("D06"),
         panes: [{
             id: "M004", deriveFn: _deriveM4, search: ["OBJID", "UIATT", "LIBNM"],
             cols: [
@@ -262,7 +260,7 @@ function _buildModes() {
     // M005 — 단축키 등록 이벤트 사용처(조건부)
     if (_allowM5()) {
         M.push({
-            key: "M005", icon: "keyboard", title: _z("478"),
+            key: "M005", title: _z("478"),
             panes: [{
                 id: "M005", help: true, deriveFn: _deriveM5, search: ["HOTKEY", "UIATV", "EVTXT", "UIATT", "OBJID"],
                 cols: [
@@ -294,18 +292,10 @@ function _renderNav() {
         oBtn.type = "button";
         oBtn.setAttribute("data-mode", m.key);
         oBtn.setAttribute("aria-selected", (m.key === oState.mode) ? "true" : "false");
-        if (m.icon) { oBtn.appendChild(_iEl(m.icon)); }        // 모드 아이콘(fa)
-        oBtn.appendChild(_el("span", "u4aFindNav__lbl", m.title)); // 라벨(공통 navlist > span, flex 채움)
-        // 라벨 잘리면 공통 툴팁(트리 패턴 data-tip-trunc-sel — 라벨 자식 잘림 검사).
-        oBtn.setAttribute("data-tip", m.title);
-        oBtn.setAttribute("data-tip-trunc-sel", ".u4aFindNav__lbl");
-        var iCnt = _modeCount(m);                               // 우측 건수 배지(전체 사용처 수, 숫자만)
-        var oCnt = _el("span", "u4aFindNav__cnt", String(iCnt));
-        oCnt.setAttribute("data-zero", iCnt === 0 ? "true" : "false");
-        oBtn.appendChild(oCnt);
+        oBtn.appendChild(_el("span", null, m.title));
         oBtn.addEventListener("click", function () {
             if (bBusy || m.key === oState.mode) { return; }
-            _renderMode(m, true);
+            _renderMode(m);
         });
         oNav.appendChild(oBtn);
     });
@@ -318,152 +308,44 @@ function _updateNavSelection() {
     });
 }
 
-// 모드 전체 건수(파생 데이터 합, 검색 필터 무관 — 좌 네비 배지·헤더 칩용).
-function _modeCount(oMode) {
-    var n = 0;
-    (oMode.panes || []).forEach(function (p) {
-        try { n += (p.deriveFn() || []).length; } catch (e) { }
-    });
-    return n;
-}
-function _indexOfMode(sKey) {
-    for (var i = 0; i < aModes.length; i++) { if (aModes[i].key === sKey) { return i; } }
-    return -1;
-}
-
-// 카드 헤더(모드 아이콘 + 제목 + 건수 칩 + [도움말(M005)·새로고침] 액션).
-//   ★ 제목은 잘리면 공통 툴팁(data-tip-trunc). 액션 클러스터는 공통 attachOverflow(§11, 좁으면 ⋯).
-function _buildHead(oMode) {
-    var oHead = _el("div", "u4aFindHead");
-
-    var oIco = _el("span", "u4aFindHead__ico");
-    oIco.appendChild(_iEl(oMode.icon || "magnifying-glass"));
-    oHead.appendChild(oIco);
-
-    // 제목 — 말줄임 시에만 공통 툴팁(네이티브 title 금지, 16 §2.9a).
-    var oTitle = _el("span", "u4aFindHead__title", oMode.title);
-    oTitle.setAttribute("data-tip", oMode.title);
-    oTitle.setAttribute("data-tip-trunc", "");
-    oHead.appendChild(oTitle);
-
-    // 건수 칩(고정, 축소 금지).
-    oHead.appendChild(_el("span", "u4aFindHead__chip", String(_modeCount(oMode))));
-
-    // 액션 클러스터(공통 attachOverflow 대상) — 도움말(M005)·새로고침.
-    var oActions = _el("div", "u4aFindHead__actions");
-
-    if (oMode.help || (oMode.panes && oMode.panes[0] && oMode.panes[0].help)) {
-        var oHelpBtn = _el("button", "u4a-btn-icon");
-        oHelpBtn.type = "button";
-        oHelpBtn.innerHTML = _fa("circle-question");
-        oHelpBtn.title = _z("198"); // 도움말
-        oHelpBtn.addEventListener("click", _openHelp);
-        oActions.appendChild(oHelpBtn);
-    }
-
-    var oRefreshBtn = _el("button", "u4a-btn-icon");
-    oRefreshBtn.type = "button";
-    oRefreshBtn.innerHTML = _fa("rotate-right");
-    // 새로고침 툴팁/⋯라벨 문구는 메시지키 미확보 → 미설정(키 확보 시 채움). 원본도 아이콘 전용.
-    oRefreshBtn.addEventListener("click", _doRefresh);
-    oActions.appendChild(oRefreshBtn);
-
-    oHead.appendChild(oActions);
-
-    // 공통 오버플로(§11) — 좁으면 액션을 ⋯ 로 접음. [hidden] override CSS + reflow 재시도(폭 0 오판 방지).
-    if (window.U4AUI && typeof U4AUI.attachOverflow === "function") {
-        var oOvf = U4AUI.attachOverflow(oActions, { noOvfAutoMargin: true, btnClass: "u4a-btn-icon" });
-        if (oOvf && typeof requestAnimationFrame === "function") {
-            (function _try(n) {
-                if (oActions.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { } return; }
-                if (n <= 0) { return; }
-                requestAnimationFrame(function () { _try(n - 1); });
-            })(30);
-        }
-    }
-
-    return oHead;
-}
-
-// 모드 페이지 1장 조립(카드헤더 + 본문) — { pageEl, ctx }.
-function _buildPageEl(oMode) {
-    var oPage = _el("div", "u4aFindPage");
-    oPage.appendChild(_buildHead(oMode));
-
-    var aCtx = [];
-    var oBody = _el("div", "u4aFindMode");
-    if (oMode.split) {
-        oBody.classList.add("u4a-splitter");
-        var oPaneL = _buildPane(oMode.panes[0], aCtx);
-        oPaneL.classList.add("u4a-splitter__pane");
-        var oBar = _el("div", "u4a-splitter__bar");
-        var oPaneR = _buildPane(oMode.panes[1], aCtx);
-        oPaneR.classList.add("u4a-splitter__pane");
-        oBody.appendChild(oPaneL);
-        oBody.appendChild(oBar);
-        oBody.appendChild(oPaneR);
-    } else {
-        oBody.appendChild(_buildPane(oMode.panes[0], aCtx));
-    }
-    oPage.appendChild(oBody);
-
-    return { pageEl: oPage, ctx: aCtx };
-}
-
-// ── 모드 렌더(원본 NavContainer 페이지 전환 → 공통 §9 슬라이드 스코프 복제) ──
-//   bAnimate=true(네비 클릭)면 슬라이드+페이드. 나가는 페이지는 즉시 감춰(--out) 겹침 차단,
-//   들어오는 페이지(z2)가 방향(fwd/back)대로 슬라이드 인. animationend+400ms 폴백 정리.
-var _findNavGen = 0;
-function _renderMode(oMode, bAnimate) {
-    var iOld = _indexOfMode(oState.mode);
-    var iNew = _indexOfMode(oMode.key);
-
+// ── 모드 렌더(원본 NavContainer 페이지 전환) ────────────────────────────────
+function _renderMode(oMode) {
     oState.mode = oMode.key;
     _updateNavSelection();
 
     var oMain = document.getElementById("findMain");
     if (!oMain) { return; }
+    oMain.innerHTML = "";
 
-    var oBuilt = _buildPageEl(oMode);
-    var oNewPage = oBuilt.pageEl;
-    var aCtx = oBuilt.ctx;
-
-    var oOldPage = oMain.querySelector(".u4aFindPage");
-    var iGen = ++_findNavGen;
-
-    if (!bAnimate || !oOldPage) {
-        if (oOldPage) { try { oOldPage.remove(); } catch (e) { } }
-        oMain.appendChild(oNewPage);
+    // 본문(단일/좌우 분할). 제목은 좌 네비 하이라이트로 표시(중복 밴드 제거).
+    //   새로고침(전역)은 마지막(=단일 팬 또는 M002 우측 팬) 툴바 우측에 1회 배치.
+    var aCtx = [];
+    var oBody = _el("div", "u4aFindMode");
+    if (oMode.split) {
+        oBody.classList.add("u4a-splitter");
+        var oPaneL = _buildPane(oMode.panes[0], aCtx, false);
+        oPaneL.classList.add("u4a-splitter__pane");
+        var oBar = _el("div", "u4a-splitter__bar");
+        var oPaneR = _buildPane(oMode.panes[1], aCtx, true);
+        oPaneR.classList.add("u4a-splitter__pane");
+        oBody.appendChild(oPaneL);
+        oBody.appendChild(oBar);
+        oBody.appendChild(oPaneR);
     } else {
-        var bFwd = iNew > iOld;
-        oOldPage.classList.add("u4aFindPage--out");
-        oMain.appendChild(oNewPage);
-        oNewPage.classList.add(bFwd ? "u4aFindPage--inFwd" : "u4aFindPage--inBack");
-
-        var bDone = false;
-        var fnCleanup = function () {
-            if (bDone || iGen !== _findNavGen) { return; }
-            bDone = true;
-            try { oOldPage.remove(); } catch (e) { }
-            oNewPage.classList.remove("u4aFindPage--inFwd", "u4aFindPage--inBack");
-        };
-        oNewPage.addEventListener("animationend", fnCleanup, { once: true });
-        setTimeout(fnCleanup, 400);
+        oBody.appendChild(_buildPane(oMode.panes[0], aCtx, true));
     }
+    oMain.appendChild(oBody);
 
     oCurrent = { mode: oMode, ctx: aCtx };
 
-    var oBody = oNewPage.querySelector(".u4aFindMode");
-    if (oMode.split && oBody) { _wireSplit(oBody); }
+    if (oMode.split) { _wireSplit(oBody); }
 
     aCtx.forEach(function (c) { _renderTableInto(c); _observeWrap(c.wrapEl); });
-
-    _applyMainWidth(); // 반응형(좁으면 M002 세로) 즉시 반영
 }
 
 // 팬(검색툴바 + 테이블) 1개 생성 — aCtx 에 컨텍스트 push.
-//   툴바 = [M002 라벨] [검색(폭 채움)]. 도움말/새로고침은 카드 헤더(_buildHead)로 이관.
-function _buildPane(oPaneDef, aCtx) {
+//   툴바 = [M002 라벨] [검색(폭 채움)] [도움말(M005)] [새로고침(bRefresh)]. 우측 액션 아이콘.
+function _buildPane(oPaneDef, aCtx, bRefresh) {
     var oPane = _el("div", "u4aFindPane");
 
     var oTb = _el("div", "u4aFindPane__toolbar");
@@ -473,16 +355,32 @@ function _buildPane(oPaneDef, aCtx) {
         var oLbl = _el("span", "u4aFindPane__headlabel");
         if (oPaneDef.headIcon) { oLbl.appendChild(_iEl(oPaneDef.headIcon)); }
         oLbl.appendChild(_el("span", null, oPaneDef.head));
-        // 라벨(텍스트 span) 잘리면 공통 툴팁.
-        oLbl.setAttribute("data-tip", oPaneDef.head);
-        oLbl.setAttribute("data-tip-trunc-sel", "span");
         oTb.appendChild(oLbl);
     }
 
     var oSrchHost = _el("div", "u4aFindSearch");
     oTb.appendChild(oSrchHost);
 
-    // 테이블 래퍼(공통 .u4a-table-wrap — 반응형 data-view, 빈상태는 _renderTableInto 가 대체).
+    // 도움말(M005) — 우측(원본 shortcutWhereUsed 테이블 툴바 Help 버튼).
+    if (oPaneDef.help) {
+        var oHelpBtn = _el("button", "u4a-btn-icon");
+        oHelpBtn.type = "button";
+        oHelpBtn.innerHTML = _fa("circle-question");
+        oHelpBtn.title = _z("198"); // 도움말
+        oHelpBtn.addEventListener("click", _openHelp);
+        oTb.appendChild(oHelpBtn);
+    }
+
+    // 새로고침(전역, 원본 App header refresh) — 마지막 팬 툴바 최우측.
+    if (bRefresh) {
+        var oRefreshBtn = _el("button", "u4a-btn-icon");
+        oRefreshBtn.type = "button";
+        oRefreshBtn.innerHTML = _fa("rotate-right");
+        oRefreshBtn.addEventListener("click", _doRefresh);
+        oTb.appendChild(oRefreshBtn);
+    }
+
+    // 테이블 래퍼(공통 .u4a-table-wrap — 프레임은 카드가 담당, 반응형 data-view).
     var oWrap = _el("div", "u4aFindWrap u4a-table-wrap");
 
     var oCtx = { def: oPaneDef, wrapEl: oWrap, field: null };
@@ -502,22 +400,6 @@ function _buildPane(oPaneDef, aCtx) {
 
     oPane.appendChild(oTb);
     oPane.appendChild(oWrap);
-
-    // 라벨 있는 팬(M002)의 툴바 오버플로(§11) — 좁으면 라벨을 ⋯ 로 접고 검색창(isSkip)은 유지.
-    if (oPaneDef.head && window.U4AUI && typeof U4AUI.attachOverflow === "function") {
-        var oOvf = U4AUI.attachOverflow(oTb, {
-            noOvfAutoMargin: true,
-            btnClass: "u4a-btn-icon",
-            isSkip: function (el) { return el.classList.contains("u4aFindSearch"); } // 검색은 접지 않음(폭 채움)
-        });
-        if (oOvf && typeof requestAnimationFrame === "function") {
-            (function _try(n) {
-                if (oTb.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { } return; }
-                if (n <= 0) { return; }
-                requestAnimationFrame(function () { _try(n - 1); });
-            })(30);
-        }
-    }
 
     aCtx.push(oCtx);
     return oPane;
@@ -541,23 +423,9 @@ function _renderTableInto(oCtx) {
         });
     }
 
+    var oTable = _renderTable(oDef.cols, aRows);
     oCtx.wrapEl.innerHTML = "";
-    if (!aRows.length) {
-        // 빈 상태(아이콘 + 공통 no-data 메시지 _z("946")) — 밋밋한 "No data" 한 줄 대체.
-        oCtx.wrapEl.appendChild(_buildEmpty());
-        return;
-    }
-    oCtx.wrapEl.appendChild(_renderTable(oDef.cols, aRows));
-}
-
-// 빈 상태(아이콘 + 공통 no-data 메시지). 임의 문구 없이 기존 메시지키만 사용.
-function _buildEmpty() {
-    var o = _el("div", "u4aFindEmpty");
-    var oIco = _el("div", "u4aFindEmpty__ico");
-    oIco.appendChild(_iEl("magnifying-glass"));
-    o.appendChild(oIco);
-    o.appendChild(_el("div", "u4aFindEmpty__txt", _z("946")));
-    return o;
+    oCtx.wrapEl.appendChild(oTable);
 }
 
 function _renderTable(aCols, aRows) {
@@ -595,7 +463,7 @@ function _renderTable(aCols, aRows) {
                 oTd.dataset.label = c.label; // 카드뷰 라벨
                 var val = (typeof c.field === "function") ? c.field(oRow) : oRow[c.field];
                 val = (val == null) ? "" : String(val);
-                // 잘린 셀 툴팁은 공통 .u4a-table 자동(initTooltip data-tip-trunc, 잘릴 때만) — 네이티브 title 금지(16 §2.9a).
+                if (val) { oTd.title = val; } // 잘린 데이터 hover 로 전체 표시
                 if (c.link) {
                     var oLink = _el("span", "u4aFindLink", val);
                     oLink.setAttribute("role", "link");
@@ -693,30 +561,6 @@ function _observeWrap(oWrap) {
     oRO.observe(oWrap);
 }
 
-// ── 반응형: 메인 폭 → data-w(narrow|wide). 좁으면 M002 세로 분할(CSS). 좌 네비는 항상 좌측. ──
-function _applyMainWidth() {
-    var oMain = document.getElementById("findMain");
-    if (!oMain) { return; }
-    var iW = oMain.getBoundingClientRect().width;
-    if (!iW) { return; }
-    var sW = (iW < MAIN_NARROW_MAX) ? "narrow" : "wide";
-    if (oMain.getAttribute("data-w") !== sW) { oMain.setAttribute("data-w", sW); }
-}
-function _observeMain() {
-    var oMain = document.getElementById("findMain");
-    if (!oMain) { return; }
-    _applyMainWidth();
-    if (typeof ResizeObserver === "undefined") { return; }
-    var bSched = false;
-    var oRO = new ResizeObserver(function () {
-        if (bSched) { return; }
-        bSched = true;
-        var fnRAF = (typeof requestAnimationFrame === "function") ? requestAnimationFrame : function (cb) { return setTimeout(cb, 16); };
-        fnRAF(function () { bSched = false; _applyMainWidth(); });
-    });
-    oRO.observe(oMain);
-}
-
 // ── 새로고침(원본 App header refresh → --find--data--refresh) ────────────────
 function _doRefresh() {
     if (bBusy) { return; }
@@ -738,7 +582,7 @@ function _onRefreshCallback(event, oInfo) {
     aModes = _buildModes();
     _renderNav();
     var oCur = _findMode(oState.mode) || aModes[0];
-    if (oCur) { _renderMode(oCur, false); }
+    if (oCur) { _renderMode(oCur); }
     _setBusy(false);
 }
 
@@ -797,7 +641,7 @@ function _onFindInfo(event, oInfo) {
     aModes = _buildModes();
     _renderNav();
     var oFirst = _findMode(oState.mode) || aModes[0];
-    if (oFirst) { _renderMode(oFirst, false); }
+    if (oFirst) { _renderMode(oFirst); }
 
     _finishOpen();
 }
@@ -877,9 +721,6 @@ window.addEventListener("load", function () {
     // 외곽 스플리터(네비|메인) 드래그 리사이즈 — 정적 마크업이라 1회 배선.
     var oSplit = document.getElementById("findSplit");
     if (oSplit) { _wireSplit(oSplit); }
-
-    // 반응형 폭 관찰(정적 #findMain) — 좁으면 M002 세로. RO 1회 배선.
-    _observeMain();
 
     IPCRENDERER.on("if-find-info", _onFindInfo);
     IPCMAIN.on(BROWSKEY + "--find--success", _onFindSuccess);
