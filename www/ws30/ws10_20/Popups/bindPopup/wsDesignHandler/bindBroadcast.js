@@ -37,6 +37,58 @@
     // WS20 디자인 영역 busy off 요청(원본 sendDesignAreaBusyOff) — WS20 잠금 해제.
     function _sendDesignAreaBusyOff() { _sendPostMessage({ PRCCD: "BUSY_OFF" }); }
 
+    /************************************************************************
+     * [P6 송신] N건 바인딩 정보 수집 — 원본 setBindAggrData 1:1.
+     *   oUi._BIND_AGGR[key] = [UI객체…] → key 별 _OBJID 배열만 추려 전송본 구성.
+     ************************************************************************/
+    function _setBindAggrData(sParam, oUi) {
+        if (!oUi._BIND_AGGR || Object.keys(oUi._BIND_AGGR).length === 0) { return; }
+        for (var key in oUi._BIND_AGGR) {
+            var aAggr = oUi._BIND_AGGR[key] || [];
+            sParam[key] = [];
+            for (var i = 0; i < aAggr.length; i++) { sParam[key].push(aAggr[i]._OBJID); }
+        }
+    }
+
+    /************************************************************************
+     * [P6 송신] attribute data(oPrev) 구성 — 원본 setPrevdata 1:1.
+     *   prev[OBJID] 중 _T_0015 가 있는 것만 → {_T_0015, _MODEL, _BIND_AGGR(OBJID 배열)}.
+     ************************************************************************/
+    function _setPrevData() {
+        var oPrev = {};
+        var oSrc = oAPP.attr.prev || {};
+        for (var key in oSrc) {
+            var oUi = oSrc[key];
+            if (!oUi || typeof oUi._T_0015 === "undefined") { continue; }
+            var sParam = { _T_0015: oUi._T_0015, _MODEL: oUi._MODEL, _BIND_AGGR: {} };
+            _setBindAggrData(sParam._BIND_AGGR, oUi);
+            oPrev[key] = sParam;
+        }
+        return oPrev;
+    }
+
+    /************************************************************************
+     * [P6 송신 · SPEC §8/§3.11] 팝업 → WS20 디자인 데이터 반영
+     *   — 원본 broadcastChannelBindPopup.js updateBindPopupDesignData 1:1.
+     *   ★ PRCCD = "UPDATE-DESIGN-DATA"(하이픈, 송신). 수신 코드(UPDATE_DESIGN_DATA, 밑줄)와 별개 — 통일 금지.
+     *   ★ busy 왕복(§3.11): 여기서 busy ON 만 하고 스스로 끄지 않는다. WS20 이 반영 후 UPDATE_DESIGN_DATA 를
+     *     되돌려주면 _updateDesignData 가 트리 재빌드 → BUSY_OFF 송신 → 로컬 setBusy(false) 로 끝난다.
+     *     (이 왕복 전에 busy 를 풀면 사용자가 stale 데이터에 재조작 가능 → 원본이 금지.)
+     ************************************************************************/
+    oAPP.fn.updateBindPopupDesignData = function () {
+        if (!oChannel) {
+            console.error("[HTML5][bindWindow] 방송채널 없음 — WS20 반영 불가(UPDATE-DESIGN-DATA)");
+            return;
+        }
+        oAPP.fn.setBusy(true);
+        _sendPostMessage({
+            PRCCD: "UPDATE-DESIGN-DATA",
+            T_0014: (typeof oAPP.fn.getDesignT0014 === "function") ? oAPP.fn.getDesignT0014() : [],
+            oPrev: _setPrevData(),
+            T_CEVT: oAPP.attr.T_CEVT || []
+        });
+    };
+
     // WS20 → 팝업 디자인 데이터 갱신(원본 updateDesignData 핵심 1:1).
     function _updateDesignData(oEvent) {
         var d = (oEvent && oEvent.data) || {};
@@ -65,6 +117,31 @@
 
         oAPP.fn.setBusy(false);
     }
+
+    /************************************************************************
+     * [P6 송신 · SPEC §8 패스스루] 도움말 문서 열기 요청 — 원본 broadcastChannelBindPopup.js:757 1:1.
+     *   별창은 U4A HELP DOCUMENT 팝업을 직접 못 여니 WS20(디자인 영역)에 호출을 위임한다.
+     *   ★ sParam 키 "opstion"(원본 오타) 그대로 유지 — 수신측이 그 문자열로 읽는다. 고치면 계약 파손.
+     ************************************************************************/
+    oAPP.fn.sendHelpDocOpen = function (oData) {
+        _sendPostMessage({ PRCCD: "U4A_HELP_DOC_OPEN", sParam: oData });
+    };
+
+    /************************************************************************
+     * [P6] 디자인 변경 후속 방송(합침) — 원본 onModelDataChanged(모델 messageChange) 대응.
+     *   원본은 쓰기 후 refresh(true) 1회 → messageChange 1회 → UPDATE-DESIGN-DATA 1회다.
+     *   HTML5 는 attrChange 가 행마다 불리므로(멀티 N행) rAF 로 묶어 1회만 보낸다(원본과 동등).
+     *   호출처: bindWrite attrChange(바인딩/해제) + MPROP stamp 경로(추가속성 적용).
+     ************************************************************************/
+    var iBroadRaf = 0;
+    oAPP.fn.designBroadcastUpdate = function () {
+        if (iBroadRaf) { return; }
+        iBroadRaf = requestAnimationFrame(function () {
+            iBroadRaf = 0;
+            try { oAPP.fn.updateBindPopupDesignData(); }
+            catch (e) { console.error("[HTML5][bindWindow] designBroadcastUpdate:", e && e.message); }
+        });
+    };
 
     // [PUBLIC] 방송 채널 생성(원본 createChannel) — frame.js Stage6 에서 호출.
     oAPP.fn.createBindChannel = function () {

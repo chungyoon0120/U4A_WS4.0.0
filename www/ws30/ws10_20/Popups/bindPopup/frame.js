@@ -91,6 +91,35 @@ function _zmsg(sNo, p1) {
 oAPP.common.msg = _msg;
 oAPP.common.zmsg = _zmsg;
 
+// WLO(등록 기능) 여부 — 원본 index.js:1045 oAPP.common.checkWLOList 1:1.
+//   데이터 원천 = oAPP.attr.oUserInfo.META.T_REG_WLO(부트 수신, bindData.js 도 동일 참조).
+oAPP.common.checkWLOList = function (REGTYP, CHGOBJ) {
+    var aReg = (oAPP.attr.oUserInfo && oAPP.attr.oUserInfo.META && oAPP.attr.oUserInfo.META.T_REG_WLO) || [];
+    return aReg.some(function (item) { return item.REGTYP === REGTYP && item.CHGOBJ === CHGOBJ; });
+};
+
+/****************************************************************************
+ * [P6] 도움말(198) — 원본 index.js oAPP.fn.onHelp 1:1.
+ *   v3.6.0_00004+ 부터 도움말 HTML 을 U4A HELP DOCUMENT 로 통합 → WLO(C/UHAK901369) 등록 시
+ *   WS20 디자인 영역에 팝업 호출을 방송 요청(startMenuId "000276")하고 종료한다.
+ *   ★ busy 는 켠 채로 둔다(원본 동일) — WS20 이 도움말을 띄우고 BUSY_OFF 를 되돌려줘야 풀린다.
+ *   ★ WLO 미등록(구버전) 경로 = utils/callTooltipsPopup.js(로컬 도움말 HTML). 별창 + CJS(module.exports)
+ *     제약으로 미이식 — 해당 시스템에선 도움말이 뜨지 않는다(P6 잔여, 보고 대상).
+ ****************************************************************************/
+oAPP.fn.onHelp = function () {
+    if (oAPP.common.checkWLOList("C", "UHAK901369") === true) {
+        oAPP.fn.setBusy(true, { ISBROAD: true });
+        if (typeof oAPP.fn.sendHelpDocOpen === "function") {
+            oAPP.fn.sendHelpDocOpen({ opstion: { startMenuId: "000276" } });
+        } else {
+            console.error("[HTML5][bindWindow] onHelp: sendHelpDocOpen 없음 — 방송 미배선");
+            oAPP.fn.setBusy(false);
+        }
+        return;
+    }
+    console.warn("[HTML5][bindWindow] onHelp: WLO(UHAK901369) 미등록 — 구버전 tooltip 팝업 경로 미이식(P6 잔여)");
+};
+
 // SYSID 별 테마 JSON(theme_ws4) — 라이브 테마 변경 추종용.
 function _getThemeInfo() {
     try {
@@ -115,6 +144,41 @@ function _setBusy(bOn, oOpt) {
 oAPP.fn.setBusy = function (bIsShow, oOpt) {
     // 원본 setBusy(bBusy, {ISBROAD}) 계약 — 'X'/true 켜기, ''/false 끄기.
     _setBusy(bIsShow === true || bIsShow === "X", oOpt);
+};
+
+/****************************************************************************
+ * [P6] WS20 상호작용 busy — 원본 index.js oAPP.fn.setBusyWS20Interaction(bBusy, sOption) 1:1.
+ *   원본 구성: oAPP.oMain.attr.isBusy 광역화 + sap.ui.getCore().lock/unlock + lf_setAppBusy +
+ *              lf_setCurrentWindowClosable + (sOption 있을 때) lf_postBusyToChild(BUSY_ON/OFF).
+ *   HTML5 매핑:
+ *     · lock/unlock(UI5 전용) → busy 오버레이(.u4a-busy)가 포인터 차단으로 대체.
+ *     · lf_setAppBusy       → _setBusy(로딩 오버레이).
+ *     · lf_postBusyToChild  → oBroad(자식창 채널). ★ WS20 이 아니라 "자식 팝업"용이다(SPEC §8) —
+ *                             WS20 반영은 UPDATE-DESIGN-DATA(bindBroadcast) 가 담당하는 별개 경로.
+ *     · sOption(TITLE/DESC) → 원본처럼 TYPE:"DIALOG" 로 실어 보내고, _setBusy 의 기본 방송은
+ *                             ISBROAD 로 억제해 중복 송신을 막는다.
+ *   ★ 미정의 상태로 utils/callTooltipsPopup.js 가 호출해 크래시하던 것을 복원(P6).
+ ****************************************************************************/
+oAPP.fn.setBusyWS20Interaction = function (bBusy, sOption) {
+    var bOn = (bBusy === true || bBusy === "X");
+    oAPP.attr.isBusyWS20 = bOn;   // 원본 oAPP.oMain.attr.isBusy 광역화 대응.
+
+    if (typeof sOption !== "undefined" && sOption !== null && oBroad) {
+        try {
+            oBroad.postMessage(bOn
+                ? { PRCCD: "BUSY_ON", TITLE: sOption.TITLE || "", DESC: sOption.DESC || "", TYPE: "DIALOG" }
+                : { PRCCD: "BUSY_OFF" });
+        } catch (e) { console.error("[HTML5][bindWindow] setBusyWS20Interaction 방송:", e && e.message); }
+        _setBusy(bOn, { ISBROAD: true });   // 위에서 이미 보냈으므로 재방송 억제.
+    } else {
+        _setBusy(bOn);
+    }
+
+    // 원본 lf_setCurrentWindowClosable — busy 왕복 중 닫기 차단(창 closable 은 항상 false, 버튼만 토글).
+    try {
+        var oBtn = document.querySelector(".u4a-winbtn--close");
+        if (oBtn) { oBtn.disabled = bOn; }
+    } catch (e) { }
 };
 
 // 로드 완료 — 메인 busy lock 해제 + 공용 BUSY_OFF + 본문 표시(1회만).

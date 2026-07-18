@@ -70,15 +70,22 @@
                     <div class="u4aSnipEmpty__desc" id="snipEmptyDesc"></div>
                 </div>
 
-                <!-- 편집(스니펫 기본정보 + 코드 + 저장/취소) -->
-                <div class="u4aSnipEdit" id="snipEdit" hidden>
+                <!-- 편집(스니펫 기본정보 + 코드 + 저장/취소) — 초기 숨김(클래스 기반, §9 전환) -->
+                <div class="u4aSnipEdit u4aSnipPageHidden" id="snipEdit">
                     <div class="u4aSnipEdit__body">
                         <div class="u4aSnipInfoPanel" id="snipInfoPanel"></div>
 
                         <div class="u4aSnipCode">
                             <div class="u4aSnipCode__head">
                                 <i class="fa-solid fa-code" aria-hidden="true"></i>
-                                <span id="snipCodeTitle"></span>
+                                <span id="snipCodeTitle" class="u4aSnipCode__title"></span>
+                                <!-- 에디터 툴바 한 세트(확대/축소 · 줌% · 꾸밈정렬) — 좁아지면 공통 ⋯ 오버플로(§11) -->
+                                <div class="u4aSnipEdTools" id="snipEdTools">
+                                    <button type="button" class="u4a-btn u4aSnipFlat" id="snipZoomOut" title="Zoom out (Ctrl + Wheel ↓)" aria-label="Zoom out"><i class="fa-solid fa-minus"></i></button>
+                                    <button type="button" class="u4a-btn u4aSnipFlat u4aSnipZoomPct" id="snipZoomBtn" title="Reset zoom (Ctrl+0)" aria-label="Reset zoom"><i class="fa-solid fa-magnifying-glass"></i><span>100%</span></button>
+                                    <button type="button" class="u4a-btn u4aSnipFlat" id="snipZoomIn" title="Zoom in (Ctrl + Wheel ↑)" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
+                                    <button type="button" class="u4a-btn u4aSnipFlat u4aSnipFormatBtn" id="snipFormatBtn"><i class="fa-solid fa-wand-magic-sparkles"></i><span id="snipFormatText"></span></button>
+                                </div>
                             </div>
                             <div class="u4aSnipCode__body">
                                 <iframe id="snipEditor" class="u4aSnipEditorFrame MONACO_EDITOR" src="about:blank" frameborder="0"></iframe>
@@ -101,7 +108,7 @@
     <dialog class="u4a-busy" id="snipBusy" role="progressbar" aria-valuetext="Busy">
         <div class="u4a-busy__card">
             <div class="u4a-busy__spinner"></div>
-            <div class="u4a-busy__label" id="snipBusyLabel">Loading...</div>
+            <div class="u4a-busy__label" id="snipBusyLabel"></div>
         </div>
     </dialog>
 

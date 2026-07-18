@@ -923,47 +923,75 @@
 
         var l_data = ls_item.is_tree;   // 붙여넣을 패턴 최상위(원본 is_data).
 
-        // ── designAddTreeData 전반부 가드(원본 6501~6544) ──
+        // ── 공통 코어로 위임(원본 designAddTreeData 상당) ──
+        //   검증 사슬(UA039/UA040/카디널리티/특정부모/예외aggr) + aggregation 선택 + $OTR 보강 +
+        //   재구성(_applyP13nPattern) + 후처리를 모두 포함. 트리 컨텍스트 메뉴 M07 붙여넣기와 완전 동일 경로.
+        //   (패턴 drop 은 위 preamble 에서 파일→l_data/l_drop 준비만 다르다.)
+        oAPP.fn.fnWs20AddTreeData(l_data, l_drop, oAPP.fn.getMousePosition(), _exit);
+
+        return true;
+    };
+
+    /* ====================================================================
+     * 5-c) 공통 UI 추가/붙여넣기 코어 (원본 uiDesignArea.js designAddTreeData 5808~ 상당).
+     *   패턴 drop(5-b) 과 트리 컨텍스트 메뉴 M07 붙여넣기(ws_html5_ws20_edit.js _pasteUI)가 공유한다.
+     *
+     *   ★이름 주의 — 원본 oAPP.fn.designAddTreeData(is_data, is_tree, sAggr) 와 이름이 겹치지 않도록
+     *     HTML5 전용 명(fnWs20*)을 쓴다. 원본은 3번째 인자가 "이미 선택된 aggregation" 이고 이 함수는
+     *     "팝업 위치" 라 시그니처가 다르다. 현재 메인 렌더러엔 uiDesignArea.js(UI5)가 미로드라 충돌은
+     *     없지만, 동명·이(異)시그니처는 향후 로드 시 무성 파손이 되므로 이름을 분리한다.
+     *
+     *     is_data   = 붙여넣을 트리 최상위(_T_0015/_DESC/_CEVT 박제).
+     *     is_drop   = 대상(부모) 노드. is_data 는 is_drop 의 선택 aggregation 자식으로 삽입된다.
+     *     i_pos     = aggregation 선택 팝업 위치({x,y}), 미지정 시 마우스 위치.
+     *     i_doneCb  = 완료/취소/가드 실패 시 정리 콜백(busy/shortcut lock 해제 등, 호출측 책임).
+     *   검증 사슬 → aggregation 선택 → $OTR 보강 → 재구성/미리보기/후처리를 원본 순서대로 수행.
+     * ==================================================================== */
+    oAPP.fn.fnWs20AddTreeData = function (is_data, is_drop, i_pos, i_doneCb) {
+
+        var _done = (typeof i_doneCb === "function") ? i_doneCb : function () { };
+
+        // ── 전반부 가드(원본 6501~6544) ──
         // ① UA039 앱당 1개만 허용 UI 중복(designChkUnique) → skip.
-        if (oAPP.fn.designChkUnique(l_data.UIOBK) === true) { _exit(); return; }
+        if (oAPP.fn.designChkUnique(is_data.UIOBK) === true) { _done(); return; }
         // ② UA040 HIDDEN_AREA 전용 UI 위치 점검(designChkHiddenAreaUi).
-        if (oAPP.fn.designChkHiddenAreaUi(l_data.UIOBK, l_drop.UIOBK) === true) { _exit(); return; }
+        if (oAPP.fn.designChkHiddenAreaUi(is_data.UIOBK, is_drop.UIOBK) === true) { _done(); return; }
 
         // 트리 아이콘 구성(가드).
-        _safe(function () { if (typeof oAPP.fn.setTreeUiIcon === "function") { oAPP.fn.setTreeUiIcon(l_data); } });
+        _safe(function () { if (typeof oAPP.fn.setTreeUiIcon === "function") { oAPP.fn.setTreeUiIcon(is_data); } });
 
-        // aggregation 선택 팝업 → 선택된 aggregation 으로 패턴 적용.
-        var l_pos = oAPP.fn.getMousePosition();
-        oAPP.fn.aggrSelectPopup(l_data, l_drop, async function (param) {
+        // aggregation 선택 팝업 → 선택된 aggregation 으로 적용(후보 0/1 자동, 2+ 팝업).
+        var l_pos = i_pos || oAPP.fn.getMousePosition();
+        oAPP.fn.aggrSelectPopup(is_data, is_drop, async function (param) {
 
-            // ── lf_aggrPopup_cb 가드(원본 6236~6352) = 일반 drop_cb 검증 사슬(982~998)과 동일 ──
+            // ── lf_aggrPopup_cb 가드(원본 6236~6352) ──
             // ③ 이동 가능한 aggregation 없음(원본 269).
-            if (typeof param === "undefined") { _toast("I", _wsc("269")); _exit(); return; }
+            if (typeof param === "undefined") { _toast("I", _wsc("269")); _done(); return; }
             // ④ 카디널리티(0:1 aggr 중복 방지).
-            if (oAPP.fn.chkUiCardinality(l_drop, param.UIATK, param.ISMLB) === true) { _exit(); return; }
+            if (oAPP.fn.chkUiCardinality(is_drop, param.UIATK, param.ISMLB) === true) { _done(); return; }
             // ⑤ 특정 부모 전용 UI.
-            if (oAPP.fn.designChkFixedParentUI(l_data.UIOBK, l_drop.UIOBK, param.UIATT) === true) { _exit(); return; }
+            if (oAPP.fn.designChkFixedParentUI(is_data.UIOBK, is_drop.UIOBK, param.UIATT) === true) { _done(); return; }
             // ⑥ 예외 aggregation 추가 불가/허용(exceptionUI.js).
             var _exMod = null;
             _safe(function () { _exMod = parent.require(parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "js", "exception", "exceptionUI.js")); });
             if (_exMod) {
-                var _deny = false; _safe(function () { _deny = _exMod.checkDenyChildAggr({ UIOBK: l_drop.UIOBK, UIATT: param.UIATT, CHILD_UIOBK: l_data.UIOBK }); });
-                if (_deny === true) { _toast("E", _wsc("214", l_data.OBJID, l_drop.OBJID, param.UIATT)); _exit(); return; }
-                var _allow = true; _safe(function () { _allow = _exMod.checkAllowChildAggr({ PUIOK: l_drop.UIOBK, UIATT: param.UIATT, UIOBK: l_data.UIOBK }); });
-                if (_allow !== true) { _toast("E", _wsc("214", l_data.OBJID, l_drop.OBJID, param.UIATT)); _exit(); return; }
+                var _deny = false; _safe(function () { _deny = _exMod.checkDenyChildAggr({ UIOBK: is_drop.UIOBK, UIATT: param.UIATT, CHILD_UIOBK: is_data.UIOBK }); });
+                if (_deny === true) { _toast("E", _wsc("214", is_data.OBJID, is_drop.OBJID, param.UIATT)); _done(); return; }
+                var _allow = true; _safe(function () { _allow = _exMod.checkAllowChildAggr({ PUIOK: is_drop.UIOBK, UIATT: param.UIATT, UIOBK: is_data.UIOBK }); });
+                if (_allow !== true) { _toast("E", _wsc("214", is_data.OBJID, is_drop.OBJID, param.UIATT)); _done(); return; }
             }
 
-            // ⑦ 패턴의 $OTR: alias 서버조회로 T_OTR 채운 뒤 적용(원본 lf_getOTRtext 6149).
-            //    미리보기(uiPreviewArea.js 1118)가 T_OTR 로 $OTR 텍스트를 해석하므로 붙여넣기 전 필요.
-            //    ※ keep-binding 확인(원본 lf_chkBindNEvent+116/117)은 저장 시 바인딩/서버이벤트를
-            //      걸러내므로(fnP13nDesignPopupOpen.js 337) 이 경로에선 항상 미도달 → bKeep=false 고정.
-            try { await _fetchP13nOtr(l_data); }
-            catch (e) { console.error("[HTML5][WS20][dnd] getOTRTextsAlias", e); }
+            // ⑦ $OTR: alias 서버조회로 T_OTR 보강(원본 lf_getOTRtext 6149).
+            //    미리보기(uiPreviewArea.js 1118)가 T_OTR 로 $OTR 텍스트를 해석하므로 삽입 전 필요.
+            try { await _fetchP13nOtr(is_data); }
+            catch (e) { console.error("[HTML5][WS20][designAddTreeData] getOTRTextsAlias", e); }
 
-            try { await _applyP13nPattern(l_data, l_drop, param); }
-            catch (e) { console.error("[HTML5][WS20][dnd] applyP13nPattern", e); }
-            _exit();
-        }, l_pos.x, l_pos.y, function () { _exit(); });
+            // ⑧ 재구성(OBJID 재채번=삽입후재귀 → 형제중복 없음) + 미리보기 + 후처리
+            //    (원본 lf_setPasteCopiedData + lf_paste_cb 1:1, 바인딩/서버이벤트 값 제외 필터 포함).
+            try { await _applyP13nPattern(is_data, is_drop, param); }
+            catch (e) { console.error("[HTML5][WS20][designAddTreeData] applyPaste", e); }
+            _done();
+        }, l_pos.x, l_pos.y, function () { _done(); });
 
         return true;
     };

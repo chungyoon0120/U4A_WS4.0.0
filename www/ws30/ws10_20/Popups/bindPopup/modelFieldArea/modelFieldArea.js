@@ -211,9 +211,10 @@
                     DnDRandKey: oAPP.attr.DnDRandKey,
                     IF_DATA: _dragField(oNode)
                 };
-                // 추가속성(MPROP) — 우측 패널 미확정값. 아직 미배선(P3)이면 "".
+                // 추가속성(MPROP) — 우측 스테이징(MAIN_ADDIT = oAPP.attr.additRows) 미확정값을 캐리.
+                //   원본 index.js:8494 setAdditBindData(oAddit.oModel.oData.T_MPROP) → HTML5 우측 스토어 additRows.
                 oObj.IF_DATA.MPROP = (typeof oAPP.fn.setAdditBindData === "function")
-                    ? (oAPP.fn.setAdditBindData(oAPP.attr.oAddit && oAPP.attr.oAddit.oModel && oAPP.attr.oAddit.oModel.oData.T_MPROP) || "")
+                    ? (oAPP.fn.setAdditBindData(oAPP.attr.additRows) || "")
                     : "";
                 // 추가속성 검증(있으면) — 오류 시 payload 에 실어 드롭측이 차단(원본 checkAdditData).
                 try {

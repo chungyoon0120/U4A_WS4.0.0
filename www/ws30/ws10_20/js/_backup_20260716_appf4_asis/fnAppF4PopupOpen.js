@@ -414,18 +414,12 @@
         var T1_MAP = {};   // key → col (셀 텍스트/정렬·필터용)
         T1_COLS.forEach(function (c) { if (c.key) { T1_MAP[c.key] = c; } });
 
-        // 좌측 컬럼 고정 — ★원본(getAppF4ListUiTable) 은 setFixedColumnCount(3) 을 audit 권한 게이트
-        //   if(checkWLOList("C","UHAK901182")) 안에서만 호출한다(생성/변경 5컬럼 추가와 같은 블록).
-        //   즉 권한이 없으면 컬럼 추가도, 고정도 없다(UI5 기본값 0=고정 없음). bAudit 로 그대로 재현.
-        //   pickOnly 면 액션 2컬럼이 빠져 User Name 1개만 고정.
-        var T1_FRZN = bPickOnly ? 1 : (bAudit ? 3 : 0);
+        // 좌측 컬럼 고정 — 기본 3(User Name/Run/Display). pickOnly 면 액션 2컬럼 빠져 User Name 1개만 고정.
+        var T1_FRZN = bPickOnly ? 1 : 3;
         var T1_FRZ_COLS = T1_COLS.slice(0, T1_FRZN);   // 고정 페인 컬럼
         var T1_SCR_COLS = T1_COLS.slice(T1_FRZN);      // 스크롤 페인 컬럼
 
         var oT1G = _build2Pane();
-        // 고정 컬럼이 0 이면 고정 페인 자체를 숨긴다(빈 페인의 우측 '고정바'가 남지 않게).
-        //   그리드 col1 = auto 라 숨기면 폭 0 으로 접히고 스크롤 페인이 전폭을 쓴다.
-        if (T1_FRZN === 0) { oT1G.frzPane.hidden = true; }
         var oT1Wrap = oT1G.grid;        // oPage1 에 들어갈 컨테이너(그리드)
         var oT1FrzHead = oT1G.frzHead, oT1FrzBody = oT1G.frzBody;   // 고정 페인(일반 렌더)
         var oT1ScrHead = oT1G.scrHead, oT1ScrBody = oT1G.scrBody;   // 스크롤 페인(가상 스크롤)
@@ -615,15 +609,12 @@
             { action: "disp", w: "6.5rem", align: "center" },  // App Views — 고정 컬럼(탭1과 동일 폭)
             { key: "APPID", label: _txt("/U4A/CL_WS_COMMON", "C01"), w: "12rem", link: true },
             { key: "APPVR", label: _txt("/U4A/CL_WS_COMMON", "C02"), w: "6rem", align: "center", nz: true },
-            // 원본(fnCreateAppF4Tab2) 기준 nz(ROOT/패키지 공백)는 lf_nozero·lf_nozero_date·lf_nozero_time 가
-            // 걸린 APPVR/ERDAT/ERTIM/AEDAT/AETIM 5개 컬럼에만 적용된다. CODPG/UITHM/ERUSR/AEUSR 은 원본이
-            // plain Text 바인딩이므로 패키지 행에서도 값을 그대로 표시한다.
-            { key: "CODPG", label: _txt("/U4A/CL_WS_COMMON", "C03"), w: "6rem", align: "center" },
-            { key: "UITHM", label: _txt("/U4A/CL_WS_COMMON", "C04"), w: "8rem" },
-            { key: "ERUSR", label: _txt("/U4A/CL_WS_COMMON", "C05"), w: "8rem" },
+            { key: "CODPG", label: _txt("/U4A/CL_WS_COMMON", "C03"), w: "6rem", align: "center", nz: true },
+            { key: "UITHM", label: _txt("/U4A/CL_WS_COMMON", "C04"), w: "8rem", nz: true },
+            { key: "ERUSR", label: _txt("/U4A/CL_WS_COMMON", "C05"), w: "8rem", nz: true },
             { key: "ERDAT", label: _wsTxt("387"), w: "7rem", align: "center", nz: true, fmt: _fmtDate },
             { key: "ERTIM", label: _wsTxt("388"), w: "6rem", align: "center", nz: true, fmt: _fmtTime },
-            { key: "AEUSR", label: _wsTxt("411"), w: "8rem" },
+            { key: "AEUSR", label: _wsTxt("411"), w: "8rem", nz: true },
             { key: "AEDAT", label: _wsTxt("412"), w: "7rem", align: "center", nz: true, fmt: _fmtDate },
             { key: "AETIM", label: _wsTxt("413"), w: "6rem", align: "center", nz: true, fmt: _fmtTime }
         ];
@@ -660,10 +651,9 @@
             // 디바운스(타이핑 중 매 글자 재렌더 방지). 가상 스크롤이라 렌더는 보이는 행만 → 즉시.
             _filtT = setTimeout(function () {
                 sTreeFilter = oTSrch.input.value.trim().toUpperCase();
-                // ★ 펼침 동작은 원본 change 핸들러 그대로: 값이 있으면 expandToLevel(99)=전체 펼침,
-                //   값을 지우면 collapseAll() + expandToLevel(1)=1레벨로 리셋(펼침 상태 잔존 금지).
-                //   _treeExpandAll(false) 가 '전부 접고 루트만 펼침'이라 expandToLevel(1) 과 동일.
-                _treeExpandAll(!!sTreeFilter);   // 내부에서 _renderTree 수행
+                // 검색 시 매칭 경로만 자동 펼쳐 매치를 드러낸다(강제펼침 X → 이후 수동 접기 가능).
+                if (sTreeFilter) { _expandMatchPaths(); }
+                _renderTree();
             }, 200);
         });
         // 정렬·필터 전체 해제 — 컬럼 정렬·컬럼필터·검색박스를 한 번에 초기화(걸린 게 없으면 비활성).
@@ -796,13 +786,13 @@
                     if (!bWS10 || bHasKids || _isRoot(node)) { b.disabled = true; }
                     td.appendChild(b);
                 } else if (c.link && !bPickOnly) {
-                    // 원본: sap.m.Link(emphasized, text/tooltip="{APPID}") — ROOT/패키지 행도 공백 처리 없이
-                    //   링크로 그대로 렌더한다(실행 불가 판정은 press 핸들러 _doTreeRun 의 가드가 담당).
-                    var a = _el("a", "u4aAppF4Link", node[c.key] || "");
-                    a.href = "javascript:void(0)";
-                    a.title = node[c.key] || "";   // 원본 tooltip="{APPID}"
-                    a.addEventListener("click", function (e) { e.stopPropagation(); _doTreeRun(node); });
-                    td.appendChild(a);
+                    if (_isRoot(node)) { td.textContent = ""; }
+                    else {
+                        var a = _el("a", "u4aAppF4Link", node[c.key] || "");
+                        a.href = "javascript:void(0)";
+                        a.addEventListener("click", function (e) { e.stopPropagation(); _doTreeRun(node); });
+                        td.appendChild(a);
+                    }
                 } else {
                     var v = node[c.key];
                     if (c.nz && _isRoot(node)) { v = ""; }
@@ -1118,9 +1108,6 @@
             ".u4aAppF4Grid{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;overflow:hidden;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--surface);}",
             /* 고정 페인 — col1/row1. 세로바 없음(스크롤 페인 scrollTop 추종). 우측 경계선 = '고정바'. */
             ".u4aAppF4Pane--frozen{grid-column:1;grid-row:1;min-width:0;overflow:hidden;border-right:.0625rem solid var(--line);}",
-            /* 고정 컬럼 0(원본: audit 권한 없으면 setFixedColumnCount 미호출) → 페인 숨김. 명시 override 를
-               깔아둬야 [hidden] 이 확실히 먹는다(같은 셀렉터에 display 가 생겨도 안전). */
-            ".u4aAppF4Pane[hidden]{display:none;}",
             /* 스크롤 페인 — col2/row1. ★가로 스크롤바는 여기서 제거(하단 hsb 로 분리)★ → 가로바가 행과 안 겹침. 세로바만. */
             ".u4aAppF4Pane--scroll{grid-column:2;grid-row:1;min-width:0;overflow-x:hidden;overflow-y:auto;}",
             /* 하단 별도 가로 스크롤바(UI5 sap.ui.table HSb) — col2/row2. 트랙 폭(spacer)=스크롤 페인 콘텐츠 폭(JS 동기). */

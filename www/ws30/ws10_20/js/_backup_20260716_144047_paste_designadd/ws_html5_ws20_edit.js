@@ -522,34 +522,26 @@
         if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { return; }
         var clone;
         try { clone = JSON.parse(JSON.stringify(oNode)); } catch (e) { return; }
-        // 각 노드의 속성(_T_0015) + 클라이언트 이벤트(_CEVT) + 설명(_DESC) 동봉 (붙여넣기 시 새 OBJID 로 복원).
-        //   ★필드 형식은 원본 contextMenuUiCopy(lf_setTreeItemAttr)/패턴 저장과 동일(_CEVT = T_CEVT 원행).
-        //     붙여넣기는 공통 designAddTreeData → _applyP13nPattern 경로가 이 형식을 그대로 소비한다.
+        // 각 노드의 속성(_T_0015) + 클라이언트 이벤트(T_CEVT) + 설명(T_DESC) 동봉 (붙여넣기 시 새 OBJID 로 복원)
         (function attach(n) {
             try {
                 var p = oAPP.attr.prev && oAPP.attr.prev[n.OBJID];
                 n._T_0015 = (p && p._T_0015) ? JSON.parse(JSON.stringify(p._T_0015)) : [];
             } catch (e) { n._T_0015 = []; }
-            // 클라이언트 이벤트 — 원본 getUiClientEvent 1:1: SAP.UI.CORE.HTML 의 content(HM) +
-            //   JS 이벤트(_T_0015.UIATY==="2")를 T_CEVT 원행(OBJID=원OBJID+UIASN/CONTENT) 그대로 수집.
-            //   있을 때만 _CEVT 세팅(원본 동일 — lf_copyClientEvent 는 undefined 면 skip).
+            // 클라이언트 이벤트(HM/CS/JS) — 원본 _T_0015(ADDSC≠"") 기준 T_CEVT(키=OBJID+UIASN) 수집.
+            n._T_CEVT = [];
             try {
                 var _A = oAPP.DATA.APPDATA;
-                var _cev = [];
-                if (_A && Array.isArray(_A.T_CEVT) && _A.T_CEVT.length) {
-                    if (n.UIFND === "SAP.UI.CORE.HTML") {
-                        var _hi = _A.T_CEVT.findIndex(function (a) { return a.OBJID === n.OBJID + "CONTENT" && a.OBJTY === "HM"; });
-                        if (_hi !== -1) { _cev.push(_A.T_CEVT[_hi]); }
-                    }
-                    var _evt = (n._T_0015 || []).filter(function (a) { return a.UIATY === "2"; });
-                    for (var c = 0; c < _evt.length; c++) {
-                        var _ji = _A.T_CEVT.findIndex(function (a) { return a.OBJID === n.OBJID + _evt[c].UIASN && a.OBJTY === "JS"; });
-                        if (_ji !== -1) { _cev.push(_A.T_CEVT[_ji]); }
+                if (_A && Array.isArray(_A.T_CEVT) && Array.isArray(n._T_0015)) {
+                    for (var c = 0; c < n._T_0015.length; c++) {
+                        if (n._T_0015[c].ADDSC === "") { continue; }
+                        var _k = n._T_0015[c].OBJID + n._T_0015[c].UIASN;
+                        var _aCe = _A.T_CEVT.filter(function (a) { return a.OBJID === _k; });
+                        for (var d = 0; d < _aCe.length; d++) { n._T_CEVT.push({ UIASN: n._T_0015[c].UIASN, OBJTY: _aCe[d].OBJTY, DATA: _aCe[d].DATA }); }
                     }
                 }
-                if (_cev.length) { n._CEVT = JSON.parse(JSON.stringify(_cev)); }
             } catch (e) { }
-            // 설명(_DESC)
+            // 설명(T_DESC)
             try { n._DESC = (typeof oAPP.fn.getDesc === "function") ? (oAPP.fn.getDesc(n.OBJID) || "") : ""; } catch (e) { n._DESC = ""; }
             if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { attach(n.zTREE[i]); } }
         })(clone);
@@ -576,39 +568,55 @@
     function _pasteUI(oTarget) {
         if (!oTarget || !_isEdit()) { return; }
         var src = _getCopy();
-        if (!src) { return; } // 복사본 없으면 무동작(메뉴 en.paste 로 이미 비활성)
+        if (!src) { return; } // 복사본 없으면 무동작(원본은 메뉴 enab07 로 Paste 비활성)
         var clone;
         try { clone = JSON.parse(JSON.stringify(src)); } catch (e) { return; }
 
-        // ★원본 붙여넣기의 실제 경로(uiDesignArea.js designAddTreeData 5808~)로 위임 — 패턴 drop 과 완전 동일.
-        //   구 _pasteUI 는 "전체 채번 후 1회 push" 로 형제 OBJID 가 중복되던 버그가 있었다. 공통 경로는
-        //   원본처럼 "노드 삽입 후 자식 재귀" 라 형제마다 유일 OBJID 를 보장하고, 아래를 함께 처리한다:
-        //     - aggregation 선택/검증(UA039 중복·UA040 hidden·카디널리티·특정부모·예외aggr)
-        //     - $OTR: alias 서버조회 보강 + 바인딩/서버이벤트 값 제외 필터
-        //     - 미리보기 생성/이동 + 14/15 재구성 + 모델·트리·바인딩팝업 갱신 + 선택/변경플래그
-        //   붙여넣기는 대상 노드의 선택 aggregation 끝에 append → 대상의 stale dropLineInfo 제거(append 강제).
-        try { delete oTarget.dropLineInfo; } catch (e) { }
+        // OBJID 재채번(재귀) + 부모관계 재설정
+        //   ★ setOBJID 는 "숫자 없는 베이스"를 받아 다음 번호를 붙인다(designCopyUI 와 동일).
+        //     숫자 미제거 시 BUTTON1→setOBJID("BUTTON1")→"BUTTON11" 이 되던 버그 수정
+        //     (BUTTON1 붙여넣기 → BUTTON2 가 정상).
+        (function regen(n, sPobid, sPuiok) {
+            n.OBJID = oAPP.fn.setOBJID(String(n.UIOBJ || n.OBJID || "UI").replace(/\d/g, ""));
+            n.POBID = sPobid;
+            if (sPuiok != null) { n.PUIOK = sPuiok; }
+            if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { regen(n.zTREE[i], n.OBJID, n.UIOBK); } }
+        })(clone, oTarget.OBJID, oTarget.UIOBK);
 
         _broadBusy(true);   // 자식창 잠금(원본 붙여넣기 시 BUSY_ON)
-        try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(true); } } catch (e) { }
-        var _done = function () {
-            try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } } catch (e) { }
-            _broadBusy(false);   // 짝 BUSY_OFF (가드 실패/취소/완료 모두 여기로)
-        };
+        oAPP.fn.fnWs20PushUndo();
+        if (!oTarget.zTREE) { oTarget.zTREE = []; }
+        oTarget.zTREE.push(clone);
 
-        try {
-            if (typeof oAPP.fn.fnWs20AddTreeData === "function") {
-                // undo push 는 재구성 직전 코어 내부(_applyP13nPattern)에서 수행 → 여기서 별도 호출 금지.
-                oAPP.fn.fnWs20AddTreeData(clone, oTarget, null, _done);
-            } else {
-                // dnd 모듈 미로드 방어 — 공통 경로 부재 시 붙여넣기 취소(임의 fallback 금지).
-                console.error("[HTML5][WS20][paste] oAPP.fn.fnWs20AddTreeData 미정의 — 붙여넣기 취소");
-                _done();
-            }
-        } catch (e) {
-            console.error("[HTML5][WS20][paste] fnWs20AddTreeData", e);
-            _done();
-        }
+        // 복사해온 속성 + 클라이언트 이벤트 + 설명을 새 OBJID 로 복원(가드)
+        (function restore(n) {
+            try {
+                if (oAPP.attr.prev && n._T_0015) {
+                    oAPP.attr.prev[n.OBJID] = oAPP.attr.prev[n.OBJID] || {};
+                    oAPP.attr.prev[n.OBJID]._T_0015 = n._T_0015;
+                }
+            } catch (e) { }
+            // 클라이언트 이벤트(HM/CS/JS) 복원 — 새 OBJID+UIASN 로 재키잉해 T_CEVT push.
+            try {
+                var _A = oAPP.DATA.APPDATA;
+                if (_A && Array.isArray(_A.T_CEVT) && Array.isArray(n._T_CEVT)) {
+                    for (var e2 = 0; e2 < n._T_CEVT.length; e2++) {
+                        _A.T_CEVT.push({ OBJID: n.OBJID + n._T_CEVT[e2].UIASN, OBJTY: n._T_CEVT[e2].OBJTY, DATA: n._T_CEVT[e2].DATA });
+                    }
+                }
+            } catch (e) { }
+            // 설명(T_DESC) 복원.
+            try { if (n._DESC && typeof oAPP.fn.setDesc === "function") { oAPP.fn.setDesc(n.OBJID, n._DESC); } } catch (e) { }
+            delete n._T_0015; delete n._T_CEVT; delete n._DESC;
+            if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { restore(n.zTREE[i]); } }
+        })(clone);
+
+        _refreshTree();
+        // 미리보기 생성(가드)
+        _prev("createUIInstance", [clone, (oAPP.attr.prev && oAPP.attr.prev[clone.OBJID] && oAPP.attr.prev[clone.OBJID]._T_0015) || []]);
+        _selectNode(clone.OBJID);
+        _markChanged();
+        _broadBusy(false);   // 짝 BUSY_OFF
         // (원본 contextMenuUiPaste 는 완료 토스트 없음)
     }
 

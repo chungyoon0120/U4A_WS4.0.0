@@ -53,8 +53,9 @@ var zconsole = WSERR(window, document, console);
 
 // 반응형 카드 전환 폭(px) — 이보다 좁으면 행을 카드로(공통 .u4a-table-wrap[data-view]). Chromium93 컨테이너쿼리 미지원.
 var CARD_VIEW_MAX = 560;
-// 메인 영역이 이보다 좁으면 M002 좌우 분할을 세로로(좌 네비는 항상 좌측 고정). RO 로 data-w 토글.
-var MAIN_NARROW_MAX = 620;
+// 메인 영역이 이보다 좁으면 M002 좌우 분할이 "페이지 모드"(팬 1개 + 하단 도트)로 바뀐다. RO 로 data-w 토글.
+// 값 800 = 원본 sap.ui.layout.SplitPane.requiredParentWidth 기본값(index.js fnGetFindPage2 는 미지정 → 기본).
+var MAIN_NARROW_MAX = 800;
 
 // ── 상태 ─────────────────────────────────────────────────────────────────
 var oData = { attr: [], serv: [], t0022: [], user: null, theme: null };
@@ -180,9 +181,13 @@ function _deriveM5() {
     var aList = a.filter(function (e) { return e.UIATY == "2" && e.SHCUT != null && e.SHCUT !== ""; });
     var aOut = [];
     aList.forEach(function (o) {
-        var r = { HOTKEY: "", UIATV: o.UIATV || "", UIATT: o.UIATT || "", OBJID: o.OBJID || "", EVTXT: "" };
+        // ★ 장군님 지시(2026-07-15): "대상 이벤트 속성"(UIATT) 링크가 M004 "UI 오브젝트 ID" 링크
+        //   (둘 다 원본 ev_press_Link_Find → --find)와 동일 파라미터로 동작하도록, 축약행이 아니라
+        //   원본 aAttrData 행 전체(UIOBK 등 포함)를 base 로 두고 HOTKEY/EVTXT 만 덧붙인다.
+        var r = Object.assign({}, o);
+        r.HOTKEY = "";
         try { var sc = JSON.parse(o.SHCUT); r.HOTKEY = sc.SCKEY || ""; } catch (e) { r.HOTKEY = ""; }
-        var m = ev.find(function (x) { return x.KEY == r.UIATV; });
+        var m = ev.find(function (x) { return x.KEY == (r.UIATV || ""); });
         r.EVTXT = (m && m.DESC) || "";
         aOut.push(r);
     });
@@ -407,7 +412,70 @@ function _buildPageEl(oMode) {
     }
     oPage.appendChild(oBody);
 
+    // 원본 ResponsiveSplitter 의 하단 페이지네이터 — 좁을 때(폭 < 800) 만 CSS 로 노출된다.
+    // ★ .u4aFindMode 의 직계 자식이 되면 공통 wireSplitter 가 "팬"으로 오인하므로 페이지 직계로 둔다.
+    if (oMode.split) { oPage.appendChild(_buildPager(oBody, oMode)); }
+
     return { pageEl: oPage, ctx: aCtx };
+}
+
+// 좌/우 팬 페이지 도트(원본 ResponsiveSplitter 페이지 모드). 클릭 시 해당 팬만 노출.
+function _buildPager(oBody, oMode) {
+    var oPager = _el("div", "u4aFindPager");
+    var aPanes = oMode.panes || [];
+
+    aPanes.forEach(function (oPaneDef, i) {
+        var oDot = _el("button", "u4aFindPager__dot");
+        oDot.type = "button";
+        oDot.setAttribute("aria-label", oPaneDef.head || "");
+        oDot.addEventListener("click", function () { _setSplitPage(oBody, oPager, i); });
+        oPager.appendChild(oDot);
+    });
+
+    _setSplitPage(oBody, oPager, 0);
+
+    return oPager;
+}
+
+// 팬 페이지 전환 — 16 §9.5(별창 서브페이지도 슬라이드+페이드, 즉시 스왑 금지).
+//   방향 = 인덱스 증가 forward / 감소 back. 세대 카운터 + animationend + 400ms 폴백(§9.3).
+var _findPgGen = 0;
+function _setSplitPage(oBody, oPager, iIdx) {
+    var iOld = parseInt(oBody.getAttribute("data-page") || "0", 10);
+
+    var aDots = oPager.querySelectorAll(".u4aFindPager__dot");
+    for (var i = 0; i < aDots.length; i++) {
+        aDots[i].classList.toggle("u4aFindPager__dot--on", i === iIdx);
+    }
+
+    var aPanes = oBody.querySelectorAll(".u4a-splitter__pane");
+    var sClr = "u4aFindPane--inFwd u4aFindPane--inBack u4aFindPane--outFwd u4aFindPane--outBack";
+    for (var j = 0; j < aPanes.length; j++) { aPanes[j].classList.remove.apply(aPanes[j].classList, sClr.split(" ")); }
+
+    oBody.setAttribute("data-page", String(iIdx));
+
+    // 최초 구성(전환 아님) / 같은 페이지 / 넓은 화면(분할이라 전환 없음)이면 애니메이션 없음.
+    var oMain = document.getElementById("findMain");
+    if (iOld === iIdx || !oBody.isConnected || !oMain || oMain.getAttribute("data-w") !== "narrow") { return; }
+
+    var oOut = aPanes[iOld];
+    var oIn = aPanes[iIdx];
+    if (!oOut || !oIn) { return; }
+
+    var bFwd = iIdx > iOld;
+    oOut.classList.add(bFwd ? "u4aFindPane--outFwd" : "u4aFindPane--outBack");
+    oIn.classList.add(bFwd ? "u4aFindPane--inFwd" : "u4aFindPane--inBack");
+
+    var iGen = ++_findPgGen;
+    var bDone = false;
+    var fnCleanup = function () {
+        if (bDone || iGen !== _findPgGen) { return; }
+        bDone = true;
+        oOut.classList.remove("u4aFindPane--outFwd", "u4aFindPane--outBack");
+        oIn.classList.remove("u4aFindPane--inFwd", "u4aFindPane--inBack");
+    };
+    oIn.addEventListener("animationend", fnCleanup, { once: true });
+    setTimeout(fnCleanup, 400);
 }
 
 // ── 모드 렌더(원본 NavContainer 페이지 전환 → 공통 §9 슬라이드 스코프 복제) ──
@@ -428,7 +496,12 @@ function _renderMode(oMode, bAnimate) {
     var oNewPage = oBuilt.pageEl;
     var aCtx = oBuilt.ctx;
 
-    var oOldPage = oMain.querySelector(".u4aFindPage");
+    // ★ 빠른/연속 전환 잔재 정리 — 이전 전환이 세대 무효화로 cleanup 을 건너뛰면 --out 페이지가
+    //   stage 에 남아(하단에 이전 모드 테이블 잔상) querySelector 가 엉뚱한 걸 old 로 잡는다.
+    //   진입 시 남은 페이지들 중 "가장 최근(활성)" 하나만 old 로 남기고 나머지는 즉시 제거한다.
+    var aExist = oMain.querySelectorAll(".u4aFindPage");
+    for (var _i = 0; _i < aExist.length - 1; _i++) { try { aExist[_i].remove(); } catch (e) { } }
+    var oOldPage = aExist.length ? aExist[aExist.length - 1] : null;
     var iGen = ++_findNavGen;
 
     if (!bAnimate || !oOldPage) {
@@ -436,7 +509,8 @@ function _renderMode(oMode, bAnimate) {
         oMain.appendChild(oNewPage);
     } else {
         var bFwd = iNew > iOld;
-        oOldPage.classList.add("u4aFindPage--out");
+        // 나가는 페이지도 §9.2 대로 슬라이드아웃(중앙→∓32px). 내용은 애니메이션 후 정리(§9.3).
+        oOldPage.classList.add(bFwd ? "u4aFindPage--outFwd" : "u4aFindPage--outBack");
         oMain.appendChild(oNewPage);
         oNewPage.classList.add(bFwd ? "u4aFindPage--inFwd" : "u4aFindPage--inBack");
 
@@ -454,21 +528,24 @@ function _renderMode(oMode, bAnimate) {
     oCurrent = { mode: oMode, ctx: aCtx };
 
     var oBody = oNewPage.querySelector(".u4aFindMode");
-    if (oMode.split && oBody) { _wireSplit(oBody); }
+    if (oMode.split && oBody && window.U4AUI && U4AUI.wireSplitter) {
+        U4AUI.wireSplitter(oBody, { axis: "x" }); // M002 좌|우 — 공통 소비(min-width 하한은 CSS 단일출처)
+    }
 
     aCtx.forEach(function (c) { _renderTableInto(c); _observeWrap(c.wrapEl); });
 
-    _applyMainWidth(); // 반응형(좁으면 M002 세로) 즉시 반영
+    _applyMainWidth(); // 반응형(좁으면 M002 페이지 모드) 즉시 반영
 }
 
 // 팬(검색툴바 + 테이블) 1개 생성 — aCtx 에 컨텍스트 push.
 //   툴바 = [M002 라벨] [검색(폭 채움)]. 도움말/새로고침은 카드 헤더(_buildHead)로 이관.
 function _buildPane(oPaneDef, aCtx) {
     var oPane = _el("div", "u4aFindPane");
+    if (!oPaneDef.head) { oPane.classList.add("u4aFindPane--single"); }
 
     var oTb = _el("div", "u4aFindPane__toolbar");
 
-    // M002 좌/우 라벨(원본 아이콘+텍스트: Properties/Aggregations).
+    // M002 좌/우 제목 — ★ 툴바 직계(attachOverflow 컨테이너 밖) 이므로 절대 숨겨지지 않는다(말줄임만).
     if (oPaneDef.head) {
         var oLbl = _el("span", "u4aFindPane__headlabel");
         if (oPaneDef.headIcon) { oLbl.appendChild(_iEl(oPaneDef.headIcon)); }
@@ -480,7 +557,15 @@ function _buildPane(oPaneDef, aCtx) {
     }
 
     var oSrchHost = _el("div", "u4aFindSearch");
-    oTb.appendChild(oSrchHost);
+    // M002: 검색만 attachOverflow 컨테이너(oSrchOvf) 안에 둔다 → 좁으면 "검색만" ⋯ 로 접힘(제목은 직계라 유지).
+    var oSrchOvf = null;
+    if (oPaneDef.head) {
+        oSrchOvf = _el("div", "u4aFindSearchOvf");
+        oSrchOvf.appendChild(oSrchHost);
+        oTb.appendChild(oSrchOvf);
+    } else {
+        oTb.appendChild(oSrchHost);
+    }
 
     // 테이블 래퍼(공통 .u4a-table-wrap — 반응형 data-view, 빈상태는 _renderTableInto 가 대체).
     var oWrap = _el("div", "u4aFindWrap u4a-table-wrap");
@@ -503,16 +588,31 @@ function _buildPane(oPaneDef, aCtx) {
     oPane.appendChild(oTb);
     oPane.appendChild(oWrap);
 
-    // 라벨 있는 팬(M002)의 툴바 오버플로(§11) — 좁으면 라벨을 ⋯ 로 접고 검색창(isSkip)은 유지.
-    if (oPaneDef.head && window.U4AUI && typeof U4AUI.attachOverflow === "function") {
-        var oOvf = U4AUI.attachOverflow(oTb, {
+    // ★ M002 팬: attachOverflow 대상 = 검색 컨테이너(oSrchOvf) "뿐". 좁으면 검색만 ⋯ 로 접힌다(제목은 손 안 탐).
+    //   검색=menuItem {node}(원본 el 이동 없이 ⋯ 메뉴에 새 검색 생성, 동일 oSearch 핸들러 — fnP13n 콤보 패턴).
+    if (oSrchOvf && window.U4AUI && typeof U4AUI.attachOverflow === "function") {
+        var oOvf = U4AUI.attachOverflow(oSrchOvf, {
             noOvfAutoMargin: true,
             btnClass: "u4a-btn-icon",
-            isSkip: function (el) { return el.classList.contains("u4aFindSearch"); } // 검색은 접지 않음(폭 채움)
+            isSep: function () { return false; },
+            menuItem: function (el) {
+                if (el === oSrchHost) {
+                    var oMF = U4AUI.createField({
+                        type: "text", clear: true, placeholder: _c("A75"),
+                        value: oSearch[oPaneDef.id] || "",
+                        onInput: function (v) { oSearch[oPaneDef.id] = v; try { if (oCtx.field && oCtx.field.setValue) { oCtx.field.setValue(v); } } catch (e) { } _renderTableInto(oCtx); },
+                        onClear: function () { oSearch[oPaneDef.id] = ""; try { if (oCtx.field && oCtx.field.setValue) { oCtx.field.setValue(""); } } catch (e) { } _renderTableInto(oCtx); }
+                    });
+                    var oRow = _el("div", "u4aFindSearchMenuRow");
+                    oRow.appendChild(oMF.el);
+                    return { node: oRow };
+                }
+                return null;
+            }
         });
         if (oOvf && typeof requestAnimationFrame === "function") {
             (function _try(n) {
-                if (oTb.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { } return; }
+                if (oSrchOvf.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { } return; }
                 if (n <= 0) { return; }
                 requestAnimationFrame(function () { _try(n - 1); });
             })(30);
@@ -542,22 +642,12 @@ function _renderTableInto(oCtx) {
     }
 
     oCtx.wrapEl.innerHTML = "";
-    if (!aRows.length) {
-        // 빈 상태(아이콘 + 공통 no-data 메시지 _z("946")) — 밋밋한 "No data" 한 줄 대체.
-        oCtx.wrapEl.appendChild(_buildEmpty());
-        return;
-    }
+    // ★ 데이터 0건이어도 컬럼 헤더는 항상 유지 — 공통 .u4a-table 이 [헤더 + no-data 행("데이터 없음")]을
+    //   그린다(공통 표준). 임의 아이콘 빈상태로 헤더를 덮지 않는다.
     oCtx.wrapEl.appendChild(_renderTable(oDef.cols, aRows));
-}
-
-// 빈 상태(아이콘 + 공통 no-data 메시지). 임의 문구 없이 기존 메시지키만 사용.
-function _buildEmpty() {
-    var o = _el("div", "u4aFindEmpty");
-    var oIco = _el("div", "u4aFindEmpty__ico");
-    oIco.appendChild(_iEl("magnifying-glass"));
-    o.appendChild(oIco);
-    o.appendChild(_el("div", "u4aFindEmpty__txt", _z("946")));
-    return o;
+    // 0건↔데이터 전환(검색)은 폭 불변이라 RO 가 안 돈다 — 뷰(table/card)를 즉시 재평가해
+    //   0건이면 테이블뷰(헤더 유지)로 확정한다.
+    _applyWrapView(oCtx.wrapEl);
 }
 
 function _renderTable(aCols, aRows) {
@@ -640,43 +730,12 @@ function _onFindSuccess() {
     _setBusy(false);
 }
 
-// ── 스플리터 드래그 리사이즈 — 공통 .u4a-splitter__bar 소비(외곽 네비|메인 + M002 좌|우) ──
-//   바의 직계 형제(previousElementSibling)를 좌측 팬으로 리사이즈. :scope> 로 자기 바만 잡아
-//   중첩 스플리터(메인 안 M002)와 섞이지 않게 한다. 더블클릭 최초폭 복귀는 공통 전역 자동.
-function _wireSplit(oSplit) {
-    var oBar = oSplit.querySelector(":scope > .u4a-splitter__bar");
-    if (!oBar) { return; }
-    var oLeft = oBar.previousElementSibling;
-    if (!oLeft) { return; }
-
-    oBar.addEventListener("mousedown", function (e) {
-        if (e.button !== 0) { return; }
-        e.preventDefault();
-        var iStartX = e.clientX;
-        var iStartW = oLeft.getBoundingClientRect().width;
-        var iTotal = oSplit.getBoundingClientRect().width;
-        var iMin = 120;
-
-        function onMove(ev) {
-            var w = iStartW + (ev.clientX - iStartX);
-            if (w < iMin) { w = iMin; }
-            if (w > iTotal - iMin - 11) { w = iTotal - iMin - 11; }
-            oLeft.style.flex = "0 0 " + w + "px";
-        }
-        function onUp() {
-            document.removeEventListener("mousemove", onMove);
-            document.removeEventListener("mouseup", onUp);
-        }
-        document.addEventListener("mousemove", onMove);
-        document.addEventListener("mouseup", onUp);
-    });
-}
-
 // ── 반응형 table↔card(ResizeObserver→data-view) ────────────────────────────
 function _applyWrapView(oWrap) {
     if (!oWrap || !oWrap.isConnected) { return; }
     var iW = oWrap.getBoundingClientRect().width;
     if (!iW) { return; }
+    // 좁으면 카드뷰(데이터 0건이어도 카드 형태로) — 우측 가로 스크롤 대신 반응형 카드. 장군님 지시(2026-07-15).
     var sView = (iW < CARD_VIEW_MAX) ? "card" : "table";
     if (oWrap.dataset.view !== sView) { oWrap.dataset.view = sView; }
 }
@@ -693,7 +752,7 @@ function _observeWrap(oWrap) {
     oRO.observe(oWrap);
 }
 
-// ── 반응형: 메인 폭 → data-w(narrow|wide). 좁으면 M002 세로 분할(CSS). 좌 네비는 항상 좌측. ──
+// ── 반응형: 메인 폭 → data-w(narrow|wide). 좁으면 M002 페이지 모드(CSS). 좌 네비는 항상 좌측. ──
 function _applyMainWidth() {
     var oMain = document.getElementById("findMain");
     if (!oMain) { return; }
@@ -771,7 +830,8 @@ function _openHelp() {
     var oBody = _el("div", "u4aFindHelpBody");
     var oFrame = document.createElement("iframe");
     oFrame.className = "u4aFindHelpFrame";
-    oFrame.setAttribute("sandbox", "allow-same-origin");
+    // ★ sandbox 미지정(원본 준수) — 도움말 HTML 내부 스크립트가 실행돼야 한다.
+    //   sandbox="allow-same-origin" 만 주면 allow-scripts 부재로 srcdoc 스크립트가 차단돼 콘솔 오류 발생.
     oFrame.srcdoc = sContent;
     oBody.appendChild(oFrame);
     oDlg.appendChild(oBody);
@@ -874,9 +934,12 @@ window.addEventListener("load", function () {
     _initChrome();
     _initBroadcast();
 
-    // 외곽 스플리터(네비|메인) 드래그 리사이즈 — 정적 마크업이라 1회 배선.
+    // 외곽 스플리터(네비|메인) — 공통 U4AUI.wireSplitter 소비(드래그 rAF·창리사이즈 재클램프·
+    //   더블클릭 최초복귀·iframe 차단 전부 공통). onResize=반응형 폭 재평가.
     var oSplit = document.getElementById("findSplit");
-    if (oSplit) { _wireSplit(oSplit); }
+    if (oSplit && window.U4AUI && U4AUI.wireSplitter) {
+        U4AUI.wireSplitter(oSplit, { axis: "x", onResize: _applyMainWidth });
+    }
 
     // 반응형 폭 관찰(정적 #findMain) — 좁으면 M002 세로. RO 1회 배선.
     _observeMain();

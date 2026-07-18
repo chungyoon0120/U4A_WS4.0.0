@@ -1,0 +1,319 @@
+/************************************************************************
+ * monacoThemeDesign/Popup/css/index.css  (HTML5)
+ *   화면 전용 레이아웃만. 색/보더/그림자는 공통 자산(shell/bootstrap-skin) + 의미 토큰 소비.
+ *   위저드(.u4aTplWiz__*) 스타일은 js/wizardNav.js 가 주입(UI 템플릿 마법사와 100% 동일).
+ ************************************************************************/
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+.u4aTdBody {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+    font-family: var(--font);
+    opacity: 0;
+    transition: opacity var(--motion) ease;
+}
+
+.u4aTdBody.u4a-visible {
+    opacity: 1;
+}
+
+/* [hidden] 함정(§11.1): .u4a-btn=inline-flex 라 UA 기본 [hidden]{display:none} 을 이김 → 강제.
+   (푸터 Save 버튼 = 테마 미선택 시 숨김) */
+.u4aTdBody [hidden] {
+    display: none !important;
+}
+
+/* ===== 본문 / 스플리터 =====
+   ★ 분할 화면은 창 가장자리에 딱 붙인다(외곽 여백 0) — split-layout-flush. */
+.u4aTdMain {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+}
+
+.u4aTdSplit {
+    height: 100%;
+    width: 100%;
+}
+
+/* 좌측 : 에디터 미리보기(원본 PAGE1, SplitterLayoutData minSize:300) */
+.u4aTdLeft {
+    flex: 1 1 auto;
+    min-width: 18.75rem;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* 우측 : 테마 설정 위저드(원본 PAGE2, SplitterLayoutData minSize:300 / size:50%) */
+.u4aTdRight {
+    flex: 0 0 50%;
+    min-width: 18.75rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ===== 좌측 : 미리보기(Language 바 + Monaco) ===== */
+.u4aTdPrev {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+    background: var(--surface);
+}
+
+/* Language 바(원본 HBOX1 sapUiTinyMargin) */
+.u4aTdPrev__head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--surface-raised);
+    border-bottom: 0.0625rem solid var(--line);
+}
+
+.u4aTdPrev__label {
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    color: var(--text);
+}
+
+.u4aTdPrev__field {
+    flex: 0 1 14rem;
+    min-width: 0;
+}
+
+.u4aTdPrev__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+}
+
+.u4aTdPrevFrame {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+}
+
+/* 드래그(스플리터/타이틀바) 동안 iframe 이 포인터를 먹지 않게 — 공통 규약(§4.3) */
+body.u4a-dragging .u4aTdPrevFrame {
+    pointer-events: none;
+}
+
+/* ===== 우측 : 위저드 스텝 본문 ===== */
+/* 라벨 + 입력 한 줄(원본 HBOX2/HBOX3 alignItems:Center) — 좁아지면 자연 줄바꿈(반응형) */
+.u4aTdRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.u4aTdRow__label {
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    color: var(--text);
+    margin: 0;
+}
+
+/* 원본 sap.m.Label required:true */
+.u4aTdRow__label[data-required="true"]::after {
+    content: " *";
+    color: var(--error);
+}
+
+/* 테마 콤보 / 커스텀 테마명 — 고정 px 금지(반응형: 넓으면 22rem, 좁으면 줄 폭) */
+.u4aTdThemeCombo,
+.u4aTdCustomName {
+    flex: 1 1 12rem;
+    min-width: 0;
+    max-width: 22rem;
+}
+
+/* 테마 콤보 필수검증 오류 — 공통 setValueState no-op 보완(화면 스코프 data-vs). */
+.u4aTdRow .u4a-combo[data-vs="error"] {
+    border-color: var(--error) !important;
+}
+
+/* 테마 dark/light 서브텍스트(원본 sap.m.Text {/S_THEME/THEME_SUBTX}) */
+.u4aTdSubTx {
+    flex: 0 1 auto;
+    min-width: 0;
+    color: var(--text-muted, var(--text));
+    font-size: 0.8125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ===== 회색 겹침(얼룩) 정리 — 장군님 지적 =====
+   지적 전 겹: app-bg(페이지) → surface-raised(스텝카드) → hover-bg(패널 헤더 띠)
+              → surface(테이블 액자) → surface(thead) → hover-bg(지브라)  = 6겹
+   정리 후 겹: app-bg(페이지) → surface-raised(스텝카드)                  = 2겹
+   · 테이블 액자(--boxed) 미부착(js) · 지브라(data-odd) 미사용(js)
+   · 패널 헤더 틴트 제거 · thead 를 카드와 같은 면으로 → 카드 위에 표가 그냥 얹힌 모습(원본 동일). */
+
+/* 스텝 카드 안의 패널(Rules/Colors) — 카드가 이미 액자라 패널은 평탄화(이중 테두리/띠 방지).
+   공통 .u4a-panel 파일은 미수정(스코프 override). */
+.u4aTdPanel.u4a-panel {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.u4aTdPanel.u4a-panel + .u4aTdPanel.u4a-panel {
+    margin-top: 0.75rem;
+}
+
+/* 헤더 틴트(shell .u4a-panel__head{background:var(--hover-bg)}) 제거 → 소제목처럼 평평하게.
+   구분은 하단 경계선 하나로만. hover 틴트(--active-bg)도 끈다(접기 토글은 그대로 동작). */
+.u4aTdPanel .u4a-panel__head,
+.u4aTdPanel .u4a-panel__head:hover {
+    background: transparent;
+    border-bottom: 0.0625rem solid var(--line);
+    min-height: 2.25rem;
+}
+
+/* 테이블 — 원본 sap.ui.table visibleRowCount = min(건수, C_MAXROW=7) →
+   HTML5 는 "최대 7행 높이까지만 늘고 그 뒤 스크롤"(헤더 1 + 행 7 = 8행 높이). */
+.u4aTdTblWrap {
+    max-height: calc(var(--row-h, 2.5rem) * 8);
+    overflow: auto;
+}
+
+/* sticky thead — 액자를 뺐으니 카드와 같은 면으로. ★불투명 필수(스크롤 시 행이 비쳐 겹침 방지). */
+.u4aTdTblWrap .u4a-table thead th {
+    background: var(--surface-raised);
+}
+
+/* 행 — 지브라 없음. 구분은 공통 border-bottom 하나. 행 자체는 클릭 대상이 아니므로 커서/hover 정리
+   (공통 .u4a-table tbody tr{cursor:pointer}+tr:hover{background:hover-bg} 는 선택형 표 기준). */
+.u4aTdTblWrap .u4a-table tbody tr {
+    cursor: default;
+}
+
+.u4aTdTblWrap .u4a-table tbody tr:hover {
+    background: transparent;
+}
+
+/* 키워드 셀 — 최대 2줄 개행 허용, 초과 시 말줄임(장군님 지시).
+   공통 td 는 nowrap+ellipsis 이므로 이 셀만 정상 줄바꿈으로 풀고, 클램프는 안쪽 span 이 담당
+   (td 에 -webkit-box 를 걸면 표 레이아웃이 깨진다). td height(2.5rem)는 표에서 최소높이로
+   동작 → 2줄이면 행이 자연히 커진다. */
+.u4aTdTblWrap .u4a-table tbody td.u4aTdKeyCell {
+    white-space: normal;
+    padding-top: 0.3125rem;
+    padding-bottom: 0.3125rem;
+}
+
+.u4aTdKey {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    line-height: 1.35;
+}
+
+/* 색상 컬럼 — 원본 Column hAlign:"Center".
+   ★ 공통 .u4a-table 은 table-layout:fixed → 컬럼 폭은 지정값이 그대로 먹는다(% 금지, rem 고정).
+   폭 미지정 컬럼(Keyword)이 남는 폭을 흡수. 헤더 라벨이 잘리면 공통 툴팁이 자동(§2.9a).
+   ★폭 실측 근거: 우측 패널은 창 기본폭 1100 의 50% = 550px, 표 폭 ≈ 434px.
+   색상 2열 7rem(112px×2) + 글꼴 9rem(144px) 이면 키워드에 66px 밖에 안 남아 'comment' 같은
+   짧은 토큰까지 2줄로 깨졌다(실측). → 칩(2rem)+패딩만 담을 만큼으로 줄여 키워드에 폭을 준다. */
+.u4aTdColorCell {
+    text-align: center;
+    white-space: nowrap;
+    width: 4.5rem;
+}
+
+/* Font Style 컬럼 — select 가 들어가므로 최소한의 폭만 확보 */
+.u4aTdFsCell {
+    width: 7rem;
+}
+
+/* 색상 칩(스와치) — 원본 화면과 동일하게 색을 "면"으로 표시.
+   투명 버튼 + 안쪽 칩. 칩 뒤 체커보드로 opacity(#RRGGBBAA)가 비쳐 보인다.
+   테두리(--line)는 어두운 배경에서 어두운 색(#1E1E1E)도 식별되게 하는 최소 장치. */
+.u4aTdSwatch.u4a-btn {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0.25rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.u4aTdSwatch.u4a-btn:hover .u4aTdSwatch__chip {
+    border-color: var(--accent);
+}
+
+/* 바깥 칩 = 체커보드(투명도 배경) + 테두리. 색은 안쪽 __fill 이 덮는다.
+   ★색과 체커보드를 같은 요소에 주면 background-image 가 background-color 위에 그려져 얼룩진다. */
+.u4aTdSwatch__chip {
+    position: relative;
+    display: block;
+    width: 2rem;
+    height: 1.25rem;
+    border-radius: 0.1875rem;
+    border: 0.0625rem solid var(--line);
+    box-sizing: border-box;
+    overflow: hidden;
+    background-image:
+        linear-gradient(45deg, rgba(128, 128, 128, 0.55) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(128, 128, 128, 0.55) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(128, 128, 128, 0.55) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(128, 128, 128, 0.55) 75%);
+    background-size: 0.5rem 0.5rem;
+    background-position: 0 0, 0 0.25rem, 0.25rem -0.25rem, -0.25rem 0;
+}
+
+/* 실제 색 면 — 불투명 색이면 체커보드를 완전히 덮고, alpha 가 있으면 그만큼 비친다. */
+.u4aTdSwatch__fill {
+    position: absolute;
+    inset: 0;
+    display: block;
+}
+
+/* Font Style select — 원본 sap.m.Select width:"100%" */
+.u4aTdRulesTbl td .u4a-combo {
+    width: 100%;
+    margin: 0;
+}
+
+/* ===== 푸터(Save/Reset/Close) — 공통 48px ===== */
+.u4aTdFooter {
+    flex: 0 0 48px;
+    height: 48px;
+    border-top: 0.0625rem solid var(--line);
+    background-color: var(--surface-raised);
+    padding: 0 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.u4aTdFooter__spacer {
+    flex: 1 1 auto;
+}

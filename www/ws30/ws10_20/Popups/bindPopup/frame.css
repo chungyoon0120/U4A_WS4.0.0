@@ -68,8 +68,10 @@ body {
 
 /* 중앙 세로 2분할(디자인 트리 | 추가속성 적용) — 공통 wireSplitter(axis:y) 소비.
    디자인=고정 높이(초기 basis %), 추가속성적용=유연(잔여 흡수). 최소높이 단일 출처(min-height). */
-.u4aBwpDesign { flex: 0 1 56%; min-height: 6rem; display: flex; flex-direction: column; position: relative; }
-.u4aBwpAdditApply { flex: 1 1 auto; min-height: 5rem; display: flex; flex-direction: column; }
+/* ★ .u4aBwpArea(아래 86줄, flex:1 1 auto·min-height:0)가 같은 특정성으로 뒤에 정의돼 이 규칙을 덮는다
+   (디자인이 grow 로 잔여를 다 먹어 추가속성이 최소높이만 남던 원인). → .u4aBwpArea 를 함께 걸어 특정성(0,2,0)으로 확정. */
+.u4aBwpArea.u4aBwpDesign { flex: 0 1 60%; min-height: 6rem; display: flex; flex-direction: column; position: relative; }
+.u4aBwpArea.u4aBwpAdditApply { flex: 1 1 auto; min-height: 5rem; display: flex; flex-direction: column; }
 
 /* ★ 원본 BULK 모드(기본) 첫 실행 = 좌(모델트리) + 중(디자인트리) + 우("추가 속성 바인딩")의 3분할.
    ★ 우측 패널(oPageRight = bindAdditInfo, index.js:1289 / start 1046)은 BULK 3번째 스플리터 영역이라
@@ -169,6 +171,15 @@ body {
     position: relative;
 }
 
+/* 빈상태(No data) — 공통 emp 는 내부 body(컬럼폭 합 ≈46rem) 안에 있어, 좁은 패널에선 안내가 그 폭 기준
+   가운데라 가시영역 밖으로 밀리고 가로 스크롤이 생긴다. → designArea observer 가 emp 폭을 host 가시폭(px)으로
+   고정하고, 여기서 sticky left:0 로 가로 가시영역에 고정(세로는 기존대로 body 가운데 유지). */
+.u4aBwpTreeHost.u4aBwpTreeEmptyState { overflow-x: hidden; }
+.u4aBwpTreeHost .u4aColTreeEmpty {
+    position: sticky; left: 0;
+    box-sizing: border-box;
+}
+
 /* ===== 스플리터 바 = 공통 .u4a-splitter__bar 스킨(11px + 가운데 알약 그립) 그대로 소비 =====
    세로 바(좌|중, 중|우)는 공통 그대로(col-resize + 세로 그립). 가로 바(디자인|추가속성)만 방향 전환. */
 .u4aBwpSplitBar--h {
@@ -266,6 +277,9 @@ body {
 /* 디자인 트리 — 체크박스(멀티 선택) + 바인딩 경로(Link 색). */
 .u4aBwpDesignChk { flex: 0 0 auto; margin: 0; cursor: pointer; width: 1.05rem; height: 1.05rem; accent-color: var(--accent); }
 .u4aBwpDesignPath { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: var(--accent); }
+/* 바인딩경로 = 링크(클릭 시 우측 추가속성 재구성, SPEC §3.2/§3.5). 값 있을 때만 링크 커서/hover 밑줄. */
+.u4aBwpDesignPathLink { cursor: pointer; }
+.u4aBwpDesignPathLink:hover { text-decoration: underline; }
 
 /* 행 액션 컬럼(원본 rowActionTemplate = WS20 트리 +/휴지통과 동일한 2슬롯 — 빈슬롯으로 세로 정렬 유지). */
 .u4aBwpRowActions { display: flex; align-items: center; justify-content: center; gap: 0.125rem; }
@@ -369,3 +383,12 @@ body {
 .u4aBwpAdditVal .u4a-field,
 .u4aBwpAdditVal .u4a-combo { width: 100%; }
 .u4aBwpAdditVal .u4aBwpAdditTxt { user-select: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+
+/* 중앙 하단(DESIGN_ADDIT) 툴바 선택 attribute 상태(원본 ObjectStatus S_SEL_ATTR OBJID/UIATT). */
+.u4aBwpAdditSelStat {
+    min-width: 0; max-width: 16rem;
+    margin: 0 0.5rem;
+    font-size: 0.8125rem; font-weight: 600; color: var(--accent);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.u4aBwpAdditSelStat:empty { display: none; }

@@ -1,20 +1,22 @@
 /****************************************************************************
- * Binding Popup(대형 별창) 우측 "추가 속성 바인딩"(bindAdditInfo) 영역 — HTML5
+ * Binding Popup(대형 별창) "바인딩 추가 속성"(MPROP) 영역 — HTML5
  * --------------------------------------------------------------------------
- *  원본: uiModule/bindAdditInfo.js(start 1046) — sap.ui.table.Table(속성|값 2열) +
- *        상단 OverflowToolbar(098 추가 속성 바인딩 / 161 컬럼최적화 / 198 Help).
- *        행 데이터 = index.js setAdditBindInfo(3064) 가 T_9011 UA028(P01~P08)로 구성.
- *  HTML5: 공통 .u4a-table 골격 + createField/createSelect(값 셀) + 공유 oAPP.H 소비.
+ *  ★ 원본은 추가속성 패널이 2개다(SPEC §4 / bindAdditInfo.js:1126, index.js:4499):
+ *    1) 우측  MAIN_ADDIT  = 스테이징 입력폼(항상 표시, 초기 8행). 신규/일괄 적용용.
+ *       소비 3곳 = 좌측필드 드래그 캐리 · 098 멀티일괄 · 디자인트리 행액션 accept.
+ *    2) 중앙하단 DESIGN_ADDIT = 이미 바인딩된 디자인트리 1행의 MPROP 열람/수정용.
+ *       바인딩경로 링크 클릭 시 표시(vis_addit), 툴바 172 접기 / 139 적용 / 161.
+ *  ★ 두 패널은 서로 다른 스토어를 갖는다(코덱스 교차검증 2026-07-16):
+ *       우측  = oAPP.attr.additRows      (CTX.MAIN)
+ *       중앙하단= oAPP.attr.additRowsSel  (CTX.SEL)
+ *     내부 helper 가 전역 additRows 를 암묵 참조하면 두 패널이 다시 섞이므로,
+ *     모든 렌더/DDLB 함수는 ctx(스토어·host·tbody) 를 명시로 받는다.
  *
- *  ★ 레이아웃(BULK 모드): 이 패널(oPageRight)은 3분할 중 우측 영역이라 첫 실행부터 항상 보인다.
- *    (vis_addit 은 중앙 하단 "추가속성 적용"만 제어 — 이 패널과 무관. frame.css 참조.)
  *  ★ 행 P01~P08(원본 setAdditBindInfo 1:1):
  *      P01 Field name(txt) · P02 Field path(txt) · P03 type(txt) ·
  *      P04 Bind type(sel, 참조필드 DDLB, P타입만 편집) · P05 Reference Field name(sel, CUKY/UNIT 있을때만) ·
  *      P06 Conversion Routine(inp, maxlen5) · P07 Nozero(sel true/false, default false) ·
  *      P08 Is number format?(sel true/false, default false).
- *  ★ 첫 실행 = 디자인 선택 없음 → 빈 is_tree 로 8행 기본형(값 비고 잠금)을 표시(image1 첫 실행과 동일).
- *    실제 필드 선택 시 재구성은 디자인 트리 링크(onShowBindAdditInfo)에서 이 함수를 재호출(Stage4).
  ****************************************************************************/
 (function () {
     "use strict";
@@ -24,7 +26,14 @@
 
     var H = oAPP.H;
 
-    var oA = { tool: null, host: null, tbody: null };
+    // 패널 컨텍스트 — 우측(MAIN) / 중앙하단(SEL). host/tbody 는 initAdditArea 에서 채움.
+    var oA = {
+        MAIN: { tool: null, host: null, tbody: null, tab: "MAIN_ADDIT", store: "additRows", hostId: "bwpAdditInfo", toolId: "bwpAdditInfoTool" },
+        SEL: { tool: null, host: null, tbody: null, tab: "DESIGN_ADDIT", store: "additRowsSel", hostId: "bwpAdditApply", toolId: "bwpAdditApplyTool", statEl: null }
+    };
+    // 스토어 접근(코덱스: 읽기/쓰기에 어느 패널인지 명시).
+    function _rows(ctx) { return oAPP.attr[ctx.store] || []; }
+    function _setRows(ctx, a) { oAPP.attr[ctx.store] = a; }
 
     // Nozero 불가 타입(원본 l_nozero) / number format 가능 타입(원본 l_numfmt).
     var CS_NOZERO_NG = "Cg", CS_NUMFMT_OK = "IP";
@@ -40,10 +49,10 @@
         } catch (e) { }
         return el.offsetWidth;
     }
-    function _fitCols() {
-        if (!oA.host) { return; }
+    function _fitCols(ctx) {
+        if (!ctx || !ctx.host) { return; }
         try {
-            var oTbl = oA.host.querySelector(".u4aBwpAdditTbl");
+            var oTbl = ctx.host.querySelector(".u4aBwpAdditTbl");
             if (!oTbl) { return; }
             var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
             var mx = 0, aProp = oTbl.querySelectorAll("th:first-child, .u4aBwpAdditProp");
@@ -56,45 +65,12 @@
         } catch (e) { console.error("[HTML5][bindWindow] additFitCols:", e && e.message); }
     }
 
-    /* ── 영역 초기화(frame.js _bootApp → initAdditArea) ─────────────────────── */
-    oAPP.fn.initAdditArea = function () {
-        oA.tool = document.getElementById("bwpAdditInfoTool");
-        oA.host = document.getElementById("bwpAdditInfo");
-        if (!oA.tool || !oA.host) { return; }
+    // 161 컬럼최적화 외부 노출(우측 MAIN 버튼용 — 원본 setUiTableAutoResizeColumn 대응).
+    oAPP.fn.additFitCols = function () { _fitCols(oA.MAIN); };
 
-        // ── 헤더 툴바(원본 bindAdditInfo.js:1078) — 098 추가 속성 바인딩(강조) · 도움말 ──
-        oA.tool.innerHTML = "";
-        var bRO = !oAPP.attr.editable;
-        var oBind = H.el("button", "u4a-btn u4a-btn--emphasized");
-        oBind.type = "button";
-        oBind.innerHTML = H.fa("layer-group");
-        oBind.appendChild(document.createTextNode(H.z("098")));   // 098 추가 속성 바인딩
-        oBind.title = H.z("098");
-        if (bRO) { oBind.disabled = true; }
-        oBind.addEventListener("click", function () {
-            // 멀티 추가속성 바인딩(원본 onMultiAdditionalBind) — 적용 단계(Stage4/5)에서 배선.
-            if (typeof oAPP.fn.onMultiAdditionalBind === "function") {
-                try { oAPP.fn.onMultiAdditionalBind(); } catch (e) { console.error("[HTML5][bindWindow] onMultiAdditionalBind:", e && e.message); }
-            }
-        });
-        oA.tool.appendChild(oBind);
-        oA.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
-        // 161 컬럼최적화 — 속성 컬럼을 라벨 콘텐츠 폭에 맞춤(원본 resize-horizontal).
-        oA.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () { _fitCols(); }));
-        // 957 화면 커스터마이징 — 원본 bindAdditInfo.js:1164 createBindLayoutCustomizingButton(좌·중·우 공통).
-        oA.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {
-            if (oAPP.attr.editable === false) { return; }
-            if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
-        }));
-        oA.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
-            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
-        }));
-
-        // 패널 좁아질 때 넘치는 버튼(추가 속성 바인딩/도움말)을 ⋯ 오버플로 메뉴로(16 §11, 공통 attachOverflow).
-        oAPP.fn.attachToolOverflow(oA.tool);
-
-        // ── 속성|값 2열 테이블(원본 2열 Property/Value) ──
-        oA.host.innerHTML = "";
+    /* ── 공통 테이블 골격 생성(속성|값 2열) ─────────────────────────────────── */
+    function _buildTable(ctx) {
+        ctx.host.innerHTML = "";
         var oTbl = H.el("table", "u4aBwpAdditTbl u4a-table");
         var oThead = H.el("thead");
         var oTrH = H.el("tr");
@@ -102,33 +78,108 @@
         oTrH.appendChild(H.el("th", null, H.z("178")));   // 178 Value(값)
         oThead.appendChild(oTrH);
         oTbl.appendChild(oThead);
-        oA.tbody = H.el("tbody");
-        oTbl.appendChild(oA.tbody);
-        oA.host.appendChild(oTbl);
+        ctx.tbody = H.el("tbody");
+        oTbl.appendChild(ctx.tbody);
+        ctx.host.appendChild(oTbl);
+    }
 
-        // 첫 실행 — 원본 초기 함수 setAdditialListData 로 UA028 기반 8행 기본형 표시.
-        oAPP.fn.setAdditialListData();
+    /* ── 영역 초기화(frame.js _bootApp → initAdditArea) — 두 패널 모두 구성 ──── */
+    oAPP.fn.initAdditArea = function () {
+        oA.MAIN.tool = document.getElementById(oA.MAIN.toolId);
+        oA.MAIN.host = document.getElementById(oA.MAIN.hostId);
+        oA.SEL.tool = document.getElementById(oA.SEL.toolId);
+        oA.SEL.host = document.getElementById(oA.SEL.hostId);
+
+        // ── 우측(MAIN) 툴바 — 098 추가 속성 바인딩 / 161 / 957 / 198 (원본 bindAdditInfo.js:1102) ──
+        if (oA.MAIN.tool && oA.MAIN.host) {
+            oA.MAIN.tool.innerHTML = "";
+            var bRO = !oAPP.attr.editable;
+            var oBind = H.el("button", "u4a-btn u4a-btn--emphasized");
+            oBind.type = "button";
+            oBind.innerHTML = H.fa("layer-group");
+            oBind.appendChild(document.createTextNode(H.z("098")));   // 098 추가 속성 바인딩
+            oBind.title = H.z("098");
+            if (bRO) { oBind.disabled = true; }
+            oBind.addEventListener("click", function () {
+                if (typeof oAPP.fn.onMultiAdditionalBind === "function") {
+                    try { oAPP.fn.onMultiAdditionalBind(); } catch (e) { console.error("[HTML5][bindWindow] onMultiAdditionalBind:", e && e.message); }
+                }
+            });
+            oA.MAIN.tool.appendChild(oBind);
+            oA.MAIN.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
+            oA.MAIN.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () { _fitCols(oA.MAIN); }));   // 161 컬럼최적화
+            oA.MAIN.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {   // 957 화면 커스터마이징
+                if (oAPP.attr.editable === false) { return; }
+                if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
+            }));
+            oA.MAIN.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
+                if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+            }));
+            oAPP.fn.attachToolOverflow(oA.MAIN.tool);
+
+            _buildTable(oA.MAIN);
+            oAPP.fn.setAdditialListData();   // 우측 = 초기 8행 스테이징.
+        }
+
+        // ── 중앙 하단(SEL) 툴바 — 172 접기 / 139 추가속성적용 / 상태 / 161 (원본 index.js:4273) ──
+        if (oA.SEL.tool && oA.SEL.host) {
+            oA.SEL.tool.innerHTML = "";
+            // 172 Collapse(접기) — 원본 press: clearSelectAdditBind + setAdditLayout("").
+            var oCol = H.el("button", "u4a-btn u4a-btn--emphasized");
+            oCol.type = "button";
+            oCol.innerHTML = H.fa("down-left-and-up-right-to-center");
+            oCol.appendChild(document.createTextNode(H.z("172")));   // 172 Collapse
+            oCol.title = H.z("172");
+            oCol.addEventListener("click", function () {
+                if (typeof oAPP.fn.clearSelectAdditBind === "function") { try { oAPP.fn.clearSelectAdditBind(); } catch (e) { } }
+                if (typeof oAPP.fn.setAdditLayout === "function") { try { oAPP.fn.setAdditLayout(""); } catch (e) { } }
+            });
+            oA.SEL.tool.appendChild(oCol);
+            // 139 추가속성적용 — 원본 press: onAdditBind(enabled {/edit}).
+            var oApply = H.el("button", "u4a-btn u4a-btn--emphasized");
+            oApply.type = "button";
+            oApply.innerHTML = H.fa("check");
+            oApply.appendChild(document.createTextNode(H.z("139")));   // 139 추가속성적용
+            oApply.title = H.z("139");
+            if (!oAPP.attr.editable) { oApply.disabled = true; }
+            oApply.addEventListener("click", function () {
+                if (typeof oAPP.fn.applyDesignAdditBind === "function") {
+                    try { oAPP.fn.applyDesignAdditBind(); } catch (e) { console.error("[HTML5][bindWindow] applyDesignAdditBind:", e && e.message); }
+                }
+            });
+            oA.SEL.tool.appendChild(oApply);
+            // 선택 attribute 상태(원본 ObjectStatus S_SEL_ATTR OBJID/UIATT).
+            oA.SEL.statEl = H.el("span", "u4aBwpAdditSelStat");
+            oA.SEL.tool.appendChild(oA.SEL.statEl);
+            oA.SEL.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
+            oA.SEL.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () { _fitCols(oA.SEL); }));   // 161 컬럼최적화
+            oAPP.fn.attachToolOverflow(oA.SEL.tool);
+
+            _buildTable(oA.SEL);
+            _setRows(oA.SEL, []);
+            _renderRows(oA.SEL);   // 초기 빈(숨김 상태 = frame.css u4aBwpShowAddit 없음).
+        }
     };
 
+    // 중앙하단 상태 텍스트 갱신(원본 ObjectStatus title/text = S_SEL_ATTR OBJID/UIATT).
+    function _updateSelStat() {
+        if (!oA.SEL.statEl) { return; }
+        var s = oAPP.attr.S_SEL_ATTR || {};
+        var sTxt = (s.OBJID || "") + (s.UIATT ? (" · " + s.UIATT) : "");
+        oA.SEL.statEl.textContent = sTxt;
+        if (sTxt) { oA.SEL.statEl.setAttribute("data-tip", sTxt); oA.SEL.statEl.setAttribute("data-tip-trunc", ""); }
+        else { oA.SEL.statEl.removeAttribute("data-tip"); }
+    }
+
     /************************************************************************
-     * 첫 실행 추가속성 8행 기본형 — 원본 uiModule/bindAdditInfo.js setAdditialListData(870) 1:1.
-     *   ★ 이게 원본 첫 실행(onViewReady:117)의 SSOT다. 선택필드용 setAdditBindInfo(아래)와 다르다:
-     *     초기엔 P04 Bind type · P06 Conversion Routine · P07 Nozero · P08 Is number format? = edit=true,
-     *     P05 Reference Field name = sel 표시하되 edit=false(참조필드 목록 없음), P01~P03 = 값 공란(표시 안 함).
-     *   ★ P07/P08 초기값 "false". T_DDLB: P04=참조필드(UA022 FLD03="X"), P07/P08=boolean.
+     * 우측(MAIN) 첫 실행 8행 기본형 — 원본 setAdditialListData(bindAdditInfo.js:870) 1:1.
      ************************************************************************/
     oAPP.fn.setAdditialListData = function () {
         var aT9011 = oAPP.attr.T_9011 || [];
-
-        // boolean DDLB(원본 lt_bool).
         var aBool = [{ KEY: "true", TEXT: "true" }, { KEY: "false", TEXT: "false" }];
-
-        // Bind type 참조 DDLB(원본 lt_refList = 빈 항목 + UA022 FLD03="X").
         var aRefList = [{ KEY: "", TEXT: "" }];
         aT9011.filter(function (a) { return a.CATCD === "UA022" && a.FLD03 === "X"; })
             .forEach(function (a) { aRefList.push({ KEY: a.FLD01, TEXT: a.FLD01 }); });
-
-        // 추가속성 항목(UA028) — ITMCD 정렬.
         var aUa028 = aT9011.filter(function (a) { return a.CATCD === "UA028"; })
             .slice().sort(function (a, b) { return a.ITMCD.localeCompare(b.ITMCD); });
 
@@ -140,22 +191,22 @@
                 edit: false, inp_vis: false, sel_vis: false, txt_vis: false, maxlen: null, T_DDLB: null
             };
             switch (s.ITMCD) {
-                case "P01": case "P02": case "P03":   // Field name / Field path / type — 값 공란(초기 표시 없음).
+                case "P01": case "P02": case "P03":
                     r.isFieldInfo = true;
                     break;
-                case "P04":   // Bind type — 편집 가능 콤보.
+                case "P04":
                     r.edit = true; r.sel_vis = true; r.T_DDLB = JSON.parse(JSON.stringify(aRefList));
                     break;
-                case "P05":   // Reference Field name — 콤보 표시(참조필드 없어 잠금).
+                case "P05":
                     r.sel_vis = true;
                     break;
-                case "P06":   // Conversion Routine — 편집 가능 입력(5자).
+                case "P06":
                     r.maxlen = 5; r.edit = true; r.inp_vis = true;
                     break;
-                case "P07":   // Nozero — 편집 가능 콤보, 기본 false.
+                case "P07":
                     r.val = "false"; r.edit = true; r.sel_vis = true; r.T_DDLB = JSON.parse(JSON.stringify(aBool));
                     break;
-                case "P08":   // Is number format? — 편집 가능 콤보, 기본 false.
+                case "P08":
                     r.val = "false"; r.edit = true; r.sel_vis = true; r.T_DDLB = JSON.parse(JSON.stringify(aBool));
                     break;
                 default:
@@ -163,17 +214,13 @@
             }
             aMprop.push(r);
         }
-        oAPP.attr.additRows = aMprop;
-        _renderRows();
+        _setRows(oA.MAIN, aMprop);
+        _renderRows(oA.MAIN);
     };
 
     /************************************************************************
-     * 추가속성 정보(T_MPROP) 구성 — 원본 index.js setAdditBindInfo(3064) 1:1.
-     *   @param is_tree    선택 필드 노드(KIND/NTEXT/CHILD/TYPE/TYPE_KIND)
-     *   @param MPROP      기존 바인딩의 MPROP 문자열("|" 조인, 없으면 "")
-     *   @param it_parent  선택 필드의 형제(참조필드 CUKY/UNIT 탐색용)
-     *  ★ 원본은 KIND!=="E" 면 T_MPROP 를 비운다(프로퍼티가 아니면 추가속성 없음).
-     *  ★ 첫 실행 8행은 이 함수가 아니라 setAdditialListData(위) 가 담당 — 이건 디자인트리 필드 선택 시(Stage4).
+     * 중앙하단(SEL) 추가속성 정보 구성 — 원본 setAdditBindInfo(index.js:3064) 1:1.
+     *   바인딩경로 링크 클릭(designArea _showBindAdditInfo)에서 호출. ★ SEL 스토어에만 쓴다.
      ************************************************************************/
     oAPP.fn.setAdditBindInfo = function (is_tree, MPROP, it_parent) {
         is_tree = is_tree || { KIND: "", NTEXT: "", CHILD: "", TYPE: "", TYPE_KIND: "" };
@@ -181,24 +228,18 @@
 
         var aMprop = [];
 
-        // 프로퍼티(E)가 아니면 추가속성 없음 — 빈 테이블.
         if (is_tree.KIND !== "E") {
-            oAPP.attr.additRows = [];
-            _renderRows();
+            _setRows(oA.SEL, []);
+            _renderRows(oA.SEL);
+            _updateSelStat();
             return;
         }
 
         var aT9011 = oAPP.attr.T_9011 || [];
-
-        // 참조필드 DDLB(원본 UA022 FLD03="X").
         var aRefList = [{ KEY: "", TEXT: "" }];
         aT9011.filter(function (a) { return a.CATCD === "UA022" && a.FLD03 === "X"; })
             .forEach(function (a) { aRefList.push({ KEY: a.FLD01, TEXT: a.FLD01 }); });
-
-        // boolean DDLB(원본 lt_bool).
         var aBool = [{ KEY: "true", TEXT: "true" }, { KEY: "false", TEXT: "false" }];
-
-        // 추가속성 항목(UA028) — ITMCD 정렬(원본 localeCompare).
         var aUa028 = aT9011.filter(function (a) { return a.CATCD === "UA028"; })
             .slice().sort(function (a, b) { return a.ITMCD.localeCompare(b.ITMCD); });
 
@@ -214,22 +255,22 @@
             };
 
             switch (s.ITMCD) {
-                case "P01":   // Field name
+                case "P01":
                     r.val = is_tree.NTEXT; r.txt_vis = true; r.isFieldInfo = true;
                     break;
-                case "P02":   // Field path
+                case "P02":
                     r.val = is_tree.CHILD; r.txt_vis = true; r.isFieldInfo = true;
                     break;
-                case "P03":   // type
+                case "P03":
                     r.val = is_tree.TYPE; r.txt_vis = true; r.isFieldInfo = true;
                     break;
-                case "P04":   // Bind type
+                case "P04":
                     if (aSplit.length > 0) { r.val = aSplit[0]; }
                     r.sel_vis = true;
-                    if (is_tree.TYPE_KIND !== "P") { r.edit = false; }   // P 타입만 편집.
+                    if (is_tree.TYPE_KIND !== "P") { r.edit = false; }
                     r.T_DDLB = JSON.parse(JSON.stringify(aRefList));
                     break;
-                case "P05":   // Reference Field name
+                case "P05":
                     if (aSplit.length > 0) { r.val = aSplit[1]; }
                     r.sel_vis = true;
                     r.edit = false;
@@ -241,20 +282,20 @@
                     }
                     if (aSplit.length === 0 || aSplit[0] === "") { r.edit = false; }
                     break;
-                case "P06":   // Conversion Routine
+                case "P06":
                     r.maxlen = 5;
                     if (aSplit.length > 0) { r.val = aSplit[2]; }
                     if (aSplit.length > 0 && aSplit[0] !== "") { r.edit = false; }
                     r.inp_vis = true;
                     break;
-                case "P07":   // Nozero
+                case "P07":
                     if (aSplit.length > 0) { r.val = aSplit[3]; }
                     if (r.val === "") { r.val = "false"; }
                     r.sel_vis = true;
                     if (CS_NOZERO_NG.indexOf(is_tree.TYPE_KIND) !== -1) { r.edit = false; }
                     r.T_DDLB = JSON.parse(JSON.stringify(aBool));
                     break;
-                case "P08":   // Is number format?
+                case "P08":
                     if (aSplit.length > 0) { r.val = aSplit[4]; }
                     if (r.val === "") { r.val = "false"; }
                     r.sel_vis = true;
@@ -268,48 +309,40 @@
             aMprop.push(r);
         }
 
-        oAPP.attr.additRows = aMprop;
-        _renderRows();
+        _setRows(oA.SEL, aMprop);
+        _renderRows(oA.SEL);
+        _updateSelStat();
     };
 
     /************************************************************************
-     * [P3-A 검증] 추가속성 바인딩 가능여부 점검 — 원본 bindAdditInfo.js chkPossibleAdditBind(440) 1:1.
-     *   대상 = 디자인트리 선택라인(ATTR: DATYP/UIATY/UIATV/ISBND). 반환 {RETCD:""|"E", RTMSG}.
-     *   데이터 매핑: 원본 oContr.oModel.oData.T_MPROP → HTML5 oAPP.attr.additRows,
-     *               oAPP.attr.oModel.oData.zTREE → oAPP.attr.modelTree, getModelBindData 그대로.
+     * [P3-A 검증] 추가속성 바인딩 가능여부 — 원본 chkPossibleAdditBind(bindAdditInfo.js:440) 1:1.
+     *   ★ 098 멀티/행액션(우측 MAIN) 경로 전용. 값 판정은 우측 additRows(MAIN) 기준.
      ************************************************************************/
     oAPP.fn.chkPossibleAdditBind = function (is_attr) {
         var _sRes = { RETCD: "", RTMSG: "" };
-        // ATTRIBUTE 가 프로퍼티(DATYP 02)가 아니면 불가 — 148 Property 라인만 적용 가능.
         if (is_attr.DATYP !== "02") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("148"); return _sRes; }
         if (is_attr.UIATY !== "1") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("148"); return _sRes; }
-        // 바인딩 안 된 라인은 추가속성 적용 불가 — 149 바인딩 정보 없음.
         if (is_attr.UIATV === "" || is_attr.ISBND === "") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("149"); return _sRes; }
-        // 모델필드 기준 상세 점검 위임.
         _sRes = oAPP.fn.chkModelFiendAdditData(is_attr.UIATV);
         return _sRes;
     };
 
     /************************************************************************
-     * [P3-A 검증] 모델필드 기준 추가속성 가능여부 — 원본 chkModelFiendAdditData(495) 1:1.
+     * [P3-A 검증] 모델필드 기준 — 원본 chkModelFiendAdditData(495) 1:1. 우측 MAIN 값 기준.
      ************************************************************************/
     oAPP.fn.chkModelFiendAdditData = function (modelField) {
         var _sRes = { RETCD: "", RTMSG: "" };
 
         var _sField = oAPP.fn.getModelBindData(modelField, oAPP.attr.modelTree);
-        // 150 &1 필드가 모델 항목에 존재하지 않음.
         if (typeof _sField === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("150", modelField); return _sRes; }
-        // 151 일반유형 ABAP TYPE(E)만 가능.
         if (_sField.KIND !== "E") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("151"); return _sRes; }
 
-        var _aMPROP = oAPP.attr.additRows || [];
+        var _aMPROP = _rows(oA.MAIN);
 
-        // P04 Bind type — 092 없음 / 093 P 유형만.
         var _sP04 = _aMPROP.find(function (i) { return i.ITMCD === "P04"; });
         if (typeof _sP04 === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("092"); return _sRes; }
         if (_sP04.val !== "" && _sField.TYPE_KIND !== "P") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("093"); return _sRes; }
 
-        // P05 Reference Field — 136 없음 / 152 부모 path 다름.
         var _sP05 = _aMPROP.find(function (i) { return i.ITMCD === "P05"; });
         if (typeof _sP05 === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("136"); return _sRes; }
         if (_sP05.val !== "") {
@@ -318,12 +351,10 @@
             }
         }
 
-        // P07 Nozero — 094 없음 / 095 CHAR(C)·STRING(g) 불가.
         var _sP07 = _aMPROP.find(function (i) { return i.ITMCD === "P07"; });
         if (typeof _sP07 === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("094"); return _sRes; }
         if (_sP07.val === "true" && "Cg".indexOf(_sField.TYPE_KIND) !== -1) { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("095"); return _sRes; }
 
-        // P08 Is number format — 096 없음 / 097 INT(I)·P 만.
         var _sP08 = _aMPROP.find(function (i) { return i.ITMCD === "P08"; });
         if (typeof _sP08 === "undefined") { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("096"); return _sRes; }
         if (_sP08.val === "true" && "IP".indexOf(_sField.TYPE_KIND) === -1) { _sRes.RETCD = "E"; _sRes.RTMSG = H.z("097"); return _sRes; }
@@ -332,17 +363,15 @@
     };
 
     /************************************************************************
-     * [P3-B 서버검증] Conversion Routine(P06) — 원본 checkConversion(index.js:5276) /
-     *   convChangeInput / clearConvError(bindAdditInfo.js:361/386) 1:1.
-     *   서버콜 = POST {servNm}/chkConvExit (FormData CONVEXIT). 실패 시 value-state Error.
-     *   HTML5: 원본 oContr.oModel.refresh() → 해당 입력칸 ctrl.setValueState 직접 갱신(재렌더 없이 포커스 유지).
+     * [P3-B 서버검증] Conversion Routine(P06) — 원본 checkConversion/convChangeInput/clearConvError 1:1.
+     *   ★ 행 r 만 갱신(스토어 무관) — value-state 는 그 입력칸 ctrl 에 직접.
      ************************************************************************/
     function _clearRowErr(r) { r.stat = null; r.statTxt = ""; r._error = false; r._error_msg = ""; }
 
     oAPP.fn.checkConversion = function (convName) {
         return new Promise(function (resolve) {
             var _sRes = { RETCD: "", RTMSG: "" };
-            if (convName === "") { return resolve(_sRes); }   // 미입력 = 서버콜 안 함(원본).
+            if (convName === "") { return resolve(_sRes); }
             var oFormData = new FormData();
             oFormData.append("CONVEXIT", convName);
             oAPP.fn.sendAjax(oAPP.attr.servNm + "/chkConvExit", oFormData, function (param) {
@@ -352,7 +381,6 @@
         });
     };
 
-    // P06 값 변경 완료(change) — 대문자(createField upper)·서버검증·오류표시. oInp = 그 입력칸 ctrl.
     oAPP.fn.convChangeInput = async function (r, oInp) {
         oAPP.fn.setBusy(true);
         if (!r || r.ITMCD !== "P06") { oAPP.fn.setBusy(false); return; }
@@ -368,7 +396,6 @@
         oAPP.fn.setBusy(false);
     };
 
-    // P06 입력 중(liveChange) — 오류 표시 즉시 해제(원본 clearConvError).
     oAPP.fn.clearConvError = function (r, oInp) {
         if (!r || r.ITMCD !== "P06") { return; }
         _clearRowErr(r);
@@ -377,47 +404,42 @@
 
     /************************************************************************
      * [P3-C 상호배타] Bind type(P04) ↔ Reference Field(P05) / Conversion(P06)
-     *   — 원본 setAddtBindInfoDDLB(index.js:8276) 1:1.
-     *   · P04 빈값 → P05 초기화+잠금, P06 활성.
-     *   · P04 값 선택 → P05 활성, P06 잠금+초기화(오류도 클리어).
-     *   HTML5: 원본 refresh() → _renderRows()(edit 변경=위젯 활성/잠금 반영).
+     *   — 원본 setAddtBindInfoDDLB(index.js:8276) 1:1. ★ ctx 패널 내부에서만 작동(코덱스: 패널별 독립).
      ************************************************************************/
-    oAPP.fn.setAddtBindInfoDDLB = function (r) {
-        var _aMPROP = oAPP.attr.additRows || [];
-        // 변경행 오류 표현 초기화(원본).
+    oAPP.fn.setAddtBindInfoDDLB = function (r, ctx) {
+        ctx = ctx || oA.MAIN;
+        var _aMPROP = _rows(ctx);
         r.stat = null; r.statTxt = "";
-        if (r.ITMCD !== "P04" && r.ITMCD !== "P05") { _renderRows(); return; }
+        if (r.ITMCD !== "P04" && r.ITMCD !== "P05") { _renderRows(ctx); return; }
 
         var ls_P04 = _aMPROP.find(function (a) { return a.ITMCD === "P04"; });
         var ls_P05 = _aMPROP.find(function (a) { return a.ITMCD === "P05"; });
         var ls_P06 = _aMPROP.find(function (a) { return a.ITMCD === "P06"; });
         if (!ls_P04 || !ls_P05 || !ls_P06) { return; }
 
-        if (r.ITMCD === "P04" && r.val === "") { ls_P05.val = ""; }   // Bind type 비움 → 참조필드 비움.
-        if (r.ITMCD === "P05" && r.val === "") { ls_P04.val = ""; }   // 참조필드 비움 → Bind type 비움.
+        if (r.ITMCD === "P04" && r.val === "") { ls_P05.val = ""; }
+        if (r.ITMCD === "P05" && r.val === "") { ls_P04.val = ""; }
 
         if (ls_P04.val === "") {
-            ls_P05.edit = false; ls_P05.val = ""; ls_P06.edit = true;              // 참조필드 잠금·비움 / Conversion 활성.
+            ls_P05.edit = false; ls_P05.val = ""; ls_P06.edit = true;
         } else if (r.val !== "") {
-            ls_P05.edit = true; ls_P06.edit = false; ls_P06.val = "";               // 참조필드 활성 / Conversion 잠금·비움.
-            _clearRowErr(ls_P06);                                                   // Conversion 오류 초기화.
+            ls_P05.edit = true; ls_P06.edit = false; ls_P06.val = "";
+            _clearRowErr(ls_P06);
         }
-        _renderRows();
+        _renderRows(ctx);
     };
 
     /************************************************************************
-     * [P3-C 참조필드] Reference Field(P05) DDLB 구성/초기화
-     *   — 원본 setRefFieldList(bindAdditInfo.js:706) / clearRefField(672) 1:1.
-     *   디자인트리 체크선택 + 모델선택의 부모경로가 단일 구조일 때만, 그 형제 중
-     *   DATATYPE CUKY/UNIT 필드로 P05 목록 구성. 섞이거나 없으면 초기화(잠금).
+     * [P3-C 참조필드] Reference Field(P05) DDLB — 원본 setRefFieldList/clearRefField 1:1.
+     *   ★ 원본은 우측(MAIN) 모듈 전용(bindAdditInfo.js:706, 모델트리 선택 onSelTabRow에서 호출). MAIN 고정.
      ************************************************************************/
     oAPP.fn.clearRefField = function () {
-        var _aMPROP = oAPP.attr.additRows || [];
+        var _aMPROP = _rows(oA.MAIN);
         if (_aMPROP.length === 0) { return; }
         var _sP05 = _aMPROP.find(function (i) { return i.ITMCD === "P05"; });
         if (!_sP05) { return; }
         _sP05.val = ""; _sP05.T_DDLB = [];
-        _renderRows();
+        _renderRows(oA.MAIN);
     };
 
     oAPP.fn.setRefFieldList = function () {
@@ -425,39 +447,35 @@
         var _aField = [];
         for (var i = 0; i < _aTree.length; i++) {
             var _sTree = _aTree[i];
-            if (_sTree.UIATV === "" || _sTree.ISBND === "") { continue; }      // 미바인딩 skip.
-            if (_sTree.UIATY !== "1") { oAPP.fn.clearRefField(); return; }      // 프로퍼티 아님 → 초기화.
+            if (_sTree.UIATV === "" || _sTree.ISBND === "") { continue; }
+            if (_sTree.UIATY !== "1") { oAPP.fn.clearRefField(); return; }
             var _field = _sTree.UIATV.substr(0, _sTree.UIATV.lastIndexOf("-"));
             if (_aField.indexOf(_field) === -1) { _aField.push(_field); }
         }
-        // 모델트리 선택라인의 부모경로도 수집.
         var _sMField = (typeof oAPP.fn.getSelectedModelLine === "function") ? oAPP.fn.getSelectedModelLine() : undefined;
         if (_sMField && _aField.indexOf(_sMField.PARENT) === -1) { _aField.push(_sMField.PARENT); }
 
-        if (_aField.length > 1) { oAPP.fn.clearRefField(); return; }           // 서로 다른 구조 섞임 → 초기화.
+        if (_aField.length > 1) { oAPP.fn.clearRefField(); return; }
 
         var _sField = oAPP.fn.getModelBindData(_aField[0], oAPP.attr.modelTree);
         if (typeof _sField === "undefined") { oAPP.fn.clearRefField(); return; }
 
-        // 구조 형제 중 CUKY/UNIT 만.
         var _aFilt = (_sField.zTREE || []).filter(function (it) { return it.DATATYPE === "CUKY" || it.DATATYPE === "UNIT"; });
         if (_aFilt.length === 0) { oAPP.fn.clearRefField(); return; }
 
-        var _aMPROP = oAPP.attr.additRows || [];
+        var _aMPROP = _rows(oA.MAIN);
         if (_aMPROP.length === 0) { return; }
         var _sP05 = _aMPROP.find(function (i) { return i.ITMCD === "P05"; });
         if (!_sP05) { return; }
 
-        _sP05.T_DDLB = [{ KEY: "", TEXT: "" }];   // 공란 + CUKY/UNIT.
+        _sP05.T_DDLB = [{ KEY: "", TEXT: "" }];
         for (var j = 0; j < _aFilt.length; j++) { _sP05.T_DDLB.push({ KEY: _aFilt[j].CHILD, TEXT: _aFilt[j].CHILD }); }
-        // 기존 선택값이 새 목록에 없으면 초기화.
         if (_sP05.T_DDLB.findIndex(function (it) { return it.KEY === _sP05.val; }) === -1) { _sP05.val = ""; }
-        _renderRows();
+        _renderRows(oA.MAIN);
     };
 
     /************************************************************************
-     * [P3-D 적용] MPROP 직렬화 — 원본 setAdditBindData(index.js:5316) 1:1.
-     *   isFieldInfo(P01~P03) 제외 → ITMCD 정렬 → val 을 "|" 조인 = "P04|P05|P06|P07|P08".
+     * [P3-D 적용] MPROP 직렬화 — 원본 setAdditBindData(index.js:5316) 1:1. 파라미터 배열(스토어 무관).
      ************************************************************************/
     oAPP.fn.setAdditBindData = function (aMPROP) {
         if (typeof aMPROP === "undefined") { return; }
@@ -467,40 +485,38 @@
     };
 
     /************************************************************************
-     * [P3-D 검증] 우측 입력 완결성 — 원본 chkAdditBindData(index.js:4886, MAIN_ADDIT) 간이판.
-     *   ★ P6 경계: 원본의 TY_BIND_ERROR/ACTCD 라우팅·showMessagePopover 는 P6 → 여기선 {RETCD,RTMSG}(첫 오류)만.
-     *   반환 {RETCD:""|"E", RTMSG}.
+     * [P3-D 검증] 입력 완결성 — 원본 chkAdditBindData(index.js:4886) 간이판.
+     *   @param sPanel "SEL"=중앙하단(additRowsSel), 그 외=우측 MAIN(additRows).
+     *   ★ 원본은 oTab.data(TAB_NAME) 으로 ACTCD 라우팅만 분기(검증 로직 동일) — P6에서 정교화.
      ************************************************************************/
-    oAPP.fn.chkAdditBindData = function () {
-        var a = oAPP.attr.additRows || [];
-        if (a.length === 0) { return { RETCD: "E", RTMSG: H.z("133") }; }                 // 133 추가속성 정보 없음.
-        if (a.findIndex(function (i) { return i.val !== ""; }) === -1) { return { RETCD: "E", RTMSG: H.z("134") }; }  // 134 입력건 없음.
+    oAPP.fn.chkAdditBindData = function (sPanel) {
+        var ctx = (sPanel === "SEL") ? oA.SEL : oA.MAIN;
+        var a = _rows(ctx);
+        if (a.length === 0) { return { RETCD: "E", RTMSG: H.z("133") }; }
+        if (a.findIndex(function (i) { return i.val !== ""; }) === -1) { return { RETCD: "E", RTMSG: H.z("134") }; }
         var p04 = a.find(function (i) { return i.ITMCD === "P04"; });
-        if (!p04) { return { RETCD: "E", RTMSG: H.z("135") }; }                           // 135 Bind type 없음.
+        if (!p04) { return { RETCD: "E", RTMSG: H.z("135") }; }
         var p05 = a.find(function (i) { return i.ITMCD === "P05"; });
-        if (!p05) { return { RETCD: "E", RTMSG: H.z("136") }; }                           // 136 Reference Field 없음.
+        if (!p05) { return { RETCD: "E", RTMSG: H.z("136") }; }
         var _res = { RETCD: "", RTMSG: "" };
-        if (p04.val !== "" && p05.val === "") { _res = { RETCD: "E", RTMSG: H.z("137") }; }   // 137 Bind type 선택 시 참조필드 필수.
+        if (p04.val !== "" && p05.val === "") { _res = { RETCD: "E", RTMSG: H.z("137") }; }
         var p06 = a.find(function (i) { return i.ITMCD === "P06"; });
-        if (!p06) { return { RETCD: "E", RTMSG: H.z("138") }; }                           // 138 Conversion 없음.
-        if (p06._error === true) { _res = { RETCD: "E", RTMSG: p06._error_msg || H.z("138") }; }   // P06 서버검증 오류.
+        if (!p06) { return { RETCD: "E", RTMSG: H.z("138") }; }
+        if (p06._error === true) { _res = { RETCD: "E", RTMSG: p06._error_msg || H.z("138") }; }
         return _res;
     };
 
     /************************************************************************
-     * [P3-D 멀티 적용] 098 "추가 속성 바인딩" — 원본 onMultiAdditionalBind(bindAdditInfo.js:162) 이식.
-     *   ★ P6 경계: busy 왕복·UPDATE-DESIGN-DATA 방송·showMessagePopover 정교 라우팅 = P6.
-     *   ★ 부분적용 방지(간이 all-or-nothing): 체크행 하나라도 chkPossibleAdditBind E 면 전체 중단.
+     * [P3-D 멀티 적용] 098 "추가 속성 바인딩" — 원본 onMultiAdditionalBind(bindAdditInfo.js:162).
+     *   ★ 우측(MAIN) 스토어 값을 체크된 N행에 일괄 stamp. busy 왕복·방송 = P6.
      ************************************************************************/
     oAPP.fn.onMultiAdditionalBind = async function () {
-        // 우측 입력 완결성.
-        var _r1 = oAPP.fn.chkAdditBindData();
+        var _r1 = oAPP.fn.chkAdditBindData();   // MAIN.
         if (_r1.RETCD === "E") { oAPP.fn.toast(_r1.RTMSG); return; }
 
         var _aTree = (typeof oAPP.fn.getSelectedDesignTree === "function") ? (oAPP.fn.getSelectedDesignTree() || []) : [];
-        if (_aTree.length === 0) { oAPP.fn.toast(H.z("142")); return; }   // 142 디자인 라인 선택 필요.
+        if (_aTree.length === 0) { oAPP.fn.toast(H.z("142")); return; }
 
-        // 간이 all-or-nothing — 하나라도 불가면 전체 차단(원본 checkMultiAdditBind 취지).
         for (var i = 0; i < _aTree.length; i++) {
             var _rr = oAPP.fn.chkPossibleAdditBind(_aTree[i]);
             if (_rr.RETCD === "E") {
@@ -509,16 +525,14 @@
             }
         }
 
-        // 166 &1건 선택 + 089 적용 확인.
         var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("089"));
         if (!_ok) { return; }
 
-        var _MPROP = oAPP.fn.setAdditBindData(oAPP.attr.additRows);
-        oAPP.fn.additionalBindMulti(_MPROP);   // designArea — 체크행 일괄 stamp + _T_0015 갱신.
-        oAPP.fn.toast(H.z("090"));             // 090 적용 완료.
+        var _MPROP = oAPP.fn.setAdditBindData(_rows(oA.MAIN));
+        oAPP.fn.additionalBindMulti(_MPROP);
+        oAPP.fn.toast(H.z("090"));
     };
 
-    // 적용 확인창(원본 MessageBox.confirm 166+089) — 공통 U4AUI.confirm 로. Promise<bool>.
     function _confirmAdditApply(sMsg) {
         return new Promise(function (resolve) {
             U4AUI.confirm({
@@ -529,63 +543,90 @@
         });
     }
 
-    /* ── 행 렌더(값 셀 = 텍스트 / 입력 / 선택) ─────────────────────────────── */
-    function _renderRows() {
-        if (!oA.tbody) { return; }
-        oA.tbody.innerHTML = "";
-        var aRows = oAPP.attr.additRows || [];
-        var bEditGlobal = !!oAPP.attr.editable;   // 원본 enabled="{/edit}".
+    /************************************************************************
+     * [중앙하단 레이아웃] setAdditLayout — 원본 index.js:6052(BULK) 1:1.
+     *   KIND==="E" → 중앙하단(bwpAdditApply) 표시(vis_addit=true), 그 외 숨김.
+     *   원본 width/height/resize_v(30%/60%) = HTML5 CSS flex + 세로 스플리터로 대체(추적표 §1.3).
+     ************************************************************************/
+    oAPP.fn.setAdditLayout = function (KIND, oOption) {
+        var oShell = document.getElementById("bwpShell");
+        if (!oShell) { return; }
+        var bShow = (KIND === "E");
+
+        // ★ 스플리터 드래그가 박은 인라인 flex(px 고정, u4a-ui.js:1077 _splitPxFlex)를 제거 →
+        //   CSS 기본 비율로 복귀. 안 지우면 접어도 디자인이 그 높이에 멈춰 아래가 빈다(장군님 지적).
+        //   접힘: .u4aBwpDesign flex:1 1 auto(100%) / 펼침: 디자인 60% + 추가 40%(원본 height 60% 정합).
+        var oDes = document.getElementById("bwpDesignArea");
+        var oAdd = document.getElementById("bwpAdditApplyArea");
+        if (oDes) { oDes.style.flex = ""; oDes.style.flexBasis = ""; oDes.style.flexGrow = ""; }
+        if (oAdd) { oAdd.style.flex = ""; oAdd.style.flexBasis = ""; oAdd.style.flexGrow = ""; }
+
+        oShell.classList.toggle("u4aBwpShowAddit", bShow);
+        if (bShow) {
+            // 원본 setUiTableAutoResizeColumn(oAdditTab) — 표시 직후 컬럼 폭 맞춤(레이아웃 안정 후).
+            setTimeout(function () { try { _fitCols(oA.SEL); } catch (e) { } }, 0);
+        }
+    };
+
+    /************************************************************************
+     * [중앙하단 초기화] clearSelectAdditBind — 원본 index.js:2xxx 1:1.
+     *   중앙하단 스토어(additRowsSel) 비움 + 선택 attribute(S_SEL_ATTR) 비움.
+     ************************************************************************/
+    oAPP.fn.clearSelectAdditBind = function () {
+        _setRows(oA.SEL, []);
+        oAPP.attr.S_SEL_ATTR = {};
+        _renderRows(oA.SEL);
+        _updateSelStat();
+    };
+
+    /* ── 행 렌더(값 셀 = 텍스트 / 입력 / 선택) — ctx 스토어/tbody 명시 ───────── */
+    function _renderRows(ctx) {
+        if (!ctx || !ctx.tbody) { return; }
+        ctx.tbody.innerHTML = "";
+        var aRows = _rows(ctx);
+        var bEditGlobal = !!oAPP.attr.editable;
 
         for (var i = 0; i < aRows.length; i++) {
             var r = aRows[i];
             var oTr = H.el("tr");
 
-            // 속성명(데이터 아님 — 선택 금지, 말줄임 툴팁).
             var oTdP = H.el("td");
             var oProp = H.el("span", "u4aBwpAdditProp", r.prop || "");
             if (r.prop) { oProp.setAttribute("data-tip", r.prop); oProp.setAttribute("data-tip-trunc", ""); }
             oTdP.appendChild(oProp);
             oTr.appendChild(oTdP);
 
-            // 값 셀.
             var oTdV = H.el("td", "u4aBwpAdditVal");
             var bEnabled = bEditGlobal && r.edit;
 
             if (r.sel_vis) {
                 var aItems = (r.T_DDLB || []).map(function (d) { return { value: d.KEY, text: d.TEXT }; });
-                // ★ onChange 로 선택값을 행(r.val)에 되쓴다 — 원본 selectedKey:"{val}" 양방향 바인딩 대응.
-                //   (이후 MPROP 조립/검증 단계가 r.val 을 읽으므로 미배선 시 입력값 유실.)
-                // P04(Bind type)/P05(Reference Field) 변경 = 상호배타 보정(setAddtBindInfoDDLB). 그 외 콤보는 값만.
                 var bDdlbSync = (r.ITMCD === "P04" || r.ITMCD === "P05");
                 var oSel = U4AUI.createField({
                     type: "combo", items: aItems, value: r.val || "", disabled: !bEnabled,
-                    onChange: (function (row) { return function (v) { row.val = v; if (bDdlbSync) { oAPP.fn.setAddtBindInfoDDLB(row); } }; })(r)
+                    onChange: (function (row, cx) { return function (v) { row.val = v; if (bDdlbSync) { oAPP.fn.setAddtBindInfoDDLB(row, cx); } }; })(r, ctx)
                 });
                 oTdV.appendChild(oSel.el);
             } else if (r.inp_vis) {
-                // P06 Conversion Routine — 대문자(upper) + change=서버검증(convChangeInput) + 입력중=오류해제(clearConvError).
                 var bConv = (r.ITMCD === "P06");
                 var oInp = U4AUI.createField({
                     type: "text", value: r.val || "",
                     maxLength: (r.maxlen != null ? r.maxlen : undefined),
                     disabled: !bEnabled, clear: bEnabled, upper: bConv,
-                    // ★ 입력값을 행(r.val)에 되쓰고(원본 value:"{val}") P06 이면 서버검증.
                     onChange: (function (row) { return function (v) { row.val = v; if (bConv) { oAPP.fn.convChangeInput(row, oInp); } }; })(r),
                     onInput: bConv ? (function (row) { return function () { oAPP.fn.clearConvError(row, oInp); }; })(r) : undefined,
                     onClear: (function (row) { return function () { row.val = ""; if (bConv) { oAPP.fn.clearConvError(row, oInp); } }; })(r)
                 });
-                // 재구성 시 기존 오류 상태 복원(원본 stat/_error).
                 if (bConv && r.stat === "Error") { try { oInp.setValueState("error", r.statTxt || ""); } catch (e) { } }
                 oTdV.appendChild(oInp.el);
             } else {
-                // txt_vis(또는 기본) — 읽기전용 텍스트(값 표면이라 선택 허용).
                 var oTxt = H.el("span", "u4aBwpAdditTxt", r.val || "");
                 if (r.val) { oTxt.setAttribute("data-tip", r.val); oTxt.setAttribute("data-tip-trunc", ""); }
                 oTdV.appendChild(oTxt);
             }
 
             oTr.appendChild(oTdV);
-            oA.tbody.appendChild(oTr);
+            ctx.tbody.appendChild(oTr);
         }
     }
 

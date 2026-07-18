@@ -3,26 +3,110 @@
 
 <head>
     <meta charset="utf-8">
-    <style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
-    </style>
+    <!-- ===== CSS 리소스 스택 (tokens → shell → bootstrap-bridge → bootstrap-skin → 화면) ===== -->
+    <link rel="stylesheet" href="../../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="../../../../../lib/bootstrap/5.0.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../../../theme/tokens.css">
+    <link rel="stylesheet" href="../../../theme/shell.css">
+    <link rel="stylesheet" href="../../../theme/bootstrap-bridge.css">
+    <link rel="stylesheet" href="../../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="css/index.css">
 
+    <!-- ===== JS 리소스 스택 (동기) ===== -->
+    <script src="../../../theme/theme-api.js"></script>
+    <script src="../../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 BGCOL/THEME/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { }
+        })();
+    </script>
 </head>
 
-<body style="margin:0px;padding:0px;overflow:hidden">
+<body class="u4aTdBody">
 
-    <iframe id="ws_frame" src="" frameborder="0"
-        style="overflow:hidden;overflow-x:hidden;overflow-y:hidden;height:100%;width:100%;position:absolute;top:0px;left:0px;right:0px;bottom:0px;">
-    </iframe>
-    
-    <script>
+    <!-- ===== frameless 타이틀바 (공통 .u4a-titlebar) ===== -->
+    <header class="u4a-titlebar" id="tdTitlebar">
+        <img class="u4a-titlebar__logo" id="tdLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="tdTitle"></span>
+        <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="tdWinMax" data-action="max" title="Maximize" aria-label="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="tdWinClose" data-action="close" title="Close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
 
-        let oScr = document.createElement("script");
-            oScr.src = "index.js";
+    <!-- ===== 본문 : 좌(에디터 미리보기 PAGE1) | 우(테마 설정 위저드 PAGE2) 스플리터 ===== -->
+    <main class="u4aTdMain">
+        <div class="u4a-splitter u4aTdSplit" id="tdSplit" data-axis="x">
 
-            document.body.appendChild(oScr);
+            <!-- 좌측 : 에디터 미리보기(원본 PAGE1 = Language 콤보 + EDITOR_FRAME1) -->
+            <section class="u4a-splitter__pane u4aTdLeft" id="tdLeftPane">
+                <div class="u4aTdPrev">
+                    <div class="u4aTdPrev__head">
+                        <label class="u4aTdPrev__label" id="tdLanguLabel"></label>
+                        <div class="u4aTdPrev__field" id="tdLanguHost"></div>
+                    </div>
+                    <div class="u4aTdPrev__body">
+                        <!-- src 는 js/index.js 가 oAPP 전역(monacoVSPath/monacoLoaderPath) 노출 후 주입.
+                             (HTML 에 박으면 monaco/ 가 parent.oAPP 를 읽는 시점보다 먼저 로드되는 레이스) -->
+                        <iframe id="tdPreview" class="u4aTdPrevFrame EDITOR_FRAME1" src="about:blank" frameborder="0"></iframe>
+                    </div>
+                </div>
+            </section>
 
-    </script>
+            <div class="u4a-splitter__bar" id="tdSplitBar" role="separator" aria-orientation="vertical"></div>
+
+            <!-- 우측 : 테마 설정 위저드(원본 PAGE2 = sap.m.Wizard 3 step + footer)
+                 위저드 UX = UI 템플릿 마법사(fnUiTempWizardPopupOpen)와 100% 동일 자산(.u4aTplWiz__*) -->
+            <section class="u4a-splitter__pane u4aTdRight" id="tdRightPane">
+
+                <!-- 스크롤 컨테이너(스티키 진행 내비게이터 + 스텝 카드 + 하단 가상여백) -->
+                <div class="u4aTplWiz__page" id="tdPage">
+                    <div class="u4aTplWiz__wz" id="tdWiz">
+                        <!-- 진행 내비게이터 + 스텝 카드는 js/index.js 가 주입(_buildNav/_card) -->
+                    </div>
+                    <div class="u4aTplWiz__scrollPad" id="tdPad" aria-hidden="true"></div>
+                </div>
+
+                <!-- 푸터(원본 TOOLBAR1 = Reset/Close + Wizard finishButton=Save) -->
+                <footer class="u4aTdFooter" id="tdFooter">
+                    <div class="u4aTdFooter__spacer"></div>
+                    <button type="button" class="u4a-btn u4a-btn--emphasized" id="tdBtnSave" hidden><i class="fa-solid fa-floppy-disk"></i> <span id="tdBtnSaveText"></span></button>
+                    <button type="button" class="u4a-btn" id="tdBtnReset"><i class="fa-solid fa-rotate-left"></i> <span id="tdBtnResetText"></span></button>
+                    <button type="button" class="u4a-btn u4a-btn--negative" id="tdBtnClose"><i class="fa-solid fa-xmark"></i> <span id="tdBtnCloseText"></span></button>
+                </footer>
+
+            </section>
+        </div>
+    </main>
+
+    <!-- ===== Top-layer Busy 오버레이 ===== -->
+    <dialog class="u4a-busy" id="tdBusy" role="progressbar" aria-valuetext="Busy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+            <div class="u4a-busy__label" id="tdBusyLabel"></div>
+        </div>
+    </dialog>
+
+    <!-- ===== JS 리소스 스택 (끝) ===== -->
+    <script src="../../../../../lib/bootstrap/5.0.2/js/bootstrap.bundle.min.js"></script>
+    <script src="js/fnColorPickerPopover.js"></script>
+    <script src="js/wizardNav.js"></script>
+    <script src="js/index.js"></script>
 
 </body>
 

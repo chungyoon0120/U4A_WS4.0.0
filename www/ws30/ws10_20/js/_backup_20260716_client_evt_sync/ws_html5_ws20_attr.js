@@ -3815,32 +3815,22 @@
 
             //저장/삭제 후 콜백 — ADDSC 매핑 + syntax 아이콘색 갱신(원본 빌드 line 917~921 대응) + 행 재렌더.
             function lf_cb(param) {
-                //클라 JS 유무 변경 여부 판정(세팅 전 = 이전 상태).
-                var bWasJs = (is_attr.ADDSC === "JS");
                 is_attr.ADDSC = (param === "X") ? "JS" : "";
-                var bNowJs = (param === "X");
-
-                //아이콘색 갱신(존재=red).
                 try {
                     var bHas = oAPP.DATA.APPDATA.T_CEVT.findIndex(function (a) { return a && a.OBJID === l_objid && a.OBJTY === "JS"; }) !== -1;
                     is_attr.icon2_color = bHas ? "red" : "#acaba7";
                 } catch (e) { }
-
-                //★ 클라 JS 유무가 실제로 바뀐 경우 — prev 수집본(_T_0015)까지 반드시 동기화한다.
-                //  getAttrChangedData() 는 prev._T_0015 를 순회하므로, row 객체(is_attr)의 ADDSC 만 바꾸면
-                //  "찾기" 팝업 Refresh 시 옛 ADDSC="JS" 가 남아 M004(이벤트 JS 사용 위치)가 안 사라진다
-                //  (2026-07-16 장군님 지적). 컨텍스트 메뉴 삭제 경로(attr_ctxmenu → fnWs20AttrChange)와 동일하게
-                //  fnWs20AttrChange 로 attrChgAttrVal→prev 반영(+변경flag·재렌더·헤더 갱신 포함).
-                //  attrChgAttrVal 은 T_CEVT(에디터가 이미 갱신) 존재여부로 라인 유지/삭제를 정확히 처리한다.
-                //  bSkipUndo=true — 에디터가 이미 T_CEVT 를 변경한 뒤라 여기서 undo push 는 부정확.
-                if (bWasJs !== bNowJs) {
-                    try { oAPP.fn.fnWs20AttrChange(is_attr, "", true); }
-                    catch (e) { console.error("[HTML5][WS20][attr] lf_cb fnWs20AttrChange:", e && e.message); }
-                    return;
-                }
-
-                //변경 없음(원래도 없던 이벤트를 빈 채로 저장 등) — 재렌더만. 거짓 Inactive 방지 위해 IS_CHAG 강제 안 함.
                 try { oAPP.fn.fnRenderWs20AttrRows(); } catch (e) { }
+                //저장/삭제로 변경분이 생기면 앱 상태 Active→Inactive 반영.
+                //  원본은 sap /WS20/APP/IS_CHAG 바인딩이 헤더를 자동 갱신했으나, HTML5 는 명시 갱신이 필요.
+                //  ★ 권위값 = appInfo.IS_CHAG(에디터 저장 lf_save 의 setAppChange 가 조건부로 세팅).
+                //    "X" 를 하드코딩하지 않고 그 값을 모델에 미러 → 변경 없는 빈 저장에서 거짓 Inactive 방지.
+                //  (속성 변경 경로 fnWs20AttrChange 의 헤더 갱신과 동일한 처리.)
+                try {
+                    var oInfo = parent.getAppInfo && parent.getAppInfo();
+                    if (oInfo) { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", oInfo.IS_CHAG || ""); }
+                } catch (e) { }
+                try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
             }
 
             //팝업 호출(미로드 시 지연로드).

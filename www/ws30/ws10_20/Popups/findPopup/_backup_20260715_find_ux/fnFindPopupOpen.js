@@ -73,9 +73,6 @@
         oBrowserOptions.closable = false;
         oBrowserOptions.width = 1100;
         oBrowserOptions.height = 720;
-        // [HTML5] 최소 크기 — 좌 네비(8.5rem)+메인(20rem)+스플리터(≈480px) 보장(본문 잘림 방지, findFrame.css min-width 짝).
-        oBrowserOptions.minWidth = 520;
-        oBrowserOptions.minHeight = 420;
 
         oBrowserOptions.webPreferences.partition = SESSKEY;
         oBrowserOptions.webPreferences.browserkey = BROWSKEY;

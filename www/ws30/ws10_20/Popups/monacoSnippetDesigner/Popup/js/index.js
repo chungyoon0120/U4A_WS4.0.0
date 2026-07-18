@@ -27,12 +27,22 @@
         PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")),
         WSUTIL = require(PATHINFO.WSUTIL),
         IPCRENDERER = require("electron").ipcRenderer,
+        IPCMAIN = REMOTE.require("electron").ipcMain,
         CURRWIN = REMOTE.getCurrentWindow();
 
     const oQueryParams = WSUTIL.QueryString.parse(location.href);
     const USERINFO = oQueryParams.USERINFO || {},
         LANGU = USERINFO.LANGU || "",
-        SYSID = USERINFO.SYSID || "";
+        SYSID = USERINFO.SYSID || "",
+        BROWSKEY = oQueryParams.browserkey || "";
+
+    // 메시지 클래스 텍스트(/U4A/CL_WS_COMMON 등 SAP 메시지 클래스) — 꾸밈정렬 라벨(C25) 등.
+    const WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU);
+    function mcMsg(sCls, sNo, sFallback) {
+        try { const s = WSMSG.fnGetMsgClsText(sCls, sNo); if (s && s.trim()) { return s; } }
+        catch (e) { console.error("[스니펫디자이너] 메시지클래스 조회 실패:", sCls, sNo, e); }
+        return sFallback || sNo;
+    }
 
     // 공통 Monaco 호스트(js/codeeditor)가 GRAND_FATHER(=최상위 창)에서 lib 경로를 해석한다 →
     //   최상위 창(이 문서)에 PATH/APPPATH 노출(안 하면 호스트가 monaco lib 경로를 못 찾음).
@@ -46,7 +56,8 @@
     const SNIPPET_ROOT = PATH.join(PATHINFO.P13N_ROOT, "monaco", "snippet");
     const SNIPPET_LIST_JSON = PATH.join(SNIPPET_ROOT, "list.json");
 
-    // 공통 Monaco 호스트 채널.
+    // Monaco 호스트(editorPopup/host — 에디터 시리즈 전용, 꾸밈정렬 capability evt:"fmtcap" 통지) 채널.
+    const HOST_CH = "__u4aedh";
     const HOSTID = "SNIPPET_CODE";
 
     // 언어 목록(원본 TY_SNIPPET_LANGU_DDLB: ""(미선택) + js/css/html).
@@ -67,8 +78,14 @@
     };
 
     // UI refs
-    let oLanguField, oNameField, oDescField, oListPanel, oInfoPanel;
+    let oLanguField, oNameField, oDescField, oInfoPanel;
+    let oLanguMsg = null;              // 언어 콤보용 valueState 메시지(.u4a-field__msg) — 콤보는 공통 setValueState 미지원
     let oBtnNew, oBtnDel, oBtnSave, oBtnCancel;
+    let oBtnSaveTop, oBtnCancelTop;    // 상단(기본정보 패널 헤더) 저장/취소 — 원본은 헤더+푸터 양쪽에 배치
+    let oListActsBar = null;           // 좌측 헤더 액션 바(⋯ 오버플로 대상)
+    let _dt = null;                    // 공통 makeDataTable 컨트롤러(스니펫 리스트)
+    let _descFit = null;               // 설명 TextArea 자동 높이조절 함수
+    let _ovfTools = null, _ovfActs = null, _ovfInfoActs = null;   // attachOverflow 핸들(reflow 용)
 
     /* ==================================================================
      * 3. 공통 유틸(메시지 / 토스트 / busy / 오류)
@@ -87,14 +104,19 @@
     let _toastTimer = null;
     function _toast(sMsg) {
         if (!sMsg) { return; }
+        // ★ 열린 <dialog>(confirm top-layer) 위에 뜨도록 매 표시마다 host 재선택(안 하면 모달 뒤에 묻힘).
+        //   toast-common-center 표준 — dialog[open] 있으면 거기에, 없으면 body.
+        //   ★★ 단 busy(.u4a-busy)는 제외 — busy 는 작업 끝나면 곧 close 되고, 그 안에 붙은 토스트도
+        //      함께 사라져 사용자가 "저장됨"을 못 본다(장군님 지적). busy 중 토스트는 body 에 둔다.
+        const oHost = document.querySelector("dialog[open]:not(.u4a-busy)") || document.body;
         let oT = document.getElementById("snipToast");
         if (!oT) {
             oT = document.createElement("div");
             oT.id = "snipToast";
             oT.className = "u4a-toast";
             oT.setAttribute("role", "alert");
-            document.body.appendChild(oT);
         }
+        if (oT.parentNode !== oHost) { oHost.appendChild(oT); }
         oT.textContent = sMsg;
         oT.setAttribute("data-show", "true");
         clearTimeout(_toastTimer);
@@ -110,6 +132,37 @@
             if (bIsBusy) { if (!oBusy.open) { oBusy.showModal(); } }
             else { if (oBusy.open) { oBusy.close(); } }
         } catch (e) { console.error("[스니펫디자이너] busy 토글 오류:", e); }
+    }
+
+    // 자식창 일괄 busy 방송 수신 — 원본 frame.js _attachBroadCastEvent 이식(장군님 지시로 복원).
+    //   메인(WS)이 다른 별창(MIME/바인딩/문서/옵션/OTR 등 fnDialogPopupOpener 11곳)을 열 때
+    //   `broadcast-to-child-window_{BROWSKEY}` 로 BUSY_ON 을 쏘면 떠 있는 모든 자식창이 함께 잠긴다.
+    //   ★ 이 팝업은 수신 전용 — opener 는 BUSY_ON 을 쏘지 않는다(원본 동일).
+    let _oBroadToChild = null;
+    function _attachBroadCastEvent() {
+        try {
+            _oBroadToChild = new BroadcastChannel("broadcast-to-child-window_" + BROWSKEY);
+            _oBroadToChild.onmessage = function (oEvent) {
+                const _PRCCD = (oEvent && oEvent.data && oEvent.data.PRCCD) || undefined;
+                if (typeof _PRCCD === "undefined") { return; }
+
+                // 프로세스에 따른 로직분기(원본 동일).
+                switch (_PRCCD) {
+                    case "BUSY_ON":
+                        // BUSY ON을 요청받은경우.
+                        fn_setBusy(true);
+                        break;
+
+                    case "BUSY_OFF":
+                        // BUSY OFF를 요청 받은 경우.
+                        fn_setBusy(false);
+                        break;
+
+                    default:
+                        break;
+                }
+            };
+        } catch (e) { console.error("[스니펫디자이너] BroadCast 배선 오류:", e); }
     }
 
     // 오류 모달(공통 U4AUI.confirm) — 저장/삭제 실패 등. 단추는 OK 하나.
@@ -131,17 +184,43 @@
         return sLangu ? sLangu : "plaintext";
     }
 
-    // BGCOL 명도로 빌트인 Monaco 테마(vs / vs-dark) 결정.
-    function _computeMonacoTheme() {
-        const sBg = oQueryParams.BGCOL || "";
-        const m = /^#?([0-9a-fA-F]{6})$/.exec(String(sBg).trim());
-        if (m) {
-            const n = parseInt(m[1], 16);
-            const lum = 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
-            return lum < 128 ? "vs-dark" : "vs";
-        }
+    // 현재 적용 테마의 다크/화이트 → Monaco 빌트인 테마(vs-dark / vs).
+    //   ★판정 = <html data-sl-theme>("dark"|"light") — U4ATheme.apply() 의 _applySkin 이 세팅하는 공식 신호.
+    //     (BGCOL 명도 추측 금지 — 실제 테마와 어긋난다. horizon_dark 만 dark, 나머지(red/purple 등)는 light.)
+    function _monacoThemeNow() {
+        try {
+            const sMode = document.documentElement.getAttribute("data-sl-theme");
+            if (sMode === "dark") { return "vs-dark"; }
+            if (sMode === "light") { return "vs"; }
+        } catch (e) { }
         return "vs-dark";
     }
+
+    // 테마 변경 시 에디터 테마도 함께 전환(안 하면 화이트 테마에 다크 에디터가 남는다 — 장군님 지적).
+    function _applyMonacoTheme() {
+        oState.monacoTheme = _monacoThemeNow();
+        _toHost({ cmd: "setTheme", theme: oState.monacoTheme });
+    }
+
+    // 실시간 테마 변경 추종(원본 frame.js if-p13n-themeChange-{SYSID}) — 창 배경 CSS + U4ATheme 재적용.
+    function _getThemeInfo() {
+        try {
+            const sPath = PATH.join(PATHINFO.THEME, SYSID + ".json");
+            if (!FS.existsSync(sPath)) { return null; }
+            return JSON.parse(FS.readFileSync(sPath, "utf-8"));
+        } catch (e) { console.error("[스니펫디자이너] 테마 정보 로드 오류:", e); return null; }
+    }
+    function _onThemeChange() {
+        const oTheme = _getThemeInfo();
+        if (!oTheme) { return; }
+        try { CURRWIN.webContents.insertCSS("html, body { margin: 0px; height: 100%; background-color: " + oTheme.BGCOL + "; }"); } catch (e) { }
+        try {
+            if (window.U4ATheme && oTheme.THEME) {
+                window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(oTheme.THEME) : oTheme.THEME);
+            }
+        } catch (e) { console.error("[스니펫디자이너] 테마 적용 오류:", e); }
+    }
+    const _THEME_CH = SYSID ? ("if-p13n-themeChange-" + SYSID) : "";
 
     /* ==================================================================
      * 4. 데이터 계층 (P13N FS I/O) — 원본 control.js 1:1
@@ -247,10 +326,31 @@
             const oFrame = document.getElementById("snipEditor");
             if (!oFrame || !oFrame.contentWindow) { return; }
             oMsg = oMsg || {};
-            oMsg.__u4ace = true;
+            oMsg[HOST_CH] = true;
             oMsg.hostId = HOSTID;
             oFrame.contentWindow.postMessage(oMsg, "*");
         } catch (e) { console.error("[스니펫디자이너] 호스트 송신 오류:", e); }
+    }
+
+    // 줌 % 라벨 갱신(호스트 evt:zoom). 숫자라 i18n 불필요.
+    function _setZoomLabel(pct) {
+        const oBtn = document.getElementById("snipZoomBtn");
+        if (!oBtn) { return; }
+        const n = (typeof pct === "number" && isFinite(pct)) ? pct : 100;
+        const oSpan = oBtn.querySelector("span");
+        if (oSpan) { oSpan.textContent = n + "%"; }
+        oBtn.title = n + "% (Ctrl+0)";
+    }
+
+    // 꾸밈정렬 버튼 활성/비활성 — 호스트 evt:"fmtcap"(현재 언어 포맷 지원 여부)로만 결정.
+    //   ★부모가 isSupported 를 추측하지 않는다(언어 비동기 반영 레이스 회피 — format-btn-capability).
+    //   Monaco 0.33 은 CSS 포맷 provider 미등록 → 미지원 언어는 비활성(장군님 지시).
+    function _setFormatCap(bSupported) {
+        const oBtn = document.getElementById("snipFormatBtn");
+        if (!oBtn) { return; }
+        oBtn.disabled = !bSupported;
+        const sLabel = mcMsg("/U4A/CL_WS_COMMON", "C25", "Pretty Print");
+        oBtn.title = bSupported ? (sLabel + " (Shift+F1)") : (sLabel + " — N/A");
     }
 
     // 현재 에디터 값(동일 출처 직접 접근).
@@ -280,10 +380,11 @@
     // 호스트 → 부모 통지 수신.
     window.addEventListener("message", function (oEvent) {
         const d = oEvent && oEvent.data;
-        if (!d || d.__u4ace !== true || d.hostId !== HOSTID) { return; }
+        if (!d || d[HOST_CH] !== true || d.hostId !== HOSTID) { return; }
         switch (d.evt) {
             case "ready":
                 oState.editorReady = true;
+                _applyMonacoTheme();   // 로드 전 테마가 바뀌었을 수 있으니 현재 테마로 확정
                 _applyEditorState();
                 return;
             case "change":
@@ -294,6 +395,13 @@
                 // 에디터 Ctrl+S → 저장(편집 화면일 때만).
                 if (oState.cur) { saveSnippet(); }
                 return;
+            case "zoom":
+                _setZoomLabel(d.pct);
+                return;
+            case "fmtcap":
+                // 현재 언어의 꾸밈정렬 지원 여부 → 버튼 활성/비활성.
+                _setFormatCap(!!d.supported);
+                return;
             default:
                 return;
         }
@@ -302,94 +410,135 @@
     /* ==================================================================
      * 6. 화면 표시 토글 / 액션 버튼 상태
      * ================================================================== */
+    // ── 우측 서브페이지 전환(빈상태 ↔ 편집) — 16 §9.2 고정 사양(0.26s±32px 슬라이드+페이드).
+    //    별창은 ws20.css(.u4aWsNav*) 미로드 → 화면 스코프로 복제(patternPopup 선례). ──
+    const _A_SNIPNAV = ["u4aSnipNavInFwd", "u4aSnipNavInBack", "u4aSnipNavOutFwd", "u4aSnipNavOutBack"];
+    function _navRight(oShow, oHide, bForward) {
+        if (!oShow) { return; }
+        oShow.classList.remove.apply(oShow.classList, _A_SNIPNAV);
+        oShow.classList.remove("u4aSnipPageHidden");
+        if (!oHide) { return; }   // 최초 표시 = 애니메이션 없이 노출
+        oShow.classList.add(bForward ? "u4aSnipNavInFwd" : "u4aSnipNavInBack");
+
+        oHide.classList.remove.apply(oHide.classList, _A_SNIPNAV);
+        const sOut = bForward ? "u4aSnipNavOutFwd" : "u4aSnipNavOutBack";
+        oHide.classList.add(sOut);
+        let bDone = false;
+        const _done = function () {   // 완료 후 정리(animationend + 400ms 폴백).
+            if (bDone) { return; }
+            bDone = true;
+            oHide.classList.remove(sOut);
+            oHide.classList.add("u4aSnipPageHidden");
+            oHide.removeEventListener("animationend", _done);
+        };
+        oHide.addEventListener("animationend", _done);
+        setTimeout(_done, 400);
+    }
+
     function _showEmpty() {
         const oE = document.getElementById("snipEmpty");
         const oEd = document.getElementById("snipEdit");
-        if (oE) { oE.hidden = false; }
-        if (oEd) { oEd.hidden = true; }
+        // 편집이 보이던 상태에서만 슬라이드(빈상태 이미 보이면 no-op = 최초 포함).
+        if (oEd && !oEd.classList.contains("u4aSnipPageHidden")) {
+            _navRight(oE, oEd, false);   // 편집→빈 = back
+        } else {
+            if (oE) { oE.classList.remove("u4aSnipPageHidden"); }
+            if (oEd) { oEd.classList.add("u4aSnipPageHidden"); }
+        }
+        // 원본 setInit 대칭 — 빈 상태에선 에디터를 clear + readonly 로 되돌린다(숨은 에디터에 직전 코드/편집상태 잔존 방지).
+        //   cur 는 이 시점 null → _applyEditorState 가 setValue("")+setReadOnly(true) 전송(슬라이드 페이드가 가림).
+        _applyEditorState();
         _syncActionButtons();
     }
 
     function _showEdit() {
         const oE = document.getElementById("snipEmpty");
         const oEd = document.getElementById("snipEdit");
-        if (oE) { oE.hidden = true; }
-        if (oEd) { oEd.hidden = false; }
-        // 숨김→표시 전환 후 Monaco 레이아웃 재계산(자동레이아웃 보조).
+        if (!oEd) { _syncActionButtons(); return; }
+        if (oEd.classList.contains("u4aSnipPageHidden")) {
+            _navRight(oEd, oE, true);    // 빈→편집 = forward
+        } else {
+            // 이미 편집중(다른 스니펫 선택) — 편집 페이지를 다시 슬라이드-인(선택 피드백).
+            oEd.classList.remove.apply(oEd.classList, _A_SNIPNAV);
+            void oEd.offsetWidth;        // reflow 강제 → 같은 애니메이션 재발화
+            oEd.classList.add("u4aSnipNavInFwd");
+        }
+        // 전환 후 Monaco 레이아웃 재계산(자동레이아웃 보조).
         _toHost({ cmd: "layout" });
+        // 숨김→표시로 폭이 확정되면 편집 페이지 툴바 오버플로 재계산(폭 0 시점 오판 보정).
+        if (_ovfTools) { try { _ovfTools.reflow(); } catch (e) { } }
+        if (_ovfInfoActs) { try { _ovfInfoActs.reflow(); } catch (e) { } }
         _syncActionButtons();
     }
 
+    // 툴바 버튼 활성 — 원본 setPageToolHdrBtnHandle 매트릭스 1:1.
+    //   선택없음(초기) : 신규 ON  / 삭제 off / 저장 off / 취소 off
+    //   신규 생성중    : 신규 OFF / 삭제 off / 저장 ON  / 취소 ON      ← ★신규 버튼 비활성
+    //   기존 로드행    : 신규 ON  / 삭제 ON  / 저장 ON  / 취소 off
+    //   (원본은 _ischg 시 재평가하지 않으므로 기존행은 변경 여부와 무관하게 저장 ON 유지 = 위 매트릭스가 실효 동작.)
     function _syncActionButtons() {
         const bCur = !!oState.cur;
-        const bDirty = bCur && (oState.cur._isnew || oState.cur._ischg);
-        if (oBtnDel) { oBtnDel.disabled = !bCur; }
-        if (oBtnSave) { oBtnSave.disabled = !bDirty; }
-        if (oBtnCancel) { oBtnCancel.disabled = !bCur; }
+        const bNew = bCur && !!oState.cur._isnew;
+        const bExist = bCur && !bNew && !!oState.cur._key;
+        const bSave = (bNew || bExist);
+        if (oBtnNew) { oBtnNew.disabled = bNew; }
+        if (oBtnDel) { oBtnDel.disabled = !bExist; }
+        // 저장/취소는 상단(패널 헤더)·하단(푸터) 양쪽 동일 상태 — 원본 헤더툴바 + clone 푸터 구조.
+        if (oBtnSave) { oBtnSave.disabled = !bSave; }
+        if (oBtnSaveTop) { oBtnSaveTop.disabled = !bSave; }
+        if (oBtnCancel) { oBtnCancel.disabled = !bNew; }
+        if (oBtnCancelTop) { oBtnCancelTop.disabled = !bNew; }
     }
 
     /* ==================================================================
-     * 7. 리스트 렌더 / 선택
+     * 7. 리스트(공통 makeDataTable) / 선택
      * ================================================================== */
-    function renderList() {
-        const oHost = document.getElementById("snipTableHost");
-        if (!oHost) { return; }
-
-        if (!oState.list.length) {
-            oHost.innerHTML = "";
-            const oEmpty = document.createElement("div");
-            oEmpty.className = "u4aSnipListEmpty";
-            oEmpty.textContent = wsMsg("946", "No data");
-            oHost.appendChild(oEmpty);
-            return;
+    // 이름 셀 = 이름 + 설명 서브라인(원본 Description popin). 잘릴 때만 공통 툴팁(16 §2.9a).
+    function _nameCell(rec) {
+        const frag = document.createDocumentFragment();
+        const oNm = document.createElement("div");
+        oNm.className = "u4aSnipTable__nm";
+        oNm.textContent = rec.snippet_name || (rec._isnew ? wsMsg("361", "New") : "");
+        if (oNm.textContent) { oNm.setAttribute("data-tip", oNm.textContent); oNm.setAttribute("data-tip-trunc", ""); }
+        frag.appendChild(oNm);
+        if (rec.snippet_desc) {
+            const oDesc = document.createElement("div");
+            oDesc.className = "u4aSnipTable__desc";
+            oDesc.textContent = wsMsg("176", "Description") + ": " + rec.snippet_desc;
+            oDesc.setAttribute("data-tip", oDesc.textContent);
+            oDesc.setAttribute("data-tip-trunc", "");
+            frag.appendChild(oDesc);
         }
+        return frag;
+    }
 
-        const oTbl = document.createElement("table");
-        oTbl.className = "u4a-table u4aSnipTable";
-
-        const oThead = document.createElement("thead");
-        const oHr = document.createElement("tr");
-        const oThName = document.createElement("th"); oThName.textContent = wsMsg("363", "Snippet Name");
-        const oThLangu = document.createElement("th"); oThLangu.textContent = wsMsg("001", "Language");
-        oHr.appendChild(oThName); oHr.appendChild(oThLangu);
-        oThead.appendChild(oHr);
-        oTbl.appendChild(oThead);
-
-        const oTbody = document.createElement("tbody");
-        oState.list.forEach(function (rec) {
-            const oTr = document.createElement("tr");
-            oTr.dataset.key = rec._key;
-            if (oState.cur && oState.cur._key === rec._key) { oTr.classList.add("is-selected"); }
-            if (rec._isnew) { oTr.classList.add("is-new"); }
-            // 설명은 잘릴 수 있어 행 툴팁으로(공통 툴팁 — 잘릴 때만 노출).
-            if (rec.snippet_desc) { oTr.setAttribute("data-tip", rec.snippet_desc); }
-
-            const oTdName = document.createElement("td");
-            oTdName.className = "u4aSnipTable__name";
-            oTdName.textContent = rec.snippet_name || (rec._isnew ? wsMsg("361", "New") : "");
-
-            const oTdLangu = document.createElement("td");
-            oTdLangu.className = "u4aSnipTable__langu";
-            oTdLangu.textContent = rec.snippet_langu || "";
-
-            oTr.appendChild(oTdName);
-            oTr.appendChild(oTdLangu);
-            oTr.addEventListener("click", function () { onRowClick(rec._key); });
-            oTbody.appendChild(oTr);
+    // 공통 데이터테이블 1회 생성(호스트 부착). 이후 데이터 변경은 renderList()가 setRows.
+    //   선택=aria-selected(공통), 빈상태=tr.u4a-table__nodata(공통 emptyText).
+    //   ★진입(로드)=행 단일클릭(onSelect) — 장군님 지시(원본 상세버튼/더블클릭 대신 원클릭, 상세버튼 미사용).
+    function _initListTable(oHost) {
+        if (!oHost || !U4AUI.makeDataTable) { return; }
+        _dt = U4AUI.makeDataTable(oHost, {
+            virtual: false,                 // 개인 스니펫 소형 목록 — 가상스크롤 불필요
+            tableClass: "u4aSnipTable",
+            emptyText: wsMsg("946", "No data"),
+            rowKey: function (r) { return r._key; },
+            columns: [
+                { label: wsMsg("363", "Snippet Name"), cellClass: "u4aSnipTable__name", cell: _nameCell },
+                { label: wsMsg("001", "Language"), cellClass: "u4aSnipTable__langu", cell: function (r) { return (r && r.snippet_langu) || ""; } }
+            ],
+            onSelect: function (r) { if (r) { onRowClick(r._key); } },   // 단일클릭 = 로드
+            rowHook: function (tr, r) { if (r && r._isnew) { tr.classList.add("is-new"); } }
         });
-        oTbl.appendChild(oTbody);
+    }
 
-        oHost.innerHTML = "";
-        oHost.appendChild(oTbl);
+    function renderList() {
+        if (!_dt) { return; }
+        _dt.setRows(oState.list.slice());   // 사본 전달(내부 보관 배열과 참조 분리)
+        _dt.setSel(oState.cur ? oState.cur._key : null);
     }
 
     function _markSelectedRow(sKey) {
-        const oHost = document.getElementById("snipTableHost");
-        if (!oHost) { return; }
-        const aTr = oHost.querySelectorAll("tr[data-key]");
-        Array.prototype.forEach.call(aTr, function (tr) {
-            tr.classList.toggle("is-selected", tr.dataset.key === sKey);
-        });
+        if (_dt) { _dt.setSel(sKey); }
     }
 
     // 미저장 신규건 제거.
@@ -423,7 +572,11 @@
     function onRowClick(sKey) {
         if (oState.cur && oState.cur._key === sKey) { return; }   // 이미 선택
         _guardDirtyThen(function (bProceed) {
-            if (!bProceed) { return; }
+            if (!bProceed) {
+                // makeDataTable 은 클릭 즉시 선택(aria-selected)을 옮기므로, 가드 취소 시 현재 편집행으로 되돌린다.
+                if (_dt) { _dt.setSel(oState.cur ? oState.cur._key : null); }
+                return;
+            }
             _loadIntoEdit(sKey);
         });
     }
@@ -452,13 +605,25 @@
         _clearValueStates();
 
         _showEdit();
+        if (_descFit) { _descFit(); }   // 설명 높이를 로드된 내용에 맞춤(2~5행)
         _markSelectedRow(sKey);
         _applyEditorState();
         _syncActionButtons();
     }
 
+    // 언어 select value-state — 공통 createField(select)의 setValueState 는 no-op(15 §3.5.5, 콤보는 공통
+    //   [data-vs] 마커 없음) → 화면 스코프로 콤보에 data-vs(빨간 테두리) + 공통 .u4a-field__msg(메시지) 직접 제어.
+    //   메시지는 공통 규칙대로 행 포커스 시에만 노출(.u4a-form__row:focus-within).
+    function _setLanguVs(bError, sMsg) {
+        const oCombo = oLanguField && oLanguField.el;
+        if (oCombo) {
+            if (bError) { oCombo.setAttribute("data-vs", "error"); } else { oCombo.removeAttribute("data-vs"); }
+        }
+        if (oLanguMsg) { oLanguMsg.textContent = bError ? (sMsg || "") : ""; }
+    }
+
     function _clearValueStates() {
-        try { oLanguField.setValueState("none"); } catch (e) { }
+        _setLanguVs(false);
         try { oNameField.setValueState("none"); } catch (e) { }
     }
 
@@ -490,6 +655,9 @@
                 if (a !== "YES") { return; }
                 fn_setBusy(true);
                 try {
+                    // 삭제 위치(원본 iFindIndex) — 인접행 자동선택 기준.
+                    const iIdx = oState.list.findIndex(function (o) { return o._key === sKey; });
+
                     // 목록에서 제거.
                     oState.list = oState.list.filter(function (o) { return o._key !== sKey; });
 
@@ -505,7 +673,15 @@
 
                     oState.cur = null;
                     renderList();
-                    _showEmpty();
+
+                    // 원본 프로세스: 삭제 위치의 다음 행(없으면 이전 행)을 자동 로드. 없으면 빈 화면.
+                    let oNext = null;
+                    if (oState.list.length) {
+                        if (iIdx <= 0) { oNext = oState.list[0]; }
+                        else { oNext = oState.list[iIdx] || oState.list[iIdx - 1]; }
+                    }
+                    if (oNext) { _loadIntoEdit(oNext._key); } else { _showEmpty(); }
+
                     if (!bWasNew) { _broadcastChange(); }
                 } finally {
                     fn_setBusy(false);
@@ -519,6 +695,7 @@
         // 유효성 우선(validate-first).
         if (_checkSave().RETCD === "E") { return; }
 
+        let bSaved = false;
         fn_setBusy(true);
         try {
             const oSaveData = {
@@ -552,11 +729,15 @@
             renderList();
             _markSelectedRow(oSaveData._key);
             _syncActionButtons();
-            _toast(wsMsg("366", "Saved."));
             _broadcastChange();
+            bSaved = true;
         } finally {
             fn_setBusy(false);
         }
+
+        // ★ busy 해제 후에 토스트 — busy(top-layer dialog)가 열린 채로 띄우면 그 위에 가려지거나
+        //   busy 가 닫힐 때 함께 사라져 사용자가 저장 여부를 못 본다(원본 M366 = "저장되었습니다!").
+        if (bSaved) { _toast(wsMsg("366", "Saved.")); }
     }
 
     function cancelSnippet() {
@@ -567,7 +748,9 @@
             renderList();
             _showEmpty();
         };
-        if (oState.cur._ischg || oState.cur._isnew) {
+        // ★원본 cancelSnippet 1:1 — 확인창은 실제 변경(_ischg)이 있을 때만.
+        //   신규 생성 직후처럼 입력이 없으면(_ischg=false) 확인 없이 바로 취소한다(_isnew 는 조건 아님).
+        if (oState.cur._ischg) {
             U4AUI.confirm({ type: "C", message: wsMsg("354", "Discard changes and continue?"), onClose: function (a) { if (a === "YES") { _finish(); } } });
         } else {
             _finish();
@@ -588,24 +771,23 @@
         oState.cur.snippet_name = sName;
         oState.cur.snippet_desc = sDesc;
 
+        // ★필드 검증 메시지는 토스트가 아니라 valueState 메시지로(장군님 지시) — 포커스 이동으로 노출된다.
         if (!sLangu) {
-            oLanguField.setValueState("error", wsMsg("349", "Language is required."));
-            _toast(wsMsg("349", "Language is required."));
+            _setLanguVs(true, wsMsg("349", "Language is required."));
             try { oLanguField.focus(); } catch (e) { }
             return { RETCD: "E" };
         }
         if (!sName) {
             oNameField.setValueState("error", wsMsg("350", "Snippet name is required."));
-            _toast(wsMsg("350", "Snippet name is required."));
             try { oNameField.focus(); } catch (e) { }
             return { RETCD: "E" };
         }
         if (/\s/.test(sName)) {
             oNameField.setValueState("error", wsMsg("351", "Snippet name cannot contain spaces."));
-            _toast(wsMsg("351", "Snippet name cannot contain spaces."));
             try { oNameField.focus(); } catch (e) { }
             return { RETCD: "E" };
         }
+        // 코드는 입력 필드가 아니라 에디터 → 붙일 valueState 자리가 없어 토스트 유지(원본 M352 동일).
         if (!sCode) {
             _toast(wsMsg("352", "Enter snippet code."));
             _toHost({ cmd: "focus" });
@@ -621,13 +803,13 @@
         if (!oState.cur) { return; }
         oState.cur._ischg = true;
         const sLangu = oLanguField.getValue() || "";
-        try { oLanguField.setValueState("none"); } catch (e) { }
+        _setLanguVs(false);
         if (!sLangu) {
-            try { oLanguField.setValueState("error", wsMsg("349", "Language is required.")); } catch (e) { }
-            _toast(wsMsg("349", "Language is required."));
-        } else {
-            _toHost({ cmd: "setLanguage", language: _monacoLang(sLangu) });
+            _setLanguVs(true, wsMsg("349", "Language is required."));
         }
+        // 언어(빈값=plaintext 포함)를 항상 호스트에 반영 → 호스트가 fmtcap 재통지.
+        //   (빈값으로 바꿔도 setLanguage 를 보내야 이전 언어/꾸밈정렬 활성상태가 잔존하지 않음 — Codex 지적)
+        _toHost({ cmd: "setLanguage", language: _monacoLang(sLangu) });
         _syncActionButtons();
     }
 
@@ -637,8 +819,8 @@
         const sName = oNameField.getValue() || "";
         try { oNameField.setValueState("none"); } catch (e) { }
         if (/\s/.test(sName)) {
+            // 입력 중이라 이미 포커스가 있어 valueState 메시지가 바로 보인다(토스트 사용 안 함).
             try { oNameField.setValueState("error", wsMsg("351", "Snippet name cannot contain spaces.")); } catch (e) { }
-            _toast(wsMsg("351", "Snippet name cannot contain spaces."));
         }
         _syncActionButtons();
     }
@@ -652,9 +834,11 @@
     /* ==================================================================
      * 10. UI 빌드
      * ================================================================== */
+    // 폼 행 — 공통 .u4a-form__row 소비(필수!): shell.css 가 `.u4a-form__row:focus-within .u4a-field__msg`
+    //   로만 valueState 메시지를 노출한다. 이 클래스가 없으면 메시지가 영영 안 뜬다(장군님 지적).
     function _fieldBlock(sLabel, bRequired, oInputEl) {
         const oWrap = document.createElement("div");
-        oWrap.className = "u4aSnipField";
+        oWrap.className = "u4a-form__row u4aSnipField";
         const oLbl = document.createElement("label");
         oLbl.className = "u4aSnipField__label";
         if (bRequired) { oLbl.setAttribute("data-required", "true"); }
@@ -664,33 +848,81 @@
         return oWrap;
     }
 
+    // 좌측 = 평면 헤더(제목 + 신규/삭제) + 테이블(원본 sap.m.Table 대응). 패널(접이식 카드) 아님.
     function _buildListPanel() {
-        oListPanel = U4AUI.createPanel({ title: wsMsg("360", "Snippet List") });
-        oListPanel.el.classList.add("u4aSnipListPanelCard");
+        const oRoot = document.getElementById("snipListPanel");
+        if (!oRoot) { return; }
+        oRoot.innerHTML = "";
 
-        // 헤더 액션: 신규 / 삭제 (아이콘 + 툴팁).
+        // 헤더 행: 제목 + [신규 생성][삭제]
+        const oHead = document.createElement("div");
+        oHead.className = "u4aSnipListHead";
+
+        const oTitle = document.createElement("span");
+        oTitle.className = "u4aSnipListHead__title";
+        oTitle.innerHTML = '<i class="fa-solid fa-rectangle-list"></i>';
+        const oTitleTxt = document.createElement("span");
+        oTitleTxt.textContent = wsMsg("360", "Snippet List");
+        oTitle.appendChild(oTitleTxt);
+
+        const oActs = document.createElement("div");
+        oActs.className = "u4aSnipListHead__actions";
+
         oBtnNew = document.createElement("button");
         oBtnNew.type = "button";
-        oBtnNew.className = "u4a-btn u4a-btn--emphasized";
-        oBtnNew.innerHTML = '<i class="fa-solid fa-plus"></i>';
-        oBtnNew.setAttribute("data-tip", wsMsg("361", "New"));
+        oBtnNew.className = "u4a-btn u4a-btn--emphasized u4aSnipHeadBtn";
+        oBtnNew.innerHTML = '<i class="fa-solid fa-plus"></i><span></span>';
+        oBtnNew.querySelector("span").textContent = wsMsg("361", "New");
         oBtnNew.addEventListener("click", newSnippet);
 
         oBtnDel = document.createElement("button");
         oBtnDel.type = "button";
-        oBtnDel.className = "u4a-btn u4a-btn--negative";
-        oBtnDel.innerHTML = '<i class="fa-solid fa-trash"></i>';
-        oBtnDel.setAttribute("data-tip", wsMsg("029", "Delete"));
+        oBtnDel.className = "u4a-btn u4a-btn--negative u4aSnipHeadBtn";
+        oBtnDel.innerHTML = '<i class="fa-solid fa-trash"></i><span></span>';
+        oBtnDel.querySelector("span").textContent = wsMsg("029", "Delete");
         oBtnDel.addEventListener("click", deleteSnippet);
 
-        oListPanel.actions.appendChild(oBtnNew);
-        oListPanel.actions.appendChild(oBtnDel);
+        oActs.appendChild(oBtnNew);
+        oActs.appendChild(oBtnDel);
+        oListActsBar = oActs;   // ⋯ 오버플로 배선 대상
+        oHead.appendChild(oTitle);
+        oHead.appendChild(oActs);
 
+        // 테이블 스크롤 본문 + 공통 makeDataTable 생성
+        const oBody = document.createElement("div");
+        oBody.className = "u4aSnipListBody";
         const oTableHost = document.createElement("div");
         oTableHost.id = "snipTableHost";
-        oListPanel.body.appendChild(oTableHost);
+        oBody.appendChild(oTableHost);
 
-        document.getElementById("snipListPanel").appendChild(oListPanel.el);
+        oRoot.appendChild(oHead);
+        oRoot.appendChild(oBody);
+
+        _initListTable(oTableHost);
+    }
+
+    // 설명 TextArea growing — 원본 sap.m.TextArea(growing:true, growingMaxLines:5, 초기 2행).
+    //   초기 2행 → 내용 늘면 최대 5행까지 자동 성장 → 그 이후 내부 스크롤. 높이는 JS 로 실측 조절.
+    function _makeTextareaGrow(ta, iMin, iMax) {
+        if (!ta) { return null; }
+        ta.rows = iMin;
+        ta.style.overflowY = "hidden";
+        return function () {
+            try {
+                const cs = getComputedStyle(ta);
+                const lh = parseFloat(cs.lineHeight) || 18;
+                const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+                const bordV = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+                const bBorder = (cs.boxSizing === "border-box");
+                const minH = lh * iMin + padV + bordV;
+                const maxH = lh * iMax + padV + bordV;
+                ta.style.height = "auto";
+                let h = ta.scrollHeight + (bBorder ? bordV : 0);
+                if (h < minH) { h = minH; }
+                if (h >= maxH) { h = maxH; ta.style.overflowY = "auto"; } else { ta.style.overflowY = "hidden"; }
+                ta.style.height = h + "px";
+            } catch (e) { }
+        };
     }
 
     function _buildInfoPanel() {
@@ -698,30 +930,59 @@
 
         oLanguField = U4AUI.createField({ type: "select", items: LANGU_ITEMS, onChange: onLanguChange });
         oNameField = U4AUI.createField({ type: "text", maxLength: 100, clear: true, onChange: onNameChange, onInput: _markDirty });
-        oDescField = U4AUI.createField({ type: "textarea", rows: 3, maxLength: 200, onInput: _markDirty });
+        oDescField = U4AUI.createField({ type: "textarea", rows: 2, maxLength: 200, onInput: function () { _markDirty(); if (_descFit) { _descFit(); } } });
+        _descFit = _makeTextareaGrow(oDescField.input, 2, 5);
 
         // 초기 미선택 상태.
         try { oLanguField.setValue(""); } catch (e) { }
 
         const oGrid = document.createElement("div");
         oGrid.className = "u4aSnipInfoGrid";
-        oGrid.appendChild(_fieldBlock(wsMsg("001", "Language"), true, oLanguField.el));
+
+        // 언어(콤보)는 createField 가 .u4a-field 래퍼/메시지를 안 만든다 → 공통 구조로 직접 감싼다
+        //   (.u4a-field = position:relative → .u4a-field__msg 가 입력칸 바로 아래 절대배치).
+        const oLanguWrap = document.createElement("div");
+        oLanguWrap.className = "u4a-field";
+        oLanguWrap.appendChild(oLanguField.el);
+        oLanguMsg = document.createElement("span");
+        oLanguMsg.className = "u4a-field__msg";
+        oLanguWrap.appendChild(oLanguMsg);
+        oGrid.appendChild(_fieldBlock(wsMsg("001", "Language"), true, oLanguWrap));
         oGrid.appendChild(_fieldBlock(wsMsg("363", "Snippet Name"), true, oNameField.el));
         const oDescBlock = _fieldBlock(wsMsg("176", "Description"), false, oDescField.el);
         oDescBlock.classList.add("u4aSnipField--full");
         oGrid.appendChild(oDescBlock);
 
         oInfoPanel.body.appendChild(oGrid);
+
+        // 상단 저장/취소(패널 헤더 액션 슬롯) — 원본은 커스텀 헤더 툴바 + 그 clone 을 푸터에 둔다(양쪽 동일 동작).
+        oBtnSaveTop = document.createElement("button");
+        oBtnSaveTop.type = "button";
+        oBtnSaveTop.className = "u4a-btn u4a-btn--emphasized u4aSnipHeadBtn";
+        oBtnSaveTop.innerHTML = '<i class="fa-solid fa-floppy-disk"></i><span></span>';
+        oBtnSaveTop.querySelector("span").textContent = wsMsg("365", "Save");
+        oBtnSaveTop.addEventListener("click", saveSnippet);
+
+        oBtnCancelTop = document.createElement("button");
+        oBtnCancelTop.type = "button";
+        oBtnCancelTop.className = "u4a-btn u4a-btn--negative u4aSnipHeadBtn";
+        oBtnCancelTop.innerHTML = '<i class="fa-solid fa-xmark"></i><span></span>';
+        oBtnCancelTop.querySelector("span").textContent = wsMsg("003", "Cancel");
+        oBtnCancelTop.addEventListener("click", cancelSnippet);
+
+        oInfoPanel.actions.appendChild(oBtnSaveTop);
+        oInfoPanel.actions.appendChild(oBtnCancelTop);
+
         document.getElementById("snipInfoPanel").appendChild(oInfoPanel.el);
     }
 
     function _buildEditorFrame() {
-        oState.monacoTheme = _computeMonacoTheme();
+        oState.monacoTheme = _monacoThemeNow();
         const oFrame = document.getElementById("snipEditor");
         if (!oFrame) { return; }
-        const oParams = { HOSTID: HOSTID, LANG: "javascript", THEME: oState.monacoTheme, READONLY: true };
-        // 공통 호스트(js/codeeditor)를 상대경로로 로드(?PARAMS 로 초기값 주입).
-        oFrame.src = "../../../js/codeeditor/index.html?PARAMS=" + encodeURIComponent(JSON.stringify(oParams));
+        const oParams = { HOSTID: HOSTID, LANG: "plaintext", THEME: oState.monacoTheme, READONLY: true };
+        // 에디터 시리즈 호스트(editorPopup/host — 꾸밈정렬 capability evt:"fmtcap" 지원). ?PARAMS 초기값 주입.
+        oFrame.src = "../../editorPopup/host/index.html?PARAMS=" + encodeURIComponent(JSON.stringify(oParams));
     }
 
     function _bindTitlebar() {
@@ -767,6 +1028,8 @@
         if (oEmptyDesc) { oEmptyDesc.textContent = wsMsg("359", "Select a snippet from the list."); }
         const oCodeTitle = document.getElementById("snipCodeTitle");
         if (oCodeTitle) { oCodeTitle.textContent = wsMsg("364", "Snippet Code"); }
+        const oFmtTxt = document.getElementById("snipFormatText");
+        if (oFmtTxt) { oFmtTxt.textContent = mcMsg("/U4A/CL_WS_COMMON", "C25", "Pretty Print"); }
         const oSaveTxt = document.getElementById("snipBtnSaveText");
         if (oSaveTxt) { oSaveTxt.textContent = wsMsg("365", "Save"); }
         const oCancelTxt = document.getElementById("snipBtnCancelText");
@@ -786,8 +1049,32 @@
         oBtnSave.addEventListener("click", saveSnippet);
         oBtnCancel.addEventListener("click", cancelSnippet);
 
+        // 코드 에디터 툴바 한 세트(확대/축소·줌%·꾸밈정렬) — 공통 UX(에디터=한 세트).
+        const _byId = function (id) { return document.getElementById(id); };
+        if (_byId("snipZoomOut")) { _byId("snipZoomOut").addEventListener("click", function () { _toHost({ cmd: "fontZoomOut" }); }); }
+        if (_byId("snipZoomBtn")) { _byId("snipZoomBtn").addEventListener("click", function () { _toHost({ cmd: "fontZoomReset" }); }); }
+        if (_byId("snipZoomIn")) { _byId("snipZoomIn").addEventListener("click", function () { _toHost({ cmd: "fontZoomIn" }); }); }
+        if (_byId("snipFormatBtn")) { _byId("snipFormatBtn").addEventListener("click", function () { _toHost({ cmd: "format" }); }); }
+        _setZoomLabel(100);
+        _setFormatCap(false);   // 언어 반영(fmtcap) 전까지 비활성.
+
         // 좌|우 스플리터(공통).
         try { U4AUI.wireSplitter(document.getElementById("snipSplit"), { axis: "x" }); } catch (e) { console.error("[스니펫디자이너] 스플리터 배선 오류:", e); }
+
+        // 테마 변경 추종 — U4ATheme.apply() 가 쏘는 u4a-theme-changed 를 받아 에디터 테마도 전환.
+        //   (IPC if-p13n-themeChange 핸들러도 결국 U4ATheme.apply 를 부르므로 이 한 곳으로 수렴.)
+        try { if (window.U4ATheme && U4ATheme.onChange) { U4ATheme.onChange(_applyMonacoTheme); } }
+        catch (e) { console.error("[스니펫디자이너] 테마 변경 구독 오류:", e); }
+
+        // 헤더/툴바 반응형 오버플로(⋯) — 공통 U4AUI.attachOverflow(§11). 좁아지면 넘치는 액션을 ⋯ 로 접는다.
+        //   ★ btnClass 를 반드시 넘긴다 — 기본값(u4a-tx-*)은 테마 CSS 미정의라 브라우저 기본 박스로 뜬다.
+        //     레퍼런스(bindShared/fnP13nDesignPopupOpen)처럼 화면 툴바 버튼과 동일 스타일로 맞춘다(여기선 평면 u4aSnipFlat).
+        try { _ovfTools = U4AUI.attachOverflow(document.getElementById("snipEdTools"), { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); }
+        catch (e) { console.error("[스니펫디자이너] 코드 툴바 오버플로 배선 오류:", e); }
+        try { if (oListActsBar) { _ovfActs = U4AUI.attachOverflow(oListActsBar, { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
+        catch (e) { console.error("[스니펫디자이너] 리스트 헤더 오버플로 배선 오류:", e); }
+        try { if (oInfoPanel && oInfoPanel.actions) { _ovfInfoActs = U4AUI.attachOverflow(oInfoPanel.actions, { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
+        catch (e) { console.error("[스니펫디자이너] 기본정보 헤더 오버플로 배선 오류:", e); }
 
         // 초기 데이터 로드 + 렌더 + 빈상태.
         oState.list = _readList();
@@ -805,7 +1092,13 @@
 
     document.addEventListener("DOMContentLoaded", function () {
         try {
+            // BroadCast Event 걸기 — 원본 frame.js 는 UI 빌드보다 먼저 건다(동일 순서).
+            _attachBroadCastEvent();
+
             initUIBuild();
+
+            // 실시간 테마 변경 추종 등록(원본 frame.js 동일).
+            if (_THEME_CH) { try { IPCMAIN.on(_THEME_CH, _onThemeChange); } catch (e) { console.error("[스니펫디자이너] 테마 IPC 등록 오류:", e); } }
 
             // 준비 완료 → 창 노출(플래시 방지: opener show:false 로 열림).
             requestAnimationFrame(function () {
@@ -818,6 +1111,12 @@
             try { CURRWIN.show(); } catch (e2) { }
         }
     });
+
+    // 창 제거 시 IPC 리스너 해제(누수 방지) + 방송 채널 종료.
+    window.addEventListener("pagehide", function () {
+        if (_THEME_CH) { try { IPCMAIN.removeListener(_THEME_CH, _onThemeChange); } catch (e) { } }
+        if (_oBroadToChild) { try { _oBroadToChild.close(); } catch (e) { } _oBroadToChild = null; }
+    }, { once: true });
 
     // busy 중 닫기 차단.
     window.onbeforeunload = function () {

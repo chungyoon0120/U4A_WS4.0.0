@@ -45,6 +45,28 @@
         "ISDFT", "OBDEC", "AGTYP", "UIATK", "UIATT", "UIASN", "UIATY", "UIADT", "UIADS", "VALKY",
         "ISLST", "ISMLB", "TOOLB", "UIFND", "PUIATK", "UILIB", "ISEXT", "TGLIB", "DEL_UOK", "DEL_POK", "ISECP"];
 
+    /************************************************************************
+     * [P6 송신] WS20 전송용 T_0014 구성 — 원본 broadcastChannelBindPopup.js set0014Data 1:1.
+     *   디자인 트리를 평면화해 DATYP==="01"(UI 오브젝트) 행만 추리고, 보존해 둔 S_14_* 를 T_0014 필드로 역매핑.
+     *   (원본 parseTree2Tab(zTREE_DESIGN) + filter(DATYP==="01") 대응 — 트리가 SSOT 이므로 재귀 수집.)
+     ************************************************************************/
+    oAPP.fn.getDesignT0014 = function () {
+        var aOut = [];
+        (function rec(aList) {
+            if (!aList) { return; }
+            for (var i = 0; i < aList.length; i++) {
+                var n = aList[i];
+                if (n.DATYP === "01") {
+                    var s = {};
+                    for (var k = 0; k < S14_KEYS.length; k++) { s[S14_KEYS[k]] = n["S_14_" + S14_KEYS[k]]; }
+                    aOut.push(s);
+                }
+                rec(n.zTREE_DESIGN);
+            }
+        })(oAPP.attr.designTree || []);
+        return aOut;
+    };
+
     var oD = { tool: null, host: null, ctrl: null };
 
     // 텍스트+아이콘 액션 버튼(공통 .u4a-btn) — 원본 sap.m.Button(type Accept/Emphasized/Reject).
@@ -255,6 +277,235 @@
         });
     };
 
+    /************************************************************************
+     * [SPEC §3.5 · 원본 designTree.js:225 _showBindAdditInfo] 바인딩경로 링크 클릭 →
+     *   ★ 중앙 하단(DESIGN_ADDIT) 패널을 그 필드 정보로 재구성해 표시(vis_addit).
+     *     우측(MAIN_ADDIT 스테이징)은 절대 건드리지 않는다 — setAdditBindInfo 는 SEL 스토어 전용.
+     *   게이트 통과 못하면 중앙 하단 숨김(setAdditLayout("")).
+     ************************************************************************/
+    oAPP.fn.onShowBindAdditInfo = function (n) { _showBindAdditInfo(n); };
+
+    function _showBindAdditInfo(sTree) {
+        if (typeof oAPP.fn.clearSelectAdditBind === "function") { try { oAPP.fn.clearSelectAdditBind(); } catch (e) { } }
+        function _hide() { if (typeof oAPP.fn.setAdditLayout === "function") { try { oAPP.fn.setAdditLayout(""); } catch (e) { } } }
+
+        if (!sTree || sTree.UIATV === "") { _hide(); return; }          // 바인딩 없음.
+        if (sTree.UIATY !== "1") { _hide(); return; }                   // 프로퍼티만.
+
+        var _sBind = oAPP.fn.getModelBindData(sTree.UIATV, oAPP.attr.modelTree);
+        if (typeof _sBind === "undefined") { oAPP.fn.toast(H.z("150", sTree.UIATV)); _hide(); return; }   // 150 필드 없음.
+        if (_sBind.KIND !== "E") { _hide(); return; }                   // 일반 필드만.
+
+        var _sParent = oAPP.fn.getModelBindData(_sBind.PARENT, oAPP.attr.modelTree);
+        if (typeof _sParent === "undefined") { oAPP.fn.toast(H.z("150", _sBind.PARENT)); _hide(); return; }
+
+        oAPP.attr.S_SEL_ATTR = JSON.parse(JSON.stringify(sTree));       // 선택 attribute 전역화(원본).
+        if (typeof oAPP.fn.setAdditBindInfo === "function") {
+            oAPP.fn.setAdditBindInfo(_sBind, sTree.MPROP, _sParent.zTREE);   // 중앙 하단(SEL) = 선택 필드로 재구성.
+        }
+        if (typeof oAPP.fn.setAdditLayout === "function") { try { oAPP.fn.setAdditLayout(_sBind.KIND); } catch (e) { } }
+    }
+
+    /************************************************************************
+     * [139 추가속성적용] 중앙 하단(DESIGN_ADDIT) — 원본 onAdditBind(index.js:8602)→setMPROP(designTree.js:2780) 1:1.
+     *   중앙 하단에서 고친 값(additRowsSel)을 S_SEL_ATTR 선택행 + prev._T_0015 에 stamp 후 트리 갱신.
+     *   ★ WS20 busy 왕복·UPDATE-DESIGN-DATA 방송 = P6. 여기선 로컬 적용 + toast(090)까지.
+     ************************************************************************/
+    oAPP.fn.applyDesignAdditBind = async function () {
+        // ① 중앙 하단 입력 완결성(원본 chkAdditBindData(oAdditTab=DESIGN_ADDIT)).
+        var _r1 = (typeof oAPP.fn.chkAdditBindData === "function") ? oAPP.fn.chkAdditBindData("SEL") : { RETCD: "" };
+        if (_r1.RETCD === "E") { oAPP.fn.toast(_r1.RTMSG); return; }
+
+        // ② 선택 attribute(S_SEL_ATTR) 존재.
+        var _sAttr = oAPP.attr.S_SEL_ATTR;
+        if (!_sAttr || !_sAttr.OBJID) { return; }
+
+        // ③ 트리 라인 + UI 정보(_T_0015) 확인(원본 setMPROP).
+        var _sTree = (typeof oAPP.fn.getDesignTreeAttrData === "function") ? oAPP.fn.getDesignTreeAttrData(_sAttr.OBJID, _sAttr.UIATK) : undefined;
+        if (typeof _sTree === "undefined") { oAPP.fn.toast(H.z("110", _sAttr.UIATT || _sAttr.OBJID)); return; }   // 110 정보 없음.
+        var _oUi = oAPP.attr.prev && oAPP.attr.prev[_sTree.OBJID];
+        if (!_oUi || !_oUi._T_0015) { oAPP.fn.toast(H.z("110", _sTree.OBJID)); return; }
+
+        // ④ 로컬 적용: 트리행 + _T_0015 stamp(중앙 하단 스토어 = additRowsSel).
+        _sTree.MPROP = oAPP.fn.setAdditBindData(oAPP.attr.additRowsSel);
+        var _s15 = _oUi._T_0015.find(function (it) { return it.UIATK === _sTree.UIATK; });
+        if (_s15) { _s15.MPROP = _sTree.MPROP; }
+
+        _refreshDesignTree();
+        oAPP.fn.toast(H.z("090"));   // 090 적용 완료.
+        // [P6] WS20 반영(§3.11) — MPROP stamp 는 attrChange 를 거치지 않으므로 명시 방송.
+        //   busy 는 여기서 켜고 WS20 왕복(UPDATE_DESIGN_DATA 수신) 후에 풀린다 — 스스로 끄지 않음.
+        if (typeof oAPP.fn.designBroadcastUpdate === "function") { oAPP.fn.designBroadcastUpdate(); }
+    };
+
+    /************************************************************************
+     * [SPEC §6] 전 라인 오류표시 초기화 — 원본 designTree.js resetErrorField 1:1.
+     ************************************************************************/
+    oAPP.fn.resetErrorField = function () {
+        (function rec(a) {
+            if (!a) { return; }
+            for (var i = 0; i < a.length; i++) { _resetErrorFieldLine(a[i]); rec(a[i].zTREE_DESIGN); }
+        })(oAPP.attr.designTree || []);
+    };
+
+    // 오류행 수집(간이 TY_BIND_ERROR) — ACTCD 라우팅/showMessagePopover 정교화는 P6 잔여.
+    function _pushErr(aOut, sTitle, sDesc, sLineKey) {
+        aOut.push({ ACTCD: "", LINE_KEY: sLineKey || "", TYPE: "Error", TITLE: sTitle, DESC: sDesc, LK_VIS: false });
+    }
+
+    /************************************************************************
+     * [SPEC §3.8/§6 게이트] 멀티 바인딩 가능여부 — 원본 designArea/checkMultiBinding.js 1:1.
+     *   차단: 디자인 미선택(087+142) · 모델필드 미선택(085+083) · checkValidBind 실패행 1건이라도(088).
+     *   ★ 원본 §11-7 낙관적 fallthrough(0건 분기에 return 없음) 그대로 — 뒤 재검사가 실제 종료 담당.
+     ************************************************************************/
+    function _checkMultiBinding() {
+        var _sRes = { RETCD: "", RTMSG: "", T_RTMSG: [] };
+        oAPP.fn.resetErrorField();
+
+        var _aTree = oAPP.fn.getSelectedDesignTree();
+        if (_aTree.length === 0) {
+            _sRes.RETCD = "E"; _sRes.RTMSG = H.z("087");
+            _pushErr(_sRes.T_RTMSG, H.z("087"), H.z("142"));   // 087 라인 미선택 / 142 안내.
+        }
+
+        var _sField = (typeof oAPP.fn.getSelectedModelLine === "function") ? oAPP.fn.getSelectedModelLine() : undefined;
+        if (typeof _sField === "undefined") {
+            _sRes.RETCD = "E"; _sRes.RTMSG = H.z("085");
+            _pushErr(_sRes.T_RTMSG, H.z("085"), H.z("083"));   // 085 모델필드 미선택 / 083 안내.
+            return _sRes;
+        }
+        if (_aTree.length === 0) { return _sRes; }   // 원본 동일(위에서 이미 E 세팅).
+
+        var _bErr = false;
+        for (var i = 0; i < _aTree.length; i++) {
+            var _sTree = _aTree[i];
+            var _sChk = oAPP.fn.checkValidBind(_sTree, _sField);
+            if (_sChk.RETCD !== "E") { continue; }
+            _bErr = true;
+            _sTree._bind_error = true;   // 실패행 마크(빨간 하이라이트 렌더 = P6 잔여).
+            _pushErr(_sRes.T_RTMSG, H.z("144", (_sTree.OBJID || "") + " - " + (_sTree.UIATT || "")),
+                oAPP.common.msg(_sChk.MSGID, _sChk.MSGNO), _sTree.CHILD);   // 144 &1 필드 바인딩 오류.
+        }
+        if (_bErr) {
+            _refreshDesignTree();
+            _sRes.RETCD = "E"; _sRes.RTMSG = H.z("088");   // 088 오류행 존재 → 멀티 바인딩 불가.
+        }
+        return _sRes;
+    }
+
+    /************************************************************************
+     * [SPEC §3.7/§6 게이트] 멀티 해제 가능여부 — 원본 designArea/checkMultiUnbinding.js 1:1.
+     *   차단: 디자인 미선택(087+145) · 미바인딩(UIATV==="") 행 1건이라도(147).
+     ************************************************************************/
+    function _checkMultiUnbinding() {
+        var _sRes = { RETCD: "", RTMSG: "", T_RTMSG: [] };
+        var _aTree = oAPP.fn.getSelectedDesignTree();
+        if (_aTree.length === 0) {
+            _sRes.RETCD = "E"; _sRes.RTMSG = H.z("087");
+            _pushErr(_sRes.T_RTMSG, H.z("087"), H.z("145"));   // 087 / 145 안내.
+            return _sRes;
+        }
+        var _bErr = false;
+        for (var i = 0; i < _aTree.length; i++) {
+            var _sTree = _aTree[i];
+            if (_sTree.UIATV !== "") { continue; }
+            _bErr = true;
+            _sTree._bind_error = true;
+            _pushErr(_sRes.T_RTMSG, H.z("144", (_sTree.OBJID || "") + " - " + (_sTree.UIATT || "")),
+                H.z("108"), _sTree.CHILD);   // 108 바인딩되지 않은 필드 선택.
+        }
+        if (_bErr) {
+            _refreshDesignTree();
+            _sRes.RETCD = "E"; _sRes.RTMSG = H.z("147");   // 147 오류행 존재 → 멀티 해제 불가.
+        }
+        return _sRes;
+    }
+
+    /************************************************************************
+     * [SPEC §3.8] 멀티 바인딩(130) — 원본 designTree.js onMultiBind 1:1.
+     *   게이트 → 확인창(166+156, aggregation 기존바인딩 섞이면 181+182 로 교체) → attrSetBindProp 반복 → 157.
+     *   ★ 쓰기 함수는 §3.4 드래그드롭과 동일(attrSetBindProp) — 세 경로 결과 일관성 보장.
+     *   ★ WS20 반영: attrSetBindProp → attrChange → designBroadcastUpdate(rAF 합침) = 1회 방송(P6).
+     ************************************************************************/
+    oAPP.fn.onMultiBind = async function () {
+        var _sRes = _checkMultiBinding();
+        if (_sRes.RETCD === "E") { oAPP.fn.toast(_sRes.RTMSG); return; }   // 정교 showMessagePopover = P6 잔여.
+
+        var _sField = oAPP.fn.getSelectedModelLine();
+        if (typeof _sField === "undefined") { return; }
+
+        var _aTree = oAPP.fn.getSelectedDesignTree();
+
+        // 166 &1건 선택 + 156 진행 확인. 기존 aggregation 바인딩이 섞이면 원본은 181+182 로 문구를 "교체"한다.
+        var _msg = H.z("166", String(_aTree.length)) + "\n" + H.z("156");
+        if (_aTree.findIndex(function (it) { return it.UIATV !== "" && it.UIATY === "3"; }) !== -1) {
+            _msg = H.z("181") + H.z("182");   // 181 자식 바인딩 초기화 경고 + 182 계속?
+        }
+        var _ok = await _confirmAdditApply(_msg);
+        if (!_ok) { return; }
+
+        for (var i = 0; i < _aTree.length; i++) {
+            var _sTree = _aTree[i];
+            _sTree.chk_seleced = false;   // 라인 선택 해제(원본).
+            switch (_sTree.UIATY) {
+                case "1":
+                    oAPP.fn.attrSetBindProp(_sTree, _sField);
+                    break;
+                case "3":
+                    if (_sTree.UIATV !== "" && _sTree.ISBND === "X") {
+                        oAPP.fn.attrUnbindAggr(oAPP.attr.prev[_sTree.OBJID], _sTree.UIATT, _sTree.UIATV);
+                        oAPP.fn.attrUnbindTree(_sTree);   // Tree/TreeTable PARENT·CHILD 예외.
+                    }
+                    oAPP.fn.attrSetBindProp(_sTree, _sField);
+                    if (oAPP.attr.prev[_sTree.OBJID]) { oAPP.attr.prev[_sTree.OBJID]._MODEL[_sTree.UIATT] = _sTree.UIATV; }
+                    break;
+                default: break;
+            }
+        }
+
+        if (typeof oAPP.fn.clearSelectAdditBind === "function") { try { oAPP.fn.clearSelectAdditBind(); } catch (e) { } }
+        if (typeof oAPP.fn.setAdditLayout === "function") { try { oAPP.fn.setAdditLayout(""); } catch (e) { } }
+        _refreshDesignTree();
+        oAPP.fn.toast(H.z("157"));   // 157 멀티 바인딩 완료.
+    };
+
+    /************************************************************************
+     * [SPEC §3.7] 멀티 해제(186) — 원본 designTree.js onMultiUnbind 1:1.
+     *   게이트 → 확인창(166+167) → 체크행마다 §3.6 단일해제와 동일 로직 → 155.
+     ************************************************************************/
+    oAPP.fn.onMultiUnbind = async function () {
+        var _sRes = _checkMultiUnbinding();
+        if (_sRes.RETCD === "E") { oAPP.fn.toast(_sRes.RTMSG); return; }
+
+        var _aTree = oAPP.fn.getSelectedDesignTree();
+        // 166 &1건 선택 + 167 해제 진행 확인.
+        var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("167"));
+        if (!_ok) { return; }
+
+        for (var i = 0; i < _aTree.length; i++) {
+            var _sTree = _aTree[i];
+            _resetErrorFieldLine(_sTree);
+            _sTree.chk_seleced = false;
+            switch (_sTree.UIATY) {
+                case "1":
+                    oAPP.fn.attrSetUnbindProp(_sTree);
+                    _excepUnbindDropAbleProperty(_sTree);   // dropAble 프로퍼티 예외.
+                    break;
+                case "3":
+                    oAPP.fn.attrUnbindAggr(oAPP.attr.prev[_sTree.OBJID], _sTree.UIATT, _sTree.UIATV);
+                    oAPP.fn.attrSetUnbindProp(_sTree);
+                    oAPP.fn.attrUnbindTree(_sTree);
+                    break;
+                default: break;
+            }
+        }
+
+        if (typeof oAPP.fn.clearSelectAdditBind === "function") { try { oAPP.fn.clearSelectAdditBind(); } catch (e) { } }
+        if (typeof oAPP.fn.setAdditLayout === "function") { try { oAPP.fn.setAdditLayout(""); } catch (e) { } }
+        _refreshDesignTree();
+        oAPP.fn.toast(H.z("155"));   // 155 멀티 해제 완료.
+    };
+
     // 디자인트리 체크선택 행 수집(원본 getSelectedDesignTree 1:1) — 멀티/참조필드(P3-C) 공용.
     oAPP.fn.getSelectedDesignTree = function () {
         var aSel = [];
@@ -300,6 +551,8 @@
         if (_s15) { _s15.MPROP = n.MPROP; }
         oAPP.fn.toast(H.z("154"));   // 154 적용 완료.
         _refreshDesignTree();
+        // [P6] WS20 반영(§3.11) — MPROP stamp 는 attrChange 를 안 거치므로 명시 방송.
+        if (typeof oAPP.fn.designBroadcastUpdate === "function") { oAPP.fn.designBroadcastUpdate(); }
     };
 
     // 멀티 적용 stamp(원본 additionalBindMulti: designTree.js:2936) — 체크행 전부 동일 MPROP + _T_0015 갱신.
@@ -316,6 +569,8 @@
             if (_s15) { _s15.MPROP = MPROP; }
         }
         _refreshDesignTree();
+        // [P6] WS20 반영(§3.11) — 체크행 N건을 한 번에 stamp 했으므로 방송도 1회(rAF 합침).
+        if (typeof oAPP.fn.designBroadcastUpdate === "function") { oAPP.fn.designBroadcastUpdate(); }
     };
 
     // 바인딩 쓰기 디스패처(원본 _setBindAttribute 1:1 — UIATK _1 제거 + T_0023/0022 가드 + 오류초기화 + switch).
@@ -632,7 +887,17 @@
             // C2 = 바인딩 경로(UIATV) / (개발) C3 = MPROP / 마지막 = 행 액션 컬럼.
             cell: function (n) {
                 var oPath = H.el("span", "u4aBwpDesignPath", n.UIATV || "");
-                if (n.UIATV) { oPath.setAttribute("data-tip", n.UIATV); oPath.setAttribute("data-tip-trunc", ""); }
+                if (n.UIATV) {
+                    oPath.setAttribute("data-tip", n.UIATV); oPath.setAttribute("data-tip-trunc", "");
+                    // SPEC §3.2 2열=바인딩경로 Link, press onShowBindAdditInfo(원본 designTree.js:4123) →
+                    //   클릭 시 우측 추가속성 패널을 이 필드로 재구성(§3.5 _showBindAdditInfo).
+                    oPath.classList.add("u4aBwpDesignPathLink");
+                    oPath.setAttribute("role", "button"); oPath.tabIndex = 0;
+                    oPath.addEventListener("click", function (e) {
+                        e.stopPropagation();
+                        if (typeof oAPP.fn.onShowBindAdditInfo === "function") { oAPP.fn.onShowBindAdditInfo(n); }
+                    });
+                }
                 var out = { c2: oPath };
                 if (bDevCol) {
                     var oMp = H.el("span", "u4aBwpDescTxt", n.MPROP || "");
@@ -657,6 +922,32 @@
 
         // 좌측 필드 → 디자인트리 드롭(원본 onDropBindField/_setBindAttribute) 배선.
         _wireDesignDrop(oD.host);
+
+        // [빈상태 안내 보정] 공통 makeColumnTree 는 빈 안내(.u4aColTreeEmpty)를 내부 body(컬럼폭 합 기준)에
+        //   넣는다. 좁은 패널에선 안내가 컬럼폭(≈46rem) 가운데라 가시영역 밖(오른쪽)으로 밀리고 가로 스크롤이
+        //   생긴다(실측 2026-07-16: 769px 기준 가운데 386 vs 가시 298). → 스크롤 컨테이너(host) 직속으로
+        //   끌어올려 가시영역 가운데 표시 + 빈상태 가로 스크롤 억제(공통 미수정, bindPopup 스코프).
+        (function () {
+            var oHost = oD.host;
+            var iRaf = 0;
+            function _fixEmpty() {
+                var emp = oHost.querySelector(".u4aColTreeEmpty");
+                if (!emp) { oHost.classList.remove("u4aBwpTreeEmptyState"); return; }
+                oHost.classList.add("u4aBwpTreeEmptyState");
+                // ★ emp 는 공통이 만든 자리(내부 body) 그대로 둔다(옮기면 트리 아래로 쌓여 바닥에 붙고,
+                //   공통 _showEmpty(false) 가 제거도 못 한다 — 장군님 지적). 폭만 host 가시폭으로 고정하면
+                //   sticky left:0 와 함께 가로는 가시영역 가운데, 세로는 기존대로 body 가운데가 된다.
+                var w = oHost.clientWidth;
+                if (w && emp.style.width !== w + "px") { emp.style.width = w + "px"; }
+            }
+            function _schedule() {   // RO 콜백서 동기 쓰기 금지 → rAF 지연(공통 §3.4.2 규칙).
+                if (iRaf) { return; }
+                iRaf = requestAnimationFrame(function () { iRaf = 0; _fixEmpty(); });
+            }
+            try { new MutationObserver(_fixEmpty).observe(oHost, { childList: true, subtree: true }); } catch (e) { }
+            try { new ResizeObserver(_schedule).observe(oHost); } catch (e) { }
+            _fixEmpty();
+        })();
 
         // 컬럼 자동맞춤(원본 setUiTableAutoResizeColumn = 콘텐츠+마지막 컬럼 채움). 레이아웃 확정 후 1회.
         setTimeout(function () { oAPP.fn.fitTreeColumns(oD.host); }, 0);
