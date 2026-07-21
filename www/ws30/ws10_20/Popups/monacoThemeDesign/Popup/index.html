@@ -59,6 +59,14 @@
                     <div class="u4aTdPrev__head">
                         <label class="u4aTdPrev__label" id="tdLanguLabel"></label>
                         <div class="u4aTdPrev__field" id="tdLanguHost"></div>
+                        <!-- 공통 모나코 에디터 툴바 한 세트(줌−/줌%/줌+/꾸밈정렬) — 스니펫 디자이너와 동일 UX.
+                             monaco/ 무수정: 부모가 iframe 에디터의 Monaco 내장 액션을 직접 호출. 좁아지면 ⋯ 오버플로(§11). -->
+                        <div class="u4aTdEdTools" id="tdEdTools">
+                            <button type="button" class="u4a-btn u4aTdFlat" id="tdZoomOut" title="Zoom out (Ctrl + Wheel ↓)" aria-label="Zoom out"><i class="fa-solid fa-minus"></i></button>
+                            <button type="button" class="u4a-btn u4aTdFlat u4aTdZoomPct" id="tdZoomBtn" title="Reset zoom (Ctrl + 0)" aria-label="Reset zoom"><i class="fa-solid fa-magnifying-glass"></i><span>100%</span></button>
+                            <button type="button" class="u4a-btn u4aTdFlat" id="tdZoomIn" title="Zoom in (Ctrl + Wheel ↑)" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
+                            <button type="button" class="u4a-btn u4aTdFlat u4aTdFormatBtn" id="tdFormatBtn"><i class="fa-solid fa-wand-magic-sparkles"></i><span id="tdFormatText"></span></button>
+                        </div>
                     </div>
                     <div class="u4aTdPrev__body">
                         <!-- src 는 js/index.js 가 oAPP 전역(monacoVSPath/monacoLoaderPath) 노출 후 주입.

@@ -378,7 +378,10 @@ html, body {
     display: none !important;
 }
 
-/* 툴바 버튼 = 평면(투명) 아이콘 버튼. hover 시 은은한 배경. */
+/* 툴바 버튼 = 평면(투명) 아이콘 버튼. hover 시 은은한 배경.
+   ★클릭 표적 최소 2.25rem × 2.25rem (16 §1.2) — 공통 .u4a-btn 은 height:2rem 이고 아이콘 버튼은
+     padding 이 작아 표적이 더 작아진다. 보이는 크기는 그대로 두고 표적만 키운다(코덱스 지적).
+     테마 디자이너(.u4aTdFlat)와 동일 처리 — 두 에디터 툴바 일관. */
 .u4aSnipFlat.u4a-btn {
     background: transparent;
     border: 0;
@@ -387,6 +390,9 @@ html, body {
     line-height: 1;
     font-weight: 600;
     box-shadow: none;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    justify-content: center;
 }
 
 .u4aSnipFlat.u4a-btn:hover:not(:disabled) {

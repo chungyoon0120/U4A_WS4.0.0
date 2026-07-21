@@ -51,7 +51,10 @@ body {
    flex:0 0 <px> 로 확정. 중앙 = 유연(잔여 흡수). 최소폭 단일 출처(min-width) — 16 §4.3. */
 .u4aBwpLeft  { flex: 0 1 22rem; min-width: 15rem; }
 .u4aBwpRight { flex: 0 1 22rem; min-width: 15rem; }
-.u4aBwpCenter { flex: 1 1 auto; min-width: 18.75rem; }
+/* ★ flex-basis: 0 (auto 아님) — auto 면 중앙 콘텐츠(추가속성 표 등)의 max-content 가 basis 가 돼
+   중앙 하단 표시 때 표가 커지면 basis 증가 → 좌우 패널을 최소폭까지 밀어낸다(실측 재현: 좌 352→240).
+   basis 0 이면 중앙은 잔여폭만 흡수(콘텐츠 무관) → 표는 host 안에서 처리되고 좌우 폭 불변. */
+.u4aBwpCenter { flex: 1 1 0; min-width: 18.75rem; }
 /* 화면 커스터마이징으로 중앙(DESIGN)이 숨겨진 조합에서 마지막 활성 영역이 잔여 폭을 채운다. */
 .u4aBwpFill { flex: 1 1 auto !important; }
 

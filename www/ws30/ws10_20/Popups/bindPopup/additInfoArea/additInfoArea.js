@@ -511,11 +511,14 @@
      *   ★ 우측(MAIN) 스토어 값을 체크된 N행에 일괄 stamp. busy 왕복·방송 = P6.
      ************************************************************************/
     oAPP.fn.onMultiAdditionalBind = async function () {
-        var _r1 = oAPP.fn.chkAdditBindData();   // MAIN.
-        if (_r1.RETCD === "E") { oAPP.fn.toast(_r1.RTMSG); return; }
-
+        // ★ 검증 순서 = 원본 checkMultiAdditBind.js 그대로: ①디자인 트리 선택(16행) → ②추가속성 입력(53행)
+        //   → ③행별 적용 가능여부(84행). 입력 검증을 먼저 하면 사용자가 값을 다 채운 뒤에야
+        //   "선택된 라인 없음"을 만나 헛수고한다(장군님 지적 2026-07-16 — 원본도 선택 검증이 먼저다).
         var _aTree = (typeof oAPP.fn.getSelectedDesignTree === "function") ? (oAPP.fn.getSelectedDesignTree() || []) : [];
-        if (_aTree.length === 0) { oAPP.fn.toast(H.z("142")); return; }
+        if (_aTree.length === 0) { oAPP.fn.toast(H.z("142")); return; }   // 142 디자인 라인 선택 필요(원본 087+142).
+
+        var _r1 = oAPP.fn.chkAdditBindData();   // MAIN 입력 완결성.
+        if (_r1.RETCD === "E") { oAPP.fn.toast(_r1.RTMSG); return; }
 
         for (var i = 0; i < _aTree.length; i++) {
             var _rr = oAPP.fn.chkPossibleAdditBind(_aTree[i]);

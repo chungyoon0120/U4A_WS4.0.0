@@ -327,7 +327,10 @@ async function updateAppData(oEvent){
 
         if(typeof _sTree !== "undefined"){
             //UI design tree 라인 선택 이벤트 수행.
-            await oAPP.fn.designTreeItemPress(_sTree);
+            //  ★ HTML5 변환 누락 수정 — 원본 UI5 designTreeItemPress(uiDesignArea.js:3510)는 HTML5 WS20 에서
+            //    fnWs20DesignTreeItemPress(ws_html5_ws20_attr.js:3029)로 이식됐으나, 이 수신부만 옛 이름을
+            //    그대로 호출해 "is not a function" 크래시(바인딩 팝업 UPDATE-DESIGN-DATA 방송 수신 시).
+            await oAPP.fn.fnWs20DesignTreeItemPress(_sTree);
         }
 
     }

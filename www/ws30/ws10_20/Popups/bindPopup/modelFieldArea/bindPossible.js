@@ -1,523 +1,232 @@
+/****************************************************************************
+ * Binding Popup(대형 별창) 좌측 모델필드 "바인딩 가능/불가 판정" — HTML5 (SPEC §2.1)
+ * --------------------------------------------------------------------------
+ *  원본: modelFieldArea/bindPossible.js(module.exports) 1:1 이식.
+ *  디자인 트리에서 속성/aggregation 행을 선택할 때마다 좌측 모델필드 트리의
+ *  enable/상태아이콘/하이라이트를 재계산한다. 좌측 트리는 이미 n.stat_src/n.highlight 를
+ *  소비해 렌더하므로(modelFieldArea.js), 이 함수가 그 필드를 세팅 후 재렌더만 하면 된다.
+ *
+ *  ★ 상태 4종(SPEC §2.1):
+ *     가능(초록)      status-positive / highlight "Success"
+ *     이미 같은 경로(파랑) accept        / highlight "Information"   ← "이미 바인딩된" 표시
+ *     N건 경로 조상(주황) share-2        / highlight "Warning"
+ *     불가(기본)      enable:false, 아이콘/하이라이트 null
+ *  ★ CARDI(카디널리티 요청): F=필드만 / T=테이블 / S=구조 / R=Range / ST=String table.
+ *  ★ 데이터 어댑트: 원본 oAPP.attr.oModel.oData.zTREE → HTML5 oAPP.attr.modelTree,
+ *     refresh() → oAPP.fn.refreshModelTree(). 색은 highlight(의미) 로 렌더 — stat_color(hex)는
+ *     원본 잔존값이며 HTML5 렌더가 소비하지 않는다(하드코딩 hex 미사용, §2.1 아이콘/하이라이트만).
+ *  ★ CJS(module.exports) 아님 — 별창 require 미지원이라 oAPP.fn.bindPossibleRecompute 전역 노출.
+ ****************************************************************************/
+(function () {
+    "use strict";
 
-/*************************************************************
- * @module - DESIGN TREE에서 선택한 ATTR(PROPERTY, AGGREGEGATION)
- *           에 대해 바인딩 가능한 필드 정보 표현 처리.
- *************************************************************/
-module.exports = function(is_attr){
+    var oAPP = window.oAPP;
+    if (!oAPP || !oAPP.fn) { return; }
 
-    return new Promise((res)=>{
+    /************************************************************************
+     * [PUBLIC] 좌측 판정 재계산 — 원본 bindPossible.js module.exports 1:1.
+     *   @param is_attr 디자인 트리 선택 노드(ATTR).
+     ************************************************************************/
+    oAPP.fn.bindPossibleRecompute = function (is_attr) {
+        var aRoot = oAPP.attr.modelTree || [];
+        if (aRoot.length === 0) { return { RETCD: "", RCODE: "" }; }
 
-        var _oModel = oAPP.attr.oModel;
+        // 2레벨(TABLE/STRUCTURE)부터 판정(원본 zTREE[0].zTREE).
+        var _aBindTree = aRoot[0].zTREE || [];
 
-        //바인딩 정보가 존재하지 않는경우 exit.
-        if(_oModel.oData.zTREE.length === 0){
-            return res(_sRes);
+        _resetBindPossible(aRoot);   // 전 노드 상태 초기화.
+
+        var _sRes = _chkBindPossible(is_attr);
+        if (_sRes.RETCD === "E") {
+            // 표현 대상 아님(리프 아님) → 기존 바인딩 표현(T/E 전부 가능 초록)만.
+            _setBindEnableOrg(_aBindTree, "", "");
+            oAPP.fn.refreshModelTree();
+            return _sRes;
         }
 
-        //2레벨의 TABLE, STRUCTURE정보만 발췌.
-        var _aBindTree = _oModel.oData.zTREE[0].zTREE;
+        var l_CARDI = _setFieldCardinality(is_attr);
+        var l_path = _getParentModelPath(is_attr);
 
-
-        //바인딩 가능 여부 표현 정보 초기화.
-        resetBindPossible(_oModel.oData.zTREE);
-
-
-        //바인딩 가능 여부 표현 할지 여부 점검.
-        var _sRes = chkBindPossible(is_attr);
-
-        //바인딩 가능 여부 표현 처리를 안하는경우.
-        if(_sRes.RETCD === "E"){
-
-            //기존 바인딩 표현 처리.
-            setBindEnableOrg(_aBindTree, "", _oModel, "");
-
-            oAPP.attr.oModel.refresh();
-            
-            return res(_sRes);
-
-        }
-
-
-        //바인딩 처리 cardinality 구성.
-        var l_CARDI = setFieldCardinality(is_attr);
-
-
-        //N건 바인딩 처리한 부모 모델 정보 얻기.
-        var l_path = getParentModelPath(is_attr);
-
-        
-        //기존 로직에서 사용하는 광역변수 구성.
-        oAPP.attr.oBindDialog = {};
-        oAPP.attr.oBindDialog._CARDI   = l_CARDI;
-        oAPP.attr.oBindDialog._is_attr = is_attr;
-
-
-        
-        //model field tree 바인딩 가능 여부 표현 처리.
-        lf_setBindEnable(_aBindTree, l_path, _oModel);
-
-
-        //바인딩 가능여부 표현 이후 기존 로직에서 사용하는 광역변수 제거.
+        // 재귀 판정이 참조하는 광역 컨텍스트(원본 oAPP.attr.oBindDialog).
+        oAPP.attr.oBindDialog = { _CARDI: l_CARDI, _is_attr: is_attr };
+        _lf_setBindEnable(_aBindTree, l_path, "");
         delete oAPP.attr.oBindDialog;
-        
 
-        oAPP.attr.oModel.refresh();
-        
+        oAPP.fn.refreshModelTree();
+        return _sRes;
+    };
 
-        return res(_sRes);
-
-    });
-
-}
-
-
-/*************************************************************
- * @function - 바인딩 가능 여부 표현 할지 여부 점검.
- *************************************************************/
-function chkBindPossible(is_attr){
-    
-    let _sRes = {RETCD:"", RCODE:""};
-
-    //property, aggregation이 아닌경우 exit.
-    if(is_attr.DATYP !== "02"){
-        _sRes.RETCD = "E";
-        _sRes.RCODE = "01";
-
+    // 표현 대상 여부(원본 chkBindPossible) — 리프(DATYP 02)만 판정 대상.
+    function _chkBindPossible(is_attr) {
+        var _sRes = { RETCD: "", RCODE: "" };
+        if (!is_attr || is_attr.DATYP !== "02") { _sRes.RETCD = "E"; _sRes.RCODE = "01"; }
         return _sRes;
     }
 
-    return _sRes;
-
-}
-
-
-/*************************************************************
- * @function - 바인딩 처리 cardinality 구성.
- *************************************************************/
-function setFieldCardinality(is_attr){
-    
-    var l_CARDI = "";
-
-    //attribute 타입에 따른 분기.
-    switch(is_attr.UIATY){
-        case "1": //property
-  
-            l_CARDI = "F";
-    
-            //SELECT OPTION2의 VALUE에 바인딩처리 하는경우.
-            if(is_attr.UIATK === "EXT00001161"){
-                //RANGE TABLE만 바인딩 가능 FLAG 처리.
-                l_CARDI = "R";
-            }
-    
-            //SELECT OPTION3의 VALUE에 바인딩처리 하는경우.
-            if(is_attr.UIATK === "EXT00002507"){
-                //RANGE TABLE만 바인딩 가능 FLAG 처리.
-                l_CARDI = "R";
-            }
-    
-            //프로퍼티가 ARRAY로 입력 가능한 경우, 프로퍼티 타입이 숫자 유형이 아니면.
-            if(is_attr.ISMLB === "X" && (is_attr.UIADT !== "int" && is_attr.UIADT !== "float")){
-                //STRING_TABLE 바인딩 가능 FLAG 처리.
-                l_CARDI = "ST";
-            }
-    
-            break;
-  
-        case "3": //Aggregation
-  
-            l_CARDI = "T";
-            break;
-  
-  
-    } //UI Attribute Type에 따른 분기.
-
-    return l_CARDI;
-
-}
-
-
-/*************************************************************
- * @function - N건 바인딩 처리한 부모 모델 정보 얻기.
- *************************************************************/
-function getParentModelPath(is_attr){
-    
-    //n건 바인딩 처리된 UI인지 여부 확인.
-    var l_path = oAPP.fn.getParentAggrBind(oAPP.attr.prev[is_attr.OBJID]);
-
-    
-    //현재 UI의 라인 정보 얻기.
-    var ls_tree = oAPP.fn.getDesignTreeData(is_attr.OBJID);
-
-
-    //바인딩 팝업을 호출한 attribute정보가 sap.m.Tree의 parent, child인경우.
-    if(is_attr.UIATK === "EXT00001190" ||  //parent
-        is_attr.UIATK === "EXT00001191"){   //child
-
-        //items aggregation에 바인딩된 정보 매핑.
-        l_path = oAPP.attr.prev[is_attr.OBJID]._MODEL["items"];
-
-    //바인딩 팝업을 호출한 attribute정보가 sap.ui.table.TreeTable의 parent, child인경우.
-    }else if(is_attr.UIATK === "EXT00001192" || //parent
-        is_attr.UIATK === "EXT00001193"){  //child
-                    
-        //rows aggregation에 바인딩된 정보 매핑.
-        l_path = oAPP.attr.prev[is_attr.OBJID]._MODEL["rows"];
-        
-    }else if(is_attr.UIATK === "EXT00002382" &&        //sap.ui.table.Column의 markCellColor 프로퍼티
-        oAPP.attr.prev[is_attr.OBJID].__PARENT){ //sap.ui.table.Column의 parent가 존재하는경우
-        
-        //rows aggregation에 바인딩된 정보 매핑.
-        l_path = oAPP.attr.prev[is_attr.OBJID].__PARENT._MODEL["rows"];
-
-    }else if(ls_tree && (ls_tree.PUIATK === "AT000022249" || ls_tree.PUIATK === "AT000022258" || 
-        ls_tree.PUIATK === "AT000013070" || ls_tree.PUIATK === "AT000013148")){
-        //sap.ui.table.Table(sap.ui.table.TreeTable)의 rowSettingsTemplate, rowActionTemplate aggregation에 속한 UI인경우.
-        //부모의 rows aggregation의 path 정보 얻기.
-        l_path = oAPP.attr.prev[ls_tree.POBID]._MODEL["rows"];
-        
-    }else if(ls_tree && ls_tree.PUIATK === "AT000013013"){
-        //sap.ui.table.RowAction의 items aggregation에 존재하는 ui인경우.
-
-        //부모의 items에 바인딩이 설정되있지 않다면.
-        if(!oAPP.attr.prev[ls_tree.POBID]._MODEL["items"]){
-
-            //부모의 라인 정보 얻기.
-            var ls_parent = oAPP.fn.getDesignTreeData(ls_tree.POBID);
-
-            //sap.ui.table.RowAction의 부모(ui table, tree table의 rows에 바인딩된 정보를 얻기.)
-            if(ls_parent && (ls_parent.UIOBK === "UO01139" || ls_parent.UIOBK === "UO01142")){
-                l_path = oAPP.attr.prev[ls_parent.POBID]._MODEL["rows"];
-            }
-
-        }
-
-    }
-
-    return l_path;
-
-}
-
-
-/*************************************************************
- * @function - 바인딩 가능 여부 초기화.
- *************************************************************/
-function resetBindPossible(aTree){
-
-    for (let i = 0; i < aTree.length; i++) {
-        
-        var _sTree = aTree[i];
-
-        _sTree.enable     = false;
-
-        //바인딩 가능 여부 표현 필드 초기화.
-        _sTree.stat_color = null;
-        _sTree.stat_src   = null;
-        _sTree.highlight  = null;
-
-        //하위를 탐색하며 바인딩 가능 여부 표현 필드 초기화.
-        resetBindPossible(_sTree.zTREE);
-        
-    }
-
-}
-
-
-
-/*************************************************************
- * @function - 기존 바인딩 가능 여부 처리.
- *************************************************************/
-function setBindEnableOrg(it_tree, l_path, l_model, KIND) {
-
-    if (it_tree.length === 0) {
-        return;
-    }
-
-    for (var i = 0, l = it_tree.length; i < l; i++) {
-        
-        switch (it_tree[i].KIND) {
-            case "T": //TABLE인경우.
-                it_tree[i].enable     = true;
-                it_tree[i].stat_src   = "sap-icon://status-positive";
-                it_tree[i].stat_color = "#01DF3A";
-
-                //하위 path를 탐색하며 선택 가능 flag 처리.
-                setBindEnableOrg(it_tree[i].zTREE, l_path, l_model, it_tree[i].KIND);
-
+    // 카디널리티(원본 setFieldCardinality).
+    function _setFieldCardinality(is_attr) {
+        var l_CARDI = "";
+        switch (is_attr.UIATY) {
+            case "1":   // property → 필드(F).
+                l_CARDI = "F";
+                if (is_attr.UIATK === "EXT00001161") { l_CARDI = "R"; }   // SelectOption2 value → Range.
+                if (is_attr.UIATK === "EXT00002507") { l_CARDI = "R"; }   // SelectOption3 value → Range.
+                if (is_attr.ISMLB === "X" && (is_attr.UIADT !== "int" && is_attr.UIADT !== "float")) { l_CARDI = "ST"; }   // 배열형(숫자 아님) → String table.
                 break;
-
-            case "S": //STRUCTURE인경우.
-
-                //하위 path를 탐색하며 선택 가능 flag 처리.
-                setBindEnableOrg(it_tree[i].zTREE, l_path, l_model, KIND);
-
+            case "3":   // aggregation → 테이블(T).
+                l_CARDI = "T";
                 break;
-
-            case "E": //일반 필드인경우.
-
-                it_tree[i].enable     = true;
-                it_tree[i].stat_src   = "sap-icon://status-positive";
-                it_tree[i].stat_color = "#01DF3A";
-
-                break;
-
+            default: break;
         }
-
+        return l_CARDI;
     }
 
-} //바인딩 가능여부 flag 처리.
+    // N건 바인딩 부모 모델 path(원본 getParentModelPath) — Tree/TreeTable/Column/RowAction 특수 매핑.
+    function _getParentModelPath(is_attr) {
+        var l_path = oAPP.fn.getParentAggrBind(oAPP.attr.prev[is_attr.OBJID]);
+        var ls_tree = oAPP.fn.getDesignTreeData(is_attr.OBJID);
 
-
-
-/*************************************************************
- * @function - model field tree 바인딩 가능 여부 표현 처리.
- *************************************************************/
-function lf_setBindEnable(it_tree, l_path, l_model, KIND){
-
-    if(it_tree.length === 0){return;}
-
-    for(var i = 0, l = it_tree.length; i < l; i++){
-
-      switch(it_tree[i].KIND){
-        case "T": //TABLE인경우.
-
-            //range table 바인딩 처리건 여부 확인.
-            if(lf_chkRangeTable(it_tree[i]) === true){
-                //해당 table이 range table이며, 현재 range table을 바인딩 처리하고자 하는경우.
-                it_tree[i].enable     = true;
-                it_tree[i].stat_src   = "sap-icon://status-positive";
-                it_tree[i].stat_color = "#01DF3A";
-                it_tree[i].highlight  = "Success";
-
-                //현재 TABLE이 바인딩 팝업 호출건의 PATH와 동일하다면.
-                if(it_tree[i].CHILD === oAPP.attr.oBindDialog._is_attr.UIATV){
-                    //선택됨 icon 처리.
-                    it_tree[i].stat_src   = "sap-icon://accept";
-                    it_tree[i].stat_color = "#1589FF";
-                    it_tree[i].highlight  = "Information";
+        if (is_attr.UIATK === "EXT00001190" || is_attr.UIATK === "EXT00001191") {   // sap.m.Tree parent/child → items.
+            l_path = oAPP.attr.prev[is_attr.OBJID]._MODEL["items"];
+        } else if (is_attr.UIATK === "EXT00001192" || is_attr.UIATK === "EXT00001193") {   // TreeTable parent/child → rows.
+            l_path = oAPP.attr.prev[is_attr.OBJID]._MODEL["rows"];
+        } else if (is_attr.UIATK === "EXT00002382" && oAPP.attr.prev[is_attr.OBJID].__PARENT) {   // Column markCellColor → 부모 rows.
+            l_path = oAPP.attr.prev[is_attr.OBJID].__PARENT._MODEL["rows"];
+        } else if (ls_tree && (ls_tree.PUIATK === "AT000022249" || ls_tree.PUIATK === "AT000022258" ||
+            ls_tree.PUIATK === "AT000013070" || ls_tree.PUIATK === "AT000013148")) {   // rowSettings/rowAction template → 부모 rows.
+            l_path = oAPP.attr.prev[ls_tree.POBID]._MODEL["rows"];
+        } else if (ls_tree && ls_tree.PUIATK === "AT000013013") {   // RowAction.items 하위 UI.
+            if (!oAPP.attr.prev[ls_tree.POBID]._MODEL["items"]) {
+                var ls_parent = oAPP.fn.getDesignTreeData(ls_tree.POBID);
+                if (ls_parent && (ls_parent.UIOBK === "UO01139" || ls_parent.UIOBK === "UO01142")) {
+                    l_path = oAPP.attr.prev[ls_parent.POBID]._MODEL["rows"];
                 }
-
-                continue;
             }
-
-            //STRING_TABLE 바인딩 처리건 여부 확인.
-            if(lf_chkStringTable(it_tree[i]) === true){
-                //해당 table이 STRING_TABLE이며, 현재 STRING_TABLE을 바인딩 처리하고자 하는경우.
-                it_tree[i].enable     = true;
-                it_tree[i].stat_src   = "sap-icon://status-positive";
-                it_tree[i].stat_color = "#01DF3A";
-                it_tree[i].highlight  = "Success";
-
-                //현재 TABLE이 바인딩 팝업 호출건의 PATH와 동일하다면.
-                if(it_tree[i].CHILD === oAPP.attr.oBindDialog._is_attr.UIATV){
-                    //선택됨 icon 처리. 
-                    it_tree[i].stat_src   = "sap-icon://accept";
-                    it_tree[i].stat_color = "#1589FF";
-                    it_tree[i].highlight  = "Information";
-                }
-
-                continue;
-
-            }
-
-            //property에서 바인딩 팝업 호출시 n건 바인딩 path와 현재 path가 동일한 경우 하위 탐색.
-            if((oAPP.attr.oBindDialog._CARDI === "F" ||
-                oAPP.attr.oBindDialog._CARDI === "R" ||
-                oAPP.attr.oBindDialog._CARDI === "ST" ) && 
-                ( l_path && l_path.substr(0, it_tree[i].CHILD.length) === it_tree[i].CHILD)){
-
-                //N건 바인딩 필드 아이콘 표현.
-                it_tree[i].stat_src   = "sap-icon://share-2";
-                it_tree[i].stat_color = "#FBB917";
-                it_tree[i].highlight  = "Warning";
-
-                lf_setBindEnable(it_tree[i].zTREE, l_path, l_model, it_tree[i].KIND);
-                continue;
-
-            }
-
-            //property에서 바인딩 팝업 호출시 table인경우 하위 정보 활성화 skip.
-            if(oAPP.attr.oBindDialog._CARDI === "F"){
-                continue;
-            }
-
-            //aggregation인경우 첫번째 만나는 TABLE은 선택 가능 처리 후 하위 정보 활성화 SKIP.
-            if(oAPP.attr.oBindDialog._CARDI === "T" && l_path && l_path.substr(0, it_tree[i].CHILD.length) === it_tree[i].CHILD){
-
-                var lt_child = it_tree[i].zTREE.filter( a => a.PARENT === it_tree[i].CHILD && a.KIND !== "E" );
-                lf_setBindEnable(lt_child, l_path, l_model, it_tree[i].KIND);
-
-                continue;
-            }
-
-
-            //현재 선택한 UI가 AGGR이 N건인경우 바인딩 불가능.
-            if(oAPP.fn.attrChkBindAggrPossible(oAPP.attr.oBindDialog._is_attr) === true){
-                continue;
-            }
-
-            //대상 UI로부터 자식을 탐색하며 바인딩 가능 여부 점검.
-            if(oAPP.fn.getChildAggrBind(oAPP.attr.oBindDialog._is_attr.OBJID, it_tree[i].CHILD) === true){
-                continue;
-            }
-
-            //aggregation인경우 첫번째 만나는 TABLE은 선택 가능 처리 후 하위 정보 활성화 SKIP.
-            if(oAPP.attr.oBindDialog._CARDI === "T"){
-
-                //현재 path의 하위 정보 얻기.
-                var l_indx = it_tree[i].zTREE.length;
-
-                //하위 필드 정보가 존재하는경우.
-                if(l_indx > 0){
-                    it_tree[i].enable     = true;
-                    it_tree[i].stat_src   = "sap-icon://status-positive";
-                    it_tree[i].stat_color = "#01DF3A";
-                    it_tree[i].highlight  = "Success";
-                }
-
-                //현재 TABLE이 바인딩 팝업 호출건의 PATH와 동일하다면.
-                if(it_tree[i].CHILD === oAPP.attr.oBindDialog._is_attr.UIATV){
-                    //선택됨 icon 처리.
-                    it_tree[i].stat_src   = "sap-icon://accept";
-                    it_tree[i].stat_color = "#1589FF";
-                    it_tree[i].highlight  = "Information";
-                }            
-
-                continue;
-            }
-
-            break;
-
-        case "S": //STRUCTURE인경우.
-
-            var l_KIND = "";
-
-            //aggregation인경우 일반 필드는 검색 불필요 함으로 제외 조건값 구성.
-            if(oAPP.attr.oBindDialog._CARDI === "T"){
-                l_KIND = "E";
-            }
-
-            if(oAPP.attr.oBindDialog._CARDI === "S"){
-                it_tree[i].enable     = true;
-                it_tree[i].stat_src   = "sap-icon://status-positive";
-                it_tree[i].stat_color = "#01DF3A";
-                it_tree[i].highlight  = "Success";
-            }
-
-            //현재 path의 하위 path정보 얻기.
-            var lt_child = it_tree[i].zTREE.filter( a => a.PARENT === it_tree[i].CHILD && a.KIND !== l_KIND);
-
-            //하위 path를 탐색하며 선택 가능 flag 처리.
-            lf_setBindEnable(lt_child, l_path, l_model, KIND);
-
-            break;
-
-        case "E": //일반 필드인경우.
-
-            //TREE의 경우PARENT, CHILD에 바인딩시 바인딩된 AGGR의 TABLE건만 가능.
-            if(oAPP.attr.oBindDialog._is_attr.UIATK === "EXT00001190" ||
-                oAPP.attr.oBindDialog._is_attr.UIATK === "EXT00001191" ||
-                oAPP.attr.oBindDialog._is_attr.UIATK === "EXT00001192" ||
-                oAPP.attr.oBindDialog._is_attr.UIATK === "EXT00001193"){
-
-                if(l_path && it_tree[i].CHILD.substr(0, l_path.length) !== l_path){
-                    continue;
-
-                }
-
-            }
-
-            
-            //property인경우 필드 선택 가능 처리.
-            if(oAPP.attr.oBindDialog._CARDI === "F"){
-
-                if(l_path && KIND === "T" && it_tree[i].CHILD.substr(0, l_path.length) !== l_path){
-                    continue;
-                }
-
-                //바인딩 예외처리 항목에 해당하는건은 선택 불가능 처리.
-                if(oAPP.attr.CT_BIND_EXCEPT.findIndex( item => item.FLD01 === oAPP.attr.oBindDialog._is_attr.UIATK) !== -1){
-                    continue;
-                }
-
-                it_tree[i].enable     = true;
-                it_tree[i].stat_src   = "sap-icon://status-positive";
-                it_tree[i].stat_color = "#01DF3A";
-                it_tree[i].highlight  = "Success";
-
-                //현재 path가 이전 바인딩값과 동일한 경우.
-                if(it_tree[i].CHILD === oAPP.attr.oBindDialog._is_attr.UIATV){
-                    //선택됨 icon 처리.
-                    it_tree[i].stat_src   = "sap-icon://accept";
-                    it_tree[i].stat_color = "#1589FF";
-                    it_tree[i].highlight  = "Information";
-
-                    // //이전 선택한 바인딩 상세정보가 존재하는경우.
-                    // if(oAPP.attr.oBindDialog._is_attr.MPROP !== ""){
-                    //     //바인딩 상세정보 매핑.
-                    //     it_tree[i].MPROP = oAPP.attr.oBindDialog._is_attr.MPROP;
-                    // }
-
-                }
-
-            }
-
-            break;
-
         }
-
+        return l_path;
     }
 
-} //model field tree 바인딩 가능 여부 표현 처리.
-
-
-/*************************************************************
- * @function - range table 여부 확인.
- *************************************************************/
-function lf_chkRangeTable(is_tree){
-
-    //바인딩 팝업 호출시 RANGE 처리용으로 호출하지 않은경우 EXIT.
-    if(oAPP.attr.oBindDialog._CARDI !== "R"){return;}
-
-    //TABLE이 아닌경우 EXIT.
-    if(is_tree.KIND !== "T"){return;}
-
-    //현재 table의 하위 필드 정보 검색.
-    var lt_filter = is_tree.zTREE;
-
-    //child가 4건이 아닌경우 exit.
-    if(lt_filter.length !== 4){return;}
-
-    //SIGN, OPTION, LOW, HIGH 필드가 아닌 필드 검색.
-    var l_indx = lt_filter.findIndex( a => a.NTEXT !== "SIGN" && a.NTEXT !== "OPTION" 
-        &&  a.NTEXT !== "LOW" && a.NTEXT !== "HIGH");
-
-    //SIGN, OPTION, LOW, HIGH 이외의 필드가 존재하지 않는경우.
-    if(l_indx === -1){
-        //range table flag return
-        return true;
+    // 상태 초기화(원본 resetBindPossible).
+    function _resetBindPossible(aTree) {
+        for (var i = 0; i < aTree.length; i++) {
+            var _sTree = aTree[i];
+            _sTree.enable = false;
+            _sTree.stat_color = null; _sTree.stat_src = null; _sTree.highlight = null;
+            _resetBindPossible(_sTree.zTREE || []);
+        }
     }
 
-} //range table 여부 확인.
-
-
-/*************************************************************
- * @function - STRING_TABLE 여부 확인.
- *************************************************************/
-function lf_chkStringTable(is_tree){
-
-    //STRING_TABLE 바인딩 처리용으로 호출되지 않은경우 EXIT.
-    if(oAPP.attr.oBindDialog._CARDI !== "ST"){return;}
-
-    //TABLE이 아닌경우 EXIT.
-    if(is_tree.KIND !== "T"){return;}
-
-    //부모가 ROOT인경우 EXIT.(바인딩 가능한건은 STRU-FIELD or TABLE-FIELD만 가능)
-    if(is_tree.PARENT === "Attribute"){return;}
-
-    //현재 라인이 STRING_TABLE인경우 STRING_TABLE FLAG RETURN.
-    if(is_tree.EXP_TYP === "STR_TAB"){
-        return true;
+    // 표현 대상 아닐 때 기존 바인딩 표현(원본 setBindEnableOrg) — T/E 는 모두 가능(초록).
+    function _setBindEnableOrg(it_tree, l_path, KIND) {
+        if (!it_tree || it_tree.length === 0) { return; }
+        for (var i = 0; i < it_tree.length; i++) {
+            switch (it_tree[i].KIND) {
+                case "T":
+                    it_tree[i].enable = true; it_tree[i].stat_src = "sap-icon://status-positive"; it_tree[i].stat_color = "#01DF3A";
+                    _setBindEnableOrg(it_tree[i].zTREE || [], l_path, it_tree[i].KIND);
+                    break;
+                case "S":
+                    _setBindEnableOrg(it_tree[i].zTREE || [], l_path, KIND);
+                    break;
+                case "E":
+                    it_tree[i].enable = true; it_tree[i].stat_src = "sap-icon://status-positive"; it_tree[i].stat_color = "#01DF3A";
+                    break;
+                default: break;
+            }
+        }
     }
 
-}  //STRING_TABLE 여부 확인.
+    // 상태 세팅(초록/파랑/주황) — 원본과 동일. HTML5 렌더는 stat_src/highlight 소비.
+    function _mark(t, sSrc, sColor, sHl) { t.stat_src = sSrc; t.stat_color = sColor; t.highlight = sHl; }
+    function _markPos(t) { t.enable = true; _mark(t, "sap-icon://status-positive", "#01DF3A", "Success"); }   // 가능 초록.
+    function _markSel(t) { _mark(t, "sap-icon://accept", "#1589FF", "Information"); }                          // 이미 바인딩(파랑).
+    function _markAnc(t) { _mark(t, "sap-icon://share-2", "#FBB917", "Warning"); }                             // N건 경로 조상(주황).
+
+    // model field tree 판정(원본 lf_setBindEnable 1:1).
+    function _lf_setBindEnable(it_tree, l_path, KIND) {
+        if (!it_tree || it_tree.length === 0) { return; }
+        var oD = oAPP.attr.oBindDialog;
+
+        for (var i = 0; i < it_tree.length; i++) {
+            var t = it_tree[i];
+            switch (t.KIND) {
+                case "T":   // TABLE.
+                    if (_lf_chkRangeTable(t) === true) {   // Range table.
+                        _markPos(t);
+                        if (t.CHILD === oD._is_attr.UIATV) { _markSel(t); }
+                        continue;
+                    }
+                    if (_lf_chkStringTable(t) === true) {   // String table.
+                        _markPos(t);
+                        if (t.CHILD === oD._is_attr.UIATV) { _markSel(t); }
+                        continue;
+                    }
+                    // 프로퍼티 호출 + N건 경로 조상 → 주황 후 하위 탐색.
+                    if ((oD._CARDI === "F" || oD._CARDI === "R" || oD._CARDI === "ST") &&
+                        (l_path && l_path.substr(0, t.CHILD.length) === t.CHILD)) {
+                        _markAnc(t);
+                        _lf_setBindEnable(t.zTREE || [], l_path, t.KIND);
+                        continue;
+                    }
+                    if (oD._CARDI === "F") { continue; }   // 프로퍼티 → 테이블 하위 skip.
+                    // aggregation + 경로 조상 테이블 → 하위(비-E) 탐색.
+                    if (oD._CARDI === "T" && l_path && l_path.substr(0, t.CHILD.length) === t.CHILD) {
+                        var lt_child = (t.zTREE || []).filter(function (a) { return a.PARENT === t.CHILD && a.KIND !== "E"; });
+                        _lf_setBindEnable(lt_child, l_path, t.KIND);
+                        continue;
+                    }
+                    if (oAPP.fn.attrChkBindAggrPossible(oD._is_attr) === true) { continue; }   // 대상 UI aggr N건 → 불가.
+                    if (oAPP.fn.getChildAggrBind(oD._is_attr.OBJID, t.CHILD) === true) { continue; }
+                    if (oD._CARDI === "T") {   // aggregation → 첫 테이블 선택 가능.
+                        if ((t.zTREE || []).length > 0) { _markPos(t); }
+                        if (t.CHILD === oD._is_attr.UIATV) { _markSel(t); }
+                        continue;
+                    }
+                    break;
+
+                case "S": {   // STRUCTURE.
+                    var l_KIND = (oD._CARDI === "T") ? "E" : "";
+                    if (oD._CARDI === "S") { _markPos(t); }
+                    var lt_childS = (t.zTREE || []).filter(function (a) { return a.PARENT === t.CHILD && a.KIND !== l_KIND; });
+                    _lf_setBindEnable(lt_childS, l_path, KIND);
+                    break;
+                }
+
+                case "E":   // 일반 필드.
+                    // Tree/TreeTable parent·child 바인딩은 바인딩된 aggr 테이블 하위만 가능.
+                    if (oD._is_attr.UIATK === "EXT00001190" || oD._is_attr.UIATK === "EXT00001191" ||
+                        oD._is_attr.UIATK === "EXT00001192" || oD._is_attr.UIATK === "EXT00001193") {
+                        if (l_path && t.CHILD.substr(0, l_path.length) !== l_path) { continue; }
+                    }
+                    if (oD._CARDI === "F") {   // property → 필드 선택 가능.
+                        if (l_path && KIND === "T" && t.CHILD.substr(0, l_path.length) !== l_path) { continue; }
+                        if (oAPP.attr.CT_BIND_EXCEPT.findIndex(function (item) { return item.FLD01 === oD._is_attr.UIATK; }) !== -1) { continue; }   // 제외 프로퍼티.
+                        _markPos(t);
+                        if (t.CHILD === oD._is_attr.UIATV) { _markSel(t); }   // ★ 이미 바인딩된 경로 = 파랑 accept.
+                    }
+                    break;
+
+                default: break;
+            }
+        }
+    }
+
+    // Range table 여부(원본 lf_chkRangeTable) — CARDI R, 자식 4개가 SIGN/OPTION/LOW/HIGH 뿐.
+    function _lf_chkRangeTable(is_tree) {
+        if (oAPP.attr.oBindDialog._CARDI !== "R") { return; }
+        if (is_tree.KIND !== "T") { return; }
+        var lt = is_tree.zTREE || [];
+        if (lt.length !== 4) { return; }
+        var l_indx = lt.findIndex(function (a) { return a.NTEXT !== "SIGN" && a.NTEXT !== "OPTION" && a.NTEXT !== "LOW" && a.NTEXT !== "HIGH"; });
+        if (l_indx === -1) { return true; }
+    }
+
+    // String table 여부(원본 lf_chkStringTable) — CARDI ST, 루트 아님, EXP_TYP STR_TAB.
+    function _lf_chkStringTable(is_tree) {
+        if (oAPP.attr.oBindDialog._CARDI !== "ST") { return; }
+        if (is_tree.KIND !== "T") { return; }
+        if (is_tree.PARENT === "Attribute") { return; }
+        if (is_tree.EXP_TYP === "STR_TAB") { return true; }
+    }
+
+})();

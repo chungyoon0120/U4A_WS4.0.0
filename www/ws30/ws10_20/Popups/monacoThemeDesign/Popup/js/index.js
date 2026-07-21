@@ -59,6 +59,14 @@
         return sFallback || sNo;
     }
 
+    // 메시지 클래스 텍스트(/U4A/CL_WS_COMMON 등) — 꾸밈정렬 라벨 C25(스니펫디자이너와 동일).
+    const WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU);
+    function mcMsg(sCls, sNo, sFallback) {
+        try { const s = WSMSG.fnGetMsgClsText(sCls, sNo); if (s && s.trim()) { return s; } }
+        catch (e) { console.error("[테마디자이너] 메시지클래스 조회 실패:", sCls, sNo, e); }
+        return sFallback || sNo;
+    }
+
     // 공통 토스트(.u4a-toast) — 화면 정중앙·싱글톤·3초(원본 MessageToast center center).
     let _toastTimer = null;
     function _toast(sMsg) {
@@ -164,41 +172,32 @@
     ];
 
     // DEFAULT 테마 색상(rules) — 이 목록에 있는 token 만 Rules 리스트로 노출.
+    //   ★장군님 지시(실제 적용되는 것만): USP 에디터는 시맨틱 하이라이팅 OFF + 순수 monarch(js/css/html).
+    //     실제 Monaco 로 전 토큰을 토크나이즈 검증 → "실제로 색이 먹는" 토큰만 남기고 나머지(미적용)는 제거.
+    //   [제거된 미적용 25개 — 설정해도 안 바뀜 → SR 방지 위해 표에서 숨김]
+    //     · 시맨틱(시맨틱하이라이팅 필요, 미활성): variable · variable.predefined · variable.parameter · constant
+    //     · 타 언어 전용: string.sql · keyword.json · keyword.flow.scss · operator.scss/sql/swift · predefined.sql ·
+    //                    meta.scss · tag.id.pug · tag.class.pug · delimiter.xml · metatag.xml · metatag.php ·
+    //                    string.key.json · string.value.json · key
+    //     · 마크다운: emphasis · strong
+    //     · 기타: annotation(JS는 invalid 처리) · keyword.flow(monarch 미방출) · meta.tag(html은 metatag)
+    //   (원본 control.js 전체 목록은 백업 _backup_20260716_monacoThemeDesign_ui5 에 보존.)
     const CT_DEFAILT_RULES = [
-        { token: '', foreground: 'D4D4D4', background: '1E1E1E' },
-        { token: 'invalid', foreground: 'f44747' },
-        { token: 'emphasis', fontStyle: 'italic' },
-        { token: 'strong', fontStyle: 'bold' },
-
-        { token: 'variable', foreground: '74B0DF' },
-        { token: 'variable.predefined', foreground: '4864AA' },
-        { token: 'variable.parameter', foreground: '9CDCFE' },
-        { token: 'constant', foreground: '569CD6' },
+        { token: '', foreground: 'D4D4D4', background: '1E1E1E' },   // base(표에는 미노출, setRuleList가 '' skip)
+        { token: 'invalid', foreground: 'f44747' },                  // 오류 코드 강조(구문 오류 시 적용)
         { token: 'comment', foreground: '608B4E' },
         { token: 'number', foreground: 'B5CEA8' },
         { token: 'number.hex', foreground: '5BB498' },
         { token: 'regexp', foreground: 'B46695' },
-        { token: 'annotation', foreground: 'cc6666' },
         { token: 'type', foreground: '3DC9B0' },
 
         { token: 'delimiter', foreground: 'DCDCDC' },
         { token: 'delimiter.html', foreground: '808080' },
-        { token: 'delimiter.xml', foreground: '808080' },
 
         { token: 'tag', foreground: '569CD6' },
-        { token: 'tag.id.pug', foreground: '4F76AC' },
-        { token: 'tag.class.pug', foreground: '4F76AC' },
-        { token: 'meta.scss', foreground: 'A79873' },
-        { token: 'meta.tag', foreground: 'CE9178' },
         { token: 'metatag', foreground: 'DD6A6F' },
         { token: 'metatag.content.html', foreground: '9CDCFE' },
         { token: 'metatag.html', foreground: '569CD6' },
-        { token: 'metatag.xml', foreground: '569CD6' },
-        { token: 'metatag.php', fontStyle: 'bold' },
-
-        { token: 'key', foreground: '9CDCFE' },
-        { token: 'string.key.json', foreground: '9CDCFE' },
-        { token: 'string.value.json', foreground: 'CE9178' },
 
         { token: 'attribute.name', foreground: '9CDCFE' },
         { token: 'attribute.value', foreground: 'CE9178' },
@@ -207,27 +206,38 @@
         { token: 'attribute.value.hex.css', foreground: 'D4D4D4' },
 
         { token: 'string', foreground: 'CE9178' },
-        { token: 'string.sql', foreground: 'FF0000' },
 
-        { token: 'keyword', foreground: '569CD6' },
-        { token: 'keyword.flow', foreground: 'C586C0' },
-        { token: 'keyword.json', foreground: 'CE9178' },
-        { token: 'keyword.flow.scss', foreground: '569CD6' },
-
-        { token: 'operator.scss', foreground: '909090' },
-        { token: 'operator.sql', foreground: '778899' },
-        { token: 'operator.swift', foreground: '909090' },
-        { token: 'predefined.sql', foreground: 'FF00FF' }
+        { token: 'keyword', foreground: '569CD6' }
     ];
 
     // DEFAULT 테마 색상(colors) — 이 목록에 있는 token 만 Colors 리스트로 노출.
+    //   ★장군님 지시(실제 적용되는 것만): 표준 Monaco 색상키만 남긴다.
+    //   [제거된 미적용 4개 — Monaco 비표준 키라 defineTheme 에서 무시됨(설정해도 안 먹음)]
+    //     · editor.InactiveSelection    (표준=editor.inactiveSelectionBackground)
+    //     · editor.IndentGuide1         (표준=editorIndentGuide.background1)
+    //     · editor.ActiveIndentGuide1   (표준=editorIndentGuide.activeBackground1)
+    //     · editor.SelectionHighlight   (표준=editor.selectionHighlightBackground)
+    /* Colors 화이트리스트 — ★USP 에디터 옵션 기준으로 '실제 화면에 나타나는 것'만.
+       원본 CT_DEFAULT_COLORS 6건 중 4건(editor.InactiveSelection / editor.IndentGuide1 /
+       editor.ActiveIndentGuide1 / editor.SelectionHighlight)은 Monaco 에 존재하지 않는 색상 ID 라
+       defineTheme 이 조용히 무시한다(실측: 해당 색이 CSS 로 방출조차 안 됨) → 제외.
+       아래 7건은 Monaco 0.33.0 + USP 생성옵션 그대로 실측해 렌더 확인된 것만 남겼다.
+         editor.background / editor.foreground        — 항상
+         editor.selectionBackground                   — 드래그 선택
+         editorCursor.foreground                      — 캐럿
+         editorWhitespace.foreground                  — renderWhitespace 기본값('selection')에서 선택 시
+         editorIndentGuide.background / .activeBackground — 들여쓰기 가이드(기본 on)
+       ※ editor.lineHighlightBackground 는 54개 테마가 갖고 있으나 base(vs-dark) 상속
+          editor.lineHighlightBorder 가 이겨 배경이 그려지지 않는다(실측 전 옵션값에서 미적용) → 제외.
+       ※ 기본값은 Monaco vs-dark 실측치. */
     const CT_DEFAULT_COLORS = [
         { token: 'editor.background', color: '#1E1E1E' },
         { token: 'editor.foreground', color: '#D4D4D4' },
-        { token: 'editor.InactiveSelection', color: '#3A3D41' },
-        { token: 'editor.IndentGuide1', color: '#404040' },
-        { token: 'editor.ActiveIndentGuide1', color: '#707070' },
-        { token: 'editor.SelectionHighlight', color: '#ADD6FF26' }
+        { token: 'editor.selectionBackground', color: '#264F78' },
+        { token: 'editorCursor.foreground', color: '#AEAFAD' },
+        { token: 'editorWhitespace.foreground', color: '#E3E4E229' },
+        { token: 'editorIndentGuide.background', color: '#E3E4E229' },
+        { token: 'editorIndentGuide.activeBackground', color: '#E3E4E229' }
     ];
 
     // 폰트 스타일.
@@ -245,6 +255,102 @@
     const C_DARK_THEME = wsMsg("334", "Dark Theme");     // 334
     const C_STANDARD_THEME = wsMsg("317", "Standard Theme"); // 317
     const C_CUSTOM_THEME = wsMsg("318", "Custom Theme");     // 318
+
+    /* ==================================================================
+     * 3.1 언어별 샘플 코드 (장군님 요청 — 원본엔 없던 추가)
+     * ------------------------------------------------------------------
+     *  좌측 미리보기 에디터에 기본 출력되는 예제. 우측 Rules 토큰/Colors 설정을 바꾸면 즉시
+     *  눈으로 확인되도록 각 언어가 만들어내는 토큰(주석/키워드/문자열/숫자/16진수/정규식/변수/
+     *  상수/타입/연산자/구분자/태그/속성명·값/색상값 등)을 최대한 빠짐없이 포함한다.
+     *  ※ 원본 테마 디자이너는 빈 에디터 + 안내문구(340)만 있었다 → 이 샘플은 장군님 지시로 추가된 기능.
+     * ================================================================== */
+    const SAMPLES = {
+        javascript: [
+            "/**",
+            " * 샘플: JavaScript 테마 색상 테스트 (블록 주석 / JSDoc)",
+            " * @param {number} count 반복 횟수",
+            " */",
+            "// 한 줄 주석 — comment 토큰",
+            "import { Router } from \"./router\";        // keyword, string",
+            "",
+            "const MAX_RETRY = 0xFF;                    // keyword, number.hex",
+            "let ratio = 3.14, enabled = true, data = null;  // number, constant(true/null)",
+            "const pattern = /^\\d{3}-\\w+$/gi;           // regexp",
+            "",
+            "class ThemeSample extends Router {          // keyword, type",
+            "  constructor(name = \"default\") {          // string",
+            "    super();",
+            "    this.name = name;                       // key / 속성",
+            "    this.items = [1, 2, 3];                 // number, delimiter",
+            "  }",
+            "",
+            "  async load(url) {                         // keyword(async)",
+            "    try {",
+            "      const res = await fetch(url + \"?t=\" + Date.now());",
+            "      if (!res.ok) throw new Error(\"실패!\"); // keyword.flow, string",
+            "      return await res.json();",
+            "    } catch (e) {",
+            "      console.error(e);                     // variable",
+            "      return { status: \"error\", code: 500 };// key, string, number",
+            "    }",
+            "  }",
+            "}",
+            "",
+            "for (let i = 0; i < MAX_RETRY; i++) {       // keyword.flow, operator",
+            "  // TODO: 반복 처리",
+            "}",
+            "export default ThemeSample;                 // keyword"
+        ].join("\n"),
+
+        css: [
+            "/* 샘플: CSS 테마 색상 테스트 (comment) */",
+            "@import url(\"base.css\");                    /* keyword, string */",
+            "",
+            ":root {",
+            "  --primary: #3b82f6;                       /* attribute.name, hex */",
+            "  --gap: 1.5rem;                            /* number, unit */",
+            "}",
+            "",
+            ".card, #main > .item:hover {                /* 태그/클래스/아이디 선택자 */",
+            "  color: rgba(255, 0, 0, 0.8);              /* attribute.name, number */",
+            "  margin: 0 auto;",
+            "  padding: 10px 1.5rem;                     /* number.css, unit.css */",
+            "  background: #1e1e1e url(\"bg.png\") no-repeat;  /* hex, string */",
+            "  border: 1px solid var(--primary) !important;   /* keyword !important */",
+            "  transition: all 0.3s ease-in-out;",
+            "}",
+            "",
+            "@media (max-width: 768px) {                 /* at-rule, number, unit */",
+            "  .card { display: none; }                  /* keyword */",
+            "}"
+        ].join("\n"),
+
+        html: [
+            "<!DOCTYPE html>                             <!-- metatag -->",
+            "<!-- 샘플: HTML 테마 색상 테스트 (comment) -->",
+            "<html lang=\"ko\">                            <!-- tag, attribute.name/value -->",
+            "<head>",
+            "  <meta charset=\"utf-8\">",
+            "  <title>테마 미리보기</title>",
+            "  <style>",
+            "    body { color: #333; margin: 0; }        /* 내장 CSS */",
+            "  </style>",
+            "</head>",
+            "<body class=\"theme-sample\" data-id=\"42\">",
+            "  <h1 id=\"title\">색상 테스트 &amp; 미리보기</h1>",
+            "  <p>문단 텍스트 <a href=\"https://x.io\">링크</a></p>",
+            "  <ul>",
+            "    <li>항목 1</li>",
+            "    <li>항목 2</li>",
+            "  </ul>",
+            "  <script>",
+            "    const n = 10;                           // 내장 JS",
+            "    console.log(n);",
+            "  </script>",
+            "</body>",
+            "</html>"
+        ].join("\n")
+    };
 
     /* ==================================================================
      * 4. 상태(원본 oContr.oModel.oData / oContr.attr)
@@ -325,7 +431,24 @@
         return _aLangugage;
     }
 
-    function getThemeDDLBList(themePath) {
+    // 해당 테마에서 편집 가능한 Rules 행이 하나라도 나오는지(화이트리스트 교집합).
+    //   표준 테마 56개 중 Brilliance-Black 만 0건 — rules 366개가 전부 TextMate 스코프라
+    //   monarch 토큰과 겹치는 게 meta.tag 하나뿐인데 그마저 미적용 토큰이다.
+    //   선택해도 Rules 표가 비어 아무것도 못 하므로 목록에서 제외한다(장군님 지시).
+    function _hasEditableRules(sThemeInfo) {
+        const a = sThemeInfo && sThemeInfo.rules;
+        if (!Array.isArray(a)) { return false; }
+        for (let i = 0, l = a.length; i < l; i++) {
+            const t = a[i] && a[i].token;
+            if (!t) { continue; }
+            if (CT_DEFAILT_RULES.some(function (o) { return o.token === t; })) { return true; }
+        }
+        return false;
+    }
+
+    // bSkipEmpty=true 면 Rules 0건 테마를 목록에서 제외(표준 테마에만 적용 —
+    // 커스텀은 사용자가 저장한 자기 데이터라 임의로 숨기지 않는다).
+    function getThemeDDLBList(themePath, bSkipEmpty) {
         const _aThemeList = [];
 
         // 해당 경로의 파일 및 폴더 항목 발췌.
@@ -367,6 +490,9 @@
                 continue;
             }
 
+            // 편집 가능한 Rules 가 0건인 테마는 목록에서 제외.
+            if (bSkipEmpty === true && _hasEditableRules(_sThemeInfo) === false) { continue; }
+
             // theme sub text 정보 구성.
             const _SUBTX = setThemeSubText(_sThemeInfo?.base);
 
@@ -404,6 +530,211 @@
             if (!oFrame || !oFrame.contentWindow) { return; }
             oFrame.contentWindow.postMessage(oMsg);
         } catch (e) { console.error("[테마디자이너] 프리뷰 송신 오류:", e); }
+    }
+
+    // 에디터 준비 대기 — monaco/ 는 비동기 로드(require vs/editor.main 후 window.editor 생성).
+    //   monaco/ 무수정 유지: 값 주입은 부모가 iframe.contentWindow.editor 로 직접(스니펫디자이너가
+    //   getValue() 로 읽는 것과 동일한 동일출처 접근). ready 신호가 없으므로 짧게 폴링.
+    function _ensureEditor(fnCb, iLeft) {
+        const oFrame = document.querySelector(".EDITOR_FRAME1");
+        let ed = null;
+        try { ed = oFrame && oFrame.contentWindow && oFrame.contentWindow.editor; } catch (e) { ed = null; }
+        if (ed) { try { fnCb(ed); } catch (e) { console.error("[테마디자이너] 에디터 콜백 오류:", e); } return; }
+        const n = (typeof iLeft === "number") ? iLeft : 80;   // 80 × 80ms ≈ 6.4s
+        if (n <= 0) { return; }
+        setTimeout(function () { _ensureEditor(fnCb, n - 1); }, 80);
+    }
+
+    // 언어별 샘플 코드를 에디터에 출력(장군님 요청). 언어 선택/초기 로드 시 호출.
+    function _applyLanguageSample(sLang) {
+        const sCode = SAMPLES[sLang] || "";
+        _ensureEditor(function (ed) {
+            try { ed.setValue(sCode); } catch (e) { console.error("[테마디자이너] 샘플 주입 오류:", e); }
+        });
+    }
+
+    /* ==================================================================
+     * 7.1 공통 에디터 툴바(줌 · 꾸밈정렬) — 공통 모나코 에디터 필수 세트.
+     *   monaco/ 무수정: 부모가 iframe 의 window.editor(Monaco) 내장 액션을 직접 호출.
+     *   (스니펫 디자이너는 editorPopup/host 채널을 쓰지만, 이 팝업은 자체 monaco/ 프리뷰라 직접 호출.)
+     * ================================================================== */
+    let _fmtLabel = "";   // 꾸밈정렬 라벨(메시지클래스 C25) — _bindStaticTexts 에서 세팅
+    const _MONACO_BASE_FONT = 14;   // monaco/index.js create 시 기본 폰트(줌% 계산 기준)
+
+    // 에디터 액션 실행(내장 Monaco 액션) — 꾸밈정렬 등 줌 이외 액션용.
+    function _edAction(sActionId) {
+        _ensureEditor(function (ed) {
+            try { const a = ed.getAction(sActionId); if (a) { a.run(); } }
+            catch (e) { console.error("[테마디자이너] 에디터 액션 오류:", sActionId, e); }
+        });
+    }
+
+    /* ---- 줌 : ★이 화면의 monaco/ 는 Monaco 내장 EditorZoom 이 아니라 자체 Ctrl+휠 핸들러가
+         updateOptions({fontSize}) 로 폰트크기를 직접 바꾼다(monaco/index.js: currentFontSize 14, 10~50).
+         따라서 editor.action.fontZoomIn/Out/Reset(EditorZoom)을 호출하면 Ctrl+휠로 바뀐 값이
+         되돌아가지 않는다(=줌 초기화 무동작 버그). → 툴바도 그 핸들러를 그대로 구동한다:
+         에디터 DOM 에 ctrlKey wheel 이벤트를 디스패치해 monaco/ 의 currentFontSize 와 항상 동기.
+         (monaco/ 무수정 유지 + Ctrl+휠과 툴바가 단일 소스로 일치) ---- */
+    const _ZOOM_MIN = 10, _ZOOM_MAX = 50;   // monaco/index.js 와 동일 클램프
+
+    // nSteps > 0 = 확대, < 0 = 축소. monaco/ 핸들러가 1스텝당 1px 증감.
+    function _zoomStep(nSteps) {
+        _ensureEditor(function (ed) {
+            try {
+                const oFrame = document.querySelector(".EDITOR_FRAME1");
+                const W = oFrame && oFrame.contentWindow;
+                const oDom = ed.getDomNode();
+                if (!W || !oDom) { return; }
+                const iCnt = Math.abs(nSteps);
+                const iDelta = (nSteps > 0) ? -1 : 1;   // deltaY<0 = 확대(monaco/ 핸들러 규약)
+                for (let i = 0; i < iCnt; i++) {
+                    oDom.dispatchEvent(new W.WheelEvent("wheel", {
+                        ctrlKey: true, deltaY: iDelta, bubbles: true, cancelable: true
+                    }));
+                }
+                _updateZoomLabel();
+            } catch (e) { console.error("[테마디자이너] 줌 오류:", e); }
+        });
+    }
+
+    // 줌 초기화 — 현재 폰트크기에서 기본(14)까지 필요한 스텝만큼 되돌린다.
+    function _zoomReset() {
+        _ensureEditor(function (ed) {
+            try {
+                const px = Math.round(_readFontSize(ed));
+                const iDiff = px - _MONACO_BASE_FONT;
+                if (iDiff !== 0) { _zoomStep(-iDiff); } else { _updateZoomLabel(); }
+            } catch (e) { console.error("[테마디자이너] 줌 초기화 오류:", e); }
+        });
+    }
+
+    // 현재 폰트 크기(px) 읽기 — iframe 의 monaco EditorOption 사용.
+    function _readFontSize(ed) {
+        try {
+            const oFrame = document.querySelector(".EDITOR_FRAME1");
+            const m = oFrame && oFrame.contentWindow && oFrame.contentWindow.monaco;
+            if (m && m.editor && m.editor.EditorOption && ed.getOption) {
+                return ed.getOption(m.editor.EditorOption.fontSize) || _MONACO_BASE_FONT;
+            }
+        } catch (e) { }
+        return _MONACO_BASE_FONT;
+    }
+
+    // 줌% 라벨 갱신 — Ctrl+휠/버튼으로 fontSize 가 바뀌면 base(14) 대비 %.
+    //   EditorOption enum 은 iframe 의 monaco 에 있으므로 그쪽에서 읽어 fontSize 조회.
+    function _updateZoomLabel() {
+        _ensureEditor(function (ed) {
+            try {
+                const pct = Math.round(_readFontSize(ed) / _MONACO_BASE_FONT * 100);
+                const oBtn = document.getElementById("tdZoomBtn");
+                if (oBtn) { const sp = oBtn.querySelector("span"); if (sp) { sp.textContent = pct + "%"; } oBtn.title = pct + "%"; }
+            } catch (e) { }
+        });
+    }
+
+    // 꾸밈정렬 지원 여부로 버튼 활성/비활성([format-btn-capability]). CSS 는 Monaco 미등록 → 비활성.
+    //   1회 판정(현재 시점 스냅샷). 수렴은 _updateFormatCapSettled 가 담당.
+    function _updateFormatCap() {
+        let bSupported = false;
+        try {
+            const oFrame = document.querySelector(".EDITOR_FRAME1");
+            const ed = oFrame && oFrame.contentWindow && oFrame.contentWindow.editor;
+            const a = ed && ed.getAction("editor.action.formatDocument");
+            bSupported = !!(a && (typeof a.isSupported !== "function" || a.isSupported()));
+        } catch (e) { bSupported = false; }
+        _setFormatCap(bSupported);
+        return bSupported;
+    }
+
+    // 꾸밈정렬 버튼 표시 갱신(스니펫 디자이너 _setFormatCap 과 동일 역할).
+    function _setFormatCap(bSupported) {
+        const oBtn = document.getElementById("tdFormatBtn");
+        if (!oBtn) { return; }
+        oBtn.disabled = !bSupported;
+        oBtn.title = _fmtLabel + (bSupported ? " (Shift + F1)" : " — N/A");
+    }
+
+    /* ★ 언어 반영은 비동기다 — 부모가 postMessage({actcd:"changeLanguage"}) 를 던진 직후 isSupported()
+         를 읽으면 (a) 아직 이전 언어이거나 (b) 언어 첫 활성화(모드 setup)가 비동기라 포맷 provider 가
+         미등록이라 일시 false 다. → "처음엔 안 뜨다 두번째부터 뜨는" 간헐 버그.
+         공통 호스트(editorPopup/host/index.html _reportFmtCapSettled)와 동일하게, 지원으로 켜질 때까지
+         몇 프레임 재판정해 수렴시킨다. 미지원 언어(css 등)는 상한까지만.
+         그 사이 언어가 또 바뀌면(_fmtTk 증가) 이전 루프는 스스로 폐기 → 콤보 연타에도 마지막이 승리. */
+    // 현재 에디터 모델의 실제 언어 id.
+    function _curEditorLang() {
+        try {
+            const oFrame = document.querySelector(".EDITOR_FRAME1");
+            const ed = oFrame && oFrame.contentWindow && oFrame.contentWindow.editor;
+            const m = ed && ed.getModel();
+            return (m && m.getLanguageId) ? m.getLanguageId() : "";
+        } catch (e) { return ""; }
+    }
+
+    let _fmtTk = 0;
+    function _updateFormatCapSettled(sLang) {
+        _fmtTk++;
+        const tk = _fmtTk;
+        let iTry = 0;
+        _ensureEditor(function () {
+            (function loop() {
+                if (tk !== _fmtTk) { return; }                  // 더 최근 언어변경 발생 → 폐기
+                // ★언어가 아직 반영 전이면 판정 자체를 보류(이전 언어의 지원여부가 굳어버리는 것 방지).
+                //   예: JS(지원) → CSS(미지원) 전환 시 0프레임에 판정하면 true 로 확정돼 버튼이 계속 활성.
+                const bApplied = (!sLang || _curEditorLang() === sLang);
+                if (!bApplied) { _setFormatCap(false); }                // 반영 전엔 비활성 유지
+                else if (_updateFormatCap()) { return; }                // 지원 확정 → 종료
+                if (iTry++ >= 10) { if (bApplied) { _updateFormatCap(); } return; }   // 상한 도달
+                requestAnimationFrame(loop);
+            })();
+        });
+    }
+
+    // 에디터 준비 후 툴바 상태 동기 + fontSize 변경 구독(줌% 라벨).
+    function _initEditorToolbar() {
+        _ensureEditor(function (ed) {
+            _updateZoomLabel();
+            _updateFormatCapSettled(oData.S_THEME.LANGUAGE);
+            try {
+                // Ctrl+휠/버튼 줌 시 fontSize 변경 → 줌% 라벨 갱신(원본 monaco/index.js 도 fontSize 변경 감지).
+                ed.onDidChangeConfiguration(function () { _updateZoomLabel(); });
+                // 언어가 실제로 바뀐 시점에도 재판정(postMessage 반영 완료 시점의 진실).
+                if (ed.onDidChangeModelLanguage) {
+                    ed.onDidChangeModelLanguage(function () { _updateFormatCapSettled(_curEditorLang()); });
+                }
+            } catch (e) { }
+            _bindEditorShortcuts(ed);
+        });
+    }
+
+    /* ---- 공통 모나코 에디터 기본 단축키(editorPopup/host 와 동일 세트) ----
+         Shift+F1 = 꾸밈정렬(editor.action.formatDocument)
+         Ctrl+0   = 줌 초기화 → ★내장 fontZoomReset 이 아니라 _zoomReset() 호출.
+                    이 화면의 monaco/ 는 updateOptions({fontSize}) 로 줌하므로
+                    EditorZoom 계열(fontZoomReset)로는 되돌아가지 않는다(툴바 버그와 동일 원인).
+         Ctrl+S   = 미배선 — 이 팝업의 저장은 에디터 내용 저장이 아니라 '테마 저장'이라 해당 없음.
+         Ctrl+휠  = monaco/index.js 자체 핸들러가 이미 제공.
+         (monaco/ 무수정 유지: 커맨드는 부모가 iframe 의 monaco KeyMod/KeyCode 로 등록) */
+    let _bShortcutBound = false;
+    function _bindEditorShortcuts(ed) {
+        if (_bShortcutBound) { return; }
+        try {
+            const oFrame = document.querySelector(".EDITOR_FRAME1");
+            const m = oFrame && oFrame.contentWindow && oFrame.contentWindow.monaco;
+            if (!m || !m.KeyMod || !m.KeyCode || typeof ed.addCommand !== "function") { return; }
+
+            // Shift+F1 — 꾸밈정렬
+            ed.addCommand(m.KeyMod.Shift | m.KeyCode.F1, function () {
+                _edAction("editor.action.formatDocument");
+            });
+
+            // Ctrl/⌘+0 — 줌 초기화(Monaco 버전별 enum 명 차이 대응)
+            const _KEY_0 = (m.KeyCode.Digit0 != null) ? m.KeyCode.Digit0 : m.KeyCode.KEY_0;
+            if (_KEY_0 != null) {
+                ed.addCommand(m.KeyMod.CtrlCmd | _KEY_0, function () { _zoomReset(); });
+            }
+
+            _bShortcutBound = true;
+        } catch (e) { console.error("[테마디자이너] 단축키 등록 오류:", e); }
     }
 
     // 에디터 테마 변경 처리(원본 changeEditorTheme).
@@ -791,6 +1122,13 @@
         _sData.language = oData.S_THEME.LANGUAGE;
         _toPreview(_sData);
 
+        // 선택한 언어의 샘플 코드로 교체(장군님 요청 — 언어별 예제로 색상 테스트).
+        _applyLanguageSample(oData.S_THEME.LANGUAGE);
+
+        // 언어가 바뀌면 꾸밈정렬 지원 여부 재평가(JS/HTML 지원, CSS 미등록 → 비활성).
+        //   ★즉시 판정 금지 — postMessage 반영이 비동기라 이전 언어 결과가 굳는다. 수렴 루프로.
+        _updateFormatCapSettled(oData.S_THEME.LANGUAGE);
+
         fn_setBusy(false);
     }
 
@@ -1018,7 +1356,7 @@
         oData.T_LANGAGE = getLanguageDDLBList();
 
         // stadard 테마 리스트 구성.
-        const _aStandardThemeList = getThemeDDLBList(oAttr.standardThemePath);
+        const _aStandardThemeList = getThemeDDLBList(oAttr.standardThemePath, true);
 
         // custom 테마 리스트 구성.
         const _aCustomThemeList = getThemeDDLBList(oAttr.customThemePath);
@@ -1051,12 +1389,15 @@
     // 테마 콤보 항목 — 원본 ComboBox sorter(IS_STANDARD 그룹: Standard Theme / Custom Theme).
     //   공통 createSelect 의 group 지원 소비. 빈 항목("")은 원본 ComboBox 의 "미선택" 상태 재현.
     function _themeItems() {
-        const a = [{ value: "", text: "" }];
-        oData.T_THEME.forEach(function (t) {
-            if (t.IS_STANDARD === true) { a.push({ value: t.KEY, text: t.TEXT, group: C_STANDARD_THEME }); }
-        });
+        // ★순서 = 원본 ComboBox sorter Sorter("IS_STANDARD", false)=오름차순 → false(커스텀)가 먼저,
+        //   true(표준)가 뒤. 즉 저장한 커스텀 테마가 목록 상단, 표준 테마가 하단(원본 동일).
+        //   (빈 항목은 원본에 없으므로 넣지 않는다 — 초기 미선택은 value="" 로 콤보가 빈칸 표시.)
+        const a = [];
         oData.T_THEME.forEach(function (t) {
             if (t.IS_STANDARD !== true) { a.push({ value: t.KEY, text: t.TEXT, group: C_CUSTOM_THEME }); }
+        });
+        oData.T_THEME.forEach(function (t) {
+            if (t.IS_STANDARD === true) { a.push({ value: t.KEY, text: t.TEXT, group: C_STANDARD_THEME }); }
         });
         return a;
     }
@@ -1139,7 +1480,13 @@
             tr.appendChild(tdB);
 
             // Font Style (원본 sap.m.Select width 100%, selectedKey={fontStyle})
+            //   ★ 원본 sap.m.Select 는 forceSelection=true(기본) — selectedKey 가 항목 KEY(""/F01/F02/F03)와
+            //     안 맞으면(테마 json 이 "bold"/"italic" 실제값을 넣는 32개 테마) 첫 항목(None)으로 강제 선택하고
+            //     모델도 그 값으로 갱신한다(UI5 1.107 원전 확인). 공통 콤보는 미매칭 시 빈칸을 내므로,
+            //     여기서 동일하게 정규화해 원본과 같은 "None" 표시 + 모델 갱신을 재현한다.
             const tdS = document.createElement("td");
+            const _bValidFs = oData.T_FONT_STYLE.some(function (f) { return f.KEY === r.fontStyle; });
+            if (!_bValidFs) { r.fontStyle = ""; }   // forceSelection: 미매칭 → 첫 항목(None)으로 모델 갱신
             const oSel = U4AUI.createField({
                 type: "select",
                 items: oData.T_FONT_STYLE.map(function (f) { return { value: f.KEY, text: f.TEXT }; }),
@@ -1251,9 +1598,29 @@
         });
         document.getElementById("tdLanguHost").appendChild(oLanguField.el);
 
+        // 꾸밈정렬 라벨(C25) 세팅.
+        _fmtLabel = mcMsg("/U4A/CL_WS_COMMON", "C25", "Pretty Print");
+        const oFmtTxt = document.getElementById("tdFormatText");
+        if (oFmtTxt) { oFmtTxt.textContent = _fmtLabel; }
+
+        // 공통 에디터 툴바(줌−/줌%/줌+/꾸밈정렬) 버튼 배선 — Monaco 내장 액션 직접 호출.
+        const _byId = function (id) { return document.getElementById(id); };
+        // 줌 = monaco/ 자체 Ctrl+휠 핸들러 구동(EditorZoom 아님 — 위 _zoomStep 주석 참조).
+        if (_byId("tdZoomOut")) { _byId("tdZoomOut").addEventListener("click", function () { _zoomStep(-1); }); }
+        if (_byId("tdZoomBtn")) { _byId("tdZoomBtn").addEventListener("click", _zoomReset); }
+        if (_byId("tdZoomIn")) { _byId("tdZoomIn").addEventListener("click", function () { _zoomStep(1); }); }
+        if (_byId("tdFormatBtn")) { _byId("tdFormatBtn").addEventListener("click", function () { _edAction("editor.action.formatDocument"); }); }
+
+        // 툴바 반응형 오버플로(⋯) — 공통 attachOverflow(§11). btnClass 는 화면 툴바 버튼과 동일(평면).
+        try { U4AUI.attachOverflow(document.getElementById("tdEdTools"), { noOvfAutoMargin: true, btnClass: "u4a-btn u4aTdFlat u4aTdOvfBtn" }); }
+        catch (e) { console.error("[테마디자이너] 에디터 툴바 오버플로 배선 오류:", e); }
+
         // Monaco 프리뷰 iframe — oAPP 전역 노출(setInitData) 이후에 src 주입(레이스 방지).
         const oFrame = document.getElementById("tdPreview");
         if (oFrame) { oFrame.src = "../monaco/index.html"; }
+
+        // 에디터 준비되면 툴바 상태 초기화(줌% + 꾸밈정렬 capability + fontSize 구독).
+        _initEditorToolbar();
     }
 
     function _buildWizard() {
@@ -1417,6 +1784,9 @@
         catch (e) { console.error("[테마디자이너] 스플리터 배선 오류:", e); }
 
         _renderAll();
+
+        // 초기 언어(기본 javascript)의 샘플 코드 출력(장군님 요청). 에디터 로드 완료를 폴링 대기.
+        _applyLanguageSample(oData.S_THEME.LANGUAGE);
     }
 
     /* ==================================================================

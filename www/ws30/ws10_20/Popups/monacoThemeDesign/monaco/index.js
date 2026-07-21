@@ -69,6 +69,10 @@ window.require([
             value: '',
             language: 'javascript',
             theme: 'vs-dark',
+            // ✅ Monaco 자체 우클릭 메뉴 비활성(공통 에디터 호스트 editorPopup/host 와 동일).
+            //    frameless 창에서 메뉴 DOM 이 -webkit-app-region 을 서브프레임에 등록해
+            //    부모 타이틀바 드래그가 죽는 문제 예방.
+            contextmenu: false,
             glyphMargin: true,
             automaticLayout: true,
             tabCompletion: 'on',  // 탭 완성 활성화

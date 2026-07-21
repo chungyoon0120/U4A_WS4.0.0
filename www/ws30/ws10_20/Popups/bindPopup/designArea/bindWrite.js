@@ -60,6 +60,10 @@
     //   미리보기 갱신 + WS20 브로드캐스트(UPDATE-DESIGN-DATA)는 P6 designBroadcastUpdate 로 위임(가드).
     oAPP.fn.attrChange = function (is_attr) {
         oAPP.fn.setDesignTreeEnableButton(is_attr);
+        // [SPEC §2.1] 바인딩/해제 후 좌측 모델필드 판정 재계산(원본 designTree.js:1588 등 — 해제/바인딩 후 bindPossible).
+        if (typeof oAPP.fn.bindPossibleRecompute === "function") {
+            try { oAPP.fn.bindPossibleRecompute(is_attr); } catch (e) { console.error("[HTML5][bindWindow] bindPossibleRecompute(attrChange):", e && e.message); }
+        }
         try { if (typeof oAPP.fn.designBroadcastUpdate === "function") { oAPP.fn.designBroadcastUpdate(is_attr); } } catch (e) { }
     };
 

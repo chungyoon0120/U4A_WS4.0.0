@@ -238,6 +238,10 @@
         });
     }
 
+    // [PUBLIC] 좌측 모델트리 재렌더 — bindPossible(선택 시 상태색 재계산) 후 반영용.
+    //   oM 은 이 IIFE 로컬이라 외부(bindPossible/designArea)에서 rerender 하려면 이 진입점을 쓴다.
+    oAPP.fn.refreshModelTree = function () { if (oM.ctrl) { oM.ctrl.rerender(); } };
+
     /************************************************************************
      * 모델 필드 데이터 로드(원본 getBindFieldInfo 1:1 — 서버 /getBindAttrData).
      ************************************************************************/

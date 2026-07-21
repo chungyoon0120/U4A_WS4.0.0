@@ -99,6 +99,68 @@ html, body {
     min-width: 0;
 }
 
+/* 언어 라벨/콤보는 성장 안 함(flex:0) → 툴바가 남는 폭 흡수(§11 오버플로 전제) */
+.u4aTdPrev__label { flex: 0 0 auto; }
+.u4aTdPrev__field { flex: 0 1 12rem; }
+
+/* 공통 에디터 툴바(줌·꾸밈정렬) = ⋯ 오버플로 바(§11): 단일행 nowrap + overflow:hidden + 우측정렬. */
+.u4aTdEdTools {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    overflow: hidden;
+}
+
+/* [hidden] 함정(§11.1): .u4a-btn=inline-flex → UA 기본 [hidden]{display:none} 이김 → 강제. */
+.u4aTdEdTools > [hidden] {
+    display: none !important;
+}
+
+/* 툴바 버튼 = 평면(투명) 아이콘 버튼(스니펫디자이너 .u4aSnipFlat 동일).
+   ★클릭 표적 최소 2.25rem × 2.25rem (16 §1.2) — 공통 .u4a-btn 은 height:2rem 이고 아이콘 버튼은
+     padding 이 작아 표적이 더 작아진다. 보이는 크기는 그대로 두고 표적만 키운다(코덱스 지적). */
+.u4aTdFlat.u4a-btn {
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    padding: 0.2rem 0.4rem;
+    line-height: 1;
+    font-weight: 600;
+    box-shadow: none;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    justify-content: center;
+}
+
+.u4aTdFlat.u4a-btn:hover:not(:disabled) {
+    background: var(--hover-bg);
+}
+
+.u4aTdFlat.u4a-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.u4aTdZoomPct {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 3.75rem;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.u4aTdFormatBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
 .u4aTdPrev__body {
     flex: 1 1 auto;
     min-height: 0;
@@ -154,6 +216,23 @@ body.u4a-dragging .u4aTdPrevFrame {
     border-color: var(--error) !important;
 }
 
+/* ===== 활성 ↔ 비활성 input 구분 — 장군님 지적("둘다 별 차이 없어") =====
+   현상: 이 팝업 필드는 위저드 스텝 카드(surface-raised) 위에 있어, 공통 다크 비활성 룩
+        (투명 배경 + --line 테두리)이 카드색과 대비 7 로 사실상 안 보인다 → 활성과 구분 불가.
+   근거(다른 소스 참고): 라이트 테마들은 bootstrap-skin 에서 비활성 input 에 회색 fill 을 줘 확실히
+        구분한다([data-theme=white] .u4a-input:disabled{background:#dde1e6...}). 다크만 그 fill 이 없다.
+   조치: 라이트가 쓰는 방식과 동일하게 비활성에 의미 토큰 fill 을 준다 — 배경 var(--disabled-bg)
+        (다크 #1c2228=카드보다 어두운 눌린 박스, 라이트 #f5f6f7=밝은 회색), 글자 var(--disabled-text),
+        테두리 --line. → 활성(surface-raised + --divider 테두리 + 일반 글자)과 명확히 구분(전 테마).
+   ※ 앞서 넣었던 '--divider 테두리 승격'은 활성 테두리와 같아져 오히려 구분이 사라져 폐기. */
+.u4aTdBody .u4a-input:disabled,
+.u4aTdBody .u4a-input[readonly],
+.u4aTdBody .u4a-input.u4a-input--display {
+    background: var(--disabled-bg);
+    color: var(--disabled-text);
+    border-color: var(--line);
+}
+
 /* 테마 dark/light 서브텍스트(원본 sap.m.Text {/S_THEME/THEME_SUBTX}) */
 .u4aTdSubTx {
     flex: 0 1 auto;
@@ -165,12 +244,13 @@ body.u4a-dragging .u4aTdPrevFrame {
     white-space: nowrap;
 }
 
-/* ===== 회색 겹침(얼룩) 정리 — 장군님 지적 =====
-   지적 전 겹: app-bg(페이지) → surface-raised(스텝카드) → hover-bg(패널 헤더 띠)
-              → surface(테이블 액자) → surface(thead) → hover-bg(지브라)  = 6겹
-   정리 후 겹: app-bg(페이지) → surface-raised(스텝카드)                  = 2겹
-   · 테이블 액자(--boxed) 미부착(js) · 지브라(data-odd) 미사용(js)
-   · 패널 헤더 틴트 제거 · thead 를 카드와 같은 면으로 → 카드 위에 표가 그냥 얹힌 모습(원본 동일). */
+/* ===== 원본 UI5 sap.ui.table 격자 재현 + 회색 겹침 정리 =====
+   장군님 지적 1: 회색이 얼룩(겹 6개=페이지·카드·패널띠·액자·thead·지브라) → 겹 2개(페이지·카드)로.
+   장군님 지적 2: 세로구분선/외곽 프레임이 없어 '목록'처럼 보임 → 원본 sap.ui.table 처럼 격자 복원.
+   ★핵심: 얼룩의 원인은 회색 "면(fill)"이지 "선(border)"이 아니다 → 회색 면(패널띠·지브라)은 빼되
+     격자 선(외곽 프레임 + 세로 구분선)은 넣는다. 그래야 표처럼 보이면서 얼룩지지 않는다.
+   세로 구분선 = 마법사(fnUiTempWizardPopupOpen) 검증 기법 box-shadow inset(-1px) 소비 —
+     공통 .u4a-table 이 border-collapse:collapse 라 실제 border-right 는 소수px 스냅에 떨린다(collapse-border-flicker). */
 
 /* 스텝 카드 안의 패널(Rules/Colors) — 카드가 이미 액자라 패널은 평탄화(이중 테두리/띠 방지).
    공통 .u4a-panel 파일은 미수정(스코프 override). */
@@ -193,19 +273,41 @@ body.u4a-dragging .u4aTdPrevFrame {
     min-height: 2.25rem;
 }
 
-/* 테이블 — 원본 sap.ui.table visibleRowCount = min(건수, C_MAXROW=7) →
-   HTML5 는 "최대 7행 높이까지만 늘고 그 뒤 스크롤"(헤더 1 + 행 7 = 8행 높이). */
+/* 테이블 외곽 프레임 — 원본 sap.ui.table 처럼 표를 사각 격자로 감싼다(회색 fill 없이 선만).
+   ★격자선 색 = var(--divider) : 공통 --line 은 다크 표면(#2a323a) 위에서 대비 7(거의 안 보임).
+     --divider(다크 #45515d)는 대비 54 로 또렷 → 헤더는 보이는데 본문 경계선이 안 보이던 원인.
+     --divider 는 "보이는 구분선"용 의미 토큰(shell.css 도 헤더/푸터 경계에 사용). 테마별 정의 존재.
+   원본 visibleRowCount = min(건수, C_MAXROW=7) → 최대 8행(헤더1+행7) 높이까지만 늘고 그 뒤 스크롤. */
 .u4aTdTblWrap {
     max-height: calc(var(--row-h, 2.5rem) * 8);
     overflow: auto;
+    border: 0.0625rem solid var(--divider);
+    border-radius: var(--radius);
 }
 
-/* sticky thead — 액자를 뺐으니 카드와 같은 면으로. ★불투명 필수(스크롤 시 행이 비쳐 겹침 방지). */
+/* sticky thead — ★불투명 필수(스크롤 시 행이 비쳐 겹침 방지). 헤더는 카드보다 살짝 다른 면으로
+   구분(원본 sap.ui.table 헤더 톤). 세로 구분선(box-shadow inset)도 바디와 같은 컬럼 경계에 정렬. */
 .u4aTdTblWrap .u4a-table thead th {
-    background: var(--surface-raised);
+    background: var(--surface);
+    box-shadow: inset -0.0625rem 0 0 var(--divider);
+    border-bottom-color: var(--divider);
 }
 
-/* 행 — 지브라 없음. 구분은 공통 border-bottom 하나. 행 자체는 클릭 대상이 아니므로 커서/hover 정리
+.u4aTdTblWrap .u4a-table thead th:last-child {
+    box-shadow: none;
+}
+
+/* 세로 컬럼 구분선(원본 sap.ui.table 셀 보더) — 마지막 컬럼 제외. */
+.u4aTdTblWrap .u4a-table tbody td {
+    box-shadow: inset -0.0625rem 0 0 var(--divider);
+    border-bottom-color: var(--divider);   /* 가로줄도 또렷하게(공통 td border-bottom 은 --line) */
+}
+
+.u4aTdTblWrap .u4a-table tbody td:last-child {
+    box-shadow: none;
+}
+
+/* 행 — 지브라 없음(회색 면 금지). 행 자체는 클릭 대상이 아니므로 커서/hover 정리
    (공통 .u4a-table tbody tr{cursor:pointer}+tr:hover{background:hover-bg} 는 선택형 표 기준). */
 .u4aTdTblWrap .u4a-table tbody tr {
     cursor: default;
@@ -214,6 +316,16 @@ body.u4a-dragging .u4aTdPrevFrame {
 .u4aTdTblWrap .u4a-table tbody tr:hover {
     background: transparent;
 }
+
+/* 마지막 행 아래줄 제거(외곽 프레임 border-bottom 과 이중선 방지). */
+.u4aTdTblWrap .u4a-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* 표 최소폭 — 컬럼(%)이 너무 좁아 내용이 뭉개지지 않도록 최소폭 보장.
+   컨테이너가 더 좁아지면 원본 sap.ui.table 처럼 표째로 가로 스크롤(첫 컬럼 고정 없음 — 원본 동일). */
+.u4aTdRulesTbl { min-width: 24rem; }
+.u4aTdColorsTbl { min-width: 15rem; }
 
 /* 키워드 셀 — 최대 2줄 개행 허용, 초과 시 말줄임(장군님 지시).
    공통 td 는 nowrap+ellipsis 이므로 이 셀만 정상 줄바꿈으로 풀고, 클램프는 안쪽 span 이 담당
@@ -234,22 +346,26 @@ body.u4a-dragging .u4aTdPrevFrame {
     line-height: 1.35;
 }
 
-/* 색상 컬럼 — 원본 Column hAlign:"Center".
-   ★ 공통 .u4a-table 은 table-layout:fixed → 컬럼 폭은 지정값이 그대로 먹는다(% 금지, rem 고정).
-   폭 미지정 컬럼(Keyword)이 남는 폭을 흡수. 헤더 라벨이 잘리면 공통 툴팁이 자동(§2.9a).
-   ★폭 실측 근거: 우측 패널은 창 기본폭 1100 의 50% = 550px, 표 폭 ≈ 434px.
-   색상 2열 7rem(112px×2) + 글꼴 9rem(144px) 이면 키워드에 66px 밖에 안 남아 'comment' 같은
-   짧은 토큰까지 2줄로 깨졌다(실측). → 칩(2rem)+패딩만 담을 만큼으로 줄여 키워드에 폭을 준다. */
+/* 색상 컬럼 — 원본 Column hAlign:"Center". 폭은 아래 비율(%) 규칙이 담당. */
 .u4aTdColorCell {
     text-align: center;
     white-space: nowrap;
-    width: 4.5rem;
 }
 
-/* Font Style 컬럼 — select 가 들어가므로 최소한의 폭만 확보 */
-.u4aTdFsCell {
-    width: 7rem;
-}
+/* ===== 컬럼 비율 분배 — 장군님 지적(스플리터로 폭 변하면 전 컬럼이 함께 커지고 줄어들게) =====
+   기존: 색상/글꼴을 고정 rem 으로 두니 남는 폭을 키워드만 흡수 → 키워드만 길어졌다.
+   변경: table-layout:fixed + 컬럼 폭 % → 표 폭이 바뀌면 모든 컬럼이 비율대로 함께 스케일.
+   ★공통 UX 의 "컬럼 폭 rem 고정(% 금지)" 은 makeColumnTree 처럼 드래그로 컬럼폭을 조절하는
+     트리테이블용 규칙이다. 이 표는 리사이즈 컬럼이 아니라 패널 폭에 맞춰 비율로 늘어야 하는
+     단순 표시 표이므로 % 가 맞다(장군님 명시 요구). 최소폭(min-width)+키워드 sticky 로 붕괴 방지.
+   폭 지정은 table-layout:fixed 에서 첫 행(thead) 셀 기준으로 컬럼이 결정된다. */
+.u4aTdRulesTbl thead th:nth-child(1) { width: 40%; }   /* 키워드 */
+.u4aTdRulesTbl thead th:nth-child(2),
+.u4aTdRulesTbl thead th:nth-child(3) { width: 18%; }   /* 전경색 / 배경색 */
+.u4aTdRulesTbl thead th:nth-child(4) { width: 24%; }   /* 글꼴 유형 */
+
+.u4aTdColorsTbl thead th:nth-child(1) { width: 74%; }  /* 키워드 */
+.u4aTdColorsTbl thead th:nth-child(2) { width: 26%; }  /* 색상 */
 
 /* 색상 칩(스와치) — 원본 화면과 동일하게 색을 "면"으로 표시.
    투명 버튼 + 안쪽 칩. 칩 뒤 체커보드로 opacity(#RRGGBBAA)가 비쳐 보인다.
@@ -296,9 +412,11 @@ body.u4a-dragging .u4aTdPrevFrame {
     display: block;
 }
 
-/* Font Style select — 원본 sap.m.Select width:"100%" */
+/* Font Style select — 원본 sap.m.Select width:"100%". min-width:0 로 고정 컬럼(7rem)을
+   콤보 최소폭이 밀어내지 못하게(안 하면 표가 넘쳐 가로 스크롤 유발). */
 .u4aTdRulesTbl td .u4a-combo {
     width: 100%;
+    min-width: 0;
     margin: 0;
 }
 

@@ -506,6 +506,33 @@
         oAPP.fn.toast(H.z("155"));   // 155 멀티 해제 완료.
     };
 
+    /************************************************************************
+     * [SPEC §5.1] 동일속성 바인딩(129) 진입 — 원본 designTree.js onSynchronizionBind 1:1(검증부).
+     *   검증: 0건(183) / 2건이상(107) / 미바인딩(108) / 모델필드 매칭실패(109) / 후보 0건(158).
+     *   통과 시 = 동일속성 화면으로 전환(§5.2 start) → ★스텝2에서 배선. 부수효과(4종 off) 도 스텝2.
+     ************************************************************************/
+    oAPP.fn.onSynchronizionBind = async function () {
+        var _aTree = oAPP.fn.getSelectedDesignTree();
+        if (_aTree.length === 0) { oAPP.fn.toast(H.z("183")); return; }   // 183 선택 라인 없음.
+        if (_aTree.length > 1) { oAPP.fn.toast(H.z("107")); return; }     // 107 1건만 선택.
+
+        var _sTree = _aTree[0];
+        if (_sTree.UIATV === "") { oAPP.fn.toast(H.z("108")); return; }   // 108 미바인딩 필드 선택.
+
+        var _sField = oAPP.fn.getModelBindData(_sTree.UIATV, oAPP.attr.modelTree);
+        if (typeof _sField === "undefined") { oAPP.fn.toast(H.z("109")); return; }   // 109 바인딩 필드 정보 없음.
+
+        var _aList = (typeof oAPP.fn.getSameAttrList === "function") ? oAPP.fn.getSameAttrList(_sTree) : [];
+        if (_aList.length === 0) { oAPP.fn.toast(H.z("158", _sTree.UIATT)); return; }   // 158 동일 속성 없음.
+
+        // 검증 통과 — 동일속성 화면 진입(§5.2). ★스텝2에서 배선(현재는 후보 수집까지 완료).
+        if (typeof oAPP.fn.openSyncBindScreen === "function") {
+            oAPP.fn.openSyncBindScreen(_sTree, _aList);
+        } else {
+            console.warn("[HTML5][bindWindow] onSynchronizionBind: 동일속성 화면(openSyncBindScreen) 미배선(P4 스텝2). 후보 " + _aList.length + "건 수집 완료.");
+        }
+    };
+
     // 디자인트리 체크선택 행 수집(원본 getSelectedDesignTree 1:1) — 멀티/참조필드(P3-C) 공용.
     oAPP.fn.getSelectedDesignTree = function () {
         var aSel = [];
@@ -917,7 +944,13 @@
                     oRow.classList.toggle("u4aBwpDropNo", n.DATYP === "02" && n._drop_enable !== true);
                 }
             },
-            onSelect: function (n) { oAPP.attr.selDesignNode = n; }
+            onSelect: function (n) {
+                oAPP.attr.selDesignNode = n;
+                // [SPEC §2.1] 디자인 트리 속성 선택 → 좌측 모델필드 바인딩 가능/불가 재계산(이미 바인딩=파랑).
+                if (typeof oAPP.fn.bindPossibleRecompute === "function") {
+                    try { oAPP.fn.bindPossibleRecompute(n); } catch (e) { console.error("[HTML5][bindWindow] bindPossibleRecompute:", e && e.message); }
+                }
+            }
         });
 
         // 좌측 필드 → 디자인트리 드롭(원본 onDropBindField/_setBindAttribute) 배선.
