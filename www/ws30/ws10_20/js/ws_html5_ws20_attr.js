@@ -3438,6 +3438,24 @@
     }; // end of oAPP.fn.fnWs20AttrChange
 
     /************************************************************************
+     * [호환] 구 이름 attrChange → HTML5 fnWs20AttrChange 위임.
+     *   원본 oAPP.fn.attrChange 는 design/js/uiAttributeArea.js:1764 에만 정의되어 있고, 그 파일은
+     *   HTML5 WS20 에서 로드되지 않는다(속성 영역이 이 파일로 대체됨). 그래서 아직 원본 그대로 쓰는
+     *   모듈이 구 이름으로 호출하면 "attrChange is not a function" 으로 죽는다.
+     *   실제 사례: design/js/uiPreviewArea.js:1346 (prevStyleClassApply 의 저장 경로 — "UI5 미리 정의된
+     *   CSS" 팝업 [적용] 시, 현재 선택된 UI 가 체크 대상에 포함될 때만 진입하는 잠복 크래시).
+     *   ★ 원본 파일은 수정하지 않고 여기에 이름 연결만 둔다(dont-modify-common-override-scoped).
+     *   ★ 원본 시그니처는 (is_attr, uityp, bSkipRefresh, bForceUpdate) 이지만 3·4번째는 UI5 속성 테이블
+     *     재렌더 제어용이라 HTML5 대응이 없다 → 전달하지 않는다(fnWs20AttrChange 가 항상 재렌더).
+     *     fnWs20AttrChange 의 3번째 인자(bSkipUndo)와 의미가 다르므로 절대 그대로 넘기면 안 된다.
+     ************************************************************************/
+    if (typeof oAPP.fn.attrChange !== "function") {
+        oAPP.fn.attrChange = function (is_attr, uityp) {
+            return oAPP.fn.fnWs20AttrChange(is_attr, uityp);
+        };
+    }
+
+    /************************************************************************
      * u4a.m.UsageArea 의 AppID(EXT00000030) icon2(빨간 휴지통 delete) = AppID/AppDesc 삭제(초기화).
      *   원본 uiAttributeArea.js attrAppF4Del(5700행) 1:1 이식.
      *   · AppID 와 AppDescript(EXT00000031)는 "한 몸"이라 함께 비운다(icon1 앱검색 F4 의 짝).

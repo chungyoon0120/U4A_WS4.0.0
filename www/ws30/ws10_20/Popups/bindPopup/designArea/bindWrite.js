@@ -56,9 +56,134 @@
         is_attr._bind_visible = true;
     };
 
-    // attribute 변경 후속(원본 attrChange → attrChangeProc). 로컬: 버튼 활성만.
+    // 15번 정보 구조 생성(원본 crtStru0015: index.js:7677 1:1).
+    oAPP.fn.crtStru0015 = function () {
+        return {
+            "APPID": "", "GUINR": "", "OBJID": "", "UIATK": "", "UIATV": "", "ISBND": "", "UILIK": "",
+            "UIOBK": "", "UIATT": "", "UIASN": "", "UIADT": "", "RVALU": "", "BPATH": "", "ADDSC": "",
+            "UIATY": "", "ISMLB": "", "ISEMB": "", "DEL_LIB": "", "DEL_UOK": "", "DEL_ATT": "",
+            "ISWIT": "", "ISSPACE": "", "FTYPE": "", "REFFD": "", "CONVR": "", "MPROP": ""
+        };
+    };
+
+    // MOVE-CORRESPONDING(원본 moveCorresponding: index.js:7689 1:1).
+    oAPP.fn.moveCorresponding = function (source, target) {
+        for (var i in source) {
+            if (typeof target[i] === "undefined") { continue; }
+            target[i] = source[i];
+        }
+    };
+
+    /************************************************************************
+     * property / event / aggregation 입력값을 prev[OBJID]._T_0015 에 반영
+     *   — 원본 attrChgAttrVal(index.js:7449) 1:1.
+     *
+     *  ★ 이게 빠지면(감사표 §3-N1) 바인딩·해제 결과가 _T_0015 에 남지 않는다.
+     *    _T_0015 는 bindBroadcast.js _setPrevData() 가 그대로 WS20 으로 보내는 원천이고,
+     *    attrSetBindProp/attrSetUnbindProp 의 N건 바인딩 판정(findIndex ISBND==="X") 근거이기도 하다.
+     *    → 옛 상태 전송 + 판정 오작동을 낳으므로 반드시 attrChange 진입 시 먼저 돈다.
+     *
+     *  ★ 원본 대비 접근자만 어댑트: oAPP.DATA.APPDATA.T_CEVT → oAPP.attr.T_CEVT (HTML5 광역).
+     ************************************************************************/
+    oAPP.fn.attrChgAttrVal = function (is_attr) {
+        var oPrev = oAPP.attr.prev ? oAPP.attr.prev[is_attr.OBJID] : null;
+        if (!oPrev || typeof oPrev._T_0015 === "undefined") { return; }
+
+        // ATTRIBUTE 수집처리(원본 lf_add_T_0015).
+        function lf_add_T_0015() {
+            // 수집건이 존재하는 경우 — 해당 라인 갱신.
+            if (l_indx !== -1) {
+                oPrev._T_0015[l_indx].UIATV = is_attr.UIATV;
+                oPrev._T_0015[l_indx].ISBND = is_attr.ISBND;
+                oPrev._T_0015[l_indx].MPROP = is_attr.MPROP;
+                oPrev._T_0015[l_indx].ADDSC = is_attr.ADDSC;
+                oPrev._T_0015[l_indx].ISWIT = is_attr.ISWIT;
+                oPrev._T_0015[l_indx].ISSPACE = is_attr.ISSPACE;
+                return;
+            }
+
+            // 수집건이 존재하지 않는 경우 신규 라인 생성.
+            var ls_0015 = oAPP.fn.crtStru0015();
+            oAPP.fn.moveCorresponding(is_attr, ls_0015);
+
+            ls_0015.APPID = (oAPP.attr.oAppInfo || {}).APPID || "";
+            ls_0015.GUINR = (oAPP.attr.oAppInfo || {}).GUINR || "";
+
+            var ls_0022 = (oAPP.attr.T_0022 || []).find(function (a) { return a.UIOBK === is_attr.UIOBK; });
+            if (ls_0022) { ls_0015.UILIK = ls_0022.UILIK; }
+
+            oPrev._T_0015.push(ls_0015);
+        }
+
+        // 기존 수집건 존재 여부 확인.
+        var l_indx = oPrev._T_0015.findIndex(function (a) {
+            return a.OBJID === is_attr.OBJID && a.UIATT === is_attr.UIATT && a.UIATY === is_attr.UIATY;
+        });
+
+        // 바인딩 해제 건인 경우 — 수집 라인 삭제 + 표현 필드 초기화.
+        if (is_attr.UIATV === "") {
+            if (l_indx !== -1) { oPrev._T_0015.splice(l_indx, 1); }
+            is_attr.UIATV = "";
+            is_attr.ISBND = "";
+            is_attr.ISSPACE = "";
+            is_attr.MPROP = "";
+            is_attr.ADDSC = "";
+            is_attr.ISWIT = "";
+            return;
+        }
+
+        // 이벤트(UIATY="2") 값 입력건.
+        if (is_attr.UIATY === "2" && is_attr.UIATV !== "") { lf_add_T_0015(); return; }
+
+        // AGGREGATION(UIATY="3") 값 입력건.
+        if (is_attr.UIATY === "3" && is_attr.UIATV !== "") { lf_add_T_0015(); return; }
+
+        // 이벤트인데 입력값이 없는 경우 — 클라이언트 이벤트가 있으면 공백 수집, 없으면 라인 삭제.
+        if (is_attr.UIATY === "2" && is_attr.UIATV === "") {
+            var l_cevt = (oAPP.attr.T_CEVT || []).find(function (a) {
+                return a.OBJID === is_attr.OBJID + is_attr.UIASN && a.OBJTY === "JS";
+            });
+            if (l_cevt) { lf_add_T_0015(); return; }
+            if (l_indx === -1) { return; }
+            oPrev._T_0015.splice(l_indx, 1);
+            return;
+        }
+
+        // AGGREGATION 인데 입력값이 없고 수집건이 있는 경우 — 라인 삭제.
+        if (is_attr.UIATY === "3" && is_attr.UIATV === "" && l_indx !== -1) {
+            oPrev._T_0015.splice(l_indx, 1);
+            return;
+        }
+
+        // 프로퍼티 — default 값 비교(ROOT / 직접입력 aggregation("_1") 은 제외).
+        var ls_0023, l_dval = "";
+        if (is_attr.OBJID !== "ROOT" && is_attr.UIATK.indexOf("_1") === -1) {
+            ls_0023 = (oAPP.attr.T_0023 || []).find(function (a) { return a.UIATK === is_attr.UIATK; });
+        }
+        if (ls_0023) { l_dval = ls_0023.DEFVL; }
+
+        // default 값과 동일하면 수집하지 않는다(있으면 제거).
+        if (l_dval === is_attr.UIATV && l_indx === -1) { return; }
+        if (l_dval === is_attr.UIATV && l_indx !== -1) { oPrev._T_0015.splice(l_indx, 1); return; }
+
+        // 프로퍼티 type 이 숫자 유형인 경우 입력값 숫자로 정규화.
+        if (is_attr.UIATY === "1" && is_attr.ISBND === "" && is_attr.ISMLB === "" &&
+            (is_attr.UIADT === "int" || is_attr.UIADT === "float")) {
+            is_attr.UIATV = String(Number(is_attr.UIATV));
+        }
+
+        // 입력값이 없는데 default 와 다르면 SPACE 입력 FLAG.
+        is_attr.ISSPACE = "";
+        if (is_attr.UIATV === "" && l_dval !== is_attr.UIATV) { is_attr.ISSPACE = "X"; }
+
+        lf_add_T_0015();
+    };
+
+    // attribute 변경 후속(원본 attrChange → attrChangeProc). 로컬: _T_0015 반영 + 버튼 활성.
     //   미리보기 갱신 + WS20 브로드캐스트(UPDATE-DESIGN-DATA)는 P6 designBroadcastUpdate 로 위임(가드).
     oAPP.fn.attrChange = function (is_attr) {
+        // [감사표 §3-N1] 원본 attrChangeProc(index.js:7434) 은 attrChgAttrVal 을 먼저 돈다.
+        oAPP.fn.attrChgAttrVal(is_attr);
         oAPP.fn.setDesignTreeEnableButton(is_attr);
         // [SPEC §2.1] 바인딩/해제 후 좌측 모델필드 판정 재계산(원본 designTree.js:1588 등 — 해제/바인딩 후 bindPossible).
         if (typeof oAPP.fn.bindPossibleRecompute === "function") {

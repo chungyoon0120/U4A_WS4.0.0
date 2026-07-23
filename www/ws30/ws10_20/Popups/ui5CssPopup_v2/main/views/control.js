@@ -121,6 +121,10 @@ export async function getControl() {
     oContr.msg.M391_E38 = parent.WSUTIL.getWsMsgClsTxt(sWsLangu, "ZMSG_WS_COMMON_001", "244", oContr.msg.E38); // An issue occurred while retrieving CSS Menu information
     oContr.msg.M391_E39 = parent.WSUTIL.getWsMsgClsTxt(sWsLangu, "ZMSG_WS_COMMON_001", "244", oContr.msg.E39); // An issue occurred while retrieving stored data
 
+    // [2026-07-23] "눌렀는데 무반응" 모순 해소용 신규 문구(장군님 DB 등록).
+    oContr.msg.M987 = parent.WSUTIL.getWsMsgClsTxt(sWsLangu, "ZMSG_WS_COMMON_001", "987"); // There are no windows to close.
+    oContr.msg.M989 = parent.WSUTIL.getWsMsgClsTxt(sWsLangu, "ZMSG_WS_COMMON_001", "989"); // There are no items to unselect.
+
 /********************************************************************
  * 💖 PRIVATE FUNCTION 선언부
  ********************************************************************/
@@ -133,10 +137,13 @@ export async function getControl() {
         // CSS메뉴 목록을 구한다.
         var oResult = await _getCSSMenuList();
         if(oResult.RETCD === "E"){
-            
+
             console.error(oResult);
-            
-            // sap.m.MessageBox.error(oResult.RTMSG);
+
+            // ★ 통신/파싱 실패를 "검색 결과 없음" 그림으로만 보여주면 사용자는 "목록이 없다"로 오해한다.
+            //   실패 사유를 오류 박스로 알린다(문구는 _getCSSMenuList 가 실은 기존 키 M389/M390/M391 —
+            //   신규 문구 아님. no-invented-messages). 화면은 원본대로 데이터없음 페이지 유지.
+            sap.m.MessageBox.error(oResult.RTMSG);
 
             oContr.ui.NAVCON2.to(oContr.ui.NODATAPG1);
 
@@ -1262,9 +1269,13 @@ export async function getControl() {
 
         let aMenuList = oContr.oModel.oData.T_LMENU_LIST;
         if(!aMenuList || Array.isArray(aMenuList) === false || aMenuList.length === 0){
-            
+
             oContr.fn.setBusy(false);
-            
+
+            // ★ 해제 확인(M388) OK 후 대상이 없어 아무것도 안 하면 무반응 → 안내(신규 M989).
+            //   작업 대상 없음이라 M386 과 동일 위계 경고 박스. (2026-07-23 무반응 모순 해소)
+            sap.m.MessageBox.warning(oContr.msg.M989);
+
             // // 메인 영역 Busy 끄기
             // parent.IPCRENDERER.send(`if-send-action-${oParentAPP.attr.IF_DATA.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" });
 
@@ -1302,6 +1313,73 @@ export async function getControl() {
 
 
     /*******************************************************
+     * @function - 미리보기/적용 요청 전송 → WS20 판정 결과 수신 → ★이 창에서★ 메시지 출력
+     *-------------------------------------------------------
+     * ★공통 UX "결과 메시지는 요청한 창이 띄운다"(.analy/16 §2.11).
+     *   기존: IPC 를 던지자마자(단방향) 무조건 M371("처리가 완료되었습니다") 토스트 →
+     *         실제 검증은 WS20 이 하고 경고(286)는 WS20 창에 모달로 떠서, 한 번의 클릭에
+     *         상반된 메시지 2개가 서로 다른 창에 뜨는 모순(장군님 지적 2026-07-23).
+     *   변경: 결과(RETCD/MSGTY/RTMSG)를 받아 성공이면 M371, 실패면 부모가 보낸 문구를 그대로 출력.
+     * ★문구는 부모가 실어 보낸다(기존 메시지 키 재사용 — no-invented-messages).
+     * ★busy 는 응답 수신 시 해제. 부모가 성공/실패/예외를 모두 회신하므로 타임아웃 폴백은 쓰지 않는다
+     *   (no-timeout-busy-fallback). 수신기는 1회성 — 받는 즉시 해제.
+     *******************************************************/
+    oContr.fn.sendCssIfcWithResult = function(IF_PARAM){
+
+        return new Promise(function(resolve){
+
+            let sResChannel = "if-ui5css-result";
+
+            function lf_onResult(oEvent, oRES){
+
+                // 내가 보낸 요청의 응답만 처리
+                if(!oRES || oRES.PRCCD !== IF_PARAM.PRCCD){
+                    return;
+                }
+
+                // 1회성 수신기 해제(누수 방지)
+                parent.IPCRENDERER.off(sResChannel, lf_onResult);
+
+                oContr.fn.setBusy(false);
+
+                // 실패 — 부모가 판정한 사유를 이 창에서 출력
+                if(oRES.RETCD !== "S"){
+
+                    let sErrMsg = oRES.RTMSG || "";
+                    if(sErrMsg !== ""){
+
+                        if(oRES.MSGTY === "E"){
+                            sap.m.MessageBox.error(sErrMsg);
+                        }else{
+                            sap.m.MessageBox.warning(sErrMsg);
+                        }
+
+                    }
+
+                    resolve(oRES);
+                    return;
+                }
+
+                // MSG - 처리가 완료되었습니다.
+                sap.m.MessageToast.show(oContr.msg.M371);
+
+                resolve(oRES);
+
+            }
+
+            parent.IPCRENDERER.on(sResChannel, lf_onResult);
+
+            // 전송!!
+            let sChennalId = `${oContr.IF_DATA.BROWSKEY}--if-ui5css`;
+
+            parent.IPCRENDERER.send(sChennalId, IF_PARAM);
+
+        });
+
+    }; // end of oContr.fn.sendCssIfcWithResult
+
+
+    /*******************************************************
      * @function - 선택한 items 들을 미리보기에 적용
      *******************************************************/
     oContr.fn.setCssPreview = function(){
@@ -1331,7 +1409,9 @@ export async function getControl() {
                     // MSG - 선택한 데이터 없음!!
                     var sErrMsg = oContr.msg.M386;
 
-                    sap.m.MessageToast.show(sErrMsg);
+                    // ★ 작업이 실행되지 않은 경우(선택 0건)라 연한 토스트로는 놓치기 쉽다 → 경고 박스로 통일.
+                    //   트리 미체크(부모 판정)도 경고 박스이므로 "선택 안 함" 안내 위계를 맞춘다. (문구 M386 그대로)
+                    sap.m.MessageBox.warning(sErrMsg);
 
                     break;
             }
@@ -1354,18 +1434,9 @@ export async function getControl() {
             DATA: aCssList
         };
 
-        // 전송!!
-        let sChennalId = `${oContr.IF_DATA.BROWSKEY}--if-ui5css`;
-
-        parent.IPCRENDERER.send(sChennalId, IF_PARAM);
-        
-        oContr.fn.setBusy(false);
-
-
-        // MSG - 처리가 완료되었습니다.
-        let sMsg = oContr.msg.M371;
-
-        sap.m.MessageToast.show(sMsg);
+        // 전송 후 결과 수신 → busy 해제 + 성공/실패 메시지 모두 ★이 창에서★ 출력.
+        //   (기존: 던지자마자 무조건 완료 토스트 + 경고는 WS20 창에 → 모순. .analy/16 §2.11)
+        return oContr.fn.sendCssIfcWithResult(IF_PARAM);
 
     }; // end of oContr.fn.setCssPreview
 
@@ -1396,7 +1467,9 @@ export async function getControl() {
                     // MSG - 선택한 데이터 없음!!
                     var sErrMsg = oContr.msg.M386;
 
-                    sap.m.MessageToast.show(sErrMsg);
+                    // ★ 작업이 실행되지 않은 경우(선택 0건)라 연한 토스트로는 놓치기 쉽다 → 경고 박스로 통일.
+                    //   트리 미체크(부모 판정)도 경고 박스이므로 "선택 안 함" 안내 위계를 맞춘다. (문구 M386 그대로)
+                    sap.m.MessageBox.warning(sErrMsg);
 
                     break;
             }
@@ -1467,7 +1540,9 @@ export async function getControl() {
                     // MSG - 선택한 데이터 없음!!
                     var sErrMsg = oContr.msg.M386;
 
-                    sap.m.MessageToast.show(sErrMsg);
+                    // ★ 작업이 실행되지 않은 경우(선택 0건)라 연한 토스트로는 놓치기 쉽다 → 경고 박스로 통일.
+                    //   트리 미체크(부모 판정)도 경고 박스이므로 "선택 안 함" 안내 위계를 맞춘다. (문구 M386 그대로)
+                    sap.m.MessageBox.warning(sErrMsg);
 
                     break;
             }
@@ -1520,10 +1595,10 @@ export async function getControl() {
             return;
         }
 
-        oContr.fn.setCssApply(oCssResult.RDATA);  
+        // 결과 수신까지 대기 — busy 해제/메시지는 sendCssIfcWithResult 가 담당(.analy/16 §2.11).
+        //   (기존의 뒤따르던 setBusy(false) 는 응답 전에 busy 를 풀어 중복 BUSY_OFF 를 쏘므로 제거)
+        await oContr.fn.setCssApply(oCssResult.RDATA);
 
-        oContr.fn.setBusy(false); 
-        
         // // 메인 영역 Busy 끄기
         // parent.IPCRENDERER.send(`if-send-action-${oParentAPP.attr.IF_DATA.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" });
 
@@ -1550,16 +1625,9 @@ export async function getControl() {
             DATA: aCssList
         };
 
-        // 전송!!
-        let sChennalId = `${oContr.IF_DATA.BROWSKEY}--if-ui5css`;
-
-        parent.IPCRENDERER.send(sChennalId, IF_PARAM);
-
-
-        // MSG - 처리가 완료되었습니다.
-        let sMsg = oContr.msg.M371;
-
-        sap.m.MessageToast.show(sMsg);
+        // 전송 후 결과 수신 → busy 해제 + 성공/실패 메시지 모두 ★이 창에서★ 출력.
+        //   (기존: 던지자마자 무조건 완료 토스트 + 경고는 WS20 창에 → 모순. .analy/16 §2.11)
+        return oContr.fn.sendCssIfcWithResult(IF_PARAM);
 
     }; // end of oContr.fn.setCssApply
 
@@ -1579,7 +1647,9 @@ export async function getControl() {
 
         oCURRWIN.close();
 
-        sap.m.MessageToast.show("Cancel");
+        // ★ 하드코딩 영문 "Cancel" 제거 → 이미 로드된 기존 문구(A41=취소)로 교체. (no-invented-messages)
+        //   표시 시점은 원본 그대로(창 닫기 직후).
+        sap.m.MessageToast.show(oContr.msg.A41);
 
     }; // end of oContr.fn.setCssCancel
 
@@ -1610,7 +1680,7 @@ export async function getControl() {
      * @function - 자식창 전체 닫기
      *******************************************************/
     oContr.fn.clearAllChildWindow = function(){
-        
+
         let oREMOTE = parent.REMOTE;
 
         // CSS 팝업 메인 윈도우
@@ -1619,6 +1689,11 @@ export async function getControl() {
         // CSS 팝업 메인 윈도우 자식 윈도우
         let aChildWindows = oCURRWIN.getChildWindows();
         if(!aChildWindows || Array.isArray(aChildWindows) === false || aChildWindows.length === 0){
+
+            // ★ 닫을 창이 없을 때 무반응이면 버튼 고장으로 오인 → 안내(신규 M987). 작업 대상 없음이라
+            //   M386(선택0건)과 동일 위계로 경고 박스. (2026-07-23 무반응 모순 해소)
+            sap.m.MessageBox.warning(oContr.msg.M987);
+
             return;
         }
 

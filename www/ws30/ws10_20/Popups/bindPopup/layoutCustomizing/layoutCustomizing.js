@@ -134,6 +134,12 @@
         try { if (window.U4AUI && U4AUI.reclampSplitters) { U4AUI.reclampSplitters(); } } catch (e) { }
         // 레이아웃 변경 후 표시 중인 트리 컬럼 재적합(원본 refreshBindLayoutTables — 마지막 컬럼이 잔여폭 흡수).
         try { if (typeof oAPP.fn.refitBindTables === "function") { oAPP.fn.refitBindTables(); } } catch (e) { }
+
+        // MODEL(좌측) 영역 활성 시 좌측 트리 전체 펼침 — 원본 applyBindLayoutCustomizing 의
+        //   `if(oState.MODEL) scheduleExpandModelFieldTree()`(index.js:2410) 1:1.
+        if (st.MODEL && typeof oAPP.fn.expandModelFieldTree === "function") {
+            try { oAPP.fn.expandModelFieldTree(); } catch (e) { }
+        }
     };
 
     // 부트 초기 상태 로드 + 적용(frame.js _bootApp 에서 호출) — 저장된 영역 표시상태 복원(원본 loadBindLayoutState).

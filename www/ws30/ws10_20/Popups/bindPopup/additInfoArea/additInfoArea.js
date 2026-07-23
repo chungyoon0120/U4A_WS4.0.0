@@ -102,7 +102,7 @@
             if (bRO) { oBind.disabled = true; }
             oBind.addEventListener("click", function () {
                 if (typeof oAPP.fn.onMultiAdditionalBind === "function") {
-                    try { oAPP.fn.onMultiAdditionalBind(); } catch (e) { console.error("[HTML5][bindWindow] onMultiAdditionalBind:", e && e.message); }
+                    try { oAPP.fn.onMultiAdditionalBind(oBind); } catch (e) { console.error("[HTML5][bindWindow] onMultiAdditionalBind:", e && e.message); }
                 }
             });
             oA.MAIN.tool.appendChild(oBind);
@@ -144,7 +144,7 @@
             if (!oAPP.attr.editable) { oApply.disabled = true; }
             oApply.addEventListener("click", function () {
                 if (typeof oAPP.fn.applyDesignAdditBind === "function") {
-                    try { oAPP.fn.applyDesignAdditBind(); } catch (e) { console.error("[HTML5][bindWindow] applyDesignAdditBind:", e && e.message); }
+                    try { oAPP.fn.applyDesignAdditBind(oApply); } catch (e) { console.error("[HTML5][bindWindow] applyDesignAdditBind:", e && e.message); }
                 }
             });
             oA.SEL.tool.appendChild(oApply);
@@ -199,6 +199,8 @@
                     break;
                 case "P05":
                     r.sel_vis = true;
+                    // UI5 Select 는 항목 없어도 빈 줄 하나를 렌더 — 공란 1개로 모양새 재현(장군님 지시).
+                    r.T_DDLB = [{ KEY: "", TEXT: "" }];
                     break;
                 case "P06":
                     r.maxlen = 5; r.edit = true; r.inp_vis = true;
@@ -274,10 +276,11 @@
                     if (aSplit.length > 0) { r.val = aSplit[1]; }
                     r.sel_vis = true;
                     r.edit = false;
+                    // UI5 Select 는 항목 없어도 빈 줄 하나를 렌더 — 공란 1개 기본(장군님 지시). CUKY/UNIT 있으면 뒤에 추가.
+                    r.T_DDLB = [{ KEY: "", TEXT: "" }];
                     var aFilt = it_parent.filter(function (a) { return a.DATATYPE === "CUKY" || a.DATATYPE === "UNIT"; });
                     if (aFilt.length !== 0) {
                         r.edit = true;
-                        r.T_DDLB = [{ KEY: "", TEXT: "" }];
                         aFilt.forEach(function (a) { r.T_DDLB.push({ KEY: a.CHILD, TEXT: a.CHILD }); });
                     }
                     if (aSplit.length === 0 || aSplit[0] === "") { r.edit = false; }
@@ -375,7 +378,17 @@
             var oFormData = new FormData();
             oFormData.append("CONVEXIT", convName);
             oAPP.fn.sendAjax(oAPP.attr.servNm + "/chkConvExit", oFormData, function (param) {
-                if (param && param.RETCD === "E") { _sRes.RETCD = param.RETCD; _sRes.RTMSG = param.RTMSG; }
+                if (param && param.RETCD === "E") {
+                    _sRes.RETCD = param.RETCD;
+                    // ★ [.analy/17 · 장군님 지시] 표시 문구는 반드시 "클라이언트 메시지 클래스 DB" 를 본다.
+                    //   ① 서버 렌더 텍스트를 로컬 DB 로 역매핑(WsMsgCls.relocalize) → 화면 언어 재렌더.
+                    //   ② 역매핑 실패(로컬 DB 에 없는 서버 문구)면 서버 원문을 쓰지 않고 로컬 138 로 대체.
+                    //      → 화면에 서버 언어(영문)가 섞여 나오지 않는다.
+                    var _sSrv = (param.RTMSG || "");
+                    var _sLoc = (typeof oAPP.common.relocalizeServerMsg === "function")
+                        ? oAPP.common.relocalizeServerMsg(_sSrv) : _sSrv;
+                    _sRes.RTMSG = (_sLoc && _sLoc !== _sSrv) ? _sLoc : H.z("138");   // 138 Conversion Routine 없음.
+                }
                 resolve(_sRes);
             });
         });
@@ -438,7 +451,9 @@
         if (_aMPROP.length === 0) { return; }
         var _sP05 = _aMPROP.find(function (i) { return i.ITMCD === "P05"; });
         if (!_sP05) { return; }
-        _sP05.val = ""; _sP05.T_DDLB = [];
+        // 원본 데이터는 [] 지만 UI5 Select 위젯은 항목이 없어도 빈 줄 하나를 렌더한다.
+        //   공통 콤보는 items 0개면 아무것도 안 보이므로, 그 모양새를 공란 1개로 재현(장군님 지시 2026-07-23).
+        _sP05.val = ""; _sP05.T_DDLB = [{ KEY: "", TEXT: "" }];
         _renderRows(oA.MAIN);
     };
 
@@ -492,40 +507,123 @@
     oAPP.fn.chkAdditBindData = function (sPanel) {
         var ctx = (sPanel === "SEL") ? oA.SEL : oA.MAIN;
         var a = _rows(ctx);
-        if (a.length === 0) { return { RETCD: "E", RTMSG: H.z("133") }; }
-        if (a.findIndex(function (i) { return i.val !== ""; }) === -1) { return { RETCD: "E", RTMSG: H.z("134") }; }
+        var A = oAPP.attr.CS_MSG_ACTCD || {};
+        // 원본 chkAdditBindData(index.js:4895) TAB_NAME 분기: MAIN=ACT03(영역)/ACT05(행), DESIGN=ACT06/ACT07.
+        var _ACTCD01 = (ctx === oA.SEL) ? A.ACT06 : A.ACT03;   // 영역 단위 오류.
+        var _ACTCD02 = (ctx === oA.SEL) ? A.ACT07 : A.ACT05;   // 행 단위 오류(LINE_KEY=ITMCD).
+        var _res = { RETCD: "", RTMSG: "", T_RTMSG: [] };
+
+        // 영역 오류(LK_VIS=false — 이동할 행이 없음).
+        function _errArea(sMsg, sDesc) {
+            _res.RETCD = "E"; _res.RTMSG = sMsg;
+            _res.T_RTMSG.push(oAPP.fn.newBindError({ ACTCD: _ACTCD01, TYPE: "Error", TITLE: sMsg, DESC: sDesc || sMsg, LK_VIS: false }));
+            return _res;
+        }
+        // 행 오류(LINE_KEY=ITMCD → "오류 위치 확인"으로 그 행 강조).
+        function _errRow(sItmcd, sMsg, sDesc) {
+            _res.RETCD = "E"; _res.RTMSG = sMsg;
+            _res.T_RTMSG.push(oAPP.fn.newBindError({ ACTCD: _ACTCD02, LINE_KEY: sItmcd, TYPE: "Error", TITLE: sMsg, DESC: sDesc || sMsg }));
+        }
+
+        // ★ DESC 는 원본 그대로: 구조 누락(133/135/136/138) = 131(관리자 문의), 134 = 자기 자신,
+        //   137 = 105(Reference Field 입력), P06 서버오류 = 서버 RTMSG. (원본 index.js:4917~ 1:1)
+        if (a.length === 0) { return _errArea(H.z("133"), H.z("131")); }                             // 133 추가속성 정보 없음.
+        if (a.findIndex(function (i) { return i.val !== ""; }) === -1) { return _errArea(H.z("134")); }   // 134 입력건 없음(DESC=TITLE).
         var p04 = a.find(function (i) { return i.ITMCD === "P04"; });
-        if (!p04) { return { RETCD: "E", RTMSG: H.z("135") }; }
+        if (!p04) { return _errArea(H.z("135"), H.z("131")); }                                       // 135 Bind type 없음.
         var p05 = a.find(function (i) { return i.ITMCD === "P05"; });
-        if (!p05) { return { RETCD: "E", RTMSG: H.z("136") }; }
-        var _res = { RETCD: "", RTMSG: "" };
-        if (p04.val !== "" && p05.val === "") { _res = { RETCD: "E", RTMSG: H.z("137") }; }
+        if (!p05) { return _errArea(H.z("136"), H.z("131")); }                                       // 136 Reference Field 없음.
+        if (p04.val !== "" && p05.val === "") { _errRow(p05.ITMCD, H.z("137"), H.z("105")); }         // 137 필수 / DESC=105 입력 안내.
         var p06 = a.find(function (i) { return i.ITMCD === "P06"; });
-        if (!p06) { return { RETCD: "E", RTMSG: H.z("138") }; }
-        if (p06._error === true) { _res = { RETCD: "E", RTMSG: p06._error_msg || H.z("138") }; }
+        if (!p06) { return _errArea(H.z("138"), H.z("131")); }                                       // 138 Conversion 없음.
+        if (p06._error === true) { _errRow(p06.ITMCD, p06._error_msg || H.z("138")); }               // P06 서버검증 오류(이미 로컬 DB 로 현지화된 문구).
         return _res;
+    };
+
+    // [SPEC §6] 검증 오류 표시 — 목록 팝오버(앵커 필요), 없으면 토스트 폴백.
+    async function _showErrPop(oAnchor, oRes) {
+        var aMsg = (oRes && oRes.T_RTMSG) || [];
+        if (oAnchor && aMsg.length && typeof oAPP.fn.showMessagePopoverOppener === "function") {
+            await oAPP.fn.showMessagePopoverOppener(oAnchor, aMsg);
+            return;
+        }
+        if (oRes && oRes.RTMSG) { oAPP.fn.toast(oRes.RTMSG); }
+    }
+
+    /************************************************************************
+     * [SPEC §6] 추가속성 행 오류 표시/해제 — 원본 setFocusErrorBindAdditLine /
+     *   setFocusErrorDesignBindAdditLine(showMessagePopover.js) 1:1.
+     *   @param sItmcd P04~P08 / @param sPanel "SEL"=중앙하단, 그 외=우측 MAIN.
+     ************************************************************************/
+    oAPP.fn.focusErrorAdditLine = function (sItmcd, sPanel) {
+        var ctx = (sPanel === "SEL") ? oA.SEL : oA.MAIN;
+        oAPP.fn.clearAdditErrorMark();   // 원본: 표시 전 초기화.
+        var r = _rows(ctx).find(function (i) { return i.ITMCD === sItmcd; });
+        if (!r) { return; }
+        r.stat = "Error"; r.statTxt = "";
+        _renderRows(ctx);
+        // 해당 행으로 스크롤(원본 UI5 는 테이블 자체 스크롤 — HTML5 는 DOM 이동).
+        try {
+            var oTr = ctx.tbody && ctx.tbody.querySelector('tr[data-itmcd="' + sItmcd + '"]');
+            if (oTr && typeof oTr.scrollIntoView === "function") { oTr.scrollIntoView({ block: "nearest" }); }
+        } catch (e) { }
+    };
+
+    // 추가속성 오류 표시 초기화(원본 resetErrorField) — 양 패널.
+    oAPP.fn.clearAdditErrorMark = function () {
+        [oA.MAIN, oA.SEL].forEach(function (ctx) {
+            var a = _rows(ctx), bHit = false;
+            for (var i = 0; i < a.length; i++) {
+                if (a[i].stat === "Error" && a[i]._error !== true) { a[i].stat = null; a[i].statTxt = ""; bHit = true; }
+            }
+            if (bHit) { _renderRows(ctx); }
+        });
     };
 
     /************************************************************************
      * [P3-D 멀티 적용] 098 "추가 속성 바인딩" — 원본 onMultiAdditionalBind(bindAdditInfo.js:162).
      *   ★ 우측(MAIN) 스토어 값을 체크된 N행에 일괄 stamp. busy 왕복·방송 = P6.
      ************************************************************************/
-    oAPP.fn.onMultiAdditionalBind = async function () {
+    oAPP.fn.onMultiAdditionalBind = async function (oAnchor) {
         // ★ 검증 순서 = 원본 checkMultiAdditBind.js 그대로: ①디자인 트리 선택(16행) → ②추가속성 입력(53행)
         //   → ③행별 적용 가능여부(84행). 입력 검증을 먼저 하면 사용자가 값을 다 채운 뒤에야
         //   "선택된 라인 없음"을 만나 헛수고한다(장군님 지적 2026-07-16 — 원본도 선택 검증이 먼저다).
         var _aTree = (typeof oAPP.fn.getSelectedDesignTree === "function") ? (oAPP.fn.getSelectedDesignTree() || []) : [];
-        if (_aTree.length === 0) { oAPP.fn.toast(H.z("142")); return; }   // 142 디자인 라인 선택 필요(원본 087+142).
+        if (_aTree.length === 0) {
+            // 원본 checkMultiAdditBind.js:21~39 — ACT02(디자인트리 영역) / TITLE=087 / DESC=142 / LK_VIS=false.
+            var A0 = oAPP.attr.CS_MSG_ACTCD || {};
+            await _showErrPop(oAnchor, {
+                RETCD: "E", RTMSG: H.z("087"),
+                T_RTMSG: [oAPP.fn.newBindError({ ACTCD: A0.ACT02, TYPE: "Error", TITLE: H.z("087"), DESC: H.z("142"), LK_VIS: false })]
+            });
+            return;
+        }
 
         var _r1 = oAPP.fn.chkAdditBindData();   // MAIN 입력 완결성.
-        if (_r1.RETCD === "E") { oAPP.fn.toast(_r1.RTMSG); return; }
+        // [SPEC §6] 오류는 목록 팝오버(항목별 "오류 위치 확인" 링크 포함).
+        if (_r1.RETCD === "E") { await _showErrPop(oAnchor, _r1); return; }
 
+        // 행별 적용 가능여부 — 원본 checkMultiAdditBind.js:84~ 1:1.
+        //   실패 행은 _bind_error 마크 + ACT04(LINE_KEY=CHILD)로 수집하고, 하나라도 있으면 084 로 전체 차단.
+        var A1 = oAPP.attr.CS_MSG_ACTCD || {};
+        var _aErr = [], _bErr = false;
         for (var i = 0; i < _aTree.length; i++) {
-            var _rr = oAPP.fn.chkPossibleAdditBind(_aTree[i]);
-            if (_rr.RETCD === "E") {
-                oAPP.fn.toast(H.z("143", (_aTree[i].OBJID || "") + " - " + (_aTree[i].UIATT || "")) + " : " + _rr.RTMSG);
-                return;
-            }
+            var _sTree = _aTree[i];
+            var _rr = oAPP.fn.chkPossibleAdditBind(_sTree);
+            if (_rr.RETCD !== "E") { continue; }
+            _bErr = true;
+            _sTree._bind_error = true;   // 트리 행 오류 마크(원본).
+            _aErr.push(oAPP.fn.newBindError({
+                ACTCD: A1.ACT04, LINE_KEY: _sTree.CHILD, TYPE: "Error",
+                TITLE: H.z("143", (_sTree.OBJID || "") + " - " + (_sTree.UIATT || "")),   // 143 &1 필드 추가속성 바인딩 오류.
+                DESC: _rr.RTMSG
+            }));
+        }
+        if (_bErr) {
+            if (typeof oAPP.fn.refreshDesignTree === "function") { try { oAPP.fn.refreshDesignTree(); } catch (e) { } }
+            // 084 선택한 정보 중 추가 속성 불가능건이 존재합니다.
+            await _showErrPop(oAnchor, { RETCD: "E", RTMSG: H.z("084"), T_RTMSG: _aErr });
+            return;
         }
 
         var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("089"));
@@ -592,6 +690,9 @@
         for (var i = 0; i < aRows.length; i++) {
             var r = aRows[i];
             var oTr = H.el("tr");
+            // [SPEC §6] 오류 위치 이동/강조 대상 식별 + 오류 행 표시(원본 stat="Error" → _style).
+            if (r.ITMCD) { oTr.setAttribute("data-itmcd", r.ITMCD); }
+            if (r.stat === "Error") { oTr.classList.add("u4aBwpAdditRow--error"); }
 
             var oTdP = H.el("td");
             var oProp = H.el("span", "u4aBwpAdditProp", r.prop || "");
@@ -604,10 +705,12 @@
 
             if (r.sel_vis) {
                 var aItems = (r.T_DDLB || []).map(function (d) { return { value: d.KEY, text: d.TEXT }; });
-                var bDdlbSync = (r.ITMCD === "P04" || r.ITMCD === "P05");
                 var oSel = U4AUI.createField({
                     type: "combo", items: aItems, value: r.val || "", disabled: !bEnabled,
-                    onChange: (function (row, cx) { return function (v) { row.val = v; if (bDdlbSync) { oAPP.fn.setAddtBindInfoDDLB(row, cx); } }; })(r, ctx)
+                    // ★ P04↔P05 동기화 판정은 클로저 안에서 row.ITMCD 로 직접 한다.
+                    //   (예전엔 루프 밖 var bDdlbSync 를 참조 → for 함수스코프 단일변수라 모든 행의 onChange 가
+                    //    마지막 행(P08=false) 값을 공유 → P04 선택해도 setAddtBindInfoDDLB 미호출 → P05 영영 회색. 버그 수정.)
+                    onChange: (function (row, cx) { return function (v) { row.val = v; if (row.ITMCD === "P04" || row.ITMCD === "P05") { oAPP.fn.setAddtBindInfoDDLB(row, cx); } }; })(r, ctx)
                 });
                 oTdV.appendChild(oSel.el);
             } else if (r.inp_vis) {

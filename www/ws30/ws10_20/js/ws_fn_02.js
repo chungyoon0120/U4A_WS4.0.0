@@ -2066,7 +2066,10 @@
             }
 
             try {
-                oChild.close();
+                // ★ frameless 별창 다수가 closable:false(OS 닫기 차단)라 raw close() 가 무시된다.
+                //   공통 U4AUI.closeWindow(setClosable(true)+close())로 닫아야 실제로 닫힌다. (ws_common.js:566 선례)
+                if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oChild); }
+                else { oChild.setClosable(true); oChild.close(); }
             } catch (error) {
 
             }
@@ -2093,7 +2096,11 @@
             try {
                 // win.isDestroyed() 체크는 필수입니다 (이미 닫힌 창 에러 방지)
                 if (win && !win.isDestroyed()) {
-                    win.close(); 
+                    // ★ frameless 별창 다수가 closable:false(OS 닫기 차단)라 raw close() 가 무시된다.
+                    //   공통 U4AUI.closeWindow(setClosable(true)+close())로 닫아야 실제로 닫힌다.
+                    //   (ws_common.js:566 fnMultiFooterMsgClose 선례와 동일. browser-window-common-ux §2.6.1)
+                    if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(win); }
+                    else { win.setClosable(true); win.close(); }
                 }
             } catch (err) {
                 console.warn("Window Close Error:", err);
@@ -2147,7 +2154,12 @@
                     continue;
                 }
 
-                oChild.close();
+                // ★ frameless 별창 다수가 closable:false(OS 닫기 차단)라 raw close() 가 무시된다.
+                //   공통 U4AUI.closeWindow(setClosable(true)+close())로 닫아야 실제로 닫힌다.
+                //   (ws_common.js:566 선례 동일. 이게 안 되면 모드전환 시 별창이 안 닫혀 조회모드인데
+                //    팝업 [적용]이 살아있는 등 모순 발생. browser-window-common-ux §2.6.1)
+                if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oChild); }
+                else { oChild.setClosable(true); oChild.close(); }
 
             } catch (error) {
                 continue;

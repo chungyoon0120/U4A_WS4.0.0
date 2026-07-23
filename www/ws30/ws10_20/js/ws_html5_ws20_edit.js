@@ -431,6 +431,43 @@
             _refreshTree();
         };
     }
+    // 체크박스 선택건 수집 (구 designGetCheckedLine 4776) — ROOT 부터 재귀하며 chk 인 노드의
+    //   {OBJID, UIOBK} 를 et_chked 에 push. 원본은 순수 모델 탐색(UI5 의존 0)이라 로직 1:1 이식.
+    //   ★ 호출부: design/js/uiPreviewArea.js:1264 prevStyleClassApply — "UI5 미리 정의된 CSS" 팝업
+    //     (UI5CSSPOP_V2)의 [미리 보기]/[적용] 이 IPC 로 부모에 요청하는 경로. 정의처(uiDesignArea.js)가
+    //     HTML5 WS20 에선 미로드라 "is not a function" 크래시가 나던 결손을 여기서 메운다.
+    //   ★ HTML5 트리도 체크 상태를 동일 필드(node.chk)에 보관한다(ws_html5_ws20_tree.js:521,525)
+    //     → 원본 그대로 동작한다.
+    if (typeof oAPP.fn.designGetCheckedLine !== "function") {
+        oAPP.fn.designGetCheckedLine = function (bFirst, et_chked, is_tree) {
+
+            //function 최초 호출 flag가 존재하는경우.
+            if (bFirst) {
+                //ROOT를 시작점으로 설정.
+                is_tree = _tree()[0];
+            }
+
+            if (!is_tree) { return; }
+
+            //현재 라인이 체크박스 선택된건인경우.
+            if (is_tree.chk) {
+                //현재라인의 OBJID 수집 처리.
+                et_chked.push({ OBJID: is_tree.OBJID, UIOBK: is_tree.UIOBK });
+            }
+
+            //현재 라인의 CHILD가 존재하지 않는경우 EXIT.
+            if (!is_tree.zTREE || is_tree.zTREE.length === 0) { return; }
+
+            //CHILD가 존재하는경우.
+            for (var i = 0, l = is_tree.zTREE.length; i < l; i++) {
+
+                //하위를 탐색하며, CHECKBOX 선택건 수집 처리.
+                oAPP.fn.designGetCheckedLine(false, et_chked, is_tree.zTREE[i]);
+
+            }
+
+        };
+    }
     // 멀티 삭제 (구 designTreeMultiDeleteItem 4353) — 체크된 UI 일괄 삭제.
     if (typeof oAPP.fn.designTreeMultiDeleteItem !== "function") {
         oAPP.fn.designTreeMultiDeleteItem = function () {

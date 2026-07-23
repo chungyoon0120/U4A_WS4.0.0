@@ -1664,11 +1664,15 @@ body.u4a-dragging iframe { pointer-events: none; }
     transform: rotate(180deg);
 }
 
-/* 펼침 목록 (팝오버 토큰 소비) */
+/* 펼침 목록 (팝오버 토큰 소비)
+   ★ max-height 를 CSS 로 고정하지 않는다(§2.2). 상한은 "타이틀바~화면 하단" 가용 공간이며
+   u4a-ui.js _open() 이 실측해 인라인 max-height 로 클램프한다.
+   과거 여기 max-height:16rem 이 있어 JS 가 목록 높이를 항상 256px 로만 보게 되어
+   `h > lMax` 가 거짓 → 가용 공간 클램프 로직이 통째로 죽었다(가용 494px 인데 256px 만 사용,
+   55개 항목 콤보가 6개만 노출). 높이 제한은 JS 한 곳에서만 결정한다. */
 .u4a-combo__list {
     position: fixed;
     z-index: 1100;
-    max-height: 16rem;
     overflow: auto;
     padding: 0.25rem;
     background: var(--popover-bg);

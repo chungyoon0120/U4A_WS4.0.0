@@ -52,10 +52,12 @@
         //    펼침/접힘은 공통 트리 표준(16 §3.2 선택기준). 새로고침은 원본과 동일한 라벨 버튼(Emphasized).
         oM.tool.innerHTML = "";
         oM.tool.appendChild(H.iconBtn("angles-down", H.z("169"), function () {   // 169 Expand All
-            if (oM.ctrl) { oM.ctrl.expandSelected(); }
+            // 전체 펼침(원본 expandToLevel(99999)) — 선택 노드만 펼치던 것 수정(장군님 지적 2026-07-23).
+            if (oM.ctrl && oM.ctrl.tree && oM.ctrl.tree.expandAll) { oM.ctrl.tree.expandAll(); }
         }));
         oM.tool.appendChild(H.iconBtn("angles-up", H.z("170"), function () {     // 170 Collapse All
-            if (oM.ctrl) { oM.ctrl.collapseSelected(); }
+            // 전체 접기(원본 collapseAll).
+            if (oM.ctrl && oM.ctrl.tree && oM.ctrl.tree.collapseAll) { oM.ctrl.tree.collapseAll(); }
         }));
         oM.tool.appendChild(H.el("span", "u4aBwpToolSep"));
         oM.tool.appendChild(_btn("rotate", H.z("171"), H.z("171"), "u4a-btn--emphasized", function () {  // 171 Refresh
@@ -130,6 +132,10 @@
             },
             onSelect: function (n) {
                 oAPP.attr.selModelNode = n;
+                // 클릭한 행에 선택 강조(aria-selected) — 원본 좌측 트리 selectionMode:"Single"(index.js:4335)
+                //   의 행 하이라이트 재현. 공통 트리는 강조 API(selectKey)만 제공하고 화면이 호출한다.
+                //   bScroll=false: 사용자가 직접 클릭한 행이라 스크롤 점프 금지.
+                if (oM.ctrl && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(n.CHILD, false); } catch (e) { } }
                 // 모델필드 선택 변경 → 우측 참조필드(P05) 재구성(원본 onSelTabRow → setRefFieldList, P3-C).
                 if (typeof oAPP.fn.setRefFieldList === "function") { try { oAPP.fn.setRefFieldList(); } catch (e) { } }
             }
@@ -240,7 +246,28 @@
 
     // [PUBLIC] 좌측 모델트리 재렌더 — bindPossible(선택 시 상태색 재계산) 후 반영용.
     //   oM 은 이 IIFE 로컬이라 외부(bindPossible/designArea)에서 rerender 하려면 이 진입점을 쓴다.
-    oAPP.fn.refreshModelTree = function () { if (oM.ctrl) { oM.ctrl.rerender(); } };
+    //   ★ 원본(UI5 model.refresh)은 바인딩/해제 후 판정색만 갱신하고 선택·스크롤을 건드리지 않는다.
+    //     공통 rerender() 는 DOM 을 다시 그려 선택(aria-selected)·스크롤을 잃고, 인자 없으면 첫 루트를
+    //     강제 선택(최상위로 튕김)한다 → 멀티바인딩/해제 후 좌측 선택이 최상위로 이동하던 버그(장군님 지적 2026-07-23).
+    //     현재 선택 키/스크롤을 저장 → rerender(false)(자동선택 방지) → 복원해 원본 거동을 재현한다.
+    oAPP.fn.refreshModelTree = function () {
+        if (!oM.ctrl) { return; }
+        var oSel = (typeof oM.ctrl.getSelected === "function") ? oM.ctrl.getSelected() : null;
+        var sKey = oSel ? oSel.CHILD : null;
+        var iTop = oM.host ? oM.host.scrollTop : 0;
+        oM.ctrl.rerender(false);   // 첫 루트 자동선택 방지
+        if (sKey && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(sKey, false); } catch (e) { } }
+        if (oM.host) { oM.host.scrollTop = iTop; }
+    };
+
+    // [PUBLIC] 좌측 모델트리 전체 펼침 — 원본 expandModelFieldTree(index.js:2691) 대응.
+    //   레이아웃 커스터마이징으로 MODEL 영역이 (재)활성될 때 호출(applyBindLayout). 공통 트리 내부
+    //   makeTree 의 expandAll 을 ctrl.tree 로 소비(공통 무수정). 원본 expandToLevel(99999) = 전체 펼침.
+    oAPP.fn.expandModelFieldTree = function () {
+        if (oM.ctrl && oM.ctrl.tree && typeof oM.ctrl.tree.expandAll === "function") {
+            try { oM.ctrl.tree.expandAll(); } catch (e) { }
+        }
+    };
 
     /************************************************************************
      * 모델 필드 데이터 로드(원본 getBindFieldInfo 1:1 — 서버 /getBindAttrData).
@@ -270,7 +297,11 @@
             try {
                 if (!param || param.RETCD === "E") {
                     oM.ctrl.rerender();
-                    if (param && param.RTMSG) { oAPP.fn.toast(param.RTMSG); }
+                    // ★ [.analy/17] 서버 렌더 텍스트 → 클라이언트 메시지 클래스 DB 역매핑 후 표시(못 찾으면 원문).
+                    if (param && param.RTMSG) {
+                        oAPP.fn.toast((typeof oAPP.common.relocalizeServerMsg === "function")
+                            ? oAPP.common.relocalizeServerMsg(param.RTMSG) : param.RTMSG);
+                    }
                     return;
                 }
 
@@ -289,7 +320,11 @@
 
                 // 평면 → 중첩(zTREE).
                 oAPP.attr.modelTree = oAPP.fn.setTreeData(aTree, "CHILD", "PARENT", "zTREE");
-                oM.ctrl.rerender(true);   // 첫 루트 선택 → Expand=전체(16 §3.2)
+                // ★ 초기 로드 = 선택 없이 전체 펼침(원본 loadBindData 후 clearSelection + expandToLevel(99999),
+                //   index.js:8145~8148). 예전엔 rerender(true) 로 첫 루트만 선택하고 펼침을 안 해(주석과 달리)
+                //   좌측 트리가 접힌 채 떴다 — 장군님 지적 2026-07-23. 원본은 늘 전체 펼침 상태로 시작한다.
+                oM.ctrl.rerender(false);          // 첫 루트 자동선택 방지(원본 clearSelection).
+                oAPP.fn.expandModelFieldTree();   // 전체 펼침(원본 expandToLevel(99999)).
                 oAPP.fn.setTreeEmptyMark(oM.host, !(oAPP.attr.modelTree || []).length);
                 oAPP.fn.fitTreeColumns(oM.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
 

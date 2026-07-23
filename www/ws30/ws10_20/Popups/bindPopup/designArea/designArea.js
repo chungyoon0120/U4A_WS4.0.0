@@ -80,10 +80,10 @@
         if (typeof fn === "function") { b.addEventListener("click", fn); }
         return b;
     }
-    // Stage5(멀티/동기화/Unbind) 핸들러 호출 — 아직 미배선이면 안전 무시(정의되면 자동 배선).
-    function _call(sFn) {
+    // 툴바 핸들러 호출 — 클릭한 버튼을 앵커로 넘긴다(원본 oEvent.oSource → 오류목록 팝오버 openBy 대상).
+    function _call(sFn, oAnchor) {
         if (typeof oAPP.fn[sFn] === "function") {
-            try { oAPP.fn[sFn](); } catch (e) { console.error("[HTML5][bindWindow] " + sFn + ":", e && e.message); }
+            try { oAPP.fn[sFn](oAnchor); } catch (e) { console.error("[HTML5][bindWindow] " + sFn + ":", e && e.message); }
         }
     }
 
@@ -311,10 +311,10 @@
      *   중앙 하단에서 고친 값(additRowsSel)을 S_SEL_ATTR 선택행 + prev._T_0015 에 stamp 후 트리 갱신.
      *   ★ WS20 busy 왕복·UPDATE-DESIGN-DATA 방송 = P6. 여기선 로컬 적용 + toast(090)까지.
      ************************************************************************/
-    oAPP.fn.applyDesignAdditBind = async function () {
+    oAPP.fn.applyDesignAdditBind = async function (oAnchor) {
         // ① 중앙 하단 입력 완결성(원본 chkAdditBindData(oAdditTab=DESIGN_ADDIT)).
         var _r1 = (typeof oAPP.fn.chkAdditBindData === "function") ? oAPP.fn.chkAdditBindData("SEL") : { RETCD: "" };
-        if (_r1.RETCD === "E") { oAPP.fn.toast(_r1.RTMSG); return; }
+        if (_r1.RETCD === "E") { await _showErr(oAnchor, _r1); return; }   // [SPEC §6] 목록 팝오버.
 
         // ② 선택 attribute(S_SEL_ATTR) 존재.
         var _sAttr = oAPP.attr.S_SEL_ATTR;
@@ -348,10 +348,74 @@
         })(oAPP.attr.designTree || []);
     };
 
-    // 오류행 수집(간이 TY_BIND_ERROR) — ACTCD 라우팅/showMessagePopover 정교화는 P6 잔여.
-    function _pushErr(aOut, sTitle, sDesc, sLineKey) {
-        aOut.push({ ACTCD: "", LINE_KEY: sLineKey || "", TYPE: "Error", TITLE: sTitle, DESC: sDesc, LK_VIS: false });
+    /************************************************************************
+     * [SPEC §6] 검증 오류 표시 — 목록이 있으면 팝오버, 없으면(단문) 토스트 폴백.
+     *   원본: showMessagePopoverOppener(oEvent.oSource, _sRes.T_RTMSG).
+     ************************************************************************/
+    async function _showErr(oAnchor, oRes) {
+        var aMsg = (oRes && oRes.T_RTMSG) || [];
+        if (oAnchor && aMsg.length && typeof oAPP.fn.showMessagePopoverOppener === "function") {
+            await oAPP.fn.showMessagePopoverOppener(oAnchor, aMsg);
+            return;
+        }
+        if (oRes && oRes.RTMSG) { oAPP.fn.toast(oRes.RTMSG); }   // 앵커/목록 없을 때만 토스트.
     }
+
+    /************************************************************************
+     * [SPEC §6] 오류행 수집(TY_BIND_ERROR) — 원본 checkMultiBinding/Unbinding/AdditBind 1:1.
+     *   sLineKey(디자인트리 CHILD) 가 있으면 ACT04(라인) + 위치확인 링크 노출,
+     *   없으면 영역 단위(ACT02 디자인트리 / ACT01 모델트리)로 링크 숨김.
+     ************************************************************************/
+    function _pushErr(aOut, sTitle, sDesc, sLineKey, sActcdArea) {
+        var A = oAPP.attr.CS_MSG_ACTCD || {};
+        var bLine = !!sLineKey;
+        aOut.push(oAPP.fn.newBindError({
+            ACTCD: bLine ? A.ACT04 : (sActcdArea || A.ACT02),
+            LINE_KEY: sLineKey || "",
+            TYPE: "Error", TITLE: sTitle, DESC: sDesc,
+            LK_VIS: bLine   // 이동할 라인이 있을 때만 "오류 위치 확인" 노출(원본).
+        }));
+    }
+
+    /************************************************************************
+     * [SPEC §6] 디자인 트리 오류 라인 강조 + 스크롤 이동
+     *   — 원본 showMessagePopover.js setFocusErrorDesignLine 1:1
+     *     (resetErrorField → _check_vs="Error" → getTreeItemIndex → setFirstVisibleRow).
+     *   HTML5: 노드 마크 후 재렌더 → 해당 행 DOM 을 scrollIntoView.
+     ************************************************************************/
+    oAPP.fn.focusErrorDesignLine = function (LINE_KEY) {
+        if (!LINE_KEY) { return; }
+        oAPP.fn.resetErrorField();   // 원본: 표시 전 초기화.
+
+        var oNode = null;
+        (function rec(a) {
+            if (!a || oNode) { return; }
+            for (var i = 0; i < a.length; i++) {
+                if (a[i].CHILD === LINE_KEY) { oNode = a[i]; return; }
+                rec(a[i].zTREE_DESIGN);
+                if (oNode) { return; }
+            }
+        })(oAPP.attr.designTree || []);
+        if (!oNode) { return; }
+
+        oNode._bind_error = true;
+        oNode._check_vs = "Error";
+        oNode._highlight = "Error";   // 행 좌측 상태바(H.rowHl → u4aBwpRow--error).
+
+        _refreshDesignTree();
+
+        // 해당 행으로 스크롤(원본 setFirstVisibleRow 대응).
+        try {
+            var oRow = null, aRows = oD.host ? oD.host.querySelectorAll(".u4aColTreeRow") : [];
+            for (var r = 0; r < aRows.length; r++) {
+                if (aRows[r].__bwpNode && aRows[r].__bwpNode.CHILD === LINE_KEY) { oRow = aRows[r]; break; }
+            }
+            if (oRow && typeof oRow.scrollIntoView === "function") { oRow.scrollIntoView({ block: "nearest" }); }
+        } catch (e) { }
+    };
+
+    // [SPEC §6] 오류목록 팝오버 닫힘 시 트리 재렌더(원본 clearError 의 model.refresh 대응).
+    oAPP.fn.refreshDesignTree = function () { _refreshDesignTree(); };
 
     /************************************************************************
      * [SPEC §3.8/§6 게이트] 멀티 바인딩 가능여부 — 원본 designArea/checkMultiBinding.js 1:1.
@@ -371,7 +435,7 @@
         var _sField = (typeof oAPP.fn.getSelectedModelLine === "function") ? oAPP.fn.getSelectedModelLine() : undefined;
         if (typeof _sField === "undefined") {
             _sRes.RETCD = "E"; _sRes.RTMSG = H.z("085");
-            _pushErr(_sRes.T_RTMSG, H.z("085"), H.z("083"));   // 085 모델필드 미선택 / 083 안내.
+            _pushErr(_sRes.T_RTMSG, H.z("085"), H.z("083"), "", (oAPP.attr.CS_MSG_ACTCD || {}).ACT01);   // 085 모델필드 미선택 / 083 안내(ACT01=모델트리 영역).
             return _sRes;
         }
         if (_aTree.length === 0) { return _sRes; }   // 원본 동일(위에서 이미 E 세팅).
@@ -427,9 +491,10 @@
      *   ★ 쓰기 함수는 §3.4 드래그드롭과 동일(attrSetBindProp) — 세 경로 결과 일관성 보장.
      *   ★ WS20 반영: attrSetBindProp → attrChange → designBroadcastUpdate(rAF 합침) = 1회 방송(P6).
      ************************************************************************/
-    oAPP.fn.onMultiBind = async function () {
+    oAPP.fn.onMultiBind = async function (oAnchor) {
         var _sRes = _checkMultiBinding();
-        if (_sRes.RETCD === "E") { oAPP.fn.toast(_sRes.RTMSG); return; }   // 정교 showMessagePopover = P6 잔여.
+        // [SPEC §6] 오류는 목록 팝오버로(원본 showMessagePopoverOppener). 앵커 = 클릭한 버튼.
+        if (_sRes.RETCD === "E") { await _showErr(oAnchor, _sRes); return; }
 
         var _sField = oAPP.fn.getSelectedModelLine();
         if (typeof _sField === "undefined") { return; }
@@ -473,9 +538,9 @@
      * [SPEC §3.7] 멀티 해제(186) — 원본 designTree.js onMultiUnbind 1:1.
      *   게이트 → 확인창(166+167) → 체크행마다 §3.6 단일해제와 동일 로직 → 155.
      ************************************************************************/
-    oAPP.fn.onMultiUnbind = async function () {
+    oAPP.fn.onMultiUnbind = async function (oAnchor) {
         var _sRes = _checkMultiUnbinding();
-        if (_sRes.RETCD === "E") { oAPP.fn.toast(_sRes.RTMSG); return; }
+        if (_sRes.RETCD === "E") { await _showErr(oAnchor, _sRes); return; }
 
         var _aTree = oAPP.fn.getSelectedDesignTree();
         // 166 &1건 선택 + 167 해제 진행 확인.
@@ -556,11 +621,11 @@
 
     // 행 액션 - 추가속성 정보 적용(단건, 원본 onAdditionalBind: designTree.js:1633). ★로컬 적용까지(P3-D).
     //   busy 왕복·UPDATE-DESIGN-DATA 방송 = P6. 검증 오류표시는 간이 toast(정교 showMessagePopover = P6).
-    oAPP.fn.onAdditionalBind = async function (n) {
+    oAPP.fn.onAdditionalBind = async function (n, oAnchor) {
         if (!n) { return; }
         // ① 우측 입력 완결성.
         var _r1 = (typeof oAPP.fn.chkAdditBindData === "function") ? oAPP.fn.chkAdditBindData() : { RETCD: "" };
-        if (_r1.RETCD === "E") { oAPP.fn.toast(_r1.RTMSG); return; }
+        if (_r1.RETCD === "E") { await _showErr(oAnchor, _r1); return; }   // [SPEC §6] 목록 팝오버.
         // ② 라인 가능여부.
         var _r2 = (typeof oAPP.fn.chkPossibleAdditBind === "function") ? oAPP.fn.chkPossibleAdditBind(n) : { RETCD: "" };
         if (_r2.RETCD === "E") { oAPP.fn.toast(_r2.RTMSG); return; }
@@ -798,7 +863,11 @@
         }
 
         if (oD.ctrl) {
-            oD.ctrl.rerender(true);
+            // ★ 트리 재구성(드롭/방송 수신) 후 전체 펼침 — 원본 setDesignTreeData 후 expandToLevel(99999)
+            //   (designTree.js:1171/2025 등). 예전엔 rerender(true) 로 첫 루트만 선택하고 펼침을 안 해
+            //   중앙 트리가 1레벨만 펼쳐졌다 — 장군님 지적 2026-07-23.
+            oD.ctrl.rerender(false);   // 첫 루트 자동선택 방지
+            if (oD.ctrl.tree && oD.ctrl.tree.expandAll) { oD.ctrl.tree.expandAll(); }
             // 디자인 트리는 브로드캐스트 전엔 빈 트리 → 경계선 끔(데이터 도착 시 해제).
             oAPP.fn.setTreeEmptyMark(oD.host, !(oAPP.attr.designTree || []).length);
             oAPP.fn.fitTreeColumns(oD.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
@@ -822,7 +891,7 @@
         var bEdit = !!oAPP.attr.editable;
         // 슬롯1: 추가속성 정보 적용(accept, 132)
         if (bEdit && n._bind_visible) {
-            oAct.appendChild(H.iconBtn("circle-check", H.z("132"), function (e) { e.stopPropagation(); oAPP.fn.onAdditionalBind(n); }, "u4aBwpRowActBtn u4aBwpRowActBtn--bind"));
+            oAct.appendChild(H.iconBtn("circle-check", H.z("132"), function (e) { e.stopPropagation(); oAPP.fn.onAdditionalBind(n, e && e.currentTarget); }, "u4aBwpRowActBtn u4aBwpRowActBtn--bind"));
         } else { oAct.appendChild(H.el("span", "u4aBwpRowActSlot")); }
         // 슬롯2: 바인딩 해제(disconnected, 186)
         if (bEdit && n._unbind_visible) {
@@ -841,15 +910,16 @@
         //    실제 일괄 적용 로직(onSynchronizionBind/onMultiBind/onMultiUnbind)은 통신·적용 단계(Stage5)에서 배선. ──
         var bRO = !oAPP.attr.editable;   // IS_EDIT !== "X" → 편집 불가(원본 enabled="{/edit}").
         oD.tool.innerHTML = "";
-        oD.tool.appendChild(H.iconBtn("angles-down", H.z("169"), function () { if (oD.ctrl) { oD.ctrl.expandSelected(); } }));  // 169 Expand All
-        oD.tool.appendChild(H.iconBtn("angles-up", H.z("170"), function () { if (oD.ctrl) { oD.ctrl.collapseSelected(); } }));   // 170 Collapse All
+        // 169/170 = 전체 펼침/접기(원본 expandCollapseAll → expandToLevel(99999)/collapseAll). 선택 노드만 하던 것 수정.
+        oD.tool.appendChild(H.iconBtn("angles-down", H.z("169"), function () { if (oD.ctrl && oD.ctrl.tree && oD.ctrl.tree.expandAll) { oD.ctrl.tree.expandAll(); } }));  // 169 Expand All
+        oD.tool.appendChild(H.iconBtn("angles-up", H.z("170"), function () { if (oD.ctrl && oD.ctrl.tree && oD.ctrl.tree.collapseAll) { oD.ctrl.tree.collapseAll(); } }));   // 170 Collapse All
         oD.tool.appendChild(H.el("span", "u4aBwpToolSep"));
         oD.tool.appendChild(H.iconBtn("ban", H.z("187"), function () { _clearChecks(); }));   // 187 Clear selection
         oD.tool.appendChild(H.el("span", "u4aBwpToolSep"));
         // 129 동일속성 바인딩 일괄적용(Accept, 녹색) / 130 멀티 바인딩(Emphasized, 파랑) / 186 Unbind(Reject, 빨강).
-        oD.tool.appendChild(_btn("check-double", H.z("129"), H.z("129"), "u4aBwpBtn--sync", bRO, function () { _call("onSynchronizionBind"); }));
-        oD.tool.appendChild(_btn("link", H.z("130"), H.z("130"), "u4a-btn--emphasized", bRO, function () { _call("onMultiBind"); }));
-        oD.tool.appendChild(_btn("link-slash", H.z("186"), H.z("186"), "u4a-btn--negative", bRO, function () { _call("onMultiUnbind"); }));
+        oD.tool.appendChild(_btn("check-double", H.z("129"), H.z("129"), "u4aBwpBtn--sync", bRO, function (e) { _call("onSynchronizionBind", e && e.currentTarget); }));
+        oD.tool.appendChild(_btn("link", H.z("130"), H.z("130"), "u4a-btn--emphasized", bRO, function (e) { _call("onMultiBind", e && e.currentTarget); }));
+        oD.tool.appendChild(_btn("link-slash", H.z("186"), H.z("186"), "u4a-btn--negative", bRO, function (e) { _call("onMultiUnbind", e && e.currentTarget); }));
         oD.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
         // 161 컬럼최적화 — 리사이즈바 더블클릭과 ★완전 동일★한 순수 autofit(잔여폭 흡수 없음).
         //   원본 setUiTableAutoResizeColumn 1:1. 채움(fitTreeColumns)은 레이아웃 변경 전용.

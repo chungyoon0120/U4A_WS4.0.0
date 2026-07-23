@@ -143,17 +143,8 @@
             if (lLeft + lw > window.innerWidth - 4) { lLeft = window.innerWidth - lw - 4; }
             if (lLeft < 4) { lLeft = 4; }
             oList.style.left = lLeft + "px";
-            // 상단 경계 = 타이틀바 하단(공통 §2.2). 아래 공간 우선, 부족하면 위로 플립하되 타이틀바 침범 금지.
-            //   목록은 .u4a-combo__list max-height 가 있으나, 화면 끝/타이틀바를 넘지 않게 동적 제한.
-            const topMin = (_topChromeBottom() || 0) + 2;
-            const h = oList.offsetHeight;
-            const below = window.innerHeight - 4 - (r.bottom + 2);
-            const above = (r.top - 2) - topMin;
-            let lTop, lMax;
-            if (h <= below || below >= above) { lTop = r.bottom + 2; lMax = below; }   // 아래로
-            else { lMax = above; lTop = Math.max(topMin, r.top - 2 - Math.min(h, lMax)); }   // 위로 플립
-            oList.style.top = lTop + "px";
-            if (h > lMax) { oList.style.maxHeight = Math.max(80, lMax) + "px"; oList.style.overflowY = "auto"; }
+            // 상단 경계 = 타이틀바 하단(공통 §2.2). 세로 배치/높이 클램프는 _clampListV 1곳.
+            _clampListV(oList, r, r.bottom + 2);
 
             oCombo.dataset.open = "true";
             oCombo.setAttribute("aria-expanded", "true");
@@ -291,8 +282,10 @@
                     if (mr.height) { iTop = mr.bottom + 2; }
                 }
             }
-            oList.style.top = iTop + "px";
             oList.style.minWidth = r.width + "px";
+            // 세로 배치/높이 클램프(§2.2) — 콤보와 동일 로직 1곳. 후보가 많아도 화면 밖으로
+            //   늘어나지 않고 내부 스크롤로 제한된다(예전엔 CSS max-height 에만 기대고 있었다).
+            _clampListV(oList, r, iTop);
         }
 
         function _open(bShowAll) {
@@ -851,6 +844,30 @@
             }
             return 0;
         } catch (e) { return 0; }
+    }
+
+    /**
+     * 펼침 목록(.u4a-combo__list) 세로 배치/높이 클램프 — 콤보·제안목록 공통 1곳(§2.2).
+     *   아래 공간 우선, 부족하면 위로 플립하되 타이틀바 하단은 침범하지 않는다.
+     *   ★상한은 CSS 가 아니라 여기서 실측한 가용 공간이다. shell.css 의 .u4a-combo__list 에
+     *     max-height 를 다시 넣으면 아래 h 가 그 값으로 고정돼 `h > lMax` 가 거짓이 되고
+     *     이 클램프가 통째로 죽는다(가용 494px 인데 256px 만 쓰던 버그).
+     * @param {HTMLElement} oList     펼침 목록
+     * @param {DOMRect}     rAnchor   앵커(콤보/입력칸) 사각형
+     * @param {number}      iTopBelow 아래로 펼칠 때의 top(앵커 하단 +2, 제안목록은 메시지 아래)
+     */
+    function _clampListV(oList, rAnchor, iTopBelow) {
+        const topMin = (_topChromeBottom() || 0) + 2;
+        // 재측정 전 초기화 — 제안목록은 타이핑마다 재배치되므로 이전 클램프가 남으면 계속 좁아진다.
+        oList.style.maxHeight = "";
+        const h = oList.offsetHeight;
+        const below = window.innerHeight - 4 - iTopBelow;
+        const above = (rAnchor.top - 2) - topMin;
+        let lTop, lMax;
+        if (h <= below || below >= above) { lTop = iTopBelow; lMax = below; }          // 아래로
+        else { lMax = above; lTop = Math.max(topMin, rAnchor.top - 2 - Math.min(h, lMax)); }   // 위로 플립
+        oList.style.top = lTop + "px";
+        if (h > lMax) { oList.style.maxHeight = Math.max(80, lMax) + "px"; oList.style.overflowY = "auto"; }
     }
 
     /**

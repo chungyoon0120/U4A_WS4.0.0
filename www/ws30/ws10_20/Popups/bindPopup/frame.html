@@ -102,6 +102,8 @@
     <!-- 공용 헬퍼(sendAjax/setTreeData) + 영역 모듈(로드 순서 = 의존 순서).
          다열 컬럼트리는 공통 U4AUI.makeColumnTree(theme/u4a-ui.js) 소비 — 별도 스크립트 없음. -->
     <script src="bindShared.js"></script>
+    <!-- 오류목록 팝오버(§6) — 원본 sap.m.MessagePopover 대응. 검증 실패 시 N건 목록+위치확인 링크. -->
+    <script src="utils/showMessagePopover.js"></script>
     <script src="modelFieldArea/modelFieldArea.js"></script>
     <!-- 좌측 바인딩 가능/불가 판정(§2.1) — 원본 CJS(module.exports)를 oAPP.fn 전역 노출로 이식. -->
     <script src="modelFieldArea/bindPossible.js"></script>

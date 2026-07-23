@@ -58,6 +58,38 @@ oAPP.fn = {};
 oAPP.ui = {};
 oAPP.attr = {};
 oAPP.common = {};
+oAPP.types = {};
+
+/* ── 오류 메시지 계약(SPEC §6) — 원본 index.js:1297/1332 1:1 ─────────────────
+ *  검증 실패 시 게이트가 TY_BIND_ERROR 배열(T_RTMSG)을 만들고, 오류목록 팝오버가
+ *  각 항목의 "오류 위치 확인"(msg 091) 링크를 ACTCD 로 라우팅해 실제 위치로 이동/강조한다.
+ *  ★ ACTCD 값·의미는 원본 그대로. 통일/변경 금지(라우팅 분기 키). */
+oAPP.attr.CS_MSG_ACTCD = {
+    ACT01: "01",   // 모델(좌측) 트리 영역
+    ACT02: "02",   // 디자인 트리 영역
+    ACT03: "03",   // 추가속성 정보 영역(우측 MAIN_ADDIT)
+    ACT04: "04",   // 디자인 트리 "라인"        — 해당 행 강조 + 스크롤 이동
+    ACT05: "05",   // 우측 추가속성 테이블 "라인" — ITMCD 매칭 강조
+    ACT06: "06",   // 중앙 하단 추가속성 영역(DESIGN_ADDIT)
+    ACT07: "07"    // 중앙 하단 추가속성 "라인"  — ITMCD 매칭 강조
+};
+
+// 오류 1건 구조(원본 oAPP.types.TY_BIND_ERROR). LK_VIS=false 면 "오류 위치 확인" 링크 숨김.
+oAPP.types.TY_BIND_ERROR = {
+    ACTCD: "",      // 오류 위치 ACTION CODE(CS_MSG_ACTCD)
+    LINE_KEY: "",   // 오류 라인 KEY(디자인트리=CHILD / 추가속성=ITMCD)
+    TYPE: "",       // 오류 TYPE(Error/Warning/Information)
+    TITLE: "",      // 오류 제목
+    DESC: "",       // 오류 상세
+    LK_VIS: true    // 위치확인 링크 노출 여부
+};
+
+// 오류 1건 생성 헬퍼 — 원본 JSON.parse(JSON.stringify(TY_BIND_ERROR)) 대응(템플릿 오염 방지).
+oAPP.fn.newBindError = function (o) {
+    var s = JSON.parse(JSON.stringify(oAPP.types.TY_BIND_ERROR));
+    if (o) { for (var k in o) { if (k in s) { s[k] = o[k]; } } }
+    return s;
+};
 
 oAPP.REMOTE = REMOTE;
 oAPP.IPCRENDERER = IPCRENDERER;
@@ -90,6 +122,24 @@ function _zmsg(sNo, p1) {
 }
 oAPP.common.msg = _msg;
 oAPP.common.zmsg = _zmsg;
+
+/****************************************************************************
+ * [.analy/17] 서버 오류 텍스트 → 클라이언트 메시지 클래스 DB 로 역현지화.
+ *   서버(ABAP)는 메시지를 "서버 로그온 언어"로 이미 렌더한 텍스트만 내려준다(서버 수정 불가).
+ *   → 받은 텍스트로 로컬 MESSAGE_CLASS.db 에서 키를 역추적한 뒤 클라 언어로 다시 렌더한다.
+ *   ★ 공통 단일출처 WsMsgCls.relocalize(electron/lib/msg/WsMsgClsService.js) 위임 — 자체 구현 금지.
+ *   ★ 못 찾으면 원문 그대로(graceful) — 표시는 되고 재렌더만 안 됨.
+ ****************************************************************************/
+oAPP.common.relocalizeServerMsg = function (sText) {
+    var sRaw = String(sText || "");
+    if (!sRaw) { return sRaw; }
+    try {
+        var WC = REMOTE.getGlobal("WsMsgCls");
+        if (!WC || typeof WC.relocalize !== "function") { return sRaw; }
+        // beLangu=null → 공통이 EN/KO 후보로 역추적. wsLangu = 화면(Workspace) 언어.
+        return WC.relocalize(sRaw, null, oAPP.attr.GLANGU || LANGU || "") || sRaw;
+    } catch (e) { return sRaw; }
+};
 
 // WLO(등록 기능) 여부 — 원본 index.js:1045 oAPP.common.checkWLOList 1:1.
 //   데이터 원천 = oAPP.attr.oUserInfo.META.T_REG_WLO(부트 수신, bindData.js 도 동일 참조).
