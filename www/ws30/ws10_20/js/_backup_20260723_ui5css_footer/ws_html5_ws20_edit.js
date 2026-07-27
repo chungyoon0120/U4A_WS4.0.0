@@ -1,0 +1,1706 @@
+/************************************************************************
+ * ws_html5_ws20_edit.js  (HTML5)
+ * ----------------------------------------------------------------------
+ * WS20 좌측 디자인 트리의 "UI 편집" 기능 — 우클릭 컨텍스트 메뉴 + 행 액션(+/삭제)
+ *   핸들러를 HTML5 로 이식한다. (구 design/js/uiDesignArea.js / callDesignContextMenu.js
+ *   는 UI5 파일이라 메인 렌더러에 미로드 → 여기서 sap-free 로 재구현.)
+ *
+ *   · 트리 데이터(oAPP.attr.oModel.oData.zTREE) 직접 조작 + 모델 refresh(→fnRenderDesignTree)
+ *   · 미리보기(Preview iframe = UI5 KEEP)의 createUIInstance/moveUIObjPreView/destroyUIPreView
+ *     호출은 try/catch 가드(iframe 미로드/함수 부재 시 트리만 갱신).
+ *   · 변경 시 setChangeFlag + 앱헤더(Active→Inactive) 갱신.
+ *   · 모든 oAPP.fn.* 는 가드 정의(원본 UI5 가 로드된 환경이면 그쪽 우선).
+ *
+ *   [Phase 1] 컨텍스트 메뉴 + 삭제/이동(Up/Down)/복사/붙여넣기.
+ *   [Phase 2 예정] UI 삽입 팝업(insert-UI: aggregation 선택 + UI 카탈로그) — 현재 안내.
+ ************************************************************************/
+(function (window, oAPP) {
+    "use strict";
+
+    oAPP.fn = oAPP.fn || {};
+    oAPP.attr = oAPP.attr || {};
+    var APPCOMMON = oAPP.common || (oAPP.common = {});
+
+    var COPY_AREA = "U4AWSuiDesignArea"; // setCopyData/getCopyData 키 (원본 동일)
+
+    // 언어 = 서버 메시지 클래스 단일 출처(원본 동일). 내부 영문 폴백 보관 금지(2026-06-16 지시).
+    function _msg(sNum) {
+        try {
+            var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum);
+            if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
+        } catch (e) { }
+        return sNum;
+    }
+    function _msgWs(sNum) {
+        try {
+            var s = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNum);
+            if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
+        } catch (e) { }
+        return sNum;
+    }
+    function _footer(sType, sMsg) {
+        try { APPCOMMON.fnShowFloatingFooterMsg(sType, "WS20", sMsg); } catch (e) { }
+    }
+    function _isEdit() {
+        try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { return false; }
+    }
+    function _tree() {
+        try { return oAPP.attr.oModel.oData.zTREE || []; } catch (e) { return []; }
+    }
+    // 노드 찾기 (HTML5 getTreeData 우선, 없으면 자체 재귀)
+    function _node(sObjid) {
+        try { if (typeof oAPP.fn.getTreeData === "function") { return oAPP.fn.getTreeData(sObjid); } } catch (e) { }
+        var found = null;
+        (function walk(arr) {
+            if (!arr || found) { return; }
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i].OBJID === sObjid) { found = arr[i]; return; }
+                walk(arr[i].zTREE);
+            }
+        })(_tree());
+        return found;
+    }
+    function _refreshTree() {
+        try { oAPP.attr.oModel.refresh(); } catch (e) { }       // → fnRenderDesignTree 훅
+        try { if (oAPP.fn.fnRenderDesignTree) { oAPP.fn.fnRenderDesignTree(); } } catch (e) { }
+    }
+    function _markChanged() {
+        try { if (typeof oAPP.fn.setChangeFlag === "function") { oAPP.fn.setChangeFlag(); } } catch (e) { }
+        try { APPCOMMON.fnSetModelProperty && APPCOMMON.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { }
+        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+    }
+    // 재선택 = setSelectTreeItem(→fnWs20SelectUI, async: refreshPreview+selPreviewUI 대기).
+    //  ★ Promise 를 반환한다 — undo/redo 가 이 완료(=편집하던 페이지 복원)까지 await 해야
+    //    BUSY 를 그 전에 풀지 않고, PAGE1 이 잠깐 노출되는 깜빡임도 막는다.
+    function _selectNode(sObjid) {
+        try {
+            if (typeof oAPP.fn.setSelectTreeItem === "function") { return oAPP.fn.setSelectTreeItem(sObjid); }
+        } catch (e) { }
+        return Promise.resolve();
+    }
+    // 열려있는 형제(자식) 윈도우 busy 브로드캐스트 — 원본 uiDesignArea.js 의 디자인 변경(삭제/이동/붙여넣기/삽입)이
+    //  bindPopupBroadCast("BUSY_ON"/"BUSY_OFF")로 전체 자식 윈도우(앱 멀티 미리보기 등)를 잠갔다 푼다.
+    //  (attr.js _broadChildBusy 와 동일 채널. D&D 는 dnd.js _bindBusy 가 이미 처리하므로 여기선 비-D&D 경로만.)
+    function _broadBusy(bOn) {
+        try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: bOn ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
+    }
+    // 미리보기 iframe 함수 안전 호출 (UI5 preview KEEP — 부재 시 무시)
+    function _prev(fnName, aArgs) {
+        try {
+            var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
+            if (w && typeof w[fnName] === "function") { w[fnName].apply(w, aArgs || []); return true; }
+        } catch (e) { }
+        return false;
+    }
+
+    // 행 액션 아이콘(+추가/삭제) 표시 플래그 계산 (구 uiDesignArea.js designSetActionIcon 1860 1:1)
+    //   setUIAreaEditable 이 _safeDecorate("designSetActionIcon", root) 로 호출 → visible_add/delete 세팅.
+    //   규칙: Change 모드(IS_EDIT)만 노출, ROOT=둘다 없음, APP=추가만, 그외=추가+삭제. (재귀)
+    if (typeof oAPP.fn.designSetActionIcon !== "function") {
+        oAPP.fn.designSetActionIcon = function (is_tree) {
+            if (!is_tree) { return; }
+            var bEdit = false;
+            try { bEdit = oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { }
+            is_tree.visible_add = bEdit;
+            is_tree.visible_delete = bEdit;
+            if (is_tree.OBJID === "ROOT") { is_tree.visible_add = false; is_tree.visible_delete = false; }
+            else if (is_tree.OBJID === "APP") { is_tree.visible_delete = false; }
+            if (!is_tree.zTREE || !is_tree.zTREE.length) { return; }
+            for (var i = 0; i < is_tree.zTREE.length; i++) { oAPP.fn.designSetActionIcon(is_tree.zTREE[i]); }
+        };
+    }
+
+    /********************************************************************
+     * Undo / Redo (스냅샷 기반) — 원본 undoRedo 모듈(action별 클래스, design 모듈 의존)을
+     *   대체. 편집 직전 zTREE + prev._T_0015 + IS_CHAG 스냅샷을 쌓고, undo 시 복원 + 트리
+     *   재렌더 + 프리뷰 drawPreview(가드). 삽입/삭제/이동/복사붙여넣기에 균일 적용.
+     ********************************************************************/
+    var _undoStack = [], _redoStack = [], _UNDO_MAX = 50;
+    var _bHistBusy = false;   // undo/redo 복원(async drawPreview+재선택) 진행 중 재진입 차단 플래그.
+
+    function _snapshot() {
+        var z = [];
+        try { z = JSON.parse(JSON.stringify(_tree())); } catch (e) { }
+        var t15 = {};
+        try {
+            var p = oAPP.attr.prev || {};
+            for (var k in p) { if (p[k] && p[k]._T_0015) { try { t15[k] = JSON.parse(JSON.stringify(p[k]._T_0015)); } catch (e2) { } } }
+        } catch (e) { }
+        // ★ 클라이언트 이벤트(T_CEVT)·설명(T_DESC) 도 편집 대상이므로 스냅샷에 포함(원본 undoRedo 는 삽입/
+        //   삭제/DND/ATTR 모든 액션에서 이 둘을 저장·복원함 — 미포함이 원본 대비 회귀였다).
+        //   전역 배열 통째 clone — prev 처럼 키 병합이 아니라 배열 전체 교체라 부작용 국소적.
+        var cevt = null, desc = null;
+        try {
+            var A = oAPP.DATA && oAPP.DATA.APPDATA;
+            if (A && Array.isArray(A.T_CEVT)) { cevt = JSON.parse(JSON.stringify(A.T_CEVT)); }
+            if (A && Array.isArray(A.T_DESC)) { desc = JSON.parse(JSON.stringify(A.T_DESC)); }
+        } catch (e) { }
+        var chag = ""; try { chag = (parent.getAppInfo() || {}).IS_CHAG || ""; } catch (e) { }
+        var sel = ""; try { sel = (oAPP.attr.oModel.oData.uiinfo && oAPP.attr.oModel.oData.uiinfo.OBJID) || ""; } catch (e) { }
+        return { z: z, t15: t15, chag: chag, sel: sel, cevt: cevt, desc: desc };
+    }
+    // async — drawPreview·재선택(refreshPreview/selPreviewUI)이 async 라, 호출측(_doApply)이
+    //  이 완료까지 await 해야 BUSY 해제/재진입이 재구성 도중에 끼어들지 않는다.
+    async function _restoreSnap(s) {
+        if (!s) { return; }
+        // 선택 노드가 복원 후 사라질 경우(예: 삭제 redo)의 대체 앵커 = 그 부모(영향 페이지).
+        var sSelParent = "";
+        try { var oSelCur = s.sel ? _node(s.sel) : null; if (oSelCur) { sSelParent = oSelCur.POBID || ""; } } catch (e) { }
+
+        // ── 트리 체크박스 선택(chk) 보존 ──
+        //  chk 는 "편집 내용"이 아니라 일시적 멀티선택 상태다. 스냅샷은 zTREE 를 통째 담아 chk 도
+        //  캡처되므로, 그냥 복원하면 "편집 후 체크한 박스가 undo 시 풀리는" 부작용이 난다. → 복원 "전"
+        //  현재 chk 를 OBJID 별로 담아, 복원한 zTREE 에 다시 씌운다(undo/redo 가 선택상태를 안 바꾸게).
+        var oChkMap = {};
+        try { (function w(a) { if (!a) { return; } for (var i = 0; i < a.length; i++) { oChkMap[a[i].OBJID] = a[i].chk === true; w(a[i].zTREE); } })(_tree()); } catch (e) { }
+
+        // ── 데이터 복원 ──
+        try { oAPP.attr.oModel.oData.zTREE = JSON.parse(JSON.stringify(s.z)); } catch (e) { }
+        // 복원된 zTREE 에 현재 chk 재적용(스냅샷의 chk 는 무시 — 선택상태는 히스토리 대상 아님).
+        try { (function w(a) { if (!a) { return; } for (var i = 0; i < a.length; i++) { a[i].chk = (oChkMap[a[i].OBJID] === true); w(a[i].zTREE); } })(oAPP.attr.oModel.oData.zTREE); } catch (e) { }
+        try {
+            oAPP.attr.prev = oAPP.attr.prev || {};
+            // (1) 스냅샷에 담긴 키 복원.
+            for (var k in s.t15) { oAPP.attr.prev[k] = oAPP.attr.prev[k] || {}; oAPP.attr.prev[k]._T_0015 = JSON.parse(JSON.stringify(s.t15[k])); }
+            // (2) ★ 스냅샷에 "없는" 키의 _T_0015 는 편집으로 새로 생긴 잔재이므로 [] 로 비운다.
+            //   drawPreview 는 getAttrChangedData()로 현재 prev "전체"를 훑어 T_0015 를 다시 만든다
+            //   (preview/index.js:8496). 스냅샷 키만 덮고 잔재를 안 지우면, 어떤 속성을 "처음" 바꾼 뒤
+            //   undo 해도 그 노드의 편집 _T_0015 가 남아 T_0015 에 실려 편집값이 되살아난다(=undo 미반영).
+            //   _snapshot 은 push 시점 _T_0015 가 있던 키만 담으므로, 스냅샷에 없다=push 당시 변경 없음
+            //   → [] 가 정확한 복원값(빈 배열도 스냅샷에 담기니 오검출 없음).
+            for (var pk in oAPP.attr.prev) {
+                if (!oAPP.attr.prev[pk]) { continue; }
+                if (Object.prototype.hasOwnProperty.call(s.t15, pk)) { continue; }
+                if (Array.isArray(oAPP.attr.prev[pk]._T_0015)) { oAPP.attr.prev[pk]._T_0015 = []; }
+            }
+        } catch (e) { }
+        // T_CEVT/T_DESC 복원 — 배열 참조 유지 위해 in-place 교체(구버전 스냅샷/미로딩 가드).
+        try {
+            var _A = oAPP.DATA && oAPP.DATA.APPDATA;
+            if (_A) {
+                if (Array.isArray(s.cevt) && Array.isArray(_A.T_CEVT)) { _A.T_CEVT.length = 0; Array.prototype.push.apply(_A.T_CEVT, JSON.parse(JSON.stringify(s.cevt))); }
+                if (Array.isArray(s.desc) && Array.isArray(_A.T_DESC)) { _A.T_DESC.length = 0; Array.prototype.push.apply(_A.T_DESC, JSON.parse(JSON.stringify(s.desc))); }
+            }
+        } catch (e) { }
+        _refreshTree();
+
+        // 복원 트리에 존재하는 유효 앵커(선택 대상).
+        var sAnchor = "";
+        if (s.sel && _node(s.sel)) { sAnchor = s.sel; }
+        else if (sSelParent && _node(sSelParent)) { sAnchor = sSelParent; }
+
+        // IS_CHAG 는 스냅샷 값으로 되돌리지 않고 항상 dirty("X") 유지 — undo/redo 도 "변경 행위"라
+        //  한 번이라도 편집했으면 계속 dirty 여야 뒤로가기 변경감지 팝업이 뜬다(원본은 IS_CHAG 미변경).
+        function _commitState() {
+            try { var oi = parent.getAppInfo(); if (oi) { oi.IS_CHAG = "X"; parent.setAppInfo(oi); } } catch (e) { }
+            try { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { }
+            try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+            _updateUndoBtns();
+        }
+
+        // ★ 미리보기 반영 = "값 복원 후 화면 전면 재구성"(원본 사상 그대로 — 삽입/삭제/이동/속성/이름/테마 균일).
+        //   [WHY 노드별 setter 가 아니라 전면 재구성인가]
+        //   스냅샷은 "무슨 노드의 무슨 속성이 바뀌었는지"를 갖지 않고 전체 _T_0015 만 담는다.
+        //   노드별 setter(previewUIsetProp) 재적용 방식은 두 빈틈이 있어 undo 미반영을 낳았다:
+        //     (1) 어떤 속성을 "처음" 바꾼 경우 편집 直前 스냅샷에 그 속성 행이 없어 되돌릴 setter 자체가
+        //         없다 → 살아있는 컨트롤이 편집값을 그대로 유지(데이터는 되돌아가는데 미리보기만 안 바뀜).
+        //     (2) previewUIsetProp 은 내부가 async(prevGetOTRText().then)라 직후의 재선택과 경쟁한다.
+        //   → 복원된 모델(zTREE + prev._T_0015 + ROOT 테마)로 drawPreview 가 모든 컨트롤을 새로 그리면
+        //     (uiPreviewArea 초기로드와 동일 경로: setUIScript(zTREE) + 테마 재적용) 위 빈틈 없이 항상
+        //     "데이터 = 미리보기" 가 보장된다. 페이지 위치는 이어지는 _selectNode(sAnchor) 가 그 노드의
+        //     페이지로 재이동시켜 보존한다(원본 초기로드 패턴 uiPreviewArea:155 drawPreview().then(select)).
+        //  ★ drawPreview → (완료 대기) → _selectNode 순서로 await. drawPreview 가 root 를 APP 기본
+        //    페이지로 재구성하므로, 그 "완료 뒤"에 앵커를 재선택해야 편집하던 페이지로 정확히 복귀한다
+        //    (fire-and-forget 이면 PAGE1 이 잠깐 노출되거나 재선택이 재구성과 경쟁).
+        try {
+            var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
+            if (w && typeof w.drawPreview === "function") { await w.drawPreview(); }
+        } catch (e) { console.warn("[HTML5][WS20] undo/redo drawPreview:", e && e.message); }
+        _commitState();
+        if (sAnchor) { try { await _selectNode(sAnchor); } catch (e) { } }
+    }
+    // 편집 직전 호출 — 현재 상태를 undo 스택에 적재(+redo 비움).
+    oAPP.fn.fnWs20PushUndo = function () {
+        _undoStack.push(_snapshot());
+        if (_undoStack.length > _UNDO_MAX) { _undoStack.shift(); }
+        _redoStack = [];
+        _updateUndoBtns();
+    };
+    // 트리 노드 총 개수(재귀) — undo/redo 가 "삭제 방향"인지 판정용.
+    function _countNodes(aTree) {
+        var n = 0;
+        (function walk(a) { if (!a) { return; } for (var i = 0; i < a.length; i++) { n++; walk(a[i].zTREE); } })(aTree);
+        return n;
+    }
+    // 트리 툴바/단축키 진입점 (구 undoRedo.executeHistory("UNDO"/"REDO"))
+    //  ★ 원본 CL_DELETE_UI.executeHistory(undoRedo.js 885~931): 되돌리기/다시하기 결과
+    //    UI 가 화면에서 사라지는 경우(=삭제 방향)에는 "003 정말 삭제?" 확인 팝업을 띄우고,
+    //    취소(NO)하면 스택을 소비하지 않고 원위치로 둔다(삭제/추가가 양방향으로 변환되므로
+    //    삭제 redo 뿐 아니라 추가 undo 도 UI 가 사라지면 동일하게 확인 — 원본 1:1).
+    //    스냅샷 방식엔 액션 타입이 없으므로 "복원 결과 트리 노드 수가 줄어드는가"로 판정한다
+    //    (이동/속성변경/Rename 은 노드 수 동일 → 팝업 없음, 자동으로 원본과 일치).
+    oAPP.fn.fnWs20ExecHistory = function (sMode) {
+        // ★ 재진입 차단 — 복원(_restoreSnap)이 async(drawPreview+재선택)라 완료 전에 또 undo/redo 를
+        //   누르면 재구성이 겹쳐 히스토리/미리보기가 엉킨다. 진행 중이면 무시(코덱스 지적).
+        if (_bHistBusy) { return; }
+        var aSrc = (sMode === "UNDO") ? _undoStack : _redoStack;
+        var aDst = (sMode === "UNDO") ? _redoStack : _undoStack;
+        if (!aSrc.length) { return; }
+
+        var oTarget = aSrc[aSrc.length - 1];                       // 복원될 스냅샷(아직 소비 전)
+        var nCur = _countNodes(_tree());                           // 현재 트리 노드 수
+        var nNext = (oTarget && oTarget.z) ? _countNodes(oTarget.z) : nCur;
+
+        async function _doApply() {
+            //열려있는 형제(자식) 윈도우 BUSY_ON/OFF — 원본 undoRedo.js executeHistory(143·156행)가
+            //  bindPopupBroadCast("BUSY_ON")/("BUSY_OFF")로 전체 자식 윈도우(앱 멀티 미리보기 등)를 잠금.
+            //  ★ _restoreSnap 을 await 해 drawPreview + 재선택(페이지 복원)까지 끝난 "뒤"에 BUSY_OFF·
+            //    재진입 해제 — 재구성 도중 잠금이 풀려 다른 undo 가 끼어들던 race 를 막는다(코덱스 지적).
+            //  ※ attr.js _broadChildBusy 와 동일 채널 — edit.js 는 oMainBroad 미사용이라 인라인.
+            _bHistBusy = true;
+            try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { }
+            try {
+                aDst.push(_snapshot());
+                await _restoreSnap(aSrc.pop());
+            } catch (e) {
+                console.error("[HTML5][WS20] undo/redo 복원 오류:", e && e.message);
+            } finally {
+                try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+                _bHistBusy = false;
+            }
+        }
+
+        // 복원 결과 UI 가 사라지면(노드 감소) 원본과 동일하게 삭제 확인 팝업.
+        if (nNext < nCur) {
+            var sMsg = _msgWs("003", "Do you really want to delete?");
+            var fnConfirm = APPCOMMON.fnConfirmBox;
+            // 취소(NO)면 스택을 소비하지 않음 → 원위치(원본 903~931 의미와 동일).
+            function lf_do(act) { if (act === "YES") { _doApply(); } }
+            if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
+            else { lf_do(window.confirm(sMsg) ? "YES" : "NO"); }
+            return;
+        }
+
+        _doApply();
+    };
+    oAPP.fn.fnWs20ClearHistory = function () { _undoStack = []; _redoStack = []; _updateUndoBtns(); };
+    oAPP.fn.fnWs20CanUndo = function () { return _undoStack.length > 0; };
+    oAPP.fn.fnWs20CanRedo = function () { return _redoStack.length > 0; };
+    // undo/redo 버튼 활성/비활성 갱신 (tree.js 가 data-uract 마커 부여)
+    function _updateUndoBtns() {
+        try {
+            var u = document.querySelector('[data-uract="UNDO"]'), r = document.querySelector('[data-uract="REDO"]');
+            if (u) { u.disabled = !_undoStack.length; }
+            if (r) { r.disabled = !_redoStack.length; }
+        } catch (e) { }
+    }
+    oAPP.fn.fnWs20UpdateUndoBtns = _updateUndoBtns;
+
+    // OBJID 채번 (구 uiDesignArea.js setOBJID 1:1 — 붙여넣기/삽입용)
+    if (typeof oAPP.fn.setOBJID !== "function") {
+        oAPP.fn.setOBJID = function (objid) {
+            var l_cnt = 1;
+            var l_upper = String(objid || "UI").toUpperCase();
+            var l_objid = l_upper + l_cnt;
+            var lt_0014 = (typeof oAPP.fn.parseTree2Tab === "function")
+                ? oAPP.fn.parseTree2Tab(oAPP.attr.oModel.oData.zTREE) : [];
+            while (true) {
+                if (lt_0014.findIndex(function (a) { return a.OBJID === l_objid; }) === -1) { return l_objid; }
+                l_cnt += 1; l_objid = l_upper + l_cnt;
+            }
+        };
+    }
+
+    // 파라메터(&1) 치환 메시지 (구 fnGetMsgClsText 3rd arg)
+    function _msgWsP(sNum, p1, sFallback) {
+        try {
+            var s = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNum, p1);
+            if (s != null && s !== "") { return s; }
+        } catch (e) { }
+        return sFallback;
+    }
+
+    /********************************************************************
+     * 노드 미리보기 정리 (구 lf_delSelLine 의 preview 정리부 — 시그니처 1:1)
+     *   setChildUiException(부모 필수자식 보강) → delUIObjPreView → destroyUIPreView
+     *   → oAPP.attr.prev 제거. (단건/멀티 삭제 공용)
+     ********************************************************************/
+    function _removeNodePreview(n) {
+        if (!n) { return; }
+        // 삭제 노드의 부모가 "자식 필수" UI(UA050)인데 자식이 사라지면 기본 자식 강제 셋업(구 4385, bIgnore=true)
+        _prev("setChildUiException", [n.PUIOK, n.POBID, undefined, undefined, true]);
+        // 미리보기에서 제거 (구 delUIObjPreView(OBJID,POBID,PUIOK,UIATT,ISMLB,UIOBK))
+        _prev("delUIObjPreView", [n.OBJID, n.POBID, n.PUIOK, n.UIATT, n.ISMLB, n.UIOBK]);
+        // 미리보기 인스턴스 destroy (구 destroyUIPreView(OBJID,POBID,UIOBK,PUIOK) — 자식 재귀 정리)
+        _prev("destroyUIPreView", [n.OBJID, n.POBID, n.UIOBK, n.PUIOK]);
+        try { if (oAPP.attr.prev) { delete oAPP.attr.prev[n.OBJID]; } } catch (e) { }
+    }
+
+    /********************************************************************
+     * 삭제 (구 designUIDelete) — 확인 후 부모 zTREE 에서 노드 제거.
+     ********************************************************************/
+    function _deleteUI(oNode) {
+        if (!oNode || !_isEdit()) { return; }
+        if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { return; }
+
+        var sMsg = _msgWs("003", "Do you really want to delete?");
+        var fnConfirm = APPCOMMON.fnConfirmBox;
+        function lf_do(act) {
+            if (act !== "YES") { return; }
+            var oParent = _node(oNode.POBID);
+            if (!oParent || !oParent.zTREE) { return; }
+            _broadBusy(true);   // 자식창 잠금(원본 삭제 시 BUSY_ON)
+            oAPP.fn.fnWs20PushUndo();
+            // 미리보기 제거(가드, 시그니처 1:1)
+            _removeNodePreview(oNode);
+            // 부모 배열에서 제거
+            var idx = oParent.zTREE.findIndex(function (a) { return a.OBJID === oNode.OBJID; });
+            if (idx !== -1) { oParent.zTREE.splice(idx, 1); }
+            _refreshTree();
+            _selectNode(oParent.OBJID);
+            _markChanged();
+            _broadBusy(false);   // 짝 BUSY_OFF
+        }
+        if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
+        else { lf_do(window.confirm(sMsg) ? "YES" : "NO"); }
+    }
+
+    /********************************************************************
+     * 체크박스 (Change 모드 멀티선택 삭제) — 구 uiDesignArea.js 1:1 이식.
+     *   데이터 로더/ setUIAreaEditable 이 _safeDecorate("setTreeChkBoxEnable") 로 호출.
+     *   트리(ws_html5_ws20_tree.js)가 chk_visible/chk 로 체크박스 렌더 + designTreeSelChkbox 호출.
+     ********************************************************************/
+    // UI 아이콘 데코레이터 (구 setTreeUiIcon 1645) — T_0022 에서 UIOBK 로 UICON 조회 →
+    //   fnGetSapIconPath(...icons/x.gif) → icon_visible 토글, 재귀. ROOT/APP 등 T_0022 미존재 노드는
+    //   UICON 없으면 icon_visible=false. 로더(_safeDecorate)·designAddUIObject(insert) 공용 단일 소스.
+    if (typeof oAPP.fn.setTreeUiIcon !== "function") {
+        oAPP.fn.setTreeUiIcon = function (is_tree) {
+            if (!is_tree) { return; }
+            // aggregation 아이콘(가드 — HTML5 미구현 시 skip)
+            try { if (typeof oAPP.fn.setTreeAggrIcon === "function") { oAPP.fn.setTreeAggrIcon(is_tree); } } catch (e) { }
+            // UI 아이콘 — T_0022.UICON → 경로 변환(구 1654, 항상 재계산)
+            try {
+                var T22 = _LIB().T_0022 || [];
+                var ls = T22.find(function (a) { return a.UIOBK === is_tree.UIOBK; });
+                if (ls && ls.UICON && ls.UICON !== "" && typeof oAPP.fn.fnGetSapIconPath === "function") {
+                    is_tree.UICON = oAPP.fn.fnGetSapIconPath(ls.UICON) || is_tree.UICON;
+                }
+            } catch (e) { }
+            is_tree.icon_visible = !!(is_tree.UICON && is_tree.UICON !== "");
+            if (is_tree.zTREE) {
+                for (var i = 0; i < is_tree.zTREE.length; i++) { oAPP.fn.setTreeUiIcon(is_tree.zTREE[i]); }
+            }
+        };
+    }
+    // 체크박스 활성여부 (구 setTreeChkBoxEnable 1759) — IS_EDIT && ROOT/APP 제외, chk 초기화. 재귀.
+    if (typeof oAPP.fn.setTreeChkBoxEnable !== "function") {
+        oAPP.fn.setTreeChkBoxEnable = function (is_tree) {
+            if (!is_tree) { return; }
+            var bEdit = _isEdit();
+            is_tree.chk = false;
+            is_tree.chk_visible = bEdit && is_tree.OBJID !== "ROOT" && is_tree.OBJID !== "APP";
+            if (is_tree.zTREE) {
+                for (var i = 0; i < is_tree.zTREE.length; i++) { oAPP.fn.setTreeChkBoxEnable(is_tree.zTREE[i]); }
+            }
+        };
+    }
+    // 체크박스 토글 전파 (구 designTreeSelChkbox 3613) — 하위 전체 동기화 + 해제 시 조상 해제.
+    if (typeof oAPP.fn.designTreeSelChkbox !== "function") {
+        oAPP.fn.designTreeSelChkbox = function (is_tree) {
+            if (!is_tree) { return; }
+            var bChk = is_tree.chk === true;
+            (function setAll(n) {
+                n.chk = bChk;
+                if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { setAll(n.zTREE[i]); } }
+            })(is_tree);
+            // 체크 해제 시: 부분선택이 된 조상들의 전체체크 상태 해제
+            if (!bChk) {
+                var p = _node(is_tree.POBID);
+                while (p) { p.chk = false; p = _node(p.POBID); }
+            }
+            _refreshTree();
+        };
+    }
+    // 체크박스 전체 해제 (구 designClearCheckAll 1793)
+    if (typeof oAPP.fn.designClearCheckAll !== "function") {
+        oAPP.fn.designClearCheckAll = function () {
+            (function clr(arr) {
+                if (!arr) { return; }
+                for (var i = 0; i < arr.length; i++) { arr[i].chk = false; clr(arr[i].zTREE); }
+            })(_tree());
+            _refreshTree();
+        };
+    }
+    // 멀티 삭제 (구 designTreeMultiDeleteItem 4353) — 체크된 UI 일괄 삭제.
+    if (typeof oAPP.fn.designTreeMultiDeleteItem !== "function") {
+        oAPP.fn.designTreeMultiDeleteItem = function () {
+            if (!_isEdit()) { return; }
+
+            // 체크된 노드 수집 (ROOT/APP 제외)
+            var aChecked = [];
+            (function collect(arr) {
+                if (!arr) { return; }
+                for (var i = 0; i < arr.length; i++) {
+                    var n = arr[i];
+                    if (n.chk === true && n.OBJID !== "ROOT" && n.OBJID !== "APP") { aChecked.push(n); }
+                    collect(n.zTREE);
+                }
+            })(_tree());
+
+            // 체크건 없음 → 안내 (구 286 Check box not selected.)
+            if (aChecked.length === 0) {
+                try { parent.showMessage(null, 10, "I", _msgWs("286", "Check box not selected.")); } catch (e) { }
+                return;
+            }
+
+            // 삭제 후 선택할 라인(첫 체크 노드의 부모 — 삭제되면 ROOT)
+            var sSelAfter = (aChecked[0] && aChecked[0].POBID) || "ROOT";
+
+            // 확인: 378 &1 rows has been selected. + 003 Do you really want to delete?
+            var sMsg = _msgWsP("378", aChecked.length, aChecked.length + " rows has been selected.") +
+                "\n" + _msgWs("003", "Do you really want to delete?");
+            var fnConfirm = APPCOMMON.fnConfirmBox;
+
+            function lf_do(act) {
+                if (act !== "YES") { return; }
+                _broadBusy(true);   // 자식창 잠금(원본 다중 삭제 시 BUSY_ON)
+                oAPP.fn.fnWs20PushUndo();
+                // bottom-up(자식 먼저) 재귀 삭제 — 구 lf_delSelLine: chk===true 노드만 제거.
+                (function del(arr) {
+                    if (!arr) { return; }
+                    for (var i = arr.length - 1; i >= 0; i--) {
+                        var n = arr[i];
+                        del(n.zTREE);                 // 자식 먼저
+                        if (n.chk !== true) { continue; }
+                        _removeNodePreview(n);
+                        arr.splice(i, 1);
+                    }
+                })(_tree());
+                if (!_node(sSelAfter)) { sSelAfter = "ROOT"; }
+                _refreshTree();
+                _selectNode(sSelAfter);
+                _markChanged();
+                // 원본 designTreeMultiDeleteItem 4541행: 005 "Job finished." (구 showMessage 팝업 → HTML5 footer)
+                _footer("S", _msgWs("005", "Job finished."));
+                _broadBusy(false);   // 짝 BUSY_OFF
+            }
+            if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
+            else { lf_do(window.confirm(sMsg) ? "YES" : "NO"); }
+        };
+    }
+
+    /********************************************************************
+     * 위/아래 이동 (구 contextMenuUiMove) — 형제 배열 내 순서 변경.
+     *   sDir: "-" 위로 / "+" 아래로
+     ********************************************************************/
+    function _moveUI(oNode, sDir) {
+        if (!oNode || !_isEdit()) { return; }
+        var oParent = _node(oNode.POBID);
+        if (!oParent || !oParent.zTREE) { return; }
+        var aSib = oParent.zTREE;
+        var idx = aSib.findIndex(function (a) { return a.OBJID === oNode.OBJID; });
+        if (idx === -1) { return; }
+        var newIdx = (sDir === "-") ? idx - 1 : idx + 1;
+        if (newIdx < 0 || newIdx >= aSib.length) { return; } // 경계
+        _broadBusy(true);   // 자식창 잠금(원본 이동 시 BUSY_ON)
+        oAPP.fn.fnWs20PushUndo();
+        aSib.splice(idx, 1);
+        aSib.splice(newIdx, 0, oNode);
+        _refreshTree();
+        // 미리보기 순서 반영(가드) — 시그니처: (OBJID, UILIB, POBID, PUIOK, UIATT, POSIT, ISMLB, UIOBK)
+        _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, newIdx, oNode.ISMLB, oNode.UIOBK]);
+        _selectNode(oNode.OBJID);
+        _markChanged();
+        _broadBusy(false);   // 짝 BUSY_OFF
+    }
+
+    /********************************************************************
+     * 복사 (구 contextMenuUiCopy) — 노드+속성 깊은복사 → copy 버퍼.
+     ********************************************************************/
+    function _copyUI(oNode) {
+        if (!oNode) { return; }
+        if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { return; }
+        var clone;
+        try { clone = JSON.parse(JSON.stringify(oNode)); } catch (e) { return; }
+        // 각 노드의 속성(_T_0015) + 클라이언트 이벤트(_CEVT) + 설명(_DESC) 동봉 (붙여넣기 시 새 OBJID 로 복원).
+        //   ★필드 형식은 원본 contextMenuUiCopy(lf_setTreeItemAttr)/패턴 저장과 동일(_CEVT = T_CEVT 원행).
+        //     붙여넣기는 공통 designAddTreeData → _applyP13nPattern 경로가 이 형식을 그대로 소비한다.
+        (function attach(n) {
+            try {
+                var p = oAPP.attr.prev && oAPP.attr.prev[n.OBJID];
+                n._T_0015 = (p && p._T_0015) ? JSON.parse(JSON.stringify(p._T_0015)) : [];
+            } catch (e) { n._T_0015 = []; }
+            // 클라이언트 이벤트 — 원본 getUiClientEvent 1:1: SAP.UI.CORE.HTML 의 content(HM) +
+            //   JS 이벤트(_T_0015.UIATY==="2")를 T_CEVT 원행(OBJID=원OBJID+UIASN/CONTENT) 그대로 수집.
+            //   있을 때만 _CEVT 세팅(원본 동일 — lf_copyClientEvent 는 undefined 면 skip).
+            try {
+                var _A = oAPP.DATA.APPDATA;
+                var _cev = [];
+                if (_A && Array.isArray(_A.T_CEVT) && _A.T_CEVT.length) {
+                    if (n.UIFND === "SAP.UI.CORE.HTML") {
+                        var _hi = _A.T_CEVT.findIndex(function (a) { return a.OBJID === n.OBJID + "CONTENT" && a.OBJTY === "HM"; });
+                        if (_hi !== -1) { _cev.push(_A.T_CEVT[_hi]); }
+                    }
+                    var _evt = (n._T_0015 || []).filter(function (a) { return a.UIATY === "2"; });
+                    for (var c = 0; c < _evt.length; c++) {
+                        var _ji = _A.T_CEVT.findIndex(function (a) { return a.OBJID === n.OBJID + _evt[c].UIASN && a.OBJTY === "JS"; });
+                        if (_ji !== -1) { _cev.push(_A.T_CEVT[_ji]); }
+                    }
+                }
+                if (_cev.length) { n._CEVT = JSON.parse(JSON.stringify(_cev)); }
+            } catch (e) { }
+            // 설명(_DESC)
+            try { n._DESC = (typeof oAPP.fn.getDesc === "function") ? (oAPP.fn.getDesc(n.OBJID) || "") : ""; } catch (e) { n._DESC = ""; }
+            if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { attach(n.zTREE[i]); } }
+        })(clone);
+        try {
+            if (typeof oAPP.fn.setCopyData === "function") { oAPP.fn.setCopyData(COPY_AREA, [COPY_AREA], clone); }
+            else { oAPP.attr.__ws20Copy = clone; }
+            // (원본 contextMenuUiCopy 는 완료 토스트 없음)
+        } catch (e) { }
+    }
+    function _getCopy() {
+        try {
+            if (typeof oAPP.fn.getCopyData === "function") {
+                var r = oAPP.fn.getCopyData(COPY_AREA);
+                return (r && r[0] && r[0].DATA) ? r[0].DATA : null;
+            }
+        } catch (e) { }
+        return oAPP.attr.__ws20Copy || null;
+    }
+
+    /********************************************************************
+     * 붙여넣기 (구 contextMenuUiPaste, 간소화) — 복사본을 대상 노드 자식으로 삽입.
+     *   OBJID 는 setOBJID 로 전부 재채번. 미리보기 생성은 가드(부재 시 트리만).
+     ********************************************************************/
+    function _pasteUI(oTarget) {
+        if (!oTarget || !_isEdit()) { return; }
+        var src = _getCopy();
+        if (!src) { return; } // 복사본 없으면 무동작(메뉴 en.paste 로 이미 비활성)
+        var clone;
+        try { clone = JSON.parse(JSON.stringify(src)); } catch (e) { return; }
+
+        // ★원본 붙여넣기의 실제 경로(uiDesignArea.js designAddTreeData 5808~)로 위임 — 패턴 drop 과 완전 동일.
+        //   구 _pasteUI 는 "전체 채번 후 1회 push" 로 형제 OBJID 가 중복되던 버그가 있었다. 공통 경로는
+        //   원본처럼 "노드 삽입 후 자식 재귀" 라 형제마다 유일 OBJID 를 보장하고, 아래를 함께 처리한다:
+        //     - aggregation 선택/검증(UA039 중복·UA040 hidden·카디널리티·특정부모·예외aggr)
+        //     - $OTR: alias 서버조회 보강 + 바인딩/서버이벤트 값 제외 필터
+        //     - 미리보기 생성/이동 + 14/15 재구성 + 모델·트리·바인딩팝업 갱신 + 선택/변경플래그
+        //   붙여넣기는 대상 노드의 선택 aggregation 끝에 append → 대상의 stale dropLineInfo 제거(append 강제).
+        try { delete oTarget.dropLineInfo; } catch (e) { }
+
+        _broadBusy(true);   // 자식창 잠금(원본 붙여넣기 시 BUSY_ON)
+        try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(true); } } catch (e) { }
+        var _done = function () {
+            try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } } catch (e) { }
+            _broadBusy(false);   // 짝 BUSY_OFF (가드 실패/취소/완료 모두 여기로)
+        };
+
+        try {
+            if (typeof oAPP.fn.fnWs20AddTreeData === "function") {
+                // undo push 는 재구성 직전 코어 내부(_applyP13nPattern)에서 수행 → 여기서 별도 호출 금지.
+                oAPP.fn.fnWs20AddTreeData(clone, oTarget, null, _done);
+            } else {
+                // dnd 모듈 미로드 방어 — 공통 경로 부재 시 붙여넣기 취소(임의 fallback 금지).
+                console.error("[HTML5][WS20][paste] oAPP.fn.fnWs20AddTreeData 미정의 — 붙여넣기 취소");
+                _done();
+            }
+        } catch (e) {
+            console.error("[HTML5][WS20][paste] fnWs20AddTreeData", e);
+            _done();
+        }
+        // (원본 contextMenuUiPaste 는 완료 토스트 없음)
+    }
+
+    /********************************************************************
+     * [PUBLIC] 행 액션/메뉴 핸들러 — 트리 +/삭제 버튼이 호출(designUIAdd/Delete).
+     *   원본 UI5 가 미로드일 때만 정의(가드).
+     ********************************************************************/
+    if (typeof oAPP.fn.designUIDelete !== "function") {
+        oAPP.fn.designUIDelete = function (oNode) { _deleteUI(oNode); };
+    }
+    /********************************************************************
+     * [Phase 2] UI 삽입 — 카탈로그(추가가능 aggregation/UI) + 팝업 + designAddUIObject.
+     *   가이드(.analy WS20 §10/§17): 추가가능 판정은 공통코드(T_0023/T_0022/T_0027/
+     *   UW10/UW03/UW08) 기준, 검증(checkDeny/Allow/cardinality) 우회 금지, 텍스트 미하드코딩,
+     *   Tree↔Preview 동기화(createUIInstance/moveUIObjPreView 가드).
+     ********************************************************************/
+    function _LIB() { return (oAPP.DATA && oAPP.DATA.LIB) || {}; }
+    function _SCODE() { return (oAPP.attr && oAPP.attr.S_CODE) || {}; }
+
+    // 추가 불가 child aggregation (구 exceptionUI.checkDenyChildAggr — UW08, 1:1 이식)
+    if (typeof oAPP.fn.checkDenyChildAggr !== "function") {
+        oAPP.fn.checkDenyChildAggr = function (oParam) {
+            var UW08 = _SCODE().UW08;
+            if (!UW08) { return false; }
+            if (!oParam || !oParam.UIOBK || !oParam.UIATT || !oParam.CHILD_UIOBK) { return false; }
+            var f = UW08.findIndex(function (i) {
+                return i.FLD01 === oParam.UIOBK && i.FLD03 === oParam.UIATT && i.FLD04 === oParam.CHILD_UIOBK && i.FLD06 !== "X";
+            });
+            return f !== -1;
+        };
+    }
+    // 허용 child aggregation (구 exceptionUI.checkAllowChildAggr — UW10 + T_0027 파생, 1:1 이식)
+    if (typeof oAPP.fn.checkAllowChildAggr !== "function") {
+        oAPP.fn.checkAllowChildAggr = function (oParam) {
+            var UW10 = _SCODE().UW10;
+            if (!UW10) { return true; }
+            if (!oParam || !oParam.PUIOK || !oParam.UIOBK || !oParam.UIATT) { return true; }
+            var aUW10 = UW10.filter(function (i) { return i.FLD01 === oParam.PUIOK && i.FLD03 === oParam.UIATT && i.FLD06 !== "X"; });
+            if (aUW10.length === 0) { return true; }
+            var T_0022 = _LIB().T_0022 || [], T_0027 = _LIB().T_0027 || [];
+            for (var i = 0; i < aUW10.length; i++) {
+                var u = aUW10[i];
+                if (u.FLD04 === oParam.UIOBK) { return true; }
+                if (u.FLD07 !== "X") { continue; }
+                var s22 = T_0022.find(function (a) { return a.UIOBK === u.FLD04; });
+                if (!s22) { continue; }
+                var TOBTY = (s22.OBJTY === "3") ? "4" : "3";
+                if (T_0027.some(function (a) { return a.SGOBJ === u.FLD04 && a.TGOBJ === oParam.UIOBK && a.TOBTY === TOBTY; })) { return true; }
+            }
+            return false;
+        };
+    }
+    // UW03: 특정 부모/aggregation 에만 추가 가능 (designChkFixedParentUI 와 동일 기준)
+    function _checkUW03(childUIOBK, parentUIOBK, aggName) {
+        var UW03 = _SCODE().UW03;
+        if (!UW03) { return true; }
+        var a = UW03.filter(function (i) { return i.FLD01 === childUIOBK && i.FLD06 !== "X"; });
+        if (a.length === 0) { return true; }
+        return a.some(function (i) { return i.FLD03 === parentUIOBK && i.FLD05 === aggName; });
+    }
+    // cardinality (구 callDesignContextMenu.chkUiCardinality — 0:1 aggr 중복 방지, 1:1 이식)
+    if (typeof oAPP.fn.chkUiCardinality !== "function") {
+        oAPP.fn.chkUiCardinality = function (is_parent, UIATK, ISMLB) {
+            if (!is_parent || !is_parent.zTREE || is_parent.zTREE.length === 0) { return; }
+            var idx = is_parent.zTREE.findIndex(function (a) { return a.UIATK === UIATK; });
+            if (ISMLB === "" && idx !== -1) {
+                try { parent.showMessage(null, 10, "W", _msgWs("022", "Can not specify more than one object in the corresponding Aggregation.")); } catch (e) { }
+                return true;
+            }
+            if (ISMLB === "X") {
+                var s15 = null;
+                try { s15 = oAPP.attr.prev[is_parent.OBJID]._T_0015.find(function (a) { return a.UIATK === UIATK && a.UIATY === "3"; }); } catch (e) { }
+                if (s15 && s15.UIATV !== "" && s15.ISBND === "X" && idx !== -1) {
+                    try { parent.showMessage(null, 10, "W", _msgWs("021", "The object is already specified in Aggregation.")); } catch (e) { }
+                    return true;
+                }
+            }
+        };
+    }
+
+    // 카탈로그: 부모 UIOBK 의 추가가능 aggregation 목록
+    function _getAggregations(parentUIOBK) {
+        var T_0023 = _LIB().T_0023 || [];
+        return T_0023.filter(function (r) { return r.UIOBK === parentUIOBK && r.UIATY === "3" && r.ISDEP !== "X"; });
+    }
+    // 카탈로그: 선택 aggregation 에 추가가능한 UI 목록 (T_0022/T_0027 + UW10/UW03/UW08)
+    function _getUIs(aggRow, parentUIOBK) {
+        var T_0022 = _LIB().T_0022 || [], T_0027 = _LIB().T_0027 || [], T_0020 = _LIB().T_0020 || [];
+        if (!aggRow) { return []; }
+        var base = T_0022.find(function (r) { return r.UIFND === String(aggRow.UIADT || "").toUpperCase(); });
+        if (!base) { return []; }
+        var rels = T_0027.filter(function (r) { return r.SGOBJ === base.UIOBK && (r.TOBTY === "3" || r.TOBTY === "4" || r.TOBTY === "5"); });
+        var bAbstract = false;
+        try { bAbstract = oAPP.common.checkWLOList && oAPP.common.checkWLOList("C", "UHAK900877") === true; } catch (e) { }
+        var aObjTy = bAbstract ? ["1", "2", "4"] : ["1", "4"];
+        var out = [], seen = {};
+        for (var i = 0; i < rels.length; i++) {
+            var ui = T_0022.find(function (r) { return r.UIOBK === rels[i].TGOBJ; });
+            if (!ui || seen[ui.UIOBK]) { continue; }
+            if (ui.ISDEP === "X" || ui.ISSTP === "X" || aObjTy.indexOf(ui.OBJTY) === -1) { continue; }
+            var lib = T_0020.find(function (r) { return r.UILIK === ui.UILIK; });
+            if (lib && lib.NUSED === "X") { continue; }
+            if (oAPP.fn.checkDenyChildAggr({ UIOBK: parentUIOBK, UIATT: aggRow.UIATT, CHILD_UIOBK: ui.UIOBK })) { continue; }
+            if (!oAPP.fn.checkAllowChildAggr({ PUIOK: parentUIOBK, UIATT: aggRow.UIATT, UIOBK: ui.UIOBK })) { continue; }
+            if (!_checkUW03(ui.UIOBK, parentUIOBK, aggRow.UIATT)) { continue; }
+            seen[ui.UIOBK] = 1;
+            out.push(ui);
+        }
+        out.sort(function (a, b) { return String(a.UIOBJ).localeCompare(String(b.UIOBJ)); });
+        return out;
+    }
+
+    // UI 추가 본 처리 (구 designAddUIObject 의 데이터 부분 + 가드된 프리뷰)
+    if (typeof oAPP.fn.designAddUIObject !== "function") {
+        oAPP.fn.designAddUIObject = async function (is_tree, is_0022, is_0023, i_cnt) {
+            if (!is_tree || !is_0022 || !is_0023) { return; }
+            var cnt = parseInt(i_cnt, 10); if (!(cnt > 0)) { cnt = 1; }
+            // 개인화 속성 적용 여부(구 uiDesignArea.js 5012 arguments[4]) — 삽입 팝업 체크박스 값.
+            var _isPresetAttr = arguments[4] || false;
+            // 선행 검증 (cardinality — 0:1 aggregation 중복 방지)
+            if (oAPP.fn.chkUiCardinality(is_tree, is_0023.UIATK, is_0023.ISMLB) === true) { return; }
+
+            oAPP.fn.fnWs20PushUndo();
+
+            // 개인화 속성 적용 시 UI_ATTR_PRESET.db 를 1회 조회(추가UI UIOBK 는 cnt 반복 내내 동일).
+            var _aPreset = _isPresetAttr ? await _readAttrPreset(is_0022.UIOBK) : [];
+
+            var oInfo = {};
+            try { oInfo = parent.getAppInfo() || {}; } catch (e) { }
+            if (!is_tree.zTREE) { is_tree.zTREE = []; }
+            var bEdit = false; try { bEdit = oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { }
+            var lastObjid = "";
+
+            for (var c = 0; c < cnt; c++) {
+                var l14 = oAPP.fn.crtStru0014();
+                l14.APPID = oInfo.APPID || ""; l14.GUINR = oInfo.GUINR || "";
+                l14.OBJID = oAPP.fn.setOBJID(is_0022.UIOBJ || "UI");
+                l14.POBID = is_tree.OBJID;
+                l14.UIOBK = is_0022.UIOBK; l14.PUIOK = is_tree.UIOBK;
+                l14.UIATK = is_0023.UIATK; l14.UIATT = is_0023.UIATT;
+                l14.UIASN = is_0023.UIASN; l14.UIATY = is_0023.UIATY; l14.UIADT = is_0023.UIADT; l14.UIADS = is_0023.UIADS;
+                l14.ISMLB = is_0023.ISMLB; l14.UIFND = is_0022.UIFND; l14.PUIATK = is_0023.UIATK;
+                l14.UILIB = is_0022.LIBNM; l14.ISEXT = is_0022.ISEXT; l14.TGLIB = is_0022.TGLIB; l14.ISECP = is_0022.ISECP;
+                l14.zTREE = [];
+                // tree bind field (구 crtTreeBindField)
+                l14.drag_enable = true; l14.drop_enable = bEdit; l14.chk_visible = bEdit; l14.chk = false;
+                l14.highlight = "None"; l14.visible_add = bEdit; l14.visible_delete = bEdit;
+                // UI 아이콘 + aggregation 아이콘 — 트리 로더와 동일한 공통 데코레이터 재사용.
+                //   l14.UIOBK 로 T_0022 에서 UICON 조회 → fnGetSapIconPath → icon_visible 세팅.
+                //   (인라인 중복 제거: insert/로드 모두 setTreeUiIcon 단일 소스 → 아이콘 일관.)
+                if (typeof oAPP.fn.setTreeUiIcon === "function") { oAPP.fn.setTreeUiIcon(l14); }
+
+                // embedded aggregation _T_0015 (UIATY="6", ISEMB="X")
+                var s15 = oAPP.fn.crtStru0015();
+                s15.APPID = l14.APPID; s15.GUINR = l14.GUINR; s15.OBJID = l14.OBJID;
+                s15.UIOBK = is_0022.UIOBK; s15.UILIK = is_0022.UILIK;
+                s15.UIATK = is_0023.UIATK; s15.UIATT = is_0023.UIATT; s15.UIASN = is_0023.UIASN; s15.UIADT = is_0023.UIADT;
+                s15.UIATY = "6"; s15.ISMLB = is_0023.ISMLB; s15.ISEMB = "X";
+                // 개인화 속성 적용 시 개인화 프로퍼티 _T_0015 레코드 append(구 5311~5367 — embed aggr + preset).
+                var aT0015 = [s15].concat(_buildPresetT0015(_aPreset, l14, is_0022));
+                try {
+                    oAPP.attr.prev = oAPP.attr.prev || {};
+                    oAPP.attr.prev[l14.OBJID] = oAPP.attr.prev[l14.OBJID] || {};
+                    oAPP.attr.prev[l14.OBJID]._T_0015 = aT0015;
+                } catch (e) { }
+
+                // 같은 aggregation 내 위치(_posit) = 기존 동일 UIATK 형제 수
+                var posit = is_tree.zTREE.filter(function (a) { return a.UIATK === is_0023.UIATK; }).length;
+                is_tree.zTREE.push(l14);
+
+                // 미리보기 동기화(UI5 preview iframe, 가드 — 부재 시 트리만). 구 designAddUIObject 순서 1:1.
+                _prev("createUIInstance", [l14, aT0015]);
+                _prev("setRichTextEditorException", [l14.UIOBK, l14.OBJID]);
+                // ★ [필수] 자식이 강제로 필요한 UI(UA050)에 기본 자식/내부 셋업(구 5383).
+                //   누락 시 컨트롤이 필수 내부(예: 내부 Image)를 못 갖춘 채 저장되고,
+                //   Active 후 재진입(재로드) 때 미리보기가 그 null 을 렌더하다 _getNativeImage 오류.
+                _prev("setChildUiException", [l14.UIOBK, l14.OBJID, l14.zTREE, (oAPP.attr.S_CODE && oAPP.attr.S_CODE.UA050)]);
+                _prev("moveUIObjPreView", [l14.OBJID, l14.UILIB, l14.POBID, l14.PUIOK, l14.UIATT, posit, l14.ISMLB, l14.UIOBK, true]);
+                // 미리보기 예외 draw(차트/IFrame 등 — uiPreviewArea 로드 시에만, 가드)
+                try { if (typeof oAPP.fn.prevDrawExceptionUi === "function") { oAPP.fn.prevDrawExceptionUi(l14.UIOBK, l14.OBJID); } } catch (e) { }
+                lastObjid = l14.OBJID;
+            }
+
+            _refreshTree();
+            if (lastObjid) { _selectNode(lastObjid); }
+            _markChanged();
+            // (원본 designAddUIObject 는 완료 토스트 없음)
+        };
+    }
+
+    // 트리 +버튼/컨텍스트메뉴 Insert → 삽입 팝업
+    if (typeof oAPP.fn.designUIAdd !== "function") {
+        oAPP.fn.designUIAdd = function (oNode) { _showInsertPopup(oNode); };
+    }
+    // 구 UI5 디자인 영역(uiDesignArea.js)이 designUIAdd 를 UI5 버전으로 덮어쓰더라도
+    // 부트스트랩 삽입 팝업(.u4a-dialog)을 호출할 수 있도록 안정적 핸들로 항상 노출.
+    // (WS20 디자인 다이얼로그 UX 통일 — UI5 sap.m.Dialog 대신 .u4a-dialog 사용)
+    oAPP.fn.designInsertPopupHtml5 = _showInsertPopup;
+
+    /********************************************************************
+     * UI 삽입 팝업 (구 callUIInsertPopup, sap.m.Dialog → HTML5 .u4a-dialog)
+     *   aggregation 선택 + UI 카탈로그 검색/선택 + 개수 → designAddUIObject.
+     ********************************************************************/
+    // UI 생성 최대 갯수(구 insertUIPopop CV_MAX_CNT).
+    var CV_INS_MAX = 100;
+
+    // 개인화 속성 적용 체크박스 텍스트(구 ZMSG_WS_COMMON_001/812). 영문 폴백 보관 금지 → 미조회 시 "".
+    function _p13nText() {
+        try { var s = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "812"); if (s) { return s; } } catch (e) { }
+        return "";
+    }
+    // 개인화 속성 적용 체크값 localStorage I/O (구 lf_get/saveAttrPreset — 키 동일).
+    function _getP13n() {
+        try { var v = JSON.parse(localStorage.getItem("U4A_APPLY_P13N_ATTR")); return !!(v && v.VALUE); } catch (e) { return false; }
+    }
+    function _saveP13n(b) {
+        try { localStorage.setItem("U4A_APPLY_P13N_ATTR", JSON.stringify({ VALUE: !!b })); } catch (e) { }
+    }
+    // UI명 suggestion 이력 저장 (구 design/js/main.js saveUiSuggest 1:1 — 단 그 함수는 HTML5 미정의/크래시라
+    //   HTML5 전용 fnSuggestionSave/Read 로 직접 구현). 최근값을 맨 위로, 중복 제거, iMax 개로 캡.
+    //   ※ 이게 없으면 이력이 안 쌓여 UI 오브젝트 input 의 suggestion 이 영영 안 뜬다(증상=제안 없음).
+    function _saveInsertSuggest(sName, sVal, iMax) {
+        if (!sVal || typeof oAPP.fn.fnSuggestionRead !== "function" || typeof oAPP.fn.fnSuggestionSave !== "function") { return; }
+        try {
+            var a = oAPP.fn.fnSuggestionRead(sName) || [];
+            if (!Array.isArray(a)) { a = []; }
+            var i = a.findIndex(function (o) { return o && o.NAME === sVal; });
+            if (i !== -1) { a.splice(i, 1); }
+            a.unshift({ NAME: sVal });
+            if (a.length > iMax) { a.splice(iMax, a.length); }
+            oAPP.fn.fnSuggestionSave(sName, a);
+        } catch (e) { console.error("[HTML5][WS20] _saveInsertSuggest:", e && e.message ? e.message : e); }
+    }
+    // UI Attribute 개인화 항목(UI_ATTR_PRESET.db) 조회 (구 uiDesignArea.js designAddUIObject 5313~5370 1:1).
+    //   현재 라이브러리버전/사용자/추가UI(UIOBK)에 저장된 개인화 프로퍼티 목록을 반환(없으면 []).
+    //   DB 접근 방식·where 절은 원본과 동일(LIBVER/UNAME/UIOBK), M06 설정 팝업과 같은 스키마.
+    async function _readAttrPreset(sUIOBK) {
+        if (!sUIOBK) { return []; }
+        try {
+            var _filePath = parent.PATH.join(parent.PATHINFO.P13N_ROOT, "UI_ATTR", "UI_ATTR_PRESET.db");
+            if (!parent.FS.existsSync(_filePath)) { return []; }
+            var _path = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "util", "sqliteManager.js");
+            var _mod = await import(_path);
+            var sqliteManager = _mod.default;
+            var _sqlite = new sqliteManager(_filePath);
+            return _sqlite.selectData({
+                tableName: "UI_ATTR_PRESET",
+                where: {
+                    LIBVER: oAPP.attr.metadata.METADATA.LIBVER,
+                    UNAME: oAPP.attr.metadata.USERINFO.UNAME,
+                    UIOBK: sUIOBK
+                }
+            }) || [];
+        } catch (e) {
+            console.error("[HTML5][WS20] _readAttrPreset:", e && e.message ? e.message : e);
+            return [];
+        }
+    }
+    // 개인화 프리셋 rows → 신규 UI(OBJID)의 개인화 프로퍼티 _T_0015 레코드 배열 (구 5338~5367 1:1).
+    function _buildPresetT0015(aPreset, l14, is_0022) {
+        var aOut = [];
+        if (!aPreset || !aPreset.length) { return aOut; }
+        var T_0023 = _LIB().T_0023 || [];
+        var oInfo = {}; try { oInfo = parent.getAppInfo() || {}; } catch (e) { }
+        for (var i = 0; i < aPreset.length; i++) {
+            var _sPreset = aPreset[i];
+            var _UIATK = _sPreset.UIATK;
+            //직접 입력 가능한 AGGR 여부 확인(구 5343 — "_1" suffix 제거 후 T_0023 조회).
+            if (typeof _UIATK === "string" && _UIATK.endsWith("_1")) { _UIATK = _UIATK.replace("_1", ""); }
+            var _s0023 = T_0023.find(function (item) { return item.UIATK === _UIATK; });
+            if (!_s0023) { continue; }
+            var _s0015 = oAPP.fn.crtStru0015();
+            _s0015.APPID = oInfo.APPID || l14.APPID; _s0015.GUINR = oInfo.GUINR || l14.GUINR;
+            _s0015.OBJID = l14.OBJID;
+            _s0015.UIOBK = _s0023.UIOBK;
+            _s0015.UIATK = _sPreset.UIATK;
+            _s0015.UILIK = is_0022.UILIK;
+            _s0015.UIATT = _s0023.UIATT;
+            _s0015.UIATV = _sPreset.UIATV;
+            _s0015.UIASN = _s0023.UIASN;
+            _s0015.UIADT = _s0023.UIADT;
+            _s0015.UIATY = _sPreset.UIATY;
+            _s0015.ISMLB = _s0023.ISMLB;
+            aOut.push(_s0015);
+        }
+        return aOut;
+    }
+    /********************************************************************
+     * UI 미리보기 이미지 팝업 (구 design/js/callUiPreviewImagePopup.js — sap.m.ResponsivePopover
+     *   + Carousel → HTML5 .u4a-dialog 캐러셀). 삽입 팝업의 심볼 아이콘 클릭 시 호출.
+     *   이미지 = design/image/UI_PREVIEW/index.json(UIFND↔LIBNM 매칭, 없으면 부모 재귀).
+     ********************************************************************/
+    var _uiPreviewIndex = null;   // index.json 캐시(1회 read).
+    var C_UIPREV_FOLDER = "UI_PREVIEW";
+    function _uiPreviewPath() {
+        return parent.PATH.join(parent.REMOTE.app.getAppPath(), "ws30", "ws10_20", "design", "image", C_UIPREV_FOLDER);
+    }
+    function _readUiPreviewIndex() {
+        if (_uiPreviewIndex) { return _uiPreviewIndex; }
+        _uiPreviewIndex = [];
+        try {
+            var p = parent.PATH.join(_uiPreviewPath(), "index.json");
+            if (parent.FS.existsSync(p)) {
+                var j = JSON.parse(parent.FS.readFileSync(p, "utf-8"));
+                if (Array.isArray(j)) { _uiPreviewIndex = j; }
+            }
+        } catch (e) { _uiPreviewIndex = []; }
+        return _uiPreviewIndex;
+    }
+    // UIOBK → 이미지 엔트리(구 lf_getImageData: LIBNM 매칭, 없으면 부모(T_0027 TOBTY="1") 재귀).
+    function _findUiPreviewEntry(sUIOBK) {
+        var aData = _readUiPreviewIndex();
+        if (!aData.length) { return null; }
+        var T_0022 = _LIB().T_0022 || [], T_0027 = _LIB().T_0027 || [];
+        var s22 = T_0022.find(function (a) { return a.UIOBK === sUIOBK; });
+        if (!s22) { return null; }
+        for (var i = 0; i < aData.length; i++) {
+            if (!aData[i].T_IMG || !aData[i].T_IMG.length) { continue; }
+            var parts = String(aData[i].UIFND || "").replace(/ /g, "").split("|");
+            if (parts.indexOf(s22.LIBNM) !== -1) { return aData[i]; }
+        }
+        var sp = T_0027.find(function (a) { return a.SGOBJ === sUIOBK && a.TOBTY === "1"; });
+        if (!sp) { return null; }
+        return _findUiPreviewEntry(sp.TGOBJ);
+    }
+    // 현재 열린 미리보기 팝오버(싱글턴) — 다른 심볼 클릭 시 이전 것 닫기.
+    var _uiPrevPop = null;
+    function _closeUiPreviewPopup() {
+        if (_uiPrevPop && typeof _uiPrevPop._close === "function") { _uiPrevPop._close(); }
+    }
+    // 클릭한 심볼(oAnchor) 위치에 화살표(caret)까지 붙는 앵커드 팝오버(구 sap.m.ResponsivePopover openBy).
+    //   oContainer(삽입 다이얼로그=showModal top-layer) 안에 붙여 모달 위로 표시(openColumnMenu 패턴).
+    function _showUiPreviewPopup(sUIOBK, oAnchor, oContainer) {
+        _closeUiPreviewPopup();   // 이전 팝오버 정리.
+        var entry = _findUiPreviewEntry(sUIOBK);
+        var T_0022 = _LIB().T_0022 || [];
+        var s22 = T_0022.find(function (a) { return a.UIOBK === sUIOBK; }) || {};
+        var aImgs = [];
+        if (entry && entry.T_IMG) {
+            for (var i = 0; i < entry.T_IMG.length; i++) {
+                try { aImgs.push("file:///" + String(parent.PATH.join(_uiPreviewPath(), entry.T_IMG[i].FNAME_R)).replace(/\\/g, "/")); } catch (e) { }
+            }
+        }
+        if (!aImgs.length) {
+            // 196 &1 does not exist. (&1 = E32 Preview Image)
+            try { parent.showMessage(null, 10, "E", _msgWsP("196", _msg("E32"), _msg("E32"))); } catch (e) { }
+            return;
+        }
+
+        var sTitle = (s22.UIOBJ || "") + (s22.LIBNM ? " (" + s22.LIBNM + ")" : "");
+        var oPop = document.createElement("div");
+        oPop.className = "u4a-popover u4aWs20UiPrevPop";
+        oPop.innerHTML =
+            '<span class="u4aWs20UiPrevCaret" aria-hidden="true"></span>' +
+            '<div class="u4aWs20UiPrevHead">' +
+            '  <i class="fa-solid fa-image" aria-hidden="true"></i><span class="u4aWs20UiPrevTitle"></span>' +
+            //040 Rotation On/Off — 자동 넘김 토글(공통 .u4a-switch).
+            '  <label class="u4a-switch u4aWs20UiPrevRot" title="' + _esc(_wsTxtEdit("040")) + '"><input type="checkbox" checked><span class="u4a-switch__slider"></span></label>' +
+            '  <button type="button" class="u4a-btn-icon" data-act="close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>' +
+            '<div class="u4aWs20UiPrevBody">' +
+            '  <button type="button" class="u4a-btn-icon u4aWs20UiPrevNav u4aWs20UiPrevPrev" title="&#9664;"><i class="fa-solid fa-chevron-left"></i></button>' +
+            //뷰포트(overflow hidden) + 트랙(가로 배치, translateX 슬라이드). 슬라이드=이미지 1장씩.
+            '  <div class="u4aWs20UiPrevViewport"><div class="u4aWs20UiPrevTrack"></div></div>' +
+            '  <button type="button" class="u4a-btn-icon u4aWs20UiPrevNav u4aWs20UiPrevNext" title="&#9654;"><i class="fa-solid fa-chevron-right"></i></button>' +
+            //페이지 표시 = 숫자 카운터("현재 / 전체"). 이미지 많아도 깔끔(구 sap.m.Carousel numeric indicator).
+            '  <div class="u4aWs20UiPrevPage"></div>' +
+            '</div>';
+        oPop.querySelector(".u4aWs20UiPrevTitle").textContent = sTitle;
+        oPop.querySelector(".u4aWs20UiPrevTitle").title = sTitle;
+
+        var oTrack = oPop.querySelector(".u4aWs20UiPrevTrack");
+        var oPage = oPop.querySelector(".u4aWs20UiPrevPage");
+        var oRot = oPop.querySelector(".u4aWs20UiPrevRot input");
+        var oCaret = oPop.querySelector(".u4aWs20UiPrevCaret");
+        var iCur = 0, iTimer = 0, _zoomOpen = false;
+        // 슬라이드 트랙 구성 — 각 이미지를 1장씩(뷰포트 폭). translateX 로 이동(CSS transition 이 애니메이션).
+        oTrack.style.width = (aImgs.length * 100) + "%";
+        for (var s = 0; s < aImgs.length; s++) {
+            var oSlide = document.createElement("div");
+            oSlide.className = "u4aWs20UiPrevSlide";
+            oSlide.style.width = (100 / aImgs.length) + "%";
+            var oSlideImg = document.createElement("img");
+            oSlideImg.alt = ""; oSlideImg.src = aImgs[s];
+            oSlideImg.title = _msg("A67", "Preview");
+            oSlideImg.addEventListener("error", function () { this.style.display = "none"; });
+            // 이미지 클릭 → 원본 크기 확대 라이트박스.
+            (function (sSrc) { oSlideImg.addEventListener("click", function () { _openZoom(sSrc); }); })(aImgs[s]);
+            oSlide.appendChild(oSlideImg);
+            oTrack.appendChild(oSlide);
+        }
+        // 원본 크기 확대 라이트박스(최상위 showModal — 팝오버/삽입팝업 위). 아무 데나 클릭/ESC 로 닫기.
+        function _openZoom(sSrc) {
+            _stopTimer();   // 확대 동안 자동 넘김 정지.
+            _zoomOpen = true;   // 확대 동안 팝오버 바깥클릭/ESC 닫기 중단(팝오버 유지).
+            var oZoom = document.createElement("dialog");
+            oZoom.className = "u4a-dialog u4aWs20UiPrevZoom";
+            // 닫기 = 우상단 흰색 X 아이콘만(일반 이미지 뷰어 스타일, 배경/박스 없음). 아무 데나 클릭/ESC 로도 닫힘.
+            oZoom.innerHTML =
+                '<img class="u4aWs20UiPrevZoomImg" alt="" src="' + _esc(sSrc) + '">' +
+                '<button type="button" class="u4aWs20UiPrevZoomX" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>';
+            function _zclose() { try { oZoom.close(); } catch (e) { } try { oZoom.remove(); } catch (e) { } setTimeout(function () { _zoomOpen = false; }, 0); _startTimer(); }
+            oZoom.addEventListener("click", _zclose);                                   // 아무 데나 클릭 닫기
+            oZoom.addEventListener("cancel", function (e) { e.preventDefault(); _zclose(); });   // ESC
+            document.body.appendChild(oZoom);
+            try { oZoom.showModal(); } catch (e) { try { oZoom.show(); } catch (e2) { } }
+        }
+        function _paint() {
+            // 트랙 전체 폭 대비 현재 인덱스만큼 좌로 이동(슬라이드 애니메이션).
+            oTrack.style.transform = "translateX(" + (-iCur * (100 / aImgs.length)) + "%)";
+            // 숫자 페이지 카운터(여러 장일 때만 표시).
+            oPage.textContent = aImgs.length > 1 ? (iCur + 1) + " / " + aImgs.length : "";
+        }
+        function _go(n) { iCur = (n + aImgs.length) % aImgs.length; _paint(); }
+        function _stopTimer() { if (iTimer) { clearInterval(iTimer); iTimer = 0; } }
+        function _startTimer() {
+            _stopTimer();
+            if (aImgs.length > 1 && oRot.checked) { iTimer = setInterval(function () { _go(iCur + 1); }, 2000); }
+        }
+        function _close() {
+            _stopTimer();
+            document.removeEventListener("mousedown", _onOutside, true);
+            document.removeEventListener("keydown", _onKey, true);
+            window.removeEventListener("resize", _close);
+            window.removeEventListener("scroll", _close, true);
+            try { oPop.remove(); } catch (e) { }
+            if (_uiPrevPop === oApi) { _uiPrevPop = null; }
+        }
+        // 확대 라이트박스가 열려 있는 동안엔 팝오버의 바깥클릭/ESC 닫기를 중단(안 그러면 확대 닫는 클릭·ESC 가
+        //   팝오버까지 닫아 사용자가 재실행해야 함).
+        function _onOutside(ev) { if (_zoomOpen) { return; } if (!oPop.contains(ev.target) && ev.target !== oAnchor) { _close(); } }
+        function _onKey(ev) { if (_zoomOpen) { return; } if (ev.key === "Escape") { ev.preventDefault(); _close(); } }
+        var oApi = { _close: _close };
+
+        // 단일 이미지면 캐러셀 컨트롤(좌우 화살표·회전 토글·점)은 의미 없으므로 숨김.
+        //   ※ .u4a-btn-icon 의 display 가 [hidden] 을 덮어써 hidden 속성만으론 안 숨는다 → 인라인 display:none.
+        if (aImgs.length <= 1) {
+            Array.prototype.forEach.call(oPop.querySelectorAll(".u4aWs20UiPrevNav"), function (b) { b.style.display = "none"; });
+            var oRotWrap = oPop.querySelector(".u4aWs20UiPrevRot");
+            if (oRotWrap) { oRotWrap.style.display = "none"; }
+        }
+        oPop.querySelector(".u4aWs20UiPrevPrev").addEventListener("click", function () { _go(iCur - 1); _startTimer(); });
+        oPop.querySelector(".u4aWs20UiPrevNext").addEventListener("click", function () { _go(iCur + 1); _startTimer(); });
+        oRot.addEventListener("change", _startTimer);
+        oPop.querySelector('[data-act="close"]').addEventListener("click", _close);
+        oPop.addEventListener("mousedown", function (e) { e.stopPropagation(); });   // 내부 클릭은 라이트 디스미스 제외.
+
+        // 삽입 다이얼로그(top-layer) 안에 붙여 모달 위로(openColumnMenu 와 동일 전략).
+        (oContainer || document.body).appendChild(oPop);
+        _paint();
+        _startTimer();
+
+        // ── 위치: 클릭한 심볼 오른쪽(공간 없으면 왼쪽) 세로 중앙 + caret 이 심볼을 가리킴 ──
+        function _place() {
+            var r = oAnchor.getBoundingClientRect();
+            var pw = oPop.offsetWidth, ph = oPop.offsetHeight;
+            var GAP = 10, M = 8;
+            var bLeft = (r.right + GAP + pw > window.innerWidth - M) && (r.left - GAP - pw >= M);
+            var left = bLeft ? (r.left - GAP - pw) : (r.right + GAP);
+            var top = r.top + r.height / 2 - ph / 2;
+            top = Math.max(M, Math.min(top, window.innerHeight - ph - M));
+            oPop.style.left = Math.round(left) + "px";
+            oPop.style.top = Math.round(top) + "px";
+            oPop.classList.toggle("u4aWs20UiPrevPop--left", bLeft);   // caret 방향
+            // caret 세로 위치 = 심볼 중앙(팝오버 상대).
+            var caretY = (r.top + r.height / 2) - top;
+            caretY = Math.max(12, Math.min(caretY, ph - 12));
+            oCaret.style.top = Math.round(caretY) + "px";
+        }
+        _place();
+        // 이미지 로드로 팝오버 높이가 바뀌면 재배치(뷰포트 고정높이라 대개 불변, 안전차 1회 바인딩).
+        Array.prototype.forEach.call(oTrack.querySelectorAll("img"), function (im) { im.addEventListener("load", _place); });
+
+        _uiPrevPop = oApi;
+        window.addEventListener("resize", _close);
+        window.addEventListener("scroll", _close, true);
+        setTimeout(function () { document.addEventListener("mousedown", _onOutside, true); document.addEventListener("keydown", _onKey, true); }, 0);
+    }
+    // 팝업 텍스트(ZMSG_WS_COMMON_001) — 040 Rotation On/Off 등(구 getWsMsgClsTxt).
+    function _wsTxtEdit(sNum) {
+        try { var s = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", sNum); if (s) { return s; } } catch (e) { }
+        return "";
+    }
+
+    // SAP 아이콘 키 → <img src> (구 fnGetSapIconPath + 트리와 동일한 file:// 변환).
+    function _iconSrc(sKey) {
+        if (!sKey) { return ""; }
+        var p = "";
+        try { p = oAPP.fn.fnGetSapIconPath(sKey) || ""; } catch (e) { }
+        if (!p) { return ""; }
+        if (/^(file:|https?:|data:|\/)/i.test(p)) { return p; }
+        return "file:///" + String(p).replace(/\\/g, "/");
+    }
+    function _esc(s) {
+        return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+            return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c];
+        });
+    }
+
+    // 헤더를 잡고 드래그해서 팝업 이동(구 sap.m.Dialog draggable:true 대체).
+    // 헤더 드래그는 공통 U4AUI.makeDialogDraggable 사용(화면 밖/상단 공통헤더 클램프).
+    function _enableDrag(oDlg, oHandle) {
+        if (window.U4AUI && U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHandle); }
+    }
+
+    function _showInsertPopup(is_tree) {
+        if (!is_tree) { return; }
+        var aAgg = _getAggregations(is_tree.UIOBK);
+        if (!aAgg.length) {
+            // 280 입력 가능한 Aggregation이 존재하지 않습니다.
+            try { parent.showMessage(null, 10, "W", _msgWs("280", "No aggregation available to add.")); } catch (e) { }
+            return;
+        }
+
+        // 타이틀: "UI Object Select - <부모 UI명>"(구 D97 + UIOBJ).
+        var T_0022 = _LIB().T_0022 || [], T_0023 = _LIB().T_0023 || [];
+        var sParent = T_0022.find(function (a) { return a.UIOBK === is_tree.UIOBK; });
+        var sTitle = _msg("D97", "UI Object Select") + (sParent && sParent.UIOBJ ? " - " + sParent.UIOBJ : "");
+        // aggregation DDLB 맨 앞 빈 라인(구 동일 — 미선택 시작).
+        var aAggSel = [{ UIATK: "", UIATT: "", ISMLB: "" }].concat(aAgg);
+
+        var oDlg = document.createElement("dialog");
+        oDlg.className = "u4a-dialog u4aWs20InsertDlg";
+        oDlg.innerHTML =
+            '<div class="u4a-dialog__header u4aWs20InsHead">' +
+            '  <i class="fa-solid fa-layer-group"></i>' +
+            '  <span class="u4aWs20InsTitle"></span>' +
+            '  <button type="button" class="u4a-btn-icon u4aWs20InsX" data-act="cancel" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>' +
+            '<div class="u4a-dialog__body">' +
+            '  <div class="u4aWs20InsForm">' +
+            '    <div class="u4aWs20InsRow"><label>' + _esc(_msg("D98", "Aggregation Name")) + '</label><span class="u4aWs20InsAgg"></span></div>' +
+            '    <div class="u4aWs20InsRow u4aWs20InsCntRow" hidden><label>' + _esc(_msg("D99", "Generated Cnt")) + '</label>' +
+            '      <div class="u4aWs20InsStep">' +
+            '        <button type="button" class="u4a-btn-icon" data-step="-1"><i class="fa-solid fa-minus"></i></button>' +
+            '        <input type="text" inputmode="numeric" class="u4a-input u4aWs20InsCnt" value="1">' +
+            '        <button type="button" class="u4a-btn-icon" data-step="1"><i class="fa-solid fa-plus"></i></button>' +
+            '        <span class="u4aWs20InsMax">' + _esc(_msg("B25", "Max")) + ' : ' + CV_INS_MAX + '</span>' +
+            '      </div>' +
+            '    </div>' +
+            '    <div class="u4aWs20InsRow"><label>' + _esc(_msg("E01", "UI Object")) + '</label>' +
+            //공통 입력 clear(X) — .u4a-field[data-trail] 래퍼 + .u4a-field__clear(값 있을 때만 노출, attachClear).
+            '      <div class="u4a-field u4aWs20InsSearchWrap" data-trail="1">' +
+            '        <input type="text" class="u4a-input u4a-field__input u4aWs20InsSearch" autocomplete="off">' +
+            '        <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear"><i class="fa-solid fa-xmark"></i></button>' +
+            '      </div></div>' +
+            '    <label class="u4aWs20InsChkRow"><input type="checkbox" class="u4aWs20InsP13n"><span>' + _esc(_p13nText()) + '</span></label>' +
+            '  </div>' +
+            '  <div class="u4aWs20InsTableWrap u4a-table-wrap">' +
+            //행높이=공통 .u4a-table 기본(레퍼런스 F4 탭1·Login 동일). --compact 안 씀(혼자 좁아지지 않게).
+            '    <table class="u4aWs20InsTable u4a-table">' +
+            //헤더는 _renderHead 가 동적 구성(공통 .u4a-th--menu 클릭→U4AUI.openColumnMenu, 정렬/필터 표시자 갱신).
+            '      <thead></thead>' +
+            '      <tbody></tbody>' +
+            '    </table>' +
+            '    <div class="u4aWs20InsEmpty" hidden></div>' +
+            '  </div>' +
+            '</div>' +
+            '<div class="u4a-dialog__footer">' +
+            '  <button type="button" class="u4a-btn u4aWs20InsConfirm" data-act="ok" disabled><i class="fa-solid fa-check"></i> ' + _esc(_msg("A40", "Confirm")) + '</button>' +
+            '  <button type="button" class="u4a-btn u4aWs20InsCancel" data-act="cancel"><i class="fa-solid fa-xmark"></i> ' + _esc(_msg("A41", "Cancel")) + '</button>' +
+            '</div>';
+
+        oDlg.querySelector(".u4aWs20InsTitle").textContent = sTitle;
+        oDlg.querySelector(".u4aWs20InsTitle").title = sTitle;
+
+        var oBody = oDlg.querySelector(".u4a-dialog__body");
+        var oWrap = oDlg.querySelector(".u4aWs20InsTableWrap");   // 가상스크롤 스크롤 컨테이너(overflow:auto)
+        var oTbody = oDlg.querySelector(".u4aWs20InsTable tbody");
+        var oEmpty = oDlg.querySelector(".u4aWs20InsEmpty");
+        var oSearch = oDlg.querySelector(".u4aWs20InsSearch");
+        var oOk = oDlg.querySelector('[data-act="ok"]');
+        var oCntRow = oDlg.querySelector(".u4aWs20InsCntRow");
+        var oCntInp = oDlg.querySelector(".u4aWs20InsCnt");
+        var oAggSlot = oDlg.querySelector(".u4aWs20InsAgg");
+        var oP13n = oDlg.querySelector(".u4aWs20InsP13n");
+
+        // 가짜 백드롭 — 비모달 show() 를 모달처럼 보이게(투명, 배경 클릭 차단만. 공통 규약=dialog::backdrop 도 투명).
+        //   원본 동작 재현: 평소 모달 → 드래그 순간 백드롭 off(비모달, 배경 트리 drop 가능) → 놓으면 백드롭 on(모달).
+        //   (네이티브 <dialog> 는 close 없이 모달 토글 불가 + close 는 드래그 취소 → show()+백드롭 토글로 대체.)
+        var oBackdrop = null;
+        // bModal=true: 백드롭 on(배경 클릭 차단) + 다이얼로그 정상.
+        // bModal=false: 드래그 중 — 백드롭 off + 다이얼로그를 클릭 통과(pointer-events:none)+반투명 처리해야
+        //   80vw 팝업에 가려진 뒤쪽 디자인 트리가 dragover/drop 을 받고, 사용자도 트리/드롭표시를 볼 수 있음.
+        function _setModalLook(bModal) {
+            if (oBackdrop) { oBackdrop.style.display = bModal ? "" : "none"; }
+            oDlg.classList.toggle("u4aWs20InsDragThru", !bModal);
+        }
+
+        oP13n.checked = _getP13n();
+
+        var oSelAgg = aAggSel[0];   // 현재 선택 aggregation row(빈 라인부터)
+        var oSelUI = null;          // 현재 선택 UI(T_0022 row)
+        var sSortKey = "", sSortDir = "asc";
+        var oColFilters = {};       // 컬럼별 필터(AND·contains) — 공통 컬럼메뉴(U4AUI.openColumnMenu)가 갱신
+
+        // 정렬/필터 메뉴 문구(메시지 키 SSOT — 화면이 해석해 공통 헬퍼에 전달). 810/811=ZMSG_WS_COMMON_001.
+        function _wsMsgRaw(n) { try { var s = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", n); if (s) { return s; } } catch (e) { } return n; }
+        var INS_MENU_LABELS = { filter: _msg("A68"), asc: _wsMsgRaw("810"), desc: _wsMsgRaw("811"), clear: _msg("A69") };
+        // 정렬/필터 대상 데이터 컬럼(Symbol 은 아이콘 전용 — 비정렬). 라벨은 메시지 키.
+        var INS_COLS = [
+            { key: "UIOBJ", label: _msg("E01"), cls: "" },
+            { key: "LIBNM", label: _msg("E03"), cls: "" },
+            { key: "UIOBK", label: _msg("E04"), cls: "u4aWs20InsThKey" }
+        ];
+        // 공통 컬럼메뉴(U4AUI.openColumnMenu) 소비 컨트롤러 — 상태=sSortKey/sSortDir/oColFilters(ServerList/F4 동일 패턴).
+        var _insColCtl = {
+            getFilter: function (k) { return oColFilters[k] || ""; },
+            setFilter: function (k, v) { if (v) { oColFilters[k] = v; } else { delete oColFilters[k]; } },
+            getSort: function () { return sSortKey ? { key: sSortKey, dir: sSortDir } : null; },
+            setSort: function (k, d) { sSortKey = k || ""; sSortDir = d || "asc"; },
+            rerender: function () { _renderHead(); lf_renderTable(); }
+        };
+
+        // 헤더 셀(데이터 컬럼) — 공통 .u4a-th--menu, 클릭→공통 컬럼메뉴. 정렬/필터 표시자는 활성 컬럼에만.
+        function _buildInsTh(c) {
+            var th = document.createElement("th");
+            th.className = "u4a-th--menu" + (c.cls ? " " + c.cls : "");
+            var inner = document.createElement("div"); inner.className = "u4a-th__inner";
+            var lbl = document.createElement("span"); lbl.className = "u4a-th__label"; lbl.textContent = c.label;
+            inner.appendChild(lbl);
+            var bSorted = sSortKey === c.key, bFiltered = !!oColFilters[c.key];
+            if (bSorted || bFiltered) {
+                var ind = document.createElement("span"); ind.className = "u4a-th__ind";
+                if (bSorted) { ind.innerHTML += '<i class="fa-solid fa-arrow-' + (sSortDir === "desc" ? "down" : "up") + '"></i>'; }
+                if (bFiltered) { ind.innerHTML += '<i class="fa-solid fa-filter"></i>'; }
+                inner.appendChild(ind);
+            }
+            th.appendChild(inner);
+            th.addEventListener("click", function (e) {
+                e.stopPropagation();
+                if (window.U4AUI && U4AUI.openColumnMenu) {
+                    U4AUI.openColumnMenu(c, th, _insColCtl, { container: oDlg, labels: INS_MENU_LABELS });
+                }
+            });
+            return th;
+        }
+        // 헤더 전체 재구성(정렬/필터 표시자 갱신 위해 rerender 마다 호출 — ServerList _renderHead 패턴).
+        function _renderHead() {
+            var thead = oDlg.querySelector(".u4aWs20InsTable thead");
+            if (!thead) { return; }
+            thead.textContent = "";
+            var tr = document.createElement("tr");
+            // Symbol(아이콘 전용 — 비정렬, 메뉴 없음)
+            var thSym = document.createElement("th"); thSym.className = "u4aWs20InsThSym";
+            var inS = document.createElement("div"); inS.className = "u4a-th__inner u4a-th__inner--center";
+            var lbS = document.createElement("span"); lbS.className = "u4a-th__label"; lbS.textContent = _msg("E31");
+            inS.appendChild(lbS); thSym.appendChild(inS); tr.appendChild(thSym);
+            INS_COLS.forEach(function (c) { tr.appendChild(_buildInsTh(c)); });
+            thead.appendChild(tr);
+        }
+        // 표시 행 파생 — 상단 검색박스 + 컬럼필터(AND·contains) + 정렬(공통 컬럼메뉴 상태).
+        function _cellText(k, ui) { return String(ui && ui[k] != null ? ui[k] : ""); }
+        function _deriveRows(aUIs) {
+            var sQ = (oSearch.value || "").toLowerCase();
+            var aKeys = Object.keys(oColFilters).filter(function (k) { return oColFilters[k]; });
+            var arr = aUIs.filter(function (ui) {
+                if (sQ && String(ui.UIOBJ).toLowerCase().indexOf(sQ) === -1 && String(ui.LIBNM).toLowerCase().indexOf(sQ) === -1) { return false; }
+                return aKeys.every(function (k) { return _cellText(k, ui).toLowerCase().indexOf(oColFilters[k]) !== -1; });
+            });
+            if (sSortKey) {
+                var d = sSortDir === "desc" ? -1 : 1;
+                arr.sort(function (a, b) { return _cellText(sSortKey, a).localeCompare(_cellText(sSortKey, b), undefined, { numeric: true }) * d; });
+            }
+            return arr;
+        }
+
+        // ESC 닫기 — 비모달 dialog 는 cancel 이벤트가 안 뜨고, oDlg keydown 은 포커스가 밖이면 안 잡힘 →
+        //   document 레벨(capture)로 처리. 단 미리보기 팝오버/제안목록이 열려 있으면 그쪽이 먼저 닫히게 양보.
+        function _onEscKey(e) {
+            if (e.key !== "Escape") { return; }
+            if (_uiPrevPop) { return; }                                   // 미리보기 팝오버 먼저 닫기
+            if (document.querySelector(".u4a-combo__list")) { return; }   // 제안목록 먼저 닫기
+            e.preventDefault();
+            lf_cancel();
+        }
+        function lf_close() { try { document.removeEventListener("keydown", _onEscKey, true); } catch (e) { } try { _closeUiPreviewPopup(); } catch (e) { } try { U4AUI && U4AUI.closeColumnMenu && U4AUI.closeColumnMenu(); } catch (e) { } try { if (oBackdrop) { oBackdrop.remove(); } } catch (e) { } try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
+
+        function lf_clampCnt() {
+            var v = parseInt(oCntInp.value, 10);
+            if (!(v > 0)) { v = 1; }
+            if (v > CV_INS_MAX) { v = CV_INS_MAX; }
+            oCntInp.value = v;
+            return v;
+        }
+
+        // 결과 행 1개 빌드(가상 스크롤러가 보이는 구간만 호출). idx=절대 인덱스(zebra).
+        function _buildInsRow(ui, idx) {
+            var tr = document.createElement("tr");
+            if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }   // 공통 zebra
+            var sImg = _iconSrc(ui.UICON);
+            tr.innerHTML =
+                '<td class="u4aWs20InsTdSym">' + (sImg ? '<img src="' + _esc(sImg) + '" alt="" title="' + _esc(_msg("A67", "Preview")) + '" onerror="this.style.display=\'none\'">' : "") + '</td>' +
+                '<td class="u4aWs20InsTdName">' + _esc(ui.UIOBJ) + '</td>' +
+                '<td class="u4aWs20InsTdFull">' + _esc(ui.LIBNM) + '</td>' +
+                '<td class="u4aWs20InsTdKey">' + _esc(ui.UIOBK) + '</td>';
+            tr.addEventListener("click", function () {
+                oSelUI = ui; oOk.disabled = false;
+                _vs.setSel(ui.UIOBK); _vs.refresh();   // 공통 선택(aria-selected) — 스크롤로 행이 사라져도 유지
+            });
+            tr.addEventListener("dblclick", function () { oSelUI = ui; lf_confirm(); });
+            // 심볼 아이콘 클릭 → UI 미리보기 이미지 팝업(구 insertUIPopop oImage.attachPress). 행 선택과 분리(stopPropagation).
+            var oSym = tr.querySelector(".u4aWs20InsTdSym img");
+            if (oSym) {
+                oSym.style.cursor = "pointer";
+                oSym.addEventListener("click", function (ev) { ev.stopPropagation(); _showUiPreviewPopup(ui.UIOBK, oSym, oDlg); });
+                oSym.addEventListener("dblclick", function (ev) { ev.stopPropagation(); });   // 심볼 더블클릭이 행 confirm 안 되게.
+            }
+            // 결과 행 D&D — 디자인 트리로 직접 드래그해 특정 위치 삽입(구 insertUIPopop lf_rowDragStart/End).
+            //   ★팝업은 비모달(show)로 열려 있어 드래그 중 배경 트리가 그대로 drop 을 받는다 → 팝업을 닫지 않는다
+            //   (원본도 setModal(false)로 유지). 닫으면 안 되는 이유=네이티브 드래그 취소/사용자 지적된 이슈.
+            tr.setAttribute("draggable", "true");
+            tr.addEventListener("dragstart", function (ev) {
+                try {
+                    _closeUiPreviewPopup();   // 미리보기 팝오버 열려있으면 정리.
+                    oSelUI = ui;
+                    var iCnt = (oSelAgg && oSelAgg.ISMLB === "X") ? lf_clampCnt() : 1;
+                    var sP13n = oP13n.checked ? "true" : "false";
+                    var sKey = "";
+                    try { sKey = oAPP.attr.DnDRandKey || ""; } catch (e) { }
+                    // ★effectAllowed 는 반드시 트리와 동일 "copyMove". "copy" 로 두면 트리 dragover 가 dropEffect="move"
+                    //   (Ctrl 미누름 기본)로 세팅 → copy 전용과 불일치 → 브라우저가 drop 을 거부(drop 이벤트 미발생 = UI 추가 안 됨).
+                    ev.dataTransfer.effectAllowed = "copyMove";
+                    // 구 형식: callUIInsertPopup|UIOBK|개수|DnDRandKey|개인화여부
+                    ev.dataTransfer.setData("text/plain", "callUIInsertPopup|" + ui.UIOBK + "|" + iCnt + "|" + sKey + "|" + sP13n);
+                    // rtmcls(런타임 클래스 네비) — 라이브러리명.
+                    var s22 = (_LIB().T_0022 || []).find(function (a) { return a.UIOBK === ui.UIOBK; });
+                    if (s22) { ev.dataTransfer.setData("rtmcls", s22.LIBNM); }
+                    _saveP13n(oP13n.checked);
+                    if (typeof oAPP.fn.designTreeDragStart === "function") { oAPP.fn.designTreeDragStart({ OBJID: undefined, UIOBK: ui.UIOBK }); }
+                    // ★비모달 전환(백드롭 off + 다이얼로그 pointer-events:none)은 반드시 setTimeout 으로 미룬다.
+                    //   dragstart 중 동기적으로 소스 조상을 pointer-events:none 로 만들면 브라우저가 드래그를 취소함(=드래그 안 됨).
+                    setTimeout(function () { _setModalLook(false); }, 0);
+                } catch (e) { console.error("[HTML5][WS20] insert drag start:", e && e.message ? e.message : e); }
+            });
+            tr.addEventListener("dragend", function () {
+                _setModalLook(true);   // 놓으면 다시 모달 — 원본 setModal(true) 대응.
+                try { if (typeof oAPP.fn.designDragEnd === "function") { oAPP.fn.designDragEnd(); } } catch (e) { }
+            });
+            return tr;
+        }
+        // 공통 가상 스크롤(U4AUI.makeVScroller) — 대용량 UI 목록도 보이는 구간만 DOM. 0건=공통 no-data(946).
+        var _vs = U4AUI.makeVScroller(oWrap, oTbody, {
+            colCount: 4,
+            buildRow: _buildInsRow,
+            nodata: _wsMsgRaw("946"),
+            getSelKey: function (ui) { return ui.UIOBK; }
+        });
+
+        function lf_renderTable() {
+            oSelUI = null; oOk.disabled = true;
+            _vs.setSel(null);
+            // 빈(미선택) aggregation 이면 비움.
+            var aUIs = oSelAgg.UIATK ? _getUIs(oSelAgg, is_tree.UIOBK) : [];
+            _vs.setRows(_deriveRows(aUIs));   // 검색박스 + 컬럼필터(AND) + 정렬(공통 컬럼메뉴 상태)
+        }
+
+        function lf_confirm() {
+            if (!oSelUI) { return; }
+            var cnt = oSelAgg.ISMLB === "X" ? lf_clampCnt() : 1;
+            var ls_0022 = T_0022.find(function (a) { return a.UIOBK === oSelUI.UIOBK; }) || oSelUI;
+            var ls_0023 = T_0023.find(function (a) { return a.UIATK === oSelAgg.UIATK; }) || oSelAgg;
+            _saveP13n(oP13n.checked);
+            // UI명 suggestion 이력 저장 (구 insertUIPopop saveUiSuggest("insertUiName", UIOBJ, 10))
+            _saveInsertSuggest("insertUiName", ls_0022.UIOBJ, 10);
+            lf_close();
+            // 자식창 잠금(원본 삽입 시 BUSY_ON) — designAddUIObject 는 async 라 완료 후 BUSY_OFF.
+            //  ※ D&D 삽입 경로는 dnd.js _bindBusy 가 이미 처리하므로 여기(팝업 confirm)에서만 브로드캐스트.
+            _broadBusy(true);
+            Promise.resolve(oAPP.fn.designAddUIObject(is_tree, ls_0022, ls_0023, cnt, oP13n.checked))
+                .catch(function (e) { console.error("[HTML5][WS20] designAddUIObject:", e && e.message ? e.message : e); })
+                .then(function () { _broadBusy(false); });
+        }
+
+        // aggregation 셀렉트(공통 U4AUI.createSelect — 빈 라인 포함). 원본 Item text:"{UIATT}" 그대로.
+        var aAggItems = aAggSel.map(function (r) { return { value: r.UIATK, text: r.UIATK ? r.UIATT : "" }; });
+        function lf_onAgg(v) {
+            oSelAgg = aAggSel.find(function (a) { return a.UIATK === v; }) || aAggSel[0];
+            oCntRow.hidden = oSelAgg.ISMLB !== "X";   // 다건 허용일 때만 Generated Cnt 노출
+            if (oCntRow.hidden) { oCntInp.value = 1; }
+            // aggregation 변경 시 컬럼 필터/정렬 초기화(구 resetUiTableFilterSort) — 이전 필터가 새 목록을 가리지 않게.
+            oColFilters = {}; sSortKey = ""; sSortDir = "asc";
+            _renderHead();
+            lf_renderTable();
+            // aggregation 선택 후 UI 오브젝트 검색 input 으로 포커스 이동(구 insertUIPopop oInp2.focus()).
+            //   콤보 닫힘/렌더 뒤에 포커스가 잡히도록 마이크로태스크 지연.
+            if (oSelAgg.UIATK) { setTimeout(function () { try { oSearch.focus(); } catch (e) { } }, 0); }
+        }
+        if (window.U4AUI && U4AUI.createSelect) {
+            var oSel = U4AUI.createSelect(aAggItems, oSelAgg.UIATK, lf_onAgg);
+            oSel.style.flex = "1 1 auto";
+            oAggSlot.appendChild(oSel);
+        } else {
+            var oNative = document.createElement("select");
+            oNative.className = "u4a-input";
+            aAggItems.forEach(function (it) { var o = document.createElement("option"); o.value = it.value; o.textContent = it.text; oNative.appendChild(o); });
+            oNative.addEventListener("change", function () { lf_onAgg(oNative.value); });
+            oAggSlot.appendChild(oNative);
+        }
+
+        // 헤더 최초 구성(클릭→공통 컬럼메뉴, 정렬/필터 표시자는 활성 컬럼에만). 이후 갱신은 컨트롤러 rerender.
+        _renderHead();
+
+        // Generated Cnt 스텝퍼 +/-
+        Array.prototype.forEach.call(oDlg.querySelectorAll(".u4aWs20InsStep [data-step]"), function (b) {
+            b.addEventListener("click", function () {
+                oCntInp.value = lf_clampCnt() + parseInt(b.getAttribute("data-step"), 10);
+                lf_clampCnt();
+            });
+        });
+        oCntInp.addEventListener("change", lf_clampCnt);
+        oCntInp.addEventListener("blur", lf_clampCnt);
+
+        oSearch.addEventListener("input", lf_renderTable);
+        oSearch.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); lf_confirm(); } });
+
+        //공통 입력 clear(X) — 값 있을 때만 노출, 클릭 시 비우고 input 이벤트로 표 재필터(lf_renderTable).
+        if (window.U4AUI && U4AUI.attachClear) {
+            U4AUI.attachClear(oSearch, oDlg.querySelector(".u4aWs20InsSearchWrap .u4a-field__clear"));
+        }
+        // UI 오브젝트 input 자동완성 (구 setUiSuggest(oInp2,"insertUiName") — 이력 기반 suggestion).
+        //   이전에 추가한 UI명(insertUiName 이력)을 부분일치로 제안 → 선택 시 검색 필터 적용.
+        if (window.U4AUI && U4AUI.attachSuggest && typeof oAPP.fn.fnSuggestionRead === "function") {
+            U4AUI.attachSuggest(oSearch,
+                function () {
+                    try { return (oAPP.fn.fnSuggestionRead("insertUiName") || []).map(function (o) { return o && o.NAME; }).filter(Boolean); }
+                    catch (e) { return []; }
+                },
+                function (v) { oSearch.value = v; lf_renderTable(); });
+        }
+        // 취소/닫기(X·취소버튼·ESC) → 001 Cancel operation 안내 후 종료(구 insertUIPopop 닫기/취소 press).
+        //   확정(lf_confirm)은 lf_close 만 호출(안내 없음).
+        function lf_cancel() { try { parent.showMessage(null, 10, "I", _msgWs("001")); } catch (e) { } lf_close(); }
+        oOk.addEventListener("click", lf_confirm);
+        Array.prototype.forEach.call(oDlg.querySelectorAll('[data-act="cancel"]'), function (b) {
+            b.addEventListener("click", lf_cancel);
+        });
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_cancel(); }); // (모달 전용, 폴백) ESC
+        // ★비모달(show)이라 cancel 이벤트가 안 뜨고 oDlg keydown 은 포커스가 밖이면 안 잡힘 → document capture 로 ESC 처리.
+        document.addEventListener("keydown", _onEscKey, true);
+
+        _enableDrag(oDlg, oDlg.querySelector(".u4aWs20InsHead"));
+        // 헤더 더블클릭 → 화면 중앙 복귀 / 우하단 grip → 크기조절 (공통 U4AUI, SAPUI5 동일 UX)
+        if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oDlg.querySelector(".u4aWs20InsHead")); }
+        if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 420, minH: 320 }); }
+
+        // 가짜 백드롭(투명 클릭차단) — 다이얼로그 바로 아래 z-index. 평소엔 모달처럼 배경 클릭 차단.
+        oBackdrop = document.createElement("div");
+        oBackdrop.className = "u4aWs20InsBackdrop";
+        document.body.appendChild(oBackdrop);
+
+        document.body.appendChild(oDlg);
+        // ★결과 행을 디자인 트리로 드래그하려면 배경 트리가 상호작용 가능해야 함 → showModal(배경 inert) 금지.
+        //   네이티브 dialog 는 모달↔비모달 mid-drag 전환 불가(close=드래그 취소)라, 처음부터 비모달 show()로 연다.
+        //   모달 느낌은 가짜 백드롭(_setModalLook)이 담당: 평소 on(모달) → 드래그 중 off(비모달) → drop 후 on.
+        //   위치/z-index 는 스코프 CSS(.u4aWs20InsertDlg)가 담당. (SSOT 교훈: p13n 내패턴 팝업)
+        try { oDlg.show(); } catch (e) { try { oDlg.showModal(); } catch (e2) { } }
+        lf_renderTable();
+        setTimeout(function () { try { (oSel || oSearch).focus(); } catch (e) { } }, 0);
+        if (oBody) { /* 헤더 드래그·body 스크롤 분리 보장 */ }
+    }
+
+    /********************************************************************
+     * [PUBLIC] 우클릭 컨텍스트 메뉴 (구 callDesignContextMenu / enableDesignContextMenu)
+     ********************************************************************/
+    var _openMenu = null;
+    function _closeMenu() {
+        if (_openMenu) { try { _openMenu.remove(); } catch (e) { } _openMenu = null; }
+        document.removeEventListener("mousedown", _onOutside, true);
+        document.removeEventListener("keydown", _onEsc, true);
+        window.removeEventListener("resize", _closeMenu);
+    }
+    function _onOutside(ev) { if (_openMenu && !_openMenu.contains(ev.target)) { _closeMenu(); } }
+    function _onEsc(ev) { if (ev.key === "Escape") { _closeMenu(); } }
+
+    /********************************************************************
+     * Move Position (구 contextMenuUiMovePosition/uiMovePosition) — 형제 내
+     *   임의 위치로 이동. 작은 위치선택 다이얼로그로 HTML5 재현.
+     ********************************************************************/
+    function _moveUIPosition(oNode) {
+        if (!oNode || !_isEdit()) { return; }
+        var oParent = _node(oNode.POBID);
+        if (!oParent || !oParent.zTREE || oParent.zTREE.length <= 1) { return; }
+        var aSib = oParent.zTREE;
+        var iCur = aSib.findIndex(function (a) { return a.OBJID === oNode.OBJID; });
+        var nTot = aSib.length;
+
+        // 모양새 = WS30 위치 이동 팝업(공통 표준 .u4a-dialog)과 동일하게 통일:
+        //   헤더 아이콘+타이틀+닫기X / 인라인 바디(라벨·number·"/ N") / 푸터=공통
+        //   --emphasized(파랑 ✓) + --negative(빨강 ✗) 아이콘 전용 / 드래그·리사이즈.
+        var oDlg = document.createElement("dialog");
+        oDlg.className = "u4a-dialog";
+        oDlg.style.cssText = "width:min(92vw,360px);padding:0;display:flex;flex-direction:column";
+        oDlg.innerHTML =
+            '<div class="u4a-dialog__header">' +
+            '  <i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span>' + _esc(_msg("A57", "Move Position") + " - " + oNode.OBJID) + '</span>' +
+            '  <button type="button" class="u4a-btn-icon" data-act="cancel" aria-label="Close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>' +
+            '<div class="u4a-dialog__body" style="flex:1 1 auto;display:flex;flex-direction:column;gap:1rem;padding:1.25rem 1.5rem;overflow:visible">' +
+            '  <div style="display:flex;align-items:baseline;justify-content:center;gap:0.4rem">' +
+            '    <input type="number" class="u4a-input u4aWs20MovePos" style="width:4.5rem;font-size:1.6rem;font-weight:700;text-align:center;flex:0 0 auto" min="1" max="' + nTot + '" value="' + (iCur + 1) + '">' +
+            '    <span style="color:var(--text-muted);font-size:1rem">/ ' + nTot + '</span>' +
+            '  </div>' +
+            '  <div style="display:flex;align-items:center;gap:0.75rem;width:100%">' +
+            '    <span style="color:var(--text-muted);font-size:0.8rem;flex:0 0 auto">1</span>' +
+            '    <input type="range" class="u4aWs20MovePosRange" style="flex:1 1 auto;min-width:0;accent-color:var(--accent);cursor:pointer" min="1" max="' + nTot + '" value="' + (iCur + 1) + '">' +
+            '    <span style="color:var(--text-muted);font-size:0.8rem;flex:0 0 auto">' + nTot + '</span>' +
+            '  </div>' +
+            '</div>' +
+            '<div class="u4a-dialog__footer">' +
+            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="ok" title="' + _esc(_msg("A40", "Confirm")) + '"><i class="fa-solid fa-check"></i></button>' +
+            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="cancel" title="' + _esc(_msg("A41", "Cancel")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>';
+        var oInp = oDlg.querySelector(".u4aWs20MovePos");
+        function lf_close() { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
+        function lf_ok() {
+            var v = parseInt(oInp.value, 10); if (!(v >= 1)) { v = 1; } if (v > nTot) { v = nTot; }
+            var iTarget = v - 1;
+            lf_close();
+            if (iTarget === iCur) { return; }
+            _broadBusy(true);   // 자식창 잠금(원본 위치 이동 시 BUSY_ON)
+            oAPP.fn.fnWs20PushUndo();
+            aSib.splice(iCur, 1);
+            aSib.splice(iTarget, 0, oNode);
+            _refreshTree();
+            _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, iTarget, oNode.ISMLB, oNode.UIOBK]);
+            _selectNode(oNode.OBJID);
+            _markChanged();
+            _broadBusy(false);   // 짝 BUSY_OFF
+        }
+        oDlg.querySelector('[data-act="ok"]').addEventListener("click", lf_ok);
+        // 슬라이더 ↔ 숫자 input 동기화(둘 다 1..nTot 클램프).
+        var oRange = oDlg.querySelector(".u4aWs20MovePosRange");
+        function lf_clamp(v) { v = parseInt(v, 10); if (!(v >= 1)) { v = 1; } if (v > nTot) { v = nTot; } return v; }
+        oRange.addEventListener("input", function () { oInp.value = String(lf_clamp(oRange.value)); });
+        oInp.addEventListener("input", function () { oRange.value = String(lf_clamp(oInp.value)); });
+        // 헤더 X + 푸터 ✗ 둘 다 data-act="cancel" → 닫기.
+        oDlg.querySelectorAll('[data-act="cancel"]').forEach(function (b) { b.addEventListener("click", lf_close); });
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
+        oInp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); lf_ok(); } });
+        document.body.appendChild(oDlg);
+        var oHeader = oDlg.querySelector(".u4a-dialog__header");
+        try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { }
+        try { if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 280, minH: 160 }); } } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { }
+        setTimeout(function () { try { oInp.focus(); oInp.select(); } catch (e) { } }, 0);
+    }
+
+    // UI Where use(M08) — 원본(contextMenuUiWhereUse)은 선택 UI 를 "전체 애플리케이션"
+    //   대상으로 전수 검색한다. 다수가 동시에 쓰면 서버에 과도한 검색 부하 → 장애 위험이
+    //   큰 설계라, HTML5 에서는 원본 호출을 막고 경고 토스트만 노출한다(사용자 지시).
+    //   ★i18n: 아래 KO/EN 문구는 하드코딩 — 메시지 클래스 키화 필요 항목으로 보고
+    //     (원본 A59 는 메뉴 라벨 전용 키라 본문 문구가 없음).
+    function _whereUseNotice() {
+        var bKo = false;
+        try { bKo = ((parent.getUserInfo && parent.getUserInfo().LANGU) || "EN") === "KO"; } catch (e) { }
+        var sMsg = bKo
+            ? "‘UI 사용 위치’는 전체 애플리케이션을 전수 조회하는 기능으로, 서버에 큰 부하를 줄 수 있어 현재 비활성화되어 있습니다."
+            : "‘UI Where-Used’ scans every application and can put heavy load on the server, so it is currently disabled.";
+        try { parent.showMessage(null, 10, "W", sMsg); } catch (e) { }
+    }
+
+    // My Pattern(내 패턴, M11) — HTML5 인앱 팝업(fnP13nDesignPopupOpen.js) 진입.
+    //   ★런타임에 UI5 원본(callDesignContextMenu/callP13nDesignDataPopup)이 이미 로드돼
+    //     UI5 contextMenuP13nDesignPopup(→ new sap.m.Dialog, HTML5 스텁이라 오류)이 존재할 수 있음.
+    //     따라서 "함수 존재"가 아니라 "내 HTML5 파일(고유 fnP13nDesignPopupOpen) 로드 여부"로 판단해,
+    //     미로드면 먼저 loadJs 하여 UI5 정의(contextMenuP13nDesignPopup/callP13nDesignDataPopup)를 덮어쓴다.
+    //   HTML5 컨텍스트 메뉴는 /lcmenu/OBJID 미세팅 → 선택 노드(oNode)를 직접 전달.
+    function _openMyPattern(oNode) {
+        var run = function () {
+            try { oAPP.fn.contextMenuP13nDesignPopup(oNode); }
+            catch (e) { console.error("[HTML5][WS20] My Pattern:", e && e.message ? e.message : e); }
+        };
+        if (typeof oAPP.fn.fnP13nDesignPopupOpen === "function") { run(); return; }
+        try { oAPP.loadJs("fnP13nDesignPopupOpen", run); }
+        catch (e) { console.error("[HTML5][WS20] My Pattern load:", e && e.message ? e.message : e); }
+    }
+
+    // 노드/모드별 메뉴 항목 enable 규칙 (구 enableDesignContextMenu — 1:1 이식)
+    //   원본과 동일하게 "모든 항목을 항상 노출하고, 불가 항목은 disable" 한다.
+    function _buildItems(oNode) {
+        var bEdit = _isEdit();
+        var bHasCopy = !!_getCopy();
+        var sId = oNode.OBJID;
+        var oParent = _node(oNode.POBID);
+        var aSib = (oParent && oParent.zTREE) || [];
+        var iIdx = aSib.findIndex(function (a) { return a.OBJID === sId; });
+
+        // enab01~08/11 (구 enableDesignContextMenu)
+        var en = { add: false, del: false, up: false, down: false, movepos: false, copy: false, paste: false, whereuse: false, pattern: false };
+        if (sId === "ROOT") {
+            // ROOT(DOCUMENT): 전부 비활성
+        } else {
+            // ROOT 가 아니면 편집여부 무관하게 UI Where use / My Pattern 가능
+            en.whereuse = true;
+            en.pattern = true;
+            // 편집 상태면 UI추가 + (복사본 존재 시)붙여넣기
+            if (bEdit) { en.add = true; en.paste = bHasCopy; }
+            if (sId === "APP") {
+                // APP: 위 설정만(추가/붙여넣기·where use·pattern)
+            } else if (!bEdit) {
+                // Display(편집 불가)·일반 노드: copy 만 추가 허용
+                en.copy = true;
+            } else {
+                // 편집 가능한 일반 노드: 삭제/이동/복사 가능
+                en.del = true; en.up = true; en.down = true; en.movepos = true; en.copy = true;
+                // 형제 1건 → up/down/movepos 불가, 첫째 → up 불가, 막내 → down 불가
+                if (aSib.length === 1) { en.up = false; en.down = false; en.movepos = false; }
+                else if (iIdx === 0) { en.up = false; }
+                else if (iIdx + 1 === aSib.length) { en.down = false; }
+            }
+        }
+
+        // 원본 메뉴 순서/아이콘/구분선(startsSection) 그대로 — 전부 반환(필터 안 함)
+        return [
+            { key: "M01", icon: "plus", text: _msg("A54", "Insert Element"), on: en.add, sep: true, fn: function () { oAPP.fn.designUIAdd(oNode); } },
+            { key: "M02", icon: "trash", text: _msg("A03", "Delete"), on: en.del, fn: function () { _deleteUI(oNode); } },
+            { key: "M03", icon: "chevron-up", text: _msg("A55", "Up"), on: en.up, sep: true, fn: function () { _moveUI(oNode, "-"); } },
+            { key: "M04", icon: "chevron-down", text: _msg("A56", "Down"), on: en.down, fn: function () { _moveUI(oNode, "+"); } },
+            { key: "M05", icon: "up-down-left-right", text: _msg("A57", "Move Position"), on: en.movepos, fn: function () { _moveUIPosition(oNode); } },
+            { key: "M06", icon: "copy", text: _msg("A04", "Copy"), on: en.copy, sep: true, fn: function () { _copyUI(oNode); } },
+            { key: "M07", icon: "paste", text: _msg("A58", "Paste"), on: en.paste, fn: function () { _pasteUI(oNode); } },
+            { key: "M08", icon: "magnifying-glass", text: _msg("A59", "UI Where use"), on: en.whereuse, sep: true, fn: function () { _whereUseNotice(); } },
+            { key: "M11", icon: "floppy-disk", text: _msg("E19", "My Pattern"), on: en.pattern, sep: true, fn: function () { _openMyPattern(oNode); } }
+        ];
+    }
+
+    oAPP.fn.fnWs20ShowTreeContextMenu = function (oNode, iX, iY) {
+        _closeMenu();
+        if (!oNode) { return; }
+        var aItems = _buildItems(oNode);
+
+        var oMenu = document.createElement("div");
+        oMenu.className = "u4a-menu u4aWs20TreeCtxMenu";
+        oMenu.setAttribute("role", "menu");
+
+        // 상단 타이틀(구 M00 — 노드명, 항상 비활성 헤더)
+        var oTitle = document.createElement("div");
+        oTitle.className = "u4a-menu__item u4aWs20CtxTitle";
+        oTitle.setAttribute("role", "presentation");
+        oTitle.setAttribute("aria-disabled", "true");
+        oTitle.innerHTML = '<i class="fa-solid fa-bars"></i><span class="u4a-menu__item-text">' + _esc(oNode.OBJID) + '</span>';
+        oMenu.appendChild(oTitle);
+
+        aItems.forEach(function (it) {
+            // [공통 UX] ws10_html 메뉴와 동일 마크업(.u4a-menu__item + __item-text + FA <i>).
+            //   원본처럼 "모든 항목 노출 + 불가 항목 disable"(숨기지 않음).
+            var oItem = document.createElement("div");
+            oItem.className = "u4a-menu__item";
+            oItem.setAttribute("role", "menuitem");
+            if (it.sep) { oItem.style.borderTop = "1px solid var(--line)"; } // 그룹 구분(startsSection)
+            if (!it.on) { oItem.setAttribute("aria-disabled", "true"); } // 불가 항목 disable
+            oItem.innerHTML = '<i class="fa-solid fa-' + it.icon + '"></i><span class="u4a-menu__item-text">' + _esc(it.text) + '</span>';
+            if (it.on) {
+                oItem.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    _closeMenu();
+                    try { it.fn(); } catch (err) { console.warn("[HTML5][WS20] ctx menu " + it.key + " error:", err && err.message); }
+                });
+            }
+            oMenu.appendChild(oItem);
+        });
+
+        document.body.appendChild(oMenu);
+        // 위치(화면 경계 보정)
+        var r = oMenu.getBoundingClientRect();
+        var x = iX, y = iY;
+        if (x + r.width > window.innerWidth) { x = Math.max(4, window.innerWidth - r.width - 4); }
+        if (y + r.height > window.innerHeight) { y = Math.max(4, window.innerHeight - r.height - 4); }
+        oMenu.style.position = "fixed";
+        oMenu.style.left = x + "px";
+        oMenu.style.top = y + "px";
+        oMenu.style.zIndex = "4000";
+        _openMenu = oMenu;
+        // 창 리사이즈 시 컨텍스트 메뉴 닫기(표준 메뉴 UX).
+        window.addEventListener("resize", _closeMenu);
+        // 미리보기(iframe) 클릭 닫기는 전역(u4a-ui.js _installIframeBlurClose)이 합성 mousedown 으로 처리.
+        setTimeout(function () {
+            document.addEventListener("mousedown", _onOutside, true);
+            document.addEventListener("keydown", _onEsc, true);
+        }, 0);
+    };
+
+    /********************************************************************
+     * Undo/Redo 단축키 — 원본 정식 KEY(Ctrl+Shift+Z=Undo/247, Ctrl+Shift+X=Redo/248,
+     *   ws_common.js getShortCutList)로 통일. 기존 raw keydown(Ctrl+Z/Ctrl+Y) 리스너는
+     *    ① 정식 KEY 와 어긋나 "단축키 리스트" 팝업 표기(247/248)와 실제 동작이 불일치하고
+     *       (특히 Ctrl+Shift+Z 를 Redo 로 처리 — 원본은 Undo),
+     *    ② 공통 가드(fnRunShortCut: busy/락/isShortcutLock/다이얼로그/미리보기 iframe 포커스 전달)를
+     *       우회한다 → 제거.
+     *   실제 배선은 ws_html5_ws20.js 의 getShortCutList super-wrap 이 두 KEY fn 을
+     *   fnWs20ExecHistory("UNDO"/"REDO") 로 교체(버튼 ↶↷ 와 동일 스택·활성·초기화).
+     ********************************************************************/
+
+})(window, (window.oAPP = window.oAPP || {}));

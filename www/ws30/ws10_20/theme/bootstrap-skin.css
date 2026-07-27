@@ -564,6 +564,9 @@ html[data-sl-theme="dark"] .u4a-toast {
 .u4a-input[data-vs="error"],
 .u4a-select[data-vs="error"] {
     border-color: var(--state-error) !important;
+    /* ★ 에러 배경 전역 적용(장군님 지시 2026-07-24) — 원본 UI5 ValueState.Error 처럼 옅은 빨강 채움.
+       활성 배경(--surface-raised, shell.css:1432 특이도 0,1,0)을 (0,2,0)+늦은 로드로 이김. */
+    background: var(--state-error-bg);
 }
 /* (B) 비활성(readonly/disabled/display) — 진한 회색 배경 + 옅은 테두리로 확실히 가라앉힘. */
 [data-theme="horizon_white"] .u4a-input:disabled,

@@ -1347,9 +1347,8 @@ export async function getControl() {
 
                     let sErrMsg = oRES.RTMSG || "";
 
-                    // 바인딩(992)·CSS 미지원(993): 확인 시 그 UI 를 WS20 에서 선택시킨다.
-                    //   부모 setSelectTreeItem(OBJID, UIATK) 를 태우도록 SELECT_UI 요청(첫 건). (장군님 지시)
-                    //   992 는 UIATK(styleClass 속성키) 동봉 → 선택+속성이동, 993 은 UIATK 없음 → 선택만.
+                    // 바인딩(992): 확인 시 그 UI 를 WS20 에서 선택 + styleClass 속성으로 이동시킨다.
+                    //   부모 setSelectTreeItem(OBJID, UIATK) 를 태우도록 SELECT_UI 요청(첫 바인딩 건). (장군님 지시)
                     let aBound = oRES.BOUND;
                     let fnAfter = null;
                     if(aBound && Array.isArray(aBound) && aBound.length > 0){

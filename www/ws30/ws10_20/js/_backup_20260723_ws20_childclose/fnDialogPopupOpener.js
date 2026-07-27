@@ -3505,38 +3505,21 @@
         var bReply = (sPRCCD === "PREVIEW" || sPRCCD === "SAVE");
 
         //팝업으로 결과 회신(메시지 문구까지 실어 보낸다 — 팝업이 그대로 출력. no-invented-messages).
-        //  oExtra: 추가 데이터(예: 992 바인딩 목록 BOUND) 를 응답에 동봉.
-        function lf_reply(sRetcd, sMsgty, sMsg, oExtra) {
+        function lf_reply(sRetcd, sMsgty, sMsg) {
 
             if (bReply !== true) { return; }
 
-            var oPayload = {
-                PRCCD: sPRCCD,
-                RETCD: sRetcd,
-                MSGTY: sMsgty || "",
-                RTMSG: sMsg || ""
-            };
-            if (oExtra) { for (var k in oExtra) { oPayload[k] = oExtra[k]; } }
-
             try {
-                oRes.WIN.webContents.send("if-ui5css-result", oPayload);
+                oRes.WIN.webContents.send("if-ui5css-result", {
+                    PRCCD: sPRCCD,
+                    RETCD: sRetcd,
+                    MSGTY: sMsgty || "",
+                    RTMSG: sMsg || ""
+                });
             } catch (e) {
                 console.error("[WS20] UI5 Predefined CSS 결과 회신 실패:", e && e.message);
             }
 
-        }
-
-        //팝업이 992(바인딩) 확인 후 보내는 "그 UI 선택 + styleClass 속성으로 이동" 요청.
-        //  공통 setSelectTreeItem(OBJID, UIATK, TYPE)=UI 선택+속성 포커스(ws_html5_ws20_prev.js). 회신 없음.
-        if (sPRCCD === "SELECT_UI") {
-            try {
-                if (typeof oAPP.fn.setSelectTreeItem === "function") {
-                    oAPP.fn.setSelectTreeItem(oRes.OBJID, oRes.UIATK, "");
-                }
-            } catch (e) {
-                console.error("[WS20] UI5 Predefined CSS 바인딩 UI 선택 이동 실패:", e && e.message);
-            }
-            return;
         }
 
         try {
@@ -3554,11 +3537,8 @@
 
                 //CHECKBOX 선택건이 존재하지 않는경우.
                 if (lt_OBJID.length === 0) {
-                    //  ★원본은 286 "체크박스가 선택되지 않았습니다"(uiPreviewArea.js:1271)를 썼으나, 이 팝업엔
-                    //    CSS 카드마다 체크박스가 있어 "카드 체크했는데 왜?" 오해를 부른다(장군님 지적 2026-07-23).
-                    //    이 팝업 경로 전용으로 대상이 "디자인 화면의 UI"임을 명시한 991 로 회신(ZMSG_WS_COMMON_001).
-                    //    원본 WS20 자체 경로(286)는 무수정 — 이 회신 문구만 교체.
-                    lf_reply("E", "W", oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "991", "", "", "", ""));
+                    //286	Check box not selected. (원본 uiPreviewArea.js:1271 과 동일 키 재사용)
+                    lf_reply("E", "W", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "286", "", "", "", ""));
                     return;
                 }
 
@@ -3573,38 +3553,7 @@
             //     처리함"(2024-08-09) 으로 남은 미완성 상태.)
             //    → SAVE 일 때만 저장. PREVIEW = 임시 적용(다음 호출/창 닫기 시 원복).
             //      CLOSE 는 DATA 가 빈 배열이라 1259행에서 원복만 하고 종료 — 기존 동작 그대로.
-            //  ★반환 = { applied: 실제 반영 건수, bound: 바인딩되어 중단시킨 UI 목록 }.
-            var oApplyRes = oAPP.fn.prevStyleClassApply(oRes.DATA, sPRCCD === "SAVE");
-
-            //(3-a) 바인딩된 항목이 있으면 아무것도 적용하지 않고, 어떤 UI 가 바인딩됐는지 알린다(신규 992).
-            //     styleClass 자리에 이미 값이 연결(바인딩)된 UI 에 덮어쓰면 안 되므로 전체 중단(장군님 지시).
-            //     확인 후 그 UI 로 선택/이동시키도록 BOUND(첫 건의 OBJID/UIATK)를 동봉한다.
-            if (oApplyRes && oApplyRes.bound && oApplyRes.bound.length > 0) {
-                var sBoundList = oApplyRes.bound.map(function (o) { return o.OBJID; }).join(", ");
-                lf_reply("E", "W",
-                    oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "992", sBoundList, "", "", ""),
-                    { BOUND: oApplyRes.bound });
-                return;
-            }
-
-            //(3-b) CSS 를 지원하지 않는 UI(styleClass 프로퍼티 정의 자체가 없는 UI)가 섞여 있으면 전체 중단하고
-            //     어떤 UI 인지 알린다(신규 993). 확인 후 그 UI 를 선택시키도록 BOUND(첫 건 OBJID)를 동봉한다.
-            //     ※ styleClass 속성 자체가 없으므로 UIATK 없음 → 팝업은 UI 선택만(속성 이동 없음). (2026-07-24)
-            if (oApplyRes && oApplyRes.nostyle && oApplyRes.nostyle.length > 0) {
-                var sNoStyleList = oApplyRes.nostyle.map(function (o) { return o.OBJID; }).join(", ");
-                lf_reply("E", "W",
-                    oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "993", sNoStyleList, "", "", ""),
-                    { BOUND: oApplyRes.nostyle });
-                return;
-            }
-
-            //(3-c) 바인딩·미지원은 없으나 한 건도 반영되지 않았으면(0건) "완료" 대신 "적용된 항목이 없습니다"(신규 990).
-            //     체크는 했으나 아무 변화가 없었는데 성공 토스트가 뜨던 모순 해소. (2026-07-23)
-            if (!oApplyRes || oApplyRes.applied === 0) {
-                //  ★990 은 ZMSG_WS_COMMON_001 클래스에 등록됨(286 의 /U4A/MSG_WS 와 별개 클래스 — 혼동 주의).
-                lf_reply("E", "W", oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "990", "", "", "", ""));
-                return;
-            }
+            oAPP.fn.prevStyleClassApply(oRes.DATA, sPRCCD === "SAVE");
 
             lf_reply("S", "", "");
 

@@ -119,6 +119,46 @@
     }
 
     /************************************************************************
+     * [P6 수신 · SPEC §6] WS20 반송 추가속성 오류 → 오류 팝오버.
+     *   원본 broadcastChannelBindPopup.js:330 responseAdditError 1:1.
+     *   흐름: 팝업 필드+추가속성을 WS20 캔버스에 드롭 → WS20 attrCheckDropMPROP 검사 →
+     *         오류면 WS20 이 { PRCCD:"ERROR-ADDIT-DATA", T_ERMSG:[{ITMCD,ERMSG}] } 반송
+     *         (원본 send측 sendAdditError:773). HTML5 수신부가 없어 그동안 조용히 무시됨(P6 잔여).
+     *   표시: T_ERMSG → TY_BIND_ERROR(ACT05=우측 추가속성 라인, LINE_KEY=ITMCD) → 우측 패널 앵커 팝오버.
+     *   ★ 원본과 동일하게 로컬 busy(표시 전후) + showMessagePopoverOppener(자체 오류 게이트와 같은 계약).
+     ************************************************************************/
+    function _responseAdditError(oEvent) {
+        var d = (oEvent && oEvent.data) || {};
+        if (d.PRCCD !== "ERROR-ADDIT-DATA") { return; }
+        var aErm = d.T_ERMSG;
+        if (typeof aErm === "undefined" || !aErm.length) { return; }   // 원본: undefined/0 이면 무시.
+
+        oAPP.fn.setBusy(true);
+
+        var A = oAPP.attr.CS_MSG_ACTCD || {};
+        var aErr = [];
+        for (var i = 0; i < aErm.length; i++) {
+            var e = aErm[i] || {};
+            aErr.push(oAPP.fn.newBindError({
+                ACTCD: A.ACT05,          // 우측 추가속성 테이블 "라인"(ITMCD 매칭 강조 + 링크이동)
+                LINE_KEY: e.ITMCD,
+                TYPE: "Error",
+                TITLE: e.ERMSG,
+                DESC: e.ERMSG
+            }));
+        }
+
+        // 앵커 = 우측 "추가 속성 바인딩" 패널 호스트(#bwpAdditInfo). 원본 oAddit.ui.ROOT 대응.
+        var oAnchor = document.getElementById("bwpAdditInfo");
+        if (oAnchor && aErr.length && typeof oAPP.fn.showMessagePopoverOppener === "function") {
+            Promise.resolve(oAPP.fn.showMessagePopoverOppener(oAnchor, aErr))
+                .then(function () { oAPP.fn.setBusy(false); }, function () { oAPP.fn.setBusy(false); });
+        } else {
+            oAPP.fn.setBusy(false);
+        }
+    }
+
+    /************************************************************************
      * [P6 송신 · SPEC §8 패스스루] 도움말 문서 열기 요청 — 원본 broadcastChannelBindPopup.js:757 1:1.
      *   별창은 U4A HELP DOCUMENT 팝업을 직접 못 여니 WS20(디자인 영역)에 호출을 위임한다.
      *   ★ sParam 키 "opstion"(원본 오타) 그대로 유지 — 수신측이 그 문자열로 읽는다. 고치면 계약 파손.
@@ -167,7 +207,10 @@
                 case "BUSY_OFF":
                     oAPP.fn.setBusy(false, { ISBROAD: true });
                     break;
-                // ERROR-ADDIT-DATA / DESIGN-TREE-SELECT-OBJID = P6 잔여.
+                case "ERROR-ADDIT-DATA":
+                    _responseAdditError(oEvent);   // WS20 반송 추가속성 오류 → 우측 패널 팝오버(SPEC §6).
+                    break;
+                // DESIGN-TREE-SELECT-OBJID = P6 잔여(R3).
                 default:
                     break;
             }

@@ -1255,8 +1255,8 @@
     oAPP.attr.prevCSS = [];
 
 
-    //적용 처리 대상 CSS 가 존재하지 않는경우 exit. ([HTML5] {적용건수, 바인딩목록} 반환)
-    if(typeof it_css === "undefined" || it_css.length === 0){return { applied: 0, bound: [] };}
+    //적용 처리 대상 CSS 가 존재하지 않는경우 exit.
+    if(typeof it_css === "undefined" || it_css.length === 0){return;}
 
     var lt_OBJID = [];
 
@@ -1268,51 +1268,15 @@
     if(lt_OBJID.length === 0){
       //오류 메시지 처리.
       //286	Check box not selected.
-      //  ※[HTML5] UI5CSSPOP_V2 경로는 부모 _ui5PreCssApply 가 선판정해 여기 도달 전에 회신하므로
-      //    이 showMessage 는 원본(WS20 자체) 경로 전용. 적용 건수 0 반환.
       parent.showMessage(sap, 20, "W", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "286", "", "", "", ""));
-      return { applied: 0, bound: [] };
+      return;
 
     }
 
     //STYLE CLASS 병합처리.
     var l_css = it_css.join(" ");
 
-    //[HTML5 2026-07-23] 실제 styleClass 를 건드린(적용된) 건수. 0 이면 호출측이 "적용된 항목이 없습니다"
-    //  안내(신규 987~ 계열 990). styleClass 미보유 UI 나 바인딩건은 skip 되어 카운트되지 않는다.
-    var l_changed = false, l_UIATV = "", l_sep = "", l_applied = 0;
-
-    //[HTML5 2026-07-23] 바인딩 선검사 — 선택 UI 중 styleClass 가 바인딩된 게 하나라도 있으면 전체 중단하고
-    //  해당 UI 목록을 반환한다(장군님 지시: 바인딩건에 CSS 덮어쓰기 금지 + 어떤 UI 인지 사용자에게 통지).
-    //  판정 기준은 아래 적용 루프의 바인딩 SKIP(ls_0015.ISBND==="X") 과 동일. 원본 부분적용 → 전체중단으로 변경.
-    //[HTML5 2026-07-24] CSS 미지원 UI 선검사(993) 동봉 — styleClass 프로퍼티 정의(T_0023)가 아예 없는 UI 는
-    //  CSS 를 붙일 수 없다. 하나라도 섞여 있으면 전체 중단하고 해당 UI 목록 반환(장군님 지시: 1%도 전체중단).
-    var lt_bound = [];
-    var lt_nostyle = [];
-    for(var b=0, bl=lt_OBJID.length; b<bl; b++){
-
-      var ls_0023_b = oAPP.DATA.LIB.T_0023.find( a=> a.UIOBK === lt_OBJID[b].UIOBK &&
-        a.UIATT === "styleClass" && a.UIATY === "1" && a.ISDEP !== "X" );
-
-      //styleClass 프로퍼티 정의 자체가 없는 UI = CSS 미지원 → 수집(993). (UIATK 없음 → 선택만, 속성이동 없음)
-      if(!ls_0023_b){ lt_nostyle.push({ OBJID: lt_OBJID[b].OBJID }); continue; }
-
-      var oPrev_b = oAPP.attr.prev[lt_OBJID[b].OBJID];
-      if(!oPrev_b || !oPrev_b._T_0015){ continue; }
-
-      var ls_0015_b = oPrev_b._T_0015.find( a=> a.UIATK === ls_0023_b.UIATK );
-
-      //styleClass 프로퍼티가 바인딩된 건 수집. (OBJID=UI식별, UIATK=styleClass 속성키 → 확인 후 해당
-      //  속성으로 선택/이동시키기 위함 — setSelectTreeItem(OBJID, UIATK))
-      if(ls_0015_b && ls_0015_b.ISBND === "X"){ lt_bound.push({ OBJID: lt_OBJID[b].OBJID, UIATK: ls_0023_b.UIATK }); }
-
-    }
-
-    //바인딩된 항목이 하나라도 있으면 아무것도 적용하지 않고 목록 반환(호출측이 안내). 우선순위: 바인딩(992) > 미지원(993).
-    if(lt_bound.length > 0){ return { applied: 0, bound: lt_bound, nostyle: lt_nostyle }; }
-
-    //CSS 미지원 UI 가 하나라도 있으면 전체 중단하고 목록 반환(호출측이 993 안내).
-    if(lt_nostyle.length > 0){ return { applied: 0, bound: [], nostyle: lt_nostyle }; }
+    var l_changed = false, l_UIATV = "", l_sep = "";
 
     //DESIGN영역의 CHECKBOX 선택건을 대상으로 CSS 적용 처리.
     for(var i=0, l=lt_OBJID.length; i<l; i++){
@@ -1351,10 +1315,7 @@
         oAPP.attr.prev[lt_OBJID[i].OBJID].setStyleClass(l_UIATV + l_sep + l_css);
 
       }
-
-      //[HTML5 2026-07-23] 여기까지 온 건 = styleClass 를 실제 반영한 건(미리보기/적용 공통). 적용 건수 누적.
-      l_applied++;
-
+      
       //실제 적용 처리가 아닌경우 CSS 적용건 수집 처리.
       if(!bSave){
         oAPP.attr.prevCSS.push({OBJID:lt_OBJID[i].OBJID, CSS:l_css, ISEXT:ls_0023.ISEXT, UIATV:l_UIATV});
@@ -1428,10 +1389,6 @@
       //change flag 설정.
       oAPP.fn.setChangeFlag();
     }
-
-    //[HTML5 2026-07-23] 실제 적용된 건수 반환(applied 0 이면 호출측이 "적용된 항목이 없습니다" 안내).
-    //  bound 는 위 선검사에서 이미 걸러졌으므로 여기선 항상 빈 배열.
-    return { applied: l_applied, bound: [] };
 
   };  //미리보기 css 적용 처리.
     

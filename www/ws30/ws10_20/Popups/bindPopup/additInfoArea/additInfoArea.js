@@ -397,7 +397,8 @@
     oAPP.fn.convChangeInput = async function (r, oInp) {
         oAPP.fn.setBusy(true);
         if (!r || r.ITMCD !== "P06") { oAPP.fn.setBusy(false); return; }
-        if (r.val === "") { _clearRowErr(r); if (oInp) { oInp.setValueState("none", ""); } oAPP.fn.setBusy(false); return; }
+        // 빈 값 = 에러 해제 → in-cell/입력칸 상태 + top-layer 팝오버 모두 내림.
+        if (r.val === "") { _clearRowErr(r); if (oInp) { oInp.setValueState("none", ""); } oAPP.fn._bwpVsHide(); oAPP.fn.setBusy(false); return; }
         var _sRes = await oAPP.fn.checkConversion(r.val);
         if (_sRes.RETCD === "E") {
             r.stat = "Error"; r.statTxt = _sRes.RTMSG; r._error = true; r._error_msg = _sRes.RTMSG;
@@ -406,6 +407,7 @@
         }
         _clearRowErr(r);
         if (oInp) { oInp.setValueState("none", ""); }
+        oAPP.fn._bwpVsHide();   // 정상 값 → 팝오버 내림
         oAPP.fn.setBusy(false);
     };
 
@@ -413,6 +415,7 @@
         if (!r || r.ITMCD !== "P06") { return; }
         _clearRowErr(r);
         if (oInp) { oInp.setValueState("none", ""); }
+        oAPP.fn._bwpVsHide();   // X(clear)·타이핑 등으로 에러 해제 시 top-layer 팝오버도 내림
     };
 
     /************************************************************************
@@ -680,6 +683,53 @@
         _updateSelStat();
     };
 
+    /* ── [R1] valueState 검증 메시지 = top-layer 팝오버 (원본 UI5 ValueStateMessage 대응) ─────
+       추가속성 표가 overflow 컨테이너(.u4aBwpTableHost) 안이라, 셀 안 absolute 팝오버는 클리핑/스태킹으로
+       안 보일 수 있다(장군님 실기 재현). → 원본 UI5 처럼 문서 최상단(body/dialog[open])에 position:fixed 로
+       입력칸 바로 아래 부착. 싱글톤 1개 재사용. 스크롤/리사이즈로 앵커 어긋나면 숨김(공통 툴팁 정책과 동일).
+       색/아이콘/보더는 공통 .u4a-field__msg 소비(신규 스타일 없음), 폭은 입력칸 폭으로 설정 → 반응형 개행. */
+    var _vsPop = null, _vsBound = false, _vsField = null;
+    function _vsEl() {
+        if (!_vsPop) {
+            _vsPop = document.createElement("span");
+            _vsPop.className = "u4a-field__msg u4aBwpVsPop";
+            _vsPop.setAttribute("data-vs", "error");
+        }
+        return _vsPop;
+    }
+    oAPP.fn._bwpVsHide = function () { if (_vsPop) { _vsPop.style.display = "none"; } };
+    oAPP.fn._bwpVsShow = function (oInputEl, r) {
+        if (!oInputEl || !r || r.stat !== "Error" || !r.statTxt) { oAPP.fn._bwpVsHide(); return; }
+        var el = _vsEl();
+        _vsField = (oInputEl.closest && oInputEl.closest(".u4aBindAdditField")) || oInputEl;  // 현재 앵커 필드(외부클릭 판정용)
+        el.textContent = r.statTxt;
+        el.setAttribute("data-vs", "error");
+        var host = (oInputEl.closest && oInputEl.closest("dialog[open]")) || document.body;
+        if (el.parentNode !== host) { host.appendChild(el); }
+        var rc = oInputEl.getBoundingClientRect();
+        el.style.position = "fixed";
+        el.style.margin = "0";                          // 공통 margin-top(0.25rem) 무효화 → top 결정적
+        el.style.left = Math.round(rc.left) + "px";
+        el.style.top = Math.round(rc.bottom + 4) + "px";
+        el.style.width = Math.round(rc.width) + "px";   // 입력칸 폭 → 문구 개행(반응형)
+        el.style.display = "inline-flex";
+        if (!_vsBound) {
+            _vsBound = true;
+            window.addEventListener("scroll", function () { oAPP.fn._bwpVsHide(); }, true);
+            window.addEventListener("resize", function () { oAPP.fn._bwpVsHide(); });
+            // [C-1 버그1] 다른 영역 클릭 시 숨김 — blur 만으론 스플릿바(mousedown 에서 preventDefault 로
+            //   포커스 이동을 막음)처럼 input blur 를 안 일으키는 클릭을 못 잡는다. mousedown capture 로 보강.
+            //   단, 현재 앵커 필드 내부(input 재클릭)·팝오버 자체 클릭은 유지(재포커스 깜빡임/영구숨김 방지).
+            document.addEventListener("mousedown", function (e) {
+                if (!_vsPop || _vsPop.style.display === "none") { return; }
+                var t = e.target;
+                if (_vsField && t && t.closest && t.closest(".u4aBindAdditField") === _vsField) { return; }
+                if (_vsPop.contains && t && _vsPop.contains(t)) { return; }
+                oAPP.fn._bwpVsHide();
+            }, true);
+        }
+    };
+
     /* ── 행 렌더(값 셀 = 텍스트 / 입력 / 선택) — ctx 스토어/tbody 명시 ───────── */
     function _renderRows(ctx) {
         if (!ctx || !ctx.tbody) { return; }
@@ -702,6 +752,11 @@
 
             var oTdV = H.el("td", "u4aBwpAdditVal");
             var bEnabled = bEditGlobal && r.edit;
+            // [R1] 필드(입력/선택) 값셀은 공통 .u4a-table 자동 말줄임툴팁 대상에서 제외한다.
+            //   값셀 textContent 에 섞인 검증 메시지(.u4a-field__msg)까지 긁어 hover 시 오류문구가
+            //   툴팁으로 새던 문제 차단. data-tip="" → 공통 _show 가 빈 문자열이면 표시 생략(u4a-ui.js:689).
+            //   (텍스트 값셀은 건드리지 않아 긴 값 말줄임 툴팁은 그대로 유지.)
+            if (r.sel_vis || r.inp_vis) { oTdV.setAttribute("data-tip", ""); }
 
             if (r.sel_vis) {
                 var aItems = (r.T_DDLB || []).map(function (d) { return { value: d.KEY, text: d.TEXT }; });
@@ -717,6 +772,10 @@
                 var bConv = (r.ITMCD === "P06");
                 var oInp = U4AUI.createField({
                     type: "text", value: r.val || "",
+                    // [R1] 검증 메시지 = 원본 UI5 ValueState.Error 재현. 에러 시 빨간 배경+테두리(공통 전역)
+                    //   + '포커스 시' 문구 팝오버. 팝오버는 top-layer(_bwpVsShow, 아래)로 띄운다 — 이 표가
+                    //   overflow 컨테이너(.u4aBwpTableHost) 안이라 셀 안 absolute 팝오버는 잘리거나 안 보임.
+                    className: "u4aBindAdditField",
                     maxLength: (r.maxlen != null ? r.maxlen : undefined),
                     disabled: !bEnabled, clear: bEnabled, upper: bConv,
                     onChange: (function (row) { return function (v) { row.val = v; if (bConv) { oAPP.fn.convChangeInput(row, oInp); } }; })(r),
@@ -724,6 +783,13 @@
                     onClear: (function (row) { return function () { row.val = ""; if (bConv) { oAPP.fn.clearConvError(row, oInp); } }; })(r)
                 });
                 if (bConv && r.stat === "Error") { try { oInp.setValueState("error", r.statTxt || ""); } catch (e) { } }
+                if (bConv) {
+                    // [R1] 포커스 시 top-layer 팝오버 노출 / blur 시 숨김(원본 UI5 ValueStateMessage = 문서레벨 팝업).
+                    (function (row, inpEl) {
+                        inpEl.addEventListener("focus", function () { oAPP.fn._bwpVsShow(inpEl, row); });
+                        inpEl.addEventListener("blur", function () { oAPP.fn._bwpVsHide(); });
+                    })(r, oInp.input);
+                }
                 oTdV.appendChild(oInp.el);
             } else {
                 var oTxt = H.el("span", "u4aBwpAdditTxt", r.val || "");

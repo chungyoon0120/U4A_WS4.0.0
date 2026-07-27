@@ -1501,10 +1501,9 @@ body.u4a-dragging iframe { pointer-events: none; }
     border-color: var(--state-error);
 }
 
-/* ValueState.Error (체크리스트 F) */
+/* ValueState.Error (체크리스트 F) — 빨간 테두리. 배경(옅은 빨강 채움)은 원본 UI5 재현으로
+   전역 적용(장군님 지시 2026-07-24) — 색 SSOT = bootstrap-skin.css:564(늦게 로드해 이김). */
 .u4a-input[data-vs="error"] {
-    /* [눈피로 완화] 빨간 채움 제거 → 빨간 테두리만(UI5 처럼 어두운 안 + 빨간 외곽).
-       오류 인지는 빨간 테두리 + 아래 메시지(빨간 아이콘)로 충분. */
     border-color: var(--state-error);
 }
 

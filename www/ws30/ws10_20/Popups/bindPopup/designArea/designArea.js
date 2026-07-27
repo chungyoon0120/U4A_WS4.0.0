@@ -884,6 +884,21 @@
         return "";   // Properties/Aggregations 그룹(아이콘 없음)
     }
 
+    // 임베디드 속성 배지(원본 designTree.js:4093 이름칸 ObjectStatus{text:EMATT, icon:EMATT_ICON}, SpaceBetween 우측).
+    //   EMATT = 그 UI 가 대표하는 임베디드 속성(S_14_UIATT). 아이콘 = Aggregation 카디널리티(원본 _build0014:105).
+    //   ★WS20 UI 트리(js/ws_html5_ws20_tree.js:193 _AGGR_ICON)와 ★동일 클래스★로 맞춤(장군님 통일 지시 2026-07-24):
+    //     0:1 color-fill → fa-regular fa-square(사각형 1개) / 0:N dimension → fa-regular fa-clone(겹친 사각형).
+    function _ematBadge(n) {
+        if (!n || !n.EMATT) { return null; }
+        var oB = H.el("span", "u4aBwpEmatt");
+        var sCls = (n.EMATT_ICON === "sap-icon://dimension") ? "fa-regular fa-clone"   // 0:N (겹친 사각형)
+            : (n.EMATT_ICON === "sap-icon://color-fill") ? "fa-regular fa-square" : ""; // 0:1 (사각형 1개)
+        if (sCls) { var oI = H.el("span", "u4aBwpEmattIcon"); oI.innerHTML = '<i class="' + sCls + '"></i>'; oB.appendChild(oI); }
+        oB.appendChild(document.createTextNode(n.EMATT));
+        oB.setAttribute("data-tip", n.EMATT); oB.setAttribute("data-tip-trunc", "");   // 잘릴 때만 툴팁(공통).
+        return oB;
+    }
+
     // 행 액션 컬럼(원본 rowActionTemplate — accept=추가속성적용 / disconnected=해제).
     //   WS20 디자인 트리의 +/휴지통과 동일한 2슬롯 구조(빈슬롯으로 세로 정렬 유지). 편집 상태 + 가시 플래그일 때만 버튼.
     function _rowActions(n) {
@@ -1008,6 +1023,13 @@
                 var sHl = H.rowHl(n._highlight);
                 if (sHl) { oRow.classList.add(sHl); }
                 oRow.__bwpNode = n;   // 드롭 대상 조회용(좌측 필드 → 이 행).
+                // 임베디드 속성 배지 — 이름칸(.u4aColTreeNameCell) 우측에 덧댐(원본 ObjectStatus SpaceBetween 재현).
+                //   공통 미수정 — 이름칸은 공통이 조립하고 여기(화면 rowHook)서 추가만 한다.
+                var oEmat = _ematBadge(n);
+                if (oEmat) {
+                    var oNameCell = oRow.querySelector(".u4aColTreeNameCell");
+                    if (oNameCell) { oNameCell.appendChild(oEmat); }
+                }
                 // 드래그 진행 중이면 현재 drop 가능여부 표시 유지(재렌더 대비).
                 if (oAPP.attr.dragModelNode) {
                     oRow.classList.toggle("u4aBwpDropOk", n._drop_enable === true);

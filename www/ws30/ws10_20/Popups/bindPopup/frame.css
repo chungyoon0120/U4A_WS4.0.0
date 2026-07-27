@@ -284,6 +284,13 @@ body {
 .u4aBwpDesignPathLink { cursor: pointer; }
 .u4aBwpDesignPathLink:hover { text-decoration: underline; }
 
+/* 임베디드 속성 배지(원본 designTree.js:4093 ObjectStatus{EMATT/EMATT_ICON}) — 이름칸 우측(SpaceBetween 재현).
+   ★색/크기/잘림은 WS20 UI 트리 .u4aWs20TreeAggr(WS10/css/ws20.css:480/490)와 동일: --ws20-aggr=--accent, 13px/11px, 좁으면 clip. */
+.u4aBwpEmatt { margin-left: auto; flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 0.1875rem;
+    overflow: hidden; text-overflow: clip; white-space: nowrap;
+    font-size: 0.8125rem; color: var(--accent); }
+.u4aBwpEmattIcon { flex: 0 0 auto; color: var(--accent); font-size: 0.6875rem; }
+
 /* 행 액션 컬럼(원본 rowActionTemplate = WS20 트리 +/휴지통과 동일한 2슬롯 — 빈슬롯으로 세로 정렬 유지). */
 .u4aBwpRowActions { display: flex; align-items: center; justify-content: center; gap: 0.125rem; }
 .u4aBwpRowActSlot { display: inline-block; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; }
@@ -386,6 +393,18 @@ body {
 .u4aBwpAdditVal .u4a-field,
 .u4aBwpAdditVal .u4a-combo { width: 100%; }
 .u4aBwpAdditVal .u4aBwpAdditTxt { user-select: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+
+/* [R1 · 원본 UI5 ValueState.Error 재현 · 장군님 지시 2026-07-24]
+   원본 sap.m.Input ValueState(bindAdditInfo.js:1239 stat / 1240 statTxt) 동작을 그대로 옮긴다.
+     ① 에러 input '빨간 배경+테두리' 상시 = 공통 전역(bootstrap-skin:564~).
+     ② 메시지는 '포커스가 갔을 때만' input 아래 팝오버. ★셀 안 absolute 팝오버는 이 표가 overflow
+        컨테이너(.u4aBwpTableHost) 안이라 클리핑/스태킹으로 안 보임(장군님 실기 재현) → 원본 UI5
+        ValueStateMessage 처럼 문서 최상단(body/dialog)에 position:fixed 로 띄운다(additInfoArea `_bwpVsShow`).
+        색/아이콘/보더는 공통 .u4a-field__msg 소비. 아래 .u4aBwpVsPop 는 그 top-layer 인스턴스.
+        ※ hover 로 오류문구가 새던 문제(공통 .u4a-table 자동 말줄임툴팁이 값셀 textContent=숨은 메시지까지
+          긁어감)는 additInfoArea 에서 필드 값셀에 data-tip="" 로 opt-out(공통 무수정).
+     ③ 반응형 개행 — 팝오버 폭을 입력칸 폭으로 JS 설정 + white-space:normal 로 문구 줄바꿈. */
+.u4aBwpVsPop { z-index: 40; white-space: normal; overflow-wrap: anywhere; }
 
 /* 추가속성 오류 행 강조(SPEC §6) — 원본 stat="Error" + _style="u4aWsDesignTreeError" 대응.
    "오류 위치 확인" 링크로 이동했을 때 그 행을 눈에 띄게. 색은 의미 토큰만. */

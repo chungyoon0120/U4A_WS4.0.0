@@ -3587,18 +3587,7 @@
                 return;
             }
 
-            //(3-b) CSS 를 지원하지 않는 UI(styleClass 프로퍼티 정의 자체가 없는 UI)가 섞여 있으면 전체 중단하고
-            //     어떤 UI 인지 알린다(신규 993). 확인 후 그 UI 를 선택시키도록 BOUND(첫 건 OBJID)를 동봉한다.
-            //     ※ styleClass 속성 자체가 없으므로 UIATK 없음 → 팝업은 UI 선택만(속성 이동 없음). (2026-07-24)
-            if (oApplyRes && oApplyRes.nostyle && oApplyRes.nostyle.length > 0) {
-                var sNoStyleList = oApplyRes.nostyle.map(function (o) { return o.OBJID; }).join(", ");
-                lf_reply("E", "W",
-                    oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "993", sNoStyleList, "", "", ""),
-                    { BOUND: oApplyRes.nostyle });
-                return;
-            }
-
-            //(3-c) 바인딩·미지원은 없으나 한 건도 반영되지 않았으면(0건) "완료" 대신 "적용된 항목이 없습니다"(신규 990).
+            //(3-b) 바인딩은 없으나 한 건도 반영되지 않았으면(0건) "완료" 대신 "적용된 항목이 없습니다"(신규 990).
             //     체크는 했으나 아무 변화가 없었는데 성공 토스트가 뜨던 모순 해소. (2026-07-23)
             if (!oApplyRes || oApplyRes.applied === 0) {
                 //  ★990 은 ZMSG_WS_COMMON_001 클래스에 등록됨(286 의 /U4A/MSG_WS 와 별개 클래스 — 혼동 주의).

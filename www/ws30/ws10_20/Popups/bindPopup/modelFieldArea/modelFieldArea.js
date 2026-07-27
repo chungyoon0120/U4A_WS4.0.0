@@ -320,11 +320,22 @@
 
                 // 평면 → 중첩(zTREE).
                 oAPP.attr.modelTree = oAPP.fn.setTreeData(aTree, "CHILD", "PARENT", "zTREE");
-                // ★ 초기 로드 = 선택 없이 전체 펼침(원본 loadBindData 후 clearSelection + expandToLevel(99999),
-                //   index.js:8145~8148). 예전엔 rerender(true) 로 첫 루트만 선택하고 펼침을 안 해(주석과 달리)
-                //   좌측 트리가 접힌 채 떴다 — 장군님 지적 2026-07-23. 원본은 늘 전체 펼침 상태로 시작한다.
-                oM.ctrl.rerender(false);          // 첫 루트 자동선택 방지(원본 clearSelection).
-                oAPP.fn.expandModelFieldTree();   // 전체 펼침(원본 expandToLevel(99999)).
+                // ★ 초기 로드 = 원본 getBindFieldInfo 순서 1:1 재현:
+                //   collapseAll → clearSelection → expandToLevel(99999) → setSelectedIndex(0) (index.js:8142~8172).
+                //   ★첫 행 선택(8172)이 onSelTabRow→setRefFieldList(우측 참조필드 P05)를 즉시 구성한다.
+                //   예전 HTML5 는 8148(펼침)까지만 보고 8172(첫행 선택)를 누락 → 초기 우측 참조필드가 빈 채로 떴다(Δ1).
+                //   ★★순서 결정적: 공통 expandAll 은 oUl.innerHTML 을 비우고 전 행을 재생성(u4a-ui.js:1584/1601)한다.
+                //     따라서 "펼침 전에" 강조하면 재렌더가 aria-selected 를 지워 화면에 선택이 안 뜬다(장군님 2026-07-24).
+                //     원본과 동일하게 반드시 [펼침 → 선택] 순으로 한다.
+                oM.ctrl.rerender(true);           // 첫 루트를 selNode 로 설정(원본 setSelectedIndex(0) 대응).
+                oAPP.fn.expandModelFieldTree();   // 전체 펼침(원본 expandToLevel(99999)) — 여기서 DOM 재생성.
+                // 펼침(재렌더) 뒤 첫 행 강조를 재적용 → 화면에 선택바 유지(selNode 는 JS 변수라 재렌더에도 보존됨).
+                var _oFirst = (typeof oM.ctrl.getSelected === "function") ? oM.ctrl.getSelected() : null;
+                if (_oFirst && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(_oFirst.CHILD, false); } catch (e) { } }
+                oAPP.attr.selModelNode = _oFirst || null;
+                // 공통 selectByKey 는 강조/selNode 전용이라 onSelect 콜백을 안 태운다 → 원본 onSelTabRow→
+                //   setRefFieldList(우측 참조필드 P05) 를 명시 호출(중복 아님).
+                if (typeof oAPP.fn.setRefFieldList === "function") { try { oAPP.fn.setRefFieldList(); } catch (e) { } }
                 oAPP.fn.setTreeEmptyMark(oM.host, !(oAPP.attr.modelTree || []).length);
                 oAPP.fn.fitTreeColumns(oM.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
 

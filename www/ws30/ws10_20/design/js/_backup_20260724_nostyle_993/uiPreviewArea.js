@@ -1285,17 +1285,14 @@
     //[HTML5 2026-07-23] 바인딩 선검사 — 선택 UI 중 styleClass 가 바인딩된 게 하나라도 있으면 전체 중단하고
     //  해당 UI 목록을 반환한다(장군님 지시: 바인딩건에 CSS 덮어쓰기 금지 + 어떤 UI 인지 사용자에게 통지).
     //  판정 기준은 아래 적용 루프의 바인딩 SKIP(ls_0015.ISBND==="X") 과 동일. 원본 부분적용 → 전체중단으로 변경.
-    //[HTML5 2026-07-24] CSS 미지원 UI 선검사(993) 동봉 — styleClass 프로퍼티 정의(T_0023)가 아예 없는 UI 는
-    //  CSS 를 붙일 수 없다. 하나라도 섞여 있으면 전체 중단하고 해당 UI 목록 반환(장군님 지시: 1%도 전체중단).
     var lt_bound = [];
-    var lt_nostyle = [];
     for(var b=0, bl=lt_OBJID.length; b<bl; b++){
 
       var ls_0023_b = oAPP.DATA.LIB.T_0023.find( a=> a.UIOBK === lt_OBJID[b].UIOBK &&
         a.UIATT === "styleClass" && a.UIATY === "1" && a.ISDEP !== "X" );
 
-      //styleClass 프로퍼티 정의 자체가 없는 UI = CSS 미지원 → 수집(993). (UIATK 없음 → 선택만, 속성이동 없음)
-      if(!ls_0023_b){ lt_nostyle.push({ OBJID: lt_OBJID[b].OBJID }); continue; }
+      //styleClass 프로퍼티 자체가 없는 UI 는 바인딩 대상도 아님 → 통과.
+      if(!ls_0023_b){ continue; }
 
       var oPrev_b = oAPP.attr.prev[lt_OBJID[b].OBJID];
       if(!oPrev_b || !oPrev_b._T_0015){ continue; }
@@ -1308,11 +1305,8 @@
 
     }
 
-    //바인딩된 항목이 하나라도 있으면 아무것도 적용하지 않고 목록 반환(호출측이 안내). 우선순위: 바인딩(992) > 미지원(993).
-    if(lt_bound.length > 0){ return { applied: 0, bound: lt_bound, nostyle: lt_nostyle }; }
-
-    //CSS 미지원 UI 가 하나라도 있으면 전체 중단하고 목록 반환(호출측이 993 안내).
-    if(lt_nostyle.length > 0){ return { applied: 0, bound: [], nostyle: lt_nostyle }; }
+    //바인딩된 항목이 하나라도 있으면 아무것도 적용하지 않고 목록 반환(호출측이 안내).
+    if(lt_bound.length > 0){ return { applied: 0, bound: lt_bound }; }
 
     //DESIGN영역의 CHECKBOX 선택건을 대상으로 CSS 적용 처리.
     for(var i=0, l=lt_OBJID.length; i<l; i++){

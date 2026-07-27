@@ -3463,7 +3463,8 @@
 
             await oCSS.start(parent.require, IF_DATA, function (oRes) {
 
-                _ui5PreCssApply(oRes);
+                // CSS를 미리보기에 적용
+                oAPP.fn.prevStyleClassApply(oRes.DATA, oRes.PRCCD);
 
             });
 
@@ -3480,144 +3481,6 @@
         }
 
     }; // end of oAPP.fn.fnUI5PreCssPopupOpener
-
-    /************************************************************************
-     * [WS20] UI5 Predefined Css Popup(V2) 요청 처리 — ★판정만 하고 결과를 팝업에 회신★.
-     * --------------------------------------------------------------------------
-     *  ★공통 UX: "결과 메시지는 요청한 창이 띄운다"(.analy/16 §2.11).
-     *    버튼은 팝업에서 눌렀는데 경고가 WS20 창에 뜨면(그것도 팝업에 가려진 모달 박스로)
-     *    사용자는 한 클릭에 상반된 메시지 2개를 서로 다른 창에서 보게 된다(장군님 지적, 2026-07-23).
-     *    → 여기(부모)는 메시지를 띄우지 않는다. 판정 결과만 돌려주고 출력은 팝업이 한다.
-     *
-     *  ★판정을 부모가 하는 이유: "어떤 UI 가 체크됐는지" 는 WS20 디자인 트리에만 있는 정보이고,
-     *    팝업이 떠 있는 동안에도 사용자가 트리 체크를 바꿀 수 있어 팝업이 미리 받아두면 stale 이 된다.
-     *
-     *  ★반드시 답을 준다(성공/실패/예외 전부). 회신이 없으면 팝업이 busy 에 갇힌다(broadcast-busy-pair).
-     *    단 PRCCD="CLOSE"(창 닫는 중 원복 요청)는 받을 창이 사라지므로 회신하지 않는다.
-     *
-     *  @param {object} oRes - 팝업이 보낸 {PRCCD:"PREVIEW"|"SAVE"|"CLOSE", DATA:[css…]} + WIN(팝업 창)
-     ************************************************************************/
-    function _ui5PreCssApply(oRes) {
-
-        var sPRCCD = (oRes && oRes.PRCCD) || "";
-
-        //회신 대상 여부 — CLOSE 는 창이 닫히는 중이라 수신자가 없다.
-        var bReply = (sPRCCD === "PREVIEW" || sPRCCD === "SAVE");
-
-        //팝업으로 결과 회신(메시지 문구까지 실어 보낸다 — 팝업이 그대로 출력. no-invented-messages).
-        //  oExtra: 추가 데이터(예: 992 바인딩 목록 BOUND) 를 응답에 동봉.
-        function lf_reply(sRetcd, sMsgty, sMsg, oExtra) {
-
-            if (bReply !== true) { return; }
-
-            var oPayload = {
-                PRCCD: sPRCCD,
-                RETCD: sRetcd,
-                MSGTY: sMsgty || "",
-                RTMSG: sMsg || ""
-            };
-            if (oExtra) { for (var k in oExtra) { oPayload[k] = oExtra[k]; } }
-
-            try {
-                oRes.WIN.webContents.send("if-ui5css-result", oPayload);
-            } catch (e) {
-                console.error("[WS20] UI5 Predefined CSS 결과 회신 실패:", e && e.message);
-            }
-
-        }
-
-        //팝업이 992(바인딩) 확인 후 보내는 "그 UI 선택 + styleClass 속성으로 이동" 요청.
-        //  공통 setSelectTreeItem(OBJID, UIATK, TYPE)=UI 선택+속성 포커스(ws_html5_ws20_prev.js). 회신 없음.
-        if (sPRCCD === "SELECT_UI") {
-            try {
-                if (typeof oAPP.fn.setSelectTreeItem === "function") {
-                    oAPP.fn.setSelectTreeItem(oRes.OBJID, oRes.UIATK, "");
-                }
-            } catch (e) {
-                console.error("[WS20] UI5 Predefined CSS 바인딩 UI 선택 이동 실패:", e && e.message);
-            }
-            return;
-        }
-
-        try {
-
-            //(1) 유효성 점검 먼저 — 통과해야 적용/부작용. (validate-first-in-handlers)
-            //    원본은 이 검사를 prevStyleClassApply 안(uiPreviewArea.js:1268)에서 하고 WS20 창에
-            //    경고를 띄웠다. 여기서 선제 판정하면 그 분기에 도달하지 않아 부모 창 메시지가 사라진다
-            //    (원본 파일 무수정 — dont-modify-common-override-scoped).
-            if (bReply === true) {
-
-                var lt_OBJID = [];
-
-                //CHECKBOX 선택건 수집. (구 designGetCheckedLine — ws_html5_ws20_edit.js 이식본)
-                oAPP.fn.designGetCheckedLine(true, lt_OBJID);
-
-                //CHECKBOX 선택건이 존재하지 않는경우.
-                if (lt_OBJID.length === 0) {
-                    //  ★원본은 286 "체크박스가 선택되지 않았습니다"(uiPreviewArea.js:1271)를 썼으나, 이 팝업엔
-                    //    CSS 카드마다 체크박스가 있어 "카드 체크했는데 왜?" 오해를 부른다(장군님 지적 2026-07-23).
-                    //    이 팝업 경로 전용으로 대상이 "디자인 화면의 UI"임을 명시한 991 로 회신(ZMSG_WS_COMMON_001).
-                    //    원본 WS20 자체 경로(286)는 무수정 — 이 회신 문구만 교체.
-                    lf_reply("E", "W", oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "991", "", "", "", ""));
-                    return;
-                }
-
-            }
-
-            //(2) CSS를 미리보기에 적용
-            //  ★ 받는 쪽 prevStyleClassApply(it_css, bSave)(uiPreviewArea.js:1219)의 2번째 인자는
-            //    "실제 저장 여부(boolean)"인데, V2 팝업은 PRCCD 문자열("PREVIEW"/"SAVE"/"CLOSE")을
-            //    보낸다. 문자열은 전부 truthy 라 [미리 보기]까지 저장 경로로 빠져, 되돌리기용 수집
-            //    (oAPP.attr.prevCSS — 1320행)이 안 되고 styleClass 가 영구 반영돼 원복이 불가능했다.
-            //    (원본도 V2 전용 처리가 uiPreviewArea.js:1396~1425 에 "로직이 완성되지 않아 주석
-            //     처리함"(2024-08-09) 으로 남은 미완성 상태.)
-            //    → SAVE 일 때만 저장. PREVIEW = 임시 적용(다음 호출/창 닫기 시 원복).
-            //      CLOSE 는 DATA 가 빈 배열이라 1259행에서 원복만 하고 종료 — 기존 동작 그대로.
-            //  ★반환 = { applied: 실제 반영 건수, bound: 바인딩되어 중단시킨 UI 목록 }.
-            var oApplyRes = oAPP.fn.prevStyleClassApply(oRes.DATA, sPRCCD === "SAVE");
-
-            //(3-a) 바인딩된 항목이 있으면 아무것도 적용하지 않고, 어떤 UI 가 바인딩됐는지 알린다(신규 992).
-            //     styleClass 자리에 이미 값이 연결(바인딩)된 UI 에 덮어쓰면 안 되므로 전체 중단(장군님 지시).
-            //     확인 후 그 UI 로 선택/이동시키도록 BOUND(첫 건의 OBJID/UIATK)를 동봉한다.
-            if (oApplyRes && oApplyRes.bound && oApplyRes.bound.length > 0) {
-                var sBoundList = oApplyRes.bound.map(function (o) { return o.OBJID; }).join(", ");
-                lf_reply("E", "W",
-                    oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "992", sBoundList, "", "", ""),
-                    { BOUND: oApplyRes.bound });
-                return;
-            }
-
-            //(3-b) CSS 를 지원하지 않는 UI(styleClass 프로퍼티 정의 자체가 없는 UI)가 섞여 있으면 전체 중단하고
-            //     어떤 UI 인지 알린다(신규 993). 확인 후 그 UI 를 선택시키도록 BOUND(첫 건 OBJID)를 동봉한다.
-            //     ※ styleClass 속성 자체가 없으므로 UIATK 없음 → 팝업은 UI 선택만(속성 이동 없음). (2026-07-24)
-            if (oApplyRes && oApplyRes.nostyle && oApplyRes.nostyle.length > 0) {
-                var sNoStyleList = oApplyRes.nostyle.map(function (o) { return o.OBJID; }).join(", ");
-                lf_reply("E", "W",
-                    oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "993", sNoStyleList, "", "", ""),
-                    { BOUND: oApplyRes.nostyle });
-                return;
-            }
-
-            //(3-c) 바인딩·미지원은 없으나 한 건도 반영되지 않았으면(0건) "완료" 대신 "적용된 항목이 없습니다"(신규 990).
-            //     체크는 했으나 아무 변화가 없었는데 성공 토스트가 뜨던 모순 해소. (2026-07-23)
-            if (!oApplyRes || oApplyRes.applied === 0) {
-                //  ★990 은 ZMSG_WS_COMMON_001 클래스에 등록됨(286 의 /U4A/MSG_WS 와 별개 클래스 — 혼동 주의).
-                lf_reply("E", "W", oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "990", "", "", "", ""));
-                return;
-            }
-
-            lf_reply("S", "", "");
-
-        } catch (e) {
-
-            //삼키지 않는다 — 콘솔에 남기고 팝업에도 오류로 알린다. (never-suppress-script-errors)
-            console.error("[WS20] UI5 Predefined CSS 적용 오류:", e && e.message);
-
-            lf_reply("E", "E", (e && e.message) || "");
-
-        }
-
-    } // end of _ui5PreCssApply
 
     /************************************************************************
      * [WS20] UI5 Predefined Css Popup Opener
