@@ -3428,6 +3428,12 @@
             //모델 갱신 처리. (원본 1959행 — HTML5: 속성 행 재렌더)
             oAPP.fn.fnRenderWs20AttrRows();
 
+            //[F-5] 바인딩 팝업(별창) 디자인 영역 반영 — 원본 attrChange 끝 updateBindPopupDesignData(uiAttributeArea.js:1893).
+            //  ★속성변경 허브: bind·unbind·F4·styleClass·M03 동일속성·RESET_ATTR 이 전부 이 경로를 거친다.
+            //  원본은 여기서 반영을 불렀으나 HTML5 이식 시 finally 의 BUSY_OFF 만 남고 반영이 누락됐었다(deep dive 2026-07-28).
+            //  팝업 열려 있으면 방송(UPDATE-DESIGN-DATA), 미오픈이면 방송모듈 isCreateChannel 가드로 no-op(안전).
+            try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
+
         } finally {
             try { oAPP.fn.setShortcutLock(false); } catch (e) { }
             try { parent.setBusy && parent.setBusy(""); } catch (e) { }

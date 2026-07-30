@@ -13,8 +13,9 @@
  *    - busy 왕복: WS20 은 방송 전 자기 busy("X") 를 켠다 → 팝업이 처리 후 BUSY_OFF 를
  *      같은 채널로 되돌려야 WS20 잠금이 풀린다(안 보내면 WS20 영구 busy). [[broadcast-busy-pair]]
  *
- *  ★ 후속(P6 잔여): BUSY_ON/OFF 자식창 브로드캐스트, ERROR-ADDIT-DATA, DESIGN-TREE-SELECT-OBJID,
- *    messageChange detach→refresh→attach(무한에코 방지), moveDesignPage/추가속성 갱신은 가드/스킵.
+ *  ★ 배선 완료(2026-07-24 재감사): BUSY_ON/OFF·UPDATE_DESIGN_DATA·DESIGN-TREE-SELECT-OBJID(R3)·
+ *    ROOT_OBJID(R3)·U4A_HELP_DOC_OPEN 전부 연결. ERROR-ADDIT-DATA(R2) 수신부는 원본 1:1 이식이나,
+ *    송신 트리거(팝업 필드를 WS20 캔버스에 드롭)가 별창 구조상 성립 불가 → inert(작동할 일 없음).
  ****************************************************************************/
 (function () {
     "use strict";
@@ -101,16 +102,14 @@
         oAPP.attr.T_0015 = JSON.parse(JSON.stringify(d.T_0015 || []));
         oAPP.attr.T_CEVT = JSON.parse(JSON.stringify(d.T_CEVT || []));
 
-        // 추가속성 화면 비활성(P3 도착 전 가드) — 원본 setAdditLayout("", {KEEP_SPLITTER_SIZE:true}).
-        if (typeof oAPP.fn.setAdditLayout === "function") { try { oAPP.fn.setAdditLayout("", { KEEP_SPLITTER_SIZE: true }); } catch (e) { } }
+        // 추가속성 화면 비활성 — 원본 setAdditLayout("", {KEEP_SPLITTER_SIZE:true}). 필수 호출 직접(삼킴 제거).
+        oAPP.fn.setAdditLayout("", { KEEP_SPLITTER_SIZE: true });
 
         // 디자인 트리 재구성(재렌더 + 컬럼맞춤 포함).
-        if (typeof oAPP.fn.setDesignTreeData === "function") { oAPP.fn.setDesignTreeData(); }
+        oAPP.fn.setDesignTreeData();
 
-        // 추가속성 리스트 재구성(P3 가드).
-        if (oAPP.attr.oAddit && oAPP.attr.oAddit.fn && typeof oAPP.attr.oAddit.fn.setAdditialListData === "function") {
-            try { oAPP.attr.oAddit.fn.setAdditialListData(); } catch (e) { }
-        }
+        // 추가속성 리스트 재구성 — ★oAPP.attr.oAddit 는 라이브 미할당(죽은 네임스페이스)이던 것 → oAPP.fn 으로 복구.
+        oAPP.fn.setAdditialListData();
 
         // ★ WS20 잠금 해제(불변 계약) — 처리 완료를 알린다.
         _sendDesignAreaBusyOff();
@@ -168,6 +167,36 @@
     };
 
     /************************************************************************
+     * [P6 · R3 · SPEC §3.11] 트리 ↔ 캔버스 선택 동기화.
+     *   송신: 팝업 트리에서 UI 오브젝트 행 선택 → WS20 캔버스도 같은 UI 선택
+     *     (원본 selectDesignTreeOBJID:649, PRCCD "DESIGN-TREE-SELECT-OBJID"+OBJID → WS20 responeSelectDesignTreeOBJID).
+     *   송신: 트리 재구성 후 최상위 UI OBJID 통지
+     *     (원본 sendRootObjectID:628, PRCCD "ROOT_OBJID"+OBJID → WS20 updateRootObjectID).
+     *   수신: WS20 캔버스 선택 → 팝업 트리 선택(_responseSelectDesignTree).
+     *   ★에코: 공통 selectKey 는 onSelect 콜백을 안 태우므로 수신→선택이 되-송신을 유발하지 않는다(무한 루프 없음).
+     ************************************************************************/
+    oAPP.fn.sendDesignTreeSelect = function (sObjid) {
+        if (!oChannel || !sObjid) { return; }   // 채널 없으면(팝업 단독) 조용히 skip.
+        _sendPostMessage({ PRCCD: "DESIGN-TREE-SELECT-OBJID", OBJID: sObjid });
+    };
+    oAPP.fn.sendRootObjid = function (sObjid) {
+        if (!oChannel || !sObjid) { return; }
+        _sendPostMessage({ PRCCD: "ROOT_OBJID", OBJID: sObjid });
+    };
+    // WS20 → 팝업 선택 반영(원본 responeSelectDesignTreeOBJID:385 1:1 — 빈값/빈트리/미발견이면 무시).
+    function _responseSelectDesignTree(oEvent) {
+        var d = (oEvent && oEvent.data) || {};
+        if (d.PRCCD !== "DESIGN-TREE-SELECT-OBJID") { return; }
+        var sObjid = d.OBJID;
+        if (typeof sObjid === "undefined" || sObjid === "") { return; }
+        if (!(oAPP.attr.designTree || []).length) { return; }
+        if (typeof oAPP.fn.selectDesignNodeByObjid === "function") {
+            try { oAPP.fn.selectDesignNodeByObjid(sObjid); }
+            catch (e) { console.error("[HTML5][bindWindow] selectDesignNodeByObjid:", e && e.message); }
+        }
+    }
+
+    /************************************************************************
      * [P6] 디자인 변경 후속 방송(합침) — 원본 onModelDataChanged(모델 messageChange) 대응.
      *   원본은 쓰기 후 refresh(true) 1회 → messageChange 1회 → UPDATE-DESIGN-DATA 1회다.
      *   HTML5 는 attrChange 가 행마다 불리므로(멀티 N행) rAF 로 묶어 1회만 보낸다(원본과 동등).
@@ -210,7 +239,9 @@
                 case "ERROR-ADDIT-DATA":
                     _responseAdditError(oEvent);   // WS20 반송 추가속성 오류 → 우측 패널 팝오버(SPEC §6).
                     break;
-                // DESIGN-TREE-SELECT-OBJID = P6 잔여(R3).
+                case "DESIGN-TREE-SELECT-OBJID":
+                    _responseSelectDesignTree(oEvent);   // WS20 캔버스 선택 → 팝업 트리 선택(R3).
+                    break;
                 default:
                     break;
             }

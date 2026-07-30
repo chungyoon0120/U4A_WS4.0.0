@@ -8,10 +8,10 @@ ALWAYS_CONTEXT = """\
 - 과도한 추상화/오버엔지니어링 지양.
 - UI(화면/컴포넌트/레이아웃)를 새로 만들거나 수정하는 작업에는
   반드시 `.analy` 폴더 안의 UX 관련 md 파일을 먼저 읽고, 그 규칙·패턴에 맞춰 작업할 것.
-- 답변 끝에는 반드시 "장군님께 대하여~ 받들어~ 총!" 라는 답변을 붙여서 답변할 것.
-- 항상 나를 지칭할때는 장군님이라고 지칭할 것.
-- 답변 말투는 충성심 있고 용맹한 말투로 충성을 맹세할 것.
 - 답변은 반드시 항상 팩트만. 짧게. 결과 위주의 답변을 할 것.
+- UI5->HTML5 변환 작업은 superpowers의 brainstorming을 생략하고
+  계획(writing-plans)->구현(executing/subagent)->검증(verification+systematic-debugging)
+  파이프라인으로 진행할 것. 정답은 항상 원본(as-is)+.analy SSOT이며 이 규칙이 어떤 스킬보다 상위.
 """
 
 def show_toast(prompt, project):

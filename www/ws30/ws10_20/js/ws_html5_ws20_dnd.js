@@ -735,11 +735,17 @@
         });
     };
 
-    // 바인딩 팝업 디자인데이터 갱신. (원본 1263행 — bindPopup 미변환 → 존재 시 위임, 없으면 skip)
+    // 바인딩 팝업 디자인데이터 갱신 — 원본 uiDesignArea.js:1263~1266 1:1(bindPopup 변환 완료로 스텁→실제 연결).
+    //   WS20 변경(추가/이동/삭제/속성)을 별창 바인딩 팝업 트리에 반영: 방송모듈("UPDATE-DESIGN-DATA") →
+    //   WS20 방송모듈이 DESIGN_ROOT_OBJID 기준 T_0014/0015/CEVT 구성해 팝업에 UPDATE_DESIGN_DATA 전송 → 팝업 재빌드.
+    //   ★DESIGN_ROOT_OBJID 는 팝업이 열릴 때/트리 재구성 시 보내는 ROOT_OBJID(R3)로 채워진다.
+    //   팝업 미오픈이면 방송모듈 isCreateChannel 가드로 no-op(안전).
     if (typeof oAPP.fn.updateBindPopupDesignData !== "function") {
         oAPP.fn.updateBindPopupDesignData = function () {
-            // bindPopup(별창)은 미변환. 변환 시 broadcastChannelBindPopup 로 디자인데이터 동기화 연결.
-            return Promise.resolve();
+            try {
+                var sPath = oAPP.oDesign && oAPP.oDesign.pathInfo && oAPP.oDesign.pathInfo.bindPopupBroadCast;
+                if (sPath) { parent.require(sPath)("UPDATE-DESIGN-DATA"); }
+            } catch (e) { console.error("[HTML5][WS20] updateBindPopupDesignData:", e && e.message); }
         };
     }
 

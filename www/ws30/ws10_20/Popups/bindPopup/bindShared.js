@@ -25,12 +25,12 @@
                 try { fn_success(oRes); } catch (e2) { console.error("[HTML5][bindWindow] 콜백 오류:", e2 && e2.message); }
             } else {
                 console.error("[HTML5][bindWindow] 서버 오류 status=", xhr.status, sPath);
-                try { fn_success(null); } catch (e3) { }
+                try { fn_success(null); } catch (e3) { console.error("[HTML5][bindWindow] 콜백 오류(서버오류 분기):", e3 && e3.message); }
             }
         };
         xhr.onerror = function () {
             console.error("[HTML5][bindWindow] 네트워크 오류:", sPath);
-            try { fn_success(null); } catch (e) { }
+            try { fn_success(null); } catch (e) { console.error("[HTML5][bindWindow] 콜백 오류(네트워크 분기):", e && e.message); }
         };
         xhr.withCredentials = true;
         xhr.open("post", sPath, true);

@@ -1927,8 +1927,12 @@
      * 헤더(.u4a-th--menu) 클릭 시 공통 메뉴(필터 input → 오름/내림 정렬 → 필터 초기화)를 연다.
      * ServerList/AppF4 가 쓰던 패턴을 공통화 — 화면은 상태 컨트롤러(ctl)만 제공:
      *   ctl = { getFilter(key), setFilter(key,val), getSort()→{key,dir}|null, setSort(key,dir), rerender() }
+     *         ※ 섹션을 끄면 그 섹션 콜백은 불필요 — 필터전용이면 getSort/setSort, 정렬전용이면 getFilter/setFilter 생략 가능.
      *   opts = { container: 앵커 append 대상(top-layer 다이얼로그 등, 기본 document.body),
-     *            labels: { filter, asc, desc, clear } }  // 문구 키는 화면이 해석해 전달(메시지 SSOT 유지)
+     *            labels: { filter, asc, desc, clear },  // 문구 키는 화면이 해석해 전달(메시지 SSOT 유지)
+     *            filter: 기본 true — false 면 필터 input/초기화 숨김(정렬 전용 컬럼),
+     *            sort:   기본 true — false 면 정렬 asc/desc 숨김(필터 전용 컬럼) }
+     *        ★기능 분리 원칙(장군님): 필터/정렬은 독립 토글 — 컬럼마다 필터만/정렬만/둘다 자유 조합.
      */
     let _oColMenuEl = null;
     function _onColMenuOutside(e) { if (_oColMenuEl && !_oColMenuEl.contains(e.target)) { closeColumnMenu(); } }
@@ -1950,56 +1954,65 @@
         m.setAttribute("role", "menu");
         m.addEventListener("click", function (e) { e.stopPropagation(); });
 
-        // 필터 input (contains, Enter/blur 적용)
-        const fw = _el("div", "u4a-colmenu__filter");
-        const fi = _el("input", "u4a-input");
-        fi.type = "text";
-        fi.placeholder = L.filter || "";
-        fi.value = ctl.getFilter(oCol.key) || "";
-        function applyF() {
-            const v = fi.value.trim().toLowerCase(), cur = ctl.getFilter(oCol.key) || "";
-            if (v === cur) { return; }
-            ctl.setFilter(oCol.key, v);
-            ctl.rerender();
+        // 기능 분리 토글(기본 둘 다 표시 — 기존 소비처 무영향). false 로 해당 섹션 숨김.
+        const bFilter = opts.filter !== false;
+        const bSort = opts.sort !== false;
+
+        // 필터 input (contains, Enter/blur 적용) — bFilter 일 때만.
+        let fi = null;
+        if (bFilter) {
+            const fw = _el("div", "u4a-colmenu__filter");
+            fi = _el("input", "u4a-input");
+            fi.type = "text";
+            fi.placeholder = L.filter || "";
+            fi.value = ctl.getFilter(oCol.key) || "";
+            const applyF = function () {
+                const v = fi.value.trim().toLowerCase(), cur = ctl.getFilter(oCol.key) || "";
+                if (v === cur) { return; }
+                ctl.setFilter(oCol.key, v);
+                ctl.rerender();
+            };
+            fi.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); applyF(); closeColumnMenu(); } });
+            fi.addEventListener("blur", applyF);
+            fw.appendChild(fi);
+            m.appendChild(fw);
         }
-        fi.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); applyF(); closeColumnMenu(); } });
-        fi.addEventListener("blur", applyF);
-        fw.appendChild(fi);
-        m.appendChild(fw);
 
-        m.appendChild(_el("div", "u4a-colmenu__sep"));
+        // 정렬(오름/내림 — 활성 방향 재클릭 시 해제) — bSort 일 때만.
+        if (bSort) {
+            if (bFilter) { m.appendChild(_el("div", "u4a-colmenu__sep")); }
+            const mkSort = function (sDir, sIcon, sLabel) {
+                const it = _el("div", "u4a-menu__item");
+                it.setAttribute("role", "menuitem");
+                it.innerHTML = _fa(sIcon) + "<span></span>";
+                it.querySelector("span").textContent = sLabel || "";
+                const s = ctl.getSort();
+                const bActive = (s && s.key === oCol.key && s.dir === sDir);
+                if (bActive) { it.setAttribute("data-active", "true"); }
+                it.addEventListener("click", function () {
+                    if (bActive) { ctl.setSort(null, null); } else { ctl.setSort(oCol.key, sDir); }
+                    ctl.rerender(); closeColumnMenu();
+                });
+                return it;
+            };
+            m.appendChild(mkSort("asc", "arrow-up", L.asc));
+            m.appendChild(mkSort("desc", "arrow-down", L.desc));
+        }
 
-        // 정렬(오름/내림 — 활성 방향 재클릭 시 해제)
-        function mkSort(sDir, sIcon, sLabel) {
-            const it = _el("div", "u4a-menu__item");
-            it.setAttribute("role", "menuitem");
-            it.innerHTML = _fa(sIcon) + "<span></span>";
-            it.querySelector("span").textContent = sLabel || "";
-            const s = ctl.getSort();
-            const bActive = (s && s.key === oCol.key && s.dir === sDir);
-            if (bActive) { it.setAttribute("data-active", "true"); }
-            it.addEventListener("click", function () {
-                if (bActive) { ctl.setSort(null, null); } else { ctl.setSort(oCol.key, sDir); }
-                ctl.rerender(); closeColumnMenu();
+        // 필터 초기화(이 컬럼) — bFilter 일 때만(필터 없으면 초기화도 없음). 활성 필터 없으면 비활성.
+        if (bFilter) {
+            m.appendChild(_el("div", "u4a-colmenu__sep"));
+            const clr = _el("div", "u4a-menu__item");
+            clr.setAttribute("role", "menuitem");
+            clr.innerHTML = _fa("xmark") + "<span></span>";
+            clr.querySelector("span").textContent = L.clear || "";
+            if (!ctl.getFilter(oCol.key)) { clr.setAttribute("aria-disabled", "true"); }
+            clr.addEventListener("click", function () {
+                if (!ctl.getFilter(oCol.key)) { return; }
+                ctl.setFilter(oCol.key, ""); fi.value = ""; ctl.rerender(); closeColumnMenu();
             });
-            return it;
+            m.appendChild(clr);
         }
-        m.appendChild(mkSort("asc", "arrow-up", L.asc));
-        m.appendChild(mkSort("desc", "arrow-down", L.desc));
-
-        m.appendChild(_el("div", "u4a-colmenu__sep"));
-
-        // 필터 초기화(이 컬럼) — 활성 필터 없으면 비활성
-        const clr = _el("div", "u4a-menu__item");
-        clr.setAttribute("role", "menuitem");
-        clr.innerHTML = _fa("xmark") + "<span></span>";
-        clr.querySelector("span").textContent = L.clear || "";
-        if (!ctl.getFilter(oCol.key)) { clr.setAttribute("aria-disabled", "true"); }
-        clr.addEventListener("click", function () {
-            if (!ctl.getFilter(oCol.key)) { return; }
-            ctl.setFilter(oCol.key, ""); fi.value = ""; ctl.rerender(); closeColumnMenu();
-        });
-        m.appendChild(clr);
 
         // 위치 — 앵커(헤더) 아래. container(top-layer 다이얼로그 등) 안에 붙여 모달 위로.
         oContainer.appendChild(m);
@@ -2013,7 +2026,7 @@
         window.addEventListener("resize", closeColumnMenu);
         window.addEventListener("scroll", closeColumnMenu, true);
         setTimeout(function () { document.addEventListener("mousedown", _onColMenuOutside, true); }, 0);
-        try { fi.focus(); } catch (e) { }   // 열리면 바로 필터 입력 가능
+        if (fi) { try { fi.focus(); } catch (e) { } }   // 필터 표시 시 열리면 바로 입력 가능
     }
 
     /* ── 가상 스크롤(windowing) — 보이는 행만 DOM 에 렌더 (전 화면 공통) ────────
@@ -2653,7 +2666,15 @@
             },
             expandSelected: function () { if (selNode) { try { oTree.expandSubtree(selNode); } catch (e) { } } },
             collapseSelected: function () { if (selNode) { try { oTree.setExpanded(selNode, false); } catch (e) { } } },
-            selectKey: function (sKey, bScroll) { try { oTree.selectByKey(sKey, bScroll === true); } catch (e) { } }
+            selectKey: function (sKey, bScroll) { try { oTree.selectByKey(sKey, bScroll === true); } catch (e) { } },
+            // 프로그램적 "마우스 클릭과 동일한" 선택 — selNode 설정 + 강조 + cfg.onSelect 발화(후속 로직 재사용).
+            //   selectKey 는 강조만(selNode 안 바뀜 → getSelected 미반영) 하므로, 클릭 경로를 그대로 태우려면 이 select 를 쓴다.
+            select: function (node, bScroll) {
+                if (!node) { return; }
+                selNode = node;
+                try { oTree.selectByKey(oCfg.key(node), bScroll === true); } catch (e) { }
+                if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(node, null); } catch (e) { } }
+            }
         };
         try { oHost.__u4aColTreeCtrl = oRet; } catch (e) { }   // fitTreeColumns(161) 등이 host→ctrl 역참조로 autoWidth 소비
         return oRet;

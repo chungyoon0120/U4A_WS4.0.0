@@ -189,7 +189,7 @@
         if (typeof oAPP.fn.bindPossibleRecompute === "function") {
             try { oAPP.fn.bindPossibleRecompute(is_attr); } catch (e) { console.error("[HTML5][bindWindow] bindPossibleRecompute(attrChange):", e && e.message); }
         }
-        try { if (typeof oAPP.fn.designBroadcastUpdate === "function") { oAPP.fn.designBroadcastUpdate(is_attr); } } catch (e) { }
+        oAPP.fn.designBroadcastUpdate(is_attr);   // [표준] WS20 반영 필수 호출 직접(삼킴 제거).
     };
 
     /************************************************************************
@@ -253,9 +253,10 @@
         // 변경건 후속 처리(버튼 활성 + 브로드캐스트 가드).
         oAPP.fn.attrChange(is_attr);
 
-        // aggregation 인 경우 N건 바인딩 모델 정보 초기화.
+        // aggregation 인 경우 N건 바인딩 모델 정보 초기화 — 경로 존재 시에만 delete(빈 catch 삼킴 제거, 명시 가드).
         if (is_attr.UIATY === "3") {
-            try { delete oAPP.attr.prev[is_attr.OBJID]._MODEL[is_attr.UIATT]; } catch (e) { }
+            var _oPrev = oAPP.attr.prev[is_attr.OBJID];
+            if (_oPrev && _oPrev._MODEL) { delete _oPrev._MODEL[is_attr.UIATT]; }
         }
     };
 

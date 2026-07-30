@@ -99,6 +99,14 @@ oAPP.FS = FS;
 oAPP.APP = APP;
 oAPP.APPPATH = APPPATH;
 oAPP.WSUTIL = WSUTIL;
+
+// [C-9 픽스] 아이콘 이름(T_0022.UICON) → .gif 절대경로 변환기.
+//   원본 index.js:8705 / WS20 ws_fn_03.js:315 와 1:1. 라이브 팝업은 index.js 를 로드하지 않아
+//   이 함수가 없었고(진단 확정 2026-07-29 hasFn:false), 그 탓에 디자인트리 UI 오브젝트 이미지가 안 떴다.
+oAPP.fn.fnGetSapIconPath = function (sIcon) {
+    if (sIcon == null) { return; }
+    return PATH.join(APP.getAppPath(), "icons", sIcon + ".gif");
+};
 oAPP.USERDATA = USERDATA;
 
 // 접속(워크스페이스) 언어 — 메시지 SSOT.

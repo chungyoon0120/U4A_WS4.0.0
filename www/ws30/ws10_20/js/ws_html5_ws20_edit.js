@@ -262,6 +262,9 @@
             try {
                 aDst.push(_snapshot());
                 await _restoreSnap(aSrc.pop());
+                //[F-3] 바인딩 팝업(별창) 반영 — 원본 undoRedo.js executeHistory 가 복원 후 updateBindPopupDesignData 호출(547/1017/1512).
+                //  HTML5 이식 시 BUSY 만 배선되고 반영이 누락됐었다(장군님 발견 2026-07-28). 팝업 미오픈이면 방송모듈 가드로 no-op.
+                try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e2) { }
             } catch (e) {
                 console.error("[HTML5][WS20] undo/redo 복원 오류:", e && e.message);
             } finally {
@@ -345,11 +348,13 @@
 
         var sMsg = _msgWs("003", "Do you really want to delete?");
         var fnConfirm = APPCOMMON.fnConfirmBox;
+        // [F-4] 원본(uiDesignArea.js:293/301) = 삭제 버튼 즉시 BUSY_ON → ★확인창 뜨는 동안★ 팝업 잠금.
+        //   HTML5 는 확인 YES 후에만 잠갔었음 → 확인창 前으로 이동. 이후 모든 경로(취소·가드 실패·완료)에서 BUSY_OFF 로 짝 맞춤.
+        _broadBusy(true);
         function lf_do(act) {
-            if (act !== "YES") { return; }
+            if (act !== "YES") { _broadBusy(false); return; }   // 취소 → 잠금 해제.
             var oParent = _node(oNode.POBID);
-            if (!oParent || !oParent.zTREE) { return; }
-            _broadBusy(true);   // 자식창 잠금(원본 삭제 시 BUSY_ON)
+            if (!oParent || !oParent.zTREE) { _broadBusy(false); return; }   // 가드 실패 → 잠금 해제.
             oAPP.fn.fnWs20PushUndo();
             // 미리보기 제거(가드, 시그니처 1:1)
             _removeNodePreview(oNode);
@@ -359,6 +364,9 @@
             _refreshTree();
             _selectNode(oParent.OBJID);
             _markChanged();
+            // 바인딩 팝업(열려 있으면)에 삭제 반영 — 원본 삭제도 updateBindPopupDesignData 호출(uiDesignArea.js:4546).
+            //   추가/이동/붙여넣기엔 있었으나 삭제 경로만 누락됐던 것 보완(장군님 발견 2026-07-24).
+            try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
             _broadBusy(false);   // 짝 BUSY_OFF
         }
         if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
@@ -498,9 +506,11 @@
                 "\n" + _msgWs("003", "Do you really want to delete?");
             var fnConfirm = APPCOMMON.fnConfirmBox;
 
+            // [F-4] 원본(uiDesignArea.js:707) = 다중 삭제 버튼 즉시 BUSY_ON → ★확인창 동안★ 팝업 잠금.
+            //   HTML5 는 YES 후에만 잠갔었음 → 확인창 前으로 이동. 취소 시 BUSY_OFF 로 짝 맞춤.
+            _broadBusy(true);
             function lf_do(act) {
-                if (act !== "YES") { return; }
-                _broadBusy(true);   // 자식창 잠금(원본 다중 삭제 시 BUSY_ON)
+                if (act !== "YES") { _broadBusy(false); return; }   // 취소 → 잠금 해제.
                 oAPP.fn.fnWs20PushUndo();
                 // bottom-up(자식 먼저) 재귀 삭제 — 구 lf_delSelLine: chk===true 노드만 제거.
                 (function del(arr) {
@@ -519,6 +529,8 @@
                 _markChanged();
                 // 원본 designTreeMultiDeleteItem 4541행: 005 "Job finished." (구 showMessage 팝업 → HTML5 footer)
                 _footer("S", _msgWs("005", "Job finished."));
+                // 바인딩 팝업(열려 있으면)에 삭제 반영 — 원본 4546행 updateBindPopupDesignData(단일과 동일 누락 보완).
+                try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
                 _broadBusy(false);   // 짝 BUSY_OFF
             }
             if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
@@ -548,6 +560,9 @@
         _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, newIdx, oNode.ISMLB, oNode.UIOBK]);
         _selectNode(oNode.OBJID);
         _markChanged();
+        // [F-7] 바인딩 팝업(별창) 반영 — 위/아래 이동(_moveUI) 경로가 반영을 누락했었다(deep dive 2교 2026-07-29).
+        //   드롭 이동엔 있었으나 컨텍스트메뉴 위/아래 이동만 빠짐. 팝업 미오픈이면 no-op.
+        try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
         _broadBusy(false);   // 짝 BUSY_OFF
     }
 
@@ -832,6 +847,10 @@
             _refreshTree();
             if (lastObjid) { _selectNode(lastObjid); }
             _markChanged();
+            // [F-6] 바인딩 팝업(별창) 반영 — "+" 삽입 추가 경로가 반영을 누락했었다(장군님 발견 2026-07-29,
+            //   C-6 테스트: WS20 에서 UI 추가해도 팝업 트리에 안 뜸). 드롭/붙여넣기/복사엔 있었으나 삽입 추가만 빠짐.
+            //   원본은 모델 messageChange 자동 리스너로 반영됐으나 HTML5 는 편집마다 수동 호출 필요. 팝업 미오픈이면 no-op.
+            try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
             // (원본 designAddUIObject 는 완료 토스트 없음)
         };
     }
@@ -1574,6 +1593,8 @@
             _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, iTarget, oNode.ISMLB, oNode.UIOBK]);
             _selectNode(oNode.OBJID);
             _markChanged();
+            // [F-7] 바인딩 팝업 반영 — 위치이동 다이얼로그 경로도 반영 누락(위/아래 이동 _moveUI 와 동일 계열). 팝업 미오픈이면 no-op.
+            try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
             _broadBusy(false);   // 짝 BUSY_OFF
         }
         oDlg.querySelector('[data-act="ok"]').addEventListener("click", lf_ok);

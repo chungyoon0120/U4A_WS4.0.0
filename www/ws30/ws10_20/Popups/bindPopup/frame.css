@@ -69,6 +69,16 @@ body {
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
 
+/* [R4] 오브젝트이름 헤더 = 필터 어포던스. 공통 관례(shell.css:1976): 클릭=pointer+hover 만,
+   깔때기 표시자(.u4a-th__ind, 색=--accent)는 designArea _bwpSyncFilterInd 가 ★필터 걸릴 때만★ 붙임.
+   AppF4 등 다른 컬럼필터와 아이콘·색 완전 동일(공통 미수정·스코프). */
+.u4aBwpShell .u4aColTreeHead .u4aColTreeCol.u4aBwpDesignNameTh { cursor: pointer; }
+.u4aBwpShell .u4aColTreeHead .u4aColTreeCol.u4aBwpDesignNameTh:hover { background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--surface); }
+.u4aBwpShell .u4aColTreeHead .u4aBwpDesignNameTh .u4a-th__ind { margin-left: 0.25rem; }
+
+/* 디자인 트리 UI 오브젝트 아이콘 = 실제 컨트롤 이미지(원본 sap.m.Image). WS20 디자인 트리 .u4aWs20TreeIcon(18px)와 동일 규격. */
+.u4aBwpShell .u4a-tree__icon img.u4aBwpTreeIcon { width: 18px; height: 18px; object-fit: contain; flex: 0 0 auto; }
+
 /* 중앙 세로 2분할(디자인 트리 | 추가속성 적용) — 공통 wireSplitter(axis:y) 소비.
    디자인=고정 높이(초기 basis %), 추가속성적용=유연(잔여 흡수). 최소높이 단일 출처(min-height). */
 /* ★ .u4aBwpArea(아래 86줄, flex:1 1 auto·min-height:0)가 같은 특정성으로 뒤에 정의돼 이 규칙을 덮는다
@@ -209,7 +219,10 @@ body {
 .u4aBwpRow--success { box-shadow: inset 0.1875rem 0 0 var(--state-success); }
 .u4aBwpRow--info { box-shadow: inset 0.1875rem 0 0 var(--state-info, var(--accent)); }
 .u4aBwpRow--warning { box-shadow: inset 0.1875rem 0 0 var(--state-warning); }
-.u4aBwpRow--error { box-shadow: inset 0.1875rem 0 0 var(--state-error); }
+/* 디자인 트리 오류 행 = 원본 _style="u4aWsDesignTreeError"(index.css:361 background 전체 빨강) 대응.
+   원본은 배경만(#FF6347 !important). HTML5는 hex 금지 → 의미 토큰 배경 + 좌측바(하단 추가속성 오류행과 통일).
+   ★ !important = 원본과 동일 — hover/zebra/선택 배경이 오류 빨강을 덮지 않게(장군님 지적 2026-07-30 hover 시 사라짐). */
+.u4aBwpRow--error { box-shadow: inset 0.1875rem 0 0 var(--state-error); background: var(--state-error-bg) !important; }
 
 /* 유형(아이콘+텍스트)/설명 셀 콘텐츠 — 말줄임. */
 .u4aBwpTypeWrap { display: flex; align-items: center; gap: 0.375rem; min-width: 0; overflow: hidden; }

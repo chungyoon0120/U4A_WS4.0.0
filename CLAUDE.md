@@ -47,3 +47,17 @@ U4A WS → HTML로 변환하는 모든 작업**은 아래 절차를 따른다.
 - 각 단계 수용 기준 통과/실패 표
 - 12번 6.6 체크리스트(A~J) 점검 결과
 - 문서와 어긋났거나 추측한 부분 목록
+
+## superpowers 스킬 운용 규칙 (필수)
+
+이 프로젝트에는 superpowers 플러그인이 설치돼 있으나, **UI5→HTML5 변환 작업의
+정답은 항상 원본(as-is) + `.analy` SSOT**이므로 다음과 같이 제한적으로만 사용한다.
+
+- **brainstorming(발산/설계)은 건너뛴다.** 변환은 창의가 아니라 원본 이식이므로,
+  설계 발산 단계의 결과물은 이미 원본과 `.analy` 문서로 확정돼 있다. 발동하더라도
+  "정답은 원본"으로 즉시 통과시키고 다음 단계로 넘어간다. **임의창작 금지 규칙이 상위.**
+- 실제 파이프라인: **writing-plans(계획, `.analy` 절 번호 근거) →
+  executing-plans / subagent-driven-development(구현) →
+  verification-before-completion + systematic-debugging(검증)**.
+- 이 파이프라인은 기존 규칙(항목별 테스트 게이트, 로직+배선 감사, 소스 기반 검증)과
+  동일한 결이며, **`.analy` SSOT·원본우선 규칙이 어떤 스킬보다 항상 최상위**다.

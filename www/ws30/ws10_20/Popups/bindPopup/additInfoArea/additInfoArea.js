@@ -131,8 +131,8 @@
             oCol.appendChild(document.createTextNode(H.z("172")));   // 172 Collapse
             oCol.title = H.z("172");
             oCol.addEventListener("click", function () {
-                if (typeof oAPP.fn.clearSelectAdditBind === "function") { try { oAPP.fn.clearSelectAdditBind(); } catch (e) { } }
-                if (typeof oAPP.fn.setAdditLayout === "function") { try { oAPP.fn.setAdditLayout(""); } catch (e) { } }
+                oAPP.fn.clearSelectAdditBind();   // [표준] 필수 호출 직접(삼킴 제거).
+                oAPP.fn.setAdditLayout("");
             });
             oA.SEL.tool.appendChild(oCol);
             // 139 추가속성적용 — 원본 press: onAdditBind(enabled {/edit}).
@@ -371,6 +371,16 @@
      ************************************************************************/
     function _clearRowErr(r) { r.stat = null; r.statTxt = ""; r._error = false; r._error_msg = ""; }
 
+    // [오류표시 통일] 입력칸(oInp)이 속한 행 <tr> 에 오류 라인 강조(u4aBwpAdditRow--error) 토글.
+    //   원본은 conversion 오류 시 oContr.oModel.refresh()(bindAdditInfo.js:423)로 테이블을 다시 그려 행 전체가
+    //   빨개진다. HTML5 는 실시간 입력 포커스 유지를 위해 재렌더 대신 그 행에만 클래스를 직접 토글한다
+    //   (재렌더 경로 additInfoArea.js:755 와 동일 클래스 — 디자인 트리 오류행과 통일된 라인 빨강).
+    function _bwpAdditRowErr(oInp, bOn) {
+        var oTr = (oInp && oInp.input && oInp.input.closest) ? oInp.input.closest("tr") : null;
+        if (!oTr) { return; }
+        oTr.classList.toggle("u4aBwpAdditRow--error", bOn === true);
+    }
+
     oAPP.fn.checkConversion = function (convName) {
         return new Promise(function (resolve) {
             var _sRes = { RETCD: "", RTMSG: "" };
@@ -398,15 +408,27 @@
         oAPP.fn.setBusy(true);
         if (!r || r.ITMCD !== "P06") { oAPP.fn.setBusy(false); return; }
         // 빈 값 = 에러 해제 → in-cell/입력칸 상태 + top-layer 팝오버 모두 내림.
-        if (r.val === "") { _clearRowErr(r); if (oInp) { oInp.setValueState("none", ""); } oAPP.fn._bwpVsHide(); oAPP.fn.setBusy(false); return; }
+        if (r.val === "") { _clearRowErr(r); if (oInp) { oInp.setValueState("none", ""); } _bwpAdditRowErr(oInp, false); oAPP.fn._bwpVsHide(); oAPP.fn.setBusy(false); return; }
         var _sRes = await oAPP.fn.checkConversion(r.val);
         if (_sRes.RETCD === "E") {
             r.stat = "Error"; r.statTxt = _sRes.RTMSG; r._error = true; r._error_msg = _sRes.RTMSG;
             if (oInp) { oInp.setValueState("error", _sRes.RTMSG); }
-            oAPP.fn.setBusy(false); return;
+            _bwpAdditRowErr(oInp, true);   // [오류표시 통일] 그 라인 전체를 빨강으로(원본 refresh 재현, 재렌더 없이).
+            oAPP.fn.setBusy(false);   // busy 먼저 내려야(오버레이 제거) 재포커스가 먹는다.
+            // [원본 UI5 아키텍처 재현] 엔터/blur 로 값이 바뀌어 오류가 나면 UI5 는 busy 로 잠깐 blur 됐다가
+            //   오류 필드에 ★포커스를 되돌리고★ ValueState 메시지를 띄운다(장군님 지적 2026-07-29).
+            //   HTML5 엔 자동 재포커스가 없으므로 명시적으로 재포커스 + top-layer 팝오버 표시 —
+            //   그래야 "다른 곳을 클릭해 blur 시켜도 오류면 이 칸으로 다시 돌아오고 메시지가 뜬다".
+            //   ★_bwpVsShow 는 DOM 입력요소(oInp.input)를 받는다(794행 배선과 동일) — 래퍼 넘기면 위치계산 실패.
+            if (oInp && oInp.input) {
+                try { oInp.input.focus(); } catch (e) { }
+                oAPP.fn._bwpVsShow(oInp.input, r);
+            }
+            return;
         }
         _clearRowErr(r);
         if (oInp) { oInp.setValueState("none", ""); }
+        _bwpAdditRowErr(oInp, false);
         oAPP.fn._bwpVsHide();   // 정상 값 → 팝오버 내림
         oAPP.fn.setBusy(false);
     };
@@ -415,6 +437,7 @@
         if (!r || r.ITMCD !== "P06") { return; }
         _clearRowErr(r);
         if (oInp) { oInp.setValueState("none", ""); }
+        _bwpAdditRowErr(oInp, false);
         oAPP.fn._bwpVsHide();   // X(clear)·타이핑 등으로 에러 해제 시 top-layer 팝오버도 내림
     };
 
@@ -623,7 +646,7 @@
             }));
         }
         if (_bErr) {
-            if (typeof oAPP.fn.refreshDesignTree === "function") { try { oAPP.fn.refreshDesignTree(); } catch (e) { } }
+            oAPP.fn.refreshDesignTree();   // [표준] 필수 호출 직접(삼킴 제거).
             // 084 선택한 정보 중 추가 속성 불가능건이 존재합니다.
             await _showErrPop(oAnchor, { RETCD: "E", RTMSG: H.z("084"), T_RTMSG: _aErr });
             return;

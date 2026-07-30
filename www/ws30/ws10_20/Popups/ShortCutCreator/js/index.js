@@ -15,7 +15,11 @@
           APPPATH = APP.getAppPath(),
           PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")),
           WSUTIL = require(PATHINFO.WSUTIL),
+          WSERR = require(PATHINFO.WSTRYCATCH),
           CURRWIN = REMOTE.getCurrentWindow();
+
+    // 전역 오류 감시견(window.onerror + unhandledrejection) — 다른 팝업과 동일 표준(누락 보강 2026-07-30).
+    const zconsole = WSERR(window, document, console);
 
     // 브라우저의 쿼리 스트링 정보 파싱
     const oQueryParams = WSUTIL.QueryString.parse(location.href);

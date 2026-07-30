@@ -137,7 +137,7 @@
                 //   bScroll=false: 사용자가 직접 클릭한 행이라 스크롤 점프 금지.
                 if (oM.ctrl && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(n.CHILD, false); } catch (e) { } }
                 // 모델필드 선택 변경 → 우측 참조필드(P05) 재구성(원본 onSelTabRow → setRefFieldList, P3-C).
-                if (typeof oAPP.fn.setRefFieldList === "function") { try { oAPP.fn.setRefFieldList(); } catch (e) { } }
+                oAPP.fn.setRefFieldList();   // [표준] 필수 호출 직접(삼킴 제거).
             }
         });
 
@@ -153,7 +153,8 @@
      *   · T, E → 녹색 체크(status-positive) = 바인딩(드래그) 가능.
      *   · S    → 아이콘 없음(구조체 자체는 드래그 불가), 하위로 재귀.
      *   ★ 첫 실행(디자인 선택 없음)에도 전 모델필드에 표시 — image1(첫 실행) 과 동일.
-     *   ★ 원본의 chkRangeTable/enable(드래그 활성) 은 드래그드롭 단계(Stage3)에서 배선. 여기선 표시색만.
+     *   ★ [L-1 2026-07-29] range table 각인(chkRangeTable, EXP_TYP="RANGE_TAB")을 T 케이스에 이식(원본 setBindEnable:8240).
+     *     — SelectOptions value 드롭 검증(bindData.js:309)이 이 값에 의존. enable(드래그 활성)은 편집모드로 커버.
      ************************************************************************/
     function _applyBindEnable(aFlat) {
         if (!Array.isArray(aFlat) || aFlat.length === 0) { return; }
@@ -169,6 +170,15 @@
                 switch (n.KIND) {
                     case "T":   // 테이블 — 녹색 + 하위(파생필드)까지 재귀(KIND="T" 전파).
                         n.stat_src = "sap-icon://status-positive";
+                        // [L-1] range table 각인 — 원본 chkRangeTable(index.js:5464) = setBindEnable:8240 부수효과 1:1.
+                        //   자식이 정확히 4건이고 전부 SIGN/OPTION/LOW/HIGH 뿐 → EXP_TYP="RANGE_TAB".
+                        //   SelectOptions value(EXT00001161/EXT00002507) 드롭 검증(bindData.js:309)이 이 값을 요구.
+                        //   각인 없으면 정상 range 필드도 드롭 거부(장군님 지적 2026-07-29). 서버는 STR_TAB만 주고 RANGE_TAB는 클라 도출.
+                        if (aChild.length === 4 && aChild.findIndex(function (c) {
+                            return c.NTEXT !== "SIGN" && c.NTEXT !== "OPTION" && c.NTEXT !== "LOW" && c.NTEXT !== "HIGH";
+                        }) === -1) {
+                            n.EXP_TYP = "RANGE_TAB";
+                        }
                         _walk(aChild, n.KIND_PATH, "T");
                         break;
                     case "S":   // 구조체 — 아이콘 없음, 하위 필드로 재귀(부모 KIND 유지).
@@ -235,6 +245,10 @@
                 document.body.classList.add("u4a-dragging");   // iframe 위 드래그 끊김 방지(공통).
                 // 중앙 트리 drop 가능표시(증분2에서 구현되면 자동 배선).
                 try { if (typeof oAPP.fn.designSetDropFlag === "function") { oAPP.fn.designSetDropFlag(oNode); } } catch (e3) { }
+                // [G-2] 원본 setDragStart 말미(index.js:8544 setSelectedIndex "라인 재 선택 처리") 이식.
+                //   드래그 시작 = 그 행을 좌측 선택으로 잡아야, 드롭 후 참조필드(P05)가 드래그한 필드 기준으로 뜬다.
+                //   클릭 경로(onSelect)를 그대로 재사용 — select: selNode 설정 + 강조 + setRefFieldList.
+                oM.ctrl.select(oNode);
             } catch (e) { console.error("[HTML5][bindWindow] 모델필드 dragstart:", e && e.message); }
         });
         oRow.addEventListener("dragend", function () {
@@ -270,6 +284,34 @@
     };
 
     /************************************************************************
+     * [PUBLIC · UX 개선] 경로(sPath = 바인딩 경로 UIATV)로 좌측 모델 필드를 자동 선택.
+     *   ★원본에 없는 동작(장군님 승인 2026-07-30). 바인딩 경로 링크 클릭 시 호출 →
+     *     좌측 트리에서 그 필드를 펼침+선택+강조 → onSelect 와 동일하게 selNode 설정 + setRefFieldList
+     *     → 우측 "참조 필드(P05)" 목록이 자동으로 채워짐(선택 왕복 제거).
+     *   좌측에 해당 필드가 없으면 아무것도 안 함(원본 흐름 불변). 접힘 펼침은 R3b 와 동일 패턴.
+     ************************************************************************/
+    oAPP.fn.selectModelFieldByPath = function (sPath) {
+        if (!oM.ctrl || !sPath) { return; }
+        var oNode = null, aAnc = [];
+        (function rec(a, aPath) {
+            if (!a || oNode) { return; }
+            for (var i = 0; i < a.length; i++) {
+                if (a[i].CHILD === sPath) { oNode = a[i]; aAnc = aPath.slice(); return; }
+                rec(a[i].zTREE, aPath.concat(a[i]));
+                if (oNode) { return; }
+            }
+        })(oAPP.attr.modelTree || [], []);
+        if (!oNode) { return; }   // 좌측에 없는 경로 = 무동작.
+        // 접힌 조상 먼저 펼침(대상 행 DOM 이 있어야 선택·스크롤이 먹음 — R3b 패턴).
+        if (oM.ctrl.tree && typeof oM.ctrl.tree.setExpanded === "function") {
+            for (var e2 = 0; e2 < aAnc.length; e2++) { try { oM.ctrl.tree.setExpanded(aAnc[e2], true); } catch (e3) { } }
+        }
+        // ★마우스 클릭과 동일하게 선택(공통 select) → onSelect 발화 = selNode 설정 + 우측 참조필드(setRefFieldList) 등
+        //   후속 로직이 알아서 작동(장군님 지적 2026-07-30). selectKey(강조만)로는 우측이 안 채워짐.
+        if (typeof oM.ctrl.select === "function") { oM.ctrl.select(oNode, true); }
+    };
+
+    /************************************************************************
      * 모델 필드 데이터 로드(원본 getBindFieldInfo 1:1 — 서버 /getBindAttrData).
      ************************************************************************/
     oAPP.fn.loadBindData = function () {
@@ -279,6 +321,10 @@
         oAPP.attr.modelFlat = [];
         oAPP.attr.modelTree = [];
         oAPP.attr.selModelNode = null;
+        // [G-3] 원본 getBindFieldInfo 진입부(index.js:8058·8062) — 재로드 전 하단 "추가속성 적용" 패널 비움+숨김
+        //   (안 하면 새로고침 후 옛 선택행 값이 잔존). 함수 없으면(초기화 전) 조용히 skip.
+        oAPP.fn.clearSelectAdditBind();   // [표준·G-3] 필수 호출 직접(삼킴 제거).
+        oAPP.fn.setAdditLayout("");
 
         var oInfo = oAPP.attr.oAppInfo || {};
         if (!oAPP.attr.servNm || !oInfo.CLSID) {
@@ -335,7 +381,7 @@
                 oAPP.attr.selModelNode = _oFirst || null;
                 // 공통 selectByKey 는 강조/selNode 전용이라 onSelect 콜백을 안 태운다 → 원본 onSelTabRow→
                 //   setRefFieldList(우측 참조필드 P05) 를 명시 호출(중복 아님).
-                if (typeof oAPP.fn.setRefFieldList === "function") { try { oAPP.fn.setRefFieldList(); } catch (e) { } }
+                oAPP.fn.setRefFieldList();   // [표준] 필수 호출 직접(삼킴 제거).
                 oAPP.fn.setTreeEmptyMark(oM.host, !(oAPP.attr.modelTree || []).length);
                 oAPP.fn.fitTreeColumns(oM.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
 

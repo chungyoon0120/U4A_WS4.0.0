@@ -39,9 +39,10 @@
 
     // 오류 표시 초기화(원본 clearError) — 디자인트리 + 추가속성 양쪽. 각 영역이 제공하는 API 만 소비.
     function _clearError() {
-        try { if (typeof oAPP.fn.resetErrorField === "function") { oAPP.fn.resetErrorField(); } } catch (e) { }
-        try { if (typeof oAPP.fn.clearAdditErrorMark === "function") { oAPP.fn.clearAdditErrorMark(); } } catch (e) { }
-        try { if (typeof oAPP.fn.refreshDesignTree === "function") { oAPP.fn.refreshDesignTree(); } } catch (e) { }
+        // [표준] 팝오버 닫힘 시 오류표시 초기화(원본 clearError) — 필수 호출 직접(삼킴 제거).
+        oAPP.fn.resetErrorField();
+        oAPP.fn.clearAdditErrorMark();
+        oAPP.fn.refreshDesignTree();
     }
 
     /* ── 위치 계산(원본 placement PreferredLeftOrFlip) ───────────────────── */
