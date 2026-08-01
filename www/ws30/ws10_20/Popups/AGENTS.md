@@ -1,7 +1,8 @@
 # AGENTS.md — 별창 팝업 개발 규칙 (이 폴더 스코프)
 
-이 폴더(`Popups/`) 아래에서 **새 창·별창·팝업·BrowserWindow·일렉트론(Electron) 창/팝업·frameless·모달 등
-어떤 표현이든 "창/팝업/화면"을 만들거나 고칠 때는 반드시 공통 UX 가드레일을 따른다.**
+이 폴더(`Popups/`) 아래에서 요청에 **"공통 UX"** 가 있으면 — 대상을 새 창·별창·팝업·BrowserWindow·
+일렉트론(Electron) 창/팝업·frameless·모달 등 **뭐라 부르든** — 아래 공통 UX 규칙을 반드시 따른다.
+("공통 UX" 언급이 없는 일반 작업엔 적용하지 않는다.)
 
 → 규칙 원문: **`_common-ux-bundle/GUARDRAIL.md`** (레포 루트) 를 먼저 읽고 그대로 따를 것.
 
