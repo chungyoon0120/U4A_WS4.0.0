@@ -66,7 +66,7 @@
 
 | 동료가 이렇게 말하면 | = 우리 표준 | 쓸 것 |
 |---|---|---|
-| electron window / 새창 / BrowserWindow / frameless / 팝업 창 | **별창(별도창)** | `_win-popup-template` 복사 + `16` §2.6·2.11·9.5 + `.u4a-titlebar` |
+| 새 창 / 새창 / 별창 / 팝업 / 팝업 창 / BrowserWindow / Electron(일렉트론) 창·팝업 / frameless window | **별창(별도창)** | `_win-popup-template` 복사 + `16` §2.6·2.11·9.5 + `.u4a-titlebar` |
 | 모달 / dialog / 팝업 | 공통 모달 | `.u4a-dialog` (`16` §2.x) |
 | dropdown / select / 콤보 | — | `U4AUI.createSelect` / `.u4a-combo` |
 | 입력칸 / textbox / field | — | `U4AUI.createField` (`15`) |
