@@ -73,9 +73,8 @@ www/ws30/ws10_20/ux-gallery.html             # 공통 UX 실물 갤러리(대조
 .analy/16_공통_화면UX_표준.md                 # 화면 공통 표준 SSOT (별창=§2.6·2.11·9.5)
 .analy/15_공통_입력UX_가이드.md               # 입력칸 공통 표준
 
-# AI 가드레일
+# AI 가드레일 (동료 = Codex — Claude SKILL 미포함)
 www/ws30/ws10_20/Popups/AGENTS.md            # Codex 스코프 가드레일 (Popups/ 밑 작업 시 자동 로드, 루트 AGENTS.md 안 건드림)
-.claude/skills/common-ux/SKILL.md            # Claude Code용 (신규 폴더 = 추가만, 안전)
 
 # 번들 메타 (언더바 = 현행 소스 아님, 충돌 회피)
 _common-ux-bundle/GUARDRAIL.md               # Codex/공용 가드레일 (SKILL.md 와 쌍둥이 내용)
@@ -135,13 +134,13 @@ JS: `theme/theme-api.js` → `theme/u4a-ui.js` → 팝업 `frame.js`(→ iframe 
   Codex 는 작업 파일 위쪽 폴더의 `AGENTS.md` 를 자동으로 읽으므로, `Popups/` 밑 별창 작업 시
   이 규칙이 **자동 적용**된다(루트 + 스코프 중첩 병합, 충돌 없음). → **동료 수동 편집 불필요.**
 - 이관 시엔 **내 팝업 폴더만** 옮기므로 `Popups/AGENTS.md` 는 원본 프로젝트로 따라오지 않는다(오염 0).
-- 규칙 원문은 `_common-ux-bundle/GUARDRAIL.md`(+ Claude 용 `.claude/skills/common-ux/SKILL.md`).
-  `Popups/AGENTS.md` 는 이 GUARDRAIL 을 가리키는 얇은 스코프 파일.
-- 규칙 실체 SSOT = `.analy/16`(+`15`) → `GUARDRAIL.md`·`SKILL.md`·`Popups/AGENTS.md`는 얇은 포인터라 **드리프트 없음**.
+- 규칙 원문은 `_common-ux-bundle/GUARDRAIL.md`. `Popups/AGENTS.md` 는 이 GUARDRAIL 을 가리키는 얇은 스코프 파일.
+- 동료 = Codex 확정 → Claude 용 `SKILL.md` 는 번들 미포함(코덱스가 안 읽음, GUARDRAIL 과 내용 중복).
+- 규칙 실체 SSOT = `.analy/16`(+`15`) → `GUARDRAIL.md`·`Popups/AGENTS.md`는 얇은 포인터라 **드리프트 없음**.
 
 ---
 
-## 6. 가드레일(GUARDRAIL.md / SKILL.md) 내용 설계
+## 6. 가드레일(GUARDRAIL.md · Popups/AGENTS.md) 내용 설계
 
 동료는 UX를 모르고, 용어도 다르게 쓰며, 옵션(가상스크롤 등)을 신경 안 쓴다. 판단은 사람이 아니라
 **Codex가 규칙대로 대신**하게 만든다.
@@ -239,7 +238,7 @@ JS: `theme/theme-api.js` → `theme/u4a-ui.js` → 팝업 `frame.js`(→ iframe 
       (제목줄·busy·화이트 테마 적용).
 - [ ] 그 팝업 폴더를 내 프로젝트 `Popups/` 에 넣으면 **경로 수정 없이 그대로 실행**(이관 호환).
 - [ ] 평면 표(`makeDataTable`)가 가상스크롤 기본 ON.
-- [ ] `GUARDRAIL.md`·`SKILL.md` = 이관규칙 + 3층 + 용어표 + 결정규칙 + 알려진 제약, 내용 동일.
+- [ ] `GUARDRAIL.md` + `Popups/AGENTS.md` = 이관규칙 + 3층 + 용어표 + 결정규칙 + 알려진 제약(Codex 자동 로드).
 - [ ] `VERSION.md`(SHA·날짜·변경요약) + `manifest.txt` 존재. 한글 파일명 UTF-8 무손상.
 
 ---

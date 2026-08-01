@@ -44,7 +44,7 @@ _common-ux-bundle/{GUARDRAIL,README,VERSION}.md   가드레일·안내·버전
 - **기존 루트 `AGENTS.md` 는 건드리지 않는다**(덮어쓰기·수동 편집 불필요). Codex 는 루트 + 이 스코프 파일을
   함께 읽는다(중첩 병합, 충돌 없음).
 - 이관 시엔 **내 팝업 폴더만** 옮기므로 `Popups/AGENTS.md` 는 원본 프로젝트로 따라오지 않는다(오염 0).
-- (Claude Code 를 쓴다면 `.claude/skills/common-ux/SKILL.md` 가 자동 인식된다. Codex 만 쓰면 무시해도 무방.)
+- (동료는 Codex 사용 — Claude Code 용 스킬은 번들에 포함하지 않음. 규칙 원문은 `GUARDRAIL.md`.)
 
 ---
 

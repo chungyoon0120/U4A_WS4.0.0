@@ -16,10 +16,9 @@ www/ws30/ws10_20/Popups/_win-popup-template/**
 www/ws30/ws10_20/ux-gallery.html
 .analy/16_공통_화면UX_표준.md
 .analy/15_공통_입력UX_가이드.md
-# --- AI 가드레일 (SKILL 은 .claude 경로로 매핑) ---
+# --- AI 가드레일 (동료는 Codex — Popups/AGENTS.md 로 자동 로드) ---
 # Popups 스코프 AGENTS.md — 코덱스가 Popups/ 밑에서 작업 시 자동으로 읽음(루트 AGENTS.md 안 건드림)
 www/ws30/ws10_20/Popups/AGENTS.md
-_common-ux-bundle/SKILL.md => .claude/skills/common-ux/SKILL.md
 _common-ux-bundle/GUARDRAIL.md
 _common-ux-bundle/README.md
 _common-ux-bundle/VERSION.md
