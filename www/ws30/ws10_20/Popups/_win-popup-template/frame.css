@@ -1,0 +1,59 @@
+/************************************************************************
+ * _win-popup-template/frame.css — 별창 창 셸(공통 타이틀바/iframe/로더) 레이아웃.
+ * 타이틀바(.u4a-titlebar/.u4a-winbtn)는 shell.css+bootstrap-skin.css 공통 소유.
+ * 색·radius·shadow 는 theme/tokens.css 의미 토큰만 소비(하드코딩 0).
+ ************************************************************************/
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    overflow: hidden;
+    /* 타이틀바(고정) + 본문(가변) 세로 스택 */
+    display: flex;
+    flex-direction: column;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+    font-family: var(--font);
+    /* 부모 창 위에서 가장자리가 또렷하게 보이도록 내부 테두리 링(레이아웃 영향 없음) */
+    box-shadow: inset 0 0 0 0.0625rem var(--line);
+}
+
+/* 공통 타이틀바는 flex 컬럼에서 높이 고정(세로 압박에도 안 줄게) */
+.u4a-titlebar {
+    flex: 0 0 auto;
+}
+
+/* ── 본문 = iframe(팝업 UX) ─────────────────────────────── */
+/* 등장 효과: 처음 opacity:0 → 본문 로드 완료 시 .u4aTplShown 으로 페이드인.
+   ★네이티브 창 opacity(무거움·흰 플래시) 대신 DOM CSS transition(GPU 합성). 스펙 §2.6. */
+#tplContent {
+    flex: 1 1 auto;
+    position: relative;
+    min-height: 0;
+    background: var(--app-bg);
+    opacity: 0;
+    transition: opacity 0.3s linear;
+}
+
+#tplContent.u4aTplShown {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #tplContent { transition: none; }
+}
+
+#ws_frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    overflow: hidden;
+}
+
+/* ── 로딩 오버레이 = 공통 .u4a-busy(shell.css SSOT). 화면별 로더 CSS 없음. ── */

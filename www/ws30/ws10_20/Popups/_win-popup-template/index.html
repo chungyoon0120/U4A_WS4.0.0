@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- ★ 별창 팝업 견본 본문(index) — 여기에 팝업 UX 를 구성한다. 공통 컴포넌트만 소비:
+         입력칸=U4AUI.createField, 접이식 패널=U4AUI.createPanel, 평면표=U4AUI.makeDataTable,
+         트리테이블=U4AUI.makeColumnTree, 콤보=U4AUI.createSelect, 토스트=공통 .u4a-toast.
+         색은 tokens.css 토큰만. 외부 셸(frame.js)의 oAPP(테마/Busy/IPC) 사용. 스펙 §6. -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <!-- 입력칸/테이블 등 색의 단일 출처(shell 뒤 로드해 이김) — 없으면 입력칸이 평평해짐(스펙 §15). -->
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="index.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] frame 이 iframe src 에 넘긴 BGCOL/THEME 를 첫 페인트 전에 적용(스펙 §2.6). -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+            } catch (e) { /* index.js 에서 재적용 */ }
+        })();
+    </script>
+</head>
+
+<body>
+    <main id="tplBody" class="tpl-body">
+        <!-- TODO(견본): 여기에 팝업 UX 를 U4AUI.* / .u4a-* 로 구성한다.
+             착수 전 반드시 구조 승인 게이트(스펙 §6.0): 이름 확정 → UX 구조 스케치 → 소유자 확인 → 구현. -->
+    </main>
+    <script src="index.js"></script>
+</body>
+
+</html>
