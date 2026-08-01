@@ -1,7 +1,7 @@
 # 공통 UX 번들 — 사용 안내
 
-원본 프로젝트의 **공통 화면 UX 자산·표준·별창 견본·AI 가드레일** 묶음.
-이 번들로 **별창 팝업을 개발**한 뒤 **그 폴더만 원본 프로젝트로 이관**하면 이질감 0으로 실행된다.
+원본 프로젝트의 **공통 화면 UX 자산·표준·브라우저 윈도우 견본·AI 가드레일** 묶음.
+이 번들로 **브라우저 윈도우 팝업을 개발**한 뒤 **그 폴더만 원본 프로젝트로 이관**하면 이질감 0으로 실행된다.
 
 ---
 
@@ -15,7 +15,7 @@
 기존 루트 `AGENTS.md` **맨 아래에 아래 문구**를 붙인다(루트에 `AGENTS.md` 가 없으면 이 내용으로 새로 만든다):
 
 ```
-[공통 UX 규칙] 요청에 "공통 UX"(또는 공통 ux / common ux) 라는 말이 있으면 — 대상이 새 창·별창·팝업·
+[공통 UX 규칙] 요청에 "공통 UX"(또는 공통 ux / common ux) 라는 말이 있으면 — 대상이 새 창·브라우저 윈도우·팝업·
 BrowserWindow·Electron(일렉트론) 창/팝업·frameless·모달·화면·입력칸·표·트리 등 무엇이든 —
 먼저 _common-ux-bundle/GUARDRAIL.md 를 읽고 그 규칙(견본 복사·공통 컴포넌트 소비·표준 준수)을 반드시 따를 것.
 "공통 UX" 언급이 없는 일반 작업에는 이 규칙을 적용하지 않는다.
@@ -24,9 +24,9 @@ BrowserWindow·Electron(일렉트론) 창/팝업·frameless·모달·화면·입
 **동작 방식:** Codex 는 대화 시작 시 **루트 `AGENTS.md` 만** 자동으로 읽는다. 위 문구 덕분에,
 동료가 **"공통 UX 로 새 창 만들어줘"** 처럼 **"공통 UX"만 붙이면** — 그 뒤 창을 뭐라 부르든
 (BrowserWindow·일렉트론 팝업·새 창·모달…) — Codex 가 규칙을 찾아 따르고, 창 용어는 GUARDRAIL 의
-용어표(§5)가 알아서 **별창**으로 번역한다. **"공통 UX" 를 안 붙인 요청은 건드리지 않는다.**
+용어표(§5)가 알아서 **우리 공통 표준(브라우저 윈도우 견본·공통 컴포넌트)** 으로 연결한다. **"공통 UX" 를 안 붙인 요청은 건드리지 않는다.**
 
-> **설치 끝.** 이제 새 대화창에서 **"공통 UX 로 새 창(별창 팝업) 하나 만들어줘"** 라고만 하면,
+> **설치 끝.** 이제 새 대화창에서 **"공통 UX 로 새 창(브라우저 윈도우 팝업) 하나 만들어줘"** 라고만 하면,
 > Codex 가 견본 복사 → 공통 컴포넌트로 화면 구현까지 규칙대로 알아서 한다. 완성된 `Popups/<이름>/`
 > 폴더만 원본 담당자에게 넘기면 된다.
 
@@ -34,8 +34,8 @@ BrowserWindow·Electron(일렉트론) 창/팝업·frameless·모달·화면·입
 ```
 www/ws30/ws10_20/theme/**            공통 컴포넌트·스타일·테마 (u4a-ui.js, shell.css, tokens.css, theme-api.js, themes/)
 www/lib/{bootstrap,fontawesome}/**   벤더 라이브러리 (전량 동봉)
-www/ws30/ws10_20/Popups/_win-popup-template/**   별창 팝업 견본 (복사용)
-www/ws30/ws10_20/Popups/AGENTS.md    별창 작업 스코프 규칙 (Codex 가 Popups/ 작업 시 보강 로드)
+www/ws30/ws10_20/Popups/_win-popup-template/**   브라우저 윈도우 팝업 견본 (복사용)
+www/ws30/ws10_20/Popups/AGENTS.md    브라우저 윈도우 작업 스코프 규칙 (Codex 가 Popups/ 작업 시 보강 로드)
 www/ws30/ws10_20/ux-gallery.html     공통 UX 실물 갤러리 (작업 전 대조)
 .analy/16_공통_화면UX_표준.md          화면 공통 표준 (SSOT)
 .analy/15_공통_입력UX_가이드.md        입력칸 공통 표준
@@ -44,7 +44,7 @@ _common-ux-bundle/{GUARDRAIL,README,VERSION}.md   가드레일·안내·버전
 
 ---
 
-## 2. 별창 팝업 시작법 (Codex 로 개발)
+## 2. 브라우저 윈도우 팝업 시작법 (Codex 로 개발)
 
 설치(위 2단계) 후, 동료가 **"공통 UX 로 새 창 만들어줘"** 라고 요청하면 Codex 가 다음을 **자율로** 수행한다
 (원격 승인자 없음 — 애매하면 요청한 동료에게 되묻는다):
@@ -72,7 +72,7 @@ _common-ux-bundle/{GUARDRAIL,README,VERSION}.md   가드레일·안내·버전
 
 ## 4. 배선/로드 스택 (견본에 이미 적용됨 — 바꾸지 말 것)
 
-별창 정규 로드 순서:
+브라우저 윈도우 정규 로드 순서:
 
 ```
 CSS : tokens.css → shell.css → bootstrap-skin.css → fontawesome(all.min.css)
@@ -80,7 +80,7 @@ JS  : theme-api.js → u4a-ui.js → frame.js   (본문 iframe: index.html → i
 ```
 
 - **불변식**: theme CSS 중 `bootstrap-skin.css` 가 **마지막**(색·그림자·테두리 override). 어기면 테마 안 먹음.
-- 별창은 `.u4a-*` + `.u4a-titlebar` 만 쓰므로 **Bootstrap(min/bridge) 미로드**.
+- 브라우저 윈도우는 `.u4a-*` + `.u4a-titlebar` 만 쓰므로 **Bootstrap(min/bridge) 미로드**.
 - 색은 `tokens.css` 의미 토큰만(하드코딩 hex 금지). 고정 px 폭 금지(반응형).
 - 파라미터에 테마 정보 없으면 **화이트(horizon_white) 기본**.
 
@@ -101,7 +101,7 @@ JS  : theme-api.js → u4a-ui.js → frame.js   (본문 iframe: index.html → i
 견본 `frame.js` 는 원본 프로젝트의 셸 런타임을 사용한다(동료 환경에서 동일 사용 가능해야 함):
 
 - `@electron/remote`, `ws30/resources/pathInfo.js`, `WSUTIL`(QueryString·MessageClassText 등).
-- 별창을 여는 **부모 창**이 `USERINFO`(LANGU/SYSID)·`browserkey`·`BGCOL`/`THEME`/`TITLE` 를 **쿼리스트링으로 전달**.
+- 브라우저 윈도우를 여는 **부모 창**이 `USERINFO`(LANGU/SYSID)·`browserkey`·`BGCOL`/`THEME`/`TITLE` 를 **쿼리스트링으로 전달**.
 - 메시지 클래스 텍스트(SQLite) 백엔드.
 
 개발 중 견본을 실행하려면 위 셸 런타임 + 최소 부모 오프너(쿼리스트링 전달)가 필요하다.
