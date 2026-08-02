@@ -35,7 +35,6 @@ BrowserWindow·Electron(일렉트론) 창/팝업·frameless·모달·화면·입
 www/ws30/ws10_20/theme/**            공통 컴포넌트·스타일·테마 (u4a-ui.js, shell.css, tokens.css, theme-api.js, themes/)
 www/lib/{bootstrap,fontawesome}/**   벤더 라이브러리 (전량 동봉)
 www/ws30/ws10_20/Popups/_win-popup-template/**   브라우저 윈도우 팝업 견본 (복사용)
-www/ws30/ws10_20/Popups/AGENTS.md    브라우저 윈도우 작업 스코프 규칙 (Codex 가 Popups/ 작업 시 보강 로드)
 www/ws30/ws10_20/ux-gallery.html     공통 UX 실물 갤러리 (작업 전 대조)
 .analy/16_공통_화면UX_표준.md          화면 공통 표준 (SSOT)
 .analy/15_공통_입력UX_가이드.md        입력칸 공통 표준
@@ -60,12 +59,9 @@ _common-ux-bundle/{GUARDRAIL,README,VERSION}.md   가드레일·안내·버전
 
 ## 3. 가드레일이 걸리는 원리 (참고)
 
-- **첫 마디부터 확실히 걸리는 트리거** = 설치 2단계의 **루트 `AGENTS.md` 한 줄**. Codex 는 대화 시작 시
-  루트 `AGENTS.md` 를 항상 읽으므로, 이 한 줄이 `GUARDRAIL.md` 로 연결해 준다. **그래서 2단계가 필수.**
-- **보강** = 번들의 **`www/ws30/ws10_20/Popups/AGENTS.md`**. Codex 가 `Popups/` 밑 파일을 만질 때
-  추가로 읽혀 규칙을 다시 확인시킨다(루트 한 줄이 "첫 진입", 이 파일이 "작업 중 재확인").
+- **트리거** = 설치 2단계의 **루트 `AGENTS.md` 한 줄**. Codex 는 대화 시작 시 루트 `AGENTS.md` 를 항상
+  읽으므로, 요청에 **"공통 UX"** 가 있으면 이 한 줄이 `GUARDRAIL.md` 로 연결해 준다. **그래서 2단계가 필수.**
 - **기존 루트 `AGENTS.md` 를 덮지 않는다** — 2단계는 맨 아래에 한 줄 **추가**(기존 내용 보존).
-- 이관 시엔 **내 팝업 폴더만** 옮기므로 `Popups/AGENTS.md` 는 원본 프로젝트로 따라오지 않는다(오염 0).
 - (동료는 Codex 사용 — Claude Code 용 스킬은 번들에 미포함. 규칙 원문은 `GUARDRAIL.md`.)
 
 ---

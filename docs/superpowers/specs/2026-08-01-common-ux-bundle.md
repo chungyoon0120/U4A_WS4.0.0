@@ -29,7 +29,7 @@
 
 ### 이미 확인된 전제 (재확인 불필요)
 - **AI = Codex 확정**(동료 확인). → 가드레일은 `AGENTS.md`/`GUARDRAIL.md` 로 적용(§5).
-- **동료에게 기존 루트 `AGENTS.md` 있음 확정**. → 루트는 **안 건드리고**, 스코프 `www/ws30/ws10_20/Popups/AGENTS.md` 로 자동 적용(§5).
+- **동료에게 기존 루트 `AGENTS.md` 있음 확정**. → 루트는 **안 건드리고**, 동료가 루트에 트리거 한 줄 추가(§5).
 - 목표=**HTML5+Bootstrap** · OS=**Windows** · **동일 Electron**.
 - 동료 환경엔 **bootstrap/FA 등 HTML5 프론트 라이브러리만 없음(UI5 유사)** → 번들이 **HTML5 토대 전량 제공**, 버전 충돌 없음.
 - **★ WS 셸 런타임은 동료도 동일하게 사용 가능**(확인): `@electron/remote`, `ws30/resources/pathInfo.js`,
@@ -73,8 +73,7 @@ www/ws30/ws10_20/ux-gallery.html             # 공통 UX 실물 갤러리(대조
 .analy/16_공통_화면UX_표준.md                 # 화면 공통 표준 SSOT (별창=§2.6·2.11·9.5)
 .analy/15_공통_입력UX_가이드.md               # 입력칸 공통 표준
 
-# AI 가드레일 (동료 = Codex — Claude SKILL 미포함)
-www/ws30/ws10_20/Popups/AGENTS.md            # Codex 스코프 가드레일 (Popups/ 밑 작업 시 자동 로드, 루트 AGENTS.md 안 건드림)
+# AI 가드레일 (동료 = Codex — Claude SKILL 미포함, 루트 AGENTS.md 는 동료가 한 줄 추가)
 
 # 번들 메타 (언더바 = 현행 소스 아님, 충돌 회피)
 _common-ux-bundle/GUARDRAIL.md               # Codex/공용 가드레일 (SKILL.md 와 쌍둥이 내용)
@@ -96,7 +95,7 @@ _common-ux-bundle/manifest.txt               # 번들 대상 경로 목록 (재�
 ### 3.3 제외 (넣지 않음)
 
 - **화면 전용/프로세스 문서**: `.analy/00~14, 17`, `U4A_WS20_*` 및 화면별 CSS(예: `login.css`), 다른 팝업 폴더들.
-- **`AGENTS.md`(루트)**: 동료 것 존재 확정 → **덮지 않는다**. 대신 스코프 `Popups/AGENTS.md` 포함(§5).
+- **`AGENTS.md`(루트)**: 동료 것 존재 확정 → **덮지 않는다**. 대신 동료가 루트에 트리거 한 줄 추가(§5).
 - **pack 스크립트**: 내 레포에만(번들엔 `VERSION.md`만).
 - (`.analy/12_테마_컨버전_전략.md`: 테마 CSS/스위처는 포함하되, 테마 *전환 전략 문서*는 화면 표준이 아니라 제외. 필요 시 후속.)
 
@@ -127,20 +126,19 @@ JS: `theme/theme-api.js` → `theme/u4a-ui.js` → 팝업 `frame.js`(→ iframe 
 
 ---
 
-## 5. AGENTS.md 충돌 회피 (Codex 확정 · 루트 AGENTS.md 존재 확정)
+## 5. 트리거 = 루트 AGENTS.md 한 줄 (Codex 확정 · 루트 AGENTS.md 존재 확정)
 
 - **루트 `AGENTS.md`는 오버레이하지 않는다**(동료 것 존재 확정 — 덮으면 삭제됨).
-- 대신 **스코프 `www/ws30/ws10_20/Popups/AGENTS.md`** 를 번들에 포함한다.
-  Codex 는 작업 파일 위쪽 폴더의 `AGENTS.md` 를 자동으로 읽으므로, `Popups/` 밑 별창 작업 시
-  이 규칙이 **자동 적용**된다(루트 + 스코프 중첩 병합, 충돌 없음). → **동료 수동 편집 불필요.**
-- 이관 시엔 **내 팝업 폴더만** 옮기므로 `Popups/AGENTS.md` 는 원본 프로젝트로 따라오지 않는다(오염 0).
-- 규칙 원문은 `_common-ux-bundle/GUARDRAIL.md`. `Popups/AGENTS.md` 는 이 GUARDRAIL 을 가리키는 얇은 스코프 파일.
+- 대신 **동료가 자기 루트 `AGENTS.md` 맨 아래에 한 줄(트리거 문구) 추가**(최초 1회, README 2단계).
+  Codex 는 대화 시작 시 루트 `AGENTS.md` 를 항상 읽으므로, 요청에 **"공통 UX"** 가 있으면 이 한 줄이
+  `GUARDRAIL.md` 로 연결한다. → 첫 마디부터 확실히 걸림. "공통 UX" 없는 일반 작업엔 미적용.
+- 스코프 `Popups/AGENTS.md` 는 **폐기**(루트 한 줄이 확실한 트리거라 중복 · Codex의 나중-로드 타이밍 의존이라 불확실).
 - 동료 = Codex 확정 → Claude 용 `SKILL.md` 는 번들 미포함(코덱스가 안 읽음, GUARDRAIL 과 내용 중복).
-- 규칙 실체 SSOT = `.analy/16`(+`15`) → `GUARDRAIL.md`·`Popups/AGENTS.md`는 얇은 포인터라 **드리프트 없음**.
+- 규칙 실체 SSOT = `.analy/16`(+`15`) → `GUARDRAIL.md` 가 얇은 포인터라 **드리프트 없음**.
 
 ---
 
-## 6. 가드레일(GUARDRAIL.md · Popups/AGENTS.md) 내용 설계
+## 6. 가드레일(GUARDRAIL.md) 내용 설계
 
 동료는 UX를 모르고, 용어도 다르게 쓰며, 옵션(가상스크롤 등)을 신경 안 쓴다. 판단은 사람이 아니라
 **Codex가 규칙대로 대신**하게 만든다.
@@ -238,7 +236,7 @@ JS: `theme/theme-api.js` → `theme/u4a-ui.js` → 팝업 `frame.js`(→ iframe 
       (제목줄·busy·화이트 테마 적용).
 - [ ] 그 팝업 폴더를 내 프로젝트 `Popups/` 에 넣으면 **경로 수정 없이 그대로 실행**(이관 호환).
 - [ ] 평면 표(`makeDataTable`)가 가상스크롤 기본 ON.
-- [ ] `GUARDRAIL.md` + `Popups/AGENTS.md` = 이관규칙 + 3층 + 용어표 + 결정규칙 + 알려진 제약(Codex 자동 로드).
+- [ ] `GUARDRAIL.md` = 이관규칙 + 3층 + 용어표 + 결정규칙 + 알려진 제약. 루트 AGENTS.md 트리거 한 줄로 연결.
 - [ ] `VERSION.md`(SHA·날짜·변경요약) + `manifest.txt` 존재. 한글 파일명 UTF-8 무손상.
 
 ---
