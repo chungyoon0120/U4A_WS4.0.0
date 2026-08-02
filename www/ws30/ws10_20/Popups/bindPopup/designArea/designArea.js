@@ -184,15 +184,16 @@
 
     /* ── 좌측 필드 → 디자인트리 드롭(원본 onDropBindField/_setBindAttribute) ──────── */
 
-    // 드래그 데이터 정합성(원본 _checkDragData 축약) — DnDRandKey(=SSID) 일치 + 사전 오류 없음.
+    // 드래그 데이터 정합성 — 원본 _checkDragData(designTree.js:838-883) 1:1(4종 안내 메시지 이식, G-4).
+    //   실패 시 RTMSG 를 호출부(_onDesignDrop:779)가 토스트로 노출한다(예전엔 RTMSG 비어 무음이었음).
     function _checkDragData(sPrc001) {
         var r = { RETCD: "", RTMSG: "", IF_DATA: null };
-        if (!sPrc001) { r.RETCD = "E"; return r; }
+        if (!sPrc001) { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("099"); return r; }                       // 099 Drag 정보 없음
         var o;
-        try { o = JSON.parse(sPrc001); } catch (e) { r.RETCD = "E"; return r; }
-        if (!o || o.PRCCD !== "PRC001") { r.RETCD = "E"; return r; }
-        if (o.DnDRandKey !== oAPP.attr.DnDRandKey) { r.RETCD = "E"; return r; }   // 다른 팝업 인스턴스 드래그 차단.
-        if (o.RETCD === "E") { r.RETCD = "E"; r.RTMSG = o.RTMSG || ""; return r; } // 추가속성 검증 오류.
+        try { o = JSON.parse(sPrc001); } catch (e) { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("100"); return r; }  // 100 잘못된 Drag 정보
+        if (!o || o.PRCCD !== "PRC001") { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("101"); return r; }     // 101 작업 수행 불가
+        if (o.DnDRandKey !== oAPP.attr.DnDRandKey) { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("102"); return r; }  // 102 다른 영역 Drag
+        if (o.RETCD === "E") { r.RETCD = "E"; r.RTMSG = o.RTMSG || ""; return r; }                          // 추가속성 검증 오류(payload 동봉)
         r.IF_DATA = o.IF_DATA;
         return r;
     }
@@ -426,14 +427,9 @@
 
         _refreshDesignTree();
 
-        // 해당 행으로 스크롤(원본 setFirstVisibleRow 대응).
-        try {
-            var oRow = null, aRows = oD.host ? oD.host.querySelectorAll(".u4aColTreeRow") : [];
-            for (var r = 0; r < aRows.length; r++) {
-                if (aRows[r].__bwpNode && aRows[r].__bwpNode.CHILD === LINE_KEY) { oRow = aRows[r]; break; }
-            }
-            if (oRow && typeof oRow.scrollIntoView === "function") { oRow.scrollIntoView({ block: "nearest" }); }
-        } catch (e) { }
+        // 해당 행으로 스크롤(원본 setFirstVisibleRow 대응) — 가상 scrollToKey 경유 selectKey(key,true).
+        //   (비가상 querySelectorAll+scrollIntoView 제거 — 가상은 화면 밖 행 DOM 없음.)
+        if (oD.ctrl && typeof oD.ctrl.selectKey === "function") { oD.ctrl.selectKey(LINE_KEY, true); }
     };
 
     // [SPEC §6] 오류목록 팝오버 닫힘 시 트리 재렌더(원본 clearError 의 model.refresh 대응).
@@ -1002,13 +998,10 @@
             // 선택 강조(원본 setSelectedIndex). ★공통 selectKey 는 비가상 트리에선 스크롤을 안 한다
             //   (u4a-ui.js:1630 — bVirtual&&bReveal 일 때만 scrollToKey). 디자인 트리는 비가상이라
             //   스크롤은 아래서 행 DOM 을 직접 scrollIntoView(원본 setFirstVisibleRow 대응, focusErrorDesignLine 과 동일).
-            if (typeof oD.ctrl.selectKey === "function") { oD.ctrl.selectKey(oNode.CHILD, false); }
+            // 선택 강조 + off-screen reveal — 공통 selectKey(key,true)가 가상 scrollToKey 로 스크롤 이동
+            //   (원본 setSelectedIndex+setFirstVisibleRow). 비가상 querySelectorAll+scrollIntoView 제거(가상은 화면 밖 행 DOM 없음).
+            if (typeof oD.ctrl.selectKey === "function") { oD.ctrl.selectKey(oNode.CHILD, true); }
             oAPP.fn.bindPossibleRecompute(oNode);   // [표준] 필수 호출 직접(삼킴 제거).
-            var oRow = null, aRows = oD.host ? oD.host.querySelectorAll(".u4aColTreeRow") : [];
-            for (var r = 0; r < aRows.length; r++) {
-                if (aRows[r].__bwpNode && aRows[r].__bwpNode.CHILD === oNode.CHILD) { oRow = aRows[r]; break; }
-            }
-            if (oRow && typeof oRow.scrollIntoView === "function") { oRow.scrollIntoView({ block: "nearest" }); }
         } finally { _bRemoteDesignSelect = false; }
     };
 
@@ -1067,6 +1060,7 @@
         oD.host.setAttribute("data-act-col", String(iActCol));   // 액션 컬럼 인덱스 → sticky CSS 대상.
         oD.ctrl = U4AUI.makeColumnTree(oD.host, {
             columns: aCols,
+            virtual: true,   // 대용량(수만 UI) 대비 가상 스크롤 — WS20 디자인 트리와 동일 자산(원본 TreeTable 가상).
             // autofit(더블클릭·161버튼 공용) = 원본 setUiTableAutoResizeColumn 정책(여유 0.5rem/최소 4rem/상한 없음).
             autofit: { slackRem: 0.5, minRem: 4, max: Infinity },
             lastColResize: false,   // 액션 컬럼(마지막)은 고정 거터 — 우측 리사이즈 그립(||) 제거.
@@ -1123,6 +1117,9 @@
                 if (n._bind_error) { oRow.classList.add("u4aBwpRow--error"); }
                 else { var sHl = H.rowHl(n._highlight); if (sHl) { oRow.classList.add(sHl); } }
                 oRow.__bwpNode = n;   // 드롭 대상 조회용(좌측 필드 → 이 행).
+                // [가상 선택강조] WS20(tree.js:595) 패턴 — 화면 소유 선택키(selDesignNode)로 매 빌드 aria-selected
+                //   재적용(공통 selKey 미동기라 가상 스크롤 재생성 시 강조 소실 방지).
+                if (oAPP.attr.selDesignNode && oAPP.attr.selDesignNode.CHILD === n.CHILD) { oRow.setAttribute("aria-selected", "true"); }
                 // 임베디드 속성 배지 — 이름칸(.u4aColTreeNameCell) 우측에 덧댐(원본 ObjectStatus SpaceBetween 재현).
                 //   공통 미수정 — 이름칸은 공통이 조립하고 여기(화면 rowHook)서 추가만 한다.
                 var oEmat = _ematBadge(n);
@@ -1138,6 +1135,10 @@
             },
             onSelect: function (n) {
                 oAPP.attr.selDesignNode = n;
+                // 클릭한 행에 선택 강조(aria-selected) 즉시 적용 — 공통 트리는 강조 API(selectKey)만 제공하고 화면이 호출한다.
+                //   가상 전환 후 클릭만으론 재렌더가 안 일어나 rowHook 강조가 스크롤(재렌더)해야 뜨던 것 수정(장군님 지적 2026-07-31).
+                //   bScroll=false: 사용자가 직접 클릭한 보이는 행이라 스크롤 점프 금지. 좌측 모델트리(modelFieldArea.js:143)와 동일.
+                if (oD.ctrl && typeof oD.ctrl.selectKey === "function") { try { oD.ctrl.selectKey(n.CHILD, false); } catch (e) { } }
                 // [SPEC §2.1] 디자인 트리 속성 선택 → 좌측 모델필드 바인딩 가능/불가 재계산(이미 바인딩=파랑).
                 if (typeof oAPP.fn.bindPossibleRecompute === "function") {
                     try { oAPP.fn.bindPossibleRecompute(n); } catch (e) { console.error("[HTML5][bindWindow] bindPossibleRecompute:", e && e.message); }
@@ -1195,7 +1196,9 @@
                 if (iRaf) { return; }
                 iRaf = requestAnimationFrame(function () { iRaf = 0; _fixEmpty(); });
             }
-            try { new MutationObserver(_fixEmpty).observe(oHost, { childList: true, subtree: true }); } catch (e) { }
+            // [가상 대비] 가상 스크롤은 매 프레임 행을 add/remove → MutationObserver 동기 _fixEmpty 폭주.
+            //   rAF 게이트(_schedule)로 프레임당 1회로 합침(공통 §3.4.2 RO 콜백 동기쓰기 금지와 동일 결).
+            try { new MutationObserver(_schedule).observe(oHost, { childList: true, subtree: true }); } catch (e) { }
             try { new ResizeObserver(_schedule).observe(oHost); } catch (e) { }
             _fixEmpty();
         })();

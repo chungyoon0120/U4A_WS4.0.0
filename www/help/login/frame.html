@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <!-- ===== 공통 헤더(.u4a-titlebar) 적용 — index.html/extopen/aboutU4APopup 과 동일 짝 ===== -->
+    <link rel="stylesheet" href="../../ws30/ws10_20/theme/tokens.css">
+    <link rel="stylesheet" href="../../ws30/ws10_20/theme/shell.css">
+    <!-- ★ bootstrap-skin = 공통 헤더의 실제 모양(.u4a-titlebar 그라데이션 + 윈도우 버튼) -->
+    <link rel="stylesheet" href="../../ws30/ws10_20/theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../lib/fontawesome/7.2.0/css/all.min.css">
+
+    <script src="../../ws30/ws10_20/theme/theme-api.js"></script>
+    <script src="../../ws30/ws10_20/theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* DOMContentLoaded 에서 재적용 */ }
+        })();
+    </script>
+
+    <style>
+        html, body {
+            height: 100%;
+            /* apply 전 흰 순간 차단 — documentElement 배경도 테마색. */
+            background: var(--boot-bg, var(--app-bg));
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            /* 타이틀바(고정) + 콘텐츠(가변) 세로 스택 */
+            display: flex;
+            flex-direction: column;
+            background: var(--boot-bg, var(--app-bg));
+        }
+        /* 콘텐츠 영역 = iframe (타이틀바 아래 전체 채움) */
+        #helpContent {
+            flex: 1 1 auto;
+            position: relative;
+            min-height: 0;
+            background: var(--boot-bg, var(--app-bg));
+        }
+        #mainFRAME {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            overflow: hidden;
+            /* [흰 플래시 방지 ②] iframe 요소 자체 배경을 테마색으로 → 매뉴얼 로드 전(about:blank)에도 흰색 차단. */
+            background: var(--boot-bg, var(--app-bg));
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <!-- ===== 공통 커스텀 헤더 (메인 창 .u4a-titlebar 와 동일 — 리사이즈 창이라 최소/최대/닫기) ===== -->
+    <header class="u4a-titlebar" id="helpTitlebar">
+        <img class="u4a-titlebar__logo" id="helpLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="helpTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button class="u4a-winbtn" data-action="min" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button class="u4a-winbtn" id="helpMaxBtn" data-action="max" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <div id="helpContent">
+        <iframe id="mainFRAME" frameborder="0"></iframe>
+    </div>
+
+    <script>
+        (function () {
+
+            var REMOTE = require('@electron/remote'),
+                PATH = REMOTE.require('path'),
+                APP = REMOTE.app,
+                APPPATH = APP.getAppPath(),
+                CURRWIN = REMOTE.getCurrentWindow();
+
+            function lf_toFileUrl(sPath) {
+                return encodeURI("file:///" + String(sPath).replaceAll("\\", "/"));
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+
+                try { CURRWIN.setMenu(null); } catch (e) { }
+
+                try {
+                    // 로고 = 메인 창과 동일(APPPATH/img/logo.png)
+                    var oLogo = document.getElementById("helpLogo");
+                    if (oLogo) { oLogo.src = lf_toFileUrl(PATH.join(APPPATH, "img", "logo.png")); }
+
+                    // 제목 = opener 가 넘긴 창 제목
+                    var oTitle = document.getElementById("helpTitle");
+                    if (oTitle) {
+                        var sTtl = "";
+                        try { sTtl = document.title || CURRWIN.getTitle() || ""; } catch (e) { sTtl = document.title || ""; }
+                        oTitle.textContent = sTtl;
+                    }
+
+                    // 최소화
+                    var oMin = document.querySelector('#helpTitlebar [data-action="min"]');
+                    if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { } }); }
+
+                    // 최대화 / 복원 (아이콘 토글)
+                    var oMax = document.getElementById("helpMaxBtn");
+                    if (oMax) {
+                        var lf_syncMaxIcon = function () {
+                            var oIco = oMax.querySelector("i");
+                            if (!oIco) { return; }
+                            var bMax = false;
+                            try { bMax = CURRWIN.isMaximized(); } catch (e) { bMax = false; }
+                            oIco.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
+                            oMax.title = bMax ? "Restore" : "Maximize";
+                        };
+                        oMax.addEventListener("click", function () {
+                            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+                        });
+                        try {
+                            CURRWIN.on("maximize", lf_syncMaxIcon);
+                            CURRWIN.on("unmaximize", lf_syncMaxIcon);
+                        } catch (e) { }
+                        lf_syncMaxIcon();
+                    }
+
+                    // 닫기 (busy 중 closable=false 면 무시 — 메인 창과 동일하게 close())
+                    var oClose = document.querySelector('#helpTitlebar [data-action="close"]');
+                    if (oClose) { oClose.addEventListener("click", function () { try { CURRWIN.close(); } catch (e) { } }); }
+                } catch (e) { /* 헤더 초기화 실패해도 본문(iframe)은 정상 */ }
+
+                // 매뉴얼(iframe) 로드 — opener 가 넘긴 언어 폴더(KO/EN)의 index.html.
+                //   원본 매뉴얼은 그대로 두고 iframe 으로만 호스팅한다.
+                var q = new URLSearchParams(location.search);
+                var sLangu = q.get("LANGU") || "EN";
+                var oFrame = document.getElementById("mainFRAME");
+
+                // [HTML5 표준] opener 는 show:false. 콘텐츠(매뉴얼) 로드 완료 후 창을 표시 →
+                //   opacity 페이드 없이, 흰 순간 없이 바로 나타난다. (aboutU4APopup 동일)
+                oFrame.addEventListener("load", function () {
+                    try { if (CURRWIN && !CURRWIN.isVisible()) { CURRWIN.show(); CURRWIN.focus(); } } catch (e) { }
+                }, { once: true });
+
+                oFrame.src = "./" + sLangu + "/index.html";
+            });
+
+        })();
+    </script>
+
+</body>
+
+</html>

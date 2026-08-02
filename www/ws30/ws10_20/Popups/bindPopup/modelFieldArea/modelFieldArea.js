@@ -98,6 +98,7 @@
                 { label: H.z("176"), width: "16rem" }    // 176 Description
             ],
             // autofit(더블클릭·161버튼 공용) = 원본 정책(여유 0.5rem/최소 4rem/상한 없음) — 디자인트리와 동일.
+            virtual: true,   // 대용량(수만 노드) 대비 가상 스크롤 — WS20 디자인 트리와 동일(원본 sap.ui.table TreeTable 가상 재현).
             autofit: { slackRem: 0.5, minRem: 4, max: Infinity },
             roots: function () { return oAPP.attr.modelTree || []; },
             children: function (n) { return n.zTREE || []; },
@@ -128,6 +129,10 @@
             rowHook: function (oRow, n) {
                 var sHl = H.rowHl(n.highlight);
                 if (sHl) { oRow.classList.add(sHl); }
+                // [가상 선택강조] 공통 selectKey 는 현재 DOM 행에만 aria-selected 를 걸어, 가상에서 스크롤로 행이
+                //   재생성되면 강조가 소실된다(u4a-ui.js:2119 selKey 미동기). WS20(tree.js:595)처럼 화면 소유
+                //   선택키(selModelNode)로 매 빌드 재적용해 유지한다.
+                if (oAPP.attr.selModelNode && oAPP.attr.selModelNode.CHILD === n.CHILD) { oRow.setAttribute("aria-selected", "true"); }
                 _wireModelDrag(oRow, n);   // 좌측 필드 → 중앙 디자인트리 드래그 소스(원본 setDragStart).
             },
             onSelect: function (n) {

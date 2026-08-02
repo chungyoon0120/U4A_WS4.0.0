@@ -1963,10 +1963,11 @@ var oAPP = (function () {
         parent.setDomBusy("X");
         const oSettingInfo = WSUTIL.getWsSettingsInfo(), WS_LANGU = oSettingInfo.globalLanguage;
         const sHelpRoot = PATH.join(APPPATH, "help", "login");
-        let sHelpLanguPath = PATH.join(sHelpRoot, WS_LANGU, "index.html");
-        if (!parent.FS.existsSync(sHelpLanguPath)) {
-            sHelpLanguPath = PATH.join(sHelpRoot, "EN", "index.html");
-            if (!parent.FS.existsSync(sHelpLanguPath)) {
+        // 매뉴얼 언어 폴더 결정(없으면 EN 폴백). 실제 매뉴얼은 공통 셸(frame.html) 내부 iframe 이 로드.
+        let sLangDir = WS_LANGU;
+        if (!parent.FS.existsSync(PATH.join(sHelpRoot, sLangDir, "index.html"))) {
+            sLangDir = "EN";
+            if (!parent.FS.existsSync(PATH.join(sHelpRoot, "EN", "index.html"))) {
                 oAPP.fn.fnMessageBox("I", oAPP.msg.M414);
                 parent.setDomBusy("");
                 return;
@@ -1986,9 +1987,13 @@ var oAPP = (function () {
             oBrowserOptions = _deepClone(oDefaultOption.browserWindow);
         oBrowserOptions.title = oAPP.msg.M415;
         oBrowserOptions.autoHideMenuBar = true;
+        // [공통 헤더] 네이티브 타이틀바 제거 → 공통 .u4a-titlebar(메인 창과 동일)로 대체(프레임리스).
+        oBrowserOptions.titleBarStyle = "hidden";
         oBrowserOptions.parent = CURRWIN;
+        // [흰 플래시 방지 ①] 창 배경을 테마색으로 → 첫 OS 페인트부터 테마색.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 표준] 네이티브 opacity 페이드(setBrowserOpacity) 미사용 — 프레임리스에선 복원 안 돼 안 보임.
+        //   show:false 로 만들고 콘텐츠 준비 시 frame.html 이 CURRWIN.show(). (aboutU4APopup 동일)
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
         oBrowserOptions.webPreferences.partition = SESSKEY;
@@ -1998,20 +2003,25 @@ var oAPP = (function () {
         const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
         oBrowserWindow.setMenu(null);
+        // 공통 프레임리스 셸(frame.html) 로드 — 매뉴얼(KO/EN index.html)은 셸 내부 iframe 으로 호스팅.
+        const sFramePath = PATH.join(sHelpRoot, "frame.html");
         const oQueryParams = {
             browserkey: oBrowserOptions?.webPreferences?.browserkey,
             sessionKey: oBrowserOptions?.webPreferences?.partition,
-            OBJTY: sPopupName
+            OBJTY: sPopupName,
+            TITLE: oBrowserOptions.title || "",
+            THEME: oThemeInfo.THEME || "",
+            BGCOL: oThemeInfo.BGCOL || "",
+            LANGU: sLangDir
         };
-        const sLoadUrl = WSUTIL.QueryString.build(sHelpLanguPath, oQueryParams);
+        const sLoadUrl = WSUTIL.QueryString.build(sFramePath, oQueryParams);
         oBrowserWindow.loadURL(sLoadUrl);
         oBrowserWindow.once('ready-to-show', () => { WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow); });
         oBrowserWindow.webContents.on('did-finish-load', function () {
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
             parent.setDomBusy("");
-            oBrowserWindow.closable = true;
-            oBrowserWindow.show();
+            // 표시는 frame.html 이 iframe(매뉴얼) 로드 후 CURRWIN.show() 로 수행(흰 플래시 방지).
+            try { oBrowserWindow.closable = true; } catch (e) { }
         });
         oBrowserWindow.on('closed', () => { oBrowserWindow = null; CURRWIN.focus(); });
     }

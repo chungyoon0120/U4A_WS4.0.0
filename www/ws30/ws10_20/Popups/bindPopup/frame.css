@@ -358,6 +358,15 @@ body {
 .u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row.u4aBwpDropRow .u4aColTreeC4 {
     background-image: linear-gradient(var(--state-info-bg), var(--state-info-bg));
 }
+/* ★ 오류 행의 고정 액션칸도 오류 빨강으로 덮는다 — 원본(#FF6347 !important)은 행 전체 폭(액션 거터 포함)을
+   빨강으로 덮어 선택(파랑)이 안 보였다. HTML5 고정 액션셀은 불투명 유지를 위해 자기 background 를 칠해
+   행의 background:!important 가 닿지 않으므로, 셀에도 직접 오류색을 얹어 선택 파랑·surface 가 새지 않게 한다.
+   맨 뒤에 둬 hover/DropOk/선택/DropRow 를 모두 이긴다(행 본문 !important 와 동일 우선순위).
+   장군님 지적 2026-07-30 "오류 행에 파랑+빨강 섞임". */
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row.u4aBwpRow--error .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row.u4aBwpRow--error .u4aColTreeC4 {
+    background-image: linear-gradient(var(--state-error-bg), var(--state-error-bg));
+}
 
 /* ===== 툴바 텍스트+아이콘 버튼(공통 .u4a-btn 소비) — 라벨 있는 액션 =====
    원본 sap.m.Button(type Accept/Emphasized/Reject). 파랑(Emphasized)·빨강(Reject/negative)은 공통
