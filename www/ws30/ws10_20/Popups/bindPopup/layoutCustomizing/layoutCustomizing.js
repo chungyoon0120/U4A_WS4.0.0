@@ -184,7 +184,8 @@
         oHelp.innerHTML = H.fa("circle-question");
         oHelp.title = H.z("198");
         oHelp.addEventListener("click", function () {
-            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+            // [B4] 레이아웃 커스터마이징 다이얼로그 도움말 문서 "000281"(원본 index.js:3121). 영역별 라우팅.
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000281"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
         });
         oHead.appendChild(oHelp);
 

@@ -95,26 +95,42 @@
         var d = (oEvent && oEvent.data) || {};
         if (d.PRCCD !== "UPDATE_DESIGN_DATA") { return; }
 
+        // ★ 이 경로가 "WS20 캔버스/ROOT UI를 팝업 가운데로 드롭" 시 실제 재구성 경로다(창간 native 드래그가 못 넘어
+        //   WS20 이 UPDATE_DESIGN_DATA 를 방송, bindBroadcast.js:7). 드롭 즉시 busy ON.
         oAPP.fn.setBusy(true);
 
-        // 광역변수 갱신(원본).
+        // [원본 updateDesignData:256 closeAllPopups] 재구성 前 열린 오류 팝오버 닫기(사라질 행에 앵커된 stale 방지).
+        //   live 대응 = closeMessagePopover(원본 closeAllPopups 는 툴팁/F4 포함이나 팝업서 상시 열림은 오류 팝오버뿐).
+        if (typeof oAPP.fn.closeMessagePopover === "function") { try { oAPP.fn.closeMessagePopover(); } catch (e) { } }
+
+        // 광역변수 갱신(원본) — 즉시 세팅(다른 코드가 oAPP.attr.T_00xx 를 읽으므로 지연 금지).
         oAPP.attr.T_0014 = JSON.parse(JSON.stringify(d.T_0014 || []));
         oAPP.attr.T_0015 = JSON.parse(JSON.stringify(d.T_0015 || []));
         oAPP.attr.T_CEVT = JSON.parse(JSON.stringify(d.T_CEVT || []));
 
-        // 추가속성 화면 비활성 — 원본 setAdditLayout("", {KEEP_SPLITTER_SIZE:true}). 필수 호출 직접(삼킴 제거).
-        oAPP.fn.setAdditLayout("", { KEEP_SPLITTER_SIZE: true });
-
-        // 디자인 트리 재구성(재렌더 + 컬럼맞춤 포함).
-        oAPP.fn.setDesignTreeData();
-
-        // 추가속성 리스트 재구성 — ★oAPP.attr.oAddit 는 라이브 미할당(죽은 네임스페이스)이던 것 → oAPP.fn 으로 복구.
-        oAPP.fn.setAdditialListData();
-
-        // ★ WS20 잠금 해제(불변 계약) — 처리 완료를 알린다.
-        _sendDesignAreaBusyOff();
-
-        oAPP.fn.setBusy(false);
+        // ★ 동기 재구성은 오버레이가 페인트될 틈이 없다 → rAF 2틱(페인트 1회 확보) 뒤 재구성한다(#bwpBusy 페이드 제거와 함께
+        //   비로소 보임). ★불변계약(§3.11/[[broadcast-busy-pair]]): WS20 잠금해제(BUSY_OFF)·로컬 setBusy(false)는
+        //   "처리 후"에 보내야 하므로 지연 콜백 안에서 호출(예외 시에도 finally 로 보장 — WS20 영구 busy 방지).
+        var _fnRebuild = function () {
+            try {
+                // 추가속성 화면 비활성 — 원본 setAdditLayout("", {KEEP_SPLITTER_SIZE:true}). 필수 호출 직접(삼킴 제거).
+                oAPP.fn.setAdditLayout("", { KEEP_SPLITTER_SIZE: true });
+                // 디자인 트리 재구성(재렌더 + 컬럼맞춤 포함).
+                oAPP.fn.setDesignTreeData();
+                // 추가속성 리스트 재구성 — ★oAPP.attr.oAddit 는 라이브 미할당(죽은 네임스페이스)이던 것 → oAPP.fn 으로 복구.
+                oAPP.fn.setAdditialListData();
+            } catch (e) {
+                console.error("[HTML5][bindWindow] UPDATE_DESIGN_DATA 재구성 오류:", e && e.message);
+            } finally {
+                _sendDesignAreaBusyOff();   // WS20 잠금 해제(불변 계약) — 처리 완료 후 반드시.
+                oAPP.fn.setBusy(false);
+            }
+        };
+        if (typeof requestAnimationFrame === "function") {
+            requestAnimationFrame(function () { requestAnimationFrame(_fnRebuild); });
+        } else {
+            _fnRebuild();
+        }
     }
 
     /************************************************************************

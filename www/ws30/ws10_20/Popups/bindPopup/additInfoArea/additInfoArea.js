@@ -113,7 +113,8 @@
                 if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
             }));
             oA.MAIN.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
-                if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+                // [B4] 추가속성 도움말 문서 "000274"(원본 bindAdditInfo.js:348). 영역별 라우팅.
+                if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000274"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
             }));
             oAPP.fn.attachToolOverflow(oA.MAIN.tool);
 
@@ -652,7 +653,8 @@
             return;
         }
 
-        var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("089"));
+        // 166+089 확인 + 219 "추가 속성 바인딩 진행" — 확인창 동안 WS20 busy(원본 onMultiAdditionalBind bindAdditInfo.js:167·170).
+        var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("089"), H.z("219"));
         if (!_ok) { return; }
 
         var _MPROP = oAPP.fn.setAdditBindData(_rows(oA.MAIN));
@@ -660,15 +662,30 @@
         oAPP.fn.toast(H.z("090"));
     };
 
-    function _confirmAdditApply(sMsg) {
+    // sBusyDesc 주면 원본 동작 재현: 확인창 뜨는 즉시 WS20 busy 다이얼로그(진행 메시지) ON → 확인창 동안 유지(팝업만 끔)
+    //   → 취소면 WS20+팝업 해제 / 확인이면 유지(성공 후 방송 왕복이 해제). 근거=메모리 ws20-busy-dialog-during-popup-confirm.
+    function _confirmAdditApply(sMsg, sBusyDesc) {
+        if (sBusyDesc) { oAPP.fn.setBusyWS20Interaction(true, { DESC: sBusyDesc }); }
         return new Promise(function (resolve) {
             U4AUI.confirm({
                 type: "C", message: sMsg,
                 buttons: [{ act: "YES", label: H.cl("A03"), emphasized: true }, { act: "NO", label: H.cl("A39") }],
-                onClose: function (sAct) { resolve(sAct === "YES"); }
+                onClose: function (sAct) {
+                    if (sBusyDesc) {
+                        oAPP.fn.setBusy(true, { ISBROAD: true });   // 팝업 재-ON(WS20 재방송 없음).
+                        if (sAct !== "YES") { oAPP.fn.setBusyWS20Interaction(false, {}); }   // 취소 → WS20+팝업 OFF.
+                    }
+                    resolve(sAct === "YES");
+                }
             });
+            if (sBusyDesc) { oAPP.fn.setBusy(false, { ISBROAD: true }); }   // 확인창 표시 직후 팝업만 OFF(WS20 유지).
         });
     }
+
+    // (GAP1 되돌림 2026-08-05) checkAdditData 는 원본 index.js:8380 에 코드로는 존재하나, 런타임에 이 케이스
+    //   (Conversion Routine 오류)를 실제로 막지 않음(장군님 실물 확인 — 오류 상태에서도 좌측 드래그 바인딩됨).
+    //   "코드 존재 ≠ 동작"이라 원본 파리티가 아님 → 함수 미정의 상태 유지(modelFieldArea:242 typeof 가드 = 무동작).
+    //   [[audit-logic-and-wiring-not-just-name]] 위반(런타임 미검증)이라 취소.
 
     /************************************************************************
      * [중앙하단 레이아웃] setAdditLayout — 원본 index.js:6052(BULK) 1:1.

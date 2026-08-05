@@ -84,7 +84,8 @@
         }));
         // 198 Help — 도움말 문서(원본 onHelp = U4A_HELP_DOC_OPEN 브로드캐스트)는 통신 단계(Stage6)에서 배선.
         oM.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {  // 198 Help
-            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+            // [B4] 모델필드 도움말 문서 "000276"(원본 index.js:4872). 영역별 라우팅.
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000276"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
         }));
 
         // 패널 좁아질 때 넘치는 버튼을 ⋯ 오버플로 메뉴로(16 §11, 공통 attachOverflow).
@@ -338,6 +339,9 @@
             return;
         }
 
+        // ★ 초기 로드 busy 소유권 표식 — 부트에서 _finishOpen 이 이 로드 완료 전에 busy 를 끄지 않도록(frame.js _finishOpen).
+        //   원본 UIUpdated(index.js:3603 ON → finally 3651 OFF)가 로드~렌더 전체를 감싼 것과 동일 취지.
+        oAPP.attr.isBindLoading = true;
         oAPP.fn.setBusy(true);
 
         var oFormData = new FormData();
@@ -394,6 +398,7 @@
                 console.error("[HTML5][bindWindow] 모델필드 로드 처리 오류:", e && e.message);
                 oM.ctrl.rerender();
             } finally {
+                oAPP.attr.isBindLoading = false;
                 oAPP.fn.setBusy(false);
             }
         });

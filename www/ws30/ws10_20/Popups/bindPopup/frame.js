@@ -159,16 +159,20 @@ oAPP.common.checkWLOList = function (REGTYP, CHGOBJ) {
 /****************************************************************************
  * [P6] 도움말(198) — 원본 index.js oAPP.fn.onHelp 1:1.
  *   v3.6.0_00004+ 부터 도움말 HTML 을 U4A HELP DOCUMENT 로 통합 → WLO(C/UHAK901369) 등록 시
- *   WS20 디자인 영역에 팝업 호출을 방송 요청(startMenuId "000276")하고 종료한다.
+ *   WS20 디자인 영역에 팝업 호출을 방송 요청(startMenuId)하고 종료한다.
+ *   ★ 영역별 도움말 문서 ID(원본): 모델필드 "000276"(index.js:4872) · 디자인트리 "000275"(designTree.js:2696)
+ *     · 추가속성 "000274"(bindAdditInfo.js:348) · 레이아웃 커스터마이징 "000281"(index.js:3121)
+ *     · 동기화 "000277"(synchronizionBind.js:796). 호출부가 자기 영역 ID 를 넘긴다(미지정=모델필드 276 하위호환).
  *   ★ busy 는 켠 채로 둔다(원본 동일) — WS20 이 도움말을 띄우고 BUSY_OFF 를 되돌려줘야 풀린다.
  *   ★ WLO 미등록(구버전) 경로 = utils/callTooltipsPopup.js(로컬 도움말 HTML). 별창 + CJS(module.exports)
  *     제약으로 미이식 — 해당 시스템에선 도움말이 뜨지 않는다(P6 잔여, 보고 대상).
  ****************************************************************************/
-oAPP.fn.onHelp = function () {
+oAPP.fn.onHelp = function (sStartMenuId) {
+    var _sMenuId = sStartMenuId || "000276";   // 미지정 = 모델필드 문서(하위호환).
     if (oAPP.common.checkWLOList("C", "UHAK901369") === true) {
         oAPP.fn.setBusy(true, { ISBROAD: true });
         if (typeof oAPP.fn.sendHelpDocOpen === "function") {
-            oAPP.fn.sendHelpDocOpen({ opstion: { startMenuId: "000276" } });
+            oAPP.fn.sendHelpDocOpen({ opstion: { startMenuId: _sMenuId } });
         } else {
             console.error("[HTML5][bindWindow] onHelp: sendHelpDocOpen 없음 — 방송 미배선");
             oAPP.fn.setBusy(false);
@@ -245,7 +249,10 @@ function _finishOpen() {
     bOpenDone = true;
     try { clearTimeout(iBusyWatch); } catch (e) { }
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { }
-    _setBusy(false);
+    // ★ 초기 모델트리 로드가 진행 중이면 busy 를 끄지 않는다 — loadBindData 가 비동기 ajax 를 던진 직후
+    //   부트가 여기로 오므로, 여기서 끄면 로드~렌더 구간이 무오버레이가 된다(장군님 지적 2026-08-03 "대량 로드 시 busy 안 뜸").
+    //   로드의 finally(modelFieldArea loadBindData)가 렌더 완료 후 busy 를 끈다. 원본 UIUpdated 가 로드~렌더를 감싼 것과 동일.
+    if (!(oAPP.attr && oAPP.attr.isBindLoading)) { _setBusy(false); }
     var oShell = document.getElementById("bwpShell");
     if (oShell) { oShell.classList.add("u4aBwpShown"); }
 }
@@ -384,6 +391,8 @@ function _bootApp() {
         if (typeof oAPP.fn.loadBindData === "function") { oAPP.fn.loadBindData(); }
     } catch (e) {
         console.error("[HTML5][bindWindow] 앱 기동 오류:", e && e.message);
+        // 기동 중 예외로 loadBindData 콜백 finally 가 안 돌 수 있음 → 로드 표식 해제해 아래 _finishOpen 이 busy 를 끄게(무한 busy 방지).
+        try { oAPP.attr.isBindLoading = false; } catch (x) { }
     }
     _finishOpen();
 }

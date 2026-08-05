@@ -151,6 +151,9 @@
             _place(oPop, oTarget);
 
             // 바깥 클릭 / 리사이즈 → 닫기(앵커 오버레이 재배치 규칙).
+            //   ★ [판단 08-05] 원본 sap.m.MessagePopover 는 성공/입력 시 팝오버를 안 닫아(원본 코드에 닫기 없음)
+            //     재적용 성공해도 오류목록이 남는 결함이 있다. HTML5 는 바깥클릭 자동닫힘 + 닫힘 시 _clearError(빨강 해제)로
+            //     그 결함을 보정한다(장군님 결정: "자동으로 닫아주면서 오류도 사라지는 이전이 낫다"). = 원본과 의도적 상이.
             fnOnDocDown = function (ev) {
                 if (ev && ev.type === "mousedown" && oPop && oPop.contains(ev.target)) { return; }
                 oAPP.fn.closeMessagePopover();

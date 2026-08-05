@@ -207,6 +207,10 @@ body {
 /* 드래그 중 커서/iframe 차단은 공통 wireSplitter(body.style.cursor) + 전역 body.u4a-dragging 이 담당. */
 
 /* busy 오버레이는 공통 .u4a-busy(shell.css) 소비 — data-busy 로 표시 토글. */
+/* ★ 즉시 표시(스코프 override, 공통 미수정): 공통 .u4a-busy 는 opacity 를 var(--motion)(~0.25s) 페이드인한다.
+   디자인 트리 재구성 같은 수십ms 짧은 busy 는 페이드가 완성되기 전에 꺼져 화면에 안 보였다(장군님 DA1 "전혀 안뜸").
+   이 팝업은 짧은 동기 작업이 많아 페이드를 제거해 켜는 즉시 풀 오버레이가 뜨게 한다(끌 때도 즉시). 카드 등장 애니는 유지. */
+#bwpBusy { transition: none; }
 
 /* 다열 그리드 트리테이블(.u4aColTree*) = 공통 컴포넌트 → theme/shell.css 로 이관(U4AUI.makeColumnTree 스킨).
  *   2026-07-08 공통 승격. 대형 별창·소형 callBindPopup 이 같은 컴포넌트를 소비한다. 여기서 재정의 금지. */
@@ -223,6 +227,13 @@ body {
    원본은 배경만(#FF6347 !important). HTML5는 hex 금지 → 의미 토큰 배경 + 좌측바(하단 추가속성 오류행과 통일).
    ★ !important = 원본과 동일 — hover/zebra/선택 배경이 오류 빨강을 덮지 않게(장군님 지적 2026-07-30 hover 시 사라짐). */
 .u4aBwpRow--error { box-shadow: inset 0.1875rem 0 0 var(--state-error); background: var(--state-error-bg) !important; }
+/* 오류 우선: 오류 행은 선택돼도 앞쪽 세로줄·배경을 빨강으로 유지(공통 shell.css:491 선택 accent 파랑을
+   specificity 로 덮음 → !important 로 확정). 장군님 지시 — 오류>선택 우선. */
+.u4a-tree__row.u4aBwpRow--error[aria-selected="true"],
+.u4a-tree__row.u4aBwpRow--error[aria-selected="true"]:hover {
+    box-shadow: inset 0.1875rem 0 0 0 var(--state-error) !important;
+    background: var(--state-error-bg) !important;
+}
 
 /* 유형(아이콘+텍스트)/설명 셀 콘텐츠 — 말줄임. */
 .u4aBwpTypeWrap { display: flex; align-items: center; gap: 0.375rem; min-width: 0; overflow: hidden; }

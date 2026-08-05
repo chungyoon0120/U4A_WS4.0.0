@@ -240,14 +240,26 @@
      ************************************************************************/
     oAPP.fn.onUnbind = function (n) {
         if (!n) { return; }
+        // ★ [원본 onUnbind designTree.js:1457] 해제 버튼 즉시 busy ON(DESC=222 "바인딩 해제 진행 중").
+        //   setBusyWS20Interaction(_, sOption) 이 broadcast-to-child-window 로 BUSY_ON(TYPE:DIALOG) 을 쏴
+        //   WS20 이 자기 busy 다이얼로그를 띄운다(ws_fn_broad.js:26 → parent.setBusy). → 확인창 동안 WS20 잠금.
+        oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("222") });
         // 185 Do you want to continue unbind?
         U4AUI.confirm({
             type: "C",
             message: H.z("185"),
             buttons: [{ act: "YES", label: H.cl("A03"), emphasized: true }, { act: "NO", label: H.cl("A39") }],
             onClose: function (sAct) {
-                if (sAct !== "YES") { return; }
-
+                // 원본 1506: onClose 시 팝업 busy 재-ON(WS20 는 계속 잠김). ISBROAD=팝업만(WS20 재방송 없음).
+                oAPP.fn.setBusy(true, { ISBROAD: true });
+                if (sAct !== "YES") {
+                    // 원본 1535: 취소 → WS20 BUSY_OFF(방송) + 팝업 OFF.
+                    oAPP.fn.setBusyWS20Interaction(false, {});
+                    return;
+                }
+                // 성공 경로는 자기해제 금지(§3.11, 원본 1595) — attrSetUnbindProp→attrChange→designBroadcastUpdate
+                //   (WS20 왕복, UIATY 1·3 항상 발생 확인) 후 _updateDesignData 가 팝업 setBusy(false)+_sendDesignAreaBusyOff
+                //   (oChannel BUSY_OFF)로 팝업·WS20 을 함께 해제한다.
                 oAPP.fn.resetErrorField();   // [표준] 필수 호출 직접(삼킴 제거).
 
                 switch (n.UIATY) {
@@ -276,6 +288,10 @@
                 oAPP.fn.toast(H.z("153"));
             }
         });
+        // 원본 1522: 확인창 표시 직후 "팝업 busy 만" OFF(WS20 잠금은 유지) → 확인창 상호작용 가능.
+        //   ★ISBROAD=true 로 WS20 에 BUSY_OFF 를 방송하지 않는다 — HTML5 setBusyWS20Interaction(false) 은
+        //   인자 없어도 방송해 WS20 이 풀려버리므로(원본은 sOption 있을 때만 방송), 팝업만 끄려면 이 경로를 쓴다.
+        oAPP.fn.setBusy(false, { ISBROAD: true });
     };
 
     /************************************************************************
@@ -524,7 +540,8 @@
         if (_aTree.findIndex(function (it) { return it.UIATV !== "" && it.UIATY === "3"; }) !== -1) {
             _msg = H.z("181") + H.z("182");   // 181 자식 바인딩 초기화 경고 + 182 계속?
         }
-        var _ok = await _confirmAdditApply(_msg);
+        // 224 "멀티 바인딩 처리를 진행하고 있습니다" — 확인창 동안 WS20 busy 다이얼로그(원본 onMultiBind:2291·2294).
+        var _ok = await _confirmAdditApply(_msg, H.z("224"));
         if (!_ok) { return; }
 
         for (var i = 0; i < _aTree.length; i++) {
@@ -561,8 +578,8 @@
         if (_sRes.RETCD === "E") { await _showErr(oAnchor, _sRes); return; }
 
         var _aTree = oAPP.fn.getSelectedDesignTree();
-        // 166 &1건 선택 + 167 해제 진행 확인.
-        var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("167"));
+        // 166 &1건 선택 + 167 해제 진행 확인. 223 "멀티 바인딩 해제 진행" — 확인창 동안 WS20 busy(원본 onMultiUnbind:2089·2092).
+        var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("167"), H.z("223"));
         if (!_ok) { return; }
 
         for (var i = 0; i < _aTree.length; i++) {
@@ -588,6 +605,9 @@
         oAPP.fn.clearSelectAdditBind();
         oAPP.fn.setAdditLayout("");
         _refreshDesignTree();
+        // ★ 원본 onMultiUnbind:2244 bindPossible(_sTree) — 좌측 모델필드 바인딩 가능여부 재판정(마지막 해제행 기준).
+        //   onUnbind(위 285)에는 있으나 멀티 해제엔 누락됐던 것 복원(2026-08-04 감사). _sTree=루프 마지막 값(var 스코프).
+        oAPP.fn.bindPossibleRecompute(_sTree);
         oAPP.fn.toast(H.z("155"));   // 155 멀티 해제 완료.
     };
 
@@ -628,14 +648,27 @@
         return aSel;
     };
 
-    // 적용 확인창(원본 MessageBox.confirm 089) — 공통 U4AUI.confirm. Promise<bool>.
-    function _confirmAdditApply(sMsg) {
+    // 적용 확인창(원본 MessageBox.confirm) — 공통 U4AUI.confirm. Promise<bool>.
+    //   ★ sBusyDesc 주면 원본 동작 재현(각 핸들러 setBusyWS20Interaction(true,{DESC})→confirm→취소 OFF, 성공은 왕복 위임):
+    //     확인창 뜨는 즉시 WS20 busy 다이얼로그(진행 메시지) ON → 확인창 동안 유지(팝업만 끔) → 취소면 WS20+팝업 해제 /
+    //     확인이면 유지(성공 후 방송 왕복이 해제). 근거·시퀀스 = 메모리 ws20-busy-dialog-during-popup-confirm.
+    //     sBusyDesc 없으면 기존대로 busy 없음(하위호환).
+    function _confirmAdditApply(sMsg, sBusyDesc) {
+        if (sBusyDesc) { oAPP.fn.setBusyWS20Interaction(true, { DESC: sBusyDesc }); }   // 진입: WS20 다이얼로그 + 팝업 ON
         return new Promise(function (resolve) {
             U4AUI.confirm({
                 type: "C", message: sMsg,
                 buttons: [{ act: "YES", label: H.cl("A03"), emphasized: true }, { act: "NO", label: H.cl("A39") }],
-                onClose: function (sAct) { resolve(sAct === "YES"); }
+                onClose: function (sAct) {
+                    if (sBusyDesc) {
+                        oAPP.fn.setBusy(true, { ISBROAD: true });   // 팝업 재-ON(원본 onClose). ISBROAD=WS20 재방송 없음.
+                        if (sAct !== "YES") { oAPP.fn.setBusyWS20Interaction(false, {}); }   // 취소 → WS20+팝업 OFF.
+                    }
+                    resolve(sAct === "YES");
+                }
             });
+            // 확인창 표시 직후 "팝업만" OFF(WS20 잠금 유지) — ISBROAD 로 WS20 에 BUSY_OFF 방송 안 함(원본 1522 대응).
+            if (sBusyDesc) { oAPP.fn.setBusy(false, { ISBROAD: true }); }
         });
     }
 
@@ -644,6 +677,8 @@
     oAPP.fn.onAdditionalBind = async function (n, oAnchor) {
         if (!n) { return; }
         // [G-4] 진입 시 오류표시 초기화(원본 onAdditionalBind:1679/1703 resetErrorField). 필수 호출 직접.
+        //   ※ 추가속성칸 오류마크(clearAdditErrorMark)는 여기서 안 지운다 — 팝오버 바깥클릭 자동닫힘 시
+        //     _clearError(showMessagePopover.js)가 이미 지운다(장군님 결정 08-05: 자동닫힘 UX 유지).
         oAPP.fn.resetErrorField();
         // ① 우측 입력 완결성.
         var _r1 = (typeof oAPP.fn.chkAdditBindData === "function") ? oAPP.fn.chkAdditBindData() : { RETCD: "" };
@@ -652,6 +687,7 @@
         var _r2 = (typeof oAPP.fn.chkPossibleAdditBind === "function") ? oAPP.fn.chkPossibleAdditBind(n) : { RETCD: "" };
         if (_r2.RETCD === "E") {
             n._bind_error = true; n._check_vs = "Error";   // [G-4] 원본 1713-1718(_check_vs + _style). 오류=_bind_error → rowHook 배경 + reset 해제.
+            n._error_tooltip = _r2.RTMSG;   // [원본 1718] 오류 라인 hover 툴팁 각인 → rowHook 이 data-tip 으로 렌더(누락 복원 2026-08-04).
             _refreshDesignTree();
             oAPP.fn.toast(_r2.RTMSG); return;
         }
@@ -660,7 +696,8 @@
         if (!_oUi || !_oUi._T_0015) { oAPP.fn.toast(H.z("106", n.OBJID)); return; }   // 106 UI 정보 없음.
         // ④ 기존 MPROP 있으면 재적용 확인(089).
         if (n.MPROP !== "") {
-            var _ok = await _confirmAdditApply(H.z("089"));
+            // 089 재적용 확인 + 219 "추가 속성 바인딩 진행" — 확인창 동안 WS20 busy(원본 onAdditionalBind:1652·1655).
+            var _ok = await _confirmAdditApply(H.z("089"), H.z("219"));
             if (!_ok) { return; }
         }
         // ⑤ 로컬 적용: 트리행 + _T_0015 stamp.
@@ -760,6 +797,8 @@
         // 추가속성 리스트 재구성 — ★oAPP.attr.oAddit 는 라이브 미할당(죽은 네임스페이스)이던 것 → oAPP.fn 으로 복구.
         oAPP.fn.setAdditialListData();
 
+        // ※ busy 는 이 함수가 아니라 호출부(drop 이벤트 핸들러 _wireDesignDrop)에서 드롭 즉시 ON→재구성 후 OFF 한다
+        //   — dataTransfer 유효구간(이벤트 내)에서 prc002 를 읽어야 하고, 페인트 확보(rAF)를 위해 호출부가 감싼다.
         return true;
     };
 
@@ -840,6 +879,24 @@
         oHost.addEventListener("drop", async function (ev) {
             ev.preventDefault();   // ★ preventDefault 는 await 前 동기 호출.
             _dropZone(false); _setDropRow(null);
+            // ★ 선별 금지 — 드롭 이벤트 진입 즉시 무조건 busy ON, 필요 없는 분기에서만 OFF(장군님 지시).
+            oAPP.fn.setBusy(true);
+            // dataTransfer 는 이 이벤트 안에서만 유효 → prc002 문자열 동기 판독.
+            var _prc002 = ev.dataTransfer.getData("prc002");
+            if (_prc002) {
+                // WS20 UI 드롭 → 트리 전체 재구성(로컬). 동기라 rAF 2틱(페인트 확보) 뒤 실행 → 완료/예외 시 OFF.
+                var _fnDrop = function () {
+                    try { oAPP.fn.dropDesignArea(_prc002); }
+                    catch (e) { console.error("[HTML5][bindWindow] dropDesignArea:", e && e.message); }
+                    finally { oAPP.fn.setBusy(false); }
+                };
+                if (typeof requestAnimationFrame === "function") {
+                    requestAnimationFrame(function () { requestAnimationFrame(_fnDrop); });
+                } else { _fnDrop(); }
+                return;
+            }
+            // 좌측 모델필드(prc001) 바인딩은 busy 왕복이 아직 미이식((B)군) → 여기선 OFF 후 위임(무한 busy 방지).
+            oAPP.fn.setBusy(false);
             try { await _onDesignDrop(ev); }
             catch (e) { console.error("[HTML5][bindWindow] 디자인트리 drop:", e && e.message); }
         });
@@ -1037,7 +1094,8 @@
             if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
         }));
         oD.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
-            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp(); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+            // [B4] 디자인트리 도움말 문서 "000275"(원본 designTree.js:2696). 영역별 라우팅.
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000275"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
         }));
 
         // 패널 좁아질 때 넘치는 버튼(동일속성/멀티/Unbind 등)을 ⋯ 오버플로 메뉴로(16 §11, 공통 attachOverflow).
@@ -1098,6 +1156,11 @@
                     oPath.setAttribute("role", "button"); oPath.tabIndex = 0;
                     oPath.addEventListener("click", function (e) {
                         e.stopPropagation();
+                        // [UX · 원본에 없음, 장군님 지시 2026-08-02] 바인딩 경로 링크 클릭도 테이블 행 클릭과
+                        //   동일 효과가 나게 — 그 행을 선택(selDesignNode+파랑+bindPossibleRecompute).
+                        //   ★select→패널 순서: 재계산이 먼저, 좌측 자동선택(C-15, onShowBindAdditInfo 내부)이 나중이라
+                        //   재계산 재렌더가 좌측 선택을 지우지 않는다. select 는 클릭 경로(oCfg.onSelect) 그대로 재사용.
+                        if (oD.ctrl && typeof oD.ctrl.select === "function") { oD.ctrl.select(n); }
                         if (typeof oAPP.fn.onShowBindAdditInfo === "function") { oAPP.fn.onShowBindAdditInfo(n); }
                     });
                 }
@@ -1114,8 +1177,20 @@
                 // 오류 행 = _bind_error 전용(원본 _style="u4aWsDesignTreeError" 대응). reset(_resetErrorFieldLine)이
                 //   _bind_error 를 지우므로 다음 동작 시 해제된다. 오류를 _highlight 에 얹으면 reset 이 못 지우거나
                 //   UI 줄 Success 까지 날리므로 분리(장군님 지적 2026-07-30 "언제 지워지나").
-                if (n._bind_error) { oRow.classList.add("u4aBwpRow--error"); }
-                else { var sHl = H.rowHl(n._highlight); if (sHl) { oRow.classList.add(sHl); } }
+                if (n._bind_error) {
+                    oRow.classList.add("u4aBwpRow--error");
+                    // [원본 designTree.js:4051~ tooltip="{_error_tooltip}"] 오류 라인 hover 시 검증 메시지 표시(누락 복원).
+                    //   ★ 공통 makeColumnTree 는 행에 data-tip-trunc-sel(이름 잘릴 때만 툴팁)을 건다(1130 tip 옵션).
+                    //     오류 툴팁은 이름 길이와 무관하게 항상 떠야 하므로 그 "잘릴 때만" 조건을 해제한다([GAP2] 배선 복원).
+                    if (n._error_tooltip) {
+                        oRow.setAttribute("data-tip", n._error_tooltip);
+                        oRow.removeAttribute("data-tip-trunc-sel");
+                        oRow.removeAttribute("data-tip-trunc");
+                    } else { oRow.removeAttribute("data-tip"); }
+                } else {
+                    oRow.removeAttribute("data-tip");
+                    var sHl = H.rowHl(n._highlight); if (sHl) { oRow.classList.add(sHl); }
+                }
                 oRow.__bwpNode = n;   // 드롭 대상 조회용(좌측 필드 → 이 행).
                 // [가상 선택강조] WS20(tree.js:595) 패턴 — 화면 소유 선택키(selDesignNode)로 매 빌드 aria-selected
                 //   재적용(공통 selKey 미동기라 가상 스크롤 재생성 시 강조 소실 방지).
