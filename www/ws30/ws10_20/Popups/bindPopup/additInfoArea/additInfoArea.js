@@ -99,6 +99,7 @@
             oBind.innerHTML = H.fa("layer-group");
             oBind.appendChild(document.createTextNode(H.z("098")));   // 098 추가 속성 바인딩
             oBind.title = H.z("098");
+            oBind.setAttribute("data-bwp-lock", "additbind");   // [S1a] setAdditBindButtonEnable 대상.
             if (bRO) { oBind.disabled = true; }
             oBind.addEventListener("click", function () {
                 if (typeof oAPP.fn.onMultiAdditionalBind === "function") {
@@ -108,10 +109,12 @@
             oA.MAIN.tool.appendChild(oBind);
             oA.MAIN.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
             oA.MAIN.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () { _fitCols(oA.MAIN); }));   // 161 컬럼최적화
-            oA.MAIN.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {   // 957 화면 커스터마이징
+            var _oGearAddit = H.iconBtn("gear", H.z("957"), function () {   // 957 화면 커스터마이징
                 if (oAPP.attr.editable === false) { return; }
                 if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
-            }));
+            });
+            _oGearAddit.setAttribute("data-bwp-lock", "layout-addit");   // [S1a] setLayoutCustomizingEditable 대상.
+            oA.MAIN.tool.appendChild(_oGearAddit);
             oA.MAIN.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
                 // [B4] 추가속성 도움말 문서 "000274"(원본 bindAdditInfo.js:348). 영역별 라우팅.
                 if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000274"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
@@ -142,6 +145,7 @@
             oApply.innerHTML = H.fa("check");
             oApply.appendChild(document.createTextNode(H.z("139")));   // 139 추가속성적용
             oApply.title = H.z("139");
+            oApply.setAttribute("data-bwp-lock", "edit");   // [S1a] setViewEditable(edit) 주 대상 = 중앙하단 적용버튼.
             if (!oAPP.attr.editable) { oApply.disabled = true; }
             oApply.addEventListener("click", function () {
                 if (typeof oAPP.fn.applyDesignAdditBind === "function") {

@@ -60,9 +60,11 @@
             if (oM.ctrl && oM.ctrl.tree && oM.ctrl.tree.collapseAll) { oM.ctrl.tree.collapseAll(); }
         }));
         oM.tool.appendChild(H.el("span", "u4aBwpToolSep"));
-        oM.tool.appendChild(_btn("rotate", H.z("171"), H.z("171"), "u4a-btn--emphasized", function () {  // 171 Refresh
+        var _oRefreshBtn = _btn("rotate", H.z("171"), H.z("171"), "u4a-btn--emphasized", function () {  // 171 Refresh
             oAPP.fn.loadBindData();
-        }));
+        });
+        _oRefreshBtn.setAttribute("data-bwp-lock", "refresh");   // [S1a] setViewEditable(edit_refresh) 대상.
+        oM.tool.appendChild(_oRefreshBtn);
         oM.tool.appendChild(_spacer());
         // 161 컬럼최적화 — 리사이즈바 더블클릭과 ★완전 동일★한 순수 autofit(잔여폭 흡수 없음).
         //   원본 setUiTableAutoResizeColumn 1:1. 채움(fitTreeColumns)은 레이아웃 변경 전용.
@@ -78,10 +80,12 @@
             if (window.U4AUI && U4AUI.reclampSplitters) { U4AUI.reclampSplitters(); }
         }));
         // 957 화면 커스터마이징 — 3영역(바인딩필드/DESIGN TREE/추가속성) 표시·숨김 팝업(원본 좌측 툴바).
-        oM.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {
+        var _oGearMain = H.iconBtn("gear", H.z("957"), function () {
             if (oAPP.attr.editable === false) { return; }   // 원본 enabled="{/edit_layout_customizing}"
             if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
-        }));
+        });
+        _oGearMain.setAttribute("data-bwp-lock", "layout-main");   // [S1a] setViewEditable(edit_layout_customizing) 대상.
+        oM.tool.appendChild(_oGearMain);
         // 198 Help — 도움말 문서(원본 onHelp = U4A_HELP_DOC_OPEN 브로드캐스트)는 통신 단계(Stage6)에서 배선.
         oM.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {  // 198 Help
             // [B4] 모델필드 도움말 문서 "000276"(원본 index.js:4872). 영역별 라우팅.

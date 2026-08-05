@@ -57,6 +57,8 @@ var oAPP = {};
 oAPP.fn = {};
 oAPP.ui = {};
 oAPP.attr = {};
+// [S1a §5.1-6] 동일속성 바인딩 화면 활성 플래그(원본 oAPP.attr.bSyncEqualityScreenActive). 기본 false.
+oAPP.attr.bSyncEqualityScreenActive = false;
 oAPP.common = {};
 oAPP.types = {};
 
@@ -180,6 +182,48 @@ oAPP.fn.onHelp = function (sStartMenuId) {
         return;
     }
     console.warn("[HTML5][bindWindow] onHelp: WLO(UHAK901369) 미등록 — 구버전 tooltip 팝업 경로 미이식(P6 잔여)");
+};
+
+/****************************************************************************
+ * [S1a §5.1-6] 동일속성 바인딩 화면 진입/복귀 잠금 3종.
+ *   원본은 UI5 모델플래그(edit/edit_refresh/edit_layout_customizing/edit_additbind)를 컨트롤
+ *   enabled 에 자동바인딩했다. HTML5-live 는 각 버튼 DOM(data-bwp-lock)의 .disabled 로 직접 토글.
+ *   ★ live 잠금 대상은 렌더 시 정적 editable 로 굳으므로 플래그만 뒤집으면 안 바뀐다("코드 존재≠동작")
+ *     → 반드시 DOM 을 직접 토글한다.
+ *   대상(data-bwp-lock):
+ *     · "edit"        = 중앙하단 추가속성 적용(139)      … 원본 index.js:4296 {/edit}
+ *     · "refresh"     = 좌측 모델트리 갱신(171)          … 원본 index.js:4044 {/edit_refresh}
+ *     · "layout-main" = 좌측/메인 커스터마이징 기어(957) … 원본 index.js:3070 {/edit_layout_customizing}
+ *     · "additbind"   = 우측 추가속성 바인딩(098)        … 원본 bindAdditInfo.js setAdditBindButtonEnable
+ *     · "layout-addit"= 우측 커스터마이징 기어(957)      … 원본 bindAdditInfo.js setLayoutCustomizingEditable
+ *   ★ 좌측 드래그는 대상 아님(원본 DragInfo enabled=생성 시 상수, index.js:4364).
+ ****************************************************************************/
+function _bwpToggleLock(sKind, bEnable) {
+    try {
+        var aEl = document.querySelectorAll('[data-bwp-lock="' + sKind + '"]');
+        for (var i = 0; i < aEl.length; i++) { aEl[i].disabled = !bEnable; }
+    } catch (e) { console.error("[HTML5][bindWindow] _bwpToggleLock(" + sKind + "):", e && e.message); }
+}
+
+// 메인 화면 잠금/해제 — 원본 index.js:8015 setViewEditable(bLock). bLock=true 활성 / false 잠금.
+//   edit(중앙하단 적용) + edit_refresh(좌측 갱신) + edit_layout_customizing(좌측 기어). ★드래그 제외.
+oAPP.fn.setViewEditable = function (bLock) {
+    if (oAPP.attr.editable !== true) { return; }   // 원본 IS_EDIT==="" → exit(조회모드는 이미 잠김).
+    _bwpToggleLock("edit", bLock);
+    _bwpToggleLock("refresh", bLock);
+    _bwpToggleLock("layout-main", bLock);
+};
+
+// 우측 추가속성 바인딩 버튼 활성/비활성 — 원본 bindAdditInfo.js setAdditBindButtonEnable.
+//   ★ 조회모드(IS_EDIT!=="X")면 원본처럼 무조건 비활성(원본 _setAdditBindButtonEnable 112~115).
+oAPP.fn.setAdditBindButtonEnable = function (bEnable) {
+    if (oAPP.attr.editable !== true) { _bwpToggleLock("additbind", false); return; }
+    _bwpToggleLock("additbind", bEnable);
+};
+
+// 우측 커스터마이징 기어 활성/비활성 — 원본 bindAdditInfo.js setLayoutCustomizingEditable.
+oAPP.fn.setLayoutCustomizingEditable = function (bEnable) {
+    _bwpToggleLock("layout-addit", bEnable);
 };
 
 // SYSID 별 테마 JSON(theme_ws4) — 라이브 테마 변경 추종용.
