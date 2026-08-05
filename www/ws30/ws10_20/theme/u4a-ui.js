@@ -1539,7 +1539,11 @@
         function _toggleVirtual(node) {
             const bOpen = _isExpanded(node, 0);
             if (_onToggle) { _onToggle(node, !bOpen, null); }
-            else { const k = _key(node); if (k !== "") { _expanded[k] = !bOpen; } }
+            // ★ 접기 = 자손까지 재귀 접힘(WS20식 표준 — 비가상 _toggle:1439 와 동일. 재오픈해도 자손은 접힌 상태).
+            //   가상 경로에만 이 처리가 빠져 있어(도입부터) 재오픈 시 자손이 다 펼쳐지던 것을 비가상과 일치시킴.
+            //   외부 펼침맵(_onToggle) 소비처는 그쪽이 자손 접힘을 관리(앱검색 _collapseDesc 등)하므로 위 분기로 위임.
+            else if (bOpen) { _collapseRec(node); }
+            else { const k = _key(node); if (k !== "") { _expanded[k] = true; } }
             _renderVirtual(true);
         }
         // 가상 스크롤 컨테이너 = 명시 지정(cfg.scrollContainer) 우선, 미지정 시 기존대로 ul 부모(하위호환).

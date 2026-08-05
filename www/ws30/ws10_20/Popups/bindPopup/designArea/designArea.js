@@ -198,10 +198,28 @@
         return r;
     }
 
-    // 드롭 위치 tree 노드(원본 _getContextData) — 이벤트 target 의 행에서 __bwpNode.
+    // 필터(_filterDesignRoots) 상태에선 렌더 노드가 Object.assign 복사본이라 원본 designTree 의 라이브 상태
+    //   (_drop_enable · 바인딩 결과)와 분리된다 → CHILD 로 원본 노드를 되찾아 드롭 판정·쓰기·하이라이트에 쓴다.
+    function _designNodeByChild(sChild) {
+        if (!sChild) { return undefined; }
+        var oFound;
+        (function rec(a) {
+            if (!a || oFound) { return; }
+            for (var i = 0; i < a.length; i++) {
+                if (a[i].CHILD === sChild) { oFound = a[i]; return; }
+                rec(a[i].zTREE_DESIGN);
+                if (oFound) { return; }
+            }
+        })(oAPP.attr.designTree || []);
+        return oFound;
+    }
+    // 렌더 노드(필터 시 복사본) → 원본 노드. 못 찾으면(비필터=이미 원본) 그대로.
+    function _srcNode(n) { return n ? (_designNodeByChild(n.CHILD) || n) : n; }
+
+    // 드롭 위치 tree 노드(원본 _getContextData) — 이벤트 target 의 행에서 __bwpNode → 원본 노드.
     function _dropNodeOf(ev) {
         var oRow = (ev.target && ev.target.closest) ? ev.target.closest(".u4a-tree__row") : null;
-        return oRow ? oRow.__bwpNode : undefined;
+        return oRow ? _srcNode(oRow.__bwpNode) : undefined;
     }
 
     // design tree 라인 오류 필드 초기화(원본 _resetErrorFieldLine 1:1).
@@ -864,7 +882,7 @@
             // ② 좌측 모델필드 드래그(로컬) — drop 가능행 위에서만 허용 + 그 행에 드롭존 테두리.
             if (!oAPP.attr.dragModelNode) { _setDropRow(null); return; }
             var oRowEl = (ev.target && ev.target.closest) ? ev.target.closest(".u4a-tree__row") : null;
-            var oNode = oRowEl ? oRowEl.__bwpNode : undefined;
+            var oNode = oRowEl ? _srcNode(oRowEl.__bwpNode) : undefined;   // 필터 복사본 → 원본(_drop_enable 라이브).
             if (oNode && oNode._drop_enable === true) {
                 ev.preventDefault(); ev.dataTransfer.dropEffect = "copy";
                 _setDropRow(oRowEl);
@@ -907,7 +925,7 @@
         if (!oD.host) { return; }
         var aRows = oD.host.querySelectorAll(".u4a-tree__row");
         for (var i = 0; i < aRows.length; i++) {
-            var oRow = aRows[i], n = oRow.__bwpNode;
+            var oRow = aRows[i], n = _srcNode(oRow.__bwpNode);   // 필터 복사본 → 원본(_drop_enable 라이브).
             if (!bDragging || !n) { oRow.classList.remove("u4aBwpDropOk", "u4aBwpDropNo", "u4aBwpDropRow"); continue; }   // DropRow=hover 행 테두리(드래그 종료 시 정리).
             oRow.classList.toggle("u4aBwpDropOk", n._drop_enable === true);
             oRow.classList.toggle("u4aBwpDropNo", n.DATYP === "02" && n._drop_enable !== true);
@@ -1204,8 +1222,9 @@
                 }
                 // 드래그 진행 중이면 현재 drop 가능여부 표시 유지(재렌더 대비).
                 if (oAPP.attr.dragModelNode) {
-                    oRow.classList.toggle("u4aBwpDropOk", n._drop_enable === true);
-                    oRow.classList.toggle("u4aBwpDropNo", n.DATYP === "02" && n._drop_enable !== true);
+                    var _nSrc = _srcNode(n);   // 필터 복사본 → 원본(_drop_enable 라이브).
+                    oRow.classList.toggle("u4aBwpDropOk", _nSrc._drop_enable === true);
+                    oRow.classList.toggle("u4aBwpDropNo", _nSrc.DATYP === "02" && _nSrc._drop_enable !== true);
                 }
             },
             onSelect: function (n) {
