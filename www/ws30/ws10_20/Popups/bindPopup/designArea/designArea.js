@@ -1316,8 +1316,10 @@
         oAPP.fn.setRefFieldList();
     }
 
-    // ── [R4] 오브젝트이름 컬럼 필터 = 원본 sap.ui.table 컬럼 기본 필터(filterProperty:"DESCR", Contains) 그대로 ──
-    //   전체 트리에서 이름(DESCR) contains 검색. 매칭행 + 조상 경로 유지(트리 필터 표준). UI 선택 스코프 없음(원본에 없음).
+    // ── [R4] 오브젝트이름 컬럼 필터 — 전체 트리 이름(DESCR) contains 검색. 매칭행 + 조상 경로 유지(트리 필터 표준). ──
+    //   ★ 원본(designTree.js:2020 onFilterDesignTree)은 실제로 "선택한 UI 오브젝트(DATYP=01)의 속성행만" 스코프
+    //     검색이다(UI 미선택 시 무동작). 그러나 장군님 결정(2026-08-06)으로 UI 무관 전역 검색을 유지한다
+    //     (원본과 의도적 상이 — 사용성). 과거 주석 "UI 스코프는 원본에 없음"은 원본 오독이었어 정정함.
     function _filterDesignRoots() {
         var aAll = oAPP.attr.designTree || [];
         var sF = oAPP.attr.designNameFilter || "";
