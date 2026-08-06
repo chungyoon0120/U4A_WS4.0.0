@@ -195,9 +195,13 @@
         oAPP.fn.setViewEditable(false);                // 2670 메인(중앙하단 적용/좌측 갱신/좌측 기어) 비활성.
 
         // ── 진입 busy off(원본 onViewReady:430) — 렌더/슬라이드 안정 후(rAF 2틱, busy 페이드 조기해제 방지) ──
+        //   ★별창 로컬 busy 만 끄고 WS20 busy 는 유지(화면 동안 WS20 잠금 — 뒤로/적용완료 시 해제).
+        //   원본 setBusyWS20Interaction(false)[sOption 없음] = WS20 방송 안 함(index.js:3550 sOption 조건).
+        //   HTML5 setBusyWS20Interaction(false) 는 방송돼버리므로, 설계 관례(designArea.js:312)대로
+        //   setBusy(false,{ISBROAD:true})로 로컬만 끈다(WS20 BUSY_OFF 미방송).
         requestAnimationFrame(function () {
             requestAnimationFrame(function () {
-                oAPP.fn.setBusyWS20Interaction(false);
+                oAPP.fn.setBusy(false, { ISBROAD: true });
             });
         });
     };
