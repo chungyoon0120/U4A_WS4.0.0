@@ -531,3 +531,17 @@ body {
 .u4aBwpPgOut     { animation: u4aBwpPgOutFwd  0.26s ease both; }
 .u4aBwpPgInBack  { animation: u4aBwpPgInBack  0.26s ease both; }
 .u4aBwpPgOutBack { animation: u4aBwpPgOutBack 0.26s ease both; }
+
+/* ===== [S2] 동일속성 상단 패널 — 선택 속성 4줄 + 추가속성(MPROP) 값(원본 designView 967~1099) ===== */
+.u4aBwpSyncInfo { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.75rem; }
+.u4aBwpSyncInfoRow { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.8125rem; }
+.u4aBwpSyncInfoLbl {   /* 원본 라벨 폭 170px≈10.6rem — 반응형(최소~최대) + 말줄임. */
+    flex: 0 0 auto; min-width: 10rem; max-width: 14rem;
+    font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.u4aBwpSyncInfoVal {
+    flex: 1 1 auto; min-width: 0; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.u4aBwpSyncMprop { border-top: 1px solid var(--line); margin-top: 0.25rem; padding-top: 0.5rem; }

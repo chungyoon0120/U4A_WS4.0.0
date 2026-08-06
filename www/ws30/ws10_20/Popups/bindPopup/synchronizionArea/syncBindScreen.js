@@ -33,6 +33,60 @@
         return b;
     }
 
+    // 라벨:값 한 줄(잘리면 공통 툴팁 — 16 §2.9a data-tip-trunc).
+    function _infoRow(oParent, sLabel, sVal) {
+        var oRow = H.el("div", "u4aBwpSyncInfoRow");
+        var oLb = H.el("span", "u4aBwpSyncInfoLbl");
+        oLb.textContent = sLabel || "";
+        oLb.setAttribute("data-tip", sLabel || ""); oLb.setAttribute("data-tip-trunc", "");
+        var oVal = H.el("span", "u4aBwpSyncInfoVal");
+        var sTxt = (sVal === null || typeof sVal === "undefined") ? "" : String(sVal);
+        oVal.textContent = sTxt;
+        oVal.setAttribute("data-tip", sTxt); oVal.setAttribute("data-tip-trunc", "");
+        oRow.appendChild(oLb); oRow.appendChild(oVal);
+        oParent.appendChild(oRow);
+    }
+
+    // 추가속성(T_MPROP) 구성 — 원본 _setAdditBindData(synchronizionBind.js:118) 1:1.
+    //   MPROP split("|") | UA028(FLD02≠"X" 제외 → ITMCD 정렬) 을 ★같은 인덱스로 짝(prop=FLD01, val=split[i]).
+    function _buildTMprop(sMprop) {
+        var a = [];
+        if (typeof sMprop === "undefined" || sMprop === "") { return a; }
+        var aSplit = sMprop.split("|");
+        if (aSplit.length === 0) { return a; }
+        var aUa = (oAPP.attr.T_9011 || []).filter(function (x) { return x.CATCD === "UA028"; });
+        if (aUa.length === 0) { return a; }
+        aUa = aUa.filter(function (x) { return x.FLD02 !== "X"; });                       // 조회속성 제외.
+        aUa.sort(function (x, y) { return x.ITMCD.localeCompare(y.ITMCD); });             // ITMCD 오름차순.
+        for (var i = 0; i < aUa.length; i++) {
+            a.push({ ITMCD: aUa[i].ITMCD, prop: aUa[i].FLD01, val: aSplit[i] });          // ★인덱스 짝(순서 틀리면 값 밀림).
+        }
+        return a;
+    }
+
+    // [S2] 상단 패널 — 선택 속성 4줄 + 추가속성 값. 원본 setModelData(87)/designView 패널부(967~1099).
+    function _renderSyncPanel(oBody) {
+        var s = oSync.S_ATTR || {};
+        var oPanel = U4AUI.createPanel({ title: H.z("060") });   // 060 Selected UI Object Info(트위스티=원본 ▶ 대체).
+        oBody.appendChild(oPanel.el);
+
+        // 4줄: 190 UI Object ID / 191 Attribute ID / 192 Attribute Type / 193 Binding Field.
+        var oInfo = H.el("div", "u4aBwpSyncInfo");
+        _infoRow(oInfo, H.z("190"), s.OBJID);
+        _infoRow(oInfo, H.z("191"), s.UIATT);
+        _infoRow(oInfo, H.z("192"), s.UIADT);
+        _infoRow(oInfo, H.z("193"), s.UIATV);
+        oPanel.body.appendChild(oInfo);
+
+        // 추가속성 값 목록(읽기전용) — 없으면 미표시(원본 _setAdditBindData exit).
+        var aMprop = _buildTMprop(s.MPROP);
+        if (aMprop.length > 0) {
+            var oMp = H.el("div", "u4aBwpSyncInfo u4aBwpSyncMprop");
+            aMprop.forEach(function (m) { _infoRow(oMp, m.prop, m.val); });
+            oPanel.body.appendChild(oMp);
+        }
+    }
+
     /************************************************************************
      * [S1b §5.2] 동일속성 화면 진입 — 원본 start(4)+designView 툴바부(892) + onSynchronizionBind 부수효과.
      *   sTree = 선택한 바인딩 속성행(원본 is_attr = S_ATTR), aList = 동일속성 후보(getSameAttrList).
@@ -64,6 +118,9 @@
         var body = H.el("div", "u4aBwpSyncBody");
         oSync.body = body;
         page.appendChild(body);
+
+        // 상단 패널(선택 속성 4줄 + 추가속성 값) — S2. (하단 후보 테이블 = S3.)
+        _renderSyncPanel(body);
 
         oSync.page = page;
 
