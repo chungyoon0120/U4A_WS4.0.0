@@ -99,8 +99,11 @@
 
         // 툴바: [일괄적용 141 — S4까지 비활성] · Spacer · [컬럼최적화 161].
         var oBar = H.el("div", "u4aBwpTool u4aBwpSyncListTool");
-        var oApply = _btn("check", H.z("141"), H.z("141"), "u4a-btn--emphasized", null);   // 141 일괄적용.
-        oApply.disabled = true;   // S4 까지 비활성(원본 onSetSyncAttr 자리).
+        var oApply = _btn("check", H.z("141"), H.z("141"), "u4a-btn--emphasized", function () {   // 141 일괄적용.
+            if (typeof oAPP.fn.onSetSyncAttr === "function") {
+                try { oAPP.fn.onSetSyncAttr(); } catch (e) { console.error("[HTML5][bindWindow] onSetSyncAttr:", e && e.message); }
+            }
+        });
         oApply.setAttribute("data-bwp-sync-apply", "1");
         oBar.appendChild(oApply);
         oBar.appendChild(H.el("span", "u4aBwpToolSpacer"));

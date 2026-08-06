@@ -659,6 +659,95 @@
         }
     };
 
+    /************************************************************************
+     * [S4 §5.4/§6] 동일속성 일괄적용 — 원본 synchronizionBind.js onSetSyncAttr(494)+_setSyncAttr(224).
+     *   141 버튼(syncBindScreen)이 호출. all-or-nothing / ★MPROP 전파는 이 경로만 / 복원4종 /
+     *   busy 는 WS20 왕복 후 해제(자기해제 금지 — onMultiBind 동일). 쓰기=공유 attrSetBindProp(§12).
+     ************************************************************************/
+    oAPP.fn.onSetSyncAttr = async function () {
+        var _oSync = oAPP.attr.oSync || {};
+        var _aSel = (typeof oAPP.fn.getSyncSelectedRows === "function") ? oAPP.fn.getSyncSelectedRows() : [];
+
+        // 183 선택 라인 없음(원본 541) — busy 켜기 전이라 off 불필요.
+        if (_aSel.length === 0) { oAPP.fn.toast(H.z("183")); return; }
+
+        // 166 &1건 선택 + 159 일괄적용 확인. 129 "동일속성 바인딩 진행" WS20 busy(원본 onSetSyncAttr 3중 busy 대응).
+        //   _confirmAdditApply = 진입 WS20+팝업 busy → 확인창 동안 팝업만 off(WS20 유지) → onClose 팝업 재on /
+        //   취소면 WS20+팝업 off. (원본 취소 경로 busy 함정 §4-2 = 이 공통 경로가 해소.)
+        var _ok = await _confirmAdditApply(H.z("166", String(_aSel.length)) + "\n" + H.z("159"), H.z("129"));
+        if (!_ok) { return; }   // 취소 — busy off 는 _confirmAdditApply 가 처리.
+
+        await _setSyncAttr(_aSel, _oSync);
+    };
+
+    // 원본 _setSyncAttr(synchronizionBind.js:224) 1:1(별창 각색: setBusyDialog→setBusy, autoResize→fitTreeColumns).
+    async function _setSyncAttr(aList, oSync) {
+        var _UIATV = oSync.S_ATTR.UIATV;
+        var _sField = oAPP.fn.getModelBindData(_UIATV, oAPP.attr.modelTree);
+
+        // 150 &1 필드가 모델 항목에 존재하지 않습니다 — all-or-nothing 중단. busy(WS20+팝업) off.
+        if (typeof _sField === "undefined") {
+            oAPP.fn.setBusyWS20Interaction(false, {});
+            oAPP.fn.toast(H.z("150", _UIATV));
+            return;
+        }
+
+        _sField = JSON.parse(JSON.stringify(_sField));
+
+        // ★MPROP 전파 — 동일속성 일괄적용만(§5.4). 일반 드롭/멀티는 미전파.
+        if (typeof oSync.S_ATTR.MPROP !== "undefined" && oSync.S_ATTR.MPROP !== "") {
+            _sField.MPROP = oSync.S_ATTR.MPROP;
+        }
+
+        for (var i = 0; i < aList.length; i++) {
+            var _sLine = aList[i];
+            var _sTree = oAPP.fn.getDesignTreeAttrData(_sLine.OBJID, _sLine.UIATK);
+            if (typeof _sTree === "undefined") { continue; }
+
+            switch (_sTree.UIATY) {
+                case "1":
+                    oAPP.fn.attrSetBindProp(_sTree, _sField);   // 프로퍼티 바인딩.
+                    break;
+                case "3":
+                    if (_sTree.UIATV !== "" && _sTree.ISBND === "X") {
+                        oAPP.fn.attrUnbindAggr(oAPP.attr.prev[_sTree.OBJID], _sTree.UIATT, _sTree.UIATV);
+                        oAPP.fn.attrUnbindTree(_sTree);   // Tree/TreeTable PARENT·CHILD 예외.
+                    }
+                    oAPP.fn.attrSetBindProp(_sTree, _sField);   // aggregation 바인딩.
+                    if (oAPP.attr.prev[_sTree.OBJID]) { oAPP.attr.prev[_sTree.OBJID]._MODEL[_sTree.UIATT] = _sTree.UIATV; }
+                    break;
+                default: break;
+            }
+
+            _sLine.UIATV = _sTree.UIATV;   // 후보 행 값 갱신(원본 298).
+        }
+
+        // 자기화면 갱신(원본 oDesign.oModel.refresh(true)+oModel.refresh() 대응) — 가운데 트리(UIATV 반영) + 후보테이블.
+        //   WS20 반영은 attrSetBindProp→attrChange→designBroadcastUpdate(rAF 1회 방송)가 이미 담당.
+        _refreshDesignTree();
+        if (oSync.tbl && typeof oSync.tbl.setRows === "function") { oSync.tbl.setRows(oSync.aList || []); }
+
+        oAPP.fn.toast(H.z("160"));   // 160 동일속성 바인딩 처리 완료.
+
+        // 디자인 영역으로 복귀(원본 moveDesignPage) — 슬라이드.
+        await oAPP.fn.moveDesignPage();
+
+        // 복원 4종(§5.6 — 진입의 정확한 역).
+        oAPP.fn.setAdditBindButtonEnable(true);
+        oAPP.fn.setLayoutCustomizingEditable(true);
+        oAPP.attr.bSyncEqualityScreenActive = false;
+        oAPP.fn.setViewEditable(true);
+
+        // 트리 컬럼 재조정(원본 setUiTableAutoResizeColumn:328).
+        var _oHost = document.getElementById("bwpDesignTree");
+        if (_oHost && typeof oAPP.fn.fitTreeColumns === "function") { oAPP.fn.fitTreeColumns(_oHost); }
+
+        // ★busy 자기해제 안 함(원본 331~334) — WS20 가 UPDATE-DESIGN-DATA 반영 후 BUSY_OFF 방송으로 해제. onMultiBind 동일.
+
+        // S5 훅 자리: 비모달 다이얼로그가 열려 있으면 close(원본 337~339). 현재 no-op.
+        if (oSync.oDialog && typeof oSync.oDialog.close === "function") { oSync.oDialog.close(); }
+    }
+
     // 디자인트리 체크선택 행 수집(원본 getSelectedDesignTree 1:1) — 멀티/참조필드(P3-C) 공용.
     oAPP.fn.getSelectedDesignTree = function () {
         var aSel = [];
