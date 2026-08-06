@@ -648,11 +648,14 @@
         var _aList = (typeof oAPP.fn.getSameAttrList === "function") ? oAPP.fn.getSameAttrList(_sTree) : [];
         if (_aList.length === 0) { oAPP.fn.toast(H.z("158", _sTree.UIATT)); return; }   // 158 동일 속성 없음.
 
-        // 검증 통과 — 동일속성 화면 진입(§5.2). ★스텝2에서 배선(현재는 후보 수집까지 완료).
+        // 검증 통과 — 동일속성 화면 진입(§5.2). 진입 busy on(원본 designTree.js:2492 setBusyWS20Interaction(true)).
+        //   busy off 는 화면 렌더 후 openSyncBindScreen(원본 onViewReady:430)이 담당(진입 왕복).
+        oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("129") });
         if (typeof oAPP.fn.openSyncBindScreen === "function") {
             oAPP.fn.openSyncBindScreen(_sTree, _aList);
         } else {
-            console.warn("[HTML5][bindWindow] onSynchronizionBind: 동일속성 화면(openSyncBindScreen) 미배선(P4 스텝2). 후보 " + _aList.length + "건 수집 완료.");
+            oAPP.fn.setBusyWS20Interaction(false);   // 미배선 방어 — busy 잔류 금지.
+            console.warn("[HTML5][bindWindow] onSynchronizionBind: 동일속성 화면(openSyncBindScreen) 미배선.");
         }
     };
 
@@ -1358,5 +1361,52 @@
             try { oD.ctrl.tree.expandAll(); } catch (e) { }
         }
     }
+
+    /************************************************************************
+     * [S1b §9.2] 가운데 디자인트리 영역(#bwpDesignArea) 페이지 스왑 — 원본 NavContainer to()/moveDesignPage.
+     *   트리 콘텐츠(툴바+트리호스트) ↔ 외부 페이지 el 을 슬라이드+페이드(.analy 16 §9.2: 0.26s, ±32px, opacity,
+     *   들어오는 z-index:2). 즉시스왑 금지(§9). 진입=forward, 뒤로=back.
+     ************************************************************************/
+    oAPP.fn.designSwapToPage = function (elPage, bBack) {
+        var oArea = document.getElementById("bwpDesignArea");
+        if (!oArea || !elPage) { return; }
+        elPage.classList.add("u4aBwpDesignPage");
+        oArea.appendChild(elPage);
+        elPage.classList.add(bBack ? "u4aBwpPgInBack" : "u4aBwpPgIn");   // 들어오는 페이지 슬라이드인.
+        var aOut = [oD.tool, oD.host];
+        aOut.forEach(function (el) { if (el) { el.classList.add(bBack ? "u4aBwpPgOutBack" : "u4aBwpPgOut"); } });   // 나가는 트리 슬라이드아웃.
+        setTimeout(function () {
+            aOut.forEach(function (el) {
+                if (!el) { return; }
+                el.style.display = "none";
+                el.classList.remove("u4aBwpPgOut", "u4aBwpPgOutBack");
+            });
+        }, 260);
+        oD._syncPage = elPage;
+    };
+
+    // 디자인 트리로 복귀(원본 moveDesignPage) — teardown(동일속성 페이지 제거, 원본 onViewExit destroy) 포함.
+    //   Promise = 트랜지션(0.26s) 완료 시 resolve → 호출측이 복원/ busy off 를 그 후에 수행.
+    oAPP.fn.moveDesignPage = function () {
+        return new Promise(function (res) {
+            var elPage = oD._syncPage;
+            var aIn = [oD.tool, oD.host];
+            aIn.forEach(function (el) {
+                if (!el) { return; }
+                el.style.display = "";
+                el.classList.add("u4aBwpPgInBack");   // 트리 슬라이드인(back).
+            });
+            if (elPage) {
+                elPage.classList.remove("u4aBwpPgIn", "u4aBwpPgInBack");
+                elPage.classList.add("u4aBwpPgOutBack");   // 동일속성 페이지 슬라이드아웃(back).
+            }
+            setTimeout(function () {
+                aIn.forEach(function (el) { if (el) { el.classList.remove("u4aBwpPgInBack"); } });
+                if (elPage && elPage.parentNode) { elPage.parentNode.removeChild(elPage); }
+                oD._syncPage = null;
+                res();
+            }, 260);
+        });
+    };
 
 })();

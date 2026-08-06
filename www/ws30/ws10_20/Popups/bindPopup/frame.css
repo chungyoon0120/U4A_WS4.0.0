@@ -509,3 +509,25 @@ body {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .u4aBwpAdditSelStat:empty { display: none; }
+
+
+/* ===== [S1b §9.2] 동일속성 바인딩 화면 — 가운데(#bwpDesignArea) 슬라이드 스왑 =====
+   .analy 16 §9.2: 0.26s ease both · translateX(±2rem≈32px)+opacity · 들어오는 페이지 z-index:2 · 즉시스왑 금지. */
+#bwpDesignArea { position: relative; overflow: hidden; }
+.u4aBwpDesignPage {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; flex-direction: column; min-height: 0;
+    background: var(--app-bg);   /* 트리 안 비치게 불투명(테마 토큰). */
+}
+/* 동일속성 화면 본문 컨테이너(상단 패널=S2 / 하단 후보 테이블=S3 이 여기 렌더). */
+.u4aBwpSyncRoot { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.u4aBwpSyncBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+
+@keyframes u4aBwpPgInFwd   { from { transform: translateX(2rem);  opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes u4aBwpPgOutFwd  { from { transform: none; opacity: 1; } to { transform: translateX(-2rem); opacity: 0; } }
+@keyframes u4aBwpPgInBack  { from { transform: translateX(-2rem); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes u4aBwpPgOutBack { from { transform: none; opacity: 1; } to { transform: translateX(2rem);  opacity: 0; } }
+.u4aBwpPgIn      { animation: u4aBwpPgInFwd   0.26s ease both; }
+.u4aBwpPgOut     { animation: u4aBwpPgOutFwd  0.26s ease both; }
+.u4aBwpPgInBack  { animation: u4aBwpPgInBack  0.26s ease both; }
+.u4aBwpPgOutBack { animation: u4aBwpPgOutBack 0.26s ease both; }
