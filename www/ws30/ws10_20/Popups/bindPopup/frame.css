@@ -545,3 +545,14 @@ body {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .u4aBwpSyncMprop { border-top: 1px solid var(--line); margin-top: 0.25rem; padding-top: 0.5rem; }
+
+/* ===== [S3] 동일속성 하단 후보 테이블 — 7컬럼 멀티선택 + 컬럼최적화(원본 designView 1106~1228) ===== */
+.u4aBwpSyncList { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.u4aBwpSyncListTitle { font-weight: 600; color: var(--text); padding: 0.375rem 0.75rem 0.125rem; }
+.u4aBwpSyncListHost { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* 원본 161 "데이터 최장폭 맞춤" = auto layout(공통 .u4a-table 은 fixed → 이 표만 스코프 override). */
+.u4aBwpSyncListHost .u4a-table { table-layout: auto; width: auto; min-width: 100%; }
+.u4aBwpSyncListHost .u4a-table th,
+.u4aBwpSyncListHost .u4a-table td { white-space: nowrap; }
+.u4aBwpSyncChkCol { width: 2.5rem; }
+.u4aBwpSyncChk { cursor: pointer; }

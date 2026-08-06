@@ -87,6 +87,64 @@
         }
     }
 
+    // [S3] 하단 후보 테이블 — 7컬럼 멀티선택 + 컬럼최적화. 원본 designView 테이블부(1106~1228).
+    //   데이터 = oSync.aList(getSameAttrList). 멀티선택 = 체크박스 열(공통 makeDataTable 은 단일선택뿐).
+    function _renderSyncList(oBody) {
+        var oWrap = H.el("div", "u4aBwpSyncList");
+
+        // 제목 061 Target Replace Properties.
+        var oTitle = H.el("div", "u4aBwpSyncListTitle");
+        oTitle.textContent = H.z("061");
+        oWrap.appendChild(oTitle);
+
+        // 툴바: [일괄적용 141 — S4까지 비활성] · Spacer · [컬럼최적화 161].
+        var oBar = H.el("div", "u4aBwpTool u4aBwpSyncListTool");
+        var oApply = _btn("check", H.z("141"), H.z("141"), "u4a-btn--emphasized", null);   // 141 일괄적용.
+        oApply.disabled = true;   // S4 까지 비활성(원본 onSetSyncAttr 자리).
+        oApply.setAttribute("data-bwp-sync-apply", "1");
+        oBar.appendChild(oApply);
+        oBar.appendChild(H.el("span", "u4aBwpToolSpacer"));
+        oBar.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () {   // 161 컬럼최적화(auto layout 재계산).
+            if (oSync.tbl) { oSync.tbl.refresh(); }
+        }));
+        oWrap.appendChild(oBar);
+
+        // 테이블 호스트 + 공통 makeDataTable(비가상 — 후보 소수).
+        var oHost = H.el("div", "u4aBwpSyncListHost");
+        oWrap.appendChild(oHost);
+        oBody.appendChild(oWrap);
+
+        oSync.tbl = U4AUI.makeDataTable(oHost, {
+            virtual: false, zebra: true,
+            rowKey: function (r, i) { return r.OBJID + "|" + r.UIATK + "|" + i; },
+            emptyText: H.z("312"),   // 312 No data Found.
+            columns: [
+                {
+                    label: "", className: "u4aBwpSyncChkCol", align: "center",
+                    cell: function (r) {
+                        var cb = H.el("input", "u4aBwpSyncChk"); cb.type = "checkbox"; cb.checked = !!r._chk;
+                        cb.addEventListener("click", function (e) { e.stopPropagation(); });     // 행 클릭 선택과 분리.
+                        cb.addEventListener("change", function () { r._chk = cb.checked; });
+                        return cb;
+                    }
+                },
+                { label: H.z("190"), key: "OBJID" },   // UI Object ID.
+                { label: H.z("191"), key: "UIATT" },   // Attribute ID.
+                { label: H.z("178"), key: "UIATV" },   // Value(=바인딩 필드).
+                { label: H.z("194"), key: "UILIB" },   // UI Object Module.
+                { label: H.z("195"), key: "UIOBK" },   // UI Object Key.
+                { label: H.z("196"), key: "POBID" },   // Parent UI Object ID.
+                { label: H.z("197"), key: "PUIOK" }    // Parent Object Module.
+            ]
+        });
+        oSync.tbl.setRows(oSync.aList || []);
+    }
+
+    // 선택(체크)된 후보 수집 — 원본 _getSelectedData(synchronizionBind.js:184) 대응. S4 일괄적용이 소비.
+    oAPP.fn.getSyncSelectedRows = function () {
+        return (oSync.aList || []).filter(function (r) { return r._chk === true; });
+    };
+
     /************************************************************************
      * [S1b §5.2] 동일속성 화면 진입 — 원본 start(4)+designView 툴바부(892) + onSynchronizionBind 부수효과.
      *   sTree = 선택한 바인딩 속성행(원본 is_attr = S_ATTR), aList = 동일속성 후보(getSameAttrList).
@@ -119,8 +177,9 @@
         oSync.body = body;
         page.appendChild(body);
 
-        // 상단 패널(선택 속성 4줄 + 추가속성 값) — S2. (하단 후보 테이블 = S3.)
+        // 상단 패널(선택 속성 4줄 + 추가속성 값) — S2 / 하단 후보 테이블(7컬럼 멀티선택) — S3.
         _renderSyncPanel(body);
+        _renderSyncList(body);
 
         oSync.page = page;
 
