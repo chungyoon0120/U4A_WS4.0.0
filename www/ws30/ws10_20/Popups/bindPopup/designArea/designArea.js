@@ -798,29 +798,33 @@
     //   busy 왕복·UPDATE-DESIGN-DATA 방송 = P6. 검증 오류표시는 간이 toast(정교 showMessagePopover = P6).
     oAPP.fn.onAdditionalBind = async function (n, oAnchor) {
         if (!n) { return; }
+        // ★[원본 onAdditionalBind:1655] 진입 즉시 WS20 busy(219 "추가 속성 바인딩 처리 진행중"). 검증 실패마다 off,
+        //   확인창은 팝업 로딩만 껐다 켬(WS20 유지), 취소는 전체 off, 성공은 WS20 왕복이 해제(자기해제 금지).
+        oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("219") });
         // [G-4] 진입 시 오류표시 초기화(원본 onAdditionalBind:1679/1703 resetErrorField). 필수 호출 직접.
         //   ※ 추가속성칸 오류마크(clearAdditErrorMark)는 여기서 안 지운다 — 팝오버 바깥클릭 자동닫힘 시
         //     _clearError(showMessagePopover.js)가 이미 지운다(장군님 결정 08-05: 자동닫힘 UX 유지).
         oAPP.fn.resetErrorField();
         // ① 우측 입력 완결성.
         var _r1 = (typeof oAPP.fn.chkAdditBindData === "function") ? oAPP.fn.chkAdditBindData() : { RETCD: "" };
-        if (_r1.RETCD === "E") { await _showErr(oAnchor, _r1); return; }   // [SPEC §6] 목록 팝오버.
+        if (_r1.RETCD === "E") { await _showErr(oAnchor, _r1); oAPP.fn.setBusyWS20Interaction(false, {}); return; }   // [SPEC §6] 목록 팝오버 + off(원본 1696).
         // ② 라인 가능여부 — 실패 시 그 행을 오류(빨강)로 각인(원본 1713-1718 _check_vs/_style + refresh).
         var _r2 = (typeof oAPP.fn.chkPossibleAdditBind === "function") ? oAPP.fn.chkPossibleAdditBind(n) : { RETCD: "" };
         if (_r2.RETCD === "E") {
             n._bind_error = true; n._check_vs = "Error";   // [G-4] 원본 1713-1718(_check_vs + _style). 오류=_bind_error → rowHook 배경 + reset 해제.
             n._error_tooltip = _r2.RTMSG;   // [원본 1718] 오류 라인 hover 툴팁 각인 → rowHook 이 data-tip 으로 렌더(누락 복원 2026-08-04).
             _refreshDesignTree();
-            oAPP.fn.toast(_r2.RTMSG); return;
+            oAPP.fn.toast(_r2.RTMSG); oAPP.fn.setBusyWS20Interaction(false, {}); return;   // 원본 1729
         }
         // ③ UI 정보(_T_0015) 확인.
         var _oUi = oAPP.attr.prev && oAPP.attr.prev[n.OBJID];
-        if (!_oUi || !_oUi._T_0015) { oAPP.fn.toast(H.z("106", n.OBJID)); return; }   // 106 UI 정보 없음.
-        // ④ 기존 MPROP 있으면 재적용 확인(089).
+        if (!_oUi || !_oUi._T_0015) { oAPP.fn.toast(H.z("106", n.OBJID)); oAPP.fn.setBusyWS20Interaction(false, {}); return; }   // 106 UI 정보 없음(원본 1750).
+        // ④ 기존 MPROP 있으면 재적용 확인(089) — 원본 1758~1802: 진입 busy 켜진 채, 확인창 뜰 때 "팝업만" off / onClose 팝업 재on / 취소 전체 off.
         if (n.MPROP !== "") {
-            // 089 재적용 확인 + 219 "추가 속성 바인딩 진행" — 확인창 동안 WS20 busy(원본 onAdditionalBind:1652·1655).
-            var _ok = await _confirmAdditApply(H.z("089"), H.z("219"));
-            if (!_ok) { return; }
+            oAPP.fn.setBusy(false, { ISBROAD: true });                 // 원본 1790: 확인창 위해 팝업만 off(WS20 유지).
+            var _ok = await _confirmAdditApply(H.z("089"));            // 순수 확인창(sBusyDesc 없음 — busy 는 여기서 관리).
+            if (!_ok) { oAPP.fn.setBusyWS20Interaction(false, {}); return; }   // 원본 1802: 취소 → WS20+팝업 off.
+            oAPP.fn.setBusy(true, { ISBROAD: true });                  // 원본 1773: onClose 팝업만 재on(WS20 유지, 성공 왕복이 최종 해제).
         }
         // ⑤ 로컬 적용: 트리행 + _T_0015 stamp.
         n.MPROP = oAPP.fn.setAdditBindData(oAPP.attr.additRows);
@@ -1279,7 +1283,7 @@
                 if (n.UIATV) {
                     oPath.setAttribute("data-tip", n.UIATV); oPath.setAttribute("data-tip-trunc", "");
                     // SPEC §3.2 2열=바인딩경로 Link, press onShowBindAdditInfo(원본 designTree.js:4123) →
-                    //   클릭 시 우측 추가속성 패널을 이 필드로 재구성(§3.5 _showBindAdditInfo).
+                    //   클릭 시 ★중앙 하단(DESIGN_ADDIT/SEL) 추가속성 패널을 이 필드로 재구성(§3.5 _showBindAdditInfo). ("우측" 오기 정정 2026-08-09)
                     oPath.classList.add("u4aBwpDesignPathLink");
                     oPath.setAttribute("role", "button"); oPath.tabIndex = 0;
                     oPath.addEventListener("click", function (e) {

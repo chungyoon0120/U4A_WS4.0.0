@@ -616,6 +616,9 @@
      *   ★ 우측(MAIN) 스토어 값을 체크된 N행에 일괄 stamp. busy 왕복·방송 = P6.
      ************************************************************************/
     oAPP.fn.onMultiAdditionalBind = async function (oAnchor) {
+        // ★[원본 onMultiAdditionalBind bindAdditInfo.js:170] 진입 즉시 WS20 busy(219 "추가 속성 바인딩 처리 진행중").
+        //   검증 실패마다 off, 확인창은 팝업 로딩만 껐다 켬(WS20 유지), 취소는 전체 off, 성공은 WS20 왕복이 해제(자기해제 금지).
+        oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("219") });
         // ★ 검증 순서 = 원본 checkMultiAdditBind.js 그대로: ①디자인 트리 선택(16행) → ②추가속성 입력(53행)
         //   → ③행별 적용 가능여부(84행). 입력 검증을 먼저 하면 사용자가 값을 다 채운 뒤에야
         //   "선택된 라인 없음"을 만나 헛수고한다(장군님 지적 2026-07-16 — 원본도 선택 검증이 먼저다).
@@ -627,12 +630,13 @@
                 RETCD: "E", RTMSG: H.z("087"),
                 T_RTMSG: [oAPP.fn.newBindError({ ACTCD: A0.ACT02, TYPE: "Error", TITLE: H.z("087"), DESC: H.z("142"), LK_VIS: false })]
             });
+            oAPP.fn.setBusyWS20Interaction(false, {});   // 원본 201
             return;
         }
 
         var _r1 = oAPP.fn.chkAdditBindData();   // MAIN 입력 완결성.
         // [SPEC §6] 오류는 목록 팝오버(항목별 "오류 위치 확인" 링크 포함).
-        if (_r1.RETCD === "E") { await _showErrPop(oAnchor, _r1); return; }
+        if (_r1.RETCD === "E") { await _showErrPop(oAnchor, _r1); oAPP.fn.setBusyWS20Interaction(false, {}); return; }
 
         // 행별 적용 가능여부 — 원본 checkMultiAdditBind.js:84~ 1:1.
         //   실패 행은 _bind_error 마크 + ACT04(LINE_KEY=CHILD)로 수집하고, 하나라도 있으면 084 로 전체 차단.
@@ -654,12 +658,15 @@
             oAPP.fn.refreshDesignTree();   // [표준] 필수 호출 직접(삼킴 제거).
             // 084 선택한 정보 중 추가 속성 불가능건이 존재합니다.
             await _showErrPop(oAnchor, { RETCD: "E", RTMSG: H.z("084"), T_RTMSG: _aErr });
+            oAPP.fn.setBusyWS20Interaction(false, {});
             return;
         }
 
-        // 166+089 확인 + 219 "추가 속성 바인딩 진행" — 확인창 동안 WS20 busy(원본 onMultiAdditionalBind bindAdditInfo.js:167·170).
-        var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("089"), H.z("219"));
-        if (!_ok) { return; }
+        // 166+089 확인 — 원본 bindAdditInfo.js 확인창: 진입 busy(219) 켜진 채, 확인창 뜰 때 "팝업만" off / onClose 팝업 재on / 취소 전체 off.
+        oAPP.fn.setBusy(false, { ISBROAD: true });                    // 확인창 위해 팝업만 off(WS20 유지).
+        var _ok = await _confirmAdditApply(H.z("166", String(_aTree.length)) + "\n" + H.z("089"));   // 순수 확인창(sBusyDesc 없음 — busy 는 여기서 관리).
+        if (!_ok) { oAPP.fn.setBusyWS20Interaction(false, {}); return; }   // 취소 → WS20+팝업 off.
+        oAPP.fn.setBusy(true, { ISBROAD: true });                     // onClose 팝업만 재on(WS20 유지, 성공 왕복이 최종 해제).
 
         var _MPROP = oAPP.fn.setAdditBindData(_rows(oA.MAIN));
         oAPP.fn.additionalBindMulti(_MPROP);
