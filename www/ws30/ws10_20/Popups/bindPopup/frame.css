@@ -139,6 +139,19 @@ body {
 
 /* ===== 화면 커스터마이징 팝업(.u4aBwpLcDlg) — 공통 .u4a-dialog 골격 + 영역 3행 스위치 리스트 ===== */
 .u4aBwpLcDlg { min-width: 24rem; max-width: 32rem; }
+
+/* ===== [S5] 동일속성 적용 팝업(.u4aBwpSyncDlg) — 비모달 <dialog>.show()(원본 setModal(false), 60%×60%) =====
+   ★모달(:modal)이 아니라 위치가 자동 중앙이 안 되므로 fixed+inset+margin:auto 로 직접 중앙 배치. 공통 .u4a-dialog flex 골격 상속. */
+.u4aBwpSyncDlg {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: 60%;
+    height: 60%;
+    min-width: 32rem;
+    min-height: 24rem;
+}
+.u4aBwpSyncDlg .u4aBwpSyncBody { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
 .u4aBwpLcBody { display: flex; flex-direction: column; gap: 0.75rem; }
 .u4aBwpLcList { display: flex; flex-direction: column; }
 .u4aBwpLcRow {

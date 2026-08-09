@@ -164,8 +164,10 @@
         tool.appendChild(_btn("arrow-left", H.z("189"), H.z("189"), "u4a-btn--emphasized", function () {   // 189 Back
             oAPP.fn.onSyncMoveDesignPage();
         }));
-        var oPopBtn = _btn("up-right-from-square", H.z("140"), H.z("140"), "u4a-btn--emphasized", null);    // 140 팝업 호출
-        oPopBtn.disabled = true;   // S5 까지 비활성(원본 onCallSyncBindPopup 자리).
+        // 140 동일속성 적용 팝업 호출(원본 onCallSyncBindPopup:659). ★열 때 자기 비활성(원본 666), 닫아도 재활성 안 함(화면 재진입 전까지).
+        var oPopBtn = _btn("up-right-from-square", H.z("140"), H.z("140"), "u4a-btn--emphasized", function () {
+            if (typeof oAPP.fn.onCallSyncBindPopup === "function") { oAPP.fn.onCallSyncBindPopup(oPopBtn); }
+        });
         oPopBtn.setAttribute("data-bwp-sync-popup", "1");
         tool.appendChild(oPopBtn);
         tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
@@ -208,6 +210,101 @@
             });
         });
     };
+
+    /************************************************************************
+     * [S5] 140 "동일속성 적용 팝업 호출" — 원본 onCallSyncBindPopup(synchronizionBind.js:659).
+     *   ★비모달 <dialog>.show()(원본 setModal(false)) — 뒤 디자인 트리 조작 가능.
+     *   동일속성 화면(상단 패널 + 후보 테이블)을 다이얼로그에 렌더(같은 oSync 데이터 공유), 가운데는 트리로 복귀(moveDesignPage).
+     *   busy: 진입 팝업 lock(WS20 미방송, 225 유지) → afterOpen off / 닫을 때 WS20 BUSY_OFF(225 해제, 원본 711).
+     ************************************************************************/
+    oAPP.fn.onCallSyncBindPopup = async function (oBtn) {
+        // 원본 662 setBusyWS20Interaction(true)[sOption 없음] = 팝업 lock, WS20 미방송(225 유지).
+        oAPP.fn.setBusy(true, { ISBROAD: true });
+        if (oBtn) { oBtn.disabled = true; }   // 원본 666 self setEnabled(false) — 닫아도 재활성 안 함.
+        try { if (document.activeElement) { document.activeElement.blur(); } } catch (e) { }
+
+        var oDlg = document.createElement("dialog");
+        oDlg.className = "u4a-dialog u4aBwpSyncDlg";
+
+        // 헤더 — 제목 188 + 닫기 X(056).
+        var oHead = H.el("div", "u4a-dialog__header");
+        oHead.innerHTML = "<span></span>";
+        oHead.querySelector("span").textContent = H.z("188");   // 188 Property 모두 바꾸기
+        var oX = H.el("button", "u4a-btn-icon");
+        oX.type = "button";
+        oX.innerHTML = H.fa("xmark");
+        oX.title = H.z("056");   // 056 닫기
+        oX.addEventListener("click", function () { _closeSyncDialog(); });
+        oHead.appendChild(oX);
+        oDlg.appendChild(oHead);
+
+        // 본문 — 상단 패널(S2) + 후보 테이블(S3), 같은 oSync 데이터로 재렌더(원본 VB_MAIN clone + 모델 공유).
+        var oBody = H.el("div", "u4a-dialog__body u4aBwpSyncBody");
+        oSync.body = oBody;
+        oDlg.appendChild(oBody);
+        _renderSyncPanel(oBody);
+        _renderSyncList(oBody);
+
+        // 푸터 — 닫기(003 취소).
+        var oFoot = H.el("div", "u4a-dialog__footer");
+        oFoot.appendChild(H.el("span", "u4aBwpToolSpacer"));
+        var oCloseBtn = H.el("button", "u4a-btn u4a-btn--negative");
+        oCloseBtn.type = "button";
+        oCloseBtn.innerHTML = H.fa("xmark");
+        oCloseBtn.title = H.z("003");   // 003 취소
+        oCloseBtn.addEventListener("click", function () { _closeSyncDialog(); });
+        oFoot.appendChild(oCloseBtn);
+        oDlg.appendChild(oFoot);
+
+        document.body.appendChild(oDlg);
+        // 드래그/리사이즈(공통 — 원본 draggable:true/resizable:true).
+        if (window.U4AUI) {
+            if (U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHead); }
+            if (U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg); }
+        }
+
+        // 원본 beforeOpen(685): setViewLayoutEditable(false)[좌/가운데/우 잠금] + 후보테이블 선택 해제.
+        _setSyncViewLayout(false);
+        _clearSyncListSelection();
+
+        oSync.oDialog = oDlg;
+        try { oDlg.show(); } catch (e) { try { oDlg.open = true; } catch (e2) { } }   // ★비모달(원본 setModal(false)).
+
+        // afterOpen: 팝업 busy off(원본 694). WS20(225)는 유지.
+        oAPP.fn.setBusy(false, { ISBROAD: true });
+
+        // 가운데 트리로 복귀(원본 770 moveDesignPage).
+        await oAPP.fn.moveDesignPage();
+    };
+
+    // [S5] 다이얼로그 닫기 — 원본 beforeClose(698) setViewLayoutEditable(true) / afterClose(711) destroy + WS20 BUSY_OFF(225 해제).
+    function _closeSyncDialog() {
+        var oDlg = oSync.oDialog;
+        if (!oDlg) { return; }
+        _setSyncViewLayout(true);   // 원본 beforeClose(698): 좌/가운데/우 잠금 해제.
+        try { oDlg.close(); } catch (e) { }
+        try { oDlg.remove(); } catch (e) { }
+        oSync.oDialog = null;
+        oAPP.fn.setBusyWS20Interaction(false, {});   // 원본 afterClose(711) broadToChild BUSY_OFF.
+    }
+
+    // [S5] 원본 setViewLayoutEditable(synchronizionBind.js:820) — 다이얼로그 열린 동안 좌/가운데/우 잠금.
+    function _setSyncViewLayout(bLock) {
+        if (oAPP.attr.editable !== true) { return; }   // 원본 823 IS_EDIT === "" 대응(편집 불가 화면이면 무동작).
+        if (oAPP.fn.setViewEditable) { oAPP.fn.setViewEditable(bLock); }                     // 원본 829 메인(중앙하단 적용/좌 갱신/기어)
+        if (oAPP.fn.designSetViewEditable) { oAPP.fn.designSetViewEditable(bLock); }         // 원본 833 디자인(가운데 트리 선택/링크)
+        if (oAPP.fn.setAdditBindButtonEnable) { oAPP.fn.setAdditBindButtonEnable(bLock); }   // 원본 837 우측 추가속성 바인딩 버튼
+        // 원본 839~841: 동일속성 모드면 우측 기어는 항상 잠금(false), 아니면 bLock 을 따름.
+        if (oAPP.fn.setLayoutCustomizingEditable) {
+            oAPP.fn.setLayoutCustomizingEditable(oAPP.attr.bSyncEqualityScreenActive === true ? false : bLock);
+        }
+    }
+
+    // [S5] 후보 테이블 선택 초기화 — 원본 _clearSelectionPopupTable(synchronizionBind.js:348).
+    function _clearSyncListSelection() {
+        (oSync.aList || []).forEach(function (r) { r._chk = false; });
+        if (oSync.tbl && typeof oSync.tbl.refresh === "function") { oSync.tbl.refresh(); }
+    }
 
     /************************************************************************
      * [S1b] 뒤로 — 원본 onMoveDesignPage(synchronizionBind.js:623).

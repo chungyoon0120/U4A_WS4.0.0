@@ -313,6 +313,15 @@
     };
 
     /************************************************************************
+     * [S5] 동일속성 적용 팝업(비모달)이 열린 동안 가운데 트리 상호작용 잠금 —
+     *   원본 designTree.js:2758 setViewEditable 의 edit_sync_dialog_interaction 대응.
+     *   HTML5 트리엔 입력필드가 없어, 선택(onSelect)/바인딩경로 링크 클릭을 이 플래그로 막는다.
+     ************************************************************************/
+    oAPP.fn.designSetViewEditable = function (bLock) {
+        oAPP.attr.bSyncDialogLock = (bLock === false);   // bLock=false(잠금) → lock=true.
+    };
+
+    /************************************************************************
      * [SPEC §3.5 · 원본 designTree.js:225 _showBindAdditInfo] 바인딩경로 링크 클릭 →
      *   ★ 중앙 하단(DESIGN_ADDIT) 패널을 그 필드 정보로 재구성해 표시(vis_addit).
      *     우측(MAIN_ADDIT 스테이징)은 절대 건드리지 않는다 — setAdditBindInfo 는 SEL 스토어 전용.
@@ -1288,6 +1297,8 @@
                     oPath.setAttribute("role", "button"); oPath.tabIndex = 0;
                     oPath.addEventListener("click", function (e) {
                         e.stopPropagation();
+                        // [S5] 동일속성 적용 팝업 열린 동안 바인딩 경로 링크 잠금(원본 edit_sync_dialog_interaction).
+                        if (oAPP.attr.bSyncDialogLock === true) { return; }
                         // [UX · 원본에 없음, 장군님 지시 2026-08-02] 바인딩 경로 링크 클릭도 테이블 행 클릭과
                         //   동일 효과가 나게 — 그 행을 선택(selDesignNode+파랑+bindPossibleRecompute).
                         //   ★select→패널 순서: 재계산이 먼저, 좌측 자동선택(C-15, onShowBindAdditInfo 내부)이 나중이라
@@ -1342,6 +1353,8 @@
                 }
             },
             onSelect: function (n) {
+                // [S5] 동일속성 적용 팝업 열린 동안 트리 선택 잠금(원본 edit_sync_dialog_interaction, designTree.js:2768).
+                if (oAPP.attr.bSyncDialogLock === true) { return; }
                 oAPP.attr.selDesignNode = n;
                 // 클릭한 행에 선택 강조(aria-selected) 즉시 적용 — 공통 트리는 강조 API(selectKey)만 제공하고 화면이 호출한다.
                 //   가상 전환 후 클릭만으론 재렌더가 안 일어나 rowHook 강조가 스크롤(재렌더)해야 뜨던 것 수정(장군님 지적 2026-07-31).
