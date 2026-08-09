@@ -11,6 +11,16 @@
             "async": true
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\pre_tool_use_gate.py"]
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [

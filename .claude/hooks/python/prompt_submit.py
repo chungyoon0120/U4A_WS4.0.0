@@ -1,9 +1,10 @@
 import sys
 import json
+import os
 import threading
 
-# ── 항상 AI에게 전달할 내용 ──────────────────────────
-ALWAYS_CONTEXT = """\
+# ── 항상 AI에게 전달할 내용 (폴백: 파일 못 읽을 때만 사용) ──────────────
+_ALWAYS_FALLBACK = """\
 - 응답은 한국어로, 간결하고 직접적으로.
 - 과도한 추상화/오버엔지니어링 지양.
 - UI(화면/컴포넌트/레이아웃)를 새로 만들거나 수정하는 작업에는
@@ -13,6 +14,18 @@ ALWAYS_CONTEXT = """\
   계획(writing-plans)->구현(executing/subagent)->검증(verification+systematic-debugging)
   파이프라인으로 진행할 것. 정답은 항상 원본(as-is)+.analy SSOT이며 이 규칙이 어떤 스킬보다 상위.
 """
+
+def load_always(cwd):
+    """상시 규칙 = .claude/rules/always.md (없으면 폴백). 규칙 수정 = 파일 편집으로."""
+    try:
+        base = os.environ.get("CLAUDE_PROJECT_DIR") or cwd or ""
+        path = os.path.join(base, ".claude", "rules", "always.md")
+        with open(path, "r", encoding="utf-8") as f:
+            body = f.read().strip()
+        # 원래 하드코딩 규칙도 함께 유지(중복 아님 — 파일은 소통 규칙, 아래는 작업 파이프라인 규칙).
+        return _ALWAYS_FALLBACK + "\n" + body if body else _ALWAYS_FALLBACK
+    except Exception:
+        return _ALWAYS_FALLBACK
 
 def show_toast(prompt, project):
     """데스크탑 알림 (블로킹 방지를 위해 별도 스레드)"""
@@ -43,11 +56,11 @@ def main():
     t = threading.Thread(target=show_toast, args=(prompt, project), daemon=True)
     t.start()
 
-    # 컨텍스트 주입
+    # 컨텍스트 주입 (상시 규칙 = rules/always.md)
     output = {
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
-            "additionalContext": ALWAYS_CONTEXT,
+            "additionalContext": load_always(cwd),
         }
     }
     print(json.dumps(output))   # stdout → AI 컨텍스트로 삽입
