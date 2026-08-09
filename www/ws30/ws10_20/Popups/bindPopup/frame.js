@@ -243,6 +243,14 @@ function _setBusy(bOn, oOpt) {
     if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
     try { CURRWIN.closable = false; } catch (e) { }
+    // ★ 원본 setBusy(index.js:3473/3488) = lf_setCurrentWindowClosable(!bBusy) — 닫기(X)버튼도 busy 와 대칭 토글.
+    //   ★★ busy off 는 setBusyWS20Interaction 뿐 아니라 setBusy(false)(왕복 해제부 bindBroadcast:126 등)로도 온다.
+    //   여기서 복원을 안 하면, 진입 때 setBusyWS20Interaction(true)로 건 disabled=true 가 성공-왕복(setBusy(false)) 후
+    //   잔류해 X 가 영구 사망한다(2026-08-09 감사: 해제/멀티/일괄적용/추가속성 성공경로 6건 결함). SSOT 를 여기로 일원화.
+    try {
+        var oBtnClose = document.querySelector(".u4a-winbtn--close");
+        if (oBtnClose) { oBtnClose.disabled = bBusy; }
+    } catch (e) { }
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
         try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
     }
@@ -277,14 +285,14 @@ oAPP.fn.setBusyWS20Interaction = function (bBusy, sOption) {
         } catch (e) { console.error("[HTML5][bindWindow] setBusyWS20Interaction 방송:", e && e.message); }
         _setBusy(bOn, { ISBROAD: true });   // 위에서 이미 보냈으므로 재방송 억제.
     } else {
-        _setBusy(bOn);
+        // 원본 index.js:3550 — sOption 없으면 WS20 에 방송하지 않는다(로컬 busy/닫기버튼만 처리).
+        //   기존 _setBusy(bOn)[방송] 은 진입완료 시 WS20 busy 를 조기 해제해 원본과 어긋났다.
+        //   → ISBROAD 로 방송 억제. 이제 setBusyWS20Interaction(false)[sOption 없음] = 닫기버튼 복원 + 로컬 off + WS20 유지.
+        _setBusy(bOn, { ISBROAD: true });
     }
 
-    // 원본 lf_setCurrentWindowClosable — busy 왕복 중 닫기 차단(창 closable 은 항상 false, 버튼만 토글).
-    try {
-        var oBtn = document.querySelector(".u4a-winbtn--close");
-        if (oBtn) { oBtn.disabled = bOn; }
-    } catch (e) { }
+    // ★ 닫기(X)버튼 토글은 _setBusy 로 일원화(위 두 분기 모두 _setBusy 경유) — 원본 lf_setCurrentWindowClosable.
+    //   여기서 따로 토글하지 않는다(중복 제거). busy off 가 setBusy(false) 로 오는 경로도 _setBusy 가 복원한다.
 };
 
 // 로드 완료 — 메인 busy lock 해제 + 공용 BUSY_OFF + 본문 표시(1회만).

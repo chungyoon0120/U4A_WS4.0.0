@@ -367,22 +367,25 @@
      *   ★ WS20 busy 왕복·UPDATE-DESIGN-DATA 방송 = P6. 여기선 로컬 적용 + toast(090)까지.
      ************************************************************************/
     oAPP.fn.applyDesignAdditBind = async function (oAnchor) {
+        // ★[원본 onAdditBind:8610] 클릭 즉시 WS20 busy(219 "추가 속성 바인딩 처리 진행중"). 성공은 왕복이 해제(자기해제 금지),
+        //   각 중단 분기는 setBusyWS20Interaction(false,{})로 해제(원본 8637/8661). off 짝 누락 = WS20 영구잠금.
+        oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("219") });
         oAPP.fn.clearAdditErrorMark();   // [원본 onAdditBind:8644] 추가속성 오류 표시 초기화(검증 전).
         // ① 중앙 하단 입력 완결성(원본 chkAdditBindData(oAdditTab=DESIGN_ADDIT)).
         var _r1 = (typeof oAPP.fn.chkAdditBindData === "function") ? oAPP.fn.chkAdditBindData("SEL") : { RETCD: "" };
-        if (_r1.RETCD === "E") { await _showErr(oAnchor, _r1); return; }   // [SPEC §6] 목록 팝오버.
+        if (_r1.RETCD === "E") { await _showErr(oAnchor, _r1); oAPP.fn.setBusyWS20Interaction(false, {}); return; }   // [SPEC §6] 목록 팝오버 + busy off(원본 8661).
         // [원본 onAdditBind:8668] 검증 통과 → 디자인 트리 오류 각인 초기화(하단으로 정상 적용 시 이전 빨강 해제).
         oAPP.fn.resetErrorField();
 
         // ② 선택 attribute(S_SEL_ATTR) 존재.
         var _sAttr = oAPP.attr.S_SEL_ATTR;
-        if (!_sAttr || !_sAttr.OBJID) { return; }
+        if (!_sAttr || !_sAttr.OBJID) { oAPP.fn.setBusyWS20Interaction(false, {}); return; }
 
         // ③ 트리 라인 + UI 정보(_T_0015) 확인(원본 setMPROP).
         var _sTree = (typeof oAPP.fn.getDesignTreeAttrData === "function") ? oAPP.fn.getDesignTreeAttrData(_sAttr.OBJID, _sAttr.UIATK) : undefined;
-        if (typeof _sTree === "undefined") { oAPP.fn.toast(H.z("110", _sAttr.UIATT || _sAttr.OBJID)); return; }   // 110 정보 없음.
+        if (typeof _sTree === "undefined") { oAPP.fn.setBusyWS20Interaction(false, {}); oAPP.fn.toast(H.z("110", _sAttr.UIATT || _sAttr.OBJID)); return; }   // 110 정보 없음.
         var _oUi = oAPP.attr.prev && oAPP.attr.prev[_sTree.OBJID];
-        if (!_oUi || !_oUi._T_0015) { oAPP.fn.toast(H.z("110", _sTree.OBJID)); return; }
+        if (!_oUi || !_oUi._T_0015) { oAPP.fn.setBusyWS20Interaction(false, {}); oAPP.fn.toast(H.z("110", _sTree.OBJID)); return; }
 
         // ④ 로컬 적용: 트리행 + _T_0015 stamp(중앙 하단 스토어 = additRowsSel).
         _sTree.MPROP = oAPP.fn.setAdditBindData(oAPP.attr.additRowsSel);
@@ -648,9 +651,10 @@
         var _aList = (typeof oAPP.fn.getSameAttrList === "function") ? oAPP.fn.getSameAttrList(_sTree) : [];
         if (_aList.length === 0) { oAPP.fn.toast(H.z("158", _sTree.UIATT)); return; }   // 158 동일 속성 없음.
 
-        // 검증 통과 — 동일속성 화면 진입(§5.2). 진입 busy on(원본 designTree.js:2492 setBusyWS20Interaction(true)).
+        // 검증 통과 — 동일속성 화면 진입(§5.2). 진입 busy on(원본 designTree.js:2489·2492).
+        //   ★DESC = 225 "바인딩 팝업에서 동일속성 바인딩 처리를 진행하고 있습니다."(원본 그대로). 129=버튼 라벨이라 오이식이었음.
         //   busy off 는 화면 렌더 후 openSyncBindScreen(원본 onViewReady:430)이 담당(진입 왕복).
-        oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("129") });
+        oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("225") });
         if (typeof oAPP.fn.openSyncBindScreen === "function") {
             oAPP.fn.openSyncBindScreen(_sTree, _aList);
         } else {
@@ -671,12 +675,18 @@
         // 183 선택 라인 없음(원본 541) — busy 켜기 전이라 off 불필요.
         if (_aSel.length === 0) { oAPP.fn.toast(H.z("183")); return; }
 
-        // 166 &1건 선택 + 159 일괄적용 확인. 129 "동일속성 바인딩 진행" WS20 busy(원본 onSetSyncAttr 3중 busy 대응).
-        //   _confirmAdditApply = 진입 WS20+팝업 busy → 확인창 동안 팝업만 off(WS20 유지) → onClose 팝업 재on /
-        //   취소면 WS20+팝업 off. (원본 취소 경로 busy 함정 §4-2 = 이 공통 경로가 해소.)
-        var _ok = await _confirmAdditApply(H.z("166", String(_aSel.length)) + "\n" + H.z("159"), H.z("129"));
-        if (!_ok) { return; }   // 취소 — busy off 는 _confirmAdditApply 가 처리.
+        // ★원본 onSetSyncAttr(synchronizionBind.js:494~)는 이 경로에서 WS20 에 busy 를 절대 방송하지 않는다
+        //   (setBusyWS20Interaction 을 전부 sOption 없이 호출 = 방송 안 함, 497/512/529/549/584/601). 진입 때 켠
+        //   WS20 busy(225)를 그대로 유지하고, 확인창·아니오·성공 내내 WS20 는 안 건드린다(성공은 WS20 왕복이 225 해제, 331~334).
+        //   ▶ _confirmAdditApply 에 sBusyDesc(129)를 주면 안 됨 — 주면 WS20 에 129 재방송(문구 225→129 로 바뀜) + 아니오 시
+        //     WS20 BUSY_OFF(225 조기해제)가 되어 원본과 어긋난다(장군님 08-09 발견). 그래서 sBusyDesc 없이 호출.
+        //   166 &1건 선택 + 159 일괄적용 확인.
+        var _ok = await _confirmAdditApply(H.z("166", String(_aSel.length)) + "\n" + H.z("159"));
+        if (!_ok) { return; }   // 취소 — WS20(225) 유지(안 건드림). 로컬 busy 도 안 켰으니 정리 불필요.
 
+        // 성공 처리 동안 "별창 로컬 busy 만"(원본 onClose:567 setBusy(true)+570 ROOT.setBusy(true), WS20 미방송=ISBROAD).
+        //   자기해제 안 함 — _setSyncAttr 의 attrSetBindProp→WS20 왕복이 로컬·WS20(225) busy 를 함께 해제(원본 331~334).
+        oAPP.fn.setBusy(true, { ISBROAD: true });
         await _setSyncAttr(_aSel, _oSync);
     };
 
@@ -685,9 +695,11 @@
         var _UIATV = oSync.S_ATTR.UIATV;
         var _sField = oAPP.fn.getModelBindData(_UIATV, oAPP.attr.modelTree);
 
-        // 150 &1 필드가 모델 항목에 존재하지 않습니다 — all-or-nothing 중단. busy(WS20+팝업) off.
+        // 150 &1 필드가 모델 항목에 존재하지 않습니다 — all-or-nothing 중단.
+        //   ★원본 236 = setBusyWS20Interaction(false)[sOption 없음] = WS20 미방송(225 유지) + 로컬 off.
+        //   setBusyWS20Interaction(false,{})는 sOption={} 라 WS20 에 BUSY_OFF 방송(225 조기해제) → 금지. 로컬만 끈다.
         if (typeof _sField === "undefined") {
-            oAPP.fn.setBusyWS20Interaction(false, {});
+            oAPP.fn.setBusy(false, { ISBROAD: true });
             oAPP.fn.toast(H.z("150", _UIATV));
             return;
         }
@@ -914,26 +926,28 @@
 
     // 드롭 처리(원본 onDropBindField 1:1 — WS20 캔버스(prc002) 우선 → 프로퍼티/aggregation(prc001)) — 편집모드 + 검증 통과 시 쓰기 후 재렌더.
     async function _onDesignDrop(ev) {
-        if (oAPP.attr.editable === false) { return; }
+        // ★ 진입 WS20 busy(220)는 호출측 drop 리스너가 켠다 → 여기 각 중단 분기에서 반드시 OFF(원본 onDropBindField 1244/1278/1299).
+        //   성공은 OFF 하지 않음 — _setBindAttribute→attrSetBindProp→WS20 왕복이 해제(자기해제 금지).
+        if (oAPP.attr.editable === false) { oAPP.fn.setBusyWS20Interaction(false, {}); return; }
 
-        // ① WS20 디자인 트리 드래그(prc002) → 디자인 트리 전체 재구성(원본 우선 분기).
-        if (oAPP.fn.dropDesignArea(ev.dataTransfer.getData("prc002")) === true) { return; }
+        // ① WS20 디자인 트리 드래그(prc002) → 디자인 트리 전체 재구성(원본 우선 분기). 리스너가 이미 처리하므로 보통 도달 안 함(방어).
+        if (oAPP.fn.dropDesignArea(ev.dataTransfer.getData("prc002")) === true) { oAPP.fn.setBusyWS20Interaction(false, {}); return; }
 
         // ② 좌측 모델필드 드래그(prc001) → 바인딩 쓰기.
         var _sRes = _checkDragData(ev.dataTransfer.getData("prc001"));   // ★ dataTransfer 는 await 前 동기 판독.
-        if (_sRes.RETCD === "E") { if (_sRes.RTMSG) { oAPP.fn.toast(_sRes.RTMSG); } return; }
+        if (_sRes.RETCD === "E") { if (_sRes.RTMSG) { oAPP.fn.toast(_sRes.RTMSG); } oAPP.fn.setBusyWS20Interaction(false, {}); return; }   // 원본 1278
 
         var _sDrop = _dropNodeOf(ev);
-        if (typeof _sDrop === "undefined") { return; }
+        if (typeof _sDrop === "undefined") { oAPP.fn.setBusyWS20Interaction(false, {}); return; }   // 원본 1299
 
         // 드롭 가능 검증(원본 checkValidBind) — 불가 시 메시지.
         var _chk = oAPP.fn.checkValidBind(_sDrop, _sRes.IF_DATA);
-        if (_chk.RETCD === "E") { oAPP.fn.toast(oAPP.common.zmsg(_chk.MSGNO) || ""); return; }
+        if (_chk.RETCD === "E") { oAPP.fn.toast(oAPP.common.zmsg(_chk.MSGNO) || ""); oAPP.fn.setBusyWS20Interaction(false, {}); return; }
 
         // DESIGN TREE 드롭은 추가속성 미적용(원본 §4.8-b) — MPROP 초기화.
         _sRes.IF_DATA.MPROP = "";
 
-        if ((await _setBindAttribute(_sRes.IF_DATA, _sDrop)) === false) { return; }
+        if ((await _setBindAttribute(_sRes.IF_DATA, _sDrop)) === false) { oAPP.fn.setBusyWS20Interaction(false, {}); return; }
         _sDrop.chk_seleced = false;
 
         // [R-3] 원본 onDropBindField: 바인딩 후 참조필드 DDLB + 중앙하단 SEL 패널 재구성(designTree.js:1328·1332). 필수 호출 직접.
@@ -990,25 +1004,29 @@
             ev.preventDefault();   // ★ preventDefault 는 await 前 동기 호출.
             _dropZone(false); _setDropRow(null);
             // ★ 선별 금지 — 드롭 이벤트 진입 즉시 무조건 busy ON, 필요 없는 분기에서만 OFF(장군님 지시).
-            oAPP.fn.setBusy(true);
+            oAPP.fn.setBusy(true);   // 즉시 로컬 오버레이(busy 페이드 조기해제 방지).
             // dataTransfer 는 이 이벤트 안에서만 유효 → prc002 문자열 동기 판독.
             var _prc002 = ev.dataTransfer.getData("prc002");
             if (_prc002) {
-                // WS20 UI 드롭 → 트리 전체 재구성(로컬). 동기라 rAF 2틱(페인트 확보) 뒤 실행 → 완료/예외 시 OFF.
+                // WS20 UI 드롭 → 트리 전체 재구성. ★원본 221 "디자인 TREE 영역을 갱신하고 있습니다" WS20 busy
+                //   (designTree.js onDropBindField:1229/1232). 재구성은 로컬이라 완료/예외 시 직접 OFF(원본 1268).
+                oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("221") });
                 var _fnDrop = function () {
                     try { oAPP.fn.dropDesignArea(_prc002); }
                     catch (e) { console.error("[HTML5][bindWindow] dropDesignArea:", e && e.message); }
-                    finally { oAPP.fn.setBusy(false); }
+                    finally { oAPP.fn.setBusyWS20Interaction(false, {}); }
                 };
                 if (typeof requestAnimationFrame === "function") {
                     requestAnimationFrame(function () { requestAnimationFrame(_fnDrop); });
                 } else { _fnDrop(); }
                 return;
             }
-            // 좌측 모델필드(prc001) 바인딩은 busy 왕복이 아직 미이식((B)군) → 여기선 OFF 후 위임(무한 busy 방지).
-            oAPP.fn.setBusy(false);
+            // 좌측 모델필드(prc001) 바인딩 — ★원본 220 "바인딩 처리를 진행하고 있습니다" WS20 busy
+            //   (designTree.js onDropBindField:1224/1232). 성공은 attrSetBindProp→WS20 왕복이 해제(자기해제 금지),
+            //   중단 분기는 _onDesignDrop 안에서 setBusyWS20Interaction(false,{})로 OFF(원본 1290/1309).
+            oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("220") });
             try { await _onDesignDrop(ev); }
-            catch (e) { console.error("[HTML5][bindWindow] 디자인트리 drop:", e && e.message); }
+            catch (e) { console.error("[HTML5][bindWindow] 디자인트리 drop:", e && e.message); oAPP.fn.setBusyWS20Interaction(false, {}); }
         });
     }
 
