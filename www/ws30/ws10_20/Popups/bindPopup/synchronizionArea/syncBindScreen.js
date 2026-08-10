@@ -194,7 +194,7 @@
 
         // 상단 툴바: [뒤로 189] · [동일속성 적용 팝업 호출 140 — S5까지 비활성] · Spacer · [도움말 198].
         var tool = H.el("div", "u4aBwpTool u4aBwpSyncTool");
-        tool.appendChild(_btn("arrow-left", H.z("189"), H.z("189"), "u4a-btn--emphasized", function () {   // 189 Back
+        tool.appendChild(_btn("chevron-left", H.z("189"), H.z("189"), "u4a-btn--emphasized", function () {   // 189 Back — WS20 뒤로가기와 동일 아이콘(원본 nav-back → HTML5 chevron-left, ws_html5_ws20.js:717)
             oAPP.fn.onSyncMoveDesignPage();
         }));
         // 140 동일속성 적용 팝업 호출(원본 onCallSyncBindPopup:659). ★열 때 자기 비활성(원본 666), 닫아도 재활성 안 함(화면 재진입 전까지).
@@ -222,7 +222,12 @@
         oSync.page = page;
 
         // ── 가운데 영역 슬라이드 진입(forward) ──
-        oAPP.fn.designSwapToPage(page, false);
+        //   ★진입 busy off 는 슬라이드(0.26s) 완전 종료 콜백에서 — 원본 afterNavigate/onViewReady:430 = setBusyWS20Interaction(false)[sOption 없음].
+        //     (슬라이드 도중 로딩을 미리 끄면 그 틈에 "동일속성 적용 팝업 호출" 등 버튼 연타가 들어와 화면 전환이 꼬여 백지 — 2026-08-10 장군님 발견.)
+        //     WS20 미방송: 별창 로컬 busy off + 닫기(X)버튼 복원, WS20 busy(225)는 뒤로/적용완료까지 유지(2026-08-09 정정 유지).
+        oAPP.fn.designSwapToPage(page, false, function () {
+            oAPP.fn.setBusyWS20Interaction(false);
+        });
 
         // ── 진입 부수효과(원본 designTree.js onSynchronizionBind:2656~2670 순서) ──
         oAPP.fn.setAdditBindButtonEnable(false);       // 2656 우측 바인딩 버튼 비활성.
@@ -231,17 +236,6 @@
         if (typeof oAPP.fn.clearSelectAdditBind === "function") { oAPP.fn.clearSelectAdditBind(); }   // 2662 추가속성 선택 초기화.
         if (typeof oAPP.fn.setAdditLayout === "function") { oAPP.fn.setAdditLayout(""); }             // 2666 중앙하단 addit 패널 비움.
         oAPP.fn.setViewEditable(false);                // 2670 메인(중앙하단 적용/좌측 갱신/좌측 기어) 비활성.
-
-        // ── 진입 busy off(원본 onViewReady:430) — 렌더/슬라이드 안정 후(rAF 2틱, busy 페이드 조기해제 방지) ──
-        //   ★원본 onViewReady:430 = setBusyWS20Interaction(false)[sOption 없음]: 별창 로컬 busy off +
-        //     ★별창 닫기(X)버튼 복원 + WS20 방송 안 함(=WS20 busy 유지, 뒤로/적용완료 시 해제).
-        //   frame.js setBusyWS20Interaction else 경로가 방송을 억제(ISBROAD)하도록 정정돼 원본과 1:1.
-        //   (기존 setBusy(false,{ISBROAD}) 우회는 닫기버튼 복원을 안 해 진입 후 X 가 안 눌리던 결함 — 2026-08-09 장군님 발견.)
-        requestAnimationFrame(function () {
-            requestAnimationFrame(function () {
-                oAPP.fn.setBusyWS20Interaction(false);
-            });
-        });
     };
 
     /************************************************************************
@@ -322,6 +316,11 @@
         oAPP.fn.setBusyWS20Interaction(false, {});   // 원본 afterClose(711) broadToChild BUSY_OFF.
     }
 
+    // [S5] 닫기 전용 절차를 외부(일괄적용 성공 경로 designArea.onSetSyncAttr)에서도 호출 가능하게 공개.
+    //   원본은 UI5 Dialog.close() 가 beforeClose(잠금해제)+afterClose(destroy+BUSY_OFF)를 자동 발동하나,
+    //   HTML5 <dialog> 는 자동 이벤트가 없어 성공 경로에서 이 절차를 명시 호출해야 X/취소 닫기와 동일해진다.
+    oAPP.fn.closeSyncBindDialog = _closeSyncDialog;
+
     // [S5] 원본 setViewLayoutEditable(synchronizionBind.js:820) — 다이얼로그 열린 동안 좌/가운데/우 잠금.
     function _setSyncViewLayout(bLock) {
         if (oAPP.attr.editable !== true) { return; }   // 원본 823 IS_EDIT === "" 대응(편집 불가 화면이면 무동작).
@@ -339,6 +338,7 @@
     function _clearSyncListSelection() {
         (oSync.aList || []).forEach(function (r) { r._chk = false; });
         if (oSync.tbl && typeof oSync.tbl.refresh === "function") { oSync.tbl.refresh(); }
+        _syncSetAllChkState();   // 헤더 전체선택 체크박스도 해제 상태로 갱신 — 개별 행만 지우면 맨 위 전체선택이 직전(뒤 테이블) 상태로 남는다(원본 _clearSelectionPopupTable=테이블 전체 선택 해제, 헤더 포함).
     }
 
     /************************************************************************

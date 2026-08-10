@@ -777,8 +777,11 @@
 
         // ★busy 자기해제 안 함(원본 331~334) — WS20 가 UPDATE-DESIGN-DATA 반영 후 BUSY_OFF 방송으로 해제. onMultiBind 동일.
 
-        // S5 훅 자리: 비모달 다이얼로그가 열려 있으면 close(원본 337~339). 현재 no-op.
-        if (oSync.oDialog && typeof oSync.oDialog.close === "function") { oSync.oDialog.close(); }
+        // S5: 비모달 다이얼로그가 열려 있으면 닫는다(원본 337~339 close()).
+        //   ★원본 close() 는 beforeClose(잠금해제 setViewLayoutEditable(true))+afterClose(destroy+BUSY_OFF)를 자동 발동하나,
+        //     HTML5 <dialog> 는 자동 이벤트가 없다 → 닫기 전용 절차(closeSyncBindDialog=_closeSyncDialog)를 명시 호출해야
+        //     X/취소 닫기와 동일하게 뒤 화면 잠금 해제 + 창 제거 + WS20 BUSY_OFF 가 함께 처리된다(성공만 raw close 라 잠금 잔존했음).
+        if (oSync.oDialog && typeof oAPP.fn.closeSyncBindDialog === "function") { oAPP.fn.closeSyncBindDialog(); }
     }
 
     // 디자인트리 체크선택 행 수집(원본 getSelectedDesignTree 1:1) — 멀티/참조필드(P3-C) 공용.
@@ -1067,8 +1070,10 @@
         for (var i = 0; i < aRows.length; i++) {
             var oRow = aRows[i], n = _srcNode(oRow.__bwpNode);   // 필터 복사본 → 원본(_drop_enable 라이브).
             if (!bDragging || !n) { oRow.classList.remove("u4aBwpDropOk", "u4aBwpDropNo", "u4aBwpDropRow"); continue; }   // DropRow=hover 행 테두리(드래그 종료 시 정리).
-            oRow.classList.toggle("u4aBwpDropOk", n._drop_enable === true);
-            oRow.classList.toggle("u4aBwpDropNo", n.DATYP === "02" && n._drop_enable !== true);
+            // ★동일속성 적용 팝업 열림(bSyncDialogLock) = 가운데 전부 드롭 불가 → 놓을수있음(초록) 표시 없음 + 속성행 전부 '흐림'(못 놓는 행과 동일 표시, 장군님 지시 2026-08-10).
+            var bLock = (oAPP.attr.bSyncDialogLock === true);
+            oRow.classList.toggle("u4aBwpDropOk", !bLock && n._drop_enable === true);
+            oRow.classList.toggle("u4aBwpDropNo", n.DATYP === "02" && (bLock || n._drop_enable !== true));
         }
     }
 
@@ -1533,28 +1538,34 @@
      *   트리 콘텐츠(툴바+트리호스트) ↔ 외부 페이지 el 을 슬라이드+페이드(.analy 16 §9.2: 0.26s, ±32px, opacity,
      *   들어오는 z-index:2). 즉시스왑 금지(§9). 진입=forward, 뒤로=back.
      ************************************************************************/
-    oAPP.fn.designSwapToPage = function (elPage, bBack) {
+    oAPP.fn.designSwapToPage = function (elPage, bBack, fnDone) {
         var oArea = document.getElementById("bwpDesignArea");
-        if (!oArea || !elPage) { return; }
+        if (!oArea || !elPage) { if (typeof fnDone === "function") { fnDone(); } return; }
+        // ★이전 스왑/복귀의 미완료 뒷정리 타이머를 취소(원본 NavContainer 직렬화 대응) — 안 하면 뒤늦게 발동해 되살린 트리를 다시 감춰 백지.
+        if (oD._swapTimer) { clearTimeout(oD._swapTimer); oD._swapTimer = null; }
         elPage.classList.add("u4aBwpDesignPage");
         oArea.appendChild(elPage);
         elPage.classList.add(bBack ? "u4aBwpPgInBack" : "u4aBwpPgIn");   // 들어오는 페이지 슬라이드인.
         var aOut = [oD.tool, oD.host];
         aOut.forEach(function (el) { if (el) { el.classList.add(bBack ? "u4aBwpPgOutBack" : "u4aBwpPgOut"); } });   // 나가는 트리 슬라이드아웃.
-        setTimeout(function () {
+        oD._syncPage = elPage;
+        oD._swapTimer = setTimeout(function () {
+            oD._swapTimer = null;
             aOut.forEach(function (el) {
                 if (!el) { return; }
                 el.style.display = "none";
                 el.classList.remove("u4aBwpPgOut", "u4aBwpPgOutBack");
             });
+            if (typeof fnDone === "function") { fnDone(); }   // ★진입 슬라이드(0.26s) 완전 종료 후 콜백 — busy off 를 여기서(원본 afterNavigate 1:1).
         }, 260);
-        oD._syncPage = elPage;
     };
 
     // 디자인 트리로 복귀(원본 moveDesignPage) — teardown(동일속성 페이지 제거, 원본 onViewExit destroy) 포함.
     //   Promise = 트랜지션(0.26s) 완료 시 resolve → 호출측이 복원/ busy off 를 그 후에 수행.
     oAPP.fn.moveDesignPage = function () {
         return new Promise(function (res) {
+            // ★진입 스왑의 "트리 감추기" 타이머가 아직 안 끝났으면 취소 — 되살릴 트리를 뒤늦게 다시 감추는 백지 방지(직접 원인).
+            if (oD._swapTimer) { clearTimeout(oD._swapTimer); oD._swapTimer = null; }
             var elPage = oD._syncPage;
             var aIn = [oD.tool, oD.host];
             aIn.forEach(function (el) {
@@ -1566,7 +1577,8 @@
                 elPage.classList.remove("u4aBwpPgIn", "u4aBwpPgInBack");
                 elPage.classList.add("u4aBwpPgOutBack");   // 동일속성 페이지 슬라이드아웃(back).
             }
-            setTimeout(function () {
+            oD._swapTimer = setTimeout(function () {
+                oD._swapTimer = null;
                 aIn.forEach(function (el) { if (el) { el.classList.remove("u4aBwpPgInBack"); } });
                 if (elPage && elPage.parentNode) { elPage.parentNode.removeChild(elPage); }
                 oD._syncPage = null;

@@ -84,7 +84,7 @@
      */
     var SKIN_MAP = {
         horizon_white: { mode: "light", accent: "#0070f2", hover: "#0064d9", soft: "rgba(0,112,242,.14)", bar: "#354a5f", bar2: "#2c5a7a" },
-        horizon_dark: { mode: "dark", accent: "#3c93f5", hover: "#5aa6f7", soft: "rgba(60,147,245,.18)", bar: "#1b2a3a", bar2: "#22405e" },
+        horizon_dark: { mode: "dark", accent: "#3c93f5", hover: "#5aa6f7", soft: "rgba(60,147,245,.18)", bar: "#1b2a3a", bar2: "#22405e", successStrong: "#3aa564" },
         horizon_purple: { mode: "light", accent: "#7a3ff2", hover: "#6a2fe0", soft: "rgba(122,63,242,.16)", bar: "#4a2a6f", bar2: "#5e3491", bg: "#f6f2fe", surface: "#efe8fd", surface2: "#e7dcfb", border: "#e3d8f6" },
         horizon_red: { mode: "light", accent: "#e23b3b", hover: "#c92f2f", soft: "rgba(226,59,59,.15)", bar: "#6f2a2a", bar2: "#8c3030", bg: "#fdf4f4", surface: "#fbeaea", surface2: "#f7dcdc", border: "#f2d6d6" },
         horizon_green: { mode: "light", accent: "#1f9d57", hover: "#178047", soft: "rgba(31,157,87,.15)", bar: "#244d2c", bar2: "#2c6639", bg: "#f1faf4", surface: "#e6f5ec", surface2: "#d6eede", border: "#d3ead9" },
@@ -109,6 +109,11 @@
         oRoot.style.setProperty("--u4a-accent", oT.accent);
         oRoot.style.setProperty("--u4a-accent-hover", oT.hover);
         oRoot.style.setProperty("--u4a-accent-soft", oT.soft);
+        // Accept(성공) 초록 강조 버튼 마우스 올림 — 파랑(--u4a-accent-hover)과 동일하게 테마별.
+        //   미설정 테마는 인라인 제거 → tokens.css 기본(--c-success-strong=진한 초록) 유지(밝은 테마=진하게).
+        //   설정 테마(예 어두운 테마)는 그 값 사용(어두운 배경=밝은 초록) → 파랑과 방향 일치.
+        if (oT.successStrong) { oRoot.style.setProperty("--state-success-strong", oT.successStrong); }
+        else { oRoot.style.removeProperty("--state-success-strong"); }
         oRoot.style.setProperty("--u4a-titlebar-bg", oT.bar);
         oRoot.style.setProperty("--u4a-titlebar-bg2", oT.bar2 || oT.bar);
         var _v = function (sName, sVal) { if (sVal) { oRoot.style.setProperty(sName, sVal); } else { oRoot.style.removeProperty(sName); } };

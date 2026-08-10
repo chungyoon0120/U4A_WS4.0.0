@@ -37,6 +37,7 @@
 
     /* horizon 상태색 (테마 공통) */
     --c-success: #107e3e;
+    --c-success-strong: #0d6b35;   /* 성공 초록의 진한 짝(파랑 --c-blue/--c-blue-strong 과 대칭) — Accept 버튼 마우스 올림용. */
     --c-warning: #e76500;
     --c-error: #e90b0b;
 }
@@ -77,6 +78,7 @@
     --state-warning: var(--c-warning);
     --state-warning-bg: #fff8e5;
     --state-success: var(--c-success);
+    --state-success-strong: var(--c-success-strong);   /* Accept(성공) 채운 버튼 마우스 올림 — 파랑 --accent-strong 과 대칭. */
     --state-success-bg: #eafaf0;
     --state-info: var(--accent);
     --state-info-bg: #e8f1ff;

@@ -418,7 +418,13 @@ body {
     border-color: var(--state-success);
     color: var(--state-success-contrast, #fff);
 }
-.u4aBwpBtn--sync:hover { filter: brightness(0.95); }
+/* ★ 마우스 올림 = 파랑 버튼(.u4a-btn--emphasized:hover=var(--accent-strong))과 동일 방식: 진한 같은색으로 바꾼다.
+   재지정 안 하면 공통 .u4a-btn:hover(회색 --sl-surface-2)가 배경을 덮어 초록이 회색으로 뜬다(파랑/빨강은 공통에
+   hover 배경 있어 무사, 초록만 공통 미제공이라 누락됐던 것). 진한 초록은 공통 팔레트에 대칭 보완(tokens.css). */
+.u4aBwpBtn--sync:hover {
+    background: var(--state-success-strong);
+    border-color: var(--state-success-strong);
+}
 /* ★ 공통 .u4a-btn:disabled(shell.css, 0,2,0)가 단일클래스 .u4aBwpBtn--sync(0,1,0)의 배경을 덮어
    비활성 시 녹색 테두리+회색 배경으로 깨진다 → 색 버튼 규약(16 §)대로 원색을 opacity 로 재지정. */
 .u4aBwpBtn--sync:disabled {
