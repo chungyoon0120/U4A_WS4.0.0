@@ -374,6 +374,11 @@
   background: var(--ws20-panel); /* 행/컬럼 격자선은 아래 트리 ul 배경에 얹음(스크롤 동기화 위해) */
 }
 .u4aWs20TreeEmpty {
+  /* 빈 상태 문구는 영역 정중앙(위아래+좌우) — 공통 UX(.u4a-empty, .analy/16 체크리스트 D)와 동일.
+     부모 .u4aWs20TreeScroll 가 flex:1 로 높이가 정해져 있어 min-height:100% 로 채운 뒤 flex 가운데정렬. */
+  min-height: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
   padding: 16px; text-align: center; color: var(--ws20-text-sub); font-size: 13px;
 }
 
@@ -788,10 +793,14 @@
 .u4aWs20AttrScroller {
   flex: 1 1 auto; min-height: 0;
   overflow-y: auto; overflow-x: hidden;
+  /* 세로 배치 — 내용이 없을 때 아래 ROWS 가 남는 높이를 채워 빈 문구를 정중앙에 두기 위함.
+     자식(INFO/STICKY/ROWS)은 아래에서 flex-shrink:0 로 두어 스크롤 동작(눌림 방지)을 유지. */
+  display: flex; flex-direction: column;
 }
 .u4aWs20AttrSticky {
   position: sticky; top: 0; z-index: 3;
   background: var(--ws20-panel);
+  flex: 0 0 auto;
 }
 
 /* (a) 상단 헤더 — [UI 아이콘] [UI명(흰색 굵게)] … [UILIB] */
@@ -963,8 +972,11 @@
 
 /* (f) 속성 행 — 스크롤은 부모 SCROLLER 가 담당(이전엔 ROWS 자체가 스크롤이었음) */
 .u4aWs20AttrRows {
-  flex: 0 0 auto;
+  /* 내용이 스크롤보다 짧으면 남는 높이를 채우고(grow), 길면 줄지 않아(shrink 0) 스크롤 유지.
+     빈 상태(.u4aWs20AttrRows--empty)일 때 이 높이 안에서 문구를 정중앙에 둔다. */
+  flex: 1 0 auto; min-height: 0;
 }
+.u4aWs20AttrRows--empty { display: flex; align-items: center; justify-content: center; }
 .u4aWs20AttrEmpty { padding: 16px; text-align: center; color: var(--ws20-text-sub); }
 
 /* 그룹 헤더 (구 Sorter group: Properties / Events / Aggregations …)

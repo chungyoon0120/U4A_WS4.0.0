@@ -23,24 +23,6 @@
         var sBg = q.get("BGCOL"); if (sBg) { docEl.style.setProperty("--boot-bg", sBg); }
         var sTitle = q.get("TITLE"); if (sTitle) { document.title = sTitle; }
 
-        // [HTML5 2026-07-24] 다크 테마인데 color-scheme 미지정이면 Chromium 이 첫 페인트 캔버스/스크롤바를
-        //   기본값(light=흰색)으로 그려 흰 번쩍의 한 원인이 된다. THEME 키에 "dark" 가 있거나 BGCOL 휘도가
-        //   어두우면 dark, 아니면 light 로 첫 페인트 전 지정(하드코딩 아님 — 테마 밝기로 선택). toUI5Theme 동일 판정.
-        (function () {
-            function _isDarkColor(v) {
-                var s = String(v || "").trim().replace(/^#/, ""), r, g, b;
-                if (/^[0-9a-f]{3}$/i.test(s)) { s = s.replace(/(.)/g, "$1$1"); }
-                var m = s.match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-                if (m) { r = parseInt(m[1], 16); g = parseInt(m[2], 16); b = parseInt(m[3], 16); }
-                else { var mr = s.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/); if (mr) { r = +mr[1]; g = +mr[2]; b = +mr[3]; } }
-                if (typeof r !== "number") { return false; }
-                return (0.299 * r + 0.587 * g + 0.114 * b) < 128;
-            }
-            var sTheme = q.get("THEME");
-            var bDark = /dark/i.test(sTheme || "") || _isDarkColor(sBg);
-            docEl.style.setProperty("color-scheme", bDark ? "dark" : "light");
-        })();
-
         var THEME_DIR = "../../../../theme";
         var LIB = "../../../../../../lib";
         var head = document.getElementsByTagName("head")[0];
@@ -58,12 +40,10 @@
             //   winChrome 에 html margin 규칙이 없어 그 여백이 그대로 먹으면 문서 루트가 뷰포트보다 커져 "루트 스크롤"이
             //   생기고, 그 스크롤이 화면 최상단 고정 타이틀바까지 밀어 올린다(헤더가 본문과 함께 스크롤되는 증상).
             //   여기서 html{margin:0;overflow:hidden} 로 잡아(특정성 우위) 루트 스크롤을 없애고, 스크롤은 body 만 담당.
-            // ★html(바깥틀)에도 테마색 배경 — body 만 칠하면 첫 페인트 극초기·뷰포트 여백에 루트 캔버스(흰색)가 비친다.
-            'html[data-u4a-win="X"]{height:100%;margin:0;overflow:hidden;background:var(--boot-bg,var(--app-bg));}' +
+            'html[data-u4a-win="X"]{height:100%;margin:0;overflow:hidden;}' +
             'html[data-u4a-win="X"] body{height:100%;margin:0;box-sizing:border-box;overflow:auto;background:var(--boot-bg,var(--app-bg));}' +
             '#u4aOtherTitlebar{position:fixed;top:0;left:0;right:0;z-index:2147483000;}' +
-            // ★iframe 칸 자체 배경 투명 — M1/M2 속화면(frame.html)이 로드되기 전 iframe 기본 캔버스(흰색)가 번쩍이는 것 차단.
-            'html[data-u4a-win="X"] #detail_frame{position:fixed;top:var(--u4a-win-hd,48px);left:0;right:0;bottom:0;width:auto;height:auto;border:0;background:transparent;}' +
+            'html[data-u4a-win="X"] #detail_frame{position:fixed;top:var(--u4a-win-hd,48px);left:0;right:0;bottom:0;width:auto;height:auto;border:0;}' +
             // 정적 가이드 문서(M3/M4) 텍스트 선택 복원 — shell.css 전역 user-select:none 상쇄(타이틀바 제외).
             'html[data-u4a-win="X"] body > *:not(#u4aOtherTitlebar){-webkit-user-select:text;user-select:text;}';
         head.appendChild(st);

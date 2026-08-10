@@ -132,14 +132,7 @@
         return oOvf;
     };
 
-    /************************************************************************
-     * 빈 트리 표식 — 데이터가 없으면 host 에 .u4aBwpTreeEmpty 를 붙여 그리드/행라인을 끈다.
-     *   ★ 공통 makeColumnTree 는 .u4aColTreeBody(반복 그라디언트=가로 행라인)+.u4aColTreeGrid(세로 컬럼라인)를
-     *     데이터 없어도 그린다. 원본 sap.ui.table 은 빈 경우 선을 안 그리므로(사용자 지적), 빈 트리에선 스코프로 끈다.
-     ************************************************************************/
-    oAPP.fn.setTreeEmptyMark = function (oHost, bEmpty) {
-        if (oHost) { oHost.classList.toggle("u4aBwpTreeEmpty", !!bEmpty); }
-    };
+    /* 빈 트리 격자 숨김(setTreeEmptyMark/.u4aBwpTreeEmpty)은 공통 makeColumnTree _showEmpty 로 흡수돼 제거됨(2026-08-10). */
 
     /************************************************************************
      * 컬럼 폭 계산 헬퍼 — makeColumnTree host 각 컬럼의 "콘텐츠 자연폭"(좌우 패딩 포함).

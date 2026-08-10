@@ -160,6 +160,19 @@
     // busy/Lock — 원본 fnSetBusyLock 그대로(창 자체 오버레이).
     function lf_busy(b) { try { oAPP.common.fnSetBusyLock(b ? "X" : ""); } catch (e) { } }
 
+    // 트리 렌더 — 공통 래퍼(makeColumnTree) rerender 경유. 0건이면 격자 숨김 + 안내문구(emptyText)를
+    //   가운데 표시(공통 .u4a-empty, .analy/16 §3.4.2·395), 데이터 있으면 정상 렌더.
+    //   자동 첫행선택은 끔(false) — mime 는 My APP 경로로 직접 선택하므로.
+    function lf_treeRender() {
+        try {
+            if (oUI && oUI.treeCtrl && typeof oUI.treeCtrl.rerender === "function") {
+                oUI.treeCtrl.rerender(false);
+                return;
+            }
+        } catch (e) { console.error("[HTML5][MIME] 트리 렌더 오류:", e && e.message); }
+        try { if (oUI && oUI.tree) { oUI.tree.render(); } } catch (e2) { }
+    }
+
     /* ── Monaco 호스트(iframe) 통신 ───────────────────────────────────── */
     function lf_toHost(oMsg) {
         try {
@@ -275,7 +288,7 @@
             oExpand = {};
             for (var r = 0; r < aTreeRoots.length; r++) { oExpand[aTreeRoots[r].CHILD] = true; }
 
-            oUI.tree.render();
+            lf_treeRender();
 
             lf_expandMyApp(aFlat);
 
@@ -299,7 +312,7 @@
         oState.myAppPath = [];
         if (oUI && oUI.myAppBtn) { oUI.myAppBtn.hidden = !oState.myAppKey; }
         if (!oMyApp) {
-            if (aTreeRoots[0]) { oState.selKey = aTreeRoots[0].CHILD; oUI.tree.render(); lf_autoSelect(aTreeRoots[0].CHILD); }
+            if (aTreeRoots[0]) { oState.selKey = aTreeRoots[0].CHILD; lf_treeRender(); lf_autoSelect(aTreeRoots[0].CHILD); }
             return;
         }
         var byKey = {};
@@ -330,7 +343,7 @@
         if (!oState.myAppKey) { return; }
         (oState.myAppPath || []).forEach(function (k) { oExpand[k] = true; });
         oState.selKey = oState.myAppKey;
-        oUI.tree.render();
+        lf_treeRender();
         oUI.tree.scrollToKey(oState.myAppKey);
         lf_autoSelect(oState.myAppKey);   // 우측 속성까지 자동 출력
     }
@@ -389,7 +402,7 @@
 
                 _buildChildrenFromResult(oNode, oRes);
 
-                oUI.tree.render();
+                lf_treeRender();
                 lf_busy(false);
                 resolve(true);
             });
@@ -411,6 +424,8 @@
         var oCtrl = U4AUI.makeColumnTree(oHost, {
             virtual: true,
             fillLast: true,
+            // 0건일 때 공통 빈상태(격자 숨김 + 문구 가운데). 문구=공통 312("데이터를 찾을 수 없습니다.").
+            emptyText: _wsTxt("312"),
             columns: [
                 { label: _txt("/U4A/CL_WS_COMMON", "A50"), width: "11rem" },   // A50 이름(고정폭·리사이즈 대상)
                 { label: _txt("/U4A/CL_WS_COMMON", "A35") }                     // A35 설명(채움)
@@ -759,7 +774,7 @@
         if (!n) { return; }
         if (n.ZLEVEL === 1 || n.ZLEVEL === 2) {
             _walkNodes(aTreeRoots, function (x) { if (_hasRealKids(x)) { oExpand[x.CHILD] = true; } });
-            oUI.tree.render();
+            lf_treeRender();
             return;
         }
         lf_expandSubtreeLazy(n);
@@ -769,7 +784,7 @@
         if (!oNode) { return; }
         lf_busy(true);
         var iPending = 0;
-        function _done() { if (iPending === 0) { oUI.tree.render(); lf_busy(false); } }
+        function _done() { if (iPending === 0) { lf_treeRender(); lf_busy(false); } }
         function step(n) {
             if (!n || n.CHILD === "DUMMY_CHILD") { return; }
             if (oState.sLazy && _hasDummy(n)) {
@@ -795,7 +810,7 @@
         var n = lf_selNode();
         if (!n) { return; }
         oExpand[n.CHILD] = false;
-        oUI.tree.render();
+        lf_treeRender();
     }
 
     /************************************************************************
@@ -1123,7 +1138,7 @@
     //   추가하자마자 그 파일이 선택되고 우측에 내용이 뜨게 — lf_autoSelect 가 lf_onRowSelect(파일=미리보기 로드) 호출.
     function lf_selectNewNode(sLastKey) {
         if (sLastKey) { oState.selKey = sLastKey; }
-        oUI.tree.render();
+        lf_treeRender();
         try { if (sLastKey) { oUI.tree.scrollToKey(sLastKey); } } catch (e) { }
         if (sLastKey) { lf_autoSelect(sLastKey); }
     }
@@ -1205,7 +1220,7 @@
         oState.selKey = "";
         lf_setProps({});
         lf_showPreview("none");
-        oUI.tree.render();
+        lf_treeRender();
     }
 
     /************************************************************************
@@ -1742,7 +1757,7 @@
 
         oUI = {
             frame: oFrame, img: oImg, pdf: oPdf, audio: oAudio, video: oVideo, nodata: oNoData,
-            tree: oTree, treeBody: oTreeBody, panel: oPanel, myAppBtn: oMyAppBtn,
+            tree: oTree, treeCtrl: oCtrl, treeBody: oTreeBody, panel: oPanel, myAppBtn: oMyAppBtn,
             typeField: oTypeField, fileField: oFileField, urlField: oUrlField, dateField: oDateField, timeField: oTimeField, nameField: oNameField,
             split: oSplit, hostReady: false
         };
@@ -1842,7 +1857,7 @@
         if (oUI.myAppBtn) { oUI.myAppBtn.hidden = true; }
         lf_setProps({});
         lf_showPreview("none");
-        oUI.tree.render();
+        lf_treeRender();
 
         lf_loadTree();
 

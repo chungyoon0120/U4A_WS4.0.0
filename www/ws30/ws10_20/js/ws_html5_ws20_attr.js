@@ -5018,6 +5018,8 @@
         if (!ROWS) { return; }
 
         ROWS.innerHTML = "";
+        //빈 상태 가운데정렬 클래스는 매 렌더 초기화 → 행이 그려지면 일반(위→아래) 흐름.
+        ROWS.classList.remove("u4aWs20AttrRows--empty");
 
         var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
 
@@ -5027,6 +5029,8 @@
         //   텍스트는 서버 메시지 클래스 단일 출처: ZMSG_WS_COMMON_001 번호 312
         //   ("데이터를 찾을 수 없습니다." / fnMimePopupOpen 에서도 쓰는 코드). 하드코딩 아님.
         function _attrEmpty() {
+            //빈 상태면 ROWS 를 남는 높이만큼 채운 뒤 문구를 정중앙에(공통 빈상태 UX와 동일).
+            ROWS.classList.add("u4aWs20AttrRows--empty");
             var EMPTY = document.createElement("div");
             EMPTY.className = "u4aWs20AttrEmpty";
             EMPTY.textContent = _wsMsg("312");

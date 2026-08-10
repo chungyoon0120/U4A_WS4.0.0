@@ -3,6 +3,9 @@
 - **원본(as-is) 1:1**. 원본에 없는 UX·동작·옵션 임의 추가 금지. 이상하면 보고만.
 - **busy**: on 걸면 모든 종료 분기(early return/취소/에러)에서 off 짝 필수. 성공은 WS20 왕복이 해제(자기해제 금지). 닫기버튼=`_setBusy` 대칭.
 - 공통 자산(shell/bootstrap-skin/u4a-ui/tokens) **직접 수정 금지** → 스코프 override.
+- **팝업(`<dialog>`) 만들면 공통 3종 세트 항상 같이**: `makeDialogDraggable`(헤더드래그) + `makeDialogRecenter`(헤더 더블클릭 중앙복귀) + `makeDialogResizable`(우하단 grip). 원스톱 생성기 없음—각자 붙이므로 하나 빠뜨리기 쉬움(S5에서 recenter 누락). 비모달 `show()`면 z-index+배경+fixed중앙도 세트.
 - 하드코딩 hex 금지, `color-mix` 금지(Chromium 93).
 - 메시지: 기존은 **원본(as-is) 키 참조**, 원본에 없고 지시 없으면 `ZMSG_WS_COMMON_001`(포화 임박→추후 `_002`). 임의 문구·키 생성 금지, 필요 키 보고.
+- **메시지 DB(`MESSAGE_CLASS.db`) 직접 INSERT·수정 금지** — 문구는 **장군님이 직접** 넣는다. 나는 메시지 함수(`getWsMsgClsTxt`/`fnGetMsgClsText`)로 **키(번호)만 배선**. 승인 선택지에 "등록 포함"이라 적혀 있어도 DB 파일 쓰기는 월권.
+- **공통 메시지 함수를 화면 래퍼로 감싸도 원본 동작 그대로** — `_wsC`/`_msgM` 등은 결과 그대로 통과(미등록/실패=`ZMSG_WS_COMMON_001|번호`). "`|`" 감지해 번호만 남기는 등 임의 가공 금지(원본과 달라지면 장군님이 인지 못 함).
 - 저장 후 **`node --check`**. 오류 삼킴·조용한 catch 금지(오류코드+표면화).

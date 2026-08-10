@@ -71,6 +71,15 @@
             ]
         },
         {
+            //Padding(안쪽 여백) — 원본 index.html·소개글(567)은 "padding 포함"이라 했으나 목록엔 빠져
+            //  있던 구획. 장군님 지시로 신설(원본 소개글 약속 이행). SAPUI5 표준 콘텐츠 패딩 3종.
+            //  설명 문구는 신규라 메시지키 994~998 을 KO/EN MESSAGE_CLASS.db 에 등록해 참조.
+            titleNr: "994", descNr: "995", rows: [   // Padding
+                ["sapUiContentPadding", "996"], ["sapUiResponsiveContentPadding", "997"],
+                ["sapUiNoContentPadding", "998"]
+            ]
+        },
+        {
             titleNr: "611", descNr: "612", rows: [   // Content Density
                 ["sapUiSizeCozy", "613"], ["sapUiSizeCompact", "614"]
             ]
@@ -96,19 +105,16 @@
         if (typeof txt !== "undefined") { o.textContent = txt; }
         return o;
     }
+    //공통 메시지 함수 결과를 그대로 사용 — 원본·공통 동작과 100% 동일. 미등록/조회실패 시 공통 함수가
+    //  주는 "ZMSG_WS_COMMON_001|번호" 형태가 그대로 노출된다(어느 메시지인지 추적 가능).
+    //  ※ 이전엔 여기서 "|" 를 감지해 번호만 남겼으나, 원본과 동작이 달라지는 임의 가공이라 제거.
     function _wsC(sNr) {
-        try {
-            var s = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", sNr);
-            if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
-        return sNr;
+        return parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", sNr);
     }
+    //공통 메시지 함수 결과를 그대로 사용 — 원본·공통 동작과 동일(미등록/조회실패 시 "/U4A/MSG_WS|번호"
+    //  노출). ※ 이전엔 "|" 를 감지해 번호만 남겼으나 임의 가공이라 제거(_wsC 와 동일 방침).
     function _msgM(sNr) {   // /U4A/MSG_WS (294=검색 placeholder, 174=결과 없음)
-        try {
-            var s = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNr);
-            if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
-        return sNr;
+        return APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNr);
     }
     function _isEdit() {
         try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { return false; }

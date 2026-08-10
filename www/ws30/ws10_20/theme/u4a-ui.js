@@ -2640,6 +2640,10 @@
             var oExist = oBody.querySelector(".u4aColTreeEmpty");
             if (bShow) {
                 oTree.el.style.display = "none";
+                // 0건: 트리뿐 아니라 격자(세로 그리드층 + 본문 가로줄 그라디언트)도 숨겨 안내 문구만 보이게.
+                //   (트리만 숨기면 빈 격자만 남아 어색 — 장군님 지시 2026-08-10.)
+                if (oGrid) { oGrid.style.display = "none"; }
+                oBody.style.backgroundImage = "none";
                 if (!oExist) {
                     oExist = _el("div", "u4a-empty u4aColTreeEmpty");
                     oExist.textContent = oCfg.emptyText || "";
@@ -2647,6 +2651,8 @@
                 }
             } else {
                 oTree.el.style.display = "";
+                if (oGrid) { oGrid.style.display = ""; }
+                oBody.style.backgroundImage = "";   // 스타일시트 그라디언트 복원
                 if (oExist) { oExist.remove(); }
             }
         }

@@ -118,7 +118,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         IF_DATA = oBrodData;
 
-        oIframe.src = "frame.html";
+        // [HTML5 2026-07-24] 속화면(frame.html)에도 테마색(BGCOL)·테마명(THEME) 전달 — 안 넘기면 iframe 이
+        //   UI5 로드 전 흰색으로 떠 흰 번쩍. frame.html <head> 부트 스크립트가 이 값으로 첫 페인트 배경을 칠한다.
+        var sBootBg = oQueryParams.BGCOL || "";
+        var sBootTheme = oQueryParams.THEME || "";
+        oIframe.src = "frame.html?BGCOL=" + encodeURIComponent(sBootBg) + "&THEME=" + encodeURIComponent(sBootTheme);
 
     };
 

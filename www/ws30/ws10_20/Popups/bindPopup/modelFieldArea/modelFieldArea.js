@@ -151,8 +151,33 @@
             }
         });
 
-        // 초기(데이터 로드 전) = 빈 트리 → 경계선 끔(로드 성공 시 loadBindData 가 해제).
-        oAPP.fn.setTreeEmptyMark(oM.host, true);
+        // 초기(데이터 로드 전) = 빈 트리 → 공통 makeColumnTree 렌더. 0건이면 _showEmpty 가 격자(가로 행라인·세로 컬럼라인)를 끈다.
+        oM.ctrl.rerender();
+
+        // [빈상태 안내 보정] 가운데 디자인트리(designArea.js:1417)와 동일 처리 이식 — 공통 makeColumnTree 는
+        //   빈 안내(.u4aColTreeEmpty)를 내부 body(컬럼폭 합 기준)에 넣어, 좁은 좌측 패널에선 안내가 가시영역
+        //   밖(오른쪽)으로 밀리고 가로 스크롤이 생긴다(장군님 실물 2026-08-10, 좌측만 이 보정이 빠져 있었음).
+        //   → host 가시폭으로 emp 폭 고정 + u4aBwpTreeEmptyState 클래스 → 공통 CSS(sticky left:0 + overflow-x hidden,
+        //     frame.css:216)로 가로는 가시영역 가운데, 세로는 body 가운데. (공통 미수정, bindPopup 스코프.)
+        (function () {
+            var oHost = oM.host;
+            var iRaf = 0;
+            function _fixEmpty() {
+                var emp = oHost.querySelector(".u4aColTreeEmpty");
+                if (!emp) { oHost.classList.remove("u4aBwpTreeEmptyState"); return; }
+                oHost.classList.add("u4aBwpTreeEmptyState");
+                var w = oHost.clientWidth;
+                if (w && emp.style.width !== w + "px") { emp.style.width = w + "px"; }
+            }
+            function _schedule() {   // RO/MO 콜백서 동기 쓰기 금지 → rAF 지연(공통 §3.4.2).
+                if (iRaf) { return; }
+                iRaf = requestAnimationFrame(function () { iRaf = 0; _fixEmpty(); });
+            }
+            try { new MutationObserver(_schedule).observe(oHost, { childList: true, subtree: true }); } catch (e) { }
+            try { new ResizeObserver(_schedule).observe(oHost); } catch (e) { }
+            _fixEmpty();
+        })();
+
         // 컬럼 자동맞춤(원본 setUiTableAutoResizeColumn = 콘텐츠+마지막 컬럼 채움). 레이아웃 확정 후 1회.
         setTimeout(function () { oAPP.fn.fitTreeColumns(oM.host); }, 0);
     };
@@ -395,7 +420,6 @@
                 // 공통 selectByKey 는 강조/selNode 전용이라 onSelect 콜백을 안 태운다 → 원본 onSelTabRow→
                 //   setRefFieldList(우측 참조필드 P05) 를 명시 호출(중복 아님).
                 oAPP.fn.setRefFieldList();   // [표준] 필수 호출 직접(삼킴 제거).
-                oAPP.fn.setTreeEmptyMark(oM.host, !(oAPP.attr.modelTree || []).length);
                 oAPP.fn.fitTreeColumns(oM.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
 
             } catch (e) {

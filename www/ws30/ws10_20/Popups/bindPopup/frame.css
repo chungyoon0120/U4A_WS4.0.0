@@ -58,10 +58,7 @@ body {
 /* 화면 커스터마이징으로 중앙(DESIGN)이 숨겨진 조합에서 마지막 활성 영역이 잔여 폭을 채운다. */
 .u4aBwpFill { flex: 1 1 auto !important; }
 
-/* ★ 데이터 없는 트리는 경계선(가로 행라인·세로 컬럼라인)을 그리지 않는다(원본 sap.ui.table 동일, 사용자 지적).
-   공통 makeColumnTree 의 .u4aColTreeBody(반복 그라디언트)·.u4aColTreeGrid 를 빈 트리에서만 끈다(스코프). */
-.u4aBwpTreeEmpty .u4aColTreeBody { background: none; }
-.u4aBwpTreeEmpty .u4aColTreeGrid { display: none; }
+/* [제거 2026-08-10] 빈 트리 격자 숨김(.u4aBwpTreeEmpty)은 공통 makeColumnTree _showEmpty 로 흡수됨(전 화면 일관). */
 
 /* ★ 헤더 라벨이 좁은 컬럼을 넘쳐 가로 스크롤을 만들지 않게 말줄임 클립(스코프 override, 공통 미수정).
    컬럼폭은 fitTreeColumnsToContainer 가 컨테이너에 맞춰 채우므로 이름 헤더는 안 잘리고, 넘칠 때만 … 처리. */
@@ -150,8 +147,21 @@ body {
     height: 60%;
     min-width: 32rem;
     min-height: 24rem;
+    /* ★ 비모달 show() 는 :modal 이 아니라 top-layer 에 안 올라간다 → 일반 스택이라 뒤 화면(트리/패널)이
+       창 위로 겹쳐 보인다(장군님 실물 2026-08-10). z-index 로 뒤 화면 위에 띄운다.
+       (창 안 오류팝오버 .u4aBwpMsgPop=1200 · busy 오버레이는 이 창보다 위여야 하므로 그보다 낮게.) */
+    z-index: 30;
+    background: var(--sl-surface);   /* 공통 .u4a-dialog 배경 상속되지만 비모달 안전 위해 명시(뒤 비침 차단). */
 }
 .u4aBwpSyncDlg .u4aBwpSyncBody { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+/* ★ 팝업 본문 배분(원본 synchronizionBind.js:1077/1107 재현):
+     · 상단 패널 = '자연 높이 고정'(flex:0 0 auto) — 내용만큼만, 눌리지 않음.
+     · 후보 리스트/테이블 = '남은 공간 다 채움'(flex:1, 원본 LIST layoutData growFactor:1) — 창을 키우면
+       테이블 영역도 같이 커진다(장군님 원본 대조 2026-08-10).
+   좁아서 패널+최소테이블이 창을 넘으면 body(overflow:auto)가 통째로 스크롤. 테이블 최소 높이로 0 눌림 방지. */
+.u4aBwpSyncDlg .u4aBwpSyncBody > .u4a-panel { flex: 0 0 auto; }
+.u4aBwpSyncDlg .u4aBwpSyncList { flex: 1 1 auto; min-height: 0; }
+.u4aBwpSyncDlg .u4aBwpSyncListHost { flex: 1 1 auto; min-height: 10rem; }
 .u4aBwpLcBody { display: flex; flex-direction: column; gap: 0.75rem; }
 .u4aBwpLcList { display: flex; flex-direction: column; }
 .u4aBwpLcRow {
@@ -320,6 +330,9 @@ body {
 /* 바인딩경로 = 링크(클릭 시 우측 추가속성 재구성, SPEC §3.2/§3.5). 값 있을 때만 링크 커서/hover 밑줄. */
 .u4aBwpDesignPathLink { cursor: pointer; }
 .u4aBwpDesignPathLink:hover { text-decoration: underline; }
+/* ★동일속성 적용 팝업 열림 동안 바인딩 경로 링크 '회색(비활성)' 표시 — 파란 링크색 이기게 u4aBwpDesignPath 와 함께 걸어 특정성 확보. */
+.u4aBwpDesignPath.u4aBwpDesignPathLink--locked { color: var(--text-muted); cursor: default; pointer-events: none; }
+.u4aBwpDesignPath.u4aBwpDesignPathLink--locked:hover { text-decoration: none; }
 
 /* 임베디드 속성 배지(원본 designTree.js:4093 ObjectStatus{EMATT/EMATT_ICON}) — 이름칸 우측(SpaceBetween 재현).
    ★색/크기/잘림은 WS20 UI 트리 .u4aWs20TreeAggr(WS10/css/ws20.css:480/490)와 동일: --ws20-aggr=--accent, 13px/11px, 좁으면 clip. */
@@ -432,7 +445,7 @@ body {
     border-bottom: 0.0625rem solid var(--line);
     vertical-align: middle;
 }
-.u4aBwpAdditTbl th:first-child, .u4aBwpAdditTbl td:first-child { width: 42%; }
+.u4aBwpAdditTbl th:first-child, .u4aBwpAdditTbl td:first-child { width: 48%; }
 /* 속성명 셀 — 데이터 아님(선택 금지). 값 셀만 입력/선택 허용. */
 .u4aBwpAdditProp { color: var(--text-muted, var(--text)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .u4aBwpAdditVal { min-width: 0; }
@@ -534,7 +547,7 @@ body {
 }
 /* 동일속성 화면 본문 컨테이너(상단 패널=S2 / 하단 후보 테이블=S3 이 여기 렌더). */
 .u4aBwpSyncRoot { display: flex; flex-direction: column; min-height: 0; height: 100%; }
-.u4aBwpSyncBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.u4aBwpSyncBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; gap: 0.5rem; padding: 0.5rem; }
 
 @keyframes u4aBwpPgInFwd   { from { transform: translateX(2rem);  opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes u4aBwpPgOutFwd  { from { transform: none; opacity: 1; } to { transform: translateX(-2rem); opacity: 0; } }
@@ -546,6 +559,9 @@ body {
 .u4aBwpPgOutBack { animation: u4aBwpPgOutBack 0.26s ease both; }
 
 /* ===== [S2] 동일속성 상단 패널 — 선택 속성 4줄 + 추가속성(MPROP) 값(원본 designView 967~1099) ===== */
+/* 원본 HBOX1(wrap): [4줄]+[추가속성 값]을 가로로 나란히, 좁으면 아래로 줄바꿈. */
+.u4aBwpSyncPanelGrid { display: flex; flex-wrap: wrap; gap: 0.25rem 2rem; }
+.u4aBwpSyncPanelGrid > .u4aBwpSyncInfo { flex: 1 1 22rem; min-width: 0; }
 .u4aBwpSyncInfo { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.75rem; }
 .u4aBwpSyncInfoRow { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.8125rem; }
 .u4aBwpSyncInfoLbl {   /* 원본 라벨 폭 170px≈10.6rem — 반응형(최소~최대) + 말줄임. */
@@ -557,7 +573,8 @@ body {
     flex: 1 1 auto; min-width: 0; color: var(--text);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.u4aBwpSyncMprop { border-top: 1px solid var(--line); margin-top: 0.25rem; padding-top: 0.5rem; }
+/* 원본은 4줄과 추가속성 값 사이 구분선 없음 — 가로 여백(gap)만으로 나란히(synchronizionBind.js:1070 sapUiTinyMarginEnd). */
+.u4aBwpSyncMprop { margin-top: 0; }
 
 /* ===== [S3] 동일속성 하단 후보 테이블 — 7컬럼 멀티선택 + 컬럼최적화(원본 designView 1106~1228) ===== */
 .u4aBwpSyncList { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }

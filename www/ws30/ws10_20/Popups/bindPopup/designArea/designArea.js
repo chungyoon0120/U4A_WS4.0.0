@@ -314,11 +314,23 @@
 
     /************************************************************************
      * [S5] 동일속성 적용 팝업(비모달)이 열린 동안 가운데 트리 상호작용 잠금 —
-     *   원본 designTree.js:2758 setViewEditable 의 edit_sync_dialog_interaction 대응.
-     *   HTML5 트리엔 입력필드가 없어, 선택(onSelect)/바인딩경로 링크 클릭을 이 플래그로 막는다.
+     *   원본 designTree.js:2758 setViewEditable(edit_sync_dialog_interaction) = 선택/링크 잠금
+     *   + designTree.js edit 플래그(툴바 3버튼·체크박스·행액션·기어 enabled="{/edit}") 대응.
+     *   ★HTML5 는 렌더가 정적 editable 로 굳으므로("코드존재≠동작") 플래그만 뒤집으면 안 바뀜 →
+     *     bSyncDialogLock 세팅 + 표식(data-bwp-design-edit) 요소의 DOM disabled 를 직접 토글한다.
+     *     (트리 재렌더로 새로 생기는 버튼/체크박스는 렌더 시 bSyncDialogLock 을 초기 disabled 로 반영 — rowHook/툴바생성부.)
      ************************************************************************/
     oAPP.fn.designSetViewEditable = function (bLock) {
         oAPP.attr.bSyncDialogLock = (bLock === false);   // bLock=false(잠금) → lock=true.
+        var bDis = (bLock === false);
+        try {
+            var aEl = document.querySelectorAll("[data-bwp-design-edit]");
+            // ★잠금 해제(bDis=false) 시에도 원래 정적 편집불가(data-bwp-ro)면 계속 disabled 유지 — 편집불가 앱 회귀 방지.
+            for (var i = 0; i < aEl.length; i++) { aEl[i].disabled = bDis || (aEl[i].getAttribute("data-bwp-ro") === "1"); }
+            // 바인딩 경로 링크(span — disabled 무효라 회색 클래스로). 재렌더로 새로 생기는 링크는 cell 이 live 반영.
+            var aLink = document.querySelectorAll(".u4aBwpDesignPathLink");
+            for (var k = 0; k < aLink.length; k++) { aLink[k].classList.toggle("u4aBwpDesignPathLink--locked", bDis); }
+        } catch (e) { console.error("[HTML5][bindWindow] designSetViewEditable DOM 토글:", e && e.message); }
     };
 
     /************************************************************************
@@ -941,7 +953,7 @@
     async function _onDesignDrop(ev) {
         // ★ 진입 WS20 busy(220)는 호출측 drop 리스너가 켠다 → 여기 각 중단 분기에서 반드시 OFF(원본 onDropBindField 1244/1278/1299).
         //   성공은 OFF 하지 않음 — _setBindAttribute→attrSetBindProp→WS20 왕복이 해제(자기해제 금지).
-        if (oAPP.attr.editable === false) { oAPP.fn.setBusyWS20Interaction(false, {}); return; }
+        if (oAPP.attr.editable === false || oAPP.attr.bSyncDialogLock === true) { oAPP.fn.setBusyWS20Interaction(false, {}); return; }   // 편집불가 OR 동일속성 팝업 열림 → drop 무시(방어).
 
         // ① WS20 디자인 트리 드래그(prc002) → 디자인 트리 전체 재구성(원본 우선 분기). 리스너가 이미 처리하므로 보통 도달 안 함(방어).
         if (oAPP.fn.dropDesignArea(ev.dataTransfer.getData("prc002")) === true) { oAPP.fn.setBusyWS20Interaction(false, {}); return; }
@@ -992,10 +1004,15 @@
         }
 
         oHost.addEventListener("dragenter", function (ev) {
+            // ★ 편집 불가 OR 동일속성 적용 팝업 열림(bSyncDialogLock) = drop 불가 → preventDefault 안 함 → 커서 자동 '불가(🚫)'
+            //   (원본 onDragEnter:1981 _drop_enable≠true / DropInfo enabled="{/edit}"=false 대응 — 팝업 중 가운데 드롭 차단).
+            if (oAPP.attr.editable === false || oAPP.attr.bSyncDialogLock === true) { _dropZone(false); return; }
             if (_hasPrc002(ev.dataTransfer)) { ev.preventDefault(); _dropZone(true); }   // enter 에서 안 막으면 일부 브라우저 drop 거부.
         });
         oHost.addEventListener("dragover", function (ev) {
             var dt = ev.dataTransfer;
+            // ★ 편집 불가 OR 동일속성 적용 팝업 열림 = drop 불가 → preventDefault 안 함 → 커서 '불가(🚫)'. drop 이벤트가 와도 _onDesignDrop 이 막는다.
+            if (oAPP.attr.editable === false || oAPP.attr.bSyncDialogLock === true) { _dropZone(false); _setDropRow(null); return; }
             // ① WS20 디자인 트리 드래그(외부 창) — 트리 전체가 드롭 타겟 + 드롭존 표시.
             if (_hasPrc002(dt)) { ev.preventDefault(); try { dt.dropEffect = "copy"; } catch (e) { } _dropZone(true); return; }
             // ② 좌측 모델필드 드래그(로컬) — drop 가능행 위에서만 허용 + 그 행에 드롭존 테두리.
@@ -1106,8 +1123,7 @@
             //   중앙 트리가 1레벨만 펼쳐졌다 — 장군님 지적 2026-07-23.
             oD.ctrl.rerender(false);   // 첫 루트 자동선택 방지
             if (oD.ctrl.tree && oD.ctrl.tree.expandAll) { oD.ctrl.tree.expandAll(); }
-            // 디자인 트리는 브로드캐스트 전엔 빈 트리 → 경계선 끔(데이터 도착 시 해제).
-            oAPP.fn.setTreeEmptyMark(oD.host, !(oAPP.attr.designTree || []).length);
+            // 빈 트리(브로드캐스트 전)면 위 rerender(false)에서 공통 _showEmpty 가 격자를 끈다(별도 표식 불필요).
             oAPP.fn.fitTreeColumns(oD.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
         }
     };
@@ -1154,14 +1170,23 @@
     function _rowActions(n) {
         var oAct = H.el("span", "u4aBwpRowActions");
         var bEdit = !!oAPP.attr.editable;
+        // ★동일속성 적용 팝업 열림(bSyncDialogLock) 동안 비활성 — 원본은 visible="{/edit}"(designTree.js:4162)로 '숨김'이나,
+        //   장군님 지시(비활성화)에 맞춰 '회색' 처리로 통일. 행액션은 트리 재렌더마다 새로 생기므로 live 판독.
+        var bSyncLock = (oAPP.attr.bSyncDialogLock === true);
+        function _mkActBtn(sFa, sNo, fn, sCls) {
+            var b = H.iconBtn(sFa, H.z(sNo), fn, sCls);
+            if (bSyncLock) { b.disabled = true; }
+            b.setAttribute("data-bwp-design-edit", "");   // 팝업 열/닫 토글 대상.
+            return b;
+        }
         // 슬롯1: 추가속성 정보 적용(accept). 툴팁=139 "추가속성적용" — 원본 _txt6 실제값(designTree.js:3914).
         //   ★ 원본 사용처 주석(designTree.js:4167)은 132로 오기돼 있으나 런타임 바인딩 값은 139다.
         if (bEdit && n._bind_visible) {
-            oAct.appendChild(H.iconBtn("circle-check", H.z("139"), function (e) { e.stopPropagation(); oAPP.fn.onAdditionalBind(n, e && e.currentTarget); }, "u4aBwpRowActBtn u4aBwpRowActBtn--bind"));
+            oAct.appendChild(_mkActBtn("circle-check", "139", function (e) { e.stopPropagation(); oAPP.fn.onAdditionalBind(n, e && e.currentTarget); }, "u4aBwpRowActBtn u4aBwpRowActBtn--bind"));
         } else { oAct.appendChild(H.el("span", "u4aBwpRowActSlot")); }
         // 슬롯2: 바인딩 해제(disconnected, 186)
         if (bEdit && n._unbind_visible) {
-            oAct.appendChild(H.iconBtn("link-slash", H.z("186"), function (e) { e.stopPropagation(); oAPP.fn.onUnbind(n); }, "u4aBwpRowActBtn u4aBwpRowActBtn--unbind"));
+            oAct.appendChild(_mkActBtn("link-slash", "186", function (e) { e.stopPropagation(); oAPP.fn.onUnbind(n); }, "u4aBwpRowActBtn u4aBwpRowActBtn--unbind"));
         } else { oAct.appendChild(H.el("span", "u4aBwpRowActSlot")); }
         return oAct;
     }
@@ -1220,9 +1245,13 @@
         oD.tool.appendChild(H.iconBtn("ban", H.z("187"), function () { _clearChecks(); }));   // 187 Clear selection
         oD.tool.appendChild(H.el("span", "u4aBwpToolSep"));
         // 129 동일속성 바인딩 일괄적용(Accept, 녹색) / 130 멀티 바인딩(Emphasized, 파랑) / 186 Unbind(Reject, 빨강).
-        oD.tool.appendChild(_btn("check-double", H.z("129"), H.z("129"), "u4aBwpBtn--sync", bRO, function (e) { _call("onSynchronizionBind", e && e.currentTarget); }));
-        oD.tool.appendChild(_btn("link", H.z("130"), H.z("130"), "u4a-btn--emphasized", bRO, function (e) { _call("onMultiBind", e && e.currentTarget); }));
-        oD.tool.appendChild(_btn("link-slash", H.z("186"), H.z("186"), "u4a-btn--negative", bRO, function (e) { _call("onMultiUnbind", e && e.currentTarget); }));
+        //   ★원본 designTree.js:3981/3990/3999 enabled="{/edit}" — 동일속성 적용 팝업 열림(bSyncDialogLock) 동안 잠금.
+        //   생성 시 잠금상태(bRO 정적 OR 팝업잠금) 반영 + data-bwp-design-edit 표식(팝업 열/닫을 때 designSetViewEditable 가 토글).
+        var _bDesignLock = bRO || (oAPP.attr.bSyncDialogLock === true);
+        function _markDesignEdit(oB) { oB.setAttribute("data-bwp-design-edit", ""); if (bRO) { oB.setAttribute("data-bwp-ro", "1"); } return oB; }   // 표식 + 정적 편집불가 기억(해제 시 보존).
+        oD.tool.appendChild(_markDesignEdit(_btn("check-double", H.z("129"), H.z("129"), "u4aBwpBtn--sync", _bDesignLock, function (e) { _call("onSynchronizionBind", e && e.currentTarget); })));
+        oD.tool.appendChild(_markDesignEdit(_btn("link", H.z("130"), H.z("130"), "u4a-btn--emphasized", _bDesignLock, function (e) { _call("onMultiBind", e && e.currentTarget); })));
+        oD.tool.appendChild(_markDesignEdit(_btn("link-slash", H.z("186"), H.z("186"), "u4a-btn--negative", _bDesignLock, function (e) { _call("onMultiUnbind", e && e.currentTarget); })));
         oD.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
         // 161 컬럼최적화 — 리사이즈바 더블클릭과 ★완전 동일★한 순수 autofit(잔여폭 흡수 없음).
         //   원본 setUiTableAutoResizeColumn 1:1. 채움(fitTreeColumns)은 레이아웃 변경 전용.
@@ -1230,10 +1259,14 @@
             oAPP.fn.autofitTreeColumns(oD.host);
         }));
         // 957 화면 커스터마이징 — 원본 designTree.js:4025 createBindLayoutCustomizingButton(좌·중·우 공통).
-        oD.tool.appendChild(H.iconBtn("gear", H.z("957"), function () {
-            if (oAPP.attr.editable === false) { return; }
+        //   ★동일속성 적용 팝업 열림(bSyncDialogLock) 동안 비활성(가운데 기어) — 첫 조사 C8 누락분. 기어는 1회 생성이라 캡처+토글 OK.
+        var _oGearMid = H.iconBtn("gear", H.z("957"), function () {
+            if (oAPP.attr.editable === false || oAPP.attr.bSyncDialogLock === true) { return; }
             if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
-        }));
+        });
+        if (oAPP.attr.bSyncDialogLock === true) { _oGearMid.disabled = true; }
+        _oGearMid.setAttribute("data-bwp-design-edit", "");   // 팝업 열/닫 토글 대상.
+        oD.tool.appendChild(_oGearMid);
         oD.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
             // [B4] 디자인트리 도움말 문서 "000275"(원본 designTree.js:2696). 영역별 라우팅.
             if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000275"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
@@ -1278,6 +1311,12 @@
                 var oChk = H.el("input", "u4aBwpDesignChk");
                 oChk.type = "checkbox";
                 oChk.checked = !!n.chk_seleced;
+                // ★동일속성 적용 팝업 열림(bSyncDialogLock) 또는 편집불가면 비활성 — 원본 editable="{/edit}"(designTree.js:4062).
+                //   ★체크박스는 트리 재렌더마다 새로 생기므로 캡처값 금지 → 여기서 live 판독. + 표식(팝업 열/닫 토글 대상),
+                //     편집불가(정적)는 data-bwp-ro 로 잠금해제 시 보존.
+                oChk.disabled = (oAPP.attr.editable === false) || (oAPP.attr.bSyncDialogLock === true);
+                oChk.setAttribute("data-bwp-design-edit", "");
+                if (oAPP.attr.editable === false) { oChk.setAttribute("data-bwp-ro", "1"); }
                 oChk.addEventListener("click", function (e) { e.stopPropagation(); });
                 oChk.addEventListener("change", function () {
                     n.chk_seleced = oChk.checked;
@@ -1294,6 +1333,9 @@
                     // SPEC §3.2 2열=바인딩경로 Link, press onShowBindAdditInfo(원본 designTree.js:4123) →
                     //   클릭 시 ★중앙 하단(DESIGN_ADDIT/SEL) 추가속성 패널을 이 필드로 재구성(§3.5 _showBindAdditInfo). ("우측" 오기 정정 2026-08-09)
                     oPath.classList.add("u4aBwpDesignPathLink");
+                    // ★동일속성 적용 팝업 열림(bSyncDialogLock)이면 링크도 '회색(비활성)' 표시 — 클릭 가드(아래)에 더해 시각 표시(장군님 지시 2026-08-10).
+                    //   링크는 span 이라 disabled 무효 → 클래스로. 재렌더마다 live 판독 + designSetViewEditable 가 기존 링크 토글.
+                    if (oAPP.attr.bSyncDialogLock === true) { oPath.classList.add("u4aBwpDesignPathLink--locked"); }
                     oPath.setAttribute("role", "button"); oPath.tabIndex = 0;
                     oPath.addEventListener("click", function (e) {
                         e.stopPropagation();

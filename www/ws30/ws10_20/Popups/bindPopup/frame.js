@@ -147,7 +147,10 @@ oAPP.common.relocalizeServerMsg = function (sText) {
         var WC = REMOTE.getGlobal("WsMsgCls");
         if (!WC || typeof WC.relocalize !== "function") { return sRaw; }
         // beLangu=null → 공통이 EN/KO 후보로 역추적. wsLangu = 화면(Workspace) 언어.
-        return WC.relocalize(sRaw, null, oAPP.attr.GLANGU || LANGU || "") || sRaw;
+        // ★ wsLangu 는 반드시 접속(Workspace) 언어 LANGU(=USERINFO.LANGU) — .analy/17 §6, 타 화면(MIME frame.js:278·ShortCut:307)과 동일.
+        //   GLANGU(getWsSettingsInfo().globalLanguage)는 글로벌/시스템 언어라 접속언어와 다를 수 있다(실측 2026-08-10: 접속 KO 인데 GLANGU="EN"
+        //   → relocalize 가 서버 EN 문구를 "이미 EN"으로 보고 건너뛰어 037 이 영문으로 노출). → LANGU 를 우선한다.
+        return WC.relocalize(sRaw, null, LANGU || oAPP.attr.GLANGU || "") || sRaw;
     } catch (e) { return sRaw; }
 };
 

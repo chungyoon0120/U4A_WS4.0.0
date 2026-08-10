@@ -1010,13 +1010,14 @@ export async function getControl() {
         };
 
         // 브라우저 오픈
-        let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
+        let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);        
 
-        // [HTML5 2026-07-24] loadURL 전 insertCSS 는 about:blank 에만 적용됐다 loadURL 로 문서가 새로 얹히며
-        //   파기되어 무효였다(흰 배경 방지에 기여 못함). 창 배경은 oBrowserOptions.backgroundColor(=BGCOL)가,
-        //   페이지 첫 페인트 배경은 winChrome.js 의 --boot-bg 가 담당한다(.analy/16 §2.6). → 헛일 코드 제거.
+        // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
+        const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
 
-        // 브라우저 상단 메뉴 없애기
+        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+
+        // 브라우저 상단 메뉴 없애기        
         oBrowserWindow.setMenu(null);
 
         // BroadCast에 전송할 파라미터

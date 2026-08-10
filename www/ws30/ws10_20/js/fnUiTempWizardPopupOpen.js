@@ -320,7 +320,7 @@
             oItem.setAttribute("data-key", m.key);
             // 활성 메뉴만 녹색 아이콘 (원본 u4aWsTmplWzdAttrActive)
             var sIcon = m.enabled ? "u4aTplWiz__navIco--on" : "u4aTplWiz__navIco--off";
-            oItem.innerHTML = "<i class='fa-solid fa-fill-drip u4aTplWiz__navIco " + sIcon + "'></i><span></span>";
+            oItem.innerHTML = "<i class='fa-solid fa-square u4aTplWiz__navIco " + sIcon + "'></i><span></span>";
             oItem.querySelector("span").textContent = m.text;
             if (!m.enabled) {
                 oItem.classList.add("is-disabled");
@@ -1762,6 +1762,8 @@
         var css = [
             /* 대형 다이얼로그 — 화면의 80% 기준 (드래그/리사이즈로 조절 가능) */
             ".u4aTplWiz{width:80vw;height:80vh;max-width:96vw;max-height:92vh;padding:0;display:flex;flex-direction:column;}",
+            /* 제목바 = 앱 최상위 어두운 톤(--surface) → 아래 영역 헤더(--surface-raised)보다 확실히 어둡게 하여 계층 구분(공통 미수정, 스코프 override) */
+            ".u4aTplWiz.u4a-dialog > .u4aTplWiz__header{background:var(--surface);border-bottom-color:var(--divider);}",
             ".u4aTplWiz .u4a-dialog__body{flex:1 1 auto;min-height:0;display:flex;flex-direction:row;padding:0;overflow:hidden;}",
             /* 좌측 프리뷰 (surface 배경 + 상단 밴드로 영역 구분, min-width=스플리터 클램프 기준) */
             ".u4aTplWiz__left{flex:0 0 40%;min-width:14rem;display:flex;flex-direction:column;overflow:hidden;background:var(--surface);}",
@@ -1776,7 +1778,7 @@
             ".u4aTplWiz [hidden]{display:none!important;}",
             /* 우측 (min-width = 스플리터 클램프 기준; 바는 공통 .u4a-splitter__bar 그대로) */
             ".u4aTplWiz__right{flex:1 1 auto;min-width:22rem;display:flex;flex-direction:row;overflow:hidden;}",
-            ".u4aTplWiz__nav{flex:0 0 clamp(13rem,26%,17rem);min-width:13rem;overflow:auto;border-right:.0625rem solid var(--line);padding:.375rem 0;background:var(--surface);}",
+            ".u4aTplWiz__nav{flex:0 0 clamp(13rem,26%,17rem);min-width:13rem;overflow:auto;border-right:.0625rem solid var(--line);padding:0;background:var(--surface);}", /* 상단 밀착 — 공통 .u4a-navlist 기본(여백0) 소비, 화면별 상단 여백 금지 */
             ".u4aTplWiz__navIco{margin-right:.5rem;width:1rem;text-align:center;}",
             ".u4aTplWiz__navIco--on{color:var(--success);}",
             ".u4aTplWiz__navIco--off{color:var(--text-muted);opacity:.5;}",

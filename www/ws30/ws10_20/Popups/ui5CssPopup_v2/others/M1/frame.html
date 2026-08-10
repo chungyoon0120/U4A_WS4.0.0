@@ -8,6 +8,32 @@
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
+    <!-- [HTML5 2026-07-24] 속화면 첫 페인트 흰 번쩍 방지 — 부모(index.js)가 넘긴 ?BGCOL&THEME 로 첫 페인트 전
+         테마색 배경(--boot-bg) + color-scheme 지정. UI5 로드되면 UI5 배경으로 자연 교체. (.analy/16 §2.6 iframe) -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var el = document.documentElement;
+                var bg = q.get("BGCOL"); if (bg) { el.style.setProperty("--boot-bg", bg); }
+                var th = q.get("THEME");
+                function _d(v) {
+                    var s = String(v || "").trim().replace(/^#/, ""), r, g, b;
+                    if (/^[0-9a-f]{3}$/i.test(s)) { s = s.replace(/(.)/g, "$1$1"); }
+                    var m = s.match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+                    if (m) { r = parseInt(m[1], 16); g = parseInt(m[2], 16); b = parseInt(m[3], 16); }
+                    else { var mr = s.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/); if (mr) { r = +mr[1]; g = +mr[2]; b = +mr[3]; } }
+                    if (typeof r !== "number") { return false; }
+                    return (0.299 * r + 0.587 * g + 0.114 * b) < 128;
+                }
+                el.style.setProperty("color-scheme", (/dark/i.test(th || "") || _d(bg)) ? "dark" : "light");
+            } catch (e) { }
+        })();
+    </script>
+    <style>
+        html, body { background: var(--boot-bg, transparent); }
+    </style>
+
     <style>       
         .sapUiBlockLayer, .sapUiLocalBusyIndicator {
             background-color: transparent !important;   

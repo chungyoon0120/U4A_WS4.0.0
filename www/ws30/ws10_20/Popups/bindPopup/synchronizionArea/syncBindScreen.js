@@ -47,19 +47,19 @@
         oParent.appendChild(oRow);
     }
 
-    // 추가속성(T_MPROP) 구성 — 원본 _setAdditBindData(synchronizionBind.js:118) 1:1.
-    //   MPROP split("|") | UA028(FLD02≠"X" 제외 → ITMCD 정렬) 을 ★같은 인덱스로 짝(prop=FLD01, val=split[i]).
+    // 추가속성(T_MPROP) 구성 — 원본 _setAdditBindData(synchronizionBind.js:118) 기반 + [개선 08-09 장군님 지시].
+    //   ★원본은 MPROP 없거나 빈 값이면 exit(항목 미표시). 개선: 지정 여부와 무관하게 항목(라벨)을 '항상' 표시(값 없으면 빈 값).
+    //     → 사용자가 그 속성에 어떤 추가속성 항목이 있는지 항상 인지. (노션 개선 아이디어 기록 후 적용)
+    //   UA028(FLD02≠"X" 제외 → ITMCD 정렬) 을 MPROP split("|") 과 ★같은 인덱스로 짝(prop=FLD01, val=split[i]).
     function _buildTMprop(sMprop) {
         var a = [];
-        if (typeof sMprop === "undefined" || sMprop === "") { return a; }
-        var aSplit = sMprop.split("|");
-        if (aSplit.length === 0) { return a; }
         var aUa = (oAPP.attr.T_9011 || []).filter(function (x) { return x.CATCD === "UA028"; });
-        if (aUa.length === 0) { return a; }
+        if (aUa.length === 0) { return a; }                                              // 항목 정의 자체가 없으면 표시 불가.
         aUa = aUa.filter(function (x) { return x.FLD02 !== "X"; });                       // 조회속성 제외.
         aUa.sort(function (x, y) { return x.ITMCD.localeCompare(y.ITMCD); });             // ITMCD 오름차순.
+        var aSplit = (typeof sMprop === "string" && sMprop !== "") ? sMprop.split("|") : [];   // 지정 없으면 값 전부 빈 값.
         for (var i = 0; i < aUa.length; i++) {
-            a.push({ ITMCD: aUa[i].ITMCD, prop: aUa[i].FLD01, val: aSplit[i] });          // ★인덱스 짝(순서 틀리면 값 밀림).
+            a.push({ ITMCD: aUa[i].ITMCD, prop: aUa[i].FLD01, val: (aSplit[i] != null ? aSplit[i] : "") });   // ★인덱스 짝(순서 틀리면 값 밀림).
         }
         return a;
     }
@@ -70,21 +70,25 @@
         var oPanel = U4AUI.createPanel({ title: H.z("060") });   // 060 Selected UI Object Info(트위스티=원본 ▶ 대체).
         oBody.appendChild(oPanel.el);
 
+        // 원본 HBOX1(wrap): [선택 속성 4줄] + [추가속성 값]을 가로로 나란히(좁으면 줄바꿈) — synchronizionBind.js:997/1077.
+        var oGrid = H.el("div", "u4aBwpSyncPanelGrid");
+
         // 4줄: 190 UI Object ID / 191 Attribute ID / 192 Attribute Type / 193 Binding Field.
         var oInfo = H.el("div", "u4aBwpSyncInfo");
         _infoRow(oInfo, H.z("190"), s.OBJID);
         _infoRow(oInfo, H.z("191"), s.UIATT);
         _infoRow(oInfo, H.z("192"), s.UIADT);
         _infoRow(oInfo, H.z("193"), s.UIATV);
-        oPanel.body.appendChild(oInfo);
+        oGrid.appendChild(oInfo);
 
         // 추가속성 값 목록(읽기전용) — 없으면 미표시(원본 _setAdditBindData exit).
         var aMprop = _buildTMprop(s.MPROP);
         if (aMprop.length > 0) {
             var oMp = H.el("div", "u4aBwpSyncInfo u4aBwpSyncMprop");
             aMprop.forEach(function (m) { _infoRow(oMp, m.prop, m.val); });
-            oPanel.body.appendChild(oMp);
+            oGrid.appendChild(oMp);
         }
+        oPanel.body.appendChild(oGrid);
     }
 
     // [S3] 하단 후보 테이블 — 7컬럼 멀티선택 + 컬럼최적화. 원본 designView 테이블부(1106~1228).
@@ -127,7 +131,7 @@
                     cell: function (r) {
                         var cb = H.el("input", "u4aBwpSyncChk"); cb.type = "checkbox"; cb.checked = !!r._chk;
                         cb.addEventListener("click", function (e) { e.stopPropagation(); });     // 행 클릭 선택과 분리.
-                        cb.addEventListener("change", function () { r._chk = cb.checked; });
+                        cb.addEventListener("change", function () { r._chk = cb.checked; _syncSetAllChkState(); });   // 개별 → 헤더 전체선택 동기화.
                         return cb;
                     }
                 },
@@ -141,6 +145,35 @@
             ]
         });
         oSync.tbl.setRows(oSync.aList || []);
+        _injectSyncSelectAll(oHost);   // 헤더 전체선택 체크박스 주입(원본 MultiToggle 대응). setRows 는 헤더 미갱신이라 1회 주입으로 유지.
+    }
+
+    // [S3] 헤더 첫 칸 전체선택 체크박스 주입 — 공통 makeDataTable 무수정(헤더 커스텀 셀 미지원) → 이 표 스코프 후처리.
+    //   원본 sap.ui.table.Table selectionMode 기본값 MultiToggle 의 헤더 전체선택 대응(synchronizionBind.js:1107, selectionMode 미지정).
+    function _injectSyncSelectAll(oHost) {
+        var oTh = oHost && oHost.querySelector("thead th.u4aBwpSyncChkCol");
+        if (!oTh) { oSync._allChk = null; return; }
+        oTh.textContent = "";
+        var oAll = H.el("input", "u4aBwpSyncChk u4aBwpSyncChkAll"); oAll.type = "checkbox";
+        oAll.addEventListener("click", function (e) { e.stopPropagation(); });
+        oAll.addEventListener("change", function () {
+            (oSync.aList || []).forEach(function (r) { r._chk = oAll.checked; });   // 전 행 일괄 체크/해제.
+            if (oSync.tbl) { oSync.tbl.setRows(oSync.aList || []); }                // body 재렌더(헤더 유지).
+            oAll.indeterminate = false;
+        });
+        oTh.appendChild(oAll);
+        oSync._allChk = oAll;
+        _syncSetAllChkState();
+    }
+
+    // 개별 체크 상태 → 헤더 전체선택 동기화: 전부=체크 / 일부=중간표시 / 없음=해제.
+    function _syncSetAllChkState() {
+        var oAll = oSync._allChk;
+        if (!oAll) { return; }
+        var a = oSync.aList || [];
+        var n = a.filter(function (r) { return r._chk === true; }).length;
+        oAll.checked = (a.length > 0 && n === a.length);
+        oAll.indeterminate = (n > 0 && n < a.length);
     }
 
     // 선택(체크)된 후보 수집 — 원본 _getSelectedData(synchronizionBind.js:184) 대응. S4 일괄적용이 소비.
@@ -261,6 +294,7 @@
         if (window.U4AUI) {
             if (U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHead); }
             if (U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg); }
+            if (U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHead); }   // 헤더 더블클릭 → 화면 중앙 복귀(공통 표준 UX, 타 팝업 전부 소비 — S5 만 누락되어 이식).
         }
 
         // 원본 beforeOpen(685): setViewLayoutEditable(false)[좌/가운데/우 잠금] + 후보테이블 선택 해제.
@@ -294,6 +328,7 @@
         if (oAPP.fn.setViewEditable) { oAPP.fn.setViewEditable(bLock); }                     // 원본 829 메인(중앙하단 적용/좌 갱신/기어)
         if (oAPP.fn.designSetViewEditable) { oAPP.fn.designSetViewEditable(bLock); }         // 원본 833 디자인(가운데 트리 선택/링크)
         if (oAPP.fn.setAdditBindButtonEnable) { oAPP.fn.setAdditBindButtonEnable(bLock); }   // 원본 837 우측 추가속성 바인딩 버튼
+        if (oAPP.fn.refreshAdditFieldsLock) { oAPP.fn.refreshAdditFieldsLock(); }            // 값 입력칸(중앙하단·우측) 잠금 반영 — 우측은 진입 시 재렌더 안 되므로 강제 재렌더.
         // 원본 839~841: 동일속성 모드면 우측 기어는 항상 잠금(false), 아니면 bLock 을 따름.
         if (oAPP.fn.setLayoutCustomizingEditable) {
             oAPP.fn.setLayoutCustomizingEditable(oAPP.attr.bSyncEqualityScreenActive === true ? false : bLock);

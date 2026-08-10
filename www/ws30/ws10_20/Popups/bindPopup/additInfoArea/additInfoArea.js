@@ -395,14 +395,11 @@
             oAPP.fn.sendAjax(oAPP.attr.servNm + "/chkConvExit", oFormData, function (param) {
                 if (param && param.RETCD === "E") {
                     _sRes.RETCD = param.RETCD;
-                    // ★ [.analy/17 · 장군님 지시] 표시 문구는 반드시 "클라이언트 메시지 클래스 DB" 를 본다.
-                    //   ① 서버 렌더 텍스트를 로컬 DB 로 역매핑(WsMsgCls.relocalize) → 화면 언어 재렌더.
-                    //   ② 역매핑 실패(로컬 DB 에 없는 서버 문구)면 서버 원문을 쓰지 않고 로컬 138 로 대체.
-                    //      → 화면에 서버 언어(영문)가 섞여 나오지 않는다.
-                    var _sSrv = (param.RTMSG || "");
-                    var _sLoc = (typeof oAPP.common.relocalizeServerMsg === "function")
-                        ? oAPP.common.relocalizeServerMsg(_sSrv) : _sSrv;
-                    _sRes.RTMSG = (_sLoc && _sLoc !== _sSrv) ? _sLoc : H.z("138");   // 138 Conversion Routine 없음.
+                    // ★ chkConvExit 오류 = "Conversion Routine 존재 안 함" 단일 종류(원본 index.js:5297 은 서버 param.RTMSG 를 그대로 표시).
+                    //   [.analy/17] 서버 영문 문구를 백엔드 WsMsgCls.relocalize 로 현지화하려 했으나, 부분매핑으로
+                    //   "변환 루틴 does not exist"(로컬조각 D76 + 영문 잔존) 잡탕이 나온다(백엔드 수정 불가 — 장군님 확인 08-10).
+                    //   → 이 오류는 종류가 하나뿐이므로 로컬 완성 문구 138("…Conversion Routine 이 존재하지 않습니다")로 고정한다.
+                    _sRes.RTMSG = H.z("138");
                 }
                 resolve(_sRes);
             });
@@ -786,7 +783,9 @@
         if (!ctx || !ctx.tbody) { return; }
         ctx.tbody.innerHTML = "";
         var aRows = _rows(ctx);
-        var bEditGlobal = !!oAPP.attr.editable;
+        // ★동일속성 적용 팝업 열림(bSyncDialogLock) 동안 값 입력칸/드롭다운 비활성 — 원본 enabled="{/edit}"(index.js:4562·bindAdditInfo.js:1241).
+        //   _renderRows 는 재렌더마다 호출되므로 여기서 live 판독. (우측 MAIN 은 진입 시 재렌더 안 되므로 잠금 토글 시 refreshAdditFieldsLock 로 강제 재렌더.)
+        var bEditGlobal = !!oAPP.attr.editable && oAPP.attr.bSyncDialogLock !== true;
 
         for (var i = 0; i < aRows.length; i++) {
             var r = aRows[i];
@@ -852,5 +851,15 @@
             ctx.tbody.appendChild(oTr);
         }
     }
+
+    // [S5 잠금] 동일속성 적용 팝업 열/닫 시 추가속성 값 입력칸(중앙하단 SEL·우측 MAIN) 잠금 상태 반영.
+    //   ★우측 MAIN 은 팝업 진입 시 재렌더되지 않으므로(SEL 만 clearSelectAdditBind), 잠금 토글 시점에 강제 재렌더해야
+    //     이미 그려진 입력칸이 bSyncDialogLock 을 반영해 비활성/활성으로 바뀐다. per-row r.edit 은 재렌더로 보존.
+    oAPP.fn.refreshAdditFieldsLock = function () {
+        try {
+            if (oA.MAIN && oA.MAIN.tbody) { _renderRows(oA.MAIN); }
+            if (oA.SEL && oA.SEL.tbody) { _renderRows(oA.SEL); }
+        } catch (e) { console.error("[HTML5][bindWindow] refreshAdditFieldsLock:", e && e.message); }
+    };
 
 })();
