@@ -169,8 +169,10 @@ oAPP.common.checkWLOList = function (REGTYP, CHGOBJ) {
  *     · 추가속성 "000274"(bindAdditInfo.js:348) · 레이아웃 커스터마이징 "000281"(index.js:3121)
  *     · 동기화 "000277"(synchronizionBind.js:796). 호출부가 자기 영역 ID 를 넘긴다(미지정=모델필드 276 하위호환).
  *   ★ busy 는 켠 채로 둔다(원본 동일) — WS20 이 도움말을 띄우고 BUSY_OFF 를 되돌려줘야 풀린다.
- *   ★ WLO 미등록(구버전) 경로 = utils/callTooltipsPopup.js(로컬 도움말 HTML). 별창 + CJS(module.exports)
- *     제약으로 미이식 — 해당 시스템에선 도움말이 뜨지 않는다(P6 잔여, 보고 대상).
+ *   ★ WLO 미등록(구버전) 경로 = utils/callTooltipsPopup.js(로컬 도움말 HTML 을 Electron 별창으로 로드).
+ *     영역별 index.html(design/html/helper/{언어}/bindPopup/{영역}/) 존재 + frame.js 의 oAPP.REMOTE/PATH/FS/APP
+ *     로 동작 가능 → 원본 각 영역의 callTooltipsPopup(영역, 코드) 호출을 startMenuId→(영역,코드) 매핑으로 재현.
+ *     레이아웃 커스터마이징(000281)은 원본도 구버전 도움말 미호출(index.js:3114 미등록 시 종료) → 매핑 제외.
  ****************************************************************************/
 oAPP.fn.onHelp = function (sStartMenuId) {
     var _sMenuId = sStartMenuId || "000276";   // 미지정 = 모델필드 문서(하위호환).
@@ -184,7 +186,22 @@ oAPP.fn.onHelp = function (sStartMenuId) {
         }
         return;
     }
-    console.warn("[HTML5][bindWindow] onHelp: WLO(UHAK901369) 미등록 — 구버전 tooltip 팝업 경로 미이식(P6 잔여)");
+    // ★ WLO 미등록(구버전) — 로컬 도움말 HTML 별창(원본 callTooltipsPopup). busy 는 callTooltipsPopup 이 자체 관리(진입 on → did-finish-load 후 off).
+    //   startMenuId(HELP DOC 문서ID) → 원본 구버전 (영역, 툴팁코드) 매핑. (원본: 모델필드 index.js:4877 / 디자인트리 designTree.js:2701 / 추가속성 bindAdditInfo.js:353 / 동일속성 synchronizionBind.js:801)
+    var oLegacy = {
+        "000276": { area: "modelFieldArea", code: "200" },
+        "000275": { area: "designArea", code: "201" },
+        "000274": { area: "bindAdditArea", code: "202" },
+        "000277": { area: "synchronizionArea", code: "203" }
+    };
+    var oGV = oLegacy[_sMenuId];
+    if (!oGV) { return; }   // 레이아웃 커스터마이징(000281) 등 = 원본도 구버전 도움말 없음(미등록 시 종료).
+    try {
+        parent.require("./utils/callTooltipsPopup.js")(oGV.area, oGV.code);
+    } catch (e) {
+        console.error("[HTML5][bindWindow] onHelp 구버전 tooltip:", e && e.message);
+        oAPP.fn.setBusyWS20Interaction(false);   // 로드 실패 시 busy 잔류 방지(callTooltipsPopup 이 켠 뒤 예외 시 짝).
+    }
 };
 
 /****************************************************************************
