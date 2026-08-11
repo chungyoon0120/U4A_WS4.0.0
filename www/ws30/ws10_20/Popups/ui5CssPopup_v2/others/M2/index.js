@@ -124,6 +124,8 @@ document.addEventListener('DOMContentLoaded', function () {
         //   UI5 로드 전 흰색으로 떠 흰 번쩍. frame.html <head> 부트 스크립트가 이 값으로 첫 페인트 배경을 칠한다.
         var sBootBg = oQueryParams.BGCOL || "";
         var sBootTheme = oQueryParams.THEME || "";
+        // 숨겨둔 속화면을 내용 로드 완료 시 표시(그전까진 부모 테마색). onload 를 src 지정 전에 걸어 누락 방지.
+        oIframe.onload = function () { oIframe.style.visibility = "visible"; };
         oIframe.src = "frame.html?BGCOL=" + encodeURIComponent(sBootBg) + "&THEME=" + encodeURIComponent(sBootTheme);
 
     };

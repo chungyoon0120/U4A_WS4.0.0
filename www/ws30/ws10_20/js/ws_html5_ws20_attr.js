@@ -3363,6 +3363,20 @@
             try { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { }
             try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
 
+            //[원본 attrChangeProc 이식 — setChangeFlag 직후 블록] 넘겨받은 sAttr 이 모델의 실제 줄이 아니라
+            //  복사본일 수 있어, 모델(T_ATTR)에서 같은 UIATK 줄을 찾아 값을 옮겨 넣고(moveCorresponding),
+            //  이후 처리(검증·수집·스타일·렌더)를 그 "실제 줄"로 진행한다. 이 재지정이 없으면 복사본에만
+            //  값이 반영돼 화면/모델이 어긋나는 원본 버그가 그대로 남는다.
+            try {
+                var _pos = oAPP.attr.oModel.oData.T_ATTR.findIndex(item => item.UIATK === sAttr.UIATK);
+                if (_pos !== -1) {
+                    oAPP.fn.moveCorresponding(sAttr, oAPP.attr.oModel.oData.T_ATTR[_pos]);
+                    sAttr = oAPP.attr.oModel.oData.T_ATTR[_pos];
+                }
+            } catch (e) {
+                console.warn("[HTML5][WS20][attr] T_ATTR 실줄 동기화 skip:", e && e.message);
+            }
+
             //(원본 1920행 checkPropertyValue(designTreeData.js): 입력값 점검 모듈 —
             // parent.require 로드 가능시에만 수행)
             try {

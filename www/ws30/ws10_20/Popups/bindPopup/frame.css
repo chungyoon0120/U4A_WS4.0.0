@@ -437,23 +437,11 @@ body {
 /* 툴바 세퍼레이터(원본 sap.m.ToolbarSeparator). */
 .u4aBwpToolSep { flex: 0 0 auto; width: 0.0625rem; align-self: stretch; margin: 0.125rem 0.25rem; background: var(--line); }
 
-/* ===== 우측 "추가 속성 바인딩"(bindAdditInfo) — 속성|값 2열 테이블(.u4a-table 소비) ===== */
-.u4aBwpAdditTbl { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.8125rem; }
-.u4aBwpAdditTbl th {
-    position: sticky; top: 0; z-index: 1;
-    text-align: left; font-weight: 600;
-    padding: 0.375rem 0.625rem;
-    background: var(--surface); color: var(--text);
-    border-bottom: 0.0625rem solid var(--line);
-}
-.u4aBwpAdditTbl td {
-    padding: 0.25rem 0.625rem;
-    border-bottom: 0.0625rem solid var(--line);
-    vertical-align: middle;
-}
-.u4aBwpAdditTbl th:first-child, .u4aBwpAdditTbl td:first-child { width: 48%; }
-/* 속성명 셀 — 데이터 아님(선택 금지). 값 셀만 입력/선택 허용. */
-.u4aBwpAdditProp { color: var(--text-muted, var(--text)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ===== 우측/중앙하단 "추가 속성 바인딩"(bindAdditInfo) — 속성|값 2열 표 =====
+   ★ 모달과 동일하게 공통 평면표(U4AUI.makeDataTable · .u4a-table)를 소비한다. 헤더/셀/격자선/행높이는 공통이 담당
+   (화면별 th/td 색·패딩·고정 %폭 override 제거 — 컬럼 폭은 리사이즈 colgroup/auto-fit 이 소유, 16 §3.4.2). */
+/* 속성명 셀 — 모달과 동일하게 굵게(데이터 아님, 선택 금지). 값 셀만 입력/선택 허용. */
+.u4aBwpAdditProp { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .u4aBwpAdditVal { min-width: 0; }
 .u4aBwpAdditVal .u4a-field,
 .u4aBwpAdditVal .u4a-combo { width: 100%; }

@@ -38,49 +38,81 @@
     // Nozero 불가 타입(원본 l_nozero) / number format 가능 타입(원본 l_numfmt).
     var CS_NOZERO_NG = "Cg", CS_NUMFMT_OK = "IP";
 
-    // 161 컬럼최적화 — 속성 컬럼을 라벨 최대폭에 맞춤(원본 setUiTableAutoResizeColumn 대응). 실패 무해.
-    //   ★ Range 로 실제 텍스트폭 측정(컬럼폭 무관·항상 동일). scrollWidth 는 grow-only 버그라 안 씀.
-    function _textW(el) {
-        try {
-            var r = document.createRange();
-            r.selectNodeContents(el);
-            var w = r.getBoundingClientRect().width;
-            if (w) { return w; }
-        } catch (e) { }
-        return el.offsetWidth;
-    }
+    // 161 컬럼최적화 — 공통 평면표의 컬럼 자동맞춤(내용 최장 폭). 원본 setUiTableAutoResizeColumn 대응. 실패 무해.
     function _fitCols(ctx) {
-        if (!ctx || !ctx.host) { return; }
-        try {
-            var oTbl = ctx.host.querySelector(".u4aBwpAdditTbl");
-            if (!oTbl) { return; }
-            var rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-            var mx = 0, aProp = oTbl.querySelectorAll("th:first-child, .u4aBwpAdditProp");
-            for (var i = 0; i < aProp.length; i++) { var w = _textW(aProp[i]); if (w > mx) { mx = w; } }
-            if (mx > 0) {
-                var sW = Math.max(6 * rem, Math.ceil(mx) + 1.5 * rem) + "px";
-                var aFirst = oTbl.querySelectorAll("tr > :first-child");
-                for (var j = 0; j < aFirst.length; j++) { aFirst[j].style.width = sW; }
-            }
-        } catch (e) { console.error("[HTML5][bindWindow] additFitCols:", e && e.message); }
+        if (!ctx || !ctx.dt || typeof ctx.dt.autoFit !== "function") { return; }
+        try { ctx.dt.autoFit(); } catch (e) { console.error("[HTML5][bindWindow] additFitCols:", e && e.message); }
     }
 
     // 161 컬럼최적화 외부 노출(우측 MAIN 버튼용 — 원본 setUiTableAutoResizeColumn 대응).
     oAPP.fn.additFitCols = function () { _fitCols(oA.MAIN); };
 
-    /* ── 공통 테이블 골격 생성(속성|값 2열) ─────────────────────────────────── */
+    /* ── 공통 평면표(속성|값 2열) 생성 — 모달과 동일 컴포넌트·옵션(격자 + 컬럼 폭 드래그 조절). 컨텍스트당 1회 생성 후 행만 갱신. ── */
     function _buildTable(ctx) {
-        ctx.host.innerHTML = "";
-        var oTbl = H.el("table", "u4aBwpAdditTbl u4a-table");
-        var oThead = H.el("thead");
-        var oTrH = H.el("tr");
-        oTrH.appendChild(H.el("th", null, H.z("177")));   // 177 Property(속성)
-        oTrH.appendChild(H.el("th", null, H.z("178")));   // 178 Value(값)
-        oThead.appendChild(oTrH);
-        oTbl.appendChild(oThead);
-        ctx.tbody = H.el("tbody");
-        oTbl.appendChild(ctx.tbody);
-        ctx.host.appendChild(oTbl);
+        ctx.dt = U4AUI.makeDataTable(ctx.host, {
+            virtual: false, grid: true, resizable: true, selectable: false, zebra: false,
+            tableClass: "u4aBwpAdditTbl",
+            columns: [
+                {
+                    label: H.z("177"),   // 177 Property(속성)
+                    cell: function (r) {
+                        var s = H.el("span", "u4aBwpAdditProp", r.prop || "");
+                        if (r.prop) { s.setAttribute("data-tip", r.prop); s.setAttribute("data-tip-trunc", ""); }
+                        return s;
+                    }
+                },
+                {
+                    label: H.z("178"), cellClass: "u4aBwpAdditVal",   // 178 Value(값)
+                    cell: (function (cx) { return function (r) { return _additValCell(cx, r); }; })(ctx)
+                }
+            ],
+            rowHook: function (oTr, r) {
+                if (r && r.ITMCD) { oTr.setAttribute("data-itmcd", r.ITMCD); }   // [SPEC §6] 오류 위치 이동/강조 대상 식별
+                if (r && r.stat === "Error") { oTr.classList.add("u4aBwpAdditRow--error"); }   // 오류 행 표시
+                // [R1] 필드(입력/선택) 값셀은 공통 말줄임 툴팁 대상에서 제외(숨은 검증 메시지 hover 누수 차단).
+                if (r && (r.sel_vis || r.inp_vis)) { var oV = oTr.cells[1]; if (oV) { oV.setAttribute("data-tip", ""); } }
+            }
+        });
+        ctx.tbody = ctx.dt.tbody;   // 기존 ctx.tbody 참조 호환(refreshAdditFieldsLock truthy 체크 등).
+    }
+
+    // 값 셀 빌더 — 콤보(P04↔P05 연동) / Conversion 입력(검증·포커스 팝오버) / 읽기전용 텍스트. 원본 _renderRows 값셀 1:1.
+    //   ★ 편집가능(bEnabled)은 재렌더마다 바뀌므로 매 호출 실시간 판독(makeDataTable setRows 가 cell 재호출).
+    function _additValCell(ctx, r) {
+        var bEnabled = (!!oAPP.attr.editable && oAPP.attr.bSyncDialogLock !== true) && r.edit;
+        if (r.sel_vis) {
+            var aItems = (r.T_DDLB || []).map(function (d) { return { value: d.KEY, text: d.TEXT }; });
+            var oSel = U4AUI.createField({
+                type: "combo", items: aItems, value: r.val || "", disabled: !bEnabled,
+                // ★ P04↔P05 동기화 판정은 클로저 안에서 row.ITMCD 로 직접(행별 캡처).
+                onChange: (function (row, cx) { return function (v) { row.val = v; if (row.ITMCD === "P04" || row.ITMCD === "P05") { oAPP.fn.setAddtBindInfoDDLB(row, cx); } }; })(r, ctx)
+            });
+            return oSel.el;
+        }
+        if (r.inp_vis) {
+            var bConv = (r.ITMCD === "P06");
+            var oInp = U4AUI.createField({
+                type: "text", value: r.val || "",
+                // [R1] 검증 메시지 = 원본 UI5 ValueState.Error 재현(빨간 테두리 + 포커스 시 top-layer 팝오버 _bwpVsShow).
+                className: "u4aBindAdditField",
+                maxLength: (r.maxlen != null ? r.maxlen : undefined),
+                disabled: !bEnabled, clear: bEnabled, upper: bConv,
+                onChange: (function (row) { return function (v) { row.val = v; if (bConv) { oAPP.fn.convChangeInput(row, oInp); } }; })(r),
+                onInput: bConv ? (function (row) { return function () { oAPP.fn.clearConvError(row, oInp); }; })(r) : undefined,
+                onClear: (function (row) { return function () { row.val = ""; if (bConv) { oAPP.fn.clearConvError(row, oInp); } }; })(r)
+            });
+            if (bConv && r.stat === "Error") { try { oInp.setValueState("error", r.statTxt || ""); } catch (e) { } }
+            if (bConv) {
+                (function (row, inpEl) {
+                    inpEl.addEventListener("focus", function () { oAPP.fn._bwpVsShow(inpEl, row); });
+                    inpEl.addEventListener("blur", function () { oAPP.fn._bwpVsHide(); });
+                })(r, oInp.input);
+            }
+            return oInp.el;
+        }
+        var oTxt = H.el("span", "u4aBwpAdditTxt", r.val || "");
+        if (r.val) { oTxt.setAttribute("data-tip", r.val); oTxt.setAttribute("data-tip-trunc", ""); }
+        return oTxt;
     }
 
     /* ── 영역 초기화(frame.js _bootApp → initAdditArea) — 두 패널 모두 구성 ──── */
@@ -778,78 +810,10 @@
         }
     };
 
-    /* ── 행 렌더(값 셀 = 텍스트 / 입력 / 선택) — ctx 스토어/tbody 명시 ───────── */
+    /* ── 행 렌더 — 공통 평면표에 데이터만 갱신(컬럼폭·격자·리사이즈는 컴포넌트가 유지). 값셀 구성은 _additValCell. ── */
     function _renderRows(ctx) {
-        if (!ctx || !ctx.tbody) { return; }
-        ctx.tbody.innerHTML = "";
-        var aRows = _rows(ctx);
-        // ★동일속성 적용 팝업 열림(bSyncDialogLock) 동안 값 입력칸/드롭다운 비활성 — 원본 enabled="{/edit}"(index.js:4562·bindAdditInfo.js:1241).
-        //   _renderRows 는 재렌더마다 호출되므로 여기서 live 판독. (우측 MAIN 은 진입 시 재렌더 안 되므로 잠금 토글 시 refreshAdditFieldsLock 로 강제 재렌더.)
-        var bEditGlobal = !!oAPP.attr.editable && oAPP.attr.bSyncDialogLock !== true;
-
-        for (var i = 0; i < aRows.length; i++) {
-            var r = aRows[i];
-            var oTr = H.el("tr");
-            // [SPEC §6] 오류 위치 이동/강조 대상 식별 + 오류 행 표시(원본 stat="Error" → _style).
-            if (r.ITMCD) { oTr.setAttribute("data-itmcd", r.ITMCD); }
-            if (r.stat === "Error") { oTr.classList.add("u4aBwpAdditRow--error"); }
-
-            var oTdP = H.el("td");
-            var oProp = H.el("span", "u4aBwpAdditProp", r.prop || "");
-            if (r.prop) { oProp.setAttribute("data-tip", r.prop); oProp.setAttribute("data-tip-trunc", ""); }
-            oTdP.appendChild(oProp);
-            oTr.appendChild(oTdP);
-
-            var oTdV = H.el("td", "u4aBwpAdditVal");
-            var bEnabled = bEditGlobal && r.edit;
-            // [R1] 필드(입력/선택) 값셀은 공통 .u4a-table 자동 말줄임툴팁 대상에서 제외한다.
-            //   값셀 textContent 에 섞인 검증 메시지(.u4a-field__msg)까지 긁어 hover 시 오류문구가
-            //   툴팁으로 새던 문제 차단. data-tip="" → 공통 _show 가 빈 문자열이면 표시 생략(u4a-ui.js:689).
-            //   (텍스트 값셀은 건드리지 않아 긴 값 말줄임 툴팁은 그대로 유지.)
-            if (r.sel_vis || r.inp_vis) { oTdV.setAttribute("data-tip", ""); }
-
-            if (r.sel_vis) {
-                var aItems = (r.T_DDLB || []).map(function (d) { return { value: d.KEY, text: d.TEXT }; });
-                var oSel = U4AUI.createField({
-                    type: "combo", items: aItems, value: r.val || "", disabled: !bEnabled,
-                    // ★ P04↔P05 동기화 판정은 클로저 안에서 row.ITMCD 로 직접 한다.
-                    //   (예전엔 루프 밖 var bDdlbSync 를 참조 → for 함수스코프 단일변수라 모든 행의 onChange 가
-                    //    마지막 행(P08=false) 값을 공유 → P04 선택해도 setAddtBindInfoDDLB 미호출 → P05 영영 회색. 버그 수정.)
-                    onChange: (function (row, cx) { return function (v) { row.val = v; if (row.ITMCD === "P04" || row.ITMCD === "P05") { oAPP.fn.setAddtBindInfoDDLB(row, cx); } }; })(r, ctx)
-                });
-                oTdV.appendChild(oSel.el);
-            } else if (r.inp_vis) {
-                var bConv = (r.ITMCD === "P06");
-                var oInp = U4AUI.createField({
-                    type: "text", value: r.val || "",
-                    // [R1] 검증 메시지 = 원본 UI5 ValueState.Error 재현. 에러 시 빨간 배경+테두리(공통 전역)
-                    //   + '포커스 시' 문구 팝오버. 팝오버는 top-layer(_bwpVsShow, 아래)로 띄운다 — 이 표가
-                    //   overflow 컨테이너(.u4aBwpTableHost) 안이라 셀 안 absolute 팝오버는 잘리거나 안 보임.
-                    className: "u4aBindAdditField",
-                    maxLength: (r.maxlen != null ? r.maxlen : undefined),
-                    disabled: !bEnabled, clear: bEnabled, upper: bConv,
-                    onChange: (function (row) { return function (v) { row.val = v; if (bConv) { oAPP.fn.convChangeInput(row, oInp); } }; })(r),
-                    onInput: bConv ? (function (row) { return function () { oAPP.fn.clearConvError(row, oInp); }; })(r) : undefined,
-                    onClear: (function (row) { return function () { row.val = ""; if (bConv) { oAPP.fn.clearConvError(row, oInp); } }; })(r)
-                });
-                if (bConv && r.stat === "Error") { try { oInp.setValueState("error", r.statTxt || ""); } catch (e) { } }
-                if (bConv) {
-                    // [R1] 포커스 시 top-layer 팝오버 노출 / blur 시 숨김(원본 UI5 ValueStateMessage = 문서레벨 팝업).
-                    (function (row, inpEl) {
-                        inpEl.addEventListener("focus", function () { oAPP.fn._bwpVsShow(inpEl, row); });
-                        inpEl.addEventListener("blur", function () { oAPP.fn._bwpVsHide(); });
-                    })(r, oInp.input);
-                }
-                oTdV.appendChild(oInp.el);
-            } else {
-                var oTxt = H.el("span", "u4aBwpAdditTxt", r.val || "");
-                if (r.val) { oTxt.setAttribute("data-tip", r.val); oTxt.setAttribute("data-tip-trunc", ""); }
-                oTdV.appendChild(oTxt);
-            }
-
-            oTr.appendChild(oTdV);
-            ctx.tbody.appendChild(oTr);
-        }
+        if (!ctx || !ctx.dt) { return; }
+        ctx.dt.setRows(_rows(ctx));
     }
 
     // [S5 잠금] 동일속성 적용 팝업 열/닫 시 추가속성 값 입력칸(중앙하단 SEL·우측 MAIN) 잠금 상태 반영.

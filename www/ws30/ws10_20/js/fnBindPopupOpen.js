@@ -1192,74 +1192,112 @@
     lf_renderAddit();
   }
 
-  // 추가속성 테이블 렌더(공통 .u4a-table + createField/createSelect) — 원본 sap.ui.table.Table 대응.
-  function lf_renderAddit() {
-    oUI.additWrap.innerHTML = "";
-    var bEdit = _isEdit();
-
-    var oTable = _el("table", "u4a-table u4aBindAdditTable");
-    var oThead = _el("thead");
-    var oHrow = _el("tr");
-    oHrow.appendChild(_el("th", "u4aBindAdditColProp", _cl("A52")));   // A52 Property
-    oHrow.appendChild(_el("th", null, _cl("A53")));                    // A53 Value
-    oThead.appendChild(oHrow);
-    oTable.appendChild(oThead);
-
-    var oTbody = _el("tbody");
-
-    for (var i = 0; i < oS.T_MPROP.length; i++) {
-      (function (ls, idx) {
-        var oTr = _el("tr");
-        // 지브라(교대 배경) 제거 — 속성/값 폼형 테이블이라 줄무늬 대신 라인 구분만(사용자 요청). data-odd 미설정.
-        if (ls.stat === "Error") { oTr.setAttribute("data-state", "error"); }
-
-        // Property 셀.
-        var oTdP = _el("td", "u4aBindAdditProp", ls.prop || "");   // 툴팁=공통 .u4a-table 자동(_autoCellTip: 잘릴 때만)
-        oTr.appendChild(oTdP);
-
-        // Value 셀 — 읽기전용 텍스트 / 입력 / 콤보.
-        var oTdV = _el("td", "u4aBindAdditVal");
-
-        if (ls.txt_vis) {
-          oTdV.textContent = ls.val || "";
-          oTdV.classList.add("u4aBindAdditText");   // 값 툴팁=공통 .u4a-table 자동(잘릴 때만 전체값)
-
-        } else if (ls.inp_vis) {
-          // Conversion Routine — 대문자 입력.
-          var oF = U4AUI.createField({
-            type: "text", value: ls.val || "", upper: true, clear: true,
-            maxLength: ls.maxlen, readOnly: !(ls.edit && bEdit), disabled: !(ls.edit && bEdit),
-            className: "u4aBindAdditField",
-            onChange: function (v) { ls.val = (v || "").toUpperCase(); }
-          });
-          ls._field = oF;
-          oTdV.appendChild(oF.el);
-
-        } else if (ls.sel_vis) {
-          var aItems = (ls.T_DDLB || []).map(function (d) { return { value: d.KEY, text: d.TEXT }; });
-          var oSel = U4AUI.createField({
-            type: "select", value: ls.val || "", items: aItems,
-            disabled: !(ls.edit && bEdit),
-            className: "u4aBindAdditField",
-            onChange: function (v) { ls.val = v; lf_onMpropChange(ls); }
-          });
-          ls._field = oSel;
-          oTdV.appendChild(oSel.el);
-        }
-
-        // ★ 오류 표시 = 필드 밸류스테이트(원본 callBindPopup valueState:"{stat}"/valueStateText:"{statTxt}" 1:1).
-        //   라벨/텍스트 빨강 아님 — 필드에 빨간 테두리 + 메시지(포커스 시 표시). txt 셀(필드없음)은 오류 대상 아님.
-        // ★ 공통 createField 는 소문자 value-state("error"/"none")로 data-vs 를 세팅(shell.css .u4a-input[data-vs="error"]
-        //   빨간 테두리). ls.stat 은 UI5식 "Error"/"None" 이라 소문자로 매핑해야 빨간 테두리가 걸린다.
-        if (ls._field && ls._field.setValueState) { ls._field.setValueState(ls.stat === "Error" ? "error" : "none", ls.statTxt || ""); }
-
-        oTr.appendChild(oTdV);
-        oTbody.appendChild(oTr);
-      })(oS.T_MPROP[i], i);
+  /* ── 추가속성 값-스테이트 메시지 = 문서 최상단 fixed 팝오버(별창 additInfoArea._bwpVsShow 이식) ──
+     추가속성 표가 overflow 컨테이너(.u4aBindAdditWrap) 안이라, 메시지를 입력칸(.u4a-field) 안에
+     인라인으로 넣으면 (1) 필드가 2줄로 커져 지우기(X) 버튼이 가운데로 내려앉고 (2) 메시지가 셀 안에서
+     잘린다(장군님 실기 재현). → 원본 UI5 ValueStateMessage 처럼 dialog[open]/body 최상단에
+     position:fixed 로 입력칸 바로 아래 부착. 싱글톤 1개 재사용, 포커스 시 표시/blur·스크롤·리사이즈·
+     바깥클릭 시 숨김. 색/아이콘/보더는 공통 .u4a-field__msg 소비(신규 스타일 없음). */
+  var _vsPop = null, _vsBound = false, _vsField = null;
+  function _vsEl() {
+    if (!_vsPop) {
+      _vsPop = document.createElement("span");
+      _vsPop.className = "u4a-field__msg u4aBindVsPop";
+      _vsPop.setAttribute("data-vs", "error");
     }
+    return _vsPop;
+  }
+  function _bindVsHide() { if (_vsPop) { _vsPop.style.display = "none"; } }
+  function _bindVsShow(oInputEl, ls) {
+    if (!oInputEl || !ls || ls.stat !== "Error" || !ls.statTxt) { _bindVsHide(); return; }
+    var el = _vsEl();
+    _vsField = (oInputEl.closest && oInputEl.closest(".u4aBindAdditField")) || oInputEl;   // 현재 앵커 필드(바깥클릭 판정용)
+    el.textContent = ls.statTxt;
+    el.setAttribute("data-vs", "error");
+    var host = (oInputEl.closest && oInputEl.closest("dialog[open]")) || document.body;
+    if (el.parentNode !== host) { host.appendChild(el); }
+    var rc = oInputEl.getBoundingClientRect();
+    el.style.position = "fixed";
+    el.style.margin = "0";                          // 공통 margin-top(0.25rem) 무효화 → top 결정적
+    el.style.left = Math.round(rc.left) + "px";
+    el.style.top = Math.round(rc.bottom + 4) + "px";
+    el.style.width = Math.round(rc.width) + "px";   // 입력칸 폭 → 문구 개행(반응형)
+    el.style.display = "inline-flex";
+    if (!_vsBound) {
+      _vsBound = true;
+      window.addEventListener("scroll", function () { _bindVsHide(); }, true);
+      window.addEventListener("resize", function () { _bindVsHide(); });
+      // blur 만으론 못 잡는 바깥 클릭(포커스 이동 없는 클릭) 보강 — mousedown capture. 앵커 필드/팝오버 자체는 유지.
+      document.addEventListener("mousedown", function (e) {
+        if (!_vsPop || _vsPop.style.display === "none") { return; }
+        var t = e.target;
+        if (_vsField && t && t.closest && t.closest(".u4aBindAdditField") === _vsField) { return; }
+        if (_vsPop.contains && t && _vsPop.contains(t)) { return; }
+        _bindVsHide();
+      }, true);
+    }
+  }
 
-    oTable.appendChild(oTbody);
-    oUI.additWrap.appendChild(oTable);
+  // 추가속성 테이블 렌더(공통 .u4a-table + createField/createSelect) — 원본 sap.ui.table.Table 대응.
+  // 값 셀 빌더 — 읽기전용 텍스트 / 대문자 입력(Conversion) / 콤보. 편집가능·오류표시·포커스 팝오버·P04 연동 보존.
+  //   ★ 편집모드(bEdit)는 재렌더마다 바뀌므로 캡처하지 않고 _isEdit() 로 매 호출 실시간 판독(makeDataTable setRows 가 cell 재호출).
+  function _renderAdditValCell(ls) {
+    var bEdit = _isEdit();
+    if (ls.txt_vis) {
+      return _el("span", "u4aBindAdditText", ls.val || "");   // 값 툴팁=공통 자동(잘릴 때만)
+    }
+    if (ls.inp_vis) {
+      // Conversion Routine — 대문자 입력.
+      var oF = U4AUI.createField({
+        type: "text", value: ls.val || "", upper: true, clear: true,
+        maxLength: ls.maxlen, readOnly: !(ls.edit && bEdit), disabled: !(ls.edit && bEdit),
+        className: "u4aBindAdditField",
+        onChange: function (v) { ls.val = (v || "").toUpperCase(); }
+      });
+      ls._field = oF;
+      // [값-스테이트 메시지] 포커스 시 문서 최상단 fixed 팝오버 표시 / blur 시 숨김(별창 방식). 빨간 테두리는 setValueState.
+      (function (row, inpEl) {
+        if (!inpEl) { return; }
+        inpEl.addEventListener("focus", function () { _bindVsShow(inpEl, row); });
+        inpEl.addEventListener("blur", function () { _bindVsHide(); });
+      })(ls, oF.input);
+      if (oF.setValueState) { oF.setValueState(ls.stat === "Error" ? "error" : "none", ls.statTxt || ""); }
+      return oF.el;
+    }
+    if (ls.sel_vis) {
+      var aItems = (ls.T_DDLB || []).map(function (d) { return { value: d.KEY, text: d.TEXT }; });
+      var oSel = U4AUI.createField({
+        type: "select", value: ls.val || "", items: aItems,
+        disabled: !(ls.edit && bEdit),
+        className: "u4aBindAdditField",
+        onChange: function (v) { ls.val = v; lf_onMpropChange(ls); }
+      });
+      ls._field = oSel;
+      if (oSel.setValueState) { oSel.setValueState(ls.stat === "Error" ? "error" : "none", ls.statTxt || ""); }
+      return oSel.el;
+    }
+    return null;
+  }
+
+  function lf_renderAddit() {
+    // ★ 공통 평면표(격자선 + 컬럼 폭 드래그 조절) 1회 생성 후 행만 갱신 — 재렌더 시 사용자가 조절한 컬럼폭 보존.
+    //   (모달·별창 동일 컴포넌트·동일 옵션. 값칸 위젯/오류표시/연동 로직은 위 _renderAdditValCell 이 담당.)
+    if (!oUI.additDt || oUI.additDt.el !== oUI.additWrap) {
+      oUI.additDt = U4AUI.makeDataTable(oUI.additWrap, {
+        virtual: false, grid: true, resizable: true, selectable: false, zebra: false,
+        tableClass: "u4aBindAdditTable",
+        columns: [
+          { label: _cl("A52"), cellClass: "u4aBindAdditProp", cell: function (ls) { return ls.prop || ""; } },   // A52 Property(굵게)
+          { label: _cl("A53"), cellClass: "u4aBindAdditVal", cell: _renderAdditValCell }                          // A53 Value
+        ],
+        rowHook: function (oTr, ls) {
+          if (ls && ls.stat === "Error") { oTr.setAttribute("data-state", "error"); }   // 오류 행 표시
+          // [값셀 툴팁 제외] 필드 셀은 공통 말줄임 툴팁 대상에서 제외(숨은 검증 메시지 hover 누수 차단).
+          if (ls && (ls.inp_vis || ls.sel_vis)) { var oV = oTr.cells[1]; if (oV) { oV.setAttribute("data-tip", ""); } }
+        }
+      });
+    }
+    oUI.additDt.setRows(oS.T_MPROP || []);
   }
 
   // 추가속성 DDLB 상호작용 (원본 oTabCol2Sel1 change — Bind type ↔ Reference/Conversion).
@@ -1683,21 +1721,15 @@
       ".u4aBindShowAddit .u4aBindSplitBar { display: flex; }",
       ".u4aBindAdditWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }",
       ".u4aBindAdditTable td { vertical-align: middle; }",
-      // 컬럼 경계 세로선 — 좌측 트리와 동일한 그리드 느낌으로 속성|값 사이 세로 구분선(헤더+행 전체).
-      ".u4aBindAdditTable td:first-child, .u4aBindAdditTable th:first-child { border-right: 0.0625rem solid var(--line); }",
-      ".u4aBindAdditColProp, .u4aBindAdditProp { width: 42%; }",
+      // 세로 칸 구분선·컬럼 폭은 공통 격자(.u4a-table--grid) + 컬럼 리사이즈(colgroup/auto-fit)가 담당 — 화면 인라인 세로선/고정%폭 제거.
       ".u4aBindAdditProp { font-weight: 700; }",
       ".u4aBindAdditText { color: var(--text-muted); }",
       ".u4aBindAdditVal .u4aBindAdditField { width: 100%; }",
-      // ★ 값-스테이트 메시지(원본 valueState/valueStateText). MPROP 은 테이블 셀(폼-행 없음)이라 공통 focus 규칙
-      //   (.u4a-form__row:focus-within, shell.css 1262)이 안 걸리고, 게다가 검증 재렌더+토스트로 포커스가 흔들려
-      //   focus-within 은 이 컨텍스트에서 불안정 → ★"에러 상태(data-vs=error)면 항상" 인라인 표시(포커스 무관, 확실).
-      //   공통 .u4a-field__msg 요소를 그대로 소비하되 위치만 스코프로 인라인화: 텍스트 필드(.u4a-field)를 flex-wrap 해
-      //   메시지를 입력칸 '아래 줄'에 정적 배치(absolute 플로팅 아님 → 아래 행 안 가림 + overflow 클리핑 없음).
-      //   (.u4aBindAdditField 는 select 콤보에도 붙으므로 .u4a-field 동시선택으로 텍스트 필드에만 한정.)
-      ".u4aBindAdditField.u4a-field { flex-wrap: wrap; }",
-      ".u4aBindAdditField.u4a-field .u4a-field__msg { position: static; flex: 0 0 100%; margin-top: 0.25rem; box-shadow: none; }",
-      ".u4aBindAdditField.u4a-field .u4a-input[data-vs=\"error\"] ~ .u4a-field__msg:not(:empty) { display: inline-flex; }",
+      // ★ 값-스테이트 메시지(원본 valueState/valueStateText) = 문서 최상단 fixed 팝오버(_bindVsShow, 별창 방식).
+      //   MPROP 표가 overflow 컨테이너(.u4aBindAdditWrap) 안이라, 메시지를 입력칸 안 인라인으로 넣으면 필드가
+      //   2줄로 커져 지우기(X) 버튼이 어긋나고 메시지가 셀에 잘린다 → dialog[open]/body 최상단에 fixed 로 띄운다.
+      //   (인라인 .u4a-field__msg 는 공통 기본 display:none 그대로 숨김 유지 — 별도 노출 규칙 없음.)
+      ".u4aBindVsPop { z-index: 40; white-space: normal; overflow-wrap: anywhere; }",
       // 드래그 중 iframe(미리보기) 위 끊김 방지는 공통(body.u4a-dragging).
       ".u4aBindResizing, .u4aBindResizing * { cursor: col-resize !important; user-select: none !important; }"
     ].join("");

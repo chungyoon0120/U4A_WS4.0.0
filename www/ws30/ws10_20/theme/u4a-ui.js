@@ -2719,12 +2719,19 @@
         var aCols = oCfg.columns || [];
         var bVirtual = oCfg.virtual !== false;
         var bZebra = oCfg.zebra !== false;
+        // [확장·opt-in, 하위호환] 세로 격자선 / 컬럼 폭 드래그 조절 / 행선택 여부. 미지정 시 기존 동작 그대로.
+        var bGrid = !!oCfg.grid;
+        var bResizable = !!oCfg.resizable;
+        var bSelectable = oCfg.selectable !== false;
+        //  리사이즈는 colgroup·채움열·그립·auto-fit 을 "직접 렌더된 행"에 얹으므로 가상 스크롤과 병행하지 않는다(소형 편집표 전용).
+        if (bResizable) { bVirtual = false; }
 
         // 골격 — 공통 .u4a-table(shell.css) + 스크롤 래퍼(호스트). 색/sticky/zebra/선택은 공통이 담당.
         oHost.classList.add("u4a-table-wrap");
         if (oCfg.compact) { oHost.classList.add("u4a-compact"); }
         oHost.innerHTML = "";
         var oTable = _el("table", "u4a-table");
+        if (bGrid) { oTable.classList.add("u4a-table--grid"); }   // 세로 칸 구분선(격자)
         if (oCfg.tableClass) { oTable.classList.add(oCfg.tableClass); }
         var oThead = _el("thead");
         var oHeadTr = _el("tr");
@@ -2738,6 +2745,94 @@
             return (typeof oCfg.rowKey === "function") ? oCfg.rowKey(oRow, iIdx) : iIdx;
         }
 
+        // ───────────── 컬럼 리사이즈(resizable) 지원 — 16 §3.4.2 (colgroup + 맨끝 채움열 + 놓을때 적용 + auto-fit) ─────────────
+        //   ★ <table>(table-layout:fixed)에 width:100% 를 주면 컬럼이 비례 stretch 돼 <col> 지정폭≠실제폭 → 그립 어긋남.
+        //     데이터 컬럼은 <col> 고정폭, 맨끝에 폭 미지정 "채움 col+셀" 하나로 나머지 폭 흡수(격자 우측 끝까지, 데이터 stretch 없음).
+        //   참조 구현 = UI 템플릿 마법사(fnUiTempWizardPopupOpen _wzColGrip/_wzCellNatW). 여기로 공통 승격.
+        var _colW = null, _oColg = null, _autofitTry = 0, _autofitDone = false, _mctx = null;
+        function _px(v) { var n = parseFloat(v); return (isFinite(n) && n > 0) ? n : 0; }
+        function _initColW() {
+            if (_colW) { return; }
+            _colW = [];
+            for (var i = 0; i < aCols.length; i++) { _colW[i] = _px(aCols[i] && aCols[i].width) || 120; }
+        }
+        function _applyMinW() {
+            var s = 0; for (var i = 0; i < (_colW ? _colW.length : 0); i++) { s += _colW[i]; }
+            oTable.style.minWidth = s + "px";
+        }
+        function _buildColgroup() {
+            if (_oColg && _oColg.parentNode) { _oColg.parentNode.removeChild(_oColg); }
+            _oColg = document.createElement("colgroup");
+            for (var i = 0; i < aCols.length; i++) {
+                var col = document.createElement("col");
+                col.style.width = (_colW[i] || 120) + "px";
+                _oColg.appendChild(col);
+            }
+            _oColg.appendChild(document.createElement("col"));   // 채움(폭 미지정) — 나머지 흡수
+            oTable.insertBefore(_oColg, oTable.firstChild);
+        }
+        // 텍스트 잉크폭 = canvas measureText(DOM 변형·reflow 0 — 오프스크린 span 금지, 16 §3.4.2).
+        function _measTxt(sText, oRef) {
+            if (!_mctx) { try { _mctx = document.createElement("canvas").getContext("2d"); } catch (e) { _mctx = null; } }
+            if (!_mctx) { return (sText || "").length * 7; }
+            if (oRef) {
+                var cs = getComputedStyle(oRef);
+                _mctx.font = (cs.fontStyle || "normal") + " " + (cs.fontWeight || "400") + " " + (cs.fontSize || "13px") + " " + (cs.fontFamily || "sans-serif");
+            }
+            return _mctx.measureText(sText || "").width;
+        }
+        // 셀이 필요로 하는 폭(px, 셀 패딩 포함). 편집칸(콤보/입력)은 폭 100%라 안의 텍스트를, 텍스트 셀은 그 텍스트를 실측.
+        function _cellNatW(oCell) {
+            if (!oCell) { return 0; }
+            var cs = getComputedStyle(oCell);
+            var iPad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+            var oCombo = oCell.querySelector(".u4a-combo");
+            if (oCombo) { var oTxt = oCombo.querySelector(".u4a-combo__text"); return _measTxt(oTxt ? oTxt.textContent : "", oTxt || oCombo) + 36 + iPad; }
+            var oInp = oCell.querySelector("input:not([type=checkbox])");
+            if (oInp) { return _measTxt(oInp.value || oInp.getAttribute("placeholder") || "", oInp) + 18 + iPad; }
+            return _measTxt((oCell.textContent || "").trim(), oCell) + iPad + 2;
+        }
+        function _autoW(idx) {
+            var iMax = 0;
+            var hr = oTable.tHead && oTable.tHead.rows[0];
+            if (hr && hr.cells[idx]) { iMax = Math.max(iMax, _cellNatW(hr.cells[idx])); }
+            var tb = oTable.tBodies[0];
+            if (tb) { for (var r = 0; r < tb.rows.length; r++) { var c = tb.rows[r].cells[idx]; if (c && !c.classList.contains("u4a-dt__fill")) { iMax = Math.max(iMax, _cellNatW(c)); } } }
+            return Math.max(48, Math.min(Math.ceil(iMax) + 4, 800));
+        }
+        function _attachGrips() {
+            var aTh = oHeadTr.children;
+            for (var i = 0; i < aCols.length; i++) {   // 채움(마지막) 제외
+                var th = aTh[i];
+                if (!th) { continue; }
+                // 공통 .u4a-table thead th 는 sticky(=positioned) 라 그립 absolute 의 기준이 된다 → position 을 덮지 않는다(sticky 유지).
+                var old = th.querySelector(".u4a-dt__grip"); if (old && old.parentNode) { old.parentNode.removeChild(old); }
+                (function (idx) {
+                    var oGrip = _el("div", "u4a-dt__grip");
+                    oGrip.setAttribute("aria-hidden", "true");
+                    attachColumnResize(oGrip, {
+                        host: oTable, min: 48,
+                        getWidth: function () { var t = oHeadTr.children[idx]; return (t && t.getBoundingClientRect().width) || _colW[idx]; },
+                        setWidth: function (px) { _colW[idx] = px; var col = _oColg && _oColg.children[idx]; if (col) { col.style.width = px + "px"; } _applyMinW(); },
+                        getAutoWidth: function () { return _autoW(idx); }
+                    });
+                    th.appendChild(oGrip);
+                })(i);
+            }
+        }
+        // 최초 렌더 초기폭 = auto-fit(콘텐츠 최장 폭). 표가 아직 안 보이면(hidden) 보일 때까지 다음 프레임 재시도. 이후 수동조절 폭 보존.
+        function _autoFitAll() {
+            if (!bResizable || !_colW) { return; }
+            if (oTable.offsetParent === null) { if (++_autofitTry <= 10) { requestAnimationFrame(_autoFitAll); } return; }
+            _autofitTry = 0;
+            for (var i = 0; i < aCols.length; i++) {
+                var w = _autoW(i); _colW[i] = w;
+                var col = _oColg && _oColg.children[i]; if (col) { col.style.width = w + "px"; }
+            }
+            _applyMinW();
+            _autofitDone = true;
+        }
+
         function _renderHead() {
             oHeadTr.innerHTML = "";
             for (var i = 0; i < aCols.length; i++) {
@@ -2745,9 +2840,16 @@
                 var th = _el("th", null, (c.label != null) ? c.label : "");
                 if (c.label) { th.title = c.label; }
                 if (c.align) { th.style.textAlign = c.align; }
-                if (c.width) { th.style.width = c.width; }
+                if (!bResizable && c.width) { th.style.width = c.width; }   // 리사이즈면 colgroup 이 폭을 소유
                 if (c.className) { th.classList.add(c.className); }
                 oHeadTr.appendChild(th);
+            }
+            if (bResizable) {
+                oHeadTr.appendChild(_el("th", "u4a-dt__fill"));   // 채움 헤더(나머지 폭 흡수)
+                _initColW();
+                _buildColgroup();
+                _attachGrips();
+                _applyMinW();
             }
         }
 
@@ -2775,11 +2877,14 @@
                 if (c.cellClass) { td.classList.add(c.cellClass); }
                 oTr.appendChild(td);
             }
-            oTr.addEventListener("click", function () {
-                if (_vs) { _vs.setSel(sKey); _vs.refresh(); }
-                else { _markSel(sKey); }
-                if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onSelect 오류:", e); } }
-            });
+            if (bResizable) { oTr.appendChild(_el("td", "u4a-dt__fill")); }   // 채움 셀(나머지 폭 흡수 — 격자 우측 끝까지)
+            if (bSelectable) {
+                oTr.addEventListener("click", function () {
+                    if (_vs) { _vs.setSel(sKey); _vs.refresh(); }
+                    else { _markSel(sKey); }
+                    if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onSelect 오류:", e); } }
+                });
+            }
             if (typeof oCfg.onActivate === "function") {
                 oTr.addEventListener("dblclick", function () { try { oCfg.onActivate(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onActivate 오류:", e); } });
             }
@@ -2849,8 +2954,13 @@
             renderHead: _renderHead,
             setRows: function (aRows, bKeepScroll) {
                 if (bVirtual && _vs) { _vs.setRows(aRows || [], bKeepScroll); }
-                else { _aRows = aRows || []; _renderAll(); }
+                else {
+                    _aRows = aRows || []; _renderAll();
+                    // 최초 1회만 내용폭에 자동맞춤(이후 재렌더·수동조절 폭 보존).
+                    if (bResizable && !_autofitDone) { _autoFitAll(); }
+                }
             },
+            autoFit: function () { _autofitDone = false; _autoFitAll(); },
             setSel: function (sKey) {
                 if (bVirtual && _vs) { _vs.setSel(sKey); _vs.refresh(); }
                 else { _markSel(sKey); }

@@ -1886,7 +1886,10 @@ dialog::backdrop {
     text-align: left;
     font-weight: 600;
     padding: 0.25rem 0.75rem;
-    background: var(--surface);
+    /* 열 제목(헤더) 밴드 = 페이지 배경 톤(--app-bg) → 본문 행(--surface)과 또렷이 구분·테마대응.
+       트리형 헤더밴드(.u4aColTreeHead)와 동일 표준(.analy/16 §3.4). ★--surface-raised 는 화이트 테마에서
+       --surface 와 동색이라 안 보임 → --app-bg. (mac/signature 테마는 자체 override 로 그대로) */
+    background: var(--app-bg);
     border-bottom: 0.0625rem solid var(--line);
     color: var(--text-muted);
     white-space: nowrap;
@@ -1977,8 +1980,8 @@ dialog::backdrop {
      표시자(.u4a-th__ind: 화살표/깔때기)는 **현재 정렬·필터가 걸린 컬럼에만** 노출한다. */
 .u4a-table thead th.u4a-th--menu { cursor: pointer; }
 /* ⚠ 헤더는 sticky(top:0) — hover 시 반투명 --hover-bg 로만 덮으면 뒤로 스크롤되는 데이터가
-   비쳐 "헤더 글자가 겹쳐" 보인다. 불투명 --surface 위에 hover 틴트를 얹는다(프로즌 셀과 동일 레이어 문법). */
-.u4a-table thead th.u4a-th--menu:hover { background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--surface); color: var(--text); }
+   비쳐 "헤더 글자가 겹쳐" 보인다. 불투명 헤더 밴드(--app-bg) 위에 hover 틴트를 얹는다(프로즌 셀과 동일 레이어 문법). */
+.u4a-table thead th.u4a-th--menu:hover { background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--app-bg); color: var(--text); }
 .u4a-th__inner { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
 .u4a-th__inner--center { justify-content: center; }
 .u4a-th__label { overflow: hidden; text-overflow: ellipsis; }
@@ -2010,6 +2013,38 @@ dialog::backdrop {
     height: var(--row-h-compact, 1.75rem);
     vertical-align: middle;
     line-height: 1.4;
+}
+
+/* ── [확장] 세로 칸 구분선(격자) — makeDataTable grid:true. 기본 가로선에 세로선을 더해 편집 그리드 모양. ── */
+.u4a-table--grid > thead > tr > th,
+.u4a-table--grid > tbody > tr > td {
+    border-right: 0.0625rem solid var(--line);
+}
+
+.u4a-table--grid > thead > tr > th:last-child,
+.u4a-table--grid > tbody > tr > td:last-child {
+    border-right: 0;
+}
+
+/* ── [확장] 컬럼 폭 드래그 조절 — 맨끝 채움열(나머지 폭 흡수) + 헤더 우측 경계 손잡이. 16 §3.4.2. ── */
+.u4a-table .u4a-dt__fill {
+    min-width: 0;
+    padding: 0;
+    border-right: 0;
+}
+
+.u4a-table > tbody > tr > td.u4a-dt__fill {
+    border-bottom: 0;   /* 채움 영역 아래는 매끈하게(원본 UI5 동일) */
+}
+
+.u4a-dt__grip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -0.1875rem;
+    width: 0.4375rem;
+    cursor: col-resize;
+    z-index: 2;
 }
 
 /* 터치/포인터(coarse) — 행 높이 확대 (체크리스트 J) */

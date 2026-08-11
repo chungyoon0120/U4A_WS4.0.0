@@ -1911,7 +1911,16 @@
     //화면에서 UI추가, 이동, 삭제 및 attr 변경시 변경 flag 처리.
     oAPP.fn.setChangeFlag();
 
-    
+    let _pos = oAPP.attr.oModel.oData.T_ATTR.findIndex( item => item.UIATK === is_attr.UIATK );
+
+    if(_pos !== -1){
+      oAPP.fn.moveCorresponding(is_attr, oAPP.attr.oModel.oData.T_ATTR[_pos]);
+
+      is_attr = oAPP.attr.oModel.oData.T_ATTR[_pos];
+
+    }
+
+
     var _oDesignChkModule = parent.require(
       parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "js", "checkAppData", "designTreeData.js"));
 

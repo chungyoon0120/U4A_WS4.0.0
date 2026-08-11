@@ -7,6 +7,31 @@
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta charset="utf-8">
 
+    <!-- [HTML5 2026-07-24] ★흰 플래시 방지 — 첫 페인트 전 동기(editorFrame.html 패턴). winChrome.js 는 외부 파일이라
+         그 로드/실행 전 첫 화면이 흰색으로 그려질 수 있다. 배경 변수(--boot-bg)+색스킴+배경 규칙을 head 인라인으로
+         정적 배치해 첫 페인트에 배경을 확정한다. (winChrome.js 는 공통 헤더 배선 담당 — 중복은 무해) -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var el = document.documentElement;
+                var bg = q.get("BGCOL"); if (bg) { el.style.setProperty("--boot-bg", bg); }
+                var th = q.get("THEME");
+                function _d(v) {
+                    var s = String(v || "").trim().replace(/^#/, ""), r, g, b;
+                    if (/^[0-9a-f]{3}$/i.test(s)) { s = s.replace(/(.)/g, "$1$1"); }
+                    var m = s.match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+                    if (m) { r = parseInt(m[1], 16); g = parseInt(m[2], 16); b = parseInt(m[3], 16); }
+                    else { var mr = s.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/); if (mr) { r = +mr[1]; g = +mr[2]; b = +mr[3]; } }
+                    if (typeof r !== "number") { return false; }
+                    return (0.299 * r + 0.587 * g + 0.114 * b) < 128;
+                }
+                el.style.setProperty("color-scheme", (/dark/i.test(th || "") || _d(bg)) ? "dark" : "light");
+            } catch (e) { }
+        })();
+    </script>
+    <style>html, body { background: var(--boot-bg, transparent); }</style>
+
     <!-- [HTML5] 공통 frameless 헤더(.u4a-titlebar) — winChrome.js 가 로고/제목/최대화/닫기(minimize 제외) 주입 -->
     <script src="../winChrome.js"></script>
 </head>
