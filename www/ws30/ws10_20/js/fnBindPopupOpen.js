@@ -700,8 +700,8 @@
     // ESC = 닫기(취소 메시지 포함 — 원본 buttons 의 Reject press).
     oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_closeCancel(); });
 
-    // 스플리터 드래그.
-    _wireSplitter();
+    // 스플리터 = 공통 U4AUI.wireSplitter (드래그 + 더블클릭 최초복귀 + 창 리사이즈 재클램프 전부 공통). 자체 구현 폐지.
+    if (window.U4AUI && U4AUI.wireSplitter) { U4AUI.wireSplitter(oSplit, { axis: "x" }); }
 
     if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
     if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 560, minH: 440 }); }
@@ -1083,13 +1083,11 @@
   function lf_showAddit(bShow) {
     oS.showAddit = !!bShow;
     if (!oUI.dlg) { return; }
+    // 최초 배치(트리 넓게 : 추가속성)는 CSS(.u4aBindShowAddit)가 담당. 드래그/복귀는 공통 스플릿바.
     oUI.dlg.classList.toggle("u4aBindShowAddit", !!bShow);
-    if (bShow) {
-      // 최초 표시 시 트리 62% / 추가속성 38% (이후 스플리터 드래그로 조정). 이미 드래그값 있으면 유지.
-      var cur = oUI.splitEl && oUI.splitEl.style.getPropertyValue("--u4aBindTreeW");
-      if (oUI.splitEl && (!cur || cur === "100%")) { oUI.splitEl.style.setProperty("--u4aBindTreeW", "62%"); }
-    } else {
-      if (oUI.splitEl) { oUI.splitEl.style.removeProperty("--u4aBindTreeW"); }
+    if (!bShow) {
+      try { if (oUI.additDt && oUI.additDt.destroy) { oUI.additDt.destroy(); } } catch (e) { }   // 크기감지기·강조선 해제(누수 방지)
+      oUI.additDt = null;                        // 다음 표시 때 공통 평면표 새로 생성(숨김 시 내용 비워 stale 참조 방지)
       if (oUI.additWrap) { oUI.additWrap.innerHTML = ""; }
     }
   }
@@ -1432,26 +1430,7 @@
   }
 
   /* ── 스플리터 드래그(트리 ↔ 추가속성) ── */
-  function _wireSplitter() {
-    var bDrag = false;
-    oUI.splitBar.addEventListener("mousedown", function (ev) {
-      if (!oS.showAddit) { return; }
-      bDrag = true;
-      document.body.classList.add("u4a-dragging");   // iframe 위 드래그 끊김 방지(공통).
-      if (oUI.dlg) { oUI.dlg.classList.add("u4aBindResizing"); }   // 드래그 중 커서.
-      ev.preventDefault();
-    });
-    document.addEventListener("mousemove", function (ev) {
-      if (!bDrag || !oUI.splitEl) { return; }
-      var r = oUI.splitEl.getBoundingClientRect();
-      var pct = ((ev.clientX - r.left) / r.width) * 100;
-      pct = Math.max(30, Math.min(80, pct));
-      oUI.splitEl.style.setProperty("--u4aBindTreeW", pct + "%");
-    });
-    document.addEventListener("mouseup", function () {
-      if (bDrag) { bDrag = false; document.body.classList.remove("u4a-dragging"); if (oUI.dlg) { oUI.dlg.classList.remove("u4aBindResizing"); } }
-    });
-  }
+  // (스플리터 자체 구현 폐지 — 공통 U4AUI.wireSplitter 로 일원화. 드래그·더블클릭 복귀·재클램프 전부 공통 담당. 기본 배치는 CSS.)
 
   /* ====================================================================
    * 3. 적용 콜백 (원본 attrBindCallBack 계열 → attrSet·attrUnbind 계열)
@@ -1693,9 +1672,10 @@
       ".u4aBindActBtn[hidden] { display: none; }",
       // 바디 + 가로 스플리터(MIME .u4aMimeBody/.u4aMimeSplit).
       ".u4aBindBody { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 0; display: flex; }",
-      ".u4aBindSplit { flex: 1 1 auto; width: 100%; min-width: 0; min-height: 0; --u4aBindTreeW: 100%; }",
+      ".u4aBindSplit { flex: 1 1 auto; width: 100%; min-width: 0; min-height: 0; }",
       // 트리 패널(좌) — 공통 U4AUI.makeColumnTree(.u4aColTree)를 담는 컨테이너. 폭/스크롤/그리드/리사이즈는 컴포넌트가 담당.
-      ".u4aBindTreePane { flex: 1 1 var(--u4aBindTreeW); display: flex; min-width: 0; min-height: 0; background: var(--surface); overflow: hidden; }",
+      //   추가속성 숨김 시 트리가 판 전체를 채움(flex:1 1 auto). 표시 시 폭은 아래 .u4aBindShowAddit 규칙. min-width=공통 스플릿 클램프.
+      ".u4aBindTreePane { flex: 1 1 auto; display: flex; min-width: 8rem; min-height: 0; background: var(--surface); overflow: hidden; }",
       ".u4aBindTreeHost { flex: 1 1 auto; min-width: 0; min-height: 0; }",
       // 셀 내용(공통 .u4aColTreeCell 안) — C2=상태아이콘+유형텍스트, C3=설명. 말줄임 시에만 툴팁.
       ".u4aBindTypeCell { display: flex; align-items: center; gap: 0.375rem; min-width: 0; overflow: hidden; }",
@@ -1714,9 +1694,10 @@
       // 선택 행 설명 텍스트색(공통은 라벨만 처리 → 설명도 명시). 이름 라벨은 공통 shell.css 가 처리.
       ".u4aColTreeTree .u4a-tree__row[aria-selected=\"true\"] .u4aBindDescTxt { color: var(--selected-text); }",
       // 우: 추가속성(MPROP) 패널 — 공통 .u4a-table. 기본 숨김, showAddit 시 표시. (트리 가로 스크롤은 .u4aColTree 자체 담당.)
-      ".u4aBindAdditPane { display: none; flex: 1 1 0; min-width: 0; background: var(--surface); overflow: hidden; }",
+      ".u4aBindAdditPane { display: none; flex: 1 1 0; min-width: 8rem; background: var(--surface); overflow: hidden; }",
       ".u4aBindSplitBar { display: none; }",
-      ".u4aBindShowAddit .u4aBindTreePane { flex: 0 0 var(--u4aBindTreeW); }",
+      // 추가속성 표시 시 기본 배치 = 트리 62%(공통 스플릿바가 드래그로 조정, 더블클릭 시 이 기본값으로 복귀 = inline flex 제거).
+      ".u4aBindShowAddit .u4aBindTreePane { flex: 0 0 62%; }",
       ".u4aBindShowAddit .u4aBindAdditPane { display: flex; }",
       ".u4aBindShowAddit .u4aBindSplitBar { display: flex; }",
       ".u4aBindAdditWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }",
@@ -1729,9 +1710,8 @@
       //   MPROP 표가 overflow 컨테이너(.u4aBindAdditWrap) 안이라, 메시지를 입력칸 안 인라인으로 넣으면 필드가
       //   2줄로 커져 지우기(X) 버튼이 어긋나고 메시지가 셀에 잘린다 → dialog[open]/body 최상단에 fixed 로 띄운다.
       //   (인라인 .u4a-field__msg 는 공통 기본 display:none 그대로 숨김 유지 — 별도 노출 규칙 없음.)
-      ".u4aBindVsPop { z-index: 40; white-space: normal; overflow-wrap: anywhere; }",
-      // 드래그 중 iframe(미리보기) 위 끊김 방지는 공통(body.u4a-dragging).
-      ".u4aBindResizing, .u4aBindResizing * { cursor: col-resize !important; user-select: none !important; }"
+      ".u4aBindVsPop { z-index: 40; white-space: normal; overflow-wrap: anywhere; }"
+      // (드래그 커서는 공통 wireSplitter 가 처리 — 자체 스플리터 제거로 .u4aBindResizing 규칙 삭제.)
     ].join("");
     // 항상 최신 CSS 로 갱신(1회 캐시 시 옛 규칙 잔류 방지 — MIME 컨벤션).
     var oStyle = document.getElementById("u4aBindStyle");

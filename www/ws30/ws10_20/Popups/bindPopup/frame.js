@@ -374,6 +374,24 @@ function _initChrome() {
             else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { } }
         });
     }
+
+    // 최소화 / 최대화(복원) — 공통 별창 템플릿(_win-popup-template/frame.js)과 동일
+    var oMin = document.getElementById("bwpWinMin");
+    if (oMin) {
+        oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { } });
+    }
+
+    var oMax = document.getElementById("bwpWinMax");
+    if (oMax) {
+        // 공통: 클릭 토글 + 최대화/복원 상태에 맞춰 아이콘·툴팁 동기화(아이콘 안 바뀌던 문제 수정).
+        if (window.U4AUI && U4AUI.wireWinMaxBtn) {
+            U4AUI.wireWinMaxBtn(CURRWIN, oMax);
+        } else {
+            oMax.addEventListener("click", function () {
+                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+            });
+        }
+    }
 }
 
 // 라이브 테마 변경(원본 _onIpcMain_if_p13n_themeChange). 개인화 없음 → 워크스페이스 테마 추종.

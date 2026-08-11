@@ -2295,6 +2295,33 @@
     }
 
     /**
+     * 공통 — 별창 제목줄 "최대화" 버튼 배선.
+     *   클릭 = 최대화↔복원 토글 + 버튼 아이콘/툴팁을 현재 창 상태에 동기화(최대화면 '복원' 두겹네모, 아니면 '최대화' 한겹네모).
+     *   상태 변화 감지는 renderer 의 'resize'(최대화·복원 시 창 크기가 바뀌며 발생)로 — 리모트 이벤트 구독/누수 없음.
+     *   ★최대화 버튼을 둔 모든 별창이 이걸 소비(아이콘 토글 로직 복붙 금지).
+     * @param {object} oWin  현재 BrowserWindow(remote).
+     * @param {HTMLElement} oBtn  최대화 버튼(<button><i class="fa-solid fa-window-maximize"></i></button>).
+     */
+    function wireWinMaxBtn(oWin, oBtn) {
+        if (!oWin || !oBtn) { return; }
+        var oIcon = oBtn.querySelector("i");
+        function _sync() {
+            var bMax = false; try { bMax = oWin.isMaximized(); } catch (e) { }
+            if (oIcon) {
+                oIcon.classList.toggle("fa-window-maximize", !bMax);
+                oIcon.classList.toggle("fa-window-restore", bMax);
+            }
+            try { oBtn.title = bMax ? "Restore" : "Maximize"; } catch (e) { }
+        }
+        oBtn.addEventListener("click", function () {
+            try { if (oWin.isMaximized()) { oWin.unmaximize(); } else { oWin.maximize(); } } catch (e) { }
+            _sync();
+        });
+        window.addEventListener("resize", _sync);   // 최대화/복원 시 창 크기 변동 → 아이콘 재동기화
+        _sync();
+    }
+
+    /**
      * 공통 — 컬럼 리사이즈 그립(가이드 라인 + 놓을 때 적용, UI5 sap.ui.table 방식) SSOT.
      *   드래그 중엔 마우스를 따라 "세로 가이드 라인"만 이동하고, mouseup 때 한 번만 폭을 적용한다
      *   (실시간 컬럼 갱신은 매 프레임 리플로우로 무겁고 잔상). 근거: 16 §3.4.2.
@@ -2353,8 +2380,8 @@
         }
         function _moveGuide(iX) { var g = document.getElementById("u4aColResizeGuide"); if (g) { g.style.left = iX + "px"; } }
         function _hideGuide() { var g = document.getElementById("u4aColResizeGuide"); if (g) { g.style.display = "none"; } }
-        function _hoverOn() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.add(cfg.hoverClass); } }
-        function _hoverOff() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.remove(cfg.hoverClass); } }
+        function _hoverOn() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.add(cfg.hoverClass); } if (typeof cfg.onHover === "function") { try { cfg.onHover(true); } catch (e) { } } }
+        function _hoverOff() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.remove(cfg.hoverClass); } if (typeof cfg.onHover === "function") { try { cfg.onHover(false); } catch (e) { } } }
 
         function lf_move(e) {
             if (!bDrag) { return; }
@@ -2800,6 +2827,30 @@
             if (tb) { for (var r = 0; r < tb.rows.length; r++) { var c = tb.rows[r].cells[idx]; if (c && !c.classList.contains("u4a-dt__fill")) { iMax = Math.max(iMax, _cellNatW(c)); } } }
             return Math.max(48, Math.min(Math.ceil(iMax) + 4, 800));
         }
+        // 경계 강조 — 트리(정답)처럼 "그 경계에 세로줄 하나짜리 단일 요소"로 균일하게 그린다.
+        //   (셀마다 box-shadow 로 그리면 격자선과 겹쳐 굵기가 제각각으로 보임 → 단일 선으로 통일.)
+        var _hlLine = null;
+        function _hlEl() {
+            if (!_hlLine) { _hlLine = _el("div", "u4a-dt__hlline"); _hlLine.setAttribute("aria-hidden", "true"); }
+            // ★ 리사이즈 가이드(_showGuide)와 동일: 모달 <dialog>(top-layer) 안이면 그 안에, 아니면 body 에 fixed 로 붙인다(§2.10).
+            var host = (oHost.closest && oHost.closest("dialog[open]")) || document.body;
+            if (_hlLine.parentNode !== host) { host.appendChild(_hlLine); }
+            return _hlLine;
+        }
+        function _setColHover(idx, bOn) {
+            if (!bOn) { if (_hlLine) { _hlLine.style.display = "none"; } return; }
+            var th = oHeadTr.children[idx]; if (!th) { return; }
+            // ★ position:fixed + 뷰포트 좌표(getBoundingClientRect 원값) — 스크롤 컨테이너 종속 absolute 는 스크롤 시 어긋남(리뷰 지적). 세로범위는 보이는 표 영역으로 클램프.
+            var r = th.getBoundingClientRect(), hr = oHost.getBoundingClientRect();
+            var vh = window.innerHeight || document.documentElement.clientHeight;
+            var iTop = Math.max(hr.top, 0), iBot = Math.min(hr.bottom, vh);
+            if (iBot < iTop) { iBot = iTop; }
+            var el = _hlEl();
+            el.style.left = Math.round(r.right) + "px";
+            el.style.top = iTop + "px";
+            el.style.height = (iBot - iTop) + "px";
+            el.style.display = "block";
+        }
         function _attachGrips() {
             var aTh = oHeadTr.children;
             for (var i = 0; i < aCols.length; i++) {   // 채움(마지막) 제외
@@ -2814,13 +2865,83 @@
                         host: oTable, min: 48,
                         getWidth: function () { var t = oHeadTr.children[idx]; return (t && t.getBoundingClientRect().width) || _colW[idx]; },
                         setWidth: function (px) { _colW[idx] = px; var col = _oColg && _oColg.children[idx]; if (col) { col.style.width = px + "px"; } _applyMinW(); },
-                        getAutoWidth: function () { return _autoW(idx); }
+                        getAutoWidth: function () { return _autoW(idx); },
+                        onHover: function (bOn) { _setColHover(idx, bOn); }   // 경계에 마우스 올리면 그 열 전체에 파란 강조선(트리와 동일)
                     });
                     th.appendChild(oGrip);
                 })(i);
             }
         }
-        // 최초 렌더 초기폭 = auto-fit(콘텐츠 최장 폭). 표가 아직 안 보이면(hidden) 보일 때까지 다음 프레임 재시도. 이후 수동조절 폭 보존.
+        // 마지막 데이터 컬럼(값)을 판 폭에 맞춰 확장 — 원본 sap.ui.table 처럼 컬럼이 영역 오른쪽 끝까지 꽉 차게(빈 띠 제거).
+        //   16 §3.4.2 fit-to-container(첫 오픈 1회). 판이 컬럼합보다 좁으면 확장 안 함(가로 스크롤).
+        function _fillLastToHost() {
+            if (!bResizable || !_colW || !aCols.length) { return; }
+            var hostW = oHost.clientWidth; if (!hostW) { return; }
+            var last = aCols.length - 1, others = 0;
+            for (var i = 0; i < _colW.length; i++) { if (i !== last) { others += _colW[i]; } }
+            var want = hostW - others - 2;   // 보더 여유
+            if (want > _colW[last]) {
+                _colW[last] = want;
+                var col = _oColg && _oColg.children[last]; if (col) { col.style.width = want + "px"; }
+                _applyMinW();
+            }
+        }
+        // 첫 오픈에 가로 스크롤 금지 — 내용(표)이 판보다 넓으면 마지막 열을 그만큼 줄여 넘침을 없앤다(보더/스크롤바 오차 흡수).
+        function _noHOverflow() {
+            if (!bResizable || !_colW || !aCols.length) { return; }
+            var over = oHost.scrollWidth - oHost.clientWidth;
+            if (over <= 0) { return; }
+            var last = aCols.length - 1;
+            var nw = Math.max(48, _colW[last] - over);
+            if (nw < _colW[last]) {
+                _colW[last] = nw;
+                var col = _oColg && _oColg.children[last]; if (col) { col.style.width = nw + "px"; }
+                _applyMinW();
+            }
+        }
+        // 데이터 아래 빈 영역을 "빈 격자 행"으로 채움 — 원본 sap.ui.table 처럼 영역 전체가 격자로 보이게(가로+세로줄 이어짐).
+        //   빈 행은 데이터 아님(선택/측정 제외). 판 높이 변하면 rAF 로 다시 계산. 데이터 0건이면 안 채움(빈 상태 문구만).
+        var _padRaf = 0;
+        function _mkPadRow() {
+            var tr = _el("tr"); tr.setAttribute("data-dt-pad", "");
+            for (var c = 0; c < aCols.length; c++) { tr.appendChild(_el("td")); }
+            tr.appendChild(_el("td", "u4a-dt__fill"));   // 채움 셀(나머지 폭 흡수)
+            oTbody.appendChild(tr);
+            return tr;
+        }
+        function _padRows() {
+            if (!bResizable) { return; }
+            var pads = oTbody.querySelectorAll("tr[data-dt-pad]");
+            for (var p = 0; p < pads.length; p++) { if (pads[p].parentNode) { pads[p].parentNode.removeChild(pads[p]); } }
+            if (oHost.offsetParent === null) { return; }
+            var dataRows = oTbody.querySelectorAll("tr:not([data-dt-pad]):not(.u4a-table__nodata)");   // 안내(0건) 행 제외
+            if (!dataRows.length) { return; }
+            var headH = oThead.offsetHeight || 0;
+            var avail = oHost.clientHeight - headH - oTbody.offsetHeight;   // 데이터 아래 남는 높이
+            if (avail <= 1) { return; }
+            // ★빈 채움행은 입력칸이 없어 데이터행보다 낮다 → 데이터행 높이로 개수를 세면 하단이 덜 채워져
+            //   빈 블록이 남는다. 실제 빈행(probe) 높이로 세고, 1행 미만 자투리는 마지막 행을 키워 끝까지 격자로 덮는다.
+            var first = _mkPadRow();
+            var padH = first.offsetHeight;
+            if (!padH || padH <= 0) { padH = dataRows[0].offsetHeight || Math.round(2.5 * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16)); }
+            if (padH <= 0) { return; }
+            var total = Math.floor(avail / padH);
+            if (total < 1) { if (first.parentNode) { first.parentNode.removeChild(first); } return; }
+            for (var k = 1; k < total; k++) { _mkPadRow(); }
+            var remainder = avail - total * padH;   // 1행 미만 자투리
+            if (remainder >= 2) {
+                var aP = oTbody.querySelectorAll("tr[data-dt-pad]");
+                var last = aP[aP.length - 1];
+                if (last) {
+                    for (var c2 = 0; c2 < last.cells.length; c2++) {
+                        if (!last.cells[c2].classList.contains("u4a-dt__fill")) { last.cells[c2].style.height = (padH + remainder) + "px"; }
+                    }
+                }
+            }
+        }
+        function _schedulePad() { if (_padRaf) { return; } _padRaf = requestAnimationFrame(function () { _padRaf = 0; _padRows(); }); }
+
+        // 최초 렌더 초기폭 = auto-fit(콘텐츠 최장 폭) → 값 열 판 폭 채움 → 빈 격자 채움. 안 보이면 보일 때까지 다음 프레임 재시도. 이후 수동조절 폭 보존.
         function _autoFitAll() {
             if (!bResizable || !_colW) { return; }
             if (oTable.offsetParent === null) { if (++_autofitTry <= 10) { requestAnimationFrame(_autoFitAll); } return; }
@@ -2830,6 +2951,9 @@
                 var col = _oColg && _oColg.children[i]; if (col) { col.style.width = w + "px"; }
             }
             _applyMinW();
+            _padRows();          // 높이 먼저 채워 세로 스크롤바 유무 확정
+            _fillLastToHost();   // 확정된 판 폭으로 값 열 채움
+            _noHOverflow();      // 남는 가로 넘침 제거 — 첫 오픈에 가로 스크롤 금지
             _autofitDone = true;
         }
 
@@ -2947,6 +3071,11 @@
         // 초기 컬럼(주어졌을 때만 vs 생성 — 빈 컬럼이면 setColumns 시점까지 미룸).
         _renderHead();
         if (bVirtual && aCols.length) { _makeVs(); }
+        // 판(호스트) 크기 변하면 빈 격자 다시 채움(원본처럼 영역 전체 격자 유지). rAF 로 미뤄 ResizeObserver 루프 방지.
+        var _ro = null;
+        if (bResizable && typeof ResizeObserver !== "undefined") {
+            try { _ro = new ResizeObserver(function () { _schedulePad(); }); _ro.observe(oHost); } catch (e) { _ro = null; }
+        }
 
         return {
             el: oHost, table: oTable, thead: oThead, tbody: oTbody,
@@ -2956,11 +3085,16 @@
                 if (bVirtual && _vs) { _vs.setRows(aRows || [], bKeepScroll); }
                 else {
                     _aRows = aRows || []; _renderAll();
-                    // 최초 1회만 내용폭에 자동맞춤(이후 재렌더·수동조절 폭 보존).
-                    if (bResizable && !_autofitDone) { _autoFitAll(); }
+                    // 최초 1회만 내용폭에 자동맞춤(이후 재렌더·수동조절 폭 보존). 재렌더 후엔 빈 격자만 다시 채움.
+                    if (bResizable) { if (!_autofitDone) { _autoFitAll(); } else { _padRows(); } }
                 }
             },
             autoFit: function () { _autofitDone = false; _autoFitAll(); },
+            // 정리 — 재생성 전/파기 시 호출(호스트 크기감지기·강조선 DOM 해제로 누수 방지).
+            destroy: function () {
+                try { if (_ro) { _ro.disconnect(); _ro = null; } } catch (e) { }
+                try { if (_hlLine && _hlLine.parentNode) { _hlLine.parentNode.removeChild(_hlLine); } _hlLine = null; } catch (e) { }
+            },
             setSel: function (sKey) {
                 if (bVirtual && _vs) { _vs.setSel(sKey); _vs.refresh(); }
                 else { _markSel(sKey); }
@@ -2974,6 +3108,7 @@
         el: _el,
         confirm: confirm,
         closeWindow: closeWindow,
+        wireWinMaxBtn: wireWinMaxBtn,
         attachColumnResize: attachColumnResize,
         makeColumnTree: makeColumnTree,
         makeDataTable: makeDataTable,

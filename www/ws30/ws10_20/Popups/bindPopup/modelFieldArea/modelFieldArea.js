@@ -219,7 +219,12 @@
                     case "S":   // 구조체 — 아이콘 없음, 하위 필드로 재귀(부모 KIND 유지).
                         _walk(aChild, n.KIND_PATH, sKind);
                         break;
-                    case "E":   // 일반 필드 — 녹색.
+                    case "E":   // 일반 필드 — 표/구조 안에 든 필드만 바인딩 가능(녹색).
+                        // ★ BR4: 표/구조 밖 최상위 단독 변수(sKindPath==="")는 바인딩 대상이 아님(SPEC §2.1, 원본 1:1).
+                        //   원본은 이런 필드에 KIND_PATH 를 부여하지 않아 checkValidBind 115("Structure, Table로 시작하는
+                        //   필드만 바인딩 가능")로 거절됐다. HTML5 는 루트부터 순회하며 line 203 에서 KIND_PATH="E" 를 붙여
+                        //   그 거절을 우회해버렸다 → 단독 변수가 바인딩됐다(테스터 BR4). KIND_PATH 를 도로 지워 원본 거절 복원.
+                        if (sKindPath === "") { delete n.KIND_PATH; break; }   // 단독 변수 → 표식 제거 + 녹색 미표시.
                         n.stat_src = "sap-icon://status-positive";
                         break;
                     default:

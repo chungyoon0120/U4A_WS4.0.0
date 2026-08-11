@@ -1,0 +1,19 @@
+[project]
+name = "u4a-ws4-mcp"
+version = "0.1.0"
+description = "U4A WS4.0 .analy 컨버전/UX 표준 문서를 온디맨드로 서빙하는 MCP 서버"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.2.0",
+]
+
+[project.scripts]
+u4a-ws4-mcp = "u4a_ws4_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/u4a_ws4_mcp"]

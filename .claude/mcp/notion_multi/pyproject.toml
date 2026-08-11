@@ -1,0 +1,19 @@
+[project]
+name = "notion-multi-mcp"
+version = "1.0.0"
+description = "여러 노션 워크스페이스를 이름으로 골라 페이지/DB 를 다루는 MCP 서버"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp==1.28.0",
+]
+
+[project.scripts]
+notion-multi = "notion_multi.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/notion_multi"]

@@ -782,6 +782,11 @@
             var _isPresetAttr = arguments[4] || false;
             // 선행 검증 (cardinality — 0:1 aggregation 중복 방지)
             if (oAPP.fn.chkUiCardinality(is_tree, is_0023.UIATK, is_0023.ISMLB) === true) { return; }
+            // ★ BR14: 앱당 1개만 허용되는 UI(UA039) 중복 추가 점검 — 원본 uiDesignArea.js:5049 designAddUIObject 의
+            //   designChkUnique(is_0022.UIOBK, l_cnt) 를 이 팝업/드롭 확정 경로에 1:1 복원(HTML5 이식 때 누락됨).
+            //   중복이면 designChkUnique 내부에서 원본 메시지(130 중복 불가) 토스트 후 true → 추가 차단(undo push 이전).
+            //   (라이브러리 직접 D&D 경로 fnWs20AddTreeData 는 이미 동일 점검 보유 — 경로 간 동작 일치.)
+            if (typeof oAPP.fn.designChkUnique === "function" && oAPP.fn.designChkUnique(is_0022.UIOBK, cnt) === true) { return; }
 
             oAPP.fn.fnWs20PushUndo();
 
@@ -1247,11 +1252,13 @@
         //   (네이티브 <dialog> 는 close 없이 모달 토글 불가 + close 는 드래그 취소 → show()+백드롭 토글로 대체.)
         var oBackdrop = null;
         // bModal=true: 백드롭 on(배경 클릭 차단) + 다이얼로그 정상.
-        // bModal=false: 드래그 중 — 백드롭 off + 다이얼로그를 클릭 통과(pointer-events:none)+반투명 처리해야
-        //   80vw 팝업에 가려진 뒤쪽 디자인 트리가 dragover/drop 을 받고, 사용자도 트리/드롭표시를 볼 수 있음.
+        // bModal=false: 드래그 중 — 전체화면 백드롭만 off → 팝업 "밖"의 보이는 디자인 트리/미리보기가
+        //   dragover/drop 을 받는다. 팝업 "자신"은 계속 클릭을 막는다(pointer-events 유지):
+        //   [BR13] 예전엔 드래그 중 팝업까지 클릭 통과(pointer-events:none)시켜, 팝업에 가려진 뒤 트리에
+        //   놓이고 미리보기엔 파란 놓기표시가 잘못 떴다. 이제 팝업이 가린 부분은 뒤 화면이 이벤트를 못 받아
+        //   놓기표시·놓기가 모두 안 생기고, 팝업 밖 보이는 부분에서만 삽입된다.
         function _setModalLook(bModal) {
             if (oBackdrop) { oBackdrop.style.display = bModal ? "" : "none"; }
-            oDlg.classList.toggle("u4aWs20InsDragThru", !bModal);
         }
 
         oP13n.checked = _getP13n();
@@ -1373,9 +1380,10 @@
                 oSym.addEventListener("click", function (ev) { ev.stopPropagation(); _showUiPreviewPopup(ui.UIOBK, oSym, oDlg); });
                 oSym.addEventListener("dblclick", function (ev) { ev.stopPropagation(); });   // 심볼 더블클릭이 행 confirm 안 되게.
             }
-            // 결과 행 D&D — 디자인 트리로 직접 드래그해 특정 위치 삽입(구 insertUIPopop lf_rowDragStart/End).
-            //   ★팝업은 비모달(show)로 열려 있어 드래그 중 배경 트리가 그대로 drop 을 받는다 → 팝업을 닫지 않는다
-            //   (원본도 setModal(false)로 유지). 닫으면 안 되는 이유=네이티브 드래그 취소/사용자 지적된 이슈.
+            // 결과 행 D&D — 디자인 트리/미리보기로 직접 드래그해 특정 위치 삽입(구 insertUIPopop lf_rowDragStart/End).
+            //   ★팝업은 비모달(show)로 열려 있어, 드래그 중 팝업 "밖"의 보이는 트리/미리보기가 drop 을 받는다
+            //   → 팝업을 닫지 않는다(원본도 setModal(false)로 유지). 팝업 "안(가린 영역)"은 계속 클릭을 막아
+            //   뒤 화면이 이벤트를 못 받게 한다(BR13 — _setModalLook 주석 참고).
             tr.setAttribute("draggable", "true");
             tr.addEventListener("dragstart", function (ev) {
                 try {
@@ -1395,8 +1403,8 @@
                     if (s22) { ev.dataTransfer.setData("rtmcls", s22.LIBNM); }
                     _saveP13n(oP13n.checked);
                     if (typeof oAPP.fn.designTreeDragStart === "function") { oAPP.fn.designTreeDragStart({ OBJID: undefined, UIOBK: ui.UIOBK }); }
-                    // ★비모달 전환(백드롭 off + 다이얼로그 pointer-events:none)은 반드시 setTimeout 으로 미룬다.
-                    //   dragstart 중 동기적으로 소스 조상을 pointer-events:none 로 만들면 브라우저가 드래그를 취소함(=드래그 안 됨).
+                    // 전체화면 백드롭 off(팝업 밖 보이는 트리/미리보기가 drop 받도록). dragstart 직후 한 틱 미뤄
+                    //   드래그 개시를 방해하지 않게 한다(백드롭은 드래그 소스의 조상이 아니라 취소 위험은 없으나 안전상 유지).
                     setTimeout(function () { _setModalLook(false); }, 0);
                 } catch (e) { console.error("[HTML5][WS20] insert drag start:", e && e.message ? e.message : e); }
             });

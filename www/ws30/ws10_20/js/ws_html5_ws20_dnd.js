@@ -56,7 +56,8 @@
         effect: "",        // 원본 __dropEffect ("Move"/"Copy")
         dragObjid: "",     // 드래그 시작 OBJID
         dropObjid: "",     // 현재 드래그가 올라간 행 OBJID
-        dropPos: ""        // "On"/"Before"/"After"
+        dropPos: "",       // "On"/"Before"/"After"
+        seq: 0             // 드래그 회차(안전망이 자기 드래그만 종료 처리하도록 식별)
     };
 
     // GLANGU (prev.js 부트스트랩).
@@ -281,14 +282,31 @@
         }
     };
 
+    // ★ BR15: 드래그 종료 안전망. 트리를 아래로 끌면 브라우저 자동 스크롤 → 가상 스크롤(보이는 행만 DOM)이
+    //   재렌더하며 드래그 소스 행을 제거 → 네이티브 dragend 가 전달되지 않음. 그러면 _dnd.active 가 안 꺼지고
+    //   행 데코 훅(fnWs20DndDecorateRow)이 이후 렌더마다 놓기불가 행을 계속 흐리게(u4aWs20TreeDropNo) 칠해 잔류.
+    //   (재현: 스크롤 이동 후 ①놓기 가능 라인 드롭→Aggregation 팝업 ②트리 밖 드롭. 정리를 dragend 한 경로에만
+    //    의존한 탓.) → 드래그 시작 시 document 에 "끝나면 한 번만" 도는 안전망을 건다. 이 앱은 단일 엔진
+    //   (Chromium)이라 네이티브 드래그 중엔 mousemove 가 억제되고 종료 후 재개되므로, 종료 후 첫 mousemove 로
+    //   확실히 감지 → 정상 경로(dragend/drop_cb)가 이미 정리했으면 _dnd.active 가 false 라 no-op.
+    function _armDragEndSafetyNet(iSeq) {
+        function _onEnd() {
+            // 자기 회차의 드래그가 아직 살아있을 때만 정리(다음 드래그를 조기 종료시키지 않도록 회차 대조).
+            if (_dnd.active && _dnd.seq === iSeq) { oAPP.fn.designDragEnd(); }
+        }
+        document.addEventListener("mousemove", _onEnd, { capture: true, once: true });
+    }
+
     // design tree item drag 시작. (원본 3905행 1:1)
     oAPP.fn.designTreeDragStart = function (is_tree) {
         _dnd.active = true;
+        _dnd.seq = _dnd.seq + 1;   // 이 드래그의 회차(안전망 대조용)
         _dnd.effect = "";   // 이 드래그의 Copy/Move 는 이후 dragover/drop 에서 결정(새 드래그마다 초기화)
         if (is_tree && is_tree.OBJID) { _dnd.dragObjid = is_tree.OBJID; }
         oAPP.fn.setTreeDnDEnable(_root());          // 기본 가능여부
         if (is_tree) { oAPP.fn.setDropEnable(is_tree); }  // drag 기준 drop 가능 라인 판정
         oAPP.fn.designSetDropStyle();               // drop 불가 행 표시
+        _armDragEndSafetyNet(_dnd.seq);             // ★ BR15: 네이티브 dragend 유실 대비 종료 안전망.
     };
 
     // drag 종료. (원본 1679행 — UI5 InstanceManager/insert popup 잔상부는 HTML5 무관 제거)

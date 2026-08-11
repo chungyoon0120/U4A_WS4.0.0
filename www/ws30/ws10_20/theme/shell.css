@@ -2047,6 +2047,18 @@ dialog::backdrop {
     z-index: 2;
 }
 
+/* 컬럼 경계 강조 — 손잡이에 마우스 올리면 그 경계에 파란 세로선 하나(균일 굵기 3px 단일 요소).
+   ★ position:fixed + 뷰포트 좌표(top/left/height 는 JS 가 인라인 지정) — 스크롤 컨테이너 종속 absolute 는 스크롤 시 어긋남. */
+.u4a-dt__hlline {
+    position: fixed;
+    width: 0.1875rem;
+    transform: translateX(-50%);
+    background: var(--accent);
+    pointer-events: none;
+    z-index: 9998;
+    display: none;
+}
+
 /* 터치/포인터(coarse) — 행 높이 확대 (체크리스트 J) */
 @media (pointer: coarse) {
 

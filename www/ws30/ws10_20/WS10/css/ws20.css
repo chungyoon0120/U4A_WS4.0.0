@@ -565,13 +565,23 @@
 .u4aWs20TreeRow.u4aWs20TreeDragging { opacity: 0.5; }
 /* 드롭 불가 행 — 흐리게 + no-drop(원본 u4aWsDisableTreeDrop). */
 .u4aWs20TreeRow.u4aWs20TreeDropNo { opacity: 0.45; cursor: no-drop; }
-/* 드롭 위치 표시 */
-.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropOn {
-  background: var(--hover-bg);
-  box-shadow: inset 0 0 0 0.125rem var(--accent);
+/* 드롭 위치 표시 (On=사방 링 / Before=상단선 / After=하단선).
+   ★ 초록(accent) 링/선은 행 위에 겹치는 우측 고정 액션칸(.u4aWs20TreeActions, position:sticky·z-index:1·
+      불투명 배경)에 가려 오른쪽이 잘려 보였다(2026-08-11 장군 지적). box-shadow 를 행에 직접 주면 자식인
+      액션칸 배경이 그 위를 덮으므로, 액션칸(z-index:1)보다 위(z-index:2)인 행 오버레이(::after)로 그려
+      행 전체 폭에 걸쳐 보이게 한다. 오버레이는 클릭 통과(pointer-events:none)라 [+][삭제] 버튼은 그대로. */
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropOn { background: var(--hover-bg); }
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropOn,
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropBefore,
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropAfter { position: relative; }
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropOn::after,
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropBefore::after,
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropAfter::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
 }
-.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropBefore { box-shadow: inset 0 0.125rem 0 0 var(--accent); }
-.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropAfter { box-shadow: inset 0 -0.125rem 0 0 var(--accent); }
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropOn::after { box-shadow: inset 0 0 0 0.125rem var(--accent); }
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropBefore::after { box-shadow: inset 0 0.125rem 0 0 var(--accent); }
+.u4a-tree__row.u4aWs20TreeRow.u4aWs20DropAfter::after { box-shadow: inset 0 -0.125rem 0 0 var(--accent); }
 
 /* aggregation 선택 다이얼로그(2+ 후보) — 공통 .u4a-dialog(__header/__body/__footer) 소비.
    폭·콤보 전폭·푸터 spacer(버튼 우측정렬)만 스코프 보강. */
@@ -620,10 +630,10 @@
      그립(우하단 .u4a-dialog__resize)이 좌상단 고정으로 리사이즈하므로 그걸로 통일. */
 }
 /* 삽입 팝업 가짜 백드롭 — 비모달 show()를 모달처럼(투명, 배경 클릭 차단만. 공통 dialog::backdrop 도 투명).
-   드래그 순간 JS 가 display:none 으로 꺼 배경 트리 drop 을 허용 → 놓으면 복원. 다이얼로그(1500) 바로 아래. */
+   드래그 순간 JS 가 display:none 으로 꺼 팝업 "밖" 보이는 트리/미리보기 drop 을 허용 → 놓으면 복원.
+   [BR13] 팝업 "자신"은 드래그 중에도 클릭을 막는다(pointer-events 유지) — 팝업에 가려진 뒤 화면은
+   놓기·놓기표시 대상에서 제외. 다이얼로그(1500) 바로 아래. */
 .u4aWs20InsBackdrop { position: fixed; inset: 0; z-index: 1499; background: transparent; }
-/* 결과 행 드래그 중 — 팝업이 뒤 트리를 덮으므로 클릭 통과(뒤 트리가 drop 수신). 원본처럼 투명도는 그대로. */
-.u4aWs20InsertDlg.u4aWs20InsDragThru { pointer-events: none; }
 /* 확인 버튼 — 원본 sap.m.Button type:"Accept"(녹색) 재현 */
 .u4aWs20InsConfirm,
 .u4aWs20InsConfirm:disabled {
@@ -1100,6 +1110,15 @@
 
 /* 값 셀 (가운데) — grid 2번 트랙(입력·선택 열). minmax(0,1fr) 라 내부 컨트롤이 100%+ellipsis 로 안전히 줄어듦. */
 .u4aWs20AttrRowVal { min-width: 0; }
+/* [필드→속성 드래그 바인딩] 놓기 가능 표시 — 공통 드롭존 강조 표준(16 §4.3a):
+   실선 accent 테두리 + 옅은 정보색 배경. 점선 금지, 색은 의미 토큰만.
+   ★ 변경행(.changeValue) 이 "행 전체"를 칠하는 것과 동일하게, 강조는 값칸이 아니라 행(.u4aWs20AttrRow) 전체에 준다. */
+.u4aWs20AttrRow { transition: background-color 0.15s ease; }
+.u4aWs20AttrRow.u4aWs20AttrValDrag {
+    outline: 0.125rem solid var(--accent);
+    outline-offset: -0.125rem;
+    background: var(--state-info-bg);
+}
 /* [공통 컴포넌트] 트레일링 아이콘 입력 메커니즘은 shell.css .u4a-field 가 담당.
    WS20 는 속성 그리드에 맞춰 아이콘 크기/여백만 컴팩트하게 오버라이드. */
 .u4aWs20AttrValBox { --field-icon: 22px; --field-edge: 4px; }

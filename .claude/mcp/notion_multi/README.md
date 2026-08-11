@@ -1,0 +1,16 @@
+# notion-multi MCP 서버
+
+여러 노션 워크스페이스를 **이름으로 골라**, 그 워크스페이스의 열쇠(토큰)로
+페이지 검색 / 내용 추가 / 페이지 생성 / DB 생성을 수행하는 MCP 서버.
+
+- 실행: `uv run --project ./.claude/mcp/notion_multi notion-multi` (stdio)
+- 열쇠 저장소(git 밖): `~/.claude/secrets/notion_workspaces.json` + `*.token`
+  - 환경변수 `NOTION_SECRETS_DIR` 로 위치 변경 가능.
+- 토큰 값은 로그·응답에 노출하지 않는다.
+
+## 도구
+- `list_workspaces` — 등록된 워크스페이스 목록.
+- `search_pages(workspace, query?)` — `id | 종류 | 제목` 목록.
+- `append_text(workspace, page_id, text)` — 페이지에 문단 추가.
+- `create_page(workspace, title, parent_page_id?, text?)` — 새 페이지.
+- `create_database(workspace, parent_page_id, title, properties?)` — 새 DB.

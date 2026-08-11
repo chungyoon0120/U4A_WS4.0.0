@@ -5026,10 +5026,350 @@
      *   Show Changed Items 토글(sAttrFilt.press) 시 변경 행만 표시
      *   (changedDataFilter 의 단순 필터 대체 — _isChangedRow 판정).
      ************************************************************************/
+    /************************************************************************
+     * [필드→속성 드래그 바인딩] 드래그 데이터의 추가속성(MPROP) 점검 — 원본 uiAttributeArea.js:9008 1:1 이식.
+     *   Bind type(093)/참조필드 필수(137)·부모경로 정합(152)/Nozero(095)/number format(097) 검사.
+     *   의존 chkBindPath(ws_html5_ws20_prev.js)·oAPP.attr.S_CODE.UA028 모두 현행 존재.
+     ************************************************************************/
+    if (typeof oAPP.fn.attrCheckDropMPROP !== "function") {
+        oAPP.fn.attrCheckDropMPROP = function (IF_DATA) {
+            var TY_ADDIT_MSG = { ITMCD: "", ERMSG: "" };
+            var _sRes = { RETCD: "", RTMSG: "", T_ERMSG: [] };
+            if (typeof IF_DATA.MPROP === "undefined" || IF_DATA.MPROP === "") { return _sRes; }
+            if (!oAPP.attr.S_CODE || !oAPP.attr.S_CODE.UA028) { return _sRes; } // 현행 가드(코드테이블 미구성 시 안전)
+            var _aSplit = IF_DATA.MPROP.split("|");
+            var _aUA028 = JSON.parse(JSON.stringify(oAPP.attr.S_CODE.UA028));
+            _aUA028 = _aUA028.filter(function (item) { return item.FLD02 === ""; }); // 입력 가능한 추가속성만
+            if (_aUA028.length === 0) { return _sRes; }
+            _aUA028.sort(function (a, b) { return a.ITMCD.localeCompare(b.ITMCD); });
+            var l_nozero = "Cg"; // Nozero 불가 타입
+            var l_numfmt = "IP"; // number format 가능 타입
+            for (var i = 0, l = _aUA028.length; i < l; i++) {
+                var _sUA028 = _aUA028[i];
+                var _param = _aSplit[i];
+                if (_param === "") { continue; }
+                switch (_sUA028.ITMCD) {
+                    case "P04": // Bind type
+                        if (IF_DATA.TYPE_KIND !== "P") {
+                            var _e1 = JSON.parse(JSON.stringify(TY_ADDIT_MSG));
+                            _e1.ITMCD = _sUA028.ITMCD;
+                            _e1.ERMSG = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "093");
+                            _sRes.T_ERMSG.push(_e1);
+                        }
+                        var _indx = _aUA028.findIndex(function (item) { return item.ITMCD === "P05"; });
+                        if (_aSplit[_indx] === "") { // Reference Field name 필수
+                            var _e2 = JSON.parse(JSON.stringify(TY_ADDIT_MSG));
+                            _e2.ITMCD = "P05";
+                            _e2.ERMSG = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "137");
+                            _sRes.T_ERMSG.push(_e2);
+                        }
+                        break;
+                    case "P05": // Reference Field name — 부모 path 파생 여부
+                        if (oAPP.fn.chkBindPath(IF_DATA.PARENT, _param) !== true) {
+                            var _e3 = JSON.parse(JSON.stringify(TY_ADDIT_MSG));
+                            _e3.ITMCD = _sUA028.ITMCD;
+                            _e3.ERMSG = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "152");
+                            _sRes.T_ERMSG.push(_e3);
+                        }
+                        break;
+                    case "P06": // Conversion Routine — 검사 없음(원본 빈 case)
+                        break;
+                    case "P07": // Nozero
+                        if (_param === "true" && l_nozero.indexOf(IF_DATA.TYPE_KIND) !== -1) {
+                            var _e4 = JSON.parse(JSON.stringify(TY_ADDIT_MSG));
+                            _e4.ITMCD = _sUA028.ITMCD;
+                            _e4.ERMSG = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "095");
+                            _sRes.T_ERMSG.push(_e4);
+                        }
+                        break;
+                    case "P08": // Is number format?
+                        if (_param === "true" && l_numfmt.indexOf(IF_DATA.TYPE_KIND) === -1) {
+                            var _e5 = JSON.parse(JSON.stringify(TY_ADDIT_MSG));
+                            _e5.ITMCD = _sUA028.ITMCD;
+                            _e5.ERMSG = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "097");
+                            _sRes.T_ERMSG.push(_e5);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+            if (_sRes.T_ERMSG.length > 0) {
+                _sRes.RETCD = "E";
+                _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "146");
+                return _sRes;
+            }
+            return _sRes;
+        };
+    }
+
+    /************************************************************************
+     * [필드→속성 드래그 바인딩] 집합(aggregation) 자식 중복검사 — 원본 uiAttributeArea.js:9186 이식.
+     *   ★ 원본의 라이브 _MODEL 루프는 제거(현행 prev 는 평면 데이터). 저장된 속성행 _T_0015
+     *     (ISBND="X"/UIATY="3"/UIATV=경로)만 검사 — 바인딩 값은 여기에 동일하게 남으므로 정보 손실 없음.
+     *   자식 prev 는 지연 생성이라 없을 수 있어 안전 접근(없으면 중복 아님으로 스킵).
+     ************************************************************************/
+    if (typeof oAPP.fn.getChildAggrBind !== "function") {
+        oAPP.fn.getChildAggrBind = function (OBJID, BINDFIELD) {
+            function lf_chkChildAggrBind(aChild) {
+                if (!aChild || aChild.length === 0) { return; }
+                for (var i = 0; i < aChild.length; i++) {
+                    var sChild = aChild[i];
+                    var oPrevC = (oAPP.attr.prev && sChild && sChild.OBJID != null) ? oAPP.attr.prev[sChild.OBJID] : null;
+                    var aT15 = oPrevC ? oPrevC._T_0015 : undefined;
+                    if (typeof aT15 !== "undefined") {
+                        var _found = aT15.findIndex(function (item) {
+                            return item.ISBND === "X" && item.UIATY === "3" && String(item.UIATV).startsWith(BINDFIELD) === true;
+                        });
+                        if (_found !== -1) { return true; }
+                    }
+                    var _f2 = lf_chkChildAggrBind(sChild.zTREE);
+                    if (_f2 === true) { return _f2; }
+                }
+            }
+            var _sTree = oAPP.fn.getTreeData(OBJID);
+            if (!_sTree) { return; }
+            return lf_chkChildAggrBind(_sTree.zTREE);
+        };
+    }
+
+    /************************************************************************
+     * [필드→속성 드래그 바인딩] WS20 속성 값칸에 놓기 받기 — 원본 uiAttributeArea.js attrDrop(8418) 1:1 이식.
+     *   진입부만 위임 방식: 원본은 UI5 DropInfo(dragSession.getDropControl→getBindingContext),
+     *   현행은 드롭된 행(.u4aWs20AttrRow)의 __attrData 를 ls_attr 로 받는다. 이후 검증·분기·적용은 원본 그대로.
+     *   ★ 성공 경로는 setBusy 를 스스로 끄지 않는다 — attrSetBindProp→fnWs20AttrChange 의 WS20 왕복이 해제(원본 8874).
+     ************************************************************************/
+    oAPP.fn.fnWs20AttrDrop = function (sRaw, ls_attr) {
+
+        // 로딩표시 옵션(원본 8420~8423: 212 "디자인 화면에서 Attribute 변경 작업 중").
+        var _sOption = {};
+        try { _sOption = JSON.parse(JSON.stringify(oAPP.oDesign.types.TY_BUSY_OPTION)); } catch (e) { _sOption = {}; }
+        try { _sOption.DESC = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "212"); } catch (e) { }
+
+        var _bp = oAPP.oDesign.pathInfo.bindPopupBroadCast;
+
+        // WS20 -> 바인딩 팝업 BUSY ON (원본 8426).
+        try { parent.require(_bp)("BUSY_ON", _sOption); } catch (e) { }
+
+        // 실패 공통 — 214(Unable to bind)/265(Binding attributes does not exist) 표시 + 팝업 BUSY OFF + WS20 busy off.
+        var _fail = function (sNo) {
+            APPCOMMON.fnShowFloatingFooterMsg("E", "WS20", APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNo, "", "", "", ""));
+            try { parent.require(_bp)("BUSY_OFF"); } catch (e) { }
+            parent.setBusy("");
+        };
+
+      // ★본문 전체를 try 로 감싼다 — 잘못된 payload(IF_DATA/CHILD 누락 등)로 예외가 나도 로딩표시를 삼키지 않게
+      //   214 표시 + 로딩 해제(오류 삼킴 금지, 코덱스+안티 검수 2026-08-11). 원본은 정상 payload 를 가정하지만 현행은 방어.
+      try {
+        // 원본 V1~V3(드롭 대상/컨텍스트 못 얻음) — 위임에선 행/속성 못 찾음.
+        if (!ls_attr) { return _fail("214"); }
+        // V4 — 놓기 불가 줄.
+        if (!ls_attr.dropEnable) { return _fail("214"); }
+
+        // drag 정보(prc001) — drop 핸들러가 동기로 읽어 넘긴 문자열. 원본 8486.
+        var l_json = sRaw;
+        if (typeof l_json === "undefined" || l_json === "") { return _fail("214"); }   // V5
+        try { l_json = JSON.parse(l_json); } catch (e) { return _fail("265"); }        // V6
+        if (l_json.PRCCD !== "PRC001") { return _fail("265"); }                        // V7
+        if (l_json.DnDRandKey !== oAPP.attr.DnDRandKey) { return _fail("214"); }        // V8 (다른 앱 세션)
+
+        // 추가속성(MPROP) 점검 — 원본 8542 attrCheckDropMPROP. 현행 미이식 시 스킵(추후 이식).
+        if (typeof oAPP.fn.attrCheckDropMPROP === "function") {
+            var _sRes = oAPP.fn.attrCheckDropMPROP(l_json.IF_DATA);                     // V9
+            if (_sRes && _sRes.RETCD === "E") {
+                if (typeof l_json.T_ERMSG !== "undefined" && l_json.T_ERMSG.length > 0) { _sRes.T_ERMSG = _sRes.T_ERMSG.concat(l_json.T_ERMSG); }
+                try { parent.require(_bp)("ERROR-ADDIT-DATA", _sRes.T_ERMSG); } catch (e) { }
+                parent.setBusy("");   // ★원본 8558: 이 경로는 BUSY_OFF 방송 없이 setBusy 만.
+                return;
+            }
+        }
+
+        // 끌어온 값 자체 오류 — 원본 8566. V10
+        if (l_json.RETCD === "E" && typeof l_json.T_ERMSG !== "undefined") {
+            try { parent.require(_bp)("ERROR-ADDIT-DATA", l_json.T_ERMSG); } catch (e) { }
+            parent.setBusy("");
+            return;
+        }
+
+        var oIF = l_json.IF_DATA || {};
+        // V11 — 원본은 typeof undefined 만 봤으나, KIND_PATH 가 null/비문자열이면 뒤의 .split 크래시(안티 검수 2026-08-11) → 문자열 아니면 265.
+        if (typeof oIF.KIND_PATH !== "string") { return _fail("265"); }
+        if (oIF.KIND === "" || oIF.KIND === "S") { return _fail("214"); }              // V12 (최상위/구조)
+        if (ls_attr.UIATY === "3" && oIF.KIND !== "T") { return _fail("214"); }         // V13 (집합엔 TABLE만)
+
+        // ── N건(부모 aggregation) 경로 계산 — 원본 8618~8730 ──
+        //   ★★ 원본은 "살아있는 UI5 컨트롤 인스턴스"의 prev._MODEL[…] 에서 N건 바인딩 경로를 읽는다.
+        //      그러나 현행 HTML5 prev 는 라이브 인스턴스가 아니라 평면 데이터(_T_0015 만 보유)라 _MODEL 이 없다.
+        //      → 원본 코드를 그대로 접근하면 undefined._MODEL 로 크래시한다(서브에이전트 검증 2026-08-11).
+        //      트리/집합(N건) 경로 계산은 현행 데이터 기준 재작성이 필요하며 그건 후속 단계로 둔다.
+        //      지금은 "안전 접근"만 하여(없으면 undefined) 아래 `l_isTree && !l_path` 게이트로 "바인딩 불가"로
+        //      안전 종료시킨다(크래시 방지). 일반 property 는 l_isTree=false 라 이 구간 영향 없이 정상 동작한다.
+        var _prevOf = function (sObjid) { return (oAPP.attr.prev && sObjid != null) ? oAPP.attr.prev[sObjid] : null; };
+        var _modelOf = function (o, k) { return (o && o._MODEL) ? o._MODEL[k] : undefined; };
+        var oPrevA = _prevOf(ls_attr.OBJID);
+        var l_path = oAPP.fn.getParentAggrBind(oPrevA);
+        var l_isTree = false;
+        var ls_tree = oAPP.fn.getTreeData(ls_attr.OBJID) || {};
+
+        if (ls_attr.UIATK === "EXT00001190" || ls_attr.UIATK === "EXT00001191") {          // sap.m.Tree parent/child
+            l_path = _modelOf(oPrevA, "items"); l_isTree = true;
+        } else if (ls_attr.UIATK === "EXT00001192" || ls_attr.UIATK === "EXT00001193") {    // TreeTable parent/child
+            l_path = _modelOf(oPrevA, "rows"); l_isTree = true;
+        } else if (ls_attr.UIATK === "EXT00002382" && oPrevA && oPrevA.__PARENT) {          // Column markCellColor
+            l_path = _modelOf(oPrevA.__PARENT, "rows"); l_isTree = true;
+        } else if (ls_tree.PUIATK === "AT000022249" || ls_tree.PUIATK === "AT000022258" ||
+                   ls_tree.PUIATK === "AT000013070" || ls_tree.PUIATK === "AT000013148") {   // rowSettings/rowAction
+            l_path = _modelOf(_prevOf(ls_tree.POBID), "rows"); l_isTree = true;
+        } else if (ls_tree.PUIATK === "AT000013013") {                                       // RowAction items
+            if (!_modelOf(_prevOf(ls_tree.POBID), "items")) {
+                var ls_parent = oAPP.fn.getTreeData(ls_tree.POBID);
+                if (ls_parent && (ls_parent.UIOBK === "UO01139" || ls_parent.UIOBK === "UO01142")) {
+                    l_path = _modelOf(_prevOf(ls_parent.POBID), "rows");
+                }
+            }
+        }
+
+        if (l_isTree && !l_path) { return _fail("214"); }                              // V14
+
+        var lt_split1, lt_split2;
+        if (oIF.isTabField === true) {                                                 // 테이블 파생 필드
+            if (typeof l_path === "undefined" || l_path === "" || l_path === null) { return _fail("214"); }  // V15
+            if (l_path !== oIF.CHILD.substr(0, l_path.length)) { return _fail("214"); }                       // V16
+            lt_split1 = l_path.split("-");
+            lt_split2 = oIF.KIND_PATH.split("-");
+            lt_split2.splice(0, lt_split1.length);
+        }
+
+        // ── property(UIATY==="1") 경로 — 원본 8733~8876 ──
+        if (ls_attr.UIATY === "1") {
+
+            // P-a: selectOption2 value = RANGE_TAB (원본 8736)
+            if (ls_attr.UIATK === "EXT00001161" || ls_attr.UIATK === "EXT00002507") {
+                if (oIF.EXP_TYP !== "RANGE_TAB") { return _fail("214"); }               // V17
+                if (typeof lt_split2 !== "undefined") {
+                    lt_split2.splice(lt_split2.length - 1, 1);
+                    if (lt_split2.findIndex(function (a) { return a === "T"; }) !== -1) { return _fail("214"); }  // V18
+                }
+                oAPP.fn.attrSetBindProp(ls_attr, oIF);
+                return;
+            }
+
+            // P-b: 배열입력 property(숫자형 아님) = STR_TAB (원본 8776)
+            if (ls_attr.ISMLB === "X" && (ls_attr.UIADT !== "int" && ls_attr.UIADT !== "float")) {
+                if (oIF.EXP_TYP !== "STR_TAB") { return _fail("214"); }                 // V19
+                if (oIF.EXP_TYP === "STR_TAB" && oIF.PARENT === "Attribute") { return _fail("214"); }  // V20
+                if (typeof lt_split2 !== "undefined") {
+                    lt_split2.splice(lt_split2.length - 1, 1);
+                    if (lt_split2.findIndex(function (a) { return a === "T"; }) !== -1) { return _fail("214"); }  // V21
+                }
+                oAPP.fn.attrSetBindProp(ls_attr, oIF);
+                return;
+            }
+
+            // P-c: 일반 property = Elementary (원본 8826)
+            if (oIF.KIND !== "E") { return _fail("214"); }                             // V22
+            if (typeof lt_split2 !== "undefined" && lt_split2.findIndex(function (a) { return a === "T"; }) !== -1) { return _fail("214"); }  // V23
+            if (l_isTree && l_path && l_path !== oIF.CHILD.substr(0, l_path.length)) { return _fail("214"); }  // V24
+
+            // sap.ui.core.HTML content 예외 — 원본 8863.
+            if (oAPP.fn.attrChkHTMLContent(ls_attr, true, function () {
+                parent.setBusy("X");
+                oAPP.fn.attrSetBindProp(ls_attr, oIF);
+            }) === true) { return; }
+
+            oAPP.fn.attrSetBindProp(ls_attr, oIF);
+            return;
+        }
+
+        // ── aggregation(UIATY==="3") 경로 — 원본 uiAttributeArea.js:8880~8996 이식 ──
+        if (ls_attr.UIATY === "3" && ls_attr.ISMLB !== "X") { return _fail("214"); }            // V25 N건 못 들어가는 집합
+        if (ls_attr.UIATY === "3" && oIF.EXP_TYP === "STR_TAB") { return _fail("214"); }         // V26 집합에 string_table
+        if (ls_attr.UIATY === "3" && oIF.KIND === "T") {
+            if (oAPP.fn.attrChkBindAggrPossible(ls_attr, true)) { return _fail("214"); }         // V27 집합 가능성
+            if (oAPP.fn.getChildAggrBind(ls_attr.OBJID, oIF.CHILD) === true) { return _fail("214"); }  // V28 자식 중복
+            // 부모 N건 존재 여부 — 미리보기 라이브면 _MODEL 에서 읽힘, 스탠드인이면 undefined(스킵).
+            var _parentModel = oAPP.fn.getParentAggrBind(_prevOf(ls_tree.POBID), ls_tree.UIATT);
+            if (typeof _parentModel !== "undefined") {
+                if (_parentModel.startsWith(oIF.CHILD) === true) { return _fail("214"); }          // V29 동일 PATH
+                if (oIF.CHILD !== _parentModel && oIF.CHILD.startsWith(_parentModel) === true) {   // 부모 N건 파생 자식
+                    if (oAPP.fn.getChildAggrBind(ls_attr.OBJID, _parentModel) === true) { return _fail("214"); }  // V30
+                }
+            }
+            if (typeof lt_split2 !== "undefined") {
+                lt_split2.splice(lt_split2.length - 1, 1);                                          // 마지막(TABLE) 제거
+                if (lt_split2.findIndex(function (a) { return a === "T"; }) !== -1) { return _fail("214"); }  // V31
+            }
+            oAPP.fn.attrBindCallBackAggr(true, oIF, ls_attr);                                       // 집합 바인딩 적용
+            return;
+        }
+
+        // 어느 분기도 안 탐(원본 fall-through 8998) — 로딩표시만 해제.
+        try { parent.require(_bp)("BUSY_OFF"); } catch (e) { }
+        parent.setBusy("");
+      } catch (e) {
+          // 예상외 예외(잘못된 payload 등) — 조용히 삼키지 말고 214 표시 + 로딩 해제(오류 삼킴 금지).
+          _fail("214");
+          console.error("[HTML5][WS20][drop] 바인딩 처리 예외:", e && e.message);
+      }
+    };
+
     oAPP.fn.fnRenderWs20AttrRows = function () {
 
         var ROWS = document.getElementById("ws20AttrRows");
         if (!ROWS) { return; }
+
+        // [필드→속성 드래그 바인딩] 놓기 받기는 값칸 하나하나가 아니라 목록 전체(ROWS)에 위임한다.
+        //   원본 uiAttributeArea.js:388 DropInfo 가 "속성 테이블(items)" 레벨에서 받고 드롭된 행을 찾는 것과 동일 방식.
+        //   (값칸 개별 리스너는 dragover target 이 셀이 아닐 때 안 잡히는 문제가 있어 위임으로 전환.) ROWS 는 재사용 요소라 1회만.
+        if (!ROWS.__bwpDropWired) {
+            ROWS.__bwpDropWired = true;
+            ROWS.addEventListener("dragover", function (ev) {
+                var row = ev.target && ev.target.closest ? ev.target.closest(".u4aWs20AttrRow") : null;
+                var oAttr = row ? row.__attrData : null;
+                if (!oAttr || oAttr.dropEnable !== true) {
+                    // 놓기 불가 줄·여백으로 이동 → 직전 강조 제거(안티 검수 2026-08-11: 강조 잔존 방지).
+                    if (ROWS.__bwpDragRow) { ROWS.__bwpDragRow.classList.remove("u4aWs20AttrValDrag"); ROWS.__bwpDragRow = null; }
+                    return;
+                }
+                ev.preventDefault();                                  // 놓기 허용(안 하면 브라우저가 drop 거부)
+                if (row !== ROWS.__bwpDragRow) {                       // 강조는 값칸이 아니라 "줄 전체"에(변경행과 동일).
+                    if (ROWS.__bwpDragRow) { ROWS.__bwpDragRow.classList.remove("u4aWs20AttrValDrag"); }
+                    row.classList.add("u4aWs20AttrValDrag");
+                    ROWS.__bwpDragRow = row;
+                }
+            });
+            ROWS.addEventListener("dragleave", function (ev) {
+                // 목록 안(다른 행)으로 이동한 경우는 유지 — 목록을 완전히 벗어날 때만 해제.
+                if (ev.relatedTarget && ROWS.contains(ev.relatedTarget)) { return; }
+                if (ROWS.__bwpDragRow) { ROWS.__bwpDragRow.classList.remove("u4aWs20AttrValDrag"); ROWS.__bwpDragRow = null; }
+            });
+            ROWS.addEventListener("drop", function (ev) {
+                ev.preventDefault();
+                if (ROWS.__bwpDragRow) { ROWS.__bwpDragRow.classList.remove("u4aWs20AttrValDrag"); ROWS.__bwpDragRow = null; }
+                var row = ev.target && ev.target.closest ? ev.target.closest(".u4aWs20AttrRow") : null;
+                var oAttr = row ? row.__attrData : null;
+                //dataTransfer 는 drop 콜백의 "동기" 스코프에서만 유효 → 지금 읽어 확보한다.
+                var sRaw = "";
+                try { sRaw = ev.dataTransfer.getData("prc001"); } catch (e) { sRaw = ""; }
+                var _run = function () { oAPP.fn.fnWs20AttrDrop(sRaw, oAttr); };
+                //로드했는데도 함수가 없거나 로드 자체 실패 = 조용히 삼키지 말고 214 표시 + 로딩 해제(오류 삼킴 금지, 코덱스 검수 2026-08-11).
+                var _loadFail = function (sWhy) {
+                    try { APPCOMMON.fnShowFloatingFooterMsg("E", "WS20", APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "214", "", "", "", "")); } catch (e) { }
+                    try { parent.setBusy(""); } catch (e) { }
+                    console.error("[HTML5][WS20][drop] 바인딩 적용 함수(attrSetBindProp) 확보 실패:", sWhy);
+                };
+                //바인딩 적용 함수(attrSetBindProp)는 소형 팝업 파일(fnBindPopupOpen)에 있어 온디맨드 로드일 수 있음 → 보장 후 실행.
+                if (typeof oAPP.fn.attrSetBindProp === "function") { _run(); }
+                else {
+                    try {
+                        oAPP.loadJs("fnBindPopupOpen", function () {
+                            if (typeof oAPP.fn.attrSetBindProp === "function") { _run(); }
+                            else { _loadFail("loadJs 후에도 attrSetBindProp 미정의"); }
+                        });
+                    } catch (e2) { _loadFail(e2 && e2.message); }
+                }
+            });
+        }
 
         ROWS.innerHTML = "";
         //빈 상태 가운데정렬 클래스는 매 렌더 초기화 → 행이 그려지면 일반(위→아래) 흐름.
@@ -5127,6 +5467,7 @@
             VAL.className = "u4aWs20AttrRowVal";
             VAL.setAttribute("data-ctx-key", "AT02");   //구 oRInp2/oRSel1.data("CONTEXT_MENU","AT02")
             VAL.appendChild(_buildValueControl(sAttr));
+            //── [필드→속성 드래그 바인딩] 놓기 받기는 목록 전체(ROWS)에 위임 — 위 fnRenderWs20AttrRows 진입부 참조. ──
             ROW.appendChild(VAL);
 
             //── 아이콘 셀 ×2 (구 40px 컬럼 — 바인딩/help) ──

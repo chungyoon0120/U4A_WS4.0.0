@@ -831,9 +831,10 @@
             oFocusUI = ls_ui.oInp1;
         }
 
-        // 앱 설명(Web Application Name) 미입력. ★[보완] 원본은 K01(일반)만 검증했으나, DataSet 탭도
-        //   앱 설명이 필수(*) 표시이므로 K01/K02 공통 검증(lf_chkValue 는 K01/K02 에서만 호출).
-        if (ls_appl.APPNM === "") {
+        // 앱 설명(Web Application Name) 미입력. [BR12] 원본대로 K01(일반) 탭에서만 필수 검증한다.
+        //   DataSet(K02) 탭은 앱 설명이 비어도 통과 — 이어지는 테이블 검색/필드선택 결과의 설명(DDTEXT/TDESC)이
+        //   앱 설명이 비었을 때 자동으로 채워지기 때문(lf_ObjNameF4Help 콜백·필드선택 후). 원본 .bak 776행 1:1.
+        if (ls_appl.APPNM === "" && l_selHKey === "K01") {
             ls_appl.APPNM_stat = "Error";
             ls_appl.APPNM_stxt = _txt("/U4A/MSG_WS", "014", _txt("/U4A/CL_WS_COMMON", "A33"));
             l_err = true;
