@@ -974,22 +974,21 @@
     }
 
     /** 서브헤더 뷰 전환 세그먼트 (Tree / Master-Detail) — Bootstrap btn-group */
-    /** 테스트 모드 스위치 + 자동 로그인 ID 입력 — 환경변수 U4A_WS_TEST_MODE='X' 일 때만 활성화.
+    /** 테스트 모드 스위치 + 자동 로그인 ID 입력 — 개발(비패키지)에서만 노출/활성.
+     *  패키지(배포) 상태에선 아예 렌더하지 않는다(null 반환).
      *  스위치 ON → ID 입력칸 노출. 입력한 ID 는 서버 더블클릭 시 로그인 창으로 전달되어
      *  하단 스태프 버튼 중 일치하는 계정으로 자동 로그인된다. (개발/테스트 전용, 라벨 하드코딩) */
     function _buildTestModeToggle() {
-        const bDevHost = process.env.U4A_WS_TEST_MODE === "X";
+        if (APP.isPackaged) { return null; } // 배포 빌드에선 스위치 자체를 만들지 않음
 
-        // 마지막 입력값/스위치 상태 복원(appdata). 비-테스트 머신에선 스위치 강제 off.
+        // 마지막 입력값/스위치 상태 복원(appdata)
         if (oAPP.attr._testId === undefined) {
             const oTs = _loadTestState();
             oAPP.attr._testId = oTs.testId;
-            oAPP.attr._testMode = bDevHost ? oTs.testMode : false;
+            oAPP.attr._testMode = oTs.testMode;
         }
 
         const oWrap = _el("span", "u4a-bar__testmode");
-        if (!bDevHost) { oWrap.classList.add("is-disabled"); } // :has() 미지원(Chromium93) → 클래스로 흐림
-
         const oText = _el("span", "u4a-bar__testmode-label", "테스트 모드");
 
         const oSwitch = _el("label", "u4a-switch");
@@ -997,7 +996,6 @@
         oChk.type = "checkbox";
         oChk.id = "u4aWsTestMode";
         oChk.checked = !!oAPP.attr._testMode;
-        oChk.disabled = !bDevHost; // U4A_WS_TEST_MODE='X' 일 때만 활성화
         oSwitch.append(oChk, _el("span", "u4a-switch__slider"));
 
         // 자동 로그인 ID 입력칸 — 스위치 ON 일 때만 노출
@@ -1011,7 +1009,6 @@
         oIdInput.addEventListener("change", () => { oAPP.attr._testId = oIdInput.value; _saveTestState(); });
 
         oChk.addEventListener("change", () => {
-            if (!bDevHost) { return; }
             oAPP.attr._testMode = oChk.checked;
             oIdInput.hidden = !oChk.checked;
             _saveTestState();
@@ -1804,7 +1801,11 @@
         const oSettingsBtn = _buildSettingsDropdown();
         // 마지막 선택 뷰 복원(appdata) 후 뷰 전환 세그먼트 배치
         if (!oAPP.attr._viewMode) { oAPP.attr._viewMode = oAPP.fn.fnLoadViewMode(); }
-        oSubBar.append(oSubTitle, oSubSpacer, _buildTestModeToggle(), _buildViewSwitcher(), oSettingsBtn);
+        // 테스트 모드 스위치는 개발(비패키지)에서만 — 패키지면 null 이라 추가하지 않는다.
+        const oTestToggle = _buildTestModeToggle();
+        oSubBar.append(oSubTitle, oSubSpacer);
+        if (oTestToggle) { oSubBar.append(oTestToggle); }
+        oSubBar.append(_buildViewSwitcher(), oSettingsBtn);
 
         // ── 본문: 활성 뷰(Tree/Master-Detail)에 따라 fnRenderActiveView 가 채운다 ──
         const oBody = _el("div", "u4a-page__body");
