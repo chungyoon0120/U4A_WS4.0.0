@@ -116,8 +116,9 @@
             sendAjax: (oDeps && oDeps.sendAjax) ? oDeps.sendAjax : function () { return sendAjax.apply(null, arguments); }
         };
 
-        // 팝업 상태(클로저) — 행 데이터 / 선택 인덱스.
-        const oState = { aRows: [], iSel: -1, fnCb: (typeof fnCallback === "function") ? fnCallback : null };
+        // 팝업 상태(클로저) — 행 데이터 / 선택 행 객체.
+        //   ★[BR11] 가상 스크롤 전환으로 선택은 인덱스가 아니라 행 객체(oSel) 기준(스크롤로 행이 사라져도 유지).
+        const oState = { aRows: [], oSel: null, fnCb: (typeof fnCallback === "function") ? fnCallback : null };
 
         // ── 다이얼로그 골격 ─────────────────────────────────────────────
         const oDlg = document.createElement("dialog");
@@ -196,6 +197,12 @@
         oTbWrap.appendChild(oEmpty);
         oBody.appendChild(oTbWrap);
 
+        // ★[BR11] 결과 목록 가상 스크롤 — 스크롤 컨테이너=oTbWrap, 행 컨테이너=oTbody. 4컬럼, 선택키=TRKORR.
+        //   공통 유틸 없으면 null → _renderRows 가 전체 행 폴백. 빈목록 안내는 기존 .u4aCtsEmpty 그대로.
+        const _vs = (window.U4AUI && U4AUI.makeVScroller)
+            ? U4AUI.makeVScroller(oTbWrap, oTbody, { colCount: 4, buildRow: _buildRow, getSelKey: function (r) { return r.TRKORR; } })
+            : null;
+
         // ── 푸터: Confirm(A40) / Close(A39) ─────────────────────────────
         const oFoot = _el("div", "u4a-dialog__footer");
         oFoot.style.display = "flex";
@@ -222,20 +229,44 @@
         function _setBusy(bOn) { _D.setBusy(bOn ? "X" : ""); }
 
         // ── 행 선택/렌더 헬퍼 ───────────────────────────────────────────
-        function _selectRow(iIdx) {
-            oState.iSel = iIdx;
+        //   ★[BR11] 결과 목록은 공통 가상 스크롤(U4AUI.makeVScroller)로 보이는 구간만 그린다(대용량 대비).
+        //     공통 유틸이 없으면(별도창 등 U4AUI 미로드) 전체 행을 그리는 폴백으로 동작 → 원본 UX 동일.
+
+        // 결과 행 1개 빌드(가상 스크롤러가 보이는 구간만 호출). 클릭=선택, 더블클릭=선택+확정.
+        function _buildRow(oRow) {
+            const oTr = _el("tr");
+            oTr.__row = oRow;   // 폴백 선택강조 비교용(가상 스크롤은 getSelKey 로 판정).
+            oTr.setAttribute("aria-selected", oState.oSel === oRow ? "true" : "false");
+            const aCell = [
+                { v: oRow.TRKORR, cls: "u4aCtsColC" },
+                { v: oRow.AS4TEXT, cls: "" },
+                { v: _fmtDate(oRow.AS4DATE), cls: "u4aCtsColC" },
+                { v: _fmtTime(oRow.AS4TIME), cls: "u4aCtsColC" }
+            ];
+            aCell.forEach(function (c) { oTr.appendChild(_el("td", c.cls, c.v || "")); });
+            oTr.addEventListener("click", function () { _selectRow(oRow); });
+            oTr.addEventListener("dblclick", function () { _selectRow(oRow); _accept(true); });
+            return oTr;
+        }
+
+        // 선택 강조 반영 — 가상 스크롤이면 키(TRKORR)로(setSel+refresh), 폴백이면 보이는 tr 순회.
+        function _applySel() {
+            if (_vs) { _vs.setSel(oState.oSel ? oState.oSel.TRKORR : null); _vs.refresh(); return; }
             const aTr = oTbody.querySelectorAll("tr");
             for (let i = 0; i < aTr.length; i++) {
-                aTr[i].setAttribute("aria-selected", i === iIdx ? "true" : "false");
+                aTr[i].setAttribute("aria-selected", aTr[i].__row === oState.oSel ? "true" : "false");
             }
-            const oRow = (iIdx >= 0) ? oState.aRows[iIdx] : null;
-            oInpNo.value = oRow ? (oRow.TRKORR || "") : "";
-            oInpTx.value = oRow ? (oRow.AS4TEXT || "") : "";
+        }
+
+        function _selectRow(oRow) {
+            oState.oSel = oRow || null;
+            oInpNo.value = oState.oSel ? (oState.oSel.TRKORR || "") : "";
+            oInpTx.value = oState.oSel ? (oState.oSel.AS4TEXT || "") : "";
+            _applySel();
         }
 
         function _renderRows() {
-            oTbody.innerHTML = "";
-            oState.iSel = -1;
+            oState.oSel = null;
             oInpNo.value = "";
             oInpTx.value = "";
             const aRows = oState.aRows;
@@ -246,20 +277,13 @@
             }
             // A73 Search Result : n  형태로 건수 표기(원본 결과건수 라벨과 동일 키).
             oCount.textContent = _txt("/U4A/CL_WS_COMMON", "A73") + " : " + aRows.length;
-            aRows.forEach(function (oRow, iIdx) {
-                const oTr = _el("tr");
-                oTr.setAttribute("aria-selected", "false");
-                const aCell = [
-                    { v: oRow.TRKORR, cls: "u4aCtsColC" },
-                    { v: oRow.AS4TEXT, cls: "" },
-                    { v: _fmtDate(oRow.AS4DATE), cls: "u4aCtsColC" },
-                    { v: _fmtTime(oRow.AS4TIME), cls: "u4aCtsColC" }
-                ];
-                aCell.forEach(function (c) { oTr.appendChild(_el("td", c.cls, c.v || "")); });
-                oTr.addEventListener("click", function () { _selectRow(iIdx); });
-                oTr.addEventListener("dblclick", function () { _selectRow(iIdx); _accept(true); });
-                oTbody.appendChild(oTr);
-            });
+            if (_vs) {
+                _vs.setSel(null);
+                _vs.setRows(aRows);   // 보이는 구간만 그림(빈목록이면 tbody 비움 → .u4aCtsEmpty 안내 노출)
+            } else {
+                oTbody.innerHTML = "";
+                aRows.forEach(function (oRow) { oTbody.appendChild(_buildRow(oRow)); });
+            }
         }
 
         // ── 서버 조회(원본 ev_GetCtsDialogAfterOpen / fnGetCtsDataSucc/Err) ──
@@ -288,12 +312,12 @@
         // ── 선택 확정(Accept / 더블클릭) ────────────────────────────────
         //   더블클릭(bImmediate=true) 은 원본과 동일하게 확인 질문 후 콜백.
         function _accept(bImmediate) {
-            if (oState.iSel < 0) {
+            if (!oState.oSel) {
                 // 268  Selected line does not exists.
                 _D.showMessage(null, 10, "I", _txt("/U4A/MSG_WS", "268"));
                 return;
             }
-            const oRow = oState.aRows[oState.iSel];
+            const oRow = oState.oSel;
             if (bImmediate) {
                 // 346  Do you want to choose?
                 _D.showMessage(null, 30, "I", _txt("/U4A/MSG_WS", "346"), function (sAction) {
