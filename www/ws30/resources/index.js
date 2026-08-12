@@ -203,11 +203,15 @@ oAPP.views = window?.oAPP?.views || {};
                 //   Chromium93 은 popover API 없음 → 토스트를 "가장 위에 열린 모달 <dialog> 안"에 넣어 top-layer 에 올린다.
                 //   가장 위 = data-tl-seq(showModal 호출 순서) 최대값(busy 제외). 모달 없으면 body 폴백 = 기존 동작.
                 //   .u4a-toast 는 position:fixed + pointer-events:none 이라 어디 붙어도 뷰포트 중앙·클릭통과 유지.
-                var oHost = document.body, aDlg = document.querySelectorAll("dialog[open]"), iTop = -1;
+                //   ★[BR19 후속] 반드시 "showModal(top-layer) 로 연 모달"만 대상. 비모달 show() 다이얼로그(예: WS20
+                //   UI 추가 팝업 — 뒤 트리 D&D 위해 비모달)는 top-layer 가 아니라 body 토스트를 안 가리므로 얹으면 안 된다.
+                //   비모달은 tlSeq 가 없어 0 → iTop 을 0 에서 시작하고 "> 0" 인 것만 골라 제외(전에는 iTop=-1 이라 0 도
+                //   잡혀, 비모달 팝업 안에 토스트를 넣었다가 팝업이 닫히며 함께 지워져 토스트가 안 보였다).
+                var oHost = document.body, aDlg = document.querySelectorAll("dialog[open]"), iTop = 0;
                 for (var i = 0; i < aDlg.length; i++) {
                     if (aDlg[i].id === "u4aWsBusyIndicator") { continue; }
                     var iSeq = parseInt(aDlg[i].dataset.tlSeq || "0", 10);
-                    if (iSeq >= iTop) { iTop = iSeq; oHost = aDlg[i]; }
+                    if (iSeq > iTop) { iTop = iSeq; oHost = aDlg[i]; }
                 }
                 if (oT.parentNode !== oHost) { oHost.appendChild(oT); }
                 oT.textContent = sMsg || "";

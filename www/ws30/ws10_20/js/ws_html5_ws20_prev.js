@@ -1213,7 +1213,7 @@
 
         fnDone = (typeof fnDone === "function") ? fnDone : function () { };
 
-        if (_bPrevModuleLoaded) { fnDone(); return; }
+        if (_bPrevModuleLoaded) { lf_installPreviewMoveDelegate(); fnDone(); return; }   // ★ BR17: 재진입 시에도 위임 보장(멱등).
 
         _aPrevModuleWaiters.push(fnDone);
 
@@ -1241,10 +1241,104 @@
             }
         }
 
+        // ★ BR17: 미리보기 우클릭 "위/아래" 이동을 트리와 동일한 HTML5 이동(fnWs20MoveUI/스냅샷 되돌리기)으로 위임.
+        //   원본 callDesignContextMenu.js 의 contextMenuUiMove 는 옛 방식 되돌리기 이력 저장에서 미정의 함수
+        //   (getTreeIndexOfChild)를 불러 예외로 죽고, 그 앞의 BUSY_ON 짝(OFF)에 도달 못 해 화면이 잠겼다.
+        //   트리 경로는 fnWs20MoveUI 로 정상 → 미리보기도 동일 경로로 통일(되돌리기 이원화 방지).
+        //   원본 파일은 손대지 않고, 로드된 뒤 함수를 감싼다. 대상위치 이동(pos)·undo/redo 재적용 호출은
+        //   원래 함수로 넘겨 동작 불변(위/아래 사용자 조작만 위임).
+        function lf_installPreviewMoveDelegate() {
+            var fnMove = oAPP.fn.contextMenuUiMove;
+            if (typeof fnMove === "function" && fnMove.__ws20MoveDelegate !== true) {
+                var _orig = fnMove;
+                var _wrapped = function (sign, pos) {
+                    var _isUndoRedo = false;
+                    try { _isUndoRedo = Array.prototype.slice.call(arguments).some(function (a) { return a && a.PRCCD === "UNDO_REDO"; }); } catch (e) { }
+                    if (typeof pos === "undefined" && !_isUndoRedo && (sign === "-" || sign === "+") &&
+                        typeof oAPP.fn.fnWs20MoveUI === "function") {
+                        var l_objid = "";
+                        try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
+                        var ls_node = (typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid) : null;
+                        if (ls_node) { return oAPP.fn.fnWs20MoveUI(ls_node, sign); }
+                    }
+                    // ★ BR18: "위치 이동"(pos 지정, undo/redo 아님)도 HTML5 move-to-index 로 위임.
+                    //   위치이동 팝업 확정 → contextMenuUiMove(undefined, pos) 인데, 원본 pos 경로는 위/아래와
+                    //   동일하게 getTreeIndexOfChild(미정의)로 죽는다 → 트리와 동일한 HTML5 이동으로 통일.
+                    if (typeof pos !== "undefined" && !_isUndoRedo &&
+                        typeof oAPP.fn.fnWs20MoveUIToIndex === "function") {
+                        var l_objid2 = "";
+                        try { l_objid2 = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
+                        var ls_node2 = (typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid2) : null;
+                        if (ls_node2) { return oAPP.fn.fnWs20MoveUIToIndex(ls_node2, pos); }
+                    }
+                    return _orig.apply(this, arguments);
+                };
+                _wrapped.__ws20MoveDelegate = true;
+                oAPP.fn.contextMenuUiMove = _wrapped;
+            }
+
+            // ★ BR20: 미리보기 우클릭 "복사"를 트리와 동일한 HTML5 복사(fnWs20CopyUI)로 위임.
+            //   원본 callDesignContextMenu.js 의 contextMenuUiCopy 는 lf_setTreeItemAttr 에서 미정의 함수
+            //   (getUiClientEvent)를 불러 예외로 죽어 복사가 완료되지 않고 [Critical Error]만 떴다.
+            //   트리 경로 _copyUI(=fnWs20CopyUI)는 클라이언트이벤트·속성·설명을 원본과 동일 형식으로 동봉해
+            //   정상 → 미리보기도 동일 경로로 통일(붙여넣기 형식 불변). 원본 파일은 손대지 않고 감싼다.
+            //   메뉴 선택 시 켜진 화면잠금(setBusy)·단축키잠금(setShortcutLock)은 원본 tail 과 동일하게
+            //   반드시 해제(예외에도 finally 로 보장 — BR20 의 정리 미도달을 원천 차단).
+            var fnCopy = oAPP.fn.contextMenuUiCopy;
+            if (typeof fnCopy === "function" && fnCopy.__ws20CopyDelegate !== true &&
+                typeof oAPP.fn.fnWs20CopyUI === "function") {
+                var _origCopy = fnCopy;
+                var _wrappedCopy = function () {
+                    var l_objid = "";
+                    try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
+                    var ls_node = (typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid) : null;
+                    if (!ls_node) { return _origCopy.apply(this, arguments); }
+                    try {
+                        oAPP.fn.fnWs20CopyUI(ls_node);   // ROOT/APP 가드·깊은복사·복사버퍼 저장(원본 1:1)
+                    } finally {
+                        // 원본 tail(callDesignContextMenu.js 708~710행)과 동일한 정리.
+                        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
+                        try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                    }
+                };
+                _wrappedCopy.__ws20CopyDelegate = true;
+                oAPP.fn.contextMenuUiCopy = _wrappedCopy;
+            }
+
+            // ★ BR21: 미리보기 우클릭 "붙여넣기"를 트리와 동일한 HTML5 붙여넣기(fnWs20PasteUI)로 위임.
+            //   원본 callDesignContextMenu.js 의 contextMenuUiPaste 는 원본 main() 에서만 로드되는 미정의 함수
+            //   (aggrSelectPopupOpener)를 무가드로 불러 예외로 죽어 붙여넣기가 안 되고 [Critical Error]만 떴고,
+            //   그 앞의 바인딩팝업 BUSY_ON 짝(OFF)에 도달 못 해 자식창 잠금이 남을 위험이 있었다.
+            //   트리 경로 _pasteUI(=fnWs20PasteUI)는 공통 코어(fnWs20AddTreeData)로 aggregation 선택·검증
+            //   (UA039/UA040/카디널리티)·하위트리 재귀복사·$OTR·Preview/Tree/Attribute/바인딩팝업 동기화·
+            //   undo(PASTE)를 원본과 동일하게 처리하고, 잠금(BUSY/단축키)도 성공·취소·검증실패·예외 모두
+            //   짝으로 해제한다. 원본 파일은 손대지 않고, 로드된 뒤 함수를 감싼다(멱등).
+            //   ★붙여넣기는 비동기(aggregation 선택 콜백)라 fnWs20PasteUI 가 자체적으로 잠금을 짝 해제하므로,
+            //     여기서 동기 finally 로 잠금을 풀지 않는다(복사 위임과 다른 점 — 조기 해제 방지).
+            var fnPaste = oAPP.fn.contextMenuUiPaste;
+            if (typeof fnPaste === "function" && fnPaste.__ws20PasteDelegate !== true &&
+                typeof oAPP.fn.fnWs20PasteUI === "function") {
+                var _origPaste = fnPaste;
+                var _wrappedPaste = function () {
+                    var l_objid = "";
+                    try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
+                    //문서 최상위(ROOT)·APP 대상 붙여넣기는 원본이 그대로 종료(EXIT)한다(원본 1344행). 이 경우는
+                    //  공통 코어로 위임하지 않고 원본의 깔끔한 종료 분기로 넘겨 원본과 동일하게 무동작으로 둔다.
+                    if (l_objid === "ROOT" || l_objid === "APP") { return _origPaste.apply(this, arguments); }
+                    var ls_node = (typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid) : null;
+                    if (!ls_node) { return _origPaste.apply(this, arguments); }
+                    return oAPP.fn.fnWs20PasteUI(ls_node);   // 편집가드·복사버퍼·공통 붙여넣기 코어(원본 1:1)
+                };
+                _wrappedPaste.__ws20PasteDelegate = true;
+                oAPP.fn.contextMenuUiPaste = _wrappedPaste;
+            }
+        }
+
         function lf_loadContextMenu() {
             //context menu ui 생성 function이 존재하는경우. (원본 uiDesignArea.js 988행)
             if (typeof oAPP.fn.callDesignContextMenu !== "undefined" &&
                 oAPP.fn.callDesignContextMenu.__ws20Guard !== true) {
+                lf_installPreviewMoveDelegate();   // ★ BR17: 이미 로드된 경우에도 위임 보장(멱등).
                 lf_finish();
                 return;
             }
@@ -1253,6 +1347,7 @@
             //  UI 를 생성하므로 호스트에 UI5 가 없어도 "정의" 자체는 안전.
             try {
                 oAPP.fn.getScript("design/js/callDesignContextMenu", function () {
+                    lf_installPreviewMoveDelegate();   // ★ BR17: 로드 직후 위/아래 이동 위임 설치.
                     lf_finish();
                 });
             } catch (e) {

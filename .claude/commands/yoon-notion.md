@@ -10,23 +10,30 @@ allowed-tools: mcp__notion-multi__list_workspaces, mcp__notion-multi__search_pag
 `notion-multi` MCP 도구로 노션에 기록한다. 열쇠(토큰)·한글 처리·HTTP 통신은 모두 MCP 서버가 내부에서
 처리하므로, **임시 파일을 만들거나 curl 을 직접 쓰지 않는다.**
 
-## 도구
-- `mcp__notion-multi__list_workspaces` — 등록된 워크스페이스 목록. 인자 없음.
-- `mcp__notion-multi__search_pages` — `{workspace, query?}` → `id | 종류 | 제목` 목록.
-- `mcp__notion-multi__append_text` — `{workspace, page_id, text}` → 페이지에 문단 추가.
-- `mcp__notion-multi__create_page` — `{workspace, title, parent_page_id?, text?}` → 새 페이지.
-- `mcp__notion-multi__create_database` — `{workspace, parent_page_id, title, properties?}` → 새 DB.
+## 도구 (전부 `mcp__notion-multi__` 접두)
+읽기·검색·생성·수정을 한 서버가 다 한다. **DB(표) 작업은 아래 전용 도구를 쓰고, search_pages 로 헤매지 말 것.**
+- `list_workspaces` — 워크스페이스 목록 + 기본 페이지/이슈 DB 의 **page_id·database_id** 반환. (여기 나온 id 를 바로 쓰고 다시 검색하지 말 것)
+- `search_pages` — `{workspace, query?}` → `id | 종류 | 제목`. (제목으로 페이지 찾기용)
+- `query_database` — `{workspace, database_id, match_text?}` → DB 행들 `page_id | 속성=값 ...`. 특정 행(예: BR20)은 `match_text` 로 추림.
+- `get_page` — `{workspace, page_id}` → 그 페이지/행의 **속성 + 본문(각 줄 앞 block_id)**. 읽기·수정 전 필수.
+- `append_text` — `{workspace, page_id, text}` → 페이지에 문단 추가.
+- `update_page_properties` — `{workspace, page_id, properties}` → 행/페이지의 속성 값 수정(상태·제목 등).
+- `update_block_text` — `{workspace, block_id, text}` → 본문 한 줄(문단·제목 등) 통째 교체.
+- `create_page` — `{workspace, title, parent_page_id?, text?}` → 새 페이지.
+- `create_database` — `{workspace, parent_page_id, title, properties?}` → 새 DB.
 
 ## 절차
-1. **워크스페이스명 확인.** 입력에 없거나 애매하면 `list_workspaces` 로 목록을 보여주고 되묻는다.
+1. **워크스페이스 확인 + id 확보.** 먼저 `list_workspaces` 를 부른다. "이슈 리포트 DB" 같은 등록된 대상은 여기서
+   나온 `database_id`·`page_id` 를 **그대로 쓴다**(다시 검색 금지).
 2. **동작 판별.**
-   - "~ 페이지 만들어/생성해" → `create_page`.
-   - "~ DB/데이터베이스 만들어" → 먼저 부모 페이지를 `search_pages` 로 찾아 `create_database`.
-   - 그 외 "~ 에 ~ 작성/기록/추가/업데이트" → `search_pages` 로 대상 page_id 를 찾아 `append_text`.
+   - **DB 행 읽기/수정** ("~DB의 BR20 읽고 수정" 등): `query_database {database_id, match_text:"BR20"}` 로 그 행의
+     `page_id` 를 잡고 → `get_page {page_id}` 로 속성·본문(block_id)을 읽는다 → 무엇을 어떻게 바꿀지 **사용자에게 확인** 후
+     속성은 `update_page_properties`, 본문 줄은 `update_block_text` 로 고친다.
+   - **페이지에 글 추가**: `search_pages` 로 page_id 찾고 → `append_text`.
+   - **새 페이지/DB**: `create_page` / `create_database`(부모는 list_workspaces 나 search_pages 로).
    - 애매하면 되묻는다.
-3. **대상 찾기.** 기존 페이지/부모 페이지가 필요하면 `search_pages {workspace, query:"<제목>"}` 로 page_id 를
-   확정한다. 제목이 여러 개면 목록을 보여주고 고르게 한다.
-4. **실행.** 해당 도구를 호출한다. 도구 결과 텍스트에 `[HTTP 200] ... 성공` 이면 성공, `isError` 면 실패다.
+3. **쓰기 전 확인.** 되돌리기 어려운 바깥 작업이므로, **무엇을 바꾸는지 한 줄로 알리고 사용자 확인 후** 실행한다.
+4. **판정.** 도구 결과에 `[HTTP 200] ... 성공` 이면 성공, `isError`/`[HTTP 4xx]` 면 실패(사유 표시).
 
 ## 확인 & 보고
 - 추가/생성 뒤 필요하면 `search_pages` 로 다시 조회해 반영을 확인한다.

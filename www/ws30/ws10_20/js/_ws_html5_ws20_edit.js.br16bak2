@@ -343,31 +343,18 @@
      * 삭제 (구 designUIDelete) — 확인 후 부모 zTREE 에서 노드 제거.
      ********************************************************************/
     function _deleteUI(oNode) {
-        // [BR16] 우클릭 메뉴(callDesignContextMenu.js attachItemSelected)가 진입 시 걸어둔
-        //   ★화면잠금(parent.setBusy)★ + ★단축키잠금(setShortcutLock=미리보기 헤더 자물쇠 아이콘)★을
-        //   이 삭제 흐름의 "모든 종료 경로"에서 반드시 해제한다.
-        //   원본 designUIDelete 는 취소분기에서 setShortcutLock(false), 성공은 바인딩팝업 왕복이 해제했으나,
-        //   WS20 엔 그 왕복 함수(oAPP.fn.updateBindPopupDesignData)가 로드되지 않아(죽은 코드) 성공·취소 모두
-        //   자물쇠가 남았다 → 복사/붙여넣기(_done)와 동일하게 모든 경로에서 직접 해제한다.
-        function _unlock() {
-            try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } } catch (e) { }
-            try { parent.setBusy(""); } catch (e) { }
-        }
-        if (!oNode || !_isEdit()) { _unlock(); return; }
-        if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { _unlock(); return; }
+        if (!oNode || !_isEdit()) { return; }
+        if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { return; }
 
         var sMsg = _msgWs("003", "Do you really want to delete?");
         var fnConfirm = APPCOMMON.fnConfirmBox;
-        // [BR16] 확인창을 클릭 가능하게: 확인창 띄우기 직전 ★화면잠금만★ 해제한다(원본 uiDesignArea:6677 1:1).
-        //   안 풀면 메인 body 의 pointer-events:none 이 WS 앱 iframe 전체(=확인창 포함)의 클릭을 막아 먹통.
-        //   단축키잠금(자물쇠)은 원본(6680)처럼 확인창 동안 유지 → 확인/취소 후 _unlock 에서 해제.
-        parent.setBusy("");
-        // [F-4] 확인창 뜨는 동안 자식창(바인딩팝업 등) 잠금(원본). 모든 종료 경로에서 BUSY_OFF 로 짝 맞춤.
+        // [F-4] 원본(uiDesignArea.js:293/301) = 삭제 버튼 즉시 BUSY_ON → ★확인창 뜨는 동안★ 팝업 잠금.
+        //   HTML5 는 확인 YES 후에만 잠갔었음 → 확인창 前으로 이동. 이후 모든 경로(취소·가드 실패·완료)에서 BUSY_OFF 로 짝 맞춤.
         _broadBusy(true);
         function lf_do(act) {
-            if (act !== "YES") { _broadBusy(false); _unlock(); return; }   // 취소 → 잠금 해제.
+            if (act !== "YES") { _broadBusy(false); return; }   // 취소 → 잠금 해제.
             var oParent = _node(oNode.POBID);
-            if (!oParent || !oParent.zTREE) { _broadBusy(false); _unlock(); return; }   // 가드 실패 → 잠금 해제.
+            if (!oParent || !oParent.zTREE) { _broadBusy(false); return; }   // 가드 실패 → 잠금 해제.
             oAPP.fn.fnWs20PushUndo();
             // 미리보기 제거(가드, 시그니처 1:1)
             _removeNodePreview(oNode);
@@ -381,7 +368,6 @@
             //   추가/이동/붙여넣기엔 있었으나 삭제 경로만 누락됐던 것 보완(장군님 발견 2026-07-24).
             try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
             _broadBusy(false);   // 짝 BUSY_OFF
-            _unlock();           // [BR16] 성공 후 단축키잠금(자물쇠)·화면잠금 해제(원본 왕복 해제 대체 — WS20 왕복 부재).
         }
         if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
         else { lf_do(window.confirm(sMsg) ? "YES" : "NO"); }
@@ -1629,20 +1615,16 @@
         if (iTarget > nTot - 1) { iTarget = nTot - 1; }
         if (iTarget === iCur) { return; }   // 동일 위치 no-op(불필요한 되돌리기·재렌더 방지)
         _broadBusy(true);   // 자식창 잠금(원본 위치 이동 시 BUSY_ON)
-        // ★ on 이후 전 구간을 try/finally 로 감싸 동기 예외에도 BUSY_OFF 도달 보장(위/아래 _moveUI 와 대칭).
-        try {
-            oAPP.fn.fnWs20PushUndo();
-            aSib.splice(iCur, 1);
-            aSib.splice(iTarget, 0, oNode);
-            _refreshTree();
-            _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, iTarget, oNode.ISMLB, oNode.UIOBK]);
-            _selectNode(oNode.OBJID);
-            _markChanged();
-            // 바인딩 팝업 반영(팝업 미오픈이면 no-op). 이 왕복이 미리보기 팝업의 부모 BUSY 도 해제한다.
-            try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
-        } finally {
-            _broadBusy(false);   // 짝 BUSY_OFF (예외에도 반드시)
-        }
+        oAPP.fn.fnWs20PushUndo();
+        aSib.splice(iCur, 1);
+        aSib.splice(iTarget, 0, oNode);
+        _refreshTree();
+        _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, iTarget, oNode.ISMLB, oNode.UIOBK]);
+        _selectNode(oNode.OBJID);
+        _markChanged();
+        // 바인딩 팝업 반영(팝업 미오픈이면 no-op). 이 왕복이 미리보기 팝업의 부모 BUSY 도 해제한다.
+        try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
+        _broadBusy(false);   // 짝 BUSY_OFF
     };
 
     /********************************************************************
@@ -1696,11 +1678,6 @@
                 if (i + 1 === iPos1) { nd.highlight = "Indication02"; }
             }
             try { if (typeof oAPP.fn.fnRenderDesignTree === "function") { oAPP.fn.fnRenderDesignTree(); } } catch (e) { }
-            // 원본 designSetScrollPosOBJID: 대상 위치 줄이 화면 밖이면 그 줄로 스크롤(초기화 때는 안 함).
-            if (bReset !== true) {
-                var oTgt = aSib[iPos1 - 1];
-                try { if (oTgt && typeof oAPP.fn.fnWs20ScrollTreeToOBJID === "function") { oAPP.fn.fnWs20ScrollTreeToOBJID(oTgt.OBJID); } } catch (e) { }
-            }
         }
         function lf_close() { lf_moveMark(1, true); try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
         function lf_ok() {

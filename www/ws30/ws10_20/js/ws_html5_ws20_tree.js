@@ -940,6 +940,10 @@
         } catch (e) { }
     }
 
+    // [PUBLIC] 디자인 트리를 OBJID 라인으로 스크롤(안 보이면 그 위치로 내려줌) — 원본 designSetScrollPosOBJID 대응.
+    //   위치이동 팝업의 미리강조가 화면 밖 대상 위치를 강조할 때 그 줄로 스크롤하는 데 사용.
+    oAPP.fn.fnWs20ScrollTreeToOBJID = _findScrollTo;
+
     // 검색 실행(구 lf_designFindOBJID). POS:+1/-1, bRefresh:키워드/equal 변경 시 재수집.
     function _findExec(POS, bRefresh, oMsgEl) {
         if (oMsgEl) { oMsgEl.textContent = ""; oMsgEl.className = "u4aWs20FindMsg"; }

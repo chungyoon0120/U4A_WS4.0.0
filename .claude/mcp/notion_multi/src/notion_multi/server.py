@@ -94,17 +94,84 @@ def paragraph_block(text: str) -> dict:
     }
 
 
+def render_rich_text(rt) -> str:
+    return "".join(t.get("plain_text", "") for t in (rt or []))
+
+
+def render_property(v: dict) -> str:
+    """노션 속성 하나를 사람이 읽을 문자열로."""
+    t = v.get("type")
+    if t == "title":
+        return render_rich_text(v.get("title"))
+    if t == "rich_text":
+        return render_rich_text(v.get("rich_text"))
+    if t == "select":
+        s = v.get("select")
+        return s.get("name", "") if s else ""
+    if t == "status":
+        s = v.get("status")
+        return s.get("name", "") if s else ""
+    if t == "multi_select":
+        return ", ".join(o.get("name", "") for o in v.get("multi_select", []))
+    if t == "number":
+        n = v.get("number")
+        return "" if n is None else str(n)
+    if t == "checkbox":
+        return "예" if v.get("checkbox") else "아니오"
+    if t == "date":
+        d = v.get("date")
+        if not d:
+            return ""
+        return d.get("start", "") + (("~" + d["end"]) if d.get("end") else "")
+    if t == "url":
+        return v.get("url") or ""
+    if t == "email":
+        return v.get("email") or ""
+    if t == "phone_number":
+        return v.get("phone_number") or ""
+    if t == "people":
+        return ", ".join(p.get("name", "") for p in v.get("people", []))
+    if t == "formula":
+        f = v.get("formula", {}) or {}
+        return str(f.get(f.get("type"), ""))
+    if t == "rollup":
+        r = v.get("rollup", {}) or {}
+        return str(r.get(r.get("type"), ""))
+    return f"({t})"
+
+
+def render_block(b: dict) -> str:
+    """블록 하나를 'block_id | (종류) 텍스트' 로. 편집 대상 지정에 block_id 사용."""
+    bid = b.get("id", "")
+    bt = b.get("type", "")
+    payload = b.get(bt, {}) if isinstance(b.get(bt), dict) else {}
+    txt = render_rich_text(payload.get("rich_text")) if isinstance(payload, dict) else ""
+    return f"{bid} | ({bt}) {txt}"
+
+
 # =====================================================================
 # 도구 (FastMCP)
 # =====================================================================
 @mcp.tool()
 def list_workspaces() -> str:
-    """등록된 노션 워크스페이스 목록을 반환한다. 인자 없음."""
+    """등록된 노션 워크스페이스 목록과, 미리 등록된 기본 페이지/이슈 DB 의 id 를 반환한다. 인자 없음.
+
+    여기서 나온 database_id 는 query_database 에 바로 쓸 수 있다(다시 검색하지 말 것).
+    """
     reg = load_registry()
     lines = []
     for name, meta in reg.items():
-        dp = meta.get("default_page_title", "")
-        lines.append(f"- {name}" + (f"  (기본 페이지: {dp})" if dp else ""))
+        lines.append(f"- {name}")
+        if meta.get("default_page_id") or meta.get("default_page_title"):
+            lines.append(
+                f"    기본 페이지: {meta.get('default_page_title','')} "
+                f"(page_id={meta.get('default_page_id','')})"
+            )
+        if meta.get("issue_db_id") or meta.get("issue_db_title"):
+            lines.append(
+                f"    이슈 DB: {meta.get('issue_db_title','')} "
+                f"(database_id={meta.get('issue_db_id','')})"
+            )
     return "등록된 워크스페이스:\n" + "\n".join(lines)
 
 
@@ -215,6 +282,134 @@ def create_database(
     if status != 200:
         return f"[HTTP {status}] DB 생성 실패: {json.dumps(data, ensure_ascii=False)}"
     return f"[HTTP 200] DB 생성 성공\nid={data.get('id')}\nurl={data.get('url')}"
+
+
+@mcp.tool()
+def query_database(
+    workspace: str,
+    database_id: str,
+    match_text: Optional[str] = None,
+    page_size: int = 100,
+) -> str:
+    """DB(표) 안의 행 목록을 반환한다. 각 행은 'page_id | 속성=값 · 속성=값 ...' 형태.
+
+    특정 행(예: 'BR20')을 찾을 때 match_text 에 그 값을 주면, 값이 포함된 행만 추린다.
+    반환된 page_id 를 get_page 로 읽거나 update_page_properties 로 고칠 수 있다.
+
+    workspace: 워크스페이스명
+    database_id: 대상 DB id (list_workspaces 의 database_id 사용)
+    match_text: 이 문자열이 든 행만 추림(선택)
+    page_size: 한 번에 가져올 행 수(기본 100, 최대 100)
+    """
+    token = get_token(workspace)
+    rows = []
+    cursor = None
+    while True:
+        body: dict = {"page_size": min(max(page_size, 1), 100)}
+        if cursor:
+            body["start_cursor"] = cursor
+        status, data = notion_request(
+            "POST", f"/databases/{database_id}/query", token, body
+        )
+        if status != 200:
+            return f"[HTTP {status}] DB 조회 실패: {json.dumps(data, ensure_ascii=False)}"
+        for pg in data.get("results", []):
+            pid = pg.get("id")
+            props = pg.get("properties", {}) or {}
+            parts = []
+            for name, v in props.items():
+                txt = render_property(v)
+                if txt:
+                    parts.append(f"{name}={txt}")
+            line = f"{pid} | " + " · ".join(parts)
+            if match_text is None or match_text.lower() in line.lower():
+                rows.append(line)
+        if data.get("has_more") and match_text is not None:
+            cursor = data.get("next_cursor")
+        else:
+            break
+    return "\n".join(rows) if rows else "행 없음"
+
+
+@mcp.tool()
+def get_page(workspace: str, page_id: str) -> str:
+    """페이지(또는 DB 행)의 속성과 본문(블록)을 읽어 반환한다.
+    본문 각 줄 앞의 block_id 는 update_block_text 로 그 줄을 고칠 때 쓴다.
+
+    workspace: 워크스페이스명
+    page_id: 대상 페이지/행 id
+    """
+    token = get_token(workspace)
+    out = []
+
+    status, page = notion_request("GET", f"/pages/{page_id}", token)
+    if status == 200:
+        props = page.get("properties", {}) or {}
+        if props:
+            out.append("[속성]")
+            for name, v in props.items():
+                out.append(f"- {name}: {render_property(v)}")
+    else:
+        out.append(f"[HTTP {status}] 속성 조회 실패: {json.dumps(page, ensure_ascii=False)}")
+
+    out.append("[본문]")
+    cursor = None
+    while True:
+        path = f"/blocks/{page_id}/children?page_size=100"
+        if cursor:
+            path += f"&start_cursor={cursor}"
+        st, data = notion_request("GET", path, token)
+        if st != 200:
+            out.append(f"[HTTP {st}] 본문 조회 실패: {json.dumps(data, ensure_ascii=False)}")
+            break
+        for b in data.get("results", []):
+            out.append(render_block(b))
+        if data.get("has_more"):
+            cursor = data.get("next_cursor")
+        else:
+            break
+    return "\n".join(out)
+
+
+@mcp.tool()
+def update_page_properties(workspace: str, page_id: str, properties: dict) -> str:
+    """페이지(또는 DB 행)의 속성을 수정한다. properties 는 노션 속성 갱신 형식(dict).
+
+    예) 제목 바꾸기: {"이름": {"title": [{"type":"text","text":{"content":"새 제목"}}]}}
+        선택값 바꾸기: {"상태": {"select": {"name": "완료"}}}
+
+    workspace: 워크스페이스명
+    page_id: 대상 페이지/행 id
+    properties: 갱신할 속성(dict)
+    """
+    token = get_token(workspace)
+    status, data = notion_request(
+        "PATCH", f"/pages/{page_id}", token, {"properties": properties}
+    )
+    if status != 200:
+        return f"[HTTP {status}] 속성 수정 실패: {json.dumps(data, ensure_ascii=False)}"
+    return f"[HTTP 200] 속성 수정 성공 (page_id={page_id})"
+
+
+@mcp.tool()
+def update_block_text(workspace: str, block_id: str, text: str) -> str:
+    """텍스트 블록(문단·제목·목록·할일 등)의 내용을 text 로 통째로 교체한다.
+    block_id 는 get_page 본문에서 얻는다.
+
+    workspace: 워크스페이스명
+    block_id: 대상 블록 id
+    text: 새 내용
+    """
+    token = get_token(workspace)
+    st, b = notion_request("GET", f"/blocks/{block_id}", token)
+    if st != 200:
+        return f"[HTTP {st}] 블록 조회 실패: {json.dumps(b, ensure_ascii=False)}"
+    bt = b.get("type")
+    body = {bt: {"rich_text": [{"type": "text", "text": {"content": text}}]}}
+    status, data = notion_request("PATCH", f"/blocks/{block_id}", token, body)
+    if status != 200:
+        return f"[HTTP {status}] 블록 수정 실패: {json.dumps(data, ensure_ascii=False)}"
+    return f"[HTTP 200] 블록 수정 성공 (block_id={block_id})"
 
 
 def main():

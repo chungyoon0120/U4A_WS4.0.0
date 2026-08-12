@@ -343,31 +343,18 @@
      * 삭제 (구 designUIDelete) — 확인 후 부모 zTREE 에서 노드 제거.
      ********************************************************************/
     function _deleteUI(oNode) {
-        // [BR16] 우클릭 메뉴(callDesignContextMenu.js attachItemSelected)가 진입 시 걸어둔
-        //   ★화면잠금(parent.setBusy)★ + ★단축키잠금(setShortcutLock=미리보기 헤더 자물쇠 아이콘)★을
-        //   이 삭제 흐름의 "모든 종료 경로"에서 반드시 해제한다.
-        //   원본 designUIDelete 는 취소분기에서 setShortcutLock(false), 성공은 바인딩팝업 왕복이 해제했으나,
-        //   WS20 엔 그 왕복 함수(oAPP.fn.updateBindPopupDesignData)가 로드되지 않아(죽은 코드) 성공·취소 모두
-        //   자물쇠가 남았다 → 복사/붙여넣기(_done)와 동일하게 모든 경로에서 직접 해제한다.
-        function _unlock() {
-            try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } } catch (e) { }
-            try { parent.setBusy(""); } catch (e) { }
-        }
-        if (!oNode || !_isEdit()) { _unlock(); return; }
-        if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { _unlock(); return; }
+        if (!oNode || !_isEdit()) { return; }
+        if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { return; }
 
         var sMsg = _msgWs("003", "Do you really want to delete?");
         var fnConfirm = APPCOMMON.fnConfirmBox;
-        // [BR16] 확인창을 클릭 가능하게: 확인창 띄우기 직전 ★화면잠금만★ 해제한다(원본 uiDesignArea:6677 1:1).
-        //   안 풀면 메인 body 의 pointer-events:none 이 WS 앱 iframe 전체(=확인창 포함)의 클릭을 막아 먹통.
-        //   단축키잠금(자물쇠)은 원본(6680)처럼 확인창 동안 유지 → 확인/취소 후 _unlock 에서 해제.
-        parent.setBusy("");
-        // [F-4] 확인창 뜨는 동안 자식창(바인딩팝업 등) 잠금(원본). 모든 종료 경로에서 BUSY_OFF 로 짝 맞춤.
+        // [F-4] 원본(uiDesignArea.js:293/301) = 삭제 버튼 즉시 BUSY_ON → ★확인창 뜨는 동안★ 팝업 잠금.
+        //   HTML5 는 확인 YES 후에만 잠갔었음 → 확인창 前으로 이동. 이후 모든 경로(취소·가드 실패·완료)에서 BUSY_OFF 로 짝 맞춤.
         _broadBusy(true);
         function lf_do(act) {
-            if (act !== "YES") { _broadBusy(false); _unlock(); return; }   // 취소 → 잠금 해제.
+            if (act !== "YES") { _broadBusy(false); return; }   // 취소 → 잠금 해제.
             var oParent = _node(oNode.POBID);
-            if (!oParent || !oParent.zTREE) { _broadBusy(false); _unlock(); return; }   // 가드 실패 → 잠금 해제.
+            if (!oParent || !oParent.zTREE) { _broadBusy(false); return; }   // 가드 실패 → 잠금 해제.
             oAPP.fn.fnWs20PushUndo();
             // 미리보기 제거(가드, 시그니처 1:1)
             _removeNodePreview(oNode);
@@ -381,7 +368,6 @@
             //   추가/이동/붙여넣기엔 있었으나 삭제 경로만 누락됐던 것 보완(장군님 발견 2026-07-24).
             try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
             _broadBusy(false);   // 짝 BUSY_OFF
-            _unlock();           // [BR16] 성공 후 단축키잠금(자물쇠)·화면잠금 해제(원본 왕복 해제 대체 — WS20 왕복 부재).
         }
         if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
         else { lf_do(window.confirm(sMsg) ? "YES" : "NO"); }
@@ -634,9 +620,6 @@
             // (원본 contextMenuUiCopy 는 완료 토스트 없음)
         } catch (e) { }
     }
-    // ★ BR20: 미리보기 우클릭 "복사"도 이 트리 복사 함수로 위임(prev.js). 원본 contextMenuUiCopy 는
-    //    HTML5 에 없는 함수(getUiClientEvent)를 불러 예외로 죽어 복사가 안 되고 오류창이 떴다.
-    oAPP.fn.fnWs20CopyUI = _copyUI;
     function _getCopy() {
         try {
             if (typeof oAPP.fn.getCopyData === "function") {
@@ -689,11 +672,6 @@
         }
         // (원본 contextMenuUiPaste 는 완료 토스트 없음)
     }
-    // ★ BR21: 미리보기 우클릭 "붙여넣기"도 이 트리 붙여넣기 함수로 위임(prev.js). 원본 contextMenuUiPaste 는
-    //    HTML5 에 없는 함수(aggrSelectPopupOpener)를 불러 예외로 죽어 붙여넣기가 안 되고 [Critical Error]만 떴다.
-    //    트리 경로 _pasteUI(=fnWs20PasteUI)는 공통 코어(fnWs20AddTreeData)로 aggregation 선택·검증·재귀복사·
-    //    동기화·undo 를 원본과 동일하게 처리하고, 잠금(BUSY/단축키)도 성공·취소·검증실패·예외 모두 짝으로 해제한다.
-    oAPP.fn.fnWs20PasteUI = _pasteUI;
 
     /********************************************************************
      * [PUBLIC] 행 액션/메뉴 핸들러 — 트리 +/삭제 버튼이 호출(designUIAdd/Delete).
@@ -1207,28 +1185,14 @@
     }
 
     function _showInsertPopup(is_tree) {
-        // [BR19] 우클릭 메뉴(callDesignContextMenu 의 attachItemSelected)가 진입 시 BUSY ON + 단축키잠금을
-        //   켜므로, 팝업을 못 여는 모든 조기 종료 경로에서 그 짝(해제)을 반드시 맞춰야 한다. 원본 designUIAdd
-        //   /callUIInsertPopup(uiDesignArea.js:6575·6577, insertUIPopop.js:22·24)와 동일. 안 맞추면 BUSY 가
-        //   남아 이후 화면을 조작할 수 없다.
-        function _releaseBusyLock() {
-            try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } }
-            catch (e) { console.error("[HTML5][WS20] insert releaseShortcutLock:", e && e.message ? e.message : e); }
-            try { parent.setBusy(""); }
-            catch (e) { console.error("[HTML5][WS20] insert releaseBusy:", e && e.message ? e.message : e); }
-        }
-        if (!is_tree) { _releaseBusyLock(); return; }
+        if (!is_tree) { return; }
         var aAgg = _getAggregations(is_tree.UIOBK);
         if (!aAgg.length) {
             // 280 입력 가능한 Aggregation이 존재하지 않습니다.
             try { parent.showMessage(null, 10, "W", _msgWs("280", "No aggregation available to add.")); } catch (e) { }
-            _releaseBusyLock();
             return;
         }
 
-        // [BR19] 여기부터 팝업 구성 전체를 오류 안전망으로 감싼다 — 중간에 오류가 나도 함수 끝 catch 에서
-        //   BUSY/단축키 잠금을 해제하고 부분 생성물을 정리한다(검수 지적 반영). 들여쓰기는 diff 최소화를 위해 유지.
-        try {
         // 타이틀: "UI Object Select - <부모 UI명>"(구 D97 + UIOBJ).
         var T_0022 = _LIB().T_0022 || [], T_0023 = _LIB().T_0023 || [];
         var sParent = T_0022.find(function (a) { return a.UIOBK === is_tree.UIOBK; });
@@ -1578,21 +1542,6 @@
         lf_renderTable();
         setTimeout(function () { try { (oSel || oSearch).focus(); } catch (e) { } }, 0);
         if (oBody) { /* 헤더 드래그·body 스크롤 분리 보장 */ }
-        // [BR19] 원본 sap.m.Dialog afterOpen(insertUIPopop.js:59-68) 대응 — 팝업이 열리고 content DOM
-        //   구성(lf_renderTable)까지 끝난 뒤, 우클릭 메뉴가 켠 BUSY/단축키잠금을 해제한다. 해제를 안 하면
-        //   BUSY 가 남아 팝업을 조작할 수 없다(BR19). WP1: 첫 프레임은 렌더 반영 직전이라, 두 번째 프레임
-        //   (=렌더가 실제 화면에 그려진 뒤)에 해제해 연타로 상태가 꼬이지 않게 한다. (검수 지적 반영: 이중 rAF)
-        requestAnimationFrame(function () { requestAnimationFrame(function () { _releaseBusyLock(); }); });
-        } catch (eBuild) {
-            // [BR19] 팝업 구성(다이얼로그/백드롭/공통배선/lf_renderTable) 중 오류가 나면 여기서 BUSY/단축키
-            //   잠금을 반드시 해제(안 하면 화면이 영구 잠김 — 원래 증상 재발). 부분 생성된 백드롭/다이얼로그와
-            //   등록한 ESC 리스너도 정리해 화면을 원래대로 되돌린다. (검수 지적 반영: 오류 경로 off 짝)
-            console.error("[HTML5][WS20] insert popup build:", eBuild && eBuild.message ? eBuild.message : eBuild);
-            try { document.removeEventListener("keydown", _onEscKey, true); } catch (e2) { }
-            try { if (oBackdrop) { oBackdrop.remove(); } } catch (e2) { }
-            try { if (oDlg) { oDlg.remove(); } } catch (e2) { }
-            _releaseBusyLock();
-        }
     }
 
     /********************************************************************
@@ -1607,43 +1556,6 @@
     }
     function _onOutside(ev) { if (_openMenu && !_openMenu.contains(ev.target)) { _closeMenu(); } }
     function _onEsc(ev) { if (ev.key === "Escape") { _closeMenu(); } }
-
-    /********************************************************************
-     * [PUBLIC] 형제 내 임의 위치(0-based index)로 이동 — 트리/미리보기 위치이동 팝업 공용.
-     *   ★ 원본 callDesignContextMenu.js 의 contextMenuUiMove(pos 지정 경로)는 옛 방식 되돌리기
-     *     이력 저장에서 HTML5 미정의 함수(getTreeIndexOfChild)를 불러 예외로 죽는다(BR17 과 동일 crash).
-     *     그래서 미리보기 "위치 이동" 확정도 이 HTML5 이동으로 위임(prev.js 위임 래퍼가 라우팅).
-     *   ★ 트리 위치이동(_moveUIPosition)과 완전히 동일한 이동 절차(스냅샷 되돌리기 + 미리보기 반영 +
-     *     선택 + 변경플래그 + 바인딩팝업 반영 + 자식창 BUSY 짝). 동일 위치면 no-op.
-     ********************************************************************/
-    oAPP.fn.fnWs20MoveUIToIndex = function (oNode, iTarget) {
-        if (!oNode || !_isEdit()) { return; }
-        var oParent = _node(oNode.POBID);
-        if (!oParent || !oParent.zTREE) { return; }
-        var aSib = oParent.zTREE;
-        var iCur = aSib.findIndex(function (a) { return a.OBJID === oNode.OBJID; });
-        if (iCur < 0) { return; }
-        var nTot = aSib.length;
-        iTarget = parseInt(iTarget, 10);
-        if (!(iTarget >= 0)) { iTarget = 0; }
-        if (iTarget > nTot - 1) { iTarget = nTot - 1; }
-        if (iTarget === iCur) { return; }   // 동일 위치 no-op(불필요한 되돌리기·재렌더 방지)
-        _broadBusy(true);   // 자식창 잠금(원본 위치 이동 시 BUSY_ON)
-        // ★ on 이후 전 구간을 try/finally 로 감싸 동기 예외에도 BUSY_OFF 도달 보장(위/아래 _moveUI 와 대칭).
-        try {
-            oAPP.fn.fnWs20PushUndo();
-            aSib.splice(iCur, 1);
-            aSib.splice(iTarget, 0, oNode);
-            _refreshTree();
-            _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, iTarget, oNode.ISMLB, oNode.UIOBK]);
-            _selectNode(oNode.OBJID);
-            _markChanged();
-            // 바인딩 팝업 반영(팝업 미오픈이면 no-op). 이 왕복이 미리보기 팝업의 부모 BUSY 도 해제한다.
-            try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
-        } finally {
-            _broadBusy(false);   // 짝 BUSY_OFF (예외에도 반드시)
-        }
-    };
 
     /********************************************************************
      * Move Position (구 contextMenuUiMovePosition/uiMovePosition) — 형제 내
@@ -1681,56 +1593,42 @@
             '</div>' +
             '<div class="u4a-dialog__footer">' +
             '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="ok" title="' + _esc(_msg("A40", "Confirm")) + '"><i class="fa-solid fa-check"></i></button>' +
-            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="cancel" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="cancel" title="' + _esc(_msg("A41", "Cancel")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>';
         var oInp = oDlg.querySelector(".u4aWs20MovePos");
-        // 이동 가능 위치 + 이동 대상(자기) + 대상 위치를 디자인 트리에 미리 강조(원본 designMoveMark 1:1 이식).
-        //  원본 함수는 UI5 uiDesignArea.js 정의라 HTML5 미로드 → 동일 로직 재현(트리 highlight + fnRenderDesignTree).
-        //  iPos1 = 대상 1-based 위치. bReset=true 면 강조 제거. (원본 스크롤 이동은 HTML5 공개 함수 없어 제외.)
-        function lf_moveMark(iPos1, bReset) {
-            for (var i = 0, l = aSib.length; i < l; i++) {
-                var nd = aSib[i];
-                if (bReset === true) { nd.highlight = "None"; continue; }
-                nd.highlight = "Indication04";
-                if (nd.OBJID === oNode.OBJID) { nd.highlight = "Indication08"; }
-                if (i + 1 === iPos1) { nd.highlight = "Indication02"; }
-            }
-            try { if (typeof oAPP.fn.fnRenderDesignTree === "function") { oAPP.fn.fnRenderDesignTree(); } } catch (e) { }
-            // 원본 designSetScrollPosOBJID: 대상 위치 줄이 화면 밖이면 그 줄로 스크롤(초기화 때는 안 함).
-            if (bReset !== true) {
-                var oTgt = aSib[iPos1 - 1];
-                try { if (oTgt && typeof oAPP.fn.fnWs20ScrollTreeToOBJID === "function") { oAPP.fn.fnWs20ScrollTreeToOBJID(oTgt.OBJID); } } catch (e) { }
-            }
-        }
-        function lf_close() { lf_moveMark(1, true); try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
+        function lf_close() { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
         function lf_ok() {
             var v = parseInt(oInp.value, 10); if (!(v >= 1)) { v = 1; } if (v > nTot) { v = nTot; }
             var iTarget = v - 1;
             lf_close();
-            // 실제 이동은 공용 함수로(트리·미리보기 위치이동 팝업 공용). 동일 위치면 내부에서 no-op.
-            oAPP.fn.fnWs20MoveUIToIndex(oNode, iTarget);
+            if (iTarget === iCur) { return; }
+            _broadBusy(true);   // 자식창 잠금(원본 위치 이동 시 BUSY_ON)
+            oAPP.fn.fnWs20PushUndo();
+            aSib.splice(iCur, 1);
+            aSib.splice(iTarget, 0, oNode);
+            _refreshTree();
+            _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, iTarget, oNode.ISMLB, oNode.UIOBK]);
+            _selectNode(oNode.OBJID);
+            _markChanged();
+            // [F-7] 바인딩 팝업 반영 — 위치이동 다이얼로그 경로도 반영 누락(위/아래 이동 _moveUI 와 동일 계열). 팝업 미오픈이면 no-op.
+            try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
+            _broadBusy(false);   // 짝 BUSY_OFF
         }
         oDlg.querySelector('[data-act="ok"]').addEventListener("click", lf_ok);
         // 슬라이더 ↔ 숫자 input 동기화(둘 다 1..nTot 클램프).
         var oRange = oDlg.querySelector(".u4aWs20MovePosRange");
         function lf_clamp(v) { v = parseInt(v, 10); if (!(v >= 1)) { v = 1; } if (v > nTot) { v = nTot; } return v; }
-        // 값 표시(숫자칸↔슬라이더)는 실시간(input) 동기화, 트리 다시 그리기(미리강조)는 마우스를 놓는
-        //  순간(change)에만 → 슬라이더 끌 때 매번 트리를 다시 그리지 않아 버벅임 방지.
         oRange.addEventListener("input", function () { oInp.value = String(lf_clamp(oRange.value)); });
         oInp.addEventListener("input", function () { oRange.value = String(lf_clamp(oInp.value)); });
-        oRange.addEventListener("change", function () { lf_moveMark(lf_clamp(oRange.value)); });
-        oInp.addEventListener("change", function () { lf_moveMark(lf_clamp(oInp.value)); });
         // 헤더 X + 푸터 ✗ 둘 다 data-act="cancel" → 닫기.
         oDlg.querySelectorAll('[data-act="cancel"]').forEach(function (b) { b.addEventListener("click", lf_close); });
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
-        // 숫자 input Enter → 확인 버튼으로 포커스 이동(원본 keydown 13 → oBtn1.focus() 1:1. 즉시 확정 아님).
-        oInp.addEventListener("keydown", function (e) { if (e.key !== "Enter") { return; } e.preventDefault(); try { oDlg.querySelector('[data-act="ok"]').focus(); } catch (e2) { } });
+        oInp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); lf_ok(); } });
         document.body.appendChild(oDlg);
         var oHeader = oDlg.querySelector(".u4a-dialog__header");
         try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { }
         try { if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 280, minH: 160 }); } } catch (e) { }
         try { oDlg.showModal(); } catch (e) { }
-        lf_moveMark(iCur + 1);   // 원본 attachAfterOpen: 현재 위치 기준 초기 미리강조.
         setTimeout(function () { try { oInp.focus(); oInp.select(); } catch (e) { } }, 0);
     }
 
