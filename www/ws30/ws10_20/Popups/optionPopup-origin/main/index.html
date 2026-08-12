@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <div class="op-shell">
+        <header class="op-header">
+            <button id="menuToggle" class="op-icon-button" type="button" data-opt-aria-msg-cls="ZMSG_WS_COMMON_001" data-opt-aria-msg-no="858" data-opt-title-msg-cls="ZMSG_WS_COMMON_001" data-opt-title-msg-no="858">
+                <span class="op-titlebar-icon" data-sap-icon="sap-icon://u4a-fw-solid/Bars"></span>
+            </button>
+            <div class="op-header__title" data-opt-msg-cls="/U4A/CL_WS_COMMON" data-opt-msg-no="B52"></div>
+            <div class="op-window-controls" aria-label="window controls">
+                <button id="windowMinimize" class="op-window-button op-window-button--minimize" type="button" data-opt-aria-msg-cls="ZMSG_WS_COMMON_001" data-opt-aria-msg-no="855" data-opt-title-msg-cls="ZMSG_WS_COMMON_001" data-opt-title-msg-no="855">
+                    <span class="op-window-icon" data-sap-icon="sap-icon://u4a-fw-regular/Window Minimize"></span>
+                </button>
+                <button id="windowMaximize" class="op-window-button op-window-button--maximize" type="button" data-opt-aria-msg-cls="ZMSG_WS_COMMON_001" data-opt-aria-msg-no="856" data-opt-title-msg-cls="ZMSG_WS_COMMON_001" data-opt-title-msg-no="856">
+                    <span class="op-window-icon" data-sap-icon="sap-icon://u4a-fw-regular/Window Maximize"></span>
+                </button>
+                <button id="windowClose" class="op-window-button op-window-button--close" type="button" data-opt-aria-msg-cls="ZMSG_WS_COMMON_001" data-opt-aria-msg-no="056" data-opt-title-msg-cls="ZMSG_WS_COMMON_001" data-opt-title-msg-no="056">
+                    <span class="op-window-icon" data-sap-icon="sap-icon://u4a-fw-solid/Xmark"></span>
+                </button>
+            </div>
+        </header>
+
+        <div class="op-body">
+            <nav id="menuList" class="op-menu" aria-label="option menu"></nav>
+            <main class="op-content">
+                <iframe id="optionContentFrame" title="option content" frameborder="0"></iframe>
+            </main>
+        </div>
+
+        <div id="busyOverlay" class="op-busy" aria-live="polite">
+            <div class="op-busy__indicator"></div>
+        </div>
+    </div>
+
+    <script src="../js/index.js"></script>
+    <script src="../common/util.js"></script>
+    <script src="../common/iconFont.js"></script>
+    <script src="../common/popup.js"></script>
+    <script src="index.js"></script>
+</body>
+
+</html>

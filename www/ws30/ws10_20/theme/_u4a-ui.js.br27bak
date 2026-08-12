@@ -1604,9 +1604,6 @@
                         return oLi;
                     },
                     getSelKey: function (item) { return _key(item.node); },
-                    // 재렌더 시 선택 강조를 <li> 껍데기가 아니라 안쪽 실제 행(.u4a-tree__row)에 붙인다(강조 CSS 대상과 일치).
-                    //   이게 없으면 선택 후 패널 표시·리사이즈로 재렌더될 때 강조가 사라진다(직접 선택은 findRow 가 행에 붙여 정상).
-                    selEl: function (oLi) { return oLi.querySelector(".u4a-tree__row") || oLi; },
                     makeSpacer: function () {
                         const li = document.createElement("li");
                         li.className = "u4aVSpacer"; li.setAttribute("aria-hidden", "true");
@@ -1672,9 +1669,6 @@
             const aSel = oUl.querySelectorAll('.u4a-tree__row[aria-selected="true"]');
             for (let i = 0; i < aSel.length; i++) { if (aSel[i] !== oRow) { aSel[i].removeAttribute("aria-selected"); } }
             if (oRow) { oRow.setAttribute("aria-selected", "true"); }
-            // ★ 가상 모드: 선택 키를 윈도잉 스크롤러에 반영 → 선택 행이 화면 밖으로 나갔다 다시 들어와도(재생성)
-            //   강조를 복원한다(buildRow 의 getSelKey 비교로 재적용). 비가상/스크롤러 미생성 시 무영향.
-            if (bVirtual && _vs) { _vs.setSel(sKey == null ? null : sKey); }
             return oRow;
         }
 
@@ -2161,11 +2155,7 @@
             for (let i = start; i < end; i++) {
                 const tr = opt.buildRow(aData[i], i);
                 if (selKey != null && opt.getSelKey && opt.getSelKey(aData[i]) === selKey) {
-                    // 선택 강조를 붙일 요소 — 기본은 buildRow 반환 요소(표=tr 그대로). 트리는 buildRow 가 <li> 껍데기를
-                    //   돌려주고 실제 강조 CSS 는 안쪽 .u4a-tree__row 대상이라, opt.selEl 로 그 안쪽 행을 지정한다.
-                    //   (미지정 소비처=표는 tr 그대로 → 하위호환. 이 보정 없으면 재렌더 시 강조가 <li> 로 붙어 사라짐.)
-                    const oSelEl = opt.selEl ? opt.selEl(tr) : tr;
-                    if (oSelEl) { oSelEl.setAttribute("aria-selected", "true"); }
+                    tr.setAttribute("aria-selected", "true");
                 }
                 frag.appendChild(tr);
             }

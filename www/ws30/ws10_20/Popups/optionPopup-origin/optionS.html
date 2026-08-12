@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+
+        .cl_theme_notice_text {
+            color: #f69607 !important;
+            font-size: 20px !important;
+
+        }
+    </style>
+
+</head>
+
+<body class="sapUiBody">
+
+    <div id="content"></div>
+
+    <script>
+
+        //UI5 생성 Object 그룹핑 
+        const oUI5 = {};
+
+        //APP 컨트롤 오브젝트 얻기  
+        var oAPP = parent.fn_getParent();
+
+
+        /************************************************************************
+         * 에러 감지
+         ************************************************************************/
+        var zconsole = parent.WSERR(window, document, console);
+        
+
+        /************************************************************************
+         * ws의 설정 정보를 구한다.
+         ************************************************************************/
+        function getSettingsInfo() {
+
+            let oAPP = parent.fn_getParent(),
+                PATH = oAPP.path,
+                PATHINFO = parent.PATHINFO,
+                APPPATH = oAPP.apppath;
+
+            // Browser Window option
+            var sSettingsJsonPath = PATHINFO.WSSETTINGS,
+
+                // JSON 파일 형식의 Setting 정보를 읽는다..
+                oSettings = parent.require(sSettingsJsonPath);
+            if (!oSettings) {
+                return;
+            }
+
+            return oSettings;
+
+        } // end of oAPP.fn.getSettingsInfo
+
+        /**************************************************
+         * BootStrap 로드
+         **************************************************/
+        function fnLoadBootStrapSetting() {
+
+            var oAPP = parent.fn_getParent(),
+                oSettings = getSettingsInfo(),
+                oSetting_UI5 = oSettings.UI5,     
+                oBootStrap = oSetting_UI5.bootstrap,
+                oUserInfo = oAPP.IF_DATA.oUserInfo,
+                sLangu = oUserInfo.LANGU,
+                oThemeInfo = oAPP.fn.getThemeInfo();
+
+            var oScript = document.createElement("script");
+            oScript.id = "sap-ui-bootstrap";
+
+            // 공통 속성 적용
+            for (const key in oBootStrap) {
+                oScript.setAttribute(key, oBootStrap[key]);
+            }
+
+            // 로그인 Language 적용
+            // oScript.setAttribute('data-sap-ui-theme', oAPP.IF_DATA.THEME_INFO.THEME);
+            oScript.setAttribute('data-sap-ui-theme', oThemeInfo.THEME);
+            oScript.setAttribute("data-sap-ui-language", sLangu);
+            oScript.setAttribute("data-sap-ui-libs", "sap.m, sap.ui.core, sap.tnt, sap.f");
+            oScript.setAttribute("src", oSetting_UI5.resourceUrl);           
+
+            document.head.appendChild(oScript);
+            oScript.addEventListener('load', gfn_BootstrapLoad);
+
+        } // end of fnLoadBootStrapSetting
+
+
+        //******************************************************************//
+        // 내부 사용 펑션 
+        //*****************************************************************// 
+
+        //화면 Loading Mode 설정 
+        function fn_WaitMode(a) {
+
+            zconsole.log("!!Busy: " + a);
+
+            oUI5.NVCNT.setBusy(a);
+            oUI5.NAVIGATIONLIST.setBusy(a);
+
+        }
+
+         /*******************************************************
+         * @function - Busy indicator 실행
+         *******************************************************/
+        oAPP.fn.setBusy = function(bIsBusy, sOption){
+
+            // 현재 Busy 실행 여부 플래그
+            oAPP.attr.isBusy = bIsBusy;
+
+            fn_WaitMode(bIsBusy);
+
+            // 브로드 캐스트 객체
+            var _ISBROAD = sOption?.ISBROAD || undefined;            
+
+            if(bIsBusy === true){
+
+                // 브라우저 닫기 버튼 비활성
+                oAPP.CURRWIN.closable = false;
+
+                //다른 팝업의 BUSY ON 요청 처리.                
+                if(typeof _ISBROAD === "undefined"){
+                    oAPP.broadToChild.postMessage({PRCCD:"BUSY_ON"});
+                } 
+
+                return;
+
+            }
+
+            // 브라우저 닫기 버튼 활성
+            oAPP.CURRWIN.closable = true;
+
+            //다른 팝업의 BUSY OFF 요청 처리.            
+            if(typeof _ISBROAD === "undefined"){
+                oAPP.broadToChild.postMessage({PRCCD:"BUSY_OFF"});
+            }
+
+
+        }; // end of oAPP.fn.setBusy
+
+
+        /*************************************************************
+         * @function - SYSID에 해당하는 테마 변경 IPC 이벤트
+         *************************************************************/
+        function _onIpcMain_if_p13n_themeChange(){ 
+
+            let oThemeInfo = oAPP.fn.getThemeInfo();
+            if(!oThemeInfo){
+                return;
+            }
+
+            let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
+            let oBrowserWindow = oAPP.REMOTE.getCurrentWindow();
+                oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+
+            sap.ui.getCore().applyTheme(oThemeInfo.THEME);
+
+            let oThemeSelect = oUI5?.oThemeSelect || undefined;
+            if(!oThemeSelect){
+                return;
+            }
+
+            oThemeSelect.setSelectedKey(oThemeInfo.THEME);
+
+            let oSelectedItem = oThemeSelect.getSelectedItem();
+
+            oThemeSelect.fireChange({ selectedItem: oSelectedItem });
+
+
+        } // end of _onIpcMain_if_p13n_themeChange        
+
+        /*************************************************************
+         * @function - IPC Event 등록
+         *************************************************************/
+        function _attachIpcEvents(){
+
+            let oUserInfo = parent.process.USERINFO;
+            let sSysID = oUserInfo.SYSID;
+
+            // SYSID에 해당하는 테마 변경 IPC 이벤트를 등록한다.
+            oAPP.IPCMAIN.on(`if-p13n-themeChange-${sSysID}`, _onIpcMain_if_p13n_themeChange); 
+
+        } // end of _attachIpcEvents
+
+        /*************************************************************
+         * @function - IPC Event 해제
+         *************************************************************/
+        function _detachIpcEvents(){
+
+            let oUserInfo = parent.process.USERINFO;
+            let sSysID = oUserInfo.SYSID;
+
+            // SYSID에 해당하는 테마 변경 IPC 이벤트를 등록한다.
+            oAPP.IPCMAIN.off(`if-p13n-themeChange-${sSysID}`, _onIpcMain_if_p13n_themeChange); 
+
+        } // end of _detachIpcEvents
+        
+
+        /**************************************************
+         * BroadCast Event 걸기
+         **************************************************/
+        function _attachBroadCastEvent(){
+
+            oAPP.broadToChild = new BroadcastChannel(`broadcast-to-child-window_${oAPP.BROWSKEY}`);        
+
+            oAPP.broadToChild.onmessage = function(oEvent){
+
+                var _PRCCD = oEvent?.data?.PRCCD || undefined;
+
+                if(typeof _PRCCD === "undefined"){
+                    return;
+                }
+
+                //프로세스에 따른 로직분기.
+                switch (_PRCCD) {
+                    case "BUSY_ON":
+
+                        //BUSY ON을 요청받은경우.
+                        // oAPP.fn.setBusyIndicator("X", {ISBROAD:true});
+
+                        oAPP.fn.setBusy(true, {ISBROAD:true});
+
+                        break;
+
+                    case "BUSY_OFF":
+                        //BUSY OFF를 요청 받은 경우.
+                        // oAPP.fn.setBusyIndicator("",  {ISBROAD:true});
+
+                        oAPP.fn.setBusy(false, {ISBROAD:true});
+
+                        break;
+
+                    default:
+                        break;
+                }
+
+            };
+
+        }
+
+        
+
+        //UI5 부트스트립 로드 script 
+        //oAPP.IF_DATA.THEME_INFO.THEME
+        //oAPP.IF_DATA.THEME_INFO.BGCOL
+
+        // oAPP.remote.getCurrentWindow().show();
+
+        // bootstrap setting
+        fnLoadBootStrapSetting();
+
+        function gfn_BootstrapLoad() {
+
+            // BroadCast Event 걸기
+            _attachBroadCastEvent();
+
+            sap.ui.getCore().attachInit(function () {
+
+                // IPC Event 등록
+                _attachIpcEvents();
+
+                //BASE DATA 추출 
+                oAPP.fs.readFile(oAPP.path.join(oAPP.__dirname, 'json/MenuList.json'), 'utf8', function (err, data) {
+                    if (err) {
+                        return console.error(err);
+                    }
+
+                    $('#content').fadeOut(0, 'swing');
+
+                    //Menu JSON
+                    let sMenuData = JSON.parse(data);
+
+                    // //******************************************************************//
+                    // // 내부 사용 펑션 
+                    // //*****************************************************************//  
+
+                    // //화면 Loading Mode 설정 
+                    // function fn_WaitMode(a) {
+
+                    //     zconsole.log("!!Busy: " + a);
+
+                    //     oUI5.NVCNT.setBusy(a);
+                    //     oUI5.NAVIGATIONLIST.setBusy(a);
+
+                    // }
+
+                    //******************************************************************//
+                    // Menu ui 생성
+                    //*****************************************************************//            
+
+                    //sap.ui.getCore().applyTheme(oAPP.IF_DATA.THEME_INFO.THEME);
+
+                    oUI5.APP = new sap.m.App().addStyleClass("sapUiSizeCompact");
+                    var PAGE = new sap.m.Page({
+                        showHeader: false,
+                        enableScrolling: false
+                    });
+                    oUI5.APP.addPage(PAGE);
+
+                    var TOOLPAGE = new sap.tnt.ToolPage({
+                        sideExpanded: false
+                    });
+                    PAGE.addContent(TOOLPAGE);
+
+                    //Model 생성 
+                    var oModel = new sap.ui.model.json.JSONModel();
+
+                    //*--------------------------------------------------//
+                    //MainContent 영역 
+                    //*--------------------------------------------------//
+                    oUI5.NVCNT = new sap.m.NavContainer({
+                        autoFocus: false,
+                        busyIndicatorDelay: 1
+                    });
+                    oUI5.SPAGE = new sap.m.Page({
+                        showHeader: false,
+                        enableScrolling: false
+                    });
+                    oUI5.NVCNT.addPage(oUI5.SPAGE);
+
+                    TOOLPAGE.addMainContent(oUI5.NVCNT);
+
+
+                    //*--------------------------------------------------//
+                    //Side 영역 
+                    //*--------------------------------------------------//
+                    var SIDENAVIGATION = new sap.tnt.SideNavigation();
+                    TOOLPAGE.setSideContent(SIDENAVIGATION);
+
+                    oUI5.NAVIGATIONLIST = new sap.tnt.NavigationList({
+                        busyIndicatorDelay: 1
+                    });
+                    SIDENAVIGATION.setItem(oUI5.NAVIGATIONLIST);
+
+
+                    //*--------------------------------------------------// 
+                    //SIDE 메뉴 생성 
+                    //*--------------------------------------------------//
+                    var oModel = new sap.ui.model.json.JSONModel();
+                    oUI5.NAVIGATIONLIST.setModel(oModel);
+                    var oNaviItem = new sap.tnt.NavigationListItem({
+                        text: {
+                            path: "DESC"
+                        },
+                        key: {
+                            path: "MCODE"
+                        },
+                        icon: {
+                            path: "ICON"
+                        },
+                        select: function (e) {
+
+                            //wait on
+                            // fn_WaitMode(true);
+                            oAPP.fn.setBusy(true);
+
+                            oUI5.NVCNT.removeAllPages();
+
+                            var sLine = e.oSource.getModel().mContexts[e.oSource.oBindingContexts.undefined.sPath].getProperty();
+                            var Lpath = oAPP.path.join(oAPP.__dirname, '/js/' + sLine.MCODE + '.js');
+                            jQuery.getScript(Lpath, function () {
+                                // fn_WaitMode(false); /*wait off*/
+                            });
+
+                        }
+                    }).bindProperty("text", "MCODE", function (MCODE) {
+
+                        switch (MCODE) {
+                            case "ThemeSetting":
+                                return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D22"); // Theme Setting
+
+                            case "CdnSetting":
+                                return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D19"); // CDN Setting
+
+                            case "LanguTrans":
+                                return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E17"); // Language Translate
+
+                            default:
+                                break;
+                        }
+
+                    });
+
+                    oUI5.NAVIGATIONLIST.bindAggregation('items', {
+                        path: "/AT_MENU",
+                        template: oNaviItem,
+                        templateShareable: true
+                    });
+
+                    oModel.setData(sMenuData);
+
+                    //*--------------------------------------------------//
+                    //메뉴 툴바 영역 구성 
+                    //*--------------------------------------------------//
+                    var TOOLHEADER = new sap.tnt.ToolHeader();
+                    TOOLPAGE.setHeader(TOOLHEADER);
+
+
+                    //*--------------------------------------------------//
+                    //좌측 메뉴버튼 (SIDE 메뉴 영역 활성/비활성)
+                    //*--------------------------------------------------//
+                    var oBtMenu = new sap.m.Button({
+                        icon: "sap-icon://menu2",
+                        type: "Transparent",
+                        press: function (e) {
+                            if (TOOLPAGE.getSideExpanded()) {
+                                TOOLPAGE.setSideExpanded(false);
+
+                            } else {
+                                TOOLPAGE.setSideExpanded(true);
+                            }
+
+                        }
+                    });
+
+                    TOOLHEADER.addContent(oBtMenu);
+                    
+                    TOOLHEADER.addContent(new sap.m.ToolbarSpacer());
+
+                    let oIcon1 = new sap.ui.core.Icon({
+                        src: "sap-icon://action-settings",
+                        width: "25px"
+                    });
+                    TOOLHEADER.addContent(oIcon1);
+
+                    let oTitle1 = new sap.m.Title({
+                        text: oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B52") // Options
+                    });
+
+                    TOOLHEADER.addContent(oTitle1);
+
+                    TOOLHEADER.addContent(new sap.m.ToolbarSpacer());
+
+                    oUI5.APP.placeAt("content");
+
+                    // //window 활성 
+                    // oAPP.remote.getCurrentWindow().show();
+
+                    //content 활성 
+                    $('#content').fadeIn(300);
+                    
+                    oAPP.fn.setBusy(true);
+
+                    let oDelegate = {
+                        onAfterRendering : function(){
+                    
+                            oUI5.APP.removeEventDelegate(oDelegate);
+
+                            oAPP.CURRWIN.show();
+
+                            oAPP.WSUTIL.setBrowserOpacity(oAPP.CURRWIN); 
+
+                            oAPP.fn.setBusy(false);
+                    
+                            // 화면이 다 그려지고 난 후 메인 영역 Busy 끄기
+                            oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); 
+                    
+                        }
+                    };
+                    
+                    oUI5.APP.addEventDelegate(oDelegate);
+
+
+                }); //[END] BASE DATA 추출 
+
+            });
+
+        }
+
+
+        parent.window.addEventListener('pagehide', function(){
+           
+            // IPC Event 해제
+            _detachIpcEvents();
+
+        });
+
+    </script>
+
+
+</body>
+
+</html>

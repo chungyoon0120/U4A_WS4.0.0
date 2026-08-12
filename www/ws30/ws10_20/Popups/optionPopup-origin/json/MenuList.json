@@ -1,0 +1,16 @@
+{
+    "AT_MENU": [
+        {
+            "MCODE": "theme",
+            "DESC": "",
+            "DESC_KEY": "THEME_SETTINGS",
+            "ICON": "TH"
+        },
+        {
+            "MCODE": "selectionEffect",
+            "DESC": "",
+            "DESC_KEY": "SELECTION_EFFECT_MENU",
+            "ICON": "SE"
+        }
+    ]
+}

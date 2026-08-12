@@ -371,23 +371,92 @@ def get_page(workspace: str, page_id: str) -> str:
     return "\n".join(out)
 
 
+def wrap_property_value(prop_type: str, value):
+    """속성 타입에 맞게 원시 값(문자열/숫자/불리언/리스트)을 노션 갱신 형식으로 감싼다.
+    이미 dict(노션 형식)면 그대로 반환. 알 수 없는 타입은 그대로 둔다.
+    """
+    if isinstance(value, dict):
+        return value  # 이미 노션 형식으로 넘긴 경우 그대로 사용.
+
+    if prop_type in ("title", "rich_text"):
+        return {prop_type: [{"type": "text", "text": {"content": str(value)}}]}
+    if prop_type == "select":
+        return {"select": {"name": str(value)}}
+    if prop_type == "status":
+        return {"status": {"name": str(value)}}
+    if prop_type == "multi_select":
+        names = value if isinstance(value, list) else [
+            s.strip() for s in str(value).split(",") if s.strip()
+        ]
+        return {"multi_select": [{"name": str(n)} for n in names]}
+    if prop_type == "number":
+        try:
+            return {"number": float(value)}
+        except (TypeError, ValueError):
+            return {"number": None}
+    if prop_type == "checkbox":
+        return {"checkbox": bool(value) if isinstance(value, bool) else str(value).lower() in ("x", "true", "1", "yes", "y")}
+    if prop_type in ("url", "email", "phone_number"):
+        return {prop_type: str(value)}
+    if prop_type == "date":
+        return {"date": {"start": str(value)}}
+    # 알 수 없는 타입: 값을 그대로 넘겨 노션이 판정하게 둔다(원시값이면 실패할 수 있음).
+    return value
+
+
 @mcp.tool()
 def update_page_properties(workspace: str, page_id: str, properties: dict) -> str:
-    """페이지(또는 DB 행)의 속성을 수정한다. properties 는 노션 속성 갱신 형식(dict).
+    """페이지(또는 DB 행)의 속성을 수정한다.
 
-    예) 제목 바꾸기: {"이름": {"title": [{"type":"text","text":{"content":"새 제목"}}]}}
-        선택값 바꾸기: {"상태": {"select": {"name": "완료"}}}
+    ★ 값은 두 가지로 줄 수 있다:
+      (1) 그냥 값만 — 권장. 속성의 실제 타입(status/select/title/number/checkbox 등)을
+          서버가 자동으로 읽어 맞는 형식으로 감싼다. 타입을 몰라도 된다.
+          예) {"상태": "수정완료"}   {"이름": "새 제목"}   {"진행률": 80}
+              여러 선택(multi_select): {"태그": ["a","b"]} 또는 {"태그": "a, b"}
+      (2) 노션 원형 형식(dict) — 그대로 전달한다(하위호환).
+          예) {"상태": {"status": {"name": "수정완료"}}}
+              {"이름": {"title": [{"type":"text","text":{"content":"새 제목"}}]}}
+
+    ※ "상태" 처럼 워크플로 칸은 대개 status 타입이라 {"select":...} 가 아니라 {"status":...} 이어야
+      하는데, (1) 방식을 쓰면 서버가 알아서 처리하므로 신경 쓸 필요 없다.
 
     workspace: 워크스페이스명
     page_id: 대상 페이지/행 id
-    properties: 갱신할 속성(dict)
+    properties: 갱신할 속성(dict) — 값은 원시값 또는 노션 형식.
     """
     token = get_token(workspace)
+
+    # 원시값(비-dict)이 하나라도 있으면 실제 속성 타입을 읽어 자동 변환.
+    need_schema = any(not isinstance(v, dict) for v in properties.values())
+    schema_types = {}
+    if need_schema:
+        st, page = notion_request("GET", f"/pages/{page_id}", token)
+        if st != 200:
+            return f"[HTTP {st}] 속성 타입 조회 실패(자동 변환용): {json.dumps(page, ensure_ascii=False)}"
+        for name, v in (page.get("properties", {}) or {}).items():
+            schema_types[name] = v.get("type")
+
+    body_props = {}
+    unknown = []
+    for name, value in properties.items():
+        if isinstance(value, dict):
+            body_props[name] = value
+            continue
+        ptype = schema_types.get(name)
+        if not ptype:
+            unknown.append(name)
+            body_props[name] = value  # 타입 못 찾음 — 원시값 그대로(노션이 판정/거부).
+            continue
+        body_props[name] = wrap_property_value(ptype, value)
+
     status, data = notion_request(
-        "PATCH", f"/pages/{page_id}", token, {"properties": properties}
+        "PATCH", f"/pages/{page_id}", token, {"properties": body_props}
     )
     if status != 200:
-        return f"[HTTP {status}] 속성 수정 실패: {json.dumps(data, ensure_ascii=False)}"
+        hint = ""
+        if unknown:
+            hint = f" (경고: 속성 {unknown} 은 대상 페이지에 없어 타입 자동변환 못 함 — 속성명을 확인)"
+        return f"[HTTP {status}] 속성 수정 실패: {json.dumps(data, ensure_ascii=False)}{hint}"
     return f"[HTTP 200] 속성 수정 성공 (page_id={page_id})"
 
 

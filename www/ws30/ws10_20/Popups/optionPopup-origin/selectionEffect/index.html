@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <section class="se-page">
+        <div class="se-layout">
+            <aside class="se-settings">
+                <header class="se-panel-title">
+                    <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="823"></span>
+                </header>
+
+                <div class="se-scroll">
+                    <section class="se-control-group se-control-group--basic">
+                        <h2 class="se-control-group__title" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="825"></h2>
+
+                        <label class="se-field">
+                            <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="175" data-opt-suffix=":"></span>
+                            <select id="effectTypeSelect"></select>
+                        </label>
+
+                        <label class="se-field se-field--preset">
+                            <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="829" data-opt-suffix=":"></span>
+                            <div class="se-field-inline">
+                                <select id="presetSelect"></select>
+                                <button id="renamePresetButton" class="se-icon-action" type="button" disabled>
+                                    <span data-sap-icon="sap-icon://u4a-fw-solid/Pen"></span>
+                                </button>
+                            </div>
+                        </label>
+                    </section>
+
+                    <section class="se-control-group">
+                        <div class="se-control-group__header">
+                            <h2 class="se-control-group__title" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="826"></h2>
+                            <button id="resetColorButton" class="se-reset-button" type="button">
+                                <span class="se-reset-button__icon" data-sap-icon="sap-icon://u4a-fw-solid/Arrow Rotate Left"></span>
+                                <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="830"></span>
+                            </button>
+                        </div>
+
+                        <div class="se-color-panels">
+                            <section class="se-color-panel">
+                                <div class="se-group__head">
+                                    <h3 data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="831"></h3>
+                                    <button class="se-palette-button" type="button" data-palette="border" data-opt-aria-msg-cls="ZMSG_WS_COMMON_001" data-opt-aria-msg-no="870" data-opt-title-msg-cls="ZMSG_WS_COMMON_001" data-opt-title-msg-no="870">
+                                        <span data-sap-icon="sap-icon://u4a-fw-solid/Eye Dropper"></span>
+                                    </button>
+                                    <button class="se-panel-reset-button" type="button" data-reset-group="border">
+                                        <span data-sap-icon="sap-icon://u4a-fw-solid/Arrow Rotate Left"></span>
+                                        <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="830"></span>
+                                    </button>
+                                </div>
+
+                                <div class="se-slider-row">
+                                    <label for="borderR" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="710" data-opt-suffix=":"></label>
+                                    <input id="borderR" type="range" min="0" max="255" data-field="BORDER_R">
+                                    <output data-output="BORDER_R"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="borderG" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="713" data-opt-suffix=":"></label>
+                                    <input id="borderG" type="range" min="0" max="255" data-field="BORDER_G">
+                                    <output data-output="BORDER_G"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="borderB" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="714" data-opt-suffix=":"></label>
+                                    <input id="borderB" type="range" min="0" max="255" data-field="BORDER_B">
+                                    <output data-output="BORDER_B"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="borderA" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="717" data-opt-suffix=":"></label>
+                                    <input id="borderA" type="range" min="0" max="100" data-field="BORDER_A" data-suffix="%">
+                                    <output data-output="BORDER_A"></output>
+                                </div>
+
+                                <div class="se-switch">
+                                    <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="834" data-opt-suffix=":"></span>
+                                    <span class="se-switch__control">
+                                        <input id="borderNeon" type="checkbox">
+                                        <label class="se-switch__track" for="borderNeon" aria-hidden="true"></label>
+                                    </span>
+                                </div>
+                            </section>
+
+                            <section class="se-color-panel">
+                                <div class="se-group__head">
+                                    <h3 data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="832"></h3>
+                                    <button class="se-palette-button" type="button" data-palette="fill" data-opt-aria-msg-cls="ZMSG_WS_COMMON_001" data-opt-aria-msg-no="871" data-opt-title-msg-cls="ZMSG_WS_COMMON_001" data-opt-title-msg-no="871">
+                                        <span data-sap-icon="sap-icon://u4a-fw-solid/Eye Dropper"></span>
+                                    </button>
+                                    <button class="se-panel-reset-button" type="button" data-reset-group="fill">
+                                        <span data-sap-icon="sap-icon://u4a-fw-solid/Arrow Rotate Left"></span>
+                                        <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="830"></span>
+                                    </button>
+                                </div>
+
+                                <div class="se-slider-row">
+                                    <label for="fillR" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="710" data-opt-suffix=":"></label>
+                                    <input id="fillR" type="range" min="0" max="255" data-field="FILL_R">
+                                    <output data-output="FILL_R"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="fillG" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="713" data-opt-suffix=":"></label>
+                                    <input id="fillG" type="range" min="0" max="255" data-field="FILL_G">
+                                    <output data-output="FILL_G"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="fillB" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="714" data-opt-suffix=":"></label>
+                                    <input id="fillB" type="range" min="0" max="255" data-field="FILL_B">
+                                    <output data-output="FILL_B"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="fillA" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="717" data-opt-suffix=":"></label>
+                                    <input id="fillA" type="range" min="0" max="100" data-field="FILL_A" data-suffix="%">
+                                    <output data-output="FILL_A"></output>
+                                </div>
+                            </section>
+
+                            <section class="se-color-panel">
+                                <div class="se-group__head">
+                                    <h3 data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="833"></h3>
+                                    <button class="se-palette-button" type="button" data-palette="stripe" data-opt-aria-msg-cls="ZMSG_WS_COMMON_001" data-opt-aria-msg-no="872" data-opt-title-msg-cls="ZMSG_WS_COMMON_001" data-opt-title-msg-no="872">
+                                        <span data-sap-icon="sap-icon://u4a-fw-solid/Eye Dropper"></span>
+                                    </button>
+                                    <button class="se-panel-reset-button" type="button" data-reset-group="stripe">
+                                        <span data-sap-icon="sap-icon://u4a-fw-solid/Arrow Rotate Left"></span>
+                                        <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="830"></span>
+                                    </button>
+                                </div>
+
+                                <div class="se-slider-row">
+                                    <label for="stripeR" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="710" data-opt-suffix=":"></label>
+                                    <input id="stripeR" type="range" min="0" max="255" data-field="STRIPE_R">
+                                    <output data-output="STRIPE_R"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="stripeG" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="713" data-opt-suffix=":"></label>
+                                    <input id="stripeG" type="range" min="0" max="255" data-field="STRIPE_G">
+                                    <output data-output="STRIPE_G"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="stripeB" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="714" data-opt-suffix=":"></label>
+                                    <input id="stripeB" type="range" min="0" max="255" data-field="STRIPE_B">
+                                    <output data-output="STRIPE_B"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="stripeA" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="717" data-opt-suffix=":"></label>
+                                    <input id="stripeA" type="range" min="0" max="100" data-field="STRIPE_A" data-suffix="%">
+                                    <output data-output="STRIPE_A"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="stripeAngle" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="835" data-opt-suffix=":"></label>
+                                    <input id="stripeAngle" type="range" min="0" max="180" data-field="STRIPE_ANGLE" data-suffix="deg">
+                                    <output data-output="STRIPE_ANGLE"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="stripeGap" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="836" data-opt-suffix=":"></label>
+                                    <input id="stripeGap" type="range" min="1" max="96" data-field="STRIPE_GAP" data-suffix="px">
+                                    <output data-output="STRIPE_GAP"></output>
+                                </div>
+                                <div class="se-slider-row">
+                                    <label for="stripeWidth" data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="837" data-opt-suffix=":"></label>
+                                    <input id="stripeWidth" type="range" min="1" max="48" data-field="STRIPE_WIDTH" data-suffix="px">
+                                    <output data-output="STRIPE_WIDTH"></output>
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+                </div>
+
+            </aside>
+
+            <div id="selectionSplitter" class="se-splitter" role="separator" tabindex="0" aria-orientation="vertical" data-opt-aria-msg-cls="ZMSG_WS_COMMON_001" data-opt-aria-msg-no="874" data-opt-title-msg-cls="ZMSG_WS_COMMON_001" data-opt-title-msg-no="874">
+                <span class="se-splitter__icon" data-sap-icon="sap-icon://u4a-fw-solid/Grip Vertical"></span>
+            </div>
+
+            <section class="se-preview-pane">
+                <header class="se-panel-title">
+                    <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="824"></span>
+                    <button id="previewHelpButton" class="opt-help-button" type="button" data-opt-aria-msg-cls="ZMSG_WS_COMMON_001" data-opt-aria-msg-no="877" data-opt-title-msg-cls="ZMSG_WS_COMMON_001" data-opt-title-msg-no="877">
+                        <span data-sap-icon="sap-icon://u4a-fw-regular/Circle Question"></span>
+                    </button>
+                </header>
+                <div class="se-preview-stage">
+                    <div id="previewTarget" class="se-preview-target">
+                        <div class="se-preview-card">
+                            <div class="se-preview-card__header">
+                                <strong>test header</strong>
+                                <span>test value</span>
+                            </div>
+                            <div class="se-preview-card__row">
+                                <button class="se-preview-test-button" type="button">test Button</button>
+                            </div>
+                            <div class="se-preview-card__body"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer class="se-actions">
+            <button id="applyButton" class="se-action se-action--primary" type="button">
+                <span class="se-action__icon" data-sap-icon="sap-icon://u4a-fw-solid/Check"></span>
+                <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="232"></span>
+            </button>
+            <button id="deleteButton" class="se-action se-action--danger" type="button">
+                <span class="se-action__icon" data-sap-icon="sap-icon://u4a-fw-regular/Trash Can"></span>
+                <span data-opt-msg-cls="ZMSG_WS_COMMON_001" data-opt-msg-no="029"></span>
+            </button>
+        </footer>
+    </section>
+
+    <script src="../common/util.js"></script>
+    <script src="../common/iconFont.js"></script>
+    <script src="../common/popup.js"></script>
+    <script src="../common/colorPalette.js"></script>
+    <script src="../common/db.js"></script>
+    <script src="index.js"></script>
+</body>
+
+</html>

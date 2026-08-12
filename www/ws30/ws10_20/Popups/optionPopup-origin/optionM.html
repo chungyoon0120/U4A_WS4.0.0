@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title></title>
+
+    <style>
+
+
+    </style>
+
+</head>
+
+<body style="margin:0px;padding:0px;overflow:hidden">
+
+    <iframe id="mainFRAME" src="" frameborder="0"
+        style="overflow:hidden;overflow-x:hidden;overflow-y:hidden;height:100%;width:100%;position:absolute;top:0px;left:0px;right:0px;bottom:0px; display:none;">
+    </iframe>
+
+    <script>
+        /************************************************************************
+         * 에러 감지
+         ************************************************************************/
+        var REMOTE = require('@electron/remote'),
+            PATH = REMOTE.require('path'),
+            APP = REMOTE.app,
+            APPPATH = APP.getAppPath(),
+            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
+            PATHINFO = require(PATHINFOURL),
+            WSUTIL = parent.require(PATHINFO.WSUTIL),
+            WSERR = require(PATHINFO.WSTRYCATCH);
+
+        var zconsole = WSERR(window, document, console);
+    </script>
+
+    <script src="js/index.js"></script>
+
+</body>
+
+</html>

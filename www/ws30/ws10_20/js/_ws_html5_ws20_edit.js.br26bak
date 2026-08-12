@@ -340,25 +340,6 @@
     }
 
     /********************************************************************
-     * [BR26] 삭제 노드의 하위 UI 를 oAPP.attr.prev 에서 재귀 제거.
-     *   원본 designUIDelete 의 lf_deleteTreeLine 재귀부 1:1(uiDesignArea.js:6634~6669):
-     *   자식 먼저 재귀 후 delete oAPP.attr.prev[OBJID] + 미리보기 예외(UA015) 정리.
-     *   화면·미리보기는 부모 UI5 control 의 .destroy() 로 자식까지 지워지나(BR26 보고 = 화면 정상),
-     *   oAPP.attr.prev 맵에는 자식 OBJID(및 그 안의 _T_0015)가 남아 화면과 내부 상태가 어긋났다.
-     *   ★단건 삭제(designUIDelete) 전용★ — 멀티(체크) 삭제는 체크된 노드별로 개별 처리(원본 lf_delSelLine 1:1).
-     ********************************************************************/
-    function _purgePrevSubtree(n) {
-        if (!n || !n.zTREE) { return; }
-        for (var i = 0; i < n.zTREE.length; i++) {
-            var c = n.zTREE[i];
-            _purgePrevSubtree(c);   // 자식 먼저(원본 6639~6645 재귀)
-            try { if (oAPP.attr.prev) { delete oAPP.attr.prev[c.OBJID]; } } catch (e) { }   // 원본 6663
-            // 미리보기 예외처리 대상 UI(UA015)가 삭제되는 하위 UI면 정보 제거(원본 6666~6669).
-            try { if (oAPP.attr && oAPP.attr.UA015UI && oAPP.attr.UA015UI._OBJID === c.OBJID) { delete oAPP.attr.UA015UI; } } catch (e) { }
-        }
-    }
-
-    /********************************************************************
      * 삭제 (구 designUIDelete) — 확인 후 부모 zTREE 에서 노드 제거.
      ********************************************************************/
     function _deleteUI(oNode) {
@@ -390,8 +371,6 @@
             oAPP.fn.fnWs20PushUndo();
             // 미리보기 제거(가드, 시그니처 1:1)
             _removeNodePreview(oNode);
-            // [BR26] 하위 UI 를 oAPP.attr.prev 에서 재귀 제거(원본 재귀 삭제 1:1). 최상위는 _removeNodePreview 가 이미 제거.
-            _purgePrevSubtree(oNode);
             // 부모 배열에서 제거
             var idx = oParent.zTREE.findIndex(function (a) { return a.OBJID === oNode.OBJID; });
             if (idx !== -1) { oParent.zTREE.splice(idx, 1); }
@@ -555,10 +534,6 @@
                         del(n.zTREE);                 // 자식 먼저
                         if (n.chk !== true) { continue; }
                         _removeNodePreview(n);
-                        // [BR26] 체크된 노드가 부모면 그 아래 남은 하위 UI 도 화면에서 함께 사라지므로
-                        //   oAPP.attr.prev 를 재귀 정리(단건 삭제와 동일 논리). 정상 조작에선 체크 전파로
-                        //   하위도 chk===true 라 개별 처리되어 no-op, 그 밖의 경우만 잔존 방지.
-                        _purgePrevSubtree(n);
                         arr.splice(i, 1);
                     }
                 })(_tree());

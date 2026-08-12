@@ -963,10 +963,6 @@
   function lf_renderTree() {
     if (!oUI.ctrl) {
       oUI.ctrl = U4AUI.makeColumnTree(oUI.treeHost, {
-        // ★ BR27: 화면에 보이는 만큼만 그리기(virtual) — 원본 sap.ui.table.TreeTable 이 본래 보이는 행만
-        //   렌더(가상)였는데 HTML5 변환 때 전 행을 DOM 에 그려 대용량 시 느려졌다. 공통 컴포넌트가 이미
-        //   지원하는 옵션을 켜 원본 동작으로 복원(USP/MIME 트리와 동일 경로). 세로 그리드/행높이는 공통이 실측.
-        virtual: true,
         columns: [
           { label: _cl("A50"), width: "16rem" },   // A50 Object Name
           { label: _cl("A51"), width: "8rem" },     // A51 Type
@@ -1018,9 +1014,10 @@
     if (n.enable !== true) {
       oS.selNode = null;
       lf_showAddit(false);
-      // 선택 해제 — 공통 selectByKey(null) 로 통일: 가상 모드에선 화면 밖 이전 선택까지 스크롤러에서 해제해
-      //   되돌아와도 옛 강조가 살아나지 않게 한다(비가상은 기존과 동일하게 보이는 행 강조만 해제).
-      if (oUI.tree) { oUI.tree.selectByKey(null, false); }
+      if (oUI.tree) {
+        var aSel = oUI.tree.el.querySelectorAll('.u4a-tree__row[aria-selected="true"]');
+        for (var i = 0; i < aSel.length; i++) { aSel[i].removeAttribute("aria-selected"); }
+      }
       return;
     }
 
