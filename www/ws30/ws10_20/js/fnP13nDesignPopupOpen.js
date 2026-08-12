@@ -688,8 +688,29 @@
         window.addEventListener("resize", lf_clampSplit);
         try { oUI.ro = new ResizeObserver(function () { lf_clampSplit(); }); oUI.ro.observe(oBody); } catch (e) { }
 
-        if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
+        // 헤더 더블클릭 = 가운데 복귀. ★공통 makeDialogRecenter 는 인라인 위치를 비워 CSS 기본
+        //   (position:fixed; inset:0; margin:auto = 뷰포트 전체 중앙)으로 되돌리는데, 이 팝업은 부모 창
+        //   제목표시줄(.u4a-titlebar) 아래에서만 움직여야 하므로 그 방식은 제목표시줄을 침범한다.
+        //   또 전체창 상태에선 가운데 이동 자체가 무의미하다. → 자체 처리(공통 파일 미수정):
+        //   ① 전체창이면 스킵. ② 제목표시줄 하단 ~ 뷰포트 끝 영역 기준으로 중앙 배치(제목표시줄 미침범).
+        oHeader.addEventListener("dblclick", function (e) {
+            if (e && e.target && e.target.closest("button")) { return; }   // 헤더 버튼 더블클릭 제외(공통과 동일 가드)
+            if (oS.fullSize) { return; }                                    // 전체창 → 가운데 복귀 안 함
+            var iTop = lf_topChromeBottom();                                // 제목표시줄 하단 y(최대화와 동일 기준)
+            var r = oDlg.getBoundingClientRect();
+            var left = Math.max(0, Math.round((window.innerWidth - r.width) / 2));
+            var top = iTop + Math.max(0, Math.round((window.innerHeight - iTop - r.height) / 2));
+            oDlg.style.position = "fixed"; oDlg.style.margin = "0";
+            oDlg.style.left = left + "px"; oDlg.style.top = top + "px";
+        });
         if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 720, minH: 460 }); }
+        // ★전체창 상태에서 우하단 grip 을 누르면 즉시 전체창을 해제한다 — 단 크기는 "현재 실제 픽셀"로
+        //   고정(전체창 크기 그대로)하고, 화면에 붙이던 규칙(inset 오른쪽·아래 0)·상대단위(100vw)·최대치 제한을
+        //   전부 실측 px 로 박제한다(lf_exitFullState). 그래서 ⓐ "누르기만" 하면 크기가 안 변하고(=현재 px),
+        //   ⓑ 끌면 그 px 기준으로 자연스럽게 리사이즈된다. (상대단위+inset 이 남아 브라우저가 위치·크기를
+        //   재계산하며 확 튀던 문제 제거.) 공통 makeDialogResizable 은 fullSize 를 모르므로 여기서만 얹는다.
+        var oGrip = oDlg.querySelector(".u4a-dialog__resize");
+        if (oGrip) { oGrip.addEventListener("mousedown", function () { lf_exitFullState(); }); }
 
         document.body.appendChild(oDlg);
         oUI.dlg = oDlg;
@@ -1038,6 +1059,28 @@
         d.style.maxHeight = (window.innerHeight - iTop) + "px";
     }
 
+    // 전체창 "상태"만 해제(크기·위치는 호출측이 정함) — grip 리사이즈처럼 사용자가 직접 크기를 바꾸면
+    //   더 이상 전체창이 아니므로 아이콘=최대화로 되돌리고 창 추종·최대치 제한을 푼다.
+    function lf_exitFullState() {
+        if (!oS.fullSize) { return; }
+        oS.fullSize = false;
+        if (oUI && oUI.btnFull) { oUI.btnFull.innerHTML = _fa("expand"); }
+        try { window.removeEventListener("resize", lf_onWinResizeFull); } catch (e) { }
+        // ★크기·위치를 "현재 실제 픽셀"로 박제 + 화면에 붙이던 규칙(inset 오른쪽·아래)·최대치 제한 해제.
+        //   전체창의 상대단위(100vw)·inset:0 이 남아 리사이즈 시 위치·크기가 재계산되며 확 튀는 것을 막는다.
+        if (oUI && oUI.dlg) {
+            var d = oUI.dlg, r = d.getBoundingClientRect();
+            d.style.position = "fixed"; d.style.margin = "0";
+            d.style.left = Math.round(r.left) + "px"; d.style.top = Math.round(r.top) + "px";
+            d.style.right = "auto"; d.style.bottom = "auto";
+            d.style.width = Math.round(r.width) + "px"; d.style.height = Math.round(r.height) + "px";
+            // ★공통 .u4a-dialog 의 max-width:92vw / max-height:92vh 를 "none" 으로 무력화한다(shell.css:1142).
+            //   "" 로 비우면 전체창용 인라인 제한(100vw)이 사라지며 공통 92vw 가 되살아나 팝업 폭이 그 크기로
+            //   확 줄어든다(CDP 실측: 전체창 1293 → maxWidth 비움 시 1190=92vw). none 이면 현재 실측 px 유지.
+            d.style.maxWidth = "none"; d.style.maxHeight = "none";
+        }
+    }
+
     // 창 리사이즈 추종 — 최대화 상태면 새 창 크기로 다시 채운다(px 고정이 안 따라오는 문제 해결).
     function lf_onWinResizeFull() {
         if (oS.fullSize && oUI && oUI.dlg && oUI.dlg.open) { lf_applyMaxSize(); }
@@ -1049,12 +1092,13 @@
         if (!oUI.dlg) { return; }
         var d = oUI.dlg;
         if (oS.fullSize) {
-            oS.fullSize = false;
-            oUI.btnFull.innerHTML = _fa("expand");
-            window.removeEventListener("resize", lf_onWinResizeFull);
-            // 인라인 최대화 스타일 해제 → CSS 기본(중앙 배치) 복귀.
+            // 전체창 버튼으로 해제 → 상태 해제(공통) + 크기·위치도 CSS 기본(중앙)으로 복귀.
+            //   (grip 리사이즈 해제와 달리 버튼 해제는 크기까지 리셋해 원래 중앙 크기로 돌아간다.)
+            lf_exitFullState();
             d.style.position = ""; d.style.margin = ""; d.style.left = ""; d.style.top = "";
-            d.style.width = ""; d.style.height = ""; d.style.maxWidth = ""; d.style.maxHeight = "";
+            d.style.right = ""; d.style.bottom = "";   // 실측 박제 때 넣은 auto 도 비워 CSS 기본(inset:0+margin:auto 중앙) 복원
+            d.style.width = ""; d.style.height = "";
+            d.style.maxWidth = ""; d.style.maxHeight = "";   // exitFullState 가 넣은 none 도 비워 공통 92vw/92vh 복원(중앙 크기)
         } else {
             oS.fullSize = true;
             oUI.btnFull.innerHTML = _fa("compress");
@@ -1071,41 +1115,49 @@
      * 7. 트리 / 리스트 렌더 (공통 createTree / .u4a-table)
      * ==================================================================== */
 
-    // 우측 디자인 트리 렌더(공통 U4AUI.createTree).
+    // 우측 디자인 트리 렌더(공통 U4AUI.createTree, 가상 스크롤).
     function lf_renderTree() {
         if (!oUI.treeWrap) { return; }
-        oUI.treeWrap.innerHTML = "";
-        oUI.tree = U4AUI.createTree({
-            roots: function () { return oS.zTREE || []; },
-            children: function (n) { return n.zTREE || []; },
-            hasChildren: function (n) { return !!(n.zTREE && n.zTREE.length); },
-            key: function (n) { return n.OBJID; },
-            label: function (n) { return n.OBJID; },
-            tip: function (n) { return n.OBJID; },
-            selectable: false,
-            // UI 아이콘 — WS20 트리와 동일(.gif OS경로 → file:// URL, sap-icon:// 등은 제외).
-            icon: function (n) {
-                var src = _uiconSrc(n && n.UICON);
-                if (!src) { return ""; }
-                return '<img class="u4aWs20TreeIcon" src="' + _esc(src) + '" alt="" onerror="this.style.display=\'none\'">';
-            },
-            // aggregation 라벨 — WS20 트리와 동일(sap-icon:// → FA 클래스 + UIATT 텍스트, img 아님).
-            slotTrailing: function (n) {
-                if (!n.UIATT) { return null; }
-                var RIGHT = _el("span", "u4aWs20TreeRowRight");
-                var AGGR = _el("span", "u4aWs20TreeAggr");
-                var sCls = _aggrIconClass(n.UIATT_ICON);
-                if (sCls) { AGGR.appendChild(_el("i", "u4aWs20TreeAggrIcon " + sCls)); }
-                AGGR.appendChild(_el("span", null, n.UIATT));
-                RIGHT.appendChild(AGGR);
-                return RIGHT;
-            },
-            // WS20 트리와 동일 행 클래스 — 라벨 flex:1(남는 폭 채움)로 aggregation 우측 정렬.
-            rowHook: function (oRow) { oRow.classList.add("u4aWs20TreeRow"); }
-        });
-        oUI.tree.el.classList.add("u4aWs20Tree");
-        oUI.tree.el.classList.add("u4aP13nTree");
-        oUI.treeWrap.appendChild(oUI.tree.el);
+        // ★트리 컨트롤러는 팝업당 1회만 생성한다 — 가상 스크롤(makeVScroller)이 스크롤 컨테이너에
+        //   휠/리사이즈 처리를 붙이는데, 매번 createTree 를 새로 만들면 같은 컨테이너에 중복 부착된다.
+        //   WS20 디자인 트리와 동일 패턴(생성 1회 + 재렌더 재사용). 데이터(oS.zTREE) 갱신은 아래
+        //   collapseAll/expandToLevel 이 재렌더를 트리거해 반영(roots 콜백이 항상 최신 oS.zTREE 참조).
+        if (!oUI.tree) {
+            oUI.tree = U4AUI.createTree({
+                // 대용량(수만 노드) 트리 대비 — 보이는 행만 DOM 으로 그리는 가상 스크롤(WS20 트리와 동일).
+                virtual: true,
+                roots: function () { return oS.zTREE || []; },
+                children: function (n) { return n.zTREE || []; },
+                hasChildren: function (n) { return !!(n.zTREE && n.zTREE.length); },
+                key: function (n) { return n.OBJID; },
+                label: function (n) { return n.OBJID; },
+                tip: function (n) { return n.OBJID; },
+                selectable: false,
+                // UI 아이콘 — WS20 트리와 동일(.gif OS경로 → file:// URL, sap-icon:// 등은 제외).
+                icon: function (n) {
+                    var src = _uiconSrc(n && n.UICON);
+                    if (!src) { return ""; }
+                    return '<img class="u4aWs20TreeIcon" src="' + _esc(src) + '" alt="" onerror="this.style.display=\'none\'">';
+                },
+                // aggregation 라벨 — WS20 트리와 동일(sap-icon:// → FA 클래스 + UIATT 텍스트, img 아님).
+                slotTrailing: function (n) {
+                    if (!n.UIATT) { return null; }
+                    var RIGHT = _el("span", "u4aWs20TreeRowRight");
+                    var AGGR = _el("span", "u4aWs20TreeAggr");
+                    var sCls = _aggrIconClass(n.UIATT_ICON);
+                    if (sCls) { AGGR.appendChild(_el("i", "u4aWs20TreeAggrIcon " + sCls)); }
+                    AGGR.appendChild(_el("span", null, n.UIATT));
+                    RIGHT.appendChild(AGGR);
+                    return RIGHT;
+                },
+                // WS20 트리와 동일 행 클래스 — 라벨 flex:1(남는 폭 채움)로 aggregation 우측 정렬.
+                rowHook: function (oRow) { oRow.classList.add("u4aWs20TreeRow"); }
+            });
+            oUI.tree.el.classList.add("u4aWs20Tree");
+            oUI.tree.el.classList.add("u4aP13nTree");
+            oUI.treeWrap.appendChild(oUI.tree.el);
+        }
+        // 데이터 반영 + 초기 펼침(1단계) — 가상 모드에서도 재렌더로 최신 트리 반영.
         oUI.tree.collapseAll();
         oUI.tree.expandToLevel(1);
     }
@@ -1195,10 +1247,12 @@
         }
     }
 
-    // 가짜 백드롭 토글 + 드래그 중 다이얼로그 클릭통과/반투명 — 팝업에 가린 뒤 트리가 drop 수신. (삽입 팝업과 동일 방식)
+    // 가짜 백드롭만 토글한다 — 팝업(다이얼로그) 자신은 드래그 중에도 클릭을 계속 막는다(삽입 팝업 BR13 방식).
+    //   bModal=false(드래그 중): 전체화면 백드롭만 off → 팝업 "밖"의 보이는 디자인 트리/미리보기가 dragover/drop 수신.
+    //   팝업 "자신"은 pointer-events 유지 → 팝업이 가린 부분은 뒤 화면이 이벤트를 못 받아 놓기표시·놓기가 모두 안 생기고,
+    //   팝업 밖 보이는 부분에서만 드롭된다. (예전엔 팝업까지 클릭통과시켜 아직 팝업 안인데도 뒤 트리에 잘못 놓이던 버그.)
     function _setModalLook(bModal) {
         if (oUI && oUI.backdrop) { oUI.backdrop.style.display = bModal ? "" : "none"; }
-        if (oUI && oUI.dlg) { oUI.dlg.classList.toggle("u4aP13nDragThru", !bModal); }
     }
 
     // 드래그 종료 — 디자인영역 드래그 종료(잔상/드롭가능표시 정리) + 모달 복귀.
@@ -1575,8 +1629,8 @@
             ".u4aP13nDlg { position: fixed; inset: 0; margin: auto; z-index: 1500; width: min(94vw, 1040px); height: min(88vh, 720px); padding: 0; display: flex; flex-direction: column; }" +
             // 가짜 백드롭(투명 클릭차단) — 다이얼로그(1500) 바로 아래. 평소 모달, 드래그 중 JS 가 display:none 으로 끔.
             ".u4aP13nBackdrop { position: fixed; inset: 0; z-index: 1499; background: transparent; }" +
-            // 드래그 중 — 팝업이 뒤 트리를 덮으므로 클릭 통과(뒤 트리 drop 수신). 원본처럼 투명도는 그대로.
-            ".u4aP13nDlg.u4aP13nDragThru { pointer-events: none; }" +
+            // (제거) 드래그 중 팝업 클릭통과는 팝업 위에서도 뒤 트리에 잘못 놓이던 버그의 원인 — 삽입 팝업 BR13 과
+            //   동일하게 팝업 자신은 클릭을 계속 막고 백드롭만 토글한다(_setModalLook 참고).
             ".u4aP13nDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
             ".u4aP13nDlg .u4a-dialog__header span { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
             // 바디 = 가로 스플리터.
@@ -1594,9 +1648,10 @@
             //   .u4aP13nLeft 는 이미 overflow:hidden(삐짐 클립). 전환 클래스(.u4aWsNav*)는 ws20.css 공통 소비.
             ".u4aP13nLeft { position: relative; }" +
             ".u4aP13nLeft.u4aP13nNaving > .u4aP13nRegPage, .u4aP13nLeft.u4aP13nNaving > .u4aP13nListPage { position: absolute; inset: 0; }" +
-            // 좌측 툴바 = 우측 트리 툴바(.u4aWs20TreeToolbar: surface-raised 밴드 + --ws20-sep 보더)와 동일 밴드로 통일.
-            //   (평평 배경 + 옅은 --line 은 경계선이 안 보여 트리 툴바만 밴드처럼 튀던 문제 해결.)
-            ".u4aP13nRegTool, .u4aP13nListTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; background: var(--surface-raised); border-bottom: 0.0625rem solid var(--ws20-sep); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; }" +
+            // 팝업 안 툴바는 배경 없이 본문 톤 + 하단 경계선만 둔다(공통 규칙: 헤더만 살짝 다른 톤 밴드).
+            //   바인딩 팝업 .u4aBindTool 과 동일 — 다이얼로그 헤더(밴드)와 툴바 경계를 확보한다.
+            //   (이전엔 surface-raised 밴드로 통일했으나 헤더 톤과 겹쳐 경계가 사라져 되돌림.)
+            ".u4aP13nRegTool, .u4aP13nListTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; border-bottom: 0.0625rem solid var(--ws20-sep); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; }" +
             // 제목은 축소/말줄임 금지(flex:0 0 auto) — 좁아지면 제목이 "..."로 찌그러지는 대신
             //   뒤쪽 UI(테마 콤보→라벨)가 attachOverflow 로 먼저 ⋯ 메뉴에 접힌다.
             ".u4aP13nPrevTitle { font-weight: 600; color: var(--text); font-size: 0.8125rem; white-space: nowrap; flex: 0 0 auto; }" +
@@ -1627,10 +1682,10 @@
             ".u4aP13nPrevPane { flex: 1 1 auto; min-width: 15rem; display: flex; flex-direction: column; min-height: 0; }" +
             ".u4aP13nTreePane { flex: 0 0 28%; min-width: 16rem; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }" +
             // min-width:0+overflow:hidden = attachOverflow 폭 측정 전제(자연폭으로 늘어나 오판 방지 — 트리툴바 fix 동일).
-            ".u4aP13nPrevTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; background: var(--surface-raised); border-bottom: 0.0625rem solid var(--ws20-sep); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; min-width: 0; overflow: hidden; }" +
-            // 트리 툴바 = WS20 .u4aWs20TreeToolbar 스킨 소유(padding/gap/배경/보더) — 여기선 이웃(미리보기
-            //   툴바 2.5rem)과 높이 정렬만 확장.
-            ".u4aP13nTreeTool { min-height: 2.5rem; box-sizing: border-box; }" +
+            ".u4aP13nPrevTool { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.5rem; border-bottom: 0.0625rem solid var(--ws20-sep); flex-wrap: nowrap; min-height: 2.5rem; box-sizing: border-box; min-width: 0; overflow: hidden; }" +
+            // 트리 툴바 = WS20 .u4aWs20TreeToolbar 스킨 소유(padding/gap/보더). 팝업 안에서는 배경만
+            //   본문 톤으로 덮어(WS20 본체는 surface-raised 유지) 미리보기 툴바·헤더 경계와 통일.
+            ".u4aP13nTreeTool { min-height: 2.5rem; box-sizing: border-box; background: transparent; }" +
             // 테마선택 wrapper(라벨+콤보) — 한 항목으로 접히게 축소 금지(flex:0 0 auto).
             ".u4aP13nThemeWrap { display: flex; align-items: center; gap: 0.375rem; flex: 0 0 auto; }" +
             ".u4aP13nThemeLbl { font-weight: 600; color: var(--text); font-size: 0.75rem; white-space: nowrap; flex: 0 0 auto; }" +

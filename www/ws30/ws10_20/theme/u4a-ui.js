@@ -806,11 +806,13 @@
         grip.title = "Resize";
         oHost.appendChild(grip);
 
-        let on = false, sx = 0, sy = 0, sw = 0, sh = 0;
+        let on = false, sx = 0, sy = 0, sw = 0, sh = 0, sl = 0, st = 0;
         function mv(e) {
             if (!on) { return; }
-            const w = Math.min(Math.max(minW, sw + (e.clientX - sx)), window.innerWidth - 16);
-            const h = Math.min(Math.max(minH, sh + (e.clientY - sy)), window.innerHeight - 16);
+            // 상한 = 팝업 좌상단(sl/st, 리사이즈 시작 위치)에서 뷰포트 끝까지(여백 8). 좌상단 고정 확장이라
+            //   위치를 빼지 않으면 오른쪽·아래가 화면 밖으로 넘쳐 팝업이 숨는다 → 부모 창 안에 가둔다.
+            const w = Math.min(Math.max(minW, sw + (e.clientX - sx)), window.innerWidth - sl - 8);
+            const h = Math.min(Math.max(minH, sh + (e.clientY - sy)), window.innerHeight - st - 8);
             oDlg.style.width = w + "px";
             oDlg.style.height = h + "px";
         }
@@ -821,6 +823,7 @@
             document.body.classList.add("u4a-dragging");   // 리사이즈 동안 iframe 마우스 차단(끊김 방지 — 헤더 드래그와 동일)
             const r = oDlg.getBoundingClientRect();
             sx = e.clientX; sy = e.clientY; sw = r.width; sh = r.height;
+            sl = r.left; st = r.top;   // 좌상단 위치 캐시 — mv 상한을 화면 안으로 제한(부모 창 밖 방지)
             // 좌상단을 고정하고 우하단만 늘리도록 현재 위치 박제(드래그와 동일 방식).
             oDlg.style.margin = "0"; oDlg.style.position = "fixed";
             oDlg.style.left = r.left + "px"; oDlg.style.top = r.top + "px";

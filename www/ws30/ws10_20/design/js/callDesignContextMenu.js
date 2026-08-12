@@ -205,7 +205,37 @@
                 break;
             
             case "M11": //UI 개인화 저장.
-                oAPP.fn.contextMenuP13nDesignPopup();
+                // ★HTML5 내 패턴 팝업 모듈(js/fnP13nDesignPopupOpen.js)을 먼저 로드해
+                //   UI5판 contextMenuP13nDesignPopup 을 HTML5판으로 덮어쓴 뒤 실행한다.
+                //   미로드 상태로 바로 부르면 UI5 원본 contextMenuP13nDesignPopup →
+                //   callP13nDesignDataPopup 의 new sap.m.Dialog(미리보기에 sap.m.Dialog 없음)로
+                //   예외 발생 + BUSY/단축키 잠금 미해제. (Design Tree _openMyPattern 과 동일 진입)
+                //   HTML5판은 노드 미전달 시 /lcmenu/OBJID 로 폴백하므로 인자 없이 호출.
+                (function () {
+                    var run = function () {
+                        try {
+                            oAPP.fn.contextMenuP13nDesignPopup();
+                        } catch (e) {
+                            console.error("[HTML5][design] My Pattern:", e && e.message ? e.message : e);
+                            // 예외 시, 메뉴 선택에서 미리 건 BUSY/단축키 잠금 해제(원본 종료 경로와 동일).
+                            oAPP.fn.setShortcutLock(false);
+                            parent.setBusy("");
+                        }
+                    };
+                    // 이미 HTML5 모듈이 로드돼 있으면 즉시 실행.
+                    if (typeof oAPP.fn.fnP13nDesignPopupOpen === "function") { run(); return; }
+                    // 미로드면 로드 후 실행(loadJs 는 동기 로드).
+                    try { oAPP.loadJs("fnP13nDesignPopupOpen", run); }
+                    catch (e) { console.error("[HTML5][design] My Pattern load:", e && e.message ? e.message : e); }
+                    // loadJs 는 성공 콜백만 있고 오류 콜백이 없다(동기 AJAX). 로드 실패로 run 이
+                    // 불리지 않고 여전히 미로드면, 메뉴 선택에서 건 BUSY/단축키 잠금을 해제한다
+                    // (BR23 권장수정: 모든 종료 경로에서 해제 — 코덱스 사후검증 지적 반영).
+                    if (typeof oAPP.fn.fnP13nDesignPopupOpen !== "function") {
+                        console.error("[HTML5][design] My Pattern: fnP13nDesignPopupOpen load failed");
+                        oAPP.fn.setShortcutLock(false);
+                        parent.setBusy("");
+                    }
+                })();
                 break;
 
         }
@@ -1470,61 +1500,24 @@
 
 
     //ui 사용처 리스트 메뉴.
+    //  [BR22] 원본 경로는 callUiWhereUsePopup.js 를 로드해 new sap.m.Dialog(...) 로 사용처
+    //  조회 팝업을 띄우고 /uiWhereUseList 를 전수 조회한다. HTML5 실행 환경엔 sap.m.Dialog
+    //  생성자가 없어 팝업 생성 단계에서 예외로 죽고, 메뉴 진입 시 걸어둔 단축키 잠금·BUSY 가
+    //  복구되지 못해 이후 화면 조작이 멈췄다.
+    //  → 좌측 트리 M08 과 "동일 기능" 이므로 같은 공용 처리를 쓴다:
+    //    ws_html5_ws20_edit.js 의 oAPP.fn.fnWs20WhereUseNotice(안내 메시지만, 문구·동작 단일 관리).
+    //    미리보기 진입 시 걸린 단축키 잠금·BUSY 는 이 경로에서 즉시 원복(잔류 금지)한 뒤 공용 안내 호출.
     oAPP.fn.contextMenuUiWhereUse = function(){
-        
-        //단축키 잠금 처리.
-        oAPP.fn.setShortcutLock(true);
+
+        //진입 시 걸어둔 단축키 잠금·BUSY 즉시 원복(잔류 금지).
+        oAPP.fn.setShortcutLock(false);
 
         parent.setBusy("");
 
-
-        //사용처 확인전 질문팝업 호출.
-        //123 Do you want to continue?
-        parent.showMessage(sap, 30, "I", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "123", "", "", "", ""), function(param){
-
-            parent.setBusy("X");
-
-            oAPP.fn.setShortcutLock(true);
-            
-
-            //YES를 선택하지 않은경우 EXIT.
-            if(param !== "YES"){
-                                
-                oAPP.fn.setShortcutLock(false);
-                    
-                parent.setBusy("");
-            
-                return;
-            }
-
-            //context menu를 호출한 라인의 OBJID 얻기.
-            var l_OBJID = oAPP.attr.oModel.getProperty("/lcmenu/OBJID");
-            
-            //DOCUMENT영역에 PASTE한경우 EXIT.
-            if(l_OBJID === "ROOT"){
-
-                oAPP.fn.setShortcutLock(false);
-
-                parent.setBusy("");
-
-                return;
-            }
-
-            //OBJID에 해당하는 TREE 정보 얻기.
-            var ls_tree = oAPP.fn.getTreeData(l_OBJID);
-
-            //ui 사용처 팝업 function이 존재하는경우 즉시 호출.
-            if(typeof oAPP.fn.callUiWhereUsePopup !== "undefined"){
-                oAPP.fn.callUiWhereUsePopup(ls_tree);
-                return;
-            }
-
-            //ui 사용처 팝업 function이 존재하지 않는경우 js 로드 후 호출.
-            oAPP.fn.getScript("design/js/callUiWhereUsePopup",function(){
-                oAPP.fn.callUiWhereUsePopup(ls_tree);
-            });
-
-        });
+        //트리와 동일한 공용 안내 호출(문구·동작 한 곳에서 관리).
+        if(typeof oAPP.fn.fnWs20WhereUseNotice === "function"){
+            oAPP.fn.fnWs20WhereUseNotice();
+        }
 
     };  //ui 사용처 리스트 메뉴.
 
