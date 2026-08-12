@@ -1074,10 +1074,6 @@
   color: var(--ws20-accent);
 }
 .u4aWs20AttrReqIcon { font-size: 10px; flex: 0 0 auto; }
-/* [BR24] 속성명 앞 종류 아이콘(구 sap.m.ObjectStatus icon) — 프로퍼티/이벤트/집합 구분 마커.
-   이벤트 대기표시 미사용(ISWIT="X")이면 체크아이콘으로 바뀐다. 라벨 텍스트와 flex gap(4px) 간격,
-   본문보다 살짝 옅게(muted) 표시해 이름 가독을 해치지 않게. */
-.u4aWs20AttrLblIcon { font-size: 11px; flex: 0 0 auto; color: var(--text-muted); }
 
 /* 변경된 행 — 구 changedDataMarker 의 .changeValue.
    ★ 기존 풀-로우 틴트 + neumorphic inset 입체감은 "과하다"는 피드백 → 좌측 액센트 바
@@ -1151,9 +1147,6 @@
   background: var(--surface-raised, var(--surface));
   box-shadow: none;            /* 그리드에선 포커스 링 생략(컴팩트) */
 }
-/* [BR24] 콤보 오류표시(빨간 테두리·옅은 빨강 배경·값 글자 + 펼침목록 최상단 문구)는 공통 컴포넌트로
-   이관 — bootstrap-skin.css `.u4a-combo[data-vs="error"]`(!important 라 화면 컴팩트 테두리·배경도 이김)
-   + shell.css `.u4a-combo__vsmsg` + createSelect.setValueState. 화면 전용 처리 없음. */
 /* 비활성 콤보(평문) = 전 화면 공통(bootstrap-skin.css `.u4a-combo.is-disabled`)이 소유 — 화면별 처리 없음. */
 
 /* DDLB (구 sap.m.ComboBox — 네이티브 폴백 전용, 공통 폼 보더) */

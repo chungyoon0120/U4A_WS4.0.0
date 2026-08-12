@@ -454,6 +454,14 @@ html[data-sl-theme="dark"] .btn-close {
     background: var(--u4a-accent-soft);
     color: var(--u4a-accent);
 }
+/* [공통] 밸류스테이트=오류 — 입력칸(.u4a-input[data-vs=error])과 동일하게 콤보도 테두리·배경(옅은
+   빨강)·값 글자를 빨강으로(원본 UI5 ComboBox valueState=Error). 테마별 콤보 배경/테두리(특이도 높음)를
+   이기도록 !important(입력칸 오류 규칙과 동일한 이유). */
+.u4a-combo[data-vs="error"] {
+    border-color: var(--state-error) !important;
+    background: var(--state-error-bg) !important;
+}
+.u4a-combo[data-vs="error"] .u4a-combo__text { color: var(--state-error); }
 
 /* 체크박스 / 스위치 — on 상태 강조색 */
 .u4a-check input[type="checkbox"],
@@ -559,7 +567,7 @@ html[data-sl-theme="dark"] .u4a-toast {
     "빨간 테두리는 포커스 무관 항상 유지"). 위 (A) 같은 테마별 활성-테두리 규칙(특이도 0,5,0)이나
     hover/focus 규칙보다 무조건 이겨야 한다. 테마마다 :not([data-vs]) 로 비껴가는 방식은 취약
     (테마 하나 놓치면 또 안 뜸) → !important 로 한 곳에서 못박는다. 색 SSOT = 이 파일.
-  (콤보는 공통 [data-vs] 마커가 없어 화면별 .u4aCapErr 등으로 처리)
+  (콤보도 이제 공통 [data-vs="error"] 마커 지원 — createSelect.setValueState + 위 .u4a-combo[data-vs="error"])
 ======================================================================*/
 .u4a-input[data-vs="error"],
 .u4a-select[data-vs="error"] {

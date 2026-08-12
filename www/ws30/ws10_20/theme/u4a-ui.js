@@ -79,6 +79,34 @@
             oText.textContent = _label(sCurrent);
         };
 
+        // [공통] 밸류스테이트(오류표시) — 입력칸(createField)과 동등하게 콤보도 지원(원본 UI5 ComboBox
+        //   valueState 대응). 접힘 상태: data-vs 로 테두리·값 글자색(상시). 펼침 상태: 펼침목록 최상단에
+        //   메시지 줄(sticky)을 붙여 목록에 가리지 않고 항상 보이게 한다. setValueState(state, text) 로 갱신.
+        let sVs = opts.valueState || "none";
+        let sVsText = opts.valueStateText || "";
+        function _applyVs() {
+            if (sVs && sVs !== "none") { oCombo.setAttribute("data-vs", sVs); }
+            else { oCombo.removeAttribute("data-vs"); }
+        }
+        function _renderVsMsg() {
+            if (!oList) { return; }
+            const old = oList.querySelector(":scope > .u4a-combo__vsmsg");
+            if (old) { old.remove(); }
+            if (sVs && sVs !== "none" && sVsText) {
+                const m = _el("div", "u4a-combo__vsmsg");
+                m.setAttribute("data-vs", sVs);
+                m.textContent = sVsText;
+                oList.insertBefore(m, oList.firstChild);
+            }
+        }
+        oCombo.setValueState = function (sState, sText) {
+            sVs = sState || "none";
+            sVsText = sText || "";
+            _applyVs();
+            _renderVsMsg();
+        };
+        _applyVs();
+
         function _onOutside(ev) {
             if (!oCombo.contains(ev.target) && (!oList || !oList.contains(ev.target))) {
                 _close();
@@ -133,6 +161,9 @@
             // 모달 <dialog> 내부면 top-layer 유지 위해 dialog 에 append
             const oHost = oCombo.closest("dialog") || document.body;
             oHost.appendChild(oList);
+
+            // [공통] 밸류스테이트 메시지가 있으면 펼침목록 최상단에 붙인다(sticky — 목록에 가리지 않음).
+            _renderVsMsg();
 
             const r = oCombo.getBoundingClientRect();
             oList.style.minWidth = r.width + "px";
@@ -1638,6 +1669,9 @@
             const aSel = oUl.querySelectorAll('.u4a-tree__row[aria-selected="true"]');
             for (let i = 0; i < aSel.length; i++) { if (aSel[i] !== oRow) { aSel[i].removeAttribute("aria-selected"); } }
             if (oRow) { oRow.setAttribute("aria-selected", "true"); }
+            // ★ 가상 모드: 선택 키를 윈도잉 스크롤러에 반영 → 선택 행이 화면 밖으로 나갔다 다시 들어와도(재생성)
+            //   강조를 복원한다(buildRow 의 getSelKey 비교로 재적용). 비가상/스크롤러 미생성 시 무영향.
+            if (bVirtual && _vs) { _vs.setSel(sKey == null ? null : sKey); }
             return oRow;
         }
 

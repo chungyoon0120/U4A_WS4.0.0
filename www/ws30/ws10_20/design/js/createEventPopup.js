@@ -45,6 +45,21 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
     try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
     catch (e) { return ""; }
   }
+  // 서버가 "백엔드(로그온) 언어로 구워" 보낸 메시지 텍스트를 접속(워크스페이스) 언어로 되돌린다.
+  //   서버는 성공/오류 메시지를 세션 언어(SY-LANGU)로 렌더한 완성 텍스트(RTMSG)로만 내려주고
+  //   메시지 번호를 주지 않으므로(서버 /U4A/WS000001 CREATEEVENTMETHOD 확인), 공통 역현지화
+  //   WsMsgCls.relocalize(SSOT)로 텍스트→키 역매핑→접속언어 재렌더한다. WS20 활성/저장의
+  //   ws_events.js _ws20RelocalizeBaked 와 동일 패턴. 화면언어=서버언어면 그대로, 미등록/실패는 원문 폴백.
+  function lf_relocalize(sText) {
+    try {
+      if (!sText) { return sText; }
+      var wsL = (parent.getUserInfo() || {}).LANGU || "";
+      var beL = (parent.getServerInfo && parent.getServerInfo()) ? (parent.getServerInfo().LANGU || "") : "";
+      if (!wsL || (beL && beL === wsL)) { return sText; }
+      var WC = parent.REMOTE ? parent.REMOTE.getGlobal("WsMsgCls") : null;
+      return (WC && WC.relocalize) ? WC.relocalize(sText, beL, wsL) : sText;
+    } catch (e) { return sText; }
+  }
   function _el(sTag, sClass, sText) {
     var o = document.createElement(sTag);
     if (sClass) { o.className = sClass; }
@@ -284,9 +299,10 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
 
       //오류가 발생한 경우, eval 처리 script가 존재하지 않는경우.
       if (param.RETCD === "E" && typeof param.SCRIPT === "undefined") {
+        var sErrTx = lf_relocalize(param.RTMSG);   //서버 세션언어 오류문구 → 접속언어로 되돌림
         oData.meth_stat = "Error";
-        oData.meth_text = param.RTMSG;
-        lf_setVs(oMethInp, oMethMsg, true, param.RTMSG);
+        oData.meth_text = sErrTx;
+        lf_setVs(oMethInp, oMethMsg, true, sErrTx);
 
         //메소드명 입력필드에 focus 처리.
         oMethInp.focus();
@@ -297,6 +313,13 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
       //  서버 SCRIPT(sap 참조/lf_callCtsPopup 등) 안전 eval — 전 코드베이스 공통 규약.
       //  같은 클로저라 lf_callCtsPopup·oMethInp 도달, sap 참조는 전역 안전스텁이 흡수.
       if (param.RETCD === "E" && typeof param.SCRIPT !== "undefined") {
+        //eval(SCRIPT) 동안만 parent.showMessage 를 되돌림으로 감싼다(서버가 스크립트 안에
+        //  구워 넣은 세션언어 문구를 접속언어로 재렌더). eval 은 인라인 유지 — 서버 스크립트가
+        //  참조하는 지역 스코프(lf_callCtsPopup·oMethInp 등) 보존. finally 로 원복.
+        var _oOrigSM = parent.showMessage;
+        parent.showMessage = function (oUI5, kind, type, sMsg, fnCb) {
+          return _oOrigSM.call(parent, oUI5, kind, type, lf_relocalize(sMsg), fnCb);
+        };
         try {
           // eslint-disable-next-line no-eval
           eval(param.SCRIPT);
@@ -305,6 +328,8 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
           //SCRIPT 가 깨져도 서버 메시지는 보여준다.
           if (param.RTMSG) { parent.showMessage(null, 20, "E", param.RTMSG); }
           parent.setBusy("");
+        } finally {
+          parent.showMessage = _oOrigSM;
         }
         return;
       }
@@ -375,9 +400,9 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
       //DIALOG 종료.
       lf_dialogClose(true);
 
-      //메시지 처리.
+      //메시지 처리. (서버가 세션언어로 구운 성공 문구를 접속언어로 되돌려 표시)
       if (typeof param.RTMSG !== "undefined" && param.RTMSG !== "") {
-        parent.showMessage(null, 10, "S", param.RTMSG);
+        parent.showMessage(null, 10, "S", lf_relocalize(param.RTMSG));
       }
 
       //RETURN 받은 CTS번호가 존재하는경우.

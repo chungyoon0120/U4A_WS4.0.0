@@ -1684,6 +1684,33 @@ body.u4a-dragging iframe { pointer-events: none; }
     display: none;
 }
 
+/* [공통] 밸류스테이트 메시지 — 펼침목록 최상단에 sticky 로 고정(스크롤해도 보임, 목록에 안 가림).
+   목록 패딩(0.25rem)을 음수 마진으로 상쇄해 목록 폭을 꽉 채운다. 색은 의미 토큰만(하드코딩 없음).
+   원본 UI5 ComboBox 가 열렸을 때 valueStateText 를 목록 위에 보여주던 동작의 HTML5 대응. */
+.u4a-combo__vsmsg {
+    position: sticky;
+    top: -0.25rem;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: -0.25rem -0.25rem 0.25rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    color: var(--text);
+    background: var(--state-error-bg);
+    border-bottom: 0.0625rem solid var(--state-error);
+}
+.u4a-combo__vsmsg::before {
+    content: "\f057";
+    font-family: "Font Awesome 7 Free";
+    font-weight: 900;
+    flex: 0 0 auto;
+    font-size: 0.875rem;
+    color: var(--state-error);
+}
+
 .u4a-combo__item {
     display: flex;
     align-items: center;

@@ -4024,7 +4024,6 @@
         return '<i class="fa-solid fa-' + sFa + '"></i>';
     }
 
-
     // 클립보드 복사 (원본 attrCopyText 1:1 — 복사 후 "&1 복사됨" 토스트로 피드백)
     function _copyText(sText) {
         //text 정보가 없는경우 exit(원본 attrCopyText 가드).
@@ -4743,8 +4742,7 @@
             var sVal = sAttr.UIATV != null ? sAttr.UIATV : "";
             var bDisabled = !bEnabled || (sAttr.edit !== true);
 
-            // {value,text} 변환 (구 KEY/TEXT). 현재 값이 목록에 없으면 표시 보장용으로 맨 뒤에 붙인다.
-            //   ★서버 목록의 선두 빈칸(KEY="")이 항상 최상위여야 하므로 선두(unshift)가 아니라 끝(push).
+            // {value,text} 변환 (구 KEY/TEXT). 현재 값이 목록에 없으면 표시 보장용 선두 추가.
             var aItems = [];
             var bFound = false;
             for (var i = 0; i < aDDLB.length; i++) {
@@ -4754,69 +4752,42 @@
                     text: aDDLB[i].TEXT != null ? aDDLB[i].TEXT : ""
                 });
             }
-            if (!bFound && sVal) { aItems.push({ value: sVal, text: sVal }); }
+            if (!bFound) { aItems.unshift({ value: sVal, text: sVal }); }
 
             function _onPick(v) {
                 sAttr.UIATV = v;
                 sAttr.comboval = v;
-                // [BR24] 값을 새로 고르면 이 라인의 오류표시 해제 — 유효한 서버이벤트를 선택하면 빨간 테두리가
-                //   사라지게(원본 attrClearErrorField 의미). 프로퍼티 DDLB 는 이어지는 checkPropertyValue 가
-                //   재검증하므로 여기서 지워도 안전.
-                sAttr.valst = undefined; sAttr.valtx = undefined;
                 oAPP.fn.fnWs20AttrChange(sAttr, "DDLB");
             }
 
             // 이벤트 DDLB(UIATY="2")는 "펼치기 직전" 최신 서버이벤트 목록을 받아 채운다.
             //   (원본 uiAttributeArea.js oRSel1 combobox click 로직 — getServerEventList →
             //    T_DDLB 매핑 → open. 다른 창/이 화면 녹색아이콘으로 추가된 이벤트가 즉시 반영.)
-            // 콤보 공통 밸류스테이트(오류표시) 초기값 — 접힘 상태에서도 빨간 테두리·값 글자가 보이게 전달.
-            //   프로퍼티 DDLB(checkPropertyValue 오류)·이벤트 DDLB 공통. 펼치면 목록 최상단에 문구가 뜬다.
-            var oSelOpts = {
-                valueState: (sAttr.valst === "Error") ? "error" : "none",
-                valueStateText: sAttr.valtx || ""
-            };
-
-            // 이벤트 DDLB(UIATY="2")는 "펼치기 직전" 최신 서버이벤트 목록을 받아 채운다.
-            //   (원본 uiAttributeArea.js oRSel1 combobox click 로직 — getServerEventList →
-            //    T_DDLB 매핑 → open. 다른 창/이 화면 녹색아이콘으로 추가된 이벤트가 즉시 반영.)
+            var oSelOpts = null;
             if (sAttr.UIATY === "2" && !bDisabled) {
-                oSelOpts.onOpen = function (oCombo) {
-                    // [BR24] 목록 누락 검증은 "조회 성공" 시에만 한다 — 원본은 성공 콜백 안에서만 누락을
-                    //   판정한다(uiAttributeArea.js:1087-1113 은 success 경로). getServerEventList 는
-                    //   서버 RETCD!=="S"·통신오류에는 콜백(f_cb)을 부르지 않고, 성공에만 f_cb(lt_ddlb) 를
-                    //   부른다. 검증을 성공 콜백에 두면 통신/세션/백엔드 오류를 "목록에 없음"으로 오판해
-                    //   정상 이벤트에 빨간표시를 다는 [코덱스 P1] 문제가 사라진다(실패 시 기존 상태 보존).
-                    var fnOk = function (aDdlb) {
-                        aDdlb = aDdlb || [{ KEY: "", TEXT: "", DESC: "" }];
-                        sAttr.T_DDLB = aDdlb;   //서버이벤트 항목 매핑(원본 _sAttr.T_DDLB = _aEvent).
-                        var aNew = [], bHas = false;
-                        for (var k = 0; k < aDdlb.length; k++) {
-                            if (aDdlb[k].KEY === sAttr.UIATV) { bHas = true; }
-                            aNew.push({
-                                value: aDdlb[k].KEY != null ? aDdlb[k].KEY : "",
-                                text: aDdlb[k].TEXT != null ? aDdlb[k].TEXT : ""
-                            });
-                        }
-                        // 등록된 서버이벤트가 조회 목록에 없으면 원본처럼 오류표시(원본 uiAttributeArea.js:1111
-                        //   setAttrFocus(UIATK,"E")). 공통 콤보 밸류스테이트로 처리 → 접힘=빨간 테두리·글자,
-                        //   펼침=목록 최상단 오류문구. 값이 목록에 없어도 콤보에 보이게 맨 뒤에 붙인다(선두 빈칸 유지).
-                        if (!bHas && sAttr.UIATV) {
-                            aNew.push({ value: sAttr.UIATV, text: sAttr.UIATV });
-                            //등록 안된 이벤트 문구(&1=이벤트명). 장군님 등록 ZMSG_WS_COMMON_001|999.
-                            sAttr.valst = "Error";
-                            sAttr.valtx = oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "999", sAttr.UIATV || "", "", "", "");
-                            oCombo.setValueState("error", sAttr.valtx);
-                        } else {
-                            //값이 유효(목록에 존재)하면 이 라인 오류표시 해제.
-                            if (sAttr.valst === "Error") { sAttr.valst = undefined; sAttr.valtx = undefined; }
-                            oCombo.setValueState("none");
-                        }
-                        oCombo.setItems(aNew);
-                    };
-                    // 반환 Promise 는 성공/실패 전 경로에서 resolve 되므로 드롭다운은 항상 열린다. 검증은 성공 시만.
-                    return oAPP.fn.getServerEventList(fnOk, false).catch(function (e) {
-                        console.error("[HTML5][WS20][attr] 서버이벤트 목록 조회 실패:", e && e.message);
-                    });
+                oSelOpts = {
+                    onOpen: function (oCombo) {
+                        // getServerEventList 가 반환하는 Promise 는 성공/실패/에러 전 경로에서
+                        //   lt_ddlb 로 resolve 되므로 콜백 대신 반환 Promise 를 쓴다(미해결 방지).
+                        return oAPP.fn.getServerEventList(null, false).then(function (aDdlb) {
+                            aDdlb = aDdlb || [{ KEY: "", TEXT: "", DESC: "" }];
+                            //서버이벤트 항목 매핑(원본 _sAttr.T_DDLB = _aEvent).
+                            sAttr.T_DDLB = aDdlb;
+                            var aNew = [], bHas = false;
+                            for (var k = 0; k < aDdlb.length; k++) {
+                                if (aDdlb[k].KEY === sAttr.UIATV) { bHas = true; }
+                                aNew.push({
+                                    value: aDdlb[k].KEY != null ? aDdlb[k].KEY : "",
+                                    text: aDdlb[k].TEXT != null ? aDdlb[k].TEXT : ""
+                                });
+                            }
+                            //현재 선택값이 목록에 없으면 표시 보장용 선두 추가(원본은 오류표시 — 여기선 값 유지).
+                            if (!bHas && sAttr.UIATV) { aNew.unshift({ value: sAttr.UIATV, text: sAttr.UIATV }); }
+                            oCombo.setItems(aNew);
+                        }).catch(function (e) {
+                            console.error("[HTML5][WS20][attr] 서버이벤트 목록 조회 실패:", e && e.message);
+                        });
+                    }
                 };
             }
 
@@ -5470,17 +5441,6 @@
                 REQ.innerHTML = _iconHtml(sAttr.icon0_src, "star");
                 if (sAttr.icon0_color) { REQ.style.color = sAttr.icon0_color; }
                 LBL.appendChild(REQ);
-            }
-
-            // [BR24] 속성명 앞 종류 아이콘 — 원본 sap.m.ObjectStatus({text:UIATT, icon:UIATT_ICON}) 이식분.
-            //   프로퍼티/이벤트/집합 라인 종류별 아이콘(attrSetLineStyle 에서 계산된 UIATT_ICON)을 라벨 앞에
-            //   표시한다. 특히 이벤트에서 대기표시 미사용(ISWIT="X")이면 border→complete 로 바뀐 값이 여기서
-            //   보인다. HTML5 이식 때 라벨의 icon 바인딩이 통째로 누락돼(텍스트만 그림) 표시가 안 되던 것.
-            if (sAttr.UIATT_ICON) {
-                var TIC = document.createElement("span");
-                TIC.className = "u4aWs20AttrLblIcon";
-                TIC.innerHTML = _iconHtml(sAttr.UIATT_ICON);
-                LBL.appendChild(TIC);
             }
 
             // 라벨 = <a>(링크) — "클릭하면 설명(도움말) 팝업"이라는 의미에 맞고, shell.css 의
