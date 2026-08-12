@@ -1284,19 +1284,26 @@
             //   정상 → 미리보기도 동일 경로로 통일(붙여넣기 형식 불변). 원본 파일은 손대지 않고 감싼다.
             //   메뉴 선택 시 켜진 화면잠금(setBusy)·단축키잠금(setShortcutLock)은 원본 tail 과 동일하게
             //   반드시 해제(예외에도 finally 로 보장 — BR20 의 정리 미도달을 원천 차단).
+            //   ※ 위임 함수(fnWs20CopyUI) 준비 여부와 무관하게 감싸고(멱등), 호출 시점에 위임 가능 여부를
+            //     판단한다(BR17 이동 위임과 동일). 위임 함수/대상 노드가 없으면 깨진 원본 복사(미정의
+            //     getUiClientEvent 경로)를 부르지 않고 — 그 경로는 다시 BR20 예외 → tail 미도달로 잠금 잔류 —
+            //     잠금만 안전 해제하고 종료한다(코덱스 지적2 반영).
             var fnCopy = oAPP.fn.contextMenuUiCopy;
-            if (typeof fnCopy === "function" && fnCopy.__ws20CopyDelegate !== true &&
-                typeof oAPP.fn.fnWs20CopyUI === "function") {
-                var _origCopy = fnCopy;
+            if (typeof fnCopy === "function" && fnCopy.__ws20CopyDelegate !== true) {
                 var _wrappedCopy = function () {
+                    var _canDelegate = (typeof oAPP.fn.fnWs20CopyUI === "function");
                     var l_objid = "";
                     try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
-                    var ls_node = (typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid) : null;
-                    if (!ls_node) { return _origCopy.apply(this, arguments); }
+                    var ls_node = (_canDelegate && typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid) : null;
                     try {
-                        oAPP.fn.fnWs20CopyUI(ls_node);   // ROOT/APP 가드·깊은복사·복사버퍼 저장(원본 1:1)
+                        if (_canDelegate && ls_node) {
+                            oAPP.fn.fnWs20CopyUI(ls_node);   // ROOT/APP 가드·깊은복사·복사버퍼 저장(원본 1:1)
+                        } else {
+                            // 정상 기동에선 도달하지 않음(선행 로드로 함수·노드 준비). 진단만 남기고 잠금 정리로 종료.
+                            console.error("[HTML5][WS20][prev][BR20] 복사 위임 불가 — fnWs20CopyUI=" + _canDelegate + ", node=" + (!!ls_node) + ", OBJID=" + l_objid);
+                        }
                     } finally {
-                        // 원본 tail(callDesignContextMenu.js 708~710행)과 동일한 정리.
+                        // 원본 tail(callDesignContextMenu.js 708~710행)과 동일 — 예외에도 잠금/BUSY 해제 보장.
                         try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
                         try { parent.setBusy && parent.setBusy(""); } catch (e) { }
                     }
@@ -1311,10 +1318,20 @@
             //   그 앞의 바인딩팝업 BUSY_ON 짝(OFF)에 도달 못 해 자식창 잠금이 남을 위험이 있었다.
             //   트리 경로 _pasteUI(=fnWs20PasteUI)는 공통 코어(fnWs20AddTreeData)로 aggregation 선택·검증
             //   (UA039/UA040/카디널리티)·하위트리 재귀복사·$OTR·Preview/Tree/Attribute/바인딩팝업 동기화·
-            //   undo(PASTE)를 원본과 동일하게 처리하고, 잠금(BUSY/단축키)도 성공·취소·검증실패·예외 모두
-            //   짝으로 해제한다. 원본 파일은 손대지 않고, 로드된 뒤 함수를 감싼다(멱등).
-            //   ★붙여넣기는 비동기(aggregation 선택 콜백)라 fnWs20PasteUI 가 자체적으로 잠금을 짝 해제하므로,
-            //     여기서 동기 finally 로 잠금을 풀지 않는다(복사 위임과 다른 점 — 조기 해제 방지).
+            //   undo(PASTE)를 원본과 동일하게 처리한다. 원본 파일은 손대지 않고, 로드된 뒤 함수를 감싼다(멱등).
+            //
+            //   ★잠금 소유권(검수 BR21 반영):
+            //    - 미리보기 메뉴는 항목 선택 시 화면잠금(parent.setBusy "X")+단축키잠금을 켠다
+            //      (callDesignContextMenu.js 17·20행). 이 두 잠금은 HTML5 붙여넣기 코어가 소유하지 않는다
+            //      (코어는 자식창(바인딩팝업) 방송잠금 _broadBusy + 자체 단축키잠금만 진행 시 걸고 완료 콜백에서
+            //      짝 해제하며, 화면잠금은 후보 2개+ 선택팝업이 뜰 때만 dnd 603행에서 푼다 → 후보 0/1·앞단
+            //      가드·편집아님/복사없음 조기종료에선 화면잠금이 남는다).
+            //    - 그래서 위임 직전 메뉴가 켠 화면잠금·단축키잠금을 여기서 해제하고 넘긴다. 이후 코어가 진행하면
+            //      자체 잠금을 다시 걸고 짝 해제하므로, 트리 붙여넣기(SSOT)와 동일한 잠금 흐름이 된다.
+            //    - 대상이 문서 최상위(ROOT)면 원본이 화면잠금 해제 후 그대로 종료(원본 1350~1352행)하므로 원본
+            //      EXIT 로 넘긴다. 앱(APP) 노드는 원본에 종료 분기가 없어(그대로 미정의 함수로 크래시) 일반
+            //      노드와 동일하게 코어로 위임한다(원본 메뉴·트리 메뉴 모두 APP 붙여넣기 허용).
+            //    - 대상 노드를 못 얻으면(이론상 없음) 원본은 이 경우도 크래시하므로, 위에서 잠금 해제 후 안전 종료.
             var fnPaste = oAPP.fn.contextMenuUiPaste;
             if (typeof fnPaste === "function" && fnPaste.__ws20PasteDelegate !== true &&
                 typeof oAPP.fn.fnWs20PasteUI === "function") {
@@ -1322,12 +1339,17 @@
                 var _wrappedPaste = function () {
                     var l_objid = "";
                     try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
-                    //문서 최상위(ROOT)·APP 대상 붙여넣기는 원본이 그대로 종료(EXIT)한다(원본 1344행). 이 경우는
-                    //  공통 코어로 위임하지 않고 원본의 깔끔한 종료 분기로 넘겨 원본과 동일하게 무동작으로 둔다.
-                    if (l_objid === "ROOT" || l_objid === "APP") { return _origPaste.apply(this, arguments); }
+                    //문서 최상위(ROOT)만 원본의 화면잠금 해제 EXIT 로 넘긴다.
+                    if (l_objid === "ROOT") { return _origPaste.apply(this, arguments); }
                     var ls_node = (typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid) : null;
-                    if (!ls_node) { return _origPaste.apply(this, arguments); }
-                    return oAPP.fn.fnWs20PasteUI(ls_node);   // 편집가드·복사버퍼·공통 붙여넣기 코어(원본 1:1)
+                    //메뉴가 켠 화면잠금·단축키잠금 해제(코어가 소유하지 않음 — 조기종료에도 잔류 방지).
+                    try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                    try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
+                    //대상 노드 못 얻으면 안전 종료(원본은 이 경우 크래시 — 위에서 잠금 해제했으니 무동작).
+                    if (!ls_node) { return; }
+                    //APP 포함 유효 노드는 트리와 동일 경로로 위임. 코어가 진행 시 자체 잠금(자식창 방송+단축키)을
+                    //  다시 걸고 성공·취소·검증실패·예외 모두 완료 콜백에서 짝 해제한다.
+                    return oAPP.fn.fnWs20PasteUI(ls_node);
                 };
                 _wrappedPaste.__ws20PasteDelegate = true;
                 oAPP.fn.contextMenuUiPaste = _wrappedPaste;

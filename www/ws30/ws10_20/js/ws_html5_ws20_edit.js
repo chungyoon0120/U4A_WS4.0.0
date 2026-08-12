@@ -596,7 +596,8 @@
         if (!oNode) { return; }
         if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { return; }
         var clone;
-        try { clone = JSON.parse(JSON.stringify(oNode)); } catch (e) { return; }
+        try { clone = JSON.parse(JSON.stringify(oNode)); }
+        catch (e) { console.error("[WS20][copy] 트리 직렬화 실패 OBJID=" + (oNode && oNode.OBJID), e); return; }
         // 각 노드의 속성(_T_0015) + 클라이언트 이벤트(_CEVT) + 설명(_DESC) 동봉 (붙여넣기 시 새 OBJID 로 복원).
         //   ★필드 형식은 원본 contextMenuUiCopy(lf_setTreeItemAttr)/패턴 저장과 동일(_CEVT = T_CEVT 원행).
         //     붙여넣기는 공통 designAddTreeData → _applyP13nPattern 경로가 이 형식을 그대로 소비한다.
@@ -624,15 +625,18 @@
                 }
                 if (_cev.length) { n._CEVT = JSON.parse(JSON.stringify(_cev)); }
             } catch (e) { }
-            // 설명(_DESC)
-            try { n._DESC = (typeof oAPP.fn.getDesc === "function") ? (oAPP.fn.getDesc(n.OBJID) || "") : ""; } catch (e) { n._DESC = ""; }
+            // 설명(_DESC) — ★원본 callDesignContextMenu.js:654 1:1: 빈 설명이면 _DESC 속성 자체를 만들지 않는다.
+            //   (붙여넣기 소비부는 _DESC "존재 여부"로 setDesc 를 호출 → 빈값이라도 넣으면 원본에 없던 빈 T_DESC 행이 생김.)
+            try {
+                var _d = (typeof oAPP.fn.getDesc === "function") ? oAPP.fn.getDesc(n.OBJID) : "";
+                if (_d) { n._DESC = _d; }
+            } catch (e) { console.error("[WS20][copy] getDesc 실패 OBJID=" + (n && n.OBJID), e); }
             if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { attach(n.zTREE[i]); } }
         })(clone);
-        try {
-            if (typeof oAPP.fn.setCopyData === "function") { oAPP.fn.setCopyData(COPY_AREA, [COPY_AREA], clone); }
-            else { oAPP.attr.__ws20Copy = clone; }
-            // (원본 contextMenuUiCopy 는 완료 토스트 없음)
-        } catch (e) { }
+        // ★원본 contextMenuUiCopy 는 setCopyData 를 무가드 호출(완료 토스트 없음). 저장 실패를 삼키면
+        //   오래된 복사본이 남아 다음 붙여넣기에서 옛 UI 가 붙으므로, 실패는 표면화한다(조용한 catch 금지).
+        if (typeof oAPP.fn.setCopyData === "function") { oAPP.fn.setCopyData(COPY_AREA, [COPY_AREA], clone); }
+        else { oAPP.attr.__ws20Copy = clone; }
     }
     // ★ BR20: 미리보기 우클릭 "복사"도 이 트리 복사 함수로 위임(prev.js). 원본 contextMenuUiCopy 는
     //    HTML5 에 없는 함수(getUiClientEvent)를 불러 예외로 죽어 복사가 안 되고 오류창이 떴다.
@@ -669,7 +673,10 @@
 
         _broadBusy(true);   // 자식창 잠금(원본 붙여넣기 시 BUSY_ON)
         try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(true); } } catch (e) { }
+        var _bDone = false;   // 중복 실행 방지(비동기 취소/완료 경로가 겹쳐도 짝 해제 1회만).
         var _done = function () {
+            if (_bDone) { return; }
+            _bDone = true;
             try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } } catch (e) { }
             _broadBusy(false);   // 짝 BUSY_OFF (가드 실패/취소/완료 모두 여기로)
         };
