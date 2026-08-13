@@ -92,8 +92,6 @@ allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__notion-multi__list_work
 4. **테스트 현황판 정리(히스토리 이관).** 이 코드번호가 속한 그룹의 **모든 항목이 통과(✅ O)됐으면**, `.works/<화면영역명>/00_현황판.md`에서 그 그룹을 **그룹째** `.works/<화면영역명>/00_히스토리.md`로 옮긴다.
    - 그룹 중 일부만 통과(✅ O)한 상태면 **이관하지 않는다**(그 자리 표시만 유지). 그룹 전 항목이 ✅ O일 때만 그룹째 이관.
    - `00_히스토리.md`가 없으면 새로 만든다.
-5. **커밋·푸시를 진행할지 장군님께 질문**한다.
-   - "예"면: 기본 브랜치면 먼저 브랜치. 커밋 제목 맨앞 `[YYYY-MM-DD HH:MM]`, 끝에 `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. 푸시 후 `notion-log`로 작업일지 기록.
 
 ---
 

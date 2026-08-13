@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>선택 강조 효과 설정 — 목업</title>
+<style>
+/* ===== 공통 토큰(라이트) — tokens.css 발췌 인라인 (목업용) ===== */
+:root{
+  --c-white:#fff; --c-bg-light:#f5f6f7; --c-text:#1d2d3e; --c-text-muted:#556b82; --c-line:#d9d9d9;
+  --c-blue:#0070f2; --c-blue-strong:#0064d9; --c-red:#e8000d; --c-red-strong:#c60017;
+  --app-bg:var(--c-bg-light); --surface:#fff; --surface-raised:#fff; --text:var(--c-text); --text-muted:var(--c-text-muted);
+  --line:var(--c-line); --accent:var(--c-blue); --accent-strong:var(--c-blue-strong); --error:var(--c-red);
+  --hover-bg:rgba(85,107,130,.08); --active-bg:rgba(85,107,130,.16); --selected-bg:rgba(0,112,242,.18); --selected-text:var(--accent);
+  --disabled-text:#a9b4be; --disabled-opacity:.4; --switch-off:#c4ccd4; --placeholder:#8b97a3;
+  --radius:.5rem; --radius-sm:.25rem; --line-strong:#c2ccd6;
+  --elevation:0 .125rem .5rem rgba(34,54,84,.10); --popover-shadow:0 .5rem 2rem rgba(34,54,84,.20);
+  --font:"Segoe UI","72",Arial,Helvetica,sans-serif; --titlebar-bg:var(--surface); --close-hover:var(--c-red);
+  --scrollbar-thumb:#c4ccd4;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;background:#e7eaee;font-family:var(--font);color:var(--text);
+  font-size:14px;-webkit-font-smoothing:antialiased;}
+body{display:flex;align-items:center;justify-content:center;padding:24px;}
+
+/* ===== 별창 팝업 프레임(frameless) ===== */
+.win{width:960px;height:640px;max-width:100%;max-height:100%;display:flex;flex-direction:column;
+  background:var(--app-bg);border-radius:10px;overflow:hidden;box-shadow:0 24px 64px rgba(20,30,45,.34);border:1px solid rgba(0,0,0,.12);}
+
+/* 타이틀바 */
+.titlebar{height:40px;flex:0 0 40px;display:flex;align-items:center;gap:8px;padding:0 6px 0 12px;
+  background:var(--titlebar-bg);border-bottom:1px solid var(--line);}
+.tb-logo{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,#0070f2,#5d36ff);flex:0 0 auto;}
+.tb-title{font-weight:600;font-size:13px;color:var(--text);}
+.tb-spacer{flex:1 1 auto;}
+.winbtn{width:34px;height:28px;border:0;background:transparent;border-radius:6px;color:var(--text-muted);
+  font-size:13px;cursor:default;display:flex;align-items:center;justify-content:center;}
+.winbtn:hover{background:var(--hover-bg);}
+.winbtn.close:hover{background:var(--close-hover);color:#fff;}
+
+/* 본문: 좌 메뉴 + 스플리터 + 콘텐츠 */
+.body{flex:1 1 auto;display:flex;min-height:0;}
+.nav{flex:0 0 200px;background:var(--app-bg);padding:6px 0 6px 1px;border-right:1px solid var(--line);}
+.nav-item{height:40px;display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--text);cursor:default;
+  font-size:13px;border-left:3px solid transparent;}
+.nav-item .ico{width:18px;text-align:center;color:var(--text-muted);}
+.nav-item:hover{background:var(--hover-bg);}
+.nav-item.active{background:var(--selected-bg);color:var(--selected-text);font-weight:600;border-left-color:var(--accent);}
+.nav-item.active .ico{color:var(--accent);}
+
+.content{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;background:var(--surface);}
+.sec-hdr{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 16px;font-weight:600;font-size:14px;
+  background:var(--surface-raised);border-bottom:1px solid var(--line);}
+.sec-hdr .ico{color:var(--accent);}
+
+/* 화면 안: 설정 | 크기조절바 | 미리보기 */
+.se{flex:1 1 auto;display:grid;grid-template-columns:minmax(300px,384px) 8px minmax(280px,1fr);min-height:0;}
+.pane-title{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;
+  font-size:12px;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--line);background:var(--app-bg);}
+
+/* 설정 패널 */
+.settings{display:flex;flex-direction:column;min-height:0;border-right:0;}
+.scroll{flex:1 1 auto;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:14px;}
+.group{display:flex;flex-direction:column;gap:10px;}
+.group-title{font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:.02em;text-transform:none;}
+.group-head{display:flex;align-items:center;justify-content:space-between;}
+
+.field{display:flex;flex-direction:column;gap:5px;}
+.field > label{font-size:12px;color:var(--text-muted);}
+.field-inline{display:flex;gap:6px;align-items:center;}
+.sel{flex:1 1 auto;height:32px;border:1px solid var(--line-strong);border-radius:var(--radius-sm);background:#fff;
+  padding:0 28px 0 10px;font:inherit;font-size:13px;color:var(--text);appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--text-muted) 50%),linear-gradient(135deg,var(--text-muted) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;}
+.icon-btn{width:32px;height:32px;flex:0 0 auto;border:1px solid var(--line-strong);border-radius:var(--radius-sm);
+  background:#fff;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:default;font-size:13px;}
+.icon-btn:hover:not([disabled]){background:var(--hover-bg);border-color:var(--accent);color:var(--accent);}
+.icon-btn[disabled]{opacity:var(--disabled-opacity);}
+
+/* 색상 패널 */
+.color-panel{border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:9px;background:var(--surface);}
+.cp-head{display:flex;align-items:center;gap:8px;}
+.cp-head h3{margin:0;font-size:13px;font-weight:600;flex:1 1 auto;}
+.reset-chip{height:26px;border:1px solid var(--line-strong);border-radius:var(--radius-sm);background:#fff;color:var(--text-muted);
+  padding:0 10px;font-size:12px;display:inline-flex;align-items:center;gap:5px;cursor:default;}
+.reset-chip:hover{background:var(--hover-bg);}
+.palette-btn{width:26px;height:26px;border-radius:var(--radius-sm);border:1px solid var(--line-strong);cursor:default;
+  display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:#fff;}
+.palette-btn::before{content:"";position:absolute;inset:0;opacity:.22;
+  background:conic-gradient(from 0deg,#e54b4b,#f9c74f,#6fdd8b,#00a3ff,#b55cff,#e54b4b);}
+.palette-btn span{position:relative;font-size:12px;color:var(--text);}
+
+/* 슬라이더 행 */
+.srow{display:grid;grid-template-columns:52px 1fr 58px;align-items:center;gap:10px;}
+.srow > label{font-size:12px;color:var(--text-muted);}
+.rng{-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;outline:none;
+  background:var(--line);}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);
+  border:2px solid #fff;box-shadow:0 1px 3px rgba(15,23,42,.24);cursor:default;}
+.vwrap{display:flex;align-items:center;border:1px solid var(--line-strong);border-radius:var(--radius-sm);height:26px;overflow:hidden;background:#fff;}
+.vwrap input{width:100%;border:0;text-align:right;font:inherit;font-size:12px;padding:0 4px;color:var(--text);background:transparent;outline:none;}
+.vwrap .suffix{font-size:11px;color:var(--text-muted);padding:0 6px 0 0;}
+
+/* 네온 스위치 */
+.switch{display:grid;grid-template-columns:1fr 44px;align-items:center;gap:8px;padding-top:2px;}
+.switch > span{font-size:12px;color:var(--text-muted);}
+.track{width:44px;height:22px;border-radius:11px;background:var(--switch-off);position:relative;transition:.16s;}
+.track::before{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.28);transition:.16s;}
+.track.on{background:var(--accent);}
+.track.on::before{transform:translateX(22px);}
+
+/* 크기조절 바 */
+.splitbar{background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:col-resize;
+  border-left:1px solid var(--line);border-right:1px solid var(--line);color:#b6c0cb;font-size:11px;}
+
+/* 미리보기 */
+.preview{display:flex;flex-direction:column;min-height:0;}
+.help-btn{width:24px;height:24px;border-radius:50%;border:1px solid var(--accent);color:var(--accent);background:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:12px;cursor:default;}
+.stage{flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;background:var(--app-bg);}
+.ptarget{width:min(320px,100%);aspect-ratio:15/13;min-height:180px;border-radius:8px;position:relative;
+  border:2px solid rgba(0,120,255,1);background:var(--surface);overflow:hidden;
+  box-shadow:0 1px 4px rgba(15,23,42,.16);}
+.ptarget::after{content:"";position:absolute;inset:0;border-radius:5px;background-color:rgba(0,120,255,.08);pointer-events:none;}
+.pcard{position:relative;z-index:1;padding:14px;height:100%;display:flex;flex-direction:column;gap:10px;}
+.pcard .ph{display:flex;justify-content:space-between;font-size:12px;}
+.pcard .ph strong{font-weight:700;}
+.pcard .ph span{color:var(--text-muted);}
+.ptest-btn{align-self:flex-start;height:28px;border:1px solid var(--line-strong);border-radius:var(--radius-sm);
+  background:#fff;padding:0 12px;font-size:12px;color:var(--text);box-shadow:0 1px 2px rgba(15,23,42,.12);}
+.pbody{flex:1 1 auto;border:1px dashed var(--line);border-radius:6px;}
+
+/* 푸터 */
+.footer{flex:0 0 48px;height:48px;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 12px;
+  background:var(--surface);border-top:1px solid var(--line);}
+.btn{height:32px;border-radius:var(--radius-sm);border:1px solid transparent;padding:0 16px;font:inherit;font-size:13px;
+  display:inline-flex;align-items:center;gap:7px;cursor:default;}
+.btn-emph{background:var(--accent);color:#fff;}
+.btn-emph:hover{background:var(--accent-strong);}
+.btn-danger{background:#fff;color:var(--c-red);border-color:var(--c-red);}
+.btn-danger:hover{background:var(--c-red);color:#fff;}
+
+.hint{max-width:960px;margin:0 auto 12px;color:#5b6b7d;font-size:12px;text-align:center;}
+</style>
+</head>
+<body>
+<div style="display:flex;flex-direction:column;">
+  <div class="hint">※ 정적 목업(화면만). 별창 팝업 프레임 안에 "선택 강조 효과" 화면이 뜬 모습 · 공통 화면 룩 기반 · 기본 프리셋 "밝은 UI 선택 스타일" 값 표시</div>
+  <div class="win">
+    <!-- 타이틀바 -->
+    <div class="titlebar">
+      <div class="tb-logo"></div>
+      <div class="tb-title">Options</div>
+      <div class="tb-spacer"></div>
+      <button class="winbtn">—</button>
+      <button class="winbtn">▢</button>
+      <button class="winbtn close">✕</button>
+    </div>
+    <!-- 본문 -->
+    <div class="body">
+      <!-- 좌측 메뉴 -->
+      <div class="nav">
+        <div class="nav-item"><span class="ico">◧</span>테마 설정</div>
+        <div class="nav-item active"><span class="ico">✦</span>선택 강조 효과</div>
+      </div>
+      <!-- 콘텐츠 -->
+      <div class="content">
+        <div class="sec-hdr"><span class="ico">✦</span>UI 선택 스타일 설정</div>
+        <div class="se">
+          <!-- 설정 패널 -->
+          <div class="settings">
+            <div class="pane-title"><span>설정</span></div>
+            <div class="scroll">
+              <!-- 기본 설정 -->
+              <div class="group">
+                <div class="group-title">기본 설정</div>
+                <div class="field">
+                  <label>유형 :</label>
+                  <select class="sel"><option>UI 선택 스타일</option><option>Context Menu 선택 스타일</option></select>
+                </div>
+                <div class="field">
+                  <label>프리셋 :</label>
+                  <div class="field-inline">
+                    <select class="sel"><option>밝은 UI 선택 스타일 (기본값)</option><option>굵은 네온사인 (기본값)</option><option>네온 사선 (기본값)</option></select>
+                    <button class="icon-btn" disabled title="프리셋 이름 변경">✎</button>
+                  </div>
+                </div>
+              </div>
+              <!-- 색상 설정 -->
+              <div class="group">
+                <div class="group-head">
+                  <div class="group-title">색상 설정</div>
+                  <button class="reset-chip">↺ 초기화</button>
+                </div>
+
+                <!-- 테두리 색상 -->
+                <div class="color-panel">
+                  <div class="cp-head">
+                    <h3>테두리 색상</h3>
+                    <button class="palette-btn" title="색상 팔레트"><span>◑</span></button>
+                    <button class="reset-chip" style="height:26px;">↺</button>
+                  </div>
+                  <div class="srow"><label>빨강</label><input class="rng" type="range" min="0" max="255" value="0" style="background:linear-gradient(90deg,var(--accent) 0%,var(--line) 0%);"><div class="vwrap"><input value="0"></div></div>
+                  <div class="srow"><label>초록</label><input class="rng" type="range" min="0" max="255" value="120" style="background:linear-gradient(90deg,var(--accent) 47%,var(--line) 47%);"><div class="vwrap"><input value="120"></div></div>
+                  <div class="srow"><label>파랑</label><input class="rng" type="range" min="0" max="255" value="255" style="background:linear-gradient(90deg,var(--accent) 100%,var(--line) 100%);"><div class="vwrap"><input value="255"></div></div>
+                  <div class="srow"><label>투명도</label><input class="rng" type="range" min="0" max="100" value="100" style="background:linear-gradient(90deg,var(--accent) 100%,var(--line) 100%);"><div class="vwrap"><input value="100"><span class="suffix">%</span></div></div>
+                  <div class="switch"><span>네온 효과 :</span><div class="track"></div></div>
+                </div>
+
+                <!-- 내부 색상 -->
+                <div class="color-panel">
+                  <div class="cp-head">
+                    <h3>내부 색상</h3>
+                    <button class="palette-btn" title="색상 팔레트"><span>◑</span></button>
+                    <button class="reset-chip" style="height:26px;">↺</button>
+                  </div>
+                  <div class="srow"><label>빨강</label><input class="rng" type="range" min="0" max="255" value="0" style="background:linear-gradient(90deg,var(--accent) 0%,var(--line) 0%);"><div class="vwrap"><input value="0"></div></div>
+                  <div class="srow"><label>초록</label><input class="rng" type="range" min="0" max="255" value="120" style="background:linear-gradient(90deg,var(--accent) 47%,var(--line) 47%);"><div class="vwrap"><input value="120"></div></div>
+                  <div class="srow"><label>파랑</label><input class="rng" type="range" min="0" max="255" value="255" style="background:linear-gradient(90deg,var(--accent) 100%,var(--line) 100%);"><div class="vwrap"><input value="255"></div></div>
+                  <div class="srow"><label>투명도</label><input class="rng" type="range" min="0" max="100" value="8" style="background:linear-gradient(90deg,var(--accent) 8%,var(--line) 8%);"><div class="vwrap"><input value="8"><span class="suffix">%</span></div></div>
+                </div>
+
+                <!-- 내부 색상 사선 효과 -->
+                <div class="color-panel">
+                  <div class="cp-head">
+                    <h3>내부 색상 사선 효과</h3>
+                    <button class="palette-btn" title="색상 팔레트"><span>◑</span></button>
+                    <button class="reset-chip" style="height:26px;">↺</button>
+                  </div>
+                  <div class="srow"><label>빨강</label><input class="rng" type="range" min="0" max="255" value="0" style="background:linear-gradient(90deg,var(--accent) 0%,var(--line) 0%);"><div class="vwrap"><input value="0"></div></div>
+                  <div class="srow"><label>초록</label><input class="rng" type="range" min="0" max="255" value="120" style="background:linear-gradient(90deg,var(--accent) 47%,var(--line) 47%);"><div class="vwrap"><input value="120"></div></div>
+                  <div class="srow"><label>파랑</label><input class="rng" type="range" min="0" max="255" value="255" style="background:linear-gradient(90deg,var(--accent) 100%,var(--line) 100%);"><div class="vwrap"><input value="255"></div></div>
+                  <div class="srow"><label>투명도</label><input class="rng" type="range" min="0" max="100" value="0" style="background:linear-gradient(90deg,var(--accent) 0%,var(--line) 0%);"><div class="vwrap"><input value="0"><span class="suffix">%</span></div></div>
+                  <div class="srow"><label>각도</label><input class="rng" type="range" min="0" max="180" value="45" style="background:linear-gradient(90deg,var(--accent) 25%,var(--line) 25%);"><div class="vwrap"><input value="45"><span class="suffix">deg</span></div></div>
+                  <div class="srow"><label>간격</label><input class="rng" type="range" min="1" max="96" value="32" style="background:linear-gradient(90deg,var(--accent) 33%,var(--line) 33%);"><div class="vwrap"><input value="32"><span class="suffix">px</span></div></div>
+                  <div class="srow"><label>두께</label><input class="rng" type="range" min="1" max="48" value="8" style="background:linear-gradient(90deg,var(--accent) 15%,var(--line) 15%);"><div class="vwrap"><input value="8"><span class="suffix">px</span></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 크기조절 바 -->
+          <div class="splitbar">⋮</div>
+
+          <!-- 미리보기 -->
+          <div class="preview">
+            <div class="pane-title"><span>UI 선택 스타일 미리보기</span><button class="help-btn" title="도움말">?</button></div>
+            <div class="stage">
+              <div class="ptarget">
+                <div class="pcard">
+                  <div class="ph"><strong>test header</strong><span>test value</span></div>
+                  <button class="ptest-btn">test Button</button>
+                  <div class="pbody"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 푸터 -->
+        <div class="footer">
+          <button class="btn btn-emph">✓ 적용</button>
+          <button class="btn btn-danger">🗑 삭제</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

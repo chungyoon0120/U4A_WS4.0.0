@@ -72,10 +72,9 @@
     // 재선택 = setSelectTreeItem(→fnWs20SelectUI, async: refreshPreview+selPreviewUI 대기).
     //  ★ Promise 를 반환한다 — undo/redo 가 이 완료(=편집하던 페이지 복원)까지 await 해야
     //    BUSY 를 그 전에 풀지 않고, PAGE1 이 잠깐 노출되는 깜빡임도 막는다.
-    //  sUiatk 가 있으면 재선택 후 그 속성 줄로 스크롤(원본 setSelectTreeItem(OBJID, UIATK)→setAttrFocus).
-    function _selectNode(sObjid, sUiatk) {
+    function _selectNode(sObjid) {
         try {
-            if (typeof oAPP.fn.setSelectTreeItem === "function") { return oAPP.fn.setSelectTreeItem(sObjid, sUiatk || undefined); }
+            if (typeof oAPP.fn.setSelectTreeItem === "function") { return oAPP.fn.setSelectTreeItem(sObjid); }
         } catch (e) { }
         return Promise.resolve();
     }
@@ -186,13 +185,8 @@
         _refreshTree();
 
         // 복원 트리에 존재하는 유효 앵커(선택 대상).
-        //  ★ 속성 값 변경 복원이면 원본처럼 "값이 바뀐 그 노드" 를 선택한다(직전에 골라놨던 노드가
-        //    아니라). 원본 undoRedo.js CL_CHANGE_ATTR.executeChangeAttr 끝의
-        //    setSelectTreeItem(T_ATTR[0].OBJID, UIATK) 대응. 이게 없으면 "A 변경 → B 선택 →
-        //    되돌리기 → 다시하기" 시 다시하기가 A 가 아닌 B 로 이동하는 버그가 난다.
         var sAnchor = "";
-        if (s.focus && s.focus.OBJID && _node(s.focus.OBJID)) { sAnchor = s.focus.OBJID; }
-        else if (s.sel && _node(s.sel)) { sAnchor = s.sel; }
+        if (s.sel && _node(s.sel)) { sAnchor = s.sel; }
         else if (sSelParent && _node(sSelParent)) { sAnchor = sSelParent; }
 
         // IS_CHAG 는 스냅샷 값으로 되돌리지 않고 항상 dirty("X") 유지 — undo/redo 도 "변경 행위"라
@@ -223,21 +217,11 @@
             if (w && typeof w.drawPreview === "function") { await w.drawPreview(); }
         } catch (e) { console.warn("[HTML5][WS20] undo/redo drawPreview:", e && e.message); }
         _commitState();
-        //  ★ 속성 값 변경 스냅샷이면 그 바뀐 속성(UIATK) 줄로 스크롤 이동 — 원본 undoRedo
-        //    CL_CHANGE_ATTR.executeChangeAttr 끝의 setSelectTreeItem(OBJID, UIATK) 대응(그동안 누락).
-        //    앵커(선택 노드)가 그 속성의 소속 노드일 때만 스크롤(삭제 대체앵커=부모면 스크롤 안 함).
-        if (sAnchor) {
-            var sFocusUiatk = (s.focus && s.focus.OBJID === sAnchor) ? s.focus.UIATK : "";
-            try { await _selectNode(sAnchor, sFocusUiatk); } catch (e) { }
-        }
+        if (sAnchor) { try { await _selectNode(sAnchor); } catch (e) { } }
     }
     // 편집 직전 호출 — 현재 상태를 undo 스택에 적재(+redo 비움).
-    //  oFocus={OBJID, UIATK} 를 주면 스냅샷에 "바뀐 속성"을 기록 → undo/redo 복원 시 그 줄로 스크롤.
-    //  (속성 값 변경 경로만 전달. 삽입/삭제/이동은 미전달 → 스크롤 없음, 원본도 CHANGE_ATTR 만 스크롤.)
-    oAPP.fn.fnWs20PushUndo = function (oFocus) {
-        var _snap = _snapshot();
-        if (oFocus && oFocus.OBJID && oFocus.UIATK) { _snap.focus = { OBJID: oFocus.OBJID, UIATK: oFocus.UIATK }; }
-        _undoStack.push(_snap);
+    oAPP.fn.fnWs20PushUndo = function () {
+        _undoStack.push(_snapshot());
         if (_undoStack.length > _UNDO_MAX) { _undoStack.shift(); }
         _redoStack = [];
         _updateUndoBtns();
@@ -276,11 +260,7 @@
             _bHistBusy = true;
             try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { }
             try {
-                //반대 스택에 넣는 현재 스냅샷에도 "바뀐 속성" 을 이어붙인다 — 되돌리기/다시하기 어느
-                //  방향으로 가도 같은 속성 줄로 스크롤되게(원본은 두 방향 모두 T_ATTR[0].UIATK 로 스크롤).
-                var _oRevert = _snapshot();
-                if (oTarget && oTarget.focus) { _oRevert.focus = oTarget.focus; }
-                aDst.push(_oRevert);
+                aDst.push(_snapshot());
                 await _restoreSnap(aSrc.pop());
                 //[F-3] 바인딩 팝업(별창) 반영 — 원본 undoRedo.js executeHistory 가 복원 후 updateBindPopupDesignData 호출(547/1017/1512).
                 //  HTML5 이식 시 BUSY 만 배선되고 반영이 누락됐었다(장군님 발견 2026-07-28). 팝업 미오픈이면 방송모듈 가드로 no-op.
@@ -870,11 +850,6 @@
             //   중복이면 designChkUnique 내부에서 원본 메시지(130 중복 불가) 토스트 후 true → 추가 차단(undo push 이전).
             //   (라이브러리 직접 D&D 경로 fnWs20AddTreeData 는 이미 동일 점검 보유 — 경로 간 동작 일치.)
             if (typeof oAPP.fn.designChkUnique === "function" && oAPP.fn.designChkUnique(is_0022.UIOBK, cnt) === true) { return; }
-            // ★ BR35: 특정 부모에만 존재 가능한 UI(UA040 HIDDEN_AREA — 예: SessionWorker/PressTrigger 는 sap.m.App 만)
-            //   점검을 원본 uiDesignArea.js:5063 designAddUIObject 의 designChkHiddenAreaUi(is_0022.UIOBK, is_tree.UIOBK)
-            //   로 이 팝업/드롭 확정 경로에 1:1 복원(HTML5 이식 때 누락됨). 허용 부모가 아니면 내부에서 원본 메시지(131)
-            //   토스트 후 true → 추가 차단(undo push·트리/미리보기 변경 이전). D&D 직접경로(dnd.js:982)는 이미 보유 — 경로 일치.
-            if (typeof oAPP.fn.designChkHiddenAreaUi === "function" && oAPP.fn.designChkHiddenAreaUi(is_0022.UIOBK, is_tree.UIOBK) === true) { return; }
 
             oAPP.fn.fnWs20PushUndo();
 
@@ -1274,15 +1249,6 @@
             try { parent.setBusy(""); }
             catch (e) { console.error("[HTML5][WS20] insert releaseBusy:", e && e.message ? e.message : e); }
         }
-        // [BR36] 사용자 액션 시작 시점 BUSY ON — 원본 트리 "+" press(uiDesignArea.js:264·267)가
-        //   designUIAdd 호출 전에 setBusy("X")+setShortcutLock(true) 을 켰으나, HTML5 두 진입 경로
-        //   (트리 "+" 아이콘 클릭 ws_html5_ws20_tree.js:560 · 우클릭 메뉴 Insert Element M01 편집.js:1858)
-        //   가 이를 빠뜨려 켜기 없이 팝업만 떴다. 두 경로가 모두 이 함수로 모이므로 여기서 한 번 켜고,
-        //   아래 모든 종료 분기의 _releaseBusyLock() 이 짝을 맞춰 끈다(성공은 팝업 렌더 완료 후 double-rAF 해제).
-        try { parent.setBusy("X"); }
-        catch (e) { console.error("[HTML5][WS20] insert setBusy:", e && e.message ? e.message : e); }
-        try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(true); } }
-        catch (e) { console.error("[HTML5][WS20] insert setShortcutLock:", e && e.message ? e.message : e); }
         if (!is_tree) { _releaseBusyLock(); return; }
         var aAgg = _getAggregations(is_tree.UIOBK);
         if (!aAgg.length) {

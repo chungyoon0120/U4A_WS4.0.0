@@ -564,7 +564,6 @@
     oS.selNode = null;
     oS.T_MPROP = [];
     oS.showAddit = false;
-    oS.treeFilters = {};   // 트리 컬럼 필터(이름/유형/설명) — 팝업 열 때마다 초기화(원본 lf_resetFilter).
 
     // UIATK → 대상 attribute 라인 검색(원본: UIATY 를 CARDI 로 역산).
     if (typeof UIATK !== "undefined") {
@@ -964,78 +963,6 @@
     }
   } // end of lf_setBindEnable
 
-  /* ── 트리 컬럼 필터 (원본 sap.ui.table Column filterProperty NTEXT/TYPE/DESCR — 이름·유형·설명 걸러보기) ──
-   *   원본: 각 컬럼 헤더 필터 → 매칭 행 표시 + 전체펼침(attachFilter→expandToLevel), 재로드 시 필터 해제.
-   *   HTML5: 3개 컬럼 헤더 클릭 → 공통 U4AUI.openColumnMenu(필터 전용, 정렬 없음). 상태=oS.treeFilters(소문자 부분일치). */
-  function _treeFilterOn() {
-    var f = oS.treeFilters || {};
-    return !!(f.NTEXT || f.TYPE || f.DESCR);
-  }
-  function _nodeMatchTreeFilter(n) {
-    var f = oS.treeFilters || {};
-    if (f.NTEXT && String(n.NTEXT == null ? "" : n.NTEXT).toLowerCase().indexOf(f.NTEXT) === -1) { return false; }
-    if (f.TYPE && String(n.TYPE == null ? "" : n.TYPE).toLowerCase().indexOf(f.TYPE) === -1) { return false; }
-    if (f.DESCR && String(n.DESCR == null ? "" : n.DESCR).toLowerCase().indexOf(f.DESCR) === -1) { return false; }
-    return true;
-  }
-  // 노드 유지 = 자기 매칭 OR 자손 중 매칭(원본 트리 필터: 매칭 행 + 조상 유지).
-  function _keepTreeNode(n) {
-    if (_nodeMatchTreeFilter(n)) { return true; }
-    var kids = (n && n.zTREE) || [];
-    for (var i = 0; i < kids.length; i++) { if (_keepTreeNode(kids[i])) { return true; } }
-    return false;
-  }
-  function _filterTreeNodes(aNodes) {
-    return _treeFilterOn() ? (aNodes || []).filter(_keepTreeNode) : (aNodes || []);
-  }
-  // 활성 필터 컬럼 헤더에 공통 필터 표시자(깔때기) 노출 — 공통 .u4a-th__ind(색=--accent · fa-filter)
-  //   재사용(AppF4·동일속성·대형 별창 디자인트리와 완전 동일). ★필터 걸린 컬럼에만 표시(상시 아이콘 금지).
-  function _syncTreeColFilterMark() {
-    if (!oUI.treeHost) { return; }
-    var aTh = oUI.treeHost.querySelectorAll(".u4aColTreeHead .u4aColTreeCol");
-    var aKey = ["NTEXT", "TYPE", "DESCR"];
-    for (var i = 0; i < aTh.length && i < 3; i++) {
-      var on = !!(oS.treeFilters && oS.treeFilters[aKey[i]]);
-      var oInd = aTh[i].querySelector(".u4a-th__ind");
-      if (on) {
-        if (!oInd) { oInd = _el("span", "u4a-th__ind"); oInd.innerHTML = _fa("filter"); aTh[i].appendChild(oInd); }
-      } else if (oInd) { oInd.remove(); }
-    }
-  }
-  // 필터 적용 = 재렌더 + 전체 펼침(원본 attachFilter → expandToLevel).
-  function _applyTreeFilter() {
-    if (!oUI.ctrl) { return; }
-    oUI.ctrl.rerender(false);
-    if (oUI.tree && oS.zTREE && oS.zTREE[0]) { try { oUI.tree.expandToLevel(99999); } catch (e) { } }
-    _syncTreeColFilterMark();
-  }
-  // 3개 컬럼 헤더에 공통 컬럼메뉴(필터 전용, 정렬 없음) 배선 — 헤더는 makeColumnTree 가 1회 생성하므로 1회만.
-  function _wireTreeColFilter() {
-    if (!oUI.treeHost || oUI.treeHost.__bindColFilterWired) { return; }
-    var aTh = oUI.treeHost.querySelectorAll(".u4aColTreeHead .u4aColTreeCol");
-    if (!aTh || aTh.length < 3) { return; }
-    var aKey = ["NTEXT", "TYPE", "DESCR"];
-    var oCtl = {
-      getFilter: function (k) { return (oS.treeFilters && oS.treeFilters[k]) || ""; },
-      setFilter: function (k, v) { if (!oS.treeFilters) { oS.treeFilters = {}; } oS.treeFilters[k] = (v || "").toLowerCase(); },
-      rerender: function () { _applyTreeFilter(); }
-    };
-    for (var i = 0; i < 3; i++) {
-      (function (th, key) {
-        th.classList.add("u4aBindColMenuTh");
-        th.addEventListener("click", function () {
-          if (!(window.U4AUI && U4AUI.openColumnMenu)) { return; }
-          U4AUI.openColumnMenu({ key: key }, th, oCtl, {
-            container: oUI.dlg, filter: true, sort: false,
-            filterIndicator: true,   // ★공통 메뉴가 깔때기 표시자를 자동 관리(화면이 손으로 안 붙임).
-            labels: { filter: _cl("A68"), clear: _cl("A69") }   // A68 필터 값 / A69 필터 초기화
-          });
-        });
-      })(aTh[i], aKey[i]);
-    }
-    oUI.treeHost.__bindColFilterWired = true;
-  }
-
   /* ── 트리 렌더 (공통 U4AUI.makeColumnTree — 3열 그리드 트리테이블) ──
    *   헤더/세로 그리드라인/컬럼 리사이즈(가이드 라인)/가로 스크롤을 컴포넌트가 전담(대형 바인딩 별창과 동일).
    *   화면은 데이터 매핑(cell/rowHook/onSelect)만 제공. 트리 손볼 일은 U4AUI.makeColumnTree 한 곳(16 §3.4.2). */
@@ -1052,9 +979,9 @@
           { label: _cl("A51"), width: "8rem" },     // A51 Type
           { label: _cl("A35"), width: "16rem" }      // A35 Description
         ],
-        roots: function () { return _filterTreeNodes(oS.zTREE || []); },
-        children: function (n) { return _filterTreeNodes((n && n.zTREE) || []); },
-        hasChildren: function (n) { return _filterTreeNodes((n && n.zTREE) || []).length > 0; },
+        roots: function () { return oS.zTREE || []; },
+        children: function (n) { return n.zTREE || []; },
+        hasChildren: function (n) { return !!(n.zTREE && n.zTREE.length); },
         key: function (n) { return n.CHILD; },
         label: function (n) { return n.NTEXT; },
         tip: function (n) { return n.NTEXT; },   // 이름 말줄임 시 툴팁=전체 이름
@@ -1087,14 +1014,12 @@
         onSelect: function (n) { lf_selRow(n); }
       });
       oUI.tree = oUI.ctrl.tree;   // 기존 oUI.tree.*(펼침/접기/선택/el) 호출을 그대로 유지
-      _wireTreeColFilter();       // 3개 컬럼 헤더에 컬럼메뉴(필터) 배선(1회).
     }
     // ★ BR27: 재사용(재오픈/새로고침) 세션 경계 초기화 — 이전 세션의 선택 키가 가상 스크롤러에 남아,
     //   새 데이터에 같은 키(CHILD)가 있으면 엉뚱한 줄에 강조가 되살아나는(유령 선택) 회귀를 막는다.
     //   새로 그리기 전에 선택을 명시 해제(비가상도 안전). 이후 lf_setSelectTree 가 올바른 줄만 다시 선택.
     if (oUI.tree) { oUI.tree.selectByKey(null, false); }
     oUI.ctrl.rerender(false);     // 첫행 자동선택 안 함(lf_setSelectTree 가 선택 담당)
-    _syncTreeColFilterMark();      // 재오픈 시 필터 초기화됐으면 헤더 강조도 해제.
   }
 
   // 라인선택 이벤트 (원본 lf_selTabRow 458행).
@@ -1361,7 +1286,7 @@
         type: "text", value: ls.val || "", upper: true, clear: true,
         maxLength: ls.maxlen, readOnly: !(ls.edit && bEdit), disabled: !(ls.edit && bEdit),
         className: "u4aBindAdditField",
-        onChange: function (v) { ls.val = (v || "").toUpperCase(); lf_onMpropChange(ls); }
+        onChange: function (v) { ls.val = (v || "").toUpperCase(); }
       });
       ls._field = oF;
       // [값-스테이트 메시지] 포커스 시 문서 최상단 fixed 팝오버 표시 / blur 시 숨김(별창 방식). 빨간 테두리는 setValueState.
@@ -1370,9 +1295,7 @@
         inpEl.addEventListener("focus", function () { _bindVsShow(inpEl, row); });
         inpEl.addEventListener("blur", function () { _bindVsHide(); });
       })(ls, oF.input);
-      // ★비활성(읽기전용) 칸엔 빨간 오류표시를 안 그린다 — 원본 sap.m 은 editable=false 필드에 valueState 를
-      //   표시하지 않는다. (Bind type 을 빈값으로 바꾸면 Reference Field name 이 비활성이 되며 빨간표시가 사라짐.)
-      if (oF.setValueState) { oF.setValueState((ls.stat === "Error" && ls.edit && bEdit) ? "error" : "none", ls.statTxt || ""); }
+      if (oF.setValueState) { oF.setValueState(ls.stat === "Error" ? "error" : "none", ls.statTxt || ""); }
       return oF.el;
     }
     if (ls.sel_vis) {
@@ -1384,8 +1307,7 @@
         onChange: function (v) { ls.val = v; lf_onMpropChange(ls); }
       });
       ls._field = oSel;
-      // ★비활성(읽기전용) 드롭다운엔 빨간 오류표시를 안 그린다(원본 sap.m 동일). Bind type 빈값 → 이 칸 비활성 → 빨간표시 사라짐.
-      if (oSel.setValueState) { oSel.setValueState((ls.stat === "Error" && ls.edit && bEdit) ? "error" : "none", ls.statTxt || ""); }
+      if (oSel.setValueState) { oSel.setValueState(ls.stat === "Error" ? "error" : "none", ls.statTxt || ""); }
       return oSel.el;
     }
     return null;
@@ -1414,13 +1336,7 @@
 
   // 추가속성 DDLB 상호작용 (원본 oTabCol2Sel1 change — Bind type ↔ Reference/Conversion).
   function lf_onMpropChange(ls) {
-    // ★값을 채우면 그 칸의 빨간 오류표시를 즉시 해제. 원본은 valueState 가 stat 에 모델 바인딩돼 값 입력
-    //   즉시 반영되지만, HTML5 는 그 연동이 없어 여기서 명시 해제한다(값 채웠는데 빨간색 남는 문제 해결).
-    if (ls && ls.stat === "Error" && ls.val != null && ls.val !== "") {
-      ls.stat = "None"; ls.statTxt = "";
-      if (ls._field && typeof ls._field.setValueState === "function") { try { ls._field.setValueState("none", ""); } catch (e) { } }
-    }
-    if (!ls || ls.ITMCD !== "P04") { return; }
+    if (ls.ITMCD !== "P04") { return; }
     var ls_P05 = oS.T_MPROP.find(function (a) { return a.ITMCD === "P05"; });
     var ls_P06 = oS.T_MPROP.find(function (a) { return a.ITMCD === "P06"; });
     if (!ls_P05 || !ls_P06) { return; }
@@ -1439,13 +1355,7 @@
   function lf_resetMPROPMsg() {
     if (oS.CARDI !== "F") { return; }
     if (!oS.T_MPROP || oS.T_MPROP.length === 0) { return; }
-    for (var i = 0; i < oS.T_MPROP.length; i++) {
-      oS.T_MPROP[i].stat = "None"; oS.T_MPROP[i].statTxt = "";
-      // ★원본은 valueState 모델 바인딩이라 stat 초기화 시 칸의 빨간 표시가 자동으로 지워진다(callBindPopup.js:969~972).
-      //   HTML5 는 그 연동이 없으므로, 살아있는 칸의 오류표시를 명시적으로 해제해 원본 암묵동작을 재현한다.
-      var _f = oS.T_MPROP[i]._field;
-      if (_f && typeof _f.setValueState === "function") { try { _f.setValueState("none", ""); } catch (e) { } }
-    }
+    for (var i = 0; i < oS.T_MPROP.length; i++) { oS.T_MPROP[i].stat = "None"; oS.T_MPROP[i].statTxt = ""; }
   }
 
   /* ── Bind / Unbind ── */
@@ -1472,7 +1382,7 @@
           ls_P05.stat = "Error";
           ls_P05.statTxt = _mw("267");   // 267 Bind type 선택 시 Reference Field name 필수.
           lf_renderAddit();
-          _refocus(ls_P05._field && ls_P05._field.input);   // 드롭다운 빨간 테두리+문구는 공통 setValueState 로 표시(BC2 반영). 포커스로 값상태 노출.
+          _refocus(ls_P05._field && ls_P05._field.input);   // (select 는 공통 setValueState no-op 라 메시지 미표시 — 별도 이슈)
           _msg(10, "E", ls_P05.statTxt);
           return resolve(true);
         }
@@ -1619,8 +1529,6 @@
     if (is_attr.UIATV !== "" && is_attr.ISBND === "X") {
       _confirm(function () {
         if (bLive) { try { oAPP.fn.attrUnbindAggr(oPrev, is_attr.UIATT, is_attr.UIATV); } catch (e) { } }
-        // ★원본 uiAttributeArea.js:4811 1:1 — 재바인딩(바꾸기)도 UNDO 이력 생략(집합 해제와 동일하게 Ctrl+Z 한 번).
-        if (oAPP.oDesign && oAPP.oDesign.CS_ACTCD) { is_attr.ACTCD = oAPP.oDesign.CS_ACTCD.UNBIND_AGGR; }
         doBind();
       });
     } else { doBind(); }
@@ -1814,11 +1722,6 @@
       ".u4aBindTypeCell { display: flex; align-items: center; gap: 0.375rem; min-width: 0; overflow: hidden; }",
       ".u4aBindTypeTxt, .u4aBindDescTxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }",
       ".u4aBindDescTxt { color: var(--text); }",
-      // 트리 컬럼 헤더 = 클릭 시 컬럼메뉴(필터). 클릭 어포던스만(활성 필터 표시는 공통 깔때기 .u4a-th__ind).
-      ".u4aBindColMenuTh { cursor: pointer; }",
-      ".u4aBindColMenuTh:hover { color: var(--accent); }",
-      // 활성 필터 깔때기(.u4a-th__ind)는 헤더 글자에 붙지 않게 오른쪽 끝으로 띄운다(대형 별창과 동일한 간격 처리).
-      ".u4aBindColMenuTh .u4a-th__ind { margin-left: 0.375rem; }",
       // 상태 아이콘 색(시맨틱 토큰).
       ".u4aBindStat { flex: 0 0 auto; }",
       ".u4aBindStat--success { color: var(--state-success); }",
@@ -1835,7 +1738,7 @@
       ".u4aBindAdditPane { display: none; flex: 1 1 0; min-width: 8rem; background: var(--surface); overflow: hidden; }",
       ".u4aBindSplitBar { display: none; }",
       // 추가속성 표시 시 기본 배치 = 트리 62%(공통 스플릿바가 드래그로 조정, 더블클릭 시 이 기본값으로 복귀 = inline flex 제거).
-      ".u4aBindShowAddit .u4aBindTreePane { flex: 0 0 52%; }",
+      ".u4aBindShowAddit .u4aBindTreePane { flex: 0 0 62%; }",
       ".u4aBindShowAddit .u4aBindAdditPane { display: flex; }",
       ".u4aBindShowAddit .u4aBindSplitBar { display: flex; }",
       ".u4aBindAdditWrap { flex: 1 1 auto; min-height: 0; overflow: auto; }",

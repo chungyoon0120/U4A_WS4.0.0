@@ -1815,9 +1815,7 @@
 
         // ── combo / select : createSelect 위임(콤보는 .value getter/setter + setItems 보유) ──
         if (sType === "combo" || sType === "select") {
-            // 밸류스테이트(오류표시)를 생성 시점부터 콤보에 전달 — 초기 오류상태도 그 칸에 표시.
-            const oCombo = createSelect(opts.items || [], opts.value, opts.onChange,
-                { onOpen: opts.onOpen, valueState: opts.valueState, valueStateText: opts.valueStateText });
+            const oCombo = createSelect(opts.items || [], opts.value, opts.onChange, { onOpen: opts.onOpen });
             if (opts.id) { oCombo.id = opts.id; }
             if (opts.className) { opts.className.split(/\s+/).forEach(c => { if (c) { oCombo.classList.add(c); } }); }
             if (opts.width) { oCombo.style.width = opts.width; }
@@ -1828,9 +1826,7 @@
                 setValue(v) { oCombo.value = v; },
                 setItems(a) { if (oCombo.setItems) { oCombo.setItems(a); } },
                 setReadOnly() { },
-                // 오류표시는 공통 콤보(createSelect)가 이미 지원 — 빈 함수로 덮지 말고 그대로 위임.
-                //   (드롭다운 칸 자체에 빨간 테두리 + 펼침목록 최상단 오류문구. 원본 UI5 ComboBox valueState 대응.)
-                setValueState(sState, sText) { if (oCombo.setValueState) { oCombo.setValueState(sState, sText); } },
+                setValueState() { },
                 focus() { oCombo.focus(); }
             };
         }
@@ -2006,18 +2002,6 @@
         const bFilter = opts.filter !== false;
         const bSort = opts.sort !== false;
 
-        // [옵션] 필터 표시자(깔때기) 자동 관리 — opts.filterIndicator 일 때만(기본 꺼짐=기존 소비처 무영향).
-        //   필터 걸린 컬럼 헤더에만 공통 .u4a-th__ind(fa-filter · --accent)를 붙인다(상시 아이콘 금지).
-        //   화면마다 손으로 붙이던 것을 공통화 — 앞으로 컬럼메뉴만 쓰면 깔때기가 자동으로 뜬다(장군님 지시 2026-08-13).
-        function _syncFilterInd() {
-            if (!opts.filterIndicator || !oTh || !bFilter || !ctl.getFilter) { return; }
-            const bOn = !!ctl.getFilter(oCol.key);
-            let oInd = oTh.querySelector(".u4a-th__ind");
-            if (bOn) {
-                if (!oInd) { oInd = _el("span", "u4a-th__ind"); oInd.innerHTML = _fa("filter"); oTh.appendChild(oInd); }
-            } else if (oInd) { oInd.remove(); }
-        }
-
         // 필터 input (contains, Enter/blur 적용) — bFilter 일 때만.
         let fi = null;
         if (bFilter) {
@@ -2031,10 +2015,9 @@
                 if (v === cur) { return; }
                 ctl.setFilter(oCol.key, v);
                 ctl.rerender();
-                _syncFilterInd();
             };
             fi.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); applyF(); closeColumnMenu(); } });
-            // ★필터는 Enter 로만 적용(장군님 지시 2026-08-13). 포커스 빠짐(blur=Tab/딴곳 클릭)으로는 적용하지 않는다.
+            fi.addEventListener("blur", applyF);
             fw.appendChild(fi);
             m.appendChild(fw);
         }
@@ -2070,7 +2053,7 @@
             if (!ctl.getFilter(oCol.key)) { clr.setAttribute("aria-disabled", "true"); }
             clr.addEventListener("click", function () {
                 if (!ctl.getFilter(oCol.key)) { return; }
-                ctl.setFilter(oCol.key, ""); fi.value = ""; ctl.rerender(); _syncFilterInd(); closeColumnMenu();
+                ctl.setFilter(oCol.key, ""); fi.value = ""; ctl.rerender(); closeColumnMenu();
             });
             m.appendChild(clr);
         }
@@ -2083,7 +2066,6 @@
         m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)) + "px";
         m.style.zIndex = "10";
         _oColMenuEl = m;
-        _syncFilterInd();   // 현재 필터 상태를 헤더 깔때기에 반영(옵션 시).
         // 창 리사이즈/스크롤 시 닫기 — 앵커 이동으로 위치 어긋남 방지.
         window.addEventListener("resize", closeColumnMenu);
         window.addEventListener("scroll", closeColumnMenu, true);
