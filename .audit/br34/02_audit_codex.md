@@ -19,7 +19,8 @@
 
 - 위치: `www/ws30/ws10_20/js/ws_html5_ws20_attr.js:5003`, `5025-5032`, `5948`
 - `fnRenderWs20AttrRows()`는 `ROWS.innerHTML = ""`로 입력 DOM을 제거하지만, 렌더 시작 전에 `_attrVsHide()`를 호출하지 않는다.
-- 포커스된 노드를 DOM에서 직접 제거할 때 `blur`가 항상 발생한다고 의존할 수 없다. 프로그램 재렌더는 mousedown·scroll·resize를 동반하지 않을 수도 있으므로, body에 붙은 싱글톤 팝오버가 이전 좌표와 문구로 남고 `_attrVsField`도 분리된 옛 필드를 가리킬 수 있다.
+- WHATWG HTML의 removing steps는 포커스 요소 제거 시 문서의 focused area를 viewport로 바꾸지만 unfocusing/focus-update steps를 실행하지 않으므로 `blur`/`change` 발생을 보장하지 않는다. 따라서 body에 붙은 싱글톤 팝오버가 이전 좌표와 문구로 남고 `_attrVsField`도 분리된 옛 필드를 가리킨다.
+- 이 경로는 외부 프로그램 호출에만 한정되지 않는다. 공통 `createField`의 native change 콜백이 `fnWs20AttrChange()`를 동기 호출하고, 그 안에서 행 전체 재렌더가 실행되므로 일반 사용자 편집·검증 경로에서도 발생한다.
 - 요청서의 “재렌더로 입력 DOM이 재생성돼도 … 다른 UI 선택 시 팝오버가 남지 않는가”를 충족하려면 행 제거 전에 팝오버를 명시적으로 숨기고 앵커 참조도 정리해야 한다.
 
 ### 3. [P2] 원본의 검증 직후 명시적 메시지 open 의미는 이식되지 않았다
@@ -37,6 +38,14 @@
 - 공통 `.u4a-field__msg`의 색·아이콘·테두리를 소비하며 신규 색상이나 공통 CSS 수정은 없다.
 - 콤보는 기존 `createSelect` value-state 경로를 그대로 사용하여 BR34 텍스트 입력 변경과 분리되어 있다.
 - 바깥 클릭으로 다른 필드에 이동하는 일반 경로는 capture mousedown 및 blur가 팝오버를 숨긴다.
+
+## 독립 서브에이전트 재검수 취합
+
+- 독립 반박 재검수도 세 P2를 모두 확정했고 추가 필수 결함은 찾지 못했다.
+- 1번은 scroll/resize가 `activeElement`를 유지하고 동일 요소 재클릭은 focus를 재발화하지 않는다는 DOM 이벤트 계약으로 재입증됐다.
+- 2번은 포커스 노드 제거 시 blur/change가 보장되지 않는 WHATWG removing steps와 실제 `change → fnWs20AttrChange → fnRenderWs20AttrRows` 동기 호출 사슬로 재입증됐다.
+- 3번은 요청서가 원본 `_oValueStateMessage.open()` 1:1을 검사항목으로 명시하고, `.analy/15` §3.5.3~3.5.4도 busy 해제 뒤 다음 tick 오류 필드 재포커스를 요구하므로 BR34 범위 내 결함이라는 데 동의했다.
+- 보완 시 렌더 시작 전 멱등 hide와 `_attrVsField = null`, 동일 오류 입력 click 재표시, finally의 busy 해제 뒤 새 DOM을 찾아 deferred focus/show가 함께 필요하다.
 
 ## 수용 기준 점검
 

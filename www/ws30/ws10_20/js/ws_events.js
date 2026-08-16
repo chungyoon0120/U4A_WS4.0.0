@@ -1320,6 +1320,9 @@
         let T_excep = oAPP.fn.chkExcepionAttr(),
             iexceplength = T_excep.length;
 
+        // [BR34] 점검이 오류표시(valst)를 지운 뒤 속성 행 재렌더 → 빨간 테두리·오류 안내문구 실제 제거(원본 refresh 재현).
+        try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+
         if (iexceplength !== 0) {
 
             oAPP.fn.fnMultiFooterMsg(T_excep);
@@ -1525,6 +1528,12 @@
         try {
             if (typeof oAPP.fn.chkExcepionAttr === "function") { T_excep = oAPP.fn.chkExcepionAttr() || []; }
         } catch (e) { console.warn("[HTML5][WS20] chkExcepionAttr skip:", e && e.message); }
+
+        // [BR34] 실행 점검(chkExcepionAttr)이 오류표시(valst)를 지운 뒤 속성 행을 다시 그려 빨간 테두리·오류 안내문구를
+        //   실제로 제거한다. 원본 UI5 는 chkExcepionAttr 안 oModel.refresh() 가 속성 테이블을 재렌더해 지웠으나,
+        //   HTML5 refresh 훅은 좌측 트리만 그리므로 여기서 명시 재렌더한다(정상 복구값이면 오류표시가 사라짐).
+        try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+
         let iexceplength = T_excep.length;
 
         if (iexceplength !== 0) {

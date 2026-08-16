@@ -654,6 +654,9 @@
 /* ── 상단 폼 ── */
 .u4aWs20InsForm { flex: 0 0 auto; display: flex; flex-direction: column; gap: 0.5rem; }
 .u4aWs20InsRow { display: flex; align-items: center; gap: 0.625rem; }
+/* [BR37] hidden 속성 존중 — .u4aWs20InsRow 의 display:flex 가 브라우저 기본 [hidden]{display:none} 을
+   이겨, Generated Cnt 행(hidden 토글)이 집계 미선택·단일(ISMLB="") 에도 항상 표시되던 것 차단. */
+.u4aWs20InsRow[hidden] { display: none; }
 .u4aWs20InsRow > label { flex: 0 0 8.75rem; font-size: 0.8125rem; font-weight: 700; color: var(--text); }
 /* Aggregation DDLB / UI 오브젝트 검색칸은 행 전체로 늘리지 않고 적당한 폭에서 고정(우측 여백 남김). */
 .u4aWs20InsRow .u4aWs20InsAgg { flex: 0 1 25rem; max-width: 25rem; min-width: 0; display: flex; }

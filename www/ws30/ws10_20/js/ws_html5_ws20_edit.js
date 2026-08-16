@@ -344,6 +344,39 @@
     }
 
     /********************************************************************
+     * [BR41] 삭제 UI 의 클라이언트 이벤트(JS)·HTML content(HM) 수집건을
+     *   oAPP.DATA.APPDATA.T_CEVT 에서 제거. 원본 uiDesignArea.js:2034 delUiClientEvent 1:1 이식
+     *   (uiDesignArea.js 는 UI5 전용이라 HTML5 런타임에 미로드 → 여기 이식. copyUiClientEvent 이식과 동일).
+     *   원본 순서 그대로: T_CEVT 없음 → exit / prev._T_0015 없음 → exit /
+     *   sap.ui.core.HTML 이면 OBJID+"CONTENT"(OBJTY "HM") 제거 / _T_0015(UIATY "2") 이벤트별 OBJID+UIASN(OBJTY "JS") 제거.
+     *   ★prev._T_0015 를 참조하므로 반드시 delete oAPP.attr.prev[OBJID] 이전에 호출한다(원본 6648 < 6663).
+     ********************************************************************/
+    if (typeof oAPP.fn.delUiClientEvent !== "function") {
+        oAPP.fn.delUiClientEvent = function (is_tree) {
+            var A = oAPP.DATA && oAPP.DATA.APPDATA;
+            if (!is_tree || !A || !Array.isArray(A.T_CEVT) || A.T_CEVT.length === 0) { return; }
+            var oPrev = oAPP.attr && oAPP.attr.prev && oAPP.attr.prev[is_tree.OBJID];
+            if (!oPrev || !Array.isArray(oPrev._T_0015) || oPrev._T_0015.length === 0) { return; }
+
+            // sap.ui.core.HTML content(HM) 제거 (원본 2044~2053)
+            if (is_tree.UIFND === "SAP.UI.CORE.HTML") {
+                var hx = A.T_CEVT.findIndex(function (a) { return a.OBJID === is_tree.OBJID + "CONTENT" && a.OBJTY === "HM"; });
+                if (hx !== -1) { A.T_CEVT.splice(hx, 1); }
+            }
+
+            // 이벤트 설정건(_T_0015 UIATY==="2") 기준 클라이언트 JS 이벤트 제거 (원본 2056~2072)
+            var lt_evt = oPrev._T_0015.filter(function (a) { return a.UIATY === "2"; });
+            if (lt_evt.length === 0) { return; }
+            for (var i = 0; i < lt_evt.length; i++) {
+                var sKey = is_tree.OBJID + lt_evt[i].UIASN;
+                var jx = A.T_CEVT.findIndex(function (a) { return a.OBJID === sKey && a.OBJTY === "JS"; });
+                if (jx === -1) { continue; }
+                A.T_CEVT.splice(jx, 1);
+            }
+        };
+    }
+
+    /********************************************************************
      * 노드 미리보기 정리 (구 lf_delSelLine 의 preview 정리부 — 시그니처 1:1)
      *   setChildUiException(부모 필수자식 보강) → delUIObjPreView → destroyUIPreView
      *   → oAPP.attr.prev 제거. (단건/멀티 삭제 공용)
@@ -356,7 +389,12 @@
         _prev("delUIObjPreView", [n.OBJID, n.POBID, n.PUIOK, n.UIATT, n.ISMLB, n.UIOBK]);
         // 미리보기 인스턴스 destroy (구 destroyUIPreView(OBJID,POBID,UIOBK,PUIOK) — 자식 재귀 정리)
         _prev("destroyUIPreView", [n.OBJID, n.POBID, n.UIOBK, n.PUIOK]);
+        // [BR41] 클라이언트 이벤트/HTML content(T_CEVT) 제거 (원본 delUiClientEvent 1:1 — uiDesignArea.js:6648).
+        //   ★prev._T_0015 참조 → 아래 delete oAPP.attr.prev 이전에 호출(원본 6648 < 6663).
+        try { if (typeof oAPP.fn.delUiClientEvent === "function") { oAPP.fn.delUiClientEvent(n); } } catch (e) { console.error("[HTML5][BR41] delUiClientEvent cleanup error:", e); }
         try { if (oAPP.attr.prev) { delete oAPP.attr.prev[n.OBJID]; } } catch (e) { }
+        // [BR40] 삭제 UI 의 Description(T_DESC) 제거 (원본 delDesc(is_tree.OBJID) 1:1 — uiDesignArea.js:6651/4375).
+        try { if (typeof oAPP.fn.delDesc === "function") { oAPP.fn.delDesc(n.OBJID); } } catch (e) { }
     }
 
     /********************************************************************
@@ -372,7 +410,11 @@
         for (var i = 0; i < n.zTREE.length; i++) {
             var c = n.zTREE[i];
             _purgePrevSubtree(c);   // 자식 먼저(원본 6639~6645 재귀)
+            // [BR41] 하위 UI 의 클라이언트 이벤트/HTML content(T_CEVT) 제거 (원본 6648 delUiClientEvent). prev 삭제 前.
+            try { if (typeof oAPP.fn.delUiClientEvent === "function") { oAPP.fn.delUiClientEvent(c); } } catch (e) { console.error("[HTML5][BR41] delUiClientEvent cleanup error:", e); }
             try { if (oAPP.attr.prev) { delete oAPP.attr.prev[c.OBJID]; } } catch (e) { }   // 원본 6663
+            // [BR40] 하위 UI 의 Description(T_DESC) 제거(원본 재귀부의 delDesc 1:1 — uiDesignArea.js:6651).
+            try { if (typeof oAPP.fn.delDesc === "function") { oAPP.fn.delDesc(c.OBJID); } } catch (e) { }
             // 미리보기 예외처리 대상 UI(UA015)가 삭제되는 하위 UI면 정보 제거(원본 6666~6669).
             try { if (oAPP.attr && oAPP.attr.UA015UI && oAPP.attr.UA015UI._OBJID === c.OBJID) { delete oAPP.attr.UA015UI; } } catch (e) { }
         }
@@ -874,18 +916,76 @@
             //   점검을 원본 uiDesignArea.js:5063 designAddUIObject 의 designChkHiddenAreaUi(is_0022.UIOBK, is_tree.UIOBK)
             //   로 이 팝업/드롭 확정 경로에 1:1 복원(HTML5 이식 때 누락됨). 허용 부모가 아니면 내부에서 원본 메시지(131)
             //   토스트 후 true → 추가 차단(undo push·트리/미리보기 변경 이전). D&D 직접경로(dnd.js:982)는 이미 보유 — 경로 일치.
-            if (typeof oAPP.fn.designChkHiddenAreaUi === "function" && oAPP.fn.designChkHiddenAreaUi(is_0022.UIOBK, is_tree.UIOBK) === true) { return; }
+            //   ★fail-closed(원본은 무조건 호출=미정의면 throw): 점검 함수(dnd.js 정의)가 부분 로드로 없으면 그냥 통과
+            //   시키지 말고(fail-open 이면 금지 UI 가 들어와 BR35 결함 재발) 오류 표면화 후 추가 취소. 붙여넣기 경로가
+            //   fnWs20AddTreeData 부재 시 취소하는 것(위 _pasteUI)과 동일한 방어. 원본 fail-closed 계약과 일치.
+            if (typeof oAPP.fn.designChkHiddenAreaUi !== "function") {
+                console.error("[HTML5][WS20][insert] designChkHiddenAreaUi 미정의 — UA040 허용부모 점검 불가, UI 추가 취소");
+                return;
+            }
+            if (oAPP.fn.designChkHiddenAreaUi(is_0022.UIOBK, is_tree.UIOBK) === true) { return; }
 
-            oAPP.fn.fnWs20PushUndo();
+            // ★ BR44: UI Object Select 확정 시 원본 uiDesignArea.js:5079/5110/5142 의 세 검사(UW03·UW08·UW10)를
+            //   이 팝업/드롭 확정 경로에 1:1 복원(HTML5 이식 때 누락됨 → 금지 조합이 트리로 그대로 유입).
+            //   순서·파라미터·메시지 모두 원본과 동일하며, 되돌리기 스냅샷(fnWs20PushUndo)·트리/미리보기 변경 이전에 거른다.
+            //   D&D 직접경로(dnd.js:1276~1290)는 이미 동일 3검사 보유 — 경로 간 동작 일치. 214 치환 인자도 원본
+            //   5116/5148 과 동일(is_0022.UIOBJ, is_tree.OBJID, is_0023.UIATT).
+            //   214 &1 UI 는 &2 의 &3 Aggregation 에 추가 할 수 없습니다. (원본 ZMSG_WS_COMMON_001/214)
+            function _wsc214() {
+                try {
+                    return parent.WSUTIL.getWsMsgClsTxt(
+                        (oAPP.oDesign && oAPP.oDesign.settings && oAPP.oDesign.settings.GLANGU) || "",
+                        "ZMSG_WS_COMMON_001", "214", is_0022.UIOBJ, is_tree.OBJID, is_0023.UIATT, "");
+                } catch (e) { return "214"; }
+            }
+            //   ① UW03 특정 부모 전용(designChkFixedParentUI, 원본 5079): true 면 내부에서 원본 메시지(306) 자체 토스트 후 취소.
+            //      ★fail-closed(원본은 무조건 호출=미정의면 throw): 점검 함수(dnd.js 정의)가 부분 로드로 없으면 그냥
+            //      통과시키지 말고(fail-open 이면 특정부모 전용 UI 가 엉뚱한 부모에 유입) 오류 표면화 후 추가 취소. BR35 와 동일 방어.
+            if (typeof oAPP.fn.designChkFixedParentUI !== "function") {
+                console.error("[HTML5][WS20][insert] designChkFixedParentUI 미정의 — UW03 특정부모 점검 불가, UI 추가 취소");
+                return;
+            }
+            if (oAPP.fn.designChkFixedParentUI(is_0022.UIOBK, is_tree.UIOBK, is_0023.UIATT) === true) { return; }
+            //   ② UW08 부모 aggregation 에 추가 불가한 UI(checkDenyChildAggr, 원본 5110): true 면 214 후 취소.
+            if (oAPP.fn.checkDenyChildAggr({ UIOBK: is_tree.UIOBK, UIATT: is_0023.UIATT, CHILD_UIOBK: is_0022.UIOBK }) === true) {
+                try { parent.showMessage(null, 10, "E", _wsc214()); } catch (e) { }
+                return;
+            }
+            //   ③ UW10 실제 허용 UI(checkAllowChildAggr, 원본 5142): 허용이 아니면(!== true) 214 후 취소.
+            if (oAPP.fn.checkAllowChildAggr({ PUIOK: is_tree.UIOBK, UIATT: is_0023.UIATT, UIOBK: is_0022.UIOBK }) !== true) {
+                try { parent.showMessage(null, 10, "E", _wsc214()); } catch (e) { }
+                return;
+            }
 
             // 개인화 속성 적용 시 UI_ATTR_PRESET.db 를 1회 조회(추가UI UIOBK 는 cnt 반복 내내 동일).
+            //   ★ BR43 검수(코덱스 P1) 반영: 이 await 를 fnWs20PushUndo() "앞"으로 옮긴다. 이러면 되돌리기
+            //   스냅샷 적재부터 아래 동기 삽입 루프(재구성·미리보기)까지 사이에 await 가 없어져, 그 틈에
+            //   WS20 되돌리기/편집이 끼어드는 재진입 창이 사라진다(삽입 원자성). 조회 실패 시 스냅샷도 안 쌓임.
+            //   (WS20 전체 재진입 잠금/작업 세대 토큰은 원본에 없는 방어라 미채택 — 03 참고, 별건 권고.)
             var _aPreset = _isPresetAttr ? await _readAttrPreset(is_0022.UIOBK) : [];
+
+            oAPP.fn.fnWs20PushUndo();
 
             var oInfo = {};
             try { oInfo = parent.getAppInfo() || {}; } catch (e) { }
             if (!is_tree.zTREE) { is_tree.zTREE = []; }
             var bEdit = false; try { bEdit = oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { }
             var lastObjid = "";
+
+            // ★ BR43: 바인딩된 aggregation 에 값이 지정된 상태에서 다건(2↑) 추가 시 → 1개만 추가 + 021 안내.
+            //   원본 uiDesignArea.js:5169~5176 designAddUIObject 의 clamp 를 1:1 복원(HTML5 이식 때 누락됨).
+            //   chkUiCardinality(위 909)는 "이미 자식이 있는(idx!==-1)" 바인딩 칸만 막으므로, 자식 없이 바인딩만
+            //   된 aggregation 에 여러 개 넣는 경우는 이 clamp 가 담당(원본과 동일 분업). 대상 aggregation 의 값칸
+            //   _T_0015 는 prev[대상].UIATK===is_0023.UIATK && UIATY==="3" 로 조회(원본과 동일, prev 부재 가드).
+            try {
+                var _lsAgg0015 = (oAPP.attr.prev && oAPP.attr.prev[is_tree.OBJID] && oAPP.attr.prev[is_tree.OBJID]._T_0015)
+                    ? oAPP.attr.prev[is_tree.OBJID]._T_0015.find(function (a) { return a.UIATK === is_0023.UIATK && a.UIATY === "3"; })
+                    : undefined;
+                if (_lsAgg0015 && _lsAgg0015.UIATV !== "" && _lsAgg0015.ISBND === "X" && cnt >= 2) {
+                    cnt = 1;
+                    try { parent.showMessage(null, 10, "W", _msgWs("021", "The object is already specified in Aggregation.")); } catch (e) { }
+                }
+            } catch (e) { console.error("[HTML5][WS20][insert] BR43 바인딩 다건 clamp 오류:", e && e.message); }
 
             for (var c = 0; c < cnt; c++) {
                 var l14 = oAPP.fn.crtStru0014();
@@ -1292,6 +1392,11 @@
             return;
         }
 
+        // [BR36-P2] ESC 핸들러 이름칸을 오류 안전망(try) 바깥(함수 스코프)에 선언한다. 엄격모드에서 try
+        //   블록 안 function 선언은 catch 에서 안 보여(블록 스코프), 아래 catch 의 removeEventListener 가
+        //   ReferenceError 로 실패→키 리스너가 남았다. 이름칸만 밖에 두고 함수 본체 배정은 try 안(아래
+        //   _onEscKey = function...)에 유지해야 그 안의 lf_cancel 등 형제 함수를 계속 참조할 수 있다.
+        var _onEscKey;
         // [BR19] 여기부터 팝업 구성 전체를 오류 안전망으로 감싼다 — 중간에 오류가 나도 함수 끝 catch 에서
         //   BUSY/단축키 잠금을 해제하고 부분 생성물을 정리한다(검수 지적 반영). 들여쓰기는 diff 최소화를 위해 유지.
         try {
@@ -1452,13 +1557,18 @@
 
         // ESC 닫기 — 비모달 dialog 는 cancel 이벤트가 안 뜨고, oDlg keydown 은 포커스가 밖이면 안 잡힘 →
         //   document 레벨(capture)로 처리. 단 미리보기 팝오버/제안목록이 열려 있으면 그쪽이 먼저 닫히게 양보.
-        function _onEscKey(e) {
+        // [BR36-P2] 이름칸은 try 밖(함수 스코프)에 선언, 본체 배정은 여기(try 안)에 유지 —
+        //   함수 표현식이 이 try 스코프를 캡처해야 아래 lf_cancel 등 형제 함수를 참조할 수 있다.
+        // ★ESC = 취소 안내(001) 후 닫기(닫기·취소 버튼과 동작 통일). 장군님 결정(2026-08-14):
+        //   원본 UI5 는 ESC 에 escapeHandler 가 없어 안내 없이 닫혔으나(닫기/취소 버튼과 어긋나는 원본 결함),
+        //   닫기 경로 통일성을 위해 ESC 도 안내를 낸다. 그래서 lf_close 가 아니라 lf_cancel 을 부른다.
+        _onEscKey = function (e) {
             if (e.key !== "Escape") { return; }
             if (_uiPrevPop) { return; }                                   // 미리보기 팝오버 먼저 닫기
             if (document.querySelector(".u4a-combo__list")) { return; }   // 제안목록 먼저 닫기
             e.preventDefault();
             lf_cancel();
-        }
+        };
         function lf_close() { try { document.removeEventListener("keydown", _onEscKey, true); } catch (e) { } try { _closeUiPreviewPopup(); } catch (e) { } try { U4AUI && U4AUI.closeColumnMenu && U4AUI.closeColumnMenu(); } catch (e) { } try { if (oBackdrop) { oBackdrop.remove(); } } catch (e) { } try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } }
 
         function lf_clampCnt() {
@@ -1614,14 +1724,15 @@
                 },
                 function (v) { oSearch.value = v; lf_renderTable(); });
         }
-        // 취소/닫기(X·취소버튼·ESC) → 001 Cancel operation 안내 후 종료(구 insertUIPopop 닫기/취소 press).
-        //   확정(lf_confirm)은 lf_close 만 호출(안내 없음).
+        // 닫기(X)·취소버튼·ESC → 001 Cancel operation 안내 후 종료. 닫기/취소는 원본(insertUIPopop 88·782),
+        //   ESC 는 장군님 통일 결정(2026-08-14)으로 안내 추가(원본 UI5 ESC 는 안내 없이 닫혔음 — 원본 결함).
+        //   확정(lf_confirm)만 lf_close 로 안내 없이 닫는다.
         function lf_cancel() { try { parent.showMessage(null, 10, "I", _msgWs("001")); } catch (e) { } lf_close(); }
         oOk.addEventListener("click", lf_confirm);
         Array.prototype.forEach.call(oDlg.querySelectorAll('[data-act="cancel"]'), function (b) {
             b.addEventListener("click", lf_cancel);
         });
-        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_cancel(); }); // (모달 전용, 폴백) ESC
+        oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_cancel(); }); // (모달 전용, 폴백) ESC=취소 안내 후 닫기(장군님 통일 결정)
         // ★비모달(show)이라 cancel 이벤트가 안 뜨고 oDlg keydown 은 포커스가 밖이면 안 잡힘 → document capture 로 ESC 처리.
         document.addEventListener("keydown", _onEscKey, true);
 

@@ -60,6 +60,9 @@
         let sCurrent = sValue;
         let oList = null;
         let iActive = -1;
+        // [opt:closeOnDblClick] 값칸을 두 번 클릭하면 목록을 열지 않게 하는 옵션(기본 꺼짐, 하위호환).
+        //   두 번 클릭 신호가 오면 이 값을 켜서, 첫 클릭이 시작한 비동기 열기(_requestOpen)를 취소한다.
+        let bDblSuppress = false;
 
         function _label(v) {
             const o = aItems.find(i => i.value === v);
@@ -219,13 +222,19 @@
             if (oCombo.getAttribute("aria-disabled") === "true") { return; }   // 비활성 콤보는 열기 차단(클릭·키보드 공통)
             if (oList) { _close(); return; }
             if (oCombo.dataset.loading === "true") { return; }
+            bDblSuppress = false;   // [opt:closeOnDblClick] 새 열기 요청 시작 — 두 번 클릭 억제 초기화
             const fnOpen = opts.onOpen;
             if (typeof fnOpen === "function") {
                 let r;
                 try { r = fnOpen(oCombo); } catch (e) { r = null; }
                 if (r && typeof r.then === "function") {
                     oCombo.dataset.loading = "true";
-                    const _done = function () { delete oCombo.dataset.loading; _open(); };
+                    const _done = function () {
+                        delete oCombo.dataset.loading;
+                        // [opt:closeOnDblClick] 조회 중 두 번 클릭이 들어오면 열지 않는다(취소).
+                        if (bDblSuppress) { bDblSuppress = false; return; }
+                        _open();
+                    };
                     r.then(_done, _done);
                     return;
                 }
@@ -234,6 +243,15 @@
         }
 
         oCombo.addEventListener("click", () => { _requestOpen(); });
+        // [opt:closeOnDblClick] 값칸을 두 번 클릭하면 목록을 열지 않는다(기본 꺼짐, 하위호환).
+        //   두 번 클릭 신호는 실제로 두 번 눌렀을 때만 오므로 한 번 클릭 열기(위 click)는 그대로 유지된다.
+        //   첫 클릭이 이미 시작한 비동기 열기는 억제 플래그로 취소하고, 이미 열렸으면 닫는다.
+        if (opts.closeOnDblClick === true) {
+            oCombo.addEventListener("dblclick", () => {
+                bDblSuppress = true;
+                if (oList) { _close(); }
+            });
+        }
         oCombo.addEventListener("keydown", (ev) => {
             switch (ev.key) {
                 case "ArrowDown":

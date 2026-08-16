@@ -586,10 +586,23 @@
                 var sObjid = _objKey(n);
                 oRow.setAttribute("data-objid", sObjid);
                 // 우클릭 컨텍스트 메뉴 (구 callDesignContextMenu)
-                oRow.addEventListener("contextmenu", function (e) {
+                oRow.addEventListener("contextmenu", async function (e) {
                     e.preventDefault(); e.stopPropagation();
-                    _safeCall("setSelectTreeItem", [sObjid]);
-                    if (oAPP.fn.fnWs20ShowTreeContextMenu) { oAPP.fn.fnWs20ShowTreeContextMenu(n, e.clientX, e.clientY); }
+                    // 좌표는 await 이전에 확보(이벤트 객체가 이후 재사용될 수 있음).
+                    var iX = e.clientX, iY = e.clientY;
+                    // ★원본(design/js/uiDesignArea.js:1003~1060) 직렬화 1:1 복원(BR47).
+                    //   원본 우클릭은 ① 선택을 await 로 "완전히" 끝낸 뒤(팝업 유형 UI면 이때
+                    //   미리보기에서 그 팝업이 열리며 포커스가 미리보기 쪽으로 옮겨간다),
+                    //   ② 한 틱(setTimeout 0) 더 기다리고, ③ 그제서야 메뉴를 연다.
+                    //   (원본 주석 1046~1056: busy off 직후 즉시 메뉴를 열면 "메뉴가 종료되는 문제".)
+                    //   HTML5 변환이 이 직렬화를 빠뜨려 선택을 기다리지 않고 메뉴부터 띄우던 탓에,
+                    //   팝업 유형 UI 우클릭 시 미리보기 팝업이 포커스를 가져가 부모창이 초점을 잃고
+                    //   → 전역 미리보기-포커스 닫기 로직이 갓 뜬 메뉴를 즉시 제거했다(표시 직후 닫힘).
+                    //   특정 UI 예외가 아니라 공통 흐름을 원본과 동일 순서로 되돌린다.
+                    try { await _safeCall("setSelectTreeItem", [sObjid]); }
+                    catch (err) { console.warn("[HTML5][WS20][tree] ctx select 실패(메뉴는 계속 표시):", err && err.message); }
+                    await new Promise(function (res) { setTimeout(res, 0); });
+                    if (oAPP.fn.fnWs20ShowTreeContextMenu) { oAPP.fn.fnWs20ShowTreeContextMenu(n, iX, iY); }
                 });
                 // 선택 하이라이트(공통 aria-selected) — WS20 선택표시는 _getSelectedObjid
                 if (_getSelectedObjid() === sObjid) { oRow.setAttribute("aria-selected", "true"); }

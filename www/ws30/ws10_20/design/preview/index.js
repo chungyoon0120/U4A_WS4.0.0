@@ -4837,6 +4837,25 @@ oWS.sMark.fn_mark = function(oMarkUi) {
 	ensurePreviewSelectionLayerEvents();
 	updatePreviewSelectionLayer();
 
+	// [BR38] 선택 UI를 미리보기 화면 안으로 스크롤 이동(원본 fn_mark 의 스크롤 처리 복원).
+	//  - 선택 표시(위 CustomData/선택 레이어)만 하고 스크롤 이동이 빠져, 표시 범위 밖 UI 선택 시
+	//    미리보기가 그 위치로 내려가지 않던 문제.
+	//  - 이미 표시 범위 안이면 유지, 범위 밖일 때만 이동(block:"nearest").
+	//    반대 방향(미리보기→트리)의 "범위 밖일 때만 이동" 및 원본 속성영역
+	//    uiAttributeArea.js:8303 의 scrollIntoView({block:"nearest"}) 패턴과 동일.
+	//  - 렌더/선택 레이어가 자리 잡은 뒤 이동하도록 프레임 뒤로 미룬다.
+	setTimeout(function () {
+		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
+		try {
+			var _oDom = (oMarkUi && typeof oMarkUi.getDomRef === "function") ? oMarkUi.getDomRef() : null;
+			if (_oDom && typeof _oDom.scrollIntoView === "function") {
+				_oDom.scrollIntoView({ block: "nearest", inline: "nearest" });
+			}
+		} catch (e) {
+			parent.console && parent.console.error("[HTML5][WS20][prev] fn_mark 선택 UI 스크롤 이동 오류:", e && e.message);
+		}
+	}, 0);
+
 	// @u4a-src Returns the computed preview value or exits the function at this point.
 	return Promise.resolve();
 };
@@ -5614,13 +5633,9 @@ function setUIProp(UIOBK, UILIB, T_0015, T_UA018, T_UA032, T_UA030) {
 	}
 	// @u4a-src Defines local state used by the following preview calculation.
 	var l_meta;
-	// @u4a-src Starts a protected block so preview errors can be contained.
-	try {
-		// @u4a-src Defines local state used by the following preview calculation.
-		var _oUi = getUIClassInstance(UILIB);
-		l_meta = _oUi.getMetadata();
-	// @u4a-src Handles an error raised by the protected preview block.
-	} catch (e) {}
+	// @u4a-src [BR 2026-08-14 장군님 지시] 삼킴 제거: 메타데이터 조회 실패를 감추지 않고 그대로 터뜨린다.
+	var _oUi = getUIClassInstance(UILIB);
+	l_meta = _oUi.getMetadata();
 	// @u4a-src Iterates through a collection and applies the same preview rule to each item.
 	for (var i = 0, l = T_0015.length; i < l; i++) {
 		// @u4a-src Checks a required condition before the following preview logic continues.
@@ -5908,12 +5923,8 @@ function addUIObjPreView(OBJID, UIOBK, UILIB, UIFND, POBID, PUIOK, UIATT, T_0015
 	var ls_0022 = parent.oAPP.DATA.LIB.T_0022.find(a => a.UIOBK === UIOBK);
 	// @u4a-src Checks a required condition before the following preview logic continues.
 	if (ls_0022 && ls_0022.TGLIB !== "" && ls_0022.UIFND.indexOf("U4A.") === -1 && ls_0022.UIFND.indexOf("SAPUI6.") === -1) {
-		// @u4a-src Starts a protected block so preview errors can be contained.
-		try {
-			// @u4a-src Hooks into UI5 module, core, lifecycle, or delegate APIs used by the preview runtime.
-			sap.ui.getCore().loadLibrary(ls_0022.TGLIB);
-		// @u4a-src Handles an error raised by the protected preview block.
-		} catch (e) {}
+		// @u4a-src [BR 2026-08-14 장군님 지시] 삼킴 제거: 라이브러리 로드 실패를 감추지 않고 그대로 터뜨린다.
+		sap.ui.getCore().loadLibrary(ls_0022.TGLIB);
 	}
 	// @u4a-src Defines local state used by the following preview calculation.
 	var lt_0015 = [];
@@ -8282,7 +8293,7 @@ parent.oAPP.fn.exceptionRespGridLayout = function(UIOBK) {
 			}
 		// @u4a-src Handles an error raised by the protected preview block.
 		} catch (e) {
-			console.log(e);
+			console.error("[PREVIEW][renderProtectedBlock] 미리보기 렌더 실패", e);
 		}
 	};
 };
@@ -8335,40 +8346,8 @@ function createUIInstance(is_tree, it_0015) {
 		return;
 	}
 	excepSapui6Library(ls_0022.LIBNM);
-	// @u4a-src Starts a protected block so preview errors can be contained.
-	try {
-		// @u4a-src Hooks into UI5 module, core, lifecycle, or delegate APIs used by the preview runtime.
-		sap.ui.requireSync(ls_0022.LIBNM.replace(/\./g, "/"));
-	// @u4a-src Handles an error raised by the protected preview block.
-	} catch (e) {
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.attr.prev[is_tree.OBJID] = new sap.ui.core.Element();
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		var lt_0015 = it_0015 || parent.oAPP.DATA.APPDATA.T_0015.filter(a => a.OBJID === is_tree.OBJID);
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.attr.prev[is_tree.OBJID]._T_0015 = lt_0015;
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.attr.prev[is_tree.OBJID]._MODEL = {};
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.attr.prev[is_tree.OBJID]._BIND_AGGR = {};
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.attr.prev[is_tree.OBJID]._OBJID = is_tree.OBJID;
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		var ls_embed = parent.oAPP.attr.prev[is_tree.OBJID]._T_0015.find(a => a.OBJID === is_tree.OBJID && a.UIATY === "6");
-		// @u4a-src Checks a required condition before the following preview logic continues.
-		if (!ls_embed) {
-			// @u4a-src Returns the computed preview value or exits the function at this point.
-			return;
-		}
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.attr.prev[is_tree.OBJID].__PARENT = parent.oAPP.attr.prev[is_tree.POBID];
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.attr.prev[is_tree.OBJID]._EMBED_AGGR = ls_embed.UIATT;
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.fn.setModelBind(parent.oAPP.attr.prev[is_tree.OBJID]);
-		// @u4a-src Returns the computed preview value or exits the function at this point.
-		return;
-	}
+	// @u4a-src [BR 2026-08-14 장군님 지시] 삼킴 제거: 라이브러리 로드 실패를 빈 요소로 감추지 않고 그대로 터뜨려 원인(어느 부품/묶음이 실패했는지)을 드러낸다.
+	sap.ui.requireSync(ls_0022.LIBNM.replace(/\./g, "/"));
 	lf_excepRequire(ls_0022.UIOBK);
 	// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
 	parent.oAPP.fn.exceptionRespGridLayout(is_tree.UIOBK);
@@ -8376,22 +8355,12 @@ function createUIInstance(is_tree, it_0015) {
 	var lt_0015 = it_0015 || parent.oAPP.DATA.APPDATA.T_0015.filter(a => a.OBJID === is_tree.OBJID);
 	// @u4a-src Defines local state used by the following preview calculation.
 	var l_class = getUIClassInstance(ls_0022.LIBNM);
-	// @u4a-src Starts a protected block so preview errors can be contained.
-	try {
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid(), setUIProperty(is_tree, lt_0015));
-	// @u4a-src Handles an error raised by the protected preview block.
-	} catch (e) {
-		// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
-		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid());
-	}
+	// @u4a-src [BR 2026-08-14 장군님 지시] 삼킴 제거: 속성 포함 생성 실패를 속성 빠진 반쪽 UI로 감추지 않고 그대로 터뜨린다.
+	parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid(), setUIProperty(is_tree, lt_0015));
 	// @u4a-src Reads or writes UI5 CustomData that mirrors design-time metadata into the DOM.
 	addPreviewTabIndexCustomData(parent.oAPP.attr.prev[is_tree.OBJID]);
-	// @u4a-src Starts a protected block so preview errors can be contained.
-	try {
-		setUIPropertyDirectly(is_tree.OBJID, lt_0015);
-	// @u4a-src Handles an error raised by the protected preview block.
-	} catch (e) {}
+	// @u4a-src [BR 2026-08-14 장군님 지시] 삼킴 제거: 직접 속성적용 실패를 감추지 않고 그대로 터뜨린다.
+	setUIPropertyDirectly(is_tree.OBJID, lt_0015);
 	// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
 	parent.oAPP.attr.prev[is_tree.OBJID]._T_0015 = lt_0015;
 	// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
@@ -8833,7 +8802,7 @@ function setUIParent(is_tree, skipRoot) {
 		parent.oAPP.attr.prev[is_tree.POBID][l_agrnm](parent.oAPP.attr.prev[is_tree.OBJID]);
 	// @u4a-src Handles an error raised by the protected preview block.
 	} catch (e) {
-		console.log(e);
+		console.error("[PREV-ATTACH-FAIL] 부모에 붙이기 실패 OBJID=" + is_tree.OBJID + " UIOBK=" + is_tree.UIOBK + " POBID=" + is_tree.POBID + " aggr=" + ls_embed.UIATT + " func=" + l_agrnm, e);
 	}
 	// @u4a-src Reads or updates shared workspace/preview state used across the iframe boundary.
 	parent.oAPP.fn.prevDrawExceptionUi(is_tree.UIOBK, is_tree.OBJID);

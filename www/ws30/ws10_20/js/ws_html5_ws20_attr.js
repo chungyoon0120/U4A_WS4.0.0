@@ -2972,21 +2972,13 @@
                 //행 재렌더 후 대상 라인 스크롤/포커스. (구 oRTab1 focus 대응)
                 oAPP.fn.fnRenderWs20AttrRows();
 
-                //★ 스크롤·포커스는 다음 화면 프레임에 처리 — 원본 uiAttributeArea.js:8312 requestAnimationFrame
-                //  focus 대응. 동기 focus 는 되돌리기 직후 이어지는 재렌더·미리보기 선택(selPreviewUI)·
-                //  로딩표시 해제에 밀려 특히 입력칸(input) 포커스가 씹혔다 → 화면 정리 후 재조회해 처리.
-                var _lf_focus = function () {
-                    try {
-                        var oRow = document.querySelector(
-                            '#ws20AttrRows .u4aWs20AttrRow[data-uiatk="' + UIATK + '"]');
-                        if (!oRow) { return; }
-                        try { oRow.scrollIntoView({ block: "nearest" }); } catch (e) { }
-                        var oInp = oRow.querySelector("input, select, textarea, button");
-                        if (oInp) { try { oInp.focus(); } catch (e) { } }
-                    } catch (e) { }
-                };
-                if (typeof requestAnimationFrame === "function") { requestAnimationFrame(_lf_focus); }
-                else { _lf_focus(); }
+                var oRow = document.querySelector(
+                    '#ws20AttrRows .u4aWs20AttrRow[data-uiatk="' + UIATK + '"]');
+                if (oRow) {
+                    try { oRow.scrollIntoView({ block: "nearest" }); } catch (e) { }
+                    var oInp = oRow.querySelector("input, select, textarea, button");
+                    if (oInp) { try { oInp.focus(); } catch (e) { } }
+                }
             } catch (e) { }
 
         };  //attribute 영역 선택처리.
@@ -3453,8 +3445,7 @@
 
                 try {
                     //변경 직전 스냅샷 1회 — autoGrowing 값 + 이벤트 초기화를 한 번에 되돌린다.
-                    //  (바뀐 속성 실어 undo/redo 복원 시 그 줄로 스크롤.)
-                    try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK } : undefined); } } catch (e) { }
+                    try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } } catch (e) { }
 
                     if (param !== "YES") {
                         //취소 — autoGrowing 값 false 로 복귀 + 대상 이벤트 잠금 해제(원본 3154~3160).
@@ -3489,78 +3480,6 @@
             return true;
 
         }; //autoGrowing 프로퍼티 변경건 예외처리.
-    }
-
-    /************************************************************************
-     * dropAble 프로퍼티 변경건 확인 게이트 — [BR31 / 일관성]
-     *   ★ 원본에는 없는 동작(장군님 지시 2026-08-13). 자동증가(autoGrowing)를 켤 때
-     *   "설정된 서버/클라이언트 이벤트가 초기화됩니다. 계속 진행하시겠습니까?"(메시지 283)
-     *   확인 팝업을 띄우는 것과 동일하게, dropAble 을 켠 상태(등록된 DnDDrop 이벤트 있음)에서
-     *   끄면 그 이벤트가 초기화되므로 같은 확인 팝업을 먼저 띄운다(일관성).
-     *   · dropAble 을 켜는 방향이거나(초기화 없음), 지울 DnDDrop 이벤트가 없으면 팝업 없이 정규 흐름.
-     *   · 팝업 YES → 그대로 재진입(정규 흐름의 dropAble 예외처리가 잠금+초기화 수행).
-     *   · 팝업 NO  → dropAble 값을 다시 true 로 되돌린 뒤 재진입(이벤트 유지·잠금 해제).
-     *   메시지 283 문구는 자동증가/드롭 공통(범용 "설정된 서버/클라이언트 이벤트…") → 재사용.
-     * @param {object} is_attr - 이벤트 발생 attr 라인.
-     * @return {boolean} true = 호출부(fnWs20AttrChange) 후속 처리 skip(확인 팝업 경로 전환).
-     ************************************************************************/
-    if (typeof oAPP.fn.attrChangeDropAbleProp !== "function") {
-        oAPP.fn.attrChangeDropAbleProp = function (is_attr) {
-
-            //dropAble 프로퍼티 변경건이 아닌경우 미해당.
-            if (!is_attr || is_attr.UIASN !== "DROPABLE") { return; }
-
-            //바인딩 처리된경우 팝업 없이 정규 흐름(자동증가와 동일 처리).
-            if (is_attr.ISBND === "X") { return; }
-
-            //dropAble 을 켜는(true) 방향이면 초기화가 없으므로 팝업 없이 정규 흐름.
-            if (is_attr.UIATV === "true") { return; }
-
-            //DnDDrop 이벤트 라인이 아예 없는 UI 는 초기화 대상 자체가 없어 미해당(정규 흐름).
-            //  ※ 이벤트가 "걸려있는지" 여부로는 가르지 않는다 — 자동증가와 동일하게, 끄는 방향이면
-            //    등록 이벤트 유무와 무관하게 무조건 확인 팝업을 띄운다(장군님 지시 2026-08-13).
-            var aAttr = null;
-            try { aAttr = oAPP.attr.oModel.oData.T_ATTR; } catch (e) { aAttr = null; }
-            var ls_drop = aAttr && aAttr.find(function (a) { return a.UIASN === "DNDDROP"; });
-            if (!ls_drop) { return; }
-
-            //283 설정된 서버/클라이언트 이벤트가 초기화됩니다. 계속 진행하시겠습니까? (자동증가와 동일 문구)
-            var sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "283", "", "", "", "");
-
-            parent.showMessage(null, 30, "I", sMsg, async function (param) {
-
-                try {
-                    //변경 직전 스냅샷 1회 — dropAble 값 + DnDDrop 초기화를 한 번에 되돌린다.
-                    //  (바뀐 속성 실어 undo/redo 복원 시 그 줄로 스크롤.)
-                    try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK } : undefined); } } catch (e) { }
-
-                    if (param !== "YES") {
-                        //취소 — dropAble 값을 다시 true 로 되돌림(DnDDrop 유지·잠금 해제는 재진입 예외처리가 수행).
-                        is_attr.UIATV = "true";
-                        is_attr.comboval = "true";
-                    }
-
-                    //값 반영·DnDDrop 예외처리·재렌더·디자인영역/바인딩 반영·busy — 정규 경로 재사용.
-                    //  (undo 스냅샷 위에서 1회 적재 → skip / 확인 게이트 재호출 방지 = 4번째 인자 true.)
-                    oAPP.fn.fnWs20AttrChange(is_attr, "DDLB", true, true);
-
-                    //디자인 트리(좌측) 갱신 — 자동증가 확인 콜백과 동일(원본 designRefershModel 대응).
-                    try { if (typeof oAPP.fn.designRefershModel === "function") { await oAPP.fn.designRefershModel(); } } catch (e) { }
-
-                } catch (e) {
-                    console.error("[HTML5][WS20][attr][BR31] dropAble 초기화 확인 처리 오류:", e && e.message);
-                    //예외 시 화면 잠금·로딩표시·자식창 잠금 원복(짝 보장).
-                    try { parent.setBusy && parent.setBusy(""); } catch (e2) { }
-                    try { oAPP.fn.setShortcutLock(false); } catch (e2) { }
-                    try { _broadChildBusy(false); } catch (e2) { }
-                }
-
-            }); //dropAble 을 끄고 등록 이벤트가 있는 경우 확인 팝업.
-
-            //호출부 후속 처리 skip flag.
-            return true;
-
-        }; //dropAble 프로퍼티 변경건 확인 게이트.
     }
 
     /* ********************************************************************
@@ -3614,16 +3533,6 @@
                 return;
             }
 
-            //dropAble 프로퍼티 변경건 확인 게이트. [BR31 / 일관성 — 장군님 지시 2026-08-13]
-            //  dropAble 을 끄면(등록된 DnDDrop 이벤트가 있을 때) 초기화되므로 자동증가와 동일한
-            //  확인 팝업(283)을 먼저 띄운다. true 반환 = 확인 팝업 경로로 전환 → 정규 처리 skip.
-            //  값 반영·이벤트 초기화는 팝업 콜백이 fnWs20AttrChange 재진입(4번째 인자 true)으로 수행.
-            //  (bSkipAutoGrow 는 두 확인 게이트 공통 재진입 방지 스위치로 재사용.)
-            if (bSkipAutoGrow !== true && typeof oAPP.fn.attrChangeDropAbleProp === "function"
-                && oAPP.fn.attrChangeDropAbleProp(sAttr) === true) {
-                return;
-            }
-
             //(원본 1780행 attrDocumentProc: ROOT 의 테마/CSS 적용 등 "미리보기" 반영 —
             // W2 미변환 → 데이터 수집(attrChgAttrVal)만 수행하고 미리보기 반영은 skip)
 
@@ -3639,10 +3548,7 @@
             //    예: 집합 바인딩 해제·재바인딩·트리 부모/자식 해제 = 원본과 동일하게 Ctrl+Z 한 번에 통째로 되돌림.
             try {
                 if (bSkipUndo !== true && CT_SKIP_UNDO_ACTION.indexOf(_actcd) === -1
-                    && typeof oAPP.fn.fnWs20PushUndo === "function") {
-                    //바뀐 속성(OBJID+UIATK)을 스냅샷에 실어 undo/redo 복원 시 그 줄로 스크롤(원본 대응).
-                    oAPP.fn.fnWs20PushUndo(sAttr ? { OBJID: sAttr.OBJID, UIATK: sAttr.UIATK } : undefined);
-                }
+                    && typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
             } catch (e) {
                 console.warn("[HTML5][WS20][attr] undo push skip:", e && e.message);
             }
@@ -3705,13 +3611,11 @@
             //DDLB 변경 라인 STYLE 처리. (원본 1944행)
             try { oAPP.fn.attrSetLineStyle(sAttr); } catch (e) { }
 
-            //[BR31] dropAble 프로퍼티 변경 실행부 — DnDDrop 이벤트 연동(잠금/초기화/해제).
-            //  원본 attrSetDropAbleException(uiAttributeArea.js:3388) 대응. dropAble 을 끄면 DnDDrop
-            //  입력을 잠그고 오른쪽 두 버튼을 숨기며 등록된 서버/클라이언트 이벤트를 초기화, 켜면 잠금 해제.
-            //  ※ "끌 때 등록 이벤트가 있으면" 초기화 확인 팝업(283)은 진입부 게이트 attrChangeDropAbleProp
-            //    이 먼저 처리(YES 시 여기로 재진입해 실제 초기화, NO 시 값 되돌린 뒤 재진입해 잠금 해제).
-            //  dropAble 라인 자체 수집(attrChgAttrVal)은 위에서 마쳤고, 재렌더/바인딩팝업 반영은
-            //  공통 경로가 처리하므로 여기선 DnDDrop 부수효과만 태운다.
+            //[BR31] dropAble 프로퍼티 변경건 예외처리 — DnDDrop 이벤트 연동.
+            //  원본 attrChange 1798행 attrChangeDropAbleProp → attrSetDropAbleException(is_attr,true,true).
+            //  dropAble 을 끄면 DnDDrop 이벤트 입력을 잠그고 등록된 서버/클라이언트 이벤트를 초기화,
+            //  켜면 입력 잠금을 해제한다. dropAble 라인 자체 수집(attrChgAttrVal)은 위에서 이미 마쳤고,
+            //  뒤따르는 재렌더/바인딩팝업 반영을 공통 경로가 처리하므로 여기선 DnDDrop 부수효과만 태운다.
             try {
                 if (sAttr && sAttr.UIASN === "DROPABLE" && typeof oAPP.fn.attrSetDropAbleException === "function") {
                     oAPP.fn.attrSetDropAbleException(sAttr, false, true);
@@ -3752,6 +3656,10 @@
 
             //모델 갱신 처리. (원본 1959행 — HTML5: 속성 행 재렌더)
             oAPP.fn.fnRenderWs20AttrRows();
+
+            //[BR34] 값 확정 직후 오류가 남으면 그 오류 입력칸에 커서를 다시 놓아 안내문구가 저절로 뜨게 한다.
+            //  원본은 확정 직후 오류면 문구를 자동으로 연다(uiAttributeArea.js:831). 오류 없으면 예약 취소.
+            _attrVsRefocus((sAttr && sAttr.valst === "Error") ? sAttr.UIATK : "");
 
             //[F-5] 바인딩 팝업(별창) 디자인 영역 반영 — 원본 attrChange 끝 updateBindPopupDesignData(uiAttributeArea.js:1893).
             //  ★속성변경 허브: bind·unbind·F4·styleClass·M03 동일속성·RESET_ATTR 이 전부 이 경로를 거친다.
@@ -4127,15 +4035,6 @@
 
             //DnDDrop 이벤트 입력 가능여부 처리.
             ls_drop.edit = l_edit;
-
-            //DnDDrop 비활성 시 오른쪽 두 버튼(서버이벤트 생성 아이콘·클라이언트 이벤트 편집 아이콘) 숨김.
-            //  원본 attrSetDropAbleException(uiAttributeArea.js:3450)은 edit 만 바꾸고 아이콘 표시여부는
-            //  건드리지 않아 잠긴 DnDDrop 줄에도 두 버튼이 남는 결함이 있었다. autoGrowing 예외처리
-            //  (attrSetAutoGrowingException, 원본 3326~3329)는 edit 에 맞춰 아이콘도 함께 잠근다 →
-            //  동일 기준으로 맞춰 잠금 시 버튼을 숨긴다(장군님 지시 2026-08-13). 렌더 _buildIconCell 은
-            //  icon1_visb/icon2_visb 가 false 면 버튼을 그리지 않는다.
-            ls_drop.icon1_visb = l_edit;
-            ls_drop.icon2_visb = l_edit;
 
             //초기화 flag 가 있고 입력 불가(=dropAble 를 끈 경우) DnDDrop 등록 이벤트 초기화.
             if (bClear === true && l_edit === false) {
@@ -4985,13 +4884,11 @@
 
     } // end of _renderAttrHeader
 
-    /* ── [BR34] 속성 값 입력칸 오류 메시지 팝오버 = 문서 최상단 fixed 팝오버 ──
-       원본 uiAttributeArea.js:736 sap.m.Input({valueState:"{valst}", valueStateText:"{valtx}"}) +
-       attachChange 끝 this._oValueStateMessage.open()(831~833) 이식. 값 입력칸이 스크롤되는 행
-       목록(.u4aWs20AttrRows) 안이라 인라인 메시지는 셀에서 잘리므로, 바인딩 팝업 _bindVsShow 와 동일하게
-       body 최상단 position:fixed 로 입력칸 바로 아래 부착. 싱글톤 1개 재사용, 포커스(클릭) 시 표시 /
-       blur·스크롤·리사이즈·바깥클릭 시 숨김. 색/아이콘/보더는 공통 .u4a-field__msg 소비(신규 스타일 없음). */
-    var _attrVsPop = null, _attrVsBound = false, _attrVsField = null;
+    /* ── [BR34] 속성 값 입력칸 오류 안내문구 = 문서 최상단 고정 팝오버(원본 sap.m.Input valueStateMessage 재현) ──
+       원본 uiAttributeArea.js:736 valueState/valueStateText + 831 확정 직후 오류면 open(). 값칸이 스크롤되는 행
+       목록 안이라 셀에 붙이면 잘리므로 바인딩 팝업 _bindVsShow 와 동일하게 body 최상단 고정으로 입력칸 아래 부착.
+       하나만 만들어 재사용, 포커스(클릭) 시 표시 / 커서 빠짐·스크롤·창크기변경·바깥클릭 시 숨김. 색/테두리는 공통 .u4a-field__msg 소비. */
+    var _attrVsPop = null, _attrVsBound = false, _attrVsField = null, _attrVsRefocusTimer = 0;
     function _attrVsEl() {
         if (!_attrVsPop) {
             _attrVsPop = document.createElement("span");
@@ -5000,20 +4897,32 @@
         }
         return _attrVsPop;
     }
-    function _attrVsHide() { if (_attrVsPop) { _attrVsPop.style.display = "none"; } }
+    function _attrVsHide() { if (_attrVsPop) { _attrVsPop.style.display = "none"; } _attrVsField = null; }
+    function _attrVsRefocus(sUiatk) {
+        if (_attrVsRefocusTimer) { clearTimeout(_attrVsRefocusTimer); _attrVsRefocusTimer = 0; }
+        if (!sUiatk) { return; }
+        _attrVsRefocusTimer = setTimeout(function () {
+            _attrVsRefocusTimer = 0;
+            try {
+                var oRow = document.querySelector('#ws20AttrRows .u4aWs20AttrRow[data-uiatk="' + sUiatk + '"]');
+                var oInp = oRow && oRow.querySelector("input.u4aWs20AttrInp.val");
+                if (oInp) { oInp.focus(); }
+            } catch (e) { }
+        }, 0);
+    }
     function _attrVsShow(oInputEl, sTxt) {
         if (!oInputEl || !sTxt) { _attrVsHide(); return; }
         var el = _attrVsEl();
-        _attrVsField = (oInputEl.closest && oInputEl.closest(".u4aWs20AttrValBox")) || oInputEl;   // 현재 앵커 필드(바깥클릭 판정용)
+        _attrVsField = (oInputEl.closest && oInputEl.closest(".u4aWs20AttrValBox")) || oInputEl;
         el.textContent = sTxt;
         el.setAttribute("data-vs", "error");
         if (el.parentNode !== document.body) { document.body.appendChild(el); }
         var rc = oInputEl.getBoundingClientRect();
         el.style.position = "fixed";
-        el.style.margin = "0";                          // 공통 margin-top(0.25rem) 무효화 → top 결정적
+        el.style.margin = "0";
         el.style.left = Math.round(rc.left) + "px";
         el.style.top = Math.round(rc.bottom + 4) + "px";
-        el.style.width = Math.round(rc.width) + "px";   // 입력칸 폭 → 문구 개행(반응형)
+        el.style.width = Math.round(rc.width) + "px";
         el.style.zIndex = "40";
         el.style.whiteSpace = "normal";
         el.style.overflowWrap = "anywhere";
@@ -5022,7 +4931,6 @@
             _attrVsBound = true;
             window.addEventListener("scroll", function () { _attrVsHide(); }, true);
             window.addEventListener("resize", function () { _attrVsHide(); });
-            // blur 만으론 못 잡는 바깥 클릭(포커스 이동 없는 클릭) 보강 — mousedown capture. 앵커 필드/팝오버 자체는 유지.
             document.addEventListener("mousedown", function (e) {
                 if (!_attrVsPop || _attrVsPop.style.display === "none") { return; }
                 var t = e.target;
@@ -5187,11 +5095,12 @@
                 }
             }
             if (sAttr.valst === "Error") {
-                oValFld.input.classList.add("err"); oValFld.input.title = sAttr.valtx || oValFld.input.value;
-                // [BR34] 오류 메시지 팝오버 — 오류 입력칸을 클릭(포커스)하면 입력칸 아래에 오류문구 표시, blur 시 숨김.
-                //   원본 sap.m.Input valueStateMessage(uiAttributeArea.js:736 valueState/valueStateText) 재현.
+                oValFld.input.classList.add("err");   // 빨간 테두리(원본 valueState=Error). 툴팁은 위에서 값(원본 tooltip:{UIATV})로 유지.
+                // [BR34] 오류 안내문구 팝오버 — 오류 입력칸에 커서가 놓이거나(포커스) 클릭하면 입력칸 아래에 표시, 커서 빠지면 숨김.
+                //   원본 sap.m.Input valueStateMessage(uiAttributeArea.js:736·831) 재현.
                 (function (inpEl, sMsg) {
                     inpEl.addEventListener("focus", function () { _attrVsShow(inpEl, sMsg); });
+                    inpEl.addEventListener("click", function () { _attrVsShow(inpEl, sMsg); });
                     inpEl.addEventListener("blur", function () { _attrVsHide(); });
                 })(oValFld.input, sAttr.valtx || "");
             }
@@ -5827,31 +5736,6 @@
         };
     }
 
-    /************************************************************************
-     * [BR32] styleClass 값칸 더블클릭 → CSS 편집기(Monaco) 팝업 호출.
-     *   원본 uiAttributeArea.js:3007 attrDblClickStyleClass 1:1 이식.
-     *   프로퍼티(UIATY="1")·styleClass(UIASN="STYLECLASS")·비바인딩(ISBND≠"X")·
-     *   값 존재(UIATV) 조건일 때만 편집기(OBJTY="CS")를 열고 하위로직 skip flag(true) 반환.
-     *   ※ styleClass F4 값도움(미리 정의된 CSS 클래스 목록, fnStyleClassPopupOpen)과는 별개 기능.
-     ************************************************************************/
-    if (typeof oAPP.fn.attrDblClickStyleClass !== "function") {
-        oAPP.fn.attrDblClickStyleClass = function (is_attr) {
-            //프로퍼티가 아니면 exit. (원본 3010)
-            if (!is_attr || is_attr.UIATY !== "1") { return; }
-            //styleClass 프로퍼티가 아니면 exit. (원본 3013)
-            if (is_attr.UIASN !== "STYLECLASS") { return; }
-            //바인딩 처리된 경우 exit. (원본 3016)
-            if (is_attr.ISBND === "X") { return; }
-            //입력값이 없으면 exit. (원본 3019 UIATV === "" — null 안전 포함)
-            if (!is_attr.UIATV) { return; }
-            //에디터 정보 구성(원본 3022) 후 CSS 편집기 팝업 호출(원본 3029 fnEditorPopupOpener).
-            var oEditorInfo = { OBJID: is_attr.OBJID + is_attr.UIASN, OBJTY: "CS", OBJNM: "CSS" };
-            oAPP.fn.fnEditorPopupOpener(oEditorInfo, is_attr.UIATV);
-            //하위 로직 skip flag. (원본 3032)
-            return true;
-        };
-    }
-
     oAPP.fn.fnRenderWs20AttrRows = function () {
 
         var ROWS = document.getElementById("ws20AttrRows");
@@ -5869,26 +5753,8 @@
                 var row = oVal.closest(".u4aWs20AttrRow");
                 var oAttr = row ? row.__attrData : null;
                 if (!oAttr) { return; }
-
-                // 원본 attrDblclickEvent(uiAttributeArea.js:2956) 순서: styleClass → (bindField) → serverEvent.
-                //   ★화면잠금은 여기서 미리 걸지 않는다 — CSS 편집기 여는 함수(fnEditorPopupOpen)가 진입 즉시
-                //     스스로 fnSetBusyLock("X") 를 걸고(자기 수명주기로 해제) 있으므로 중복이며, 미리 잠그면
-                //     최초 실행에서 편집기 스크립트 로드가 실패할 때(loadJs 오류콜백 없음) 풀 주체가 없어 화면이
-                //     영구 고착된다(검수 P1). Edit 메뉴 CSS 편집기(fnHmws.js:147 fnHmws20_30_10)의 선-잠금+위임
-                //     패턴과 동일한 선재 결함이라, BR32 는 잠금을 편집기에 온전히 맡겨 이 노출을 없앤다.
-                //   (bindField 더블클릭=서버 위치조회는 미변환 — 별도 이슈.)
-                try {
-                    // [BR32] styleClass 값 더블클릭 → CSS 편집기. 단, 값칸 안 F4 값도움(복사 아이콘)·
-                    //   지우기 버튼은 자체 동작이므로 제외(원본 기대: 링크·버튼·아이콘 제외).
-                    if (!ev.target.closest(".u4a-field__vh, .u4a-field__clear")
-                        && oAPP.fn.attrDblClickStyleClass(oAttr)) {
-                        return;                                          // 편집기 여는 함수가 잠금 관리
-                    }
-                    // [BR33] 서버이벤트 값칸 더블클릭 이동(원본 attrDblClickServerEvent, 반환값 없음).
-                    oAPP.fn.attrDblClickServerEvent(oAttr);
-                } catch (e) {
-                    console.error("[HTML5][WS20][attr] 값칸 더블클릭 처리 오류:", e && e.message);
-                }
+                try { oAPP.fn.attrDblClickServerEvent(oAttr); }
+                catch (e) { console.error("[HTML5][WS20][attr] 서버이벤트 더블클릭 이동 오류:", e && e.message); }
             });
         }
 
@@ -5945,6 +5811,8 @@
             });
         }
 
+        //[BR34] 행(입력칸)을 지우기 전에 오류 안내문구를 먼저 숨긴다 — 사라질 입력칸을 가리킨 채 남지 않게.
+        _attrVsHide();
         ROWS.innerHTML = "";
         //빈 상태 가운데정렬 클래스는 매 렌더 초기화 → 행이 그려지면 일반(위→아래) 흐름.
         ROWS.classList.remove("u4aWs20AttrRows--empty");

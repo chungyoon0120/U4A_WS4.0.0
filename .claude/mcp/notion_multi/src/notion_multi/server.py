@@ -77,12 +77,12 @@ def notion_request(method: str, path: str, token: str, body: Optional[dict] = No
 
 def title_of(obj: dict) -> str:
     """검색 결과 객체에서 제목 텍스트 뽑기."""
+    if obj.get("object") == "database":
+        return "".join(t.get("plain_text", "") for t in obj.get("title", []))
     props = obj.get("properties", {}) or {}
     for _, v in props.items():
         if isinstance(v, dict) and v.get("type") == "title":
             return "".join(t.get("plain_text", "") for t in v.get("title", []))
-    if obj.get("object") == "database":
-        return "".join(t.get("plain_text", "") for t in obj.get("title", []))
     return ""
 
 
@@ -458,6 +458,69 @@ def update_page_properties(workspace: str, page_id: str, properties: dict) -> st
             hint = f" (경고: 속성 {unknown} 은 대상 페이지에 없어 타입 자동변환 못 함 — 속성명을 확인)"
         return f"[HTTP {status}] 속성 수정 실패: {json.dumps(data, ensure_ascii=False)}{hint}"
     return f"[HTTP 200] 속성 수정 성공 (page_id={page_id})"
+
+
+@mcp.tool()
+def create_database_row(
+    workspace: str,
+    database_id: str,
+    properties: dict,
+    text: Optional[str] = None,
+) -> str:
+    """DB(표)에 새 행(page)을 하나 만든다. properties 는 '속성명: 값' 맵.
+
+    ★ 값 주는 법(update_page_properties 와 동일):
+      (1) 그냥 값만 — 권장. DB 스키마의 실제 속성 타입(title/status/select/number/date 등)을
+          서버가 읽어 맞는 형식으로 자동 변환한다. 타입을 몰라도 된다.
+          예) {"코드": "BR43", "분류": "기능", "상태": "접수", "화면": "WS20 Design",
+               "내용": "..."}
+      (2) 노션 원형 형식(dict) — 그대로 전달(하위호환).
+
+    ※ title 속성은 이름이 'title' 이 아닐 수 있다(이 이슈 DB는 '내용'이 title). DB 스키마의
+      실제 title 속성명으로 값을 주면 서버가 title 로 감싼다.
+    ※ text 를 주면 본문 첫 문단으로 함께 추가한다(상세 설명 등).
+
+    workspace: 워크스페이스명
+    database_id: 대상 DB id (list_workspaces 의 database_id 사용)
+    properties: {속성명: 값} — 원시값 또는 노션 형식
+    text: 본문 한 문단(선택)
+    """
+    token = get_token(workspace)
+
+    # DB 스키마에서 속성 타입 읽기(원시값 자동 변환용).
+    st, db = notion_request("GET", f"/databases/{database_id}", token)
+    if st != 200:
+        return f"[HTTP {st}] DB 스키마 조회 실패: {json.dumps(db, ensure_ascii=False)}"
+    schema = db.get("properties", {}) or {}
+    schema_types = {name: v.get("type") for name, v in schema.items()}
+
+    body_props = {}
+    unknown = []
+    for name, value in properties.items():
+        if isinstance(value, dict):
+            body_props[name] = value
+            continue
+        ptype = schema_types.get(name)
+        if not ptype:
+            unknown.append(name)
+            body_props[name] = value  # 타입 못 찾음 — 원시값 그대로(노션이 판정/거부).
+            continue
+        body_props[name] = wrap_property_value(ptype, value)
+
+    body: dict = {
+        "parent": {"type": "database_id", "database_id": database_id},
+        "properties": body_props,
+    }
+    if text:
+        body["children"] = [paragraph_block(text)]
+
+    status, data = notion_request("POST", "/pages", token, body)
+    if status != 200:
+        hint = ""
+        if unknown:
+            hint = f" (경고: 속성 {unknown} 은 DB 스키마에 없음 — 속성명 확인)"
+        return f"[HTTP {status}] 행 생성 실패: {json.dumps(data, ensure_ascii=False)}{hint}"
+    return f"[HTTP 200] 행 생성 성공\nid={data.get('id')}\nurl={data.get('url')}"
 
 
 @mcp.tool()
