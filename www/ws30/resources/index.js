@@ -241,7 +241,7 @@ oAPP.views = window?.oAPP?.views || {};
                 '<div class="u4a-dialog__header" data-type="' + (sType || "I") + '">' +
                     '<i class="fa-solid fa-' + (oTypeIcon[sType] || "circle-info") + '"></i><span></span>' +
                 '</div>' +
-                '<div class="u4a-dialog__body" style="white-space:pre-wrap;line-height:1.45;"></div>' +
+                '<div class="u4a-dialog__body" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;"></div>' +
                 '<div class="u4a-dialog__footer"></div>';
             oDlg.querySelector(".u4a-dialog__header span").textContent = sTitle || "";
             oDlg.querySelector(".u4a-dialog__body").textContent = sMsg || "";

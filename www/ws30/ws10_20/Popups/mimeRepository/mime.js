@@ -64,6 +64,13 @@
             return oAPP.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", sCode, p1 || "");
         } catch (e) { return ""; }
     }
+    // ZMSG_WS_COMMON_002 조회(001 포화 후 신설 클래스). 001 과 동일 규약, 클래스만 002.
+    function _wsTxt2(sCode, p1) {
+        try {
+            var L = oAPP.attr.LANGU || "";
+            return oAPP.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_002", sCode, p1 || "");
+        } catch (e) { return ""; }
+    }
     function _el(sTag, sClass, sText) {
         var o = document.createElement(sTag);
         if (sClass) { o.className = sClass; }
@@ -1001,9 +1008,13 @@
     function lf_confirmCreateFolder() {
         if (!oCrUI || !oCrUI.target) { return; }
 
-        var sName = oCrUI.nameField.getValue() || "";
+        // [BR48] 폴더명 앞뒤 공백 제거 후 검증.
+        //   원본(fnMimePopupOpen.js ev_createMimeFolderEvent)은 FLDNM=="" (빈 문자열)만 검사해,
+        //   빈칸(SPACE)만 입력하면 검증을 통과하고 서버로 가서 엉뚱한 "Duplicate filename exists."
+        //   응답이 뜨던 레거시 버그(원본 WS3.0 동일 재현). 검증 전 공백 제거 → 빈값이면 서버 도달 전 차단.
+        var sName = (oCrUI.nameField.getValue() || "").replace(/^\s+|\s+$/g, "");
 
-        // 검증 — 폴더명 필수(원본: FLDNM=="" → valueState Error + MSG_WS 050).
+        // 검증 — 폴더명 필수(원본: FLDNM=="" → valueState Error + MSG_WS 050 "& is required"). 공백만도 필수 누락으로.
         if (sName === "") {
             var sTxt = _txt("/U4A/CL_WS_COMMON", "D01");        // Folder Name
             sTxt = _txt("/U4A/MSG_WS", "050", sTxt);            // & is required.
@@ -1357,12 +1368,21 @@
     function _addImportFiles(fs) {
         if (!oImpUI || !fs || !fs.length) { return; }
         var C_NAME_MAX = 60;   // 파일명(확장자 포함) 최대 길이 — 초과 시 첨부 불가
-        var aZero = [], aLong = [];
+        var aZero = [], aLong = [], aDup = [];
+        // [BR48] 동일 파일명 중복 첨부 차단. 원본(fnMimePopupOpen.js)은 중복 체크 함수(_checkDupSaveFile)를
+        //   껍데기만 만들고 주석 처리해 실제 검사가 없었다(원본 WS3.0 동일 재현). 이미 목록에 있거나 이번에
+        //   담은 동일 파일명은 목록에 넣지 않고(=서버 업로드도 안 됨) 사유를 안내한다.
+        var oSeen = {};
+        for (var k = 0; k < oImpUI.files.length; k++) {
+            if (oImpUI.files[k] && oImpUI.files[k].file) { oSeen[oImpUI.files[k].file.name] = true; }
+        }
         for (var i = 0; i < fs.length; i++) {
             var f = fs[i];
             if (!f) { continue; }
             if (!(f.size > 0)) { aZero.push(f.name); continue; }                    // 0KB → 제외
             if (String(f.name).length > C_NAME_MAX) { aLong.push(f.name); continue; } // 60자 초과 → 제외
+            if (oSeen[f.name]) { aDup.push(f.name); continue; }                     // 이미 첨부(또는 이번 중복) → 제외
+            oSeen[f.name] = true;
             oImpUI.files.push({ file: f, desc: "" });
         }
         lf_renderImpList();
@@ -1375,8 +1395,16 @@
             aMsg.push((_wsTxt("969") || _txt("/U4A/MSG_WS", "140")) + "\n" + aZero.join("\n"));
         }
         if (aLong.length) {
-            // 파일명 60자 초과 첨부 불가 — 신규 970, 미동기화 시 339("업로드한 파일에 문제가 있습니다") 폴백.
-            aMsg.push((_wsTxt("970") || _txt("/U4A/MSG_WS", "339")) + "\n" + aLong.join("\n"));
+            // 파일명 길이 초과 첨부 불가 — ZMSG_WS_COMMON_002 004("파일 이름은 &1자를 넘을 수 없습니다." 계열).
+            //   최대 길이(C_NAME_MAX)를 &1 로 넘겨 치환 → 제한값이 바뀌어도 소스의 C_NAME_MAX 만 고치면 문구 불변.
+            //   (기존 970 은 "브라우저 종료" 오배선이라 제거. /U4A/MSG_WS 는 신규 추가 금지, 001 은 포화 →
+            //    001 포화 후 신설된 002 클래스의 다음 빈 번호 004 로 배선.)
+            aMsg.push((_wsTxt2("004", String(C_NAME_MAX)) || "") + "\n" + aLong.join("\n"));
+        }
+        if (aDup.length) {
+            // [BR48] 이미 첨부된 동일 파일명 — 원본 메시지 키 /U4A/MSG_WS 004("중복된 파일 이름이 있습니다.") 재사용.
+            //   (원본 서버가 중복 시 반환하던 문구와 동일 클래스. 신규 번호 생성 없이 기존 키 참조.)
+            aMsg.push(_txt("/U4A/MSG_WS", "004") + "\n" + aDup.join("\n"));
         }
         if (aMsg.length) {
             oAPP.fn.showMessage(null, 20, "W", aMsg.join("\n\n"));

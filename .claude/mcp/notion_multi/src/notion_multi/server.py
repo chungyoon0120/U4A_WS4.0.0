@@ -523,6 +523,68 @@ def create_database_row(
     return f"[HTTP 200] 행 생성 성공\nid={data.get('id')}\nurl={data.get('url')}"
 
 
+def build_property_schema(prop_type: str, options=None) -> dict:
+    """속성 타입명 -> 노션 DB 속성 스키마(빈 골격 또는 옵션 포함).
+    select/multi_select 는 options(문자열 리스트 또는 {"name","color"} dict 리스트)로 항목 지정.
+    """
+    pt = (prop_type or "rich_text").lower()
+    if pt in ("rich_text", "text"):
+        return {"rich_text": {}}
+    if pt == "title":
+        return {"title": {}}
+    if pt == "number":
+        return {"number": {"format": "number"}}
+    if pt == "checkbox":
+        return {"checkbox": {}}
+    if pt == "date":
+        return {"date": {}}
+    if pt in ("url", "email", "phone_number", "people", "files"):
+        return {pt: {}}
+    if pt in ("select", "multi_select"):
+        opts = []
+        for o in (options or []):
+            opts.append(o if isinstance(o, dict) else {"name": str(o)})
+        return {pt: {"options": opts}}
+    # 알 수 없는 타입은 안전하게 rich_text 로.
+    return {"rich_text": {}}
+
+
+@mcp.tool()
+def add_database_property(
+    workspace: str,
+    database_id: str,
+    name: str,
+    prop_type: str = "rich_text",
+    options: Optional[list] = None,
+) -> str:
+    """DB(표)에 새 컬럼(속성)을 하나 추가한다. (노션 API PATCH /databases 로 스키마 수정)
+
+    행 추가(create_database_row)·속성 수정(update_page_properties)은 기존 컬럼만 다룰 수 있으므로,
+    없는 컬럼을 새로 만들 때 이 도구를 먼저 쓴다. 추가 후 각 행 값은 update_page_properties 로 채운다.
+
+    workspace: 워크스페이스명
+    database_id: 대상 DB id (list_workspaces 의 database_id 사용)
+    name: 새 컬럼(속성) 이름 (예: "작성자")
+    prop_type: 컬럼 타입. 기본 rich_text(자유 글자).
+        지원: rich_text | number | checkbox | date | url | email | phone_number |
+             people | files | select | multi_select
+        (title 은 DB당 1개뿐이라 새로 추가 불가. status 는 노션 API 로 신규 생성 불가 → rich_text/select 사용.)
+    options: select/multi_select 일 때 항목 목록. 문자열 리스트(["High","Low"]) 또는
+             색 지정 dict 리스트([{"name":"High","color":"red"}]).
+    """
+    token = get_token(workspace)
+    schema = build_property_schema(prop_type, options)
+    body = {"properties": {name: schema}}
+    status, data = notion_request("PATCH", f"/databases/{database_id}", token, body)
+    if status != 200:
+        return f"[HTTP {status}] 컬럼 추가 실패: {json.dumps(data, ensure_ascii=False)}"
+    return (
+        f"[HTTP 200] 컬럼 추가 성공 "
+        f"(database_id={database_id}, 컬럼='{name}', 타입={prop_type}). "
+        f"이제 update_page_properties 로 각 행의 '{name}' 값을 채울 수 있다."
+    )
+
+
 @mcp.tool()
 def update_block_text(workspace: str, block_id: str, text: str) -> str:
     """텍스트 블록(문단·제목·목록·할일 등)의 내용을 text 로 통째로 교체한다.

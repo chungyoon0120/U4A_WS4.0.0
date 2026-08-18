@@ -374,7 +374,11 @@
             try { APPCOMMON.removeShortCut("WS30"); } catch (e) { }
 
             // 서버 세션 종료 → lf_success 에서 잠금 해제 + WS10 이동
-            oAPP.fn.fnKillUserSession(parent.getAppInfo(), lf_success);
+            //   ★ 앱정보는 원본(ws_usp.js fnMoveToWs10)과 동일하게 모델 /WS30/APP 에서 읽는다.
+            //     (원본 fnGetAppInfo() === 모델 /WS30/APP. WS30 은 parent.getAppInfo() 를 채우지
+            //      않으므로 parent.getAppInfo() 로 읽으면 APPID 누락 → 세션종료·잠금해제가 어긋난다.)
+            var oBackAppInfo = APPCOMMON.fnGetModelProperty("/WS30/APP");
+            oAPP.fn.fnKillUserSession(oBackAppInfo, lf_success);
 
         } catch (e) {
             console.error("[HTML5][WS30] _doBackToWs10 error:", e);
@@ -383,7 +387,8 @@
 
         async function lf_success() {
             try {
-                var oInfo = parent.getAppInfo();
+                // ★ 원본(ws_usp.js _fnKillUserSessionCb)과 동일하게 모델 /WS30/APP 을 읽는다.
+                var oInfo = APPCOMMON.fnGetModelProperty("/WS30/APP");
 
                 // Change 모드였다면 서버 Lock 해제
                 if (oInfo && oInfo.IS_EDIT === "X") {

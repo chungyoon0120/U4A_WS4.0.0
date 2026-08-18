@@ -917,9 +917,10 @@
     // SPLIT 컨테이너에 패널을 aOrder(SID 배열) 순서대로 재배치 + 리사이저 새로 바인딩.
     //   리사이저는 항상 "패널 사이"에 위치하며, 인접한 '고정' 패널(트리/속성)의 폭을 조절한다
     //   (미리보기=flex:1 가변 이라 슬랙을 흡수). 패널 순서가 어떻든 동작.
+    //   반환: 실제로 재배치(패널 재부착=미리보기 iframe 재로드)했으면 true, 생략했으면 false.
     function _ws20ArrangeSplit(SPLIT, aOrder) {
         var oPanels = SPLIT.__ws20Panels;
-        if (!oPanels) { return; }
+        if (!oPanels) { return false; }
 
         // 현재 DOM 패널 순서가 이미 aOrder 와 같으면 재배치 생략 — 불필요한 미리보기 iframe
         //   re-parent(=재로드) 방지. (setDesignLayout 가 setUIAreaEditable 마다 호출되므로 중요)
@@ -929,7 +930,7 @@
             else if (el.classList && el.classList.contains("u4aWsDesignPreview")) { aCur.push("designPreview"); }
             else if (el.classList && el.classList.contains("u4aWsDesignAttr")) { aCur.push("designAttr"); }
         });
-        if (aCur.length === aOrder.length && aCur.every(function (s, i) { return s === aOrder[i]; })) { return; }
+        if (aCur.length === aOrder.length && aCur.every(function (s, i) { return s === aOrder[i]; })) { return false; }
 
         // 컨테이너 비우기(패널 노드는 oPanels 가 참조 보유 → 유실 없음) — 기존 리사이저는 폐기(리스너째).
         while (SPLIT.firstChild) { SPLIT.removeChild(SPLIT.firstChild); }
@@ -954,14 +955,17 @@
         if (window.U4AUI && U4AUI.wireSplitter) {
             U4AUI.wireSplitter(SPLIT, { axis: "x", mode: bDefault ? "giveway" : "adjacent" });
         }
+        return true;
     }
 
     // [PUBLIC] 구 setDesignLayout — 저장된 순서로 현재 SPLIT 재배치(셸 렌더/모드전환 시 호출).
+    //   반환: 실제로 패널을 재배치(미리보기 iframe 재로드 유발)했으면 true.
     oAPP.fn.setDesignLayout = function () {
         try {
             var oSplit = document.getElementById("ws20DesignSplit");
-            if (oSplit && oSplit.__ws20Panels) { _ws20ArrangeSplit(oSplit, _ws20SavedLayoutOrder()); }
+            if (oSplit && oSplit.__ws20Panels) { return _ws20ArrangeSplit(oSplit, _ws20SavedLayoutOrder()); }
         } catch (e) { console.warn("[HTML5][WS20] setDesignLayout error:", e && e.message); }
+        return false;
     };
 
     /************************************************************************
@@ -1043,9 +1047,35 @@
                 });
                 try { if (parent.setP13nData) { parent.setP13nData("designLayout", aT_LAYOUT); } }
                 catch (e) { console.error("[HTML5][WS20] designLayout 저장 실패:", e); }
-                // 실제 패널 순서 적용 + 미리보기 재로드(구 loadPreviewFrame(true)).
-                try { oAPP.fn.setDesignLayout(); } catch (e) { console.error("[HTML5][WS20] 레이아웃 적용 실패:", e); }
-                try { if (typeof oAPP.fn.fnWs20LoadPreview === "function") { oAPP.fn.fnWs20LoadPreview(); } } catch (e) { }
+                // 실제 패널 순서 적용 (구 loadPreviewFrame(true)).
+                var _bReparented = false;
+                try { _bReparented = oAPP.fn.setDesignLayout(); } catch (e) { console.error("[HTML5][WS20] 레이아웃 적용 실패:", e); }
+                // [BR49] 레이아웃 순서가 바뀐 저장에서 Critical Error(instanceof 형변환) 방지.
+                //   원인: 순서가 바뀌면 setDesignLayout 이 3분할 컨테이너를 재구성하며 미리보기 iframe 이
+                //   떼였다 붙어 "다시 로드"된다(주석 924~925행). 그 재로드의 초기화(preview index.js 초기
+                //   drawPreview)는 맨 처음 removePreviewPage 로 옛 미리보기 UI 를 지우는데, 재로드로
+                //   무효화된 옛 컨텍스트의 컨트롤에 destroy 를 걸면 UI5 destroyAggregation 의
+                //   instanceof 우측이 객체가 아니게 되어 실패 → reject → loadPreviewFrame 에 catch 없어
+                //   Uncaught → Critical Error. (간헐: 재로드 self-heal 과 아래 명시 재-draw 경쟁.)
+                if (_bReparented) {
+                    // ★원본(callDesignLayoutChangePopup.js lf_frame 219~225행) 재현: 다시 그리기 전에
+                    //   옛 미리보기 UI 참조를 먼저 제거 → removePreviewPage 의 `!_page1` 가드가 조기
+                    //   return(destroy 통째 건너뜀) → 무효화된 옛 컨텍스트에서 destroy 가 안 돌아 크래시 차단.
+                    //   지운 옛 컨트롤은 폐기되는 iframe 컨텍스트와 함께 GC(원본도 destroy 없이 delete 만 함).
+                    try {
+                        var _ui = oAPP.attr.ui;
+                        if (_ui) {
+                            delete _ui.prevRootPage; delete _ui._page1;
+                            delete _ui.prevPopupArea; delete _ui._hbox1; delete _ui.oMenu;
+                        }
+                    } catch (e) { console.warn("[HTML5][WS20][BR49] 미리보기 참조 정리 skip:", e && e.message); }
+                    // 재로드가 미리보기를 스스로 재구성(초기 로드와 동일 경로: 참조 정리→새 _page1 생성→ROOT
+                    //   재선택)하므로, 여기서 fnWs20LoadPreview 를 또 부르지 않는다(중복 재-draw 제거 — 부르면
+                    //   재로드 직전 옛 컨텍스트에 _page1 을 다시 세워 재로드 초기화가 그걸 destroy → 크래시 재현).
+                } else {
+                    // 순서 무변경 → iframe 재로드 없음(안정 컨텍스트) → 예전처럼 명시 재로드로 미리보기 갱신.
+                    try { if (typeof oAPP.fn.fnWs20LoadPreview === "function") { oAPP.fn.fnWs20LoadPreview(); } } catch (e) { }
+                }
                 _close();
             }
             try {

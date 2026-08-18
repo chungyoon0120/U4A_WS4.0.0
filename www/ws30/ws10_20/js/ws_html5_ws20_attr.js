@@ -394,17 +394,189 @@
                 oAPP.attr.oModel.oData.T_ATTR[i].valtx = undefined;
             }
 
+            // ★[HTML5 필수] 원본 UI5 는 attrClearErrorField 뒤 oModel.refresh() 가 속성 테이블(valueState 바인딩)을
+            //   재렌더해 값칸 오류표시(빨간 테두리)를 지웠으나, HTML5 refresh() 훅은 좌측 트리만 그린다. 따라서
+            //   valst 를 지웠으면 **인자(bRefresh) 유무와 무관하게 항상** 속성행을 다시 그려 실제로 빨간이
+            //   사라지게 한다 — 실행/저장 점검 chkExcepionAttr 는 인자 없이 attrClearErrorField() 를 부르므로,
+            //   여기서 안 그리면 오류를 지워도 화면 빨간이 남는다(장군님 재현: 액티브 후 값칸 빨간 잔존).
+            try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } }
+            catch (e) { console.error("[HTML5][WS20][attr] attrClearErrorField 속성행 재렌더 오류:", e && e.message); }
+
+            //bRefresh=true 면 좌측 트리도 갱신(원본 refresh 대응).
             if (!bRefresh) { return; }
+            oAPP.attr.oModel.refresh();
+
+        };  //오류 필드 초기화 처리.
+    }
+
+    //★[HTML5 필수 이식] 오류 출력 구조 생성 (원본 design/js/main.js:175 crtErrorSyntaxStru 1:1).
+    //  chkExcepUiTable 이 표(Table) 오류건 수집 시 부르는데, 원본은 main.js 에서 정의(HTML5 미로드)라
+    //  런타임에 undefined 였다(실측). 이식 안 하면 표 오류 분기에서 크래시.
+    if (typeof oAPP.fn.crtErrorSyntaxStru !== "function") {
+        oAPP.fn.crtErrorSyntaxStru = function () {
+            return {
+                "GRCOD": "", "TYPE": "", "FNAME": "", "DESC": "", "LINE": "",
+                "METHOD": "", "OBJID": "", "UIATK": "", "GUBN": ""
+            };
+        };  //오류 출력 구조 생성.
+    }
+
+    //★[HTML5 필수 이식] attribute 예외처리 항목 점검 (원본 design/js/main.js:1315 chkExcepionAttr 1:1).
+    //  원본은 이 함수를 "미리보기 메인" 함수 안에서 정의하는데, HTML5 는 그 UI5 미리보기 메인을 실행하지
+    //  않아 oAPP.fn.chkExcepionAttr / chkExcepUiTable 가 런타임에 정의되지 않았다(실측 CDP 확인). 그 결과
+    //  실행(액티브)·저장·신텍스체크가 "함수 있으면 점검"에서 통째로 건너뛰어져 ①오류 있는 앱도 통과되고
+    //  ②오류표시 초기화(attrClearErrorField)도 안 불려 값칸 빨간이 남았다. 여기서 원본 그대로 이식한다.
+    if (typeof oAPP.fn.chkExcepionAttr !== "function") {
+        oAPP.fn.chkExcepionAttr = function () {
+
+            //오류 표현 필드 초기화 처리.
+            oAPP.fn.attrClearErrorField();
 
             oAPP.attr.oModel.refresh();
 
-            // ★[HTML5 필수] 원본 UI5 는 refresh() 가 바인딩된 속성 테이블을 재렌더해 valueState(err) 표시가
-            //   같이 지워졌으나, HTML5 refresh() 훅은 좌측 트리만 재렌더한다. 오류 표시(valst→input.err
-            //   클래스, 라인 3961)는 fnRenderWs20AttrRows 가 그리므로 여기서 명시 재렌더해야 빨간 테두리가
-            //   실제로 사라진다(오류 "설정" 경로 setAttrFocus 는 이미 fnRenderWs20AttrRows 를 호출 — 대칭 유지).
-            try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
 
-        };  //오류 필드 초기화 처리.
+            var _aError = [];
+
+            //ui table 예외처리 프로퍼티 점검.
+            oAPP.fn.chkExcepUiTable(_aError);
+
+            //20240724 PES.
+            //디자인 tree 데이터 점검 module load.
+            var _oDesignChkModule = parent.require(
+                parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "js", "checkAppData", "designTreeData.js"));
+
+
+            //자식이 필수인 UI에 대한 자식 존재 여부 점검(공통코드 UA050)
+            var _aReuireError = _oDesignChkModule.checkRequireChild();
+
+            //점검 오류 항목이 존재하는경우 오류 수집 처리.
+            if (typeof _aReuireError !== "undefined" && _aReuireError.length > 0) {
+                _aError = _aError.concat(_aReuireError);
+            }
+
+
+            //프로퍼티 입력값 점검 처리.
+            var _aPropError = _oDesignChkModule.checkValidProperty();
+
+            //점검 오류 항목이 존재하는경우 오류 수집 처리.
+            if (typeof _aPropError !== "undefined" && _aPropError.length > 0) {
+                _aError = _aError.concat(_aPropError);
+            }
+
+
+            //오류 항목의 index 정보 매핑 처리.
+            for (var i = 0, l = _aError.length; i < l; i++) {
+
+                var _sError = _aError[i];
+
+                //index 매핑.
+                _sError.LINE = i + 1;
+
+            }
+
+            //오류 점검 결과 RETURN.
+            return _aError;
+
+        };  //attribute 예외처리 항목 점검 function.
+    }
+
+    //★[HTML5 필수 이식] ui table 예외처리 프로퍼티 점검 (원본 design/js/main.js:1371 chkExcepUiTable 1:1).
+    if (typeof oAPP.fn.chkExcepUiTable !== "function") {
+        oAPP.fn.chkExcepUiTable = function (it_err) {
+
+            //design tree 정보를 기준으로 ZY04A0014 저장 정보 구성.
+            var lt_0014 = oAPP.fn.parseTree2Tab(oAPP.attr.oModel.oData.zTREE);
+
+            if (lt_0014.length === 0) { return; }
+
+            //sap.ui.table.Table 정보 존재여부 확인.
+            var lt_tab = lt_0014.filter(function (a) { return a.UIOBK === "UO01139"; });
+
+            //sap.ui.table.Table이 존재하지 않는경우 exit.
+            if (lt_tab.length === 0) { return; }
+
+            //sap.ui.table.Table의 예외처리 프로퍼티 입력값 점검.
+            for (var i = 0, l = lt_tab.length; i < l; i++) {
+
+                if (!oAPP.attr.prev[lt_tab[i].OBJID]._T_0015) { continue; }
+
+                //대상 TABLE의 autoColumnResize 프로퍼티 입력건 확인.
+                var ls_0015 = oAPP.attr.prev[lt_tab[i].OBJID]._T_0015.find(function (a) { return a.UIATK === "EXT00002289"; });
+
+                //입력건이 존재하지 않는경우 SKIP.
+                if (!ls_0015) { continue; }
+
+                //바인딩처리된건, 입력값이 존재하지 않는건인경우 SKIP.
+                if (ls_0015.ISBND === "X" || ls_0015.UIATV === "") { continue; }
+
+                //autoColumnResize를 사용하고자 설정한 경우.
+                if (ls_0015.UIATV !== "true") { continue; }
+
+                //해당 TABLE의 columns Aggregation에 속한 UI 검색.
+                var lt_col = lt_0014.filter(function (a) { return a.POBID === lt_tab[i].OBJID && a.UIATK === "AT000013067"; });
+
+                //columns Aggregation ui가 존재하지 않는경우 skip.
+                if (lt_col.length === 0) { continue; }
+
+                var l_found = false;
+
+                //대상 table의 column에 autoColumnResize 프로퍼티 입력건 확인.
+                for (var j = 0, l2 = lt_col.length; j < l2; j++) {
+                    if (!oAPP.attr.prev[lt_col[j].OBJID]._T_0015) { continue; }
+
+                    //autoResizable 프러퍼티 입력건 존재 여부 확인.
+                    var l_attr = oAPP.attr.prev[lt_col[j].OBJID]._T_0015.find(function (a) { return a.UIATK === "AT000012975"; });
+
+                    //입력건이 존재하지 않는경우 skip.
+                    if (!l_attr) { continue; }
+
+                    //autoResizable 프로퍼티에 바인딩 처리된경우.
+                    if (l_attr.ISBND === "X" && l_attr.UIATV !== "") {
+                        //찾름 flag 처리 후 loop exit.
+                        l_found = true;
+                        break;
+                    }
+
+                    //autoResizable 프로퍼티를 true로 설정한 건이 존재하는경우.
+                    if (l_attr.UIATV === "true") {
+                        //찾름 flag 처리 후 loop exit.
+                        l_found = true;
+                        break;
+                    }
+
+                }
+
+                //autoResizable프로퍼티 입력건이 존재하는 경우 skip.
+                if (l_found === true) { continue; }
+
+                //대상 table의 autoColumnResize 프로퍼티를 설정한경우,
+                //column UI의 autoResizable 프로퍼티를 true로 설정한건이 한건도 없다면 오류 처리.
+
+                //오류 필드 생성 처리.
+                var ls_err = oAPP.fn.crtErrorSyntaxStru();
+
+                //오류 수집 처리.
+                ls_err.GRCOD = "PROG";
+                ls_err.TYPE = "E";
+                ls_err.FNAME = "";
+
+                //296  When the UI Table property "AutoColumnResize" value is "true",
+                ls_err.DESC = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "296", "", "", "", "");
+
+                //297  it must be "true" in "autoResizable" among the column properties.
+                ls_err.DESC += " " + oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "297", "", "", "", "");
+
+                ls_err.LINE = "";
+                ls_err.METHOD = "";
+                ls_err.OBJID = lt_tab[i].OBJID;
+                ls_err.UIATK = ls_0015.UIATK;
+                ls_err.GUBN = "A";
+                it_err.push(ls_err);
+                ls_err = {};
+
+            } //sap.ui.table.Table의 예외처리 프로퍼티 입력값 점검.
+
+        };  //ui table 예외처리 프로퍼티 점검.
     }
 
     //attribute 항목의 DDLB 정보 구성. (원본 6540행 1:1)
@@ -1397,6 +1569,7 @@
         }; //Description 세팅.
     }
 
+
     //Description 검색. (원본 7792행 1:1)
     if (typeof oAPP.fn.getDesc !== "function") {
         oAPP.fn.getDesc = function (OBJID) {
@@ -1560,6 +1733,16 @@
             if (oAPP.attr.prev[sBf]) {
                 oAPP.attr.prev[sNew] = oAPP.attr.prev[sBf];
                 oAPP.attr.prev[sNew]._OBJID = sNew;
+                //[BR39] 미리보기(UI5) 컨트롤의 CustomData OBJID 도 함께 변경건으로 갱신.
+                //  · oAPP.attr.prev[OBJID] = 미리보기 UI 인스턴스이며, 생성 시 .data("OBJID", OBJID) 로
+                //    식별자를 심는다(design/preview/index.js). 미리보기 클릭→트리 식별(uiDesignArea.js 4993)이
+                //    이 값을 읽으므로 이름 변경 시 함께 갱신하지 않으면 옛 ID로 남아 식별이 어긋난다.
+                //  · 원본(UI5 WS3.0/WS4.0)은 _OBJID 만 갱신하고 .data("OBJID") 는 방치한 결함 → 장군님 지시로 보완.
+                try {
+                    if (oAPP.attr.prev[sNew] && typeof oAPP.attr.prev[sNew].data === "function") {
+                        oAPP.attr.prev[sNew].data("OBJID", sNew);
+                    }
+                } catch (e) { console.error("[HTML5][WS20][attr][BR39] 미리보기 컨트롤 OBJID 갱신 오류:", e && e.message); }
                 delete oAPP.attr.prev[sBf];
             }
 
@@ -3022,7 +3205,13 @@
         try {
             var oRow = document.querySelector(
                 '#ws20DesignTree .u4aWs20TreeRow[data-objid="' + OBJID + '"]');
-            if (oRow) { oRow.scrollIntoView({ block: "nearest" }); }
+            if (oRow) { oRow.scrollIntoView({ block: "nearest" }); return; }
+            // 화면 밖 줄 = 트리가 "보이는 행만 그려서" DOM 에 없음 → 공통 트리 인덱스 스크롤로
+            //  그 줄을 화면에 나오게 한다(원본 desginSetFirstVisibleRow 의 인덱스 스크롤 대응).
+            //  이미 그려진(보이는) 줄은 위에서 최소 이동으로 끝나므로 원본 keep-if-visible 유지.
+            if (typeof oAPP.fn.fnWs20TreeRevealObjid === "function") {
+                oAPP.fn.fnWs20TreeRevealObjid(OBJID);
+            }
         } catch (e) { }
     }
 
@@ -3508,11 +3697,19 @@
     //    autoGrowing 확인 콜백이 값 반영을 위해 이 함수를 재진입할 때 팝업이 무한 재호출되지 않도록.
     oAPP.fn.fnWs20AttrChange = function (sAttr, uityp, bSkipUndo, bSkipAutoGrow) {
 
+        //[BR34] 동기 재진입 방지 — 값 변경 후 속성 행을 다시 그릴 때(fnRenderWs20AttrRows→ROWS.innerHTML="")
+        //  포커스가 있던 입력칸이 제거되며 change/blur 가 다시 발생해 이 함수가 재귀 호출되면, 안쪽 호출이
+        //  오류 표시(valst)를 초기화(attrClearErrorField)하고 busy 를 먼저 해제해 오류 표시가 사라지고
+        //  화면이 꼬인다(장군님 재현: 범위밖 값 넣어도 오류 표시 안 뜸). 진행 중이면 즉시 무시.
+        //  (BR29 autoGrowing·확인창 콜백의 재진입은 비동기라 이 플래그가 finally 에서 해제된 뒤 실행 → 영향 없음.)
+        if (oAPP.attr._fnAttrChangeBusy === true) { return; }
+        oAPP.attr._fnAttrChangeBusy = true;
+
         try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
         try { oAPP.fn.setShortcutLock(true); } catch (e) { }
         //열려있는 형제(자식) 윈도우 BUSY_ON. (원본: 모든 attr 변경 콜백이 bindPopupBroadCast("BUSY_ON")
         //  → 전체 자식 윈도우 잠금. 개별 콜백 19곳 대신 공통 변경 경로 1곳에 배선. 짝 BUSY_OFF 는 아래 finally.)
-        _broadChildBusy(true);
+        try { _broadChildBusy(true); } catch (e) { }
 
         try {
 
@@ -3671,7 +3868,9 @@
             try { oAPP.fn.setShortcutLock(false); } catch (e) { }
             try { parent.setBusy && parent.setBusy(""); } catch (e) { }
             //형제(자식) 윈도우 BUSY_OFF — 위 BUSY_ON 짝. (원본: updateBindPopupDesignData→sendBindPopupBusyOff)
-            _broadChildBusy(false);
+            try { _broadChildBusy(false); } catch (e) { }
+            //[BR34] 재진입 방지 플래그 해제(진입부 set 과 짝).
+            oAPP.attr._fnAttrChangeBusy = false;
         }
 
     }; // end of oAPP.fn.fnWs20AttrChange
@@ -4212,8 +4411,10 @@
      *    - 그 외: 현재값≠DEFVL 이면 DEFVL 로. (이미 기본값이면 skip)
      *  · 값 반영은 수동 변경과 동일 경로(fnWs20AttrChange)로 — 수집(_T_0015)/변경표시/
      *    헤더·상태(Active→Inactive)/재렌더가 그대로 처리된다(원본 attrChangeProc+refresh 대응).
-     *  ※ UI5 전용(undo getResetAttrParam·preview onAfterRendering·bindPopup broadcast)은
-     *    HTML5 미해당이라 생략(undo 는 fnWs20AttrChange 가 변경건마다 자체 기록).
+     *  · [BR42] undo 는 RESET 전체를 하나의 스텝으로 묶는다(원본 saveActionHistoryData("RESET_ATTR")
+     *    1회). 첫 실제 변경 직전 fnWs20PushUndo 1회 + 각 변경 fnWs20AttrChange(,,bSkipUndo=true).
+     *    → RESET 이후 Undo 한 번에 초기화된 모든 프로퍼티가 함께 복원된다(WS3.0 동일).
+     *  ※ UI5 전용(preview onAfterRendering·bindPopup broadcast)은 HTML5 미해당이라 생략.
      ************************************************************************/
     if (typeof oAPP.fn.attrResetAttr !== "function") {
         oAPP.fn.attrResetAttr = function () {
@@ -4248,6 +4449,13 @@
                     //순회 중 fnWs20AttrChange 가 재렌더해도 배열 구조는 불변이나, 안전하게 프로퍼티만 추려 복사본 순회.
                     var aProps = ((oData.T_ATTR) || []).filter(function (a) { return a && a.UIATY === "1" && a.ISBND !== "X"; });
 
+                    //[BR42] RESET 전체를 하나의 undo 스텝으로 묶는다(원본 uiAttributeArea.js:2168~2173:
+                    //  getResetAttrParam 으로 초기화 대상이 1건 이상일 때만 saveActionHistoryData("RESET_ATTR") 1회).
+                    //  → HTML5: 첫 실제 변경 "직전"에 fnWs20PushUndo 로 스냅샷(당시 _T_0015 전체)을 1회만 적재하고,
+                    //    루프의 각 변경은 fnWs20AttrChange(...,bSkipUndo=true) 로 개별 스냅샷을 막는다. 이러면 RESET 이후
+                    //    Undo 한 번에 초기화된 모든 프로퍼티가 함께 복원된다(WS3.0 동일). 변경 대상이 없으면 push 안 함(빈 undo 방지).
+                    var bUndoPushed = false;
+
                     for (var i = 0; i < aProps.length; i++) {
                         var _sAttr = aProps[i];
 
@@ -4269,13 +4477,21 @@
                             if (_sAttr.UIATV === sDefault) { continue; }
                         }
 
+                        //[BR42] 첫 실제 변경 직전 1회만 undo 스냅샷 적재(원본 RESET_ATTR 1스텝 대응).
+                        if (!bUndoPushed) {
+                            try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } }
+                            catch (e) { console.warn("[HTML5][WS20][attr] reset undo push skip:", e && e.message); }
+                            bUndoPushed = true;
+                        }
+
                         //값을 기본값으로 — 컨트롤 종류별 필드 동기화 후 동일 변경 경로 수행.
                         _sAttr.UIATV = sDefault;
                         _sAttr.comboval = sDefault;                 //combo
                         _sAttr.UIATV_c = (sDefault === "true");      //checkbox
 
                         var uityp = _sAttr.chk_visb ? "CHECK" : (_sAttr.sel_visb ? "DDLB" : "INPUT");
-                        try { oAPP.fn.fnWs20AttrChange(_sAttr, uityp); }
+                        //[BR42] undo 는 위에서 1회만 → 개별 변경은 bSkipUndo=true 로 스냅샷 생략.
+                        try { oAPP.fn.fnWs20AttrChange(_sAttr, uityp, true); }
                         catch (e) { console.error("[HTML5][WS20][attr] reset 변경 오류:", _sAttr.UIATT, e && e.message); }
                     }
 
@@ -4868,6 +5084,18 @@
             //edit01 === false (ROOT/APP) → 변경 불가. /IS_EDIT false → 비활성.
             INP.readOnly = (oUiInfo.edit01 === false);
             INP.disabled = !_isEditMode();
+            //[BR39] 빨간 오류 표시는 "지금 편집 중인 그 UI 의 상태"에만 묶는다 — 헤더는 입력필드를
+            //  재사용(_buildAttrSkeleton 이 최초 1회만 생성)하므로 명시로 동기화하지 않으면 이전 UI 의
+            //  빨간 테두리가 새 UI 로 그대로 남는다. 원본 UI5 는 입력필드 valueState 가 /uiinfo/OBJID_stat
+            //  에 바인딩돼 현재 uiinfo 상태를 그대로 반영한다. 원본 setUIInfo(uiAttributeArea.js:7462)는
+            //  UI 선택마다 uiinfo 를 새로 만들고 OBJID_stat 을 보존하지 않으므로, 다른 UI 를 선택하면 그
+            //  UI 엔 오류 상태가 없어 자동 해제된다(다른 UI 이동 시 이전 오류는 폐기 = 원본 계약).
+            if (oUiInfo.OBJID_stat === "Error") {
+                INP.classList.add("err");
+                INP.title = oUiInfo.OBJID_stxt || INP.title;
+            } else {
+                INP.classList.remove("err");
+            }
         }
 
         var TXA = document.getElementById("ws20AttrDescTxa");
@@ -5075,7 +5303,10 @@
                 } : null,
                 f4IconHtml: '<i class="fa-regular fa-clone"></i>',   // F4=아웃라인 clone(복사버튼과 구분, 2026-06-17)
                 f4Disabled: !bFieldEdit,
-                onChange: function (v) { sAttr.UIATV = v; oAPP.fn.fnWs20AttrChange(sAttr, "INPUT"); }
+                onChange: function (v) { sAttr.UIATV = v; oAPP.fn.fnWs20AttrChange(sAttr, "INPUT"); },
+                // 엔터로도 값 확정(원본 sap.m.Input 은 엔터=change). 정상값 넣고 엔터=오류 해제, 잘못된 값+엔터=오류 표시.
+                //   공통 createField 의 onEnter(keydown Enter, preventDefault)라 변경 확정(onChange=blur)과 겹치지 않는다.
+                onEnter: function (v) { sAttr.UIATV = v; oAPP.fn.fnWs20AttrChange(sAttr, "INPUT"); }
             });
             oValFld.input.title = oValFld.input.value;
             //F4Only + 편집모드 = readOnly 지만 '편집 가능' 외관 유지(직접 타이핑만 차단, F4·clear 는 동작).

@@ -886,13 +886,25 @@
         }
 
         // aggregation 선택 후 UI 추가(구 lf_setChild). aggrSelectPopup 콜백 = (is_0023, i_drag, i_drop).
+        //   ★화면잠금 해제 3종 세트로 종료(장군님 발견 2026-08-18, FlexItemData 꽉 찬 layoutData 에 드롭 시 스피너 잔존).
+        //   트리 drop 핸들러(약 1671)가 parent.setBusy("X")+setShortcutLock(true) 를 직접 걸고, UIDrop 처리됨(bHandled)
+        //   이면 그 자리서 정리 없이 downstream(=이 콜백)에 위임한다(1678, "aggrSelectPopup→drop_cb 가 정리").
+        //   그런데 후보 aggregation 이 1개라 자동선택돼 이 콜백을 타는 경우(예: 이미 꽉 찬 0:1 자리에 드롭 → 내부
+        //   chkUiCardinality 조기취소), 기존엔 방송잠금(_bindBusy BUSY_OFF)만 풀고 화면잠금·단축키잠금을 안 풀어
+        //   스피너가 남았다. 원본 designAddUIObject 는 모든 조기취소 분기에서 방송+화면+단축키 3종을 다 풀었으므로
+        //   그 계약대로 여기(성공/취소 공통 종료)에서도 3종을 함께 해제한다(형제 종료분기 466·566·913·1219·1682 와 동일).
+        function lf_setChildDone() {
+            _bindBusy("BUSY_OFF");
+            _safe(function () { oAPP.fn.setShortcutLock(false); });
+            try { parent.setBusy(""); } catch (e) { }
+            oAPP.fn.designDragEnd();
+        }
         async function lf_setChild(is_0023) {
             var ls_0022 = oAPP.DATA.LIB.T_0022.find(function (a) { return a.UIOBK === l_UIOBK && a.ISDEP !== "X" && a.ISSTP !== "X"; });
-            if (!ls_0022 || !is_0023) { _bindBusy("BUSY_OFF"); oAPP.fn.designDragEnd(); return; }
+            if (!ls_0022 || !is_0023) { lf_setChildDone(); return; }
             try { await oAPP.fn.designAddUIObject(ls_drop, ls_0022, is_0023, l_cnt, _isPresetAttr); }
             catch (e) { console.error("[HTML5][WS20] insert drop add:", e && e.message ? e.message : e); }
-            _bindBusy("BUSY_OFF");
-            oAPP.fn.designDragEnd();
+            lf_setChildDone();
         }
 
         var l_pos = oAPP.fn.getMousePosition();

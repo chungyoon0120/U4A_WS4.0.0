@@ -964,6 +964,18 @@
             //   (WS20 전체 재진입 잠금/작업 세대 토큰은 원본에 없는 방어라 미채택 — 03 참고, 별건 권고.)
             var _aPreset = _isPresetAttr ? await _readAttrPreset(is_0022.UIOBK) : [];
 
+            // ★ BR44 검수(코덱스 P1) 반영: 위 개인화 조회 await 는 개인화 적용(_isPresetAttr) 시에만 발생하는데,
+            //   그 대기 동안 화면 WS20 본체는 잠기지 않아 사용자가 추가 대상(is_tree)을 삭제할 수 있다. 그 상태로
+            //   재개하면 화면 트리엔 없는데 내부 저장(prev)·미리보기에만 자식이 생기는 "고아"가 남아 저장 payload 가
+            //   오염된다(현행 트리 기반 T_0014 엔 없고, prev 전체를 훑는 T_0015 엔 남음). 원본은 이 조회가 동기라
+            //   이 틈이 없었음 → HTML5 비동기 이식으로 생긴 틈을 막아 원본의 원자성을 재현: 되돌리기 스냅샷·삽입
+            //   직전에 대상이 현재 트리에 아직 있는지 재확인, 없으면 조용히 취소(스냅샷·추가 없음).
+            //   (여섯 검사 전체 재검증·WS20 전체 잠금은 원본에 없는 과한 방어라 미채택 — 03 참고, 별건 권고.)
+            if (_isPresetAttr && !_node(is_tree.OBJID)) {
+                console.warn("[HTML5][WS20][insert] 개인화 조회 대기 중 추가 대상이 사라짐 — UI 추가 취소(고아 삽입 방지)");
+                return;
+            }
+
             oAPP.fn.fnWs20PushUndo();
 
             var oInfo = {};
@@ -1034,6 +1046,11 @@
                 _prev("moveUIObjPreView", [l14.OBJID, l14.UILIB, l14.POBID, l14.PUIOK, l14.UIATT, posit, l14.ISMLB, l14.UIOBK, true]);
                 // 미리보기 예외 draw(차트/IFrame 등 — uiPreviewArea 로드 시에만, 가드)
                 try { if (typeof oAPP.fn.prevDrawExceptionUi === "function") { oAPP.fn.prevDrawExceptionUi(l14.UIOBK, l14.OBJID); } } catch (e) { }
+                // file uploader 계열 UI 의 uploaderUrl 프로퍼티 예외처리(원본 uiDesignArea.js 5628 — 드롭 형제 경로 dnd.js 와 동일).
+                //   BR45: 삽입 팝업 추가 경로에만 이 호출이 빠져 있어 팝업으로 넣은 FileUploader/UploadCollection 은
+                //   uploaderUrl 초기값 예외처리가 적용되지 않았다(끌어놓기 경로엔 있었음). 미리보기 미로드 환경 방어(형제 동일).
+                try { if (typeof oAPP.fn.attrUploadUrlException === "function") { oAPP.fn.attrUploadUrlException(l14.OBJID, l14.UIOBK); } }
+                catch (e) { console.error("[HTML5][WS20][insert] attrUploadUrlException:", e && e.message ? e.message : e); }
                 lastObjid = l14.OBJID;
             }
 
@@ -2039,6 +2056,18 @@
         oMenu.style.top = y + "px";
         oMenu.style.zIndex = "4000";
         _openMenu = oMenu;
+        // ★[BR47] 팝업(창)류 UI 선택 시, 미리보기(iframe) 안에서 그 창이 열리며 화면 초점을
+        //   미리보기로 가져간다(선택을 await 로 마쳤으므로 메뉴가 뜨는 시점엔 이미 그 상태).
+        //   이때 전역 "미리보기로 초점 이동 시 열린 메뉴 닫기"(u4a-ui.js _installIframeBlurClose)가
+        //   다음 틱에 활성 요소가 iframe 이면 이 메뉴를 지운다(실측: menu-shown active=IFRAME →
+        //   2ms 뒤 합성 mousedown/제거). 그래서 [선택 await → 틱 → 메뉴]만으로는 못 막았다.
+        //   → 메뉴에 화면 초점을 줘 활성 요소를 메뉴(부모 문서)로 옮긴다. 그 전역 처리는
+        //     "활성 요소가 iframe 아님"으로 판정해 통째로 건너뛴다(닫힘 원천 차단).
+        //   원본 sap.m.Menu(openBy)도 열릴 때 메뉴가 포커스를 가져가므로 동작상 원본과 일치하며,
+        //   키보드 Esc/이동에도 맞다. (공통 파일 미수정 — 스코프 내 해결.)
+        oMenu.setAttribute("tabindex", "-1");
+        oMenu.style.outline = "none";   // 메뉴 박스에 초점 표시줄이 뜨지 않게(마우스 메뉴).
+        try { oMenu.focus({ preventScroll: true }); } catch (e) { try { oMenu.focus(); } catch (e2) { } }
         // 창 리사이즈 시 컨텍스트 메뉴 닫기(표준 메뉴 UX).
         window.addEventListener("resize", _closeMenu);
         // 미리보기(iframe) 클릭 닫기는 전역(u4a-ui.js _installIframeBlurClose)이 합성 mousedown 으로 처리.

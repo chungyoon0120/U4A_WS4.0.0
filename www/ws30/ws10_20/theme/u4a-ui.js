@@ -2314,7 +2314,7 @@
             '<div class="u4a-dialog__header" data-type="' + sType + '">' +
                 '<i class="fa-solid fa-' + oIcon + '"></i><span></span>' +
             '</div>' +
-            '<div class="u4a-dialog__body" style="white-space:pre-wrap;line-height:1.45;"></div>' +
+            '<div class="u4a-dialog__body" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;"></div>' +
             '<div class="u4a-dialog__footer"></div>';
         oDlg.querySelector(".u4a-dialog__header span").textContent = sTitle;
         oDlg.querySelector(".u4a-dialog__body").textContent = sMsg;

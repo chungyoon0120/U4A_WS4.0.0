@@ -654,6 +654,25 @@
     }
 
     /************************************************************************
+     * [PUBLIC] 선택 줄을 화면 안으로 스크롤(가상 트리 대응) — 원본
+     *   desginSetFirstVisibleRow(uiDesignArea.js:3572)의 인덱스 스크롤 대응.
+     *   트리가 "보이는 행만 그리는" 방식(virtual)이라 화면 밖 줄은 DOM에 없어
+     *   scrollIntoView 로는 못 옮긴다 → 공통 트리 scrollToKey(평탄 인덱스로 스크롤
+     *   후 윈도우 렌더)로 그 줄을 화면에 나오게 한다. (미리보기→트리 선택 시 사용)
+     ************************************************************************/
+    oAPP.fn.fnWs20TreeRevealObjid = function (OBJID) {
+        try {
+            if (OBJID == null || OBJID === "") { return; }
+            var oTree = _ensureWs20Tree();
+            if (oTree && typeof oTree.scrollToKey === "function") {
+                oTree.scrollToKey(String(OBJID));
+            }
+        } catch (e) {
+            console.error("[HTML5][WS20][tree] 선택 줄 스크롤 이동 오류:", e && e.message);
+        }
+    };
+
+    /************************************************************************
      * [PUBLIC] 수동 렌더 — 원본 TreeTable rows 바인딩(/zTREE) 대체.
      *   /zTREE 가 갱신되면(designAddTreeData/undoRedo 등 → 모델 set) 이 함수를
      *   호출하여 다시 그린다. 데이터가 비어있어도 안전하게 빈 트리 렌더.

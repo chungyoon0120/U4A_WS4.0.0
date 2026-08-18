@@ -1316,12 +1316,9 @@
         // 멀티 푸터 메시지가 있을 경우 닫기
         APPCOMMON.fnMultiFooterMsgClose();
 
-        // 디자인 영역의 오류를 점검한다.
+        // 디자인 영역의 오류를 점검한다. (chkExcepionAttr 첫 줄 attrClearErrorField() 가 값칸 오류표시를 지우며 속성행 재렌더)
         let T_excep = oAPP.fn.chkExcepionAttr(),
             iexceplength = T_excep.length;
-
-        // [BR34] 점검이 오류표시(valst)를 지운 뒤 속성 행 재렌더 → 빨간 테두리·오류 안내문구 실제 제거(원본 refresh 재현).
-        try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
 
         if (iexceplength !== 0) {
 
@@ -1524,15 +1521,12 @@
         APPCOMMON.fnMultiFooterMsgClose();
 
         // [HTML5] 예외검증은 design 모듈(chkExcepionAttr)에 의존 — 미로드/오류 시 검증 skip.
+        //   chkExcepionAttr 첫 줄 attrClearErrorField() 가 값칸 오류표시를 지우며 속성행을 다시 그린다
+        //   (attrClearErrorField 가 항상 재렌더 — 원본 refresh 대응). 실행 후 정상값 칸은 빨간이 사라진다.
         let T_excep = [];
         try {
             if (typeof oAPP.fn.chkExcepionAttr === "function") { T_excep = oAPP.fn.chkExcepionAttr() || []; }
         } catch (e) { console.warn("[HTML5][WS20] chkExcepionAttr skip:", e && e.message); }
-
-        // [BR34] 실행 점검(chkExcepionAttr)이 오류표시(valst)를 지운 뒤 속성 행을 다시 그려 빨간 테두리·오류 안내문구를
-        //   실제로 제거한다. 원본 UI5 는 chkExcepionAttr 안 oModel.refresh() 가 속성 테이블을 재렌더해 지웠으나,
-        //   HTML5 refresh 훅은 좌측 트리만 그리므로 여기서 명시 재렌더한다(정상 복구값이면 오류표시가 사라짐).
-        try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
 
         let iexceplength = T_excep.length;
 
