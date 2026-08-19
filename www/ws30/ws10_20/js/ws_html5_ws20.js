@@ -950,11 +950,17 @@
         // 공통 스플리터 배선(16 §4.4) — 드래그/재클램프/더블클릭/iframe차단 전부 공통 소비.
         //   · 기본 순서[tree,preview,attr] = give-way(센터=preview 가 먼저 흡수→닿으면 반대편이 자기 min 까지 양보).
         //   · 그 외(재정렬) 순서 = 인접쌍(adjacent). self/center/opp·min·재클램프는 전부 공통이 계산.
+        // [BR49-P1] 이 시점에서 이미 패널 재부착(=미리보기 iframe 재로드)은 끝났다. 아래 배선이
+        //   오류를 던져도 "재부착됨"이라는 사실이 소실되면 안 된다(호출측 _doSave 가 false 로 오판해
+        //   옛 컨텍스트에 대고 명시 재로드→크래시 재발). 그래서 배선을 자체 try 로 감싸 성공/실패와
+        //   무관하게 아래 return true(=재부착됨) 로 도달하게 한다.
         var bDefault = aOrder.length === 3 &&
             aOrder[0] === "designTree" && aOrder[1] === "designPreview" && aOrder[2] === "designAttr";
-        if (window.U4AUI && U4AUI.wireSplitter) {
-            U4AUI.wireSplitter(SPLIT, { axis: "x", mode: bDefault ? "giveway" : "adjacent" });
-        }
+        try {
+            if (window.U4AUI && U4AUI.wireSplitter) {
+                U4AUI.wireSplitter(SPLIT, { axis: "x", mode: bDefault ? "giveway" : "adjacent" });
+            }
+        } catch (e) { console.error("[HTML5][WS20] 스플리터 배선 오류(재부착은 완료됨):", e && e.message ? e.message : e); }
         return true;
     }
 
@@ -1069,11 +1075,31 @@
                             delete _ui.prevPopupArea; delete _ui._hbox1; delete _ui.oMenu;
                         }
                     } catch (e) { console.warn("[HTML5][WS20][BR49] 미리보기 참조 정리 skip:", e && e.message); }
+                    // [BR49-P2] 재부착으로 시작된 미리보기 재로드는 비동기라, 그 self-heal 이 끝나기 전에
+                    //   팝업을 다시 열어 "같은 순서"로 재저장하면 아래 else 의 명시 재로드가 진행 중인 재로드와
+                    //   두 번째 drawPreview 를 겹쳐 돌려 같은 파괴 경쟁이 열린다. → "재로드 진행 중" 표시를
+                    //   세워 그동안 명시 재로드를 막는다. 표시는 iframe 이 새로 load 되면 해제(그 뒤 self-heal
+                    //   이어짐). 표시가 남아 있어도 막는 건 "같은 순서=미리보기 이미 정확" 경로뿐이라 무해.
+                    try {
+                        oAPP.attr.__ws20PrevReloading = true;
+                        var _pf = document.getElementById("prevHTML");
+                        if (_pf) {
+                            var _onPrevLd = function () {
+                                oAPP.attr.__ws20PrevReloading = false;
+                                _pf.removeEventListener("load", _onPrevLd);
+                            };
+                            _pf.addEventListener("load", _onPrevLd);
+                        }
+                    } catch (e) { }
                     // 재로드가 미리보기를 스스로 재구성(초기 로드와 동일 경로: 참조 정리→새 _page1 생성→ROOT
                     //   재선택)하므로, 여기서 fnWs20LoadPreview 를 또 부르지 않는다(중복 재-draw 제거 — 부르면
                     //   재로드 직전 옛 컨텍스트에 _page1 을 다시 세워 재로드 초기화가 그걸 destroy → 크래시 재현).
+                } else if (oAPP.attr && oAPP.attr.__ws20PrevReloading === true) {
+                    // [BR49-P2] 앞선 재배치 저장의 미리보기 재로드가 아직 진행 중 — 순서도 안 바뀌었으니
+                    //   미리보기는 곧 self-heal 로 최신이 된다. 지금 명시 재로드를 하면 두 그리기가 겹쳐
+                    //   파괴 경쟁이 되므로 이번 명시 재로드는 생략한다.
                 } else {
-                    // 순서 무변경 → iframe 재로드 없음(안정 컨텍스트) → 예전처럼 명시 재로드로 미리보기 갱신.
+                    // 순서 무변경 + 진행 중 재로드 없음 → 안정 컨텍스트 → 예전처럼 명시 재로드로 미리보기 갱신.
                     try { if (typeof oAPP.fn.fnWs20LoadPreview === "function") { oAPP.fn.fnWs20LoadPreview(); } } catch (e) { }
                 }
                 _close();
