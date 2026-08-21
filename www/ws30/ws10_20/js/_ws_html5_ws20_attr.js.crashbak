@@ -3066,94 +3066,146 @@
         }
     }
 
-    // ★ 선택 테두리가 안 뜬 경우 다시 그려달라고 요청(선택 직후 짧은 구간만).
-    //   증상: 글자편집기(RichTextEditor)를 고르면 테두리가 아예 안 뜬다.
-    //   원인(CDP 실측): 선택표시 함수가 대상에 포커스를 준 "직후" 곧바로 테두리를 계산하는데,
-    //   그 순간엔 화면 이동이 아직 반영되지 않아 대상이 화면 밖으로 판정된다 → 테두리를 숨기고
-    //   지켜보기(감시)까지 끊어, 이동이 끝난 뒤에도 아무도 다시 그려주지 않는다.
-    //   (실측: 선택 직후 테두리 없음 → 다시 그려달라고 한 번만 요청하면 695x200 정상 표시)
-    //   편집기의 "준비 완료" 신호는 이미 그려진 편집기에선 다시 오지 않아 기다리는 방식은 불가(실측 확인).
-    //   그래서 뜰 때까지 몇 프레임만 다시 그려달라고 요청한다. 뜨면 즉시 종료, 선택이 바뀌면 중단.
-    //   ※ 미리보기에 "다시 그려달라"고만 한다 — 글자편집기 엔진은 건드리지 않는다(오류 재발 방지).
-    function _reassertPreviewSelection(OBJID) {
-        try {
+    // ★ 미리보기 렌더가 다 끝날 때까지 대기 — 스크롤 이동·선택표시 "직전"에 부른다.
+    //   왜 필요한가: 글자편집기(RichTextEditor)는 화면에 붙은 뒤에도 편집기 내부가 늦게 준비되며 크기를
+    //   다시 잡는다. 그 전에 선택표시를 하면, ①스크롤은 옛 높이 기준으로 움직이고 ②곧이어 편집기가 커지며
+    //   그 아래 UI(예: 새로 넣은 버튼)가 밀려 내려가, 테두리만 옛 자리에 남아 엉뚱한 UI 위에 그려진 것처럼 보인다.
+    //   원본 UI5 는 추가 처리에서 편집기 렌더 완료를 기다리고(uiDesignArea.js:5651~5666
+    //   renderingRichTextEditor + await Promise.all) 화면 갱신 완료까지 기다린 뒤(5670 designRefershModel)
+    //   비로소 선택(5681)한다. 그 "완료 대기"를 선택 흐름에도 명시 재현한다(WP1: 완료 후 후속).
+    //   대기 대상은 선택 UI 하나가 아니라 그 UI가 올라간 화면(부모 계통) 전체 — 밀어내는 주범이 형제 편집기라서다.
+    //   미리보기 미로드/모듈 부재면 조용히 통과(트리 선택만 진행), 무한대기 방지 상한 있음.
+    function _waitPreviewRenderDone(oNode) {
+        return new Promise(function (resolve) {
             var oWin = _frameWin();
-            if (!oWin || !oWin.oWS || !oWin.oWS.sMark) { return; }
-            if (typeof oWin.requestAnimationFrame !== "function") { return; }
-            if (typeof oWin.requestPreviewSelectionLayerUpdate !== "function") { return; }
-            var doc = oWin.document, sMark = oWin.oWS.sMark;
-            var iFrames = 0, iStable = 0;
-            var MAX_FRAMES = 60;   // ~1초 상한
-            function _tick() {
-                iFrames++;
-                try {
-                    // 선택이 다른 UI 로 바뀌었으면 손대지 않는다.
-                    if (!sMark.oSelectedUi || sMark.oSelectedUi._OBJID !== OBJID) { return; }
-                    if (doc.querySelector('[data-u4a-layer-visible]')) {
-                        if (++iStable >= 3) { return; }   // 떴고 유지됨 → 종료
-                    } else {
-                        iStable = 0;
+            if (!oWin || !oNode) { resolve(); return; }
+
+            // 원본 미리보기 렌더 완료 모듈(setOnAfterRender) — 원본이 쓰는 그 창구 그대로.
+            var oRender = null;
+            try { oRender = parent.require(oAPP.oDesign.pathInfo.setOnAfterRender); } catch (e) { oRender = null; }
+
+            // 화면 최상위(부모 계통 꼭대기) 노드 — 형제 편집기까지 포함해 기다리기 위함.
+            var oTop = oNode;
+            try {
+                var iGuard = 0;
+                while (oTop && oTop.POBID && iGuard++ < 50) {
+                    var oParent = _findTreeNode(oTop.POBID);
+                    if (!oParent) { break; }
+                    oTop = oParent;
+                }
+            } catch (e) { oTop = oNode; }
+
+            var aWait = [];
+            try {
+                if (oRender && typeof oRender.renderingRichTextEditor === "function") {
+                    aWait = oRender.renderingRichTextEditor(oTop, true) || [];
+                }
+            } catch (e) {
+                console.error("[HTML5][WS20][attr] 미리보기 렌더 완료 대기 등록 오류:", e && e.message);
+                aWait = [];
+            }
+
+            // 무한대기 방지: 상한을 두고, 편집기 준비가 끝나면 곧바로 다음(레이아웃 안정 확인)으로.
+            var bDone = false;
+            var iCap = null;
+            function _next() {
+                if (bDone) { return; }
+                bDone = true;
+                if (iCap) { clearTimeout(iCap); iCap = null; }
+                _waitLayoutStable(oWin, oNode, resolve);
+            }
+            iCap = setTimeout(_next, 3000);
+            Promise.all(aWait).then(_next, function (e) {
+                console.error("[HTML5][WS20][attr] 미리보기 렌더 완료 대기 실패:", e && e.message ? e.message : e);
+                _next();
+            });
+        });
+    }
+
+    // 대상의 위치·크기가 연속 몇 프레임 그대로일 때(=레이아웃이 멈췄을 때) 완료로 본다.
+    //   편집기 준비 신호 뒤에도 남는 마지막 자리잡기(크기 재조정)를 흡수하기 위한 짧은 확인.
+    function _waitLayoutStable(oWin, oNode, fnDone) {
+        if (typeof oWin.requestAnimationFrame !== "function") { fnDone(); return; }
+        var iFrames = 0, iStable = 0, sPrev = "";
+        var MAX_FRAMES = 90;    // ~1.5s 상한
+        var NEED = 5;           // 연속 5프레임 그대로면 멈춘 것으로 판단
+        function _box() {
+            try {
+                var oUi = oAPP.attr.prev && oAPP.attr.prev[oNode.OBJID];
+                var oDom = (oUi && typeof oUi.getDomRef === "function") ? oUi.getDomRef() : null;
+                if (!oDom || typeof oDom.getBoundingClientRect !== "function") { return ""; }
+                var r = oDom.getBoundingClientRect();
+                return Math.round(r.top) + "," + Math.round(r.left) + "," +
+                    Math.round(r.width) + "," + Math.round(r.height);
+            } catch (e) { return ""; }
+        }
+        function _tick() {
+            iFrames++;
+            var s = _box();
+            if (s !== "" && s === sPrev) { iStable++; } else { iStable = 0; sPrev = s; }
+            if (iStable >= NEED || iFrames >= MAX_FRAMES) { fnDone(); return; }
+            oWin.requestAnimationFrame(_tick);
+        }
+        oWin.requestAnimationFrame(_tick);
+    }
+
+    // ★ 선택 테두리 따라가기 감시(선택 직후 짧은 구간 한정).
+    //   미리보기의 선택 테두리는 대상의 "크기 변화·보임 여부·글자모양 변화"가 있을 때만 다시 그려진다.
+    //   그래서 아래 두 경우를 놓친다.
+    //     ① 글자편집기(RichTextEditor)처럼 늦게 자리잡는 UI를 고르면, 자리잡는 순간 대상을 잠깐 못 재
+    //        테두리를 숨기고 감시까지 끊어, 자리잡은 뒤에도 테두리가 안 돌아온다.
+    //     ② ★같은 화면의 글자편집기가 뒤늦게 커지면 그 아래 UI(예: 새로 넣은 버튼)가 "크기는 그대로인 채
+    //        아래로 밀리기만" 한다. 밀림은 크기 변화가 아니라 감시가 안 깨어나고, 테두리는 옛 자리에 남아
+    //        엉뚱한 UI(글자편집기 도구모음 등) 위에 그려진 것처럼 보인다.
+    //   원본 UI5 는 designRefershModel 의 실제 렌더 완료 대기(rowsUpdated/onAfterRendering)로 대상이
+    //   다 자리잡은 뒤에 테두리를 그려 이 틈이 작다(uiDesignArea.js:5670/5698~5730).
+    //   미리보기 파일은 원본 KEEP-UI5 라 직접 수정 불가 → 내 파일에서, 선택 직후 짧은 구간 동안
+    //   대상 위치·크기가 바뀌면 테두리를 다시 그려달라고 요청해 따라붙게 한다(테두리 동작 자체는 원본 그대로).
+    //   고정 시간 대기 아님(자리잡히면 조기 종료), 다른 UI로 선택이 바뀌면 즉시 중단.
+    function _reassertPreviewSelection(OBJID) {
+        var oWin = _frameWin();
+        if (!oWin || !oWin.oWS || !oWin.oWS.sMark) { return; }
+        if (typeof oWin.requestAnimationFrame !== "function") { return; }
+        var doc = oWin.document, sMark = oWin.oWS.sMark;
+        var iFrames = 0, iStable = 0;
+        var MAX_FRAMES = 150;    // ~2.5s 상한 (글자편집기 자리잡기 여유)
+        var STABLE_NEED = 45;    // 위치·크기가 ~0.75s 안 변하고 테두리도 떠 있으면 종료
+        var sPrevBox = "";
+        function _tick() {
+            iFrames++;
+            try {
+                // 다른 UI로 선택이 바뀌었으면 중단(현재 선택이 이 OBJID 가 아니면 손대지 않음).
+                var oSel = sMark.oSelectedUi;
+                if (!oSel || oSel._OBJID !== OBJID) { return; }
+
+                var oDom = (typeof oSel.getDomRef === "function") ? oSel.getDomRef() : null;
+                var oRect = (oDom && typeof oDom.getBoundingClientRect === "function")
+                    ? oDom.getBoundingClientRect() : null;
+                // 위치·크기를 한 문자열로 (소수점 흔들림 무시)
+                var sBox = oRect
+                    ? (Math.round(oRect.top) + "," + Math.round(oRect.left) + "," +
+                        Math.round(oRect.width) + "," + Math.round(oRect.height))
+                    : "";
+                var bVisible = !!doc.querySelector('[data-u4a-layer-visible]');
+
+                // 위치/크기가 바뀌었거나(=밀림·자리잡기) 테두리가 꺼져 있으면 다시 그려달라고 요청.
+                if (sBox !== sPrevBox || !bVisible) {
+                    sPrevBox = sBox;
+                    iStable = 0;
+                    if (typeof oWin.requestPreviewSelectionLayerUpdate === "function") {
                         oWin.requestPreviewSelectionLayerUpdate();
                     }
-                } catch (e) {
-                    console.error("[HTML5][WS20][attr] 선택 테두리 재요청 오류:", e && e.message);
-                    return;
+                } else if (bVisible) {
+                    if (++iStable >= STABLE_NEED) { return; }   // 자리잡음 → 조기 종료
                 }
-                if (iFrames < MAX_FRAMES) { oWin.requestAnimationFrame(_tick); }
-            }
-            oWin.requestAnimationFrame(_tick);
-        } catch (e) {
-            console.error("[HTML5][WS20][attr] 선택 테두리 재요청 시작 오류:", e && e.message);
-        }
-    }
-
-    // ★ 화면(Page 등) 자체를 고르면 미리보기를 그 화면의 처음(위쪽)이 보이게 맞춘다.
-    //   원본 선택표시는 "포커스 주기"로 화면을 옮기는데, 이 방식은 필요한 만큼만 움직인다.
-    //   화면(Page)은 보이는 영역보다 커서 이미 영역을 꽉 채우므로 한 칸도 안 움직이고,
-    //   그 전에 아래쪽 UI(예: 글자편집기)를 골라 내려가 있던 위치가 그대로 남아
-    //   화면 위쪽(달력 등)이 안 보인 채로 남는다(CDP 실측: 편집기 선택 후 스크롤 716,
-    //   PAGE1 을 다시 골라도 716 유지 → 위쪽 달력 안 보임).
-    //   그래서 "고른 UI가 보이는 영역보다 큰 경우"에 한해 그 위쪽 끝에 맞춰 준다.
-    //   ※ 스크롤 값만 한 번 바꾼다 — 미리보기 UI·글자편집기 엔진은 건드리지 않는다.
-    function _alignPreviewToScreenTop(OBJID) {
-        try {
-            var oWin = _frameWin();
-            if (!oWin || !oWin.document) { return; }
-            var oUi = oAPP.attr.prev && oAPP.attr.prev[OBJID];
-            var oDom = (oUi && typeof oUi.getDomRef === "function") ? oUi.getDomRef() : null;
-            if (!oDom || typeof oDom.getBoundingClientRect !== "function") { return; }
-
-            // ① 이 UI 를 담고 있는 바깥 스크롤 영역 먼저 찾는다(낱개 UI 인 경우).
-            var oOuter = oDom.parentElement;
-            while (oOuter) {
-                if (oOuter.scrollHeight - oOuter.clientHeight > 2) { break; }
-                oOuter = oOuter.parentElement;
-            }
-            if (oOuter) {
-                // 고른 UI 가 보이는 영역보다 작으면 = 낱개 UI → 원본 동작(필요한 만큼만 이동) 유지.
-                if (oDom.getBoundingClientRect().height < oOuter.clientHeight) { return; }
-                var iDelta = Math.round(oDom.getBoundingClientRect().top - oOuter.getBoundingClientRect().top);
-                if (iDelta === 0) { return; }
-                oOuter.scrollTop = oOuter.scrollTop + iDelta;
+            } catch (e) {
+                console.error("[HTML5][WS20][attr] 선택 테두리 따라가기 오류:", e && e.message);
                 return;
             }
-
-            // ② 바깥에 스크롤 영역이 없으면 = 고른 것이 화면(Page) 자체다.
-            //    화면은 스크롤 영역을 자기 "안"에 품으므로, 그 안쪽 내용을 맨 위로 되돌린다.
-            //    (CDP 실측: 편집기 선택으로 716 까지 내려간 상태 → 0 으로 복귀 → 위쪽 달력 다시 보임)
-            var aInner = oDom.querySelectorAll("*");
-            var oInner = null, iMax = 2;
-            for (var i = 0; i < aInner.length; i++) {
-                var iGap = aInner[i].scrollHeight - aInner[i].clientHeight;
-                if (iGap > iMax) { iMax = iGap; oInner = aInner[i]; }
-            }
-            if (!oInner || oInner.scrollTop === 0) { return; }
-            oInner.scrollTop = 0;
-        } catch (e) {
-            console.error("[HTML5][WS20][attr] 미리보기 화면 위쪽 맞추기 오류:", e && e.message);
+            if (iFrames < MAX_FRAMES) { oWin.requestAnimationFrame(_tick); }
         }
+        oWin.requestAnimationFrame(_tick);
     }
-
 
     /************************************************************************
      * 우 상단 attribute header 펼침/접힘 — 원본 attrHeaderExpanded(uiAttributeArea.js
@@ -3247,28 +3299,9 @@
                 var oRow = document.querySelector(
                     '#ws20AttrRows .u4aWs20AttrRow[data-uiatk="' + UIATK + '"]');
                 if (oRow) {
-                    //[BR52] 대상 행 선택 강조 — 원본 oRTab1.setSelectedItem(uiAttributeArea.js:8279).
-                    //  트리 줄과 같은 공통 선택 표시(aria-selected)를 쓴다(단일 선택 — 기존 표시 제거 후 지정).
-                    try {
-                        var aPrev = document.querySelectorAll('#ws20AttrRows .u4aWs20AttrRow[aria-selected="true"]');
-                        for (var p = 0; p < aPrev.length; p++) { aPrev[p].removeAttribute("aria-selected"); }
-                        oRow.setAttribute("aria-selected", "true");
-                    } catch (e) { }
-
-                    //[BR52] ATTR 상단 영역 접힘 처리 — 원본 attrHeaderExpanded(false)(8338행).
-                    //  오류 입력칸이 확실히 보이게 위 요약영역을 접는다.
-                    try { _attrHeaderExpanded(false); } catch (e) { }
-
-                    //DOM 위치로 부드러운 스크롤 이동 — 원본 8346행 1:1.
-                    try { oRow.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" }); } catch (e) { }
-
-                    //비동기로 focus 처리 — 원본 8355행 requestAnimationFrame 1:1.
+                    try { oRow.scrollIntoView({ block: "nearest" }); } catch (e) { }
                     var oInp = oRow.querySelector("input, select, textarea, button");
-                    if (oInp) {
-                        requestAnimationFrame(function () {
-                            try { oInp.focus(); } catch (e) { }
-                        });
-                    }
+                    if (oInp) { try { oInp.focus(); } catch (e) { } }
                 }
             } catch (e) { }
 
@@ -3516,10 +3549,12 @@
         try {
             var oWin = _frameWin();
             if (oWin && oNode && typeof oWin.selPreviewUI === "function") {
+                // ★ 미리보기 렌더(글자편집기 자리잡기 포함)가 끝난 "뒤에" 스크롤 이동 + 선택표시.
+                //   먼저 표시하면 옛 높이 기준으로 스크롤되고, 곧이어 편집기가 커지며 대상이 밀려
+                //   테두리만 옛 자리에 남는다(원본도 추가 처리에서 렌더 완료를 기다린 뒤 선택한다).
+                await _waitPreviewRenderDone(oNode);
                 await oWin.selPreviewUI(OBJID);
-                // 화면(Page 등) 자체를 고른 경우 그 화면 처음이 보이도록 맞춤(낱개 UI 는 원본 동작 유지).
-                _alignPreviewToScreenTop(OBJID);
-                // 테두리가 안 뜬 경우(글자편집기 등) 뜰 때까지 짧게 다시 그려달라고 요청.
+                // 남은 미세한 자리잡기까지 테두리가 따라붙도록 짧게 감시(자리잡히면 조기 종료).
                 _reassertPreviewSelection(OBJID);
             }
         } catch (e) {
@@ -3888,15 +3923,15 @@
                 console.warn("[HTML5][WS20][attr] T_ATTR 실줄 동기화 skip:", e && e.message);
             }
 
-            //(원본 1957행 checkPropertyValue(designTreeData.js): 입력값 점검 모듈.
-            // 원본은 try/catch 없이 무조건 호출한다 — 실패하면 그대로 크게 드러난다.)
+            //(원본 1920행 checkPropertyValue(designTreeData.js): 입력값 점검 모듈 —
+            // parent.require 로드 가능시에만 수행)
             try {
                 var _oDesignChkModule = parent.require(
                     parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "js", "checkAppData", "designTreeData.js"));
 
                 var _aReuireError = _oDesignChkModule.checkPropertyValue(sAttr);
 
-                //입력한 값에 오류가 존재하는경우. (원본 1965행)
+                //입력한 값에 오류가 존재하는경우. (원본 1923행)
                 if (_aReuireError && _aReuireError.RETCD === "E") {
 
                     sAttr.valst = "Error";
@@ -3907,22 +3942,7 @@
 
                 }
             } catch (e) {
-                //[BR51] 점검 모듈 로드/실행 실패를 조용히 삼키지 않는다(코딩규칙: 조용한 catch 금지).
-                //  구간 오류코드로 콘솔에 남기고 화면에도 드러낸다(현장 SR 추적용).
-                //  ※ 정상 설치 환경에서는 로드가 항상 성공하므로 이 갈래는 원래 타지 않는다.
-                console.error("[WS20ATTR-CHK01] 입력값 점검 모듈(designTreeData.js) 로드/실행 실패 — 값 점검 미수행:", e);
-                //화면 안내는 추적 코드만 표시(내부 예외 원문 노출 금지 — 상세는 콘솔에 이미 있음).
-                //  정식 안내 문구 키는 장군님 번호 지정 대기(임의 문구·키 생성 금지).
-                try {
-                    parent.showMessage(null, 10, "E", "WS20ATTR-CHK01");
-                } catch (e2) {
-                    console.error("[WS20ATTR-CHK01] 오류 안내 표시 실패:", e2 && e2.message);
-                }
-                //[BR51-P1] 원본은 점검 실패(예외)가 그대로 전파돼 이후 수집(attrChgAttrVal)·스타일·재렌더에
-                //  도달하지 않는다(fail-closed). 여기서도 동일 경계를 지킨다 — 검증되지 않은 값을
-                //  변경 수집(prev._T_0015)·저장 후보에 넣지 않도록 후속 처리를 중단하고 종료.
-                //  아래 finally 가 busy·단축키·자식창 잠금·재진입 플래그를 원복한다(autoGrowing 조기 return 과 동일 패턴).
-                return;
+                // 점검 모듈 미로드(헤드리스) — skip.
             }
 
             //attr 변경처리(로컬 모델 수집). (원본 1939행)

@@ -782,17 +782,11 @@
 
         try {
             // [W4] HTML5 속성 패널 선택 흐름 — ws_html5_ws20_attr.js 의 fnWs20SelectUI.
-            //  ★ 화면잠금(덮는 표시) 해제는 반드시 선택 함수 "안쪽"이 하도록 맡긴다(bSkipBusy 미지정).
-            //    원본(uiDesignArea.js 28행 parent.setBusy("X") → 78행 setSelectTreeItem 호출)도
-            //    바깥 클릭 핸들러는 잠그기만 하고, 해제는 setSelectTreeItem 내부(2549~2557)가 한 뒤
-            //    2565행에서 미리보기 선택(selPreviewUI)을 부른다. 즉 미리보기 선택 시점엔 잠금이 이미 풀려 있다.
-            //    이식본이 bSkipBusy 로 안쪽 해제를 막아, 잠금이 걸린 채 미리보기 선택이 실행돼
-            //    선택 UI 로의 포커스 이동이 무시되고 → 화면 밖 UI 를 골라도 미리보기가 스크롤되지 않았다
-            //    (CDP 실측: 잠금 켜짐=스크롤 0 그대로·테두리 없음 / 꺼짐=정상 이동·테두리 표시).
-            //    바깥 잠금 ON 이 중복돼도 원본과 동일한 형태다(원본도 28행+2333행 이중 ON, 해제 1회).
+            //  (원본 setSelectTreeItem 의 비-UI 부속(busy/잠금/BUSY_ON)은 본 핸들러가
+            //   이미 수행 중이므로 bSkipBusy 로 중복 회피. UI5 TreeTable 의존부 제외)
             if (typeof oAPP.fn.fnWs20SelectUI === "function") {
                 try {
-                    await oAPP.fn.fnWs20SelectUI(oNode.OBJID);
+                    await oAPP.fn.fnWs20SelectUI(oNode.OBJID, { bSkipBusy: true });
                 } catch (e) {
                     console.warn("[HTML5][WS20][tree] fnWs20SelectUI error:", e && e.message);
                 }
@@ -806,11 +800,8 @@
                 console.warn("[HTML5][WS20][tree] setSelectTreeItem not implemented (W4 예정)");
             }
 
-            // 바인딩 팝업 라인 선택 — 원본은 이 클릭 핸들러에서 부르던 것을 주석 처리하고(uiDesignArea.js 64~66)
-            //   선택 함수 안쪽(setSelectTreeItem 2546행)으로 통합했다. 위 fnWs20SelectUI 가 이미 수행하므로
-            //   여기서 또 부르면 중복이라 원본대로 호출하지 않는다. (폴백 경로는 아래 else 분기에서 처리)
-            if (typeof oAPP.fn.fnWs20SelectUI !== "function" &&
-                typeof oAPP.fn.selectBindingPopupOBJID === "function") {
+            // 바인딩 팝업 라인 선택 (미리보기 W2 연계) — 가드
+            if (typeof oAPP.fn.selectBindingPopupOBJID === "function") {
                 try {
                     oAPP.fn.selectBindingPopupOBJID(oNode);
                 } catch (e) {

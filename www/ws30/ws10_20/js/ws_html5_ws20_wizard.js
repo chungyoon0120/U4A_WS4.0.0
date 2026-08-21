@@ -118,11 +118,15 @@
         //    262 메시지를 내므로, 원본과 동일 메시지(280)를 여기서 먼저 낸다.)
         if (oReturn.uName !== "ReportTemplate") {
             var _cUIOBK = _uiobkOf(oReturn.uName);
-            if (_cUIOBK && typeof oAPP.fn.chkAggrRelation === "function" &&
-                oAPP.fn.chkAggrRelation(ls_tree.UIOBK, ls_tree.OBJID, _cUIOBK).length === 0) {
-                _bindBusy("BUSY_OFF");
-                _fail(fnCallback, _mw("280")); // 입력 가능한 Aggregation이 존재하지 않습니다.
-                return;
+            // ★ chkAggrRelation 이 구조체 {RETCD,RTMSG,T_SEL} 반환판으로 재작성됨(원본 designChkSelLine uiDesignArea.js:1474).
+            //   RETCD==="E" 면 그 RTMSG(바인딩=002/부재=003/집계없음=001)를 낸다 — 미조회 시 280 폴백.
+            if (_cUIOBK && typeof oAPP.fn.chkAggrRelation === "function") {
+                var _aggrRes = oAPP.fn.chkAggrRelation(ls_tree.UIOBK, ls_tree.OBJID, _cUIOBK);
+                if (_aggrRes && _aggrRes.RETCD === "E") {
+                    _bindBusy("BUSY_OFF");
+                    _fail(fnCallback, _aggrRes.RTMSG || _mw("280")); // 추가 가능한 Aggregation이 존재하지 않습니다.
+                    return;
+                }
             }
         }
 

@@ -1493,22 +1493,6 @@
         //(성공시: prev 에 실제 UI 인스턴스가 채워져 있어 스탠드인은 더이상 생성되지 않음 /
         // 실패시: 헤드리스와 동일하게 스탠드인 모드로 복귀 — 속성 패널 정상 동작)
         oAPP.attr.__ws20PrevBooting = false;
-
-        // [BR60] 미리보기 로드 종료(성공·실패 공통) 알림 — 대기 등록된 1회성 콜백을 실행한다.
-        //   미리보기 로더는 자기 화면잠금만 관리하므로, "미리보기가 다 뜬 뒤에 풀어야 하는"
-        //   다른 잠금(레이아웃 저장의 단축키 잠금 등)이 이 시점을 받아 갈 수 있게 한다.
-        //   등록: oAPP.attr.__ws20PrevDoneCbs.push(fn). 실행 후 목록은 비운다(중복 실행 방지).
-        try {
-            var _aDone = oAPP.attr.__ws20PrevDoneCbs;
-            if (Array.isArray(_aDone) && _aDone.length) {
-                oAPP.attr.__ws20PrevDoneCbs = [];
-                _aDone.forEach(function (fnDone) {
-                    try { fnDone(); }
-                    catch (e) { console.error("[HTML5][WS20][prev] 미리보기 로드 종료 콜백 오류:", e); }
-                });
-            }
-        } catch (e) { console.error("[HTML5][WS20][prev] 미리보기 로드 종료 알림 오류:", e); }
-
         if (!_bPrevBusyOn) { return; }
         _bPrevBusyOn = false;
         try { oAPP.common.fnSetBusyLock(""); } catch (e) { }

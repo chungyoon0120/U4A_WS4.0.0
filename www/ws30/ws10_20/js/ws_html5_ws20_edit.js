@@ -918,7 +918,10 @@
         return a.some(function (i) { return i.FLD03 === parentUIOBK && i.FLD05 === aggName; });
     }
     // cardinality (구 callDesignContextMenu.chkUiCardinality — 0:1 aggr 중복 방지, 1:1 이식)
-    if (typeof oAPP.fn.chkUiCardinality !== "function") {
+    // ★ 무조건 재대입(override): 작업폴더 원본 callDesignContextMenu.js 가 이 함수를 옛 문구(021)로 먼저 정의 →
+    //   typeof 가드를 두면 내 새 문구 버전이 건너뛰어진다(살아있는 앱 실측 확인). 내 파일이 그 파일보다 나중
+    //   로드되므로 무조건 덮어 새 문구 버전으로 override(원본 파일은 안 고침 — 재대입 override 원칙).
+    {
         oAPP.fn.chkUiCardinality = function (is_parent, UIATK, ISMLB) {
             if (!is_parent || !is_parent.zTREE || is_parent.zTREE.length === 0) { return; }
             var idx = is_parent.zTREE.findIndex(function (a) { return a.UIATK === UIATK; });
@@ -938,6 +941,9 @@
                 }
             }
         };
+        // ★ callDesignContextMenu.js(작업폴더 옛 원본)가 미리보기 모듈 로드 시 이 함수를 옛 문구(021)로 되덮으므로,
+        //   그 로드 직후 되돌릴 수 있도록 내 새 문구 버전을 안정 이름에도 보관(prev.js lf_installPreviewMoveDelegate 에서 재적용). 멱등.
+        oAPP.fn._ws20ChkUiCardinality = oAPP.fn.chkUiCardinality;
     }
 
     // 카탈로그: 부모 UIOBK 의 추가가능 aggregation 목록
@@ -1171,7 +1177,9 @@
             await _rerenderParentRTE(is_tree);
 
             _refreshTree();
-            if (lastObjid) { _selectNode(lastObjid); }
+            // ★ 원본 designAddUIObject 5681 은 선택을 await 한다(await setSelectTreeItem). 이식본이 await 를
+            //   빠뜨려, 트리·미리보기 갱신과 선택 표시가 완료되기 전에 다음 처리로 넘어가던 문제 복원(WP1: 전환 완료 후 후속).
+            if (lastObjid) { await _selectNode(lastObjid); }
             _markChanged();
             // [F-6] 바인딩 팝업(별창) 반영 — "+" 삽입 추가 경로가 반영을 누락했었다(장군님 발견 2026-07-29,
             //   C-6 테스트: WS20 에서 UI 추가해도 팝업 트리에 안 뜸). 드롭/붙여넣기/복사엔 있었으나 삽입 추가만 빠짐.

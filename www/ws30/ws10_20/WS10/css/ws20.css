@@ -1037,6 +1037,10 @@
   border-bottom: 1px solid var(--ws20-line);
 }
 .u4aWs20AttrRow:hover { background: var(--ws20-hover-bg); }
+/* [BR52] 오류 항목으로 이동(setAttrFocus) 시 대상 행 선택 강조 — 원본 sap.m.Table
+   setSelectedItem(uiAttributeArea.js:8279) 대응. 트리 줄과 같은 공통 선택 표시(aria-selected). */
+.u4aWs20AttrRow[aria-selected="true"] { background: var(--ws20-sel-bg); }
+.u4aWs20AttrRow[aria-selected="true"]:hover { background: var(--ws20-sel-bg); }
 
 /* 라벨 셀 (좌) */
 .u4aWs20AttrRowLbl {

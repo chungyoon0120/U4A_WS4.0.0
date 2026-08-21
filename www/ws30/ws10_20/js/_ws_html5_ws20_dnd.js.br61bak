@@ -417,35 +417,22 @@
     //     자리 자체가 없으면 003, aggregation 정의 자체 없으면 001 을 실어 호출측(aggrSelectPopup/wizard 사전점검)이
     //     조용히 제외 대신 안내를 띄우게 한다. HTML5 이식본은 옛 배열판이라 끌어놓기 시 바인딩 자리가 조용히 제외돼
     //     안내가 안 떴다(장군님 특별지시 T01). 반환 구조 변경 → 호출부(aggrSelectPopup·wizard) 함께 갱신.
-    //   ★ T01 검수(코덱스 P1) 반영 — 옛 배열 계약 소비자 호환: 작업폴더 UAI(design/UAI/parseAiLibraryData.js,
-    //     옛 판)가 이 함수 반환값의 `.length === 0` 만 검사한다(408·411, 원소 접근 없음 — 원본 최신 UAI 는 구조체
-    //     소비로 이미 교체됨: WS_DESIGN parseAiLibraryData.js:434). 원본 파일은 못 고치므로 반환 구조체에
-    //     `length`(= T_SEL 개수)를 함께 실어, 원작자가 UAI 를 최신판으로 덮어쓰기 전까지 옛 사전거부도 살린다.
-    //     (신판 소비자는 RETCD/T_SEL 만 보므로 length 는 무해.)
     oAPP.fn.chkAggrRelation = function (tUIOBK, tOBJID, sUIOBK) {
         var _sRes = { RETCD: "", RTMSG: "", T_SEL: [] };
-        // 반환 마무리 — 옛 소비자(.length) 호환 속성 동기화(모든 return 경로 공통).
-        function _fin() { _sRes.length = _sRes.T_SEL.length; return _sRes; }
-        // ★ T01 검수(안티 P2) 반영 — 라이브러리/미리보기 미로드 방어(정상 경로 무변화, 크래시만 차단).
-        var _LIB = (oAPP.DATA && oAPP.DATA.LIB) ? oAPP.DATA.LIB : {};
         var _sTarget = oAPP.fn.getTreeData(tOBJID);
-        var lt_0023 = (_LIB.T_0023 || []).filter(function (a) { return a.UIOBK === tUIOBK && a.UIATY === "3" && a.ISDEP !== "X"; });
+        var lt_0023 = oAPP.DATA.LIB.T_0023.filter(function (a) { return a.UIOBK === tUIOBK && a.UIATY === "3" && a.ISDEP !== "X"; });
         // aggregation 정의 자체가 없는 경우(원본 1613 → 001).
         if (lt_0023.length === 0) {
             _sRes.RETCD = "E";
-            // ★ BR61: 문구 조회가 실패하면 안내가 통째로 사라진다 → 삼키지 말고 표면화(code.md 규칙).
-            try { _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "001", tOBJID); }
-            catch (e) { console.error("[HTML5][WS20][chkAggrRelation] 안내 문구 조회 실패(001):", e && e.message ? e.message : e); }
-            return _fin();
+            try { _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "001", tOBJID); } catch (e) { }
+            return _sRes;
         }
-        var lt_0027 = (_LIB.T_0027 || []).filter(function (a) { return a.TGOBJ === sUIOBK && a.TOBTY !== "1"; });
-        var _sPrev = (oAPP.attr && oAPP.attr.prev) ? oAPP.attr.prev[tOBJID] : undefined;
-        var _sModel = (_sPrev && _sPrev._MODEL) ? _sPrev._MODEL : {};
+        var lt_0027 = oAPP.DATA.LIB.T_0027.filter(function (a) { return a.TGOBJ === sUIOBK && a.TOBTY !== "1"; });
+        var _sModel = (oAPP.attr.prev[tOBJID] && oAPP.attr.prev[tOBJID]._MODEL) ? oAPP.attr.prev[tOBJID]._MODEL : {};
         var _isModelBind = false;   // 바인딩 때문에 제외된 aggregation 존재 여부(원본 1629).
         for (var i = 0, l = lt_0023.length; i < l; i++) {
             var _s0023 = lt_0023[i];
-            var _sUpper = (_s0023.UIADT || "").toUpperCase();
-            var _s0022 = (_LIB.T_0022 || []).find(function (a) { return a.UIFND === _sUpper; });
+            var _s0022 = oAPP.DATA.LIB.T_0022.find(function (a) { return a.UIFND === _s0023.UIADT.toUpperCase(); });
             if (!_s0022) { continue; }
             // drag UI 가 aggregation type 과 같거나 상속관계에 있을 때만 후보(원본 1642).
             if (sUIOBK !== _s0022.UIOBK && !lt_0027.some(function (b) { return b.SGOBJ === _s0022.UIOBK; })) { continue; }
@@ -462,14 +449,11 @@
                 _sRes.RTMSG = _isModelBind
                     ? parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "002")
                     : parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "003");
-            } catch (e) {
-                // ★ BR61: 위와 같은 이유로 표면화(문구가 비면 붙여넣기 실패 사유가 화면에 안 뜬다).
-                console.error("[HTML5][WS20][chkAggrRelation] 안내 문구 조회 실패(002/003):", e && e.message ? e.message : e);
-            }
-            return _fin();
+            } catch (e) { }
+            return _sRes;
         }
         _sRes.RETCD = "S";
-        return _fin();
+        return _sRes;
     };
 
     // AGGREGATION 선택 — 후보 0/1 자동, 2+ 는 HTML5 .u4a-dialog. (원본 aggrSelectPopup.js 1:1 동작)
@@ -1035,11 +1019,7 @@
 
             // ── lf_aggrPopup_cb 가드(원본 6236~6352) ──
             // ③ 이동 가능한 aggregation 없음(원본 269).
-            // ★ BR61: 메시지 클래스 오지정 수정. 원본 lf_aggrPopup_cb(uiDesignArea.js 6469)는
-            //   oAPP.common.fnGetMsgClsText("/U4A/MSG_WS","269") = "붙여넣을 수 있는 aggregation이 없습니다."
-            //   를 띄우는데, 이식본이 _wsc(=ZMSG_WS_COMMON_001) 269 를 써서 전혀 무관한 파일 끌어놓기 안내가
-            //   떴다(같은 번호, 다른 클래스). 클래스를 원본과 동일하게 되돌린다.
-            if (typeof param === "undefined") { _toast("I", _msg("/U4A/MSG_WS", "269")); _done(); return; }
+            if (typeof param === "undefined") { _toast("I", _wsc("269")); _done(); return; }
             // ④ 카디널리티(0:1 aggr 중복 방지).
             if (oAPP.fn.chkUiCardinality(is_drop, param.UIATK, param.ISMLB) === true) { _done(); return; }
             // ⑤ 특정 부모 전용 UI.
@@ -1064,21 +1044,7 @@
             try { await _applyP13nPattern(is_data, is_drop, param); }
             catch (e) { console.error("[HTML5][WS20][designAddTreeData] applyPaste", e); }
             _done();
-        }, l_pos.x, l_pos.y, function (sRes) {
-            // ★ BR61: 취소/후보없음 사유를 원본과 동일하게 안내한다.
-            //   원본은 이 자리(aggrSelectPopup 의 cancelFunc)에서 받은 결과를 호출측이 직접 띄운다
-            //   — contextMenuUiPaste(callDesignContextMenu.js 1407~1427), designP13nUIData(uiDesignArea.js 5997~6017).
-            //   RETCD "E" 이면 RCODE 02(붙여넣을 aggregation 자체가 없음)=확인창(KIND 20),
-            //   RCODE 01(선택 팝업에서 취소)=토스트(KIND 10). RTMSG 는 chkAggrRelation 이 실어준 문구
-            //   (ZMSG_WS_COMMON_002 001/002/003) 또는 취소(/U4A/MSG_WS 001).
-            //   이식본은 이 콜백이 결과를 버리고 정리만 해서, 붙여넣기가 막힌 이유가 화면에 전혀 안 떴다.
-            if (sRes && sRes.RETCD === "E") {
-                var _KIND = (sRes.RCODE === "02") ? 20 : 10;
-                try { parent.showMessage(null, _KIND, "I", sRes.RTMSG); }
-                catch (e) { console.error("[HTML5][WS20][designAddTreeData] 붙여넣기 불가 안내:", e && e.message ? e.message : e); }
-            }
-            _done();
-        });
+        }, l_pos.x, l_pos.y, function () { _done(); });
 
         return true;
     };

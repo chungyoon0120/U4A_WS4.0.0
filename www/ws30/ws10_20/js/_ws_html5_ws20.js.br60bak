@@ -1027,14 +1027,11 @@
                 C.addEventListener("drop", function (e) {
                     e.preventDefault(); C.classList.remove("is-over");
                     if (!_dragSid || _dragSid === sid) { return; }
-                    // ★[BR60-1] 원본(callDesignLayoutChangePopup.js lf_drop 299~307행)은 끌던 타일과
-                    //   놓인 타일의 '자리를 서로 맞바꾼다'(사이에 낀 가운데 타일은 그대로). 이전 변환본은
-                    //   끌던 타일을 빼서 놓은 자리에 끼워넣어(밀어넣기) 한 칸 건너 옮길 때 결과가 원본과
-                    //   달랐다. 예) [트리·미리보기·속성]에서 트리→속성 위로: 원본=[속성·미리보기·트리],
-                    //   밀어넣기=[미리보기·속성·트리]. 원본대로 맞바꿈으로 복원.
+                    // _dragSid 를 sid 위치로 이동(순서 재배열)
                     var iFrom = aWork.indexOf(_dragSid), iTo = aWork.indexOf(sid);
                     if (iFrom === -1 || iTo === -1) { return; }
-                    var sTmp = aWork[iFrom]; aWork[iFrom] = aWork[iTo]; aWork[iTo] = sTmp;   // 맞바꿈(swap)
+                    aWork.splice(iFrom, 1);
+                    aWork.splice(iTo, 0, _dragSid);
                     _renderCards();
                 });
                 CARDS.appendChild(C);
@@ -1042,52 +1039,13 @@
         }
         _renderCards();
 
-        // 팝업 종료. bSkip=true(저장 경로)면 취소 안내 없이 닫기만 — 원본 lf_close(oDlg, bSkip) 재현.
-        function _close(bSkip) {
-            try { DLG.close(); } catch (e) { } DLG.remove();
-            if (bSkip) { return; }
-            // ★[BR60-2] 우상단 X · 하단 '닫기' · 키보드 ESC 로 닫을 때 취소 안내(원본 lf_close 176~177행,
-            //   MSG_WS 001 "Cancel operation"). 저장으로 닫힐 때(_doSave→_close(true))만 안내 생략.
-            var s001 = ""; try { s001 = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "001"); } catch (e) { }
-            try { if (parent.showMessage) { parent.showMessage(null, 10, "I", s001); } } catch (e) { }
-        }
+        function _close() { try { DLG.close(); } catch (e) { } DLG.remove(); }
 
         function _save() {
             // 저장 확인 (구 010 "Do you want to save it?") — 중앙 showMessage(HTML5) 사용.
             var sMsg = "";
             try { sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "010"); } catch (e) { }
             function _doSave() {
-                // ★[BR60-3][BR60-4] 저장 확정~미리보기 재로드가 끝날 때까지 화면잠금(로딩 표시)+단축키잠금.
-                //   원본 lf_save(callDesignLayoutChangePopup.js): 확인 YES 시 parent.setBusy("X")(244행)
-                //   + setShortcutLock(true)(253행). 잠금은 미리보기 재로드가 끝난 뒤에만 푼다(WP1 — 중간에
-                //   풀면 그 틈에 연타/단축키가 들어와 상태가 꼬임).
-                //
-                //   [BR60 검수반영] 화면잠금·단축키잠금은 **소유권 단위로 각각 한 번만** 푼다.
-                //   둘 다 참조 카운트 없는 전역 상태라, 이 저장이 이미 놓은 잠금을 두 번 끄면
-                //   그 사이 다른 작업이 새로 건 잠금까지 풀려 버린다(중복 해제 금지 = 아래 소유 표시).
-                //   · 화면잠금 소유권은 "이 저장이 미리보기 재로드를 남에게 맡기면" 그쪽으로 넘긴다
-                //     (미리보기 로더가 자기 잠금을 걸고 그리기 완료 시 스스로 푸는 계약을 이미 가짐).
-                var _bOwnBusy = false, _bOwnShortcut = false;
-                try { if (parent.setBusy) { parent.setBusy("X"); _bOwnBusy = true; } }
-                catch (e) { console.error("[HTML5][WS20][BR60] 저장 중 화면잠금 실패(저장은 계속):", e); }
-                try { if (oAPP.fn.setShortcutLock) { oAPP.fn.setShortcutLock(true); _bOwnShortcut = true; } }
-                catch (e) { console.error("[HTML5][WS20][BR60] 저장 중 단축키잠금 실패(저장은 계속):", e); }
-
-                // 단축키 잠금만 해제(화면잠금은 재로드 주체가 관리하는 경로에서 사용).
-                function _releaseShortcut() {
-                    if (!_bOwnShortcut) { return; }
-                    _bOwnShortcut = false;
-                    try { oAPP.fn.setShortcutLock(false); }
-                    catch (e) { console.error("[HTML5][WS20][BR60] 단축키잠금 해제 실패:", e); }
-                }
-                // 이 저장이 건 잠금 전부 해제(각각 한 번만).
-                function _unlockAll() {
-                    _releaseShortcut();
-                    if (!_bOwnBusy) { return; }
-                    _bOwnBusy = false;
-                    try { parent.setBusy(""); }
-                    catch (e) { console.error("[HTML5][WS20][BR60] 화면잠금 해제 실패:", e); }
-                }
                 // P13N 저장 (구 setP13nData("designLayout", T_LAYOUT)) — POSIT/SID/UIID 포함.
                 var aT_LAYOUT = aWork.map(function (sid, i) {
                     var d = _def(sid) || {};
@@ -1126,26 +1084,13 @@
                         oAPP.attr.__ws20PrevReloading = true;
                         var _pf = document.getElementById("prevHTML");
                         if (_pf) {
-                            // ★[BR60-3][BR60-4] 재부착으로 시작된 미리보기 재로드가 끝난 뒤에만 잠금 해제(WP1).
-                            //   성공(load)·실패(error) 어느 쪽이든 반드시 한 번 회수해 화면이 잠긴 채 멈추지 않게 한다
-                            //   (미리보기 로더의 iframe 오류 안전장치와 같은 방식 — ws_html5_ws20_prev.js).
-                            var _offPrevLd = function () {
+                            var _onPrevLd = function () {
                                 oAPP.attr.__ws20PrevReloading = false;
                                 _pf.removeEventListener("load", _onPrevLd);
-                                _pf.removeEventListener("error", _onPrevErr);
-                            };
-                            var _onPrevLd = function () { _offPrevLd(); _unlockAll(); };
-                            var _onPrevErr = function () {
-                                console.error("[HTML5][WS20][BR60] 미리보기 재로드 실패 — 잠금 회수.");
-                                _offPrevLd(); _unlockAll();
                             };
                             _pf.addEventListener("load", _onPrevLd);
-                            _pf.addEventListener("error", _onPrevErr);
-                        } else { _unlockAll(); }   // 미리보기 iframe 없음 → 기다릴 재로드 없음, 즉시 해제.
-                    } catch (e) {
-                        console.error("[HTML5][WS20][BR60] 미리보기 재로드 대기 배선 실패 — 잠금 회수:", e);
-                        _unlockAll();   // 대기를 못 걸었으면 잠금이 남지 않게 즉시 회수.
-                    }
+                        }
+                    } catch (e) { }
                     // 재로드가 미리보기를 스스로 재구성(초기 로드와 동일 경로: 참조 정리→새 _page1 생성→ROOT
                     //   재선택)하므로, 여기서 fnWs20LoadPreview 를 또 부르지 않는다(중복 재-draw 제거 — 부르면
                     //   재로드 직전 옛 컨텍스트에 _page1 을 다시 세워 재로드 초기화가 그걸 destroy → 크래시 재현).
@@ -1153,33 +1098,11 @@
                     // [BR49-P2] 앞선 재배치 저장의 미리보기 재로드가 아직 진행 중 — 순서도 안 바뀌었으니
                     //   미리보기는 곧 self-heal 로 최신이 된다. 지금 명시 재로드를 하면 두 그리기가 겹쳐
                     //   파괴 경쟁이 되므로 이번 명시 재로드는 생략한다.
-                    // ★[BR60-3][BR60-4] 이번 저장은 스스로 재로드를 걸지 않았다 → 기다릴 완료 신호가 없으므로
-                    //   이 저장이 건 잠금은 지금 회수한다(안 풀면 화면이 잠긴 채 멈춘다).
-                    _unlockAll();
                 } else {
                     // 순서 무변경 + 진행 중 재로드 없음 → 안정 컨텍스트 → 예전처럼 명시 재로드로 미리보기 갱신.
-                    // ★[BR60-3][BR60-4] 미리보기 로더는 자기 화면잠금을 걸고 **미리보기 구성이 끝난 뒤**
-                    //   스스로 푸는 계약을 이미 갖고 있다(ws_html5_ws20_prev.js 의 로드 시작/종료 처리).
-                    //   → 화면잠금 소유권을 로더에 넘기고(여기서 끄면 로더가 방금 건 잠금까지 꺼져
-                    //   그리기 도중 화면이 열린다), 로더가 관리하지 않는 단축키 잠금만
-                    //   "미리보기 로드 종료" 알림을 받아 그때 푼다(WP1 직렬화).
-                    var _bDelegated = false;
-                    if (typeof oAPP.fn.fnWs20LoadPreview === "function") {
-                        try {
-                            if (!Array.isArray(oAPP.attr.__ws20PrevDoneCbs)) { oAPP.attr.__ws20PrevDoneCbs = []; }
-                            oAPP.attr.__ws20PrevDoneCbs.push(_releaseShortcut);
-                            _bOwnBusy = false;                 // 화면잠금 소유권 이전(로더가 해제).
-                            oAPP.fn.fnWs20LoadPreview();
-                            _bDelegated = true;
-                        } catch (e) {
-                            console.error("[HTML5][WS20][BR60] 미리보기 재로드 호출 실패 — 잠금 회수:", e);
-                            _bOwnBusy = true;                  // 위임 실패 → 소유권 회수해 아래에서 해제.
-                        }
-                    }
-                    // 로더가 없거나 호출이 실패했으면 기다릴 완료 신호가 없다 → 즉시 회수.
-                    if (!_bDelegated) { _unlockAll(); }
+                    try { if (typeof oAPP.fn.fnWs20LoadPreview === "function") { oAPP.fn.fnWs20LoadPreview(); } } catch (e) { }
                 }
-                _close(true);   // ★[BR60-2] 저장으로 닫히는 경로 → 취소 안내 없음(원본 lf_after→lf_close(_, true)).
+                _close();
             }
             try {
                 if (parent.showMessage) {
