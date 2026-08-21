@@ -73,8 +73,16 @@
     //  ★ Promise 를 반환한다 — undo/redo 가 이 완료(=편집하던 페이지 복원)까지 await 해야
     //    BUSY 를 그 전에 풀지 않고, PAGE1 이 잠깐 노출되는 깜빡임도 막는다.
     //  sUiatk 가 있으면 재선택 후 그 속성 줄로 스크롤(원본 setSelectTreeItem(OBJID, UIATK)→setAttrFocus).
-    function _selectNode(sObjid, sUiatk) {
+    //  oOpt 를 주면 선택 흐름(fnWs20SelectUI)에 그대로 전달한다.
+    //  [BR59-5] 되돌리기/다시하기는 oOpt.bNoRowSelect=true 로 불러, 속성 줄로 커서·스크롤은 하되
+    //  그 줄에 파란 선택 강조는 남기지 않는다(장군님 지시 2026-08-21).
+    function _selectNode(sObjid, sUiatk, oOpt) {
         try {
+            if (oOpt && typeof oAPP.fn.fnWs20SelectUI === "function") {
+                var o = { UIATK: sUiatk || undefined, TYPE: undefined };
+                for (var k in oOpt) { if (Object.prototype.hasOwnProperty.call(oOpt, k)) { o[k] = oOpt[k]; } }
+                return Promise.resolve(oAPP.fn.fnWs20SelectUI(sObjid, o));
+            }
             if (typeof oAPP.fn.setSelectTreeItem === "function") { return oAPP.fn.setSelectTreeItem(sObjid, sUiatk || undefined); }
         } catch (e) { }
         return Promise.resolve();
@@ -105,18 +113,29 @@
     //   RTE 재렌더·완료대기 5651~5666), HTML5 팝업 추가 경로엔 이 처리가 통째로 누락돼 있었다
     //   (끌어놓기 경로 dnd.js _rerenderCore 5568~5579 엔 이미 있음 → 경로 간 동작 일치시키려 복원).
     //   미리보기 iframe 미로드 시 재렌더 대상이 없으므로 조용히 건너뛴다(트리만 갱신, _prev 가드와 동일).
-    async function _rerenderParentRTE(parentNode) {
-        if (!parentNode || !parentNode.OBJID) { return; }
+    //   midFn(선택) = "그리기 완료 대기 등록 뒤 · 다시 그리기 앞"에 끼워 넣을 미리보기 변경
+    //   (원본 contextMenuUiMove 568~578 순서: setAfterRendering 등록 → moveUIObjPreView → rerender).
+    //   ★ midFn 은 어떤 조기 종료 경로에서도 반드시 1회 실행한다(미리보기 미로드·렌더모듈 부재여도
+    //     이동 반영 자체가 사라지면 안 되므로). 인자 없이 부르면 기존 동작 그대로.
+    async function _rerenderParentRTE(parentNode, midFn) {
+        var _bMidDone = false;
+        function _runMid() {
+            if (_bMidDone || typeof midFn !== "function") { return; }
+            _bMidDone = true;
+            try { midFn(); } catch (e) { console.error("[HTML5][WS20][edit] 재렌더 중간처리:", e && e.message ? e.message : e); }
+        }
+        if (!parentNode || !parentNode.OBJID) { _runMid(); return; }
         try {
             var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
-            if (!w) { return; }
-        } catch (e) { return; }
-        var R = _renderMod(); if (!R) { return; }
+            if (!w) { _runMid(); return; }
+        } catch (e) { _runMid(); return; }
+        var R = _renderMod(); if (!R) { _runMid(); return; }
         function _safe(fn) { try { return fn(); } catch (e) { console.error("[HTML5][WS20][insert] RTE 재렌더:", e && e.message); } }
         var oTarget = null, oDom = null, oPromise = null, aRte = [];
         _safe(function () { oTarget = R.getTargetAfterRenderingUI(oAPP.attr.prev[parentNode.OBJID]); });
         _safe(function () { oDom = (oTarget && typeof oTarget.getDomRef === "function") ? oTarget.getDomRef() : null; });
         _safe(function () { if (oDom) { oPromise = R.setAfterRendering(oTarget); } });
+        _runMid();
         _safe(function () { aRte = R.renderingRichTextEditor(parentNode) || []; });
         if (oPromise) {
             try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[HTML5][WS20][insert] rerender:", e && e.message); }
@@ -258,20 +277,47 @@
         //    CL_CHANGE_ATTR.executeChangeAttr 끝의 setSelectTreeItem(OBJID, UIATK) 대응(그동안 누락).
         //    앵커(선택 노드)가 그 속성의 소속 노드일 때만 스크롤(삭제 대체앵커=부모면 스크롤 안 함).
         if (sAnchor) {
-            var sFocusUiatk = (s.focus && s.focus.OBJID === sAnchor) ? s.focus.UIATK : "";
-            try { await _selectNode(sAnchor, sFocusUiatk); } catch (e) { }
+            var sFocusUiatk = (s.focus && s.focus.OBJID === sAnchor) ? (s.focus.UIATK || "") : "";
+            //[BR59-5] 되돌리기/다시하기는 줄 선택 강조 없이(커서·스크롤·접힘만) 이동.
+            try { await _selectNode(sAnchor, sFocusUiatk, { bNoRowSelect: true }); } catch (e) { }
         }
     }
     // 편집 직전 호출 — 현재 상태를 undo 스택에 적재(+redo 비움).
-    //  oFocus={OBJID, UIATK} 를 주면 스냅샷에 "바뀐 속성"을 기록 → undo/redo 복원 시 그 줄로 스크롤.
-    //  (속성 값 변경 경로만 전달. 삽입/삭제/이동은 미전달 → 스크롤 없음, 원본도 CHANGE_ATTR 만 스크롤.)
+    //  oFocus={OBJID[, UIATK]} 를 주면 스냅샷에 "이 편집이 건드린 대상 UI"를 기록 → undo/redo 복원 시
+    //  그 UI 를 다시 선택한다(UIATK 까지 주면 그 속성 줄로 스크롤).
+    //  ★ [BR59-3] 원본 undoRedo 는 **모든 액션이 "그 액션의 대상 UI"를 재선택**한다 —
+    //     MOVE: contextMenuUiMove 599 `await setSelectTreeItem(ls_tree.OBJID)`(이동한 UI)
+    //     INSERT 543 / DRAG_DROP 1758·1924 / CHANGE_ATTR 2278 / AI_INSERT 2872 모두 동일.
+    //     (DELETE 1012 만 "선택 유지, 단 그게 삭제 대상이면 부모" — 아래 sSelParent 폴백이 그 몫.)
+    //     대상을 안 넘기면 "편집 직전에 선택돼 있던 노드"로 돌아가, 우클릭 이동처럼 선택과 대상이
+    //     다른 경우 되돌리기 후 강조가 엉뚱한 줄로 간다(장군님 실화면 지적 2026-08-21).
     oAPP.fn.fnWs20PushUndo = function (oFocus) {
         var _snap = _snapshot();
-        if (oFocus && oFocus.OBJID && oFocus.UIATK) { _snap.focus = { OBJID: oFocus.OBJID, UIATK: oFocus.UIATK }; }
+        if (oFocus && oFocus.OBJID) { _snap.focus = { OBJID: oFocus.OBJID, UIATK: oFocus.UIATK || "" }; }
         _undoStack.push(_snap);
         if (_undoStack.length > _UNDO_MAX) { _undoStack.shift(); }
         _redoStack = [];
         _updateUndoBtns();
+        return _snap;   // [BR59-4] 나중에 대상 UI 를 새겨 넣을 수 있게 그 기록 자체를 돌려준다.
+    };
+    /********************************************************************
+     * [BR59-4] 방금 쌓은 스냅샷에 "이 편집이 건드린 대상 UI" 를 나중에 새겨 넣는다.
+     *   추가/붙여넣기/패턴적용처럼 **대상 UI 이름을 편집 도중에 새로 만드는** 경로는
+     *   되돌리기 기록을 쌓는 시점(편집 직전)엔 그 이름을 아직 모른다 → 이름이 정해진 뒤 호출.
+     *   ★방향별 동작은 복원측 존재확인이 알아서 갈라준다(원본과 동일 결과):
+     *     - 되돌리기(추가 이전 상태) → 그 UI 가 트리에 없음 → 기존 폴백(선택 유지/부모)
+     *       = 원본이 "추가 되돌리기 = 삭제" 로 처리해 선택을 유지하는 것과 같다.
+     *     - 다시하기(추가 이후 상태) → 그 UI 가 있음 → 그 UI 선택
+     *       = 원본 CL_INSERT_UI 543 `setSelectTreeItem(삽입한 UI)` 와 같다.
+     ********************************************************************/
+    //   ★ oSnap = fnWs20PushUndo 가 돌려준 그 기록. 편집 도중 화면 그리기 대기(await)가 끼어 있으면
+    //     그 사이 다른 편집이 기록을 더 쌓을 수 있으므로, **맨 위**가 아니라 **내가 쌓은 그 기록**에
+    //     새겨야 안전하다. 못 받은 경우에만 맨 위로 되돌아간다(예전 호출 호환).
+    oAPP.fn.fnWs20SetUndoTarget = function (oFocus, oSnap) {
+        if (!oFocus || !oFocus.OBJID) { return; }
+        var oTgt = oSnap || (_undoStack.length ? _undoStack[_undoStack.length - 1] : null);
+        if (!oTgt) { return; }
+        oTgt.focus = { OBJID: oFocus.OBJID, UIATK: oFocus.UIATK || "" };
     };
     // 트리 노드 총 개수(재귀) — undo/redo 가 "삭제 방향"인지 판정용.
     function _countNodes(aTree) {
@@ -480,7 +526,11 @@
             if (act !== "YES") { _broadBusy(false); _unlock(); return; }   // 취소 → 잠금 해제.
             var oParent = _node(oNode.POBID);
             if (!oParent || !oParent.zTREE) { _broadBusy(false); _unlock(); return; }   // 가드 실패 → 잠금 해제.
-            oAPP.fn.fnWs20PushUndo();
+            //[BR62-C] 되돌리기 대상 = 지우는 그 UI. 원본은 삭제 이력을 "추가"로 저장하고(undoRedo.js 770),
+            //  되돌릴 때 추가 처리가 **되살린 UI를 선택**한다(543). 트리 줄의 삭제 아이콘은 그 줄을
+            //  선택하지 않으므로, 대상을 안 남기면 딴 줄이 선택된 채 복원된다.
+            //  다시하기(재삭제) 때는 그 UI가 없으므로 기존 폴백(선택 유지 → 부모)이 걸려 원본과 같다.
+            oAPP.fn.fnWs20PushUndo({ OBJID: oNode.OBJID });
             // 미리보기 제거(가드, 시그니처 1:1)
             _removeNodePreview(oNode);
             // [BR26] 하위 UI 를 oAPP.attr.prev 에서 재귀 제거(원본 재귀 삭제 1:1). 최상위는 _removeNodePreview 가 이미 제거.
@@ -639,7 +689,9 @@
             _broadBusy(true);
             function lf_do(act) {
                 if (act !== "YES") { _broadBusy(false); return; }   // 취소 → 잠금 해제.
-                oAPP.fn.fnWs20PushUndo();
+                //[BR62-C] 다건 삭제도 되돌리기 대상을 남긴다 — 원본 추가 처리도 대표 1건만 선택하므로
+                //  체크된 것 중 **첫 번째**를 기준으로 한다(undoRedo.js 543 과 동일 의미).
+                oAPP.fn.fnWs20PushUndo((aChecked[0] && aChecked[0].OBJID) ? { OBJID: aChecked[0].OBJID } : undefined);
                 // bottom-up(자식 먼저) 재귀 삭제 — 구 lf_delSelLine: chk===true 노드만 제거.
                 (function del(arr) {
                     if (!arr) { return; }
@@ -706,7 +758,37 @@
      * 위/아래 이동 (구 contextMenuUiMove) — 형제 배열 내 순서 변경.
      *   sDir: "-" 위로 / "+" 아래로
      ********************************************************************/
-    function _moveUI(oNode, sDir) {
+    /********************************************************************
+     * [BR59-2] 컨텍스트 메뉴 이동의 미리보기 반영 — 원본 contextMenuUiMove 546~592 1:1.
+     *   원본 순서: ① 미리보기에서 대상 UI 제거(prevRemoveUiObject) → ② 다시 생성
+     *   (reCreateUIObjInstance) → ③ 부모 "그리기 완료" 대기 등록 → ④ 새 위치로 이동
+     *   (moveUIObjPreView) → ⑤ 부모 다시 그리기 + 완료 대기(글자편집기 포함).
+     *   ★ 이 대기가 끝난 뒤에야 선택을 해야, 미리보기가 새 위치로 화면 이동(스크롤)한다.
+     *     미리보기 선택 표시(fn_mark)가 선택 UI 에 focus 를 주어 브라우저가 그 자리로
+     *     스크롤하는 구조라, 아직 새 자리에 다시 그려지기 전이면 옛 자리/무반응이 된다.
+     *     (UI 추가 경로도 동일 — 다 그린 뒤 await 선택. 원본 599 await setSelectTreeItem)
+     ********************************************************************/
+    async function _movePreviewAndWait(oNode, aSib) {
+        var oParent = _node(oNode.POBID);
+        // ① 미리보기 UI 제거(원본 562).
+        try {
+            if (oAPP.oDesign && oAPP.oDesign.fn && typeof oAPP.oDesign.fn.prevRemoveUiObject === "function") {
+                await oAPP.oDesign.fn.prevRemoveUiObject(oNode);
+            }
+        } catch (e) { console.error("[HTML5][WS20][move] 미리보기 UI 제거:", e && e.message ? e.message : e); }
+        // ② UI 다시 생성(원본 565).
+        try {
+            if (typeof oAPP.fn.reCreateUIObjInstance === "function") { oAPP.fn.reCreateUIObjInstance(oNode); }
+        } catch (e) { console.error("[HTML5][WS20][move] 미리보기 UI 재생성:", e && e.message ? e.message : e); }
+        // ③~⑤ 대기 등록 → 이동 반영 → 다시 그리기 + 완료 대기(원본 568~592).
+        //   위치값은 같은 그룹 형제 기준 index(BR59). aSib 는 이미 이동 완료된 배열.
+        var iIdx = _aggrPrevIndex(aSib, oNode);
+        await _rerenderParentRTE(oParent, function () {
+            _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, iIdx, oNode.ISMLB, oNode.UIOBK]);
+        });
+    }
+
+    async function _moveUI(oNode, sDir) {
         if (!oNode || !_isEdit()) { return; }
         var oParent = _node(oNode.POBID);
         if (!oParent || !oParent.zTREE) { return; }
@@ -718,28 +800,31 @@
         // [BR59] 이동 전, 같은 그룹(aggregation) 형제 안에서의 위치 기록(원본 contextMenuUiMove l_indx1).
         var iAggrBefore = _aggrPos(aSib, oNode);
         _broadBusy(true);   // 자식창 잠금(원본 이동 시 BUSY_ON)
-        // ★ BR17: on 이후 어느 동기 예외가 나도 BUSY_OFF 에 반드시 도달하도록 try/finally 로 감싼다
+        // ★ BR17: on 이후 어느 예외가 나도 BUSY_OFF 에 반드시 도달하도록 try/finally 로 감싼다
         //   (미리보기 우클릭 위/아래도 이 경로로 위임 → 예외 후 화면 잠김 재발 방지).
         try {
-            oAPP.fn.fnWs20PushUndo();
+            // [BR59-3] 이동 대상 UI 를 기록 → 되돌리기/다시하기 후 그 UI 가 다시 선택된다(원본 599).
+            oAPP.fn.fnWs20PushUndo({ OBJID: oNode.OBJID });
             aSib.splice(idx, 1);
             aSib.splice(newIdx, 0, oNode);
             _refreshTree();
-            // [BR59] 미리보기 순서 반영 — 시그니처: (OBJID, UILIB, POBID, PUIOK, UIATT, POSIT, ISMLB, UIOBK).
-            //   POSIT 은 전체 자식순서(newIdx)가 아니라 "같은 그룹 형제 기준 index"(_aggrPrevIndex)로 넘긴다.
-            //   그룹 내 위치가 실제로 바뀐 경우에만 반영(다른 그룹 형제만 지나친 경우 미리보기 그룹 순서는 그대로
-            //   = 원본 l_indx1!==l_indx2 가드). 그러면 트리와 미리보기의 표시 순서가 일치한다.
+            // [BR59] 미리보기 순서 반영 — 위치값은 전체 자식순서(newIdx)가 아니라 "같은 그룹 형제 기준
+            //   index". 그룹 내 위치가 실제로 바뀐 경우에만 반영(다른 그룹 형제만 지나친 경우 미리보기
+            //   그룹 순서는 그대로 = 원본 l_indx1!==l_indx2 가드).
             var iAggrAfter = _aggrPos(aSib, oNode);
             if (iAggrBefore !== iAggrAfter) {
-                _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, _aggrPrevIndex(aSib, oNode), oNode.ISMLB, oNode.UIOBK]);
+                // [BR59-2] 제거→재생성→이동→다시 그리기 완료까지 대기(원본 546~592).
+                await _movePreviewAndWait(oNode, aSib);
             }
-            _selectNode(oNode.OBJID);
+            // [BR59-2] ★다 그린 뒤에 선택(원본 599 await setSelectTreeItem) — 선택이 미리보기
+            //   해당 UI 에 focus 를 주어 그 자리로 화면 이동(스크롤)까지 일으킨다.
+            await _selectNode(oNode.OBJID);
             _markChanged();
             // [F-7] 바인딩 팝업(별창) 반영 — 위/아래 이동(_moveUI) 경로가 반영을 누락했었다(deep dive 2교 2026-07-29).
             //   드롭 이동엔 있었으나 컨텍스트메뉴 위/아래 이동만 빠짐. 팝업 미오픈이면 no-op.
             try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
         } finally {
-            _broadBusy(false);   // 짝 BUSY_OFF (예외에도 반드시 해제)
+            _broadBusy(false);   // 짝 BUSY_OFF (예외에도 반드시 해제. WP1: 렌더 완료 후 해제)
         }
     }
     // ★ BR17: 미리보기 우클릭 "위/아래" 이동이 트리와 동일한 이 HTML5 경로로 위임하도록 노출.
@@ -1084,7 +1169,7 @@
                 return;
             }
 
-            oAPP.fn.fnWs20PushUndo();
+            var _oInsSnap = oAPP.fn.fnWs20PushUndo();
 
             var oInfo = {};
             try { oInfo = parent.getAppInfo() || {}; } catch (e) { }
@@ -1177,6 +1262,9 @@
             await _rerenderParentRTE(is_tree);
 
             _refreshTree();
+            // [BR59-4] 되돌리기 대상 = 방금 추가한 UI(원본 CL_INSERT_UI 543 과 동일 기준).
+            //   이름이 삽입 루프에서 정해지므로 여기서 새겨 넣는다.
+            try { if (lastObjid && typeof oAPP.fn.fnWs20SetUndoTarget === "function") { oAPP.fn.fnWs20SetUndoTarget({ OBJID: lastObjid }, _oInsSnap); } } catch (e) { }
             // ★ 원본 designAddUIObject 5681 은 선택을 await 한다(await setSelectTreeItem). 이식본이 await 를
             //   빠뜨려, 트리·미리보기 갱신과 선택 표시가 완료되기 전에 다음 처리로 넘어가던 문제 복원(WP1: 전환 완료 후 후속).
             if (lastObjid) { await _selectNode(lastObjid); }
@@ -1934,7 +2022,7 @@
      *   ★ 트리 위치이동(_moveUIPosition)과 완전히 동일한 이동 절차(스냅샷 되돌리기 + 미리보기 반영 +
      *     선택 + 변경플래그 + 바인딩팝업 반영 + 자식창 BUSY 짝). 동일 위치면 no-op.
      ********************************************************************/
-    oAPP.fn.fnWs20MoveUIToIndex = function (oNode, iTarget) {
+    oAPP.fn.fnWs20MoveUIToIndex = async function (oNode, iTarget) {
         if (!oNode || !_isEdit()) { return; }
         var oParent = _node(oNode.POBID);
         if (!oParent || !oParent.zTREE) { return; }
@@ -1951,17 +2039,20 @@
         _broadBusy(true);   // 자식창 잠금(원본 위치 이동 시 BUSY_ON)
         // ★ on 이후 전 구간을 try/finally 로 감싸 동기 예외에도 BUSY_OFF 도달 보장(위/아래 _moveUI 와 대칭).
         try {
-            oAPP.fn.fnWs20PushUndo();
+            // [BR59-3] 이동 대상 UI 를 기록 → 되돌리기/다시하기 후 그 UI 가 다시 선택된다(원본 599).
+            oAPP.fn.fnWs20PushUndo({ OBJID: oNode.OBJID });
             aSib.splice(iCur, 1);
             aSib.splice(iTarget, 0, oNode);
             _refreshTree();
-            // [BR59] 미리보기 위치는 전체 자식순서(iTarget)가 아니라 "같은 그룹 형제 기준 index"(_aggrPrevIndex)로.
+            // [BR59] 미리보기 위치는 전체 자식순서(iTarget)가 아니라 "같은 그룹 형제 기준 index".
             //   그룹 내 위치가 실제로 바뀐 경우에만 반영(원본 l_indx1!==l_indx2 가드) → 트리·미리보기 순서 일치.
             var iAggrAfter = _aggrPos(aSib, oNode);
             if (iAggrBefore !== iAggrAfter) {
-                _prev("moveUIObjPreView", [oNode.OBJID, oNode.UILIB, oNode.POBID, oNode.PUIOK, oNode.UIATT, _aggrPrevIndex(aSib, oNode), oNode.ISMLB, oNode.UIOBK]);
+                // [BR59-2] 제거→재생성→이동→다시 그리기 완료까지 대기(위/아래 경로와 동일, 원본 546~592).
+                await _movePreviewAndWait(oNode, aSib);
             }
-            _selectNode(oNode.OBJID);
+            // [BR59-2] ★다 그린 뒤에 선택(원본 599) — 미리보기가 새 위치로 화면 이동(스크롤)한다.
+            await _selectNode(oNode.OBJID);
             _markChanged();
             // 바인딩 팝업 반영(팝업 미오픈이면 no-op). 이 왕복이 미리보기 팝업의 부모 BUSY 도 해제한다.
             try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }

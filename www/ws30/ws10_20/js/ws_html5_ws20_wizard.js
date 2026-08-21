@@ -156,7 +156,7 @@
     function _aggrCb(oReturn, ls_parent, aggr, fnCallback) {
 
         // 편집 직전 undo 스냅샷 (원본 saveActionHistoryData("WIZARD_INSERT") 대체 — HTML5 단일스택).
-        try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } } catch (e) { }
+        var _oWizSnap; try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { _oWizSnap = oAPP.fn.fnWs20PushUndo(); } } catch (e) { }
 
         var l_OBJID;
         try {
@@ -185,6 +185,10 @@
         //   P13n 드롭 ws_html5_ws20_dnd.js 1061~1070 과 동일 — 재귀형이라 부모 1회로 서브트리 전체 적용)
         //   ★직접 visible_add=true 금지 → 반드시 공통 데코 경유(ROOT/leaf 규칙 반영).
         _decorate(ls_parent);
+
+        // [BR59-4] 되돌리기 대상 = 이번에 만든 UI(원본 CL_INSERT_UI 543 기준). 이름이 위에서
+        //   정해지므로 여기서 새겨 넣는다(되돌리기 방향에선 그 UI 가 없어 기존 폴백이 걸린다).
+        try { if (l_OBJID && typeof oAPP.fn.fnWs20SetUndoTarget === "function") { oAPP.fn.fnWs20SetUndoTarget({ OBJID: l_OBJID }, _oWizSnap); } } catch (e) { }
 
         // 후속 처리(트리/미리보기 갱신) → 성공 콜백.
         _wizFinish(l_OBJID).then(function () {

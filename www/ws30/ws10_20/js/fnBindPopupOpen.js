@@ -212,7 +212,8 @@
 
       try {
         //UNDO 1회(원본 5646행 CHANGE_ATTR — AppID+AppDesc 를 한 스텝으로).
-        if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
+        // [BR59-4] 되돌리기 대상 = 값이 바뀌는 그 UI 와 그 속성 줄(원본 CL_CHANGE_ATTR 2278 기준).
+        if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr && is_attr.OBJID ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK || "" } : undefined); }
 
         //APPLICATION ID 매핑 + ATTR 변경(undo 는 위에서 1회 → skip).
         is_attr.UIATV = param.APPID != null ? param.APPID : "";
@@ -279,7 +280,8 @@
 
       try {
         //UNDO 1회(원본 5865행 CHANGE_ATTR — F4HelpID+ReturnField 한 스텝).
-        if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); }
+        // [BR59-4] 되돌리기 대상 = 값이 바뀌는 그 UI 와 그 속성 줄(원본 CL_CHANGE_ATTR 2278 기준).
+        if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr && is_attr.OBJID ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK || "" } : undefined); }
 
         //F4 HELP 선택 SHLPNAME 매핑 + ATTR 변경(undo skip).
         is_attr.UIATV = param.SHLPNAME != null ? param.SHLPNAME : "";

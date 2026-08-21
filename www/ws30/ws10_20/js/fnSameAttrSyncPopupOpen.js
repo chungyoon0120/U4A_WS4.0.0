@@ -373,7 +373,8 @@
         }
 
         //★ UNDO: 대상+소스 전체를 한 단위로 — 변경 "직전" 상태를 1회만 적재.
-        try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } }
+        // [BR59-4] 되돌리기 대상 = 값이 바뀌는 그 UI 와 그 속성 줄(원본 CL_CHANGE_ATTR 2278 기준).
+        try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr && is_attr.OBJID ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK || "" } : undefined); } }
         catch (e) { console.warn("[HTML5][WS20][sameAttr] undo push skip:", e && e.message); }
 
         try {

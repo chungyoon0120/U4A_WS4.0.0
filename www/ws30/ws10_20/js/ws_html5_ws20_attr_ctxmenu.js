@@ -362,7 +362,8 @@
             //★ UNDO: T_CEVT 삭제 "전" 에 스냅샷 1회. 삭제 후(=fnWs20AttrChange 내부) push 하면
             //  스냅샷이 이미 지워진 T_CEVT 를 담아 UNDO 로 이벤트 소스가 복원되지 않는다.
             //  → 여기서 먼저 push 하고, fnWs20AttrChange 는 bSkipUndo=true 로 재-push 방지(M03 과 동일 패턴).
-            try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } }
+            // [BR59-4] 되돌리기 대상 = 값이 바뀌는 그 UI 와 그 속성 줄(원본 CL_CHANGE_ATTR 2278 기준).
+            try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr && is_attr.OBJID ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK || "" } : undefined); } }
             catch (e) { console.warn("[HTML5][WS20][attr] undo push skip:", e && e.message); }
 
             try { oAPP.fn.attrDelClientEvent(is_attr, l_OBJTY); }

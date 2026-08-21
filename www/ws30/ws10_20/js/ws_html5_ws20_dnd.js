@@ -1119,7 +1119,7 @@
 
         var w = _frameWin();
 
-        _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } });
+        var _oUndoSnap = _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { return oAPP.fn.fnWs20PushUndo(); } });
 
         if (!is_target.zTREE) { is_target.zTREE = []; }
 
@@ -1261,6 +1261,8 @@
         await oAPP.fn.designRefershModel();
         _safe(function () { if (typeof oAPP.fn.setChangeFlag === "function") { oAPP.fn.setChangeFlag(); } });
         _safe(function () { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } });
+        // [BR59-4] 되돌리기 대상 = 이번에 붙여 넣은 최상위 UI(원본 CL_INSERT_UI 543 기준).
+        _safe(function () { if (ls_top && typeof oAPP.fn.fnWs20SetUndoTarget === "function") { oAPP.fn.fnWs20SetUndoTarget({ OBJID: ls_top.OBJID }, _oUndoSnap); } });
         if (ls_top) { _safe(function () { if (typeof oAPP.fn.setSelectTreeItem === "function") { return oAPP.fn.setSelectTreeItem(ls_top.OBJID); } }); }
     }
 
@@ -1291,7 +1293,8 @@
             }
 
             // UNDO (HTML5 단일스택).
-            _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } });
+            // [BR59-4] 되돌리기 대상 = 끌어온 UI(원본 CL_DRAG_DROP 1758·1924 `setSelectTreeItem(S_DRAG.OBJID)` 기준).
+            _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo({ OBJID: i_drag.OBJID }); } });
 
             var w = _frameWin();
             var l_funcnm = oAPP.fn.getUIAttrFuncName(oAPP.attr.prev[i_drag.POBID], "3", i_drag.UIATT, "_sIndexGetter");
@@ -1365,8 +1368,10 @@
         if (typeof l_parentC === "undefined") { _exit(); return; }
         var l_indx = l_parentC.zTREE.findIndex(function (a) { return a.OBJID === i_drag.OBJID; });
         if (l_indx === -1) { _exit(); return; }
+            // [BR59-4] 되돌리기 대상 = 끌어온 UI(원본 CL_DRAG_DROP 1758·1924 `setSelectTreeItem(S_DRAG.OBJID)` 기준).
 
-        _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } });
+        // [BR59-4] 되돌리기 대상 = 끌어온 UI(원본 CL_DRAG_DROP 1758·1924 기준).
+        _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo({ OBJID: i_drag.OBJID }); } });
 
         var wC = _frameWin();
 
@@ -1583,7 +1588,7 @@
         var ls_copy = lf_copy0014(is_t, is_p, aggrParam);
 
         // UNDO (HTML5 단일스택 — 원본 undoRedo COPY 대체).
-        _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } });
+        var _oUndoSnap = _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { return oAPP.fn.fnWs20PushUndo(); } });
 
         await _rerenderParent(is_p);
 
@@ -1591,6 +1596,8 @@
         oAPP.fn.designDragEnd();
         oAPP.fn.setChangeFlag();
         oAPP.fn.updateBindPopupDesignData();
+        // [BR59-4] 되돌리기 대상 = 이번에 붙여 넣은 UI(원본 CL_INSERT_UI 543 기준).
+        _safe(function () { if (ls_copy && typeof oAPP.fn.fnWs20SetUndoTarget === "function") { oAPP.fn.fnWs20SetUndoTarget({ OBJID: ls_copy.OBJID }, _oUndoSnap); } });
         if (ls_copy) { await oAPP.fn.setSelectTreeItem(ls_copy.OBJID); }
         // 272 &1 has been copied.
         _toast("I", _msg("/U4A/MSG_WS", "272", "UI"));
