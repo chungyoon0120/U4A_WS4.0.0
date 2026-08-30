@@ -1729,18 +1729,7 @@
             _clearErr();
 
             //OBJECT ID 변경전 UNDO 이력 추가. (원본 4288행 saveActionHistoryData("CHANGE_OBJID") → 단일 스냅샷 스택)
-            //[BR62-A] 되돌리기 대상 = **되돌린 뒤의 이름**(= 바꾸기 전 옛 이름).
-            //  여기서 대상을 안 남기면, 복원 시 앵커가 "그때 선택돼 있던 이름"으로 잡히는데
-            //  그 값은 이미 **새 이름**이라 되돌린 트리에 없다 → 부모(예: PAGE1)로 선택이 튄다.
-            //  옛 이름을 남기면 되돌리기는 그 줄을 그대로 찾고, 다시하기는 옛 이름이 없어
-            //  기존 폴백(그때 선택 = 새 이름)이 걸려 **양방향 모두 같은 UI**가 선택된다.
-            //  ★UIATK 는 주지 않는다 — 원본 이름변경 되돌리기(undoRedo.js CL_CHANGE_OBJID 1405~1560)에는
-            //    속성 줄로 이동하는 처리가 없다(전 구간 setSelectTreeItem 부재).
-            try {
-                if (typeof oAPP.fn.fnWs20PushUndo === "function") {
-                    oAPP.fn.fnWs20PushUndo(ls_uiinfo.OBJID_bf ? { OBJID: ls_uiinfo.OBJID_bf } : undefined);
-                }
-            } catch (e) { }
+            try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(); } } catch (e) { }
 
             oAPP.attr.prev = oAPP.attr.prev || {};
 

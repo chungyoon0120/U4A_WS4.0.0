@@ -1520,28 +1520,13 @@
         // 멀티 푸터 메시지가 있을 경우 닫기
         APPCOMMON.fnMultiFooterMsgClose();
 
-        // 예외검증(chkExcepionAttr). 원본 1317행은 감싸지 않고 직접 호출한다 — 점검이 실패하면
-        //   예외가 그대로 터져 활성화도 진행되지 않는다(fail-closed).
-        // [BR55] 기존 HTML5 는 이 호출을 try/catch 로 감싸 점검 실패를 조용히 삼켰고(오류 0건 취급),
-        //   그 결과 오류가 있는 앱이 그대로 활성화될 여지가 있었다. 점검 실패는 삼키지 말고
-        //   구간 오류코드로 표면화한 뒤 활성화를 중단한다(조용한 catch 금지 규칙).
-        //   ※ chkExcepionAttr 첫 줄 attrClearErrorField() 가 값칸 오류표시를 지우며 속성행을 다시 그린다
-        //     (attrClearErrorField 가 항상 재렌더 — 원본 refresh 대응). 실행 후 정상값 칸은 빨간이 사라진다.
+        // [HTML5] 예외검증은 design 모듈(chkExcepionAttr)에 의존 — 미로드/오류 시 검증 skip.
+        //   chkExcepionAttr 첫 줄 attrClearErrorField() 가 값칸 오류표시를 지우며 속성행을 다시 그린다
+        //   (attrClearErrorField 가 항상 재렌더 — 원본 refresh 대응). 실행 후 정상값 칸은 빨간이 사라진다.
         let T_excep = [];
         try {
-            if (typeof oAPP.fn.chkExcepionAttr !== "function") {
-                throw new Error("oAPP.fn.chkExcepionAttr 미정의(예외 점검 모듈 미로드)");
-            }
-            T_excep = oAPP.fn.chkExcepionAttr() || [];
-        } catch (e) {
-            //[BR55] 점검 실패 = 검증되지 않은 상태 → 활성화 중단(fail-closed). busy·Lock 은 여기서 원복.
-            console.error("[WS20ACT-CHK01] 실행 전 예외 점검(chkExcepionAttr) 실패 — 활성화 중단:", e);
-            try { oAPP.common.fnSetBusyLock(""); } catch (e2) { console.error("[WS20ACT-CHK01] busy 해제 실패:", e2 && e2.message); }
-            //화면 안내는 추적 코드만 표시(내부 예외 원문 노출 금지 — 상세는 콘솔에 있음).
-            //  정식 안내 문구 키는 장군님 번호 지정 대기(임의 문구·키 생성 금지).
-            try { parent.showMessage(null, 10, "E", "WS20ACT-CHK01"); } catch (e3) { console.error("[WS20ACT-CHK01] 오류 안내 표시 실패:", e3 && e3.message); }
-            return;
-        }
+            if (typeof oAPP.fn.chkExcepionAttr === "function") { T_excep = oAPP.fn.chkExcepionAttr() || []; }
+        } catch (e) { console.warn("[HTML5][WS20] chkExcepionAttr skip:", e && e.message); }
 
         let iexceplength = T_excep.length;
 
@@ -1549,21 +1534,11 @@
 
             // // 자식 윈도우 활성화
             // oAPP.fn.fnChildWindowShow(true);
-
+            
             // 멀티푸터 메시지 실행
             // 이 안에서 화면이 로드가 완료되면
             // IPC로 비지 끄는 로직 있음
-            //[BR55] 오류목록 표시 실패도 조용히 넘기지 않는다(표시가 죽으면 busy 가 풀리지 않아 화면이 멈춘다).
-            try {
-                if (typeof oAPP.fn.fnMultiFooterMsg !== "function") {
-                    throw new Error("oAPP.fn.fnMultiFooterMsg 미정의(오류목록 표시 모듈 미로드)");
-                }
-                oAPP.fn.fnMultiFooterMsg(T_excep);
-            } catch (e) {
-                console.error("[WS20ACT-CHK02] 예외 점검 오류목록 표시 실패:", e);
-                try { oAPP.common.fnSetBusyLock(""); } catch (e2) { console.error("[WS20ACT-CHK02] busy 해제 실패:", e2 && e2.message); }
-                try { parent.showMessage(null, 10, "E", "WS20ACT-CHK02"); } catch (e3) { console.error("[WS20ACT-CHK02] 오류 안내 표시 실패:", e3 && e3.message); }
-            }
+            try { if (oAPP.fn.fnMultiFooterMsg) { oAPP.fn.fnMultiFooterMsg(T_excep); } } catch (e) { }
 
             // 작업표시줄 깜빡임
             _ws20FlashFrame();

@@ -1046,18 +1046,7 @@
   background: var(--ws20-sel-bg);
   color: var(--selected-text);
   font-weight: 600;
-  position: relative;               /* 아래 좌측 선택 줄(::before)의 기준 */
-}
-/* [BR53] 좌측 선택 줄 — 종전엔 이 줄을 box-shadow 로 그렸는데, 값이 바뀐 줄(.changeValue)이
-   같은 box-shadow 자리를 뒤에서 덮어써 **마우스를 올렸을 때만 파란 줄이 나타났다가 떼면 사라지는**
-   들쭉날쭉이 있었다(마우스 올림 규칙이 한 단계 더 세서 그때만 이김).
-   값이 바뀐 줄의 움푹한 표시와 자리를 다투지 않도록 줄을 따로 그린다 → 마우스와 무관하게 항상 보인다. */
-.u4aWs20AttrRow[aria-selected="true"]::before {
-  content: "";
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: 0.1875rem;
-  background: var(--accent);
-  pointer-events: none;
+  box-shadow: inset 0.1875rem 0 0 0 var(--accent);
 }
 /* 선택 행의 라벨 글자도 선택 글자색을 따르게(라벨은 별도 색을 갖고 있어 함께 지정). */
 .u4aWs20AttrRow[aria-selected="true"] .u4aWs20AttrLblTxt { color: var(--selected-text); }

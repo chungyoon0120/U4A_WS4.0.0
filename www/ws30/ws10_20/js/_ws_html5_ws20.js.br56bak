@@ -59,47 +59,6 @@
     }
 
     /************************************************************************
-     * [BR56] Syntax Check 예외 시 로딩 표시(busy) 미해제 방지 — 원본 무수정 래핑
-     * ----------------------------------------------------------------------
-     *  원본 oAPP.events.ev_pressSyntaxCheckBtn(ws_events.js:1304~)은 시작 시
-     *  fnSetBusyLock("X") 로 로딩 표시를 켠 뒤 곧바로 chkExcepionAttr() 를 동기 호출한다.
-     *  그 점검이 예외를 던지면 busy 해제 코드에도, 오류 메시지 팝업(인계 해제 경로)에도
-     *  도달하지 못해 화면이 로딩 표시로 잠긴 채 남는다(BR34 후속).
-     *
-     *  · 정상 오류 갈래(디자인 오류 / 서버 신텍스 오류)는 fnMultiFooterMsg 가 여는
-     *    오류 메시지 팝업 창이 busy 를 왕복 해제하는 established 패턴이므로 건드리지 않는다.
-     *  · 원본은 시작에서 busy 만 켜고 자식 창 broadcast(BUSY_ON)는 보내지 않으므로,
-     *    예외 갈래에서도 그 대칭인 fnSetBusyLock("") 만 내려 켠 만큼만 되돌린다
-     *    (broadcast BUSY_OFF 는 짝이 없어 보내지 않는다).
-     *  · 원본 파일은 한 줄도 고치지 않는다(2026-08-18 지시). 이 파일은 ws_events.js "뒤"
-     *    (library-preload.js 67행 → 162행)에 로드되므로 여기서 함수를 감싸면, 이 핸들러를
-     *    부르는 상단 툴바 'Syntax Check' 버튼 클릭 경로가 이 래퍼를 탄다.
-     *    (참고: Ctrl+F2 단축키의 HTML5 재배선은 아래 getShortCutList super-wrap 맵에
-     *     아직 없어, 현재 단축키는 원본 UI5 경로(sap.byId)라 이 핸들러까지 도달하지 않는다.
-     *     추후 단축키가 이 핸들러를 직접 부르게 되면 자동으로 같은 보호를 받는다.)
-     *  · 오류는 삼키지 않고 [BR56] 코드로 콘솔에 표면화한다. 되던지지(rethrow) 않는 이유:
-     *    이 파일의 기존 오류처리(툴바 디스패처 189~194행, /app_delte eval 가드 등)와 동일하게
-     *    로그 후 진행하며, 미가드 호출자에서 window.onerror→APP.exit(앱 강제종료) 회귀를 피한다.
-     ************************************************************************/
-    (function () {
-        var fnOrigSyntaxCheck = oAPP.events && oAPP.events.ev_pressSyntaxCheckBtn;
-        if (typeof fnOrigSyntaxCheck !== "function") {
-            console.error("[HTML5][WS20][BR56] ev_pressSyntaxCheckBtn 원본 미정의 — 래핑 불가(로드 순서 확인)");
-            return;
-        }
-        oAPP.events.ev_pressSyntaxCheckBtn = function (oEvent) {
-            try {
-                return fnOrigSyntaxCheck.call(this, oEvent);
-            } catch (e) {
-                // 예외로 끝난 종료 분기 — 시작에서 켠 로딩 표시(fnSetBusyLock("X"))를 대칭 해제.
-                //   정상 오류(디자인/서버 신텍스)는 오류 메시지 팝업 창이 왕복 해제하므로 여기 안 옴.
-                console.error("[HTML5][WS20][BR56] Syntax Check 처리 중 예외 → 로딩 표시 해제:", e && e.message, e);
-                try { oAPP.common.fnSetBusyLock(""); } catch (e2) { }
-            }
-        };
-    })();
-
-    /************************************************************************
      * WS20 윈도우 메뉴 데이터 (구 fnGetWindowMenuListWS20 / fnGetWindowMenuWS20 미러)
      *   sap-icon → FontAwesome 매핑. ws10_html.js 의 공유 buildMenubar 가 소비.
      ************************************************************************/
