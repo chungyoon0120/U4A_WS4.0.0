@@ -727,7 +727,7 @@
             return;
         }
         
-        loApp.ui.oFavIconPopup.setModal(true);
+        // loApp.ui.oFavIconPopup.setModal(true);
 
         //icon src 복사 처리.
         parent.setClipBoardTextCopy(oData.sList.ICON_SRC);
@@ -736,7 +736,7 @@
         // 272	&1 has been copied.
         parent.showMessage(sap, 10, "S", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "272", oData.sList.ICON_SRC, "", "", ""));
 
-        loApp.ui.oFavIconPopup.setModal(false);
+        // loApp.ui.oFavIconPopup.setModal(false);
 
     }   //복사버튼 선택 이벤트.
 

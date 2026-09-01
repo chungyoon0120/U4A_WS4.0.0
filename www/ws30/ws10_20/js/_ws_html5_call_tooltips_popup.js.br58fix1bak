@@ -1,0 +1,189 @@
+/* ********************************************************************
+ * [BR58] 도움말(Tooltips) 팝업 호출 — HTML5.
+ *
+ * 원본(as-is): design/js/callTooltipsPopup.js (140행) — 읽기 전용.
+ *   ★ 원본 파일은 한 줄도 고치지 않는다(원작 개발자가 design 폴더를 통째로
+ *     덮어쓰므로). 그래서 원본 폴더 "밖"인 이 파일에 동일 로직을 이식하고
+ *     oAPP.fn.callTooltipsPopup 을 여기서 정의한다.
+ *
+ * 배경:
+ *   원본은 서버에 U4A Help Document(공통코드 UHAK901369)가 등록돼 있으면
+ *   그쪽 팝업을 열고 return, 등록이 없는 구버전 서버에서만 이 도움말 창을
+ *   폴백으로 연다(uiPreviewArea.js 127~135 / uiAttributeArea.js 614~641 /
+ *   uiDesignArea.js 966~985). HTML5 는 그 폴백이 비어 있어 구버전 서버에서
+ *   도움말이 아예 뜨지 않았다 → 원본과 동일하게 복원.
+ *
+ * 원본 대비 바뀐 곳(이 2가지 뿐):
+ *   (1) parent.showMessage(sap, ...) → parent.showMessage(null, ...)
+ *       HTML5 에는 UI5 전역(sap)이 없다. 첫 인자는 표시 대상 지정용이며
+ *       null 이 HTML5 표준(다른 변환 파일 동일).
+ *   (2) 창 생성 자체가 실패할 때를 try/catch 로 감싸 오류를 표면화하고
+ *       busy 를 반드시 해제(코딩규칙: busy on 은 모든 종료 분기에서 off 짝,
+ *       조용한 catch 금지). 원본은 이 방어가 없어 실패 시 busy 가 남는다.
+ *
+ * 동작(원본 1:1):
+ *   ① 누른 버튼(oUi)이 없으면 단축키 잠금 해제 + busy 해제 후 종료
+ *   ② 언어별 도움말 HTML 경로 구성 — 없으면 안내 메시지(377) 후 종료
+ *   ③ 제목 = "Tooltips(E20) - 영역명(sCODE)"
+ *   ④ 별도 창(760x800, 모달 아님, 처음엔 투명)으로 그 HTML 을 열고
+ *      부모 창 가운데 배치 → 다 뜨면 보이기 + 서서히 나타내기
+ *      → 단축키 잠금 해제 + busy 해제
+ * ******************************************************************** */
+(function () {
+    "use strict";
+
+    if (typeof oAPP === "undefined" || !oAPP.fn) {
+        console.error("[WS20HELP-01] oAPP.fn 미구성 — 도움말 팝업 정의 실패.");
+        return;
+    }
+
+    /************************************************************************
+     * 도움말 팝업 호출. (원본 design/js/callTooltipsPopup.js 10행 1:1)
+     * **********************************************************************
+     * @param {object} oUi   - 도움말 팝업 선택 UI instance(HTML5 = 누른 버튼 DOM).
+     * @param {string} sArea - 도움말 HTML 문서명(prevTooltip/attrTooltip/designTooltip).
+     * @param {string} sCODE - 도움말 팝업 title 의 text element(E22/E23/E21).
+     ************************************************************************/
+    oAPP.fn.callTooltipsPopup = function (oUi, sArea, sCODE) {
+
+        //팝업 호출 ui가 존재하지 않는경우 exit. (원본 13~21행)
+        if (!oUi) {
+            _releaseLock();
+            return;
+        }
+
+        //도움말 html의 파일 경로 구성. (원본 24~31행)
+        var l_path = lf_setHTMLPath(sArea, sCODE);
+        if (!l_path) {
+            _releaseLock();
+            return;
+        }
+
+        //도움말 html 팝업 title 구성. (원본 34행)
+        var l_title = lf_setHTMLTitle(sCODE);
+
+        var opt = {
+            "height": 760,
+            "width": 800,
+            "modal": false,
+            "show": false,
+            "opacity": 0.0,
+            "minHeight": 750,
+            "minWidth": 500,
+            "icon": "www/img/logo.png",
+            "title": l_title,
+            "autoHideMenuBar": true,
+            "parent": parent.REMOTE.getCurrentWindow(),
+            "webPreferences": {
+                "devTools": true,
+                "nodeIntegration": true,
+                "contextIsolation": false,
+                "nativeWindowOpen": true,
+                "webSecurity": false
+            }
+        };
+
+        //[HTML5 보강] 창 생성/로드 실패 시 busy 가 남지 않도록 경계를 친다.
+        //  (원본에는 없는 방어 — 코딩규칙 "busy on 은 모든 종료 분기에서 off 짝".
+        //   오류는 삼키지 않고 추적 코드와 함께 표면화한다.)
+        var oWin;
+        try {
+
+            oWin = new parent.REMOTE.BrowserWindow(opt);
+
+            oWin.setMenu(null);
+
+            oWin.loadURL(l_path);
+
+            // 브라우저가 활성화 될 준비가 될때 타는 이벤트 (원본 66~71행)
+            oWin.once("ready-to-show", function () {
+
+                // 부모 위치 가운데 배치한다.
+                oAPP.fn.setParentCenterBounds(oWin, opt);
+
+            });
+
+            // 브라우저가 오픈이 다 되면 타는 이벤트 (원본 75~90행)
+            oWin.webContents.on("did-finish-load", function () {
+
+                oWin.show();
+
+                // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
+                parent.WSUTIL.setBrowserOpacity(oWin);
+
+                // 부모 위치 가운데 배치한다.
+                oAPP.fn.setParentCenterBounds(oWin, opt);
+
+                //단축키 잠금 해제처리.
+                _releaseLock();
+
+            });
+
+        } catch (e) {
+
+            console.error("[WS20HELP-02] 도움말 창 열기 실패 — 경로:", l_path, e);
+
+            try { parent.showMessage(null, 10, "E", "WS20HELP-02"); }
+            catch (e2) { console.error("[WS20HELP-02] 오류 안내 표시 실패:", e2 && e2.message); }
+
+            try { if (oWin && !oWin.isDestroyed()) { oWin.destroy(); } }
+            catch (e3) { console.error("[WS20HELP-02] 창 정리 실패:", e3 && e3.message); }
+
+            _releaseLock();
+        }
+
+    };  //도움말 팝업 호출.
+
+
+    //단축키 잠금 해제 + busy 해제. (원본이 종료 분기마다 반복하던 2줄을 한 곳으로)
+    function _releaseLock() {
+
+        try { oAPP.fn.setShortcutLock(false); }
+        catch (e) { console.error("[WS20HELP-03] 단축키 잠금 해제 실패:", e && e.message); }
+
+        try { parent.setBusy(""); }
+        catch (e) { console.error("[WS20HELP-03] busy 해제 실패:", e && e.message); }
+
+    }   //단축키 잠금 해제 + busy 해제.
+
+
+    //HTML PATH 구성. (원본 96~121행 1:1)
+    function lf_setHTMLPath(sArea, sCODE) {
+
+        var l_langu = parent.getUserInfo().LANGU;
+
+        //HTML파일 PATH 구성.
+        var l_path = parent.PATH.join(parent.REMOTE.app.getAppPath(), "ws30", "ws10_20", "design",
+            "html", "helper", l_langu, sArea, "index.html");
+
+        //HTML 파일이 존재하지 않는경우 EXIT.
+        if (parent.FS.existsSync(l_path) !== true) {
+
+            //377  &1 tooltips HTML file does not exist.
+            //  ★ 원본은 첫 인자로 UI5 전역(sap)을 넘겼으나 HTML5 에는 없다 → null.
+            parent.showMessage(null, 10, "E",
+                oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "377",
+                    oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", sCODE, "", "", "", ""), "", "", ""));
+
+            return;
+        }
+
+        //파일이 존재하는경우 path return.
+        return l_path;
+
+    }   //HTML PATH 구성.
+
+
+    //도움말 html 팝업 title 구성. (원본 125~137행 1:1)
+    function lf_setHTMLTitle(S_CODE) {
+
+        //E20  Tooltips
+        var l_txt = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "E20", "", "", "", "");
+
+        var l_stitle = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", S_CODE, "", "", "", "");
+
+        return l_txt + " - " + l_stitle;
+
+    }   //도움말 html 팝업 title 구성.
+
+})();

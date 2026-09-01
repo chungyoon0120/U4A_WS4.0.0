@@ -65,6 +65,7 @@ export async function attrPresetPopup(sParam){
         showHelpDocButton : true,
         u4aHelpDocMenuID : "000278",
         disableMaximize : true,
+        closeActionCode : "CANCEL",
         actions:[
         {
             ACTCD:"OK", 

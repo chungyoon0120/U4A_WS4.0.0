@@ -1098,7 +1098,22 @@
       });
 
        //서버이벤트 항목 매핑.
-      _sAttr.T_DDLB = _aEvent;
+      _sAttr.T_DDLB = JSON.parse(JSON.stringify(_aEvent));
+      
+      /**
+       * @since   2026-08-14 00:33:00
+       * @version vNAN-NAN
+       * @author  pes
+       * @description
+       * 서버이벤트 항목에 현재 선택된 값이 존재하지 않는경우 combobox에 현재 선택된 값을 추가하여
+       * 이후 combobox의 item 선택 시 selectedKey가 선택한 값으로 갱신 될 수 있게 처리함.
+       * (DDLB 항목에 현재 선택된 값이 존재하지 않는경우 DDLB의 다른 항목을 선택 하더라도
+       * 이전 선택된 값을 유지하는 문제가 발생함.)
+       */
+      if(_sAttr.T_DDLB.findIndex(item=>item.KEY === _sAttr.UIATV) === -1){
+        _sAttr.T_DDLB.push({KEY:_sAttr.UIATV, TEXT:_sAttr.UIATV, DESC:""});
+      }
+      
 
       _sAttr.valst = "None";
       _sAttr.valtx = "";
@@ -1109,6 +1124,8 @@
       
       //서버이벤트가 존재하는경우 현재 선택된 값이 서버이벤트 목록에 없는경우 오류 표현 처리.
       if(_sAttr.UIATV !== "" && _aEvent.findIndex(item=>item.KEY === _sAttr.UIATV) === -1){
+
+
         oAPP.fn.setAttrFocus(_sAttr.UIATK, "E");
       }
 
@@ -1880,8 +1897,8 @@
     }
 
 
-    //미리보기 ui 선택 처리
-    await oAPP.attr.ui.frame.contentWindow.selPreviewUI(_sTree.OBJID);
+    // //미리보기 ui 선택 처리
+    // await oAPP.attr.ui.frame.contentWindow.selPreviewUI(_sTree.OBJID);
 
 
     //design tree, attr table 갱신 대기.
@@ -1891,6 +1908,9 @@
     //20240621 pes.
     //바인딩 팝업의 디자인 영역 갱신처리.
     oAPP.fn.updateBindPopupDesignData();
+
+    //미리보기 ui 선택 처리
+    await oAPP.attr.ui.frame.contentWindow.selPreviewUI(_sTree.OBJID);
 
   
   }; //attribute 입력건에 대한 처리.
@@ -1908,9 +1928,22 @@
    ************************************************************************/
   oAPP.fn.attrChangeProc = function(is_attr, uityp, bSkipRefresh, bForceUpdate){
 
+
     //화면에서 UI추가, 이동, 삭제 및 attr 변경시 변경 flag 처리.
     oAPP.fn.setChangeFlag();
 
+    
+    /**
+     * @since   2026-08-10 16:50:00
+     * @version vNAN-NAN
+     * @author  pes
+     * @description
+     * 툴바의 바인딩 팝업 버튼을 통해 바인딩 팝업을 호출한 상태에서
+     * attribute 영역의 바인딩 팝업, 서버이벤트 팝업 등을 호출한뒤
+     * 툴바의 바인딩 팝업에서 바인딩 처리를 진행하는 경우 attribute 영역에서
+     * 호출한 팝업에서 처리한 내용이 해당 attribute에 반영되지 않는 문제점이 발생하여
+     * 해당 attribute에 대한 모델의 데이터를 갱신하는 로직을 추가함.
+     */
     let _pos = oAPP.attr.oModel.oData.T_ATTR.findIndex( item => item.UIATK === is_attr.UIATK );
 
     if(_pos !== -1){
@@ -1920,7 +1953,7 @@
 
     }
 
-
+    
     var _oDesignChkModule = parent.require(
       parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "js", "checkAppData", "designTreeData.js"));
 
@@ -1939,6 +1972,19 @@
 
       //기존 입력값을 DEFAULT 값으로 변경.
       is_attr.UIATV = oAPP.DATA.LIB.T_0023.find( a => a.UIATK === is_attr.UIATK )?.DEFVL || "";
+
+      /**
+       * @since   2026-08-19 16:36:03
+       * @version vNAN-NAN
+       * @author  pes
+       * @description
+       * 프로퍼티 속성값 변경시 designTreeData.js에서 점검 처리 후 오류가 발생하여
+       * 입력값을 default 값으로 변경시 combobox의 value 프로퍼티의 바인딩된 값도
+       * 같이 default 값으로 설정하도록 처리함.
+       */
+      if(uityp === "DDLB"){
+        is_attr.comboval = is_attr.UIATV;
+      }
 
 
     }
@@ -2375,6 +2421,7 @@
 
     //trial 인경우 exit.
     if(oAPP.fn.fnOnCheckIsTrial()){return;}
+
 
     //B18  Data Binding / Unbinding
     var l_title = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B18", "", "", "", "") + " - ";
@@ -4312,6 +4359,15 @@
 
     //UI의 OBJECT ID매핑건 변경 처리.
     oAPP.attr.prev[ls_uiinfo.OBJID]._OBJID = ls_uiinfo.OBJID;
+
+    /**
+     * @since   2026-08-13 23:53:59
+     * @version vNAN-NAN
+     * @author  pes
+     * @description
+     * 변경된 이름의 UI에 customData에 등록된 OBJID를 변경된 이름으로 매핑 처리.
+     */
+    oAPP.attr.prev[ls_uiinfo.OBJID].data('OBJID', ls_uiinfo.OBJID);
 
     //이전 이름의 UI 제거.
     delete oAPP.attr.prev[ls_uiinfo.OBJID_bf];
@@ -6986,12 +7042,35 @@
 
       //수집건은 존재하나 값이 존재하지 않는경우.
       if(ls_0015.UIATV === ""){
-        ls_0015.UIAT = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
+        /**
+         * @since   2026-08-18 16:01:29
+         * @version vNAN-NAN
+         * @author  pes
+         * @description
+         * sap.m.UploadCollection, sap.ui.unified.FileUploader UI의 uploadUrl 프로퍼티 기본값을
+         * 매핑하여 프로퍼티의 DEFAULT 값으로 설정하는 로직에서 잘못된 필드에 값을 매핑 하였기에 수정 처리함
+         */
+        // ls_0015.UIAT = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
+        ls_0015.UIATV = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
         return;
       }
 
+      /**
+       * @since   2026-08-18 16:12:52
+       * @version vNAN-NAN
+       * @author  pes
+       * @description
+       * sap.m.UploadCollection, sap.ui.unified.FileUploader UI의 uploadUrl 프로퍼티 기본값이
+       * /zu4a_srs/ 으로 시작하는지 여부를 판단하는 로직 변경 처리.
+       * (대소문자 구분없이 판단하도록 처리)
+       */
+      // //uploadUrl 프로퍼티의 값이 U4A에서 기본 세팅한 값이 아닌경우 EXIT.
+      // if(ls_0015.UIATV.indexOf("/zu4a_srs/") === -1){
+      //   return;
+      // }
+
       //uploadUrl 프로퍼티의 값이 U4A에서 기본 세팅한 값이 아닌경우 EXIT.
-      if(ls_0015.UIATV.indexOf("/zu4a_srs/") === -1){
+      if(!ls_0015.UIATV.toUpperCase().startsWith("/ZU4A_SRS/")){
         return;
       }
 
@@ -7000,8 +7079,17 @@
 
       //기존의 프로퍼티에 등록한 application id와 현재 application id가 다른경우.
       if(l_appid !== oAPP.attr.appInfo.APPID){
+        /**
+         * @since   2026-08-18 16:01:29
+         * @version vNAN-NAN
+         * @author  pes
+         * @description
+         * sap.m.UploadCollection, sap.ui.unified.FileUploader UI의 uploadUrl 프로퍼티 기본값을
+         * 매핑하여 프로퍼티의 DEFAULT 값으로 설정하는 로직에서 잘못된 필드에 값을 매핑 하였기에 수정 처리함
+         */
         //현재 application id로 매핑 처리.
-        ls_0015.UIAT = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
+        // ls_0015.UIAT = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
+        ls_0015.UIATV = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
       }
 
       return;

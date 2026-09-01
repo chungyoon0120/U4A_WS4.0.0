@@ -84,7 +84,7 @@
     oCtx.attr.UIATV = (oUI.sw && oUI.sw.checked) ? "X" : "";
 
     // 원본 attrChangeProc(is_attr,…) 대응 — HTML5 통합 변경 처리(변경표시/수집/재렌더/undo).
-    try { oAPP.fn.fnWs20AttrChange(oCtx.attr, "INPUT"); }
+    try { oAPP.fn.fnWs20AttrChange(oCtx.attr, "INPUT", false, false, true); }   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 design/documents/callInitPreScreenPopup/index.js:185).
     catch (e) { console.error("[HTML5][WS20][InitPreScreen] attr 변경 처리 오류:", e && e.message); }
 
     // (원본 updateBindPopupDesignData: 바인딩 팝업 디자인 영역 갱신 — W4+ 미변환)

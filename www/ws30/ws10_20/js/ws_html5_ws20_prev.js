@@ -881,6 +881,288 @@
     };
 
     /************************************************************************
+     * [HTML5] "UI5 미리 정의된 CSS" 여러 UI 적용 — 원본 함수 덮어쓰기
+     * ---------------------------------------------------------------------
+     *  원본(design/js/uiPreviewArea.js prevStyleClassApply)은 우리 팝업이 필요로 하는 세 가지를
+     *  돌려주지 않는다. 2026-07 작업 때는 그 원본 사본을 직접 고쳤으나, 원본은 계속 갱신되므로
+     *  사본에 우리 코드를 두면 갱신 때마다 백업·재분석이 반복된다(장군님 지시 2026-08-31).
+     *  → 사본은 원본 그대로 두고, **원본이 로드된 뒤 같은 이름에 우리 것을 다시 대입**한다.
+     *
+     *  본문은 원본 최신본(2026-08-31 저장분 1307~1481행) 1:1. 아래 세 가지만 우리 추가:
+     *   ① 실제로 꾸밈을 반영한 UI 개수를 세어 돌려준다 → 0 이면 팝업이 "적용된 항목이 없습니다" 안내.
+     *   ② 고른 UI 중 꾸밈 이름이 바인딩된 UI가 하나라도 있으면 **아무것도 적용하지 않고** 그 목록을 돌려준다.
+     *   ③ 고른 UI 중 꾸밈 이름 속성 자체가 없는(꾸밈을 못 붙이는) UI가 섞여 있으면 역시 전체 중단하고 목록 반환.
+     *  받는 곳 = js/fnDialogPopupOpener.js 3577행 부근(회신 문구 991·992·993).
+     ************************************************************************/
+    function _installPrevCssApplyOverride() {
+
+        //원본이 아직 안 실렸으면 설치 불가 — 조용히 넘기지 않고 드러낸다.
+        if (typeof oAPP.fn.prevStyleClassApply !== "function") {
+            console.error("[HTML5][WS20][prev][PREV-CSS-01] 원본 꾸밈 적용 함수가 없어 덮어쓰기 실패");
+            return;
+        }
+
+        //이미 우리 것으로 바뀌어 있으면 다시 설치하지 않는다.
+        if (oAPP.fn.prevStyleClassApply.__u4aCssResult === true) { return; }
+
+        var fnNew = function (it_css, bSave) {
+
+            //이전 선택한 건에 대해서 CSS 원복 처리. (원본 1309~1340행 1:1)
+            for (var i = 0, l = oAPP.attr.prevCSS.length; i < l; i++) {
+
+                if (!oAPP.attr.prev[oAPP.attr.prevCSS[i].OBJID]) { continue; }
+
+                var ls_attr0 = oAPP.attr.prev[oAPP.attr.prevCSS[i].OBJID]._T_0015.find(function (a) { return a.UIATT === "styleClass"; });
+
+                if (ls_attr0 && ls_attr0.ISBND === "X") { continue; }
+
+                if (oAPP.attr.prevCSS[i].ISEXT === "X") {
+                    oAPP.attr.prev[oAPP.attr.prevCSS[i].OBJID].removeStyleClass(oAPP.attr.prevCSS[i].CSS);
+                    if (oAPP.attr.prevCSS[i].UIATV !== "") {
+                        oAPP.attr.prev[oAPP.attr.prevCSS[i].OBJID].addStyleClass(oAPP.attr.prevCSS[i].UIATV);
+                    }
+                } else {
+                    oAPP.attr.prev[oAPP.attr.prevCSS[i].OBJID].setStyleClass(oAPP.attr.prevCSS[i].UIATV);
+                }
+
+            }
+
+            oAPP.attr.prevCSS = [];
+
+            //적용 처리 대상 CSS 가 존재하지 않는경우 exit. ([우리] 결과 꾸러미 반환)
+            if (typeof it_css === "undefined" || it_css.length === 0) { return { applied: 0, bound: [] }; }
+
+            var lt_OBJID = [];
+
+            oAPP.fn.designGetCheckedLine(true, lt_OBJID);
+
+            //CHECKBOX 선택건이 존재하지 않는경우. (원본 1355~1362행)
+            if (lt_OBJID.length === 0) {
+                //286 Check box not selected.
+                parent.showMessage((typeof sap !== "undefined" ? sap : null), 20, "W",
+                    oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "286", "", "", "", ""));
+                return { applied: 0, bound: [] };
+            }
+
+            //STYLE CLASS 병합처리.
+            var l_css = it_css.join(" ");
+
+            //[우리 ①] 실제로 꾸밈을 반영한 UI 개수.
+            var l_changed = false, l_UIATV = "", l_sep = "", l_applied = 0;
+
+            //[우리 ②③] 적용 전 선검사 — 바인딩된 UI / 꾸밈 못 붙이는 UI 가 하나라도 있으면 전체 중단.
+            var lt_bound = [];
+            var lt_nostyle = [];
+            for (var b = 0, bl = lt_OBJID.length; b < bl; b++) {
+
+                var ls_0023_b = oAPP.DATA.LIB.T_0023.find(function (a) {
+                    return a.UIOBK === lt_OBJID[b].UIOBK && a.UIATT === "styleClass" && a.UIATY === "1" && a.ISDEP !== "X";
+                });
+
+                //꾸밈 이름 속성 정의 자체가 없는 UI = 꾸밈을 못 붙임 → 수집(993). 속성키 없음(선택만).
+                if (!ls_0023_b) { lt_nostyle.push({ OBJID: lt_OBJID[b].OBJID }); continue; }
+
+                var oPrev_b = oAPP.attr.prev[lt_OBJID[b].OBJID];
+                if (!oPrev_b || !oPrev_b._T_0015) { continue; }
+
+                var ls_0015_b = oPrev_b._T_0015.find(function (a) { return a.UIATK === ls_0023_b.UIATK; });
+
+                //꾸밈 이름이 바인딩된 UI 수집(992). 확인 후 그 속성으로 이동시키려고 속성키도 같이.
+                if (ls_0015_b && ls_0015_b.ISBND === "X") { lt_bound.push({ OBJID: lt_OBJID[b].OBJID, UIATK: ls_0023_b.UIATK }); }
+
+            }
+
+            //우선순위: 바인딩(992) > 꾸밈 미지원(993).
+            if (lt_bound.length > 0) { return { applied: 0, bound: lt_bound, nostyle: lt_nostyle }; }
+            if (lt_nostyle.length > 0) { return { applied: 0, bound: [], nostyle: lt_nostyle }; }
+
+            //DESIGN영역의 CHECKBOX 선택건을 대상으로 CSS 적용 처리. (원본 1370~1473행 1:1)
+            for (var i2 = 0, l2 = lt_OBJID.length; i2 < l2; i2++) {
+
+                var ls_0023 = oAPP.DATA.LIB.T_0023.find(function (a) {
+                    return a.UIOBK === lt_OBJID[i2].UIOBK && a.UIATT === "styleClass" && a.UIATY === "1" && a.ISDEP !== "X";
+                });
+
+                if (!ls_0023) { continue; }
+
+                var ls_0015 = oAPP.attr.prev[lt_OBJID[i2].OBJID]._T_0015.find(function (a) { return a.UIATK === ls_0023.UIATK; });
+
+                if (ls_0015 && ls_0015.ISBND === "X") { continue; }
+
+                l_UIATV = "";
+                l_sep = "";
+                if (ls_0015 && ls_0015.UIATV) {
+                    l_UIATV = ls_0015.UIATV;
+                    l_sep = " ";
+                }
+
+                if (ls_0023.ISEXT === "X") {
+                    oAPP.attr.prev[lt_OBJID[i2].OBJID].addStyleClass(l_css);
+                } else {
+                    oAPP.attr.prev[lt_OBJID[i2].OBJID].setStyleClass(l_UIATV + l_sep + l_css);
+                }
+
+                //[우리 ①] 여기까지 온 건 = 꾸밈을 실제 반영한 건. 개수 누적.
+                l_applied++;
+
+                //실제 적용 처리가 아닌경우 CSS 적용건 수집 처리.
+                if (!bSave) {
+                    oAPP.attr.prevCSS.push({ OBJID: lt_OBJID[i2].OBJID, CSS: l_css, ISEXT: ls_0023.ISEXT, UIATV: l_UIATV });
+                    continue;
+                }
+
+                //실제 적용시 현재 DESIGN에서 선택한 UI가 CSS 적용대상건인경우.
+                if (bSave && oAPP.attr.oModel.oData.uiinfo.OBJID === lt_OBJID[i2].OBJID) {
+
+                    var ls_attr = oAPP.attr.oModel.oData.T_ATTR.find(function (a) { return a.UIATK === ls_0023.UIATK; });
+
+                    if (ls_attr) {
+
+                        l_changed = true;
+
+                        if (ls_attr.UIATV !== "") { ls_attr.UIATV += " "; }
+
+                        ls_attr.UIATV += l_css;
+
+                        oAPP.fn.attrChange(ls_attr, "INPUT");
+
+                        oAPP.fn.setAttrFocus(ls_attr.UIATK, "");
+
+                        continue;
+
+                    }
+
+                }
+
+                if (ls_0015) {
+
+                    if (ls_0015.UIATV !== "") { ls_0015.UIATV += " "; }
+
+                    ls_0015.UIATV += l_css;
+
+                } else {
+
+                    ls_0015 = oAPP.fn.crtStru0015();
+                    oAPP.fn.moveCorresponding(ls_0023, ls_0015);
+
+                    ls_0015.OBJID = lt_OBJID[i2].OBJID;
+
+                    ls_0015.UIATV = l_css;
+
+                }
+
+                oAPP.fn.attrChgAttrVal(ls_0015, "INPUT");
+
+                l_changed = true;
+
+            }
+
+            //변경된건이 존재하는경우.
+            if (l_changed) {
+                oAPP.fn.setChangeFlag();
+            }
+
+            //[우리 ①] 실제 반영 건수 반환(0 이면 팝업이 "적용된 항목이 없습니다" 안내).
+            return { applied: l_applied, bound: [] };
+
+        };
+
+        fnNew.__u4aCssResult = true;
+        oAPP.fn.prevStyleClassApply = fnNew;
+
+    } // end of _installPrevCssApplyOverride
+
+    /************************************************************************
+     * [HTML5] 미리보기 오류 표면화 (장군님 지시 2026-08-14 "오류 삼킴 금지" 복원, 2026-08-31)
+     * ---------------------------------------------------------------------
+     *  미리보기 화면 파일(design/preview/index.js)은 원작 개발자가 통째로 갱신하는 자리라
+     *  한 줄도 고치지 않는다. 그 파일 안 4곳이 실패를 조용히 먹고 넘어가,
+     *  화면엔 아무 표시 없이 UI 가 빠지거나 빈 껍데기로 들어간다.
+     *    · 부품 정보 읽기            (setUIProp        내부 try/catch{})
+     *    · 화면 묶음 불러오기        (addUIObjPreView  내부 try/catch{})
+     *    · 속성 넣어 UI 만들기       (createUIInstance 내부 try → 빈 UI 로 대체)
+     *    · 속성 직접 적용            (createUIInstance 내부 try/catch{})
+     *  → 그 안에서 실제로 던지는 함수들을 iframe 쪽에서 감싸, 실패하면 오류코드와 함께
+     *    드러낸 뒤 원래대로 다시 던진다(원본 흐름·대비책은 그대로 유지, 표면화만 추가).
+     *  ※ 파일을 못 고치므로 try/catch 자체는 없앨 수 없다 — 표면화까지가 한계.
+     ************************************************************************/
+    function _installPrevErrorSurface(oFrame) {
+
+        var w = null;
+        try { w = oFrame && oFrame.contentWindow; } catch (e) { w = null; }
+        if (!w) { return; }
+
+        //iframe 문서가 새로 생길 때마다 1회만 설치(중복 감쌈 방지).
+        if (w.__u4aPrevErrSurface === true) { return; }
+
+        //미리보기 스크립트는 index.html 이 동적으로 붙여 실행 → load 시점에 아직 없을 수 있다.
+        //  대상 함수가 생길 때까지 짧게 기다렸다가 설치(최대 약 20초).
+        if (typeof w.getUIClassInstance !== "function") {
+            var iTry = (w.__u4aPrevErrSurfaceTry || 0) + 1;
+            w.__u4aPrevErrSurfaceTry = iTry;
+            if (iTry > 100) {
+                console.error("[HTML5][WS20][prev][PREV-ERR-00] 오류 표면화 설치 실패 — 미리보기 함수가 나타나지 않음");
+                return;
+            }
+            setTimeout(function () { try { _installPrevErrorSurface(oFrame); } catch (e) { } }, 200);
+            return;
+        }
+
+        w.__u4aPrevErrSurface = true;
+
+        //실패 시 오류코드와 함께 드러낸 뒤 그대로 다시 던진다(원본 catch 의 대비책은 유지).
+        function lf_wrap(oHost, sName, sCode, sDesc) {
+
+            if (!oHost || typeof oHost[sName] !== "function") {
+                console.error("[HTML5][WS20][prev][" + sCode + "] 감쌀 대상 없음: " + sName);
+                return;
+            }
+
+            if (oHost[sName].__u4aErrSurface === true) { return; }
+
+            var fnOrg = oHost[sName];
+
+            var fnNew = function () {
+                try {
+                    return fnOrg.apply(this, arguments);
+                } catch (e) {
+                    var oCon = (w.parent && w.parent.console) || console;
+                    oCon.error("[HTML5][WS20][prev][" + sCode + "] " + sDesc + " 실패:", e && e.message, e);
+                    throw e;
+                }
+            };
+
+            fnNew.__u4aErrSurface = true;
+            oHost[sName] = fnNew;
+
+        } // end of lf_wrap
+
+        //① 부품 정보 읽기 — setUIProp 의 try/catch{} 안에서 던지는 지점.
+        lf_wrap(w, "getUIClassInstance", "PREV-ERR-01", "UI 부품 정보 읽기");
+
+        //② 속성 넣어 UI 만들기 — createUIInstance 의 try 안에서 던지면 빈 UI 로 대체된다.
+        lf_wrap(w, "setUIProperty", "PREV-ERR-02", "UI 속성 구성");
+
+        //③ 속성 직접 적용 — createUIInstance 의 try/catch{}.
+        lf_wrap(w, "setUIPropertyDirectly", "PREV-ERR-03", "UI 속성 직접 적용");
+
+        //④ 화면 묶음 불러오기 — addUIObjPreView / createUIInstance 의 try/catch{}.
+        try {
+            if (w.sap && w.sap.ui) {
+                lf_wrap(w.sap.ui, "requireSync", "PREV-ERR-04", "화면 묶음 즉시 불러오기");
+                if (typeof w.sap.ui.getCore === "function") {
+                    lf_wrap(w.sap.ui.getCore(), "loadLibrary", "PREV-ERR-05", "화면 묶음 불러오기");
+                }
+            } else {
+                console.error("[HTML5][WS20][prev][PREV-ERR-04] 화면 묶음 함수 감쌈 실패 — 미리보기 엔진 미로드");
+            }
+        } catch (e) {
+            console.error("[HTML5][WS20][prev][PREV-ERR-04] 화면 묶음 함수 감쌈 중 오류:", e && e.message);
+        }
+
+    } // end of _installPrevErrorSurface
+
+    /************************************************************************
      * [HTML5] 미리보기 iframe 에 포커스가 가도 WS20 단축키가 동작하도록 keydown 포워딩
      * ---------------------------------------------------------------------
      *  미리보기 iframe 에 포커스가 있으면 keydown 이 iframe 문서로만 들어가, 메인 문서에
@@ -990,9 +1272,11 @@
         //   src 설정/리로드로 load 가 날 때마다(=문서 새로 생길 때마다) 재부착.
         oFrame.addEventListener("load", function () {
             try { _attachPreviewShortcutForward(oFrame); } catch (e) { }
+            try { _installPrevErrorSurface(oFrame); } catch (e) { }
         });
         // 이미 로드된 상태(load 이벤트를 놓친 경우)도 즉시 시도.
         try { _attachPreviewShortcutForward(oFrame); } catch (e) { }
+        try { _installPrevErrorSurface(oFrame); } catch (e) { }
 
         /* ── 헤더(#ws20PrevHeader) 컨트롤 연결 ───────────────────────── */
 
@@ -1109,36 +1393,63 @@
                 oBtnHelp.title = _msg("B39", "Help");
                 oBtnHelp.addEventListener("click", function () {
 
-                    var l_ui = this;
+                    var l_ui = this;   //원본 uiPreviewArea.js 137행 `var l_ui = this;`
 
+                    //원본 uiPreviewArea.js 115행 — 눌리는 즉시 busy.
+                    parent.setBusy("X");
+
+                    //U4A HELP DOCUMENT 통합 (원본 127~132행: UHAK901369 +
+                    // fnU4AHelpDocuPopupOpener({startMenuId:"000273"}))
+                    //[BR58 검수반영] 패치 판정과 "여는 기능이 실렸는지" 검사를 분리한다.
+                    //  ★ 예전엔 두 조건을 && 로 묶어서, 패치 서버인데 여는 기능만 안 실린
+                    //    경우 구버전 도움말로 잘못 빠졌다(원본엔 그 검사 자체가 없다).
+                    var bPatch = false;
                     try {
-                        //U4A HELP DOCUMENT 통합 (원본 102~106행: UHAK901369 +
-                        // fnU4AHelpDocuPopupOpener({startMenuId:"000273"}))
-                        if (oAPP.common.checkWLOList("C", "UHAK901369") === true &&
-                            typeof oAPP.fn.fnU4AHelpDocuPopupOpener === "function") {
-                            parent.setBusy("X"); //원본 90행
-                            oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000273" });
-                            return;
-                        }
+                        bPatch = (oAPP.common.checkWLOList("C", "UHAK901369") === true);
                     } catch (e) {
-                        console.warn("[HTML5][WS20][prev] U4A HELP 팝업 오류:", e && e.message);
+                        console.error("[WS20HELP-30] 통합 도움말 등록여부 판정 실패:", e);
                         try { parent.setBusy && parent.setBusy(""); } catch (e2) { }
+                        return;
                     }
 
-                    //attribute 도움말 팝업 (원본 112~124행 — callTooltipsPopup 은
-                    // sap.m 팝업(UI5)이라 HTML5 호스트 미지원 → 존재시에만 호출 가드)
-                    if (typeof oAPP.fn.callTooltipsPopup !== "undefined") {
+                    if (bPatch) {
+
+                        if (typeof oAPP.fn.fnU4AHelpDocuPopupOpener !== "function") {
+                            console.error("[WS20HELP-31] 통합 도움말 여는 기능 미로드 — 구성 확인 필요.");
+                            try { parent.setBusy && parent.setBusy(""); } catch (e3) { }
+                            return;
+                        }
+
+                        //★ opener 는 async 라 실패가 약속(Promise) 거부로 온다 → 반드시 받아서
+                        //  대기 표시를 풀어야 한다(동기 try/catch 로는 안 잡힘 · 검수 P1).
                         try {
-                            parent.setBusy("X");
-                            oAPP.fn.callTooltipsPopup(l_ui, "prevTooltip", "E22");
+                            var oRet = oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000273" });
+                            if (oRet && typeof oRet.catch === "function") {
+                                oRet.catch(function (e) {
+                                    console.error("[WS20HELP-31] 통합 도움말 팝업 호출 실패:", e);
+                                    try { parent.setBusy && parent.setBusy(""); } catch (e4) { }
+                                });
+                            }
                         } catch (e) {
-                            console.warn("[HTML5][WS20][prev] callTooltipsPopup 오류(UI5 의존 — 미변환):", e && e.message);
-                            try { parent.setBusy && parent.setBusy(""); } catch (e2) { }
+                            console.error("[WS20HELP-31] 통합 도움말 팝업 호출 실패:", e);
+                            try { parent.setBusy && parent.setBusy(""); } catch (e5) { }
                         }
                         return;
                     }
 
-                    console.warn("[HTML5][WS20][prev] 도움말 팝업 미변환(UI5 의존) — skip.");
+                    //[BR58] 구버전 서버(UHAK901369 미등록) 폴백 = 도움말 창.
+                    //  원본 139~152행 callTooltipsPopup(l_ui, "prevTooltip", "E22").
+                    //  ★ 이전 주석의 "sap.m 팝업(UI5)이라 미변환" 은 사실이 아니었다 —
+                    //    원본 callTooltipsPopup 은 UI5 부품을 쓰지 않고 별도 창에
+                    //    정적 HTML 을 띄우는 방식이라 그대로 이식 가능했다.
+                    //    (이식본 = ws_html5_call_tooltips_popup.js)
+                    if (typeof oAPP.fn.callTooltipsPopup !== "function") {
+                        console.error("[WS20HELP-32] 도움말 팝업 미로드 — ws_html5_call_tooltips_popup.js 로드 확인 필요.");
+                        try { parent.setBusy && parent.setBusy(""); } catch (e3) { }
+                        return;
+                    }
+                    //E22  Preview Area
+                    oAPP.fn.callTooltipsPopup(l_ui, "prevTooltip", "E22");
 
                 });
             }
@@ -1390,6 +1701,10 @@
         //  UI5 코드 없음 / oAPP.oDesign.fn 참조 1건 → 위에서 보장).
         try {
             oAPP.fn.getScript("design/js/uiPreviewArea", function () {
+                //원본이 실린 직후 우리 꾸밈 적용 처리를 다시 설치(원본 사본 무수정 원칙).
+                try { _installPrevCssApplyOverride(); } catch (e) {
+                    console.error("[HTML5][WS20][prev][PREV-CSS-02] 꾸밈 적용 덮어쓰기 설치 실패:", e && e.message);
+                }
                 lf_loadContextMenu();
             });
         } catch (e) {

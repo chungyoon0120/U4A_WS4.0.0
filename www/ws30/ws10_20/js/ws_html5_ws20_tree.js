@@ -244,7 +244,10 @@
         if (typeof oCfg.press === "function") {
             BTN.addEventListener("click", function () {
                 try {
-                    oCfg.press();
+                    //[BR58] 원본(UI5)은 버튼 눌림 처리 안에서 this = 누른 버튼이다
+                    //  (uiDesignArea.js 983 `var l_ui = this;`). 도움말 팝업이 그 값을
+                    //  받아야 하므로 HTML5 에서도 누른 버튼을 this 로 넘긴다.
+                    oCfg.press.call(BTN);
                 } catch (e) {
                     console.warn("[HTML5][WS20][tree] toolbar press error:", oCfg.icon, e && e.message);
                 }
@@ -397,15 +400,64 @@
                 icon: "sap-icon://question-mark", gly: "?",
                 tooltip: _msg("B39"),
                 press: function () {
+
+                    var l_ui = this;   //원본 uiDesignArea.js 983행 `var l_ui = this;`
+
+                    //원본 uiDesignArea.js 967행 — 눌리는 즉시 busy.
+                    parent.setBusy("X");
+
+                    //[BR58 검수반영] 패치 판정과 "여는 기능이 실렸는지" 검사를 분리한다.
+                    //  ★ 예전엔 두 조건을 && 로 묶어서, 패치 서버인데 여는 기능만 안 실린
+                    //    경우 조건이 거짓이 되어 구버전 도움말로 잘못 빠졌다.
+                    //    원본(uiDesignArea.js 978)은 패치 판정만 보고 통합 도움말을 부른다.
+                    var bPatch = false;
                     try {
-                        if (oAPP.common && oAPP.common.checkWLOList &&
-                            oAPP.common.checkWLOList("C", "UHAK901369") === true &&
-                            typeof oAPP.fn.fnU4AHelpDocuPopupOpener === "function") {
-                            oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000272" });
+                        bPatch = !!(oAPP.common && oAPP.common.checkWLOList &&
+                            oAPP.common.checkWLOList("C", "UHAK901369") === true);
+                    } catch (e) {
+                        console.error("[WS20HELP-10] 통합 도움말 등록여부 판정 실패:", e);
+                        try { parent.setBusy(""); } catch (e2) { }
+                        return;
+                    }
+
+                    if (bPatch) {
+
+                        if (typeof oAPP.fn.fnU4AHelpDocuPopupOpener !== "function") {
+                            //패치 서버인데 여는 기능이 없으면 구성 이상 → 구버전 도움말로 빠지지 않는다.
+                            console.error("[WS20HELP-11] 통합 도움말 여는 기능 미로드 — 구성 확인 필요.");
+                            try { parent.setBusy(""); } catch (e3) { }
                             return;
                         }
-                    } catch (e) { }
-                    _safeCall("callTooltipsPopup", [null, "designTooltip", "E21"]);
+
+                        //U4A HELP DOCUMENT 팝업 호출(원본 979행) — busy 는 opener 가 해제.
+                        //  ★ opener 는 async 라 실패가 약속(Promise) 거부로 온다 → 반드시 받아서
+                        //    대기 표시를 풀어야 한다(동기 try/catch 로는 안 잡힘 · 검수 P1).
+                        try {
+                            var oRet = oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000272" });
+                            if (oRet && typeof oRet.catch === "function") {
+                                oRet.catch(function (e) {
+                                    console.error("[WS20HELP-11] 통합 도움말 팝업 호출 실패:", e);
+                                    try { parent.setBusy(""); } catch (e4) { }
+                                });
+                            }
+                        } catch (e) {
+                            console.error("[WS20HELP-11] 통합 도움말 팝업 호출 실패:", e);
+                            try { parent.setBusy(""); } catch (e5) { }
+                        }
+                        return;
+                    }
+
+                    //[BR58] 구버전 서버(UHAK901369 미등록) 폴백 = 도움말 창.
+                    //  원본 985행 callTooltipsPopup(l_ui, "designTooltip", "E21").
+                    //  ★ 이전에는 첫 인자를 null 로 넘겨, 팝업이 있어도 원본의
+                    //    `if(!oUi) return;` 에 걸려 아무것도 뜨지 않았다.
+                    if (typeof oAPP.fn.callTooltipsPopup !== "function") {
+                        console.error("[WS20HELP-12] 도움말 팝업 미로드 — ws_html5_call_tooltips_popup.js 로드 확인 필요.");
+                        try { parent.setBusy(""); } catch (e3) { }
+                        return;
+                    }
+                    //E21  Design Area
+                    oAPP.fn.callTooltipsPopup(l_ui, "designTooltip", "E21");
                 }
             }
         ];

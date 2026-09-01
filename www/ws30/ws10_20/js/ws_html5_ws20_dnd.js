@@ -1587,6 +1587,31 @@
 
         var ls_copy = lf_copy0014(is_t, is_p, aggrParam);
 
+        /* [D03] Ctrl 누른 채 끌어다 놓아 복사할 때, 새 자리에서 쓸 수 없는 여러 건 바인딩 경로를 푼다.
+         *   원본 근거 = U4A_WS_DESIGN\design\js\uiDesignArea.js 2873~2907 (designCopyUI, 2026-08-16 갱신분).
+         *   ★순서 제약: 복사본이 만들어진 "뒤" · 되돌리기 저장 "앞". 되돌리기 뒤에 넣으면 되돌리기 기록에
+         *     "바인딩이 안 풀린 상태"가 찍혀, 한 번 되돌렸다 다시 하면 상태가 어긋난다(원본도 이 자리).
+         *   ★판정 기준이 둘로 갈린다 — 표 열 여부는 "복사본(ls_copy)", 경로 조회는 "끌어온 원래 줄(is_t)". */
+        var _UIATT_CP = undefined;
+
+        //끌어온 UI가 표의 열이면서 본보기 자리에 UI가 있으면, 여러 건 바인딩 판단을 본보기 자리 기준으로.
+        if (ls_copy && ls_copy.UIOBK === "UO01127" &&
+            (ls_copy.zTREE || []).findIndex(function (item) { return item.UIATT === "template"; }) !== -1) {
+            _UIATT_CP = "template";
+        }
+
+        //끌어온 UI가 여러 건 바인딩돼 있는지 확인.
+        var _pathCp = oAPP.fn.getParentAggrBind(oAPP.attr.prev[is_t.OBJID], _UIATT_CP);
+
+        //놓는 자리의 여러 건 바인딩 경로 확인.
+        var _pathCp2 = oAPP.fn.getParentAggrBind(oAPP.attr.prev[is_p.OBJID], aggrParam.UIATT);
+
+        //경로가 서로 다르면 복사본의 바인딩을 하위까지 푼다(원본 l_unbind).
+        var _unbindCp = false;
+        if (_pathCp && _pathCp !== "" && _pathCp !== _pathCp2) { _unbindCp = true; }
+
+        oAPP.fn.designUnbindUi(ls_copy, _pathCp, _unbindCp);
+
         // UNDO (HTML5 단일스택 — 원본 undoRedo COPY 대체).
         var _oUndoSnap = _safe(function () { if (typeof oAPP.fn.fnWs20PushUndo === "function") { return oAPP.fn.fnWs20PushUndo(); } });
 

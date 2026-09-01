@@ -1,6 +1,6 @@
 {
   "name": "com.u4a_ws3.app",
-  "version": "3.6.3",
+  "version": "3.6.4",
   "displayName": "U4A Workspace",
   "description": "U4A Application for Integrated Development of Web Environments Developed by the U4A Solution RnD Team.",
   "main": "electron/main.js",

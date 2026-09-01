@@ -1037,30 +1037,10 @@
   border-bottom: 1px solid var(--ws20-line);
 }
 .u4aWs20AttrRow:hover { background: var(--ws20-hover-bg); }
-/* [BR52] 오류 항목으로 이동(setAttrFocus) 시 대상 행 선택 강조 — 원본 sap.m.Table
-   setSelectedItem(uiAttributeArea.js:8279) 대응. 공통 선택 행 표시 세트를 통째로 소비
-   (shell.css 686~691 계약: 배경+선택 글자색+굵기+좌측 accent 줄 — 진한 선택배경 테마에서
-   글자가 묻히지 않게 글자색까지 한 세트, .analy/16 §3.7). */
-.u4aWs20AttrRow[aria-selected="true"],
-.u4aWs20AttrRow[aria-selected="true"]:hover {
-  background: var(--ws20-sel-bg);
-  color: var(--selected-text);
-  font-weight: 600;
-  position: relative;               /* 아래 좌측 선택 줄(::before)의 기준 */
-}
-/* [BR53] 좌측 선택 줄 — 종전엔 이 줄을 box-shadow 로 그렸는데, 값이 바뀐 줄(.changeValue)이
-   같은 box-shadow 자리를 뒤에서 덮어써 **마우스를 올렸을 때만 파란 줄이 나타났다가 떼면 사라지는**
-   들쭉날쭉이 있었다(마우스 올림 규칙이 한 단계 더 세서 그때만 이김).
-   값이 바뀐 줄의 움푹한 표시와 자리를 다투지 않도록 줄을 따로 그린다 → 마우스와 무관하게 항상 보인다. */
-.u4aWs20AttrRow[aria-selected="true"]::before {
-  content: "";
-  position: absolute; left: 0; top: 0; bottom: 0;
-  width: 0.1875rem;
-  background: var(--accent);
-  pointer-events: none;
-}
-/* 선택 행의 라벨 글자도 선택 글자색을 따르게(라벨은 별도 색을 갖고 있어 함께 지정). */
-.u4aWs20AttrRow[aria-selected="true"] .u4aWs20AttrLblTxt { color: var(--selected-text); }
+/* [BR52/BR53 철회 2026-08-30 · 장군님 결정] 속성 줄 "선택 표시"(파란 배경·좌측 파란 줄·굵은 글자) 제거.
+   사유: 원본은 표(sap.m.Table)의 클릭 선택이 켜진 기본 성질을 그대로 쓴 것뿐이고,
+   그 선택 결과를 읽어 쓰는 곳이 원본 전체에 0곳(전수 확인) → 화면상 의미 없는 표시.
+   오류 인지는 값칸 빨간 테두리+안내 문구로 충분하다는 판단. 이동·접힘·포커스만 남긴다. */
 
 /* 라벨 셀 (좌) */
 .u4aWs20AttrRowLbl {
@@ -1346,6 +1326,12 @@
 .u4aWs20AttrPopBtn > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .u4aWs20AttrPopBtn > i, .u4aWs20AttrPopBtn > svg { flex: 0 0 auto; }
 .u4aWs20AttrPopBtn.attention { border-color: var(--warning); color: var(--warning); }
+/* 파랗게 채운 버튼(구 sap.m.Button type:"Emphasized" — 코드마스터 UW11 FLD07).
+   공통 .u4a-btn--emphasized 와 같은 색을 쓰되, 속성 값칸 전용 버튼이라 이 스코프에서만 지정. */
+.u4aWs20AttrPopBtn.emphasized {
+  background: var(--u4a-accent); border-color: var(--u4a-accent); color: #fff;
+}
+.u4aWs20AttrPopBtn.emphasized:hover { background: var(--u4a-accent-hover); border-color: var(--u4a-accent-hover); }
 .u4aWs20AttrPopBtn:hover { background: var(--ws20-btn-hover); }
 .u4aWs20AttrPopBtn:disabled { opacity: 0.55; cursor: default; }
 

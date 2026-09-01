@@ -224,6 +224,17 @@
         URL: "./js/usp/ws_html5_usp_editor_ctxmenu.js",
         MIMETYPE: "script"
     },
+    // [UI5 제거][BR58] 도움말(Tooltips) 팝업 — 원본 design/js/callTooltipsPopup.js 이식.
+    //   서버에 U4A Help Document(UHAK901369)가 없는 구버전 서버에서 트리/속성/미리보기
+    //   도움말 버튼이 타는 폴백(oAPP.fn.callTooltipsPopup 정의).
+    //   ★ 반드시 목록 "맨 뒤" — 아래 loadLibrary 의 ajax error 갈래는 다음 파일로
+    //     이어가지 않으므로, 앞쪽에 두면 이 파일 하나가 배포에서 빠졌을 때 뒤따르는
+    //     WS20 필수 파일이 전부 안 실려 화면이 통째로 죽는다. 이 파일은 함수 정의만 하고
+    //     실제 호출은 도움말 버튼을 누를 때라 로드 순서에 매이지 않는다. (BR58 검수 P1 반영)
+    {
+        URL: "./js/ws_html5_call_tooltips_popup.js",
+        MIMETYPE: "script"
+    },
     ];
 
     oAPP.loadLibrary = function (scripts, index, fnCallback) {

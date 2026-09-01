@@ -684,7 +684,19 @@
 
                     //입력한 값이 default 값인경우.
                     if(ls_0023.DEFVL === l_UIATV){
+
+                        //이전 수집건 제거 처리.
                         oAPP.attr.prev[ls_line.OBJID]._T_0015.splice(_pos, 1);
+
+                        /**
+                         * @since   2026-07-07 02:06:27
+                         * @version vNAN-NAN
+                         * @author  pes
+                         * @description
+                         * 동일 attribute 동기화 처리시 입력값이 default값인경우
+                         * default 값으로 미리보기 화면 UI의 프로퍼티 변경 처리하도록 수정.
+                         */
+                        ls_0015.UIATV = l_UIATV;
 
                         //미리보기 화면 UI의 프로퍼티 변경 처리.
                         oAPP.fn.previewUIsetProp(ls_0015);

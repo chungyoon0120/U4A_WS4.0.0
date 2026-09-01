@@ -217,14 +217,14 @@
 
         //APPLICATION ID 매핑 + ATTR 변경(undo 는 위에서 1회 → skip).
         is_attr.UIATV = param.APPID != null ? param.APPID : "";
-        oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+        oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppf4Popup 5705).
 
         //AppDescript(EXT00000031) 프로퍼티에 APPNM 매핑(원본 5656행).
         var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
         var ls_desc = aAttr.find(function (a) { return a.UIATK === "EXT00000031"; });
         if (ls_desc) {
           ls_desc.UIATV = param.APPNM != null ? param.APPNM : "";
-          oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true);
+          oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppf4Popup 5716).
         }
 
         //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 5669·5673행).
@@ -285,7 +285,7 @@
 
         //F4 HELP 선택 SHLPNAME 매핑 + ATTR 변경(undo skip).
         is_attr.UIATV = param.SHLPNAME != null ? param.SHLPNAME : "";
-        oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+        oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpID 5924).
 
         //짝인 F4HelpReturnField 초기화(원본 5876행 — 바인딩건은 제외). selOpt2=1189 / selOpt3=2535(원본 5850·5854행).
         var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
@@ -294,7 +294,7 @@
         if (ls_ret && ls_ret.ISBND !== "X") {
           ls_ret.UIATV = "";
           ls_ret.ISBND = "";
-          oAPP.fn.fnWs20AttrChange(ls_ret, "INPUT", true);
+          oAPP.fn.fnWs20AttrChange(ls_ret, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpID 5939).
         }
 
         //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 5892·5896행).

@@ -2828,10 +2828,6 @@
      ************************************************************************/
     function _updateAttrList(UIOBK, OBJID) {
 
-        //[BR52] 다른 UI 로 전환 시 속성 행 선택 강조 해제 — 원본 updateAttrList 의
-        //  removeSelections(uiAttributeArea.js 7139~7150 부속) 1:1 대응.
-        oAPP.attr._attrSelUiatk = null;
-
         //(원본 7139~7150행: changedDataFilter import/initButtonBind/clearDataFilter/
         // removeSelections — UI5/모듈 부속. HTML5 에선 필터 상태 초기화로 대체.)
         oAPP.attr.oModel.oData.sAttrFilt = {
@@ -3326,36 +3322,26 @@
                     default: break;
                 }
 
-                //[BR52] 대상 행 선택 강조 — 원본 oRTab1.setSelectedItem(uiAttributeArea.js:8279).
-                //  선택키를 상태에 보관하고, 행 재렌더(fnRenderWs20AttrRows)가 매 세대 복원한다
-                //  (원본 sap.m.Table 은 같은 UI 안 재렌더에서 선택이 유지됨 — 그 계약 재현).
-                //  다른 UI 로 전환하면 _updateAttrList 가 해제(원본 updateAttrList removeSelections 대응).
-                //[BR59-5] 장군님 지시(2026-08-21): **되돌리기/다시하기**로 그 속성 줄을 찾아갈 때는
-                //  줄 선택 강조를 하지 않는다 — 커서·스크롤·위 영역 접힘만. (원본 8279 는 이때도 줄을
-                //  선택하지만 화면에서 불필요한 강조로 보인다는 장군님 판단. 되돌리기 경로에서만 끈다.)
-                var bNoRowSelect = !!(oOpt && oOpt.bNoRowSelect);
-                oAPP.attr._attrSelUiatk = bNoRowSelect ? undefined : UIATK;
+                //[BR52/BR53 철회 2026-08-30 · 장군님 결정] 대상 행 "선택 표시"(원본 8279
+                //  oRTab1.setSelectedItem)는 **이식하지 않는다**. 원본은 표(sap.m.Table)의 클릭 선택이
+                //  켜진 기본 성질을 그대로 쓴 것뿐이고, 그 선택 결과를 읽어 쓰는 곳이 원본 전체에 0곳
+                //  (전수 확인) → 화면상 의미 없는 표시. 오류 인지는 값칸 빨간 테두리+안내 문구로 충분.
+                //  여기서는 원본의 나머지(위 영역 접힘 → 이동 → 포커스)만 수행한다.
 
                 //[BR53] bKeepRow = 지금 화면에 있는 행을 그대로 두고 이동·포커스만 한다.
                 //  원본 8271행은 모델 새로고침(oModel.refresh)뿐이라 값 컨트롤(콤보 등) 인스턴스가 그대로
                 //  살아 있다. 서버이벤트 콤보의 "펼치기 직전" 경로(uiAttributeArea.js:1129)가 이 함수를
                 //  부르는데, HTML5 에서 행을 다시 그리면 지금 열리려는 콤보가 통째로 교체돼 펼침목록이
-                //  붙을 자리를 잃는다. 그 경로만 bKeepRow 로 부르고 선택 표시는 행에 직접 남긴다.
+                //  붙을 자리를 잃는다. 그 경로만 bKeepRow 로 불러 행을 다시 그리지 않는다.
                 var bKeepRow = !!(oOpt && oOpt.bKeepRow);
-                if (bKeepRow) {
-                    var aPrev = document.querySelectorAll(
-                        '#ws20AttrRows .u4aWs20AttrRow[aria-selected="true"]');
-                    for (var p = 0; p < aPrev.length; p++) { aPrev[p].removeAttribute("aria-selected"); }
-                } else {
-                    //행 재렌더 후 대상 라인 스크롤/포커스. (구 oRTab1 focus 대응 — 재렌더가 선택 표시도 복원)
+                if (!bKeepRow) {
+                    //행 재렌더 후 대상 라인 스크롤/포커스. (구 oRTab1 focus 대응)
                     oAPP.fn.fnRenderWs20AttrRows();
                 }
 
                 var oRow = document.querySelector(
                     '#ws20AttrRows .u4aWs20AttrRow[data-uiatk="' + UIATK + '"]');
                 if (oRow) {
-
-                    if (bKeepRow && !bNoRowSelect) { oRow.setAttribute("aria-selected", "true"); }
 
                     //[BR52] ATTR 상단 영역 접힘 처리 — 원본 attrHeaderExpanded(false)(8338행).
                     //  오류 입력칸이 확실히 보이게 위 요약영역을 접는다.
@@ -3625,7 +3611,7 @@
         }
 
         //10. attribute 영역 선택처리. (원본 2407행 — busy 해제 "후" 수행, UIATK 입력시)
-        try { oAPP.fn.setAttrFocus(oOpt.UIATK, oOpt.TYPE, oOpt.bNoRowSelect ? { bNoRowSelect: true } : undefined); } catch (e) { }
+        try { oAPP.fn.setAttrFocus(oOpt.UIATK, oOpt.TYPE); } catch (e) { }
 
         //11. 미리보기 ui 선택 처리 — 반드시 마지막. (문서 8.1 11단계 —
         //    frame/contentWindow/_loaded 가드. 미리보기 미로드시 skip)
@@ -3876,7 +3862,7 @@
 
                     //값 반영·재렌더·디자인영역/바인딩 반영·busy — 정규 경로 재사용.
                     //  (undo 스냅샷은 위에서 1회 적재 → skip / autoGrowing 게이트 재호출 방지.)
-                    oAPP.fn.fnWs20AttrChange(is_attr, "DDLB", true, true);
+                    oAPP.fn.fnWs20AttrChange(is_attr, "DDLB", true, true, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrChangeAutoGrowingProp 3197·3214).
 
                     //디자인 트리(좌측) 갱신 — 원본 확인 콜백 designRefershModel(3183) 대응.
                     //  ★원본은 await 로 완료를 기다린다 → HTML5 도 await(완료 대기 + rejection 을
@@ -3914,10 +3900,22 @@
      *     원본 attrChange 는 async 라 await 한 줄로 끝나지만, HTML5 fnWs20AttrChange 는 동기 함수다.
      *     호출부 20여 곳이 이 함수가 끝난 "직후" 후속 처리를 이어가므로(예: 바인딩 팝업 적용 경로가
      *     반환 뒤 트리/미리보기 갱신을 명시 호출) async 로 바꾸면 그 후속들이 값 반영 전에 실행돼
-     *     깨진다. 다행히 (1)(2) 대상 판정은 전부 동기라, 판정만 먼저 하고 대상일 때만 (3) 을
-     *     비동기로 넘긴다. 판정 조건·실행 내용은 원본과 동일하다.
+     *     깨진다. 다행히 (1)(2) 대상 판정은 전부 동기라, 판정만 먼저 하고(_isAttrChangeException)
+     *     대상일 때만 (3) 을 비동기로 넘긴다(_runAttrChangeException).
+     *     ★ (3) 은 로직을 옮겨 적지 않고 **원본 모듈을 그대로 불러 실행**한다 — 그래야 전용 모듈을
+     *       찾는 기준 위치와 실행 방식이 원본과 완전히 같다. 자세한 이유는 _runAttrChangeException 주석.
+     *
+     *   ★ BR54 범위 밖(보고만): 원본 attrChange 는 이 갈래보다 **앞**에 두 개의 조기 종료가 더 있다 —
+     *     ROOT 문서 속성 처리(attrDocumentProc, 원본 1795) 와 dropAble 처리(원본 1815). HTML5 는
+     *     앞의 것이 미이식(미리보기 의존)이고 뒤의 것은 값 처리 뒤 부수효과로 옮겨져 있어, 그 속성들이
+     *     코드마스터에 등록되면 원본은 이 갈래에 도달하지 않는데 HTML5 는 도달한다. 등록 여부가
+     *     서버 설정이라 실측 불가하며, 두 조기 종료의 위치 차이는 BR54 이전부터 있던 것이다.
      ************************************************************************/
     //대상 판정 — 해당하면 UW13 코드마스터 줄을, 아니면 null 을 반환한다. (원본 모듈 28~37행)
+    //  ★ 여기만 원본 모듈에서 옮겨 적었다. 원본 모듈은 통째로 기다려야 답을 주는데, 이 함수는
+    //    기다릴 수 없는 동기 함수라 "탈지 말지"를 먼저 알아야 하기 때문이다. 옮겨 적은 두 조건은
+    //    원본에서도 기다림 없이 즉시 끝나는 부분이라 판정 결과는 원본과 같다.
+    //    실제 실행은 아래 _runAttrChangeException 이 원본 모듈을 그대로 불러서 맡긴다.
     function _isAttrChangeException(sAttr) {
 
         //해당 패치가 존재하지 않는경우 exit. (원본 28행)
@@ -3926,7 +3924,14 @@
         //[HTML5 가드] 코드마스터(S_CODE) 미구성/UW13 그룹 없음 → 대상 아님.
         //  원본은 S_CODE.UW13 를 무조건 참조해 그룹이 없으면 그 자리에서 죽는다(원본 33행).
         //  이 파일의 다른 S_CODE 참조부(UA003·UA035)와 동일한 가드를 둔다.
-        if (!oAPP.attr.S_CODE || !Array.isArray(oAPP.attr.S_CODE.UW13)) { return null; }
+        //  ★ 다만 패치가 켜져 있는데 그룹이 통째로 없는 건 설치가 덜 된 비정상 상태이므로 조용히 넘기지 않고
+        //    오류로 드러낸다(rules/code.md "오류 삼킴 금지"). 그룹이 없으면 등록된 속성도 없다는 뜻이라
+        //    처리 자체는 원본과 같이 정규 경로로 이어간다(막아버리면 원본에 없는 동작이 된다).
+        if (!oAPP.attr.S_CODE || !Array.isArray(oAPP.attr.S_CODE.UW13)) {
+            console.error("[HTML5][WS20][attr] 전용 예외처리 패치는 켜져 있으나 코드마스터 UW13 그룹이 없습니다"
+                + " — 설치 상태 확인 필요(정규 값 처리로 진행).");
+            return null;
+        }
 
         //WS 3.0 Attribute 예외처리 module 호출 항목 해당 여부 확인. (원본 33행)
         return oAPP.attr.S_CODE.UW13.find(function (item) {
@@ -3935,14 +3940,48 @@
 
     }
 
-    //전용 모듈 실행 — 원본 모듈 39~45행(module path 구성 + 동적 로드 + default 실행) 1:1.
+    /************************************************************************
+     * 전용 예외처리 실행 — 원본 모듈(design/attributesArea/attrChangeException.js)을
+     *   베끼지 않고 **그대로 불러서 실행**한다(원본 attrChange 1840~1843행과 동일).
+     *
+     *   ★ 왜 베끼지 않는가(중요):
+     *     원본 모듈은 코드마스터가 알려준 경로(FLD04+FLD05)로 전용 모듈을 다시 불러온다.
+     *     그 경로가 상대경로면 **어느 파일에서 불렀는지에 따라 기준 위치가 달라진다.**
+     *     원본은 design/attributesArea/ 에서 부르고 내 파일은 js/ 에서 부르므로, 로직을 베껴
+     *     내 파일에서 부르면 같은 값이라도 다른 곳을 찾게 된다. 원본 모듈을 그대로 부르면
+     *     기준 위치까지 원본과 같아진다. 원본이 갱신돼도 자동으로 따라간다.
+     *   반환값도 원본 그대로 — true 면 호출측이 이후 값 처리를 건너뛴다(원본 1843행).
+     ************************************************************************/
+    //「원본 전용 모듈 → 내 파일」 갈아끼우기 목록. 키 = 코드마스터(UW13)가 알려준 모듈 경로(FLD04+FLD05).
+    //  ★ 원본 전용 모듈은 UI5 화면 부품(패널·스위치·슬라이더·대화상자 뷰어)으로 만들어져 HTML5 에선 돌지 않는다.
+    //    원본 파일은 한 줄도 고치지 않고, 여기서 같은 값을 돌려주는 내 파일로 바꿔 실행한다.
+    //    목록에 없는 경로는 종전대로 원본 모듈을 그대로 불러 실행한다(기준 위치·동작 동일).
+    var _EXC_MODULE_HTML5 = {
+        //이미지 압축 설정(파일 올리기 UI 2종 + 올린파일 목록 1종 공용) — 원본 design/attributesArea/imageCompress.js
+        "./imageCompress.js": function (sAttr) {
+            oAPP.fn.fnImageCompressPopupOpener(sAttr);
+            //원본 모듈과 같이 true → 호출측이 이후 값 처리를 건너뛴다(값 반영은 창의 적용 버튼이 한다).
+            return true;
+        }
+    };
+
     function _runAttrChangeException(sAttr, sUW13) {
 
-        //module path 구성 처리. (원본 40행)
-        var _path = sUW13.FLD04 + sUW13.FLD05;
+        //코드마스터가 알려준 모듈 경로(원본 attrChangeException.js 40행 FLD04 + FLD05).
+        var _sModPath = ((sUW13 && sUW13.FLD04) || "") + ((sUW13 && sUW13.FLD05) || "");
+
+        var _fnHtml5 = _EXC_MODULE_HTML5[_sModPath];
+
+        if (typeof _fnHtml5 === "function") {
+            //내 파일로 갈아끼워 실행 — 원본 모듈과 같은 자리에서 같은 인자·같은 반환값.
+            return Promise.resolve(_fnHtml5(sAttr));
+        }
+
+        var _path = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath,
+            "attributesArea", "attrChangeException.js");
 
         return import(_path).then(function (oModule) {
-            return oModule["default"](sAttr);
+            return oModule.attrChangeException(sAttr);
         });
 
     }
@@ -3984,7 +4023,14 @@
     //    fnWs20PushUndo 로 1회만 적재하고 소스 커밋 refresh 는 이 함수로 재사용하기 위한 스위치.
     //  @param {boolean} [bSkipAutoGrow] true 면 autoGrowing 확인 팝업 게이트를 건너뛴다. [BR29]
     //    autoGrowing 확인 콜백이 값 반영을 위해 이 함수를 재진입할 때 팝업이 무한 재호출되지 않도록.
-    oAPP.fn.fnWs20AttrChange = function (sAttr, uityp, bSkipUndo, bSkipAutoGrow) {
+    //  @param {boolean} [bSkipAttrExc] true 면 [BR54] 전용 예외처리 갈래를 건너뛴다.
+    //    ★ 왜 필요한가: 원본은 값 변경 함수가 둘이다 — 사용자 편집 진입점 attrChange(예외처리 갈래 포함,
+    //      uiAttributeArea.js:1781) 와 값 반영 일꾼 attrChangeProc(예외처리 갈래 없음, 1929).
+    //      HTML5 는 이 둘을 fnWs20AttrChange 하나로 합쳤기 때문에, 원본이 attrChangeProc 를 직접 부르던
+    //      경로까지 예외처리 갈래를 타게 되어 원본과 달라진다. 그런 경로는 이 스위치로 원본과 맞춘다.
+    //      (원본 호출처 전수 대조 결과 = RESET_ATTR 루프 2206·2219 / AppID·F4 계열 5705·5716·5786·5796·
+    //       6171·6185 / autoGrowing 확인 콜백 3197·3214 / 덤프 이력 기록 2953 / 초기화면 이벤트 185.)
+    oAPP.fn.fnWs20AttrChange = function (sAttr, uityp, bSkipUndo, bSkipAutoGrow, bSkipAttrExc) {
 
         //[BR34] 동기 재진입 방지 — 값 변경 후 속성 행을 다시 그릴 때(fnRenderWs20AttrRows→ROWS.innerHTML="")
         //  포커스가 있던 입력칸이 제거되며 change/blur 가 다시 발생해 이 함수가 재귀 호출되면, 안쪽 호출이
@@ -4048,7 +4094,8 @@
             //  대상이 아니면(패치 미설치 또는 코드마스터 미등록) 판정만 하고 지나가 종전과 완전히 동일하다.
             var _sExcUW13 = null;
             try {
-                _sExcUW13 = _isAttrChangeException(sAttr);
+                //bSkipAttrExc = 원본이 attrChangeProc 를 직접 부르던 경로(예외처리 갈래 없음) → 판정도 안 한다.
+                if (bSkipAttrExc !== true) { _sExcUW13 = _isAttrChangeException(sAttr); }
             } catch (e) {
                 console.error("[HTML5][WS20][attr] attrChangeException 대상 판정 실패:", e && e.message ? e.message : e);
             }
@@ -4056,10 +4103,22 @@
             if (_sExcUW13) {
                 _bExcPending = true;
                 try {
-                    _runAttrChangeException(sAttr, _sExcUW13)["catch"](function (e) {
-                        console.error("[HTML5][WS20][attr] attrChangeException 실행 실패:", e && e.message ? e.message : e);
-                    }).then(function () {
+                    _runAttrChangeException(sAttr, _sExcUW13).then(function (bHandled) {
+
                         //모듈이 다 돈 뒤에 잠금 해제(로딩표시·단축키·자식창·재진입) — WP1 직렬화 규칙.
+                        _releaseAttrChangeLock();
+
+                        //★ 원본 1843행은 모듈이 true 를 줄 때만 값 처리를 건너뛴다. true 가 아니면
+                        //  원본은 그대로 값 처리로 내려간다. HTML5 는 여기서 이미 빠져나왔으므로,
+                        //  잠금을 푼 뒤 예외 갈래만 건너뛰고 다시 들어가 값 처리를 이어간다.
+                        //  (되돌리기 이력은 위에서 이미 쌓았으므로 생략, autoGrowing 게이트도 통과했으므로 생략.)
+                        if (bHandled !== true) {
+                            oAPP.fn.fnWs20AttrChange(sAttr, uityp, true, true, true);
+                        }
+
+                    })["catch"](function (e) {
+                        //원본도 모듈이 실패하면 값 처리로 내려가지 않는다(예외가 attrChange 를 끊음) — 동일.
+                        console.error("[HTML5][WS20][attr] attrChangeException 실행 실패:", e && e.message ? e.message : e);
                         _releaseAttrChangeLock();
                     });
                 } catch (e) {
@@ -4247,14 +4306,14 @@
 
                 //AppID 입력값 초기화 + ATTR 변경(undo 는 위에서 1회 → skip).
                 is_attr.UIATV = "";
-                oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+                oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppF4Del 5786).
 
                 //AppDescript(EXT00000031) 프로퍼티 초기화(원본 5737행).
                 var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
                 var ls_desc = aAttr.find(function (a) { return a.UIATK === "EXT00000031"; });
                 if (ls_desc) {
                     ls_desc.UIATV = "";
-                    oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true);
+                    oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppF4Del 5796).
                 }
 
                 //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 5750·5754행).
@@ -4309,14 +4368,14 @@
                     //F4HelpID 입력값·바인딩 초기화 후 변경(undo 는 위 1회 → skip).
                     is_attr.UIATV = "";
                     is_attr.ISBND = "";
-                    oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+                    oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpIDDel 6171).
 
                     //짝 ReturnField — 바인딩 안 됐으면 함께 초기화(원본 6124행).
                     var ls_attr = aAttr.find(function (a) { return a.UIATK === l_UIATK; });
                     if (ls_attr && ls_attr.ISBND !== "X") {
                         ls_attr.UIATV = "";
                         ls_attr.ISBND = "";
-                        oAPP.fn.fnWs20AttrChange(ls_attr, "INPUT", true);
+                        oAPP.fn.fnWs20AttrChange(ls_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpIDDel 6185).
                     }
 
                     //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 6138·6142행).
@@ -4333,7 +4392,7 @@
 
                     is_attr.UIATV = "";
                     is_attr.ISBND = "";
-                    oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true);
+                    oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpIDDel 6224).
 
                     if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
                     if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
@@ -4822,7 +4881,7 @@
 
                         var uityp = _sAttr.chk_visb ? "CHECK" : (_sAttr.sel_visb ? "DDLB" : "INPUT");
                         //[BR42] undo 는 위에서 1회만 → 개별 변경은 bSkipUndo=true 로 스냅샷 생략.
-                        try { oAPP.fn.fnWs20AttrChange(_sAttr, uityp, true); }
+                        try { oAPP.fn.fnWs20AttrChange(_sAttr, uityp, true, false, true); }   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrResetAttr 2206·2219).
                         catch (e) { console.error("[HTML5][WS20][attr] reset 변경 오류:", _sAttr.UIATT, e && e.message); }
                     }
 
@@ -4870,7 +4929,8 @@
         "sap-icon://complete": "check",                     // event(wait off)
         "sap-icon://color-fill": "diamond",                 // aggregation 0:1
         "sap-icon://dimension": "diamond",                  // aggregation 0:N
-        "sap-icon://value-help": "clone"                    // F4 값도움 — 원본 sap-icon://value-help(겹친 사각형) 모양에 가장 가까운 fa-clone 로 재현(사용자 피드백 2026-06-17)
+        "sap-icon://value-help": "clone",                   // F4 값도움 — 원본 sap-icon://value-help(겹친 사각형) 모양에 가장 가까운 fa-clone 로 재현(사용자 피드백 2026-06-17)
+        "sap-icon://picture": "image"                       // 이미지 압축 설정 버튼(코드마스터 UW11 FLD08 지정 아이콘)
     };
     // sap-icon → FontAwesome <i> 마크업. 못 찾으면 sFaFallback(기본 circle).
     function _iconHtml(sIcon, sFaFallback) {
@@ -5312,17 +5372,60 @@
         HLP.title = _msg("B39", "Help");
         HLP.innerHTML = '<i class="fa-solid fa-circle-question"></i>';
         HLP.addEventListener("click", function () {
-            //원본(uiAttributeArea.js 599행): 패치(UHAK901369) 서버면 U4A Help Document 팝업(startMenuId 000271)
+
+            var l_ui = this;   //원본 uiAttributeArea.js 621행 `var l_ui = this;`
+
+            //원본 uiAttributeArea.js 602행 — 눌리는 즉시 busy.
+            parent.setBusy("X");
+
+            //원본(uiAttributeArea.js 614행): 패치(UHAK901369) 서버면 U4A Help Document 팝업(startMenuId 000271)
             //   호출. fnU4AHelpDocuPopupOpener 는 HTML5 구현 완료(도움말 문서 워커/뷰어 재사용).
+            var bPatch = false;
             try {
-                if (oAPP.common.checkWLOList("C", "UHAK901369") === true) {
-                    oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000271" });
+                bPatch = (oAPP.common.checkWLOList("C", "UHAK901369") === true);
+            } catch (e) {
+                console.error("[WS20HELP-20] 통합 도움말 등록여부 판정 실패:", e);
+                try { parent.setBusy(""); } catch (e2) { }
+                return;
+            }
+
+            if (bPatch) {
+
+                //[BR58 검수반영] 패치 서버인데 여는 기능이 안 실렸으면 구성 이상 →
+                //  구버전 도움말로 빠지지 않고 오류로 끝낸다(트리·미리보기와 동일 계약).
+                if (typeof oAPP.fn.fnU4AHelpDocuPopupOpener !== "function") {
+                    console.error("[WS20HELP-21] 통합 도움말 여는 기능 미로드 — 구성 확인 필요.");
+                    try { parent.setBusy(""); } catch (e3) { }
                     return;
                 }
-            } catch (e) { console.error("[HTML5][WS20] Attribute Help(U4A Help Document) 오픈 실패:", e); }
-            //미패치 서버 폴백 = 구 callTooltipsPopup(attrTooltip/E23) — UI5 툴팁 팝업 미변환(W4+ 예정).
-            console.warn("[W4+ 예정] Attribute Help 폴백(callTooltipsPopup) 미변환 — 패치(UHAK901369) 서버에서 U4A Help Document 사용");
-            _wipToast();
+
+                //★ opener 는 async 라 실패가 약속(Promise) 거부로 온다 → 반드시 받아서
+                //  대기 표시를 풀어야 한다(동기 try/catch 로는 안 잡힘 · 검수 P1).
+                try {
+                    var oRet = oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000271" });
+                    if (oRet && typeof oRet.catch === "function") {
+                        oRet.catch(function (e) {
+                            console.error("[WS20HELP-21] 통합 도움말 팝업 호출 실패:", e);
+                            try { parent.setBusy(""); } catch (e4) { }
+                        });
+                    }
+                } catch (e) {
+                    console.error("[WS20HELP-21] 통합 도움말 팝업 호출 실패:", e);
+                    try { parent.setBusy(""); } catch (e5) { }
+                }
+                return;
+            }
+
+            //[BR58] 구버전 서버(UHAK901369 미등록) 폴백 = 도움말 창.
+            //  원본 624~641행 callTooltipsPopup(l_ui, "attrTooltip", "E23").
+            //  ★ 이전에는 폴백을 부르지 않고 "아직 작업중입니다" 안내만 띄웠다.
+            if (typeof oAPP.fn.callTooltipsPopup !== "function") {
+                console.error("[WS20HELP-22] 도움말 팝업 미로드 — ws_html5_call_tooltips_popup.js 로드 확인 필요.");
+                try { parent.setBusy(""); } catch (e3) { }
+                return;
+            }
+            //E23  Attribute Area
+            oAPP.fn.callTooltipsPopup(l_ui, "attrTooltip", "E23");
         });
         TBR.appendChild(HLP);
 
@@ -5847,14 +5950,20 @@
 
             var BTN = document.createElement("button");
             BTN.type = "button";
+            //버튼 유형 = 코드마스터 UW11 FLD07(원본 uiAttributeArea.js 6953행 btn_type) 그대로.
+            //  Attention=노란 테두리 / Emphasized=파랗게 채운 버튼(원본 sap.m.Button type 동일 의미).
             BTN.className = "u4aWs20AttrPopBtn" +
-                ((sAttr.btn_type === "Attention") ? " attention" : "");
+                ((sAttr.btn_type === "Attention") ? " attention" : "") +
+                ((sAttr.btn_type === "Emphasized") ? " emphasized" : "");
             // 팝업 호출형 버튼(CSS/JS Link Add·Web Security·Enable Dump Write 등)은 조회 모드에서도
             //   클릭 가능 — 팝업을 "보기"는 허용하고, 내부 편집은 각 팝업이 _isEdit() 로 읽기전용 처리한다.
             BTN.disabled = false;
 
             BTN.innerHTML = _iconHtml(sAttr.btn_icon, "up-right-from-square");
-            var sBtnTxt = sAttr.btn_text || sAttr.UIATT || "";
+            //버튼 글자 = 원본 sap.m.Button text:"{btn_text}" 1:1 — 코드마스터(UW11 FLD06)가 준 글자만 쓴다.
+            //  ★ 종전에는 글자가 비면 속성명(UIATT)으로 채웠으나, 원본은 비면 아이콘만 그린다(예: 이미지 압축
+            //    설정 = 글자 없음 + 사진 아이콘). 속성명은 아래 title(마우스 올림 설명)로 계속 확인 가능.
+            var sBtnTxt = sAttr.btn_text || "";
             if (sBtnTxt) {
                 var SP = document.createElement("span");
                 SP.textContent = sBtnTxt;
@@ -5882,9 +5991,12 @@
                         if (oAPP.fn.fnInitPreScreenPopupOpener) { oAPP.fn.fnInitPreScreenPopupOpener(sAttr); return; }
                         break;
                 }
-                //팝업 호출형 속성 버튼 미변환(구현 5종 외) — 작업중 안내.
-                console.warn("[W4+ 예정] 팝업 호출형 속성 버튼 미변환:", sAttr.UIATT, "(", sAttr.UIATK, ")");
-                _wipToast();
+                //위 5종(ROOT 문서 속성)은 원본이 attrDocumentProc 로 직접 처리하는 갈래라 팝업을 바로 부른다.
+                //  그 외 팝업 호출형 버튼은 원본 버튼 press(uiAttributeArea.js 1523행)와 똑같이
+                //  공통 값변경 처리로 넘긴다 → 그 안에서 코드마스터(UW13) 전용 처리 갈래로 이어진다.
+                //  (예: 이미지 압축 설정 = UW13 등록건 → 전용 모듈이 창을 띄운다.)
+                //  등록건이 아니면 원본과 같이 값 처리만 하고 조용히 끝난다.
+                oAPP.fn.fnWs20AttrChange(sAttr, "BUTTON");
             });
 
             BOX.appendChild(BTN);
@@ -6475,11 +6587,6 @@
             ROW.className = "u4aWs20AttrRow" + (bChanged ? " changeValue" : "");
             ROW.setAttribute("data-uiatk", sAttr.UIATK || "");
             ROW.setAttribute("data-uiaty", sAttr.UIATY || "");
-            //[BR52] 선택 강조 복원 — setAttrFocus 가 보관한 선택키(_attrSelUiatk)를 매 재렌더마다
-            //  같은 행에 다시 표시(원본 sap.m.Table 은 같은 UI 안 재렌더에서 선택 유지 — 그 계약 재현).
-            if (oAPP.attr._attrSelUiatk && oAPP.attr._attrSelUiatk === sAttr.UIATK) {
-                ROW.setAttribute("aria-selected", "true");
-            }
             //우클릭 컨텍스트 메뉴(ws_html5_ws20_attr_ctxmenu.js)가 이 행의 attr 원본을 참조.
             //  (원본 attrBeforeContextMenu 는 바인딩 컨텍스트로 is_attr 를 얻는다 — HTML5 는 행에 직접 보관.)
             ROW.__attrData = sAttr;

@@ -82,6 +82,7 @@ module.exports.checkPropertyValue = function(sAttr){
         return _sRes;
     }
 
+
     //공통코드 UI 프로퍼티 점검 항목이 존재하지 않는다면 EXIT.
     if(typeof oAPP.attr.S_CODE?.UW09 === "undefined" || oAPP.attr.S_CODE?.UW09 === null){
         return _sRes;
@@ -373,6 +374,93 @@ oCheckFunc.validFromTo = function(sAttr, from, to){
 
 };
 
+
+
+/**
+ * @since   2026-08-14 19:22:08
+ * @version vNAN-NAN
+ * @author  pes
+ * @description
+ * sap.ui.layout.form.ResponsiveGridLayout 컬럼/레이블 관련 속성 점검
+ */
+oCheckFunc.validResponsiveGridLayoutColumns = function(sAttr){
+
+    const _sRes = JSON.parse(JSON.stringify(TY_CHECK_RES));
+
+    var _sKey = "";
+
+    if(typeof sAttr.UIATK === "string"){
+        _sKey = sAttr.UIATK.trim();
+    }
+
+    if(_sKey === ""){
+        return null;
+    }
+
+    // 대상 속성인지 판단.
+    switch(_sKey){
+        case "AT000012666": // labelSpanXL
+        case "AT000012675": // columnsXL
+            break;
+        case "AT000012667": // labelSpanL
+        case "AT000012668": // labelSpanM
+        case "AT000012669": // labelSpanS
+        case "AT000012676": // columnsL
+        case "AT000012677": // columnsM
+            break;
+        default:
+            return null;
+    }
+
+    //숫자 유형 여부 확인.
+    var _sVal = sAttr.UIATV;
+
+    _sVal = _sVal && _sVal.trim ? _sVal.trim() : String(_sVal);
+
+    const _nVal = Number(_sVal);
+
+    if(_sVal === "" || Number.isNaN(_nVal) || Number.isInteger(_nVal) !== true){
+
+        _sRes.RETCD = "E";
+
+        //372	&1 은 숫자 유형이 아닙니다. 숫자 유형의 값을 입력 하십시오.
+        _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, "ZMSG_WS_COMMON_001", "372", sAttr.UIATV);
+
+        return _sRes;
+    }
+
+    // labelSpanXL/columnsXL: -1, 1~12 허용
+    if(_sKey === "AT000012666" || _sKey === "AT000012675"){
+
+        if(_nVal !== -1 && (_nVal < 1 || _nVal > 12)){
+
+            _sRes.RETCD = "E";
+
+            //226	&1 값은 허용값이 아닙니다.(&2 ~ &3 사이의 값을 입력하십시오.)
+            _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, 
+                "ZMSG_WS_COMMON_001", "226", sAttr.UIATV, -1, 12);
+
+            return _sRes;
+        }
+
+        return _sRes;
+    }
+
+    // 나머지 대상 속성: 1~12 허용
+    if(_nVal < 1 || _nVal > 12){
+
+        _sRes.RETCD = "E";
+
+        //226	&1 값은 허용값이 아닙니다.(&2 ~ &3 사이의 값을 입력하십시오.)
+        _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt(oAPP.oDesign.settings.GLANGU, 
+            "ZMSG_WS_COMMON_001", "226", sAttr.UIATV, 1, 12);
+
+        return _sRes;
+    }
+
+    return _sRes;
+
+};
 
 
 

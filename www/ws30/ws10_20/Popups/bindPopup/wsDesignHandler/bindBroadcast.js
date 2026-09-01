@@ -115,10 +115,19 @@
             try {
                 // 추가속성 화면 비활성 — 원본 setAdditLayout("", {KEEP_SPLITTER_SIZE:true}). 필수 호출 직접(삼킴 제거).
                 oAPP.fn.setAdditLayout("", { KEEP_SPLITTER_SIZE: true });
+                // [BR63] 우측 추가속성 바인딩 버튼 활성 — 원본 broadcastChannelBindPopup.js:282
+                //   setAdditBindButtonEnable(true). HTML5 에 누락돼 있던 원본 1:1 호출을 복원한다.
+                oAPP.fn.setAdditBindButtonEnable(true);
                 // 디자인 트리 재구성(재렌더 + 컬럼맞춤 포함).
                 oAPP.fn.setDesignTreeData();
-                // 추가속성 리스트 재구성 — ★oAPP.attr.oAddit 는 라이브 미할당(죽은 네임스페이스)이던 것 → oAPP.fn 으로 복구.
-                oAPP.fn.setAdditialListData();
+                // ★[BR63] 추가속성 리스트 재구성은 하지 않는다 — 원본 broadcastChannelBindPopup.js:288~289 가
+                //   setAdditialListData() 를 **주석 처리**해 두었다(268~269 clearSelectAdditBind, 304~305
+                //   oAddit.oModel.refresh() 도 동일하게 주석). 즉 원본은 이 경로에서 우측 추가속성 값을
+                //   의도적으로 건드리지 않고 사용자가 넣어둔 값을 그대로 남긴다.
+                //   HTML5 가 이를 "죽은 네임스페이스(oAPP.attr.oAddit) 복구"로 오인해 되살리는 바람에,
+                //   팝업 필드를 WS20 속성줄에 끌어다 놓을 때마다 우측 추가속성 값이 초기값(빈 값 / false)으로
+                //   되돌아갔다. 원본대로 호출하지 않는다.
+                // (원본 289) oAPP.fn.setAdditialListData();
             } catch (e) {
                 console.error("[HTML5][bindWindow] UPDATE_DESIGN_DATA 재구성 오류:", e && e.message);
             } finally {

@@ -28,6 +28,7 @@
  *  oParam.actions       - popover action button 정보
  *  oParam.IF_DATA       - HTML 내부로 전달할 데이터 정보
  *  oParam.fnCallback    - action 버튼 press 시 호출될 콜백 함수
+ *  oParam.closeActionCode - 팝업 종료 시 호출될 action code
  *************************************************************/
 //#region ⚙️ popoverViewer
 export function popoverViewer(contents, oParam){
@@ -73,7 +74,39 @@ export function popoverViewer(contents, oParam){
                     type : "Reject",
                     icon : "sap-icon://decline",
                     press : function() {
-                        oPopover.close();
+                        /**
+                         * @since   2026-07-07 02:00:12
+                         * @version vNAN-NAN
+                         * @author  pes
+                         * @description
+                         * 팝업 종료에 대한 action code를 전달받아 호출처에 전달하도록 처리.
+                         */
+                        // oPopover.close();
+
+                        if(!oParam.fnCallback){
+                            oPopover.close();
+                            return;
+                        }
+
+                        if(!oParam.closeActionCode){
+                            oPopover.close();
+                            return;
+                        }
+
+                        const _sParam = {
+
+                            ACTCD : oParam.closeActionCode,
+
+                            //POPOVER 내부 I/F 데이터 정보
+                            IF_DATA : oPopover.data("IF_DATA"),
+
+                            //popover ui instance.
+                            popover : oPopover,
+
+                        };
+
+                        //액션 코드에 해당하는 커스텀 데이터 정보를 얻어 호출처에 전달.
+                        oParam.fnCallback(_sParam);
                     }
                 })
             ]
@@ -424,6 +457,7 @@ export function popoverViewer(contents, oParam){
  *  oParam.actions       - dialog action button 정보
  *  oParam.IF_DATA       - HTML 내부로 전달할 데이터 정보
  *  oParam.fnCallback    - action 버튼 press 시 호출될 콜백 함수
+ *  oParam.closeActionCode - 팝업 종료 시 호출될 action code
  * @return {Promise} dialog 내부에서 처리되는 Promise 객체
 */
 export function dialogViewer(contents, oParam){
@@ -449,6 +483,39 @@ export function dialogViewer(contents, oParam){
         draggable: oParam?.draggable,
         resizable: oParam?.resizable,
         verticalScrolling: false,
+        escapeHandler : function(oPromise) {
+            /**
+             * @since   2026-07-07 02:00:12
+             * @version vNAN-NAN
+             * @author  pes
+             * @description
+             * 팝업 종료에 대한 action code를 전달받아 호출처에 전달하도록 처리.
+             */
+            if(!oParam.fnCallback){
+                oDialog.close();
+                return;
+            }
+
+            if(!oParam.closeActionCode){
+                oDialog.close();
+                return;
+            }
+
+            const _sParam = {
+
+                ACTCD : oParam.closeActionCode,
+
+                //dialog 내부 I/F 데이터 정보
+                IF_DATA : oDialog.data("IF_DATA"),
+
+                //dialog ui instance.
+                dialog : oDialog,
+
+            };
+
+            //액션 코드에 해당하는 커스텀 데이터 정보를 얻어 호출처에 전달.
+            oParam.fnCallback(_sParam);
+        },
         // showHeader : false,
         customHeader : new sap.m.Toolbar({
             content: [
@@ -469,7 +536,39 @@ export function dialogViewer(contents, oParam){
                     type : "Reject",
                     icon : "sap-icon://decline",
                     press : function() {
-                        oDialog.close();
+                        /**
+                         * @since   2026-07-07 02:00:12
+                         * @version vNAN-NAN
+                         * @author  pes
+                         * @description
+                         * 팝업 종료에 대한 action code를 전달받아 호출처에 전달하도록 처리.
+                         */
+                        // oDialog.close();
+
+                        if(!oParam.fnCallback){
+                            oDialog.close();
+                            return;
+                        }
+
+                        if(!oParam.closeActionCode){
+                            oDialog.close();
+                            return;
+                        }
+
+                        const _sParam = {
+
+                            ACTCD : oParam.closeActionCode,
+
+                            //dialog 내부 I/F 데이터 정보
+                            IF_DATA : oDialog.data("IF_DATA"),
+
+                            //dialog ui instance.
+                            dialog : oDialog,
+
+                        };
+
+                        //액션 코드에 해당하는 커스텀 데이터 정보를 얻어 호출처에 전달.
+                        oParam.fnCallback(_sParam);
                     }
                 })
             ]
@@ -524,7 +623,7 @@ export function dialogViewer(contents, oParam){
 
                     ACTCD : oEvent.detail.ACTCD,
 
-                    //POPOVER 내부 I/F 데이터 정보
+                    //dialog 내부 I/F 데이터 정보
                     IF_DATA : oEvent.detail.IF_DATA,
 
                     //dialog ui instance.

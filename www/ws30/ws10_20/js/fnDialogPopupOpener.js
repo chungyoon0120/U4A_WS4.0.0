@@ -300,6 +300,25 @@
     }; // end of oAPP.fn.fnInitPreScreenPopupOpener
 
     /************************************************************************
+     * WS20 속성 "imageCompressSettings"(파일 올리기 UI) 이미지 압축 설정 팝업 실행 메소드
+     *   @param {object} sAttr - 대상 속성 행(is_attr). 팝업이 UIATV 를 읽어 반영한다.
+     *   ★ busy/단축키 잠금은 여는 쪽(공통 값변경 처리 fnWs20AttrChange)이 이미 걸었고,
+     *     전용 처리 모듈이 끝난 뒤 그쪽이 함께 푼다(원본 imageCompress.js 와 같은 순서).
+     ************************************************************************/
+    oAPP.fn.fnImageCompressPopupOpener = function (sAttr) {
+
+        if (oAPP.fn.fnImageCompressPopupOpen) {
+            oAPP.fn.fnImageCompressPopupOpen(sAttr);
+            return;
+        }
+
+        oAPP.loadJs("fnImageCompressPopupOpen", function () {
+            oAPP.fn.fnImageCompressPopupOpen(sAttr);
+        });
+
+    }; // end of oAPP.fn.fnImageCompressPopupOpener
+
+    /************************************************************************
      * WS20의 Client Event 팝업 실행시켜 주는 메소드
      ************************************************************************/
     oAPP.fn.fnClientEditorPopupOpener = function (TYPE, PARAM, fnCallback) {

@@ -3435,6 +3435,20 @@
     oAPP.fn.fnShowMainWindow = function () {
         const aBrowserList = REMOTE.BrowserWindow.getAllWindows();
         let oFirst = null;
+
+        // 다중 모니터 대응: 활성 창이 다른 모니터에 있으면 전면으로 와도 안 보이므로,
+        // 서버리스트(현재 창=CURRWIN)가 놓인 모니터의 가운데로 끌어온다. 기준은 확실한
+        // CURRWIN 하나 — global.CURRWIN 등 외부 상태에 의존하지 않는다.
+        let oParent = null, oWorkArea = null;
+        try {
+            oParent = CURRWIN.getBounds();
+            const SCREEN = REMOTE.require("electron").screen;
+            const oDisp = SCREEN.getDisplayMatching(oParent);
+            oWorkArea = (oDisp && oDisp.workArea) ? oDisp.workArea : null;
+        } catch (e) {
+            console.error("[fnShowMainWindow] 화면 정보 조회 실패:", e);
+        }
+
         for (const oBrows of aBrowserList) {
             try {
                 if (oBrows.isDestroyed()) { continue; }
@@ -3443,9 +3457,25 @@
                 // 활성 자식 창(로그인/메인)은 OBJTY === "MAIN" — 이들을 전면으로 끌어온다.
                 if (oWebPref.OBJTY !== "MAIN") { continue; }
                 if (oBrows.isMinimized()) { oBrows.restore(); }
+
+                // 서버리스트 창의 가운데(그 모니터)로 이동 — 창 크기는 유지, 작업영역 안으로 보정.
+                if (oParent) {
+                    const oCh = oBrows.getBounds();
+                    let iX = Math.round(oParent.x + (oParent.width - oCh.width) / 2);
+                    let iY = Math.round(oParent.y + (oParent.height - oCh.height) / 2);
+                    if (oWorkArea) {
+                        iX = Math.max(oWorkArea.x, Math.min(iX, oWorkArea.x + oWorkArea.width - oCh.width));
+                        iY = Math.max(oWorkArea.y, Math.min(iY, oWorkArea.y + oWorkArea.height - oCh.height));
+                    }
+                    oBrows.setBounds({ x: iX, y: iY, width: oCh.width, height: oCh.height });
+                }
+
                 oBrows.show();
                 if (!oFirst) { oFirst = oBrows; }
-            } catch (error) { continue; }
+            } catch (error) {
+                console.error("[fnShowMainWindow] 활성 창 이동/표시 실패:", error);
+                continue;
+            }
         }
         // 가장 먼저 열린(첫 번째) 활성 창을 포커스
         if (oFirst) { oFirst.focus(); }

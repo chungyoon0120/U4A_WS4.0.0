@@ -59,3 +59,8 @@
         text-shadow: 0 0 10px #ffffff;
     }
 }
+
+.u4aInsertUiKeyToolbar.sapMOTB {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}

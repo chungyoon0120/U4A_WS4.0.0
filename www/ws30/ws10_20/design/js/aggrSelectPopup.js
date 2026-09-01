@@ -18,9 +18,21 @@
   //AGGREGATION 선택 팝업.
   oAPP.fn.aggrSelectPopup = function(i_drag, i_drop, retfunc, i_x, i_y, cancelFunc){
 
+    /**
+     * @since   2026-08-14 19:22:08
+     * @version vNAN-NAN
+     * @author  pes
+     * @description
+     * oAPP.fn.chkAggrRelation 함수에서 추가 가능 aggregation 구성시,
+     * 구성되지 않는 aggregation이 존재하는 경우, 오류 내용과 메시지를 같이 구성하도록
+     * 내용이 변경되어 기존 로직 주석 처리.
+     */
     //입력 UI의 UI 가능 AGGREGATION 정보 얻기.
-    var lt_sel = oAPP.fn.chkAggrRelation(i_drop.UIOBK, i_drop.OBJID, i_drag.UIOBK);
+    // var lt_sel = oAPP.fn.chkAggrRelation(i_drop.UIOBK, i_drop.OBJID, i_drag.UIOBK);
+    const _sAggrRes = oAPP.fn.chkAggrRelation(i_drop.UIOBK, i_drop.OBJID, i_drag.UIOBK);
     
+    var lt_sel = _sAggrRes.T_SEL;
+
 
     //선택가능 aggregation리스트가 존재하지 않는경우, drag, drop의 부모, aggregation이 동일한경우.
     if(lt_sel.length === 0 && i_drag.POBID === i_drop.POBID && i_drag.UIATK === i_drop.UIATK ){
@@ -50,7 +62,8 @@
         _sRes.RCODE = "02";
 
         //262	이동 가능한 aggregation이 존재하지 않습니다.
-        _sRes.RTMSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "262", "", "", "", "");
+        // _sRes.RTMSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "262", "", "", "", "");
+        _sRes.RTMSG = _sAggrRes.RTMSG;
 
         //취소 callback function 호출.
         cancelFunc(_sRes);
@@ -61,8 +74,9 @@
       //20250702 PES -END.
 
       //오류 메시지 출력.
-      //262	이동 가능한 aggregation이 존재하지 않습니다.
-      parent.showMessage(sap, 10, "I", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "262", "", "", "", ""));
+      // //262	이동 가능한 aggregation이 존재하지 않습니다.
+      // parent.showMessage(sap, 10, "I", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "262", "", "", "", ""));
+      parent.showMessage(sap, 10, "I", _sAggrRes.RTMSG);
 
       //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
       parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");

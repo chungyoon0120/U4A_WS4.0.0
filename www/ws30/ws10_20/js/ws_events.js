@@ -1562,6 +1562,12 @@
             } catch (e) {
                 console.error("[WS20ACT-CHK02] 예외 점검 오류목록 표시 실패:", e);
                 try { oAPP.common.fnSetBusyLock(""); } catch (e2) { console.error("[WS20ACT-CHK02] busy 해제 실패:", e2 && e2.message); }
+                //[BR55-P1] fnMultiFooterMsg 는 진입 즉시 본창 busy + 자식창 BUSY_ON 을 함께 건다
+                //  (fnDialogPopupOpener.js 2822~2826). 도중 실패로 여기 오면 본창만 풀어선 안 되고
+                //  이미 나간 자식창 잠금도 같이 회수해야 한다(BUSY_ON 잠그면 BUSY_OFF 필수).
+                try {
+                    if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
+                } catch (e4) { console.error("[WS20ACT-CHK02] 자식창 busy 해제 방송 실패:", e4 && e4.message); }
                 try { parent.showMessage(null, 10, "E", "WS20ACT-CHK02"); } catch (e3) { console.error("[WS20ACT-CHK02] 오류 안내 표시 실패:", e3 && e3.message); }
             }
 

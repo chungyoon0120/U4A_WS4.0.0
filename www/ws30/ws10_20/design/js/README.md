@@ -79,3 +79,38 @@ oAPP.fn.fnBindWindowPopupOpener
 14. WS_20에서 저장 처리시 저장 데이터 구성하는 펑션
 www\ws10_20\design\js\main.js
 oAPP.fn.getSaveData
+
+
+15. 프로퍼티 바인딩 CALLBACK 펑션
+www\ws30\ws10_20\design\js\uiAttributeArea.js
+oAPP.fn.attrBindCallBackProp
+
+
+16. AGGREGATION 바인딩 CALLBACK 펑션
+www\ws30\ws10_20\design\js\uiAttributeArea.js
+oAPP.fn.attrBindCallBackAggr
+
+
+17. 프로퍼티 바인딩 팝업 호출 펑션
+www\ws30\ws10_20\design\js\uiAttributeArea.js
+oAPP.fn.attrBindProp
+
+
+18. AGGREGATION 바인딩 팝업 호출 
+www\ws30\ws10_20\design\js\uiAttributeArea.js
+oAPP.fn.attrBindAggr
+
+
+19. ATTRIBUTE F4 HELP 이벤트
+www\ws30\ws10_20\design\js\uiAttributeArea.js
+oAPP.fn.attrCallValueHelp
+
+
+20. 바인딩, 서버이벤트 아이콘 클릭
+www\ws30\ws10_20\design\js\uiAttributeArea.js
+oAPP.fn.attrIcon1Proc
+
+
+21. 클라이언트 이벤트 아이콘 클릭
+www\ws30\ws10_20\design\js\uiAttributeArea.js
+oAPP.fn.attrIcon2Proc

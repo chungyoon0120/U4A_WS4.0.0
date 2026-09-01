@@ -1,18 +1,6 @@
-/*
- * @u4a-preview-css-doc-version 2026-06-09
- *
- * Preview marker stylesheet guide.
- *
- * This stylesheet owns visual-only design-time markers inside the preview
- * iframe: normal UI selection, context-menu highlighting, native UI5 focus
- * suppression, theme-aware marker colors, and popup z-index ordering.
- */
+/* Design-time selection, context, focus-suppression, and popup marker styles. */
 
-/*
- * Preview selection/context marker variables.
- * These values are shared by normal selection, context-menu highlight,
- * and the diagonal hatch fill drawn inside marker backgrounds.
- */
+/* Shared selection, context-menu, and hatch marker variables. */
 :root {
     --u4a-preview-selection-border-color: #0078ff;
     --u4a-preview-selection-bg: rgba(0, 120, 255, 0.08);
@@ -103,52 +91,29 @@ body[class*="sapUiTheme-"][class*="_hcw"] {
 }
 
 .selPreviewUI {
-    /* @u4a-css-decl background-color: Adds a low-opacity marker fill while keeping the underlying preview UI readable. */
     background-color: var(--u4a-preview-selection-legacy-bg) !important;
 }
 
 .u4aWsDisplayNone {
-    /* @u4a-css-decl display: Controls whether the marker/helper element participates in rendering; most layers default to none and become visible through data attributes. */
     display: none !important;
 }
 
 .u4aSelOpt3 {
-    /* @u4a-css-decl display: Controls whether the marker/helper element participates in rendering; most layers default to none and become visible through data attributes. */
     display: flex !important;
-    /* @u4a-css-decl align-items: Aligns helper toolbar/form content vertically inside flex containers. */
     align-items: center;
 }
 
-/*
- * Hide native UI5 focus indicators inside the preview.
- *
- * Selection in the preview is not represented by browser/UI5 focus rings.
- * The selected UI is highlighted by #u4a_ws_selection_layer.
- *
- * Important:
- * - UI5 often draws focus with :focus::before, :focus::after,
- *   :focus > child::before, .sapMFocus, or .sapMInputBaseFocused.
- * - This reset hides those focus indicators inside selectable preview UIs.
- * - The U4A selection layer is a body-level overlay DOM, so this reset can
- *   hide UI5 focus drawing without changing the selected UI structure.
- */
+/* Selection uses the detached U4A layer, so native UI5 focus rings are suppressed. */
 html.sap-desktop [data-u4a-selectable="X"]:where(:focus, :focus-visible, :focus-within),
 html.sap-desktop [data-u4a-selectable="X"] :where(:focus, :focus-visible, :focus-within),
 html.sap-desktop [data-u4a-selectable="X"]:where(.sapMFocus, .sapMInputBaseFocused),
 html.sap-desktop [data-u4a-selectable="X"] :where(.sapMFocus, .sapMInputBaseFocused) {
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-    /* @u4a-css-decl outline-offset: Moves fallback outlines inside or outside the target without changing layout size. */
     outline-offset: 0 !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: none !important;
 }
 
-/*
- * Hide UI5 focus borders drawn on the focused element itself.
- * Do not use content:none/display:none here, because some controls use
- * pseudo-elements for non-focus rendering. Make the focus drawing invisible.
- */
+/* Keep pseudo-elements alive because some controls also use them for non-focus rendering. */
 html.sap-desktop [data-u4a-selectable="X"]:where(:focus, :focus-visible, :focus-within):not([data-u4a-selected="X"]):not([data-u4a-contextmenu="X"])::before,
 html.sap-desktop [data-u4a-selectable="X"]:where(:focus, :focus-visible, :focus-within):not([data-u4a-selected="X"]):not([data-u4a-contextmenu="X"])::after,
 html.sap-desktop [data-u4a-selectable="X"] :where(:focus, :focus-visible, :focus-within):not([data-u4a-selected="X"]):not([data-u4a-contextmenu="X"])::before,
@@ -157,38 +122,22 @@ html.sap-desktop [data-u4a-selectable="X"]:where(.sapMFocus, .sapMInputBaseFocus
 html.sap-desktop [data-u4a-selectable="X"]:where(.sapMFocus, .sapMInputBaseFocused):not([data-u4a-selected="X"]):not([data-u4a-contextmenu="X"])::after,
 html.sap-desktop [data-u4a-selectable="X"] :where(.sapMFocus, .sapMInputBaseFocused):not([data-u4a-selected="X"]):not([data-u4a-contextmenu="X"])::before,
 html.sap-desktop [data-u4a-selectable="X"] :where(.sapMFocus, .sapMInputBaseFocused):not([data-u4a-selected="X"]):not([data-u4a-contextmenu="X"])::after {
-    /* @u4a-css-decl border-color: Overrides UI5 focus border color so native focus rings do not compete with U4A markers. */
     border-color: transparent !important;
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: none !important;
-    /* @u4a-css-decl background-color: Adds a low-opacity marker fill while keeping the underlying preview UI readable. */
     background-color: transparent !important;
 }
 
-/*
- * Selected elements can still receive focus.
- * Hide only the selected element's ::before focus indicator and keep its
- * ::after alive because ::after is the U4A selection layer.
- */
+/* Keep the selected element's ::after U4A marker while hiding its focus ::before. */
 html.sap-desktop [data-u4a-selected="X"]:where(:focus, :focus-visible, :focus-within)::before,
 html.sap-desktop [data-u4a-selected="X"]:where(.sapMFocus, .sapMInputBaseFocused)::before {
-    /* @u4a-css-decl border-color: Overrides UI5 focus border color so native focus rings do not compete with U4A markers. */
     border-color: transparent !important;
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: none !important;
-    /* @u4a-css-decl background-color: Adds a low-opacity marker fill while keeping the underlying preview UI readable. */
     background-color: transparent !important;
 }
 
-/*
- * Hide UI5 focus indicators drawn on immediate child elements.
- * This covers patterns such as:
- * html.sap-desktop .sapMBtn:focus > .sapMFocusable::before
- */
+/* UI5 can draw focus indicators on an immediate child instead of the root. */
 html.sap-desktop [data-u4a-selectable="X"]:where(:focus, :focus-visible, :focus-within) > *:not([data-u4a-contextmenu="X"])::before,
 html.sap-desktop [data-u4a-selectable="X"] :where(:focus, :focus-visible, :focus-within) > *:not([data-u4a-contextmenu="X"])::before,
 html.sap-desktop [data-u4a-selectable="X"]:where(.sapMFocus, .sapMInputBaseFocused) > *:not([data-u4a-contextmenu="X"])::before,
@@ -197,30 +146,14 @@ html.sap-desktop [data-u4a-selectable="X"]:where(:focus, :focus-visible, :focus-
 html.sap-desktop [data-u4a-selectable="X"] :where(:focus, :focus-visible, :focus-within) > *:not([data-u4a-selected="X"])::after,
 html.sap-desktop [data-u4a-selectable="X"]:where(.sapMFocus, .sapMInputBaseFocused) > *:not([data-u4a-selected="X"])::after,
 html.sap-desktop [data-u4a-selectable="X"] :where(.sapMFocus, .sapMInputBaseFocused) > *:not([data-u4a-selected="X"])::after {
-    /* @u4a-css-decl border-color: Overrides UI5 focus border color so native focus rings do not compete with U4A markers. */
     border-color: transparent !important;
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: none !important;
-    /* @u4a-css-decl background-color: Adds a low-opacity marker fill while keeping the underlying preview UI readable. */
     background-color: transparent !important;
 }
 
 
-/*
- * Hide UI5 focus helper DOMs.
- *
- * Some UI5 controls do not draw the focus border on the focused DOM itself
- * or through ::before / ::after. Instead, they render a real child DOM only
- * for the focus indicator.
- *
- * Example:
- * html.sap-desktop .sapMGT:focus .sapMGTFocusDiv
- *
- * This block removes those helper-DOM focus borders inside selectable preview
- * controls without having to add one rule per UI5 control.
- */
+/* Covers real focus-helper children such as .sapMGTFocusDiv without per-control rules. */
 html.sap-desktop [data-u4a-selectable="X"]:where(:focus, :focus-visible, :focus-within)
     :where([class*="FocusDiv"], [class*="FocusIndicator"], [class*="FocusRing"], [class*="FocusOutline"], [class*="FocusBorder"]),
 html.sap-desktop [data-u4a-selectable="X"]
@@ -231,66 +164,36 @@ html.sap-desktop [data-u4a-selectable="X"]:where(.sapMFocus, .sapMInputBaseFocus
 html.sap-desktop [data-u4a-selectable="X"]
     :where(.sapMFocus, .sapMInputBaseFocused)
     :where([class*="FocusDiv"], [class*="FocusIndicator"], [class*="FocusRing"], [class*="FocusOutline"], [class*="FocusBorder"]) {
-    /* @u4a-css-decl border: Draws or suppresses the visible edge of the selection/context marker. */
     border: 0 !important;
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: none !important;
-    /* @u4a-css-decl background-color: Adds a low-opacity marker fill while keeping the underlying preview UI readable. */
     background-color: transparent !important;
 }
 
-/*
- * Helper DOMs can also be affected when the selected root itself receives
- * focus. Keep the U4A selected ::after layer alive, but suppress real child
- * helper elements such as .sapMGTFocusDiv.
- */
+/* Suppress focus-helper children when the selected root itself receives focus. */
 html.sap-desktop [data-u4a-selected="X"]:where(:focus, :focus-visible, :focus-within)
     :where([class*="FocusDiv"], [class*="FocusIndicator"], [class*="FocusRing"], [class*="FocusOutline"], [class*="FocusBorder"]),
 html.sap-desktop [data-u4a-selected="X"]:where(.sapMFocus, .sapMInputBaseFocused)
     :where([class*="FocusDiv"], [class*="FocusIndicator"], [class*="FocusRing"], [class*="FocusOutline"], [class*="FocusBorder"]) {
-    /* @u4a-css-decl border: Draws or suppresses the visible edge of the selection/context marker. */
     border: 0 !important;
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: none !important;
-    /* @u4a-css-decl background-color: Adds a low-opacity marker fill while keeping the underlying preview UI readable. */
     background-color: transparent !important;
 }
 
-/*
- * Selected UI overlay layer.
- *
- * JavaScript appends this single layer to body and positions it over the
- * selected UI with getBoundingClientRect() + page scroll offsets. The layer
- * does not occupy layout space and does not mutate the selected UI DOM.
- */
+/* Body-level selection overlay avoids mutating or occupying the selected UI layout. */
 .u4a_ws_selection_layer {
-    /* @u4a-css-decl display: Controls whether the marker/helper element participates in rendering; most layers default to none and become visible through data attributes. */
     display: none !important;
-    /* @u4a-css-decl position: Chooses the positioning model; preview overlay layers use absolute positioning so they do not consume layout width or height. */
     position: absolute !important;
-    /* @u4a-css-decl left: Sets the horizontal origin used by the overlay or pseudo-element. */
     left: 0;
-    /* @u4a-css-decl top: Sets the vertical origin used by the overlay or pseudo-element. */
     top: 0;
-    /* @u4a-css-decl width: Defines the rendered width of the marker, control helper, or animation segment. */
     width: 0;
-    /* @u4a-css-decl height: Defines the rendered height of the marker, control helper, or animation segment. */
     height: 0;
-    /* @u4a-css-decl box-sizing: Uses border-box math so borders and insets do not enlarge selected UI dimensions. */
     box-sizing: border-box !important;
-    /* @u4a-css-decl margin: Removes outside spacing from overlay DOMs so the computed rectangle stays exact. */
     margin: 0 !important;
-    /* @u4a-css-decl padding: Removes inside spacing from overlay DOMs unless the selected UI itself provides spacing. */
     padding: 0 !important;
-    /* @u4a-css-decl border: Draws or suppresses the visible edge of the selection/context marker. */
     border: var(--u4a-preview-selection-width) var(--u4a-preview-selection-border-style) var(--u4a-preview-selection-border-color) !important;
-    /* @u4a-css-decl border-radius: Matches or derives rounded corners from the selected UI so marker corners do not look cut off. */
     border-radius: var(--u4a-selection-layer-radius, var(--u4a-preview-selection-radius)) !important;
-    /* @u4a-css-decl background: Draws configurable diagonal hatch lines over the selected marker fill. */
     background:
         repeating-linear-gradient(
             var(--u4a-preview-selection-hatch-angle),
@@ -299,60 +202,37 @@ html.sap-desktop [data-u4a-selected="X"]:where(.sapMFocus, .sapMInputBaseFocused
             transparent calc(var(--u4a-preview-selection-hatch-gap) + var(--u4a-preview-selection-hatch-size)) calc(var(--u4a-preview-selection-hatch-gap) + var(--u4a-preview-selection-hatch-size) + var(--u4a-preview-selection-hatch-gap))
         ),
         var(--u4a-preview-selection-bg) !important;
-    /* @u4a-css-decl pointer-events: Keeps overlay DOMs transparent to mouse events so preview selection still hits the underlying UI. */
     pointer-events: none !important;
-    /* @u4a-css-decl z-index: Places preview overlays above controls while keeping menus/popup layers above overlays. */
     z-index: var(--u4a-preview-selection-z-index) !important;
-    /* @u4a-css-decl transform: Promotes overlay drawing to a stable compositor path and avoids subpixel repaint artifacts. */
     transform: translate3d(0, 0, 0) !important;
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-    /* @u4a-css-decl clip: Resets old clipping rules that could cut off pseudo-element marker corners. */
     clip: auto !important;
-    /* @u4a-css-decl clip-path: Controls or resets modern clipping so rounded marker shapes remain intact. */
     clip-path: none !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: var(--u4a-preview-selection-layer-shadow);
-    /* @u4a-css-decl animation: Runs the selected visual marker, such as the configured marker state. */
     animation: var(--u4a-preview-selection-layer-animation) !important;
 }
 
 .u4a_ws_selection_layer[data-u4a-layer-visible="X"] {
-    /* @u4a-css-decl display: Controls whether the marker/helper element participates in rendering; most layers default to none and become visible through data attributes. */
     display: block !important;
 }
 
 .u4a_ws_selection_layer[data-u4a-layer-compact="X"] {
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: var(--u4a-preview-selection-layer-compact-shadow) !important;
-    /* @u4a-css-decl animation: Runs the selected visual marker, such as the configured marker state. */
     animation: var(--u4a-preview-selection-layer-compact-animation) !important;
 }
 
 .u4a_ws_context_layer.u4a_ws_context_layer {
-    /* @u4a-css-decl display: Controls whether the marker/helper element participates in rendering; most layers default to none and become visible through data attributes. */
     display: none !important;
-    /* @u4a-css-decl position: Chooses the positioning model; preview overlay layers use absolute positioning so they do not consume layout width or height. */
     position: absolute !important;
-    /* @u4a-css-decl left: Sets the horizontal origin used by the overlay or pseudo-element. */
     left: 0;
-    /* @u4a-css-decl top: Sets the vertical origin used by the overlay or pseudo-element. */
     top: 0;
-    /* @u4a-css-decl width: Defines the rendered width of the marker, control helper, or animation segment. */
     width: 0;
-    /* @u4a-css-decl height: Defines the rendered height of the marker, control helper, or animation segment. */
     height: 0;
-    /* @u4a-css-decl box-sizing: Uses border-box math so borders and insets do not enlarge selected UI dimensions. */
     box-sizing: border-box !important;
-    /* @u4a-css-decl margin: Removes outside spacing from overlay DOMs so the computed rectangle stays exact. */
     margin: 0 !important;
-    /* @u4a-css-decl padding: Removes inside spacing from overlay DOMs unless the selected UI itself provides spacing. */
     padding: 0 !important;
-    /* @u4a-css-decl border: Draws or suppresses the visible edge of the selection/context marker. */
     border: var(--u4a-preview-context-width) var(--u4a-preview-context-border-style) var(--u4a-preview-context-color) !important;
-    /* @u4a-css-decl border-radius: Matches or derives rounded corners from the selected UI so marker corners do not look cut off. */
     border-radius: var(--u4a-selection-layer-radius, var(--u4a-preview-selection-radius)) !important;
-    /* @u4a-css-decl background: Draws configurable diagonal hatch lines over the context marker fill. */
     background:
         repeating-linear-gradient(
             var(--u4a-preview-context-hatch-angle),
@@ -361,94 +241,44 @@ html.sap-desktop [data-u4a-selected="X"]:where(.sapMFocus, .sapMInputBaseFocused
             transparent calc(var(--u4a-preview-context-hatch-gap) + var(--u4a-preview-context-hatch-size)) calc(var(--u4a-preview-context-hatch-gap) + var(--u4a-preview-context-hatch-size) + var(--u4a-preview-context-hatch-gap))
         ),
         var(--u4a-preview-context-bg) !important;
-    /* @u4a-css-decl pointer-events: Keeps overlay DOMs transparent to mouse events so preview selection still hits the underlying UI. */
     pointer-events: none !important;
-    /* @u4a-css-decl z-index: Places preview overlays above controls while keeping menus/popup layers above overlays. */
     z-index: var(--u4a-preview-context-layer-z-index) !important;
-    /* @u4a-css-decl transform: Promotes overlay drawing to a stable compositor path and avoids subpixel repaint artifacts. */
     transform: translate3d(0, 0, 0) !important;
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-    /* @u4a-css-decl clip: Resets old clipping rules that could cut off pseudo-element marker corners. */
     clip: auto !important;
-    /* @u4a-css-decl clip-path: Controls or resets modern clipping so rounded marker shapes remain intact. */
     clip-path: none !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: var(--u4a-preview-context-layer-shadow);
-    /* @u4a-css-decl animation: Runs the configured context marker visual state. */
     animation: var(--u4a-preview-context-layer-animation) !important;
 }
 
 .u4a_ws_context_layer[data-u4a-layer-visible="X"] {
-    /* @u4a-css-decl display: Controls whether the marker/helper element participates in rendering; most layers default to none and become visible through data attributes. */
     display: block !important;
 }
 
-/*
- * sap.m.Menu context-menu popup layer.
- *
- * addStyleClass() applies u4a_ws_preview_context_menu to the menu control DOM.
- * UI5 renders sap.m.Menu inside a sapUiPopup wrapper, so JavaScript also adds
- * u4a_ws_preview_context_menu_popup to that wrapper after openAsContextMenu().
- * The wrapper z-index must stay above both the selected UI layer and the
- * context highlight layer.
- */
+/* UI5 renders sap.m.Menu in a wrapper that must remain above both marker layers. */
 .u4a_ws_preview_context_menu,
 .u4a_ws_preview_context_menu_popup,
 .sapUiPopup.u4a_ws_preview_context_menu_popup {
-    /* @u4a-css-decl z-index: Places preview overlays above controls while keeping menus/popup layers above overlays. */
     z-index: var(--u4a-preview-context-menu-z-index) !important;
 }
 
 .sapUiPopup:has(.u4a_ws_preview_context_menu) {
-    /* @u4a-css-decl z-index: Places preview overlays above controls while keeping menus/popup layers above overlays. */
     z-index: var(--u4a-preview-context-menu-z-index) !important;
 }
 
-/*
- * Legacy selected UI marker.
- *
- * This is a CSS layer style. It does not create a real DOM node.
- * The layer is drawn by the selected element's ::after pseudo-element and
- * covers the selected DOM area.
- *
- * Fix notes
- * - Rounded parent containers such as sap.f.Card can clip a selected child
- *   when the child touches the rounded edge. The common overlay is therefore
- *   drawn slightly inside the selected DOM area by --u4a-preview-selection-inset.
- * - UI5 popup root controls such as sap.m.Dialog/sap.m.Popover must not be
- *   forced to position: relative and must not use the generated ::after layer.
- *   They are positioned and layered by sap.ui.core.Popup.
- * - Popup root controls use an outline fallback with its own offset variable.
- *   This keeps the marker visible above the popup surface and prevents the
- *   marker from being pushed behind the dialog content.
- *
- * Keep this block after the focus reset rules so the U4A selection layer wins.
- */
+/* Legacy ::after fallback uses an inset for clipped children; popup roots keep UI5 positioning and use outline. */
 html.sap-desktop [data-u4a-selected="X"],
 [data-u4a-selected="X"] {
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
 }
 
-/*
- * Non-popup selected UI.
- * Only non-popup controls receive position: relative for the generated layer.
- */
+/* Only non-popup controls may anchor the generated marker with position: relative. */
 html.sap-desktop [data-u4a-selected="X"]:not(:where(.sapMDialog, .sapMPopover, .sapMMessagePopover, .sapMActionSheetPopover, .sapMActionSheetDialog, .sapMMenu)),
 [data-u4a-selected="X"]:not(:where(.sapMDialog, .sapMPopover, .sapMMessagePopover, .sapMActionSheetPopover, .sapMActionSheetDialog, .sapMMenu)) {
-    /* @u4a-css-decl position: Chooses the positioning model; preview overlay layers use absolute positioning so they do not consume layout width or height. */
     position: relative;
 }
 
-/*
- * Compact text-like selected UI.
- *
- * sap.m.Title / sap.m.Text / sap.m.Label 揶쏆늿? ?臾? ?誘れ뵠??UI?? * ?袁⑸열 inset 揶쏅???域밸챶?嚥??怨몄뒠??롢늺 ?醫뤾문?醫롮뵠 ??용뮞?紐? 野껊???癰귣똻?졾쳞怨뺢돌
- * ??댭???됥걹??곗쨮 ??쇰선揶쎛 ??명?源놁뵠 ??λ선筌?????덈뼄.
- *
- * ???됰뗀以?? ??용뮞???④쑴肉?UI?癒?춸 ?醫뤾문??inset/radius??????? * ?臾? UI?癒?퐣???醫뤾문 ??뽯뻻揶쎛 ?醫딆구??띿쓺 癰귣똻??袁⑥쨯 ??뺣뼄.
- */
+/* Compact text controls use zero inset so the marker remains visible in small line boxes. */
 html.sap-desktop .sapMTitle[data-u4a-selected="X"],
 html.sap-desktop .sapMText[data-u4a-selected="X"],
 html.sap-desktop .sapMLabel[data-u4a-selected="X"],
@@ -457,68 +287,33 @@ html.sap-desktop .sapMLnk[data-u4a-selected="X"],
 .sapMText[data-u4a-selected="X"],
 .sapMLabel[data-u4a-selected="X"],
 .sapMLnk[data-u4a-selected="X"] {
-    /* @u4a-css-decl --u4a-preview-selection-inset: Inset amount used to draw pseudo-element markers inside clipped controls. */
     --u4a-preview-selection-inset: 0px;
-    /* @u4a-css-decl --u4a-preview-selection-radius: Shared corner radius for marker overlays and fallback outlines. */
     --u4a-preview-selection-radius: 0.125rem;
 }
 
-/*
- * Non-popup selection layer.
- * The layer is intentionally inset from every edge so it remains visible when
- * the selected child is clipped by a rounded parent container.
- *
- * The common inset is kept small enough for compact controls, and the marker
- * uses a rounded border so large/card-like controls still look natural.
- */
+/* Inset keeps the fallback marker visible when a rounded parent clips its child. */
 html.sap-desktop [data-u4a-selected="X"]:not(:where(.sapMDialog, .sapMPopover, .sapMMessagePopover, .sapMActionSheetPopover, .sapMActionSheetDialog, .sapMMenu))[data-u4a-selected="X"]::after,
 [data-u4a-selected="X"]:not(:where(.sapMDialog, .sapMPopover, .sapMMessagePopover, .sapMActionSheetPopover, .sapMActionSheetDialog, .sapMMenu))[data-u4a-selected="X"]::after {
-    /* @u4a-css-decl content: Creates an empty pseudo-element box used as a CSS-only marker layer. */
     content: "" !important;
-    /* @u4a-css-decl display: Controls whether the marker/helper element participates in rendering; most layers default to none and become visible through data attributes. */
     display: block !important;
-    /* @u4a-css-decl clear: Neutralizes clearfix behavior on marker pseudo-elements. */
     clear: none !important;
-
-    /* @u4a-css-decl position: Chooses the positioning model; preview overlay layers use absolute positioning so they do not consume layout width or height. */
     position: absolute !important;
-    /* @u4a-css-decl inset: Sets all four pseudo-element offsets together for compact marker geometry. */
     inset: var(--u4a-preview-selection-inset) !important;
-    /* @u4a-css-decl top: Sets the vertical origin used by the overlay or pseudo-element. */
     top: var(--u4a-preview-selection-inset) !important;
-    /* @u4a-css-decl right: Sets the right-side inset or edge position for overlay geometry. */
     right: var(--u4a-preview-selection-inset) !important;
-    /* @u4a-css-decl bottom: Sets the bottom-side inset or edge position for overlay geometry. */
     bottom: var(--u4a-preview-selection-inset) !important;
-    /* @u4a-css-decl left: Sets the horizontal origin used by the overlay or pseudo-element. */
     left: var(--u4a-preview-selection-inset) !important;
-
-    /* @u4a-css-decl width: Defines the rendered width of the marker, control helper, or animation segment. */
     width: auto !important;
-    /* @u4a-css-decl height: Defines the rendered height of the marker, control helper, or animation segment. */
     height: auto !important;
-    /* @u4a-css-decl min-width: Prevents marker pseudo-elements from creating an unwanted minimum size. */
     min-width: 0 !important;
-    /* @u4a-css-decl min-height: Prevents marker pseudo-elements from creating an unwanted minimum size. */
     min-height: 0 !important;
-    /* @u4a-css-decl max-width: Removes maximum-size limits so the marker can match the target control bounds. */
     max-width: none !important;
-    /* @u4a-css-decl max-height: Removes maximum-size limits so the marker can match the target control bounds. */
     max-height: none !important;
-
-    /* @u4a-css-decl margin: Removes outside spacing from overlay DOMs so the computed rectangle stays exact. */
     margin: 0 !important;
-    /* @u4a-css-decl padding: Removes inside spacing from overlay DOMs unless the selected UI itself provides spacing. */
     padding: 0 !important;
-
-    /* @u4a-css-decl box-sizing: Uses border-box math so borders and insets do not enlarge selected UI dimensions. */
     box-sizing: border-box !important;
-    /* @u4a-css-decl border: Draws or suppresses the visible edge of the selection/context marker. */
     border: 0 !important;
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-
-    /* @u4a-css-decl background: Draws configurable diagonal hatch lines over the selected marker fill. */
     background:
         repeating-linear-gradient(
             var(--u4a-preview-selection-hatch-angle),
@@ -527,63 +322,30 @@ html.sap-desktop [data-u4a-selected="X"]:not(:where(.sapMDialog, .sapMPopover, .
             transparent calc(var(--u4a-preview-selection-hatch-gap) + var(--u4a-preview-selection-hatch-size)) calc(var(--u4a-preview-selection-hatch-gap) + var(--u4a-preview-selection-hatch-size) + var(--u4a-preview-selection-hatch-gap))
         ),
         var(--u4a-preview-selection-bg) !important;
-    /* @u4a-css-decl pointer-events: Keeps overlay DOMs transparent to mouse events so preview selection still hits the underlying UI. */
     pointer-events: none !important;
-    /* @u4a-css-decl z-index: Places preview overlays above controls while keeping menus/popup layers above overlays. */
     z-index: var(--u4a-preview-selection-z-index) !important;
 
-    /*
-     * Use a common rounded marker instead of pushing the layer too far inside.
-     * The value can be overridden per selected DOM through CSS variables.
-     */
-    /* @u4a-css-decl border-radius: Matches or derives rounded corners from the selected UI so marker corners do not look cut off. */
+    /* Individual controls may override the common radius through the CSS variable. */
     border-radius: var(--u4a-preview-selection-radius) !important;
-
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: var(--u4a-preview-selection-pseudo-shadow);
-
-    /* @u4a-css-decl transform: Promotes overlay drawing to a stable compositor path and avoids subpixel repaint artifacts. */
     transform: none !important;
-    /* @u4a-css-decl opacity: Adjusts marker brightness during animation while keeping a visible baseline. */
     opacity: 1 !important;
-    /* @u4a-css-decl clip: Resets old clipping rules that could cut off pseudo-element marker corners. */
     clip: auto !important;
-    /* @u4a-css-decl clip-path: Controls or resets modern clipping so rounded marker shapes remain intact. */
     clip-path: none !important;
-    /* @u4a-css-decl animation: Runs the selected visual marker, such as the configured marker state. */
     animation: var(--u4a-preview-selection-pseudo-animation) !important;
 }
 
-/*
- * Detached selection layer mode.
- *
- * The selected UI visual marker is drawn by the body-level
- * #u4a_ws_selection_layer. Keep data-u4a-selected="X" as the selected-state
- * source, but prevent the original selected DOM from drawing a second
- * CSS-only ::after marker. This avoids duplicate inner lines on any UI5
- * control whose root DOM contains nested visual wrappers.
- */
+/* Detached-layer mode disables the legacy ::after marker to avoid duplicate lines. */
 html.sap-desktop [data-u4a-selected="X"]:not(:where(.sapMDialog, .sapMPopover, .sapMMessagePopover, .sapMActionSheetPopover, .sapMActionSheetDialog, .sapMMenu))[data-u4a-selected="X"]::after,
 [data-u4a-selected="X"]:not(:where(.sapMDialog, .sapMPopover, .sapMMessagePopover, .sapMActionSheetPopover, .sapMActionSheetDialog, .sapMMenu))[data-u4a-selected="X"]::after {
-    /* @u4a-css-decl content: Disables the legacy selected pseudo-layer because the detached selection layer owns the visible selected marker. */
     content: none !important;
-    /* @u4a-css-decl display: Prevents the selected DOM pseudo-layer from painting duplicate inner marker lines. */
     display: none !important;
-    /* @u4a-css-decl background: Removes fallback marker fill from the original selected DOM. */
     background: none !important;
-    /* @u4a-css-decl box-shadow: Removes fallback inset/glow lines from the original selected DOM. */
     box-shadow: none !important;
-    /* @u4a-css-decl animation: Stops fallback marker animation on the original selected DOM while preserving the detached layer animation. */
     animation: none !important;
 }
 
-/*
- * Popup root fallback.
- * Do not draw a generated ::after layer on UI5 popup root controls.
- * Do not set position here. The popup position/z-index is owned by UI5.
- * Use outline with popup-specific offset/radius so the marker is not hidden
- * behind dialog content and follows rounded popup corners.
- */
+/* Popup roots retain UI5 position and z-index and use an outline instead of ::after. */
 html.sap-desktop .sapMDialog[data-u4a-selected="X"],
 html.sap-desktop .sapMPopover[data-u4a-selected="X"],
 html.sap-desktop .sapMMessagePopover[data-u4a-selected="X"],
@@ -596,26 +358,15 @@ html.sap-desktop .sapMMenu[data-u4a-selected="X"],
 .sapMActionSheetPopover[data-u4a-selected="X"],
 .sapMActionSheetDialog[data-u4a-selected="X"],
 .sapMMenu[data-u4a-selected="X"] {
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: var(--u4a-preview-selection-width) var(--u4a-preview-selection-border-style) var(--u4a-preview-selection-border-color) !important;
-    /* @u4a-css-decl outline-offset: Moves fallback outlines inside or outside the target without changing layout size. */
     outline-offset: var(--u4a-preview-popup-selection-offset, 0px) !important;
-    /* @u4a-css-decl border-radius: Matches or derives rounded corners from the selected UI so marker corners do not look cut off. */
     border-radius: var(--u4a-preview-popup-selection-radius, var(--u4a-preview-selection-radius)) !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: var(--u4a-preview-selection-popup-shadow);
-    /* @u4a-css-decl animation: Runs the selected visual marker, such as the configured marker state. */
     animation: var(--u4a-preview-selection-popup-animation) !important;
 }
 
 
-/*
- * Popup rounding note.
- * outline has no dedicated outline-radius property, so the popup root's
- * border-radius is set directly. Modern browser rendering follows the element
- * border-radius for outline painting, while UI5 keeps ownership of popup
- * position/z-index.
- */
+/* Outline has no radius property, so popup rounding follows the root border-radius. */
 html.sap-desktop .sapMDialog[data-u4a-selected="X"][data-u4a-selected="X"]::after,
 html.sap-desktop .sapMPopover[data-u4a-selected="X"][data-u4a-selected="X"]::after,
 html.sap-desktop .sapMMessagePopover[data-u4a-selected="X"][data-u4a-selected="X"]::after,
@@ -628,17 +379,11 @@ html.sap-desktop .sapMMenu[data-u4a-selected="X"][data-u4a-selected="X"]::after,
 .sapMActionSheetPopover[data-u4a-selected="X"][data-u4a-selected="X"]::after,
 .sapMActionSheetDialog[data-u4a-selected="X"][data-u4a-selected="X"]::after,
 .sapMMenu[data-u4a-selected="X"][data-u4a-selected="X"]::after {
-    /* @u4a-css-decl content: Creates an empty pseudo-element box used as a CSS-only marker layer. */
     content: none !important;
-    /* @u4a-css-decl display: Controls whether the marker/helper element participates in rendering; most layers default to none and become visible through data attributes. */
     display: none !important;
 }
 
-/*
- * Fallback for replaced/native elements where ::before/::after is unreliable.
- * UI5 wrapper DOM should be preferred for sap.m.Input/sap.m.Button, but this
- * keeps the marker visible if data-u4a-selected="X" is attached directly.
- */
+/* Native and replaced elements use outline because their pseudo-elements are unreliable. */
 img[data-u4a-selected="X"],
 input[data-u4a-selected="X"],
 textarea[data-u4a-selected="X"],
@@ -646,15 +391,10 @@ select[data-u4a-selected="X"],
 canvas[data-u4a-selected="X"],
 svg[data-u4a-selected="X"],
 video[data-u4a-selected="X"] {
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: var(--u4a-preview-selection-width) var(--u4a-preview-selection-border-style) var(--u4a-preview-selection-border-color) !important;
-    /* @u4a-css-decl outline-offset: Moves fallback outlines inside or outside the target without changing layout size. */
     outline-offset: calc(-1 * var(--u4a-preview-selection-inset)) !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: var(--u4a-preview-selection-native-shadow);
-    /* @u4a-css-decl filter: Applies fallback glow to native tags that do not reliably render pseudo-elements. */
     filter: var(--u4a-preview-selection-native-filter);
-    /* @u4a-css-decl animation: Runs the selected visual marker, such as the configured marker state. */
     animation: var(--u4a-preview-selection-native-animation) !important;
 }
 
@@ -668,78 +408,44 @@ html.sap-desktop [data-u4a-selectable="X"] input[data-u4a-selected="X"]:focus,
 html.sap-desktop [data-u4a-selectable="X"] textarea[data-u4a-selected="X"]:focus,
 html.sap-desktop [data-u4a-selectable="X"] select[data-u4a-selected="X"]:focus,
 html.sap-desktop [data-u4a-selectable="X"].sapMInputBase .sapMInputBaseInner[data-u4a-selected="X"]:focus {
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: var(--u4a-preview-selection-width) var(--u4a-preview-selection-border-style) var(--u4a-preview-selection-border-color) !important;
-    /* @u4a-css-decl outline-offset: Moves fallback outlines inside or outside the target without changing layout size. */
     outline-offset: calc(-1 * var(--u4a-preview-selection-inset)) !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: var(--u4a-preview-selection-native-shadow) !important;
-    /* @u4a-css-decl filter: Applies fallback glow to native tags that do not reliably render pseudo-elements. */
     filter: var(--u4a-preview-selection-native-filter);
-    /* @u4a-css-decl animation: Runs the selected visual marker, such as the configured marker state. */
     animation: var(--u4a-preview-selection-native-animation) !important;
 }
 
-/*
- * Context-menu base marker.
- * This is the lightweight fallback used before a context marker is
- * mapped to its internal render selector.
- */
+/* Fallback used until a context marker is mapped to its internal render selector. */
 .u4a_ws_context_mark,
 [data-u4a-contextmenu="X"] {
-    /* @u4a-css-decl position: Chooses the positioning model; preview overlay layers use absolute positioning so they do not consume layout width or height. */
     position: relative;
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
 }
 
 .u4a_ws_context_mark.u4a_ws_context_mark::before,
 [data-u4a-contextmenu="X"][data-u4a-contextmenu="X"]::before {
-    /* @u4a-css-decl content: Creates an empty pseudo-element box used as a CSS-only marker layer. */
     content: "" !important;
-    /* @u4a-css-decl display: Controls whether the marker/helper element participates in rendering; most layers default to none and become visible through data attributes. */
     display: block !important;
-    /* @u4a-css-decl clear: Neutralizes clearfix behavior on marker pseudo-elements. */
     clear: none !important;
-    /* @u4a-css-decl position: Chooses the positioning model; preview overlay layers use absolute positioning so they do not consume layout width or height. */
     position: absolute !important;
-    /* @u4a-css-decl inset: Sets all four pseudo-element offsets together for compact marker geometry. */
     inset: 0 !important;
-    /* @u4a-css-decl top: Sets the vertical origin used by the overlay or pseudo-element. */
     top: 0 !important;
-    /* @u4a-css-decl right: Sets the right-side inset or edge position for overlay geometry. */
     right: 0 !important;
-    /* @u4a-css-decl bottom: Sets the bottom-side inset or edge position for overlay geometry. */
     bottom: 0 !important;
-    /* @u4a-css-decl left: Sets the horizontal origin used by the overlay or pseudo-element. */
     left: 0 !important;
-    /* @u4a-css-decl width: Defines the rendered width of the marker, control helper, or animation segment. */
     width: auto !important;
-    /* @u4a-css-decl height: Defines the rendered height of the marker, control helper, or animation segment. */
     height: auto !important;
-    /* @u4a-css-decl min-width: Prevents marker pseudo-elements from creating an unwanted minimum size. */
     min-width: 0 !important;
-    /* @u4a-css-decl min-height: Prevents marker pseudo-elements from creating an unwanted minimum size. */
     min-height: 0 !important;
-    /* @u4a-css-decl max-width: Removes maximum-size limits so the marker can match the target control bounds. */
     max-width: none !important;
-    /* @u4a-css-decl max-height: Removes maximum-size limits so the marker can match the target control bounds. */
     max-height: none !important;
-    /* @u4a-css-decl margin: Removes outside spacing from overlay DOMs so the computed rectangle stays exact. */
     margin: 0 !important;
-    /* @u4a-css-decl padding: Removes inside spacing from overlay DOMs unless the selected UI itself provides spacing. */
     padding: 0 !important;
-    /* @u4a-css-decl box-sizing: Uses border-box math so borders and insets do not enlarge selected UI dimensions. */
     box-sizing: border-box !important;
-    /* @u4a-css-decl border: Draws or suppresses the visible edge of the selection/context marker. */
     border: var(--u4a-preview-context-width) var(--u4a-preview-context-border-style) var(--u4a-preview-context-color) !important;
-    /* @u4a-css-decl border-radius: Matches or derives rounded corners from the selected UI so marker corners do not look cut off. */
     border-radius: inherit !important;
-    /* @u4a-css-decl pointer-events: Keeps overlay DOMs transparent to mouse events so preview selection still hits the underlying UI. */
     pointer-events: none !important;
-    /* @u4a-css-decl z-index: Places preview overlays above controls while keeping menus/popup layers above overlays. */
     z-index: 1 !important;
-    /* @u4a-css-decl background: Draws configurable diagonal hatch lines over the context marker fill. */
     background:
         repeating-linear-gradient(
             var(--u4a-preview-context-hatch-angle),
@@ -748,15 +454,10 @@ html.sap-desktop [data-u4a-selectable="X"].sapMInputBase .sapMInputBaseInner[dat
             transparent calc(var(--u4a-preview-context-hatch-gap) + var(--u4a-preview-context-hatch-size)) calc(var(--u4a-preview-context-hatch-gap) + var(--u4a-preview-context-hatch-size) + var(--u4a-preview-context-hatch-gap))
         ),
         var(--u4a-preview-context-bg) !important;
-    /* @u4a-css-decl transform: Promotes overlay drawing to a stable compositor path and avoids subpixel repaint artifacts. */
     transform: none !important;
-    /* @u4a-css-decl clip: Resets old clipping rules that could cut off pseudo-element marker corners. */
     clip: auto !important;
-    /* @u4a-css-decl clip-path: Controls or resets modern clipping so rounded marker shapes remain intact. */
     clip-path: none !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: var(--u4a-preview-context-pseudo-shadow);
-    /* @u4a-css-decl animation: Runs the configured context marker visual state. */
     animation: var(--u4a-preview-context-pseudo-animation) !important;
 }
 
@@ -774,13 +475,9 @@ select[data-u4a-contextmenu="X"],
 canvas[data-u4a-contextmenu="X"],
 svg[data-u4a-contextmenu="X"],
 video[data-u4a-contextmenu="X"] {
-    /* @u4a-css-decl outline: Provides a non-layout-affecting fallback border, especially for native tags or popup roots. */
     outline: none !important;
-    /* @u4a-css-decl box-shadow: Adds glow, inset borders, or depth without changing the target UI layout box. */
     box-shadow: var(--u4a-preview-context-native-shadow) !important;
-    /* @u4a-css-decl filter: Adds glow to native media/form tags when box-shadow is partially clipped. */
     filter: var(--u4a-preview-context-native-filter);
-    /* @u4a-css-decl animation: Runs the configured context marker visual state. */
     animation: var(--u4a-preview-context-native-animation) !important;
 }
 

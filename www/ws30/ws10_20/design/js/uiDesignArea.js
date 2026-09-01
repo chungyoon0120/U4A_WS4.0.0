@@ -50,27 +50,33 @@
       //선택 라인 정보 얻기.
       var ls_tree = oEvent.mParameters.rowBindingContext.getProperty();
 
-      //테스트주석처리!!!!!!!!
+      /**
+       * @since   2026-06-25 14:55:11
+       * @version v3.6.4-3
+       * @author  pes
+       * @description
+       * 라인선택 처리 내용을 통합하기 위한 기존로직 주석 처리.
+       */
       // //라인선택에 따른 각 화면에 대한 처리.
       // await oAPP.fn.designTreeItemPress(ls_tree);
-      //테스트주석처리!!!!!!!!
-
-      //테스트!!!!!!!!!!!
-      oAPP.fn.setSelectTreeItem(ls_tree.OBJID);
-      //테스트!!!!!!!!!!!
-
-      //20240527 PES
-      //바인딩 팝업에 UI 라인 선택 처리.
-      oAPP.fn.selectBindingPopupOBJID(ls_tree);
 
 
-      // 전체 자식 윈도우에 Busy 종료.
-      oAPP.attr.oMainBroad.postMessage({PRCCD:"BUSY_OFF"});
+      // //20240527 PES
+      // //바인딩 팝업에 UI 라인 선택 처리.
+      // oAPP.fn.selectBindingPopupOBJID(ls_tree);
 
-      //단축키 잠금 해제 처리.
-      oAPP.fn.setShortcutLock(false);
+
+      // // 전체 자식 윈도우에 Busy 종료.
+      // oAPP.attr.oMainBroad.postMessage({PRCCD:"BUSY_OFF"});
+
+      // //단축키 잠금 해제 처리.
+      // oAPP.fn.setShortcutLock(false);
       
-      parent.setBusy("");
+      // parent.setBusy("");
+
+      //UI design tree 라인 선택 이벤트 수행.
+      oAPP.fn.setSelectTreeItem(ls_tree.OBJID);
+      
 
     }); //tree item 선택 이벤트.
 
@@ -335,6 +341,19 @@
 
     //design tree의 drop css 제거 처리 기능 추가.
     oAPP.fn.clearDropEffectUI(oAPP.attr.ui.oLTree1);
+
+
+    oAPP.attr.ui.oLTree1.attachBrowserEvent("mousedown", function(oEvent){
+
+      if(oEvent.button !== 0){
+        return;
+      }
+
+      if(typeof oAPP.fn.fnShowBindPopupBeforeDragStart === "function"){
+        oAPP.fn.fnShowBindPopupBeforeDragStart();
+      }
+
+    });
 
 
     // //drop UI 생성.
@@ -1298,11 +1317,29 @@
         return;
       }
 
+      /**
+       * @since   2026-08-14 19:22:08
+       * @version vNAN-NAN
+       * @author  pes
+       * @description
+       * oAPP.fn.chkAggrRelation 함수에서 추가 가능 aggregation 구성시,
+       * 구성되지 않는 aggregation이 존재하는 경우, 오류 내용과 메시지를 같이 구성하도록
+       * 내용이 변경되어 기존 로직 주석 처리.
+       */
+      // //내 밑에 들어갈 수 없다면 drop 불가 처리.
+      // if(oAPP.fn.chkAggrRelation(l_dragover.UIOBK, l_dragover.OBJID, l_drag.UIOBK).length === 0){
+      //   oEvent.oSource.setDropEffect("None");
+      //   return;
+      // }
+
+      const _sRes = oAPP.fn.chkAggrRelation(l_dragover.UIOBK, l_dragover.OBJID, l_drag.UIOBK);
+
       //내 밑에 들어갈 수 없다면 drop 불가 처리.
-      if(oAPP.fn.chkAggrRelation(l_dragover.UIOBK, l_dragover.OBJID, l_drag.UIOBK).length === 0){
+      if(_sRes.T_SEL.length === 0){
         oEvent.oSource.setDropEffect("None");
         return;
       }
+
 
     }
     
@@ -1414,15 +1451,35 @@
     }
 
 
-    //UI를 추가 가능한 Aggregation 존재여부 확인.
-    if(oAPP.fn.chkAggrRelation(ls_tree.UIOBK, ls_tree.OBJID, l_UIOBK).length === 0){
-      ls_ret.SUBRC = "E";
-      //280  입력 가능한 Aggregation이 존재하지 않습니다.
-      ls_ret.MSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "280", "", "", "", "");
+    /**
+     * @since   2026-08-14 19:22:08
+     * @version vNAN-NAN
+     * @author  pes
+     * @description
+     * oAPP.fn.chkAggrRelation 함수에서 추가 가능 aggregation 구성시,
+     * 구성되지 않는 aggregation이 존재하는 경우, 오류 내용과 메시지를 같이 구성하도록
+     * 내용이 변경되어 기존 로직 주석 처리.
+     */
+    // //UI를 추가 가능한 Aggregation 존재여부 확인.
+    // if(oAPP.fn.chkAggrRelation(ls_tree.UIOBK, ls_tree.OBJID, l_UIOBK).length === 0){
+    //   ls_ret.SUBRC = "E";
+    //   //280  입력 가능한 Aggregation이 존재하지 않습니다.
+    //   ls_ret.MSG = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "280", "", "", "", "");
 
-      //오류 정보 RETURN.
-      return ls_ret;
+    //   //오류 정보 RETURN.
+    //   return ls_ret;
 
+    // }
+
+    const _sRes = oAPP.fn.chkAggrRelation(ls_tree.UIOBK, ls_tree.OBJID, l_UIOBK);
+    if(_sRes.RETCD === "E"){
+
+        ls_ret.RETCD = _sRes.RETCD;
+
+        //425	선택 가능한 Aggregation이 존재하지 않습니다.
+        ls_ret.MSG = _sRes.RTMSG;
+        
+        return ls_ret;
     }
 
     //오류가 존재하지 않는경우 초기 구조 return.
@@ -1454,80 +1511,173 @@
 
 
 
+  /**
+   * @since   2026-08-14 19:22:08
+   * @version vNAN-NAN
+   * @author  pes
+   * @description
+   * oAPP.fn.chkAggrRelation 함수에서 추가 가능 aggregation 구성시,
+   * 구성되지 않는 aggregation이 존재하는 경우, 오류 내용과 메시지를 같이 구성하도록
+   * 내용이 변경처리함(AGGREGATION 항목이 구성되지 못한 경우 상세 메시지 구성).
+   */
+  // //입력 UI OBJECT가 target UI OBJECT에 추가 가능한지 여부 확인.
+  // oAPP.fn.chkAggrRelation = function(tUIOBK, tOBJID, sUIOBK){
+
+  //   var lt_sel = [];
+
+  //   //입력 UI OBJECT KEY의 AGGREGATION 정보 얻기.
+  //   var lt_0023 = oAPP.DATA.LIB.T_0023.filter(a => a.UIOBK === tUIOBK && a.UIATY === "3" && a.ISDEP !== "X" );
+
+
+  //   //UI의 하위 AGGR 정보가 존재하지 않는경우 EXIT.
+  //   if(lt_0023.length === 0){
+  //     return lt_sel;
+  //   }
+
+  //   //입력 UI OBJECT의 상속관계 정보 얻기.
+  //   var lt_0027 = oAPP.DATA.LIB.T_0027.filter( a => a.TGOBJ === sUIOBK && a.TOBTY !== "1" );
+
+  //   //상속관계 정보가 존재하지 않는경우 exit.
+  //   if(lt_0027.length === 0){
+  //     return lt_sel;
+  //   }
+
+  //   //target AGGREGATION을 기준으로 점검.
+  //   for(var i=0, l = lt_0023.length; i<l; i++){
+
+  //     //get aggregation명 얻기.
+  //     var l_agrnm = oAPP.fn.getUIAttrFuncName(oAPP.attr.prev[tOBJID], "3", lt_0023[i].UIATT, "_sGetter");
+
+  //     //대상 UI의 AGGREGATION이 존재하지 않는경우 SKIP.
+  //     if(!l_agrnm || !oAPP.attr.prev[tOBJID][l_agrnm]){continue;}
+
+  //     //해당 aggregation의 child 정보 얻기.
+  //     var l_child = oAPP.attr.prev[tOBJID][l_agrnm]();
+
+
+  //     //해당 aggregation에 n건 바인딩이 설정된 경우
+  //     //child UI가 이미 존재하는 경우 skip.
+  //     if(oAPP.attr.prev[tOBJID]._MODEL[lt_0023[i].UIATT] &&
+  //       (l_child !== null && l_child.length !== 0)){
+  //       continue;
+  //     }
+
+  //     //0:1 aggregation에 이미 ui가 존재하는 경우 skip.
+  //     //l_child._OBJID를 판단하는 이유는 공통코드 UA050항목에 의해
+  //     //강제로 추가된 CHILD UI인경우 SKIP 처리를 하지 않기 위함.
+  //     if(lt_0023[i].ISMLB === "" && l_child && typeof l_child._OBJID !== "undefined" ){
+  //       continue;
+  //     }
+
+  //     //aggregation 타입 대문자 전환(SAP.UI.CORE.CONTROL)
+  //     var l_upper = lt_0023[i].UIADT.toUpperCase();
+
+  //     //라이브러리 테이블에서 해당 UI 검색.
+  //     var ls_0022 = oAPP.DATA.LIB.T_0022.find( a => a.UIFND === l_upper);
+  //     if(!ls_0022){continue;}
+
+  //     //drag UI가 drop UI의 aggregation type과 동일한경우 수집 처리.
+  //     if(sUIOBK === ls_0022.UIOBK){
+  //       lt_sel.push(lt_0023[i]);
+  //       continue;
+  //     }
+
+  //     var ls_0027 = lt_0027.find( b => b.SGOBJ === ls_0022.UIOBK);
+  //     if(!ls_0027){continue;}
+  //     lt_sel.push(lt_0023[i]);
+
+  //   }
+
+  //   return lt_sel;
+
+  // };  //입력 UI OBJECT가 target UI OBJECT에 추가 가능한지 여부 확인.
 
   //입력 UI OBJECT가 target UI OBJECT에 추가 가능한지 여부 확인.
-  oAPP.fn.chkAggrRelation = function(tUIOBK, tOBJID, sUIOBK){
+  oAPP.fn.chkAggrRelation = function (tUIOBK, tOBJID, sUIOBK) {
 
-    var lt_sel = [];
+    const _sRes = {
+      RETCD: "",
+      RTMSG: "",
+      T_SEL: []
+    };
+
+    //target UI OBJECT의 트리 정보 얻기.
+    const _sTarget = oAPP.fn.getTreeData(tOBJID);
 
     //입력 UI OBJECT KEY의 AGGREGATION 정보 얻기.
-    var lt_0023 = oAPP.DATA.LIB.T_0023.filter(a => a.UIOBK === tUIOBK && a.UIATY === "3" && a.ISDEP !== "X" );
+    const _aT0023 = oAPP.DATA.LIB.T_0023.filter(item =>
+      item.UIOBK === tUIOBK && item.UIATY === "3" && item.ISDEP !== "X"
+    );
 
-
-    //UI의 하위 AGGR 정보가 존재하지 않는경우 EXIT.
-    if(lt_0023.length === 0){
-      return lt_sel;
+    //UI의 하위 AGGREGATION 정보가 존재하지 않는 경우 EXIT.
+    if (_aT0023.length === 0) {
+      _sRes.RETCD = "E";
+      //001 &1 UI의 Aggregation 항목이 존재하지 않습니다.
+      _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "001", tOBJID);
+      return _sRes;
     }
 
     //입력 UI OBJECT의 상속관계 정보 얻기.
-    var lt_0027 = oAPP.DATA.LIB.T_0027.filter( a => a.TGOBJ === sUIOBK && a.TOBTY !== "1" );
+    const _aT0027 = oAPP.DATA.LIB.T_0027.filter(item =>
+      item.TGOBJ === sUIOBK && item.TOBTY !== "1"
+    );
 
-    //상속관계 정보가 존재하지 않는경우 exit.
-    if(lt_0027.length === 0){
-      return lt_sel;
-    }
+    //target UI OBJECT의 MODEL 바인딩 정보.
+    const _sModel = oAPP.attr.prev[tOBJID]?._MODEL ?? {};
+
+    //바인딩으로 인해 제외된 aggregation 존재 여부.
+    let _isModelBind = false;
 
     //target AGGREGATION을 기준으로 점검.
-    for(var i=0, l = lt_0023.length; i<l; i++){
+    for (const _s0023 of _aT0023) {
 
-      //get aggregation명 얻기.
-      var l_agrnm = oAPP.fn.getUIAttrFuncName(oAPP.attr.prev[tOBJID], "3", lt_0023[i].UIATT, "_sGetter");
+      //라이브러리 테이블에서 aggregation type에 해당하는 UI 검색.
+      //(aggregation 타입 대문자 전환 : sap.ui.core.Control -> SAP.UI.CORE.CONTROL)
+      const _s0022 = oAPP.DATA.LIB.T_0022.find(item =>
+        item.UIFND === _s0023.UIADT.toUpperCase()
+      );
+      if (!_s0022) { continue; }
 
-      //대상 UI의 AGGREGATION이 존재하지 않는경우 SKIP.
-      if(!l_agrnm || !oAPP.attr.prev[tOBJID][l_agrnm]){continue;}
+      //drag UI가 aggregation type과 동일하거나, 상속관계에 존재하는 경우만 후보로 인정.
+      if (sUIOBK !== _s0022.UIOBK &&
+          !_aT0027.some(item => item.SGOBJ === _s0022.UIOBK)) { continue; }
 
-      //해당 aggregation의 child 정보 얻기.
-      var l_child = oAPP.attr.prev[tOBJID][l_agrnm]();
+      //해당 aggregation의 child UI 존재 여부 확인.
+      const _isChildExist = _sTarget.zTREE.some(item => item.UIATK === _s0023.UIATK);
 
-
-      //해당 aggregation에 n건 바인딩이 설정된 경우
-      //child UI가 이미 존재하는 경우 skip.
-      if(oAPP.attr.prev[tOBJID]._MODEL[lt_0023[i].UIATT] &&
-        (l_child !== null && l_child.length !== 0)){
+      //해당 aggregation에 n건 바인딩이 설정되어 있고 child UI가 이미 존재하는 경우 skip.
+      //(바인딩 aggregation은 template 1건만 허용)
+      if (_sModel[_s0023.UIATT] && _isChildExist === true) {
+        _isModelBind = true;
         continue;
       }
 
-      //0:1 aggregation에 이미 ui가 존재하는 경우 skip.
-      //l_child._OBJID를 판단하는 이유는 공통코드 UA050항목에 의해
-      //강제로 추가된 CHILD UI인경우 SKIP 처리를 하지 않기 위함.
-      if(lt_0023[i].ISMLB === "" && l_child && typeof l_child._OBJID !== "undefined" ){
-        continue;
-      }
-
-      //aggregation 타입 대문자 전환(SAP.UI.CORE.CONTROL)
-      var l_upper = lt_0023[i].UIADT.toUpperCase();
-
-      //라이브러리 테이블에서 해당 UI 검색.
-      var ls_0022 = oAPP.DATA.LIB.T_0022.find( a => a.UIFND === l_upper);
-      if(!ls_0022){continue;}
-
-      //drag UI가 drop UI의 aggregation type과 동일한경우 수집 처리.
-      if(sUIOBK === ls_0022.UIOBK){
-        lt_sel.push(lt_0023[i]);
-        continue;
-      }
-
-      ls_0027 = lt_0027.find( b => b.SGOBJ === ls_0022.UIOBK);
-      if(!ls_0027){continue;}
-      lt_sel.push(lt_0023[i]);
+      _sRes.T_SEL.push({ ..._s0023 });
 
     }
 
-    return lt_sel;
+    //추가 가능한 aggregation이 존재하지 않는 경우.
+    if (_sRes.T_SEL.length === 0) {
+      _sRes.RETCD = "E";
 
+      //바인딩으로 인해 제외된 경우와 원천적으로 대상이 없는 경우를 구분.
+      if (_isModelBind === true) {
+
+        //002 추가 및 이동 가능한 Aggregation 항목에 바인딩이 설정되어 있어 UI를 2건 이상 추가할 수 없습니다.
+        _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "002");
+      } else {
+        //003 추가 및 이동 가능한 Aggregation이 존재하지 않습니다.
+        _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "003");
+      }
+
+      return _sRes;
+    }
+
+    _sRes.RETCD = "S";
+
+    return _sRes;
 
   };  //입력 UI OBJECT가 target UI OBJECT에 추가 가능한지 여부 확인.
-
 
 
   
@@ -1623,11 +1773,25 @@
       //해당되지 않는다면 오류 메시지 처리.
       var lt_msg = [];
       for(var i=0, l=lt_UW03.length; i<l; i++){
-        lt_msg.push(lt_UW03[i].FLD04 + "-" + lt_UW03[i].FLD05);
+        lt_msg.push(lt_UW03[i].FLD04 + " - " + lt_UW03[i].FLD05);
       }
 
-      //306	&1 UI is only allowed for &2 parent.
-      parent.showMessage(sap, 10, "E", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "306", lt_UW03[0].FLD02, lt_msg.join(", "), "", ""));
+      /**
+       * @since   2026-08-18 14:48:51
+       * @version vNAN-NAN
+       * @author  pes
+       * @description
+       * 공통코드 UW03에 의해 특정 UI의 aggregation에만 추가 가능한 UI에 해당되는 UI인경우
+       * 해당되지 않는 부모의 aggregation에 추가시 기존 messageToast로 허용 불가 메시지를
+       * 표현하는 것이 아닌, 팝업 메시지로 변경 처리 및 기존 메시지 내용도 가독성 있게 변경 처리함.
+       * 
+       */
+      // //306	&1 UI is only allowed for &2 parent.
+      // parent.showMessage(sap, 10, "E", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "306", lt_UW03[0].FLD02, lt_msg.join(", "), "", ""));
+
+      //005 &1 은(는) 다음 UI의 Aggregation에만 추가할 수 있습니다.\n&2
+      parent.showMessage(sap, 20, "I", oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_002", "005", lt_UW03[0].FLD02, lt_msg.join("\n"), "", ""));
+
       return true;
 
     }
@@ -1677,6 +1841,10 @@
 
   //drag 종료 처리.
   oAPP.fn.designDragEnd = function(){
+
+    if(typeof oAPP.fn.fnReleaseBindPopupOnDragEnd === "function"){
+      oAPP.fn.fnReleaseBindPopupOnDragEnd();
+    }
 
     //tree drag & drop 가능여부 처리.
     oAPP.fn.setTreeDnDEnable(oAPP.attr.oModel.oData.zTREE[0]);
@@ -2406,6 +2574,10 @@
       //attribute 영역 선택처리(UIATK가 입력된경우 선택처리)
       oAPP.fn.setAttrFocus(UIATK, TYPE);
 
+      
+      //미리보기 ui 선택 처리
+      await oAPP.attr.ui.frame.contentWindow.selPreviewUI(_sTree.OBJID);
+
 
       return resolve();
 
@@ -2710,6 +2882,44 @@
     
     //ui 복사 처리.
     var ls_copy = lf_copy0014(is_t, is_p, aggrParam);
+
+
+    /**
+     * @since   2026-08-16 00:08:54
+     * @version vNAN-NAN
+     * @author  pes
+     * @description
+     * design tree에서 UI를 Drap하여 Ctrl + Drop으로 UI를 복사, 붙여넣기로 추가 할때
+     * 모델 바인딩 path 정보가 허용 가능하는지 여부를 판단하여 path 정보를 초기화 하는 로직 추가.
+     */
+    var _UIATT = undefined;
+
+    //현재 drag 한 UI가 column이면서 template aggregation에 UI가 존재하는경우.
+    if(ls_copy.UIOBK === "UO01127" && ls_copy.zTREE.findIndex( item => item.UIATT === "template") !== -1){
+      //N건 바인딩을 template으로 판단.
+      _UIATT = "template";
+    }
+
+
+    //현재 UI가 N건 바인딩 처리 됐는지 여부 확인.
+    var l_path = oAPP.fn.getParentAggrBind(oAPP.attr.prev[is_t.OBJID], _UIATT);
+
+
+    //drop ui의 N건 바인딩 여부 확인.
+    var l_path2 = oAPP.fn.getParentAggrBind(oAPP.attr.prev[is_p.OBJID], aggrParam.UIATT);
+
+    //DEFAULT 바인딩 수집건 유지.
+    var l_unbind = false;
+
+    //n건 바인딩 정보가 존재하는경우. 이동 대상 ui의 path와 다르다면.
+    if(l_path && l_path !== "" && l_path !== l_path2){
+      //바인딩 수집건 제거 flag.
+      l_unbind = true;
+    }
+
+    //TREE라인을 기준으로 N건 바인딩 해제 처리.
+    oAPP.fn.designUnbindUi(ls_copy, l_path, l_unbind);
+    
 
 
     //UNDO HISTORY 추가 처리.
@@ -3231,8 +3441,20 @@
     var l_path = oAPP.fn.getParentAggrBind(oAPP.attr.prev[i_drag.OBJID], _UIATT);
 
 
+    /**
+     * @since   2026-08-15 00:41:53
+     * @version vNAN-NAN
+     * @author  pes
+     * @description
+     * sap.ui.table.Table의 column aggregation에 Drop 처리 되는 UI 인경우
+     * N건 바인딩 판단을 template aggregation으로 판단하도록 처리.
+     */
+    if(["UO01139", "UO01142"].includes(i_drop.UIOBK) && param.UIATT === "columns"){
+      _UIATT = "template";
+    }
+
     //drop ui의 N건 바인딩 여부 확인.
-    var l_path2 = oAPP.fn.getParentAggrBind(oAPP.attr.prev[i_drop.OBJID], param.UIATT);
+    var l_path2 = oAPP.fn.getParentAggrBind(oAPP.attr.prev[i_drop.OBJID], _UIATT);
 
     //DEFAULT 바인딩 수집건 유지.
     var l_unbind = false;
@@ -3553,8 +3775,8 @@
       }
 
 
-      //미리보기 ui 선택 처리
-      await oAPP.attr.ui.frame.contentWindow.selPreviewUI(is_tree.OBJID);
+      // //미리보기 ui 선택 처리
+      // await oAPP.attr.ui.frame.contentWindow.selPreviewUI(is_tree.OBJID);
 
 
       //처리 완료 resolve
@@ -3903,6 +4125,10 @@
    * @param {object} OBJID - drag를 시작한 tree라인 정보
    ************************************************************************/
   oAPP.fn.designTreeDragStart = function(is_tree){
+
+    if(typeof oAPP.fn.fnShowBindPopupOnDragStart === "function"){
+      oAPP.fn.fnShowBindPopupOnDragStart();
+    }
     
     //DRAG 시작됨 FLAG 처리.
     oAPP.attr.ui.oLTree1.__isdragStarted = true;
@@ -5171,8 +5397,22 @@
     //대상 AGGREGATION에 바인딩 처리된경우 추가하고자 하는 UI를 2개 이상 입력했다면 알림 메시지, UI는 1개만 추가되게 처리.
     if(typeof ls_0015 !== "undefined" && ls_0015.UIATV !== "" && ls_0015.ISBND === "X" & l_cnt >= 2){
       l_cnt = 1;
-      //021	The object is already specified in Aggrigation.
-      parent.showMessage(sap, 10, "W", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "021", "", "", "", ""));
+
+      /**
+       * @since   2026-08-14 14:14:19
+       * @version vNAN-NAN
+       * @author  pes
+       * @description
+       * AGGREGATION에 바인딩이 설정 되어 있는 경우 기존 메시지 처리 내용이
+       * 모호하여 메시지 처리 내용을 변경함.
+       * 객체는 이미 Aggrigation에 지정되어 있습니다. ->
+       * &1 Aggregation에 바인딩이 설정되어 있어 UI를 2건 이상 추가할 수 없습니다.
+       */
+      // //021	The object is already specified in Aggrigation.
+      // parent.showMessage(sap, 10, "W", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "021", "", "", "", ""));
+
+      //&1 Aggregation에 바인딩이 설정되어 있어 UI를 2건 이상 추가할 수 없습니다.
+      parent.showMessage(sap, 10, "W", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "000", ls_0015.UIATT));
     }
 
 
@@ -6570,20 +6810,12 @@
   oAPP.fn.designUIAdd = function(is_tree){
 
     if(!is_tree){
-
+      
       //단축키 잠금 해제처리.
       oAPP.fn.setShortcutLock(false);
 
       parent.setBusy("");
 
-      return;
-    }
-
-    //부트스트랩 삽입 팝업(.u4a-dialog)이 있으면 UI5 sap.m.Dialog 대신 그것을 사용.
-    //(WS20 디자인 다이얼로그 UX 통일 — ws_html5_ws20_edit.js _showInsertPopup,
-    // 최종적으로 동일한 designAddUIObject 를 호출하므로 추가 흐름은 동일)
-    if(typeof oAPP.fn.designInsertPopupHtml5 === "function"){
-      oAPP.fn.designInsertPopupHtml5(is_tree);
       return;
     }
 
@@ -6604,7 +6836,14 @@
     }
     
     //UI 추가 팝업 정보가 존재하지 않는다면 JS 호출 후 팝업 호출.
-    oAPP.fn.getScript("design/js/insertUIPopop",function(){
+    /**
+     * @since   2026-07-10 14:19:50
+     * @version vNAN-NAN
+     * @author  pes
+     * @description
+     * UI 추가 팝업 스크립트 파일 위치 변경에 따라 getScript 호출 경로를 design/insertUIPopop/index로 변경.
+     */
+    oAPP.fn.getScript("design/insertUIPopop/index",function(){
       oAPP.fn.callUIInsertPopup(is_tree.UIOBK, lf_setChild);
     });
 

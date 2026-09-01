@@ -404,22 +404,45 @@ async function setAiDataParentAggr(sAppData) {
     }
 
 
-    //입력 UI의 UI 가능 AGGREGATION 정보 얻기.
-    var _aT_AGGR = oAPP.fn.chkAggrRelation(sAppData.sParent.UIOBK, sAppData.sParent.OBJID, _sAIRoot.UIOBK);
+    /**
+     * @since   2026-08-14 19:22:08
+     * @version vNAN-NAN
+     * @author  pes
+     * @description
+     * oAPP.fn.chkAggrRelation 함수에서 추가 가능 aggregation 구성시,
+     * 구성되지 않는 aggregation이 존재하는 경우, 오류 내용과 메시지를 같이 구성하도록
+     * 내용이 변경되어 기존 로직 주석 처리.
+     */
+    // //입력 UI의 UI 가능 AGGREGATION 정보 얻기.
+    // var _aT_AGGR = oAPP.fn.chkAggrRelation(sAppData.sParent.UIOBK, sAppData.sParent.OBJID, _sAIRoot.UIOBK);
 
-    //추가 가능한 aggregation 항목이 존재하지 않는경우.
-    if(_aT_AGGR.length === 0){
+    // //추가 가능한 aggregation 항목이 존재하지 않는경우.
+    // if(_aT_AGGR.length === 0){
 
-        sAppData.RETCD = "E";
+    //     sAppData.RETCD = "E";
+
+    //     //RCODE 02 : 선택할 aggregation이 존재하지 않음
+    //     sAppData.RCODE = "02";
+
+    //     //425	선택 가능한 Aggregation이 존재하지 않습니다.
+    //     sAppData.RTMSG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "425");
+        
+    //     return sAppData;
+
+    // }
+
+    const _sRes = oAPP.fn.chkAggrRelation(sAppData.sParent.UIOBK, sAppData.sParent.OBJID, _sAIRoot.UIOBK);
+    if(_sRes.RETCD === "E"){
+
+        sAppData.RETCD = _sRes.RETCD;
 
         //RCODE 02 : 선택할 aggregation이 존재하지 않음
         sAppData.RCODE = "02";
 
         //425	선택 가능한 Aggregation이 존재하지 않습니다.
-        sAppData.RTMSG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "425");
+        sAppData.RTMSG = _sRes.RTMSG;
         
         return sAppData;
-
     }
 
     

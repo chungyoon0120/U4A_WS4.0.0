@@ -94,9 +94,17 @@ export async function styleClassPopup(sParam){
 
             sRes.popover.close();
 
-
+            /**
+             * @since   2026-07-09 14:11:08
+             * @version vNAN-NAN
+             * @author  pes
+             * @description
+             * STYLE CLASS 적용 사항에 대해 ui attribute 변경 처리 및 미리보기 처리에 대해
+             * 공통 함수로 변경 처리.
+             */
             //attribute 입력건에 대한 미리보기, attr 라인 style 등에 대한 처리.
-            oAPP.fn.attrChangeProc(sParam.sAttr, undefined ,false, true);
+            // oAPP.fn.attrChangeProc(sParam.sAttr, undefined ,false, true);
+            oAPP.fn.attrChange(sParam.sAttr, undefined ,false, true);
 
 
             //20240621 pes.

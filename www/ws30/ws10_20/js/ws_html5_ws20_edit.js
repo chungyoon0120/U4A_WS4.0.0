@@ -74,8 +74,8 @@
     //    BUSY 를 그 전에 풀지 않고, PAGE1 이 잠깐 노출되는 깜빡임도 막는다.
     //  sUiatk 가 있으면 재선택 후 그 속성 줄로 스크롤(원본 setSelectTreeItem(OBJID, UIATK)→setAttrFocus).
     //  oOpt 를 주면 선택 흐름(fnWs20SelectUI)에 그대로 전달한다.
-    //  [BR59-5] 되돌리기/다시하기는 oOpt.bNoRowSelect=true 로 불러, 속성 줄로 커서·스크롤은 하되
-    //  그 줄에 파란 선택 강조는 남기지 않는다(장군님 지시 2026-08-21).
+    //  [BR52/BR53 철회 2026-08-30] 속성 줄 "선택 표시" 자체를 이식하지 않기로 해(장군님 결정),
+    //  종전의 bNoRowSelect 옵션은 불필요해져 제거했다. 이동·접힘·커서만 수행된다.
     function _selectNode(sObjid, sUiatk, oOpt) {
         try {
             if (oOpt && typeof oAPP.fn.fnWs20SelectUI === "function") {
@@ -198,7 +198,7 @@
      *       삭제 되돌려 지움 = delUIObjPreView + destroyUIPreView (_removeNodePreview)
      *       삭제 되살림     = createUIInstance(+자식 재귀 setUIParent) + moveUIObjPreView (_prevCreateSubtree)
      *       이동            = prevRemoveUiObject + reCreateUIObjInstance + moveUIObjPreView (_movePreviewAndWait 동일 조각)
-     *       속성            = reCreateUIObjInstance(제자리, 복원된 _T_0015 로 재생성)
+     *       속성            = 값만 다시 꽂기(setModelBind + previewUIsetProp) — 인스턴스는 안 건드림 [BR54-4]
      *       이름변경        = 옛이름 지우기 + 새(옛)이름 되살리기(키가 달라 충돌 없음)
      *     끝에 영향받은 "부모만" 다시 그림(원본 invalidateUiObject→rerender = _rerenderParentRTE).
      *   ★ 스냅샷 방식은 "무엇이 바뀌었는지" 목록이 없으므로, 복원 직전(new)·복원값(old) 트리를 비교해
@@ -259,6 +259,97 @@
         var iIdx = oParent ? _aggrPrevIndex(oParent.zTREE, node) : 0;
         _prev("moveUIObjPreView", [node.OBJID, node.UILIB, node.POBID, node.PUIOK, node.UIATT, iIdx, node.ISMLB, node.UIOBK, true]);
     }
+    /************************************************************************
+     * [BR54-4] 속성만 바뀐 되돌리기/다시하기의 미리보기 반영.
+     *   원본 undoRedo.js CL_CHANGE_ATTR.executeChangeAttr(2127~2207) 1:1.
+     *   원본은 UI 인스턴스를 부수고 다시 만들지 않는다 — 이미 화면에 있는 UI 에 값만 다시 꽂는다.
+     *     · 값이 달라진 줄        → 복원값 그대로 꽂기(원본 2204 previewUIsetProp)
+     *     · 되돌리며 사라진 줄    → 속성 마스터의 기본값으로 되돌려 꽂기(원본 2154~2170)
+     *     · 꽂기 전 n건 바인딩 부모 매핑 1회(원본 2200 setModelBind)
+     ************************************************************************/
+    function _applyAttrPreview(sObjid, aOld, aNew) {
+
+        var oPrev = oAPP.attr.prev && oAPP.attr.prev[sObjid];
+        if (!oPrev) { return; }
+
+        function _byKey(a) {
+            var m = {};
+            for (var i = 0; i < (a || []).length; i++) { if (a[i] && a[i].UIATK) { m[a[i].UIATK] = a[i]; } }
+            return m;
+        }
+        var mOld = _byKey(aOld), mNew = _byKey(aNew), sK, aTarget = [];
+
+        //(1) 복원값에 있고 지금과 다른 줄.
+        for (sK in mOld) {
+            if (JSON.stringify(mOld[sK]) !== JSON.stringify(mNew[sK] || null)) { aTarget.push(mOld[sK]); }
+        }
+
+        //(2) 편집으로 생겼다가 되돌리며 사라진 줄 → 기본값으로 되돌린다(원본 2154~2170).
+        for (sK in mNew) {
+            if (mOld[sK]) { continue; }
+            var ls = null;
+            try {
+                ls = oAPP.fn.crtStru0015();
+                //직접 입력 가능한 aggregation 은 구분자 제거(원본 2160).
+                var sBase = String(sK).replace(/_1/, "");
+                var s23 = (oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_0023))
+                    ? oAPP.DATA.LIB.T_0023.find(function (a) { return a.UIATK === sBase; })
+                    : undefined;
+                if (typeof s23 !== "undefined") {
+                    Object.assign(ls, JSON.parse(JSON.stringify(s23)));
+                    ls.UIATV = s23.DEFVL;
+                }
+                ls.OBJID = sObjid;
+            } catch (e) {
+                console.error("[HTML5][WS20][BR54-4] 되돌리기 기본값 복원 실패(" + sObjid + " / " + sK + "):",
+                    e && e.message ? e.message : e);
+                ls = null;
+            }
+            if (ls) { aTarget.push(ls); }
+        }
+
+        if (aTarget.length === 0) { return; }
+
+        //n건 바인딩 해제 판단(원본 2176~2196) — 복원값에 바인딩이 안 남았으면 부모에서 뗀다.
+        try {
+            if (typeof oAPP.fn.getParentAggrBind === "function" && typeof oAPP.fn.attrUnbindProp === "function") {
+                var sModel = oAPP.fn.getParentAggrBind(oPrev);
+                if (typeof sModel !== "undefined" && sModel !== "") {
+                    for (var u = 0; u < aTarget.length; u++) {
+                        var sUK = aTarget[u].UIATK;
+                        var iBnd = (oPrev._T_0015 || []).findIndex(function (a) {
+                            return a.ISBND === "X" && a.UIATK !== sUK
+                                && String(a.UIATV || "").substr(0, sModel.length) === sModel;
+                        });
+                        if (iBnd === -1) { oAPP.fn.attrUnbindProp(aTarget[u]); }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("[HTML5][WS20][BR54-4] 되돌리기 바인딩 해제 판단 실패(" + sObjid + "):",
+                e && e.message ? e.message : e);
+        }
+
+        //n건 바인딩 처리건이면 부모 UI 에 현재 UI 매핑(원본 2200).
+        try {
+            if (typeof oAPP.fn.setModelBind === "function") { oAPP.fn.setModelBind(oPrev); }
+        } catch (e) {
+            console.error("[HTML5][WS20][BR54-4] 되돌리기 부모 매핑 실패(" + sObjid + "):",
+                e && e.message ? e.message : e);
+        }
+
+        //미리보기 화면의 대상 UI 프로퍼티 변경(원본 2204).
+        for (var i = 0; i < aTarget.length; i++) {
+            try {
+                if (typeof oAPP.fn.previewUIsetProp === "function") { oAPP.fn.previewUIsetProp(aTarget[i]); }
+            } catch (e) {
+                console.error("[HTML5][WS20][BR54-4] 되돌리기 미리보기 반영 실패("
+                    + sObjid + " / " + aTarget[i].UIATK + "):", e && e.message ? e.message : e);
+            }
+        }
+
+    }
+
     // old = 복원값(스냅샷) 트리 / oldT15 = 그 _T_0015 맵, new = 복원 직전 트리 / newT15 = 그 맵.
     //   부분 반영에 성공하면 true, 불가하면 throw(→ 호출측 drawPreview 폴백).
     async function _applyPartialPreview(oldTree, oldT15, newTree, newT15) {
@@ -321,10 +412,14 @@
             _markParent(oN.POBID);
             if (oNew[k] && oNew[k].POBID) { _markParent(oNew[k].POBID); }   // 부모가 바뀐 이동이면 옛 부모(잃은 쪽)도 다시 그림.
         }
-        // ④ 속성(자리 그대로, _T_0015 만 바뀜) — 복원된 _T_0015 로 제자리 재생성. 상위가 재구성되면 스킵.
+        // ④ 속성(자리 그대로, _T_0015 만 바뀜) — 바뀐 속성만 미리보기에 다시 꽂는다. 상위가 재구성되면 스킵.
+        //   ★ [BR54-4] 종전에는 reCreateUIObjInstance 로 UI 를 부수고 다시 만들었는데, 그러면
+        //     부모에서 빠진 뒤 다시 붙지 않아 그 UI 가 미리보기에서 통째로 사라졌다(실화면 확인 2026-08-31:
+        //     Reset 되돌리기 후 Button 이 안 그려짐). 원본 undoRedo.js CL_CHANGE_ATTR.executeChangeAttr
+        //     (2127~2207)은 인스턴스를 건드리지 않고 값만 다시 꽂는다 → 원본대로 되돌린다.
         for (k in setAttr) {
             if (_ancestorIn(oOld, k, setMove) || _ancestorIn(oOld, k, setAdd)) { continue; }
-            try { if (typeof oAPP.fn.reCreateUIObjInstance === "function") { oAPP.fn.reCreateUIObjInstance(oOld[k]); } } catch (e) { }
+            _applyAttrPreview(k, (oldT15 && oldT15[k]) || [], (newT15 && newT15[k]) || []);
             _markParent(oOld[k].POBID);
         }
         // ⑤ 영향받은 부모만 다시 그림 + 완료 대기(원본 invalidateUiObject→rerender + attachOnAfterRendering).
@@ -429,8 +524,7 @@
         //    앵커(선택 노드)가 그 속성의 소속 노드일 때만 스크롤(삭제 대체앵커=부모면 스크롤 안 함).
         if (sAnchor) {
             var sFocusUiatk = (s.focus && s.focus.OBJID === sAnchor) ? (s.focus.UIATK || "") : "";
-            //[BR59-5] 되돌리기/다시하기는 줄 선택 강조 없이(커서·스크롤·접힘만) 이동.
-            try { await _selectNode(sAnchor, sFocusUiatk, { bNoRowSelect: true }); } catch (e) { }
+            try { await _selectNode(sAnchor, sFocusUiatk); } catch (e) { }
         }
     }
     // 편집 직전 호출 — 현재 상태를 undo 스택에 적재(+redo 비움).

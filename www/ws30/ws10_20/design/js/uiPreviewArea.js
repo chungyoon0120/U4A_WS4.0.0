@@ -77,6 +77,31 @@
     });//미리보기 전체화면 스위치 변경 이벤트.
 
 
+    /**
+     * @since   2026-06-10 19:24:17
+     * @version v3.6.4-3
+     * @author  pes
+     * @description
+     * 미리보기 툴바에 선택/컨텍스트 메뉴 마커 표시 제어 스위치를 추가한다.
+     * 스위치는 미리보기 선택 상태를 초기화하지 않고, 마커 표시 여부만 변경한다.
+     */
+    if(typeof oAPP.attr.previewMarkVisible === "undefined"){
+      oAPP.attr.previewMarkVisible = true;
+    }
+
+    var oBtnPreviewMark = new sap.m.Switch({
+      state:oAPP.attr.previewMarkVisible !== false,
+      tooltip:oAPP.common.fnGetMsgClsText("ZMSG_WS_COMMON_001", "912", "", "", "", "")
+    });
+    oTool.addContent(oBtnPreviewMark);
+
+    oAPP.attr.ui.oPreviewMarkSwitch = oBtnPreviewMark;
+
+    oBtnPreviewMark.attachChange(function(){
+      oAPP.fn.setPreviewMarkVisible(this.getState());
+    });
+
+
     //B39	Help
     //도움말 버튼.
     var oLBtnHelp = new sap.m.Button({icon:"sap-icon://question-mark", 
@@ -134,14 +159,195 @@
 
 
   //미리보기 iframe 영역 구성.
-  //테스트!!!!!!!!!!!!!!!
-  //bReset 제거
-  oAPP.fn.loadPreviewFrame = function(bReset){
-  // oAPP.fn.loadPreviewFrame = function(){
+  /**
+   * @since   2026-06-10 19:24:17
+   * @version v3.6.4-3
+   * @author  pes
+   * @description
+   * 미리보기 툴바 스위치 상태를 미리보기 아이프레임으로 전달한다.
+   * 아이프레임 준비 시 u4aSetPreviewMarkVisible()을 호출하고, 준비 전에는
+   * 루트 숨김 클래스를 토글하여 마커 DOM/데이터 상태를 유지한다.
+   */
+  oAPP.fn.setPreviewMarkVisible = function(bVisible){
 
-    console.time("미리보기 FRAME 로드 시간");
+    var bState = bVisible !== false;
+    var oFrame = oAPP.attr.ui?.frame || document.getElementById("prevHTML");
+    var oWin = oFrame?.contentWindow;
 
-    //테스트!!!!!!!!!!!!!!!!!
+    oAPP.attr.previewMarkVisible = bState;
+
+    if(oAPP.attr.ui?.oPreviewMarkSwitch && oAPP.attr.ui.oPreviewMarkSwitch.getState() !== bState){
+      oAPP.attr.ui.oPreviewMarkSwitch.setState(bState);
+    }
+
+    if(!oWin){
+      return bState;
+    }
+
+    try{
+      if(typeof oWin.u4aSetPreviewMarkVisible === "function"){
+        return oWin.u4aSetPreviewMarkVisible(bState);
+      }
+
+      if(oWin.document?.documentElement?.classList){
+        oWin.document.documentElement.classList.toggle("u4a_preview_mark_hidden", bState !== true);
+      }
+    }catch(e){}
+
+    return bState;
+
+  };
+
+  /**
+   * @since   2026-06-25 15:25:28
+   * @version v3.6.4-3
+   * @author  pes
+   * @description
+   * 기존 미리보기 HTML을 로드하는 방식 주석처리.
+   * 서버에서 미리보기 HTML을 구성하던 이전 로직을 개선하여
+   * 클라이언트에서 미리보기 HTML을 구성, UI5 라이브러리만
+   * 서버 경로를 참조하도록 로직 변경함.
+   */
+  // oAPP.fn.loadPreviewFrame = function(bReset){
+
+  //   //🦺자주 사용할 내용에 대해서 util로 기능을 빼놓기.
+  //   function lf_setParam(oForm, name, value){
+
+  //     var iput = document.createElement("input");
+  //         iput.setAttribute("name", name);
+  //         iput.setAttribute("value", value);
+  //         iput.setAttribute("type", "hidden");
+  //         oForm.appendChild(iput);
+
+  //   }
+
+  //   //초기화 처리 하는경우.
+  //   if(bReset === true){
+
+  //     //미리보기 영역 onAfterRendering 제거.
+  //     oAPP.attr.ui.oDesignPreview.removeEventDelegate(oAPP.fn.prevFrameReload);
+
+  //     //frame 정보 초기화.
+  //     oAPP.attr.ui.frame = null;
+  //   }
+
+  //   //미리보기 html 정보가 로드되지 않은경우.
+  //   if(!oAPP.attr.ui.frame || !oAPP.attr.ui.frame.contentWindow){
+  //     oAPP.attr.ui.frame = document.getElementById("prevHTML");
+
+  //     var l_info = parent.getUserInfo();
+
+  //     var oform = document.createElement("form");
+  //     oform.setAttribute("id",     "prvSendForm");
+  //     oform.setAttribute("target", oAPP.attr.ui.frame.id);
+  //     oform.setAttribute("method", "POST");
+  //     oform.setAttribute("action", parent.getHost() + "/zu4a_wbc/u4a_ipcmain/getPrevHTML");
+  //     oform.style.display = "none";
+
+  //     //client 파라메터 추가.
+  //     lf_setParam(oform, "sap-client", l_info.CLIENT);
+
+  //     //접속 언어 파라메터 추가.
+  //     lf_setParam(oform, "sap-language", l_info.LANGU);
+
+  //     //SAP 접속 ID 파라메터 추가.
+  //     lf_setParam(oform, "sap-user", l_info.ID);
+
+  //     //SAP 접속 PW 파라메터 추가.
+  //     lf_setParam(oform, "sap-password", l_info.PW);
+
+  //     //라이브러리 bootstrap 경로 파라메터 추가.
+  //     lf_setParam(oform, "LIBPATH", oAPP.fn.getBootStrapUrl());
+
+      
+  //     //20250117 PES -START.
+  //     //U4A, SAPUI6 라이브러리 PATH 정보 추가 처리.
+  //     var sUA025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "U4A_LIB"  && a.FLD06 === "X" );
+
+  //     if(typeof sUA025 !== "undefined"){
+  //       //U4A 라이브러리 PATH 정보 구성.
+  //       lf_setParam(oform, "LIBPATH_U4A", sUA025.FLD04 + sUA025.FLD05);
+  //     }
+      
+
+  //     var sUA025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "UI6_LIB"  && a.FLD06 === "X" );
+
+  //     if(typeof sUA025 !== "undefined"){
+  //       //SAPUI6 라이브러리 PATH 정보 구성.
+  //       lf_setParam(oform, "LIBPATH_UI6", sUA025.FLD04 + sUA025.FLD05);
+  //     }      
+  //     //20250117 PES -END.
+
+
+  //     //20250212 PES -START.
+  //     //AM5 차트의 라이브러리 정보도 서버 전송 데이터에 구성 처리.
+  //     var sUA025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "AM5CHART"  && a.FLD06 === "X" );
+
+  //     if(typeof sUA025 !== "undefined"){
+  //       //SAPUI6 라이브러리 PATH 정보 구성.
+  //       lf_setParam(oform, "LIBPATH_AM5", sUA025.FLD04 + sUA025.FLD05);
+  //     }      
+  //     //20250212 PES -END.
+
+
+  //     //LOAD 대상 LIBRARY 항목 파라메터 추가.
+  //     lf_setParam(oform, "LIBRARY", oAPP.fn.getUi5Libraries(true));
+
+  //     //미리보기 THEME 정보 파라메터 추가.
+  //     lf_setParam(oform, "THEME", oAPP.DATA.APPDATA.S_0010.UITHM);
+      
+  //     document.body.appendChild(oform);
+
+  //     oform.submit();
+
+  //     //미리보기 영역이 onAfterRendering 호출되는경우 다시 미리보기 영역을 load처리.
+  //     oAPP.attr.ui.oDesignPreview.addEventDelegate(oAPP.fn.prevFrameReload);
+
+  //     //🦺body에 추가 하는게 아니라 이런 용도로 보이지 않는 dom을 만들어
+  //     //해당 영역에 추가.
+  //     //그리고 나갈때 삭제 한다던가 해야함.
+  //     setTimeout(() => {
+  //       document.body.removeChild(oform);
+  //     }, 0);
+
+ 
+  //     // //미리보기 서버 URL 정보 구성.
+  //     // oAPP.attr.ui.frame.src = parent.getHost() + "/zu4a_wbc/u4a_ipcmain/getPrevHTML?" +
+  //     //   "sap-client=" + l_info.CLIENT +  
+  //     //   "&sap-language=" + l_info.LANGU + 
+  //     //   "&sap-user=" + l_info.ID +
+  //     //   "&sap-password=" + l_info.PW +
+  //     //   "&LIBPATH=" + oAPP.fn.getBootStrapUrl() + 
+  //     //   "&LIBRARY=" + oAPP.fn.getUi5Libraries(true) +
+  //     //   "&THEME=" + encodeURIComponent(oAPP.DATA.APPDATA.S_0010.UITHM);
+
+  //     return;
+
+  //   }
+
+  //   //미리보기 화면 구성.
+  //   if(oAPP.attr.ui.frame.contentWindow && oAPP.attr.ui.frame.contentWindow._loaded === true){
+      
+  //     //미리보기 화면 제거.
+  //     oAPP.attr.ui.frame.contentWindow.removePreviewPage();
+
+  //     //테마 구성.
+  //     oAPP.attr.ui.frame.contentWindow.setPreviewUiTheme(oAPP.DATA.APPDATA.S_0010.UITHM);
+
+  //     //라이브러리 로드 처리.
+  //     oAPP.attr.ui.frame.contentWindow.setUiLoadLibraries(oAPP.fn.getUi5Libraries());
+
+  //     //미리보기 ui 구성
+  //     oAPP.attr.ui.frame.contentWindow.drawPreview();
+
+  //   }
+
+
+  // };  //미리보기 iframe 영역 구성.
+
+
+  oAPP.fn.loadPreviewFrame = function(){
+
     const oFrame = document.getElementById("prevHTML");
     if (oFrame === null) {
         return;
@@ -153,6 +359,15 @@
 
       //미리보기 ui 구성
       oFrame.contentWindow.drawPreview().then(()=>{
+
+        /**
+         * @since   2026-06-10 19:24:17
+         * @version v3.6.4-3
+         * @author  pes
+         * @description
+         * 미리보기 다시 그리기 이후 저장된 마커 표시 상태를 다시 적용한다.
+         */
+        oAPP.fn.setPreviewMarkVisible(oAPP.attr.previewMarkVisible !== false);
         
         const _oRow = oAPP.attr.ui.oLTree1.getRows()[0];
         if(!_oRow?.getBindingContext){
@@ -172,149 +387,22 @@
 
     const sUrl = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "preview", "index.html");
 
+    oFrame.onload = function(){
+      /**
+       * @since   2026-06-10 19:24:17
+       * @version v3.6.4-3
+       * @author  pes
+       * @description
+       * 미리보기 아이프레임 로드 이후 저장된 마커 표시 상태를 다시 적용한다.
+       */
+      oAPP.fn.setPreviewMarkVisible(oAPP.attr.previewMarkVisible !== false);
+    };
+
     oFrame.setAttribute("src", sUrl);
 
     oAPP.attr.ui.frame = oFrame;
 
-    return;
-    //테스트!!!!!!!!!!!!!!!!!
-
-
-    //🦺자주 사용할 내용에 대해서 util로 기능을 빼놓기.
-    function lf_setParam(oForm, name, value){
-
-      var iput = document.createElement("input");
-          iput.setAttribute("name", name);
-          iput.setAttribute("value", value);
-          iput.setAttribute("type", "hidden");
-          oForm.appendChild(iput);
-
-    }
-
-    //초기화 처리 하는경우.
-    if(bReset === true){
-
-      //미리보기 영역 onAfterRendering 제거.
-      oAPP.attr.ui.oDesignPreview.removeEventDelegate(oAPP.fn.prevFrameReload);
-
-      //frame 정보 초기화.
-      oAPP.attr.ui.frame = null;
-    }
-
-    //미리보기 html 정보가 로드되지 않은경우.
-    if(!oAPP.attr.ui.frame || !oAPP.attr.ui.frame.contentWindow){
-      oAPP.attr.ui.frame = document.getElementById("prevHTML");
-
-      var l_info = parent.getUserInfo();
-
-      var oform = document.createElement("form");
-      oform.setAttribute("id",     "prvSendForm");
-      oform.setAttribute("target", oAPP.attr.ui.frame.id);
-      oform.setAttribute("method", "POST");
-      oform.setAttribute("action", parent.getHost() + "/zu4a_wbc/u4a_ipcmain/getPrevHTML");
-      oform.style.display = "none";
-
-      //client 파라메터 추가.
-      lf_setParam(oform, "sap-client", l_info.CLIENT);
-
-      //접속 언어 파라메터 추가.
-      lf_setParam(oform, "sap-language", l_info.LANGU);
-
-      //SAP 접속 ID 파라메터 추가.
-      lf_setParam(oform, "sap-user", l_info.ID);
-
-      //SAP 접속 PW 파라메터 추가.
-      lf_setParam(oform, "sap-password", l_info.PW);
-
-      //라이브러리 bootstrap 경로 파라메터 추가.
-      lf_setParam(oform, "LIBPATH", oAPP.fn.getBootStrapUrl());
-
-      
-      //20250117 PES -START.
-      //U4A, SAPUI6 라이브러리 PATH 정보 추가 처리.
-      var sUA025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "U4A_LIB"  && a.FLD06 === "X" );
-
-      if(typeof sUA025 !== "undefined"){
-        //U4A 라이브러리 PATH 정보 구성.
-        lf_setParam(oform, "LIBPATH_U4A", sUA025.FLD04 + sUA025.FLD05);
-      }
-      
-
-      var sUA025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "UI6_LIB"  && a.FLD06 === "X" );
-
-      if(typeof sUA025 !== "undefined"){
-        //SAPUI6 라이브러리 PATH 정보 구성.
-        lf_setParam(oform, "LIBPATH_UI6", sUA025.FLD04 + sUA025.FLD05);
-      }      
-      //20250117 PES -END.
-
-
-      //20250212 PES -START.
-      //AM5 차트의 라이브러리 정보도 서버 전송 데이터에 구성 처리.
-      var sUA025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "AM5CHART"  && a.FLD06 === "X" );
-
-      if(typeof sUA025 !== "undefined"){
-        //SAPUI6 라이브러리 PATH 정보 구성.
-        lf_setParam(oform, "LIBPATH_AM5", sUA025.FLD04 + sUA025.FLD05);
-      }      
-      //20250212 PES -END.
-
-
-      //LOAD 대상 LIBRARY 항목 파라메터 추가.
-      lf_setParam(oform, "LIBRARY", oAPP.fn.getUi5Libraries(true));
-
-      //미리보기 THEME 정보 파라메터 추가.
-      lf_setParam(oform, "THEME", oAPP.DATA.APPDATA.S_0010.UITHM);
-      
-      document.body.appendChild(oform);
-
-      oform.submit();
-
-      //미리보기 영역이 onAfterRendering 호출되는경우 다시 미리보기 영역을 load처리.
-      oAPP.attr.ui.oDesignPreview.addEventDelegate(oAPP.fn.prevFrameReload);
-
-      //🦺body에 추가 하는게 아니라 이런 용도로 보이지 않는 dom을 만들어
-      //해당 영역에 추가.
-      //그리고 나갈때 삭제 한다던가 해야함.
-      setTimeout(() => {
-        document.body.removeChild(oform);
-      }, 0);
-
- 
-      // //미리보기 서버 URL 정보 구성.
-      // oAPP.attr.ui.frame.src = parent.getHost() + "/zu4a_wbc/u4a_ipcmain/getPrevHTML?" +
-      //   "sap-client=" + l_info.CLIENT +  
-      //   "&sap-language=" + l_info.LANGU + 
-      //   "&sap-user=" + l_info.ID +
-      //   "&sap-password=" + l_info.PW +
-      //   "&LIBPATH=" + oAPP.fn.getBootStrapUrl() + 
-      //   "&LIBRARY=" + oAPP.fn.getUi5Libraries(true) +
-      //   "&THEME=" + encodeURIComponent(oAPP.DATA.APPDATA.S_0010.UITHM);
-
-      return;
-
-    }
-
-    //미리보기 화면 구성.
-    if(oAPP.attr.ui.frame.contentWindow && oAPP.attr.ui.frame.contentWindow._loaded === true){
-      
-      //미리보기 화면 제거.
-      oAPP.attr.ui.frame.contentWindow.removePreviewPage();
-
-      //테마 구성.
-      oAPP.attr.ui.frame.contentWindow.setPreviewUiTheme(oAPP.DATA.APPDATA.S_0010.UITHM);
-
-      //라이브러리 로드 처리.
-      oAPP.attr.ui.frame.contentWindow.setUiLoadLibraries(oAPP.fn.getUi5Libraries());
-
-      //미리보기 ui 구성
-      oAPP.attr.ui.frame.contentWindow.drawPreview();
-
-    }
-
-
-  };  //미리보기 iframe 영역 구성.
-
+  };
 
 
 
@@ -1255,8 +1343,8 @@
     oAPP.attr.prevCSS = [];
 
 
-    //적용 처리 대상 CSS 가 존재하지 않는경우 exit. ([HTML5] {적용건수, 바인딩목록} 반환)
-    if(typeof it_css === "undefined" || it_css.length === 0){return { applied: 0, bound: [] };}
+    //적용 처리 대상 CSS 가 존재하지 않는경우 exit.
+    if(typeof it_css === "undefined" || it_css.length === 0){return;}
 
     var lt_OBJID = [];
 
@@ -1268,51 +1356,15 @@
     if(lt_OBJID.length === 0){
       //오류 메시지 처리.
       //286	Check box not selected.
-      //  ※[HTML5] UI5CSSPOP_V2 경로는 부모 _ui5PreCssApply 가 선판정해 여기 도달 전에 회신하므로
-      //    이 showMessage 는 원본(WS20 자체) 경로 전용. 적용 건수 0 반환.
       parent.showMessage(sap, 20, "W", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "286", "", "", "", ""));
-      return { applied: 0, bound: [] };
+      return;
 
     }
 
     //STYLE CLASS 병합처리.
     var l_css = it_css.join(" ");
 
-    //[HTML5 2026-07-23] 실제 styleClass 를 건드린(적용된) 건수. 0 이면 호출측이 "적용된 항목이 없습니다"
-    //  안내(신규 987~ 계열 990). styleClass 미보유 UI 나 바인딩건은 skip 되어 카운트되지 않는다.
-    var l_changed = false, l_UIATV = "", l_sep = "", l_applied = 0;
-
-    //[HTML5 2026-07-23] 바인딩 선검사 — 선택 UI 중 styleClass 가 바인딩된 게 하나라도 있으면 전체 중단하고
-    //  해당 UI 목록을 반환한다(장군님 지시: 바인딩건에 CSS 덮어쓰기 금지 + 어떤 UI 인지 사용자에게 통지).
-    //  판정 기준은 아래 적용 루프의 바인딩 SKIP(ls_0015.ISBND==="X") 과 동일. 원본 부분적용 → 전체중단으로 변경.
-    //[HTML5 2026-07-24] CSS 미지원 UI 선검사(993) 동봉 — styleClass 프로퍼티 정의(T_0023)가 아예 없는 UI 는
-    //  CSS 를 붙일 수 없다. 하나라도 섞여 있으면 전체 중단하고 해당 UI 목록 반환(장군님 지시: 1%도 전체중단).
-    var lt_bound = [];
-    var lt_nostyle = [];
-    for(var b=0, bl=lt_OBJID.length; b<bl; b++){
-
-      var ls_0023_b = oAPP.DATA.LIB.T_0023.find( a=> a.UIOBK === lt_OBJID[b].UIOBK &&
-        a.UIATT === "styleClass" && a.UIATY === "1" && a.ISDEP !== "X" );
-
-      //styleClass 프로퍼티 정의 자체가 없는 UI = CSS 미지원 → 수집(993). (UIATK 없음 → 선택만, 속성이동 없음)
-      if(!ls_0023_b){ lt_nostyle.push({ OBJID: lt_OBJID[b].OBJID }); continue; }
-
-      var oPrev_b = oAPP.attr.prev[lt_OBJID[b].OBJID];
-      if(!oPrev_b || !oPrev_b._T_0015){ continue; }
-
-      var ls_0015_b = oPrev_b._T_0015.find( a=> a.UIATK === ls_0023_b.UIATK );
-
-      //styleClass 프로퍼티가 바인딩된 건 수집. (OBJID=UI식별, UIATK=styleClass 속성키 → 확인 후 해당
-      //  속성으로 선택/이동시키기 위함 — setSelectTreeItem(OBJID, UIATK))
-      if(ls_0015_b && ls_0015_b.ISBND === "X"){ lt_bound.push({ OBJID: lt_OBJID[b].OBJID, UIATK: ls_0023_b.UIATK }); }
-
-    }
-
-    //바인딩된 항목이 하나라도 있으면 아무것도 적용하지 않고 목록 반환(호출측이 안내). 우선순위: 바인딩(992) > 미지원(993).
-    if(lt_bound.length > 0){ return { applied: 0, bound: lt_bound, nostyle: lt_nostyle }; }
-
-    //CSS 미지원 UI 가 하나라도 있으면 전체 중단하고 목록 반환(호출측이 993 안내).
-    if(lt_nostyle.length > 0){ return { applied: 0, bound: [], nostyle: lt_nostyle }; }
+    var l_changed = false, l_UIATV = "", l_sep = "";
 
     //DESIGN영역의 CHECKBOX 선택건을 대상으로 CSS 적용 처리.
     for(var i=0, l=lt_OBJID.length; i<l; i++){
@@ -1351,10 +1403,7 @@
         oAPP.attr.prev[lt_OBJID[i].OBJID].setStyleClass(l_UIATV + l_sep + l_css);
 
       }
-
-      //[HTML5 2026-07-23] 여기까지 온 건 = styleClass 를 실제 반영한 건(미리보기/적용 공통). 적용 건수 누적.
-      l_applied++;
-
+      
       //실제 적용 처리가 아닌경우 CSS 적용건 수집 처리.
       if(!bSave){
         oAPP.attr.prevCSS.push({OBJID:lt_OBJID[i].OBJID, CSS:l_css, ISEXT:ls_0023.ISEXT, UIATV:l_UIATV});
@@ -1428,10 +1477,6 @@
       //change flag 설정.
       oAPP.fn.setChangeFlag();
     }
-
-    //[HTML5 2026-07-23] 실제 적용된 건수 반환(applied 0 이면 호출측이 "적용된 항목이 없습니다" 안내).
-    //  bound 는 위 선검사에서 이미 걸러졌으므로 여기선 항상 빈 배열.
-    return { applied: l_applied, bound: [] };
 
   };  //미리보기 css 적용 처리.
     

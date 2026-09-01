@@ -203,7 +203,12 @@
         { ITMCD: "", FLD01: "EXT00001349" },   // sap.m.List autoGrowing
         { ITMCD: "", FLD01: "EXT00002374" },   // sap.m.Page useBackToTopButton
         { ITMCD: "", FLD01: "EXT00002378" },   // sap.uxap.ObjectPageLayout useBackToTopButton
-        { ITMCD: "", FLD01: "EXT00002379" }    // sap.f.DynamicPage
+        { ITMCD: "", FLD01: "EXT00002379" },   // sap.f.DynamicPage
+        // [원본 2026-08-11 반영] 파일 올리기 계열 3종의 그림 압축 설정을 바인딩 제외에 추가.
+        //   근거 = 원본 Popups/bindPopup/index.js 1337~1339 (U4A_WS_DESIGN, 2026-08-16 갱신분).
+        { ITMCD: "", FLD01: "AT000043275" },   // sap.ui.unified.FileUploader imageCompressSettings
+        { ITMCD: "", FLD01: "AT000043276" },   // sap.ui.commons.FileUploader imageCompressSettings
+        { ITMCD: "", FLD01: "AT000043277" }    // sap.m.UploadCollection imageCompressSettings
     ];
 
     // 하위 UI 에 단축키 등록건 존재 여부(원본 attrGetShortcutEvent 1:1).
