@@ -326,8 +326,16 @@
                 type: "C",
                 message: sMsg,
                 buttons: [{ act: "YES", label: H.cl("A03"), emphasized: true }, { act: "NO", label: H.cl("A39") }],
-                onClose: function (sAct) { resolve(sAct === "YES" ? "OK" : ""); }
+                onClose: function (sAct) {
+                    // [BR65] 원본 index.js:6976·7051 — 확인창이 닫히는 즉시 "이 팝업의 busy 만" 다시 ON.
+                    //   (WS20·다른 팝업 busy 는 유지 — sOption 없이 호출하면 방송하지 않는다.)
+                    oAPP.fn.setBusyWS20Interaction(true);
+                    resolve(sAct === "YES" ? "OK" : "");
+                }
             });
+            // [BR65] 원본 index.js:6990·7064 — 확인창을 띄운 직후 "이 팝업의 busy 만" OFF.
+            //   이게 빠지면 확인창 위/아래로 로딩 덮개가 남아 이후 조작이 막힌다(WS20 busy 는 유지).
+            oAPP.fn.setBusyWS20Interaction(false);
         });
     }
 
@@ -335,7 +343,8 @@
      * aggregation 바인딩 callback(원본 attrBindCallBackAggr 1:1).
      *   is_tree = 드래그한 모델필드, is_attr = 디자인트리 드롭 대상(aggregation 행).
      *   ★ 별도 aggregation 선택 팝업 없음 — 드롭 행이 곧 대상 aggregation(UIATT).
-     *   ★ WS20 busy 핸드셰이크(setBusyWS20Interaction)는 P6 — 로컬은 동기라 생략.
+     *   ★ [BR65] 확인창 busy 핸드쉐이크 = 원본 index.js:6976/6990/6999 · 7051/7064/7075 1:1 복원.
+     *     (확인창 뜨면 이 팝업 busy 만 OFF → 닫힐 때 다시 ON → 취소면 WS20까지 전부 OFF.)
      ************************************************************************/
     oAPP.fn.attrBindCallBackAggr = async function (bIsbind, is_tree, is_attr) {
         var oPrev = oAPP.attr.prev[is_attr.OBJID];
@@ -345,7 +354,8 @@
             // n건 바인딩 처리한 하위 UI 가 존재하면 확인 후 진행(181+182).
             if (typeof oPrev._BIND_AGGR[is_attr.UIATT] !== "undefined" && oPrev._BIND_AGGR[is_attr.UIATT].length !== 0) {
                 var _p1 = await _confirmAsync(oAPP.common.zmsg("181") + oAPP.common.zmsg("182"));
-                if (_p1 !== "OK") { return; }
+                // [BR65] 원본 index.js:6999 — 취소면 WS20+팝업 busy 를 모두 해제하고 중단.
+                if (_p1 !== "OK") { oAPP.fn.setBusyWS20Interaction(false, {}); return; }
             }
             oAPP.fn.attrUnbindAggr(oPrev, is_attr.UIATT, is_attr.UIATV);
             oAPP.fn.attrSetUnbindProp(is_attr);
@@ -356,7 +366,8 @@
         // 이전 바인딩 정보가 존재하는 경우 → 재바인딩 확인(181+182) 후 기존 해제 + 새 바인딩.
         if (is_attr.UIATV !== "" && is_attr.ISBND === "X") {
             var _p2 = await _confirmAsync(oAPP.common.zmsg("181") + oAPP.common.zmsg("182"));
-            if (_p2 !== "OK") { return; }
+            // [BR65] 원본 index.js:7075 — 취소면 WS20+팝업 busy 를 모두 해제하고 중단.
+            if (_p2 !== "OK") { oAPP.fn.setBusyWS20Interaction(false, {}); return; }
 
             oAPP.fn.attrUnbindAggr(oPrev, is_attr.UIATT, is_attr.UIATV);
             oAPP.fn.attrUnbindTree(is_attr);

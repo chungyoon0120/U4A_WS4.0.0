@@ -1,8 +1,21 @@
 /************************************************************************
- * Copyright 2020. INFOCG Inc. all rights reserved. 
+ * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
  * - file Name : fnDialogPopupOpener.js
  * - file Desc : 각종 Dialog Popup Opener
+ * ----------------------------------------------------------------------
+ * 오류코드 접두: FDPO / 다음 번호: 005
+ *   (표준 SSOT = `.analy/19_예외처리_크리티컬오류_표준.md`,
+ *    실무 규약 = `.works/DEV_STANDARD_오류처리.md` §3)
+ *
+ * ── 코드 사전 ──
+ *  FDPO-001  오류 목록 창(fnMultiFooterMsg) — 주소 읽기 자체가 실패
+ *  FDPO-002  오류 목록 창 — 내용을 못 읽음(파일 없음 등, 본 문서 기준)
+ *  FDPO-003  오류 목록 창 — 창의 화면 프로세스가 죽음
+ *  FDPO-004  오류 목록 창 — 내용을 다 띄우기 前에 닫힘
+ *
+ * ★[BR55] 2026-09-01 수정 전에는 이 창이 **뜨다가** 실패하면 잠금을 풀어 줄 신호가
+ *   영영 오지 않아 편집화면이 흐려진 채 멈췄다(안내도 없음). 백업 = `_fnDialogPopupOpener.js.br55bak`.
  ************************************************************************/
 (function (window, $, oAPP) {
     "use strict";
@@ -2917,7 +2930,79 @@
         // URL에 QueryString 파라미터를 적용한다.
         const sLoadUrl = parent.WSUTIL.QueryString.build(sUrlPath, oQueryParams);
 
-        oBrowserWindow.loadURL(sLoadUrl);
+        /********************************************************************
+         * [BR55/FDPO-001] 오류 목록 창 **띄우기 실패 회수 장치**.
+         * ------------------------------------------------------------------
+         *  이 함수는 들어오자마자 본 화면과 자식 윈도우를 잠근다. 잠금을 푸는 길은
+         *  **오직 하나 — 창 내용이 다 뜬 뒤 그 창이 보내오는 신호**뿐이었다.
+         *  그래서 창이 **뜨다가** 실패하면(파일 없음 · 화면 프로세스 죽음 · 다 뜨기 전 닫힘)
+         *  신호가 영영 오지 않아 **편집화면이 흐려진 채 멈춰** 있었다(안내도 없음).
+         *  → 실패·조기 닫힘일 때 잠금을 풀고 오류 코드를 남기는 정리를 **한 곳**에 둔다.
+         *  ※ 정상으로 다 뜨면 이 정리는 동작하지 않는다(원래 신호가 잠금을 푼다).
+         ********************************************************************/
+        let bErrWinReady = false;   // 내용이 다 떴나(= 원래 경로로 잠금이 풀릴 예정인가)
+        let bErrWinFailed = false;  // 회수 1회만
+
+        function lf_recoverOpenFail(sCode, sDetail) {
+
+            if (bErrWinReady === true || bErrWinFailed === true) { return; }
+            bErrWinFailed = true;
+
+            try { console.error("[" + sCode + "] 오류 목록 창 띄우기 실패 — 화면 잠금 회수: " + sDetail); } catch (e) { }
+
+            // 본 화면 잠금 해제
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error("[" + sCode + "] fnSetBusyLock 해제 실패:", e && e.message); }
+            try { parent.setBusy(""); } catch (e) { console.error("[" + sCode + "] setBusy 해제 실패:", e && e.message); }
+
+            // 자식 윈도우 잠금 회수 (진입 때 BUSY_ON 을 방송했으므로 짝 필수)
+            try {
+                if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
+            } catch (e) { console.error("[" + sCode + "] 자식 윈도우 busy 해제 방송 실패:", e && e.message); }
+
+            // 화면 안내 — `[코드] + 기존 메시지 키 문구`(표준 `.analy/19` §4·§5)
+            try {
+                const sLangu = (parent.getUserInfo() || {}).LANGU || "";
+                let sTxt = parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "314") || "";
+                const sGuide = parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "290") || "";
+                if (sGuide) { sTxt += (sTxt ? " " : "") + sGuide; }
+                parent.showMessage(null, 20, "E", "[" + sCode + "] " + sTxt);
+            } catch (e) { console.error("[" + sCode + "] 오류 팝업 표시 실패:", e && e.message); }
+
+            // 반쯤 뜬 창 정리
+            try {
+                if (oBrowserWindow && oBrowserWindow.isDestroyed() === false) {
+                    if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oBrowserWindow); }
+                    else { oBrowserWindow.setClosable(true); oBrowserWindow.close(); }
+                }
+            } catch (e) { console.error("[" + sCode + "] 실패한 창 닫기 실패:", e && e.message); }
+        }
+
+        // 주소 읽기 자체가 실패한 경우(Electron 은 실패 시 거절을 돌려준다 — 종전엔 버려졌다).
+        try {
+            const oLoad = oBrowserWindow.loadURL(sLoadUrl);
+            if (oLoad && typeof oLoad.catch === "function") {
+                oLoad.catch(function (err) {
+                    lf_recoverOpenFail("FDPO-001", (err && err.message) ? err.message : String(err));
+                });
+            }
+        } catch (e) {
+            lf_recoverOpenFail("FDPO-001", (e && e.message) ? e.message : String(e));
+        }
+
+        // 내용을 못 읽은 경우(파일 없음 등). 하위 프레임 실패는 무시하고 본 문서만 본다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false) { return; }
+                lf_recoverOpenFail("FDPO-002", "(" + iErrCode + ") " + sErrDesc + " / " + sUrl);
+            });
+        } catch (e) { console.error("[FDPO-002] did-fail-load 등록 실패:", e && e.message); }
+
+        // 창의 화면 프로세스가 죽은 경우.
+        try {
+            oBrowserWindow.webContents.on('render-process-gone', function (evt, oDetail) {
+                lf_recoverOpenFail("FDPO-003", (oDetail && oDetail.reason) ? oDetail.reason : "render-process-gone");
+            });
+        } catch (e) { console.error("[FDPO-003] render-process-gone 등록 실패:", e && e.message); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -2934,6 +3019,9 @@
 
         // 브라우저가 오픈이 다 되면 타는 이벤트
         oBrowserWindow.webContents.on('did-finish-load', function () {
+
+            // [BR55] 여기까지 왔으면 원래 경로(창이 보내는 신호)로 잠금이 풀린다 → 회수 장치 해제.
+            bErrWinReady = true;
 
             const oSendData = {
                 oUserInfo: parent.getUserInfo(), // 로그인 사용자 정보
@@ -2955,6 +3043,10 @@
         oBrowserWindow.on('closed', () => {
 
             IPCMAIN.off(`${BROWSKEY}--errormsg--click`, oAPP.fn.fnIpcMain_errmsg_click);
+
+            // [BR55/FDPO-004] 내용이 다 뜨기 前에 닫힌 경우 — 잠금을 풀어 줄 신호가 영영 안 온다.
+            //   (다 뜬 뒤 사용자가 닫은 정상 경우는 bErrWinReady 가 true 라 아무 일도 안 한다.)
+            lf_recoverOpenFail("FDPO-004", "오류 목록 창이 내용을 다 띄우기 전에 닫혔습니다.");
 
             oBrowserWindow = null;
 

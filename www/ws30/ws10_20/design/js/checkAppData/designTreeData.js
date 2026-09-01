@@ -1,3 +1,21 @@
+/**************************************************************************
+ * 오류코드 접두: DCHK / 다음 번호: 005
+ *   (표준 SSOT = `.analy/19_예외처리_크리티컬오류_표준.md`,
+ *    실무 규약 = `.works/DEV_STANDARD_오류처리.md` §3 — 파일별 유일 접두 + 파일 내 로컬 번호)
+ *
+ * ── 코드 사전 ──
+ *  DCHK-001  자식 필수 UI 점검 — 코드마스터(oAPP.attr.S_CODE) 자체가 없음
+ *  DCHK-002  프로퍼티 입력값 점검 — 트리에 있는 UI 인데 미리보기 정보(oAPP.attr.prev[OBJID])가 없음
+ *  DCHK-003  프로퍼티 입력값 점검 — 미리보기 정보는 있으나 속성 목록(_T_0015)이 없음
+ *  DCHK-004  프로퍼티 값 검사 스크립트 실행 실패 (종전 빈 catch 로 삼키던 자리)
+ *
+ * ★던지면 부르는 쪽(WS20 실행/구문 검사)의 공통 처리기가 이 코드를 그대로 화면에 띄운다
+ *   (`js/ws_events.js` `_wsevCritical` ⓪ — 안쪽 코드 우선).
+ * ★[BR55] 2026-09-01 수정 전에는 아래 자리들이 **값 확인 없이 그대로 파고들어** 터졌고,
+ *   값 검사 스크립트 오류는 **빈 catch 로 조용히 삼켜** 틀린 값이 통과될 수 있었다.
+ *   백업 = `_designTreeData.js.br55bak`.
+ **************************************************************************/
+
 //#region [MF-001]
 // var oFrame = document.getElementById('ws_frame');
 
@@ -6,6 +24,17 @@ var oAPP = parent.oAPP;
 //#endregion
 
 var oCheckFunc = {};
+
+/*********************************************************
+ * [BR55] 이 파일 공통 — 코드 담아 던지기.
+ *   콘솔에 [코드] + 어느 자리인지 + 상세를 남기고, 같은 문구로 예외를 던진다.
+ *   부르는 쪽(WS20)이 그 코드를 화면 오류 팝업에 그대로 보여 준다.
+ ********************************************************/
+function raiseDchk(sCode, sWhere, sDetail) {
+    var sMsg = "[" + sCode + "] " + sWhere + (sDetail ? " — " + sDetail : "");
+    try { console.error(sMsg); } catch (e) { }
+    throw new Error(sMsg);
+}
 
 
 /************************************************************************
@@ -108,12 +137,17 @@ module.exports.checkPropertyValue = function(sAttr){
 
 
     //구성된 script 수행.
+    //[BR55/DCHK-004] 종전에는 빈 catch 로 **조용히 삼켜**, 검사 스크립트가 터지면 잘못된 값도
+    //  "이상 없음"으로 통과됐다(표준 §1 위반 — 불완전한 데이터가 저장될 수 있음).
+    //  이제는 코드로 드러내 부르는 쪽이 저장·활성화를 막게 한다.
     try {
-        eval(_eval);    
+        eval(_eval);
     } catch (error) {
-
+        raiseDchk("DCHK-004", "프로퍼티 값 검사 스크립트 실행 실패",
+            "UI(" + (sAttr && sAttr.OBJID ? sAttr.OBJID : "?") + ") 프로퍼티(" + (sAttr && sAttr.UIATT ? sAttr.UIATT : "?") + "): " +
+            ((error && error.message) ? error.message : String(error)));
     }
-    
+
 
     return _sRes;
 
@@ -136,11 +170,20 @@ function checkRequireChildRec(aTree, aError = []) {
     }
 
 
+    //[BR55/DCHK-001] 코드마스터 자체가 없으면 점검을 할 수 없다 → 조용히 통과시키지 않고 코드로 드러낸다.
+    //  ※ 코드마스터는 있는데 UA050 항목만 없는 경우는 "자식 필수 UI 가 한 건도 없다"는 정상 상태이므로
+    //    빈 목록으로 보고 그대로 진행한다(점검할 대상이 없을 뿐).
+    if (typeof oAPP.attr === "undefined" || oAPP.attr === null || typeof oAPP.attr.S_CODE === "undefined" || oAPP.attr.S_CODE === null) {
+        raiseDchk("DCHK-001", "자식 필수 UI 점검", "코드마스터(oAPP.attr.S_CODE) 정보가 없습니다.");
+    }
+
+    var _aUA050All = Array.isArray(oAPP.attr.S_CODE.UA050) ? oAPP.attr.S_CODE.UA050 : [];
+
     for (let i = 0, l = aTree.length; i < l; i++) {
-        
+
         var _sTree = aTree[i];
 
-        var _aUA050 = oAPP.attr.S_CODE.UA050.filter( item => item.FLD01 === _sTree.UIOBK && item.FLD08 !== "X" );
+        var _aUA050 = _aUA050All.filter( item => item.FLD01 === _sTree.UIOBK && item.FLD08 !== "X" );
 
         if(_aUA050.length === 0){
             //하위를 탐색하며, 점검 처리.
@@ -153,8 +196,13 @@ function checkRequireChildRec(aTree, aError = []) {
             
             var _sUA050 = _aUA050[j];
 
+            //[BR55] 자식 목록이 아예 없는 UI 도 있다(서버에서 안 내려오거나 아직 안 만들어진 경우).
+            //  종전에는 확인 없이 바로 뒤져서 터졌다. 자식 목록이 없다 = 자식이 하나도 없다 는 뜻이므로
+            //  빈 목록으로 보고 그대로 점검한다(→ 아래에서 "자식을 추가하십시오" 오류로 정상 수집된다).
+            var _aChild = Array.isArray(_sTree.zTREE) ? _sTree.zTREE : [];
+
             //필수 aggregation의 child가 존재하는지 확인.
-            var _exist = _sTree.zTREE.findIndex( item => item.UIATT === _sUA050.FLD03 );
+            var _exist = _aChild.findIndex( item => item.UIATT === _sUA050.FLD03 );
 
             //존재하는경우 하위 로직 skip.
             if(_exist === 0){
@@ -162,7 +210,7 @@ function checkRequireChildRec(aTree, aError = []) {
             }
 
             //필수점검 예외 AGGR명(해당 AGGR에 UI가 존재시 점검 생략) 항목이 존재시 해당 aggr에 UI가 존재하는경우.
-            if(_sUA050.FLD09 !== "" && _sTree.zTREE.findIndex( item => item.UIATT === _sUA050.FLD09 ) !== -1){
+            if(_sUA050.FLD09 !== "" && _aChild.findIndex( item => item.UIATT === _sUA050.FLD09 ) !== -1){
                 //필수 점검 생략 처리.
                 _exist = 0;
             }
@@ -280,7 +328,18 @@ function checkValidProperty(aTree, aError = []){
         
         const _sTree = aTree[i];
 
-        const _aT0015 = oAPP.attr.prev[_sTree.OBJID]._T_0015;
+        //[BR55/DCHK-002·003] 트리에 UI 가 있는데 그 UI 의 미리보기 정보가 없으면 값 점검을 할 수 없다.
+        //  종전에는 확인 없이 바로 뒤져서 터졌다. 여기서 조용히 건너뛰면 **검사 안 된 값이 저장·활성화**되므로
+        //  코드로 드러내 부르는 쪽이 저장을 막게 한다(표준 §1 — 불완전한 데이터는 저장하지 않는다).
+        const _oPrev = (oAPP.attr && oAPP.attr.prev) ? oAPP.attr.prev[_sTree.OBJID] : undefined;
+        if (typeof _oPrev === "undefined" || _oPrev === null) {
+            raiseDchk("DCHK-002", "프로퍼티 입력값 점검", "UI(" + _sTree.OBJID + ") 의 미리보기 정보가 없습니다.");
+        }
+        if (!Array.isArray(_oPrev._T_0015)) {
+            raiseDchk("DCHK-003", "프로퍼티 입력값 점검", "UI(" + _sTree.OBJID + ") 의 속성 목록(_T_0015)이 없습니다.");
+        }
+
+        const _aT0015 = _oPrev._T_0015;
 
         for (let j = 0; j < _aT0015.length; j++) {
             

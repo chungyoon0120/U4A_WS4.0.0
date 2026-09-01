@@ -722,10 +722,27 @@
         });
     }
 
-    // (GAP1 되돌림 2026-08-05) checkAdditData 는 원본 index.js:8380 에 코드로는 존재하나, 런타임에 이 케이스
-    //   (Conversion Routine 오류)를 실제로 막지 않음(장군님 실물 확인 — 오류 상태에서도 좌측 드래그 바인딩됨).
-    //   "코드 존재 ≠ 동작"이라 원본 파리티가 아님 → 함수 미정의 상태 유지(modelFieldArea:242 typeof 가드 = 무동작).
-    //   [[audit-logic-and-wiring-not-just-name]] 위반(런타임 미검증)이라 취소.
+    /************************************************************************
+     * [BR64] 추가속성 오류 점검 — 원본 checkAdditData(index.js:8380) 1:1.
+     *   좌측 바인딩 필드를 드래그(modelFieldArea setDragStart)할 때, 우측 스테이징(additRows)에 오류값
+     *   (_error===true, 예: 존재하지 않는 Conversion Routine)이 하나라도 있으면 RETCD="E"+RTMSG(146)를
+     *   반환한다. 그 값은 드래그 payload(oObj.RETCD/RTMSG)에 실려 → 드롭측 _checkDragData(designArea:196)가
+     *   RETCD==="E" 를 만나 쓰기 전에 차단(기존 프로퍼티 바인딩·추가속성 유지) + RTMSG 를 toast 로 안내한다.
+     *   ★ 원본은 oAddit.oModel.oData.T_MPROP 를, HTML5 는 그 대응 스토어 oAPP.attr.additRows 를 본다
+     *     (modelFieldArea:273 매핑과 동일). 판정 기준(_error)은 적용 버튼 경로 chkAdditBindData(:599 p06._error)와 같다.
+     *   (2026-08-05 'GAP1 되돌림'을 BR64로 재적용 — 원본 소스는 명확히 차단하고, BR64가 D&D 차단을 요구한다.)
+     ************************************************************************/
+    oAPP.fn.checkAdditData = function () {
+        var _sRes = { RETCD: "", RTMSG: "", T_ERMSG: [] };
+        var _aErr = (oAPP.attr.additRows || []).filter(function (i) { return i._error === true; });
+        if (_aErr.length === 0) { return _sRes; }                                   // 오류건 없으면 통과(정상 드래그).
+        for (var i = 0; i < _aErr.length; i++) {
+            _sRes.T_ERMSG.push({ ITMCD: _aErr[i].ITMCD, ERMSG: _aErr[i]._error_msg || "" });   // 원본 T_ERMSG(ITMCD+ERMSG) 수집.
+        }
+        _sRes.RETCD = "E";
+        _sRes.RTMSG = H.z("146");   // 146 바인딩 추가속성 정보에 오류건이 존재합니다.
+        return _sRes;
+    };
 
     /************************************************************************
      * [중앙하단 레이아웃] setAdditLayout — 원본 index.js:6052(BULK) 1:1.

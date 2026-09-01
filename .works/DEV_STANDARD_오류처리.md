@@ -23,6 +23,16 @@ if (typeof X === "function") { try { X(); } catch (e) { } }
 if (typeof X !== "function") { throw new Error("[BWP-MF-001] X 미정의"); }
 X();
 ```
+### 화면 메시지 형태 (장군님 지침 2026-09-01)
+- 사용자에게 보이는 문구는 **`[코드] 사용자 친화 문구`** 형태로 만든다.
+  예) `[WSEV-003] 알 수 없는 오류가 발생하였습니다. 다시시도 하시거나, 문제가 지속될 경우 U4A 솔루션 팀에 문의 하세요.`
+- 문구는 **기존 메시지 키만** 쓴다(임의 문구 생성 금지):
+  `ZMSG_WS_COMMON_001` **314**(알 수 없는 오류가 발생하였습니다.) + **290**(다시시도 하시거나, 문제가 지속될 경우 U4A 솔루션 팀에 문의 하세요.)
+- **예외 원문·스택은 화면에 노출하지 않는다** — 콘솔에만 남긴다(`[코드] 어느 자리인지 + 예외 원문`).
+- 저장·실행처럼 **반드시 성공해야 하는 프로세스**는, 전송 前 구간에서 하나라도 터지면
+  **서버로 보내지 않고 중단**한다(오류난 데이터를 저장하느니 저장을 안 한다).
+  저장이 끝난 뒤 구간은 되돌릴 수 없으므로 코드만 드러낸다.
+
 - 공통 헬퍼(선택): `raiseCritical(code, detail)` = `console.error("["+code+"] "+detail)` + `throw new Error("["+code+"] "+detail)`.
 - 이미 명시 함수가 있는 창은 `showCriticalErrorDialog("[코드] …")` 를 직접 불러도 됨(메인 창 방식).
 
@@ -39,6 +49,9 @@ X();
 | `BWP-AI` | bindPopup/additInfoArea |
 | `BWP-BD` | bindPopup/designArea/bindData |
 | `BWP-FR` | bindPopup/frame |
+| `WSEV` | ws30/ws10_20/js/ws_events.js (WS20 화면 버튼 동작 — Activate·Save·Syntax Check) |
+| `FDPO` | ws30/ws10_20/js/fnDialogPopupOpener.js (각종 별도 창 열기) |
+| `DCHK` | ws30/ws10_20/design/js/checkAppData/designTreeData.js (디자인 값 검사) |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

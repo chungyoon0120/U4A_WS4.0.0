@@ -93,6 +93,19 @@
     function _broadBusy(bOn) {
         try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: bOn ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
     }
+    /********************************************************************
+     * [BR62 검수] 되돌리기 "부분 갱신" 전용 엄격 호출 — 실패를 그대로 던진다.
+     *   공용 _prev 는 함수 부재·예외를 모두 삼키므로(다른 경로의 계약), 부분 갱신이 절반만
+     *   되고도 성공으로 끝나 전체 재생성 폴백이 안 걸렸다(코덱스 P2·안티 P1 지적).
+     *   → 부분 갱신 경로만 이 엄격 호출을 쓰고, 실패 시 예외를 던져 폴백이 반드시 돌게 한다.
+     *   ★공용 _prev 의 계약은 그대로 둔다(파급 최소 — 코덱스 제안).
+     ********************************************************************/
+    function _prevStrict(fnName, aArgs) {
+        var w = null;
+        try { w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow; } catch (e) { w = null; }
+        if (!w || typeof w[fnName] !== "function") { throw new Error("[BR62] preview fn missing: " + fnName); }
+        return w[fnName].apply(w, aArgs || []);
+    }
     // 미리보기 iframe 함수 안전 호출 (UI5 preview KEEP — 부재 시 무시)
     function _prev(fnName, aArgs) {
         try {
@@ -117,20 +130,21 @@
     //   (원본 contextMenuUiMove 568~578 순서: setAfterRendering 등록 → moveUIObjPreView → rerender).
     //   ★ midFn 은 어떤 조기 종료 경로에서도 반드시 1회 실행한다(미리보기 미로드·렌더모듈 부재여도
     //     이동 반영 자체가 사라지면 안 되므로). 인자 없이 부르면 기존 동작 그대로.
-    async function _rerenderParentRTE(parentNode, midFn) {
+    //  bStrict=true(되돌리기 부분 갱신 전용)면 내부 실패를 삼키지 않고 던진다 — 폴백이 걸리도록(BR62 검수).
+    async function _rerenderParentRTE(parentNode, midFn, bStrict) {
         var _bMidDone = false;
         function _runMid() {
             if (_bMidDone || typeof midFn !== "function") { return; }
             _bMidDone = true;
             try { midFn(); } catch (e) { console.error("[HTML5][WS20][edit] 재렌더 중간처리:", e && e.message ? e.message : e); }
         }
-        if (!parentNode || !parentNode.OBJID) { _runMid(); return; }
+        if (!parentNode || !parentNode.OBJID) { _runMid(); if (bStrict) { throw new Error("[BR62] rerender: 부모 정보 없음"); } return; }
         try {
             var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
-            if (!w) { _runMid(); return; }
-        } catch (e) { _runMid(); return; }
-        var R = _renderMod(); if (!R) { _runMid(); return; }
-        function _safe(fn) { try { return fn(); } catch (e) { console.error("[HTML5][WS20][insert] RTE 재렌더:", e && e.message); } }
+            if (!w) { _runMid(); if (bStrict) { throw new Error("[BR62] rerender: 미리보기 창 없음"); } return; }
+        } catch (e) { _runMid(); if (bStrict) { throw e; } return; }
+        var R = _renderMod(); if (!R) { _runMid(); if (bStrict) { throw new Error("[BR62] rerender: 렌더 모듈 없음"); } return; }
+        function _safe(fn) { try { return fn(); } catch (e) { console.error("[HTML5][WS20][insert] RTE 재렌더:", e && e.message); if (bStrict) { throw e; } } }
         var oTarget = null, oDom = null, oPromise = null, aRte = [];
         _safe(function () { oTarget = R.getTargetAfterRenderingUI(oAPP.attr.prev[parentNode.OBJID]); });
         _safe(function () { oDom = (oTarget && typeof oTarget.getDomRef === "function") ? oTarget.getDomRef() : null; });
@@ -138,10 +152,10 @@
         _runMid();
         _safe(function () { aRte = R.renderingRichTextEditor(parentNode) || []; });
         if (oPromise) {
-            try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[HTML5][WS20][insert] rerender:", e && e.message); }
+            try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[HTML5][WS20][insert] rerender:", e && e.message); if (bStrict) { throw e; } }
         }
         // ★ BR46 검수 반영(안티 P2): RTE 렌더 완료 대기 실패를 조용히 삼키지 않고 표면화(code.md 규칙).
-        try { await Promise.all(aRte); } catch (e) { console.error("[HTML5][WS20][insert] RTE 렌더 대기:", e && e.message ? e.message : e); }
+        try { await Promise.all(aRte); } catch (e) { console.error("[HTML5][WS20][insert] RTE 렌더 대기:", e && e.message ? e.message : e); if (bStrict) { throw e; } }
     }
 
     // 행 액션 아이콘(+추가/삭제) 표시 플래그 계산 (구 uiDesignArea.js designSetActionIcon 1860 1:1)
@@ -226,6 +240,19 @@
             return { x: w.pageXOffset || (el ? el.scrollLeft : 0) || 0, y: w.pageYOffset || (el ? el.scrollTop : 0) || 0 };
         } catch (e) { return null; }
     }
+    // 화면 그리기가 실제로 끝난 다음 틱까지 기다린다(스크롤 복원 타이밍용).
+    function _afterPaint() {
+        return new Promise(function (res) {
+            var bDone = false;
+            function fin() { if (bDone) { return; } bDone = true; res(); }
+            setTimeout(fin, 120);   // 상한(창이 가려져 그리기 콜백이 안 도는 환경 대비).
+            try {
+                var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
+                var rq = (w && w.requestAnimationFrame) ? w.requestAnimationFrame.bind(w) : window.requestAnimationFrame.bind(window);
+                rq(function () { rq(fin); });
+            } catch (e) { fin(); }
+        });
+    }
     function _restorePrevScroll(o) {
         if (!o) { return; }
         try {
@@ -239,16 +266,18 @@
         if (!node) { return; }
         var oPrev = oAPP.attr.prev && oAPP.attr.prev[node.OBJID];
         var aT15 = (oPrev && oPrev._T_0015) ? oPrev._T_0015 : [];
-        _prev("createUIInstance", [node, aT15]);
-        _prev("setRichTextEditorException", [node.UIOBK, node.OBJID]);
-        _prev("setChildUiException", [node.UIOBK, node.OBJID, node.zTREE, (oAPP.attr.S_CODE && oAPP.attr.S_CODE.UA050)]);
+        //[BR62 검수] 되돌리기 전용이라 엄격 호출 — 하나라도 실패하면 던져서 전체 재생성 폴백을 태운다.
+        _prevStrict("createUIInstance", [node, aT15]);
+        _prevStrict("setRichTextEditorException", [node.UIOBK, node.OBJID]);
+        _prevStrict("setChildUiException", [node.UIOBK, node.OBJID, node.zTREE, (oAPP.attr.S_CODE && oAPP.attr.S_CODE.UA050)]);
         if (node.zTREE && node.zTREE.length) {
             for (var i = 0; i < node.zTREE.length; i++) {
                 _prevCreateInstanceDeep(node.zTREE[i]);
-                _prev("setUIParent", [node.zTREE[i]]);
+                _prevStrict("setUIParent", [node.zTREE[i]]);
             }
         }
-        try { if (typeof oAPP.fn.prevDrawExceptionUi === "function") { oAPP.fn.prevDrawExceptionUi(node.UIOBK, node.OBJID); } } catch (e) { }
+        if (typeof oAPP.fn.prevDrawExceptionUi !== "function") { throw new Error("[BR62] preview fn missing: prevDrawExceptionUi"); }
+        oAPP.fn.prevDrawExceptionUi(node.UIOBK, node.OBJID);
     }
     // 미리보기에 노드 서브트리를 복원된 데이터로 새로 생성(원본 insertUiObject+createPreviewUI 대응).
     //   서브트리 인스턴스 생성 후, 이 최상위 노드를 부모의 제자리(그룹 index)에 부착(moveUIObjPreView).
@@ -257,7 +286,7 @@
         _prevCreateInstanceDeep(node);
         var oParent = _node(node.POBID);
         var iIdx = oParent ? _aggrPrevIndex(oParent.zTREE, node) : 0;
-        _prev("moveUIObjPreView", [node.OBJID, node.UILIB, node.POBID, node.PUIOK, node.UIATT, iIdx, node.ISMLB, node.UIOBK, true]);
+        _prevStrict("moveUIObjPreView", [node.OBJID, node.UILIB, node.POBID, node.PUIOK, node.UIATT, iIdx, node.ISMLB, node.UIOBK, true]);
     }
     /************************************************************************
      * [BR54-4] 속성만 바뀐 되돌리기/다시하기의 미리보기 반영.
@@ -303,7 +332,8 @@
             } catch (e) {
                 console.error("[HTML5][WS20][BR54-4] 되돌리기 기본값 복원 실패(" + sObjid + " / " + sK + "):",
                     e && e.message ? e.message : e);
-                ls = null;
+                //[BR62 검수] 삼키면 그 속성만 안 돌아온 채 "성공"으로 끝나 전체 재생성 폴백이 안 걸린다 → 던진다.
+                throw e;
             }
             if (ls) { aTarget.push(ls); }
         }
@@ -328,6 +358,7 @@
         } catch (e) {
             console.error("[HTML5][WS20][BR54-4] 되돌리기 바인딩 해제 판단 실패(" + sObjid + "):",
                 e && e.message ? e.message : e);
+            throw e;   //[BR62 검수] 폴백이 걸리도록 전파.
         }
 
         //n건 바인딩 처리건이면 부모 UI 에 현재 UI 매핑(원본 2200).
@@ -336,15 +367,18 @@
         } catch (e) {
             console.error("[HTML5][WS20][BR54-4] 되돌리기 부모 매핑 실패(" + sObjid + "):",
                 e && e.message ? e.message : e);
+            throw e;   //[BR62 검수] 폴백이 걸리도록 전파.
         }
 
         //미리보기 화면의 대상 UI 프로퍼티 변경(원본 2204).
+        if (typeof oAPP.fn.previewUIsetProp !== "function") { throw new Error("[BR62] preview fn missing: previewUIsetProp"); }
         for (var i = 0; i < aTarget.length; i++) {
             try {
-                if (typeof oAPP.fn.previewUIsetProp === "function") { oAPP.fn.previewUIsetProp(aTarget[i]); }
+                oAPP.fn.previewUIsetProp(aTarget[i]);
             } catch (e) {
                 console.error("[HTML5][WS20][BR54-4] 되돌리기 미리보기 반영 실패("
                     + sObjid + " / " + aTarget[i].UIATK + "):", e && e.message ? e.message : e);
+                throw e;   //[BR62 검수] 폴백이 걸리도록 전파.
             }
         }
 
@@ -391,7 +425,7 @@
         // ① 삭제(편집이 추가했던 것 되돌려 지움) — 상위가 함께 지워지면 스킵.
         for (k in setRemove) {
             if (_ancestorIn(oNew, k, setRemove)) { continue; }
-            _removeNodePreview(oNew[k]);
+            _removeNodePreview(oNew[k], true);   //[BR62 검수] 엄격 — 실패 시 던져 전체 재생성 폴백.
             _markParent(oNew[k].POBID);
         }
         // ② 추가(편집이 지웠던 것 되살림) — 상위가 함께 되살아나면 스킵(재귀 생성이 처리).
@@ -401,14 +435,27 @@
             _markParent(oOld[k].POBID);
         }
         // ③ 이동(제자리 재생성 후 새 위치로) — 상위가 추가/이동으로 재구성되면 스킵.
+        //   ★[BR62 검수/코덱스·안티 공통] 떼어내기(prevRemoveUiObject)에는 반드시 **지금 미리보기에
+        //     붙어 있는 위치**(oNew[k] = 되돌리기 직전 상태)를 넘긴다. 데이터(zTREE/prev)는 이 함수를
+        //     부르기 전에 이미 복원값으로 바뀌어 있으므로, 복원값(oOld[k])을 넘기면 "UI 가 있지도 않은
+        //     옛 부모"에서 떼어내려 해 지금 부모에 그대로 남고, 이어지는 붙이기에서 같은 UI 가 두 군데
+        //     남거나(중복) 부모 중복 할당 오류가 난다. 원본 D&D 되돌리기도 "현재 상태에서 지우고 →
+        //     저장해 둔 이전 상태로 다시 넣기" 순서다(undoRedo.js 1661~1706, 1725~1743).
+        //     다시 만들기·붙이기(reCreateUIObjInstance/moveUIObjPreView)는 복원값(oOld[k]) 기준이 맞다.
         for (k in setMove) {
             if (_ancestorIn(oOld, k, setMove) || _ancestorIn(oOld, k, setAdd)) { continue; }
             var oN = oOld[k];
-            try { if (oAPP.oDesign && oAPP.oDesign.fn && typeof oAPP.oDesign.fn.prevRemoveUiObject === "function") { await oAPP.oDesign.fn.prevRemoveUiObject(oN); } } catch (e) { }
-            try { if (typeof oAPP.fn.reCreateUIObjInstance === "function") { oAPP.fn.reCreateUIObjInstance(oN); } } catch (e) { }
+            if (!(oAPP.oDesign && oAPP.oDesign.fn && typeof oAPP.oDesign.fn.prevRemoveUiObject === "function")) {
+                throw new Error("[BR62] preview fn missing: prevRemoveUiObject");
+            }
+            await oAPP.oDesign.fn.prevRemoveUiObject(oNew[k]);   // 지금 붙어 있는 위치에서 뗀다.
+            if (typeof oAPP.fn.reCreateUIObjInstance !== "function") {
+                throw new Error("[BR62] preview fn missing: reCreateUIObjInstance");
+            }
+            oAPP.fn.reCreateUIObjInstance(oN);                    // 복원값으로 다시 만든다.
             var oParM = _node(oN.POBID);
             var iIdxM = oParM ? _aggrPrevIndex(oParM.zTREE, oN) : 0;
-            _prev("moveUIObjPreView", [oN.OBJID, oN.UILIB, oN.POBID, oN.PUIOK, oN.UIATT, iIdxM, oN.ISMLB, oN.UIOBK, true]);
+            _prevStrict("moveUIObjPreView", [oN.OBJID, oN.UILIB, oN.POBID, oN.PUIOK, oN.UIATT, iIdxM, oN.ISMLB, oN.UIOBK, true]);
             _markParent(oN.POBID);
             if (oNew[k] && oNew[k].POBID) { _markParent(oNew[k].POBID); }   // 부모가 바뀐 이동이면 옛 부모(잃은 쪽)도 다시 그림.
         }
@@ -425,7 +472,7 @@
         // ⑤ 영향받은 부모만 다시 그림 + 완료 대기(원본 invalidateUiObject→rerender + attachOnAfterRendering).
         for (var pid in oParents) {
             var oPar = _node(pid);
-            if (oPar) { await _rerenderParentRTE(oPar); }
+            if (oPar) { await _rerenderParentRTE(oPar, undefined, true); }   //[BR62 검수] 엄격.
         }
         return true;
     }
@@ -516,6 +563,9 @@
                 var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
                 if (w && typeof w.drawPreview === "function") { await w.drawPreview(); }
             } catch (e) { console.warn("[HTML5][WS20] undo/redo drawPreview:", e && e.message); }
+            //[BR62 검수/안티] 전체 재생성 직후엔 아직 화면 높이가 안 잡혀 스크롤 명령이 무시된다
+            //  → 그리기가 실제로 끝난 다음 틱에 복원한다(두 번 기다림 + 시간 상한).
+            await _afterPaint();
             _restorePrevScroll(_prevScroll);   // 전체 재생성은 스크롤 초기화 → 보던 위치 복원.
         }
         _commitState();
@@ -595,7 +645,16 @@
             //  ★ _restoreSnap 을 await 해 drawPreview + 재선택(페이지 복원)까지 끝난 "뒤"에 BUSY_OFF·
             //    재진입 해제 — 재구성 도중 잠금이 풀려 다른 undo 가 끼어들던 race 를 막는다(코덱스 지적).
             //  ※ attr.js _broadChildBusy 와 동일 채널 — edit.js 는 oMainBroad 미사용이라 인라인.
+            //★[BR62 검수/코덱스 P1] 원본 executeHistory(undoRedo.js 143·147·156)는 되돌리기 시작 즉시
+            //  ① 화면잠금(parent.setBusy("X")) ② 단축키잠금(setShortcutLock(true)) ③ 자식창 BUSY_ON 을
+            //  모두 걸고, 모든 종료 경로에서 역순으로 푼다(164~169·180~185·230~235·826~879·922~928).
+            //  HTML5 는 자식창 잠금과 되돌리기 버튼 재진입 차단만 있어, 복원이 끝나기를 기다리는 동안
+            //  메인 화면에서 UI 추가·삭제·속성변경·끌어놓기가 그대로 들어올 수 있었다. 그 편집이
+            //  되돌리기 기록을 새로 쌓으면 방금 만든 다시하기 기록이 지워지고, 복원 중인 트리를 다시
+            //  건드려 화면과 데이터가 어긋난다 → 원본대로 화면 전체를 잠근다.
             _bHistBusy = true;
+            try { parent.setBusy("X"); } catch (e) { }
+            try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(true); } } catch (e) { }
             try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { }
             try {
                 //반대 스택에 넣는 현재 스냅샷에도 "바뀐 속성" 을 이어붙인다 — 되돌리기/다시하기 어느
@@ -610,7 +669,10 @@
             } catch (e) {
                 console.error("[HTML5][WS20] undo/redo 복원 오류:", e && e.message);
             } finally {
+                //원본 역순 해제(자식창 → 단축키 → 화면). 어느 경로로 끝나도 반드시 짝을 맞춘다.
                 try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+                try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } } catch (e) { }
+                try { parent.setBusy(""); } catch (e) { }
                 _bHistBusy = false;
             }
         }
@@ -703,14 +765,16 @@
      *   setChildUiException(부모 필수자식 보강) → delUIObjPreView → destroyUIPreView
      *   → oAPP.attr.prev 제거. (단건/멀티 삭제 공용)
      ********************************************************************/
-    function _removeNodePreview(n) {
+    //  bStrict=true(되돌리기 부분 갱신 전용)면 미리보기 호출 실패를 던진다(BR62 검수 — 폴백 보장).
+    function _removeNodePreview(n, bStrict) {
         if (!n) { return; }
+        var P = bStrict ? _prevStrict : _prev;
         // 삭제 노드의 부모가 "자식 필수" UI(UA050)인데 자식이 사라지면 기본 자식 강제 셋업(구 4385, bIgnore=true)
-        _prev("setChildUiException", [n.PUIOK, n.POBID, undefined, undefined, true]);
+        P("setChildUiException", [n.PUIOK, n.POBID, undefined, undefined, true]);
         // 미리보기에서 제거 (구 delUIObjPreView(OBJID,POBID,PUIOK,UIATT,ISMLB,UIOBK))
-        _prev("delUIObjPreView", [n.OBJID, n.POBID, n.PUIOK, n.UIATT, n.ISMLB, n.UIOBK]);
+        P("delUIObjPreView", [n.OBJID, n.POBID, n.PUIOK, n.UIATT, n.ISMLB, n.UIOBK]);
         // 미리보기 인스턴스 destroy (구 destroyUIPreView(OBJID,POBID,UIOBK,PUIOK) — 자식 재귀 정리)
-        _prev("destroyUIPreView", [n.OBJID, n.POBID, n.UIOBK, n.PUIOK]);
+        P("destroyUIPreView", [n.OBJID, n.POBID, n.UIOBK, n.PUIOK]);
         // [BR41] 클라이언트 이벤트/HTML content(T_CEVT) 제거 (원본 delUiClientEvent 1:1 — uiDesignArea.js:6648).
         //   ★prev._T_0015 참조 → 아래 delete oAPP.attr.prev 이전에 호출(원본 6648 < 6663).
         try { if (typeof oAPP.fn.delUiClientEvent === "function") { oAPP.fn.delUiClientEvent(n); } } catch (e) { console.error("[HTML5][BR41] delUiClientEvent cleanup error:", e); }
