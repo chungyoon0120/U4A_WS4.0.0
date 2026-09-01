@@ -1416,7 +1416,18 @@
         if (_beforePOBID === i_drop.OBJID && _beforeUIATT === param.UIATT) { _UIATT = undefined; }
 
         var l_path = oAPP.fn.getParentAggrBind(oAPP.attr.prev[i_drag.OBJID], _UIATT);
-        var l_path2 = oAPP.fn.getParentAggrBind(oAPP.attr.prev[i_drop.OBJID], param.UIATT);
+
+        /* [D04] sap.ui.table.Table / sap.ui.table.TreeTable 의 columns aggregation 에 Drop 되는 UI 는
+         *   N건 바인딩 판단을 template aggregation 기준으로 한다.
+         *   원본 근거 = U4A_WS_DESIGN\design\js\uiDesignArea.js 3438행(drop_cb, 2026-08-16 갱신분).
+         *   ★순서 제약: 반드시 위 l_path(끌어온 쪽 경로) 계산 "뒤".
+         *     _UIATT 는 끌어온 쪽 판정에도 쓰이므로, 이 블록이 위로 가면 끌어온 쪽 경로까지
+         *     template 로 잘못 계산돼 살아 있어야 할 바인딩이 해제된다. */
+        if (["UO01139", "UO01142"].indexOf(i_drop.UIOBK) !== -1 && param.UIATT === "columns") {
+            _UIATT = "template";
+        }
+
+        var l_path2 = oAPP.fn.getParentAggrBind(oAPP.attr.prev[i_drop.OBJID], _UIATT);
         var l_unbind = false;
         if (l_path && l_path !== "" && l_path !== l_path2) { l_unbind = true; }
         oAPP.fn.designUnbindUi(i_drag, l_path, l_unbind);

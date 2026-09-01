@@ -1317,16 +1317,41 @@
         APPCOMMON.fnMultiFooterMsgClose();
 
         // 디자인 영역의 오류를 점검한다. (chkExcepionAttr 첫 줄 attrClearErrorField() 가 값칸 오류표시를 지우며 속성행 재렌더)
-        let T_excep = oAPP.fn.chkExcepionAttr(),
-            iexceplength = T_excep.length;
+        // [BR55] 원본은 감싸지 않고 직접 부른다(원본 1159행). 그래서 점검부가 터지면 예외가 그대로
+        //   빠져나가는데, 진입부에서 이미 화면을 잠가 놨으므로(fnSetBusyLock("X")) 사용자에겐
+        //   "안내도 없이 화면이 잠긴 채 멈춘" 상태가 된다. 점검부에 방어 없는 참조가 여러 곳 있어
+        //   실제로 터질 수 있으므로(목록 = .audit/br55/04_final.md), 실행(Activate) 과 같은
+        //   크리티컬 공통 처리로 잠금 해제 + 공통 오류 팝업 후 중단한다(fail-closed).
+        let T_excep = [];
+        try {
+            if (typeof oAPP.fn.chkExcepionAttr !== "function") {
+                throw new Error("oAPP.fn.chkExcepionAttr 미정의(예외 점검 모듈 미로드)");
+            }
+            T_excep = oAPP.fn.chkExcepionAttr() || [];
+        } catch (e) {
+            // 여기는 fnMultiFooterMsg 호출 前 → 자식창 BUSY_ON 방송이 아직 안 나갔다(회수 불필요).
+            _ws20CriticalError("WS20SYN-CHK01", e, false);
+            return;
+        }
+
+        let iexceplength = T_excep.length;
 
         if (iexceplength !== 0) {
 
-            oAPP.fn.fnMultiFooterMsg(T_excep);
+            // [BR55] 오류목록 표시 실패도 조용히 넘기지 않는다(표시가 죽으면 로드 완료 IPC 가 오지 않아
+            //   화면 잠금이 풀리지 않는다). 이 시점엔 자식창 BUSY_ON 방송이 나간 뒤라 회수까지 한다.
+            try {
+                if (typeof oAPP.fn.fnMultiFooterMsg !== "function") {
+                    throw new Error("oAPP.fn.fnMultiFooterMsg 미정의(오류목록 표시 모듈 미로드)");
+                }
+                oAPP.fn.fnMultiFooterMsg(T_excep);
+            } catch (e) {
+                _ws20CriticalError("WS20SYN-CHK02", e, true);
+            }
 
             // 작업표시줄 깜빡임
             oCurrWin.flashFrame(true);
-        
+
             return;
         }
 
@@ -1507,6 +1532,59 @@
     }
 
     /************************************************************************
+     * [BR55] WS20 크리티컬 오류 공통 처리.
+     * ---------------------------------------------------------------------
+     *  프로젝트 기존 크리티컬 전례를 그대로 따른다:
+     *   · ws_common.js 4009~4027 fnJsonParseError — console.error → 화면 Lock 해제
+     *     → parent.setBusy("") → 메시지 "/U4A/MSG_WS 192"(Fatal Error! Please contact
+     *     your system administrator.) + 예외 원문 → showMessage(KIND 20, "E") 1버튼 팝업.
+     *   · usp/ws_usp.js 4048~4074 fnCriticalErrorWs30 — 오류음 + 작업표시줄 깜빡임.
+     *  ※ KIND 20 은 공통 오류 팝업(1버튼 OK)이며 내부에서 오류음을 낸다
+     *    (resources/index.js 293~298 lf_sound) → 여기서 소리를 따로 내지 않는다.
+     *  ※ 세션 전체 창을 닫는 fnCriticalError 콜백은 붙이지 않는다 — WS20 은 저장 안 한
+     *    앱 설계가 메모리에 있어 강제 로그오프 시 작업분이 사라진다(장군님 판단 대기).
+     *  호출측은 이 함수 뒤에 반드시 return 하여 다음 처리를 진행하지 않는다(fail-closed).
+     *
+     *  @param {string} sCode      구간 추적 코드 (예: "WS20ACT-CHK01")
+     *  @param {*}      e          잡은 예외
+     *  @param {boolean} bBroadOff 자식창 잠금(BUSY_ON) 방송이 이미 나갔으면 true → BUSY_OFF 회수
+     ************************************************************************/
+    function _ws20CriticalError(sCode, e, bBroadOff) {
+
+        // ① 콘솔에 구간 코드 + 예외 원문 (조용한 삼킴 금지 — 현장 SR 추적용)
+        try { console.error("[" + sCode + "] critical:", e); } catch (e0) { }
+
+        // ② 화면 잠금 해제 (원본 fnJsonParseError: sap unlock + parent.setBusy(""))
+        try { oAPP.common.fnSetBusyLock(""); } catch (e1) { console.error("[" + sCode + "] fnSetBusyLock 해제 실패:", e1 && e1.message); }
+        try { parent.setBusy(""); } catch (e2) { console.error("[" + sCode + "] setBusy 해제 실패:", e2 && e2.message); }
+
+        // ③ 자식창 잠금 회수 (BUSY_ON 을 이미 방송한 구간에서만 — 짝 필수)
+        if (bBroadOff === true) {
+            try {
+                if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
+            } catch (e3) { console.error("[" + sCode + "] 자식창 busy 해제 방송 실패:", e3 && e3.message); }
+        }
+
+        // ④ 작업표시줄 깜빡임 (크리티컬 전례 fnCriticalErrorWs30 4052)
+        _ws20FlashFrame();
+
+        // ⑤ 공통 오류 팝업 — 문구는 기존 메시지 키만 사용(임의 문구 생성 금지).
+        //    192 = Fatal Error! Please contact your system administrator.
+        var sMsg = "";
+        try { sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "192") || ""; }
+        catch (e4) { console.error("[" + sCode + "] 메시지 조회 실패:", e4 && e4.message); }
+
+        var sDetail = "";
+        try { sDetail = (e && e.message) ? e.message : String(e); } catch (e5) { sDetail = ""; }
+
+        sMsg += (sMsg ? "\n\n" : "") + "[" + sCode + "] " + sDetail;
+
+        try { parent.showMessage(null, 20, "E", sMsg); }
+        catch (e6) { console.error("[" + sCode + "] 오류 팝업 표시 실패:", e6 && e6.message); }
+
+    } // end of _ws20CriticalError
+
+    /************************************************************************
      * Activate Button Event
      ************************************************************************/
     oAPP.events.ev_pressActivateBtn = async function (oEvent) {
@@ -1534,12 +1612,12 @@
             }
             T_excep = oAPP.fn.chkExcepionAttr() || [];
         } catch (e) {
-            //[BR55] 점검 실패 = 검증되지 않은 상태 → 활성화 중단(fail-closed). busy·Lock 은 여기서 원복.
-            console.error("[WS20ACT-CHK01] 실행 전 예외 점검(chkExcepionAttr) 실패 — 활성화 중단:", e);
-            try { oAPP.common.fnSetBusyLock(""); } catch (e2) { console.error("[WS20ACT-CHK01] busy 해제 실패:", e2 && e2.message); }
-            //화면 안내는 추적 코드만 표시(내부 예외 원문 노출 금지 — 상세는 콘솔에 있음).
-            //  정식 안내 문구 키는 장군님 번호 지정 대기(임의 문구·키 생성 금지).
-            try { parent.showMessage(null, 10, "E", "WS20ACT-CHK01"); } catch (e3) { console.error("[WS20ACT-CHK01] 오류 안내 표시 실패:", e3 && e3.message); }
+            //[BR55] 점검 실패 = 검증되지 않은 상태 → 활성화 중단(fail-closed).
+            //  점검부(chkExcepionAttr → chkExcepUiTable / designTreeData.js)에는 방어 없는
+            //  참조가 여러 곳 있어(자세한 목록 = .audit/br55/04_final.md) 실제로 터질 수 있다.
+            //  크리티컬 공통 처리로 화면 잠금 해제 + 공통 오류 팝업까지 수행한다.
+            //  ※ 여기는 fnMultiFooterMsg 호출 前이라 자식창 BUSY_ON 방송이 아직 안 나갔다 → 회수 불필요.
+            _ws20CriticalError("WS20ACT-CHK01", e, false);
             return;
         }
 
@@ -1560,15 +1638,10 @@
                 }
                 oAPP.fn.fnMultiFooterMsg(T_excep);
             } catch (e) {
-                console.error("[WS20ACT-CHK02] 예외 점검 오류목록 표시 실패:", e);
-                try { oAPP.common.fnSetBusyLock(""); } catch (e2) { console.error("[WS20ACT-CHK02] busy 해제 실패:", e2 && e2.message); }
                 //[BR55-P1] fnMultiFooterMsg 는 진입 즉시 본창 busy + 자식창 BUSY_ON 을 함께 건다
                 //  (fnDialogPopupOpener.js 2822~2826). 도중 실패로 여기 오면 본창만 풀어선 안 되고
-                //  이미 나간 자식창 잠금도 같이 회수해야 한다(BUSY_ON 잠그면 BUSY_OFF 필수).
-                try {
-                    if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
-                } catch (e4) { console.error("[WS20ACT-CHK02] 자식창 busy 해제 방송 실패:", e4 && e4.message); }
-                try { parent.showMessage(null, 10, "E", "WS20ACT-CHK02"); } catch (e3) { console.error("[WS20ACT-CHK02] 오류 안내 표시 실패:", e3 && e3.message); }
+                //  이미 나간 자식창 잠금도 같이 회수해야 한다(BUSY_ON 잠그면 BUSY_OFF 필수) → 3번째 인자 true.
+                _ws20CriticalError("WS20ACT-CHK02", e, true);
             }
 
             // 작업표시줄 깜빡임

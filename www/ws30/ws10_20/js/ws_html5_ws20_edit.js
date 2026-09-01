@@ -2181,7 +2181,19 @@
         oCntInp.addEventListener("change", lf_clampCnt);
         oCntInp.addEventListener("blur", lf_clampCnt);
 
-        oSearch.addEventListener("input", lf_renderTable);
+        /* [D25] 검색어가 빈 값이 되면 결과 목록의 정렬·컬럼 필터까지 초기화한다.
+         *   원본 근거 = U4A_WS_DESIGN\design\insertUIPopop\index.js 608행(검색 input 의 liveChange 에서
+         *   값이 "" 일 때 resetUiTableFilterSort 호출) + 그 본체 design\js\main.js 1841행
+         *   (정렬 해제 · 컬럼별 필터 해제 · 컬럼 정렬표시 해제).
+         *   ★원본 조건은 "지우기(X) 아이콘"만이 아니라 **값이 빈 문자열이 된 모든 경우**다(백스페이스 포함).
+         *     지우기(X)는 값을 비우고 input 이벤트를 쏘므로 이 경로로 함께 처리된다. */
+        oSearch.addEventListener("input", function () {
+            if (oSearch.value === "") {
+                oColFilters = {}; sSortKey = ""; sSortDir = "asc";
+                _renderHead();
+            }
+            lf_renderTable();
+        });
         oSearch.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); lf_confirm(); } });
 
         //공통 입력 clear(X) — 값 있을 때만 노출, 클릭 시 비우고 input 이벤트로 표 재필터(lf_renderTable).

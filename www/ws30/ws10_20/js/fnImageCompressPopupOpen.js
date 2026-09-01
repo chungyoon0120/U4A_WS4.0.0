@@ -201,6 +201,23 @@
      *   막대는 0.01~1 만 표현 가능하므로 범위 밖 입력은 막대에만 잘라 반영하고,
      *   숫자칸 값은 사용자가 넣은 그대로 둔다(원본 Slider 와 동일 — 점검은 Apply 에서).
      ************************************************************************/
+    /************************************************************************
+     * 화질 숫자칸 최대값 제한 — ★원본에는 없는 동작(장군님 지시 2026-08-31).
+     *   원본은 1 보다 큰 값도 칸에는 들어가고, 적용을 누를 때 오류로 막는다.
+     *   여기서는 1 을 넘는 값이 칸에 들어오면 즉시 1 로 낮춘다(최소값 쪽은 소수를 찍는 도중
+     *   0.0… 상태를 지나가므로 막지 않는다 — 적용 시 점검 그대로).
+     *   되돌리려면 이 함수 호출부(숫자칸 onInput/onChange) 두 줄만 원래대로 두면 된다.
+     *   @returns {string} 제한을 적용한 값(호출부가 이어서 쓴다)
+     ************************************************************************/
+    function lf_capMax(sVal) {
+        if (sVal === "" || sVal == null) { return sVal; }
+        var n = Number(sVal);
+        if (isNaN(n) || n <= C_MAX_QUALITY) { return sVal; }
+        var sCapped = String(C_MAX_QUALITY);
+        try { oUI.qty.setValue(sCapped); } catch (e) { }
+        return sCapped;
+    }
+
     function lf_syncQualityToRange(sVal) {
         if (!oUI.rng) { return; }
         var n = Number(sVal);
@@ -298,9 +315,21 @@
         //화질 입력칸(원본 sap.m.Input type Number width 60px) — 공통 입력칸 사용.
         var oQty = U4AUI.createField({
             className: "u4aImgCompQtyField",
-            onInput: function (v) { lf_syncQualityToRange(v); },
-            onChange: function (v) { lf_syncQualityToRange(v); }
+            onInput: function (v) { v = lf_capMax(v); lf_syncQualityToRange(v); },
+            onChange: function (v) { v = lf_capMax(v); lf_syncQualityToRange(v); }
         });
+        //원본 sap.m.Input type:"Number" — 숫자 외에는 아예 입력되지 않는다(장군님 실측 확인 2026-08-31).
+        //  공통 입력칸은 글자 칸으로 만들어지므로, 만든 뒤 숫자 전용으로 바꾸고 허용 범위·증감폭도 원본과 맞춘다.
+        //  (값 조절은 옆의 미는 막대가 맡으므로 칸 안 증감 화살표는 스타일에서 감춘다 — 원본도 화살표가 없다.)
+        try {
+            oQty.input.type = "number";
+            oQty.input.min = String(C_MIN_QUALITY);
+            oQty.input.max = String(C_MAX_QUALITY);
+            oQty.input.step = "0.01";
+            oQty.input.inputMode = "decimal";
+        } catch (e) {
+            console.error("[HTML5][WS20][ImageCompress] 화질 입력칸을 숫자 전용으로 만들지 못했습니다:", e && e.message);
+        }
         oRow.appendChild(oQty.el);
         oUI.qty = oQty;
 
@@ -313,8 +342,8 @@
         oRng.step = "0.01";
         oRng.addEventListener("input", function () {
             try { oQty.setValue(oRng.value); } catch (e) { }
-            //값을 고치면 오류표시 해제(원본도 재점검 전까지 오류표시가 남지 않는다).
-            try { oQty.setValueState("none", ""); } catch (e) { }
+            //★오류 표시는 여기서 지우지 않는다 — 원본은 오류 표시를 모델에 담아두고 다시 적용을 누를 때
+            //  점검 결과로만 갱신한다(입력 도중에는 그대로 남는다). 원본과 같게 맞춘 것.
         });
         oRow.appendChild(oRng);
         oUI.rng = oRng;
@@ -447,6 +476,10 @@
             ".u4aImgCompQtyRow { display: flex; align-items: center; gap: 0.75rem; }" +
             //화질 숫자칸 — 원본 60px 폭에 대응(좁은 칸), 나머지 폭은 미는 막대가 차지.
             ".u4aImgCompQtyField { flex: 0 0 auto; width: 4.5rem; }" +
+            //숫자 칸 안의 증감 화살표 감춤 — 값 조절은 옆의 미는 막대가 맡는다(원본에도 화살표 없음).
+            ".u4aImgCompQtyField input[type=number] { -moz-appearance: textfield; }" +
+            ".u4aImgCompQtyField input[type=number]::-webkit-outer-spin-button," +
+            ".u4aImgCompQtyField input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }" +
             ".u4aImgCompRange { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); cursor: pointer; }" +
             ".u4aImgCompRange:disabled { cursor: default; opacity: 0.6; }" +
             ".u4aImgCompSwitch input:disabled + .u4a-switch__slider { opacity: 0.6; cursor: default; }" +
