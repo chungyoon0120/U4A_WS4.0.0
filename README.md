@@ -1,129 +1,117 @@
 # U4A Workspace 4.0
 
-SAP UI5 기반 U4A Workspace를 **HTML5 + 바닐라 JS**로 컨버전하는 Electron 데스크톱 앱.
-백엔드(Electron/IPC/Node)는 유지하고, 화면 렌더링 레이어만 UI5 → HTML5로 교체한다.
-
-> 변환 표준의 단일 출처(SSOT)는 [`.analy/`](.analy/) 문서 세트다. 화면·UI 작업 전 반드시 `.analy/13_AI_작업지시_가이드.md`와 `.analy/16_공통_화면UX_표준.md`를 먼저 읽는다.
+SAP UI5 기반 U4A Workspace 를 **HTML5 + 바닐라 JS** 로 바꾸는 Electron 데스크톱 앱.
+백엔드(Electron / IPC / Node)는 그대로 두고, 화면 그리는 부분만 UI5 → HTML5 로 교체한다.
 
 ---
 
-## 📑 목차
+## 새 PC에서 처음 세팅하기 (이 순서대로)
 
-- [UI5 → HTML5 변환 진행 현황](#ui5--html5-변환-진행-현황)
-- [📊 리포트(.report)](.report/) — 잔여 산출 스냅샷 + 일자별 데일리 로그
+### 0. 먼저 깔아야 하는 것 4가지
 
----
+**이 4개가 없으면 뒤에서 반드시 막힌다.** 특히 Python 과 C++ 빌드 도구는
+sqlite 를 다시 빌드할 때 쓰이는데, 없으면 앱이 아예 안 켜진다.
 
-## UI5 → HTML5 변환 진행 현황
+| 준비물 | 왜 필요한가 | 현재 개발 PC에서 쓰는 버전 |
+|---|---|---|
+| **Git** | 소스 내려받기 | 2.52.0 |
+| **Node.js** (LTS) | npm 설치·앱 실행 | v24.13.0 (npm 11.6.2) |
+| **Python 3.x** | sqlite 다시 빌드할 때 내부에서 씀. 없으면 빌드가 멈춤 | 3.14.4 |
+| **Visual Studio Build Tools 2022** — 설치할 때 **"C++를 사용한 데스크톱 개발"** 항목 체크 | sqlite 를 C++ 로 다시 컴파일함 | 17.14 (Build Tools) |
 
-> 최종 산출 **2026-06-26** · 전면 재검증 **2026-07-08** · 상세 → **[변환 잔여 산출 보고서](.report/status/UI5_HTML5_변환잔여_산출보고서.md)**
+- Node.js: https://nodejs.org (LTS 설치. 설치 중 "Tools for Native Modules" 체크하면 Python·빌드 도구를 같이 깔아준다)
+- Python: https://www.python.org/downloads/ (설치 첫 화면에서 **Add python.exe to PATH** 반드시 체크)
+- Visual Studio Build Tools: https://visualstudio.microsoft.com/downloads/ → "Build Tools for Visual Studio 2022"
 
-WS10 / WS20 / WS30 전체 단위기능 전수 조사 기준 **잔여 ≈ 21건** (완전 미완 18 · 부분 3, 그중 🚧 변환 중 1). *(USP 새 창 열기·WS10 셸 3건 = 제외)*
+설치 다 됐는지 확인:
 
-| 축 | 완전 미완 | 부분/진행 | 합계 |
-|---|:---:|:---:|:---:|
-| ① UI5 팝업 변환 (별도 UI5 코드 → HTML5) | 7 | 1 🚧 | **8** |
-| ② WS20 코어 (속성 편집기·미리보기 스텁) | 7 | 2 | **9** |
-| ② WS30 USP (Monaco 우클릭 클릭 동작) | 4 | 0 | **4** |
-| **합계** | **18** | **3** | **🎯 21** |
+```bash
+git --version && node -v && npm -v && python --version
+```
 
-> 🔎 **7/8 재검증 정정**: ✅ 완료 확인(잔여↓) — `patternPopup`·**UI Sample**·**앱 헤더 Find 버튼**. 🆕 잔여 명세화(잔여↑) — 속성 F4/Attr Help/팝업버튼/아이콘동작/M05 · 미리보기 영역 D&D · 미리보기 도움말.
-> ✅ **7/1~7/6 완료**: iconPrevPopup · illustMsgPopup · Find(Ctrl+F) · 속성 데이터 바인딩 · 키보드 단축키 리스트 · OBJID 변경 · 속성 우클릭 컨텍스트 메뉴(M01~M06) · 동일 속성 동기화 · UI Attribute 개인화.
-> ✅ **6/30 완료**: runtimeClassNavigator · 트리 D&D · F4 검색도움말 모듈 · 스켈레톤 팝업 · versionMng · docPopup · optionPopup.
+### 1. 소스 내려받기
 
----
+```bash
+git clone https://github.com/chungyoon0120/U4A_WS4.0.0.git
+```
 
-### 🔴 잔여 작업 — ① UI5 팝업 변환 (8)
+기본은 `main` 브랜치다. 작업 브랜치가 따로 있으면 받은 뒤에 옮긴다:
 
-**별창 팝업 미변환 (7)**
+```bash
+git checkout bootstrap
+```
 
-- [ ] `bindPopup` ⭐ — 툴바 데이터 바인딩(대형 별창) *(속성 아이콘 바인딩은 완료)*
-- [ ] `releaseNotePopup` — 릴리즈 노트 *(라이선스 미보유 시 UI5)*
-- [ ] `ShortCutCreator` — 앱 바로가기 생성 *(현재 오프너 주석·토스트 대체)*
-- [ ] `ui5CssPopup_v2` — UI5 Predefined CSS *(현재 오프너 주석·토스트 대체)*
-- [ ] `webDynConversionLog` — WebDynpro 변환 로그
-- [ ] `monacoSnippetDesigner` — 스니펫 디자이너 *(쉘 레이아웃만)*
-- [ ] `monacoThemeDesign` — 테마 디자이너 *(쉘 레이아웃만)*
+### 2. 라이브러리 설치
 
-**🚧 변환 작업 중 (1)**
-- [ ] `fnUiTempWizard` — **UI 템플릿 마법사** *(WS20 디자인 트리 툴바 모니터 아이콘 버튼 · 인앱 마법사)* — HTML5 재작성 진행 중, **Stage 1 완료 · 2~4 미완**
+받은 폴더 안에서:
 
-**🚫 전환 대상 제외 확정** *(현행 미사용, 변환 안 함)*
-- ~~`uspNewPopup` — USP 새 창 열기~~
+```bash
+npm install
+```
 
-  ✅ `patternPopup` 완료 (7/8 재검증) — 오프너 활성·HTML5 렌더
-  ✅ `mimeRepository` 완료 — 뷰어 + K3 폴더생성·K4 삭제·K5 업로드·K6 다운로드 전부 구현
+- `node_modules` 는 저장소에 안 들어있어서 PC마다 새로 깔아야 한다.
+- 설치 끝에 `electron-builder install-app-deps` 가 자동으로 돌면서 sqlite 를 Electron 용으로 다시 빌드한다. 여기서 Python·C++ 빌드 도구가 쓰인다.
 
----
+### 3. sqlite 다시 빌드 (2번에서 실패했거나, 앱이 안 켜질 때)
 
-### 🔴 잔여 작업 — ② WS20 코어 (9)
+```bash
+npm run sqlite:rebuild
+```
 
-**속성 편집기 팝업/동작 (5 완전미완)** — `console.warn "[W4+ 예정]"`
-- [ ] F4 Value Help (`attrCallValueHelp`) — `attr.js:4648`
-- [ ] Attribute Help (`callTooltipsPopup`) — `attr.js:4421`
-- [ ] 팝업 호출형 속성 버튼 — `attr.js:4816`
-- [ ] 속성 아이콘 동작 — `attr.js:4932`
-- [ ] M05 속성 컨텍스트 단축키 등록(별창) — `attr_ctxmenu.js:245`
+### 4. 앱 실행
 
-**미리보기 (2 완전미완 + 2 부분)**
-- [ ] 미리보기 **영역** D&D — `prev.js:810/815/820` *(트리 D&D와 별개)*
-- [ ] 미리보기 도움말 팝업 — `prev.js:1141`
-- [ ] 〰️ 미리보기 우클릭 컨텍스트메뉴 *(부분 · 원본 UI5 모듈 위임)*
-- [ ] 〰️ previewUIsetProp 실시간 반영 *(부분 · 원본 UI5 모듈 위임)*
+```bash
+npm start
+```
 
-  ✅ **UI Sample 팝업**·**앱 헤더 Find 버튼**·OBJID 변경·속성 우클릭 M01~M04·M06·동일속성동기화 M03·개인화 M06·트리 D&D 완료
+### 5. 설치 파일(exe) 만들기 — 필요할 때만
 
----
+```bash
+npm run build
+```
 
-### 🔴 잔여 작업 — ② WS30 USP (4)
-
-**Monaco 우클릭 *클릭 동작* (4)** · *메뉴 표시는 완료*
-- [ ] 패턴 삽입 (executeEdits)
-- [ ] Theme Designer 호출 *(Test 메뉴 경로는 동작)*
-- [ ] Snippet Designer 호출 *(Test 메뉴 경로는 동작)*
-- [ ] Ctrl+우클릭 전체 패턴 팝업
-
-> 🚫 **WS10 셸 3건 제외**: setConnectionAI(AI 미공개) · fnOnInitP13nSettings(개인화 초기화) · UAI 배선 — 잔여 아님
+결과물은 `dist` 폴더에 생긴다.
 
 ---
 
-### 🗺️ 착수 우선순위
+## 잘 막히는 곳 (여기서 시간 다 날아감)
 
-1. **UI 템플릿 마법사** Stage 2~4 완성 — 이미 착수, 마무리가 가장 가까움
-2. **USP Monaco 우클릭 클릭 동작 4종** — 메뉴 표시 완성, 핸들러 등록만
-3. **WS20 속성 F4 Value Help + Attr Help** — 속성 편집 핵심 잔여
-4. **bindPopup**(툴바 대형 별창) → 색상 / 아이콘 picker
-5. 미리보기 영역 D&D + 나머지 별창 팝업(releaseNote·ShortCut·ui5Css_v2·webDynLog·Monaco Designer 2종)
+| 증상 | 원인 | 해결 |
+|---|---|---|
+| 앱 켜자마자 죽음 + `better_sqlite3.node` / `NODE_MODULE_VERSION` 글자가 보이는 오류 | sqlite 가 Node 용으로만 빌드돼 있고 Electron 용이 아님 | `npm run sqlite:rebuild` |
+| 설치 도중 `Could not find any Python installation` | Python 이 없거나 PATH 에 안 잡힘 | Python 설치 + **Add python.exe to PATH** 체크 후 새 터미널에서 다시 |
+| 설치 도중 C++ 컴파일 관련 오류(`MSB...`, `Visual Studio not found`) | C++ 빌드 도구 없음 | Visual Studio Build Tools 2022 에서 **"C++를 사용한 데스크톱 개발"** 설치 |
+| 위 3개를 고친 뒤에도 계속 같은 오류 | 예전에 실패한 찌꺼기가 남음 | `node_modules` 폴더 통째로 지우고 `npm install` 부터 다시 |
 
 ---
 
-<details>
-<summary>✅ <b>완료 항목</b> (펼치기) — 6/26 이후 + 누적</summary>
+## 저장소에 안 들어있는 것 (새 PC에서 따로 챙겨야 함)
 
-**🆕 6/30 완료**
-- [x] 별도창 **runtimeClassNavigator**(런타임 클래스 탐색) HTML5화
-- [x] WS20 **트리 D&D**(이동/복사) — 신규 `ws_html5_ws20_dnd.js`
-- [x] **F4 검색도움말 제네릭 모듈**(Code Page · Authorization Group)
-- [x] **스켈레톤 화면 설정 팝업** HTML5화
-- [x] 별도창 **versionMng · docPopup · optionPopup** HTML5화
+| 대상 | 설명 |
+|---|---|
+| `node_modules`, `dist` | 저장소 제외. `npm install` / `npm run build` 로 다시 만듦 |
+| `.mcp.json` | Claude Code 용 설정. PC마다 경로가 달라서 제외했다. 쓰려면 새로 만들어야 하고 `uv` 도 필요하다 |
+| 접속 서버 목록·개인 설정 | 소스가 아니라 PC 안에 저장된다 — 사용자 데이터 폴더(`%APPDATA%\com.u4a_ws3.app.dev`)와 윈도우 레지스트리(`HKCU\SOFTWARE\U4A\WS`). **새 PC에서는 서버를 다시 등록해야 한다** |
+| `node_modules/U4A` | 설치 파일 만들 때 참조하는 항목인데 지금 개발 PC에도 없다(미확인). 실행에는 영향 없음 |
 
-**6/29 완료**
-- [x] WS30 트리 우클릭 **K1~K10 전부** (K5 Download · K6 Test Service 추가)
-- [x] USP **Save · Activate · 모드전환** 이식 · **Monaco 우클릭 메뉴 표시**
-- [x] WS20 **트리선택 → 속성** · 신규 속성 팝업 **DumpWrite** · **InitPreScreen**
+---
 
-**별도창 팝업 완료 (10)**
-- [x] OTRF4HelpPopup · editorPopup · errPageEditorPopup · errMsgPopup · textSearchPopup · winShowHidePopup · **versionMng** · **docPopup** · **optionPopup** · **runtimeClassNavigator**
+## 명령어 한눈에
 
-**인앱/속성 팝업 + 원래 순수 HTML (누적)**
-- [x] fnAppCopy · fnAppF4 · fnCts · fnSelectBrowser · fnCssJsLinkAdd · fnClientEditor · fnWebSecurity · fnDumpWrite · fnInitPreScreen
-- [x] (순수 HTML) aboutU4APopup · importExportPopup · screen_record · relese_notes · ui5CssPopup(v1) · designTreeUiSearchPopup
+| 명령 | 하는 일 |
+|---|---|
+| `npm install` | 라이브러리 설치 (+ Electron 용 sqlite 자동 재빌드) |
+| `npm start` | 앱 실행 |
+| `npm run sqlite:rebuild` | sqlite 만 Electron 용으로 다시 빌드 |
+| `npm run build` | 윈도우 설치 파일(exe) 만들기 → `dist` |
 
-**화면 (누적)**
-- [x] **WS10** — 헤더(줌·핀·창숨김·텍스트검색·최대화·F11·메뉴바 오버플로) · 메뉴 디스패치 · 트랜잭션(Display/Change/Save/Activate)
-- [x] **WS20** — 텍스트/콤보/체크박스/이벤트/Aggregation 편집기 · 트리 렌더·컨텍스트(M01~M11) · Insert/Delete/Move/Copy/Undo·Redo · 미리보기 줌·전체화면
-- [x] **WS30** — 트리(가상스크롤·아이콘·펼침/접힘·선택) · Monaco 2분할 · Properties · 트리 우클릭 K1~K10
+---
 
-</details>
+## 작업 규칙·문서
 
-> 상세 표·판정 근거는 **[변환 잔여 산출 보고서](.report/status/UI5_HTML5_변환잔여_산출보고서.md)** 참조.
+화면·UI 작업을 하려면 아래를 먼저 읽는다. 변환 기준의 원본은 [`.analy/`](.analy/) 문서 묶음이다.
+
+- [`CLAUDE.md`](CLAUDE.md) — 프로젝트 작업 규칙 (원본 손대지 않기 등 최우선 규칙)
+- [`.analy/13_AI_작업지시_가이드.md`](.analy/13_AI_작업지시_가이드.md) — 작업 방식·가드레일
+- [`.analy/16_공통_화면UX_표준.md`](.analy/16_공통_화면UX_표준.md) — 모든 화면 공통 표준
+- [`.report/`](.report/) — 변환 진행 현황·잔여 목록
