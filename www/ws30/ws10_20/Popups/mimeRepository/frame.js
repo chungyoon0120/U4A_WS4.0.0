@@ -1,3 +1,4 @@
+// 오류코드 접두: MIMF / 다음 번호: 003
 /************************************************************************
  * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
@@ -204,7 +205,11 @@ let oAPP = (function (window) {
         if (typeof fnCb === "function") {
             if (window.U4AUI && U4AUI.confirm) {
                 U4AUI.confirm({ type: sType || "I", title: _msgTitle(sType), message: sMsg || "", onClose: fnCb });
-            } else { try { fnCb(window.confirm(sMsg || "") ? "YES" : "NO"); } catch (e) { } }
+            } else {
+                // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 U4AUI.confirm 미로드는 오류코드 표면화 + fail-closed(NO).
+                console.error("[MIMF-001] showMessage 확인질문: 공통 U4AUI.confirm 미로드 — 표시 불가. message:", sMsg || "");
+                try { fnCb("NO"); } catch (e) { console.error("[MIMF-002] showMessage 콜백 예외:", e && e.message); }
+            }
             return;
         }
 

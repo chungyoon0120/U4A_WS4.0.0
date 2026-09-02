@@ -52,6 +52,13 @@ X();
 | `WSEV` | ws30/ws10_20/js/ws_events.js (WS20 화면 버튼 동작 — Activate·Save·Syntax Check) |
 | `FDPO` | ws30/ws10_20/js/fnDialogPopupOpener.js (각종 별도 창 열기) |
 | `DCHK` | ws30/ws10_20/design/js/checkAppData/designTreeData.js (디자인 값 검사) |
+| `U4AUI` | ws30/ws10_20/theme/u4a-ui.js (공통 UI 컴포넌트) |
+| `RSRC` | ws30/resources/index.js (공통 메시지·토스트·메시지박스) |
+| `SHEL` | ws30/ws10_20/js/ws_html5_shell.js (셸) |
+| `USP` | ws30/ws10_20/js/usp/ws_html5_usp.js (USP 화면) |
+| `W20E` | ws30/ws10_20/js/ws_html5_ws20_edit.js (WS20 디자인 트리 편집) |
+| `MIMF` | ws30/ws10_20/Popups/mimeRepository/frame.js |
+| `VMNG` | ws30/ws10_20/Popups/versionMng/versionMngFrame.js |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

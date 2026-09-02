@@ -193,13 +193,7 @@
         try { o = JSON.parse(sPrc001); } catch (e) { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("100"); return r; }  // 100 잘못된 Drag 정보
         if (!o || o.PRCCD !== "PRC001") { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("101"); return r; }     // 101 작업 수행 불가
         if (o.DnDRandKey !== oAPP.attr.DnDRandKey) { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("102"); return r; }  // 102 다른 영역 Drag
-        // ★[BR64] payload 의 추가속성 검증 오류(o.RETCD==="E")는 여기서 막지 않는다 — 원본 _checkDragData
-        //   (U4A_WS_DESIGN designTree.js:838~883)는 payload RETCD/T_ERMSG 를 읽지 않는다. 별창 안쪽 디자인트리 드롭은
-        //   _onDesignDrop:976 에서 IF_DATA.MPROP="" 로 우측 추가속성을 버리므로(원본 designTree.js:1315~1317
-        //   "DESIGN TREE 영역에 DROP 되는 데이터는 바인딩 추가 속성 정보를 적용하지 않기에 초기화"),
-        //   Conversion Routine 오류는 이 경로와 무관하다. 오류 차단은 추가속성을 실제 적용하는 WS20 메인 드롭
-        //   (ws_html5_ws20_attr.js:6322 V10)에서만 한다. (BR64 검수 P2 반영 — checkAdditData 정의로 여기가 오작동으로
-        //   활성화돼 오류 무관한 별창 안쪽 드롭까지 막던 회귀 제거.)
+        if (o.RETCD === "E") { r.RETCD = "E"; r.RTMSG = o.RTMSG || ""; return r; }                          // 추가속성 검증 오류(payload 동봉)
         r.IF_DATA = o.IF_DATA;
         return r;
     }

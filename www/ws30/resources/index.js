@@ -1,3 +1,4 @@
+// 오류코드 접두: RSRC / 다음 번호: 004
 /**
  * index.js  (cleaned)
  *
@@ -218,7 +219,10 @@ oAPP.views = window?.oAPP?.views || {};
                 oT.dataset.show = "true";
                 if (oT.__t) { clearTimeout(oT.__t); }
                 oT.__t = setTimeout(function () { oT.dataset.show = "false"; }, 3000);
-            } catch (e) { try { alert(sMsg); } catch (e2) { } }
+            } catch (e) {
+                // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 토스트 표시 실패는 오류코드로만 표면화한다.
+                console.error("[RSRC-001] 토스트 표시 실패 —", e && e.message, "message:", sMsg);
+            }
         }
         // 메시지 팝업(구 MessageBox) — 테마 native <dialog class="u4a-msgbox">.
         //   aBtns: [{act,label,emphasized}] → 콜백에 UI5 Action 과 동일한 act("OK"/"YES"/"NO"/"CANCEL") 전달.
@@ -229,9 +233,11 @@ oAPP.views = window?.oAPP?.views || {};
             var oDlg;
             try { oDlg = document.createElement("dialog"); } catch (e) { oDlg = null; }
             if (!oDlg || typeof oDlg.showModal !== "function") {
-                if (aBtns.length <= 1) { try { alert(sMsg); } catch (e) { } lf_cb("OK"); return; }
-                var bOk = false; try { bOk = confirm(sMsg); } catch (e) { }
-                lf_cb(bOk ? "YES" : (bCancel ? "CANCEL" : "NO")); return;
+                // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — <dialog>.showModal 은 메시지 팝업의 필수 의존성.
+                //   미지원이면 삼키지 말고 오류코드로 표면화하고 fail-closed 로 종료(버튼 1개=OK, 여러 개=진행 안 함).
+                console.error("[RSRC-002] _u4aMsgBox: <dialog>.showModal 미지원 — 메시지 팝업 표시 불가. message:", sMsg);
+                lf_cb(aBtns.length <= 1 ? "OK" : (bCancel ? "CANCEL" : "NO"));
+                return;
             }
             // 서버리스트/셸/로그인 메시지박스와 동일한 .u4a-dialog(헤더 아이콘 + 본문 + 푸터) 디자인으로 통일.
             var oTypeIcon = { C: "circle-question", S: "circle-check", E: "circle-xmark", W: "triangle-exclamation", I: "circle-info" };
@@ -257,8 +263,9 @@ oAPP.views = window?.oAPP?.views || {};
             });
             oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(bCancel ? "CANCEL" : (bNo ? "NO" : "OK")); });
             try { document.body.appendChild(oDlg); oDlg.showModal(); } catch (e) {
-                if (aBtns.length <= 1) { try { alert(sMsg); } catch (e2) { } lf_close("OK"); }
-                else { var ok = false; try { ok = confirm(sMsg); } catch (e2) { } lf_close(ok ? "YES" : (bCancel ? "CANCEL" : "NO")); }
+                // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 표시 실패는 오류코드 표면화 + fail-closed 종료.
+                console.error("[RSRC-003] _u4aMsgBox: showModal 실패 —", e && e.message);
+                lf_close(aBtns.length <= 1 ? "OK" : (bCancel ? "CANCEL" : "NO"));
             }
         }
 

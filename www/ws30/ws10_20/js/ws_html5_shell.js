@@ -1,3 +1,4 @@
+// 오류코드 접두: SHEL / 다음 번호: 002
 /************************************************************************
  * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
@@ -474,9 +475,10 @@
             U4AUI.confirm({ type: sType || "I", title: sTitle, message: sMsg || "", buttons: aBtns, onClose: fnCallback });
             return;
         }
-        var bOk = false;
-        try { bOk = window.confirm(sMsg || ""); } catch (e2) { bOk = true; }
-        lf_done(bOk ? "YES" : (bHasCancel ? "CANCEL" : "NO"));
+        // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 U4AUI.confirm 은 확인창의 필수 의존성.
+        //   미로드면 삼키지 말고 오류코드로 표면화 + fail-closed(진행하지 않음)로 종료.
+        console.error("[SHEL-001] fnConfirmBox: 공통 U4AUI.confirm 미로드 — 확인창 표시 불가. message:", sMsg || "");
+        lf_done(bHasCancel ? "CANCEL" : "NO");
     };
 
     /************************************************************************

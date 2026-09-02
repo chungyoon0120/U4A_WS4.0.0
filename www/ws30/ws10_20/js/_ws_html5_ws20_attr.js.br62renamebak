@@ -1736,10 +1736,9 @@
             //  기존 폴백(그때 선택 = 새 이름)이 걸려 **양방향 모두 같은 UI**가 선택된다.
             //  ★UIATK 는 주지 않는다 — 원본 이름변경 되돌리기(undoRedo.js CL_CHANGE_OBJID 1405~1560)에는
             //    속성 줄로 이동하는 처리가 없다(전 구간 setSelectTreeItem 부재).
-            var _oRenameSnap = null;
             try {
                 if (typeof oAPP.fn.fnWs20PushUndo === "function") {
-                    _oRenameSnap = oAPP.fn.fnWs20PushUndo(ls_uiinfo.OBJID_bf ? { OBJID: ls_uiinfo.OBJID_bf } : undefined);
+                    oAPP.fn.fnWs20PushUndo(ls_uiinfo.OBJID_bf ? { OBJID: ls_uiinfo.OBJID_bf } : undefined);
                 }
             } catch (e) { }
 
@@ -1747,17 +1746,6 @@
 
             var sBf = ls_uiinfo.OBJID_bf;
             var sNew = ls_uiinfo.OBJID;
-
-            //★[BR62-이름변경] 이 편집이 "이름만 바꿈"임을 되돌리기 기록에 새긴다.
-            //  이게 없으면 복원 때 스냅샷 비교가 옛 이름/새 이름을 **서로 다른 UI**로 보고
-            //  미리보기를 destroy 후 재생성하고(속성이 바뀐 것도 아닌데), 트리 펼침 기억도
-            //  옛 이름으로 못 돌아가 하위가 저절로 펼쳐진다(장군님 지적 2026-09-02).
-            //  원본은 인스턴스를 그대로 두고 키만 교체한다(undoRedo.js CL_CHANGE_OBJID 1450~1491).
-            try {
-                if (typeof oAPP.fn.fnWs20SetUndoRename === "function") {
-                    oAPP.fn.fnWs20SetUndoRename(_oRenameSnap, sBf, sNew);
-                }
-            } catch (e) { console.error("[HTML5][WS20][attr] 이름변경 되돌리기 기록:", e && e.message ? e.message : e); }
 
             //① 이전 UI OBJECT에 수집된 ATTR 의 OBJID를 변경건으로 매핑. (원본 4292행)
             if (oAPP.attr.prev[sBf] && oAPP.attr.prev[sBf]._T_0015 && oAPP.attr.prev[sBf]._T_0015.length !== 0) {

@@ -268,7 +268,13 @@
                     if (oList) { _select(iActive); } else { _requestOpen(); }
                     break;
                 case "Escape":
-                    if (oList) { ev.stopPropagation(); _close(); }
+                    // 떠 있는 목록이 있으면 Esc 는 **그 목록만** 닫는다(안쪽부터 닫기 — 원본 UI5 동일,
+                    //   장군님 실화면 확인 2026-09-02). ★ preventDefault 까지 해야 한다 — showModal() 로 열린
+                    //   <dialog> 는 브라우저가 Esc 를 기본동작으로 가로채 팝업을 닫는다. stopPropagation
+                    //   만으로는 그걸 못 막아 서버 이벤트 생성 팝업에서 첫 Esc 에 팝업까지 닫혔다
+                    //   (장군님 지적 2026-09-02). Chromium 실측: keydown 에서 preventDefault 하면 팝업이 유지된다.
+                    //   예전엔 팝업마다 예외를 넣어야 했다(UI 오브젝트 선택 팝업만 있었음) → 이곳 한 곳으로 올림.
+                    if (oList) { ev.preventDefault(); ev.stopPropagation(); _close(); }
                     break;
                 case "Tab":
                     _close();
@@ -416,7 +422,13 @@
                     if (oList && iActive >= 0) { ev.preventDefault(); ev.stopImmediatePropagation(); _select(iActive); }
                     break;
                 case "Escape":
-                    if (oList) { ev.stopPropagation(); _close(); }
+                    // 떠 있는 목록이 있으면 Esc 는 **그 목록만** 닫는다(안쪽부터 닫기 — 원본 UI5 동일,
+                    //   장군님 실화면 확인 2026-09-02). ★ preventDefault 까지 해야 한다 — showModal() 로 열린
+                    //   <dialog> 는 브라우저가 Esc 를 기본동작으로 가로채 팝업을 닫는다. stopPropagation
+                    //   만으로는 그걸 못 막아 서버 이벤트 생성 팝업에서 첫 Esc 에 팝업까지 닫혔다
+                    //   (장군님 지적 2026-09-02). Chromium 실측: keydown 에서 preventDefault 하면 팝업이 유지된다.
+                    //   예전엔 팝업마다 예외를 넣어야 했다(UI 오브젝트 선택 팝업만 있었음) → 이곳 한 곳으로 올림.
+                    if (oList) { ev.preventDefault(); ev.stopPropagation(); _close(); }
                     break;
                 case "Tab":
                     _close();
@@ -2300,13 +2312,15 @@
 
         function _done(sAct) { if (typeof fnCb === "function") { try { fnCb(sAct); } catch (e) { } } }
 
-        // 네이티브 <dialog> 미지원 시 — 브라우저 confirm 폴백(동작 보장).
+        // ★[장군님 지시 2026-09-02] window.confirm / window.alert 사용 절대 금지.
+        //   이전엔 <dialog> 미지원 시 window.confirm 으로 fallback 했으나 제거한다.
+        //   <dialog>.showModal 은 확인 팝업의 필수 의존성 — 없으면 삼키지 말고 오류코드로 표면화하고,
+        //   판정은 fail-closed(진행하지 않음 = CANCEL/NO)로 종료한다.
         let oDlg;
         try { oDlg = document.createElement("dialog"); } catch (e) { oDlg = null; }
         if (!oDlg || typeof oDlg.showModal !== "function") {
-            let bOk = false;
-            try { bOk = window.confirm(sMsg); } catch (e2) { bOk = true; }
-            _done(bOk ? "YES" : (bHasCancel ? "CANCEL" : "NO"));
+            console.error("[U4AUI-001] confirm: <dialog>.showModal 미지원 — 확인 팝업을 표시할 수 없음. message:", sMsg);
+            _done(bHasCancel ? "CANCEL" : "NO");
             return;
         }
 
@@ -2353,7 +2367,12 @@
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); _close(bHasCancel ? "CANCEL" : "NO"); });
 
         try { document.body.appendChild(oDlg); oDlg.showModal(); }
-        catch (e) { _close(window.confirm(sMsg) ? "YES" : (bHasCancel ? "CANCEL" : "NO")); }
+        catch (e) {
+            // ★[장군님 지시 2026-09-02] window.confirm fallback 금지 — 표시 실패는 오류코드로 표면화 + fail-closed 종료.
+            console.error("[U4AUI-002] confirm: showModal 실패 —", e && e.message);
+            _close(bHasCancel ? "CANCEL" : "NO");
+            return;
+        }
 
         return oDlg;
     }

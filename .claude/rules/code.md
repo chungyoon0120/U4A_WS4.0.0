@@ -7,6 +7,7 @@
 - 어느 쪽이든 **고치기 전 백업**(`_` 접두)과 **왜 고쳤는지 주석**을 남긴다.
 - **busy**: on 걸면 모든 종료 분기(early return/취소/에러)에서 off 짝 필수. 성공은 WS20 왕복이 해제(자기해제 금지). 닫기버튼=`_setBusy` 대칭.
 - **★비동기·화면전환은 WP1 방식으로**(장군님 필수 지시 2026-08-10, 반드시 준수): ① **로딩표시(busy)는 화면 렌더·데이터 구성·전환 애니메이션이 완전히 끝난 뒤에 끈다.** 중간에 미리 끄면 그 틈에 버튼 연타가 들어와 상태가 꼬인다(백지 등). ② **예약한 뒷정리 타이머(setTimeout 등)는 핸들을 저장**하고, 다음 동작 시작 시 **먼저 clearTimeout** 해 겹침을 막는다(직렬화). ③ **화면 전환은 완료를 콜백/Promise로 알리고**, 후속(잠금해제·busy off·복원)은 그 **완료 후**에만 실행. 원본 UI5의 afterNavigate/NavContainer 직렬화를 HTML5에서 명시 재현.
+- **★`window.confirm` · `window.alert` · `window.prompt` 절대 금지**(장군님 지시 2026-09-02). 브라우저 기본 대화상자는 테마·다국어·드래그가 안 먹고 모달창 위에도 딸판으로 뜨며 앱 전체를 멈춰 세운다. 확인창은 **공통 `U4AUI.confirm` / `fnConfirmBox` 만** 쓴다. 공통이 없거나 `<dialog>.showModal()` 이 실패하면 **fallback 을 만들지 말고** `접두-번호` 오류코드로 표면화 + **fail-closed**(진행하지 않음 = NO/CANCEL)로 종료한다.
 - 공통 자산(shell/bootstrap-skin/u4a-ui/tokens) **직접 수정 금지** → 스코프 override.
 - **팝업(`<dialog>`) 만들면 공통 3종 세트 항상 같이**: `makeDialogDraggable`(헤더드래그) + `makeDialogRecenter`(헤더 더블클릭 중앙복귀) + `makeDialogResizable`(우하단 grip). 원스톱 생성기 없음—각자 붙이므로 하나 빠뜨리기 쉬움(S5에서 recenter 누락). 비모달 `show()`면 z-index+배경+fixed중앙도 세트.
 - 하드코딩 hex 금지, `color-mix` 금지(Chromium 93).

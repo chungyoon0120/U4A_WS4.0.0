@@ -1,3 +1,4 @@
+// 오류코드 접두: USP / 다음 번호: 002
 /************************************************************************
  * ws_html5_usp.js  (HTML5)  — WS30 USP 코드에디터 "셸"
  * ----------------------------------------------------------------------
@@ -486,7 +487,9 @@
                 { act: "CANCEL", label: "Cancel" }
             ]);
         } else {
-            _uspBackCb(window.confirm(sMsg) ? "YES" : "CANCEL");
+            // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(CANCEL=머무름).
+            console.error("[USP-001] 되돌아가기 확인: 공통 fnConfirmBox 미로드 — 확인창 표시 불가. message:", sMsg);
+            _uspBackCb("CANCEL");
         }
     }
 

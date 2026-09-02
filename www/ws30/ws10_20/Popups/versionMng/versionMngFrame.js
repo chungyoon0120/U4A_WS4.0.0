@@ -1,3 +1,4 @@
+// 오류코드 접두: VMNG / 다음 번호: 003
 /****************************************************************************
  * 버전 관리(Version Management) 창 로직 (versionMngFrame.js)
  * --------------------------------------------------------------------------
@@ -196,7 +197,8 @@ function _fatal(sType, sMsg) {
             onClose: function () { _closeWindow(); }
         });
     } else {
-        try { window.alert(sMsg || ""); } catch (e) { }
+        // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 U4AUI.confirm 미로드는 오류코드로 표면화하고 창을 닫는다.
+        console.error("[VMNG-001] 오류안내 팝업: 공통 U4AUI.confirm 미로드 — 표시 불가. message:", sMsg || "");
         _closeWindow();
     }
 }
@@ -784,7 +786,8 @@ function _onOpenNewWindow(oRow) {
             onClose: function (sAct) { if (sAct === "YES") { _doCreateTempApp(oRow); } }
         });
     } else {
-        if (window.confirm(_z("396"))) { _doCreateTempApp(oRow); }
+        // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 U4AUI.confirm 미로드는 오류코드 표면화 + fail-closed(생성하지 않음).
+        console.error("[VMNG-002] 임시 App 생성 확인: 공통 U4AUI.confirm 미로드 — 표시 불가.");
     }
 }
 

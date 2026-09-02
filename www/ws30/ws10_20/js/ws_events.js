@@ -1,7 +1,7 @@
 /**************************************************************************
  * ws_events.js
  **************************************************************************
- * 오류코드 접두: WSEV / 다음 번호: 018
+ * 오류코드 접두: WSEV / 다음 번호: 020
  *   (개발표준 = `.works/DEV_STANDARD_오류처리.md` §3 — 파일별 유일 접두 + 파일 내 로컬 번호.
  *    번호는 이 파일 안에서 위에서 아래로 증가. 다른 파일과 절대 중복되지 않는다.)
  *
@@ -1173,8 +1173,9 @@
         if (oAPP.common && typeof oAPP.common.fnConfirmBox === "function") {
             oAPP.common.fnConfirmBox('I', sMsg, lf_MsgCallback);
         } else {
-            // 폴백: 헬퍼 미로드 시 브라우저 confirm
-            lf_MsgCallback(window.confirm(sMsg) ? "YES" : "NO");
+            // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(NO).
+            console.error("[WSEV-018] 확인창: 공통 fnConfirmBox 미로드 — 표시 불가. message:", sMsg);
+            lf_MsgCallback("NO");
         }
 
         function lf_MsgCallback(TYPE) {
@@ -1264,7 +1265,9 @@
                 { act: "CANCEL", label: "Cancel" }
             ]);
         } else {
-            oAPP.events.ev_pageBack_MsgCallBack(window.confirm(sMsg) ? "YES" : "CANCEL");
+            // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(CANCEL=머무름).
+            console.error("[WSEV-019] 페이지 뒤로가기 확인: 공통 fnConfirmBox 미로드 — 표시 불가. message:", sMsg);
+            oAPP.events.ev_pageBack_MsgCallBack("CANCEL");
         }
 
     }; // end of oAPP.events.ev_pageBack

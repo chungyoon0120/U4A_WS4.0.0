@@ -322,20 +322,34 @@
     function _confirmAsync(sMsg) {
         return new Promise(function (resolve) {
             var H = oAPP.H;
+            // [BR65 보완 · 두 검수 공통지적] 확인창이 닫힌 뒤 busy 를 다시 켜는 것과
+            //   띄운 직후 끄는 것의 순서가 뒤집힐 수 있어(onClose 가 반환 전 동기 호출되는 경우)
+            //   반환 여부를 표시해 원본 순서(표시 직후 OFF → 닫힐 때 ON → resolve)를 강제한다.
+            //   ★공통 U4AUI.confirm 의 window.confirm fallback 은 2026-09-02 장군님 지시로 제거돼
+            //     현재 동기 호출 경로는 없다 — 순서 보장 방어로 유지한다(정상 경로 동작 동일).
+            var bReturned = false, bClosed = false, sRet = "";
+            function _closeStep() {
+                // [BR65] 원본 index.js:6976·7051 — 확인창이 닫히는 즉시 "이 팝업의 busy 만" 다시 ON.
+                //   (WS20·다른 팝업 busy 는 유지 — sOption 없이 호출하면 방송하지 않는다.)
+                oAPP.fn.setBusyWS20Interaction(true);
+                resolve(sRet);
+            }
             window.U4AUI.confirm({
                 type: "C",
                 message: sMsg,
                 buttons: [{ act: "YES", label: H.cl("A03"), emphasized: true }, { act: "NO", label: H.cl("A39") }],
                 onClose: function (sAct) {
-                    // [BR65] 원본 index.js:6976·7051 — 확인창이 닫히는 즉시 "이 팝업의 busy 만" 다시 ON.
-                    //   (WS20·다른 팝업 busy 는 유지 — sOption 없이 호출하면 방송하지 않는다.)
-                    oAPP.fn.setBusyWS20Interaction(true);
-                    resolve(sAct === "YES" ? "OK" : "");
+                    bClosed = true;
+                    sRet = (sAct === "YES") ? "OK" : "";
+                    if (!bReturned) { return; }   // 동기 폴백 — 아래 반환 직후 구간이 OFF → ON → resolve 순서로 처리.
+                    _closeStep();
                 }
             });
+            bReturned = true;
             // [BR65] 원본 index.js:6990·7064 — 확인창을 띄운 직후 "이 팝업의 busy 만" OFF.
             //   이게 빠지면 확인창 위/아래로 로딩 덮개가 남아 이후 조작이 막힌다(WS20 busy 는 유지).
             oAPP.fn.setBusyWS20Interaction(false);
+            if (bClosed) { _closeStep(); }   // 동기 폴백으로 이미 닫힌 경우 — 여기서 순서대로 ON + resolve.
         });
     }
 

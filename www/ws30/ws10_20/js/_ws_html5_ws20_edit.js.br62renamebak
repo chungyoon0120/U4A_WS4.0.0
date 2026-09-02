@@ -477,66 +477,6 @@
         }
         return true;
     }
-    /********************************************************************
-     * [BR62-이름변경] 이름만 바뀐 편집의 복원 — 원본처럼 **키만 갈아끼운다**.
-     *   s.rename = { from: 이 스냅샷 시점 이름, to: 편집 후 이름 }.
-     *   지금 화면이 to 이고 복원 목표가 from 일 때만 동작(반대 방향은 그 스택의 자기 기록이 처리).
-     *   대상: 미리보기 인스턴스 보관통(oAPP.attr.prev) 키 · _OBJID · _T_0015[].OBJID ·
-     *        트리 펼침 기억 · 트리 선택 표시 · 비교용 직전 트리 사본(_newTree/_newT15).
-     *   비교용 사본까지 고쳐야 뒤이어 도는 부분갱신이 "바뀐 것 없음"으로 보고 그려도 안 된다.
-     ********************************************************************/
-    function _applyRenameBeforeDiff(s, oNewTree, oNewT15) {
-        if (!s || !s.rename || !s.rename.from || !s.rename.to) { return null; }
-        var sTo = s.rename.to, sFrom = s.rename.from;
-        if (sTo === sFrom) { return null; }
-        // 방향 확인 — 지금 트리에 to 가 있고 from 은 없어야 이름되돌리기가 맞다.
-        if (!_node(sTo) || _node(sFrom)) { return null; }
-
-        //★[BR62-이름변경] 원본은 이름 변경 되돌리기/다시하기에서 **선택 표시를 아예 안 건드린다**
-        //  (undoRedo.js CL_CHANGE_OBJID.executeHistory 1405~1560 전 구간 setSelectTreeItem 없음 —
-        //   INSERT 543 · DELETE 1012 · 이동 599 · 끌어놓기 1758/1924 · 속성 2278 과 다른 유일한 예외).
-        //  단, 지금 오른쪽에 그 UI 를 띄워 놓고 있었으면 원본도 이름칸·속성목록의 이름을 옛 이름으로
-        //  바꿔 준다(1516~1526) → 그 경우에만 같은 UI 를 다시 선택해 오른쪽을 새로 그린다.
-        //  다른 줄을 선택해 둔 상태였다면 원본처럼 **그대로 둔다**(장군님 지적 2026-09-02).
-        var sCurSel = "";
-        try { sCurSel = (oAPP.attr.oModel.oData.uiinfo && oAPP.attr.oModel.oData.uiinfo.OBJID) || ""; } catch (e) { }
-        var sReselect = (sCurSel === sTo) ? sFrom : "";
-
-        var P = oAPP.attr.prev || (oAPP.attr.prev = {});
-        if (P[sTo]) {
-            P[sFrom] = P[sTo];
-            try { P[sFrom]._OBJID = sFrom; } catch (e) { }
-            try {
-                var a15 = P[sFrom]._T_0015;
-                if (a15 && a15.length) { for (var i = 0; i < a15.length; i++) { a15[i].OBJID = sFrom; } }
-            } catch (e) { }
-            try { delete P[sTo]; } catch (e) { }
-        }
-        // 트리 접힘/펼침 기억·선택 표시도 이름별이라 함께 옮긴다(안 옮기면 기본값=펼침).
-        try {
-            var oExp = oAPP.attr.ws20TreeExpanded;
-            if (oExp && Object.prototype.hasOwnProperty.call(oExp, sTo)) { oExp[sFrom] = oExp[sTo]; delete oExp[sTo]; }
-        } catch (e) { }
-        try { if (oAPP.attr.ws20SelectedObjid === sTo) { oAPP.attr.ws20SelectedObjid = sFrom; } } catch (e) { }
-        // 비교용 직전 트리 사본도 같은 이름으로 맞춰 둔다(그래야 변화 0 으로 잡힌다).
-        (function w(a) {
-            if (!a) { return; }
-            for (var i = 0; i < a.length; i++) {
-                if (a[i].OBJID === sTo) { a[i].OBJID = sFrom; }
-                if (a[i].POBID === sTo) { a[i].POBID = sFrom; }
-                w(a[i].zTREE);
-            }
-        })(oNewTree);
-        try {
-            if (oNewT15 && Object.prototype.hasOwnProperty.call(oNewT15, sTo)) {
-                var aC = oNewT15[sTo];
-                if (aC && aC.length) { for (var j = 0; j < aC.length; j++) { aC[j].OBJID = sFrom; } }
-                oNewT15[sFrom] = aC; delete oNewT15[sTo];
-            }
-        } catch (e) { }
-        return { handled: true, reselect: sReselect };
-    }
-
     // async — drawPreview·재선택(refreshPreview/selPreviewUI)이 async 라, 호출측(_doApply)이
     //  이 완료까지 await 해야 BUSY 해제/재진입이 재구성 도중에 끼어들지 않는다.
     async function _restoreSnap(s) {
@@ -556,16 +496,6 @@
         //  현재 chk 를 OBJID 별로 담아, 복원한 zTREE 에 다시 씌운다(undo/redo 가 선택상태를 안 바꾸게).
         var oChkMap = {};
         try { (function w(a) { if (!a) { return; } for (var i = 0; i < a.length; i++) { oChkMap[a[i].OBJID] = a[i].chk === true; w(a[i].zTREE); } })(_tree()); } catch (e) { }
-
-        // ★[BR62-이름변경] 이 스냅샷이 "이름만 바뀐 편집"이면, 비교하기 **전에** 원본처럼
-        //   미리보기 UI 인스턴스의 **키만 갈아끼운다**(undoRedo.js CL_CHANGE_OBJID 1450~1491 동일).
-        //   이걸 안 하면 스냅샷 비교가 옛 이름=생긴 것 / 새 이름=없어진 것 으로 잡아
-        //   속성이 바뀐 것도 아닌데 미리보기를 destroy 후 재생성했고(장군님 지적 2026-09-02),
-        //   자식들도 POBID 가 바뀌어 "자리이동"으로 잡혀 다시 붙었다.
-        //   또 트리 접힘/펼침·선택 표시는 **UI 이름별로** 기억하므로 같이 옮기지 않으면
-        //   옛 이름에 기억이 없어 **기본값(펼침)**으로 떨어져 하위가 저절로 펼쳐졌다(같은 지적).
-        var _oRenameRet = null;
-        try { _oRenameRet = _applyRenameBeforeDiff(s, _newTree, _newT15); } catch (e) { console.error("[W20E-004] 이름변경 되돌리기 선반영:", e && e.message ? e.message : e); }
 
         // ── 데이터 복원 ──
         try { oAPP.attr.oModel.oData.zTREE = JSON.parse(JSON.stringify(s.z)); } catch (e) { }
@@ -603,11 +533,7 @@
         //    setSelectTreeItem(T_ATTR[0].OBJID, UIATK) 대응. 이게 없으면 "A 변경 → B 선택 →
         //    되돌리기 → 다시하기" 시 다시하기가 A 가 아닌 B 로 이동하는 버그가 난다.
         var sAnchor = "";
-        if (_oRenameRet && _oRenameRet.handled) {
-            //이름 변경 = 원본에 선택 처리가 없다. 오른쪽에 그 UI 를 띄워 놓고 있었을 때만 다시 그린다.
-            sAnchor = (_oRenameRet.reselect && _node(_oRenameRet.reselect)) ? _oRenameRet.reselect : "";
-        }
-        else if (s.focus && s.focus.OBJID && _node(s.focus.OBJID)) { sAnchor = s.focus.OBJID; }
+        if (s.focus && s.focus.OBJID && _node(s.focus.OBJID)) { sAnchor = s.focus.OBJID; }
         else if (s.sel && _node(s.sel)) { sAnchor = s.sel; }
         else if (sSelParent && _node(sSelParent)) { sAnchor = sSelParent; }
 
@@ -736,11 +662,6 @@
                 //  방향으로 가도 같은 속성 줄로 스크롤되게(원본은 두 방향 모두 T_ATTR[0].UIATK 로 스크롤).
                 var _oRevert = _snapshot();
                 if (oTarget && oTarget.focus) { _oRevert.focus = oTarget.focus; }
-                //[BR62-이름변경] 반대 방향에도 같은 기록을 **앞뒤 바꿔** 달아 둔다.
-                //  그래야 다시하기도 재생성 없이 키만 갈아끼운다.
-                if (oTarget && oTarget.rename && oTarget.rename.from && oTarget.rename.to) {
-                    _oRevert.rename = { from: oTarget.rename.to, to: oTarget.rename.from };
-                }
                 aDst.push(_oRevert);
                 await _restoreSnap(aSrc.pop());
                 //[F-3] 바인딩 팝업(별창) 반영 — 원본 undoRedo.js executeHistory 가 복원 후 updateBindPopupDesignData 호출(547/1017/1512).
@@ -773,17 +694,6 @@
         }
 
         _doApply();
-    };
-    /********************************************************************
-     * [BR62-이름변경] 방금 쌓은 되돌리기 기록에 "이름만 바꿈" 을 새긴다.
-     *   이름을 바꾸는 자리에서 새 이름이 확정된 뒤 호출한다.
-     *   이게 있어야 복원이 원본처럼 **미리보기 재생성 없이 키만 교체**로 끝난다.
-     ********************************************************************/
-    oAPP.fn.fnWs20SetUndoRename = function (oSnap, sFrom, sTo) {
-        if (!sFrom || !sTo || sFrom === sTo) { return; }
-        var oTgt = oSnap || (_undoStack.length ? _undoStack[_undoStack.length - 1] : null);
-        if (!oTgt) { return; }
-        oTgt.rename = { from: sFrom, to: sTo };
     };
     oAPP.fn.fnWs20ClearHistory = function () { _undoStack = []; _redoStack = []; _updateUndoBtns(); };
     oAPP.fn.fnWs20CanUndo = function () { return _undoStack.length > 0; };
