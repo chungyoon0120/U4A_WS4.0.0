@@ -946,7 +946,7 @@
         }
     };
 
-    /** 테스트 모드 상태(스위치 on/off + 자동 로그인 ID) — appdata 영속화 */
+    /** 테스트 모드 상태(스위치 on/off + 자동 로그인 ID/PW) — appdata 영속화 */
     function _testStateFilePath() {
         return PATH.join(USERDATA, "p13n", "serverlist_test.json");
     }
@@ -955,10 +955,15 @@
             const sPath = _testStateFilePath();
             if (FS.existsSync(sPath)) {
                 const o = JSON.parse(FS.readFileSync(sPath, "utf-8") || "{}");
-                return { testMode: !!o.testMode, testId: typeof o.testId === "string" ? o.testId : "" };
+                return {
+                    testMode: !!o.testMode,
+                    testClient: typeof o.testClient === "string" ? o.testClient : "",
+                    testId: typeof o.testId === "string" ? o.testId : "",
+                    testPw: typeof o.testPw === "string" ? o.testPw : ""
+                };
             }
         } catch (e) { /* 손상/누락 → 기본값 */ }
-        return { testMode: false, testId: "" };
+        return { testMode: false, testClient: "", testId: "", testPw: "" };
     }
     function _saveTestState() {
         try {
@@ -966,7 +971,9 @@
             if (!FS.existsSync(sDir)) { FS.mkdirSync(sDir, { recursive: true }); }
             FS.writeFileSync(_testStateFilePath(), JSON.stringify({
                 testMode: !!oAPP.attr._testMode,
-                testId: oAPP.attr._testId || ""
+                testClient: oAPP.attr._testClient || "",
+                testId: oAPP.attr._testId || "",
+                testPw: oAPP.attr._testPw || ""
             }, null, 2), "utf-8");
         } catch (e) {
             console.error("[ServerList] 테스트 상태 저장 실패:", e);
@@ -974,17 +981,19 @@
     }
 
     /** 서브헤더 뷰 전환 세그먼트 (Tree / Master-Detail) — Bootstrap btn-group */
-    /** 테스트 모드 스위치 + 자동 로그인 ID 입력 — 개발(비패키지)에서만 노출/활성.
+    /** 테스트 모드 스위치 + 자동 로그인 ID/PW 입력 — 개발(비패키지)에서만 노출/활성.
      *  패키지(배포) 상태에선 아예 렌더하지 않는다(null 반환).
-     *  스위치 ON → ID 입력칸 노출. 입력한 ID 는 서버 더블클릭 시 로그인 창으로 전달되어
-     *  하단 스태프 버튼 중 일치하는 계정으로 자동 로그인된다. (개발/테스트 전용, 라벨 하드코딩) */
+     *  스위치 ON → ID·PW 입력칸 노출. 입력한 ID/PW 는 서버 더블클릭 시 로그인 창으로 전달되어
+     *  그 계정으로 자동 로그인된다. (개발/테스트 전용, 라벨 하드코딩) */
     function _buildTestModeToggle() {
         if (APP.isPackaged) { return null; } // 배포 빌드에선 스위치 자체를 만들지 않음
 
         // 마지막 입력값/스위치 상태 복원(appdata)
         if (oAPP.attr._testId === undefined) {
             const oTs = _loadTestState();
+            oAPP.attr._testClient = oTs.testClient;
             oAPP.attr._testId = oTs.testId;
+            oAPP.attr._testPw = oTs.testPw;
             oAPP.attr._testMode = oTs.testMode;
         }
 
@@ -998,24 +1007,32 @@
         oChk.checked = !!oAPP.attr._testMode;
         oSwitch.append(oChk, _el("span", "u4a-switch__slider"));
 
-        // 자동 로그인 ID 입력칸 — 스위치 ON 일 때만 노출
-        const oIdInput = _el("input", "u4a-input u4a-bar__testmode-input");
-        oIdInput.type = "text";
-        oIdInput.placeholder = "자동 로그인 ID";
-        oIdInput.value = oAPP.attr._testId || "";
-        oIdInput.hidden = !oAPP.attr._testMode;
-        // 입력 중엔 라이브로 반영, 커밋(blur/Enter) 시점에 영속화
-        oIdInput.addEventListener("input", () => { oAPP.attr._testId = oIdInput.value; });
-        oIdInput.addEventListener("change", () => { oAPP.attr._testId = oIdInput.value; _saveTestState(); });
+        // 자동 로그인 입력칸(CLIENT/ID/PW) — 스위치 ON 일 때만 노출. 로그인은 넷 다 필요.
+        const _mkTestField = (sType, sPlaceholder, sAttr, iWidth) => {
+            const oInp = _el("input", "u4a-input u4a-bar__testmode-input");
+            oInp.type = sType;
+            oInp.placeholder = sPlaceholder;
+            if (iWidth) { oInp.style.width = iWidth; }
+            oInp.value = oAPP.attr[sAttr] || "";
+            oInp.hidden = !oAPP.attr._testMode;
+            oInp.addEventListener("input", () => { oAPP.attr[sAttr] = oInp.value; });
+            oInp.addEventListener("change", () => { oAPP.attr[sAttr] = oInp.value; _saveTestState(); });
+            return oInp;
+        };
+        const oClientInput = _mkTestField("text", "CLIENT", "_testClient", "5rem");
+        const oIdInput = _mkTestField("text", "자동 로그인 ID", "_testId", null);
+        const oPwInput = _mkTestField("password", "자동 로그인 PW", "_testPw", null);
 
         oChk.addEventListener("change", () => {
             oAPP.attr._testMode = oChk.checked;
+            oClientInput.hidden = !oChk.checked;
             oIdInput.hidden = !oChk.checked;
+            oPwInput.hidden = !oChk.checked;
             _saveTestState();
-            if (oChk.checked) { setTimeout(() => oIdInput.focus(), 0); }
+            if (oChk.checked) { setTimeout(() => oClientInput.focus(), 0); }
         });
 
-        oWrap.append(oText, oSwitch, oIdInput);
+        oWrap.append(oText, oSwitch, oClientInput, oIdInput, oPwInput);
         return oWrap;
     }
 
@@ -2754,9 +2771,11 @@
             SETTINGS: oBindData.settings || undefined
         };
 
-        // 테스트 모드: 입력한 ID 를 로그인 창으로 전달 → 일치하는 스태프 버튼 자동 로그인
+        // 테스트 모드: 입력한 CLIENT/ID/PW 를 로그인 창으로 전달 → 그 계정으로 자동 로그인
         if (oAPP.attr._testMode && oAPP.attr._testId && oAPP.attr._testId.trim()) {
+            oLoginInfo.TESTCLIENT = (oAPP.attr._testClient || "").trim();
             oLoginInfo.TESTID = oAPP.attr._testId.trim();
+            oLoginInfo.TESTPW = oAPP.attr._testPw || "";
         }
 
         // 사용자 테마 정보

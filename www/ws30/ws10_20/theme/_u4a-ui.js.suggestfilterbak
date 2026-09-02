@@ -298,14 +298,12 @@
             if (oInput !== ev.target && (!oList || !oList.contains(ev.target))) { _close(); }
         }
 
-        // 입력칸에 글자가 있으면 어떤 경로로 열리든(타이핑·포커스·아래화살표) 항상 그 글자로 좁힌다.
-        //   [수정 2026-09-02] 예전엔 포커스로 열 때만 전체 이력을 다시 보여줘서, 글자를 치고
-        //   목록을 좁혀 놓은 뒤 다른 곳을 눌렀다 입력칸으로 돌아오면 필터가 풀렸다
-        //   (장군님 보고 2026-09-02 — 일반 검색창 관행에 맞춰 공통 전체 적용).
-        function _filtered() {
+        // bShowAll: 포커스로 열 때는 입력값과 무관하게 전체 이력을 보여준다.
+        // 사용자가 직접 타이핑(input)할 때만 부분일치로 좁힌다.
+        function _filtered(bShowAll) {
             const aAll = fnItems() || [];
             const sQ = (oInput.value || "").toLowerCase();
-            if (!sQ) { return aAll.slice(); }
+            if (bShowAll || !sQ) { return aAll.slice(); }
             const a = aAll.filter((s) => String(s).toLowerCase().includes(sQ));
             if (a.length === 1 && String(a[0]).toLowerCase() === sQ) { return []; }
             return a;
@@ -339,8 +337,8 @@
             _clampListV(oList, r, iTop);
         }
 
-        function _open() {
-            aMatch = _filtered();
+        function _open(bShowAll) {
+            aMatch = _filtered(bShowAll);
             if (!aMatch.length) { _close(); return; }
 
             if (!oList) {
@@ -400,13 +398,13 @@
             oInput.focus();
         }
 
-        oInput.addEventListener("input", () => { if (_suppressOpen) { return; } _open(); }); // 타이핑 → 부분일치 필터
-        oInput.addEventListener("focus", () => _open());           // 포커스 → 값이 있으면 그 값으로 좁힌 목록, 비었으면 전체 이력
+        oInput.addEventListener("input", () => { if (_suppressOpen) { return; } _open(false); }); // 타이핑 → 부분일치 필터
+        oInput.addEventListener("focus", () => _open(true));       // 포커스 → 전체 이력
         oInput.addEventListener("keydown", (ev) => {
             switch (ev.key) {
                 case "ArrowDown":
                     ev.preventDefault();
-                    if (!oList) { _open(); } else { _setActive(Math.min(iActive + 1, aMatch.length - 1)); }
+                    if (!oList) { _open(true); } else { _setActive(Math.min(iActive + 1, aMatch.length - 1)); }
                     break;
                 case "ArrowUp":
                     if (oList) { ev.preventDefault(); _setActive(Math.max(iActive - 1, 0)); }

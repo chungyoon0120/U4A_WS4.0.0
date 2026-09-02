@@ -2267,22 +2267,30 @@ var oAPP = (function () {
             return;
         }
 
-        // 테스트 모드 자동 로그인 — ServerList 에서 전달한 TESTID 와 일치하는 스태프 계정으로 로그인.
-        //   (스태프 버튼과 동일한 fnStaffLogin 호출 = "일치하는 버튼 자동 클릭")
+        // 테스트 모드 자동 로그인 — ServerList 에서 전달한 ID/PW 로 그 계정 자동 로그인.
+        //   (스태프 버튼과 동일한 방식: ID/PW 필드 채우고 ev_login 호출)
         try {
             const sTestId = oServerInfo && oServerInfo.TESTID;
-            if (sTestId && parent.isU4A_RND_SERVER && parent.isU4A_RND_SERVER(oServerInfo.SYSID)) {
-                const sKey = String(sTestId).trim().toLowerCase();
-                const oStaff = oAPP.fn.fnGetStaffList().find(
-                    (o) => o.id.toLowerCase() === sKey || o.text === sTestId.trim()
-                );
-                if (oStaff) {
-                    _fnFadeInContent();
-                    parent.setDomBusy("");
-                    oAPP.fn.fnStaffLogin(oStaff.id);
-                    return;
+            if (sTestId && String(sTestId).trim()) {
+                const sId = String(sTestId).trim();
+                const sPw = (oServerInfo.TESTPW != null) ? String(oServerInfo.TESTPW) : "";
+                const sClient = (oServerInfo.TESTCLIENT != null) ? String(oServerInfo.TESTCLIENT).trim() : "";
+                const oId = document.getElementById("ws_id");
+                const oPw = document.getElementById("ws_pw");
+                const oClient = document.getElementById("ws_client");
+                // CLIENT 는 입력값이 있을 때만 채운다(비면 서버 기본/기억값 유지)
+                if (sClient) {
+                    if (oClient) { oClient.value = sClient; }
+                    oModel.setProperty("/LOGIN/CLIENT", sClient);
                 }
-                console.warn("[테스트 모드] 일치하는 스태프 계정 없음:", sTestId);
+                if (oId) { oId.value = sId; }
+                if (oPw) { oPw.value = sPw; }
+                oModel.setProperty("/LOGIN/ID", sId);
+                oModel.setProperty("/LOGIN/PW", sPw);
+                _fnFadeInContent();
+                parent.setDomBusy("");
+                oAPP.events.ev_login();
+                return;
             }
         } catch (e) {
             console.error("[테스트 모드] 자동 로그인 실패:", e);
