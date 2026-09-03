@@ -1,7 +1,7 @@
 /**************************************************************************
  * ws_events.js
  **************************************************************************
- * 오류코드 접두: WSEV / 다음 번호: 020   (018 사용, 019 는 아직 빈 번호)
+ * 오류코드 접두: WSEV / 다음 번호: 020
  *   (개발표준 = `.works/DEV_STANDARD_오류처리.md` §3 — 파일별 유일 접두 + 파일 내 로컬 번호.
  *    번호는 이 파일 안에서 위에서 아래로 증가. 다른 파일과 절대 중복되지 않는다.)
  *
@@ -23,7 +23,6 @@
  *  WSEV-015  Save(저장) 버튼 — 저장 요청 보내기(sendAjax) 실패
  *  WSEV-016  Save(저장) 버튼 — [서버 저장 성공 後] 앱 헤더 갱신 실패
  *  WSEV-017  Save(저장) 버튼 — [서버 저장 성공 後] Undo/Redo 이력 비우기 실패
- *  WSEV-018  Save·Activate·Syntax Check — [서버 처리 後] 선택 UI 다시 클릭(_ws20ReselectSelectedUI) 실패
  *
  * ★ Activate(활성화)·Save(저장) 은 둘 다 저장 행위다.
  *   서버 전송 前 구간(WSEV-003~008 / WSEV-011~015)은 하나라도 터지면
@@ -1421,9 +1420,6 @@
                 // busy 끄고 Lock 풀기
                 oAPP.common.fnSetBusyLock("");
 
-                // [2026-09-03 장군님 지시] 서버 왕복까지 끝난 시점 → 왼쪽 UI 트리의 선택 줄 다시 클릭.
-                _ws20ReselectSelectedUI("Syntax Check(구문 검사)");
-
                 return;
             }
 
@@ -1664,37 +1660,6 @@
         catch (e6) { console.error("[" + sCode + "] 오류 팝업 표시 실패:", e6 && e6.message); }
 
     } // end of _wsevCritical
-
-    /************************************************************************
-     * [공통] 서버 왕복이 끝난 뒤 왼쪽 UI 트리의 선택 줄을 "다시 클릭"한다.
-     *   장군님 지시 2026-09-03 — Save(저장) / Activate(활성화) / Syntax Check(구문 검사)
-     *   가 서버까지 갔다가 다 끝나는 시점에, 지금 선택돼 있는 UI 를 한 번 더 클릭한
-     *   효과를 준다(속성 영역·미리보기 선택이 클릭과 똑같이 다시 맞춰진다).
-     *
-     *   ★새 동작을 만들지 않는다 — 트리 클릭 핸들러를 그대로 다시 부르는
-     *     fnWs20TreeReselectCurrent(ws_html5_ws20_tree.js) 에 위임한다.
-     *   ★이 시점은 서버 저장이 이미 끝난 뒤라 되돌릴 수 없다. 그래서 여기서 터져도
-     *     저장을 되돌리지 않고, 조용히 삼키지도 않고 코드로 드러내기만 한다(WSEV-018).
-     *   선택된 줄이 없으면 아무것도 하지 않는다.
-     ************************************************************************/
-    function _ws20ReselectSelectedUI(sWhere) {
-
-        try {
-
-            if (typeof oAPP.fn.fnWs20TreeReselectCurrent !== "function") {
-                throw new Error("oAPP.fn.fnWs20TreeReselectCurrent 미정의(WS20 트리 모듈 미로드)");
-            }
-
-            //비동기(속성영역·미리보기 선택까지) — 안에서 실패해도 코드로 드러낸다.
-            Promise.resolve(oAPP.fn.fnWs20TreeReselectCurrent()).catch(function (e) {
-                console.error("[WSEV-018] " + sWhere + " — [서버 처리 後] 선택 UI 다시 클릭 실패:", e);
-            });
-
-        } catch (e) {
-            console.error("[WSEV-018] " + sWhere + " — [서버 처리 後] 선택 UI 다시 클릭 실패:", e);
-        }
-
-    } // end of _ws20ReselectSelectedUI
 
     /************************************************************************
      * Activate Button Event
@@ -2032,13 +1997,10 @@
 
             // activate 이벤트 전파
             let oIpcHandler = new parent.CLIpcHandler();
-                oIpcHandler.command("activate", {
+                oIpcHandler.command("activate", { 
                     fromPage  : parent.getCurrPage(),       // Activate 수행한 화면
                     browserKey: parent.getBrowserKey()      // 현재 브라우저 고유 키
                 });
-
-            // [2026-09-03 장군님 지시] 서버 왕복까지 끝난 시점 → 왼쪽 UI 트리의 선택 줄 다시 클릭.
-            _ws20ReselectSelectedUI("Activate(활성화)");
 
         });
 
@@ -2411,12 +2373,7 @@
 
             }
 
-            // [2026-09-03 장군님 지시] 서버 왕복까지 끝난 시점 → 왼쪽 UI 트리의 선택 줄 다시 클릭.
-            //  ※ 위쪽 ISBACK(WS10 로 이동) / ISDISP(Display 모드 전환) 분기는 화면 자체가 바뀌므로
-            //    그 앞에서 이미 return 되어 여기 오지 않는다(다시 클릭도 하지 않는다).
-            _ws20ReselectSelectedUI("Save(저장)");
-
-        } // end of lf_getAppInfo
+        } // end of lf_getAppInfo      
 
     }; // end of oAPP.events.ev_pressSaveBtn
 
