@@ -1,4 +1,4 @@
-// 오류코드 접두: RSRC / 다음 번호: 004
+// 오류코드 접두: RSRC / 다음 번호: 005
 /**
  * index.js  (cleaned)
  *
@@ -1324,7 +1324,28 @@ oAPP.views = window?.oAPP?.views || {};
 
     };
 
+    // 39-0. 접속 언어(WS Language)에 맞는 메시지 DB 문구 조회 — 없으면 fallback 그대로.
+    //   [보강 2026-09-07, 장군님 지시] 원본은 언어 상관없이 영문 고정이었으나, 이제 메시지 DB 값을 따라
+    //   접속 언어대로 나온다. 미등록·미로드 시엔 fallback(영문) 반환(oAPP.common.fnGetMsgClsText 는
+    //   미등록 시 "" 또는 "클래스|번호" 반환 — "|" 감지 가드).
+    function _netErrMsg(sCls, sNum, sFallback) {
+        try {
+            if (oAPP.common && oAPP.common.fnGetMsgClsText) {
+                var s = oAPP.common.fnGetMsgClsText(sCls, sNum);
+                if (s && s.indexOf("|") === -1) { return s; }
+            }
+        } catch (e) { }
+        return sFallback;
+    }
+
     // 39. 네트워크 상태에 따른 Busy Indicator 실행 메소드
+    //   [보강 2026-09-07] 원본은 아이콘+문구만 있던 화면 — 제목·설명 문구(메시지DB 연동) + 경과시간
+    //   표시 + 종료 버튼 추가.
+    //   ★재시작(RETRY) 버튼 없음(장군님 지시) — 네트워크가 끊겨서 뜨는 화면인데 앱만 다시 켠다고
+    //     네트워크가 돌아오는 게 아니라 재시작은 의미가 없음. 종료 버튼만 둔다.
+    //   ★화면 자체를 버튼으로 그냥 닫는 길도 없음(장군님 지시) — 네트워크가 살아있을 때만 동작하는
+    //     게 솔루션 컨셉. 온라인 이벤트로만 자동 해제된다(setNetworkBusy(false)).
+    //   종료 동작은 Login.js 의 업데이트 오류창 CLOSE(APP.exit()) 와 동일 패턴 재사용.
     oWS.utill.fn.setNetworkBusy = (bIsBusy, iZindex) => {
 
         var oNetBusy = document.getElementById("u4a_neterr");
@@ -1332,9 +1353,47 @@ oAPP.views = window?.oAPP?.views || {};
             return;
         }
 
+        // 버튼 배선은 최초 1회만. 이 스크립트는 #u4a_neterr 보다 먼저 파싱되어(head 쪽 <script>),
+        //   여기(호출 시점)가 DOM 존재가 보장되는 가장 이른 지점이라 여기서 지연 배선한다.
+        if (!oNetBusy.dataset.wired) {
+            oNetBusy.dataset.wired = "1";
+            var oExitBtn = oNetBusy.querySelector("#u4a_neterr_exit");
+            if (oExitBtn) {
+                oExitBtn.addEventListener("click", function () {
+                    // ★[보강 2026-09-07, 장군님 지시] 종료 전 확인창 필수. window.confirm 절대 금지
+                    //   → 공통 U4AUI.confirm 만 사용(§code.md). 문구는 기존 메시지 DB 키 그대로 참조
+                    //   (ZMSG_WS_COMMON_001 049 "프로그램을 종료하시겠습니까?" / CL_WS_COMMON B87 예·B88 아니오).
+                    if (typeof U4AUI === "undefined" || !U4AUI.confirm) {
+                        // 확인창은 필수 의존성 — 못 띄우면 삼키지 말고 오류코드 표면화 + fail-closed(종료 안 함).
+                        console.error("[RSRC-004] u4a_neterr exit: 공통 U4AUI.confirm 미로드 — 확인창 표시 불가, 종료 취소");
+                        return;
+                    }
+                    U4AUI.confirm({
+                        type: "C",
+                        message: _netErrMsg("ZMSG_WS_COMMON_001", "049", "Are you sure you want to Exit the Program?"),
+                        buttons: [
+                            { act: "YES", label: _netErrMsg("/U4A/CL_WS_COMMON", "B87", "Yes"), emphasized: true },
+                            { act: "NO", label: _netErrMsg("/U4A/CL_WS_COMMON", "B88", "No") }
+                        ],
+                        onClose: function (sAct) {
+                            if (sAct === "YES") { APP.exit(); }
+                        }
+                    });
+                });
+            }
+        }
+
         oNetBusy.classList.add("u4a_neterrInactive");
+        _clearNetErrElapsedTimer(); // WP1 ② — 겹침 방지: 새 상태 진입 전 이전 타이머 핸들부터 정리.
 
         if (bIsBusy) {
+
+            // 제목·설명 — ZMSG_WS_COMMON_002 007(제목)/008(설명), 매번 재적용(로그인 사이 언어가
+            //   바뀌어도 최신 값으로 반영). 확인창(049/B87/B88)과 같은 조회 경로라 항상 같은 언어로 나온다.
+            var oTitle = oNetBusy.querySelector("#u4a_loaders_msg");
+            var oDesc = oNetBusy.querySelector("#u4a_neterr_desc");
+            if (oTitle) { oTitle.textContent = _netErrMsg("ZMSG_WS_COMMON_002", "007", "Network connection lost"); }
+            if (oDesc) { oDesc.textContent = _netErrMsg("ZMSG_WS_COMMON_002", "008", "Please check your internet connection. This screen will close automatically once the connection is restored."); }
 
             setTimeout(() => {
                 oNetBusy.focus();
@@ -1342,10 +1401,34 @@ oAPP.views = window?.oAPP?.views || {};
 
             oNetBusy.classList.remove("u4a_neterrInactive");
             oNetBusy.style.zIndex = iZindex ? iZindex : 999999;
+            _startNetErrElapsedTimer(oNetBusy);
             return;
         }
 
     };
+
+    // 39-1. 네트워크 끊김 경과 시간(분:초) — 1초마다 갱신, 복구(setNetworkBusy(false))·재진입 시 정지.
+    var _iNetErrElapsedTimer = null;
+    function _clearNetErrElapsedTimer() {
+        if (_iNetErrElapsedTimer) {
+            clearInterval(_iNetErrElapsedTimer);
+            _iNetErrElapsedTimer = null;
+        }
+    }
+    function _startNetErrElapsedTimer(oNetBusy) {
+        var oElapsed = oNetBusy.querySelector("#u4a_neterr_elapsed");
+        if (!oElapsed) {
+            return;
+        }
+        var iStart = Date.now();
+        function _tick() {
+            var iSec = Math.floor((Date.now() - iStart) / 1000);
+            var iM = Math.floor(iSec / 60), iS = iSec % 60;
+            oElapsed.textContent = "Disconnected " + iM + ":" + (iS < 10 ? "0" : "") + iS;
+        }
+        _tick();
+        _iNetErrElapsedTimer = setInterval(_tick, 1000);
+    }
 
 })(oWS);
 

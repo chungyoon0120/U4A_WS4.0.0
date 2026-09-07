@@ -290,43 +290,82 @@ body {
     }
 }
 
-/* Network 끊겼을 때 나오는 장막 */
+/* Network 끊겼을 때 나오는 장막(§16 2.3 카드 언어 통일 — 경과시간·종료/재시작 버튼 보강, 2026-09-07) */
 .u4a_neterr {
     font-family: sans-serif;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100%;
-    /* font-size: 2.5rem; */
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: rgba(2, 8, 16, 0.55);
     position: absolute;
     top: 0;
     width: 100%;
-    /* background: white; */
     background: rgb(255 255 255 / 85%);
     box-shadow: rgba(0, 0, 0, 0.11) 0px 15px 30px 0px, rgba(0, 0, 0, 0.08) 0px 5px 15px 0px;
-    /* z-index: 99999; */
 }
 
 .u4a_neterrInactive {
     display: none;
 }
 
+/* 카드 — u4aWsSessCard(세션만료 안내창)와 동일한 토큰·둥근모서리 언어(§16 2.3).
+   [확대 2026-09-07] 장군님 지시 — 기존 크기가 너무 작아 보여 전반적으로 키움. */
+.u4a_neterrCard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .75rem;
+    padding: 2.6rem 3rem 2.2rem;
+    text-align: center;
+    min-width: 24rem;
+    max-width: 30rem;
+    background: var(--surface-raised, #fff);
+    color: var(--text, #222);
+    border: 1px solid var(--line, #d8dde3);
+    border-radius: 20px;
+    box-shadow: var(--popover-shadow, 0 18px 50px rgba(0, 0, 0, .25));
+}
+
+.u4a_neterrTitle {
+    font-weight: 700;
+    font-size: 1.4rem;
+}
+
+.u4a_neterrDesc {
+    font-size: .9375rem;
+    color: var(--text-muted, #6b7480);
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+.u4a_neterrElapsed {
+    font-size: 1rem;
+    color: var(--text-muted, #6b7480);
+    min-height: 1.2em;
+}
+
+.u4a_neterrFoot {
+    margin-top: 1.2rem;
+    display: flex;
+    gap: .8rem;
+    justify-content: center;
+}
+
+.u4a_neterrFoot .u4a-btn {
+    min-width: 7rem;
+    min-height: 2.75rem;
+    font-size: 1rem;
+}
+
 .u4a_neterr .wifi {
-    /* width: 64px;
-    height: 64px; */
-    width: 40px;
-    fill: #eee;
-    margin-right: 10px;
+    width: 64px;
+    fill: var(--text-muted, #99a2ab);
+    margin-bottom: .3rem;
 }
 
 @keyframes u4a_wifi_wave {
-
-    /* 50% { fill: #000; } */
     50% {
-        fill: rgba(2, 8, 16, 0.55)
+        fill: var(--text, #222)
     }
 }
 
