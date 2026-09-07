@@ -1,4 +1,4 @@
-// 오류코드 접두: RSRC / 다음 번호: 005
+// 오류코드 접두: RSRC / 다음 번호: 006
 /**
  * index.js  (cleaned)
  *
@@ -1346,6 +1346,10 @@ oAPP.views = window?.oAPP?.views || {};
     //   ★화면 자체를 버튼으로 그냥 닫는 길도 없음(장군님 지시) — 네트워크가 살아있을 때만 동작하는
     //     게 솔루션 컨셉. 온라인 이벤트로만 자동 해제된다(setNetworkBusy(false)).
     //   종료 동작은 Login.js 의 업데이트 오류창 CLOSE(APP.exit()) 와 동일 패턴 재사용.
+    //   ★[수정 2026-09-08, 장군님 지시] <div>+class 토글 → <dialog>+showModal()/close(). class 토글
+    //     방식은 진짜로 막는 게 아니라 실측상 Tab 키가 뒤 화면(검색창 등)으로 새어나가 배경을 그대로
+    //     조작할 수 있었다(심각). u4aWsBusyIndicator 와 같은 방식으로 전환 — 포커스 가둠은 브라우저
+    //     top-layer 가 네이티브로 처리(손수 포커스트랩 구현 안 함, §오버레이는 공통 하나로).
     oWS.utill.fn.setNetworkBusy = (bIsBusy, iZindex) => {
 
         var oNetBusy = document.getElementById("u4a_neterr");
@@ -1357,6 +1361,8 @@ oAPP.views = window?.oAPP?.views || {};
         //   여기(호출 시점)가 DOM 존재가 보장되는 가장 이른 지점이라 여기서 지연 배선한다.
         if (!oNetBusy.dataset.wired) {
             oNetBusy.dataset.wired = "1";
+            // ESC 로 못 닫게(원본 escapeHandler 빈 함수와 동일 취지) — 네트워크 복구 전엔 절대 안 닫힘.
+            oNetBusy.addEventListener("cancel", function (e) { e.preventDefault(); });
             var oExitBtn = oNetBusy.querySelector("#u4a_neterr_exit");
             if (oExitBtn) {
                 oExitBtn.addEventListener("click", function () {
@@ -1383,7 +1389,6 @@ oAPP.views = window?.oAPP?.views || {};
             }
         }
 
-        oNetBusy.classList.add("u4a_neterrInactive");
         _clearNetErrElapsedTimer(); // WP1 ② — 겹침 방지: 새 상태 진입 전 이전 타이머 핸들부터 정리.
 
         if (bIsBusy) {
@@ -1395,14 +1400,19 @@ oAPP.views = window?.oAPP?.views || {};
             if (oTitle) { oTitle.textContent = _netErrMsg("ZMSG_WS_COMMON_002", "007", "Network connection lost"); }
             if (oDesc) { oDesc.textContent = _netErrMsg("ZMSG_WS_COMMON_002", "008", "Please check your internet connection. This screen will close automatically once the connection is restored."); }
 
-            setTimeout(() => {
-                oNetBusy.focus();
-            }, 0);
-
-            oNetBusy.classList.remove("u4a_neterrInactive");
-            oNetBusy.style.zIndex = iZindex ? iZindex : 999999;
+            // showModal() 은 이미 열려있으면 예외(InvalidStateError) — 재진입 가드.
+            //   포커스는 showModal() 이 스펙대로 자동 처리(첫 포커스 가능 요소=CLOSE 버튼) — 손수 focus() 안 함.
+            if (!oNetBusy.open) {
+                try { oNetBusy.showModal(); }
+                catch (e) { console.error("[RSRC-005] u4a_neterr showModal 실패 —", e && e.message); }
+            }
             _startNetErrElapsedTimer(oNetBusy);
             return;
+        }
+
+        // 복구 — 열려있을 때만 close(중복 호출 예외 방지).
+        if (oNetBusy.open) {
+            try { oNetBusy.close(); } catch (e) { }
         }
 
     };

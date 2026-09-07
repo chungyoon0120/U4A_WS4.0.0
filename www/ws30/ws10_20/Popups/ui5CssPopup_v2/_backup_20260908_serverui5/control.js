@@ -1,4 +1,3 @@
-// 오류코드 접두: UCSS / 다음 번호: 002
 
 /*******************************************************************
  *  IF_DATA 필수 파라미터
@@ -46,25 +45,7 @@ export async function start(require, IF_DATA, fnCallback){
     IF_DATA.SERVER_HOST      = await WSUTIL.getSysInfoIPC({ PRCCD: "SERVER_HOST", BROWSKEY: BROWSKEY });
     IF_DATA.SERVER_PATH      = await WSUTIL.getSysInfoIPC({ PRCCD: "SERVER_PATH", BROWSKEY: BROWSKEY });
     IF_DATA.SERVER_BOOT_PATH = IF_DATA.USER_INFO.META.LIBPATH;
-    // ★[2026-09-08 장군님 지시] ★패키지(APP.isPackaged)일 때만★ 팝업 "틀"(main/index.js) + "다른 CSS 가이드"(others/M1·M2) 의
-    //   UI5 부트 소스를 로컬 리소스 대신 서버 UI5(접속 서버 + LIBPATH)로 쓴다. 패키지에 로컬 UI5 를 더 이상 싣지 않기
-    //   때문(node_modules/U4A 없음 → 틀이 못 떠 "통신 오류(391)" 안내). 개발 모드(isPackaged=false)는 원본 설계 그대로
-    //   resourceUrl(=CDN 테스트 경로) 유지 — 일부러 나눠 둔 설계(장군님)라 건드리지 않는다.
-    //   서버 경로 계산식 = 오른쪽 미리보기(detail)와 동일(main/views/control.js _setCssMenuConfig 의 '임시로직' 포함).
-    //   실패 처리 추가 없음 — 로드 실패(onerror)·sap 없음 검사가 main/index.js 에 이미 있다. 타이머·사전 ping 금지(장군님).
     IF_DATA.WS30_BOOT_PATH   = oSetting_UI5.resourceUrl;
-    if (APP.isPackaged) {
-        // LIBPATH 없음 = 필수 의존성 없음 → 오류코드로 표면화하고 중단(throw → 오프너 fnUI5PreCssPopupOpener 의 catch 가 busy 해제).
-        if (typeof IF_DATA.SERVER_BOOT_PATH !== "string" || IF_DATA.SERVER_BOOT_PATH === "") {
-            console.error("[UCSS-001] start: USER_INFO.META.LIBPATH 없음 — 서버 UI5 부트 경로를 만들 수 없어 팝업을 열지 않음.");
-            throw new Error("[UCSS-001] LIBPATH missing");
-        }
-        IF_DATA.WS30_BOOT_PATH = IF_DATA.SERVER_HOST + IF_DATA.SERVER_BOOT_PATH;
-        // 임시로직(원본 그대로): 서버 라이브러리 경로가 '/zu4a_imp/' 로 시작하지 않으면 호스트를 붙이지 않고 경로 전체를 그대로 본다.
-        if (IF_DATA.SERVER_BOOT_PATH.substring(0, 10) !== "/zu4a_imp/") {
-            IF_DATA.WS30_BOOT_PATH = IF_DATA.SERVER_BOOT_PATH;
-        }
-    }
     IF_DATA.SUBROOT_PATH     = "/getui5_pre_css_v2";
     IF_DATA.THEME_INFO       = oThemeInfo;
 

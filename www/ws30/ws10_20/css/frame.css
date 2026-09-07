@@ -290,22 +290,44 @@ body {
     }
 }
 
-/* Network 끊겼을 때 나오는 장막(§16 2.3 카드 언어 통일 — 경과시간·종료/재시작 버튼 보강, 2026-09-07) */
+/* Network 끊겼을 때 나오는 장막(§16 2.3 카드 언어 통일 — 경과시간·종료 버튼 보강, 2026-09-07)
+   ★[수정 2026-09-08, 장군님 지시] <div> → <dialog>+showModal() 로 전환. 원본은 그냥 <div> 라
+   진짜로 막는 게 아니어서 탭키를 누르면 뒤에 깔린 화면(검색창 등)으로 포커스가 새어나가 배경 요소가
+   그대로 조작되는 실측 버그가 있었다. u4aWsBusyIndicator(아래 dialog.u4aWsBusyIndicator, 580번대
+   부근)와 동일한 "전체화면 <dialog>" 패턴을 그대로 재사용 — 포커스 가둠은 브라우저 네이티브 top-layer
+   가 처리하므로 손수 구현하지 않는다(§오버레이는 공통 하나로). */
 .u4a_neterr {
     font-family: sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    width: 100%;
-    background: rgb(255 255 255 / 85%);
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    /* [수정 2026-09-08, 장군님 지시] 완전 불투명(테마 배경 채움) → 뒤가 은은하게 비치는 반투명 틴트로.
+       ★ backdrop-filter/blur 는 이 문서(index.html, 창 제목줄과 같은 문서)엔 절대 금지 —
+       shell.css:134 경고대로 "영구 컴포지팅 레이어"가 생기면 창 리사이즈 시 제목줄 드래그가 죽는다
+       (Electron 실제 버그 사례: electron/electron#39529, #30077). 그래서 흐림 없이, 세션 끊김
+       안내창(ws_fn_03.js .u4aWsSessDlg::backdrop, rgba(15,18,28,.32))과 같은 톤의 반투명 색만
+       올려 "스모크 유리" 느낌을 낸다 — 오래 떠있는 화면이라 안내창보다 살짝 더 짙게(.6). */
+    background: rgba(15, 18, 28, .6);
     box-shadow: rgba(0, 0, 0, 0.11) 0px 15px 30px 0px, rgba(0, 0, 0, 0.08) 0px 5px 15px 0px;
 }
-
-.u4a_neterrInactive {
+.u4a_neterr:not([open]) {
     display: none;
+}
+.u4a_neterr[open] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* 우리 자체 반투명 배경(위)이 이미 어둡게 채우므로 브라우저 기본 backdrop 은 무색 처리(이중 어둡힘 방지) */
+.u4a_neterr::backdrop {
+    background: transparent;
 }
 
 /* 카드 — u4aWsSessCard(세션만료 안내창)와 동일한 토큰·둥근모서리 언어(§16 2.3).
@@ -323,7 +345,8 @@ body {
     color: var(--text, #222);
     border: 1px solid var(--line, #d8dde3);
     border-radius: 20px;
-    box-shadow: var(--popover-shadow, 0 18px 50px rgba(0, 0, 0, .25));
+    /* 유리 위에 얹힌 느낌의 미세한 상단 하이라이트 한 줄(inset) — blur 없이 존재감만 살짝. */
+    box-shadow: var(--popover-shadow, 0 18px 50px rgba(0, 0, 0, .25)), inset 0 1px 0 rgba(255, 255, 255, .06);
 }
 
 .u4a_neterrTitle {

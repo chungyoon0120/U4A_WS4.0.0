@@ -563,11 +563,16 @@
         //     <style> 전역 누수 방지), 배경 투명(다크에서 흰블록 방지), 호스트 문서
         //     (www/ws30/ws10_20/) 기준 ../../svg/ 로 해석. 삽화 파일이 아직 없거나 로드 실패하면
         //     폴백 FA 아이콘(톤다운)으로 자동 대체 — 파일이 들어오는 즉시 그대로 표시된다.
-        //   ※ 삽화 에셋 배치 위치: www/svg/session-expired.svg (세션만료) / www/svg/trial-lock.svg (Trial).
+        //   ★2026-09-07: 원본 SAP 그림(tnt-Dialog-SessionExpired / tnt-Spot-Lock, OpenUI5 1.107.1
+        //     공식 저장소, Apache-2.0)을 그대로 받아, 실제 CDN(sap/m/themes/{테마}/library.css)에서 확인한
+        //     sap_horizon(밝게)/sap_horizon_dark(어둡게) 색상값을 입혀 두 벌씩 www/svg 에 배치
+        //     (빌드 스크립트: .works/일러스트팝업/build-tnt-illustrations.js). fnProgressDialogOpen(ws_common.js)
+        //     과 동일 컨벤션 — 화면이 어두운 테마인지(data-sl-theme)만 보고 그 중 하나를 고른다.
         function _artFile(sType) {
+            var sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
             switch (sType) {
-                case "tnt-SessionExpired": return "session-expired.svg";
-                case "tnt-Lock": return "trial-lock.svg";
+                case "tnt-SessionExpired": return "session-expired-" + sMode + ".svg";
+                case "tnt-Lock": return "trial-lock-" + sMode + ".svg";
                 default: return "";
             }
         }

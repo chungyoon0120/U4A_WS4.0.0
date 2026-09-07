@@ -59,6 +59,7 @@ X();
 | `W20E` | ws30/ws10_20/js/ws_html5_ws20_edit.js (WS20 디자인 트리 편집) |
 | `MIMF` | ws30/ws10_20/Popups/mimeRepository/frame.js |
 | `VMNG` | ws30/ws10_20/Popups/versionMng/versionMngFrame.js |
+| `UCSS` | ws30/ws10_20/Popups/ui5CssPopup_v2/control.js (UI5 Predefined CSS 팝업 오프너) |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

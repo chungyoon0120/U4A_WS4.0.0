@@ -3445,9 +3445,18 @@
             APP.exit();
             return;
         }
-        // 활성 자식 창이 있을 경우 안내 (UI5 IllustratedMessage 대체)
-        oAPP.fn.fnShowMessageBox("W", T("043") || "An activated window exists. Please close all activated windows first.", () => {
-            oAPP.fn.fnShowMainWindow();
+        // ★2026-09-07: 원본 그림(tnt-Teams, OpenUI5 1.107.1 공식 저장소)을 밝은/어두운 화면용 2벌
+        //   받아 배치(.works/일러스트팝업/build-tnt-illustrations.js). 텍스트만 뜨던 것을 원본처럼
+        //   그림 있는 안내 팝업으로 복원(원본은 확인 버튼 1개만).
+        _showIllustDialog({
+            id: "u4aWsServListClsDlg",
+            title: "",
+            desc: T("043") || "An activated window exists. Please close all activated windows first.",
+            imgBase: "activated-windows",
+            fallbackIcon: ICON.warning,
+            buttons: [
+                { text: T("002") || "OK", emphasized: true, onClick: () => oAPP.fn.fnShowMainWindow() },
+            ],
         });
     };
 
@@ -3565,6 +3574,76 @@
     }
 
     /********************************************************************
+     * 일러스트 확인 팝업(그림 있는 헤더 없는 카드형, 원본 sap.m.Dialog(showHeader:false) 대체)
+     *   fnShowShutdownAskPopup(exit-confirm)/fnRequestClose(activated-windows) 전용.
+     *   ws_fn_03.js 의 fnShowIllustMsgDialog(WS20 세션타임아웃)와 동일 컨벤션(카드+그림+폴백 아이콘),
+     *   버튼 여러 개(OK/CANCEL) 지원만 다르다. §16 2.3.
+     * @param {Object} o {id, title, desc, imgBase(밝게/어둡게 svg 파일명 접두), fallbackIcon(HTML),
+     *                    buttons:[{text, emphasized, onClick(oDlg)}]}
+     ********************************************************************/
+    function _showIllustDialog(o) {
+        let oExist = document.getElementById(o.id);
+        if (oExist) { if (!oExist.open) { try { oExist.showModal(); } catch (e) { } } return; }
+
+        if (!document.getElementById("u4aWsExitStyle")) {
+            const oSt = document.createElement("style");
+            oSt.id = "u4aWsExitStyle";
+            oSt.textContent =
+                ".u4aWsExitDlg{border:0;padding:0;background:transparent;overflow:visible;" +
+                "min-width:0;max-width:none;width:fit-content;box-shadow:none;border-radius:0}" +
+                ".u4aWsExitDlg::backdrop{background:rgba(15,18,28,.32);backdrop-filter:blur(1.5px)}" +
+                ".u4aWsExitCard{display:flex;flex-direction:column;align-items:center;gap:.5rem;" +
+                "padding:1.7rem 2.2rem 1.45rem;text-align:center;min-width:18rem;max-width:26rem;" +
+                "background:var(--surface-raised,#1b2128);color:var(--text,#fff);" +
+                "border:1px solid var(--line,#33414f);border-radius:16px;" +
+                "box-shadow:var(--popover-shadow,0 18px 50px rgba(0,0,0,.55))}" +
+                ".u4aWsExitArt{width:8.5rem;height:8.5rem;display:flex;align-items:center;justify-content:center;margin-bottom:.2rem}" +
+                ".u4aWsExitArtImg{max-width:100%;max-height:100%;display:block}" +
+                ".u4aWsExitArtFb{font-size:3rem;line-height:1;color:var(--text-muted,#9aa3ad)}" +
+                ".u4aWsExitTitle{font-weight:700;font-size:1.06rem;letter-spacing:.2px}" +
+                ".u4aWsExitTitle:empty{display:none}" +
+                ".u4aWsExitDesc{font-size:.8125rem;color:var(--text-muted,#9aa3ad);line-height:1.5;white-space:pre-line}" +
+                ".u4aWsExitFoot{margin-top:.85rem;display:flex;gap:.5rem;justify-content:center}";
+            document.head.appendChild(oSt);
+        }
+
+        const oDlg = document.createElement("dialog");
+        oDlg.id = o.id;
+        oDlg.className = "u4aWsExitDlg";
+        oDlg.innerHTML =
+            '<div class="u4aWsExitCard">' +
+            '<div class="u4aWsExitArt"><img class="u4aWsExitArtImg" alt="" aria-hidden="true"/>' +
+            '<span class="u4aWsExitArtFb"></span></div>' +
+            '<div class="u4aWsExitTitle"></div>' +
+            '<div class="u4aWsExitDesc"></div>' +
+            '<div class="u4aWsExitFoot"></div></div>';
+        oDlg.querySelector(".u4aWsExitTitle").textContent = o.title || "";
+        oDlg.querySelector(".u4aWsExitDesc").textContent = o.desc || "";
+        oDlg.querySelector(".u4aWsExitArtFb").innerHTML = o.fallbackIcon || "";
+        oDlg.addEventListener("cancel", (e) => e.preventDefault()); // esc 로 안 닫힘(원본 escapeHandler 빈 함수)
+
+        const oFoot = oDlg.querySelector(".u4aWsExitFoot");
+        (o.buttons || []).forEach((b) => {
+            const oBtn = document.createElement("button");
+            oBtn.type = "button";
+            oBtn.className = "u4a-btn" + (b.emphasized ? " u4a-btn--emphasized" : "");
+            oBtn.textContent = b.text || "";
+            oBtn.addEventListener("click", () => { oDlg.close(); oDlg.remove(); b.onClick(); });
+            oFoot.appendChild(oBtn);
+        });
+
+        document.body.appendChild(oDlg);
+        try { oDlg.showModal(); } catch (e) { }
+
+        const oImg = oDlg.querySelector(".u4aWsExitArtImg");
+        const oFb = oDlg.querySelector(".u4aWsExitArtFb");
+        const sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+        oImg.onload = () => { oImg.style.display = ""; oFb.style.display = "none"; };
+        oImg.onerror = () => { oImg.style.display = "none"; oFb.style.display = ""; };
+        try { oImg.src = new URL(`../svg/${o.imgBase}-${sMode}.svg`, window.location.href).href; } catch (e) { }
+    }
+
+    /********************************************************************
      * 프로그램 종료 질문 팝업 (원본 _showShuttdownAskPopup 대체)
      *  - OK : 전체 자식(MAIN) 프로그램 종료 요청 후, 모두 닫히면 APP.exit()
      *  - CANCEL : 아무것도 하지 않음
@@ -3573,47 +3652,60 @@
         const sMsg = (oAPP.msg.M048 || "Unsaved data will be lost.") + " \n " +
             (oAPP.msg.M049 || "Are you sure you want to exit the Program?");
 
-        oAPP.fn.fnShowMessageBox("C", sMsg, (sAction) => {
-            if (sAction !== "OK") { return; }
-
-            // 종료 진행 동안 busy 오버레이 + 안내 문구로 사용자 인지 ("종료 중… (남은초)")
-            const sExiting = L("exiting");
-            const sBase = sExiting ? sExiting + "…" : "";
-            const _renderBusy = (iSec) => {
-                oAPP.setBusy(true, sBase ? `${sBase} (${iSec}s)` : `(${iSec}s)`);
-            };
-
-            oAPP.fn.fnProgramShuttDown(); // 전체 자식 프로그램 종료 요청
-
-            if (oAPP.attr.windowCloseInterval) {
-                clearInterval(oAPP.attr.windowCloseInterval);
-                delete oAPP.attr.windowCloseInterval;
-            }
-
-            // 자식(MAIN) 창이 모두 닫히면 즉시 종료. 단, 최대 30초까지만 기다리고
-            // 그래도 안 닫힌 창이 있으면 강제로 파기한 뒤 앱을 종료한다(무한 대기 방지).
-            let iLeft = 30;
-            _renderBusy(iLeft);
-            const _finish = () => {
-                clearInterval(oAPP.attr.windowCloseInterval);
-                delete oAPP.attr.windowCloseInterval;
-                APP.exit();
-            };
-            oAPP.attr.windowCloseInterval = setInterval(() => {
-                if (_checkMainProgramExit()) { _finish(); return; }
-
-                iLeft -= 1;
-                if (iLeft <= 0) {
-                    // 30초 경과 — 정상 종료에 응답하지 않는 MAIN 창을 강제 파기 후 종료
-                    console.warn("[shutdown] 30초 경과 — 남은 MAIN 창 강제 종료");
-                    _forceCloseRemainMain();
-                    _finish();
-                    return;
-                }
-                _renderBusy(iLeft);
-            }, 1000);
+        // ★2026-09-07: 원본 그림(sapIllus-Connection, OpenUI5 1.107.1 공식 저장소)을 밝은/어두운
+        //   화면용 2벌 받아 배치(.works/일러스트팝업/build-tnt-illustrations.js). 텍스트만 뜨던 것을
+        //   원본처럼 그림 있는 확인 팝업으로 복원.
+        _showIllustDialog({
+            id: "u4aProgramExitDlg",
+            title: "",
+            desc: sMsg,
+            imgBase: "exit-confirm",
+            fallbackIcon: ICON.confirm,
+            buttons: [
+                { text: T("002") || "OK", emphasized: true, onClick: () => _onShutdownOk() },
+                { text: T("003") || "Cancel", onClick: () => { } },
+            ],
         });
     };
+
+    function _onShutdownOk() {
+        // 종료 진행 동안 busy 오버레이 + 안내 문구로 사용자 인지 ("종료 중… (남은초)")
+        const sExiting = L("exiting");
+        const sBase = sExiting ? sExiting + "…" : "";
+        const _renderBusy = (iSec) => {
+            oAPP.setBusy(true, sBase ? `${sBase} (${iSec}s)` : `(${iSec}s)`);
+        };
+
+        oAPP.fn.fnProgramShuttDown(); // 전체 자식 프로그램 종료 요청
+
+        if (oAPP.attr.windowCloseInterval) {
+            clearInterval(oAPP.attr.windowCloseInterval);
+            delete oAPP.attr.windowCloseInterval;
+        }
+
+        // 자식(MAIN) 창이 모두 닫히면 즉시 종료. 단, 최대 30초까지만 기다리고
+        // 그래도 안 닫힌 창이 있으면 강제로 파기한 뒤 앱을 종료한다(무한 대기 방지).
+        let iLeft = 30;
+        _renderBusy(iLeft);
+        const _finish = () => {
+            clearInterval(oAPP.attr.windowCloseInterval);
+            delete oAPP.attr.windowCloseInterval;
+            APP.exit();
+        };
+        oAPP.attr.windowCloseInterval = setInterval(() => {
+            if (_checkMainProgramExit()) { _finish(); return; }
+
+            iLeft -= 1;
+            if (iLeft <= 0) {
+                // 30초 경과 — 정상 종료에 응답하지 않는 MAIN 창을 강제 파기 후 종료
+                console.warn("[shutdown] 30초 경과 — 남은 MAIN 창 강제 종료");
+                _forceCloseRemainMain();
+                _finish();
+                return;
+            }
+            _renderBusy(iLeft);
+        }, 1000);
+    }
 
     /** 전체 프로그램 종료 요청 (IPC — 원본 PRCCD "04" 유지) */
     oAPP.fn.fnProgramShuttDown = function () {

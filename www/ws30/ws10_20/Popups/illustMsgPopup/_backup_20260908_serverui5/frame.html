@@ -58,8 +58,8 @@
         var oScript = document.createElement("script");
         oScript.id = "sap-ui-bootstrap";
 
-        // ★ UI5 부트 소스 = UI5LIB_WSSRC. [2026-09-08 장군님 지시] 개발(APP.isPackaged=false)=resourceUrl(CDN) 원본 그대로 /
-        //   ★패키지에서만★ index.js 가 WSSRC 에 서버 UI5(UI5LIB_SSRC)를 넣는다(패키지에 로컬 UI5 미탑재). 아래 선례 참고.
+        // ★ UI5 부트 소스 = 원본 그대로 UI5LIB_WSSRC(=resourceUrl).
+        //   dev(APP.isPackaged=false)에서는 resourceUrl=testResource(원격 UI5 CDN, sap-ui-core.js)라 검증된 URL.
         //   ※ 한때 UI5LIB_SSRC(sServerHost+LIBPATH)로 바꿨더니 sap 이 안 떠서 frame.js 크래시 → 바깥 프레임까지
         //     백지가 됐음(200 오응답이면 onerror 도 안 떠 오류 다이얼로그도 없음). 원본 설계=frame.js:WSSRC /
         //     selectSAP:SSRC 분리 로 원복. (selectSAP.html 은 원본대로 SSRC 유지 = KEEP-UI5)

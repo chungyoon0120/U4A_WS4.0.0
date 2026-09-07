@@ -3691,14 +3691,9 @@
             oDlg = document.createElement("dialog");
             oDlg.id = sDialogId;
             oDlg.className = "u4aWsProgDlg";
-            // 위성 안테나 로딩 일러스트(www/svg/...) — fnIllustMsgDialogOpen 과 동일 자산/경로 규칙.
-            //   ws_common.js 는 ajax+eval 로드(스크립트 태그 없음)라 host 문서(www/ws30/ws10_20/) 기준.
-            var sArtRel = "../../svg/satellite-antenna-loading-animated.svg";
-            var sArtUrl = sArtRel;
-            try { sArtUrl = new URL(sArtRel, window.location.href).href; } catch (e) { }
             oDlg.innerHTML =
                 '<div class="u4aWsProgCard">' +
-                '<img class="u4aWsProgArt" src="' + sArtUrl + '" alt="" aria-hidden="true"/>' +
+                '<img class="u4aWsProgArt" alt="" aria-hidden="true"/>' +
                 '<div class="u4aWsProgTitle"></div>' +
                 '<div class="u4aWsProgDesc"></div>' +
                 '<div class="u4aWsProgBarWrap"><div class="u4aWsProgBar"></div>' +
@@ -3708,6 +3703,25 @@
             oDlg.addEventListener("cancel", function (e) { e.preventDefault(); });
             document.body.appendChild(oDlg);
         }
+
+        // ★2026-09-07: 원본은 이 팝업(도움말 다운로드 진행률)에 tnt-Systems 그림을 썼다(busy 팝업의
+        //   tnt-Radar 와 다른 그림 — 원본 소스 illustrationType 실측 확인). 그동안은 busy 팝업 그림(위성
+        //   안테나)을 임시로 재사용했었는데, SAP 공식 OpenUI5 저장소(Apache-2.0, 이 앱과 같은 v1.107.1)에서
+        //   tnt-Dialog-Systems.svg 실물을 받아, 실제 CDN(sap/m/themes/{테마}/library.css)에서 확인한
+        //   sap_horizon(밝게)/sap_horizon_dark(어둡게) 색상값을 입혀 www/svg/tnt-systems-light.svg,
+        //   tnt-systems-dark.svg 두 벌로 만들어 교체한다(빌드 스크립트: .works/일러스트팝업/build-tnt-systems-svg.js).
+        //   SAP 원본도 이 그림은 밝게/어둡게 2벌만 있고 그 외 테마 그림은 없어(원본 sap_hcb 테마 확인),
+        //   이 화면의 11개 테마 중 어두운 테마(horizon_dark) 여부만 보고 2벌 중 하나를 고르면 원본과 동일.
+        try {
+            var sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+            var sArtRel = "../../svg/tnt-systems-" + sMode + ".svg";
+            var sArtUrl = new URL(sArtRel, window.location.href).href;
+            var oArtImg = oDlg.querySelector(".u4aWsProgArt");
+            if (oArtImg.getAttribute("data-mode") !== sMode) {
+                oArtImg.src = sArtUrl;
+                oArtImg.setAttribute("data-mode", sMode);
+            }
+        } catch (e) { /* 그림 갱신 실패는 진행률 표시 자체를 막지 않음 */ }
 
         oDlg.querySelector(".u4aWsProgTitle").textContent = oOptions.title || "";
         oDlg.querySelector(".u4aWsProgDesc").textContent = oOptions.description || "";
@@ -3752,8 +3766,10 @@
      * illustrationSize
      */
     // [HTML5] 구 sap.m.IllustratedMessage(tnt-Radar) + sap.m.Dialog → 네이티브 <dialog>.
-    //   위성 안테나 로딩 일러스트(www/svg/satellite-antenna-loading-animated.svg, <img> 로드) +
-    //   제목/설명 카드. sap 의존 제거. SAPGUI 실행 등 진행 안내 모달(IPC if-browser-interconnection).
+    //   ★2026-09-08: 그동안 임시로 쓰던 자체 제작 위성안테나 그림을, SAP 공식 OpenUI5 저장소
+    //   (Apache-2.0, 이 앱과 같은 v1.107.1)에서 받은 tnt-Radar 원본 그림(밝게/어둡게 2벌,
+    //   www/svg/tnt-radar-{light|dark}.svg, 빌드=.works/일러스트팝업/build-tnt-illustrations.js)
+    //   으로 교체. 제목/설명 카드. sap 의존 제거. SAPGUI 실행 등 진행 안내 모달(IPC if-browser-interconnection).
     oAPP.common.fnIllustMsgDialogOpen = (oOptions) => {
         oOptions = oOptions || {};
         var sDialogId = "u4aWsIllustedMsgDialog";
@@ -3793,20 +3809,9 @@
             //   레이더 카드(.u4aWsIllustCard)가 자체 배경·보더·그림자를 다 가지므로 다이얼로그는
             //   순수 컨테이너(.u4aWsIllustDlg)면 충분.
             oDlg.className = "u4aWsIllustDlg";
-            // [HTML5] 위성 안테나 로딩 일러스트(www/svg/satellite-antenna-loading-animated.svg)를
-            //   <img> 로 로드 — SVG 내부 <style>(generic .dish/.scan/.cross 등 클래스·keyframe)이
-            //   문서 전역으로 새어 충돌하는 것을 막기 위함(인라인하면 SVG <style> 이 document 스코프).
-            //   ws_common.js 는 <script src> 가 아니라 ajax+eval 로 로드되므로(스크립트 태그 없음)
-            //   호스트 문서(window.location.href, = www/ws30/ws10_20/) 기준으로 해석한다.
-            //   www/ws30/ws10_20/ → ../../svg/ = www/svg/ (preload 의 "./js/..." 해석과 동일 규칙).
-            var sArtRel = "../../svg/satellite-antenna-loading-animated.svg";
-            var sArtUrl = sArtRel;
-            try { sArtUrl = new URL(sArtRel, window.location.href).href; } catch (e) { }
             oDlg.innerHTML =
                 '<div class="u4aWsIllustCard">' +
-                // 위성 안테나 로딩 일러스트(접시 + 신호파 + 부유 애니메이션) — SVG 내부 CSS 애니메이션은
-                //   <img> 로 로드해도 정상 재생되며 스타일은 이미지 문서에 샌드박스된다.
-                '<img class="u4aWsIllustArt" src="' + sArtUrl + '" alt="" aria-hidden="true"/>' +
+                '<img class="u4aWsIllustArt" alt="" aria-hidden="true"/>' +
                 '<div class="u4aWsIllustTitle"></div>' +
                 '<div class="u4aWsIllustDesc"></div>' +
                 '</div>';
@@ -3814,6 +3819,21 @@
             oDlg.addEventListener("cancel", function (e) { e.preventDefault(); });
             document.body.appendChild(oDlg);
         }
+
+        // ★2026-09-08: 원본 tnt-Radar 그림(SAP 공식 OpenUI5 저장소 실물, sap_horizon/sap_horizon_dark
+        //   색상 실측 적용, .works/일러스트팝업/build-tnt-illustrations.js 빌드) 을 밝은/어두운 화면에 맞춰
+        //   교체. ws_common.js 는 ajax+eval 로 로드되므로(스크립트 태그 없음) 호스트 문서
+        //   (window.location.href, = www/ws30/ws10_20/) 기준으로 상대경로를 해석한다.
+        try {
+            var sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+            var sArtRel = "../../svg/tnt-radar-" + sMode + ".svg";
+            var sArtUrl = new URL(sArtRel, window.location.href).href;
+            var oArtImg = oDlg.querySelector(".u4aWsIllustArt");
+            if (oArtImg.getAttribute("data-mode") !== sMode) {
+                oArtImg.src = sArtUrl;
+                oArtImg.setAttribute("data-mode", sMode);
+            }
+        } catch (e) { /* 그림 갱신 실패는 팝업 표시 자체를 막지 않음 */ }
 
         oDlg.querySelector(".u4aWsIllustTitle").textContent = oOptions.title || "";
         oDlg.querySelector(".u4aWsIllustDesc").textContent = oOptions.description || "";

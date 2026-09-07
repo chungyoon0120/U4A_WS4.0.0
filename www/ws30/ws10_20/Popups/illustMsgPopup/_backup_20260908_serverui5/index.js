@@ -391,16 +391,6 @@ function fnInitLoad() {
         oAPP.UI5LIB_SSRC = oAPP.attr.sServerLibPath;
     }
 
-    // ★[2026-09-08 장군님 지시] ★패키지(APP.isPackaged)일 때만★ 뷰어(frame.html) 부트 소스를 로컬 리소스(resourceUrl) 대신
-    //   서버 UI5(UI5LIB_SSRC = 접속 서버 + LIBPATH, '/zu4a_imp/' 임시로직 포함)로. 패키지에 로컬 UI5 를 더 이상
-    //   싣지 않기 때문(node_modules/U4A 없음 → 뷰어가 못 떠 "통신 오류" 안내). 개발 모드는 원본 설계 그대로
-    //   resourceUrl(CDN) 유지 — 일부러 나눠 둔 설계. UI5 Predefined CSS 팝업(ui5CssPopup_v2/control.js)과 동일 컨셉.
-    //   ※ frame.html 주석의 "예전에 SSRC 로 바꿨다 sap 이 안 떠 백지" 선례 → 지금은 onerror + sap 없음 검사가 있어
-    //     백지 대신 오류 안내 후 닫힌다. 타이머·사전 ping 금지(장군님).
-    if (oAPP.APP.isPackaged) {
-        oAPP.UI5LIB_WSSRC = oAPP.UI5LIB_SSRC;
-    }
-
     oAPP.UI5_LANGU = oAPP.attr.WS_LANGU;
     // ★ 부트스트랩 data-sap-ui-theme 는 UI5 테마명이어야 함(HTML5 키 → UI5명 매핑).
     oAPP.UI5_THEME = oAPP.fn.toUI5Theme(oAPP.attr.sDefTheme);

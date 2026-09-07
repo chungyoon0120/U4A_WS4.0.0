@@ -119,8 +119,12 @@
     </dialog>
     <!-- Busy Indicator End -->
 
-    <!-- Network 연결 해제 시 화면 전체를 막는 카드(원본 wifi 아이콘 유지 + 경과시간·종료/재시작 버튼 보강, 2026-09-07) -->
-    <div id="u4a_neterr" class="u4a_neterr u4a_neterrInactive" tabindex="-1">
+    <!-- Network 연결 해제 시 화면 전체를 막는 카드(원본 wifi 아이콘 유지 + 경과시간·종료 버튼 보강, 2026-09-07)
+         ★[수정 2026-09-08, 장군님 지시] 원본은 그냥 <div> 라 진짜로 막는 게 아니었음 — 탭키를 누르면
+         뒤에 깔린 화면(검색창 등)으로 포커스가 새어나가 배경 요소가 그대로 조작됐다(실측). u4aWsBusyIndicator
+         와 같은 <dialog>+showModal() 방식으로 바꿔 브라우저가 진짜로 뒤를 막게 한다(포커스 가둠은 네이티브
+         제공, 손수 구현 안 함). -->
+    <dialog id="u4a_neterr" class="u4a_neterr" tabindex="-1">
         <div class="u4a_neterrCard">
             <svg class="wifi" viewBox="0 0 40 32">
                 <path d="M17.98 28.12c0-1.1.9-2.02 2.02-2.02s2.02.9 2.02 2.02-.9 2.02-2.02 2.02-2.02-.9-2.02-2.02" />
@@ -142,7 +146,7 @@
                 <button type="button" id="u4a_neterr_exit" class="u4a-btn u4a-btn--negative">CLOSE</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <!-- Page Loading Start -->
     <div id="u4a_main_load" class="u4a_loaders u4a_loadersInactive" style="display: none;">

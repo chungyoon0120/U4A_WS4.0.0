@@ -1464,9 +1464,24 @@ var oAPP = (function () {
         const oIllust = document.getElementById("u4aWsVerIllust");
         if (oIllust) {
             const bDone = (o.ILLUSTTYPE === "sapIllus-SuccessHighFive");
-            // 완료=성공 아이콘, 진행중=공통 busy 스피너(.u4a-busy__spinner, 셸/ServerList 와 동일 이중 링)
-            oIllust.innerHTML = bDone ? ICON.success : '<div class="u4a-busy__spinner"></div>';
-            oIllust.dataset.spin = bDone ? "false" : "true";
+            const sKind = bDone ? "success" : "checking";
+            // ★2026-09-07: 원본 그림(진행중=sapIllus-BeforeSearch/완료=sapIllus-SuccessHighFive,
+            //   OpenUI5 1.107.1 공식 저장소)을 밝은/어두운 화면용 2벌씩 받아 배치
+            //   (.works/일러스트팝업/build-tnt-illustrations.js). 로드 실패시 기존 폴백(스피너/체크 아이콘) 유지.
+            //   다운로드 중엔 퍼센트(TITLE/DESC)만 계속 바뀌므로, kind 가 실제로 바뀔 때만 다시 그린다.
+            if (oIllust.dataset.kind !== sKind) {
+                var sFile = bDone ? "login-success" : "login-checking";
+                var sFallback = bDone ? ICON.success : '<div class="u4a-busy__spinner"></div>';
+                var sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+                oIllust.innerHTML = `<img class="u4a-login__verdlg-illust-img" alt="" aria-hidden="true"/><span class="u4a-login__verdlg-illust-fb">${sFallback}</span>`;
+                oIllust.dataset.kind = sKind;
+                var oImg = oIllust.querySelector(".u4a-login__verdlg-illust-img");
+                var oFb = oIllust.querySelector(".u4a-login__verdlg-illust-fb");
+                oImg.onload = function () { oImg.style.display = ""; oFb.style.display = "none"; };
+                oImg.onerror = function () { oImg.style.display = "none"; oFb.style.display = ""; };
+                oImg.style.display = "none";
+                try { oImg.src = new URL("../../../svg/" + sFile + "-" + sMode + ".svg", window.location.href).href; } catch (e) { }
+            }
         }
     }
     oModel._observers["/BUSYPOP"] = _fnSyncVersionDialog;
@@ -1484,11 +1499,26 @@ var oAPP = (function () {
         oDlg.className = "u4a-dialog u4a-login__noauth";
         oDlg.innerHTML =
             `<div class="u4a-dialog__body u4a-login__noauth-body">` +
-            `<div class="u4a-login__noauth-illust">${ICON.noauth}</div>` +
+            `<div class="u4a-login__noauth-illust">` +
+            `<img class="u4a-login__noauth-illust-img" alt="" aria-hidden="true"/>` +
+            `<span class="u4a-login__noauth-illust-fb">${ICON.noauth}</span>` +
+            `</div>` +
             `<div class="u4a-login__noauth-title">No Authority!</div>` +
             `<div class="u4a-login__noauth-desc"></div>` +
             `</div>` +
             `<div class="u4a-dialog__footer"></div>`;
+        // ★2026-09-07: 원본 그림(tnt-UnsuccessfulAuth, OpenUI5 1.107.1 공식 저장소)을 밝은/어두운
+        //   화면용 2벌로 받아 배치(.works/일러스트팝업/build-tnt-illustrations.js). 기본은 기존 아이콘
+        //   표시, 로드 성공하면 그림으로 교체(파일 없거나 실패해도 아이콘으로 안전 폴백).
+        (function () {
+            var oImg = oDlg.querySelector(".u4a-login__noauth-illust-img");
+            var oFb = oDlg.querySelector(".u4a-login__noauth-illust-fb");
+            var sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+            oImg.onload = function () { oImg.style.display = ""; oFb.style.display = "none"; };
+            oImg.onerror = function () { oImg.style.display = "none"; oFb.style.display = ""; };
+            oImg.style.display = "none";
+            try { oImg.src = new URL("../../../svg/login-noauth-" + sMode + ".svg", window.location.href).href; } catch (e) { }
+        })();
         oDlg.querySelector(".u4a-login__noauth-desc").textContent = sMsg || "";
         oDlg.addEventListener("cancel", (e) => e.preventDefault());
         const oOk = document.createElement("button");
