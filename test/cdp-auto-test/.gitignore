@@ -1,0 +1,3 @@
+logs/*.log
+!logs/.gitkeep
+node_modules/

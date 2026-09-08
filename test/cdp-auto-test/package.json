@@ -1,0 +1,15 @@
+{
+  "name": "cdp-auto-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "U4A Workspace 실행 중 화면에 CDP로 붙어 단축키 반복 자동화 테스트",
+  "main": "edit-back-loop.js",
+  "scripts": {
+    "probe": "node probe.js",
+    "start": "node edit-back-loop.js",
+    "test": "node --test lib/*.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.13.0"
+  }
+}
