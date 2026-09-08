@@ -88,13 +88,13 @@ async function runWindowLoop(page, label) {
         while (running) {
             cycleNo++;
 
-            const alive = await isWindowAlive(DEBUG_HOST, page.id);
-            if (!alive) {
-                logger.error(`${label} [화면크래시] 창이 사라졌다 — 사이클 ${cycleNo} 시작 전. 이 창의 반복을 종료한다.`);
-                break;
-            }
-
             try {
+                const alive = await isWindowAlive(DEBUG_HOST, page.id);
+                if (!alive) {
+                    logger.error(`${label} [화면크래시] 창이 사라졌다 — 사이클 ${cycleNo} 시작 전. 이 창의 반복을 종료한다.`);
+                    break;
+                }
+
                 await runCycle(page, label, cycleNo);
             } catch (e) {
                 logger.error(`${label} 사이클 ${cycleNo} 중 자동화 스크립트 예외: ${e && e.stack ? e.stack : e}`);
