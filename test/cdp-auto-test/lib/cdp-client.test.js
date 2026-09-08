@@ -39,3 +39,21 @@ test('parseKeySpec("Escape")은 Escape 키를 만든다', () => {
     assert.strictEqual(spec.code, 'Escape');
     assert.strictEqual(spec.windowsVirtualKeyCode, 27);
 });
+
+const { classifyConsoleEntry, describeException } = require('./cdp-client');
+
+test('classifyConsoleEntry는 type이 error일 때만 오류로 본다', () => {
+    const errorEntry = classifyConsoleEntry({ type: 'error', args: [{ value: '문제 발생' }] });
+    assert.strictEqual(errorEntry.isError, true);
+    assert.match(errorEntry.text, /문제 발생/);
+
+    const logEntry = classifyConsoleEntry({ type: 'log', args: [{ value: '그냥 로그' }] });
+    assert.strictEqual(logEntry.isError, false);
+});
+
+test('describeException은 예외 문구를 사람이 읽을 문자열로 만든다', () => {
+    const text = describeException({
+        exceptionDetails: { text: 'Uncaught', exception: { description: 'TypeError: x is not a function' } }
+    });
+    assert.match(text, /TypeError: x is not a function/);
+});

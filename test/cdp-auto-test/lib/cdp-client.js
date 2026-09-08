@@ -143,10 +143,75 @@ async function dispatchKey(page, keySpec) {
     ws.close();
 }
 
+function classifyConsoleEntry(params) {
+    const isError = params && params.type === 'error';
+    const text = ((params && params.args) || [])
+        .map((a) => (a && (a.value || a.description)) || '')
+        .filter(Boolean)
+        .join(' ');
+    return { isError, text: text || '(내용 없음)' };
+}
+
+function describeException(params) {
+    const details = (params && params.exceptionDetails) || {};
+    const desc = details.exception && details.exception.description;
+    return desc || details.text || '(알 수 없는 예외)';
+}
+
+async function watchErrors(page, handlers) {
+    const ws = new WebSocket(page.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => {
+        ws.on('open', resolve);
+        ws.on('error', reject);
+    });
+
+    ws.on('message', (data) => {
+        let msg;
+        try {
+            msg = JSON.parse(data);
+        } catch (e) {
+            return;
+        }
+
+        if (msg.method === 'Runtime.consoleAPICalled') {
+            const { isError, text } = classifyConsoleEntry(msg.params);
+            if (isError) {
+                handlers.onConsoleError(text);
+            }
+        } else if (msg.method === 'Runtime.exceptionThrown') {
+            handlers.onScriptError(describeException(msg.params));
+        }
+    });
+
+    let id = 0;
+    const send = (m) => {
+        const myId = ++id;
+        ws.send(JSON.stringify({ id: myId, ...m }));
+    };
+
+    send({ method: 'Runtime.enable' });
+
+    return {
+        close: () => ws.close()
+    };
+}
+
+async function isWindowAlive(debugHost, targetId) {
+    const list = await listTargets(debugHost);
+    if (!list) {
+        return false;
+    }
+    return list.some((x) => x.id === targetId);
+}
+
 module.exports = {
     listTargets,
     pickMainWindow,
     parseKeySpec,
     evalOnPage,
-    dispatchKey
+    dispatchKey,
+    classifyConsoleEntry,
+    describeException,
+    watchErrors,
+    isWindowAlive
 };
