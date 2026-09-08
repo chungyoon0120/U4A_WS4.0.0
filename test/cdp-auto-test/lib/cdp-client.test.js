@@ -57,3 +57,23 @@ test('describeException은 예외 문구를 사람이 읽을 문자열로 만든
     });
     assert.match(text, /TypeError: x is not a function/);
 });
+
+const { pickMainWindows } = require('./cdp-client');
+
+test('pickMainWindows는 #Main 타이틀을 가진 page 타입을 전부 고른다', () => {
+    const list = [
+        { type: 'page', title: 'U4A Workspace #ServerList', id: 'a' },
+        { type: 'page', title: 'U4A Workspace #Main', id: 'b' },
+        { type: 'page', title: 'U4A Workspace #Main', id: 'c' },
+        { type: 'iframe', title: 'U4A Workspace #Main', id: 'd' }
+    ];
+
+    const picked = pickMainWindows(list);
+    assert.strictEqual(picked.length, 2);
+    assert.deepStrictEqual(picked.map((p) => p.id), ['b', 'c']);
+});
+
+test('#Main이 없으면 빈 배열을 돌려준다', () => {
+    const picked = pickMainWindows([{ type: 'page', title: 'U4A Workspace #ServerList', id: 'a' }]);
+    assert.deepStrictEqual(picked, []);
+});

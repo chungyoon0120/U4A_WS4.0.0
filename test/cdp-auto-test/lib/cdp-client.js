@@ -17,6 +17,13 @@ function pickMainWindow(list) {
     return found || null;
 }
 
+function pickMainWindows(list) {
+    if (!Array.isArray(list)) {
+        return [];
+    }
+    return list.filter((x) => x && x.type === 'page' && /#Main/.test(x.title || ''));
+}
+
 const WebSocket = require('ws');
 
 // CDP Input.dispatchKeyEvent 의 modifiers 비트: Alt=1, Ctrl=2, Meta/Cmd=4, Shift=8
@@ -207,6 +214,7 @@ async function isWindowAlive(debugHost, targetId) {
 module.exports = {
     listTargets,
     pickMainWindow,
+    pickMainWindows,
     parseKeySpec,
     evalOnPage,
     dispatchKey,
