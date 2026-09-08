@@ -46,7 +46,7 @@
   function _fa(s) { return '<i class="fa-solid fa-' + s + '"></i>'; }
   function _txt(sCls, sCode, p1, p2, p3, p4) {
     try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
   function _el(sTag, sClass, sText) {
     var o = document.createElement(sTag);
@@ -58,7 +58,7 @@
   // 현재 화면 편집모드 여부(원본 /WS20/APP/IS_EDIT 바인딩 대응).
   function _isEdit() {
     try { var o = APPCOMMON.fnGetModelProperty("/WS20/APP"); return !!(o && o.IS_EDIT === "X"); }
-    catch (e) { return false; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
   }
 
   // 셸 테마(다크/라이트)에 맞춰 Monaco 빌트인 테마 선택 — body 배경 휘도로 판정(토큰 비결합).
@@ -69,7 +69,7 @@
       if (!m) { return "vs-dark"; }
       var lum = 0.299 * (+m[1]) + 0.587 * (+m[2]) + 0.114 * (+m[3]);
       return lum < 128 ? "vs-dark" : "vs";
-    } catch (e) { return "vs-dark"; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return "vs-dark"; }
   }
 
   // T_CEVT 배열 보장(쓰기 전 가드).
@@ -102,14 +102,14 @@
   function lf_busyOn() {
     if (bBusy) { return; }
     bBusy = true;
-    try { parent.setBusy("X"); } catch (e) { }
-    try { oAPP.fn.setShortcutLock(true); } catch (e) { }
+    try { parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
   function lf_busyOff() {
     if (!bBusy) { return; }
     bBusy = false;
-    try { parent.setBusy(""); } catch (e) { }
-    try { oAPP.fn.setShortcutLock(false); } catch (e) { }
+    try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 호스트(iframe)로 명령 전송.
@@ -119,7 +119,7 @@
       oMsg.__u4ace = true;
       oMsg.hostId = C_HOSTID;
       if (oUI && oUI.frame && oUI.frame.contentWindow) { oUI.frame.contentWindow.postMessage(oMsg, "*"); }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 현재 스크립트 값(T_CEVT 에서 OBJID/OBJTY 매칭) — 상태는 oState 에서 읽는다.
@@ -128,16 +128,16 @@
       var a = _ensureCevt();
       var o = a.find(function (x) { return x && x.OBJID === oState.sObjId && x.OBJTY === oState.sObjTy; });
       return (o && typeof o.DATA === "string") ? o.DATA : "";
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
 
   function lf_readEditor() {
-    try { return oUI.frame.contentWindow.editor.getValue(); } catch (e) { return null; }
+    try { return oUI.frame.contentWindow.editor.getValue(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
   }
 
   function lf_toastSaved() {
     // 002 Saved success
-    try { parent.showMessage(null, 10, "S", _txt("/U4A/MSG_WS", "002")); } catch (e) { }
+    try { parent.showMessage(null, 10, "S", _txt("/U4A/MSG_WS", "002")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 저장(원본 ev_pressClientEditorSave 1:1) — 상태는 oState 에서 읽는다.
@@ -154,10 +154,10 @@
       // 입력값 없음 — 기존 라인 있으면 삭제(원본 ev_pressClientEditorSave 1:1).
       if (iIdx >= 0) {
         aCevt.splice(iIdx, 1);
-        try { parent.setAppChange("X"); } catch (e) { }
+        try { parent.setAppChange("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       }
       lf_toastSaved();   // 빈 값이어도 저장 완료 토스트(사용자 지시).
-      if (typeof oState.fnCallback === "function") { try { oState.fnCallback(""); } catch (e) { } }
+      if (typeof oState.fnCallback === "function") { try { oState.fnCallback(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
       return;
     }
 
@@ -168,9 +168,9 @@
     } else {
       aCevt.push({ OBJID: oState.sObjId, OBJTY: oState.sObjTy, DATA: sVal });
     }
-    try { parent.setAppChange("X"); } catch (e) { }
+    try { parent.setAppChange("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     lf_toastSaved();
-    if (typeof oState.fnCallback === "function") { try { oState.fnCallback("X"); } catch (e) { } }
+    if (typeof oState.fnCallback === "function") { try { oState.fnCallback("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
   }
 
   // 삭제(원본 ev_pressClientEditorDel) — 에디터 내용만 비움. 비움도 기준값과 달라지므로(비교 방식)
@@ -197,19 +197,19 @@
       ta.select();
       bOk = document.execCommand("copy");
       if (ta.parentNode) { ta.parentNode.removeChild(ta); }
-    } catch (e) { bOk = false; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bOk = false; }
     if (!bOk) {
-      try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(sVal); bOk = true; } } catch (e) { }
+      try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(sVal); bOk = true; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
-    if (bOk) { try { parent.showMessage(null, 10, "S", _txt("/U4A/MSG_WS", "303")); } catch (e) { } }   // Clipboard Copy Success!
+    if (bOk) { try { parent.showMessage(null, 10, "S", _txt("/U4A/MSG_WS", "303")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }   // Clipboard Copy Success!
   }
 
   // 팝업 닫기 — ★제거하지 않고 숨기기만★(재사용). busy 해제. 리스너/iframe 은 유지.
   function lf_close() {
-    try { clearTimeout(iWatch); } catch (e) { }
+    try { clearTimeout(iWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oUI) { oUI._askingClose = false; }
     lf_busyOff();
-    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 미저장 변경 여부 — 표시(읽기)모드 항상 false. 로딩(값 주입) 중에도 false(비교 무의미).
@@ -237,7 +237,7 @@
         if (oUI) { oUI._askingClose = false; }
         if (sAct === "YES") { lf_close(); }
       });
-    } catch (e) { if (oUI) { oUI._askingClose = false; } lf_close(); }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } if (oUI) { oUI._askingClose = false; } lf_close(); }
   }
 
   // 현재 oState 를 에디터에 반영(언어/readonly/값/포커스).
@@ -265,12 +265,12 @@
     if (!d || d.__u4ace !== true || d.hostId !== C_HOSTID) { return; }
     if (d.evt === "ready") {
       if (oUI) { oUI.ready = true; }
-      try { clearTimeout(iWatch); } catch (e) { }
+      try { clearTimeout(iWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       lf_applyContent();   // 최초 로드 완료 → 현재 oState 기준 값/포커스 주입.
       lf_busyOff();
       return;
     }
-    if (d.evt === "applied") { oState.bLoading = false; try { clearTimeout(iLoadGuard); } catch (e) { } return; }   // 값 주입 완료 → busy(로딩) 해제.
+    if (d.evt === "applied") { oState.bLoading = false; try { clearTimeout(iLoadGuard); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }   // 값 주입 완료 → busy(로딩) 해제.
     if (d.evt === "zoom") { lf_setZoom(d.pct); return; }
     if (d.evt === "save") {
       // 에디터 한정 Ctrl+S → 저장(✓) 위임. 편집모드일 때만(표시모드는 ✓ 자체가 숨김 = 저장 불가).
@@ -347,6 +347,7 @@
       var _PATHINFO = parent.require(_PATH.join(parent.APPPATH, "ws30", "resources", "pathInfo.js"));
       sHostSrc = _PATH.join(_PATHINFO.JS_ROOT, "codeeditor", "index.html");
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
       sHostSrc = "./js/codeeditor/index.html";   // 폴백(상대 — 문서 base 가 ws10_20/index.html 일 때).
     }
     oFrame.src = sHostSrc + "?PARAMS=" + oQuery;
@@ -441,8 +442,8 @@
     // 영속 리스너 — 다이얼로그가 세션 동안 살아있으므로 1회만 등록(누적 없음).
     window.addEventListener("message", lf_onMessage);
     //  발행 window 가 WS20 프레임/셸 중 어디일지 확정적이지 않아 둘 다 구독(file:// 동일 출처).
-    try { window.addEventListener("u4a-theme-changed", lf_onThemeChange); } catch (e) { }
-    try { if (window.parent) { window.parent.addEventListener("u4a-theme-changed", lf_onThemeChange); } } catch (e) { }
+    try { window.addEventListener("u4a-theme-changed", lf_onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (window.parent) { window.parent.addEventListener("u4a-theme-changed", lf_onThemeChange); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     oUI = {
       dlg: oDlg, frame: oFrame, headerTitle: oHeaderTitle,
@@ -484,7 +485,7 @@
 
     // busy(로딩) ON — 값 주입 완료('applied') 까지 ESC 무시. ack 유실 대비 안전 타임아웃.
     oState.bLoading = true;
-    try { clearTimeout(iLoadGuard); } catch (e) { }
+    try { clearTimeout(iLoadGuard); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     iLoadGuard = setTimeout(function () { oState.bLoading = false; }, 5000);
 
     // 최초 1회만 생성(혹시 DOM 에서 사라졌으면 재생성).
@@ -505,11 +506,11 @@
     } else {
       // 최초 로드 — ready 메시지에서 반영. 로드 동안 busy + 워치독(영구 busy 방지).
       lf_busyOn();
-      try { clearTimeout(iWatch); } catch (e) { }
+      try { clearTimeout(iWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       iWatch = setTimeout(lf_busyOff, 8000);
     }
 
-    if (!oUI.dlg.open) { try { oUI.dlg.showModal(); } catch (e) { } }
+    if (!oUI.dlg.open) { try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
   }; // end of oAPP.fn.fnClientJsEditorPopup
 

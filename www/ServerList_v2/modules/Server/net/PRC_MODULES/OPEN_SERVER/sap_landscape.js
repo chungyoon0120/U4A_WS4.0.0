@@ -57,6 +57,7 @@
                     }
                     return current;
                 } catch (error) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                     return undefined;
                 }
             };
@@ -139,6 +140,7 @@
             return directParentUuid;
     
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             
             return undefined;
 
@@ -192,6 +194,7 @@
                 });
     
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
     
                 // 예상치 못한 오류 발생시 undefined 출력
                 return resolve();

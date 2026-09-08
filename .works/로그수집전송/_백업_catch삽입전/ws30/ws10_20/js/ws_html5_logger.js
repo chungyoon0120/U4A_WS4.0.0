@@ -1,0 +1,996 @@
+/****************************************************************************************
+ * 공통 로그 함수 (화면 쪽)
+ * --------------------------------------------------------------------------------------
+ * 오류코드 접두: ULOG / 다음 번호: 003
+ *
+ * 왜 만들었나 (2026-09-08)
+ *   지금은 화면마다 제각각으로 로그를 남겨 모양이 다르다.
+ *   AI 가 로그만 보고 원인을 짚으려면 줄 모양이 매번 같아야 한다.
+ *   기준 = .works/로그수집전송/02_로그설계표준.md
+ *
+ * 줄 모양
+ *   [등급] [창] [화면] [추적ID] 무슨 일 | 대상 | 결과 | 걸린 시간
+ *   예) [알림] [메인] [화면목록] [A7F3] 눌렀음 | 편집 | 화면 이동 시작
+ *
+ * 어떻게 파일에 남나
+ *   기존 로그 라이브러리가 창의 console 을 갈아끼워 두었다.
+ *   그래서 여기서 console 을 부르면 그대로 로그 파일에 쌓인다. 새로 만든 통로가 아니다.
+ *
+ * 쓰는 법
+ *   U4ALOG.setWindow('메인');            // 창 이름 (창마다 한 번)
+ *   U4ALOG.setScreen('화면목록');         // 화면이 바뀔 때마다
+ *   var sTrace = U4ALOG.newTrace();      // 사용자가 뭔가 시작할 때
+ *   U4ALOG.action('눌렀음', '편집', '화면 이동 시작');
+ *   U4ALOG.server('보냈음', '화면정보 조회', '성공', 810);
+ *   U4ALOG.error('터짐', '없는 값을 꺼내 씀: 화면정보', oError);
+ ****************************************************************************************/
+
+(function (global) {
+
+    'use strict';
+
+    if (global.U4ALOG) {
+        return;   // 이미 올라와 있으면 두 번 만들지 않는다
+    }
+
+    /* ================================================================= */
+    /* 안쪽 상태
+    /* ================================================================= */
+    var _sWindowName = '';      // 창 이름
+    var _sScreenName = '';      // 지금 화면 이름
+    var _sTraceId = '';         // 지금 작업의 추적 ID
+    var _iLastActionAt = 0;     // 앞 조작 시각(간격 계산용)
+
+    /**
+     * 잡고 넘어간 오류를 자리별로 몇 번 났는지 센다 (2026-09-08)
+     * 같은 자리가 수천 번 걸려도 로그가 터지지 않게 하려는 것.
+     */
+    var _oCaughtCount = {};
+    var CAUGHT_FIRST = 3;      // 처음 3번은 그대로 남긴다
+    var CAUGHT_EVERY = 100;    // 그 뒤로는 100번마다 한 번
+
+    var MAX_LINE = 1000;        // 한 줄 최대 길이(너무 길면 뒤를 자른다)
+
+    /* ================================================================= */
+    /* 창 이름·화면 이름을 스스로 알아낸다 (2026-09-08 추가)
+    /* -----------------------------------------------------------------
+    /* 왜 바꿨나
+    /*   앞서는 화면마다 이름을 알려 주게 만들었는데, 아무도 부르지 않아
+    /*   실제 로그가 전부 '창미상 / 화면미상' 으로 나왔다(실측).
+    /*   화면마다 한 줄씩 넣는 방식은 반드시 빠뜨린다. 그래서 스스로 알아내게 바꾼다.
+    /*
+    /* 어떻게 알아내나
+    /*   창 이름 = 맨 위 창의 제목. 틀 안 화면이면 '(창제목) 안'.
+    /*   화면 이름 = 이 문서의 제목, 없으면 주소의 파일 이름.
+    /* ================================================================= */
+    function _clip(s, n) {
+        s = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+        return (s.length > n) ? (s.slice(0, n) + '…') : s;
+    }
+
+    /** 창 이름 — 맨 위 창의 제목을 쓴다 */
+    function _detectWindowName() {
+
+        var sTop = '';
+
+        try {
+            sTop = (window.top && window.top.document) ? (window.top.document.title || '') : '';
+        } catch (e) {
+            sTop = '';   // 맨 위 창을 못 읽는 경우
+        }
+
+        if (!sTop) {
+            try { sTop = document.title || ''; } catch (e) { }
+        }
+
+        sTop = _clip(sTop, 40);
+
+        // 틀 안 화면이면 어느 창 안인지까지 밝힌다
+        var bInFrame = false;
+
+        try { bInFrame = (window.top !== window); } catch (e) { bInFrame = true; }
+
+        if (!sTop) { return bInFrame ? '틀 안 화면' : '창'; }
+
+        return bInFrame ? (sTop + ' 안') : sTop;
+
+    }
+
+    /** 화면 이름 — 문서 제목, 없으면 주소의 파일 이름 */
+    function _detectScreenName() {
+
+        var s = '';
+
+        try { s = document.title || ''; } catch (e) { }
+
+        if (s) { return _clip(s, 40); }
+
+        try {
+
+            var sPath = (location && location.pathname) ? location.pathname : '';
+            var aSeg = sPath.split('/').filter(function (x) { return x; });
+
+            if (aSeg.length === 0) { return ''; }
+
+            var sLast = aSeg[aSeg.length - 1];
+
+            // index.html / frame.html 처럼 흔한 이름이면 한 단계 위 폴더 이름을 쓴다
+            if (/^(index|frame|main)\./i.test(sLast) && aSeg.length >= 2) {
+                return _clip(aSeg[aSeg.length - 2], 40);
+            }
+
+            return _clip(sLast.replace(/\.[^.]+$/, ''), 40);
+
+        } catch (e) {
+            return '';
+        }
+
+    }
+
+    /* ================================================================= */
+    /* 추적 ID 만들기 — 짧고 읽기 쉬운 4글자
+    /* ================================================================= */
+    function _makeTraceId() {
+
+        var sChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // 헷갈리는 글자(I,O,0,1) 제외
+        var s = '';
+
+        for (var i = 0; i < 4; i++) {
+            s += sChars.charAt(Math.floor(Math.random() * sChars.length));
+        }
+
+        return s;
+
+    }
+
+    /* ================================================================= */
+    /* 이 줄을 남긴 자리 (2026-09-08 추가 — 장군님 지시)
+    /* -----------------------------------------------------------------
+    /* 왜 넣었나
+    /*   이 로그는 사람이 읽으려는 게 아니라 AI 에게 그대로 줘서
+    /*   소스를 열고 고치게 하려고 남긴다. 그런데 "화면 이동" 같은 말만 있고
+    /*   그 줄을 남긴 코드가 어디인지가 없어 소스 전체를 뒤져야 했다.
+    /*
+    /* 어떻게 뽑나
+    /*   지금 자리를 스스로 물어보고, 그 목록에서 이 파일이 아닌 첫 자리를 고른다.
+    /*   = 로그를 부른 진짜 코드 자리.
+    /* ================================================================= */
+    var MY_FILE = 'ws_html5_logger.js';
+
+    /** 설치 폴더 경로를 프로젝트 기준으로 줄인다 */
+    function _shortPath(sFile) {
+
+        try {
+
+            var s2 = String(sFile);
+
+            // 뒤에 붙은 :줄:칸 은 떼어 두었다가 다시 붙인다(그게 있어야 그 줄을 연다)
+            var sTail = '';
+            var mTail = s2.match(/(:\d+(?::\d+)?)$/);
+
+            if (mTail) {
+                sTail = mTail[1];
+                s2 = s2.slice(0, s2.length - sTail.length);
+            }
+
+            // .../app.asar/www/... → www/...  (설치한 앱)
+            var m = s2.match(/(?:app\.asar[\\/])?(www[\\/].+)$/);
+            if (m) { return m[1].replace(/\\/g, '/') + sTail; }
+
+            // 그 외에는 파일 이름만
+            var m2 = s2.match(/([^\\/]+\.(?:js|html))$/);
+            return (m2 ? m2[1] : s2) + sTail;
+
+        } catch (e) {
+            return String(sFile);
+        }
+
+    }
+
+    /** 로그를 부른 진짜 코드 자리 — "파일:줄 함수()" */
+    function _callSite() {
+
+        try {
+
+            var aStack = String(new Error().stack || '').split('\n');
+
+            for (var i = 1; i < aStack.length; i++) {
+
+                var sLine = aStack[i];
+
+                // 이 파일 안에서 부른 것은 건너뛴다 — 진짜 부른 쪽을 찾는다
+                if (sLine.indexOf(MY_FILE) >= 0) { continue; }
+                if (sLine.indexOf('at Error') >= 0) { continue; }
+
+                // 파일 이름이 안 나오는 곳에서도 로그 함수 자신은 걸러낸다
+                if (/at\s+(_callSite|_buildLine|_write|_screenState|_logClick|Object\.(info|warn|error|fatal|action|server))\b/.test(sLine)) { continue; }
+
+                // 프로그램 안쪽 줄은 뺀다
+                if (sLine.indexOf('node:internal') >= 0) { continue; }
+
+                // "at 함수이름 (파일:줄:칸)"
+                var m = sLine.match(/at\s+([^\s(]+)\s+\((.+):(\d+):(\d+)\)/);
+                if (m) { return _shortPath(m[2]) + ':' + m[3] + ' ' + m[1] + '()'; }
+
+                // "at 파일:줄:칸"
+                m = sLine.match(/at\s+(.+):(\d+):(\d+)/);
+                if (m) { return _shortPath(m[1]) + ':' + m[2]; }
+
+            }
+
+            return '';
+
+        } catch (e) {
+            return '';
+        }
+
+    }
+
+    /** 오류가 터진 자리 전체 — 경로를 프로젝트 기준으로 줄여 읽기 쉽게 */
+    function _shortStack(sStack) {
+
+        try {
+
+            var aOut = [];
+            var aIn = String(sStack).split('\n');
+
+            for (var i = 0; i < aIn.length && aOut.length < 12; i++) {
+
+                var L = aIn[i];
+
+                // 프로그램 안쪽 줄은 원인과 무관하다 — 뺀다
+                if (L.indexOf('node:internal') >= 0) { continue; }
+                if (L.indexOf('chrome-extension:') >= 0) { continue; }
+
+                aOut.push(L.replace(/\(?((?:[A-Za-z]:[\\/]|file:\/\/)[^)\s]+)\)?/g, function (whole, p1) {
+                    return '(' + _shortPath(p1) + ')';
+                }));
+
+            }
+
+            return aOut.join('\n');
+
+        } catch (e) {
+            return String(sStack);
+        }
+
+    }
+
+    /**
+     * 터진 자리 중 **맨 처음** 자리 하나 (2026-09-08 추가)
+     * 오류 줄 한 줄만 봐도 어느 파일 몇 번째 줄인지 알게 하려는 것.
+     */
+    function _crashSite(oError) {
+
+        try {
+
+            var aStack = String(oError && oError.stack || '').split('\n');
+
+            for (var i = 0; i < aStack.length; i++) {
+
+                var L = aStack[i];
+
+                if (L.indexOf(' at ') < 0 && L.indexOf('at ') !== 0 && L.trim().indexOf('at ') !== 0) { continue; }
+                if (L.indexOf('node:internal') >= 0) { continue; }
+                if (L.indexOf(MY_FILE) >= 0) { continue; }
+
+                var m = L.match(/at\s+([^\s(]+)\s+\((.+):(\d+):(\d+)\)/);
+                if (m) { return _shortPath(m[2]) + ':' + m[3] + ' ' + m[1] + '()'; }
+
+                m = L.match(/at\s+(.+):(\d+):(\d+)/);
+                if (m) { return _shortPath(m[1]) + ':' + m[2]; }
+
+            }
+
+            return '';
+
+        } catch (e) {
+            return '';
+        }
+
+    }
+
+    /* ================================================================= */
+    /* 한 줄 만들기
+    /* ================================================================= */
+    function _buildLine(sLevel, sWhat, sTarget, sResult, iElapsedMs, bWithGap) {
+
+        var aCol = [];
+
+        // 이름이 비어 있으면 그 자리에서 알아낸다 (화면마다 알려 주지 않아도 되게)
+        if (!_sWindowName) {
+            try { _sWindowName = _detectWindowName(); } catch (e) { }
+        }
+
+        if (!_sScreenName) {
+            try { _sScreenName = _detectScreenName(); } catch (e) { }
+        }
+
+        /**
+         * 추적 번호가 비어 있으면 그 자리에서 하나 뽑는다 (2026-09-08 보완).
+         * 앞서는 버튼을 누를 때만 뽑게 해서, 앱이 스스로 하는 일(화면이 뜨면서 자동으로
+         * 나가는 요청 등)에는 번호가 없었다. 실제 로그의 번호 자리가 계속 비어 있었다.
+         */
+        if (!_sTraceId) {
+            _sTraceId = _makeTraceId();
+        }
+
+        aCol.push('[' + sLevel + ']');
+        aCol.push('[' + (_sWindowName || '창미상') + ']');
+        aCol.push('[' + (_sScreenName || '화면미상') + ']');
+        aCol.push('[' + _sTraceId + ']');
+
+        var sBody = sWhat || '';
+
+        if (sTarget) {
+            sBody += ' | ' + sTarget;
+        }
+
+        if (sResult) {
+            sBody += ' | ' + sResult;
+        }
+
+        if (typeof iElapsedMs === 'number' && iElapsedMs >= 0) {
+            sBody += ' | ' + (iElapsedMs / 1000).toFixed(1) + '초';
+        }
+
+        // 앞 조작과의 간격 — 사용자 조작에만 붙인다
+        if (bWithGap && _iLastActionAt) {
+            var iGap = Date.now() - _iLastActionAt;
+            sBody += ' | 앞 조작 ' + (iGap / 1000).toFixed(1) + '초 뒤';
+        }
+
+        var sLine = aCol.join(' ') + ' ' + sBody;
+
+        if (sLine.length > MAX_LINE) {
+            sLine = sLine.slice(0, MAX_LINE) + ' …(줄이 길어 잘림)';
+        }
+
+        // ★그 줄을 남긴 코드 자리 — 이게 있어야 AI 가 소스를 바로 연다(2026-09-08)
+        var sAt = _callSite();
+
+        if (sAt) {
+            sLine += ' @ ' + sAt;
+        }
+
+        return sLine;
+
+    }
+
+    /* ================================================================= */
+    /* 실제로 남기기
+    /*  - 로그 남기다 앱이 죽으면 안 되므로 여기서만 감싼다.
+    /* ================================================================= */
+    function _write(sLevel, sLine) {
+
+        try {
+
+            if (sLevel === '오류' || sLevel === '치명') {
+                console.error(sLine);
+                return;
+            }
+
+            if (sLevel === '주의') {
+                console.warn(sLine);
+                return;
+            }
+
+            console.log(sLine);
+
+        } catch (e) {
+            // 여기서 또 터지면 남길 데가 없다. 조용히 넘어가되 앱은 계속 간다.
+        }
+
+    }
+
+    /* ================================================================= */
+    /* 버튼 누름 자동 기록 — 안쪽 함수들
+    /* ================================================================= */
+    var _bClickLogInstalled = false;
+
+    var MAX_NAME = 40;      // 이름이 길면 잘라 쓴다
+
+    /** 글자를 한 줄로 다듬는다 */
+    function _clean(s) {
+
+        if (!s) { return ''; }
+
+        s = String(s).replace(/\s+/g, ' ').trim();
+
+        if (s.length > MAX_NAME) {
+            s = s.slice(0, MAX_NAME) + '…';
+        }
+
+        return s;
+
+    }
+
+    /** 누른 것이 무엇인지 이름을 알아낸다 */
+    function _nameOf(el) {
+
+        if (!el) { return ''; }
+
+        // ① 미리 붙여 둔 이름표가 있으면 그것을 최우선으로
+        var sMark = el.getAttribute ? el.getAttribute('data-log-name') : '';
+        if (sMark) { return _clean(sMark); }
+
+        // ② 버튼에 적힌 글자
+        var sText = _clean(el.innerText || el.textContent || '');
+        if (sText) { return sText; }
+
+        // ③ 마우스 올렸을 때 뜨는 설명
+        var sTitle = el.getAttribute ? (el.getAttribute('title') || '') : '';
+        if (sTitle) { return _clean(sTitle); }
+
+        // ④ 화면 읽어주는 도구용 이름
+        var sAria = el.getAttribute ? (el.getAttribute('aria-label') || '') : '';
+        if (sAria) { return _clean(sAria); }
+
+        // ⑤ 입력칸이면 안내 글자
+        var sPlace = el.getAttribute ? (el.getAttribute('placeholder') || '') : '';
+        if (sPlace) { return _clean(sPlace); }
+
+        return '';
+
+    }
+
+    /** 이름을 못 찾았을 때 — 어느 자리의 몇 번째인지라도 남긴다 */
+    function _whereOf(el) {
+
+        try {
+
+            var oParent = el.parentElement;
+
+            if (!oParent) { return '이름 없는 버튼'; }
+
+            var iIndex = Array.prototype.indexOf.call(oParent.children, el) + 1;
+            var sParentName = _nameOf(oParent);
+
+            if (sParentName) {
+                return '이름 없는 버튼 (' + sParentName + ' 안 ' + iIndex + '번째)';
+            }
+
+            return '이름 없는 버튼 (' + iIndex + '번째)';
+
+        } catch (e) {
+            return '이름 없는 버튼';
+        }
+
+    }
+
+    /**
+     * 목록·트리에서 고른 줄의 이름
+     * -----------------------------------------------------------------
+     * 2026-09-08 보완: 처음에는 줄 전체 글자를 남겼는데, 표의 한 줄에는
+     * 업무 자료가 통째로 들어 있다. 그게 로그에 박히고 밖으로도 나갈 수 있다.
+     * 그래서 **맨 앞 한 칸만**(대표 이름) 짧게 남긴다.
+     */
+    var MAX_ROW_NAME = 24;
+
+    function _rowOf(el) {
+
+        try {
+
+            var oRow = el.closest ? el.closest('tr, li, [role="row"], [role="treeitem"], [role="option"]') : null;
+
+            if (!oRow) { return ''; }
+
+            // 표의 줄이면 맨 앞 칸만
+            var oFirst = null;
+
+            if (oRow.querySelector) {
+                oFirst = oRow.querySelector('td, th, [role="gridcell"], [role="cell"]');
+            }
+
+            var sRow = (oFirst)
+                ? (oFirst.innerText || oFirst.textContent || '')
+                : (oRow.innerText || oRow.textContent || '');
+
+            sRow = String(sRow).replace(/\s+/g, ' ').trim();
+
+            if (sRow.length > MAX_ROW_NAME) {
+                sRow = sRow.slice(0, MAX_ROW_NAME) + '…';
+            }
+
+            return sRow;
+
+        } catch (e) {
+            return '';
+        }
+
+    }
+
+    /**
+     * 그 순간 화면 상태 (2026-09-08 추가)
+     * -------------------------------------------------------------------
+     * 왜 필요한가
+     *   이 앱은 로딩 표시가 켜진 채 버튼이 눌리거나, 위에 덮는 창이 떠 있는 채
+     *   조작이 들어가 꼬이는 문제가 반복된다. 오류 때 그 상태를 알아야 가려낼 수 있다.
+     *
+     * 어디를 보나 (소스 확인 2026-09-08)
+     *   로딩 표시 = id 가 u4aWsBusyIndicator 인 요소 하나뿐이다(resources/index.js 의 setDomBusy).
+     *   틀 안 화면(iframe)은 자기 것이 없고 parent.setDomBusy 를 부른다.
+     *   그래서 내 문서에 없으면 맨 위 창에서 찾는다.
+     *   메인 화면은 <dialog> 라 열림 여부로, 서버목록·별창은 <div> 라 보임 여부로 판단한다.
+     */
+    var BUSY_ID = 'u4aWsBusyIndicator';
+
+    /** 로딩 표시 요소를 가진 문서를 찾는다 (내 문서 → 맨 위 창) */
+    function _busyDoc() {
+
+        try {
+            if (document.getElementById(BUSY_ID)) { return document; }
+        } catch (e) { }
+
+        try {
+            if (window.top && window.top !== window && window.top.document.getElementById(BUSY_ID)) {
+                return window.top.document;
+            }
+        } catch (e) {
+            // 맨 위 창을 못 읽는 경우 — 내 문서만 본다
+        }
+
+        return null;
+
+    }
+
+    function _screenState() {
+
+        var aOut = [];
+        var oDoc = _busyDoc();
+
+        // ① 로딩 표시가 켜져 있나
+        try {
+
+            var oBusy = oDoc ? oDoc.getElementById(BUSY_ID) : null;
+            var bOn = false;
+
+            if (oBusy) {
+
+                if (typeof oBusy.showModal === 'function') {
+                    bOn = !!oBusy.open;                                   // 메인 화면 — 열려 있으면 켜짐
+                } else {
+                    bOn = (oBusy.style && oBusy.style.display === 'flex'); // 서버목록·별창 — 보이면 켜짐
+                }
+
+            }
+
+            aOut.push(oBusy ? ('로딩표시 ' + (bOn ? '켜짐' : '꺼짐')) : '로딩표시 (없는 화면)');
+
+        } catch (e) {
+            aOut.push('로딩표시 (못 읽음)');
+        }
+
+        // ② 위에 덮여 열려 있는 창이 몇 개인가 — 로딩 표시는 창이 아니므로 뺀다
+        try {
+
+            var oCountDoc = oDoc || document;
+            var aOpen = oCountDoc.querySelectorAll('dialog[open]');
+            var iCnt = 0;
+
+            for (var i = 0; i < aOpen.length; i++) {
+                if (aOpen[i].id !== BUSY_ID) { iCnt++; }
+            }
+
+            aOut.push('떠 있는 창 ' + iCnt + '개');
+
+        } catch (e) {
+            aOut.push('떠 있는 창 (못 읽음)');
+        }
+
+        // ③ 지금 초점이 어디에 있나 — 이름만 남긴다(입력한 값은 안 남긴다)
+        try {
+
+            var oFocus = document.activeElement;
+            var sFocus = oFocus ? (_nameOf(oFocus) || (oFocus.tagName || '').toLowerCase()) : '';
+            aOut.push('초점 ' + (sFocus || '(없음)'));
+
+        } catch (e) {
+            aOut.push('초점 (못 읽음)');
+        }
+
+        return aOut.join(' / ');
+
+    }
+
+    /** 누름 한 건 기록 */
+    function _logClick(ev) {
+
+        var oEl = ev && ev.target;
+
+        if (!oEl || !oEl.closest) { return; }
+
+        // 누를 수 있는 것만 남긴다. 빈 바탕을 누른 것까지 남기면 로그가 지저분해진다.
+        var oHit = oEl.closest('button, a, [role="button"], input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"], option, [role="menuitem"], [role="tab"], [role="treeitem"], [role="option"], tr, li');
+
+        if (!oHit) { return; }
+
+        var sWhat = '눌렀음';
+        var sName = _nameOf(oHit);
+
+        // 목록·트리에서 고른 것이면 "골랐음" 으로 남긴다
+        var sTag = (oHit.tagName || '').toUpperCase();
+        var sRole = oHit.getAttribute ? (oHit.getAttribute('role') || '') : '';
+
+        if (sTag === 'TR' || sTag === 'LI' || sTag === 'OPTION'
+            || sRole === 'treeitem' || sRole === 'option' || sRole === 'row') {
+
+            sWhat = '골랐음';
+
+            var sRow = _rowOf(oHit);
+            if (sRow) { sName = sRow; }
+
+        }
+
+        if (!sName) {
+            sName = _whereOf(oHit);
+        }
+
+        // 체크 표시는 켠 것인지 끈 것인지도 같이
+        var sResult = '';
+
+        if (sTag === 'INPUT') {
+
+            var sType = (oHit.getAttribute('type') || '').toLowerCase();
+
+            if (sType === 'checkbox' || sType === 'radio') {
+                sResult = oHit.checked ? '켬' : '끔';
+            }
+
+        }
+
+        /**
+         * ★사용자가 새로 뭔가 시작할 때마다 추적 번호를 새로 뽑는다 (2026-09-08).
+         * 이걸 안 해서 실제 로그의 번호 자리가 전부 비어 있었다(실측).
+         * 번호가 있어야 「이 버튼 → 이 서버 요청 → 여기서 터짐」 을 하나로 묶을 수 있다.
+         * 목록·트리에서 고른 것은 새 작업이 아니라 고르는 중이므로 번호를 바꾸지 않는다.
+         */
+        if (sWhat === '눌렀음') {
+            _sTraceId = _makeTraceId();
+        } else if (!_sTraceId) {
+            _sTraceId = _makeTraceId();
+        }
+
+        U4ALOG.action(sWhat, sName, sResult);
+
+    }
+
+    /* ================================================================= */
+    /* 밖에서 쓰는 것들
+    /* ================================================================= */
+    var U4ALOG = {
+
+        /** 창 이름 지정 — 창마다 한 번 */
+        setWindow: function (sName) {
+            _sWindowName = sName || '';
+        },
+
+        /** 화면 이름 지정 — 화면이 바뀔 때마다 */
+        setScreen: function (sName) {
+            _sScreenName = sName || '';
+        },
+
+        getWindow: function () { return _sWindowName; },
+        getScreen: function () { return _sScreenName; },
+
+        /** 새 작업 시작 — 추적 ID 를 새로 만든다 */
+        newTrace: function () {
+            _sTraceId = _makeTraceId();
+            return _sTraceId;
+        },
+
+        /** 다른 창에서 넘어온 추적 ID 를 이어 쓴다 */
+        setTrace: function (sTraceId) {
+            _sTraceId = sTraceId || '';
+        },
+
+        getTrace: function () { return _sTraceId; },
+
+        /** 알림 — 정상 흐름의 주요 지점 */
+        info: function (sWhat, sTarget, sResult, iElapsedMs) {
+            _write('알림', _buildLine('알림', sWhat, sTarget, sResult, iElapsedMs, false));
+        },
+
+        /** 주의 — 정상은 아니지만 계속 진행 가능 */
+        warn: function (sWhat, sTarget, sResult) {
+            _write('주의', _buildLine('주의', sWhat, sTarget, sResult, -1, false));
+        },
+
+        /**
+         * 오류 — 기능이 실패
+         * @param {Error} [oError] 있으면 난 자리 전체를 함께 남긴다
+         */
+        error: function (sWhat, sTarget, oError) {
+
+            /**
+             * 오류 줄 끝에는 **터진 자리**를 붙인다 (2026-09-08 보완).
+             * 앞서는 오류를 '잡은' 자리가 붙어, 한 줄만 봐서는 어디가 터졌는지 몰랐다.
+             */
+            var sCrash = _crashSite(oError);
+            var sResult = sCrash ? ('터진 자리 ' + sCrash) : '';
+
+            _write('오류', _buildLine('오류', sWhat, sTarget, sResult, -1, false));
+
+            if (oError && oError.stack) {
+                _write('오류', '        난 자리:\n' + _shortStack(oError.stack));
+            }
+
+            _write('오류', '        그때 화면: ' + _screenState());
+
+        },
+
+        /** 오류가 났을 때 그 순간 화면이 어떤 상태였는지 (밖에서도 쓸 수 있게 내보낸다) */
+        screenState: function () {
+            return _screenState();
+        },
+
+        /**
+         * 잡았지만 그냥 넘어간 오류를 남긴다 (2026-09-08 추가 — 장군님 지시)
+         * -------------------------------------------------------------------
+         * 왜 필요한가
+         *   오류를 잡는 자리 대부분이 아무 흔적도 안 남기고 조용히 넘어갔다(실측 81%).
+         *   그 자리에서 무슨 일이 있었는지 로그에 없으면 나중에 원인을 못 짚는다.
+         *
+         * 로그가 터지지 않게
+         *   같은 자리에서 계속 나는 것은 처음 3번만 남기고,
+         *   그 뒤로는 100번마다 한 번씩 "몇 번째" 를 붙여 남긴다.
+         *
+         * 쓰는 법 (오류를 잡는 자리 맨 앞에 한 줄)
+         *   catch (e) { if (typeof U4ALOG !== 'undefined') { U4ALOG.caught(e); } ... }
+         */
+        caught: function (oError, sWhere) {
+
+            try {
+
+                var sAt = _crashSite(oError) || _callSite();
+                var sKey = sAt || String(sWhere || '');
+
+                if (!_oCaughtCount[sKey]) { _oCaughtCount[sKey] = 0; }
+                _oCaughtCount[sKey]++;
+
+                var iCnt = _oCaughtCount[sKey];
+
+                // 처음 3번, 그 뒤로는 100번마다
+                if (iCnt > CAUGHT_FIRST && (iCnt % CAUGHT_EVERY) !== 0) {
+                    return;
+                }
+
+                var sMsg = '';
+
+                if (oError && oError.message) {
+                    sMsg = oError.message;
+                } else if (oError) {
+                    sMsg = String(oError);
+                } else {
+                    sMsg = '(내용 없는 오류)';
+                }
+
+                var sTarget = (sWhere ? (sWhere + ' — ') : '') + sMsg;
+                var sResult = sAt ? ('터진 자리 ' + sAt) : '';
+
+                if (iCnt > CAUGHT_FIRST) {
+                    sResult += (sResult ? ' | ' : '') + iCnt + '번째';
+                }
+
+                _write('주의', _buildLine('주의', '잡고 넘어감', sTarget, sResult, -1, false));
+
+            } catch (e) {
+                // 로그 남기다 앱을 멈추면 안 된다.
+            }
+
+        },
+
+        /** 지금 추적 번호 — 오류를 보낼 때 같이 실어 어느 조작 때문인지 잇는다 */
+        getTrace: function () {
+            return _sTraceId || '';
+        },
+
+        /** 지금 화면 이름 — 오류를 보낼 때 같이 실는다 */
+        getScreen: function () {
+            if (!_sScreenName) {
+                try { _sScreenName = _detectScreenName(); } catch (e) { }
+            }
+            return _sScreenName || '';
+        },
+
+        /** 지금 창 이름 — 어느 창에서 났는지 잇는다 */
+        getWindow: function () {
+            if (!_sWindowName) {
+                try { _sWindowName = _detectWindowName(); } catch (e) { }
+            }
+            return _sWindowName || '';
+        },
+
+        /** 치명 — 앱을 더 못 씀 */
+        fatal: function (sWhat, sTarget, oError) {
+
+            _write('치명', _buildLine('치명', sWhat, sTarget, '', -1, false));
+
+            if (oError && oError.stack) {
+                _write('치명', '        난 자리: ' + oError.stack);
+            }
+
+        },
+
+        /**
+         * 사용자 조작 — 버튼 누름, 목록에서 고름 등
+         * 앞 조작과의 간격을 자동으로 붙인다.
+         */
+        action: function (sWhat, sTarget, sResult) {
+
+            _write('알림', _buildLine('알림', sWhat, sTarget, sResult, -1, true));
+            _iLastActionAt = Date.now();
+
+        },
+
+        /** 서버에 보내고 받는 자리 */
+        server: function (sWhat, sTarget, sResult, iElapsedMs) {
+
+            var sLevel = (sResult && String(sResult).indexOf('실패') === 0) ? '오류' : '알림';
+            _write(sLevel, _buildLine(sLevel, sWhat, sTarget, sResult, iElapsedMs, false));
+
+        },
+
+        /**
+         * 버튼 누름 자동 기록 설치 (2026-09-08 추가)
+         * ---------------------------------------------------------------
+         * 왜 이렇게 하나:
+         *   버튼을 만드는 공통 자리가 없어서 화면마다 각자 만든다.
+         *   버튼 하나하나에 손으로 넣으면 반드시 빠뜨린다.
+         *   그래서 누른 순간을 가로채 **화면에 적힌 글자**로 이름을 알아낸다.
+         *
+         * 이름을 알아내는 순서 (앞에서 못 찾으면 다음으로)
+         *   ① 버튼에 적힌 글자
+         *   ② 마우스 올렸을 때 뜨는 설명
+         *   ③ 화면 읽어주는 도구용 이름
+         *   ④ 미리 붙여 둔 이름표
+         *   ⑤ 어느 영역의 몇 번째인지
+         *
+         * 원래 동작을 절대 막지 않는다. 보기만 하고 흘려보낸다.
+         */
+        installClickLog: function () {
+
+            if (_bClickLogInstalled) {
+                return;
+            }
+
+            _bClickLogInstalled = true;
+
+            try {
+
+                document.addEventListener('click', function (ev) {
+
+                    try {
+                        _logClick(ev);
+                    } catch (e) {
+                        // 로그 때문에 버튼이 안 눌리면 안 된다.
+                    }
+
+                }, true);   // 눌린 즉시(가로채기) — 다른 코드가 막아도 기록은 남는다
+
+            } catch (e) {
+                _bClickLogInstalled = false;
+            }
+
+        },
+
+        /**
+         * 창이 열릴 때 한 번 — 창 이름과 화면 이름을 정하고 열림을 남긴다
+         */
+        openWindow: function (sWindowName, sScreenName) {
+
+            _sWindowName = sWindowName || '';
+            _sScreenName = sScreenName || '';
+
+            if (!_sTraceId) {
+                _sTraceId = _makeTraceId();
+            }
+
+            _write('알림', _buildLine('알림', '창 열림', '', '', -1, false));
+
+        }
+
+    };
+
+    global.U4ALOG = U4ALOG;
+
+    /**
+     * 별창 닫힘 로그 — 공통 자산을 고치지 않고 덧대는 방식 (2026-09-08)
+     * -------------------------------------------------------------------
+     * 별창 닫기는 공통 컴포넌트의 closeWindow 한 곳을 지난다.
+     * 그러나 공통 자산은 직접 고치지 않는다는 규칙이 있어,
+     * 그 함수가 올라온 뒤 **같은 이름으로 감싸서 다시 끼운다**(원래 동작은 그대로 호출).
+     */
+    function _wrapCloseWindow() {
+
+        try {
+
+            if (!global.U4AUI || typeof global.U4AUI.closeWindow !== 'function') {
+                return false;
+            }
+
+            if (global.U4AUI.__u4aLogWrapped) {
+                return true;
+            }
+
+            var fnOrigin = global.U4AUI.closeWindow;
+
+            global.U4AUI.closeWindow = function (oWin) {
+
+                try {
+
+                    if (oWin && !oWin.isDestroyed()) {
+                        U4ALOG.info('별창 닫힘', (oWin.getTitle && oWin.getTitle()) || '(이름 없음)', '');
+                    }
+
+                } catch (e) {
+                    // 로그 때문에 창 닫기가 막히면 안 된다.
+                }
+
+                return fnOrigin.apply(this, arguments);   // 원래 동작 그대로
+
+            };
+
+            global.U4AUI.__u4aLogWrapped = true;
+            return true;
+
+        } catch (e) {
+            return false;
+        }
+
+    }
+
+    /**
+     * 버튼 누름 기록을 자동으로 켠다 (2026-09-08)
+     * 화면마다 따로 부르지 않아도 되게, 이 파일이 올라오면 스스로 건다.
+     */
+    try {
+
+        if (typeof document !== 'undefined') {
+
+            var _fnStart = function () {
+
+                U4ALOG.installClickLog();
+
+                /**
+                 * 별창 닫힘 로그 덧대기.
+                 * 공통 컴포넌트가 이 파일보다 늦게 올라올 수 있어 몇 번 다시 시도한다.
+                 * 예약한 타이머는 핸들을 들고 있다가 성공하면 바로 끈다(겹침 방지).
+                 */
+                var iTry = 0;
+                var iTimer = null;
+
+                var _fnTryWrap = function () {
+
+                    iTry++;
+
+                    if (_wrapCloseWindow() || iTry >= 20) {
+                        if (iTimer) { clearInterval(iTimer); iTimer = null; }
+                    }
+
+                };
+
+                if (!_wrapCloseWindow()) {
+                    iTimer = setInterval(_fnTryWrap, 300);   // 최대 6초까지만 기다린다
+                }
+
+            };
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', _fnStart);
+            } else {
+                _fnStart();
+            }
+
+        }
+
+    } catch (e) {
+        // 여기서 터져도 화면은 정상으로 떠야 한다.
+    }
+
+    // 노드 방식으로 부르는 자리도 있을 수 있으므로 함께 내보낸다
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = U4ALOG;
+    }
+
+})(typeof window !== 'undefined' ? window : this);

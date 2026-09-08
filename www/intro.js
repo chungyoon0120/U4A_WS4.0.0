@@ -51,9 +51,9 @@
 
         // 인트로 페인트를 막지 않도록 다음 틱으로 미루고, 실패해도 무시한다(워밍 목적).
         setTimeout(() => {
-            try { require("events"); }        catch (e) {}
-            try { require("puppeteer-core"); } catch (e) {}
-            try { require("crypto"); }         catch (e) {}
+            try { require("events"); }        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
+            try { require("puppeteer-core"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
+            try { require("crypto"); }         catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
         }, 0);
 
     } // end of _preloadHeavyModules
@@ -206,7 +206,8 @@
 
             oAPP.endTime = new Date().getTime();
 
-            let iTime = 100,
+            // 패키지 빌드: 5.5초 최소 노출, 미패키지(개발) 실행: 0.1초(장군님 지시 2026-09-08)
+            let iTime = APP.isPackaged ? 5500 : 100,
                 timeDiff = oAPP.endTime - oAPP.startTime;
 
             if (iTime - timeDiff >= 0) {
@@ -552,6 +553,7 @@
             try {
                 oCurrWindow.close();    
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 
             }
 
@@ -1070,7 +1072,7 @@
         FS.readdirSync(USERDATA)
         .filter(f => /\.(exe|zip|dmg|AppImage)$/.test(f))
         .forEach(f => {
-            try { FS.unlinkSync(PATH.join(USERDATA, f)); } catch (e) {}
+            try { FS.unlinkSync(PATH.join(USERDATA, f)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
         });
 
 
@@ -1230,6 +1232,7 @@
             sAppVersion = oPackageJson.version;
             
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             
             sAppVersion = APP.getVersion();
 

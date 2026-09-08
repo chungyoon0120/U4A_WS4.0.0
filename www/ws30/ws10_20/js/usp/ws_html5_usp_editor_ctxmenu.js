@@ -42,7 +42,7 @@
     }
 
     function _esc(s) { return (oAPP.usphtml._esc ? oAPP.usphtml._esc(s) : String(s == null ? "" : s)); }
-    function _model(p) { try { var v = APPCOMMON.fnGetModelProperty(p); return v == null ? null : v; } catch (e) { return null; } }
+    function _model(p) { try { var v = APPCOMMON.fnGetModelProperty(p); return v == null ? null : v; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; } }
 
     // 공통 헤더(타이틀바) 하단 y — 팝업이 브라우저 타이틀바(클릭 불가 영역)를 덮지 않게 클램프(16번 §2.2).
     //   (u4a-ui.js 의 _topChromeBottom 은 비공개 → 동일 로직 인라인. 공통 미변경.)
@@ -53,7 +53,7 @@
                 var r = el.getBoundingClientRect();
                 if (r.height > 0 && r.top < window.innerHeight * 0.5) { return r.bottom; }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return 0;
     }
 
@@ -149,12 +149,12 @@
                 try {
                     var oDoc = ifr.contentDocument;
                     if (oDoc) { oDoc.addEventListener("mousedown", _closeAll, true); _boundDocs.push(oDoc); }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _unbindEditorDocClose() {
-        _boundDocs.forEach(function (oDoc) { try { oDoc.removeEventListener("mousedown", _closeAll, true); } catch (e) { } });
+        _boundDocs.forEach(function (oDoc) { try { oDoc.removeEventListener("mousedown", _closeAll, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
         _boundDocs = [];
     }
 

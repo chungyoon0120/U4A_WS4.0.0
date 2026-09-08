@@ -31,17 +31,17 @@
 
     // 메시지 텍스트(원본 fnGetMsgClsText). oAPP 는 호출 시 전달(디자인 컨텍스트).
     function _txt(oAPP, sCls, sCode, p1) {
-        try { return oAPP.common.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); } catch (e) { return sCode; }
+        try { return oAPP.common.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sCode; }
     }
     // 공통 no-data(946) — ZMSG_WS_COMMON_001, 워크스페이스 언어.
     function _wsTxt(sNo) {
         try {
             var sLangu = (parent.getUserInfo() || {}).LANGU;
             return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sNo);
-        } catch (e) { return sNo; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sNo; }
     }
     // 공통 토스트(셸 showMessage KIND 10) — 형제 멀티선택 팝업(CssJsLink/동일속성동기화)과 동일 전달.
-    function _toast(sType, sText) { try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { } }
+    function _toast(sType, sText) { try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
 
     /* ── 스코프 스타일 1회 주입(토큰 기반, 공통 컴포넌트와 일관) ── */
@@ -102,7 +102,7 @@
                     parent.setBusy("");
                     resolve(ret || { RETCD: "E" });
                 });
-            } catch (e) { parent.setBusy(""); resolve({ RETCD: "E" }); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } parent.setBusy(""); resolve({ RETCD: "E" }); }
         });
     }
 
@@ -140,7 +140,7 @@
 
         // ── 다이얼로그 골격 ──
         var oDlg = _el("dialog", "u4a-dialog u4aDsFldDlg");
-        function _close() { try { oDlg.close(); } catch (e) { } try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { } }
+        function _close() { try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         function _cancel() {
             _close();
             // 001 Cancel operation
@@ -365,13 +365,13 @@
 
         // 헤더 드래그 / 더블클릭 리센터 / grip 리사이즈 — 공통 U4AUI.
         if (window.U4AUI) {
-            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { }
-            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { }
-            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 440, minH: 320 }); } catch (e) { }
+            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 440, minH: 320 }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         document.body.appendChild(oDlg);
-        try { oDlg.showModal(); } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /* ── 공개 API(원본 exports 대체 — 디자인 컨텍스트 oAPP.fn 에 부착) ── */
@@ -381,7 +381,7 @@
             return new Promise(function (resolve) {
                 // _run 은 async — 초기 구성 중 예외로 거부되면 호출측 await 가 멈추므로 E 로 폴백(스크립트 오류는 콘솔로 표면화).
                 Promise.resolve(_run(is_dataSet, oAPPx, resolve)).catch(function (e) {
-                    try { parent.setBusy(""); } catch (e2) { }
+                    try { parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                     console.error("[HTML5][DsFld] 팝업 오류:", e && (e.stack || e.message) || e);
                     resolve({ RETCD: "E" });
                 });

@@ -106,7 +106,7 @@ export async function getControl() {
                 var qs = qp.toString();
                 if (qs) { sLoginPath += (sLoginPath.indexOf("?") >= 0 ? "&" : "?") + qs; }
             }
-        } catch (e) { /* noop */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
 
         // ★ 창 드래그 근본 해결: 로그인은 iframe 안에 있어 자체 타이틀바를 그리면
         //   iframe 내부 -webkit-app-region:drag 가 창 리사이즈 후 죽는다(알려진 버그).
@@ -151,17 +151,17 @@ export async function getControl() {
                     try {
                         var sTheme = oData && oData.THEME;
                         if (!sTheme) { return; }
-                        try { if (parent.U4ATheme) { parent.U4ATheme.apply(sTheme); } } catch (e1) { }
-                        try { if (window.U4ATheme) { window.U4ATheme.apply(sTheme); } } catch (e2) { }
-                        try { if (oIframe && oIframe.contentWindow && oIframe.contentWindow.U4ATheme) { oIframe.contentWindow.U4ATheme.apply(sTheme); } } catch (e3) { }
-                        try { if (parent.setThemeInfo) { parent.setThemeInfo(oData); } } catch (e4) { }
-                        try { if (oData.BGCOL && parent.CURRWIN) { parent.CURRWIN.setBackgroundColor(oData.BGCOL); } } catch (e5) { }
+                        try { if (parent.U4ATheme) { parent.U4ATheme.apply(sTheme); } } catch (e1) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e1); } }
+                        try { if (window.U4ATheme) { window.U4ATheme.apply(sTheme); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+                        try { if (oIframe && oIframe.contentWindow && oIframe.contentWindow.U4ATheme) { oIframe.contentWindow.U4ATheme.apply(sTheme); } } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                        try { if (parent.setThemeInfo) { parent.setThemeInfo(oData); } } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+                        try { if (oData.BGCOL && parent.CURRWIN) { parent.CURRWIN.setBackgroundColor(oData.BGCOL); } } catch (e5) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e5); } }
                         // (--boot-bg 는 위 각 프레임의 U4ATheme.apply 가 테마 CSS 로드 후 --app-bg 로 중앙
                         //   동기화한다(theme-api.js _syncBootBg) → 여기서 따로 손대지 않는다.)
-                    } catch (e) { /* noop */ }
+                    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
                 });
             }
-        } catch (e) { /* noop */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
 
     } // end of _loadLoginPage
 
@@ -185,10 +185,10 @@ export async function getControl() {
             oWin.setBounds({ x: b.x, y: b.y, width: b.width + 1, height: b.height + 1 });
             requestAnimationFrame(function () {
                 requestAnimationFrame(function () {
-                    try { if (!oWin.isDestroyed()) { oWin.setBounds(b); } } catch (_) { /* noop */ }
+                    try { if (!oWin.isDestroyed()) { oWin.setBounds(b); } } catch (_) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_); } /* noop */ }
                 });
             });
-        } catch (_) { /* noop */ }
+        } catch (_) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_); } /* noop */ }
     } // end of _kickHostDragRegion
 
 

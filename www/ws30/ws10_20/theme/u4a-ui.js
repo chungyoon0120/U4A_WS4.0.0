@@ -226,7 +226,7 @@
             const fnOpen = opts.onOpen;
             if (typeof fnOpen === "function") {
                 let r;
-                try { r = fnOpen(oCombo); } catch (e) { r = null; }
+                try { r = fnOpen(oCombo); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } r = null; }
                 if (r && typeof r.then === "function") {
                     oCombo.dataset.loading = "true";
                     const _done = function () {
@@ -401,7 +401,7 @@
             //   클리어 X 노출=data-filled, 모델 바인딩 등)도 함께 동기화. 단 자기 자신의 input 핸들러는
             //   재오픈하지 않게 잠깐 억제. (타이핑이 아니라 "선택"으로 채울 때도 X 가 떠야 함)
             _suppressOpen = true;
-            try { oInput.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { }
+            try { oInput.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _suppressOpen = false;
             oInput.focus();
         }
@@ -909,7 +909,7 @@
                 if (r.height > 0 && r.top < window.innerHeight * 0.5) { return r.bottom; }
             }
             return 0;
-        } catch (e) { return 0; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return 0; }
     }
 
     /**
@@ -961,7 +961,7 @@
             if (!oDlg || oDlg.nodeName !== "DIALOG" || !oDlg.classList) { return; }
             if (!oDlg.classList.contains("u4a-dialog")) { return; }
             if (oDlg.hasAttribute("data-u4a-keep")) { return; }   // 상태 보존 싱글톤 — 제외
-            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e2) { }
+            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         }, true);
     }
 
@@ -1088,7 +1088,7 @@
                 if (global.oAPP && oAPP.fn && typeof oAPP.fn.fnUpdateTableWidthClass === "function") {
                     oAPP.fn.fnUpdateTableWidthClass();
                 }
-            } catch (e2) { }
+            } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         });
     }
 
@@ -1212,7 +1212,7 @@
                 _splitPxFlex(oA, na);
                 _splitPxFlex(oB, nb);
             }
-            if (fnAfter) { try { fnAfter(); } catch (e) { } }
+            if (fnAfter) { try { fnAfter(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         }
         function lf_move(ev) {
             if (!bDrag) { return; }
@@ -1225,7 +1225,7 @@
             bDrag = false;
             if (iRaf) { cancelAnimationFrame(iRaf); iRaf = 0; }
             D = null;
-            try { document.body.style.cursor = ""; } catch (e) { }
+            try { document.body.style.cursor = ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             document.removeEventListener("mousemove", lf_move);
             document.removeEventListener("mouseup", lf_up);
         }
@@ -1262,7 +1262,7 @@
                 oMin: oOpp ? _splitPaneMin(oOpp, AX) : 0,
                 oppCur: oOpp ? oOpp.getBoundingClientRect()[AX.rect] : 0
             };
-            try { document.body.style.cursor = AX.cur; } catch (e) { }
+            try { document.body.style.cursor = AX.cur; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             document.addEventListener("mousemove", lf_move);
             document.addEventListener("mouseup", lf_up);
             ev.preventDefault();
@@ -1293,7 +1293,7 @@
             var iCut = Math.min(Math.max(0, iCur - iMin), iNeed);
             if (iCut > 0) { p.style.flex = "0 0 " + (iCur - iCut) + "px"; iNeed -= iCut; }
         });
-        if (rec.onResize) { try { rec.onResize(); } catch (e) { } }
+        if (rec.onResize) { try { rec.onResize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     }
     function _splitReclampAll() { _SPLIT_REGISTRY.forEach(_splitReclampOne); }
 
@@ -1303,6 +1303,19 @@
         var AX = _splitAxis(opts.axis);
         var sMode = (opts.mode === "giveway") ? "giveway" : "adjacent";
         _splitBars(oSplit).forEach(function (oBar) { _splitBindBar(oSplit, oBar, AX, sMode, opts.onResize); });
+
+        // [2026-09-08 누수 수정] 화면에서 이미 빠진 항목을 목록에서 제거.
+        //   이 목록은 창 크기 변경 시 전부 다시 맞추려고 유지하는데, 빼는 코드가 없어서
+        //   화면에서 걷어낸 요소를 계속 붙잡고 있었다. 붙잡힌 요소는 그 아래 자식 전체를
+        //   함께 끌고 남아 치워지지 않는다.
+        //   실측(2026-09-08, .works/auto-test/ws20-retainer.js): WS10↔WS20 왕복 4회 뒤
+        //   치워지지 않은 화면 조각 1,791개 중 1,497개(83.6%)가 이 목록에 붙잡혀 있었다.
+        //   왕복 1회당 화면 조각 +666개 · 메모리 +5.6MB 가 그대로 쌓였다.
+        //   ※ 목록에서 빼기만 한다. 폭 다시 맞추기 동작 자체는 그대로다.
+        for (var iDead = _SPLIT_REGISTRY.length - 1; iDead >= 0; iDead--) {
+            var oDeadEl = _SPLIT_REGISTRY[iDead] && _SPLIT_REGISTRY[iDead].el;
+            if (!oDeadEl || oDeadEl.isConnected === false) { _SPLIT_REGISTRY.splice(iDead, 1); }
+        }
 
         var rec = null;
         for (var i = 0; i < _SPLIT_REGISTRY.length; i++) {
@@ -1335,7 +1348,7 @@
                 oHandle.setAttribute("data-u4a-draghandle", ""); // 커스텀 핸들도 위임이 잡게 표식
             }
             if (oDlg && opt && opt.topBoundary != null) { oDlg.__u4aTopBoundary = opt.topBoundary; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /**
@@ -1364,13 +1377,13 @@
         };
 
         let oWin = null;
-        try { oWin = require("@electron/remote").getCurrentWindow(); } catch (e) { oWin = null; }
+        try { oWin = require("@electron/remote").getCurrentWindow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oWin = null; }
 
         // 활성 여부를 항상 네이티브 OS 창 포커스에서 재독 → iframe 포커스 이동에도 오판 없음
         const _resync = function () {
             let bFocused;
             try { bFocused = oWin ? oWin.isFocused() : document.hasFocus(); }
-            catch (e) { bFocused = document.hasFocus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bFocused = document.hasFocus(); }
             _set(!bFocused);
         };
 
@@ -1378,14 +1391,14 @@
         //    까지 잡는 유일한 신호. <head> 선로드 유실 보정을 위해 remove 후 재등록한다.
         const _rebindNative = function () {
             if (!oWin) { return; }
-            try { oWin.removeListener("focus", _resync); oWin.removeListener("blur", _resync); } catch (e) { }
-            try { oWin.on("focus", _resync); oWin.on("blur", _resync); } catch (e) { }
+            try { oWin.removeListener("focus", _resync); oWin.removeListener("blur", _resync); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oWin.on("focus", _resync); oWin.on("blur", _resync); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         };
         _rebindNative();
         window.addEventListener("load", _rebindNative);   // 로드 후 재바인딩(유실 보정)
         if (oWin) {
             window.addEventListener("beforeunload", function () {
-                try { oWin.removeListener("focus", _resync); oWin.removeListener("blur", _resync); } catch (e) { }
+                try { oWin.removeListener("focus", _resync); oWin.removeListener("blur", _resync); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
 
@@ -1764,12 +1777,12 @@
                 // 1) 합성 mousedown — 모든 outside-close 오버레이가 각자 정상 닫힘(리스너 정리까지).
                 try {
                     document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 // 2) 안전망 — 그래도 남은 메뉴(.u4a-menu = 상단 메뉴바 드롭다운 / 툴바 오버플로 ⋯)는 직접 제거.
                 try {
                     var aMenus = document.querySelectorAll(".u4a-menu");
                     for (var i = 0; i < aMenus.length; i++) { aMenus[i].remove(); }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }, 0);
         });
     }
@@ -1897,7 +1910,7 @@
             oVh.type = "button"; oVh.tabIndex = -1;
             oVh.innerHTML = opts.f4IconHtml || _fa(opts.f4Icon || "magnifying-glass");
             if (opts.f4Disabled) { oVh.disabled = true; }
-            oVh.addEventListener("click", () => { try { opts.f4(oInput); } catch (e) { } });
+            oVh.addEventListener("click", () => { try { opts.f4(oInput); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
             oWrap.appendChild(oVh); iTrail++;
         }
         if (iTrail) { oWrap.setAttribute("data-trail", String(iTrail)); }
@@ -1915,13 +1928,13 @@
         }
 
         // 동작 배선(기존 공통 블록 재사용). onClear: 비운 뒤 콜백(모델 반영 등).
-        if (opts.clear) { try { _clearSync = attachClear(oInput, oClear, opts.onClear || null); } catch (e) { } }
-        if (opts.suggest) { try { attachSuggest(oInput, opts.suggest, opts.onPick || null); } catch (e) { } }
+        if (opts.clear) { try { _clearSync = attachClear(oInput, oClear, opts.onClear || null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+        if (opts.suggest) { try { attachSuggest(oInput, opts.suggest, opts.onPick || null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         if (opts.upper) {
             oInput.addEventListener("input", () => {
                 const s = oInput.selectionStart, e = oInput.selectionEnd;
                 const up = oInput.value.toUpperCase();
-                if (up !== oInput.value) { oInput.value = up; try { oInput.setSelectionRange(s, e); } catch (x) { } }
+                if (up !== oInput.value) { oInput.value = up; try { oInput.setSelectionRange(s, e); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } }
             });
         }
         if (opts.onInput) { oInput.addEventListener("input", () => opts.onInput(oInput.value)); }
@@ -1938,7 +1951,7 @@
             getValue() { return oInput.value; },
             setValue(v) {
                 oInput.value = (v == null ? "" : String(v));
-                if (typeof _clearSync === "function") { try { _clearSync(); } catch (e) { } }
+                if (typeof _clearSync === "function") { try { _clearSync(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             },
             setReadOnly(b) { oInput.readOnly = !!b; },
             // value-state(검증) — data-vs(빨간 테두리, 상시) + 메시지(.u4a-field__msg, 포커스시 표시는 CSS).
@@ -1982,7 +1995,7 @@
         function setCollapsed(b) {
             sec.setAttribute("data-collapsed", b ? "X" : "");
             tgl.setAttribute("aria-expanded", b ? "false" : "true");
-            if (typeof cfg.onToggle === "function") { try { cfg.onToggle(!!b); } catch (e) { } }
+            if (typeof cfg.onToggle === "function") { try { cfg.onToggle(!!b); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         }
         tgl.addEventListener("click", function () { setCollapsed(!isCollapsed()); });
         if (cfg.collapsed) { setCollapsed(true); }
@@ -2018,7 +2031,7 @@
     function _onColMenuOutside(e) { if (_oColMenuEl && !_oColMenuEl.contains(e.target)) { closeColumnMenu(); } }
     function closeColumnMenu() {
         if (!_oColMenuEl) { return; }
-        try { _oColMenuEl.remove(); } catch (e) { }
+        try { _oColMenuEl.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _oColMenuEl = null;
         document.removeEventListener("mousedown", _onColMenuOutside, true);
         window.removeEventListener("resize", closeColumnMenu);
@@ -2120,7 +2133,7 @@
         window.addEventListener("resize", closeColumnMenu);
         window.addEventListener("scroll", closeColumnMenu, true);
         setTimeout(function () { document.addEventListener("mousedown", _onColMenuOutside, true); }, 0);
-        if (fi) { try { fi.focus(); } catch (e) { } }   // 필터 표시 시 열리면 바로 입력 가능
+        if (fi) { try { fi.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }   // 필터 표시 시 열리면 바로 입력 가능
     }
 
     /* ── 가상 스크롤(windowing) — 보이는 행만 DOM 에 렌더 (전 화면 공통) ────────
@@ -2170,7 +2183,7 @@
             try {
                 off = (oTbody.getBoundingClientRect().top - oWrap.getBoundingClientRect().top) + st;
                 if (!(off > 0)) { off = 0; }
-            } catch (e) { off = 0; }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } off = 0; }
 
             if (!total) {
                 oTbody.textContent = "";
@@ -2246,7 +2259,7 @@
         //   overscroll-behavior:contain 으로 경계 바운스/스크롤 체이닝을 끈다(Chromium 63+).
         //   overflow-anchor:none — 윈도잉이 뷰포트 위 행을 갈아끼울 때 브라우저 스크롤 앵커링이 위치를
         //   보정하려다 튀는 것 방지(가상스크롤은 우리가 scrollTop·스페이서로 위치를 직접 관리하므로 앵커링 불필요).
-        try { oWrap.style.overscrollBehavior = "contain"; oWrap.style.overflowAnchor = "none"; } catch (e) { }
+        try { oWrap.style.overscrollBehavior = "contain"; oWrap.style.overflowAnchor = "none"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // ★ 휠 직접 처리 — 가상 스크롤 컨테이너의 네이티브 휠→스크롤이 안 먹는 환경(모달 top-layer 등) 대비.
         //   ★ 끝단 떨림 방지: 우리가 직접 클램프하고, 스크롤 여지가 있으면 '항상' preventDefault 해서
@@ -2267,17 +2280,17 @@
 
         // 컨테이너 크기 변경(스플리터/창 리사이즈) 시 보일 행 수가 바뀌므로 재계산(rAF 스로틀=_onScroll).
         if (typeof ResizeObserver !== "undefined") {
-            try { new ResizeObserver(function () { _onScroll(); }).observe(oWrap); } catch (e) { }
+            try { new ResizeObserver(function () { _onScroll(); }).observe(oWrap); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         return {
             setRows: function (a, bKeepScroll) {
                 aData = a || [];
                 if (!bKeepScroll) {
-                    try { oWrap.scrollTop = 0; } catch (e) { }
+                    try { oWrap.scrollTop = 0; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 } else {
                     const maxTop = Math.max(0, aData.length * ROWH - (oWrap.clientHeight || 0));
-                    if (oWrap.scrollTop > maxTop) { try { oWrap.scrollTop = maxTop; } catch (e) { } }
+                    if (oWrap.scrollTop > maxTop) { try { oWrap.scrollTop = maxTop; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
                 }
                 _render();
             },
@@ -2310,14 +2323,14 @@
         const bHasCancel = aBtns.some(function (b) { return b.act === "CANCEL"; });
         const oIcon = { S: "circle-check", E: "circle-xmark", W: "triangle-exclamation", I: "circle-info", C: "circle-question" }[sType] || "circle-info";
 
-        function _done(sAct) { if (typeof fnCb === "function") { try { fnCb(sAct); } catch (e) { } } }
+        function _done(sAct) { if (typeof fnCb === "function") { try { fnCb(sAct); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } }
 
         // ★[장군님 지시 2026-09-02] window.confirm / window.alert 사용 절대 금지.
         //   이전엔 <dialog> 미지원 시 window.confirm 으로 fallback 했으나 제거한다.
         //   <dialog>.showModal 은 확인 팝업의 필수 의존성 — 없으면 삼키지 말고 오류코드로 표면화하고,
         //   판정은 fail-closed(진행하지 않음 = CANCEL/NO)로 종료한다.
         let oDlg;
-        try { oDlg = document.createElement("dialog"); } catch (e) { oDlg = null; }
+        try { oDlg = document.createElement("dialog"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oDlg = null; }
         if (!oDlg || typeof oDlg.showModal !== "function") {
             console.error("[U4AUI-001] confirm: <dialog>.showModal 미지원 — 확인 팝업을 표시할 수 없음. message:", sMsg);
             _done(bHasCancel ? "CANCEL" : "NO");
@@ -2336,8 +2349,8 @@
         oDlg.querySelector(".u4a-dialog__body").textContent = sMsg;
 
         function _close(sAct) {
-            try { oDlg.close(); } catch (e) { }
-            try { oDlg.remove(); } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _done(sAct);
         }
 
@@ -2392,7 +2405,7 @@
                 oWin.setClosable(true);
                 oWin.close();
             }
-        } catch (e) { /* 이미 파괴된 창 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 이미 파괴된 창 무시 */ }
     }
 
     /**
@@ -2407,15 +2420,15 @@
         if (!oWin || !oBtn) { return; }
         var oIcon = oBtn.querySelector("i");
         function _sync() {
-            var bMax = false; try { bMax = oWin.isMaximized(); } catch (e) { }
+            var bMax = false; try { bMax = oWin.isMaximized(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             if (oIcon) {
                 oIcon.classList.toggle("fa-window-maximize", !bMax);
                 oIcon.classList.toggle("fa-window-restore", bMax);
             }
-            try { oBtn.title = bMax ? "Restore" : "Maximize"; } catch (e) { }
+            try { oBtn.title = bMax ? "Restore" : "Maximize"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         oBtn.addEventListener("click", function () {
-            try { if (oWin.isMaximized()) { oWin.unmaximize(); } else { oWin.maximize(); } } catch (e) { }
+            try { if (oWin.isMaximized()) { oWin.unmaximize(); } else { oWin.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _sync();
         });
         window.addEventListener("resize", _sync);   // 최대화/복원 시 창 크기 변동 → 아이콘 재동기화
@@ -2461,7 +2474,7 @@
             var n = oGrip.parentNode;
             while (n && n.nodeType === 1) {
                 var st;
-                try { st = getComputedStyle(n); } catch (e) { st = null; }
+                try { st = getComputedStyle(n); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } st = null; }
                 if (st && /(auto|scroll|overlay)/.test(st.overflowY) && n.scrollHeight > n.clientHeight + 1) {
                     return n.getBoundingClientRect();
                 }
@@ -2481,8 +2494,8 @@
         }
         function _moveGuide(iX) { var g = document.getElementById("u4aColResizeGuide"); if (g) { g.style.left = iX + "px"; } }
         function _hideGuide() { var g = document.getElementById("u4aColResizeGuide"); if (g) { g.style.display = "none"; } }
-        function _hoverOn() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.add(cfg.hoverClass); } if (typeof cfg.onHover === "function") { try { cfg.onHover(true); } catch (e) { } } }
-        function _hoverOff() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.remove(cfg.hoverClass); } if (typeof cfg.onHover === "function") { try { cfg.onHover(false); } catch (e) { } } }
+        function _hoverOn() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.add(cfg.hoverClass); } if (typeof cfg.onHover === "function") { try { cfg.onHover(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } }
+        function _hoverOff() { if (cfg.hoverEl && cfg.hoverClass) { cfg.hoverEl.classList.remove(cfg.hoverClass); } if (typeof cfg.onHover === "function") { try { cfg.onHover(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } }
 
         function lf_move(e) {
             if (!bDrag) { return; }
@@ -2492,12 +2505,12 @@
         function lf_up() {
             if (!bDrag) { return; }
             bDrag = false;
-            try { document.body.classList.remove("u4a-dragging"); } catch (e) { }
+            try { document.body.classList.remove("u4a-dragging"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             document.body.style.cursor = "";
             document.body.style.userSelect = "";
             _hideGuide();
             if (bHover) { _hoverOn(); }   // 드래그 끝 + 그립 위면 hover 강조 복귀
-            try { cfg.setWidth(iGuideX - iColLeft); } catch (e) { }   // ★ 놓을 때 실제 폭 적용
+            try { cfg.setWidth(iGuideX - iColLeft); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // ★ 놓을 때 실제 폭 적용
             document.removeEventListener("mousemove", lf_move);
             document.removeEventListener("mouseup", lf_up);
         }
@@ -2510,7 +2523,7 @@
             iColLeft = e.clientX - iW;   // 컬럼 좌측 경계(뷰포트 x) = 그립(우측 경계) − 현재 폭
             iGuideX = e.clientX;
             _hoverOff();   // 드래그 중엔 헤더 강조 끄고 가이드 라인만
-            try { document.body.classList.add("u4a-dragging"); } catch (e2) { }   // iframe 위 드래그 끊김 방지(공통)
+            try { document.body.classList.add("u4a-dragging"); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }   // iframe 위 드래그 끊김 방지(공통)
             document.body.style.cursor = "col-resize";
             document.body.style.userSelect = "none";
             _showGuide(e.clientX);
@@ -2522,9 +2535,9 @@
             oGrip.addEventListener("dblclick", function (e) {
                 if (typeof cfg.getAutoWidth === "function") {
                     // ★ auto-fit(엑셀/sap.ui.table) — 콘텐츠 최장 폭으로. 최소폭 clamp.
-                    try { var iW = cfg.getAutoWidth(); if (iW > 0) { cfg.setWidth(Math.max(iMin, iW)); } } catch (e2) { }
+                    try { var iW = cfg.getAutoWidth(); if (iW > 0) { cfg.setWidth(Math.max(iMin, iW)); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                 } else {
-                    try { cfg.onReset(); } catch (e2) { }
+                    try { cfg.onReset(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                 }
                 e.preventDefault(); e.stopPropagation();
             });
@@ -2617,7 +2630,7 @@
         //   canvas 는 순수 계산이라 리플로우 0. (letterSpacing 은 통상 0 이라 생략 — _bwpGlyphW 와 동일 정책.)
         var _mCtx = null;
         function _measTxt(sText, oRef) {
-            if (!_mCtx) { try { _mCtx = document.createElement("canvas").getContext("2d"); } catch (e) { _mCtx = null; } }
+            if (!_mCtx) { try { _mCtx = document.createElement("canvas").getContext("2d"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _mCtx = null; } }
             if (!_mCtx) { return (sText || "").length * 7; }   // canvas 미지원 폴백(대략폭).
             if (oRef) {
                 var cs = getComputedStyle(oRef);
@@ -2754,11 +2767,11 @@
                 if (oIco) { oNameCell.appendChild(oIco); }
                 if (oLbl) { oNameCell.appendChild(oLbl); }
                 oRow.insertBefore(oNameCell, oRow.firstChild);
-                if (typeof oCfg.rowHook === "function") { try { oCfg.rowHook(oRow, n); } catch (e) { } }
+                if (typeof oCfg.rowHook === "function") { try { oCfg.rowHook(oRow, n); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             },
             onSelect: function (n, oRow) {
                 selNode = n;
-                if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(n, oRow); } catch (e) { } }
+                if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(n, oRow); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             }
         });
         oTree.el.classList.add("u4aColTreeTree");
@@ -2790,7 +2803,7 @@
             tree: oTree,
             // ★ per-컬럼 autofit 폭(px) — 리사이즈바 더블클릭과 동일 계산. 161버튼(fitTreeColumns)이 이걸 소비해
             //   두 경로가 완전히 같은 폭을 내도록 단일화(중복 측정 로직 제거).
-            autoWidth: function (iCol) { try { return _autoW(iCol); } catch (e) { return 0; } },
+            autoWidth: function (iCol) { try { return _autoW(iCol); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return 0; } },
             getSelected: function () { return selNode; },
             rerender: function (bSelectFirst) {
                 var aRoots = (typeof oCfg.roots === "function") ? (oCfg.roots() || []) : [];
@@ -2799,22 +2812,22 @@
                 oTree.render();
                 _syncTotal();
                 if (bSelectFirst !== false && aRoots[0]) {
-                    try { oTree.selectByKey(oCfg.key(aRoots[0]), false); selNode = aRoots[0]; } catch (e) { }
+                    try { oTree.selectByKey(oCfg.key(aRoots[0]), false); selNode = aRoots[0]; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 }
             },
-            expandSelected: function () { if (selNode) { try { oTree.expandSubtree(selNode); } catch (e) { } } },
-            collapseSelected: function () { if (selNode) { try { oTree.setExpanded(selNode, false); } catch (e) { } } },
-            selectKey: function (sKey, bScroll) { try { oTree.selectByKey(sKey, bScroll === true); } catch (e) { } },
+            expandSelected: function () { if (selNode) { try { oTree.expandSubtree(selNode); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } },
+            collapseSelected: function () { if (selNode) { try { oTree.setExpanded(selNode, false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } },
+            selectKey: function (sKey, bScroll) { try { oTree.selectByKey(sKey, bScroll === true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } },
             // 프로그램적 "마우스 클릭과 동일한" 선택 — selNode 설정 + 강조 + cfg.onSelect 발화(후속 로직 재사용).
             //   selectKey 는 강조만(selNode 안 바뀜 → getSelected 미반영) 하므로, 클릭 경로를 그대로 태우려면 이 select 를 쓴다.
             select: function (node, bScroll) {
                 if (!node) { return; }
                 selNode = node;
-                try { oTree.selectByKey(oCfg.key(node), bScroll === true); } catch (e) { }
-                if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(node, null); } catch (e) { } }
+                try { oTree.selectByKey(oCfg.key(node), bScroll === true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(node, null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             }
         };
-        try { oHost.__u4aColTreeCtrl = oRet; } catch (e) { }   // fitTreeColumns(161) 등이 host→ctrl 역참조로 autoWidth 소비
+        try { oHost.__u4aColTreeCtrl = oRet; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // fitTreeColumns(161) 등이 host→ctrl 역참조로 autoWidth 소비
         return oRet;
     }
 
@@ -2901,7 +2914,7 @@
         }
         // 텍스트 잉크폭 = canvas measureText(DOM 변형·reflow 0 — 오프스크린 span 금지, 16 §3.4.2).
         function _measTxt(sText, oRef) {
-            if (!_mctx) { try { _mctx = document.createElement("canvas").getContext("2d"); } catch (e) { _mctx = null; } }
+            if (!_mctx) { try { _mctx = document.createElement("canvas").getContext("2d"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _mctx = null; } }
             if (!_mctx) { return (sText || "").length * 7; }
             if (oRef) {
                 var cs = getComputedStyle(oRef);
@@ -3083,7 +3096,7 @@
             var oTr = _el("tr");
             if (bZebra && (iIdx % 2 === 1)) { oTr.setAttribute("data-odd", "true"); }
             var sKey = _rowKey(oRow, iIdx);
-            try { if (oRow && typeof oRow === "object") { oRow.__dtKey = sKey; } } catch (e) { }   // getSelKey 용 스태시(F4 __f4Idx 패턴)
+            try { if (oRow && typeof oRow === "object") { oRow.__dtKey = sKey; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // getSelKey 용 스태시(F4 __f4Idx 패턴)
             for (var i = 0; i < aCols.length; i++) {
                 var c = aCols[i];
                 var td = _el("td");
@@ -3113,7 +3126,7 @@
             if (typeof oCfg.onActivate === "function") {
                 oTr.addEventListener("dblclick", function () { try { oCfg.onActivate(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onActivate 오류:", e); } });
             }
-            if (typeof oCfg.rowHook === "function") { try { oCfg.rowHook(oTr, oRow, iIdx); } catch (e) { } }
+            if (typeof oCfg.rowHook === "function") { try { oCfg.rowHook(oTr, oRow, iIdx); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             return oTr;
         }
 
@@ -3175,7 +3188,7 @@
         // 판(호스트) 크기 변하면 빈 격자 다시 채움(원본처럼 영역 전체 격자 유지). rAF 로 미뤄 ResizeObserver 루프 방지.
         var _ro = null;
         if (bResizable && typeof ResizeObserver !== "undefined") {
-            try { _ro = new ResizeObserver(function () { _schedulePad(); }); _ro.observe(oHost); } catch (e) { _ro = null; }
+            try { _ro = new ResizeObserver(function () { _schedulePad(); }); _ro.observe(oHost); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _ro = null; }
         }
 
         return {
@@ -3193,8 +3206,8 @@
             autoFit: function () { _autofitDone = false; _autoFitAll(); },
             // 정리 — 재생성 전/파기 시 호출(호스트 크기감지기·강조선 DOM 해제로 누수 방지).
             destroy: function () {
-                try { if (_ro) { _ro.disconnect(); _ro = null; } } catch (e) { }
-                try { if (_hlLine && _hlLine.parentNode) { _hlLine.parentNode.removeChild(_hlLine); } _hlLine = null; } catch (e) { }
+                try { if (_ro) { _ro.disconnect(); _ro = null; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { if (_hlLine && _hlLine.parentNode) { _hlLine.parentNode.removeChild(_hlLine); } _hlLine = null; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             },
             setSel: function (sKey) {
                 if (bVirtual && _vs) { _vs.setSel(sKey); _vs.refresh(); }
@@ -3240,24 +3253,24 @@
     global.U4AUI = U4AUI;
 
     // 커스텀 툴팁 전역 1회 초기화 (모든 화면 공통 — [data-tip] 요소에 자동 적용)
-    try { initTooltip(); } catch (e) { }
+    try { initTooltip(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // 창 포커스 상태(활성/비활성) 표시 전역 1회 초기화 (모든 셸 공통)
-    try { initWindowFocusState(); } catch (e) { }
+    try { initWindowFocusState(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // 다이얼로그 헤더 드래그 전역 1회 설치 — 모든 .u4a-dialog 가 자동으로 드래그+화면/헤더 클램프.
     //   (팝업마다 배선 불필요. 헤더는 .u4a-dialog__header / [data-u4a-draghandle] 둘 다 인식)
-    try { _installGlobalDialogDrag(); } catch (e) { }
+    try { _installGlobalDialogDrag(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // 다이얼로그 "닫으면 DOM 제거" 전역 1회 설치 — 모든 .u4a-dialog 가 close 시 자동 제거(배선 불필요).
     //   다음 열기 = 새 build(기본 상태). 상태 보존이 필요한 팝업만 [data-u4a-keep] 로 opt-out.
-    try { _installGlobalDialogClose(); } catch (e) { }
+    try { _installGlobalDialogClose(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // 스플릿바 더블클릭 → 최초 위치 복귀 전역 1회 설치 — 모든 .u4a-splitter__bar 자동(배선 불필요).
-    try { _installGlobalSplitterReset(); } catch (e) { }
+    try { _installGlobalSplitterReset(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // iframe(미리보기) 클릭 시 열린 모든 오버레이(메뉴/드롭다운/팝오버) 닫기 전역 1회 설치 — 배선 불필요.
-    try { _installIframeBlurClose(); } catch (e) { }
+    try { _installIframeBlurClose(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // CommonJS(Electron nodeIntegration) 환경에서도 require 가능하게
     if (typeof module === "object" && module.exports) {

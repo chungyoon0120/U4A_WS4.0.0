@@ -561,6 +561,7 @@
       try {
         var _sAppData = JSON.parse(appData);
       } catch (error) {
+          if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         return;
       }
 
@@ -5948,6 +5949,7 @@
     try{
       var ls_item = JSON.parse(parent.FS.readFileSync(l_path, "utf-8"));
     }catch(e){
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
       parent.showMessage(sap, 10, "E", e);
 
       //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.

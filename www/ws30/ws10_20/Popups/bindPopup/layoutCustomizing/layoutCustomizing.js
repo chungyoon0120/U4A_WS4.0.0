@@ -57,10 +57,10 @@
             var s = localStorage.getItem(_storeKey());
             if (!s) { return _default(); }
             return _normalize(JSON.parse(s));
-        } catch (e) { return _default(); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return _default(); }
     }
     function _save(o) {
-        try { localStorage.setItem(_storeKey(), JSON.stringify(_normalize(o))); } catch (e) { }
+        try { localStorage.setItem(_storeKey(), JSON.stringify(_normalize(o))); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /* ── 영역/바 DOM ───────────────────────────────────────────────────────── */
@@ -94,7 +94,7 @@
             if (!Array.isArray(s)) { return; }
             if (bResizeWindow === true) { win.setSize(iWidth, s[1]); return; }
             if (s[0] < minW) { win.setSize(minW, s[1]); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -131,14 +131,14 @@
         oAPP.attr.iBindLayoutActiveCount = iCount;
 
         // 패널 표시/숨김으로 폭 구성이 바뀌었으니 공통 재클램프(드래그로 px 고정된 패널이 넘치지 않게).
-        try { if (window.U4AUI && U4AUI.reclampSplitters) { U4AUI.reclampSplitters(); } } catch (e) { }
+        try { if (window.U4AUI && U4AUI.reclampSplitters) { U4AUI.reclampSplitters(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 레이아웃 변경 후 표시 중인 트리 컬럼 재적합(원본 refreshBindLayoutTables — 마지막 컬럼이 잔여폭 흡수).
-        try { if (typeof oAPP.fn.refitBindTables === "function") { oAPP.fn.refitBindTables(); } } catch (e) { }
+        try { if (typeof oAPP.fn.refitBindTables === "function") { oAPP.fn.refitBindTables(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // MODEL(좌측) 영역 활성 시 좌측 트리 전체 펼침 — 원본 applyBindLayoutCustomizing 의
         //   `if(oState.MODEL) scheduleExpandModelFieldTree()`(index.js:2410) 1:1.
         if (st.MODEL && typeof oAPP.fn.expandModelFieldTree === "function") {
-            try { oAPP.fn.expandModelFieldTree(); } catch (e) { }
+            try { oAPP.fn.expandModelFieldTree(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     };
 
@@ -164,7 +164,7 @@
         if (oAPP.attr.editable === false) { return; }
 
         var oExist = document.getElementById("bwpLcDlg");
-        if (oExist) { try { oExist.close(); oExist.remove(); } catch (e) { } }
+        if (oExist) { try { oExist.close(); oExist.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         var work = _normalize(oAPP.attr.bindLayout || _load());   // 현재/저장 상태 기준 작업본(Apply 전까지 미반영)
         var aMeta = _areaMeta();
@@ -262,7 +262,7 @@
         document.body.appendChild(oDlg);
         _syncStatus();
         // showModal 미지원 등 예외 시 비모달 노출로 대체(이미 append 됐으므로 재append 불필요).
-        try { oDlg.showModal(); } catch (e) { try { if (oDlg.show) { oDlg.show(); } else { oDlg.open = true; } } catch (e2) { } }
+        try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } try { if (oDlg.show) { oDlg.show(); } else { oDlg.open = true; } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } }
 
         // 스위치 상호 보정(원본 fnMakeAreaItem change 1:1).
         function _onToggle(sKey, bOn) {
@@ -301,8 +301,8 @@
         }
 
         function _close() {
-            try { oDlg.close(); } catch (e) { }
-            try { oDlg.remove(); } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     };
 

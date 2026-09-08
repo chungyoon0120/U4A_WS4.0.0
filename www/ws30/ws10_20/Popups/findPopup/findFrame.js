@@ -79,12 +79,12 @@ function _iEl(s) { var i = document.createElement("i"); i.className = "fa-solid 
 // /U4A/CL_WS_COMMON (C49/D03 등).
 function _c(sCode) {
     try { return WSMSG.fnGetMsgClsText("/U4A/CL_WS_COMMON", sCode, "", "", "", ""); }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 // ZMSG_WS_COMMON_001 (479/478/946 등 — M005 라벨·no-data). versionMng/runtimeClassNav 선례.
 function _z(sNo) {
     try { return WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo) || ""; }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 
 function _getThemeInfo() {
@@ -92,7 +92,7 @@ function _getThemeInfo() {
         var sPath = PATH.join(USERDATA, "p13n", "theme_ws4", SYSID + ".json");
         if (!FS.existsSync(sPath)) { return null; }
         return JSON.parse(FS.readFileSync(sPath, "utf-8"));
-    } catch (e) { return null; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
 }
 
 // busy(로딩 오버레이 + 닫기 차단 + 자식창/메인 브로드캐스트). runtimeClassNavigator 동일 규약.
@@ -100,9 +100,9 @@ function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
     var oEl = document.getElementById("findBusy");
     if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
-    try { CURRWIN.closable = false; } catch (e) { }   // 닫기는 닫기버튼(공통 closeWindow)으로만
+    try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 닫기는 닫기버튼(공통 closeWindow)으로만
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
-        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
+        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 }
 
@@ -110,8 +110,8 @@ function _setBusy(bOn, oOpt) {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { clearTimeout(iBusyWatch); } catch (e) { }
-    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { }
+    try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _setBusy(false);
     var oBody = document.getElementById("findBody");
     if (oBody) { oBody.classList.add("u4aFindShown"); }
@@ -129,7 +129,7 @@ function _allowM5() {
         var aWlo = oMeta && oMeta.T_REG_WLO;
         if (!Array.isArray(aWlo)) { return false; }
         return aWlo.findIndex(function (it) { return it.REGTYP === "C" && it.CHGOBJ === "UHAK901289"; }) !== -1;
-    } catch (e) { return false; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
 }
 
 // M002 좌측 Binding Field — UIATV 를 '-' 로 나눈 마지막 조각(원본 formatter 1:1).
@@ -186,7 +186,7 @@ function _deriveM5() {
         //   원본 aAttrData 행 전체(UIOBK 등 포함)를 base 로 두고 HOTKEY/EVTXT 만 덧붙인다.
         var r = Object.assign({}, o);
         r.HOTKEY = "";
-        try { var sc = JSON.parse(o.SHCUT); r.HOTKEY = sc.SCKEY || ""; } catch (e) { r.HOTKEY = ""; }
+        try { var sc = JSON.parse(o.SHCUT); r.HOTKEY = sc.SCKEY || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } r.HOTKEY = ""; }
         var m = ev.find(function (x) { return x.KEY == (r.UIATV || ""); });
         r.EVTXT = (m && m.DESC) || "";
         aOut.push(r);
@@ -327,7 +327,7 @@ function _updateNavSelection() {
 function _modeCount(oMode) {
     var n = 0;
     (oMode.panes || []).forEach(function (p) {
-        try { n += (p.deriveFn() || []).length; } catch (e) { }
+        try { n += (p.deriveFn() || []).length; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
     return n;
 }
@@ -380,7 +380,7 @@ function _buildHead(oMode) {
         var oOvf = U4AUI.attachOverflow(oActions, { noOvfAutoMargin: true, btnClass: "u4a-btn-icon" });
         if (oOvf && typeof requestAnimationFrame === "function") {
             (function _try(n) {
-                if (oActions.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { } return; }
+                if (oActions.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
                 if (n <= 0) { return; }
                 requestAnimationFrame(function () { _try(n - 1); });
             })(30);
@@ -500,12 +500,12 @@ function _renderMode(oMode, bAnimate) {
     //   stage 에 남아(하단에 이전 모드 테이블 잔상) querySelector 가 엉뚱한 걸 old 로 잡는다.
     //   진입 시 남은 페이지들 중 "가장 최근(활성)" 하나만 old 로 남기고 나머지는 즉시 제거한다.
     var aExist = oMain.querySelectorAll(".u4aFindPage");
-    for (var _i = 0; _i < aExist.length - 1; _i++) { try { aExist[_i].remove(); } catch (e) { } }
+    for (var _i = 0; _i < aExist.length - 1; _i++) { try { aExist[_i].remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     var oOldPage = aExist.length ? aExist[aExist.length - 1] : null;
     var iGen = ++_findNavGen;
 
     if (!bAnimate || !oOldPage) {
-        if (oOldPage) { try { oOldPage.remove(); } catch (e) { } }
+        if (oOldPage) { try { oOldPage.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         oMain.appendChild(oNewPage);
     } else {
         var bFwd = iNew > iOld;
@@ -518,7 +518,7 @@ function _renderMode(oMode, bAnimate) {
         var fnCleanup = function () {
             if (bDone || iGen !== _findNavGen) { return; }
             bDone = true;
-            try { oOldPage.remove(); } catch (e) { }
+            try { oOldPage.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oNewPage.classList.remove("u4aFindPage--inFwd", "u4aFindPage--inBack");
         };
         oNewPage.addEventListener("animationend", fnCleanup, { once: true });
@@ -600,8 +600,8 @@ function _buildPane(oPaneDef, aCtx) {
                     var oMF = U4AUI.createField({
                         type: "text", clear: true, placeholder: _c("A75"),
                         value: oSearch[oPaneDef.id] || "",
-                        onInput: function (v) { oSearch[oPaneDef.id] = v; try { if (oCtx.field && oCtx.field.setValue) { oCtx.field.setValue(v); } } catch (e) { } _renderTableInto(oCtx); },
-                        onClear: function () { oSearch[oPaneDef.id] = ""; try { if (oCtx.field && oCtx.field.setValue) { oCtx.field.setValue(""); } } catch (e) { } _renderTableInto(oCtx); }
+                        onInput: function (v) { oSearch[oPaneDef.id] = v; try { if (oCtx.field && oCtx.field.setValue) { oCtx.field.setValue(v); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } _renderTableInto(oCtx); },
+                        onClear: function () { oSearch[oPaneDef.id] = ""; try { if (oCtx.field && oCtx.field.setValue) { oCtx.field.setValue(""); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } _renderTableInto(oCtx); }
                     });
                     var oRow = _el("div", "u4aFindSearchMenuRow");
                     oRow.appendChild(oMF.el);
@@ -612,7 +612,7 @@ function _buildPane(oPaneDef, aCtx) {
         });
         if (oOvf && typeof requestAnimationFrame === "function") {
             (function _try(n) {
-                if (oSrchOvf.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { } return; }
+                if (oSrchOvf.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
                 if (n <= 0) { return; }
                 requestAnimationFrame(function () { _try(n - 1); });
             })(30);
@@ -627,7 +627,7 @@ function _buildPane(oPaneDef, aCtx) {
 function _renderTableInto(oCtx) {
     var oDef = oCtx.def;
     var aRows = [];
-    try { aRows = oDef.deriveFn() || []; } catch (e) { aRows = []; }
+    try { aRows = oDef.deriveFn() || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } aRows = []; }
 
     // 검색 필터(contains, 대소문자 무시 — 원본 SearchField 필터 필드 동일).
     var sQ = (oSearch[oDef.id] || "").toLowerCase();
@@ -716,12 +716,12 @@ function _onLink(sType, oRow) {
     if (sType === "controller") {
         // 컨트롤러(클래스빌더) 실행 — 완료 이벤트가 없어 원본대로 3초 후 busy 해제.
         _setBusy(true);
-        try { IPCRENDERER.send(BROWSKEY + "--find--controller", oRow); } catch (e) { }
+        try { IPCRENDERER.send(BROWSKEY + "--find--controller", oRow); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         setTimeout(function () { _setBusy(false); }, 3000);
     } else {
         // 트리 선택 — 메인이 완료 시 --find--success 로 busy 해제(가짜 타이머 금지).
         _setBusy(true);
-        try { IPCRENDERER.send(BROWSKEY + "--find", oRow); } catch (e) { }
+        try { IPCRENDERER.send(BROWSKEY + "--find", oRow); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 }
 
@@ -780,12 +780,12 @@ function _observeMain() {
 function _doRefresh() {
     if (bBusy) { return; }
     _setBusy(true);
-    try { IPCRENDERER.removeListener(BROWSKEY + "--find--data--refresh--callback", _onRefreshCallback); } catch (e) { }
+    try { IPCRENDERER.removeListener(BROWSKEY + "--find--data--refresh--callback", _onRefreshCallback); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     IPCRENDERER.on(BROWSKEY + "--find--data--refresh--callback", _onRefreshCallback);
-    try { IPCRENDERER.send(BROWSKEY + "--find--data--refresh"); } catch (e) { }
+    try { IPCRENDERER.send(BROWSKEY + "--find--data--refresh"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 function _onRefreshCallback(event, oInfo) {
-    try { IPCRENDERER.removeListener(BROWSKEY + "--find--data--refresh--callback", _onRefreshCallback); } catch (e) { }
+    try { IPCRENDERER.removeListener(BROWSKEY + "--find--data--refresh--callback", _onRefreshCallback); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oInfo) {
         oData.user = oInfo.oUserInfo || oData.user;
         oData.theme = oInfo.oThemeInfo || oData.theme;
@@ -810,8 +810,9 @@ function _openHelp() {
     var sContent = "";
     try { sContent = FS.readFileSync(PATH.join(sBase, sLangu, "index.html"), "utf-8").toString(); }
     catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         try { sContent = FS.readFileSync(PATH.join(sBase, "EN", "index.html"), "utf-8").toString(); }
-        catch (e2) { sContent = ""; }
+        catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } sContent = ""; }
     }
 
     var oDlg = _el("dialog", "u4a-dialog u4aFindHelpDlg");
@@ -823,7 +824,7 @@ function _openHelp() {
     oX.type = "button";
     oX.innerHTML = _fa("xmark");
     oX.title = _c("A39"); // Close
-    oX.addEventListener("click", function () { try { oDlg.close(); } catch (e) { } });
+    oX.addEventListener("click", function () { try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
     oHeader.appendChild(oX);
     oDlg.appendChild(oHeader);
 
@@ -837,8 +838,8 @@ function _openHelp() {
     oDlg.appendChild(oBody);
 
     document.body.appendChild(oDlg);
-    oDlg.addEventListener("close", function () { try { oDlg.remove(); } catch (e) { } });
-    try { oDlg.showModal(); } catch (e) { }
+    oDlg.addEventListener("close", function () { try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
+    try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // ── 메인(opener) → 창: 초기 데이터 수신(원본 if-find-info) ──────────────────
@@ -871,32 +872,32 @@ function _onThemeChange() {
             CURRWIN.webContents.insertCSS("html,body{margin:0;height:100%;background-color:" + oTheme.BGCOL + ";}");
             BGCOL = oTheme.BGCOL;
         }
-    } catch (e) { }
-    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // ── 타이틀바/새로고침/닫기 초기화 ───────────────────────────────────────────
 function _initChrome() {
     var oLogo = document.getElementById("findLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     var oTitle = document.getElementById("findTitle");
     if (oTitle) {
         var s = "";
-        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { s = document.title || ""; }
+        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } s = document.title || ""; }
         if (!s) { s = _c("D02"); } // Find
         oTitle.textContent = s;
     }
 
     // 창 버튼(축소/확대/닫기) — 공통 3버튼 고정(versionMng/MIME 동일).
     var oMin = document.getElementById("findWinMin");
-    if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { } }); }
+    if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }); }
     var oMax = document.getElementById("findWinMax");
     if (oMax) {
         oMax.addEventListener("click", function () {
-            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
     var oClose = document.getElementById("findWinClose");
@@ -904,13 +905,13 @@ function _initChrome() {
         oClose.addEventListener("click", function () {
             if (bBusy) { return; }
             if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); }
-            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { } }
+            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         });
     }
 }
 
 function _keepSession() {
-    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { }
+    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 function _initBroadcast() {
@@ -921,13 +922,13 @@ function _initBroadcast() {
             if (sPrc === "BUSY_ON") { _setBusy(true, { ISBROAD: true }); }
             else if (sPrc === "BUSY_OFF") { _setBusy(false, { ISBROAD: true }); }
         };
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // ── 부트 ────────────────────────────────────────────────────────────────
 window.addEventListener("load", function () {
 
-    try { CURRWIN.setMenu(null); } catch (e) { }
+    try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     _setBusy(true);
 
@@ -952,7 +953,7 @@ window.addEventListener("load", function () {
     window.addEventListener("keyup", _keepSession);
     _keepSession();
 
-    try { CURRWIN.show(); } catch (e) { }
+    try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // 안전판 — if-find-info 가 안 오면 busy 강제 해제(원본 동작엔 없던 방어).
     iBusyWatch = setTimeout(function () {
@@ -966,8 +967,8 @@ window.onbeforeunload = function () {
     if (bBusy) { return false; }
     window.removeEventListener("click", _keepSession);
     window.removeEventListener("keyup", _keepSession);
-    try { IPCRENDERER.removeListener("if-find-info", _onFindInfo); } catch (e) { }
-    try { IPCRENDERER.removeListener(BROWSKEY + "--find--data--refresh--callback", _onRefreshCallback); } catch (e) { }
-    try { IPCMAIN.removeListener(BROWSKEY + "--find--success", _onFindSuccess); } catch (e) { }
-    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { }
+    try { IPCRENDERER.removeListener("if-find-info", _onFindInfo); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCRENDERER.removeListener(BROWSKEY + "--find--data--refresh--callback", _onRefreshCallback); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCMAIN.removeListener(BROWSKEY + "--find--success", _onFindSuccess); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 };

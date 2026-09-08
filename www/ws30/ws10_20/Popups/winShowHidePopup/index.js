@@ -37,7 +37,7 @@
     // 닫기(원본 close 버튼 → currWin.close()) — 부모창 복원(투명도/클릭통과/항상위)은
     //   opener(ws_fn_04.js) 의 'closed' 핸들러가 수행(원본 동일, 여기서 중복 처리 안 함).
     function _close() {
-        try { if (!CURRWIN.isDestroyed()) { CURRWIN.close(); } } catch (e) { }
+        try { if (!CURRWIN.isDestroyed()) { CURRWIN.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     function _build() {
@@ -108,16 +108,16 @@
             if (!t) { return; }
             if (t.BGCOL) { document.documentElement.style.setProperty("--boot-bg", t.BGCOL); }
             if (t.THEME && window.U4ATheme) { window.U4ATheme.apply(window.U4ATheme.normalize(t.THEME)); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 전 창 테마 실시간 동기화([[browser-window-common-ux]]) — 구독 + 해제.
     var _sysid = (oAPP.USERINFO || {}).SYSID;
     function _onThemeChange() { _applyTheme(); }   // 변경 시 getThemeInfo 가 JSON 새로 읽어 새 테마 반영
     if (_sysid && oAPP.IPCMAIN) {
-        try { oAPP.IPCMAIN.on("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { }
+        try { oAPP.IPCMAIN.on("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         window.addEventListener("beforeunload", function () {
-            try { oAPP.IPCMAIN.off("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { }
+            try { oAPP.IPCMAIN.off("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
 

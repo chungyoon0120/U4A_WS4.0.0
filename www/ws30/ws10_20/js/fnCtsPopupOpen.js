@@ -30,7 +30,7 @@
     // 메시지 클래스 텍스트 헬퍼(원본 fnGetMsgClsText 호출 그대로).
     function _txt(sCls, sCode) {
         try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, "", "", "", ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     const _fa = (sName) => '<i class="fa-solid fa-' + sName + '"></i>';
 
@@ -338,8 +338,8 @@
         }
 
         function _close() {
-            try { oDlg.close(); } catch (e) { }
-            try { oDlg.remove(); } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // ESC → 닫기.

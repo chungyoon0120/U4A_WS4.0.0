@@ -101,11 +101,11 @@ function getPreviewSelectionEffectHostValue(sName) {
 
 	try {
 		aTargets.push(parent);
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	try {
 		aTargets.push(parent.parent);
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	aTargets.push(window);
 
@@ -114,7 +114,7 @@ function getPreviewSelectionEffectHostValue(sName) {
 			if (typeof aTargets[i]?.[sName] !== "undefined") {
 				return aTargets[i][sName];
 			}
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -131,7 +131,7 @@ function getPreviewSelectionEffectRequire() {
 		if (oRemote?.require) {
 			return oRemote.require.bind(oRemote);
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 function getPreviewSelectionEffectSysId() {
@@ -139,19 +139,19 @@ function getPreviewSelectionEffectSysId() {
 		if (parent?.process?.USERINFO?.SYSID) {
 			return parent.process.USERINFO.SYSID;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	try {
 		if (parent?.oAPP?.attr?.metadata?.USERINFO?.SYSID) {
 			return parent.oAPP.attr.metadata.USERINFO.SYSID;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	try {
 		if (u4aRootParent?.process?.USERINFO?.SYSID) {
 			return u4aRootParent.process.USERINFO.SYSID;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	return "";
 }
@@ -167,7 +167,7 @@ function getPreviewSelectionEffectP13nRoot() {
 		if (typeof parent?.getPath === "function") {
 			return parent.getPath("P13N_ROOT");
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	try {
 		var oPath = getPreviewSelectionEffectHostValue("PATH");
@@ -176,7 +176,7 @@ function getPreviewSelectionEffectP13nRoot() {
 		if (oPath && oRemote?.app?.getPath) {
 			return oPath.join(oRemote.app.getPath("userData"), "p13n");
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 function getPreviewSelectionEffectDbPath() {
@@ -188,6 +188,7 @@ function getPreviewSelectionEffectDbPath() {
 			var oRequire = getPreviewSelectionEffectRequire();
 			oPath = typeof oRequire === "function" ? oRequire("path") : null;
 		} catch (e) {
+		    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 			oPath = null;
 		}
 	}
@@ -224,6 +225,7 @@ function openPreviewSelectionEffectDb() {
 			fileMustExist: true
 		});
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		return null;
 	}
 }
@@ -292,11 +294,12 @@ function readPreviewSelectionEffectRow(sEffty) {
 
 		return oRow || null;
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		return null;
 	} finally {
 		try {
 			oDb.close();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -368,7 +371,7 @@ function attachPreviewSelectionEffectIpcEvent() {
 		oWS.sMark.sSelectionEffectIpcChannel = "if-p13n-selectionEffectChange-" + sSysID;
 		oIpcMain.on(oWS.sMark.sSelectionEffectIpcChannel, onPreviewSelectionEffectChange);
 		oWS.sMark.bSelectionEffectIpcAttached = true;
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 function detachPreviewSelectionEffectIpcEvent() {
@@ -385,7 +388,7 @@ function detachPreviewSelectionEffectIpcEvent() {
 		oWS.sMark.oSelectionEffectIpcMain = null;
 		oWS.sMark.sSelectionEffectIpcChannel = "";
 		oWS.sMark.bSelectionEffectIpcAttached = false;
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 window.addEventListener("pagehide", detachPreviewSelectionEffectIpcEvent);
@@ -403,6 +406,7 @@ function getPreviewSelectionPersonalization() {
 			parent?.oAPP?.DATA?.APPDATA?.PREVIEW_SELECTION_PERSONALIZATION ||
 			null;
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		oPers = null;
 	}
 	if (!oPers || typeof oPers !== "object") {
@@ -650,6 +654,7 @@ function getPreviewContextMenuPersonalization() {
 			parent?.oAPP?.DATA?.APPDATA?.PREVIEW_CONTEXT_PERSONALIZATION ||
 			null;
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		oPers = null;
 	}
 
@@ -754,7 +759,7 @@ function setPreviewRuntimePersonalization(sAttrName, sWindowName, oConfig) {
 		if (parent?.oAPP?.attr) {
 			parent.oAPP.attr[sAttrName] = oTarget;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	return oTarget;
 }
@@ -790,7 +795,7 @@ function getPreviewMarkVisiblePersonalization() {
 		if (typeof parent?.oAPP?.attr?.previewMarkVisible !== "undefined") {
 			return normalizePreviewMarkVisibleState(parent.oAPP.attr.previewMarkVisible);
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	if (typeof window._u4aPreviewMarkVisible !== "undefined") {
 		return normalizePreviewMarkVisibleState(window._u4aPreviewMarkVisible);
@@ -821,7 +826,7 @@ window.u4aSetPreviewMarkVisible = function(bVisible) {
 		if (parent?.oAPP?.attr) {
 			parent.oAPP.attr.previewMarkVisible = bState;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	return applyPreviewMarkVisibility(bState);
 };
@@ -1331,7 +1336,7 @@ function defineU4ACustomData() {
 				for (i = 0; i < aFound.length; i++) {
 					addDomCandidate(aDoms, aFound[i]);
 				}
-			} catch (e) {}
+			} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 		}
 
 		
@@ -1375,6 +1380,7 @@ function defineU4ACustomData() {
 								return oBaseDom;
 							}
 						} catch (e) {
+						    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 							return null;
 						}
 					}
@@ -1396,6 +1402,7 @@ function defineU4ACustomData() {
 			try {
 				return oBaseDom.querySelector(sSelector);
 			} catch (e) {
+			    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 				// 잘못된 CSS selector는 DOM 반영 대상 없음으로 처리한다.
 				return null;
 			}
@@ -2144,7 +2151,7 @@ function removePreviewMarkCustomData(oUi, sKey, vValue) {
 	try {
 		oUi.removeCustomData(oCustomData);
 		oCustomData.destroy();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 /**
@@ -2169,7 +2176,7 @@ function cleanupPreviewMarkDomFallback() {
 		for (var i = 0, l = aSelectedDom.length; i < l; i++) {
 			aSelectedDom[i].removeAttribute(oWS.sMark.selectedAttr);
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 
@@ -2190,7 +2197,7 @@ function cleanupPreviewContextMenuMarkDomFallback() {
 		for (var i = 0, l = aContextDom.length; i < l; i++) {
 			aContextDom[i].removeAttribute(oWS.sMark.contextAttr);
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 /**
@@ -2244,7 +2251,7 @@ function bindPreviewContextMenuMarkCleanup(oMenu) {
 		}
 		try {
 			oMenu[aCloseEvents[i]](removePreviewContextMenuMark);
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	if (typeof oMenu.close !== "function" || oMenu._u4aContextMarkCloseWrapped === true) {
 		return;
@@ -2363,7 +2370,7 @@ function collectPreviewSelectionDomCandidates(oUi) {
 			for (var i = 0, l = aFound.length; i < l; i++) {
 				lf_addDom(aFound[i]);
 			}
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	if (!oUi) {
 		return aDoms;
@@ -2431,6 +2438,7 @@ function getPreviewSelectionDomScore(oUi, oDom, oRect, iIndex) {
 	try {
 		oStyle = window.getComputedStyle ? window.getComputedStyle(oDom) : null;
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		oStyle = null;
 	}
 
@@ -2604,7 +2612,7 @@ function hasPreviewSelectionInteractiveSemantics(oTargetDom) {
 		if (typeof oTargetDom.querySelector === "function" && oTargetDom.querySelector(sInteractiveSelector)) {
 			return true;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	return false;
 }
@@ -2641,12 +2649,12 @@ function disconnectPreviewSelectionObservers() {
 	if (oWS.sMark.oSelectionResizeObserver) {
 		try {
 			oWS.sMark.oSelectionResizeObserver.disconnect();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	if (oWS.sMark.oSelectionIntersectionObserver) {
 		try {
 			oWS.sMark.oSelectionIntersectionObserver.disconnect();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 
 	/**
@@ -2659,7 +2667,7 @@ function disconnectPreviewSelectionObservers() {
 	if (oWS.sMark.oSelectionMutationObserver) {
 		try {
 			oWS.sMark.oSelectionMutationObserver.disconnect();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	oWS.sMark.oSelectionResizeObserver = null;
 	oWS.sMark.oSelectionMutationObserver = null;
@@ -2703,7 +2711,7 @@ function observePreviewSelectionTarget(oTargetDom, oUi) {
 			} else if (document.documentElement) {
 				oWS.sMark.oSelectionResizeObserver.observe(document.documentElement);
 			}
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 
 	/**
@@ -2729,7 +2737,7 @@ function observePreviewSelectionTarget(oTargetDom, oUi) {
 					attributeFilter: ["class", "style"]
 				});
 			}
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	if (typeof window.IntersectionObserver === "function") {
 		
@@ -2751,7 +2759,7 @@ function observePreviewSelectionTarget(oTargetDom, oUi) {
 		});
 		try {
 			oWS.sMark.oSelectionIntersectionObserver.observe(oTargetDom);
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -2979,7 +2987,7 @@ function ensurePreviewSelectionLayerEvents() {
 				oCore.attachUIUpdated(requestPreviewMarkLayerUpdate);
 			}
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	oWS.sMark.bSelectionLayerEventBound = true;
 }
 //#endregion
@@ -3011,7 +3019,7 @@ oWS.sMark.fn_mark = function(oMarkUi) {
 	if (typeof oMarkUi.focus === "function") {
 		try {
 			oMarkUi.focus();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 
 	ensurePreviewSelectionLayerEvents();
@@ -3456,7 +3464,7 @@ function setUIProp(UIOBK, UILIB, T_0015, T_UA018, T_UA032, T_UA030) {
 	try {
 		var _oUi = getUIClassInstance(UILIB);
 		l_meta = _oUi.getMetadata();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	for (var i = 0, l = T_0015.length; i < l; i++) {
 		if (T_0015[i].UIASN === "DRAGABLE") {
 			continue;
@@ -3617,7 +3625,7 @@ function addUIObjPreView(OBJID, UIOBK, UILIB, UIFND, POBID, PUIOK, UIATT, T_0015
 	if (ls_0022 && ls_0022.TGLIB !== "" && ls_0022.UIFND.indexOf("U4A.") === -1 && ls_0022.UIFND.indexOf("SAPUI6.") === -1) {
 		try {
 			sap.ui.getCore().loadLibrary(ls_0022.TGLIB);
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	var lt_0015 = [];
 	if (typeof T_0015 !== "undefined") {
@@ -3856,7 +3864,7 @@ function freeUiDom(oUi) {
 	}
 	try {
 		l_dom.remove();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	freeUiDom(oUi);
 }
 
@@ -3894,7 +3902,7 @@ function removeAllTreeChild(is_tree) {
 		try {
 			parent.oAPP.attr.prev[is_tree.OBJID].removeAllAggregation(lt_aggr[i]);
 			parent.oAPP.attr.prev[is_tree.OBJID][l_remove]();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -3981,7 +3989,7 @@ async function refreshPreview(is_tree) {
 		var _oPromise = _oRender.setAfterRendering(parent.oAPP.attr.ui.prevRootPage);
 		try {
 			parent.oAPP.attr.ui.prevRootPage.removeAllContent();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 		parent.oAPP.attr.ui.prevRootPage.invalidate();
 		await _oPromise;
 		parent.oAPP.attr.UA015UI = parent.oAPP.attr.prev[is_tree.OBJID];
@@ -4417,7 +4425,7 @@ function destroyPreviewUi(is_tree) {
 	}
 	try {
 		parent.oAPP.attr.prev[is_tree.OBJID].destroy();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 
@@ -4431,14 +4439,14 @@ function destroyPlanningCalendarRow(is_tree) {
 	}
 	try {
 		l_ui.destroy();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	l_ui = sap.ui.getCore().byId(parent.oAPP.attr.prev[is_tree.OBJID].sId + "-CalRow");
 	if (!l_ui) {
 		return;
 	}
 	try {
 		l_ui.destroy();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 
@@ -4450,7 +4458,7 @@ function destroyPreviewUiOthers() {
 	for (var i in ls_ui) {
 		try {
 			ls_ui[i].destroy();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -5044,6 +5052,7 @@ function createUIInstance(is_tree, it_0015) {
 	try {
 		sap.ui.requireSync(ls_0022.LIBNM.replace(/\./g, "/"));
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		parent.oAPP.attr.prev[is_tree.OBJID] = new sap.ui.core.Element();
 		var lt_0015 = it_0015 || parent.oAPP.DATA.APPDATA.T_0015.filter(a => a.OBJID === is_tree.OBJID);
 		parent.oAPP.attr.prev[is_tree.OBJID]._T_0015 = lt_0015;
@@ -5066,12 +5075,13 @@ function createUIInstance(is_tree, it_0015) {
 	try {
 		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid(), setUIProperty(is_tree, lt_0015));
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid());
 	}
 	addPreviewTabIndexCustomData(parent.oAPP.attr.prev[is_tree.OBJID]);
 	try {
 		setUIPropertyDirectly(is_tree.OBJID, lt_0015);
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	parent.oAPP.attr.prev[is_tree.OBJID]._T_0015 = lt_0015;
 	parent.oAPP.attr.prev[is_tree.OBJID]._MODEL = {};
 	parent.oAPP.fn.setAggrBind(parent.oAPP.attr.prev[is_tree.OBJID]);
@@ -5691,7 +5701,7 @@ function start() {
 								(!a || a && a.indexOf(t) < 0) && i.addAggregation("content", t, !0)
 							}
 						}), this)
-					} catch (t) {}
+					} catch (t) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(t); }}
 					return this
 				};
 				sap.ui.requireSync("sap/ui/layout/form/SimpleForm");

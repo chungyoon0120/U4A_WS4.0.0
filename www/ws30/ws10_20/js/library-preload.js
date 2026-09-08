@@ -56,6 +56,14 @@
         MIMETYPE: "script"
     },
     {
+        /**
+         * 공통 로그 함수 (2026-09-08 추가)
+         * ws_common.js 의 서버 통신 로그가 이 함수를 쓰므로 반드시 먼저 올라와야 한다.
+         */
+        URL: "./js/ws_html5_logger.js",
+        MIMETYPE: "script"
+    },
+    {
         URL: "./js/ws_common.js",
         MIMETYPE: "script"
     },

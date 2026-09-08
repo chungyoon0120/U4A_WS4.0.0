@@ -73,6 +73,7 @@ let oAPP = (function (window) {
         try {
             var oThemeJsonData = JSON.parse(sThemeJson);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -93,7 +94,7 @@ let oAPP = (function (window) {
         let sKey = window.U4ATheme.apply(sUI5Theme);
 
         // 테마 <link> 로드 후 첫 페인트 플래시용 --boot-bg 는 해제(안 그러면 테마 미리보기 시 배경 고정).
-        try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { }
+        try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         return sKey;
 
@@ -135,7 +136,7 @@ let oAPP = (function (window) {
         try {
             var oW = oAPP.REMOTE.getCurrentWindow();
             if (oW && !oW.isDestroyed()) { oW.setClosable(true); oW.destroy(); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     oAPP.fn.attachOpenerCloseWatch = function () {
         var iOpenerId = parseInt(oQueryParams.OPENERID, 10);
@@ -145,10 +146,10 @@ let oAPP = (function (window) {
             if (_oOpenerWin && !_oOpenerWin.isDestroyed()) {
                 _oOpenerWin.once('closed', _onOpenerClosed);
             }
-        } catch (e) { _oOpenerWin = null; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _oOpenerWin = null; }
     };
     oAPP.fn.detachOpenerCloseWatch = function () {
-        try { if (_oOpenerWin && !_oOpenerWin.isDestroyed()) { _oOpenerWin.removeListener('closed', _onOpenerClosed); } } catch (e) { }
+        try { if (_oOpenerWin && !_oOpenerWin.isDestroyed()) { _oOpenerWin.removeListener('closed', _onOpenerClosed); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _oOpenerWin = null;
     };
 
@@ -170,16 +171,16 @@ let oAPP = (function (window) {
             if (bOn) {
                 if (!oB.__cancelBound) { oB.addEventListener("cancel", function (e) { e.preventDefault(); }); oB.__cancelBound = true; } // ESC 닫힘 차단
                 if (_iBusyDelay) { clearTimeout(_iBusyDelay); }
-                _iBusyDelay = setTimeout(function () { try { if (!oB.open) { oB.showModal(); } } catch (e) { } }, 300); // 0.3s 지연(짧은 작업은 안 뜸)
+                _iBusyDelay = setTimeout(function () { try { if (!oB.open) { oB.showModal(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 300); // 0.3s 지연(짧은 작업은 안 뜸)
             } else {
                 if (_iBusyDelay) { clearTimeout(_iBusyDelay); _iBusyDelay = null; }
-                try { if (oB.open) { oB.close(); } } catch (e) { }
+                try { if (oB.open) { oB.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         }
 
         // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 fnClose(setClosable→close)로만.
         //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
-        try { oAPP.CURRWIN.closable = false; } catch (e) { }
+        try { oAPP.CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.setBusy
 
@@ -196,7 +197,7 @@ let oAPP = (function (window) {
      ***********************************************************/
     function _msgTitle(sType) {
         var m = { S: "D86", E: "B93", W: "B89", I: "B86", C: "B86" }, k = m[sType] || "B86";
-        try { return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", k) || ""; } catch (e) { return ""; }
+        try { return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", k) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     var _iToastTimer = null;
     oAPP.fn.showMessage = function (a, b, sType, sMsg, fnCb) {
@@ -218,7 +219,7 @@ let oAPP = (function (window) {
         // 오류/경고 → 메시지 박스(OK). (놓치기 쉬운 토스트 대신 모달로 확실히 노출)
         if ((sType === "E" || sType === "W") && window.U4AUI && U4AUI.confirm) {
             var sOk = "OK";
-            try { sOk = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A40") || "OK"; } catch (e) { } // Confirm
+            try { sOk = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A40") || "OK"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } // Confirm
             U4AUI.confirm({ type: sType, title: _msgTitle(sType), message: sMsg, buttons: [{ act: "OK", label: sOk, emphasized: true }] });
             return;
         }
@@ -250,7 +251,7 @@ let oAPP = (function (window) {
      *     ④ needCts → CTS 팝업(opts.onCts)
      ***********************************************************/
     function _genericErrTxt() {
-        try { return oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.LANGU || "", "ZMSG_WS_COMMON_001", "314", ""); } catch (e) { return "Error"; }
+        try { return oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.LANGU || "", "ZMSG_WS_COMMON_001", "314", ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return "Error"; }
     }
     // SAP 프레임워크 메시지(메시지클래스 키 아님) 패턴사전 — 대표 케이스만 최소.
     var _FW_PATTERNS = [
@@ -282,14 +283,14 @@ let oAPP = (function (window) {
             var sRaw = String(sServerText || "");
             var sLoc = WC.relocalize(sRaw, null, oAPP.attr.LANGU || "");
             return (sLoc && sLoc !== sRaw) ? sLoc : null;   // 원문 그대로면 못 찾은 것 → null(프레임워크 패턴/원문 폴백)
-        } catch (e) { return null; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
     }
 
     // SAP 프레임워크 메시지(키 없음) 패턴사전.
     function _frameworkLocalize(sText) {
         for (var i = 0; i < _FW_PATTERNS.length; i++) {
             if (_FW_PATTERNS[i].re.test(sText)) {
-                try { return oAPP.common.fnGetMsgClsText(_FW_PATTERNS[i].cls, _FW_PATTERNS[i].no); } catch (e) { }
+                try { return oAPP.common.fnGetMsgClsText(_FW_PATTERNS[i].cls, _FW_PATTERNS[i].no); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         }
         return null;
@@ -317,14 +318,14 @@ let oAPP = (function (window) {
         //   "취소" 하면 아래 깔린 오류만 남아 "취소인데 오류" 로 보였다(원본 eval 이 둘 다 실행한 잘못된 UX).
         //   → 취소=조용히 종료, 선택=재시도. (CTS 처리기 없을 때만 아래에서 오류 메시지 표시)
         if (bNeedCts && typeof opts.onCts === "function") {
-            try { opts.onCts(); } catch (e) { }
+            try { opts.onCts(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
 
         // ② 역현지화(완전일치/템플릿) → ③ 프레임워크 패턴 → 원문 폴백.
         if (sText) {
             var sLoc = null;
-            try { sLoc = _reverseLocalize(sText) || _frameworkLocalize(sText); } catch (e) { sLoc = null; }
+            try { sLoc = _reverseLocalize(sText) || _frameworkLocalize(sText); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sLoc = null; }
             oAPP.fn.showMessage(null, 20, sType, sLoc || sText);
         } else {
             // 표시할 것도 후속동작도 없으면 일반 오류.
@@ -334,7 +335,7 @@ let oAPP = (function (window) {
 
     // 사운드/로그인 체크/푸터메시지 — 별도창에선 경량 처리(원본 부작용 없음).
     oAPP.fn.setSoundMsg = function () { /* 별도창 — 사운드 생략(원본 sap sound 비결합) */ };
-    oAPP.fn.sendAjaxLoginChk = function (cb) { try { cb({ RETCD: "S" }); } catch (e) { } };
+    oAPP.fn.sendAjaxLoginChk = function (cb) { try { cb({ RETCD: "S" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } };
     oAPP.fn.fnHideFloatingFooterMsg = function () { };
     oAPP.fn.getUserInfo = function () { return oAPP.attr.oUserInfo || { LANGU: oAPP.attr.LANGU }; };
     oAPP.fn.getServerPath = function () { return oAPP.attr.servNm || ""; };
@@ -346,7 +347,7 @@ let oAPP = (function (window) {
      *   앱정보는 if-mime-info IPC 로 늦게 도착하므로, 초기(fnInitHeader)+도착 시 둘 다 호출.
      ************************************************************************/
     oAPP.fn.fnSetTitle = function () {
-        function T(k) { try { return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", k); } catch (e) { return ""; } }
+        function T(k) { try { return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", k); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; } }
         var s = T("C26") || "U4A MIME Repository";
         var oApp = oAPP.attr.oAppInfo || {};
         if (oApp.APPID) {
@@ -361,7 +362,7 @@ let oAPP = (function (window) {
         }
         var oT = document.getElementById("mimeTitle");
         if (oT) { oT.textContent = s; }
-        try { document.title = s; } catch (e) { }
+        try { document.title = s; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     /************************************************************************
@@ -375,17 +376,17 @@ let oAPP = (function (window) {
                 var sLogoPath = String(oAPP.PATHINFO.WS_LOGO).replace(/\\/g, "/");
                 oLogo.src = encodeURI("file:///" + sLogoPath);
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         oAPP.fn.fnSetTitle();   // 제목(+현재 앱 APPID). 앱정보는 IPC 도착 시 재호출로 갱신.
 
         var oMin = document.getElementById("mimeWinMin");
-        if (oMin) { oMin.addEventListener("click", function () { try { oAPP.CURRWIN.minimize(); } catch (e) { } }); }
+        if (oMin) { oMin.addEventListener("click", function () { try { oAPP.CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }); }
 
         var oMax = document.getElementById("mimeWinMax");
         if (oMax) {
             oMax.addEventListener("click", function () {
-                try { if (oAPP.CURRWIN.isMaximized()) { oAPP.CURRWIN.unmaximize(); } else { oAPP.CURRWIN.maximize(); } } catch (e) { }
+                try { if (oAPP.CURRWIN.isMaximized()) { oAPP.CURRWIN.unmaximize(); } else { oAPP.CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
 
@@ -407,7 +408,7 @@ let oAPP = (function (window) {
                 oCurrWin.setClosable(true);
                 oCurrWin.close();
             }
-        } catch (e) { /* 이미 파괴된 창 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 이미 파괴된 창 무시 */ }
 
     }; // end of oAPP.fn.fnClose
 
@@ -442,10 +443,10 @@ let oAPP = (function (window) {
 
         // 본문 페이드인 + 메인 Busy Lock 해제(원본 별도창 동일).
         oAPP.fn.fnShowContent();
-        try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { }
+        try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // ★형제 창 BUSY_OFF broadcast(opener fnMimeWindowOpener 가 oMainBroad BUSY_ON 으로 형제창 잠금 → 짝맞춤).
         //   SETBUSYLOCK 은 "메인" busy 만 풀어 형제창(docPopup 등)은 안 풀린다 → 영구 busy+닫기차단 방지.
-        try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } catch (e) { }
+        try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     });
 
@@ -458,12 +459,12 @@ let oAPP = (function (window) {
     //   eval 된 SCRIPT 가 그대로 동작하게 한다(최상위 창이라 parent === window). [guard-server-script-eval]
     try {
         window.showMessage = function () { return oAPP.fn.showMessage.apply(oAPP.fn, arguments); };
-        window.setSoundMsg = function () { try { return oAPP.fn.setSoundMsg.apply(oAPP.fn, arguments); } catch (e) { } };
-        window.setBusy = function (s) { try { return oAPP.fn.setBusy(s); } catch (e) { } };
+        window.setSoundMsg = function () { try { return oAPP.fn.setSoundMsg.apply(oAPP.fn, arguments); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } };
+        window.setBusy = function (s) { try { return oAPP.fn.setBusy(s); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } };
         window.getServerPath = function () { return oAPP.fn.getServerPath(); };
         window.getUserInfo = function () { return oAPP.fn.getUserInfo(); };
         if (!window.sap) { window.sap = { ui: { getCore: function () { return { byId: function () { return null; } }; } } }; }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     return oAPP;
 
@@ -479,7 +480,7 @@ window.onload = function () {
     try {
         var oTheme = oAPP.fn.getThemeInfo();
         if (oTheme && oTheme.THEME) { oAPP.fn.applyTheme(oTheme.THEME); }
-    } catch (e) { /* 기본 라이트 토큰 */ }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 기본 라이트 토큰 */ }
 
     oAPP.CURRWIN.setMenu(null);
     oAPP.fn.fnInitHeader();
@@ -490,7 +491,7 @@ window.onload = function () {
     //   다이얼로그(생성/가져오기/확인)가 각자 cancel 로 자기만 닫는다. 창 닫기는 타이틀바 X/Alt+F4만.
 
     // 창 즉시 표시(네이티브 opacity 페이드 미사용 — 흰 플래시 방지). 위치는 opener ready-to-show 에서.
-    try { oAPP.CURRWIN.show(); } catch (e) { }
+    try { oAPP.CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
 };
 

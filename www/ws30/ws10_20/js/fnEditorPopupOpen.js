@@ -195,7 +195,7 @@
 
         // 저장으로 변경분 발생 → WS20 헤더 Active→Inactive 반영(클라이언트 에디터 lf_cb 와 동일 처리).
         //   setAppInfo 가 글로벌 oAppInfo 에 ACTST="I"/IS_CHAG="X" 를 세팅했으므로 헤더만 다시 그린다.
-        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.fnIpcMain_EditorSave
 

@@ -69,6 +69,10 @@
       "**/node_modules/@electron/remote/**/*"
     ],
     "extraResources": [
+      {
+        "from": "test/telegram_token.json",
+        "to": "telegram_token.json"
+      },
       "./node_modules/**/*",
       "./node_modules/@electron/remote/**",
       "./www/ext_api/nsh/**",

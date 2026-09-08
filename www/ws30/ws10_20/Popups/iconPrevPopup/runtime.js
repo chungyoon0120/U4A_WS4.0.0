@@ -86,7 +86,7 @@ oAPP.fn.attachInit = async () => {
     jQuery.sap.require("sap.m.MessageBox");
 
     // 셸 공통 .u4a-busy 해제(초기 서버 UI5 로드 인디케이터) — 이후 콘텐츠 busy 는 oAPP.setBusy(UI5).
-    try { parent.oAPP.fn.setShellBusy(false); } catch (e) { }
+    try { parent.oAPP.fn.setShellBusy(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     oAPP.setBusy("X");
 

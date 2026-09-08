@@ -184,7 +184,7 @@
         try { parent.setAppChange('X'); } catch (e) { console.error("[HTML5][errPageEditor] setAppChange 오류:", e && e.message); }
 
         // 저장으로 변경분 발생 → WS20 헤더 Active→Inactive 반영(에디터 시리즈 fnIpcMain_EditorSave 와 동일 처리).
-        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.fnIpcMain_ErrorPageEditorSave
 
@@ -279,7 +279,7 @@
             // [HTML5] 네이티브 opacity 페이드 제거 — 로드 완료 시 닫기 버튼만 즉시 활성화.
             try {
                 if (!oBrowserWindow.isDestroyed()) { oBrowserWindow.closable = true; }
-            } catch (error) { }
+            } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); } }
 
             // 오류 페이지 미리보기가 로드가 되면 오류 페이지 에디터에 실행중인 Busy를 끄라고 알린다.
             parent.IPCRENDERER.send(`if-errorPageEditor-setBusy-${parent.getBrowserKey()}`, "");

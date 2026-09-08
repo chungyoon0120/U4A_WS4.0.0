@@ -163,7 +163,7 @@ module.exports = function(REMOTE, oAPP){
 
         //  현재 윈도우가 닫힐 때(새로고침 등) 브라우저 정리 (1회성)
         window.addEventListener('pagehide', function(){
-            try { oBrowserWindow.close(); } catch (error) {}
+            try { oBrowserWindow.close(); } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
         }, { once: true });
 
 

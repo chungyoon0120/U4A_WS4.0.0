@@ -43,7 +43,7 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   var _fa = function (s) { return '<i class="fa-solid fa-' + s + '"></i>'; };
   function _txt(sCls, sCode, p1, p2, p3, p4) {
     try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
   // 서버가 "백엔드(로그온) 언어로 구워" 보낸 메시지 텍스트를 접속(워크스페이스) 언어로 되돌린다.
   //   서버는 성공/오류 메시지를 세션 언어(SY-LANGU)로 렌더한 완성 텍스트(RTMSG)로만 내려주고
@@ -58,7 +58,7 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
       if (!wsL || (beL && beL === wsL)) { return sText; }
       var WC = parent.REMOTE ? parent.REMOTE.getGlobal("WsMsgCls") : null;
       return (WC && WC.relocalize) ? WC.relocalize(sText, beL, wsL) : sText;
-    } catch (e) { return sText; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sText; }
   }
   function _el(sTag, sClass, sText) {
     var o = document.createElement(sTag);
@@ -149,8 +149,8 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   //팝업 종료.
   function lf_dialogClose(bSkipMsg) {
 
-    try { oDlg.close(); } catch (e) { }
-    try { oDlg.remove(); } catch (e) { }
+    try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     if (bSkipMsg === true) { return; }
 
@@ -216,8 +216,8 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
       parent.showMessage(null, 20, "E", APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "274", "", "", "", ""));
 
       //첫 오류 필드로 포커스 → value-state 메시지가 바로 보이게(공통 :focus-within 노출 규약).
-      if (oData.meth_stat === "Error") { try { oMethInp.focus(); } catch (e) { } }
-      else if (oData.desc_stat === "Error") { try { oDescInp.focus(); } catch (e) { } }
+      if (oData.meth_stat === "Error") { try { oMethInp.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+      else if (oData.desc_stat === "Error") { try { oDescInp.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
       return l_erflag;
     }
@@ -548,11 +548,11 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   if (window.U4AUI && U4AUI.attachSuggest && typeof oAPP.fn.fnSuggestionRead === "function") {
     U4AUI.attachSuggest(oMethInp, function () {
       try { return (oAPP.fn.fnSuggestionRead("crtServEvtMethName") || []).map(function (o) { return o && o.NAME; }).filter(Boolean); }
-      catch (e) { return []; }
+      catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return []; }
     });
     U4AUI.attachSuggest(oDescInp, function () {
       try { return (oAPP.fn.fnSuggestionRead("crtServEvtMethDesc") || []).map(function (o) { return o && o.NAME; }).filter(Boolean); }
-      catch (e) { return []; }
+      catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return []; }
     });
   }
 
@@ -580,7 +580,7 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   document.body.appendChild(oDlg);
 
   //서버이벤트 생성 팝업 호출(구 oDlg.open()).
-  try { oDlg.showModal(); } catch (e) { document.body.appendChild(oDlg); }
+  try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } document.body.appendChild(oDlg); }
 
   //dialog 호출시 이벤트(구 oDlg.attachAfterOpen).
   parent.setBusy("");
@@ -588,7 +588,7 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
 
   //메소드명에 focus 처리.
   requestAnimationFrame(function () {
-    try { oMethInp.focus(); } catch (e) { }
+    try { oMethInp.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   });
 
 }; // 이벤트 생성 팝업 호출.

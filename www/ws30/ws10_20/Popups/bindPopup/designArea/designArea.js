@@ -108,7 +108,7 @@
         // UI 컨트롤 아이콘(T_0022 UICON) — fnGetSapIconPath 있으면 이미지, 없으면 skip(FA 폴백은 icon()).
         var s0022 = (oAPP.attr.T_0022 || []).find(function (a) { return a.UIOBK === t.S_14_UIOBK; });
         if (s0022 && typeof oAPP.fn.fnGetSapIconPath === "function") {
-            try { t._image_src = oAPP.fn.fnGetSapIconPath(s0022.UICON); t._image_visible = true; } catch (e) { }
+            try { t._image_src = oAPP.fn.fnGetSapIconPath(s0022.UICON); t._image_visible = true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         aTree.push(t);
     }
@@ -190,7 +190,7 @@
         var r = { RETCD: "", RTMSG: "", IF_DATA: null };
         if (!sPrc001) { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("099"); return r; }                       // 099 Drag 정보 없음
         var o;
-        try { o = JSON.parse(sPrc001); } catch (e) { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("100"); return r; }  // 100 잘못된 Drag 정보
+        try { o = JSON.parse(sPrc001); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("100"); return r; }  // 100 잘못된 Drag 정보
         if (!o || o.PRCCD !== "PRC001") { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("101"); return r; }     // 101 작업 수행 불가
         if (o.DnDRandKey !== oAPP.attr.DnDRandKey) { r.RETCD = "E"; r.RTMSG = oAPP.common.zmsg("102"); return r; }  // 102 다른 영역 Drag
         // ★[BR64] payload 의 추가속성 검증 오류(o.RETCD==="E")는 여기서 막지 않는다 — 원본 _checkDragData
@@ -351,7 +351,7 @@
         //   그 경로(UIATV) 필드를 자동 선택 → 우측 참조필드(P05) 목록이 자동으로 채워짐(선택 왕복 제거).
         //   ★링크 클릭 경로에서만 호출 — _showBindAdditInfo 자체(적용/새로고침 재구성)엔 안 걸어 부작용 차단.
         if (n && n.UIATV && typeof oAPP.fn.selectModelFieldByPath === "function") {
-            try { oAPP.fn.selectModelFieldByPath(n.UIATV); } catch (e) { }
+            try { oAPP.fn.selectModelFieldByPath(n.UIATV); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     };
 
@@ -933,7 +933,7 @@
         if (oAPP.attr.editable === false) { return false; }
         if (typeof oData === "undefined" || oData === null || oData === "") { return false; }
         var _sDragData;
-        try { _sDragData = JSON.parse(oData); } catch (e) { return false; }
+        try { _sDragData = JSON.parse(oData); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
 
         var _sRes = _chkDesignTreeDragData(_sDragData);
         if (_sRes.RETCD === "E") { oAPP.fn.toast(_sRes.RTMSG); return true; }
@@ -1023,7 +1023,7 @@
             // ★ 편집 불가 OR 동일속성 적용 팝업 열림 = drop 불가 → preventDefault 안 함 → 커서 '불가(🚫)'. drop 이벤트가 와도 _onDesignDrop 이 막는다.
             if (oAPP.attr.editable === false || oAPP.attr.bSyncDialogLock === true) { _dropZone(false); _setDropRow(null); return; }
             // ① WS20 디자인 트리 드래그(외부 창) — 트리 전체가 드롭 타겟 + 드롭존 표시.
-            if (_hasPrc002(dt)) { ev.preventDefault(); try { dt.dropEffect = "copy"; } catch (e) { } _dropZone(true); return; }
+            if (_hasPrc002(dt)) { ev.preventDefault(); try { dt.dropEffect = "copy"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } _dropZone(true); return; }
             // ② 좌측 모델필드 드래그(로컬) — drop 가능행 위에서만 허용 + 그 행에 드롭존 테두리.
             if (!oAPP.attr.dragModelNode) { _setDropRow(null); return; }
             var oRowEl = (ev.target && ev.target.closest) ? ev.target.closest(".u4a-tree__row") : null;
@@ -1124,7 +1124,7 @@
             // [R3/ΔF1] 최상위 UI OBJID 를 WS20 에 통지(원본 setDesignTreeData 끝 SEND-ROOT-OBJID, designTree.js:3384).
             //   aTree[0] = 첫 _build0014(최상위 UI). 채널 없으면(팝업 단독) sendRootObjid 가 조용히 skip.
             if (aTree.length && typeof oAPP.fn.sendRootObjid === "function") {
-                try { oAPP.fn.sendRootObjid(aTree[0].OBJID); } catch (e) { }
+                try { oAPP.fn.sendRootObjid(aTree[0].OBJID); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         }
 
@@ -1227,7 +1227,7 @@
             // ★접힌 조상 먼저 펼침(원본은 선택 시 해당 위치까지 확장). 안 그러면 대상 행 DOM 이 없어
             //   선택 강조·스크롤이 무효(장군님 지적 2026-07-29). ★펼침→선택 순서 필수(재렌더가 강조를 지우므로).
             if (oD.ctrl.tree && typeof oD.ctrl.tree.setExpanded === "function") {
-                for (var e2 = 0; e2 < aAnc.length; e2++) { try { oD.ctrl.tree.setExpanded(aAnc[e2], true); } catch (e3) { } }
+                for (var e2 = 0; e2 < aAnc.length; e2++) { try { oD.ctrl.tree.setExpanded(aAnc[e2], true); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } } }
             }
             // 선택 강조(원본 setSelectedIndex). ★공통 selectKey 는 비가상 트리에선 스크롤을 안 한다
             //   (u4a-ui.js:1630 — bVirtual&&bReveal 일 때만 scrollToKey). 디자인 트리는 비가상이라
@@ -1412,7 +1412,7 @@
                 // 클릭한 행에 선택 강조(aria-selected) 즉시 적용 — 공통 트리는 강조 API(selectKey)만 제공하고 화면이 호출한다.
                 //   가상 전환 후 클릭만으론 재렌더가 안 일어나 rowHook 강조가 스크롤(재렌더)해야 뜨던 것 수정(장군님 지적 2026-07-31).
                 //   bScroll=false: 사용자가 직접 클릭한 보이는 행이라 스크롤 점프 금지. 좌측 모델트리(modelFieldArea.js:143)와 동일.
-                if (oD.ctrl && typeof oD.ctrl.selectKey === "function") { try { oD.ctrl.selectKey(n.CHILD, false); } catch (e) { } }
+                if (oD.ctrl && typeof oD.ctrl.selectKey === "function") { try { oD.ctrl.selectKey(n.CHILD, false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
                 // [SPEC §2.1] 디자인 트리 속성 선택 → 좌측 모델필드 바인딩 가능/불가 재계산(이미 바인딩=파랑).
                 if (typeof oAPP.fn.bindPossibleRecompute === "function") {
                     try { oAPP.fn.bindPossibleRecompute(n); } catch (e) { console.error("[HTML5][bindWindow] bindPossibleRecompute:", e && e.message); }
@@ -1420,7 +1420,7 @@
                 // [R3] UI 오브젝트 행(DATYP 01) 선택 → WS20 캔버스에서 같은 UI 선택 요청(원본 designTree.js:1891~1893).
                 //   _bRemoteDesignSelect 중(WS20 수신 반영)엔 되-송신 금지(에코 방지).
                 if (!_bRemoteDesignSelect && n && n.DATYP === CS_DATYP.UOBJ && typeof oAPP.fn.sendDesignTreeSelect === "function") {
-                    try { oAPP.fn.sendDesignTreeSelect(n.OBJID); } catch (e) { }
+                    try { oAPP.fn.sendDesignTreeSelect(n.OBJID); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 }
             }
         });
@@ -1472,8 +1472,8 @@
             }
             // [가상 대비] 가상 스크롤은 매 프레임 행을 add/remove → MutationObserver 동기 _fixEmpty 폭주.
             //   rAF 게이트(_schedule)로 프레임당 1회로 합침(공통 §3.4.2 RO 콜백 동기쓰기 금지와 동일 결).
-            try { new MutationObserver(_schedule).observe(oHost, { childList: true, subtree: true }); } catch (e) { }
-            try { new ResizeObserver(_schedule).observe(oHost); } catch (e) { }
+            try { new MutationObserver(_schedule).observe(oHost, { childList: true, subtree: true }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { new ResizeObserver(_schedule).observe(oHost); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _fixEmpty();
         })();
 
@@ -1535,7 +1535,7 @@
         var oNameTh = oD.host.querySelector(".u4aColTreeHead .u4aColTreeCol");
         if (oNameTh) { _bwpSyncFilterInd(oNameTh, bActive); }
         if (oD.ctrl.tree && typeof oD.ctrl.tree.expandAll === "function") {
-            try { oD.ctrl.tree.expandAll(); } catch (e) { }
+            try { oD.ctrl.tree.expandAll(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     }
 

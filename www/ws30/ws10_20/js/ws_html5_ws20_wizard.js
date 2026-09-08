@@ -70,7 +70,7 @@
                 }
                 try { oAPP.fn.fnUiTempWizardPopupOpener(param); }
                 catch (e) { console.error("[HTML5][WS20][tplwiz] open:", e && e.message ? e.message : e); _unlock(); return; }
-                try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
+                try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         } catch (e) {
             console.error("[HTML5][WS20][tplwiz] WZD_CHKER:", e && e.message ? e.message : e);
@@ -156,7 +156,7 @@
     function _aggrCb(oReturn, ls_parent, aggr, fnCallback) {
 
         // 편집 직전 undo 스냅샷 (원본 saveActionHistoryData("WIZARD_INSERT") 대체 — HTML5 단일스택).
-        var _oWizSnap; try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { _oWizSnap = oAPP.fn.fnWs20PushUndo(); } } catch (e) { }
+        var _oWizSnap; try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { _oWizSnap = oAPP.fn.fnWs20PushUndo(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var l_OBJID;
         try {
@@ -188,7 +188,7 @@
 
         // [BR59-4] 되돌리기 대상 = 이번에 만든 UI(원본 CL_INSERT_UI 543 기준). 이름이 위에서
         //   정해지므로 여기서 새겨 넣는다(되돌리기 방향에선 그 UI 가 없어 기존 폴백이 걸린다).
-        try { if (l_OBJID && typeof oAPP.fn.fnWs20SetUndoTarget === "function") { oAPP.fn.fnWs20SetUndoTarget({ OBJID: l_OBJID }, _oWizSnap); } } catch (e) { }
+        try { if (l_OBJID && typeof oAPP.fn.fnWs20SetUndoTarget === "function") { oAPP.fn.fnWs20SetUndoTarget({ OBJID: l_OBJID }, _oWizSnap); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 후속 처리(트리/미리보기 갱신) → 성공 콜백.
         _wizFinish(l_OBJID).then(function () {
@@ -237,16 +237,16 @@
             })
             .then(function () {
                 // HTML5 트리 재렌더 (원본 oLTree1 tree binding _buildTree 대체).
-                try { if (typeof oAPP.fn.fnRenderDesignTree === "function") { oAPP.fn.fnRenderDesignTree(); } } catch (e) { }
+                try { if (typeof oAPP.fn.fnRenderDesignTree === "function") { oAPP.fn.fnRenderDesignTree(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 // 추가된 UI 선택/펼침.
                 if (OBJID && typeof oAPP.fn.setSelectTreeItem === "function") {
-                    try { return oAPP.fn.setSelectTreeItem(OBJID); } catch (e) { }
+                    try { return oAPP.fn.setSelectTreeItem(OBJID); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 }
             })
             .then(function () {
-                try { if (typeof oAPP.fn.setChangeFlag === "function") { oAPP.fn.setChangeFlag(); } } catch (e) { }
+                try { if (typeof oAPP.fn.setChangeFlag === "function") { oAPP.fn.setChangeFlag(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 // 바인딩 팝업 디자인 영역 갱신 (원본 updateBindPopupDesignData).
-                try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { }
+                try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
     }
 
@@ -257,7 +257,7 @@
         var sSel = oAPP.attr && oAPP.attr.ws20SelectedObjid;
         return sSel ? oAPP.fn.getTreeData(sSel) : null;
     }
-    function _safe(fn) { try { fn(); } catch (e) { } }
+    function _safe(fn) { try { fn(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     // 공통 트리 행 데코레이터 4종(재귀) — DnD/체크박스/아이콘/액션아이콘(+추가·삭제).
     function _decorate(oNode) {
         if (!oNode) { return; }
@@ -267,13 +267,13 @@
         _safe(function () { if (typeof oAPP.fn.designSetActionIcon === "function") { oAPP.fn.designSetActionIcon(oNode); } });
     }
     function _fail(fnCallback, sMsg) {
-        try { if (typeof fnCallback === "function") { fnCallback({ SUBRC: "E", MSG: sMsg }); } } catch (e) { }
+        try { if (typeof fnCallback === "function") { fnCallback({ SUBRC: "E", MSG: sMsg }); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _bindBusy(sPrccd, oOpt) {
         try {
             var sPath = oAPP.oDesign && oAPP.oDesign.pathInfo && oAPP.oDesign.pathInfo.bindPopupBroadCast;
             if (sPath && typeof parent.require === "function") { parent.require(sPath)(sPrccd, oOpt); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     // BUSY_ON 옵션(형제창 busy 메시지) — 원본 _sOption.DESC=215 "디자인 화면에서 UI 추가 처리 작업을 진행하고 있습니다".
     function _busyOpt() {
@@ -282,22 +282,22 @@
             var L = (oAPP.oDesign.settings && oAPP.oDesign.settings.GLANGU) || "";
             o.DESC = parent.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", "215");
             return o;
-        } catch (e) { return undefined; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return undefined; }
     }
     function _cl(sCode, p1) {
         try { return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", sCode, p1 || "", "", "", ""); }
-        catch (e) { return sCode; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sCode; }
     }
     function _mw(sCode, p1) {
         try { return oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", sCode, p1 || "", "", "", ""); }
-        catch (e) { return sCode; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sCode; }
     }
     function _msg(sType, sMsg) {
-        try { parent.showMessage(window.sap || null, 10, sType, sMsg); } catch (e) { }
+        try { parent.showMessage(window.sap || null, 10, sType, sMsg); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _unlock() {
-        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
-        try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 파일 로드 시 override 설치.

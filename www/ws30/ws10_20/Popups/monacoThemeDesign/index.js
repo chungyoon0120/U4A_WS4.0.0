@@ -111,7 +111,7 @@ module.exports = function (REMOTE, oAPP, sEditorSettings) {
     oBrowserWindow.loadURL(sLoadUrl);
 
     oBrowserWindow.once("ready-to-show", () => {
-        try { WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow); } catch (e) { }
+        try { WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     // 로드 완료 → 초기 데이터 push(자식이 받고 UI 빌드 + 스스로 show). 원본 if_p13nMonacoEditor 계약 유지.
@@ -131,14 +131,14 @@ module.exports = function (REMOTE, oAPP, sEditorSettings) {
 
     oBrowserWindow.on("closed", () => {
         oBrowserWindow = null;
-        try { CURRWIN.focus(); } catch (e) { }
+        try { CURRWIN.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     // 메인 로드 실패 시 창 정리(타이틀바 미표시 → 사용자가 못 닫는 상황 방지) + busy 해제.
     oBrowserWindow.webContents.on("did-fail-load", (event, errCode, errDesc, validatedURL, isMainFrame) => {
         if (!isMainFrame || errCode === -3) { return; }
         console.error("[HTML5][테마디자이너] 메인 로드 실패:", errCode, errDesc);
-        try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { }
+        try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oAPP.common.fnSetBusyLock("");
     });
 

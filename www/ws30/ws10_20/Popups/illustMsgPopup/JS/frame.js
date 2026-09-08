@@ -377,7 +377,8 @@ function SEARCH_VALUE(e) {
 // ▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣ UI생성 후 ▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣
 function fn_UIUPdated() {
 
-    sap.ui.getCore().detachEvent(sap.ui.core.Core.M_EVENTS.UIUpdated, fn_UIUPdated);
+    // [2026-09-08] 등록과 짝(createUi 참고) — Rendering 에서 해제.
+    oAPP.attr._oRendering.detachUIUpdated(fn_UIUPdated);
 
     let LV_SETKEY = sap.ui.getCore().getConfiguration().getTheme();         // ▶ 현재 적용되어있는 테마의 정보
 
@@ -468,7 +469,13 @@ function _attachCurrentWindowEvents() {
 // ▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣ UI생성 ▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣▣
 function createUi() {
 
-    sap.ui.getCore().attachEvent(sap.ui.core.Core.M_EVENTS.UIUpdated, fn_UIUPdated);
+    // ★[2026-09-08 장군님 지시·CDP 실측] 서버 UI5 1.120 에선 Core 레벨 "UIUpdated"(sap.ui.getCore().attachEvent) 가 발화하지 않는다
+    //   (실측: Core=미발화 / sap/ui/core/Rendering=발화). 그래서 fn_UIUPdated 가 영영 안 불려 oAPP.WIN.show()·parent.setBusy("") 까지
+    //   못 가고 busy 만 돌았다(패키지 = 서버 UI5). 같은 팝업의 selectSAP.js:504 · iconPrevPopup/runtime.js:115 와 동일하게
+    //   sap/ui/core/Rendering 으로 받는다(개발 CDN 1.107.1 에도 존재 확인). 타이머 없음. 백업 _backup_20260908_serverui5/JS/frame.js
+    oAPP.attr = oAPP.attr || {};
+    oAPP.attr._oRendering = sap.ui.requireSync('sap/ui/core/Rendering');
+    oAPP.attr._oRendering.attachUIUpdated(fn_UIUPdated);
 
     // ▶ App 생성
     let LO_APP = new sap.m.App("u4aFApp", {

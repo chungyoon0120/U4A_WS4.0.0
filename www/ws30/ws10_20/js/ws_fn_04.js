@@ -729,6 +729,7 @@
                 return;
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                     
             }
 
@@ -884,6 +885,7 @@
                 CURRWIN.focus();	
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 
             }            
 
@@ -906,8 +908,8 @@
     oAPP.fn.fnCloseAdminDevToolDlg = () => {
         let oDlg = oAPP.fn.fnGetAdminDevToolDlg();
         if (!oDlg) { return; }
-        try { oDlg.close(); } catch (e) { }
-        try { oDlg.remove(); } catch (e) { }
+        try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     oAPP.fn.fnOpenDevTool = () => {
@@ -1047,7 +1049,7 @@
 
         // 초기 모드 = Key In
         oAPP.fn.fnDevToolModeChange(0);
-        try { oField.focus(); } catch (e) { }
+        try { oField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.fnOpenDevTool
 
@@ -1075,7 +1077,7 @@
             // Key In
             if (oField) { oField.style.display = ""; }
             if (oDrop) { oDrop.style.display = "none"; }
-            try { if (oKey) { oKey.focus(); } } catch (e) { }
+            try { if (oKey) { oKey.focus(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         } else {
             // File Drag — 입력값 초기화(원본: /KEY = "").
             if (oKey) { oKey.value = ""; }
@@ -1130,7 +1132,7 @@
         } catch (e) {
             // 권한 모듈(파일 다이얼로그/fs/복호화) 예외는 삼키지 말고 표면화 — 다이얼로그가 조용히 멈추지 않도록.
             console.error("[Admin DevTool] 파일 첨부 처리 오류:", e);
-            try { parent.showMessage(null, 20, "E", String((e && e.message) || e)); } catch (x) { }
+            try { parent.showMessage(null, 20, "E", String((e && e.message) || e)); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         }
 
         oAPP.fn.fnCloseAdminDevToolDlg();
@@ -1157,7 +1159,7 @@
         } catch (e) {
             // 복호화/검증 예외는 삼키지 말고 표면화 — 다이얼로그가 조용히 멈추지 않도록.
             console.error("[Admin DevTool] 키/파일 검증 처리 오류:", e);
-            try { parent.showMessage(null, 20, "E", String((e && e.message) || e)); } catch (x) { }
+            try { parent.showMessage(null, 20, "E", String((e && e.message) || e)); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         }
 
         oAPP.fn.fnCloseAdminDevToolDlg();
@@ -1176,8 +1178,8 @@
         // 이미 떠 있으면 중복 방지
         var oExist = document.getElementById("u4aSvrInfoDlg");
         if (oExist) {
-            try { oExist.close(); } catch (e) { }
-            try { oExist.remove(); } catch (e) { }
+            try { oExist.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oExist.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 스코프 스타일 1회 주입 — 공통 .u4a-form 재사용 + 라벨/값 "가로" 정렬만 조정(읽기전용 정보).
@@ -1195,9 +1197,9 @@
 
         // ── 데이터 (원본 모델 /SERVERINFO·/USERINFO·/METADATA 의 실제 소스) ──
         var si = {}, ui = {}, meta = {};
-        try { si = (parent.getServerInfo && parent.getServerInfo()) || {}; } catch (e) { }
-        try { ui = (parent.getUserInfo && parent.getUserInfo()) || {}; } catch (e) { }
-        try { meta = (parent.getMetadata && parent.getMetadata()) || {}; } catch (e) { }
+        try { si = (parent.getServerInfo && parent.getServerInfo()) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { ui = (parent.getUserInfo && parent.getUserInfo()) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { meta = (parent.getMetadata && parent.getMetadata()) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oSvrVer = meta.S_WSVER;                                              // {SVRVER, WSSVER} | undefined
         var sUserId = (typeof ui.ID === "string") ? ui.ID.toUpperCase() : "";    // 원본: ID 대문자
@@ -1224,8 +1226,8 @@
         oDlg.id = "u4aSvrInfoDlg";
 
         function lf_close() {
-            try { oDlg.close(); } catch (e) { }
-            try { oDlg.remove(); } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 헤더 (상태 아이콘 + 제목 + 닫기 X)
@@ -1366,6 +1368,7 @@
                 aPopUpObj.push(oWin);
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -1384,6 +1387,7 @@
                 oPopup.close();
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;   
             }            
             

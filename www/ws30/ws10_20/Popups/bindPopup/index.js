@@ -164,7 +164,7 @@ window.oAPP = (function(window) {
 
         try {
             CURRWIN.webContents.insertCSS(`html, body { margin: 0px; height: 100%; background-color: ${sBgColor}; }`);
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
     }
 
@@ -188,13 +188,14 @@ window.oAPP = (function(window) {
         try {
             oAPP.IPCMAIN.on(`if-p13n-themeChange-${SYSID}`, onFrameThemeChange);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
         window.addEventListener("pagehide", function () {
             try {
                 oAPP.IPCMAIN.off(`if-p13n-themeChange-${SYSID}`, onFrameThemeChange);
-            } catch (error) {}
+            } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
         }, { once: true });
 
     }
@@ -234,6 +235,7 @@ window.oAPP = (function(window) {
                 }
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -304,6 +306,7 @@ window.oAPP = (function(window) {
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             oMap = null;
         }
 
@@ -444,6 +447,7 @@ window.oAPP = (function(window) {
         try {
             return typeof oWin.isDestroyed === "function" && oWin.isDestroyed() === true;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return true;
         }
 
@@ -476,6 +480,7 @@ window.oAPP = (function(window) {
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -501,6 +506,7 @@ window.oAPP = (function(window) {
                 }
             }
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             oDipPoint = undefined;
         }
 
@@ -547,6 +553,7 @@ window.oAPP = (function(window) {
                 return oWin[methodName]();
             }
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -567,12 +574,14 @@ window.oAPP = (function(window) {
         try {
             sTitle = oAPP.WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU, "/U4A/CL_WS_COMMON", "A15");
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             sTitle = "";
         }
 
         try {
             sDefaultTitle = oAPP.WSUTIL.getWsMsgClsTxt("", "/U4A/CL_WS_COMMON", "A15");
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             sDefaultTitle = "";
         }
 
@@ -597,6 +606,7 @@ window.oAPP = (function(window) {
         try {
             bIsMaximized = typeof oWin.isMaximized === "function" && oWin.isMaximized() === true;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -639,6 +649,7 @@ window.oAPP = (function(window) {
             oWin.maximize();
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -710,6 +721,7 @@ window.oAPP = (function(window) {
         try {
             return typeof oWin?.isMaximized === "function" && oWin.isMaximized() === true;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return false;
         }
 
@@ -741,6 +753,7 @@ window.oAPP = (function(window) {
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return false;
         }
 
@@ -798,6 +811,7 @@ window.oAPP = (function(window) {
             oWin.setPosition(iX, iY);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             endFrameTitlebarDrag();
         }
 
@@ -896,6 +910,7 @@ window.oAPP = (function(window) {
             oEvent.preventDefault();
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             bFrameTitlebarManualDragActive = false;
             endFrameTitlebarDrag();
         }
@@ -997,10 +1012,11 @@ window.oAPP = (function(window) {
                 oWin.off("maximize", updateWindowState);
                 oWin.off("unmaximize", updateWindowState);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 try {
                     oWin.removeListener("maximize", updateWindowState);
                     oWin.removeListener("unmaximize", updateWindowState);
-                } catch (e) {}
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
             }
 
         }, { once: true });
@@ -1031,6 +1047,7 @@ window.oAPP = (function(window) {
             var oThemeJsonData = JSON.parse(sThemeJson);    
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -1101,7 +1118,7 @@ window.oAPP = (function(window) {
                 }
             }
 
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
         return `${Math.round(window.innerWidth || 0)}x${Math.round(window.innerHeight || 0)}`;
 
@@ -1156,7 +1173,7 @@ window.oAPP = (function(window) {
                 return true;
             }
 
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
         return true;
 
@@ -1472,7 +1489,7 @@ let oAPP = parent.oAPP,
 
             _oWin.closable = bClosable;
 
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
     }
 
@@ -1487,7 +1504,7 @@ let oAPP = parent.oAPP,
 
             oAPP.oMain.broadToChild.postMessage(oParam);
 
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
     }
     
@@ -2079,6 +2096,7 @@ let oAPP = parent.oAPP,
             return normalizeBindLayoutState(JSON.parse(sState));
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return getBindLayoutDefaultState();
         }
 
@@ -2089,7 +2107,7 @@ let oAPP = parent.oAPP,
 
         try {
             localStorage.setItem(getBindLayoutStorageKey(), JSON.stringify(normalizeBindLayoutState(oState)));
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
     }
 
@@ -2220,6 +2238,7 @@ let oAPP = parent.oAPP,
             };
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -2261,7 +2280,7 @@ let oAPP = parent.oAPP,
                 height : oSnapshot.windowBounds.height
             });
 
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
     }
 
@@ -2310,6 +2329,7 @@ let oAPP = parent.oAPP,
         try {
             return normalizeBindLayoutState(JSON.parse(oSnapshot?.layoutState || "{}"));
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return getCurrentBindLayoutState();
         }
 
@@ -2631,7 +2651,7 @@ let oAPP = parent.oAPP,
                 oWin.setSize(iMinWidth, aSize[1]);
             }
 
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
     }
 
@@ -3571,22 +3591,23 @@ let oAPP = parent.oAPP,
         try {
             oAPP.fn.setBusy(false);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             try {
                 oAPP.oMain.attr.isBusy = false;
-            } catch (e) {}
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
             try {
                 lf_setAppBusy(false);
-            } catch (e) {}
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
             try {
                 sap.ui.getCore().unlock();
-            } catch (e) {}
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
             try {
                 lf_postBusyToChild({PRCCD:"BUSY_OFF"});
-            } catch (e) {}
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
         }
 
@@ -5577,7 +5598,7 @@ let oAPP = parent.oAPP,
             if(typeof oAPP.attr?.oDesign?.oModel?.refresh === "function"){
                 oAPP.attr.oDesign.oModel.refresh();
             }
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
         try {
             if(typeof oAPP.attr?.oAddit?.fn?.resetErrorField === "function"){
@@ -5587,7 +5608,7 @@ let oAPP = parent.oAPP,
             if(typeof oAPP.attr?.oAddit?.oModel?.refresh === "function"){
                 oAPP.attr.oAddit.oModel.refresh(true);
             }
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
         try {
             oAPP.fn.resetMPROPMsg();
@@ -5595,7 +5616,7 @@ let oAPP = parent.oAPP,
             if(typeof oAPP.attr?.oModel?.refresh === "function"){
                 oAPP.attr.oModel.refresh(true);
             }
-        } catch (error) {}
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
     };
 
@@ -5862,7 +5883,7 @@ let oAPP = parent.oAPP,
             try {
                 _oWin.off("will-resize", _fnCloseResizeSensitivePopovers);
                 _oWin.off("resize", _fnCloseResizeSensitivePopovers);
-            } catch (error) {}
+            } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
 
         }, {once: true});
 

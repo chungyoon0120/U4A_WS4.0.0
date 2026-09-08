@@ -41,21 +41,21 @@
     }
     // 코드형 라벨/메시지(/U4A/CL_WS_COMMON, /U4A/MSG_WS 등).
     function _txt(sCls, sCode, p1) {
-        try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); } catch (e) { return sCode; }
+        try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sCode; }
     }
     // ZMSG_WS_COMMON_001 — 워크스페이스 언어 기준(공통 no-data 등).
     function _wsTxt(sNo) {
         try {
             var sLangu = (parent.getUserInfo() || {}).LANGU;
             return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sNo);
-        } catch (e) { return sNo; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sNo; }
     }
-    function _msg(sType, sText) { try { parent.showMessage(null, 10, sType, sText); } catch (e) { } }
+    function _msg(sType, sText) { try { parent.showMessage(null, 10, sType, sText); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
     // 서버 경로(WS20 design context — 원본 oAPP.attr.servNm).
     function _serverPath() {
-        try { if (oAPP.attr && oAPP.attr.servNm) { return oAPP.attr.servNm; } } catch (e) { }
-        try { return parent.getServerPath(); } catch (e) { return ""; }
+        try { if (oAPP.attr && oAPP.attr.servNm) { return oAPP.attr.servNm; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { return parent.getServerPath(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
 
     /* ====================================================================
@@ -69,7 +69,7 @@
 
         // 이전 인스턴스 정리(원본도 매번 new Dialog — 싱글톤 아님).
         var oOld = document.getElementById("u4aDynLDlg");
-        if (oOld) { try { oOld.remove(); } catch (e) { } }
+        if (oOld) { try { oOld.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // ── 상태 ──────────────────────────────────────────────────
         var aColumns = [];   // [{ key, label }]
@@ -81,8 +81,8 @@
         oDlg.id = "u4aDynLDlg";
 
         function _close() {
-            try { oDlg.close(); } catch (e) { }
-            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 취소로 닫기(X/푸터/ESC) → 001(Cancel operation) 토스트(원본 닫기 버튼 54행).
         function _cancel() {
@@ -136,7 +136,7 @@
 
             // 편집상태가 아닌경우 exit(원본 169행).
             var bEdit = false;
-            try { bEdit = oAPP.attr.oModel.oData.IS_EDIT !== false; } catch (e) { bEdit = false; }
+            try { bEdit = oAPP.attr.oModel.oData.IS_EDIT !== false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bEdit = false; }
             if (!bEdit) { return; }
 
             if (fnPick) {
@@ -187,7 +187,7 @@
 
                     //★ busy 해제 — sendAjax 정상 응답 경로(onload)는 busy off 를 호출측 책임으로 둔다
                     //  (성공 시 setBusy("") 를 호출하지 않음). 원본도 lf_setDynList/에러 콜백에서 직접 해제.
-                    try { parent.setBusy && parent.setBusy(""); } catch (e2) { }
+                    try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
 
                     // 테이블 구성정보를 얻지 못한 경우(원본 109행).
                     if (param && param.RETCD === "E") {
@@ -197,7 +197,8 @@
                     _setDynList(param || {});
                 }, "X");
             } catch (e) {
-                try { parent.setBusy && parent.setBusy(""); } catch (e2) { }
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                 _msg("E", String(e && e.message || e));
             }
         }
@@ -205,13 +206,13 @@
         /* ── 오픈 ─────────────────────────────────────────────────── */
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); _cancel(); });
         if (window.U4AUI) {
-            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { }
-            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { }
-            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 420, minH: 300 }); } catch (e) { }
+            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 420, minH: 300 }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         document.body.appendChild(oDlg);
-        try { oDlg.showModal(); } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // afterOpen: 동적 테이블 구성 조회(원본 attachBeforeOpen → lf_getDynLayout).
         _load();

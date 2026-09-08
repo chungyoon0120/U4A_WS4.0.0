@@ -8590,6 +8590,7 @@
       l_json = JSON.parse(l_json);
 
     }catch(e){
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
       //265	Binding attributes does not exist.
       oAPP.common.fnShowFloatingFooterMsg("E", "WS20", oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "265", "", "", "", ""));
 

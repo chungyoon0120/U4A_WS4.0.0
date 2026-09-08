@@ -15,20 +15,114 @@
      *     서버 200 만 가정 — HTML5 는 네트워크/파싱 오류에도 busy 잔류를 막게 null 전달).
      ************************************************************************/
     oAPP.fn.sendAjax = function (sPath, oFormData, fn_success) {
+
+        /**
+         * 서버 통신 로그 (2026-09-08 추가)
+         * 이 별창은 자기 서버 통신 코드를 따로 갖고 있어 공통 자리에 안 잡힌다.
+         * 그래서 여기에도 같은 모양으로 남긴다. 요청 이름만 남기고 값은 안 남긴다.
+         */
+        var _iAjaxStartAt = Date.now();
+        var _sAjaxName = String(sPath).split("?")[0].split("/").pop() || sPath;
+
+        /**
+         * 요청 번호 (2026-09-08 추가)
+         * 같은 요청이 한꺼번에 여러 번 나가면 응답이 뒤섞여 돌아온다(실측).
+         * 번호를 붙여야 보낸 줄과 받은 줄의 짝이 맞는다.
+         */
+        if (typeof window.__u4aAjaxSeq !== "number") { window.__u4aAjaxSeq = 0; }
+        window.__u4aAjaxSeq++;
+        var _sAjaxNo = "#" + window.__u4aAjaxSeq;
+
+        /**
+         * 서버 통신 실패를 자세히 남긴다 (2026-09-08 추가 — 장군님 지시)
+         * 앞서는 "실패: 통신 오류" 한 줄뿐이라 서버가 뭐라고 했는지 알 수 없었다.
+         * 실패했을 때만 주소·상태·서버가 준 내용을 남긴다(성공은 한 줄 그대로).
+         */
+        function _ajaxFail(sReason, oXhrLike) {
+
+            _ajaxLog("끝남", "실패: " + sReason);
+
+            try {
+
+                if (typeof U4ALOG === "undefined") { return; }
+
+                var _sp = String(sPath == null ? "" : sPath);
+                var _i = _sp.indexOf("?");
+                if (_i >= 0) { _sp = _sp.slice(0, _i) + " (뒤쪽 정보는 가림)"; }
+
+                U4ALOG.error("서버통신 실패 상세", "보낸 곳: " + _sp);
+
+                var x = oXhrLike || null;
+
+                if (!x) {
+                    U4ALOG.error("서버통신 실패 상세", "서버 응답 자체가 없음 (연결이 끊겼거나 서버에 못 닿음)");
+                    return;
+                }
+
+                U4ALOG.error("서버통신 실패 상세", "서버 상태: "
+                    + ((typeof x.status === "number") ? x.status : "-")
+                    + (x.statusText ? (" " + x.statusText) : ""));
+
+                try {
+                    if (typeof x.getResponseHeader === "function") {
+                        var _aMark = ["sap-err-id", "u4a_status", "content-type"];
+                        for (var _k = 0; _k < _aMark.length; _k++) {
+                            var _v = x.getResponseHeader(_aMark[_k]);
+                            if (_v) { U4ALOG.error("서버통신 실패 상세", "응답표시 " + _aMark[_k] + ": " + _v); }
+                        }
+                    }
+                } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+
+                try {
+
+                    var _sBody = (x.responseText != null) ? x.responseText : (x.response != null ? String(x.response) : "");
+
+                    if (!_sBody) {
+                        _sBody = "(서버가 아무 내용도 안 줬음)";
+                    } else if (_sBody.length > 4000) {
+                        _sBody = _sBody.slice(0, 4000) + " …(뒤 " + (_sBody.length - 4000) + "자 잘림)";
+                    }
+
+                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용: " + _sBody);
+
+                } catch (e3) {
+                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용을 못 읽음: " + e3);
+                }
+
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                // 로그 남기다 통신을 막으면 안 된다.
+            }
+
+        }
+
+
+        function _ajaxLog(sWhat, sResult) {
+            try {
+                if (typeof U4ALOG === "undefined") { return; }
+                U4ALOG.server(sWhat, _sAjaxName + " " + _sAjaxNo, sResult, Date.now() - _iAjaxStartAt);
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+        _ajaxLog("보냈음", "");
+
         var xhr = new XMLHttpRequest();
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== xhr.DONE) { return; }
             if (xhr.status === 200 || xhr.status === 201) {
+                _ajaxLog("끝남", "성공");
                 var oRes = null;
                 try { oRes = JSON.parse(xhr.response); }
                 catch (e) { console.error("[HTML5][bindWindow] 응답 파싱 실패:", e && e.message); }
                 try { fn_success(oRes); } catch (e2) { console.error("[HTML5][bindWindow] 콜백 오류:", e2 && e2.message); }
             } else {
+                _ajaxFail("서버가 상태 " + xhr.status + " 를 돌려줌", xhr);
                 console.error("[HTML5][bindWindow] 서버 오류 status=", xhr.status, sPath);
                 try { fn_success(null); } catch (e3) { console.error("[HTML5][bindWindow] 콜백 오류(서버오류 분기):", e3 && e3.message); }
             }
         };
         xhr.onerror = function () {
+            _ajaxFail("서버에 못 닿음 (연결 끊김·차단·주소 틀림)", xhr);
             console.error("[HTML5][bindWindow] 네트워크 오류:", sPath);
             try { fn_success(null); } catch (e) { console.error("[HTML5][bindWindow] 콜백 오류(네트워크 분기):", e && e.message); }
         };
@@ -124,7 +218,7 @@
         // 초기 reflow — 스플리터 레이아웃으로 폭이 확정된 뒤 측정(폭 0이면 항상 오버플로로 오판).
         if (oOvf && typeof requestAnimationFrame === "function") {
             (function _try(n) {
-                if (oTool.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { } return; }
+                if (oTool.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
                 if (n <= 0) { return; }
                 requestAnimationFrame(function () { _try(n - 1); });
             })(30);
@@ -148,7 +242,7 @@
             var cs = getComputedStyle(el);
             _bwpMeasCtx.font = cs.fontStyle + " " + cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
             return Math.ceil(_bwpMeasCtx.measureText(el.textContent || "").width);
-        } catch (e) { return 0; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return 0; }
     }
     function _bwpCellNat(oCell) {
         var cr = oCell.getBoundingClientRect();
@@ -313,11 +407,11 @@
             }
         },
         // 메시지 — /U4A/CL_WS_COMMON.
-        cl: function (sCode) { try { return oAPP.common.msg("/U4A/CL_WS_COMMON", sCode); } catch (e) { return ""; } },
+        cl: function (sCode) { try { return oAPP.common.msg("/U4A/CL_WS_COMMON", sCode); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; } },
         // 메시지 — /U4A/MSG_WS.
-        mw: function (sCode, p1, p2, p3, p4) { try { return oAPP.common.msg("/U4A/MSG_WS", sCode, p1, p2, p3, p4); } catch (e) { return ""; } },
+        mw: function (sCode, p1, p2, p3, p4) { try { return oAPP.common.msg("/U4A/MSG_WS", sCode, p1, p2, p3, p4); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; } },
         // 메시지 — ZMSG_WS_COMMON_001(원본 bindPopup 전 문구가 이 클래스).
-        z: function (sNo, p1) { try { return oAPP.common.zmsg(sNo, p1); } catch (e) { return ""; } }
+        z: function (sNo, p1) { try { return oAPP.common.zmsg(sNo, p1); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; } }
     };
 
 })();

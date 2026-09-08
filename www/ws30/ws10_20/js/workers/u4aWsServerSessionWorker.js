@@ -55,6 +55,7 @@ self.onmessage = function (e) {
                         oResult = JSON.parse(sRes);
 
                     } catch (error) {
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
                         //1. 전체 다 닫는다.
                         self.postMessage({

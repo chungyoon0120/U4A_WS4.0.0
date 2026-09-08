@@ -111,6 +111,7 @@ function _zipExtractAsync(sSourcePath, sTargetPath, pOverwrite){
             });
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return resolve({ RETCD: "E" });            
         }
 
@@ -126,6 +127,7 @@ async function gfn_fileDel(oFS, PATH) {
         try {
             oFS.unlink(PATH, (e) => { });
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
         }
 
@@ -182,6 +184,7 @@ async function gfn_getHeadData() {
             try {
                 var sDATA = JSON.parse(e.target.response);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 resolve({
                     RETCD: "E",
                     RTMSG: GS_MSG.M01
@@ -326,7 +329,7 @@ function gfn_setProgressbar(iValue, iTotalValue) {
             typeof parent.oAPP.common.fnProgressDialogSetValue === "function") {
             parent.oAPP.common.fnProgressDialogSetValue(sPerValue, sMsg);
         }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
 } // end of gfn_setProgressbar
 
@@ -441,7 +444,7 @@ async function _zipDocuOpen(oOptions){
      */
     // 기존 다운 받은 ZIP 파일이 남아 있으면 삭제한다.
     // if(FS.existsSync(sDocFilePath) === true){
-    //     try { FS.unlinkSync(sDocFilePath); } catch (error) {}
+    //     try { FS.unlinkSync(sDocFilePath); } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
     // }
 
     // DOCU_VIEWER(oOpenOptions);
@@ -498,6 +501,7 @@ function _getHelpDocFileDown(oPARAM){
                     oWorker.terminate();
                     console.log("worker terminate - [WORKER-001]");
                 } catch (error) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                     
                 }
 
@@ -535,6 +539,7 @@ function _getHelpDocFileDown(oPARAM){
                         oWorker.terminate();
                         console.log(`worker terminate - [PRCCD]: ${oIF_DATA.PRCCD}`);
                     } catch (error) {
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                         
                     }            
 
@@ -591,6 +596,7 @@ function _getHelpDocFileDown(oPARAM){
                         oWorker.terminate();
                         console.log(`worker terminate - [PRCCD]: ${oIF_DATA.PRCCD}`);
                     } catch (error) {
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                         
                     }
 
@@ -716,6 +722,7 @@ function _getHelpDocFileDown(oPARAM){
                 oWorker.terminate();
                 console.log("worker terminate - END");
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 
             }
 

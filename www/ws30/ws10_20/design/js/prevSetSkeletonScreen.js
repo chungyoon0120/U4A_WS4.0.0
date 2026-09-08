@@ -47,7 +47,7 @@
     }
     function _msg(sCls, sCode) {
         try { return oAPP.common.fnGetMsgClsText(sCls, sCode, "", "", "", "") || ""; }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
 
     // Glass concentration 정규화 — 0.0~100.0, 소숫점 1자리(원본 step 0.1 / precision 1).
@@ -64,7 +64,7 @@
     var oUI = null;
 
     function lf_close() {
-        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // ── 화면 출력 정보 구성(원본 lf_getSkeletonData) — T_SKLE → 초기값 ──
@@ -120,10 +120,10 @@
                 lf_close();
 
                 // 005  Job finished. (KIND 10 토스트 — 공통 정중앙. DumpWrite 와 동일 경로)
-                try { parent.showMessage(null, 10, "S", _msg("/U4A/MSG_WS", "005")); } catch (e) { }
+                try { parent.showMessage(null, 10, "S", _msg("/U4A/MSG_WS", "005")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 // 변경 flag 처리(원본 oAPP.fn.setChangeFlag).
-                try { oAPP.fn.setChangeFlag(); } catch (e) { }
+                try { oAPP.fn.setChangeFlag(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         });
     }
@@ -260,7 +260,7 @@
         // 초기값 구성(원본 attachBeforeOpen → lf_getSkeletonData).
         lf_loadData();
 
-        try { oUI.dlg.showModal(); } catch (e) { }
+        try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     /************************************************************************

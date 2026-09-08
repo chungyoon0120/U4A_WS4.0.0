@@ -32,7 +32,7 @@
     // 메시지 클래스 텍스트 헬퍼 (원본 fnGetMsgClsText 6-인자 호출 그대로)
     function _txt(sCls, sCode, p1, p2, p3, p4) {
         try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     const _fa = (sName) => '<i class="fa-solid fa-' + sName + '"></i>';
 
@@ -46,7 +46,7 @@
             const sBeLangu = (parent.getServerInfo() || {}).LANGU;  // 백엔드 로그온 언어(구운 언어)
             const WC = (parent.REMOTE && parent.REMOTE.getGlobal) ? parent.REMOTE.getGlobal("WsMsgCls") : null;
             return (WC && WC.relocalize) ? WC.relocalize(sText, sBeLangu, sWsLangu) : sText;
-        } catch (e) { return sText; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sText; }
     }
 
     // 오류 필드 자동 포커스 — blur/change/click 처리 '도중' 동기 focus() 는 진행 중인 포커스 이동에 밀려
@@ -54,7 +54,7 @@
     //   .u4a-form__row:focus-within 로 밸류스테이트 메시지(.u4a-field__msg)가 노출된다(.analy/15 §3.5).
     function _refocus(oEl) {
         if (!oEl || typeof oEl.focus !== "function") { return; }
-        setTimeout(function () { try { oEl.focus(); } catch (e) { } }, 0);
+        setTimeout(function () { try { oEl.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
     }
 
 
@@ -196,7 +196,7 @@
                 this.refresh();
             },
             bind(fn) { aBind.push(fn); },
-            refresh() { for (let i = 0; i < aBind.length; i++) { try { aBind[i](); } catch (e) { } } }
+            refresh() { for (let i = 0; i < aBind.length; i++) { try { aBind[i](); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } }
         };
     }
 
@@ -1163,8 +1163,8 @@
      * dialog 종료 처리 (구 lf_closeDialog)
      ************************************************************************/
     function lf_closeDialog(oDlg, bSkipMsg) {
-        try { oDlg.close(); } catch (e) { }
-        try { oDlg.remove(); } catch (e) { }
+        try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (bSkipMsg === true) { return; }
         // 001 Cancel operation
         parent.showMessage(null, 10, "I", _txt("/U4A/MSG_WS", "001"));
@@ -1274,6 +1274,7 @@
                 const _oCEvt = new CustomEvent("conversionWebdynpro", { detail: _sParam });
                 oUIobj.UAWD.oContr.onEvt.dispatchEvent(_oCEvt);
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "948")); // Web Dynpro Conversion is not available.
             }
             return;
@@ -1379,6 +1380,7 @@
             lf_getScript("js/fnF4SearchHelpPopup", _openF4);
             return true;
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "949")); // Value help is not available.
         }
     }
@@ -1393,6 +1395,7 @@
                 oModel.setProperty(ls_stru + "/REQTX", param.AS4TEXT);
             });
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "950")); // Request value help is not available.
         }
     }

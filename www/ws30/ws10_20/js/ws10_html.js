@@ -27,9 +27,9 @@
      * 셸 자원 가드 (메인 프레임 전역 / 독립 미리보기 모두 대응)
      ********************************************************************/
     function _currWin() {
-        try { if (typeof CURRWIN !== "undefined" && CURRWIN) { return CURRWIN; } } catch (e) { }
-        try { if (parent && parent.CURRWIN) { return parent.CURRWIN; } } catch (e) { }
-        try { if (parent && parent.REMOTE) { return parent.REMOTE.getCurrentWindow(); } } catch (e) { }
+        try { if (typeof CURRWIN !== "undefined" && CURRWIN) { return CURRWIN; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (parent && parent.CURRWIN) { return parent.CURRWIN; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (parent && parent.REMOTE) { return parent.REMOTE.getCurrentWindow(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return null;
     }
 
@@ -40,7 +40,7 @@
                 var s = String(p).replaceAll("\\", "/");
                 return encodeURI("file:///" + s);
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return "../../img/logo.png";
     }
 
@@ -52,7 +52,7 @@
                     return window.U4ATheme.normalize(o.THEME);
                 }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return null;
     }
 
@@ -66,6 +66,23 @@
         IS_STAFF: true
     };
     oAPP.ws10html.state = WS_STATE;
+
+    /********************************************************************
+     * 앱이름 입력칸 값의 단일 반영 지점.
+     *   ★ 원본(UI5)은 앱이름 입력칸이 /WS10/APPID 와 양방향으로 묶여 있어(ws_fn_01.js
+     *     SearchField value:"{/WS10/APPID}") 입력칸을 고치면 모델도 즉시 같이 바뀌었다.
+     *     HTML5 는 plain DOM 이라 그 묶임이 끊겼고, 그 결과 /WS10/APPID 를 읽던 기능
+     *     (패키지 변경 등)이 옛 값을 집는 회귀가 있었다 → 여기서 명시적으로 다시 묶는다.
+     ********************************************************************/
+    function _setAppId(v) {
+        var s = (v == null ? "" : String(v));
+        WS_STATE.WS10.APPID = s;
+        try { oAPP.common.fnSetModelProperty("/WS10/APPID", s); }
+        catch (e) {
+            console.error("[HTML5][WS10] 앱ID 모델 반영 실패:", e && e.message ? e.message : e);
+        }
+    }
+    oAPP.ws10html.setAppId = _setAppId;   // 값도움(F4) 픽 등 화면 밖에서도 같은 경로로 반영
 
     /********************************************************************
      * 라벨 메시지 — 언어는 "서버 메시지 클래스 단일 출처"에서만 가져온다.
@@ -90,7 +107,7 @@
                 var s = oC.fnGetMsgClsText("/U4A/CL_WS_COMMON", k);
                 if (s && s.indexOf("|") === -1) { return s; }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return k;
     }
 
@@ -101,7 +118,7 @@
             var lg = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
             var s = parent.WSUTIL.getWsMsgClsTxt(lg, "ZMSG_WS_COMMON_001", nr);
             if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return "";
     }
 
@@ -216,9 +233,9 @@
     var APPEXEC_BR_ICON = { CHROME: { icon: "chrome", brand: true }, MSEDGE: { icon: "edge", brand: true }, DEV_BROWSER: { icon: "flask", brand: false } };
     function _getAppExecBrowsers() {
         var aDef = [];
-        try { aDef = oAPP.common.fnGetModelProperty("/DEFBR") || []; } catch (e) { }
+        try { aDef = oAPP.common.fnGetModelProperty("/DEFBR") || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (!Array.isArray(aDef) || !aDef.length) { return APP_EXEC_BROWSERS.slice(); } // /DEFBR 미로드 시 폴백
-        var bPackaged = false; try { bPackaged = !!(parent.APP && parent.APP.isPackaged); } catch (e) { }
+        var bPackaged = false; try { bPackaged = !!(parent.APP && parent.APP.isPackaged); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return aDef.map(function (o) {
             var ic = APPEXEC_BR_ICON[o.NAME] || {};
             var en = !(!o.NAME || o.ENABLED === false);
@@ -236,7 +253,7 @@
         if (window.oAPP && oAPP.events && typeof oAPP.events.ev_AppExecByBrowser === "function") {
             try { oAPP.events.ev_AppExecByBrowser(sName); }
             catch (e) {
-                if (typeof console !== "undefined") { console.warn("[WS10] ev_AppExecByBrowser error", e); }
+                if (typeof console !== "undefined") { console.error("[WS10] ev_AppExecByBrowser error", e); }
                 _showFooter("E", "Application Execution 오류: " + (e && e.message));
             }
             return;
@@ -271,7 +288,7 @@
             var fn = window.oAPP && oAPP.fn && oAPP.fn[sFnName];
             if (typeof fn === "function") { fn(); return true; }
         } catch (e) {
-            if (typeof console !== "undefined") { console.warn("[WS10] " + sFnName + " error", e); }
+            if (typeof console !== "undefined") { console.error("[WS10] " + sFnName + " error", e); }
             _showFooter("E", (sLabel || sFnName) + " 오류: " + (e && e.message));
             return true;
         }
@@ -295,7 +312,7 @@
         if (WIRED_EVENTS[sName] && window.oAPP && oAPP.events && typeof oAPP.events[sName] === "function") {
             try { oAPP.events[sName](); }
             catch (e) {
-                if (typeof console !== "undefined") { console.warn("[WS10] " + sName + " error", e); }
+                if (typeof console !== "undefined") { console.error("[WS10] " + sName + " error", e); }
                 _showFooter("E", (sLabel || sName) + " 오류: " + (e && e.message));
             }
             return;
@@ -327,7 +344,7 @@
             try {
                 var sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "062", sTcode);
                 oAPP.common.fnShowFloatingFooterMsg("E", parent.getCurrPage(), sMsg);
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             var oClr = document.getElementById("sapTcode");
             if (oClr && !bSilent) { oClr.value = ""; oClr.dispatchEvent(new Event("input", { bubbles: true })); } // 클리어 X 노출 동기화
             return;
@@ -338,11 +355,11 @@
         if (oInp && !bSilent) { oInp.value = sTcode; oInp.dispatchEvent(new Event("input", { bubbles: true })); } // 클리어 X 노출 동기화
 
         // 이력 저장 + /SUGG/TCODE 모델 갱신 (원본 동일)
-        try { oAPP.fn.fnSaveTCodeSuggestion(sTcode); } catch (e) { }
-        try { oAPP.common.fnSetModelProperty("/SUGG/TCODE", oAPP.fn.fnReadTCodeSuggestion()); } catch (e) { }
+        try { oAPP.fn.fnSaveTCodeSuggestion(sTcode); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oAPP.common.fnSetModelProperty("/SUGG/TCODE", oAPP.fn.fnReadTCodeSuggestion()); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 실행 (원본 execControllerClass(null, null, sTcode, oAppInfo))
-        var oAppInfo = {}; try { oAppInfo = parent.getAppInfo() || {}; } catch (e) { }
+        var oAppInfo = {}; try { oAppInfo = parent.getAppInfo() || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try { oAPP.common.execControllerClass(null, null, sTcode, oAppInfo); }
         catch (e) { console.error("[HTML5] T-CODE 실행 오류:", e && e.message ? e.message : e); }
     }
@@ -455,8 +472,8 @@
      ********************************************************************/
     var _zoomPop = null;
     function _webFrame() {
-        try { if (parent && parent.WEBFRAME) { return parent.WEBFRAME; } } catch (e) { }
-        try { if (window.WEBFRAME) { return window.WEBFRAME; } } catch (e) { }
+        try { if (parent && parent.WEBFRAME) { return parent.WEBFRAME; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (window.WEBFRAME) { return window.WEBFRAME; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return null;
     }
     function _zoomPct(nLevel) {
@@ -470,10 +487,10 @@
         document.removeEventListener("mousedown", oCtx.onOutside, true);
         document.removeEventListener("keydown", oCtx.onEsc, true);
         window.removeEventListener("resize", oCtx.onWinChange);
-        try { oCtx.el.remove(); } catch (e) { }
+        try { oCtx.el.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (oCtx.anchor) { oCtx.anchor.setAttribute("aria-expanded", "false"); }
         // 원본 beforeClose — 현재 줌을 zoom.json 에 저장(FS 기반 setPersonWinZoom 은 sap 무관 → HTML5 가용).
-        try { if (window.oAPP && oAPP.fn && typeof oAPP.fn.setPersonWinZoom === "function") { oAPP.fn.setPersonWinZoom("S"); } } catch (e) { }
+        try { if (window.oAPP && oAPP.fn && typeof oAPP.fn.setPersonWinZoom === "function") { oAPP.fn.setPersonWinZoom("S"); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _openZoomPop(oAnchor) {
         if (_zoomPop) { _closeZoomPop(); return; }   // 이미 열림 → 토글 닫기(저장)
@@ -487,7 +504,7 @@
         oRng.className = "u4a-zoom-pop__slider";
         oRng.min = "-5"; oRng.max = "5"; oRng.step = "0.1";   // 원본 Slider 동일
         var nCur = 0;
-        try { if (oWf && oWf.getZoomLevel) { nCur = oWf.getZoomLevel(); } } catch (e) { }
+        try { if (oWf && oWf.getZoomLevel) { nCur = oWf.getZoomLevel(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oRng.value = String(nCur);
 
         // − [🔍 %] + — 모나코 에디터 푸터(.u4aEdZoom)와 동일 패턴: 셋 다 공통 .u4a-btn 톤,
@@ -510,7 +527,7 @@
         function _applyZoom(v) {
             v = Math.max(-5, Math.min(5, Math.round(v * 10) / 10));
             oRng.value = String(v);
-            try { if (oWf && oWf.setZoomLevel) { oWf.setZoomLevel(v); } } catch (e) { }
+            try { if (oWf && oWf.setZoomLevel) { oWf.setZoomLevel(v); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oValSpan.textContent = _zoomPct(v) + "%";
         }
 
@@ -552,7 +569,7 @@
         // 현재 WEBFRAME 줌 → 슬라이더/% 재동기(팝오버 열린 채 Ctrl+휠 등 외부 줌 반영).
         function _syncFromZoom() {
             var v = 0;
-            try { if (oWf && oWf.getZoomLevel) { v = oWf.getZoomLevel(); } } catch (e) { }
+            try { if (oWf && oWf.getZoomLevel) { v = oWf.getZoomLevel(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oRng.value = String(v);   // 프로그램 set 은 input/change 미발화 → 피드백 루프 없음
             oValSpan.textContent = _zoomPct(v) + "%";
         }
@@ -571,7 +588,7 @@
             document.addEventListener("keydown", fnEsc, true);
             window.addEventListener("resize", fnWin);
         }, 0);
-        try { oRng.focus(); } catch (e) { }
+        try { oRng.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _buildZoomBtn() {
         var b = _iconBtn(ICON.zoom, "Zoom", function () { _openZoomPop(b); });
@@ -642,7 +659,7 @@
             // 이미 열림 → busy/prepare 없이 즉시 닫기(토글)
             if (wrap.getAttribute("aria-expanded") === "true") { _closeMenus(); return; }
             function open() {
-                try { parent.setBusy(""); } catch (e) { }
+                try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 var aItems = (typeof cfg.getItems === "function") ? (cfg.getItems() || []) : [];
                 // 앵커=wrap → 메뉴 좌측이 본체 시작에 정렬(치우침 방지)
                 _openMenuAt(wrap, aItems, function (it) {
@@ -650,7 +667,7 @@
                 }, "left");
             }
             if (typeof cfg.prepare === "function") {
-                try { parent.setBusy("X"); } catch (e) { }   // 준비(느린 체크) 동안만 busy
+                try { parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 준비(느린 체크) 동안만 busy
                 Promise.resolve().then(function () { return cfg.prepare(); })
                     .catch(function (e) { console.error("[split] prepare", e); })
                     .then(open);
@@ -706,7 +723,7 @@
         // 활성 테마 적용 (서버 THEMEINFO → 없으면 기본)
         try {
             if (window.U4ATheme) { window.U4ATheme.apply(_savedTheme() || window.U4ATheme.current() || "horizon_white"); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oContent = document.getElementById("content");
         if (!oContent) { return; }
@@ -770,7 +787,7 @@
             var oPages = (oAPP.attr.ui && oAPP.attr.ui.pages) || {};
             var oTo = oPages[sToId];
             if (!oTo) { return; }
-            try { parent.setCurrPage(sToId); } catch (e) { }
+            try { parent.setCurrPage(sToId); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 현재 보이는 페이지(나갈 페이지) 탐색
             var oFrom = null, sFromId = null;
@@ -779,6 +796,30 @@
                     oFrom = oPages[k]; sFromId = k;
                 }
             });
+
+            /**
+             * 화면 전환 로그 (2026-09-08 추가)
+             * ---------------------------------------------------------------
+             * 왜 여기인가: 화면 전환이 실제로 일어나는 유일한 자리다.
+             *             위쪽 전환 함수들이 전부 여기로 내려온다.
+             * 무엇을 남기나: 어디에서 어디로 갔는지.
+             *             화면이 바뀌면 이후 로그의 화면 이름도 같이 바꾼다.
+             */
+            try {
+
+                if (typeof U4ALOG !== "undefined") {
+
+                    // 화면을 옮기는 것도 새 작업의 시작이다 — 새 추적 번호를 뽑는다(2026-09-08)
+                    if (typeof U4ALOG.newTrace === "function") { U4ALOG.newTrace(); }
+
+                    U4ALOG.info("화면 이동", (sFromId || "(처음)") + " → " + sToId, "시작");
+                    U4ALOG.setScreen(sToId);
+                }
+
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                // 로그 때문에 화면 전환이 막히면 안 된다.
+            }
 
             // 나갈 페이지가 없으면(초기) 애니메이션 없이 표시
             if (!oFrom || oFrom === oTo) {
@@ -834,9 +875,9 @@
             if (window.jQuery) {
                 window.jQuery(oContent).hide().fadeIn(300, "linear");
             }
-        } catch (e) { }
-        try { if (parent && parent.setBusy) { parent.setBusy(""); } } catch (e) { }
-        try { if (parent && parent.setDomBusy) { parent.setDomBusy(""); } } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (parent && parent.setBusy) { parent.setBusy(""); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (parent && parent.setDomBusy) { parent.setDomBusy(""); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     function _renderTitlebar() {
@@ -860,17 +901,17 @@
         function _syncMaxIcon() {
             if (!oMaxBtn) { return; }
             var w = _currWin(); var bMax = false;
-            try { bMax = !!(w && w.isMaximized()); } catch (e) { }
+            try { bMax = !!(w && w.isMaximized()); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oMaxBtn.innerHTML = bMax ? '<i class="fa-solid fa-window-restore"></i>' : '<i class="fa-solid fa-window-maximize"></i>';
             oMaxBtn.title = bMax ? "Restore" : "Maximize";
         }
         try {
             var wMax = _currWin();
             if (wMax && wMax.on) { wMax.on("maximize", _syncMaxIcon); wMax.on("unmaximize", _syncMaxIcon); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _syncMaxIcon();
         o.querySelector('[data-action="close"]').addEventListener("click", function () {
-            try { oAPP.attr = oAPP.attr || {}; oAPP.attr.isPressWindowClose = "X"; } catch (e) { }
+            try { oAPP.attr = oAPP.attr || {}; oAPP.attr.isPressWindowClose = "X"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             var w = _currWin(); if (w) { w.close(); }
         });
         return o;
@@ -967,7 +1008,7 @@
             // SAP T-CODE 이력 자동완성 (원본 ev_suggestSapTcode — fnReadTCodeSuggestion 의 {TCODE} 목록)
             suggest: function () {
                 try { return (oAPP.fn.fnReadTCodeSuggestion() || []).map(function (o) { return o && o.TCODE; }).filter(Boolean); }
-                catch (e) { return []; }
+                catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return []; }
             },
             onEnter: function (v) { _runTcode(v); }   // 선택은 채움만, 실행은 Enter(원본 동일)
         });
@@ -1047,7 +1088,7 @@
                 // 초기 reflow — 헤더 폭이 확정된 뒤 측정(폭 0 이면 프레임마다 최대 N회 재시도).
                 if (oOvfCtl && typeof oOvfCtl.reflow === "function" && typeof requestAnimationFrame === "function") {
                     (function _tryReflow(n) {
-                        if (o.clientWidth > 0) { try { oOvfCtl.reflow(); } catch (e) { } return; }
+                        if (o.clientWidth > 0) { try { oOvfCtl.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
                         if (n > 0) { requestAnimationFrame(function () { _tryReflow(n - 1); }); }
                     })(30);
                 }
@@ -1087,7 +1128,7 @@
      ********************************************************************/
     function _readPin() {
         try { return !!(window.oAPP && oAPP.common && oAPP.common.fnGetModelProperty && oAPP.common.fnGetModelProperty("/SETTING/ISPIN")); }
-        catch (e) { return false; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
     function _buildPinBtn() {
         var b = document.createElement("button");
@@ -1099,7 +1140,7 @@
         b.addEventListener("click", function () {
             var bOn = !_readPin();
             // 모델 갱신(원본 pressed:{/SETTING/ISPIN} 양방향 바인딩 대응)
-            try { if (window.oAPP && oAPP.common && oAPP.common.fnSetModelProperty) { oAPP.common.fnSetModelProperty("/SETTING/ISPIN", bOn); } } catch (e) { }
+            try { if (window.oAPP && oAPP.common && oAPP.common.fnSetModelProperty) { oAPP.common.fnSetModelProperty("/SETTING/ISPIN", bOn); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             // 현재 창 항상위 처리(원본 ev_windowPinBtn 대응).
             //   ★ [Electron 버그] 켤 때는 레벨("screen-saver")을 줘야 풀스크린/다른 always-on-top
             //     창 위로 확실히 뜬다 → 코드베이스 브라우저 실행부(ws_fn_04/uai/dev_browser)와 동일하게
@@ -1110,7 +1151,7 @@
                     if (bOn) { w.setAlwaysOnTop(true, "screen-saver"); }
                     else { w.setAlwaysOnTop(false); }
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             b.setAttribute("aria-pressed", bOn ? "true" : "false");
         });
         return b;
@@ -1258,6 +1299,7 @@
             WS_STATE.WS10.APPSUGG = aIds;
             return aIds;
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return WS_STATE.WS10.APPSUGG || [];
         }
     }
@@ -1277,23 +1319,23 @@
             type: "text", id: "AppNmInput", placeholder: "Search",
             className: "u4a-ws10__searchfield",
             clear: true,
-            onClear: function () { WS_STATE.WS10.APPID = ""; },
+            onClear: function () { _setAppId(""); },
             suggest: _loadAppSugg,
             onPick: function (v) {
                 oSearchFld.input.value = (v || "").toUpperCase();
-                WS_STATE.WS10.APPID = oSearchFld.input.value;
+                _setAppId(oSearchFld.input.value);
             },
             f4: function () { _invoke("ev_AppValueHelp", "App Search Help (F4)"); },  // 맨 우측 Search Help(F4)
             onChange: function (v) {
                 var up = (v || "").toUpperCase();
-                oSearchFld.input.value = up; WS_STATE.WS10.APPID = up;
+                oSearchFld.input.value = up; _setAppId(up);
             }
         });
         var oInput = oSearchFld.input;
         oInput.autocomplete = "off";
         oInput.setAttribute("role", "combobox");
         oInput.title = "";
-        try { oSearchFld.el.querySelector(".u4a-field__vh").title = "Search Help (F4)"; } catch (e) { }
+        try { oSearchFld.el.querySelector(".u4a-field__vh").title = "Search Help (F4)"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // F4 키 → 값도움(버튼 클릭과 동일), Enter → no-op(원본 SearchField 동일), 더블클릭 → 전체선택.
         oInput.addEventListener("keydown", function (e) {
             if (e.key === "F4") { e.preventDefault(); _invoke("ev_AppValueHelp", "App Search Help (F4)"); }
@@ -1344,8 +1386,8 @@
         var oBar = document.getElementById("ws10StatusBar");
         if (!oBar) { return; }
         var si = {}, ui = {};
-        try { si = (parent.getServerInfo && parent.getServerInfo()) || {}; } catch (e) { }
-        try { ui = (parent.getUserInfo && parent.getUserInfo()) || {}; } catch (e) { }
+        try { si = (parent.getServerInfo && parent.getServerInfo()) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { ui = (parent.getUserInfo && parent.getUserInfo()) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         function set(id, v) {
             var el = oBar.querySelector('[data-stat="' + id + '"] .u4a-ws10__stat-val');
             if (el) { el.textContent = (v == null || v === "") ? "-" : String(v); }
@@ -1369,7 +1411,7 @@
         if (!oPage) { return; }
         var sTheme;
         try { sTheme = (window.U4ATheme && window.U4ATheme.current()) || document.documentElement.dataset.theme || ""; }
-        catch (e) { sTheme = document.documentElement.dataset.theme || ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sTheme = document.documentElement.dataset.theme || ""; }
         var bDark = sTheme.indexOf("dark") > -1 || sTheme.indexOf("hcb") > -1;
         oPage.classList.toggle("u4a-ws-light-theme", !bDark);
     }
@@ -1380,7 +1422,7 @@
         try {
             window.__u4aHeroThemeObs = new MutationObserver(_applyHeroThemeClass);
             window.__u4aHeroThemeObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 배경 마크업 (doc 03 §5 _getWs10ContentHtml — ws10_20/index.html 기준 ../../img)
@@ -1426,27 +1468,87 @@
         if (oAPP.ws10html._scWired) { return; }
         oAPP.ws10html._scWired = true;
         document.addEventListener("keydown", function (e) {
+
             // 자동 반복(키 꾹 누름) 중복 발화 방지.
-            if (e.repeat) { return; }
+            if (e.repeat) {
+                return;
+            }
+
             // ★ WS10 단축키는 WS10 화면에서만 동작한다.
             //   WS10·WS20 는 같은 문서(#content 교체)라 이 document 리스너가 페이지 이동 후에도
             //   살아있다 → WS20 에서 같은 키를 눌러도 WS10 액션이 발화되던 버그. 현재 페이지가
             //   WS10 이 아니면 무시(WS20 undo/redo 핸들러의 getCurrPage 가드와 동일 패턴).
-            try { if (parent.getCurrPage && parent.getCurrPage() !== "WS10") { return; } } catch (e2) { }
-            // 모달 팝업이 떠 있으면 메인 단축키 무시(팝업 위에서 뒤 화면 액션 실행 방지).
-            if (document.querySelector("dialog[open]")) { return; }
+            try {
+                if (parent.getCurrPage && parent.getCurrPage() !== "WS10") {
+                    return;
+                }
+            } catch (e2) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                    U4ALOG.caught(e2);
+                }
+            }
+
+            // 눌린 키 조합을 만들어 이 화면 단축키 목록에서 찾는다.
             var parts = [];
-            if (e.ctrlKey) { parts.push("ctrl"); }
-            if (e.shiftKey) { parts.push("shift"); }
-            if (e.altKey) { parts.push("alt"); }
+
+            if (e.ctrlKey) {
+                parts.push("ctrl");
+            }
+
+            if (e.shiftKey) {
+                parts.push("shift");
+            }
+
+            if (e.altKey) {
+                parts.push("alt");
+            }
+
             parts.push(e.key);
+
             var sCombo = parts.join("+").toLowerCase();
             var hit = null;
-            for (var i = 0; i < aMap.length; i++) { if (aMap[i].sc.toLowerCase() === sCombo) { hit = aMap[i]; break; } }
-            if (!hit) { return; }
-            if (hit.dev && WS_STATE.USERINFO.IS_DEV !== "D") { return; }
+
+            for (var i = 0; i < aMap.length; i++) {
+                if (aMap[i].sc.toLowerCase() === sCombo) {
+                    hit = aMap[i];
+                    break;
+                }
+            }
+
+            // 이 화면 단축키가 아니면 여기서 끝(공통 체크까지 가지 않는다 — 글자 입력마다 로그가 쌓이지 않게).
+            if (!hit) {
+                return;
+            }
+
+            /********************************************************************
+             * 단축키 실행 할지 말지 여부 체크 (2026-09-09 추가 — 장군님 지시)
+             * ------------------------------------------------------------------
+             * 원본(as-is) ws_common.js 의 각 단축키 fn 과 동일한 컨셉으로, 공통 함수
+             *   oAPP.common.fnShortCutExeAvaliableCheck() 하나로 아래를 전부 본다.
+             *   ① 단축키 잠금  ② 화면 이동 중  ③ busy(처리중)  ④ 메뉴 열림  ⑤ 팝업 열림
+             *
+             * 왜 고쳤나:
+             *   - 전에는 이 자리에서 팝업만 따로 봤다(document.querySelector("dialog[open]")).
+             *     그런데 busy 표시도 같은 <dialog> 를 showModal() 로 띄우므로(resources/index.js
+             *     setDomBusy) 팝업 검사에 busy 까지 걸려, busy 중에는 단축키가 로그 한 줄 없이
+             *     조용히 삼켜졌다. 원본이라면 "Busy가 켜져 있어서 단축기 실행 불가" 가 찍힌다.
+             *   - 또 ①②④ 는 아예 보지 않아, 화면 전환 중에도 이 화면 단축키가 그냥 실행됐다.
+             *   ※ 팝업 검사는 없어진 게 아니라 공통 함수 안(fnCheckIsDialogOpen)으로 들어갔다.
+             ********************************************************************/
+            var sScChkResult = oAPP.common.fnShortCutExeAvaliableCheck();
+
+            // X 이면 실행 불가
+            if (sScChkResult === "X") {
+                return;
+            }
+
+            if (hit.dev && WS_STATE.USERINFO.IS_DEV !== "D") {
+                return;
+            }
+
             e.preventDefault();
             _invoke(hit.ev, hit.t);
+
         });
     }
 

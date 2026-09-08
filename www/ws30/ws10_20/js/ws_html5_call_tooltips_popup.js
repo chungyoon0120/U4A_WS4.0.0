@@ -187,6 +187,7 @@
             }
 
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
             lf_finish("창 생성 실패", e, true);
 

@@ -22,7 +22,7 @@
         try {
             var s = document.currentScript && document.currentScript.src;
             return s ? s.replace(/\/[^\/]*$/, "") : "";
-        } catch (e) { return ""; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     })();
 
     /**
@@ -54,7 +54,7 @@
             if (typeof document === "undefined" || !document.documentElement) { return; }
             var bg = getComputedStyle(document.documentElement).getPropertyValue("--app-bg").trim();
             if (bg) { document.documentElement.style.setProperty("--boot-bg", bg); }
-        } catch (e) { /* noop */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
     }
 
     /**

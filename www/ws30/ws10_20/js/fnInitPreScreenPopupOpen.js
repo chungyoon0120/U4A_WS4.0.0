@@ -53,7 +53,7 @@
     try {
       var L = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
       return parent.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", sCode, p1 || "") || "";
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
   function _el(sTag, sClass, sText) {
     var o = document.createElement(sTag);
@@ -63,7 +63,7 @@
   }
   function _isEdit() {
     try { var o = APPCOMMON.fnGetModelProperty("/WS20/APP"); return !!(o && o.IS_EDIT === "X"); }
-    catch (e) { return false; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
   }
 
   // 단일 캐시 + 현재 컨텍스트(여는 쪽이 넘긴 WS20 속성 행).
@@ -72,7 +72,7 @@
 
   // 닫기 = close() 만. DOM 제거는 공통(u4a-ui.js _installGlobalDialogClose)이 .u4a-dialog 전역으로 처리.
   function lf_close() {
-    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // ── Apply(원본 OK 액션 콜백 setInitPreScreen) — 스위치 값을 속성 행에 반영 후 변경 흐름 수행 ──
@@ -89,7 +89,7 @@
 
     // (원본 updateBindPopupDesignData: 바인딩 팝업 디자인 영역 갱신 — W4+ 미변환)
     if (typeof oAPP.fn.updateBindPopupDesignData === "function") {
-      try { oAPP.fn.updateBindPopupDesignData(); } catch (e) { }
+      try { oAPP.fn.updateBindPopupDesignData(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     lf_close();
@@ -98,7 +98,7 @@
     //   공통 KIND 10 토스트=화면 정중앙). 닫힌 뒤 메인 위에 표시.
     try {
       parent.showMessage(null, 10, "S", APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "002", "", "", "", ""));
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   /************************************************************************
@@ -134,7 +134,7 @@
         });
         oHeader.appendChild(oHelpBtn);
       }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     var oXBtn = _el("button", "u4a-btn-icon");
     oXBtn.type = "button";
@@ -196,7 +196,7 @@
   function lf_fillText(sAttr) {
     // 헤더 제목 = 속성 라벨(UIATT, 워크스페이스 언어). (원본 dialogViewer title 대응)
     var sTitle = (sAttr && sAttr.UIATT) || "Use init pre-screen event";
-    try { oUI.dlg.querySelector(".u4a-dialog__header span").textContent = sTitle; } catch (e) { }
+    try { oUI.dlg.querySelector(".u4a-dialog__header span").textContent = sTitle; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // 254  init pre-screen event 사용여부 설정.
     oUI.label.textContent = _wsTxt("254");
@@ -214,7 +214,7 @@
     if (!oUI || !oUI.dlg || !document.body.contains(oUI.dlg)) { oUI = null; lf_build(); }
 
     if (oUI.dlg.open) {
-      try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+      try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       return;
     }
 
@@ -231,10 +231,10 @@
     // Apply 노출(원본 OK visible=/WS20/APP/IS_EDIT). 조회 모드면 보기 전용.
     oUI.applyBtn.hidden = !_isEdit();
 
-    try { oUI.dlg.showModal(); } catch (e) { }
+    try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // busy 끄고 Lock 풀기(원본 afterOpen).
-    try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+    try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
   }; // end of oAPP.fn.fnInitPreScreenPopupOpen
 

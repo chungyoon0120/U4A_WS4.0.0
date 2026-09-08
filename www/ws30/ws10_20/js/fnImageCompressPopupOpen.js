@@ -70,7 +70,7 @@
         try {
             var L = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
             return parent.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", sCode, "") || "";
-        } catch (e) { return ""; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     function _el(sTag, sClass, sText) {
         var o = document.createElement(sTag);
@@ -81,7 +81,7 @@
     function _isEdit() {
         //원본 oAPP.attr.oModel.oData.IS_EDIT 대응(문서 편집 가능 여부).
         try { var o = APPCOMMON.fnGetModelProperty("/WS20/APP"); return !!(o && o.IS_EDIT === "X"); }
-        catch (e) { return false; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
 
     // 단일 캐시 + 현재 컨텍스트(여는 쪽이 넘긴 WS20 속성 행).
@@ -90,7 +90,7 @@
 
     // 닫기 = close() 만. DOM 제거는 공통(u4a-ui.js)이 .u4a-dialog 전역으로 처리.
     function lf_close() {
-        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -147,14 +147,14 @@
 
         //입력값 점검 오류가 존재하는경우(원본 150~162행) — 오류표시 + 메시지 후 중단.
         if (_sRes.RETCD === "E") {
-            try { oUI.qty.setValueState("error", _sRes.RTMSG); } catch (e) { }
-            try { parent.showMessage(null, 20, "E", _sRes.RTMSG); } catch (e) { }
-            try { oUI.qty.focus(); } catch (e) { }
+            try { oUI.qty.setValueState("error", _sRes.RTMSG); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { parent.showMessage(null, 20, "E", _sRes.RTMSG); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oUI.qty.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
 
         //오류표시 해제(원본은 valueSt 를 통째로 초기화한 결과와 동일).
-        try { oUI.qty.setValueState("none", ""); } catch (e) { }
+        try { oUI.qty.setValueState("none", ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         //품질 숫자유형으로 변경(원본 158행).
         _sSetting.quality = Number(_sSetting.quality);
@@ -214,7 +214,7 @@
         var n = Number(sVal);
         if (isNaN(n) || n <= C_MAX_QUALITY) { return sVal; }
         var sCapped = String(C_MAX_QUALITY);
-        try { oUI.qty.setValue(sCapped); } catch (e) { }
+        try { oUI.qty.setValue(sCapped); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sCapped;
     }
 
@@ -341,7 +341,7 @@
         oRng.max = String(C_MAX_QUALITY);
         oRng.step = "0.01";
         oRng.addEventListener("input", function () {
-            try { oQty.setValue(oRng.value); } catch (e) { }
+            try { oQty.setValue(oRng.value); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             //★오류 표시는 여기서 지우지 않는다 — 원본은 오류 표시를 모델에 담아두고 다시 적용을 누를 때
             //  점검 결과로만 갱신한다(입력 도중에는 그대로 남는다). 원본과 같게 맞춘 것.
         });
@@ -390,9 +390,9 @@
      ************************************************************************/
     function lf_fillText(bEdit) {
         // 506  Image Compression Settings
-        try { oUI.dlg.querySelector(".u4a-dialog__header span").textContent = _wsTxt("506"); } catch (e) { }
+        try { oUI.dlg.querySelector(".u4a-dialog__header span").textContent = _wsTxt("506"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 503  Image Compression Options
-        try { oUI.panel.el.querySelector(".u4a-panel__title").textContent = _wsTxt("503"); } catch (e) { }
+        try { oUI.panel.el.querySelector(".u4a-panel__title").textContent = _wsTxt("503"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 504  Enable Image Compression
         oUI.lblEnabled.textContent = _wsTxt("504");
         // 505  Image Quality
@@ -436,20 +436,20 @@
 
         //값 채우기.
         lf_syncEnabled(!!_sSetting.enabled);
-        try { oUI.qty.setValue(String(_sSetting.quality)); } catch (e) { }
-        try { oUI.qty.setValueState("none", ""); } catch (e) { }
+        try { oUI.qty.setValue(String(_sSetting.quality)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oUI.qty.setValueState("none", ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         lf_syncQualityToRange(_sSetting.quality);
 
         //편집 가능 여부(원본 Switch/Input/Slider enabled·editable = IS_EDIT).
         oUI.swHead.disabled = !bEdit;
         oUI.swBody.disabled = !bEdit;
         oUI.rng.disabled = !bEdit;
-        try { oUI.qty.input.disabled = !bEdit; } catch (e) { }
+        try { oUI.qty.input.disabled = !bEdit; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         //Apply 노출(원본 OK visible = IS_EDIT).
         oUI.applyBtn.hidden = !bEdit;
 
-        try { oUI.dlg.showModal(); } catch (e) { }
+        try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.fnImageCompressPopupOpen
 

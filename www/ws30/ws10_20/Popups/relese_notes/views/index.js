@@ -36,6 +36,7 @@ class ReleaseApp {
             window.WSUTIL = require(_pathinfo.WSUTIL);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             
             //😡 개별 실행용 메시지 유틸 객체
             // - 메인 프로젝트와 통합되면 공통 WSUTIL 을 사용하므로 이 영역은 개발/테스트용 대체 로직이다.
@@ -126,7 +127,8 @@ class ReleaseApp {
       if (!_raw) return {};
       try {
         return JSON.parse(decodeURIComponent(_raw));
-      } catch {
+      } catch (_u4aErr) {
+          if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }
         return {};
       }
 

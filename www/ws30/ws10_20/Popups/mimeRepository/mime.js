@@ -29,15 +29,107 @@
      *   bIsBlob === "X" → 응답을 Blob 으로(미리보기 getmimeobj). 그 외 → JSON 파싱.
      ************************************************************************/
     function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_error, bIsBlob) {
+
+        /**
+         * 서버 통신 로그 (2026-09-08 추가)
+         * 이 별창은 자기 서버 통신 코드를 따로 갖고 있어 공통 자리에 안 잡힌다.
+         * 요청 이름만 남기고 값은 안 남긴다.
+         */
+        var _iAjaxStartAt = Date.now();
+        var _sAjaxName = String(sPath).split("?")[0].split("/").pop() || sPath;
+
+        /**
+         * 요청 번호 (2026-09-08 추가)
+         * 같은 요청이 한꺼번에 여러 번 나가면 응답이 뒤섞여 돌아온다(실측).
+         * 번호를 붙여야 보낸 줄과 받은 줄의 짝이 맞는다.
+         */
+        if (typeof window.__u4aAjaxSeq !== "number") { window.__u4aAjaxSeq = 0; }
+        window.__u4aAjaxSeq++;
+        var _sAjaxNo = "#" + window.__u4aAjaxSeq;
+
+        /**
+         * 서버 통신 실패를 자세히 남긴다 (2026-09-08 추가 — 장군님 지시)
+         * 앞서는 "실패: 통신 오류" 한 줄뿐이라 서버가 뭐라고 했는지 알 수 없었다.
+         * 실패했을 때만 주소·상태·서버가 준 내용을 남긴다(성공은 한 줄 그대로).
+         */
+        function _ajaxFail(sReason, oXhrLike) {
+
+            _ajaxLog("끝남", "실패: " + sReason);
+
+            try {
+
+                if (typeof U4ALOG === "undefined") { return; }
+
+                var _sp = String(sPath == null ? "" : sPath);
+                var _i = _sp.indexOf("?");
+                if (_i >= 0) { _sp = _sp.slice(0, _i) + " (뒤쪽 정보는 가림)"; }
+
+                U4ALOG.error("서버통신 실패 상세", "보낸 곳: " + _sp);
+
+                var x = oXhrLike || null;
+
+                if (!x) {
+                    U4ALOG.error("서버통신 실패 상세", "서버 응답 자체가 없음 (연결이 끊겼거나 서버에 못 닿음)");
+                    return;
+                }
+
+                U4ALOG.error("서버통신 실패 상세", "서버 상태: "
+                    + ((typeof x.status === "number") ? x.status : "-")
+                    + (x.statusText ? (" " + x.statusText) : ""));
+
+                try {
+                    if (typeof x.getResponseHeader === "function") {
+                        var _aMark = ["sap-err-id", "u4a_status", "content-type"];
+                        for (var _k = 0; _k < _aMark.length; _k++) {
+                            var _v = x.getResponseHeader(_aMark[_k]);
+                            if (_v) { U4ALOG.error("서버통신 실패 상세", "응답표시 " + _aMark[_k] + ": " + _v); }
+                        }
+                    }
+                } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+
+                try {
+
+                    var _sBody = (x.responseText != null) ? x.responseText : (x.response != null ? String(x.response) : "");
+
+                    if (!_sBody) {
+                        _sBody = "(서버가 아무 내용도 안 줬음)";
+                    } else if (_sBody.length > 4000) {
+                        _sBody = _sBody.slice(0, 4000) + " …(뒤 " + (_sBody.length - 4000) + "자 잘림)";
+                    }
+
+                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용: " + _sBody);
+
+                } catch (e3) {
+                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용을 못 읽음: " + e3);
+                }
+
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                // 로그 남기다 통신을 막으면 안 된다.
+            }
+
+        }
+
+
+        function _ajaxLog(sWhat, sResult) {
+            try {
+                if (typeof U4ALOG === "undefined") { return; }
+                U4ALOG.server(sWhat, _sAjaxName + " " + _sAjaxNo, sResult, Date.now() - _iAjaxStartAt);
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+        _ajaxLog("보냈음", "");
+
         var xhr = new XMLHttpRequest();
         var sMeth = (meth || "POST").toString().toUpperCase();
         var bBlob = (bIsBlob === "X" || bIsBlob === true);
         xhr.withCredentials = true;
-        try { xhr.open(sMeth, sPath, true); } catch (e) { if (typeof fn_error === "function") { fn_error(e); } return; }
+        try { xhr.open(sMeth, sPath, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _ajaxFail("요청을 시작 못 함 — " + (e && e.message ? e.message : e), null); if (typeof fn_error === "function") { fn_error(e); } return; }
         if (bBlob) { xhr.responseType = "blob"; }
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== 4) { return; }
             if (xhr.status === 200 || xhr.status === 201) {
+                _ajaxLog("끝남", "성공");
                 try {
                     if (bBlob) { fn_success(xhr.response); }
                     else { fn_success(JSON.parse(xhr.response)); }
@@ -46,30 +138,31 @@
                     if (typeof fn_error === "function") { fn_error(e); }
                 }
             } else {
+                _ajaxFail("서버가 상태 " + xhr.status + " 를 돌려줌", xhr);
                 if (typeof fn_error === "function") { fn_error(xhr); }
             }
         };
-        try { xhr.send(oFormData || null); } catch (e) { if (typeof fn_error === "function") { fn_error(e); } }
+        try { xhr.send(oFormData || null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _ajaxFail("요청을 못 보냄 — " + (e && e.message ? e.message : e), null); if (typeof fn_error === "function") { fn_error(e); } }
     }
 
     // ── 로컬 헬퍼 ─────────────────────────────────────────────────
     function _fa(s) { return '<i class="fa-solid fa-' + s + '"></i>'; }
     function _txt(sCls, sCode, p1, p2, p3, p4) {
         try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     function _wsTxt(sCode, p1) {
         try {
             var L = oAPP.attr.LANGU || "";
             return oAPP.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", sCode, p1 || "");
-        } catch (e) { return ""; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     // ZMSG_WS_COMMON_002 조회(001 포화 후 신설 클래스). 001 과 동일 규약, 클래스만 002.
     function _wsTxt2(sCode, p1) {
         try {
             var L = oAPP.attr.LANGU || "";
             return oAPP.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_002", sCode, p1 || "");
-        } catch (e) { return ""; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     function _el(sTag, sClass, sText) {
         var o = document.createElement(sTag);
@@ -90,7 +183,7 @@
             if (!m) { return "vs-dark"; }
             var lum = 0.299 * (+m[1]) + 0.587 * (+m[2]) + 0.114 * (+m[3]);
             return lum < 128 ? "vs-dark" : "vs";
-        } catch (e) { return "vs-dark"; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return "vs-dark"; }
     }
     function _monacoThemeOf(sName) { return (typeof sName === "string" && /dark$/i.test(sName)) ? "vs-dark" : "vs"; }
 
@@ -165,7 +258,7 @@
     var iWatch = null;
 
     // busy/Lock — 원본 fnSetBusyLock 그대로(창 자체 오버레이).
-    function lf_busy(b) { try { oAPP.common.fnSetBusyLock(b ? "X" : ""); } catch (e) { } }
+    function lf_busy(b) { try { oAPP.common.fnSetBusyLock(b ? "X" : ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
     // 트리 렌더 — 공통 래퍼(makeColumnTree) rerender 경유. 0건이면 격자 숨김 + 안내문구(emptyText)를
     //   가운데 표시(공통 .u4a-empty, .analy/16 §3.4.2·395), 데이터 있으면 정상 렌더.
@@ -177,7 +270,7 @@
                 return;
             }
         } catch (e) { console.error("[HTML5][MIME] 트리 렌더 오류:", e && e.message); }
-        try { if (oUI && oUI.tree) { oUI.tree.render(); } } catch (e2) { }
+        try { if (oUI && oUI.tree) { oUI.tree.render(); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
     }
 
     /* ── Monaco 호스트(iframe) 통신 ───────────────────────────────────── */
@@ -187,7 +280,7 @@
             oMsg.__u4ace = true;
             oMsg.hostId = C_HOSTID;
             if (oUI && oUI.frame && oUI.frame.contentWindow) { oUI.frame.contentWindow.postMessage(oMsg, "*"); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function lf_onMessage(oEvent) {
         var d = oEvent && oEvent.data;
@@ -269,8 +362,8 @@
                     "=> lf_loadTree => lf_success",
                     "[LOG]: Mime Data Not Found"
                 ].join("\r\n"));
-                try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
-                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+                try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 lf_busy(false);
                 return;
             }
@@ -278,7 +371,7 @@
             var aFlat = oResult.MIMETREE || [];
 
             oState.sLazy = false;
-            try { oState.sLazy = (oAPP.fn.checkWLOList() === true); } catch (e) { oState.sLazy = false; }
+            try { oState.sLazy = (oAPP.fn.checkWLOList() === true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oState.sLazy = false; }
             if (oState.sLazy) {
                 var aHasChild = aFlat.filter(function (e) { return e && e.ISECD === "X"; });
                 for (var i = 0; i < aHasChild.length; i++) {
@@ -300,10 +393,10 @@
             lf_expandMyApp(aFlat);
 
             if (aFlat.findIndex(function (a) { return a.MYAPP === "X"; }) === -1) {
-                try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
+                try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 var sMsg = _txt("/U4A/CL_WS_COMMON", "D00") + " " + _txt("/U4A/CL_WS_COMMON", "A30");
                 sMsg = _txt("/U4A/MSG_WS", "196", sMsg);
-                try { oAPP.fn.showMessage(null, 10, "E", sMsg); } catch (e) { }
+                try { oAPP.fn.showMessage(null, 10, "E", sMsg); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
 
             lf_busy(false);
@@ -342,7 +435,7 @@
         var oNode = _findNodeByKey(sKey);
         if (!oNode) { return; }
         var oRow = null;
-        try { oRow = oUI.treeBody.querySelector('.u4a-tree__row[aria-selected="true"]'); } catch (e) { }
+        try { oRow = oUI.treeBody.querySelector('.u4a-tree__row[aria-selected="true"]'); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         lf_onRowSelect(oNode, oRow);
     }
 
@@ -399,9 +492,9 @@
                     }
                     console.error(aLog.join("\r\n"));
                     sRetMsg = sRetMsg + "\n\n" + _wsTxt("228");
-                    try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
-                    try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
-                    try { oAPP.fn.showMessage(null, 20, "E", sRetMsg); } catch (e) { }
+                    try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    try { oAPP.fn.showMessage(null, 20, "E", sRetMsg); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     lf_busy(false);
                     resolve(false);
                     return;
@@ -509,7 +602,7 @@
         try {
             var oRow = oUI.treeBody.querySelector('.u4a-tree__row[aria-selected="true"]');
             if (oRow && oRow.__mimeNode) { return oRow.__mimeNode; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return oState.oSel;
     }
 
@@ -556,11 +649,11 @@
         try {
             if (oAPP.fn.sendAjaxLoginChk) {
                 oAPP.fn.sendAjaxLoginChk(function (oReturn) {
-                    if (!oReturn || oReturn.RETCD !== "S") { try { oAPP.fn.setBusy(""); } catch (e) { } return; }
+                    if (!oReturn || oReturn.RETCD !== "S") { try { oAPP.fn.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
                     fnGet();
                 });
             } else { fnGet(); }
-        } catch (e) { fnGet(); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } fnGet(); }
     }
 
     // POST /getmimeobj → blob (원본 fnGetMimeObject).
@@ -568,20 +661,20 @@
         var sPath = oAPP.fn.getServerPath() + "/getmimeobj",
             oFormData = new FormData();
         oFormData.append("URL", sUrl);
-        try { oAPP.fn.setBusy("X"); } catch (e) { }
+        try { oAPP.fn.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         sendAjax(sPath, oFormData, fnSuccess, null, null, "POST", null, "X");
     }
 
     // blob → 미리보기. ★MIME 기반 분기★.
     function lf_preview(oBlob) {
-        if (!oBlob || oBlob.size === 0) { try { oAPP.fn.setBusy(""); } catch (e) { } return; }
+        if (!oBlob || oBlob.size === 0) { try { oAPP.fn.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
 
         var sMime = String(oBlob.type || "").toLowerCase();
         var sName = (oState.oSel && oState.oSel.NTEXT) || "";
 
         if (sMime.indexOf("image/") === 0) {
             lf_showPreview("image", URL.createObjectURL(oBlob));
-            try { oAPP.fn.setBusy(""); } catch (e2) { }
+            try { oAPP.fn.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             return;
         }
 
@@ -592,12 +685,12 @@
             var sVType = _videoMime(sName, sMime);
             var oVBlob = (String(oBlob.type).toLowerCase() === sVType) ? oBlob : new Blob([oBlob], { type: sVType });
             lf_showPreview("video", URL.createObjectURL(oVBlob));
-            try { oAPP.fn.setBusy(""); } catch (e2) { }
+            try { oAPP.fn.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             return;
         }
         if (sMedia === "audio") {
             lf_showPreview("audio", URL.createObjectURL(oBlob));
-            try { oAPP.fn.setBusy(""); } catch (e2) { }
+            try { oAPP.fn.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             return;
         }
 
@@ -608,7 +701,7 @@
 
         if (_isBinaryMime(sMime)) {
             lf_showPreview("none");
-            try { oAPP.fn.setBusy(""); } catch (e2) { }
+            try { oAPP.fn.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             return;
         }
 
@@ -620,9 +713,9 @@
             } else {
                 lf_showPreview("text", { text: sText, lang: _langOf(sName, sMime) });
             }
-            try { oAPP.fn.setBusy(""); } catch (e2) { }
+            try { oAPP.fn.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         };
-        reader.onerror = function () { lf_showPreview("none"); try { oAPP.fn.setBusy(""); } catch (e2) { } };
+        reader.onerror = function () { lf_showPreview("none"); try { oAPP.fn.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } };
         reader.readAsText(oBlob, "UTF-8");
     }
 
@@ -631,7 +724,7 @@
         var oQ = encodeURIComponent(JSON.stringify({ HOSTID: C_PDFHOST, THEME: _editorTheme() }));
         var sSrc;
         try { sSrc = _fileUrl(oAPP.PATH.join(oAPP.PATHINFO.JS_ROOT, "pdfviewer", "index.html")); }
-        catch (e) { sSrc = "../../js/pdfviewer/index.html"; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sSrc = "../../js/pdfviewer/index.html"; }
         return sSrc + "?PARAMS=" + oQ;
     }
     function lf_pdfPost(ab) {
@@ -648,10 +741,10 @@
             if (!oUI.pdf.getAttribute("src")) { oUI.pdf.src = lf_pdfHostUrl(); }
             if (oUI.pdfReady) { lf_pdfPost(ab); }
             else { oState.pendingPdf = ab; }
-            try { oAPP.fn.setBusy(""); } catch (e) { }
+            try { oAPP.fn.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }).catch(function () {
             lf_showPreview("none");
-            try { oAPP.fn.setBusy(""); } catch (e) { }
+            try { oAPP.fn.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
 
@@ -659,7 +752,7 @@
     function lf_showPreview(sMode, oPayload) {
         if (!oUI) { return; }
 
-        if (oUI._objUrl) { try { URL.revokeObjectURL(oUI._objUrl); } catch (e) { } oUI._objUrl = null; }
+        if (oUI._objUrl) { try { URL.revokeObjectURL(oUI._objUrl); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } oUI._objUrl = null; }
 
         var bImg = sMode === "image", bAudio = sMode === "audio", bVideo = sMode === "video",
             bPdf = sMode === "pdf", bText = sMode === "text";
@@ -671,10 +764,10 @@
         oUI.nodata.hidden = !(sMode === "none");
 
         if (!bImg) { oUI.img.src = ""; }
-        if (!bAudio) { try { oUI.audio.pause(); } catch (e) { } oUI.audio.removeAttribute("src"); }
-        if (!bVideo) { try { if (oUI.video.getAttribute("src")) { oUI.video.src = "about:blank"; } } catch (e) { } } // iframe 언로드(재생 정지)
+        if (!bAudio) { try { oUI.audio.pause(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } oUI.audio.removeAttribute("src"); }
+        if (!bVideo) { try { if (oUI.video.getAttribute("src")) { oUI.video.src = "about:blank"; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } // iframe 언로드(재생 정지)
         if (!bPdf && oUI.pdf && oUI.pdf.contentWindow && oUI.pdfReady) {
-            try { oUI.pdf.contentWindow.postMessage({ __u4apdf: true, hostId: C_PDFHOST, cmd: "clear" }, "*"); } catch (e) { }
+            try { oUI.pdf.contentWindow.postMessage({ __u4apdf: true, hostId: C_PDFHOST, cmd: "clear" }, "*"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         if (bImg) {
@@ -747,16 +840,17 @@
             oInput.removeAttribute("readonly");
             oInput.select();
             document.execCommand("copy");
-            try { oInput.setSelectionRange(0, 0); } catch (e) { }
+            try { oInput.setSelectionRange(0, 0); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oInput.setAttribute("readonly", "readonly");
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             try {
                 var ta = document.createElement("textarea");
                 ta.value = sVal; document.body.appendChild(ta); ta.select();
                 document.execCommand("copy"); document.body.removeChild(ta);
-            } catch (e2) { }
+            } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         }
-        try { oAPP.fn.showMessage(null, 10, "S", _txt("/U4A/MSG_WS", "303")); } catch (e) { }
+        try { oAPP.fn.showMessage(null, 10, "S", _txt("/U4A/MSG_WS", "303")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -932,7 +1026,7 @@
         lf_closeCreateFolder();                 // 혹시 떠있던 이전 팝업 정리
         lf_buildCreateFolder(oNode);            // ★ 매번 새로 생성(재사용 안 함 → 재오픈 안 되던 버그 제거)
         try { oCrUI.dlg.showModal(); } catch (e) { console.error("[HTML5][MIME] 폴더생성 showModal:", e); }
-        setTimeout(function () { try { if (oCrUI) { oCrUI.nameField.focus(); } } catch (e) { } }, 0);
+        setTimeout(function () { try { if (oCrUI) { oCrUI.nameField.focus(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
     }
 
     function lf_buildCreateFolder(oNode) {
@@ -1000,8 +1094,8 @@
 
     function lf_closeCreateFolder() {
         if (!oCrUI) { return; }
-        try { if (oCrUI.dlg.open) { oCrUI.dlg.close(); } } catch (e) { }
-        try { oCrUI.dlg.remove(); } catch (e) { }   // DOM 에서 제거(다음 오픈은 새로 생성)
+        try { if (oCrUI.dlg.open) { oCrUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oCrUI.dlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // DOM 에서 제거(다음 오픈은 새로 생성)
         oCrUI = null;
     }
 
@@ -1019,7 +1113,7 @@
             var sTxt = _txt("/U4A/CL_WS_COMMON", "D01");        // Folder Name
             sTxt = _txt("/U4A/MSG_WS", "050", sTxt);            // & is required.
             oCrUI.nameField.setValueState("error", sTxt);
-            try { oCrUI.nameField.focus(); } catch (e) { }
+            try { oCrUI.nameField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
         oCrUI.nameField.setValueState("none", "");
@@ -1067,8 +1161,8 @@
             if (oCrUI && oCrUI.createBtn) { oCrUI.createBtn.disabled = false; }
 
             if (!oResult || oResult.RETCD === "E") {
-                try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
-                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+                try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 // 서버 예외 → 클라 언어 출력(공통 단일 헬퍼, .analy/17 전략 — 역현지화/SCRIPT 파싱).
                 //   onCts: 전송요청(CTS) 팝업. SCRIPT 는 헬퍼가 파싱(eval 없음)해 needCts 판정.
@@ -1084,9 +1178,9 @@
         function lf_crError() {
             lf_busy(false);
             if (oCrUI && oCrUI.createBtn) { oCrUI.createBtn.disabled = false; }
-            try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
-            try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
-            try { oAPP.fn.showMessage(null, 20, "E", _wsTxt("314")); } catch (e) { }
+            try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.fn.showMessage(null, 20, "E", _wsTxt("314")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         _doCreate();   // 최초 시도(앱 기본 REQNO)
@@ -1110,8 +1204,8 @@
                 // 확인질문(콜백형) → 공통 U4AUI.confirm(예/아니오). 제목은 메시지키로 현지화(B86 Information).
                 if (typeof fnCb === "function") {
                     var sTitle = "";
-                    try { sTitle = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B86"); } catch (e) { }
-                    U4AUI.confirm({ type: sType || "I", title: sTitle, message: sMsg, onClose: function (sAct) { try { fnCb(sAct); } catch (e) { } } });
+                    try { sTitle = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B86"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    U4AUI.confirm({ type: sType || "I", title: sTitle, message: sMsg, onClose: function (sAct) { try { fnCb(sAct); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } });
                     return;
                 }
                 oAPP.fn.showMessage(a, b, sType, sMsg);   // 단순 알림 → 토스트
@@ -1150,7 +1244,7 @@
     function lf_selectNewNode(sLastKey) {
         if (sLastKey) { oState.selKey = sLastKey; }
         lf_treeRender();
-        try { if (sLastKey) { oUI.tree.scrollToKey(sLastKey); } } catch (e) { }
+        try { if (sLastKey) { oUI.tree.scrollToKey(sLastKey); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (sLastKey) { lf_autoSelect(sLastKey); }
     }
 
@@ -1201,16 +1295,16 @@
         sendAjax(sPath, oFormData, function (oResult) {
             lf_busy(false);
             if (!oResult || oResult.RETCD === "E") {
-                try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
-                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+                try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.fn.fnRenderServerError(oResult, { onCts: lf_delCts });
                 return;
             }
             lf_removeNodeFromTree(oNode);
         }, null, null, "POST", function () {
             lf_busy(false);
-            try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
-            try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+            try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oAPP.fn.fnRenderServerError(null, {});
         });
     }
@@ -1250,8 +1344,8 @@
 
     function lf_closeImport() {
         if (!oImpUI) { return; }
-        try { if (oImpUI.dlg.open) { oImpUI.dlg.close(); } } catch (e) { }
-        try { oImpUI.dlg.remove(); } catch (e) { }
+        try { if (oImpUI.dlg.open) { oImpUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oImpUI.dlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oImpUI = null;
     }
 
@@ -1349,7 +1443,7 @@
         ["dragenter", "dragover"].forEach(function (t) {
             oZone.addEventListener(t, function (e) {
                 _stop(e);
-                try { if (e.dataTransfer) { e.dataTransfer.dropEffect = "copy"; } } catch (x) { }
+                try { if (e.dataTransfer) { e.dataTransfer.dropEffect = "copy"; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
                 if (oHi) { oHi.classList.add("u4aMimeImpDrag"); }
             });
         });
@@ -1491,8 +1585,8 @@
             lf_busy(false);
             if (oImpUI && oImpUI.saveBtn) { oImpUI.saveBtn.disabled = false; }
             if (!oResult || oResult.RETCD === "E") {
-                try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
-                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+                try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.fn.fnRenderServerError(oResult, { onCts: function () { lf_createMimeCts(); } });
                 return;
             }
@@ -1516,7 +1610,7 @@
 
             // 일부 등록 실패 시 — 키(323 "처리 실패") + 실패 파일명(데이터)을 줄바꿈으로.
             if (aFailed.length) {
-                try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
+                try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.fn.showMessage(null, 20, "W", _txt("/U4A/MSG_WS", "323") + "\n\n" + aFailed.join("\n"));
             }
         }
@@ -1524,8 +1618,8 @@
         function lf_impError(arg) {
             lf_busy(false);
             if (oImpUI && oImpUI.saveBtn) { oImpUI.saveBtn.disabled = false; }
-            try { oAPP.fn.setSoundMsg("02"); } catch (e) { }
-            try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { }
+            try { oAPP.fn.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (CURRWIN) { CURRWIN.flashFrame(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             // HTTP 413(Request Entity Too Large) = 업로드 파일이 서버(nginx/ICF) 허용 용량 초과. 응답이
             //   우리 JSON 이 아니라 nginx HTML 이라 fnRenderServerError 가 "알 수 없는 오류" 로 떨어짐
             //   → 상태코드로 직접 판정해 용량 초과 안내.
@@ -1551,7 +1645,7 @@
 
         var fnGet = function () {
             lf_getMimeObject(oNode.URL, function (oBlob) {   // lf_getMimeObject 가 busy("X") 처리
-                try { oAPP.fn.setBusy(""); } catch (e) { }
+                try { oAPP.fn.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 if (!oBlob || oBlob.size <= 0) { return; }   // 원본 동일(빈 오브젝트는 무동작)
                 _saveBlobToDisk(oNode.NTEXT, oBlob);
             });
@@ -1561,11 +1655,11 @@
         try {
             if (oAPP.fn.sendAjaxLoginChk) {
                 oAPP.fn.sendAjaxLoginChk(function (oReturn) {
-                    if (!oReturn || oReturn.RETCD !== "S") { try { oAPP.fn.setBusy(""); } catch (e) { } return; }
+                    if (!oReturn || oReturn.RETCD !== "S") { try { oAPP.fn.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
                     fnGet();
                 });
             } else { fnGet(); }
-        } catch (e) { fnGet(); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } fnGet(); }
     }
 
     // blob → 디스크 저장(원본 fnFileDown). 폴더 선택 다이얼로그 + FS.writeFile + 폴더에서 보이기.
@@ -1576,7 +1670,7 @@
         var B = (typeof Buffer !== "undefined") ? Buffer : REMOTE.require("buffer").Buffer;
 
         var sDefault = oAPP.attr._filedownFolderPath || "";
-        if (!sDefault) { try { sDefault = oAPP.APP.getPath("downloads"); } catch (e) { sDefault = ""; } }
+        if (!sDefault) { try { sDefault = oAPP.APP.getPath("downloads"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sDefault = ""; } }
 
         var sTitle = (_txt("/U4A/CL_WS_COMMON", "B79") + " " + _txt("/U4A/CL_WS_COMMON", "B78")).trim(); // File Download
 
@@ -1599,7 +1693,7 @@
                     var buf = B.from(ev.target.result);
                     FS.writeFile(sFilePath, buf, {}, function (err) {
                         if (err) { console.error("[HTML5][MIME] download write:", err); return; }
-                        try { SHELL.showItemInFolder(sFilePath); } catch (e) { }   // 저장 폴더에서 파일 보이기
+                        try { SHELL.showItemInFolder(sFilePath); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 저장 폴더에서 파일 보이기
                     });
                 } catch (e) { console.error("[HTML5][MIME] download buffer:", e); }
             };
@@ -1754,7 +1848,7 @@
         }));
         var sHostSrc;
         try { sHostSrc = _fileUrl(oAPP.PATH.join(oAPP.PATHINFO.JS_ROOT, "codeeditor", "index.html")); }
-        catch (e) { sHostSrc = "../../js/codeeditor/index.html"; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sHostSrc = "../../js/codeeditor/index.html"; }
         oFrame.src = sHostSrc + "?PARAMS=" + oQuery;
 
         var oNoData = _el("div", "u4aMimeNoData2");
@@ -1781,7 +1875,7 @@
         _bindSplitResizeClamp(oSplit);
 
         window.addEventListener("message", lf_onMessage);
-        try { window.addEventListener("u4a-theme-changed", lf_onThemeChange); } catch (e) { }
+        try { window.addEventListener("u4a-theme-changed", lf_onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         oUI = {
             frame: oFrame, img: oImg, pdf: oPdf, audio: oAudio, video: oVideo, nodata: oNoData,
@@ -1867,7 +1961,7 @@
      ************************************************************************/
     window.fnMimeStart = function () {
 
-        try { oAPP.fn.fnHideFloatingFooterMsg(); } catch (e) { }
+        try { oAPP.fn.fnHideFloatingFooterMsg(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         if (!oUI || !document.getElementById("mimeRoot").contains(oUI.split)) {
             oUI = null;

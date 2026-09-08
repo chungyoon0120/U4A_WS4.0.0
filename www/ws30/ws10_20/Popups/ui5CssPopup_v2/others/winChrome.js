@@ -80,8 +80,8 @@
                 var PATH = REMOTE.require('path');
                 var APPPATH = REMOTE.app.getAppPath();
 
-                try { CURRWIN.setMenu(null); } catch (e) { }
-                try { if (window.U4AUI && U4AUI.initWindowFocusState) { U4AUI.initWindowFocusState(); } } catch (e) { }
+                try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { if (window.U4AUI && U4AUI.initWindowFocusState) { U4AUI.initWindowFocusState(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 // 타이틀바 구성 — 로고 / 제목 / 최대화 / 닫기 (minimize 없음)
                 var hd = document.createElement("header");
@@ -90,7 +90,7 @@
 
                 var logo = document.createElement("img");
                 logo.className = "u4a-titlebar__logo"; logo.alt = "U4A";
-                try { logo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { }
+                try { logo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 var tit = document.createElement("span");
                 tit.className = "u4a-titlebar__title"; tit.textContent = document.title || "";
@@ -123,30 +123,30 @@
                 function _syncMax() {
                     var i = btnMax.querySelector("i");
                     if (!i) { return; }
-                    var m = false; try { m = CURRWIN.isMaximized(); } catch (e) { }
+                    var m = false; try { m = CURRWIN.isMaximized(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     i.className = m ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
                 }
-                btnMax.addEventListener("click", function () { try { CURRWIN.isMaximized() ? CURRWIN.unmaximize() : CURRWIN.maximize(); } catch (e) { } });
-                try { CURRWIN.on("maximize", _syncMax); CURRWIN.on("unmaximize", _syncMax); } catch (e) { }
+                btnMax.addEventListener("click", function () { try { CURRWIN.isMaximized() ? CURRWIN.unmaximize() : CURRWIN.maximize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
+                try { CURRWIN.on("maximize", _syncMax); CURRWIN.on("unmaximize", _syncMax); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 _syncMax();
 
                 // 닫기 — closable:false 라 직접 close 불가 → 공통 U4AUI.closeWindow(폴백 setClosable+close)
                 btnClose.addEventListener("click", function () {
                     if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); }
-                    else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { } }
+                    else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
                 });
 
                 // 스타일/배선 끝났으니 표시(흰 플래시 없음)
-                try { CURRWIN.show(); } catch (e) { }
+                try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             } catch (e) {
                 console.error("[ui5CssPopup others win] 크롬 배선 오류:", e && e.message);
-                try { require('@electron/remote').getCurrentWindow().show(); } catch (e2) { }
+                try { require('@electron/remote').getCurrentWindow().show(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             }
         };
 
         function _afterAssets() {
             _js(THEME_DIR + "/theme-api.js", function () {
-                try { var th = q.get("THEME"); if (th && window.U4ATheme) { U4ATheme.apply(U4ATheme.normalize ? U4ATheme.normalize(th) : th); } } catch (e) { }
+                try { var th = q.get("THEME"); if (th && window.U4ATheme) { U4ATheme.apply(U4ATheme.normalize ? U4ATheme.normalize(th) : th); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 _js(THEME_DIR + "/u4a-ui.js", function () { window._u4aOtherInitChrome(); });
             });
         }
@@ -159,7 +159,7 @@
         //   실제 load 이벤트 기반(타이머 아님). 1회 가드로 정상경로와 중복돼도 안전.
         window.addEventListener("load", function () {
             try { window._u4aOtherInitChrome(); }
-            catch (e) { try { require('@electron/remote').getCurrentWindow().show(); } catch (e2) { } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } try { require('@electron/remote').getCurrentWindow().show(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } }
         });
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 })();

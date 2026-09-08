@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- ===== 공통 헤더(.u4a-titlebar)·트리·테이블·입력칸·토큰 (docPopup/runtimeClassNav 과 동일 짝) ===== -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="frame.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* frame.js 에서 재적용 */ }
+        })();
+    </script>
+</head>
+
+<body>
+
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/닫기 ===== -->
+    <header class="u4a-titlebar" id="bwpTitlebar">
+        <img class="u4a-titlebar__logo" id="bwpLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="bwpTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button class="u4a-winbtn" id="bwpWinMin" data-action="minimize" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button class="u4a-winbtn" id="bwpWinMax" data-action="maximize" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- ===== 본체 = [좌: 모델필드 트리] | [중: 디자인 트리(상) + 추가속성 적용(하)] | [우: 추가속성 정보] =====
+         원본 sap.ui.layout.Splitter(가로 3영역, 중앙은 세로 2분할) 대응. 기본 모드 = BULK(3분할).
+         각 영역 콘텐츠(툴바/트리/테이블)는 frame.js + 영역 모듈이 렌더한다. -->
+    <main class="u4aBwpShell" id="bwpShell">
+
+        <!-- 좌: 모델 필드 트리 -->
+        <section class="u4aBwpPane u4a-splitter__pane u4aBwpLeft" id="bwpLeftPane">
+            <div class="u4aBwpArea" id="bwpModelArea">
+                <div class="u4aBwpTool" id="bwpModelTool"></div>
+                <div class="u4aBwpTreeHost" id="bwpModelTree"></div>
+            </div>
+        </section>
+
+        <!-- 세로 스플리터 바(좌|중) -->
+        <div class="u4a-splitter__bar u4aBwpSplitBar u4aBwpSplitBar--v" id="bwpSplit1" role="separator" aria-orientation="vertical"></div>
+
+        <!-- 중: 디자인 트리(상) + 추가속성 적용(하) — 자체가 세로 스플리터(axis:y) -->
+        <section class="u4aBwpPane u4a-splitter__pane u4a-splitter__pane--flex u4aBwpCenter" id="bwpCenterPane">
+
+            <div class="u4aBwpArea u4a-splitter__pane u4aBwpDesign" id="bwpDesignArea">
+                <div class="u4aBwpTool" id="bwpDesignTool"></div>
+                <div class="u4aBwpTreeHost" id="bwpDesignTree"></div>
+            </div>
+
+            <!-- 가로 스플리터 바(디자인 트리 | 추가속성 적용) -->
+            <div class="u4a-splitter__bar u4aBwpSplitBar u4aBwpSplitBar--h" id="bwpSplit2" role="separator" aria-orientation="horizontal"></div>
+
+            <div class="u4aBwpArea u4a-splitter__pane u4a-splitter__pane--flex u4aBwpAdditApply" id="bwpAdditApplyArea">
+                <div class="u4aBwpTool" id="bwpAdditApplyTool"></div>
+                <div class="u4aBwpTableHost" id="bwpAdditApply"></div>
+            </div>
+
+        </section>
+
+        <!-- 세로 스플리터 바(중|우) -->
+        <div class="u4a-splitter__bar u4aBwpSplitBar u4aBwpSplitBar--v" id="bwpSplit3" role="separator" aria-orientation="vertical"></div>
+
+        <!-- 우: 추가속성(MPROP) 정보 -->
+        <section class="u4aBwpPane u4a-splitter__pane u4aBwpRight" id="bwpRightPane">
+            <div class="u4aBwpArea" id="bwpAdditInfoArea">
+                <div class="u4aBwpTool" id="bwpAdditInfoTool"></div>
+                <div class="u4aBwpTableHost" id="bwpAdditInfo"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 로딩 오버레이 = 공통 busy(.u4a-busy, shell.css SSOT). 토스트는 frame.js 가 동적 생성. -->
+    <div class="u4a-busy" id="bwpBusy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+        </div>
+    </div>
+
+    <!-- 부트/셸(frameless) — 전역 oAPP/헬퍼 구성. 이후 영역 모듈이 이 전역을 소비한다. -->
+    <script src="frame.js"></script>
+    <!-- 공용 헬퍼(sendAjax/setTreeData) + 영역 모듈(로드 순서 = 의존 순서).
+         다열 컬럼트리는 공통 U4AUI.makeColumnTree(theme/u4a-ui.js) 소비 — 별도 스크립트 없음. -->
+    <script src="bindShared.js"></script>
+    <!-- 오류목록 팝오버(§6) — 원본 sap.m.MessagePopover 대응. 검증 실패 시 N건 목록+위치확인 링크. -->
+    <script src="utils/showMessagePopover.js"></script>
+    <script src="modelFieldArea/modelFieldArea.js"></script>
+    <!-- 좌측 바인딩 가능/불가 판정(§2.1) — 원본 CJS(module.exports)를 oAPP.fn 전역 노출로 이식. -->
+    <script src="modelFieldArea/bindPossible.js"></script>
+    <script src="designArea/bindData.js"></script>
+    <script src="designArea/bindWrite.js"></script>
+    <script src="designArea/designArea.js"></script>
+    <!-- 동일속성 바인딩(§5) 매칭 데이터 — 원본 CJS(module.exports)를 oAPP.fn 전역 노출로 이식. -->
+    <script src="synchronizionArea/getSameAttrList.js"></script>
+    <!-- 동일속성 바인딩 화면(§5) — 원본 uiModule/synchronizionBind.js. 슬라이드 스왑(designArea.js). -->
+    <script src="synchronizionArea/syncBindScreen.js"></script>
+    <script src="additInfoArea/additInfoArea.js"></script>
+    <script src="layoutCustomizing/layoutCustomizing.js"></script>
+    <!-- 부모창(WS20) 방송 수신부 = 가운데 디자인 트리 데이터 유입(UPDATE_DESIGN_DATA). Stage6 에서 createBindChannel 호출. -->
+    <script src="wsDesignHandler/bindBroadcast.js"></script>
+
+</body>
+
+</html>

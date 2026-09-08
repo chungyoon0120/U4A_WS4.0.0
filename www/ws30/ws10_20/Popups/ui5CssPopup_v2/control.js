@@ -166,6 +166,7 @@ export async function start(require, IF_DATA, fnCallback){
             CURRWIN.focus();    
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             
         }
 

@@ -124,7 +124,7 @@
         oT.textContent = sMsg;
         oT.setAttribute("data-show", "true");
         clearTimeout(_toastTimer);
-        _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { } }, 3000);
+        _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 3000);
     }
 
     // busy(top-layer <dialog>) 제어.
@@ -196,7 +196,7 @@
             const sMode = document.documentElement.getAttribute("data-sl-theme");
             if (sMode === "dark") { return "vs-dark"; }
             if (sMode === "light") { return "vs"; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return "vs-dark";
     }
 
@@ -217,7 +217,7 @@
     function _onThemeChange() {
         const oTheme = _getThemeInfo();
         if (!oTheme) { return; }
-        try { CURRWIN.webContents.insertCSS("html, body { margin: 0px; height: 100%; background-color: " + oTheme.BGCOL + "; }"); } catch (e) { }
+        try { CURRWIN.webContents.insertCSS("html, body { margin: 0px; height: 100%; background-color: " + oTheme.BGCOL + "; }"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try {
             if (window.U4ATheme && oTheme.THEME) {
                 window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(oTheme.THEME) : oTheme.THEME);
@@ -470,8 +470,8 @@
         // 전환 후 Monaco 레이아웃 재계산(자동레이아웃 보조).
         _toHost({ cmd: "layout" });
         // 숨김→표시로 폭이 확정되면 편집 페이지 툴바 오버플로 재계산(폭 0 시점 오판 보정).
-        if (_ovfTools) { try { _ovfTools.reflow(); } catch (e) { } }
-        if (_ovfInfoActs) { try { _ovfInfoActs.reflow(); } catch (e) { } }
+        if (_ovfTools) { try { _ovfTools.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+        if (_ovfInfoActs) { try { _ovfInfoActs.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         _syncActionButtons();
     }
 
@@ -603,9 +603,9 @@
         };
 
         // 폼 반영
-        try { oLanguField.setValue(oState.cur.snippet_langu); } catch (e) { }
-        try { oNameField.setValue(oState.cur.snippet_name); } catch (e) { }
-        try { oDescField.setValue(oState.cur.snippet_desc); } catch (e) { }
+        try { oLanguField.setValue(oState.cur.snippet_langu); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oNameField.setValue(oState.cur.snippet_name); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDescField.setValue(oState.cur.snippet_desc); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _clearValueStates();
 
         _showEdit();
@@ -628,7 +628,7 @@
 
     function _clearValueStates() {
         _setLanguVs(false);
-        try { oNameField.setValueState("none"); } catch (e) { }
+        try { oNameField.setValueState("none"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /* ==================================================================
@@ -643,7 +643,7 @@
             oState.list.unshift({ _key: sKey, snippet_langu: "", snippet_name: "", snippet_desc: "", _isnew: true });
             renderList();
             _loadIntoEdit(sKey);
-            setTimeout(function () { try { oNameField.focus(); } catch (e) { } }, 0);
+            setTimeout(function () { try { oNameField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
         });
     }
 
@@ -778,17 +778,17 @@
         // ★필드 검증 메시지는 토스트가 아니라 valueState 메시지로(장군님 지시) — 포커스 이동으로 노출된다.
         if (!sLangu) {
             _setLanguVs(true, wsMsg("349", "Language is required."));
-            try { oLanguField.focus(); } catch (e) { }
+            try { oLanguField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return { RETCD: "E" };
         }
         if (!sName) {
             oNameField.setValueState("error", wsMsg("350", "Snippet name is required."));
-            try { oNameField.focus(); } catch (e) { }
+            try { oNameField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return { RETCD: "E" };
         }
         if (/\s/.test(sName)) {
             oNameField.setValueState("error", wsMsg("351", "Snippet name cannot contain spaces."));
-            try { oNameField.focus(); } catch (e) { }
+            try { oNameField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return { RETCD: "E" };
         }
         // 코드는 입력 필드가 아니라 에디터 → 붙일 valueState 자리가 없어 토스트 유지(원본 M352 동일).
@@ -821,10 +821,10 @@
         if (!oState.cur) { return; }
         oState.cur._ischg = true;
         const sName = oNameField.getValue() || "";
-        try { oNameField.setValueState("none"); } catch (e) { }
+        try { oNameField.setValueState("none"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (/\s/.test(sName)) {
             // 입력 중이라 이미 포커스가 있어 valueState 메시지가 바로 보인다(토스트 사용 안 함).
-            try { oNameField.setValueState("error", wsMsg("351", "Snippet name cannot contain spaces.")); } catch (e) { }
+            try { oNameField.setValueState("error", wsMsg("351", "Snippet name cannot contain spaces.")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         _syncActionButtons();
     }
@@ -925,7 +925,7 @@
                 if (h < minH) { h = minH; }
                 if (h >= maxH) { h = maxH; ta.style.overflowY = "auto"; } else { ta.style.overflowY = "hidden"; }
                 ta.style.height = h + "px";
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         };
     }
 
@@ -938,7 +938,7 @@
         _descFit = _makeTextareaGrow(oDescField.input, 2, 5);
 
         // 초기 미선택 상태.
-        try { oLanguField.setValue(""); } catch (e) { }
+        try { oLanguField.setValue(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         const oGrid = document.createElement("div");
         oGrid.className = "u4aSnipInfoGrid";
@@ -993,7 +993,7 @@
         // 로고
         const oLogo = document.getElementById("snipLogo");
         if (oLogo) {
-            try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+            try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 제목
         const oTitle = document.getElementById("snipTitle");
@@ -1010,12 +1010,12 @@
                 try {
                     const oI = oMax.querySelector("i");
                     if (oI) { oI.className = CURRWIN.isMaximized() ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             };
             oMax.addEventListener("click", function () {
-                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
-            try { CURRWIN.on("maximize", _syncMaxIcon); CURRWIN.on("unmaximize", _syncMaxIcon); } catch (e) { }
+            try { CURRWIN.on("maximize", _syncMaxIcon); CURRWIN.on("unmaximize", _syncMaxIcon); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _syncMaxIcon();
         }
     }
@@ -1091,7 +1091,7 @@
      * ================================================================== */
     // opener 초기 데이터(scope/theme) — 없어도 동작(테마/타이틀은 쿼리로 이미 반영).
     IPCRENDERER.on("if-data", function (event, oData) {
-        try { oState.scopeCode = (oData && oData.scopeCode) || ""; } catch (e) { }
+        try { oState.scopeCode = (oData && oData.scopeCode) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     document.addEventListener("DOMContentLoaded", function () {
@@ -1106,20 +1106,20 @@
 
             // 준비 완료 → 창 노출(플래시 방지: opener show:false 로 열림).
             requestAnimationFrame(function () {
-                try { CURRWIN.show(); } catch (e) { }
+                try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 document.body.classList.add("u4a-visible");
                 fn_setBusy(false);
             });
         } catch (e) {
             console.error("[스니펫디자이너] 초기화 오류:", e);
-            try { CURRWIN.show(); } catch (e2) { }
+            try { CURRWIN.show(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         }
     });
 
     // 창 제거 시 IPC 리스너 해제(누수 방지) + 방송 채널 종료.
     window.addEventListener("pagehide", function () {
-        if (_THEME_CH) { try { IPCMAIN.removeListener(_THEME_CH, _onThemeChange); } catch (e) { } }
-        if (_oBroadToChild) { try { _oBroadToChild.close(); } catch (e) { } _oBroadToChild = null; }
+        if (_THEME_CH) { try { IPCMAIN.removeListener(_THEME_CH, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+        if (_oBroadToChild) { try { _oBroadToChild.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } _oBroadToChild = null; }
     }, { once: true });
 
     // busy 중 닫기 차단.

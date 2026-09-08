@@ -26,7 +26,7 @@
     var WSUTIL = require(PATHINFO.WSUTIL);
 
     var oQuery = {};
-    try { oQuery = WSUTIL.QueryString.parse(location.href) || {}; } catch (e) { }
+    try { oQuery = WSUTIL.QueryString.parse(location.href) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     var USERINFO = oQuery.USERINFO || {};
     var LANGU = USERINFO.LANGU || "";
     var SYSID = USERINFO.SYSID || "";
@@ -39,14 +39,14 @@
     function _ready() {
         if (_bReadySent) { return; }
         _bReadySent = true;
-        try { CURRWIN.setOpacity(1.0); } catch (e) { }
-        try { CURRWIN.show(); } catch (e) { }
-        try { if (BROWSKEY) { IPC.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } } catch (e) { }
+        try { CURRWIN.setOpacity(1.0); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (BROWSKEY) { IPC.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // ★형제 창 busy 해제(누락 버그 수정): opener(fnWsOptionsPopupOpener)가 oMainBroad 로 BUSY_ON 을
         //   broadcast 해 docPopup 등 형제 창을 전부 잠갔다. SETBUSYLOCK 은 "메인" busy 만 풀 뿐 형제창은
         //   안 푼다 → 여기서 BUSY_OFF 도 broadcast 해야 형제창이 풀린다(안 하면 형제창 영구 busy+닫기차단).
         //   BROAD_BUSY 액션 = 메인이 oMainBroad 로 중계(extopen/importExport 와 동일 패턴).
-        try { if (BROWSKEY) { IPC.send("if-send-action-" + BROWSKEY, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } } catch (e) { }
+        try { if (BROWSKEY) { IPC.send("if-send-action-" + BROWSKEY, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // ── 자식창 busy 동기화 채널 (원본 optionS.html _attachBroadCastEvent + setBusy 1:1 이식) ─────────
@@ -68,10 +68,10 @@
         }
         oEl.setAttribute("data-busy", bBusy ? "true" : "false");
         // 닫기 차단은 closable 을 항상 false 로 유지 + _close/onbeforeunload 의 busy 가드로(공통 browser-window-common-ux).
-        try { CURRWIN.closable = false; } catch (e) { }
+        try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 수신(ISBROAD)으로 켠 건 되쏘지 않는다(수신↔발신 무한 루프 방지). 자체 busy 만 형제창에 전파.
         if (oBroad && !(oOpt && oOpt.ISBROAD)) {
-            try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
+            try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     }
     function _initBroadcast() {
@@ -84,15 +84,15 @@
                 if (sPrc === "BUSY_ON") { _setBusy(true, { ISBROAD: true }); }
                 else if (sPrc === "BUSY_OFF") { _setBusy(false, { ISBROAD: true }); }
             };
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     // busy(자체/형제창 잠금) 중에는 창을 닫지 못하게 한다(원본 setBusy 의 closable=false 대응).
     window.onbeforeunload = function () { if (bBusy) { return false; } };
 
     var WSMSG = null;
-    try { WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU); } catch (e) { }
+    try { WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     function _txt(sCls, sCode) {
-        try { return (WSMSG && WSMSG.fnGetMsgClsText(sCls, sCode, "", "", "", "")) || ""; } catch (e) { return ""; }
+        try { return (WSMSG && WSMSG.fnGetMsgClsText(sCls, sCode, "", "", "", "")) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     var _fa = function (s) { return '<i class="fa-solid fa-' + s + '"></i>'; };
     function _toFileUrl(sPath) { return encodeURI("file:///" + String(sPath).replace(/\\/g, "/")); }
@@ -167,13 +167,13 @@
 
     function _norm(s) {
         try { return (window.U4ATheme && window.U4ATheme.normalize) ? window.U4ATheme.normalize(s) : s; }
-        catch (e) { return s; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return s; }
     }
     function _applyTheme(sKey) {
-        try { if (window.U4ATheme) { window.U4ATheme.apply(sKey); } } catch (e) { }
+        try { if (window.U4ATheme) { window.U4ATheme.apply(sKey); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 첫 페인트용 --boot-bg(BGCOL) 해제 → 이후 body 배경이 활성 테마 --app-bg 를 따라
         //   미리보기(테마 클릭)마다 갱신된다. (테마 CSS 는 did-finish-load 시점에 이미 로드됨)
-        try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { }
+        try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         sCurTheme = sKey;
     }
 
@@ -282,14 +282,14 @@
         document.querySelectorAll("[data-code]").forEach(function (n) {
             n.classList.toggle("active", n.getAttribute("data-code") === sCode);
         });
-        try { sec.render(oCont); } catch (e) { oCont.innerHTML = ""; }
+        try { sec.render(oCont); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oCont.innerHTML = ""; }
     }
 
     function _close(bRevert) {
         if (bBusy) { return; }   // busy(자체/형제창 잠금) 중 닫기 무시(원본 closable=false 대응).
         if (bRevert) { _applyTheme(sOrigTheme); }
-        try { CURRWIN.setClosable && CURRWIN.setClosable(true); } catch (e) { }
-        try { CURRWIN.close(); } catch (e) { try { CURRWIN.destroy(); } catch (e2) { } }
+        try { CURRWIN.setClosable && CURRWIN.setClosable(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } try { CURRWIN.destroy(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } }
     }
 
     // 공통 토스트(shell.css .u4a-toast — ServerList 와 동일 패턴, bootstrap-skin 이 색 입힘)
@@ -316,15 +316,15 @@
         try {
         var sKey = sCurTheme;
         var sBg = "";
-        try { sBg = WSUTIL.getThemeBackgroundColor ? WSUTIL.getThemeBackgroundColor(sKey) : ""; } catch (e) { }
-        if (!sBg) { try { sBg = getComputedStyle(document.documentElement).getPropertyValue("--app-bg").trim(); } catch (e) { } }
+        try { sBg = WSUTIL.getThemeBackgroundColor ? WSUTIL.getThemeBackgroundColor(sKey) : ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        if (!sBg) { try { sBg = getComputedStyle(document.documentElement).getPropertyValue("--app-bg").trim(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         var sData = { THEME: sKey, BGCOL: sBg || "" };
         try {
             var sDir = PATH.join(USERDATA, "p13n", "theme_ws4");
-            try { FS.mkdirSync(sDir, { recursive: true }); } catch (e2) { }
+            try { FS.mkdirSync(sDir, { recursive: true }); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             FS.writeFileSync(PATH.join(sDir, SYSID + ".json"), JSON.stringify(sData), "utf-8");
-        } catch (e) { }
-        try { IPC.send("if-p13n-themeChange-" + SYSID, sData); } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { IPC.send("if-p13n-themeChange-" + SYSID, sData); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // ★ 열려 있는 모든 창의 "네이티브 BrowserWindow 배경색"도 새 테마 배경으로 일괄 적용한다.
         //   내용(DOM) 재테마는 각 창의 if-p13n-themeChange 핸들러가 하지만, 네이티브 창 배경은
@@ -334,9 +334,9 @@
         if (sData.BGCOL) {
             try {
                 REMOTE.BrowserWindow.getAllWindows().forEach(function (w) {
-                    try { if (w && !w.isDestroyed() && w.setBackgroundColor) { w.setBackgroundColor(sData.BGCOL); } } catch (e2) { }
+                    try { if (w && !w.isDestroyed() && w.setBackgroundColor) { w.setBackgroundColor(sData.BGCOL); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                 });
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 적용 후 origin 갱신 → 이후 Close 가 방금 적용한 테마를 되돌리지 않게.
@@ -345,7 +345,7 @@
         //    "&1 has been saved", &1 = B52(Options))만 토스트로 표시.
         var sB52 = _txt("/U4A/CL_WS_COMMON", "B52") || "Options";
         var sMsg = "";
-        try { sMsg = (WSMSG && WSMSG.fnGetMsgClsText("/U4A/MSG_WS", "330", sB52, "", "", "")) || ""; } catch (e) { }
+        try { sMsg = (WSMSG && WSMSG.fnGetMsgClsText("/U4A/MSG_WS", "330", sB52, "", "", "")) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _toast(sMsg || sB52);
         } finally { _setBusy(false); }
     }
@@ -363,7 +363,7 @@
 
         var sTitle = _txt("/U4A/CL_WS_COMMON", "B52") || "Options";
         var sLogo = "";
-        try { sLogo = _toFileUrl(PATHINFO.WS_LOGO); } catch (e) { }
+        try { sLogo = _toFileUrl(PATHINFO.WS_LOGO); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         root.innerHTML =
             '<div class="d-flex flex-column" style="height:100vh">' +
@@ -393,9 +393,9 @@
             '</div>';
 
         // 창 제어 버튼 (frameless — 공통 .u4a-winbtn)
-        document.getElementById("optWinMin").addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { } });
+        document.getElementById("optWinMin").addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
         document.getElementById("optWinMax").addEventListener("click", function () {
-            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
         document.getElementById("optWinClose").addEventListener("click", function () { _close(true); });
 
@@ -444,17 +444,17 @@
             var sKey = _norm((oData && oData.THEME) || "");
             if (!sKey || THEMES.map(function (t) { return t.key; }).indexOf(sKey) === -1) { return; }
             if (window.U4ATheme) { window.U4ATheme.apply(sKey); }
-            try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { }
+            try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             sCurTheme = sKey;
             sOrigTheme = sKey;   // 다른 창이 "적용"한 게 새 기준 → 이 팝업 Close 가 옛 테마로 되돌리지 않게
             _markSel(sKey);      // 선택 카드 체크 갱신(카드 렌더 전이면 no-op)
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
-    try { if (SYSID) { IPCMAIN.on("if-p13n-themeChange-" + SYSID, _onThemeChangeFromOther); } } catch (e) { }
+    try { if (SYSID) { IPCMAIN.on("if-p13n-themeChange-" + SYSID, _onThemeChangeFromOther); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // 창 닫힐 때 리스너 해제 — remote ipcMain 리스너를 안 떼면 창 파괴 후 브로드캐스트 시 메인에서 죽은
     //   콜백 호출로 오류. beforeunload 가 _close/네이티브 X 등 모든 닫힘 경로를 덮는다.
     window.addEventListener("beforeunload", function () {
-        try { if (SYSID) { IPCMAIN.off("if-p13n-themeChange-" + SYSID, _onThemeChangeFromOther); } } catch (e) { }
+        try { if (SYSID) { IPCMAIN.off("if-p13n-themeChange-" + SYSID, _onThemeChangeFromOther); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     document.addEventListener("DOMContentLoaded", function () {

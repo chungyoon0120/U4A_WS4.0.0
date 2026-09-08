@@ -28,13 +28,13 @@
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum);
             if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
     function _fa(sName) { return '<i class="fa-solid fa-' + sName + '"></i>'; }
     function _isEdit() {
         var o = {};
-        try { o = APPCOMMON.fnGetModelProperty("/WS30/APP") || {}; } catch (e) { }
+        try { o = APPCOMMON.fnGetModelProperty("/WS30/APP") || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return o.IS_EDIT === "X";
     }
 
@@ -70,7 +70,7 @@
     //   루트레벨=모델 최상위, 그 외=부모 노드의 USPTREE.
     function _siblingsAndIndex(oNode) {
         var aTree = [];
-        try { aTree = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { }
+        try { aTree = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         var aSib = null;
         if (oNode.PUJKY === "" || oNode.PUJKY == null) {
             aSib = aTree;
@@ -228,7 +228,7 @@
         if (!oNode) { return; }
         ev.preventDefault();
         ev.stopPropagation();
-        try { if (oAPP.fn.fnUspTreeCtxSelect) { oAPP.fn.fnUspTreeCtxSelect(oNode); } } catch (e) { }
+        try { if (oAPP.fn.fnUspTreeCtxSelect) { oAPP.fn.fnUspTreeCtxSelect(oNode); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _openMenu(ev.clientX, ev.clientY, oNode);
     }, false);
 
@@ -246,15 +246,15 @@
         if (IS_CHAG === "X") {
             // 변경분 있음(119) — YES: 저장 후 생성팝업 / NO: 변경 버리고 바로 생성팝업 / CANCEL: 취소 (원본 _fnCreateUspAppChangeMsgCB)
             var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "119");
-            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oAPP.common.fnConfirmBox("W", sMsg, function (act) {
                 if (act === "YES") {
                     oAPP.fn.fnSaveUspWs30({ AFPRC: "C", _createNode: oNode });
                 } else if (act === "NO") {
-                    try { if (oAPP.fn.fnUspSaveCancel) { oAPP.fn.fnUspSaveCancel(); } } catch (e) { }
+                    try { if (oAPP.fn.fnUspSaveCancel) { oAPP.fn.fnUspSaveCancel(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     if (oAPP.fn.fnCreateUspNodePopup) { oAPP.fn.fnCreateUspNodePopup(oNode); }
                 } else {
-                    try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
+                    try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 }
             }, [
                 { act: "YES", label: "Yes", emphasized: true },
@@ -274,12 +274,12 @@
         if (!oNode) { return; }
         // " [ 이름 ] " + "정말 삭제하시겠습니까?"(003)
         var sMsg = " [ " + (oNode.OBDEC || "") + " ] " + APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "003");
-        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oAPP.common.fnConfirmBox("W", sMsg, function (act) {
             if (act === "YES") {
                 if (oAPP.fn.fnDeleteUspNode) { oAPP.fn.fnDeleteUspNode(oNode); }
             } else {
-                try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
+                try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         }, [
             { act: "YES", label: "Yes", emphasized: true },
@@ -296,15 +296,15 @@
         if (IS_CHAG === "X") {
             // 변경분 있음(119) — YES: 저장 후 Rename팝업 / NO: 변경 버리고 바로 Rename팝업 / CANCEL: 취소 (원본 _fnRenameUspAppChangeMsgCB)
             var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "119");
-            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oAPP.common.fnConfirmBox("W", sMsg, function (act) {
                 if (act === "YES") {
                     oAPP.fn.fnSaveUspWs30({ AFPRC: "RN", _renameNode: oNode });
                 } else if (act === "NO") {
-                    try { if (oAPP.fn.fnUspSaveCancel) { oAPP.fn.fnUspSaveCancel(); } } catch (e) { }
+                    try { if (oAPP.fn.fnUspSaveCancel) { oAPP.fn.fnUspSaveCancel(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     if (oAPP.fn.fnRenameUspNodePopup) { oAPP.fn.fnRenameUspNodePopup(oNode); }
                 } else {
-                    try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
+                    try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 }
             }, [
                 { act: "YES", label: "Yes", emphasized: true },

@@ -41,7 +41,7 @@
   function _fa(s) { return '<i class="fa-solid fa-' + s + '"></i>'; }
   function _txt(sCls, sCode, p1) {
     try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
   function _el(sTag, sClass, sText) {
     var o = document.createElement(sTag);
@@ -50,30 +50,30 @@
     return o;
   }
   function _randomKey() {
-    try { return parent.getRandomKey(10); } catch (e) { return "K" + Math.round(performance.now() * 1000) + "_" + (oUI ? oUI.seq++ : 0); }
+    try { return parent.getRandomKey(10); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return "K" + Math.round(performance.now() * 1000) + "_" + (oUI ? oUI.seq++ : 0); }
   }
   // ZMSG_WS_COMMON_001 클래스 텍스트(원본 getWsMsgClsTxt). Workspace 언어 사용. p1=&1 치환값(선택).
   function _wsCommon(sCode, p1) {
     try {
       var sLangu = "";
-      try { sLangu = (parent.getUserInfo() || {}).LANGU || ""; } catch (e) { }
+      try { sLangu = (parent.getUserInfo() || {}).LANGU || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sCode, p1 || "") || "";
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
 
   // 현재 화면 편집모드(원본 /WS20/APP/IS_EDIT).
   function _isEdit() {
     try { var o = APPCOMMON.fnGetModelProperty("/WS20/APP"); return !!(o && o.IS_EDIT === "X"); }
-    catch (e) { return false; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
   }
   function _appInfo() {
-    try { return APPCOMMON.fnGetModelProperty("/WS20/APP") || {}; } catch (e) { return {}; }
+    try { return APPCOMMON.fnGetModelProperty("/WS20/APP") || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return {}; }
   }
 
   // Exclude(비활성) 컬럼 노출 여부 — 원본: 패치 UHAK900822 보유 또는 미패키징.
   function _excludeVisible() {
-    try { if (oAPP.common.checkWLOList && oAPP.common.checkWLOList("C", "UHAK900822") === true) { return true; } } catch (e) { }
-    try { if (parent.APP && parent.APP.isPackaged === false) { return true; } } catch (e) { }
+    try { if (oAPP.common.checkWLOList && oAPP.common.checkWLOList("C", "UHAK900822") === true) { return true; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (parent.APP && parent.APP.isPackaged === false) { return true; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     return false;
   }
 
@@ -94,7 +94,7 @@
 
   // ── 팝업 닫기(숨김) + 콜백 ─────────────────────────────────────────
   function lf_close(bSkipCallback) {
-    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (!bSkipCallback) { lf_publishCallback("CANCEL", []); }
   }
 
@@ -106,7 +106,7 @@
           ACTCD: sActcd, TYPE: oState.type, T_DATA: aData || []
         });
       }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 디자인 미리보기 반영(원본 setCSSLink) — W2 미리보기 프레임 미배선 시 null 가드.
@@ -125,9 +125,9 @@
     try {
       var oInfo = parent.getAppInfo && parent.getAppInfo();
       if (oInfo) { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", oInfo.IS_CHAG || ""); }
-    } catch (e) { }
-    try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
-    try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // ── 테이블 본문 렌더(aRows 기준) ─────────────────────────────────────
@@ -208,7 +208,7 @@
   //   자동 배치하므로 모달 위/메인 위 모두 보인다. sType: S(성공)/W(경고)/E(오류)/I(정보).
   function lf_msg(sType, sText) {
     if (!sText) { return; }
-    try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { }
+    try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 헤더 전체선택 체크박스 상태 동기화(전체/부분/없음).
@@ -232,7 +232,7 @@
       var oLast = aTr[aTr.length - 1];
       var oInput = oLast && oLast.querySelector(".u4aCslUrlField input");
       if (oInput) { oInput.focus(); }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   function lf_delSelected() {
@@ -251,6 +251,7 @@
         lf_renderRows();
       });
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
       // showMessage 불가 시 폴백 — 바로 삭제(원본 동작).
       oState.rows = oState.rows.filter(function (r) { return !oDel[r.KEY]; });
       lf_renderRows();
@@ -267,7 +268,7 @@
     if (!oState.rows.length) {
       if (oState.type === C_JS) { oAPP.DATA.APPDATA.T_JSLK = []; }
       else { oAPP.DATA.APPDATA.T_CSLK = []; lf_reflectCssPreview([]); }
-      try { parent.setAppChange("X"); } catch (e) { }
+      try { parent.setAppChange("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       lf_syncWs20Changed();   // IS_CHAG 미러 + 속성행 변경배경 + 헤더 Active→Inactive.
       lf_close(true);
       lf_msg("S", _txt("/U4A/MSG_WS", "002"));   // Saved success(전체삭제 저장 포함).
@@ -296,7 +297,7 @@
     });
 
     if (bErr) {
-      if (oFirstErr && oFirstErr.focus) { try { oFirstErr.focus(); } catch (e) { } }
+      if (oFirstErr && oFirstErr.focus) { try { oFirstErr.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
       lf_msg("W", sErrTxt);   // 빨간 보더(value-state)와 함께 사유 안내(모달 위 토스트). MSG_WS 014 = & 는 필수 입력값.
       return;   // 다이얼로그 유지.
     }
@@ -307,7 +308,7 @@
       oAPP.DATA.APPDATA.T_CSLK = aSaveData;
       lf_reflectCssPreview(aUrls);
     }
-    try { parent.setAppChange("X"); } catch (e) { }
+    try { parent.setAppChange("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     lf_syncWs20Changed();   // IS_CHAG 미러 + 속성행 변경배경 + 헤더 Active→Inactive.
 
     lf_close(true);
@@ -369,7 +370,7 @@
     oMimeBtn.type = "button";
     oMimeBtn.innerHTML = _fa("image") + "<span></span>";
     oMimeBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A10");   // MIME Repository — 텍스트 유지(아이콘 전용은 Add/Del 만, 사용자 지시).
-    oMimeBtn.addEventListener("click", function () { try { oAPP.fn.fnMimeWindowOpener(); } catch (e) { } });   // 별도창 판(롤백=fnMimeDialogOpener)
+    oMimeBtn.addEventListener("click", function () { try { oAPP.fn.fnMimeWindowOpener(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });   // 별도창 판(롤백=fnMimeDialogOpener)
     oToolbar.appendChild(oAddBtn);
     oToolbar.appendChild(oDelBtn);
     oToolbar.appendChild(oMimeBtn);
@@ -463,7 +464,7 @@
   oAPP.fn.fnCssJsLinkAddPopupOpen = function (TYPE) {
 
     if (TYPE !== C_CSS && TYPE !== C_JS) {
-      try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+      try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       return;
     }
     oState.type = TYPE;
@@ -473,7 +474,7 @@
 
     // 이미 열려 있으면(중복 호출) busy 만 풀고 반환(원본).
     if (oUI.dlg.open) {
-      try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+      try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       return;
     }
 
@@ -501,10 +502,10 @@
     lf_loadData(TYPE);
     lf_renderRows();
 
-    try { oUI.dlg.showModal(); } catch (e) { }
+    try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // busy 끄고 Lock 풀기(원본 afterOpen).
-    try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+    try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
   }; // end of oAPP.fn.fnCssJsLinkAddPopupOpen
 

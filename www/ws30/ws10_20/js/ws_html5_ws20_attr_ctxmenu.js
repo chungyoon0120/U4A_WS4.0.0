@@ -29,21 +29,21 @@
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum);
             if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
     function _msgM(sNum) {   // /U4A/MSG_WS (263/264/005)
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNum);
             if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
     function _msgW(sNr) {    // ZMSG_WS_COMMON_001 (805/627)
         try {
             var s = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", sNr);
             if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNr;
     }
     function _fa(sName) { return '<i class="fa-solid fa-' + sName + '"></i>'; }
@@ -51,14 +51,14 @@
     // ACTION CODE(UNDO/이력 예외) — oAPP.oDesign.CS_ACTCD (없으면 undefined 안전).
     function _actcd(sName) {
         try { return oAPP.oDesign && oAPP.oDesign.CS_ACTCD ? oAPP.oDesign.CS_ACTCD[sName] : undefined; }
-        catch (e) { return undefined; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return undefined; }
     }
 
     // 미변환 별창(M03/M05/M06) 임시 안내 — 구 attrPresetPopup 토글 버튼과 동일.
     //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 각 별창(callSetSameAttrPopup /
     //   eventShortcutReg / attrPresetPopup settings) HTML5 변환 시 실제 오픈 로직으로 교체.
     function _todoToast() {
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -115,7 +115,7 @@
                 var l_OBJTY = (is_attr.UIATK === "AT000011858") ? "HM" : "JS";
 
                 var aCevt = [];
-                try { aCevt = oAPP.DATA.APPDATA.T_CEVT || []; } catch (e) { aCevt = []; }
+                try { aCevt = oAPP.DATA.APPDATA.T_CEVT || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } aCevt = []; }
                 var l_index = aCevt.findIndex(function (a) {
                     return a.OBJID === is_attr.OBJID + is_attr.UIASN && a.OBJTY === l_OBJTY;
                 });
@@ -148,7 +148,7 @@
 
         //M05 단축키 등록 — WLO(UHAK901289) 패치 서버에서만 노출(원본 checkWLOList).
         var bShortcut = false;
-        try { bShortcut = APPCOMMON.checkWLOList("C", "UHAK901289") === true; } catch (e) { }
+        try { bShortcut = APPCOMMON.checkWLOList("C", "UHAK901289") === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (bShortcut) {
             aItems.push({ KEY: "M05", FA: "keyboard", TXT: _msgW("805"), VISIBLE: vis.vis05, ENABLED: true });   // sap-icon://keyboard-and-mouse
         }
@@ -380,7 +380,7 @@
 
     //005 Job finished.
     function _doneToast() {
-        try { parent.showMessage(null, 10, "I", _msgM("005")); } catch (e) { }
+        try { parent.showMessage(null, 10, "I", _msgM("005")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     //확인 팝업(YES/NO) — 바인딩 팝업과 동일하게 공통 U4AUI.confirm 우선.
@@ -389,7 +389,7 @@
             U4AUI.confirm({ type: "C", message: sMsg, onClose: function (act) { if (act === "YES") { fnYes(); } } });
         } else {
             try { parent.showMessage(null, 30, "I", sMsg, function (p) { if (p === "YES") { fnYes(); } }); }
-            catch (e) { }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     }
 
@@ -403,7 +403,7 @@
 
         //편집모드 아니면 메뉴 없음(원본 IS_EDIT !== true → exit).
         var bEdit = false;
-        try { bEdit = oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { }
+        try { bEdit = oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (!bEdit) { return; }
 
         var is_attr = oRow.__attrData;

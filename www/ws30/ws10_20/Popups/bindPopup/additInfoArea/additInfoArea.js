@@ -101,7 +101,7 @@
                 onInput: bConv ? (function (row) { return function () { oAPP.fn.clearConvError(row, oInp); }; })(r) : undefined,
                 onClear: (function (row) { return function () { row.val = ""; if (bConv) { oAPP.fn.clearConvError(row, oInp); } }; })(r)
             });
-            if (bConv && r.stat === "Error") { try { oInp.setValueState("error", r.statTxt || ""); } catch (e) { } }
+            if (bConv && r.stat === "Error") { try { oInp.setValueState("error", r.statTxt || ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             if (bConv) {
                 (function (row, inpEl) {
                     inpEl.addEventListener("focus", function () { oAPP.fn._bwpVsShow(inpEl, row); });
@@ -455,7 +455,7 @@
             //   그래야 "다른 곳을 클릭해 blur 시켜도 오류면 이 칸으로 다시 돌아오고 메시지가 뜬다".
             //   ★_bwpVsShow 는 DOM 입력요소(oInp.input)를 받는다(794행 배선과 동일) — 래퍼 넘기면 위치계산 실패.
             if (oInp && oInp.input) {
-                try { oInp.input.focus(); } catch (e) { }
+                try { oInp.input.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.fn._bwpVsShow(oInp.input, r);
             }
             return;
@@ -626,7 +626,7 @@
         try {
             var oTr = ctx.tbody && ctx.tbody.querySelector('tr[data-itmcd="' + sItmcd + '"]');
             if (oTr && typeof oTr.scrollIntoView === "function") { oTr.scrollIntoView({ block: "nearest" }); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     // 추가속성 오류 표시 초기화(원본 resetErrorField) — 양 패널.
@@ -765,7 +765,7 @@
         oShell.classList.toggle("u4aBwpShowAddit", bShow);
         if (bShow) {
             // 원본 setUiTableAutoResizeColumn(oAdditTab) — 표시 직후 컬럼 폭 맞춤(레이아웃 안정 후).
-            setTimeout(function () { try { _fitCols(oA.SEL); } catch (e) { } }, 0);
+            setTimeout(function () { try { _fitCols(oA.SEL); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
         }
     };
 

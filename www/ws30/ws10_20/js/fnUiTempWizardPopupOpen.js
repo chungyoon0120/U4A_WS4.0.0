@@ -57,19 +57,19 @@
     // /U4A/CL_WS_COMMON 메시지 클래스
     function _cl(sCode, p1, p2, p3, p4) {
         try { return APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-        catch (e) { return sCode; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sCode; }
     }
     // /U4A/MSG_WS 워크스페이스 메시지 클래스
     function _mw(sCode, p1, p2, p3, p4) {
         try { return APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-        catch (e) { return sCode; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sCode; }
     }
     // ZMSG_WS_COMMON_001 (워크스페이스 언어별)
     function _ws(sCode, p1) {
         try {
             var L = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
             return parent.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", sCode, p1 || "");
-        } catch (e) { return sCode; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sCode; }
     }
     function _msg(iKind, sType, sMsg, fnCb) {
         try { parent.showMessage(window.sap || null, iKind, sType, sMsg, fnCb); }
@@ -90,14 +90,14 @@
                 oT.textContent = sMsg || "";
                 oT.setAttribute("data-show", "true");
                 clearTimeout(oUI._toastT);
-                oUI._toastT = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { } }, 3000);
+                oUI._toastT = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 3000);
                 return;
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _msg(10, sType, sMsg); // 폴백(다이얼로그 부재 시 공통 토스트)
     }
     function _busy(bOn) {
-        try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { }
+        try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 웹딘→U4A 변환 플러그인(U4A_CVT_WDR) 설치 서버 여부 (원본 uiDesignArea.js 888행)
@@ -106,7 +106,7 @@
             var oUser = parent.getUserInfo && parent.getUserInfo();
             var aP = oUser && oUser.META && oUser.META.T_PLIST;
             return !!(aP && typeof aP.find === "function" && aP.find(function (x) { return x === "U4A_CVT_WDR"; }));
-        } catch (e) { return false; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
 
     /* ==================================================================
@@ -137,7 +137,7 @@
         _selectFirstEnabledMenu();
 
         if (!oUI.dlg.open) {
-            try { oUI.dlg.showModal(); } catch (e) { }
+            try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 원본 ev_UiTempWizardAfterOpen : busy 해제
@@ -282,8 +282,8 @@
         });
 
         /* ---- 공통 API : 중앙정렬 + 리사이즈 ---- */
-        if (window.U4AUI && U4AUI.makeDialogRecenter) { try { U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { } }
-        if (window.U4AUI && U4AUI.makeDialogResizable) { try { U4AUI.makeDialogResizable(oDlg, { minW: 880, minH: 560 }); } catch (e) { } }
+        if (window.U4AUI && U4AUI.makeDialogRecenter) { try { U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+        if (window.U4AUI && U4AUI.makeDialogResizable) { try { U4AUI.makeDialogResizable(oDlg, { minW: 880, minH: 560 }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         document.body.appendChild(oDlg);
 
@@ -455,7 +455,7 @@
                 roPad.observe(oPage);
                 if (oContent) { roPad.observe(oContent); }
                 oPg.__ro = roPad; // 정리 대상: oUI.pages[key] = oPg (외부 래퍼)
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // ★스크롤스파이 — 스크롤하면 최상단에 걸린 섹션 카드에 맞춰 진행바 선택 표시(nav.selIdx)를 따라 이동.
@@ -827,7 +827,7 @@
             var oCard0 = sec.els.cards[0];
             var oPageEl = oCard0 && oCard0.closest ? oCard0.closest(".u4aTplWiz__page") : null;
             if (oPageEl) { _updateScrollPad(oPageEl); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 카드 제목(번호) + 노출(available && gate) 갱신. gate=WZD3 Table 은 Form 모델 로드 후.
@@ -844,7 +844,7 @@
     // 카드로 스크롤(available/gate 통과 시) — full/mini/팝오버 공용.
     function _wzScrollToCard(sec, idx) {
         var c = sec.els.cards[idx];
-        if (c && !c.hidden) { try { c.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { } }
+        if (c && !c.hidden) { try { c.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     }
 
     /* ================================================================
@@ -869,7 +869,7 @@
         oNav.appendChild(oMini);
         nav.els.nav = oNav; nav.els.navFull = oFull; nav.els.navMini = oMini;
         if (window.ResizeObserver) {
-            try { nav.ro = new ResizeObserver(function () { _wzNavResize(nav); }); nav.ro.observe(oNav); } catch (e) { }
+            try { nav.ro = new ResizeObserver(function () { _wzNavResize(nav); }); nav.ro.observe(oNav); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         if (oS) { (oS.navs = oS.navs || []).push(nav); } // lf_close 정리 대상
         _syncNav(nav);
@@ -1104,9 +1104,9 @@
 
     function _wzClosePop(nav) {
         if (!nav) { return; }
-        if (nav._popOutside) { try { document.removeEventListener("mousedown", nav._popOutside, true); } catch (e) { } nav._popOutside = null; }
-        if (nav._popClose) { try { window.removeEventListener("resize", nav._popClose); } catch (e) { } if (nav._popScroller) { try { nav._popScroller.removeEventListener("scroll", nav._popClose, true); } catch (e) { } } nav._popClose = null; nav._popScroller = null; }
-        if (nav.els && nav.els.pop) { try { nav.els.pop.remove(); } catch (e) { } nav.els.pop = null; }
+        if (nav._popOutside) { try { document.removeEventListener("mousedown", nav._popOutside, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } nav._popOutside = null; }
+        if (nav._popClose) { try { window.removeEventListener("resize", nav._popClose); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } if (nav._popScroller) { try { nav._popScroller.removeEventListener("scroll", nav._popClose, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } nav._popClose = null; nav._popScroller = null; }
+        if (nav.els && nav.els.pop) { try { nav.els.pop.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } nav.els.pop = null; }
     }
 
     // UI Choice 변경 (원본 ev_tmplWzd1SelectChangeEvent)
@@ -1188,7 +1188,7 @@
             _syncCreateForMenu(oS.cur);
 
             // 모델 정보 스텝으로 스크롤 이동(원본 setCurrentStep STEP3)
-            try { sec.els.cards[2].scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { }
+            try { sec.els.cards[2].scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
 
@@ -1344,7 +1344,7 @@
     //   시 셀마다 강제 리플로우로 느림 → canvas 로 교체(공통 makeColumnTree _measTxt 와 동일 정책, .analy/16 §3.4.2).
     var _wzMCtx = null;
     function _wzMeasTxt(sText, oRef) {
-        if (!_wzMCtx) { try { _wzMCtx = document.createElement("canvas").getContext("2d"); } catch (e) { _wzMCtx = null; } }
+        if (!_wzMCtx) { try { _wzMCtx = document.createElement("canvas").getContext("2d"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _wzMCtx = null; } }
         if (!_wzMCtx) { return (sText || "").length * 7; }
         if (oRef) {
             var cs = getComputedStyle(oRef);
@@ -1649,25 +1649,25 @@
                 for (var n = 0; n < oS.navs.length; n++) {
                     var nv = oS.navs[n];
                     _wzClosePop(nv);
-                    if (nv.ro) { try { nv.ro.disconnect(); } catch (e) { } nv.ro = null; }
+                    if (nv.ro) { try { nv.ro.disconnect(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } nv.ro = null; }
                 }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 페이지 스크롤 스페이서 ResizeObserver 정리.
         try {
             if (oUI && oUI.pages) {
                 for (var pk in oUI.pages) {
                     if (!Object.prototype.hasOwnProperty.call(oUI.pages, pk)) { continue; }
                     var op = oUI.pages[pk];
-                    if (op && op.__ro) { try { op.__ro.disconnect(); } catch (e) { } op.__ro = null; }
+                    if (op && op.__ro) { try { op.__ro.disconnect(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } op.__ro = null; }
                 }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 리사이즈 재클램프 리스너 정리 (§4.3).
-        try { window.removeEventListener("resize", lf_clampSplit); } catch (e) { }
-        try { if (oUI && oUI.ro) { oUI.ro.disconnect(); oUI.ro = null; } } catch (e) { }
+        try { window.removeEventListener("resize", lf_clampSplit); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (oUI && oUI.ro) { oUI.ro.disconnect(); oUI.ro = null; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // dlg.close() 만 — 공통 _installGlobalDialogClose 가 DOM 제거(§2.2). 다음 열기=재build.
-        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 원본 ev_UiTempWizardAfterClose : 상태 초기화
         oS = null;
     }
@@ -1689,7 +1689,7 @@
         oBar.addEventListener("mousedown", function (ev) {
             if (ev.button !== 0) { return; }
             bDrag = true;
-            try { document.body.classList.add("u4a-dragging"); } catch (e) { }
+            try { document.body.classList.add("u4a-dragging"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             ev.preventDefault();
         });
         document.addEventListener("mousemove", function (ev) {
@@ -1704,7 +1704,7 @@
         document.addEventListener("mouseup", function () {
             if (bDrag) {
                 bDrag = false;
-                try { document.body.classList.remove("u4a-dragging"); } catch (e) { }
+                try { document.body.classList.remove("u4a-dragging"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         });
 
@@ -1715,7 +1715,7 @@
             try {
                 oUI.ro = new ResizeObserver(function () { lf_clampSplit(); });
                 oUI.ro.observe(oUI.body);
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     }
 
@@ -1749,7 +1749,7 @@
         try {
             var v = parseFloat(getComputedStyle(oEl).minWidth);
             if (isFinite(v) && v > 0) { return v; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return 120;
     }
 

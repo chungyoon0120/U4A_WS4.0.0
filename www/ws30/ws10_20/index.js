@@ -116,6 +116,36 @@ IPCRENDERER.on('if-meta-info', (event, res) => {
     // 서버 정보
     if (oMetadata.SERVERINFO) {
         oWS.oServerInfo = oMetadata.SERVERINFO;
+
+        /**
+         * 접속 서버 로그 (2026-09-08 추가)
+         * -------------------------------------------------------------
+         * 왜 여기인가: 창이 "어느 서버에 붙었는지" 처음 알게 되는 자리다.
+         * 무엇을 남기나: 서버 이름·시스템 번호·클라이언트 정도.
+         *              비밀번호나 접속 열쇠는 남기지 않는다.
+         */
+        try {
+
+            if (typeof U4ALOG !== "undefined") {
+
+                var _oSrv = oMetadata.SERVERINFO;
+                var _sSrv = "";
+
+                _sSrv += (_oSrv.NAME || _oSrv.host || "(이름 없음)");
+
+                if (_oSrv.SYSID) { _sSrv += " / 시스템 " + _oSrv.SYSID; }
+                if (_oSrv.CLIENT) { _sSrv += " / 클라이언트 " + _oSrv.CLIENT; }
+                if (_oSrv.LANGU) { _sSrv += " / 언어 " + _oSrv.LANGU; }
+
+                U4ALOG.info("접속 서버", _sSrv, "");
+
+            }
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            // 로그 때문에 창이 뜨는 것을 막으면 안 된다.
+        }
+
     }
 
     // 이전 서버 접속 정보
@@ -180,7 +210,7 @@ IPCRENDERER.on('if-meta-info', (event, res) => {
 window.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
         if (!_bMainFrameInited) {
-            console.log("[DEV] if-meta-info 미수신 → 폴백 초기화 실행");
+            console.warn("[주의] 서버 정보를 못 받아 기본값으로 초기화한다");
             _mainFrameInit();
         }
     }, 600);

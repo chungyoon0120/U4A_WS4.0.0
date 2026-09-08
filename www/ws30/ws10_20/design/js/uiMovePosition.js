@@ -36,13 +36,13 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
     try {
       var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sCode, "", "", "", "");
       return (s === "" || typeof s === "undefined") ? (sFallback || sCode) : s;
-    } catch (e) { return sFallback || sCode; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sFallback || sCode; }
   }
   function _msgWs(sCode, sFallback) {
     try {
       var s = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sCode, "", "", "", "");
       return (s === "" || typeof s === "undefined") ? (sFallback || sCode) : s;
-    } catch (e) { return sFallback || sCode; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sFallback || sCode; }
   }
   function _esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -100,27 +100,27 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
       if (nd.OBJID === OBJID) { nd.highlight = "Indication08"; }  // 이동 대상(자기)
       if (i + 1 === iPos1) { nd.highlight = "Indication02"; }     // 대상 위치
     }
-    try { if (typeof oAPP.fn.fnRenderDesignTree === "function") { oAPP.fn.fnRenderDesignTree(); } } catch (e) { }
+    try { if (typeof oAPP.fn.fnRenderDesignTree === "function") { oAPP.fn.fnRenderDesignTree(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // 원본 designSetScrollPosOBJID: 대상 위치 줄이 화면 밖이면 그 줄로 스크롤(초기화 때는 안 함).
     if (bReset !== true) {
       var oTgt = is_parent.zTREE[iPos1 - 1];
-      try { if (oTgt && typeof oAPP.fn.fnWs20ScrollTreeToOBJID === "function") { oAPP.fn.fnWs20ScrollTreeToOBJID(oTgt.OBJID); } } catch (e) { }
+      try { if (oTgt && typeof oAPP.fn.fnWs20ScrollTreeToOBJID === "function") { oAPP.fn.fnWs20ScrollTreeToOBJID(oTgt.OBJID); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
   }
 
   // 팝업 종료(원본 lf_close: 미리강조 제거 + setShortcutLock(false) + 닫기).
   function lf_close() {
     lf_moveMark(1, true);   // 원본 designMoveMark(reset) — 미리강조 원복
-    try { oAPP.fn.setShortcutLock(false); } catch (e) { }
-    try { oDlg.close(); } catch (e) { }
-    try { oDlg.remove(); } catch (e) { }
+    try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 취소(헤더 X · 푸터 ✗ · ESC) — 원본 동작: 001 "Cancel operation" 안내.
   function lf_cancel() {
     lf_close();
     //001	Cancel operation
-    try { parent.showMessage(null, 10, "I", _msgWs("001", "Cancel operation")); } catch (e) { }
+    try { parent.showMessage(null, 10, "I", _msgWs("001", "Cancel operation")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 확인 — 대상 위치(0-based)로 콜백. 실제 이동은 호출측(콜백→contextMenuUiMove 위임 래퍼→
@@ -156,22 +156,22 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
   oInp.addEventListener("keydown", function (e) {
     if (e.key !== "Enter") { return; }
     e.preventDefault();
-    try { oDlg.querySelector('[data-act="ok"]').focus(); } catch (e2) { }
+    try { oDlg.querySelector('[data-act="ok"]').focus(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
   });
 
   document.body.appendChild(oDlg);
 
   // 공통 UX 3종(헤더드래그는 전역 위임 자동) — 리센터/리사이즈.
   var oHeader = oDlg.querySelector(".u4a-dialog__header");
-  try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { }
-  try { if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 280, minH: 160 }); } } catch (e) { }
+  try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+  try { if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 280, minH: 160 }); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
   // 메뉴 선택 시 켠 잠금(단축키+로딩표시)을 확실히 푸는 공통 종료 정리.
   //  ★ 어떤 종료 분기(오픈 실패·예외 포함)에서도 반드시 도달해야 화면 잠금이 남지 않는다
   //    (callDesignContextMenu 15~17행이 parent.setBusy("X")/setShortcutLock(true) 로 켠 상태).
   function lf_releaseLocks() {
-    try { oAPP.fn.setShortcutLock(false); } catch (e) { }
-    try { parent.setBusy(""); } catch (e) { }
+    try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 팝업 호출(구 oDlg.open()) — 오픈 성공을 확인한 뒤에만 정상 진행.
@@ -187,7 +187,7 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
 
   // 오픈 실패 — DOM 잔여 제거 + 잠금 해제 후 중단(화면 잠김 방지).
   if (!bOpened) {
-    try { oDlg.remove(); } catch (e) { }
+    try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     lf_releaseLocks();
     return;
   }
@@ -196,6 +196,6 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
   //  ★ 팝업이 완전히 뜬 뒤 여기서 로딩표시를 꺼야 팝업 클릭이 먹힌다(안 끄면 덮개가 팝업 위에 남음).
   lf_releaseLocks();
   lf_moveMark(iCur + 1);   // 원본 attachAfterOpen: 현재 위치 기준 초기 미리강조.
-  setTimeout(function () { try { oInp.focus(); oInp.select(); } catch (e) { } }, 0);
+  setTimeout(function () { try { oInp.focus(); oInp.select(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
 
 };  // UI move Position 메뉴 선택시 팝업 UI.

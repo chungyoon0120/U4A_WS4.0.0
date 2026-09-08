@@ -246,7 +246,8 @@ async function checkMicAvailable() {
     }
 
     _refreshMicButton();
-  } catch {
+  } catch (_u4aErr) {
+      if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }
     // enumerateDevices 실패 시 미연결로 간주
     _micAvailable = false;
     _refreshMicButton();
@@ -425,7 +426,7 @@ async function onRecordingFileDeleted() {
     btnDrawing.classList.remove('drawing-on');
   }
 
-  try { await recorder.stop(); } catch {}
+  try { await recorder.stop(); } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }}
 
   store.set(`${sessionKey}_status`, 'idle');
   setUIStatus('idle');
@@ -442,8 +443,8 @@ async function startRecording() {
   if (_status !== 'idle') return;
 
   forceCloseAllHistory();
-  try { closeSettingsWindow(); } catch {}
-  try { closeDrawingWindow();  } catch {}
+  try { closeSettingsWindow(); } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }}
+  try { closeDrawingWindow();  } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }}
 
   if (!_sourceId) {
     MessageBox.alert(MSG.M029, { title: MSG.M028, type: 'error' });
@@ -457,6 +458,7 @@ async function startRecording() {
     startFileWatch(_outputPath);
     _sendToIndicator('recording');
   } catch (err) {
+      if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
     setUIStatus('idle');
     MessageBox.alert(err.message, { title: MSG.M030, type: 'error' });
   }
@@ -492,6 +494,7 @@ async function stopRecording() {
       ipcRenderer.send(`rec-done-${sessionKey}`, result);
     }
   } catch (err) {
+      if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
     savingOverlay.classList.remove('visible');
     setUIStatus('idle');
     MessageBox.alert(err.message, { title: MSG.M031, type: 'error' });
@@ -561,6 +564,7 @@ function onOpenDir() {
     if (!fs.existsSync(_outputDir)) fs.mkdirSync(_outputDir, { recursive: true });
     shell.openPath(_outputDir);
   } catch (err) {
+      if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
     MessageBox.alert(err.message, { title: MSG.M032, type: 'error' });
   }
 }
@@ -581,6 +585,7 @@ function onPlayLast() {
     }
     shell.openPath(path.join(_outputDir, files[0].name));
   } catch (err) {
+      if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
     MessageBox.alert(err.message, { title: MSG.M035, type: 'error' });
   }
 }

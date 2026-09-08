@@ -526,12 +526,12 @@
         oAPP.common.fnNaviLock();
         // 떠나는 현재 화면(이동 완료 전) 캡쳐.
         var sFromPage = "";
-        try { sFromPage = (parent.getCurrPage && parent.getCurrPage()) || ""; } catch (e) { }
+        try { sFromPage = (parent.getCurrPage && parent.getCurrPage()) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // ★ 단축키 해제는 "가장 먼저" — 전환(서버콜·removeContent·렌더) 시작 전에 떠나는 화면의
         //   단축키를 즉시 제거한다. 그래야 비동기 이동 도중 그 화면 단축키가 한 번 더 발화하지 않는다.
         //   (기존엔 lf_success 끝에서 "WS20" 하드코딩으로 늦게 제거 → WS30 단축키 누수·연타 재진입 원인.)
-        try { APPCOMMON.removeShortCut(sFromPage || "WS20"); } catch (e) { }
+        try { APPCOMMON.removeShortCut(sFromPage || "WS20"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oAppInfo = parent.getAppInfo();
 
@@ -1287,7 +1287,7 @@
             // 공통 헤더가 "첫 페인트부터" 테마/제목을 반영하도록 쿼리스트링으로 전달
             //   (extopen.html head 의 조기 테마 적용 스크립트가 THEME/BGCOL/TITLE 을 소비).
             var oExtTheme = {};
-            try { oExtTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { oExtTheme = {}; }
+            try { oExtTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oExtTheme = {}; }
 
             const oQueryParams = {
                 browserkey: oBrowserOptions?.webPreferences?.browserkey,
@@ -1487,7 +1487,7 @@
         try {
 
             // 기본 브라우저 설정 — /DEFBR 직접 적재(스텁 fnOnInitP13nSettings 대체).
-            try { oAPP.fn.fnOnP13nExeDefaultBrowser(); } catch (e) { }
+            try { oAPP.fn.fnOnP13nExeDefaultBrowser(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oAPP.fn.fnOnInitP13nSettings();
 
             var SPAWN = parent.SPAWN,
@@ -1800,6 +1800,7 @@
                     oWebPref = oWebCon.getWebPreferences();
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -1861,6 +1862,7 @@
                     oWebPref = oWebCon.getWebPreferences();
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -1953,6 +1955,7 @@
             aParams = null;
 
         } catch (err) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
 
         }
 
@@ -2071,6 +2074,7 @@
                 if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oChild); }
                 else { oChild.setClosable(true); oChild.close(); }
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             }
 
@@ -2162,6 +2166,7 @@
                 else { oChild.setClosable(true); oChild.close(); }
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -2228,6 +2233,7 @@
                             oChild.setOpacity(0);
 
                         } catch (error) {
+                            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                             return;
                         }
 
@@ -2249,11 +2255,13 @@
                 try {
                     oChild.setOpacity(1);
                 } catch (error) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
                 }
 
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 

@@ -69,6 +69,7 @@ let oAPP = parent.oAPP,
                 IPCRENDERER = oAPP.IPCRENDERER;
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 

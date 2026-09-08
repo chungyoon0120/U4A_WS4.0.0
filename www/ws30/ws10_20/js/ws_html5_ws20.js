@@ -55,7 +55,7 @@
             var oInfo = parent.getAppInfo && parent.getAppInfo();
             if (oInfo == null) { return true; }     // 원본: appInfo null → 기존 enabled 유지
             return oInfo.IS_EDIT === "X";
-        } catch (e) { return true; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return true; }
     }
 
     /************************************************************************
@@ -143,7 +143,7 @@
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum);
             if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
 
@@ -153,7 +153,7 @@
             var lg = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
             var s = parent.WSUTIL.getWsMsgClsTxt(lg, "ZMSG_WS_COMMON_001", sNr);
             if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNr;
     }
 
@@ -227,12 +227,12 @@
     // /DEFBR 모델 → 드롭다운 메뉴 항목 (원본 MENUITEM1 enabled/icon formatter 이식)
     function _buildAppExecMenuItems() {
         var aDefBr = [];
-        try { aDefBr = APPCOMMON.fnGetModelProperty("/DEFBR") || []; } catch (e) { }
+        try { aDefBr = APPCOMMON.fnGetModelProperty("/DEFBR") || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (!Array.isArray(aDefBr)) { aDefBr = []; }
 
         // 패키징(운영) 환경 여부 — DEV_BROWSER 차단 판정용
         var bPackaged = false;
-        try { bPackaged = !!(parent.APP && parent.APP.isPackaged); } catch (e) { }
+        try { bPackaged = !!(parent.APP && parent.APP.isPackaged); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         return aDefBr.map(function (oBr) {
             var sName = oBr.NAME;
@@ -288,7 +288,7 @@
      ************************************************************************/
     function _iconToolEntry() {
         var bIconViewer = false;
-        try { bIconViewer = APPCOMMON.checkWLOList("C", "UHAK900630"); } catch (e) { }
+        try { bIconViewer = APPCOMMON.checkWLOList("C", "UHAK900630"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (!bIconViewer) {
             return { id: "iconListBtn", fa: "icons", text: _msg("A12"), tooltip: _msg("A12") + " (Ctrl+Shift+F10)", ev: "ev_pressIconListBtn" };
         }
@@ -468,13 +468,13 @@
 
         // app 정보 (미로그인/미오픈 시 안전 폴백)
         var oInfo = null;
-        try { oInfo = parent.getAppInfo && parent.getAppInfo(); } catch (e) { }
+        try { oInfo = parent.getAppInfo && parent.getAppInfo(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         function lf_model(sPath) {
             try {
                 var v = APPCOMMON.fnGetModelProperty(sPath);
                 if (v != null) { return v; }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return undefined;
         }
         // appInfo 우선, 없으면 모델
@@ -524,7 +524,7 @@
         _collapseToolbarSeparators();
 
         // 모드별 버튼 가시성 변경 후 오버플로(⋯) 재계산
-        try { if (_ws20TbOvf) { _ws20TbOvf.reflow(); } } catch (e) { }
+        try { if (_ws20TbOvf) { _ws20TbOvf.reflow(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.fnUpdateWs20Toolbar
 
@@ -581,25 +581,25 @@
             return;
         }
         // 폴백(공통 미로드 시) — 최소 가드
-        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { }
-        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { }
+        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (e && e.repeat === true) { return; }
-        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS20") { return; } } catch (x) { }
-        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { }
+        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS20") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         try { fn(e); } catch (err) { console.error("[HTML5][WS20] shortcut:", err); }
     }
 
     //F3 — 뒤로가기(원본 ws_common.js 1281 [WS20] Back Button). ← 버튼과 동일한 ev_pageBack 수행.
     function _ws20Back() {
         //메뉴 팝오버 닫기(원본 fnCloseMenuPopover).
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         //단축키 실행 가능 여부(원본 fnShortCutExeAvaliableCheck) — "X" 면 중단.
         try {
             if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
                 oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { }
+        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         //입력 중 포커스 날리기(편집값 반영 — 원본 동일).
-        try { if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); } } catch (x) { }
+        try { if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         //뒤로가기 — ← 버튼과 동일.
         if (oAPP.events && typeof oAPP.events.ev_pageBack === "function") { oAPP.events.ev_pageBack(); }
         else { console.warn("[HTML5][WS20] ev_pageBack not available (F3)"); }
@@ -608,11 +608,11 @@
     //Ctrl+Shift+F12 — MIME Repository(별도창). 원본 ws_common.js 의 sap.byId("mimeBtn").firePress(UI5)
     //  는 HTML5 서 무동작이라, 버튼과 동일한 핸들러(ev_pressMimeBtn → fnMimeWindowOpener)로 교체.
     function _ws20Mime() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         try {
             if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
                 oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { }
+        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (oAPP.events && typeof oAPP.events.ev_pressMimeBtn === "function") { oAPP.events.ev_pressMimeBtn(); }
         else { console.warn("[HTML5][WS20] ev_pressMimeBtn not available (Ctrl+Shift+F12)"); }
     }
@@ -620,11 +620,11 @@
     //Ctrl+F — WS20 Find(별도창). 원본 ws_common.js 의 sap.byId("ws20_findBtn").firePress(UI5)
     //  는 HTML5 서 무동작이라, 헤더 Find 버튼과 동일 핸들러(fnFindPopupOpen → 별도창)로 교체.
     function _ws20Find() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         try {
             if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
                 oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { }
+        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") { oAPP.fn.fnFindPopupOpener(); }
         else { console.warn("[HTML5][WS20] fnFindPopupOpener not available (Ctrl+F)"); }
     }
@@ -633,25 +633,25 @@
     //  (UI5 iframe/bindPopup 의존 design 모듈) → HTML5 스냅샷 스택 진입점 fnWs20ExecHistory 로 교체.
     //  트리 툴바 버튼(↶)과 동일 함수라 활성/이력유무/초기화가 완전히 일치한다.
     function _ws20Undo() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         //편집모드에서만 (원본 fn: IS_EDIT !== "X" 면 중단).
-        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { return; }
+        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } return; }
         try {
             if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
                 oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { }
+        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("UNDO"); }
         else { console.warn("[HTML5][WS20] fnWs20ExecHistory not available (Undo)"); }
     }
 
     //Ctrl+Shift+X — [WS20] Redo(248). (Undo 와 동일 정책 — REDO 수행)
     function _ws20Redo() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { }
-        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { return; }
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } return; }
         try {
             if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
                 oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { }
+        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("REDO"); }
         else { console.warn("[HTML5][WS20] fnWs20ExecHistory not available (Redo)"); }
     }
@@ -791,13 +791,13 @@
 
         // app 정보 (미로그인/미오픈 시 안전 폴백)
         var oInfo = null;
-        try { oInfo = parent.getAppInfo && parent.getAppInfo(); } catch (e) { }
+        try { oInfo = parent.getAppInfo && parent.getAppInfo(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         function lf_model(sPath) {
             try {
                 var v = APPCOMMON.fnGetModelProperty(sPath);
                 if (v != null) { return v; }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return null;
         }
 
@@ -833,10 +833,10 @@
                 var oWin = (parent.CURRWIN) || (parent.REMOTE && parent.REMOTE.getCurrentWindow && parent.REMOTE.getCurrentWindow());
                 if (oWin && oWin.setTitle) { oWin.setTitle(sTitle); }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 모드별 트랜잭션 버튼 표시/숨김도 함께 갱신 (헤더와 동일 타이밍 = 모든 재진입/모드전환)
-        try { oAPP.fn.fnUpdateWs20Toolbar(); } catch (e) { }
+        try { oAPP.fn.fnUpdateWs20Toolbar(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.fnUpdateWs20AppHeader
 
@@ -910,7 +910,7 @@
                 // 3개 SID 가 정확히 일치할 때만 채택(데이터 오염 방어)
                 if (WS20_LAYOUT_DEF.every(function (d) { return aSid.indexOf(d.SID) !== -1; })) { return aSid; }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return _ws20DefaultOrder();
     }
 
@@ -984,7 +984,7 @@
 
         // 기존 열림 제거
         var oOld = document.getElementById("ws20LayoutDlg");
-        if (oOld) { try { oOld.close(); } catch (e) { } oOld.remove(); }
+        if (oOld) { try { oOld.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } oOld.remove(); }
 
         var aWork = _ws20SavedLayoutOrder();   // 작업용 순서(SID 배열) — 저장 전까지 임시
         function _def(sid) { return WS20_LAYOUT_DEF.filter(function (d) { return d.SID === sid; })[0]; }
@@ -1020,7 +1020,7 @@
                 C.innerHTML = '<i class="fa-solid fa-grip-vertical u4aWs20LayoutGrip"></i>' +
                     '<i class="fa-solid fa-' + d.fa + ' u4aWs20LayoutIco"></i>' +
                     '<span class="u4aWs20LayoutTxt">' + _esc(_msg(d.msg)) + '</span>';
-                C.addEventListener("dragstart", function (e) { _dragSid = sid; C.classList.add("is-dragging"); try { e.dataTransfer.effectAllowed = "move"; } catch (x) { } });
+                C.addEventListener("dragstart", function (e) { _dragSid = sid; C.classList.add("is-dragging"); try { e.dataTransfer.effectAllowed = "move"; } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } });
                 C.addEventListener("dragend", function () { _dragSid = null; C.classList.remove("is-dragging"); });
                 C.addEventListener("dragover", function (e) { e.preventDefault(); C.classList.add("is-over"); });
                 C.addEventListener("dragleave", function () { C.classList.remove("is-over"); });
@@ -1044,18 +1044,18 @@
 
         // 팝업 종료. bSkip=true(저장 경로)면 취소 안내 없이 닫기만 — 원본 lf_close(oDlg, bSkip) 재현.
         function _close(bSkip) {
-            try { DLG.close(); } catch (e) { } DLG.remove();
+            try { DLG.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } DLG.remove();
             if (bSkip) { return; }
             // ★[BR60-2] 우상단 X · 하단 '닫기' · 키보드 ESC 로 닫을 때 취소 안내(원본 lf_close 176~177행,
             //   MSG_WS 001 "Cancel operation"). 저장으로 닫힐 때(_doSave→_close(true))만 안내 생략.
-            var s001 = ""; try { s001 = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "001"); } catch (e) { }
-            try { if (parent.showMessage) { parent.showMessage(null, 10, "I", s001); } } catch (e) { }
+            var s001 = ""; try { s001 = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "001"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (parent.showMessage) { parent.showMessage(null, 10, "I", s001); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         function _save() {
             // 저장 확인 (구 010 "Do you want to save it?") — 중앙 showMessage(HTML5) 사용.
             var sMsg = "";
-            try { sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "010"); } catch (e) { }
+            try { sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "010"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             function _doSave() {
                 // ★[BR60-3][BR60-4] 저장 확정~미리보기 재로드가 끝날 때까지 화면잠금(로딩 표시)+단축키잠금.
                 //   원본 lf_save(callDesignLayoutChangePopup.js): 확인 YES 시 parent.setBusy("X")(244행)
@@ -1186,7 +1186,7 @@
                     parent.showMessage(null, 30, "I", sMsg, function (sAct) { if (sAct === "YES") { _doSave(); } });
                     return;
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _doSave(); // showMessage 미가용 시 바로 저장
         }
 
@@ -1201,7 +1201,7 @@
         DLG.addEventListener("cancel", function (e) { e.preventDefault(); _close(); }); // ESC
 
         document.body.appendChild(DLG);
-        if (typeof DLG.showModal === "function") { try { DLG.showModal(); } catch (e) { DLG.setAttribute("open", ""); } }
+        if (typeof DLG.showModal === "function") { try { DLG.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } DLG.setAttribute("open", ""); } }
         else { DLG.setAttribute("open", ""); }
 
     }; // end of fnWs20OpenLayoutPopup
@@ -1266,17 +1266,17 @@
     // 접속 서버 정보 Popover (구 fnWs20SideFIXITM_10 → sap.m.ResponsivePopover 를 HTML5 로)
     function _ws20ShowServerInfo(oAnchor) {
         var old = document.querySelector(".u4aWs20SrvPop");
-        if (old) { try { old.remove(); } catch (e) { } if (old.__anchor === oAnchor) { return; } }
+        if (old) { try { old.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } if (old.__anchor === oAnchor) { return; } }
 
         var S = {}, U = {}, M = {};
-        try { S = parent.getServerInfo() || {}; } catch (e) { }
-        try { U = parent.getUserInfo() || {}; } catch (e) { }
-        try { M = (oAPP.attr && oAPP.attr.metadata && oAPP.attr.metadata.METADATA) || {}; } catch (e) { }
-        function _wz(n) { try { return parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", n) || n; } catch (e) { return n; } }
+        try { S = parent.getServerInfo() || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { U = parent.getUserInfo() || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { M = (oAPP.attr && oAPP.attr.metadata && oAPP.attr.metadata.METADATA) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        function _wz(n) { try { return parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", n) || n; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return n; } }
 
         var sSvrVer = "";
-        try { if (M.S_WSVER && M.S_WSVER.SVRVER) { sSvrVer = M.S_WSVER.SVRVER + " ( " + (M.S_WSVER.WSSVER || "") + " )"; } } catch (e) { }
-        var sHost = ""; try { sHost = (S.SERVER_INFO && S.SERVER_INFO.host) || ""; } catch (e) { }
+        try { if (M.S_WSVER && M.S_WSVER.SVRVER) { sSvrVer = M.S_WSVER.SVRVER + " ( " + (M.S_WSVER.WSSVER || "") + " )"; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        var sHost = ""; try { sHost = (S.SERVER_INFO && S.SERVER_INFO.host) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 원본 ws_fn_03.js 768~966 필드 순서 (값 없으면 행 생략)
         var aRows = [
@@ -1326,7 +1326,7 @@
         POP.style.zIndex = "4000";
 
         function _close() {
-            try { POP.remove(); } catch (e) { }
+            try { POP.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             document.removeEventListener("mousedown", _out, true);
             document.removeEventListener("keydown", _esc, true);
             window.removeEventListener("resize", _close);
@@ -1377,7 +1377,7 @@
             BTN.addEventListener("click", function () {
                 try {
                     console.warn("[HTML5][WS20] preview action not implemented (W2 예정):", sId);
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
             return BTN;
         }
@@ -1457,7 +1457,7 @@
                 //   폭이 0 이면(아직 미배치/숨김) 프레임마다 최대 N회 재시도 후 폭이 잡히면 reflow.
                 if (oOvfCtl && typeof oOvfCtl.reflow === "function" && typeof requestAnimationFrame === "function") {
                     (function _tryReflow(n) {
-                        if (HDR.clientWidth > 0) { try { oOvfCtl.reflow(); } catch (e) { } return; }
+                        if (HDR.clientWidth > 0) { try { oOvfCtl.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
                         if (n > 0) { requestAnimationFrame(function () { _tryReflow(n - 1); }); }
                     })(30);
                 }
@@ -1517,7 +1517,7 @@
 
         // 이미 셸이 렌더되어 있으면 스킵 (앱 헤더 텍스트만 최신값으로 갱신)
         if (oWS20.getAttribute("data-ws20-shell") === "X") {
-            try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { }
+            try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
 
@@ -1558,7 +1558,7 @@
         oWS20.setAttribute("data-ws20-shell", "X");
 
         // 앱 헤더 텍스트 채움 (APPID / 모드 / 상태)
-        try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { }
+        try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 렌더 "전"에 설정된 /FMSG/WS20 메시지 리플레이 — Change 모드 lock 메시지는
         // fnOnEnterDispChangeMode 가 fnOnMoveToPage(→렌더) 보다 먼저 호출하므로,
@@ -1566,7 +1566,7 @@
         try {
             var oFMsg = APPCOMMON.fnGetModelProperty("/FMSG/WS20");
             if (oFMsg && oFMsg.ISSHOW) { oAPP.ws20html.showFooter(oFMsg.TYPE || "I", oFMsg.TXT || ""); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 내부 참조 보관(추후 단계에서 패널 접근용)
         oAPP.attr.ui = oAPP.attr.ui || {};
@@ -1617,7 +1617,7 @@
             if (oNewWin_IF_DATA && oNewWin_IF_DATA.ACTCD === "MOVE20" && parent.setNewBrowserIF_DATA) {
                 parent.setNewBrowserIF_DATA(undefined);
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }; // end of oAPP.fn.fnMoveToWs20
 
     /************************************************************************
@@ -1713,14 +1713,14 @@
             APPCOMMON.fnSetModelProperty("/WS20/APP", oAppInfo);
 
             // 현재 떠있는 Electron Browser들 전체 닫는 function (원본 1:1 — 가드)
-            try { oAPP.fn.fnChildWindowClose(); } catch (e) { }
+            try { oAPP.fn.fnChildWindowClose(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // Change Mode 모드로 변환 (문서 4장 — setUIAreaEditable 시작점.
             //  busy 는 이후 getAppData(fnLoadWs20TreeData) 완료 시점에 해제됨)
             oAPP.fn.setUIAreaEditable();
 
             // [HTML5] 앱 헤더(모드 표기) 갱신
-            try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { }
+            try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 푸터 메시지 처리
             var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "020"); // Switch to edit mode.
@@ -1735,7 +1735,7 @@
                     browserKey: parent.getBrowserKey(),
                     IS_EDIT: "X"
                 });
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         }
 
@@ -1769,10 +1769,10 @@
 
             if (RETURN.RTCOD === "E") {
 
-                try { parent.setSoundMsg("02"); } catch (e) { } // error sound
+                try { parent.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } // error sound
 
                 // 작업표시줄 깜빡임 (구 CURRWIN.flashFrame)
-                try { parent.REMOTE.getCurrentWindow().flashFrame(true); } catch (e) { }
+                try { parent.REMOTE.getCurrentWindow().flashFrame(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 // 크리티컬 오류 처리 (구 showMessage(sap, 20, …, fnCriticalError)
                 //  → Electron 네이티브 KIND 99. ※ KIND 99 는 콜백 미지원 — 기존
@@ -1780,7 +1780,7 @@
                 try {
                     parent.showMessage(null, 99, "E", RETURN.RTMSG,
                         (typeof fnCriticalError === "function") ? fnCriticalError : undefined);
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 // 화면 Lock 해제 (구 sap.ui.getCore().unlock())
                 oAPP.common.fnSetBusyLock("");
@@ -1798,7 +1798,7 @@
             APPCOMMON.fnSetModelProperty("/WS20/APP", RETURN); // 모델 정보 갱신
 
             // 현재 떠있는 Electron Browser들 전체 닫는 function (원본 1:1 — 가드)
-            try { oAPP.fn.fnChildWindowClose(); } catch (e) { }
+            try { oAPP.fn.fnChildWindowClose(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "029"); // Switch to display mode.
 
@@ -1809,12 +1809,12 @@
             oAPP.fn.setUIAreaEditable(oAppInfo.IS_CHAG);
 
             // [HTML5] 앱 헤더(모드 표기) 갱신
-            try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { }
+            try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // AI 서버 연결되어있을 경우 연결 해제 하기 (원본 1:1 — 가드)
             try {
                 await parent.UAI.disconnect({ CONID: parent.getBrowserKey() });
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 앱 모드 전환 시 ipc의 command 이벤트 전송 (원본 1:1 — 가드)
             try {
@@ -1824,7 +1824,7 @@
                     browserKey: parent.getBrowserKey(),
                     IS_EDIT: ""
                 });
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // busy/Lock 정리 (4.1 경로는 setUIAreaEditable 이 setBusy("")까지 수행)
             oAPP.common.fnSetBusyLock("");

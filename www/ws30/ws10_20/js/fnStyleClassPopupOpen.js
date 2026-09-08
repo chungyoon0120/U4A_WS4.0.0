@@ -117,7 +117,7 @@
         return APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNr);
     }
     function _isEdit() {
-        try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { return false; }
+        try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
 
     /* ── 단일 인스턴스 + 상태 ────────────────────────────────────────── */
@@ -129,7 +129,7 @@
     var _spyResumeTimer = null; // 스크롤 정지 감지(디바운스)로 spy 재개 — scrollend 미지원(Ch93) 대체
 
     function _close() {
-        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     function _resolveModel() {
@@ -293,7 +293,7 @@
         bSpyOff = true;
         _setActive(gi);
         try { oUI.content.scrollTo({ top: oSec.offsetTop, behavior: "smooth" }); }
-        catch (e) { oUI.content.scrollTop = oSec.offsetTop; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oUI.content.scrollTop = oSec.offsetTop; }
         //스크롤이 시작조차 안 될 수 있으니(이미 그 위치) 백스톱으로도 재개 예약. 스크롤이 오면 아래 디바운스가 갱신.
         _armSpyResume(600);
     }
@@ -411,7 +411,7 @@
             oSClr.hidden = (oSInp.value === "");
             _renderAll();
             //검색 시 상단으로(첫 매치 구획).
-            try { oUI.content.scrollTop = 0; } catch (e) { }
+            try { oUI.content.scrollTop = 0; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         oSInp.addEventListener("input", _applyQuery);
         oSClr.addEventListener("click", function () { oSInp.value = ""; _applyQuery(); oSInp.focus(); });
@@ -490,9 +490,9 @@
 
         //★ showModal 로 레이아웃(높이)이 생긴 "후"에 최상단 정렬 + spy 를 잡는다.
         //  showModal 전엔 content 높이=0 → _spy 바닥감지(0+0>=0-2)가 참이 돼 마지막 구획이 오판 활성됐다.
-        try { oUI.dlg.showModal(); } catch (e) { }
+        try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _fitSpacer();   // showModal 로 높이(clientHeight)가 생긴 뒤 스페이서 확정(그전엔 0이라 계산 불가).
-        try { oUI.content.scrollTop = 0; } catch (e) { }
+        try { oUI.content.scrollTop = 0; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         bSpyOff = false; _spy();
     };
 

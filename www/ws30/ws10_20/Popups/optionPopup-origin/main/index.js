@@ -62,6 +62,7 @@
                 aParams[3] || ""
             ) || sMissingText;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return sMissingText;
         }
 
@@ -241,6 +242,7 @@
         try {
             oBroadcast?.close();
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -280,6 +282,7 @@
         try {
             return typeof oWin.isDestroyed === "function" && oWin.isDestroyed() === true;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return true;
         }
 
@@ -298,6 +301,7 @@
             return oWin;
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -318,6 +322,7 @@
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -328,6 +333,7 @@
         try {
             return oAPP?.fn?.getBusy?.() === true;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return false;
         }
 
@@ -348,6 +354,7 @@
         try {
             oWin.closable = bClosable;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -377,6 +384,7 @@
             oWin.maximize?.();
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -425,6 +433,7 @@
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -442,6 +451,7 @@
         try {
             bIsMaximized = typeof oWin.isMaximized === "function" && oWin.isMaximized() === true;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -472,6 +482,7 @@
             updateWindowState();
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -505,6 +516,7 @@
             oCurrentWindow = null;
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             oCurrentWindow = null;
         }
 
@@ -591,6 +603,7 @@
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -638,6 +651,7 @@
                 DATA: oThemeInfo
             }, "*");
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -651,6 +665,7 @@
                 DATA: data || {}
             }, "*");
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -693,6 +708,7 @@
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -718,12 +734,14 @@
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
         try {
             oBroadcast?.close();
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 

@@ -1074,7 +1074,8 @@ function isURLPath(path) {
         
         return url.protocol === 'http:' || url.protocol === 'https:';
     
-    } catch {
+    } catch (_u4aErr) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }
         return false;
 
     }

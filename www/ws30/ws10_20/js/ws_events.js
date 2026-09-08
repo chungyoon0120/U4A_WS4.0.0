@@ -1255,7 +1255,7 @@
 
         // 사용자 응답을 대기하므로 busy 해제 + 떠있는 팝업 잠시 숨김
         oAPP.common.fnSetBusyLock("");
-        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 저장 여부 질문 (구: parent.showMessage(sap, 40, 'W', ...) — sap 의존 →
         //   HTML5 확인창. YES=저장 후 이동 / NO=저장 안 하고 이동 / CANCEL=머무름.)
@@ -1297,14 +1297,14 @@
             //   → 저장 핸들러 직접 호출(ISBACK="X" → 저장 성공 후 WS10 으로 이동).
             if (typeof oAPP.events.ev_pressSaveBtn !== "function") {
                 oAPP.common.fnSetBusyLock("");
-                try { parent.showMessage(null, 20, "E", "[Save] ev_pressSaveBtn 미정의"); } catch (e) { }
+                try { parent.showMessage(null, 20, "E", "[Save] ev_pressSaveBtn 미정의"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return;
             }
             try {
                 oAPP.events.ev_pressSaveBtn({ ISBACK: "X" });
             } catch (e) {
                 oAPP.common.fnSetBusyLock("");
-                try { parent.showMessage(null, 20, "E", "[Save] " + (e && e.message ? e.message : String(e))); } catch (e2) { }
+                try { parent.showMessage(null, 20, "E", "[Save] " + (e && e.message ? e.message : String(e))); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                 console.error("[HTML5][WS20] save(ISBACK) error:", e);
             }
 
@@ -1376,6 +1376,7 @@
             }
             T_excep = oAPP.fn.chkExcepionAttr() || [];
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             // 여기는 fnMultiFooterMsg 호출 前 → 자식창 BUSY_ON 방송이 아직 안 나갔다(회수 불필요).
             _wsevCritical("WSEV-001", "Syntax Check(구문 검사) — 디자인 영역 오류 점검(chkExcepionAttr)", e, false);
             return;
@@ -1393,6 +1394,7 @@
                 }
                 oAPP.fn.fnMultiFooterMsg(T_excep);
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 _wsevCritical("WSEV-002", "Syntax Check(구문 검사) — 오류 목록 창 열기(fnMultiFooterMsg)", e, true);
             }
 
@@ -1558,7 +1560,7 @@
             if (!wsL || (beL && beL === wsL)) { return sText; }
             var WC = REMOTE.getGlobal("WsMsgCls");
             return (WC && WC.relocalize) ? WC.relocalize(sText, beL, wsL) : sText;
-        } catch (e) { return sText; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sText; }
     }
     // eval(SCRIPT) 동안만 parent.showMessage 를 역현지화로 감싼다(원본 반환값=복원용). eval 은 반드시
     //   인라인 유지 — 서버 스크립트가 참조하는 지역 oNewEvent/모듈 lf_saveActiveCtsPopup 스코프 보존.
@@ -1578,7 +1580,7 @@
             var w = (typeof CURRWIN !== "undefined" && CURRWIN) ? CURRWIN
                   : (parent.REMOTE ? parent.REMOTE.getCurrentWindow() : (parent.CURRWIN || null));
             if (w && w.flashFrame) { w.flashFrame(true); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -1621,10 +1623,10 @@
                 var aInner = e.message.match(/^\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3})\]/);
                 if (aInner) { sCode = aInner[1]; }
             }
-        } catch (e9) { }
+        } catch (e9) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e9); } }
 
         // ① 콘솔에 [코드] + 위치 + 예외 원문 (조용한 삼킴 금지 — 현장 SR 추적용)
-        try { console.error("[" + sCode + "] " + sWhere + " — 오류 발생:", e); } catch (e0) { }
+        try { console.error("[" + sCode + "] " + sWhere + " — 오류 발생:", e); } catch (e0) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e0); } }
 
         // ② 정리(cleanup) — 화면 잠금 해제
         try { oAPP.common.fnSetBusyLock(""); } catch (e1) { console.error("[" + sCode + "] fnSetBusyLock 해제 실패:", e1 && e1.message); }
@@ -1724,6 +1726,7 @@
             }
             T_excep = oAPP.fn.chkExcepionAttr() || [];
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             //[BR55] 점검 실패 = 검증되지 않은 상태 → 활성화 중단(fail-closed).
             //  점검부(chkExcepionAttr → chkExcepUiTable / designTreeData.js)에는 방어 없는
             //  참조가 여러 곳 있어(자세한 목록 = .audit/br55/04_final.md) 실제로 터질 수 있다.
@@ -1750,6 +1753,7 @@
                 }
                 oAPP.fn.fnMultiFooterMsg(T_excep);
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 //[BR55-P1] fnMultiFooterMsg 는 진입 즉시 본창 busy + 자식창 BUSY_ON 을 함께 건다
                 //  (fnDialogPopupOpener.js 2822~2826). 도중 실패로 여기 오면 본창만 풀어선 안 되고
                 //  이미 나간 자식창 잠금도 같이 회수해야 한다(BUSY_ON 잠그면 BUSY_OFF 필수) → 3번째 인자 true.
@@ -1773,6 +1777,7 @@
             }
             oAPP.fn.fnChildWindowShow(false);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             // 여기부터는 저장(서버 전송) 직전 구간이다. 자식 윈도우 정리가 실패한 채로 저장을 진행하면
             //  잠금 상태가 어긋난 채 서버에 데이터가 올라간다 → 코드 남기고 저장하지 않는다.
             _wsevCritical("WSEV-005", "Activate(활성화) — 자식 윈도우 숨기기(fnChildWindowShow(false))", e, false);
@@ -1807,6 +1812,7 @@
 
             oFormData.append("IS_ACT", 'X');
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _wsevCritical("WSEV-006", "Activate(활성화) — 서버 주소·전송 꾸러미 준비(getServerPath / FormData / TRKORR·IS_ACT)", e, false, true);
             return;
         }
@@ -1822,6 +1828,7 @@
             }
             oSaveData = JSON.parse(JSON.stringify(oAPP.fn.getSaveData()));
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _wsevCritical("WSEV-007", "Activate(활성화) — 저장 데이터 만들기(getSaveData + 복제)", e, false, true);
             return;
         }
@@ -1853,6 +1860,7 @@
             // oFormData.append("APPDATA", JSON.stringify(oAPP.fn.getSaveData()));
             oFormData.append("APPDATA", JSON.stringify(oSaveData));
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _wsevCritical("WSEV-008", "Activate(활성화) — 저장 데이터를 전송 형식으로 바꾸기(_convertSaveDataToFormData / APPDATA)", e, false, true);
             return;
         }
@@ -1990,6 +1998,7 @@
                 }
                 oAPP.fn.fnUpdateWs20AppHeader();
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 _wsevCritical("WSEV-009", "Activate(활성화) — [저장 성공 後] 앱 헤더(Active 표기) 갱신", e, false);
             }
 
@@ -2008,6 +2017,7 @@
                 _oUndoRedo.clearHistory();
                 _oUndoRedo.setUndoRedoButtonEnable();
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 _wsevCritical("WSEV-010", "Activate(활성화) — [저장 성공 後] Undo/Redo 이력 비우기", e, false);
             }
 
@@ -2160,6 +2170,7 @@
             }
             oAPP.fn.fnChildWindowShow(false);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             // 저장 직전 구간이다. 자식 윈도우 정리가 실패한 채 저장하면 잠금 상태가 어긋난 데이터가 올라간다.
             _wsevCritical("WSEV-011", "Save(저장) — 자식 윈도우 숨기기(fnChildWindowShow(false))", e, false, false);
             return;
@@ -2200,6 +2211,7 @@
                 oFormData.append("TRKORR", sReqNo);
             }
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _wsevCritical("WSEV-012", "Save(저장) — 서버 주소·전송 꾸러미 준비(getServerPath / FormData / TRKORR)", e, false, true);
             return;
         }
@@ -2214,6 +2226,7 @@
             }
             oSaveData = JSON.parse(JSON.stringify(oAPP.fn.getSaveData()));
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _wsevCritical("WSEV-013", "Save(저장) — 저장 데이터 만들기(getSaveData + 복제)", e, false, true);
             return;
         }
@@ -2246,6 +2259,7 @@
             // oFormData.append("APPDATA", JSON.stringify(oAPP.fn.getSaveData()));
             oFormData.append("APPDATA", JSON.stringify(oSaveData));
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _wsevCritical("WSEV-014", "Save(저장) — 저장 데이터를 전송 형식으로 바꾸기(_convertSaveDataToFormData / APPDATA)", e, false, true);
             return;
         }
@@ -2256,6 +2270,7 @@
         try {
             sendAjax(sPath, oFormData, lf_getAppInfo);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _wsevCritical("WSEV-015", "Save(저장) — 저장 요청 보내기(sendAjax)", e, false, true);
             return;
         }
@@ -2326,7 +2341,7 @@
                     oAPP.fn.fnMoveToWs10();
                 } catch (eMove) {
                     oAPP.common.fnSetBusyLock("");
-                    try { parent.showMessage(null, 20, "E", "[Back] " + (eMove && eMove.message ? eMove.message : String(eMove))); } catch (e) { }
+                    try { parent.showMessage(null, 20, "E", "[Back] " + (eMove && eMove.message ? eMove.message : String(eMove))); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     console.error("[HTML5][WS20] fnMoveToWs10 error:", eMove);
                 }
 
@@ -2371,6 +2386,7 @@
                 }
                 oAPP.fn.fnUpdateWs20AppHeader();
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 _wsevCritical("WSEV-016", "Save(저장) — [저장 성공 後] 앱 헤더 갱신", e, false, false);
             }
 
@@ -2389,6 +2405,7 @@
                 _oUndoRedo.clearHistory();
                 _oUndoRedo.setUndoRedoButtonEnable();
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 _wsevCritical("WSEV-017", "Save(저장) — [저장 성공 後] Undo/Redo 이력 비우기", e, false, false);
             }
 

@@ -108,7 +108,7 @@ function _validateSettings(obj) {
   ];
 
   return checks.every(fn => {
-    try { return fn(); } catch { return false; }
+    try { return fn(); } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); } return false; }
   });
 }
 

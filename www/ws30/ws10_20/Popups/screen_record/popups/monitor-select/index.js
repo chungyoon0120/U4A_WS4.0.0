@@ -83,6 +83,7 @@ async function loadDisplays() {
     });
     renderGrid();
   } catch (err) {
+      if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
     loadingEl.innerHTML = `<span style="color:var(--danger);font-size:12px">${MSG.M001}: ${err.message}</span>`;
   }
 }

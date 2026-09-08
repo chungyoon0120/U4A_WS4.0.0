@@ -46,7 +46,7 @@
     function _wsMsg(s) { return (oAPP.usphtml._wsMsg ? oAPP.usphtml._wsMsg(s) : s); }
     function _fa(s, b) { return (oAPP.usphtml._fa ? oAPP.usphtml._fa(s, b) : '<i class="fa-solid fa-' + s + '"></i>'); }
     function _esc(s) { return (oAPP.usphtml._esc ? oAPP.usphtml._esc(s) : String(s == null ? "" : s)); }
-    function _model(p) { try { var v = APPCOMMON.fnGetModelProperty(p); return v == null ? null : v; } catch (e) { return null; } }
+    function _model(p) { try { var v = APPCOMMON.fnGetModelProperty(p); return v == null ? null : v; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; } }
 
     // 본 호스트가 만드는 에디터 iframe 수 (구 이중 에디터 = 2)
     var EDITOR_COUNT = 2;
@@ -60,7 +60,7 @@
         try {
             var ifr = document.querySelector("#uspEditorHost iframe.EDITOR_MAIN");
             return (ifr && ifr.contentWindow && ifr.contentWindow.editor) || null;
-        } catch (e) { return null; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
     }
 
     // 현재 파일 언어가 꾸밈정렬(포맷)을 지원하는지 = Monaco 공식 신호(formatDocument 액션 isSupported).
@@ -73,7 +73,7 @@
             if (!ed) { return false; }
             var oAct = ed.getAction("editor.action.formatDocument");
             return !!(oAct && oAct.isSupported());
-        } catch (e) { return false; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
 
     // Pretty Print 버튼 활성/비활성 = (편집모드 && 파일 && 비루트 && 언어가 포맷 지원).
@@ -101,7 +101,7 @@
             if (!ed || ed._u4aFmtHooked) { return; }
             ed._u4aFmtHooked = true;
             ed.onDidChangeModelLanguage(function () { _applyPrettyEnabled(); });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // Pretty Print (구 ev_codeeditorPrettyPrint) — 두 에디터 모두 formatDocument
@@ -131,7 +131,7 @@
                 //   바꾸므로, \s+ 압축으로는 매칭 실패한다. 공백 무시해야 같은 줄로 인식된다.
                 sAnchor = (sLine || "").replace(/\s/g, "");
             }
-        } catch (e0) { }
+        } catch (e0) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e0); } }
 
         var pMain = null;
         ["EDITOR_FRAME1", "EDITOR_FRAME2"].forEach(function (cls) {
@@ -157,8 +157,8 @@
                             edMain.revealLineInCenterIfOutsideViewport(iTarget);
                         }
                     }
-                } catch (e1) { }
-                try { edMain.focus(); } catch (e2) { }
+                } catch (e1) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e1); } }
+                try { edMain.focus(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             };
             if (pMain && typeof pMain.then === "function") { pMain.then(_restore, _restore); }
             else { _restore(); }
@@ -199,7 +199,7 @@
         if (oFBtn) {
             oFBtn.setAttribute("aria-pressed", bFull ? "true" : "false");
             oFBtn.innerHTML = _fa(bFull ? "compress" : "expand");
-            try { oFBtn.title = bFull ? _wsMsg("370") : _wsMsg("369"); } catch (e) { }
+            try { oFBtn.title = bFull ? _wsMsg("370") : _wsMsg("369"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     }
 
@@ -235,13 +235,13 @@
         try {
             var o = oAPP.usp.getLastSelectedEditorTheme && oAPP.usp.getLastSelectedEditorTheme();
             if (o && o.themeName) { return o.themeName; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return _model("/WS30/USP_EDITOR/sSelectedTheme") || "";
     }
 
     function _themeP13nDir() {
         try { return PATH.join(PATHINFO.P13N_ROOT, "monaco", "theme", parent.getUserInfo().SYSID, "usp_main"); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
 
     // 테마 선택 변경 (구 _oEditorThemeChange) — 개인화 저장 + 전체 에디터 applyTheme
@@ -259,8 +259,8 @@
             }
         }
 
-        try { APPCOMMON.fnSetModelProperty("/WS30/USP_EDITOR/sSelectedTheme", sThemeName); } catch (e) { }
-        try { oAPP.usp.sendEditorPostMessageAll({ actcd: "applyTheme", oThemeInfo: oThemeInfo }); } catch (e) { }
+        try { APPCOMMON.fnSetModelProperty("/WS30/USP_EDITOR/sSelectedTheme", sThemeName); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oAPP.usp.sendEditorPostMessageAll({ actcd: "applyTheme", oThemeInfo: oThemeInfo }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 테마 그룹 라벨 (구 Sorter: standard=317 / custom=318)
@@ -276,7 +276,7 @@
             clearTimeout(oAPP.attr.uspEditorBusyWatch);
             delete oAPP.attr.uspEditorBusyWatch;
         }
-        try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+        try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // (WS30 단축키 등록은 에디터가 아니라 "셸 렌더 직후"(ws_html5_usp.js fnOnMoveToPage override,
         //   fnRenderUspShell 뒤)에서 한다 — 에디터는 노드 선택 시에만 떠서 display/문서 패널 화면에선
         //   _releaseBusy 가 안 불려 단축키가 영영 미등록되던 회귀가 있었음.)
@@ -284,7 +284,7 @@
         try {
             var oCombo = document.querySelector("#uspEditorHost .u4aWs30EditorThemeSel");
             if (oCombo) { oCombo.value = _selectedTheme(); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 부모↔iframe 커스텀 이벤트 DOM(#IF_USP_EDITOR) 보장 + EDITOR_LOAD/CONTENT_SYNC 리스너(1회).
@@ -306,9 +306,9 @@
                     oAPP.attr.uspEditorLoadCnt -= 1;
                     if (oAPP.attr.uspEditorLoadCnt > 0) { return; }
                     // 첫 로드 완료 시점에도 현재 모드(IS_EDIT) 읽기전용 적용 — Display 진입 후 첫 파일이 수정되던 회귀 방지.
-                    try { oAPP.usphtml.editorSetReadOnly((_model("/WS30/APP") || {}).IS_EDIT !== "X"); } catch (e) { }
+                    try { oAPP.usphtml.editorSetReadOnly((_model("/WS30/APP") || {}).IS_EDIT !== "X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     // 메인 에디터 언어변경 감시 구독(1회) + Pretty 버튼 활성상태 최초 보정(포맷 지원언어만 활성).
-                    try { _hookMainFormatWatch(); _applyPrettyEnabled(); } catch (e) { }
+                    try { _hookMainFormatWatch(); _applyPrettyEnabled(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     _releaseBusy();
                     return;
 
@@ -434,10 +434,10 @@
         _applyPrettyEnabled();
 
         var oCombo = document.querySelector("#uspEditorHost .u4aWs30EditorThemeSel");
-        if (oCombo) { try { oCombo.value = _selectedTheme(); } catch (e) { } }
+        if (oCombo) { try { oCombo.value = _selectedTheme(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // 버튼 활성/표시 상태 변경(파일↔폴더 등) 후 오버플로 재계산.
-        try { if (_editorTbOvf) { _editorTbOvf.reflow(); } } catch (e) { }
+        try { if (_editorTbOvf) { _editorTbOvf.reflow(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     // 외부(예: Rename 적용)에서 에디터 헤더 파일명/상태만 갱신 — 재로드 없이.
     oAPP.usphtml.editorRefreshToolbar = _refreshToolbarInfo;
@@ -543,7 +543,7 @@
                                 return { value: t.name, text: t.name, group: _themeGroupLabel(t.groupName) };
                             });
                             var oMenuCombo = U4AUI.createSelect(aThemeItems, _selectedTheme(), function (v) {
-                                try { el.value = v; } catch (e) { }   // 실제(숨은) 툴바 콤보 값 동기화
+                                try { el.value = v; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 실제(숨은) 툴바 콤보 값 동기화
                                 _onThemeChange(v);
                             });
                             oMenuCombo.classList.add("u4aWs30EditorThemeSel");
@@ -598,17 +598,17 @@
             _refreshToolbarInfo();
 
             var bReady = Array.prototype.every.call(aFrames, function (f) {
-                try { return !!(f.contentWindow && f.contentWindow.editor); } catch (e) { return false; }
+                try { return !!(f.contentWindow && f.contentWindow.editor); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
             });
             if (bReady) {
                 // 준비된 에디터에 내용/언어만 전달(전 에디터 동기) → 즉시 busy 해제.
                 try { oAPP.usp.sendEditorPostMessageAll({ actcd: "setValue", value: (oRowData && oRowData.CONTENT) || "" }); } catch (e) { console.error("[HTML5][WS30] editor setValue:", e); }
                 try { oAPP.usp.sendEditorPostMessageAll({ actcd: "language_change", extension: (oRowData && oRowData.EXTEN) || "" }); } catch (e) { console.error("[HTML5][WS30] editor language_change:", e); }
                 // 파일 로드 시 현재 모드(IS_EDIT)에 따라 읽기전용 적용 — Display 모드면 수정 불가(원본 editable 바인딩 대응).
-                try { oAPP.usphtml.editorSetReadOnly((_model("/WS30/APP") || {}).IS_EDIT !== "X"); } catch (e) { }
+                try { oAPP.usphtml.editorSetReadOnly((_model("/WS30/APP") || {}).IS_EDIT !== "X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 // display:none 으로 숨겨져 있던 동안 Monaco 가 컨테이너 0 크기로 굳었을 수 있어 강제 relayout.
                 Array.prototype.forEach.call(aFrames, function (f) {
-                    try { if (f.contentWindow && f.contentWindow.editor) { f.contentWindow.editor.layout(); } } catch (e) { }
+                    try { if (f.contentWindow && f.contentWindow.editor) { f.contentWindow.editor.layout(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 });
                 _releaseBusy();
             }
@@ -618,7 +618,7 @@
         }
 
         // ── 최초 1회: 에디터 영역(툴바 + 스플릿 + iframe) 생성 ──
-        try { delete oAPP.usp.USP_EDITOR_CHANNEL; } catch (e) { }
+        try { delete oAPP.usp.USP_EDITOR_CHANNEL; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oAPP.usp.USP_EDITOR_CHANNEL = new MessageChannel();
 
         // 두 에디터 로드 카운터 (구 iEditorLoadCnt = 2)

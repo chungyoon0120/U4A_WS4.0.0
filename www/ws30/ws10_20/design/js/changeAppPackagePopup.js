@@ -31,7 +31,7 @@
     // 메시지 클래스 텍스트 헬퍼(원본 fnGetMsgClsText 6-인자 호출 그대로)
     function _txt(sCls, sCode, p1, p2, p3, p4) {
         try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
 
     // 오류 필드 자동 포커스 — blur/change/click '도중' 동기 focus() 는 진행 중 포커스 이동에 밀릴 수 있어
@@ -39,7 +39,7 @@
     //   value-state 메시지(.u4a-field__msg)가 노출된다(.analy/15 §3.5). (createApplicationPopup 과 동일)
     function _refocus(oEl) {
         if (!oEl || typeof oEl.focus !== "function") { return; }
-        setTimeout(function () { try { oEl.focus(); } catch (e) { } }, 0);
+        setTimeout(function () { try { oEl.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
     }
 
     function _el(sTag, sClass, sText) {
@@ -62,7 +62,7 @@
             if (!wsL || (beL && beL === wsL)) { return sText; }
             const WC = (parent.REMOTE && parent.REMOTE.getGlobal) ? parent.REMOTE.getGlobal("WsMsgCls") : null;
             return (WC && WC.relocalize) ? WC.relocalize(sText, beL, wsL) : sText;
-        } catch (e) { return sText; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sText; }
     }
 
     /************************************************************************
@@ -164,7 +164,7 @@
             },
             setProperty(sPath, vVal) { const r = _resolve(sPath); r.parent[r.key] = vVal; this.refresh(); },
             bind(fn) { aBind.push(fn); },
-            refresh() { for (let i = 0; i < aBind.length; i++) { try { aBind[i](); } catch (e) { } } }
+            refresh() { for (let i = 0; i < aBind.length; i++) { try { aBind[i](); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } }
         };
     }
 
@@ -316,7 +316,7 @@
         _ensureStyle();
 
         // 푸터 메시지가 있으면 닫는다.
-        try { APPCOMMON.fnHideFloatingFooterMsg(); } catch (e) { }
+        try { APPCOMMON.fnHideFloatingFooterMsg(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         const oModel = _createModel();
         // 초기 빈 모델(조회 전) — value-state/설명 필드까지 확보.
@@ -423,8 +423,8 @@
      ************************************************************************/
     function lf_closePopup(oDlg) {
         if (!oDlg) { return; }
-        try { oDlg.close(); } catch (e) { }
-        try { oDlg.remove(); } catch (e) { }
+        try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -653,6 +653,7 @@
             // 공통 F4 모듈(ws10_20/js/fnF4SearchHelpPopup) 미로드 시 지연 로드 후 오픈.
             lf_getScript("js/fnF4SearchHelpPopup", _openF4);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "950")); // Value help is not available.
         }
     }
@@ -686,6 +687,7 @@
                 lf_clearVs(oModel, C_BIND + "/CREQN_vs", C_BIND + "/CREQN_tx");
             });
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "950")); // Request value help is not available.
         }
     }

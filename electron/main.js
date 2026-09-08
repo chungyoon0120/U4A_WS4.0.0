@@ -40,6 +40,48 @@ app.setPath(
 //#endregion
 
 
+//#region 앱 본체 로그 · 오류 수집 (2026-09-08 추가)
+/**
+ * 왜 넣었나:
+ *   앱 본체에는 오류·창 종료·응답 없음을 받는 자리가 하나도 없었다(실측 0건).
+ *   그래서 앱이 뻗으면 로그가 한 줄도 안 남았다.
+ *
+ * 왜 여기인가:
+ *   userData 경로를 고정한 직후, 창이 만들어지기 전에 걸어야 처음부터 다 잡힌다.
+ *
+ * 무엇을 바꾸지 않았나:
+ *   오류를 받아서 남기기만 한다. 앱을 끄거나 기존 흐름을 바꾸지 않는다.
+ */
+const WsMainLog = require('./lib/log/ws_main_log');
+WsMainLog.install(app);
+
+/**
+ * 텔레그램 전송 (테스트 기간 전용).
+ * 설정 파일에 토큰·방 번호가 없으면 아무것도 보내지 않는다. 앱은 정상 동작한다.
+ * 테스트가 끝나면 설정 파일의 enabled 를 false 로 두면 전송이 전부 멈춘다.
+ */
+const WsTelegram = require('./lib/log/ws_telegram');
+WsTelegram.install(app);
+
+/**
+ * 감시가 없던 화면 49곳(창 26 · 틀 안 화면 23)에 오류 감시를 자동으로 넣는다.
+ * 화면마다 한 줄씩 넣는 방식은 또 빠뜨리므로 앱 본체에서 일괄로 건다.
+ * 이미 감시가 있는 화면은 건드리지 않는다(로그가 두 번 남지 않게).
+ */
+const WsErrorHook = require('./lib/log/ws_error_hook');
+WsErrorHook.install(app);
+
+/**
+ * 앱이 뻗었을 때 처리.
+ *  ① 죽는 순간 잡는 장치를 켠다(서버로 안 올리고 이 컴퓨터에만 남긴다)
+ *  ② "돌고 있음" 표시를 남기고, 정상 종료 때 지운다
+ *  ③ 다음에 켤 때 표시가 남아 있으면 지난번에 뻗은 것으로 보고 그때 로그를 보낸다
+ */
+const WsCrashReport = require('./lib/log/ws_crash_report');
+WsCrashReport.install(app);
+//#endregion
+
+
 //#region Sqlite 기반 메시지 클래스
 const WsMsgClsService = require('./lib/msg/WsMsgClsService');
 

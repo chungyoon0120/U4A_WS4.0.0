@@ -61,20 +61,20 @@
     };
 
     // GLANGU (prev.js 부트스트랩).
-    function _gl() { try { return oAPP.oDesign.settings.GLANGU; } catch (e) { return ""; } }
+    function _gl() { try { return oAPP.oDesign.settings.GLANGU; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; } }
 
     // ZMSG_WS_COMMON_001 메시지(WSUTIL) — 원본 parent.WSUTIL.getWsMsgClsTxt 대응.
     function _wsc(code, a1, a2, a3, a4) {
         try { return parent.WSUTIL.getWsMsgClsTxt(_gl(), "ZMSG_WS_COMMON_001", code, a1 || "", a2 || "", a3 || "", a4 || ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     // /U4A/MSG_WS·CL_WS_COMMON 등 메시지(공통).
     function _msg(cls, code, a1, a2, a3, a4) {
         try { return oAPP.common.fnGetMsgClsText(cls, code, a1 || "", a2 || "", a3 || "", a4 || ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     // 토스트(원본 showMessage(sap,10,...) / MessageToast → KIND 10).
-    function _toast(type, text) { try { parent.showMessage(null, 10, type, text); } catch (e) { } }
+    function _toast(type, text) { try { parent.showMessage(null, 10, type, text); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
     /* ── 바인딩 팝업(별창) prc002 드래그 데이터(원본 design/bindPopupHandler/setDragBindPopupData.js 1:1) ──
        WS20 디자인 트리 → 바인딩 팝업 가운데(디자인 트리) drop 시 소비하는 native dataTransfer.
@@ -134,22 +134,22 @@
         var _sRes = _chkBindPopupDragAppData(is_drag);
         if (_sRes.RETCD === "E") {
             _sParam.RETCD = _sRes.RETCD; _sParam.RTMSG = _sRes.RTMSG;
-            try { ev.dataTransfer.setData("prc002", JSON.stringify(_sParam)); } catch (e) { }
+            try { ev.dataTransfer.setData("prc002", JSON.stringify(_sParam)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
         var _sData = _setBindPopupDragAppData(is_drag);
         _sParam.T_0014 = _sData.T_0014; _sParam.T_0015 = _sData.T_0015; _sParam.T_CEVT = _sData.T_CEVT;
-        try { ev.dataTransfer.setData("prc002", JSON.stringify(_sParam)); } catch (e) { }
+        try { ev.dataTransfer.setData("prc002", JSON.stringify(_sParam)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     function _frameWin() {
         try {
             var f = oAPP.attr.ui && oAPP.attr.ui.frame;
             return (f && f.contentWindow) || null;
-        } catch (e) { return null; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
     }
     function _root() {
-        try { return oAPP.attr.oModel.oData.zTREE[0]; } catch (e) { return null; }
+        try { return oAPP.attr.oModel.oData.zTREE[0]; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
     }
     function _isEdit() {
         try {
@@ -157,7 +157,7 @@
             var v = (m && typeof m.getProperty === "function") ? m.getProperty("/IS_EDIT")
                 : (m && m.oData ? m.oData.IS_EDIT : undefined);
             return v === true || v === "X";
-        } catch (e) { return false; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
     // 펼침 사이드맵(tree.js 와 단일출처 공유) — 기본 펼침(false 명시건만 접힘).
     function _isExpandedNode(oNode) {
@@ -181,20 +181,20 @@
     }
     // require 모듈 로더(가드).
     function _req(sPathKey) {
-        try { return parent.require(oAPP.oDesign.pathInfo[sPathKey]); } catch (e) { return null; }
+        try { return parent.require(oAPP.oDesign.pathInfo[sPathKey]); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
     }
     function _bindBusy(sAct, oOpt) {
-        try { var f = _req("bindPopupBroadCast"); if (f) { f(sAct, oOpt); } } catch (e) { }
+        try { var f = _req("bindPopupBroadCast"); if (f) { f(sAct, oOpt); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _busyOption(code) {
-        var o; try { o = JSON.parse(JSON.stringify(oAPP.oDesign.types.TY_BUSY_OPTION)); } catch (e) { o = { TITLE: "", DESC: "" }; }
+        var o; try { o = JSON.parse(JSON.stringify(oAPP.oDesign.types.TY_BUSY_OPTION)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } o = { TITLE: "", DESC: "" }; }
         o.DESC = _wsc(code); return o;
     }
     function _safe(fn) { try { return fn(); } catch (e) { console.error("[HTML5][WS20][dnd]", e); } }
     // 부모에 추가되지 않는 UI(UA026) 여부 — 미리보기 index 카운트(_cnt) 계산용. (S_CODE 미로드 가드)
     function _isUa026(uilib) {
         try { var a = oAPP.attr.S_CODE && oAPP.attr.S_CODE.UA026; return !!(a && a.findIndex(function (item) { return item.FLD01 === uilib; }) !== -1); }
-        catch (e) { return false; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
 
 
@@ -497,7 +497,7 @@
             _toast("I", _sMsg);
             _bindBusy("BUSY_OFF");
             oAPP.fn.setShortcutLock(false);
-            try { parent.setBusy(""); } catch (e) { }
+            try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
         // 후보 1 → 자동 선택.
@@ -512,7 +512,7 @@
 
         // 기존 잔존 제거.
         var oOld = document.getElementById("ws20AggrSelDlg");
-        if (oOld) { try { oOld.remove(); } catch (e) { } }
+        if (oOld) { try { oOld.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // 공통 .u4a-dialog 규격(DumpWrite 등과 동일 구조: __header/__body/__footer + 드래그리센터).
         var DLG = document.createElement("dialog");
@@ -581,9 +581,9 @@
 
         var bDone = false;
         function _cleanup() {
-            try { document.removeEventListener("keydown", _onKey, true); } catch (e) { }
-            try { if (DLG.open) { DLG.close(); } } catch (e) { }
-            try { DLG.remove(); } catch (e) { }
+            try { document.removeEventListener("keydown", _onKey, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (DLG.open) { DLG.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { DLG.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 취소/닫기 — 원본: __dropEffect 초기화 + (cancelFunc 있으면 호출, 없으면 BUSY_OFF+001 토스트).
         function _cancel() {
@@ -597,7 +597,7 @@
             } else {
                 _bindBusy("BUSY_OFF");
                 oAPP.fn.setShortcutLock(false);
-                try { parent.setBusy(""); } catch (e) { }
+                try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 // 001 Cancel operation
                 _toast("I", _msg("/U4A/MSG_WS", "001"));
             }
@@ -618,7 +618,7 @@
         DLG.addEventListener("cancel", function (e) { e.preventDefault(); _cancel(); });
         document.addEventListener("keydown", _onKey, true);
 
-        try { DLG.showModal(); } catch (e) { try { DLG.show(); } catch (e2) { } }
+        try { DLG.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } try { DLG.show(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } }
         // 공통 다이얼로그 드래그/리센터(헤더 핸들).
         _safe(function () { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(DLG, oHeader); } });
         // 드롭 위치에 팝업 표시(원본 편의성 — 드롭한 자리에서 aggregation 선택). 좌표 없으면 중앙 유지.
@@ -633,7 +633,7 @@
             DLG.style.top = Math.round(top) + "px";
         });
         // 팝업 떴으니 busy 해제(원본 afterOpen: parent.setBusy("")).
-        try { parent.setBusy(""); } catch (e) { }
+        try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oAPP.fn.setShortcutLock(false);
     }
 
@@ -929,7 +929,7 @@
         function lf_setChildDone() {
             _bindBusy("BUSY_OFF");
             _safe(function () { oAPP.fn.setShortcutLock(false); });
-            try { parent.setBusy(""); } catch (e) { }
+            try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oAPP.fn.designDragEnd();
         }
         async function lf_setChild(is_0023) {
@@ -955,7 +955,7 @@
      * ==================================================================== */
     oAPP.fn.applyP13nPatternDrop = function (lt_dragInfo, i_OBJID, i_dropPosition) {
 
-        function _exit() { _bindBusy("BUSY_OFF"); _safe(function () { oAPP.fn.setShortcutLock(false); }); try { parent.setBusy(""); } catch (e) { } }
+        function _exit() { _bindBusy("BUSY_OFF"); _safe(function () { oAPP.fn.setShortcutLock(false); }); try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // 편집 불가면 무시(디자인 추가 불가).
         if (!_isEdit()) { _exit(); return; }
@@ -976,7 +976,7 @@
         if (!l_path || parent.FS.existsSync(l_path) !== true) { _toast("E", _wsc("017")); _exit(); return; }  // 017 저장 파일 없음.
 
         var ls_item;
-        try { ls_item = JSON.parse(parent.FS.readFileSync(l_path, "utf-8")); } catch (e) { _toast("E", e && e.message ? e.message : e); _exit(); return; }
+        try { ls_item = JSON.parse(parent.FS.readFileSync(l_path, "utf-8")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _toast("E", e && e.message ? e.message : e); _exit(); return; }
         if (!ls_item || !ls_item.is_tree) { _exit(); return; }
 
         // drop 대상 UI.
@@ -1099,7 +1099,7 @@
         if (aAlias.length === 0) { return Promise.resolve(); }   // 수집 alias 없으면 서버조회 생략.
 
         return new Promise(function (resolve) {
-            var fd; try { fd = new FormData(); fd.append("ALIAS", JSON.stringify(aAlias)); } catch (e) { resolve(); return; }
+            var fd; try { fd = new FormData(); fd.append("ALIAS", JSON.stringify(aAlias)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } resolve(); return; }
             sendAjax(oAPP.attr.servNm + "/getOTRTextsAlias", fd, function (oRet) {
                 if (oRet && oRet.RETCD === "E") { _toast("W", oRet.RTMSG); }
                 if (oRet && typeof oRet.T_OTR !== "undefined") { oAPP.DATA.APPDATA.T_OTR = oRet.T_OTR; }   // 원본 6213 동일(대체).
@@ -1134,7 +1134,7 @@
         //   없으면 대상 zTREE 끝. 사용 후 원본처럼 제거.
         var _dropIndex = (is_target.dropLineInfo && typeof is_target.dropLineInfo.dropIndex === "number")
             ? is_target.dropLineInfo.dropIndex : is_target.zTREE.length;
-        try { delete is_target.dropLineInfo; } catch (e) { }
+        try { delete is_target.dropLineInfo; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 속성 복사 — 파일 박제 _T_0015 사용(원본 lf_copyAttrData, bKeep=false: 바인딩/서버이벤트값 제외).
         function _copyAttr(is_14, is_copied, i_aggr) {
@@ -1241,7 +1241,7 @@
         }
 
         // 파일 원본 보호 위해 1회 클론(치환이 _CEVT 등 in-place 발생).
-        var oPattern; try { oPattern = JSON.parse(JSON.stringify(is_pattern)); } catch (e) { oPattern = is_pattern; }
+        var oPattern; try { oPattern = JSON.parse(JSON.stringify(is_pattern)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oPattern = is_pattern; }
 
         var ls_top = _rebuild(oPattern, is_target, aggrParam);
 
@@ -1281,7 +1281,7 @@
         var l_effect = _dnd.effect;
         _dnd.effect = "";
 
-        function _exit() { _bindBusy("BUSY_OFF"); oAPP.fn.setShortcutLock(false); try { parent.setBusy(""); } catch (e) { } }
+        function _exit() { _bindBusy("BUSY_OFF"); oAPP.fn.setShortcutLock(false); try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // ── CASE A : 같은 부모/같은 aggregation 순서변경 (param undefined) ──
         if (typeof param === "undefined" && i_drag.POBID === i_drop.POBID && i_drag.UIATK === i_drop.UIATK) {
@@ -1669,7 +1669,7 @@
         if (oPromise) {
             try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[HTML5][WS20][dnd] rerender", e); }
         }
-        try { await Promise.all(aRte); } catch (e) { }
+        try { await Promise.all(aRte); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
 
@@ -1719,13 +1719,13 @@
             var oNode = oAPP.fn.getTreeData(sObjid);
             if (!oNode) { ev.preventDefault(); return; }
 
-            try { ev.dataTransfer.effectAllowed = "copyMove"; } catch (e) { }
+            try { ev.dataTransfer.effectAllowed = "copyMove"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             // rtmcls(런타임 클래스 네비) — 라이브러리명.
             _safe(function () {
                 var ls_0022 = oAPP.DATA.LIB.T_0022.find(function (a) { return a.UIOBK === oNode.UIOBK; });
                 if (ls_0022) { ev.dataTransfer.setData("rtmcls", ls_0022.LIBNM); }
             });
-            try { ev.dataTransfer.setData("text/plain", "designTree|" + oNode.OBJID + "|" + oAPP.attr.DnDRandKey); } catch (e) { }
+            try { ev.dataTransfer.setData("text/plain", "designTree|" + oNode.OBJID + "|" + oAPP.attr.DnDRandKey); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 바인딩 팝업(별창) 가운데 디자인 트리로 drop 시 소비할 prc002 데이터(원본 setDragAppData 1:1).
             _safe(function () { _setDragBindPopupData(oNode, ev); });
@@ -1740,7 +1740,7 @@
             if (!oRow) { return; }
             ev.preventDefault();           // drop 허용.
             _dnd.effect = ev.ctrlKey ? "Copy" : "Move";
-            try { ev.dataTransfer.dropEffect = ev.ctrlKey ? "copy" : "move"; } catch (e) { }
+            try { ev.dataTransfer.dropEffect = ev.ctrlKey ? "copy" : "move"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             var sObjid = oRow.getAttribute("data-objid");
             var sPos = _calcDropPos(oRow, ev.clientY);
@@ -1774,7 +1774,7 @@
             if (!_isEdit()) { oAPP.fn.designDragEnd(); return; }
 
             // 드롭 처리(원본 attachDrop 흐름).
-            try { parent.setBusy("X"); } catch (e) { }
+            try { parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oAPP.fn.setShortcutLock(true);
 
             var oSynth = { mParameters: { dropPosition: sPos, browserEvent: { dataTransfer: ev.dataTransfer } } };
@@ -1786,7 +1786,7 @@
             // 미처리 → 정리.
             _bindBusy("BUSY_OFF");
             oAPP.fn.setShortcutLock(false);
-            try { parent.setBusy(""); } catch (e) { }
+            try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oAPP.fn.designDragEnd();
         }, false);
 

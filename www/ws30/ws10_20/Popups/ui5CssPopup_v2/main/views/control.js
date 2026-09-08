@@ -376,6 +376,7 @@ export async function getControl() {
             var aSavedCssList = JSON.parse(sSavedCssList);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             // JSON PARSE 오류
             oRES.ERRCD = "E01";
@@ -740,6 +741,7 @@ export async function getControl() {
                 }
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }          
 
@@ -935,6 +937,7 @@ export async function getControl() {
                 CURRWIN.focus();    
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 
             }
             
@@ -1084,6 +1087,7 @@ export async function getControl() {
                 CURRWIN.focus();    
                 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 
             }
 
@@ -1151,6 +1155,7 @@ export async function getControl() {
             var aSavedList = JSON.parse(sSavedList);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             aSavedList = [];
         }
 
@@ -1723,9 +1728,10 @@ export async function getControl() {
             try {
                 // ★ frameless 자식창(openNewBrowserMenu)은 closable:false 라 close() 가 무시됨.
                 //   공통 closeWindow 와 동일하게 닫기 전에 setClosable(true) 로 허용해야 실제로 닫힌다.
-                try { oChild.setClosable(true); } catch (e) { }
+                try { oChild.setClosable(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oChild.close();
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             }
 
@@ -1808,6 +1814,7 @@ export async function getControl() {
                 }          
                 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
             

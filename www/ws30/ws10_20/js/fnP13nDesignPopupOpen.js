@@ -59,29 +59,29 @@
     // /U4A/CL_WS_COMMON 메시지.
     function _cl(sCode, p1, p2, p3, p4) {
         try { return APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     // /U4A/MSG_WS 메시지.
     function _mw(sCode, p1, p2, p3, p4) {
         try { return APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     // ZMSG_WS_COMMON_001 (언어 라우팅 — 원본 parent.WSUTIL.getWsMsgClsTxt).
     function _zc(sCode, p1, p2, p3) {
         try {
             var lang = "";
-            try { lang = (oAPP.oDesign && oAPP.oDesign.settings && oAPP.oDesign.settings.GLANGU) || ""; } catch (e) { }
+            try { lang = (oAPP.oDesign && oAPP.oDesign.settings && oAPP.oDesign.settings.GLANGU) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return parent.WSUTIL.getWsMsgClsTxt(lang, "ZMSG_WS_COMMON_001", sCode, p1 || "", p2 || "", p3 || "");
-        } catch (e) { return ""; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     // 메시지 팝업(원본 parent.showMessage).
     function _msg(iKind, sType, sMsg, fnCb) {
         try { parent.showMessage(window.sap || null, iKind, sType, sMsg, fnCb); }
         catch (e) { console.warn("[HTML5][WS20][p13n] showMessage 실패:", e && e.message); }
     }
-    function _busy(bOn) { try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { } }
-    function _unlock() { try { oAPP.fn.setShortcutLock(false); } catch (e) { } }
-    function _lock() { try { oAPP.fn.setShortcutLock(true); } catch (e) { } }
+    function _busy(bOn) { try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+    function _unlock() { try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+    function _lock() { try { oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     function _esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
 
     // aggregation cardinality 아이콘: sap-icon:// → FontAwesome 클래스(원본/WS20 트리와 동일).
@@ -110,7 +110,7 @@
         };
     }
 
-    function _sysid() { try { return parent.getUserInfo().SYSID; } catch (e) { return ""; } }
+    function _sysid() { try { return parent.getUserInfo().SYSID; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; } }
 
     // 개인화 폴더/헤더 파일 경로(userData 기준).
     function _userP13nPath() { return parent.PATH.join(parent.REMOTE.app.getPath("userData"), C_P13N, C_FOLDER); }
@@ -129,11 +129,11 @@
     function lf_setInitData(sMode) {
         oS.mode = sMode;
 
-        try { oS.lockFile = parent.require("proper-lockfile"); } catch (e) { oS.lockFile = null; }
+        try { oS.lockFile = parent.require("proper-lockfile"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oS.lockFile = null; }
 
         // bootstrap url(미리보기용) — UI5 전용 헬퍼(HTML5 미로드일 수 있음).
         oS.bootPath = "";
-        try { if (typeof oAPP.fn.getBootStrapUrl === "function") { oS.bootPath = oAPP.fn.getBootStrapUrl() || ""; } } catch (e) { }
+        try { if (typeof oAPP.fn.getBootStrapUrl === "function") { oS.bootPath = oAPP.fn.getBootStrapUrl() || ""; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // default 테마 — ROOT 의 DH001021(theme) 프로퍼티 → 없으면 공통코드 UA007 기본.
         oS.theme = "";
@@ -143,13 +143,13 @@
                 var l = aRoot15.find(function (a) { return a.UIATK === "DH001021"; });
                 if (l) { oS.theme = l.UIATV || ""; }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var aUA007 = [];
-        try { aUA007 = (oAPP.attr.S_CODE && oAPP.attr.S_CODE.UA007) || []; } catch (e) { aUA007 = []; }
+        try { aUA007 = (oAPP.attr.S_CODE && oAPP.attr.S_CODE.UA007) || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } aUA007 = []; }
 
         var bWLO = false;
-        try { bWLO = (typeof oAPP.common.checkWLOList === "function") && oAPP.common.checkWLOList("C", "UHAK900889") === true; } catch (e) { bWLO = false; }
+        try { bWLO = (typeof oAPP.common.checkWLOList === "function") && oAPP.common.checkWLOList("C", "UHAK900889") === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bWLO = false; }
 
         if (oS.theme === "") {
             var lsDef = aUA007.find(function (i) { return i.FLD02 === "X"; });
@@ -172,6 +172,7 @@
             var l3 = _userHeaderPath();
             if (!parent.FS.existsSync(l3)) { parent.FS.writeFileSync(l3, JSON.stringify([])); }
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _msg(10, "E", e && e.message ? e.message : e);
             return true;
         }
@@ -183,7 +184,7 @@
         var l_path = _lockHeaderPath();
 
         if (bUnlock) {
-            if (oS.lock) { try { oS.lockFile.unlockSync(l_path); } catch (e) { } }
+            if (oS.lock) { try { oS.lockFile.unlockSync(l_path); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             return;
         }
         if (oS.lock) { return; }
@@ -193,11 +194,11 @@
                 _msg(10, "S", _mw("382"));
                 return;
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try {
             oS.lockFile.lockSync(l_path);
             oS.lock = true;
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
 
@@ -212,15 +213,15 @@
         if (parent.FS.existsSync(l_path) !== true) { _msg(10, "I", l_notExist); return []; }
 
         var l_file;
-        try { l_file = parent.FS.readFileSync(l_path, "utf-8"); } catch (e) { l_file = ""; }
+        try { l_file = parent.FS.readFileSync(l_path, "utf-8"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } l_file = ""; }
         if (!l_file) { _msg(10, "I", l_notExist); return []; }
 
         var lt_head;
-        try { lt_head = JSON.parse(l_file); } catch (e) { lt_head = []; }
+        try { lt_head = JSON.parse(l_file); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } lt_head = []; }
 
         // 세팅정보(라이브러리 버전).
         var ls_setting = {};
-        try { ls_setting = parent.WSUTIL.getWsSettingsInfo() || {}; } catch (e) { ls_setting = {}; }
+        try { ls_setting = parent.WSUTIL.getWsSettingsInfo() || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } ls_setting = {}; }
         var sVer = (ls_setting.UI5 && ls_setting.UI5.version) || "";
 
         // 현재 화면 lock 획득 시도(리스트 진입 시 편집 가능하게).
@@ -253,9 +254,9 @@
             return null;
         }
         var l_file;
-        try { l_file = parent.FS.readFileSync(l_path, "utf-8"); } catch (e) { l_file = ""; }
+        try { l_file = parent.FS.readFileSync(l_path, "utf-8"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } l_file = ""; }
         if (!l_file) { _msg(10, "E", _mw("018")); return null; }
-        try { return JSON.parse(l_file); } catch (e) { return null; }
+        try { return JSON.parse(l_file); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
     }
 
     // 랜덤 파일명 구성(중복 회피 — 원본 lf_getFileName).
@@ -294,7 +295,7 @@
                     l_tempCSS = l_dom.style.cssText;
                     l_dom.style.cssText = "width:100%; height:100%;";
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             oS.HTML = new XMLSerializer().serializeToString(l_dom);
 
@@ -312,7 +313,7 @@
         // UICON = 파일명만(확장자 제거).
         try {
             ls_0014.UICON = parent.PATH.basename(is_tree.UICON || "").replace(".gif", "");
-        } catch (e) { ls_0014.UICON = ""; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } ls_0014.UICON = ""; }
 
         ls_0014.UIATT_ICON = is_tree.UIATT_ICON;
 
@@ -320,7 +321,7 @@
         try {
             var l_desc = (typeof oAPP.fn.getDesc === "function") ? oAPP.fn.getDesc(is_tree.OBJID) : "";
             if (l_desc !== "" && l_desc != null) { ls_0014._DESC = l_desc; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         ls_0014.zTREE = [];
 
@@ -328,14 +329,14 @@
         try {
             var ls_0022 = oAPP.DATA.LIB.T_0022.find(function (a) { return a.UIOBK === ls_0014.UIOBK; });
             if (ls_0022) { ls_0014.UILIB = ls_0022.LIBNM; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 바인딩/이벤트 항목 제외한 프로퍼티만.
         try {
             var oPrev = oAPP.attr.prev && oAPP.attr.prev[is_tree.OBJID];
             var a15 = (oPrev && oPrev._T_0015) || [];
             ls_0014._T_0015 = a15.filter(function (a) { return a.ISBND !== "X" && a.UIATY !== "2"; });
-        } catch (e) { ls_0014._T_0015 = []; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } ls_0014._T_0015 = []; }
 
         // CLIENT EVENT(UI5 전용 헬퍼 — 가드).
         try {
@@ -345,7 +346,7 @@
                     ls_0014._CEVT = lt_CEVT.filter(function (a) { return a.OBJTY !== "JS"; });
                 }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var aCh = is_tree.zTREE || [];
         for (var i = 0; i < aCh.length; i++) { ls_0014.zTREE.push(lf_collectSaveData(aCh[i])); }
@@ -365,6 +366,7 @@
         try {
             parent.FS.writeFileSync(_userItemPath(is_head.fileName), JSON.stringify(ls_item));
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _msg(10, "E", e && e.message ? e.message : e);
         }
     }
@@ -374,14 +376,14 @@
 
         var l_folder = _userSysPath();
         if (!parent.FS.existsSync(l_folder)) {
-            try { parent.FS.mkdirSync(l_folder); } catch (e) { _msg(10, "E", e && e.message ? e.message : e); _busy(false); return; }
+            try { parent.FS.mkdirSync(l_folder); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _msg(10, "E", e && e.message ? e.message : e); _busy(false); return; }
         }
 
         var l_filePath = _userHeaderPath();
         var lt_head = [];
         if (parent.FS.existsSync(l_filePath)) {
-            try { lt_head = JSON.parse(parent.FS.readFileSync(l_filePath, "utf-8")); } catch (e) { lt_head = []; }
-            try { parent.FS.unlinkSync(l_filePath); } catch (e) { _msg(10, "E", e && e.message ? e.message : e); _busy(false); return; }
+            try { lt_head = JSON.parse(parent.FS.readFileSync(l_filePath, "utf-8")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } lt_head = []; }
+            try { parent.FS.unlinkSync(l_filePath); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _msg(10, "E", e && e.message ? e.message : e); _busy(false); return; }
         }
 
         var ls_head = {};
@@ -397,7 +399,7 @@
             ls_head.bootPath = oS.bootPath;
 
             var ls_setting = {};
-            try { ls_setting = parent.WSUTIL.getWsSettingsInfo() || {}; } catch (e) { }
+            try { ls_setting = parent.WSUTIL.getWsSettingsInfo() || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             ls_head.LibraryVersion = (ls_setting.UI5 && ls_setting.UI5.version) || "";
 
             lt_head.splice(0, 0, ls_head);
@@ -418,6 +420,7 @@
         try {
             parent.FS.writeFileSync(l_filePath, JSON.stringify(lt_head));
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             _msg(20, "E", e && e.message ? e.message : e); _busy(false); return;
         }
 
@@ -444,25 +447,25 @@
 
                 var l_folder = _userSysPath();
                 if (!parent.FS.existsSync(l_folder)) {
-                    try { parent.FS.mkdirSync(l_folder); } catch (e) { _msg(10, "E", e && e.message ? e.message : e); _busy(false); return; }
+                    try { parent.FS.mkdirSync(l_folder); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _msg(10, "E", e && e.message ? e.message : e); _busy(false); return; }
                 }
 
                 var l_filePath = _userHeaderPath();
                 var lt_head = [];
                 if (parent.FS.existsSync(l_filePath)) {
-                    try { lt_head = JSON.parse(parent.FS.readFileSync(l_filePath, "utf-8")); } catch (e) { lt_head = []; }
-                    try { parent.FS.unlinkSync(l_filePath); } catch (e) { _msg(10, "E", e && e.message ? e.message : e); _busy(false); return; }
+                    try { lt_head = JSON.parse(parent.FS.readFileSync(l_filePath, "utf-8")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } lt_head = []; }
+                    try { parent.FS.unlinkSync(l_filePath); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _msg(10, "E", e && e.message ? e.message : e); _busy(false); return; }
                 }
 
                 var l_indx = lt_head.findIndex(function (a) { return a.fileName === sFileName; });
                 if (l_indx !== -1) {
-                    try { parent.FS.unlinkSync(_userItemPath(sFileName)); } catch (e) { }
+                    try { parent.FS.unlinkSync(_userItemPath(sFileName)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     lt_head.splice(l_indx, 1);
                 }
 
                 try {
                     parent.FS.writeFileSync(l_filePath, JSON.stringify(lt_head));
-                } catch (e) { _msg(20, "E", e && e.message ? e.message : e); _busy(false); return; }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _msg(20, "E", e && e.message ? e.message : e); _busy(false); return; }
 
                 oS.mode = "R";
                 oS.HTML = "";
@@ -498,7 +501,7 @@
         if (!l_frame || !l_frame.contentDocument) { return; }
 
         // extension 아이콘 등록(가드 — contentWindow UI5 준비된 경우만).
-        try { lf_setPrevExtIcon(l_frame.contentWindow); } catch (e) { }
+        try { lf_setPrevExtIcon(l_frame.contentWindow); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var l_prev = l_frame.contentDocument.getElementById("prev");
         if (!l_prev) {
@@ -549,10 +552,10 @@
         }
 
         var l_info;
-        try { l_info = parent.getUserInfo(); } catch (e) { l_info = {}; }
+        try { l_info = parent.getUserInfo(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } l_info = {}; }
 
         var sHost = "";
-        try { sHost = parent.getHost(); } catch (e) { }
+        try { sHost = parent.getHost(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oForm = document.createElement("form");
         oForm.setAttribute("id", "u4aP13nPrvForm");
@@ -566,14 +569,14 @@
         lf_setParam(oForm, "sap-user", l_info.ID);
         lf_setParam(oForm, "sap-password", l_info.PW);
         lf_setParam(oForm, "LIBPATH", oS.bootPath);
-        try { lf_setParam(oForm, "LIBRARY", oAPP.fn.getUi5Libraries(true)); } catch (e) { lf_setParam(oForm, "LIBRARY", ""); }
+        try { lf_setParam(oForm, "LIBRARY", oAPP.fn.getUi5Libraries(true)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } lf_setParam(oForm, "LIBRARY", ""); }
         lf_setParam(oForm, "THEME", oS.theme);
         lf_setParam(oForm, "LANGU", l_info.LANGU);
         lf_setParam(oForm, "CALLBACKFUNC", "parent.oAPP.fn.P13nPrevLoaded();");
 
         document.body.appendChild(oForm);
         oForm.submit();
-        setTimeout(function () { try { document.body.removeChild(oForm); } catch (e) { } }, 0);
+        setTimeout(function () { try { document.body.removeChild(oForm); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
     }
 
     // 부트 헬퍼 부재 시 미리보기 영역 안내(HTML5 degrade).
@@ -598,7 +601,7 @@
     oAPP.fn.P13nChangeTheme = function (sTheme) {
         var l_frame = document.getElementById(oS.frameID);
         if (!l_frame || !l_frame.contentWindow || !l_frame.contentWindow.sap) { return; }
-        try { l_frame.contentWindow.sap.ui.getCore().applyTheme(sTheme); } catch (e) { }
+        try { l_frame.contentWindow.sap.ui.getCore().applyTheme(sTheme); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
 
@@ -686,7 +689,7 @@
         //   px 고정된 패널만 손댐(%/flex 패널은 CSS 가 알아서 줄어듦). 클램프는 초과 시 1회 축소라 RO 루프 없음.
         window.removeEventListener("resize", lf_clampSplit);
         window.addEventListener("resize", lf_clampSplit);
-        try { oUI.ro = new ResizeObserver(function () { lf_clampSplit(); }); oUI.ro.observe(oBody); } catch (e) { }
+        try { oUI.ro = new ResizeObserver(function () { lf_clampSplit(); }); oUI.ro.observe(oBody); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 헤더 더블클릭 = 가운데 복귀. ★공통 makeDialogRecenter 는 인라인 위치를 비워 CSS 기본
         //   (position:fixed; inset:0; margin:auto = 뷰포트 전체 중앙)으로 되돌리는데, 이 팝업은 부모 창
@@ -875,7 +878,7 @@
                 // 초기 reflow — 폭 확정 후 측정(ws10 헤더와 동일 재시도 패턴).
                 if (oUI.prevOvf && typeof requestAnimationFrame === "function") {
                     (function _tryReflow(n) {
-                        if (oPTool.clientWidth > 0) { try { oUI.prevOvf.reflow(); } catch (e) { } return; }
+                        if (oPTool.clientWidth > 0) { try { oUI.prevOvf.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
                         if (n > 0) { requestAnimationFrame(function () { _tryReflow(n - 1); }); }
                     })(30);
                 }
@@ -947,7 +950,7 @@
         try {
             var v = parseFloat(getComputedStyle(oEl).minWidth);
             if (isFinite(v) && v > 0) { return v; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return 120;
     }
 
@@ -976,7 +979,7 @@
                     document.body.classList.remove("u4a-dragging");
                     if (oUI.dlg) { oUI.dlg.classList.remove("u4aP13nResizing"); }
                     // 미리보기 패널 폭이 바뀌었으니 툴바 오버플로(⋯) 재측정.
-                    try { if (oUI.prevOvf) { oUI.prevOvf.reflow(); } } catch (e) { }
+                    try { if (oUI.prevOvf) { oUI.prevOvf.reflow(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 }
             });
         }
@@ -1028,7 +1031,7 @@
             }
         }
         // 미리보기 툴바 오버플로(⋯) 재측정 — 패널 폭 변동 반영.
-        try { if (oUI.prevOvf) { oUI.prevOvf.reflow(); } } catch (e) { }
+        try { if (oUI.prevOvf) { oUI.prevOvf.reflow(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 다이얼로그 상단 경계 = 창 타이틀바(.u4a-titlebar) 하단 y.
@@ -1040,7 +1043,7 @@
                 var r = el.getBoundingClientRect();
                 if (r.height > 0 && r.top < window.innerHeight * 0.5) { return Math.max(0, r.bottom); }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return 0;
     }
 
@@ -1065,7 +1068,7 @@
         if (!oS.fullSize) { return; }
         oS.fullSize = false;
         if (oUI && oUI.btnFull) { oUI.btnFull.innerHTML = _fa("expand"); }
-        try { window.removeEventListener("resize", lf_onWinResizeFull); } catch (e) { }
+        try { window.removeEventListener("resize", lf_onWinResizeFull); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // ★크기·위치를 "현재 실제 픽셀"로 박제 + 화면에 붙이던 규칙(inset 오른쪽·아래)·최대치 제한 해제.
         //   전체창의 상대단위(100vw)·inset:0 이 남아 리사이즈 시 위치·크기가 재계산되며 확 튀는 것을 막는다.
         if (oUI && oUI.dlg) {
@@ -1084,7 +1087,7 @@
     // 창 리사이즈 추종 — 최대화 상태면 새 창 크기로 다시 채운다(px 고정이 안 따라오는 문제 해결).
     function lf_onWinResizeFull() {
         if (oS.fullSize && oUI && oUI.dlg && oUI.dlg.open) { lf_applyMaxSize(); }
-        else { try { window.removeEventListener("resize", lf_onWinResizeFull); } catch (e) { } }
+        else { try { window.removeEventListener("resize", lf_onWinResizeFull); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     }
 
     // 전체화면 토글(원본 lf_setPopupResize) — 타이틀바 하단부터 뷰포트 끝까지(헤더 미침범 + 창 추종).
@@ -1236,7 +1239,7 @@
                 return;
             }
             // drop 가능 제어(원본 designTreeDragStart).
-            try { oAPP.fn.designTreeDragStart({ OBJID: undefined, UIOBK: is_head.UIOBK }); } catch (e) { }
+            try { oAPP.fn.designTreeDragStart({ OBJID: undefined, UIOBK: is_head.UIOBK }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             ev.dataTransfer.setData("rtmcls", is_head.UILIB || "");
             ev.dataTransfer.setData("text/plain", "P13nUIData|" + is_head.fileName + "|" + (oAPP.attr.DnDRandKey || ""));
@@ -1258,7 +1261,7 @@
     // 드래그 종료 — 디자인영역 드래그 종료(잔상/드롭가능표시 정리) + 모달 복귀.
     function lf_rowDragEnd() {
         _setModalLook(true);   // 놓으면 다시 모달 — 원본 setModal(true) 대응.
-        try { oAPP.fn.designDragEnd(); } catch (e) { }
+        try { oAPP.fn.designDragEnd(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
 
@@ -1364,7 +1367,7 @@
         var ls_item = lf_getItemData(is_head);
         if (!ls_item) { _busy(false); return; }
 
-        try { if (typeof oAPP.fn.setTreeUiIcon === "function") { oAPP.fn.setTreeUiIcon(ls_item.is_tree); } } catch (e) { }
+        try { if (typeof oAPP.fn.setTreeUiIcon === "function") { oAPP.fn.setTreeUiIcon(ls_item.is_tree); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         oS.zTREE = [ls_item.is_tree];
         oS.HTML = ls_item.HTML || "";
@@ -1380,7 +1383,7 @@
         var ls_item = lf_getItemData(is_head);
         if (!ls_item) { _busy(false); return; }
 
-        try { if (typeof oAPP.fn.setTreeUiIcon === "function") { oAPP.fn.setTreeUiIcon(ls_item.is_tree); } } catch (e) { }
+        try { if (typeof oAPP.fn.setTreeUiIcon === "function") { oAPP.fn.setTreeUiIcon(ls_item.is_tree); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         oS.mode = "C";
         oS.HTML = ls_item.HTML || "";
@@ -1446,13 +1449,13 @@
      * ==================================================================== */
 
     function lf_close() {
-        try { window.removeEventListener("resize", lf_onWinResizeFull); } catch (e) { }
-        try { window.removeEventListener("resize", lf_clampSplit); } catch (e) { }
-        try { if (oUI && oUI.ro) { oUI.ro.disconnect(); oUI.ro = null; } } catch (e) { }
+        try { window.removeEventListener("resize", lf_onWinResizeFull); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { window.removeEventListener("resize", lf_clampSplit); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (oUI && oUI.ro) { oUI.ro.disconnect(); oUI.ro = null; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oS.fullSize = false;
-        try { if (oUI && oUI.onEsc) { document.removeEventListener("keydown", oUI.onEsc, true); oUI.onEsc = null; } } catch (e) { }
-        try { if (oUI && oUI.backdrop) { oUI.backdrop.remove(); oUI.backdrop = null; } } catch (e) { }
-        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+        try { if (oUI && oUI.onEsc) { document.removeEventListener("keydown", oUI.onEsc, true); oUI.onEsc = null; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (oUI && oUI.backdrop) { oUI.backdrop.remove(); oUI.backdrop = null; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 닫기(취소) — 원본 lf_close("001") + 파일 unlock + 잠금해제.
@@ -1540,8 +1543,8 @@
             oUI.backdrop = document.createElement("div");
             oUI.backdrop.className = "u4aP13nBackdrop";
             document.body.appendChild(oUI.backdrop);
-        } catch (e) { }
-        try { oUI.dlg.show(); } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oUI.dlg.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // afterOpen 처리.
         lf_afterOpen();
@@ -1577,16 +1580,16 @@
                 _busy(false);
                 return;
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 호출 노드 OBJID — 전달 노드 우선, 없으면 /lcmenu/OBJID(UI5 경로).
         var l_OBJID = (is_node && is_node.OBJID) ? is_node.OBJID : "";
-        if (!l_OBJID) { try { l_OBJID = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { } }
+        if (!l_OBJID) { try { l_OBJID = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         if (!l_OBJID || l_OBJID === "ROOT") { _unlock(); _busy(false); return; }
 
         // 최신/완전한 트리 노드 확보(getTreeData 우선, 실패 시 전달 노드).
         var ls_tree = null;
-        try { ls_tree = oAPP.fn.getTreeData(l_OBJID); } catch (e) { }
+        try { ls_tree = oAPP.fn.getTreeData(l_OBJID); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (!ls_tree) { ls_tree = is_node || null; }
         if (!ls_tree) { _unlock(); _busy(false); return; }
 
@@ -1603,7 +1606,7 @@
             if (!parent.FS.existsSync(l2)) { parent.FS.mkdirSync(l2); }
             var l3 = _userHeaderPath();
             if (!parent.FS.existsSync(l3)) { parent.FS.writeFileSync(l3, JSON.stringify([])); }
-        } catch (e) { _msg(10, "E", e && e.message ? e.message : e); return true; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _msg(10, "E", e && e.message ? e.message : e); return true; }
     }
 
 

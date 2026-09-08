@@ -239,7 +239,7 @@ function createRecorder() {
       _s.stream.getTracks().forEach(t => t.stop());
       _cleanupAudio();
       if (_s.lockFd !== null) {
-        try { fs.closeSync(_s.lockFd); } catch {}
+        try { fs.closeSync(_s.lockFd); } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }}
         _s.lockFd = null;
       }
       _requestEnd();
@@ -255,7 +255,7 @@ function createRecorder() {
     // 파일 잠금 (Best-Effort, 500ms 후 시도)
     setTimeout(() => {
       if (_s.status === 'recording' || _s.status === 'paused') {
-        try { _s.lockFd = fs.openSync(outputPath, 'r'); } catch {}
+        try { _s.lockFd = fs.openSync(outputPath, 'r'); } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }}
       }
     }, 500);
   }
@@ -275,7 +275,7 @@ function createRecorder() {
 
       _s.writeStream.once('finish', () => {
         const fileSize = (() => {
-          try { return fs.statSync(_s.outputPath).size; } catch { return 0; }
+          try { return fs.statSync(_s.outputPath).size; } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); } return 0; }
         })();
         resolve({ filePath: _s.outputPath, duration, fileSize });
       });
@@ -337,6 +337,7 @@ function createRecorder() {
       _s.audioEnabled = true;
       return { ok: true };
     } catch (err) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
       return { ok: false, reason: err.message };
     }
   }

@@ -1092,7 +1092,7 @@
             try { oAPP.main.fnOnInitModelBinding(); } catch (e) { console.warn("[HTML5] fnOnInitModelBinding skip:", e && e.message); }
 
             // 초기 현재 화면 위치 정보 저장
-            try { parent.setCurrPage("WS10"); } catch (e) { }
+            try { parent.setCurrPage("WS10"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // [UI5 제거] parent.oWS.utill.attr.sap = sap; 제거 (sap 없음).
 
@@ -1112,9 +1112,9 @@
             try { _attachCurrentWindowEvents(); } catch (e) { console.warn("[HTML5] _attachCurrentWindowEvents skip:", e && e.message); }
 
             // [UI5 무력화] illustration/SAP/U4A 아이콘 등록은 UI5 전용 → sap 참조 시 크래시. 가드.
-            try { if (oAPP.fn.fnRegisterIllustrationPool) oAPP.fn.fnRegisterIllustrationPool(); } catch (e) { }
-            try { if (oAPP.fn.fnRegisterSAPIcons) oAPP.fn.fnRegisterSAPIcons(); } catch (e) { }
-            try { if (oAPP.fn.fnRegisterU4AIcons) oAPP.fn.fnRegisterU4AIcons(); } catch (e) { }
+            try { if (oAPP.fn.fnRegisterIllustrationPool) oAPP.fn.fnRegisterIllustrationPool(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oAPP.fn.fnRegisterSAPIcons) oAPP.fn.fnRegisterSAPIcons(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oAPP.fn.fnRegisterU4AIcons) oAPP.fn.fnRegisterU4AIcons(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // // 초기 현재 화면 위치 정보 저장
             // parent.setCurrPage("WS10");
@@ -1177,7 +1177,7 @@
                 parent.oWS.utill.attr.UIUpdated = "X";
 
                 // WS 10번 화면 관련 AI 커스텀 이벤트 등록
-                try { if (parent.UAI && parent.UAI.setCustomEvent_WS_10) parent.UAI.setCustomEvent_WS_10(); } catch (e) { }
+                try { if (parent.UAI && parent.UAI.setCustomEvent_WS_10) parent.UAI.setCustomEvent_WS_10(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 // 시스템 공지사항이 있을 경우 화면에 출력
                 try {
@@ -1192,7 +1192,7 @@
                          * ──────────────────────────────────────────────────────────────── */
                         await oAPP.common.showSystemNotiMsg();
                     }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 // 새창 띄우면서 IF_DATA에 파라미터가 존재할 경우
                 let oNewWin_IF_DATA = parent.getNewBrowserIF_DATA && parent.getNewBrowserIF_DATA();
@@ -1241,7 +1241,7 @@
                             browserKey: parent.getBrowserKey()
                         });
                         zconsole.log("IPC_HANDLER.command - WS_MAIN_UI_UPDATED!");
-                    } catch (e) { }
+                    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                     jQuery('#content').fadeIn({
                         duration: 300,

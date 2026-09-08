@@ -592,7 +592,7 @@
         if (sArtFile) {
             var sRel = "../../svg/" + sArtFile;
             sArtUrl = sRel;
-            try { sArtUrl = new URL(sRel, window.location.href).href; } catch (e) { }
+            try { sArtUrl = new URL(sRel, window.location.href).href; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 스타일 1회 주입(§16 2.3 컨벤션 — 카드/텍스트는 테마 토큰, 백드롭은 옅은 중립).
@@ -650,7 +650,7 @@
                 _applyArt(oExist);
                 oExist.querySelector(".u4aWsSessTitle").textContent = sTitle || "";
                 oExist.querySelector(".u4aWsSessDesc").textContent = sDesc || "";
-                try { oExist.showModal(); } catch (e) { }
+                try { oExist.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
             return;
         }
@@ -658,7 +658,7 @@
         // 확인 버튼 라벨(A40 Confirm, 없으면 OK). 색은 공통 u4a-btn--emphasized(=테마 accent) 소비
         //   — 하드코딩 금지(테마마다 주요색 다름). 확인=주요 액션이라 emphasized 가 규약상 맞다.
         var sOk = "OK";
-        try { sOk = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A40") || "OK"; } catch (e) { }
+        try { sOk = oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A40") || "OK"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oDlg = document.createElement("dialog");
         oDlg.id = sDlgId;
@@ -684,13 +684,13 @@
 
         // 확인 → 닫고 제거(원본 afterClose destroy) 후 콜백.
         oDlg.querySelector(".u4aWsSessOk").addEventListener("click", function () {
-            try { oDlg.close(); } catch (e) { }
-            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             if (typeof fnCallback === "function") { fnCallback(); }
         });
 
         document.body.appendChild(oDlg);
-        try { oDlg.showModal(); } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.fnShowIllustMsgDialog
 
@@ -1178,7 +1178,8 @@
                                         
                                         var oUI = eval(sCode);
 
-                                    } catch (error) {                                        
+                                    } catch (error) {
+                                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }                                        
                                         return;
                                     }
 

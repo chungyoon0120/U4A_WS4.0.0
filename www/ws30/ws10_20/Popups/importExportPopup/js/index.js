@@ -150,6 +150,7 @@ const oAPP = {
                             }
 
                         } catch (e) {
+                            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                             //오류 발생?
 
                             let sMsg = oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "340"); // During Application Import, a server response error occurred.
@@ -244,6 +245,7 @@ const oAPP = {
                 oAPP.fs.statSync(oAPP.FilePath);
                 var IsfileExt = true;
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 var IsfileExt = false;
 
             }
@@ -302,6 +304,7 @@ const oAPP = {
                         }
 
                     } catch (e) {
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
                         if (xhr.getResponseHeader('RETCD') !== "S") {
 

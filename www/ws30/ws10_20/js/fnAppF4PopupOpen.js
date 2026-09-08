@@ -32,21 +32,49 @@
 
     // 코드형 라벨(/U4A/CL_WS_COMMON 등). p1 = &1 치환 파라미터(선택).
     function _txt(sCls, sCode, p1) {
-        try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1); } catch (e) { return sCode; }
+        try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sCode; }
     }
     // ZMSG_WS_COMMON_001 "번호" — 워크스페이스 언어(getUserInfo().LANGU) 기준.
     function _wsTxt(sNo) {
         try {
             var sLangu = (parent.getUserInfo() || {}).LANGU;
             return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sNo);
-        } catch (e) { return sNo; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sNo; }
     }
 
-    function _msg(sType, sText) { try { parent.showMessage(null, 10, sType, sText); } catch (e) { } }
+    function _msg(sType, sText) { try { parent.showMessage(null, 10, sType, sText); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     function _flash() {
-        try { (parent.CURRWIN || parent.REMOTE.getCurrentWindow()).flashFrame(true); } catch (e) { }
+        try { (parent.CURRWIN || parent.REMOTE.getCurrentWindow()).flashFrame(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
-    function _busy(bOn) { try { APPCOMMON.fnSetBusyLock(bOn ? "X" : ""); } catch (e) { } }
+    /* ── busy(대기 표시) ─────────────────────────────────────────────
+     *  ★법칙(장군님 지시 2026-09-09): 어떤 처리든 "시작하자마자" busy 를 켜고,
+     *    준비가 완전히 끝난 "맨 마지막"에 끈다. 처리 중에는 사용자 조작을 막는다.
+     *  겹침(팝업 열기 → 그 안에서 자동검색, 탭 전환 → 계층 조회)이 생기므로 깊이를 센다.
+     *    안쪽 처리가 끝났다고 바깥 처리가 아직인데 busy 가 풀리는 일을 막는다.
+     */
+    var _busyDepth = 0;
+    function _busy(bOn) {
+        try {
+            if (bOn) {
+                _busyDepth++;
+                if (_busyDepth === 1) { APPCOMMON.fnSetBusyLock("X"); }
+                return;
+            }
+            if (_busyDepth <= 0) { return; }
+            _busyDepth--;
+            if (_busyDepth === 0) { APPCOMMON.fnSetBusyLock(""); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    }
+    /* busy 를 팝업 위로 다시 올린다.
+     *  모달 팝업(showModal)과 busy 는 둘 다 브라우저 top-layer 라 z-index 가 아니라
+     *  "showModal 을 부른 순서"로만 위아래가 정해진다. busy 를 켜 둔 채 팝업을 열면
+     *  팝업이 busy 위로 올라가 busy 가 가려지고, 준비가 안 끝났는데 팝업을 만질 수 있게 된다.
+     *  → 팝업을 연 직후 busy 를 껐다 다시 켜서 맨 위로 올린다(켜져 있을 때만). */
+    function _busyRaise() {
+        if (_busyDepth <= 0) { return; }
+        try { APPCOMMON.fnSetBusyLock(""); APPCOMMON.fnSetBusyLock("X"); }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    }
 
     function _isRoot(o) { return !!(o && (o.APPID === "ROOT" || o.PACKG === "ROOT")); }
     // 진짜 최상위 컨테이너(U4A IDE)만 — 필터 시 항상 표시 대상. (PACKG==="ROOT" 인 최상위 패키지들은
@@ -56,6 +84,12 @@
     /* ── 고정 컬럼(가로 스크롤 시 좌측 N개 sticky 고정) — 탭1/트리 공통 헬퍼 ──────────
      *  CSS(.is-frz/.is-frz-last) 는 .u4aAppF4Tbl 스코프로 두 테이블 공유. 고정 개수·left 오프셋만
      *  테이블별로 준다. lefts = 선행 고정컬럼 폭 누적(rem). 액션컬럼 기본폭 4.5rem(=.is-action). */
+    // 지정한 key 컬럼까지(그 컬럼 포함) 좌측 고정할 때의 고정 컬럼 개수. 그 컬럼이 없으면 0(고정 없음).
+    function _frznThru(cols, sKey) {
+        for (var i = 0; i < cols.length; i++) { if (cols[i].key === sKey) { return i + 1; } }
+        return 0;
+    }
+
     function _frzLefts(cols, frzn) {
         var lefts = [], acc = 0;
         for (var i = 0; i < frzn; i++) {
@@ -85,7 +119,7 @@
 
     // 생성/변경 부가 컬럼 표시 여부(원본: checkWLOList("C","UHAK901182"))
     function _showAudit() {
-        try { return !!APPCOMMON.checkWLOList("C", "UHAK901182"); } catch (e) { return false; }
+        try { return !!APPCOMMON.checkWLOList("C", "UHAK901182"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
 
     /* ── 공통 입력 필드 — 공통 팩토리(U4AUI.createField) 위임(생성/clear/대문자/Enter 단일화) ── */
@@ -122,7 +156,16 @@
     /* ====================================================================
      * 메인 진입 — 팝업 생성/오픈
      * ================================================================== */
+    //  ★법칙 적용 — 팝업을 여는 순간 무조건 busy 부터 켠다. 화면을 다 만들고 첫 조회까지
+    //    끝나야 꺼진다(자동검색이 있으면 그 검색이 끝난 뒤 — 깊이 세기로 보장).
+    //    본체가 중간에 터져도 busy 가 남지 않도록 finally 로 반드시 내린다.
     oAPP.fn.fnAppF4PopupOpen = function (options, fnCallback) {
+        _busy(true);
+        try { _openAppF4Popup(options, fnCallback); }
+        finally { _busy(false); }
+    };
+
+    function _openAppF4Popup(options, fnCallback) {
 
         _ensureStyle();
 
@@ -140,7 +183,7 @@
             oExisting._appf4Reopen(options, fnCallback);
             return;
         }
-        if (oExisting) { try { oExisting.remove(); } catch (e) { } }
+        if (oExisting) { try { oExisting.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // 팝업 상태(스코프 변수로 보관).
         var _fnCb = fnCallback;     // pick 콜백(재오픈 시 갱신 가능하게 mutable)
@@ -212,8 +255,25 @@
             hsb.addEventListener("scroll", function () { _syncLeft(hsb, scrPane); });   // 하단바 드래그 → 스크롤 페인 가로
 
             // 하단 가로바 트랙 폭 = 스크롤 페인 콘텐츠(테이블) 실제 폭. setRows/리사이즈 시 갱신.
-            function _sync() { hsbSpacer.style.width = (scrTbl.scrollWidth || scrPane.scrollWidth) + "px"; }
-            try { new ResizeObserver(_sync).observe(scrPane); } catch (e) { }
+            //  [2026-09-08 수정] 크기감시(ResizeObserver) 안에서 폭을 바로 쓰면 같은 프레임 되먹임이 생겨
+            //    "ResizeObserver loop limit exceeded" 가 터지고, 앱 전역 오류감시(ws_trycatch)가 이를
+            //    Critical Error 창으로 띄운다(숏컷 생성 화면에서 표 다 그린 직후 발생).
+            //    되먹임 경로: 스페이서 폭↑ → 하단 가로바(.u4aAppF4HSb, overflow-x:auto)에 가로 스크롤바 생김
+            //                → 격자 2행 높이↑ → 1행(스크롤 페인) 높이↓ → 같은 프레임에 크기감시 재발화.
+            //    끊는 법 ① 값이 그대로면 아예 쓰지 않는다 ② 감시 콜백은 다음 프레임(rAF)으로 미룬다.
+            //    (바깥에서 부르는 sync() 는 지금 즉시 반영 — 표 갱신 직후 가로바가 바로 맞아야 한다.)
+            var _hsbW = -1, _hsbRaf = 0;
+            function _sync() {
+                var iW = (scrTbl.scrollWidth || scrPane.scrollWidth) || 0;
+                if (iW === _hsbW) { return; }
+                _hsbW = iW;
+                hsbSpacer.style.width = iW + "px";
+            }
+            function _syncDefer() {
+                if (_hsbRaf) { return; }
+                _hsbRaf = requestAnimationFrame(function () { _hsbRaf = 0; _sync(); });
+            }
+            try { new ResizeObserver(_syncDefer).observe(scrPane); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // ── 같은 행 hover 동기 — ★마우스 위치 기반★. 두 페인 행 DOM 이 비동기로 갈려, mouseover 만으론 스크롤 직후
             //   한쪽(마우스 있는 페인)만 떠서 어긋난다. → 마우스 y 아래 스크롤 페인 행 idx 를 elementFromPoint 로 구해
@@ -260,9 +320,9 @@
         oDlg.setAttribute("data-u4a-keep", "");
 
         // 숨김(파괴 X) — 앱 조회 시 검색 상태 보존용(다음 호출/복귀에 재표시).
-        function lf_hide() { try { _closeColMenu(); } catch (e) { } try { oDlg.close(); } catch (e) { } }
+        function lf_hide() { try { _closeColMenu(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         // 명시적 닫기(X·푸터·ESC·선택완료) — 숨긴 뒤 DOM 제거(상태 폐기). 다음 열기 = 새 build.
-        function lf_close() { lf_hide(); try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { } }
+        function lf_close() { lf_hide(); try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // 헤더
         var oHeader = _el("div", "u4a-dialog__header");
@@ -311,7 +371,14 @@
             return b;
         }
         /* ── 탭 전환 ─────────────────────────────────────────────── */
+        //  ★법칙 — 탭을 누른 순간부터 busy. K2(계층 구조)는 서버에 다녀오므로,
+        //    깊이 세기 덕분에 조회가 끝날 때까지 busy 가 유지된다.
         function _selectTab(sKey) {
+            _busy(true);
+            try { _selectTabInner(sKey); }
+            finally { _busy(false); }
+        }
+        function _selectTabInner(sKey) {
             var b1 = sKey === "K1";
             oPage1.hidden = !b1; oPage2.hidden = b1;
             oTab1Btn.setAttribute("aria-selected", b1 ? "true" : "false");
@@ -320,8 +387,8 @@
                 // 원본 K1: 트리 선택해제 + 패키지 입력 포커스.
                 //   ★ K1 은 탭 전환으로 재검색하지 않는다(결과는 마지막 검색 스냅샷 유지 — 사용자 요청).
                 //     autoSearch(처음 오픈) 자동검색은 오픈/재오픈 경로에서 1회만 한다(여기서 X).
-                try { _vs2.setSel(null); _vs2f.setSel(null); _vs2.refresh(); _vs2f.refresh(); } catch (e) { }
-                try { oPkg.input.focus(); } catch (e) { }
+                try { _vs2.setSel(null); _vs2f.setSel(null); _vs2.refresh(); _vs2f.refresh(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { oPkg.input.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             } else {
                 // ★ 원본 K2: 선택할 때마다 매번 서버에서 계층 재조회(once 가드 없음 — fnGetAppHierList).
                 _loadTree();
@@ -342,7 +409,7 @@
             return r;
         }
 
-        var bTrial = false; try { bTrial = !!(parent.getIsTrial && parent.getIsTrial()); } catch (e) { }
+        var bTrial = false; try { bTrial = !!(parent.getIsTrial && parent.getIsTrial()); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oPkg = _mkField(initCond.PACKG || "", { upper: true, disabled: bTrial, onEnter: _doSearch });
         var oUsr = _mkField(initCond.ERUSR || "", { upper: true, disabled: bTrial, onEnter: _doSearch });
@@ -417,8 +484,11 @@
         // 좌측 컬럼 고정 — ★원본(getAppF4ListUiTable) 은 setFixedColumnCount(3) 을 audit 권한 게이트
         //   if(checkWLOList("C","UHAK901182")) 안에서만 호출한다(생성/변경 5컬럼 추가와 같은 블록).
         //   즉 권한이 없으면 컬럼 추가도, 고정도 없다(UI5 기본값 0=고정 없음). bAudit 로 그대로 재현.
-        //   pickOnly 면 액션 2컬럼이 빠져 User Name 1개만 고정.
-        var T1_FRZN = bPickOnly ? 1 : (bAudit ? 3 : 0);
+        //  [2026-09-09 장군님 지시] 좌측 고정 범위를 "앱 설명"(APPNM) 컬럼까지로 넓힌다.
+        //    고정을 하느냐 마느냐(위 원본 audit 게이트)는 그대로 두고, 고정할 때의 '끝 컬럼'만 앱 설명으로.
+        //    pickOnly 는 액션 2컬럼이 빠지므로 사용자 이름 + 웹앱 ID + 앱 설명 = 3개,
+        //    audit 권한이 있는 일반 호출은 액션 2컬럼을 포함해 5개가 된다.
+        var T1_FRZN = (bPickOnly || bAudit) ? _frznThru(T1_COLS, "APPNM") : 0;
         var T1_FRZ_COLS = T1_COLS.slice(0, T1_FRZN);   // 고정 페인 컬럼
         var T1_SCR_COLS = T1_COLS.slice(T1_FRZN);      // 스크롤 페인 컬럼
 
@@ -574,7 +644,7 @@
         // ── 컬럼 헤더 메뉴(정렬 asc/desc + 필터 input + 초기화) — 공통 U4AUI.openColumnMenu 소비 ──
         //   (구: 로컬 _openColMenu 1벌 → 전 화면 공통 헬퍼로 통합. ctl 인자 동일, .u4a-colmenu CSS=shell.css.)
         //   ctl = 탭별 컨트롤러(getFilter/setFilter/getSort/setSort/rerender) — 탭1·탭2(트리) 공유.
-        function _closeColMenu() { try { if (window.U4AUI && U4AUI.closeColumnMenu) { U4AUI.closeColumnMenu(); } } catch (e) { } }
+        function _closeColMenu() { try { if (window.U4AUI && U4AUI.closeColumnMenu) { U4AUI.closeColumnMenu(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         function _openColMenu(c, th, ctl) {
             if (window.U4AUI && U4AUI.openColumnMenu) {
                 U4AUI.openColumnMenu(c, th, ctl, {
@@ -591,7 +661,7 @@
                 APPNM: oDesc.input.value, APPTY: oApptySel.value,
                 HITS: oHits.input.value, EXPAGE: initCond.EXPAGE || ""
             };
-            try { oAPP.attr.gAPPTY = oApptySel.value; } catch (e) { }
+            try { oAPP.attr.gAPPTY = oApptySel.value; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             var sPath = parent.getServerPath() + "/getappsearch";
             var fd = new FormData();
             fd.append("APPINFO", JSON.stringify(oCond));
@@ -602,9 +672,14 @@
                     arr.sort(function (a, b) { return String(a.APPID).localeCompare(String(b.APPID)); });
                     aResult = arr;
                     _renderT1();
+                    _busy(false);   // ★ 화면을 다 그린 "뒤"에 끈다
+                }, null, null, null, function (oErr) {
+                    //  ★ 통신 자체가 실패하면 성공 콜백이 안 온다 → 여기서 안 내리면 대기 표시가 영영 안 풀린다.
+                    console.error("[APPF4-01] 앱 검색 서버 요청 실패:", oErr);
                     _busy(false);
+                    _flash(); _msg("E", "[APPF4-01] " + String((oErr && oErr.message) || oErr || ""));
                 });
-            } catch (e) { _busy(false); _msg("E", String(e && e.message || e)); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _busy(false); _msg("E", String(e && e.message || e)); }
         }
 
         /* ============================================================
@@ -887,7 +962,7 @@
             sTreeFilter = "";
             if (oTSrch.input.value) {   // 검색박스도 비우고 clear(X) 글리프 동기화(input 이벤트)
                 oTSrch.input.value = "";
-                try { oTSrch.input.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { }
+                try { oTSrch.input.dispatchEvent(new Event("input", { bubbles: true })); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
             _renderTree();
         }
@@ -969,7 +1044,7 @@
                 sendAjax(sPath, null, function (oRes) {
                     if (oRes && oRes.RETCD === "E") {
                         _flash(); _busy(false);
-                        try { APPCOMMON.fnShowFloatingFooterMsg("E", parent.getCurrPage(), oRes.RTMSG); } catch (e) { }
+                        try { APPCOMMON.fnShowFloatingFooterMsg("E", parent.getCurrPage(), oRes.RTMSG); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                         return;
                     }
                     aTreeRoot = _buildTree(oRes && oRes.T_APPL);
@@ -980,17 +1055,22 @@
                         // 검색/컬럼필터가 활성이면 매칭 경로를 다시 펼친다 → 다른 탭 갔다 와도(=K2 재조회) 펼침 모습 유지.
                         _expandMatchPaths();
                     } else {
-                        try { var _u0 = aTreeRoot[0] ? aTreeRoot[0]._uid : null; _vs2.setSel(_u0); _vs2f.setSel(_u0); } catch (e) { } // 원본 setSelectedIndex(0)
+                        try { var _u0 = aTreeRoot[0] ? aTreeRoot[0]._uid : null; _vs2.setSel(_u0); _vs2f.setSel(_u0); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } // 원본 setSelectedIndex(0)
                     }
                     _renderTree();
+                    _busy(false);   // ★ 트리를 다 그린 "뒤"에 끈다
+                }, null, null, null, function (oErr) {
+                    //  ★ 통신 실패 시 성공 콜백이 안 오므로 여기서 반드시 내린다.
+                    console.error("[APPF4-02] 패키지 계층 서버 요청 실패:", oErr);
                     _busy(false);
+                    _flash(); _msg("E", "[APPF4-02] " + String((oErr && oErr.message) || oErr || ""));
                 });
-            } catch (e) { _busy(false); _msg("E", String(e && e.message || e)); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _busy(false); _msg("E", String(e && e.message || e)); }
         }
 
         /* ── 행 액션 ─────────────────────────────────────────────── */
         function _pick(row) {
-            try { if (typeof _fnCb === "function") { _fnCb(row); } } catch (e) { }
+            try { if (typeof _fnCb === "function") { _fnCb(row); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             lf_close();
         }
 
@@ -1008,7 +1088,7 @@
                 }
                 if (info.APPTY === "U") { parent.setBusy(""); _flash(); _msg("E", _txt("/U4A/MSG_WS", "189")); return; }
                 if (info.ACTST === "I") { parent.setBusy(""); _flash(); _msg("E", _wsTxt("434")); return; }
-                try { oAPP.fn.fnOnExecApp(sAPPID); } catch (e) { parent.setBusy(""); _msg("E", String(e && e.message || e)); }
+                try { oAPP.fn.fnOnExecApp(sAPPID); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } parent.setBusy(""); _msg("E", String(e && e.message || e)); }
             });
         }
 
@@ -1029,7 +1109,7 @@
             //    원본 sap setValue 도 이벤트 미발생. clear-X 노출은 data-filled 로 직접 동기.
             inp.value = sAPPID;
             if (fld) { fld.setAttribute("data-filled", "true"); }
-            try { fnDisp(); } catch (e) { }                         //    firePress(displayBtn) → 동기로 값 읽음
+            try { fnDisp(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }                         //    firePress(displayBtn) → 동기로 값 읽음
             inp.value = "";                                         // ④ setValue("") — WS10 입력칸에 잔상 방지
             if (fld) { fld.setAttribute("data-filled", "false"); }
         }
@@ -1053,36 +1133,49 @@
         /* ── 오픈 ────────────────────────────────────────────────── */
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
         if (window.U4AUI) {
-            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { }
-            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { }
-            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 720, minH: 420 }); } catch (e) { }
+            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 720, minH: 420 }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 싱글톤 재표시 훅 — 숨겨진 인스턴스를 다음 F4 에 다시 띄울 때 사용(상태 보존, 콜백/검색 갱신).
         oDlg._appf4Reopen = function (opt, cb) {
-            if (typeof cb === "function") { _fnCb = cb; }
-            oDlg._pendingReshow = false;
-            _bAutoSearch = !!(opt && opt.autoSearch);   // 원본 oOptions.autoSearch 갱신
-            if (!oDlg.open) { try { oDlg.showModal(); } catch (e) { } }
-            _selectTab("K1");                           // showModal 후 select(포커스)
-            if (_bAutoSearch) { _doSearch(); }          // 재오픈 요청이 autoSearch 면 1회 자동검색
+            _busy(true);   // ★법칙 — 다시 여는 것도 '처리'다. 시작하자마자 켜고 준비 끝나면 끈다.
+            try {
+                if (typeof cb === "function") { _fnCb = cb; }
+                oDlg._pendingReshow = false;
+                _bAutoSearch = !!(opt && opt.autoSearch);   // 원본 oOptions.autoSearch 갱신
+                if (!oDlg.open) {
+                    try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    _busyRaise();   // 팝업 위로 busy 재배치
+                }
+                _selectTab("K1");                           // showModal 후 select(포커스)
+                if (_bAutoSearch) { _doSearch(); }          // 재오픈 요청이 autoSearch 면 1회 자동검색
+            } finally { _busy(false); }
         };
 
         // WS20→WS10 back 복귀 시 재표시(검색/탭/상태 그대로 — 원본 setVisible(true) 대응).
         //   호출은 셸 fnOnMoveToPage("WS10") 분기가 _pendingReshow 인 인스턴스에 한해 수행.
         oDlg._appf4Reshow = function () {
-            oDlg._pendingReshow = false;
-            if (!oDlg.open) { try { oDlg.showModal(); } catch (e) { } }
+            _busy(true);   // ★법칙 — 다시 띄우는 동안에도 조작을 막는다.
+            try {
+                oDlg._pendingReshow = false;
+                if (!oDlg.open) {
+                    try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    _busyRaise();
+                }
+            } finally { _busy(false); }
         };
 
         document.body.appendChild(oDlg);
-        try { _renderT1(); } catch (e) { }   // 초기 헤더(+no-data) 렌더(검색 전에도 컬럼 표시)
+        try { _renderT1(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 초기 헤더(+no-data) 렌더(검색 전에도 컬럼 표시)
         oDlg.showModal();
+        _busyRaise();   // 팝업이 busy 위로 올라갔으므로 busy 를 다시 맨 위로(준비 끝날 때까지 조작 차단)
         // 원본 ev_AppF4DialogAfterOpen: 열린 뒤 현재 탭으로 select 발화(포커스). autoSearch 면 1회 자동검색.
         _selectTab("K1");
         if (_bAutoSearch) { _doSearch(); }   // 처음 오픈 시 1회만(탭 클릭 재검색 아님)
 
-    }; // end of oAPP.fn.fnAppF4PopupOpen
+    } // end of _openAppF4Popup (진입 = oAPP.fn.fnAppF4PopupOpen)
 
     /* ====================================================================
      * 스코프 CSS (1회 주입) — 토큰 기반, 공통 컴포넌트와 일관.

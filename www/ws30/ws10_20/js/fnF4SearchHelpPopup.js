@@ -40,22 +40,22 @@
     }
     // 코드형 라벨(/U4A/CL_WS_COMMON 등).
     function _txt(sCls, sCode, p1) {
-        try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); } catch (e) { return sCode; }
+        try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sCode; }
     }
     // ZMSG_WS_COMMON_001 — 워크스페이스 언어 기준(공통 no-data 등).
     function _wsTxt(sNo) {
         try {
             var sLangu = (parent.getUserInfo() || {}).LANGU;
             return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sNo);
-        } catch (e) { return sNo; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sNo; }
     }
-    function _msg(sType, sText) { try { parent.showMessage(null, 10, sType, sText); } catch (e) { } }
-    function _flash() { try { (parent.CURRWIN || parent.REMOTE.getCurrentWindow()).flashFrame(true); } catch (e) { } }
+    function _msg(sType, sText) { try { parent.showMessage(null, 10, sType, sText); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+    function _flash() { try { (parent.CURRWIN || parent.REMOTE.getCurrentWindow()).flashFrame(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
     // 서버 경로(WS20 design context: oAPP.attr.servNm, 원본 callF4HelpPopup 은 parent.getServerPath()).
     function _serverPath() {
-        try { if (oAPP.attr && oAPP.attr.servNm) { return oAPP.attr.servNm; } } catch (e) { }
-        try { return parent.getServerPath(); } catch (e) { return ""; }
+        try { if (oAPP.attr && oAPP.attr.servNm) { return oAPP.attr.servNm; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { return parent.getServerPath(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
 
     /* ====================================================================
@@ -75,7 +75,7 @@
 
         // 이전 인스턴스 정리(싱글톤이 아니라 매 호출 새로 — 원본도 매번 new Dialog).
         var oOld = document.getElementById("u4aF4ShDlg");
-        if (oOld) { try { oOld.remove(); } catch (e) { } }
+        if (oOld) { try { oOld.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // ── 상태 ──────────────────────────────────────────────────
         var aSearchFields = [];   // [{ paramKey, field, datatype }]
@@ -88,8 +88,8 @@
         oDlg.id = "u4aF4ShDlg";
 
         function lf_close() {
-            try { oDlg.close(); } catch (e) { }
-            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oDlg.parentNode) { oDlg.parentNode.removeChild(oDlg); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 헤더(검색 아이콘 + 제목 + 닫기 X)
@@ -185,7 +185,7 @@
         function _setSearchBusy(bBusy) {
             oSearchBtn.disabled = !!bBusy;
             oTableWrap.setAttribute("aria-busy", bBusy ? "true" : "false");
-            try { parent.setBusy(bBusy ? "X" : ""); } catch (e) { }
+            try { parent.setBusy(bBusy ? "X" : ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // (행 빌드·zebra·단일클릭 선택·더블클릭 확정은 공통 makeDataTable 이 담당 —
@@ -279,9 +279,9 @@
                     _renderRows([]);   // 초기 no-data
                     _setSearchBusy(false);
                     // 첫 검색필드 포커스(원본 afterOpen 흐름 — 사용자가 바로 입력/검색).
-                    try { if (aSearchFields.length) { aSearchFields[0].field.input.focus(); } } catch (e) { }
+                    try { if (aSearchFields.length) { aSearchFields[0].field.input.focus(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 });
-            } catch (e) { _setSearchBusy(false); _msg("E", String(e && e.message || e)); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _setSearchBusy(false); _msg("E", String(e && e.message || e)); }
         }
 
         /* ── 검색 실행(원본 LF_getServerData — trgubun "D") ── */
@@ -314,7 +314,7 @@
                         if (iCnt > 5 && oPanel && oPanel.setCollapsed) { oPanel.setCollapsed(true); }
 
                         var oData = {};
-                        try { oData = JSON.parse(param.TEXT[0].VALUE); } catch (e) { oData = {}; }
+                        try { oData = JSON.parse(param.TEXT[0].VALUE); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oData = {}; }
                         _renderRows(oData.TF4LIST || []);
 
                     } else if (param && param.TEXT && param.TEXT[0] && param.TEXT[0].NAME === "NOTFOUND") {
@@ -326,19 +326,19 @@
 
                     _setSearchBusy(false);
                 });
-            } catch (e) { _setSearchBusy(false); _msg("E", String(e && e.message || e)); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _setSearchBusy(false); _msg("E", String(e && e.message || e)); }
         }
 
         /* ── 오픈 ─────────────────────────────────────────────────── */
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
         if (window.U4AUI) {
-            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { }
-            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { }
-            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 560, minH: 380 }); } catch (e) { }
+            try { U4AUI.makeDialogDraggable && U4AUI.makeDialogDraggable(oDlg, oHeader); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { U4AUI.makeDialogRecenter && U4AUI.makeDialogRecenter(oDlg, oHeader); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { U4AUI.makeDialogResizable && U4AUI.makeDialogResizable(oDlg, { minW: 560, minH: 380 }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         document.body.appendChild(oDlg);
-        try { oDlg.showModal(); } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // afterOpen: F4 필드정보 조회(원본 attachAfterOpen → lf_getF4Field). 자동검색은 안 함(원본 동일).
         _loadF4Field();

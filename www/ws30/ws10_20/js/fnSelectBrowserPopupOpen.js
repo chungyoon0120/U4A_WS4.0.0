@@ -25,14 +25,14 @@
 
     function _txt(sCls, sCode, p1, p2, p3, p4) {
         try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     function _wsTxt(nr) {
         try {
             var lg = (parent.getUserInfo() || {}).LANGU || "";
             var s = parent.WSUTIL.getWsMsgClsTxt(lg, "ZMSG_WS_COMMON_001", nr);
             if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return "";
     }
     function _el(sTag, sClass, sText) {
@@ -92,7 +92,7 @@
 
         // 이미 떠 있으면 제거 후 재생성(모델이 갱신되었을 수 있으므로 새로 그린다).
         var oOld = document.getElementById(C_DLG_ID);
-        if (oOld) { try { oOld.close(); } catch (e) { } oOld.remove(); }
+        if (oOld) { try { oOld.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } oOld.remove(); }
 
         var oDlg = document.createElement("dialog");
         oDlg.id = C_DLG_ID;
@@ -246,8 +246,8 @@
     function _close() {
         var oDlg = document.getElementById(C_DLG_ID);
         if (!oDlg) { return; }
-        try { oDlg.close(); } catch (e) { }
-        try { oDlg.remove(); } catch (e) { }
+        try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     // 헤더 드래그는 공통 U4AUI.makeDialogDraggable 사용(화면 밖/상단 헤더 클램프). 로컬 _attachDrag 제거.
 

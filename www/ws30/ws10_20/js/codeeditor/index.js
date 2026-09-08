@@ -55,18 +55,18 @@ window.require(["vs/editor/editor.main"], function () {
         try {
             var fs = editor.getOption(monaco.editor.EditorOption.fontInfo).fontSize;
             _toParent({ evt: "zoom", pct: Math.round((fs / C_BASE_FONT) * 100) });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     editor.onDidChangeConfiguration(function (e) {
         try { if (e.hasChanged(monaco.editor.EditorOption.fontInfo)) { _reportZoom(); } }
-        catch (e2) { _reportZoom(); }
+        catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _reportZoom(); }
     });
     _reportZoom();
 
     // Shift+F1 = Pretty Print(포맷). ★에디터 한정★ — Monaco 키바인딩이라 에디터에 포커스가
     //   있을 때만 발화하고 iframe 경계 안에서 처리되어 부모(워크스페이스 단축키)로 새지 않는다.
     editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F1, function () {
-        try { editor.getAction("editor.action.formatDocument").run(); } catch (e) { }
+        try { editor.getAction("editor.action.formatDocument").run(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     // Ctrl/⌘+S = 저장(팝업 하단 ✓ 기능). ★에디터 한정★ — Monaco 가 Ctrl+S 를 가로채
@@ -80,7 +80,7 @@ window.require(["vs/editor/editor.main"], function () {
     // Ctrl/⌘+0 = 폰트 줌 원복(Ctrl+휠 확대/축소 되돌리기). Monaco 내장 액션 사용.
     var _KEY_0 = (monaco.KeyCode.Digit0 != null) ? monaco.KeyCode.Digit0 : monaco.KeyCode.KEY_0;
     editor.addCommand(monaco.KeyMod.CtrlCmd | _KEY_0, function () {
-        try { editor.getAction("editor.action.fontZoomReset").run(); } catch (e) { }
+        try { editor.getAction("editor.action.fontZoomReset").run(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     // ESC = 부모에 "닫기 요청" 위임(인앱 에디터 팝업 편의 — 부모가 변경분 확인 후 닫는다).
@@ -106,7 +106,7 @@ window.require(["vs/editor/editor.main"], function () {
                 if (cs.display !== "none" && cs.visibility !== "hidden") { return true; }
             }
             return false;
-        } catch (e) { return false; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
     editor.onKeyDown(function (e) {
         if (e.keyCode !== monaco.KeyCode.Escape) { return; }

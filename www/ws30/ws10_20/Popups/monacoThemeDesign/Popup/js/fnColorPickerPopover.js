@@ -84,7 +84,7 @@
   function _wsTxt(sCode) {
     try {
       return WSUTIL.getWsMsgClsTxt(_LANGU, "ZMSG_WS_COMMON_001", sCode, "") || "";
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
 
   // 닫기(취소) — DOM 은 남기고 숨김 + 리스너 해제.

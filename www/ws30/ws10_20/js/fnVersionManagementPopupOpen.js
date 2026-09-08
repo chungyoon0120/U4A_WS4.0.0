@@ -28,7 +28,7 @@
 
         // busy 키고 Lock 걸기 + 전체 자식 윈도우 Busy
         oAPP.common.fnSetBusyLock("X");
-        try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { }
+        try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         const sPopupName = "VERMNG";
 
@@ -37,7 +37,7 @@
         if (oResult.ISOPEN) {
             parent.WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
             oAPP.common.fnSetBusyLock("");
-            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
 
@@ -51,7 +51,7 @@
         // 창 제목(원본 oBrowserOptions.title = ZMSG_WS_COMMON_001/403 "Version Management").
         let sTitle = "";
         try { sTitle = WSUTIL.getWsMsgClsTxt(oUserInfo.LANGU, "ZMSG_WS_COMMON_001", "403") || "Version Management"; }
-        catch (e) { sTitle = "Version Management"; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sTitle = "Version Management"; }
 
         const
             sSettingsJsonPath = parent.getPath("BROWSERSETTINGS"),
@@ -75,7 +75,7 @@
         oBrowserOptions.webPreferences.USERINFO = parent.process.USERINFO;
 
         let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
-        try { REMOTEMAIN.enable(oBrowserWindow.webContents); } catch (e) { }
+        try { REMOTEMAIN.enable(oBrowserWindow.webContents); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
         const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
@@ -106,7 +106,7 @@
         oBrowserWindow.once('ready-to-show', () => {
             parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
             oAPP.common.fnSetBusyLock("");
-            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
 
         // 브라우저가 오픈이 다 되면 IF 데이터 전달(원본 if-version-management 대응 → if-vermng-info).
@@ -133,14 +133,14 @@
                     if (oBrowserWindow && !oBrowserWindow.isDestroyed()) {
                         oBrowserWindow.webContents.send("if-vermng-newwin-done");
                     }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
         IPCMAIN.on(`${BROWSKEY}-if-version-management-new-window`, _fnNewWindow);
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
-            try { IPCMAIN.removeListener(`${BROWSKEY}-if-version-management-new-window`, _fnNewWindow); } catch (e) { }
+            try { IPCMAIN.removeListener(`${BROWSKEY}-if-version-management-new-window`, _fnNewWindow); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oBrowserWindow = null;
             CURRWIN.focus();
         });

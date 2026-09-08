@@ -44,8 +44,8 @@ window.require(["vs/editor/editor.main"], function () {
     // 좌/우 모두 입력 막기(원본 동일 — 버전 비교는 읽기 전용).
     var oOrig = window.editor.getOriginalEditor();
     var oModf = window.editor.getModifiedEditor();
-    try { oOrig.updateOptions({ readOnly: true, domReadOnly: true }); } catch (e) { }
-    try { oModf.updateOptions({ readOnly: true, domReadOnly: true }); } catch (e) { }
+    try { oOrig.updateOptions({ readOnly: true, domReadOnly: true }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { oModf.updateOptions({ readOnly: true, domReadOnly: true }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     /***********************************************************************
      * 폰트 확대/축소 — ★Monaco 내장(EditorZoom) 사용 (editorPopup 호스트와 동일한 공통 패턴/국룰).
@@ -58,7 +58,7 @@ window.require(["vs/editor/editor.main"], function () {
      ***********************************************************************/
     var C_BASE_FONT = DEFAULT_FONT_SIZE;
     function _runZoom(sAct) {
-        try { var a = oModf.getAction(sAct) || oOrig.getAction(sAct); if (a) { a.run(); } } catch (e) { }
+        try { var a = oModf.getAction(sAct) || oOrig.getAction(sAct); if (a) { a.run(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     // 부모(versionMngFrame)의 줌 버튼이 호출(index.html cmd 핸들러 → 이 전역) — 내장 액션 위임.
     window._vmFont = {
@@ -71,23 +71,23 @@ window.require(["vs/editor/editor.main"], function () {
         try {
             var fs = oModf.getOption(monaco.editor.EditorOption.fontInfo).fontSize;
             _toParent({ evt: "zoom", pct: Math.round((fs / C_BASE_FONT) * 100) });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     // 폰트(줌) 변경 시마다 % 재통지 — Ctrl+휠/키/버튼 모두 fontInfo 변경을 거친다.
     function _watchFont(oEd) {
         try {
             oEd.onDidChangeConfiguration(function (e) {
                 try { if (e.hasChanged(monaco.editor.EditorOption.fontInfo)) { _reportZoom(); } }
-                catch (e2) { _reportZoom(); }
+                catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _reportZoom(); }
             });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     _watchFont(oOrig); _watchFont(oModf);
 
     // Ctrl/⌘+0 = 폰트 줌 원복(내장 reset 은 Numpad0 만 바인딩 → Digit0 보강). 양 에디터에 등록.
     var _KEY_0 = (monaco.KeyCode.Digit0 != null) ? monaco.KeyCode.Digit0 : monaco.KeyCode.KEY_0;
     function _bindReset(oEd) {
-        try { oEd.addCommand(monaco.KeyMod.CtrlCmd | _KEY_0, function () { _runZoom("editor.action.fontZoomReset"); }); } catch (e) { }
+        try { oEd.addCommand(monaco.KeyMod.CtrlCmd | _KEY_0, function () { _runZoom("editor.action.fontZoomReset"); }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     _bindReset(oOrig); _bindReset(oModf);
 

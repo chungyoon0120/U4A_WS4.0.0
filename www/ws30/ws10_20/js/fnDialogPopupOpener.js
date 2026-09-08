@@ -113,7 +113,7 @@
 
         // busy 키고 Lock 걸기 + 전체 자식 윈도우 Busy
         oAPP.common.fnSetBusyLock("X");
-        try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { }
+        try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         let sPopupName = "MIMEPOP";
 
@@ -126,15 +126,15 @@
                 let oW = aAll[wi];
                 if (!oW || oW.isDestroyed()) { continue; }
                 let sT = "";
-                try { sT = WSUTIL.QueryString.parse(oW.getURL()).OBJTY; } catch (e) { sT = ""; }
+                try { sT = WSUTIL.QueryString.parse(oW.getURL()).OBJTY; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sT = ""; }
                 if (sT !== sPopupName) { continue; }
-                try { if (oW.isMinimized()) { oW.restore(); } } catch (e) { }
-                try { oW.focus(); } catch (e) { }
+                try { if (oW.isMinimized()) { oW.restore(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { oW.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.common.fnSetBusyLock("");
-                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return;
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         let SESSKEY2 = parent.getSessionKey(),
             BROWSKEY2 = parent.getBrowserKey(),
@@ -143,13 +143,13 @@
 
         // WLO(UHAK901016) 지연로드 플래그 — WS20 에서 판정해 전달(별도창은 모델 비결합).
         let bWloLazy = false;
-        try { bWloLazy = (oAPP.common.checkWLOList("C", "UHAK901016") === true); } catch (e) { bWloLazy = false; }
+        try { bWloLazy = (oAPP.common.checkWLOList("C", "UHAK901016") === true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bWloLazy = false; }
 
         // 현재 편집 중인 APP 정보 — 원본 fnMimePopupOpen _appInfo() 와 동일하게 모델에서 읽어 전달.
         //   (getAppInfo()=워크스페이스 레벨이라 WS20 편집 대상과 다를 수 있어 트리 스코프가 어긋남)
         let oMimeAppInfo = {};
-        try { oMimeAppInfo = oAPP.common.fnGetModelProperty("/WS20/APP") || {}; } catch (e) { oMimeAppInfo = {}; }
-        try { var _w3 = oAPP.common.fnGetModelProperty("/WS30/APP"); if (_w3 && _w3.APPID) { oMimeAppInfo = _w3; } } catch (e) { }
+        try { oMimeAppInfo = oAPP.common.fnGetModelProperty("/WS20/APP") || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oMimeAppInfo = {}; }
+        try { var _w3 = oAPP.common.fnGetModelProperty("/WS30/APP"); if (_w3 && _w3.APPID) { oMimeAppInfo = _w3; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 브라우저 옵션
         let sSettingsJsonPath = parent.getPath("BROWSERSETTINGS"),
@@ -182,8 +182,8 @@
         //   뒤로가기/모드전환(fnCloseAllWs20Dialogs → fnChildWindowClose → _closeAllChildWindowMap)에
         //   같은 브라우저키 팝업으로 자동 닫히게 한다. (닫힐 때 맵에서 제거)
         let oChildMap = null;
-        try { oChildMap = parent.CURRWIN && parent.CURRWIN._aChildWinMap; } catch (e) { oChildMap = null; }
-        try { if (oChildMap) { oChildMap.set(oBrowserWindow.id, oBrowserWindow); } } catch (e) { }
+        try { oChildMap = parent.CURRWIN && parent.CURRWIN._aChildWinMap; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oChildMap = null; }
+        try { if (oChildMap) { oChildMap.set(oBrowserWindow.id, oBrowserWindow); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
@@ -227,7 +227,7 @@
 
         let iMimeWinId = oBrowserWindow.id;
         oBrowserWindow.on('closed', () => {
-            try { if (oChildMap) { oChildMap.delete(iMimeWinId); } } catch (e) { }
+            try { if (oChildMap) { oChildMap.delete(iMimeWinId); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oBrowserWindow = null;
             CURRWIN.focus();
         });
@@ -1586,6 +1586,7 @@
             try {
                 CURRWIN.focus();
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             }
 
@@ -2320,8 +2321,8 @@
         };
 
         if (sFlag === "EXPORT") {
-            // [HTML5] /WS10/APPID 모델이 비어있을 수 있어, 검증 통과한 입력값(sValue)을 우선 사용.
-            oSendData.APPID = sValue || sAppId;
+            // 원본과 동일 — 모델값 사용([HTML5] 입력칸 ↔ /WS10/APPID 묶임 복원으로 입력칸값과 동일).
+            oSendData.APPID = sAppId;
         }
 
         // 브라우저 실행 경로에 붙일 QueryString 정보
@@ -2442,7 +2443,7 @@
         oBrowserOptions.titleBarStyle = "hidden";
         // 테마 정보 1회 조회(창 배경 + 쿼리 전달 공용).
         let oAboutTheme = {};
-        try { oAboutTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { oAboutTheme = {}; }
+        try { oAboutTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oAboutTheme = {}; }
         // [흰 플래시 방지 ①] BrowserWindow 배경을 테마색으로 → 첫 OS 페인트부터 흰색이 아니라 테마색.
         if (oAboutTheme.BGCOL) { oBrowserOptions.backgroundColor = oAboutTheme.BGCOL; }
         // [HTML5 표준] 네이티브 opacity 페이드(setBrowserOpacity) 미사용 — 저사양 PC 성능부하 이슈.
@@ -2469,7 +2470,7 @@
             if (oAboutTheme.BGCOL) {
                 oBrowserWindow.webContents.insertCSS("html, body { margin:0; height:100%; background-color:" + oAboutTheme.BGCOL + "; }");
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 브라우저 실행 경로에 붙일 QueryString 정보
         const oQueryParams = {
@@ -2520,7 +2521,7 @@
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
             // 콘텐츠(frame.html) 준비 후 index.html 이 CURRWIN.show() 로 표시(setBrowserOpacity 페이드 미사용).
-            try { oBrowserWindow.closable = true; } catch (error) { }
+            try { oBrowserWindow.closable = true; } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); } }
 
         });
 
@@ -2867,6 +2868,7 @@
                 if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oResult.WINDOW); }
                 else { oResult.WINDOW.setClosable(true); oResult.WINDOW.close(); }
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             }
 
@@ -2948,7 +2950,7 @@
             if (bErrWinReady === true || bErrWinFailed === true) { return; }
             bErrWinFailed = true;
 
-            try { console.error("[" + sCode + "] 오류 목록 창 띄우기 실패 — 화면 잠금 회수: " + sDetail); } catch (e) { }
+            try { console.error("[" + sCode + "] 오류 목록 창 띄우기 실패 — 화면 잠금 회수: " + sDetail); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 본 화면 잠금 해제
             try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error("[" + sCode + "] fnSetBusyLock 해제 실패:", e && e.message); }
@@ -2986,6 +2988,7 @@
                 });
             }
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             lf_recoverOpenFail("FDPO-001", (e && e.message) ? e.message : String(e));
         }
 
@@ -3338,6 +3341,7 @@
                 try {
                     oBrowserWindow.closable = true;
                 } catch (error) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
                 }
 
@@ -4083,8 +4087,8 @@
         oBrowserWindow.webContents.on('did-fail-load', (event, errCode, errDesc, validatedURL, isMainFrame) => {
             if (!isMainFrame || errCode === -3) { return; }   // 서브리소스/사용자취소(-3)는 무시
             console.error('[숏컷] 자식창 메인 로드 실패:', errCode, errDesc);
-            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
-            try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { console.error('[숏컷] 로드실패 창 정리 실패:', e); }
         });
 

@@ -40,7 +40,7 @@
     const _fa = (sName) => '<i class="fa-solid fa-' + sName + '"></i>';
     function _txt(sCls, sCode, p1, p2, p3, p4) {
         try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     function _el(sTag, sClass, sText) {
         const o = document.createElement(sTag);
@@ -336,7 +336,12 @@
                             if (sId === "AppNmInput") {
                                 var el = document.getElementById("AppNmInput");
                                 return {
-                                    setValue: function (v) { if (el) { el.value = (v == null ? "" : v); } },
+                                    setValue: function (v) {
+                                        if (!el) { return; }
+                                        el.value = (v == null ? "" : v);
+                                        // 입력칸 ↔ /WS10/APPID 묶임 유지(원본 setValue = 바인딩으로 모델도 갱신).
+                                        if (oAPP.ws10html && oAPP.ws10html.setAppId) { oAPP.ws10html.setAppId(el.value); }
+                                    },
                                     getValue: function () { return el ? el.value : ""; }
                                 };
                             }
@@ -387,6 +392,7 @@
             var WC = REMOTE.getGlobal("WsMsgCls");
             return (WC && WC.relocalize) ? WC.relocalize(sText, sBeLangu, sWsLangu) : sText;
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return sText;
         }
     }
@@ -553,7 +559,7 @@
 
         if (!oCopyUI || !oCopyUI.dlg) { return; }
 
-        try { oCopyUI.dlg.close(); } catch (e) { }
+        try { oCopyUI.dlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     } // end of lf_AppCopyPopupClose
 

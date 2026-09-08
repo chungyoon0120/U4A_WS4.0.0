@@ -74,6 +74,16 @@
         return Array.isArray(aWLO) && !!aWLO.find(function (e) { return e.REGTYP == REGTYP && e.CHGOBJ == CHGOBJ; });
     };
 
+    // [2026-09-09 추가] 공통 busy 이름을 이 창의 busy 로 연결.
+    //   공통 부품(fnAppF4PopupOpen 등)은 서버에 가기 직전 oAPP.common.fnSetBusyLock("X") 을 부르고
+    //   끝나면 "" 로 끈다. 자식창인 여기엔 그 이름이 없어서 호출이 그대로 실패했고(조용히 넘어감),
+    //   앱 검색 도움말에서 탭 전환·검색으로 서버에 가는 동안 아무 표시도 안 떴다.
+    //   → 여기 busy(fn_setBusy) 로 이어 준다. 서버 왕복·저장 중에는 화면을 덮어 조작을 막는다.
+    //   (같은 방식 선례: MIME 리포지토리 창)
+    oAPP.common.fnSetBusyLock = function (sIsBusy) {
+        fn_setBusy(sIsBusy === "X");
+    };
+
     function getMsgText(sMsgCls, sMsgNo, sFallback) {
         let sTxt = oAPP.common.fnGetMsgClsText(sMsgCls, sMsgNo);
         return (sTxt && sTxt.trim()) ? sTxt : sFallback;
@@ -121,6 +131,97 @@
     window.showMessage = function (oSap, iCode, sType, sText) { try { U4AUI.confirm({ type: sType, title: getMsgText('/U4A/CL_WS_COMMON','C00','fail'), message: sText }); } catch (e) { console.error('[숏컷] showMessage shim 오류:', e); } };
     // fnAppF4PopupOpen 의 전역 sendAjax(ws_common.js) 경량 shim — 자식창엔 원본이 없어 fetch 로 대체(FormData+WSVER 계약 유지).
     window.sendAjax = function (sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_error) {
+
+        /**
+         * 서버 통신 로그 (2026-09-08 추가)
+         * 이 별창은 자기 서버 통신 코드를 따로 갖고 있어 공통 자리에 안 잡힌다.
+         * 요청 이름만 남기고 값은 안 남긴다.
+         */
+        var _iAjaxStartAt = Date.now();
+        var _sAjaxName = String(sPath).split("?")[0].split("/").pop() || sPath;
+
+        /**
+         * 요청 번호 (2026-09-08 추가)
+         * 같은 요청이 한꺼번에 여러 번 나가면 응답이 뒤섞여 돌아온다(실측).
+         * 번호를 붙여야 보낸 줄과 받은 줄의 짝이 맞는다.
+         */
+        if (typeof window.__u4aAjaxSeq !== "number") { window.__u4aAjaxSeq = 0; }
+        window.__u4aAjaxSeq++;
+        var _sAjaxNo = "#" + window.__u4aAjaxSeq;
+
+        /**
+         * 서버 통신 실패를 자세히 남긴다 (2026-09-08 추가 — 장군님 지시)
+         * 앞서는 "실패: 통신 오류" 한 줄뿐이라 서버가 뭐라고 했는지 알 수 없었다.
+         * 실패했을 때만 주소·상태·서버가 준 내용을 남긴다(성공은 한 줄 그대로).
+         */
+        function _ajaxFail(sReason, oXhrLike) {
+
+            _ajaxLog("끝남", "실패: " + sReason);
+
+            try {
+
+                if (typeof U4ALOG === "undefined") { return; }
+
+                var _sp = String(sPath == null ? "" : sPath);
+                var _i = _sp.indexOf("?");
+                if (_i >= 0) { _sp = _sp.slice(0, _i) + " (뒤쪽 정보는 가림)"; }
+
+                U4ALOG.error("서버통신 실패 상세", "보낸 곳: " + _sp);
+
+                var x = oXhrLike || null;
+
+                if (!x) {
+                    U4ALOG.error("서버통신 실패 상세", "서버 응답 자체가 없음 (연결이 끊겼거나 서버에 못 닿음)");
+                    return;
+                }
+
+                U4ALOG.error("서버통신 실패 상세", "서버 상태: "
+                    + ((typeof x.status === "number") ? x.status : "-")
+                    + (x.statusText ? (" " + x.statusText) : ""));
+
+                try {
+                    if (typeof x.getResponseHeader === "function") {
+                        var _aMark = ["sap-err-id", "u4a_status", "content-type"];
+                        for (var _k = 0; _k < _aMark.length; _k++) {
+                            var _v = x.getResponseHeader(_aMark[_k]);
+                            if (_v) { U4ALOG.error("서버통신 실패 상세", "응답표시 " + _aMark[_k] + ": " + _v); }
+                        }
+                    }
+                } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+
+                try {
+
+                    var _sBody = (x.responseText != null) ? x.responseText : (x.response != null ? String(x.response) : "");
+
+                    if (!_sBody) {
+                        _sBody = "(서버가 아무 내용도 안 줬음)";
+                    } else if (_sBody.length > 4000) {
+                        _sBody = _sBody.slice(0, 4000) + " …(뒤 " + (_sBody.length - 4000) + "자 잘림)";
+                    }
+
+                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용: " + _sBody);
+
+                } catch (e3) {
+                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용을 못 읽음: " + e3);
+                }
+
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                // 로그 남기다 통신을 막으면 안 된다.
+            }
+
+        }
+
+
+        function _ajaxLog(sWhat, sResult) {
+            try {
+                if (typeof U4ALOG === "undefined") { return; }
+                U4ALOG.server(sWhat, _sAjaxName + " " + _sAjaxNo, sResult, Date.now() - _iAjaxStartAt);
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+        _ajaxLog("보냈음", "");
+
         try {
             var oUser = oAPP.attr.oUserInfo || {};
             if (oFormData && oFormData instanceof FormData) {
@@ -129,8 +230,9 @@
             }
             fetch(sPath, { method: (meth || "POST"), body: (oFormData || undefined) })
                 .then(function (r) { if (!r.ok) { throw new Error("HTTP " + r.status); } return r.json(); })
-                .then(function (oRes) { if (typeof fn_success === "function") { fn_success(oRes); } })
+                .then(function (oRes) { _ajaxLog("끝남", "성공"); if (typeof fn_success === "function") { fn_success(oRes); } })
                 .catch(function (err) {
+                    _ajaxFail((err && err.message ? err.message : "서버에 못 닿음"), (err && err.xhr) ? err.xhr : null);
                     console.error('[숏컷] sendAjax shim 오류:', err);
                     if (typeof fn_error === "function") { try { fn_error(err); } catch (e) { console.error('[숏컷] sendAjax fn_error 오류:', e); } }
                 });
@@ -169,6 +271,7 @@
         try {
             return JSON.parse(sThemeJson);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
     };
@@ -178,27 +281,45 @@
         return oAPP.attr.isBusy;
     };
 
-    // Busy 설정 함수 (top-layer <dialog> 제어 표준 준수)
+    /* Busy 설정 함수 (top-layer <dialog> 제어 표준 준수)
+     *  [2026-09-09 변경] ★법칙(장군님 지시) — 어떤 처리든 시작하자마자 켜고, 준비가 완전히
+     *    끝난 맨 마지막에 끈다. 처리가 겹치므로(숏컷 만들기 → 그 안에서 앱 ID 서버 검사,
+     *    앱 검색 도움말 열기 → 그 안에서 자동 검색) "이 창에서 진행 중인 처리 개수"를 센다.
+     *    안쪽 처리가 끝났다고 바깥 처리 도중에 표시가 풀리지 않는다.
+     *  opener(부모 창)가 알려오는 바쁨(ISBROAD)은 우리 처리 개수와 섞지 않고 따로 기억한다.
+     *    섞으면 짝이 안 맞을 때 표시가 영영 안 풀리는 사고가 난다. 둘 중 하나라도 바쁘면 띄운다. */
+    let _iBusyDepth = 0;      // 이 창에서 진행 중인 처리 개수
+    let _bBroadBusy = false;  // 부모 창이 "지금 바쁘다"고 알려온 상태
+    let _bBusyShown = false;  // 지금 화면에 실제로 떠 있는지
+
     function fn_setBusy(bIsBusy, sOption) {
-        oAPP.attr.isBusy = bIsBusy;
         const _ISBROAD = sOption?.ISBROAD || undefined;
+        const bFromBroad = (typeof _ISBROAD !== "undefined");
+
+        if (bFromBroad) {
+            _bBroadBusy = (bIsBusy === true);
+        } else if (bIsBusy === true) {
+            _iBusyDepth++;
+        } else if (_iBusyDepth > 0) {
+            _iBusyDepth--;
+        }
+
+        const bWant = (_iBusyDepth > 0) || _bBroadBusy;
+        oAPP.attr.isBusy = bWant;
+
+        if (bWant === _bBusyShown) { return; }   // 상태 변화 없음 — 화면도 전파도 그대로
+        _bBusyShown = bWant;
+
         const busyOverlay = document.getElementById("u4aShortcutBusy");
-
-        if (bIsBusy === true) {
-            if (busyOverlay && !busyOverlay.open) {
-                busyOverlay.showModal();
-            }
-            if (typeof _ISBROAD === "undefined" && oAPP.broadToChild) {
-                oAPP.broadToChild.postMessage({ PRCCD: "BUSY_ON" });
-            }
-            return;
+        if (bWant) {
+            if (busyOverlay && !busyOverlay.open) { busyOverlay.showModal(); }
+        } else {
+            if (busyOverlay && busyOverlay.open) { busyOverlay.close(); }
         }
 
-        if (busyOverlay && busyOverlay.open) {
-            busyOverlay.close();
-        }
-        if (typeof _ISBROAD === "undefined" && oAPP.broadToChild) {
-            oAPP.broadToChild.postMessage({ PRCCD: "BUSY_OFF" });
+        // 내 창에서 시작한 처리만 자식 창에 전파(부모가 보낸 지시는 되돌려 보내지 않는다 — 원래 동작).
+        if (!bFromBroad && oAPP.broadToChild) {
+            oAPP.broadToChild.postMessage({ PRCCD: bWant ? "BUSY_ON" : "BUSY_OFF" });
         }
     }
 
@@ -394,14 +515,20 @@
     let _appIdCheckSeq = 0;   // 앱ID 검사 요청 순번 — 비동기 레이스 방지(늦게 도착한 이전 응답을 폐기)
 
     // 앱 ID 존재 검사 + 앱 Name 채움. blur/Enter/F4/제출 공통. 성공="", 실패="E".
+    //  ★법칙 — 서버에 다녀오는 처리다. 시작하자마자 켜고, 응답을 화면에 다 반영한
+    //    "맨 마지막"에 끈다(예전에는 응답이 오자마자 꺼서, 앱 설명 채우기·오류 표시·확인창이
+    //    뜨는 동안 조작이 열려 있었다).
     async function fn_CheckAppId() {
+        fn_setBusy(true);
+        try { return await _fn_CheckAppIdRun(); }
+        finally { fn_setBusy(false); }
+    }
+    async function _fn_CheckAppIdRun() {
         const mySeq = ++_appIdCheckSeq;   // 이번 요청 순번(응답 적용 전 최신인지 확인)
 
         // ★검사 시작 시 이전 밸류스테이트(오류 테두리+메시지)를 먼저 지운다.
         //   정상값이면 이미 지워져 안 뜨고, 아래 검사에서 걸리면 그때 다시 세팅한다.
         oAppIdField.setValueState("none");
-
-        fn_setBusy(true);
 
         // App Name 라벨 초기화
         oAppNmField.setValue("");
@@ -416,8 +543,6 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(Ldata)
             });
-
-            fn_setBusy(false);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -460,7 +585,6 @@
 
         } catch (err) {
             console.error("[숏컷] App ID 서버 검증 및 파라미터 유효성 검사 오류:", err);
-            fn_setBusy(false);
             const Lmsg = err.message || err.responseText || "";
             U4AUI.confirm({
                 type: "E",
@@ -1257,7 +1381,7 @@
         // 로고 로드 (메인 창과 동일 APPPATH/img/logo.png)
         var oLogo = document.getElementById("u4aShortcutLogo");
         if (oLogo) {
-            try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+            try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 자연스러운 팝업 현출 (Fade-in 효과)
@@ -1278,6 +1402,10 @@
 
     // DOM 로드 완료 라이프사이클
     document.addEventListener("DOMContentLoaded", function () {
+        //  ★법칙 — 팝업이 뜨자마자 무조건 busy 부터 켠다. opener 가 보낸 데이터로 화면을
+        //    다 그리고 창을 보여 준 "맨 마지막"(아래 if_APP_shortcutCreator 끝)에서만 끈다.
+        fn_setBusy(true);
+
         // 타이틀바 & 취소/저장 액션 바인딩
         document.getElementById("u4aShortcutWinClose").addEventListener("click", fn_close);
         document.getElementById("btnCancel").addEventListener("click", fn_close);

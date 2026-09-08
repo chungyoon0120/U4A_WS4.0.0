@@ -123,12 +123,12 @@ var bBusy = false, oToastTimer = null, iBusyWatch = null, bOpenDone = false,
 // /U4A/CL_WS_COMMON · /U4A/MSG_WS 등 메시지 클래스 텍스트.
 function _msg(sCls, sCode, p1, p2, p3, p4) {
     try { return WSMSG.fnGetMsgClsText(sCls, sCode, p1 || "", p2 || "", p3 || "", p4 || ""); }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 // ZMSG_WS_COMMON_001 (Workspace 다국어 — 원본 bindPopup 은 이 클래스로 전 문구를 냄).
 function _zmsg(sNo, p1) {
     try { return WSUTIL.getWsMsgClsTxt(oAPP.attr.GLANGU || LANGU, "ZMSG_WS_COMMON_001", sNo, p1 || "") || ""; }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 oAPP.common.msg = _msg;
 oAPP.common.zmsg = _zmsg;
@@ -151,7 +151,7 @@ oAPP.common.relocalizeServerMsg = function (sText) {
         //   GLANGU(getWsSettingsInfo().globalLanguage)는 글로벌/시스템 언어라 접속언어와 다를 수 있다(실측 2026-08-10: 접속 KO 인데 GLANGU="EN"
         //   → relocalize 가 서버 EN 문구를 "이미 EN"으로 보고 건너뛰어 037 이 영문으로 노출). → LANGU 를 우선한다.
         return WC.relocalize(sRaw, null, LANGU || oAPP.attr.GLANGU || "") || sRaw;
-    } catch (e) { return sRaw; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sRaw; }
 };
 
 // WLO(등록 기능) 여부 — 원본 index.js:1045 oAPP.common.checkWLOList 1:1.
@@ -252,7 +252,7 @@ function _getThemeInfo() {
         var sPath = PATH.join(USERDATA, "p13n", "theme_ws4", SYSID + ".json");
         if (!FS.existsSync(sPath)) { return null; }
         return JSON.parse(FS.readFileSync(sPath, "utf-8"));
-    } catch (e) { return null; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
 }
 
 // busy(로딩 오버레이 + 닫기 차단 + 공용 자식창 브로드캐스트). runtimeClassNav/docPopup 규약.
@@ -262,7 +262,7 @@ function _setBusy(bOn, oOpt) {
     var oEl = document.getElementById("bwpBusy");
     if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
-    try { CURRWIN.closable = false; } catch (e) { }
+    try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // ★ 원본 setBusy(index.js:3473/3488) = lf_setCurrentWindowClosable(!bBusy) — 닫기(X)버튼도 busy 와 대칭 토글.
     //   ★★ busy off 는 setBusyWS20Interaction 뿐 아니라 setBusy(false)(왕복 해제부 bindBroadcast:126 등)로도 온다.
     //   여기서 복원을 안 하면, 진입 때 setBusyWS20Interaction(true)로 건 disabled=true 가 성공-왕복(setBusy(false)) 후
@@ -270,9 +270,9 @@ function _setBusy(bOn, oOpt) {
     try {
         var oBtnClose = document.querySelector(".u4a-winbtn--close");
         if (oBtnClose) { oBtnClose.disabled = bBusy; }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
-        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
+        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 }
 oAPP.fn.setBusy = function (bIsShow, oOpt) {
@@ -319,8 +319,8 @@ oAPP.fn.setBusyWS20Interaction = function (bBusy, sOption) {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { clearTimeout(iBusyWatch); } catch (e) { }
-    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { }
+    try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // ★ 초기 모델트리 로드가 진행 중이면 busy 를 끄지 않는다 — loadBindData 가 비동기 ajax 를 던진 직후
     //   부트가 여기로 오므로, 여기서 끄면 로드~렌더 구간이 무오버레이가 된다(장군님 지적 2026-08-03 "대량 로드 시 busy 안 뜸").
     //   로드의 finally(modelFieldArea loadBindData)가 렌더 완료 후 busy 를 끈다. 원본 UIUpdated 가 로드~렌더를 감싼 것과 동일.
@@ -346,7 +346,7 @@ function _toast(sText) {
     if (oEl.parentNode !== oHost) { oHost.appendChild(oEl); }
     oEl.textContent = sText;
     oEl.dataset.show = "true";
-    try { clearTimeout(oToastTimer); } catch (e) { }
+    try { clearTimeout(oToastTimer); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     oToastTimer = setTimeout(function () { oEl.dataset.show = "false"; }, 3000);
 }
 oAPP.fn.toast = _toast;
@@ -355,13 +355,13 @@ oAPP.fn.toast = _toast;
 function _initChrome() {
     var oLogo = document.getElementById("bwpLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     var oTitle = document.getElementById("bwpTitle");
     if (oTitle) {
         var s = "";
-        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { s = document.title || ""; }
+        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } s = document.title || ""; }
         if (!s) { s = _msg("/U4A/CL_WS_COMMON", "A15"); } // Binding Popup
         oTitle.textContent = s;
     }
@@ -371,14 +371,14 @@ function _initChrome() {
         oClose.addEventListener("click", function () {
             if (bBusy) { return; }
             if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); }
-            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { } }
+            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         });
     }
 
     // 최소화 / 최대화(복원) — 공통 별창 템플릿(_win-popup-template/frame.js)과 동일
     var oMin = document.getElementById("bwpWinMin");
     if (oMin) {
-        oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { } });
+        oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
     }
 
     var oMax = document.getElementById("bwpWinMax");
@@ -388,7 +388,7 @@ function _initChrome() {
             U4AUI.wireWinMaxBtn(CURRWIN, oMax);
         } else {
             oMax.addEventListener("click", function () {
-                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
     }
@@ -404,8 +404,8 @@ function _onThemeChange() {
             BGCOL = oTheme.BGCOL;
             document.documentElement.style.setProperty("--boot-bg", oTheme.BGCOL);
         }
-    } catch (e) { }
-    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     oAPP.attr.oThemeInfo = oTheme;
 }
 
@@ -435,7 +435,7 @@ function _initBroadcast() {
             else if (sPrc === "BUSY_OFF") { _setBusy(false, { ISBROAD: true }); }
         };
         oAPP.attr.oMainBroad = oBroad;
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 /* ── 부트: if_modelBindingPopup 수신 → 데이터 저장 → 앱 기동 ──────────────── */
@@ -482,25 +482,25 @@ function _bootApp() {
     } catch (e) {
         console.error("[HTML5][bindWindow] 앱 기동 오류:", e && e.message);
         // 기동 중 예외로 loadBindData 콜백 finally 가 안 돌 수 있음 → 로드 표식 해제해 아래 _finishOpen 이 busy 를 끄게(무한 busy 방지).
-        try { oAPP.attr.isBindLoading = false; } catch (x) { }
+        try { oAPP.attr.isBindLoading = false; } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
     }
     _finishOpen();
 }
 
 function _keepSession() {
-    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { }
+    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // 디자인영역 드래그 종료 IPC(원본 if-dragEnd 대응) — 드롭 강조 해제.
 function _onDialogDragEnd() {
-    try { if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); } } catch (x) { }
-    try { if (typeof oAPP.fn.onDesignDragEnd === "function") { oAPP.fn.onDesignDragEnd(); } } catch (e) { }
+    try { if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+    try { if (typeof oAPP.fn.onDesignDragEnd === "function") { oAPP.fn.onDesignDragEnd(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 /* ── 부트 진입 ──────────────────────────────────────────────────────────── */
 window.addEventListener("load", function () {
 
-    try { CURRWIN.setMenu(null); } catch (e) { }
+    try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     _setBusy(true);
 
@@ -519,7 +519,7 @@ window.addEventListener("load", function () {
     _keepSession();
 
     // frameless — 위치 확정 후 표시(흰 번쩍 방지). opener show:false.
-    try { CURRWIN.show(); } catch (e) { }
+    try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // 안전판 — if_modelBindingPopup 이 안 오면 busy 강제 해제(방어).
     iBusyWatch = setTimeout(function () {
@@ -531,13 +531,13 @@ window.addEventListener("load", function () {
 // busy 중 창 닫기 차단(원본 onbeforeunload). 정상 종료 시 리스너/IPC 해제.
 window.onbeforeunload = function () {
     if (bBusy) { return false; }
-    try { window.removeEventListener("click", _keepSession); } catch (e) { }
-    try { window.removeEventListener("keyup", _keepSession); } catch (e) { }
-    try { IPCRENDERER.removeListener("if_modelBindingPopup", _onModelBindingPopup); } catch (e) { }
-    try { IPCMAIN.removeListener("if-Dialog-dragEnd", _onDialogDragEnd); } catch (e) { }
-    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { }
-    try { if (typeof oAPP.fn.onWindowClose === "function") { oAPP.fn.onWindowClose(); } } catch (e) { }
-    try { if (oBroad) { oBroad.close(); } } catch (e) { }
+    try { window.removeEventListener("click", _keepSession); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { window.removeEventListener("keyup", _keepSession); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCRENDERER.removeListener("if_modelBindingPopup", _onModelBindingPopup); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCMAIN.removeListener("if-Dialog-dragEnd", _onDialogDragEnd); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (typeof oAPP.fn.onWindowClose === "function") { oAPP.fn.onWindowClose(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (oBroad) { oBroad.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 };
 
 // 영역 모듈이 접근할 수 있도록 전역 노출(원본 window.oAPP 계약).

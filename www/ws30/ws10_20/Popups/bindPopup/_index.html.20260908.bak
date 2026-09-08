@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<style>
+    html,
+    body {
+        height: 100%;
+    }
+
+    body {
+        margin: 0px;
+        overflow: hidden;
+    }
+</style>
+
+<body class="sapUiBody">
+
+    <div class="u4a_bind_shell">
+        <header class="u4a_bind_titlebar">
+            <div class="u4a_bind_titlebar_left"></div>
+
+            <div id="u4a_bind_title_text" class="u4a_bind_title_text"></div>
+
+            <div class="u4a_bind_window_controls" aria-label="">
+                <button id="u4a_bind_minimize" class="u4a_bind_window_button" type="button" title="" aria-label="">
+                    <span class="u4a_bind_window_icon" data-sap-icon="sap-icon://u4a-fw-regular/Window Minimize"></span>
+                </button>
+                <button id="u4a_bind_maximize" class="u4a_bind_window_button" type="button" title="" aria-label="">
+                    <span class="u4a_bind_window_icon" data-sap-icon="sap-icon://u4a-fw-regular/Window Maximize"></span>
+                </button>
+                <button id="u4a_bind_close" class="u4a_bind_window_button u4a_bind_window_button_close" type="button" title="" aria-label="">
+                    <span class="u4a_bind_window_icon" data-sap-icon="sap-icon://u4a-fw-solid/Xmark"></span>
+                </button>
+            </div>
+        </header>
+
+        <div class="u4a_bind_body">
+            <div id="content" class="u4a_bind_frame"></div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+
+</html>

@@ -1548,6 +1548,7 @@
             try{
                 parent.FS.mkdirSync(l_folderPath);
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
 
                 //단축키 잠금 해제처리.
@@ -1568,6 +1569,7 @@
             try{
                 parent.FS.mkdirSync(l_folderPath);
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
 
                 //단축키 잠금 해제처리.
@@ -1589,6 +1591,7 @@
                 //header 파일 생성 처리.
                 parent.FS.writeFileSync(l_filePath, JSON.stringify([]));
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
 
                 //단축키 잠금 해제처리.

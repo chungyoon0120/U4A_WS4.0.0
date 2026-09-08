@@ -40,14 +40,14 @@ var oAPP = {};
         // 로고 (메인 창과 동일: APPPATH/img/logo.png)
         var oLogo = document.getElementById("extopenLogo");
         if (oLogo) {
-            try { oLogo.src = lf_toFileUrl(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { }
+            try { oLogo.src = lf_toFileUrl(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 제목 (head 의 조기 스크립트가 쿼리 TITLE → document.title 로 세팅, 없으면 창 제목)
         var oTitle = document.getElementById("extopenTitle");
         if (oTitle) {
             var sTitle = "";
-            try { sTitle = document.title || CURRWIN.getTitle() || ""; } catch (e) { sTitle = document.title || ""; }
+            try { sTitle = document.title || CURRWIN.getTitle() || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sTitle = document.title || ""; }
             oTitle.textContent = sTitle;
         }
 
@@ -55,7 +55,7 @@ var oAPP = {};
         var oMin = document.querySelector('#extopenTitlebar [data-action="min"]');
         if (oMin) {
             oMin.addEventListener("click", function () {
-                try { CURRWIN.minimize(); } catch (e) { }
+                try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
 
@@ -66,19 +66,19 @@ var oAPP = {};
                 var oIco = oMax.querySelector("i");
                 if (!oIco) { return; }
                 var bMax = false;
-                try { bMax = CURRWIN.isMaximized(); } catch (e) { bMax = false; }
+                try { bMax = CURRWIN.isMaximized(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bMax = false; }
                 oIco.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
                 oMax.title = bMax ? "Restore" : "Maximize";
             };
             oMax.addEventListener("click", function () {
                 try {
                     if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
             try {
                 CURRWIN.on("maximize", lf_syncMaxIcon);
                 CURRWIN.on("unmaximize", lf_syncMaxIcon);
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             lf_syncMaxIcon();
         }
 
@@ -86,11 +86,11 @@ var oAPP = {};
         var oClose = document.querySelector('#extopenTitlebar [data-action="close"]');
         if (oClose) {
             oClose.addEventListener("click", function () {
-                try { CURRWIN.close(); } catch (e) { }
+                try { CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
 
-    } catch (e) { /* 헤더 초기화 실패해도 본문(iframe)은 정상 동작 */ }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 헤더 초기화 실패해도 본문(iframe)은 정상 동작 */ }
 
 })();
 

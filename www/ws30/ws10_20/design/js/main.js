@@ -216,6 +216,7 @@
       try{
         return l_meta[l_getfunc](UIATT)[param];
       }catch(e){
+          if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
       }
 

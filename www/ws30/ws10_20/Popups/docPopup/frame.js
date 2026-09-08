@@ -68,7 +68,7 @@ var oTiny = null, oTitleField = null, bBusy = false, oToastTimer = null,
 // ── 로컬 헬퍼 ──────────────────────────────────────────────────────────
 function _msg(sCls, sCode, p1) {
     try { return WSMSG.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 
 function _getThemeInfo() {
@@ -76,7 +76,7 @@ function _getThemeInfo() {
         var sPath = PATH.join(USERDATA, "p13n", "theme_ws4", SYSID + ".json");
         if (!FS.existsSync(sPath)) { return null; }
         return JSON.parse(FS.readFileSync(sPath, "utf-8"));
-    } catch (e) { return null; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
 }
 
 // 배경색(BGCOL) 휘도로 다크 판정 → oxide / oxide-dark 스킨 선택.
@@ -91,7 +91,7 @@ function _isDarkBg(sBg) {
             r = +m2[1]; g = +m2[2]; b = +m2[3];
         }
         return (0.299 * r + 0.587 * g + 0.114 * b) < 128;
-    } catch (e) { return true; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return true; }
 }
 
 // 공통 토큰 실제 계산값(편집영역 iframe 에 주입할 색 — iframe 은 부모 CSS 변수 캐스케이드 안 됨).
@@ -99,7 +99,7 @@ function _tok(sName, sFallback) {
     try {
         var v = getComputedStyle(document.documentElement).getPropertyValue(sName).trim();
         return v || sFallback;
-    } catch (e) { return sFallback; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sFallback; }
 }
 function _contentStyle() {
     var bg = _tok("--surface", "#ffffff"),
@@ -133,7 +133,7 @@ function _contentStyle() {
 
 // ── TinyMCE 래퍼(에디터 종류 의존 최소화) ────────────────────────────────
 function _getEditorValue() {
-    try { return oTiny ? oTiny.getContent() : null; } catch (e) { return null; }
+    try { return oTiny ? oTiny.getContent() : null; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
 }
 function _setEditorValue(sHtml) {
     if (!oTiny) { return; }
@@ -142,11 +142,11 @@ function _setEditorValue(sHtml) {
         oTiny.setContent((typeof sHtml === "string") ? sHtml : "");
         oTiny.setDirty(false);   // clean 으로 리셋 → 다음 "실제 편집" 때만 dirty 발화
         oState.origHtml = oTiny.getContent();   // 로드 직후 실제 정규화값 = dirty 오탐 비교 기준
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     setTimeout(function () { oState.silent = false; }, 50);
 }
 function _setEditorReadOnly(bRead) {
-    try { if (oTiny && oTiny.mode) { oTiny.mode.set(bRead ? "readonly" : "design"); } } catch (e) { }
+    try { if (oTiny && oTiny.mode) { oTiny.mode.set(bRead ? "readonly" : "design"); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // 툴바 더보기(⋯) 드로어 닫기 — floating 드로어(.tox-toolbar__overflow)는 자동으로 안 닫혀서,
@@ -164,7 +164,7 @@ function _closeToolbarOverflow(oEvTarget) {
         var aGrp = oCont ? oCont.querySelectorAll(".tox-toolbar__primary .tox-toolbar__group") : [];
         var oMore = aGrp.length ? aGrp[aGrp.length - 1].querySelector(".tox-tbtn:last-child") : null;
         if (oMore) { oMore.click(); }   // 더보기 토글 → 닫힘
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 // 바깥(제목/문서목록/타이틀바 등 메인문서) 클릭 시 닫기. 본문 iframe 클릭은 setup 의 ed.on("click") 이 담당.
 function _onDocMouseDownCloseOverflow(ev) {
@@ -178,17 +178,17 @@ function _setBusy(bOn, oOpt) {
     if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); } // 공통 .u4a-busy 토글
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
     //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
-    try { CURRWIN.closable = false; } catch (e) { }
+    try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
-        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
+        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 }
 
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { clearTimeout(iBusyWatch); } catch (e) { }
-    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { }
+    try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _setBusy(false);
     _fadeInContent();
 }
@@ -209,7 +209,7 @@ function _toast(sText) {
     }
     oEl.textContent = sText;
     oEl.dataset.show = "true";
-    try { clearTimeout(oToastTimer); } catch (e) { }
+    try { clearTimeout(oToastTimer); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     oToastTimer = setTimeout(function () { oEl.dataset.show = "false"; }, 3000);
 }
 
@@ -219,7 +219,7 @@ function _zoomStep(iDelta) {
     if (n < 50) { n = 50; }
     if (n > 200) { n = 200; }
     oState.zoom = n;
-    try { if (oTiny && oTiny.getBody) { oTiny.getBody().style.zoom = (n / 100); } } catch (e) { }
+    try { if (oTiny && oTiny.getBody) { oTiny.getBody().style.zoom = (n / 100); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // ── 저장 키/일시 헬퍼(원본 fn_makeDOCKY / fn_getDateTime / convEXIT) ─────────
@@ -373,7 +373,7 @@ function _commitCurrent() {
     // 값 캡처 후 에디터 dirty 리셋 → 같은 문서 계속 편집 시 다음 변경에 dirty 재발화(isChang 재설정).
     //   비교기준(origHtml)도 방금 캡처값으로 갱신 — 안 하면 이후 단순 클릭이 "커밋 전" 원본과
     //   비교돼 다시 오탐 dirty 로 잡힘.
-    try { if (oTiny) { oTiny.setDirty(false); oState.origHtml = sVal !== null ? sVal : oState.origHtml; } } catch (e) { }
+    try { if (oTiny) { oTiny.setDirty(false); oState.origHtml = sVal !== null ? sVal : oState.origHtml; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 function _applyEditorState() {
@@ -527,7 +527,7 @@ function _xhrGet() {
 
         var oData = null;
         try { oData = JSON.parse(this.response); }
-        catch (e) { _finishOpen(); _fatal(sWrong); return; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _finishOpen(); _fatal(sWrong); return; }
 
         switch (oData.RETCD) {
             case "S":
@@ -582,7 +582,7 @@ function _xhrSave() {
 
         var oData = null;
         try { oData = JSON.parse(this.response); }
-        catch (e) { _fatal(sWrong); return; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _fatal(sWrong); return; }
 
         switch (oData.RETCD) {
             case "S":
@@ -660,7 +660,7 @@ function _initEditor() {
                         evt.preventDefault();
                         _zoomStep(evt.deltaY < 0 ? 10 : -10);
                     }, { passive: false });
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
     }).then(function (aEds) {
@@ -687,7 +687,7 @@ function _reinitEditor() {
     if (!oTiny) { return; }
     _commitCurrent();
     oState._reselectKey = oState.curKey;   // null 가능(빈 상태)
-    try { oTiny.remove(); } catch (e) { }   // remove() 가 textarea#docEditor 복원 → 같은 selector 재init 가능
+    try { oTiny.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // remove() 가 textarea#docEditor 복원 → 같은 selector 재init 가능
     oTiny = null;
     oState.editorReady = false;
     _initEditor();
@@ -709,7 +709,7 @@ function _onAppDocuInfo(event, oInfo) {
         oState.APPID = (oAppInfo && oAppInfo.APPID) || "";
         oState.USRNM = (oUser && oUser.ID) || "";
         oState.URL = ((oInfo && oInfo.SERVPATH) || "") + "/u4a_app_doc";
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     oState.gotInfo = true;
     _maybeLoad();
 }
@@ -723,8 +723,8 @@ function _onThemeChange() {
         if (oTheme.BGCOL) {
             CURRWIN.webContents.insertCSS("html,body{margin:0;height:100%;background-color:" + oTheme.BGCOL + ";}");
         }
-    } catch (e) { }
-    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oTheme.BGCOL) { BGCOL = oTheme.BGCOL; }
     setTimeout(function () { _reinitEditor(); }, 200);
 }
@@ -733,13 +733,13 @@ function _onThemeChange() {
 function _initChrome() {
     var oLogo = document.getElementById("docLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     var oTitle = document.getElementById("docTitle");
     if (oTitle) {
         var s = "";
-        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { s = document.title || ""; }
+        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } s = document.title || ""; }
         oTitle.textContent = s;
     }
 
@@ -749,7 +749,7 @@ function _initChrome() {
             if (bBusy) { return; }   // busy 중 닫기 차단
             // 창은 closable:false 라 직접 close() 불가 → 공통 closeWindow(setClosable→close).
             if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); }
-            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { } }
+            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         });
     }
 
@@ -841,7 +841,7 @@ function _initSplitter() {
 }
 
 function _keepSession() {
-    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { }
+    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 function _initBroadcast() {
@@ -852,13 +852,13 @@ function _initBroadcast() {
             if (sPrc === "BUSY_ON") { _setBusy(true, { ISBROAD: true }); }
             else if (sPrc === "BUSY_OFF") { _setBusy(false, { ISBROAD: true }); }
         };
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // ── 부트 ────────────────────────────────────────────────────────────────
 window.addEventListener("load", function () {
 
-    try { CURRWIN.setMenu(null); } catch (e) { }
+    try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     _initChrome();
     _initSplitter();
@@ -875,7 +875,7 @@ window.addEventListener("load", function () {
     // 메인문서 클릭(제목/문서목록/타이틀바 등) 시 더보기 드로어 닫기(capture — 다른 핸들러보다 먼저).
     document.addEventListener("mousedown", _onDocMouseDownCloseOverflow, true);
 
-    try { CURRWIN.show(); } catch (e) { }
+    try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     iBusyWatch = setTimeout(function () {
         console.error("[HTML5][docPopup] 에디터/서버 로드 지연 — busy 강제 해제");
@@ -888,8 +888,8 @@ window.onbeforeunload = function () {
     if (bBusy) { return false; }
     window.removeEventListener("click", _keepSession);
     window.removeEventListener("keyup", _keepSession);
-    try { document.removeEventListener("mousedown", _onDocMouseDownCloseOverflow, true); } catch (e) { }
-    try { IPCRENDERER.removeListener("if-appdocu-info", _onAppDocuInfo); } catch (e) { }
-    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { }
-    try { if (oTiny) { oTiny.remove(); } } catch (e) { }
+    try { document.removeEventListener("mousedown", _onDocMouseDownCloseOverflow, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCRENDERER.removeListener("if-appdocu-info", _onAppDocuInfo); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (oTiny) { oTiny.remove(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 };

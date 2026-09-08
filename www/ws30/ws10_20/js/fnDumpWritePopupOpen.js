@@ -44,7 +44,7 @@
     try {
       var L = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
       return parent.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", sCode, p1 || "") || "";
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
   function _el(sTag, sClass, sText) {
     var o = document.createElement(sTag);
@@ -54,11 +54,11 @@
   }
   function _isEdit() {
     try { var o = APPCOMMON.fnGetModelProperty("/WS20/APP"); return !!(o && o.IS_EDIT === "X"); }
-    catch (e) { return false; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
   }
   function _isKo() {
     try { return ((parent.getUserInfo && parent.getUserInfo().LANGU) || "EN") === "KO"; }
-    catch (e) { return false; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
   }
 
   // ── 설명 텍스트 번들(원본 design/html/documents/<KO|EN>/dumpWritePopup/index.html 1:1) ──
@@ -102,7 +102,7 @@
   // 닫기 = close() 만. DOM 제거는 공통(u4a-ui.js _installGlobalDialogClose)이 .u4a-dialog 전역으로 처리,
   //   다음 열기는 아래 진입부의 contains 가드가 새로 build(기본 상태로).
   function lf_close() {
-    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // ── Apply(원본 OK 액션 콜백) — 스위치 값을 속성 행에 반영 후 변경 흐름 수행 ──
@@ -119,7 +119,7 @@
 
     // (원본 updateBindPopupDesignData: 바인딩 팝업 디자인 영역 갱신 — W4+ 미변환)
     if (typeof oAPP.fn.updateBindPopupDesignData === "function") {
-      try { oAPP.fn.updateBindPopupDesignData(); } catch (e) { }
+      try { oAPP.fn.updateBindPopupDesignData(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     lf_close();
@@ -128,7 +128,7 @@
     //   공통 KIND 10 토스트=화면 정중앙). 닫힌 뒤 메인 위에 표시.
     try {
       parent.showMessage(null, 10, "S", APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "002", "", "", "", ""));
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   /************************************************************************
@@ -277,7 +277,7 @@
     oUI.footTitle.textContent = t.footTitle;
     oUI.footDesc.textContent = t.footDesc;
     // 헤더/버튼 타이틀도 재적용(언어 변경 대응).
-    try { oUI.dlg.querySelector(".u4a-dialog__header span").textContent = _wsTxt("492"); } catch (e) { }
+    try { oUI.dlg.querySelector(".u4a-dialog__header span").textContent = _wsTxt("492"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oUI.applyBtn) { oUI.applyBtn.title = _wsTxt("232"); }
   }
 
@@ -290,7 +290,7 @@
     if (!oUI || !oUI.dlg || !document.body.contains(oUI.dlg)) { oUI = null; lf_build(); }
 
     if (oUI.dlg.open) {
-      try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+      try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       return;
     }
 
@@ -307,10 +307,10 @@
     // Apply 노출(원본 OK visible=/WS20/APP/IS_EDIT). 조회 모드면 보기 전용.
     oUI.applyBtn.hidden = !_isEdit();
 
-    try { oUI.dlg.showModal(); } catch (e) { }
+    try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // busy 끄고 Lock 풀기(원본 afterOpen).
-    try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+    try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
   }; // end of oAPP.fn.fnDumpWritePopupOpen
 

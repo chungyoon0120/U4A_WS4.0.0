@@ -251,7 +251,7 @@
         // 원본 662 setBusyWS20Interaction(true)[sOption 없음] = 팝업 lock, WS20 미방송(225 유지).
         oAPP.fn.setBusy(true, { ISBROAD: true });
         if (oBtn) { oBtn.disabled = true; }   // 원본 666 self setEnabled(false) — 닫아도 재활성 안 함.
-        try { if (document.activeElement) { document.activeElement.blur(); } } catch (e) { }
+        try { if (document.activeElement) { document.activeElement.blur(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aBwpSyncDlg";
@@ -299,7 +299,7 @@
         _clearSyncListSelection();
 
         oSync.oDialog = oDlg;
-        try { oDlg.show(); } catch (e) { try { oDlg.open = true; } catch (e2) { } }   // ★비모달(원본 setModal(false)).
+        try { oDlg.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } try { oDlg.open = true; } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } }   // ★비모달(원본 setModal(false)).
 
         // afterOpen: 팝업 busy off(원본 694). WS20(225)는 유지.
         oAPP.fn.setBusy(false, { ISBROAD: true });
@@ -313,8 +313,8 @@
         var oDlg = oSync.oDialog;
         if (!oDlg) { return; }
         _setSyncViewLayout(true);   // 원본 beforeClose(698): 좌/가운데/우 잠금 해제.
-        try { oDlg.close(); } catch (e) { }
-        try { oDlg.remove(); } catch (e) { }
+        try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oSync.oDialog = null;
         oAPP.fn.setBusyWS20Interaction(false, {});   // 원본 afterClose(711) broadToChild BUSY_OFF.
     }

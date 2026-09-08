@@ -150,11 +150,11 @@ oAPP.views = window?.oAPP?.views || {};
             if (typeof HTMLDialogElement === "undefined" || HTMLDialogElement.prototype.__tlSeqWrapped) { return; }
             var _orig = HTMLDialogElement.prototype.showModal, _seq = 0;
             HTMLDialogElement.prototype.showModal = function () {
-                try { this.dataset.tlSeq = String(++_seq); } catch (e) { }
+                try { this.dataset.tlSeq = String(++_seq); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return _orig.apply(this, arguments);
             };
             HTMLDialogElement.prototype.__tlSeqWrapped = true;
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     })();
 
     oWS.utill.fn.showMessage = function (oUI5, KIND, TYPE, MSG, fn_callback) {
@@ -188,7 +188,7 @@ oAPP.views = window?.oAPP?.views || {};
         //   렌더한다. 구 oUI5.m.MessageToast/MessageBox 의존 제거(oUI5 인자 무시). KIND 99(네이티브)만 유지.
         //   기존 모든 parent.showMessage(sap, KIND, TYPE, MSG, cb) 호출부가 그대로 동작.
         function lf_sound(t) {
-            try { if (t === "S") { setSoundMsg("01"); } else if (t === "W" || t === "E") { setSoundMsg("02"); } } catch (e) { }
+            try { if (t === "S") { setSoundMsg("01"); } else if (t === "W" || t === "E") { setSoundMsg("02"); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 토스트(구 MessageToast) — 싱글톤 .u4a-toast, 3초 자동 숨김
         function _u4aToast(sMsg) {
@@ -227,11 +227,11 @@ oAPP.views = window?.oAPP?.views || {};
         // 메시지 팝업(구 MessageBox) — 테마 native <dialog class="u4a-msgbox">.
         //   aBtns: [{act,label,emphasized}] → 콜백에 UI5 Action 과 동일한 act("OK"/"YES"/"NO"/"CANCEL") 전달.
         function _u4aMsgBox(sType, sTitle, sMsg, aBtns, fnCb) {
-            function lf_cb(sAct) { if (typeof fnCb === "function") { try { fnCb(sAct); } catch (e) { } } }
+            function lf_cb(sAct) { if (typeof fnCb === "function") { try { fnCb(sAct); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } }
             var bCancel = aBtns.some(function (b) { return b.act === "CANCEL"; });
             var bNo = aBtns.some(function (b) { return b.act === "NO"; });
             var oDlg;
-            try { oDlg = document.createElement("dialog"); } catch (e) { oDlg = null; }
+            try { oDlg = document.createElement("dialog"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oDlg = null; }
             if (!oDlg || typeof oDlg.showModal !== "function") {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — <dialog>.showModal 은 메시지 팝업의 필수 의존성.
                 //   미지원이면 삼키지 말고 오류코드로 표면화하고 fail-closed 로 종료(버튼 1개=OK, 여러 개=진행 안 함).
@@ -251,7 +251,7 @@ oAPP.views = window?.oAPP?.views || {};
                 '<div class="u4a-dialog__footer"></div>';
             oDlg.querySelector(".u4a-dialog__header span").textContent = sTitle || "";
             oDlg.querySelector(".u4a-dialog__body").textContent = sMsg || "";
-            function lf_close(sAct) { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } lf_cb(sAct); }
+            function lf_close(sAct) { try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } lf_cb(sAct); }
             var oFooter = oDlg.querySelector(".u4a-dialog__footer");
             aBtns.forEach(function (b) {
                 var oBtn = document.createElement("button");
@@ -700,7 +700,7 @@ oAPP.views = window?.oAPP?.views || {};
 
             // 새창을 요청한 호출자(예: 버전관리 팝업)에 "로드 완료" 통지(옵션). 호출자가 자기 busy 를 끈다.
             if (typeof fnOnLoaded === "function") {
-                try { fnOnLoaded(oBrowserWindow); } catch (e) { }
+                try { fnOnLoaded(oBrowserWindow); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
 
             var oSAPServerInfo = getServerInfo();
@@ -1334,7 +1334,7 @@ oAPP.views = window?.oAPP?.views || {};
                 var s = oAPP.common.fnGetMsgClsText(sCls, sNum);
                 if (s && s.indexOf("|") === -1) { return s; }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sFallback;
     }
 
@@ -1412,7 +1412,7 @@ oAPP.views = window?.oAPP?.views || {};
 
         // 복구 — 열려있을 때만 close(중복 호출 예외 방지).
         if (oNetBusy.open) {
-            try { oNetBusy.close(); } catch (e) { }
+            try { oNetBusy.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
     };
@@ -1622,7 +1622,7 @@ function setDomBusy(bIsBusy) {
                 oBusyDom.addEventListener("cancel", function (e) { e.preventDefault(); });
             }
             if (!oBusyDom.open) {
-                try { oBusyDom.showModal(); } catch (e) { oBusyDom.style.display = "flex"; }
+                try { oBusyDom.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oBusyDom.style.display = "flex"; }
             }
         } else {
             oBusyDom.style.display = "flex"; // 카드 중앙정렬 (스크림 flex center)
@@ -1631,7 +1631,7 @@ function setDomBusy(bIsBusy) {
     }
 
     if (bIsDialog) {
-        if (oBusyDom.open) { try { oBusyDom.close(); } catch (e) { } }
+        if (oBusyDom.open) { try { oBusyDom.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     } else {
         oBusyDom.style.display = "none";
     }
@@ -2478,6 +2478,7 @@ function getSameBrowsers() {
                 oWebPref = oWebCon.getWebPreferences();
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             continue;
         }
 

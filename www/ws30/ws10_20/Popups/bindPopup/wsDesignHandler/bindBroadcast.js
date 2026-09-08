@@ -101,7 +101,7 @@
 
         // [원본 updateDesignData:256 closeAllPopups] 재구성 前 열린 오류 팝오버 닫기(사라질 행에 앵커된 stale 방지).
         //   live 대응 = closeMessagePopover(원본 closeAllPopups 는 툴팁/F4 포함이나 팝업서 상시 열림은 오류 팝오버뿐).
-        if (typeof oAPP.fn.closeMessagePopover === "function") { try { oAPP.fn.closeMessagePopover(); } catch (e) { } }
+        if (typeof oAPP.fn.closeMessagePopover === "function") { try { oAPP.fn.closeMessagePopover(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // 광역변수 갱신(원본) — 즉시 세팅(다른 코드가 oAPP.attr.T_00xx 를 읽으므로 지연 금지).
         oAPP.attr.T_0014 = JSON.parse(JSON.stringify(d.T_0014 || []));
@@ -286,7 +286,7 @@
     // [PUBLIC] 방송 채널 종료(원본 closeChannel) — 창 종료 시.
     oAPP.fn.closeBindChannel = function () {
         if (!oChannel) { return; }
-        try { oChannel.close(); } catch (e) { }
+        try { oChannel.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oChannel = null;
         oAPP.attr.oBindChannel = null;
     };

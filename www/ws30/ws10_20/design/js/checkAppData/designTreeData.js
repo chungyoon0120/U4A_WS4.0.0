@@ -32,7 +32,7 @@ var oCheckFunc = {};
  ********************************************************/
 function raiseDchk(sCode, sWhere, sDetail) {
     var sMsg = "[" + sCode + "] " + sWhere + (sDetail ? " — " + sDetail : "");
-    try { console.error(sMsg); } catch (e) { }
+    try { console.error(sMsg); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     throw new Error(sMsg);
 }
 
@@ -143,6 +143,7 @@ module.exports.checkPropertyValue = function(sAttr){
     try {
         eval(_eval);
     } catch (error) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         raiseDchk("DCHK-004", "프로퍼티 값 검사 스크립트 실행 실패",
             "UI(" + (sAttr && sAttr.OBJID ? sAttr.OBJID : "?") + ") 프로퍼티(" + (sAttr && sAttr.UIATT ? sAttr.UIATT : "?") + "): " +
             ((error && error.message) ? error.message : String(error)));
@@ -799,6 +800,7 @@ oCheckFunc.validmTimePickerLocaleId = function(sAttr){
         new Locale(_sVal);
 
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
         _sRes.RETCD = "E";
 

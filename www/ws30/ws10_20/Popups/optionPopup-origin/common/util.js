@@ -302,6 +302,7 @@
                 oWin = oWin.parent;
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 return;
             }
 
@@ -531,6 +532,7 @@
         try {
             return JSON.parse(oFs.readFileSync(filePath, "utf-8"));
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -616,6 +618,7 @@
                 aParams[3] || ""
             ) || sMissingText;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return sMissingText;
         }
 
@@ -700,6 +703,7 @@
             oWin?.webContents?.insertCSS(`html, body { margin: 0; height: 100%; background-color: ${sBgColor}; }`);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -721,6 +725,7 @@
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return false;
         }
 
@@ -729,6 +734,7 @@
         try {
             return typeof oAPP?.fn?.getBusy === "function" && oAPP.fn.getBusy() === true;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return false;
         }
 
@@ -753,6 +759,7 @@
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -765,6 +772,7 @@
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -838,6 +846,7 @@
             oAPP?.WSUTIL?.setBrowserOpacity?.(oAPP.CURRWIN);
             oAPP?.IPCRENDERER?.send?.(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" });
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 

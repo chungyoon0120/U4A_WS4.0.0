@@ -225,13 +225,13 @@
 
         // 이미 떠 있으면 제거 후 재생성.
         var oOld = document.getElementById("u4aSysNotiDlg");
-        if (oOld) { try { oOld.close(); } catch (e) { } oOld.remove(); }
+        if (oOld) { try { oOld.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } oOld.remove(); }
 
         var sClose = "Close";
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
             if (s && s.indexOf("|") === -1) { sClose = s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oDlg = document.createElement("dialog");
         oDlg.id = "u4aSysNotiDlg";
@@ -323,8 +323,8 @@
     }
 
     function _sysNotiClose(oDlg) {
-        try { oDlg.close(); } catch (e) { }
-        try { oDlg.remove(); } catch (e) { }
+        try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
 
@@ -512,6 +512,7 @@
         try {
             var aMsgList = JSON.parse(sMsgListJson);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return `${sMsgCls}|${sPath}|${sLangu}|JSON Parse Error`;
         }
 
@@ -570,6 +571,7 @@
                 if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oResult.WINDOW); }
                 else { oResult.WINDOW.setClosable(true); oResult.WINDOW.close(); }
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             }
 
@@ -671,11 +673,11 @@
      * @param {Function} fnAction  실제 동작
      ************************************************************************/
     oAPP.common.fnRunShortCut = function (e, sPage, fnAction) {
-        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { }
-        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { }
+        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (e && e.repeat === true) { return; }                                                          // (1)
-        try { if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) { return; } } catch (x) { } // (2)
-        try { if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; } } catch (x) { } // (3)
+        try { if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (2)
+        try { if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (3)
         try { fnAction(e); } catch (err) { console.error("[HTML5][shortcut][" + sPage + "]", err); }
     }; // end of oAPP.common.fnRunShortCut
 
@@ -686,14 +688,14 @@
      ************************************************************************/
     oAPP.common.fnNaviLock = function () {
         oAPP.attr.isNaviBusy = true;
-        try { clearTimeout(oAPP.attr._naviBusyTimer); } catch (x) { }
+        try { clearTimeout(oAPP.attr._naviBusyTimer); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         // backstop: 정상 경로는 완료 시 release 하지만, 서버응답 누락/예외로 release 를 놓쳐도
         //   8초 후 자동 해제(그 이상 걸리면 이미 행 상태) → 단축키가 영구로 막히지 않게.
         oAPP.attr._naviBusyTimer = setTimeout(function () { oAPP.attr.isNaviBusy = false; }, 8000);
     };
     oAPP.common.fnNaviRelease = function () {
         oAPP.attr.isNaviBusy = false;
-        try { clearTimeout(oAPP.attr._naviBusyTimer); oAPP.attr._naviBusyTimer = null; } catch (x) { }
+        try { clearTimeout(oAPP.attr._naviBusyTimer); oAPP.attr._naviBusyTimer = null; } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
     };
 
     oAPP.common.fnShortCutExeAvaliableCheck = () => {
@@ -1578,7 +1580,7 @@
 
                     // split 버튼 본체 = 기본 실행(ev_pressAppExecBtn). firePress 대체로 이벤트 직접 호출.
                     try { oAPP.events.ev_pressAppExecBtn(); }
-                    catch (err) { if (typeof console !== "undefined") { console.warn("[WS20] F8 AppExec error", err); } }
+                    catch (err) { if (typeof console !== "undefined") { console.error("[WS20] F8 AppExec error", err); } }
 
                 }
             },
@@ -2672,6 +2674,7 @@
                 };
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -2751,6 +2754,7 @@
                 }
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -3721,13 +3725,13 @@
                 oArtImg.src = sArtUrl;
                 oArtImg.setAttribute("data-mode", sMode);
             }
-        } catch (e) { /* 그림 갱신 실패는 진행률 표시 자체를 막지 않음 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 그림 갱신 실패는 진행률 표시 자체를 막지 않음 */ }
 
         oDlg.querySelector(".u4aWsProgTitle").textContent = oOptions.title || "";
         oDlg.querySelector(".u4aWsProgDesc").textContent = oOptions.description || "";
         lf_setWsProgValue(oDlg, oOptions.percentValue || 0, oOptions.displayValue || "");
 
-        try { if (!oDlg.hasAttribute("open")) { oDlg.showModal(); } } catch (e) { }
+        try { if (!oDlg.hasAttribute("open")) { oDlg.showModal(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.common.fnProgressDialogOpen
 
@@ -3750,7 +3754,7 @@
         // [HTML5] 네이티브 <dialog> 닫기 + 진행값 리셋(원본 afterClose).
         var oDlg = document.getElementById("u4aWsProgressDialog");
         if (oDlg) {
-            try { oDlg.close(); } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             lf_setWsProgValue(oDlg, 0, "");
         }
 
@@ -3833,12 +3837,12 @@
                 oArtImg.src = sArtUrl;
                 oArtImg.setAttribute("data-mode", sMode);
             }
-        } catch (e) { /* 그림 갱신 실패는 팝업 표시 자체를 막지 않음 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 그림 갱신 실패는 팝업 표시 자체를 막지 않음 */ }
 
         oDlg.querySelector(".u4aWsIllustTitle").textContent = oOptions.title || "";
         oDlg.querySelector(".u4aWsIllustDesc").textContent = oOptions.description || "";
 
-        try { if (!oDlg.hasAttribute("open")) { oDlg.showModal(); } } catch (e) { }
+        try { if (!oDlg.hasAttribute("open")) { oDlg.showModal(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.common.fnIllustMsgDialogOpen
 
@@ -3848,7 +3852,7 @@
     oAPP.common.fnIllustMsgDialogClose = () => {
         // [HTML5] 네이티브 <dialog> 닫기 (sap 의존 제거)
         var oDlg = document.getElementById("u4aWsIllustedMsgDialog");
-        if (oDlg) { try { oDlg.close(); } catch (e) { } }
+        if (oDlg) { try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
     }; // end of oAPP.common.fnIllustMsgDialogClose
 
@@ -4068,6 +4072,7 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         try {
             var oURL = new URL(sPath);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -4140,7 +4145,301 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
     }
 
 
-    zconsole.log(`[ajax 요청]: ${sPath}`);
+    // 2026-09-08 정리 — 아래 새 서버 통신 로그가 같은 내용을 담으므로 예전 줄은 뺐다(로그 두 벌 방지).
+
+    /**
+     * 서버 통신 로그 (2026-09-08 추가)
+     * ---------------------------------------------------------------------
+     * 왜 넣었나: 서버와 주고받다 난 오류가 로그에 안 남아 원인을 못 짚었다.
+     *           이 함수 한 곳으로 서버 통신이 다 지나가므로 여기서만 남기면 된다.
+     * 무엇을 남기나: 무엇을 요청했는지 / 성공인지 실패인지 / 걸린 시간.
+     * 값 자체는 안 남긴다. 요청 이름만 남긴다(개인정보·업무자료 보호).
+     */
+    var _iAjaxStartAt = Date.now();
+    var _sAjaxName = String(sPath).split("?")[0].split("/").pop() || sPath;
+
+    /**
+     * 요청 번호 (2026-09-08 추가)
+     * 같은 요청이 한꺼번에 여러 번 나가면 응답이 뒤섞여 돌아온다(실측).
+     * 번호를 붙여야 보낸 줄과 받은 줄의 짝이 맞는다.
+     */
+    if (typeof window.__u4aAjaxSeq !== "number") { window.__u4aAjaxSeq = 0; }
+    window.__u4aAjaxSeq++;
+    var _sAjaxNo = "#" + window.__u4aAjaxSeq;
+
+    function _ajaxLog(sWhat, sResult) {
+
+        try {
+
+            if (typeof U4ALOG === "undefined") {
+                return;   // 공통 로그 함수가 아직 안 올라온 화면 — 조용히 넘어간다
+            }
+
+            U4ALOG.server(sWhat, _sAjaxName + " " + _sAjaxNo, sResult, Date.now() - _iAjaxStartAt);
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            // 로그 남기다 통신을 막으면 안 된다.
+        }
+
+    }
+
+    /**
+     * 서버 통신 실패를 자세히 남긴다 (2026-09-08 추가 — 장군님 지시)
+     * -----------------------------------------------------------------
+     * 왜 넣었나
+     *   서버가 500 을 돌려줬는데 로그에는 "실패: 통신 오류" 한 줄뿐이었다.
+     *   어느 주소로 보냈는지, 서버가 뭐라고 했는지가 없어 로그만 보고는 못 고친다.
+     *
+     * 무엇을 남기나 (실패했을 때만)
+     *   주소 / 방식 / 상태 번호 / 서버가 준 응답 내용 / 오류 표시 값 / 보낸 항목 이름
+     *   ※ 성공은 한 줄만 남긴다. 다 남기면 로그가 터진다.
+     */
+    var MAX_RES_TEXT = 4000;   // 응답이 길면 앞부분만
+
+    function _safePath(s) {
+
+        try {
+
+            var sp = String(s == null ? "" : s);
+            var i = sp.indexOf("?");
+
+            // 물음표 뒤에는 세션 정보가 붙어 온다 — 그대로 남기면 밖으로 샌다
+            return (i >= 0) ? (sp.slice(0, i) + " (뒤쪽 정보는 가림)") : sp;
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            return "(주소를 못 읽음)";
+        }
+
+    }
+
+    function _ajaxFail(sReason, oXhrLike) {
+
+        // ① 한 줄 요약은 지금까지처럼
+        _ajaxLog("끝남", "실패: " + sReason);
+
+        try {
+
+            if (typeof U4ALOG === "undefined") { return; }
+
+            var x = oXhrLike || null;
+
+            // ② 어디로 무엇을 보냈나
+            U4ALOG.error("서버통신 실패 상세", "보낸 곳: POST " + _safePath(sPath));
+
+            if (x) {
+
+                // ③ 서버가 준 상태
+                var iStatus = (typeof x.status === "number") ? x.status : "-";
+                var sStatusText = x.statusText || "";
+                U4ALOG.error("서버통신 실패 상세", "서버 상태: " + iStatus + (sStatusText ? (" " + sStatusText) : ""));
+
+                // ④ 오류를 알리는 응답 표시 값들
+                try {
+
+                    if (typeof x.getResponseHeader === "function") {
+
+                        var aMark = ["sap-err-id", "u4a_status", "content-type"];
+
+                        for (var i = 0; i < aMark.length; i++) {
+                            var v = x.getResponseHeader(aMark[i]);
+                            if (v) { U4ALOG.error("서버통신 실패 상세", "응답표시 " + aMark[i] + ": " + v); }
+                        }
+
+                    }
+
+                } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+
+                // ⑤ ★서버가 준 응답 내용 — 이게 원인을 짚는 핵심이다
+                try {
+
+                    var sBody = "";
+
+                    if (x.responseType === "blob" || x.responseType === "arraybuffer") {
+                        sBody = "(파일로 받은 응답이라 글로 못 남김)";
+                    } else {
+                        sBody = (x.responseText != null) ? x.responseText : (x.response != null ? String(x.response) : "");
+                    }
+
+                    if (!sBody) {
+                        sBody = "(서버가 아무 내용도 안 줬음)";
+                    } else if (sBody.length > MAX_RES_TEXT) {
+                        sBody = sBody.slice(0, MAX_RES_TEXT) + " …(뒤 " + (sBody.length - MAX_RES_TEXT) + "자 잘림)";
+                    }
+
+                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용: " + sBody);
+
+                } catch (e3) {
+                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용을 못 읽음: " + e3);
+                }
+
+            } else {
+                U4ALOG.error("서버통신 실패 상세", "서버 응답 자체가 없음 (연결이 끊겼거나 서버에 못 닿음)");
+            }
+
+            // ⑥ 무엇을 보냈는지 — 항목 이름만 남긴다(값은 안 남긴다)
+            try {
+
+                if (typeof oFormData !== "undefined" && oFormData && typeof oFormData.keys === "function") {
+
+                    var aKeys = [];
+                    var it = oFormData.keys();
+                    var r = it.next();
+
+                    while (!r.done && aKeys.length < 40) {
+                        aKeys.push(r.value);
+                        r = it.next();
+                    }
+
+                    if (aKeys.length > 0) {
+                        U4ALOG.error("서버통신 실패 상세", "보낸 항목: " + aKeys.join(", "));
+                    }
+
+                }
+
+            } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            // 로그 남기다 통신을 막으면 안 된다.
+        }
+
+    }
+
+    /**
+     * 무슨 일로 보내는 요청인지 같이 남긴다 (2026-09-08 추가 — 장군님 지시)
+     * -----------------------------------------------------------------
+     * 왜 넣었나
+     *   앞서는 요청 이름만 남겨서, 로그를 봐도 사용자가 무슨 기능을 했는지 알 수 없었다.
+     *   요청에 담긴 기능 구분 항목을 같이 남기면 "무엇을 하다 났는지"가 읽힌다.
+     *
+     * 무엇을 남기나
+     *   짧은 값만 남긴다(40자까지). 긴 값은 업무 자료라 **길이만** 적고 내용은 안 남긴다.
+     *   비밀번호처럼 가려야 하는 이름이면 통째로 뺀다.
+     */
+    function _describeRequest() {
+
+        try {
+
+            if (!oFormData || typeof oFormData.entries !== "function") { return ""; }
+
+            var aOut = [];
+            var it = oFormData.entries();
+            var r = it.next();
+            var iSeen = 0;
+
+            while (!r.done && aOut.length < 12 && iSeen < 60) {
+
+                iSeen++;
+
+                var sKey = String(r.value[0] || "");
+                var vVal = r.value[1];
+                var sUp = sKey.toUpperCase();
+
+                // 가려야 하는 것은 통째로 뺀다
+                if (sUp.indexOf("PW") >= 0 || sUp.indexOf("PASS") >= 0
+                    || sUp.indexOf("TOKEN") >= 0 || sUp.indexOf("SESS") >= 0
+                    || sUp.indexOf("KEY") >= 0 || sUp.indexOf("AUTH") >= 0) {
+                    r = it.next();
+                    continue;
+                }
+
+                // 버전·패치처럼 매번 같은 것은 뺀다(줄만 길어진다)
+                if (sUp === "WSVER" || sUp === "WSPATCH_LEVEL") {
+                    r = it.next();
+                    continue;
+                }
+
+                if (typeof vVal !== "string") {
+                    aOut.push(sKey + "=(파일)");
+                } else if (vVal.length === 0) {
+                    aOut.push(sKey + "=(빈값)");
+                } else if (vVal.length <= 40) {
+                    aOut.push(sKey + "=" + vVal.replace(/\s+/g, " "));
+                } else {
+                    aOut.push(sKey + "=(" + vVal.length + "자)");
+                }
+
+                r = it.next();
+
+            }
+
+            return aOut.join(", ");
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            return "";
+        }
+
+    }
+
+    /**
+     * 서버가 준 값의 모양을 한 줄로 (2026-09-08 추가)
+     * 항목 이름 · 목록 건수 · 비어 있는 항목만 남긴다. 값은 안 남긴다.
+     */
+    function _logResultShape(oRes) {
+
+        try {
+
+            if (typeof U4ALOG === "undefined") { return; }
+
+            if (oRes == null) {
+                U4ALOG.warn("서버 응답", _sAjaxName + " " + _sAjaxNo, "★받은 값이 아예 없음");
+                return;
+            }
+
+            if (typeof oRes !== "object") {
+                U4ALOG.info("서버 응답", _sAjaxName + " " + _sAjaxNo, "값 하나만 옴");
+                return;
+            }
+
+            var aHas = [];
+            var aEmpty = [];
+            var iSeen = 0;
+
+            for (var k in oRes) {
+
+                if (!Object.prototype.hasOwnProperty.call(oRes, k)) { continue; }
+                if (++iSeen > 60) { break; }
+
+                var v = oRes[k];
+
+                if (v == null || v === "") {
+                    aEmpty.push(k);
+                } else if (Array.isArray(v)) {
+                    aHas.push(k + "(" + v.length + "건)");
+                    if (v.length === 0) { aEmpty.push(k); }
+                } else if (typeof v === "object") {
+                    aHas.push(k + "(묶음)");
+                } else {
+                    aHas.push(k);
+                }
+
+            }
+
+            var sTxt = "받은 항목: " + (aHas.length ? aHas.join(", ") : "(없음)");
+
+            if (aEmpty.length > 0) {
+                sTxt += " | ★비어 있음: " + aEmpty.join(", ");
+            }
+
+            // 비어 있는 항목이 있으면 주의로, 아니면 알림으로
+            if (aEmpty.length > 0) {
+                U4ALOG.warn("서버 응답", _sAjaxName + " " + _sAjaxNo, sTxt);
+            } else {
+                U4ALOG.info("서버 응답", _sAjaxName + " " + _sAjaxNo, sTxt);
+            }
+
+        } catch (e) {
+            // 로그 때문에 통신을 막으면 안 된다.
+        }
+
+    }
+
+    var _sReqDesc = _describeRequest();
+
+    _ajaxLog("보냈음", _sReqDesc ? ("무슨 일: " + _sReqDesc) : "");
 
     /**
      * 서버 통신 시 버전, 패치 레벨 정보를 무조건 전송 -- End
@@ -4165,7 +4464,10 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
     // 서버 요청에 대한 정상 응답
     oXHR.onload = function (e) {
 
-        zconsole.log(`[ajax 응답]: ${sPath}`);
+        // 2026-09-08 정리 — 아래 새 서버 통신 로그로 대체(로그 두 벌 방지).
+
+        // 서버 통신 로그 — 받은 것(2026-09-08 추가)
+        _ajaxLog("받았음", "상태 " + (e && e.target ? e.target.status : "-"));
 
         // 서버 요청 메시지 팝업 타임아웃을 죽인다.
         if (typeof iReqMsgTimeout !== "undefined") {
@@ -4186,6 +4488,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         let sap_err = oXHR.getResponseHeader("sap-err-id");
         if (sap_err) {
 
+            // 서버 통신 로그 — 실패(2026-09-08 추가)
+            _ajaxFail("서버가 오류를 돌려줌", oXHR);
+
             // 현재 같은 세션으로 떠있는 브라우저 창을 전체 닫고 내 창은 Session Timeout 팝업 호출
             fn_logoff_success('X');
 
@@ -4202,6 +4507,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         // status 값이 있다면 서버에서 오류 발생
         if (u4a_status) {
 
+            // 서버 통신 로그 — 실패(2026-09-08 추가)
+            _ajaxFail("서버가 거절 (" + u4a_status + ")", oXHR);
+
             // 전역 busy 종료
             parent.setBusy("");
 
@@ -4213,6 +4521,10 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
                 var oResult = JSON.parse(oXHR.response);
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
+
+                // 서버 통신 로그 — 응답을 못 알아봄(2026-09-08 보완)
+                _ajaxFail("응답을 못 알아봄 — " + (error && error.message ? error.message : error), oXHR);
 
                 fnJsonParseError(error);
 
@@ -4227,6 +4539,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
         // 응답 타입이 Blob일 경우 응답 데이터를 success 콜백을 호출한다.
         if (oXHR.responseType === 'blob') {
+
+            // 서버 통신 로그 — 파일 받기 성공(2026-09-08 보완, 처음에 빠뜨렸던 갈래)
+            _ajaxLog("끝남", "성공 (파일 받음)");
 
             if (typeof fn_success === "function") {
                 fn_success(oXHR.response, oXHR);
@@ -4245,6 +4560,10 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
             var oResult = JSON.parse(oReturn);
 
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+
+            // 서버 통신 로그 — 응답을 못 알아봄(2026-09-08 보완, 두 번째 갈래)
+            _ajaxFail("응답을 못 알아봄 — " + (e && e.message ? e.message : e), oXHR);
 
             fnJsonParseError(e);
 
@@ -4253,6 +4572,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
         // Critical Error 일 경우 로그아웃 처리
         if (oResult.RETCD === "Z") {
+
+            // 서버 통신 로그 — 실패(2026-09-08 추가)
+            _ajaxFail("치명 오류로 로그아웃", oXHR);
 
             // 화면 Lock 해제
             sap.ui.getCore().unlock();
@@ -4268,6 +4590,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         // 로그인 티켓 만료되면 로그인 페이지로 이동한다.
         if (oResult.TYPE === "E") {
 
+            // 서버 통신 로그 — 실패(2026-09-08 추가)
+            _ajaxFail("로그인 유효기간 만료", oXHR);
+
             // error 콜백이 있다면 호출
             if (typeof fn_error === "function") {
                 fn_error();
@@ -4280,6 +4605,23 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
         }
 
+        // 서버 통신 로그 — 성공 확정(2026-09-08 추가)
+        _ajaxLog("끝남", "성공");
+
+        /**
+         * 서버가 준 값의 모양을 남긴다 (2026-09-08 추가 — 장군님 지시)
+         * -----------------------------------------------------------------
+         * 왜 넣었나
+         *   서버가 준 값을 검사 없이 바로 쓰는 자리가 638곳이다(실측).
+         *   화면에 꼭 필요한 항목이 안 왔을 때, 로그에 "서버가 무엇을 줬는지" 가
+         *   없으면 서버 잘못인지 우리 잘못인지 못 가린다.
+         *
+         * 무엇을 남기나
+         *   항목 이름 / 목록은 몇 건인지 / 비어 있는 항목이 무엇인지.
+         *   값 자체는 안 남긴다(업무 자료 보호).
+         */
+        _logResultShape(oResult);
+
         if (typeof fn_success === "function") {
             fn_success(oResult);
         }
@@ -4291,6 +4633,25 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
      * 통신 오류 또는 timeout 발생 시
      ***********************************************/
     function _onError(e) {
+
+        /**
+         * 서버 통신 로그 — 실패 (2026-09-08 보완)
+         * 앞서는 상태 번호를 안 보고 무조건 "통신 오류" 라고 적었다.
+         * 실제로는 서버가 500 을 돌려준 것도 여기로 오는데 그게 안 보였다(장군님 지적).
+         */
+        var _oFailXhr = (e && e.target) ? e.target : null;
+        var _iFailStatus = (_oFailXhr && typeof _oFailXhr.status === "number") ? _oFailXhr.status : 0;
+        var _sFailReason;
+
+        if (e && e.type === "timeout") {
+            _sFailReason = "시간 초과 (서버가 제때 답을 안 줌)";
+        } else if (_iFailStatus > 0) {
+            _sFailReason = "서버가 상태 " + _iFailStatus + " 를 돌려줌";
+        } else {
+            _sFailReason = "서버에 못 닿음 (연결 끊김·차단·주소 틀림)";
+        }
+
+        _ajaxFail(_sFailReason, _oFailXhr);
 
         // 서버 요청 메시지 팝업 타임아웃을 죽인다.
         if (typeof iReqMsgTimeout !== "undefined") {

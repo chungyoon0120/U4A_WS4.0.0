@@ -61,6 +61,7 @@
         const WSERR = parent.require(PATHINFO.WSTRYCATCH);
         window.zconsole = WSERR(window, document, console);
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         window.zconsole = console;
     }
 
@@ -69,6 +70,7 @@
     try {
         SETTINGS = require(PATHINFO.WSSETTINGS);
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         SETTINGS = require(PATH.join(APPPATH, "settings", "ws_settings.json"));
     }
 
@@ -105,7 +107,7 @@
     try {
         const vbsDirectory = PATH.join(PATH.dirname(APP.getPath('exe')), 'resources/regedit/vbs');
         REGEDIT.setExternalVBSLocation(vbsDirectory);
-    } catch (e) { /* dev 환경 무시 */ }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* dev 환경 무시 */ }
 
     // PowerShell 경로
     const PS_ROOT_PATH = PATH.join(USERDATA, "ext_api", "ps");
@@ -139,7 +141,7 @@
      *  (구: 여기 THEME_MAP/applyBsTheme → theme-api 로 이관, 중복 제거)
      ********************************************************************/
     oAPP.fn.fnApplyTheme = function (sKey) {
-        try { U4ATheme.apply(sKey); } catch (e) { }
+        try { U4ATheme.apply(sKey); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     /********************************************************************
@@ -364,7 +366,7 @@
             oAudio.src = "";
             oAudio.src = sAudioPath;
             oAudio.play();
-        } catch (e) { /* 사운드 실패는 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 사운드 실패는 무시 */ }
     };
 
     /********************************************************************
@@ -383,6 +385,7 @@
             const sUi5Theme = (oTheme && oTheme.value) ? oTheme.value : SETTINGS.defaultTheme;
             oAPP.fn.fnApplyTheme(sUi5Theme);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             oAPP.fn.fnApplyTheme("horizon_white");
         }
         // [흰색 플래시] 첫 페인트용 동기 배경(--boot-bg, intro 가 BGCOL 로 전달)은 테마 CSS 가
@@ -392,7 +395,7 @@
             requestAnimationFrame(function () {
                 document.documentElement.style.removeProperty("--boot-bg");
             });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oAPP.fn.fnOnMainStart();
     };
 
@@ -554,6 +557,7 @@
         try {
             oResult = await oAPP.fn.fnGetRegInfoForSAPLogon();
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return oAPP.fn.fnPromiseError(error);
         }
         await oAPP.fn.fnGetRegInfoForSAPLogonThen(oResult);
@@ -608,6 +612,7 @@
             try {
                 oReadResult = await oAPP.fn.fnReadSAPLogonData("LandscapeFile", sLandscapeFilePath);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 oAPP.fn.fnPromiseError(error);
                 return;
             }
@@ -933,7 +938,7 @@
                     return o.viewMode;
                 }
             }
-        } catch (e) { /* 손상/누락 → 기본값 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 손상/누락 → 기본값 */ }
         return VIEW_MODES.TREE;
     };
     oAPP.fn.fnSaveViewMode = function (sMode) {
@@ -962,7 +967,7 @@
                     testPw: typeof o.testPw === "string" ? o.testPw : ""
                 };
             }
-        } catch (e) { /* 손상/누락 → 기본값 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 손상/누락 → 기본값 */ }
         return { testMode: false, testClient: "", testId: "", testPw: "" };
     }
     function _saveTestState() {
@@ -1187,7 +1192,7 @@
                 const o = JSON.parse(FS.readFileSync(p, "utf-8") || "{}");
                 if (o && typeof o === "object") { return o; }
             }
-        } catch (e) { /* 손상/누락 → 빈 이력 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 손상/누락 → 빈 이력 */ }
         return {};
     }
     // 이력 엔트리 정규화(구 포맷 number → {ts,count} 호환)
@@ -1255,7 +1260,7 @@
         try {
             const r = oAPP.fn.fnGetSavedServerListDataAll();
             if (r.RETCD === "S") { r.RETDATA.forEach((s) => oSaved.add(s.uuid)); }
-        } catch (e) { /* 저장파일 없음 → 전부 미저장 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 저장파일 없음 → 전부 미저장 */ }
         return aAll.map((o) => Object.assign({}, o, { ISSAVE: oSaved.has(o.uuid) }));
     }
     function _getRecentServers(iLimit) {
@@ -1499,7 +1504,7 @@
 
             // 활성 행 보이게 스크롤
             const oActiveRow = oList.querySelector(".u4a-lnch__row.active");
-            if (oActiveRow && oActiveRow.scrollIntoView) { try { oActiveRow.scrollIntoView({ block: "nearest" }); } catch (e) { } }
+            if (oActiveRow && oActiveRow.scrollIntoView) { try { oActiveRow.scrollIntoView({ block: "nearest" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
             // 활성 서버 기준으로 푸터 버튼 상태/선택 동기화
             const oActSrv = aRes[oAPP.attr._launcherActiveIdx] || null;
@@ -1549,7 +1554,7 @@
         const iKeepScroll = oAPP.attr._lnchScroll || 0;
         oBodyArea.scrollTop = iKeepScroll;
         setTimeout(() => {
-            try { oInput.focus({ preventScroll: true }); oInput.setSelectionRange(oInput.value.length, oInput.value.length); } catch (e) { }
+            try { oInput.focus({ preventScroll: true }); oInput.setSelectionRange(oInput.value.length, oInput.value.length); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oBodyArea.scrollTop = iKeepScroll; // 포커스 후에도 위치 유지
         }, 0);
     };
@@ -1623,7 +1628,7 @@
 
         // 헤더: 폴더명 · N servers / M active
         let sFolder = "";
-        try { sFolder = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { }
+        try { sFolder = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         const iActive = aItems.filter(o => o.ISSAVE === true).length;
         const oHead = _el("div", "u4a-md__listhead");
         const oHInfo = _el("div", "u4a-md__listinfo");
@@ -1727,7 +1732,7 @@
 
         // 필드 그리드
         let sGroup = "";
-        try { sGroup = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { }
+        try { sGroup = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         const _field = (sLabel, sVal) => {
             const oF = _el("div", "u4a-md__field");
             oF.append(_el("div", "u4a-md__flabel", sLabel), _el("div", "u4a-md__fval", sVal || "—"));
@@ -1850,6 +1855,7 @@
             const oS = WSUTIL.getWsSettingsInfo();
             return String((oS && oS.globalLanguage) || "EN").toUpperCase();
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return "EN";
         }
     }
@@ -2092,7 +2098,7 @@
                     oAPP.attr._lastSelectedServerKey = oRegData.values["LastSelectedServerKey"].value;
                 }
             }
-        } catch (e) { /* 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
 
         // 선택 노드 키는 뷰(트리 유무)와 무관하게 메모리에 보관 — 런처로 시작했다가
         //  나중에 트리/마스터로 전환할 때 폴더 선택을 복원하기 위함.
@@ -2604,6 +2610,7 @@
             FS.writeFileSync(PATHINFO.SERVERINFO_V2, JSON.stringify(aSaveServerData, null, 2), 'utf-8');
             return { RETCD: "S" };
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return { RETCD: "E" };
         }
     }
@@ -2791,7 +2798,7 @@
         oAPP.fn.fnRecordConnection(sUUID);
         // Launcher 가 떠 있으면 즉시 RECENT 갱신(연결 새 창은 별도 → 이 창은 남아있음)
         if (oAPP.attr._viewMode === VIEW_MODES.LAUNCHER) {
-            try { oAPP.fn.fnRenderLauncher(); } catch (e) { }
+            try { oAPP.fn.fnRenderLauncher(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         fnLoginPage(oLoginInfo);
@@ -2941,6 +2948,7 @@
         try {
             aSavedData = JSON.parse(sFileContent);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             aSavedData = [];
         }
         if (!Array.isArray(aSavedData)) {
@@ -3234,14 +3242,14 @@
                 const aDir = FS.readdirSync(sMsgDirPath);
                 if (aDir.length) { aLangu = aDir.map(s => ({ KEY: s })); }
             }
-        } catch (e) { /* 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
 
         // 현재 선택 언어
         let sSelected = "EN";
         try {
             const oWsLangu = await WSUTIL.getGlobalSettingInfo("language");
             if (oWsLangu && oWsLangu.value) { sSelected = oWsLangu.value; }
-        } catch (e) { /* 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
 
         const oSel = _createSelect(aLangu.map(l => ({ value: l.KEY, text: l.KEY })), sSelected);
 
@@ -3375,7 +3383,7 @@
             try {
                 const oResult = await WSUTIL.getGlobalSettingInfo("sound");
                 if (oResult && oResult.value === "X") { oChk.checked = true; }
-            } catch (e) { /* 무시 */ }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
         })();
     }
 
@@ -3432,6 +3440,7 @@
             try {
                 oWebPref = WSUTIL.QueryString.parse(oBrows.getURL());
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
             if (oWebPref.OBJTY === "SERVERLIST" || oWebPref.OBJTY === "FLTMENU") { continue; }
@@ -3536,7 +3545,7 @@
                 CURRWIN.setAlwaysOnTop(true, "screen-saver");
                 CURRWIN.show();
                 CURRWIN.setAlwaysOnTop(false);
-            } catch (e) { /* 무시 */ }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
 
             // 자식 창이 없으면 정상 종료 허용 (Electron: undefined 반환 → 닫기 진행)
             if (_countActiveChildWindows() === 0) { return undefined; }
@@ -3583,7 +3592,7 @@
      ********************************************************************/
     function _showIllustDialog(o) {
         let oExist = document.getElementById(o.id);
-        if (oExist) { if (!oExist.open) { try { oExist.showModal(); } catch (e) { } } return; }
+        if (oExist) { if (!oExist.open) { try { oExist.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } return; }
 
         if (!document.getElementById("u4aWsExitStyle")) {
             const oSt = document.createElement("style");
@@ -3633,14 +3642,14 @@
         });
 
         document.body.appendChild(oDlg);
-        try { oDlg.showModal(); } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         const oImg = oDlg.querySelector(".u4aWsExitArtImg");
         const oFb = oDlg.querySelector(".u4aWsExitArtFb");
         const sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
         oImg.onload = () => { oImg.style.display = ""; oFb.style.display = "none"; };
         oImg.onerror = () => { oImg.style.display = "none"; oFb.style.display = ""; };
-        try { oImg.src = new URL(`../svg/${o.imgBase}-${sMode}.svg`, window.location.href).href; } catch (e) { }
+        try { oImg.src = new URL(`../svg/${o.imgBase}-${sMode}.svg`, window.location.href).href; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /********************************************************************
@@ -3722,6 +3731,7 @@
             try {
                 oWebPref = WSUTIL.QueryString.parse(oBrows.getURL());
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
             if (oWebPref.OBJTY !== "MAIN") { continue; }
@@ -3739,6 +3749,7 @@
             try {
                 oWebPref = WSUTIL.QueryString.parse(oBrows.getURL());
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
             if (oWebPref.OBJTY !== "MAIN") { continue; }
@@ -3832,7 +3843,7 @@
 
         const oCtl = {
             dlg: oDlg,
-            close() { try { oDlg.close(); } catch (e) { oDlg.remove(); } }
+            close() { try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oDlg.remove(); } }
         };
 
         const _cancel = () => {
@@ -3899,11 +3910,11 @@
                 if (U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg); }
                 if (U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHead); }
             }
-        } catch (e) { /* 헬퍼 없으면 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 헬퍼 없으면 무시 */ }
 
         // 초기 포커스
         if (opt.initialFocusEl) {
-            setTimeout(() => { try { opt.initialFocusEl.focus(); } catch (e) { } }, 0);
+            setTimeout(() => { try { opt.initialFocusEl.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
         }
         return oCtl;
     }

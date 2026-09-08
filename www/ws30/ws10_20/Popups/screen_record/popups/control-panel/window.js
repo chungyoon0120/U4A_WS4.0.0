@@ -158,7 +158,7 @@ async function open(opts = {}) {
     parentWin = opts.parentWin;
   } else {
     try { parentWin = remote.getCurrentWindow() || null; }
-    catch { parentWin = null; }
+    catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); } parentWin = null; }
   }
 
   // 부모 창이 닫힐 때 녹화 관련 팝업 전체 종료
@@ -265,8 +265,8 @@ async function open(opts = {}) {
       // 패널이 닫힐 때 항상 관련 팝업 전체 닫기
       // (녹화 히스토리, 설정, 드로잉)
       forceCloseAllHistory();
-      try { closeSettingsWindow(); } catch {}
-      try { closeDrawingWindow();  } catch {}
+      try { closeSettingsWindow(); } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }}
+      try { closeDrawingWindow();  } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }}
 
       // 정상 완료(녹화 완료) 시에만 히스토리 다시 열기
       if (result && !forced) {
@@ -390,7 +390,8 @@ function isOpen() {
     try {
       const url    = new URL(w.webContents.getURL());
       return url.searchParams.get('OBJTY') === 'SCR_REC';
-    } catch {
+    } catch (_u4aErr) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }
       return false;
     }
   });

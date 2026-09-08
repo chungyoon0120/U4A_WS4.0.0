@@ -86,6 +86,7 @@ oAPP.fn.toUI5Theme = function (sKey) {
             bDark = (String(sKey).indexOf("dark") !== -1);
         }
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         bDark = (String(sKey || "").indexOf("dark") !== -1);
     }
     return bDark ? "sap_horizon_dark" : "sap_horizon";
@@ -110,7 +111,7 @@ oAPP.fn._msgCls = function (sCode) {
         var sLangu = (process.USERINFO && process.USERINFO.LANGU) || oAPP.attr.WS_LANGU || "";
         if (!sSysID || !sLangu) { return ""; }
         return new WSUTIL.MessageClassText(sSysID, sLangu).fnGetMsgClsText("/U4A/CL_WS_COMMON", sCode, "", "", "", "");
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }; // end of oAPP.fn._msgCls
 
 // ZMSG_WS_COMMON_001 번호 텍스트(본문).
@@ -118,7 +119,7 @@ oAPP.fn._msgCommon = function (sNo) {
     try {
         var sLangu = (process.USERINFO && process.USERINFO.LANGU) || oAPP.attr.WS_LANGU || "";
         return WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sNo);
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }; // end of oAPP.fn._msgCommon
 
 // 로드 감시 시작(fnFrameLoad 직후) — did-fail-load 리스너 + 백스톱 워치독.
@@ -126,8 +127,8 @@ oAPP.fn._startLoadGuards = function () {
     oAPP.attr.bBootOk = false;
     oAPP.attr.bLoadFailed = false;
     // 재로드(창 재사용) 시에도 새 서버 문서의 흰 캔버스가 노출되지 않도록 다시 숨김.
-    try { document.getElementById("ws_frame").classList.remove("is-ready"); } catch (e) { }
-    try { CURRWIN.webContents.on("did-fail-load", oAPP.fn._onFrameFailLoad); } catch (e) { }
+    try { document.getElementById("ws_frame").classList.remove("is-ready"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { CURRWIN.webContents.on("did-fail-load", oAPP.fn._onFrameFailLoad); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     oAPP.attr._loadWatchTimer = setTimeout(function () {
         if (oAPP.attr.bBootOk) { return; }
         oAPP.fn._onUi5LoadFail("watchdog-timeout");
@@ -136,7 +137,7 @@ oAPP.fn._startLoadGuards = function () {
 
 oAPP.fn._clearLoadGuards = function () {
     if (oAPP.attr._loadWatchTimer) { clearTimeout(oAPP.attr._loadWatchTimer); oAPP.attr._loadWatchTimer = null; }
-    try { CURRWIN.webContents.removeListener("did-fail-load", oAPP.fn._onFrameFailLoad); } catch (e) { }
+    try { CURRWIN.webContents.removeListener("did-fail-load", oAPP.fn._onFrameFailLoad); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }; // end of oAPP.fn._clearLoadGuards
 
 // iframe(서버 미리보기) 로드 실패 이벤트 — 네트워크/서버 오류 즉시 감지.
@@ -182,13 +183,13 @@ oAPP.fn._closeOnError = function () {
         if (oAPP.attr.isCallback === "X" && PARWIN && !PARWIN.isDestroyed()) {
             PARWIN.webContents.send("if-icon-url-callback", { RETCD: "C", RTDATA: "" });
         }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try {
         if (CURRWIN && !CURRWIN.isDestroyed()) {
             CURRWIN.setParentWindow(null);
             CURRWIN.close();   // 로드 실패창은 파괴 → 다음 실행 시 새 창으로 재시도.
         }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }; // end of oAPP.fn._closeOnError
 
 // 최대화 상태에 따라 max 버튼 아이콘 스왑(원본 _attachCurrentWindowEvents maxWinBtn 대체).
@@ -198,7 +199,7 @@ oAPP.fn._syncMaxBtnIcon = function () {
     var oIcon = oMax.querySelector("i");
     if (!oIcon) { return; }
     var bMax = false;
-    try { bMax = CURRWIN.isMaximized(); } catch (e) { bMax = false; }
+    try { bMax = CURRWIN.isMaximized(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bMax = false; }
     oIcon.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
 }; // end of oAPP.fn._syncMaxBtnIcon
 
@@ -214,26 +215,26 @@ oAPP.fn._initChrome = function () {
     // 로고
     var oLogo = document.getElementById("iconpLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 제목 = opener 가 넘긴 창 제목(Icon List [ - SYSID]) — 부트 스크립트가 document.title 에 세팅.
     var oTitle = document.getElementById("iconpTitle");
     if (oTitle) {
         var s = "";
-        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { s = document.title || ""; }
+        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } s = document.title || ""; }
         oTitle.textContent = s;
     }
 
     // 최소화
     var oMin = document.getElementById("iconpWinMin");
-    if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { } }); }
+    if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }); }
 
     // 최대화/복원 토글
     var oMax = document.getElementById("iconpWinMax");
     if (oMax) {
         oMax.addEventListener("click", function () {
-            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
 
@@ -245,7 +246,7 @@ oAPP.fn._initChrome = function () {
     try {
         CURRWIN.on("maximize", oAPP.fn._syncMaxBtnIcon);
         CURRWIN.on("unmaximize", oAPP.fn._syncMaxBtnIcon);
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     oAPP.fn._syncMaxBtnIcon();
 
 }; // end of oAPP.fn._initChrome
@@ -294,22 +295,22 @@ oAPP.fn._onShellThemeChange = function () {
     try {
         let sWebConBodyCss = "html, body { margin: 0px; height: 100%; background-color: " + oThemeInfo.BGCOL + "; }";
         oAPP.REMOTE.getCurrentWindow().webContents.insertCSS(sWebConBodyCss);
-    } catch (e) { }
-    try { document.documentElement.style.setProperty("--boot-bg", oThemeInfo.BGCOL); } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { document.documentElement.style.setProperty("--boot-bg", oThemeInfo.BGCOL); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try {
         if (window.U4ATheme) {
             U4ATheme.apply(U4ATheme.normalize ? U4ATheme.normalize(oThemeInfo.THEME) : oThemeInfo.THEME);
         }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }; // end of oAPP.fn._onShellThemeChange
 
 try {
     let _sSysID = process.USERINFO.SYSID;
     oAPP.IPCMAIN.on("if-p13n-themeChange-" + _sSysID, oAPP.fn._onShellThemeChange);
     window.addEventListener("beforeunload", function () {
-        try { oAPP.IPCMAIN.removeListener("if-p13n-themeChange-" + _sSysID, oAPP.fn._onShellThemeChange); } catch (e) { }
+        try { oAPP.IPCMAIN.removeListener("if-p13n-themeChange-" + _sSysID, oAPP.fn._onShellThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
-} catch (e) { }
+} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
 
 /************************************************************************
@@ -373,6 +374,7 @@ oAPP.fn.getThemeInfo = function (){
         var oThemeJsonData = JSON.parse(sThemeJson);    
 
     } catch (error) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         return;
     }
 
@@ -395,6 +397,7 @@ oAPP.fn.fnOnParentWindowClosedEvent = () => {
         CURRWIN.close();    
         
     } catch (error) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         
     }
     

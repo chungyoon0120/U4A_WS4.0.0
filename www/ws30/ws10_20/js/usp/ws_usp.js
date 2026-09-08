@@ -5535,6 +5535,7 @@
             return oThemeInfo;
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             return;
 

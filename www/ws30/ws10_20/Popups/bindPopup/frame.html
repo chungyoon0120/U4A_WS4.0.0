@@ -100,6 +100,9 @@
     </div>
 
     <!-- 부트/셸(frameless) — 전역 oAPP/헬퍼 구성. 이후 영역 모듈이 이 전역을 소비한다. -->
+    <!-- 공통 로그 함수 (2026-09-08 추가) — bindShared.js 의 서버 통신 로그가 이 함수를 쓴다.
+         ※ 이 창의 진입 파일은 frame.html 이다(index.html 은 안 뜬다). -->
+    <script src="../../js/ws_html5_logger.js"></script>
     <script src="frame.js"></script>
     <!-- 공용 헬퍼(sendAjax/setTreeData) + 영역 모듈(로드 순서 = 의존 순서).
          다열 컬럼트리는 공통 U4AUI.makeColumnTree(theme/u4a-ui.js) 소비 — 별도 스크립트 없음. -->

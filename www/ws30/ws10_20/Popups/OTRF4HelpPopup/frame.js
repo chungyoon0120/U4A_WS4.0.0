@@ -71,6 +71,7 @@ let oAPP = (function (window) {
         try {
             var oThemeJsonData = JSON.parse(sThemeJson);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -92,7 +93,7 @@ let oAPP = (function (window) {
         let sKey = window.U4ATheme.apply(sUI5Theme);
 
         // 테마 <link> 로드 후 첫 페인트 플래시용 --boot-bg 는 해제(안 그러면 테마 미리보기 시 배경 고정).
-        try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { }
+        try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // iframe(본문) 도 동일 테마로 맞춘다.
         try {
@@ -100,9 +101,9 @@ let oAPP = (function (window) {
             let oWin = oFrame && oFrame.contentWindow;
             if (oWin && oWin.U4ATheme) {
                 oWin.U4ATheme.apply(sKey);
-                try { oWin.document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { }
+                try { oWin.document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
-        } catch (e) { /* iframe 미로드 시 무시 — 로드 시점에 부모 테마를 따라간다 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* iframe 미로드 시 무시 — 로드 시점에 부모 테마를 따라간다 */ }
 
         return sKey;
 
@@ -204,7 +205,7 @@ let oAPP = (function (window) {
                 var sLogoPath = String(oAPP.PATHINFO.WS_LOGO).replace(/\\/g, "/");
                 oLogo.src = encodeURI("file:///" + sLogoPath);
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 제목 = "OTR Manager" (메시지 키 B59, 하드코딩 금지). 쿼리 TITLE 도 동일.
         var oTitle = document.getElementById("otrTitle");
@@ -215,13 +216,13 @@ let oAPP = (function (window) {
         // 창 제어 — 공통 .u4a-winbtn (frameless)
         var oMin = document.getElementById("otrWinMin");
         if (oMin) {
-            oMin.addEventListener("click", function () { try { oAPP.CURRWIN.minimize(); } catch (e) { } });
+            oMin.addEventListener("click", function () { try { oAPP.CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
         }
 
         var oMax = document.getElementById("otrWinMax");
         if (oMax) {
             oMax.addEventListener("click", function () {
-                try { if (oAPP.CURRWIN.isMaximized()) { oAPP.CURRWIN.unmaximize(); } else { oAPP.CURRWIN.maximize(); } } catch (e) { }
+                try { if (oAPP.CURRWIN.isMaximized()) { oAPP.CURRWIN.unmaximize(); } else { oAPP.CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
 
@@ -247,7 +248,7 @@ let oAPP = (function (window) {
                 oCurrWin.setClosable(true);
                 oCurrWin.close();
             }
-        } catch (e) { /* 이미 파괴된 창 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 이미 파괴된 창 무시 */ }
 
     }; // end of oAPP.fn.fnClose
 
@@ -330,7 +331,7 @@ window.onload = function () {
         if (oTheme && oTheme.THEME) {
             oAPP.fn.applyTheme(oTheme.THEME);
         }
-    } catch (e) { /* 기본 라이트 토큰 */ }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 기본 라이트 토큰 */ }
 
     // 네이티브 메뉴 제거 + 헤더 초기화 + 테마 변경 IPC 등록
     oAPP.CURRWIN.setMenu(null);
@@ -350,7 +351,7 @@ window.onload = function () {
 
     // 창 즉시 표시(네이티브 opacity 페이드 미사용 — 흰 플래시 방지). 위치는 opener ready-to-show 에서 잡힘.
     //   backgroundColor=BGCOL 로 이미 불투명·테마 배경이라 흰 번쩍 없음(16.공통UX 2.6).
-    try { oAPP.CURRWIN.show(); } catch (e) { }
+    try { oAPP.CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
 };
 

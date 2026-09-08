@@ -42,11 +42,11 @@
             var L = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
             var s = parent.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", sCode, (p1 == null ? "" : p1));
             if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sCode;
     }
     function _isEdit() {
-        try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { return false; }
+        try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
     // 미리보기 반영 — 원본 settings/index.js 1:1(_onChangeAttr 는 previewUIsetProp(clone) 로 편집 중
     //   미리보기를 바꾸고, OK/CANCEL 에서 previewUIsetProp(sParam.sAttr) 로 원본값 복원). 원본 previewUIsetProp
@@ -62,7 +62,7 @@
     var oCtx = { orig: null, clone: null };
 
     function lf_close() {
-        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /* ── 입력값 점검(원본 _checkAttrValue 1:1) ── */
@@ -75,7 +75,7 @@
                 parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "js", "checkAppData", "designTreeData.js"));
             var _err = _mod.checkPropertyValue(sAttr);
             if (_err && _err.RETCD === "E") { _sRes.RETCD = "E"; _sRes.RTMSG = _err.RTMSG; return _sRes; }
-        } catch (e) { /* 점검 모듈 미로드 — skip */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 점검 모듈 미로드 — skip */ }
 
         //chkValidProp 은 미리보기 frame(W2) 부재 시 UIADT 미보유 속성에서 예외가 날 수 있어 가드.
         //  (frame 없으면 원본도 undefined=판단보류 → 예외는 통과 처리, best-effort. 저장까지 막지 않는다.)
@@ -99,7 +99,7 @@
         if (oUI.field && oUI.field.setValueState) {
             oUI.field.setValueState(bErr ? "error" : "none", bErr ? (sRes.RTMSG || "") : "");
         }
-        if (bErr && oUI.field && oUI.field.focus) { try { oUI.field.focus(); } catch (e) { } }
+        if (bErr && oUI.field && oUI.field.focus) { try { oUI.field.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     }
 
     // sap-icon(UIATT_ICON) → FontAwesome (행 아이콘과 동일 계열). 미매핑은 아이콘 생략.
@@ -198,6 +198,7 @@
         if (!parent.FS.existsSync(_folderPath)) {
             try { parent.FS.mkdirSync(_folderPath, { recursive: true }); }
             catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 _sRes.RETCD = "E";
                 //651 개인화 데이터 저장 폴더 생성에 실패했습니다.
                 _sRes.RTMSG = _wsTxt("651") + "\n" + (error && error.message ? error.message : "");
@@ -270,8 +271,8 @@
     async function lf_apply() {
         if (!_isEdit() || !oCtx.clone) { lf_close(); return; }
 
-        try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
-        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { }
+        try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var _okMsg = null, _errMsg = null;
 
@@ -297,12 +298,12 @@
             console.error("[HTML5][WS20][preset] 개인화 저장 처리 오류:", e && e.message, e);
             _errMsg = (e && e.message) ? e.message : String(e);
         } finally {
-            try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
-            try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+            try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             //close 먼저 → 그 다음 toast(모달 top-layer 가림 방지). 검증오류는 _ok/_err 둘 다 null → 열어둠.
-            if (_okMsg) { lf_close(); try { parent.showMessage(null, 10, "S", _okMsg); } catch (e) { } }
-            else if (_errMsg) { lf_close(); try { parent.showMessage(null, 20, "E", _errMsg); } catch (e) { } }
+            if (_okMsg) { lf_close(); try { parent.showMessage(null, 10, "S", _okMsg); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+            else if (_errMsg) { lf_close(); try { parent.showMessage(null, 20, "E", _errMsg); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         }
     }
 
@@ -411,7 +412,7 @@
         oUI.lbl.classList.toggle("u4a-label--required", oCtx.clone.icon0_visb === true);
         oUI.lbl.onclick = function () {
             if (typeof oAPP.fn.callAttrDescPopup === "function") {
-                try { oAPP.fn.callAttrDescPopup(oUI.lbl, oCtx.clone); } catch (e) { }
+                try { oAPP.fn.callAttrDescPopup(oUI.lbl, oCtx.clone); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         };
 
@@ -430,8 +431,8 @@
         //Apply 노출 = IS_EDIT(원본 OK visible). 조회 모드면 보기 전용.
         oUI.applyBtn.hidden = !_isEdit();
 
-        try { oUI.dlg.showModal(); } catch (e) { }
-        try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+        try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     /************************************************************************

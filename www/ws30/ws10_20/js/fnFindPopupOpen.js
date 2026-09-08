@@ -34,7 +34,7 @@
 
         // busy 키고 Lock 걸기 + 전체 자식 윈도우 Busy
         oAPP.common.fnSetBusyLock("X");
-        try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { }
+        try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         const sPopupName = "UIFIND";
 
@@ -43,7 +43,7 @@
         if (oResult.ISOPEN) {
             parent.WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
             oAPP.common.fnSetBusyLock("");
-            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
 
@@ -55,7 +55,7 @@
         // 창 제목(원본 oBrowserOptions.title = /U4A/CL_WS_COMMON D02 "Find").
         let sTitle = "";
         try { sTitle = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D02") || "Find"; }
-        catch (e) { sTitle = "Find"; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sTitle = "Find"; }
 
         const
             sSettingsJsonPath = parent.getPath("BROWSERSETTINGS"),
@@ -86,7 +86,7 @@
         const aAttrData = oAPP.fn.getAttrChangedData();
 
         let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
-        try { REMOTEMAIN.enable(oBrowserWindow.webContents); } catch (e) { }
+        try { REMOTEMAIN.enable(oBrowserWindow.webContents); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
         const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
@@ -142,9 +142,9 @@
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
-            try { IPCMAIN.off(`${BROWSKEY}--find`, oAPP.fn.fnIpcMain_Find); } catch (e) { }
-            try { IPCMAIN.off(`${BROWSKEY}--find--controller`, oAPP.fn.fnIpcMain_Find_Controller); } catch (e) { }
-            try { IPCMAIN.off(`${BROWSKEY}--find--data--refresh`, oAPP.fn.fnIpcMain_Find_Data_Refresh); } catch (e) { }
+            try { IPCMAIN.off(`${BROWSKEY}--find`, oAPP.fn.fnIpcMain_Find); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { IPCMAIN.off(`${BROWSKEY}--find--controller`, oAPP.fn.fnIpcMain_Find_Controller); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { IPCMAIN.off(`${BROWSKEY}--find--data--refresh`, oAPP.fn.fnIpcMain_Find_Data_Refresh); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oBrowserWindow = null;
             CURRWIN.focus();
         });

@@ -303,13 +303,11 @@
             return;
         }
 
-        // 대상 APPID — 모델 우선, 비어있으면 검증 통과한 입력값(AppNmInput)으로 폴백.
-        //   ([HTML5] /WS10/APPID 모델이 비어있을 수 있음 — Export 경로와 동일 처리.)
+        // 대상 APPID — 원본과 동일하게 모델에서 읽는다.
+        //   ([HTML5] 앱이름 입력칸 ↔ /WS10/APPID 묶임을 ws10_html.js 에서 복원했으므로
+        //    모델값 = 입력칸값. 종전의 "모델 우선, 비면 입력칸" 폴백은 묶임이 끊겼던 시절의
+        //    임시조치였고, 옛 값이 남으면 그게 이기는 문제가 있어 제거한다.)
         let sAppId = APPCOMMON.fnGetModelProperty("/WS10/APPID");
-        if (!sAppId || sAppId === "") {
-            let oAppNmInput = document.getElementById("AppNmInput");
-            sAppId = oAppNmInput ? oAppNmInput.value : "";
-        }
 
         // 패키지 변경 팝업 호출(미로드 시 $.getScript 로 로드 후 호출).
         if (oAPP.fn.changeAppPackagePopup) {

@@ -19,7 +19,7 @@
     oAPP.usphtml = oAPP.usphtml || {};
 
     var FS, PATH, APP;
-    try { FS = parent.FS; PATH = parent.PATH; APP = parent.APP; } catch (e) { }
+    try { FS = parent.FS; PATH = parent.PATH; APP = parent.APP; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // SVG 파일 목록(확장자 아이콘 해석용) — 구 gaFileExtendImgList. 1회 로드.
     var _svgList = null;
@@ -55,7 +55,7 @@
 
     // 메시지 텍스트(컬럼 헤더/빈 데이터) — usp.js _msg/_wsMsg 와 동일 소스.
     function _msg(sNum) {
-        try { var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum); if (s != null && s !== "" && s.indexOf("|") === -1) { return s; } } catch (e) { }
+        try { var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum); if (s != null && s !== "" && s.indexOf("|") === -1) { return s; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
     function _wsMsg(sNr) {
@@ -63,7 +63,7 @@
             var lg = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
             var s = parent.WSUTIL.getWsMsgClsTxt(lg, "ZMSG_WS_COMMON_001", sNr);
             if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNr;
     }
 
@@ -86,7 +86,7 @@
             ],
             roots: function () {
                 var a = [];
-                try { a = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { }
+                try { a = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return Array.isArray(a) ? a : [];
             },
             children: function (n) { return _hasChildren(n) ? n.USPTREE : []; },
@@ -220,7 +220,7 @@
     // 트리 전체 순회 콜백(모델 ISSEL 갱신용)
     function _walkTree(fn) {
         var aTree = [];
-        try { aTree = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { }
+        try { aTree = APPCOMMON.fnGetModelProperty("/WS30/USPTREE") || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         (function rec(aNodes) {
             if (!Array.isArray(aNodes)) { return; }
             aNodes.forEach(function (o) {

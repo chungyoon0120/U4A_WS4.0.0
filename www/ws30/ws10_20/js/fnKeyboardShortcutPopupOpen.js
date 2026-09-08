@@ -69,11 +69,11 @@
     function _langu() {
         // 원본 fnShowKeyboardShortcuts 와 동일 언어원(globalLanguage).
         try { return parent.require(parent.PATHINFO.WSSETTINGS).globalLanguage || ""; }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     function _wsTxt(sCode, p1) {
         try { return WSUTIL.getWsMsgClsTxt(_langu(), "ZMSG_WS_COMMON_001", sCode, p1 || "") || ""; }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     function _el(sTag, sClass) {
         var o = document.createElement(sTag);
@@ -94,7 +94,7 @@
             if (!oDev || oDev.ENABLED === false) { return false; }
             if (parent.APP && parent.APP.isPackaged) { return false; }
             return true;
-        } catch (e) { return false; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
     // 일부 CODE 의 text/tooltip 은 UI5 모델 바인딩 문자열 "{/WSLANGU/<클래스>/<코드>}" (원본은 JSONModel
     //   /WSLANGU 트리로 렌더 시 해석). shim 은 이를 리터럴로 잡으므로 여기서 메시지 클래스로 직접 치환한다.
@@ -103,7 +103,7 @@
         if (!sVal || String(sVal).indexOf("{/WSLANGU/") === -1) { return sVal || ""; }
         return String(sVal).replace(/\{\/WSLANGU\/([^/{}]+)\/([^/{}]+)\}/g, function (m, sCls, sCode) {
             try { return WSUTIL.getWsMsgClsTxt(_langu(), sCls, sCode) || m; }
-            catch (e) { return m; }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return m; }
         });
     }
 
@@ -112,7 +112,7 @@
         try {
             var oDlg = document.getElementById(C_DLG_ID);
             if (oDlg && oDlg.open) { oDlg.close(); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -208,7 +208,7 @@
         // 이미 떠 있으면(중복 진입) busy 만 풀고 종료.
         var oPrev = document.getElementById(C_DLG_ID);
         if (oPrev && oPrev.open) {
-            try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
         if (oPrev && oPrev.parentNode) { oPrev.parentNode.removeChild(oPrev); }
@@ -345,10 +345,10 @@
 
         document.body.appendChild(oDlg);
 
-        try { oDlg.showModal(); } catch (e) { }
+        try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // busy 끄고 Lock 풀기(원본 afterOpen).
-        try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+        try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.fnKeyboardShortcutPopupOpen
 
