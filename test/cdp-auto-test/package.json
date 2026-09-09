@@ -7,7 +7,9 @@
   "scripts": {
     "probe": "node probe.js",
     "start": "node edit-back-loop.js",
-    "test": "node --test lib/*.test.js"
+    "test": "node --test lib/*.test.js",
+    "dist": "node make-dist.js",
+    "dist:full": "node make-dist.js --withModules"
   },
   "dependencies": {
     "ws": "^8.13.0"

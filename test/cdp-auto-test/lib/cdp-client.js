@@ -355,10 +355,36 @@ async function openSession(page, handlers) {
         return res.result && res.result.result ? res.result.result.value : undefined;
     }
 
+    // 화면을 그림으로 찍는다 — 고장 났을 때 "어떻게 보였는지" 증거를 남기려고.
+    //   Page.enable 은 한 번만 해 두면 되고, 실패해도 캡처는 대체로 동작하므로 조용히 넘긴다.
+    let pageEnabled = false;
+
+    async function captureScreenshot() {
+
+        if (!pageEnabled) {
+            try {
+                await send('Page.enable');
+                pageEnabled = true;
+            } catch (e) {
+                // 캡처 자체는 될 수 있으니 여기서 포기하지 않는다.
+            }
+        }
+
+        const res = await send('Page.captureScreenshot', { format: 'png' });
+
+        if (!res.result || !res.result.data) {
+            throw new Error('화면 캡처 결과가 비어 있다.');
+        }
+
+        return Buffer.from(res.result.data, 'base64');
+
+    }
+
     return {
         isClosed: () => closed,
         eval: evaluate,
         dispatchKey: (keySpec) => evaluate(_keyExpression(keySpec)),
+        captureScreenshot,
         close: () => {
             closed = true;
             try { ws.close(); } catch (e) { /* 이미 닫힌 연결 — 더 할 일 없음 */ }

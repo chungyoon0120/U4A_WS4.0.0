@@ -9,3 +9,9 @@ test/
 
 # 노션 API 토큰이 담긴 env 파일 — 커밋 제외 (sample.env.example 만 커밋)
 .claude/skills/yoon-notion/env/*.env
+
+# 자동 시험 도구 — 토큰이 든 실제 설정은 올리지 않는다 (본보기 config.sample.json 만 올림)
+test/cdp-auto-test/env/config.json
+test/cdp-auto-test/logs/
+test/cdp-auto-test/env/telegram_token.json
+test/cdp-auto-test/env/notion_token.json

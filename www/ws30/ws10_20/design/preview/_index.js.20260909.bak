@@ -5809,24 +5809,6 @@ function start() {
 			});
 			
 			sap.ui.getCore().attachThemeChanged(function() {
-				/**
-				 * @since   2026-09-09
-				 * @author  Claude
-				 * @description
-				 * ★ 미리보기 부팅(로드) 중에는 여기서 busy 를 끄지 않는다. (장군님 지시 2026-09-09)
-				 * 원본(UI5)은 이 시점에 화면잠금(oAPP.attr.oCore.lock)이 살아 있어서, 여기서
-				 * setBusy("") 로 대기표시만 사라져도 사용자 조작은 계속 막혀 있었다.
-				 * HTML5 이식본은 그 화면잠금이 아무 일도 안 하는 껍데기(lock:_noop)라서,
-				 * 여기서 busy 를 끄면 실제로 조작이 열려 버린다 → 원본에 없던 구멍.
-				 * 그래서 부팅 중이면 건너뛰고, 미리보기 구성 완료(ROOT 선택 종료) 시점에
-				 * 한 번만 풀리게 한다. (부팅이 아닐 때 = 테마 변경 등 평소 동작은 원본 그대로)
-				 */
-				try {
-					if (parent.oAPP && parent.oAPP.attr && parent.oAPP.attr.__ws20PrevBooting === true) {
-						return;
-					}
-				} catch (e) { /* 부모 접근 실패시엔 원본 동작 그대로 진행 */ }
-
 				if (u4aRootParent.require(parent.oAPP.oDesign.pathInfo.bindPopupBroadCast)("IS-CHANNEL-CREATE") === false) {
 					u4aRootParent.setBusy("");
 				}

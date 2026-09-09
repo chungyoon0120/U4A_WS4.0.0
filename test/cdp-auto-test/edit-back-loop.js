@@ -7,6 +7,9 @@ const {
     listTargets, pickMainWindows, evalOnPage, parseKeySpec, openSession, isWindowAlive
 } = require('./lib/cdp-client');
 const { createLogger } = require('./lib/logger');
+const { saveIncident, KIND_NAMES } = require('./lib/incident');
+const { notifyIncident } = require('./lib/notify');
+const { loadConfig } = require('./env');
 
 const ARGV = process.argv.slice(2);
 
@@ -41,6 +44,8 @@ if (ARGV.indexOf('--help') >= 0 || ARGV.indexOf('-h') >= 0) {
   --intervalMs <밀리초> 키를 누르는 간격.                      (기본 100 = 0.1초)
   --busyStuckMs <밀리초> 화면이 이 시간 넘게 계속 "처리중" 이면
                        멈춘 걸로 보고 전체 종료.              (기본 60000 = 1분)
+  --keepGoing          오류가 나도 멈추지 않고 계속 돈다.
+                       (기본은 처음 오류에서 멈춤)
   --help, -h           이 도움말만 보여주고 끝냄.
 
   키 이름은 F1~F12 / Escape / Enter / Tab / Backspace / 영문자 / 숫자 를 쓸 수 있고,
@@ -50,6 +55,20 @@ if (ARGV.indexOf('--help') >= 0 || ARGV.indexOf('-h') >= 0) {
   node edit-back-loop.js
   node edit-back-loop.js --intervalMs 50
   node edit-back-loop.js --port 9333 --editKey F6 --backKey F3
+
+[건드리지 않는 창]
+  핀(항상 위 고정)을 걸어 둔 창은 시험 대상에서 뺍니다.
+  보고 계신 창을 지키기 위해서입니다. 그 창도 시험하려면 압정 단추를 꺼 두십시오.
+
+[오류가 나면]
+  처음 터진 것 하나만 붙잡고 멈춥니다. 뒤따라오는 오류는 대개 뒷북이라,
+  다 담으면 정작 원인이 파묻히기 때문입니다. 멈출 때 소리로 한 번 알립니다.
+
+  그 순간의 증거를 logs 폴더 안에 「사고_날짜_시각_종류」 폴더로 묶어 둡니다.
+   - 요약.md       : 무슨 일인지 · 몇 바퀴째 · 어느 화면이었는지  ← 이것부터 보세요
+   - 화면.png      : 그 순간 화면 모습
+   - 최근기록.log  : 터지기 직전 기록
+   - 원문.json     : 오류 원문(터진 자리까지)
 
 [로그]
   logs 폴더에 두 개가 쌓입니다.
@@ -72,8 +91,23 @@ const BACK_KEY = getArg('--backKey', 'F3');
 const PRESS_INTERVAL_MS = Number(getArg('--intervalMs', '100'));
 const BUSY_STUCK_MS = Number(getArg('--busyStuckMs', '60000'));
 
+// ★처음 오류에서 멈춘다 (장군님 지시 2026-09-09).
+//   0.1초마다 도는 시험이라, 한 번 고장 나면 뒤따라오는 오류가 수천 줄씩 쌓여
+//   정작 "맨 처음 터진 곳"이 파묻힌다. 그래서 첫 오류에서 증거를 챙기고 멈춘다.
+//   그래도 끝까지 돌려 보고 싶을 때만 --keepGoing 을 준다.
+const KEEP_GOING = ARGV.indexOf('--keepGoing') >= 0;
+
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const logger = createLogger(path.join(__dirname, 'logs'));
+const LOG_DIR = path.join(__dirname, 'logs');
+const logger = createLogger(LOG_DIR);
+
+// 바깥으로 알릴 곳(텔레그램·노션) 설정 — env/config.json.
+// 설정이 없어도 도구는 그냥 돈다. 안 보낼 뿐이다.
+const ENV = loadConfig();
+
+if (ENV.error) {
+    logger.error(`알림 설정을 읽지 못했다 — 알림은 못 보낸다: ${ENV.error}`);
+}
 
 // 모든 창이 함께 보는 정지 신호 — Ctrl+C 한 번으로 창 전부에 전달된다.
 let running = true;
@@ -81,6 +115,103 @@ process.on('SIGINT', () => {
     logger.info('중지 요청(Ctrl+C) 받음 — 각 창은 이번 사이클까지만 마치고 종료.');
     running = false;
 });
+
+/* ═══════════════════════════════════════════════════════════════════
+ * 사고(오류) 처리 — 처음 하나만 붙잡고 멈춘다 (장군님 지시 2026-09-09)
+ * ═══════════════════════════════════════════════════════════════════
+ * 뒤따라오는 오류는 대부분 첫 고장의 뒷북이라, 다 담으면 정작 원인이 파묻힌다.
+ * 그래서 첫 사고에서만 증거를 챙기고(화면 캡처·직전 기록·오류 원문) 전체를 멈춘다.
+ */
+let incidentTaken = false;   // 이미 사고 하나를 붙잡았나
+let incidentPromise = null;  // 증거 담기가 끝날 때까지 기다릴 약속
+let incidentDir = null;      // 증거를 담은 폴더
+let incidentInfo = null;     // 무슨 사고였는지(끝에 요약할 때 쓴다)
+
+function fireIncident(session, info) {
+
+    if (incidentTaken) {
+        return;
+    }
+
+    incidentTaken = true;
+    incidentInfo = info;
+
+    // 소리로 한 번 알린다 — 자리를 비워 둬도 알아챌 수 있게.
+    try {
+        process.stdout.write('');
+    } catch (e) {
+        // 소리를 못 내는 환경이어도 그것 때문에 멈추면 안 된다.
+    }
+
+    // 알림 글에 같이 담을 "터지기 직전 기록"은 지금 이 순간 것을 써야 한다
+    // (증거를 담는 동안에도 기록은 계속 쌓이므로 여기서 한 번 떠 둔다).
+    const aRecent = logger.getRecent();
+    const sKindName = KIND_NAMES[info.kind] || info.kind || '알 수 없는 사고';
+
+    incidentPromise = saveIncident({
+        logDir: LOG_DIR,
+        info,
+        recentLines: aRecent,
+        session
+    }).then((sDir) => {
+
+        incidentDir = sDir;
+        logger.error(`★ 사고 증거를 담았다 → ${sDir}`);
+        return sDir;
+
+    }).catch((e) => {
+
+        logger.error(`사고 증거를 담다가 실패: ${e && e.stack ? e.stack : e}`);
+        return null;
+
+    }).then((sDir) => {
+
+        // 증거를 담은 뒤에 알린다 — 화면 그림도 같이 보내려면 폴더가 먼저 있어야 한다.
+        return notifyIncident({
+            config: ENV.config,
+            info,
+            kindName: sKindName,
+            incidentDir: sDir,
+            recentLines: aRecent
+        });
+
+    }).then((aResults) => {
+
+        (aResults || []).forEach((r) => {
+
+            if (r.skipped) {
+                logger.info(`알림 건너뜀 (${r.where}) — ${r.error}`);
+                return;
+            }
+
+            if (r.ok) {
+                logger.info(`알림 보냄 (${r.where})${r.url ? ` → ${r.url}` : ''}`);
+                return;
+            }
+
+            logger.error(`알림 실패 (${r.where}) — ${r.error}`);
+
+        });
+
+        return incidentDir;
+
+    }).catch((e) => {
+
+        // 알림이 통째로 터져도 시험 결과는 남아야 한다.
+        logger.error(`알림을 보내다가 터짐: ${e && e.stack ? e.stack : e}`);
+        return incidentDir;
+
+    });
+
+    if (KEEP_GOING) {
+        logger.error('★ 첫 오류를 붙잡았다. --keepGoing 이라 계속 돈다(이후 오류는 기록만).');
+        return;
+    }
+
+    logger.error('★ 첫 오류에서 멈춘다. 끝까지 돌려 보려면 --keepGoing 을 붙일 것.');
+    running = false;
+
+}
 
 // 메시지박스/확인창/값도움 같은 "진짜 창"이 떠 있는지만 본다.
 //   ★busy 표시(<dialog id="u4aWsBusyIndicator">)는 제외한다 — 이것도 <dialog> 라서 그냥
@@ -107,13 +238,61 @@ const STATE_EXPRESSION = `
         keys = null;
     }
 
+    // 그 창이 지금 다루고 있는 앱 이름 — 창이 여러 개일 때 어느 창인지 가려내는 단서.
+    var appId = '';
+
+    try {
+        var a = window.getAppInfo ? getAppInfo() : null;
+        appId = (a && (a.APPID || a.appId || a.APP_ID)) || '';
+    } catch (e) {
+        appId = '';
+    }
+
     return JSON.stringify({
         page      : window.getCurrPage ? getCurrPage() : '',
         busy      : window.getBusy ? getBusy() : '',
+        appId     : appId,
         dialog    : !!d,
         dialogText: d ? (d.innerText || '').slice(0, 2000) : '',
         keys      : keys
     });
+
+})()
+`;
+
+// ★창을 고를 때 쓰는 물음 — 지금 화면과 "핀(항상 위 고정)" 여부를 같이 본다.
+//   (장군님 지시 2026-09-09) 핀을 걸어 둔 창은 장군님이 보고 계신 창이므로 건드리면 안 된다.
+//   두 가지를 다 본다:
+//     ① 앱이 들고 있는 핀 값   (화면 위쪽 압정 단추 눌림 상태)
+//     ② 창이 실제로 항상 위인지 (앱 값이 어긋나 있어도 실제 창 상태로 잡아낸다)
+const PICK_EXPRESSION = `
+(function () {
+
+    var page = '';
+    var pinModel = false;
+    var pinWindow = false;
+
+    try {
+        page = window.getCurrPage ? getCurrPage() : '';
+    } catch (e) {
+        page = '';
+    }
+
+    try {
+        pinModel = !!(window.oAPP && oAPP.common && oAPP.common.fnGetModelProperty
+            && oAPP.common.fnGetModelProperty('/SETTING/ISPIN'));
+    } catch (e) {
+        pinModel = false;
+    }
+
+    try {
+        var w = require('@electron/remote').getCurrentWindow();
+        pinWindow = !!(w && w.isAlwaysOnTop && w.isAlwaysOnTop());
+    } catch (e) {
+        pinWindow = false;
+    }
+
+    return JSON.stringify({ page: page, pinned: (pinModel || pinWindow), pinModel: pinModel, pinWindow: pinWindow });
 
 })()
 `;
@@ -129,39 +308,109 @@ async function runWindowLoop(page, label) {
     let lastPressAt = null; // 직전에 키를 누른 시각 — 실제 간격을 로그에 찍기 위해
     let listeningWas = null; // 직전 바퀴에 앱이 그 키를 듣고 있었는지(바뀌는 순간만 자세히 남기려고)
 
+    // 오류가 터진 순간의 정황(어느 화면·처리중이었나·직전에 무슨 키를 눌렀나)을 같이 남기려고
+    // 최근 값을 들고 있는다. 오류 알림은 반복문 밖(연결 쪽)에서도 오기 때문에 필요하다.
+    let lastState = { page: '', busy: '', appId: '' };
+    let lastKeyName = null;
+
+    /**
+     * 창을 나중에 봐도 가려낼 수 있게 한 줄로 만든다. (장군님 지적 2026-09-09)
+     *   "[창1]" 만으로는 어느 창인지 알 수 없다 — 창 제목은 다 같고, 순번은 돌릴 때마다 바뀐다.
+     *   그래서 창 번호(유일한 값)와, 그 창이 다루던 앱 이름을 같이 적는다.
+     */
+    function _windowDesc() {
+
+        const aBits = [label];
+
+        if (page.title) {
+            aBits.push(page.title);
+        }
+
+        if (page.id) {
+            aBits.push(`창번호 ${page.id}`);
+        }
+
+        if (lastState.appId) {
+            aBits.push(`앱 ${lastState.appId}`);
+        }
+
+        return aBits.join(' · ');
+
+    }
+
     // 연결을 한 번만 열어 계속 쓴다. 오류 감시(콘솔오류·스크립트오류)도 이 연결로 같이 받는다.
     // 사람이 읽는 줄과 별개로, 원인 분석에 필요한 원문(스택·파일·줄번호 등)을 통째로
     // 별도 파일(run_*_errors.jsonl)에 한 줄 JSON 으로 남긴다.
-    const session = await openSession(page, {
+    // ★연결을 만드는 도중에도 오류 알림이 먼저 날아온다 - 앱에 "이미 쌓여 있던" 지난 오류다.
+    //   (실측 2026-09-09)
+    //   ① 그때 아래 콜백이 session 을 건드리면 "아직 준비 안 됐다"며 도구가 터졌다.
+    //   ② 게다가 그건 이번 시험에서 난 오류가 아닌데도 시작하자마자 멈춰 버렸다
+    //      (0바퀴째 · 화면도 모름 · 그림도 없음).
+    //   그래서 연결이 다 준비될 때까지는 사고로 치지 않고, 지난 오류로만 적어 둔다.
+    let session = null;
+    let ready = false;
+
+    session = await openSession(page, {
         onConsoleError: (text, raw) => {
+
+            if (!ready) {
+                logger.info(`${label} [붙기 전에 이미 있던 오류 - 무시] ${text}`);
+                return;
+            }
+
             logger.error(`${label} [콘솔오류] ${text}`);
-            logger.errorDetail({
+            const info = {
                 kind: 'consoleError',
                 window: label,
                 windowTitle: page.title,
                 windowId: page.id,
+                windowDesc: _windowDesc(),
                 cycleNo,
+                currPage: lastState.page,
+                busy: lastState.busy,
+                lastKey: lastKeyName,
                 summary: text,
                 cdpEvent: raw
-            });
+            };
+            logger.errorDetail(info);
+            fireIncident(session, info);
         },
         onScriptError: (text, raw) => {
+
+            if (!ready) {
+                logger.info(`${label} [붙기 전에 이미 있던 오류 - 무시] ${text}`);
+                return;
+            }
+
             logger.error(`${label} [스크립트오류] ${text}`);
-            logger.errorDetail({
+            const info = {
                 kind: 'scriptError',
                 window: label,
                 windowTitle: page.title,
                 windowId: page.id,
+                windowDesc: _windowDesc(),
                 cycleNo,
+                currPage: lastState.page,
+                busy: lastState.busy,
+                lastKey: lastKeyName,
                 summary: text,
+                detail: { stack: raw && raw.exceptionDetails && raw.exceptionDetails.exception
+                    ? raw.exceptionDetails.exception.description : null },
                 cdpEvent: raw
-            });
+            };
+            logger.errorDetail(info);
+            fireIncident(session, info);
         }
     });
 
     // 키 이름 풀이는 한 번만 해 두고 계속 쓴다(반복 안에서 매번 풀 필요가 없다).
     const editSpec = parseKeySpec(EDIT_KEY);
     const backSpec = parseKeySpec(BACK_KEY);
+
+    // 밀려 있던 지난 오류가 다 지나갈 짬을 준 뒤에 감시를 시작한다.
+    await wait(300);
+
+    ready = true;
 
     try {
         while (running) {
@@ -171,14 +420,20 @@ async function runWindowLoop(page, label) {
             try {
                 if (session.isClosed()) {
                     logger.error(`${label} [화면크래시] 연결이 끊겼다 — 사이클 ${cycleNo}. 이 창의 반복을 종료한다.`);
-                    logger.errorDetail({
+                    const info = {
                         kind: 'windowGone',
                         window: label,
                         windowTitle: page.title,
                         windowId: page.id,
+                        windowDesc: _windowDesc(),
                         cycleNo,
+                        currPage: lastState.page,
+                        busy: lastState.busy,
+                        lastKey: lastKeyName,
                         summary: '창과의 연결이 끊김(화면 크래시 또는 창 닫힘)'
-                    });
+                    };
+                    logger.errorDetail(info);
+                    fireIncident(session, info);
                     break;
                 }
 
@@ -187,14 +442,20 @@ async function runWindowLoop(page, label) {
                     const alive = await isWindowAlive(DEBUG_HOST, page.id);
                     if (!alive) {
                         logger.error(`${label} [화면크래시] 창이 사라졌다 — 사이클 ${cycleNo}. 이 창의 반복을 종료한다.`);
-                        logger.errorDetail({
+                        const info = {
                             kind: 'windowGone',
                             window: label,
                             windowTitle: page.title,
                             windowId: page.id,
+                            windowDesc: _windowDesc(),
                             cycleNo,
+                            currPage: lastState.page,
+                            busy: lastState.busy,
+                            lastKey: lastKeyName,
                             summary: '창이 목록에서 사라짐(화면 크래시 또는 창 닫힘)'
-                        });
+                        };
+                        logger.errorDetail(info);
+                        fireIncident(session, info);
                         break;
                     }
                 }
@@ -204,17 +465,27 @@ async function runWindowLoop(page, label) {
                 const currPage = state.page;
                 const busy = state.busy;
 
+                lastState = state;
+
                 // 메시지박스/다이얼로그가 떠 있으면 단축키가 앱 쪽에서 막히므로 그 자리서 중지
                 if (state.dialog) {
                     logger.error(`${label} 사이클 ${cycleNo}: 메시지박스/다이얼로그가 떠 있음 — 자동화를 멈춘다.`);
-                    logger.errorDetail({
+                    const info = {
                         kind: 'dialogOpen',
                         window: label,
+                        windowTitle: page.title,
+                        windowId: page.id,
+                        windowDesc: _windowDesc(),
                         cycleNo,
+                        currPage,
+                        busy,
+                        lastKey: lastKeyName,
                         summary: '메시지박스/다이얼로그가 떠 있어 단축키가 막힘',
                         dialogText: state.dialogText
-                    });
-                    process.exit(1);
+                    };
+                    logger.errorDetail(info);
+                    fireIncident(session, info);
+                    break;
                 }
 
                 // busy 감시(누르는 건 막지 않음) — 계속 켜진 채 제한 시간을 넘기면 화면 멈춤으로 보고 종료.
@@ -224,18 +495,23 @@ async function runWindowLoop(page, label) {
                     } else if (Date.now() - busySince >= BUSY_STUCK_MS) {
                         const stuckMs = Date.now() - busySince;
                         logger.error(`${label} 사이클 ${cycleNo}: busy가 ${stuckMs}ms 동안 계속 켜져 있음 — 화면 멈춤으로 보고 전체 종료.`);
-                        logger.errorDetail({
+                        const info = {
                             kind: 'busyStuck',
                             window: label,
                             windowTitle: page.title,
                             windowId: page.id,
+                            windowDesc: _windowDesc(),
                             cycleNo,
                             stuckMs,
                             limitMs: BUSY_STUCK_MS,
                             currPage,
-                            summary: 'busy 가 제한 시간 넘게 계속 켜져 있음(화면 멈춤 의심)'
-                        });
-                        process.exit(1);
+                            busy,
+                            lastKey: lastKeyName,
+                            summary: `처리중 표시가 ${stuckMs}ms 동안 안 풀림(화면 멈춤 의심)`
+                        };
+                        logger.errorDetail(info);
+                        fireIncident(session, info);
+                        break;
                     }
                 } else {
                     busySince = null;
@@ -259,6 +535,8 @@ async function runWindowLoop(page, label) {
                     const gap = lastPressAt === null ? 0 : now - lastPressAt;
                     lastPressAt = now;
 
+                    lastKeyName = keyName;
+
                     const what = isEdit ? `WS10 → 편집진입(${EDIT_KEY})` : `WS20 → 뒤로가기(${BACK_KEY})`;
                     const mark = (listening === false) ? ' ※앱이 이 키를 안 듣고 있음' : '';
                     logger.info(`${label} 사이클 ${cycleNo}: ${what} 누름 (직전 누름과 ${gap}ms 차)${mark}`);
@@ -271,6 +549,7 @@ async function runWindowLoop(page, label) {
                             window: label,
                             windowTitle: page.title,
                             windowId: page.id,
+                            windowDesc: _windowDesc(),
                             cycleNo,
                             currPage,
                             wantKey: keyName,
@@ -285,15 +564,21 @@ async function runWindowLoop(page, label) {
                 }
             } catch (e) {
                 logger.error(`${label} 사이클 ${cycleNo} 중 자동화 스크립트 예외: ${e && e.stack ? e.stack : e}`);
-                logger.errorDetail({
+                const info = {
                     kind: 'driverException',
                     window: label,
                     windowTitle: page.title,
                     windowId: page.id,
+                    windowDesc: _windowDesc(),
                     cycleNo,
+                    currPage: lastState.page,
+                    busy: lastState.busy,
+                    lastKey: lastKeyName,
                     summary: e && e.message ? e.message : String(e),
-                    stack: e && e.stack ? e.stack : null
-                });
+                    detail: { stack: e && e.stack ? e.stack : null }
+                };
+                logger.errorDetail(info);
+                fireIncident(session, info);
             }
 
             // 한 바퀴에 쓴 시간을 빼고 남은 만큼만 쉰다 — 그래야 실제 간격이 정한 값에 맞는다.
@@ -335,16 +620,40 @@ async function main() {
     }
 
     // WS10인 창만 골라 그 개수를 사람에게 먼저 확인받고, y일 때만 그 창들로 시작한다.
+    //   ★핀(항상 위 고정)을 걸어 둔 창은 뺀다 — 장군님이 보고 계신 창이라 건드리면 안 된다.
     const ws10Pages = [];
+    let iPinnedSkipped = 0;
+
     for (const page of pages) {
-        const currPage = await evalOnPage(page, "window.getCurrPage ? getCurrPage() : ''");
-        if (currPage === 'WS10') {
+
+        let oPick;
+
+        try {
+            oPick = JSON.parse(await evalOnPage(page, PICK_EXPRESSION));
+        } catch (e) {
+            logger.error(`창 상태를 못 읽어 건너뛴다 (${page.title}): ${e && e.message ? e.message : e}`);
+            continue;
+        }
+
+        if (oPick.pinned) {
+            iPinnedSkipped++;
+            logger.info(`핀이 걸린 창이라 건너뛴다 — ${page.title} (창번호 ${page.id})`);
+            continue;
+        }
+
+        if (oPick.page === 'WS10') {
             ws10Pages.push(page);
         }
+
+    }
+
+    if (iPinnedSkipped > 0) {
+        logger.info(`핀이 걸려 있어 뺀 창: ${iPinnedSkipped}개`);
     }
 
     if (ws10Pages.length === 0) {
         logger.error('WS10 화면이 하나도 없어 시작할 수 없다 — WS10으로 이동해 두고 다시 실행할 것.');
+        logger.error('  (핀이 걸린 창은 일부러 뺀다. 그 창도 시험하려면 화면 위쪽 압정 단추를 꺼 둘 것.)');
         process.exit(1);
     }
 
@@ -360,7 +669,32 @@ async function main() {
 
     await Promise.all(ws10Pages.map((page, i) => runWindowLoop(page, `[창${i + 1}]`)));
 
-    logger.info('모든 창의 반복이 끝났다.');
+    // 증거 담기가 아직 진행 중일 수 있다 — 다 담고 나서 끝낸다.
+    if (incidentPromise) {
+        await incidentPromise;
+    }
+
+    logger.info('');
+    logger.info('══════════════ 끝 ══════════════');
+
+    if (!incidentTaken) {
+        logger.info('오류 없이 끝났다(Ctrl+C 로 중지했거나 창이 모두 닫혔다).');
+        logger.info(`진행 기록: ${logger.filePath}`);
+        return;
+    }
+
+    logger.error(`왜 멈췄나 : ${incidentInfo && incidentInfo.summary ? incidentInfo.summary : '(모름)'}`);
+    logger.error(`어느 창   : ${incidentInfo && incidentInfo.window ? incidentInfo.window : '(모름)'}`);
+    logger.error(`몇 바퀴째 : ${incidentInfo && incidentInfo.cycleNo != null ? incidentInfo.cycleNo : '(모름)'}`);
+    logger.error(`그때 화면 : ${incidentInfo && incidentInfo.currPage ? incidentInfo.currPage : '(모름)'}`);
+
+    if (incidentDir) {
+        logger.error('');
+        logger.error(`★ 증거 폴더 : ${incidentDir}`);
+        logger.error('   그 안 「요약.md」 부터 보면 된다(화면 그림·직전 기록·오류 원문 같이 들어 있음).');
+    }
+
+    process.exitCode = 1;
 }
 
 main().catch((e) => {

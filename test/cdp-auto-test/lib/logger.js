@@ -15,8 +15,15 @@ function _stamp() {
         + `${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
 }
 
+// 고장 났을 때 "그 직전에 무슨 일이 있었나" 를 보려면 최근 기록이 필요하다.
+// 파일 전체를 다시 읽는 건 느리고 지저분하므로, 최근 몇 줄만 메모리에 들고 있는다.
+const RECENT_KEEP = 300;
+
 function createLogger(logDir) {
     fs.mkdirSync(logDir, { recursive: true });
+
+    // 최근 줄 보관함 — 가득 차면 오래된 것부터 버린다.
+    const recent = [];
 
     const stamp = _stamp();
     const filePath = path.join(logDir, `run_${stamp}.log`);
@@ -32,6 +39,12 @@ function createLogger(logDir) {
             console.log(line);
         }
         fs.appendFileSync(filePath, line + '\n', 'utf8');
+
+        recent.push(line);
+
+        if (recent.length > RECENT_KEEP) {
+            recent.shift();
+        }
     }
 
     // 오류 한 건의 전체 내용(스택·파일·줄번호·원본 이벤트까지)을 JSON 한 줄로 남긴다.
@@ -54,6 +67,8 @@ function createLogger(logDir) {
         info: (msg) => write('INFO', msg),
         error: (msg) => write('ERROR', msg),
         errorDetail,
+        // 최근 기록을 통째로 꺼내 준다(사고 폴더에 같이 담으려고).
+        getRecent: () => recent.slice(),
         filePath,
         errorFilePath
     };
