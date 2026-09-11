@@ -56,16 +56,36 @@
      *  설계 = .works/데이터모니터/01_버전간_데이터비교_설계.md
      *  1단계 = 좌 3.0 / 우 4.0 을 같은 모양으로 놓고 보기 + 다른 것만 걸러 보기.
      */
-    var C_PORT = 8888;          //3.0 이 보내 올 자리(장군님 지정)
+    var C_PORT = 9999;          //3.0 이 보내 올 자리(장군님 지정 2026-09-11)
     var _oSrv = null;           //열어 둔 자리 손잡이(창 닫을 때 닫는다)
     var _oCmpLeft = null;       //3.0 이 보낸 데이터 구조
     var _sCmpLeftTime = "";     //3.0 것이 들어온 시각
     var _oCmpRight = null;      //4.0 이 지금 들고 있는 데이터 구조
     var _sCmpRightTime = "";    //4.0 것을 담은 시각
     var _oCmpDiff = {};         //양쪽이 어긋난 자리 { path: "다름" | "3.0만" | "4.0만" }
+    var _iCmpDiffN = 0;         //어긋난 자리 개수(세면서 상한을 본다)
+    var _aCmpDiffTop = [];      //어긋난 자리 중 **꼭대기만** 모은 목록(이동용). 자손까지 넣으면 하나씩 못 넘긴다
+    var _iCmpAt = -1;           //그 목록에서 지금 몇 번째에 서 있나
+    var _oCmpKindN = { "다름": 0, "3.0만": 0, "4.0만": 0 };   //종류별 개수
+    var _bCmpCut = false;       //너무 많아 도중에 끊었나
     var _oCmpDiffUp = {};       //어긋난 자리로 가는 윗자리들 { path: true }
     var _bCmpDiffOnly = false;  //다른 것만 보기
-    var _oCmpExpand = {};       //비교 뷰 펼침 상태 (좌우가 같은 자리를 함께 펼친다)
+    var _sCmpFindL = "";        //좌(3.0) 찾는 글자
+    var _sCmpFindR = "";        //우(4.0) 찾는 글자
+
+    //찾기 결과를 **미리 한 번만** 만들어 둔다(장군님 지적 2026-09-11).
+    //  전에는 줄을 그릴 때마다 그 아래를 재귀로 훑었다. 그게 느려서 깊이를 6 으로 막아 뒀는데,
+    //  그러면 더 깊은 자리는 아예 못 찾는다 — 모니터링 도구에서 있을 수 없는 제약이다.
+    //  한 번만 전체를 훑어 표로 만들어 두면 **깊이 제한이 필요 없고** 그릴 때는 표만 보면 된다.
+    var _oFindHitL = {}, _oFindUpL = {}, _iFindNL = 0;   //좌 — 걸린 자리 / 가는 길 / 걸린 개수
+    var _oFindHitR = {}, _oFindUpR = {}, _iFindNR = 0;   //우
+    //★ 펼침 상태는 **좌우가 따로** 간다(장군님 지적 2026-09-11).
+    //  처음에 하나로 묶어 좌우가 같이 펼쳐지게 만들었는데, 시키지 않은 동작이었고
+    //  애초에 좌우는 줄 순서도 개수도 달라 맞춰 봐야 소용이 없다. 한쪽을 펴면 그쪽만 펴진다.
+    var _oCmpExpandL = {};      //좌(3.0) 펼침 상태
+    var _oCmpExpandR = {};      //우(4.0) 펼침 상태
+    var _oCmpClosedL = {};      //좌 - 한 번이라도 접은 적 있는 자리(그 아래는 저절로 안 펼친다)
+    var _oCmpClosedR = {};      //우 - 위와 같음
     var _oTreeL = null;         //좌 트리 손잡이
     var _oTreeR = null;         //우 트리 손잡이
     var _bCmpWantRight = false; //부모에게 4.0 것을 달라고 해 둔 상태인가
@@ -94,6 +114,8 @@
         EL.btnToggleText = $("dmBtnToggleText");
         EL.btnNow = $("dmBtnNow");
         EL.btnClear = $("dmBtnClear");
+        EL.watchOnly = $("dmWatchOnly");
+        EL.scopeOnly = $("dmScopeOnly");
         EL.chkCode = $("dmChkCode");
         EL.chkLib = $("dmChkLib");
         EL.busy = $("dmBusy");
@@ -110,6 +132,12 @@
         EL.cmpInfo = $("dmCmpInfo");
         EL.btnCmpTake = $("dmBtnCmpTake");
         EL.chkDiffOnly = $("dmChkDiffOnly");
+        EL.btnDiffPrev = $("dmBtnDiffPrev");
+        EL.btnDiffNext = $("dmBtnDiffNext");
+        EL.cmpAt = $("dmCmpAt");
+        EL.btnCollapseAll = $("dmBtnCollapseAll");
+        EL.cmpLeftSearch = $("dmCmpLeftSearch");
+        EL.cmpRightSearch = $("dmCmpRightSearch");
     }
 
 
@@ -163,18 +191,23 @@
                     break;
 
                 case "DMON_SNAPDATA":
-                    //트리 뷰가 그릴 데이터 도착.
-                    _oSnap = oData.SNAP || {};
 
-                    //비교 뷰에서 "4.0 지금 담기" 를 눌러 달라고 해 둔 것이면 그쪽으로 넣는다.
-                    if (_bCmpWantRight) {
+                    //비교 뷰에서 [4.0 지금 담기] 로 부른 것 — "지금 이 순간"을 새로 뜬 것이다.
+                    //  ★ 트리 뷰가 그릴 데이터(_oSnap)는 건드리지 않는다. 시점이 다르기 때문이다.
+                    if (oData.NOW === true) {
                         _bCmpWantRight = false;
-                        _oCmpRight = _oSnap;
+                        _oCmpRight = oData.SNAP || {};
                         _sCmpRightTime = _cmpNow();
+
+                        //★ 새로 담았으면 펼침 기록을 비운다(좌측과 같은 이유).
+                        _oCmpExpandR = {};
+                        _oCmpClosedR = {};
                         _cmpRefresh();
                         break;
                     }
 
+                    //트리 뷰가 그릴 데이터 도착(마지막으로 비교할 때 뜬 것 = 변경 목록과 같은 시점).
+                    _oSnap = oData.SNAP || {};
                     _renderTree();
                     _runJump();          //리스트 뷰에서 path 를 눌러 온 것이면 그 자리로 간다
                     break;
@@ -267,7 +300,10 @@
         }
 
         if (EL.empty) { EL.empty.hidden = true; }
-        if (EL.tableWrap) { EL.tableWrap.hidden = (_sView === "tree"); }
+        //★ 리스트 뷰일 때만 표를 보인다(장군님 지적 2026-09-11).
+        //  뷰가 둘(리스트·트리)뿐이던 때 "트리가 아니면 보인다"로 적어 둔 것이 남아 있어,
+        //  비교 뷰를 보고 있는데도 변경이 들어올 때마다 표가 도로 나왔다.
+        if (EL.tableWrap) { EL.tableWrap.hidden = (_sView !== "list"); }
 
         //위에 넣을 것을 한 덩어리로 만들어 한 번에 붙인다(화면 그리기 부담 줄이기).
         var oFrag = document.createDocumentFragment();
@@ -596,45 +632,54 @@
      *     펼침 상태를 화면이 들고 있는 경우 공통이 이 처리를 화면에 맡긴다(theme/u4a-ui.js 의 가상 트리 토글 주석).
      *     안 해 두면 접었다 펴는 순간 아래가 통째로 다시 펼쳐진다(장군님 지적 2026-09-10).
      */
-    function _setExpand(oNode, bOpen) {
+    /**
+     * ★★ 접으면 그 아래도 같이 접힌다 — 이 화면의 트리는 **전부 이 함수를 쓴다**.
+     *
+     *   왜 화면 쪽에 있나:
+     *     공통 트리의 표준은 "접기 = 자손까지 접힘" 이 맞다. 다만 펼침 상태를 바깥에서 들고 있는
+     *     방식으로 쓰면 공통이 그 처리를 쓰는 쪽에 넘긴다(공통 소스 주석에 그렇게 적혀 있다).
+     *     이 화면은 데이터가 커서 그 방식을 쓰므로 여기서 처리한다.
+     *
+     *   ★ 트리를 하나 더 만들 때는 **이 함수를 그대로 쓴다. 새로 짜지 말 것.**
+     *     (장군님 지적 2026-09-11 — 비교 뷰에 안 넣어 같은 지적을 두 번 받았다.)
+     *
+     *   @param {object} oExpand      펼침 상태 { path: true/false }
+     *   @param {object} oClosedOnce  한 번이라도 접은 적 있는 자리 { path: true }
+     */
+    function _setExpandIn(oExpand, oClosedOnce, oNode, bOpen) {
 
         var sPath = (oNode && typeof oNode === "object") ? oNode.path : oNode;
         if (!sPath) {
-            console.error("[DMWN-009] ERROR TREE_TOGGLE path is empty — expand state not stored");
+            console.error("[DMWN-009] ERROR TREE_TOGGLE path is empty - expand state not stored");
             return;
         }
 
-        _oExpand[sPath] = !!bOpen;
+        oExpand[sPath] = !!bOpen;
 
         if (bOpen) { return; }
 
-        //① ★ 이 자리를 한 번 접었다고 적어 둔다(장군님 지적 2026-09-10, 실측 재현).
-        //   아래 isExpanded 는 "아직 안 적어 둔 자리"를 종류 걸러내기·찾기가 켜져 있을 때
-        //   전부 펼침으로 답한다. 그래서 접었다 펴면 자손이 통째로 다시 펼쳐졌다
-        //   (실측: 37줄 → 접기 → 다시 펴기 37줄, 자손이 그대로 펼쳐진 채).
-        //   자손 전부에 "접힘"을 적어 두는 방법도 되지만 이 화면 데이터에서는 2만 자리를 넘어
-        //   한 번 누를 때마다 그만큼 쓰게 된다(느린 PC 에서 그대로 멎는다). 그래서 윗자리 하나만 적고,
-        //   아래에서는 조상 쪽으로 몇 단계만 거슬러 보며 판단한다(깊이만큼만 본다).
-        _oClosedOnce[sPath] = true;
+        //① 이 자리를 한 번 접었다고 적어 둔다.
+        //   자손 전부에 "접힘"을 적는 방법도 되지만 이 화면 데이터에서는 2만 자리를 넘어
+        //   한 번 누를 때마다 그만큼 쓰게 된다(느린 PC 에서 그대로 멎는다).
+        //   그래서 윗자리 하나만 적고, 볼 때 조상 쪽으로 몇 단계만 거슬러 보며 판단한다.
+        oClosedOnce[sPath] = true;
 
         //② 이미 적어 둔 자리 중 이 아래인 것도 같이 닫는다.
         //   자리 이름이 "윗자리." 또는 "윗자리[" 로 시작하면 그 아래다.
-        //   (값에서는 이미 없어졌는데 적어만 둔 자리도 여기서 같이 닫힌다.)
-        var aKeys = Object.keys(_oExpand);
+        var aKeys = Object.keys(oExpand);
         for (var i = 0; i < aKeys.length; i++) {
             var sK = aKeys[i];
             if (sK.length <= sPath.length || sK.indexOf(sPath) !== 0) { continue; }
             var sNext = sK.charAt(sPath.length);
-            if (sNext === "." || sNext === "[") { _oExpand[sK] = false; }
+            if (sNext === "." || sNext === "[") { oExpand[sK] = false; }
         }
     }
 
     /**
-     * 윗자리 중에 한 번이라도 접은 적이 있는 자리가 있나.
-     *   있으면 그 아래는 "아직 안 적어 둔 자리" 라도 저절로 펼치지 않는다.
-     *   → 접었다 펴면 자손은 접힌 채로 나온다(공통 트리 표준과 같은 동작).
+     * 윗자리 중에 한 번이라도 접은 적이 있는 자리가 있나(공용).
+     *   있으면 그 아래는 아직 안 적어 둔 자리라도 저절로 펼치지 않는다.
      */
-    function _ancestorClosed(sPath) {
+    function _ancestorClosedIn(oClosedOnce, sPath) {
 
         var sP = sPath;
 
@@ -644,8 +689,80 @@
             var iCut = (iDot > iBrk) ? iDot : iBrk;
             if (iCut <= 0) { return false; }
             sP = sP.slice(0, iCut);
-            if (_oClosedOnce[sP] === true) { return true; }
+            if (oClosedOnce[sP] === true) { return true; }
         }
+    }
+
+    /**
+     * 잘린 글자에 마우스를 올리면 다 보여준다(공용).
+     *   공통 툴팁은 표의 칸만 자동으로 잡아 주므로 트리 칸은 여기서 붙인다.
+     */
+    function _tipCells(oRow) {
+        var aCell = oRow.querySelectorAll(".u4aColTreeTrail .u4aColTreeCell");
+        for (var c = 0; c < aCell.length; c++) {
+            var sTxt = (aCell[c].textContent || "").trim();
+            if (!sTxt) { continue; }
+            aCell[c].setAttribute("data-tip", sTxt);
+            aCell[c].setAttribute("data-tip-trunc", "");
+        }
+    }
+
+    /**
+     * 이름 칸 아무 데나 눌러도 접었다 폈다 되게 한다(공용).
+     *   ★ 가상 스크롤은 줄 요소를 다시 쓴다 — 처리기는 **요소당 한 번만** 붙이고, 지금 그 줄이
+     *     무엇인지는 요소에 적어 둔 것을 읽는다. 그릴 때마다 붙이면 처리기가 쌓여, 한 번 눌러도
+     *     접었다 폈다를 거듭해 제자리로 돌아온다.
+     *
+     *   @param {function} fnToggle  fnToggle(oNode, bOpen) — 실제로 접고 펴는 일
+     *   @param {function} fnAfter   그 뒤에 다시 그리는 일
+     */
+    function _wireNameToggle(oRow, oNode, oExpand, fnToggle, fnAfter) {
+
+        var oNameCell = oRow.querySelector(".u4aColTreeNameCell");
+        if (!oNameCell) {
+            if (_hasKids(oNode.val)) {
+                console.error("[DMWN-008] ERROR TREE_NAME_CELL_MISSING path=" + oNode.path +
+                    " - click-to-toggle on the name cell is dead for this row");
+            }
+            return;
+        }
+
+        oNameCell.__dmNode = _hasKids(oNode.val) ? oNode : null;
+        oNameCell.__dmRow = oRow;
+        oNameCell.__dmExpand = oExpand;
+        oNameCell.__dmToggle = fnToggle;
+        oNameCell.__dmAfter = fnAfter;
+        oNameCell.classList.toggle("u4aDmTreeNameHit", _hasKids(oNode.val));
+
+        if (oNameCell.__dmHooked === true) { return; }
+        oNameCell.__dmHooked = true;
+
+        oNameCell.addEventListener("click", function (ev) {
+
+            //화살표를 직접 누른 것은 공통 트리가 이미 처리한다 - 여기서 또 뒤집으면 도로 닫힌다.
+            if (ev.target && ev.target.closest && ev.target.closest(".u4a-tree__toggle")) { return; }
+
+            var oNow = oNameCell.__dmNode;
+            if (!oNow) { return; }
+
+            var oMap = oNameCell.__dmExpand || {};
+            var oRowNow = oNameCell.__dmRow;
+            var bNow = Object.prototype.hasOwnProperty.call(oMap, oNow.path)
+                ? oMap[oNow.path]
+                : (!!oRowNow && oRowNow.getAttribute("aria-expanded") === "true");
+
+            oNameCell.__dmToggle(oNow, !bNow);
+            oNameCell.__dmAfter();
+        });
+    }
+
+
+    function _setExpand(oNode, bOpen) {
+        _setExpandIn(_oExpand, _oClosedOnce, oNode, bOpen);
+    }
+
+    function _ancestorClosed(sPath) {
+        return _ancestorClosedIn(_oClosedOnce, sPath);
     }
 
     /* ==================================================================
@@ -923,56 +1040,12 @@
                     //바뀐 줄은 눈에 띄게.
                     if (_oChgMap[n.path]) { oRow.classList.add("u4aDmTreeChg"); }
 
-                    //값 칸에 마우스를 올리면 잘린 글자를 다 보여준다(리스트 뷰와 같게 — 장군님 지적 2026-09-10).
-                    //  공통 툴팁은 표(.u4a-table)의 칸만 자동으로 잡아 주므로 트리 칸은 여기서 붙인다.
-                    //  잘렸을 때만 뜬다(안 잘리면 공통이 알아서 넘어간다).
-                    var aCell = oRow.querySelectorAll(".u4aColTreeTrail .u4aColTreeCell");
-                    for (var c = 0; c < aCell.length; c++) {
-                        var sTxt = (aCell[c].textContent || "").trim();
-                        if (!sTxt) { continue; }
-                        aCell[c].setAttribute("data-tip", sTxt);
-                        aCell[c].setAttribute("data-tip-trunc", "");
-                    }
+                    //잘린 글자는 마우스를 올리면 다 보인다(리스트 뷰와 같게).
+                    _tipCells(oRow);
 
-                    //첫 칸(이름) 아무 데나 눌러도 접었다 폈다 되게 한다(장군님 지시 2026-09-10).
-                    //  화살표만 눌러야 하면 표적이 너무 작아 누르기 불편하다.
-                    var oNameCell = oRow.querySelector(".u4aColTreeNameCell");
-                    if (!oNameCell) {
-                        if (_hasKids(n.val)) {
-                            console.error("[DMWN-008] ERROR TREE_NAME_CELL_MISSING path=" + n.path +
-                                " — click-to-toggle on the name cell is dead for this row");
-                        }
-                        return;
-                    }
-
-                    //★ 가상 스크롤은 줄 요소를 다시 쓴다(실측 2026-09-10: 다시 그려도 같은 요소).
-                    //  그릴 때마다 처리기를 붙이면 한 요소에 여러 개가 쌓여, 한 번 눌러도 접었다 폈다를
-                    //  거듭해 제자리로 돌아온다(눌러도 아무 일도 안 일어나는 것처럼 보인다).
-                    //  그래서 처리기는 요소당 한 번만 붙이고, 지금 그 줄이 무엇인지는 요소에 적어 둔 것을 읽는다.
-                    oNameCell.__dmNode = _hasKids(n.val) ? n : null;
-                    oNameCell.__dmRow = oRow;
-                    oNameCell.classList.toggle("u4aDmTreeNameHit", _hasKids(n.val));
-
-                    if (oNameCell.__dmHooked === true) { return; }
-                    oNameCell.__dmHooked = true;
-
-                    oNameCell.addEventListener("click", function (ev) {
-
-                        //화살표를 직접 누른 것은 공통 트리가 이미 처리한다 — 여기서 또 뒤집으면 도로 닫힌다.
-                        if (ev.target && ev.target.closest && ev.target.closest(".u4a-tree__toggle")) { return; }
-
-                        //지금 이 줄에 놓인 노드(자식 없는 줄이면 null — 아무것도 안 한다).
-                        var oNow = oNameCell.__dmNode;
-                        if (!oNow) { return; }
-
-                        var oRowNow = oNameCell.__dmRow;
-                        var bNow = Object.prototype.hasOwnProperty.call(_oExpand, oNow.path)
-                            ? _oExpand[oNow.path]
-                            : (!!oRowNow && oRowNow.getAttribute("aria-expanded") === "true");
-
-                        _setExpand(oNow, !bNow);
-                        _renderTree();
-                    });
+                    //첫 칸(이름) 아무 데나 눌러도 접었다 폈다 된다.
+                    //  ★ 배선은 공용 함수 하나로 — 트리를 더 만들 때 새로 짜지 말 것.
+                    _wireNameToggle(oRow, n, _oExpand, _setExpand, _renderTree);
                 },
                 emptyText: _emptyText()
             };
@@ -1025,6 +1098,15 @@
         if (EL.cmpOnly) { EL.cmpOnly.hidden = !bCmp; }
         if (EL.empty) { EL.empty.hidden = !bList || (_iCount > 0); }
 
+        //★ 그 뷰에서 안 쓰는 조작은 아예 안 보이게 한다(장군님 지적 2026-09-11).
+        //  비교 뷰는 감시를 쓰지 않는다 — [감시 시작]·[지금 비교]·[기록 지우기]·감시 상태 글자를 숨긴다.
+        //  감시 범위(공통코드·라이브러리)도 숨긴다: 비교 뷰에서 범위를 넓히면 4.0 쪽만 커져
+        //  3.0 에 없는 자리가 전부 "다름" 으로 나와 비교가 못 쓰게 된다.
+        if (EL.watchOnly) { EL.watchOnly.hidden = bCmp; }
+        if (EL.scopeOnly) { EL.scopeOnly.hidden = bCmp; }
+        if (EL.state) { EL.state.hidden = bCmp; }
+        if (EL.cmpInfo) { EL.cmpInfo.hidden = !bCmp; }
+
         if (EL.btnList) { EL.btnList.classList.toggle("pressed", bList); }
         if (EL.btnTree) { EL.btnTree.classList.toggle("pressed", bTree); }
         if (EL.btnCmp) { EL.btnCmp.classList.toggle("pressed", bCmp); }
@@ -1055,7 +1137,7 @@
      *
      *  들어오는 길:
      *    3.0 은 실행 중인 화면에서 감지 코드를 그 자리에 돌려 데이터 구조를 한 벌 뜬 뒤,
-     *    여기서 열어 둔 8888 로 보낸다. 3.0 쪽에는 파일을 만들지 않는다.
+     *    여기서 열어 둔 9999 로 보낸다. 3.0 쪽에는 파일을 만들지 않는다.
      *
      *  1단계 범위 — 좌우 출력 + 다른 것만 걸러 보기까지. 차이 강조색 손질·스크롤 맞물리기·
      *    짝짓기 규칙은 장군님이 화면을 보고 정하신 뒤에 얹는다.
@@ -1074,90 +1156,186 @@
     }
 
 
-    /* ---- 8888 열기 ---------------------------------------------------- */
+    /* ---- 9999 열기 ----------------------------------------------------
+     *
+     *  ★ express 를 안 쓴다 (2026-09-11 실측으로 확인).
+     *    이 앱의 Electron 이 들고 있는 Node 는 14 대인데, 프로젝트에 깔려 있는 express 는
+     *    Node 18 이상만 받는다(자기 package.json 에 그렇게 적혀 있다). 실제로 부르면
+     *    `Cannot find module 'node:events'` 로 즉시 터진다 — 붙여 넣는 방식이 달라서다.
+     *    받을 것이 GET 하나 · POST 하나뿐이라 **Node 에 원래 들어 있는 http 로 그대로 연다.**
+     *    설치할 것도 없고 버전에 매이지도 않는다.
+     * ------------------------------------------------------------------- */
+
+    //한 번에 받을 수 있는 최대 크기. 데이터 구조 한 벌 실측이 약 48만자라 넉넉히 잡는다.
+    var C_MAX_BODY = 512 * 1024 * 1024;
+
+    function _cmpSetCors(res) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+        res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    }
+
+    function _cmpJson(res, iCode, oBody) {
+        try {
+            res.statusCode = iCode;
+            res.setHeader("Content-Type", "application/json; charset=utf-8");
+            res.end(JSON.stringify(oBody));
+        } catch (e) {
+            console.error("[DMWN-013] ERROR COMPARE_REPLY_FAILED - the sender gets no answer:", e);
+        }
+    }
+
+    /**
+     * 3.0 이 보낸 데이터 구조 받기.
+     */
+    function _cmpOnSnapshot(req, res) {
+
+        var aChunk = [];
+        var iSize = 0;
+        var bDead = false;
+
+        req.on("data", function (oChunk) {
+
+            if (bDead) { return; }
+
+            iSize += oChunk.length;
+
+            if (iSize > C_MAX_BODY) {
+                bDead = true;
+                console.error("[DMWN-013] ERROR SNAPSHOT_FROM_3_0 too large size=" + iSize +
+                    " limit=" + C_MAX_BODY + " - nothing was stored.");
+                _cmpJson(res, 413, { OK: false, MSG: "too large" });
+                try { req.destroy(); } catch (e) { /* 이미 끊긴 경우 */ }
+                return;
+            }
+
+            aChunk.push(oChunk);
+        });
+
+        req.on("error", function (e) {
+            if (bDead) { return; }
+            bDead = true;
+            console.error("[DMWN-013] ERROR SNAPSHOT_FROM_3_0 receive failed:", e);
+        });
+
+        req.on("end", function () {
+
+            if (bDead) { return; }
+
+            var sRaw = "";
+            var oBody = null;
+
+            try {
+                sRaw = Buffer.concat(aChunk).toString("utf8");
+            } catch (e) {
+                console.error("[DMWN-013] ERROR SNAPSHOT_FROM_3_0 join failed size=" + iSize + ":", e);
+                _cmpJson(res, 400, { OK: false, MSG: "join failed" });
+                return;
+            }
+
+            try {
+                oBody = JSON.parse(sRaw);
+            } catch (e) {
+                console.error("[DMWN-013] ERROR SNAPSHOT_FROM_3_0 parse failed size=" + sRaw.length + ":", e);
+                _cmpJson(res, 400, { OK: false, MSG: "parse failed" });
+                return;
+            }
+
+            var oSnap = oBody && oBody.SNAP;
+
+            if (!oSnap || typeof oSnap !== "object") {
+                console.error("[DMWN-013] ERROR SNAPSHOT_FROM_3_0 has no SNAP object - nothing to show. keys=" +
+                    Object.keys(oBody || {}).join(","));
+                _cmpJson(res, 400, { OK: false, MSG: "SNAP missing" });
+                return;
+            }
+
+            _oCmpLeft = oSnap;
+            _sCmpLeftTime = _cmpNow();
+
+            //★ 새로 받았으면 펼침 기록을 비운다(장군님 지적 2026-09-11).
+            //  안 비우면 예전에 펼쳐 둔 자리만 펼쳐진 채 나머지는 기본값이라 뒤섞여 보인다.
+            //  비우면 언제 담아도 늘 같은 모양(뿌리만 펼침)으로 시작한다.
+            _oCmpExpandL = {};
+            _oCmpClosedL = {};
+
+            console.log("[DMWN] INFO SNAPSHOT_FROM_3_0 received roots=" +
+                Object.keys(oSnap).length + " size=" + sRaw.length);
+
+            //받자마자 4.0 것도 새로 담아 나란히 놓는다.
+            //  ★ 여기서 바로 다시 그리지 않는다 — 4.0 것이 도착하면 그때 한 번만 그린다.
+            //    둘 다 그리면 한 번 보낼 때마다 비교가 두 번 돌아 콘솔에도 두 줄씩 쌓인다
+            //    (장군님 지적 2026-09-11). 부모와 못 이어진 때만 왼쪽이라도 그려 둔다.
+            _cmpAskRight();
+            if (!_oChannel) { _cmpRefresh(); }
+
+            _cmpJson(res, 200, { OK: true, ROOTS: Object.keys(oSnap).length });
+        });
+    }
 
     function _startServer() {
 
         if (_oSrv) { return; }
 
-        var express = null;
+        var http = null;
 
         try {
-            express = require("express");
+            http = require("http");
         } catch (e) {
-            //없으면 3.0 것을 아예 못 받는다 - 조용히 두지 않는다.
-            console.error("[DMWN-012] ERROR EXPRESS_LOAD_FAILED port=" + C_PORT +
+            console.error("[DMWN-012] ERROR HTTP_MODULE_LOAD_FAILED port=" + C_PORT +
                 " - cannot receive data from 3.0:", e);
-            _cmpSetInfo("8888 을 못 열었습니다 (express 없음)");
+            _cmpSetInfo("9999 을 못 열었습니다");
             return;
         }
 
         try {
 
-            var oSrvApp = express();
+            _oSrv = http.createServer(function (req, res) {
 
-            //3.0 은 다른 프로그램이라 보내는 쪽 출처가 우리와 다르다. 받기만 하므로 열어 둔다.
-            oSrvApp.use(function (req, res, next) {
-                res.setHeader("Access-Control-Allow-Origin", "*");
-                res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-                res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-                if (req.method === "OPTIONS") { res.statusCode = 204; res.end(); return; }
-                next();
-            });
+                //3.0 은 다른 프로그램이라 보내는 쪽 출처가 우리와 다르다. 받기만 하므로 열어 둔다.
+                _cmpSetCors(res);
 
-            //데이터 구조 한 벌이 통째로 온다 - 기본 한도로는 모자란다.
-            oSrvApp.use(express.json({ limit: "256mb" }));
-
-            //3.0 쪽에서 살아 있는지 확인용.
-            oSrvApp.get("/ping", function (req, res) {
-                res.json({ OK: true, FROM: "4.0", PORT: C_PORT });
-            });
-
-            //3.0 이 보낸 데이터 구조 받기.
-            oSrvApp.post("/snapshot", function (req, res) {
-
-                var oBody = req.body || {};
-                var oSnap = oBody.SNAP;
-
-                if (!oSnap || typeof oSnap !== "object") {
-                    console.error("[DMWN-013] ERROR SNAPSHOT_FROM_3_0 has no SNAP object - nothing to show. keys=" +
-                        Object.keys(oBody).join(","));
-                    res.statusCode = 400;
-                    res.json({ OK: false, MSG: "SNAP missing" });
+                if (req.method === "OPTIONS") {
+                    res.statusCode = 204;
+                    res.end();
                     return;
                 }
 
-                _oCmpLeft = oSnap;
-                _sCmpLeftTime = _cmpNow();
+                var sUrl = (req.url || "").split("?")[0];
 
-                var iLen = 0;
-                try { iLen = JSON.stringify(oSnap).length; } catch (e) { iLen = -1; }
-                console.log("[DMWN] INFO SNAPSHOT_FROM_3_0 received roots=" +
-                    Object.keys(oSnap).length + " size=" + iLen);
+                //3.0 쪽에서 살아 있는지 확인용.
+                if (req.method === "GET" && sUrl === "/ping") {
+                    _cmpJson(res, 200, { OK: true, FROM: "4.0", PORT: C_PORT });
+                    return;
+                }
 
-                //받자마자 4.0 것도 새로 담아 나란히 놓는다.
-                _cmpAskRight();
-                _cmpRefresh();
+                if (req.method === "POST" && sUrl === "/snapshot") {
+                    _cmpOnSnapshot(req, res);
+                    return;
+                }
 
-                res.json({ OK: true, ROOTS: Object.keys(oSnap).length });
-            });
-
-            _oSrv = oSrvApp.listen(C_PORT, "127.0.0.1", function () {
-                console.log("[DMWN] INFO COMPARE_PORT_OPEN port=" + C_PORT);
-                _cmpSetInfo("8888 열림 - 3.0 에서 보내십시오");
+                //3.0 쪽이 주소를 잘못 적으면 여기로 온다 - 조용히 두면 원인을 못 찾는다.
+                console.error("[DMWN-013] ERROR COMPARE_UNKNOWN_REQUEST method=" + req.method +
+                    " url=" + sUrl + " - nothing was stored.");
+                _cmpJson(res, 404, { OK: false, MSG: "unknown path" });
             });
 
             _oSrv.on("error", function (e) {
                 //이미 쓰는 자리이면 3.0 것이 영영 안 들어온다 - 반드시 드러낸다.
                 console.error("[DMWN-014] ERROR COMPARE_PORT_LISTEN_FAILED port=" + C_PORT +
                     " code=" + (e && e.code) + " - data from 3.0 cannot arrive:", e);
-                _cmpSetInfo("8888 을 못 열었습니다 (" + ((e && e.code) || "error") + ")");
+                _cmpSetInfo("9999 을 못 열었습니다 (" + ((e && e.code) || "error") + ")");
                 _oSrv = null;
+            });
+
+            _oSrv.listen(C_PORT, "127.0.0.1", function () {
+                console.log("[DMWN] INFO COMPARE_PORT_OPEN port=" + C_PORT);
+                _cmpSetInfo("9999 열림 - 3.0 에서 보내십시오");
             });
 
         } catch (e) {
             console.error("[DMWN-014] ERROR COMPARE_SERVER_START_FAILED port=" + C_PORT + ":", e);
-            _cmpSetInfo("8888 을 못 열었습니다");
+            _cmpSetInfo("9999 을 못 열었습니다");
             _oSrv = null;
         }
     }
@@ -1173,8 +1351,10 @@
     /* ---- 4.0 것 담기 -------------------------------------------------- */
 
     function _cmpAskRight() {
+        //★ "지금 이 순간"을 새로 떠 달라고 한다(DMON_SNAP 과 다르다 — 그쪽은 마지막 비교 시점 것을 준다).
+        //  3.0 도 누를 때마다 지금을 뜨므로, 양쪽 시점이 맞아야 비교가 뜻이 있다.
         _bCmpWantRight = true;
-        _send({ PRCCD: "DMON_SNAP" });
+        _send({ PRCCD: "DMON_SNAPNOW" });
     }
 
 
@@ -1186,6 +1366,52 @@
         //NaN 은 서로 달라 보이지만 같은 것으로 본다.
         if (typeof a === "number" && typeof b === "number" && isNaN(a) && isNaN(b)) { return true; }
         return false;
+    }
+
+    //한 번에 표시할 수 있는 어긋난 자리 최대 개수.
+    //  한쪽에만 있는 덩어리가 크면 그 아래가 통째로 어긋난 자리가 된다 — 상한이 없으면
+    //  느린 PC 에서 그대로 멎는다. 상한에 닿으면 끊고 화면에 끊었다고 적는다.
+    var C_CMP_MAX = 20000;
+
+    function _cmpOver() { return _iCmpDiffN >= C_CMP_MAX; }
+
+    //어긋난 자리 하나 적기(개수도 같이 센다).
+    function _cmpPut(sPath, sKind, bTop) {
+        if (_oCmpDiff[sPath]) { return; }
+        _oCmpDiff[sPath] = sKind;
+        _iCmpDiffN++;
+        if (_oCmpKindN[sKind] !== undefined) { _oCmpKindN[sKind]++; }
+        //★ 이동 목록에는 **꼭대기만** 넣는다. 한쪽에만 있는 덩어리는 그 아래가 전부 어긋난 자리가 되는데,
+        //  그것까지 넣으면 [다음 차이]를 수천 번 눌러야 다음 덩어리로 간다.
+        if (bTop) { _aCmpDiffTop.push(sPath); }
+        //★ 끊겼다고 따로 한 줄 더 찍지 않는다(장군님 지적 2026-09-11).
+        //  비교가 끝날 때 남기는 줄에 cut=true 로 이미 들어 있다 — 같은 말을 두 번 남기지 않는다.
+        //  게다가 그것은 오류가 아니라 "여기서 그만 셌다"는 표시다. 오류로 찍으니 붉은 줄이 쏟아졌다.
+        if (_iCmpDiffN >= C_CMP_MAX) { _bCmpCut = true; }
+    }
+
+    /**
+     * 한쪽에만 있는 자리 — **그 아래까지 전부** 같은 종류로 적는다.
+     *   ★ 전에는 그 자리 하나만 적고 아래로 안 들어갔다(장군님 지적 2026-09-11).
+     *     그래서 ① 하위 레벨이 비교에서 빠지고 ② [다른 것만] 을 켜면 윗자리만 남고
+     *     펼쳐도 아래가 안 나왔다(화살표는 있는데 속이 비었다).
+     */
+    function _cmpMarkAll(v, sPath, sKind, iDepth, bTop) {
+
+        if (_cmpOver()) { return; }
+
+        _cmpPut(sPath, sKind, bTop === true);
+
+        if (!v || typeof v !== "object") { return; }
+        if (iDepth > 40) { return; }
+
+        var bArr = Array.isArray(v);
+        var aK = Object.keys(v);
+
+        for (var i = 0; i < aK.length; i++) {
+            if (_cmpOver()) { return; }
+            _cmpMarkAll(v[aK[i]], _joinPath(sPath, aK[i], bArr), sKind, iDepth + 1, false);
+        }
     }
 
     //어긋난 자리로 가는 윗자리를 전부 열어 둔다(걸러 볼 때 길이 막히지 않게).
@@ -1205,47 +1431,58 @@
 
     function _cmpWalk(vL, vR, sPath, iDepth) {
 
+        if (_cmpOver()) { return; }
         if (iDepth > 40) { return; }
 
         var bLObj = (vL && typeof vL === "object");
         var bRObj = (vR && typeof vR === "object");
 
-        if (bLObj && bRObj) {
-
-            var bLArr = Array.isArray(vL), bRArr = Array.isArray(vR);
-
-            if (bLArr !== bRArr) {
-                _oCmpDiff[sPath] = "다름";
-                _cmpMarkUp(sPath);
-                return;
-            }
-
-            var oSeen = {};
-            var aK = Object.keys(vL).concat(Object.keys(vR));
-
-            for (var i = 0; i < aK.length; i++) {
-
-                var sK = aK[i];
-                if (oSeen[sK]) { continue; }
-                oSeen[sK] = true;
-
-                var bInL = Object.prototype.hasOwnProperty.call(vL, sK);
-                var bInR = Object.prototype.hasOwnProperty.call(vR, sK);
-                var sSub = _joinPath(sPath, sK, bLArr);
-
-                if (bInL && !bInR) { _oCmpDiff[sSub] = "3.0만"; _cmpMarkUp(sSub); continue; }
-                if (!bInL && bInR) { _oCmpDiff[sSub] = "4.0만"; _cmpMarkUp(sSub); continue; }
-
-                _cmpWalk(vL[sK], vR[sK], sSub, iDepth + 1);
-            }
-
+        //① 한쪽만 덩어리다 — 이 자리도 다르고, 덩어리 쪽 아래도 전부 다르다.
+        if (bLObj !== bRObj) {
+            _cmpMarkAll(bLObj ? vL : vR, sPath, "다름", iDepth, true);
+            _cmpMarkUp(sPath);
             return;
         }
 
-        //한쪽만 덩어리이거나, 둘 다 홑값인데 값이 다르다.
-        if (bLObj !== bRObj || !_cmpSameLeaf(vL, vR)) {
-            _oCmpDiff[sPath] = "다름";
+        //② 둘 다 홑값이다 — 값만 견준다.
+        if (!bLObj) {
+            if (!_cmpSameLeaf(vL, vR)) {
+                _cmpPut(sPath, "다름", true);
+                _cmpMarkUp(sPath);
+            }
+            return;
+        }
+
+        //③ 둘 다 덩어리다.
+        var bLArr = Array.isArray(vL), bRArr = Array.isArray(vR);
+
+        //   목록인지 아닌지가 서로 다르면 이 자리를 다름으로 적되, **아래는 계속 견준다**
+        //   (그래야 어느 자리가 어떻게 다른지까지 보인다).
+        if (bLArr !== bRArr) {
+            _cmpPut(sPath, "다름", true);
             _cmpMarkUp(sPath);
+        }
+
+        var oSeen = {};
+        var aK = Object.keys(vL).concat(Object.keys(vR));
+
+        for (var i = 0; i < aK.length; i++) {
+
+            if (_cmpOver()) { return; }
+
+            var sK = aK[i];
+            if (oSeen[sK]) { continue; }
+            oSeen[sK] = true;
+
+            var bInL = Object.prototype.hasOwnProperty.call(vL, sK);
+            var bInR = Object.prototype.hasOwnProperty.call(vR, sK);
+            var sSub = _joinPath(sPath, sK, bLArr);
+
+            //★ 한쪽에만 있으면 **그 아래까지 전부** 적는다.
+            if (bInL && !bInR) { _cmpMarkAll(vL[sK], sSub, "3.0만", iDepth + 1, true); _cmpMarkUp(sSub); continue; }
+            if (!bInL && bInR) { _cmpMarkAll(vR[sK], sSub, "4.0만", iDepth + 1, true); _cmpMarkUp(sSub); continue; }
+
+            _cmpWalk(vL[sK], vR[sK], sSub, iDepth + 1);
         }
     }
 
@@ -1253,8 +1490,15 @@
 
         _oCmpDiff = {};
         _oCmpDiffUp = {};
+        _iCmpDiffN = 0;
+        _bCmpCut = false;
+        _aCmpDiffTop = [];
+        _iCmpAt = -1;
+        _oCmpKindN = { "다름": 0, "3.0만": 0, "4.0만": 0 };
 
         if (!_oCmpLeft || !_oCmpRight) { return; }
+
+        var t0 = (window.performance && performance.now) ? performance.now() : 0;
 
         var oSeen = {};
         var aK = Object.keys(_oCmpLeft).concat(Object.keys(_oCmpRight));
@@ -1268,51 +1512,175 @@
             var bInL = Object.prototype.hasOwnProperty.call(_oCmpLeft, sK);
             var bInR = Object.prototype.hasOwnProperty.call(_oCmpRight, sK);
 
-            if (bInL && !bInR) { _oCmpDiff[sK] = "3.0만"; continue; }
-            if (!bInL && bInR) { _oCmpDiff[sK] = "4.0만"; continue; }
+            if (bInL && !bInR) { _cmpMarkAll(_oCmpLeft[sK], sK, "3.0만", 0, true); continue; }
+            if (!bInL && bInR) { _cmpMarkAll(_oCmpRight[sK], sK, "4.0만", 0, true); continue; }
 
             _cmpWalk(_oCmpLeft[sK], _oCmpRight[sK], sK, 0);
         }
+
+        var t1 = (window.performance && performance.now) ? performance.now() : 0;
+        console.log("[DMWN] INFO COMPARE_DONE diffs=" + _iCmpDiffN +
+            " cut=" + _bCmpCut + " ms=" + Math.round(t1 - t0));
     }
 
 
     /* ---- 좌우 트리 그리기 --------------------------------------------- */
 
-    function _cmpKeep(oNode) {
-        if (!_bCmpDiffOnly) { return true; }
-        if (_oCmpDiff[oNode.path]) { return true; }
-        if (_oCmpDiffUp[oNode.path]) { return true; }
+    /**
+     * 이름순으로 늘어놓기 (장군님 지시 2026-09-11).
+     *   좌우가 담은 순서가 서로 달라 같은 이름이 딴 높이에 있어 눈으로 맞대 보기 어려웠다.
+     *   ★ 목록(Array)은 정렬하지 않는다 — 몇 번째인가가 곧 뜻이라 섞으면 안 된다.
+     */
+    function _cmpSortKeys(aKeys) {
+        return aKeys.sort(function (a, b) {
+            if (a === b) { return 0; }
+            return (a < b) ? -1 : 1;
+        });
+    }
+
+    //그 쪽에 걸어 둔 찾는 글자.
+    function _cmpFindOf(bLeft) { return bLeft ? _sCmpFindL : _sCmpFindR; }
+
+    function _cmpFindHitOf(bLeft) { return bLeft ? _oFindHitL : _oFindHitR; }
+    function _cmpFindUpOf(bLeft) { return bLeft ? _oFindUpL : _oFindUpR; }
+    function _cmpFindNOf(bLeft) { return bLeft ? _iFindNL : _iFindNR; }
+
+    //값 하나를 찾기용 글자로 바꾼다.
+    function _cmpValText(v) {
+        if (v === null) { return "null"; }
+        if (v === undefined || typeof v === "object") { return ""; }   //덩어리는 값이 없다 - 자식에서 본다
+        return String(v).toLowerCase();
+    }
+
+    //이 자리가 걸리나 — **이름과 값을 모두** 본다.
+    function _cmpHit1(vKey, vVal, sTxt) {
+        if (String(vKey).toLowerCase().indexOf(sTxt) !== -1) { return true; }
+        if (_cmpValText(vVal).indexOf(sTxt) !== -1) { return true; }
         return false;
+    }
+
+    /**
+     * 한 쪽 데이터를 **처음부터 끝까지 한 번** 훑어 걸린 자리를 표로 만든다.
+     *   ★ 깊이 제한 없음 — 담아 온 데이터 전부를 본다(담을 때 이미 상한이 걸려 있다).
+     *   hit = 걸린 자리 / up = 그 자리로 가는 윗자리(펼쳐야 보이는 길)
+     */
+    function _cmpBuildFind(bLeft) {
+
+        var oHit = {}, oUp = {}, iN = 0;
+        var sTxt = _cmpFindOf(bLeft);
+        var oSnap = bLeft ? _oCmpLeft : _oCmpRight;
+
+        if (bLeft) { _oFindHitL = oHit; _oFindUpL = oUp; _iFindNL = 0; }
+        else { _oFindHitR = oHit; _oFindUpR = oUp; _iFindNR = 0; }
+
+        if (!sTxt || !oSnap) { return; }
+
+        var t0 = (window.performance && performance.now) ? performance.now() : 0;
+
+        //걸린 자리로 가는 길을 전부 열어 둔다.
+        function _up(sPath) {
+            var sP = sPath;
+            while (true) {
+                var iDot = sP.lastIndexOf(".");
+                var iBrk = sP.lastIndexOf("[");
+                var iCut = (iDot > iBrk) ? iDot : iBrk;
+                if (iCut <= 0) { break; }
+                sP = sP.slice(0, iCut);
+                if (oUp[sP]) { break; }     //이미 열어 둔 길이면 그만
+                oUp[sP] = true;
+                if (_cmpIsRoot(sP)) { break; }
+            }
+        }
+
+        function _walk(v, sPath) {
+            if (!v || typeof v !== "object") { return; }
+            var bArr = Array.isArray(v);
+            var aKeys = Object.keys(v);
+            for (var i = 0; i < aKeys.length; i++) {
+                var sK = aKeys[i];
+                var vC = v[sK];
+                var sSub = _joinPath(sPath, sK, bArr);
+                if (_cmpHit1(sK, vC, sTxt)) { oHit[sSub] = true; iN++; _up(sSub); }
+                _walk(vC, sSub);
+            }
+        }
+
+        var aRoot = Object.keys(oSnap);
+        for (var r = 0; r < aRoot.length; r++) {
+            if (_cmpHit1(aRoot[r], oSnap[aRoot[r]], sTxt)) { oHit[aRoot[r]] = true; iN++; }
+            _walk(oSnap[aRoot[r]], aRoot[r]);
+        }
+
+        if (bLeft) { _iFindNL = iN; } else { _iFindNR = iN; }
+
+        var t1 = (window.performance && performance.now) ? performance.now() : 0;
+        console.log("[DMWN] INFO FIND_DONE side=" + (bLeft ? "3.0" : "4.0") +
+            " hits=" + iN + " ms=" + Math.round(t1 - t0));
+    }
+
+    //걸린 윗자리가 있나 — 걸린 자리 아래는 통째로 보여 주기 위한 것.
+    function _cmpFindUnder(sPath, oHit) {
+        var sP = sPath;
+        while (true) {
+            var iDot = sP.lastIndexOf(".");
+            var iBrk = sP.lastIndexOf("[");
+            var iCut = (iDot > iBrk) ? iDot : iBrk;
+            if (iCut <= 0) { return false; }
+            sP = sP.slice(0, iCut);
+            if (oHit[sP] === true) { return true; }
+            if (_cmpIsRoot(sP)) { return oHit[sP] === true; }
+        }
+    }
+
+    /**
+     * 이 줄이 지금 걸러내기에 남는가.
+     *   ① 다른 것만  ② 찾기 — 둘 다 켜면 둘 다 만족해야 남는다.
+     */
+    function _cmpKeep(oNode, bLeft) {
+
+        if (_bCmpDiffOnly) {
+            if (!_oCmpDiff[oNode.path] && !_oCmpDiffUp[oNode.path]) { return false; }
+        }
+
+        if (_cmpFindOf(bLeft)) {
+            var oHit = _cmpFindHitOf(bLeft);
+            var oUp = _cmpFindUpOf(bLeft);
+            //걸린 자리 · 가는 길 · 걸린 자리 아래 — 셋 중 하나면 남긴다.
+            if (!oHit[oNode.path] && !oUp[oNode.path] && !_cmpFindUnder(oNode.path, oHit)) { return false; }
+        }
+
+        return true;
     }
 
     function _cmpMkNode(sKey, vVal, sPath, iLvl) {
         return { key: sKey, val: vVal, path: sPath, lvl: iLvl || 0 };
     }
 
-    function _cmpRoots(oSnap) {
+    function _cmpRoots(oSnap, bLeft) {
         var aOut = [];
         if (!oSnap) { return aOut; }
-        var aKeys = Object.keys(oSnap);
+        var aKeys = _cmpSortKeys(Object.keys(oSnap));
         for (var i = 0; i < aKeys.length; i++) {
             var oN = _cmpMkNode(aKeys[i], oSnap[aKeys[i]], aKeys[i], 0);
-            if (_cmpKeep(oN)) { aOut.push(oN); }
+            if (_cmpKeep(oN, bLeft)) { aOut.push(oN); }
         }
         return aOut;
     }
 
-    function _cmpKids(oNode) {
+    function _cmpKids(oNode, bLeft) {
 
         var aOut = [];
         var v = oNode && oNode.val;
         if (!v || typeof v !== "object") { return aOut; }
 
         var bArr = Array.isArray(v);
-        var aKeys = Object.keys(v);
+        //목록은 순서가 곧 뜻이므로 그대로 두고, 묶음만 이름순으로 늘어놓는다.
+        var aKeys = bArr ? Object.keys(v) : _cmpSortKeys(Object.keys(v));
 
         for (var i = 0; i < aKeys.length; i++) {
             var sPath = _joinPath(oNode.path, aKeys[i], bArr);
             var oN = _cmpMkNode(aKeys[i], v[aKeys[i]], sPath, (oNode.lvl || 0) + 1);
-            if (_cmpKeep(oN)) { aOut.push(oN); }
+            if (_cmpKeep(oN, bLeft)) { aOut.push(oN); }
         }
 
         return aOut;
@@ -1321,6 +1689,7 @@
     function _cmpEmptyText(bLeft) {
         if (bLeft && !_oCmpLeft) { return "3.0 에서 아직 보낸 것이 없습니다."; }
         if (!bLeft && !_oCmpRight) { return "4.0 지금 담기를 누르십시오."; }
+        if (_cmpFindOf(bLeft)) { return "찾는 것이 없습니다."; }
         if (_bCmpDiffOnly) { return "다른 자리가 없습니다."; }
         return "볼 데이터가 없습니다.";
     }
@@ -1342,37 +1711,70 @@
 
         var oCfg = {
             virtual: true,
+            //★ 좌우로 반씩 나눠 쓰는 좁은 자리다. 두 칸 다 폭을 못 박으면 합이 자리보다 넓어져
+            //  가로로 밀리고, 가운데 안내 문구까지 자리 밖으로 밀려 잘린다(장군님 지적 2026-09-11).
+            //  그래서 [이름]만 폭을 두고 [값]은 **남는 자리를 채우게** 한다(공통이 주는 방식).
+            fillLast: true,
             columns: [
-                { label: "이름", width: "16rem" },
-                { label: "값", width: "20rem" }
+                { label: "이름", width: "13rem" },
+                { label: "값" }
             ],
-            roots: function () { return _cmpRoots(bLeft ? _oCmpLeft : _oCmpRight); },
-            children: _cmpKids,
-            hasChildren: function (n) { return _hasKids(n.val); },
+            roots: function () { return _cmpRoots(bLeft ? _oCmpLeft : _oCmpRight, bLeft); },
+            children: function (n) { return _cmpKids(n, bLeft); },
+            hasChildren: function (n) {
+                if (!_hasKids(n.val)) { return false; }
+                //★ 걸러내기를 켜면 자식이 전부 빠질 수 있다 - 그때는 화살표를 내리지 않는다.
+                //  안 그러면 펼침 화살표는 있는데 눌러도 아무것도 안 나온다(장군님 지적 2026-09-11).
+                if (!_bCmpDiffOnly && !_cmpFindOf(bLeft)) { return true; }
+                return _cmpKids(n, bLeft).length > 0;
+            },
             key: function (n) { return n.path; },
             label: function (n) { return String(n.key); },
             isExpanded: function (n) {
-                if (Object.prototype.hasOwnProperty.call(_oCmpExpand, n.path)) { return !!_oCmpExpand[n.path]; }
-                //다른 것만 볼 때는 길을 열어 둔다 - 안 그러면 접힌 채라 아무것도 안 보인다.
-                if (_bCmpDiffOnly) { return true; }
-                //* 넘겨받는 level 은 믿지 않는다(공통 트리가 토글 때 0 으로 넘긴다) - 노드에 단 깊이를 본다.
-                return (n.lvl || 0) < 1;
+
+                var oExp = _cmpExpandOf(bLeft);
+                if (Object.prototype.hasOwnProperty.call(oExp, n.path)) { return !!oExp[n.path]; }
+
+                //★ 윗자리를 한 번이라도 접었으면 그 아래는 저절로 펼치지 않는다(트리 뷰와 같은 동작).
+                if (_ancestorClosedIn(_cmpClosedOf(bLeft), n.path)) { return false; }
+
+                //★ 찾기 — **걸린 자리까지 길을 연다**(그 아래는 접어 둔다).
+                //  [다른 것만] 보다 **먼저** 본다. 둘 다 켜져 있을 때 찾은 자리가 접힌 채로 남으면 안 된다.
+                if (_cmpFindOf(bLeft)) { return _cmpFindUpOf(bLeft)[n.path] === true; }
+
+                //★ [다른 것만] — **어긋난 것이 아래에 있는 자리까지만** 펼친다.
+                //  어긋난 자리 자체는 안 펼친다. 좌우가 같은 어긋남 목록을 보므로 **양쪽이 똑같이** 펼쳐진다.
+                if (_bCmpDiffOnly) { return _oCmpDiffUp[n.path] === true; }
+
+                //★ 기본은 **전부 접힘**(장군님 지시 2026-09-11). 뿌리도 접는다.
+                return false;
             },
-            onToggle: function (n, bOpen) {
-                _oCmpExpand[n.path] = !!bOpen;
-                //좌우를 같이 다시 그린다 - 한쪽만 접히면 맞대 볼 수 없다.
-                _cmpRerender();
-            },
+            onToggle: function (n, bOpen) { _cmpToggle(bLeft, n, bOpen); },
             tip: function (n) { return n.path; },
             selectable: true,
             cell: function (n) {
                 return { c2: _hasKids(n.val) ? "" : _treeVal(n.val) };
             },
             rowHook: function (oRow, n) {
+
                 var sState = _oCmpDiff[n.path];
-                //* 가상 스크롤은 줄 요소를 다시 쓴다 - 안 붙일 때는 반드시 떼 준다.
+                //★ 가상 스크롤은 줄 요소를 다시 쓴다 - 안 붙일 때는 반드시 떼 준다.
                 oRow.classList.toggle("u4aDmCmpDiff", sState === "다름");
                 oRow.classList.toggle("u4aDmCmpOnlyHere", !!sState && sState !== "다름");
+
+                //찾기에 걸린 줄은 눈에 띄게(어디가 걸렸는지 보여야 쓸모가 있다).
+                oRow.classList.toggle("u4aDmCmpFound",
+                    !!_cmpFindOf(bLeft) && _cmpFindHitOf(bLeft)[n.path] === true);
+
+                //트리 뷰와 똑같이 — 잘린 글자 보여주기 + 이름 칸 아무 데나 눌러 접었다 폈다.
+                //  ★ 누른 쪽 상태만 바꾸고 그 쪽만 다시 그린다.
+                _tipCells(oRow);
+                _wireNameToggle(
+                    oRow, n,
+                    _cmpExpandOf(bLeft),
+                    function (oNode, bOpen) { _cmpToggle(bLeft, oNode, bOpen); },
+                    function () { _cmpRerenderOne(bLeft); }
+                );
             },
             emptyText: _cmpEmptyText(bLeft)
         };
@@ -1387,12 +1789,134 @@
         }
     }
 
-    function _cmpRerender() {
-        try {
-            if (_oTreeL && typeof _oTreeL.rerender === "function") { _oTreeL.rerender(false); }
-            if (_oTreeR && typeof _oTreeR.rerender === "function") { _oTreeR.rerender(false); }
-        } catch (e) {
-            console.error("[DMWN-015] ERROR COMPARE_TREE_RERENDER_FAILED:", e);
+    //쪽마다 자기 펼침 상태를 쓴다.
+    function _cmpExpandOf(bLeft) { return bLeft ? _oCmpExpandL : _oCmpExpandR; }
+    function _cmpClosedOf(bLeft) { return bLeft ? _oCmpClosedL : _oCmpClosedR; }
+
+    /**
+     * 비교 뷰 접기/펴기 — 트리 뷰와 **같은 공용 함수**를 쓴다(접으면 그 아래도 접힘).
+     *   ★ 누른 쪽만 움직인다. 반대쪽은 건드리지 않는다.
+     */
+    function _cmpToggle(bLeft, oNode, bOpen) {
+        _setExpandIn(_cmpExpandOf(bLeft), _cmpClosedOf(bLeft), oNode, bOpen);
+    }
+
+    //누른 쪽만 다시 그린다.
+    /**
+     * 한 쪽 트리만 새로 만든다(안내 문구가 바뀌므로 다시 만든다).
+     *   어긋난 자리는 그대로라 다시 세지 않는다.
+     */
+    function _cmpRebuildOne(bLeft) {
+        var oHost = bLeft ? EL.cmpLeftHost : EL.cmpRightHost;
+        if (!oHost) { return; }
+        _cmpBuildFind(bLeft);
+        oHost.textContent = "";
+        if (bLeft) { _oTreeL = _cmpMakeTree(true); }
+        else { _oTreeR = _cmpMakeTree(false); }
+    }
+
+    /* ---- 어긋난 자리로 바로 가기 --------------------------------------
+     *  어긋난 자리가 수천 곳인데 손으로 훑어 내려갈 방법이 없었다(장군님 지적 2026-09-11).
+     *  [다음 차이]·[이전 차이] 로 한 곳씩 옮기고, **좌우를 같은 자리에 세운다.**
+     * ------------------------------------------------------------------- */
+
+    //그 자리가 뿌리인가(뿌리 이름 자체에 점이 들어 있어 그냥 쪼개면 없는 자리가 나온다).
+    function _cmpIsRoot(sPath) {
+        if (_oCmpLeft && Object.prototype.hasOwnProperty.call(_oCmpLeft, sPath)) { return true; }
+        if (_oCmpRight && Object.prototype.hasOwnProperty.call(_oCmpRight, sPath)) { return true; }
+        return false;
+    }
+
+    //그 자리로 가는 윗자리들. 뿌리까지만 올라간다.
+    function _cmpAncestors(sPath) {
+        var aOut = [];
+        var sP = sPath;
+        while (true) {
+            var iDot = sP.lastIndexOf(".");
+            var iBrk = sP.lastIndexOf("[");
+            var iCut = (iDot > iBrk) ? iDot : iBrk;
+            if (iCut <= 0) { break; }
+            sP = sP.slice(0, iCut);
+            aOut.push(sP);
+            //★ 뿌리에 닿으면 멈춘다 — 더 올라가면 "oAPP" 처럼 실제로 없는 자리가 나온다.
+            if (_cmpIsRoot(sP)) { break; }
+        }
+        return aOut;
+    }
+
+    function _cmpAtText() {
+        if (!EL.cmpAt) { return; }
+        EL.cmpAt.textContent = (_iCmpAt >= 0 && _aCmpDiffTop.length)
+            ? ((_iCmpAt + 1) + " / " + _aCmpDiffTop.length)
+            : "";
+    }
+
+    /**
+     * 목록의 i 번째 어긋난 자리로 좌우를 같이 옮긴다.
+     */
+    function _cmpGoto(i) {
+
+        if (!_aCmpDiffTop.length) {
+            console.warn("[DMWN-017] WARN NO_DIFF_TO_JUMP - both sides must be captured first.");
+            return;
+        }
+
+        //끝에서 넘어가면 처음으로(반대도 같게).
+        if (i < 0) { i = _aCmpDiffTop.length - 1; }
+        if (i >= _aCmpDiffTop.length) { i = 0; }
+
+        _iCmpAt = i;
+
+        var sPath = _aCmpDiffTop[i];
+        var aUp = _cmpAncestors(sPath);
+
+        //가는 길을 양쪽 다 펼친다 — 안 그러면 그 줄이 목록에 아예 없어 못 선다.
+        for (var k = 0; k < aUp.length; k++) {
+            _oCmpExpandL[aUp[k]] = true;
+            _oCmpExpandR[aUp[k]] = true;
+            delete _oCmpClosedL[aUp[k]];
+            delete _oCmpClosedR[aUp[k]];
+        }
+
+        _cmpRebuildOne(true);
+        _cmpRebuildOne(false);
+
+        //좌우를 같은 자리에 세운다(한쪽에만 있는 자리면 그 쪽만 선다).
+        try { if (_oTreeL) { _oTreeL.selectKey(sPath, true); } }
+        catch (e) { console.error("[DMWN-017] ERROR JUMP_FAILED side=3.0 path=" + sPath + ":", e); }
+        try { if (_oTreeR) { _oTreeR.selectKey(sPath, true); } }
+        catch (e) { console.error("[DMWN-017] ERROR JUMP_FAILED side=4.0 path=" + sPath + ":", e); }
+
+        _cmpAtText();
+    }
+
+    //양쪽 모두 접기.
+    function _cmpCollapseAll() {
+        _cmpResetExpand(true);
+        _cmpResetExpand(false);
+        _iCmpAt = -1;
+        _cmpRebuildOne(true);
+        _cmpRebuildOne(false);
+        _cmpAtText();
+    }
+
+    /**
+     * 걸러내기를 건드렸을 때 그 쪽 펼침 기록을 비운다(장군님 지적 2026-09-11).
+     *   ★ 안 비우면 **손으로 접어 둔 자리가 그대로 접힌 채**라, 찾은 자리가 그 아래에 있으면 안 보인다.
+     *     비우면 걸러내기 규칙(찾은 자리까지 펼침)이 그대로 먹고,
+     *     그 뒤에 손으로 접고 펴는 것도 다시 기록되어 정상으로 먹는다.
+     */
+    function _cmpResetExpand(bLeft) {
+        if (bLeft) { _oCmpExpandL = {}; _oCmpClosedL = {}; }
+        else { _oCmpExpandR = {}; _oCmpClosedR = {}; }
+    }
+
+    function _cmpRerenderOne(bLeft) {
+        var oTree = bLeft ? _oTreeL : _oTreeR;
+        if (!oTree || typeof oTree.rerender !== "function") { return; }
+        try { oTree.rerender(false); }
+        catch (e) {
+            console.error("[DMWN-015] ERROR COMPARE_TREE_RERENDER_FAILED side=" + (bLeft ? "3.0" : "4.0") + ":", e);
         }
     }
 
@@ -1406,6 +1930,9 @@
 
         _cmpBuildDiff();
 
+        _cmpBuildFind(true);
+        _cmpBuildFind(false);
+
         if (EL.cmpLeftHost) { EL.cmpLeftHost.textContent = ""; }
         if (EL.cmpRightHost) { EL.cmpRightHost.textContent = ""; }
 
@@ -1414,19 +1941,26 @@
 
         if (EL.cmpLeftInfo) {
             EL.cmpLeftInfo.textContent = _oCmpLeft
-                ? ("받음 " + _sCmpLeftTime + " / 뿌리 " + Object.keys(_oCmpLeft).length + "개")
+                ? ("받음 " + _sCmpLeftTime + " / 뿌리 " + Object.keys(_oCmpLeft).length + "개" +
+                    (_sCmpFindL ? (" / 찾음 " + _iFindNL + "곳") : ""))
                 : "아직 받은 것 없음";
         }
         if (EL.cmpRightInfo) {
             EL.cmpRightInfo.textContent = _oCmpRight
-                ? ("담음 " + _sCmpRightTime + " / 뿌리 " + Object.keys(_oCmpRight).length + "개")
+                ? ("담음 " + _sCmpRightTime + " / 뿌리 " + Object.keys(_oCmpRight).length + "개" +
+                    (_sCmpFindR ? (" / 찾음 " + _iFindNR + "곳") : ""))
                 : "아직 담은 것 없음";
         }
 
+        _cmpAtText();
+
         if (_oCmpLeft && _oCmpRight) {
-            _cmpSetInfo("어긋난 자리 " + Object.keys(_oCmpDiff).length + "곳");
+            _cmpSetInfo("다름 " + _oCmpKindN["다름"] +
+                " · 3.0만 " + _oCmpKindN["3.0만"] +
+                " · 4.0만 " + _oCmpKindN["4.0만"] +
+                " (총 " + _iCmpDiffN + "곳" + (_bCmpCut ? ", 너무 많아 끊음" : "") + ")");
         } else if (_oSrv) {
-            _cmpSetInfo("8888 열림 - 3.0 에서 보내십시오");
+            _cmpSetInfo("9999 열림 - 3.0 에서 보내십시오");
         }
     }
 
@@ -1497,10 +2031,48 @@
             EL.btnCmpTake.addEventListener("click", function () { _cmpAskRight(); });
         }
 
+        //비교 뷰 — 어긋난 자리로 바로 가기.
+        if (EL.btnDiffNext) { EL.btnDiffNext.addEventListener("click", function () { _cmpGoto(_iCmpAt + 1); }); }
+        if (EL.btnDiffPrev) { EL.btnDiffPrev.addEventListener("click", function () { _cmpGoto(_iCmpAt - 1); }); }
+        if (EL.btnCollapseAll) { EL.btnCollapseAll.addEventListener("click", function () { _cmpCollapseAll(); }); }
+
+        //F3 = 다음 차이 / Shift+F3 = 이전 차이 (비교 뷰를 보고 있을 때만).
+        document.addEventListener("keydown", function (ev) {
+            if (ev.key !== "F3" || _sView !== "cmp") { return; }
+            ev.preventDefault();
+            _cmpGoto(ev.shiftKey ? (_iCmpAt - 1) : (_iCmpAt + 1));
+        });
+
+        //비교 뷰 — 좌우 이름 찾기(그 쪽만 좁힌다).
+        function _wireCmpFind(oInput, bLeft) {
+            if (!oInput) { return; }
+            function _apply() {
+                var sTxt = (oInput.value || "").trim().toLowerCase();
+                if (bLeft) { _sCmpFindL = sTxt; } else { _sCmpFindR = sTxt; }
+                _cmpResetExpand(bLeft);
+                _cmpRebuildOne(bLeft);
+            }
+
+            oInput.addEventListener("input", _apply);
+
+            //★ Enter 를 치면 글자가 그대로여도 다시 건다(장군님 지시 2026-09-11).
+            //  중간에 손으로 접어 둔 자리가 있어도 이때 다시 펼쳐진다.
+            oInput.addEventListener("keydown", function (ev) {
+                if (ev.key !== "Enter") { return; }
+                ev.preventDefault();
+                _apply();
+            });
+        }
+        _wireCmpFind(EL.cmpLeftSearch, true);
+        _wireCmpFind(EL.cmpRightSearch, false);
+
         //비교 뷰 — 다른 것만 보기.
         if (EL.chkDiffOnly) {
             EL.chkDiffOnly.addEventListener("change", function () {
                 _bCmpDiffOnly = !!EL.chkDiffOnly.checked;
+                //손으로 접어 둔 기록이 걸러내기를 막지 않게 양쪽 다 비운다.
+                _cmpResetExpand(true);
+                _cmpResetExpand(false);
                 _cmpRefresh();
             });
         }
@@ -1583,6 +2155,8 @@
                                 _renderTree();
                                 return;
                             }
+                            if (oThis === EL.cmpLeftSearch) { _sCmpFindL = ""; _cmpResetExpand(true); _cmpRebuildOne(true); return; }
+                            if (oThis === EL.cmpRightSearch) { _sCmpFindR = ""; _cmpResetExpand(false); _cmpRebuildOne(false); return; }
                             _applyFilterAll();
                         });
                     })(oInp);

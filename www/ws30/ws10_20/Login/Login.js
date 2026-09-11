@@ -784,6 +784,13 @@ var oAPP = (function () {
     //  있으므로 timeout 값만 지정하면 실제 timeout 이벤트로 정상 종료된다.
     const LOGIN_XHR_TIMEOUT = 30000;
 
+    // ★2026-09-11 장군님 지시 — 로그인 시 메이저/패치 업데이트 체크를 임시로 건너뜀.
+    //   true 인 동안 fnCheckCustomerLisenceThen 이 CDN 판별(fnConnectionGithub)/
+    //   메이저 체크(fnSetAutoUpdateForSAP·fnSetAutoUpdateForCDN)/패치 체크
+    //   (fnCheckSupportPackageVersion) 를 전부 건너뛰고 바로 로그인을 완료한다.
+    //   되돌릴 때는 이 값만 false 로.
+    const SKIP_UPDATE_CHECK_TEMP = true;
+
     /********************************************************************
      * 로그인 통신 대기 중, busy 팝업에 타임아웃까지 남은 시간(초) 카운트다운.
      *   공통 setDomBusy 는 스피너만 띄우므로(미변경), 호스트 busy 다이얼로그의
@@ -1312,6 +1319,18 @@ var oAPP = (function () {
             _showContentDom("X");
             return;
         }
+
+        // ★2026-09-11 장군님 지시 — 메이저/패치 업데이트 체크 임시 건너뜀(SKIP_UPDATE_CHECK_TEMP).
+        //   fnConnectionGithub(CDN 판별)/fnSetAutoUpdateForSAP·fnSetAutoUpdateForCDN(메이저)/
+        //   fnCheckSupportPackageVersion(패치) 를 전부 타지 않고 바로 로그인 완료로 넘어간다.
+        if (SKIP_UPDATE_CHECK_TEMP) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("SKIP_TEMP", "fnCheckCustomerLisenceThen", "major/patch update check skipped (SKIP_UPDATE_CHECK_TEMP=true)");
+            }
+            oAPP.fn.fnCheckVersionFinished(this.oResult, this.oAuthInfo);
+            return;
+        }
+
         var bIsCDN = parent.getIsCDN();
         if (bIsCDN == "X") {
             oAPP.fn.fnConnectionGithub().then(oAPP.fn.fnConnectionGithubThen.bind(this));

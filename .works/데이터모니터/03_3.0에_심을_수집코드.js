@@ -1,4 +1,32 @@
 /************************************************************************
+ * 3.0 에 심을 「내부 데이터 수집 + 4.0 으로 보내기」 — 한 덩이
+ * ----------------------------------------------------------------------
+ *  만든 시각 : 2026-09-11 16:02
+ *  만든 방법 : 4.0 의 수집 코드(www/ws30/ws10_20/js/ws_html5_datamon.js)를
+ *              ★글자 하나 안 고치고 그대로★ 앞에 두고, 보내는 부분만 뒤에 붙였다.
+ *              수집 규칙이 조금이라도 다르면 두 프로그램을 비교하는 뜻이 없어진다.
+ *
+ *  어디에 심나 : 3.0 의 WS10/WS20 화면(그 자리에 oAPP 와 jQuery 가 있다).
+ *      ① 그 화면 개발자 도구 Console 에 이 파일 내용을 통째로 붙여 넣거나
+ *      ② 3.0 의 파일 로드 목록 맨 뒤에 이 파일을 얹는다.
+ *
+ *  심고 나면 : 화면 오른쪽 아래에 「3.0 → 4.0 보내기」 단추가 생긴다.
+ *      4.0 의 데이터 모니터 창을 먼저 열어 두어야 받는 자리가 열려 있다.
+ *
+ *  ★ 감시는 켜지 않는다. **부르는 그 순간**의 데이터 구조를 떠서 보낸다.
+ *      단추를 누르거나, 콘솔에서 DM30.send() 를 부르면 된다. 바깥에 여는 것은 이 하나뿐이다.
+ *
+ *  보내는 것 : 감시 대상 데이터 구조 한 벌 전체(oAPP.datamon.snapshot()).
+ *
+ *  오류코드 접두: DM30 / 다음 번호: 007
+ ************************************************************************/
+
+
+/* ======================================================================
+ * [1] 수집 코드 — 4.0 원본 그대로 (아래 한 줄도 고치지 말 것)
+ * ====================================================================== */
+
+/************************************************************************
  * ws_html5_datamon.js
  * ----------------------------------------------------------------------
  * 내부 데이터 모니터 — 감시 알맹이 (1단계)
@@ -946,3 +974,233 @@
     })();
 
 })(window, $, oAPP);
+
+
+/* ======================================================================
+ * [2] 보내기 — 이 부분만 3.0 전용
+ * ====================================================================== */
+
+(function (window, oAPP) {
+    "use strict";
+
+    //4.0 의 데이터 모니터 창이 열어 두는 자리.
+    var C_URL = "http://127.0.0.1:9999/snapshot";
+
+    //단추 하나만 남게 하는 표식.
+    var C_BTN_ID = "dm30SendBtn";
+
+
+    /* ----------------------------------------------------------------
+     *  3.0 전용 — 앱 모델 oData 에 UI5 Core 모델 oData 를 합친다.
+     *
+     *  왜 (장군님 지시 2026-09-11):
+     *    4.0 은 데이터를 모델 하나에 다 들고 있는데, 3.0 은
+     *      oAPP.attr.oModel.oData        (앱 모델)
+     *      sap.ui.getCore().getModel().oData  (UI5 Core 모델)
+     *    두 군데로 나뉘어 있다. 합쳐야 4.0 과 같은 모양이 되어 비교가 뜻이 있다.
+     *
+     *  ★ 이 처리는 **3.0 에서만** 돈다. 수집 코드(위 [1])는 4.0 과 글자까지 같게 두고,
+     *    바깥에서 걸 수 있게 열어 둔 자리에만 이것을 건다.
+     *  ★ 같은 이름이 양쪽에 있으면 **앱 모델 값을 남긴다**(더 가까운 쪽). 몇 개나 겹쳤는지 남긴다.
+     * ---------------------------------------------------------------- */
+
+    function _coreModelData() {
+
+        if (typeof sap === "undefined" || !sap.ui || typeof sap.ui.getCore !== "function") {
+            console.warn("[DM30-005] WARN NO_SAP_CORE - core model data is not merged.");
+            return null;
+        }
+
+        var oCore, oModel;
+
+        try {
+            oCore = sap.ui.getCore();
+            oModel = (oCore && typeof oCore.getModel === "function") ? oCore.getModel() : null;
+        } catch (e) {
+            console.error("[DM30-005] ERROR CORE_MODEL_READ_FAILED - core model data is not merged:", e);
+            return null;
+        }
+
+        if (!oModel) {
+            console.warn("[DM30-005] WARN NO_CORE_MODEL - core model data is not merged.");
+            return null;
+        }
+
+        var vData;
+        try { vData = oModel.oData; }
+        catch (e) {
+            console.error("[DM30-005] ERROR CORE_MODEL_ODATA_READ_FAILED:", e);
+            return null;
+        }
+
+        if (!vData || typeof vData !== "object") {
+            console.warn("[DM30-005] WARN CORE_MODEL_ODATA_EMPTY - nothing to merge.");
+            return null;
+        }
+
+        return vData;
+    }
+
+    function _installModelMerge() {
+
+        if (!oAPP || !oAPP.datamon || typeof oAPP.datamon.setModelDataHook !== "function") {
+            console.error("[DM30-006] ERROR NO_MODEL_HOOK - core model data will not be merged. " +
+                "the collector part is older than this file.");
+            return false;
+        }
+
+        oAPP.datamon.setModelDataHook(function (vData, sKey) {
+
+            //앱 모델 칸에만 합친다(화면 부품 안의 모델은 그대로 둔다).
+            if (sKey !== "oModel") { return vData; }
+
+            var oCore = _coreModelData();
+            if (!oCore) { return vData; }
+
+            var oOut = {};
+            var aCoreKeys = Object.keys(oCore);
+            var i;
+
+            //Core 것을 먼저 깔고
+            for (i = 0; i < aCoreKeys.length; i++) { oOut[aCoreKeys[i]] = oCore[aCoreKeys[i]]; }
+
+            //앱 모델 것으로 덮는다(겹치면 앱 모델이 이긴다)
+            var iDup = 0;
+            if (vData && typeof vData === "object") {
+                var aKeys = Object.keys(vData);
+                for (i = 0; i < aKeys.length; i++) {
+                    if (Object.prototype.hasOwnProperty.call(oOut, aKeys[i])) { iDup++; }
+                    oOut[aKeys[i]] = vData[aKeys[i]];
+                }
+            }
+
+            console.log("[DM30] INFO CORE_MODEL_MERGED core=" + aCoreKeys.length +
+                " app=" + (vData ? Object.keys(vData).length : 0) +
+                " dup=" + iDup + " total=" + Object.keys(oOut).length);
+
+            return oOut;
+        });
+
+        return true;
+    }
+
+
+    /* ----------------------------------------------------------------
+     *  보내기
+     * ---------------------------------------------------------------- */
+    function _send(oBtn) {
+
+        function _say(sText) {
+            if (!oBtn) { return; }
+            oBtn.textContent = sText;
+        }
+
+        if (!oAPP || !oAPP.datamon || typeof oAPP.datamon.snapshot !== "function") {
+            console.error("[DM30-001] ERROR ENGINE_MISSING - the collector part did not load. nothing was sent.");
+            _say("수집 코드 없음");
+            return;
+        }
+
+        var oSnap = oAPP.datamon.snapshot();
+
+        if (!oSnap) {
+            //수집 코드 쪽에서 이미 흔적을 남긴다(DMON-009).
+            console.error("[DM30-003] ERROR SNAPSHOT_EMPTY - nothing was sent.");
+            _say("담을 것이 없음");
+            return;
+        }
+
+        var sBody = "";
+
+        try {
+            sBody = JSON.stringify({
+                FROM: "3.0",
+                TIME: new Date().toISOString(),
+                SNAP: oSnap
+            });
+        } catch (e) {
+            console.error("[DM30-003] ERROR SNAPSHOT_STRINGIFY_FAILED - nothing was sent:", e);
+            _say("글자로 못 바꿈");
+            return;
+        }
+
+        if (oBtn) { oBtn.disabled = true; }
+        _say("보내는 중…");
+
+        var t0 = (window.performance && performance.now) ? performance.now() : 0;
+
+        fetch(C_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: sBody
+        }).then(function (res) {
+            if (!res.ok) { throw new Error("HTTP " + res.status); }
+            return res.json();
+        }).then(function (oRes) {
+            var t1 = (window.performance && performance.now) ? performance.now() : 0;
+            console.log("[DM30] INFO SEND_DONE size=" + sBody.length +
+                " roots=" + (oRes && oRes.ROOTS) + " ms=" + Math.round(t1 - t0));
+            _say("보냄 (" + sBody.length + "자)");
+        })["catch"](function (e) {
+            //4.0 창이 안 떠 있거나 자리가 안 열렸으면 여기로 온다 - 조용히 넘기지 않는다.
+            console.error("[DM30-004] ERROR SEND_FAILED url=" + C_URL +
+                " size=" + sBody.length + " - is the 4.0 data monitor window open?", e);
+            _say("보내기 실패");
+        }).then(function () {
+            if (oBtn) { oBtn.disabled = false; }
+            setTimeout(function () { _say("3.0 → 4.0 보내기"); }, 2500);
+        });
+    }
+
+
+    /* ----------------------------------------------------------------
+     *  단추 만들기
+     * ---------------------------------------------------------------- */
+    function _makeButton() {
+
+        if (!document || !document.body) {
+            console.error("[DM30-005] ERROR NO_BODY - the send button was not created.");
+            return null;
+        }
+
+        //여러 번 심어도 하나만 남게.
+        var oOld = document.getElementById(C_BTN_ID);
+        if (oOld) { oOld.remove(); }
+
+        var oBtn = document.createElement("button");
+        oBtn.id = C_BTN_ID;
+        oBtn.type = "button";
+        oBtn.textContent = "3.0 → 4.0 보내기";
+
+        //3.0 화면의 스타일을 안 건드리려고 이 단추에만 직접 적는다(임시 도구).
+        oBtn.style.cssText =
+            "position:fixed; right:16px; bottom:16px; z-index:2147483647;" +
+            "padding:8px 14px; font-size:13px; line-height:1.2; cursor:pointer;" +
+            "background:#0070f2; color:#fff; border:0; border-radius:6px;" +
+            "box-shadow:0 2px 8px rgba(0,0,0,.35);";
+
+        oBtn.addEventListener("click", function () { _send(oBtn); });
+
+        document.body.appendChild(oBtn);
+        return oBtn;
+    }
+
+
+    /* ----------------------------------------------------------------
+     *  심기
+     * ---------------------------------------------------------------- */
+    var _oBtn = _makeButton();
+    var _bMerge = _installModelMerge();
+
+    //★ 감시는 켜지 않는다(장군님 지시 2026-09-11).
+    //  3.0 쪽에서 할 일은 "부르는 그 순간의 데이터 구조를 떠서 보내는 것" 하나뿐이다.
+    //  감시를 켜면 조작할 때마다 3.0 안에서 계속 비교가 돌아 느려지기만 한다.
+    //  그래서 바깥에 여는 것도 **send 하나뿐**이다.
+    window.DM30 = {
+        send: function () { _send(_oBtn); }
+    };
+
+    console.log("[DM30] INFO READY url=" + C_URL +
+        " button=" + (_oBtn ? "yes" : "no") + " coreMerge=" + _bMerge);
+
+})(window, oAPP);

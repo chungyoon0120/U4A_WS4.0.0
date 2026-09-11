@@ -56,17 +56,20 @@
 
         <!-- ===== 조작 줄 ===== -->
         <div class="u4aDmBar" id="dmBar">
-            <button type="button" class="u4a-btn u4a-btn--emphasized" id="dmBtnToggle">
-                <i class="fa-solid fa-play"></i> <span id="dmBtnToggleText">감시 시작</span>
-            </button>
-            <button type="button" class="u4a-btn" id="dmBtnNow">
-                <i class="fa-solid fa-arrows-rotate"></i> <span>지금 비교</span>
-            </button>
-            <button type="button" class="u4a-btn" id="dmBtnClear">
-                <i class="fa-solid fa-eraser"></i> <span>기록 지우기</span>
-            </button>
-
-            <span class="u4aDmBar__sep" aria-hidden="true"></span>
+            <!-- 감시 관련 — 리스트 뷰·트리 뷰에서만 쓴다. 비교 뷰에서는 통째로 숨긴다
+                 (장군님 지적 2026-09-11: 비교 뷰는 감시를 안 쓰는데 버튼이 남아 있어 헷갈린다). -->
+            <div class="u4aDmGrp" id="dmWatchOnly">
+                <button type="button" class="u4a-btn u4a-btn--emphasized" id="dmBtnToggle">
+                    <i class="fa-solid fa-play"></i> <span id="dmBtnToggleText">감시 시작</span>
+                </button>
+                <button type="button" class="u4a-btn" id="dmBtnNow">
+                    <i class="fa-solid fa-arrows-rotate"></i> <span>지금 비교</span>
+                </button>
+                <button type="button" class="u4a-btn" id="dmBtnClear">
+                    <i class="fa-solid fa-eraser"></i> <span>기록 지우기</span>
+                </button>
+                <span class="u4aDmBar__sep" aria-hidden="true"></span>
+            </div>
 
             <!-- 뷰 전환 — 리스트 뷰 / 트리 뷰 -->
             <button type="button" class="u4a-btn pressed" id="dmBtnList">
@@ -96,16 +99,33 @@
                     <i class="fa-solid fa-camera"></i> <span>4.0 지금 담기</span>
                 </button>
                 <label class="u4aDmChk"><input type="checkbox" id="dmChkDiffOnly"><span>다른 것만</span></label>
-                <span class="u4aDmCmpInfo" id="dmCmpInfo"></span>
+
+                <!-- 어긋난 자리로 바로 가기 — 수천 곳을 손으로 훑지 않게 한다 -->
+                <button type="button" class="u4a-btn" id="dmBtnDiffPrev" title="이전 차이 (Shift+F3)">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+                <button type="button" class="u4a-btn" id="dmBtnDiffNext" title="다음 차이 (F3)">
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <span class="u4aDmCmpAt" id="dmCmpAt"></span>
+
+                <button type="button" class="u4a-btn" id="dmBtnCollapseAll">
+                    <i class="fa-solid fa-compress"></i> <span>모두 접기</span>
+                </button>
             </div>
 
-            <span class="u4aDmBar__sep" aria-hidden="true"></span>
-
-            <label class="u4aDmChk"><input type="checkbox" id="dmChkCode"><span>공통코드 포함</span></label>
-            <label class="u4aDmChk"><input type="checkbox" id="dmChkLib"><span>라이브러리 포함</span></label>
+            <!-- 감시 범위 — 비교 뷰에서는 숨긴다. 여기서 범위를 넓히면 4.0 쪽만 커져
+                 3.0 에 없는 자리가 전부 "다름" 으로 나와 비교가 못 쓰게 된다. -->
+            <div class="u4aDmGrp" id="dmScopeOnly">
+                <span class="u4aDmBar__sep" aria-hidden="true"></span>
+                <label class="u4aDmChk"><input type="checkbox" id="dmChkCode"><span>공통코드 포함</span></label>
+                <label class="u4aDmChk"><input type="checkbox" id="dmChkLib"><span>라이브러리 포함</span></label>
+            </div>
 
             <div class="u4aDmBar__spacer"></div>
+            <!-- 오른쪽 끝 = 지금 상태. 리스트/트리 뷰는 감시 상태, 비교 뷰는 받기 상태를 같은 자리에 둔다. -->
             <span class="u4aDmState" id="dmState">감시 꺼짐</span>
+            <span class="u4aDmState u4aDmCmpInfo" id="dmCmpInfo" hidden></span>
         </div>
 
         <!-- ===== 바뀐 것 목록 — 곁가지 없이 바뀐 자리만 (장군님 지시 2026-09-10) ===== -->
@@ -170,12 +190,27 @@
             <!-- 비교 뷰 — 좌 3.0 / 우 4.0. 가운데 분할 바는 공통(U4AUI.wireSplitter). -->
             <div class="u4a-splitter u4aDmCmp" id="dmCmp" hidden>
                 <section class="u4a-splitter__pane u4aDmCmpPane" id="dmCmpLeftPane">
-                    <div class="u4aDmCmpHead"><span class="u4aDmCmpHead__tag">3.0</span><span id="dmCmpLeftInfo"></span></div>
+                    <div class="u4aDmCmpHead">
+                        <span class="u4aDmCmpHead__tag">3.0</span>
+                        <span class="u4aDmCmpHead__info" id="dmCmpLeftInfo"></span>
+                        <!-- 이름 찾기 — 이 쪽만 좁힌다(트리 뷰의 찾기와 같은 방식: 이름만 본다) -->
+                        <div class="u4a-field u4aDmFilterField u4aDmCmpFind" data-trail="1">
+                            <input type="text" class="u4a-input u4a-field__input u4aDmCmpSearch" id="dmCmpLeftSearch" placeholder="찾기 (이름·값)">
+                            <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear" aria-label="Clear"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
                     <div class="u4aDmCmpHost" id="dmCmpLeftHost"></div>
                 </section>
                 <div class="u4a-splitter__bar u4aDmCmp__bar" id="dmCmpBar" role="separator" aria-orientation="vertical"></div>
-                <section class="u4a-splitter__pane u4a-splitter__pane--flex u4aDmCmpPane" id="dmCmpRightPane">
-                    <div class="u4aDmCmpHead"><span class="u4aDmCmpHead__tag">4.0</span><span id="dmCmpRightInfo"></span></div>
+                <section class="u4a-splitter__pane u4aDmCmpPane" id="dmCmpRightPane">
+                    <div class="u4aDmCmpHead">
+                        <span class="u4aDmCmpHead__tag">4.0</span>
+                        <span class="u4aDmCmpHead__info" id="dmCmpRightInfo"></span>
+                        <div class="u4a-field u4aDmFilterField u4aDmCmpFind" data-trail="1">
+                            <input type="text" class="u4a-input u4a-field__input u4aDmCmpSearch" id="dmCmpRightSearch" placeholder="찾기 (이름·값)">
+                            <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear" aria-label="Clear"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
                     <div class="u4aDmCmpHost" id="dmCmpRightHost"></div>
                 </section>
             </div>

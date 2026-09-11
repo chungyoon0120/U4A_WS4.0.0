@@ -17,7 +17,7 @@
  * 실측 (2026-09-09, WS20 앱 1건 연 상태):
  *   공통코드·라이브러리 원장 뺀 기본 범위 = 사진 48만자 / 한 번 왕복 8.4ms.
  *
- * 오류코드 접두: DMON / 다음 번호: 013
+ * 오류코드 접두: DMON / 다음 번호: 012
  ************************************************************************/
 
 (function (window, $, oAPP) {
@@ -80,11 +80,6 @@
     //    우리 칸은 그대로 두므로 두 군데가 같이 바뀌는 것은 계속 보인다(그게 맞는 동작 — 장군님 확인).
     var C_UI_KEEP = ["_T_0015", "_MODEL", "_BIND_AGGR", "_OBJID", "__PARENT", "_EMBED_AGGR", "__UIFND"];
 
-    //어디에 있든 아예 안 담는 칸 이름(장군님 지시 2026-09-11).
-    //  APPID · GUINR 은 앱마다·열 때마다 값이 달라 두 프로그램을 견주면 늘 "다름"으로 나온다.
-    //  그것 때문에 진짜 어긋난 자리가 묻히므로 수집에서 뺀다. **깊이와 상관없이** 이 이름이면 안 담는다.
-    var C_SKIP_KEYS = ["APPID", "GUINR"];
-
     //모델이 놓이는 칸 이름. 이 칸 안에서는 **oData 만** 담는다(장군님 지시 2026-09-11).
     //
     //  왜 필요한가 — 같은 이름인데 두 앱에서 담긴 물건이 다르다(2026-09-11 소스 확인):
@@ -109,12 +104,6 @@
     var _oLastAct = null;        //마지막 조작 정보(무엇을 눌렀나)
     var _iSeq = 0;               //묶음 번호
     var _oInclude = { sCode: false, lib: false };   //덩치 큰 것 포함 여부
-
-    //모델 칸의 oData 를 담기 직전에 손볼 수 있게 바깥에 열어 둔 자리(기본 = 없음).
-    //  ★ 아무도 안 걸면 아무 일도 안 한다 — 4.0 은 안 건다.
-    //  3.0 은 앱 모델과 UI5 Core 모델 두 군데에 나뉘어 있어, 3.0 쪽에서만 이 자리에
-    //  "둘을 합쳐서 돌려주는 것"을 걸어 4.0 과 같은 모양으로 맞춘다(장군님 지시 2026-09-11).
-    var _fnModelData = null;
 
 
     /* ────────────────────────────────────────────────────────────────
@@ -176,9 +165,6 @@
                     //  "생김/없어짐" 줄이 떴다. 함수는 데이터가 아니므로 아예 안 담는다.
                     if (typeof vChild === "function") { continue; }
 
-                    //★ 아예 안 담는 칸(위 C_SKIP_KEYS) — 깊이와 상관없이 건너뛴다.
-                    if (C_SKIP_KEYS.indexOf(aKeys[i]) !== -1) { continue; }
-
                     vOut[aKeys[i]] = _snap(vChild, iDepth + 1, aChain, aKeys[i]);
                 } catch (e) {
                     //읽는 것만으로 터지는 칸이 있을 수 있다(값을 꺼낼 때 코드가 도는 칸).
@@ -214,18 +200,6 @@
             console.warn("[DMON-011] WARN MODEL_HAS_NO_ODATA key=" + sKey +
                 " - this model is recorded as empty.");
             return {};
-        }
-
-        //바깥에서 손볼 것을 걸어 뒀으면 그것을 거친다(안 걸었으면 그대로).
-        if (typeof _fnModelData === "function") {
-            try {
-                var vFixed = _fnModelData(vData, sKey);
-                if (vFixed !== undefined) { vData = vFixed; }
-            } catch (e) {
-                //손보다 터지면 원래 것을 담는다. 조용히 넘기면 왜 달라졌는지 알 수 없다.
-                console.error("[DMON-012] ERROR MODEL_DATA_HOOK_FAILED key=" + sKey +
-                    " - the original oData is recorded instead:", e);
-            }
         }
 
         return { oData: _snap(vData, iDepth + 1, aChain, "oData") };
@@ -392,8 +366,8 @@
 
         var oOut = {};
 
-        oOut["oAPP.attr"] = _pick(oAPP.attr, (_oInclude.sCode ? [] : C_SKIP_ATTR).concat(C_SKIP_KEYS));
-        oOut["oAPP.DATA"] = _pick(oAPP.DATA, (_oInclude.lib ? [] : C_SKIP_DATA).concat(C_SKIP_KEYS));
+        oOut["oAPP.attr"] = _pick(oAPP.attr, _oInclude.sCode ? [] : C_SKIP_ATTR);
+        oOut["oAPP.DATA"] = _pick(oAPP.DATA, _oInclude.lib ? [] : C_SKIP_DATA);
 
         return oOut;
 
@@ -684,24 +658,6 @@
 
         //지금 설정.
         getInclude: function () { return { sCode: _oInclude.sCode, lib: _oInclude.lib }; },
-
-        /**
-         * 모델 칸의 oData 를 담기 직전에 손볼 것을 걸어 둔다.
-         *   fn(vData, sKey) 가 돌려준 것을 대신 담는다. undefined 를 돌려주면 원래 것을 담는다.
-         *   null 을 넣으면 건 것을 뗀다.
-         *
-         *   ★ 4.0 은 안 건다. 3.0 만 건다 — 3.0 은 앱 모델과 UI5 Core 모델 두 군데에
-         *     데이터가 나뉘어 있어, 합쳐야 4.0 과 같은 모양이 된다(장군님 지시 2026-09-11).
-         */
-        setModelDataHook: function (fn) {
-            if (fn !== null && typeof fn !== "function") {
-                console.error("[DMON-012] ERROR MODEL_DATA_HOOK_NOT_A_FUNCTION - nothing was set.");
-                return false;
-            }
-            _fnModelData = fn;
-            console.log("[DMON] INFO MODEL_DATA_HOOK " + (fn ? "set" : "cleared"));
-            return true;
-        },
 
         /**
          * [3.0 ↔ 4.0 비교] 지금 데이터 구조를 한 벌 떠서 그대로 돌려준다.

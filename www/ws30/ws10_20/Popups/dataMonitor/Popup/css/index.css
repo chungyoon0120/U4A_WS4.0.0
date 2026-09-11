@@ -287,7 +287,7 @@ body {
 
 /* ==================================================================
  * 3.0 ↔ 4.0 비교 뷰 (2026-09-11)
- *   좌 = 3.0 이 8888 로 보낸 것 / 우 = 4.0 이 지금 들고 있는 것.
+ *   좌 = 3.0 이 9999 로 보낸 것 / 우 = 4.0 이 지금 들고 있는 것.
  *   분할 바·창 크기 따라가기는 공통(U4AUI.wireSplitter)이 한다 — 여기선 자리만 잡는다.
  * ================================================================== */
 
@@ -299,9 +299,11 @@ body {
 }
 
 .u4aDmCmpInfo {
-    font-size: .75rem;
-    color: var(--text-muted);
     white-space: nowrap;
+}
+
+.u4aDmCmpInfo[hidden] {
+    display: none !important;
 }
 
 /* 좌우 두 쪽 */
@@ -323,6 +325,14 @@ body {
 /* 좌측 기본 폭 — 고정 px 금지라 비율로 준다. 끌면 공통이 바꿔 준다. */
 #dmCmpLeftPane {
     flex: 0 0 50%;
+}
+
+/* ★ 오른쪽은 남는 자리를 전부 차지한다.
+   안 주면 안쪽 내용 폭만큼만 차지해 오른쪽이 텅 빈 채 잘려 보인다(장군님 지적 2026-09-11).
+   처음에 화면에 `u4a-splitter__pane--flex` 라고 적어 뒀는데 **그런 이름은 정의돼 있지 않다** —
+   다른 화면 markup 을 확인 없이 베껴 온 것이었다. */
+#dmCmpRightPane {
+    flex: 1 1 auto;
 }
 
 .u4aDmCmp__bar {
@@ -379,4 +389,54 @@ body {
 .u4aDmCmpOnly[hidden],
 .u4aDmCmp[hidden] {
     display: none !important;
+}
+
+
+/* 조작 줄 묶음 — 뷰에 따라 통째로 보이고 숨는다(감시 관련 / 감시 범위). */
+.u4aDmGrp {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+}
+
+.u4aDmGrp[hidden] {
+    display: none !important;
+}
+
+
+/* 좌우 머리줄 — 이름 찾기 칸이 오른쪽 끝에 붙고, 앞 글자는 남는 만큼만 */
+.u4aDmCmpHead__info {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.u4aDmCmpFind {
+    flex: 0 0 auto;
+    width: 10rem;
+    min-width: 0;
+}
+
+.u4aDmCmpSearch {
+    width: 100%;
+    min-width: 0;
+    height: 1.5rem;
+    padding: 0 1.5rem 0 .4rem;
+}
+
+/* 어긋난 자리 이동 — 지금 몇 번째인지 */
+.u4aDmCmpAt {
+    font-size: .75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    min-width: 3.5rem;
+    text-align: center;
+}
+
+
+/* 찾기에 걸린 줄 — 어디가 걸렸는지 보여야 쓸모가 있다 */
+.u4aDmCmpFound {
+    background: var(--state-success-bg);
+    box-shadow: inset 0.1875rem 0 0 var(--state-success);
 }

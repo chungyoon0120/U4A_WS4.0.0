@@ -80,11 +80,6 @@
     //    우리 칸은 그대로 두므로 두 군데가 같이 바뀌는 것은 계속 보인다(그게 맞는 동작 — 장군님 확인).
     var C_UI_KEEP = ["_T_0015", "_MODEL", "_BIND_AGGR", "_OBJID", "__PARENT", "_EMBED_AGGR", "__UIFND"];
 
-    //어디에 있든 아예 안 담는 칸 이름(장군님 지시 2026-09-11).
-    //  APPID · GUINR 은 앱마다·열 때마다 값이 달라 두 프로그램을 견주면 늘 "다름"으로 나온다.
-    //  그것 때문에 진짜 어긋난 자리가 묻히므로 수집에서 뺀다. **깊이와 상관없이** 이 이름이면 안 담는다.
-    var C_SKIP_KEYS = ["APPID", "GUINR"];
-
     //모델이 놓이는 칸 이름. 이 칸 안에서는 **oData 만** 담는다(장군님 지시 2026-09-11).
     //
     //  왜 필요한가 — 같은 이름인데 두 앱에서 담긴 물건이 다르다(2026-09-11 소스 확인):
@@ -175,9 +170,6 @@
                     //  예전엔 값만 비우고 칸은 남겨서, 함수가 새로 생기거나 없어지면
                     //  "생김/없어짐" 줄이 떴다. 함수는 데이터가 아니므로 아예 안 담는다.
                     if (typeof vChild === "function") { continue; }
-
-                    //★ 아예 안 담는 칸(위 C_SKIP_KEYS) — 깊이와 상관없이 건너뛴다.
-                    if (C_SKIP_KEYS.indexOf(aKeys[i]) !== -1) { continue; }
 
                     vOut[aKeys[i]] = _snap(vChild, iDepth + 1, aChain, aKeys[i]);
                 } catch (e) {
@@ -392,8 +384,8 @@
 
         var oOut = {};
 
-        oOut["oAPP.attr"] = _pick(oAPP.attr, (_oInclude.sCode ? [] : C_SKIP_ATTR).concat(C_SKIP_KEYS));
-        oOut["oAPP.DATA"] = _pick(oAPP.DATA, (_oInclude.lib ? [] : C_SKIP_DATA).concat(C_SKIP_KEYS));
+        oOut["oAPP.attr"] = _pick(oAPP.attr, _oInclude.sCode ? [] : C_SKIP_ATTR);
+        oOut["oAPP.DATA"] = _pick(oAPP.DATA, _oInclude.lib ? [] : C_SKIP_DATA);
 
         return oOut;
 

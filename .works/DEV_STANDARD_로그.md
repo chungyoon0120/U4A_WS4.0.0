@@ -120,6 +120,7 @@ U4ALOG.warn('값이 없어 그만둠', 'T_ATTR', 'attribute list cannot be drawn
 | `GUARD_EXIT` | 반드시 있어야 하는 값이 없어 그만둠 |
 | `DOM_MISS` | 화면 요소를 못 찾음 |
 | `CRASH` | 앱이 뻗음 |
+| `SKIP_TEMP` | 장군님 지시로 임시로 꺼둔 로직을 건너뜀 |
 
 > **표에 없는 새 사건**을 만들 때는 이 표에 한 줄 추가하고 쓴다. 임의로 만들어 쓰지 않는다.
 
