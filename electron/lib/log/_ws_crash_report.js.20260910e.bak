@@ -1,0 +1,1017 @@
+/****************************************************************************************
+ * 앱이 뻗었을 때 처리
+ * --------------------------------------------------------------------------------------
+ * 오류코드 접두: CRSH / 다음 번호: 017
+ *
+ * 왜 만들었나 (2026-09-08)
+ *   앱이 통째로 뻗으면 그 순간에는 아무것도 못 보낸다.
+ *   그래서 ① 뻗었다는 사실을 남겨 두고 ② 다음에 켤 때 그때의 로그를 보낸다.
+ *
+ * 어떻게 아나
+ *   앱을 켤 때 "돌고 있음" 표시 파일을 만들고, 정상으로 끝나면 지운다.
+ *   다음에 켰을 때 그 표시가 남아 있으면 지난번에 비정상으로 끝난 것이다.
+ *
+ * 죽는 순간 잡는 장치(크래시 리포터)
+ *   서버로 올리지 않고 그 컴퓨터에만 남긴다.
+ *   남는 것은 사람도 AI도 못 읽는 덩어리라, "죽었다 + 그 시각"만 취한다.
+ *   원인은 같이 보내는 로그 파일에서 찾는다.
+ ****************************************************************************************/
+
+const fs = require('fs');
+const path = require('path');
+
+let _app = null;
+let _installed = false;
+let _sMarkPath = '';        // "돌고 있음" 표시 파일
+
+/**
+ * 마지막으로 무엇을 했는지 (2026-09-09 추가)
+ * 뻗으면 다음 실행 때 이걸 읽어 크래시 보고서를 만든다.
+ */
+let _oLastState = {};
+
+function _lastStatePath() {
+    return path.join(_getLogFolder(), 'last_state.json');
+}
+let _sCrashDir = '';        // 죽은 흔적이 쌓이는 폴더
+
+/****************************************************************************************
+ * 로그 폴더 (화면 쪽·앱 본체와 같은 규칙)
+ ****************************************************************************************/
+function _getLogFolder() {
+
+    let baseDir = process.env.APPDATA;
+
+    if (!baseDir) {
+        baseDir = _app.getPath('appData');
+    }
+
+    const sFolder = path.join(baseDir, _app.getName(), 'logs');
+
+    if (!fs.existsSync(sFolder)) {
+        fs.mkdirSync(sFolder, { recursive: true });
+    }
+
+    return sFolder;
+
+}
+
+/****************************************************************************************
+ * ① 죽는 순간 잡는 장치 켜기 — 서버로 안 올리고 그 컴퓨터에만 남긴다
+ ****************************************************************************************/
+function _startCrashReporter() {
+
+    try {
+
+        const { crashReporter } = require('electron');
+
+        if (!crashReporter || typeof crashReporter.start !== 'function') {
+            console.warn('[CRSH-001] 죽는 순간 잡는 장치를 쓸 수 없다 — 건너뛴다.');
+            return;
+        }
+
+        /**
+         * 흔적이 쌓이는 폴더를 로그 폴더 아래로 옮긴다(장군님 지시 2026-09-08).
+         * 로그 폴더에 바로 두지 않는 이유: 이 장치가 자기 하위 폴더와 설정 파일을
+         * 여러 개 만든다. 지금 로그 파일과 섞이면 3개월 정리 로직이 그것들까지 훑는다.
+         */
+        _sCrashDir = path.join(_getLogFolder(), 'crash');
+
+        if (!fs.existsSync(_sCrashDir)) {
+            fs.mkdirSync(_sCrashDir, { recursive: true });
+        }
+
+        _app.setPath('crashDumps', _sCrashDir);
+
+        crashReporter.start({
+            submitURL: '',            // 서버로 안 올린다
+            uploadToServer: false,    // 그 컴퓨터에만 남긴다
+            compress: false
+        });
+
+    } catch (e) {
+        // 이 장치를 못 켜도 앱은 정상으로 돌아야 한다.
+        console.error('[CRSH-002] 죽는 순간 잡는 장치를 켜지 못했다.', e);
+    }
+
+}
+
+/****************************************************************************************
+ * ② 죽는 순간에 같이 남길 값 채우기
+ *   - 값 하나가 127바이트까지라 짧게 넣는다(공식 문서 확인).
+ *   - 조작이 바뀔 때마다 갱신하면 죽는 순간의 마지막 상태가 남는다.
+ ****************************************************************************************/
+/**
+ * 진행 중인 서버 요청 목록 (2026-09-10 추가 — 장군님 지시)
+ * 뻗으면 이 목록이 보고서의 "안 끝난 요청" 이 된다.
+ */
+function setPending(aList) {
+
+    try {
+
+        _oLastState['안끝난요청'] = (aList && aList.length) ? aList.join(' / ') : '';
+        _oLastState['마지막시각'] = new Date().toISOString();
+
+        fs.writeFileSync(_lastStatePath(), JSON.stringify(_oLastState), 'utf8');
+
+    } catch (e) {
+        // 못 적어도 앱은 계속 간다.
+    }
+
+}
+
+function setLastState(sKey, sValue) {
+
+    /**
+     * 우리도 따로 적어 둔다 (2026-09-09 추가)
+     * 죽는 순간 잡는 장치에만 넘기면, 다음에 켰을 때 우리가 그 값을 못 읽는다.
+     * 그래서 같은 값을 작은 파일에 적어 둔다. 다음 실행 때 이걸로 보고서를 만든다.
+     */
+    try {
+
+        _oLastState[String(sKey)] = String(sValue == null ? '' : sValue);
+        _oLastState['마지막시각'] = new Date().toISOString();
+
+        fs.writeFileSync(_lastStatePath(), JSON.stringify(_oLastState), 'utf8');
+
+    } catch (e) {
+        // 못 적어도 앱은 계속 간다.
+    }
+
+    try {
+
+        const { crashReporter } = require('electron');
+
+        if (!crashReporter || typeof crashReporter.addExtraParameter !== 'function') {
+            return;
+        }
+
+        let s = String(sValue == null ? '' : sValue);
+
+        // 127바이트를 넘으면 통째로 안 들어갈 수 있어 넉넉히 자른다
+        if (Buffer.byteLength(s, 'utf8') > 120) {
+            while (Buffer.byteLength(s, 'utf8') > 117 && s.length > 0) {
+                s = s.slice(0, -1);
+            }
+            s += '…';
+        }
+
+        crashReporter.addExtraParameter(String(sKey).slice(0, 39), s);
+
+    } catch (e) {
+        // 값을 못 채워도 앱은 계속 간다.
+    }
+
+}
+
+/****************************************************************************************
+ * ③ "돌고 있음" 표시
+ ****************************************************************************************/
+function _markRunning() {
+
+    try {
+
+        _sMarkPath = path.join(_getLogFolder(), 'running.mark');
+
+        fs.writeFileSync(_sMarkPath, JSON.stringify({
+            시작시각: new Date().toISOString(),
+            앱버전: _app.getVersion()
+        }), 'utf8');
+
+    } catch (e) {
+        console.error('[CRSH-003] 돌고 있음 표시를 만들지 못했다.', e);
+    }
+
+}
+
+function _clearRunningMark() {
+
+    try {
+
+        if (_sMarkPath && fs.existsSync(_sMarkPath)) {
+            fs.unlinkSync(_sMarkPath);
+        }
+
+    } catch (e) {
+        console.error('[CRSH-003] 돌고 있음 표시를 지우지 못했다.', e);
+    }
+
+}
+
+/****************************************************************************************
+ * ③-1 이미 보낸 흔적을 적어 두는 곳 (2026-09-08 추가 — 계획 11-3 의 6번)
+ * --------------------------------------------------------------------------------------
+ * 왜 필요한가
+ *   흔적 파일은 그 자리에 계속 남는다. 표시를 안 해 두면 앱을 켤 때마다
+ *   같은 것을 또 보내 방이 도배된다.
+ ****************************************************************************************/
+/**
+ * 흔적 덩어리가 쌓이는 폴더 (2026-09-10 - 여러 곳에서 쓰게 밖으로 뺐다)
+ * 죽는 순간 잡는 장치가 하위에 reports 폴더를 만들면 그쪽에 쌓인다.
+ */
+function _dumpDir() {
+
+    try {
+
+        const sBase = _sCrashDir || path.join(_getLogFolder(), 'crash');
+        const sReportDir = path.join(sBase, 'reports');
+
+        if (fs.existsSync(sReportDir)) {
+            return sReportDir;
+        }
+
+        if (fs.existsSync(sBase)) {
+            return sBase;
+        }
+
+        return '';
+
+    } catch (e) {
+        return '';
+    }
+
+}
+
+function _sentListPath() {
+    return path.join(_getLogFolder(), 'crash_sent.json');
+}
+
+function _readSentList() {
+
+    try {
+
+        const sPath = _sentListPath();
+
+        if (!fs.existsSync(sPath)) {
+            return [];
+        }
+
+        const a = JSON.parse(fs.readFileSync(sPath, 'utf8'));
+
+        return Array.isArray(a) ? a : [];
+
+    } catch (e) {
+        console.error('[CRSH-006] 이미 보낸 목록을 읽지 못했다.', e);
+        return [];
+    }
+
+}
+
+function _addSent(sName) {
+
+    try {
+
+        let a = _readSentList();
+
+        if (a.indexOf(sName) < 0) {
+            a.push(sName);
+        }
+
+        // 무한정 쌓이지 않게 최근 200건만 둔다
+        if (a.length > 200) {
+            a = a.slice(a.length - 200);
+        }
+
+        fs.writeFileSync(_sentListPath(), JSON.stringify(a), 'utf8');
+
+    } catch (e) {
+        console.error('[CRSH-007] 이미 보낸 목록을 적지 못했다.', e);
+    }
+
+}
+
+/****************************************************************************************
+ * ③-2 오래된 흔적 지우기 (2026-09-08 추가 — 계획 11-3 의 7번)
+ * --------------------------------------------------------------------------------------
+ * 로그 파일은 앱을 켤 때 3개월 지난 것을 지우는 자리가 이미 있다.
+ * 흔적이 쌓이는 하위 폴더는 그 대상이 아니라 여기서 같은 기준으로 지운다.
+ ****************************************************************************************/
+const KEEP_DAYS = 90;
+
+function _cleanOldCrashFiles() {
+
+    try {
+
+        const sDir = _sCrashDir || path.join(_getLogFolder(), 'crash');
+
+        if (!sDir || !fs.existsSync(sDir)) {
+            return;
+        }
+
+        const iLimit = Date.now() - (KEEP_DAYS * 24 * 60 * 60 * 1000);
+
+        const walk = (sPath) => {
+
+            const aNames = fs.readdirSync(sPath);
+
+            for (let i = 0; i < aNames.length; i++) {
+
+                const sFull = path.join(sPath, aNames[i]);
+                let st = null;
+
+                try {
+                    st = fs.statSync(sFull);
+                } catch (e) {
+                    continue;
+                }
+
+                if (st.isDirectory()) {
+                    walk(sFull);
+                    continue;
+                }
+
+                if (st.mtimeMs < iLimit) {
+                    try { fs.unlinkSync(sFull); } catch (e) { }
+                }
+
+            }
+
+        };
+
+        walk(sDir);
+
+    } catch (e) {
+        console.error('[CRSH-008] 오래된 흔적을 지우지 못했다.', e);
+    }
+
+}
+
+/****************************************************************************************
+ * ③-3 ★크래시 전용 보고서 만들기 (2026-09-09 추가 — 장군님 지시)
+ * --------------------------------------------------------------------------------------
+ * 왜 만드나
+ *   앞서는 날짜별 로그 파일 끝 200KB 를 잘라 보냈다. 로그에 이미 있는 내용을 또 보내니
+ *   같은 내용이 두 벌이 되고, 여러 번 뻗으면 겹치는 구간이 계속 반복해서 나갔다.
+ *   크래시는 크래시대로 **그 순간 정보만** 따로 남겨야 한다.
+ *
+ * 무엇을 담나
+ *   뻗은 시각 / 얼마나 돌다 죽었는지 / 마지막으로 무엇을 했는지 / 어느 화면이었는지 /
+ *   그때 컴퓨터 상태 / 로그의 **마지막 몇 줄만** (통째로 안 붙인다)
+ ****************************************************************************************/
+const CRASH_TAIL_LINES = 40;   // 로그는 뻗기 직전 이만큼만 붙인다
+
+function _readLastState() {
+
+    try {
+
+        const p = _lastStatePath();
+
+        if (!fs.existsSync(p)) {
+            return {};
+        }
+
+        return JSON.parse(fs.readFileSync(p, 'utf8')) || {};
+
+    } catch (e) {
+        return {};
+    }
+
+}
+
+/** 날짜별 로그 파일의 마지막 몇 줄만 */
+function _tailLines(sLogPath, iLines) {
+
+    try {
+
+        if (!sLogPath || !fs.existsSync(sLogPath)) {
+            return '(로그 파일을 못 찾음)';
+        }
+
+        const st = fs.statSync(sLogPath);
+        const iRead = Math.min(st.size, 64 * 1024);   // 뒤 64KB 만 읽어 줄로 자른다
+        const fd = fs.openSync(sLogPath, 'r');
+        const buf = Buffer.alloc(iRead);
+
+        fs.readSync(fd, buf, 0, iRead, Math.max(0, st.size - iRead));
+        fs.closeSync(fd);
+
+        const a = buf.toString('utf8').split('\n');
+
+        return a.slice(Math.max(0, a.length - iLines)).join('\n');
+
+    } catch (e) {
+        return '(로그 파일을 읽지 못함: ' + e + ')';
+    }
+
+}
+
+/**
+ * 크래시 보고서 파일을 만들어 그 경로를 돌려준다.
+ * 로그 폴더에 crash-report_날짜시각.txt 로 남는다 — 사람도 AI도 읽을 수 있는 글이다.
+ */
+function _writeCrashReport(oMark, sCrashInfo, sLogPath, oOpt) {
+
+    try {
+
+        const oLast = _readLastState();
+        const d = new Date();
+
+        const sStamp = d.getFullYear()
+            + String(d.getMonth() + 1).padStart(2, '0')
+            + String(d.getDate()).padStart(2, '0') + '_'
+            + String(d.getHours()).padStart(2, '0')
+            + String(d.getMinutes()).padStart(2, '0')
+            + String(d.getSeconds()).padStart(2, '0');
+
+        const sStart = (oMark && oMark.시작시각) ? oMark.시작시각 : '';
+        const sLast = oLast['마지막시각'] || '';
+
+        let sAlive = '(모름)';
+
+        if (sStart && sLast) {
+            const ms = new Date(sLast).getTime() - new Date(sStart).getTime();
+            if (ms >= 0) {
+                sAlive = Math.floor(ms / 60000) + '분 ' + Math.floor((ms % 60000) / 1000) + '초';
+            }
+        }
+
+        const os = require('os');
+        const EOL = os.EOL;
+
+        /**
+         * 제목과 마지막 줄 이름은 밖에서 정할 수 있다 (2026-09-10 추가)
+         * 창 하나만 죽은 경우는 앱 본체가 살아 있어 "다시 켠 시각" 이 말이 안 된다.
+         */
+        const sTitle = (oOpt && oOpt.제목) ? oOpt.제목 : '===== 앱이 뻗었다 =====';
+        const sNowLabel = (oOpt && oOpt.지금라벨) ? oOpt.지금라벨 : '다시 켠 시각';
+
+        let t = '';
+        t += sTitle + EOL;
+        t += EOL;
+        t += '[언제]' + EOL;
+        t += '  앱을 켠 시각    : ' + (sStart || '(모름)') + EOL;
+        t += '  마지막 흔적 시각: ' + (sLast || '(모름)') + EOL;
+        t += '  살아 있던 시간  : ' + sAlive + EOL;
+        t += '  죽은 시각       : ' + sCrashInfo + EOL;
+        t += '  ' + sNowLabel + ' : ' + d.toISOString() + EOL;
+
+        if (oOpt && oOpt.덧붙임) {
+            t += oOpt.덧붙임 + EOL;
+        }
+
+        t += EOL;
+        t += '[마지막으로 무엇을 했나]' + EOL;
+        t += '  마지막 조작 : ' + (oLast['마지막조작'] || '(없음)') + EOL;
+        t += '  마지막 화면 : ' + (oLast['마지막화면'] || '(없음)') + EOL;
+        t += EOL;
+        t += '[뻗을 때 안 끝난 서버 요청]  ★여기서 멈췄을 가능성이 가장 크다' + EOL;
+        t += '  ' + (oLast['안끝난요청'] || '(없음 — 요청 중이 아니었다)') + EOL;
+        t += EOL;
+        t += '[어떤 컴퓨터에서]' + EOL;
+        t += '  앱 버전 : ' + ((oMark && oMark.앱버전) ? oMark.앱버전 : (_app ? _app.getVersion() : '-')) + EOL;
+        t += '  윈도우  : ' + os.release() + ' / ' + process.arch + EOL;
+        t += '  메모리  : ' + Math.round(os.totalmem() / 1024 / 1024 / 1024) + 'GB'
+            + ' (남은 것 ' + Math.round(os.freemem() / 1024 / 1024) + 'MB)' + EOL;
+        t += EOL;
+        /**
+         * ★죽은 흔적 덩어리를 글로 풀어 붙인다 (2026-09-10 — 장군님 지시)
+         * -------------------------------------------------------------------
+         * "AI 가 보고 판단할 수만 있으면 된다" 는 지시에 따라, 전용 도구 없이도
+         * 읽을 수 있게 우리가 직접 푼다. 여기서 **터진 갈래와 터진 파일**이 나온다.
+         * 우리 코드 잘못인지, 끼어든 남의 프로그램 탓인지를 가르는 자리다.
+         */
+        t += '[죽은 흔적 덩어리가 말해 주는 것]  ★엔진이 어디서 터졌나' + EOL;
+
+        try {
+            t += require('./ws_crash_dump_read').readDump((oOpt && oOpt.덤프파일) ? oOpt.덤프파일 : '') + EOL;
+        } catch (e) {
+            t += '  (덩어리를 푸는 자리를 못 불렀다: ' + (e && e.message ? e.message : e) + ')' + EOL;
+        }
+
+        t += EOL;
+        t += '[뻗기 직전 로그 ' + CRASH_TAIL_LINES + '줄]' + EOL;
+        t += '  ※ 전체 로그는 같은 폴더의 날짜별 파일에 있다. 여기엔 끝부분만 붙인다.' + EOL;
+        t += EOL;
+        t += _tailLines(sLogPath, CRASH_TAIL_LINES) + EOL;
+
+        const sOut = path.join(_getLogFolder(), 'crash-report_' + sStamp + '.txt');
+
+        fs.writeFileSync(sOut, t, 'utf8');
+
+        return sOut;
+
+    } catch (e) {
+        console.error('[CRSH-011] 크래시 보고서를 만들지 못했다.', e);
+        return '';
+    }
+
+}
+
+/****************************************************************************************
+ * ④ 지난번에 뻗었는지 보고, 뻗었으면 그때 로그를 보낸다
+ ****************************************************************************************/
+function _checkLastRun() {
+
+    let oMark = null;
+    let bHadMark = false;
+
+    try {
+
+        const sMark = path.join(_getLogFolder(), 'running.mark');
+
+        /**
+         * ★표시가 없다고 바로 끝내지 않는다 (2026-09-10 - 장군님 지시)
+         * -----------------------------------------------------------------
+         * 표시는 정상 종료 때 지워진다. 그런데 **창 하나만 죽고 앱 본체는 살아 있는** 경우,
+         * 사용자가 그 뒤 앱을 정상으로 닫으면 표시가 지워진다.
+         * 그러면 다음에 켤 때 "지난번 정상 종료" 로 보여 보고서를 아예 안 만들었다.
+         * 실제로 2026-09-10 시험에서 흔적 덩어리만 남고 보고서가 하나도 없었다.
+         * 이제는 표시가 없어도 **처리 안 한 흔적 덩어리** 가 있으면 보고서를 만든다.
+         */
+        if (fs.existsSync(sMark)) {
+
+            bHadMark = true;
+
+            try {
+                oMark = JSON.parse(fs.readFileSync(sMark, 'utf8'));
+            } catch (e) {
+                oMark = {};
+            }
+
+        }
+
+    } catch (e) {
+        console.error('[CRSH-004] 지난번 실행 상태를 읽지 못했다.', e);
+        return;
+    }
+
+    // 죽은 흔적 파일이 있으면 그 시각을 뻗은 시점으로 본다
+    let sCrashInfo = '(죽은 흔적 파일 없음)';
+    let sCrashFile = '';
+
+    try {
+
+        const sDir = _dumpDir();
+
+        if (sDir) {
+
+            const aFiles = fs.readdirSync(sDir)
+                .map((f) => ({ name: f, full: path.join(sDir, f) }))
+                .filter((f) => {
+                    try { return fs.statSync(f.full).isFile(); } catch (e) { return false; }
+                })
+                .sort((a, b) => fs.statSync(b.full).mtimeMs - fs.statSync(a.full).mtimeMs);
+
+            // 이미 보낸 것은 건너뛴다 (2026-09-08 추가 — 같은 것을 또 보내지 않게)
+            const aSent = _readSentList();
+            const aNew = aFiles.filter((f) => aSent.indexOf(f.name) < 0);
+
+            if (aNew.length > 0) {
+                const st = fs.statSync(aNew[0].full);
+                sCrashInfo = '죽은 시각 ' + st.mtime.toLocaleString();
+                sCrashFile = aNew[0].full;
+            } else if (aFiles.length > 0) {
+                sCrashInfo = '(죽은 흔적은 있으나 이미 보낸 것이다)';
+            }
+
+        }
+
+    } catch (e) {
+        console.error('[CRSH-005] 죽은 흔적을 확인하지 못했다.', e);
+    }
+
+    /**
+     * 표시도 없고 처리 안 한 흔적도 없으면 지난번은 정상이었다 (2026-09-10)
+     * 이 줄이 없으면 앱을 켤 때마다 "비정상으로 끝났다" 가 거짓으로 남는다.
+     */
+    if (!bHadMark && !sCrashFile) {
+        return;
+    }
+
+    // 로그에 남긴다
+    let WsMainLog = null;
+
+    try {
+        WsMainLog = require('./ws_main_log');
+    } catch (e) { }
+
+    const sText = (bHadMark
+        ? '지난번 실행이 비정상으로 끝났다 — '
+        : '지난번 실행에서 죽은 흔적이 남아 있다 (돌고 있음 표시는 지워져 있었다) — ')
+        + '시작 ' + (oMark && oMark.시작시각 ? oMark.시작시각 : '(모름)')
+        + ' / ' + sCrashInfo;
+
+    if (WsMainLog) {
+        WsMainLog.writeLog('치명', sText);
+    }
+
+    /**
+     * ★크래시 전용 보고서를 만든다 (2026-09-09 — 장군님 지시로 방식 변경)
+     * -------------------------------------------------------------------
+     * 앞서는 ① 못 읽는 덩어리를 로그 폴더로 복사하고
+     *        ② 날짜별 로그 파일 끝 200KB 를 잘라 보냈다.
+     * 그러면 로그에 이미 있는 내용이 또 나가 같은 내용이 두 벌이 되고,
+     * 여러 번 뻗으면 겹치는 구간이 계속 반복해서 나갔다.
+     *
+     * 이제는 **뻗은 순간 정보만 담은 보고서 하나**를 만들어 그것만 보낸다.
+     */
+    const sLogPath = WsMainLog ? WsMainLog.getLogFilePath() : '';
+
+    // 찾아 낸 흔적 덩어리를 같이 넘긴다 — 보고서 안에서 글로 풀린다 (2026-09-10)
+    const sReport = _writeCrashReport(oMark, sCrashInfo, sLogPath, { 덤프파일: sCrashFile });
+
+    if (sReport && WsMainLog) {
+        WsMainLog.writeLog('치명', '크래시 보고서를 만들었다: ' + sReport);
+    }
+
+    // 죽은 흔적 덩어리는 옮겨 담지 않는다(못 읽는 파일이라 쓸모가 없다).
+    // 다만 같은 것을 또 처리하지 않게 처리했다고만 적어 둔다.
+    if (sCrashFile) {
+        _addSent(path.basename(sCrashFile));
+    }
+
+    // 보고서 하나만 보낸다
+    try {
+
+        require('./ws_telegram').sendError({
+            kind: 'crash',
+            errorCode: 'CRASH',
+            message: sText,
+            stack: '',
+            screenName: '앱 전체',
+            logFilePath: sReport || sLogPath   // 보고서가 있으면 그것만
+        });
+
+    } catch (e) {
+        console.error('[CRSH-005] 뻗은 기록을 전송으로 넘기지 못했다.', e);
+    }
+
+}
+
+/****************************************************************************************
+ * ④-2 창이 죽었을 때 — 그 자리에서 바로 보고서를 만들어 보낸다
+ * --------------------------------------------------------------------------------------
+ * 왜 필요한가 (2026-09-10 — 장군님 지시)
+ *   앱 본체가 통째로 죽으면 그 순간에는 아무것도 못 하니 다음에 켤 때 처리한다(위 ④).
+ *   그런데 **창 하나만 죽으면 앱 본체는 살아 있다.** 그때는 기다릴 이유가 없다.
+ *   오히려 지금이 더 정확하다 — 마지막 조작·안 끝난 요청이 아직 그대로 있다.
+ *
+ *   실측(2026-09-10): 창이 죽고(사유 crashed) 앱을 정상 종료했더니 흔적 덩어리만 남고
+ *   보고서도 텔레그램도 없었다. 표시 파일이 지워져 다음 실행에서 정상으로 판단했기 때문.
+ ****************************************************************************************/
+let _iLastRendererReportAt = 0;   // 여러 창이 한꺼번에 죽어도 한 번만 보낸다
+
+function reportRendererCrash(oInfo) {
+
+    // 설치를 안 했으면(개발 실행) 아무것도 안 한다
+    if (!_installed) {
+        return '';
+    }
+
+    try {
+
+        const sWin = (oInfo && oInfo.창) ? String(oInfo.창) : '(알 수 없음)';
+        const sReason = (oInfo && oInfo.사유) ? String(oInfo.사유) : '(사유 없음)';
+        const sCode = (oInfo && typeof oInfo.종료코드 !== 'undefined') ? String(oInfo.종료코드) : '-';
+
+        /**
+         * 창이 정상으로 닫힐 때도 이 신호가 올 수 있다(사유 clean-exit).
+         * 그건 뻗은 것이 아니므로 보고서를 만들지 않는다.
+         */
+        if (sReason === 'clean-exit') {
+            return '';
+        }
+
+        // 60초 안에 또 죽으면(연쇄로 여러 창) 한 건만 보낸다
+        if (_iLastRendererReportAt && (Date.now() - _iLastRendererReportAt) < 60 * 1000) {
+            return '';
+        }
+
+        _iLastRendererReportAt = Date.now();
+
+        let WsMainLog = null;
+
+        try {
+            WsMainLog = require('./ws_main_log');
+        } catch (e) { }
+
+        // 지금 돌고 있는 실행의 표시를 그대로 읽는다(앱 본체는 살아 있다)
+        let oMark = null;
+
+        try {
+
+            const sMark = path.join(_getLogFolder(), 'running.mark');
+
+            if (fs.existsSync(sMark)) {
+                oMark = JSON.parse(fs.readFileSync(sMark, 'utf8'));
+            }
+
+        } catch (e) {
+            oMark = null;
+        }
+
+        const EOL = require('os').EOL;
+
+        const sText = '창이 죽었다 — 창: ' + sWin
+            + ' / 사유: ' + sReason
+            + ' / 종료코드: ' + sCode;
+
+        const sLogPath = WsMainLog ? WsMainLog.getLogFilePath() : '';
+
+        /**
+         * ★덩어리가 다 써질 때까지 지켜보다가 보고서를 쓴다 (2026-09-10)
+         * -----------------------------------------------------------------
+         * 죽는 순간 잡는 장치가 흔적 덩어리를 다 쓰기까지 시간이 걸린다.
+         * 바로 쓰면 그 덩어리를 못 붙여 「터진 자리가 어느 파일인지」 를 놓친다.
+         *
+         * ★느린 PC 를 위해 (장군님 지시) — 「3초 뒤」 처럼 못 박지 않는다.
+         *   느린 컴퓨터에서는 덩어리 쓰는 데 3초가 넘게 걸려 그 칸이 통째로 빈다.
+         *   대신 1초마다 들여다보다가 **파일 크기가 더 안 늘면** 그때 쓴다.
+         *   빠른 PC 에서는 2초면 끝나고, 느린 PC 는 최대 1분까지 기다린다.
+         *   (기다리는 동안 앱이 닫혀도, 다음에 켤 때 흔적이 처리 안 된 채라 그때 만들어진다.)
+         */
+        _waitForDumpThen(function (sDump) {
+
+            try {
+
+                const sReport = _writeCrashReport(oMark, new Date().toLocaleString(), sLogPath, {
+                    제목: '===== 창이 죽었다 (앱 본체는 살아 있다) =====',
+                    지금라벨: '보고서 쓴 시각',
+                    덤프파일: sDump,
+                    덧붙임: EOL
+                        + '[어느 창이 죽었나]' + EOL
+                        + '  창       : ' + sWin + EOL
+                        + '  사유     : ' + sReason + EOL
+                        + '  종료코드 : ' + sCode
+                });
+
+                if (WsMainLog) {
+
+                    if (sReport) {
+                        WsMainLog.writeLog('치명', '창이 죽어 보고서를 만들었다: ' + sReport);
+                    } else {
+                        WsMainLog.writeLog('오류', '창이 죽었으나 보고서를 못 만들었다 — 로그 파일만 보낸다.');
+                    }
+
+                }
+
+                // 보고서 파일만 보낸다
+                try {
+
+                    require('./ws_telegram').sendError({
+                        kind: 'crash',
+                        errorCode: 'CRASH',
+                        message: sText,
+                        stack: '',
+                        screenName: sWin,
+                        logFilePath: sReport || sLogPath
+                    });
+
+                } catch (e) {
+                    console.error('[CRSH-012] 창이 죽은 기록을 전송으로 넘기지 못했다.', e);
+                }
+
+                /**
+                 * 쓴 흔적 덩어리를 "처리했다" 고 적어 둔다.
+                 * 안 적으면 다음에 켤 때 같은 건으로 보고서가 한 번 더 만들어진다.
+                 * ★기다리다 못 찾았으면 아무것도 안 적는다 — 다음에 켤 때 그때 처리되게 둔다.
+                 */
+                if (sDump) {
+                    _addSent(path.basename(sDump));
+                }
+
+            } catch (e) {
+                console.error('[CRSH-013] 창이 죽은 자리에서 보고서를 만들지 못했다.', e);
+            }
+
+        });
+
+        return '';
+
+    } catch (e) {
+        console.error('[CRSH-013] 창이 죽은 자리에서 보고서를 만들지 못했다.', e);
+        return '';
+    }
+
+}
+
+/****************************************************************************************
+ * 흔적 덩어리가 다 써질 때까지 지켜본다 (2026-09-10 — 장군님 지시 "느린 PC 도 고려해")
+ * --------------------------------------------------------------------------------------
+ * 왜 이렇게 하나
+ *   앞서는 「3초 뒤에 읽는다」 로 못 박아 두었다. 그런데 느린 컴퓨터에서는
+ *   덩어리 쓰는 데 3초가 넘게 걸려, 보고서의 「터진 자리」 칸이 통째로 비게 된다.
+ *
+ * 어떻게 하나
+ *   1초마다 들여다본다. 파일이 보이고 **크기가 더 안 늘면** 다 써진 것으로 보고 진행한다.
+ *   빠른 PC 는 2초, 느린 PC 는 최대 1분까지 기다린다. 그래도 없으면 덩어리 없이 만든다.
+ *   앱 본체는 살아 있으므로 기다리는 동안 잃는 것이 없다.
+ ****************************************************************************************/
+const DUMP_POLL_MS = 1000;    // 이 간격으로 들여다본다
+const DUMP_POLL_TRIES = 60;   // 이만큼까지 (최대 1분 — 느린 PC 배려)
+const DUMP_FRESH_MS = 3 * 60 * 1000;   // 이 시간 안에 생긴 것만 이번 건으로 본다
+
+function _waitForDumpThen(fnDone) {
+
+    let iTry = 0;
+    let sLastPath = '';
+    let iLastSize = -1;
+
+    function tick() {
+
+        iTry++;
+
+        let sNow = '';
+
+        try {
+            sNow = _findNewDump(DUMP_FRESH_MS);
+        } catch (e) {
+            console.error('[CRSH-015] 새로 생긴 흔적을 찾지 못했다.', e);
+        }
+
+        if (sNow) {
+
+            let iSize = -1;
+
+            try {
+                iSize = fs.statSync(sNow).size;
+            } catch (e) {
+                iSize = -1;   // 아직 쓰는 중이라 잠길 수 있다 — 다음 번에 다시 본다
+            }
+
+            // 같은 파일이고 크기가 그대로면 다 써진 것으로 본다
+            if (sNow === sLastPath && iSize > 0 && iSize === iLastSize) {
+                fnDone(sNow);
+                return;
+            }
+
+            sLastPath = sNow;
+            iLastSize = iSize;
+
+        }
+
+        if (iTry >= DUMP_POLL_TRIES) {
+
+            // 여기까지 기다렸는데 못 봤다 — 그래도 보고서는 만든다(로그에 남긴다)
+            try {
+
+                if (!sNow) {
+
+                    const WsMainLog = require('./ws_main_log');
+
+                    WsMainLog.writeLog('주의', '흔적 덩어리를 '
+                        + Math.round(DUMP_POLL_MS * DUMP_POLL_TRIES / 1000)
+                        + '초 기다렸으나 안 생겼다 — 덩어리 풀이 없이 보고서를 만든다.');
+
+                }
+
+            } catch (e) {
+                console.error('[CRSH-016] 흔적을 못 기다린 것을 로그에 못 남겼다.', e);
+            }
+
+            fnDone(sNow || '');
+            return;
+
+        }
+
+        setTimeout(tick, DUMP_POLL_MS);
+
+    }
+
+    setTimeout(tick, DUMP_POLL_MS);
+
+}
+
+/**
+ * 최근 얼마 안에 생긴 흔적 덩어리 중 아직 처리 안 한 것 하나 (2026-09-10 추가)
+ * 없으면 빈 값 — 그때는 보고서에 "덩어리 없음" 이라고 적힌다.
+ */
+function _findNewDump(iWithinMs) {
+
+    try {
+
+        const sDir = _dumpDir();
+
+        if (!sDir) { return ''; }
+
+        const aSent = _readSentList();
+        const iNow = Date.now();
+
+        let sBest = '';
+        let iBestAt = 0;
+
+        fs.readdirSync(sDir).forEach(function (sName) {
+
+            try {
+
+                if (aSent.indexOf(sName) >= 0) { return; }
+
+                const sFull = path.join(sDir, sName);
+                const st = fs.statSync(sFull);
+
+                if (!st.isFile()) { return; }
+                if ((iNow - st.mtimeMs) > iWithinMs) { return; }
+                if (st.mtimeMs <= iBestAt) { return; }
+
+                iBestAt = st.mtimeMs;
+                sBest = sFull;
+
+            } catch (e) {
+                // 파일 하나를 못 읽어도 나머지는 계속 본다.
+            }
+
+        });
+
+        return sBest;
+
+    } catch (e) {
+        console.error('[CRSH-015] 새로 생긴 흔적을 찾지 못했다.', e);
+        return '';
+    }
+
+}
+
+/****************************************************************************************
+ * 설치 — main.js 에서 부른다
+ ****************************************************************************************/
+function install(appInstance) {
+
+    /**
+     * ★포장한 앱에서만 돈다 (장군님 지시).
+     * 개발로 돌릴 때는 화면 콘솔로 보면 되므로 파일에 쌓지도, 밖으로 보내지도 않는다.
+     * 2026-09-08: 이 조건이 빠져 있어 개발 실행에서도 그대로 돌고 있었다(실제 로그로 확인).
+     */
+    if (!appInstance || !appInstance.isPackaged) {
+        return;
+    }
+
+    if (_installed) {
+        return;
+    }
+
+    _installed = true;
+    _app = appInstance;
+
+    _startCrashReporter();
+
+    // 지난번 실행부터 확인하고(표시를 읽고) 그 다음에 이번 표시를 남긴다 — 순서 중요
+    _checkLastRun();
+    _markRunning();
+
+    // 오래된 흔적 정리 — 로그 파일 지우는 기준(3개월)과 같게 맞춘다
+    _cleanOldCrashFiles();
+
+    /**
+     * 정상 종료면 표시를 지운다.
+     * -------------------------------------------------------------------
+     * ★2026-09-08 보완 — 이것만으로는 한 번도 안 지워졌다(실제 로그: 시작 17번 / 종료 0번).
+     *   이 앱은 서버 목록 화면의 닫기·종료에서 끝내는 함수를 직접 부르는데,
+     *   그 함수는 아래 두 신호를 내지 않는다. 그래서 셋 다 건다.
+     */
+    _app.on('before-quit', _clearRunningMark);
+    _app.on('will-quit', _clearRunningMark);
+
+    // ① 끝내는 함수 자체를 감싼다 — 창에서 부르는 것도 결국 여기를 지난다
+    try {
+
+        if (typeof _app.exit === 'function' && !_app.__u4aExitWrapped) {
+
+            const fnOriginExit = _app.exit.bind(_app);
+
+            _app.exit = function () {
+
+                try {
+
+                    let WsMainLog = null;
+
+                    try {
+                        WsMainLog = require('./ws_main_log');
+                    } catch (e) { }
+
+                    if (WsMainLog) {
+                        WsMainLog.writeLog('알림', '===== 앱 정상 종료 =====');
+                    }
+
+                } catch (e) {
+                    // 로그를 못 남겨도 종료는 되어야 한다.
+                }
+
+                _clearRunningMark();
+
+                return fnOriginExit.apply(null, arguments);   // 원래 동작 그대로
+
+            };
+
+            _app.__u4aExitWrapped = true;
+
+        }
+
+    } catch (e) {
+        console.error('[CRSH-009] 끝내는 함수를 감싸지 못했다.', e);
+    }
+
+    // ② 프로세스가 끝나는 순간 한 번 더 — 위를 안 거치고 끝나는 길이 있어도 막는다
+    try {
+        process.on('exit', _clearRunningMark);
+    } catch (e) {
+        console.error('[CRSH-010] 프로세스 종료 자리를 걸지 못했다.', e);
+    }
+
+}
+
+module.exports = {
+    install: install,
+    setLastState: setLastState,
+    setPending: setPending,
+    reportRendererCrash: reportRendererCrash
+};

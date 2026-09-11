@@ -1,0 +1,506 @@
+/****************************************************************************************
+ * 앱 본체(메인 프로세스) 로그 · 오류 수집
+ * --------------------------------------------------------------------------------------
+ * 오류코드 접두: MLOG / 다음 번호: 007
+ *
+ * 왜 만들었나 (2026-09-08, 장군님 지시):
+ *   실측 결과 앱 본체에는 오류·창 종료·응답 없음을 받는 자리가 하나도 없었다(0건).
+ *   그래서 앱이 뻗는 경우 로그가 한 줄도 안 남았다. 이 파일이 그 구멍을 막는다.
+ *
+ * 무엇을 하나:
+ *   ① 앱 본체에서도 electron-log 로 같은 로그 파일에 쓰게 한다
+ *      (화면 쪽 www/ws30/ws10_20/js/ws_log.js 와 동일한 경로 규칙을 그대로 따른다)
+ *   ② 파일 크기 상한을 없앤다(기본 1MB → 넘으면 이전 파일이 밀려나 사라짐)
+ *   ③ 앱 본체에서 처리되지 않은 오류를 받는다
+ *   ④ 창이 죽거나 응답 없음이 될 때를 받는다
+ *
+ * 지키는 것:
+ *   - 이 파일 때문에 앱이 죽으면 안 된다. 모든 실패는 콘솔에 코드와 함께 남기고 계속 간다.
+ *   - 기존 동작을 바꾸지 않는다. 오류를 받아서 남기기만 하고 앱을 끄지 않는다.
+ ****************************************************************************************/
+
+const path = require('path');
+const fs = require('fs');
+
+let _log = null;         // electron-log 인스턴스
+let _app = null;         // electron app
+let _installed = false;  // 중복 설치 방지
+let _logFilePath = '';   // 실제 로그 파일 경로
+
+/****************************************************************************************
+ * 오늘 날짜 문자열
+ * ※ 화면 쪽 ws_log.js 와 규칙이 반드시 같아야 한다(같은 파일에 써야 하므로).
+ *    월은 0을 채우지 않고, 일만 0을 채운다 — 원본 규칙 그대로 둔다.
+ ****************************************************************************************/
+function _getDateText() {
+
+    const today = new Date();
+
+    const year = today.getFullYear().toString();
+    const month = (today.getMonth() + 1).toString();
+    const date = today.getDate().toString().padStart(2, '0');
+
+    return year + '_' + month + '_' + date;
+
+}
+
+/****************************************************************************************
+ * 로그 파일 경로 만들기 (화면 쪽과 동일 규칙)
+ ****************************************************************************************/
+function _resolveLogFilePath() {
+
+    // 화면 쪽 ws_log.js 와 동일하게 APPDATA + 앱이름 + logs 를 쓴다.
+    let baseDir = process.env.APPDATA;
+
+    if (!baseDir) {
+        // APPDATA 가 없는 환경(윈도우가 아니거나 환경변수 없음) — 앱 사용자 데이터 폴더로 대체
+        baseDir = _app.getPath('appData');
+    }
+
+    let folder = path.join(baseDir, _app.getName());
+
+    if (!fs.existsSync(folder)) {
+        fs.mkdirSync(folder, { recursive: true });
+    }
+
+    folder = path.join(folder, 'logs');
+
+    if (!fs.existsSync(folder)) {
+        fs.mkdirSync(folder, { recursive: true });
+    }
+
+    return path.join(folder, 'U4A_WS_' + _getDateText() + '.log');
+
+}
+
+/****************************************************************************************
+ * 로그 한 줄 남기기 (이 파일 안에서만 쓰는 최소 형태)
+ *  - 줄 모양 표준은 .works/로그수집전송/02_로그설계표준.md
+ *  - 지금 단계에서는 [등급] [앱본체] 내용 까지만 맞춘다.
+ ****************************************************************************************/
+/**
+ * 등급을 영어 고정어로 (2026-09-10 추가 — 장군님 지시)
+ * 화면 쪽과 같은 말을 쓴다. 걸러내기가 확실해지고 같은 뜻이 두 벌로 안 나온다.
+ */
+const LEVEL_EN = {
+    '알림': 'INFO',
+    '주의': 'WARN',
+    '오류': 'ERROR',
+    '치명': 'FATAL'
+};
+
+function writeLog(sLevel, sText) {
+
+    const sLine = '[' + (LEVEL_EN[sLevel] || sLevel) + '] [앱본체] ' + sText;
+
+    if (_log && typeof _log[_mapLevel(sLevel)] === 'function') {
+        _log[_mapLevel(sLevel)](sLine);
+        return;
+    }
+
+    // 로그 라이브러리가 아직 없으면 콘솔로라도 남긴다(유실 방지)
+    console.log(sLine);
+
+}
+
+function _mapLevel(sLevel) {
+
+    switch (sLevel) {
+        case '치명':
+        case '오류':
+            return 'error';
+        case '주의':
+            return 'warn';
+        default:
+            return 'info';
+    }
+
+}
+
+/****************************************************************************************
+ * electron-log 준비
+ ****************************************************************************************/
+function _setupLogger() {
+
+    try {
+
+        _log = require('electron-log');
+
+    } catch (e) {
+        // 로그 라이브러리를 못 읽으면 이후 전부 콘솔로 간다. 앱은 계속 돈다.
+        console.error('[MLOG-001] electron-log 로드 실패 — 앱 본체 로그는 콘솔에만 남는다.', e);
+        _log = null;
+        return;
+    }
+
+    try {
+
+        _logFilePath = _resolveLogFilePath();
+
+        _log.transports.file.resolvePath = () => _logFilePath;
+
+        // 파일 크기 상한 없앰(2026-09-08 확정).
+        // 기본값 1MB 를 넘으면 이전 파일을 밀어내고 2개만 남아, 오류 직전 기록이 사라진다.
+        // 오래된 파일 정리는 앱 시작 시 3개월 삭제 로직이 이미 하고 있다.
+        _log.transports.file.maxSize = 0;
+
+        _log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] {text}';
+
+        // 앱 본체 콘솔은 오류만(화면 쪽 ws_log.js 와 동일한 방침)
+        _log.transports.console.level = 'error';
+
+    } catch (e) {
+        console.error('[MLOG-002] 로그 파일 경로 설정 실패 — 앱 본체 로그는 기본 경로로 간다.', e);
+    }
+
+}
+
+/****************************************************************************************
+ * 빌드 시각 알아내기
+ *  - 실행 중인 앱 본체 파일이 만들어진 시각을 쓴다.
+ *  - 같은 버전 번호로 여러 번 빌드해도 이 값으로 그 시점 소스를 구분할 수 있다.
+ ****************************************************************************************/
+function _getBuildTimeText() {
+
+    try {
+
+        const stat = fs.statSync(__filename);
+        const d = stat.mtime;
+
+        return d.getFullYear()
+            + '-' + String(d.getMonth() + 1).padStart(2, '0')
+            + '-' + String(d.getDate()).padStart(2, '0')
+            + ' ' + String(d.getHours()).padStart(2, '0')
+            + ':' + String(d.getMinutes()).padStart(2, '0');
+
+    } catch (e) {
+        console.error('[MLOG-006] 빌드 시각을 알아내지 못했다.', e);
+        return '(알 수 없음)';
+    }
+
+}
+
+/****************************************************************************************
+ * 앱 시작 머리글 (파일 앞머리에 한 번)
+ ****************************************************************************************/
+function _writeStartupHeader() {
+
+    try {
+
+        const os = require('os');
+
+        writeLog('알림', '===== 앱 시작 =====');
+        writeLog('알림', '앱 버전: ' + _app.getVersion() + ' / 패키징: ' + (_app.isPackaged ? '예' : '아니오'));
+        writeLog('알림', '전자앱: ' + process.versions.electron + ' / 크로미움: ' + process.versions.chrome + ' / 노드: ' + process.versions.node);
+        writeLog('알림', '윈도우: ' + os.release() + ' / ' + process.arch + ' / 메모리 ' + Math.round(os.totalmem() / 1024 / 1024 / 1024) + 'GB');
+
+        // 처리기 정보 (2026-09-08 추가 — 느려서 난 문제인지 가려낼 때 필요하다)
+        try {
+
+            const aCpu = os.cpus();
+
+            if (aCpu && aCpu.length > 0) {
+                writeLog('알림', '처리기: ' + String(aCpu[0].model).replace(/\s+/g, ' ').trim() + ' / ' + aCpu.length + '개');
+            }
+
+        } catch (e) {
+            // 처리기 정보를 못 읽어도 나머지 머리글은 남아야 한다.
+        }
+
+        writeLog('알림', '로그 파일: ' + _logFilePath);
+
+        /**
+         * 소스를 정확히 어느 시점 것으로 열지 알기 위한 표시 (2026-09-08 추가)
+         * 같은 버전 번호로 여러 번 빌드하므로 버전만으로는 그 시점 소스를 못 연다.
+         */
+        writeLog('알림', '빌드 시각: ' + _getBuildTimeText());
+        writeLog('알림', '소스 위치: ' + _app.getAppPath());
+
+        /**
+         * 화면 크기·배율 — 특정 환경에서만 나는 오류를 가려내기 위해.
+         * 화면 정보는 앱이 준비된 뒤에야 읽을 수 있어 그때 남긴다.
+         */
+        _app.whenReady().then(() => {
+
+            try {
+
+                const { screen } = require('electron');
+                const aDisplays = screen.getAllDisplays();
+
+                writeLog('알림', '화면 ' + aDisplays.length + '개');
+
+                aDisplays.forEach((d, i) => {
+                    writeLog('알림', '  화면' + (i + 1) + ': '
+                        + d.size.width + 'x' + d.size.height
+                        + ' / 배율 ' + Math.round((d.scaleFactor || 1) * 100) + '%');
+                });
+
+            } catch (e) {
+                console.error('[MLOG-006] 화면 정보를 남기지 못했다.', e);
+            }
+
+        });
+
+    } catch (e) {
+        console.error('[MLOG-003] 시작 머리글 기록 실패', e);
+    }
+
+}
+
+/****************************************************************************************
+ * 앱 본체 오류 받기
+ ****************************************************************************************/
+function _installProcessHandlers() {
+
+    process.on('uncaughtException', (err) => {
+
+        try {
+            writeLog('치명', '앱 본체에서 처리되지 않은 오류: ' + (err && err.message ? err.message : String(err)));
+            writeLog('치명', '난 자리: ' + (err && err.stack ? err.stack : '(스택 없음)'));
+        } catch (e) {
+            console.error('[MLOG-004] 처리되지 않은 오류를 남기다가 실패', e);
+        }
+
+        // 기존 동작을 바꾸지 않는다. 여기서 앱을 끄지 않는다.
+
+    });
+
+    process.on('unhandledRejection', (reason) => {
+
+        try {
+            const sText = (reason && reason.stack) ? reason.stack
+                : (reason && reason.message) ? reason.message
+                    : String(reason);
+
+            writeLog('오류', '앱 본체에서 처리되지 않은 비동기 실패: ' + sText);
+        } catch (e) {
+            console.error('[MLOG-004] 비동기 실패를 남기다가 실패', e);
+        }
+
+    });
+
+}
+
+/****************************************************************************************
+ * 창이 죽거나 응답 없음이 될 때 받기
+ ****************************************************************************************/
+function _installWindowHandlers() {
+
+    const { app, BrowserWindow } = require('electron');
+
+    // 화면 프로세스가 죽음
+    app.on('render-process-gone', (event, webContents, details) => {
+
+        let sTitle = '(알 수 없음)';
+
+        try {
+            const win = BrowserWindow.fromWebContents(webContents);
+            sTitle = (win && !win.isDestroyed()) ? (win.getTitle() || '(제목 없음)') : '(이미 닫힌 창)';
+        } catch (e) {
+            sTitle = '(창 정보를 못 읽음)';
+        }
+
+        writeLog('치명', '창이 죽음 — 창: ' + sTitle
+            + ' / 사유: ' + (details && details.reason ? details.reason : '(사유 없음)')
+            + ' / 종료코드: ' + (details && typeof details.exitCode !== 'undefined' ? details.exitCode : '-'));
+
+    });
+
+    // 자식 프로세스가 죽음
+    app.on('child-process-gone', (event, details) => {
+
+        writeLog('오류', '자식 프로세스가 죽음 — 종류: ' + (details && details.type ? details.type : '-')
+            + ' / 사유: ' + (details && details.reason ? details.reason : '-')
+            + ' / 종료코드: ' + (details && typeof details.exitCode !== 'undefined' ? details.exitCode : '-'));
+
+    });
+
+    // 창이 응답 없음 / 다시 응답함
+    app.on('web-contents-created', (event, contents) => {
+
+        contents.on('unresponsive', () => {
+            writeLog('주의', '창이 응답 없음 — 주소: ' + _safeUrl(contents));
+        });
+
+        contents.on('responsive', () => {
+            writeLog('알림', '창이 다시 응답함 — 주소: ' + _safeUrl(contents));
+        });
+
+    });
+
+}
+
+function _safeUrl(contents) {
+
+    try {
+        return contents.getURL() || '(주소 없음)';
+    } catch (e) {
+        return '(주소를 못 읽음)';
+    }
+
+}
+
+/****************************************************************************************
+ * 화면에서 올라온 오류 받기 (2026-09-08 추가)
+ * ---------------------------------------------------------------------------------------
+ * 감시가 없던 화면 49곳에 앱 본체가 자동으로 감시를 넣는다(ws_error_hook.js).
+ * 그 감시가 잡은 오류가 여기로 온다. 여기서 로그 파일에 남기고 전송까지 넘긴다.
+ ****************************************************************************************/
+function _installRendererErrorChannel() {
+
+    let ipcMain = null;
+
+    try {
+        ipcMain = require('electron').ipcMain;
+    } catch (e) {
+        console.error('[MLOG-005] 화면 오류를 받는 통로를 열지 못했다.', e);
+        return;
+    }
+
+    /**
+     * 진행 중인 서버 요청 목록을 받아 둔다 (2026-09-10 추가 — 장군님 지시)
+     * 앱이 뻗으면 크래시 보고서에 "안 끝난 요청" 으로 적힌다.
+     * 로그를 뒤져 짝을 맞출 필요 없이 어디서 멈췄는지 바로 보인다.
+     */
+    ipcMain.on('u4a-log:pending', (event, oInfo) => {
+
+        try {
+
+            require('./ws_crash_report').setPending((oInfo && oInfo.list) ? oInfo.list : []);
+
+        } catch (e) {
+            // 못 받아도 앱은 계속 간다.
+        }
+
+    });
+
+    ipcMain.on('u4a-log:renderer-error', (event, oInfo) => {
+
+        if (!oInfo) {
+            return;
+        }
+
+        const sScreen = oInfo.screenName || '화면미상';
+
+        /**
+         * 어느 창에서 · 어느 조작 때문에 난 것인지 (2026-09-08 추가)
+         * 이게 없어서 실제 로그가 전부 '창미상 / 추적번호 없음' 으로 나왔다(실측).
+         */
+        const sWin = oInfo.windowName || '창미상';
+        const sTrace = oInfo.traceId || '----';
+        const sHead = '[' + sWin + '] [' + sScreen + '] [' + sTrace + '] ';
+
+        /**
+         * 버튼 누름 같은 사용자 동작은 오류가 아니다 (2026-09-08 추가).
+         * 로그에만 남기고 전송하지 않는다. 안 그러면 방이 도배된다.
+         */
+        if (oInfo.kind === 'action') {
+
+            writeLog('알림', sHead + (oInfo.message || ''));
+
+            /**
+             * 죽는 순간에 같이 남길 "마지막 상태"를 갱신한다 (2026-09-08 추가).
+             * 앱이 뻗으면 이 값이 죽은 흔적에 같이 실려, 마지막에 뭘 하다 죽었는지 알 수 있다.
+             */
+            try {
+                require('./ws_crash_report').setLastState('마지막조작', (oInfo.message || '').slice(0, 100));
+                require('./ws_crash_report').setLastState('마지막화면', sScreen);
+            } catch (e) {
+                // 값 갱신에 실패해도 로그는 이미 남았다.
+            }
+
+            return;
+
+        }
+
+        writeLog('오류', sHead + (oInfo.message || '(내용 없음)'));
+
+        if (oInfo.pageUrl) {
+
+            /**
+             * 주소에서 물음표 뒤는 잘라 버린다 (2026-09-08 보완)
+             * 별창 주소에는 세션 표시·사용자 정보가 물음표 뒤에 붙어 온다.
+             * 그대로 남기면 로그 파일에 박히고, 그 파일 끝부분이 밖으로 나간다.
+             */
+            let sSafeUrl = String(oInfo.pageUrl);
+            const iMark = sSafeUrl.indexOf('?');
+
+            if (iMark >= 0) {
+                sSafeUrl = sSafeUrl.slice(0, iMark) + ' (뒤쪽 정보는 가림)';
+            }
+
+            writeLog('오류', '        주소: ' + sSafeUrl);
+
+        }
+
+        if (oInfo.stack) {
+            writeLog('오류', '        난 자리: ' + oInfo.stack);
+        }
+
+        // 오류가 난 그 순간 화면 상태 (2026-09-08 추가)
+        if (oInfo.screenState) {
+            writeLog('오류', '        그때 화면: ' + oInfo.screenState);
+        }
+
+        // 전송까지 넘긴다. 토큰이 없으면 전송 쪽이 알아서 넘어간다.
+        try {
+
+            require('./ws_telegram').sendError({
+                kind: 'error',
+                errorCode: 'WSERR',
+                message: oInfo.message || '',
+                stack: oInfo.stack || '',
+                screenName: sScreen,
+                windowName: sWin,
+                traceId: sTrace,
+                screenState: oInfo.screenState || '',
+                logFilePath: _logFilePath
+            });
+
+        } catch (e) {
+            console.error('[MLOG-005] 화면 오류를 전송으로 넘기지 못했다.', e);
+        }
+
+    });
+
+}
+
+/****************************************************************************************
+ * 설치 — main.js 에서 가장 앞에 한 번 부른다
+ ****************************************************************************************/
+function install(appInstance) {
+
+    /**
+     * ★포장한 앱에서만 돈다 (장군님 지시).
+     * 개발로 돌릴 때는 화면 콘솔로 보면 되므로 파일에 쌓지도, 밖으로 보내지도 않는다.
+     * 2026-09-08: 이 조건이 빠져 있어 개발 실행에서도 그대로 돌고 있었다(실제 로그로 확인).
+     */
+    if (!appInstance || !appInstance.isPackaged) {
+        return;
+    }
+
+    if (_installed) {
+        return;
+    }
+
+    _installed = true;
+    _app = appInstance;
+
+    _setupLogger();
+    _writeStartupHeader();
+    _installProcessHandlers();
+    _installWindowHandlers();
+    _installRendererErrorChannel();
+
+    // 정상 종료 표시 — 이 줄이 없으면 지난번에 비정상으로 끝난 것으로 본다(추후 W10 에서 사용)
+    _app.on('before-quit', () => {
+        writeLog('알림', '===== 앱 정상 종료 =====');
+    });
+
+}
+
+module.exports = {
+    install: install,
+    writeLog: writeLog,
+    getLogFilePath: () => _logFilePath
+};

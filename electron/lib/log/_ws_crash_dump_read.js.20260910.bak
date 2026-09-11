@@ -1,0 +1,452 @@
+/****************************************************************************************
+ * 죽은 흔적 덩어리를 글로 풀어 읽기
+ * --------------------------------------------------------------------------------------
+ * 오류코드 접두: CDMP / 다음 번호: 003
+ *
+ * 왜 만들었나 (2026-09-10 — 장군님 지시 "AI 가 보고 판단할 수만 있으면 된다")
+ *   죽는 순간 잡는 장치가 남기는 덩어리는 사람도 AI 도 못 읽는다.
+ *   원래는 WinDbg 같은 전용 도구를 깔아야 열리는데, 고객사에서는 그럴 수 없다.
+ *   그래서 **우리가 직접 읽어 글로 풀어** 크래시 보고서에 붙인다.
+ *
+ * 무엇을 얻나 (실제 파일로 확인함 2026-09-10)
+ *   ① 터진 갈래 (허락 안 된 메모리를 건드림 / 바닥이 남 / 메모리가 모자람 …)
+ *   ② 터진 주소가 **어느 파일 안인지** — ★남의 프로그램이 끼어들어 터뜨렸는지 여기서 보인다
+ *   ③ 그때 실행 중이던 자리
+ *   ④ 불러와 있던 파일 목록과 판 — 그래픽 도구·백신이 낀 것이 보인다
+ *   ⑤ 죽는 순간 잡는 장치가 같이 적어 둔 값 (어느 프로세스인지, 메모리 여유, Electron 판)
+ *
+ * 못 얻는 것
+ *   우리가 짠 자바스크립트의 함수 이름·줄 번호. 그건 로그와 보고서에서 찾는다.
+ *   여기서 얻는 것은 "엔진이 어디서 터졌나" 까지다.
+ *
+ * 모양 근거
+ *   윈도우 표준 덤프 모양(파일 앞 네 글자 MDMP). 자리 계산은 실제 파일로 하나씩 맞춰 봤다.
+ *   ※ 죽는 순간 잡는 장치가 붙인 값의 한 칸 크기는 **12바이트**다(문서 아닌 실측).
+ ****************************************************************************************/
+
+const fs = require('fs');
+const path = require('path');
+
+/** 파일 앞 네 글자 */
+const MAGIC = 'MDMP';
+
+/** 묶음 종류 번호 */
+const T_THREAD = 3;
+const T_MODULE = 4;
+const T_EXCEPTION = 6;
+const T_SYSTEM = 7;
+const T_CRASHPAD = 0x43500001;
+
+/** 터진 갈래 번호를 우리말로 */
+const EXC_TEXT = {
+    0xC0000005: '허락 안 된 메모리를 건드림 (가장 흔하다 — 없는 것을 가리키는 값을 따라감)',
+    0xC0000006: '디스크에서 코드를 못 읽어옴',
+    0xC000001D: '쓸 수 없는 명령을 실행함',
+    0xC0000025: '되살릴 수 없는 상태',
+    0xC0000026: '알 수 없는 처리 요청',
+    0xC000008C: '배열 범위를 벗어남',
+    0xC000008E: '0 으로 나눔 (소수)',
+    0xC0000090: '소수 계산이 잘못됨',
+    0xC0000094: '0 으로 나눔 (정수)',
+    0xC00000FD: '함수 호출이 너무 깊어 바닥이 남 (끝없이 자기를 부르는 코드)',
+    0xC0000135: '필요한 파일을 못 찾음',
+    0xC0000142: '시작할 때 준비가 실패함',
+    0xC0000374: '메모리 관리 장부가 깨짐 (앞서 메모리를 잘못 쓴 자국)',
+    0xC0000409: '메모리 울타리가 부서짐 (넘겨 쓴 자국)',
+    0xC0000602: '더 갈 수 없다고 스스로 멈춤',
+    0xC0000409: '메모리 울타리가 부서짐',
+    0x80000003: '멈춤점에 걸림 (일부러 멈춘 것)',
+    0xE0000008: '메모리가 모자람',
+    0x40000015: '스스로 끝냄 (일부러 죽인 것)'
+};
+
+/** 몇 개까지만 적는다 — 보고서가 너무 길어지면 안 된다 */
+const MAX_MODULES = 60;
+const MAX_ANNOS = 30;
+
+/****************************************************************************************
+ * 안에서만 쓰는 읽기 도구
+ ****************************************************************************************/
+function _makeReader(b) {
+
+    /** 길이가 앞에 붙은 두바이트글자 (파일 이름) */
+    function name16(rva) {
+
+        if (!rva || rva + 4 > b.length) { return ''; }
+
+        const len = b.readUInt32LE(rva);
+
+        if (len < 0 || rva + 4 + len > b.length) { return ''; }
+
+        return b.toString('utf16le', rva + 4, rva + 4 + len);
+
+    }
+
+    /** 길이가 앞에 붙은 보통글자 */
+    function name8(rva) {
+
+        if (!rva || rva + 4 > b.length) { return ''; }
+
+        const len = b.readUInt32LE(rva);
+
+        if (len < 0 || rva + 4 + len > b.length) { return ''; }
+
+        return b.toString('utf8', rva + 4, rva + 4 + len);
+
+    }
+
+    return { name16: name16, name8: name8 };
+
+}
+
+/****************************************************************************************
+ * 덩어리를 읽어 글로 돌려준다.
+ * 못 읽으면 왜 못 읽었는지를 글로 돌려준다(빈 값을 돌려주지 않는다 — 조용히 넘어가면 안 된다).
+ ****************************************************************************************/
+function readDump(sPath) {
+
+    const EOL = require('os').EOL;
+
+    let b = null;
+    let iSize = 0;
+
+    try {
+
+        if (!sPath || !fs.existsSync(sPath)) {
+            return '  (죽은 흔적 덩어리가 없다 — 읽을 것이 없음)';
+        }
+
+        const st = fs.statSync(sPath);
+
+        iSize = st.size;
+
+        // 너무 크면 앞부분만 읽는다. 우리가 보는 묶음은 대부분 앞쪽에 있다.
+        b = fs.readFileSync(sPath);
+
+    } catch (e) {
+        console.error('[CDMP-001] 죽은 흔적 덩어리를 못 읽었다.', e);
+        return '  (덩어리 파일을 못 읽었다: ' + (e && e.message ? e.message : e) + ')';
+    }
+
+    try {
+
+        if (b.length < 32 || b.toString('ascii', 0, 4) !== MAGIC) {
+            return '  (윈도우 표준 덤프 모양이 아니다 — 앞 네 글자가 ' + MAGIC + ' 가 아님)';
+        }
+
+        const R = _makeReader(b);
+
+        const nStreams = b.readUInt32LE(8);
+        const rvaDir = b.readUInt32LE(12);
+        const tStamp = b.readUInt32LE(20);
+
+        const S = {};
+
+        for (let i = 0; i < nStreams; i++) {
+
+            const o = rvaDir + i * 12;
+
+            if (o + 12 > b.length) { break; }
+
+            S[b.readUInt32LE(o)] = { size: b.readUInt32LE(o + 4), rva: b.readUInt32LE(o + 8) };
+
+        }
+
+        // ---- 불러와 있던 파일들 -------------------------------------------
+        const aMods = [];
+
+        if (S[T_MODULE]) {
+
+            const n = b.readUInt32LE(S[T_MODULE].rva);
+
+            for (let i = 0; i < n; i++) {
+
+                const o = S[T_MODULE].rva + 4 + i * 108;
+
+                if (o + 108 > b.length) { break; }
+
+                const vMS = b.readUInt32LE(o + 32);
+                const vLS = b.readUInt32LE(o + 36);
+
+                aMods.push({
+                    idx: i,
+                    base: b.readBigUInt64LE(o),
+                    size: BigInt(b.readUInt32LE(o + 8)),
+                    full: R.name16(b.readUInt32LE(o + 20)),
+                    ver: ((vMS >>> 16) & 0xffff) + '.' + (vMS & 0xffff) + '.'
+                        + ((vLS >>> 16) & 0xffff) + '.' + (vLS & 0xffff)
+                });
+
+            }
+
+        }
+
+        const aByBase = aMods.slice().sort((x, y) => (x.base < y.base ? -1 : 1));
+
+        function shortName(s) {
+            return String(s).split('\\').pop() || '(이름 없음)';
+        }
+
+        /** 이 주소가 어느 파일 안인지 */
+        function whereIs(addr) {
+
+            for (let i = 0; i < aByBase.length; i++) {
+
+                const m = aByBase[i];
+
+                if (addr >= m.base && addr < (m.base + m.size)) {
+                    return shortName(m.full) + ' + 0x' + (addr - m.base).toString(16)
+                        + '  (판 ' + m.ver + ')';
+                }
+
+            }
+
+            return '★어느 파일에도 안 들어감 — 이미 지워진 코드를 실행하려 했을 수 있다';
+        }
+
+        // ---- 글 만들기 ----------------------------------------------------
+        let t = '';
+
+        t += '  덩어리 파일 : ' + path.basename(sPath)
+            + '  (' + Math.round(iSize / 1024) + 'KB)' + EOL;
+        t += '  만든 시각   : ' + new Date(tStamp * 1000).toLocaleString() + EOL;
+
+        // ---- 터진 내용 ----------------------------------------------------
+        let iCrashTid = 0;
+
+        if (S[T_EXCEPTION]) {
+
+            const o = S[T_EXCEPTION].rva;
+
+            iCrashTid = b.readUInt32LE(o);
+
+            const code = b.readUInt32LE(o + 8);
+            const addr = b.readBigUInt64LE(o + 24);
+            const nParam = b.readUInt32LE(o + 32);
+
+            t += EOL;
+            t += '  ★터진 갈래  : 0x' + code.toString(16).toUpperCase()
+                + '  ' + (EXC_TEXT[code] || '(알려진 뜻 없음)') + EOL;
+            t += '  ★터진 자리  : ' + whereIs(addr) + EOL;
+            t += '     (그 주소 자체는 0x' + addr.toString(16) + ')' + EOL;
+
+            /**
+             * 허락 안 된 메모리를 건드린 경우, 딸린 값 두 개가 읽기였는지 쓰기였는지를 알려준다.
+             * 첫째 0=읽다가, 1=쓰다가, 8=실행하려다. 둘째는 건드리려던 주소.
+             */
+            if (code === 0xC0000005 && nParam >= 2) {
+
+                const kind = b.readBigUInt64LE(o + 40);
+                const at = b.readBigUInt64LE(o + 48);
+
+                t += '     무엇을 하다가: '
+                    + (kind === 0n ? '읽으려다가' : (kind === 1n ? '쓰려다가' : (kind === 8n ? '실행하려다가' : '(' + kind + ')')))
+                    + EOL;
+                t += '     건드리려던 주소: 0x' + at.toString(16)
+                    + (at < 0x10000n ? '   ★거의 0 — 값이 비어 있는데 그대로 쓴 것이다' : '') + EOL;
+
+            }
+
+        }
+
+        // ---- 그때 실행 중이던 자리 ----------------------------------------
+        if (S[T_THREAD]) {
+
+            const n = b.readUInt32LE(S[T_THREAD].rva);
+
+            t += EOL;
+            t += '  동시에 돌던 작업: ' + n + '개' + EOL;
+
+            for (let i = 0; i < n; i++) {
+
+                const o = S[T_THREAD].rva + 4 + i * 48;
+
+                if (o + 48 > b.length) { break; }
+                if (b.readUInt32LE(o) !== iCrashTid) { continue; }
+
+                const ctxSize = b.readUInt32LE(o + 40);
+                const ctxRva = b.readUInt32LE(o + 44);
+
+                // 64비트 상태 기록에서 「지금 실행 중인 자리」 는 0xF8 자리에 있다
+                if (ctxSize >= 0x100 && (ctxRva + 0x100) <= b.length) {
+                    t += '  실행 중이던 자리: ' + whereIs(b.readBigUInt64LE(ctxRva + 0xF8)) + EOL;
+                }
+
+                break;
+
+            }
+
+        }
+
+        // ---- 어떤 컴퓨터 --------------------------------------------------
+        if (S[T_SYSTEM]) {
+
+            const o = S[T_SYSTEM].rva;
+            const arch = b.readUInt16LE(o);
+
+            t += '  어떤 컴퓨터 : 윈도우 ' + b.readUInt32LE(o + 8) + '.' + b.readUInt32LE(o + 12)
+                + ' 빌드 ' + b.readUInt32LE(o + 16)
+                + ' / ' + (arch === 9 ? '64비트' : (arch === 0 ? '32비트' : '종류 ' + arch))
+                + ' / 처리기 ' + b.readUInt8(o + 6) + '개' + EOL;
+
+        }
+
+        // ---- 죽는 순간 잡는 장치가 같이 적어 둔 값 -------------------------
+        if (S[T_CRASHPAD]) {
+
+            const cp = S[T_CRASHPAD].rva;
+
+            // 판(4) + 보고서 번호(16) + 컴퓨터 번호(16) 다음이 값 주머니
+            const rvaSimple = b.readUInt32LE(cp + 40);
+            const rvaModList = b.readUInt32LE(cp + 48);
+
+            const aPair = [];
+
+            /** 이름=값 주머니 하나 */
+            function eatDict(rva) {
+
+                if (!rva || rva + 4 > b.length) { return; }
+
+                const n = b.readUInt32LE(rva);
+
+                for (let i = 0; i < n && aPair.length < MAX_ANNOS; i++) {
+
+                    const o = rva + 4 + i * 8;
+
+                    if (o + 8 > b.length) { break; }
+
+                    const k = R.name8(b.readUInt32LE(o));
+                    const v = R.name8(b.readUInt32LE(o + 4));
+
+                    if (k) { aPair.push(k + ' = ' + v); }
+
+                }
+
+            }
+
+            eatDict(rvaSimple);
+
+            // 파일마다 붙은 값 — 한 칸 12바이트(실측)
+            if (rvaModList && rvaModList + 4 <= b.length) {
+
+                const nm = b.readUInt32LE(rvaModList);
+
+                for (let i = 0; i < nm; i++) {
+
+                    const o = rvaModList + 4 + i * 12;
+
+                    if (o + 12 > b.length) { break; }
+
+                    const rvaInfo = b.readUInt32LE(o + 8);
+
+                    if (!rvaInfo || rvaInfo + 28 > b.length) { continue; }
+
+                    eatDict(b.readUInt32LE(rvaInfo + 16));          // 이름=값 주머니
+                    const rvaObj = b.readUInt32LE(rvaInfo + 24);    // 이름붙은 값 목록
+
+                    if (!rvaObj || rvaObj + 4 > b.length) { continue; }
+
+                    const no = b.readUInt32LE(rvaObj);
+
+                    for (let k = 0; k < no && aPair.length < MAX_ANNOS; k++) {
+
+                        const oo = rvaObj + 4 + k * 12;
+
+                        if (oo + 12 > b.length) { break; }
+
+                        const nm2 = R.name8(b.readUInt32LE(oo));
+                        const tp = b.readUInt32LE(oo + 4);
+
+                        // 종류 1 = 글자. 그 밖은 우리가 못 읽으니 건너뛴다.
+                        if (tp !== 1 || !nm2) { continue; }
+
+                        aPair.push(nm2 + ' = ' + R.name8(b.readUInt32LE(oo + 8)));
+
+                    }
+
+                }
+
+            }
+
+            if (aPair.length) {
+
+                t += EOL;
+                t += '  [죽는 순간 장치가 같이 적어 둔 값]' + EOL;
+                t += '   ※ process_type / ptype 가 renderer 면 창, browser 면 앱 본체가 죽은 것이다.' + EOL;
+
+                for (let i = 0; i < aPair.length; i++) {
+                    t += '     ' + aPair[i] + EOL;
+                }
+
+            }
+
+        }
+
+        // ---- 남의 프로그램이 끼어들었나 -----------------------------------
+        if (aMods.length) {
+
+            const aOther = [];
+
+            /**
+             * 우리 앱이 깔린 폴더 = 맨 첫 파일(앱 본체)이 있는 폴더.
+             * 폴더 이름을 글자로 짐작하면(예: 이름에 u4a 가 들었나) 틀린다 — 실제로 틀렸다.
+             */
+            let sOurDir = '';
+
+            if (aMods[0] && aMods[0].full) {
+                sOurDir = String(aMods[0].full).toLowerCase();
+                sOurDir = sOurDir.slice(0, sOurDir.lastIndexOf('\\') + 1);
+            }
+
+            for (let i = 0; i < aMods.length; i++) {
+
+                const s = String(aMods[i].full).toLowerCase();
+
+                if (!s) { continue; }
+
+                // 윈도우가 준 것도, 우리 앱 폴더 것도 아니면 "끼어든 것"
+                if (s.indexOf('\\windows\\') >= 0) { continue; }
+                if (sOurDir && s.indexOf(sOurDir) === 0) { continue; }
+
+                aOther.push(shortName(aMods[i].full) + '   판 ' + aMods[i].ver
+                    + '   [' + aMods[i].full + ']');
+
+            }
+
+            t += EOL;
+            t += '  [★끼어든 남의 프로그램]  백신·그래픽 도구·화면 녹화기가 끼면 여기 나온다' + EOL;
+
+            if (aOther.length) {
+                for (let i = 0; i < aOther.length; i++) { t += '     ' + aOther[i] + EOL; }
+                t += '     → 위 파일 중 하나가 「터진 자리」 였다면 우리 코드 잘못이 아니다.' + EOL;
+            } else {
+                t += '     (없음 — 윈도우가 준 파일과 우리 앱 파일뿐이다)' + EOL;
+            }
+
+            t += EOL;
+            t += '  [불러와 있던 파일 ' + aMods.length + '개]' + EOL;
+
+            const aShow = aByBase.slice(0, MAX_MODULES);
+
+            for (let i = 0; i < aShow.length; i++) {
+                t += '     ' + shortName(aShow[i].full) + '   판 ' + aShow[i].ver + EOL;
+            }
+
+            if (aMods.length > MAX_MODULES) {
+                t += '     … 그 밖 ' + (aMods.length - MAX_MODULES) + '개' + EOL;
+            }
+
+        }
+
+        return t;
+
+    } catch (e) {
+        console.error('[CDMP-002] 죽은 흔적 덩어리를 푸는 중에 터졌다.', e);
+        return '  (덩어리를 푸는 중에 터졌다: ' + (e && e.message ? e.message : e) + ')';
+    }
+
+}
+
+module.exports = {
+    readDump: readDump
+};

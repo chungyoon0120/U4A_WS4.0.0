@@ -1,0 +1,79 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "-X",
+              "utf8",
+              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\pre_tool_use_mcp.py"
+            ],
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "-X",
+              "utf8",
+              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\pre_tool_use_gate.py"
+            ]
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "-X",
+              "utf8",
+              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\prompt_submit.py"
+            ]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "-X",
+              "utf8",
+              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\answer_finish.py"
+            ],
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\socce\\AppData\\Local\\yoon-agent-kit\\hooks\\claude\\SessionStart\\run.cmd",
+            "timeout": 15,
+            "statusMessage": "Yoon Agent Kit"
+          }
+        ]
+      }
+    ]
+  }
+}

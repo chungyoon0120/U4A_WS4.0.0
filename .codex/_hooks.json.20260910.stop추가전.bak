@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\socce\\AppData\\Local\\yoon-agent-kit\\hooks\\codex\\SessionStart\\run.cmd",
+            "timeout": 15,
+            "commandWindows": "C:\\Users\\socce\\AppData\\Local\\yoon-agent-kit\\hooks\\codex\\SessionStart\\run.cmd",
+            "statusMessage": "Yoon Agent Kit"
+          }
+        ]
+      }
+    ]
+  }
+}
