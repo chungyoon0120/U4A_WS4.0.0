@@ -237,7 +237,7 @@ oAPP.FN.SETTING_SIZE = (SELSIZE) => {
     
             default:
     
-                console.error(`${SELSIZE} 에러`);
+                console.error(`${SELSIZE} error`);
     
             break;
     
@@ -298,7 +298,7 @@ function CHANGE_CONTENT(){
         break;
 
         default:
-            console.error("select_tab 펑션 오류");
+            console.error("select_tab function error");
         break;
     };
 

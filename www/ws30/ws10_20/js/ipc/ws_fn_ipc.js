@@ -23,7 +23,7 @@
             return;
         }
 
-        zconsole.log("시작!! -> " + Math.floor(+new Date() / 1000));
+        zconsole.log("start!! -> " + Math.floor(+new Date() / 1000));
 
         if (oAPP.attr._oWorker) {
 
@@ -313,14 +313,14 @@
 
                 var iSessionKeyLength = oAPP.attr.aSessionKeys.length;
 
-                zconsole.log(`같은 브라우저 총 갯수 : ${iSameBrowserLength} `);
-                zconsole.log(`수집된 키 총 갯수 : ${iSessionKeyLength} `);
+                zconsole.log(`same-browser count: ${iSameBrowserLength} `);
+                zconsole.log(`collected key count: ${iSessionKeyLength} `);
 
                 if (iSameBrowserLength != iSessionKeyLength) {
                     return;
                 }
 
-                zconsole.log("전체 키 수집!!!");
+                zconsole.log("collecting all keys");
 
                 // 현재 떠있는 브라우저 갯수와 수집된 브라우저 키의 갯수가 동일 하다면..
                 if (iSessionKeyLength == 1) {

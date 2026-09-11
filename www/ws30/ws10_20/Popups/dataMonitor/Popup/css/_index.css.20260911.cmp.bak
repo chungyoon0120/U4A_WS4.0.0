@@ -1,0 +1,286 @@
+/************************************************************************
+ * dataMonitor/Popup/css/index.css
+ * ----------------------------------------------------------------------
+ *  내부 데이터 모니터 별창 전용 모양. 공통 자산(tokens/shell/bootstrap-skin)을
+ *  소비하고 이 창에서만 쓰는 것만 여기 둔다(공통 파일 직접 수정 금지).
+ *  · 색은 tokens.css 의미 토큰만 — 하드코딩 색값·color-mix(Chromium 93 미지원) 금지
+ *  · 고정 px 폭 금지(창 크기를 줄여도 따라온다)
+ ************************************************************************/
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
+.u4aDmBody {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+    font-family: var(--font);
+    /* 창이 뜰 때 갑자기 나타나지 않게 — 준비되면 선명해진다 */
+    opacity: 0;
+    transition: opacity .3s;
+}
+
+.u4aDmBody.u4a-visible {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .u4aDmBody {
+        transition: none;
+    }
+}
+
+/* ── 본문 ─────────────────────────────────────────────────────────── */
+.u4aDmMain {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: .5rem;
+    gap: .5rem;
+}
+
+/* ── 조작 줄 ───────────────────────────────────────────────────────── */
+.u4aDmBar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .375rem;
+    padding: .375rem .5rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+.u4aDmBar__sep {
+    width: 1px;
+    align-self: stretch;
+    margin: 0 .25rem;
+    background: var(--divider);
+}
+
+.u4aDmBar__spacer {
+    flex: 1 1 auto;
+}
+
+.u4aDmChk {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    /* 손가락·마우스로 누를 자리를 충분히 (공통 표준 2.25rem) */
+    min-height: 2.25rem;
+    padding: 0 .25rem;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-muted);
+}
+
+.u4aDmChk input {
+    cursor: pointer;
+}
+
+.u4aDmState {
+    padding: 0 .5rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.u4aDmState.u4aDmState--on {
+    color: var(--state-success);
+    font-weight: 600;
+}
+
+/* ── 목록 ─────────────────────────────────────────────────────────── */
+.u4aDmList {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+/* ── 아무것도 없을 때 안내 ─────────────────────────────────────────── */
+.u4aDmEmpty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--text);
+}
+
+.u4aDmEmpty p {
+    margin: 0 0 .4rem;
+}
+
+.u4aDmEmpty__sub {
+    color: var(--text-muted);
+}
+
+/* 바뀐 자리 표 = 공통 표(.u4a-table) 소비.
+   ─ 셀 글자 선택·복사, 잘린 글자 툴팁, 행 높이·머리줄 고정이 공통에서 자동으로 붙는다.
+   ─ 좁아지면 표만 좌우로 밀린다(창은 안 밀림). */
+.u4aDmTableWrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* 이 표는 자리(경로)가 길어 최소 폭을 확보한다(좁아지면 표 안에서 좌우로 민다).
+   ★ 종류 칸은 펼침 목록이 들어가 5.5rem 에서는 "전.." 처럼 잘렸다(장군님 지적 2026-09-10) → 7.5rem.
+     이전·새 값도 자리가 남아 11rem → 14rem 으로 넓혔다. */
+.u4aDmTable {
+    min-width: 44rem;
+}
+
+/* 시각 칸 — 숫자 폭을 같게 맞춰 위아래로 나란히 */
+.u4aDmCell--time {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 값 칸 — 이전은 흐리게, 새 값은 또렷하게 */
+.u4aDmCell--old {
+    color: var(--text-muted);
+}
+
+.u4aDmCell--new {
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* path 칸 — 누르면 트리 뷰의 그 자리로 간다(장군님 지시 2026-09-10).
+   누를 수 있다는 것을 손 모양과 밑줄로 알린다. 글자 끌어서 복사하는 것은 그대로 된다. */
+.u4aDmPathJump {
+    cursor: pointer;
+}
+
+.u4aDmPathJump:hover {
+    color: var(--link);
+    text-decoration: underline;
+}
+
+/* 종류 표시 */
+.u4aDmKind {
+    display: inline-block;
+    padding: 0 .4rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.u4aDmKind--chg {
+    background: var(--state-info-bg);
+    color: var(--state-info);
+}
+
+.u4aDmKind--add {
+    background: var(--state-success-bg);
+    color: var(--state-success);
+}
+
+.u4aDmKind--del {
+    background: var(--state-error-bg);
+    color: var(--state-error);
+}
+
+/* 잘렸다는 안내 */
+.u4aDmCut {
+    color: var(--state-warning);
+}
+
+/* ── 걸러내기 줄 (열 제목 아래) ────────────────────────────────────── */
+.u4aDmFilterRow th {
+    /* 열 제목 줄 바로 아래에 붙어 같이 고정된다(제목 줄 높이만큼 내려서) */
+    top: var(--control-h, 2.5rem);
+    padding: .2rem .35rem;
+    background: var(--app-bg);
+    border-bottom: 1px solid var(--line);
+}
+
+/* 글자 칸 — 공통 입력칸 틀(.u4a-field) 그대로. 칸 넓이만 열에 맞춘다. */
+.u4aDmFilterField {
+    width: 100%;
+    min-width: 0;
+}
+
+.u4aDmFilter {
+    width: 100%;
+    min-width: 0;
+    height: 1.75rem;
+    padding: 0 .4rem;
+}
+
+/* 지우기(X) 가 들어갈 자리만 비워 둔다(글자가 버튼 밑으로 안 기어들게). */
+.u4aDmFilterField[data-trail="1"] .u4aDmFilter {
+    padding-right: 1.5rem;
+}
+
+/* 종류 고르기 — 앱 공통 드롭다운. 칸 폭에 맞추고 걸러내기 줄 높이에 맞게 낮춘다 */
+.u4aDmKindHost {
+    width: 100%;
+    min-width: 0;
+}
+
+.u4aDmKindSel {
+    width: 100%;
+    min-width: 0;
+    height: 1.75rem;
+    min-height: 1.75rem;
+}
+
+/* ── 트리 뷰 ───────────────────────────────────────────────────────── */
+/* 공통 컬럼 트리가 여기에 그려진다. 가상 스크롤이 host 를 스크롤 자리로 쓰므로 높이를 채운다 */
+.u4aDmTreeHost {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* 이름 셀 아무 데나 눌러도 접었다 폈다 된다 — 누를 수 있다는 걸 손 모양으로 알린다.
+   ★ 이름 셀 상자는 글자 높이(20px)뿐이라 줄(40px)의 위아래 여백은 셀 밖이었다.
+     그래서 글자 있는 데를 정확히 눌러야만 먹혔다(장군님 지적 2026-09-10).
+     줄 높이만큼 늘려 셀 어디를 눌러도 잡히게 한다. 안쪽 내용은 그대로 가운데 정렬. */
+.u4aDmTreeHost .u4aColTreeRow .u4aColTreeNameCell {
+    align-self: stretch;
+}
+
+.u4aDmTreeHost .u4aDmTreeNameHit {
+    cursor: pointer;
+}
+
+/* 바뀐 줄 — 왼쪽에 색 띠 + 살짝 밝은 바탕 */
+.u4aDmTreeChg {
+    background: var(--state-info-bg);
+    box-shadow: inset 0.1875rem 0 0 var(--state-info);
+}
+
+/* 툴바 — 트리 뷰일 때만 보이는 묶음 */
+.u4aDmTreeOnly {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+}
+
+.u4aDmTreeFiltHost {
+    width: 9rem;
+    min-width: 0;
+}
+
+/* 트리 뷰 찾기 칸 */
+.u4aDmTreeOnly .u4aDmFilterField {
+    width: 12rem;
+}
+
+.u4aDmTreeSearch {
+    width: 100%;
+    min-width: 0;
+    height: 1.75rem;
+    padding: 0 1.5rem 0 .4rem;
+}

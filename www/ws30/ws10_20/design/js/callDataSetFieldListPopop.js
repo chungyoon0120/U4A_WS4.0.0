@@ -382,7 +382,7 @@
                 // _run 은 async — 초기 구성 중 예외로 거부되면 호출측 await 가 멈추므로 E 로 폴백(스크립트 오류는 콘솔로 표면화).
                 Promise.resolve(_run(is_dataSet, oAPPx, resolve)).catch(function (e) {
                     try { parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
-                    console.error("[HTML5][DsFld] 팝업 오류:", e && (e.stack || e.message) || e);
+                    console.error("[DsFld] popup error:", e && (e.stack || e.message) || e);
                     resolve({ RETCD: "E" });
                 });
             });

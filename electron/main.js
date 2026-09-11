@@ -401,7 +401,21 @@ function attachBeforeInputEvent(contents) {
         //     렌더러(@electron/remote)에서 CURRWIN.webContents.on 으로 붙일 때 생기던 다중발화·중복
         //     바인딩(→ 단일 F11 에 2~3번 토글돼 "커졌다 작아졌다")이 없다. Alt+F4 와 동일한 정석 위치.
         //     OS 전역(globalShortcut)이 아니라 이 창이 포커스일 때만 동작 → 타 앱 F11 선점 없음.
+        //   ★ 2026-09-10 수정 — 보정키(Shift/Ctrl/Alt/Meta)가 하나도 안 눌린 F11 만 전체화면으로 처리한다.
+        //     그전에는 보정키를 안 봐서 Shift+F11(어플리케이션 복사)까지 여기서 가로채고
+        //     event.preventDefault() 로 막아 버려, 화면까지 도달하지 못했다 → 복사 창이 안 뜨고
+        //     전체화면만 켜졌다 꺼짐. 보정키가 붙은 F11 은 아래로 흘려보내 화면이 받게 한다.
         if (input.type === 'keyDown' && input.code === 'F11' && !input.isAutoRepeat) {
+
+            if (input.shift || input.control || input.alt || input.meta) {
+                // 보정키가 붙은 F11 → 전체화면 아님. 화면 쪽 단축키가 처리하도록 그대로 통과.
+                WsMainLog.writeLog('INFO', "GUARD_EXIT | F11 with modifier -> pass through to renderer"
+                    + " | shift=" + !!input.shift + " ctrl=" + !!input.control
+                    + " alt=" + !!input.alt + " meta=" + !!input.meta
+                    + " @ electron/main.js before-input-event");
+                return;
+            }
+
             event.preventDefault();
             const oFsWin = BrowserWindow.fromWebContents(event.sender);
             if (oFsWin && !oFsWin.isDestroyed()) {

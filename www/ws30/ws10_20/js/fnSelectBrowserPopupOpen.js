@@ -272,7 +272,7 @@
             FS.writeFileSync(sP13nPath, JSON.stringify(oP13nData));
 
         } catch (e) {
-            if (typeof console !== "undefined") { console.error("[WS] 기본 브라우저 저장 실패:", e); }
+            if (typeof console !== "undefined") { console.error("[WS] default browser save failed:", e); }
             return; // 저장 실패 시 팝업 유지
         }
 

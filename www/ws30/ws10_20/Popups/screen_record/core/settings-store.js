@@ -75,7 +75,7 @@ function _ensureDir(dir) {
   try {
     fs.mkdirSync(dir, { recursive: true });
   } catch (err) {
-    console.error('[settings-store] 디렉터리 생성 실패:', dir, err);
+    console.error('[settings-store] directory create failed:', dir, err);
   }
 }
 
@@ -121,9 +121,9 @@ function _repairToDefaults() {
   try {
     _ensureDir(path.dirname(_filePath));
     fs.writeFileSync(_filePath, JSON.stringify(DEFAULTS, null, 2), 'utf8');
-    console.info('[settings-store] 설정 파일을 기본값으로 복구했습니다.');
+    console.info('[settings-store] config file restored to defaults.');
   } catch (err) {
-    console.error('[settings-store] 기본값 복구 실패:', err);
+    console.error('[settings-store] restoring defaults failed:', err);
   }
 }
 
@@ -168,7 +168,7 @@ function load() {
   try {
     raw = fs.readFileSync(_filePath, 'utf8');
   } catch (err) {
-    console.error('[settings-store] 파일 읽기 실패, 기본값으로 복구합니다:', err);
+    console.error('[settings-store] file read failed, restoring defaults:', err);
     _repairToDefaults();
     return { ...DEFAULTS };
   }
@@ -178,14 +178,14 @@ function load() {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    console.warn('[settings-store] JSON 파싱 실패, 기본값으로 복구합니다. 파일 내용:', raw.slice(0, 120));
+    console.warn('[settings-store] JSON parse failed, restoring defaults. file text:', raw.slice(0, 120));
     _repairToDefaults();
     return { ...DEFAULTS };
   }
 
   // ④ 정합성 검사 — 타입·enum 범위 오류 시 복구
   if (!_validateSettings(parsed)) {
-    console.warn('[settings-store] 설정 정합성 오류, 기본값으로 복구합니다:', JSON.stringify(parsed));
+    console.warn('[settings-store] config consistency error, restoring defaults:', JSON.stringify(parsed));
     _repairToDefaults();
     return { ...DEFAULTS };
   }

@@ -185,11 +185,11 @@ class CLDevBrowser extends EventEmitter {
                     // 테스트 모드 일 경우에는 새탭을 허용
                     // 크롬 extension 디버깅도 해야되기 때문..
                     if(parent.APP.isPackaged === false){
-                        console.log("개발모드여서 새창 감지 해제됨!");
+                        console.log("dev mode - new-window detection disabled");
                         return;
                     }
 
-                    console.log('[browser] - 새 탭이 감지되어 닫았습니다.');
+                    console.log('[browser] new tab detected - closed');
                     
                     await newPage.close();
                     

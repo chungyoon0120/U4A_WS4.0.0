@@ -322,7 +322,7 @@ function _getHelpDocuDataFromPowerShell(oPARAM){
         // 실행 완료 이벤트 처리
         ps.on("close", (code) => {
             
-            console.log(`Document 다운로드 종료: ${code}`);            
+            console.log(`Document downloadload end: ${code}`);            
 
             if (!ps.killed) {              
                 ps.kill();

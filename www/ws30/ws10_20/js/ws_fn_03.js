@@ -87,7 +87,7 @@
      * **********************************************************************/
     oAPP.fn.fnWindowClickEventListener = function () {
 
-        zconsole.log("윈도우 클릭했다!!");
+        zconsole.log("window clicked");
 
         var sSessionKey = parent.getSessionKey();
 

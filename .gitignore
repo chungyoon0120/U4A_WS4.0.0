@@ -15,3 +15,5 @@ test/cdp-auto-test/env/config.json
 test/cdp-auto-test/logs/
 test/cdp-auto-test/env/telegram_token.json
 test/cdp-auto-test/env/notion_token.json
+
+test/cdp-auto-test/node_modules/

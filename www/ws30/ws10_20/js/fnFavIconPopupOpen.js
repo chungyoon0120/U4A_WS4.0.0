@@ -408,7 +408,7 @@
         try { IP = oAPP.attr.ui.frame.contentWindow.sap.ui.core.IconPool; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } IP = null; }
 
         //IconPool 미존재(미리보기/UI5 미로드) — 아이콘 glyph 가 빈 채로 렌더될 수 있어 실패를 드러낸다.
-        if (!IP) { console.warn("[HTML5][WS20][favIcon] 미리보기 IconPool 미존재 — 아이콘 content 미해석(빈 glyph 가능)"); }
+        if (!IP) { console.warn("[WS20][favIcon] preview IconPool missing - icon content may resolve to an empty glyph"); }
 
         for (var i = 0; i < T.length; i++) {
 

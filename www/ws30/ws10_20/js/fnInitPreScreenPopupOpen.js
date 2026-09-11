@@ -85,7 +85,7 @@
 
     // 원본 attrChangeProc(is_attr,…) 대응 — HTML5 통합 변경 처리(변경표시/수집/재렌더/undo).
     try { oAPP.fn.fnWs20AttrChange(oCtx.attr, "INPUT", false, false, true); }   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 design/documents/callInitPreScreenPopup/index.js:185).
-    catch (e) { console.error("[HTML5][WS20][InitPreScreen] attr 변경 처리 오류:", e && e.message); }
+    catch (e) { console.error("[WS20][InitPreScreen] attr change handle error:", e && e.message); }
 
     // (원본 updateBindPopupDesignData: 바인딩 팝업 디자인 영역 갱신 — W4+ 미변환)
     if (typeof oAPP.fn.updateBindPopupDesignData === "function") {
@@ -130,7 +130,7 @@
         oHelpBtn.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B44") || "U4A Help Document";
         oHelpBtn.addEventListener("click", function () {
           try { oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: C_HELP_MENU_ID }); }
-          catch (e) { console.error("[HTML5][WS20][InitPreScreen] 도움말 문서 호출 오류:", e && e.message); }
+          catch (e) { console.error("[WS20][InitPreScreen] help document call error:", e && e.message); }
         });
         oHeader.appendChild(oHelpBtn);
       }

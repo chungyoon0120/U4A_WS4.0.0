@@ -208,8 +208,8 @@ let oAPP = (function (window) {
                 U4AUI.confirm({ type: sType || "I", title: _msgTitle(sType), message: sMsg || "", onClose: fnCb });
             } else {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 U4AUI.confirm 미로드는 오류코드 표면화 + fail-closed(NO).
-                console.error("[MIMF-001] showMessage 확인질문: 공통 U4AUI.confirm 미로드 — 표시 불가. message:", sMsg || "");
-                try { fnCb("NO"); } catch (e) { console.error("[MIMF-002] showMessage 콜백 예외:", e && e.message); }
+                console.error("[MIMF-001] showMessage confirm: common U4AUI.confirm not loaded - blocked. message:", sMsg || "");
+                try { fnCb("NO"); } catch (e) { console.error("[MIMF-002] showMessage callback exception:", e && e.message); }
             }
             return;
         }
@@ -439,7 +439,7 @@ let oAPP = (function (window) {
         oAPP.fn.fnSetTitle();   // 앱정보 도착 → 제목에 APPID 반영
 
         // 본문(mime.js) 시작 — 트리/속성/미리보기 빌드 + 데이터 로드.
-        try { if (typeof window.fnMimeStart === "function") { window.fnMimeStart(); } } catch (e) { console.error("[HTML5][MIME] start 오류:", e); }
+        try { if (typeof window.fnMimeStart === "function") { window.fnMimeStart(); } } catch (e) { console.error("[MIME] start error:", e); }
 
         // 본문 페이드인 + 메인 Busy Lock 해제(원본 별도창 동일).
         oAPP.fn.fnShowContent();

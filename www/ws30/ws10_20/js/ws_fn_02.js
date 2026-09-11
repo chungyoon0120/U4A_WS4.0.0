@@ -1538,7 +1538,7 @@
 
         } catch (e) {
             // 어떤 오류든 busy 잔류 방지(임의 메시지 미생성 — 개발자 콘솔만).
-            console.error("[HTML5][WS20] fnLaunchBrowser:", e && e.message ? e.message : e);
+            console.error("[WS20] fnLaunchBrowser:", e && e.message ? e.message : e);
             oAPP.common.fnSetBusyLock("");
         }
 

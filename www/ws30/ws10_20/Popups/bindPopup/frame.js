@@ -181,7 +181,7 @@ oAPP.fn.onHelp = function (sStartMenuId) {
         if (typeof oAPP.fn.sendHelpDocOpen === "function") {
             oAPP.fn.sendHelpDocOpen({ opstion: { startMenuId: _sMenuId } });
         } else {
-            console.error("[HTML5][bindWindow] onHelp: sendHelpDocOpen 없음 — 방송 미배선");
+            console.error("[bindWindow] onHelp: sendHelpDocOpen none — broadcast wiring");
             oAPP.fn.setBusy(false);
         }
         return;
@@ -199,7 +199,7 @@ oAPP.fn.onHelp = function (sStartMenuId) {
     try {
         parent.require("./utils/callTooltipsPopup.js")(oGV.area, oGV.code);
     } catch (e) {
-        console.error("[HTML5][bindWindow] onHelp 구버전 tooltip:", e && e.message);
+        console.error("[bindWindow] onHelp legacy tooltip:", e && e.message);
         oAPP.fn.setBusyWS20Interaction(false);   // 로드 실패 시 busy 잔류 방지(callTooltipsPopup 이 켠 뒤 예외 시 짝).
     }
 };
@@ -222,7 +222,7 @@ function _bwpToggleLock(sKind, bEnable) {
     try {
         var aEl = document.querySelectorAll('[data-bwp-lock="' + sKind + '"]');
         for (var i = 0; i < aEl.length; i++) { aEl[i].disabled = !bEnable; }
-    } catch (e) { console.error("[HTML5][bindWindow] _bwpToggleLock(" + sKind + "):", e && e.message); }
+    } catch (e) { console.error("[bindWindow] _bwpToggleLock(" + sKind + "):", e && e.message); }
 }
 
 // 메인 화면 잠금/해제 — 원본 index.js:8015 setViewEditable(bLock). bLock=true 활성 / false 잠금.
@@ -302,7 +302,7 @@ oAPP.fn.setBusyWS20Interaction = function (bBusy, sOption) {
             oBroad.postMessage(bOn
                 ? { PRCCD: "BUSY_ON", TITLE: sOption.TITLE || "", DESC: sOption.DESC || "", TYPE: "DIALOG" }
                 : { PRCCD: "BUSY_OFF" });
-        } catch (e) { console.error("[HTML5][bindWindow] setBusyWS20Interaction 방송:", e && e.message); }
+        } catch (e) { console.error("[bindWindow] setBusyWS20Interaction broadcast:", e && e.message); }
         _setBusy(bOn, { ISBROAD: true });   // 위에서 이미 보냈으므로 재방송 억제.
     } else {
         // 원본 index.js:3550 — sOption 없으면 WS20 에 방송하지 않는다(로컬 busy/닫기버튼만 처리).
@@ -480,7 +480,7 @@ function _bootApp() {
         if (typeof oAPP.fn.createBindChannel === "function") { oAPP.fn.createBindChannel(); }
         if (typeof oAPP.fn.loadBindData === "function") { oAPP.fn.loadBindData(); }
     } catch (e) {
-        console.error("[HTML5][bindWindow] 앱 기동 오류:", e && e.message);
+        console.error("[bindWindow] app start error:", e && e.message);
         // 기동 중 예외로 loadBindData 콜백 finally 가 안 돌 수 있음 → 로드 표식 해제해 아래 _finishOpen 이 busy 를 끄게(무한 busy 방지).
         try { oAPP.attr.isBindLoading = false; } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
     }
@@ -523,7 +523,7 @@ window.addEventListener("load", function () {
 
     // 안전판 — if_modelBindingPopup 이 안 오면 busy 강제 해제(방어).
     iBusyWatch = setTimeout(function () {
-        console.error("[HTML5][bindWindow] 초기 데이터(if_modelBindingPopup) 수신 지연 — busy 강제 해제");
+        console.error("[bindWindow] initial data (if_modelBindingPopup) not received - busy force released");
         _finishOpen();
     }, 20000);
 });

@@ -151,7 +151,7 @@
             return _cap;
         } catch (e) {
             // 미리보기 실패는 치명적이지 않음 — 해당 셀만 빈칸.
-            console.error("[HTML5][KbdShortcut] 미리보기 CODE 해석 오류:", e && e.message);
+            console.error("[KbdShortcut] preview CODE parse error:", e && e.message);
             return null;
         }
     }

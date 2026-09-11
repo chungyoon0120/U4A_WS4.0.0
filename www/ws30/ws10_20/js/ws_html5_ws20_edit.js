@@ -137,7 +137,7 @@
         function _runMid() {
             if (_bMidDone || typeof midFn !== "function") { return; }
             _bMidDone = true;
-            try { midFn(); } catch (e) { console.error("[HTML5][WS20][edit] 재렌더 중간처리:", e && e.message ? e.message : e); }
+            try { midFn(); } catch (e) { console.error("[WS20][edit] re-render interim handling:", e && e.message ? e.message : e); }
         }
         if (!parentNode || !parentNode.OBJID) { _runMid(); if (bStrict) { throw new Error("[BR62] rerender: 부모 정보 없음"); } return; }
         try {
@@ -145,7 +145,7 @@
             if (!w) { _runMid(); if (bStrict) { throw new Error("[BR62] rerender: 미리보기 창 없음"); } return; }
         } catch (e) { _runMid(); if (bStrict) { throw e; } return; }
         var R = _renderMod(); if (!R) { _runMid(); if (bStrict) { throw new Error("[BR62] rerender: 렌더 모듈 없음"); } return; }
-        function _safe(fn) { try { return fn(); } catch (e) { console.error("[HTML5][WS20][insert] RTE 재렌더:", e && e.message); if (bStrict) { throw e; } } }
+        function _safe(fn) { try { return fn(); } catch (e) { console.error("[WS20][insert] RTE re-render:", e && e.message); if (bStrict) { throw e; } } }
         var oTarget = null, oDom = null, oPromise = null, aRte = [];
         _safe(function () { oTarget = R.getTargetAfterRenderingUI(oAPP.attr.prev[parentNode.OBJID]); });
         _safe(function () { oDom = (oTarget && typeof oTarget.getDomRef === "function") ? oTarget.getDomRef() : null; });
@@ -153,10 +153,10 @@
         _runMid();
         _safe(function () { aRte = R.renderingRichTextEditor(parentNode) || []; });
         if (oPromise) {
-            try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[HTML5][WS20][insert] rerender:", e && e.message); if (bStrict) { throw e; } }
+            try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[WS20][insert] rerender:", e && e.message); if (bStrict) { throw e; } }
         }
         // ★ BR46 검수 반영(안티 P2): RTE 렌더 완료 대기 실패를 조용히 삼키지 않고 표면화(code.md 규칙).
-        try { await Promise.all(aRte); } catch (e) { console.error("[HTML5][WS20][insert] RTE 렌더 대기:", e && e.message ? e.message : e); if (bStrict) { throw e; } }
+        try { await Promise.all(aRte); } catch (e) { console.error("[WS20][insert] waiting for RTE render:", e && e.message ? e.message : e); if (bStrict) { throw e; } }
     }
 
     // 행 액션 아이콘(+추가/삭제) 표시 플래그 계산 (구 uiDesignArea.js designSetActionIcon 1860 1:1)
@@ -331,7 +331,7 @@
                 }
                 ls.OBJID = sObjid;
             } catch (e) {
-                console.error("[HTML5][WS20][BR54-4] 되돌리기 기본값 복원 실패(" + sObjid + " / " + sK + "):",
+                console.error("[WS20][BR54-4] undo default value restore failed (" + sObjid + " / " + sK + "):",
                     e && e.message ? e.message : e);
                 //[BR62 검수] 삼키면 그 속성만 안 돌아온 채 "성공"으로 끝나 전체 재생성 폴백이 안 걸린다 → 던진다.
                 throw e;
@@ -357,7 +357,7 @@
                 }
             }
         } catch (e) {
-            console.error("[HTML5][WS20][BR54-4] 되돌리기 바인딩 해제 판단 실패(" + sObjid + "):",
+            console.error("[WS20][BR54-4] undo binding-release decision failed (" + sObjid + "):",
                 e && e.message ? e.message : e);
             throw e;   //[BR62 검수] 폴백이 걸리도록 전파.
         }
@@ -366,7 +366,7 @@
         try {
             if (typeof oAPP.fn.setModelBind === "function") { oAPP.fn.setModelBind(oPrev); }
         } catch (e) {
-            console.error("[HTML5][WS20][BR54-4] 되돌리기 부모 매핑 실패(" + sObjid + "):",
+            console.error("[WS20][BR54-4] undo parent mapping failed (" + sObjid + "):",
                 e && e.message ? e.message : e);
             throw e;   //[BR62 검수] 폴백이 걸리도록 전파.
         }
@@ -377,7 +377,7 @@
             try {
                 oAPP.fn.previewUIsetProp(aTarget[i]);
             } catch (e) {
-                console.error("[HTML5][WS20][BR54-4] 되돌리기 미리보기 반영 실패("
+                console.error("[WS20][BR54-4] undo preview apply failed("
                     + sObjid + " / " + aTarget[i].UIATK + "):", e && e.message ? e.message : e);
                 throw e;   //[BR62 검수] 폴백이 걸리도록 전파.
             }
@@ -565,7 +565,7 @@
         //   또 트리 접힘/펼침·선택 표시는 **UI 이름별로** 기억하므로 같이 옮기지 않으면
         //   옛 이름에 기억이 없어 **기본값(펼침)**으로 떨어져 하위가 저절로 펼쳐졌다(같은 지적).
         var _oRenameRet = null;
-        try { _oRenameRet = _applyRenameBeforeDiff(s, _newTree, _newT15); } catch (e) { console.error("[W20E-004] 이름변경 되돌리기 선반영:", e && e.message ? e.message : e); }
+        try { _oRenameRet = _applyRenameBeforeDiff(s, _newTree, _newT15); } catch (e) { console.error("[W20E-004] name change undo applied first:", e && e.message ? e.message : e); }
 
         // ── 데이터 복원 ──
         try { oAPP.attr.oModel.oData.zTREE = JSON.parse(JSON.stringify(s.z)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -631,13 +631,13 @@
             _bPartial = await _applyPartialPreview(s.z, s.t15, _newTree, _newT15);
         } catch (e) {
             _bPartial = false;
-            console.warn("[HTML5][WS20][BR62] 부분 미리보기 갱신 폴백:", e && e.message ? e.message : e);
+            console.warn("[WS20][BR62] partial preview refresh fallback:", e && e.message ? e.message : e);
         }
         if (!_bPartial) {
             try {
                 var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
                 if (w && typeof w.drawPreview === "function") { await w.drawPreview(); }
-            } catch (e) { console.warn("[HTML5][WS20] undo/redo drawPreview:", e && e.message); }
+            } catch (e) { console.warn("[WS20] undo/redo drawPreview:", e && e.message); }
             //[BR62 검수/안티] 전체 재생성 직후엔 아직 화면 높이가 안 잡혀 스크롤 명령이 무시된다
             //  → 그리기가 실제로 끝난 다음 틱에 복원한다(두 번 기다림 + 시간 상한).
             await _afterPaint();
@@ -747,7 +747,7 @@
                 //  HTML5 이식 시 BUSY 만 배선되고 반영이 누락됐었다(장군님 발견 2026-07-28). 팝업 미오픈이면 방송모듈 가드로 no-op.
                 try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             } catch (e) {
-                console.error("[HTML5][WS20] undo/redo 복원 오류:", e && e.message);
+                console.error("[WS20] undo/redo restore error:", e && e.message);
             } finally {
                 //원본 역순 해제(자식창 → 단축키 → 화면). 어느 경로로 끝나도 반드시 짝을 맞춘다.
                 try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -766,7 +766,7 @@
             if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
             else {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(삭제하지 않음).
-                console.error("[W20E-001] 되돌리기·다시하기 삭제 확인: 공통 fnConfirmBox 미로드 — 표시 불가. message:", sMsg);
+                console.error("[W20E-001] undo/redo delete confirm: common fnConfirmBox not loaded - blocked. message:", sMsg);
                 lf_do("NO");
             }
             return;
@@ -872,7 +872,7 @@
         P("destroyUIPreView", [n.OBJID, n.POBID, n.UIOBK, n.PUIOK]);
         // [BR41] 클라이언트 이벤트/HTML content(T_CEVT) 제거 (원본 delUiClientEvent 1:1 — uiDesignArea.js:6648).
         //   ★prev._T_0015 참조 → 아래 delete oAPP.attr.prev 이전에 호출(원본 6648 < 6663).
-        try { if (typeof oAPP.fn.delUiClientEvent === "function") { oAPP.fn.delUiClientEvent(n); } } catch (e) { console.error("[HTML5][BR41] delUiClientEvent cleanup error:", e); }
+        try { if (typeof oAPP.fn.delUiClientEvent === "function") { oAPP.fn.delUiClientEvent(n); } } catch (e) { console.error("[BR41] delUiClientEvent cleanup error:", e); }
         try { if (oAPP.attr.prev) { delete oAPP.attr.prev[n.OBJID]; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // [BR40] 삭제 UI 의 Description(T_DESC) 제거 (원본 delDesc(is_tree.OBJID) 1:1 — uiDesignArea.js:6651/4375).
         try { if (typeof oAPP.fn.delDesc === "function") { oAPP.fn.delDesc(n.OBJID); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -892,7 +892,7 @@
             var c = n.zTREE[i];
             _purgePrevSubtree(c);   // 자식 먼저(원본 6639~6645 재귀)
             // [BR41] 하위 UI 의 클라이언트 이벤트/HTML content(T_CEVT) 제거 (원본 6648 delUiClientEvent). prev 삭제 前.
-            try { if (typeof oAPP.fn.delUiClientEvent === "function") { oAPP.fn.delUiClientEvent(c); } } catch (e) { console.error("[HTML5][BR41] delUiClientEvent cleanup error:", e); }
+            try { if (typeof oAPP.fn.delUiClientEvent === "function") { oAPP.fn.delUiClientEvent(c); } } catch (e) { console.error("[BR41] delUiClientEvent cleanup error:", e); }
             try { if (oAPP.attr.prev) { delete oAPP.attr.prev[c.OBJID]; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 원본 6663
             // [BR40] 하위 UI 의 Description(T_DESC) 제거(원본 재귀부의 delDesc 1:1 — uiDesignArea.js:6651).
             try { if (typeof oAPP.fn.delDesc === "function") { oAPP.fn.delDesc(c.OBJID); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -954,7 +954,7 @@
         if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
         else {
             // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(삭제하지 않음).
-            console.error("[W20E-002] 단건 삭제 확인: 공통 fnConfirmBox 미로드 — 표시 불가. message:", sMsg);
+            console.error("[W20E-002] single delete confirm: common fnConfirmBox not loaded - blocked. message:", sMsg);
             lf_do("NO");
         }
     }
@@ -1142,7 +1142,7 @@
             if (typeof fnConfirm === "function") { fnConfirm("I", sMsg, lf_do); }
             else {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(삭제하지 않음).
-                console.error("[W20E-003] 다건 삭제 확인: 공통 fnConfirmBox 미로드 — 표시 불가. message:", sMsg);
+                console.error("[W20E-003] multi delete confirm: common fnConfirmBox not loaded - blocked. message:", sMsg);
                 lf_do("NO");
             }
         };
@@ -1201,11 +1201,11 @@
             if (oAPP.oDesign && oAPP.oDesign.fn && typeof oAPP.oDesign.fn.prevRemoveUiObject === "function") {
                 await oAPP.oDesign.fn.prevRemoveUiObject(oNode);
             }
-        } catch (e) { console.error("[HTML5][WS20][move] 미리보기 UI 제거:", e && e.message ? e.message : e); }
+        } catch (e) { console.error("[WS20][move] preview UI removed:", e && e.message ? e.message : e); }
         // ② UI 다시 생성(원본 565).
         try {
             if (typeof oAPP.fn.reCreateUIObjInstance === "function") { oAPP.fn.reCreateUIObjInstance(oNode); }
-        } catch (e) { console.error("[HTML5][WS20][move] 미리보기 UI 재생성:", e && e.message ? e.message : e); }
+        } catch (e) { console.error("[WS20][move] preview UI re-create error:", e && e.message ? e.message : e); }
         // ③~⑤ 대기 등록 → 이동 반영 → 다시 그리기 + 완료 대기(원본 568~592).
         //   위치값은 같은 그룹 형제 기준 index(BR59). aSib 는 이미 이동 완료된 배열.
         var iIdx = _aggrPrevIndex(aSib, oNode);
@@ -1266,7 +1266,7 @@
         if (oNode.OBJID === "ROOT" || oNode.OBJID === "APP") { return; }
         var clone;
         try { clone = JSON.parse(JSON.stringify(oNode)); }
-        catch (e) { console.error("[WS20][copy] 트리 직렬화 실패 OBJID=" + (oNode && oNode.OBJID), e); return; }
+        catch (e) { console.error("[WS20][copy] tree serialize failed OBJID=" + (oNode && oNode.OBJID), e); return; }
         // 각 노드의 속성(_T_0015) + 클라이언트 이벤트(_CEVT) + 설명(_DESC) 동봉 (붙여넣기 시 새 OBJID 로 복원).
         //   ★필드 형식은 원본 contextMenuUiCopy(lf_setTreeItemAttr)/패턴 저장과 동일(_CEVT = T_CEVT 원행).
         //     붙여넣기는 공통 designAddTreeData → _applyP13nPattern 경로가 이 형식을 그대로 소비한다.
@@ -1299,7 +1299,7 @@
             try {
                 var _d = (typeof oAPP.fn.getDesc === "function") ? oAPP.fn.getDesc(n.OBJID) : "";
                 if (_d) { n._DESC = _d; }
-            } catch (e) { console.error("[WS20][copy] getDesc 실패 OBJID=" + (n && n.OBJID), e); }
+            } catch (e) { console.error("[WS20][copy] getDesc failed OBJID=" + (n && n.OBJID), e); }
             if (n.zTREE) { for (var i = 0; i < n.zTREE.length; i++) { attach(n.zTREE[i]); } }
         })(clone);
         // ★원본 contextMenuUiCopy 는 setCopyData 를 무가드 호출(완료 토스트 없음). 저장 실패를 삼키면
@@ -1356,11 +1356,11 @@
                 oAPP.fn.fnWs20AddTreeData(clone, oTarget, null, _done);
             } else {
                 // dnd 모듈 미로드 방어 — 공통 경로 부재 시 붙여넣기 취소(임의 fallback 금지).
-                console.error("[HTML5][WS20][paste] oAPP.fn.fnWs20AddTreeData 미정의 — 붙여넣기 취소");
+                console.error("[WS20][paste] oAPP.fn.fnWs20AddTreeData undefined - paste cancelled");
                 _done();
             }
         } catch (e) {
-            console.error("[HTML5][WS20][paste] fnWs20AddTreeData", e);
+            console.error("[WS20][paste] fnWs20AddTreeData", e);
             _done();
         }
         // (원본 contextMenuUiPaste 는 완료 토스트 없음)
@@ -1447,7 +1447,7 @@
                     // ★ 안내 문구: 원본이 2026-08-14 옛 021(모호)에서 ZMSG_WS_COMMON_002 "000"(인자=집계명 &1)으로 교체
                     //   (원본 callDesignContextMenu.js:388 chkUiCardinality 바인딩 다건 분기 1:1). 결과 그대로 통과(가공 없음).
                     try { parent.showMessage(null, 10, "W", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "000", s15.UIATT)); }
-                    catch (e) { console.error("[HTML5][WS20][cardinality] 바인딩 다건 안내 문구:", e && e.message ? e.message : e); }
+                    catch (e) { console.error("[WS20][cardinality] multi-binding notice text:", e && e.message ? e.message : e); }
                     return true;
                 }
             }
@@ -1539,7 +1539,7 @@
             //   시키지 말고(fail-open 이면 금지 UI 가 들어와 BR35 결함 재발) 오류 표면화 후 추가 취소. 붙여넣기 경로가
             //   fnWs20AddTreeData 부재 시 취소하는 것(위 _pasteUI)과 동일한 방어. 원본 fail-closed 계약과 일치.
             if (typeof oAPP.fn.designChkHiddenAreaUi !== "function") {
-                console.error("[HTML5][WS20][insert] designChkHiddenAreaUi 미정의 — UA040 허용부모 점검 불가, UI 추가 취소");
+                console.error("[WS20][insert] designChkHiddenAreaUi undefined - UA040 allowed-parent check blocked, UI add cancelled");
                 return;
             }
             if (oAPP.fn.designChkHiddenAreaUi(is_0022.UIOBK, is_tree.UIOBK) === true) { return; }
@@ -1561,7 +1561,7 @@
             //      ★fail-closed(원본은 무조건 호출=미정의면 throw): 점검 함수(dnd.js 정의)가 부분 로드로 없으면 그냥
             //      통과시키지 말고(fail-open 이면 특정부모 전용 UI 가 엉뚱한 부모에 유입) 오류 표면화 후 추가 취소. BR35 와 동일 방어.
             if (typeof oAPP.fn.designChkFixedParentUI !== "function") {
-                console.error("[HTML5][WS20][insert] designChkFixedParentUI 미정의 — UW03 특정부모 점검 불가, UI 추가 취소");
+                console.error("[WS20][insert] designChkFixedParentUI undefined - UW03 fixed-parent check blocked, UI add cancelled");
                 return;
             }
             if (oAPP.fn.designChkFixedParentUI(is_0022.UIOBK, is_tree.UIOBK, is_0023.UIATT) === true) { return; }
@@ -1591,7 +1591,7 @@
             //   직전에 대상이 현재 트리에 아직 있는지 재확인, 없으면 조용히 취소(스냅샷·추가 없음).
             //   (여섯 검사 전체 재검증·WS20 전체 잠금은 원본에 없는 과한 방어라 미채택 — 03 참고, 별건 권고.)
             if (_isPresetAttr && !_node(is_tree.OBJID)) {
-                console.warn("[HTML5][WS20][insert] 개인화 조회 대기 중 추가 대상이 사라짐 — UI 추가 취소(고아 삽입 방지)");
+                console.warn("[WS20][insert] add target disappeared while waiting for personalization - UI add cancelled (prevents orphan insert)");
                 return;
             }
 
@@ -1617,9 +1617,9 @@
                 if (_lsAgg0015 && _lsAgg0015.UIATV !== "" && _lsAgg0015.ISBND === "X" && cnt >= 2) {
                     cnt = 1;
                     try { parent.showMessage(null, 10, "W", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "000", is_0023.UIATT)); }
-                    catch (e) { console.error("[HTML5][WS20][insert] 바인딩 다건 안내 문구:", e && e.message ? e.message : e); }
+                    catch (e) { console.error("[WS20][insert] multi-binding notice text:", e && e.message ? e.message : e); }
                 }
-            } catch (e) { console.error("[HTML5][WS20][insert] BR43 바인딩 다건 clamp 오류:", e && e.message); }
+            } catch (e) { console.error("[WS20][insert] BR43 multi-binding clamp error:", e && e.message); }
 
             for (var c = 0; c < cnt; c++) {
                 var l14 = oAPP.fn.crtStru0014();
@@ -1672,7 +1672,7 @@
                 //   BR45: 삽입 팝업 추가 경로에만 이 호출이 빠져 있어 팝업으로 넣은 FileUploader/UploadCollection 은
                 //   uploaderUrl 초기값 예외처리가 적용되지 않았다(끌어놓기 경로엔 있었음). 미리보기 미로드 환경 방어(형제 동일).
                 try { if (typeof oAPP.fn.attrUploadUrlException === "function") { oAPP.fn.attrUploadUrlException(l14.OBJID, l14.UIOBK); } }
-                catch (e) { console.error("[HTML5][WS20][insert] attrUploadUrlException:", e && e.message ? e.message : e); }
+                catch (e) { console.error("[WS20][insert] attrUploadUrlException:", e && e.message ? e.message : e); }
                 lastObjid = l14.OBJID;
             }
 
@@ -1680,7 +1680,7 @@
             //   이 aggregation 에 진짜 자식이 들어왔으니, 자식 없을 때 그려둔 임시 자식(OBJID 없는 것)을 제거.
             //   UI 추가 팝업 경로에 이 정리 호출이 누락돼 미리보기에 유령 자식(예: BreadCrumbs 빈 링크)이 남던 문제 복원.
             try { if (typeof oAPP.fn.destroyExcepChild === "function") { oAPP.fn.destroyExcepChild(is_tree, is_0023); } }
-            catch (e) { console.error("[HTML5][WS20][insert] destroyExcepChild:", e && e.message ? e.message : e); }
+            catch (e) { console.error("[WS20][insert] destroyExcepChild:", e && e.message ? e.message : e); }
 
             // ★ BR46: 삽입 루프 종료 후, 트리·모델 갱신 전에 부모 미리보기 재렌더 + RichTextEditor
             //   렌더 완료 대기(원본 designAddUIObject 5651~5666 대응). 끌어놓기 경로엔 이미 있으나
@@ -1744,7 +1744,7 @@
             a.unshift({ NAME: sVal });
             if (a.length > iMax) { a.splice(iMax, a.length); }
             oAPP.fn.fnSuggestionSave(sName, a);
-        } catch (e) { console.error("[HTML5][WS20] _saveInsertSuggest:", e && e.message ? e.message : e); }
+        } catch (e) { console.error("[WS20] _saveInsertSuggest:", e && e.message ? e.message : e); }
     }
     // UI Attribute 개인화 항목(UI_ATTR_PRESET.db) 조회 (구 uiDesignArea.js designAddUIObject 5313~5370 1:1).
     //   현재 라이브러리버전/사용자/추가UI(UIOBK)에 저장된 개인화 프로퍼티 목록을 반환(없으면 []).
@@ -1767,7 +1767,7 @@
                 }
             }) || [];
         } catch (e) {
-            console.error("[HTML5][WS20] _readAttrPreset:", e && e.message ? e.message : e);
+            console.error("[WS20] _readAttrPreset:", e && e.message ? e.message : e);
             return [];
         }
     }
@@ -2025,9 +2025,9 @@
         //   남아 이후 화면을 조작할 수 없다.
         function _releaseBusyLock() {
             try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } }
-            catch (e) { console.error("[HTML5][WS20] insert releaseShortcutLock:", e && e.message ? e.message : e); }
+            catch (e) { console.error("[WS20] insert releaseShortcutLock:", e && e.message ? e.message : e); }
             try { parent.setBusy(""); }
-            catch (e) { console.error("[HTML5][WS20] insert releaseBusy:", e && e.message ? e.message : e); }
+            catch (e) { console.error("[WS20] insert releaseBusy:", e && e.message ? e.message : e); }
         }
         // [BR36] 사용자 액션 시작 시점 BUSY ON — 원본 트리 "+" press(uiDesignArea.js:264·267)가
         //   designUIAdd 호출 전에 setBusy("X")+setShortcutLock(true) 을 켰으나, HTML5 두 진입 경로
@@ -2035,9 +2035,9 @@
         //   가 이를 빠뜨려 켜기 없이 팝업만 떴다. 두 경로가 모두 이 함수로 모이므로 여기서 한 번 켜고,
         //   아래 모든 종료 분기의 _releaseBusyLock() 이 짝을 맞춰 끈다(성공은 팝업 렌더 완료 후 double-rAF 해제).
         try { parent.setBusy("X"); }
-        catch (e) { console.error("[HTML5][WS20] insert setBusy:", e && e.message ? e.message : e); }
+        catch (e) { console.error("[WS20] insert setBusy:", e && e.message ? e.message : e); }
         try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(true); } }
-        catch (e) { console.error("[HTML5][WS20] insert setShortcutLock:", e && e.message ? e.message : e); }
+        catch (e) { console.error("[WS20] insert setShortcutLock:", e && e.message ? e.message : e); }
         if (!is_tree) { _releaseBusyLock(); return; }
         var aAgg = _getAggregations(is_tree.UIOBK);
         if (!aAgg.length) {
@@ -2245,8 +2245,11 @@
                 '<td class="u4aWs20InsTdFull">' + _esc(ui.LIBNM) + '</td>' +
                 '<td class="u4aWs20InsTdKey">' + _esc(ui.UIOBK) + '</td>';
             tr.addEventListener("click", function () {
+                // ★ 드래그로 텍스트 블럭을 잡은 채 뗀 click 은 행 선택으로 치지 않는다(장군님 지시 2026-09-10) — 블럭(복사) 보존.
+                if (window.U4AUI && U4AUI.isTextDragSelecting && U4AUI.isTextDragSelecting()) { return; }
                 oSelUI = ui; oOk.disabled = false;
-                _vs.setSel(ui.UIOBK); _vs.refresh();   // 공통 선택(aria-selected) — 스크롤로 행이 사라져도 유지
+                // ★ 클릭 선택은 재렌더(refresh) 대신 경량 토글(markSel) — plain click 시에도 불필요한 재렌더 방지. 구버전 대비 폴백.
+                if (_vs.markSel) { _vs.markSel(ui.UIOBK); } else { _vs.setSel(ui.UIOBK); _vs.refresh(); }
             });
             tr.addEventListener("dblclick", function () { oSelUI = ui; lf_confirm(); });
             // 심볼 아이콘 클릭 → UI 미리보기 이미지 팝업(구 insertUIPopop oImage.attachPress). 행 선택과 분리(stopPropagation).
@@ -2282,7 +2285,7 @@
                     // 전체화면 백드롭 off(팝업 밖 보이는 트리/미리보기가 drop 받도록). dragstart 직후 한 틱 미뤄
                     //   드래그 개시를 방해하지 않게 한다(백드롭은 드래그 소스의 조상이 아니라 취소 위험은 없으나 안전상 유지).
                     setTimeout(function () { _setModalLook(false); }, 0);
-                } catch (e) { console.error("[HTML5][WS20] insert drag start:", e && e.message ? e.message : e); }
+                } catch (e) { console.error("[WS20] insert drag start:", e && e.message ? e.message : e); }
             });
             tr.addEventListener("dragend", function () {
                 _setModalLook(true);   // 놓으면 다시 모달 — 원본 setModal(true) 대응.
@@ -2319,7 +2322,7 @@
             //  ※ D&D 삽입 경로는 dnd.js _bindBusy 가 이미 처리하므로 여기(팝업 confirm)에서만 브로드캐스트.
             _broadBusy(true);
             Promise.resolve(oAPP.fn.designAddUIObject(is_tree, ls_0022, ls_0023, cnt, oP13n.checked))
-                .catch(function (e) { console.error("[HTML5][WS20] designAddUIObject:", e && e.message ? e.message : e); })
+                .catch(function (e) { console.error("[WS20] designAddUIObject:", e && e.message ? e.message : e); })
                 .then(function () { _broadBusy(false); });
         }
 
@@ -2431,7 +2434,7 @@
             // [BR19] 팝업 구성(다이얼로그/백드롭/공통배선/lf_renderTable) 중 오류가 나면 여기서 BUSY/단축키
             //   잠금을 반드시 해제(안 하면 화면이 영구 잠김 — 원래 증상 재발). 부분 생성된 백드롭/다이얼로그와
             //   등록한 ESC 리스너도 정리해 화면을 원래대로 되돌린다. (검수 지적 반영: 오류 경로 off 짝)
-            console.error("[HTML5][WS20] insert popup build:", eBuild && eBuild.message ? eBuild.message : eBuild);
+            console.error("[WS20] insert popup build:", eBuild && eBuild.message ? eBuild.message : eBuild);
             try { document.removeEventListener("keydown", _onEscKey, true); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             try { if (oBackdrop) { oBackdrop.remove(); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             try { if (oDlg) { oDlg.remove(); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
@@ -2613,11 +2616,11 @@
     function _openMyPattern(oNode) {
         var run = function () {
             try { oAPP.fn.contextMenuP13nDesignPopup(oNode); }
-            catch (e) { console.error("[HTML5][WS20] My Pattern:", e && e.message ? e.message : e); }
+            catch (e) { console.error("[WS20] My Pattern:", e && e.message ? e.message : e); }
         };
         if (typeof oAPP.fn.fnP13nDesignPopupOpen === "function") { run(); return; }
         try { oAPP.loadJs("fnP13nDesignPopupOpen", run); }
-        catch (e) { console.error("[HTML5][WS20] My Pattern load:", e && e.message ? e.message : e); }
+        catch (e) { console.error("[WS20] My Pattern load:", e && e.message ? e.message : e); }
     }
 
     // 노드/모드별 메뉴 항목 enable 규칙 (구 enableDesignContextMenu — 1:1 이식)
@@ -2699,7 +2702,7 @@
                 oItem.addEventListener("click", function (e) {
                     e.stopPropagation();
                     _closeMenu();
-                    try { it.fn(); } catch (err) { console.warn("[HTML5][WS20] ctx menu " + it.key + " error:", err && err.message); }
+                    try { it.fn(); } catch (err) { console.warn("[WS20] ctx menu " + it.key + " error:", err && err.message); }
                 });
             }
             oMenu.appendChild(oItem);

@@ -804,10 +804,12 @@ var oAPP = (function () {
         const oText = _getBusyTextDom();
         if (!oText) { return; }
         const iDeadline = Date.now() + iMs;
+        // 서버리스트 종료 대기(fnShowShutdownAskPopup)와 동일 표기 — "안내문구… (Ns)".
+        // 안내문구는 원본(as-is) 메시지 키 656("대기 중")만 쓴다(임의 문구 생성 금지).
+        const sWaitMsg = oAPP.msg.M656 ? (oAPP.msg.M656 + "…") : "";
         const _tick = () => {
             const iSecLeft = Math.max(0, Math.ceil((iDeadline - Date.now()) / 1000));
-            // 서버리스트 종료 대기(fnShowShutdownAskPopup)와 동일 표기 — 스피너 + "(Ns)", 1초 간격.
-            oText.textContent = "(" + iSecLeft + "s)";
+            oText.textContent = sWaitMsg ? (sWaitMsg + " (" + iSecLeft + "s)") : ("(" + iSecLeft + "s)");
             if (iSecLeft <= 0 && _iLoginCountdownTimer) { clearInterval(_iLoginCountdownTimer); _iLoginCountdownTimer = null; }
         };
         _tick();
@@ -1151,7 +1153,7 @@ var oAPP = (function () {
         return new Promise((resolve, reject) => {
 
             // 2026-09-08 복원 — 원본에 있던 진행 상황 로그가 빠져 있었다(실측).
-            console.log("개발 권한 체크중..");
+            console.log("checking dev permission");
 
             var sServicePath = parent.getServerPath() + "/chk_u4a_authority";
             var oFormData = new FormData();
@@ -1357,7 +1359,7 @@ var oAPP = (function () {
             });
 
             autoUpdaterSAP.on('update-downloaded-sap', () => {
-                console.log('업데이트가 완료되었습니다.');     // 2026-09-08 복원(원본에 있던 줄)
+                console.log('update done');     // 2026-09-08 복원(원본에 있던 줄)
                 oModel.setProperty("/BUSYPOP/TITLE", "Update Complete! Restarting...");
                 oModel.setProperty("/BUSYPOP/ILLUSTTYPE", "sapIllus-SuccessHighFive");
                 oModel.setProperty("/BUSYPOP/PERVALUE", 100);
@@ -1439,10 +1441,10 @@ var oAPP = (function () {
     oAPP.fn.fnSetAutoUpdateForCDN = (oPARAM) => {
         return new Promise((resolve) => {
 
-            autoUpdater.on('checking-for-update', () => console.log("CDN - 업데이트 확인 중..."));
+            autoUpdater.on('checking-for-update', () => console.log("CDN - update check ..."));
 
             autoUpdater.on('update-available', () => {
-                console.log("CDN - 업데이트가 가능합니다.");   // 2026-09-08 복원(원본에 있던 줄)
+                console.log("CDN - update available");   // 2026-09-08 복원(원본에 있던 줄)
                 _showContentDom("X");
                 let oBusyPop = oModel.getProperty("/BUSYPOP");
                 oBusyPop.PROGVISI = true;
@@ -1454,7 +1456,7 @@ var oAPP = (function () {
             });
 
             autoUpdater.on('update-not-available', () => {
-                console.log("CDN - 현재 최신버전입니다.");     // 2026-09-08 복원(원본에 있던 줄)
+                console.log("CDN - already up to date");     // 2026-09-08 복원(원본에 있던 줄)
                 let oParam = { ISCDN: "X", oLoginInfo: oPARAM.oResult };
                 oAPP.fn.fnCheckSupportPackageVersion(resolve, oParam);
                 parent.setIsCDN("");
@@ -1477,7 +1479,7 @@ var oAPP = (function () {
                         }
                     }
                 });
-                console.log('CDN - 에러가 발생하였습니다. 에러내용 : ' + err);
+                console.log('CDN - error. errortext: ' + err);
             });
 
             autoUpdater.on('download-progress', (progressObj) => {
@@ -1489,7 +1491,7 @@ var oAPP = (function () {
             autoUpdater.on('update-downloaded', () => {
                 oModel.setProperty("/BUSYPOP/TITLE", "Update Complete! Restarting...");
                 oModel.setProperty("/BUSYPOP/ILLUSTTYPE", "sapIllus-SuccessHighFive");
-                console.log('CDN - 업데이트가 완료되었습니다.');   // 2026-09-08 복원(원본에 있던 줄)
+                console.log('CDN - update done');   // 2026-09-08 복원(원본에 있던 줄)
                 setTimeout(() => { parent.setIsCDN(""); autoUpdater.quitAndInstall(); }, 3000);
             });
 
@@ -1918,11 +1920,11 @@ var oAPP = (function () {
             spAutoUpdater = require(sSupportPackageCheckerPath);
 
         spAutoUpdater.on("checking-for-update-SP", (e) => {
-            console.log(e?.detail?.message || "패치 업데이트 확인중..");
+            console.log(e?.detail?.message || "checking patch update");
         });
 
         spAutoUpdater.on("update-available-SP", () => {
-            console.log("SP - 업데이트 항목이 존재합니다");    // 2026-09-08 복원(원본에 있던 줄)
+            console.log("SP - update available");    // 2026-09-08 복원(원본에 있던 줄)
             _fnFadeLoginCard(0.3);
             oAPP.fn.fnVersionCheckDialogOpen();
             parent.setDomBusy("");
@@ -1930,7 +1932,7 @@ var oAPP = (function () {
         });
 
         spAutoUpdater.on("update-not-available-SP", () => {
-            console.log("SP - 현재 최신버전입니다.");          // 2026-09-08 복원(원본에 있던 줄)
+            console.log("SP - already up to date");          // 2026-09-08 복원(원본에 있던 줄)
             resolve();
         });
 
@@ -1945,14 +1947,14 @@ var oAPP = (function () {
 
         spAutoUpdater.on("update-install-SP", () => {
             _supportPackageVersionCheckDialogProgressEnd();
-            console.log("SP - 패치 파일 다운로드 후 asar 압축 및 인스톨..");   // 2026-09-08 복원(원본에 있던 줄)
+            console.log("SP - after patch file download: unpacking asar and installing");   // 2026-09-08 복원(원본에 있던 줄)
             oModel.setProperty("/BUSYPOP/TITLE", "Support Patch Installing...");
             oModel.setProperty("/BUSYPOP/PROGTXT", "Processing");
             _supportPackageVersionCheckDialogProgressStart();
         });
 
         spAutoUpdater.on("update-downloaded-SP", () => {
-            console.log('SP - 업데이트가 완료되었습니다.');        // 2026-09-08 복원(원본에 있던 줄)
+            console.log('SP - update done');        // 2026-09-08 복원(원본에 있던 줄)
             _supportPackageVersionCheckDialogProgressEnd(true);
             oModel.setProperty("/BUSYPOP/TITLE", "Update Complete! Restarting...");
             oModel.setProperty("/BUSYPOP/PROGTXT", "Processing Complete!");
@@ -1978,7 +1980,7 @@ var oAPP = (function () {
                     APP.exit();
                 }
             });
-            console.log('SP - 패치 업데이트 중 에러 : ' + sRetMsg);
+            console.log('SP - patch update error: ' + sRetMsg);
         });
 
         let bIsCDN = (oParam.ISCDN == "X"),
@@ -2395,6 +2397,7 @@ var oAPP = (function () {
             oAPP.msg.M290 = G("290"); oAPP.msg.M294 = G("294"); oAPP.msg.M295 = G("295");
             oAPP.msg.M414 = G("414"); oAPP.msg.M415 = G("415");
             oAPP.msg.M416 = G("416"); oAPP.msg.M417 = G("417");
+            oAPP.msg.M656 = G("656"); // "대기 중" — busy 카운트다운 안내 문구(서버리스트 종료대기와 동일 표기)
             resolve();
         });
     }
@@ -2472,7 +2475,7 @@ var oAPP = (function () {
                 return;
             }
         } catch (e) {
-            console.error("[테스트 모드] 자동 로그인 실패:", e);
+            console.error("[test mode] auto login failed:", e);
         }
 
         _fnFadeInContent();

@@ -2984,7 +2984,7 @@
       let _oDom = _oRow.getDomRef() || undefined;
 
       if(typeof _oDom === "undefined"){
-        console.error("(uiDesignArea.js oAPP.fn.designCopyUI)UI 복사->추가 처리 이후 ROW의 DOM 정보 취득 실패", ls_copy.OBJID);
+        console.error("(uiDesignArea.js oAPP.fn.designCopyUI) UI copy->add: could not get the row DOM info afterwards", ls_copy.OBJID);
         break;
       }
 

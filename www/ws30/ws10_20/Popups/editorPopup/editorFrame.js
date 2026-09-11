@@ -327,7 +327,7 @@ function _onEditorInfo(event, res) {
         try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         iBusyWatch = setTimeout(function () {
             // 오류/지연 상황 — 영구 busy 방지(원본엔 없던 HTML5 안전장치).
-            console.error("[HTML5][editor] 호스트 로드 지연/실패 — busy 강제 해제");
+            console.error("[editor] host load deferred/failed — busy force release");
             _finishOpen();
         }, 15000);
         _loadHost();

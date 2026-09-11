@@ -108,7 +108,7 @@
     //  기존엔 F4 값도움/팝업버튼 미변환이 console.warn 만 남기고 사용자 피드백이 없어 "먹통"처럼 보였던 것을 보완.
     //  TODO(i18n): "아직 작업중입니다" 는 임시 하드코딩 → 메시지 클래스 키 확보 시 이 한 곳만 교체.
     function _wipToast() {
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { parent.showMessage(null, 10, "I", "not implemented yet"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 열려있는 형제(자식) 윈도우 busy 브로드캐스트 — 원본은 모든 디자인 변경 콜백이
@@ -142,7 +142,7 @@
         try {
             return fn.apply(oThis || oAPP.fn, aArgs || []);
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] call skip (미변환/데이터 미로딩):", sFnName, e && e.message);
+            console.warn("[WS20][attr] call skipped (not converted / data loading):", sFnName, e && e.message);
         }
     }
 
@@ -415,7 +415,7 @@
             //   사라지게 한다 — 실행/저장 점검 chkExcepionAttr 는 인자 없이 attrClearErrorField() 를 부르므로,
             //   여기서 안 그리면 오류를 지워도 화면 빨간이 남는다(장군님 재현: 액티브 후 값칸 빨간 잔존).
             try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } }
-            catch (e) { console.error("[HTML5][WS20][attr] attrClearErrorField 속성행 재렌더 오류:", e && e.message); }
+            catch (e) { console.error("[WS20][attr] attrClearErrorField property row re-render error:", e && e.message); }
 
             //bRefresh=true 면 좌측 트리도 갱신(원본 refresh 대응).
             if (!bRefresh) { return; }
@@ -1758,7 +1758,7 @@
                 if (typeof oAPP.fn.fnWs20SetUndoRename === "function") {
                     oAPP.fn.fnWs20SetUndoRename(_oRenameSnap, sBf, sNew);
                 }
-            } catch (e) { console.error("[HTML5][WS20][attr] 이름변경 되돌리기 기록:", e && e.message ? e.message : e); }
+            } catch (e) { console.error("[WS20][attr] name change undo recorded:", e && e.message ? e.message : e); }
 
             //① 이전 UI OBJECT에 수집된 ATTR 의 OBJID를 변경건으로 매핑. (원본 4292행)
             if (oAPP.attr.prev[sBf] && oAPP.attr.prev[sBf]._T_0015 && oAPP.attr.prev[sBf]._T_0015.length !== 0) {
@@ -1780,7 +1780,7 @@
                     if (oAPP.attr.prev[sNew] && typeof oAPP.attr.prev[sNew].data === "function") {
                         oAPP.attr.prev[sNew].data("OBJID", sNew);
                     }
-                } catch (e) { console.error("[HTML5][WS20][attr][BR39] 미리보기 컨트롤 OBJID 갱신 오류:", e && e.message); }
+                } catch (e) { console.error("[WS20][attr][BR39] preview control OBJID refresh error:", e && e.message); }
                 delete oAPP.attr.prev[sBf];
             }
 
@@ -1799,7 +1799,7 @@
                 //  **선택 표시가 통째로 사라진다**(장군님 지적 2026-08-21). 같은 줄이면 새 이름으로 옮긴다.
                 try {
                     if (oAPP.attr.ws20SelectedObjid === sBf) { oAPP.attr.ws20SelectedObjid = sNew; }
-                } catch (e) { console.error("[HTML5][WS20][attr] 트리 선택 이름 이관 오류:", e && e.message ? e.message : e); }
+                } catch (e) { console.error("[WS20][attr] tree select name sync error:", e && e.message ? e.message : e); }
                 //[BR59-6] 접힘/펼침 상태도 같은 이유로 UI 이름으로 기억한다 → 함께 옮긴다.
                 //  안 옮기면 자식을 펼쳐 둔 UI 의 이름을 바꿨을 때 그 줄이 도로 접힌다.
                 try {
@@ -1808,7 +1808,7 @@
                         oExp[sNew] = oExp[sBf];
                         delete oExp[sBf];
                     }
-                } catch (e) { console.error("[HTML5][WS20][attr] 트리 펼침 이름 이관 오류:", e && e.message ? e.message : e); }
+                } catch (e) { console.error("[WS20][attr] tree expand name sync error:", e && e.message ? e.message : e); }
             }
 
             //④ 클라이언트 이벤트 수집건 OBJID 변경. (원본 4325행)
@@ -2266,7 +2266,7 @@
                     parent.showMessage(sap, 20, "E",
                         oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "281", "", "", "", ""));
                 } catch (e) {
-                    console.warn("[HTML5][WS20][attr] Fail to Library load:", is_tab.tabnm);
+                    console.warn("[WS20][attr] Fail to Library load:", is_tab.tabnm);
                 }
                 return;
             }
@@ -2323,7 +2323,7 @@
 
             //오류 발생시 lock 해제. (원본 designAreaLockUnlock — UI5 oCore 의존 → busy 가드)
             is_tab.ERROR = "X";
-            console.warn("[HTML5][WS20][attr] getLibData 서버 호출 실패 — LIB 로드 skip:", is_tab.tabnm);
+            console.warn("[WS20][attr] getLibData server call failed — LIB load skip:", is_tab.tabnm);
             try { oAPP.common.fnSetBusyLock(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
 
         }); //라이브러리가 로드되지 않은경우 라이브러리 정보 로드를 위한 서버 호출.
@@ -2366,7 +2366,7 @@
 
         // 서버 경로가 없으면(헤드리스/비로그인) LIB 로드 skip — 크래시 금지.
         if (!oAPP.attr.servNm) {
-            console.warn("[HTML5][WS20][attr] servNm 없음 — LIB 로드 skip(서버 미로그인). 속성 목록이 비어 보일 수 있음(정상).");
+            console.warn("[WS20][attr] servNm missing - LIB load skipped (server login). property list may look empty (normal).");
             fnDone();
             return;
         }
@@ -2405,7 +2405,7 @@
             }
         } catch (e) {
             // sendAjax 자체가 throw(헤드리스 환경 등) → skip + 연속 처리.
-            console.warn("[HTML5][WS20][attr] getLibData 호출 실패 — LIB 로드 skip:", e && e.message);
+            console.warn("[WS20][attr] getLibData call failed — LIB load skip:", e && e.message);
             fnDone();
         }
 
@@ -3154,14 +3154,14 @@
                         oWin.requestPreviewSelectionLayerUpdate();
                     }
                 } catch (e) {
-                    console.error("[HTML5][WS20][attr] 선택 테두리 재요청 오류:", e && e.message);
+                    console.error("[WS20][attr] selection outline re-request error:", e && e.message);
                     return;
                 }
                 if (iFrames < MAX_FRAMES) { oWin.requestAnimationFrame(_tick); }
             }
             oWin.requestAnimationFrame(_tick);
         } catch (e) {
-            console.error("[HTML5][WS20][attr] 선택 테두리 재요청 시작 오류:", e && e.message);
+            console.error("[WS20][attr] selection outline re-request start error:", e && e.message);
         }
     }
 
@@ -3208,7 +3208,7 @@
             if (!oInner || oInner.scrollTop === 0) { return; }
             oInner.scrollTop = 0;
         } catch (e) {
-            console.error("[HTML5][WS20][attr] 미리보기 화면 위쪽 맞추기 오류:", e && e.message);
+            console.error("[WS20][attr] preview scroll-to-top error:", e && e.message);
         }
     }
 
@@ -3388,7 +3388,7 @@
                     }
                 }
             } catch (e) {
-                console.error("[HTML5][WS20][attr][BR53] 속성 라인 이동·포커스 실패(UIATK="
+                console.error("[WS20][attr][BR53] property row move/focus failed (UIATK="
                     + UIATK + "):", e);
             }
 
@@ -3474,7 +3474,7 @@
                 oWin.oWS.sMark.fn_removeMark();
             }
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] fn_removeMark 오류:", e && e.message);
+            console.warn("[WS20][attr] fn_removeMark error:", e && e.message);
         }
 
         //3. 20번 화면의 drop 잔상 제거 처리. (원본 3523행)
@@ -3499,11 +3499,11 @@
             try {
                 _updateAttrList(oNode.UIOBK, oNode.OBJID);
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] 속성 리스트 구성 오류:", e && e.message);
+                console.warn("[WS20][attr] property list build error:", e && e.message);
             }
 
         } else {
-            console.warn("[HTML5][WS20][attr] LIB/APPDATA 미로딩 — 속성 목록 비움(서버 미로그인 정상).");
+            console.warn("[WS20][attr] LIB/APPDATA loading - property list cleared (server login is fine).");
         }
 
         //정렬 + HTML5 속성 패널 렌더. (원본 updateAttrList 말미 7385~7397행
@@ -3519,7 +3519,7 @@
                 oWin.redrawUIScript(oAPP.attr.oModel.oData.zTREE);
             }
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] redrawUIScript 오류:", e && e.message);
+            console.warn("[WS20][attr] redrawUIScript error:", e && e.message);
         }
 
         //7. 미리보기 화면 갱신 처리. (원본 3543행)
@@ -3528,7 +3528,7 @@
                 await oWin.refreshPreview(oNode);
             }
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] refreshPreview 오류:", e && e.message);
+            console.warn("[WS20][attr] refreshPreview error:", e && e.message);
         }
 
         //8. 팝업 호출건 강제 종료 처리. (원본 3551~3553행 — 구버전 패치 기준 1:1 조건)
@@ -3538,7 +3538,7 @@
                 oWin.closePopup();
             }
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] closePopup 오류:", e && e.message);
+            console.warn("[WS20][attr] closePopup error:", e && e.message);
         }
 
     }; // end of oAPP.fn.fnWs20DesignTreeItemPress
@@ -3589,7 +3589,7 @@
             oNode = _findTreeNode(OBJID);
 
             if (!oNode) {
-                console.warn("[HTML5][WS20][attr] 선택 노드 미발견 — skip:", OBJID);
+                console.warn("[WS20][attr] selected node found - skip:", OBJID);
                 return;
             }
 
@@ -3643,7 +3643,7 @@
                 _reassertPreviewSelection(OBJID);
             }
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] selPreviewUI 오류:", e && e.message);
+            console.warn("[WS20][attr] selPreviewUI error:", e && e.message);
         }
 
     }; // end of oAPP.fn.fnWs20SelectUI
@@ -3889,7 +3889,7 @@
                     try { if (typeof oAPP.fn.designRefershModel === "function") { await oAPP.fn.designRefershModel(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 } catch (e) {
-                    console.error("[HTML5][WS20][attr] autoGrowing 초기화 처리 오류:", e && e.message);
+                    console.error("[WS20][attr] autoGrowing init handle error:", e && e.message);
                     //예외 시 화면 잠금·로딩표시·자식창 잠금 원복(짝 보장).
                     try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                     try { oAPP.fn.setShortcutLock(false); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
@@ -3947,7 +3947,7 @@
         //    오류로 드러낸다(rules/code.md "오류 삼킴 금지"). 그룹이 없으면 등록된 속성도 없다는 뜻이라
         //    처리 자체는 원본과 같이 정규 경로로 이어간다(막아버리면 원본에 없는 동작이 된다).
         if (!oAPP.attr.S_CODE || !Array.isArray(oAPP.attr.S_CODE.UW13)) {
-            console.error("[HTML5][WS20][attr] 전용 예외처리 패치는 켜져 있으나 코드마스터 UW13 그룹이 없습니다"
+            console.error("[WS20][attr] the dedicated exception-handling patch is on, but code master group UW13 was not found"
                 + " — 설치 상태 확인 필요(정규 값 처리로 진행).");
             return null;
         }
@@ -4105,7 +4105,7 @@
                 if (bSkipUndo !== true && CT_SKIP_UNDO_ACTION.indexOf(_actcd) === -1
                     && typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(_undoFocus(sAttr)); }
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] undo push skip:", e && e.message);
+                console.warn("[WS20][attr] undo push skip:", e && e.message);
             }
 
             //[BR54] attribute 전용 예외처리 호출. (원본 attrChange uiAttributeArea.js 1840~1845행)
@@ -4116,7 +4116,7 @@
                 //bSkipAttrExc = 원본이 attrChangeProc 를 직접 부르던 경로(예외처리 갈래 없음) → 판정도 안 한다.
                 if (bSkipAttrExc !== true) { _sExcUW13 = _isAttrChangeException(sAttr); }
             } catch (e) {
-                console.error("[HTML5][WS20][attr] attrChangeException 대상 판정 실패:", e && e.message ? e.message : e);
+                console.error("[WS20][attr] attrChangeException target decision failed:", e && e.message ? e.message : e);
             }
 
             if (_sExcUW13) {
@@ -4137,13 +4137,13 @@
 
                     })["catch"](function (e) {
                         //원본도 모듈이 실패하면 값 처리로 내려가지 않는다(예외가 attrChange 를 끊음) — 동일.
-                        console.error("[HTML5][WS20][attr] attrChangeException 실행 실패:", e && e.message ? e.message : e);
+                        console.error("[WS20][attr] attrChangeException run failed:", e && e.message ? e.message : e);
                         _releaseAttrChangeLock();
                     });
                 } catch (e) {
                     //호출 자체가 즉시 실패한 경우 — 잠금이 영구히 남지 않도록 finally 로 되돌린다.
                     _bExcPending = false;
-                    console.error("[HTML5][WS20][attr] attrChangeException 호출 실패:", e && e.message ? e.message : e);
+                    console.error("[WS20][attr] attrChangeException call failed:", e && e.message ? e.message : e);
                 }
                 return;
             }
@@ -4154,7 +4154,7 @@
             try {
                 oAPP.fn.setChangeFlag();
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] setChangeFlag skip:", e && e.message);
+                console.warn("[WS20][attr] setChangeFlag skip:", e && e.message);
             }
             // 변경 즉시 모델/앱헤더 반영 → 상태 Active→Inactive
             try { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -4171,7 +4171,7 @@
                     sAttr = oAPP.attr.oModel.oData.T_ATTR[_pos];
                 }
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] T_ATTR 실줄 동기화 skip:", e && e.message);
+                console.warn("[WS20][attr] T_ATTR row sync skipped:", e && e.message);
             }
 
             //(원본 1957행 checkPropertyValue(designTreeData.js): 입력값 점검 모듈.
@@ -4196,13 +4196,13 @@
                 //[BR51] 점검 모듈 로드/실행 실패를 조용히 삼키지 않는다(코딩규칙: 조용한 catch 금지).
                 //  구간 오류코드로 콘솔에 남기고 화면에도 드러낸다(현장 SR 추적용).
                 //  ※ 정상 설치 환경에서는 로드가 항상 성공하므로 이 갈래는 원래 타지 않는다.
-                console.error("[WS20ATTR-CHK01] 입력값 점검 모듈(designTreeData.js) 로드/실행 실패 — 값 점검 미수행:", e);
+                console.error("[WS20ATTR-CHK01] input validation module (designTreeData.js) load/run failed - skipping validation:", e);
                 //화면 안내는 추적 코드만 표시(내부 예외 원문 노출 금지 — 상세는 콘솔에 이미 있음).
                 //  정식 안내 문구 키는 장군님 번호 지정 대기(임의 문구·키 생성 금지).
                 try {
                     parent.showMessage(null, 10, "E", "WS20ATTR-CHK01");
                 } catch (e2) {
-                    console.error("[WS20ATTR-CHK01] 오류 안내 표시 실패:", e2 && e2.message);
+                    console.error("[WS20ATTR-CHK01] error notice show failed:", e2 && e2.message);
                 }
                 //[BR51-P1] 원본은 점검 실패(예외)가 그대로 전파돼 이후 수집(attrChgAttrVal)·스타일·재렌더에
                 //  도달하지 않는다(fail-closed). 여기서도 동일 경계를 지킨다 — 검증되지 않은 값을
@@ -4215,7 +4215,7 @@
             try {
                 oAPP.fn.attrChgAttrVal(sAttr, uityp);
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] attrChgAttrVal 오류:", e && e.message);
+                console.warn("[WS20][attr] attrChgAttrVal error:", e && e.message);
             }
 
             //DDLB 변경 라인 STYLE 처리. (원본 1944행)
@@ -4231,7 +4231,7 @@
                     oAPP.fn.attrSetDropAbleException(sAttr, false, true);
                 }
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] dropAble 예외처리 skip:", e && e.message);
+                console.warn("[WS20][attr] dropAble exceptionhandle skip:", e && e.message);
             }
 
             //F4 HELP 버튼 활성여부 처리. (원본 1947행)
@@ -4244,7 +4244,7 @@
             //  ※ previewUIsetProp 은 원본도 ROOT(OBJID==="ROOT")를 즉시 스킵(uiPreviewArea.js:486)하므로
             //    ROOT 테마 반영은 아래 별도 분기(원본 attrDocumentProc 상당)에서 처리한다.
             if (typeof oAPP.fn.previewUIsetProp !== "function") {
-                console.warn("[HTML5][WS20][attr] 미리보기 반영 skip (W2 예정):", sAttr.UIATT);
+                console.warn("[WS20][attr] preview apply skip (W2 pending):", sAttr.UIATT);
             } else {
                 _safeCall("previewUIsetProp", [sAttr]);
             }
@@ -4261,7 +4261,7 @@
                     oAPP.fn.fnWs20ApplyPrevTheme(sAttr.UIATV);
                 }
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] ROOT 테마 미리보기 반영 skip:", e && e.message);
+                console.warn("[WS20][attr] ROOT theme preview apply skip:", e && e.message);
             }
 
             //모델 갱신 처리. (원본 1959행 — HTML5: 속성 행 재렌더)
@@ -4340,7 +4340,7 @@
                 if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
 
             } catch (e) {
-                console.error("[HTML5][WS20][attr] AppID 삭제(attrAppF4Del) 오류:", e && e.message);
+                console.error("[WS20][attr] AppID delete(attrAppF4Del) error:", e && e.message);
             }
 
             //하위 로직 skip flag return.
@@ -4420,7 +4420,7 @@
                 }
 
             } catch (e) {
-                console.error("[HTML5][WS20][attr] F4 값 삭제(attrSelOption2F4HelpIDDel) 오류:", e && e.message);
+                console.error("[WS20][attr] F4 value delete(attrSelOption2F4HelpIDDel) error:", e && e.message);
                 return true;
             }
         };
@@ -4464,7 +4464,7 @@
             //확인 불필요(입력/바인딩 없음)면 콜백 실행 후 skip flag return(원본 3547행).
             if (l_chk !== true) {
                 try { fnCallback(is_attr); }
-                catch (e) { console.error("[HTML5][WS20][attr] HTML content 게이트 콜백 오류:", e && e.message); }
+                catch (e) { console.error("[WS20][attr] HTML content gate callback error:", e && e.message); }
                 return true;
             }
 
@@ -4472,7 +4472,7 @@
             parent.showMessage(null, 30, "I", l_msg, function (param) {
                 if (param !== "YES") { return; }
                 try { fnCallback(is_attr); }
-                catch (e) { console.error("[HTML5][WS20][attr] HTML content 게이트 콜백 오류:", e && e.message); }
+                catch (e) { console.error("[WS20][attr] HTML content gate callback error:", e && e.message); }
             });
 
             //하위 로직 skip flag return(원본 3586행).
@@ -4544,7 +4544,7 @@
                     if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
 
                 } catch (e) {
-                    console.error("[HTML5][WS20][attr] HTML Source 콜백 오류:", e && e.message);
+                    console.error("[WS20][attr] HTML Source callback error:", e && e.message);
                 }
             }
 
@@ -4655,15 +4655,15 @@
 
                 //DnDDrop 의 클라이언트 이벤트 삭제.
                 try { oAPP.fn.attrDelClientEvent(ls_drop, "JS"); }
-                catch (e) { console.error("[HTML5][WS20][attr][BR31] attrDelClientEvent 오류:", e && e.message); }
+                catch (e) { console.error("[WS20][attr][BR31] attrDelClientEvent error:", e && e.message); }
 
                 //수집건 여부 확인 후 _T_0015 에서 제거.
                 try { oAPP.fn.attrChgAttrVal(ls_drop, "DDLB"); }
-                catch (e) { console.error("[HTML5][WS20][attr][BR31] attrChgAttrVal(DnDDrop 초기화) 오류:", e && e.message); }
+                catch (e) { console.error("[WS20][attr][BR31] attrChgAttrVal(DnDDrop init) error:", e && e.message); }
 
                 //해당 라인 style 갱신(아이콘/색).
                 try { oAPP.fn.attrSetLineStyle(ls_drop); }
-                catch (e) { console.error("[HTML5][WS20][attr][BR31] attrSetLineStyle(DnDDrop) 오류:", e && e.message); }
+                catch (e) { console.error("[WS20][attr][BR31] attrSetLineStyle(DnDDrop) error:", e && e.message); }
 
             } //dropAble 를 끈 경우 DnDDrop 초기화.
 
@@ -4788,7 +4788,7 @@
                 //  bSkipUndo=true — 에디터가 이미 T_CEVT 를 변경한 뒤라 여기서 undo push 는 부정확.
                 if (bWasJs !== bNowJs) {
                     try { oAPP.fn.fnWs20AttrChange(is_attr, "", true); }
-                    catch (e) { console.error("[HTML5][WS20][attr] lf_cb fnWs20AttrChange:", e && e.message); }
+                    catch (e) { console.error("[WS20][attr] lf_cb fnWs20AttrChange:", e && e.message); }
                     return;
                 }
 
@@ -4889,7 +4889,7 @@
                         //[BR42] 첫 실제 변경 직전 1회만 undo 스냅샷 적재(원본 RESET_ATTR 1스텝 대응).
                         if (!bUndoPushed) {
                             try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(_undoFocus(_sAttr)); } }
-                            catch (e) { console.warn("[HTML5][WS20][attr] reset undo push skip:", e && e.message); }
+                            catch (e) { console.warn("[WS20][attr] reset undo push skip:", e && e.message); }
                             bUndoPushed = true;
                         }
 
@@ -4901,14 +4901,14 @@
                         var uityp = _sAttr.chk_visb ? "CHECK" : (_sAttr.sel_visb ? "DDLB" : "INPUT");
                         //[BR42] undo 는 위에서 1회만 → 개별 변경은 bSkipUndo=true 로 스냅샷 생략.
                         try { oAPP.fn.fnWs20AttrChange(_sAttr, uityp, true, false, true); }   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrResetAttr 2206·2219).
-                        catch (e) { console.error("[HTML5][WS20][attr] reset 변경 오류:", _sAttr.UIATT, e && e.message); }
+                        catch (e) { console.error("[WS20][attr] reset change error:", _sAttr.UIATT, e && e.message); }
                     }
 
                     //필터 끔 반영 + 변경표시 제거 확정(마지막 1회 재렌더 — fnWs20AttrChange 가 안 불린 경우 대비).
                     oAPP.fn.fnRenderWs20AttrRows();
 
                 } catch (e) {
-                    console.error("[HTML5][WS20][attr] Attribute Reset 오류:", e && e.message);
+                    console.error("[WS20][attr] Attribute Reset error:", e && e.message);
                 } finally {
                     try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -5089,11 +5089,11 @@
                         return;
                     }
                     try { oAPP.fn.fnExeBrowser(param.PATH, param.PARAM); }
-                    catch (e) { console.error("[HTML5][WS20] UI Sample fnExeBrowser 오류:", e); }
+                    catch (e) { console.error("[WS20] UI Sample fnExeBrowser error:", e); }
                     try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 });
             } catch (e) {
-                console.error("[HTML5][WS20] UI Sample(attrCallUiSample) 오류:", e);
+                console.error("[WS20] UI Sample(attrCallUiSample) error:", e);
                 try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         });
@@ -5146,7 +5146,7 @@
                     oUi.OBJID = oObjFld.getValue();
                     oAPP.fn.attrChnageOBJID();
                 } catch (e) {
-                    console.warn("[HTML5][WS20][attr] UI Object ID 변경 처리 오류:", e && e.message);
+                    console.warn("[WS20][attr] UI Object ID change handle error:", e && e.message);
                     try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                 }
             }
@@ -5203,7 +5203,7 @@
                     }
                 }
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] Description 변경 처리 오류:", e && e.message);
+                console.warn("[WS20][attr] Description change handle error:", e && e.message);
             }
 
             // busy off (원본 309행)
@@ -5279,7 +5279,7 @@
                     _attrSyncChevron();
                 }
             } catch (e) {
-                console.warn("[HTML5][WS20][attr] 헤더 핀 토글 오류:", e && e.message);
+                console.warn("[WS20][attr] header pin toggle error:", e && e.message);
             }
         });
         CTL.appendChild(PIN);
@@ -5305,7 +5305,7 @@
         RST.style.display = "none";
         RST.addEventListener("click", function () {
             try { oAPP.fn.attrResetAttr(); }
-            catch (e) { console.error("[HTML5][WS20][attr] Attribute Reset 호출 오류:", e && e.message); }
+            catch (e) { console.error("[WS20][attr] Attribute Reset call error:", e && e.message); }
         });
         TBR.appendChild(RST);
 
@@ -5378,7 +5378,7 @@
                 var sPath = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "attrPresetPopup", "index.js");
                 parent.require(sPath)(parent.REMOTE, oAPP);
             } catch (e) {
-                console.error("[HTML5][WS20] UI Attribute Personalization List 오픈 실패:", e);
+                console.error("[WS20] UI Attribute Personalization List open failed:", e);
             }
         });
         TBR.appendChild(PRE);
@@ -5403,7 +5403,7 @@
             try {
                 bPatch = (oAPP.common.checkWLOList("C", "UHAK901369") === true);
             } catch (e) {
-                console.error("[WS20HELP-20] 통합 도움말 등록여부 판정 실패:", e);
+                console.error("[WS20HELP-20] could not tell whether unified help is registered:", e);
                 try { parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                 return;
             }
@@ -5413,7 +5413,7 @@
                 //[BR58 검수반영] 패치 서버인데 여는 기능이 안 실렸으면 구성 이상 →
                 //  구버전 도움말로 빠지지 않고 오류로 끝낸다(트리·미리보기와 동일 계약).
                 if (typeof oAPP.fn.fnU4AHelpDocuPopupOpener !== "function") {
-                    console.error("[WS20HELP-21] 통합 도움말 여는 기능 미로드 — 구성 확인 필요.");
+                    console.error("[WS20HELP-21] unified help feature not loaded - check the build.");
                     try { parent.setBusy(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                     return;
                 }
@@ -5424,12 +5424,12 @@
                     var oRet = oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000271" });
                     if (oRet && typeof oRet.catch === "function") {
                         oRet.catch(function (e) {
-                            console.error("[WS20HELP-21] 통합 도움말 팝업 호출 실패:", e);
+                            console.error("[WS20HELP-21] help popup open failed:", e);
                             try { parent.setBusy(""); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
                         });
                     }
                 } catch (e) {
-                    console.error("[WS20HELP-21] 통합 도움말 팝업 호출 실패:", e);
+                    console.error("[WS20HELP-21] help popup open failed:", e);
                     try { parent.setBusy(""); } catch (e5) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e5); } }
                 }
                 return;
@@ -5439,7 +5439,7 @@
             //  원본 624~641행 callTooltipsPopup(l_ui, "attrTooltip", "E23").
             //  ★ 이전에는 폴백을 부르지 않고 "아직 작업중입니다" 안내만 띄웠다.
             if (typeof oAPP.fn.callTooltipsPopup !== "function") {
-                console.error("[WS20HELP-22] 도움말 팝업 미로드 — ws_html5_call_tooltips_popup.js 로드 확인 필요.");
+                console.error("[WS20HELP-22] help popup not loaded — ws_html5_call_tooltips_popup.js load check required.");
                 try { parent.setBusy(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                 return;
             }
@@ -5459,7 +5459,7 @@
                     isSkip: function (el) { return el.classList.contains("u4aWs20AttrTbSpacer"); }
                 });
             }
-        } catch (e) { console.warn("[HTML5][WS20][attr] toolbar overflow attach 실패:", e && e.message); }
+        } catch (e) { console.warn("[WS20][attr] toolbar overflow attach failed:", e && e.message); }
 
         STICKY.appendChild(TBR);
         SCROLLER.appendChild(STICKY);
@@ -5707,7 +5707,7 @@
                         var _runF4 = function () {
                             //★ bSelOpt3=true 로 호출(원본 4084·4091행) — selOpt3 진입 게이트. 안 넘기면 함수가 selOpt3 를 거부함.
                             try { oAPP.fn[_fnNm](sAttr, true); }
-                            catch (e) { console.error("[HTML5][WS20][attr] selectOption3 F4 호출 오류:", e && e.message); }
+                            catch (e) { console.error("[WS20][attr] selectOption3 F4 call error:", e && e.message); }
                         };
                         if (typeof oAPP.fn[_fnNm] === "function") { _runF4(); }
                         else { oAPP.loadJs("fnBindPopupOpen", _runF4); }
@@ -5743,7 +5743,7 @@
                     if (sAttr.UIATT === "styleClass") {
                         var _runSC = function () {
                             if (typeof oAPP.fn.fnStyleClassPopupOpen === "function") { oAPP.fn.fnStyleClassPopupOpen(sAttr); }
-                            else { console.warn("[HTML5][WS20][attr] fnStyleClassPopupOpen 미로드"); _wipToast(); }
+                            else { console.warn("[WS20][attr] fnStyleClassPopupOpen not loaded"); _wipToast(); }
                         };
                         if (oAPP.fn.fnStyleClassPopupOpen) { _runSC(); }
                         else { oAPP.loadJs("fnStyleClassPopupOpen", _runSC); }
@@ -5751,7 +5751,7 @@
                     }
 
                     //F4 값도움 미변환(컬러/DDIC/아이콘/styleClass 외) — 작업중 안내.
-                    console.warn("[W4+ 예정] F4 Value Help(attrCallValueHelp) 미변환:", sAttr.UIATT);
+                    console.warn("[W4+ pending] F4 Value Help(attrCallValueHelp) not converted:", sAttr.UIATT);
                     _wipToast();
                 } : null,
                 f4IconHtml: '<i class="fa-regular fa-clone"></i>',   // F4=아웃라인 clone(복사버튼과 구분, 2026-06-17)
@@ -5881,13 +5881,13 @@
                             try {
                                 if (parent.setBusy) { parent.setBusy("X"); bLocked = true; }
                             } catch (e) {
-                                console.error("[HTML5][WS20][attr][BR53] 이동 구간 화면잠금 실패(이동은 계속):", e);
+                                console.error("[WS20][attr][BR53] screen lock during move failed (move continues):", e);
                             }
                             try {
                                 oAPP.fn.setAttrFocus(sAttr.UIATK, "E", { bKeepRow: true });
                                 bMoved = true;
                             } catch (e) {
-                                console.error("[HTML5][WS20][attr][BR53] 미등록 서버이벤트 줄 이동 실패:", e);
+                                console.error("[WS20][attr][BR53] register serverevent line move failed:", e);
                             }
                             //등록 안된 이벤트 문구(&1=이벤트명). 장군님 등록 ZMSG_WS_COMMON_001|999.
                             sAttr.valst = "Error";
@@ -5908,7 +5908,7 @@
                         if (!bMoved) { return; }
                         return _attrWaitScrollIdle();
                     }).catch(function (e) {
-                        console.error("[HTML5][WS20][attr] 서버이벤트 목록 조회 실패:", e && e.message);
+                        console.error("[WS20][attr] serverevent list read failed:", e && e.message);
                     }).then(function () {
                         //[BR53-2차] 이동 구간 화면잠금 해제 — 원본이 목록을 펼치기 직전에 푸는 바로 그 자리다
                         //  (이 약속이 끝나는 즉시 공통 콤보가 목록을 편다). 조회 실패·예외도 위 catch 를 거쳐
@@ -5917,7 +5917,7 @@
                         bLocked = false;
                         try { if (parent.setBusy) { parent.setBusy(""); } }
                         catch (e) {
-                            console.error("[HTML5][WS20][attr][BR53] 이동 구간 화면잠금 해제 실패:", e);
+                            console.error("[WS20][attr][BR53] screen lock release after move failed:", e);
                         }
                     });
                 };
@@ -6059,7 +6059,7 @@
                     //원본 attrIcon1Proc 진입부: 오류 표현 필드 초기화 후 이벤트 팝업 호출.
                     if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
                     oAPP.fn.attrCallEventPopup(sAttr);
-                } catch (e) { console.error("[HTML5][WS20][attr] 서버이벤트 생성 호출 오류:", e && e.message); }
+                } catch (e) { console.error("[WS20][attr] serverevent create call error:", e && e.message); }
                 return;
             }
             //이벤트 행(UIATY="2")의 icon2(syntax </>) = 클라이언트 JS 이벤트 에디터 팝업.
@@ -6069,7 +6069,7 @@
                     //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 클라이언트 이벤트 팝업 호출.
                     if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
                     oAPP.fn.attrClientEventPopup(sAttr);
-                } catch (e) { console.error("[HTML5][WS20][attr] 클라이언트 이벤트 에디터 호출 오류:", e && e.message); }
+                } catch (e) { console.error("[WS20][attr] client event editor call error:", e && e.message); }
                 return;
             }
             //프로퍼티(UIATY="1")/애그리게이션(UIATY="3")의 icon1 클릭 = 원본 attrIcon1Proc 디스패처
@@ -6089,7 +6089,7 @@
                         //원본 attrIcon1Proc 진입부: 오류 표현 필드 초기화 후 바인딩 팝업 게이트 호출.
                         if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
                         oAPP.fn.attrBindIcon1Proc(sAttr);
-                    } catch (e) { console.error("[HTML5][WS20][attr] 바인딩 팝업 호출 오류:", e && e.message); }
+                    } catch (e) { console.error("[WS20][attr] binding popup call error:", e && e.message); }
                 };
                 if (typeof oAPP.fn.attrBindIcon1Proc === "function") { _runBind(); }
                 else { oAPP.loadJs("fnBindPopupOpen", _runBind); }
@@ -6102,7 +6102,7 @@
                     //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 삭제 처리.
                     if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
                     oAPP.fn.attrAppF4Del(sAttr);
-                } catch (e) { console.error("[HTML5][WS20][attr] AppID 삭제 호출 오류:", e && e.message); }
+                } catch (e) { console.error("[WS20][attr] AppID delete call error:", e && e.message); }
                 return;
             }
             //selectOption2/3 의 F4HelpID·ReturnField(EXT00001188/1189/2534/2535)의 icon2(휴지통) = F4값 삭제.
@@ -6113,7 +6113,7 @@
                     //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 F4값 삭제 처리.
                     if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
                     oAPP.fn.attrSelOption2F4HelpIDDel(sAttr);
-                } catch (e) { console.error("[HTML5][WS20][attr] F4 값 삭제 호출 오류:", e && e.message); }
+                } catch (e) { console.error("[WS20][attr] F4 value delete call error:", e && e.message); }
                 return;
             }
             //sap.ui.core.HTML content(AT000011858)의 icon2(inspection) = HTML Source 편집 팝업.
@@ -6124,7 +6124,7 @@
                     //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 285 게이트 경유 HTML Source 호출.
                     if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
                     oAPP.fn.attrChkHTMLContent(sAttr, false, oAPP.fn.attrHTMLConentPopup);
-                } catch (e) { console.error("[HTML5][WS20][attr] HTML Source 호출 오류:", e && e.message); }
+                } catch (e) { console.error("[WS20][attr] HTML Source call error:", e && e.message); }
                 return;
             }
 
@@ -6144,7 +6144,7 @@
                         //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 즐겨찾기 팝업 호출.
                         if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
                         oAPP.fn.fnFavIconPopupOpen(sAttr, fnPickFav);
-                    } catch (e) { console.error("[HTML5][WS20][attr] 즐겨찾기 아이콘 팝업 호출 오류:", e && e.message); }
+                    } catch (e) { console.error("[WS20][attr] favorite icon popup call error:", e && e.message); }
                 };
                 if (typeof oAPP.fn.fnFavIconPopupOpen === "function") { _runFav(); }
                 else { oAPP.loadJs("fnFavIconPopupOpen", _runFav); }
@@ -6153,7 +6153,7 @@
 
             //그 외(App F4 상세보기/selectOption F4 등) 구 attrIcon1Proc/attrIcon2Proc — 미변환.
             //  [임시] 완료 전까지 안내 토스트만(사용자 지시 — AppID F4 등). TODO(i18n) + 재개 시 각 동작 배선.
-            console.warn("[W4+ 예정] 속성 아이콘 동작 미변환:", sAttr.UIATT, "icon" + iNo, sSrc);
+            console.warn("[W4+ pending] property icon action not converted:", sAttr.UIATT, "icon" + iNo, sSrc);
             _wipToast();
         });
 
@@ -6450,7 +6450,7 @@
       } catch (e) {
           // 예상외 예외(잘못된 payload 등) — 조용히 삼키지 말고 214 표시 + 로딩 해제(오류 삼킴 금지).
           _fail("214");
-          console.error("[HTML5][WS20][drop] 바인딩 처리 예외:", e && e.message);
+          console.error("[WS20][drop] binding handle exception:", e && e.message);
       }
     };
 
@@ -6493,7 +6493,7 @@
                 var oAttr = row ? row.__attrData : null;
                 if (!oAttr) { return; }
                 try { oAPP.fn.attrDblClickServerEvent(oAttr); }
-                catch (e) { console.error("[HTML5][WS20][attr] 서버이벤트 더블클릭 이동 오류:", e && e.message); }
+                catch (e) { console.error("[WS20][attr] server event double-click move error:", e && e.message); }
             });
         }
 
@@ -6535,7 +6535,7 @@
                 var _loadFail = function (sWhy) {
                     try { APPCOMMON.fnShowFloatingFooterMsg("E", "WS20", APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "214", "", "", "", "")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-                    console.error("[HTML5][WS20][drop] 바인딩 적용 함수(attrSetBindProp) 확보 실패:", sWhy);
+                    console.error("[WS20][drop] could not resolve the binding apply function (attrSetBindProp):", sWhy);
                 };
                 //바인딩 적용 함수(attrSetBindProp)는 소형 팝업 파일(fnBindPopupOpen)에 있어 온디맨드 로드일 수 있음 → 보장 후 실행.
                 if (typeof oAPP.fn.attrSetBindProp === "function") { _run(); }
@@ -6648,7 +6648,7 @@
             (function (oCell, oAnchor, oAttr) {
                 oCell.addEventListener("click", function () {
                     try { oAPP.fn.callAttrDescPopup(oAnchor, oAttr); }
-                    catch (e) { console.warn("[HTML5][WS20][attr] callAttrDescPopup 오류:", e && e.message); }
+                    catch (e) { console.warn("[WS20][attr] callAttrDescPopup error:", e && e.message); }
                 });
             })(LBL, LTX, sAttr);
 
@@ -6797,7 +6797,7 @@
 
             return ls_0022p.LIBNM;
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] 라이브러리명 탐색 오류:", e && e.message);
+            console.warn("[WS20][attr] library name lookup error:", e && e.message);
             return;
         }
     }
@@ -6809,7 +6809,7 @@
                 APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "196",
                     APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A35", "", "", "", ""), "", "", ""));
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] 속성 설명 없음(196):", e && e.message);
+            console.warn("[WS20][attr] property description missing (196):", e && e.message);
         }
     }
 
@@ -6990,7 +6990,7 @@
         try {
             oAPP.fn.fnRenderWs20AttrPanel();
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] uiAttributeArea render error:", e && e.message);
+            console.warn("[WS20][attr] uiAttributeArea render error:", e && e.message);
         }
 
     }; // end of [OVERRIDE] oAPP.fn.uiAttributeArea
@@ -7011,7 +7011,7 @@
         try {
             oAPP.fn.uiAttributeArea(oAPP.attr.ui && oAPP.attr.ui.ws20 && oAPP.attr.ui.ws20.attr);
         } catch (e) {
-            console.warn("[HTML5][WS20][attr] fnRenderWs20Shell→uiAttributeArea error:", e && e.message);
+            console.warn("[WS20][attr] fnRenderWs20Shell→uiAttributeArea error:", e && e.message);
         }
 
     }; // end of [OVERRIDE] oAPP.fn.fnRenderWs20Shell

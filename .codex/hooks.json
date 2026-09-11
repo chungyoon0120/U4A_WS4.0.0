@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\socce\\AppData\\Local\\yoon-agent-kit\\hooks\\codex\\SessionStart\\run.cmd",
+            "timeout": 15,
+            "commandWindows": "C:\\Users\\socce\\AppData\\Local\\yoon-agent-kit\\hooks\\codex\\SessionStart\\run.cmd",
+            "statusMessage": "Yoon Agent Kit"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.claude/hooks/python/stop_history_gate.py",
+            "commandWindows": "python -X utf8 C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.claude/hooks/python/stop_history_gate.py",
+            "timeout": 60,
+            "statusMessage": "history gate"
+          }
+        ]
+      }
+    ]
+  }
+}

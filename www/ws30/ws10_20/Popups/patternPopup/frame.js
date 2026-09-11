@@ -183,7 +183,7 @@ function _readPatternJson(sPath) {
         var a = JSON.parse(FS.readFileSync(sPath, "utf-8"));
         return Array.isArray(a) ? a : [];
     } catch (e) {
-        console.error("[HTML5][WS30][patternPopup] 패턴 JSON 로드 오류:", sPath, e && e.message);
+        console.error("[WS30][patternPopup] pattern JSON load error:", sPath, e && e.message);
         return [];
     }
 }
@@ -562,7 +562,7 @@ function _writeCust(aFlat) {
     bSelfWrite = true;
     var bOk = true;
     try { FS.writeFileSync(PATHINFO.CUST_PATT, JSON.stringify(aFlat), "utf-8"); }
-    catch (e) { bOk = false; console.error("[HTML5][WS30][patternPopup] 커스텀 패턴 저장 오류:", e && e.message); }
+    catch (e) { bOk = false; console.error("[WS30][patternPopup] custom pattern save error:", e && e.message); }
     setTimeout(function () { bSelfWrite = false; }, 300);   // watch 이벤트(rename+change) 소진 후 해제
     return bOk;
 }
@@ -578,7 +578,7 @@ function _initCustWatch() {
             }, 120);   // 짧은 디바운스(rename+change 다중 이벤트 합침)
         });
     } catch (e) {
-        console.error("[HTML5][WS30][patternPopup] 커스텀 패턴 watch 설정 오류:", e && e.message);
+        console.error("[WS30][patternPopup] custom pattern watch config error:", e && e.message);
     }
 }
 
@@ -1135,7 +1135,7 @@ window.addEventListener("load", function () {
     _setBusy(true);
     try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     iBusyWatch = setTimeout(function () {
-        console.error("[HTML5][WS30][patternPopup] Monaco 호스트 로드 지연/실패 — busy 강제 해제");
+        console.error("[WS30][patternPopup] Monaco host load deferred/failed — busy force release");
         _finishOpen();
     }, 15000);
     _loadHost();

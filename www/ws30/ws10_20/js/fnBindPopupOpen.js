@@ -95,7 +95,7 @@
   // 메시지 팝업(원본 parent.showMessage) — WS20 렌더러의 parent 셸 제공.
   function _msg(iKind, sType, sMsg, fnCb) {
     try { parent.showMessage(window.sap || null, iKind, sType, sMsg, fnCb); }
-    catch (e) { console.warn("[HTML5][WS20][bind] showMessage 실패:", e && e.message); }
+    catch (e) { console.warn("[WS20][bind] showMessage failed:", e && e.message); }
   }
   function _busy(bOn) { try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
@@ -173,11 +173,11 @@
       //   (AppID F4=앱 검색 팝업 EXT00000030 / selectOption2·3 F4HelpID·ReturnField /
       //    sap.ui.core.HTML content 바인딩 — attrAppf4Popup 등 HTML5 미정의라 가드 skip).
       //   기존엔 조용히 종료돼 "먹통"으로 보였으므로 작업중 안내 토스트(구 attr.js _wipToast 와 동일 문구).
-      console.warn("[W4+ 예정] 바인딩 아이콘 미구현 특수 액션:", is_attr && is_attr.UIATT, "(", is_attr && is_attr.UIATK, ")");
+      console.warn("[W4+ pending] binding icon special action not implemented:", is_attr && is_attr.UIATT, "(", is_attr && is_attr.UIATK, ")");
       _msg(10, "I", "아직 작업중입니다");
 
     } catch (e) {
-      console.error("[HTML5][WS20][bind] 바인딩 아이콘 처리 오류:", e && e.message);
+      console.error("[WS20][bind] binding icon handle error:", e && e.message);
     }
 
     _unlock();
@@ -232,7 +232,7 @@
         if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
 
       } catch (e) {
-        console.error("[HTML5][WS20][bind] AppID F4 콜백 처리 오류:", e && e.message);
+        console.error("[WS20][bind] AppID F4 callback handle error:", e && e.message);
       }
     }
 
@@ -302,7 +302,7 @@
         if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
 
       } catch (e) {
-        console.error("[HTML5][WS20][bind] selectOption2 F4HelpID 콜백 오류:", e && e.message);
+        console.error("[WS20][bind] selectOption2 F4HelpID callback error:", e && e.message);
       }
     }
 
@@ -386,7 +386,7 @@
         if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
         if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
       } catch (e) {
-        console.error("[HTML5][WS20][bind] selectOption2 F4HelpReturnField 콜백 오류:", e && e.message);
+        console.error("[WS20][bind] selectOption2 F4HelpReturnField callback error:", e && e.message);
       }
     }
 
@@ -499,7 +499,7 @@
         }
       }
     } catch (e) {
-      console.warn("[HTML5][WS20][bind] attrChkBindAggrPossible 오류:", e && e.message);
+      console.warn("[WS20][bind] attrChkBindAggrPossible error:", e && e.message);
     }
   }; // end of attrChkBindAggrPossible
 
@@ -820,7 +820,7 @@
 
       }, "");
     } catch (e) {
-      console.warn("[HTML5][WS20][bind] getBindAttrData 호출 실패:", e && e.message);
+      console.warn("[WS20][bind] getBindAttrData call failed:", e && e.message);
       _fail();
     }
   }
@@ -1544,7 +1544,7 @@
 
     // 콜백으로 선택 라인 return → 적용.
     try { oS.fnCallback(true, ls_tree, oS.is_attr); }
-    catch (e) { console.error("[HTML5][WS20][bind] bind 콜백 오류:", e && e.message); }
+    catch (e) { console.error("[WS20][bind] bind callback error:", e && e.message); }
 
     _busy(false);   // 적용 완료 → busy 해제(성공 경로). (형제창 busy 는 fnWs20AttrChange 가 짝맞춰 처리)
     lf_close();
@@ -1554,7 +1554,7 @@
   function lf_unbindBtnEvt() {
     if (!_isEdit()) { _busy(false); return; }
     try { oS.fnCallback(false, null, oS.is_attr); }
-    catch (e) { console.error("[HTML5][WS20][bind] unbind 콜백 오류:", e && e.message); }
+    catch (e) { console.error("[WS20][bind] unbind callback error:", e && e.message); }
     lf_close();
   }
 

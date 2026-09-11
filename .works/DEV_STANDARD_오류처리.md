@@ -60,6 +60,13 @@ X();
 | `MIMF` | ws30/ws10_20/Popups/mimeRepository/frame.js |
 | `VMNG` | ws30/ws10_20/Popups/versionMng/versionMngFrame.js |
 | `UCSS` | ws30/ws10_20/Popups/ui5CssPopup_v2/control.js (UI5 Predefined CSS 팝업 오프너) |
+| `DMON` | ws30/ws10_20/js/ws_html5_datamon.js (내부 데이터 모니터 — 감시 알맹이) |
+| `DMOP` | ws30/ws10_20/Popups/dataMonitor/index.js (내부 데이터 모니터 — 창 여는 쪽) |
+| `DMWN` | ws30/ws10_20/Popups/dataMonitor/Popup/ (내부 데이터 모니터 — 창 화면) |
+| `MLOG` | electron/lib/log/ws_main_log.js (앱 본체 로그) |
+| `CRSH` | electron/lib/log/ws_crash_report.js (앱이 뻗었을 때 처리·보고서 만들기) |
+| `CDMP` | electron/lib/log/ws_crash_dump_read.js (죽은 흔적 덩어리를 글로 풀기) |
+| `TGSD` | electron/lib/log/ws_telegram.js (텔레그램 전송) |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

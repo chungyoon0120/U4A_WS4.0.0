@@ -1577,7 +1577,8 @@
 
             // 선택
             if (bSelectable && _onSelect) {
-                oRow.addEventListener("click", function () { _onSelect(node, oRow, oCtx); });
+                // ★ 드래그로 텍스트 블럭을 잡은 채 뗀 click 은 행 선택으로 치지 않는다(장군님 지시 2026-09-10) — 블럭(복사) 보존.
+                oRow.addEventListener("click", function () { if (isTextDragSelecting()) { return; } _onSelect(node, oRow, oCtx); });
                 oRow.addEventListener("keydown", function (ev) {
                     if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); _onSelect(node, oRow, oCtx); }
                 });
@@ -2144,6 +2145,18 @@
      *  반환: { setRows(arr, bKeepScroll), refresh(), setSel(key), getSel() }
      *  ※ oWrap 은 overflow:auto 스크롤 컨테이너, oTbody 는 그 안 <tbody>. 셸 공통 CSS 가
      *    `.u4a-table-wrap tbody tr:not(.u4aVSpacer)>td{height:var(--u4a-vsrowh,...)}` 로 행높이 강제. */
+    // 사용자가 마우스로 드래그해 텍스트 블럭을 잡은 채 버튼을 뗐는지 판정 — 그렇다면 그 click 은
+    //   행 선택/펼침으로 치지 않고 건너뛰어 블럭(복사)을 보존한다(장군님 지시 2026-09-10:
+    //   "클릭만 선택 표시, 드래그한 건 선택 안 함"). 이 방식은 재렌더 여부와 무관하게 블럭을 살린다.
+    //   ★ plain click 은 mousedown 이 기존 selection 을 collapse 하므로 click 시점엔 isCollapsed=true → false 반환(정상 선택).
+    //     드래그는 non-collapsed selection 을 남기므로 true 반환(선택 스킵).
+    function isTextDragSelecting() {
+        try {
+            var sel = (typeof window !== "undefined" && window.getSelection) ? window.getSelection() : null;
+            return !!(sel && !sel.isCollapsed && String(sel).length > 0);
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
+    }
+
     function makeVScroller(oWrap, oTbody, opt) {
         let ROWH = opt.rowH || 36;          // 행 높이(첫 렌더 후 실제 측정으로 보정)
         const OVER = opt.overscan || 6;     // 위/아래 여유 행
@@ -2223,12 +2236,19 @@
             const frag = document.createDocumentFragment();
             for (let i = start; i < end; i++) {
                 const tr = opt.buildRow(aData[i], i);
-                if (selKey != null && opt.getSelKey && opt.getSelKey(aData[i]) === selKey) {
-                    // 선택 강조를 붙일 요소 — 기본은 buildRow 반환 요소(표=tr 그대로). 트리는 buildRow 가 <li> 껍데기를
-                    //   돌려주고 실제 강조 CSS 는 안쪽 .u4a-tree__row 대상이라, opt.selEl 로 그 안쪽 행을 지정한다.
-                    //   (미지정 소비처=표는 tr 그대로 → 하위호환. 이 보정 없으면 재렌더 시 강조가 <li> 로 붙어 사라짐.)
-                    const oSelEl = opt.selEl ? opt.selEl(tr) : tr;
-                    if (oSelEl) { oSelEl.setAttribute("aria-selected", "true"); }
+                if (opt.getSelKey) {
+                    // ★ 렌더된 행에 선택키를 스탬프 — _markSel(경량 강조 토글)이 재렌더 없이 이 값으로
+                    //   aria-selected 를 켜고 끈다(드래그로 잡은 text selection 보존).
+                    let kk = null;
+                    try { kk = opt.getSelKey(aData[i]); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    tr.__vsKey = kk;
+                    if (selKey != null && kk === selKey) {
+                        // 선택 강조를 붙일 요소 — 기본은 buildRow 반환 요소(표=tr 그대로). 트리는 buildRow 가 <li> 껍데기를
+                        //   돌려주고 실제 강조 CSS 는 안쪽 .u4a-tree__row 대상이라, opt.selEl 로 그 안쪽 행을 지정한다.
+                        //   (미지정 소비처=표는 tr 그대로 → 하위호환. 이 보정 없으면 재렌더 시 강조가 <li> 로 붙어 사라짐.)
+                        const oSelEl = opt.selEl ? opt.selEl(tr) : tr;
+                        if (oSelEl) { oSelEl.setAttribute("aria-selected", "true"); }
+                    }
                 }
                 frag.appendChild(tr);
             }
@@ -2283,6 +2303,22 @@
             try { new ResizeObserver(function () { _onScroll(); }).observe(oWrap); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
+        // 선택 강조 경량 토글 — 재렌더(_render) 없이 "지금 그려진 행"의 aria-selected 만 바꾼다.
+        //   ★ click 으로 행을 고를 때 _render 로 행 DOM 을 갈아엎으면 사용자가 방금 드래그로 잡은
+        //     text selection(블럭)이 그 안 text node 와 함께 사라져 복사가 안 된다(장군님 보고 2026-09-10,
+        //     앱 검색 도움말 결과 테이블). 강조는 DOM 교체 없이 붙일 수 있으므로 클릭 선택 경로는 이 토글을 쓴다.
+        //     selKey 도 갱신하므로 이후 스크롤 재렌더(_render)에서도 같은 행이 강조된 채 다시 그려진다.
+        function _markSel(k) {
+            selKey = k;
+            for (let n = oTop.nextElementSibling; n && n !== oBot; n = n.nextElementSibling) {
+                if (!("__vsKey" in n)) { continue; }   // 스페이서 등 데이터 없는 행은 건너뜀
+                const el = opt.selEl ? opt.selEl(n) : n;
+                if (!el) { continue; }
+                if (selKey != null && n.__vsKey === selKey) { el.setAttribute("aria-selected", "true"); }
+                else { el.removeAttribute("aria-selected"); }
+            }
+        }
+
         return {
             setRows: function (a, bKeepScroll) {
                 aData = a || [];
@@ -2296,6 +2332,7 @@
             },
             refresh: _render,
             setSel: function (k) { selKey = k; },
+            markSel: _markSel,
             getSel: function () { return selKey; }
         };
     }
@@ -2332,7 +2369,7 @@
         let oDlg;
         try { oDlg = document.createElement("dialog"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oDlg = null; }
         if (!oDlg || typeof oDlg.showModal !== "function") {
-            console.error("[U4AUI-001] confirm: <dialog>.showModal 미지원 — 확인 팝업을 표시할 수 없음. message:", sMsg);
+            console.error("[U4AUI-001] confirm: <dialog>.showModal unsupported - cannot show the confirm popup. message:", sMsg);
             _done(bHasCancel ? "CANCEL" : "NO");
             return;
         }
@@ -2382,7 +2419,7 @@
         try { document.body.appendChild(oDlg); oDlg.showModal(); }
         catch (e) {
             // ★[장군님 지시 2026-09-02] window.confirm fallback 금지 — 표시 실패는 오류코드로 표면화 + fail-closed 종료.
-            console.error("[U4AUI-002] confirm: showModal 실패 —", e && e.message);
+            console.error("[U4AUI-002] confirm: showModal failed —", e && e.message);
             _close(bHasCancel ? "CANCEL" : "NO");
             return;
         }
@@ -3102,7 +3139,7 @@
                 var td = _el("td");
                 if (typeof c.cell === "function") {
                     var v = null;
-                    try { v = c.cell(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] cell 오류:", e); }
+                    try { v = c.cell(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] cell error:", e); }
                     if (v == null) { /* 빈 셀 */ }
                     else if (typeof v === "string") { td.textContent = v; td.title = v; }
                     else { td.appendChild(v); }
@@ -3118,13 +3155,16 @@
             if (bResizable) { oTr.appendChild(_el("td", "u4a-dt__fill")); }   // 채움 셀(나머지 폭 흡수 — 격자 우측 끝까지)
             if (bSelectable) {
                 oTr.addEventListener("click", function () {
-                    if (_vs) { _vs.setSel(sKey); _vs.refresh(); }
+                    // ★ 드래그로 텍스트 블럭을 잡은 채 뗀 click 은 행 선택으로 치지 않는다(장군님 지시 2026-09-10) — 블럭(복사) 보존.
+                    if (isTextDragSelecting()) { return; }
+                    // ★ 클릭 선택은 재렌더(_vs.refresh) 대신 경량 강조 토글(markSel) — plain click 시에도 불필요한 재렌더 방지.
+                    if (_vs) { _vs.markSel(sKey); }
                     else { _markSel(sKey); }
-                    if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onSelect 오류:", e); } }
+                    if (typeof oCfg.onSelect === "function") { try { oCfg.onSelect(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onSelect error:", e); } }
                 });
             }
             if (typeof oCfg.onActivate === "function") {
-                oTr.addEventListener("dblclick", function () { try { oCfg.onActivate(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onActivate 오류:", e); } });
+                oTr.addEventListener("dblclick", function () { try { oCfg.onActivate(oRow, iIdx); } catch (e) { console.error("[U4AUI][makeDataTable] onActivate error:", e); } });
             }
             if (typeof oCfg.rowHook === "function") { try { oCfg.rowHook(oTr, oRow, iIdx); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             return oTr;
@@ -3240,6 +3280,7 @@
         openColumnMenu: openColumnMenu,
         closeColumnMenu: closeColumnMenu,
         makeVScroller: makeVScroller,
+        isTextDragSelecting: isTextDragSelecting,
         btnLabel: btnLabel,
         makeDialogRecenter: makeDialogRecenter,
         makeDialogResizable: makeDialogResizable,

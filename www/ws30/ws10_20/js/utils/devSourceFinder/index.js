@@ -86,13 +86,13 @@ class DevSourceFinder {
     static init(targetWindow) {
         // 1. 인자값 유효성 검증
         if (!targetWindow || !targetWindow.addEventListener) {
-            console.error("[DevSourceFinder] 유효한 window 객체가 전달되지 않았습니다.");
+            console.error("[DevSourceFinder] no valid window object was passed");
             return;
         }
 
         const sLocalWorkspaceRoot = process?.env?.U4A_WS_LOCAL_ROOT;
         if (!sLocalWorkspaceRoot) {
-            console.warn("[DevSourceFinder] 환경 변수 'U4A_WS_LOCAL_ROOT' 미설정으로 비활성화됩니다.");
+            console.warn("[DevSourceFinder] env var 'U4A_WS_LOCAL_ROOT' not set - disabled");
             return;
         }
 
@@ -114,11 +114,11 @@ class DevSourceFinder {
                 console.log(`%c[Finder] %cFound Source Location: ${sSourcePath}`, "color: #007acc; font-weight: bold;", "color: inherit;");
                 this._openInVsCode(sSourcePath);
             } else {
-                console.warn("[Finder] 이 컨트롤에 연결된 소스 식별 정보가 없습니다.");
+                console.warn("[Finder] no source identification info on the control");
             }
         }, true);
 
-        console.log(`🚀 [RND] DevSourceFinder가 지정된 영역(${targetWindow.location.pathname})에 활성화되었습니다.`);
+        console.log(`[RND] DevSourceFinder enabled for ${targetWindow.location.pathname}`);
     }
 
     /**

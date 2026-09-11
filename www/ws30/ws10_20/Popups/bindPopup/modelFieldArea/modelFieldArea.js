@@ -89,7 +89,7 @@
         // 198 Help — 도움말 문서(원본 onHelp = U4A_HELP_DOC_OPEN 브로드캐스트)는 통신 단계(Stage6)에서 배선.
         oM.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {  // 198 Help
             // [B4] 모델필드 도움말 문서 "000276"(원본 index.js:4872). 영역별 라우팅.
-            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000276"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000276"); } catch (e) { console.error("[bindWindow] onHelp:", e && e.message); } }
         }));
 
         // 패널 좁아질 때 넘치는 버튼을 ⋯ 오버플로 메뉴로(16 §11, 공통 attachOverflow).
@@ -289,7 +289,7 @@
                 //   드래그 시작 = 그 행을 좌측 선택으로 잡아야, 드롭 후 참조필드(P05)가 드래그한 필드 기준으로 뜬다.
                 //   클릭 경로(onSelect)를 그대로 재사용 — select: selNode 설정 + 강조 + setRefFieldList.
                 oM.ctrl.select(oNode);
-            } catch (e) { console.error("[HTML5][bindWindow] 모델필드 dragstart:", e && e.message); }
+            } catch (e) { console.error("[bindWindow] model field dragstart:", e && e.message); }
         });
         oRow.addEventListener("dragend", function () {
             oAPP.attr.dragModelNode = null;
@@ -368,7 +368,7 @@
 
         var oInfo = oAPP.attr.oAppInfo || {};
         if (!oAPP.attr.servNm || !oInfo.CLSID) {
-            console.warn("[HTML5][bindWindow] 모델필드 로드 skip — servNm/CLSID 없음");
+            console.warn("[bindWindow] model field load skipped - servNm/CLSID missing");
             oM.ctrl.rerender();
             return;
         }
@@ -428,7 +428,7 @@
                 oAPP.fn.fitTreeColumns(oM.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
 
             } catch (e) {
-                console.error("[HTML5][bindWindow] 모델필드 로드 처리 오류:", e && e.message);
+                console.error("[bindWindow] model field load handler error:", e && e.message);
                 oM.ctrl.rerender();
             } finally {
                 oAPP.attr.isBindLoading = false;

@@ -181,7 +181,7 @@
         oAPP.DATA.APPDATA.S_ERHTML.IS_USE = oSaveData.IS_USE;
 
         // 어플리케이션 정보에 변경 플래그
-        try { parent.setAppChange('X'); } catch (e) { console.error("[HTML5][errPageEditor] setAppChange 오류:", e && e.message); }
+        try { parent.setAppChange('X'); } catch (e) { console.error("[errPageEditor] setAppChange error:", e && e.message); }
 
         // 저장으로 변경분 발생 → WS20 헤더 Active→Inactive 반영(에디터 시리즈 fnIpcMain_EditorSave 와 동일 처리).
         try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }

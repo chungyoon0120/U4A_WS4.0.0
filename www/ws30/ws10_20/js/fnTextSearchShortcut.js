@@ -14,7 +14,7 @@
 
     function _openTextSearch() {
         try { oAPP.fn.fnTextSearchPopupOpener(); }
-        catch (e) { console.error("[HTML5] text search open", e); }
+        catch (e) { console.error("text search open", e); }
     }
 
     if (typeof oAPP.common.getShortCutList === "function") {

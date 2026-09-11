@@ -241,7 +241,7 @@ function _preview() {
     _setBusy(true);
     try { clearTimeout(iPrevWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     iPrevWatch = setTimeout(function () {
-        console.error("[HTML5][errPageEditor] 미리보기 로드 지연/실패 — busy 강제 해제");
+        console.error("[errPageEditor] preview load deferred/failed — busy force release");
         _setBusy(false);
     }, 15000);
     try { IPCRENDERER.send("if-ErrorPage-Preview", { BROWSKEY: BROWSKEY, SAVEDATA: d }); }
@@ -293,7 +293,7 @@ function _onEditorInfo(event, res) {
         _setBusy(true);
         try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         iBusyWatch = setTimeout(function () {
-            console.error("[HTML5][errPageEditor] 호스트 로드 지연/실패 — busy 강제 해제");
+            console.error("[errPageEditor] host load deferred/failed — busy force release");
             _finishOpen();
         }, 15000);
         _loadHost();

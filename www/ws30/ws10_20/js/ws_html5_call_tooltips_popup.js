@@ -36,7 +36,7 @@
     "use strict";
 
     if (typeof oAPP === "undefined" || !oAPP.fn) {
-        console.error("[WS20HELP-01] oAPP.fn 미구성 — 도움말 팝업 정의 실패.");
+        console.error("[WS20HELP-01] oAPP.fn not built - help popup definition failed.");
         return;
     }
 
@@ -104,7 +104,7 @@
 
             if (bFail) {
 
-                console.error("[WS20HELP-02] 도움말 창 열기 실패(" + sWhy + ") — 경로:", l_path, oErr || "");
+                console.error("[WS20HELP-02] help window open failed(" + sWhy + ") — path:", l_path, oErr || "");
 
                 //추적 코드만 표시(내부 예외 원문 노출 금지 — 상세는 콘솔에 이미 있음).
                 //  ★ 정식 메시지 번호는 만들지 않는다(장군님 결정 2026-08-31).
@@ -113,10 +113,10 @@
                 //    도달할 일 없는 자리에 메시지 번호를 소모하지 않고, 만에 하나 터졌을 때는
                 //    추적 코드가 그대로 보이는 편이 원인 찾기에 낫다는 판단.
                 try { parent.showMessage(null, 10, "E", "WS20HELP-02"); }
-                catch (e) { console.error("[WS20HELP-02] 오류 안내 표시 실패:", e && e.message); }
+                catch (e) { console.error("[WS20HELP-02] error notice show failed:", e && e.message); }
 
                 try { if (oWin && !oWin.isDestroyed()) { oWin.destroy(); } }
-                catch (e) { console.error("[WS20HELP-02] 창 정리 실패:", e && e.message); }
+                catch (e) { console.error("[WS20HELP-02] window cleanup failed:", e && e.message); }
             }
 
             _releaseLock();
@@ -147,7 +147,7 @@
 
                 // 부모 위치 가운데 배치한다.
                 try { oAPP.fn.setParentCenterBounds(oWin, opt); }
-                catch (e) { console.error("[WS20HELP-04] 창 가운데 배치 실패(준비 시점):", e && e.message); }
+                catch (e) { console.error("[WS20HELP-04] window centering failed (at ready):", e && e.message); }
 
             });
 
@@ -167,7 +167,7 @@
                     oAPP.fn.setParentCenterBounds(oWin, opt);
 
                 } catch (e) {
-                    console.error("[WS20HELP-03] 도움말 창 표시 처리 실패:", e && e.message, e);
+                    console.error("[WS20HELP-03] help window show handle failed:", e && e.message, e);
                 }
 
                 //단축키 잠금 해제처리. + busy 해제.
@@ -200,10 +200,10 @@
     function _releaseLock() {
 
         try { oAPP.fn.setShortcutLock(false); }
-        catch (e) { console.error("[WS20HELP-03] 단축키 잠금 해제 실패:", e && e.message); }
+        catch (e) { console.error("[WS20HELP-03] shortcut lock release failed:", e && e.message); }
 
         try { parent.setBusy(""); }
-        catch (e) { console.error("[WS20HELP-03] busy 해제 실패:", e && e.message); }
+        catch (e) { console.error("[WS20HELP-03] busy release failed:", e && e.message); }
 
     }   //단축키 잠금 해제 + busy 해제.
 

@@ -1,7 +1,9 @@
 'use strict';
 
 const path = require('path');
-const { listTargets, pickMainWindow, evalOnPage, dispatchKey, parseKeySpec } = require('./lib/cdp-client');
+const {
+    listTargets, pickMainWindow, evalOnPage, dispatchKey, parseKeySpec, describeSocketMaker
+} = require('./lib/cdp-client');
 const { createLogger } = require('./lib/logger');
 
 const ARGV = process.argv.slice(2);
@@ -43,11 +45,24 @@ const TRY_KEY = getArg('--key', null); // 예: node probe.js --key F6
 const logger = createLogger(path.join(__dirname, 'logs'));
 
 async function main() {
-    logger.info(`대상 찾는 중... (${DEBUG_HOST})`);
+    // ★맨 먼저 "창에 붙을 수단이 있는지"부터 본다. (장군님 지적 2026-09-10 "다른 pc 에서 실행하자마자 오류")
+    //   없으면 창마다 알 수 없는 오류를 뱉다가 엉뚱한 문구로 끝나 원인이 안 보였다.
+    const oSock = describeSocketMaker();
+
+    if (!oSock.ok) {
+        logger.error('cannot start - no way to attach to a window.');
+        logger.error(String(oSock.reason));
+        process.exitCode = 1;
+        return;
+    }
+
+    logger.info(`창에 붙는 수단: ${oSock.from} (노드 ${oSock.node})`);
+
+    logger.info(`looking for CDP targets... (${DEBUG_HOST})`);
     const list = await listTargets(DEBUG_HOST);
 
     if (!list) {
-        logger.error('CDP에 붙지 못했다 — 대상 PC에서 앱이 원격디버그 포트를 켠 채로 실행 중인지 확인.');
+        logger.error('could not attach to CDP - check that the app is running with the remote debugging port open.');
         process.exit(1);
     }
 
@@ -57,9 +72,9 @@ async function main() {
         process.exit(1);
     }
 
-    logger.info(`대상 찾음: ${page.title} (id=${page.id})`);
+    logger.info(`target found: ${page.title} (id=${page.id})`);
 
-    const currPage = await evalOnPage(page, 'window.getCurrPage ? getCurrPage() : "(getCurrPage 없음)"');
+    const currPage = await evalOnPage(page, 'window.getCurrPage ? getCurrPage() : "(getCurrPage not defined)"');
     const appInfo = await evalOnPage(page, 'window.getAppInfo ? JSON.stringify(getAppInfo()) : "(getAppInfo 없음)"');
     logger.info(`getCurrPage() = ${currPage}`);
     logger.info(`getAppInfo() = ${appInfo}`);
@@ -70,14 +85,14 @@ async function main() {
         await dispatchKey(page, spec);
         await new Promise((r) => setTimeout(r, 1000));
 
-        const after = await evalOnPage(page, 'window.getCurrPage ? getCurrPage() : "(getCurrPage 없음)"');
-        logger.info(`발사 후 getCurrPage() = ${after}`);
+        const after = await evalOnPage(page, 'window.getCurrPage ? getCurrPage() : "(getCurrPage not defined)"');
+        logger.info(`getCurrPage() after dispatch = ${after}`);
     } else {
-        logger.info('키를 눌러보려면 --key F6 처럼 --key 인자를 주고 다시 실행.');
+        logger.info('to dispatch a key, pass --key (e.g. --key F6) and run again.');
     }
 }
 
 main().catch((e) => {
-    logger.error(`정찰 중 예외: ${e && e.stack ? e.stack : e}`);
+    logger.error(`probe threw: ${e && e.stack ? e.stack : e}`);
     process.exit(1);
 });

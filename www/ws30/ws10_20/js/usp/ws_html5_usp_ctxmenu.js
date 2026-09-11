@@ -212,9 +212,9 @@
             // K3~K10 — 작업단위별 핸들러(단계 구현). 등록 전이면 미구현 로그(임의 UI 문구 금지).
             var fnAct = oAPP.usphtml.uspCtxAction[sKey];
             if (typeof fnAct === "function") { fnAct(oNode); return; }
-            console.warn("[HTML5][WS30] 컨텍스트 메뉴 미구현(다음 단계):", sKey);
+            console.warn("[WS30] context menu not implemented (next step):", sKey);
         } catch (e) {
-            console.error("[HTML5][WS30] 컨텍스트 메뉴 실행 오류:", sKey, e);
+            console.error("[WS30] context menu run error:", sKey, e);
         }
     }
 

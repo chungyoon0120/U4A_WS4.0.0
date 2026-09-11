@@ -221,7 +221,7 @@ oAPP.views = window?.oAPP?.views || {};
                 oT.__t = setTimeout(function () { oT.dataset.show = "false"; }, 3000);
             } catch (e) {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 토스트 표시 실패는 오류코드로만 표면화한다.
-                console.error("[RSRC-001] 토스트 표시 실패 —", e && e.message, "message:", sMsg);
+                console.error("[RSRC-001] toast show failed -", e && e.message, "message:", sMsg);
             }
         }
         // 메시지 팝업(구 MessageBox) — 테마 native <dialog class="u4a-msgbox">.
@@ -235,7 +235,7 @@ oAPP.views = window?.oAPP?.views || {};
             if (!oDlg || typeof oDlg.showModal !== "function") {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — <dialog>.showModal 은 메시지 팝업의 필수 의존성.
                 //   미지원이면 삼키지 말고 오류코드로 표면화하고 fail-closed 로 종료(버튼 1개=OK, 여러 개=진행 안 함).
-                console.error("[RSRC-002] _u4aMsgBox: <dialog>.showModal 미지원 — 메시지 팝업 표시 불가. message:", sMsg);
+                console.error("[RSRC-002] _u4aMsgBox: <dialog>.showModal unsupported - message popup blocked. message:", sMsg);
                 lf_cb(aBtns.length <= 1 ? "OK" : (bCancel ? "CANCEL" : "NO"));
                 return;
             }
@@ -264,7 +264,7 @@ oAPP.views = window?.oAPP?.views || {};
             oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(bCancel ? "CANCEL" : (bNo ? "NO" : "OK")); });
             try { document.body.appendChild(oDlg); oDlg.showModal(); } catch (e) {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 표시 실패는 오류코드 표면화 + fail-closed 종료.
-                console.error("[RSRC-003] _u4aMsgBox: showModal 실패 —", e && e.message);
+                console.error("[RSRC-003] _u4aMsgBox: showModal failed —", e && e.message);
                 lf_close(aBtns.length <= 1 ? "OK" : (bCancel ? "CANCEL" : "NO"));
             }
         }
@@ -689,7 +689,7 @@ oAPP.views = window?.oAPP?.views || {};
         // 로드 실패시(네트워크 단절/잘못된 URL 등) 에도 did-finish-load 는 오지 않으므로,
         //   실패를 타임아웃으로 추측하지 않고 Electron 이 주는 실제 실패 이벤트로 해제한다.
         oBrowserWindow.webContents.on('did-fail-load', function (e, errorCode, errorDescription) {
-            console.warn("[HTML5][onNewWindow] did-fail-load:", errorCode, errorDescription);
+            console.warn("[onNewWindow] did-fail-load:", errorCode, errorDescription);
             _releaseBusy();
         });
 
@@ -1371,7 +1371,7 @@ oAPP.views = window?.oAPP?.views || {};
                     //   (ZMSG_WS_COMMON_001 049 "프로그램을 종료하시겠습니까?" / CL_WS_COMMON B87 예·B88 아니오).
                     if (typeof U4AUI === "undefined" || !U4AUI.confirm) {
                         // 확인창은 필수 의존성 — 못 띄우면 삼키지 말고 오류코드 표면화 + fail-closed(종료 안 함).
-                        console.error("[RSRC-004] u4a_neterr exit: 공통 U4AUI.confirm 미로드 — 확인창 표시 불가, 종료 취소");
+                        console.error("[RSRC-004] u4a_neterr exit: common U4AUI.confirm not loaded — checkwindow show blocked, end cancel");
                         return;
                     }
                     U4AUI.confirm({
@@ -1404,7 +1404,7 @@ oAPP.views = window?.oAPP?.views || {};
             //   포커스는 showModal() 이 스펙대로 자동 처리(첫 포커스 가능 요소=CLOSE 버튼) — 손수 focus() 안 함.
             if (!oNetBusy.open) {
                 try { oNetBusy.showModal(); }
-                catch (e) { console.error("[RSRC-005] u4a_neterr showModal 실패 —", e && e.message); }
+                catch (e) { console.error("[RSRC-005] u4a_neterr showModal failed —", e && e.message); }
             }
             _startNetErrElapsedTimer(oNetBusy);
             return;

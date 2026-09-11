@@ -38,7 +38,7 @@
         FS = parent.FS;
         PATHINFO = parent.require(PATH.join(parent.APPPATH, "ws30", "resources", "pathInfo.js"));
     } catch (e) {
-        console.error("[HTML5][WS30] editor PATHINFO load error:", e);
+        console.error("[WS30] editor PATHINFO load error:", e);
     }
 
     // 라벨/아이콘 헬퍼 — 셸 모듈(ws_html5_usp.js)이 노출한 단일 출처 사용.
@@ -141,7 +141,7 @@
                 var ed = ifr.contentWindow.editor;
                 var p = ed.getAction("editor.action.formatDocument").run();
                 if (ed === edMain) { pMain = p; }
-            } catch (e) { console.error("[HTML5][WS30] prettyPrint error:", e); }
+            } catch (e) { console.error("[WS30] prettyPrint error:", e); }
         });
 
         if (edMain) {
@@ -175,7 +175,7 @@
                 if (ifr && ifr.contentWindow && ifr.contentWindow.editor && ifr.contentWindow.editor.setDefaultFontSize) {
                     ifr.contentWindow.editor.setDefaultFontSize();
                 }
-            } catch (e) { console.error("[HTML5][WS30] defaultFont error:", e); }
+            } catch (e) { console.error("[WS30] defaultFont error:", e); }
         });
     }
 
@@ -228,7 +228,7 @@
         try {
             var WSUTIL = parent.require(PATHINFO.WSUTIL);
             return (WSUTIL && WSUTIL.MONACO_EDITOR && WSUTIL.MONACO_EDITOR.getThemeList()) || [];
-        } catch (e) { console.error("[HTML5][WS30] getThemeList error:", e); return []; }
+        } catch (e) { console.error("[WS30] getThemeList error:", e); return []; }
     }
 
     function _selectedTheme() {
@@ -255,7 +255,7 @@
                 if (FS.existsSync(sDir) === false) { FS.mkdirSync(sDir, { recursive: true }); }
                 FS.writeFileSync(PATH.join(sDir, "select_theme.json"), JSON.stringify(oThemeInfo), "utf-8");
             } catch (error) {
-                console.error("[HTML5][WS30] 테마 개인화 저장 오류:", error);
+                console.error("[WS30] theme personalization save error:", error);
             }
         }
 
@@ -320,7 +320,7 @@
                         oUd.CONTENT = (oData.CONTENT != null ? oData.CONTENT : "");
                         APPCOMMON.fnSetModelProperty("/WS30/USPDATA", oUd);
                         if (oAPP.fn.setAppChangeWs30) { oAPP.fn.setAppChangeWs30("X"); }
-                    } catch (e) { console.error("[HTML5][WS30] CONTENT_SYNC:", e); }
+                    } catch (e) { console.error("[WS30] CONTENT_SYNC:", e); }
                     return;
 
                 default:
@@ -342,7 +342,7 @@
         IFR.setAttribute("frameborder", "0");
         IFR.addEventListener("load", function (e) {
             try { if (typeof oAPP.fn.onFrameLoadUspEditor === "function") { oAPP.fn.onFrameLoadUspEditor(e); } }
-            catch (err) { console.error("[HTML5][WS30] onFrameLoadUspEditor error:", err); }
+            catch (err) { console.error("[WS30] onFrameLoadUspEditor error:", err); }
         });
         return IFR;
     }
@@ -413,7 +413,7 @@
         B.innerHTML = _fa(oCfg.fa);
         B.addEventListener("click", function () {
             if (B.disabled) { return; }
-            try { oCfg.press(B); } catch (e) { console.error("[HTML5][WS30] editor toolbar:", oCfg.id, e); }
+            try { oCfg.press(B); } catch (e) { console.error("[WS30] editor toolbar:", oCfg.id, e); }
         });
         return B;
     }
@@ -476,7 +476,7 @@
                 oThemeCombo.classList.add("u4aWs30EditorThemeSel");
                 TB.appendChild(oThemeCombo);
             }
-        } catch (e) { console.error("[HTML5][WS30] theme combo build error:", e); }
+        } catch (e) { console.error("[WS30] theme combo build error:", e); }
 
         // 기본 폰트 크기 (구 editorDefaultFontBtn) — 폴더면 비활성
         TB.appendChild(_tbBtn({
@@ -562,7 +562,7 @@
                     }
                 });
             }
-        } catch (e) { console.warn("[HTML5][WS30] editor toolbar overflow attach 실패:", e && e.message); }
+        } catch (e) { console.warn("[WS30] editor toolbar overflow attach failed:", e && e.message); }
 
         return TB;
     }
@@ -602,8 +602,8 @@
             });
             if (bReady) {
                 // 준비된 에디터에 내용/언어만 전달(전 에디터 동기) → 즉시 busy 해제.
-                try { oAPP.usp.sendEditorPostMessageAll({ actcd: "setValue", value: (oRowData && oRowData.CONTENT) || "" }); } catch (e) { console.error("[HTML5][WS30] editor setValue:", e); }
-                try { oAPP.usp.sendEditorPostMessageAll({ actcd: "language_change", extension: (oRowData && oRowData.EXTEN) || "" }); } catch (e) { console.error("[HTML5][WS30] editor language_change:", e); }
+                try { oAPP.usp.sendEditorPostMessageAll({ actcd: "setValue", value: (oRowData && oRowData.CONTENT) || "" }); } catch (e) { console.error("[WS30] editor setValue:", e); }
+                try { oAPP.usp.sendEditorPostMessageAll({ actcd: "language_change", extension: (oRowData && oRowData.EXTEN) || "" }); } catch (e) { console.error("[WS30] editor language_change:", e); }
                 // 파일 로드 시 현재 모드(IS_EDIT)에 따라 읽기전용 적용 — Display 모드면 수정 불가(원본 editable 바인딩 대응).
                 try { oAPP.usphtml.editorSetReadOnly((_model("/WS30/APP") || {}).IS_EDIT !== "X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 // display:none 으로 숨겨져 있던 동안 Monaco 가 컨테이너 0 크기로 굳었을 수 있어 강제 relayout.
@@ -658,7 +658,7 @@
         // 워치독 — 어떤 이유로 EDITOR_LOAD 가 안 와도 busy 가 영구히 안 남게(정상 시 EDITOR_LOAD 가 먼저 해제).
         if (oAPP.attr.uspEditorBusyWatch) { clearTimeout(oAPP.attr.uspEditorBusyWatch); }
         oAPP.attr.uspEditorBusyWatch = setTimeout(function () {
-            console.warn("[HTML5][WS30] editor load watchdog — busy 강제 해제(EDITOR_LOAD 누락)");
+            console.warn("[WS30] editor load watchdog - busy force released (EDITOR_LOAD missing)");
             oAPP.attr.uspEditorLoadCnt = 0;
             _releaseBusy();
         }, 7000);
@@ -681,7 +681,7 @@
                 if (f.contentWindow && f.contentWindow.editor) {
                     f.contentWindow.editor.updateOptions({ readOnly: !!bReadOnly });
                 }
-            } catch (e) { console.error("[HTML5][WS30] editorSetReadOnly:", e); }
+            } catch (e) { console.error("[WS30] editorSetReadOnly:", e); }
         });
     };
 

@@ -41,7 +41,7 @@
     // 161 컬럼최적화 — 공통 평면표의 컬럼 자동맞춤(내용 최장 폭). 원본 setUiTableAutoResizeColumn 대응. 실패 무해.
     function _fitCols(ctx) {
         if (!ctx || !ctx.dt || typeof ctx.dt.autoFit !== "function") { return; }
-        try { ctx.dt.autoFit(); } catch (e) { console.error("[HTML5][bindWindow] additFitCols:", e && e.message); }
+        try { ctx.dt.autoFit(); } catch (e) { console.error("[bindWindow] additFitCols:", e && e.message); }
     }
 
     // 161 컬럼최적화 외부 노출(우측 MAIN 버튼용 — 원본 setUiTableAutoResizeColumn 대응).
@@ -135,7 +135,7 @@
             if (bRO) { oBind.disabled = true; }
             oBind.addEventListener("click", function () {
                 if (typeof oAPP.fn.onMultiAdditionalBind === "function") {
-                    try { oAPP.fn.onMultiAdditionalBind(oBind); } catch (e) { console.error("[HTML5][bindWindow] onMultiAdditionalBind:", e && e.message); }
+                    try { oAPP.fn.onMultiAdditionalBind(oBind); } catch (e) { console.error("[bindWindow] onMultiAdditionalBind:", e && e.message); }
                 }
             });
             oA.MAIN.tool.appendChild(oBind);
@@ -149,7 +149,7 @@
             oA.MAIN.tool.appendChild(_oGearAddit);
             oA.MAIN.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
                 // [B4] 추가속성 도움말 문서 "000274"(원본 bindAdditInfo.js:348). 영역별 라우팅.
-                if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000274"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+                if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000274"); } catch (e) { console.error("[bindWindow] onHelp:", e && e.message); } }
             }));
             oAPP.fn.attachToolOverflow(oA.MAIN.tool);
 
@@ -181,7 +181,7 @@
             if (!oAPP.attr.editable) { oApply.disabled = true; }
             oApply.addEventListener("click", function () {
                 if (typeof oAPP.fn.applyDesignAdditBind === "function") {
-                    try { oAPP.fn.applyDesignAdditBind(oApply); } catch (e) { console.error("[HTML5][bindWindow] applyDesignAdditBind:", e && e.message); }
+                    try { oAPP.fn.applyDesignAdditBind(oApply); } catch (e) { console.error("[bindWindow] applyDesignAdditBind:", e && e.message); }
                 }
             });
             oA.SEL.tool.appendChild(oApply);
@@ -840,7 +840,7 @@
         try {
             if (oA.MAIN && oA.MAIN.tbody) { _renderRows(oA.MAIN); }
             if (oA.SEL && oA.SEL.tbody) { _renderRows(oA.SEL); }
-        } catch (e) { console.error("[HTML5][bindWindow] refreshAdditFieldsLock:", e && e.message); }
+        } catch (e) { console.error("[bindWindow] refreshAdditFieldsLock:", e && e.message); }
     };
 
 })();

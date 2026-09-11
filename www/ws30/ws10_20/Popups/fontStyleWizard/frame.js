@@ -95,7 +95,7 @@ function _multiInit(sDef) { return (!sDef || sDef === "none") ? [] : sDef.split(
 function _msg(sCls, sCode, p1) {
     if (!WSMSG) { return ""; }
     try { return WSMSG.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", "") || ""; }
-    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] message lookup failed", e); return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] message lookup failed", e); return ""; }
 }
 
 function _getThemeInfo() {
@@ -119,10 +119,10 @@ function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
     var oEl = document.getElementById("fwxBusy");
     if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
-    try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] set closable failed", e); }
+    try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] set closable failed", e); }
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
         try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); }
-        catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[HTML5][fontStyleWizard] busy broadcast failed", e2); }
+        catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[fontStyleWizard] busy broadcast failed", e2); }
     }
 }
 
@@ -130,7 +130,7 @@ function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); }
-    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] busy unlock send failed", e); }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] busy unlock send failed", e); }
     _setBusy(false);
     var oRoot = document.getElementById("fwxRoot");
     if (oRoot) { oRoot.classList.add("is-ready"); }
@@ -148,7 +148,7 @@ function _toast(sText) {
     }
     oEl.textContent = sText;
     oEl.dataset.show = "true";
-    try { clearTimeout(oToastTimer); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] toast timer clear failed", e); }
+    try { clearTimeout(oToastTimer); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] toast timer clear failed", e); }
     oToastTimer = setTimeout(function () { oEl.dataset.show = "false"; }, 3000);
 }
 
@@ -285,7 +285,7 @@ function _reset() {
         oState[oRow.key] = oRow.multi ? _multiInit(oRow.def) : oRow.def;
         var oField = oCustomFields[oRow.key];
         if (oField && oField.setValue) {
-            try { oField.setValue(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] custom reset failed", e); }
+            try { oField.setValue(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] custom reset failed", e); }
         }
         _syncField(oRow.key);
     });
@@ -309,7 +309,7 @@ function _makeChip(oRow, sValue) {
     oBtn.textContent = _chipLabel(oRow, sValue);
     // 자기시연: 이 칩에 자기 값을 직접 스타일로 입힌다(custom 제외)
     if (DEMO_CSS[oRow.css] && sValue !== "custom") {
-        try { oBtn.style[oRow.css] = sValue; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] chip demo style failed", e); }
+        try { oBtn.style[oRow.css] = sValue; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] chip demo style failed", e); }
     }
     oBtn.addEventListener("click", function () { _select(oRow, sValue); });
     return oBtn;
@@ -368,7 +368,7 @@ function _buildField(oRow) {
                 oCustomFields[oRow.key] = oFieldCtl;
                 oHost.appendChild(oFieldCtl.el);
             } else {
-                console.warn("[HTML5][fontStyleWizard] U4AUI.createField unavailable");
+                console.warn("[fontStyleWizard] U4AUI.createField unavailable");
             }
             oCtl.appendChild(oHost);
         }
@@ -430,7 +430,7 @@ function _copySource() {
         oSrc = document.getElementById("fwxSource");
     try {
         if (CLIPBOARD && CLIPBOARD.writeText) { CLIPBOARD.writeText(sText); bOk = true; }
-    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] clipboard write failed", e); }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] clipboard write failed", e); }
     if (!bOk && oSrc) {
         try {
             var oSel = window.getSelection();
@@ -440,7 +440,7 @@ function _copySource() {
             oSel.addRange(oRange);
             bOk = document.execCommand("copy");
             oSel.removeAllRanges();
-        } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[HTML5][fontStyleWizard] execCommand copy failed", e2); }
+        } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[fontStyleWizard] execCommand copy failed", e2); }
     }
     if (bOk) { _toast(_msg("/U4A/MSG_WS", "316") || "Copied"); }
 }
@@ -453,9 +453,9 @@ function _onThemeChange() {
             CURRWIN.webContents.insertCSS("html,body{margin:0;height:100%;background-color:" + oTheme.BGCOL + ";}");
             BGCOL = oTheme.BGCOL;
         }
-    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] theme background apply failed", e); }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] theme background apply failed", e); }
     try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } }
-    catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[HTML5][fontStyleWizard] theme apply failed", e2); }
+    catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[fontStyleWizard] theme apply failed", e2); }
 }
 
 function _initBroadcast() {
@@ -466,12 +466,12 @@ function _initBroadcast() {
             if (sPrc === "BUSY_ON") { _setBusy(true, { ISBROAD: true }); }
             else if (sPrc === "BUSY_OFF") { _setBusy(false, { ISBROAD: true }); }
         };
-    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] broadcast init failed", e); }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] broadcast init failed", e); }
 }
 
 function _keepSession() {
     try { IPCRENDERER.send("if-session-time", SESSKEY); }
-    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] keep session failed", e); }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] keep session failed", e); }
 }
 
 function _syncMaxIcon() {
@@ -479,28 +479,28 @@ function _syncMaxIcon() {
     if (!oBtn) { return; }
     try {
         oBtn.className = CURRWIN.isMaximized() ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
-    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] maximize icon sync failed", e); }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] maximize icon sync failed", e); }
 }
 
 function _initChrome() {
     var oLogo = document.getElementById("fwxLogo");
     if (oLogo) {
         try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); }
-        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] logo path failed", e); }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] logo path failed", e); }
     }
 
     var oTitle = document.getElementById("fwxTitle");
     if (oTitle) {
         var sTitle = "";
         try { sTitle = document.title || CURRWIN.getTitle() || ""; }
-        catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[HTML5][fontStyleWizard] title read failed", e2); }
+        catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[fontStyleWizard] title read failed", e2); }
         oTitle.textContent = sTitle || _msg("/U4A/CL_WS_COMMON", "B57") || "Font Style Wizard";
     }
 
     var oMin = document.querySelector('#fwxTitlebar [data-action="min"]');
     if (oMin) {
         oMin.addEventListener("click", function () {
-            try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] minimize failed", e); }
+            try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] minimize failed", e); }
         });
     }
 
@@ -511,12 +511,12 @@ function _initChrome() {
                 if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); }
                 else { CURRWIN.maximize(); }
                 _syncMaxIcon();
-            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] maximize toggle failed", e); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] maximize toggle failed", e); }
         });
         try {
             CURRWIN.on("maximize", _syncMaxIcon);
             CURRWIN.on("unmaximize", _syncMaxIcon);
-        } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[HTML5][fontStyleWizard] maximize listener failed", e2); }
+        } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[fontStyleWizard] maximize listener failed", e2); }
     }
 
     var oClose = document.querySelector('#fwxTitlebar [data-action="close"]');
@@ -526,7 +526,7 @@ function _initChrome() {
             if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); }
             else {
                 try { CURRWIN.setClosable(true); CURRWIN.close(); }
-                catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] close failed", e); }
+                catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] close failed", e); }
             }
         });
     }
@@ -540,11 +540,11 @@ function _initChrome() {
     try {
         if (window.U4AUI && U4AUI.initWindowFocusState) { U4AUI.initWindowFocusState(); }
         if (window.U4AUI && U4AUI.initTooltip) { U4AUI.initTooltip(); }
-    } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } _err("[HTML5][fontStyleWizard] common UX init failed", e3); }
+    } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } _err("[fontStyleWizard] common UX init failed", e3); }
 }
 
 window.addEventListener("load", function () {
-    try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] menu clear failed", e); }
+    try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] menu clear failed", e); }
 
     _setBusy(true);
     _initState();
@@ -554,13 +554,13 @@ window.addEventListener("load", function () {
     _update();
 
     try { IPCMAIN.on("if-p13n-themeChange-" + SYSID, _onThemeChange); }
-    catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[HTML5][fontStyleWizard] theme listener failed", e2); }
+    catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[fontStyleWizard] theme listener failed", e2); }
 
     window.addEventListener("click", _keepSession);
     window.addEventListener("keyup", _keepSession);
     _keepSession();
 
-    try { CURRWIN.show(); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } _err("[HTML5][fontStyleWizard] show failed", e3); }
+    try { CURRWIN.show(); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } _err("[fontStyleWizard] show failed", e3); }
     _finishOpen();
 });
 
@@ -569,9 +569,9 @@ window.onbeforeunload = function () {
     window.removeEventListener("click", _keepSession);
     window.removeEventListener("keyup", _keepSession);
     try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); }
-    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[HTML5][fontStyleWizard] theme listener cleanup failed", e); }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] theme listener cleanup failed", e); }
     try {
         CURRWIN.removeListener("maximize", _syncMaxIcon);
         CURRWIN.removeListener("unmaximize", _syncMaxIcon);
-    } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[HTML5][fontStyleWizard] window listener cleanup failed", e2); }
+    } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _err("[fontStyleWizard] window listener cleanup failed", e2); }
 };

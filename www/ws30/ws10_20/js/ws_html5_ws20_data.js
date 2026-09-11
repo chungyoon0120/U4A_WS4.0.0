@@ -122,7 +122,7 @@
     function _safeDecorate(sFnName, oRootNode) {
         var fn = oAPP.fn && oAPP.fn[sFnName];
         if (typeof fn !== "function") {
-            console.warn("[HTML5][WS20][data] decorator not found (skip):", sFnName);
+            console.warn("[WS20][data] decorator not found (skip):", sFnName);
             return;
         }
         if (!oRootNode) {
@@ -132,7 +132,7 @@
         try {
             fn(oRootNode);
         } catch (e) {
-            console.warn("[HTML5][WS20][data] decorator skip (라이브러리/미변환 의존):",
+            console.warn("[WS20][data] decorator skipped (depends on library / not converted):",
                 sFnName, e && e.message);
         }
     }
@@ -163,12 +163,12 @@
                 oAPP.attr.APPID = oAppInfo.APPID;
             }
         } catch (e) {
-            console.warn("[HTML5][WS20][data] appInfo/servNm 준비 실패(서버 미로그인 가능):", e && e.message);
+            console.warn("[WS20][data] appInfo/servNm not ready (server login may be pending):", e && e.message);
         }
 
         // 서버 경로/APPID 가 없으면(헤드리스/비로그인) 서버 호출하지 않고 빈 트리 유지.
         if (!oAPP.attr.servNm || !oAPP.attr.APPID) {
-            console.warn("[HTML5][WS20][data] servNm/APPID 없음 — 빈 트리 유지(서버 미로그인).");
+            console.warn("[WS20][data] servNm/APPID missing - keeping the empty tree (server login).");
             return;
         }
 
@@ -191,7 +191,7 @@
 
                     // 서버 응답 방어(헤드리스/오류 응답).
                     if (!param || !param.APPDATA || !param.APPDATA.T_0014) {
-                        console.warn("[HTML5][WS20][data] APPDATA/T_0014 없음 — 빈 트리 유지.");
+                        console.warn("[WS20][data] APPDATA/T_0014 missing - keeping the empty tree.");
                         return;
                     }
 
@@ -371,7 +371,7 @@
                             oAPP.fn.fnWs20LoadPreview();
                         }
                     } catch (e) {
-                        console.warn("[HTML5][WS20][data] 미리보기 로드 호출 오류:", e && e.message);
+                        console.warn("[WS20][data] preview load call error:", e && e.message);
                     }
 
                     //세션 랜덤키 얻기. (원본 592행 — 미리보기 DnD 가 참조)
@@ -380,7 +380,7 @@
                     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 } catch (e) {
-                    console.warn("[HTML5][WS20][data] getAppData 처리 오류:", e && e.message);
+                    console.warn("[WS20][data] getAppData handle error:", e && e.message);
                 } finally {
                     // 완료 시 busy lock 해제 — 단, 가운데 미리보기(iframe)가 busy 를 인수
                     // (부팅 중: __ws20PrevBooting)했으면 끄지 않는다. 미리보기 성공/실패/watchdog
@@ -392,12 +392,12 @@
 
             }, "X", true, "GET", function (e) {
                 // 오류 발생 시(서버 미연결 등) busy 해제 + 빈 트리 유지.
-                console.warn("[HTML5][WS20][data] getAppData 서버 호출 실패 — 빈 트리 유지.");
+                console.warn("[WS20][data] getAppData server call failed - keeping the empty tree.");
                 try { oAPP.common.fnSetBusyLock(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             });
         } catch (e) {
             // sendAjax 자체가 throw(헤드리스 환경 등) → busy 해제 + 빈 트리 유지.
-            console.warn("[HTML5][WS20][data] sendAjax 호출 실패 — 빈 트리 유지:", e && e.message);
+            console.warn("[WS20][data] sendAjax call failed - keeping the empty tree:", e && e.message);
             try { oAPP.common.fnSetBusyLock(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         }
 
@@ -458,7 +458,7 @@
                 _oUndoRedo.clearHistory();
                 _oUndoRedo.setUndoRedoButtonEnable();
             } catch (e) {
-                console.warn("[HTML5][WS20][data] undo/redo 초기화 skip:", e && e.message);
+                console.warn("[WS20][data] undo/redo init skip:", e && e.message);
             }
 
             var _oRoot = (oAPP.attr.oModel.oData.zTREE && oAPP.attr.oModel.oData.zTREE[0]) || null;
@@ -539,7 +539,7 @@
                 _oUndoRedo2.clearHistory();
                 _oUndoRedo2.setUndoRedoButtonEnable();
             } catch (e) {
-                console.warn("[HTML5][WS20][data] undo/redo 초기화 skip:", e && e.message);
+                console.warn("[WS20][data] undo/redo init skip:", e && e.message);
             }
 
             //design 레이아웃 순서 설정. (원본 823행 setDesignLayout — UI5 splitter 의존,
@@ -568,7 +568,7 @@
         }
 
         //LIB 로더 미존재(이론상 없음) — 트리 로드만 진행.
-        console.warn("[HTML5][WS20][data] fnLoadWs20LibData 미존재 — LIB 없이 트리 로드.");
+        console.warn("[WS20][data] fnLoadWs20LibData missing - loading the tree without LIB.");
         oAPP.fn.fnLoadWs20TreeData();
 
     }; // end of oAPP.fn.setUIAreaEditable

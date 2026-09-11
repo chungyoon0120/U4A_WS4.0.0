@@ -362,7 +362,7 @@
      */
     async function _devBrowser_newtab(){
         
-        console.log("새탭 감지!!!");
+        console.log("new tab detected");
 
         let oBindData = this;
         let oAPP = oBindData.oAPP;
@@ -404,7 +404,7 @@
      */
     async function _devBrowser_framenavigated(e){
         
-        console.log("URL 변경 감지!!!!!!!", e);
+        console.log("URL change detected", e);
         
         let oBindData = this;
         let oAPP = oBindData.oAPP;
@@ -470,7 +470,7 @@
      */
     function _devBrowser_requestfailed(e){
         
-        console.error(`${CONSOLE_SCOPE} - 요청 실패`, e);
+        console.error(`${CONSOLE_SCOPE} - request failed`, e);
 
         // let oBindData = this;
         // let oAPP = oBindData.oAPP;

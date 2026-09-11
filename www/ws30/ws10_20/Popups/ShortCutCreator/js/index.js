@@ -104,7 +104,7 @@
         oT.textContent = sMsg;
         oT.setAttribute("data-show", "true");
         clearTimeout(_toastTimer);
-        _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { console.error("[숏컷] 토스트 숨김 오류:", e); } }, 3000);
+        _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { console.error("[shortcut] toast hide error:", e); } }, 3000);
     }
 
     // 워크스페이스 메시지(ZMSG_WS_COMMON_001) — 번호 기준. 공통 빈상태("데이터 없음"=946) 등. getMsgText(SAP 메시지클래스)와 별개 채널.
@@ -114,7 +114,7 @@
         try {
             let sTxt = oAPP.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo, sP1);
             if (sTxt && sTxt.trim()) { return sTxt; }
-        } catch (e) { console.error("[숏컷] 워크스페이스 메시지 조회 실패:", e); }
+        } catch (e) { console.error("[shortcut] workspace message read failed:", e); }
         // 폴백 문구에도 동일하게 &1 치환.
         return (sFallback || sNo).replace(/&1/g, sP1);
     }
@@ -128,7 +128,7 @@
     window.getUserInfo = function () { return oAPP.attr.oUserInfo; };
     window.getServerPath = function () { return (oAPP.config && oAPP.config.SHOST) || ''; };
     window.getIsTrial = function () { return false; };
-    window.showMessage = function (oSap, iCode, sType, sText) { try { U4AUI.confirm({ type: sType, title: getMsgText('/U4A/CL_WS_COMMON','C00','fail'), message: sText }); } catch (e) { console.error('[숏컷] showMessage shim 오류:', e); } };
+    window.showMessage = function (oSap, iCode, sType, sText) { try { U4AUI.confirm({ type: sType, title: getMsgText('/U4A/CL_WS_COMMON','C00','fail'), message: sText }); } catch (e) { console.error('[shortcut] showMessage shim error:', e); } };
     // fnAppF4PopupOpen 의 전역 sendAjax(ws_common.js) 경량 shim — 자식창엔 원본이 없어 fetch 로 대체(FormData+WSVER 계약 유지).
     window.sendAjax = function (sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_error) {
 
@@ -166,16 +166,16 @@
                 var _i = _sp.indexOf("?");
                 if (_i >= 0) { _sp = _sp.slice(0, _i) + " (뒤쪽 정보는 가림)"; }
 
-                U4ALOG.error("서버통신 실패 상세", "보낸 곳: " + _sp);
+                U4ALOG.error("서버통신 실패 상세", "sent to: " + _sp);
 
                 var x = oXhrLike || null;
 
                 if (!x) {
-                    U4ALOG.error("서버통신 실패 상세", "서버 응답 자체가 없음 (연결이 끊겼거나 서버에 못 닿음)");
+                    U4ALOG.error("서버통신 실패 상세", "no response at all (connection dropped or server unreachable)");
                     return;
                 }
 
-                U4ALOG.error("서버통신 실패 상세", "서버 상태: "
+                U4ALOG.error("서버통신 실패 상세", "http status: "
                     + ((typeof x.status === "number") ? x.status : "-")
                     + (x.statusText ? (" " + x.statusText) : ""));
 
@@ -184,7 +184,7 @@
                         var _aMark = ["sap-err-id", "u4a_status", "content-type"];
                         for (var _k = 0; _k < _aMark.length; _k++) {
                             var _v = x.getResponseHeader(_aMark[_k]);
-                            if (_v) { U4ALOG.error("서버통신 실패 상세", "응답표시 " + _aMark[_k] + ": " + _v); }
+                            if (_v) { U4ALOG.error("서버통신 실패 상세", "response header " + _aMark[_k] + ": " + _v); }
                         }
                     }
                 } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
@@ -196,13 +196,13 @@
                     if (!_sBody) {
                         _sBody = "(서버가 아무 내용도 안 줬음)";
                     } else if (_sBody.length > 4000) {
-                        _sBody = _sBody.slice(0, 4000) + " …(뒤 " + (_sBody.length - 4000) + "자 잘림)";
+                        _sBody = _sBody.slice(0, 4000) + " ...(" + (_sBody.length - 4000) + " more chars truncated)";
                     }
 
-                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용: " + _sBody);
+                    U4ALOG.error("서버통신 실패 상세", "response body: " + _sBody);
 
                 } catch (e3) {
-                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용을 못 읽음: " + e3);
+                    U4ALOG.error("서버통신 실패 상세", "response body unreadable: " + e3);
                 }
 
             } catch (e) {
@@ -220,7 +220,7 @@
             } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
-        _ajaxLog("보냈음", "");
+        // 보낼 때는 안 남긴다 — 끝날 때 한 줄에 다 담는다 (2026-09-10)
 
         try {
             var oUser = oAPP.attr.oUserInfo || {};
@@ -230,15 +230,15 @@
             }
             fetch(sPath, { method: (meth || "POST"), body: (oFormData || undefined) })
                 .then(function (r) { if (!r.ok) { throw new Error("HTTP " + r.status); } return r.json(); })
-                .then(function (oRes) { _ajaxLog("끝남", "성공"); if (typeof fn_success === "function") { fn_success(oRes); } })
+                .then(function (oRes) { _ajaxLog("끝남", "성공 (상태 " + ((typeof xhr !== "undefined" && xhr && xhr.status) ? xhr.status : "-") + ")"); if (typeof fn_success === "function") { fn_success(oRes); } })
                 .catch(function (err) {
                     _ajaxFail((err && err.message ? err.message : "서버에 못 닿음"), (err && err.xhr) ? err.xhr : null);
-                    console.error('[숏컷] sendAjax shim 오류:', err);
-                    if (typeof fn_error === "function") { try { fn_error(err); } catch (e) { console.error('[숏컷] sendAjax fn_error 오류:', e); } }
+                    console.error('[shortcut] sendAjax shim error:', err);
+                    if (typeof fn_error === "function") { try { fn_error(err); } catch (e) { console.error('[shortcut] sendAjax fn_error error:', e); } }
                 });
         } catch (e) {
-            console.error('[숏컷] sendAjax shim 예외:', e);
-            if (typeof fn_error === "function") { try { fn_error(e); } catch (e2) { console.error('[숏컷] sendAjax fn_error 예외:', e2); } }
+            console.error('[shortcut] sendAjax shim exception:', e);
+            if (typeof fn_error === "function") { try { fn_error(e); } catch (e2) { console.error('[shortcut] sendAjax fn_error exception:', e2); } }
         }
     };
 
@@ -407,14 +407,14 @@
             oAPP.fn.fnAppF4PopupOpen(oOptions, function (oRow) {
                 if (oRow && oRow.APPID) { oAppIdField.setValue(oRow.APPID); oAppIdField.setValueState('none'); fn_CheckAppId(); }
             });
-        } else { console.error('[숏컷] fnAppF4PopupOpen 미로드'); }
+        } else { console.error('[shortcut] fnAppF4PopupOpen not loaded'); }
     }
 
     // 검증 실패 필드 자동 포커스(공통 §3.5.4) — Chromium93 함정 A(진행중 포커스에 밀림) 회피 위해 다음 틱으로 미룸.
     //   호출측이 busy/모달을 먼저 닫은 뒤(동기) 실행되도록 setTimeout(0) 사용(함정 B).
     function _refocus(oField) {
         if (oField && typeof oField.focus === "function") {
-            setTimeout(function () { try { oField.focus(); } catch (e) { console.error("[숏컷] 재포커스 오류:", e); } }, 0);
+            setTimeout(function () { try { oField.focus(); } catch (e) { console.error("[shortcut] re-focus error:", e); } }, 0);
         }
     }
 
@@ -427,7 +427,7 @@
             var sRaw = String(sText || "");
             var sLoc = WC.relocalize(sRaw, null, (oAPP.attr.oUserInfo && oAPP.attr.oUserInfo.LANGU) || "");
             return (sLoc && sLoc !== sRaw) ? sLoc : sText;
-        } catch (e) { console.error("[숏컷] 서버오류 역현지화 실패:", e); return sText; }
+        } catch (e) { console.error("[shortcut] server error localization failed:", e); return sText; }
     }
 
     // MSG_WS 014 = "&1 은(는) 필수 입력값입니다" — 필드명(&1)을 반드시 넘긴다(안 넘기면 주어 없이 "은 필수 입력값입니다"로 뜸).
@@ -584,7 +584,7 @@
             }
 
         } catch (err) {
-            console.error("[숏컷] App ID 서버 검증 및 파라미터 유효성 검사 오류:", err);
+            console.error("[shortcut] App ID server validation / parameter check error:", err);
             const Lmsg = err.message || err.responseText || "";
             U4AUI.confirm({
                 type: "E",
@@ -745,7 +745,7 @@
             }
         });
         } catch (e) {
-            console.error("[숏컷] 숏컷 생성 전 유효성 검사 예외 발생:", e);
+            console.error("[shortcut] validation before shortcut create threw:", e);
             fn_setBusy(false);
             U4AUI.confirm({
                 type: "E",
@@ -805,7 +805,7 @@
         if (browserType === "chrome") {
             let oFound = oAPP.browserInfo.find(b => b.TYPE === "CR");
             if (!oFound) {
-                console.error("[숏컷] Chrome 브라우저 정보가 존재하지 않습니다.");
+                console.error("[shortcut] Chrome browser info not found.");
                 let sMsg = getMsgText("/U4A/MSG_WS", "333", "Installed browser information not found.");
                 U4AUI.confirm({
                     type: "E",
@@ -820,7 +820,7 @@
         } else {
             let oFound = oAPP.browserInfo.find(b => b.TYPE === "MS_EDGE");
             if (!oFound) {
-                console.error("[숏컷] Edge 브라우저 정보가 존재하지 않습니다.");
+                console.error("[shortcut] Edge browser info not found.");
                 let sMsg = getMsgText("/U4A/MSG_WS", "333", "Installed browser information not found.");
                 U4AUI.confirm({
                     type: "E",
@@ -867,7 +867,7 @@
             fn_setBusy(false);
         }
         } catch (e) {
-            console.error("[숏컷] 바로가기 파일 생성 실행 중 예외 발생:", e);
+            console.error("[shortcut] shortcut file create threw:", e);
             fn_setBusy(false);
             U4AUI.confirm({
                 type: "E",
@@ -1419,17 +1419,17 @@
                 try {
                     var oI = oMax.querySelector("i");
                     if (oI) { oI.className = oAPP.CURRWIN.isMaximized() ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
-                } catch (e) { console.error("[숏컷] 최대화 아이콘 동기화 오류:", e); }
+                } catch (e) { console.error("[shortcut] maximize icon sync error:", e); }
             }
             oMax.addEventListener("click", function () {
                 try {
                     if (oAPP.CURRWIN.isMaximized()) { oAPP.CURRWIN.unmaximize(); } else { oAPP.CURRWIN.maximize(); }
-                } catch (e) { console.error("[숏컷] 최대화 토글 오류:", e); }
+                } catch (e) { console.error("[shortcut] maximize toggle error:", e); }
             });
             try {
                 oAPP.CURRWIN.on("maximize", _syncMaxIcon);
                 oAPP.CURRWIN.on("unmaximize", _syncMaxIcon);
-            } catch (e) { console.error("[숏컷] 최대화 리스너 등록 오류:", e); }
+            } catch (e) { console.error("[shortcut] maximize listener register error:", e); }
             _syncMaxIcon();
         })();
 

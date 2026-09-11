@@ -28,11 +28,11 @@
     // 팝업 → WS20 방송 송신(원본 sendPostMessage). 채널 없으면 오류 로깅(삼킴 아님).
     function _sendPostMessage(oData) {
         if (!oChannel) {
-            console.error("[HTML5][bindWindow] 방송채널 없음 — 송신 불가:", oData && oData.PRCCD);
+            console.error("[bindWindow] no broadcast channel - send blocked:", oData && oData.PRCCD);
             return;
         }
         try { oChannel.postMessage(oData); }
-        catch (e) { console.error("[HTML5][bindWindow] 방송 송신 오류:", oData && oData.PRCCD, e && e.message); }
+        catch (e) { console.error("[bindWindow] broadcast send error:", oData && oData.PRCCD, e && e.message); }
     }
 
     // WS20 디자인 영역 busy off 요청(원본 sendDesignAreaBusyOff) — WS20 잠금 해제.
@@ -78,7 +78,7 @@
      ************************************************************************/
     oAPP.fn.updateBindPopupDesignData = function () {
         if (!oChannel) {
-            console.error("[HTML5][bindWindow] 방송채널 없음 — WS20 반영 불가(UPDATE-DESIGN-DATA)");
+            console.error("[bindWindow] no broadcast channel - WS20 apply blocked (UPDATE-DESIGN-DATA)");
             return;
         }
         oAPP.fn.setBusy(true);
@@ -139,7 +139,7 @@
                 //   되돌아갔다. 원본대로 호출하지 않는다.
                 // (원본 289) oAPP.fn.setAdditialListData();
             } catch (e) {
-                console.error("[HTML5][bindWindow] UPDATE_DESIGN_DATA 재구성 오류:", e && e.message);
+                console.error("[bindWindow] UPDATE_DESIGN_DATA rebuild error:", e && e.message);
             } finally {
                 _sendDesignAreaBusyOff();   // WS20 잠금 해제(불변 계약) — 처리 완료 후 반드시.
                 oAPP.fn.setBusy(false);
@@ -227,7 +227,7 @@
         if (!(oAPP.attr.designTree || []).length) { return; }
         if (typeof oAPP.fn.selectDesignNodeByObjid === "function") {
             try { oAPP.fn.selectDesignNodeByObjid(sObjid); }
-            catch (e) { console.error("[HTML5][bindWindow] selectDesignNodeByObjid:", e && e.message); }
+            catch (e) { console.error("[bindWindow] selectDesignNodeByObjid:", e && e.message); }
         }
     }
 
@@ -243,14 +243,14 @@
         iBroadRaf = requestAnimationFrame(function () {
             iBroadRaf = 0;
             try { oAPP.fn.updateBindPopupDesignData(); }
-            catch (e) { console.error("[HTML5][bindWindow] designBroadcastUpdate:", e && e.message); }
+            catch (e) { console.error("[bindWindow] designBroadcastUpdate:", e && e.message); }
         });
     };
 
     // [PUBLIC] 방송 채널 생성(원본 createChannel) — frame.js Stage6 에서 호출.
     oAPP.fn.createBindChannel = function () {
         if (!oAPP.attr.channelKey) {
-            console.error("[HTML5][bindWindow] channelKey 없음 — 방송채널 미생성(WS20 동기화 불가)");
+            console.error("[bindWindow] channelKey missing - cannot create the broadcast channel (WS20 sync blocked)");
             return;
         }
         if (oChannel) { return; }   // 중복 생성 방지.

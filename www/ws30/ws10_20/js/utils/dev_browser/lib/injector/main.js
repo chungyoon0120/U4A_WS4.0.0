@@ -17,7 +17,7 @@ module.exports = async function () {
     window.u4adevb = window.u4adevb || {};
 
     if (!u4adevb.util.checkIsU4A()) {
-        console.warn("[injectScript - main.js] U4A 환경이 아닙니다.");
+        console.warn("[injectScript - main.js] not a U4A environment");
         return;
     }
 
@@ -145,7 +145,7 @@ module.exports = async function () {
 
         window.addEventListener('click', async (e) => {
 
-            console.log("**log: 클릭이 발생함!");
+            console.log("**log: click");
 
             // Ctrl 키를 눌러야 동작함!!
             if (!e.ctrlKey) {
@@ -232,7 +232,7 @@ module.exports = async function () {
             let bIsInclude = u4adevb.util.isIncludeUsageArea(oControl);
             if (bIsInclude === true) {
 
-                console.log("선택한 UI는 Usage영역에 있는 UI입니다.");
+                console.log("selected UI is inside a UsageArea");
 
                 oActionInfo.IS_CURR_APP = false;
                 // return;
@@ -353,7 +353,7 @@ module.exports = async function () {
                     mutation.addedNodes.forEach(node => {
                         if (node.nodeType !== 1 || !node.classList.contains("u4aMUsageArea")) return;
 
-                        console.log("✨ [추가됨] UsageArea 발견:", node.id);
+                        console.log("✨ [added] UsageArea found:", node.id);
 
                         // 여기에 추가 시 실행할 로직 작성 (예: 초기화, 스타일 수정 등)          
                         // 비동기 실행 (브라우저 유휴 시간 활용 또는 지연 실행)
@@ -374,7 +374,7 @@ module.exports = async function () {
                     mutation.removedNodes.forEach(node => {
                         if (node.nodeType !== 1 || !node.classList.contains("u4aMUsageArea")) return;
 
-                        console.log("🗑️ [삭제됨] UsageArea 제거됨:", node.id);
+                        console.log("🗑️ [removed] UsageArea removed:", node.id);
 
                         // 여기에 추가 시 실행할 로직 작성 (예: 초기화, 스타일 수정 등)          
                         // 비동기 실행 (브라우저 유휴 시간 활용 또는 지연 실행)

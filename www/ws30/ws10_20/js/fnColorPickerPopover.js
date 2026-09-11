@@ -289,7 +289,7 @@
     var sHex = rgb2hex(rgb.r, rgb.g, rgb.b);
     var fn = fnOnConfirm;
     lf_close();
-    if (typeof fn === "function") { try { fn(sHex); } catch (e) { console.error("[HTML5][ColorPicker] confirm cb 오류:", e && e.message); } }
+    if (typeof fn === "function") { try { fn(sHex); } catch (e) { console.error("[ColorPicker] confirm cb error:", e && e.message); } }
   }
 
   /************************************************************************

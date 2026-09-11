@@ -69,11 +69,11 @@
                     return;
                 }
                 try { oAPP.fn.fnUiTempWizardPopupOpener(param); }
-                catch (e) { console.error("[HTML5][WS20][tplwiz] open:", e && e.message ? e.message : e); _unlock(); return; }
+                catch (e) { console.error("[WS20][tplwiz] open:", e && e.message ? e.message : e); _unlock(); return; }
                 try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         } catch (e) {
-            console.error("[HTML5][WS20][tplwiz] WZD_CHKER:", e && e.message ? e.message : e);
+            console.error("[WS20][tplwiz] WZD_CHKER:", e && e.message ? e.message : e);
             _unlock();
         }
     }
@@ -93,7 +93,7 @@
                     _wizCallback(oReturn, fnCallback);
                 });
             } catch (e) {
-                console.error("[HTML5][WS20][tplwiz] getScript:", e && e.message ? e.message : e);
+                console.error("[WS20][tplwiz] getScript:", e && e.message ? e.message : e);
                 _fail(fnCallback, "");
             }
             return;
@@ -146,7 +146,7 @@
                 _fail(fnCallback, (oCancel && oCancel.RTMSG) || _mw("262"));
             });
         } catch (e) {
-            console.error("[HTML5][WS20][tplwiz] aggrSelectPopup:", e && e.message ? e.message : e);
+            console.error("[WS20][tplwiz] aggrSelectPopup:", e && e.message ? e.message : e);
             _bindBusy("BUSY_OFF");
             _fail(fnCallback, "");
         }
@@ -174,7 +174,7 @@
                 l_OBJID = _createUI(oReturn, aggr, ls_parent);
             }
         } catch (e) {
-            console.error("[HTML5][WS20][tplwiz] createUI:", e && e.message ? e.message : e);
+            console.error("[WS20][tplwiz] createUI:", e && e.message ? e.message : e);
             _bindBusy("BUSY_OFF");
             _fail(fnCallback, "");
             return;
@@ -195,7 +195,7 @@
             _bindBusy("BUSY_OFF");
             fnCallback({ SUBRC: "S", MSG: _mw("005") }); // Job finished.
         }, function (e) {
-            console.error("[HTML5][WS20][tplwiz] finish:", e && e.message ? e.message : e);
+            console.error("[WS20][tplwiz] finish:", e && e.message ? e.message : e);
             _bindBusy("BUSY_OFF");
             fnCallback({ SUBRC: "S", MSG: _mw("005") }); // 생성은 완료 — 갱신 오류도 성공 처리
         });

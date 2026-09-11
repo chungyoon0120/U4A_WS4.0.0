@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- ===== CSS 리소스 스택 (tokens → shell → bootstrap-bridge → bootstrap-skin → 화면) ===== -->
+    <link rel="stylesheet" href="../../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="../../../../../lib/bootstrap/5.0.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../../../theme/tokens.css">
+    <link rel="stylesheet" href="../../../theme/shell.css">
+    <link rel="stylesheet" href="../../../theme/bootstrap-bridge.css">
+    <link rel="stylesheet" href="../../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="css/index.css">
+
+    <!-- ===== JS 리소스 스택 (동기) ===== -->
+    <script src="../../../theme/theme-api.js"></script>
+    <script src="../../../theme/u4a-ui.js"></script>
+
+    <!-- [흰 번쩍 방지 — 동기] 부모가 넘긴 배경색/테마/제목을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) {
+                //첫 페인트 전 단계라 화면에 알릴 곳이 없다. 콘솔에만 남기고 화면은 그대로 뜬다.
+                console.error("[DMWN-001] 첫 페인트 테마 적용 실패:", e);
+            }
+        })();
+    </script>
+</head>
+
+<body class="u4aDmBody">
+
+    <!-- ===== 창틀 없는 타이틀바 (공통) ===== -->
+    <header class="u4a-titlebar" id="dmTitlebar">
+        <img class="u4a-titlebar__logo" id="dmLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="dmTitle">데이터 모니터</span>
+        <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="dmWinMax" data-action="max" title="Maximize" aria-label="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="dmWinClose" data-action="close" title="Close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <main class="u4aDmMain">
+
+        <!-- ===== 조작 줄 ===== -->
+        <div class="u4aDmBar" id="dmBar">
+            <button type="button" class="u4a-btn u4a-btn--emphasized" id="dmBtnToggle">
+                <i class="fa-solid fa-play"></i> <span id="dmBtnToggleText">감시 시작</span>
+            </button>
+            <button type="button" class="u4a-btn" id="dmBtnNow">
+                <i class="fa-solid fa-arrows-rotate"></i> <span>지금 비교</span>
+            </button>
+            <button type="button" class="u4a-btn" id="dmBtnClear">
+                <i class="fa-solid fa-eraser"></i> <span>기록 지우기</span>
+            </button>
+
+            <span class="u4aDmBar__sep" aria-hidden="true"></span>
+
+            <!-- 뷰 전환 — 리스트 뷰 / 트리 뷰 -->
+            <button type="button" class="u4a-btn pressed" id="dmBtnList">
+                <i class="fa-solid fa-list"></i> <span>리스트 뷰</span>
+            </button>
+            <button type="button" class="u4a-btn" id="dmBtnTree">
+                <i class="fa-solid fa-sitemap"></i> <span>트리 뷰</span>
+            </button>
+
+            <!-- 트리 뷰 전용 — 전체 / 바뀐 것만 -->
+            <div class="u4aDmTreeOnly" id="dmTreeOnly" hidden>
+                <div class="u4aDmTreeFiltHost" id="dmTreeFiltHost"></div>
+                <div class="u4a-field u4aDmFilterField" data-trail="1">
+                    <input type="text" class="u4a-input u4a-field__input u4aDmTreeSearch" id="dmTreeSearch" placeholder="이름 찾기">
+                    <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear" aria-label="Clear"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <span class="u4aDmBar__sep" aria-hidden="true"></span>
+
+            <label class="u4aDmChk"><input type="checkbox" id="dmChkCode"><span>공통코드 포함</span></label>
+            <label class="u4aDmChk"><input type="checkbox" id="dmChkLib"><span>라이브러리 포함</span></label>
+
+            <div class="u4aDmBar__spacer"></div>
+            <span class="u4aDmState" id="dmState">감시 꺼짐</span>
+        </div>
+
+        <!-- ===== 바뀐 것 목록 — 곁가지 없이 바뀐 자리만 (장군님 지시 2026-09-10) ===== -->
+        <div class="u4aDmList" id="dmList">
+
+            <div class="u4a-table-wrap u4aDmTableWrap" id="dmTableWrap" hidden>
+                <table class="u4a-table u4aDmTable">
+                    <colgroup>
+                        <col style="width:7.5rem">
+                        <col style="width:7.5rem">
+                        <col>
+                        <col style="width:14rem">
+                        <col style="width:14rem">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>시각</th>
+                            <th>종류</th>
+                            <th>path</th>
+                            <th>이전</th>
+                            <th>새 값</th>
+                        </tr>
+                        <!-- 걸러내기 줄 — 글자를 넣으면 그 글자가 든 줄만 남는다.
+                             글자 칸은 공통 입력칸(.u4a-field) 구조 그대로 → 값이 있을 때만 지우기(X)가 보인다. -->
+                        <tr class="u4aDmFilterRow">
+                            <th>
+                                <div class="u4a-field u4aDmFilterField" data-trail="1">
+                                    <input type="text" class="u4a-input u4a-field__input u4aDmFilter" data-col="0" placeholder="시각">
+                                    <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear" aria-label="Clear"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </th>
+                            <!-- 종류 고르기 — 브라우저가 그리는 펼침 목록은 색이 안 먹어(흰 바탕)
+                                 앱 공통 드롭다운으로 갈아 끼운다. 자리만 잡아 두고 js/index.js 가 채운다. -->
+                            <th><div class="u4aDmKindHost" id="dmKindHost"></div></th>
+                            <th>
+                                <div class="u4a-field u4aDmFilterField" data-trail="1">
+                                    <input type="text" class="u4a-input u4a-field__input u4aDmFilter" data-col="2" placeholder="path">
+                                    <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear" aria-label="Clear"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </th>
+                            <th>
+                                <div class="u4a-field u4aDmFilterField" data-trail="1">
+                                    <input type="text" class="u4a-input u4a-field__input u4aDmFilter" data-col="3" placeholder="이전">
+                                    <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear" aria-label="Clear"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </th>
+                            <th>
+                                <div class="u4a-field u4aDmFilterField" data-trail="1">
+                                    <input type="text" class="u4a-input u4a-field__input u4aDmFilter" data-col="4" placeholder="새 값">
+                                    <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear" aria-label="Clear"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="dmRows"></tbody>
+                </table>
+            </div>
+
+            <!-- 트리 뷰 — 공통 컬럼 트리(u4aColTree)가 여기에 그려진다 -->
+            <div class="u4aDmTreeHost" id="dmTreeHost" hidden></div>
+
+            <div class="u4aDmEmpty u4a-selectable" id="dmEmpty">
+                <p>감시 시작을 누른 뒤 화면을 조작하십시오.</p>
+                <p class="u4aDmEmpty__sub">바뀐 자리가 여기에 쌓입니다.</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ===== 위에 덮는 로딩 표시 ===== -->
+    <dialog class="u4a-busy" id="dmBusy" role="progressbar" aria-valuetext="Busy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+            <div class="u4a-busy__label" id="dmBusyLabel"></div>
+        </div>
+    </dialog>
+
+    <script src="../../../../../lib/bootstrap/5.0.2/js/bootstrap.bundle.min.js"></script>
+    <script src="js/index.js"></script>
+
+</body>
+
+</html>

@@ -116,7 +116,9 @@
                 { key: "Test91", text: "Prop Help" },
                 { key: "Test96", text: "스크립트 오류" },
                 { key: "Test94", text: "sample script download" },
-                { key: "Test87", text: "AI 연결 테스트" }
+                { key: "Test87", text: "AI 연결 테스트" },
+                // [내부 데이터 모니터] 조작할 때마다 내부 오브젝트에서 무엇이 바뀌는지 보여주는 개발자용 창.
+                { key: "Test84", text: "데이터 모니터" }
             ] }
         ];
     }
@@ -125,10 +127,10 @@
     function _ws20MenuSelect(it) {
         var fn = oAPP.fn["fnWS20" + it.key];
         if (typeof fn === "function") {
-            try { fn(); } catch (e) { console.warn("[HTML5][WS20] menu " + it.key + " error:", e && e.message); }
+            try { fn(); } catch (e) { console.warn("[WS20] menu " + it.key + " error:", e && e.message); }
             return;
         }
-        console.warn("[HTML5][WS20] menu not implemented:", it.key);
+        console.warn("[WS20] menu not implemented:", it.key);
     }
 
     /************************************************************************
@@ -183,14 +185,14 @@
             BTN.addEventListener("click", function () {
                 var fn = oAPP.events && oAPP.events[oCfg.ev];
                 if (typeof fn !== "function") {
-                    console.warn("[HTML5][WS20] transaction action not implemented:", oCfg.ev);
+                    console.warn("[WS20] transaction action not implemented:", oCfg.ev);
                     return;
                 }
                 try {
                     // 원본은 oEvent 인자를 받는 핸들러도 있으나, 셸 단계에선 인자 없이 호출(가드)
                     fn();
                 } catch (e) {
-                    console.error("[HTML5][WS20] transaction action error:", oCfg.ev, e);
+                    console.error("[WS20] transaction action error:", oCfg.ev, e);
                 }
             });
         }
@@ -259,20 +261,20 @@
     //   정렬(버튼 좌측)·열때만 busy·토글닫기·data-menu-anchor 는 빌더가 강제(WS10/WS20 단일 소스).
     function _txSplitBtn(oCfg) {
         if (!(oAPP.ws10html && typeof oAPP.ws10html.buildSplitButton === "function")) {
-            console.error("[HTML5][WS20] buildSplitButton 미연결 — ws10_html 로드 순서 확인");
+            console.error("[WS20] buildSplitButton not wired - check ws10_html load order");
             return document.createElement("span");
         }
         return oAPP.ws10html.buildSplitButton({
             id: oCfg.id, icon: oCfg.fa, brand: oCfg.brand, text: oCfg.text, tooltip: oCfg.tooltip,
             onMain: function () {                                       // 본체 = 기본 실행(ev_pressAppExecBtn)
                 var fn = oAPP.events && oAPP.events[oCfg.ev];
-                if (typeof fn !== "function") { console.warn("[HTML5][WS20] transaction action not implemented:", oCfg.ev); return; }
-                try { fn(); } catch (e) { console.error("[HTML5][WS20] transaction action error:", oCfg.ev, e); }
+                if (typeof fn !== "function") { console.warn("[WS20] transaction action not implemented:", oCfg.ev); return; }
+                try { fn(); } catch (e) { console.error("[WS20] transaction action error:", oCfg.ev, e); }
             },
             getItems: _buildAppExecMenuItems,                           // 동적 /DEFBR 목록
             onPick: function (it) {                                     // 선택 브라우저로 실행
                 var fn = oAPP.events && oAPP.events.ev_pressAppExecBtnByBrowser;
-                if (typeof fn === "function") { try { fn(it.key); } catch (e) { console.error("[HTML5][WS20] App 실행(브라우저) 오류:", it.key, e); } }
+                if (typeof fn === "function") { try { fn(it.key); } catch (e) { console.error("[WS20] App run(browser) error:", it.key, e); } }
             },
             prepare: (typeof oAPP.fn.fnBrowserStateModelRefresh === "function") ? oAPP.fn.fnBrowserStateModelRefresh : null
         });
@@ -301,8 +303,8 @@
             ],
             onPick: function (it) {
                 var fn = oAPP.fn["fnWS20" + it.key];
-                if (typeof fn === "function") { try { fn(); } catch (e) { console.error("[HTML5][WS20] icon menu " + it.key + " error:", e); } }
-                else { console.warn("[HTML5][WS20] icon menu not implemented:", it.key); }
+                if (typeof fn === "function") { try { fn(); } catch (e) { console.error("[WS20] icon menu " + it.key + " error:", e); } }
+                else { console.warn("[WS20] icon menu not implemented:", it.key); }
             }
         };
     }
@@ -310,7 +312,7 @@
     // 드롭다운 메뉴버튼 — 공통 빌더(oAPP.ws10html.buildMenuButton)에 위임(_txSplitBtn 와 동형).
     function _txMenuBtn(oCfg) {
         if (!(oAPP.ws10html && typeof oAPP.ws10html.buildMenuButton === "function")) {
-            console.error("[HTML5][WS20] buildMenuButton 미연결 — ws10_html 로드 순서 확인");
+            console.error("[WS20] buildMenuButton not wired - check ws10_html load order");
             return _txBtn(oCfg);   // 폴백: 평범한 버튼(드롭다운 없음)
         }
         return oAPP.ws10html.buildMenuButton({
@@ -433,7 +435,7 @@
                     }
                 });
             }
-        } catch (e) { console.warn("[HTML5][WS20] toolbar overflow attach 실패:", e && e.message); }
+        } catch (e) { console.warn("[WS20] toolbar overflow attach failed:", e && e.message); }
 
         return BAR;
 
@@ -586,7 +588,7 @@
         if (e && e.repeat === true) { return; }
         try { if (parent.getCurrPage && parent.getCurrPage() !== "WS20") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { fn(e); } catch (err) { console.error("[HTML5][WS20] shortcut:", err); }
+        try { fn(e); } catch (err) { console.error("[WS20] shortcut:", err); }
     }
 
     //F3 — 뒤로가기(원본 ws_common.js 1281 [WS20] Back Button). ← 버튼과 동일한 ev_pageBack 수행.
@@ -602,7 +604,7 @@
         try { if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         //뒤로가기 — ← 버튼과 동일.
         if (oAPP.events && typeof oAPP.events.ev_pageBack === "function") { oAPP.events.ev_pageBack(); }
-        else { console.warn("[HTML5][WS20] ev_pageBack not available (F3)"); }
+        else { console.warn("[WS20] ev_pageBack not available (F3)"); }
     }
 
     //Ctrl+Shift+F12 — MIME Repository(별도창). 원본 ws_common.js 의 sap.byId("mimeBtn").firePress(UI5)
@@ -614,7 +616,7 @@
                 oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
         } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (oAPP.events && typeof oAPP.events.ev_pressMimeBtn === "function") { oAPP.events.ev_pressMimeBtn(); }
-        else { console.warn("[HTML5][WS20] ev_pressMimeBtn not available (Ctrl+Shift+F12)"); }
+        else { console.warn("[WS20] ev_pressMimeBtn not available (Ctrl+Shift+F12)"); }
     }
 
     //Ctrl+F — WS20 Find(별도창). 원본 ws_common.js 의 sap.byId("ws20_findBtn").firePress(UI5)
@@ -626,7 +628,7 @@
                 oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
         } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") { oAPP.fn.fnFindPopupOpener(); }
-        else { console.warn("[HTML5][WS20] fnFindPopupOpener not available (Ctrl+F)"); }
+        else { console.warn("[WS20] fnFindPopupOpener not available (Ctrl+F)"); }
     }
 
     //Ctrl+Shift+Z — [WS20] Undo(247). 원본 ws_common.js fn 은 require(undoRedo).executeHistory("UNDO")
@@ -641,7 +643,7 @@
                 oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
         } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("UNDO"); }
-        else { console.warn("[HTML5][WS20] fnWs20ExecHistory not available (Undo)"); }
+        else { console.warn("[WS20] fnWs20ExecHistory not available (Undo)"); }
     }
 
     //Ctrl+Shift+X — [WS20] Redo(248). (Undo 와 동일 정책 — REDO 수행)
@@ -653,7 +655,7 @@
                 oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
         } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("REDO"); }
-        else { console.warn("[HTML5][WS20] fnWs20ExecHistory not available (Redo)"); }
+        else { console.warn("[WS20] fnWs20ExecHistory not available (Redo)"); }
     }
 
     //getShortCutList(ws_common.js)가 먼저 로드된 경우에만 super-wrap(미정의면 전 페이지 단축키가
@@ -694,9 +696,9 @@
             try {
                 // 핸들러가 연결돼 있으면 실행, 아니면 미구현 가드(W2 예정).
                 if (typeof fnClick === "function") { fnClick(); return; }
-                console.warn("[HTML5][WS20] app header action not implemented (W2 예정):", sId);
+                console.warn("[WS20] app header action not implemented (W2 pending):", sId);
             } catch (e) {
-                console.warn("[HTML5][WS20] app header action error:", sId, e && e.message);
+                console.warn("[WS20] app header action error:", sId, e && e.message);
             }
         });
         return BTN;
@@ -721,9 +723,9 @@
                     oAPP.events.ev_pageBack();
                     return;
                 }
-                console.warn("[HTML5][WS20] ev_pageBack not available");
+                console.warn("[WS20] ev_pageBack not available");
             } catch (e) {
-                console.warn("[HTML5][WS20] ev_pageBack error:", e && e.message);
+                console.warn("[WS20] ev_pageBack error:", e && e.message);
             }
         });
         HDR.appendChild(BACK);
@@ -755,7 +757,7 @@
         HDR.appendChild(_appHdrIconBtn("ws20AppHeaderFindBtn", _fa("binoculars"), _msg("A70") + " (Ctrl+F)", function () {
             // 원본 ws20_findBtn.firePress → HTML5 별도창 opener(지연로드 래퍼, sap 무관).
             if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") { oAPP.fn.fnFindPopupOpener(); return; }
-            console.warn("[HTML5][WS20] fnFindPopupOpener not available");
+            console.warn("[WS20] fnFindPopupOpener not available");
         }));
         HDR.appendChild(_appHdrIconBtn("ws20AppHeaderExportBtn", _fa("window-restore"), _msg("A09") + " (Ctrl+N)", function () {
             // WS10 ev_NewWindow 와 동일 경로 호출 (ws_events.js:966 → parent.onNewWindow())
@@ -763,7 +765,7 @@
                 oAPP.events.ev_NewWindow();
                 return;
             }
-            console.warn("[HTML5][WS20] ev_NewWindow not available");
+            console.warn("[WS20] ev_NewWindow not available");
         }));
 
         // 스페이서 — 아이콘 클러스터 뒤(우측 남는 공간 흡수). 원본은 [상태][Find][New] 가 좌측에 모임.
@@ -960,7 +962,7 @@
             if (window.U4AUI && U4AUI.wireSplitter) {
                 U4AUI.wireSplitter(SPLIT, { axis: "x", mode: bDefault ? "giveway" : "adjacent" });
             }
-        } catch (e) { console.error("[HTML5][WS20] 스플리터 배선 오류(재부착은 완료됨):", e && e.message ? e.message : e); }
+        } catch (e) { console.error("[WS20] splitter wiring error (re-attached):", e && e.message ? e.message : e); }
         return true;
     }
 
@@ -970,7 +972,7 @@
         try {
             var oSplit = document.getElementById("ws20DesignSplit");
             if (oSplit && oSplit.__ws20Panels) { return _ws20ArrangeSplit(oSplit, _ws20SavedLayoutOrder()); }
-        } catch (e) { console.warn("[HTML5][WS20] setDesignLayout error:", e && e.message); }
+        } catch (e) { console.warn("[WS20] setDesignLayout error:", e && e.message); }
         return false;
     };
 
@@ -1069,16 +1071,16 @@
                 //     (미리보기 로더가 자기 잠금을 걸고 그리기 완료 시 스스로 푸는 계약을 이미 가짐).
                 var _bOwnBusy = false, _bOwnShortcut = false;
                 try { if (parent.setBusy) { parent.setBusy("X"); _bOwnBusy = true; } }
-                catch (e) { console.error("[HTML5][WS20][BR60] 저장 중 화면잠금 실패(저장은 계속):", e); }
+                catch (e) { console.error("[WS20][BR60] save screen lock failed (save continues):", e); }
                 try { if (oAPP.fn.setShortcutLock) { oAPP.fn.setShortcutLock(true); _bOwnShortcut = true; } }
-                catch (e) { console.error("[HTML5][WS20][BR60] 저장 중 단축키잠금 실패(저장은 계속):", e); }
+                catch (e) { console.error("[WS20][BR60] save shortcutLock failed (save continues):", e); }
 
                 // 단축키 잠금만 해제(화면잠금은 재로드 주체가 관리하는 경로에서 사용).
                 function _releaseShortcut() {
                     if (!_bOwnShortcut) { return; }
                     _bOwnShortcut = false;
                     try { oAPP.fn.setShortcutLock(false); }
-                    catch (e) { console.error("[HTML5][WS20][BR60] 단축키잠금 해제 실패:", e); }
+                    catch (e) { console.error("[WS20][BR60] shortcutlock release failed:", e); }
                 }
                 // 이 저장이 건 잠금 전부 해제(각각 한 번만).
                 function _unlockAll() {
@@ -1086,7 +1088,7 @@
                     if (!_bOwnBusy) { return; }
                     _bOwnBusy = false;
                     try { parent.setBusy(""); }
-                    catch (e) { console.error("[HTML5][WS20][BR60] 화면잠금 해제 실패:", e); }
+                    catch (e) { console.error("[WS20][BR60] screenlock release failed:", e); }
                 }
                 // P13N 저장 (구 setP13nData("designLayout", T_LAYOUT)) — POSIT/SID/UIID 포함.
                 var aT_LAYOUT = aWork.map(function (sid, i) {
@@ -1094,10 +1096,10 @@
                     return { SID: sid, POSIT: i, NAME: _msg(d.msg || ""), UIID: "o" + sid.charAt(0).toUpperCase() + sid.slice(1) };
                 });
                 try { if (parent.setP13nData) { parent.setP13nData("designLayout", aT_LAYOUT); } }
-                catch (e) { console.error("[HTML5][WS20] designLayout 저장 실패:", e); }
+                catch (e) { console.error("[WS20] designLayout save failed:", e); }
                 // 실제 패널 순서 적용 (구 loadPreviewFrame(true)).
                 var _bReparented = false;
-                try { _bReparented = oAPP.fn.setDesignLayout(); } catch (e) { console.error("[HTML5][WS20] 레이아웃 적용 실패:", e); }
+                try { _bReparented = oAPP.fn.setDesignLayout(); } catch (e) { console.error("[WS20] layout apply failed:", e); }
                 // [BR49] 레이아웃 순서가 바뀐 저장에서 Critical Error(instanceof 형변환) 방지.
                 //   원인: 순서가 바뀌면 setDesignLayout 이 3분할 컨테이너를 재구성하며 미리보기 iframe 이
                 //   떼였다 붙어 "다시 로드"된다(주석 924~925행). 그 재로드의 초기화(preview index.js 초기
@@ -1116,7 +1118,7 @@
                             delete _ui.prevRootPage; delete _ui._page1;
                             delete _ui.prevPopupArea; delete _ui._hbox1; delete _ui.oMenu;
                         }
-                    } catch (e) { console.warn("[HTML5][WS20][BR49] 미리보기 참조 정리 skip:", e && e.message); }
+                    } catch (e) { console.warn("[WS20][BR49] preview reference cleanup skipped:", e && e.message); }
                     // [BR49-P2] 재부착으로 시작된 미리보기 재로드는 비동기라, 그 self-heal 이 끝나기 전에
                     //   팝업을 다시 열어 "같은 순서"로 재저장하면 아래 else 의 명시 재로드가 진행 중인 재로드와
                     //   두 번째 drawPreview 를 겹쳐 돌려 같은 파괴 경쟁이 열린다. → "재로드 진행 중" 표시를
@@ -1136,14 +1138,14 @@
                             };
                             var _onPrevLd = function () { _offPrevLd(); _unlockAll(); };
                             var _onPrevErr = function () {
-                                console.error("[HTML5][WS20][BR60] 미리보기 재로드 실패 — 잠금 회수.");
+                                console.error("[WS20][BR60] preview reload failed - lock count.");
                                 _offPrevLd(); _unlockAll();
                             };
                             _pf.addEventListener("load", _onPrevLd);
                             _pf.addEventListener("error", _onPrevErr);
                         } else { _unlockAll(); }   // 미리보기 iframe 없음 → 기다릴 재로드 없음, 즉시 해제.
                     } catch (e) {
-                        console.error("[HTML5][WS20][BR60] 미리보기 재로드 대기 배선 실패 — 잠금 회수:", e);
+                        console.error("[WS20][BR60] preview reload wait wiring failed - lock count:", e);
                         _unlockAll();   // 대기를 못 걸었으면 잠금이 남지 않게 즉시 회수.
                     }
                     // 재로드가 미리보기를 스스로 재구성(초기 로드와 동일 경로: 참조 정리→새 _page1 생성→ROOT
@@ -1172,7 +1174,7 @@
                             oAPP.fn.fnWs20LoadPreview();
                             _bDelegated = true;
                         } catch (e) {
-                            console.error("[HTML5][WS20][BR60] 미리보기 재로드 호출 실패 — 잠금 회수:", e);
+                            console.error("[WS20][BR60] preview reload call failed - lock count:", e);
                             _bOwnBusy = true;                  // 위임 실패 → 소유권 회수해 아래에서 해제.
                         }
                     }
@@ -1224,7 +1226,7 @@
         B.innerHTML = '<i class="fa-solid fa-' + sIcon + '"></i><span class="u4aWs20SideTxt"></span>';
         B.querySelector(".u4aWs20SideTxt").textContent = sText || "";
         B.addEventListener("click", function (ev) {
-            try { fn(ev); } catch (e) { console.warn("[HTML5][WS20] side action error:", e && e.message); }
+            try { fn(ev); } catch (e) { console.warn("[WS20] side action error:", e && e.message); }
         });
         return B;
     }
@@ -1248,7 +1250,7 @@
             // 구 fnWs20SideMENUITEM_10 → callDesignLayoutChangePopupOpener.
             //   HTML5 레이아웃 변경 팝업(3분할 순서 재정렬) 직접 호출.
             try { oAPP.fn.fnWs20OpenLayoutPopup(); }
-            catch (e) { console.error("[HTML5][WS20] Split Position Change(레이아웃 변경 팝업) 오류:", e); }
+            catch (e) { console.error("[WS20] Split Position Change (layout change popup) error:", e); }
         }));
         SIDE.appendChild(TOP);
 
@@ -1376,7 +1378,7 @@
             BTN.innerHTML = sGly; // FontAwesome 아이콘 HTML
             BTN.addEventListener("click", function () {
                 try {
-                    console.warn("[HTML5][WS20] preview action not implemented (W2 예정):", sId);
+                    console.warn("[WS20] preview action not implemented (W2 pending):", sId);
                 } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
             return BTN;
@@ -1462,7 +1464,7 @@
                     })(30);
                 }
             }
-        } catch (e) { console.warn("[HTML5][WS20] preview header overflow attach 실패:", e && e.message); }
+        } catch (e) { console.warn("[WS20] preview header overflow attach failed:", e && e.message); }
 
         return HDR;
 
@@ -1511,7 +1513,7 @@
         var oWS20 = (oPages && oPages.WS20) || document.getElementById("WS20");
 
         if (!oWS20) {
-            console.warn("[HTML5][WS20] #WS20 container not found — shell 미초기화");
+            console.warn("[WS20] #WS20 container not found — shell init");
             return;
         }
 
@@ -1536,7 +1538,7 @@
             if (oAPP.ws10html && typeof oAPP.ws10html.buildMenubar === "function") {
                 MAIN.appendChild(oAPP.ws10html.buildMenubar(_getWindowMenuWS20(), _ws20MenuSelect));
             }
-        } catch (e) { console.warn("[HTML5][WS20] menubar build error:", e && e.message); }
+        } catch (e) { console.warn("[WS20] menubar build error:", e && e.message); }
 
         // (A0) 앱 헤더 줄 (← APPID Change Active ... 🔍 ⤓) — 툴바 위
         MAIN.appendChild(_buildWs20AppHeader());
@@ -1592,7 +1594,7 @@
             // 셸(툴바+3분할) 렌더. (W3 override 가 좌측 트리 컨테이너에 빈 HTML5 트리까지 렌더)
             oAPP.fn.fnRenderWs20Shell();
         } catch (e) {
-            console.warn("[HTML5][WS20] fnMoveToWs20 render error:", e && e.message);
+            console.warn("[WS20] fnMoveToWs20 render error:", e && e.message);
         }
 
         // [문서 4장] WS20 진입 시작점 = setUIAreaEditable. (원본 fnMoveToWs20 633/647행)
@@ -1607,7 +1609,7 @@
                 oAPP.fn.fnLoadWs20TreeData();
             }
         } catch (e) {
-            console.warn("[HTML5][WS20] setUIAreaEditable error:", e && e.message);
+            console.warn("[WS20] setUIAreaEditable error:", e && e.message);
         }
 
         // 새창(버전관리 등) MOVE20 자동진입 1회 소비 후 IF_DATA 제거(원본 ws_fn_02.js:668~676).
@@ -1644,7 +1646,7 @@
             try {
                 oAPP.fn.fnRenderWs20Shell();
             } catch (e) {
-                console.warn("[HTML5][WS20] fnOnMoveToPage(WS20) render error:", e && e.message);
+                console.warn("[WS20] fnOnMoveToPage(WS20) render error:", e && e.message);
             }
 
             // [문서 4장] WS20 진입 시작점 = setUIAreaEditable.
@@ -1660,7 +1662,7 @@
                     oAPP.fn.fnLoadWs20TreeData();
                 }
             } catch (e) {
-                console.warn("[HTML5][WS20] setUIAreaEditable error:", e && e.message);
+                console.warn("[WS20] setUIAreaEditable error:", e && e.message);
             }
         }
 

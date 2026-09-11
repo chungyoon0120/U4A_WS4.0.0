@@ -1302,12 +1302,12 @@ const WSUTIL = {
 
         // --- 1. 필수 인자 유효성 검사 ---
         if (!REMOTE || typeof REMOTE.getCurrentWindow !== 'function' || typeof REMOTE.require !== 'function') {
-            console.error("setParentCenterBounds: 유효하지 않거나 불완전한 REMOTE 객체가 제공되었습니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: invalid or incomplete REMOTE object. aborted.");
             return;
         }
 
         if (!oChildWinow || typeof oChildWinow.getBounds !== 'function' || typeof oChildWinow.setBounds !== 'function') {
-            console.error("setParentCenterBounds: 유효하지 않은 자식 윈도우(oChildWinow) 객체입니다. getBounds 및 setBounds 메소드를 가진 BrowserWindow 인스턴스여야 합니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: invalid child window (oChildWinow). it must be a BrowserWindow with getBounds/setBounds. aborted.");
             return;
         }
 
@@ -1332,7 +1332,7 @@ const WSUTIL = {
                     _sWinName = oBrowserOptions.webPreferences.OBJTY || "";
                 }
 
-                U4ALOG.info("별창 열림", _sWinName || "(이름 없음)", "");
+                U4ALOG.info("별창 열림", _sWinName || "(untitled)", "");
 
             }
 
@@ -1343,19 +1343,19 @@ const WSUTIL = {
 
         const oMainWindow = REMOTE.getCurrentWindow();
         if (!oMainWindow || typeof oMainWindow.getPosition !== 'function' || typeof oMainWindow.getSize !== 'function') {
-            console.error("setParentCenterBounds: 메인 윈도우(oMainWindow)가 유효하지 않거나 접근할 수 없습니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: main window (oMainWindow) is invalid or unreachable. aborted.");
             return;
         }
 
         // --- 2. CURRWIN 전역변수 유효성 검사 ---
         if (!global.CURRWIN || typeof global.CURRWIN.getBounds !== 'function' || (typeof global.CURRWIN.isDestroyed === 'function' && global.CURRWIN.isDestroyed())) {
-            console.error("setParentCenterBounds: 전역 CURRWIN이 유효한 BrowserWindow 인스턴스가 아니거나 파괴되었습니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: global CURRWIN is not a valid BrowserWindow or was destroyed. aborted.");
             return;
         }
 
         const SCREEN = REMOTE.require("electron").screen;
         if (!SCREEN || typeof SCREEN.getDisplayMatching !== 'function') {
-            console.error("setParentCenterBounds: Electron 'screen' 모듈에 접근할 수 없습니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: cannot access the Electron 'screen' module. aborted.");
             return;
         }
 
@@ -1364,7 +1364,7 @@ const WSUTIL = {
         const [parentWidth, parentHeight] = oMainWindow.getSize();
 
         if (isNaN(parentX) || isNaN(parentY) || isNaN(parentWidth) || isNaN(parentHeight)) {
-            console.error(`setParentCenterBounds: 유효하지 않은 부모 윈도우 경계가 감지되었습니다. X=${parentX}, Y=${parentY}, W=${parentWidth}, H=${parentHeight}. 작업을 중단합니다.`);
+            console.error(`setParentCenterBounds: invalid parent window bounds. X=${parentX}, Y=${parentY}, W=${parentWidth}, H=${parentHeight}. action .`);
             return;
         }
 
@@ -1376,7 +1376,7 @@ const WSUTIL = {
         // --- 5. 자식 창의 현재 위치/크기 가져오기 ---
         let oChildBounds = oChildWinow.getBounds();
         if (isNaN(oChildBounds.width) || isNaN(oChildBounds.height)) {
-            console.error(`setParentCenterBounds: 유효하지 않은 초기 자식 윈도우 경계가 감지되었습니다. 너비=${oChildBounds.width}, 높이=${oChildBounds.height}. 작업을 중단합니다.`);
+            console.error(`setParentCenterBounds: invalid initial child window bounds. width=${oChildBounds.width}, height=${oChildBounds.height}. aborted.`);
             return;
         }
 
@@ -1434,10 +1434,10 @@ const WSUTIL = {
                 oChildWinow.setBounds(oBounds);
                 oChildWinow.setBounds(oBounds);
             } catch (e) {
-                console.error(`setParentCenterBounds: setBounds 호출 중 오류 발생: ${e.message}`, e);
+                console.error(`setParentCenterBounds: setBounds call error: ${e.message}`, e);
             }
         } else {
-            console.error(`setParentCenterBounds: 최종 계산된 경계가 유효하지 않습니다. setBounds 호출을 중단합니다. 유효하지 않은 경계: ${JSON.stringify(oBounds)}`);
+            console.error(`setParentCenterBounds: computed bounds are invalid. setBounds skipped. bounds: ${JSON.stringify(oBounds)}`);
         }
 
     },
@@ -1942,7 +1942,7 @@ const WSUTIL = {
                 SHELL.showItemInFolder(sFilePath);
             } catch (e) {
                 // 탐색기 오픈 실패는 치명적이지 않으므로 경고만 출력
-                console.warn("downloadResponseData: 탐색기 오픈 실패", e.toString());
+                console.warn("downloadResponseData: explorer open failed", e.toString());
             }
         }
 
@@ -2128,7 +2128,7 @@ const WSUTIL = {
 
         } catch (error) {
             let _sErrMsg = "[Icon Favorite save]: " + error.toString() + " \n\n ";
-            console.log("아이콘 즐겨찾기 저장 오류", _sErrMsg);
+            console.log("icon favorite save error", _sErrMsg);
             throw new Error(error);
         }
 

@@ -187,7 +187,7 @@
         oAPP.fn.setDesignTreeEnableButton(is_attr);
         // [SPEC §2.1] 바인딩/해제 후 좌측 모델필드 판정 재계산(원본 designTree.js:1588 등 — 해제/바인딩 후 bindPossible).
         if (typeof oAPP.fn.bindPossibleRecompute === "function") {
-            try { oAPP.fn.bindPossibleRecompute(is_attr); } catch (e) { console.error("[HTML5][bindWindow] bindPossibleRecompute(attrChange):", e && e.message); }
+            try { oAPP.fn.bindPossibleRecompute(is_attr); } catch (e) { console.error("[bindWindow] bindPossibleRecompute(attrChange):", e && e.message); }
         }
         oAPP.fn.designBroadcastUpdate(is_attr);   // [표준] WS20 반영 필수 호출 직접(삼킴 제거).
     };

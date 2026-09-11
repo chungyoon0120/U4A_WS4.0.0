@@ -61,11 +61,51 @@
      ********************************************************************/
     var WS_STATE = {
         WS10: { APPID: "", APPSUGG: [] },
-        UAI: { state: false },
-        USERINFO: { IS_DEV: "D" },
-        IS_STAFF: true
+        UAI: { state: false }
     };
     oAPP.ws10html.state = WS_STATE;
+
+    /********************************************************************
+     * 권한 판정 — 원본과 동일한 근거를 그대로 쓴다.
+     *   ★ [DM1/DM2] 종전에는 WS_STATE 에 IS_DEV:"D" / IS_STAFF:true 를 박아두고 그걸 봤다.
+     *     그 결과 원본이 걸어둔 잠금(개발 전용 버튼 감추기·메뉴 잠금·Test 메뉴 감추기)이
+     *     전부 풀려 있었다. 서버가 준 값과 원본 판정 함수를 직접 보도록 되돌린다.
+     *   · _isDevAuth : 원본 ws_fn_01.js 1357~1370(버튼 visible) / 1095~1108(메뉴 enabled)
+     *   · _isStaff   : 원본 ws_fn_01.js 1321(WS10) · 2856(WS20) / ws_usp.js 602(WS30)
+     *   두 함수 모두 판단 근거가 없으면 "권한 없음"으로 본다(막는 쪽으로 닫는다).
+     ********************************************************************/
+    function _isDevAuth() {
+        var sIsDev;
+        try {
+            sIsDev = oAPP.common.fnGetModelProperty("/USERINFO/USER_AUTH/IS_DEV");
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "_isDevAuth"); }
+            return false;
+        }
+        if (typeof sIsDev === "undefined" || sIsDev === null || sIsDev === "") {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "IS_DEV is empty",
+                    "continuing with dev-only buttons and menus locked; check login authority response");
+            }
+            return false;
+        }
+        return sIsDev === "D";
+    }
+
+    function _isStaff() {
+        if (!oAPP.fn || typeof oAPP.fn.fnIsStaff !== "function") {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnIsStaff is not defined", "continuing with the Test menu hidden");
+            }
+            return false;
+        }
+        try {
+            return oAPP.fn.fnIsStaff() === true;
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "_isStaff"); }
+            return false;
+        }
+    }
 
     /********************************************************************
      * 앱이름 입력칸 값의 단일 반영 지점.
@@ -79,7 +119,7 @@
         WS_STATE.WS10.APPID = s;
         try { oAPP.common.fnSetModelProperty("/WS10/APPID", s); }
         catch (e) {
-            console.error("[HTML5][WS10] 앱ID 모델 반영 실패:", e && e.message ? e.message : e);
+            console.error("[WS10] appID model apply failed:", e && e.message ? e.message : e);
         }
     }
     oAPP.ws10html.setAppId = _setAppId;   // 값도움(F4) 픽 등 화면 밖에서도 같은 경로로 반영
@@ -138,13 +178,17 @@
      * 윈도우 메뉴 데이터 (doc 03 §4 / fnGetWindowMenuListWS10 미러)
      ********************************************************************/
     function _getWindowMenu() {
+        //[DM1] 원본 fnWs10HeaderMenuEnableBinding(ws_fn_01.js 1095~1108) 재현 —
+        //  IS_DEV 가 "D" 가 아니면 WMENU10_01(App. Package Change)·WMENU10_02_01(App. Importing)
+        //  두 항목을 못 누르게 막는다(원본은 enabled 바인딩 = 회색 표시).
+        var _bDevMenu = _isDevAuth();
         return [
             {
                 key: "WMENU10", text: _txt("B34"), items: [
-                    { key: "WMENU10_01", icon: "arrows-rotate", text: _txt("B40") },
+                    { key: "WMENU10_01", icon: "arrows-rotate", text: _txt("B40"), disabled: !_bDevMenu },
                     {
                         key: "WMENU10_02", icon: "right-left", text: _txt("B41"), items: [
-                            { key: "WMENU10_02_01", icon: "file-import", text: _txt("B42") },
+                            { key: "WMENU10_02_01", icon: "file-import", text: _txt("B42"), disabled: !_bDevMenu },
                             { key: "WMENU10_02_02", icon: "file-export", text: _txt("B43") }
                         ]
                     },
@@ -200,7 +244,9 @@
                     { key: "Test97", text: "개발툴" },
                     { key: "Test94", text: "잘못된 서버 호출" },
                     { key: "Test86", text: "모나코 에디터 테마 디자이너" },
-                    { key: "Test85", text: "모나코 에디터 스니펫 생성기" }
+                    { key: "Test85", text: "모나코 에디터 스니펫 생성기" },
+                    // [내부 데이터 모니터] 조작할 때마다 내부 오브젝트에서 무엇이 바뀌는지 보여주는 개발자용 창.
+                    { key: "Test84", text: "데이터 모니터" }
                 ]
             }
         ];
@@ -361,7 +407,7 @@
         // 실행 (원본 execControllerClass(null, null, sTcode, oAppInfo))
         var oAppInfo = {}; try { oAppInfo = parent.getAppInfo() || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try { oAPP.common.execControllerClass(null, null, sTcode, oAppInfo); }
-        catch (e) { console.error("[HTML5] T-CODE 실행 오류:", e && e.message ? e.message : e); }
+        catch (e) { console.error("T-CODE run error:", e && e.message ? e.message : e); }
     }
 
     /********************************************************************
@@ -812,7 +858,7 @@
                     // 화면을 옮기는 것도 새 작업의 시작이다 — 새 추적 번호를 뽑는다(2026-09-08)
                     if (typeof U4ALOG.newTrace === "function") { U4ALOG.newTrace(); }
 
-                    U4ALOG.info("화면 이동", (sFromId || "(처음)") + " → " + sToId, "시작");
+                    U4ALOG.info("화면 이동", (sFromId || "(first)") + " -> " + sToId, "start");
                     U4ALOG.setScreen(sToId);
                 }
 
@@ -933,7 +979,8 @@
         var o = document.createElement("div");
         o.className = "u4a-ws10__menubar";
         (aCats || []).forEach(function (cat) {
-            if (cat.staffOnly && !WS_STATE.IS_STAFF) { return; }
+            //[DM2] 원본과 동일하게 U4A R&D 여부를 그때그때 판정한다(WS10·WS20·WS30 공용).
+            if (cat.staffOnly && !_isStaff()) { return; }
             var b = document.createElement("button");
             b.className = "u4a-wmenu-btn";
             b.type = "button";
@@ -1093,7 +1140,7 @@
                     })(30);
                 }
             }
-        } catch (e) { console.error("[WS10] common header overflow attach 실패:", e && e.message); }
+        } catch (e) { console.error("[WS10] common header overflow attach failed:", e && e.message); }
 
         return o;
     }
@@ -1160,7 +1207,7 @@
     function _renderSubHeader() {
         var o = document.createElement("div");
         o.className = "u4a-ws10__subheader";
-        var bDev = WS_STATE.USERINFO.IS_DEV === "D";
+        var bDev = _isDevAuth();   //[DM1] 서버가 준 IS_DEV 로 판정(원본 ws_fn_01.js 1357~1370)
         _aBarItems = [];
         _getSubHeaderButtons().forEach(function (cfg) {
             if (cfg.devOnly && !bDev) { return; }
@@ -1542,7 +1589,8 @@
                 return;
             }
 
-            if (hit.dev && WS_STATE.USERINFO.IS_DEV !== "D") {
+            //[DM1] 개발 전용 단축키 — 원본과 동일하게 IS_DEV 로 막는다.
+            if (hit.dev && !_isDevAuth()) {
                 return;
             }
 

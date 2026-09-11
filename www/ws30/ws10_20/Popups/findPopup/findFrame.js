@@ -957,7 +957,7 @@ window.addEventListener("load", function () {
 
     // 안전판 — if-find-info 가 안 오면 busy 강제 해제(원본 동작엔 없던 방어).
     iBusyWatch = setTimeout(function () {
-        console.error("[HTML5][findPopup] Find 정보 수신 지연 — busy 강제 해제");
+        console.error("[findPopup] Find info receive deferred — busy force release");
         _finishOpen();
     }, 20000);
 });

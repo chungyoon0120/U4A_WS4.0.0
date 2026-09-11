@@ -612,7 +612,7 @@
             if (oUI && oUI.pdf && oUI.pdf.contentWindow) {
                 oUI.pdf.contentWindow.postMessage({ __u4apdf: true, hostId: C_PDFHOST, cmd: "open", data: ab }, "*", [ab]);
             }
-        } catch (e) { console.error("[HTML5][MIME] pdf post error:", e); }
+        } catch (e) { console.error("[MIME] pdf post error:", e); }
     }
 
     // PDF 미리보기 — blob → ArrayBuffer → pdf.js 호스트로 전송(자체 렌더). Chromium plugins 불필요.
@@ -910,7 +910,7 @@
             if (sKey === "K1") { lf_expandSel(); return; }
             if (sKey === "K2") { lf_collapseSel(); return; }
             parent.showMessage(null, 10, "I", _wsTxt("498"));   // 준비중
-        } catch (e) { console.error("[HTML5][MIME] 컨텍스트 메뉴 오류:", sKey, e); }
+        } catch (e) { console.error("[MIME] context menu error:", sKey, e); }
     }
 
     /************************************************************************

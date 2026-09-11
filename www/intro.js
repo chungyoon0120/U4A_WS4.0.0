@@ -118,15 +118,15 @@
         let battery = await systeminfo.battery();
 
         console.log("============ System Information ==============");
-        console.log("**os 정보: ", JSON.stringify(os, null, 4));
-        console.log("**cpu 정보: ", JSON.stringify(cpu, null, 4));
-        console.log("**메인보드 정보: ", JSON.stringify(mainboard, null, 4));
-        console.log("**바이오스 정보: ", JSON.stringify(bios, null, 4));
-        console.log("**그래픽카드 정보: ", JSON.stringify(graphics, null, 4));
-        console.log("**하드디스크 정보: ", JSON.stringify(disk, null, 4));
-        console.log("**하드디스크 드라이브 정보: ", JSON.stringify(drive, null, 4));
-        console.log("**메모리 정보: ", JSON.stringify(memory, null, 4));
-        console.log("**배터리 정보: ", JSON.stringify(battery, null, 4));
+        console.log("**os info: ", JSON.stringify(os, null, 4));
+        console.log("**cpu info: ", JSON.stringify(cpu, null, 4));
+        console.log("**motherboard info: ", JSON.stringify(mainboard, null, 4));
+        console.log("**bios info: ", JSON.stringify(bios, null, 4));
+        console.log("**gpu info: ", JSON.stringify(graphics, null, 4));
+        console.log("**disk info: ", JSON.stringify(disk, null, 4));
+        console.log("**disk drive info: ", JSON.stringify(drive, null, 4));
+        console.log("**memory info: ", JSON.stringify(memory, null, 4));
+        console.log("**battery info: ", JSON.stringify(battery, null, 4));
         console.log("==============================================");
 
     } // end of _logOsSystemInfo
@@ -1346,7 +1346,7 @@
                 // 패턴 관련 작업 중 오류 발생 시 공통 메시지 출력
                 lf_sourcePatternErrorMsg(resolve, sMsg);
 
-                console.error("[Intro] WWW에 있는 기본 패턴파일을 USERDATA에 복사하다가 오류");
+                console.error("[Intro] copy default pattern file from WWW to USERDATA error");
 
                 return;
 
@@ -1552,7 +1552,7 @@
             let oDefPattDataResult = await USP_UTIL.getDefaultPatternData();
             if (oDefPattDataResult.RETCD == "E") {
                 resolve(oDefPattDataResult);
-                console.error("[Intro] 기본 패턴 정보 오류");
+                console.error("[Intro] default pattern info error");
                 return;
             }
 
@@ -1564,7 +1564,7 @@
             let oWriteJsonResult = await WSUTIL.fsWriteFile(sDefPattJsonPath, sDefPattJsonData);
             if (oWriteJsonResult.RETCD == "E") {
                 resolve(oDefPattDataResult);
-                console.error("[Intro] 기본패턴 정보 JSON 저장하다가 오류");
+                console.error("[Intro] error while saving default pattern JSON");
                 return;
             }
 
@@ -1585,7 +1585,7 @@
                 let oWriteResult = await WSUTIL.fsWriteFile(sCustPattJsonPath, sCustPattInitJsonData);
                 if (oWriteResult.RETCD == "E") {
                     resolve(oWriteResult);
-                    console.error("[Intro] 커스텀 패턴 파일 저장하다가 오류");
+                    console.error("[Intro] custom pattern file save error");
                     return;
                 }
 
@@ -1597,7 +1597,7 @@
             try {
                 var aCustPattData = JSON.parse(sCustPattJsonData);
             } catch (error) {
-                console.error("[Intro] 기 저장된 커스텀 패턴 파일읽어서 JSON 파싱하다가 오류");
+                console.error("[Intro] read saved custom pattern file / JSON parse error");
                 throw new Error(error.toString());
             }
 
@@ -1615,7 +1615,7 @@
             let oWriteCustJsonResult = await WSUTIL.fsWriteFile(sCustPattJsonPath, sCustPattJson);
             if (oWriteCustJsonResult.RETCD == "E") {
                 resolve(oWriteCustJsonResult);
-                console.error("[Intro] 기본패턴 정보 JSON 저장하다가 오류");
+                console.error("[Intro] error while saving default pattern JSON");
                 return;
             }
 
@@ -1704,7 +1704,7 @@
 
             let oCopyResult = await WSUTIL.fsCopy(sPsSourcePath, sPsTargetPath);
             if (oCopyResult.RETCD == "E") {
-                console.error("ws_ps.zip 파일 복사하다가 오류!!");
+                console.error("ws_ps.zip copy error");
                 throw Error(oCopyResult.RTMSG);
             }
 
@@ -1714,7 +1714,7 @@
             // 압축푼 zip 파일 삭제
             let oRemoveResult = await WSUTIL.fsRemove(sPsTargetPath);
             if (oRemoveResult.RETCD == "E") {
-                console.error("ws_ps.zip 파일 압축풀고 삭제하다가 오류!!");
+                console.error("ws_ps.zip unzip/delete error");
                 throw Error(oRemoveResult.RTMSG);
             }
 
@@ -1742,7 +1742,7 @@
 
             let oCopyResult = await WSUTIL.fsCopy(sVbsSourcePath, sVbsTargetPath);
             if (oCopyResult.RETCD == "E") {
-                console.error("Vbs Zip 파일 복사하다가 오류!!");
+                console.error("vbs zip copy error");
                 throw Error(oCopyResult.RTMSG);
             }
         
@@ -1752,7 +1752,7 @@
             // 압축푼 zip 파일 삭제
             let oRemoveResult = await WSUTIL.fsRemove(sVbsTargetPath);
             if (oRemoveResult.RETCD == "E") {
-                console.error("vbs zip 파일 압축풀고 삭제하다가 오류!!");
+                console.error("vbs zip unzip/delete error");
                 throw Error(oRemoveResult.RTMSG);
             }
 
@@ -1778,7 +1778,7 @@
                 ZIP.extractAllTo(sTargetFolderPath, /*overwrite*/ true);
 
             } catch (error) {
-                console.error(`${sSourcePath}\n 파일 압축 풀다가 오류!!`);
+                console.error(`${sSourcePath} unzip error`);
                 throw new Error(error.toString());
             }
 
@@ -1798,7 +1798,7 @@
             let sIconsPath = PATH.join(PATHINFO.WS10_20_ROOT, "icons");
 
             if (!FS.existsSync(sIconsPath)) {
-                console.error("u4a icons 폴더 없음");
+                console.error("u4a icons folder not found");
                 resolve();
                 return;
             }

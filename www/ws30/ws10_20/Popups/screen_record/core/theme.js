@@ -83,7 +83,7 @@ function injectBgCss(win, theme, variant = 'panel') {
   const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
 
   win.webContents.insertCSS(sWebConBodyCss).catch(err => {
-    console.warn('[theme] insertCSS 실패 (winId:', win.id, '):', err && err.message);
+    console.warn('[theme] insertCSS failed (winId:', win.id, '):', err && err.message);
   });
 }
 

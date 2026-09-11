@@ -148,7 +148,7 @@
                 WSLOG = require(PATH.join(APP.getAppPath(), "ws30", "ws10_20", "js", "ws_log.js"));
             } catch (e) {
                 // remote 접근 불가 — 최소한 콘솔에만 남기고 종료 시도
-                try { console.error("[Critical] remote 접근 실패", e); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+                try { console.error("[Critical] remote access failed", e); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             }
 
             // ② Electron 네이티브 모달 오류 다이얼로그
@@ -309,7 +309,7 @@
                 if (oLanguTextResult.RETCD === "E") { resolve(); return; }
                 APPCOMMON.fnSetModelProperty("/WSLANGU", oLanguTextResult.RTDATA);
             } catch (e) {
-                console.warn("[HTML5] fnGetWsMsgModelData skip:", e && e.message);
+                console.warn("fnGetWsMsgModelData skip:", e && e.message);
             }
             resolve();
         });
@@ -369,15 +369,15 @@
     oAPP.fn.fnOnInitP13nSettings = function () {
         // 로그인 init 개인화 설정. 각 기능은 개별 가드하되 오류를 삼키지 말고 로깅한다(억제 금지).
         // 개인화 폴더 생성
-        try { oAPP.fn.fnOnP13nFolderCreate(); } catch (e) { console.warn("[HTML5] fnOnP13nFolderCreate skip:", e && e.message); }
+        try { oAPP.fn.fnOnP13nFolderCreate(); } catch (e) { console.warn("fnOnP13nFolderCreate skip:", e && e.message); }
         // 브라우저 zoom 정보
-        try { oAPP.fn.fnOnP13nBrowserZoom(); } catch (e) { console.warn("[HTML5] fnOnP13nBrowserZoom skip:", e && e.message); }
+        try { oAPP.fn.fnOnP13nBrowserZoom(); } catch (e) { console.warn("fnOnP13nBrowserZoom skip:", e && e.message); }
         // Default Browser 개인화(/DEFBR 적재) — 숏컷/실행 팝업 전제. 실패 시 오류로 노출해 진단 가능하게 한다.
-        try { oAPP.fn.fnOnP13nExeDefaultBrowser(); } catch (e) { console.error("[HTML5] fnOnP13nExeDefaultBrowser error(/DEFBR 미적재):", e); }
+        try { oAPP.fn.fnOnP13nExeDefaultBrowser(); } catch (e) { console.error("fnOnP13nExeDefaultBrowser error (/DEFBR load):", e); }
         // WS10 AppName Suggestion
-        try { oAPP.fn.fnGetP13nWs10AppSuggetion(); } catch (e) { console.warn("[HTML5] fnGetP13nWs10AppSuggetion skip:", e && e.message); }
+        try { oAPP.fn.fnGetP13nWs10AppSuggetion(); } catch (e) { console.warn("fnGetP13nWs10AppSuggetion skip:", e && e.message); }
         // T-Code Suggestion
-        try { oAPP.fn.fnOnInitTCodeSuggestion(); } catch (e) { console.warn("[HTML5] fnOnInitTCodeSuggestion skip:", e && e.message); }
+        try { oAPP.fn.fnOnInitTCodeSuggestion(); } catch (e) { console.warn("fnOnInitTCodeSuggestion skip:", e && e.message); }
     };
 
     /************************************************************************
@@ -477,7 +477,7 @@
         }
         // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 U4AUI.confirm 은 확인창의 필수 의존성.
         //   미로드면 삼키지 말고 오류코드로 표면화 + fail-closed(진행하지 않음)로 종료.
-        console.error("[SHEL-001] fnConfirmBox: 공통 U4AUI.confirm 미로드 — 확인창 표시 불가. message:", sMsg || "");
+        console.error("[SHEL-001] fnConfirmBox: common U4AUI.confirm not loaded — checkwindow show blocked. message:", sMsg || "");
         lf_done(bHasCancel ? "CANCEL" : "NO");
     };
 
@@ -590,14 +590,14 @@
             if (!oAPP.fn.createApplicationPopup) {
                 $.getScript("design/js/createApplicationPopup.js", function () {
                     try { oAPP.fn.createApplicationPopup(sAppID); }
-                    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } APPCOMMON.fnShowFloatingFooterMsg("E", parent.getCurrPage(), "Create 오류: " + (e && e.message)); }
+                    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } APPCOMMON.fnShowFloatingFooterMsg("E", parent.getCurrPage(), "Create error: " + (e && e.message)); }
                     oAPP.common.fnSetBusyLock("");
                 });
                 return;
             }
 
             try { oAPP.fn.createApplicationPopup(sAppID); }
-            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } APPCOMMON.fnShowFloatingFooterMsg("E", parent.getCurrPage(), "Create 오류: " + (e && e.message)); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } APPCOMMON.fnShowFloatingFooterMsg("E", parent.getCurrPage(), "Create error: " + (e && e.message)); }
             oAPP.common.fnSetBusyLock("");
         }
     };
@@ -950,7 +950,7 @@
                 try {
                     parent.UAI.setCustomEvent_WS_30();
                 } catch (e) {
-                    console.warn("[추후 변환] UAI.setCustomEvent_WS_30:", e && e.message);
+                    console.warn("[conversion pending] UAI.setCustomEvent_WS_30:", e && e.message);
                 }
                 // ★ WS30 단축키 등록은 여기서 하지 않는다 — WS30 콘텐츠(Monaco 에디터 iframe)는
                 //   비동기 로드라, 진입 즉시 F3 을 누르면 로드 중 백(fnMoveToWs10)이 실행돼 화면이 깨진다.
@@ -984,7 +984,7 @@
             try {
                 parent.UAI.setCustomEvent_WS_20();
             } catch (e) {
-                console.warn("[추후 변환] UAI.setCustomEvent_WS_20:", e && e.message);
+                console.warn("[conversion pending] UAI.setCustomEvent_WS_20:", e && e.message);
             }
 
             // 등록은 "가장 마지막" — 화면 렌더·세팅 뒤. (WS20 는 미리보기 로드까지 busy 유지라
@@ -1111,7 +1111,7 @@
             delete oAPP.DATA.APPDATA;
             try { if (oAPP.common.checkWLOList("C", "UHAK901369")) { delete oAPP.DATA.LIB; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         } catch (e) {
-            console.warn("[HTML5][WS20] removeContent state reset:", e && e.message);
+            console.warn("[WS20] removeContent state reset:", e && e.message);
         }
 
         // WS20 디자인 모델 데이터 초기화 — 다음 진입 시 이전 앱의 트리/속성 잔상 방지.
@@ -1153,7 +1153,7 @@
                     }
                 } catch (e3) {
                     // 정리 중 실패해도 아래 틀 교체는 반드시 진행해야 한다(멈추면 더 나쁨).
-                    console.warn("[HTML5][WS20] 미리보기 수신 등록 해제 실패:", e3 && e3.message);
+                    console.warn("[WS20] preview receive register release failed:", e3 && e3.message);
                 }
 
                 try { oPrevFrame.src = ""; } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
@@ -1163,7 +1163,7 @@
             }
             if (oAPP.attr.ui) { oAPP.attr.ui.frame = null; }
         } catch (e) {
-            console.warn("[HTML5][WS20] removeContent preview iframe reset:", e && e.message);
+            console.warn("[WS20] removeContent preview iframe reset:", e && e.message);
         }
 
         // ★ 죽은 iframe(위에서 파괴됨)에 속했던 UI5 프리뷰 인스턴스 참조 정리.
@@ -1193,7 +1193,7 @@
             }
             if (oAPP.attr.ui) { oAPP.attr.ui.ws20 = undefined; }
         } catch (e) {
-            console.warn("[HTML5][WS20] removeContent DOM clear:", e && e.message);
+            console.warn("[WS20] removeContent DOM clear:", e && e.message);
         }
 
     }; // end of oAPP.fn.removeContent

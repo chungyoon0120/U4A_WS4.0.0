@@ -50,16 +50,16 @@
                 var _i = _sp.indexOf("?");
                 if (_i >= 0) { _sp = _sp.slice(0, _i) + " (뒤쪽 정보는 가림)"; }
 
-                U4ALOG.error("서버통신 실패 상세", "보낸 곳: " + _sp);
+                U4ALOG.error("서버통신 실패 상세", "sent to: " + _sp);
 
                 var x = oXhrLike || null;
 
                 if (!x) {
-                    U4ALOG.error("서버통신 실패 상세", "서버 응답 자체가 없음 (연결이 끊겼거나 서버에 못 닿음)");
+                    U4ALOG.error("서버통신 실패 상세", "no response at all (connection dropped or server unreachable)");
                     return;
                 }
 
-                U4ALOG.error("서버통신 실패 상세", "서버 상태: "
+                U4ALOG.error("서버통신 실패 상세", "http status: "
                     + ((typeof x.status === "number") ? x.status : "-")
                     + (x.statusText ? (" " + x.statusText) : ""));
 
@@ -68,7 +68,7 @@
                         var _aMark = ["sap-err-id", "u4a_status", "content-type"];
                         for (var _k = 0; _k < _aMark.length; _k++) {
                             var _v = x.getResponseHeader(_aMark[_k]);
-                            if (_v) { U4ALOG.error("서버통신 실패 상세", "응답표시 " + _aMark[_k] + ": " + _v); }
+                            if (_v) { U4ALOG.error("서버통신 실패 상세", "response header " + _aMark[_k] + ": " + _v); }
                         }
                     }
                 } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
@@ -80,13 +80,13 @@
                     if (!_sBody) {
                         _sBody = "(서버가 아무 내용도 안 줬음)";
                     } else if (_sBody.length > 4000) {
-                        _sBody = _sBody.slice(0, 4000) + " …(뒤 " + (_sBody.length - 4000) + "자 잘림)";
+                        _sBody = _sBody.slice(0, 4000) + " ...(" + (_sBody.length - 4000) + " more chars truncated)";
                     }
 
-                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용: " + _sBody);
+                    U4ALOG.error("서버통신 실패 상세", "response body: " + _sBody);
 
                 } catch (e3) {
-                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용을 못 읽음: " + e3);
+                    U4ALOG.error("서버통신 실패 상세", "response body unreadable: " + e3);
                 }
 
             } catch (e) {
@@ -104,27 +104,27 @@
             } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
-        _ajaxLog("보냈음", "");
+        // 보낼 때는 안 남긴다 — 끝날 때 한 줄에 다 담는다 (2026-09-10)
 
         var xhr = new XMLHttpRequest();
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== xhr.DONE) { return; }
             if (xhr.status === 200 || xhr.status === 201) {
-                _ajaxLog("끝남", "성공");
+                _ajaxLog("끝남", "성공 (상태 " + ((typeof xhr !== "undefined" && xhr && xhr.status) ? xhr.status : "-") + ")");
                 var oRes = null;
                 try { oRes = JSON.parse(xhr.response); }
-                catch (e) { console.error("[HTML5][bindWindow] 응답 파싱 실패:", e && e.message); }
-                try { fn_success(oRes); } catch (e2) { console.error("[HTML5][bindWindow] 콜백 오류:", e2 && e2.message); }
+                catch (e) { console.error("[bindWindow] response parse failed:", e && e.message); }
+                try { fn_success(oRes); } catch (e2) { console.error("[bindWindow] callback error:", e2 && e2.message); }
             } else {
                 _ajaxFail("서버가 상태 " + xhr.status + " 를 돌려줌", xhr);
-                console.error("[HTML5][bindWindow] 서버 오류 status=", xhr.status, sPath);
-                try { fn_success(null); } catch (e3) { console.error("[HTML5][bindWindow] 콜백 오류(서버오류 분기):", e3 && e3.message); }
+                console.error("[bindWindow] server error status=", xhr.status, sPath);
+                try { fn_success(null); } catch (e3) { console.error("[bindWindow] callback error (server error branch):", e3 && e3.message); }
             }
         };
         xhr.onerror = function () {
             _ajaxFail("서버에 못 닿음 (연결 끊김·차단·주소 틀림)", xhr);
-            console.error("[HTML5][bindWindow] 네트워크 오류:", sPath);
-            try { fn_success(null); } catch (e) { console.error("[HTML5][bindWindow] 콜백 오류(네트워크 분기):", e && e.message); }
+            console.error("[bindWindow] network error:", sPath);
+            try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (network branch):", e && e.message); }
         };
         xhr.withCredentials = true;
         xhr.open("post", sPath, true);
@@ -293,7 +293,7 @@
                 total += w;
             }
             oHost.style.setProperty("--u4act-total-w", (total + overhead) + "px");
-        } catch (e) { console.error("[HTML5][bindWindow] autofitTreeColumns:", e && e.message); }
+        } catch (e) { console.error("[bindWindow] autofitTreeColumns:", e && e.message); }
     };
 
     /************************************************************************
@@ -348,7 +348,7 @@
             var total = 0;
             for (var m = 1; m <= nCol; m++) { oHost.style.setProperty("--u4act-c" + m + "-w", aCol[m - 1] + "px"); total += aCol[m - 1]; }
             oHost.style.setProperty("--u4act-total-w", (total + overhead) + "px");
-        } catch (e) { console.error("[HTML5][bindWindow] fitTreeColumns:", e && e.message); }
+        } catch (e) { console.error("[bindWindow] fitTreeColumns:", e && e.message); }
     };
 
     /************************************************************************

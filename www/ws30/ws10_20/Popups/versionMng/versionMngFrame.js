@@ -198,7 +198,7 @@ function _fatal(sType, sMsg) {
         });
     } else {
         // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 U4AUI.confirm 미로드는 오류코드로 표면화하고 창을 닫는다.
-        console.error("[VMNG-001] 오류안내 팝업: 공통 U4AUI.confirm 미로드 — 표시 불가. message:", sMsg || "");
+        console.error("[VMNG-001] errornotice popup: common U4AUI.confirm not loaded — show blocked. message:", sMsg || "");
         _closeWindow();
     }
 }
@@ -218,7 +218,7 @@ function _post(sPath, oForm) {
                         _fatal("W", _z("390"));
                     } else {
                         // 알 수 없는 오류(M017=314) + 안내(290).
-                        console.error("[HTML5][versionMng] u4a_status=" + sStatus + " / REQ=" + sPath);
+                        console.error("[versionMng] u4a_status=" + sStatus + " / REQ=" + sPath);
                         _fatal("E", _z("314") + "\n\n" + _z("290"));
                     }
                     return resolve(null);
@@ -226,7 +226,7 @@ function _post(sPath, oForm) {
                 return r.json().then(function (data) { resolve(data); });
             })
             .catch(function (e) {
-                console.error("[HTML5][versionMng] _post 실패 REQ=" + sPath + " / " + (e && e.message));
+                console.error("[versionMng] _post failed REQ=" + sPath + " / " + (e && e.message));
                 // 통신 오류(M018=391).
                 _fatal("E", _z("391"));
                 resolve(null);
@@ -734,7 +734,7 @@ function _waitHostReady() {
         var iWatch = setTimeout(function () {
             if (bDone) { return; }
             bDone = true; fnHostReadyWait = null;
-            console.error("[HTML5][versionMng] diff 호스트 로드 지연/실패");
+            console.error("[versionMng] diff host load deferred/failed");
             _fatal("E", _z("314") + "\n\n" + _z("290"));   // 알 수 없는 오류
             resolve(false);
         }, 15000);
@@ -787,7 +787,7 @@ function _onOpenNewWindow(oRow) {
         });
     } else {
         // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 U4AUI.confirm 미로드는 오류코드 표면화 + fail-closed(생성하지 않음).
-        console.error("[VMNG-002] 임시 App 생성 확인: 공통 U4AUI.confirm 미로드 — 표시 불가.");
+        console.error("[VMNG-002] new app create confirm: common U4AUI.confirm not loaded - blocked.");
     }
 }
 
@@ -1030,7 +1030,7 @@ function _initChrome() {
                 isSep: function (el) { return el.classList.contains("u4aVmDiffSep"); },
                 menuItem: _diffOvfMenuItem
             });
-        } catch (e) { console.error("[HTML5][versionMng] diff 툴바 overflow 부착 오류:", e && e.message); }
+        } catch (e) { console.error("[versionMng] diff toolbar overflow attach error:", e && e.message); }
     }
 
     // 세로 스플리터 바 드래그.
@@ -1135,7 +1135,7 @@ window.addEventListener("load", function () {
     // opacity 0 + busy 로 고착되므로 20초 안전장치(docPopup 동일 정책). 정상 수신 시 _finishOpen 이 해제.
     iOpenWatch = setTimeout(function () {
         if (bOpenDone) { return; }
-        console.error("[HTML5][versionMng] if-vermng-info 미수신 — 오픈 fallback 발동");
+        console.error("[versionMng] if-vermng-info not received - open fallback used");
         _fatal("E", _z("314") + "\n\n" + _z("290"));   // 알 수 없는 오류 + 안내 → OK 시 창 닫기
     }, 20000);
 });

@@ -136,7 +136,7 @@ oAPP.fn._onUi5LoadFail = function (sReason) {
     oAPP.attr.bLoadFailed = true;
     setBusy(false);
 
-    console.error("[illustMsgPopup] 서버 UI5 로드 실패 → 오류 안내 후 창 닫기: " + sReason);
+    console.error("[illustMsgPopup] server UI5 load failed → error notice after window close: " + sReason);
 
     var sTitle = oAPP.fn._msgCls("B93");         // 오류 제목
     var sMsg = oAPP.fn._msgCommon("391");        // 통신 오류... 네트워크 확인... 문의

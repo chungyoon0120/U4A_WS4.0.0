@@ -71,7 +71,7 @@
         var fnPick = (typeof opts.onPick === "function") ? opts.onPick : null;
 
         // SHLPNAME 미지정 시 호출 무의미 — 방어.
-        if (!sShlpName) { console.warn("[HTML5][F4SH] shlpname 미지정 — 호출 무시"); return; }
+        if (!sShlpName) { console.warn("[F4SH] shlpname not set - call ignored"); return; }
 
         // 이전 인스턴스 정리(싱글톤이 아니라 매 호출 새로 — 원본도 매번 new Dialog).
         var oOld = document.getElementById("u4aF4ShDlg");
@@ -194,7 +194,7 @@
         // 선택 확정 → 콜백 + 닫기(원본 f_clientCallbak 후 close/destroy).
         function _pick(oRowData) {
             if (!oRowData) { return; }
-            if (fnPick) { try { fnPick(oRowData); } catch (e) { console.error("[HTML5][F4SH] onPick 오류:", e && e.message); } }
+            if (fnPick) { try { fnPick(oRowData); } catch (e) { console.error("[F4SH] onPick error:", e && e.message); } }
             lf_close();
         }
 

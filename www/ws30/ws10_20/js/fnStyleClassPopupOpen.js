@@ -162,7 +162,7 @@
             //★ 커밋(undo/미리보기/모델동기화) 실패 시 값 롤백 — 안 하면 화면만 성공처럼 보이고
             //  실제 저장(prev._T_0015)엔 반영 안 돼 UI-데이터 불일치가 남는다(코덱스 검수 지적).
             oCtx.attr.UIATV = sPrev;
-            console.error("[HTML5][WS20][styleClass] 커밋 실패 — 값 롤백:", e && e.message);
+            console.error("[WS20][styleClass] commit failed - value rolled back:", e && e.message);
         }
         _renderAll();
         if (oUI && oUI.content) { oUI.content.scrollTop = iY; _spy(); }

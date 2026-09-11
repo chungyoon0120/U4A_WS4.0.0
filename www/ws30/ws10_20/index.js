@@ -210,7 +210,7 @@ IPCRENDERER.on('if-meta-info', (event, res) => {
 window.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
         if (!_bMainFrameInited) {
-            console.warn("[주의] 서버 정보를 못 받아 기본값으로 초기화한다");
+            console.warn("[WARN] could not get server info - initializing with defaults");
             _mainFrameInit();
         }
     }, 600);

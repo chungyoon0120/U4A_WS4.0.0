@@ -53,7 +53,7 @@
     //   미로드/미변환(W2)이면 no-op.
     function _preview(sAttr) {
         if (typeof oAPP.fn.previewUIsetProp === "function") {
-            try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[HTML5][WS20][preset] previewUIsetProp:", e && e.message); }
+            try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[WS20][preset] previewUIsetProp:", e && e.message); }
         }
     }
 
@@ -86,7 +86,7 @@
                 return _sRes;
             }
         } catch (e) {
-            console.error("[HTML5][WS20][preset] chkValidProp 예외(통과 처리):", e && e.message);
+            console.error("[WS20][preset] chkValidProp exception (handled):", e && e.message);
         }
         return _sRes;
     }
@@ -260,7 +260,7 @@
                 var oWebPref = parent.WSUTIL.QueryString.parse(_w.getURL());
                 if (oWebPref && oWebPref.OBJTY === _popupName) { _w.send(_if_name, _IF_DATA); }
             }
-        } catch (e) { console.error("[HTML5][WS20][preset] ATTR_CHANGE 브로드캐스트 오류:", e && e.message); }
+        } catch (e) { console.error("[WS20][preset] ATTR_CHANGE broadcast error:", e && e.message); }
     }
 
     /* ── Apply(원본 OK 콜백) ──
@@ -295,7 +295,7 @@
             _okMsg = _wsTxt("628");
         } catch (e) {
             //조용한 실패 금지 — 실제 오류 메시지를 노출(원인 파악).
-            console.error("[HTML5][WS20][preset] 개인화 저장 처리 오류:", e && e.message, e);
+            console.error("[WS20][preset] personalization save handler error:", e && e.message, e);
             _errMsg = (e && e.message) ? e.message : String(e);
         } finally {
             try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -338,11 +338,11 @@
                 oHelpBtn.title = "U4A Help Document";   // TODO(i18n): 원본도 $$msg 하드코딩(메시지 키화 필요)
                 oHelpBtn.addEventListener("click", function () {
                     try { oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000278" }); }
-                    catch (e) { console.error("[HTML5][WS20][preset] U4A Help Document 오픈 실패:", e && e.message); }
+                    catch (e) { console.error("[WS20][preset] U4A Help Document open failed:", e && e.message); }
                 });
                 oHeader.appendChild(oHelpBtn);
             }
-        } catch (e) { console.error("[HTML5][WS20][preset] help 버튼 구성 오류:", e && e.message); }
+        } catch (e) { console.error("[WS20][preset] help button build error:", e && e.message); }
 
         var oXBtn = _el("button", "u4a-btn-icon");
         oXBtn.type = "button";

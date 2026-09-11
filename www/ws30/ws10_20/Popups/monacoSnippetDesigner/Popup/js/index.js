@@ -44,7 +44,7 @@
     const WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU);
     function mcMsg(sCls, sNo, sFallback) {
         try { const s = WSMSG.fnGetMsgClsText(sCls, sNo); if (s && s.trim()) { return s; } }
-        catch (e) { console.error("[스니펫디자이너] 메시지클래스 조회 실패:", sCls, sNo, e); }
+        catch (e) { console.error("[monacoSnippetDesigner] message class read failed:", sCls, sNo, e); }
         return sFallback || sNo;
     }
 
@@ -100,7 +100,7 @@
         try {
             const s = WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo, sP1);
             if (s && s.trim()) { return s; }
-        } catch (e) { console.error("[스니펫디자이너] 메시지 조회 실패:", sNo, e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] message read failed:", sNo, e); }
         return (sFallback || sNo).replace(/&1/g, sP1);
     }
 
@@ -135,7 +135,7 @@
         try {
             if (bIsBusy) { if (!oBusy.open) { oBusy.showModal(); } }
             else { if (oBusy.open) { oBusy.close(); } }
-        } catch (e) { console.error("[스니펫디자이너] busy 토글 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] busy toggle error:", e); }
     }
 
     // 자식창 일괄 busy 방송 수신 — 원본 frame.js _attachBroadCastEvent 이식(장군님 지시로 복원).
@@ -166,13 +166,13 @@
                         break;
                 }
             };
-        } catch (e) { console.error("[스니펫디자이너] BroadCast 배선 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] BroadCast wiring error:", e); }
     }
 
     // 오류 모달(공통 U4AUI.confirm) — 저장/삭제 실패 등. 단추는 OK 하나.
     function showErr(sMsg, sTitle) {
         try { U4AUI.confirm({ type: "E", title: sTitle || "", message: sMsg, buttons: [{ act: "OK", label: "OK", emphasized: true }] }); }
-        catch (e) { console.error("[스니펫디자이너] 오류 모달 실패:", e, sMsg); }
+        catch (e) { console.error("[monacoSnippetDesigner] error modal failed:", e, sMsg); }
     }
 
     // 랜덤키(원본 getRandomKey — A-Za-z0-9, 30자).
@@ -212,7 +212,7 @@
             const sPath = PATH.join(PATHINFO.THEME, SYSID + ".json");
             if (!FS.existsSync(sPath)) { return null; }
             return JSON.parse(FS.readFileSync(sPath, "utf-8"));
-        } catch (e) { console.error("[스니펫디자이너] 테마 정보 로드 오류:", e); return null; }
+        } catch (e) { console.error("[monacoSnippetDesigner] theme info load error:", e); return null; }
     }
     function _onThemeChange() {
         const oTheme = _getThemeInfo();
@@ -222,7 +222,7 @@
             if (window.U4ATheme && oTheme.THEME) {
                 window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(oTheme.THEME) : oTheme.THEME);
             }
-        } catch (e) { console.error("[스니펫디자이너] 테마 적용 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] theme apply error:", e); }
     }
     const _THEME_CH = SYSID ? ("if-p13n-themeChange-" + SYSID) : "";
 
@@ -244,7 +244,7 @@
                 };
             }).filter(function (o) { return o._key; });
         } catch (e) {
-            console.error("[스니펫디자이너] list.json 로드 오류:", e);
+            console.error("[monacoSnippetDesigner] list.json load error:", e);
             return [];
         }
     }
@@ -256,7 +256,7 @@
             if (!FS.existsSync(sFile)) { return ""; }
             return FS.readFileSync(sFile, "utf-8");
         } catch (e) {
-            console.error("[스니펫디자이너] 코드 파일 로드 오류:", sKey, e);
+            console.error("[monacoSnippetDesigner] code file load error:", sKey, e);
             return "";
         }
     }
@@ -271,7 +271,7 @@
             FS.writeFileSync(SNIPPET_LIST_JSON, JSON.stringify(aSave), "utf-8");
             return { RETCD: "S" };
         } catch (e) {
-            console.error("[스니펫디자이너] list.json 저장 오류:", e);
+            console.error("[monacoSnippetDesigner] list.json save error:", e);
             return { RETCD: "E" };
         }
     }
@@ -283,7 +283,7 @@
             FS.writeFileSync(PATH.join(SNIPPET_ROOT, sKey), sCode == null ? "" : String(sCode), "utf-8");
             return { RETCD: "S" };
         } catch (e) {
-            console.error("[스니펫디자이너] 코드 파일 저장 오류:", sKey, e);
+            console.error("[monacoSnippetDesigner] code file save error:", sKey, e);
             return { RETCD: "E" };
         }
     }
@@ -293,7 +293,7 @@
         try {
             const sFile = PATH.join(SNIPPET_ROOT, sKey);
             if (FS.existsSync(sFile)) { FS.unlinkSync(sFile); }
-        } catch (e) { console.error("[스니펫디자이너] 코드 파일 삭제 오류:", sKey, e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] code file delete error:", sKey, e); }
     }
 
     // 통합 저장(원본 _saveP13nSnippetData): 신규건 제외한 목록에 update/unshift → 목록 + 코드 저장.
@@ -319,7 +319,7 @@
     // 저장·삭제 후 방송(불변 계약).
     function _broadcastChange() {
         try { IPCRENDERER.send("if-browser-interconnection", { PRCCD: "MONACO_SNIPPET_CHANGE" }); }
-        catch (e) { console.error("[스니펫디자이너] snippet_change 방송 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] snippet_change broadcast error:", e); }
     }
 
     /* ==================================================================
@@ -333,7 +333,7 @@
             oMsg[HOST_CH] = true;
             oMsg.hostId = HOSTID;
             oFrame.contentWindow.postMessage(oMsg, "*");
-        } catch (e) { console.error("[스니펫디자이너] 호스트 송신 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] host send error:", e); }
     }
 
     // 줌 % 라벨 갱신(호스트 evt:zoom). 숫자라 i18n 불필요.
@@ -364,7 +364,7 @@
             if (oFrame && oFrame.contentWindow && oFrame.contentWindow.editor) {
                 return oFrame.contentWindow.editor.getValue();
             }
-        } catch (e) { console.error("[스니펫디자이너] 에디터 값 읽기 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] editor value read error:", e); }
         return "";
     }
 
@@ -1022,7 +1022,7 @@
 
     function fn_close() {
         if (oState.isBusy) { return; }   // busy 중 닫기 차단
-        try { U4AUI.closeWindow(CURRWIN); } catch (e) { console.error("[스니펫디자이너] 닫기 오류:", e); }
+        try { U4AUI.closeWindow(CURRWIN); } catch (e) { console.error("[monacoSnippetDesigner] close error:", e); }
     }
 
     function _bindStaticTexts() {
@@ -1063,22 +1063,22 @@
         _setFormatCap(false);   // 언어 반영(fmtcap) 전까지 비활성.
 
         // 좌|우 스플리터(공통).
-        try { U4AUI.wireSplitter(document.getElementById("snipSplit"), { axis: "x" }); } catch (e) { console.error("[스니펫디자이너] 스플리터 배선 오류:", e); }
+        try { U4AUI.wireSplitter(document.getElementById("snipSplit"), { axis: "x" }); } catch (e) { console.error("[monacoSnippetDesigner] splitter wiring error:", e); }
 
         // 테마 변경 추종 — U4ATheme.apply() 가 쏘는 u4a-theme-changed 를 받아 에디터 테마도 전환.
         //   (IPC if-p13n-themeChange 핸들러도 결국 U4ATheme.apply 를 부르므로 이 한 곳으로 수렴.)
         try { if (window.U4ATheme && U4ATheme.onChange) { U4ATheme.onChange(_applyMonacoTheme); } }
-        catch (e) { console.error("[스니펫디자이너] 테마 변경 구독 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] theme change subscribe error:", e); }
 
         // 헤더/툴바 반응형 오버플로(⋯) — 공통 U4AUI.attachOverflow(§11). 좁아지면 넘치는 액션을 ⋯ 로 접는다.
         //   ★ btnClass 를 반드시 넘긴다 — 기본값(u4a-tx-*)은 테마 CSS 미정의라 브라우저 기본 박스로 뜬다.
         //     레퍼런스(bindShared/fnP13nDesignPopupOpen)처럼 화면 툴바 버튼과 동일 스타일로 맞춘다(여기선 평면 u4aSnipFlat).
         try { _ovfTools = U4AUI.attachOverflow(document.getElementById("snipEdTools"), { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); }
-        catch (e) { console.error("[스니펫디자이너] 코드 툴바 오버플로 배선 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] code toolbar overflow wiring error:", e); }
         try { if (oListActsBar) { _ovfActs = U4AUI.attachOverflow(oListActsBar, { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
-        catch (e) { console.error("[스니펫디자이너] 리스트 헤더 오버플로 배선 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] list header overflow wiring error:", e); }
         try { if (oInfoPanel && oInfoPanel.actions) { _ovfInfoActs = U4AUI.attachOverflow(oInfoPanel.actions, { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
-        catch (e) { console.error("[스니펫디자이너] 기본정보 헤더 오버플로 배선 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] default-info header overflow wiring error:", e); }
 
         // 초기 데이터 로드 + 렌더 + 빈상태.
         oState.list = _readList();
@@ -1102,7 +1102,7 @@
             initUIBuild();
 
             // 실시간 테마 변경 추종 등록(원본 frame.js 동일).
-            if (_THEME_CH) { try { IPCMAIN.on(_THEME_CH, _onThemeChange); } catch (e) { console.error("[스니펫디자이너] 테마 IPC 등록 오류:", e); } }
+            if (_THEME_CH) { try { IPCMAIN.on(_THEME_CH, _onThemeChange); } catch (e) { console.error("[monacoSnippetDesigner] theme IPC register error:", e); } }
 
             // 준비 완료 → 창 노출(플래시 방지: opener show:false 로 열림).
             requestAnimationFrame(function () {
@@ -1111,7 +1111,7 @@
                 fn_setBusy(false);
             });
         } catch (e) {
-            console.error("[스니펫디자이너] 초기화 오류:", e);
+            console.error("[monacoSnippetDesigner] init error:", e);
             try { CURRWIN.show(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         }
     });

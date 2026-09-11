@@ -52,7 +52,7 @@ function _loadConfig() {
     _configPath = _resolveConfigPath();
 
     if (!fs.existsSync(_configPath)) {
-        console.warn('[TGSD-001] 텔레그램 설정 파일이 없다 — 전송하지 않는다. 경로: ' + _configPath);
+        console.warn('[TGSD-001] telegram config file is missing - not sending. path: ' + _configPath);
         _config = null;
         return;
     }
@@ -62,7 +62,7 @@ function _loadConfig() {
     try {
         sText = fs.readFileSync(_configPath, 'utf8');
     } catch (e) {
-        console.error('[TGSD-002] 텔레그램 설정 파일을 읽지 못했다 — 전송하지 않는다.', e);
+        console.error('[TGSD-002] could not read the telegram config file - not sending.', e);
         _config = null;
         return;
     }
@@ -70,7 +70,7 @@ function _loadConfig() {
     try {
         _config = JSON.parse(sText);
     } catch (e) {
-        console.error('[TGSD-003] 텔레그램 설정 파일 형식이 잘못됐다 — 전송하지 않는다.', e);
+        console.error('[TGSD-003] telegram config file has a bad shape - not sending.', e);
         _config = null;
         return;
     }
@@ -201,7 +201,7 @@ function _passesLimit(sErrorCode) {
     const iDailyLimit = typeof opt.dailySendLimit === 'number' ? opt.dailySendLimit : 200;
 
     if (_sentCountToday >= iDailyLimit) {
-        console.warn('[TGSD-004] 하루 전송 상한을 넘어 보내지 않는다.');
+        console.warn('[TGSD-004] daily send limit reached - not sending.');
         return false;
     }
 
@@ -240,26 +240,26 @@ function _maskSecrets(sText) {
         // ① 이름표가 붙은 값 — 비밀번호·열쇠 종류
         s = s.replace(
             /((?:password|passwd|pwd|비밀번호|token|apikey|api_key|secret|botToken)\s*[=:"']{1,3}\s*)([^\s,&"'}\]]+)/gi,
-            '$1(가림)'
+            '$1(masked)'
         );
 
         // ② 인증 표 — 'Bearer 값' 형태는 값까지 지운다
         s = s.replace(
             /((?:authorization|auth)\s*[=:"']{1,3}\s*)(?:bearer\s+)?([^\s,&"'}\]]+)/gi,
-            '$1(가림)'
+            '$1(masked)'
         );
 
         // ③ 주소 뒤에 붙은 값 — 세션·사용자 정보
         s = s.replace(
             /([?&](?:sessionKey|sessionkey|browserkey|USERINFO|userinfo|token|auth)=)([^&\s"']+)/gi,
-            '$1(가림)'
+            '$1(masked)'
         );
 
         // ④ 텔레그램 봇 열쇠 모양 — 긴 숫자 다음에 콜론, 그다음 긴 영문
-        s = s.replace(/[0-9]{6,}:[A-Za-z0-9_\-]{30,}/g, '(가림)');
+        s = s.replace(/[0-9]{6,}:[A-Za-z0-9_\-]{30,}/g, '(masked)');
 
     } catch (e) {
-        console.error('[TGSD-009] 가리기에 실패했다 — 보내지 않는다.', e);
+        console.error('[TGSD-009] secret masking failed - not sending (fail-closed).', e);
         return null;   // 가리기에 실패하면 보내지 않는다(fail-closed)
     }
 
@@ -272,23 +272,43 @@ function _maskSecrets(sText) {
  ****************************************************************************************/
 function _buildSendFile(oInfo) {
 
+    /**
+     * 뻗은 건은 보고서 파일을 그대로 보낸다 (2026-09-09 - 장군님 지시)
+     * 앞서는 날짜별 로그 끝 200KB 를 잘라 붙였는데, 로그에 이미 있는 내용이
+     * 또 나가 같은 내용이 두 벌이 됐다. 보고서에 필요한 것이 다 들어 있다.
+     */
+    if (oInfo.kind === 'crash' && oInfo.logFilePath) {
+
+        try {
+
+            if (fs.existsSync(oInfo.logFilePath)
+                && /crash-report_/.test(oInfo.logFilePath)) {
+                return oInfo.logFilePath;
+            }
+
+        } catch (e) {
+            // 못 읽으면 아래 기본 방식으로 간다
+        }
+
+    }
+
     const iTailBytes = 200 * 1024;   // 끝에서 200KB
 
     let sHead = '';
-    sHead += '===== U4A Workspace 오류 보고 =====' + os.EOL;
-    sHead += '앱 버전   : ' + (_app ? _app.getVersion() : '-') + os.EOL;
-    sHead += '윈도우    : ' + os.release() + ' / ' + process.arch + os.EOL;
-    sHead += '창        : ' + (oInfo.windowName || '-') + os.EOL;
-    sHead += '화면      : ' + (oInfo.screenName || '-') + os.EOL;
-    sHead += '추적 번호 : ' + (oInfo.traceId || '-') + '   ← 로그에서 이 번호로 그 조작을 찾는다' + os.EOL;
-    sHead += '오류 코드 : ' + (oInfo.errorCode || '-') + os.EOL;
-    sHead += '오류 내용 : ' + (oInfo.message || '-') + os.EOL;
-    sHead += '그때 화면 : ' + (oInfo.screenState || '-') + os.EOL;
-    sHead += '난 자리   : ' + os.EOL + (oInfo.stack || '(스택 없음)') + os.EOL;
+    sHead += '===== U4A Workspace ERROR REPORT =====' + os.EOL;
+    sHead += 'App version : ' + (_app ? _app.getVersion() : '-') + os.EOL;
+    sHead += 'Windows     : ' + os.release() + ' / ' + process.arch + os.EOL;
+    sHead += 'Window      : ' + (oInfo.windowName || '-') + os.EOL;
+    sHead += 'Screen      : ' + (oInfo.screenName || '-') + os.EOL;
+    sHead += 'Trace id    : ' + (oInfo.traceId || '-') + '   <-- grep this id in the log to find the whole action' + os.EOL;
+    sHead += 'Error code  : ' + (oInfo.errorCode || '-') + os.EOL;
+    sHead += 'Message     : ' + (oInfo.message || '-') + os.EOL;
+    sHead += 'Screen state: ' + (oInfo.screenState || '-') + os.EOL;
+    sHead += 'Stack       : ' + os.EOL + (oInfo.stack || '(no stack)') + os.EOL;
     sHead += '=================================' + os.EOL + os.EOL;
-    sHead += '--- 아래는 로그 파일의 마지막 부분 ---' + os.EOL;
+    sHead += '--- tail of the log file follows ---' + os.EOL;
 
-    let sTail = '(로그 파일을 읽지 못했다)';
+    let sTail = '(could not read the log file)';
 
     try {
 
@@ -313,7 +333,7 @@ function _buildSendFile(oInfo) {
         }
 
     } catch (e) {
-        console.error('[TGSD-005] 로그 파일 끝부분을 읽지 못했다.', e);
+        console.error('[TGSD-005] could not read the tail of the log file.', e);
     }
 
     // 임시 파일로 저장
@@ -349,7 +369,7 @@ function _buildSendFile(oInfo) {
         fs.writeFileSync(sOutPath, sSafe, { encoding: 'utf8' });
 
     } catch (e) {
-        console.error('[TGSD-006] 보낼 파일을 만들지 못했다.', e);
+        console.error('[TGSD-006] could not build the file to send.', e);
         return '';
     }
 
@@ -370,7 +390,7 @@ function _postDocument(oTarget, sFilePath, sCaption, fnDone) {
     try {
         fileBuf = fs.readFileSync(sFilePath);
     } catch (e) {
-        console.error('[TGSD-007] 보낼 파일을 읽지 못했다.', e);
+        console.error('[TGSD-007] could not read the file to send.', e);
         fnDone(false);
         return;
     }
@@ -429,7 +449,7 @@ function _postDocument(oTarget, sFilePath, sCaption, fnDone) {
                 return;
             }
 
-            console.error('[TGSD-008] 텔레그램이 거절했다. 상태: ' + res.statusCode + ' / 응답: ' + sRes.slice(0, 300));
+            console.error('[TGSD-008] telegram rejected the upload. status: ' + res.statusCode + ' / response: ' + sRes.slice(0, 300));
             fnDone(false);
 
         });
@@ -437,13 +457,13 @@ function _postDocument(oTarget, sFilePath, sCaption, fnDone) {
     });
 
     req.on('timeout', () => {
-        console.error('[TGSD-008] 텔레그램 전송 시간 초과');
+        console.error('[TGSD-008] telegram upload timed out.');
         req.destroy();
         fnDone(false);
     });
 
     req.on('error', (e) => {
-        console.error('[TGSD-008] 텔레그램 전송 실패', e);
+        console.error('[TGSD-008] telegram upload failed.', e);
         fnDone(false);
     });
 
@@ -527,7 +547,7 @@ function sendError(oInfo) {
         try {
             oInfo.logFilePath = require('./ws_main_log').getLogFilePath();
         } catch (e) {
-            console.error('[TGSD-005] 로그 파일 경로를 알아내지 못했다.', e);
+            console.error('[TGSD-005] could not determine the log file path.', e);
         }
 
     }
@@ -538,7 +558,7 @@ function sendError(oInfo) {
         return;
     }
 
-    const sCaption = (oInfo.screenName || '화면 미상') + ' / ' + (oInfo.errorCode || '코드 없음');
+    const sCaption = (oInfo.screenName || 'unknown-screen') + ' / ' + (oInfo.errorCode || 'no-code');
 
     _queue.push({
         filePath: sFilePath,
@@ -584,7 +604,7 @@ function install(appInstance) {
         });
 
     } catch (e) {
-        console.error('[TGSD-001] 화면 쪽 전송 통로를 열지 못했다.', e);
+        console.error('[TGSD-001] could not open the renderer-side send channel.', e);
     }
 
 }

@@ -27,7 +27,19 @@
                 oAPP.attr.oMainBroad.postMessage = function (oData) {
 
                     try {
-                        U4ALOG.info("창끼리 신호 보냄", (oData && oData.PRCCD) ? oData.PRCCD : "(종류 없음)", "");
+
+                        /**
+                         * 로딩 표시 켜고 끄는 신호는 안 남긴다 (2026-09-10 — 장군님 지시)
+                         * 화면이 뜰 때마다 자동으로 오가는 것이라 사용자 행위가 아니고,
+                         * 원인을 짚는 데도 쓸모가 없다. 14분에 892줄이 이것으로 찼다(실측).
+                         */
+                        var _sPrc = (oData && oData.PRCCD) ? String(oData.PRCCD) : "";
+
+                        if (_sPrc === "BUSY_ON" || _sPrc === "BUSY_OFF") {
+                            return _fnOriginPost.apply(this, arguments);
+                        }
+
+                        U4ALOG.info("창끼리 신호 보냄", _sPrc || "(no type)", "");
                     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                     return _fnOriginPost(oData);
@@ -50,7 +62,10 @@
             // 창끼리 신호 로그 — 받은 쪽 (2026-09-08 추가)
             try {
                 if (typeof U4ALOG !== "undefined") {
-                    U4ALOG.info("창끼리 신호 받음", _PRCCD || "(종류 없음)", "");
+                    var _sRecv = (oEvent && oEvent.data && oEvent.data.PRCCD) ? String(oEvent.data.PRCCD) : "";
+                    if (_sRecv !== "BUSY_ON" && _sRecv !== "BUSY_OFF") {
+                        U4ALOG.info("창끼리 신호 받음", _PRCCD || "(no type)", "");
+                    }
                 }
             } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 

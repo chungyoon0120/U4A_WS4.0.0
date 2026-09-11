@@ -243,6 +243,14 @@
         URL: "./js/ws_html5_call_tooltips_popup.js",
         MIMETYPE: "script"
     },
+    // [내부 데이터 모니터] 감시 알맹이 — 함수 정의만 하고 실제 실행은 테스트 메뉴를 누를 때라
+    //   로드 순서에 매이지 않는다. 위 도움말 팝업과 같은 이유로 목록 "맨 뒤"에 둔다
+    //   (앞쪽에 두면 이 파일이 배포에서 빠졌을 때 뒤따르는 파일이 안 실려 화면이 죽는다).
+    //   이 도구가 없어도 앱은 그대로 돈다.
+    {
+        URL: "./js/ws_html5_datamon.js",
+        MIMETYPE: "script"
+    },
     ];
 
     oAPP.loadLibrary = function (scripts, index, fnCallback) {
@@ -268,7 +276,7 @@
                 try {
                     window["eval"].call(window, data + sSourceURL);
                 } catch (e) {
-                    console.error("[HTML5] preload eval error: " + oLoadFile.URL, e);
+                    console.error("preload eval error: " + oLoadFile.URL, e);
                 }
 
                 // --- 재귀 로직 시작 ---
@@ -284,7 +292,7 @@
                 if (fnCallback) fnCallback();
             },
             error: function (xhr, status, err) {
-                console.error("로드 실패: " + oLoadFile.URL);
+                console.error("load failed: " + oLoadFile.URL);
             }
         });
     };

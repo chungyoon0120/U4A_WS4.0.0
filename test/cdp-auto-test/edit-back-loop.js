@@ -4,7 +4,8 @@
 const path = require('path');
 const readline = require('readline');
 const {
-    listTargets, pickMainWindows, evalOnPage, parseKeySpec, openSession, isWindowAlive
+    listTargets, pickMainWindows, evalOnPage, parseKeySpec, openSession, isWindowAlive,
+    describeSocketMaker
 } = require('./lib/cdp-client');
 const { createLogger } = require('./lib/logger');
 const { saveIncident, KIND_NAMES } = require('./lib/incident');
@@ -42,8 +43,11 @@ if (ARGV.indexOf('--help') >= 0 || ARGV.indexOf('-h') >= 0) {
   --editKey <키>       WS10 에서 누를 편집진입 키.            (기본 F6)
   --backKey <키>       WS20 에서 누를 뒤로가기 키.            (기본 F3)
   --intervalMs <밀리초> 키를 누르는 간격.                      (기본 100 = 0.1초)
-  --busyStuckMs <밀리초> 화면이 이 시간 넘게 계속 "처리중" 이면
-                       멈춘 걸로 보고 전체 종료.              (기본 60000 = 1분)
+  --busyStuckMs <밀리초> busy 가 이 시간 넘게 안 꺼지면
+                       화면이 잠긴 걸로 보고 전체 stopped.       (기본 300000 = 5분)
+  --cdpTimeoutMs <밀리초> 앱에 물어보고 답을 기다리는 시간.  (기본 300000 = 5분)
+  --quietMissing <횟수> 화면이 다 그려졌는데 단축키가 안 걸려 있는 상태가
+                       연달아 이만큼 이어지면 고장으로 본다.    (기본 10바퀴)
   --keepGoing          오류가 나도 멈추지 않고 계속 돈다.
                        (기본은 처음 오류에서 멈춤)
   --help, -h           이 도움말만 보여주고 끝냄.
@@ -65,15 +69,14 @@ if (ARGV.indexOf('--help') >= 0 || ARGV.indexOf('-h') >= 0) {
   다 담으면 정작 원인이 파묻히기 때문입니다. 멈출 때 소리로 한 번 알립니다.
 
   그 순간의 증거를 logs 폴더 안에 「사고_날짜_시각_종류」 폴더로 묶어 둡니다.
-   - 요약.md       : 무슨 일인지 · 몇 바퀴째 · 어느 화면이었는지  ← 이것부터 보세요
+   - SUMMARY.md       : 무슨 일인지 · 몇  cycles in a row · 어느 화면이었는지  ← 이것부터 보세요
    - 화면.png      : 그 순간 화면 모습
-   - 최근기록.log  : 터지기 직전 기록
-   - 원문.json     : 오류 원문(터진 자리까지)
+   - log-tail.log  : log tail before the failure
+   - 원문.json     : 오류 원문(stack까지)
 
 [로그]
-  logs 폴더에 두 개가 쌓입니다.
-   - run_날짜_시각.log         : 사람이 읽는 진행 기록
-   - run_날짜_시각_errors.jsonl : 오류 원문(분석용, 한 줄에 한 건)
+  logs 폴더에 사람이 읽는 진행 기록(run_날짜_시각.log)이 쌓입니다.
+  오류 원문은 사고가 났을 때만 증거 폴더 안 「원문.json」 에 담깁니다.
 `);
     process.exit(0);
 }
@@ -87,9 +90,21 @@ const BACK_KEY = getArg('--backKey', 'F3');
 // 사람이 단축키를 연타하는 상황을 그대로 재현한다 — 이 간격으로 계속 누른다.
 // 누를 키는 그때그때 현재 화면만 보고 정한다(WS10이면 편집진입, WS20이면 뒤로가기).
 // busy 는 누를지 말지를 정하는 데 쓰지 않는다 — busy 가 켜져 있어도 계속 누른다.
-// 다만 busy 가 이 시간 넘게 계속 켜진 채면 화면이 멈춘 걸로 보고 전체를 종료한다(감시용).
+// 다만 busy 가 이 시간 넘게 계속 켜진 채면 화면이 잠긴 걸로 보고 전체를 종료한다(감시용).
+//   ★기본 5분 (장군님 지시 2026-09-09). 전에는 1분이었는데, 앱은 서버 응답을 최대 10분까지
+//     기다리므로 느린 요청 하나만 있어도 아직 정상인데 도구가 먼저 포기했다.
 const PRESS_INTERVAL_MS = Number(getArg('--intervalMs', '100'));
-const BUSY_STUCK_MS = Number(getArg('--busyStuckMs', '60000'));
+const BUSY_STUCK_MS = Number(getArg('--busyStuckMs', '300000'));
+
+// 앱에 뭘 물어보고 답을 기다리는 시간. (장군님 지시 2026-09-09 — 10초에서 5분으로)
+//   연타 중 앱이 무거운 일을 하면 10초 안에 못 돌아본다. 멀쩡한데 시간초과로 끝나면 안 된다.
+const CDP_TIMEOUT_MS = Number(getArg('--cdpTimeoutMs', '300000'));
+
+// 화면이 다 그려졌는데(넘어가는 중도 아니고 처리중도 아닌데) 단축키가 안 걸려 있는 바퀴가
+// 연달아 이만큼 이어지면 고장으로 본다. (장군님 지적 2026-09-10)
+//   ★시간이 아니라 "바퀴 수"로 센다 - 느린 PC 에서는 한 바퀴가 길어지므로 실제 기다리는 시간도
+//     자연히 늘어난다. 시간으로 재면 사양에 따라 답이 달라져서 못 쓴다.
+const QUIET_MISSING_LIMIT = Number(getArg('--quietMissing', '10'));
 
 // ★처음 오류에서 멈춘다 (장군님 지시 2026-09-09).
 //   0.1초마다 도는 시험이라, 한 번 고장 나면 뒤따라오는 오류가 수천 줄씩 쌓여
@@ -98,6 +113,9 @@ const BUSY_STUCK_MS = Number(getArg('--busyStuckMs', '60000'));
 const KEEP_GOING = ARGV.indexOf('--keepGoing') >= 0;
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// 기록은 이 프로그램이 놓인 자리 옆 logs 폴더에 쌓는다.
+//   ★한 덩어리 exe 로 굽던 갈래는 뺐다(장군님 지시 2026-09-10 "bat 파일로 해").
+//     bat 은 이 파일을 그대로 돌리므로 파일이 놓인 자리가 곧 프로그램 자리다.
 const LOG_DIR = path.join(__dirname, 'logs');
 const logger = createLogger(LOG_DIR);
 
@@ -106,13 +124,13 @@ const logger = createLogger(LOG_DIR);
 const ENV = loadConfig();
 
 if (ENV.error) {
-    logger.error(`알림 설정을 읽지 못했다 — 알림은 못 보낸다: ${ENV.error}`);
+    logger.error(`could not read the notify config - notifications are disabled: ${ENV.error}`);
 }
 
 // 모든 창이 함께 보는 정지 신호 — Ctrl+C 한 번으로 창 전부에 전달된다.
 let running = true;
 process.on('SIGINT', () => {
-    logger.info('중지 요청(Ctrl+C) 받음 — 각 창은 이번 사이클까지만 마치고 종료.');
+    logger.info('stop requested (Ctrl+C) - each window will finish the current cycle, then stop.');
     running = false;
 });
 
@@ -123,7 +141,13 @@ process.on('SIGINT', () => {
  * 그래서 첫 사고에서만 증거를 챙기고(화면 캡처·직전 기록·오류 원문) 전체를 멈춘다.
  */
 let incidentTaken = false;   // 이미 사고 하나를 붙잡았나
-let incidentPromise = null;  // 증거 담기가 끝날 때까지 기다릴 약속
+let incidentPromise = null;  // 증거 담기 + 알림까지 다 끝날 때까지 기다릴 약속
+
+// ★증거 담기(화면 그림 찍기)만 따로 기다릴 약속. (실측 2026-09-10)
+//   전에는 사진을 다 찍기도 전에 반복 돌리던 쪽이 창과의 연결을 끊어서,
+//   찍던 사진이 중간에 끊기고 「화면 캡처 실패: WebSocket 오류」 만 남았다.
+//   이제 연결을 닫기 전에 이것부터 기다린다.
+let incidentSavePromise = null;
 let incidentDir = null;      // 증거를 담은 폴더
 let incidentInfo = null;     // 무슨 사고였는지(끝에 요약할 때 쓴다)
 
@@ -143,25 +167,32 @@ function fireIncident(session, info) {
         // 소리를 못 내는 환경이어도 그것 때문에 멈추면 안 된다.
     }
 
-    // 알림 글에 같이 담을 "터지기 직전 기록"은 지금 이 순간 것을 써야 한다
+    // 알림 글에 같이 담을 "log tail before the failure"은 지금 이 순간 것을 써야 한다
     // (증거를 담는 동안에도 기록은 계속 쌓이므로 여기서 한 번 떠 둔다).
     const aRecent = logger.getRecent();
-    const sKindName = KIND_NAMES[info.kind] || info.kind || '알 수 없는 사고';
+    const sKindName = KIND_NAMES[info.kind] || info.kind || 'unknown incident';
 
-    incidentPromise = saveIncident({
+    const oSaving = saveIncident({
         logDir: LOG_DIR,
         info,
         recentLines: aRecent,
+        errorDetails: logger.getErrorDetails(),
         session
-    }).then((sDir) => {
+    });
+
+    // 연결을 닫기 전에 이것부터 기다리게 한다(사진이 끊기지 않도록).
+    //   여기서 터져도 흐름이 멈추면 안 되므로 따로 받아 둔다 — 진짜 처리는 아래 chain 에서 한다.
+    incidentSavePromise = oSaving.catch(() => null);
+
+    incidentPromise = oSaving.then((sDir) => {
 
         incidentDir = sDir;
-        logger.error(`★ 사고 증거를 담았다 → ${sDir}`);
+        logger.error(`incident evidence saved -> ${sDir}`);
         return sDir;
 
     }).catch((e) => {
 
-        logger.error(`사고 증거를 담다가 실패: ${e && e.stack ? e.stack : e}`);
+        logger.error(`failed while saving incident evidence: ${e && e.stack ? e.stack : e}`);
         return null;
 
     }).then((sDir) => {
@@ -180,16 +211,16 @@ function fireIncident(session, info) {
         (aResults || []).forEach((r) => {
 
             if (r.skipped) {
-                logger.info(`알림 건너뜀 (${r.where}) — ${r.error}`);
+                logger.info(`notify skipped (${r.where}) — ${r.error}`);
                 return;
             }
 
             if (r.ok) {
-                logger.info(`알림 보냄 (${r.where})${r.url ? ` → ${r.url}` : ''}`);
+                logger.info(`notify sent (${r.where})${r.url ? ` → ${r.url}` : ''}`);
                 return;
             }
 
-            logger.error(`알림 실패 (${r.where}) — ${r.error}`);
+            logger.error(`notify failed (${r.where}) — ${r.error}`);
 
         });
 
@@ -198,7 +229,7 @@ function fireIncident(session, info) {
     }).catch((e) => {
 
         // 알림이 통째로 터져도 시험 결과는 남아야 한다.
-        logger.error(`알림을 보내다가 터짐: ${e && e.stack ? e.stack : e}`);
+        logger.error(`notify threw: ${e && e.stack ? e.stack : e}`);
         return incidentDir;
 
     });
@@ -248,9 +279,21 @@ const STATE_EXPRESSION = `
         appId = '';
     }
 
+    // 앱이 "지금 화면 넘어가는 중"이라고 스스로 켜 두는 표시.
+    //   앱 자신도 이걸 보고 단축키를 막는다(ws_common.js fnShortCutExeAvaliableCheck).
+    //   도구도 같은 기준을 써야 "넘어가는 중이라 잠깐 없는 것"을 고장으로 잘못 보지 않는다.
+    var moving = false;
+
+    try {
+        moving = (oAPP.attr.isNaviBusy === true);
+    } catch (e) {
+        moving = false;
+    }
+
     return JSON.stringify({
         page      : window.getCurrPage ? getCurrPage() : '',
         busy      : window.getBusy ? getBusy() : '',
+        moving    : moving,
         appId     : appId,
         dialog    : !!d,
         dialogText: d ? (d.innerText || '').slice(0, 2000) : '',
@@ -307,6 +350,7 @@ async function runWindowLoop(page, label) {
     let busySince = null;   // busy가 연속으로 켜져 있기 시작한 시각(안 켜져 있으면 null)
     let lastPressAt = null; // 직전에 키를 누른 시각 — 실제 간격을 로그에 찍기 위해
     let listeningWas = null; // 직전 바퀴에 앱이 그 키를 듣고 있었는지(바뀌는 순간만 자세히 남기려고)
+    let quietMissing = 0;    // 조용한 상태(넘어가는 중 아님)인데 단축키가 없는 바퀴가 몇 번 이어졌나
 
     // 오류가 터진 순간의 정황(어느 화면·처리중이었나·직전에 무슨 키를 눌렀나)을 같이 남기려고
     // 최근 값을 들고 있는다. 오류 알림은 반복문 밖(연결 쪽)에서도 오기 때문에 필요하다.
@@ -315,7 +359,7 @@ async function runWindowLoop(page, label) {
 
     /**
      * 창을 나중에 봐도 가려낼 수 있게 한 줄로 만든다. (장군님 지적 2026-09-09)
-     *   "[창1]" 만으로는 어느 창인지 알 수 없다 — 창 제목은 다 같고, 순번은 돌릴 때마다 바뀐다.
+     *   "[win1]" 만으로는 어느 창인지 알 수 없다 — 창 제목은 다 같고, 순번은 돌릴 때마다 바뀐다.
      *   그래서 창 번호(유일한 값)와, 그 창이 다루던 앱 이름을 같이 적는다.
      */
     function _windowDesc() {
@@ -327,11 +371,11 @@ async function runWindowLoop(page, label) {
         }
 
         if (page.id) {
-            aBits.push(`창번호 ${page.id}`);
+            aBits.push(`windowId ${page.id}`);
         }
 
         if (lastState.appId) {
-            aBits.push(`앱 ${lastState.appId}`);
+            aBits.push(`app ${lastState.appId}`);
         }
 
         return aBits.join(' · ');
@@ -340,12 +384,12 @@ async function runWindowLoop(page, label) {
 
     // 연결을 한 번만 열어 계속 쓴다. 오류 감시(콘솔오류·스크립트오류)도 이 연결로 같이 받는다.
     // 사람이 읽는 줄과 별개로, 원인 분석에 필요한 원문(스택·파일·줄번호 등)을 통째로
-    // 별도 파일(run_*_errors.jsonl)에 한 줄 JSON 으로 남긴다.
+    // 들고 있다가, 사고가 나면 증거 폴더 안 「원문.json」 에 담는다.
     // ★연결을 만드는 도중에도 오류 알림이 먼저 날아온다 - 앱에 "이미 쌓여 있던" 지난 오류다.
     //   (실측 2026-09-09)
     //   ① 그때 아래 콜백이 session 을 건드리면 "아직 준비 안 됐다"며 도구가 터졌다.
     //   ② 게다가 그건 이번 시험에서 난 오류가 아닌데도 시작하자마자 멈춰 버렸다
-    //      (0바퀴째 · 화면도 모름 · 그림도 없음).
+    //      (0 cycles in a row · 화면도 모름 · 그림도 없음).
     //   그래서 연결이 다 준비될 때까지는 사고로 치지 않고, 지난 오류로만 적어 둔다.
     let session = null;
     let ready = false;
@@ -354,11 +398,11 @@ async function runWindowLoop(page, label) {
         onConsoleError: (text, raw) => {
 
             if (!ready) {
-                logger.info(`${label} [붙기 전에 이미 있던 오류 - 무시] ${text}`);
+                logger.info(`${label} [pre-existing before attach - ignored] ${text}`);
                 return;
             }
 
-            logger.error(`${label} [콘솔오류] ${text}`);
+            logger.error(`${label} [CONSOLE ERROR] ${text}`);
             const info = {
                 kind: 'consoleError',
                 window: label,
@@ -378,11 +422,11 @@ async function runWindowLoop(page, label) {
         onScriptError: (text, raw) => {
 
             if (!ready) {
-                logger.info(`${label} [붙기 전에 이미 있던 오류 - 무시] ${text}`);
+                logger.info(`${label} [pre-existing before attach - ignored] ${text}`);
                 return;
             }
 
-            logger.error(`${label} [스크립트오류] ${text}`);
+            logger.error(`${label} [SCRIPT ERROR] ${text}`);
             const info = {
                 kind: 'scriptError',
                 window: label,
@@ -401,7 +445,7 @@ async function runWindowLoop(page, label) {
             logger.errorDetail(info);
             fireIncident(session, info);
         }
-    });
+    }, CDP_TIMEOUT_MS);
 
     // 키 이름 풀이는 한 번만 해 두고 계속 쓴다(반복 안에서 매번 풀 필요가 없다).
     const editSpec = parseKeySpec(EDIT_KEY);
@@ -419,7 +463,7 @@ async function runWindowLoop(page, label) {
 
             try {
                 if (session.isClosed()) {
-                    logger.error(`${label} [화면크래시] 연결이 끊겼다 — 사이클 ${cycleNo}. 이 창의 반복을 종료한다.`);
+                    logger.error(`${label} [RENDERER GONE] CDP connection closed - cycle ${cycleNo}. stopping this window.`);
                     const info = {
                         kind: 'windowGone',
                         window: label,
@@ -430,7 +474,7 @@ async function runWindowLoop(page, label) {
                         currPage: lastState.page,
                         busy: lastState.busy,
                         lastKey: lastKeyName,
-                        summary: '창과의 연결이 끊김(화면 크래시 또는 창 닫힘)'
+                        summary: 'CDP connection closed (renderer crash or window closed)'
                     };
                     logger.errorDetail(info);
                     fireIncident(session, info);
@@ -441,7 +485,7 @@ async function runWindowLoop(page, label) {
                 if (cycleNo % ALIVE_CHECK_EVERY === 0) {
                     const alive = await isWindowAlive(DEBUG_HOST, page.id);
                     if (!alive) {
-                        logger.error(`${label} [화면크래시] 창이 사라졌다 — 사이클 ${cycleNo}. 이 창의 반복을 종료한다.`);
+                        logger.error(`${label} [RENDERER GONE] window disappeared from the target list - cycle ${cycleNo}. stopping this window.`);
                         const info = {
                             kind: 'windowGone',
                             window: label,
@@ -452,7 +496,7 @@ async function runWindowLoop(page, label) {
                             currPage: lastState.page,
                             busy: lastState.busy,
                             lastKey: lastKeyName,
-                            summary: '창이 목록에서 사라짐(화면 크래시 또는 창 닫힘)'
+                            summary: 'window gone from the CDP target list (renderer crash or window closed)'
                         };
                         logger.errorDetail(info);
                         fireIncident(session, info);
@@ -469,7 +513,7 @@ async function runWindowLoop(page, label) {
 
                 // 메시지박스/다이얼로그가 떠 있으면 단축키가 앱 쪽에서 막히므로 그 자리서 중지
                 if (state.dialog) {
-                    logger.error(`${label} 사이클 ${cycleNo}: 메시지박스/다이얼로그가 떠 있음 — 자동화를 멈춘다.`);
+                    logger.error(`${label} cycle ${cycleNo}: a modal dialog is open - stopping automation.`);
                     const info = {
                         kind: 'dialogOpen',
                         window: label,
@@ -480,7 +524,7 @@ async function runWindowLoop(page, label) {
                         currPage,
                         busy,
                         lastKey: lastKeyName,
-                        summary: '메시지박스/다이얼로그가 떠 있어 단축키가 막힘',
+                        summary: 'a modal dialog is blocking the shortcut',
                         dialogText: state.dialogText
                     };
                     logger.errorDetail(info);
@@ -488,13 +532,13 @@ async function runWindowLoop(page, label) {
                     break;
                 }
 
-                // busy 감시(누르는 건 막지 않음) — 계속 켜진 채 제한 시간을 넘기면 화면 멈춤으로 보고 종료.
+                // busy 감시(누르는 건 막지 않음) — 계속 켜진 채 제한 시간을 넘기면 화면 멈춤으로 보고 stopped.
                 if (busy === 'X') {
                     if (busySince === null) {
                         busySince = Date.now();
                     } else if (Date.now() - busySince >= BUSY_STUCK_MS) {
                         const stuckMs = Date.now() - busySince;
-                        logger.error(`${label} 사이클 ${cycleNo}: busy가 ${stuckMs}ms 동안 계속 켜져 있음 — 화면 멈춤으로 보고 전체 종료.`);
+                        logger.error(`${label} cycle ${cycleNo}: busy has stayed on for ${stuckMs}ms - treating it as a hang, stopping everything.`);
                         const info = {
                             kind: 'busyStuck',
                             window: label,
@@ -507,7 +551,7 @@ async function runWindowLoop(page, label) {
                             currPage,
                             busy,
                             lastKey: lastKeyName,
-                            summary: `처리중 표시가 ${stuckMs}ms 동안 안 풀림(화면 멈춤 의심)`
+                            summary: `busy stuck on for ${stuckMs}ms (suspected hang)`
                         };
                         logger.errorDetail(info);
                         fireIncident(session, info);
@@ -523,11 +567,42 @@ async function runWindowLoop(page, label) {
                     const isEdit = (currPage === 'WS10');
                     const keyName = isEdit ? EDIT_KEY : BACK_KEY;
 
-                    // 이 키를 앱이 지금 듣고 있는지 확인한다. 안 듣고 있으면 눌러도 아무 일이 안 생기고
-                    // 앱 쪽 로그도 안 남는다 — 이 사실 자체가 중요한 증거라 따로 남긴다.
+                    /********************************************************************
+                     * 이 키를 앱이 지금 듣고 있는지 본다. (판정 기준 고침 2026-09-10 — 장군님 지적)
+                     * ------------------------------------------------------------------
+                     * 화면마다 걸리는 단축키가 다르다. 그래서 화면을 넘어갈 때 앱은
+                     *   ① 이전 화면 단축키를 떼고 → ② 서버 갔다 와서 → ③ 새 화면 단축키를 건다.
+                     * 그 사이엔 아무것도 안 걸려 있는 게 당연하다.
+                     * 도구는 0.1초마다 계속 누르므로 그 틈에 반드시 걸린다 — 이걸 고장으로 적으면
+                     * 기록이 온통 헛것으로 도배된다(실측: 한 번 돌려 200줄 넘게 도배됨).
+                     *
+                     * ★그래서 시간으로 재지 않는다. 느린 PC 에서는 그 틈이 길어지므로
+                     *   시간 기준은 사양에 따라 답이 달라진다.
+                     *   대신 앱이 스스로 켜 두는 두 표시를 본다:
+                     *     - busy   (처리중)
+                     *     - moving (화면 넘어가는 중)
+                     *   앱 자신도 이 둘을 보고 단축키를 막으므로, 켜져 있는 동안은
+                     *   단축키가 걸려 있든 없든 어차피 실행되지 않는다 = 볼 필요가 없다.
+                     *
+                     * 판정:
+                     *   busy 또는 moving 켜짐  → 넘어가는 중. 그냥 넘어간다(고장 아님)
+                     *   둘 다 꺼짐 + 계속 없음 → 화면은 멀쩡한데 눌러도 안 먹는 상태 = 진짜 고장
+                     *
+                     * 한 바퀴 튀는 것은 넘기고, 조용한 상태로 연달아 이만큼 없을 때만 고장으로 본다.
+                     * 바퀴 수로 세므로 느린 PC 에서는 그만큼 실제 시간도 길어진다.
+                     ********************************************************************/
                     const listening = Array.isArray(state.keys)
                         ? state.keys.indexOf(keyName.toLowerCase()) >= 0
                         : null;
+
+                    // 앱이 "지금 넘어가는 중"이라고 켜 둔 표시. 이때는 단축키가 없는 게 당연하다.
+                    const bMoving = (busy === 'X') || (state.moving === true);
+
+                    if (listening === false && !bMoving) {
+                        quietMissing++;
+                    } else {
+                        quietMissing = 0;
+                    }
 
                     await session.dispatchKey(isEdit ? editSpec : backSpec);
 
@@ -537,13 +612,17 @@ async function runWindowLoop(page, label) {
 
                     lastKeyName = keyName;
 
-                    const what = isEdit ? `WS10 → 편집진입(${EDIT_KEY})` : `WS20 → 뒤로가기(${BACK_KEY})`;
-                    const mark = (listening === false) ? ' ※앱이 이 키를 안 듣고 있음' : '';
-                    logger.info(`${label} 사이클 ${cycleNo}: ${what} 누름 (직전 누름과 ${gap}ms 차)${mark}`);
+                    const what = isEdit ? `WS10 -> enter edit (${EDIT_KEY})` : `WS20 -> back (${BACK_KEY})`;
 
-                    // 안 듣는 상태로 바뀌는 그 순간에만 자세히 남긴다(매 바퀴 남기면 파일만 커진다).
-                    if (listening === false && listeningWas !== false) {
-                        logger.error(`${label} 사이클 ${cycleNo}: ${currPage} 화면인데 ${keyName} 가 앱에 안 걸려 있다 — 눌러도 아무 일도 안 일어난다.`);
+                    // 넘어가는 중에 잠깐 없는 건 정상이라 아무 표시도 안 한다(기록 도배 방지).
+                    const mark = (quietMissing > 0) ? '  <-- page is settled but this key is NOT registered' : '';
+                    logger.info(`${label} cycle ${cycleNo}: ${what} dispatched (+${gap}ms since previous)${mark}`);
+
+                    // 조용한 상태로 연달아 이만큼 없으면 그때 고장으로 본다. 그 순간 한 번만 남긴다.
+                    if (quietMissing === QUIET_MISSING_LIMIT) {
+
+                        logger.error(`${label} cycle ${cycleNo}: ${currPage} is settled but ${keyName} has been unregistered for ${QUIET_MISSING_LIMIT} cycles in a row - pressing it does nothing.`);
+
                         logger.errorDetail({
                             kind: 'shortcutNotRegistered',
                             window: label,
@@ -555,15 +634,19 @@ async function runWindowLoop(page, label) {
                             wantKey: keyName,
                             registeredKeys: state.keys,
                             busy,
-                            summary: '지금 화면에 필요한 단축키가 앱에 걸려 있지 않음'
+                            moving: state.moving,
+                            quietCycles: quietMissing,
+                            summary: `${keyName} still unregistered ${QUIET_MISSING_LIMIT} cycles after the page settled`
                         });
+
                     }
+
                     listeningWas = listening;
                 } else {
-                    logger.error(`${label} 사이클 ${cycleNo}: WS10도 WS20도 아닌 화면(${currPage || '(알수없음)'}) — 이번 사이클은 안 누름`);
+                    logger.error(`${label} cycle ${cycleNo}: page is neither WS10 nor WS20 (${currPage || '(unknown)'}) - no key dispatched this cycle`);
                 }
             } catch (e) {
-                logger.error(`${label} 사이클 ${cycleNo} 중 자동화 스크립트 예외: ${e && e.stack ? e.stack : e}`);
+                logger.error(`${label} cycle ${cycleNo} : automation script threw: ${e && e.stack ? e.stack : e}`);
                 const info = {
                     kind: 'driverException',
                     window: label,
@@ -589,8 +672,20 @@ async function runWindowLoop(page, label) {
             }
         }
     } finally {
+
+        // ★사고 증거(화면 그림)를 다 찍기 전에 연결을 끊으면 사진이 중간에 끊긴다(실측 2026-09-10).
+        //   그래서 연결을 닫기 전에 증거 담기가 끝나기를 기다린다.
+        if (incidentSavePromise) {
+            logger.info(`${label} saving incident evidence - keeping the CDP connection open until it finishes.`);
+            try {
+                await incidentSavePromise;
+            } catch (e) {
+                logger.error(`${label} failed while waiting for evidence capture: ${e && e.message ? e.message : e}`);
+            }
+        }
+
         session.close();
-        logger.info(`${label} 종료.`);
+        logger.info(`${label} stopped.`);
     }
 }
 
@@ -605,11 +700,24 @@ function askConfirm(question) {
 }
 
 async function main() {
-    logger.info(`대상 찾는 중... (${DEBUG_HOST})`);
+    // ★맨 먼저 "창에 붙을 수단이 있는지"부터 본다. (장군님 지적 2026-09-10 "다른 pc 에서 실행하자마자 오류")
+    //   없으면 창마다 알 수 없는 오류를 뱉다가 엉뚱한 문구로 끝나 원인이 안 보였다.
+    const oSock = describeSocketMaker();
+
+    if (!oSock.ok) {
+        logger.error('cannot start - no way to attach to a window.');
+        logger.error(String(oSock.reason));
+        process.exitCode = 1;
+        return;
+    }
+
+    logger.info(`창에 붙는 수단: ${oSock.from} (노드 ${oSock.node})`);
+
+    logger.info(`looking for CDP targets... (${DEBUG_HOST})`);
     const list = await listTargets(DEBUG_HOST);
 
     if (!list) {
-        logger.error('CDP에 붙지 못했다 — 대상 PC에서 앱이 원격디버그 포트를 켠 채로 실행 중인지 확인.');
+        logger.error('could not attach to CDP - check that the app is running with the remote debugging port open.');
         process.exit(1);
     }
 
@@ -624,6 +732,12 @@ async function main() {
     const ws10Pages = [];
     let iPinnedSkipped = 0;
 
+    // ★못 붙은 창이 몇 개인지 따로 센다. (장군님 지적 2026-09-10)
+    //   전에는 창마다 "못 읽어 건너뛴다" 만 찍고 넘어간 뒤,
+    //   마지막에 「WS10 화면이 하나도 없다」 로 끝냈다. 붙지도 못한 것을
+    //   화면 탓으로 돌린 셈이라, 진짜 원인(창에 못 붙음)이 안 보였다.
+    const aFailed = [];
+
     for (const page of pages) {
 
         let oPick;
@@ -631,13 +745,15 @@ async function main() {
         try {
             oPick = JSON.parse(await evalOnPage(page, PICK_EXPRESSION));
         } catch (e) {
-            logger.error(`창 상태를 못 읽어 건너뛴다 (${page.title}): ${e && e.message ? e.message : e}`);
+            const sWhy = e && e.message ? e.message : String(e);
+            aFailed.push({ title: page.title, id: page.id, why: sWhy });
+            logger.error(`could not attach (${page.title}, windowId ${page.id}): ${sWhy}`);
             continue;
         }
 
         if (oPick.pinned) {
             iPinnedSkipped++;
-            logger.info(`핀이 걸린 창이라 건너뛴다 — ${page.title} (창번호 ${page.id})`);
+            logger.info(`skipping a pinned window - ${page.title} (windowId ${page.id})`);
             continue;
         }
 
@@ -651,23 +767,42 @@ async function main() {
         logger.info(`핀이 걸려 있어 뺀 창: ${iPinnedSkipped}개`);
     }
 
+    // ★못 붙은 것이 먼저다 — 화면 탓으로 돌리기 전에 이것부터 말한다. (장군님 지적 2026-09-10)
+    //   창에 붙지 못했으면 그 창이 무슨 화면인지 알 방법이 아예 없다.
+    //   그런데도 "WS10 화면이 없다" 고 끝내면, 장군님이 엉뚱하게 화면을 옮겨 놓고 다시 돌리게 된다.
+    if (aFailed.length > 0) {
+
+        logger.error(`★ 창 ${aFailed.length}개에 붙지 못했다 — 무슨 화면인지 알 수조차 없다.`);
+
+        aFailed.forEach((o) => {
+            logger.error(`   · ${o.title} (windowId ${o.id}) : ${o.why}`);
+        });
+
+        if (ws10Pages.length === 0) {
+            logger.error('   no window could be attached - fix the reasons above first.');
+            process.exit(1);
+        }
+
+        logger.error('   continuing with the rest.');
+
+    }
+
     if (ws10Pages.length === 0) {
-        logger.error('WS10 화면이 하나도 없어 시작할 수 없다 — WS10으로 이동해 두고 다시 실행할 것.');
-        logger.error('  (핀이 걸린 창은 일부러 뺀다. 그 창도 시험하려면 화면 위쪽 압정 단추를 꺼 둘 것.)');
+        logger.error('no WS10 page found - navigate to WS10 first, then run again.');
+        logger.error('  (pinned windows are excluded on purpose. turn the pin off to include them.)');
         process.exit(1);
     }
 
     const proceed = await askConfirm(`현재 WS10 화면 갯수가 ${ws10Pages.length}개입니다. 진행할까요? (y/n) `);
 
     if (!proceed) {
-        logger.info('사용자가 진행을 취소했다.');
+        logger.info('cancelled by the user.');
         process.exit(0);
     }
 
     logger.info(`대상 찾음: ${ws10Pages.length}개 창(WS10) / 편집키=${EDIT_KEY} 뒤로가기키=${BACK_KEY} / 누르는 간격=${PRESS_INTERVAL_MS}ms`);
-    logger.info(`오류 원문 로그: ${logger.errorFilePath}`);
 
-    await Promise.all(ws10Pages.map((page, i) => runWindowLoop(page, `[창${i + 1}]`)));
+    await Promise.all(ws10Pages.map((page, i) => runWindowLoop(page, `[win${i + 1}]`)));
 
     // 증거 담기가 아직 진행 중일 수 있다 — 다 담고 나서 끝낸다.
     if (incidentPromise) {
@@ -675,29 +810,29 @@ async function main() {
     }
 
     logger.info('');
-    logger.info('══════════════ 끝 ══════════════');
+    logger.info('══════════════ END ══════════════');
 
     if (!incidentTaken) {
-        logger.info('오류 없이 끝났다(Ctrl+C 로 중지했거나 창이 모두 닫혔다).');
-        logger.info(`진행 기록: ${logger.filePath}`);
+        logger.info('finished with no incident (stopped with Ctrl+C, or all windows closed).');
+        logger.info(`run log: ${logger.filePath}`);
         return;
     }
 
-    logger.error(`왜 멈췄나 : ${incidentInfo && incidentInfo.summary ? incidentInfo.summary : '(모름)'}`);
-    logger.error(`어느 창   : ${incidentInfo && incidentInfo.window ? incidentInfo.window : '(모름)'}`);
-    logger.error(`몇 바퀴째 : ${incidentInfo && incidentInfo.cycleNo != null ? incidentInfo.cycleNo : '(모름)'}`);
-    logger.error(`그때 화면 : ${incidentInfo && incidentInfo.currPage ? incidentInfo.currPage : '(모름)'}`);
+    logger.error(`왜 멈췄나 : ${incidentInfo && incidentInfo.summary ? incidentInfo.summary : '(unknown)'}`);
+    logger.error(`어느 창   : ${incidentInfo && incidentInfo.window ? incidentInfo.window : '(unknown)'}`);
+    logger.error(`몇  cycles in a row : ${incidentInfo && incidentInfo.cycleNo != null ? incidentInfo.cycleNo : '(unknown)'}`);
+    logger.error(`그때 화면 : ${incidentInfo && incidentInfo.currPage ? incidentInfo.currPage : '(unknown)'}`);
 
     if (incidentDir) {
         logger.error('');
         logger.error(`★ 증거 폴더 : ${incidentDir}`);
-        logger.error('   그 안 「요약.md」 부터 보면 된다(화면 그림·직전 기록·오류 원문 같이 들어 있음).');
+        logger.error('   start with SUMMARY.md in that folder (screenshot, log tail and the raw error are all there).');
     }
 
     process.exitCode = 1;
 }
 
 main().catch((e) => {
-    logger.error(`실행 중 처리 안 된 예외: ${e && e.stack ? e.stack : e}`);
+    logger.error(`unhandled exception during the run: ${e && e.stack ? e.stack : e}`);
     process.exit(1);
 });

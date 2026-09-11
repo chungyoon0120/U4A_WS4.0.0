@@ -1,0 +1,1040 @@
+/************************************************************************
+ * dataMonitor/Popup/js/index.js — 내부 데이터 모니터 별창 화면
+ * ----------------------------------------------------------------------
+ *  부모 창이 보내온 "바뀐 것 묶음"을 받아 화면에 쌓고,
+ *  감시 시작·중지·지금 비교·범위 바꾸기를 부모 창에 알린다.
+ *
+ *  주고받는 길: BroadcastChannel "u4a-datamon_<브라우저키>" 하나로 양방향
+ *      (기존 별창들이 쓰는 방식과 동일 — Popups/bindPopup/frame.js:431 참고)
+ *
+ *  ★ 사진 자체는 안 받는다. 부모가 비교까지 마치고 "달라진 자리"만 보낸다.
+ *    (사진은 48만자라 창끼리 넘기면 무겁다 — 2026-09-09 실측)
+ *
+ *  오류코드 접두: DMWN / 다음 번호: 010
+ *    (001 = 첫 페인트 테마 적용 실패, index.html 인라인에서 사용)
+ ************************************************************************/
+
+(function () {
+    "use strict";
+
+    /* ==================================================================
+     * 1. Electron / 창 컨텍스트
+     * ================================================================== */
+    var REMOTE = require("@electron/remote"),
+        PATH = REMOTE.require("path"),
+        APP = REMOTE.app,
+        APPPATH = APP.getAppPath(),
+        CURRWIN = REMOTE.getCurrentWindow();
+
+    var oQuery = new URLSearchParams(location.search);
+    var BROWSKEY = oQuery.get("browserkey") || "";
+    var CH_NAME = "u4a-datamon_" + BROWSKEY;
+
+    //화면에 쌓아 둘 줄 최대 개수. 넘으면 오래된 것부터 지운다(창이 무거워지지 않게).
+    var C_MAX_ROW = 2000;
+
+
+    var _sView = "list";        //지금 보고 있는 뷰("list" | "tree")
+    var _oSnap = null;          //트리 뷰가 그릴 스냅샷(부모가 보낸 것)
+    var _oChgMap = {};          //바뀐 자리 목록 { 경로: {종류,이전,새값,시각} }
+    var _oChgParent = {};       //바뀐 자리의 윗 경로들 { 경로: {바뀜:n, 생김:n} } — 종류별로 길을 열어 두려고
+    var _oTree = null;          //공통 컴럼 트리 손잡이
+    var _oTreeCfg = null;       //공통 컴럼 트리에 넘긴 설정(안내 문구를 나중에 바꾸려고 들고 있는다)
+    var _iSnapTimer = 0;        //바뀐 것이 연달아 올 때 데이터 다시 받기를 잠깐 모아 두는 손잡이
+    var _sTreeKind = "";        //트리 뷰 종류 걸러내기 ("" 전체 / "chg" 변경분만 / "변경" / "추가")
+    var _sTreeSearch = "";      //트리 뷰 — 이름 찾기(값은 안 본다)
+    var _oExpand = {};          //트리 뷰 펼침 상태 { 경로: true/false }
+    var _oClosedOnce = {};      //한 번이라도 접은 적 있는 자리 { 경로: true } — 그 아래는 저절로 펼치지 않는다
+    var _sKindFilter = "";   //종류 걸러내기에서 고른 값("" 이면 전체)
+    var _oChannel = null;
+    var _bOn = false;
+    var _iCount = 0;
+
+
+    /* ==================================================================
+     * 2. 화면 요소
+     * ================================================================== */
+    function $(sId) { return document.getElementById(sId); }
+
+    var EL = {};
+
+    function _cacheEl() {
+        EL.list = $("dmList");
+        EL.rows = $("dmRows");
+        EL.filters = document.querySelectorAll(".u4aDmFilter");
+        EL.tableWrap = $("dmTableWrap");
+        EL.treeHost = $("dmTreeHost");
+        EL.treeOnly = $("dmTreeOnly");
+        EL.btnList = $("dmBtnList");
+        EL.btnTree = $("dmBtnTree");
+        EL.treeSearch = $("dmTreeSearch");
+        EL.empty = $("dmEmpty");
+        EL.state = $("dmState");
+        EL.btnToggle = $("dmBtnToggle");
+        EL.btnToggleText = $("dmBtnToggleText");
+        EL.btnNow = $("dmBtnNow");
+        EL.btnClear = $("dmBtnClear");
+        EL.chkCode = $("dmChkCode");
+        EL.chkLib = $("dmChkLib");
+        EL.busy = $("dmBusy");
+    }
+
+
+    /* ==================================================================
+     * 3. 로딩 표시 (공통 top-layer)
+     * ================================================================== */
+    function _setBusy(bOn) {
+        try {
+            if (!EL.busy) { return; }
+            if (bOn) { if (!EL.busy.open) { EL.busy.showModal(); } }
+            else { if (EL.busy.open) { EL.busy.close(); } }
+        } catch (e) {
+            console.error("[DMWN-002] 로딩 표시 전환 실패:", e);
+        }
+    }
+
+
+    /* ==================================================================
+     * 4. 부모 창에 알리기 / 받기
+     * ================================================================== */
+    function _send(oMsg) {
+        if (!_oChannel) {
+            console.error("[DMWN-003] 부모 창과 이어지지 않아 신호를 못 보냅니다:", oMsg && oMsg.PRCCD);
+            return;
+        }
+        try { _oChannel.postMessage(oMsg); }
+        catch (e) { console.error("[DMWN-003] 부모 창에 신호 보내기 실패:", e); }
+    }
+
+    function _openChannel() {
+
+        try {
+            _oChannel = new BroadcastChannel(CH_NAME);
+        } catch (e) {
+            //부모와 못 이어지면 이 창은 아무것도 못 한다 — 조용히 두지 않고 드러낸다.
+            console.error("[DMWN-003] 부모 창과 잇는 길을 못 열었습니다:", e);
+            _oChannel = null;
+            return;
+        }
+
+        _oChannel.onmessage = function (ev) {
+
+            var oData = ev && ev.data;
+            if (!oData || !oData.PRCCD) { return; }
+
+            switch (oData.PRCCD) {
+
+                case "DMON_BATCH":
+                    //바뀐 것 묶음 한 건 도착.
+                    _addBatch(oData.BATCH);
+                    break;
+
+                case "DMON_SNAPDATA":
+                    //트리 뷰가 그릴 데이터 도착.
+                    _oSnap = oData.SNAP || {};
+                    _renderTree();
+                    break;
+
+                case "DMON_STATE":
+                    //부모가 알려주는 지금 상태(켜짐 여부).
+                    _setState(oData.ON === true);
+                    break;
+
+                default:
+                    break;
+            }
+        };
+    }
+
+
+    /* ==================================================================
+     * 5. 화면 그리기
+     * ================================================================== */
+
+    function _setState(bOn) {
+
+        _bOn = bOn;
+
+        if (EL.state) {
+            EL.state.textContent = bOn ? "감시 켜짐" : "감시 꺼짐";
+            EL.state.classList.toggle("u4aDmState--on", bOn);
+        }
+
+        if (EL.btnToggleText) { EL.btnToggleText.textContent = bOn ? "감시 중지" : "감시 시작"; }
+
+        if (EL.btnToggle) {
+            var oIcon = EL.btnToggle.querySelector("i");
+            if (oIcon) { oIcon.className = bOn ? "fa-solid fa-stop" : "fa-solid fa-play"; }
+            EL.btnToggle.classList.toggle("u4a-btn--negative", bOn);
+            EL.btnToggle.classList.toggle("u4a-btn--emphasized", !bOn);
+        }
+    }
+
+    /**
+     * 종류에 맞는 표시 만들기.
+     */
+    function _kindTag(sKind) {
+
+        var oSpan = document.createElement("span");
+        oSpan.className = "u4aDmKind " +
+            (sKind === "추가" ? "u4aDmKind--add" : (sKind === "삭제" ? "u4aDmKind--del" : "u4aDmKind--chg"));
+        oSpan.textContent = sKind;
+        return oSpan;
+    }
+
+    /**
+     * 바뀐 자리들을 표 맨 위에 줄로 넣는다.
+     *   ★ 곁가지(시각·조작·걸린시간·접었다 펴기) 없이 바뀐 것만 (장군님 지시 2026-09-10).
+     */
+    function _addBatch(oBatch) {
+
+        if (!oBatch || !oBatch.변경 || !EL.rows) { return; }
+
+        //★ 없어진 자리는 화면에 안 띄운다(장군님 결정 2026-09-10).
+        //  지워지면 그 줄이 사라지는 것으로 충분하다 — 리스트 뷰·트리 뷰 둘 다 같게 한다.
+        //  단, 받아 둔 덩어리에는 그대로 반영해야 트리가 어긋나지 않으므로 아래 덮어쓰기에는 그대로 넘긴다.
+        var aShow = [];
+        for (var s = 0; s < oBatch.변경.length; s++) {
+            if (oBatch.변경[s].종류 !== "삭제") { aShow.push(oBatch.변경[s]); }
+        }
+
+        //트리 뷰가 쓸 "바뀐 자리" 기록. 경로와 그 부모 경로들을 함께 남긴다.
+        for (var m = 0; m < aShow.length; m++) {
+            var oC = aShow[m];
+            if (!oC.자리) { continue; }
+            _oChgMap[oC.자리] = { 종류: oC.종류, 이전: oC.이전, 새값: oC.새값, 시각: oBatch.시각 };
+            //윗 경로들 — 종류를 골라 봤을 때 그 종류로 가는 길만 열려야 한다.
+            var sP = oC.자리;
+            while (true) {
+                var iDot = sP.lastIndexOf(".");
+                var iBrk = sP.lastIndexOf("[");
+                var iCut = Math.max(iDot, iBrk);
+                if (iCut <= 0) { break; }
+                sP = sP.slice(0, iCut);
+                if (!_oChgParent[sP]) { _oChgParent[sP] = {}; }
+                _oChgParent[sP][oC.종류] = (_oChgParent[sP][oC.종류] || 0) + 1;
+            }
+        }
+
+        //띄울 것이 하나도 없으면(지운 것만 온 묶음) 화면은 그대로 두고 덮어쓰기만 한다.
+        if (!aShow.length && oBatch.잘림 !== true) {
+            _syncSnap(oBatch);
+            return;
+        }
+
+        if (EL.empty) { EL.empty.hidden = true; }
+        if (EL.tableWrap) { EL.tableWrap.hidden = (_sView === "tree"); }
+
+        //위에 넣을 것을 한 덩어리로 만들어 한 번에 붙인다(화면 그리기 부담 줄이기).
+        var oFrag = document.createDocumentFragment();
+
+        for (var i = 0; i < aShow.length; i++) {
+
+            var oChg = aShow[i];
+            var oTr = document.createElement("tr");
+
+            //시각 — 언제 바뀜 것인지 한눈에 보이게 맨 앞에 둔다(장군님 지시 2026-09-10).
+            var tdT = document.createElement("td");
+            tdT.className = "u4aDmCell--time";
+            tdT.textContent = oBatch.시각 || "";
+            oTr.appendChild(tdT);
+
+            var tdK = document.createElement("td");
+            tdK.appendChild(_kindTag(oChg.종류 || "변경"));
+            oTr.appendChild(tdK);
+
+            var tdP = document.createElement("td");
+            tdP.className = "u4aDmCell--path";
+            tdP.textContent = oChg.자리 || "";
+            oTr.appendChild(tdP);
+
+            var tdO = document.createElement("td");
+            tdO.className = "u4aDmCell--old";
+            tdO.textContent = (oChg.이전 == null ? "" : String(oChg.이전));
+            oTr.appendChild(tdO);
+
+            var tdN = document.createElement("td");
+            tdN.className = "u4aDmCell--new";
+            tdN.textContent = (oChg.새값 == null ? "" : String(oChg.새값));
+            oTr.appendChild(tdN);
+
+            oFrag.appendChild(oTr);
+            _iCount++;
+        }
+
+        //바뀐 곳이 너무 많아 잘린 경우 그 사실을 한 줄로 알린다.
+        if (oBatch.잘림 === true) {
+            var oTrCut = document.createElement("tr");
+            var tdCut = document.createElement("td");
+            tdCut.colSpan = 5;
+            tdCut.className = "u4aDmCut";
+            tdCut.textContent = "바뀐 곳이 너무 많아 일부만 보여줍니다.";
+            oTrCut.appendChild(tdCut);
+            oFrag.appendChild(oTrCut);
+            _iCount++;
+        }
+
+        //넣기 전에 걸러내기를 새 줄에도 적용한다(걸러내기 켜둔 채 쌓여도 맞게 보이게).
+        var aWords = _filterWords();
+        if (aWords.length) {
+            var aNew = oFrag.children;
+            for (var j = 0; j < aNew.length; j++) { _applyFilterToRow(aNew[j], aWords); }
+        }
+
+        //최근 것이 위로 오게 맨 앞에 넣는다.
+        EL.rows.insertBefore(oFrag, EL.rows.firstChild);
+
+        //너무 쌓이면 오래된 줄(아래쪽)부터 지운다.
+        while (_iCount > C_MAX_ROW && EL.rows.lastElementChild) {
+            EL.rows.removeChild(EL.rows.lastElementChild);
+            _iCount--;
+        }
+
+        _syncSnap(oBatch);
+    }
+
+    /**
+     * 받아 둔 덩어리에 이번에 바뀐 자리만 덮어쓴다(덩어리를 다시 통째로 받지 않는다).
+     *   ★ 여기에는 지운 자리도 그대로 넘긴다 — 화면에는 안 띄우지만 덩어리에서는 빼야 맞다.
+     */
+    function _syncSnap(oBatch) {
+
+        if (_oSnap) {
+            if (oBatch.잘림 === true) {
+                //바뀐 곳이 너무 많아 부모가 목록을 잘랐다 — 덮어쓰면 빠진 자리가 생기므로 이때만 통째로 다시 받는다.
+                console.warn("[DMWN-008] 바뀐 곳이 너무 많아 목록이 잘렸습니다 — 트리 데이터를 통째로 다시 받습니다.");
+                _askSnapSoon();
+            } else if (oBatch.실값없음 === true) {
+                //부모가 값을 못 넘겼다(창끼리 넘길 수 없는 종류) — 덮어쓸 값이 없으니 통째로 다시 받는다.
+                console.warn("[DMWN-008] 바뀐 값이 안 넘어왔습니다 — 트리 데이터를 통째로 다시 받습니다.");
+                _askSnapSoon();
+            } else if (!_patchSnap(oBatch.변경)) {
+                //덮어쓸 자리를 못 찾았다(길이 어긋남) — 조용히 두면 트리가 틀린 값을 계속 보여준다.
+                _askSnapSoon();
+            } else if (_sView === "tree") {
+                _renderTree();
+            }
+        }
+    }
+
+    /* ==================================================================
+     * 5-0. 받아 둔 덩어리에 바뀐 자리만 덮어쓰기
+     *   부모가 각 줄에 담아 보낸 [조각](자리를 칸 이름으로 쪼갠 것)과
+     *   [실값](줄여 놓지 않은 진짜 값)으로 그 자리만 갈아 끼운다.
+     *   덩어리 전체(48만자)를 다시 받지 않으려는 것이다.
+     *   ★ 한 자리라도 길을 못 찾으면 false 를 돌려준다 — 부르는 쪽이 통째로 다시 받는다.
+     * ================================================================== */
+    function _patchSnap(aChg) {
+
+        if (!aChg || !aChg.length) { return true; }
+
+        var bOk = true;
+
+        for (var i = 0; i < aChg.length; i++) {
+
+            var oC = aChg[i];
+            var aSeg = oC.조각;
+
+            if (!aSeg || aSeg.length < 2) {
+                console.error("[DMWN-008] 바뀐 자리를 덮어쓸 길이 없습니다:", oC.자리);
+                bOk = false;
+                continue;
+            }
+
+            //마지막 칸의 바로 위까지 내려간다.
+            var oCur = _oSnap;
+            var bLost = false;
+            for (var d = 0; d < aSeg.length - 1; d++) {
+                if (oCur === null || typeof oCur !== "object" || !(aSeg[d] in oCur)) { bLost = true; break; }
+                oCur = oCur[aSeg[d]];
+            }
+
+            if (bLost || oCur === null || typeof oCur !== "object") {
+                console.error("[DMWN-008] 덮어쓸 자리를 못 찾았습니다:", oC.자리);
+                bOk = false;
+                continue;
+            }
+
+            var sLast = aSeg[aSeg.length - 1];
+
+            if (oC.종류 === "삭제") {
+                if (Array.isArray(oCur) && String(Number(sLast)) === String(sLast)) {
+                    //목록에서 없어지는 것은 언제나 뒤쪽이다 — 줄 수를 그 자리까지 줄인다(가운데가 비지 않게).
+                    var iCut = Number(sLast);
+                    if (oCur.length > iCut) { oCur.length = iCut; }
+                } else {
+                    delete oCur[sLast];
+                }
+                continue;
+            }
+
+            oCur[sLast] = oC.실값;
+        }
+
+        return bOk;
+    }
+
+    /* ==================================================================
+     * 5-1. 걸러내기 (열 제목 아래 칸)
+     *   글자를 넣으면 그 글자가 든 줄만 남는다(대소문자 구분 없음).
+     *   줄을 지우는 게 아니라 감추기만 한다 — 칸을 비우면 다시 보인다.
+     * ================================================================== */
+
+    //지금 걸러내기 칸에 적힌 값들(열 순서대로).
+    function _filterWords() {
+        var a = [];
+        if (EL.filters) {
+            for (var i = 0; i < EL.filters.length; i++) {
+                var el = EL.filters[i];
+                var iCol = parseInt(el.getAttribute("data-col"), 10);
+                var s = (el.value || "").trim().toLowerCase();
+                if (s) { a.push({ col: iCol, word: s }); }
+            }
+        }
+        //종류는 공통 드롭다운에서 고른 값을 따로 들고 있다(둘째 칸).
+        if (_sKindFilter) { a.push({ col: 1, word: _sKindFilter.toLowerCase() }); }
+        return a;
+    }
+
+    //줄 하나가 걸러내기에 남는지 보고 감추거나 보인다.
+    function _applyFilterToRow(oTr, aWords) {
+
+        //잘렸다는 안내 줄(칸이 하나만 있는 줄)은 걸러내기 대상이 아니다.
+        var aTd = oTr.children;
+        if (aTd.length < 5) { return; }
+
+        var bShow = true;
+        for (var i = 0; i < aWords.length; i++) {
+            var td = aTd[aWords[i].col];
+            var sTxt = td ? (td.textContent || "").toLowerCase() : "";
+            if (sTxt.indexOf(aWords[i].word) === -1) { bShow = false; break; }
+        }
+        oTr.hidden = !bShow;
+    }
+
+    //지금 쌓인 줄 전부에 다시 적용.
+    function _applyFilterAll() {
+        if (!EL.rows) { return; }
+        var aWords = _filterWords();
+        var aTr = EL.rows.children;
+        for (var i = 0; i < aTr.length; i++) { _applyFilterToRow(aTr[i], aWords); }
+    }
+
+    function _clearList() {
+
+        if (!EL.rows) { return; }
+
+        EL.rows.textContent = "";
+        _iCount = 0;
+        _oChgMap = {};
+        _oChgParent = {};
+
+        if (EL.tableWrap) { EL.tableWrap.hidden = true; }
+        if (EL.empty) { EL.empty.hidden = (_sView === "tree"); }
+        if (_sView === "tree") { _askSnap(); }
+    }
+
+
+    /* ==================================================================
+     * 5-2. 트리 뷰
+     *   공통 컬럼 트리(U4AUI.makeColumnTree)를 그대로 소비한다 — 가상 스크롤,
+     *   컬럼 폭 조절, 머리줄 고정, 셀 선택·복사가 공통에서 자동으로 붙는다.
+     *   컬럼 = [이름] [종류] [이전] [현재 값] [시각]
+     * ================================================================== */
+
+    //값을 화면에 보여줄 만큼만 줄인다(부모의 것과 같은 규칙).
+    var C_TREE_VAL_LEN = 300;
+
+    function _treeVal(v) {
+        if (v === null) { return "null"; }
+        if (v === undefined) { return ""; }
+        var t = typeof v;
+        var sOut;
+        if (t === "string") { sOut = v; }
+        else if (t !== "object") { sOut = String(v); }
+        else {
+            try { sOut = JSON.stringify(v); }
+            catch (e) { sOut = Array.isArray(v) ? ("[" + v.length + "]") : ("{" + Object.keys(v).length + "}"); }
+        }
+        return (sOut.length > C_TREE_VAL_LEN) ? (sOut.slice(0, C_TREE_VAL_LEN) + "…") : sOut;
+    }
+
+    //자식이 있는(펼칠 수 있는) 값인가.
+    function _hasKids(v) {
+        return (v !== null && typeof v === "object" && Object.keys(v).length > 0);
+    }
+
+    //경로 잇기 — 목록이면 [0], 아니면 .이름 (부모의 비교 경로와 같은 모양이어야 짝이 맞는다)
+    function _joinPath(sParent, sKey, bArray) {
+        if (!sParent) { return sKey; }
+        return sParent + (bArray ? ("[" + sKey + "]") : ("." + sKey));
+    }
+
+    //노드 하나 만들기.
+    //  걸림   = 자기 이름에 찾는 글자가 있다
+    //  아래   = 윗자리가 걸려서 딸려 나온 것
+    //  lvl    = 뿌리에서부터 몇 번째인가(0 = 뿌리)
+    //           ★ 공통 트리는 토글할 때 level 을 0 으로 넘긴다(theme/u4a-ui.js 의 가상 트리 토글).
+    //             그 값을 그대로 믿으면 깊은 자리도 "펼쳐진 것"으로 답해 화살표가 반대로 먹는다.
+    //             그래서 깊이를 노드에 직접 달아 둔다.
+    function _mkNode(sKey, vValue, sPath, bHit, bUnder, iLvl) {
+        return { key: sKey, val: vValue, path: sPath, 걸림: !!bHit, 아래: !!bUnder, lvl: iLvl || 0 };
+    }
+
+    //이름에 찾는 글자가 있나.
+    function _nameHit(vKey) {
+        return String(vKey).toLowerCase().indexOf(_sTreeSearch) !== -1;
+    }
+
+    //그 노드(또는 그 아래 어딘가)가 지금 걸러내기에 남는가.
+    function _treeKeep(oNode) {
+
+        //종류 걸러내기 — 자기가 그 종류로 바뀌었거나, 아래에 그런 게 있으면 남긴다.
+        if (_sTreeKind) {
+
+            var oSelf = _oChgMap[oNode.path];
+            var bSelf = !!oSelf && (_sTreeKind === "chg" || oSelf.종류 === _sTreeKind);
+
+            var oUnder = _oChgParent[oNode.path];
+            var bUnder = !!oUnder && (_sTreeKind === "chg" || !!oUnder[_sTreeKind]);
+
+            if (!bSelf && !bUnder) { return false; }
+        }
+
+        //찾기 — ★ 이름만 본다(장군님 지시 2026-09-10). 값은 안 본다.
+        //  · 자기 이름이 걸렸으면 남긴다
+        //  · 윗자리가 걸려서 딸려 나온 것도 남긴다 → 걸린 자리 아래는 통째로 다 보인다
+        //  · 둘 다 아니면, 아래 어딘가에 걸리는 이름이 있을 때만 길을 열어 준다
+        if (_sTreeSearch) {
+            if (!oNode.걸림 && !oNode.아래 && !_searchDeep(oNode.val, 0)) { return false; }
+        }
+
+        return true;
+    }
+
+    //찾는 이름이 이 아래 어딘가에 있나(깊이 제한을 둔다).
+    function _searchDeep(vVal, iDepth) {
+        iDepth = iDepth || 0;
+        if (iDepth > 6) { return false; }
+        if (!_hasKids(vVal)) { return false; }
+        var aKeys = Object.keys(vVal);
+        for (var i = 0; i < aKeys.length; i++) {
+            if (_nameHit(aKeys[i])) { return true; }
+            if (_searchDeep(vVal[aKeys[i]], iDepth + 1)) { return true; }
+        }
+        return false;
+    }
+
+    //자식 노드 목록.
+    function _treeKids(oNode) {
+        if (!_hasKids(oNode.val)) { return []; }
+        var bArr = Array.isArray(oNode.val);
+        var aKeys = Object.keys(oNode.val);
+        var aOut = [];
+        //윗자리가 걸렸으면(또는 이미 딸려 나온 것이면) 그 아래는 전부 딸려 나온다.
+        var bUnder = !!_sTreeSearch && (oNode.걸림 || oNode.아래);
+        for (var i = 0; i < aKeys.length; i++) {
+            var k = aKeys[i];
+            var bHit = !!_sTreeSearch && _nameHit(k);
+            var oKid = _mkNode(k, oNode.val[k], _joinPath(oNode.path, k, bArr), bHit, bUnder, (oNode.lvl || 0) + 1);
+            if (_treeKeep(oKid)) { aOut.push(oKid); }
+        }
+        return aOut;
+    }
+
+    /**
+     * 트리 펼침 상태를 바꾼다.
+     *   ★ 접으면 그 아래도 다 접는다 — 공통 트리의 표준 동작(다시 펴도 자손은 접힌 상태).
+     *     펼침 상태를 화면이 들고 있는 경우 공통이 이 처리를 화면에 맡긴다(theme/u4a-ui.js 의 가상 트리 토글 주석).
+     *     안 해 두면 접었다 펴는 순간 아래가 통째로 다시 펼쳐진다(장군님 지적 2026-09-10).
+     */
+    function _setExpand(oNode, bOpen) {
+
+        var sPath = (oNode && typeof oNode === "object") ? oNode.path : oNode;
+        if (!sPath) {
+            console.error("[DMWN-009] ERROR TREE_TOGGLE path is empty — expand state not stored");
+            return;
+        }
+
+        _oExpand[sPath] = !!bOpen;
+
+        if (bOpen) { return; }
+
+        //① ★ 이 자리를 한 번 접었다고 적어 둔다(장군님 지적 2026-09-10, 실측 재현).
+        //   아래 isExpanded 는 "아직 안 적어 둔 자리"를 종류 걸러내기·찾기가 켜져 있을 때
+        //   전부 펼침으로 답한다. 그래서 접었다 펴면 자손이 통째로 다시 펼쳐졌다
+        //   (실측: 37줄 → 접기 → 다시 펴기 37줄, 자손이 그대로 펼쳐진 채).
+        //   자손 전부에 "접힘"을 적어 두는 방법도 되지만 이 화면 데이터에서는 2만 자리를 넘어
+        //   한 번 누를 때마다 그만큼 쓰게 된다(느린 PC 에서 그대로 멎는다). 그래서 윗자리 하나만 적고,
+        //   아래에서는 조상 쪽으로 몇 단계만 거슬러 보며 판단한다(깊이만큼만 본다).
+        _oClosedOnce[sPath] = true;
+
+        //② 이미 적어 둔 자리 중 이 아래인 것도 같이 닫는다.
+        //   자리 이름이 "윗자리." 또는 "윗자리[" 로 시작하면 그 아래다.
+        //   (값에서는 이미 없어졌는데 적어만 둔 자리도 여기서 같이 닫힌다.)
+        var aKeys = Object.keys(_oExpand);
+        for (var i = 0; i < aKeys.length; i++) {
+            var sK = aKeys[i];
+            if (sK.length <= sPath.length || sK.indexOf(sPath) !== 0) { continue; }
+            var sNext = sK.charAt(sPath.length);
+            if (sNext === "." || sNext === "[") { _oExpand[sK] = false; }
+        }
+    }
+
+    /**
+     * 윗자리 중에 한 번이라도 접은 적이 있는 자리가 있나.
+     *   있으면 그 아래는 "아직 안 적어 둔 자리" 라도 저절로 펼치지 않는다.
+     *   → 접었다 펴면 자손은 접힌 채로 나온다(공통 트리 표준과 같은 동작).
+     */
+    function _ancestorClosed(sPath) {
+
+        var sP = sPath;
+
+        while (true) {
+            var iDot = sP.lastIndexOf(".");
+            var iBrk = sP.lastIndexOf("[");
+            var iCut = (iDot > iBrk) ? iDot : iBrk;
+            if (iCut <= 0) { return false; }
+            sP = sP.slice(0, iCut);
+            if (_oClosedOnce[sP] === true) { return true; }
+        }
+    }
+
+    //아무것도 안 남았을 때 보여줄 안내 문구 — 지금 걸러내기에 맞춰 바뀐다.
+    function _emptyText() {
+        if (_sTreeKind === "chg") { return "변경된 것이 없습니다."; }
+        if (_sTreeKind === "추가") { return "추가된 것이 없습니다."; }
+        if (_sTreeKind) { return "변경된 것이 없습니다."; }
+        if (_sTreeSearch) { return "찾는 것이 없습니다."; }
+        return "볼 데이터가 없습니다.";
+    }
+
+    //안내 문구를 지금 걸러내기에 맞춘다.
+    //  공통 트리는 만들 때 받은 문구를 그대로 쓰므로, 설정과 이미 떠 있는 글자를 둘 다 맞춘다.
+    function _syncEmptyText() {
+        var sTxt = _emptyText();
+        if (_oTreeCfg) { _oTreeCfg.emptyText = sTxt; }
+        if (!EL.treeHost) { return; }
+        var oEmp = EL.treeHost.querySelector(".u4aColTreeEmpty");
+        if (oEmp) { oEmp.textContent = sTxt; }
+    }
+
+    /**
+     * 트리를 그린다(또는 다시 그린다).
+     */
+    function _renderTree() {
+
+        if (!EL.treeHost) { return; }
+
+        if (!(window.U4AUI && typeof U4AUI.makeColumnTree === "function")) {
+            console.error("[DMWN-007] 공통 컬럼 트리가 없어 트리 뷰를 못 그립니다.");
+            return;
+        }
+
+        if (!_oSnap) { return; }
+
+        //이미 만들어 뒀으면 다시 그리기만 한다(컬럼 구성은 그대로).
+        if (_oTree && typeof _oTree.rerender === "function") {
+            try { _syncEmptyText(); _oTree.rerender(false); return; }
+            catch (e) { console.error("[DMWN-007] 트리 다시 그리기 실패:", e); _oTree = null; }
+        }
+
+        try {
+            _oTreeCfg = {
+                virtual: true,
+                columns: [
+                    { label: "이름", width: "22rem" },
+                    { label: "종류", width: "6rem" },
+                    { label: "이전", width: "12rem" },
+                    { label: "현재 값", width: "18rem" },
+                    { label: "시각", width: "8rem" }
+                ],
+                roots: function () {
+                    var aOut = [];
+                    var aKeys = Object.keys(_oSnap);
+                    for (var i = 0; i < aKeys.length; i++) {
+                        var oN = _mkNode(aKeys[i], _oSnap[aKeys[i]], aKeys[i],
+                            (!!_sTreeSearch && _nameHit(aKeys[i])), false, 0);
+                        if (_treeKeep(oN)) { aOut.push(oN); }
+                    }
+                    return aOut;
+                },
+                children: _treeKids,
+                hasChildren: function (n) { return _hasKids(n.val); },
+                key: function (n) { return n.path; },
+                label: function (n) { return String(n.key); },
+
+                //펼침 상태는 여기서 직접 들고 있는다(가상 트리는 바깥 펼침맵을 쓴다).
+                isExpanded: function (n) {
+                    if (Object.prototype.hasOwnProperty.call(_oExpand, n.path)) { return !!_oExpand[n.path]; }
+                    //★ 윗자리를 한 번이라도 접었으면 그 아래는 저절로 펼치지 않는다(장군님 지적 2026-09-10).
+                    if (_ancestorClosed(n.path)) { return false; }
+                    //바뀐 것만 볼 때는 길을 열어 둔다 — 안 그러면 접힌 채라 아무것도 안 보인다.
+                    //찾을 때 — 걸린 자리까지 가는 길도, 걸린 자리 아래도 전부 펼친다(장군님 지시 2026-09-10).
+                    if (_sTreeSearch) { return true; }
+                    if (_sTreeKind) { return true; }
+                    //★ 넘겨받는 level 은 믿지 않는다 — 공통 트리가 화살표를 누를 때 0 으로 넘긴다
+                    //  (theme/u4a-ui.js 의 가상 트리 토글). 그대로 믿으면 깊은 자리도 "펼쳐진 것"으로
+                    //  답해 화살표가 반대로 먹는다. 노드에 달아 둔 깊이(lvl)를 본다.
+                    return (n.lvl || 0) < 1;
+                },
+                onToggle: function (n, bOpen) { _setExpand(n, bOpen); },
+
+                tip: function (n) { return n.path; },
+                selectable: true,
+                cell: function (n) {
+                    var oChg = _oChgMap[n.path];
+                    var oOut = { c2: "", c3: "", c4: "", c5: "" };
+
+                    if (oChg) {
+                        var oTag = document.createElement("span");
+                        oTag.className = "u4aDmKind " +
+                            (oChg.종류 === "추가" ? "u4aDmKind--add"
+                                : (oChg.종류 === "삭제" ? "u4aDmKind--del" : "u4aDmKind--chg"));
+                        oTag.textContent = oChg.종류;
+                        oOut.c2 = oTag;
+                        oOut.c3 = (oChg.이전 == null ? "" : String(oChg.이전));
+                        oOut.c5 = oChg.시각 || "";
+                    }
+
+                    //현재 값.
+                    //  · 보통 덩어리는 굳이 안 적는다(펼쳐서 자식으로 보면 되니까)
+                    //  · ★ 이번에 바뀐 덩어리는 적는다 — 안 적으면 "추가" 만 뜨고
+                    //    무엇이 생겼는지 알 수 없어 일일이 펼쳐 봐야 한다(장군님 지시 2026-09-10).
+                    oOut.c4 = (_hasKids(n.val) && !oChg) ? "" : _treeVal(n.val);
+
+                    return oOut;
+                },
+                rowHook: function (oRow, n) {
+
+                    //바뀐 줄은 눈에 띄게.
+                    if (_oChgMap[n.path]) { oRow.classList.add("u4aDmTreeChg"); }
+
+                    //값 칸에 마우스를 올리면 잘린 글자를 다 보여준다(리스트 뷰와 같게 — 장군님 지적 2026-09-10).
+                    //  공통 툴팁은 표(.u4a-table)의 칸만 자동으로 잡아 주므로 트리 칸은 여기서 붙인다.
+                    //  잘렸을 때만 뜬다(안 잘리면 공통이 알아서 넘어간다).
+                    var aCell = oRow.querySelectorAll(".u4aColTreeTrail .u4aColTreeCell");
+                    for (var c = 0; c < aCell.length; c++) {
+                        var sTxt = (aCell[c].textContent || "").trim();
+                        if (!sTxt) { continue; }
+                        aCell[c].setAttribute("data-tip", sTxt);
+                        aCell[c].setAttribute("data-tip-trunc", "");
+                    }
+
+                    //첫 칸(이름) 아무 데나 눌러도 접었다 폈다 되게 한다(장군님 지시 2026-09-10).
+                    //  화살표만 눌러야 하면 표적이 너무 작아 누르기 불편하다.
+                    var oNameCell = oRow.querySelector(".u4aColTreeNameCell");
+                    if (!oNameCell) {
+                        if (_hasKids(n.val)) {
+                            console.error("[DMWN-008] ERROR TREE_NAME_CELL_MISSING path=" + n.path +
+                                " — click-to-toggle on the name cell is dead for this row");
+                        }
+                        return;
+                    }
+
+                    //★ 가상 스크롤은 줄 요소를 다시 쓴다(실측 2026-09-10: 다시 그려도 같은 요소).
+                    //  그릴 때마다 처리기를 붙이면 한 요소에 여러 개가 쌓여, 한 번 눌러도 접었다 폈다를
+                    //  거듭해 제자리로 돌아온다(눌러도 아무 일도 안 일어나는 것처럼 보인다).
+                    //  그래서 처리기는 요소당 한 번만 붙이고, 지금 그 줄이 무엇인지는 요소에 적어 둔 것을 읽는다.
+                    oNameCell.__dmNode = _hasKids(n.val) ? n : null;
+                    oNameCell.__dmRow = oRow;
+                    oNameCell.classList.toggle("u4aDmTreeNameHit", _hasKids(n.val));
+
+                    if (oNameCell.__dmHooked === true) { return; }
+                    oNameCell.__dmHooked = true;
+
+                    oNameCell.addEventListener("click", function (ev) {
+
+                        //화살표를 직접 누른 것은 공통 트리가 이미 처리한다 — 여기서 또 뒤집으면 도로 닫힌다.
+                        if (ev.target && ev.target.closest && ev.target.closest(".u4a-tree__toggle")) { return; }
+
+                        //지금 이 줄에 놓인 노드(자식 없는 줄이면 null — 아무것도 안 한다).
+                        var oNow = oNameCell.__dmNode;
+                        if (!oNow) { return; }
+
+                        var oRowNow = oNameCell.__dmRow;
+                        var bNow = Object.prototype.hasOwnProperty.call(_oExpand, oNow.path)
+                            ? _oExpand[oNow.path]
+                            : (!!oRowNow && oRowNow.getAttribute("aria-expanded") === "true");
+
+                        _setExpand(oNow, !bNow);
+                        _renderTree();
+                    });
+                },
+                emptyText: _emptyText()
+            };
+
+            _oTree = U4AUI.makeColumnTree(EL.treeHost, _oTreeCfg);
+
+            //★ 만들기만 하면 아직 아무것도 안 그린다 — 한 번 그려 줘야 줄이 나온다.
+            if (_oTree && typeof _oTree.rerender === "function") { _oTree.rerender(false); }
+
+        } catch (e) {
+            console.error("[DMWN-007] 트리 뷰 그리기 실패:", e);
+        }
+    }
+
+    /**
+     * 부모에게 지금 데이터를 달라고 하고, 오면 트리를 그린다.
+     */
+    function _askSnap() {
+        _send({ PRCCD: "DMON_SNAP" });
+    }
+
+    /**
+     * 잠깐 모았다가 한 번만 데이터를 다시 받는다.
+     *   한 번 조작에 바뀐 것이 여러 묶음으로 나눠 오기도 해서, 올 때마다 받으면 창끼리 큰 덩어리가 여러 번 오간다.
+     *   예약해 둔 것은 다음 것이 오면 먼저 취소하고 다시 잡는다(겹치지 않게 — WP1 ②).
+     */
+    function _askSnapSoon() {
+        if (_iSnapTimer) { clearTimeout(_iSnapTimer); }
+        _iSnapTimer = setTimeout(function () {
+            _iSnapTimer = 0;
+            _askSnap();
+        }, 150);
+    }
+
+    /**
+     * 뷰 바꾸기.
+     */
+    function _setView(sView) {
+
+        _sView = sView;
+
+        var bTree = (sView === "tree");
+
+        if (EL.tableWrap) { EL.tableWrap.hidden = bTree || (_iCount === 0); }
+        if (EL.treeHost) { EL.treeHost.hidden = !bTree; }
+        if (EL.treeOnly) { EL.treeOnly.hidden = !bTree; }
+        if (EL.empty) { EL.empty.hidden = bTree || (_iCount > 0); }
+
+        if (EL.btnList) { EL.btnList.classList.toggle("pressed", !bTree); }
+        if (EL.btnTree) { EL.btnTree.classList.toggle("pressed", bTree); }
+
+        //리스트 뷰로 돌아가면 예약해 둔 데이터 다시 받기를 취소한다(안 보는 것을 받아 올 필요 없다).
+        if (!bTree && _iSnapTimer) { clearTimeout(_iSnapTimer); _iSnapTimer = 0; }
+
+        if (bTree) { _askSnap(); }
+    }
+
+
+    /* ==================================================================
+     * 6. 버튼 배선
+     * ================================================================== */
+    function _bindButtons() {
+
+        if (EL.btnToggle) {
+            EL.btnToggle.addEventListener("click", function () {
+                if (_bOn) { _send({ PRCCD: "DMON_STOP" }); }
+                else {
+                    _send({
+                        PRCCD: "DMON_START",
+                        SCODE: !!(EL.chkCode && EL.chkCode.checked),
+                        LIB: !!(EL.chkLib && EL.chkLib.checked)
+                    });
+                }
+            });
+        }
+
+        if (EL.btnNow) {
+            EL.btnNow.addEventListener("click", function () { _send({ PRCCD: "DMON_NOW" }); });
+        }
+
+        if (EL.btnClear) {
+            EL.btnClear.addEventListener("click", function () { _clearList(); });
+        }
+
+        function _onIncludeChange() {
+            _send({
+                PRCCD: "DMON_INCLUDE",
+                SCODE: !!(EL.chkCode && EL.chkCode.checked),
+                LIB: !!(EL.chkLib && EL.chkLib.checked)
+            });
+        }
+
+        if (EL.chkCode) { EL.chkCode.addEventListener("change", _onIncludeChange); }
+        if (EL.chkLib) { EL.chkLib.addEventListener("change", _onIncludeChange); }
+
+        //걸러내기 칸 — 글자를 치는 즉시 적용.
+        if (EL.filters) {
+            for (var i = 0; i < EL.filters.length; i++) {
+                EL.filters[i].addEventListener("input", _applyFilterAll);
+                EL.filters[i].addEventListener("change", _applyFilterAll);
+            }
+        }
+
+        //뷰 전환 — 리스트 뷰 / 트리 뷰.
+        if (EL.btnList) { EL.btnList.addEventListener("click", function () { _setView("list"); }); }
+        if (EL.btnTree) { EL.btnTree.addEventListener("click", function () { _setView("tree"); }); }
+
+        //트리 뷰 — 전체 / 바뀐 것만.
+        var oTreeFiltHost = $("dmTreeFiltHost");
+        if (oTreeFiltHost) {
+            if (!(window.U4AUI && typeof U4AUI.createSelect === "function")) {
+                console.error("[DMWN-006] 공통 드롭다운이 없어 트리 뷰 걸러내기를 못 만들었습니다.");
+            } else {
+                //리스트 뷰의 종류 걸러내기와 같은 말을 쓴다(장군님 지적 2026-09-10).
+                //  "변경분만" 하나만 두니 그 안에 변경·추가가 섞여 보여 걸러내기 구실을 못 했다.
+                //  ※ 없어짐은 두 뷰 모두 화면에 안 띄우므로 고를 것도 없다(장군님 결정 2026-09-10).
+                var oTF = U4AUI.createSelect(
+                    [
+                        { value: "", text: "전체 데이터" },
+                        { value: "chg", text: "변경분만" },
+                        { value: "변경", text: "변경" },
+                        { value: "추가", text: "추가" }
+                    ],
+                    "",
+                    function (sVal) { _sTreeKind = sVal || ""; _oExpand = {}; _oClosedOnce = {}; _renderTree(); }
+                );
+                oTF.classList.add("u4aDmKindSel");
+                oTreeFiltHost.appendChild(oTF);
+            }
+        }
+
+        //트리 뷰 — 이름 찾기(값은 안 본다).
+        if (EL.treeSearch) {
+            EL.treeSearch.addEventListener("input", function () {
+                _sTreeSearch = (EL.treeSearch.value || "").trim().toLowerCase();
+                _oExpand = {};
+                _oClosedOnce = {};
+                _renderTree();
+            });
+        }
+
+        //종류 고르기 — 공통 드롭다운 소비.
+        //  브라우저가 그리는 펌침 목록은 바탕이 하얀색으로 고정돼 어두운 테마에서 글자가 안 보인다.
+        //  공통 드롭다운은 앱이 직접 그리므로 펌침 목록까지 테마가 먹는다.
+        var oKindHost = $("dmKindHost");
+        if (oKindHost) {
+            if (!(window.U4AUI && typeof U4AUI.createSelect === "function")) {
+                console.error("[DMWN-006] 공통 드롭다운이 없어 종류 고르기를 못 만들었습니다.");
+            } else {
+                //없어짐은 화면에 안 띄우므로 고를 것도 없다(장군님 결정 2026-09-10).
+                var aKind = [
+                    { value: "", text: "전체" },
+                    { value: "변경", text: "변경" },
+                    { value: "추가", text: "추가" }
+                ];
+                var oKind = U4AUI.createSelect(aKind, "", function (sVal) {
+                    _sKindFilter = sVal || "";
+                    _applyFilterAll();
+                });
+                oKind.classList.add("u4aDmKindSel");
+                oKindHost.appendChild(oKind);
+            }
+        }
+
+        //글자 칸의 지우기(X) — 공통 붙이기 소비(값이 있을 때만 보임).
+        //  공통이 없으면 조용히 넘어가지 않고 드러낸다(지우기가 안 먹는 상태로 보이면 헷짓).
+        var aField = document.querySelectorAll(".u4aDmFilterField");
+        if (aField.length) {
+            if (!(window.U4AUI && typeof U4AUI.attachClear === "function")) {
+                console.error("[DMWN-005] 공통 지우기 붙이기가 없어 걸러내기 칸의 X 버튼이 안 돕니다.");
+            } else {
+                for (var k = 0; k < aField.length; k++) {
+                    var oInp = aField[k].querySelector("input");
+                    var oX = aField[k].querySelector(".u4a-field__clear");
+                    if (!oInp || !oX) { continue; }
+                    //어느 칸을 지웠는지에 따라 다시 그릴 곳이 다르다 — 칸마다 따로 묶어 둔다.
+                    (function (oThis) {
+                        U4AUI.attachClear(oThis, oX, function () {
+                            if (oThis === EL.treeSearch) {
+                                _sTreeSearch = "";
+                                _oExpand = {};
+                                _oClosedOnce = {};
+                                _renderTree();
+                                return;
+                            }
+                            _applyFilterAll();
+                        });
+                    })(oInp);
+                }
+            }
+        }
+    }
+
+
+    /* ==================================================================
+     * 7. 타이틀바 (공통 표준)
+     * ================================================================== */
+    function _bindTitlebar() {
+
+        //로고
+        var oLogo = $("dmLogo");
+        if (oLogo) {
+            try {
+                oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/"));
+            } catch (e) {
+                console.error("[DMWN-004] 로고 그림 경로 만들기 실패:", e);
+            }
+        }
+
+        //닫기 — 네이티브 닫기를 막아 뒀으므로 공통 닫기로만 닫힌다.
+        var oClose = $("dmWinClose");
+        if (oClose) {
+            oClose.addEventListener("click", function () {
+                //닫기 전에 부모 쪽 감시를 꺼 준다(창 없이 계속 도는 것 방지).
+                _send({ PRCCD: "DMON_STOP" });
+                try { U4AUI.closeWindow(CURRWIN); }
+                catch (e) { console.error("[DMWN-002] 창 닫기 실패:", e); }
+            });
+        }
+
+        //최대화 토글 + 아이콘 맞추기
+        var oMax = $("dmWinMax");
+        if (oMax) {
+            var _syncMaxIcon = function () {
+                try {
+                    var oI = oMax.querySelector("i");
+                    if (oI) { oI.className = CURRWIN.isMaximized() ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
+                } catch (e) {
+                    console.error("[DMWN-002] 최대화 아이콘 맞추기 실패:", e);
+                }
+            };
+            oMax.addEventListener("click", function () {
+                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } }
+                catch (e) { console.error("[DMWN-002] 최대화 전환 실패:", e); }
+            });
+            try { CURRWIN.on("maximize", _syncMaxIcon); CURRWIN.on("unmaximize", _syncMaxIcon); }
+            catch (e) { console.error("[DMWN-002] 최대화 상태 감시 붙이기 실패:", e); }
+            _syncMaxIcon();
+        }
+    }
+
+
+    /* ==================================================================
+     * 8. 시작
+     * ================================================================== */
+    document.addEventListener("DOMContentLoaded", function () {
+
+        _cacheEl();
+        _setBusy(true);
+
+        try {
+            _bindTitlebar();
+            _bindButtons();
+            _openChannel();
+            _setState(false);
+        } catch (e) {
+            console.error("[DMWN-002] 화면 준비 실패:", e);
+        }
+
+        //창이 닫힐 때 부모 쪽 감시를 꺼 준다(모든 닫힘 경로를 덮는다).
+        window.addEventListener("beforeunload", function () {
+            _send({ PRCCD: "DMON_STOP" });
+            try { if (_oChannel) { _oChannel.close(); } }
+            catch (e) { console.error("[DMWN-003] 부모 창과 잇는 길 닫기 실패:", e); }
+        });
+
+        //준비가 다 끝난 뒤에 창을 보이고 잠금을 푼다(WP1 — 중간에 미리 풀지 않는다).
+        requestAnimationFrame(function () {
+            try { CURRWIN.show(); }
+            catch (e) { console.error("[DMWN-002] 창 표시 실패:", e); }
+            document.body.classList.add("u4a-visible");
+            _setBusy(false);
+            //부모에게 준비 완료를 알려 지금 상태를 받아온다.
+            _send({ PRCCD: "DMON_READY" });
+        });
+    });
+
+})();

@@ -332,7 +332,7 @@
                 try {
                     eval(oResult.SCRIPT);
                 } catch (e) {
-                    console.error("[HTML5] /app_delte SCRIPT eval 실패 (UI5 의존 추정):", e && e.message, oResult.SCRIPT);
+                    console.error("/app_delte SCRIPT eval failed (likely UI5 dependent):", e && e.message, oResult.SCRIPT);
                 }
             }
 
@@ -414,7 +414,7 @@
                 try {
                     eval(oResult.SCRIPT);
                 } catch (e) {
-                    console.error("[HTML5] /usp_app_delete SCRIPT eval 실패 (UI5 의존 추정):", e && e.message, oResult.SCRIPT);
+                    console.error("/usp_app_delete SCRIPT eval failed (likely UI5 dependent):", e && e.message, oResult.SCRIPT);
                 }
             }
 
@@ -1175,7 +1175,7 @@
             oAPP.common.fnConfirmBox('I', sMsg, lf_MsgCallback);
         } else {
             // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(NO).
-            console.error("[WSEV-018] 확인창: 공통 fnConfirmBox 미로드 — 표시 불가. message:", sMsg);
+            console.error("[WSEV-018] checkwindow: common fnConfirmBox not loaded — show blocked. message:", sMsg);
             lf_MsgCallback("NO");
         }
 
@@ -1267,7 +1267,7 @@
             ]);
         } else {
             // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(CANCEL=머무름).
-            console.error("[WSEV-019] 페이지 뒤로가기 확인: 공통 fnConfirmBox 미로드 — 표시 불가. message:", sMsg);
+            console.error("[WSEV-019] page back confirm: common fnConfirmBox not loaded - blocked. message:", sMsg);
             oAPP.events.ev_pageBack_MsgCallBack("CANCEL");
         }
 
@@ -1297,7 +1297,7 @@
             //   → 저장 핸들러 직접 호출(ISBACK="X" → 저장 성공 후 WS10 으로 이동).
             if (typeof oAPP.events.ev_pressSaveBtn !== "function") {
                 oAPP.common.fnSetBusyLock("");
-                try { parent.showMessage(null, 20, "E", "[Save] ev_pressSaveBtn 미정의"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { parent.showMessage(null, 20, "E", "[Save] ev_pressSaveBtn undefined"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return;
             }
             try {
@@ -1305,7 +1305,7 @@
             } catch (e) {
                 oAPP.common.fnSetBusyLock("");
                 try { parent.showMessage(null, 20, "E", "[Save] " + (e && e.message ? e.message : String(e))); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
-                console.error("[HTML5][WS20] save(ISBACK) error:", e);
+                console.error("[WS20] save(ISBACK) error:", e);
             }
 
             return;
@@ -1626,17 +1626,17 @@
         } catch (e9) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e9); } }
 
         // ① 콘솔에 [코드] + 위치 + 예외 원문 (조용한 삼킴 금지 — 현장 SR 추적용)
-        try { console.error("[" + sCode + "] " + sWhere + " — 오류 발생:", e); } catch (e0) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e0); } }
+        try { console.error("[" + sCode + "] " + sWhere + " — error:", e); } catch (e0) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e0); } }
 
         // ② 정리(cleanup) — 화면 잠금 해제
-        try { oAPP.common.fnSetBusyLock(""); } catch (e1) { console.error("[" + sCode + "] fnSetBusyLock 해제 실패:", e1 && e1.message); }
-        try { parent.setBusy(""); } catch (e2) { console.error("[" + sCode + "] setBusy 해제 실패:", e2 && e2.message); }
+        try { oAPP.common.fnSetBusyLock(""); } catch (e1) { console.error("[" + sCode + "] fnSetBusyLock release failed:", e1 && e1.message); }
+        try { parent.setBusy(""); } catch (e2) { console.error("[" + sCode + "] setBusy release failed:", e2 && e2.message); }
 
         // ②-2 자식 윈도우 잠금 회수 (BUSY_ON 을 이미 방송한 구간에서만 — 짝 필수)
         if (bBroadOff === true) {
             try {
                 if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
-            } catch (e3) { console.error("[" + sCode + "] 자식 윈도우 busy 해제 방송 실패:", e3 && e3.message); }
+            } catch (e3) { console.error("[" + sCode + "] child window busy release broadcast failed:", e3 && e3.message); }
         }
 
         // ②-3 자식 윈도우 다시 보이기 — 시작 때 fnChildWindowShow(false) 로 숨긴 뒤 터진 구간이면
@@ -1644,7 +1644,7 @@
         if (bChildShow === true) {
             try {
                 if (typeof oAPP.fn.fnChildWindowShow === "function") { oAPP.fn.fnChildWindowShow(true); }
-            } catch (e7) { console.error("[" + sCode + "] 자식 윈도우 다시 보이기 실패:", e7 && e7.message); }
+            } catch (e7) { console.error("[" + sCode + "] re-show child window failed:", e7 && e7.message); }
         }
 
         // ②-4 작업표시줄 깜빡임 (크리티컬 전례 usp/ws_usp.js fnCriticalErrorWs30)
@@ -1658,12 +1658,12 @@
             sMsg = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "314") || "";
             var sGuide = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "290") || "";
             if (sGuide) { sMsg += (sMsg ? " " : "") + sGuide; }
-        } catch (e4) { console.error("[" + sCode + "] 메시지 조회 실패:", e4 && e4.message); }
+        } catch (e4) { console.error("[" + sCode + "] message read failed:", e4 && e4.message); }
 
         sMsg = "[" + sCode + "] " + sMsg;
 
         try { parent.showMessage(null, 20, "E", sMsg); }
-        catch (e6) { console.error("[" + sCode + "] 오류 팝업 표시 실패:", e6 && e6.message); }
+        catch (e6) { console.error("[" + sCode + "] error popup failed:", e6 && e6.message); }
 
     } // end of _wsevCritical
 
@@ -1689,11 +1689,11 @@
 
             //비동기(속성영역·미리보기 선택까지) — 안에서 실패해도 코드로 드러낸다.
             Promise.resolve(oAPP.fn.fnWs20TreeReselectCurrent()).catch(function (e) {
-                console.error("[WSEV-018] " + sWhere + " — [서버 처리 後] 선택 UI 다시 클릭 실패:", e);
+                console.error("[WSEV-018] " + sWhere + " — [server handle after] select UI re-click failed:", e);
             });
 
         } catch (e) {
-            console.error("[WSEV-018] " + sWhere + " — [서버 처리 後] 선택 UI 다시 클릭 실패:", e);
+            console.error("[WSEV-018] " + sWhere + " — [server handle after] select UI re-click failed:", e);
         }
 
     } // end of _ws20ReselectSelectedUI
@@ -2342,7 +2342,7 @@
                 } catch (eMove) {
                     oAPP.common.fnSetBusyLock("");
                     try { parent.showMessage(null, 20, "E", "[Back] " + (eMove && eMove.message ? eMove.message : String(eMove))); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-                    console.error("[HTML5][WS20] fnMoveToWs10 error:", eMove);
+                    console.error("[WS20] fnMoveToWs10 error:", eMove);
                 }
 
                 return;

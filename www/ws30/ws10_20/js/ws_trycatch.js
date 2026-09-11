@@ -89,7 +89,7 @@ module.exports = function (window, document, console) {
 
         } catch (e) {
             // 전송 통로가 없어도 앱은 계속 간다. 로그는 이미 위에서 남겼다.
-            console.error('[WSERR-901] 오류 전송 요청 실패', e);
+            console.error('[WSERR-901] error report request failed', e);
         }
 
     }

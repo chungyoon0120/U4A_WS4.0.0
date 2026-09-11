@@ -426,6 +426,8 @@ function _create() {
 function _delete() {
     if (!oState.isEdit) { return; }
 
+    _commitCurrent();
+
     if (oState.list.length === 0) {
         _toast(_msg("/U4A/MSG_WS", "326")); // Select the delete line
         return;
@@ -441,9 +443,26 @@ function _delete() {
         ],
         onClose: function (sAct) {
             if (sAct !== "YES") { return; }
+
+            // 서버는 개별 삭제 API 없이 전달받은 T_DOCLIST 전체를 덮어쓴다.
+            // 삭제 전 상태를 보관했다가 SAVE 실패 시 화면을 원상 복구한다.
+            var aBefore = oState.list.slice();
+            var sBeforeKey = oState.curKey;
+            var bBeforeChang = oState.isChang;
+
             oState.isChang = false;
             _delLine(oState.curKey);
-            _toast(_msg("/U4A/MSG_WS", "327")); // Deletion processing complete
+
+            _xhrSave({
+                successMessage: _msg("/U4A/MSG_WS", "327"), // Deletion processing complete
+                onError: function () {
+                    oState.list = aBefore;
+                    oState.curKey = null;
+                    _selectDoc(sBeforeKey);
+                    oState.isChang = bBeforeChang;
+                    _updateStatus();
+                }
+            });
         }
     });
 }
@@ -471,11 +490,6 @@ function _delLine(sKey) {
 function _save() {
     if (!oState.isEdit) { return; }
     _commitCurrent();
-
-    if (oState.list.length === 0) {
-        _toast(_msg("/U4A/MSG_WS", "328")); // Saved data does not exist
-        return;
-    }
 
     U4AUI.confirm({
         type: "C",
@@ -561,7 +575,8 @@ function _xhrGet() {
     xhr.send(oForm);
 }
 
-function _xhrSave() {
+function _xhrSave(oOptions) {
+    oOptions = oOptions || {};
     _setBusy(true);
 
     var aPayload = oState.list.map(function (o) {
@@ -582,28 +597,37 @@ function _xhrSave() {
 
         var oData = null;
         try { oData = JSON.parse(this.response); }
-        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _fatal(sWrong); return; }
+        catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            if (typeof oOptions.onError === "function") { oOptions.onError(); }
+            _fatal(sWrong);
+            return;
+        }
 
         switch (oData.RETCD) {
             case "S":
                 // 저장 성공 = 로컬 현지화 메시지(서버 RTMSG 는 영문 고정이라 KO 접속 시 영어로 떠 사용자 지적).
-                _toast(_msg("/U4A/MSG_WS", "002")); // Saved success.(접속 언어로)
+                _toast(oOptions.successMessage || _msg("/U4A/MSG_WS", "002")); // Saved success.(접속 언어로)
                 oState.list.forEach(function (o) { delete o._new; delete o._dirty; }); // 저장됨 → 변경표시 해제
                 oState.isChang = false;
                 _renderList();
                 _updateStatus();   // 상태칩 숨김(저장됨)
+                if (typeof oOptions.onSuccess === "function") { oOptions.onSuccess(oData); }
                 break;
             case "E":
                 // 오류는 서버가 주는 사유(RTMSG)를 그대로 — 없으면 로컬 폴백.
+                if (typeof oOptions.onError === "function") { oOptions.onError(oData); }
                 _toast(oData.RTMSG || _msg("/U4A/MSG_WS", "324"));
                 break;
             default:
+                if (typeof oOptions.onError === "function") { oOptions.onError(oData); }
                 _fatal(sWrong);
                 return;
         }
     };
     xhr.onerror = function () {
         _setBusy(false);
+        if (typeof oOptions.onError === "function") { oOptions.onError(); }
         _fatal(sWrong);
     };
     xhr.send(oForm);
@@ -612,7 +636,7 @@ function _xhrSave() {
 // ── TinyMCE 생성/재생성 ──────────────────────────────────────────────────
 function _initEditor() {
     if (!window.tinymce || typeof window.tinymce.init !== "function") {
-        console.error("[HTML5][docPopup] TinyMCE 미로드 — 스크립트 경로/전역 확인 필요");
+        console.error("[docPopup] TinyMCE not loaded - check the script path / global");
         _finishOpen();
         return;
     }
@@ -677,7 +701,7 @@ function _initEditor() {
             _maybeLoad();
         }
     }).catch(function (e) {
-        console.error("[HTML5][docPopup] tinymce.init 실패:", e && e.message);
+        console.error("[docPopup] tinymce.init failed:", e && e.message);
         _finishOpen();
     });
 }
@@ -878,7 +902,7 @@ window.addEventListener("load", function () {
     try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     iBusyWatch = setTimeout(function () {
-        console.error("[HTML5][docPopup] 에디터/서버 로드 지연 — busy 강제 해제");
+        console.error("[docPopup] editor/server load deferred — busy force release");
         _finishOpen();
     }, 20000);
 });

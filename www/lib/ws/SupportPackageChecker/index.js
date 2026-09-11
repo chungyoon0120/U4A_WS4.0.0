@@ -17,11 +17,11 @@
 
   var spAutoUpdater = require(oAPP.path.join(__dirname, 'SupportPackageChecker/index.js'));
     
-      spAutoUpdater.on("checking-for-update-SP", (e)=>{ console.log("업데이트 확인중"); debugger; });
+      spAutoUpdater.on("checking-for-update-SP", (e)=>{ console.log("update check"); debugger; });
    
-      spAutoUpdater.on("update-available-SP", (e)=>{ console.log("업데이트 항목이 존재합니다"); debugger; });
+      spAutoUpdater.on("update-available-SP", (e)=>{ console.log("update available"); debugger; });
    
-      spAutoUpdater.on("update-not-available-SP", (e)=>{ console.log("현재 최신버전입니다."); debugger; });
+      spAutoUpdater.on("update-not-available-SP", (e)=>{ console.log("already up to date"); debugger; });
    
       spAutoUpdater.on("download-progress-SP", (e)=>{
 
@@ -32,7 +32,7 @@
                   e.detail.file_info.TOTAL  <-- 모수 
                   e.detail.file_info.TRANSFERRED <-- 현재 진행중 갯수 
  
-                   console.log("다운로드중");  
+                   console.log("downloadload");  
       });
       
       spAutoUpdater.on("update-downloaded-SP", (e)=>{  
@@ -115,7 +115,7 @@ var GS_MSG = {
     // M13: "GIT (app.zip) 패치 파일 추출하는동안 오류 발생 \n 관리자에게 문의!!",
     // M14: "GIT (node_modules.zip) 패치 파일 추출하는동안 오류 발생 \n 관리자에게 문의!!",
     // M15: "(패치) 업데이트 확인중",
-    // M16: "(패치) 현재 최신버전입니다.",
+    // M16: "(패치) already up to date",
     // M17: "(패치) 업데이트 항목이 존재합니다",
     // M18: "(패치) 업데이트가 완료되었습니다.",
     // M19: "(패치) 업데이트 설치중",
@@ -918,7 +918,7 @@ exports.checkForUpdates = async function (remote, iscdn = false, versn, splev = 
 
     //업데이트 항목이 없을 경우 
     if (!LS_CHKER.ISPATCH) {
-        document.dispatchEvent(new CustomEvent('update-not-available-SP', { detail: { message: GS_MSG.M16 } })); //현재 최신버전입니다.
+        document.dispatchEvent(new CustomEvent('update-not-available-SP', { detail: { message: GS_MSG.M16 } })); //already up to date
         return;
     }
 

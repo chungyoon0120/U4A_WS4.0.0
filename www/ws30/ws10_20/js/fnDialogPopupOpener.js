@@ -853,7 +853,7 @@
             //    (updateAppData 등)는 아직 WS20 디자인 앱과 안 맞음 → 메시지가 흐르는 Stage6 에서 정합 배선.
             //    (attr.js selectBindingPopupOBJID 와 동일하게 try/catch 로 방어 — 헤드리스/미가용 시 skip.)
             try { parent.require(_channelPath)("CHANNEL-CREATE"); }
-            catch (e) { console.warn("[HTML5][bindWindow] WS20 수신채널 생성 보류(Stage6):", e && e.message); }
+            catch (e) { console.warn("[bindWindow] WS20 receive channel creation deferred (Stage6):", e && e.message); }
 
 
             // no build 일 경우에는 개발자 툴을 실행한다.
@@ -874,7 +874,7 @@
 
             //디자인상세화면(20화면) <-> BINDPOPUP 통신 채널 종료.
             try { parent.require(_channelPath)("CHANNEL-CLOSE"); }
-            catch (e) { console.warn("[HTML5][bindWindow] WS20 수신채널 종료 보류(Stage6):", e && e.message); }
+            catch (e) { console.warn("[bindWindow] WS20 receive channel teardown deferred (Stage6):", e && e.message); }
 
             // Binding Popup 에서 콜백 이벤트 해제
             IPCRENDERER.off("if-bindPopup-callback", oAPP.fn.fnBindPopupIpcCallBack);
@@ -2950,16 +2950,16 @@
             if (bErrWinReady === true || bErrWinFailed === true) { return; }
             bErrWinFailed = true;
 
-            try { console.error("[" + sCode + "] 오류 목록 창 띄우기 실패 — 화면 잠금 회수: " + sDetail); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { console.error("[" + sCode + "] error list window open failed - screen lock count: " + sDetail); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 본 화면 잠금 해제
-            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error("[" + sCode + "] fnSetBusyLock 해제 실패:", e && e.message); }
-            try { parent.setBusy(""); } catch (e) { console.error("[" + sCode + "] setBusy 해제 실패:", e && e.message); }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error("[" + sCode + "] fnSetBusyLock release failed:", e && e.message); }
+            try { parent.setBusy(""); } catch (e) { console.error("[" + sCode + "] setBusy release failed:", e && e.message); }
 
             // 자식 윈도우 잠금 회수 (진입 때 BUSY_ON 을 방송했으므로 짝 필수)
             try {
                 if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
-            } catch (e) { console.error("[" + sCode + "] 자식 윈도우 busy 해제 방송 실패:", e && e.message); }
+            } catch (e) { console.error("[" + sCode + "] child window busy release broadcast failed:", e && e.message); }
 
             // 화면 안내 — `[코드] + 기존 메시지 키 문구`(표준 `.analy/19` §4·§5)
             try {
@@ -2968,7 +2968,7 @@
                 const sGuide = parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "290") || "";
                 if (sGuide) { sTxt += (sTxt ? " " : "") + sGuide; }
                 parent.showMessage(null, 20, "E", "[" + sCode + "] " + sTxt);
-            } catch (e) { console.error("[" + sCode + "] 오류 팝업 표시 실패:", e && e.message); }
+            } catch (e) { console.error("[" + sCode + "] error popup failed:", e && e.message); }
 
             // 반쯤 뜬 창 정리
             try {
@@ -2976,7 +2976,7 @@
                     if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oBrowserWindow); }
                     else { oBrowserWindow.setClosable(true); oBrowserWindow.close(); }
                 }
-            } catch (e) { console.error("[" + sCode + "] 실패한 창 닫기 실패:", e && e.message); }
+            } catch (e) { console.error("[" + sCode + "] closing the failed window failed:", e && e.message); }
         }
 
         // 주소 읽기 자체가 실패한 경우(Electron 은 실패 시 거절을 돌려준다 — 종전엔 버려졌다).
@@ -2998,14 +2998,14 @@
                 if (bIsMainFrame === false) { return; }
                 lf_recoverOpenFail("FDPO-002", "(" + iErrCode + ") " + sErrDesc + " / " + sUrl);
             });
-        } catch (e) { console.error("[FDPO-002] did-fail-load 등록 실패:", e && e.message); }
+        } catch (e) { console.error("[FDPO-002] did-fail-load register failed:", e && e.message); }
 
         // 창의 화면 프로세스가 죽은 경우.
         try {
             oBrowserWindow.webContents.on('render-process-gone', function (evt, oDetail) {
                 lf_recoverOpenFail("FDPO-003", (oDetail && oDetail.reason) ? oDetail.reason : "render-process-gone");
             });
-        } catch (e) { console.error("[FDPO-003] render-process-gone 등록 실패:", e && e.message); }
+        } catch (e) { console.error("[FDPO-003] render-process-gone register failed:", e && e.message); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -3584,7 +3584,7 @@
 
         } catch (e) {
 
-            console.error("[WS20] UI5 Predefined CSS 팝업 오픈 실패:", e && e.message);
+            console.error("[WS20] UI5 Predefined CSS popup open failed:", e && e.message);
 
             // busy 끄고 Lock 풀기
             oAPP.common.fnSetBusyLock("");
@@ -3636,7 +3636,7 @@
             try {
                 oRes.WIN.webContents.send("if-ui5css-result", oPayload);
             } catch (e) {
-                console.error("[WS20] UI5 Predefined CSS 결과 회신 실패:", e && e.message);
+                console.error("[WS20] UI5 Predefined CSS result reply failed:", e && e.message);
             }
 
         }
@@ -3649,7 +3649,7 @@
                     oAPP.fn.setSelectTreeItem(oRes.OBJID, oRes.UIATK, "");
                 }
             } catch (e) {
-                console.error("[WS20] UI5 Predefined CSS 바인딩 UI 선택 이동 실패:", e && e.message);
+                console.error("[WS20] UI5 Predefined CSS binding UI select move failed:", e && e.message);
             }
             return;
         }
@@ -3726,7 +3726,7 @@
         } catch (e) {
 
             //삼키지 않는다 — 콘솔에 남기고 팝업에도 오류로 알린다. (never-suppress-script-errors)
-            console.error("[WS20] UI5 Predefined CSS 적용 오류:", e && e.message);
+            console.error("[WS20] UI5 Predefined CSS apply error:", e && e.message);
 
             lf_reply("E", "E", (e && e.message) || "");
 
@@ -4078,22 +4078,22 @@
         oBrowserWindow.on('closed', () => {
             oBrowserWindow = null;
             // 자식이 정상 초기화(IPC)로 busy 를 못 풀고 닫힌 경우(초기화 예외·조기 close) 대비 — 여기서 해제 보장(멱등).
-            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { console.error('[숏컷] closed busy-off 실패:', e); }
-            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error('[숏컷] closed lock 해제 실패:', e); }
-            try { CURRWIN.focus(); } catch (e) { console.error('[숏컷] closed 포커스 실패:', e); }
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { console.error('[shortcut] closed busy-off failed:', e); }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error('[shortcut] closed lock release failed:', e); }
+            try { CURRWIN.focus(); } catch (e) { console.error('[shortcut] closed focus failed:', e); }
         });
 
         // 페이지 메인 로드 실패 시 busy 잔류 방지 + 창 정리(로드 실패면 타이틀바가 안 그려져 사용자가 못 닫음).
         oBrowserWindow.webContents.on('did-fail-load', (event, errCode, errDesc, validatedURL, isMainFrame) => {
             if (!isMainFrame || errCode === -3) { return; }   // 서브리소스/사용자취소(-3)는 무시
-            console.error('[숏컷] 자식창 메인 로드 실패:', errCode, errDesc);
+            console.error('[shortcut] childwindow main load failed:', errCode, errDesc);
             try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-            try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { console.error('[숏컷] 로드실패 창 정리 실패:', e); }
+            try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { console.error('[shortcut] cleanup of the failed window failed:', e); }
         });
 
         } catch (e) {
-            console.error("[숏컷] U4A 숏컷 링크 생성 오류:", e);
+            console.error("[shortcut] U4A shortcut link create error:", e);
 
             // 전체 자식 윈도우에 Busy 끈다.
             oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });

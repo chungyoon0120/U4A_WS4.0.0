@@ -14,7 +14,7 @@
     o.newly_list = (REMOTE, oPARENT, PARAMS) => {
 
          // 받아온 PARAMS가 없어?? 리턴해
-         if(PARAMS === 'undefined'){ console.log("newly_list.js 에러"); return;};
+         if(PARAMS === 'undefined'){ console.log("newly_list.js error"); return;};
 
         // SVTEXT => 좌측 header영역의 contentleft 텍스트 UI
         let SVTEXT = sap.ui.getCore().byId('wsy_svTxt');

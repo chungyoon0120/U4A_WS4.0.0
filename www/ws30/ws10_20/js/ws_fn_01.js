@@ -133,7 +133,7 @@
             // [HTML5] 초기 WS10 글로벌 단축키 등록 — UI5 fnOnInitRenderingWS10(:315)에 있던 것이
             //   HTML5 렌더 경로엔 누락됐었다(복귀 경로 ws_fn_02:603 에만 있어 첫 화면에선 단축키 미동작).
             //   원본대로 렌더 직후 1회 등록(Ctrl+Shift+F 텍스트검색·Ctrl+F12 생성 등 전부 복구).
-            try { APPCOMMON.setShortCut("WS10"); } catch (e) { console.error("[HTML5] setShortCut(WS10)", e); }
+            try { APPCOMMON.setShortCut("WS10"); } catch (e) { console.error("setShortCut(WS10)", e); }
             return;
         }
 

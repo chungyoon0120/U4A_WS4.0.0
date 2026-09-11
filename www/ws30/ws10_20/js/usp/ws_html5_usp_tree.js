@@ -31,7 +31,7 @@
             _svgFolder = PATH.join(APP.getAppPath(), "svg");
             _svgList = FS.readdirSync(_svgFolder) || [];
         } catch (e) {
-            console.error("[HTML5][WS30] svg 목록 로드 오류:", e);
+            console.error("[WS30] svg list load error:", e);
             _svgList = [];
         }
     }
@@ -114,7 +114,7 @@
             // 단일 클릭 = 열기(우측 페이지 + Monaco).
             onSelect: function (n) {
                 try { oAPP.fn.fnUspTreeTableRowSelect(n); }
-                catch (e) { console.error("[HTML5][WS30] tree click open error:", e); }
+                catch (e) { console.error("[WS30] tree click open error:", e); }
             },
             // WS30 확장 — 컨텍스트메뉴 트리거 클래스(.u4aWs30TreeRow)·식별(data-objky)·선택표시(ISSEL)·노드 stash.
             //   (이름 셀 래핑·컬럼 정렬은 makeColumnTree 가 담당 → USP 는 손대지 않음)

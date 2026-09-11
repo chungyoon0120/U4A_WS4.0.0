@@ -1,7 +1,7 @@
 /****************************************************************************************
  * 앱 본체(메인 프로세스) 로그 · 오류 수집
  * --------------------------------------------------------------------------------------
- * 오류코드 접두: MLOG / 다음 번호: 007
+ * 오류코드 접두: MLOG / 다음 번호: 008
  *
  * 왜 만들었나 (2026-09-08, 장군님 지시):
  *   실측 결과 앱 본체에는 오류·창 종료·응답 없음을 받는 자리가 하나도 없었다(0건).
@@ -78,9 +78,20 @@ function _resolveLogFilePath() {
  *  - 줄 모양 표준은 .works/로그수집전송/02_로그설계표준.md
  *  - 지금 단계에서는 [등급] [앱본체] 내용 까지만 맞춘다.
  ****************************************************************************************/
+/**
+ * 등급을 영어 고정어로 (2026-09-10 추가 — 장군님 지시)
+ * 화면 쪽과 같은 말을 쓴다. 걸러내기가 확실해지고 같은 뜻이 두 벌로 안 나온다.
+ */
+const LEVEL_EN = {
+    '알림': 'INFO',
+    '주의': 'WARN',
+    '오류': 'ERROR',
+    '치명': 'FATAL'
+};
+
 function writeLog(sLevel, sText) {
 
-    const sLine = '[' + sLevel + '] [앱본체] ' + sText;
+    const sLine = '[' + (LEVEL_EN[sLevel] || sLevel) + '] [main] ' + sText;
 
     if (_log && typeof _log[_mapLevel(sLevel)] === 'function') {
         _log[_mapLevel(sLevel)](sLine);
@@ -117,7 +128,7 @@ function _setupLogger() {
 
     } catch (e) {
         // 로그 라이브러리를 못 읽으면 이후 전부 콘솔로 간다. 앱은 계속 돈다.
-        console.error('[MLOG-001] electron-log 로드 실패 — 앱 본체 로그는 콘솔에만 남는다.', e);
+        console.error('[MLOG-001] electron-log failed to load - main process logs go to console only.', e);
         _log = null;
         return;
     }
@@ -139,7 +150,7 @@ function _setupLogger() {
         _log.transports.console.level = 'error';
 
     } catch (e) {
-        console.error('[MLOG-002] 로그 파일 경로 설정 실패 — 앱 본체 로그는 기본 경로로 간다.', e);
+        console.error('[MLOG-002] could not set the log file path - falling back to the default path.', e);
     }
 
 }
@@ -163,8 +174,8 @@ function _getBuildTimeText() {
             + ':' + String(d.getMinutes()).padStart(2, '0');
 
     } catch (e) {
-        console.error('[MLOG-006] 빌드 시각을 알아내지 못했다.', e);
-        return '(알 수 없음)';
+        console.error('[MLOG-006] could not determine the build time.', e);
+        return '(unknown)';
     }
 
 }
@@ -178,10 +189,10 @@ function _writeStartupHeader() {
 
         const os = require('os');
 
-        writeLog('알림', '===== 앱 시작 =====');
-        writeLog('알림', '앱 버전: ' + _app.getVersion() + ' / 패키징: ' + (_app.isPackaged ? '예' : '아니오'));
-        writeLog('알림', '전자앱: ' + process.versions.electron + ' / 크로미움: ' + process.versions.chrome + ' / 노드: ' + process.versions.node);
-        writeLog('알림', '윈도우: ' + os.release() + ' / ' + process.arch + ' / 메모리 ' + Math.round(os.totalmem() / 1024 / 1024 / 1024) + 'GB');
+        writeLog('알림', '===== APP START =====');
+        writeLog('알림', 'app version: ' + _app.getVersion() + ' / packaged: ' + (_app.isPackaged ? 'yes' : 'no'));
+        writeLog('알림', 'electron: ' + process.versions.electron + ' / chromium: ' + process.versions.chrome + ' / node: ' + process.versions.node);
+        writeLog('알림', 'windows: ' + os.release() + ' / ' + process.arch + ' / memory ' + Math.round(os.totalmem() / 1024 / 1024 / 1024) + 'GB');
 
         // 처리기 정보 (2026-09-08 추가 — 느려서 난 문제인지 가려낼 때 필요하다)
         try {
@@ -189,21 +200,21 @@ function _writeStartupHeader() {
             const aCpu = os.cpus();
 
             if (aCpu && aCpu.length > 0) {
-                writeLog('알림', '처리기: ' + String(aCpu[0].model).replace(/\s+/g, ' ').trim() + ' / ' + aCpu.length + '개');
+                writeLog('알림', 'cpu: ' + String(aCpu[0].model).replace(/\s+/g, ' ').trim() + ' / ' + aCpu.length + ' cores');
             }
 
         } catch (e) {
             // 처리기 정보를 못 읽어도 나머지 머리글은 남아야 한다.
         }
 
-        writeLog('알림', '로그 파일: ' + _logFilePath);
+        writeLog('알림', 'log file: ' + _logFilePath);
 
         /**
          * 소스를 정확히 어느 시점 것으로 열지 알기 위한 표시 (2026-09-08 추가)
          * 같은 버전 번호로 여러 번 빌드하므로 버전만으로는 그 시점 소스를 못 연다.
          */
-        writeLog('알림', '빌드 시각: ' + _getBuildTimeText());
-        writeLog('알림', '소스 위치: ' + _app.getAppPath());
+        writeLog('알림', 'build time: ' + _getBuildTimeText());
+        writeLog('알림', 'source path: ' + _app.getAppPath());
 
         /**
          * 화면 크기·배율 — 특정 환경에서만 나는 오류를 가려내기 위해.
@@ -216,22 +227,22 @@ function _writeStartupHeader() {
                 const { screen } = require('electron');
                 const aDisplays = screen.getAllDisplays();
 
-                writeLog('알림', '화면 ' + aDisplays.length + '개');
+                writeLog('알림', 'displays: ' + aDisplays.length);
 
                 aDisplays.forEach((d, i) => {
-                    writeLog('알림', '  화면' + (i + 1) + ': '
+                    writeLog('알림', '  display' + (i + 1) + ': '
                         + d.size.width + 'x' + d.size.height
-                        + ' / 배율 ' + Math.round((d.scaleFactor || 1) * 100) + '%');
+                        + ' / scale ' + Math.round((d.scaleFactor || 1) * 100) + '%');
                 });
 
             } catch (e) {
-                console.error('[MLOG-006] 화면 정보를 남기지 못했다.', e);
+                console.error('[MLOG-006] could not record display info.', e);
             }
 
         });
 
     } catch (e) {
-        console.error('[MLOG-003] 시작 머리글 기록 실패', e);
+        console.error('[MLOG-003] could not write the startup header.', e);
     }
 
 }
@@ -244,10 +255,10 @@ function _installProcessHandlers() {
     process.on('uncaughtException', (err) => {
 
         try {
-            writeLog('치명', '앱 본체에서 처리되지 않은 오류: ' + (err && err.message ? err.message : String(err)));
-            writeLog('치명', '난 자리: ' + (err && err.stack ? err.stack : '(스택 없음)'));
+            writeLog('치명', 'UNCAUGHT | main process | ' + (err && err.message ? err.message : String(err)));
+            writeLog('치명', '        stack: ' + (err && err.stack ? err.stack : '(no stack)'));
         } catch (e) {
-            console.error('[MLOG-004] 처리되지 않은 오류를 남기다가 실패', e);
+            console.error('[MLOG-004] failed while recording an uncaught error.', e);
         }
 
         // 기존 동작을 바꾸지 않는다. 여기서 앱을 끄지 않는다.
@@ -261,9 +272,9 @@ function _installProcessHandlers() {
                 : (reason && reason.message) ? reason.message
                     : String(reason);
 
-            writeLog('오류', '앱 본체에서 처리되지 않은 비동기 실패: ' + sText);
+            writeLog('오류', 'UNHANDLED_REJECT | main process | ' + sText);
         } catch (e) {
-            console.error('[MLOG-004] 비동기 실패를 남기다가 실패', e);
+            console.error('[MLOG-004] failed while recording an unhandled rejection.', e);
         }
 
     });
@@ -280,27 +291,44 @@ function _installWindowHandlers() {
     // 화면 프로세스가 죽음
     app.on('render-process-gone', (event, webContents, details) => {
 
-        let sTitle = '(알 수 없음)';
+        let sTitle = '(unknown)';
 
         try {
             const win = BrowserWindow.fromWebContents(webContents);
-            sTitle = (win && !win.isDestroyed()) ? (win.getTitle() || '(제목 없음)') : '(이미 닫힌 창)';
+            sTitle = (win && !win.isDestroyed()) ? (win.getTitle() || '(untitled)') : '(already closed)';
         } catch (e) {
-            sTitle = '(창 정보를 못 읽음)';
+            sTitle = '(window info unreadable)';
         }
 
-        writeLog('치명', '창이 죽음 — 창: ' + sTitle
-            + ' / 사유: ' + (details && details.reason ? details.reason : '(사유 없음)')
-            + ' / 종료코드: ' + (details && typeof details.exitCode !== 'undefined' ? details.exitCode : '-'));
+        writeLog('치명', 'RENDERER_GONE | window: ' + sTitle
+            + ' | reason: ' + (details && details.reason ? details.reason : '(none)')
+            + ' | exitCode: ' + (details && typeof details.exitCode !== 'undefined' ? details.exitCode : '-'));
+
+        /**
+         * ★그 자리에서 바로 보고서를 만들어 보낸다 (2026-09-10 — 장군님 지시)
+         * 앱 본체는 살아 있으니 다음 실행까지 기다릴 이유가 없다.
+         * 앞서는 로그에 위 한 줄만 남고 보고서도 텔레그램도 안 갔다(실측으로 확인).
+         */
+        try {
+
+            require('./ws_crash_report').reportRendererCrash({
+                창: sTitle,
+                사유: (details && details.reason) ? details.reason : '',
+                종료코드: (details && typeof details.exitCode !== 'undefined') ? details.exitCode : '-'
+            });
+
+        } catch (e) {
+            writeLog('오류', 'CAUGHT | could not build the renderer crash report | ' + (e && e.message ? e.message : e));
+        }
 
     });
 
     // 자식 프로세스가 죽음
     app.on('child-process-gone', (event, details) => {
 
-        writeLog('오류', '자식 프로세스가 죽음 — 종류: ' + (details && details.type ? details.type : '-')
-            + ' / 사유: ' + (details && details.reason ? details.reason : '-')
-            + ' / 종료코드: ' + (details && typeof details.exitCode !== 'undefined' ? details.exitCode : '-'));
+        writeLog('오류', 'CHILD_GONE | type: ' + (details && details.type ? details.type : '-')
+            + ' | reason: ' + (details && details.reason ? details.reason : '-')
+            + ' | exitCode: ' + (details && typeof details.exitCode !== 'undefined' ? details.exitCode : '-'));
 
     });
 
@@ -308,11 +336,11 @@ function _installWindowHandlers() {
     app.on('web-contents-created', (event, contents) => {
 
         contents.on('unresponsive', () => {
-            writeLog('주의', '창이 응답 없음 — 주소: ' + _safeUrl(contents));
+            writeLog('주의', 'UNRESPONSIVE | url: ' + _safeUrl(contents));
         });
 
         contents.on('responsive', () => {
-            writeLog('알림', '창이 다시 응답함 — 주소: ' + _safeUrl(contents));
+            writeLog('알림', 'RESPONSIVE | url: ' + _safeUrl(contents));
         });
 
     });
@@ -342,9 +370,61 @@ function _installRendererErrorChannel() {
     try {
         ipcMain = require('electron').ipcMain;
     } catch (e) {
-        console.error('[MLOG-005] 화면 오류를 받는 통로를 열지 못했다.', e);
+        console.error('[MLOG-005] could not open the channel that receives renderer errors.', e);
         return;
     }
+
+    /**
+     * 진행 중인 서버 요청 목록을 받아 둔다 (2026-09-10 추가 — 장군님 지시)
+     * 앱이 뻗으면 크래시 보고서에 "안 끝난 요청" 으로 적힌다.
+     * 로그를 뒤져 짝을 맞출 필요 없이 어디서 멈췄는지 바로 보인다.
+     */
+    ipcMain.on('u4a-log:pending', (event, oInfo) => {
+
+        try {
+
+            require('./ws_crash_report').setPending((oInfo && oInfo.list) ? oInfo.list : []);
+
+        } catch (e) {
+            // 못 받아도 앱은 계속 간다.
+        }
+
+    });
+
+    /**
+     * ★화면이 직접 알려 주는 「마지막 조작」 (2026-09-10 — 장군님이 실측으로 잡아 주심)
+     * -------------------------------------------------------------------------------
+     * 무엇이 잘못됐었나
+     *   크래시 보고서의 「마지막 조작」 칸이 틀린 값으로 나왔다.
+     *   실측(15:05 보고서): '청윤' 을 가리키는데, 로그에는 그 뒤 '테스트'·'개발툴' 을
+     *   더 누른 것이 남아 있었다. 죽은 것은 '개발툴' 을 누른 지 5.5초 뒤다.
+     *
+     * 왜 그랬나
+     *   아래 renderer-error 통로는 화면에 우리 로그 함수가 없을 때만 쓴다
+     *   (있으면 같은 조작이 두 줄 남으므로 ws_error_hook 에서 안 보낸다).
+     *   그 결과 로그 함수가 있는 화면의 조작은 앱 본체가 아예 모르게 됐다.
+     *
+     * 그래서 화면 쪽 로그 함수가 이 통로로 직접 알려 준다. 로그는 화면이 이미 남겼으므로
+     * 여기서는 **다시 안 남기고** 마지막 상태만 갱신한다(같은 줄이 두 번 남는 것을 막는다).
+     */
+    ipcMain.on('u4a-log:last-action', (event, oInfo) => {
+
+        try {
+
+            if (!oInfo || !oInfo.action) { return; }
+
+            const CR = require('./ws_crash_report');
+
+            CR.setLastState('마지막조작', String(oInfo.action).slice(0, 100));
+            CR.setLastState('마지막화면', oInfo.screenName || 'unknown-screen');
+            CR.setLastState('마지막창', oInfo.windowName || 'unknown-window');
+            CR.setLastState('마지막추적번호', oInfo.traceId || '----');
+
+        } catch (e) {
+            console.error('[MLOG-007] could not update the last user action.', e);
+        }
+
+    });
 
     ipcMain.on('u4a-log:renderer-error', (event, oInfo) => {
 
@@ -352,13 +432,13 @@ function _installRendererErrorChannel() {
             return;
         }
 
-        const sScreen = oInfo.screenName || '화면미상';
+        const sScreen = oInfo.screenName || 'unknown-screen';
 
         /**
          * 어느 창에서 · 어느 조작 때문에 난 것인지 (2026-09-08 추가)
          * 이게 없어서 실제 로그가 전부 '창미상 / 추적번호 없음' 으로 나왔다(실측).
          */
-        const sWin = oInfo.windowName || '창미상';
+        const sWin = oInfo.windowName || 'unknown-window';
         const sTrace = oInfo.traceId || '----';
         const sHead = '[' + sWin + '] [' + sScreen + '] [' + sTrace + '] ';
 
@@ -385,7 +465,7 @@ function _installRendererErrorChannel() {
 
         }
 
-        writeLog('오류', sHead + (oInfo.message || '(내용 없음)'));
+        writeLog('오류', sHead + (oInfo.message || '(no message)'));
 
         if (oInfo.pageUrl) {
 
@@ -401,17 +481,17 @@ function _installRendererErrorChannel() {
                 sSafeUrl = sSafeUrl.slice(0, iMark) + ' (뒤쪽 정보는 가림)';
             }
 
-            writeLog('오류', '        주소: ' + sSafeUrl);
+            writeLog('오류', '        url: ' + sSafeUrl);
 
         }
 
         if (oInfo.stack) {
-            writeLog('오류', '        난 자리: ' + oInfo.stack);
+            writeLog('오류', '        stack: ' + oInfo.stack);
         }
 
         // 오류가 난 그 순간 화면 상태 (2026-09-08 추가)
         if (oInfo.screenState) {
-            writeLog('오류', '        그때 화면: ' + oInfo.screenState);
+            writeLog('오류', '        state: ' + oInfo.screenState);
         }
 
         // 전송까지 넘긴다. 토큰이 없으면 전송 쪽이 알아서 넘어간다.
@@ -430,7 +510,7 @@ function _installRendererErrorChannel() {
             });
 
         } catch (e) {
-            console.error('[MLOG-005] 화면 오류를 전송으로 넘기지 못했다.', e);
+            console.error('[MLOG-005] could not hand a renderer error to the sender.', e);
         }
 
     });
@@ -466,7 +546,7 @@ function install(appInstance) {
 
     // 정상 종료 표시 — 이 줄이 없으면 지난번에 비정상으로 끝난 것으로 본다(추후 W10 에서 사용)
     _app.on('before-quit', () => {
-        writeLog('알림', '===== 앱 정상 종료 =====');
+        writeLog('알림', '===== APP EXIT (normal) =====');
     });
 
 }

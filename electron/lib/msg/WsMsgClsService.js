@@ -65,7 +65,7 @@ class WsMsgClsService {
 
         } catch (error) {
 
-            console.error(`[WsMsgClsService] DB 오픈 실패 (LANGU: ${langu}, PATH: ${dbPath})`, error);
+            console.error(`[WsMsgClsService] DB open failed (LANGU: ${langu}, PATH: ${dbPath})`, error);
             return null;
 
         }

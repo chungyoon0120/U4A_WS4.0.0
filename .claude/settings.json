@@ -7,7 +7,11 @@
           {
             "type": "command",
             "command": "python",
-            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\pre_tool_use_mcp.py"],
+            "args": [
+              "-X",
+              "utf8",
+              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\pre_tool_use_mcp.py"
+            ],
             "async": true
           }
         ]
@@ -18,7 +22,11 @@
           {
             "type": "command",
             "command": "python",
-            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\pre_tool_use_gate.py"]
+            "args": [
+              "-X",
+              "utf8",
+              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\pre_tool_use_gate.py"
+            ]
           }
         ]
       }
@@ -29,7 +37,11 @@
           {
             "type": "command",
             "command": "python",
-            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\prompt_submit.py"]
+            "args": [
+              "-X",
+              "utf8",
+              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\prompt_submit.py"
+            ]
           }
         ]
       }
@@ -40,8 +52,39 @@
           {
             "type": "command",
             "command": "python",
-            "args": ["-X", "utf8", "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\answer_finish.py"],
+            "args": [
+              "-X",
+              "utf8",
+              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\answer_finish.py"
+            ],
             "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "-X",
+              "utf8",
+              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\stop_history_gate.py"
+            ],
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\socce\\AppData\\Local\\yoon-agent-kit\\hooks\\claude\\SessionStart\\run.cmd",
+            "timeout": 15,
+            "statusMessage": "Yoon Agent Kit"
           }
         ]
       }

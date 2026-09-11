@@ -105,7 +105,7 @@
         var oBar = H.el("div", "u4aBwpTool u4aBwpSyncListTool");
         var oApply = _btn("check", H.z("141"), H.z("141"), "u4a-btn--emphasized", function () {   // 141 일괄적용.
             if (typeof oAPP.fn.onSetSyncAttr === "function") {
-                try { oAPP.fn.onSetSyncAttr(); } catch (e) { console.error("[HTML5][bindWindow] onSetSyncAttr:", e && e.message); }
+                try { oAPP.fn.onSetSyncAttr(); } catch (e) { console.error("[bindWindow] onSetSyncAttr:", e && e.message); }
             }
         });
         oApply.setAttribute("data-bwp-sync-apply", "1");
@@ -209,7 +209,7 @@
         tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
         tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
             // [B4] 동일속성 화면 도움말 문서 "000277"(원본 synchronizionBind.js:796). 영역별 라우팅.
-            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000277"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000277"); } catch (e) { console.error("[bindWindow] onHelp:", e && e.message); } }
         }));
         page.appendChild(tool);
 

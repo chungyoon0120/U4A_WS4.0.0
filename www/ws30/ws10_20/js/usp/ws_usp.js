@@ -5175,7 +5175,7 @@
             let sUspHeaderLength = xhr.getResponseHeader('usp_head_data_Length');
             if (sUspHeaderLength) {
 
-                zconsole.log(`[usp_head_data_Length] USP 응답 헤더에 데이터 길이 정보 존재!`);
+                zconsole.log(`[usp_head_data_Length] USP response header has data length info`);
 
                 let oUspBytes = new TextEncoder().encode(sJsonResult);
                 let oDecoder = new TextDecoder('utf-8');
@@ -5835,7 +5835,7 @@
      **************************************************************************/
     function ev_getRootNodeRowsUpdated(oEvent) {
 
-        zconsole.log("[USP] 루트 노드 구하기");
+        zconsole.log("[USP] get root node");
 
         var oTable = oEvent.getSource();
         var aRows = oTable.getRows(),
@@ -7320,7 +7320,7 @@
 
             case "_C": // 신규 생성일 경우.     
 
-                console.log("[USP] 신규생성");
+                console.log("[USP] create new");
 
                 _fnCreateUspNode(oEvent);
 
@@ -7331,7 +7331,7 @@
 
             case "C": // 변경된 데이터 저장 후 프로세스가 신규 생성일 경우.
 
-                console.log("[USP] 변경된 데이터 저장 후 신규 생성");
+                console.log("[USP] create new after saving changed data");
 
                 fnCreateUspNodePopup(oTreeTable);
 
@@ -7353,7 +7353,7 @@
 
             case "_RN": //rename 일 경우.
 
-                console.log("[USP] 이름변경");
+                console.log("[USP] namechange");
 
                 fnRenameUspNode(oEvent);
 
@@ -7364,7 +7364,7 @@
 
             case "RN": // 변경된 데이터 저장 후 프로세스가 Rename일 경우
 
-                console.log("[USP] 변경된 데이터 저장 후 Rename");
+                console.log("[USP] change data save after Rename");
 
                 fnRenameUspNodePopup(oTreeTable);
 

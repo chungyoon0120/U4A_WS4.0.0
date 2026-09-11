@@ -430,7 +430,7 @@
         try {
             await oU4ASERV.createServer();
         } catch (e) {
-            console.error("[Named Pipe] createServer 실패:", e);
+            console.error("[Named Pipe] createServer failed:", e);
         }
 
         oAPP.setBusy(false);
@@ -458,7 +458,7 @@
             oAPP.msg.M017 = "A problem occurred while saving the server settings.";
         } catch (e) {
             // 메시지 조회 실패 시 영문 폴백 (display 차단 방지)
-            console.warn("[fnWsGlobalMsgList] 메시지 조회 실패, 폴백 사용:", e);
+            console.warn("[fnWsGlobalMsgList] message read failed, using fallback:", e);
             oAPP.msg.M03 = "Please Check the SAPGUI is Installed and whether saved Server exists!";
             oAPP.msg.M04 = "Server information does not exist in the SAPGUI logon file.";
             oAPP.msg.M05 = "No SAPGUI version information.";
@@ -488,7 +488,7 @@
             }
             M.setProperty("/WSLANGU", oLanguTextResult.RTDATA);
         } catch (e) {
-            console.warn("[fnOnInitModeling] i18n 모델 구성 실패, 폴백 사용:", e);
+            console.warn("[fnOnInitModeling] i18n model build failed, using fallback:", e);
         }
     };
 
@@ -539,7 +539,7 @@
                 .filter(entry => entry !== null);
             oAPP.data.SAPLogon.aSys32MsgServPort = sapmsEntries;
         } catch (e) {
-            console.warn("[_getMsgServPortList] 실패:", e);
+            console.warn("[_getMsgServPortList] failed:", e);
         }
     }
 
@@ -676,7 +676,7 @@
                     "HKCU\\SOFTWARE\\U4A\\WS\\GUIPath": { "GUIVer": { value: oCheckVer.RTPATH, type: "REG_DEFAULT" } }
                 });
             } catch (e) {
-                console.warn("[fnReadSAPLogonDataThen] 레지스트리 저장 실패:", e);
+                console.warn("[fnReadSAPLogonDataThen] registry save failed:", e);
             }
 
             // Landscape 정보 저장
@@ -760,7 +760,7 @@
             });
 
             ps.on("error", (err) => {
-                console.error("[_checkSapGuiInfoShell] PowerShell 실행 오류:", err);
+                console.error("[_checkSapGuiInfoShell] PowerShell run error:", err);
                 resolve({ SUBRC: 999, LOG: err.toString() });
             });
         });
@@ -947,7 +947,7 @@
             if (!FS.existsSync(sDir)) { FS.mkdirSync(sDir, { recursive: true }); }
             FS.writeFileSync(_viewStateFilePath(), JSON.stringify({ viewMode: sMode }, null, 2), "utf-8");
         } catch (e) {
-            console.error("[ServerList] 뷰 모드 저장 실패:", e);
+            console.error("[ServerList] view mode save failed:", e);
         }
     };
 
@@ -981,7 +981,7 @@
                 testPw: oAPP.attr._testPw || ""
             }, null, 2), "utf-8");
         } catch (e) {
-            console.error("[ServerList] 테스트 상태 저장 실패:", e);
+            console.error("[ServerList] test state save failed:", e);
         }
     }
 
@@ -1213,14 +1213,14 @@
             const e = _recentEntry(o[sUuid]);
             o[sUuid] = { ts: Date.now(), count: e.count + 1 };
             _writeRecentMap(o);
-        } catch (e) { console.error("[ServerList] 접속 이력 저장 실패:", e); }
+        } catch (e) { console.error("[ServerList] connection history save failed:", e); }
     };
     // 최근 카드에서 항목 제거(× 버튼)
     oAPP.fn.fnRemoveRecent = function (sUuid) {
         try {
             const o = _loadRecentMap();
             if (o[sUuid] != null) { delete o[sUuid]; _writeRecentMap(o); }
-        } catch (e) { console.error("[ServerList] 접속 이력 삭제 실패:", e); }
+        } catch (e) { console.error("[ServerList] connection history delete failed:", e); }
     };
     // 상대 시간 표기 — 오늘/어제 HH:MM, 그 외 MM-DD HH:MM (오늘/어제는 i18n)
     function _fmtConnTime(ts) {
@@ -2064,7 +2064,7 @@
             const RegeditPromisified = parent.require('regedit').promisified;
             await RegeditPromisified.putValue(oRegData);
         } catch (e) {
-            console.warn("[setRegistryLastSelectedNodeKey] 실패:", e);
+            console.warn("[setRegistryLastSelectedNodeKey] failed:", e);
         }
     };
 
@@ -2079,7 +2079,7 @@
             const RegeditPromisified = parent.require('regedit').promisified;
             await RegeditPromisified.putValue(oRegData);
         } catch (e) {
-            console.warn("[setRegistryLastSelectedServerKey] 실패:", e);
+            console.warn("[setRegistryLastSelectedServerKey] failed:", e);
         }
     };
 
@@ -3156,7 +3156,7 @@
                 const sCreatePath = `${sSystemPath}\\${oServerInfo.SYSID}`;
                 await _regeditCreateKey([sCreatePath]);
             } catch (e) {
-                console.warn("[_registSelectedSystemInfo] 실패:", e);
+                console.warn("[_registSelectedSystemInfo] failed:", e);
             }
             resolve();
         });
@@ -3286,7 +3286,7 @@
             await oAPP.fn.fnOnInitModeling();
             oAPP.fn.fnRefreshShellTexts();
         } catch (e) {
-            console.warn("[_saveWsLangu] 실패:", e);
+            console.warn("[_saveWsLangu] failed:", e);
         }
         oCtl.close();
         oAPP.setBusy(false);
@@ -3344,7 +3344,7 @@
             WSUTIL.setWsSettingsInfo(oSettingInfo);
             await WSUTIL.saveGlobalSettingInfo("theme", sKey);
         } catch (e) {
-            console.warn("[_saveWsThemeInfo] 실패:", e);
+            console.warn("[_saveWsThemeInfo] failed:", e);
         }
         oAPP.fn.fnApplyTheme(sKey);
         oCtl.close();
@@ -3395,7 +3395,7 @@
             WSUTIL.setWsSettingsInfo(oSettingInfo);
             await WSUTIL.saveGlobalSettingInfo("sound", sState);
         } catch (e) {
-            console.warn("[_saveWsSound] 실패:", e);
+            console.warn("[_saveWsSound] failed:", e);
         }
         oCtl.close();
         oAPP.fn.showToast(oAPP.msg.M01);
@@ -3483,7 +3483,7 @@
             const oDisp = SCREEN.getDisplayMatching(oParent);
             oWorkArea = (oDisp && oDisp.workArea) ? oDisp.workArea : null;
         } catch (e) {
-            console.error("[fnShowMainWindow] 화면 정보 조회 실패:", e);
+            console.error("[fnShowMainWindow] screen info read failed:", e);
         }
 
         for (const oBrows of aBrowserList) {
@@ -3510,7 +3510,7 @@
                 oBrows.show();
                 if (!oFirst) { oFirst = oBrows; }
             } catch (error) {
-                console.error("[fnShowMainWindow] 활성 창 이동/표시 실패:", error);
+                console.error("[fnShowMainWindow] active window move/show failed:", error);
                 continue;
             }
         }
@@ -3578,7 +3578,7 @@
                 }
             }]);
         } catch (e) {
-            console.warn("[_createTaskBarMenu] 실패(무시):", e);
+            console.warn("[_createTaskBarMenu] failed (ignored):", e);
         }
     }
 
@@ -3707,7 +3707,7 @@
             iLeft -= 1;
             if (iLeft <= 0) {
                 // 30초 경과 — 정상 종료에 응답하지 않는 MAIN 창을 강제 파기 후 종료
-                console.warn("[shutdown] 30초 경과 — 남은 MAIN 창 강제 종료");
+                console.warn("[shutdown] 30s elapsed - force closing the remaining MAIN window");
                 _forceCloseRemainMain();
                 _finish();
                 return;
@@ -3756,7 +3756,7 @@
             try {
                 oBrows.destroy();
             } catch (e) {
-                console.error("[shutdown] MAIN 창 강제 종료 실패:", e);
+                console.error("[shutdown] MAIN window force end failed:", e);
             }
         }
     }

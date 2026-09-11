@@ -1131,7 +1131,7 @@
             }
         } catch (e) {
             // 권한 모듈(파일 다이얼로그/fs/복호화) 예외는 삼키지 말고 표면화 — 다이얼로그가 조용히 멈추지 않도록.
-            console.error("[Admin DevTool] 파일 첨부 처리 오류:", e);
+            console.error("[Admin DevTool] file attach handler error:", e);
             try { parent.showMessage(null, 20, "E", String((e && e.message) || e)); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         }
 
@@ -1158,7 +1158,7 @@
             }
         } catch (e) {
             // 복호화/검증 예외는 삼키지 말고 표면화 — 다이얼로그가 조용히 멈추지 않도록.
-            console.error("[Admin DevTool] 키/파일 검증 처리 오류:", e);
+            console.error("[Admin DevTool] key/file validation handler error:", e);
             try { parent.showMessage(null, 20, "E", String((e && e.message) || e)); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         }
 
@@ -1429,7 +1429,7 @@
 
                 oAPP.fn.setPersonWinZoom("S");
 
-                zconsole.log("zoom 저장!!");
+                zconsole.log("zoom save!!");
 
             }, 500);
 
@@ -1457,7 +1457,7 @@
      ************************************************************************/
     oAPP.fn.fnAttachPowerMonitorLockScreen = () => {
 
-        console.log("----- 화면 대기모드 진입 -----");
+        console.log("----- screen idle mode enter -----");
 
         // 세션 타임아웃 체크
         oAPP.fn.fnSessionTimeoutCheck(); // #[ws_fn_03.js]
@@ -1469,7 +1469,7 @@
      ************************************************************************/
     oAPP.fn.fnAttachPowerMonitorUnLockScreen = () => {
 
-        console.log("----- 화면 대기모드 진입 해제 -----");
+        console.log("----- screen idle mode exit -----");
 
         // 이벤트를 받으면 세션 타임을 초기화 한다.
         parent.IPCMAIN.off('if-session-time', oAPP.fn.fnIpcMain_if_session_time);

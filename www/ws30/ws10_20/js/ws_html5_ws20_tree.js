@@ -113,13 +113,13 @@
     function _safeCall(sFnName, aArgs, oThis) {
         var fn = oAPP.fn && oAPP.fn[sFnName];
         if (typeof fn !== "function") {
-            console.warn("[HTML5][WS20][tree] not implemented (다음 단계 변환):", sFnName);
+            console.warn("[WS20][tree] not implemented (conversion pending):", sFnName);
             return;
         }
         try {
             return fn.apply(oThis || oAPP.fn, aArgs || []);
         } catch (e) {
-            console.warn("[HTML5][WS20][tree] call error (다음 단계 변환):", sFnName, e && e.message);
+            console.warn("[WS20][tree] call error (conversion pending):", sFnName, e && e.message);
         }
     }
 
@@ -249,7 +249,7 @@
                     //  받아야 하므로 HTML5 에서도 누른 버튼을 this 로 넘긴다.
                     oCfg.press.call(BTN);
                 } catch (e) {
-                    console.warn("[HTML5][WS20][tree] toolbar press error:", oCfg.icon, e && e.message);
+                    console.warn("[WS20][tree] toolbar press error:", oCfg.icon, e && e.message);
                 }
             });
         }
@@ -340,7 +340,7 @@
                     try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     try { oAPP.fn.designCallWizardPopup(); }
                     catch (e) {
-                        console.error("[HTML5][WS20] UI Template Wizard:", e && e.message ? e.message : e);
+                        console.error("[WS20] UI Template Wizard:", e && e.message ? e.message : e);
                         try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                         try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                     }
@@ -353,11 +353,11 @@
                 press: function () {
                     var run = function () {
                         try { oAPP.fn.fnP13nDesignPopupOpen("R"); }
-                        catch (e) { console.error("[HTML5][WS20] UI Personalization List:", e && e.message ? e.message : e); }
+                        catch (e) { console.error("[WS20] UI Personalization List:", e && e.message ? e.message : e); }
                     };
                     try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     if (typeof oAPP.fn.fnP13nDesignPopupOpen === "function") { run(); }
-                    else { try { oAPP.loadJs("fnP13nDesignPopupOpen", run); } catch (e) { console.error("[HTML5][WS20] p13n load:", e && e.message ? e.message : e); } }
+                    else { try { oAPP.loadJs("fnP13nDesignPopupOpen", run); } catch (e) { console.error("[WS20] p13n load:", e && e.message ? e.message : e); } }
                 }
             },
             { sep: true },
@@ -382,7 +382,7 @@
                 disabled: !_hasWdrPlugin(),
                 press: function () {
                     // [임시] Web Dynpro 변환 로그 미완 — 안내 토스트만(사용자 지시). TODO(i18n) + 재개 시 원본 복원.
-                    try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    try { parent.showMessage(null, 10, "I", "not implemented yet"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     return;
 
                     // try {
@@ -415,7 +415,7 @@
                         bPatch = !!(oAPP.common && oAPP.common.checkWLOList &&
                             oAPP.common.checkWLOList("C", "UHAK901369") === true);
                     } catch (e) {
-                        console.error("[WS20HELP-10] 통합 도움말 등록여부 판정 실패:", e);
+                        console.error("[WS20HELP-10] could not tell whether unified help is registered:", e);
                         try { parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                         return;
                     }
@@ -424,7 +424,7 @@
 
                         if (typeof oAPP.fn.fnU4AHelpDocuPopupOpener !== "function") {
                             //패치 서버인데 여는 기능이 없으면 구성 이상 → 구버전 도움말로 빠지지 않는다.
-                            console.error("[WS20HELP-11] 통합 도움말 여는 기능 미로드 — 구성 확인 필요.");
+                            console.error("[WS20HELP-11] unified help feature not loaded - check the build.");
                             try { parent.setBusy(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                             return;
                         }
@@ -436,12 +436,12 @@
                             var oRet = oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000272" });
                             if (oRet && typeof oRet.catch === "function") {
                                 oRet.catch(function (e) {
-                                    console.error("[WS20HELP-11] 통합 도움말 팝업 호출 실패:", e);
+                                    console.error("[WS20HELP-11] help popup open failed:", e);
                                     try { parent.setBusy(""); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
                                 });
                             }
                         } catch (e) {
-                            console.error("[WS20HELP-11] 통합 도움말 팝업 호출 실패:", e);
+                            console.error("[WS20HELP-11] help popup open failed:", e);
                             try { parent.setBusy(""); } catch (e5) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e5); } }
                         }
                         return;
@@ -452,7 +452,7 @@
                     //  ★ 이전에는 첫 인자를 null 로 넘겨, 팝업이 있어도 원본의
                     //    `if(!oUi) return;` 에 걸려 아무것도 뜨지 않았다.
                     if (typeof oAPP.fn.callTooltipsPopup !== "function") {
-                        console.error("[WS20HELP-12] 도움말 팝업 미로드 — ws_html5_call_tooltips_popup.js 로드 확인 필요.");
+                        console.error("[WS20HELP-12] help popup not loaded — ws_html5_call_tooltips_popup.js load check required.");
                         try { parent.setBusy(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                         return;
                     }
@@ -492,7 +492,7 @@
                     }
                 });
             }
-        } catch (e) { console.warn("[HTML5][WS20][tree] toolbar overflow attach 실패:", e && e.message); }
+        } catch (e) { console.warn("[WS20][tree] toolbar overflow attach failed:", e && e.message); }
 
         return BAR;
     }
@@ -512,9 +512,9 @@
                 oUndoRedo.executeHistory(sMode);
                 return;
             }
-            console.warn("[HTML5][WS20][tree] undoRedo not available:", sMode);
+            console.warn("[WS20][tree] undoRedo not available:", sMode);
         } catch (e) {
-            console.warn("[HTML5][WS20][tree] executeHistory error:", sMode, e && e.message);
+            console.warn("[WS20][tree] executeHistory error:", sMode, e && e.message);
         }
     }
 
@@ -652,7 +652,7 @@
                     //   → 전역 미리보기-포커스 닫기 로직이 갓 뜬 메뉴를 즉시 제거했다(표시 직후 닫힘).
                     //   특정 UI 예외가 아니라 공통 흐름을 원본과 동일 순서로 되돌린다.
                     try { await _safeCall("setSelectTreeItem", [sObjid]); }
-                    catch (err) { console.warn("[HTML5][WS20][tree] ctx select 실패(메뉴는 계속 표시):", err && err.message); }
+                    catch (err) { console.warn("[WS20][tree] context select failed (menu still shown):", err && err.message); }
                     await new Promise(function (res) { setTimeout(res, 0); });
                     if (oAPP.fn.fnWs20ShowTreeContextMenu) { oAPP.fn.fnWs20ShowTreeContextMenu(n, iX, iY); }
                 });
@@ -720,7 +720,7 @@
                 oTree.scrollToKey(String(OBJID));
             }
         } catch (e) {
-            console.error("[HTML5][WS20][tree] 선택 줄 스크롤 이동 오류:", e && e.message);
+            console.error("[WS20][tree] scroll-to-selected-row error:", e && e.message);
         }
     };
 
@@ -846,16 +846,16 @@
                 try {
                     await oAPP.fn.fnWs20SelectUI(oNode.OBJID);
                 } catch (e) {
-                    console.warn("[HTML5][WS20][tree] fnWs20SelectUI error:", e && e.message);
+                    console.warn("[WS20][tree] fnWs20SelectUI error:", e && e.message);
                 }
             } else if (typeof oAPP.fn.setSelectTreeItem === "function") {
                 try {
                     await oAPP.fn.setSelectTreeItem(oNode.OBJID);
                 } catch (e) {
-                    console.warn("[HTML5][WS20][tree] setSelectTreeItem error (속성패널 W4 / 미변환):", e && e.message);
+                    console.warn("[WS20][tree] setSelectTreeItem error (property panel W4 / not converted):", e && e.message);
                 }
             } else {
-                console.warn("[HTML5][WS20][tree] setSelectTreeItem not implemented (W4 예정)");
+                console.warn("[WS20][tree] setSelectTreeItem not implemented (W4 pending)");
             }
 
             // 바인딩 팝업 라인 선택 — 원본은 이 클릭 핸들러에서 부르던 것을 주석 처리하고(uiDesignArea.js 64~66)
@@ -866,7 +866,7 @@
                 try {
                     oAPP.fn.selectBindingPopupOBJID(oNode);
                 } catch (e) {
-                    console.warn("[HTML5][WS20][tree] selectBindingPopupOBJID error (미리보기 W2 / 미변환):", e && e.message);
+                    console.warn("[WS20][tree] selectBindingPopupOBJID error (preview W2 / not converted):", e && e.message);
                 }
             }
         } finally {
@@ -1275,7 +1275,7 @@
         try {
             oAPP.fn.fnRenderDesignTree();
         } catch (e) {
-            console.warn("[HTML5][WS20][tree] uiDesignArea render error:", e && e.message);
+            console.warn("[WS20][tree] uiDesignArea render error:", e && e.message);
         }
 
     }; // end of [OVERRIDE] oAPP.fn.uiDesignArea
@@ -1299,13 +1299,13 @@
                 try {
                     oAPP.fn.fnRenderDesignTree();
                 } catch (e) {
-                    console.warn("[HTML5][WS20][tree] refresh→render error:", e && e.message);
+                    console.warn("[WS20][tree] refresh→render error:", e && e.message);
                 }
                 return r;
             };
             oModel.__ws20TreeHooked = true;
         } catch (e) {
-            console.warn("[HTML5][WS20][tree] model refresh hook error:", e && e.message);
+            console.warn("[WS20][tree] model refresh hook error:", e && e.message);
         }
     }; // end of fnHookWs20TreeModelRefresh
 
@@ -1332,7 +1332,7 @@
         try {
             oAPP.fn.uiDesignArea(oAPP.attr.ui && oAPP.attr.ui.ws20 && oAPP.attr.ui.ws20.tree);
         } catch (e) {
-            console.warn("[HTML5][WS20][tree] fnRenderWs20Shell→uiDesignArea error:", e && e.message);
+            console.warn("[WS20][tree] fnRenderWs20Shell→uiDesignArea error:", e && e.message);
         }
 
     }; // end of [OVERRIDE] oAPP.fn.fnRenderWs20Shell

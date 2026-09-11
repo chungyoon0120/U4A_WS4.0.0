@@ -56,7 +56,7 @@ export async function start(require, IF_DATA, fnCallback){
     if (APP.isPackaged) {
         // LIBPATH 없음 = 필수 의존성 없음 → 오류코드로 표면화하고 중단(throw → 오프너 fnUI5PreCssPopupOpener 의 catch 가 busy 해제).
         if (typeof IF_DATA.SERVER_BOOT_PATH !== "string" || IF_DATA.SERVER_BOOT_PATH === "") {
-            console.error("[UCSS-001] start: USER_INFO.META.LIBPATH 없음 — 서버 UI5 부트 경로를 만들 수 없어 팝업을 열지 않음.");
+            console.error("[UCSS-001] start: USER_INFO.META.LIBPATH missing - cannot build the server UI5 boot path; popup not opened.");
             throw new Error("[UCSS-001] LIBPATH missing");
         }
         IF_DATA.WS30_BOOT_PATH = IF_DATA.SERVER_HOST + IF_DATA.SERVER_BOOT_PATH;

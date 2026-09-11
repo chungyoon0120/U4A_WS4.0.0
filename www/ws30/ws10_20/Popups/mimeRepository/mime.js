@@ -64,16 +64,16 @@
                 var _i = _sp.indexOf("?");
                 if (_i >= 0) { _sp = _sp.slice(0, _i) + " (뒤쪽 정보는 가림)"; }
 
-                U4ALOG.error("서버통신 실패 상세", "보낸 곳: " + _sp);
+                U4ALOG.error("서버통신 실패 상세", "sent to: " + _sp);
 
                 var x = oXhrLike || null;
 
                 if (!x) {
-                    U4ALOG.error("서버통신 실패 상세", "서버 응답 자체가 없음 (연결이 끊겼거나 서버에 못 닿음)");
+                    U4ALOG.error("서버통신 실패 상세", "no response at all (connection dropped or server unreachable)");
                     return;
                 }
 
-                U4ALOG.error("서버통신 실패 상세", "서버 상태: "
+                U4ALOG.error("서버통신 실패 상세", "http status: "
                     + ((typeof x.status === "number") ? x.status : "-")
                     + (x.statusText ? (" " + x.statusText) : ""));
 
@@ -82,7 +82,7 @@
                         var _aMark = ["sap-err-id", "u4a_status", "content-type"];
                         for (var _k = 0; _k < _aMark.length; _k++) {
                             var _v = x.getResponseHeader(_aMark[_k]);
-                            if (_v) { U4ALOG.error("서버통신 실패 상세", "응답표시 " + _aMark[_k] + ": " + _v); }
+                            if (_v) { U4ALOG.error("서버통신 실패 상세", "response header " + _aMark[_k] + ": " + _v); }
                         }
                     }
                 } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
@@ -94,13 +94,13 @@
                     if (!_sBody) {
                         _sBody = "(서버가 아무 내용도 안 줬음)";
                     } else if (_sBody.length > 4000) {
-                        _sBody = _sBody.slice(0, 4000) + " …(뒤 " + (_sBody.length - 4000) + "자 잘림)";
+                        _sBody = _sBody.slice(0, 4000) + " ...(" + (_sBody.length - 4000) + " more chars truncated)";
                     }
 
-                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용: " + _sBody);
+                    U4ALOG.error("서버통신 실패 상세", "response body: " + _sBody);
 
                 } catch (e3) {
-                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용을 못 읽음: " + e3);
+                    U4ALOG.error("서버통신 실패 상세", "response body unreadable: " + e3);
                 }
 
             } catch (e) {
@@ -118,23 +118,23 @@
             } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
-        _ajaxLog("보냈음", "");
+        // 보낼 때는 안 남긴다 — 끝날 때 한 줄에 다 담는다 (2026-09-10)
 
         var xhr = new XMLHttpRequest();
         var sMeth = (meth || "POST").toString().toUpperCase();
         var bBlob = (bIsBlob === "X" || bIsBlob === true);
         xhr.withCredentials = true;
-        try { xhr.open(sMeth, sPath, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _ajaxFail("요청을 시작 못 함 — " + (e && e.message ? e.message : e), null); if (typeof fn_error === "function") { fn_error(e); } return; }
+        try { xhr.open(sMeth, sPath, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _ajaxFail("cannot start the request - " + (e && e.message ? e.message : e), null); if (typeof fn_error === "function") { fn_error(e); } return; }
         if (bBlob) { xhr.responseType = "blob"; }
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== 4) { return; }
             if (xhr.status === 200 || xhr.status === 201) {
-                _ajaxLog("끝남", "성공");
+                _ajaxLog("끝남", "성공 (상태 " + ((typeof xhr !== "undefined" && xhr && xhr.status) ? xhr.status : "-") + ")");
                 try {
                     if (bBlob) { fn_success(xhr.response); }
                     else { fn_success(JSON.parse(xhr.response)); }
                 } catch (e) {
-                    console.error("[HTML5][MIME] 응답 파싱 오류:", e && e.message);
+                    console.error("[MIME] response parse error:", e && e.message);
                     if (typeof fn_error === "function") { fn_error(e); }
                 }
             } else {
@@ -142,7 +142,7 @@
                 if (typeof fn_error === "function") { fn_error(xhr); }
             }
         };
-        try { xhr.send(oFormData || null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _ajaxFail("요청을 못 보냄 — " + (e && e.message ? e.message : e), null); if (typeof fn_error === "function") { fn_error(e); } }
+        try { xhr.send(oFormData || null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _ajaxFail("cannot send the request - " + (e && e.message ? e.message : e), null); if (typeof fn_error === "function") { fn_error(e); } }
     }
 
     // ── 로컬 헬퍼 ─────────────────────────────────────────────────
@@ -269,7 +269,7 @@
                 oUI.treeCtrl.rerender(false);
                 return;
             }
-        } catch (e) { console.error("[HTML5][MIME] 트리 렌더 오류:", e && e.message); }
+        } catch (e) { console.error("[MIME] tree render error:", e && e.message); }
         try { if (oUI && oUI.tree) { oUI.tree.render(); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
     }
 
@@ -732,7 +732,7 @@
             if (oUI && oUI.pdf && oUI.pdf.contentWindow) {
                 oUI.pdf.contentWindow.postMessage({ __u4apdf: true, hostId: C_PDFHOST, cmd: "open", data: ab }, "*", [ab]);
             }
-        } catch (e) { console.error("[HTML5][MIME] pdf post error:", e); }
+        } catch (e) { console.error("[MIME] pdf post error:", e); }
     }
 
     function lf_showPdf(oBlob) {
@@ -1009,7 +1009,7 @@
             if (sKey === "K4") { lf_deleteObject(n); return; }       // 오브젝트 삭제
             if (sKey === "K5") { lf_openImport(n); return; }         // 마임 오브젝트 가져오기
             if (sKey === "K6") { lf_downloadObject(n); return; }     // 마임 오브젝트 다운로드
-        } catch (e) { console.error("[HTML5][MIME] 컨텍스트 메뉴 오류:", sKey, e); }
+        } catch (e) { console.error("[MIME] context menu error:", sKey, e); }
     }
 
     /************************************************************************
@@ -1025,7 +1025,7 @@
         if (!oNode) { return; }
         lf_closeCreateFolder();                 // 혹시 떠있던 이전 팝업 정리
         lf_buildCreateFolder(oNode);            // ★ 매번 새로 생성(재사용 안 함 → 재오픈 안 되던 버그 제거)
-        try { oCrUI.dlg.showModal(); } catch (e) { console.error("[HTML5][MIME] 폴더생성 showModal:", e); }
+        try { oCrUI.dlg.showModal(); } catch (e) { console.error("[MIME] folder create showModal error:", e); }
         setTimeout(function () { try { if (oCrUI) { oCrUI.nameField.focus(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
     }
 
@@ -1153,7 +1153,7 @@
                 oAPP.fn.fnCtsPopupOpener(function (oResult) {
                     if (oResult && oResult.TRKORR) { _doCreate(oResult.TRKORR); }
                 });
-            } catch (e) { console.error("[HTML5][MIME] CTS open:", e); }
+            } catch (e) { console.error("[MIME] CTS open:", e); }
         }
 
         function lf_crSuccess(oResult) {
@@ -1193,7 +1193,7 @@
      ************************************************************************/
     oAPP.fn.fnCtsPopupOpener = function (fnCallback) {
         if (typeof oAPP.fn.fnCtsPopupOpen !== "function") {
-            console.error("[HTML5][MIME] CTS 모듈 미로드(fnCtsPopupOpen.js)");
+            console.error("[MIME] CTS module not loaded(fnCtsPopupOpen.js)");
             return;
         }
         oAPP.fn.fnCtsPopupOpen(fnCallback, {
@@ -1284,7 +1284,7 @@
                 oAPP.fn.fnCtsPopupOpener(function (oRes) {
                     if (oRes && oRes.TRKORR) { _doDeleteObject(oNode, oRes.TRKORR); }
                 });
-            } catch (e) { console.error("[HTML5][MIME] CTS open(delete):", e); }
+            } catch (e) { console.error("[MIME] CTS open(delete):", e); }
         }
 
         lf_busy(true);
@@ -1339,7 +1339,7 @@
         if (!oNode) { return; }
         lf_closeImport();
         lf_buildImport(oNode);
-        try { oImpUI.dlg.showModal(); } catch (e) { console.error("[HTML5][MIME] import showModal:", e); }
+        try { oImpUI.dlg.showModal(); } catch (e) { console.error("[MIME] import showModal:", e); }
     }
 
     function lf_closeImport() {
@@ -1578,7 +1578,7 @@
                 oAPP.fn.fnCtsPopupOpener(function (oResult) {
                     if (oResult && oResult.TRKORR) { _doImport(oResult.TRKORR); }
                 });
-            } catch (e) { console.error("[HTML5][MIME] CTS open:", e); }
+            } catch (e) { console.error("[MIME] CTS open:", e); }
         }
 
         function lf_impSuccess(oResult) {
@@ -1679,7 +1679,7 @@
             p = DIALOG.showOpenDialog(oAPP.CURRWIN, {
                 title: sTitle, defaultPath: sDefault, properties: ["openDirectory", "dontAddToRecent"]
             });
-        } catch (e) { console.error("[HTML5][MIME] download dialog:", e); return; }
+        } catch (e) { console.error("[MIME] download dialog:", e); return; }
 
         Promise.resolve(p).then(function (oPaths) {
             if (!oPaths || oPaths.canceled || !oPaths.filePaths || !oPaths.filePaths.length) { return; }
@@ -1692,14 +1692,14 @@
                 try {
                     var buf = B.from(ev.target.result);
                     FS.writeFile(sFilePath, buf, {}, function (err) {
-                        if (err) { console.error("[HTML5][MIME] download write:", err); return; }
+                        if (err) { console.error("[MIME] download write:", err); return; }
                         try { SHELL.showItemInFolder(sFilePath); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 저장 폴더에서 파일 보이기
                     });
-                } catch (e) { console.error("[HTML5][MIME] download buffer:", e); }
+                } catch (e) { console.error("[MIME] download buffer:", e); }
             };
-            reader.onerror = function () { console.error("[HTML5][MIME] download read 실패"); };
+            reader.onerror = function () { console.error("[MIME] download read failed"); };
             reader.readAsArrayBuffer(oBlob);
-        }).catch(function (e) { console.error("[HTML5][MIME] download:", e); });
+        }).catch(function (e) { console.error("[MIME] download:", e); });
     }
 
     /************************************************************************

@@ -190,7 +190,7 @@
         var o; try { o = JSON.parse(JSON.stringify(oAPP.oDesign.types.TY_BUSY_OPTION)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } o = { TITLE: "", DESC: "" }; }
         o.DESC = _wsc(code); return o;
     }
-    function _safe(fn) { try { return fn(); } catch (e) { console.error("[HTML5][WS20][dnd]", e); } }
+    function _safe(fn) { try { return fn(); } catch (e) { console.error("[WS20][dnd]", e); } }
     // 부모에 추가되지 않는 UI(UA026) 여부 — 미리보기 index 카운트(_cnt) 계산용. (S_CODE 미로드 가드)
     function _isUa026(uilib) {
         try { var a = oAPP.attr.S_CODE && oAPP.attr.S_CODE.UA026; return !!(a && a.findIndex(function (item) { return item.FLD01 === uilib; }) !== -1); }
@@ -435,7 +435,7 @@
             _sRes.RETCD = "E";
             // ★ BR61: 문구 조회가 실패하면 안내가 통째로 사라진다 → 삼키지 말고 표면화(code.md 규칙).
             try { _sRes.RTMSG = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "001", tOBJID); }
-            catch (e) { console.error("[HTML5][WS20][chkAggrRelation] 안내 문구 조회 실패(001):", e && e.message ? e.message : e); }
+            catch (e) { console.error("[WS20][chkAggrRelation] notice text read failed (001):", e && e.message ? e.message : e); }
             return _fin();
         }
         var lt_0027 = (_LIB.T_0027 || []).filter(function (a) { return a.TGOBJ === sUIOBK && a.TOBTY !== "1"; });
@@ -464,7 +464,7 @@
                     : parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "003");
             } catch (e) {
                 // ★ BR61: 위와 같은 이유로 표면화(문구가 비면 붙여넣기 실패 사유가 화면에 안 뜬다).
-                console.error("[HTML5][WS20][chkAggrRelation] 안내 문구 조회 실패(002/003):", e && e.message ? e.message : e);
+                console.error("[WS20][chkAggrRelation] notice text read failed (002/003):", e && e.message ? e.message : e);
             }
             return _fin();
         }
@@ -772,7 +772,7 @@
             "prevAmSerialChartCompositeDraw", "prevAmSerialChartDraw", "prevAmPieChartDraw"];
         for (var i = 0; i < aFns.length; i++) {
             if (typeof oAPP.fn[aFns[i]] === "function") {
-                var bStop; try { bStop = oAPP.fn[aFns[i]](UIOBK, OBJID); } catch (e) { console.error("[HTML5][WS20][dnd] prevDrawExceptionUi", e); }
+                var bStop; try { bStop = oAPP.fn[aFns[i]](UIOBK, OBJID); } catch (e) { console.error("[WS20][dnd] prevDrawExceptionUi", e); }
                 if (bStop) { return; }
             }
         }
@@ -796,7 +796,7 @@
             try {
                 var sPath = oAPP.oDesign && oAPP.oDesign.pathInfo && oAPP.oDesign.pathInfo.bindPopupBroadCast;
                 if (sPath) { parent.require(sPath)("UPDATE-DESIGN-DATA"); }
-            } catch (e) { console.error("[HTML5][WS20] updateBindPopupDesignData:", e && e.message); }
+            } catch (e) { console.error("[WS20] updateBindPopupDesignData:", e && e.message); }
         };
     }
 
@@ -936,7 +936,7 @@
             var ls_0022 = oAPP.DATA.LIB.T_0022.find(function (a) { return a.UIOBK === l_UIOBK && a.ISDEP !== "X" && a.ISSTP !== "X"; });
             if (!ls_0022 || !is_0023) { lf_setChildDone(); return; }
             try { await oAPP.fn.designAddUIObject(ls_drop, ls_0022, is_0023, l_cnt, _isPresetAttr); }
-            catch (e) { console.error("[HTML5][WS20] insert drop add:", e && e.message ? e.message : e); }
+            catch (e) { console.error("[WS20] insert drop add:", e && e.message ? e.message : e); }
             lf_setChildDone();
         }
 
@@ -1057,12 +1057,12 @@
             // ⑦ $OTR: alias 서버조회로 T_OTR 보강(원본 lf_getOTRtext 6149).
             //    미리보기(uiPreviewArea.js 1118)가 T_OTR 로 $OTR 텍스트를 해석하므로 삽입 전 필요.
             try { await _fetchP13nOtr(is_data); }
-            catch (e) { console.error("[HTML5][WS20][designAddTreeData] getOTRTextsAlias", e); }
+            catch (e) { console.error("[WS20][designAddTreeData] getOTRTextsAlias", e); }
 
             // ⑧ 재구성(OBJID 재채번=삽입후재귀 → 형제중복 없음) + 미리보기 + 후처리
             //    (원본 lf_setPasteCopiedData + lf_paste_cb 1:1, 바인딩/서버이벤트 값 제외 필터 포함).
             try { await _applyP13nPattern(is_data, is_drop, param); }
-            catch (e) { console.error("[HTML5][WS20][designAddTreeData] applyPaste", e); }
+            catch (e) { console.error("[WS20][designAddTreeData] applyPaste", e); }
             _done();
         }, l_pos.x, l_pos.y, function (sRes) {
             // ★ BR61: 취소/후보없음 사유를 원본과 동일하게 안내한다.
@@ -1075,7 +1075,7 @@
             if (sRes && sRes.RETCD === "E") {
                 var _KIND = (sRes.RCODE === "02") ? 20 : 10;
                 try { parent.showMessage(null, _KIND, "I", sRes.RTMSG); }
-                catch (e) { console.error("[HTML5][WS20][designAddTreeData] 붙여넣기 불가 안내:", e && e.message ? e.message : e); }
+                catch (e) { console.error("[WS20][designAddTreeData] paste blocked notice:", e && e.message ? e.message : e); }
             }
             _done();
         });
@@ -1667,7 +1667,7 @@
         if (typeof midFn === "function") { _safe(midFn); }
         _safe(function () { aRte = R.renderingRichTextEditor(rteNode) || []; });
         if (oPromise) {
-            try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[HTML5][WS20][dnd] rerender", e); }
+            try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[WS20][dnd] rerender", e); }
         }
         try { await Promise.all(aRte); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }

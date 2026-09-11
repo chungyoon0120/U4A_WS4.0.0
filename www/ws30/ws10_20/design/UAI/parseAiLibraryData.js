@@ -178,7 +178,7 @@ module.exports = async function(sAiParams){
     }
     
     
-    console.log(`[AI] - 추가 대상 OBJID : ${_sAppData?.sParent?.OBJID}`);
+    console.log(`[AI] - add target OBJID : ${_sAppData?.sParent?.OBJID}`);
 
     
     //aggregation 선택 팝업 및 확인 팝업 호출에 대한 로직 처리.

@@ -191,7 +191,7 @@
         oAPP.fn.fnSetEditorData(oSaveData);
 
         // 어플리케이션 정보에 변경 플래그
-        try { parent.setAppChange(res.IS_CHAG); } catch (e) { console.error("[HTML5][editor] setAppChange 오류:", e && e.message); }
+        try { parent.setAppChange(res.IS_CHAG); } catch (e) { console.error("[editor] setAppChange error:", e && e.message); }
 
         // 저장으로 변경분 발생 → WS20 헤더 Active→Inactive 반영(클라이언트 에디터 lf_cb 와 동일 처리).
         //   setAppInfo 가 글로벌 oAppInfo 에 ACTST="I"/IS_CHAG="X" 를 세팅했으므로 헤더만 다시 그린다.
@@ -269,7 +269,7 @@
                     if (oPrevWin && typeof oPrevWin.setCSSSource === "function") {
                         oPrevWin.setCSSSource(oSaveData.DATA);
                     }
-                } catch (e) { console.error("[HTML5][editor] CS 라이브 프리뷰 오류:", e && e.message); }
+                } catch (e) { console.error("[editor] CSS live preview error:", e && e.message); }
                 break;
         }
 

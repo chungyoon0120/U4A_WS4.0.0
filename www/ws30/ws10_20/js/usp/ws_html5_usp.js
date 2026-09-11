@@ -132,7 +132,7 @@
             if (rec.raf) { return; }
             rec.raf = requestAnimationFrame(function () {
                 rec.raf = 0;
-                try { fnCb(); } catch (e) { console.error("[HTML5][WS30] resize cb error:", sKey, e); }
+                try { fnCb(); } catch (e) { console.error("[WS30] resize cb error:", sKey, e); }
             });
         }
         try {
@@ -143,7 +143,7 @@
                 rec.winFn = _schedule;
                 window.addEventListener("resize", rec.winFn);
             }
-        } catch (e) { console.error("[HTML5][WS30] observeResize error:", sKey, e); }
+        } catch (e) { console.error("[WS30] observeResize error:", sKey, e); }
         oAPP.attr.uspObservers[sKey] = rec;
     }
 
@@ -183,7 +183,7 @@
                 parser.write(res_data);
                 parser.end();
             } catch (e) {
-                console.error("[HTML5][WS30] _uspMultiPart error:", e);
+                console.error("[WS30] _uspMultiPart error:", e);
                 resolve({ RETCD: "E" });
             }
         });
@@ -247,11 +247,11 @@
     function _ws30MenuSelect(it) {
         var fn = oAPP.fn["fnWS30" + it.key] || oAPP.fn["fnWS10" + it.key];
         if (typeof fn === "function") {
-            try { fn(); } catch (e) { console.error("[HTML5][WS30] menu " + it.key + " error:", e); }
+            try { fn(); } catch (e) { console.error("[WS30] menu " + it.key + " error:", e); }
             return;
         }
-        console.warn("[HTML5][WS30] menu not implemented:", it.key);
-        try { oAPP.common.fnShowFloatingFooterMsg("I", "WS30", (it.text || it.key) + " — 변환 예정"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        console.warn("[WS30] menu not implemented:", it.key);
+        try { oAPP.common.fnShowFloatingFooterMsg("I", "WS30", (it.text || it.key) + " — conversion pending"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -270,17 +270,17 @@
 
         BTN.addEventListener("click", function () {
             if (typeof oCfg.evFn === "function") {
-                try { oCfg.evFn(); } catch (e) { console.error("[HTML5][WS30] tx action error:", oCfg.id, e); }
+                try { oCfg.evFn(); } catch (e) { console.error("[WS30] tx action error:", oCfg.id, e); }
                 return;
             }
             if (oCfg.ev) {
                 var fn = oAPP.events && oAPP.events[oCfg.ev];
                 if (typeof fn !== "function") {
-                    console.warn("[HTML5][WS30] transaction action not implemented:", oCfg.ev);
-                    try { oAPP.common.fnShowFloatingFooterMsg("I", "WS30", (oCfg.text || oCfg.tooltip || oCfg.ev) + " — 변환 예정"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    console.warn("[WS30] transaction action not implemented:", oCfg.ev);
+                    try { oAPP.common.fnShowFloatingFooterMsg("I", "WS30", (oCfg.text || oCfg.tooltip || oCfg.ev) + " — conversion pending"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     return;
                 }
-                try { fn(); } catch (e) { console.error("[HTML5][WS30] transaction action error:", oCfg.ev, e); }
+                try { fn(); } catch (e) { console.error("[WS30] transaction action error:", oCfg.ev, e); }
             }
         });
         return BTN;
@@ -301,7 +301,7 @@
         B.title = sTip || "";
         B.innerHTML = '<span class="u4aWs30TreeTbIcon">' + _fa(sFa) + "</span>";
         B.addEventListener("click", function () {
-            try { fnPress(); } catch (e) { console.error("[HTML5][WS30] tree toolbar:", sFa, e); }
+            try { fnPress(); } catch (e) { console.error("[WS30] tree toolbar:", sFa, e); }
         });
         return B;
     }
@@ -350,9 +350,9 @@
         NEWWIN.innerHTML = _fa("window-restore");
         NEWWIN.addEventListener("click", function () {
             if (oAPP.events && typeof oAPP.events.ev_NewWindow === "function") {
-                try { oAPP.events.ev_NewWindow(); return; } catch (e) { console.error("[HTML5][WS30] ev_NewWindow error:", e); }
+                try { oAPP.events.ev_NewWindow(); return; } catch (e) { console.error("[WS30] ev_NewWindow error:", e); }
             }
-            console.warn("[HTML5][WS30] ev_NewWindow not available");
+            console.warn("[WS30] ev_NewWindow not available");
         });
         HDR.appendChild(NEWWIN);
 
@@ -382,7 +382,7 @@
             oAPP.fn.fnKillUserSession(oBackAppInfo, lf_success);
 
         } catch (e) {
-            console.error("[HTML5][WS30] _doBackToWs10 error:", e);
+            console.error("[WS30] _doBackToWs10 error:", e);
             try { oAPP.common.fnNaviRelease(); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         }
 
@@ -436,7 +436,7 @@
                 oAPP.common.fnNaviRelease();
 
             } catch (e) {
-                console.error("[HTML5][WS30] _doBackToWs10 lf_success error:", e);
+                console.error("[WS30] _doBackToWs10 lf_success error:", e);
                 try { oAPP.common.fnNaviRelease(); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
             }
         }
@@ -488,7 +488,7 @@
             ]);
         } else {
             // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(CANCEL=머무름).
-            console.error("[USP-001] 되돌아가기 확인: 공통 fnConfirmBox 미로드 — 확인창 표시 불가. message:", sMsg);
+            console.error("[USP-001] go-back confirm: common fnConfirmBox not loaded - blocked. message:", sMsg);
             _uspBackCb("CANCEL");
         }
     }
@@ -513,7 +513,7 @@
             if (typeof fnSave === "function") {
                 oAPP.common.fnSetBusyLock("X");
                 try { fnSave({ ISBACK: "X" }); return; }   // 저장→이동: 락 유지(이동 완료 시 해제)
-                catch (e) { oAPP.common.fnSetBusyLock(""); try { oAPP.common.fnNaviRelease(); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } console.error("[HTML5][WS30] save(ISBACK):", e); }
+                catch (e) { oAPP.common.fnSetBusyLock(""); try { oAPP.common.fnNaviRelease(); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } console.error("[WS30] save(ISBACK):", e); }
             }
             // 저장 미구현(2차) — 이동하지 않고 머무름 → 페이지이동 락 해제 + 안내.
             try { oAPP.common.fnNaviRelease(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -569,7 +569,7 @@
         // 파일 → SPATH 로 브라우저 실행.
         try { oAPP.fn.fnExeBrowser(oUspData.SPATH); }
         catch (e) {
-            console.error("[HTML5][WS30] Application Execution(fnExeBrowser):", e);
+            console.error("[WS30] Application Execution(fnExeBrowser):", e);
             oAPP.common.fnShowFloatingFooterMsg("E", "WS30", sMsg);
         }
     }
@@ -583,13 +583,13 @@
     function _uspControllerClass() {
         var oAppInfo = _model("/WS30/APP");
         try { oAPP.common.execControllerClass(null, null, null, oAppInfo); }
-        catch (e) { console.error("[HTML5][WS30] Controller(Class Builder):", e); }
+        catch (e) { console.error("[WS30] Controller(Class Builder):", e); }
     }
 
     // MIME Repository (Ctrl+Shift+F12) — 버튼과 동일한 일반 핸들러(ev_pressMimeBtn → fnMimeWindowOpener) 호출.
     function _uspMime() {
         var fn = oAPP.events && oAPP.events.ev_pressMimeBtn;
-        if (typeof fn === "function") { try { fn(); } catch (e) { console.error("[HTML5][WS30] MIME:", e); } }
+        if (typeof fn === "function") { try { fn(); } catch (e) { console.error("[WS30] MIME:", e); } }
     }
 
     // Code Editor Pretty Print (Shift+F1) — 에디터 모듈 핸들러 위임(가드는 그쪽이 소유).
@@ -686,7 +686,7 @@
     function _uspEvalScript(sScript) {
         try { eval(sScript); }
         catch (e) {
-            console.error("[HTML5][WS30] save SCRIPT eval error:", e);
+            console.error("[WS30] save SCRIPT eval error:", e);
             try { oAPP.common.fnSetBusyLock(""); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         }
     }
@@ -1678,7 +1678,7 @@
 
         var aUspData = oResult.USPDATA;
         if (!Array.isArray(aUspData)) {
-            console.error("[HTML5][WS30] download: USPDATA type error");
+            console.error("[WS30] download: USPDATA type error");
             oAPP.common.fnSetBusyLock(""); return;
         }
 
@@ -1687,7 +1687,7 @@
             var AdmZip = parent.require("adm-zip");
             oZip = new AdmZip();
         } catch (e) {
-            console.error("[HTML5][WS30] adm-zip load error:", e);
+            console.error("[WS30] adm-zip load error:", e);
             oAPP.common.fnSetBusyLock(""); return;
         }
 
@@ -1705,7 +1705,7 @@
                 } else {
                     oZip.addFile(sEntry, parent.Buffer.from(String(o.CONTENT || ""), "utf8"));
                 }
-            } catch (e) { console.error("[HTML5][WS30] zip add error:", sEntry, e); }
+            } catch (e) { console.error("[WS30] zip add error:", sEntry, e); }
         }
 
         var sAppId = ((_model("/WS30/APP") || {}).APPID || "usp").toLowerCase();
@@ -1720,7 +1720,7 @@
         var REMOTE = parent.REMOTE, FS = parent.FS, PATH = parent.PATH;
         var APPRT = (REMOTE && REMOTE.app), SHELL = (REMOTE && REMOTE.shell);
         if (!REMOTE || !FS || !PATH) {
-            console.error("[HTML5][WS30] download: node resource(parent.REMOTE/FS/PATH) unavailable");
+            console.error("[WS30] download: node resource(parent.REMOTE/FS/PATH) unavailable");
             oAPP.common.fnSetBusyLock(""); return;
         }
 
@@ -1733,7 +1733,7 @@
         };
         var oP;
         try { oP = REMOTE.dialog.showOpenDialog(REMOTE.getCurrentWindow(), oOpts); }
-        catch (e) { console.error("[HTML5][WS30] showOpenDialog error:", e); oAPP.common.fnSetBusyLock(""); return; }
+        catch (e) { console.error("[WS30] showOpenDialog error:", e); oAPP.common.fnSetBusyLock(""); return; }
 
         oP.then(function (oPaths) {
             if (!oPaths || oPaths.canceled || !oPaths.filePaths || !oPaths.filePaths.length) {
@@ -1757,11 +1757,11 @@
                     oAPP.common.fnSetBusyLock("");
                 });
             } catch (e) {
-                console.error("[HTML5][WS30] zip write error:", e);
+                console.error("[WS30] zip write error:", e);
                 oAPP.common.fnSetBusyLock("");
             }
         }, function (e) {
-            console.error("[HTML5][WS30] download dialog error:", e);
+            console.error("[WS30] download dialog error:", e);
             oAPP.common.fnSetBusyLock("");
         });
     }
@@ -1787,7 +1787,7 @@
             try { oAPP.common.fnShowFloatingFooterMsg("W", "WS30", _msgWs("031")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // Only in activity state !!!
             return;
         }
-        try { if (oAPP.fn.fnExeBrowser) { oAPP.fn.fnExeBrowser(oNode.SPATH); } } catch (e) { console.error("[HTML5][WS30] test service error:", e); }
+        try { if (oAPP.fn.fnExeBrowser) { oAPP.fn.fnExeBrowser(oNode.SPATH); } } catch (e) { console.error("[WS30] test service error:", e); }
     };
 
     // Activate (구 ev_pressActivateBtn = 저장 + IS_ACT)
@@ -1915,7 +1915,7 @@
         if (e && e.repeat === true) { return; }
         try { if (parent.getCurrPage && parent.getCurrPage() !== "WS30") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { fn(e); } catch (err) { console.error("[HTML5][WS30] shortcut:", err); }
+        try { fn(e); } catch (err) { console.error("[WS30] shortcut:", err); }
     }
 
     var _getShortCutList_super = oAPP.common.getShortCutList;
@@ -2154,7 +2154,7 @@
             else if (navigator.clipboard) { navigator.clipboard.writeText(sUrl || ""); }
             // 토스트(구 MessageToast) — MIME URL Copy 와 동일 메시지(MSG_WS 303 = Clipboard Copy Success!).
             try { parent.showMessage(null, 10, "S", _msgWs("303")); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
-        } catch (e) { console.error("[HTML5][WS30] url copy error:", e); }
+        } catch (e) { console.error("[WS30] url copy error:", e); }
     }
 
     // Change(편집) 모드 여부 — /WS30/APP/IS_EDIT
@@ -2175,7 +2175,7 @@
                 oApp.IS_CHAG = "X";
                 APPCOMMON.fnSetModelProperty("/WS30/APP", oApp);
             }
-        } catch (e) { console.error("[HTML5][WS30] field change:", e); }
+        } catch (e) { console.error("[WS30] field change:", e); }
     }
 
     // 날짜/시간 표시 포맷 통일 (SAP raw: YYYYMMDD→YYYY-MM-DD, HHMMSS→HH:MM:SS). 형식 안 맞으면 원문.
@@ -2426,7 +2426,7 @@
         var oPages = oUi.pages || {};
         var oWS30 = (oPages && oPages.WS30) || document.getElementById("WS30");
         if (!oWS30) {
-            console.warn("[HTML5][WS30] #WS30 container not found — shell 미초기화");
+            console.warn("[WS30] #WS30 container not found — shell init");
             return;
         }
 
@@ -2470,7 +2470,7 @@
             if (oAPP.ws10html && typeof oAPP.ws10html.buildMenubar === "function") {
                 MAIN.appendChild(oAPP.ws10html.buildMenubar(_getWindowMenuWS30(), _ws30MenuSelect));
             }
-        } catch (e) { console.error("[HTML5][WS30] menubar build error:", e); }
+        } catch (e) { console.error("[WS30] menubar build error:", e); }
 
         // 앱 헤더 + 트랜잭션 툴바
         MAIN.appendChild(_buildUspAppHeader());
@@ -2603,7 +2603,7 @@
     oAPP.fn.fnOnMoveToPage = function (sPgNm) {
         if (typeof _fnOnMoveToPage_super === "function") { _fnOnMoveToPage_super(sPgNm); }
         if (sPgNm === "WS30") {
-            try { oAPP.fn.fnRenderUspShell(); } catch (e) { console.error("[HTML5][WS30] fnOnMoveToPage render error:", e); }
+            try { oAPP.fn.fnRenderUspShell(); } catch (e) { console.error("[WS30] fnOnMoveToPage render error:", e); }
             // ★ WS30 단축키 등록은 "여기" — 셸(트리/패널) 동기 렌더 직후, WS30 진입마다 항상 실행되는
             //   지점. (진입부 fnOnEnterDispChangeMode 에선 등록 안 함: 화면 그리기 전 등록 금지 원칙.
             //    에디터 _releaseBusy 는 노드 선택 전엔 안 불려 부적합.) removeShortCut 선행 = 멱등(재진입
@@ -2613,8 +2613,8 @@
                     oAPP.common.removeShortCut("WS30");
                     oAPP.common.setShortCut("WS30");
                 }
-            } catch (e) { console.error("[HTML5][WS30] setShortCut(WS30):", e); }
-            try { oAPP.fn.fnMoveToWs30(); } catch (e) { console.error("[HTML5][WS30] fnMoveToWs30 error:", e); }
+            } catch (e) { console.error("[WS30] setShortCut(WS30):", e); }
+            try { oAPP.fn.fnMoveToWs30(); } catch (e) { console.error("[WS30] fnMoveToWs30 error:", e); }
         }
     };
 
@@ -2649,7 +2649,7 @@
             // Critical Error → 10번 강제 이동
             if (oResult.RETCD === "Z") {
                 oAPP.common.fnSetBusyLock("");
-                try { oAPP.fn.fnCriticalErrorWs30(oResult); } catch (e) { console.error("[HTML5][WS30] critical:", e); }
+                try { oAPP.fn.fnCriticalErrorWs30(oResult); } catch (e) { console.error("[WS30] critical:", e); }
                 return;
             }
 
@@ -2675,14 +2675,14 @@
             // 트리 렌더 (ws_html5_usp_tree.js)
             try {
                 if (typeof oAPP.fn.fnRenderUspTree === "function") { oAPP.fn.fnRenderUspTree(); }
-            } catch (e) { console.error("[HTML5][WS30] fnRenderUspTree error:", e); }
+            } catch (e) { console.error("[WS30] fnRenderUspTree error:", e); }
 
             // 화면 처음 로딩 시 초기 레이아웃 (구 fnOnInitLayoutSettingsWs30, ws_fn_02.js:795):
             //   트리 전체 접기 + 최상위 루트 폴더 자동 선택(구 ev_getRootNodeRowsUpdated).
             //   → 초기 화면은 루트만 접힌 채 선택된 상태(하위 펼침 아님). busy 는 루트 선택 콜백이 해제.
             try { _uspInitLayout(); }
             catch (e) {
-                console.error("[HTML5][WS30] _uspInitLayout error:", e);
+                console.error("[WS30] _uspInitLayout error:", e);
                 oAPP.common.fnSetBusyLock("");
             }
         }
@@ -2751,7 +2751,7 @@
             var reader = new FileReader();
             reader.onload = function () { resolve({ RETCD: "S", RDATA: reader.result }); };
             reader.onerror = function (error) {
-                console.error("[HTML5][WS30] _fnLineSelectCb Blob→Text 변환 오류", error);
+                console.error("[WS30] _fnLineSelectCb Blob→Text convert error", error);
                 var sErrMsg = "";
                 try { sErrMsg = (oAPP.msg.M348 || "") + "\n\n" + (oAPP.msg.M228 || ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 resolve({ RETCD: "E", RTMSG: sErrMsg });
@@ -2775,7 +2775,7 @@
                 }
             }
         } catch (error) {
-            console.error("[HTML5][WS30] _getUspMultiPartData 오류", error);
+            console.error("[WS30] _getUspMultiPartData error", error);
             var sErrMsg2 = "";
             try { sErrMsg2 = (oAPP.msg.M348 || "") + "\n\n" + (oAPP.msg.M228 || ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             try { oAPP.fn.fnCriticalErrorWs30({ RTMSG: sErrMsg2 }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -2798,7 +2798,7 @@
                 oParsed = JSON.parse(sJsonResult);
             }
         } catch (error) {
-            console.error("[HTML5][WS30] _fnLineSelectCb JSON Parse 오류", error);
+            console.error("[WS30] _fnLineSelectCb JSON Parse error", error);
             var sErrMsg3 = "";
             try { sErrMsg3 = (oAPP.msg.M348 || "") + "\n\n" + (oAPP.msg.M228 || ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             try { oAPP.fn.fnCriticalErrorWs30({ RTMSG: sErrMsg3 }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -2894,7 +2894,7 @@
                 oAPP.common.fnSetBusyLock("");
             }
         } catch (e) {
-            console.error("[HTML5][WS30] editorLoadSelected error:", e);
+            console.error("[WS30] editorLoadSelected error:", e);
             oAPP.common.fnSetBusyLock("");
         }
     }

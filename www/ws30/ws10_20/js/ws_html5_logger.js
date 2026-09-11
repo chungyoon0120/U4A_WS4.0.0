@@ -8,21 +8,23 @@
  *   AI 가 로그만 보고 원인을 짚으려면 줄 모양이 매번 같아야 한다.
  *   기준 = .works/로그수집전송/02_로그설계표준.md
  *
- * 줄 모양
- *   [등급] [창] [화면] [추적ID] 무슨 일 | 대상 | 결과 | 걸린 시간
- *   예) [알림] [메인] [화면목록] [A7F3] 눌렀음 | 편집 | 화면 이동 시작
+ * 줄 모양 (2026-09-10 — 로그 글은 전부 영어. 장군님 지시)
+ *   [LEVEL] [window] [screen] [traceId] EVENT | target | result | elapsed @ file:line fn()
+ *   예) [INFO] [U4A Workspace - Main] [WS20] [A7F3] CLICK | 저장 @ www/…/ws_events.js:120 onSave()
+ *
+ *   · 버튼 이름 같은 **화면에 실제로 적힌 글자**는 그대로 둔다. 번역하면 소스에서 못 찾는다.
  *
  * 어떻게 파일에 남나
  *   기존 로그 라이브러리가 창의 console 을 갈아끼워 두었다.
  *   그래서 여기서 console 을 부르면 그대로 로그 파일에 쌓인다. 새로 만든 통로가 아니다.
  *
- * 쓰는 법
+ * 쓰는 법 (부르는 쪽은 한국어 이름 그대로 — 아래 표가 영어로 바꿔 준다)
  *   U4ALOG.setWindow('메인');            // 창 이름 (창마다 한 번)
  *   U4ALOG.setScreen('화면목록');         // 화면이 바뀔 때마다
  *   var sTrace = U4ALOG.newTrace();      // 사용자가 뭔가 시작할 때
- *   U4ALOG.action('눌렀음', '편집', '화면 이동 시작');
- *   U4ALOG.server('보냈음', '화면정보 조회', '성공', 810);
- *   U4ALOG.error('터짐', '없는 값을 꺼내 씀: 화면정보', oError);
+ *   U4ALOG.action('눌렀음', '편집', '');                         // → CLICK | 편집
+ *   U4ALOG.server('끝남', 'getAppData #3', 'OK (status 200)', 810);   // → DONE | …
+ *   U4ALOG.error('터짐', 'appInfo is undefined', oError);        // → ERROR | … | thrown at …
  ****************************************************************************************/
 
 (function (global) {
@@ -91,9 +93,9 @@
 
         try { bInFrame = (window.top !== window); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bInFrame = true; }
 
-        if (!sTop) { return bInFrame ? '틀 안 화면' : '창'; }
+        if (!sTop) { return bInFrame ? '(iframe)' : '(window)'; }
 
-        return bInFrame ? (sTop + ' 안') : sTop;
+        return bInFrame ? (sTop + ' > iframe') : sTop;
 
     }
 
@@ -175,9 +177,16 @@
                 s2 = s2.slice(0, s2.length - sTail.length);
             }
 
-            // .../app.asar/www/... → www/...  (설치한 앱)
+            /**
+             * .../app.asar/www/ws30/ws10_20/js/x.js → js/x.js (2026-09-11 - 장군님 지시)
+             * 우리 파일은 거의 다 www/ws30/ws10_20/ 아래다. 늘 같은 앞머리를 줄마다 넣을 이유가 없다.
+             * 파일 이름만 있으면 소스에서 바로 찾는다.
+             */
             var m = s2.match(/(?:app\.asar[\\/])?(www[\\/].+)$/);
-            if (m) { return m[1].replace(/\\/g, '/') + sTail; }
+
+            if (m) {
+                return m[1].replace(/\\/g, '/').replace(/^www\/ws30\/ws10_20\//, '') + sTail;
+            }
 
             // 그 외에는 파일 이름만
             var m2 = s2.match(/([^\\/]+\.(?:js|html))$/);
@@ -297,6 +306,67 @@
     }
 
     /* ================================================================= */
+    /* 뼈대 말을 영어 고정어로 (2026-09-10 추가 — 장군님 지시)
+    /* -----------------------------------------------------------------
+    /* 왜
+    /*   · 등급이 고정 영어면 걸러내기가 확실하다(ERROR 만 뽑기 등).
+    /*   · 로그 라이브러리가 붙이는 등급과 우리 등급이 같은 뜻으로 두 번 나오던 것을 맞춘다.
+    /*
+    /* 어디까지
+    /*   등급과 '무슨 일' 만 바꾼다. **대상 이름과 설명은 한국어 그대로** —
+    /*   버튼 이름은 화면에 한글로 적혀 있으므로 그대로 두는 것이 맞다.
+    /*
+    /* 부르는 쪽은 안 고친다
+    /*   여기 한 곳에서만 바꾸므로 화면 코드는 한 글자도 안 건드린다.
+    /* ================================================================= */
+    var LEVEL_EN = {
+        '참고': 'DEBUG',   // 평소엔 쓸모없지만 오류 직전 기록으로는 값어치가 있는 것
+        '알림': 'INFO',
+        '주의': 'WARN',
+        '오류': 'ERROR',
+        '치명': 'FATAL'
+    };
+
+    var WHAT_EN = {
+        // 사용자 조작
+        '눌렀음': 'CLICK',
+        '골랐음': 'SELECT',
+        // 서버 통신
+        '보냈음': 'REQ',
+        '받았음': 'RESP',
+        '끝남': 'DONE',
+        '서버 응답': 'RESP_SHAPE',
+        '서버통신 실패 상세': 'REQ_FAIL',
+        '접속 서버': 'SERVER',
+        // 화면·창
+        '화면 이동': 'NAV',
+        '창 열림': 'WIN_READY',
+        '별창 열림': 'WIN_OPEN',
+        '별창 닫힘': 'WIN_CLOSE',
+        '창끼리 신호 보냄': 'MSG_SEND',
+        '창끼리 신호 받음': 'MSG_RECV',
+        // 오류
+        '터짐': 'EXCEPTION',
+        '화면 코드가 터짐': 'SCRIPT_ERROR',
+        '처리되지 않은 비동기 실패': 'UNHANDLED_REJECT',
+        '잡고 넘어감': 'CAUGHT',
+        '화면 요소를 못 찾음': 'DOM_MISS',
+        '값이 없어 그만둠': 'GUARD_EXIT',
+        // 2026-09-10 추가
+        '늦어짐': 'SLOW',
+        '반복': 'REPEAT',
+        '안 끝난 요청': 'PENDING'
+    };
+
+    function _levelEn(s) {
+        return LEVEL_EN[s] || s;
+    }
+
+    function _whatEn(s) {
+        return WHAT_EN[s] || s;   // 표에 없으면 그대로 둔다(뜻을 잃지 않게)
+    }
+
+    /* ================================================================= */
     /* 한 줄 만들기
     /* ================================================================= */
     function _buildLine(sLevel, sWhat, sTarget, sResult, iElapsedMs, bWithGap, bNoAt) {
@@ -321,12 +391,22 @@
             _sTraceId = _makeTraceId();
         }
 
-        aCol.push('[' + sLevel + ']');
-        aCol.push('[' + (_sWindowName || '창미상') + ']');
-        aCol.push('[' + (_sScreenName || '화면미상') + ']');
+        aCol.push('[' + _levelEn(sLevel) + ']');
+        aCol.push('[' + (_sWindowName || 'unknown-window') + ']');
+
+        /**
+         * 화면 이름이 창 이름과 같으면 안 붙인다 (2026-09-11 - 장군님 지시)
+         * 실측: [U4A Workspace #Main] [U4A Workspace #Main] 처럼 같은 글자가 두 번 나왔다.
+         * 로그는 고객사 PC 용량이다. 같은 말을 두 번 쓰지 않는다.
+         */
+        if (_sScreenName && _sScreenName !== _sWindowName) {
+            aCol.push('[' + _sScreenName + ']');
+        }
+
         aCol.push('[' + _sTraceId + ']');
 
-        var sBody = sWhat || '';
+        // 뼈대 말만 영어로. 대상·설명은 한국어 그대로 (2026-09-10)
+        var sBody = _whatEn(sWhat || '');
 
         if (sTarget) {
             sBody += ' | ' + sTarget;
@@ -337,24 +417,29 @@
         }
 
         if (typeof iElapsedMs === 'number' && iElapsedMs >= 0) {
-            sBody += ' | ' + (iElapsedMs / 1000).toFixed(1) + '초';
+            sBody += ' | ' + (iElapsedMs / 1000).toFixed(1) + 's';
         }
 
         // 앞 조작과의 간격 — 사용자 조작에만 붙인다
         if (bWithGap && _iLastActionAt) {
             var iGap = Date.now() - _iLastActionAt;
-            sBody += ' | 앞 조작 ' + (iGap / 1000).toFixed(1) + '초 뒤';
+            sBody += ' | +' + (iGap / 1000).toFixed(1) + 's since last action';
         }
 
         var sLine = aCol.join(' ') + ' ' + sBody;
 
         if (sLine.length > MAX_LINE) {
-            sLine = sLine.slice(0, MAX_LINE) + ' …(줄이 길어 잘림)';
+            sLine = sLine.slice(0, MAX_LINE) + ' ...(truncated)';
         }
 
         // ★그 줄을 남긴 코드 자리 — 이게 있어야 AI 가 소스를 바로 연다(2026-09-08)
         //   단, 이미 자리를 밝힌 줄에는 두 번 붙이지 않는다.
-        if (!bNoAt) {
+        /**
+         * 코드 자리는 **오류·경고·참고 줄에만** 붙인다 (2026-09-11 - 장군님 지시)
+         * 정상 줄(CLICK/NAV/DONE)은 버튼 이름과 화면 이름만으로 그 자리를 찾을 수 있다.
+         * 줄마다 40~60바이트씩 먹던 것을 정상 흐름에서는 뺀다.
+         */
+        if (!bNoAt && sLevel !== '알림') {
 
             var sAt = _callSite();
 
@@ -386,6 +471,7 @@
                 return;
             }
 
+            // '참고' 도 파일에는 남는다. 다만 등급이 낮아 골라내기 쉽다(2026-09-10)
             console.log(sLine);
 
         } catch (e) {
@@ -453,20 +539,20 @@
 
             var oParent = el.parentElement;
 
-            if (!oParent) { return '이름 없는 버튼'; }
+            if (!oParent) { return '(unnamed control)'; }
 
             var iIndex = Array.prototype.indexOf.call(oParent.children, el) + 1;
             var sParentName = _nameOf(oParent);
 
             if (sParentName) {
-                return '이름 없는 버튼 (' + sParentName + ' 안 ' + iIndex + '번째)';
+                return '(unnamed control #' + iIndex + ' inside ' + sParentName + ')';
             }
 
-            return '이름 없는 버튼 (' + iIndex + '번째)';
+            return '(unnamed control #' + iIndex + ')';
 
         } catch (e) {
             if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
-            return '이름 없는 버튼';
+            return '(unnamed control)';
         }
 
     }
@@ -570,11 +656,11 @@
 
             }
 
-            aOut.push(oBusy ? ('로딩표시 ' + (bOn ? '켜짐' : '꺼짐')) : '로딩표시 (없는 화면)');
+            aOut.push(oBusy ? ('busy=' + (bOn ? 'on' : 'off')) : 'busy=n/a');
 
         } catch (e) {
             if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
-            aOut.push('로딩표시 (못 읽음)');
+            aOut.push('busy=unreadable');
         }
 
         // ② 위에 덮여 열려 있는 창이 몇 개인가 — 로딩 표시는 창이 아니므로 뺀다
@@ -588,11 +674,11 @@
                 if (aOpen[i].id !== BUSY_ID) { iCnt++; }
             }
 
-            aOut.push('떠 있는 창 ' + iCnt + '개');
+            aOut.push('openDialogs=' + iCnt);
 
         } catch (e) {
             if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
-            aOut.push('떠 있는 창 (못 읽음)');
+            aOut.push('openDialogs=unreadable');
         }
 
         // ③ 지금 초점이 어디에 있나 — 이름만 남긴다(입력한 값은 안 남긴다)
@@ -600,11 +686,11 @@
 
             var oFocus = document.activeElement;
             var sFocus = oFocus ? (_nameOf(oFocus) || (oFocus.tagName || '').toLowerCase()) : '';
-            aOut.push('초점 ' + (sFocus || '(없음)'));
+            aOut.push('focus=' + (sFocus || 'none'));
 
         } catch (e) {
             if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
-            aOut.push('초점 (못 읽음)');
+            aOut.push('focus=unreadable');
         }
 
         return aOut.join(' / ');
@@ -652,7 +738,7 @@
             var sType = (oHit.getAttribute('type') || '').toLowerCase();
 
             if (sType === 'checkbox' || sType === 'radio') {
-                sResult = oHit.checked ? '켬' : '끔';
+                sResult = oHit.checked ? 'checked' : 'unchecked';
             }
 
         }
@@ -725,15 +811,19 @@
              * 앞서는 오류를 '잡은' 자리가 붙어, 한 줄만 봐서는 어디가 터졌는지 몰랐다.
              */
             var sCrash = _crashSite(oError);
-            var sResult = sCrash ? ('터진 자리 ' + sCrash) : '';
+            var sResult = sCrash ? ('thrown at ' + sCrash) : '';
 
-            _write('오류', _buildLine('오류', sWhat, sTarget, sResult, -1, false));
+            /**
+             * 터진 자리를 이미 붙였으면 뒤에 또 안 붙인다 (2026-09-11 - 장군님 지시)
+             * 앞서는 'thrown at x.js:29 fn()' 뒤에 '@ x.js:29 fn()' 이 또 붙어 같은 자리가 두 번 나왔다.
+             */
+            _write('오류', _buildLine('오류', sWhat, sTarget, sResult, -1, false, !!sCrash));
 
             if (oError && oError.stack) {
-                _write('오류', '        난 자리:\n' + _shortStack(oError.stack));
+                _write('오류', '        stack:\n' + _shortStack(oError.stack));
             }
 
-            _write('오류', '        그때 화면: ' + _screenState());
+            _write('오류', '        state: ' + _screenState());
 
         },
 
@@ -789,17 +879,23 @@
                 } else if (oError) {
                     sMsg = String(oError);
                 } else {
-                    sMsg = '(내용 없는 오류)';
+                    sMsg = '(error with no message)';
                 }
 
-                var sTarget = (sWhere ? (sWhere + ' — ') : '') + sMsg;
-                var sResult = sAt ? ('터진 자리 ' + sAt) : '';
+                var sTarget = (sWhere ? (sWhere + ' - ') : '') + sMsg;
+                var sResult = sAt ? ('thrown at ' + sAt) : '';
 
                 if (iCnt > CAUGHT_FIRST) {
-                    sResult += (sResult ? ' | ' : '') + iCnt + '번째';
+                    sResult += (sResult ? ' | ' : '') + 'occurrence #' + iCnt;
                 }
 
-                _write('주의', _buildLine('주의', '잡고 넘어감', sTarget, sResult, -1, false, !!sAt));
+                /**
+                 * '참고' 등급으로 내린다 (2026-09-10 — 장군님 지시)
+                 * 여기 걸리는 것 대부분이 '일단 해 보고 안 되면 다른 길로 가는' 정상 흐름이라
+                 * '주의' 로 남기면 로그만 봤을 때 문제가 계속 나는 것처럼 보인다.
+                 * 다만 진짜 오류 직전 기록으로는 값어치가 있어 지우지는 않는다.
+                 */
+                _write('참고', _buildLine('참고', '잡고 넘어감', sTarget, sResult, -1, false, !!sAt));
 
             } catch (e) {
                 if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
@@ -835,7 +931,7 @@
             _write('치명', _buildLine('치명', sWhat, sTarget, '', -1, false));
 
             if (oError && oError.stack) {
-                _write('치명', '        난 자리: ' + oError.stack);
+                _write('치명', '        stack: ' + oError.stack);
             }
 
         },
@@ -849,12 +945,45 @@
             _write('알림', _buildLine('알림', sWhat, sTarget, sResult, -1, true));
             _iLastActionAt = Date.now();
 
+            /**
+             * ★앱 본체에도 알린다 (2026-09-10 — 장군님이 실측으로 잡아 주심)
+             * -------------------------------------------------------------
+             * 무엇이 잘못됐었나
+             *   크래시 보고서의 「마지막 조작」 칸이 **틀린 값**으로 나왔다.
+             *   실측(2026-09-10 15:05): 보고서는 로그인 화면의 '청윤' 을 가리키는데,
+             *   로그에는 그 뒤 '테스트'·'개발툴' 을 더 누른 것이 남아 있었다.
+             *   죽은 것은 '개발툴' 을 누른 지 5.5초 뒤다.
+             *
+             * 왜 그랬나
+             *   앱 본체는 화면이 보내 주는 신호로만 「마지막 조작」 을 갱신한다.
+             *   그런데 이 파일(화면 쪽 로그 함수)이 올라와 있는 화면에서는
+             *   그 신호를 보내던 자리가 **자기 일이 아니라고 판단해 그냥 빠져나간다**
+             *   (electron/lib/log/ws_error_hook.js 의 중복 방지 조건).
+             *   결과: 로그 파일에는 남는데 보고서 머리에는 안 올라온다.
+             *
+             * 그래서 여기서 직접 알린다. 안 되면 조용히 넘어간다 — 로그는 이미 남았다.
+             */
+            try {
+
+                var IPC = require('electron').ipcRenderer;
+
+                IPC.send('u4a-log:last-action', {
+                    action: String(sWhat || '') + ' | ' + String(sTarget || ''),
+                    screenName: _detectScreenName(),
+                    windowName: _detectWindowName(),
+                    traceId: _sTraceId || ''
+                });
+
+            } catch (e) {
+                // 앱 본체에 못 알려도 화면은 계속 간다.
+            }
+
         },
 
         /** 서버에 보내고 받는 자리 */
         server: function (sWhat, sTarget, sResult, iElapsedMs) {
 
-            var sLevel = (sResult && String(sResult).indexOf('실패') === 0) ? '오류' : '알림';
+            var sLevel = (sResult && String(sResult).indexOf('FAILED') === 0) ? '오류' : '알림';
             _write(sLevel, _buildLine(sLevel, sWhat, sTarget, sResult, iElapsedMs, false));
 
         },
@@ -946,23 +1075,26 @@
 
             var sKey = sHow + '|' + sWhat;
 
-            if (!_oMissCount[sKey]) { _oMissCount[sKey] = 0; }
-            _oMissCount[sKey]++;
+            /**
+             * ★같은 이름은 딱 한 번만 남긴다 (2026-09-11 - 장군님 지시)
+             * -------------------------------------------------------------
+             * 앞서는 처음 3번 + 500번마다 남겼다. 그런데 이 줄은 대부분
+             * "그 화면엔 원래 없는 요소" 다 - 몇 번을 더 남겨도 새 정보가 0이다.
+             * 실측(2026-09-10 로그): 서로 다른 id 8개가 17줄을 차지했다.
+             * 한 번만 남겨도 "그 화면에 그 id 가 없다" 는 사실은 그대로 남는다.
+             */
+            if (_oMissCount[sKey]) { return; }
 
-            var iCnt = _oMissCount[sKey];
-
-            if (iCnt > CAUGHT_FIRST && (iCnt % CAUGHT_EVERY) !== 0) {
-                return;
-            }
+            _oMissCount[sKey] = 1;
 
             var sAt = _callSite();
-            var sResult = sAt ? ('찾은 자리 ' + sAt) : '';
+            var sResult = sAt ? ('looked up at ' + sAt) : '';
 
-            if (iCnt > CAUGHT_FIRST) {
-                sResult += (sResult ? ' | ' : '') + iCnt + '번째';
-            }
-
-            _write('주의', _buildLine('주의', '화면 요소를 못 찾음', sHow + ' ' + sWhat, sResult, -1, false, !!sAt));
+            /**
+             * '참고' 등급으로 내린다 (2026-09-10 — 장군님 지시)
+             * 이 앱은 화면마다 있는 요소가 다르다. "그 화면이 아니면 없는 게 맞는" 경우가 대부분이다.
+             */
+            _write('참고', _buildLine('참고', '화면 요소를 못 찾음', sHow + ' ' + sWhat, sResult, -1, false, !!sAt));
 
         } catch (e) {
             // 로그 때문에 화면이 멈추면 안 된다.
@@ -1007,7 +1139,7 @@
 
                     var el = fnSel(sSel);
 
-                    if (!el) { _logMiss('모양', sSel); }
+                    if (!el) { _logMiss('selector', sSel); }
 
                     return el;   // 원래 동작 그대로
 
@@ -1050,7 +1182,7 @@
                 try {
 
                     if (oWin && !oWin.isDestroyed()) {
-                        U4ALOG.info('별창 닫힘', (oWin.getTitle && oWin.getTitle()) || '(이름 없음)', '');
+                        U4ALOG.info('별창 닫힘', (oWin.getTitle && oWin.getTitle()) || '(untitled)', '');
                     }
 
                 } catch (e) {

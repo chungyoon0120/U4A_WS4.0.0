@@ -133,7 +133,7 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
     var iTarget = v - 1;
     lf_close();
     try { if (typeof f_callBack === "function") { f_callBack(iTarget); } }
-    catch (e) { console.error("[HTML5][uiMovePosition] callback 수행 실패:", e && e.message); }
+    catch (e) { console.error("[uiMovePosition] callback run failed:", e && e.message); }
   }
 
   // 확인 버튼.
@@ -182,7 +182,7 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
     oDlg.showModal();
     bOpened = true;
   } catch (e) {
-    console.error("[HTML5][uiMovePosition] 팝업 열기 실패:", e && e.message);
+    console.error("[uiMovePosition] popup open failed:", e && e.message);
   }
 
   // 오픈 실패 — DOM 잔여 제거 + 잠금 해제 후 중단(화면 잠김 방지).

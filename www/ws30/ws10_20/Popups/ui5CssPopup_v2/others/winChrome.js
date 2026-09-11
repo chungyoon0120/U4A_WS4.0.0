@@ -139,7 +139,7 @@
                 // 스타일/배선 끝났으니 표시(흰 플래시 없음)
                 try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             } catch (e) {
-                console.error("[ui5CssPopup others win] 크롬 배선 오류:", e && e.message);
+                console.error("[ui5CssPopup others win] window chrome wiring error:", e && e.message);
                 try { require('@electron/remote').getCurrentWindow().show(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             }
         };

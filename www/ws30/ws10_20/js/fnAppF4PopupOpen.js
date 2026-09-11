@@ -570,7 +570,12 @@
             tr.setAttribute("data-row-idx", String(i));               // 고정/스크롤 페인 행 hover 동기 키
             tr.setAttribute("data-appid", row.APPID == null ? "" : String(row.APPID));   // 선택 동기 키
             if (oT1G.isHovered(i)) { tr.classList.add("is-hover"); }  // 렌더 시 hover 상태 반영(타이밍 경합 무관)
-            tr.addEventListener("click", function () { _selectT1(row.APPID); });
+            // ★ 드래그로 텍스트 블럭을 잡은 채 뗀 click 은 행 선택으로 치지 않는다(장군님 지시 2026-09-10)
+            //   — 블럭(복사)을 보존. plain click 만 선택 표시.
+            tr.addEventListener("click", function () {
+                if (window.U4AUI && U4AUI.isTextDragSelecting && U4AUI.isTextDragSelecting()) { return; }
+                _selectT1(row.APPID);
+            });
             tr.addEventListener("dblclick", function () { _pick(row); });
             cols.forEach(function (c) {
                 var td = _el("td", c.align === "center" ? "is-center" : null);
@@ -617,7 +622,9 @@
             oT1ScrHead.appendChild(sr);
         }
         // 선택 강조 동기 — 두 페인 각 makeVScroller getSelKey 가 보이는 행에 aria-selected 자동 부여.
-        function _selectT1(appid) { _vs1f.setSel(appid); _vs1f.refresh(); _vs1.setSel(appid); _vs1.refresh(); }
+        // ★ 클릭 선택은 재렌더(refresh) 대신 경량 강조 토글(markSel) — 드래그로 잡은 text selection(블럭)을
+        //   보존해 값 복사가 되게 한다(장군님 보고 2026-09-10, 재렌더가 셀 text node 를 갈아엎어 블럭이 사라졌음).
+        function _selectT1(appid) { _vs1f.markSel(appid); _vs1.markSel(appid); }
         function _renderT1() {
             _renderT1Head();
             _syncT1ClearBtn();
@@ -675,7 +682,7 @@
                     _busy(false);   // ★ 화면을 다 그린 "뒤"에 끈다
                 }, null, null, null, function (oErr) {
                     //  ★ 통신 자체가 실패하면 성공 콜백이 안 온다 → 여기서 안 내리면 대기 표시가 영영 안 풀린다.
-                    console.error("[APPF4-01] 앱 검색 서버 요청 실패:", oErr);
+                    console.error("[APPF4-01] app search server request failed:", oErr);
                     _busy(false);
                     _flash(); _msg("E", "[APPF4-01] " + String((oErr && oErr.message) || oErr || ""));
                 });
@@ -838,7 +845,11 @@
             if (oT2G.isHovered(idx)) { tr.classList.add("is-hover"); }   // 렌더 시 hover 상태 반영(타이밍 경합 무관)
             if (_isRoot(node)) { tr.classList.add("is-root"); }
             if (bHasKids) { tr.setAttribute("aria-expanded", bExp ? "true" : "false"); }
-            tr.addEventListener("click", function () { _selectTree(node._uid); });
+            // ★ 드래그로 텍스트 블럭을 잡은 채 뗀 click 은 행 선택으로 치지 않는다(장군님 지시 2026-09-10) — 블럭 보존.
+            tr.addEventListener("click", function () {
+                if (window.U4AUI && U4AUI.isTextDragSelecting && U4AUI.isTextDragSelecting()) { return; }
+                _selectTree(node._uid);
+            });
             tr.addEventListener("dblclick", function () { if (!_isRoot(node)) { _pick(node); } });
             cols.forEach(function (c) {
                 var td = _el("td", c.align === "center" ? "is-center" : null);
@@ -970,7 +981,8 @@
         // 고정/스크롤 페인 모두 가상스크롤 동시 세팅(토글/필터/정렬 공통 경로).
         function _setTreeRows(view, keep) { _vs2f.setRows(view, keep); _vs2.setRows(view, keep); oT2G.setNoData(view.length === 0); oT2G.sync(); }
         // 선택 강조 동기 — 두 페인 각 makeVScroller getSelKey 가 보이는 행에 aria-selected 자동 부여.
-        function _selectTree(uid) { _vs2f.setSel(uid); _vs2f.refresh(); _vs2.setSel(uid); _vs2.refresh(); }
+        // ★ 클릭 선택은 재렌더(refresh) 대신 경량 강조 토글(markSel) — 드래그로 잡은 text selection(블럭) 보존(장군님 보고 2026-09-10).
+        function _selectTree(uid) { _vs2f.markSel(uid); _vs2.markSel(uid); }
         // 전체 렌더(로드/필터/Expand·Collapse all) = 헤더(정렬/필터 표시자) 재구성 + 평탄목록을 두 페인에.
         function _renderTree() { _buildT2Head(); _syncClearAllBtn(); _setTreeRows(_flattenTree()); }
 
@@ -1061,7 +1073,7 @@
                     _busy(false);   // ★ 트리를 다 그린 "뒤"에 끈다
                 }, null, null, null, function (oErr) {
                     //  ★ 통신 실패 시 성공 콜백이 안 오므로 여기서 반드시 내린다.
-                    console.error("[APPF4-02] 패키지 계층 서버 요청 실패:", oErr);
+                    console.error("[APPF4-02] package hierarchy server request failed:", oErr);
                     _busy(false);
                     _flash(); _msg("E", "[APPF4-02] " + String((oErr && oErr.message) || oErr || ""));
                 });
@@ -1246,7 +1258,9 @@
             ".u4aAppF4Dlg .u4aAppF4Tbl td.u4aAppF4TreeCell{padding-left:calc(.375rem + var(--u4a-tree-depth,0) * var(--u4a-tree-indent-step,1rem));}",
             ".u4aAppF4TreeInner .u4a-tree__toggle i{transition:transform var(--motion) linear;}",
             ".u4aAppF4Dlg .u4aAppF4Tree tbody tr[aria-expanded=\"true\"] .u4a-tree__toggle i{transform:rotate(90deg);}",
-            ".u4aAppF4TreeLabel{overflow:hidden;text-overflow:ellipsis;}",
+            /* ★ flex:1 로 라벨이 셀의 남는 폭을 전부 차지하게 한다(장군님 지시 2026-09-10) — 라벨 옆 빈 공간이
+               flex free space(선택 시작 불가)로 남지 않아, 텍스트 옆 여백부터 드래그해도 블럭이 잡힌다. */
+            ".u4aAppF4TreeLabel{overflow:hidden;text-overflow:ellipsis;flex:1 1 auto;min-width:0;}",
             ".u4aAppF4Link{color:var(--link);font-weight:600;cursor:pointer;}",
             ".u4aAppF4Link:hover{text-decoration:underline;}",
             /* ── zebra(공통 data-odd 배경) off — 사용자 요청(눈 피로). 행 구분은 hover/선택으로만(.analy 16 §6.1 기본은 zebra). ── */

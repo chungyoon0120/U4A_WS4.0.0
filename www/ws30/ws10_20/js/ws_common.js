@@ -678,7 +678,7 @@
         if (e && e.repeat === true) { return; }                                                          // (1)
         try { if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (2)
         try { if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (3)
-        try { fnAction(e); } catch (err) { console.error("[HTML5][shortcut][" + sPage + "]", err); }
+        try { fnAction(e); } catch (err) { console.error("[shortcut][" + sPage + "]", err); }
     }; // end of oAPP.common.fnRunShortCut
 
     /************************************************************************
@@ -701,7 +701,7 @@
     oAPP.common.fnShortCutExeAvaliableCheck = () => {
 
         if (oAPP.attr.isShortcutLock === true) {
-            zconsole.log("!! isShortcutLock => true 여서 단축키 실행 불가 !! ");
+            zconsole.log("shortcut blocked: isShortcutLock=true ");
             return "X";
         }
 
@@ -714,19 +714,19 @@
         //   네비게이션 in-flight 플래그(isNaviBusy)로 대체한다. busy 가 비동기 이동 중 잠깐 풀리는
         //   구멍(저장확인창/주석처리된 busy 해제)으로 F3 연타 시 fnMoveToWs10 재진입→화면 깨짐 방지.
         if (oAPP.attr.isNaviBusy === true) {
-            zconsole.log("!! 페이지 이동 중이라 단축키 실행 불가!!");
+            zconsole.log("shortcut blocked: page is navigating");
             return "X";
         }
 
         // Busy Indicator가 실행중인지 확인
         if (parent.getBusy() == 'X') {
-            zconsole.log("!! Busy가 켜져 있어서 단축기 실행 불가!!");
+            zconsole.log("shortcut blocked: busy is on");
             return "X";
         }
 
         // [HTML5] 드롭다운 메뉴(.u4a-menu: 윈도우메뉴/오버플로/split 등)가 떠 있으면 단축키 실행 불가.
         if (document.querySelector(".u4a-menu")) {
-            zconsole.log("!! (HTML5) 메뉴가 떠 있어서 단축기 실행 불가!!");
+            zconsole.log("shortcut blocked: menu is open");
             return "X";
         }
 
@@ -736,7 +736,7 @@
             var sId = oMenuDom.id,
                 oMenu = sap.ui.getCore().byId(sId);
             if (oMenu && oMenu.bOpen) {
-                zconsole.log("!! 메뉴가 떠 있어서 단축기 실행 불가!!");
+                zconsole.log("shortcut blocked: menu is open");
                 return "X";
             }
         }
@@ -744,11 +744,11 @@
         // 현재 Dialog Popup이 실행 되어 있는지 확인. (HTML5 native <dialog open> 도 fnCheckIsDialogOpen 이 봄)
         var bIsDialogOpen = oAPP.fn.fnCheckIsDialogOpen();
         if (bIsDialogOpen) {
-            zconsole.log("!! Dialog 팝업이 떠 있어서 단축기 실행 불가!!");
+            zconsole.log("shortcut blocked: dialog is open");
             return "X";
         }
 
-        zconsole.log("!!___단축기 실행 가능__!!");
+        zconsole.log("shortcut allowed");
 
         return "";
 
@@ -859,7 +859,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -924,7 +924,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -976,7 +976,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1014,7 +1014,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1052,7 +1052,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! [F7] 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held (F7)");
                     return;
                 }
 
@@ -1103,7 +1103,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1148,7 +1148,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1186,7 +1186,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1254,7 +1254,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1285,7 +1285,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1338,7 +1338,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1601,7 +1601,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1638,7 +1638,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1675,7 +1675,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1714,7 +1714,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1759,7 +1759,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1796,7 +1796,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1842,7 +1842,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1879,7 +1879,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1915,7 +1915,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1934,6 +1934,33 @@
 
                     oFindBtn.firePress();
                 }
+            },
+            {
+                /****************************************************************************************************
+                 * [WS20] shortcut library bug — Ctrl+Shift+F11 이 Undo 로 실행되는 것 막기. (2026-09-10)
+                 ****************************************************************************************************
+                 * 단축키 라이브러리가 키 번호를 그대로 글자로 바꿔 비교한다. F11 의 키 번호는 글자 'z' 와 같아서
+                 * Ctrl+Shift+F11 이 바로 아래 Ctrl+Shift+Z(Undo) 로 인식된다.
+                 *
+                 * 그전에는 앱 본체가 F11 을 보정키 상관없이 전부 가로채(전체화면) 화면까지 도달하지 못해
+                 * 이 문제가 가려져 있었다. electron/main.js 에서 보정키 붙은 F11 을 통과시키도록 고치면
+                 * 이 조합이 화면까지 오므로 Undo 가 잘못 실행된다 → 그래서 반드시 같이 막는다.
+                 *
+                 * 라이브러리는 남이 만든 것이라 고치지 않는다. 아무 동작도 안 하는 흡수용으로 이벤트를 삼킨다.
+                 * ★순서가 핵심 — 반드시 아래 Undo 항목보다 앞에 있어야 삼킬 수 있다.
+                 ****************************************************************************************************/
+                KEY: "Ctrl+Shift+F11",
+                VISIBLE: false,
+                fn: (e) => {
+
+                    try { e.stopImmediatePropagation(); } catch (err) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); } }
+
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "Ctrl+Shift+F11", "absorbed: shortcut lib maps F11 keycode to 'z' (= Ctrl+Shift+Z Undo). no action by design");
+                    }
+
+                },
+
             },
             {
                 // KEY: "Ctrl+Z", // [WS20] UNDO
@@ -1963,7 +1990,7 @@
                     e.stopImmediatePropagation();
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2015,7 +2042,7 @@
                     e.stopImmediatePropagation();
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2089,7 +2116,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2142,7 +2169,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! [F3] 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held (F3)");
                         return;
                     }
 
@@ -2211,7 +2238,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2262,7 +2289,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2324,7 +2351,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2385,7 +2412,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2432,7 +2459,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2469,7 +2496,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2506,7 +2533,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2859,6 +2886,27 @@
     oAPP.common.fnSetCommonShortcut = function () {
 
         var oShortcut = oAPP.attr.oShortcut;
+
+        /****************************************************************************************************
+         * [창 공통] shortcut library bug — Ctrl+F8 을 누르면 창이 닫히는 것 막기. (2026-09-10)
+         ****************************************************************************************************
+         * 단축키 라이브러리가 키 번호를 그대로 글자로 바꿔 비교한다. F8 의 키 번호는 글자 'w' 와 같아서
+         * Ctrl+F8 이 Ctrl+W(브라우저 창 닫기)로 인식되어 작업 중이던 창이 그냥 닫혔다.
+         * 편집 화면에서 F8 이 "어플리케이션 실행"이라 Ctrl 을 같이 누르는 실수가 잦다.
+         *
+         * 라이브러리는 남이 만든 것이라 고치지 않는다. 대신 같은 조합을 "아무 동작도 안 하는 흡수용"으로
+         * 먼저 등록해 이벤트를 삼킨다. 기존 Ctrl+F4(저장키) 막이와 동일한 방식이다.
+         * ★등록 순서가 핵심 — 반드시 아래 창 닫기(Ctrl+W) 등록보다 앞이어야 삼킬 수 있다.
+         ****************************************************************************************************/
+        oShortcut.add("Ctrl+F8", (e) => {
+
+            try { e.stopImmediatePropagation(); } catch (err) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); } }
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "Ctrl+F8", "absorbed: shortcut lib maps F8 keycode to 'w' (= Ctrl+W close window). no action by design");
+            }
+
+        });
 
         // 새창 띄우기
         oShortcut.add("Ctrl+N", () => {
@@ -4159,6 +4207,52 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
     var _sAjaxName = String(sPath).split("?")[0].split("/").pop() || sPath;
 
     /**
+     * 서버 통신 로그 도구 (2026-09-10 — 장군님 지시로 방식 정리)
+     * -----------------------------------------------------------------
+     * 무엇이 바뀌었나
+     *  (1) 요청 하나에 세 줄 남기던 것 → **끝날 때 한 줄**
+     *      근거: 업계 표준(요청 하나당 완료 시점에 한 줄에 다 담는다).
+     *  (2) 대신 **안 끝나면** 5초/15초/30초에 한 줄씩 남긴다.
+     *      "눌렀는데 로딩이 계속 도는" 상황의 흔적이 사라지지 않게 하는 안전장치.
+     *  (4) 같은 요청이 짧은 시간에 여러 번 나가면 **묶어서 한 줄**.
+     *  (6) 진행 중 요청 목록을 들고 있다가, 뻗으면 크래시 보고서에 적힌다.
+     */
+    if (!window.__u4aReq) {
+
+        window.__u4aReq = {
+
+            live: {},          // 진행 중인 요청 (번호 → 정보)
+            burst: {},         // 짧은 시간에 반복된 요청 묶기
+            BURST_MS: 3000,    // 이 시간 안에
+            BURST_MIN: 5,      // 이만큼 넘게 같은 요청이 나가면 묶는다
+            SLOW_MS: [5000, 15000, 30000],   // 안 끝나면 알리는 시점
+
+            /** 진행 중 목록을 앱 본체에 알려 둔다 — 뻗었을 때 보고서에 적히게 */
+            report: function () {
+
+                try {
+
+                    var a = [];
+
+                    for (var k in this.live) {
+                        if (!Object.prototype.hasOwnProperty.call(this.live, k)) { continue; }
+                        a.push(this.live[k].name + " " + k + " (" + Math.round((Date.now() - this.live[k].at) / 100) / 10 + "s elapsed)");
+                    }
+
+                    var IPC = require("electron").ipcRenderer;
+                    IPC.send("u4a-log:pending", { list: a.slice(0, 20) });
+
+                } catch (e) {
+                    // 알릴 통로가 없어도 앱은 계속 간다.
+                }
+
+            }
+
+        };
+
+    }
+
+    /**
      * 요청 번호 (2026-09-08 추가)
      * 같은 요청이 한꺼번에 여러 번 나가면 응답이 뒤섞여 돌아온다(실측).
      * 번호를 붙여야 보낸 줄과 받은 줄의 짝이 맞는다.
@@ -4216,8 +4310,11 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
     function _ajaxFail(sReason, oXhrLike) {
 
-        // ① 한 줄 요약은 지금까지처럼
-        _ajaxLog("끝남", "실패: " + sReason);
+        // 진행 중 목록에서 빼고 늦어짐 알림을 끈다 (2026-09-10)
+        _ajaxFinish();
+
+        // ① 한 줄 요약 — 실패는 묶지 않는다. 하나하나 다 남긴다
+        _ajaxLog("끝남", "FAILED: " + sReason);
 
         try {
 
@@ -4226,14 +4323,14 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
             var x = oXhrLike || null;
 
             // ② 어디로 무엇을 보냈나
-            U4ALOG.error("서버통신 실패 상세", "보낸 곳: POST " + _safePath(sPath));
+            U4ALOG.error("서버통신 실패 상세", "sent to: POST " + _safePath(sPath));
 
             if (x) {
 
                 // ③ 서버가 준 상태
                 var iStatus = (typeof x.status === "number") ? x.status : "-";
                 var sStatusText = x.statusText || "";
-                U4ALOG.error("서버통신 실패 상세", "서버 상태: " + iStatus + (sStatusText ? (" " + sStatusText) : ""));
+                U4ALOG.error("서버통신 실패 상세", "http status: " + iStatus + (sStatusText ? (" " + sStatusText) : ""));
 
                 // ④ 오류를 알리는 응답 표시 값들
                 try {
@@ -4244,7 +4341,7 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
                         for (var i = 0; i < aMark.length; i++) {
                             var v = x.getResponseHeader(aMark[i]);
-                            if (v) { U4ALOG.error("서버통신 실패 상세", "응답표시 " + aMark[i] + ": " + v); }
+                            if (v) { U4ALOG.error("서버통신 실패 상세", "response header " + aMark[i] + ": " + v); }
                         }
 
                     }
@@ -4257,25 +4354,25 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
                     var sBody = "";
 
                     if (x.responseType === "blob" || x.responseType === "arraybuffer") {
-                        sBody = "(파일로 받은 응답이라 글로 못 남김)";
+                        sBody = "(binary response - cannot be logged as text)";
                     } else {
                         sBody = (x.responseText != null) ? x.responseText : (x.response != null ? String(x.response) : "");
                     }
 
                     if (!sBody) {
-                        sBody = "(서버가 아무 내용도 안 줬음)";
+                        sBody = "(server returned an empty body)";
                     } else if (sBody.length > MAX_RES_TEXT) {
-                        sBody = sBody.slice(0, MAX_RES_TEXT) + " …(뒤 " + (sBody.length - MAX_RES_TEXT) + "자 잘림)";
+                        sBody = sBody.slice(0, MAX_RES_TEXT) + " ...(" + (sBody.length - MAX_RES_TEXT) + " more chars truncated)";
                     }
 
-                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용: " + sBody);
+                    U4ALOG.error("서버통신 실패 상세", "response body: " + sBody);
 
                 } catch (e3) {
-                    U4ALOG.error("서버통신 실패 상세", "서버가 준 내용을 못 읽음: " + e3);
+                    U4ALOG.error("서버통신 실패 상세", "response body unreadable: " + e3);
                 }
 
             } else {
-                U4ALOG.error("서버통신 실패 상세", "서버 응답 자체가 없음 (연결이 끊겼거나 서버에 못 닿음)");
+                U4ALOG.error("서버통신 실패 상세", "no response at all (connection dropped or server unreachable)");
             }
 
             // ⑥ 무엇을 보냈는지 — 항목 이름만 남긴다(값은 안 남긴다)
@@ -4293,7 +4390,7 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
                     }
 
                     if (aKeys.length > 0) {
-                        U4ALOG.error("서버통신 실패 상세", "보낸 항목: " + aKeys.join(", "));
+                        U4ALOG.error("서버통신 실패 상세", "sent fields: " + aKeys.join(", "));
                     }
 
                 }
@@ -4378,24 +4475,16 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
      * 서버가 준 값의 모양을 한 줄로 (2026-09-08 추가)
      * 항목 이름 · 목록 건수 · 비어 있는 항목만 남긴다. 값은 안 남긴다.
      */
-    function _logResultShape(oRes) {
+    function _shapeOf(oRes) {
 
         try {
 
-            if (typeof U4ALOG === "undefined") { return; }
-
-            if (oRes == null) {
-                U4ALOG.warn("서버 응답", _sAjaxName + " " + _sAjaxNo, "★받은 값이 아예 없음");
-                return;
-            }
-
-            if (typeof oRes !== "object") {
-                U4ALOG.info("서버 응답", _sAjaxName + " " + _sAjaxNo, "값 하나만 옴");
-                return;
-            }
+            if (oRes == null) { return "NO VALUE AT ALL"; }
+            if (typeof oRes !== "object") { return "single scalar value"; }
 
             var aHas = [];
             var aEmpty = [];
+            var aList = [];
             var iSeen = 0;
 
             for (var k in oRes) {
@@ -4408,38 +4497,137 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
                 if (v == null || v === "") {
                     aEmpty.push(k);
                 } else if (Array.isArray(v)) {
-                    aHas.push(k + "(" + v.length + "건)");
+                    // 목록은 몇 건인지가 중요하다 - 0건이면 그게 원인일 때가 많다
+                    aList.push(k + "=" + v.length);
+                    aHas.push(k);
                     if (v.length === 0) { aEmpty.push(k); }
-                } else if (typeof v === "object") {
-                    aHas.push(k + "(묶음)");
                 } else {
                     aHas.push(k);
                 }
 
             }
 
-            var sTxt = "받은 항목: " + (aHas.length ? aHas.join(", ") : "(없음)");
+            /**
+             * ★받은 항목 이름은 개수만 (2026-09-11 - 장군님 지시)
+             * -------------------------------------------------------------
+             * 앞서는 받은 항목 이름을 전부 늘어놨다. 실측: 한 줄에 28개 이름, 500바이트.
+             * 그런데 **값이 온 항목은 원인을 짚는 데 안 쓴다.** 원인은 늘 비어 있는 쪽이다.
+             * 그래서 값이 온 것은 개수만, **비어 있는 것만 이름을 남긴다.**
+             * 목록이 몇 건인지는 그대로 남긴다 - 0건이면 그게 원인일 때가 많다.
+             */
+            var sTxt = "fields: " + aHas.length;
 
-            if (aEmpty.length > 0) {
-                sTxt += " | ★비어 있음: " + aEmpty.join(", ");
+            if (aList.length > 0) {
+                sTxt += " | lists: " + aList.join(", ");
             }
 
-            // 비어 있는 항목이 있으면 주의로, 아니면 알림으로
             if (aEmpty.length > 0) {
-                U4ALOG.warn("서버 응답", _sAjaxName + " " + _sAjaxNo, sTxt);
-            } else {
-                U4ALOG.info("서버 응답", _sAjaxName + " " + _sAjaxNo, sTxt);
+                sTxt += " | EMPTY: " + aEmpty.join(", ");
             }
+
+            return sTxt;
 
         } catch (e) {
-            // 로그 때문에 통신을 막으면 안 된다.
+            return "";
         }
 
     }
 
     var _sReqDesc = _describeRequest();
 
-    _ajaxLog("보냈음", _sReqDesc ? ("무슨 일: " + _sReqDesc) : "");
+    /**
+     * (1) 보낼 때는 로그를 안 남긴다 — 끝날 때 한 줄에 다 담는다.
+     * (2) 대신 진행 중 목록에 넣고, 안 끝나면 5초/15초/30초에 알린다.
+     * (4) 같은 요청이 짧은 시간에 반복되면 묶는다.
+     */
+    var _oReq = window.__u4aReq;
+    var _aSlowTimers = [];
+
+    // 진행 중 목록에 넣는다
+    _oReq.live[_sAjaxNo] = { name: _sAjaxName, at: _iAjaxStartAt, desc: _sReqDesc };
+    _oReq.report();
+
+    // 안 끝나면 알린다
+    (function () {
+
+        for (var _t = 0; _t < _oReq.SLOW_MS.length; _t++) {
+
+            (function (ms) {
+
+                _aSlowTimers.push(setTimeout(function () {
+
+                    try {
+
+                        if (!_oReq.live[_sAjaxNo]) { return; }   // 이미 끝났다
+
+                        if (typeof U4ALOG !== "undefined") {
+                            U4ALOG.warn("늦어짐", _sAjaxName + " " + _sAjaxNo,
+                                "no response after " + Math.round(ms / 1000) + "s"
+                                + (_sReqDesc ? (" | what: " + _sReqDesc) : ""));
+                        }
+
+                    } catch (e) { }
+
+                }, ms));
+
+            })(_oReq.SLOW_MS[_t]);
+
+        }
+
+    })();
+
+    /** 요청이 끝났을 때 정리 — 어느 갈래로 끝나든 반드시 부른다 */
+    function _ajaxFinish() {
+
+        try {
+
+            for (var i = 0; i < _aSlowTimers.length; i++) { clearTimeout(_aSlowTimers[i]); }
+            _aSlowTimers.length = 0;
+
+            delete _oReq.live[_sAjaxNo];
+            _oReq.report();
+
+        } catch (e) { }
+
+    }
+
+    /**
+     * (4) 같은 요청이 짧은 시간에 여러 번이면 묶는다.
+     * 묶을 차례면 true 를 돌려준다(그 줄은 안 남기고 세기만 한다).
+     */
+    function _isBurst(bOk) {
+
+        try {
+
+            var b = _oReq.burst[_sAjaxName];
+            var now = Date.now();
+
+            if (!b || (now - b.first) > _oReq.BURST_MS) {
+
+                // 앞 묶음이 있으면 정리해 한 줄 남긴다
+                if (b && b.n >= _oReq.BURST_MIN && typeof U4ALOG !== "undefined") {
+                    U4ALOG.info("반복", _sAjaxName,
+                        b.n + " times | ok " + b.ok + " failed " + (b.n - b.ok)
+                        + " | over " + (Math.round((b.last - b.first) / 100) / 10) + "s");
+                }
+
+                _oReq.burst[_sAjaxName] = { first: now, last: now, n: 1, ok: bOk ? 1 : 0 };
+                return false;   // 첫 건은 그대로 남긴다
+
+            }
+
+            b.n++;
+            b.last = now;
+            if (bOk) { b.ok++; }
+
+            // 정해진 횟수를 넘어서면 그때부터 묶는다(안 남김)
+            return (b.n > _oReq.BURST_MIN);
+
+        } catch (e) {
+            return false;
+        }
+
+    }
 
     /**
      * 서버 통신 시 버전, 패치 레벨 정보를 무조건 전송 -- End
@@ -4467,7 +4655,7 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         // 2026-09-08 정리 — 아래 새 서버 통신 로그로 대체(로그 두 벌 방지).
 
         // 서버 통신 로그 — 받은 것(2026-09-08 추가)
-        _ajaxLog("받았음", "상태 " + (e && e.target ? e.target.status : "-"));
+        // (1) '받았음' 은 안 남긴다 — 끝날 때 한 줄에 상태를 같이 담는다(2026-09-10)
 
         // 서버 요청 메시지 팝업 타임아웃을 죽인다.
         if (typeof iReqMsgTimeout !== "undefined") {
@@ -4541,7 +4729,7 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         if (oXHR.responseType === 'blob') {
 
             // 서버 통신 로그 — 파일 받기 성공(2026-09-08 보완, 처음에 빠뜨렸던 갈래)
-            _ajaxLog("끝남", "성공 (파일 받음)");
+            _ajaxLog("끝남", "OK (file received)");
 
             if (typeof fn_success === "function") {
                 fn_success(oXHR.response, oXHR);
@@ -4605,8 +4793,22 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
         }
 
-        // 서버 통신 로그 — 성공 확정(2026-09-08 추가)
-        _ajaxLog("끝남", "성공");
+        /**
+         * (1) 성공은 여기 한 줄에 다 담는다 (2026-09-10)
+         *   요청 이름 · 무슨 일 · 상태 · 걸린 시간 · 받은 항목 모양
+         */
+        _ajaxFinish();
+
+        if (!_isBurst(true)) {
+
+            var _sShape = _shapeOf(oResult);
+            var _sStatus = "OK (status " + ((oXHR && oXHR.status) ? oXHR.status : "-") + ")";
+
+            _ajaxLog("끝남", _sStatus
+                + (_sReqDesc ? (" | what: " + _sReqDesc) : "")
+                + (_sShape ? (" | " + _sShape) : ""));
+
+        }
 
         /**
          * 서버가 준 값의 모양을 남긴다 (2026-09-08 추가 — 장군님 지시)
@@ -4620,7 +4822,7 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
          *   항목 이름 / 목록은 몇 건인지 / 비어 있는 항목이 무엇인지.
          *   값 자체는 안 남긴다(업무 자료 보호).
          */
-        _logResultShape(oResult);
+        // (응답 모양은 위 '끝남' 한 줄에 같이 담긴다 — 따로 안 남긴다)
 
         if (typeof fn_success === "function") {
             fn_success(oResult);

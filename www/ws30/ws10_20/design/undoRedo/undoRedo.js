@@ -358,23 +358,23 @@ class CL_INSERT_UI{
 
         //파라메터 정보가 존재하는지 확인.
         if(typeof oParam === "undefined"){
-            console.error(`(undoRedo.js) CL_INSERT_UI 이력 저장 중 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_INSERT_UI history save parameter undefined`);
             return;
         }
 
         //파라메터 정보가 존재하는지 확인.
         if(oParam === null){
-            console.error(`(undoRedo.js) CL_INSERT_UI 이력 저장 중 파라메터가 null임`);
+            console.error(`(undoRedo.js) CL_INSERT_UI history save parameter null`);
             return;
         }
 
         if(Array.isArray(oParam) !== true){
-            console.error(`(undoRedo.js) CL_INSERT_UI 이력 저장 중 파라메터가 array가 아님`);
+            console.error(`(undoRedo.js) CL_INSERT_UI history save parameter array not`);
             return;
         }
 
         if(oParam.length === 0){
-            console.error(`(undoRedo.js) CL_INSERT_UI 이력 저장 중 파라메터에 데이터가 없음`);
+            console.error(`(undoRedo.js) CL_INSERT_UI history save parameter data none`);
             return;
         }
 
@@ -431,7 +431,7 @@ class CL_INSERT_UI{
         //전달받은 파라메터가 없다면 EXIT.
         if(typeof oParam?.T_INSERT_DATA === "undefined"){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 T_INSERT_DATA 파라메터가 undefined임`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during T_INSERT_DATA parameter undefined`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -446,7 +446,7 @@ class CL_INSERT_UI{
 
         if(Array.isArray(oParam.T_INSERT_DATA) !== true){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 T_INSERT_DATA 파라메터가 array가 아님`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during T_INSERT_DATA parameter array not`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -462,7 +462,7 @@ class CL_INSERT_UI{
 
         if(oParam.T_INSERT_DATA.length === 0){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 T_INSERT_DATA에 데이터가 없음`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during T_INSERT_DATA data none`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -744,22 +744,22 @@ class CL_DELETE_UI{
     static saveActionHistoryData(aTargetHist, oParam) {
 
         if(typeof oParam === "undefined"){
-            console.error(`(undoRedo.js) CL_DELETE_UI 이력 저장 중 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_DELETE_UI history save parameter undefined`);
             return;
         }
 
         if(oParam === null){
-            console.error(`(undoRedo.js) CL_DELETE_UI 이력 저장 중 파라메터가 null임`);
+            console.error(`(undoRedo.js) CL_DELETE_UI history save parameter null`);
             return;
         }
 
         if(Array.isArray(oParam) !== true){
-            console.error(`(undoRedo.js) CL_DELETE_UI 이력 저장 중 파라메터가 array가 아님`);
+            console.error(`(undoRedo.js) CL_DELETE_UI history save parameter array not`);
             return;
         }
 
         if(oParam.length === 0){
-            console.error(`(undoRedo.js) CL_DELETE_UI 이력 저장 중 파라메터에 데이터가 없음`);
+            console.error(`(undoRedo.js) CL_DELETE_UI history save parameter data none`);
             return;
         }
 
@@ -820,7 +820,7 @@ class CL_DELETE_UI{
 
         if(typeof oParam?.T_OBJID === "undefined"){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 T_OBJID 파라메터가 undefined임`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during T_OBJID parameter undefined`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -836,7 +836,7 @@ class CL_DELETE_UI{
 
         if(oParam?.T_OBJID === null){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 T_OBJID 파라메터가 null임`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during T_OBJID parameter null`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -852,7 +852,7 @@ class CL_DELETE_UI{
 
         if(Array.isArray(oParam?.T_OBJID) !== true){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 T_OBJID 파라메터가 array가 아님`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during T_OBJID parameter array not`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -868,7 +868,7 @@ class CL_DELETE_UI{
 
         if(oParam.T_OBJID?.length === 0){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 T_OBJID 파라메터에 데이터가 없음`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during T_OBJID parameter data none`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -1225,19 +1225,19 @@ class CL_MOVE_UI{
 
         //파라메터 정보가 존재하는지 확인.
         if(typeof oParam?.OBJID === "undefined"){
-            console.error(`(undoRedo.js) CL_MOVE_UI 이력 저장 중 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_MOVE_UI history save parameter undefined`);
             return;
         }
 
         //파라메터 정보가 존재하는지 확인.
         if(oParam?.OBJID === null){
-            console.error(`(undoRedo.js) CL_MOVE_UI 이력 저장 중 파라메터가 null임`);
+            console.error(`(undoRedo.js) CL_MOVE_UI history save parameter null`);
             return;
         }
 
         //파라메터 값이 존재하지 않는경우.
         if(oParam?.OBJID === ""){
-            console.error(`(undoRedo.js) CL_MOVE_UI 이력 저장 중 파라메터에 값이 없음`);
+            console.error(`(undoRedo.js) CL_MOVE_UI history save parameter value none`);
             return;
         }
 
@@ -1269,7 +1269,7 @@ class CL_MOVE_UI{
 
         if(typeof oParam?.OBJID === "undefined"){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 OBJID 파라메터가 undefined임`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during OBJID parameter undefined`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -1284,7 +1284,7 @@ class CL_MOVE_UI{
 
         if(oParam?.OBJID === null){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 OBJID 파라메터가 null임`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during OBJID parameter null`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -1299,7 +1299,7 @@ class CL_MOVE_UI{
 
         if(oParam?.OBJID === ""){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 OBJID 파라메터에 값이 없음`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during OBJID parameter value none`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -1349,34 +1349,34 @@ class CL_CHANGE_OBJID{
 
         //파라메터 정보가 존재하는지 확인.
         if(typeof oParam?.BEFORE_OBJID === "undefined"){
-            console.error(`(undoRedo.js) CL_CHANGE_OBJID 이력 저장 중 BEFORE_OBJID 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_CHANGE_OBJID history save BEFORE_OBJID parameter undefined`);
             return;
         }
 
         //파라메터 정보가 존재하는지 확인.
         if(oParam?.BEFORE_OBJID === null){
-            console.error(`(undoRedo.js) CL_CHANGE_OBJID 이력 저장 중 BEFORE_OBJID 파라메터가 null임`);
+            console.error(`(undoRedo.js) CL_CHANGE_OBJID history save BEFORE_OBJID parameter null`);
             return;
         }
 
         //파라메터 정보가 존재하는지 확인.
         if(oParam?.BEFORE_OBJID === ""){
-            console.error(`(undoRedo.js) CL_CHANGE_OBJID 이력 저장 중 BEFORE_OBJID 파라메터에 값이 없음`);
+            console.error(`(undoRedo.js) CL_CHANGE_OBJID history save BEFORE_OBJID parameter value none`);
             return;
         }
 
         if(typeof oParam?.OBJID === "undefined"){
-            console.error(`(undoRedo.js) CL_CHANGE_OBJID 이력 저장 중 OBJID 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_CHANGE_OBJID history save OBJID parameter undefined`);
             return;
         }
 
         if(oParam?.OBJID === null){
-            console.error(`(undoRedo.js) CL_CHANGE_OBJID 이력 저장 중 OBJID 파라메터가 null임`);
+            console.error(`(undoRedo.js) CL_CHANGE_OBJID history save OBJID parameter null`);
             return;
         }
 
         if(oParam?.OBJID === ""){
-            console.error(`(undoRedo.js) CL_CHANGE_OBJID 이력 저장 중 OBJID 파라메터에 값이 없음`);
+            console.error(`(undoRedo.js) CL_CHANGE_OBJID history save OBJID parameter value none`);
             return;
         }
 
@@ -1407,7 +1407,7 @@ class CL_CHANGE_OBJID{
         //파라메터 정보가 존재하는지 확인.
         if(typeof oParam?.BEFORE_OBJID === "undefined" || oParam?.BEFORE_OBJID === null || oParam?.BEFORE_OBJID === ""){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 BEFORE_OBJID 파라메터에 데이터가 없음`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during BEFORE_OBJID parameter data none`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -1422,7 +1422,7 @@ class CL_CHANGE_OBJID{
 
         if(typeof oParam?.OBJID === "undefined" || oParam?.OBJID === null || oParam?.OBJID === ""){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 OBJID 파라메터에 데이터가 없음`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during OBJID parameter data none`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -1566,17 +1566,17 @@ class CL_DRAG_DROP{
     static saveActionHistoryData(aTargetHist, oParam) {
 
         if(typeof oParam === "undefined"){
-            console.error(`(undoRedo.js) CL_DRAG_DROP 이력 저장 중 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_DRAG_DROP history save parameter undefined`);
             return;
         }
 
         if(typeof oParam?.S_DRAG === "undefined"){
-            console.error(`(undoRedo.js) CL_DRAG_DROP 이력 저장 중 S_DRAG 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_DRAG_DROP history save S_DRAG parameter undefined`);
             return;
         }
 
         if(typeof oParam?.S_DROP === "undefined"){
-            console.error(`(undoRedo.js) CL_DRAG_DROP 이력 저장 중 S_DROP 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_DRAG_DROP history save S_DROP parameter undefined`);
             return;
         }
 
@@ -1628,7 +1628,7 @@ class CL_DRAG_DROP{
 
         if(typeof oParam?.S_DRAG === "undefined"){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 S_DRAG 파라메터가 undefined임`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during S_DRAG parameter undefined`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -1644,7 +1644,7 @@ class CL_DRAG_DROP{
 
         if(typeof oParam?.S_DROP === "undefined"){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 S_DROP 파라메터가 undefined임`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during S_DROP parameter undefined`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -2001,17 +2001,17 @@ class CL_CHANGE_ATTR{
     static saveActionHistoryData(aTargetHist, aParam) {
 
         if(typeof aParam === "undefined"){
-            console.error(`(undoRedo.js) CL_CHANGE_ATTR 이력 저장 중 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_CHANGE_ATTR history save parameter undefined`);
             return;
         }
 
         if(Array.isArray(aParam) !== true){
-            console.error(`(undoRedo.js) CL_CHANGE_ATTR 이력 저장 중 파라메터가 array가 아님`);
+            console.error(`(undoRedo.js) CL_CHANGE_ATTR history save parameter array not`);
             return;
         }
 
         if(aParam.length === 0){
-            console.error(`(undoRedo.js) CL_CHANGE_ATTR 이력 저장 중 파라메터에 데이터가 없음`);
+            console.error(`(undoRedo.js) CL_CHANGE_ATTR history save parameter data none`);
             return;
         }
 
@@ -2042,7 +2042,7 @@ class CL_CHANGE_ATTR{
 
         if(typeof oParam === "undefined"){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 oParam 파라메터가 undefined임`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during oParam parameter undefined`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -2057,7 +2057,7 @@ class CL_CHANGE_ATTR{
 
         if(Array.isArray(oParam?.T_ATTR) !== true){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 T_ATTR 파라메터가 array가 아님`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during T_ATTR parameter array not`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -2072,7 +2072,7 @@ class CL_CHANGE_ATTR{
 
         if(oParam.T_ATTR.length === 0){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 T_ATTR에 데이터가 없음`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during T_ATTR data none`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -2700,32 +2700,32 @@ class CL_AI_INSERT{
 
         //파라메터 정보가 존재하는지 확인.
         if(typeof oParam?.PRCCD === "undefined"){
-            console.error(`(undoRedo.js) CL_AI_INSERT 이력 저장 중 PRCCD 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_AI_INSERT history save PRCCD parameter undefined`);
             return;
         }
 
         //파라메터 정보가 존재하는지 확인.
         if(oParam?.PRCCD === null){
-            console.error(`(undoRedo.js) CL_AI_INSERT 이력 저장 중 PRCCD 파라메터가 null`);
+            console.error(`(undoRedo.js) CL_AI_INSERT history save PRCCD parameter null`);
             return; 
         }
 
         //파라메터 정보가 존재하는지 확인.
         if(oParam?.PRCCD === ""){
-            console.error(`(undoRedo.js) CL_AI_INSERT 이력 저장 중 PRCCD 파라메터가 공백`);
+            console.error(`(undoRedo.js) CL_AI_INSERT history save: PRCCD parameter is empty`);
             return; 
         }
 
 
         //파라메터 정보가 존재하는지 확인.
         if(typeof oParam?.HIST === "undefined"){
-            console.error(`(undoRedo.js) CL_AI_INSERT 이력 저장 중 HIST 파라메터가 undefined임`);
+            console.error(`(undoRedo.js) CL_AI_INSERT history save HIST parameter undefined`);
             return;
         }
 
         //파라메터 정보가 존재하는지 확인.
         if(oParam?.HIST === null){
-            console.error(`(undoRedo.js) CL_AI_INSERT 이력 저장 중 HIST 파라메터가 null`);
+            console.error(`(undoRedo.js) CL_AI_INSERT history save HIST parameter null`);
             return; 
         }
 
@@ -2788,7 +2788,7 @@ class CL_AI_INSERT{
         //파라메터 정보가 존재하는지 확인.
         if(typeof oParam?.HIST === "undefined" || oParam?.HIST === null){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 HIST 파라메터에 데이터가 없음`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during HIST parameter data none`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
@@ -2805,7 +2805,7 @@ class CL_AI_INSERT{
         //파라메터 정보가 존재하는지 확인.
         if(typeof oParam?.PRCCD === "undefined" || oParam?.PRCCD === null || oParam?.PRCCD === ""){
 
-            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} 수행중 PRCCD 파라메터에 데이터가 없음`);
+            console.error(`(undoRedo.js)[${sEvent.PRCCD}] ${oParam.ACTCD} during PRCCD parameter data none`);
 
             //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
             parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");

@@ -83,7 +83,7 @@
     // 툴바 핸들러 호출 — 클릭한 버튼을 앵커로 넘긴다(원본 oEvent.oSource → 오류목록 팝오버 openBy 대상).
     function _call(sFn, oAnchor) {
         if (typeof oAPP.fn[sFn] === "function") {
-            try { oAPP.fn[sFn](oAnchor); } catch (e) { console.error("[HTML5][bindWindow] " + sFn + ":", e && e.message); }
+            try { oAPP.fn[sFn](oAnchor); } catch (e) { console.error("[bindWindow] " + sFn + ":", e && e.message); }
         }
     }
 
@@ -336,7 +336,7 @@
             // 바인딩 경로 링크(span — disabled 무효라 회색 클래스로). 재렌더로 새로 생기는 링크는 cell 이 live 반영.
             var aLink = document.querySelectorAll(".u4aBwpDesignPathLink");
             for (var k = 0; k < aLink.length; k++) { aLink[k].classList.toggle("u4aBwpDesignPathLink--locked", bDis); }
-        } catch (e) { console.error("[HTML5][bindWindow] designSetViewEditable DOM 토글:", e && e.message); }
+        } catch (e) { console.error("[bindWindow] designSetViewEditable DOM toggle:", e && e.message); }
     };
 
     /************************************************************************
@@ -686,7 +686,7 @@
             oAPP.fn.openSyncBindScreen(_sTree, _aList);
         } else {
             oAPP.fn.setBusyWS20Interaction(false);   // 미배선 방어 — busy 잔류 금지.
-            console.warn("[HTML5][bindWindow] onSynchronizionBind: 동일속성 화면(openSyncBindScreen) 미배선.");
+            console.warn("[bindWindow] onSynchronizionBind: same-property screen (openSyncBindScreen) wiring.");
         }
     };
 
@@ -1052,7 +1052,7 @@
                 oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("221") });
                 var _fnDrop = function () {
                     try { oAPP.fn.dropDesignArea(_prc002); }
-                    catch (e) { console.error("[HTML5][bindWindow] dropDesignArea:", e && e.message); }
+                    catch (e) { console.error("[bindWindow] dropDesignArea:", e && e.message); }
                     finally { oAPP.fn.setBusyWS20Interaction(false, {}); }
                 };
                 if (typeof requestAnimationFrame === "function") {
@@ -1065,7 +1065,7 @@
             //   중단 분기는 _onDesignDrop 안에서 setBusyWS20Interaction(false,{})로 OFF(원본 1290/1309).
             oAPP.fn.setBusyWS20Interaction(true, { DESC: H.z("220") });
             try { await _onDesignDrop(ev); }
-            catch (e) { console.error("[HTML5][bindWindow] 디자인트리 drop:", e && e.message); oAPP.fn.setBusyWS20Interaction(false, {}); }
+            catch (e) { console.error("[bindWindow] design tree drop:", e && e.message); oAPP.fn.setBusyWS20Interaction(false, {}); }
         });
     }
 
@@ -1280,7 +1280,7 @@
         oD.tool.appendChild(_oGearMid);
         oD.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
             // [B4] 디자인트리 도움말 문서 "000275"(원본 designTree.js:2696). 영역별 라우팅.
-            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000275"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000275"); } catch (e) { console.error("[bindWindow] onHelp:", e && e.message); } }
         }));
 
         // 패널 좁아질 때 넘치는 버튼(동일속성/멀티/Unbind 등)을 ⋯ 오버플로 메뉴로(16 §11, 공통 attachOverflow).
@@ -1415,7 +1415,7 @@
                 if (oD.ctrl && typeof oD.ctrl.selectKey === "function") { try { oD.ctrl.selectKey(n.CHILD, false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
                 // [SPEC §2.1] 디자인 트리 속성 선택 → 좌측 모델필드 바인딩 가능/불가 재계산(이미 바인딩=파랑).
                 if (typeof oAPP.fn.bindPossibleRecompute === "function") {
-                    try { oAPP.fn.bindPossibleRecompute(n); } catch (e) { console.error("[HTML5][bindWindow] bindPossibleRecompute:", e && e.message); }
+                    try { oAPP.fn.bindPossibleRecompute(n); } catch (e) { console.error("[bindWindow] bindPossibleRecompute:", e && e.message); }
                 }
                 // [R3] UI 오브젝트 행(DATYP 01) 선택 → WS20 캔버스에서 같은 UI 선택 요청(원본 designTree.js:1891~1893).
                 //   _bRemoteDesignSelect 중(WS20 수신 반영)엔 되-송신 금지(에코 방지).

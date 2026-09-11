@@ -217,7 +217,7 @@ function fnOnUi5LoadFail(sReason) {
     if (bLoadFailed || bOpenDone) { return; }
     bLoadFailed = true;
 
-    console.error("[ui5CssPopup_v2] 서버 UI5 로드 실패 → 오류 안내 후 창 닫기: " + sReason);
+    console.error("[ui5CssPopup_v2] server UI5 load failed → error notice after window close: " + sReason);
 
     // 오프너가 켠 메인 busy lock 해제 + 형제창 busy off + 오버레이 해제 + 창 표시(다이얼로그 보이게).
     try { IPCRENDERER.send("if-send-action-" + oAPP.BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }

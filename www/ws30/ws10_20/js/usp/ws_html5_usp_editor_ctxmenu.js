@@ -38,7 +38,7 @@
         FS = parent.FS;
         PATHINFO = parent.require(PATH.join(parent.APPPATH, "ws30", "resources", "pathInfo.js"));
     } catch (e) {
-        console.error("[HTML5][WS30] editor ctx PATHINFO load error:", e);
+        console.error("[WS30] editor ctx PATHINFO load error:", e);
     }
 
     function _esc(s) { return (oAPP.usphtml._esc ? oAPP.usphtml._esc(s) : String(s == null ? "" : s)); }
@@ -92,7 +92,7 @@
                 return Array.isArray(a) ? a : [];
             }
         } catch (e) {
-            console.error("[HTML5][WS30] 패턴 JSON 로드 오류:", sPath, e);
+            console.error("[WS30] pattern JSON load error:", sPath, e);
         }
         return [];
     }
@@ -105,7 +105,7 @@
             var a = (typeof fn === "function") ? fn() : [];
             return Array.isArray(a) ? a : [];
         } catch (e) {
-            console.error("[HTML5][WS30] 추가 컨텍스트 메뉴 로드 오류:", e);
+            console.error("[WS30] add context menu load error:", e);
             return [];
         }
     }
@@ -290,7 +290,7 @@
         _closeAll();
         var aData = _buildMenuData();
         if (!aData.length) {
-            console.warn("[HTML5][WS30] 에디터 컨텍스트 메뉴: 표시할 항목 없음(패턴/추가 메뉴 로드 0)");
+            console.warn("[WS30] editor context menu: nothing to show (0 pattern/add menu items loaded)");
             return;
         }
         _openRoot(aData, iX, iY);
@@ -329,7 +329,7 @@
             oEditor.focus();
             if (oAPP.fn.setAppChangeWs30) { oAPP.fn.setAppChangeWs30("X"); }
         } catch (e) {
-            console.error("[HTML5][WS30] 패턴 삽입 오류:", e);
+            console.error("[WS30] pattern insert error:", e);
         }
         return true;
     }
@@ -352,13 +352,13 @@
                     if (oMod && typeof oMod.exports === "function") {
                         oMod.exports({ MENU_INFO: mi });
                     } else {
-                        console.error("[HTML5][WS30] 메뉴 모듈 exports 없음:", sCKEY);
+                        console.error("[WS30] menu module exports none:", sCKEY);
                     }
-                } catch (e) { console.error("[HTML5][WS30] 메뉴 모듈 실행 오류:", sCKEY, e); }
-            }).catch(function (e) { console.error("[HTML5][WS30] 메뉴 모듈 import 오류:", sCKEY, e); });
+                } catch (e) { console.error("[WS30] menu module run error:", sCKEY, e); }
+            }).catch(function (e) { console.error("[WS30] menu module import error:", sCKEY, e); });
             return true;
         } catch (e) {
-            console.error("[HTML5][WS30] 메뉴 모듈 디스패치 오류:", sCKEY, e);
+            console.error("[WS30] menu module dispatch error:", sCKEY, e);
             return false;
         }
     }
@@ -376,9 +376,9 @@
             // 추가 메뉴 모듈(Theme/Snippet Designer 등) — 원본과 동일하게 동적 import 실행.
             if (_runMenuModule(mi)) { return; }
             // 그 외 미구현.
-            console.warn("[HTML5][WS30] 에디터 컨텍스트 메뉴 미구현:", sCKEY, (mi && mi.DESC) || "");
+            console.warn("[WS30] editor context menu not implemented:", sCKEY, (mi && mi.DESC) || "");
         } catch (e) {
-            console.error("[HTML5][WS30] 에디터 컨텍스트 메뉴 실행 오류:", e);
+            console.error("[WS30] editor context menu run error:", e);
         }
     }
 
@@ -403,7 +403,7 @@
                 if (typeof oAPP.fn.fnSourcePatternPopupOpener === "function") {
                     oAPP.fn.fnSourcePatternPopupOpener();
                 } else {
-                    console.error("[HTML5][WS30] fnSourcePatternPopupOpener 미로드 — 소스 패턴 팝업 열 수 없음");
+                    console.error("[WS30] fnSourcePatternPopupOpener not loaded - cannot open the source pattern popupe");
                 }
                 return;
             }
@@ -424,7 +424,7 @@
 
             _openMenu(iX, iY);
         } catch (e) {
-            console.error("[HTML5][WS30] onEditorContextMenu 오류:", e);
+            console.error("[WS30] onEditorContextMenu error:", e);
         }
     };
 

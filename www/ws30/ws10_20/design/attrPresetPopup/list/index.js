@@ -181,7 +181,7 @@ async function _getPresetList(oWhere) {
     var _sqlite = await _createSqlite(false);
     if (!_sqlite) { return []; }
     try { return _sqlite.selectData({ tableName: "UI_ATTR_PRESET", where: oWhere }) || []; }
-    catch (e) { console.error("[UI_ATTR] selectData 오류:", e); return []; }
+    catch (e) { console.error("[UI_ATTR] selectData error:", e); return []; }
 }
 
 
@@ -537,7 +537,7 @@ async function _selectHead(sUIOBK) {
         _renderSelHead();
         _renderItems();
     } catch (e) {
-        console.error("[UI_ATTR] UI 선택 처리 오류:", e);
+        console.error("[UI_ATTR] UI select handle error:", e);
     } finally {
         _setBusy(false);
     }
@@ -561,7 +561,7 @@ function _onResetLayout() {
 function _onHelp() {
     _setBusy(true);
     try { IPCRENDERER.send("if-attrPresetPopup-" + SYSID, { PRCCD: "U4A_HELP_DOCUMENT", DATA: { startMenuId: "000278" } }); }
-    catch (e) { console.error("[UI_ATTR] 도움말 요청 오류:", e); _setBusy(false); }
+    catch (e) { console.error("[UI_ATTR] help request error:", e); _setBusy(false); }
 }
 
 // 삭제(원본 onDeletePresetData/_deletePresetData) — 체크 행 삭제.
@@ -647,7 +647,7 @@ async function _doDelete(aUIATK) {
 
         _toast(_zmsg("633")); // 삭제 완료
     } catch (e) {
-        console.error("[UI_ATTR] 삭제 처리 오류:", e);
+        console.error("[UI_ATTR] delete handle error:", e);
     } finally {
         _setBusy(false);
     }
@@ -697,7 +697,7 @@ async function _onDownload() {
 
         try { FS.writeFileSync(sDownloadPath, sHex, "utf8"); }
         catch (e) {
-            console.error("[UI_ATTR] 다운로드 저장 오류:", e);
+            console.error("[UI_ATTR] downloadload save error:", e);
             U4AUI.confirm({ type: "E", title: _zmsg("652"), message: _zmsg("637"), buttons: [{ act: "YES", label: "" }] });
             _setBusy(false);
             return;
@@ -708,7 +708,7 @@ async function _onDownload() {
 
         try { require("electron").shell.showItemInFolder(sDownloadPath); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     } catch (e) {
-        console.error("[UI_ATTR] 다운로드 오류:", e);
+        console.error("[UI_ATTR] downloadload error:", e);
         _setBusy(false);
     }
 }
@@ -751,7 +751,7 @@ async function _onUpload() {
         await _loadData();
         _setBusy(false);
     } catch (e) {
-        console.error("[UI_ATTR] 업로드 오류:", e);
+        console.error("[UI_ATTR] upload error:", e);
         _setBusy(false);
     }
 }
@@ -1030,7 +1030,7 @@ async function _onIpcRender(events, data) {
         case "ATTR_CHANGE":
             // 메인에서 속성 개인화 발생 → 목록 새로고침.
             _setBusy(true);
-            try { await _loadData(); } catch (e) { console.error("[UI_ATTR] ATTR_CHANGE 갱신 오류:", e); }
+            try { await _loadData(); } catch (e) { console.error("[UI_ATTR] ATTR_CHANGE refresh error:", e); }
             _setBusy(false);
             _showWindow();
             break;
@@ -1078,7 +1078,7 @@ async function _onload() {
     try {
         await _loadData();
     } catch (e) {
-        console.error("[UI_ATTR] 초기 데이터 로드 오류:", e);
+        console.error("[UI_ATTR] initial data load error:", e);
     }
 
     _observeView();
@@ -1108,7 +1108,7 @@ IPCRENDERER.once("HANDLE_ON_INIT", _ipcHandleOnInit);
 // 안전판 — HANDLE_ON_INIT 가 안 오면 busy 강제 해제(원본 동작엔 없던 방어).
 iBusyWatch = setTimeout(function () {
     if (oState.gotInit) { return; }
-    console.error("[HTML5][attrPresetPopup] 초기화 정보 수신 지연 — busy 강제 해제");
+    console.error("[attrPresetPopup] init info receive deferred — busy force release");
     _showWindow();
     _finishOpen();
 }, 20000);

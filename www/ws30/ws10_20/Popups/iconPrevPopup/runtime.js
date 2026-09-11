@@ -481,7 +481,7 @@ function fnGetSapTntIcons() {
             oIconListResult = await getJsonAsync(sUrl);
 
         if (oIconListResult.RETCD == "E") {
-            console.log("[fnGetSapTntIcons]:  SAP-icons-TNT.json 파일 없음");
+            console.log("[fnGetSapTntIcons]: SAP-icons-TNT.json file none");
             resolve();
             return;
         }
@@ -1581,7 +1581,7 @@ function fnAnimationFrame(aObservEntry, observer) {
  ************************************************************************/
 function fnIntersectionObserverCallback(aObservEntry, observe) {
 
-    zconsole.log("observer 완료 : " + aObservEntry.length);
+    zconsole.log("observer done: " + aObservEntry.length);
 
     oAPP.ani = window.requestAnimationFrame(fnAnimationFrame.bind(oAPP.ani, aObservEntry, observe));
 

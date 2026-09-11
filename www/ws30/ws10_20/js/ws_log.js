@@ -102,6 +102,16 @@ exports.start = async function(REMOTE_OBJ, CONSOLE){
     //출력 포멧 
     log.transports.console.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
     log.transports.console.level  = 'error';
+
+    /**
+     * 파일에는 등급을 안 붙인다 (2026-09-11 — 장군님 지시)
+     * -----------------------------------------------------------------
+     * 기본값이 '[시각] [{level}] 글' 이라 우리 줄이 [info] [DEBUG] 처럼 등급을 두 번 달았다.
+     * 게다가 앞엣것은 **틀리다** — console.log 로 남기는 DEBUG 줄도 info 로 찍혔다.
+     * 우리 줄이 이미 [INFO]/[WARN]/[ERROR]/[FATAL]/[DEBUG] 를 앞에 단다.
+     * 앱 본체(electron/lib/log/ws_main_log.js)도 같은 모양을 쓴다.
+     */
+    log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] {text}';
     
     //로그 저장위치 경로 
     if((typeof RESOLVE_PATH === "undefined") || RESOLVE_PATH === ""){

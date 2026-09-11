@@ -77,7 +77,7 @@
     // 메시지 팝업(원본 parent.showMessage).
     function _msg(iKind, sType, sMsg, fnCb) {
         try { parent.showMessage(window.sap || null, iKind, sType, sMsg, fnCb); }
-        catch (e) { console.warn("[HTML5][WS20][p13n] showMessage 실패:", e && e.message); }
+        catch (e) { console.warn("[WS20][p13n] showMessage failed:", e && e.message); }
     }
     function _busy(bOn) { try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     function _unlock() { try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
@@ -301,7 +301,7 @@
 
             if (l_tempCSS) { l_dom.style.cssText = l_tempCSS; }
         } catch (e) {
-            console.error("[HTML5][WS20][p13n] lf_getUiHTML 오류:", e && e.message);
+            console.error("[WS20][p13n] lf_getUiHTML error:", e && e.message);
         }
     }
 
@@ -883,7 +883,7 @@
                     })(30);
                 }
             }
-        } catch (e) { console.warn("[HTML5][WS20][p13n] preview toolbar overflow attach 실패:", e && e.message); }
+        } catch (e) { console.warn("[WS20][p13n] preview toolbar overflow attach failed:", e && e.message); }
 
         // iframe(랜덤 id). 랩에 원본 u4aP13nPreview(design/css/common.css — index.html 로드) 소비
         //   → :after "PREVIEW" 워터마크(45도 회전+blink) 원본 1:1.
@@ -1246,7 +1246,7 @@
             // ★비모달 전환은 setTimeout 으로 미룸 — dragstart 중 동기 pointer-events:none 는 드래그를 취소시킴.
             setTimeout(function () { _setModalLook(false); }, 0);   // 드래그 순간 비모달(배경 트리 drop 가능).
         } catch (e) {
-            console.error("[HTML5][WS20][p13n] 드래그 시작 오류:", e && e.message);
+            console.error("[WS20][p13n] drag start error:", e && e.message);
         }
     }
 

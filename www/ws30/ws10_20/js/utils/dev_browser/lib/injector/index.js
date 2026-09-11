@@ -84,7 +84,7 @@ const init = async function (oInjectedProviders) {
         // [사전 체크] U4A 앱의 필수 HTML 요소가 있는지 확인
         const oHiddenArea = document.getElementById("U4A_HIDDEN_AREA");
         if (!oHiddenArea) {
-            console.warn("[U4A Check] U4A 실행 영역을 찾을 수 없습니다. (대상 페이지가 U4A 앱이 아님)");
+            console.warn("[U4A Check] U4A run area not found (target page is not a U4A app)");
             return;
         }
 
@@ -116,7 +116,7 @@ const init = async function (oInjectedProviders) {
                 // 모듈 함수 실행
                 if (typeof oModule.fn === "function") {
                     await oModule.fn();
-                    console.log(`[Module Load] ${sKey} 완료`);
+                    console.log(`[Module Load] ${sKey} done`);
                 }
 
                 // [환경 확인] 유틸리티 로드 직후, 실제 U4A 라이브러리가 유효한지 최종 확인
@@ -130,7 +130,7 @@ const init = async function (oInjectedProviders) {
             }
 
             u4adevb.initialized = true;
-            console.log("🔔 [U4A DevBot] 모든 리소스가 정상적으로 로드되었습니다.");
+            console.log("🔔 [U4A DevBot] all resources loaded");
 
         } catch (err) {
             console.error("❌ [Initialization Error]", err);

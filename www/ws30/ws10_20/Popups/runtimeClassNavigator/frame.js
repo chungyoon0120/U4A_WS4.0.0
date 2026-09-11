@@ -513,7 +513,7 @@ window.addEventListener("load", function () {
 
     // 안전판 — if-runtime-info 가 안 오면 busy 강제 해제(원본 동작엔 없던 방어).
     iBusyWatch = setTimeout(function () {
-        console.error("[HTML5][runtimeClassNavigator] 런타임 정보 수신 지연 — busy 강제 해제");
+        console.error("[runtimeClassNavigator] runtime info not received - busy force released");
         _finishOpen();
     }, 20000);
 });

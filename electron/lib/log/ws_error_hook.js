@@ -34,7 +34,7 @@ const INJECT_SCRIPT = `
 
         // 이미 넣었으면 두 번 넣지 않는다
         // ※ 표시는 끝까지 성공한 뒤에 남긴다. 중간에 실패하면 다음에 다시 시도해야 한다.
-        if (window.__u4aErrHookInstalled) { return '이미 설치됨'; }
+        if (window.__u4aErrHookInstalled) { return 'already installed'; }
 
         /**
          * 두 가지를 각각 따로 판단한다 (2026-09-08 정정)
@@ -100,7 +100,7 @@ const INJECT_SCRIPT = `
                 try {
                     window.top.postMessage({ __u4aLog: true, payload: o }, '*');
                 } catch (e2) {
-                    try { console.error('[오류] ' + o.message); } catch (e3) { }
+                    try { console.error('[ERROR] ' + o.message); } catch (e3) { }
                 }
             };
 
@@ -117,8 +117,8 @@ const INJECT_SCRIPT = `
                 if (!sTop) { sTop = document.title || ''; }
                 var bInFrame = false;
                 try { bInFrame = (window.top !== window); } catch (e2) { bInFrame = true; }
-                if (!sTop) { return bInFrame ? '틀 안 화면' : '창'; }
-                return bInFrame ? (sTop + ' 안') : sTop;
+                if (!sTop) { return bInFrame ? '(iframe)' : '(window)'; }
+                return bInFrame ? (sTop + ' > iframe') : sTop;
             } catch (e) {
                 return '';
             }
@@ -169,10 +169,10 @@ const INJECT_SCRIPT = `
                         : (oBusy.style && oBusy.style.display === 'flex');
                 }
 
-                aOut.push(oBusy ? ('로딩표시 ' + (bOn ? '켜짐' : '꺼짐')) : '로딩표시 (없는 화면)');
+                aOut.push(oBusy ? ('busy=' + (bOn ? 'on' : 'off')) : 'busy=n/a');
 
             } catch (e) {
-                aOut.push('로딩표시 (못 읽음)');
+                aOut.push('busy=unreadable');
             }
 
             try {
@@ -184,10 +184,10 @@ const INJECT_SCRIPT = `
                     if (aOpen[i].id !== BUSY_ID) { iCnt++; }
                 }
 
-                aOut.push('떠 있는 창 ' + iCnt + '개');
+                aOut.push('openDialogs=' + iCnt);
 
             } catch (e) {
-                aOut.push('떠 있는 창 (못 읽음)');
+                aOut.push('openDialogs=unreadable');
             }
 
             return aOut.join(' / ');
@@ -197,7 +197,7 @@ const INJECT_SCRIPT = `
         // 넘겨받는 자리를 깐 뒤에 판단한다(그 자리는 조건과 무관하게 늘 있어야 한다)
         if (!bNeedErrorHook && !bNeedClickHook) {
             window.__u4aErrHookInstalled = true;
-            return '둘 다 이미 있음 (넘겨받는 자리는 깔림)';
+            return 'both hooks already present (receiver re-installed)';
         }
 
         if (bNeedErrorHook) {
@@ -205,7 +205,7 @@ const INJECT_SCRIPT = `
         window.onerror = function (message, url, line, col, errorObj) {
 
             _send({
-                message: '[화면 코드가 터짐] ' + message + ' (' + url + ' ' + line + ':' + col + ')',
+                message: 'SCRIPT_ERROR | ' + message + ' (' + url + ' ' + line + ':' + col + ')',
                 stack: (errorObj && errorObj.stack) ? errorObj.stack : '',
                 screenName: _where(),
                 windowName: _win(),
@@ -223,7 +223,7 @@ const INJECT_SCRIPT = `
             var r = ev ? ev.reason : null;
 
             _send({
-                message: '[처리되지 않은 비동기 실패] ' + ((r && r.message) ? r.message : String(r)),
+                message: 'UNHANDLED_REJECT | ' + ((r && r.message) ? r.message : String(r)),
                 stack: (r && r.stack) ? r.stack : '',
                 screenName: _where(),
                 windowName: _win(),
@@ -271,17 +271,15 @@ const INJECT_SCRIPT = `
                         || _cut(hit.innerText || hit.textContent)
                         || _cut(hit.getAttribute('title'))
                         || _cut(hit.getAttribute('aria-label'))
-                        || '이름 없는 버튼';
+                        || '(unnamed control)';
 
                     _send({
                         kind: 'action',
-                        message: '[눌렀음] ' + name,
+                        message: 'CLICK | ' + name,
                         stack: '',
                         screenName: _where(),
                         windowName: _win(),
                         traceId: _trace(),
-                windowName: _win(),
-                traceId: _trace(),
                         pageUrl: (location && location.href) ? location.href : ''
                     });
 
@@ -296,11 +294,11 @@ const INJECT_SCRIPT = `
 
         window.__u4aErrHookInstalled = true;   // 끝까지 성공했을 때만 표시한다
 
-        return '설치함 — 오류감시:' + (bNeedErrorHook ? '넣음' : '기존것 유지')
-            + ' / 버튼기록:' + (bNeedClickHook ? '넣음' : '공통함수가 함');
+        return 'installed - errorHook:' + (bNeedErrorHook ? 'added' : 'kept existing')
+            + ' / clickHook:' + (bNeedClickHook ? 'added' : 'handled by U4ALOG');
 
     } catch (e) {
-        return '설치 실패: ' + (e && e.message ? e.message : e);
+        return 'install failed: ' + (e && e.message ? e.message : e);
     }
 
 })();
@@ -316,12 +314,12 @@ function _injectToFrame(iProcessId, iRoutingId) {
     try {
         webFrameMain = require('electron').webFrameMain;
     } catch (e) {
-        console.error('[EHOK-001] 화면 단위 접근 기능을 쓸 수 없다 — 자동 설치를 건너뛴다.', e);
+        console.error('[EHOK-001] webFrameMain is unavailable - skipping auto install of the error hook.', e);
         return;
     }
 
     if (!webFrameMain || typeof webFrameMain.fromId !== 'function') {
-        console.error('[EHOK-001] 화면 단위 접근 기능이 없다 — 자동 설치를 건너뛴다.');
+        console.error('[EHOK-001] webFrameMain not found - skipping auto install of the error hook.');
         return;
     }
 
@@ -341,11 +339,11 @@ function _injectToFrame(iProcessId, iRoutingId) {
 
         frame.executeJavaScript(INJECT_SCRIPT, true).catch((e) => {
             // 화면이 도중에 닫히면 여기로 온다. 앱은 계속 간다.
-            console.warn('[EHOK-002] 오류 감시 설치 실패 — 화면이 닫혔을 수 있다. ' + (e && e.message ? e.message : e));
+            console.warn('[EHOK-002] could not install the error hook - the window may have been closed. ' + (e && e.message ? e.message : e));
         });
 
     } catch (e) {
-        console.warn('[EHOK-002] 오류 감시 설치 실패', e);
+        console.warn('[EHOK-002] could not install the error hook.', e);
     }
 
 }
