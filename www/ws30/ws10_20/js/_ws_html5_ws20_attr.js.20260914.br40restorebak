@@ -1585,29 +1585,6 @@
     }
 
 
-    //Description 삭제. [BR40] 원본 uiAttributeArea.js:7871 1:1 이식 복원 (배선은 ws_html5_ws20_edit.js 삭제 2경로에 존재)
-    if (typeof oAPP.fn.delDesc !== "function") {
-        oAPP.fn.delDesc = function (OBJID) {
-
-            // guard: T_DESC store not ready yet (called before load) -> description cannot be removed
-            if (!oAPP.DATA || !oAPP.DATA.APPDATA || !oAPP.DATA.APPDATA.T_DESC) {
-                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) { U4ALOG.warn("GUARD_EXIT", "T_DESC missing", "skip delDesc(" + OBJID + "), description not removed"); }
-                return;
-            }
-
-            //OBJID의 위치 검색.
-            var l_indx = oAPP.DATA.APPDATA.T_DESC.findIndex(a => a.OBJID === OBJID);
-
-            //못찾은경우 EXIT. (already removed / no description) - normal no-op
-            if (l_indx === -1) { return; }
-
-            //찾은경우 해당 라인 삭제.
-            oAPP.DATA.APPDATA.T_DESC.splice(l_indx, 1);
-
-        }; //Description 삭제.
-    }
-
-
     //Description 검색. (원본 7792행 1:1)
     if (typeof oAPP.fn.getDesc !== "function") {
         oAPP.fn.getDesc = function (OBJID) {
