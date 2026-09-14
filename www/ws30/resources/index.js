@@ -1,4 +1,4 @@
-// 오류코드 접두: RSRC / 다음 번호: 006
+// 오류코드 접두: RSRC / 다음 번호: 008
 /**
  * index.js  (cleaned)
  *
@@ -688,9 +688,19 @@ oAPP.views = window?.oAPP?.views || {};
         // 브라우저가 오픈이 다 되면 타는 이벤트
         // 로드 실패시(네트워크 단절/잘못된 URL 등) 에도 did-finish-load 는 오지 않으므로,
         //   실패를 타임아웃으로 추측하지 않고 Electron 이 주는 실제 실패 이벤트로 해제한다.
-        oBrowserWindow.webContents.on('did-fail-load', function (e, errorCode, errorDescription) {
-            console.warn("[onNewWindow] did-fail-load:", errorCode, errorDescription);
+        oBrowserWindow.webContents.on('did-fail-load', function (e, errorCode, errorDescription, validatedURL, isMainFrame) {
+            // 하위 프레임 실패(isMainFrame=false)와 사용자 취소(-3)는 창 실패가 아니다.
+            if (isMainFrame === false || errorCode === -3) { return; }
+            console.error("[RSRC-006] new window load failed:", errorCode, errorDescription, validatedURL);
             _releaseBusy();
+            // ★ [2026-09-14, 장군님 지시] 실패도 호출자에게 알린다.
+            //   종전에는 성공(did-finish-load)에서만 fnOnLoaded 를 불렀다. 그래서 새창 로드가 실패하면
+            //   호출자(버전 관리 창 등)의 busy 가 영영 안 풀렸고, 그걸 "5초 지나면 그냥 끈다"는 타이머로
+            //   덮고 있었다(금지 — .analy 16 §2.11). 이제는 실패도 같은 콜백으로 통지한다.
+            if (typeof fnOnLoaded === "function") {
+                try { fnOnLoaded(null); }
+                catch (e2) { console.error("[RSRC-006] caller notice on load failure failed:", e2 && e2.message); }
+            }
         });
 
         oBrowserWindow.webContents.on('did-finish-load', function () {
@@ -1792,26 +1802,68 @@ function getLocalAppDataPath() {
 }
 
 // 텍스트 클립보드 복사
+//   ★[수정 2026-09-14, 장군님 지시] 원본은 임시 <textarea> + document.execCommand('copy') 뿐이었다.
+//   같은 document 에 native <dialog>.showModal() 로 연 모달이 있으면 dialog 바깥이 inert 라
+//   body 에 붙인 textarea 를 select() 할 수 없다 → 실제로는 아무것도 복사되지 않는데
+//   execCommand 는 true 를 돌려주므로 실패를 아무도 모른다.
+//   실측(Electron 14.2.9 / Chromium 93): 모달 열린 상태 execCommand=true, selection length=0, clipboard 변화 없음.
+//     - 증상 사례: 즐겨찾기 아이콘 팝업(favIconPopup) 의 아이콘 이름 복사.
+//     - 원본(UI5)은 sap.m.ResponsivePopover 라 native 모달이 아니어서 inert 가 안 걸렸다.
+//   → Electron clipboard 모듈을 먼저 쓴다(DOM inert 와 무관). 이 프로젝트의 patternPopup /
+//     fontStyleWizard / illustMsgPopup 이 이미 쓰는 방식과 같다. 실패하면 원본 방식으로 내려간다.
+//   반환값 = 복사 성공 여부. 호출측은 이 값으로 "복사됨" 안내 여부를 정한다.
 function setClipBoardTextCopy(sText, fnCallback) {
 
     if (typeof sText !== "string") {
-        return;
+        return false;
     }
 
-    var oTextArea = document.createElement("textarea");
-    oTextArea.value = sText;
+    var bOk = false;
 
-    document.body.appendChild(oTextArea);
+    // 1) Electron clipboard — 모달(<dialog>) 이 열려 있어도 동작한다.
+    try {
+        var oClip = require("electron").clipboard;
+        if (oClip && typeof oClip.writeText === "function") {
+            oClip.writeText(sText);
+            bOk = true;
+        }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-    oTextArea.select();
+    // 2) fallback — 원본 방식(textarea + execCommand).
+    if (!bOk) {
 
-    document.execCommand('copy');
+        var oTextArea = null;
 
-    document.body.removeChild(oTextArea);
+        try {
+
+            oTextArea = document.createElement("textarea");
+            oTextArea.value = sText;
+
+            document.body.appendChild(oTextArea);
+
+            oTextArea.select();
+
+            // execCommand 는 실패해도 true 를 돌려준다 → selection length 로 실제 성공을 확인한다.
+            bOk = (document.execCommand('copy') === true && String(document.getSelection()).length > 0);
+
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        if (oTextArea && oTextArea.parentNode) {
+            try { document.body.removeChild(oTextArea); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+    }
+
+    if (!bOk) {
+        console.error("[RSRC-007] setClipBoardTextCopy: nothing copied - electron clipboard unavailable and execCommand copy made no selection (an open modal <dialog> makes document.body inert). text length:", sText.length);
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) { U4ALOG.warn("GUARD_EXIT", "clipboard write", "text not copied, length=" + sText.length); }
+    }
 
     if (typeof fnCallback === "function") {
-        fnCallback();
+        fnCallback(bOk);
     }
+
+    return bOk;
 
 }
 

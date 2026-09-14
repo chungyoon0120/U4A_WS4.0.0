@@ -100,6 +100,22 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고 시작하므로, 문서 로드가 실패하면 did-finish-load 가 안 와
+        //   busy 가 영영 안 풀리고 창도 안 보인다(show:false). 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 창을 정리하고 잠금을 푼다. 하위 프레임 실패(bIsMainFrame=false)와
+        //   사용자 취소(-3)는 제외한다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FVMP-001] Version Management window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FVMP-001] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FVMP-001] did-fail-load register failed:", e && e.message); }
+
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) { oBrowserWindow.webContents.openDevTools(); }
 
@@ -119,7 +135,11 @@
                 oThemeInfo: oThemeInfo
             };
 
-            oBrowserWindow.webContents.send('if-vermng-info', oSendData);
+            // ★ [2026-09-14] 전송이 실패하면 창은 busy 인 채로 남는다 — 자리를 남겨 표면화한다.
+            //   (문서 로드 자체가 실패하는 경우는 위 did-fail-load 가 창을 정리한다.)
+            try { oBrowserWindow.webContents.send('if-vermng-info', oSendData); }
+            catch (eSend) { console.error("[FVMP-001] initial data send to the window failed:", eSend && eSend.message); }
+
             parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
         });
 

@@ -189,3 +189,64 @@ README 가 2026-09-08 상태로 남아 있었다. **"텔레그램 등 외부 알
   여러 줄 문자열은 배열 + `join` 으로 만들거나 Edit 도구를 쓸 것 (이번에 두 번 당했다)
 - 장군님 지시 기억에 추가: **"항상 뭐 하나 바뀌면 현행화좀 해"**
   (`memory/keep-docs-current-with-every-change.md`)
+
+---
+
+# 이어서 (2026-09-11) — 시험으로 보낸 알림에 [TEST] 표시
+
+## 요청
+
+장군님: "야 시발 노션에 테스트 목적으로 올린거면 제목이라도 테스트 용도였다고 적어놔야지"
+
+## 변경 내용
+
+`notify-test.js --send` 로 보낸 가짜 사고가 노션 오류 기록 DB 에 **진짜 오류처럼 보이는 제목**으로 올라갔다.
+
+- 올라간 제목: `[자동 시험] uncaught script error — fake incident for testing notifications. this is NOT a real error.`
+- 문제: "진짜 오류 아님" 이 **제목 맨 뒤에 영어로만** 붙어 있었다. 노션 목록은 제목 앞부분만 보이므로
+  실제로는 `[자동 시험] uncaught script error — fake…` 까지만 보여 **구분이 안 됐다.**
+
+고친 것:
+
+1. **이미 올라간 줄 제목 교체** (page `3d8a2d4a-ab9f-8107-ad54-e971d56a3d33`)
+   → `[TEST] 진짜 오류 아님 — 알림 배선 확인용으로 일부러 보낸 것 (claude, 2026-09-11)`
+2. `notify-test.js` — `FAKE_INFO.isTest = true` 추가, `summary` 를 한국어로 바꿔 목록에서 바로 읽히게
+3. `lib/notify-notion.js` `buildProperties` — `info.isTest` 면 제목 **맨 앞**에 `[TEST] `
+4. `lib/notify-telegram.js` `buildMessage` — 첫 줄 맨 앞에 `[TEST] `
+
+## 변경 파일
+
+- 추가: 없음
+- 변경:
+  - `test/cdp-auto-test/notify-test.js`
+  - `test/cdp-auto-test/lib/notify-notion.js`
+  - `test/cdp-auto-test/lib/notify-telegram.js`
+  - 노션 오류 기록 DB 의 시험용 줄 1건 (제목만)
+- 삭제: 없음 (그 줄은 지우지 않고 제목만 바꿨다. **그 뒤 장군님이 직접 지우신 것으로 보인다** —
+  2026-09-14 확인 시 DB 에 없다)
+
+## 변경 이유
+
+시험으로 보낸 것이 진짜 고장과 섞이면, 나중에 그 DB 를 보는 사람과 AI 가 없는 고장을 쫓게 된다.
+표시는 **제목 맨 앞**에 있어야 목록에서 보인다.
+
+## 영향 범위
+
+`notify-test.js` 로 보내는 것만 `[TEST]` 가 붙는다. 실제 사고 알림(`edit-back-loop.js`)은 그대로다.
+
+## 검증
+
+보내지 않고 제목/첫 줄만 만들어 비교했다:
+
+| | 결과 |
+|---|---|
+| 노션 제목(시험) | `[TEST] [자동 시험] uncaught script error — …` ✅ |
+| 노션 제목(진짜) | `[자동 시험] console error from the app — …` (붙지 않음) ✅ |
+| 텔레그램 첫 줄(시험) | `[TEST] [자동 시험] uncaught script error` ✅ |
+| 텔레그램 첫 줄(진짜) | `[자동 시험] console error from the app` ✅ |
+
+**확인 못 한 것**: 고친 뒤 실제로 한 통 더 보내 보지는 않았다(또 시험 줄을 남기지 않으려고).
+
+## 참고 사항
+
+- **시험용으로 바깥(노션·텔레그램)에 무언가를 보낼 때는 맨 앞에 `[TEST]` 를 박는다.** 뒤에 붙이면 안 보인다.

@@ -898,7 +898,8 @@
         oBrowserOptions.modal = true;        
         oBrowserOptions.parent = oCurrWin;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
+        //   (창 표시는 extopen.js 가 iframe 로드 완료 후 CURRWIN.show() 로 한다.)
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
         

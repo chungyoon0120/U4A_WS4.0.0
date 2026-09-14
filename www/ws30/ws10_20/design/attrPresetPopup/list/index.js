@@ -76,7 +76,7 @@ var oState = {
 
 var oHeadField = null, oItemField = null,
     bBusy = false, oToastTimer = null, oBroad = null,
-    bOpenDone = false, iBusyWatch = false, bViewObserved = false;
+    bOpenDone = false, bViewObserved = false;
 
 
 /* ══════════════════════ 로컬 헬퍼 ══════════════════════ */
@@ -125,7 +125,6 @@ function _showWindow() {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { if (iBusyWatch) { clearTimeout(iBusyWatch); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // opener(index.js) 가 webContents.on('load-finish') 에서 oMainBroad BUSY_OFF + fnSetBusyLock("") 처리.
     try { CURRWIN.webContents.emit("load-finish"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _setBusy(false);
@@ -1105,13 +1104,12 @@ function _ipcHandleOnInit(events, oInfo) {
 
 IPCRENDERER.once("HANDLE_ON_INIT", _ipcHandleOnInit);
 
-// 안전판 — HANDLE_ON_INIT 가 안 오면 busy 강제 해제(원본 동작엔 없던 방어).
-iBusyWatch = setTimeout(function () {
-    if (oState.gotInit) { return; }
-    console.error("[attrPresetPopup] init info receive deferred — busy force release");
-    _showWindow();
-    _finishOpen();
-}, 20000);
+// ★ [2026-09-14, 장군님 지시] 여기 있던 "20초 지나면 busy 를 그냥 끈다" 타이머를 걷어냈다.
+//   타이머 폴백은 금지다(.analy 16 §2.11) — busy 가 안 꺼지는 건 "고장났다"는 신호인데
+//   타이머로 꺼버리면 화면은 빈 채인데 사용자는 끝난 줄 착각한다.
+//   초기 데이터가 안 오는 진짜 경우(창 문서 로드 실패 · 데이터 전송 실패)는 오프너가
+//   did-fail-load / 전송 try-catch 에서 이 창을 정리하고 잠금을 푼다.
+//   (오프너 = design/attrPresetPopup/index.js APRO-001)
 
 
 /* ══════════════════════ 종료 ══════════════════════ */

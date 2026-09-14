@@ -108,6 +108,7 @@ U4ALOG.warn('값이 없어 그만둠', 'T_ATTR', 'attribute list cannot be drawn
 |---|---|
 | `APP_START` / `APP_EXIT` | 앱 시작 / 정상 종료 |
 | `CLICK` / `SELECT` | 눌렀음 / 골랐음 |
+| `SHORTCUT` | 단축키가 그 화면 목록과 맞아 실행 단계로 들어감 (2026-09-11 추가) |
 | `NAV` | 화면 이동 |
 | `WIN_OPEN` / `WIN_CLOSE` / `WIN_READY` | 별창 열림 / 닫힘 / 창 준비됨 |
 | `REQ` / `DONE` / `SLOW` | 서버에 보냄 / 끝남 / 늦어짐 |

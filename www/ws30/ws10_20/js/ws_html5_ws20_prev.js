@@ -2064,9 +2064,10 @@
          *   않도록 차단(transient). 완료/실패시 _ws20ReleasePrevBusy 에서 해제.
          * ---------------------------------------------------------------- */
         oAPP.attr.__ws20PrevBooting = true;
-        // busy 를 "여기서 동기로" 인수(+watchdog) — 데이터 finally 가 끄지 않도록 하고
-        // (모듈 로드/iframe 이 비동기라) 모든 후속 경로에서 watchdog 안전망이 작동하게 한다.
-        // (성공: fireCellClick → release / 실패: 아래 경로들 / 60s: watchdog → release)
+        // busy 를 "여기서 동기로" 인수 — 데이터 finally 가 끄지 않도록 한다.
+        // (성공: fireCellClick → release / 실패: 아래 경로들 → release)
+        // [2026-09-14] 종전 주석에 "60s watchdog" 이 적혀 있었으나 그런 타이머는 코드에 없다.
+        //   타이머 폴백은 금지다(.analy 16 §2.11) — 해제는 실제 완료/실패 경로로만 한다.
         _ws20EngagePrevBusy();
         try {
             for (var _k in oAPP.attr.prev) {

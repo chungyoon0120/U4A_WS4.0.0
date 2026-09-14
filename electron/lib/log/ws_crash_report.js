@@ -22,7 +22,38 @@ const path = require('path');
 
 let _app = null;
 let _installed = false;
-let _sMarkPath = '';        // "돌고 있음" 표시 파일
+let _sMarkPath = '';
+
+/****************************************************************************************
+ * 로그 파일에 남기기 (2026-09-14 추가 — 장군님 지시)
+ * --------------------------------------------------------------------------------------
+ * 앱 본체의 console 은 electron-log 로 갈아끼우지 않았다(화면 쪽 ws_log.js 만 갈아끼움).
+ * 설치한 앱에는 터미널이 없으므로 console.error 로 남긴 글은 어디에도 안 남는다.
+ * writeLog 는 electron-log 에 직접 넣는다.
+ *
+ * 순환 참조 없음 — main.js 가 ws_main_log 를 가장 먼저 설치하고,
+ * 여기서는 부를 때마다 늦게 require 한다.
+ ****************************************************************************************/
+function _writeMainLog(sLevel, sText) {
+
+    try {
+        require('./ws_main_log').writeLog(sLevel, sText);
+    } catch (e) {
+        // 로그 장치를 못 얻으면 콘솔로라도 남긴다(유실 방지)
+        console.error(sText);
+    }
+
+}
+
+/** 예외 객체를 로그 한 줄 뒤에 붙일 글자로 */
+function _errText(e) {
+
+    if (!e) { return ''; }
+
+    return ' | ' + (e.message ? e.message : String(e));
+
+}
+        // "돌고 있음" 표시 파일
 
 /**
  * 마지막으로 무엇을 했는지 (2026-09-09 추가)
@@ -86,7 +117,7 @@ function _startCrashReporter() {
         const { crashReporter } = require('electron');
 
         if (!crashReporter || typeof crashReporter.start !== 'function') {
-            console.warn('[CRSH-001] crashReporter is unavailable - skipping.');
+            _writeMainLog('주의', '[CRSH-001] crashReporter is unavailable - skipping.');
             return;
         }
 
@@ -111,7 +142,7 @@ function _startCrashReporter() {
 
     } catch (e) {
         // 이 장치를 못 켜도 앱은 정상으로 돌아야 한다.
-        console.error('[CRSH-002] could not start crashReporter.', e);
+        _writeMainLog('오류', '[CRSH-002] could not start crashReporter.' + _errText(e));
     }
 
 }
@@ -199,7 +230,7 @@ function _markRunning() {
         }), 'utf8');
 
     } catch (e) {
-        console.error('[CRSH-003] could not create the running mark.', e);
+        _writeMainLog('오류', '[CRSH-003] could not create the running mark.' + _errText(e));
     }
 
 }
@@ -213,7 +244,7 @@ function _clearRunningMark() {
         }
 
     } catch (e) {
-        console.error('[CRSH-003] could not delete the running mark.', e);
+        _writeMainLog('오류', '[CRSH-003] could not delete the running mark.' + _errText(e));
     }
 
 }
@@ -271,7 +302,7 @@ function _readSentList() {
         return Array.isArray(a) ? a : [];
 
     } catch (e) {
-        console.error('[CRSH-006] could not read the already-reported list.', e);
+        _writeMainLog('오류', '[CRSH-006] could not read the already-reported list.' + _errText(e));
         return [];
     }
 
@@ -295,7 +326,7 @@ function _addSent(sName) {
         fs.writeFileSync(_sentListPath(), JSON.stringify(a), 'utf8');
 
     } catch (e) {
-        console.error('[CRSH-007] could not write the already-reported list.', e);
+        _writeMainLog('오류', '[CRSH-007] could not write the already-reported list.' + _errText(e));
     }
 
 }
@@ -351,7 +382,7 @@ function _cleanOldCrashFiles() {
         walk(sDir);
 
     } catch (e) {
-        console.error('[CRSH-008] could not delete old dump files.', e);
+        _writeMainLog('오류', '[CRSH-008] could not delete old dump files.' + _errText(e));
     }
 
 }
@@ -517,7 +548,7 @@ function _writeCrashReport(oMark, sCrashInfo, sLogPath, oOpt) {
         return sOut;
 
     } catch (e) {
-        console.error('[CRSH-011] could not build the crash report.', e);
+        _writeMainLog('오류', '[CRSH-011] could not build the crash report.' + _errText(e));
         return '';
     }
 
@@ -557,7 +588,7 @@ function _checkLastRun() {
         }
 
     } catch (e) {
-        console.error('[CRSH-004] could not read the previous run state.', e);
+        _writeMainLog('오류', '[CRSH-004] could not read the previous run state.' + _errText(e));
         return;
     }
 
@@ -593,7 +624,7 @@ function _checkLastRun() {
         }
 
     } catch (e) {
-        console.error('[CRSH-005] could not check for dump files.', e);
+        _writeMainLog('오류', '[CRSH-005] could not check for dump files.' + _errText(e));
     }
 
     /**
@@ -659,7 +690,7 @@ function _checkLastRun() {
         });
 
     } catch (e) {
-        console.error('[CRSH-005] could not hand the crash record to the sender.', e);
+        _writeMainLog('오류', '[CRSH-005] could not hand the crash record to the sender.' + _errText(e));
     }
 
 }
@@ -784,7 +815,7 @@ function reportRendererCrash(oInfo) {
                     });
 
                 } catch (e) {
-                    console.error('[CRSH-012] could not hand the renderer crash record to the sender.', e);
+                    _writeMainLog('오류', '[CRSH-012] could not hand the renderer crash record to the sender.' + _errText(e));
                 }
 
                 /**
@@ -797,7 +828,7 @@ function reportRendererCrash(oInfo) {
                 }
 
             } catch (e) {
-                console.error('[CRSH-013] could not build the report at the renderer crash site.', e);
+                _writeMainLog('오류', '[CRSH-013] could not build the report at the renderer crash site.' + _errText(e));
             }
 
         });
@@ -805,7 +836,7 @@ function reportRendererCrash(oInfo) {
         return '';
 
     } catch (e) {
-        console.error('[CRSH-013] could not build the report at the renderer crash site.', e);
+        _writeMainLog('오류', '[CRSH-013] could not build the report at the renderer crash site.' + _errText(e));
         return '';
     }
 
@@ -842,7 +873,7 @@ function _waitForDumpThen(fnDone) {
         try {
             sNow = _findNewDump(DUMP_FRESH_MS);
         } catch (e) {
-            console.error('[CRSH-015] could not look for a newly written dump.', e);
+            _writeMainLog('오류', '[CRSH-015] could not look for a newly written dump.' + _errText(e));
         }
 
         if (sNow) {
@@ -882,7 +913,7 @@ function _waitForDumpThen(fnDone) {
                 }
 
             } catch (e) {
-                console.error('[CRSH-016] could not log the fact that no dump appeared.', e);
+                _writeMainLog('오류', '[CRSH-016] could not log the fact that no dump appeared.' + _errText(e));
             }
 
             fnDone(sNow || '');
@@ -941,7 +972,7 @@ function _findNewDump(iWithinMs) {
         return sBest;
 
     } catch (e) {
-        console.error('[CRSH-015] could not look for a newly written dump.', e);
+        _writeMainLog('오류', '[CRSH-015] could not look for a newly written dump.' + _errText(e));
         return '';
     }
 
@@ -1023,14 +1054,14 @@ function install(appInstance) {
         }
 
     } catch (e) {
-        console.error('[CRSH-009] could not wrap the exit function.', e);
+        _writeMainLog('오류', '[CRSH-009] could not wrap the exit function.' + _errText(e));
     }
 
     // ② 프로세스가 끝나는 순간 한 번 더 — 위를 안 거치고 끝나는 길이 있어도 막는다
     try {
         process.on('exit', _clearRunningMark);
     } catch (e) {
-        console.error('[CRSH-010] could not hook the process exit point.', e);
+        _writeMainLog('오류', '[CRSH-010] could not hook the process exit point.' + _errText(e));
     }
 
 }

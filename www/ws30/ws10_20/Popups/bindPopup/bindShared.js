@@ -126,6 +126,19 @@
             console.error("[bindWindow] network error:", sPath);
             try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (network branch):", e && e.message); }
         };
+        // ★ [2026-09-14, 장군님 지시] 나머지 실패 경로도 같은 자리로 모은다.
+        //   호출부는 busy 를 켜고 fn_success 하나만 기다린다 — 어느 경로로 끝나든 반드시 불러야
+        //   busy 가 풀린다. 타이머로 busy 를 푸는 것은 금지(.analy 16 §2.11).
+        xhr.onabort = function () {
+            _ajaxFail("요청이 취소됨", xhr);
+            console.error("[bindWindow] request aborted:", sPath);
+            try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (abort branch):", e && e.message); }
+        };
+        xhr.ontimeout = function () {
+            _ajaxFail("응답 시간 초과", xhr);
+            console.error("[bindWindow] request timed out:", sPath);
+            try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (timeout branch):", e && e.message); }
+        };
         xhr.withCredentials = true;
         xhr.open("post", sPath, true);
         xhr.send(oFormData);

@@ -62,7 +62,8 @@ module.exports = function(REMOTE, oAPP){
         oBrowserOptions.width = 1200;
         oBrowserOptions.height = 800;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
+        //   OS 합성이라 느린 PC 에서 무겁다. 창 표시는 페이지가 준비를 마친 뒤 CURRWIN.show() 로 한다.
         oBrowserOptions.show = false;
 
         oBrowserOptions.webPreferences.partition = SESSKEY;
@@ -99,7 +100,24 @@ module.exports = function(REMOTE, oAPP){
         // URL에 QueryString 파라미터를 적용한다.
         const sLoadUrl = parent.WSUTIL.QueryString.build(sPopupPath, oQueryParams);
 
-        oBrowserWindow.loadURL(sLoadUrl);       
+        oBrowserWindow.loadURL(sLoadUrl);
+
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고, 아래 did-finish-load 가 보내는 HANDLE_ON_INIT 를 받아야
+        //   본문이 그려진다. 문서 로드가 실패하면 그 데이터가 영영 안 와 busy 가 고착된다.
+        //   타이머로 덮는 것은 금지(.analy 16 §2.11)이므로 실패 이벤트에서 창을 정리하고 잠금을 푼다.
+        //   오류코드 접두: APRO / 다음 번호: 002
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[APRO-001] attribute preset window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[APRO-001] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[APRO-001] busy release failed:", e3 && e3.message); }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[APRO-001] did-fail-load register failed:", e && e.message); }
+
 
 
         // no build 일 경우에는 개발자 툴을 실행한다.
@@ -131,7 +149,17 @@ module.exports = function(REMOTE, oAPP){
                 oThemeInfo: oThemeInfo, // 테마 정보                
             };
             
-            oBrowserWindow.webContents.send('HANDLE_ON_INIT', oOptionData);
+            // ★ [2026-09-14] 전송 자체가 실패하면 창은 busy 인 채로 남는다 — 창을 정리하고 잠금을 푼다.
+            try {
+                oBrowserWindow.webContents.send('HANDLE_ON_INIT', oOptionData);
+            } catch (eSend) {
+                console.error("[APRO-001] initial data send to the attribute preset window failed:", eSend && eSend.message);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[APRO-001] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[APRO-001] busy release failed:", e3 && e3.message); }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+                return;
+            }
 
             // 부모 위치 가운데 배치한다.
             parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);

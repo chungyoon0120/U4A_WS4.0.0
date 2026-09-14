@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- ===== 공통 헤더(.u4a-titlebar)·버튼·토큰 (aboutU4APopup 와 동일 짝) ===== -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+    <link rel="stylesheet" href="editor.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* editorFrame.js 에서 재적용 */ }
+        })();
+    </script>
+</head>
+
+<body>
+
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/닫기 ===== -->
+    <header class="u4a-titlebar" id="editorTitlebar">
+        <img class="u4a-titlebar__logo" id="editorLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="editorTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- ===== 에디터 본체 = Monaco 호스트 iframe ===== -->
+    <div id="editorContent">
+        <iframe id="editorHost" name="editorHost" frameborder="0" allowfullscreen></iframe>
+    </div>
+
+    <!-- ===== 푸터 = [줌 컨트롤 −/%/+(왼쪽)] ···· [Save(오른쪽)] ===== -->
+    <footer class="u4aEdWinFooter" id="editorFooter">
+        <!-- 줌 컨트롤 [−][🔍 NNN%][+] — 브라우저/VS Code 줌과 동일 패턴, 상시 표시(Ctrl+휠 몰라도 발견 가능).
+             −=축소 / %클릭=원복 / +=확대. % 는 Ctrl+휠 줌 시 실시간 갱신. -->
+        <div class="u4aEdZoom">
+            <button type="button" class="u4a-btn u4aEdZoomBtn u4aEdZoomStep" id="editorZoomOut" title="Ctrl + Wheel ↓">
+                <i class="fa-solid fa-minus"></i>
+            </button>
+            <button type="button" class="u4a-btn u4aEdZoomBtn u4aEdZoomPct" id="editorZoomBtn">
+                <i class="fa-solid fa-magnifying-glass"></i><span>100%</span>
+            </button>
+            <button type="button" class="u4a-btn u4aEdZoomBtn u4aEdZoomStep" id="editorZoomIn" title="Ctrl + Wheel ↑">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+        <span class="u4aEdFootSpacer"></span>
+        <!-- 꾸밈정렬(Pretty Print) / 클립보드 복사 — 클라이언트 이벤트 에디터(ws_html5_client_editor)와
+             동일 모습으로 통일. 꾸밈정렬=텍스트+아이콘(편집모드 전용), 복사=아이콘 전용(상시 노출). -->
+        <button type="button" class="u4a-btn u4aEdPretty" id="editorPrettyBtn" hidden>
+            <i class="fa-solid fa-wand-magic-sparkles"></i><span></span>
+        </button>
+        <button type="button" class="u4a-btn u4aEdPretty u4aEdIcoBtn" id="editorCopyBtn">
+            <i class="fa-solid fa-copy"></i>
+        </button>
+        <button type="button" class="u4a-btn u4a-btn--emphasized" id="editorSaveBtn">
+            <i class="fa-solid fa-check"></i><span></span>
+        </button>
+    </footer>
+
+    <!-- 로딩 오버레이 = 공통 busy(.u4a-busy, shell.css SSOT — 카드+이중링 스피너, data-busy 토글, 0.3s 지연).
+         (토스트는 공통 .u4a-toast 를 editorFrame.js 가 동적 생성) -->
+    <div class="u4a-busy" id="editorBusy">
+        <div class="u4a-busy__card">
+            <div class="u4a-busy__spinner"></div>
+            <div class="u4a-busy__label"></div>
+        </div>
+    </div>
+
+    <script src="editorFrame.js"></script>
+
+</body>
+
+</html>

@@ -103,6 +103,15 @@ function writeLog(sLevel, sText) {
 
 }
 
+/** 예외 객체를 로그 한 줄 뒤에 붙일 글자로 (2026-09-14 추가) */
+function _errText(e) {
+
+    if (!e) { return ''; }
+
+    return ' | ' + (e.message ? e.message : String(e));
+
+}
+
 function _mapLevel(sLevel) {
 
     switch (sLevel) {
@@ -150,7 +159,7 @@ function _setupLogger() {
         _log.transports.console.level = 'error';
 
     } catch (e) {
-        console.error('[MLOG-002] could not set the log file path - falling back to the default path.', e);
+        writeLog('오류', '[MLOG-002] could not set the log file path - falling back to the default path.' + _errText(e));
     }
 
 }
@@ -174,7 +183,7 @@ function _getBuildTimeText() {
             + ':' + String(d.getMinutes()).padStart(2, '0');
 
     } catch (e) {
-        console.error('[MLOG-006] could not determine the build time.', e);
+        writeLog('오류', '[MLOG-006] could not determine the build time.' + _errText(e));
         return '(unknown)';
     }
 
@@ -370,7 +379,7 @@ function _installRendererErrorChannel() {
     try {
         ipcMain = require('electron').ipcMain;
     } catch (e) {
-        console.error('[MLOG-005] could not open the channel that receives renderer errors.', e);
+        writeLog('오류', '[MLOG-005] could not open the channel that receives renderer errors.' + _errText(e));
         return;
     }
 
@@ -421,7 +430,7 @@ function _installRendererErrorChannel() {
             CR.setLastState('마지막추적번호', oInfo.traceId || '----');
 
         } catch (e) {
-            console.error('[MLOG-007] could not update the last user action.', e);
+            writeLog('오류', '[MLOG-007] could not update the last user action.' + _errText(e));
         }
 
     });
@@ -510,7 +519,7 @@ function _installRendererErrorChannel() {
             });
 
         } catch (e) {
-            console.error('[MLOG-005] could not hand a renderer error to the sender.', e);
+            writeLog('오류', '[MLOG-005] could not hand a renderer error to the sender.' + _errText(e));
         }
 
     });

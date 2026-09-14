@@ -230,9 +230,9 @@ body {
 /* 드래그 중 커서/iframe 차단은 공통 wireSplitter(body.style.cursor) + 전역 body.u4a-dragging 이 담당. */
 
 /* busy 오버레이는 공통 .u4a-busy(shell.css) 소비 — data-busy 로 표시 토글. */
-/* ★ 즉시 표시(스코프 override, 공통 미수정): 공통 .u4a-busy 는 opacity 를 var(--motion)(~0.25s) 페이드인한다.
-   디자인 트리 재구성 같은 수십ms 짧은 busy 는 페이드가 완성되기 전에 꺼져 화면에 안 보였다(장군님 DA1 "전혀 안뜸").
-   이 팝업은 짧은 동기 작업이 많아 페이드를 제거해 켜는 즉시 풀 오버레이가 뜨게 한다(끌 때도 즉시). 카드 등장 애니는 유지. */
+/* 켜는 쪽(즉시 표시)은 2026-09-11 부터 공통 .u4a-busy 가 담당한다 — 공통의 0.3s 표시지연을 없앴다(원본 = 지연 0).
+   이 한 줄은 이제 **끄는 쪽도 즉시**(페이드아웃 없음)로 만드는 역할만 남았다. 이 팝업은 수십ms 짜리 짧은
+   동기 작업(디자인 tree 재구성 등)이 많아 on/off 가 잦으므로 끌 때 잔상이 남지 않게 그대로 둔다. */
 #bwpBusy { transition: none; }
 
 /* 다열 그리드 트리테이블(.u4aColTree*) = 공통 컴포넌트 → theme/shell.css 로 이관(U4AUI.makeColumnTree 스킨).

@@ -159,7 +159,11 @@ let oAPP = (function (window) {
      ***********************************************************/
     oAPP.fn.getBusy = function () { return oAPP.attr.isBusy; };
 
-    var _iBusyDelay = null;     // 0.3s 지연 표시 타이머(공통 .u4a-busy 와 동일 — 짧은 busy 깜빡임 방지)
+    // ★ busy 는 켜는 즉시 띄운다(지연 0). — 장군님 지시 2026-09-11
+    //   [고친 이유] 종전에는 공통 .u4a-busy 를 흉내내 setTimeout 300ms 뒤에 showModal() 했다.
+    //   그 0.3s 지연은 원본에 없는 임의 창작이었고(원본은 BusyIndicator.show(0) = 지연 0),
+    //   창이 뜰 때 빈 화면이 먼저 보이고 짧은 작업은 busy 가 아예 안 뜨는 원인이었다.
+    //   공통 쪽 지연도 같은 날 shell.css 에서 제거했다. 여기 타이머도 같이 없앤다.
     oAPP.fn.setBusy = function (bIsBusy) {
 
         var bOn = (bIsBusy === true || bIsBusy === "X");
@@ -170,10 +174,8 @@ let oAPP = (function (window) {
         if (oB) {
             if (bOn) {
                 if (!oB.__cancelBound) { oB.addEventListener("cancel", function (e) { e.preventDefault(); }); oB.__cancelBound = true; } // ESC 닫힘 차단
-                if (_iBusyDelay) { clearTimeout(_iBusyDelay); }
-                _iBusyDelay = setTimeout(function () { try { if (!oB.open) { oB.showModal(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 300); // 0.3s 지연(짧은 작업은 안 뜸)
+                try { if (!oB.open) { oB.showModal(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             } else {
-                if (_iBusyDelay) { clearTimeout(_iBusyDelay); _iBusyDelay = null; }
                 try { if (oB.open) { oB.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         }
@@ -483,6 +485,17 @@ window.onload = function () {
     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 기본 라이트 토큰 */ }
 
     oAPP.CURRWIN.setMenu(null);
+
+    // ★ 창은 뜨자마자 무조건 busy 부터 켜고 시작한다(장군님 지시 2026-09-09 · 2026-09-11).
+    //   [고친 이유] 종전에는 busy 없이 CURRWIN.show() 를 불렀다. 좌측 tree 는 opener 가
+    //   did-finish-load 에 보내는 if-mime-info 를 받아야 채워지므로, 그 사이 테마 배경만 깔린 빈 창이
+    //   먼저 보였다(느린 PC·다크 테마 = 검은 화면).
+    //   해제는 if-mime-info 수신 → fnMimeStart → lf_loadTree 의 성공/실패 분기(lf_busy(false))가 한다.
+    //   ※ 타임아웃으로 busy 를 강제 해제하는 안전장치는 두지 않는다(.analy 16 §2.11 · 장군님 지시).
+    //     busy 가 안 꺼지면 "뭔가 고장났다"는 신호다. 해제는 반드시 실제 완료/실패 이벤트로만 한다
+    //     — 여기서는 lf_loadTree 의 sendAjax 성공 콜백 / 실패 콜백(7번째 인자)이 그 이벤트다.
+    oAPP.fn.setBusy("X");
+
     oAPP.fn.fnInitHeader();
     oAPP.fn.attachIpcEvents();
     oAPP.fn.attachOpenerCloseWatch();   // 메인창 닫히면 함께 종료

@@ -1,4 +1,4 @@
-// 오류코드 접두: VMNG / 다음 번호: 003
+// 오류코드 접두: VMNG / 다음 번호: 004
 /****************************************************************************
  * 버전 관리(Version Management) 창 로직 (versionMngFrame.js)
  * --------------------------------------------------------------------------
@@ -67,7 +67,7 @@ var oState = {
 };
 
 var oFrame = null, bBusy = false, oToastTimer = null, bOpenDone = false;
-var oBroad = null, fnHostReadyWait = null, iOpenWatch = null;
+var oBroad = null, fnHostReadyWait = null, fnHostFailWait = null;
 
 /* ── 메시지 헬퍼 ──────────────────────────────────────────────────────── */
 // ZMSG_WS_COMMON_001 — 원본 control.js 와 동일 번호(getWsMsgClsTxt). UI 텍스트는 키만(임의 생성 금지).
@@ -144,7 +144,6 @@ function _setBusy(bOn, oOpt) {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { clearTimeout(iOpenWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } iOpenWatch = null;
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _setBusy(false);
     var oC = document.getElementById("vmContent");
@@ -724,25 +723,37 @@ function _diffOvfMenuItem(el) {
 function _loadHost() {
     if (!oFrame || oFrame.getAttribute("src")) { return; }
     var oPARAMS = { HOSTID: C_HOSTID, THEME: _monacoThemeFromBg(BGCOL), LANG: "abap" };
+
+    // ★ [2026-09-14, 장군님 지시] iframe 이 host 문서 자체를 못 읽는 경우 — 진짜 실패 이벤트.
+    //   host 안쪽 실패(monaco loader.js / index.js / vs 모듈)는 host 가 evt:"error" 로 알려 준다.
+    try {
+        oFrame.onerror = function () {
+            console.error("[VMNG-003] diff host iframe load failed:", oFrame.src);
+            if (typeof fnHostFailWait === "function") { fnHostFailWait(); }
+        };
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
     oFrame.src = "host/index.html?PARAMS=" + encodeURIComponent(JSON.stringify(oPARAMS));
 }
 
+// ★ [2026-09-14, 장군님 지시] 종전에는 "15초 지나면 실패로 친다"는 타이머로 기다림을 끊었다.
+//   그건 금지된 방식이다(.analy 16 §2.11) — 느린 PC 에서는 정상인데도 실패로 몰고,
+//   진짜 고장은 오히려 가려진다. 이제는 host 가 실제로 알려 주는 실패로만 끊는다
+//   (iframe error · monaco loader.js/index.js onerror · require 실패 콜백 → evt:"error").
 function _waitHostReady() {
     return new Promise(function (resolve) {
         if (oState.hostReady) { return resolve(true); }
         var bDone = false;
-        var iWatch = setTimeout(function () {
-            if (bDone) { return; }
-            bDone = true; fnHostReadyWait = null;
-            console.error("[versionMng] diff host load deferred/failed");
-            _fatal("E", _z("314") + "\n\n" + _z("290"));   // 알 수 없는 오류
-            resolve(false);
-        }, 15000);
         fnHostReadyWait = function () {
             if (bDone) { return; }
-            bDone = true; fnHostReadyWait = null;
-            try { clearTimeout(iWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            bDone = true; fnHostReadyWait = null; fnHostFailWait = null;
             resolve(true);
+        };
+        fnHostFailWait = function () {
+            if (bDone) { return; }
+            bDone = true; fnHostReadyWait = null; fnHostFailWait = null;
+            _fatal("E", _z("314") + "\n\n" + _z("290"));   // 알 수 없는 오류 + 안내 → OK 시 창 닫기
+            resolve(false);
         };
     });
 }
@@ -754,6 +765,13 @@ function _onHostMessage(oEvent) {
     if (d.evt === "ready") {
         oState.hostReady = true;
         if (typeof fnHostReadyWait === "function") { fnHostReadyWait(); }
+        return;
+    }
+    if (d.evt === "error") {
+        // host 로드 실패(실제 이벤트) — 타이머로 추측하지 않는다.
+        console.error("[VMNG-003] diff host load failed:", d.where || "", d.detail || "", d.code || "");
+        if (typeof fnHostFailWait === "function") { fnHostFailWait(); }
+        else { _fatal("E", _z("314") + "\n\n" + _z("290")); }
         return;
     }
     if (d.evt === "zoom") {
@@ -814,9 +832,10 @@ function _doCreateTempApp(oRow) {
         // opener 에게 새창(WS20 MOVE20) 요청 — 원본 IPC 계약 1:1.
         try { IPCRENDERER.send(BROWSKEY + "-if-version-management-new-window", { TAPPID: sTAPPID }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-        // busy 해제는 opener 의 "if-vermng-newwin-done"(새창 did-finish-load) 신호가 1차.
-        //   신호 누락(새창 생성 실패 등) 대비 5초 안전망(원본 연타방지 타이머 = fallback).
-        setTimeout(function () { _setBusy(false); }, 5000);
+        // busy 해제는 opener 가 보내는 "if-vermng-newwin-done" 신호 하나로만 한다.
+        //   ★ [2026-09-14] 여기 있던 5초 안전망을 걷어냈다(.analy 16 §2.11 금지). 대신 공통 새창
+        //     열기(onNewWindow)의 did-fail-load 에서도 같은 신호를 보내도록 배선했다
+        //     (ws30/resources/index.js RSRC-006) — 성공이든 실패든 신호가 반드시 온다.
     });
 }
 
@@ -1127,17 +1146,20 @@ window.addEventListener("load", function () {
     window.addEventListener("keyup", _keepSession);
     _keepSession();
 
+    // ★ 창은 뜨자마자 무조건 busy 부터 켜고 시작한다(장군님 지시 2026-09-09 · 2026-09-11).
+    //   [고친 이유] 종전에는 busy 없이 show() 를 불렀다. 목록은 opener 가 did-finish-load 에 보내는
+    //   if-vermng-info 를 받아야 채워지므로, 그 사이 테마 배경만 깔린 빈 창이 먼저 보였다
+    //   (느린 PC·다크 테마 = 검은 화면). 해제는 종전과 같이 _finishOpen(정상) / _fatal(오류) 1회.
+    //   ※ 아래 20초 안전장치가 이미 있어 if-vermng-info 미수신 시에도 busy 가 풀린다(_fatal → _setBusy(false)).
+    _setBusy(true);
+
     // 창 즉시 불투명 표시(네이티브 opacity 페이드 미사용). 등장 효과는 #vmContent CSS opacity.
     try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // ★ busy 는 여기서 끄지 않는다 ★ — opener 가 켠 WS20 busy 를 목록 렌더까지 유지(_finishOpen 1회).
-    // 단, if-vermng-info 가 끝내 도착하지 않으면(opener did-finish-load 누락 등) 본문이 영원히
-    // opacity 0 + busy 로 고착되므로 20초 안전장치(docPopup 동일 정책). 정상 수신 시 _finishOpen 이 해제.
-    iOpenWatch = setTimeout(function () {
-        if (bOpenDone) { return; }
-        console.error("[versionMng] if-vermng-info not received - open fallback used");
-        _fatal("E", _z("314") + "\n\n" + _z("290"));   // 알 수 없는 오류 + 안내 → OK 시 창 닫기
-    }, 20000);
+    //   [2026-09-14] 여기 있던 "20초 지나면 오류로 친다" 타이머를 걷어냈다(.analy 16 §2.11 금지).
+    //   문서 로드가 실패해 if-vermng-info 가 안 오는 경우는 opener 의 did-fail-load 가 이 창을
+    //   정리하고 WS20 잠금을 푼다(fnVersionManagementPopupOpen.js FVMP-001).
 });
 
 /* ── 종료 정리(누수 방지) ───────────────────────────────────────────────── */
@@ -1149,7 +1171,6 @@ window.onbeforeunload = function () {
     try { IPCRENDERER.removeListener("if-vermng-info", _onVmInfo); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try { IPCRENDERER.removeListener("if-vermng-newwin-done", _onNewWinDone); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-    try { clearTimeout(iOpenWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } iOpenWatch = null;
     // 자식창 busy 동기화 채널 명시적 close(누수 방지).
     if (oBroad) { try { oBroad.onmessage = null; oBroad.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } oBroad = null; }
 };

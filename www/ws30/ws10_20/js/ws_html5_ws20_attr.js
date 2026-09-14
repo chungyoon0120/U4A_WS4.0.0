@@ -1493,12 +1493,22 @@
 
                 //수집건은 존재하나 값이 존재하지 않는경우.
                 if (ls_0015.UIATV === "") {
-                    ls_0015.UIAT = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
+                    // [BR45] 원본 정정 추종(uiAttributeArea.js 7053~7054, pes 2026-08-18):
+                    // uploadUrl 기본값을 잘못된 필드(UIAT)에 매핑하던 것을 값칸(UIATV)으로 수정.
+                    // ls_0015.UIAT = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
+                    ls_0015.UIATV = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
                     return;
                 }
 
+                // [BR45] 원본 정정 추종(uiAttributeArea.js 7065~7075, pes 2026-08-18):
+                // /zu4a_srs/ 로 시작하는지를 대소문자 구분 없이 판단하도록 변경.
+                // //uploadUrl 프로퍼티의 값이 U4A에서 기본 세팅한 값이 아닌경우 EXIT.
+                // if (ls_0015.UIATV.indexOf("/zu4a_srs/") === -1) {
+                //     return;
+                // }
+
                 //uploadUrl 프로퍼티의 값이 U4A에서 기본 세팅한 값이 아닌경우 EXIT.
-                if (ls_0015.UIATV.indexOf("/zu4a_srs/") === -1) {
+                if (!ls_0015.UIATV.toUpperCase().startsWith("/ZU4A_SRS/")) {
                     return;
                 }
 
@@ -1507,8 +1517,11 @@
 
                 //기존의 프로퍼티에 등록한 application id와 현재 application id가 다른경우.
                 if (l_appid !== oAPP.attr.appInfo.APPID) {
+                    // [BR45] 원본 정정 추종(uiAttributeArea.js 7091~7092, pes 2026-08-18):
+                    // 잘못된 필드(UIAT) 대신 값칸(UIATV)에 현재 application id 매핑.
                     //현재 application id로 매핑 처리.
-                    ls_0015.UIAT = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
+                    // ls_0015.UIAT = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
+                    ls_0015.UIATV = "/zu4a_srs/" + oAPP.attr.appInfo.APPID.toLocaleLowerCase();
                 }
 
                 return;

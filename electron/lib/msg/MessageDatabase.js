@@ -2,6 +2,37 @@
 
 const BETTER_SQLITE3 = require('better-sqlite3');
 
+/****************************************************************************************
+ * 로그 파일에 남기기 (2026-09-14 추가 — 장군님 지시)
+ * --------------------------------------------------------------------------------------
+ * 앱 본체의 console 은 electron-log 로 갈아끼우지 않았다(화면 쪽 ws_log.js 만 갈아끼움).
+ * 설치한 앱에는 터미널이 없으므로 console.error 로 남긴 글은 어디에도 안 남는다.
+ * writeLog 는 electron-log 에 직접 넣는다.
+ *
+ * 순환 참조 없음 — main.js 가 ws_main_log 를 가장 먼저 설치하고,
+ * 여기서는 부를 때마다 늦게 require 한다.
+ ****************************************************************************************/
+function _writeMainLog(sLevel, sText) {
+
+    try {
+        require('../log/ws_main_log').writeLog(sLevel, sText);
+    } catch (e) {
+        // 로그 장치를 못 얻으면 콘솔로라도 남긴다(유실 방지)
+        console.error(sText);
+    }
+
+}
+
+/** 예외 객체를 로그 한 줄 뒤에 붙일 글자로 */
+function _errText(e) {
+
+    if (!e) { return ''; }
+
+    return ' | ' + (e.message ? e.message : String(e));
+
+}
+
+
 /**
  * @class MessageDatabase
  * @description better-sqlite3 기반 메시지 클래스 단건 조회 래퍼.
@@ -71,7 +102,7 @@ class MessageDatabase {
             ) || null;
 
         } catch (error) {
-            console.error('[MessageDatabase] getMessageClassRow error:', error);
+            _writeMainLog('오류', '[MessageDatabase] getMessageClassRow error:' + _errText(error));
             return null;
         }
 
@@ -91,7 +122,7 @@ class MessageDatabase {
         try {
             return this.findByTextStmt.get(text) || null;
         } catch (error) {
-            console.error('[MessageDatabase] findByText error:', error);
+            _writeMainLog('오류', '[MessageDatabase] findByText error:' + _errText(error));
             return null;
         }
 
@@ -108,7 +139,7 @@ class MessageDatabase {
         try {
             return this.paramTemplateStmt.all();
         } catch (error) {
-            console.error('[MessageDatabase] getParamTemplates error:', error);
+            _writeMainLog('오류', '[MessageDatabase] getParamTemplates error:' + _errText(error));
             return [];
         }
 

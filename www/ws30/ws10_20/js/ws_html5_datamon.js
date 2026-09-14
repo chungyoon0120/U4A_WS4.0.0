@@ -96,6 +96,24 @@
     //  ※ 4.0 쪽은 나머지 칸이 전부 함수라 원래도 안 담겼다 — 담기는 내용이 바뀌지 않는다.
     var C_MODEL_KEYS = ["oModel", "_MODEL"];
 
+    //이름이 밑줄 **두 개**로 시작하는 칸은 어디에 있든 안 담는다(장군님 지시 2026-09-11).
+    //  밑줄 **하나**(_T_0015 · _MODEL · _BIND_AGGR · _OBJID · _EMBED_AGGR)는 우리가 심은
+    //  데이터라 그대로 담는다. 두 개짜리만 뺀다.
+    var C_SKIP_PREFIX = "__";
+
+    /**
+     * 이 칸 이름은 안 담는가.
+     *   ① 이름이 딱 맞는 것(C_SKIP_KEYS) ② 밑줄 두 개로 시작하는 것(C_SKIP_PREFIX)
+     *   ★ 담는 자리가 여러 군데라(일반 객체 · UI 부품 · 뿌리) 판정은 이 함수 하나로 모은다.
+     */
+    function _isSkipKey(sKey) {
+
+        if (typeof sKey !== "string") { return false; }
+        if (C_SKIP_KEYS.indexOf(sKey) !== -1) { return true; }
+        return sKey.indexOf(C_SKIP_PREFIX) === 0;
+
+    } // end of _isSkipKey
+
 
     /* ────────────────────────────────────────────────────────────────
      *  상태
@@ -176,8 +194,8 @@
                     //  "생김/없어짐" 줄이 떴다. 함수는 데이터가 아니므로 아예 안 담는다.
                     if (typeof vChild === "function") { continue; }
 
-                    //★ 아예 안 담는 칸(위 C_SKIP_KEYS) — 깊이와 상관없이 건너뛴다.
-                    if (C_SKIP_KEYS.indexOf(aKeys[i]) !== -1) { continue; }
+                    //★ 아예 안 담는 칸(위 _isSkipKey) — 깊이와 상관없이 건너뛴다.
+                    if (_isSkipKey(aKeys[i])) { continue; }
 
                     vOut[aKeys[i]] = _snap(vChild, iDepth + 1, aChain, aKeys[i]);
                 } catch (e) {
@@ -256,6 +274,10 @@
             var sK = C_UI_KEEP[i];
             if (!Object.prototype.hasOwnProperty.call(v, sK)) { continue; }
 
+            //★ 남기기로 한 칸이라도 밑줄 두 개로 시작하면 안 담는다(장군님 지시 2026-09-11).
+            //  이 규칙으로 __PARENT · __UIFND 가 빠진다.
+            if (_isSkipKey(sK)) { continue; }
+
             var vVal;
             try {
                 vVal = v[sK];
@@ -263,19 +285,6 @@
                 //읽는 것만으로 터지는 칸이 있을 수 있다. 그 칸만 표시로 남긴다.
                 console.error("[DMON-008] could not read the UI control cell:", sK, e);
                 oOut[sK] = "[read error]";
-                continue;
-            }
-
-            //윗 부품 자리에는 그 부품이 통째로 들어 있다. 어느 UI 인지만 알면 되므로 UI ID 만 남긴다.
-            if (sK === "__PARENT") {
-                if (vVal && typeof vVal === "object") {
-                    if (!vVal._OBJID) {
-                        console.warn("[DMON-008] parent control has no UI ID - cannot record which UI it is:", v._OBJID || "(unknown UI ID)");
-                    }
-                    oOut[sK] = vVal._OBJID || "(모름)";
-                } else {
-                    oOut[sK] = vVal;
-                }
                 continue;
             }
 
@@ -410,6 +419,7 @@
         var aKeys = Object.keys(oSrc);
         for (var i = 0; i < aKeys.length; i++) {
             if (aSkip.indexOf(aKeys[i]) !== -1) { continue; }
+            if (_isSkipKey(aKeys[i])) { continue; }
             oOut[aKeys[i]] = oSrc[aKeys[i]];
         }
 

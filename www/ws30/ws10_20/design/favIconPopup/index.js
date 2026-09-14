@@ -422,8 +422,11 @@ oAPP.fn.setFavList = function(aFavIconList = []){
         //말줄임된 아이콘 이름 전체는 타일 title 로 확인(독립 iframe — 네이티브 title 허용).
         _oTile.title = _sFavIconList.ICON_NAME || "";
 
-        //검색 필터용 소문자 이름 캐시.
-        _oTile._name = String(_sFavIconList.ICON_NAME || "").toLowerCase();
+        //검색 필터용 소문자 캐시 — 이름 + ICON_SRC.
+        //  ★[수정 2026-09-14, 장군님 지시] 이름만 보면 복사 버튼으로 복사한 값(ICON_SRC, 예 sap-icon://account)을
+        //  그대로 붙여넣어 검색했을 때 한 건도 안 나온다. 같은 앱의 아이콘 뷰어(iconPrevPopup) 도
+        //  ICON_SRC 를 검색 대상으로 쓴다 — 기준을 맞춘다.
+        _oTile._find = (String(_sFavIconList.ICON_NAME || "") + " " + String(_sFavIconList.ICON_SRC || "")).toLowerCase();
 
         //키보드 접근성 — 타일 포커스 가능 + Enter/Space 선택(더블클릭과 동일).
         _oTile.tabIndex = 0;
@@ -592,7 +595,7 @@ oAPP.fn.refreshFilter = function(){
 
     for(let i = 0; i < _total; i++){
         let _t = _tiles[i];
-        let _match = (_q === "" || (_t._name && _t._name.indexOf(_q) !== -1));
+        let _match = (_q === "" || (_t._find && _t._find.indexOf(_q) !== -1));
         _t.hidden = !_match;
         if(_match){ _shown++; }
     }

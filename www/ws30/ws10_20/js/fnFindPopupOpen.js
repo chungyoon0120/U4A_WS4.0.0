@@ -3,6 +3,7 @@
  * ----------------------------------------------------------------------
  * - file Name : fnFindPopupOpen.js
  * - file Desc : [WS20] Find (찾기) — HTML5 별도창 opener
+ * - 오류코드 접두: FFPO / 다음 번호: 003
  * ----------------------------------------------------------------------
  *  원본: Popups/findPopup (UI5 별도 BrowserWindow: frame.html→frame.js→iframe index.html→index.js,
  *        sap.tnt.ToolPage = 좌 SideNavigation(5메뉴) + 우 NavContainer(메뉴별 테이블)).
@@ -111,6 +112,21 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고, 아래 did-finish-load 가 보내는 if-find-info 를 받아야
+        //   목록이 채워진다. 문서 로드가 실패하면 그 데이터가 영영 안 와 busy 가 고착된다.
+        //   타이머로 덮는 것은 금지(.analy 16 §2.11)이므로 실패 이벤트에서 창을 정리하고 잠금을 푼다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FFPO-001] Find window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FFPO-001] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FFPO-001] busy release failed:", e3 && e3.message); }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FFPO-001] did-fail-load register failed:", e && e.message); }
+
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) { oBrowserWindow.webContents.openDevTools(); }
 
@@ -122,20 +138,39 @@
         // 브라우저가 오픈이 다 되면 IF 데이터 전달(원본 if-find-info 1:1).
         oBrowserWindow.webContents.on('did-finish-load', function () {
 
-            // 서버이벤트 리스트를 구한다(원본 동일 — 비동기 콜백).
-            oAPP.fn.getServerEventList(function (aServerEventList) {
+            // 서버이벤트 리스트를 구한다(원본 동일 — 비동기).
+            // ★ [2026-09-14, 장군님 지시] 성공 콜백 대신 Promise 로 받는다.
+            //   [고친 이유] getServerEventList 는 서버 왕복이 실패하면 성공 콜백을 부르지 않는다
+            //   (실패 콜백에서 Promise 만 resolve 한다). 그래서 서버가 안 되면 if-find-info 가
+            //   영영 안 가 Find 창이 busy 인 채로 굳었다. Promise 는 성공·실패 모두 resolve 되므로
+            //   어느 쪽이든 창에 데이터가 간다(실패면 서버이벤트 목록만 빈 상태).
+            Promise.resolve(oAPP.fn.getServerEventList()).then(function (aServerEventList) {
 
                 const oFindData = {
                     oUserInfo: parent.getUserInfo(),   // 로그인 사용자 정보
                     oThemeInfo: oThemeInfo,            // 테마 개인화 정보
                     aAttrData: aAttrData,              // 변경 속성 정보(find 모수)
-                    aServEvtData: aServerEventList,    // 서버 이벤트 리스트
+                    aServEvtData: aServerEventList || [],   // 서버 이벤트 리스트
                     aT_0022: oAPP.DATA.LIB.T_0022      // UI 클래스 매핑용
                 };
 
-                oBrowserWindow.webContents.send('if-find-info', oFindData);
-                parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
+                try {
+                    oBrowserWindow.webContents.send('if-find-info', oFindData);
+                    parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
+                } catch (eSend) {
+                    console.error("[FFPO-002] initial data send to the Find window failed:", eSend && eSend.message);
+                    try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                    catch (e2) { console.error("[FFPO-002] cleanup of the failed window failed:", e2 && e2.message); }
+                    try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FFPO-002] busy release failed:", e3 && e3.message); }
+                    try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+                }
 
+            }).catch(function (eErr) {
+                console.error("[FFPO-002] server event list read failed:", eErr && eErr.message);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FFPO-002] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FFPO-002] busy release failed:", e3 && e3.message); }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
 
         });
@@ -186,7 +221,10 @@
      **************************************************************************/
     oAPP.fn.fnIpcMain_Find_Data_Refresh = function (events, res) {
 
-        oAPP.fn.getServerEventList(function (aServerEventList) {
+        // ★ [2026-09-14, 장군님 지시] 성공 콜백 대신 Promise — 위 if-find-info 와 같은 이유다.
+        //   Find 창은 새로고침을 누르는 순간 busy 를 켜고 이 콜백만 기다린다. 서버가 안 되면
+        //   성공 콜백이 안 불려 busy 가 영영 안 풀렸다.
+        Promise.resolve(oAPP.fn.getServerEventList()).then(function (aServerEventList) {
 
             const oSender = events.sender,
                 oWebPref = oSender.getWebPreferences(),
@@ -196,12 +234,18 @@
                 oUserInfo: parent.getUserInfo(),
                 oThemeInfo: parent.getThemeInfo(),
                 aAttrData: oAPP.fn.getAttrChangedData(),
-                aServEvtData: aServerEventList,
+                aServEvtData: aServerEventList || [],
                 aT_0022: oAPP.DATA.LIB.T_0022
             };
 
             oSender.send(`${sBrowserKey}--find--data--refresh--callback`, oFindData);
 
+        }).catch(function (eErr) {
+            console.error("[FFPO-003] Find data refresh failed:", eErr && eErr.message);
+            // 창이 계속 기다리지 않도록 빈 결과라도 반드시 보낸다(busy 해제 신호를 겸한다).
+            try {
+                events.sender.send(`${events.sender.getWebPreferences().browserkey}--find--data--refresh--callback`, null);
+            } catch (e2) { console.error("[FFPO-003] empty result notice failed:", e2 && e2.message); }
         });
 
     }; // end of oAPP.fn.fnIpcMain_Find_Data_Refresh

@@ -1582,15 +1582,36 @@
              *   - 또 ①②④ 는 아예 보지 않아, 화면 전환 중에도 이 화면 단축키가 그냥 실행됐다.
              *   ※ 팝업 검사는 없어진 게 아니라 공통 함수 안(fnCheckIsDialogOpen)으로 들어갔다.
              ********************************************************************/
+            /********************************************************************
+             * 로그 (2026-09-11 추가 — 장군님 지시)
+             * ------------------------------------------------------------------
+             * 그전에는 아래 세 갈래가 전부 로그 한 줄 없이 조용히 빠져나가서,
+             * "단축키를 눌렀는데 아무 일도 안 일어난다" 를 로그만 보고는 짚을 수 없었다
+             * (실제로 Shift+F11 어플리케이션 복사가 안 되는 원인을 못 찾아 헤맸다).
+             * 여기까지 왔다는 것은 이 화면의 등록된 단축키가 실제로 눌렸다는 뜻이므로
+             * 빈도가 낮다 → 로그 양 걱정 없음.
+             ********************************************************************/
+            if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                U4ALOG.info("SHORTCUT", hit.sc + " -> " + hit.ev, "matched on WS10");
+            }
+
             var sScChkResult = oAPP.common.fnShortCutExeAvaliableCheck();
 
             // X 이면 실행 불가
             if (sScChkResult === "X") {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", hit.sc + " -> " + hit.ev,
+                        "blocked by fnShortCutExeAvaliableCheck (shortcut lock / navigating / busy / menu open / dialog open)");
+                }
                 return;
             }
 
             //[DM1] 개발 전용 단축키 — 원본과 동일하게 IS_DEV 로 막는다.
             if (hit.dev && !_isDevAuth()) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", hit.sc + " -> " + hit.ev,
+                        "blocked: dev-only shortcut but IS_DEV is not 'D'");
+                }
                 return;
             }
 

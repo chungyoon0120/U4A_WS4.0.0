@@ -311,7 +311,7 @@
     }
 
     function _apply() {
-        // 저장 중 형제창 잠금(원본 setBusy(true)→broadcast). 동기 작업이라 .u4a-busy 의 0.3s 지연으로 깜빡임 없음.
+        // 저장 중 형제창 잠금(원본 setBusy(true)→broadcast). busy 는 켜는 즉시 뜬다(지연 0, 2026-09-11).
         _setBusy(true);
         try {
         var sKey = sCurTheme;

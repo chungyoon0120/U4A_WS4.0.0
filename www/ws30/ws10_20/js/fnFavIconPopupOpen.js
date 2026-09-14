@@ -13,6 +13,7 @@
  *   iframe 콘텐츠(design/favIconPopup/index.html·index.js)는 SAP 아이콘 폰트를 로드해
  *   즐겨찾기 아이콘을 렌더한다 → 임의 SAP 아이콘 정확 렌더를 위해 iframe 유지가 필수.
  ************************************************************************/
+// 오류코드 접두: FFIP / 다음 번호: 002
 (function () {
     "use strict";
 
@@ -433,6 +434,12 @@
             out.push(row);
         }
 
+        //ICON_SRC 가 없는 항목은 타일 검색·이름 복사·선택이 모두 안 된다 — 몇 건인지 남긴다(즐겨찾기 파일 손상 감지).
+        var iNoSrc = out.filter(function (r) { return !r.ICON_SRC; }).length;
+        if (iNoSrc > 0 && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "ICON_SRC missing", "favorite rows not searchable/copyable, count=" + iNoSrc + "/" + out.length);
+        }
+
         return out;
     }
 
@@ -465,7 +472,19 @@
 
         if (!oData || !oData.sList || oData.sList.ICON_SRC == null) { return; }
 
-        try { parent.setClipBoardTextCopy(oData.sList.ICON_SRC); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        //★[수정 2026-09-14] 이 팝업은 native <dialog>.showModal() 이라 셸의 임시 textarea 가 inert 였고,
+        //  복사는 실패하는데 "복사되었습니다" 안내만 뜨고 있었다(실측). 셸 복사 함수가 이제 성공 여부를
+        //  돌려주므로, 실제로 복사된 경우에만 안내한다.
+        var bOk = false;
+
+        try { bOk = (parent.setClipBoardTextCopy(oData.sList.ICON_SRC) === true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        if (bOk !== true) {
+            //복사 실패 — 성공 안내를 띄우지 않는다. 실패 전용 메시지 키가 없어 화면 안내는 하지 않고 오류코드로만 표면화.
+            console.error("[FFIP-001] _copyText: clipboard write failed - icon name not copied. ICON_SRC:", oData.sList.ICON_SRC);
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) { U4ALOG.warn("GUARD_EXIT", "clipboard write", "icon name not copied, no success message shown"); }
+            return;
+        }
 
         //272  &1 has been copied.
         _toast("S", _msgWs("272", oData.sList.ICON_SRC));

@@ -9,24 +9,30 @@
   그보다 뒤에 손댄 파일이 있으면 "고쳤는데 안 남겼다" 로 본다.
   Edit 로 고쳤든 Bash 로 고쳤든 상관없이 잡힌다.
 
-오류코드 접두: SHG / 다음 번호: 005
+★ 프로젝트 폴더 안에 로그 파일·상태 파일을 만들지 않는다 (장군님 지시 2026-09-11).
+  - 흔적은 stderr 로만 남긴다. Stop hook 의 stderr 는 화면에 그대로 보인다
+  - 남기는 것은 **막았을 때 · 예외 · 검사를 못 하고 넘어갔을 때**뿐이다.
+    통과는 정상 동작이라 남기지 않는다 (매 턴 쌓이면 로그 표준의 '양' 조항 위반)
+  - 막은 횟수만 시스템 임시 폴더에 둔다
+
+오류코드 접두: SHG / 다음 번호: 007
 
 안전장치 - 세션이 갇히면 안 된다:
   1) payload 의 stop_hook_active 가 참이면 통과
-  2) 같은 대화에서 3번 막으면 그다음은 통과 (로그를 남기고)
+  2) 같은 대화에서 3번 막으면 그다음은 통과
   3) 어떤 예외가 나도 통과 (fail-open) - 막는 쪽이 위험하다
-  4) 무슨 일이 있어도 log 는 남긴다
+  4) 예외가 나도 흔적은 stderr 로 남긴다
 """
 import sys
 import os
 import json
 import subprocess
+import tempfile
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-LOG = os.path.join(HERE, "stop_history_gate.log")
-STATE = os.path.join(HERE, "stop_history_gate.state.json")
+STATE = os.path.join(tempfile.gettempdir(), "u4a_stop_history_gate.state.json")
 
 HISTORY_DIR = os.path.join(PROJECT, ".docs", "history")
 MAX_BLOCKS_PER_SESSION = 3
@@ -42,11 +48,12 @@ SKIP_SUFFIX = (".log", ".marker", ".state.json", ".bak", ".zip", ".tmp",
 
 
 def log(level, event, detail=""):
-    """Append one line. Never raises - a logging failure must not break the hook."""
+    """stderr 로만 남긴다. 파일을 만들지 않는다.
+
+    Never raises - a logging failure must not break the hook."""
     try:
-        with open(LOG, "a", encoding="utf-8") as f:
-            f.write("%s %s %s %s\n" % (
-                datetime.now().isoformat(timespec="seconds"), level, event, detail))
+        sys.stderr.write("[stop_history_gate] %s %s %s\n" % (level, event, detail))
+        sys.stderr.flush()
     except Exception:
         pass
 
@@ -57,7 +64,7 @@ def emit(obj):
 
 
 def passthrough(reason):
-    log("INFO", "DONE", "pass through - " + reason)
+    """통과는 정상 동작이므로 아무것도 남기지 않는다."""
     emit({"continue": True})
     return 0
 

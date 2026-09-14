@@ -1,7 +1,7 @@
 ---
 description: 버그 코드번호(br19 등) 단위로 수정→검수요청→검수결과 반영→수정완료 왕복. 인자로 4단계 분기.
 argument-hint: <코드번호> <고쳐라 | 검수 작성해라 | 결과 확인해라 | 수정 완료해라>
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__notion-multi__list_workspaces, mcp__notion-multi__query_database, mcp__notion-multi__get_page, mcp__notion-multi__update_page_properties, mcp__notion-multi__append_text
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
 사용자 입력: `$ARGUMENTS`
@@ -17,10 +17,16 @@ allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__notion-multi__list_work
 
 ### 노션 대상 (고정)
 
-이 명령의 **모든 노션 작업**은 `notion-multi` MCP의 **U4A 워크스페이스**에서, 아래 **이슈 리포트 DB만** 바라본다. 다른 워크스페이스·다른 DB는 쓰지 않는다.
-- **`database_id` = `bdd7e18b-1cd6-8396-a2b0-81900fb593d1`** (이슈 리포트 DB. 이 ID로 바로 접근한다).
-- 그 DB의 속성: 코드번호 = **`코드`**(예: `BR19`), 상태 = **`상태`**(예: `수정완료`·`접수`), 내용 = **`내용`**, 화면 = **`화면`**.
-- 모든 `query_database`·`get_page`·`update_page_properties` 호출에 `workspace:"U4A 워크스페이스"`을 넣는다.
+이 명령의 **모든 노션 작업**은 `yoon-notion` CLI 의 **`u4a` 연결**(U4A 워크스페이스, 이슈 리포트 DB)만 바라본다. 다른 연결·다른 DB 는 쓰지 않는다.
+- ※ 예전엔 `notion-multi` MCP 를 썼으나 **폐기됨.** 이슈 리포트 DB 는 2026-09-10 `yoon-notion` CLI `u4a` 연결로 이관됐다(2026-09-14 확인·갱신). MCP `notion-multi` 도구는 이제 없다.
+- **`database_id` = `bdd7e18b-1cd6-8396-a2b0-81900fb593d1`** (이슈 리포트 DB).
+- 그 DB의 속성: 코드번호 = **`코드`**(title, 예: `BR19`), 상태 = **`상태`**(status, 옵션: `접수`·`보류`·`작업중`·`수정완료`·`테스트확인중`·`✅ 최종완료`·`🔁 재오픈`·`반려`), 내용 = **`내용`**(rich_text), 화면 = **`화면`**(rich_text).
+- **CLI 실행 방법** (launcher = `.claude/skills/yoon-notion/yoon-notion.cmd`):
+  - Windows(PowerShell): `& ".claude\skills\yoon-notion\yoon-notion.cmd" <subcmd> --as u4a ...`
+  - Bash: `.claude/skills/yoon-notion/yoon-notion.sh <subcmd> --as u4a ...`
+  - subcmd: `query`(행 찾기) · `get`(행 읽기) · `update`(속성 변경) · `db`(스키마).
+  - ★필터 JSON 은 PowerShell 이 내부 큰따옴표를 벗겨내므로 `\"` 로 이스케이프한다:
+    `query --as u4a <database_id> --filter '{\"property\":\"코드\",\"title\":{\"equals\":\"BR40\"}}'` → 결과의 `id:` 가 그 행의 page_id.
 
 ---
 
@@ -46,8 +52,8 @@ allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__notion-multi__list_work
 
 ## 분기 1 — "고쳐라" (버그 수정)
 
-1. `notion-multi`로 **U4A 워크스페이스의 이슈 리포트 DB**에서 해당 코드번호 행을 읽는다(위 "노션 대상(고정)" 참조).
-   - `query_database {workspace:"U4A 워크스페이스", database_id:"bdd7e18b-1cd6-8396-a2b0-81900fb593d1", match_text:"<코드번호>"}`로 `코드`가 그 번호인 행의 `page_id`를 잡고 → `get_page {workspace:"U4A 워크스페이스", page_id}`로 **내용·상세**를 읽는다.
+1. `yoon-notion` CLI(`--as u4a`)로 이슈 리포트 DB에서 해당 코드번호 행을 읽는다(위 "노션 대상(고정)" 참조).
+   - `query --as u4a bdd7e18b-1cd6-8396-a2b0-81900fb593d1 --filter '{\"property\":\"코드\",\"title\":{\"equals\":\"<코드번호 대문자>\"}}'` 로 그 행의 `page_id`(결과의 `id:`)를 잡고 → `get --as u4a <page_id>` 로 **내용·상세**를 읽는다.
 2. 읽은 버그 내용대로 **코드를 수정**한다.
    - 기준은 항상 **원본(as-is) + `.analy` SSOT**. 원본에 없는 UX·동작 임의 추가 금지.
    - 화면/UI 관련이면 `.analy` 해당 문서를 먼저 읽고 규칙대로.
@@ -89,9 +95,9 @@ allowed-tools: Read, Write, Edit, Grep, Glob, Bash, mcp__notion-multi__list_work
 
 ## 분기 4 — "수정 완료해라" (상태 변경)
 
-1. **별도 질문 없이 바로** `notion-multi`로 **U4A 워크스페이스의 이슈 리포트 DB**에서 그 행의 `상태`를 "수정완료"로 바꾼다(위 "노션 대상(고정)" 참조). (이 명령을 실행한 것 자체가 장군님의 지시다.)
-   - `query_database {workspace:"U4A 워크스페이스", database_id:"bdd7e18b-1cd6-8396-a2b0-81900fb593d1", match_text:"<코드번호>"}`로 `코드`가 그 번호인 행의 `page_id`를 잡는다.
-   - `update_page_properties {workspace:"U4A 워크스페이스", page_id, properties:{상태:"수정완료"}}`로 `상태`를 "수정완료"로 변경.
+1. **별도 질문 없이 바로** `yoon-notion` CLI(`--as u4a`)로 이슈 리포트 DB 그 행의 `상태`를 "수정완료"로 바꾼다(위 "노션 대상(고정)" 참조). (이 명령을 실행한 것 자체가 장군님의 지시다.)
+   - `query --as u4a bdd7e18b-1cd6-8396-a2b0-81900fb593d1 --filter '{\"property\":\"코드\",\"title\":{\"equals\":\"<코드번호 대문자>\"}}'` 로 그 행의 `page_id`(결과의 `id:`)를 잡는다.
+   - `update --as u4a <page_id> --prop "상태=수정완료"` 로 `상태`를 "수정완료"로 변경.
 2. 변경 결과(성공/실패 + 노션 URL)를 보고한다.
 3. **테스트 현황판 정리(히스토리 이관).** 이 코드번호가 속한 그룹의 **모든 항목이 통과(✅ O)됐으면**, `.works/<화면영역명>/00_현황판.md`에서 그 그룹을 **그룹째** `.works/<화면영역명>/00_히스토리.md`로 옮긴다.
    - 그룹 중 일부만 통과(✅ O)한 상태면 **이관하지 않는다**(그 자리 표시만 유지). 그룹 전 항목이 ✅ O일 때만 그룹째 이관.

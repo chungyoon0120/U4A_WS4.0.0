@@ -63,7 +63,7 @@ var oState = {
 };
 
 var oTiny = null, oTitleField = null, bBusy = false, oToastTimer = null,
-    iBusyWatch = null, bOpenDone = false, oBroad = null;
+    bOpenDone = false, oBroad = null;
 
 // ── 로컬 헬퍼 ──────────────────────────────────────────────────────────
 function _msg(sCls, sCode, p1) {
@@ -187,7 +187,6 @@ function _setBusy(bOn, oOpt) {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _setBusy(false);
     _fadeInContent();
@@ -884,6 +883,14 @@ window.addEventListener("load", function () {
 
     try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
+    // ★ 창은 뜨자마자 무조건 busy 부터 켜고 시작한다(장군님 지시 2026-09-09 · 2026-09-11).
+    //   [고친 이유] 종전에는 boot 에서 busy 를 켜지 않고 CURRWIN.show() 를 불렀다. 본문은 opener 가
+    //   did-finish-load 에 보내는 if-appdocu-info 를 받아야 채워지므로, 그 사이 테마 배경만 깔린 빈 창이
+    //   먼저 보였다(느린 PC·다크 테마 = 검은 화면). 해제는 종전과 같이 _finishOpen 1회.
+    //   ※ _initBroadcast 보다 앞에 둔다 — 아직 oBroad 가 null 이라 형제창에 BUSY_ON 을 되쏘지 않는다
+    //     (opener 가 이미 형제창을 잠갔다).
+    _setBusy(true);
+
     _initChrome();
     _initSplitter();
     _initBroadcast();
@@ -901,10 +908,12 @@ window.addEventListener("load", function () {
 
     try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-    iBusyWatch = setTimeout(function () {
-        console.error("[docPopup] editor/server load deferred — busy force release");
-        _finishOpen();
-    }, 20000);
+    // ★ [2026-09-14, 장군님 지시] 여기 있던 "20초 지나면 busy 를 그냥 끈다" 타이머를 걷어냈다.
+    //   타이머 폴백은 금지다(.analy 16 §2.11) — busy 가 안 꺼지는 건 "고장났다"는 신호인데
+    //   타이머로 꺼버리면 화면은 빈 채인데 사용자는 끝난 줄 착각한다.
+    //   초기 데이터가 안 오는 진짜 경우(창 문서 로드 실패 · 데이터 전송 실패)는 오프너가
+    //   did-fail-load / 전송 try-catch 에서 이 창을 정리하고 잠금을 푼다.
+    //   (오프너 = fnDialogPopupOpener.js FDPO-011)
 });
 
 // busy 중에는 창 닫기 차단(원본 onbeforeunload). 정상 종료 시 리스너/IPC/에디터 해제.

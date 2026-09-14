@@ -53,7 +53,7 @@ var oState = {
 };
 
 var oSrchField = null, bBusy = false, oToastTimer = null,
-    iBusyWatch = null, bOpenDone = false, oBroad = null;
+    bOpenDone = false, oBroad = null;
 
 // ── 로컬 헬퍼 ──────────────────────────────────────────────────────────
 function _msg(sCls, sCode, p1) {
@@ -92,7 +92,6 @@ function _setBusy(bOn, oOpt) {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _setBusy(false);
     var oBody = document.getElementById("rtmBody");
@@ -511,11 +510,12 @@ window.addEventListener("load", function () {
 
     try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-    // 안전판 — if-runtime-info 가 안 오면 busy 강제 해제(원본 동작엔 없던 방어).
-    iBusyWatch = setTimeout(function () {
-        console.error("[runtimeClassNavigator] runtime info not received - busy force released");
-        _finishOpen();
-    }, 20000);
+    // ★ [2026-09-14, 장군님 지시] 여기 있던 "20초 지나면 busy 를 그냥 끈다" 타이머를 걷어냈다.
+    //   타이머 폴백은 금지다(.analy 16 §2.11) — busy 가 안 꺼지는 건 "고장났다"는 신호인데
+    //   타이머로 꺼버리면 화면은 빈 채인데 사용자는 끝난 줄 착각한다.
+    //   초기 데이터가 안 오는 진짜 경우(창 문서 로드 실패 · 데이터 전송 실패)는 오프너가
+    //   did-fail-load / 전송 try-catch 에서 이 창을 정리하고 잠금을 푼다.
+    //   (오프너 = fnDialogPopupOpener.js FDPO-006)
 });
 
 // busy 중 창 닫기 차단(원본 onbeforeunload). 정상 종료 시 리스너/IPC 해제.

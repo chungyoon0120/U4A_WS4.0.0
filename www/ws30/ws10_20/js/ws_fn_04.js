@@ -316,7 +316,7 @@
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
@@ -361,8 +361,7 @@
             
             oBrowserWindow.show();
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // [2026-09-13] 네이티브 투명도 페이드 제거 — 바로 위 show() 로 이미 표시했다.
 
             // 부모 위치 가운데 배치한다.            
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);

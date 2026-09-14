@@ -1016,12 +1016,21 @@ body.u4a-dragging iframe { pointer-events: none; }
     display: none;
 }
 
-/* 표시를 0.3s 지연 → 짧은 busy(빠른 on/off)는 화면에 나타나지 않아 깜빡임 없음 */
+/* ★ busy 는 켜는 즉시 표시한다(지연 0 · 페이드 0). — 장군님 지시 2026-09-11
+ *   [고친 이유] 종전에는 "짧은 busy 깜빡임 방지"를 이유로 0.3s 지연 + 0.18s 페이드인이 걸려 있었다.
+ *   그건 원본에 없는 임의 창작이었다. 원본(UI5)은 busy 를 띄울 때 지연값을 항상 0 으로 넘긴다
+ *   (sap.ui.core.BusyIndicator.show(0) — 원본 전수 13곳 모두 0. UI5 기본값 1000ms 를 일부러 끈 것).
+ *   [그 지연이 만든 실제 피해]
+ *     · 별창이 뜰 때 테마 배경만 깔린 빈 창이 0.3~0.5초 먼저 보였다(느린 PC·다크 테마에서 검은 화면).
+ *     · 수십ms 짜리 짧은 처리는 페이드가 끝나기도 전에 busy 가 꺼져 "busy 가 아예 안 뜬다"로 보였다.
+ *     · 그 탓에 화면마다 지연을 취소하는 스코프 override 를 파는 중이었다(전부 제거).
+ *   ⚠️ 끄는 쪽(아래 .u4a-busy 기본 규칙의 페이드아웃)은 건드리지 않았다 — 표시 지연만 제거한 것이다.
+ */
 .u4a-busy[data-busy="true"] {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transition: opacity 0.18s linear 0.3s, visibility 0s linear 0.3s;
+    transition: none;
 }
 
 

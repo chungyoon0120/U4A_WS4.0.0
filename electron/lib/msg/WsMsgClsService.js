@@ -4,6 +4,37 @@ const { app }         = require('electron');
 const path            = require('path');
 const MessageDatabase = require('./MessageDatabase');
 
+/****************************************************************************************
+ * 로그 파일에 남기기 (2026-09-14 추가 — 장군님 지시)
+ * --------------------------------------------------------------------------------------
+ * 앱 본체의 console 은 electron-log 로 갈아끼우지 않았다(화면 쪽 ws_log.js 만 갈아끼움).
+ * 설치한 앱에는 터미널이 없으므로 console.error 로 남긴 글은 어디에도 안 남는다.
+ * writeLog 는 electron-log 에 직접 넣는다.
+ *
+ * 순환 참조 없음 — main.js 가 ws_main_log 를 가장 먼저 설치하고,
+ * 여기서는 부를 때마다 늦게 require 한다.
+ ****************************************************************************************/
+function _writeMainLog(sLevel, sText) {
+
+    try {
+        require('../log/ws_main_log').writeLog(sLevel, sText);
+    } catch (e) {
+        // 로그 장치를 못 얻으면 콘솔로라도 남긴다(유실 방지)
+        console.error(sText);
+    }
+
+}
+
+/** 예외 객체를 로그 한 줄 뒤에 붙일 글자로 */
+function _errText(e) {
+
+    if (!e) { return ''; }
+
+    return ' | ' + (e.message ? e.message : String(e));
+
+}
+
+
 /**
  * @class WsMsgClsService
  * @description 언어별 MessageDatabase 인스턴스를 캐시하고
@@ -65,7 +96,7 @@ class WsMsgClsService {
 
         } catch (error) {
 
-            console.error(`[WsMsgClsService] DB open failed (LANGU: ${langu}, PATH: ${dbPath})`, error);
+            _writeMainLog('오류', `[WsMsgClsService] DB open failed (LANGU: ${langu}, PATH: ${dbPath})` + _errText(error));
             return null;
 
         }

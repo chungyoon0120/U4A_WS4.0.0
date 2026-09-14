@@ -65,7 +65,8 @@ module.exports = function(REMOTE, oAPP, oParams){
         oBrowserOptions.modal = true;
         oBrowserOptions.closable = false;
         
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
+        //   OS 합성이라 느린 PC 에서 무겁다. 창 표시는 페이지가 준비를 마친 뒤 CURRWIN.show() 로 한다.
         oBrowserOptions.show = false;
 
         oBrowserOptions.webPreferences.partition = SESSKEY;

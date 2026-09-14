@@ -12,7 +12,23 @@ window.require.config({
     }
 });
 
+// ★ [2026-09-14, 장군님 지시] AMD loader 의 실패 콜백(errback)을 배선한다.
+//   [고친 이유] 종전에는 성공 콜백만 넘겼다. 모듈을 못 읽으면 아무 일도 안 일어나고
+//   부모는 ready 를 영영 못 받았다. 부모가 그걸 타이머로 덮고 있었으나 타이머 폴백은
+//   금지(.analy 16 §2.11)라 걷어내고, 그 자리에 이 실패 콜백을 넣었다.
+//   _hostFail 은 index.html 인라인 스크립트가 정의한다(부모에 evt:"error" 통지).
 window.require(["vs/editor/editor.main"], function () {
+
+    try { _u4aHostBoot(); }
+    catch (e) { _hostFail("VMHT-004", "monaco editor create", e && e.message); }
+
+}, function (oErr) {
+
+    _hostFail("VMHT-003", "vs/editor/editor.main", (oErr && (oErr.message || oErr.requireType)) || "");
+
+});
+
+function _u4aHostBoot() {
 
     var DEFAULT_FONT_SIZE = 16;
 
@@ -95,4 +111,4 @@ window.require(["vs/editor/editor.main"], function () {
     _toParent({ evt: "ready" });
     _reportZoom();
 
-});
+}

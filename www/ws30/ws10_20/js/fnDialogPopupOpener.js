@@ -4,7 +4,7 @@
  * - file Name : fnDialogPopupOpener.js
  * - file Desc : 각종 Dialog Popup Opener
  * ----------------------------------------------------------------------
- * 오류코드 접두: FDPO / 다음 번호: 005
+ * 오류코드 접두: FDPO / 다음 번호: 007
  *   (표준 SSOT = `.analy/19_예외처리_크리티컬오류_표준.md`,
  *    실무 규약 = `.works/DEV_STANDARD_오류처리.md` §3)
  *
@@ -205,6 +205,22 @@
         const sLoadUrl = parent.WSUTIL.QueryString.build(sUrlPath, oQueryParams);
 
         oBrowserWindow.loadURL(sLoadUrl);
+
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고 시작하므로, 문서 로드가 실패하면 did-finish-load 가 안 와
+        //   busy 가 영영 안 풀리고 창도 안 보인다(show:false). 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 창을 정리하고 잠금을 푼다. 하위 프레임 실패(bIsMainFrame=false)와
+        //   사용자 취소(-3)는 제외한다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-010] U4A MIME Repository window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-010] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FDPO-010] did-fail-load register failed:", e && e.message); }
 
         oBrowserWindow.once('ready-to-show', () => {
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
@@ -775,6 +791,21 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고, 아래 did-finish-load 가 보내는 if_modelBindingPopup 을
+        //   받아야 본문이 그려진다. 문서 로드가 실패하면 그 데이터가 영영 안 와 busy 가 고착된다.
+        //   타이머로 덮는 것은 금지(.analy 16 §2.11)이므로 실패 이벤트에서 창을 정리한다
+        //   (창이 닫히면 아래 'closed' 가 parent.setBusy("") 로 잠금을 푼다).
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-005] binding window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-005] cleanup of the failed window failed:", e2 && e2.message); }
+                try { parent.setBusy("", {}); } catch (e3) { console.error("[FDPO-005] busy release failed:", e3 && e3.message); }
+            });
+        } catch (e) { console.error("[FDPO-005] did-fail-load register failed:", e && e.message); }
+
 
         //broadcase 통신 API 모듈 js path 정보.
         //(design/bindPopupHandler/broadcastChannelBindPopup.js)
@@ -843,7 +874,16 @@
                 channelKey: _channelKey
             };
 
-            oBrowserWindow.webContents.send('if_modelBindingPopup', oBindPopupData);
+            // ★ [2026-09-14] 전송 자체가 실패하면 창은 busy 인 채로 남는다 — 창을 정리하고 잠금을 푼다.
+            try {
+                oBrowserWindow.webContents.send('if_modelBindingPopup', oBindPopupData);
+            } catch (eSend) {
+                console.error("[FDPO-005] initial data send to the binding window failed:", eSend && eSend.message);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-005] cleanup of the failed window failed:", e2 && e2.message); }
+                try { parent.setBusy("", {}); } catch (e3) { console.error("[FDPO-005] busy release failed:", e3 && e3.message); }
+                return;
+            }
 
 
             //디자인상세화면(20화면) <-> BINDPOPUP 통신을 위한 WS20측 수신 채널 생성.
@@ -1410,6 +1450,22 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고 시작하므로, 문서 로드가 실패하면 did-finish-load 가 안 와
+        //   busy 가 영영 안 풀리고 창도 안 보인다(show:false). 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 창을 정리하고 잠금을 푼다. 하위 프레임 실패(bIsMainFrame=false)와
+        //   사용자 취소(-3)는 제외한다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-011] App. Documentation window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-011] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FDPO-011] did-fail-load register failed:", e && e.message); }
+
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
@@ -1433,7 +1489,10 @@
                 SERVPATH: parent.getServerPath()
             };
 
-            oBrowserWindow.webContents.send('if-appdocu-info', oDocuData);
+            // ★ [2026-09-14] 전송이 실패하면 창은 busy 인 채로 남는다 — 자리를 남겨 표면화한다.
+            //   (문서 로드 자체가 실패하는 경우는 위 did-fail-load 가 창을 정리한다.)
+            try { oBrowserWindow.webContents.send('if-appdocu-info', oDocuData); }
+            catch (eSend) { console.error("[FDPO-011] initial data send to the window failed:", eSend && eSend.message); }
 
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
@@ -1500,7 +1559,8 @@
         // frameless + 공통 .u4a-titlebar(optionMain.js) 로 창 크롬을 그린다. (16번 §1 공통화)
         oBrowserOptions.frame = false;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
+        //   (창 표시는 optionMain.js _ready 가 CURRWIN.show() 로 한다.)
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
@@ -1839,7 +1899,10 @@
 
         oBrowserOptions.title = WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "047"); // Icon List
         oBrowserOptions.titleBarStyle = 'hidden';
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.resizable = true;
         oBrowserOptions.movable = true;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL; //테마별 색상 처리
@@ -1920,8 +1983,9 @@
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         });
 
@@ -1990,7 +2054,10 @@
         // oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.titleBarStyle = 'hidden';
         // oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.resizable = true;
         oBrowserOptions.movable = true;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
@@ -2069,8 +2136,9 @@
 
             oBrowserWindow.webContents.send('if-illust-prev', oOptionData);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.
             oAPP.fn.setParentCenterBounds(oBrowserWindow, oBrowserOptions);
@@ -2630,6 +2698,21 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고, 아래 did-finish-load 가 보내는 if-runtime-info 를 받아야
+        //   목록이 채워진다. 문서 로드가 실패하면 그 데이터가 영영 안 와 busy 가 고착된다.
+        //   타이머로 덮는 것은 금지(.analy 16 §2.11)이므로 실패 이벤트에서 창을 정리하고 잠금을 푼다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-006] Runtime Class Navigator window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-006] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FDPO-006] busy release failed:", e3 && e3.message); }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FDPO-006] did-fail-load register failed:", e && e.message); }
+
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
@@ -2672,7 +2755,17 @@
             };
 
             // 오픈할 URL 파라미터 전송
-            oBrowserWindow.webContents.send('if-runtime-info', oRuntimeInfo);
+            // ★ [2026-09-14] 전송 자체가 실패하면 창은 busy 인 채로 남는다 — 창을 정리하고 잠금을 푼다.
+            try {
+                oBrowserWindow.webContents.send('if-runtime-info', oRuntimeInfo);
+            } catch (eSend) {
+                console.error("[FDPO-006] initial data send to the Runtime Class Navigator window failed:", eSend && eSend.message);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-006] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FDPO-006] busy release failed:", e3 && e3.message); }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+                return;
+            }
 
             // 부모 위치 가운데 배치한다.            
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
@@ -2836,7 +2929,10 @@
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A12"); // Icon List
         oBrowserOptions.url = sPath;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.parent = oCurrWin;
         oBrowserOptions.webPreferences.partition = SESSKEY;
         oBrowserOptions.webPreferences.browserkey = BROWSERKEY;
@@ -2886,7 +2982,10 @@
 
         oBrowserOptions.title = sTitle;
         oBrowserOptions.center = true;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.titleBarStyle = "hidden";
         oBrowserOptions.autoHideMenuBar = true;
@@ -3037,8 +3136,9 @@
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         });
 
@@ -3099,7 +3199,10 @@
         oBrowserOptions.url = sPath;
         oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
         oBrowserOptions.webPreferences.partition = SESSKEY;
@@ -3262,7 +3365,10 @@
 
         oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.height = 700;
         oBrowserOptions.width = 700;
@@ -3331,8 +3437,11 @@
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow, () => {
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            //   페이드가 끝난 뒤에 하던 뒷처리(closable)는 표시 직후로 옮긴다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            (() => {
 
                 if (oBrowserWindow.isDestroyed()) {
                     return;
@@ -3345,7 +3454,7 @@
 
                 }
 
-            });
+            })();
 
         });
 
@@ -3480,6 +3589,22 @@
         const sLoadUrl = parent.WSUTIL.QueryString.build(sUrlPath, oQueryParams);
 
         oBrowserWindow.loadURL(sLoadUrl);
+
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고 시작하므로, 문서 로드가 실패하면 did-finish-load 가 안 와
+        //   busy 가 영영 안 풀리고 창도 안 보인다(show:false). 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 창을 정리하고 잠금을 푼다. 하위 프레임 실패(bIsMainFrame=false)와
+        //   사용자 취소(-3)는 제외한다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-012] OTR Manager window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-012] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FDPO-012] did-fail-load register failed:", e && e.message); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -3761,7 +3886,10 @@
 
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B58"); // UI5 Predefined CSS
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.width = 1200;
@@ -3833,8 +3961,9 @@
             // 오픈할 URL 파라미터 전송
             oBrowserWindow.webContents.send('if-ui5css-info', oSendData);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.
             oAPP.fn.setParentCenterBounds(oBrowserWindow, oBrowserOptions);

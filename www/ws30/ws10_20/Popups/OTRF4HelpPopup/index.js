@@ -51,7 +51,10 @@ let oAPP = parent.oAPP,
     /************************************************************************
      * 서버 전송 (원본 sendAjax 동일 — FormData POST, withCredentials)
      ************************************************************************/
-    function sendAjax(sPath, oFormData, fn_success) {
+    // [2026-09-14] fn_error 추가 — 종전에는 실패 콜백 자리가 아예 없어서, 통신이 실패하면
+    //   부르는 쪽이 켜 둔 로딩 표시가 영영 안 꺼졌다. 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+    //   빠져 있던 실패 이벤트를 실제로 배선한다(상태코드 오류 · 응답 해석 실패 · 연결 끊김 3가지).
+    function sendAjax(sPath, oFormData, fn_success, fn_error) {
 
         /**
          * 서버 통신 로그 (2026-09-08 추가)
@@ -143,11 +146,20 @@ let oAPP = parent.oAPP,
 
         // 보낼 때는 안 남긴다 — 끝날 때 한 줄에 다 담는다 (2026-09-10)
 
+        // 실패 콜백은 어느 경로로 끝나든 딱 한 번만 부른다.
+        var bFailSent = false;
+        function _fail(oXhrLike) {
+            if (bFailSent) { return; }
+            bFailSent = true;
+            if (typeof fn_error === "function") { fn_error(oXhrLike); }
+        }
+
         var xhr = new XMLHttpRequest();
         xhr.onreadystatechange = function () {
             if (xhr.readyState === xhr.DONE) {
                 if (xhr.status !== 200 && xhr.status !== 201) {
                     _ajaxFail("서버가 상태 " + xhr.status + " 를 돌려줌", xhr);
+                    _fail(xhr);
                 }
                 if (xhr.status === 200 || xhr.status === 201) {
                     _ajaxLog("끝남", "성공 (상태 " + ((typeof xhr !== "undefined" && xhr && xhr.status) ? xhr.status : "-") + ")");
@@ -156,10 +168,15 @@ let oAPP = parent.oAPP,
                     } catch (e) {
                         console.error("[OTR] response parse error:", e && e.message);
                         _setSearchBusy(false);
+                        _fail(xhr);
                     }
                 }
             }
         };
+
+        // 연결 자체가 끊긴 경우 — onreadystatechange 의 DONE 이 status 0 으로 오거나 아예 안 온다.
+        xhr.onerror = function () { _ajaxFail("연결이 끊김", xhr); _fail(xhr); };
+        xhr.onabort = function () { _ajaxFail("요청이 취소됨", xhr); _fail(xhr); };
 
         xhr.withCredentials = true;
         xhr.open("post", sPath, true);
@@ -473,6 +490,16 @@ let oAPP = parent.oAPP,
             oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" });
             // ★형제 창 BUSY_OFF broadcast(opener 가 oMainBroad BUSY_ON 으로 형제창 잠금 → 짝맞춤).
             //   SETBUSYLOCK 은 "메인" busy 만 풀어 형제창(docPopup 등)은 안 풀린다 → 영구 busy+닫기차단 방지.
+            try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        }, function () {
+
+            // [2026-09-14] 실패 콜백 — 창이 뜰 때 켜 둔 로더를 여기서 끈다(진짜 실패 이벤트).
+            //   서버가 준 내용은 sendAjax 안의 실패 로그가 이미 남긴다. 여기서는 화면만 정리한다.
+            //   ※ 타임아웃으로 끄지 않는다(.analy 16 §2.11) — 이 콜백이 그 자리를 대신한다.
+            try { parent.oAPP.setBusyLoading(''); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oAPP.fn && oAPP.fn.fnShowContent) { oAPP.fn.fnShowContent(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         });

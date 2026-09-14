@@ -33,6 +33,37 @@
 const fs = require('fs');
 const path = require('path');
 
+/****************************************************************************************
+ * 로그 파일에 남기기 (2026-09-14 추가 — 장군님 지시)
+ * --------------------------------------------------------------------------------------
+ * 앱 본체의 console 은 electron-log 로 갈아끼우지 않았다(화면 쪽 ws_log.js 만 갈아끼움).
+ * 설치한 앱에는 터미널이 없으므로 console.error 로 남긴 글은 어디에도 안 남는다.
+ * writeLog 는 electron-log 에 직접 넣는다.
+ *
+ * 순환 참조 없음 — main.js 가 ws_main_log 를 가장 먼저 설치하고,
+ * 여기서는 부를 때마다 늦게 require 한다.
+ ****************************************************************************************/
+function _writeMainLog(sLevel, sText) {
+
+    try {
+        require('./ws_main_log').writeLog(sLevel, sText);
+    } catch (e) {
+        // 로그 장치를 못 얻으면 콘솔로라도 남긴다(유실 방지)
+        console.error(sText);
+    }
+
+}
+
+/** 예외 객체를 로그 한 줄 뒤에 붙일 글자로 */
+function _errText(e) {
+
+    if (!e) { return ''; }
+
+    return ' | ' + (e.message ? e.message : String(e));
+
+}
+
+
 /** 파일 앞 네 글자 */
 const MAGIC = 'MDMP';
 
@@ -244,7 +275,7 @@ function readDump(sPath) {
         R = _opener(sPath);
 
     } catch (e) {
-        console.error('[CDMP-001] could not open the crash dump.', e);
+        _writeMainLog('오류', '[CDMP-001] could not open the crash dump.' + _errText(e));
         return '  (could not open the dump file: ' + (e && e.message ? e.message : e) + ')';
     }
 
@@ -556,14 +587,14 @@ function readDump(sPath) {
         return t;
 
     } catch (e) {
-        console.error('[CDMP-002] the dump parser itself threw.', e);
+        _writeMainLog('오류', '[CDMP-002] the dump parser itself threw.' + _errText(e));
         return '  (the dump parser itself threw: ' + (e && e.message ? e.message : e) + ')';
     } finally {
 
         try {
             if (R) { R.close(); }
         } catch (e) {
-            console.error('[CDMP-003] could not close the dump file.', e);
+            _writeMainLog('오류', '[CDMP-003] could not close the dump file.' + _errText(e));
         }
 
     }

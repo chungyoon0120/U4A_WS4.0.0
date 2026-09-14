@@ -24,6 +24,37 @@ let _app = null;
 let _installed = false;
 
 /****************************************************************************************
+ * 로그 파일에 남기기 (2026-09-14 추가 — 장군님 지시)
+ * --------------------------------------------------------------------------------------
+ * 앱 본체의 console 은 electron-log 로 갈아끼우지 않았다(화면 쪽 ws_log.js 만 갈아끼움).
+ * 설치한 앱에는 터미널이 없으므로 console.error 로 남긴 글은 어디에도 안 남는다.
+ * writeLog 는 electron-log 에 직접 넣는다.
+ *
+ * 순환 참조 없음 — main.js 가 ws_main_log 를 가장 먼저 설치하고,
+ * 여기서는 부를 때마다 늦게 require 한다.
+ ****************************************************************************************/
+function _writeMainLog(sLevel, sText) {
+
+    try {
+        require('./ws_main_log').writeLog(sLevel, sText);
+    } catch (e) {
+        // 로그 장치를 못 얻으면 콘솔로라도 남긴다(유실 방지)
+        console.error(sText);
+    }
+
+}
+
+/** 예외 객체를 로그 한 줄 뒤에 붙일 글자로 */
+function _errText(e) {
+
+    if (!e) { return ''; }
+
+    return ' | ' + (e.message ? e.message : String(e));
+
+}
+
+
+/****************************************************************************************
  * 화면 안에 넣을 감시 코드
  *  - 그 화면 안에서 도는 코드다. 짧고 방어적으로 유지한다.
  ****************************************************************************************/
@@ -314,12 +345,12 @@ function _injectToFrame(iProcessId, iRoutingId) {
     try {
         webFrameMain = require('electron').webFrameMain;
     } catch (e) {
-        console.error('[EHOK-001] webFrameMain is unavailable - skipping auto install of the error hook.', e);
+        _writeMainLog('오류', '[EHOK-001] webFrameMain is unavailable - skipping auto install of the error hook.' + _errText(e));
         return;
     }
 
     if (!webFrameMain || typeof webFrameMain.fromId !== 'function') {
-        console.error('[EHOK-001] webFrameMain not found - skipping auto install of the error hook.');
+        _writeMainLog('오류', '[EHOK-001] webFrameMain not found - skipping auto install of the error hook.');
         return;
     }
 
@@ -339,11 +370,11 @@ function _injectToFrame(iProcessId, iRoutingId) {
 
         frame.executeJavaScript(INJECT_SCRIPT, true).catch((e) => {
             // 화면이 도중에 닫히면 여기로 온다. 앱은 계속 간다.
-            console.warn('[EHOK-002] could not install the error hook - the window may have been closed. ' + (e && e.message ? e.message : e));
+            _writeMainLog('주의', '[EHOK-002] could not install the error hook - the window may have been closed. ' + (e && e.message ? e.message : e));
         });
 
     } catch (e) {
-        console.warn('[EHOK-002] could not install the error hook.', e);
+        _writeMainLog('주의', '[EHOK-002] could not install the error hook.' + _errText(e));
     }
 
 }

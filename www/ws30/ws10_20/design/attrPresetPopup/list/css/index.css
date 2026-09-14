@@ -329,8 +329,6 @@ body.u4aApResizing {
     user-select: none;
 }
 
-/* busy 를 버튼 누르자마자 즉시 표시 — 공통 .u4a-busy 의 0.3s 표시지연(깜빡임 방지용)을
-   이 창에서만 해제한다(사용자 요청). ID(#apBusy)로 특이도 확보 → 공통 규칙만 이김(§0.5 스코프 override). */
-#apBusy.u4a-busy[data-busy="true"] {
-    transition-delay: 0s;
-}
+/* [삭제 2026-09-11, 장군님 지시] busy 즉시 표시용 스코프 override 를 뺐다.
+   공통 .u4a-busy 의 0.3s 표시지연 자체를 shell.css 에서 없앴으므로(원본 = 지연 0) 이 창만
+   따로 취소할 이유가 사라졌다. */

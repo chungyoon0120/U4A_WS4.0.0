@@ -115,7 +115,7 @@ oAPP.USERDATA = USERDATA;
 oAPP.attr.GLANGU = WSUTIL.getWsSettingsInfo().globalLanguage;
 
 // 셸 상태(부트 1회성).
-var bBusy = false, oToastTimer = null, iBusyWatch = null, bOpenDone = false,
+var bBusy = false, oToastTimer = null, bOpenDone = false,
     bBooted = false, oBroad = null;
 
 /* ── 로컬 헬퍼 ──────────────────────────────────────────────────────────── */
@@ -319,7 +319,6 @@ oAPP.fn.setBusyWS20Interaction = function (bBusy, sOption) {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // ★ 초기 모델트리 로드가 진행 중이면 busy 를 끄지 않는다 — loadBindData 가 비동기 ajax 를 던진 직후
     //   부트가 여기로 오므로, 여기서 끄면 로드~렌더 구간이 무오버레이가 된다(장군님 지적 2026-08-03 "대량 로드 시 busy 안 뜸").
@@ -521,11 +520,12 @@ window.addEventListener("load", function () {
     // frameless — 위치 확정 후 표시(흰 번쩍 방지). opener show:false.
     try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-    // 안전판 — if_modelBindingPopup 이 안 오면 busy 강제 해제(방어).
-    iBusyWatch = setTimeout(function () {
-        console.error("[bindWindow] initial data (if_modelBindingPopup) not received - busy force released");
-        _finishOpen();
-    }, 20000);
+    // ★ [2026-09-14, 장군님 지시] 여기 있던 "20초 지나면 busy 를 그냥 끈다" 타이머를 걷어냈다.
+    //   타이머 폴백은 금지다(.analy 16 §2.11) — busy 가 안 꺼지는 건 "고장났다"는 신호인데
+    //   타이머로 꺼버리면 화면은 빈 채인데 사용자는 끝난 줄 착각한다.
+    //   초기 데이터가 안 오는 진짜 경우(창 문서 로드 실패 · 데이터 전송 실패)는 오프너가
+    //   did-fail-load / 전송 try-catch 에서 이 창을 정리하고 잠금을 푼다.
+    //   (오프너 = fnDialogPopupOpener.js FDPO-005)
 });
 
 // busy 중 창 닫기 차단(원본 onbeforeunload). 정상 종료 시 리스너/IPC 해제.

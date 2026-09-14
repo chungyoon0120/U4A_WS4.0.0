@@ -1,3 +1,4 @@
+// 오류코드 접두: PATF / 다음 번호: 004
 /****************************************************************************
  * 소스 패턴(Source Pattern) 창 로직 (patternPopup/frame.js)
  * --------------------------------------------------------------------------
@@ -66,7 +67,7 @@ var oState = {
     selCustKey: ""      // 현재 선택된 커스텀 노드 CKEY(watch 재로드 시 선택 보존)
 };
 var oDefTree = null, oCustTree = null;
-var oFrame = null, bBusy = false, oToastTimer = null, iBusyWatch = null, bOpenDone = false, oBroad = null;
+var oFrame = null, bBusy = false, oToastTimer = null, bOpenDone = false, oBroad = null;
 var bSelfWrite = false, oCustWatcher = null, iWatchTimer = null;   // 커스텀 파일 watch(라이브 반영) + 자기저장 가드
 
 /* ── 로컬 헬퍼 ──────────────────────────────────────────────────────────── */
@@ -204,7 +205,6 @@ function _setBusy(bOn, oOpt) {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _setBusy(false);
     document.body.classList.add("u4aPattShown");   // 본체 페이드인
@@ -256,6 +256,11 @@ function _loadHost() {
         THEME: _monacoThemeFromBg(BGCOL),
         READONLY: true
     };
+    // ★ [2026-09-14, 장군님 지시] iframe 이 host 문서 자체를 못 읽는 경우 — 진짜 실패 이벤트.
+    //   host 안쪽 실패(monaco loader.js / index.js / vs 모듈)는 host 가 evt:"error" 로 알려 준다.
+    try { oFrame.onerror = function () { _hostFatal("PATF-001", { where: "host iframe", detail: oFrame.src }); }; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
     oFrame.src = "../editorPopup/host/index.html?PARAMS=" + encodeURIComponent(JSON.stringify(oPARAMS));
 }
 
@@ -989,7 +994,9 @@ function _onHostMessage(oEvent) {
 
     // 우측 읽기전용 뷰어 호스트.
     if (d.hostId === C_HOSTID) {
-        if (d.evt === "ready") {
+        if (d.evt === "error") {
+            _hostFatal("PATF-002", d);   // host 로드 실패(실제 이벤트) — 창을 못 쓴다.
+        } else if (d.evt === "ready") {
             oState.ready = true;
             if (oState.pending) { var n = oState.pending; oState.pending = null; _showCode(n); }
             _finishOpen();
@@ -1001,6 +1008,15 @@ function _onHostMessage(oEvent) {
 
     // 생성/수정 다이얼로그 편집 호스트.
     if (d.hostId === C_EDIT_HOSTID && oDlgUI) {
+        if (d.evt === "error") {
+            // 편집용 host 로드 실패 — 빈 편집기로 덮어쓰기를 막아야 하므로 다이얼로그를 닫는다.
+            //   창 자체는 살아 있다(우측 뷰어는 별도 host).
+            console.error("[PATF-003] source pattern edit host load failed:",
+                (d && d.where) || "", (d && d.detail) || "", (d && d.code) || "");
+            _closeCreateDlg();
+            _showFatalMsg("PATF-003", null);
+            return;
+        }
         if (d.evt === "ready") {
             oDlgUI.ready = true;
             if (oDlgUI.pending) { var p = oDlgUI.pending; oDlgUI.pending = null; _applyEditor(p); }
@@ -1014,6 +1030,45 @@ function _onHostMessage(oEvent) {
         }
         return;
     }
+}
+
+/* ── host 로드 실패 — 타이머 대신 실제 실패 이벤트로 처리 ──────────────────
+ * ★ [2026-09-14, 장군님 지시] 종전에는 "15초 지나면 busy 를 그냥 끈다"는 타이머가 있었다.
+ *   그건 금지된 방식이다(.analy 16 §2.11) — busy 가 안 꺼지는 건 "고장났다"는 신호인데
+ *   타이머로 꺼버리면 화면은 빈 채인데 사용자는 끝난 줄 착각한다. 타이머를 걷어내고
+ *   host 가 실제로 알려 주는 실패(iframe error · monaco loader.js/index.js onerror ·
+ *   require 실패 콜백)를 받아 여기서 잠금을 풀고 표면화한 뒤 창을 닫는다.
+ * ------------------------------------------------------------------------ */
+function _hostFatal(sCode, oDetail) {
+    console.error("[" + sCode + "] source pattern viewer host load failed:",
+        (oDetail && oDetail.where) || "", (oDetail && oDetail.detail) || "", (oDetail && oDetail.code) || "");
+
+    _finishOpen();   // WS30 잠금 해제 + 창 busy 해제(1회) — 이걸 해야 창을 닫을 수 있다.
+    _showFatalMsg(sCode, _closeWindowNow);
+}
+
+// 크리티컬 메시지 — ZMSG_WS_COMMON_001 314(알 수 없는 오류) + 290(안내). 임의 문구 없음.
+function _showFatalMsg(sCode, fnAfter) {
+    var sMsg = _m("314") + "\n\n" + _m("290");
+    if (window.U4AUI && U4AUI.confirm) {
+        U4AUI.confirm({
+            type: "E",
+            title: _mc("/U4A/CL_WS_COMMON", "B93"),
+            message: sMsg,
+            buttons: [{ act: "OK", label: "OK", emphasized: true }],
+            onClose: function () { if (typeof fnAfter === "function") { fnAfter(); } }
+        });
+        return;
+    }
+    // 공통 확인창이 없으면 fallback 을 만들지 않는다(window.alert 금지) — 코드로 표면화만 한다.
+    console.error("[" + sCode + "] common U4AUI.confirm not loaded - message not shown:", sMsg);
+    if (typeof fnAfter === "function") { fnAfter(); }
+}
+
+function _closeWindowNow() {
+    if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); return; }
+    try { if (!CURRWIN.isDestroyed()) { CURRWIN.setClosable(true); CURRWIN.close(); } }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 /* ── 타이틀바/뷰어 헤더 초기화 ───────────────────────────────────────────── */
@@ -1133,11 +1188,8 @@ window.addEventListener("load", function () {
 
     // busy 는 오프너가 켠 상태 유지 → 호스트 완전 로드 시 1회 해제(중간 깜빡임 없음).
     _setBusy(true);
-    try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-    iBusyWatch = setTimeout(function () {
-        console.error("[WS30][patternPopup] Monaco host load deferred/failed — busy force release");
-        _finishOpen();
-    }, 15000);
+    // ★ [2026-09-14] 여기 있던 "15초 지나면 busy 를 그냥 끈다" 타이머를 걷어냈다(.analy 16 §2.11 금지).
+    //   해제는 host 의 ready(정상) / evt:"error"(실패) 로만 한다 — _hostFatal 주석 참고.
     _loadHost();
 
     // 창은 즉시 불투명 표시(네이티브 opacity 페이드 미사용). 등장 효과는 본체 CSS opacity.

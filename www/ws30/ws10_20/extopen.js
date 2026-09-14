@@ -212,7 +212,7 @@ IPCRENDERER.on('if-extopen-url', (event, res) => {
         // 브라우저 활성화
         CURRWIN.show();
                 
-        WSUTIL.setBrowserOpacity(CURRWIN);
+        // [2026-09-13] 네이티브 투명도 페이드 제거 — 바로 위 CURRWIN.show() 로 이미 표시했다.
 
         // 화면이 다 그려지고 난 후 메인 영역 Busy 끄기
         IPCRENDERER.send(`if-send-action-${BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); 
@@ -231,6 +231,13 @@ IPCRENDERER.on('if-extopen-url', (event, res) => {
     };
 
     oFrame.src = res;
+
+    // ★ [2026-09-14] 창은 여기서 바로 보여준다 — 로딩 표시를 켠 채로.
+    //   [고친 이유] 종전에는 iframe 이 다 로드된 뒤(onload)에야 창을 보여줬다. 오프너가 창을
+    //   show:false 로 만들므로, 서버가 안 오면 창이 영영 안 보였다. 그걸 타임아웃으로 덮으려 했으나
+    //   타임아웃 폴백은 금지(.analy 16 §2.11)다 — 창을 먼저 띄우고 로딩 표시로 상태를 보여주는 것이
+    //   표준이자 정답이다(팝업은 뜨자마자 busy 부터 켜고 시작).
+    try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
 });
 

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>U4A Editor Host</title>
+
+    <style>
+        html,
+        body,
+        #content {
+            margin: 0;
+            height: 100%;
+        }
+
+        html,
+        body {
+            overflow: hidden;
+        }
+
+        /* 첫 페인트 플래시 방지 — Monaco(loader→require→create)가 비동기 마운트되는 동안
+           잘못된 색이 보이지 않도록 빌트인 테마 배경을 미리 깐다. 단일 출처 = --boot-bg
+           (아래 인라인 스크립트가 THEME 보고 documentElement 에 세팅, 상속으로 전파). */
+        html,
+        body,
+        #content {
+            background: var(--boot-bg, #1e1e1e);
+        }
+
+        /* CS 검색 하이라이트(원본 ACE cl_findLine 대체) */
+        .u4aEdFindHit {
+            background: rgba(255, 213, 0, 0.35);
+            border-radius: 2px;
+        }
+
+        /* 공통 스크롤바 톤(USP/클라이언트 호스트와 동일) */
+        .monaco-scrollable-element>.scrollbar>.slider {
+            background: rgba(128, 128, 128, 0.3) !important;
+            border-radius: 4px !important;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .monaco-scrollable-element:hover>.scrollbar>.slider {
+            opacity: 1;
+        }
+    </style>
+
+    <script>
+/****************************************************************************
+ * 에디터 시리즈(CSS/JS/HTML) 전용 Monaco 호스트 (editorPopup/host)
+ * --------------------------------------------------------------------------
+ *  ★ 클라이언트 이벤트 에디터의 호스트(js/codeeditor)와는 **별도 분리**된 독립 호스트다
+ *    (사용자 결정 1). 로드 방식은 동일(loader.js → require(['vs/editor/editor.main'])
+ *    → monaco.editor.create)하되, 이 창(editorFrame, BrowserWindow)에 종속된다.
+ *  · 초기 설정 = URL PARAMS({HOSTID, LANG, THEME, READONLY}).
+ *  · 부모(editorFrame)→호스트 명령 = postMessage({__u4aedh, hostId, cmd}).
+ *    setValue/setLanguage/setReadOnly/setTheme/format/focus/layout/find.
+ *  · 호스트→부모 통지 = window.parent.postMessage({__u4aedh, hostId, evt}).
+ *  · 모나코 경로는 부모(editorFrame) 전역 PATH/APPPATH 에서 해석(iframe 은 node require 비의존).
+ ****************************************************************************/
+        var oAPP = {};
+        oAPP.attr = {};
+
+        // 부모(editorFrame 창) — node 파생 경로 보유.
+        var GF = window.parent;
+        var PATH = GF.PATH;
+        var APPPATH = GF.APPPATH;
+
+        var MONACO_VS_ROOT_PATH = PATH.join(APPPATH, "lib", "monaco", "vs");
+        var MONACO_LOADER_PATH = PATH.join(MONACO_VS_ROOT_PATH, "loader.js");
+
+        // URL PARAMS 파싱 — { HOSTID, LANG, THEME, READONLY }
+        var oURL = new URL(location.href);
+        var oPARAMS = {};
+        try { oPARAMS = JSON.parse(oURL.searchParams.get("PARAMS") || "{}"); }
+        catch (e) { oPARAMS = {}; }
+
+        oAPP.attr.HOSTID = oPARAMS.HOSTID || "U4AEDH";
+        oAPP.attr.LANG = oPARAMS.LANG || "javascript";
+        oAPP.attr.THEME = oPARAMS.THEME || "vs-dark";
+        oAPP.attr.READONLY = (oPARAMS.READONLY === true || oPARAMS.READONLY === "X");
+
+        // 첫 페인트 플래시 방지 — THEME 에 맞춰 부트 배경 즉시 동기화(이름이 dark 로 끝나면 다크).
+        (function () {
+            var bg = "#1e1e1e";
+            if (/(^|-)vs$/.test(oAPP.attr.THEME) || /light/i.test(oAPP.attr.THEME)) { bg = "#ffffff"; }
+            else if (/hc-black/i.test(oAPP.attr.THEME)) { bg = "#000000"; }
+            try { document.documentElement.style.setProperty("--boot-bg", bg); } catch (e) { }
+        })();
+
+        // 호스트 → 부모 통지.
+        function _toParent(oMsg) {
+            try {
+                oMsg = oMsg || {};
+                oMsg.__u4aedh = true;
+                oMsg.hostId = oAPP.attr.HOSTID;
+                window.parent.postMessage(oMsg, "*");
+            } catch (e) { }
+        }
+
+        // 현재 모델 언어의 꾸밈정렬(포맷) 지원 여부를 부모에 통지.
+        //   ★판정은 언어를 실제 반영한 이 호스트에서만(부모가 자기 타이밍에 isSupported 추측하면 레이스로 샌다).
+        //   특수 에디터 부모는 이 evt 를 모르면 무시(무해).
+        function _reportFmtCap() {
+            var bSup = false;
+            try {
+                var oAct = editor.getAction("editor.action.formatDocument");
+                bSup = !!(oAct && oAct.isSupported());
+            } catch (e) { }
+            _toParent({ evt: "fmtcap", supported: bSup });
+            return bSup;
+        }
+
+        // ★ 언어 첫 활성화(모드 setup)는 비동기 → setModelLanguage 직후엔 포맷 provider 가 아직 미등록일 수
+        //   있어 isSupported 가 일시 false(=처음엔 안 뜨다 두번째부터 뜨는 간헐 버그의 원인). 지원으로 켜질
+        //   때까지 몇 프레임 재통지해 정확히 수렴시킨다. 미지원 언어(css/text 등)는 상한까지만.
+        //   그 사이 언어가 또 바뀌면(_fmtTk 증가) 이전 루프는 스스로 폐기 → 드롭다운 연타에도 마지막이 승리.
+        var _fmtTk = 0;
+        function _reportFmtCapSettled() {
+            _fmtTk++;
+            var tk = _fmtTk, iTry = 0;
+            (function loop() {
+                if (tk !== _fmtTk) { return; }              // 더 최근 언어변경 발생 → 이 루프 폐기
+                if (_reportFmtCap() || iTry++ >= 10) { return; }   // 지원 확정 or 상한 도달 시 종료
+                requestAnimationFrame(loop);
+            })();
+        }
+
+        // 부모 → 호스트 명령 수신.
+        window.addEventListener("message", function (oEvent) {
+            var d = oEvent && oEvent.data;
+            if (!d || d.__u4aedh !== true) { return; }
+            if (d.hostId && d.hostId !== oAPP.attr.HOSTID) { return; }
+            if (!window.editor) { return; }
+
+            switch (d.cmd) {
+                case "setValue":
+                    editor._u4aExternal = true;
+                    editor.setValue(typeof d.value === "string" ? d.value : "");
+                    // 값 주입(=새 내용 로드) 시 뷰를 처음 위치로.
+                    try {
+                        editor.setPosition({ lineNumber: 1, column: 1 });
+                        editor.setScrollTop(0);
+                        editor.setScrollLeft(0);
+                    } catch (e) { }
+                    return;
+
+                case "setLanguage":
+                    try { monaco.editor.setModelLanguage(editor.getModel(), d.language || "javascript"); } catch (e) { }
+                    _reportFmtCapSettled();   // 언어 반영 후 포맷 지원 여부 통지(비동기 활성화까지 수렴, 단일 소스).
+                    return;
+
+                case "setReadOnly":
+                    //domReadOnly 동반 — readOnly 만으론 IME(한글) 조합 입력이 뚫리므로 textarea 도 잠금.
+                    try { editor.updateOptions({ readOnly: !!d.readOnly, domReadOnly: !!d.readOnly }); } catch (e) { }
+                    return;
+
+                case "setTheme":
+                    try { monaco.editor.setTheme(d.theme || "vs-dark"); } catch (e) { }
+                    return;
+
+                case "format":
+                    try { editor.getAction("editor.action.formatDocument").run(); } catch (e) { }
+                    return;
+
+                case "fontZoomReset":
+                    // 푸터 줌 버튼 → 폰트 줌 원복(Ctrl+0 과 동일 Monaco 액션).
+                    try { editor.getAction("editor.action.fontZoomReset").run(); } catch (e) { }
+                    return;
+
+                case "fontZoomIn":
+                    // 푸터 [+] → 폰트 확대(Ctrl+휠 업과 동일 Monaco 액션).
+                    try { editor.getAction("editor.action.fontZoomIn").run(); } catch (e) { }
+                    return;
+
+                case "fontZoomOut":
+                    // 푸터 [−] → 폰트 축소(Ctrl+휠 다운과 동일 Monaco 액션).
+                    try { editor.getAction("editor.action.fontZoomOut").run(); } catch (e) { }
+                    return;
+
+                case "focus":
+                    try { editor.focus(); } catch (e) { }
+                    return;
+
+                case "layout":
+                    try { editor.layout(); } catch (e) { }
+                    return;
+
+                case "find":
+                    // CS 검색 하이라이트 — 공백 구분 토큰(클래스명) 전부 데코레이션(원본 ACE 마커 대체).
+                    try {
+                        var oModel = editor.getModel();
+                        var aDecos = [];
+                        var sVal = (typeof d.value === "string") ? d.value : "";
+                        var aTok = sVal.split(/\s+/);
+                        var oFirst = null;
+                        for (var i = 0; i < aTok.length; i++) {
+                            if (!aTok[i]) { continue; }
+                            var aM = oModel.findMatches(aTok[i], true, false, false, null, false);
+                            for (var j = 0; j < aM.length; j++) {
+                                aDecos.push({ range: aM[j].range, options: { inlineClassName: "u4aEdFindHit" } });
+                                if (!oFirst) { oFirst = aM[j].range; }
+                            }
+                        }
+                        editor._u4aFindDecos = editor.deltaDecorations(editor._u4aFindDecos || [], aDecos);
+                        if (oFirst) { editor.revealRangeInCenter(oFirst); }
+                    } catch (e) { }
+                    return;
+
+                default:
+                    return;
+            }
+        });
+
+        // 로더 로드 완료 → 본체(index.js) 로드.
+        function onLoad() {
+            var s = document.createElement("script");
+            s.src = "index.js";
+            document.head.append(s);
+        }
+
+        window.addEventListener("DOMContentLoaded", function () {
+            var loader = document.createElement("script");
+            loader.src = MONACO_LOADER_PATH;
+            loader.onload = onLoad;
+            document.head.append(loader);
+        });
+    </script>
+</head>
+
+<body>
+    <div id="content" style="height:100%;"></div>
+</body>
+
+</html>

@@ -48,6 +48,9 @@ if (ARGV.indexOf('--help') >= 0 || ARGV.indexOf('-h') >= 0) {
   --cdpTimeoutMs <밀리초> 앱에 물어보고 답을 기다리는 시간.  (기본 300000 = 5분)
   --quietMissing <횟수> 화면이 다 그려졌는데 단축키가 안 걸려 있는 상태가
                        연달아 이만큼 이어지면 고장으로 본다.    (기본 10바퀴)
+  --memEvery <횟수>    메모리·DOM 개수를 몇 바퀴마다 잴지.        (기본 1000, 0=안 잼)
+                       heap · documents · nodes · listeners 를 창마다 따로 남깁니다.
+                       처음 잰 값과 견준 증감이 같이 찍히므로, 계속 늘면 누수입니다.
   --keepGoing          오류가 나도 멈추지 않고 계속 돈다.
                        (기본은 처음 오류에서 멈춤)
   --help, -h           이 도움말만 보여주고 끝냄.
@@ -344,6 +347,75 @@ const PICK_EXPRESSION = `
 // 연결이 끊기면 바로 알 수 있고, 이 횟수마다 한 번씩만 목록으로 다시 확인한다.
 const ALIVE_CHECK_EVERY = 50;
 
+/**
+ * 메모리·DOM 개수를 몇 바퀴마다 한 번 잴지. (장군님 지시 2026-09-14)
+ *
+ * 왜 재나:
+ *   같은 동작을 수십만 번 반복하는 시험이다. 누수가 있으면 이 숫자가 우상향한다.
+ *   창마다 따로 재므로, 한 창에만 쌓이는지도 바로 보인다.
+ *   0 을 주면 아예 재지 않는다.
+ */
+const MEM_EVERY = Number(getArg('--memEvery', '1000'));
+
+/** 바이트를 MB 로 — 로그 폭을 줄이려고 소수 첫째 자리까지만. */
+function _mb(iBytes) {
+
+    if (typeof iBytes !== 'number') {
+        return '?';
+    }
+
+    return (iBytes / 1048576).toFixed(1) + 'MB';
+
+}
+
+/**
+ * 처음 잰 값과 견줘 얼마나 늘었는지 한 줄로 만든다.
+ *   처음 잰 값이 없으면(첫 측정) 그냥 값만 보여 준다.
+ */
+function _memLine(oNow, oFirst) {
+
+    const aPart = [];
+
+    const diff = (sKey, sName, bIsByte) => {
+
+        const vNow = oNow[sKey];
+
+        if (vNow === undefined) {
+            return;
+        }
+
+        const sNow = bIsByte ? _mb(vNow) : String(vNow);
+
+        if (!oFirst || oFirst[sKey] === undefined) {
+            aPart.push(`${sName} ${sNow}`);
+            return;
+        }
+
+        const iDelta = vNow - oFirst[sKey];
+        const sDelta = (iDelta >= 0 ? '+' : '') + (bIsByte ? _mb(iDelta) : String(iDelta));
+
+        aPart.push(`${sName} ${sNow} (${sDelta})`);
+
+    };
+
+    diff('heapUsed', 'heap', true);
+    diff('documents', 'documents', false);
+    diff('nodes', 'nodes', false);
+    diff('listeners', 'listeners', false);
+
+    // 못 읽은 것이 있으면 조용히 넘기지 않고 사유를 남긴다.
+    if (oNow.heapError) {
+        aPart.push(`heapError=${oNow.heapError}`);
+    }
+
+    if (oNow.domError) {
+        aPart.push(`domError=${oNow.domError}`);
+    }
+
+    return aPart.length ? aPart.join(' ') : 'no memory stats available';
+
+}
+
 // 창 하나를 맡아 독립적으로 무제한 반복한다. 이 창이 크래시로 끝나도 다른 창의 반복에는 영향 없다.
 async function runWindowLoop(page, label) {
     let cycleNo = 0;
@@ -456,10 +528,35 @@ async function runWindowLoop(page, label) {
 
     ready = true;
 
+    // 이 창의 첫 측정값 — 나중 값과 견줘 늘었는지 보려고 들고 있는다.
+    let memFirst = null;
+
     try {
         while (running) {
             cycleNo++;
             const cycleStart = Date.now();
+
+            /* ── 메모리·DOM 개수 재기 (장군님 지시 2026-09-14) ──
+             *   첫 바퀴에 한 번 재서 기준을 잡고, 그 뒤 MEM_EVERY 바퀴마다 잰다.
+             *   재는 데 실패해도 시험은 계속 간다 — 계측 때문에 멈추면 안 된다.
+             */
+            if (MEM_EVERY > 0 && (cycleNo === 1 || cycleNo % MEM_EVERY === 0)) {
+
+                try {
+
+                    const oMem = await session.getMemoryStats();
+
+                    if (!memFirst) {
+                        memFirst = oMem;
+                    }
+
+                    logger.info(`${label} cycle ${cycleNo} memory: ${_memLine(oMem, memFirst)}`);
+
+                } catch (e) {
+                    logger.error(`${label} cycle ${cycleNo} memory read failed: ${e && e.message ? e.message : e}`);
+                }
+
+            }
 
             try {
                 if (session.isClosed()) {

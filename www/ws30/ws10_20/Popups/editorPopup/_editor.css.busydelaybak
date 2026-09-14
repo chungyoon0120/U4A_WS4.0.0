@@ -1,0 +1,125 @@
+/****************************************************************************
+ * 에디터 시리즈(CSS/JS/HTML) 창 레이아웃 — 공통 토큰만 소비(하드코딩 색 없음).
+ *  창 골격 = [공통 .u4a-titlebar] + [에디터 호스트 iframe] + [푸터(Save)].
+ *  타이틀바/버튼 모양은 shell.css + bootstrap-skin.css 가 담당. 여기선 창 전용 배치만.
+ ****************************************************************************/
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    /* 타이틀바(고정) + 콘텐츠(가변) + 푸터(고정) 세로 스택 */
+    display: flex;
+    flex-direction: column;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+}
+
+/* 콘텐츠 = Monaco 호스트 iframe (타이틀바와 푸터 사이 전체 채움) */
+/* 등장 효과: 처음엔 opacity:0(숨김) → 에디터 준비 시 .u4aEdShown 으로 스르르 페이드인.
+   ★네이티브 창 opacity(무거움) 대신 DOM CSS transition(GPU 합성, 가벼움)으로 처리.
+   display:none 이 아닌 opacity:0 인 이유 — iframe/Monaco 가 로드·레이아웃은 진행해야 하므로. */
+#editorContent {
+    flex: 1 1 auto;
+    position: relative;
+    min-height: 0;
+    background: var(--boot-bg, var(--app-bg));
+    opacity: 0;
+    transition: opacity 0.3s linear;
+}
+
+#editorContent.u4aEdShown {
+    opacity: 1;
+}
+
+#editorHost {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+}
+
+/* 푸터(48px) — 공통 모달 푸터 톤. 오른쪽 정렬, Save 강조 버튼. */
+.u4aEdWinFooter {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    height: 3rem;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-top: 1px solid var(--divider);
+    background: var(--surface);
+}
+
+.u4aEdWinFooter .u4a-btn[hidden] {
+    display: none;
+}
+
+/* 왼쪽(줌) / 오른쪽(Save) 그룹 분리 — 스페이서가 가운데 흡수. */
+.u4aEdFootSpacer {
+    flex: 1 1 auto;
+}
+
+/* 줌 컨트롤 묶음 [−][%][+] — 브라우저/VS Code 줌과 동일 패턴. */
+.u4aEdZoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+
+/* 공통 톤(투명, 중립) — 호버 시 살짝 강조. */
+.u4aEdZoomBtn {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted, var(--icon-muted));
+}
+
+.u4aEdZoomBtn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+/* % 표시(클릭=원복) — 숫자 폭 안정. 스텝(−/+)은 정사각 컴팩트. */
+.u4aEdZoomPct {
+    font-variant-numeric: tabular-nums;
+    gap: 0.375rem;
+}
+
+.u4aEdZoomStep {
+    min-width: 1.9rem;
+    padding: 0.4rem 0.5rem;
+    justify-content: center;
+}
+
+/* 꾸밈정렬(텍스트+아이콘) / 복사(아이콘) = 보조 버튼(투명 톤) —
+   클라이언트 이벤트 에디터(ws_html5_client_editor .u4aCliEdPretty)와 동일 모습으로 통일. */
+.u4aEdPretty {
+    background: transparent;
+    border-color: transparent;
+    color: var(--sl-fg);
+}
+
+.u4aEdPretty:hover {
+    background: var(--sl-surface-2);
+}
+
+/* 아이콘 전용(복사) = 정사각 컴팩트(텍스트 패딩 제거). */
+.u4aEdIcoBtn {
+    min-width: 2.25rem;
+    padding: 0.4rem 0.6rem;
+    justify-content: center;
+}
+
+/* 로딩 오버레이 = 공통 .u4a-busy(shell.css SSOT — 카드+이중링 스피너, data-busy 토글, 0.3s 지연,
+   스크림 없음). 화면별 스피너/오버레이 CSS 제거 — editorFrame.html 이 .u4a-busy 마크업을 소비.
+   저장 토스트도 공통 .u4a-toast(shell.css — 화면 정중앙). 화면별 스타일 없음. */

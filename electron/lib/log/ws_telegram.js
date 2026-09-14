@@ -27,6 +27,37 @@ let _config = null;
 let _configPath = '';
 let _installed = false;
 
+/****************************************************************************************
+ * 로그 파일에 남기기 (2026-09-14 추가 — 장군님 지시)
+ * --------------------------------------------------------------------------------------
+ * 앱 본체의 console 은 electron-log 로 갈아끼우지 않았다(화면 쪽 ws_log.js 만 갈아끼움).
+ * 설치한 앱에는 터미널이 없으므로 console.error 로 남긴 글은 어디에도 안 남는다.
+ * writeLog 는 electron-log 에 직접 넣는다.
+ *
+ * 순환 참조 없음 — main.js 가 ws_main_log 를 가장 먼저 설치하고,
+ * 여기서는 부를 때마다 늦게 require 한다.
+ ****************************************************************************************/
+function _writeMainLog(sLevel, sText) {
+
+    try {
+        require('./ws_main_log').writeLog(sLevel, sText);
+    } catch (e) {
+        // 로그 장치를 못 얻으면 콘솔로라도 남긴다(유실 방지)
+        console.error(sText);
+    }
+
+}
+
+/** 예외 객체를 로그 한 줄 뒤에 붙일 글자로 */
+function _errText(e) {
+
+    if (!e) { return ''; }
+
+    return ' | ' + (e.message ? e.message : String(e));
+
+}
+
+
 let _sentCountToday = 0;
 let _sentCountDate = '';
 const _recentSend = {};   // 오류코드 → 마지막 전송 시각(도배 방지)
@@ -52,7 +83,7 @@ function _loadConfig() {
     _configPath = _resolveConfigPath();
 
     if (!fs.existsSync(_configPath)) {
-        console.warn('[TGSD-001] telegram config file is missing - not sending. path: ' + _configPath);
+        _writeMainLog('주의', '[TGSD-001] telegram config file is missing - not sending. path: ' + _configPath);
         _config = null;
         return;
     }
@@ -62,7 +93,7 @@ function _loadConfig() {
     try {
         sText = fs.readFileSync(_configPath, 'utf8');
     } catch (e) {
-        console.error('[TGSD-002] could not read the telegram config file - not sending.', e);
+        _writeMainLog('오류', '[TGSD-002] could not read the telegram config file - not sending.' + _errText(e));
         _config = null;
         return;
     }
@@ -70,7 +101,7 @@ function _loadConfig() {
     try {
         _config = JSON.parse(sText);
     } catch (e) {
-        console.error('[TGSD-003] telegram config file has a bad shape - not sending.', e);
+        _writeMainLog('오류', '[TGSD-003] telegram config file has a bad shape - not sending.' + _errText(e));
         _config = null;
         return;
     }
@@ -201,7 +232,7 @@ function _passesLimit(sErrorCode) {
     const iDailyLimit = typeof opt.dailySendLimit === 'number' ? opt.dailySendLimit : 200;
 
     if (_sentCountToday >= iDailyLimit) {
-        console.warn('[TGSD-004] daily send limit reached - not sending.');
+        _writeMainLog('주의', '[TGSD-004] daily send limit reached - not sending.');
         return false;
     }
 
@@ -259,7 +290,7 @@ function _maskSecrets(sText) {
         s = s.replace(/[0-9]{6,}:[A-Za-z0-9_\-]{30,}/g, '(masked)');
 
     } catch (e) {
-        console.error('[TGSD-009] secret masking failed - not sending (fail-closed).', e);
+        _writeMainLog('오류', '[TGSD-009] secret masking failed - not sending (fail-closed).' + _errText(e));
         return null;   // 가리기에 실패하면 보내지 않는다(fail-closed)
     }
 
@@ -333,7 +364,7 @@ function _buildSendFile(oInfo) {
         }
 
     } catch (e) {
-        console.error('[TGSD-005] could not read the tail of the log file.', e);
+        _writeMainLog('오류', '[TGSD-005] could not read the tail of the log file.' + _errText(e));
     }
 
     // 임시 파일로 저장
@@ -369,7 +400,7 @@ function _buildSendFile(oInfo) {
         fs.writeFileSync(sOutPath, sSafe, { encoding: 'utf8' });
 
     } catch (e) {
-        console.error('[TGSD-006] could not build the file to send.', e);
+        _writeMainLog('오류', '[TGSD-006] could not build the file to send.' + _errText(e));
         return '';
     }
 
@@ -390,7 +421,7 @@ function _postDocument(oTarget, sFilePath, sCaption, fnDone) {
     try {
         fileBuf = fs.readFileSync(sFilePath);
     } catch (e) {
-        console.error('[TGSD-007] could not read the file to send.', e);
+        _writeMainLog('오류', '[TGSD-007] could not read the file to send.' + _errText(e));
         fnDone(false);
         return;
     }
@@ -449,7 +480,7 @@ function _postDocument(oTarget, sFilePath, sCaption, fnDone) {
                 return;
             }
 
-            console.error('[TGSD-008] telegram rejected the upload. status: ' + res.statusCode + ' / response: ' + sRes.slice(0, 300));
+            _writeMainLog('오류', '[TGSD-008] telegram rejected the upload. status: ' + res.statusCode + ' / response: ' + sRes.slice(0, 300));
             fnDone(false);
 
         });
@@ -457,13 +488,13 @@ function _postDocument(oTarget, sFilePath, sCaption, fnDone) {
     });
 
     req.on('timeout', () => {
-        console.error('[TGSD-008] telegram upload timed out.');
+        _writeMainLog('오류', '[TGSD-008] telegram upload timed out.');
         req.destroy();
         fnDone(false);
     });
 
     req.on('error', (e) => {
-        console.error('[TGSD-008] telegram upload failed.', e);
+        _writeMainLog('오류', '[TGSD-008] telegram upload failed.' + _errText(e));
         fnDone(false);
     });
 
@@ -547,7 +578,7 @@ function sendError(oInfo) {
         try {
             oInfo.logFilePath = require('./ws_main_log').getLogFilePath();
         } catch (e) {
-            console.error('[TGSD-005] could not determine the log file path.', e);
+            _writeMainLog('오류', '[TGSD-005] could not determine the log file path.' + _errText(e));
         }
 
     }
@@ -604,7 +635,7 @@ function install(appInstance) {
         });
 
     } catch (e) {
-        console.error('[TGSD-001] could not open the renderer-side send channel.', e);
+        _writeMainLog('오류', '[TGSD-001] could not open the renderer-side send channel.' + _errText(e));
     }
 
 }

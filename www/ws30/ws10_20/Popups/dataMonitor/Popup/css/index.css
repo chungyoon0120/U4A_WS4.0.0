@@ -440,3 +440,197 @@ body {
     background: var(--state-success-bg);
     box-shadow: inset 0.1875rem 0 0 var(--state-success);
 }
+
+
+/* 좌우 트리 자기 툴바의 작은 단추 — 머리줄 높이에 맞춘다 */
+.u4aDmCmpPaneBtn {
+    flex: 0 0 auto;
+    height: 1.5rem;
+    padding: 0 .375rem;
+    min-height: 0;
+}
+
+/* ── 제외 규칙(정규식) — 쪽마다 자기 것 ──────────────────────────────
+   좌우는 데이터 구조가 달라 같은 정규식이 안 먹는다(장군님 지시 2026-09-11).
+   깔때기 단추를 누르면 그 쪽 머리줄 바로 아래에 이 줄이 펼쳐진다. */
+.u4aDmCmpExc {
+    display: flex;
+    align-items: flex-start;
+    gap: .375rem;
+    flex: 0 0 auto;
+    padding: .375rem .5rem;
+    border-bottom: 1px solid var(--divider);
+    background: var(--surface-raised);
+}
+
+/* 규칙을 치는 칸 — 남는 자리를 나눠 쓰되 너무 좁아지지 않게 한다 */
+.u4aDmCmpExcField {
+    flex: 1 1 10rem;
+    min-width: 6rem;
+}
+
+/* 넣어 둔 규칙 목록 — 많아지면 줄바꿈, 그래도 넘치면 이 안에서만 스크롤 */
+.u4aDmCmpExcList {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: .25rem;
+    flex: 2 1 12rem;
+    min-width: 0;
+    max-height: 4.5rem;
+    overflow-y: auto;
+}
+
+.u4aDmCmpExcChip {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    max-width: 100%;
+    height: 1.5rem;
+    padding: 0 .125rem 0 .5rem;
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: var(--font);
+    line-height: 1;
+}
+
+/* 긴 정규식은 줄임표로 — 전체는 마우스를 올리면 보인다 */
+.u4aDmCmpExcChip__txt {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.u4aDmCmpExcChip__x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.u4aDmCmpExcChip__x:hover {
+    background: var(--state-error-bg);
+    color: var(--state-error);
+}
+
+/* 깔때기 단추 위 개수 — 규칙이 있을 때만 보인다 */
+.u4aDmCmpExcN {
+    margin-left: .25rem;
+    padding: 0 .25rem;
+    border-radius: var(--radius-sm);
+    background: var(--state-info-bg);
+    color: var(--state-info);
+    font: var(--font);
+    line-height: 1.25;
+}
+
+/* ── 트리 글자를 드래그해 복사할 수 있게 (장군님 지시 2026-09-11) ──────────
+   공통은 앱 전역이 글자 선택 금지고, 표(tbody)만 되살려 놓았다. 트리는 빠져 있어
+   이 창에서 값을 복사할 수가 없었다. 공통 파일은 건드리지 않고 이 창에서만 되살린다.
+   ★ 줄 전체를 열어야 한다 — 글자에만 열어 두면 정확히 조준해야 잡히고, 셀 여백에서
+     드래그를 시작하면 아예 안 잡힌다(표에서 이미 겪은 문제).
+   ★ 펼침 화살표는 계속 금지 — 눌러서 접었다 폈다 하는 것이지 긁는 것이 아니다. */
+.u4aDmTreeHost .u4aColTreeRow,
+.u4aDmCmpHost .u4aColTreeRow {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.u4aDmTreeHost .u4a-tree__toggle,
+.u4aDmCmpHost .u4a-tree__toggle {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* ── 제외 규칙 — 칸 두 개 + 본보기 + 몇 줄 사라지는지 (장군님 지시 2026-09-11) ── */
+.u4aDmCmpExcRow {
+    display: flex;
+    align-items: center;
+    gap: .375rem;
+    flex-wrap: wrap;
+}
+
+/* 칸 앞 안내 글자 — 무엇을 적는 칸인지 읽으면 바로 알게 */
+.u4aDmCmpExcLbl {
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    font: var(--font);
+    white-space: nowrap;
+}
+
+/* 치는 동안 몇 줄이 사라지는지 — 설명서 대신 이 숫자가 맞는지를 알려 준다 */
+.u4aDmCmpExcHint {
+    flex: 1 1 8rem;
+    min-width: 0;
+    color: var(--text-muted);
+    font: var(--font);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.u4aDmCmpExcHint[data-vs="error"] {
+    color: var(--state-error);
+}
+
+/* 물음표를 누르면 펼쳐지는 본보기 — 누르면 그대로 칸에 들어간다 */
+.u4aDmCmpExcHelp {
+    display: flex;
+    flex-direction: column;
+    gap: .125rem;
+    margin-top: .375rem;
+    padding: .375rem;
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+}
+
+.u4aDmCmpExcSample {
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+    width: 100%;
+    padding: .25rem .375rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    font: var(--font);
+    text-align: left;
+    cursor: pointer;
+}
+
+.u4aDmCmpExcSample:hover {
+    background: var(--state-info-bg);
+}
+
+.u4aDmCmpExcSample__code {
+    flex: 0 0 auto;
+    min-width: 9rem;
+    color: var(--state-info);
+}
+
+.u4aDmCmpExcSample__txt {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-muted);
+}
+
+/* 본보기 맨 위 안내 줄 — 규칙 두 줄을 여기서 알려 준다 */
+.u4aDmCmpExcHelp__head {
+    padding: .25rem .375rem .375rem;
+    border-bottom: 1px solid var(--divider);
+    margin-bottom: .25rem;
+    color: var(--text-muted);
+    font: var(--font);
+}

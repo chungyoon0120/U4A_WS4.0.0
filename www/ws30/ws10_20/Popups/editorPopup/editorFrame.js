@@ -1,3 +1,4 @@
+// 오류코드 접두: EDTF / 다음 번호: 003
 /****************************************************************************
  * 에디터 시리즈(CSS/JS/HTML) 창 로직 (editorFrame.js)
  * --------------------------------------------------------------------------
@@ -40,7 +41,7 @@ var C_HOSTID = "U4AEDH";
 
 // 현재 에디터 상태.
 var oState = { EDITORINFO: null, APPINFO: null, SRCHVAL: null, ready: false };
-var oFrame = null, bBusy = false, oToastTimer = null, iBusyWatch = null, bOpenDone = false;
+var oFrame = null, bBusy = false, oToastTimer = null, bOpenDone = false;
 
 // ── 로컬 헬퍼 ──────────────────────────────────────────────────────────
 function _msg(sCls, sCode, p1) {
@@ -118,9 +119,8 @@ function _setBusy(bOn, oOpt) {
 //   끄지 않고(깜빡임 방지), 에디터가 완전히 준비(host ready)되면 _finishOpen 으로 한 번만 해제한다.
 //   host 로드 실패/지연(오류 상황)에 대비한 워치독도 같은 _finishOpen 으로 모인다.
 function _finishOpen() {
-    if (bOpenDone) { return; }              // 중복 해제 방지(ready/워치독 경합).
+    if (bOpenDone) { return; }              // 중복 해제 방지(ready / 실패 이벤트 경합).
     bOpenDone = true;
-    try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // WS20 메인 busy 잠금 해제(원본 SETBUSYLOCK) — 에디터가 다 뜬 시점에 한 번만.
     try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // 창 자체 오버레이 끄기 + 자식창 BUSY_OFF 방송.
@@ -243,6 +243,11 @@ function _loadHost() {
         THEME: _monacoThemeFromBg(BGCOL),
         READONLY: !_isEdit()
     };
+    // ★ [2026-09-14, 장군님 지시] iframe 이 host 문서 자체를 못 읽는 경우 — 진짜 실패 이벤트.
+    //   host 안쪽 실패(monaco loader.js / index.js / vs 모듈)는 host 가 evt:"error" 로 알려 준다.
+    try { oFrame.onerror = function () { _hostFatal("EDTF-001", { where: "host iframe", detail: oFrame.src }); }; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
     oFrame.src = "host/index.html?PARAMS=" + encodeURIComponent(JSON.stringify(oPARAMS));
 }
 
@@ -296,8 +301,50 @@ function _onHostMessage(oEvent) {
         _finishOpen();           // 에디터 완전 로드 → busy 1회 해제(중간 깜빡임 없음).
         return;
     }
+    if (d.evt === "error") { _hostFatal("EDTF-002", d); return; }   // host 로드 실패(실제 이벤트).
     if (d.evt === "save") { _save(); return; }   // 에디터 한정 Ctrl+S 위임.
     if (d.evt === "zoom") { _setZoom(d.pct); return; }
+}
+
+/* ── host 로드 실패 — 타이머 대신 실제 실패 이벤트로 처리 ──────────────────
+ * ★ [2026-09-14, 장군님 지시] 종전에는 "15초 지나면 busy 를 그냥 끈다"는 타이머가 있었다.
+ *   그건 금지된 방식이다(.analy 16 §2.11) — busy 가 안 꺼지는 건 "고장났다"는 신호인데
+ *   타이머로 꺼버리면 화면은 빈 채인데 사용자는 끝난 줄 착각한다. 타이머를 걷어내고
+ *   host 가 실제로 알려 주는 실패(iframe error · monaco loader.js/index.js onerror ·
+ *   require 실패 콜백)를 받아 여기서 잠금을 풀고 표면화한 뒤 창을 닫는다.
+ * ------------------------------------------------------------------------ */
+function _hostFatal(sCode, oDetail) {
+    console.error("[" + sCode + "] editor host load failed:",
+        (oDetail && oDetail.where) || "", (oDetail && oDetail.detail) || "", (oDetail && oDetail.code) || "");
+
+    _finishOpen();   // WS20 잠금 해제 + 창 busy 해제(1회) — 이걸 해야 창을 닫을 수 있다.
+
+    var sMsg = _zc("314") + "\n\n" + _zc("290");   // 알 수 없는 오류 + 안내
+    if (window.U4AUI && U4AUI.confirm) {
+        U4AUI.confirm({
+            type: "E",
+            title: _msg("/U4A/CL_WS_COMMON", "B93"),
+            message: sMsg,
+            buttons: [{ act: "OK", label: "OK", emphasized: true }],
+            onClose: _closeWindowNow
+        });
+        return;
+    }
+    // 공통 확인창이 없으면 fallback 을 만들지 않는다(window.alert 금지) — 코드로 표면화하고 닫는다.
+    console.error("[" + sCode + "] common U4AUI.confirm not loaded - message not shown:", sMsg);
+    _closeWindowNow();
+}
+
+function _closeWindowNow() {
+    if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); return; }
+    try { if (!CURRWIN.isDestroyed()) { CURRWIN.setClosable(true); CURRWIN.close(); } }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+}
+
+// ZMSG_WS_COMMON_001 문구(원본 getWsMsgClsTxt) — 314 = 알 수 없는 오류 / 290 = 안내.
+function _zc(sNo) {
+    try { return WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo) || ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 
 // 푸터 줌 표시/원복 버튼 갱신 — "NNN%" 상시 표시(처음부터 보여 발견성 확보 — 사용자 요청).
@@ -324,12 +371,8 @@ function _onEditorInfo(event, res) {
         // 최초 로드 — busy 는 오프너가 켠 상태 그대로 유지(여기서 끄지 않음).
         //   창 자체 오버레이만 켜고, 완전 로드(host ready)나 오류(워치독) 시 _finishOpen 으로 1회 해제.
         _setBusy(true);
-        try { clearTimeout(iBusyWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        iBusyWatch = setTimeout(function () {
-            // 오류/지연 상황 — 영구 busy 방지(원본엔 없던 HTML5 안전장치).
-            console.error("[editor] host load deferred/failed — busy force release");
-            _finishOpen();
-        }, 15000);
+        // ★ [2026-09-14] 여기 있던 "15초 지나면 busy 를 그냥 끈다" 타이머를 걷어냈다(.analy 16 §2.11 금지).
+        //   해제는 host 의 ready(정상) / evt:"error"(실패) 로만 한다 — _hostFatal 주석 참고.
         _loadHost();
     } else if (oState.ready) {
         // 재수신(예: CS 재오픈) — 즉시 반영. WS20 잠금은 오프너 dedup 분기가 처리하므로
@@ -440,6 +483,15 @@ window.addEventListener("load", function () {
 
     // 창은 즉시 불투명하게 표시(네이티브 opacity 페이드 미사용 — 무겁다). 등장 효과는
     //   창 안 컨텐츠(#editorContent)를 CSS opacity transition 으로 스르르 띄운다(_fadeInContent).
+    // ★ 창은 뜨자마자 무조건 busy 부터 켜고 시작한다(장군님 지시 2026-09-09 · 2026-09-11).
+    //   [고친 이유] 종전에는 busy 없이 show() 를 불렀다. 자기 오버레이는 opener 가 did-finish-load 에
+    //   보내는 if-editor-info 를 받아야 켜졌으므로, 그 사이 테마 배경만 깔린 빈 창이 먼저 보였다
+    //   (느린 PC·다크 테마 = 검은 화면). show() 보다 앞에 둬야 첫 화면부터 스피너가 보인다.
+    //   ※ 타임아웃으로 busy 를 강제 해제하는 안전장치는 두지 않는다(.analy 16 §2.11 · 장군님 지시).
+    //     busy 가 안 꺼지면 "뭔가 고장났다"는 신호다. 해제는 실제 완료/실패 이벤트로만 —
+    //     여기서는 오프너(fnEditorPopupOpen)의 did-finish-load / did-fail-load 가 그 이벤트다.
+    _setBusy(true);
+
     try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // ★ busy 는 여기서 끄지 않는다 ★ — 오프너가 켠 WS20 busy 를 에디터가 완전히 로드될 때까지 유지.

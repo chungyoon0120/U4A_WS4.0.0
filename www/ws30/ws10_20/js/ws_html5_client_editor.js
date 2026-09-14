@@ -3,6 +3,7 @@
  * ----------------------------------------------------------------------
  * - file Name : ws_html5_client_editor.js
  * - file Desc : Client Event(JavaScript/HTML) Editor Popup  (HTML5)
+ * - 오류코드 접두: CLED / 다음 번호: 003
  * ----------------------------------------------------------------------
  * [컨버전 메모]
  *  원본: js/fnClientEditorPopupOpen.js — sap.m.Dialog(draggable/resizable 50%×500px)
@@ -94,8 +95,11 @@
   // 단일 캐시(생성 후 세션 동안 유지) + 현재 open 의 가변 상태.
   var oUI = null;            // { dlg, frame, headerTitle, prettyBtn, saveBtn, delBtn, ready }
   var oState = { sObjTy: C_JS, sObjId: "", sLang: "javascript", bEdit: false, fnCallback: null, sBaseline: "", bLoading: false };
-  var iWatch = null;         // 최초 로드 busy 워치독.
-  var iLoadGuard = null;     // bLoading 안전장치('applied' ack 유실 시 ESC 영구잠김 방지).
+  // ★ [2026-09-14, 장군님 지시] 여기 있던 타이머 2개(8초 busy 워치독 · 5초 bLoading 안전장치)를
+  //   걷어냈다. 타이머 폴백은 금지(.analy 16 §2.11) — busy 가 안 꺼지는 건 "고장났다"는 신호인데
+  //   타이머로 꺼버리면 화면은 그대로인데 사용자는 끝난 줄 착각한다. 해제는 host 가 실제로 보내는
+  //   ready / applied / error 로만 한다(error 는 이번에 새로 배선 — index.html 의 loader·index.js
+  //   onerror 와 index.js 의 require 실패 콜백).
 
   // busy/단축키 잠금(최초 로드 동안만 — 재사용 open 은 즉시라 불필요).
   var bBusy = false;
@@ -110,6 +114,31 @@
     bBusy = false;
     try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+  }
+
+  /* ── host 로드 실패 — 타이머 대신 실제 실패 이벤트로 처리 ────────────────
+   * ★ [2026-09-14, 장군님 지시] 종전에는 "8초 지나면 busy 를 그냥 끈다"는 타이머가 있었다.
+   *   그건 금지된 방식이다(.analy 16 §2.11) — 그렇게 하면 편집기는 빈 채인데 busy 만 꺼져
+   *   사용자가 끝난 줄 착각한다. 이제는 실패를 표면화하고 팝업을 닫는다.
+   * ---------------------------------------------------------------------- */
+  function lf_hostFatal(oDetail) {
+    console.error("[CLED-001] client event editor host load failed:",
+      (oDetail && oDetail.where) || "", (oDetail && oDetail.detail) || "", (oDetail && oDetail.code) || "");
+
+    oState.bLoading = false;
+    lf_busyOff();
+    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+    // 314 = 알 수 없는 오류 / 290 = 안내(ZMSG_WS_COMMON_001, 원본 키). 임의 문구 생성 없음.
+    var sMsg = "";
+    try {
+      sMsg = (parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "314") || "") + "\n\n" +
+             (parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "290") || "");
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sMsg = ""; }
+
+    try { parent.showMessage(null, 10, "E", sMsg); }
+    catch (e) { console.error("[CLED-002] failure message could not be shown:", e && e.message); }
   }
 
   // 호스트(iframe)로 명령 전송.
@@ -206,7 +235,6 @@
 
   // 팝업 닫기 — ★제거하지 않고 숨기기만★(재사용). busy 해제. 리스너/iframe 은 유지.
   function lf_close() {
-    try { clearTimeout(iWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oUI) { oUI._askingClose = false; }
     lf_busyOff();
     try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -265,12 +293,12 @@
     if (!d || d.__u4ace !== true || d.hostId !== C_HOSTID) { return; }
     if (d.evt === "ready") {
       if (oUI) { oUI.ready = true; }
-      try { clearTimeout(iWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       lf_applyContent();   // 최초 로드 완료 → 현재 oState 기준 값/포커스 주입.
       lf_busyOff();
       return;
     }
-    if (d.evt === "applied") { oState.bLoading = false; try { clearTimeout(iLoadGuard); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }   // 값 주입 완료 → busy(로딩) 해제.
+    if (d.evt === "error") { lf_hostFatal(d); return; }   // host 로드 실패(실제 이벤트).
+    if (d.evt === "applied") { oState.bLoading = false; return; }   // 값 주입 완료 → 로딩 해제.
     if (d.evt === "zoom") { lf_setZoom(d.pct); return; }
     if (d.evt === "save") {
       // 에디터 한정 Ctrl+S → 저장(✓) 위임. 편집모드일 때만(표시모드는 ✓ 자체가 숨김 = 저장 불가).
@@ -350,6 +378,11 @@
         if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
       sHostSrc = "./js/codeeditor/index.html";   // 폴백(상대 — 문서 base 가 ws10_20/index.html 일 때).
     }
+    // ★ [2026-09-14, 장군님 지시] iframe 이 host 문서 자체를 못 읽는 경우 — 진짜 실패 이벤트.
+    //   host 안쪽 실패(monaco loader.js / index.js / vs 모듈)는 host 가 evt:"error" 로 알려 준다.
+    try { oFrame.onerror = function () { lf_hostFatal({ where: "host iframe", detail: oFrame.src }); }; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
     oFrame.src = sHostSrc + "?PARAMS=" + oQuery;
     oBody.appendChild(oFrame);
     oDlg.appendChild(oBody);
@@ -483,10 +516,10 @@
     oState.bEdit = bEdit;
     oState.fnCallback = fnCallback;
 
-    // busy(로딩) ON — 값 주입 완료('applied') 까지 ESC 무시. ack 유실 대비 안전 타임아웃.
-    oState.bLoading = true;
-    try { clearTimeout(iLoadGuard); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-    iLoadGuard = setTimeout(function () { oState.bLoading = false; }, 5000);
+    // 로딩 ON — 값 주입 완료('applied') 까지 ESC 무시.
+    //   [2026-09-14] 여기 있던 5초 안전장치를 걷어냈다. 'applied' 는 host 가 setValue 직후 바로 보내므로
+    //   host 가 살아 있으면 반드시 온다. host 가 죽었으면 ESC 도 host 에서 안 오니 이 잠금은 무의미하고,
+    //   그 경우는 evt:"error" 가 와서 lf_hostFatal 이 처리한다.
 
     // 최초 1회만 생성(혹시 DOM 에서 사라졌으면 재생성).
     if (!oUI || !document.body.contains(oUI.dlg)) {
@@ -504,10 +537,9 @@
       // 재사용 — 즉시 언어/readonly/값 반영(로드 없음 → busy 불필요, 플래시 없음).
       lf_applyContent();
     } else {
-      // 최초 로드 — ready 메시지에서 반영. 로드 동안 busy + 워치독(영구 busy 방지).
+      // 최초 로드 — ready 메시지에서 반영. 로드 동안 busy.
+      //   [2026-09-14] 여기 있던 8초 워치독을 걷어냈다 — 해제는 ready(정상) / evt:"error"(실패) 로만.
       lf_busyOn();
-      try { clearTimeout(iWatch); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-      iWatch = setTimeout(lf_busyOff, 8000);
     }
 
     if (!oUI.dlg.open) { try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }

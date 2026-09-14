@@ -1,0 +1,589 @@
+/****************************************************************************
+ * Binding Popup(대형 별창) frameless 창 셸 스타일 — HTML5
+ *  ★ 색·그림자·테두리는 tokens.css/shell.css/bootstrap-skin.css 의 의미 토큰만 소비(하드코딩 hex 금지).
+ *  ★ 공통 컴포넌트(.u4a-titlebar/.u4a-splitter/.u4a-tree/.u4a-table/.u4a-busy)는 화면에서 수정하지 않고
+ *    화면 스코프(.u4aBwp*)만 덧댄다(dont-modify-common-override-scoped).
+ *  Stage1 = 셸 레이아웃(타이틀바 + 3영역 스플리터 + busy + 등장). 트리/테이블 상세는 후속 단계에서 확장.
+ ****************************************************************************/
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--boot-bg, var(--app-bg));
+    color: var(--text);
+    /* 전역: 데이터 표면 외 선택 금지(text-select-copy-policy). 트리/테이블/입력은 개별 허용. */
+    user-select: none;
+}
+
+/* 공통 타이틀바(shell.css SSOT) — 셸 상단 고정. */
+.u4a-titlebar { flex: 0 0 auto; }
+
+/* ===== 본체 셸 = 3영역 가로 스플리터(좌|중|우), 중앙은 세로 2분할 ===== */
+.u4aBwpShell {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    /* 등장(frameless — 위치 확정 후 창 표시 + 본문 페이드인). */
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+.u4aBwpShell.u4aBwpShown { opacity: 1; }
+
+/* 패널(영역 컨테이너). 좌/우 고정폭(변수), 중앙 채움. */
+.u4aBwpPane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+/* 좌/우 = 고정 사이드(초기 basis=rem, 공간 부족 시 shrink). 드래그하면 공통 wireSplitter 가
+   flex:0 0 <px> 로 확정. 중앙 = 유연(잔여 흡수). 최소폭 단일 출처(min-width) — 16 §4.3. */
+.u4aBwpLeft  { flex: 0 1 22rem; min-width: 15rem; }
+.u4aBwpRight { flex: 0 1 22rem; min-width: 15rem; }
+/* ★ flex-basis: 0 (auto 아님) — auto 면 중앙 콘텐츠(추가속성 표 등)의 max-content 가 basis 가 돼
+   중앙 하단 표시 때 표가 커지면 basis 증가 → 좌우 패널을 최소폭까지 밀어낸다(실측 재현: 좌 352→240).
+   basis 0 이면 중앙은 잔여폭만 흡수(콘텐츠 무관) → 표는 host 안에서 처리되고 좌우 폭 불변. */
+.u4aBwpCenter { flex: 1 1 0; min-width: 18.75rem; }
+/* 화면 커스터마이징으로 중앙(DESIGN)이 숨겨진 조합에서 마지막 활성 영역이 잔여 폭을 채운다. */
+.u4aBwpFill { flex: 1 1 auto !important; }
+
+/* [제거 2026-08-10] 빈 트리 격자 숨김(.u4aBwpTreeEmpty)은 공통 makeColumnTree _showEmpty 로 흡수됨(전 화면 일관). */
+
+/* ★ 헤더 라벨이 좁은 컬럼을 넘쳐 가로 스크롤을 만들지 않게 말줄임 클립(스코프 override, 공통 미수정).
+   컬럼폭은 fitTreeColumnsToContainer 가 컨테이너에 맞춰 채우므로 이름 헤더는 안 잘리고, 넘칠 때만 … 처리. */
+.u4aBwpShell .u4aColTreeHead .u4aColTreeCol {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+
+/* [R4] 오브젝트이름 헤더 = 필터 어포던스. 공통 관례(shell.css:1976): 클릭=pointer+hover 만,
+   깔때기 표시자(.u4a-th__ind, 색=--accent)는 designArea _bwpSyncFilterInd 가 ★필터 걸릴 때만★ 붙임.
+   AppF4 등 다른 컬럼필터와 아이콘·색 완전 동일(공통 미수정·스코프). */
+.u4aBwpShell .u4aColTreeHead .u4aColTreeCol.u4aBwpDesignNameTh { cursor: pointer; }
+.u4aBwpShell .u4aColTreeHead .u4aColTreeCol.u4aBwpDesignNameTh:hover { background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--surface); }
+.u4aBwpShell .u4aColTreeHead .u4aBwpDesignNameTh .u4a-th__ind { margin-left: 0.25rem; }
+
+/* 디자인 트리 UI 오브젝트 아이콘 = 실제 컨트롤 이미지(원본 sap.m.Image). WS20 디자인 트리 .u4aWs20TreeIcon(18px)와 동일 규격. */
+.u4aBwpShell .u4a-tree__icon img.u4aBwpTreeIcon { width: 18px; height: 18px; object-fit: contain; flex: 0 0 auto; }
+
+/* 중앙 세로 2분할(디자인 트리 | 추가속성 적용) — 공통 wireSplitter(axis:y) 소비.
+   디자인=고정 높이(초기 basis %), 추가속성적용=유연(잔여 흡수). 최소높이 단일 출처(min-height). */
+/* ★ .u4aBwpArea(아래 86줄, flex:1 1 auto·min-height:0)가 같은 특정성으로 뒤에 정의돼 이 규칙을 덮는다
+   (디자인이 grow 로 잔여를 다 먹어 추가속성이 최소높이만 남던 원인). → .u4aBwpArea 를 함께 걸어 특정성(0,2,0)으로 확정. */
+.u4aBwpArea.u4aBwpDesign { flex: 0 1 60%; min-height: 6rem; display: flex; flex-direction: column; position: relative; }
+.u4aBwpArea.u4aBwpAdditApply { flex: 1 1 auto; min-height: 5rem; display: flex; flex-direction: column; }
+
+/* ★ 원본 BULK 모드(기본) 첫 실행 = 좌(모델트리) + 중(디자인트리) + 우("추가 속성 바인딩")의 3분할.
+   ★ 우측 패널(oPageRight = bindAdditInfo, index.js:1289 / start 1046)은 BULK 3번째 스플리터 영역이라
+     첫 실행부터 항상 보인다(oModel.oData.resize=true, width 30%).
+   ★ vis_addit(setAdditLayout index.js:3040)이 제어하는 건 우측이 아니라 ★중앙 하단★ "추가속성 적용"
+     테이블(oPageAdit)뿐 — 일반 필드(KIND="E") 선택 시에만 나타난다.
+   → 따라서 u4aBwpShowAddit 이 붙기 전엔 중앙 하단(#bwpSplit2 + .u4aBwpAdditApply)만 숨기고,
+     디자인 트리가 중앙을 세로로 채운다. 우측 패널/스플리터(#bwpSplit3)는 그대로 유지한다. */
+.u4aBwpShell:not(.u4aBwpShowAddit) #bwpSplit2,
+.u4aBwpShell:not(.u4aBwpShowAddit) .u4aBwpAdditApply { display: none; }
+.u4aBwpShell:not(.u4aBwpShowAddit) .u4aBwpDesign { flex: 1 1 auto; }
+
+/* 영역 카드 프레임 — 툴바(상) + 콘텐츠(채움). */
+.u4aBwpArea {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    overflow: hidden;
+}
+
+/* 영역 툴바(트리/테이블 상단 액션 행) — 반응형 오버플로(⋯) 대상(16 §11).
+   ★ 단일 행(nowrap) + overflow:hidden 이 attachOverflow 폭 측정의 전제(줄바꿈/자연폭 확장 시 오판).
+     좁아지면 공통 U4AUI.attachOverflow(oAPP.fn.attachToolOverflow)가 넘치는 버튼을 ⋯ 메뉴로 접는다. */
+.u4aBwpTool {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    min-height: 2.25rem;
+    box-sizing: border-box;
+    border-bottom: 0.0625rem solid var(--line);
+    flex-wrap: nowrap;
+    overflow: hidden;
+    min-width: 0;
+}
+.u4aBwpTool:empty { display: none; }
+.u4aBwpToolSpacer { flex: 1 1 auto; }
+/* ★ [hidden] 함정 — attachOverflow 는 넘치는 버튼에 el.hidden=true 를 준다. .u4a-btn/.u4a-btn-icon 은
+   display:inline-flex 라 UA 의 [hidden]{display:none} 을 이겨 ⋯ 가 항상 뜬다 → 명시적으로 숨긴다. */
+.u4aBwpTool > [hidden] { display: none !important; }
+/* ⋯ 오버플로 버튼 — 다른 아이콘 버튼과 동일 크기, 축소 금지. */
+.u4aBwpOvfBtn { flex: 0 0 auto; }
+
+/* ⋯ 오버플로 메뉴 항목 아이콘에 원본 버튼 시맨틱 색 유지(원본 UI5 OverflowToolbar 대응).
+   공통 .u4a-menu__item i(--icon-muted, 0,1,1)를 이기도록 i+클래스(0,2,1) 2-클래스 선택자. 의미 토큰만. */
+.u4a-menu__item i.u4aBwpMenuIco--success { color: var(--state-success); }
+.u4a-menu__item i.u4aBwpMenuIco--info { color: var(--state-info, var(--accent)); }
+.u4a-menu__item i.u4aBwpMenuIco--error { color: var(--state-error); }
+
+/* ===== 화면 커스터마이징 팝업(.u4aBwpLcDlg) — 공통 .u4a-dialog 골격 + 영역 3행 스위치 리스트 ===== */
+.u4aBwpLcDlg { min-width: 24rem; max-width: 32rem; }
+
+/* ===== [S5] 동일속성 적용 팝업(.u4aBwpSyncDlg) — 비모달 <dialog>.show()(원본 setModal(false), 60%×60%) =====
+   ★모달(:modal)이 아니라 위치가 자동 중앙이 안 되므로 fixed+inset+margin:auto 로 직접 중앙 배치. 공통 .u4a-dialog flex 골격 상속. */
+.u4aBwpSyncDlg {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: 60%;
+    height: 60%;
+    min-width: 32rem;
+    min-height: 24rem;
+    /* ★ 비모달 show() 는 :modal 이 아니라 top-layer 에 안 올라간다 → 일반 스택이라 뒤 화면(트리/패널)이
+       창 위로 겹쳐 보인다(장군님 실물 2026-08-10). z-index 로 뒤 화면 위에 띄운다.
+       (창 안 오류팝오버 .u4aBwpMsgPop=1200 · busy 오버레이는 이 창보다 위여야 하므로 그보다 낮게.) */
+    z-index: 30;
+    background: var(--sl-surface);   /* 공통 .u4a-dialog 배경 상속되지만 비모달 안전 위해 명시(뒤 비침 차단). */
+}
+.u4aBwpSyncDlg .u4aBwpSyncBody { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+/* ★ 팝업 본문 배분(원본 synchronizionBind.js:1077/1107 재현):
+     · 상단 패널 = '자연 높이 고정'(flex:0 0 auto) — 내용만큼만, 눌리지 않음.
+     · 후보 리스트/테이블 = '남은 공간 다 채움'(flex:1, 원본 LIST layoutData growFactor:1) — 창을 키우면
+       테이블 영역도 같이 커진다(장군님 원본 대조 2026-08-10).
+   좁아서 패널+최소테이블이 창을 넘으면 body(overflow:auto)가 통째로 스크롤. 테이블 최소 높이로 0 눌림 방지. */
+.u4aBwpSyncDlg .u4aBwpSyncBody > .u4a-panel { flex: 0 0 auto; }
+.u4aBwpSyncDlg .u4aBwpSyncList { flex: 1 1 auto; min-height: 0; }
+.u4aBwpSyncDlg .u4aBwpSyncListHost { flex: 1 1 auto; min-height: 10rem; }
+.u4aBwpLcBody { display: flex; flex-direction: column; gap: 0.75rem; }
+.u4aBwpLcList { display: flex; flex-direction: column; }
+.u4aBwpLcRow {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.625rem 0.25rem;
+    border-bottom: 0.0625rem solid var(--line);
+}
+.u4aBwpLcRow:last-child { border-bottom: none; }
+.u4aBwpLcIco {
+    flex: 0 0 auto; width: 2rem; height: 2rem;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 0.375rem;
+    background: var(--surface-2, var(--surface)); color: var(--accent);
+    font-size: 1rem;
+}
+.u4aBwpLcTexts { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.125rem; }
+.u4aBwpLcTitleWrap { display: flex; align-items: center; gap: 0.5rem; }
+.u4aBwpLcTitle { font-weight: 600; font-size: 0.875rem; }
+/* 상태 배지 — 표시(성공색)/숨김(옅음). */
+.u4aBwpLcStat {
+    font-size: 0.75rem; padding: 0.0625rem 0.375rem; border-radius: 0.75rem;
+    background: var(--line); color: var(--text-muted, var(--text));
+}
+.u4aBwpLcStat--on { background: var(--state-success); color: var(--state-success-contrast, #fff); }
+.u4aBwpLcDesc { font-size: 0.75rem; color: var(--text-muted, var(--text)); overflow: hidden; text-overflow: ellipsis; }
+.u4aBwpLcSwitch { flex: 0 0 auto; }
+/* 안내 스트립(정보). */
+.u4aBwpLcNotice {
+    display: flex; align-items: flex-start; gap: 0.375rem;
+    padding: 0.5rem 0.625rem; border-radius: 0.375rem;
+    background: var(--surface-2, var(--surface));
+    border: 0.0625rem solid var(--line);
+    font-size: 0.75rem; color: var(--text-muted, var(--text));
+}
+.u4aBwpLcNotice i { color: var(--state-info, var(--accent)); margin-top: 0.125rem; }
+
+/* 트리/테이블 호스트 — 스크롤 컨테이너. */
+.u4aBwpTreeHost,
+.u4aBwpTableHost {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    position: relative;
+}
+
+/* 빈상태(No data) — 공통 emp 는 내부 body(컬럼폭 합 ≈46rem) 안에 있어, 좁은 패널에선 안내가 그 폭 기준
+   가운데라 가시영역 밖으로 밀리고 가로 스크롤이 생긴다. → designArea observer 가 emp 폭을 host 가시폭(px)으로
+   고정하고, 여기서 sticky left:0 로 가로 가시영역에 고정(세로는 기존대로 body 가운데 유지). */
+.u4aBwpTreeHost.u4aBwpTreeEmptyState { overflow-x: hidden; }
+.u4aBwpTreeHost .u4aColTreeEmpty {
+    position: sticky; left: 0;
+    box-sizing: border-box;
+}
+
+/* ===== 스플리터 바 = 공통 .u4a-splitter__bar 스킨(11px + 가운데 알약 그립) 그대로 소비 =====
+   세로 바(좌|중, 중|우)는 공통 그대로(col-resize + 세로 그립). 가로 바(디자인|추가속성)만 방향 전환. */
+.u4aBwpSplitBar--h {
+    cursor: row-resize;
+    border-left: none; border-right: none;
+    border-top: 0.0625rem solid var(--line);
+    border-bottom: 0.0625rem solid var(--line);
+}
+.u4aBwpSplitBar--h::before { width: 36px; height: 5px; }
+.u4aBwpSplitBar--h:hover::before { width: 50px; height: 5px; }
+
+/* 드래그 중 커서/iframe 차단은 공통 wireSplitter(body.style.cursor) + 전역 body.u4a-dragging 이 담당. */
+
+/* busy 오버레이는 공통 .u4a-busy(shell.css) 소비 — data-busy 로 표시 토글. */
+/* ★ 즉시 표시(스코프 override, 공통 미수정): 공통 .u4a-busy 는 opacity 를 var(--motion)(~0.25s) 페이드인한다.
+   디자인 트리 재구성 같은 수십ms 짧은 busy 는 페이드가 완성되기 전에 꺼져 화면에 안 보였다(장군님 DA1 "전혀 안뜸").
+   이 팝업은 짧은 동기 작업이 많아 페이드를 제거해 켜는 즉시 풀 오버레이가 뜨게 한다(끌 때도 즉시). 카드 등장 애니는 유지. */
+#bwpBusy { transition: none; }
+
+/* 다열 그리드 트리테이블(.u4aColTree*) = 공통 컴포넌트 → theme/shell.css 로 이관(U4AUI.makeColumnTree 스킨).
+ *   2026-07-08 공통 승격. 대형 별창·소형 callBindPopup 이 같은 컴포넌트를 소비한다. 여기서 재정의 금지. */
+
+/* ===== 공유 상태 표현(모델·디자인 트리 공통) ===== */
+.u4aBwpStat { flex: 0 0 auto; }
+.u4aBwpStat--success { color: var(--state-success); }
+.u4aBwpStat--info { color: var(--state-info, var(--accent)); }
+.u4aBwpStat--warning { color: var(--state-warning); }
+.u4aBwpRow--success { box-shadow: inset 0.1875rem 0 0 var(--state-success); }
+.u4aBwpRow--info { box-shadow: inset 0.1875rem 0 0 var(--state-info, var(--accent)); }
+.u4aBwpRow--warning { box-shadow: inset 0.1875rem 0 0 var(--state-warning); }
+/* 디자인 트리 오류 행 = 원본 _style="u4aWsDesignTreeError"(index.css:361 background 전체 빨강) 대응.
+   원본은 배경만(#FF6347 !important). HTML5는 hex 금지 → 의미 토큰 배경 + 좌측바(하단 추가속성 오류행과 통일).
+   ★ !important = 원본과 동일 — hover/zebra/선택 배경이 오류 빨강을 덮지 않게(장군님 지적 2026-07-30 hover 시 사라짐). */
+.u4aBwpRow--error { box-shadow: inset 0.1875rem 0 0 var(--state-error); background: var(--state-error-bg) !important; }
+/* 오류 우선: 오류 행은 선택돼도 앞쪽 세로줄·배경을 빨강으로 유지(공통 shell.css:491 선택 accent 파랑을
+   specificity 로 덮음 → !important 로 확정). 장군님 지시 — 오류>선택 우선. */
+.u4a-tree__row.u4aBwpRow--error[aria-selected="true"],
+.u4a-tree__row.u4aBwpRow--error[aria-selected="true"]:hover {
+    box-shadow: inset 0.1875rem 0 0 0 var(--state-error) !important;
+    background: var(--state-error-bg) !important;
+}
+
+/* 유형(아이콘+텍스트)/설명 셀 콘텐츠 — 말줄임. */
+.u4aBwpTypeWrap { display: flex; align-items: center; gap: 0.375rem; min-width: 0; overflow: hidden; }
+.u4aBwpTypeTxt, .u4aBwpDescTxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }
+
+/* 툴바 아이콘 버튼. */
+.u4aBwpToolBtn { flex: 0 0 auto; }
+
+/* 드래그 중 디자인트리 drop 표시(원본 setDropStyle) — 가능=hover틴트+성공색 좌측바, 불가 리프=흐림.
+   color-mix 금지(Chromium93) → 배경은 공통 --hover-bg(솔리드 틴트), 강조는 성공색 inset 바. */
+.u4aBwpDropOk { background: var(--hover-bg); box-shadow: inset 0.1875rem 0 0 var(--state-success); }
+.u4aBwpDropNo { opacity: 0.4; }
+/* 좌측(prc001) 드래그 시 커서가 올라간 드롭 가능 행 = 드롭존 테두리(§4.3a 표준: 실선 accent + state-info-bg). DropOk 뒤라 배경 이김. */
+/* ★ 테두리는 행 위 "오버레이(::after)" 로 그린다 — §4.3a 표준(콘텐츠 위 z-index + pointer-events:none).
+   outline 로 그리면 불투명 sticky 액션셀(z-index:3)이 그 구간을 덮어 끊긴다. 그렇다고 액션셀 안에
+   inset box-shadow 로 이어붙이면, 행은 border-bottom 을 포함한 border 박스인데 셀(align-self:stretch)은
+   content 박스까지만 늘어나 ★1px 어긋난다★(장군님 지적 2026-07-14). 오버레이 한 장이면 끊김·어긋남·
+   잔여 세로줄이 원천적으로 없다. */
+.u4aBwpDropRow {
+    position: relative;
+    background: var(--state-info-bg);
+    box-shadow: none;
+}
+.u4aBwpDropRow::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 0.125rem solid var(--accent);
+    z-index: 5;              /* sticky 액션셀(z-index:3) 위 */
+    pointer-events: none;    /* 드롭 이벤트는 아래로 통과 */
+}
+
+/* WS20 디자인 트리 → 가운데로 드래그 중 드롭존 표시(호스트 전체, 마우스 뗄 때까지 유지).
+   효과 표준 = .analy/16 §4.3a(레퍼런스 runtimeClassNav .u4aRtmDrop.is-dragover — 실선 accent + state-info-bg + 0.15s 전환).
+   호스트는 콘텐츠+overflow 라 border 대신 outline(레이아웃 시프트 방지)로 동일 룩 구현. */
+/* 드래그 중 드롭존 = 비스크롤 래퍼(.u4aBwpDesign)에 ::after 오버레이로 네모박스를 콘텐츠 위에 덮는다.
+   ★ 스크롤되는 호스트(#bwpDesignTree)에 outline/border 를 걸면 스크롤·sticky헤더·행배경에 사방이 가려짐
+     → 콘텐츠 위(z-index) + pointer-events:none 오버레이라야 4변이 항상 온전히 보인다(장군님 지적 2026-07-13). */
+.u4aBwpDesign.u4aBwpDropZone::before,
+.u4aBwpDesign.u4aBwpDropZone::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;   /* 드롭 이벤트는 아래 호스트로 통과 */
+    border-radius: var(--radius);
+}
+/* 채움 = 반투명 wash(콘텐츠 위로 은은히 덮음). opacity 로 투명도 + 숨쉬듯 미세 오실레이션. */
+.u4aBwpDesign.u4aBwpDropZone::before {
+    background: var(--state-info-bg);
+    z-index: 4;
+    opacity: 0.4;
+    animation: u4aBwpDropBreathe 1.6s ease-in-out infinite;
+}
+/* 테두리 = 실선 accent 네모박스(wash·콘텐츠 위). 등장 시 페이드인. */
+.u4aBwpDesign.u4aBwpDropZone::after {
+    border: 0.125rem solid var(--accent);
+    z-index: 5;
+    animation: u4aBwpDropIn 0.18s ease-out;
+}
+@keyframes u4aBwpDropIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes u4aBwpDropBreathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.5; } }
+/* 접근성 — 모션 최소화 사용자는 애니메이션 끔(정적 wash+테두리만). */
+@media (prefers-reduced-motion: reduce) {
+    .u4aBwpDesign.u4aBwpDropZone::before { animation: none; opacity: 0.4; }
+    .u4aBwpDesign.u4aBwpDropZone::after { animation: none; }
+}
+
+/* 디자인 트리 — 체크박스(멀티 선택) + 바인딩 경로(Link 색). */
+.u4aBwpDesignChk { flex: 0 0 auto; margin: 0; cursor: pointer; width: 1.05rem; height: 1.05rem; accent-color: var(--accent); }
+.u4aBwpDesignPath { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: var(--accent); }
+/* 바인딩경로 = 링크(클릭 시 우측 추가속성 재구성, SPEC §3.2/§3.5). 값 있을 때만 링크 커서/hover 밑줄. */
+.u4aBwpDesignPathLink { cursor: pointer; }
+.u4aBwpDesignPathLink:hover { text-decoration: underline; }
+/* ★동일속성 적용 팝업 열림 동안 바인딩 경로 링크 '회색(비활성)' 표시 — 파란 링크색 이기게 u4aBwpDesignPath 와 함께 걸어 특정성 확보. */
+.u4aBwpDesignPath.u4aBwpDesignPathLink--locked { color: var(--text-muted); cursor: default; pointer-events: none; }
+.u4aBwpDesignPath.u4aBwpDesignPathLink--locked:hover { text-decoration: none; }
+
+/* 임베디드 속성 배지(원본 designTree.js:4093 ObjectStatus{EMATT/EMATT_ICON}) — 이름칸 우측(SpaceBetween 재현).
+   ★색/크기/잘림은 WS20 UI 트리 .u4aWs20TreeAggr(WS10/css/ws20.css:480/490)와 동일: --ws20-aggr=--accent, 13px/11px, 좁으면 clip. */
+.u4aBwpEmatt { margin-left: auto; flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 0.1875rem;
+    overflow: hidden; text-overflow: clip; white-space: nowrap;
+    font-size: 0.8125rem; color: var(--accent); }
+.u4aBwpEmattIcon { flex: 0 0 auto; color: var(--accent); font-size: 0.6875rem; }
+
+/* 행 액션 컬럼(원본 rowActionTemplate = WS20 트리 +/휴지통과 동일한 2슬롯 — 빈슬롯으로 세로 정렬 유지). */
+.u4aBwpRowActions { display: flex; align-items: center; justify-content: center; gap: 0.125rem; }
+.u4aBwpRowActSlot { display: inline-block; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; }
+.u4aBwpRowActBtn { flex: 0 0 auto; width: 1.5rem; height: 1.5rem; padding: 0; font-size: 0.8125rem; }
+.u4aBwpRowActBtn--unbind { color: var(--negative); }
+
+/* ★ 액션 컬럼 = 우측 고정(원본 sap.ui.table rowActionCount 거터). 데이터 컬럼(이름/경로/MPROP)이 가로 스크롤돼도
+   액션 컬럼은 항상 우측에 붙어있고 스크롤 콘텐츠를 불투명 배경으로 가린다.
+   ★ 세로선(좌측 경계)은 공통 .u4aColTreeCell/.u4aColTreeC4 의 border-left 로 이미 그려짐 → box-shadow 중복 금지.
+   ★ 컬럼 폭(--u4act-c4-w)은 공통 shell.css(.u4aColTreeC4)로 승격 완료 — 여기선 고정 동작만. */
+.u4aBwpTreeHost[data-act-col="3"] .u4aColTreeBody .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4aColTreeBody .u4aColTreeC4 {
+    position: sticky; right: 0; z-index: 3;
+    background-color: var(--surface);   /* ★ 불투명 base — 스크롤 콘텐츠 가림(반투명 선택/hover 틴트는 아래서 겹침) */
+}
+/* 헤더의 액션 컬럼 — 헤더 sticky top(z2) → top+right 코너 고정(z 더 높게). 헤더 밴드색. */
+.u4aBwpTreeHost[data-act-col="3"] .u4aColTreeHead .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4aColTreeHead .u4aColTreeC4 {
+    position: sticky; right: 0; z-index: 4;
+    background-color: var(--app-bg);
+}
+/* ★ 행이 없는 하단 빈 영역까지 고정 연장 — 고정은 각 '행 셀' 단위라 빈 영역엔 셀이 없어 끊긴다.
+   전체 높이를 덮는 그리드층의 액션 그리드라인(GL--cN)도 sticky-right + 불투명으로 만들어 빈 영역을 메운다.
+   (그리드층 z0 < 행 z1 → 행 영역은 행 셀이 이기고, 빈 영역만 이 GL 이 보인다.) */
+.u4aBwpTreeHost[data-act-col="3"] .u4aColTreeGL--c3,
+.u4aBwpTreeHost[data-act-col="4"] .u4aColTreeGL--c4 {
+    position: sticky; right: 0; z-index: 1;
+    background-color: var(--surface);
+    /* ★ 불투명 surface 가 본문 가로 행선(그라디언트)을 덮어 빈 영역에서 줄이 끊겨 보임 → 동일 행선을 얹어 끝까지 연장.
+       주기·색은 shell.css .u4aColTreeBody 와 동일(비가상=2.5rem, 가상=--u4a-vsrowh). 원점=그리드 top=본문 top → 정렬 일치. */
+    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--u4a-vsrowh, 2.5rem) - 0.0625rem), var(--line) calc(var(--u4a-vsrowh, 2.5rem) - 0.0625rem), var(--line) var(--u4a-vsrowh, 2.5rem));
+}
+/* 고정 액션 셀이 행 상태색(hover/선택)을 따라가되 불투명 유지 = surface(base) 위에 반투명 틴트를 background-image 로 겹침.
+   (선택/hover 색은 반투명 → background-color 로 덮으면 고정컬럼이 투명해져 스크롤 콘텐츠 비침. 틴트는 image 레이어로.)
+   선택 규칙을 뒤에 둬 hover+선택 동시엔 선택색이 이김. */
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row:hover .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row:hover .u4aColTreeC4 { background-image: linear-gradient(var(--hover-bg), var(--hover-bg)); }
+/* ★★ 드래그 내내 "드롭 가능 행 전체"에 붙는 .u4aBwpDropOk(_applyDropStyle → 행 background:--hover-bg)도
+   불투명 sticky 액션셀엔 안 먹어, C1~C3만 물들고 액션 컬럼만 무채색으로 남아 세로 "무인도" 띠가 생긴다.
+   → hover/선택과 동일하게 액션셀에도 hover-bg 를 background-image 로 겹쳐 행 전체가 균일하게 물들게 한다.
+   ★ 순서 = hover → DropOk → 선택 → DropRow. 선택 규칙을 DropOk 뒤에 둬야 "선택+드롭가능" 동시 행에서
+   C1~C3(선택색)와 C4 가 같은 선택색으로 일치(반대로 두면 C4 만 hover-bg 로 어긋나 그 행에서 다시 섬).
+   진짜 주범, 장군님 지적 2026-07-14. */
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row.u4aBwpDropOk .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row.u4aBwpDropOk .u4aColTreeC4 { background-image: linear-gradient(var(--hover-bg), var(--hover-bg)); }
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row[aria-selected="true"] .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row[aria-selected="true"] .u4aColTreeC4 { background-image: linear-gradient(var(--selected-bg), var(--selected-bg)); }
+/* 드롭 가능 행(prc001)의 액션셀 — 불투명이라 행 배경(state-info-bg)이 안 비치므로 틴트만 겹친다.
+   ★테두리는 여기서 그리지 않는다★ — 행 위 오버레이(.u4aBwpDropRow::after)가 통째로 담당(위 주석 참고).
+   선택 규칙 뒤에 둬 드롭 상태가 선택색을 이긴다. */
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row.u4aBwpDropRow .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row.u4aBwpDropRow .u4aColTreeC4 {
+    background-image: linear-gradient(var(--state-info-bg), var(--state-info-bg));
+}
+/* ★ 오류 행의 고정 액션칸도 오류 빨강으로 덮는다 — 원본(#FF6347 !important)은 행 전체 폭(액션 거터 포함)을
+   빨강으로 덮어 선택(파랑)이 안 보였다. HTML5 고정 액션셀은 불투명 유지를 위해 자기 background 를 칠해
+   행의 background:!important 가 닿지 않으므로, 셀에도 직접 오류색을 얹어 선택 파랑·surface 가 새지 않게 한다.
+   맨 뒤에 둬 hover/DropOk/선택/DropRow 를 모두 이긴다(행 본문 !important 와 동일 우선순위).
+   장군님 지적 2026-07-30 "오류 행에 파랑+빨강 섞임". */
+.u4aBwpTreeHost[data-act-col="3"] .u4a-tree__row.u4aBwpRow--error .u4aColTreeC3,
+.u4aBwpTreeHost[data-act-col="4"] .u4a-tree__row.u4aBwpRow--error .u4aColTreeC4 {
+    background-image: linear-gradient(var(--state-error-bg), var(--state-error-bg));
+}
+
+/* ===== 툴바 텍스트+아이콘 버튼(공통 .u4a-btn 소비) — 라벨 있는 액션 =====
+   원본 sap.m.Button(type Accept/Emphasized/Reject). 파랑(Emphasized)·빨강(Reject/negative)은 공통
+   변형 사용, 녹색(Accept=동일속성 바인딩)만 공통에 없어 화면 스코프로 --state-success 를 덧댄다
+   (dont-modify-common-override-scoped). 하드코딩 hex 금지 — 의미 토큰만. */
+.u4aBwpTool .u4a-btn { flex: 0 0 auto; height: 1.75rem; padding: 0 0.625rem; font-size: 0.8125rem; }
+.u4aBwpTool .u4a-btn i { margin-right: 0.25rem; }
+
+/* 동일속성 바인딩(Accept, 녹색) — 공통 미제공 변형이라 스코프 정의. */
+.u4aBwpBtn--sync {
+    background: var(--state-success);
+    border-color: var(--state-success);
+    color: var(--state-success-contrast, #fff);
+}
+/* ★ 마우스 올림 = 파랑 버튼(.u4a-btn--emphasized:hover=var(--accent-strong))과 동일 방식: 진한 같은색으로 바꾼다.
+   재지정 안 하면 공통 .u4a-btn:hover(회색 --sl-surface-2)가 배경을 덮어 초록이 회색으로 뜬다(파랑/빨강은 공통에
+   hover 배경 있어 무사, 초록만 공통 미제공이라 누락됐던 것). 진한 초록은 공통 팔레트에 대칭 보완(tokens.css). */
+.u4aBwpBtn--sync:hover {
+    background: var(--state-success-strong);
+    border-color: var(--state-success-strong);
+}
+/* ★ 공통 .u4a-btn:disabled(shell.css, 0,2,0)가 단일클래스 .u4aBwpBtn--sync(0,1,0)의 배경을 덮어
+   비활성 시 녹색 테두리+회색 배경으로 깨진다 → 색 버튼 규약(16 §)대로 원색을 opacity 로 재지정. */
+.u4aBwpBtn--sync:disabled {
+    background: var(--state-success);
+    border-color: var(--state-success);
+    color: var(--state-success-contrast, #fff);
+    opacity: 0.5;
+}
+
+/* 툴바 세퍼레이터(원본 sap.m.ToolbarSeparator). */
+.u4aBwpToolSep { flex: 0 0 auto; width: 0.0625rem; align-self: stretch; margin: 0.125rem 0.25rem; background: var(--line); }
+
+/* ===== 우측/중앙하단 "추가 속성 바인딩"(bindAdditInfo) — 속성|값 2열 표 =====
+   ★ 모달과 동일하게 공통 평면표(U4AUI.makeDataTable · .u4a-table)를 소비한다. 헤더/셀/격자선/행높이는 공통이 담당
+   (화면별 th/td 색·패딩·고정 %폭 override 제거 — 컬럼 폭은 리사이즈 colgroup/auto-fit 이 소유, 16 §3.4.2). */
+/* 속성명 셀 — 모달과 동일하게 굵게(데이터 아님, 선택 금지). 값 셀만 입력/선택 허용. */
+.u4aBwpAdditProp { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.u4aBwpAdditVal { min-width: 0; }
+.u4aBwpAdditVal .u4a-field,
+.u4aBwpAdditVal .u4a-combo { width: 100%; }
+.u4aBwpAdditVal .u4aBwpAdditTxt { user-select: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+
+/* [R1 · 원본 UI5 ValueState.Error 재현 · 장군님 지시 2026-07-24]
+   원본 sap.m.Input ValueState(bindAdditInfo.js:1239 stat / 1240 statTxt) 동작을 그대로 옮긴다.
+     ① 에러 input '빨간 배경+테두리' 상시 = 공통 전역(bootstrap-skin:564~).
+     ② 메시지는 '포커스가 갔을 때만' input 아래 팝오버. ★셀 안 absolute 팝오버는 이 표가 overflow
+        컨테이너(.u4aBwpTableHost) 안이라 클리핑/스태킹으로 안 보임(장군님 실기 재현) → 원본 UI5
+        ValueStateMessage 처럼 문서 최상단(body/dialog)에 position:fixed 로 띄운다(additInfoArea `_bwpVsShow`).
+        색/아이콘/보더는 공통 .u4a-field__msg 소비. 아래 .u4aBwpVsPop 는 그 top-layer 인스턴스.
+        ※ hover 로 오류문구가 새던 문제(공통 .u4a-table 자동 말줄임툴팁이 값셀 textContent=숨은 메시지까지
+          긁어감)는 additInfoArea 에서 필드 값셀에 data-tip="" 로 opt-out(공통 무수정).
+     ③ 반응형 개행 — 팝오버 폭을 입력칸 폭으로 JS 설정 + white-space:normal 로 문구 줄바꿈. */
+.u4aBwpVsPop { z-index: 40; white-space: normal; overflow-wrap: anywhere; }
+
+/* 추가속성 오류 행 강조(SPEC §6) — 원본 stat="Error" + _style="u4aWsDesignTreeError" 대응.
+   "오류 위치 확인" 링크로 이동했을 때 그 행을 눈에 띄게. 색은 의미 토큰만. */
+.u4aBwpAdditTbl tr.u4aBwpAdditRow--error > td { background: var(--state-error-bg); }
+.u4aBwpAdditTbl tr.u4aBwpAdditRow--error > td:first-child {
+    box-shadow: inset 0.1875rem 0 0 0 var(--state-error);
+    color: var(--state-error); font-weight: 600;
+}
+
+/* ===== 오류목록 팝오버(SPEC §6, 원본 sap.m.MessagePopover 대응) — bindPopup 전용 =====
+   utils/showMessagePopover.js 가 body 에 절대배치. 색/그림자는 공통 토큰만. */
+.u4aBwpMsgPop {
+    position: fixed; z-index: 1200;
+    min-width: 18rem; max-width: min(28rem, calc(100vw - 2rem));
+    display: flex; flex-direction: column;
+    background: var(--popover-bg, var(--surface));
+    border: 0.0625rem solid var(--line);
+    border-radius: 0.5rem;
+    box-shadow: var(--popover-shadow);
+    overflow: hidden;
+}
+.u4aBwpMsgHead {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+    border-bottom: 0.0625rem solid var(--line);
+    background: var(--surface);
+}
+/* 오류 건수 배지 */
+.u4aBwpMsgCnt {
+    font-size: 0.75rem; font-weight: 700; line-height: 1;
+    padding: 0.2rem 0.45rem; border-radius: 999px;
+    background: var(--state-error-bg); color: var(--state-error);
+}
+.u4aBwpMsgClose {
+    flex: 0 0 auto; width: 1.75rem; height: 1.75rem;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: 0; border-radius: 0.25rem;
+    color: var(--text-muted, var(--text)); cursor: pointer;
+}
+.u4aBwpMsgClose:hover { background: var(--hover-bg, var(--line)); color: var(--text); }
+.u4aBwpMsgClose:focus-visible { outline: 0.125rem solid var(--accent); outline-offset: -0.125rem; }
+
+.u4aBwpMsgList { list-style: none; margin: 0; padding: 0; overflow: auto; max-height: 60vh; }
+.u4aBwpMsgItem {
+    display: flex; gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    border-bottom: 0.0625rem solid var(--line);
+}
+.u4aBwpMsgItem:last-child { border-bottom: none; }
+.u4aBwpMsgIco { flex: 0 0 auto; color: var(--state-error); font-size: 0.9375rem; line-height: 1.4; }
+.u4aBwpMsgBody { min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.u4aBwpMsgTitle { font-size: 0.8125rem; font-weight: 600; color: var(--text); user-select: text; }
+.u4aBwpMsgDesc { font-size: 0.75rem; color: var(--text-muted, var(--text)); user-select: text; }
+/* "오류 위치 확인"(091) — 링크형 버튼 */
+.u4aBwpMsgLink {
+    align-self: flex-start; margin-top: 0.15rem;
+    background: none; border: 0; padding: 0;
+    font-size: 0.75rem; color: var(--accent); cursor: pointer;
+    text-decoration: none;
+}
+.u4aBwpMsgLink:hover { text-decoration: underline; }
+.u4aBwpMsgLink:focus-visible { outline: 0.125rem solid var(--accent); outline-offset: 0.125rem; border-radius: 0.125rem; }
+
+/* 중앙 하단(DESIGN_ADDIT) 툴바 선택 attribute 상태(원본 ObjectStatus S_SEL_ATTR OBJID/UIATT). */
+.u4aBwpAdditSelStat {
+    min-width: 0; max-width: 16rem;
+    margin: 0 0.5rem;
+    font-size: 0.8125rem; font-weight: 600; color: var(--accent);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.u4aBwpAdditSelStat:empty { display: none; }
+
+
+/* ===== [S1b §9.2] 동일속성 바인딩 화면 — 가운데(#bwpDesignArea) 슬라이드 스왑 =====
+   .analy 16 §9.2: 0.26s ease both · translateX(±2rem≈32px)+opacity · 들어오는 페이지 z-index:2 · 즉시스왑 금지. */
+#bwpDesignArea { position: relative; overflow: hidden; }
+.u4aBwpDesignPage {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; flex-direction: column; min-height: 0;
+    background: var(--app-bg);   /* 트리 안 비치게 불투명(테마 토큰). */
+}
+/* 동일속성 화면 본문 컨테이너(상단 패널=S2 / 하단 후보 테이블=S3 이 여기 렌더). */
+.u4aBwpSyncRoot { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.u4aBwpSyncBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: auto; gap: 0.5rem; padding: 0.5rem; }
+/* ★상단 패널은 줄어들지 않게(안 그러면 아래 표가 커질 때 패널이 눌려 4줄 중 1줄만 남는다 — S5 팝업 규칙과 동일). */
+.u4aBwpSyncBody > .u4a-panel { flex: 0 0 auto; }
+
+@keyframes u4aBwpPgInFwd   { from { transform: translateX(2rem);  opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes u4aBwpPgOutFwd  { from { transform: none; opacity: 1; } to { transform: translateX(-2rem); opacity: 0; } }
+@keyframes u4aBwpPgInBack  { from { transform: translateX(-2rem); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes u4aBwpPgOutBack { from { transform: none; opacity: 1; } to { transform: translateX(2rem);  opacity: 0; } }
+.u4aBwpPgIn      { animation: u4aBwpPgInFwd   0.26s ease both; }
+.u4aBwpPgOut     { animation: u4aBwpPgOutFwd  0.26s ease both; }
+.u4aBwpPgInBack  { animation: u4aBwpPgInBack  0.26s ease both; }
+.u4aBwpPgOutBack { animation: u4aBwpPgOutBack 0.26s ease both; }
+
+/* ===== [S2] 동일속성 상단 패널 — 선택 속성 4줄 + 추가속성(MPROP) 값(원본 designView 967~1099) ===== */
+/* 원본 HBOX1(wrap): [4줄]+[추가속성 값]을 가로로 나란히, 좁으면 아래로 줄바꿈. */
+.u4aBwpSyncPanelGrid { display: flex; flex-wrap: wrap; gap: 0.25rem 2rem; }
+.u4aBwpSyncPanelGrid > .u4aBwpSyncInfo { flex: 1 1 22rem; min-width: 0; }
+.u4aBwpSyncInfo { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.75rem; }
+.u4aBwpSyncInfoRow { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.8125rem; }
+.u4aBwpSyncInfoLbl {   /* 원본 라벨 폭 170px≈10.6rem — 반응형(최소~최대) + 말줄임. */
+    flex: 0 0 auto; min-width: 10rem; max-width: 14rem;
+    font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.u4aBwpSyncInfoVal {
+    flex: 1 1 auto; min-width: 0; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* 원본은 4줄과 추가속성 값 사이 구분선 없음 — 가로 여백(gap)만으로 나란히(synchronizionBind.js:1070 sapUiTinyMarginEnd). */
+.u4aBwpSyncMprop { margin-top: 0; }
+
+/* ===== [S3] 동일속성 하단 후보 테이블 — 7컬럼 멀티선택 + 컬럼최적화(원본 designView 1106~1228) ===== */
+.u4aBwpSyncList { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.u4aBwpSyncListTitle { font-weight: 600; color: var(--text); padding: 0.375rem 0.75rem 0.125rem; }
+.u4aBwpSyncListHost { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* ★가상 스크롤 = 보이는 구간만 폭을 잰다 → auto 레이아웃이면 스크롤할 때마다 칸 폭이 흔들린다.
+   공통 .u4a-table 기본(fixed)을 그대로 쓰고, 칸 폭은 컬럼 width(syncBindScreen.js)로 지정.
+   넘치는 글자는 …로 줄이고 마우스 올리면 전체(title). 표가 넓으면 가로 스크롤(호스트 overflow:auto). */
+.u4aBwpSyncListHost .u4a-table { table-layout: fixed; width: 100%; }
+.u4aBwpSyncListHost .u4a-table th,
+.u4aBwpSyncListHost .u4a-table td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ★부트스트랩(www/lib/bootstrap)이 표 칸에 붙이는 예기치 않은 점 글리프 차단 — 형제 멀티선택 팝업(CssJsLink·소형 동일속성)과 동일 방어. */
+.u4aBwpSyncListHost .u4a-table td::before,
+.u4aBwpSyncListHost .u4a-table td::after { content: none !important; }
+.u4aBwpSyncChkCol { width: 2.5rem; }
+.u4aBwpSyncChk { cursor: pointer; margin: 0; }

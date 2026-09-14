@@ -409,7 +409,7 @@ function attachBeforeInputEvent(contents) {
 
             if (input.shift || input.control || input.alt || input.meta) {
                 // 보정키가 붙은 F11 → 전체화면 아님. 화면 쪽 단축키가 처리하도록 그대로 통과.
-                WsMainLog.writeLog('INFO', "GUARD_EXIT | F11 with modifier -> pass through to renderer"
+                WsMainLog.writeLog('알림', "GUARD_EXIT | F11 with modifier -> pass through to renderer"
                     + " | shift=" + !!input.shift + " ctrl=" + !!input.control
                     + " alt=" + !!input.alt + " meta=" + !!input.meta
                     + " @ electron/main.js before-input-event");

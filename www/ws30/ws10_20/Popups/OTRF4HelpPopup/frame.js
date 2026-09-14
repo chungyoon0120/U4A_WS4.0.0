@@ -344,10 +344,17 @@ window.onload = function () {
         if (ev.key === "Escape") { oAPP.fn.fnClose(); }
     });
 
-    // [초기 로드] 대형 링 로더는 켜지 않는다 — editorPopup/optionPopup 과 동일하게
-    //   배경색(BGCOL) + 본문 CSS 페이드인(fnShowContent)만으로 등장(16.공통UX 2.6).
-    //   창이 뜨자마자 풀스크린 LOADING 링이 잠깐 번쩍이던 문제 제거. (형제창 broadcast busy 시에는
-    //   setBusy → setBusyLoading 으로 링을 그대로 사용하므로 요소/함수는 유지)
+    // ★ 창은 뜨자마자 무조건 busy 부터 켜고 시작한다(장군님 지시 2026-09-09 · 2026-09-11).
+    //   [고친 이유] 종전에는 "창이 뜨자마자 링이 잠깐 번쩍인다"는 이유로 초기 로드에 로더를 켜지 않고
+    //   배경색 + 본문 CSS 페이드인만으로 등장시켰다. 그 결과 F4 데이터가 도착할 때까지 테마 배경만
+    //   깔린 빈 창이 보였다(느린 PC·다크 테마 = 검은 화면). 번쩍임의 진짜 원인이던 공통 busy 의
+    //   0.3s 표시지연은 같은 날 제거했으므로, 이제는 원본대로 뜨자마자 켜는 것이 맞다.
+    //   해제 = index.js 가 /f4serverData 응답을 받은 뒤 setBusyLoading('') + fnShowContent().
+    //   ※ 창 잠금(oAPP.fn.setBusy)이 아니라 로더 표시만 켠다 — 닫기는 막지 않는다.
+    //   ※ 타임아웃으로 로더를 강제로 끄는 안전장치는 두지 않는다(.analy 16 §2.11 · 장군님 지시).
+    //     로더가 계속 돌면 "뭔가 고장났다"는 신호다. 해제는 실제 완료/실패 이벤트로만 —
+    //     index.js 의 /f4serverData 성공 콜백 / 실패 콜백(sendAjax 7번째 인자)이 그 이벤트다.
+    oAPP.setBusyLoading('X');
 
     // 창 즉시 표시(네이티브 opacity 페이드 미사용 — 흰 플래시 방지). 위치는 opener ready-to-show 에서 잡힘.
     //   backgroundColor=BGCOL 로 이미 불투명·테마 배경이라 흰 번쩍 없음(16.공통UX 2.6).

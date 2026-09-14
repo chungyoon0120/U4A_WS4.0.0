@@ -67,6 +67,18 @@ X();
 | `CRSH` | electron/lib/log/ws_crash_report.js (앱이 뻗었을 때 처리·보고서 만들기) |
 | `CDMP` | electron/lib/log/ws_crash_dump_read.js (죽은 흔적 덩어리를 글로 풀기) |
 | `TGSD` | electron/lib/log/ws_telegram.js (텔레그램 전송) |
+| `EDHT` | ws30/ws10_20/Popups/editorPopup/host/ (편집기 시리즈 Monaco host — 오류 페이지 에디터·소스 패턴도 이 host 를 쓴다) |
+| `VMHT` | ws30/ws10_20/Popups/versionMng/host/ (버전 관리 diff Monaco host) |
+| `CEHT` | ws30/ws10_20/js/codeeditor/ (범용 Monaco host — 클라이언트 이벤트 편집기가 쓴다) |
+| `EDTF` | ws30/ws10_20/Popups/editorPopup/editorFrame.js |
+| `EPEF` | ws30/ws10_20/Popups/errPageEditorPopup/errorPageEditorFrame.js |
+| `PATF` | ws30/ws10_20/Popups/patternPopup/frame.js (소스 패턴 창) |
+| `CLED` | ws30/ws10_20/js/ws_html5_client_editor.js (클라이언트 이벤트 편집기 팝업) |
+| `FFPO` | ws30/ws10_20/js/fnFindPopupOpen.js (Find 창 여는 쪽) |
+| `FEPE` | ws30/ws10_20/js/fnErrorPageEditorPopupOpen.js (Error Page Editor·미리보기 창 여는 쪽) |
+| `FVMP` | ws30/ws10_20/js/fnVersionManagementPopupOpen.js (Version Management 창 여는 쪽) |
+| `APRO` | ws30/ws10_20/design/attrPresetPopup/index.js (속성 기본값 팝업 여는 쪽) |
+| `FFIP` | ws30/ws10_20/js/fnFavIconPopupOpen.js (즐겨찾기 아이콘 값도움 창) |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

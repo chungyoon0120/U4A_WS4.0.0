@@ -10,7 +10,7 @@
  *  ★ 사진 자체는 안 받는다. 부모가 비교까지 마치고 "달라진 자리"만 보낸다.
  *    (사진은 48만자라 창끼리 넘기면 무겁다 — 2026-09-09 실측)
  *
- *  오류코드 접두: DMWN / 다음 번호: 017
+ *  오류코드 접두: DMWN / 다음 번호: 021
  *    (001 = 첫 페인트 테마 적용 실패, index.html 인라인에서 사용)
  ************************************************************************/
 
@@ -64,12 +64,24 @@
     var _sCmpRightTime = "";    //4.0 것을 담은 시각
     var _oCmpDiff = {};         //양쪽이 어긋난 자리 { path: "다름" | "3.0만" | "4.0만" }
     var _iCmpDiffN = 0;         //어긋난 자리 개수(세면서 상한을 본다)
-    var _aCmpDiffTop = [];      //어긋난 자리 중 **꼭대기만** 모은 목록(이동용). 자손까지 넣으면 하나씩 못 넘긴다
-    var _iCmpAt = -1;           //그 목록에서 지금 몇 번째에 서 있나
     var _oCmpKindN = { "다름": 0, "3.0만": 0, "4.0만": 0 };   //종류별 개수
     var _bCmpCut = false;       //너무 많아 도중에 끊었나
     var _oCmpDiffUp = {};       //어긋난 자리로 가는 윗자리들 { path: true }
     var _bCmpDiffOnly = false;  //다른 것만 보기
+
+    /* 제외 규칙(장군님 지시 2026-09-11) — VS Code 검색의 exclude 처럼 **정규식으로 빼는** 목록.
+     *   ★ **쪽마다 따로** 둔다(장군님 지시 2026-09-11). 두 프로그램은 지금 데이터 구조가 달라서
+     *     같은 정규식이 양쪽에 똑같이 먹지 않는다.
+     *   ★ 어긋난 자리 세기에서는 **어느 한쪽에서라도 뺀 자리는 안 센다** - 화면에 안 보이는 자리가
+     *     개수에만 남으면 "다른 것만" 을 켰을 때 빈 곳을 찾아 헤매게 된다.
+     *   ★ 거는 대상은 **path 전체**(예: oAPP.attr.T_UI[3].UIATV). 이름만 걸고 싶으면 `\.UIATV$` 처럼 쓴다.
+     *     **대소문자를 가린다**(정규식 본래 동작 — 장군님 확인 2026-09-11).
+     *     안 가리고 싶으면 `[Oo]` 처럼 규칙 안에 직접 적는다.
+     *   ★ 걸린 자리는 **그 아래까지 통째로** 뺀다 — 화면·찾기·어긋난 자리 세기 전부에서 뺀다.
+     */
+    var C_EXC_MAX = 50;             //너무 많이 쌓이면 자리마다 그만큼 견줘야 해 느린 PC 가 멎는다
+    var _aExcSrcL = [], _aExcReL = [];   //3.0 쪽 - 적은 글자 / RegExp 로 바꿔 둔 것
+    var _aExcSrcR = [], _aExcReR = [];   //4.0 쪽
     var _sCmpFindL = "";        //좌(3.0) 찾는 글자
     var _sCmpFindR = "";        //우(4.0) 찾는 글자
 
@@ -86,6 +98,12 @@
     var _oCmpExpandR = {};      //우(4.0) 펼침 상태
     var _oCmpClosedL = {};      //좌 - 한 번이라도 접은 적 있는 자리(그 아래는 저절로 안 펼친다)
     var _oCmpClosedR = {};      //우 - 위와 같음
+
+    //[전체 펼침] 을 누른 쪽인가(장군님 지시 2026-09-11).
+    //  ★ 자리마다 "펼침"을 적어 두지 않고 이 표시 하나만 본다 —
+    //    2만 자리가 넘는 데이터에서 자리마다 적으면 느린 PC 가 멎는다.
+    var _bExpandAllL = false;
+    var _bExpandAllR = false;
     var _oTreeL = null;         //좌 트리 손잡이
     var _oTreeR = null;         //우 트리 손잡이
     var _bCmpWantRight = false; //부모에게 4.0 것을 달라고 해 둔 상태인가
@@ -132,12 +150,32 @@
         EL.cmpInfo = $("dmCmpInfo");
         EL.btnCmpTake = $("dmBtnCmpTake");
         EL.chkDiffOnly = $("dmChkDiffOnly");
-        EL.btnDiffPrev = $("dmBtnDiffPrev");
-        EL.btnDiffNext = $("dmBtnDiffNext");
-        EL.cmpAt = $("dmCmpAt");
-        EL.btnCollapseAll = $("dmBtnCollapseAll");
+        EL.btnCollapseL = $("dmBtnCollapseL");
+        EL.btnCollapseR = $("dmBtnCollapseR");
+        EL.btnExpandL = $("dmBtnExpandL");
+        EL.btnExpandR = $("dmBtnExpandR");
         EL.cmpLeftSearch = $("dmCmpLeftSearch");
         EL.cmpRightSearch = $("dmCmpRightSearch");
+        EL.btnExcludeL = $("dmBtnExcludeL");
+        EL.btnExcludeR = $("dmBtnExcludeR");
+        EL.excBarL = $("dmCmpExcL");
+        EL.excBarR = $("dmCmpExcR");
+        EL.excInputL = $("dmCmpExcInputL");
+        EL.excInputR = $("dmCmpExcInputR");
+        EL.excListL = $("dmCmpExcListL");
+        EL.excListR = $("dmCmpExcListR");
+        EL.excNL = $("dmCmpExcNL");
+        EL.excNR = $("dmCmpExcNR");
+        EL.excHintL = $("dmCmpExcHintL");
+        EL.excHintR = $("dmCmpExcHintR");
+        EL.excHelpL = $("dmCmpExcHelpL");
+        EL.excHelpR = $("dmCmpExcHelpR");
+        EL.btnExcAddL = $("dmBtnExcAddL");
+        EL.btnExcAddR = $("dmBtnExcAddR");
+        EL.btnExcHelpL = $("dmBtnExcHelpL");
+        EL.btnExcHelpR = $("dmBtnExcHelpR");
+        EL.btnExcClearL = $("dmBtnExcClearL");
+        EL.btnExcClearR = $("dmBtnExcClearR");
     }
 
 
@@ -199,9 +237,9 @@
                         _oCmpRight = oData.SNAP || {};
                         _sCmpRightTime = _cmpNow();
 
-                        //★ 새로 담았으면 펼침 기록을 비운다(좌측과 같은 이유).
-                        _oCmpExpandR = {};
-                        _oCmpClosedR = {};
+                        //★ 펼침·접힘 상태는 **건드리지 않는다**(장군님 지시 2026-09-11).
+                        //  [4.0 지금 담기] 는 데이터만 새로 담는 단추다. 보던 자리가 접히거나
+                        //  펴지면 어디를 보고 있었는지 잃어버린다 — 있는 데이터만 다시 그린다.
                         _cmpRefresh();
                         break;
                     }
@@ -557,7 +595,7 @@
     //노드 하나 만들기.
     //  걸림   = 자기 이름에 찾는 글자가 있다
     //  아래   = 윗자리가 걸려서 딸려 나온 것
-    //  lvl    = 뿌리에서부터 몇 번째인가(0 = 뿌리)
+    //  lvl    = root에서부터 몇 번째인가(0 = root)
     //           ★ 공통 트리는 토글할 때 level 을 0 으로 넘긴다(theme/u4a-ui.js 의 가상 트리 토글).
     //             그 값을 그대로 믿으면 깊은 자리도 "펼쳐진 것"으로 답해 화살표가 반대로 먹는다.
     //             그래서 깊이를 노드에 직접 달아 둔다.
@@ -742,6 +780,16 @@
             //화살표를 직접 누른 것은 공통 트리가 이미 처리한다 - 여기서 또 뒤집으면 도로 닫힌다.
             if (ev.target && ev.target.closest && ev.target.closest(".u4a-tree__toggle")) { return; }
 
+            //★ 글자를 드래그해 잡은 채 뗀 것은 접었다 폈다로 치지 않는다(장군님 지시 2026-09-11).
+            //  안 그러면 복사하려고 글자를 긁는 순간 줄이 접혀 잡은 것이 사라진다.
+            //  공통이 같은 판정을 쓴다(행 선택도 이 방식으로 걸러낸다).
+            if (window.U4AUI && typeof U4AUI.isTextDragSelecting === "function") {
+                if (U4AUI.isTextDragSelecting()) { return; }
+            } else {
+                console.warn("[DMWN-016] WARN COMMON_DRAG_SELECT_CHECK_MISSING" +
+                    " - dragging text over a tree row will collapse it and lose the selection");
+            }
+
             var oNow = oNameCell.__dmNode;
             if (!oNow) { return; }
 
@@ -773,16 +821,16 @@
      * ================================================================== */
 
     /**
-     * path 를 뿌리부터 한 단계씩 늘어나는 자리 목록으로 쪼갠다.
-     *   ★ 뿌리 이름 자체에 점이 들어간다(oAPP.attr). 점으로 그냥 쪼개면 없는 자리가 나오므로
-     *     뿌리는 가진 데이터의 키와 대조해서 자른다.
-     *   @return {Array<string>|null}  [뿌리, ... , 자기 자신] / 모양이 안 맞으면 null
+     * path 를 root부터 한 단계씩 늘어나는 자리 목록으로 쪼갠다.
+     *   ★ root 이름 자체에 점이 들어간다(oAPP.attr). 점으로 그냥 쪼개면 없는 자리가 나오므로
+     *     root는 가진 데이터의 키와 대조해서 자른다.
+     *   @return {Array<string>|null}  [root, ... , 자기 자신] / 모양이 안 맞으면 null
      */
     function _splitPath(sPath) {
 
         if (!_oSnap || !sPath) { return null; }
 
-        //뿌리 = 이 path 가 그것으로 시작하는 키 중 가장 긴 것.
+        //root = 이 path 가 그것으로 시작하는 키 중 가장 긴 것.
         var sRoot = "";
         var aRootKeys = Object.keys(_oSnap);
         for (var i = 0; i < aRootKeys.length; i++) {
@@ -826,7 +874,7 @@
     /**
      * 가진 데이터에서 실제로 있는 가장 깊은 자리가 몇 번째인가.
      *   눌렀던 줄이 그 뒤에 지워졌을 수 있다 — 그때는 남아 있는 가장 가까운 윗자리로 간다.
-     *   @return {number}  aPieces 안 위치 / 뿌리조차 없으면 -1
+     *   @return {number}  aPieces 안 위치 / root조차 없으면 -1
      */
     function _deepestExisting(aPieces) {
 
@@ -935,7 +983,7 @@
     function _emptyText() {
         if (_sTreeKind === "추가") { return "추가된 것이 없습니다."; }
         if (_sTreeKind) { return "변경된 것이 없습니다."; }
-        if (_sTreeSearch) { return "찾는 것이 없습니다."; }
+        if (_sTreeSearch) { return "찾기에 걸린 것이 없습니다."; }
         return "볼 데이터가 없습니다.";
     }
 
@@ -1151,8 +1199,20 @@
         return p2(d.getHours()) + ":" + p2(d.getMinutes()) + ":" + p2(d.getSeconds());
     }
 
-    function _cmpSetInfo(sText) {
-        if (EL.cmpInfo) { EL.cmpInfo.textContent = sText || ""; }
+    //숫자에 천 단위 쉼표 — 2만이 넘는 수를 쉼표 없이 적으면 자릿수를 눈으로 못 센다.
+    function _cmpNum(iN) {
+        return String(iN).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    /**
+     * 위쪽 줄에 요약을 적는다.
+     *   sTip = 마우스를 올렸을 때 나오는 풀이. 줄만 보고는 무슨 뜻인지 모르므로 반드시 같이 준다
+     *          (장군님 지적 2026-09-11 - "무슨 말이고 시발").
+     */
+    function _cmpSetInfo(sText, sTip) {
+        if (!EL.cmpInfo) { return; }
+        EL.cmpInfo.textContent = sText || "";
+        if (sTip) { EL.cmpInfo.title = sTip; } else { EL.cmpInfo.removeAttribute("title"); }
     }
 
 
@@ -1253,21 +1313,17 @@
             _oCmpLeft = oSnap;
             _sCmpLeftTime = _cmpNow();
 
-            //★ 새로 받았으면 펼침 기록을 비운다(장군님 지적 2026-09-11).
-            //  안 비우면 예전에 펼쳐 둔 자리만 펼쳐진 채 나머지는 기본값이라 뒤섞여 보인다.
-            //  비우면 언제 담아도 늘 같은 모양(뿌리만 펼침)으로 시작한다.
-            _oCmpExpandL = {};
-            _oCmpClosedL = {};
-
+            //★ 펼침·접힘 상태는 **건드리지 않는다**(장군님 지시 2026-09-11, 앞 지시를 대체).
+            //  3.0 에서 다시 보내도 보던 자리는 그대로 둔다 - 같은 곳을 되풀이해 보며 맞대 보는
+            //  도구라, 보낼 때마다 접히면 매번 그 자리를 다시 찾아 들어가야 한다.
             console.log("[DMWN] INFO SNAPSHOT_FROM_3_0 received roots=" +
                 Object.keys(oSnap).length + " size=" + sRaw.length);
 
-            //받자마자 4.0 것도 새로 담아 나란히 놓는다.
-            //  ★ 여기서 바로 다시 그리지 않는다 — 4.0 것이 도착하면 그때 한 번만 그린다.
-            //    둘 다 그리면 한 번 보낼 때마다 비교가 두 번 돌아 콘솔에도 두 줄씩 쌓인다
-            //    (장군님 지적 2026-09-11). 부모와 못 이어진 때만 왼쪽이라도 그려 둔다.
-            _cmpAskRight();
-            if (!_oChannel) { _cmpRefresh(); }
+            //★ 4.0 것은 여기서 자동으로 담지 않는다(장군님 지적 2026-09-11).
+            //  [4.0 지금 담기] 단추가 이미 있는데 자동으로도 담으면 군더더기다 —
+            //  3.0 것만 보냈는데 4.0 것까지 바뀌어 무슨 일이 일어났는지 알 수 없다.
+            //  4.0 쪽은 단추를 누를 때만 담는다.
+            _cmpRefresh();
 
             _cmpJson(res, 200, { OK: true, ROOTS: Object.keys(oSnap).length });
         });
@@ -1284,7 +1340,8 @@
         } catch (e) {
             console.error("[DMWN-012] ERROR HTTP_MODULE_LOAD_FAILED port=" + C_PORT +
                 " - cannot receive data from 3.0:", e);
-            _cmpSetInfo("9999 을 못 열었습니다");
+            _cmpSetInfo("3.0 에서 받을 준비를 못 했습니다",
+                "포트 " + C_PORT + " 를 열지 못했습니다. 3.0 에서 보내도 이 창은 받지 못합니다.");
             return;
         }
 
@@ -1324,18 +1381,23 @@
                 //이미 쓰는 자리이면 3.0 것이 영영 안 들어온다 - 반드시 드러낸다.
                 console.error("[DMWN-014] ERROR COMPARE_PORT_LISTEN_FAILED port=" + C_PORT +
                     " code=" + (e && e.code) + " - data from 3.0 cannot arrive:", e);
-                _cmpSetInfo("9999 을 못 열었습니다 (" + ((e && e.code) || "error") + ")");
+                _cmpSetInfo("3.0 에서 받을 준비를 못 했습니다 (" + ((e && e.code) || "error") + ")",
+                    "포트 " + C_PORT + " 를 열지 못했습니다. 다른 프로그램이 쓰고 있거나 막혀 있습니다.\n" +
+                    "3.0 에서 보내도 이 창은 받지 못합니다.");
                 _oSrv = null;
             });
 
             _oSrv.listen(C_PORT, "127.0.0.1", function () {
                 console.log("[DMWN] INFO COMPARE_PORT_OPEN port=" + C_PORT);
-                _cmpSetInfo("9999 열림 - 3.0 에서 보내십시오");
+                _cmpSetInfo("3.0 이 보내는 것을 받을 준비가 됐습니다 - 3.0 에서 보내기를 누르십시오",
+                    "이 창이 3.0 의 데이터를 받으려고 기다리고 있습니다.\n" +
+                    "포트 " + C_PORT + " 로 받습니다.");
             });
 
         } catch (e) {
             console.error("[DMWN-014] ERROR COMPARE_SERVER_START_FAILED port=" + C_PORT + ":", e);
-            _cmpSetInfo("9999 을 못 열었습니다");
+            _cmpSetInfo("3.0 에서 받을 준비를 못 했습니다",
+                "포트 " + C_PORT + " 를 열지 못했습니다. 3.0 에서 보내도 이 창은 받지 못합니다.");
             _oSrv = null;
         }
     }
@@ -1376,14 +1438,11 @@
     function _cmpOver() { return _iCmpDiffN >= C_CMP_MAX; }
 
     //어긋난 자리 하나 적기(개수도 같이 센다).
-    function _cmpPut(sPath, sKind, bTop) {
+    function _cmpPut(sPath, sKind) {
         if (_oCmpDiff[sPath]) { return; }
         _oCmpDiff[sPath] = sKind;
         _iCmpDiffN++;
         if (_oCmpKindN[sKind] !== undefined) { _oCmpKindN[sKind]++; }
-        //★ 이동 목록에는 **꼭대기만** 넣는다. 한쪽에만 있는 덩어리는 그 아래가 전부 어긋난 자리가 되는데,
-        //  그것까지 넣으면 [다음 차이]를 수천 번 눌러야 다음 덩어리로 간다.
-        if (bTop) { _aCmpDiffTop.push(sPath); }
         //★ 끊겼다고 따로 한 줄 더 찍지 않는다(장군님 지적 2026-09-11).
         //  비교가 끝날 때 남기는 줄에 cut=true 로 이미 들어 있다 — 같은 말을 두 번 남기지 않는다.
         //  게다가 그것은 오류가 아니라 "여기서 그만 셌다"는 표시다. 오류로 찍으니 붉은 줄이 쏟아졌다.
@@ -1396,11 +1455,15 @@
      *     그래서 ① 하위 레벨이 비교에서 빠지고 ② [다른 것만] 을 켜면 윗자리만 남고
      *     펼쳐도 아래가 안 나왔다(화살표는 있는데 속이 비었다).
      */
-    function _cmpMarkAll(v, sPath, sKind, iDepth, bTop) {
+    function _cmpMarkAll(v, sPath, sKind, iDepth) {
 
         if (_cmpOver()) { return; }
 
-        _cmpPut(sPath, sKind, bTop === true);
+        //★ 제외한 자리는 여기서도 안 센다(_cmpWalk 과 같은 기준). 한쪽에만 있는 덩어리 아래에도
+        //  제외 규칙에 걸리는 자리가 섞여 있을 수 있다.
+        if (_cmpExcluded(sPath, true) || _cmpExcluded(sPath, false)) { return; }
+
+        _cmpPut(sPath, sKind);
 
         if (!v || typeof v !== "object") { return; }
         if (iDepth > 40) { return; }
@@ -1410,7 +1473,7 @@
 
         for (var i = 0; i < aK.length; i++) {
             if (_cmpOver()) { return; }
-            _cmpMarkAll(v[aK[i]], _joinPath(sPath, aK[i], bArr), sKind, iDepth + 1, false);
+            _cmpMarkAll(v[aK[i]], _joinPath(sPath, aK[i], bArr), sKind, iDepth + 1);
         }
     }
 
@@ -1434,12 +1497,16 @@
         if (_cmpOver()) { return; }
         if (iDepth > 40) { return; }
 
+        //★ 제외한 자리는 어긋난 자리 세기에서도 뺀다 - 화면에 안 보이는 것이 개수에만 잡히면 안 된다.
+        //  좌우 규칙이 다르므로 **어느 한쪽에서라도** 뺀 자리는 안 센다.
+        if (_cmpExcluded(sPath, true) || _cmpExcluded(sPath, false)) { return; }
+
         var bLObj = (vL && typeof vL === "object");
         var bRObj = (vR && typeof vR === "object");
 
         //① 한쪽만 덩어리다 — 이 자리도 다르고, 덩어리 쪽 아래도 전부 다르다.
         if (bLObj !== bRObj) {
-            _cmpMarkAll(bLObj ? vL : vR, sPath, "다름", iDepth, true);
+            _cmpMarkAll(bLObj ? vL : vR, sPath, "다름", iDepth);
             _cmpMarkUp(sPath);
             return;
         }
@@ -1447,7 +1514,7 @@
         //② 둘 다 홑값이다 — 값만 견준다.
         if (!bLObj) {
             if (!_cmpSameLeaf(vL, vR)) {
-                _cmpPut(sPath, "다름", true);
+                _cmpPut(sPath, "다름");
                 _cmpMarkUp(sPath);
             }
             return;
@@ -1459,12 +1526,19 @@
         //   목록인지 아닌지가 서로 다르면 이 자리를 다름으로 적되, **아래는 계속 견준다**
         //   (그래야 어느 자리가 어떻게 다른지까지 보인다).
         if (bLArr !== bRArr) {
-            _cmpPut(sPath, "다름", true);
+            _cmpPut(sPath, "다름");
             _cmpMarkUp(sPath);
         }
 
+        //★ 배열이면 번호가 아니라 **값이 겹치지 않는 칸**으로 짝짓는다(장군님 지적 2026-09-11).
+        //  한쪽에 항목이 하나 더 있어도 뒤가 통째로 밀리지 않는다.
+        var bPair = (bLArr && bRArr);
+        var sArrKey = bPair ? _cmpArrKeyOf(sPath, vL, vR) : null;
+        var oL = bPair ? _cmpArrMap(vL, sArrKey) : vL;
+        var oR = bPair ? _cmpArrMap(vR, sArrKey) : vR;
+
         var oSeen = {};
-        var aK = Object.keys(vL).concat(Object.keys(vR));
+        var aK = Object.keys(oL).concat(Object.keys(oR));
 
         for (var i = 0; i < aK.length; i++) {
 
@@ -1474,15 +1548,15 @@
             if (oSeen[sK]) { continue; }
             oSeen[sK] = true;
 
-            var bInL = Object.prototype.hasOwnProperty.call(vL, sK);
-            var bInR = Object.prototype.hasOwnProperty.call(vR, sK);
+            var bInL = Object.prototype.hasOwnProperty.call(oL, sK);
+            var bInR = Object.prototype.hasOwnProperty.call(oR, sK);
             var sSub = _joinPath(sPath, sK, bLArr);
 
             //★ 한쪽에만 있으면 **그 아래까지 전부** 적는다.
-            if (bInL && !bInR) { _cmpMarkAll(vL[sK], sSub, "3.0만", iDepth + 1, true); _cmpMarkUp(sSub); continue; }
-            if (!bInL && bInR) { _cmpMarkAll(vR[sK], sSub, "4.0만", iDepth + 1, true); _cmpMarkUp(sSub); continue; }
+            if (bInL && !bInR) { _cmpMarkAll(oL[sK], sSub, "3.0만", iDepth + 1); _cmpMarkUp(sSub); continue; }
+            if (!bInL && bInR) { _cmpMarkAll(oR[sK], sSub, "4.0만", iDepth + 1); _cmpMarkUp(sSub); continue; }
 
-            _cmpWalk(vL[sK], vR[sK], sSub, iDepth + 1);
+            _cmpWalk(oL[sK], oR[sK], sSub, iDepth + 1);
         }
     }
 
@@ -1492,8 +1566,8 @@
         _oCmpDiffUp = {};
         _iCmpDiffN = 0;
         _bCmpCut = false;
-        _aCmpDiffTop = [];
-        _iCmpAt = -1;
+        //데이터가 바뀌면 짝짓기에 쓸 칸도 달라질 수 있다 - 새로 정한다.
+        _oArrKey = {};
         _oCmpKindN = { "다름": 0, "3.0만": 0, "4.0만": 0 };
 
         if (!_oCmpLeft || !_oCmpRight) { return; }
@@ -1512,8 +1586,8 @@
             var bInL = Object.prototype.hasOwnProperty.call(_oCmpLeft, sK);
             var bInR = Object.prototype.hasOwnProperty.call(_oCmpRight, sK);
 
-            if (bInL && !bInR) { _cmpMarkAll(_oCmpLeft[sK], sK, "3.0만", 0, true); continue; }
-            if (!bInL && bInR) { _cmpMarkAll(_oCmpRight[sK], sK, "4.0만", 0, true); continue; }
+            if (bInL && !bInR) { _cmpMarkAll(_oCmpLeft[sK], sK, "3.0만", 0); continue; }
+            if (!bInL && bInR) { _cmpMarkAll(_oCmpRight[sK], sK, "4.0만", 0); continue; }
 
             _cmpWalk(_oCmpLeft[sK], _oCmpRight[sK], sK, 0);
         }
@@ -1600,6 +1674,8 @@
                 var sK = aKeys[i];
                 var vC = v[sK];
                 var sSub = _joinPath(sPath, sK, bArr);
+                //★ 제외한 자리는 찾기에서도 안 본다 - 안 그러면 안 보이는 자리 때문에 길만 열린다.
+                if (_cmpExcluded(sSub, bLeft)) { continue; }
                 if (_cmpHit1(sK, vC, sTxt)) { oHit[sSub] = true; iN++; _up(sSub); }
                 _walk(vC, sSub);
             }
@@ -1636,7 +1712,728 @@
      * 이 줄이 지금 걸러내기에 남는가.
      *   ① 다른 것만  ② 찾기 — 둘 다 켜면 둘 다 만족해야 남는다.
      */
+    /* ---- 제외 규칙 --------------------------------------------------------
+     *
+     *  규칙 = **한 줄**(장군님 지시 2026-09-11 — 칸이 둘이면 더 헷갈린다).
+     *
+     *  적는 법은 두 줄이면 끝난다
+     *    ① 별표(*)를 쓰면 **path 전체**에 맞춘다.   `*` = 아무 글자 여러 개 / `?` = 한 글자
+     *    ② 별표를 안 쓰면 **이름**이 그것인 줄을 뺀다.
+     *
+     *  본보기
+     *    `*_*`             어디에 있든 밑줄이 든 것 전부
+     *    `oAPP.attr._*`    oAPP.attr 바로 밑에서 밑줄로 시작하는 것
+     *    `oAPP.attr.*_*`   oAPP.attr 밑이면 깊이 상관없이 밑줄이 든 것
+     *    `oAPP.DATA*`      oAPP.DATA 와 그 아래 통째로
+     *    `UIATV`           이름이 UIATV 인 줄 (어디에 있든)
+     *
+     *  정규식도 그대로 받는다(AI 에게 물어보고 받아 온 것을 붙여 넣어도 먹어야 한다).
+     *    `^_`   `^oAPP[.]DATA$`  처럼 정규식 문법이 보이면 정규식으로 읽는다.
+     *    `/…/` 로 감싸면 무조건 정규식.
+     *    정규식은 **path 와 이름 둘 다** 맞춰 본다.
+     *
+     *  걸린 줄은 **그 아래까지 통째로** 사라진다.
+     *  적어 두는 곳 = 파일. 앱을 껐다 켜도 남는다(_excFilePath 설명 참고).
+     * ------------------------------------------------------------------ */
+
+    function _excSrcOf(bLeft) { return bLeft ? _aExcSrcL : _aExcSrcR; }
+    function _excReOf(bLeft) { return bLeft ? _aExcReL : _aExcReR; }
+    function _excSideOf(bLeft) { return bLeft ? "3.0" : "4.0"; }
+
+    /* 적어 두는 곳 = **파일**.
+     *   이 창은 partition 이름에 `persist:` 가 없어 session 이 메모리에만 있다.
+     *   그래서 앱을 끄면 localStorage 가 통째로 없어진다(실측 2026-09-11).
+     *   partition 은 로그인·쿠키와 얽힌 앱 전체 정책이라 못 건드린다 → 파일에 적는다.
+     */
+    var C_EXC_FILE = "u4a-datamon-exclude.json";
+
+    function _excFilePath() {
+        return PATH.join(APP.getPath("userData"), C_EXC_FILE);
+    }
+
+    /**
+     * 읽어 온 규칙 하나를 글자 한 줄로 맞춘다.
+     *   예전에 칸 두 개로 적어 둔 것({U,N})도 받아 한 줄로 합친다.
+     */
+    function _excNorm(v) {
+
+        if (typeof v === "string") { return v.trim() || null; }
+        if (!v || typeof v !== "object") { return null; }
+
+        if (typeof v.P === "string") { return v.P.trim() || null; }
+
+        var sU = (typeof v.U === "string") ? v.U.trim() : "";
+        var sN = (typeof v.N === "string") ? v.N.trim() : "";
+
+        if (sU && sN) { return sU + "." + sN; }
+        if (sU) { return sU + "*"; }
+        return sN || null;
+    }
+
+    function _excKeepList(aRead) {
+        var aKeep = [];
+        if (!Array.isArray(aRead)) { return aKeep; }
+        for (var i = 0; i < aRead.length && aKeep.length < C_EXC_MAX; i++) {
+            var s = _excNorm(aRead[i]);
+            if (s && aKeep.indexOf(s) === -1) { aKeep.push(s); }
+        }
+        return aKeep;
+    }
+
+    /**
+     * 적어 둔 규칙을 읽어 온다(좌우 한꺼번에 - 파일이 하나다).
+     *   못 읽어도 도구는 그냥 돈다. 왜 못 읽었는지는 반드시 남긴다.
+     */
+    function _excLoadAll() {
+
+        var sPath = "";
+        var sRaw = null;
+
+        try {
+            sPath = _excFilePath();
+            var fs = require("fs");
+            if (!fs.existsSync(sPath)) {
+                console.log("[DMWN] INFO EXCLUDE_FILE_NONE path=" + sPath + " - starting with no exclude rules");
+                return;
+            }
+            sRaw = fs.readFileSync(sPath, "utf8");
+        } catch (e) {
+            console.error("[DMWN-017] ERROR EXCLUDE_FILE_READ_FAILED path=" + sPath +
+                " - starting with no exclude rules:", e);
+            return;
+        }
+
+        var oRead = null;
+        try { oRead = JSON.parse(sRaw); }
+        catch (e) {
+            console.error("[DMWN-018] ERROR EXCLUDE_FILE_PARSE_FAILED path=" + sPath +
+                " - the file is not JSON, ignoring it:", e);
+            return;
+        }
+
+        if (!oRead || typeof oRead !== "object") {
+            console.warn("[DMWN-018] WARN EXCLUDE_FILE_NOT_OBJECT path=" + sPath + " - ignored");
+            return;
+        }
+
+        _aExcSrcL = _excKeepList(oRead.L);
+        _aExcSrcR = _excKeepList(oRead.R);
+        _excCompile(true);
+        _excCompile(false);
+
+        console.log("[DMWN] INFO EXCLUDE_LOADED nL=" + _aExcSrcL.length + " nR=" + _aExcSrcR.length);
+    }
+
+    //적어 둔다(좌우 한꺼번에). 못 적으면 이번 판에서만 먹는다 — 조용히 넘기지 않는다.
+    function _excSave() {
+
+        var sPath = "";
+
+        try {
+            sPath = _excFilePath();
+            require("fs").writeFileSync(sPath, JSON.stringify({ L: _aExcSrcL, R: _aExcSrcR }, null, 2), "utf8");
+        } catch (e) {
+            console.error("[DMWN-019] ERROR EXCLUDE_FILE_WRITE_FAILED path=" + sPath +
+                " - rules will be lost when the app closes:", e);
+        }
+    }
+
+    //정규식에서 뜻이 따로 있는 글자 - 별표 방식에서는 전부 "글자 그대로" 로 바꿔 준다.
+    var C_RE_SPECIAL = "\\^$.|?*+()[]{}";
+
+    /* 정규식으로 읽어야 할 글자인가.
+     *   사용자는 AI 에게 물어보고 `^_` · `^oAPP[.]DATA$` 같은 정규식을 받아 온다.
+     *   그것을 그대로 붙여 넣어도 먹어야 한다.
+     *   ★ `*` `?` `.` 는 별표 방식에도 쓰는 글자라 판별에서 뺀다 - 안 그러면
+     *     `*_*` `oAPP.attr._*` 같은 쉬운 글자까지 정규식으로 읽혀 뜻이 달라진다.
+     */
+    var C_RE_HINT = "^$[](){}|\\+";
+
+    function _excLooksRegex(sIn) {
+        for (var i = 0; i < sIn.length; i++) {
+            if (C_RE_HINT.indexOf(sIn.charAt(i)) !== -1) { return true; }
+        }
+        return false;
+    }
+
+    /**
+     * 적은 글자 한 줄을 걸러낼 수 있는 모양으로 바꾼다. 못 바꾸면 null.
+     *   @return {{RE:RegExp, K:string}}  K = "regex" | "glob" | "name"
+     *     regex : path 와 이름 **둘 다** 맞춰 본다
+     *     glob  : path 전체에 맞춰 본다
+     *     name  : 이름이 그것인지만 본다
+     */
+    function _excParse(sPat) {
+
+        var sIn = String(sPat == null ? "" : sPat).trim();
+        if (!sIn) { return null; }
+
+        //슬래시로 감싼 것 = 정규식 그대로.
+        if (sIn.length > 2 && sIn.charAt(0) === "/" && sIn.charAt(sIn.length - 1) === "/") {
+            try { return { RE: new RegExp(sIn.slice(1, -1)), K: "regex" }; }
+            catch (e) {
+                console.warn("[DMWN-020] WARN EXCLUDE_BAD_REGEX rule=" + sIn + " - not usable");
+                return null;
+            }
+        }
+
+        //정규식 문법이 보이면 정규식으로 읽는다(AI 가 준 답을 그대로 붙여 넣어도 먹게).
+        if (_excLooksRegex(sIn)) {
+            try { return { RE: new RegExp(sIn), K: "regex" }; }
+            catch (e) {
+                console.warn("[DMWN-020] WARN EXCLUDE_BAD_REGEX rule=" + sIn + " - not usable");
+                return null;
+            }
+        }
+
+        var bStar = (sIn.indexOf("*") !== -1 || sIn.indexOf("?") !== -1);
+
+        var sRe = "";
+        for (var i = 0; i < sIn.length; i++) {
+            var c = sIn.charAt(i);
+            if (c === "*") { sRe += ".*"; }
+            else if (c === "?") { sRe += "."; }
+            else if (C_RE_SPECIAL.indexOf(c) !== -1) { sRe += "\\" + c; }
+            else { sRe += c; }
+        }
+
+        try { return { RE: new RegExp("^" + sRe + "$"), K: bStar ? "glob" : "name" }; }
+        catch (e) {
+            console.warn("[DMWN-020] WARN EXCLUDE_BAD_PATTERN rule=" + sIn + " - not usable");
+            return null;
+        }
+    }
+
+    //적어 둔 규칙을 바로 쓸 수 있는 모양으로 바꿔 둔다(자리마다 새로 만들면 2만 자리에서 멎는다).
+    function _excCompile(bLeft) {
+
+        var aSrc = _excSrcOf(bLeft);
+        var aOut = [];
+
+        for (var i = 0; i < aSrc.length; i++) {
+
+            var o = _excParse(aSrc[i]);
+
+            if (!o) {
+                //손으로 고친 파일이 들어올 수 있다.
+                console.error("[DMWN-020] ERROR EXCLUDE_BAD_PATTERN side=" + _excSideOf(bLeft) +
+                    " - this rule does nothing: " + aSrc[i]);
+                continue;
+            }
+
+            aOut.push(o);
+        }
+
+        if (bLeft) { _aExcReL = aOut; } else { _aExcReR = aOut; }
+    }
+
+    /**
+     * 그 자리의 **이름**(마지막 칸)을 뽑는다.
+     *   root 는 이름 자체에 점이 들어 있으므로(`oAPP.attr`) 쪼개지 않고 그대로 쓴다.
+     *   배열 칸(`T_UI[OBJID=X]`)은 대괄호를 떼고 안쪽만 남긴다.
+     */
+    function _cmpKeyOfPath(sPath) {
+
+        if (_cmpIsRoot(sPath)) { return sPath; }
+
+        var iDot = sPath.lastIndexOf(".");
+        var iBrk = sPath.lastIndexOf("[");
+        var iCut = (iDot > iBrk) ? iDot : iBrk;
+        if (iCut < 0) { return sPath; }
+
+        var sKey = sPath.slice(iCut + 1);
+        if (sKey.charAt(sKey.length - 1) === "]") { sKey = sKey.slice(0, -1); }
+        return sKey;
+    }
+
+    //규칙 하나가 이 자리에 걸리나.
+    function _excHitOne(o, sPath, sKey) {
+        if (o.K === "name") { return o.RE.test(sKey); }
+        if (o.K === "glob") { return o.RE.test(sPath); }
+        return o.RE.test(sPath) || o.RE.test(sKey);   //regex - 둘 다 본다
+    }
+
+    //그 자리가 그 쪽 제외 규칙에 걸리나.
+    function _cmpExcluded(sPath, bLeft) {
+
+        var aRule = _excReOf(bLeft);
+        if (!aRule.length || !sPath) { return false; }
+
+        var sKey = _cmpKeyOfPath(sPath);
+
+        for (var i = 0; i < aRule.length; i++) {
+            if (_excHitOne(aRule[i], sPath, sKey)) { return true; }
+        }
+        return false;
+    }
+
+    /**
+     * 이 규칙을 넣으면 **몇 줄이 사라지는지** 미리 센다.
+     *   설명서보다 이게 확실하다 - 틀린 규칙을 쳤는지 숫자로 바로 안다.
+     *   걸린 자리는 그 아래까지 통째로 사라지므로 아래도 같이 센다.
+     *   ★ 상한을 둔다 - 칠 때마다 도는 자리라 느린 PC 에서 멎으면 안 된다.
+     */
+    var C_EXC_HINT_MAX = 50000;
+
+    function _excCountHit(bLeft, sPat) {
+
+        var oSnap = bLeft ? _oCmpLeft : _oCmpRight;
+        if (!oSnap) { return 0; }
+
+        var sIn = String(sPat || "").trim();
+        if (!sIn) { return 0; }
+
+        var o = _excParse(sIn);
+        if (!o) { return -1; }          //못 알아먹는 글자
+
+        var iSeen = 0, iHit = 0;
+
+        //걸린 자리 아래에 줄이 몇 개나 딸려 있는지.
+        function _under(v) {
+            if (!v || typeof v !== "object") { return 0; }
+            var n = 0;
+            var aK = Object.keys(v);
+            for (var i = 0; i < aK.length && iSeen < C_EXC_HINT_MAX; i++) {
+                iSeen++;
+                n += 1 + _under(v[aK[i]]);
+            }
+            return n;
+        }
+
+        function _walk(v, sPath) {
+
+            if (iSeen >= C_EXC_HINT_MAX || !v || typeof v !== "object") { return; }
+
+            var bArr = Array.isArray(v);
+            var aK = Object.keys(v);
+
+            for (var i = 0; i < aK.length && iSeen < C_EXC_HINT_MAX; i++) {
+
+                iSeen++;
+                var sSub = _joinPath(sPath, aK[i], bArr);
+
+                if (_excHitOne(o, sSub, _cmpKeyOfPath(sSub))) {
+                    iHit += 1 + _under(v[aK[i]]);      //그 아래는 더 안 본다
+                    continue;
+                }
+                _walk(v[aK[i]], sSub);
+            }
+        }
+
+        var aRoot = Object.keys(oSnap);
+        for (var r = 0; r < aRoot.length && iSeen < C_EXC_HINT_MAX; r++) {
+
+            iSeen++;
+            var sRoot = aRoot[r];
+
+            if (_excHitOne(o, sRoot, sRoot)) { iHit += 1 + _under(oSnap[sRoot]); continue; }
+            _walk(oSnap[sRoot], sRoot);
+        }
+
+        return iHit;
+    }
+
+    //물음표를 누르면 나오는 본보기. 누르면 그대로 칸에 들어간다.
+    var C_EXC_SAMPLES = [
+        { R: "*_*", T: "어디에 있든 밑줄이 든 것 전부" },
+        { R: "oAPP.attr._*", T: "oAPP.attr 바로 밑에서 밑줄로 시작하는 것" },
+        { R: "oAPP.attr.*_*", T: "oAPP.attr 밑이면 깊이 상관없이 밑줄이 든 것" },
+        { R: "oAPP.DATA*", T: "oAPP.DATA 와 그 아래 통째로" },
+        { R: "UIATV", T: "이름이 UIATV 인 줄 (어디에 있든)" },
+        { R: "*KEY", T: "path 가 KEY 로 끝나는 것" },
+        { R: "^_", T: "정규식도 그대로 먹는다 (AI 에게 받은 것을 붙여 넣어도 된다)" }
+    ];
+
+    /* ---- 제외 규칙 화면 ------------------------------------------------ */
+
+    function _excInputOf(bLeft) { return bLeft ? EL.excInputL : EL.excInputR; }
+
+    //입력칸 오류 표시 - 공통 방식(data-vs + 안내 줄) 그대로 쓴다.
+    function _excMark(oInput, sMsg) {
+
+        if (!oInput) { return; }
+
+        var oWrap = oInput.parentNode;
+        var oMsg = oWrap ? oWrap.querySelector(".u4a-field__msg") : null;
+
+        if (!sMsg) {
+            oInput.removeAttribute("data-vs");
+            if (oMsg) { oMsg.textContent = ""; oMsg.removeAttribute("data-vs"); }
+            return;
+        }
+
+        oInput.setAttribute("data-vs", "error");
+        if (!oMsg && oWrap) {
+            oMsg = document.createElement("span");
+            oMsg.className = "u4a-field__msg";
+            oWrap.appendChild(oMsg);
+        }
+        if (oMsg) { oMsg.textContent = sMsg; oMsg.setAttribute("data-vs", "error"); }
+    }
+
+    //그 쪽 제외 규칙 목록을 다시 그린다(딱지 + 단추 위 개수).
+    function _excRender(bLeft) {
+
+        var aSrc = _excSrcOf(bLeft);
+        var oN = bLeft ? EL.excNL : EL.excNR;
+        var oList = bLeft ? EL.excListL : EL.excListR;
+
+        if (oN) {
+            oN.textContent = aSrc.length ? String(aSrc.length) : "";
+            oN.hidden = !aSrc.length;
+        }
+
+        if (!oList) {
+            console.error("[DMWN-016] ERROR EXCLUDE_LIST_MISSING side=" + _excSideOf(bLeft) +
+                " - rules are applied but cannot be seen or removed");
+            return;
+        }
+
+        oList.textContent = "";
+
+        for (var i = 0; i < aSrc.length; i++) {
+
+            var oChip = document.createElement("span");
+            oChip.className = "u4aDmCmpExcChip";
+
+            var oTxt = document.createElement("span");
+            oTxt.className = "u4aDmCmpExcChip__txt";
+            oTxt.textContent = aSrc[i];
+            oTxt.title = aSrc[i];
+            oChip.appendChild(oTxt);
+
+            var oX = document.createElement("button");
+            oX.type = "button";
+            oX.className = "u4aDmCmpExcChip__x";
+            oX.title = "이 규칙 지우기";
+            oX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            oX.setAttribute("data-i", String(i));
+            oChip.appendChild(oX);
+
+            oList.appendChild(oChip);
+        }
+    }
+
+    /**
+     * 치는 동안 **몇 줄이 사라지는지** 칸 옆에 보여 준다.
+     *   설명서 대신 이 숫자가 맞는지 틀린지를 알려 준다.
+     *   어떻게 읽었는지(별표/정규식/이름)도 같이 적어 준다.
+     */
+    function _excHint(bLeft) {
+
+        var oHint = bLeft ? EL.excHintL : EL.excHintR;
+        if (!oHint) { return; }
+
+        var oInput = _excInputOf(bLeft);
+        var sPat = oInput ? oInput.value.trim() : "";
+
+        if (!sPat) { oHint.textContent = ""; oHint.removeAttribute("data-vs"); return; }
+
+        var o = _excParse(sPat);
+
+        if (!o) {
+            oHint.textContent = "이렇게는 못 알아듣습니다";
+            oHint.setAttribute("data-vs", "error");
+            return;
+        }
+
+        var sHow = (o.K === "regex") ? "정규식" : (o.K === "glob" ? "path" : "이름");
+        var iN = _excCountHit(bLeft, sPat);
+
+        oHint.removeAttribute("data-vs");
+        oHint.textContent = "(" + sHow + ") " + (iN ? (_cmpNum(iN) + "줄이 사라집니다") : "걸리는 것이 없습니다");
+    }
+
+    //규칙 하나 더하기. bDefer 면 적어 두기·다시 그리기를 여기서 안 한다.
+    function _excAdd(bLeft, sPat, bDefer) {
+
+        var oInput = _excInputOf(bLeft);
+        var sIn = String(sPat == null ? "" : sPat).trim();
+
+        if (!sIn) { _excMark(oInput, ""); return false; }
+
+        if (!_excParse(sIn)) {
+            _excMark(oInput, "이렇게는 못 알아듣습니다. 물음표 단추에 본보기가 있습니다.");
+            console.warn("[DMWN-020] WARN EXCLUDE_BAD_PATTERN_INPUT side=" + _excSideOf(bLeft) +
+                " rule=" + sIn + " - not added");
+            return false;
+        }
+
+        var aSrc = _excSrcOf(bLeft);
+
+        if (aSrc.indexOf(sIn) !== -1) {
+            _excMark(oInput, "이미 있는 규칙입니다.");
+            return false;
+        }
+
+        if (aSrc.length >= C_EXC_MAX) {
+            _excMark(oInput, "규칙은 " + C_EXC_MAX + "개까지만 둘 수 있습니다.");
+            console.warn("[DMWN-016] WARN EXCLUDE_MAX_REACHED side=" + _excSideOf(bLeft) + " max=" + C_EXC_MAX);
+            return false;
+        }
+
+        aSrc.push(sIn);
+        _excMark(oInput, "");
+
+        if (bDefer !== true) {
+            _excApply(bLeft);
+            console.log("[DMWN] INFO EXCLUDE_ADDED side=" + _excSideOf(bLeft) + " n=" + aSrc.length);
+        }
+        return true;
+    }
+
+    /**
+     * 여러 줄을 한꺼번에 붙여넣었을 때.
+     *   줄바꿈으로만 쪼갠다 - 규칙 안에 콤마가 들어갈 수 있다.
+     */
+    function _excAddMany(bLeft, sText) {
+
+        var oInput = _excInputOf(bLeft);
+        var aLine = String(sText == null ? "" : sText).split("\n");
+        var iOk = 0, iBad = 0;
+
+        for (var i = 0; i < aLine.length; i++) {
+            var sOne = aLine[i].trim();
+            if (!sOne) { continue; }
+            if (_excAdd(bLeft, sOne, true)) { iOk++; } else { iBad++; }
+        }
+
+        if (!iOk && !iBad) { return 0; }
+
+        if (iOk) {
+            _excApply(bLeft);
+            console.log("[DMWN] INFO EXCLUDE_ADDED_MANY side=" + _excSideOf(bLeft) +
+                " ok=" + iOk + " skipped=" + iBad + " n=" + _excSrcOf(bLeft).length);
+        }
+
+        if (iBad) {
+            _excMark(oInput, iBad + "줄은 넣지 못했습니다 (못 알아듣거나 이미 있음).");
+            console.warn("[DMWN-020] WARN EXCLUDE_MANY_SKIPPED side=" + _excSideOf(bLeft) + " skipped=" + iBad);
+        }
+
+        return iOk;
+    }
+
+    //규칙 하나 빼기.
+    function _excDel(bLeft, iAt) {
+
+        var aSrc = _excSrcOf(bLeft);
+        if (!(iAt >= 0) || iAt >= aSrc.length) {
+            console.warn("[DMWN-016] WARN EXCLUDE_DEL_OUT_OF_RANGE side=" + _excSideOf(bLeft) + " at=" + iAt);
+            return;
+        }
+
+        aSrc.splice(iAt, 1);
+        _excApply(bLeft);
+        console.log("[DMWN] INFO EXCLUDE_REMOVED side=" + _excSideOf(bLeft) + " n=" + aSrc.length);
+    }
+
+    //그 쪽 규칙 전부 지우기.
+    function _excClearAll(bLeft) {
+
+        if (!_excSrcOf(bLeft).length) { return; }
+
+        if (bLeft) { _aExcSrcL = []; } else { _aExcSrcR = []; }
+        _excApply(bLeft);
+        console.log("[DMWN] INFO EXCLUDE_CLEARED side=" + _excSideOf(bLeft));
+    }
+
+    //바뀐 규칙을 적어 두고 화면에 물린다.
+    //  ★ 어긋난 자리 세기가 좌우를 함께 보므로 한쪽만 바뀌어도 전체를 다시 센다.
+    function _excApply(bLeft) {
+        _excCompile(bLeft);
+        _excSave();
+        _excRender(bLeft);
+        _excHint(bLeft);
+        _cmpRefresh();
+    }
+
+    //물음표 - 본보기를 펼친다. 누르면 그대로 칸에 들어간다.
+    function _excHelpToggle(bLeft) {
+
+        var oBox = bLeft ? EL.excHelpL : EL.excHelpR;
+        if (!oBox) {
+            console.error("[DMWN-016] ERROR EXCLUDE_HELP_MISSING side=" + _excSideOf(bLeft) +
+                " - the question button does nothing");
+            return;
+        }
+
+        if (!oBox.hidden) { oBox.hidden = true; return; }
+
+        oBox.textContent = "";
+
+        //맨 위에 규칙 두 줄을 적어 둔다 - 본보기만 보고도 뜻을 알게.
+        var oHead = document.createElement("div");
+        oHead.className = "u4aDmCmpExcHelp__head";
+        oHead.textContent = "별표(*)를 쓰면 path 전체에 맞춘다 · 별표가 없으면 이름이 그것인 줄을 뺀다";
+        oBox.appendChild(oHead);
+
+        for (var i = 0; i < C_EXC_SAMPLES.length; i++) {
+
+            var oS = C_EXC_SAMPLES[i];
+
+            var oRow = document.createElement("button");
+            oRow.type = "button";
+            oRow.className = "u4aDmCmpExcSample";
+            oRow.setAttribute("data-r", oS.R);
+
+            var oCode = document.createElement("span");
+            oCode.className = "u4aDmCmpExcSample__code";
+            oCode.textContent = oS.R;
+            oRow.appendChild(oCode);
+
+            var oTxt = document.createElement("span");
+            oTxt.className = "u4aDmCmpExcSample__txt";
+            oTxt.textContent = oS.T;
+            oRow.appendChild(oTxt);
+
+            oBox.appendChild(oRow);
+        }
+
+        oBox.hidden = false;
+    }
+
+    //제외 규칙 줄 펴기/접기.
+    function _excToggleBar(bLeft) {
+
+        var oBar = bLeft ? EL.excBarL : EL.excBarR;
+        var oBtn = bLeft ? EL.btnExcludeL : EL.btnExcludeR;
+
+        if (!oBar) {
+            console.error("[DMWN-016] ERROR EXCLUDE_BAR_MISSING side=" + _excSideOf(bLeft) +
+                " - the filter button does nothing");
+            return;
+        }
+
+        oBar.hidden = !oBar.hidden;
+        if (oBtn) { oBtn.classList.toggle("pressed", !oBar.hidden); }
+
+        if (!oBar.hidden) {
+            var oInput = _excInputOf(bLeft);
+            if (oInput) { oInput.focus(); }
+        }
+    }
+
+    /* ---- 배열 짝짓기 --------------------------------------------------
+     *
+     *  왜 필요한가(장군님 지적 2026-09-11):
+     *    예전에는 배열을 **번호 순서대로**(0번↔0번, 1번↔1번) 견줬다. 그래서 한쪽에
+     *    항목이 하나만 더 있어도 그 뒤가 전부 한 칸씩 밀려 **전부 다름**으로 나왔다.
+     *
+     *  어떻게 하나:
+     *    그 배열 안에서 **값이 서로 겹치지 않는 칸**을 찾아(예: OBJID) 그 값으로 짝짓는다.
+     *    배열마다 그런 칸이 다르므로 사람이 지정할 수 없다 - 배열마다 스스로 찾는다.
+     *    못 찾으면 예전처럼 번호로 떨어진다.
+     *
+     *  자리 이름(path)도 번호 대신 그 값으로 만든다(`T_0014[OBJID=INPUT51]`).
+     *    안 그러면 왼쪽 9번과 오른쪽 3번이 같은 것인데 자리 이름이 달라 색칠이 어긋난다.
+     * ------------------------------------------------------------------ */
+
+    //배열 자리마다 "무엇으로 짝지었나" 를 적어 둔다. 좌우가 반드시 같은 것을 써야 하므로 한 곳에 모은다.
+    var _oArrKey = {};
+
+    //후보로 볼 칸 개수 상한 - 항목이 수천 개인 배열에서 칸마다 전수 검사를 하면 느린 PC 가 멎는다.
+    var C_ARR_KEY_MAX_CAND = 20;
+
+    //짝짓기에 쓸 수 있는 값인가(홑값이고 비어 있지 않아야 한다).
+    function _cmpArrKeyUsable(v) {
+        if (v === null || v === undefined) { return false; }
+        var t = typeof v;
+        if (t !== "string" && t !== "number" && t !== "boolean") { return false; }
+        return String(v) !== "";
+    }
+
+    //그 배열 안에서 이 칸의 값이 전부 서로 다른가.
+    function _cmpArrKeyUnique(aArr, sField) {
+        var oSeen = {};
+        for (var i = 0; i < aArr.length; i++) {
+            var o = aArr[i];
+            if (!o || typeof o !== "object" || Array.isArray(o)) { return false; }
+            var v = o[sField];
+            if (!_cmpArrKeyUsable(v)) { return false; }
+            var sV = String(v);
+            if (oSeen[sV]) { return false; }
+            oSeen[sV] = true;
+        }
+        return true;
+    }
+
+    //그 칸으로 짝지었을 때 좌우에서 몇 개나 맞아떨어지나(많이 맞는 칸이 옳은 칸이다).
+    function _cmpArrKeyHits(aL, aR, sField) {
+        var oL = {}, n = 0, i;
+        for (i = 0; i < aL.length; i++) { oL[String(aL[i][sField])] = true; }
+        for (i = 0; i < aR.length; i++) { if (oL[String(aR[i][sField])]) { n++; } }
+        return n;
+    }
+
+    /**
+     * 이 배열을 무엇으로 짝지을지 정한다. 못 정하면 null(= 번호로 견준다).
+     *   vR 이 없으면(한쪽만 담겼으면) 그 쪽만 보고 정한다.
+     *   한 번 정하면 자리 이름을 키로 적어 둔다 - 좌우가 반드시 같은 칸을 써야 하기 때문이다.
+     */
+    function _cmpArrKeyOf(sPath, vL, vR) {
+
+        if (Object.prototype.hasOwnProperty.call(_oArrKey, sPath)) { return _oArrKey[sPath]; }
+
+        var aL = Array.isArray(vL) ? vL : null;
+        var aR = Array.isArray(vR) ? vR : null;
+        var aMain = aL || aR;
+
+        if (!aMain || !aMain.length) { _oArrKey[sPath] = null; return null; }
+
+        //첫 항목이 객체가 아니면 짝지을 칸이 없다(값만 든 배열).
+        var oFirst = aMain[0];
+        if (!oFirst || typeof oFirst !== "object" || Array.isArray(oFirst)) { _oArrKey[sPath] = null; return null; }
+
+        //후보 = 첫 항목의 홑값 칸. 양쪽이 다 있으면 양쪽 첫 항목에 **둘 다 있는** 칸만.
+        var aCand = [];
+        var aKeys = Object.keys(oFirst);
+        var oOther = (aL && aR && aR.length) ? aR[0] : null;
+
+        for (var k = 0; k < aKeys.length && aCand.length < C_ARR_KEY_MAX_CAND; k++) {
+            var sF = aKeys[k];
+            if (!_cmpArrKeyUsable(oFirst[sF])) { continue; }
+            if (oOther && !_cmpArrKeyUsable(oOther[sF])) { continue; }
+            aCand.push(sF);
+        }
+
+        //양쪽(또는 한쪽) 배열 안에서 값이 전부 달라야 짝짓기에 쓸 수 있다.
+        var sBest = null, iBest = -1;
+        for (var c = 0; c < aCand.length; c++) {
+            var sField = aCand[c];
+            if (aL && !_cmpArrKeyUnique(aL, sField)) { continue; }
+            if (aR && !_cmpArrKeyUnique(aR, sField)) { continue; }
+
+            var iHit = (aL && aR) ? _cmpArrKeyHits(aL, aR, sField) : 0;
+            if (iHit > iBest) { iBest = iHit; sBest = sField; }
+            //한쪽만 있을 때는 맞춰 볼 상대가 없으니 처음 통과한 것을 쓴다.
+            if (!(aL && aR)) { break; }
+        }
+
+        _oArrKey[sPath] = sBest;
+
+        if (sBest) {
+            console.log("[DMWN] INFO ARRAY_KEY_PICKED path=" + sPath + " field=" + sBest +
+                " matched=" + (iBest < 0 ? 0 : iBest));
+        }
+        return sBest;
+    }
+
+    //배열을 { 보여줄 이름: 항목 } 으로 바꾼다. 짝지을 칸이 없으면 번호를 그대로 쓴다.
+    function _cmpArrMap(aArr, sField) {
+        var oOut = {};
+        if (!Array.isArray(aArr)) { return oOut; }
+        for (var i = 0; i < aArr.length; i++) {
+            var sK = sField ? (sField + "=" + String(aArr[i][sField])) : String(i);
+            oOut[sK] = aArr[i];
+        }
+        return oOut;
+    }
+
     function _cmpKeep(oNode, bLeft) {
+
+        //★ 이 쪽 제외 규칙에 걸리면 다른 무엇보다 먼저 뺀다.
+        if (_cmpExcluded(oNode.path, bLeft)) { return false; }
 
         if (_bCmpDiffOnly) {
             if (!_oCmpDiff[oNode.path] && !_oCmpDiffUp[oNode.path]) { return false; }
@@ -1674,12 +2471,24 @@
         if (!v || typeof v !== "object") { return aOut; }
 
         var bArr = Array.isArray(v);
+
+        //★ 배열은 견줄 때와 **똑같은 방법으로** 이름을 붙인다 - 안 그러면 자리 이름이 좌우로
+        //  어긋나 어긋난 자리 색칠이 딴 줄에 붙는다.
+        //  견줄 때 정해 둔 칸이 있으면 그것을 쓴다. 아직 한쪽만 담겼으면 그 쪽만 보고 정한다.
+        var vOwn = v;
+        if (bArr) {
+            var sField = Object.prototype.hasOwnProperty.call(_oArrKey, oNode.path)
+                ? _oArrKey[oNode.path]
+                : _cmpArrKeyOf(oNode.path, v, null);
+            vOwn = _cmpArrMap(v, sField);
+        }
+
         //목록은 순서가 곧 뜻이므로 그대로 두고, 묶음만 이름순으로 늘어놓는다.
-        var aKeys = bArr ? Object.keys(v) : _cmpSortKeys(Object.keys(v));
+        var aKeys = bArr ? Object.keys(vOwn) : _cmpSortKeys(Object.keys(vOwn));
 
         for (var i = 0; i < aKeys.length; i++) {
             var sPath = _joinPath(oNode.path, aKeys[i], bArr);
-            var oN = _cmpMkNode(aKeys[i], v[aKeys[i]], sPath, (oNode.lvl || 0) + 1);
+            var oN = _cmpMkNode(aKeys[i], vOwn[aKeys[i]], sPath, (oNode.lvl || 0) + 1);
             if (_cmpKeep(oN, bLeft)) { aOut.push(oN); }
         }
 
@@ -1689,8 +2498,8 @@
     function _cmpEmptyText(bLeft) {
         if (bLeft && !_oCmpLeft) { return "3.0 에서 아직 보낸 것이 없습니다."; }
         if (!bLeft && !_oCmpRight) { return "4.0 지금 담기를 누르십시오."; }
-        if (_cmpFindOf(bLeft)) { return "찾는 것이 없습니다."; }
-        if (_bCmpDiffOnly) { return "다른 자리가 없습니다."; }
+        if (_cmpFindOf(bLeft)) { return "찾기에 걸린 것이 없습니다."; }
+        if (_bCmpDiffOnly) { return "다른 것이 없습니다 - 이 쪽은 양쪽이 똑같습니다."; }
         return "볼 데이터가 없습니다.";
     }
 
@@ -1738,6 +2547,9 @@
                 //★ 윗자리를 한 번이라도 접었으면 그 아래는 저절로 펼치지 않는다(트리 뷰와 같은 동작).
                 if (_ancestorClosedIn(_cmpClosedOf(bLeft), n.path)) { return false; }
 
+                //★ [전체 펼침] 을 누른 쪽은 전부 펼친다(걸러내기보다 먼저 — 누른 대로 보여야 한다).
+                if (_cmpExpandAllOf(bLeft)) { return true; }
+
                 //★ 찾기 — **걸린 자리까지 길을 연다**(그 아래는 접어 둔다).
                 //  [다른 것만] 보다 **먼저** 본다. 둘 다 켜져 있을 때 찾은 자리가 접힌 채로 남으면 안 된다.
                 if (_cmpFindOf(bLeft)) { return _cmpFindUpOf(bLeft)[n.path] === true; }
@@ -1746,7 +2558,7 @@
                 //  어긋난 자리 자체는 안 펼친다. 좌우가 같은 어긋남 목록을 보므로 **양쪽이 똑같이** 펼쳐진다.
                 if (_bCmpDiffOnly) { return _oCmpDiffUp[n.path] === true; }
 
-                //★ 기본은 **전부 접힘**(장군님 지시 2026-09-11). 뿌리도 접는다.
+                //★ 기본은 **전부 접힘**(장군님 지시 2026-09-11). root도 접는다.
                 return false;
             },
             onToggle: function (n, bOpen) { _cmpToggle(bLeft, n, bOpen); },
@@ -1791,6 +2603,7 @@
 
     //쪽마다 자기 펼침 상태를 쓴다.
     function _cmpExpandOf(bLeft) { return bLeft ? _oCmpExpandL : _oCmpExpandR; }
+    function _cmpExpandAllOf(bLeft) { return bLeft ? _bExpandAllL : _bExpandAllR; }
     function _cmpClosedOf(bLeft) { return bLeft ? _oCmpClosedL : _oCmpClosedR; }
 
     /**
@@ -1806,98 +2619,95 @@
      * 한 쪽 트리만 새로 만든다(안내 문구가 바뀌므로 다시 만든다).
      *   어긋난 자리는 그대로라 다시 세지 않는다.
      */
-    function _cmpRebuildOne(bLeft) {
-        var oHost = bLeft ? EL.cmpLeftHost : EL.cmpRightHost;
-        if (!oHost) { return; }
-        _cmpBuildFind(bLeft);
-        oHost.textContent = "";
-        if (bLeft) { _oTreeL = _cmpMakeTree(true); }
-        else { _oTreeR = _cmpMakeTree(false); }
+    /**
+     * 그 쪽 스크롤 자리를 **새 요소로 갈아 끼운다**(장군님 지적 2026-09-11 - 휠 한 칸에 너무 많이 움직임).
+     *
+     *   왜 비우는 것으로는 모자란가:
+     *     공통 컬럼 트리(makeColumnTree)는 넘겨받은 host 자체에 wheel / scroll listener 와
+     *     ResizeObserver 를 건다. textContent = "" 는 **자식만** 지우지 host 에 걸린 listener 는
+     *     그대로 남는다. 그래서 다시 만들 때마다 wheel listener 가 하나씩 쌓이고,
+     *     휠을 한 칸 굴리면 쌓인 수만큼 scrollTop 이 더해져 몇 배씩 건너뛴다.
+     *     (찾기 Enter · [다른 것만] · [전체 펼침] · [4.0 지금 담기] 를 누를 때마다 한 개씩 늘었다.)
+     *
+     *   요소를 통째로 바꾸면 옛 listener 는 옛 요소와 함께 사라진다.
+     */
+    function _cmpFreshHost(bLeft) {
+
+        var oOld = bLeft ? EL.cmpLeftHost : EL.cmpRightHost;
+        if (!oOld) { return null; }
+
+        if (!oOld.parentNode) {
+            //자리에 안 붙어 있으면 갈아 끼울 수 없다 - 옛 방식으로 비우기만 한다.
+            console.warn("[DMWN] WARN CMP_HOST_DETACHED side=" + (bLeft ? "3.0" : "4.0") +
+                " - cannot swap host, wheel listeners may pile up");
+            oOld.textContent = "";
+            return oOld;
+        }
+
+        var oNew = document.createElement("div");
+        oNew.className = oOld.className;
+        oNew.id = oOld.id;
+        //보던 자리를 잃지 않게 스크롤 위치를 새 것에 물려 준다(줄을 다 그린 뒤 되돌린다).
+        oNew.__dmKeepTop = oOld.scrollTop || 0;
+
+        oOld.parentNode.replaceChild(oNew, oOld);
+
+        if (bLeft) { EL.cmpLeftHost = oNew; } else { EL.cmpRightHost = oNew; }
+        return oNew;
     }
 
-    /* ---- 어긋난 자리로 바로 가기 --------------------------------------
-     *  어긋난 자리가 수천 곳인데 손으로 훑어 내려갈 방법이 없었다(장군님 지적 2026-09-11).
-     *  [다음 차이]·[이전 차이] 로 한 곳씩 옮기고, **좌우를 같은 자리에 세운다.**
-     * ------------------------------------------------------------------- */
+    //줄을 다 그린 뒤 보던 자리로 되돌린다.
+    function _cmpRestoreTop(bLeft) {
+        var oHost = bLeft ? EL.cmpLeftHost : EL.cmpRightHost;
+        if (!oHost || !oHost.__dmKeepTop) { return; }
+        try { oHost.scrollTop = oHost.__dmKeepTop; }
+        catch (e) {
+            console.error("[DMWN-016] ERROR CMP_SCROLL_RESTORE_FAILED side=" +
+                (bLeft ? "3.0" : "4.0") + " - the list jumps back to the top:", e);
+        }
+    }
 
-    //그 자리가 뿌리인가(뿌리 이름 자체에 점이 들어 있어 그냥 쪼개면 없는 자리가 나온다).
+    function _cmpRebuildOne(bLeft) {
+        if (!_cmpFreshHost(bLeft)) { return; }
+        _cmpBuildFind(bLeft);
+        if (bLeft) { _oTreeL = _cmpMakeTree(true); }
+        else { _oTreeR = _cmpMakeTree(false); }
+        _cmpRestoreTop(bLeft);
+    }
+
+    //그 자리가 root인가(root 이름 자체에 점이 들어 있어 그냥 쪼개면 없는 자리가 나온다).
     function _cmpIsRoot(sPath) {
         if (_oCmpLeft && Object.prototype.hasOwnProperty.call(_oCmpLeft, sPath)) { return true; }
         if (_oCmpRight && Object.prototype.hasOwnProperty.call(_oCmpRight, sPath)) { return true; }
         return false;
     }
 
-    //그 자리로 가는 윗자리들. 뿌리까지만 올라간다.
-    function _cmpAncestors(sPath) {
-        var aOut = [];
-        var sP = sPath;
-        while (true) {
-            var iDot = sP.lastIndexOf(".");
-            var iBrk = sP.lastIndexOf("[");
-            var iCut = (iDot > iBrk) ? iDot : iBrk;
-            if (iCut <= 0) { break; }
-            sP = sP.slice(0, iCut);
-            aOut.push(sP);
-            //★ 뿌리에 닿으면 멈춘다 — 더 올라가면 "oAPP" 처럼 실제로 없는 자리가 나온다.
-            if (_cmpIsRoot(sP)) { break; }
-        }
-        return aOut;
-    }
-
-    function _cmpAtText() {
-        if (!EL.cmpAt) { return; }
-        EL.cmpAt.textContent = (_iCmpAt >= 0 && _aCmpDiffTop.length)
-            ? ((_iCmpAt + 1) + " / " + _aCmpDiffTop.length)
-            : "";
+    /**
+     * 그 쪽만 모두 접기(장군님 지시 2026-09-11 — 트리마다 자기 단추를 둔다).
+     *   ★ 반대쪽은 건드리지 않는다.
+     */
+    function _cmpCollapseOne(bLeft) {
+        if (bLeft) { _bExpandAllL = false; } else { _bExpandAllR = false; }
+        _cmpResetExpand(bLeft);
+        _cmpRebuildOne(bLeft);
+        console.log("[DMWN] INFO TREE_COLLAPSE_ALL side=" + (bLeft ? "3.0" : "4.0"));
     }
 
     /**
-     * 목록의 i 번째 어긋난 자리로 좌우를 같이 옮긴다.
+     * 그 쪽만 전체 펼침(장군님 지시 2026-09-11).
+     *   ★ 자리 수가 많으면 그리는 줄도 그만큼 늘어난다 — 걸린 시간을 남겨 둔다.
      */
-    function _cmpGoto(i) {
+    function _cmpExpandOne(bLeft) {
 
-        if (!_aCmpDiffTop.length) {
-            console.warn("[DMWN-017] WARN NO_DIFF_TO_JUMP - both sides must be captured first.");
-            return;
-        }
+        if (bLeft) { _bExpandAllL = true; } else { _bExpandAllR = true; }
+        _cmpResetExpand(bLeft);
 
-        //끝에서 넘어가면 처음으로(반대도 같게).
-        if (i < 0) { i = _aCmpDiffTop.length - 1; }
-        if (i >= _aCmpDiffTop.length) { i = 0; }
+        var t0 = (window.performance && performance.now) ? performance.now() : 0;
+        _cmpRebuildOne(bLeft);
+        var t1 = (window.performance && performance.now) ? performance.now() : 0;
 
-        _iCmpAt = i;
-
-        var sPath = _aCmpDiffTop[i];
-        var aUp = _cmpAncestors(sPath);
-
-        //가는 길을 양쪽 다 펼친다 — 안 그러면 그 줄이 목록에 아예 없어 못 선다.
-        for (var k = 0; k < aUp.length; k++) {
-            _oCmpExpandL[aUp[k]] = true;
-            _oCmpExpandR[aUp[k]] = true;
-            delete _oCmpClosedL[aUp[k]];
-            delete _oCmpClosedR[aUp[k]];
-        }
-
-        _cmpRebuildOne(true);
-        _cmpRebuildOne(false);
-
-        //좌우를 같은 자리에 세운다(한쪽에만 있는 자리면 그 쪽만 선다).
-        try { if (_oTreeL) { _oTreeL.selectKey(sPath, true); } }
-        catch (e) { console.error("[DMWN-017] ERROR JUMP_FAILED side=3.0 path=" + sPath + ":", e); }
-        try { if (_oTreeR) { _oTreeR.selectKey(sPath, true); } }
-        catch (e) { console.error("[DMWN-017] ERROR JUMP_FAILED side=4.0 path=" + sPath + ":", e); }
-
-        _cmpAtText();
-    }
-
-    //양쪽 모두 접기.
-    function _cmpCollapseAll() {
-        _cmpResetExpand(true);
-        _cmpResetExpand(false);
-        _iCmpAt = -1;
-        _cmpRebuildOne(true);
-        _cmpRebuildOne(false);
-        _cmpAtText();
+        console.log("[DMWN] INFO TREE_EXPAND_ALL side=" + (bLeft ? "3.0" : "4.0") +
+            " ms=" + Math.round(t1 - t0));
     }
 
     /**
@@ -1909,6 +2719,11 @@
     function _cmpResetExpand(bLeft) {
         if (bLeft) { _oCmpExpandL = {}; _oCmpClosedL = {}; }
         else { _oCmpExpandR = {}; _oCmpClosedR = {}; }
+    }
+
+    //걸러내기를 건드렸을 때는 [전체 펼침] 표시도 내린다 — 안 내리면 걸러도 전부 펼쳐진 채다.
+    function _cmpClearExpandAll(bLeft) {
+        if (bLeft) { _bExpandAllL = false; } else { _bExpandAllR = false; }
     }
 
     function _cmpRerenderOne(bLeft) {
@@ -1933,34 +2748,63 @@
         _cmpBuildFind(true);
         _cmpBuildFind(false);
 
-        if (EL.cmpLeftHost) { EL.cmpLeftHost.textContent = ""; }
-        if (EL.cmpRightHost) { EL.cmpRightHost.textContent = ""; }
+        //★ 비우기가 아니라 **갈아 끼우기** - 옛 wheel listener 를 요소째 버린다(_cmpFreshHost 설명 참고).
+        _cmpFreshHost(true);
+        _cmpFreshHost(false);
 
         _oTreeL = _cmpMakeTree(true);
         _oTreeR = _cmpMakeTree(false);
+        _cmpRestoreTop(true);
+        _cmpRestoreTop(false);
 
+        //★ 읽으면 바로 아는 말로 적는다(장군님 지적 2026-09-11).
+        //  예전엔 "받음 17:36:10 / root 2개" 라 무엇을 받았는지·root 가 뭔지 물어봐야 알았다.
         if (EL.cmpLeftInfo) {
             EL.cmpLeftInfo.textContent = _oCmpLeft
-                ? ("받음 " + _sCmpLeftTime + " / 뿌리 " + Object.keys(_oCmpLeft).length + "개" +
-                    (_sCmpFindL ? (" / 찾음 " + _iFindNL + "곳") : ""))
-                : "아직 받은 것 없음";
+                ? ("3.0 에서 받은 시각 " + _sCmpLeftTime +
+                    " · 맨 위 항목 " + Object.keys(_oCmpLeft).length + "개" +
+                    (_sCmpFindL ? (" · 찾기에 걸린 항목 " + _cmpNum(_iFindNL) + "개") : ""))
+                : "3.0 에서 아직 받은 것이 없습니다";
+            EL.cmpLeftInfo.title = _oCmpLeft
+                ? ("3.0 이 이 시각에 보낸 데이터를 보고 있습니다.\n" +
+                   "맨 위 항목 = 접었다 폈다 하는 목록의 가장 바깥 줄 개수입니다.")
+                : "3.0 에서 보내기를 하면 이 쪽이 채워집니다.";
         }
         if (EL.cmpRightInfo) {
             EL.cmpRightInfo.textContent = _oCmpRight
-                ? ("담음 " + _sCmpRightTime + " / 뿌리 " + Object.keys(_oCmpRight).length + "개" +
-                    (_sCmpFindR ? (" / 찾음 " + _iFindNR + "곳") : ""))
-                : "아직 담은 것 없음";
+                ? ("4.0 을 담은 시각 " + _sCmpRightTime +
+                    " · 맨 위 항목 " + Object.keys(_oCmpRight).length + "개" +
+                    (_sCmpFindR ? (" · 찾기에 걸린 항목 " + _cmpNum(_iFindNR) + "개") : ""))
+                : "4.0 을 아직 담지 않았습니다";
+            EL.cmpRightInfo.title = _oCmpRight
+                ? ("이 시각의 4.0 데이터를 보고 있습니다. 지금 것으로 바꾸려면 위쪽 [4.0 지금 담기] 를 누르십시오.\n" +
+                   "맨 위 항목 = 접었다 폈다 하는 목록의 가장 바깥 줄 개수입니다.")
+                : "위쪽 [4.0 지금 담기] 를 누르면 이 쪽이 채워집니다.";
         }
 
-        _cmpAtText();
-
         if (_oCmpLeft && _oCmpRight) {
-            _cmpSetInfo("다름 " + _oCmpKindN["다름"] +
-                " · 3.0만 " + _oCmpKindN["3.0만"] +
-                " · 4.0만 " + _oCmpKindN["4.0만"] +
-                " (총 " + _iCmpDiffN + "곳" + (_bCmpCut ? ", 너무 많아 끊음" : "") + ")");
+            //★ 줄만 읽고도 뜻을 알게 적는다(장군님 지적 2026-09-11).
+            //  예전엔 "다름 25 · 3.0만 19929 · 4.0만 46 (총 20000곳, 너무 많아 끊음)" 이라
+            //  무엇을 센 것인지, 누가 왜 끊었는지 알 수 없었다.
+            _cmpSetInfo(
+                "값이 다름 " + _cmpNum(_oCmpKindN["다름"]) +
+                " · 3.0 에만 있음 " + _cmpNum(_oCmpKindN["3.0만"]) +
+                " · 4.0 에만 있음 " + _cmpNum(_oCmpKindN["4.0만"]) +
+                " · 합계 " + _cmpNum(_iCmpDiffN) +
+                (_bCmpCut ? ("  ※ " + _cmpNum(C_CMP_MAX) + "개까지만 세고 멈췄습니다 (실제로는 더 있습니다)") : ""),
+
+                "값이 다름 : 3.0 과 4.0 양쪽에 다 있는데 값이 서로 다른 것\n" +
+                "3.0 에만 있음 : 3.0 에는 있고 4.0 에는 아예 없는 것\n" +
+                "4.0 에만 있음 : 4.0 에는 있고 3.0 에는 아예 없는 것\n" +
+                "합계 : 위 세 가지를 더한 수" +
+                (_bCmpCut
+                    ? ("\n\n※ 세는 것을 " + _cmpNum(C_CMP_MAX) + "개에서 멈췄습니다.\n" +
+                       "   화면이 감당 못 할 만큼 많아 더 세지 않았습니다 - 실제 개수는 이보다 많습니다.")
+                    : ""));
         } else if (_oSrv) {
-            _cmpSetInfo("9999 열림 - 3.0 에서 보내십시오");
+            _cmpSetInfo("3.0 이 보내는 것을 받을 준비가 됐습니다 - 3.0 에서 보내기를 누르십시오",
+                    "이 창이 3.0 의 데이터를 받으려고 기다리고 있습니다.\n" +
+                    "포트 " + C_PORT + " 로 받습니다.");
         }
     }
 
@@ -2031,17 +2875,93 @@
             EL.btnCmpTake.addEventListener("click", function () { _cmpAskRight(); });
         }
 
-        //비교 뷰 — 어긋난 자리로 바로 가기.
-        if (EL.btnDiffNext) { EL.btnDiffNext.addEventListener("click", function () { _cmpGoto(_iCmpAt + 1); }); }
-        if (EL.btnDiffPrev) { EL.btnDiffPrev.addEventListener("click", function () { _cmpGoto(_iCmpAt - 1); }); }
-        if (EL.btnCollapseAll) { EL.btnCollapseAll.addEventListener("click", function () { _cmpCollapseAll(); }); }
+        //제외 규칙 - 깔때기 단추로 그 쪽 줄을 폈다 접는다.
+        if (EL.btnExcludeL) { EL.btnExcludeL.addEventListener("click", function () { _excToggleBar(true); }); }
+        if (EL.btnExcludeR) { EL.btnExcludeR.addEventListener("click", function () { _excToggleBar(false); }); }
+        if (EL.btnExcClearL) { EL.btnExcClearL.addEventListener("click", function () { _excClearAll(true); }); }
+        if (EL.btnExcClearR) { EL.btnExcClearR.addEventListener("click", function () { _excClearAll(false); }); }
 
-        //F3 = 다음 차이 / Shift+F3 = 이전 차이 (비교 뷰를 보고 있을 때만).
-        document.addEventListener("keydown", function (ev) {
-            if (ev.key !== "F3" || _sView !== "cmp") { return; }
-            ev.preventDefault();
-            _cmpGoto(ev.shiftKey ? (_iCmpAt - 1) : (_iCmpAt + 1));
+        if (EL.btnExcHelpL) { EL.btnExcHelpL.addEventListener("click", function () { _excHelpToggle(true); }); }
+        if (EL.btnExcHelpR) { EL.btnExcHelpR.addEventListener("click", function () { _excHelpToggle(false); }); }
+        if (EL.btnExcAddL) { EL.btnExcAddL.addEventListener("click", function () { _excAddFromField(true); }); }
+        if (EL.btnExcAddR) { EL.btnExcAddR.addEventListener("click", function () { _excAddFromField(false); }); }
+
+        //칸에 적힌 것을 규칙으로 넣고 칸을 비운다.
+        function _excAddFromField(bLeft) {
+            var oInput = bLeft ? EL.excInputL : EL.excInputR;
+            if (!oInput) { return; }
+            if (_excAdd(bLeft, oInput.value)) {
+                oInput.value = "";
+                _excHint(bLeft);
+            }
+        }
+
+        //Enter 로 넣고, 치는 동안 몇 줄이 사라지는지 보여 준다.
+        [[EL.excInputL, true], [EL.excInputR, false]].forEach(function (aPair) {
+
+            var oInput = aPair[0], bLeft = aPair[1];
+            if (!oInput) { return; }
+
+            oInput.addEventListener("keydown", function (ev) {
+                if (ev.key !== "Enter") { return; }
+                ev.preventDefault();
+                _excAddFromField(bLeft);
+            });
+
+            //고쳐 치는 동안 오류 표시를 내리고 몇 줄이 사라지는지 다시 센다.
+            oInput.addEventListener("input", function () {
+                _excMark(oInput, "");
+                _excHint(bLeft);
+            });
+
+            //여러 줄을 붙여넣으면 줄마다 규칙으로 넣는다(한 줄짜리는 평소대로).
+            oInput.addEventListener("paste", function (ev) {
+
+                var sTxt = "";
+                try { sTxt = (ev.clipboardData && ev.clipboardData.getData) ? ev.clipboardData.getData("text") : ""; }
+                catch (e) {
+                    console.error("[DMWN-020] ERROR EXCLUDE_PASTE_READ_FAILED side=" + (bLeft ? "3.0" : "4.0") +
+                        " - falling back to normal paste:", e);
+                    return;
+                }
+
+                if (!sTxt || (sTxt.indexOf("\n") === -1 && sTxt.indexOf("\r") === -1)) { return; }
+
+                ev.preventDefault();
+                _excAddMany(bLeft, sTxt);
+                oInput.value = "";
+            });
         });
+
+        //칩의 X - 칩마다 걸지 않고 목록에 한 번만 건다(규칙이 늘어도 처리기는 하나다).
+        [[EL.excListL, true], [EL.excListR, false]].forEach(function (aPair) {
+            var oList = aPair[0], bLeft = aPair[1];
+            if (!oList) { return; }
+            oList.addEventListener("click", function (ev) {
+                var oX = (ev.target && ev.target.closest) ? ev.target.closest(".u4aDmCmpExcChip__x") : null;
+                if (!oX) { return; }
+                _excDel(bLeft, parseInt(oX.getAttribute("data-i"), 10));
+            });
+        });
+
+        //본보기 한 줄을 누르면 칸에 그대로 들어간다.
+        [[EL.excHelpL, true], [EL.excHelpR, false]].forEach(function (aPair) {
+            var oBox = aPair[0], bLeft = aPair[1];
+            if (!oBox) { return; }
+            oBox.addEventListener("click", function (ev) {
+                var oRow = (ev.target && ev.target.closest) ? ev.target.closest(".u4aDmCmpExcSample") : null;
+                if (!oRow) { return; }
+                var oInput = bLeft ? EL.excInputL : EL.excInputR;
+                if (oInput) { oInput.value = oRow.getAttribute("data-r") || ""; oInput.focus(); }
+                oBox.hidden = true;
+                _excHint(bLeft);
+            });
+        });
+
+        if (EL.btnExpandL) { EL.btnExpandL.addEventListener("click", function () { _cmpExpandOne(true); }); }
+        if (EL.btnExpandR) { EL.btnExpandR.addEventListener("click", function () { _cmpExpandOne(false); }); }
+        if (EL.btnCollapseL) { EL.btnCollapseL.addEventListener("click", function () { _cmpCollapseOne(true); }); }
+        if (EL.btnCollapseR) { EL.btnCollapseR.addEventListener("click", function () { _cmpCollapseOne(false); }); }
 
         //비교 뷰 — 좌우 이름 찾기(그 쪽만 좁힌다).
         function _wireCmpFind(oInput, bLeft) {
@@ -2049,6 +2969,7 @@
             function _apply() {
                 var sTxt = (oInput.value || "").trim().toLowerCase();
                 if (bLeft) { _sCmpFindL = sTxt; } else { _sCmpFindR = sTxt; }
+                _cmpClearExpandAll(bLeft);
                 _cmpResetExpand(bLeft);
                 _cmpRebuildOne(bLeft);
             }
@@ -2070,7 +2991,9 @@
         if (EL.chkDiffOnly) {
             EL.chkDiffOnly.addEventListener("change", function () {
                 _bCmpDiffOnly = !!EL.chkDiffOnly.checked;
-                //손으로 접어 둔 기록이 걸러내기를 막지 않게 양쪽 다 비운다.
+                //손으로 접어 둔 기록·전체 펼침이 걸러내기를 막지 않게 양쪽 다 내린다.
+                _cmpClearExpandAll(true);
+                _cmpClearExpandAll(false);
                 _cmpResetExpand(true);
                 _cmpResetExpand(false);
                 _cmpRefresh();
@@ -2155,8 +3078,13 @@
                                 _renderTree();
                                 return;
                             }
-                            if (oThis === EL.cmpLeftSearch) { _sCmpFindL = ""; _cmpResetExpand(true); _cmpRebuildOne(true); return; }
-                            if (oThis === EL.cmpRightSearch) { _sCmpFindR = ""; _cmpResetExpand(false); _cmpRebuildOne(false); return; }
+                            if (oThis === EL.cmpLeftSearch) { _sCmpFindL = ""; _cmpClearExpandAll(true); _cmpResetExpand(true); _cmpRebuildOne(true); return; }
+                            if (oThis === EL.cmpRightSearch) { _sCmpFindR = ""; _cmpClearExpandAll(false); _cmpResetExpand(false); _cmpRebuildOne(false); return; }
+                            //제외 규칙 칸은 **치던 글자만** 지운다 - 이미 넣어 둔 규칙은 그대로 둔다.
+                            //제외 규칙 두 칸은 **치던 글자만** 지운다 - 이미 넣어 둔 규칙은 그대로 둔다.
+                            //제외 규칙 칸은 **치던 글자만** 지운다 - 이미 넣어 둔 규칙은 그대로 둔다.
+                            if (oThis === EL.excInputL) { _excMark(oThis, ""); _excHint(true); return; }
+                            if (oThis === EL.excInputR) { _excMark(oThis, ""); _excHint(false); return; }
                             _applyFilterAll();
                         });
                     })(oInp);
@@ -2225,6 +3153,11 @@
         try {
             _bindTitlebar();
             _bindButtons();
+
+            //적어 둔 제외 규칙을 되살린다(창을 다시 열어도 그대로 남아 있어야 한다).
+            _excLoadAll();
+            _excRender(true);
+            _excRender(false);
             _openChannel();
             _setState(false);
             //3.0 이 보내 올 자리를 창이 뜰 때 같이 연다(장군님 지시 2026-09-11).

@@ -107,6 +107,22 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고 시작하므로, 문서 로드가 실패하면 did-finish-load 가 안 와
+        //   busy 가 영영 안 풀리고 창도 안 보인다(show:false). 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 창을 정리하고 잠금을 푼다. 하위 프레임 실패(bIsMainFrame=false)와
+        //   사용자 취소(-3)는 제외한다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FEPE-001] Error Page Editor window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FEPE-001] cleanup of the failed window failed:", e2 && e2.message); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FEPE-001] did-fail-load register failed:", e && e.message); }
+
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
@@ -225,6 +241,10 @@
         oBrowserOptions.title = sTitle;
         oBrowserOptions.autoHideMenuBar = true;
         // [HTML5] 네이티브 창 opacity 페이드 미사용(무겁다) — 미리보기는 사용자 HTML 렌더라 즉시 표시.
+        // ★ [2026-09-13, 장군님 지시] 창을 숨겨서 만든다 — 종전에는 show 를 안 줘서 기본값 true 로
+        //   만들어졌고, 그 결과 사용자 HTML 이 그려지기 전까지 빈 창이 먼저 보였다(느린 PC 에서 더 길다).
+        //   표시는 아래 did-finish-load 에서 한다(.analy 16 §2.6).
+        oBrowserOptions.show = false;
         oBrowserOptions.devTools = false;
         oBrowserOptions.parent = oCurrWin;
         oBrowserOptions.closable = false;
@@ -256,6 +276,22 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 미리보기 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   오류 페이지 에디터 창은 Preview 를 누른 순간 busy 를 켜고, 아래 did-finish-load 가 보내는
+        //   해제 신호로만 푼다. 문서 로드가 실패하면 그 신호가 영영 안 와 busy 가 고착된다.
+        //   타이머로 덮는 것은 금지(.analy 16 §2.11)이므로, 실패 이벤트에서 창을 정리하고
+        //   같은 해제 신호를 보내 busy 를 푼다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FEPE-002] Error Page preview window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FEPE-002] cleanup of the failed window failed:", e2 && e2.message); }
+                try { parent.IPCRENDERER.send(`if-errorPageEditor-setBusy-${parent.getBrowserKey()}`, ""); }
+                catch (e3) { console.error("[FEPE-002] busy release notice to the editor window failed:", e3 && e3.message); }
+            });
+        } catch (e) { console.error("[FEPE-002] did-fail-load register failed:", e && e.message); }
+
         // // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
@@ -277,8 +313,9 @@
             parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);            
 
             // [HTML5] 네이티브 opacity 페이드 제거 — 로드 완료 시 닫기 버튼만 즉시 활성화.
+            //   [2026-09-13] 여기서 창을 표시한다(show:false 로 만들어 뒀다) — 빈 창 먼저 보이는 것 방지.
             try {
-                if (!oBrowserWindow.isDestroyed()) { oBrowserWindow.closable = true; }
+                if (!oBrowserWindow.isDestroyed()) { oBrowserWindow.show(); oBrowserWindow.closable = true; }
             } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); } }
 
             // 오류 페이지 미리보기가 로드가 되면 오류 페이지 에디터에 실행중인 Busy를 끄라고 알린다.

@@ -427,7 +427,10 @@
 
         oBrowserOptions.title = sSpath;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
         oBrowserOptions.parent = CURRWIN;
@@ -476,8 +479,9 @@
 
             oBrowserWindow.webContents.send('if-uspnew', oSendData);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            parent.WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.
             oAPP.fn.setParentCenterBounds(oBrowserWindow, oBrowserOptions);
