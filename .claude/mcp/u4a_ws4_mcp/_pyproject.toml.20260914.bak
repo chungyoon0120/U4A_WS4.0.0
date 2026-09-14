@@ -5,7 +5,7 @@ description = "U4A WS4.0 .analy 컨버전/UX 표준 문서를 온디맨드로 �
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.2.0,<2",
+    "mcp>=1.2.0",
 ]
 
 [project.scripts]

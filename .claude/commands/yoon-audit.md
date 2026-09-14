@@ -21,9 +21,11 @@ allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 - ※ 예전엔 `notion-multi` MCP 를 썼으나 **폐기됨.** 이슈 리포트 DB 는 2026-09-10 `yoon-notion` CLI `u4a` 연결로 이관됐다(2026-09-14 확인·갱신). MCP `notion-multi` 도구는 이제 없다.
 - **`database_id` = `bdd7e18b-1cd6-8396-a2b0-81900fb593d1`** (이슈 리포트 DB).
 - 그 DB의 속성: 코드번호 = **`코드`**(title, 예: `BR19`), 상태 = **`상태`**(status, 옵션: `접수`·`보류`·`작업중`·`수정완료`·`테스트확인중`·`✅ 최종완료`·`🔁 재오픈`·`반려`), 내용 = **`내용`**(rich_text), 화면 = **`화면`**(rich_text).
-- **CLI 실행 방법** (launcher = `.claude/skills/yoon-notion/yoon-notion.cmd`):
-  - Windows(PowerShell): `& ".claude\skills\yoon-notion\yoon-notion.cmd" <subcmd> --as u4a ...`
-  - Bash: `.claude/skills/yoon-notion/yoon-notion.sh <subcmd> --as u4a ...`
+- **CLI 실행 방법** — 2026-09-14 부터 `yoon-notion` 은 **전역 한 벌**이다
+  (실체 = `C:\Users\socce\AppData\Local\yoon-agent-kit\skills\yoon-notion`, `~/.claude/skills/yoon-notion` 이 그리로 가는 junction).
+  프로젝트 안 `.claude/skills/yoon-notion/` 은 없어졌으므로 **아래 전역 경로를 쓴다.**
+  - Windows(PowerShell): `& "$env:USERPROFILE\.claude\skills\yoon-notion\yoon-notion.cmd" <subcmd> --as u4a ...`
+  - Bash: `~/.claude/skills/yoon-notion/yoon-notion.sh <subcmd> --as u4a ...`
   - subcmd: `query`(행 찾기) · `get`(행 읽기) · `update`(속성 변경) · `db`(스키마).
   - ★필터 JSON 은 PowerShell 이 내부 큰따옴표를 벗겨내므로 `\"` 로 이스케이프한다:
     `query --as u4a <database_id> --filter '{\"property\":\"코드\",\"title\":{\"equals\":\"BR40\"}}'` → 결과의 `id:` 가 그 행의 page_id.
