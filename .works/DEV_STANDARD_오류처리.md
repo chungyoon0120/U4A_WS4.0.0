@@ -79,6 +79,10 @@ X();
 | `FVMP` | ws30/ws10_20/js/fnVersionManagementPopupOpen.js (Version Management 창 여는 쪽) |
 | `APRO` | ws30/ws10_20/design/attrPresetPopup/index.js (속성 기본값 팝업 여는 쪽) |
 | `FFIP` | ws30/ws10_20/js/fnFavIconPopupOpen.js (즐겨찾기 아이콘 값도움 창) |
+| `WMAI` | ws30/ws10_20/js/ws_main.js (WS 메인 화면 구성) |
+| `VWMN` | ws30/ws10_20/views/vw_main/control.js (창 첫 화면 — 로그인/메인 분기) |
+| `INTR` | intro.js (인트로 → 서버 목록 창) |
+| `SVLS` | ServerList_v2/ServerList.js (서버 목록 → 메인 창) |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

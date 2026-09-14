@@ -237,3 +237,87 @@
   `[TEST] 테스트 끝나면 반드시 주석을 풀것!!` 로 감싸인 채 **창 닫기 처리가 주석 처리**돼 있다.
   이 파일은 현행에서 로드되는 곳을 못 찾았다(옛 UI5 판으로 보이나 **미확인**). 별건이라 손대지 않았다.
 - 남은 것은 **D5**(ServerList · Login · 인트로 · 메인 창) 하나다.
+
+---
+
+## 후속 3 (2026-09-14, 같은 대화) — D5(ServerList · Login · 인트로 · 메인 창) + 검은 화면 2건
+
+### 요청
+
+> "나머지 D5도 작업 진행해. 지금 방금 본 현상 중에, 로그인 화면에서 로그인 성공하고 메인 화면 나올때
+> busy가 꺼지고 검정색 화면이 나온다."
+> "새창 띄울때도 마찬가지. 새창 띄우기 하면 처음 실행될때 busy가 안보이고 검정색 화면만 나온다"
+
+### 변경 내용 — 원인 3가지
+
+**① 로그인 → 메인: 메인을 "시작만" 해 놓고 로딩 화면을 곧바로 껐다**
+
+`Login/Login.js` `fnOnLoginSuccess` 가 `loadWS30MainPage()` 바로 뒤에서 `showLoadingPage('')` 를 불렀다.
+그런데 `loadWS30MainPage` 는 `<script src="./js/library-preload.js">` 를 **붙여 놓기만 하고 바로 돌아온다** —
+메인은 아직 한 줄도 안 그려진 상태다. 그 순간 로딩 화면을 꺼 버리니 메인이 다 그려질 때까지
+테마 배경만 남아 검은 화면이 보였다.
+
+- `Login/Login.js` — 그 `showLoadingPage('')` **제거**.
+- `js/ws_main.js` — 본문 등장 완료 콜백(`fnWsStart` 의 `#content` fadeIn complete)에서 `showLoadingPage("")`.
+  `fnWsStart` 의 catch(진짜 실패 이벤트)에서도 푼다. 오류코드 접두 `WMAI`.
+- `js/ws10_html.js` — WS10 본문이 실제로 보이는 지점(이미 busy 를 푸는 자리)에서도 함께 푼다(중복 호출 무해).
+
+**② 새창: 창을 먼저 보여주는데 그 순간 켜 둔 것이 없었다**
+
+`views/vw_main/control.js` `onInit` 은 프레임리스 드래그 영역 때문에 **컨텐츠보다 show() 를 먼저** 부른다
+(기존 주석에 사유 명시). 그런데 그 시점에 켜 둔 것이 없어 배경만 보였다.
+
+- `views/vw_main/control.js` — `show()` **앞에서** `setDomBusy("X")`. 해제는 로그인 화면 준비 완료(Login.js)
+  또는 메인 본문 등장 완료(ws_main.js)가 한다.
+- `views/vw_main/control.js` — `loadWS30MainPage()` 진입 시 `showLoadingPage("X")`.
+- `views/vw_main/control.js` — 메인 스크립트를 못 읽는 진짜 실패 이벤트(`oScript.onerror`) 배선.
+  오류코드 접두 `VWMN`.
+
+**③ ★ 로딩 화면이 한 번도 뜬 적이 없었다**
+
+`ws30/ws10_20/index.html` 의 `#u4a_main_load` 에 `style="display: none;"` 이 박혀 있는데,
+`showLoadingPage("X")` 는 클래스만 떼고 그 인라인 값을 안 지웠다. 인라인이 이겨서 **늘 숨겨져 있었다.**
+
+- `ws30/resources/index.js` — 켤 때 `style.display = "flex"`, 끌 때 `style.display = "none"` 을 직접 처리.
+
+### 변경 내용 — D5 나머지(투명 창 · 실패 이벤트)
+
+| 파일 | 무엇 |
+|---|---|
+| `www/ws30/resources/index.js` | 새창(#Main) 을 `opacity 0` 이 아니라 `show:false` 로 만든다(.analy 16 §2.6) |
+| `www/ServerList_v2/ServerList.js` | 메인 창을 `show:false` 로. **`did-fail-load` 신규** — 실패 시 창 정리 + 서버 목록 화면 busy 해제(`SVLS-001`) |
+| `www/intro.js` | `opacity 0` 제거(이미 `show:false`). **`did-fail-load` 신규** — 실패 시 창 정리 + **감춰 둔 인트로 창 복구**(`INTR-001`). 종전에는 실패하면 화면에 아무 창도 안 남았다 |
+
+### 변경 파일 (변경만, 추가·삭제 없음)
+
+- `www/ws30/ws10_20/Login/Login.js`
+- `www/ws30/ws10_20/js/ws_main.js`
+- `www/ws30/ws10_20/js/ws10_html.js`
+- `www/ws30/ws10_20/views/vw_main/control.js`
+- `www/ws30/resources/index.js`
+- `www/intro.js`
+- `www/ServerList_v2/ServerList.js`
+- `.works/별창busy시작/00_현황판.md` (BM 그룹 신규, BT 결과 반영, D5 완료 표기)
+- `.works/DEV_STANDARD_오류처리.md` (접두 4개 추가: WMAI · VWMN · INTR · SVLS)
+
+### 영향 범위
+
+- **앱 시작 경로 전체**(인트로 → 서버 목록 → 로그인 → 메인)와 **새창**. 위험도가 높은 구간이다.
+- 새창·메인 창을 `show:false` 로 바꿨다 — **프레임리스 창 드래그 영역에 영향이 있을 수 있다**(기존 주석이
+  경고하던 바로 그 지점). BM5 로 반드시 확인해야 한다.
+- 로딩 화면이 **이제 실제로 보인다**. 종전에 안 보이던 것이 보이므로 체감이 달라진다.
+
+### 검증
+
+- 손댄 `.js` 7개 전부 `node --check` 통과(`views/vw_main/control.js` 는 ES module 이라 `.mjs` 로 검사).
+- 백업: 파일마다 같은 폴더에 `_<파일명>.<태그>bak`.
+- **앱 실행 확인 미실행** — 현황판 BM1~BM6 대기.
+
+### 참고 사항
+
+- `setDomBusy` 는 깊이를 세지 않는 단순 토글이라 두 번 켜도 한 번 끄면 꺼진다(소스 확인). 그래서
+  `onInit` 과 `_loadLoginPage` 가 둘 다 켜도 안전하다.
+- 로그인 화면 경로는 `loadWS30MainPage` 를 타지 않으므로 로딩 화면이 안 켜진다 — 로그인 화면이
+  덮이지 않는다(소스 확인). BM4 로 재확인 필요.
+- WS20 직접 진입 등 일부 경로에서 `fnWsStart` 의 본문 등장 콜백이 안 닿을 가능성은 **미확인**이다.
+  그래서 `ws10_html.js` 의 본문 표시 지점에도 해제를 넣어 두 곳에서 풀리게 했다.

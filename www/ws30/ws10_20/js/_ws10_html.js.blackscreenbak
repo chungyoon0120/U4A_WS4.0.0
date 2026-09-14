@@ -924,9 +924,6 @@
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try { if (parent && parent.setBusy) { parent.setBusy(""); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try { if (parent && parent.setDomBusy) { parent.setDomBusy(""); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        // ★ [2026-09-14, 장군님 지시] 로그인 로딩 화면도 여기서 푼다 — 지금이 WS10 본문이 실제로
-        //   화면에 보이는 시점이다. (ws_main.js 의 본문 등장 완료 콜백에서도 한 번 더 푼다 — 두 번 불러도 무해.)
-        try { if (parent && parent.showLoadingPage) { parent.showLoadingPage(""); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     function _renderTitlebar() {

@@ -1,4 +1,3 @@
-// 오류코드 접두: SVLS / 다음 번호: 002
 /************************************************************************
  * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
@@ -3044,10 +3043,7 @@
         const oWebPreferences = oBrowserOptions.webPreferences;
         const oThemeInfo = oLoginInfo.oThemeInfo;
 
-        // ★ [2026-09-14, 장군님 지시] 네이티브 투명도로 숨기지 않는다 — 표준은 show:false 다
-        //   (.analy 16 §2.6). 종전에는 창이 "보이지만 투명한" 채로 작업표시줄에만 떠 있었다.
-        //   표시는 창 문서가 한다(ws10_20/views/vw_main/control.js onInit — setOpacity(1.0)+show()).
-        oBrowserOptions.show = false;
+        oBrowserOptions.opacity = 0.0;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.titleBarStyle = 'hidden';
         oBrowserOptions.autoHideMenuBar = true;
@@ -3083,19 +3079,6 @@
         };
         const sLoadUrl = WSUTIL.QueryString.build(PATHINFO.MAINFRAME, oQueryParams);
         oBrowserWindow.loadURL(sLoadUrl);
-
-        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
-        //   [고친 이유] 서버를 고르면 이 화면은 busy 를 켜고, 아래 did-finish-load 에서만 푼다.
-        //   문서 로드가 실패하면 그 신호가 안 와 busy 가 영영 안 풀리고 새 창도 안 보인다.
-        //   타이머로 덮는 것은 금지(.analy 16 §2.11)이므로 실패 이벤트에서 창을 정리하고 잠금을 푼다.
-        oBrowserWindow.webContents.on('did-fail-load', function (e, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
-            if (bIsMainFrame === false || iErrCode === -3) { return; }
-            console.error("[SVLS-001] main window load failed:", iErrCode, sErrDesc, sUrl);
-            try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-            catch (e2) { console.error("[SVLS-001] cleanup of the failed window failed:", e2 && e2.message); }
-            try { oAPP.setBusy(false); }
-            catch (e3) { console.error("[SVLS-001] busy release failed:", e3 && e3.message); }
-        });
 
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();

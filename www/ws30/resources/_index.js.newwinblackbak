@@ -611,10 +611,7 @@ oAPP.views = window?.oAPP?.views || {};
             oBrowserOptions = JSON.parse(JSON.stringify(oDefaultOption.browserWindow));
 
         oBrowserOptions.title = "U4A Workspace - #Main";
-        // ★ [2026-09-14, 장군님 지시] 네이티브 투명도로 숨기지 않는다 — 표준은 show:false 다
-        //   (.analy 16 §2.6). 종전에는 opacity 0 으로 만들어 창이 "보이지만 투명한" 채로 작업표시줄에만
-        //   떠 있었다. 창 문서가 setOpacity(1.0) + show() 로 되살리는 건 그대로다(vw_main/control.js).
-        oBrowserOptions.show = false;
+        oBrowserOptions.opacity = 0.0;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
         oBrowserOptions.titleBarStyle = 'hidden';
@@ -1157,19 +1154,11 @@ oAPP.views = window?.oAPP?.views || {};
 
         if (bIsShow == 'X') {
             oLoadPg.style.background = "linear-gradient(to right, #1c2228, #1c2228)";
-            // ★ [2026-09-14, 장군님 지시] display 를 직접 켠다.
-            //   [고친 이유] 이 요소는 문서에 style="display: none;" 이 박혀 있고 아무도 지우지 않는다.
-            //   그래서 종전에는 이 함수로 "켜도" 클래스만 떼고 인라인 display:none 이 그대로 남아
-            //   **로딩 화면이 한 번도 화면에 나온 적이 없었다**(실측 2026-09-14). 그 탓에 로그인 뒤
-            //   메인이 그려질 때까지 테마 배경만 보였다(= 검은 화면).
-            oLoadPg.style.display = "flex";
             oLoadPg.classList.remove("u4a_loadersInactive");
 
         } else {
 
-            // 끌 때도 인라인으로 확실히 끈다 — 위에서 인라인 display 를 켰으므로
-            // 클래스(.u4a_loadersInactive { display:none })만으로는 안 꺼진다.
-            oLoadPg.style.display = "none";
+            // oLoadPg.style.background = "";
             oLoadPg.classList.add("u4a_loadersInactive");
         }
 

@@ -1,4 +1,3 @@
-// 오류코드 접두: INTR / 다음 번호: 002
 /**************************************************************************
  * intro.js
  * ************************************************************************
@@ -488,8 +487,7 @@
         oBrowserOptions.titleBarStyle = 'hidden';
 
         oBrowserOptions.autoHideMenuBar = true;
-        // ★ [2026-09-14] 네이티브 투명도로 숨기지 않는다 — 바로 위 show:false 로 이미 숨겨져 있고,
-        //   표준도 show:false 다(.analy 16 §2.6). 아래 did-finish-load 가 setOpacity(1.0)+show() 한다.
+        oBrowserOptions.opacity = 0.0;
         oBrowserOptions.resizable = true;
         oBrowserOptions.movable = true;
         // 최소 크기 — 메인 윈도우(ServerList.js fnLoginPage)와 동일하게 1000x800 으로 고정
@@ -522,23 +520,6 @@
         let sLoadUrl = WSUTIL.QueryString.build(PATHINFO.SERVERLIST_v2, oQueryParams);
 
         oBrowserWindow.loadURL(sLoadUrl);
-
-        // ★ [2026-09-14, 장군님 지시] 서버 목록 화면을 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
-        //   [고친 이유] 바로 위에서 인트로 창을 이미 감췄다(oCurrWindow.hide()). 아래 did-finish-load
-        //   에서만 새 창을 보여주므로, 문서 로드가 실패하면 **화면에 아무 창도 안 남는다**
-        //   (앱이 사라진 것처럼 보인다). 타이머로 덮는 것은 금지(.analy 16 §2.11)이므로
-        //   실패 이벤트에서 실패한 창을 정리하고 인트로 창을 되살린다.
-        //   하위 프레임 실패(isMainFrame=false)와 사용자 취소(-3)는 창 실패가 아니다.
-        oBrowserWindow.webContents.on('did-fail-load', function (e, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
-            if (bIsMainFrame === false || iErrCode === -3) { return; }
-            console.error("[INTR-001] server list window load failed:", iErrCode, sErrDesc, sUrl);
-            try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-            catch (e2) { console.error("[INTR-001] cleanup of the failed window failed:", e2 && e2.message); }
-            // 인트로 창을 되살려 사용자가 창 없이 남지 않게 한다.
-            try {
-                if (oCurrWindow && !oCurrWindow.isDestroyed()) { oCurrWindow.show(); oCurrWindow.focus(); }
-            } catch (e3) { console.error("[INTR-001] intro window could not be restored:", e3 && e3.message); }
-        });
 
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();

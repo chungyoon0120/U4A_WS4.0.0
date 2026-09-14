@@ -2,8 +2,7 @@
  * Copyright 2020. INFOCG Inc. all rights reserved. 
  * ----------------------------------------------------------------------
  * - file Name : ws_main.js
- * - file Desc : ws 메인
- * - 오류코드 접두: WMAI / 다음 번호: 002
+ * - file Desc : ws 메인 
  ************************************************************************/
 
 (function (window, oAPP) {
@@ -1249,12 +1248,6 @@
                         complete: function () {
                             parent.setBusy("");
                             parent.setDomBusy("");
-                            // ★ [2026-09-14, 장군님 지시] 로그인 로딩 화면도 여기서 끈다.
-                            //   [고친 이유] 종전에는 로그인 쪽(Login.js fnOnLoginSuccess)이 메인 로드를
-                            //   "시작만" 해 놓고 곧바로 껐다. 메인이 아직 안 그려져 검은 화면이 보였다.
-                            //   여기가 메인 본문이 실제로 다 그려진 시점이다 — 해제는 여기 한 곳에서만.
-                            try { if (typeof parent.showLoadingPage === "function") { parent.showLoadingPage(""); } }
-                            catch (e) { console.error("[WMAI-001] loading page hide failed:", e && e.message); }
                         }
                     });
 
@@ -1263,12 +1256,9 @@
             })();
 
         })().catch(function (e) {
-            // ★ 실제 실패 이벤트 — 메인 구성이 터졌다. 잠금과 로딩 화면을 여기서 푼다(타이머 아님).
-            console.error("[WMAI-001] fnWsStart failed - main screen could not be built:", e && e.message, e);
+            console.error("fnWsStart error:", e);
             parent.setBusy && parent.setBusy("");
             parent.setDomBusy && parent.setDomBusy("");
-            try { if (typeof parent.showLoadingPage === "function") { parent.showLoadingPage(""); } }
-            catch (e2) { console.error("[WMAI-001] loading page hide failed:", e2 && e2.message); }
         }); // end of fnWsStart async
 
         /************************************************************************
