@@ -65,13 +65,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python",
-            "args": [
-              "-X",
-              "utf8",
-              "${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\python\\stop_history_gate.py"
-            ],
-            "timeout": 60
+            "command": "C:\\Users\\socce\\AppData\\Local\\yoon-agent-kit\\hooks\\claude\\Stop\\run.cmd",
+            "timeout": 60,
+            "statusMessage": "Yoon Agent Kit"
           }
         ]
       }

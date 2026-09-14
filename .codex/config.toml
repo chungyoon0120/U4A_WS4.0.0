@@ -18,3 +18,7 @@ args = [
 
 [mcp_servers.u4a-ws4-mcp.env]
 U4A_WS4_ANALY_DIR = "C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.analy"
+
+[mcp_servers.ui5-mcp-server]
+command = 'C:\Users\socce\AppData\Local\yoon-agent-kit\runtime\node22.22.0\node.exe'
+args = ['C:\Users\socce\AppData\Local\yoon-agent-kit\mcp\ui5-mcp-server\bin\ui5mcp.js']
