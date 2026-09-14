@@ -10,6 +10,7 @@ test/
 # 노션 API 토큰이 담긴 env 파일 — 커밋 제외 (sample.env.example 만 커밋)
 .claude/skills/yoon-notion/env/*.env
 .claude/skills/yoon-notion/env/*.bak
+.claude/skills/yoon-notion/env/.default
 .codex/skills/yoon-notion/env/*.env
 .codex/skills/yoon-notion/env/*.bak
 .codex/skills/yoon-notion/env/.default
