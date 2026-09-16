@@ -15,10 +15,3 @@ test/
 .codex/skills/yoon-notion/env/*.bak
 .codex/skills/yoon-notion/env/.default
 
-# 자동 시험 도구 — 토큰이 든 실제 설정은 올리지 않는다 (본보기 config.sample.json 만 올림)
-test/cdp-auto-test/env/config.json
-test/cdp-auto-test/logs/
-test/cdp-auto-test/env/telegram_token.json
-test/cdp-auto-test/env/notion_token.json
-
-test/cdp-auto-test/node_modules/

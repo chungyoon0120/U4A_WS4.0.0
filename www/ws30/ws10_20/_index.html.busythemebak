@@ -8,12 +8,6 @@
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
-    <!-- ★ [2026-09-15, 장군님 지시] 공통 busy — 화면 시작 때 가장 먼저 로드한다(다른 CSS·JS 보다 앞).
-         busy 화면(<dialog>)은 u4a-busy.js 가 처음 켤 때 스스로 만들어 <body> 에 붙인다(종전엔 이 파일 <body> 에 적혀 있었다).
-         모양 = u4a-busy.css (종전 css/frame.css 에서 규칙 그대로 옮김). -->
-    <link rel="stylesheet" href="./theme/u4a-busy.css">
-    <script src="./theme/u4a-busy.js"></script>
-
     <!-- ===== from ws10_20.html ===== -->
     <link rel="stylesheet" href="./css/ws10_20.css">
     <link rel="stylesheet" href="../../css/jquery-ui.min.css">
@@ -112,7 +106,18 @@
     <!-- <iframe id="ws_frame" name="ws_frame" style="border:none;width:100%;height:100%;" allow="autoplay 'src';">
     </iframe> -->
 
-    <!-- [2026-09-15] Busy Indicator <dialog> 는 theme/u4a-busy.js 가 처음 켤 때 만들어 붙인다(여기서 뺐다). -->
+    <!-- Busy Indicator (resources/index.js 의 setBusy/setBusyDialog/setDomBusy 가 제어) — UI5 BusyDialog 대체
+         구 sap.m.BusyDialog 처럼 스크림 + 중앙 카드(스피너 + 제목 + 메시지). 메시지는 setBusy("X",{TITLE,DESC}). -->
+    <!-- ★ <dialog> 로 둔다 — setDomBusy 가 showModal()/close() 로 제어. 모달 팝업(showModal)도
+         top-layer 라 일반 <div> busy 는 가려진다 → busy 도 모달이어야 그 위에 보인다. -->
+    <dialog id="u4aWsBusyIndicator" class="u4aWsBusyIndicator">
+        <div class="u4aWsBusyCard">
+            <div class="u4aWsSpinner"></div>
+            <div class="u4aWsBusyTitle" id="u4aWsBusyTitle"></div>
+            <div class="u4aWsBusyText" id="u4aWsBusyText"></div>
+        </div>
+    </dialog>
+    <!-- Busy Indicator End -->
 
     <!-- Network 연결 해제 시 화면 전체를 막는 카드(원본 wifi 아이콘 유지 + 경과시간·종료 버튼 보강, 2026-09-07)
          ★[수정 2026-09-08, 장군님 지시] 원본은 그냥 <div> 라 진짜로 막는 게 아니었음 — 탭키를 누르면

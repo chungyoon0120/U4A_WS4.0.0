@@ -922,10 +922,11 @@
                 window.jQuery(oContent).hide().fadeIn(300, "linear");
             }
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        // ★ [2026-09-15, 장군님 지시] 여기서 busy 를 끄지 않는다 — 시작에 켜고 끝에서만 끈다.
-        //   [고친 이유] 이 함수는 메인 시작(js/ws_main.js fnWsStart) **도중**에 불린다. 여기서 끄면 뒤따르는
-        //   처리(개인화·세션·공지·새창 파라미터 등)가 도는 동안 조작이 열린다. 종전엔 busy·로딩 화면 해제가 여기 있었다.
-        //   해제는 메인 본문 등장 완료(fnWsStart 끝) · 실패 갈래(fnWsStart catch) 에서만 한다.
+        try { if (parent && parent.setBusy) { parent.setBusy(""); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (parent && parent.setDomBusy) { parent.setDomBusy(""); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        // ★ [2026-09-14, 장군님 지시] 로그인 로딩 화면도 여기서 푼다 — 지금이 WS10 본문이 실제로
+        //   화면에 보이는 시점이다. (ws_main.js 의 본문 등장 완료 콜백에서도 한 번 더 푼다 — 두 번 불러도 무해.)
+        try { if (parent && parent.showLoadingPage) { parent.showLoadingPage(""); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     function _renderTitlebar() {

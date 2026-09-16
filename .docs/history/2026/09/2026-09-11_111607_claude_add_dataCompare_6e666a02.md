@@ -1229,7 +1229,6 @@ UI5 모델은 자기 안에 **바인딩 목록 · 이벤트 등록표 · 문맥*
 - 그래서 `/json/list` 에 데이터모니터 별창 target 이 아예 안 나온다.
 - `%APPDATA%\com.u4a_ws3.app.dev\DevToolsActivePort` 에 `9222` 가 적혀 있어도 **실제로는 안 열려 있다** — 이 파일을 믿지 마라. `netstat -ano` 로 확인해라.
 - **붙이는 법**: packaged 앱을 닫고 → 4.0 을 재시작한다. 그러면 9222 를 4.0 이 잡는다.
-  붙은 뒤에는 기존 하네스 `test/cdp-auto-test/lib/cdp-client.js` 를 쓴다(새로 짜지 마라).
 
 ## 원인 (소스로 확정)
 

@@ -102,6 +102,8 @@ UI5 미로드 가드, 브라우저 기능 지원 확인은 **정상 분기 그�
 | `VWMN` | ws30/ws10_20/views/vw_main/control.js (창 첫 화면 — 로그인/메인 분기) |
 | `INTR` | intro.js (인트로 → 서버 목록 창) |
 | `SVLS` | ServerList_v2/ServerList.js (서버 목록 → 메인 창) |
+| `LPRL` | ws30/ws10_20/js/library-preload.js (로그인 후 창 — 메인 스크립트 읽기·시작) |
+| `UBSY` | ws30/ws10_20/theme/u4a-busy.js (공통 busy — window.U4ABusy, 2026-09-15) |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

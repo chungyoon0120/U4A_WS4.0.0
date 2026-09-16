@@ -1,4 +1,4 @@
-// 오류코드 접두: RSRC / 다음 번호: 009
+// 오류코드 접두: RSRC / 다음 번호: 008
 /**
  * index.js  (cleaned)
  *
@@ -1157,13 +1157,19 @@ oAPP.views = window?.oAPP?.views || {};
 
         if (bIsShow == 'X') {
             oLoadPg.style.background = "linear-gradient(to right, #1c2228, #1c2228)";
-            // [2026-09-15] 원본대로 되돌림 — 인라인 display 를 건드리지 않는다(원본에서 이 화면은 늘 숨겨져 있다).
-            //   2026-09-14 에 지시 없이 display 를 켜게 바꿨다가 빨간 LOADING 원이 보이게 됐다(장군님 지적).
+            // ★ [2026-09-14, 장군님 지시] display 를 직접 켠다.
+            //   [고친 이유] 이 요소는 문서에 style="display: none;" 이 박혀 있고 아무도 지우지 않는다.
+            //   그래서 종전에는 이 함수로 "켜도" 클래스만 떼고 인라인 display:none 이 그대로 남아
+            //   **로딩 화면이 한 번도 화면에 나온 적이 없었다**(실측 2026-09-14). 그 탓에 로그인 뒤
+            //   메인이 그려질 때까지 테마 배경만 보였다(= 검은 화면).
+            oLoadPg.style.display = "flex";
             oLoadPg.classList.remove("u4a_loadersInactive");
 
         } else {
 
-            // oLoadPg.style.background = "";
+            // 끌 때도 인라인으로 확실히 끈다 — 위에서 인라인 display 를 켰으므로
+            // 클래스(.u4a_loadersInactive { display:none })만으로는 안 꺼진다.
+            oLoadPg.style.display = "none";
             oLoadPg.classList.add("u4a_loadersInactive");
         }
 
@@ -1618,26 +1624,38 @@ function getErrorMsg() {
 
 function setDomBusy(bIsBusy) {
 
-    // ★ [2026-09-15, 장군님 지시] busy 본체를 공통 화면 리소스 theme/u4a-busy.js(U4ABusy)로 옮겼다.
-    //   busy 도 하나의 UI 이고, 화면 시작 때 가장 먼저 로드돼야 해서다(ws10_20/index.html <head> 맨 앞).
-    //   이 함수 이름은 그대로 둔다 — parent.setDomBusy 로 부르는 곳이 전부 이 이름을 쓴다.
-    //   옛 본체 = _index.js.busythemebak
-    if (typeof U4ABusy === "undefined" || !U4ABusy) {
-        // u4a-busy.js 로드가 빠진 창이다. 장군님 결정(2026-09-15): 앱 종료 없이 로그만 남긴다
-        //   (없을 수가 없고, 빠지면 테스트 때 busy 가 안 떠서 바로 드러난다). 같은 창에서 한 번만 남긴다.
-        if (!setDomBusy.__missLogged) {
-            setDomBusy.__missLogged = true;
-            console.error("[RSRC-008] setDomBusy: U4ABusy not loaded - theme/u4a-busy.js missing in this window, busy not shown");
+    let oBusyDom = document.getElementById("u4aWsBusyIndicator");
+    if (!oBusyDom) {
+        return;
+    }
+
+    // busy 요소가 <dialog> 면 showModal() 로 띄운다 — 모달 팝업(showModal)도 top-layer 라
+    //   일반 <div>(z-index 무한대라도) busy 는 그 뒤로 가려 안 보인다. busy 도 모달이어야
+    //   어떤 모달 팝업 위에도 보인다(전 화면 공통 — 모든 parent.setBusy 가 그대로 위에 뜸).
+    //   <dialog> 가 아니면(다른 창) 기존 display 토글로 폴백.
+    var bIsDialog = (typeof oBusyDom.showModal === "function");
+
+    if (bIsBusy === "X") {
+        if (bIsDialog) {
+            if (!oBusyDom.__escGuard) {
+                oBusyDom.__escGuard = true;
+                // busy 중 ESC 로 닫히지 않게(닫혀도 작업은 계속되지만 시각 잠금 유지).
+                oBusyDom.addEventListener("cancel", function (e) { e.preventDefault(); });
+            }
+            if (!oBusyDom.open) {
+                try { oBusyDom.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oBusyDom.style.display = "flex"; }
+            }
+        } else {
+            oBusyDom.style.display = "flex"; // 카드 중앙정렬 (스크림 flex center)
         }
         return;
     }
 
-    if (bIsBusy === "X") {
-        U4ABusy.show();
-        return;
+    if (bIsDialog) {
+        if (oBusyDom.open) { try { oBusyDom.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+    } else {
+        oBusyDom.style.display = "none";
     }
-
-    U4ABusy.hide();
 
 }
 

@@ -1,4 +1,4 @@
-// 오류코드 접두: RSRC / 다음 번호: 009
+// 오류코드 접두: RSRC / 다음 번호: 008
 /**
  * index.js  (cleaned)
  *
@@ -1618,26 +1618,38 @@ function getErrorMsg() {
 
 function setDomBusy(bIsBusy) {
 
-    // ★ [2026-09-15, 장군님 지시] busy 본체를 공통 화면 리소스 theme/u4a-busy.js(U4ABusy)로 옮겼다.
-    //   busy 도 하나의 UI 이고, 화면 시작 때 가장 먼저 로드돼야 해서다(ws10_20/index.html <head> 맨 앞).
-    //   이 함수 이름은 그대로 둔다 — parent.setDomBusy 로 부르는 곳이 전부 이 이름을 쓴다.
-    //   옛 본체 = _index.js.busythemebak
-    if (typeof U4ABusy === "undefined" || !U4ABusy) {
-        // u4a-busy.js 로드가 빠진 창이다. 장군님 결정(2026-09-15): 앱 종료 없이 로그만 남긴다
-        //   (없을 수가 없고, 빠지면 테스트 때 busy 가 안 떠서 바로 드러난다). 같은 창에서 한 번만 남긴다.
-        if (!setDomBusy.__missLogged) {
-            setDomBusy.__missLogged = true;
-            console.error("[RSRC-008] setDomBusy: U4ABusy not loaded - theme/u4a-busy.js missing in this window, busy not shown");
+    let oBusyDom = document.getElementById("u4aWsBusyIndicator");
+    if (!oBusyDom) {
+        return;
+    }
+
+    // busy 요소가 <dialog> 면 showModal() 로 띄운다 — 모달 팝업(showModal)도 top-layer 라
+    //   일반 <div>(z-index 무한대라도) busy 는 그 뒤로 가려 안 보인다. busy 도 모달이어야
+    //   어떤 모달 팝업 위에도 보인다(전 화면 공통 — 모든 parent.setBusy 가 그대로 위에 뜸).
+    //   <dialog> 가 아니면(다른 창) 기존 display 토글로 폴백.
+    var bIsDialog = (typeof oBusyDom.showModal === "function");
+
+    if (bIsBusy === "X") {
+        if (bIsDialog) {
+            if (!oBusyDom.__escGuard) {
+                oBusyDom.__escGuard = true;
+                // busy 중 ESC 로 닫히지 않게(닫혀도 작업은 계속되지만 시각 잠금 유지).
+                oBusyDom.addEventListener("cancel", function (e) { e.preventDefault(); });
+            }
+            if (!oBusyDom.open) {
+                try { oBusyDom.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oBusyDom.style.display = "flex"; }
+            }
+        } else {
+            oBusyDom.style.display = "flex"; // 카드 중앙정렬 (스크림 flex center)
         }
         return;
     }
 
-    if (bIsBusy === "X") {
-        U4ABusy.show();
-        return;
+    if (bIsDialog) {
+        if (oBusyDom.open) { try { oBusyDom.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+    } else {
+        oBusyDom.style.display = "none";
     }
-
-    U4ABusy.hide();
 
 }
 

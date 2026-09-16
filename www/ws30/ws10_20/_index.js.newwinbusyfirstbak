@@ -1,4 +1,3 @@
-// 오류코드 접두: MFRM / 다음 번호: 002
 /*************************************************************
  * U4A Workspace - 메인 프레임 부트스트랩 (HTML5)
  *
@@ -101,16 +100,6 @@ async function _mainFrameInit() {
 
 // 전달받은 Meta 정보를 저장한다.
 IPCRENDERER.on('if-meta-info', (event, res) => {
-
-    // ★ [2026-09-15, 장군님 지시] 새창이 뜨면 처음 호출되는 곳 — 여기서 busy 부터 켠다.
-    //   [고친 이유] 로그인 후 새창이 busy 없이 검은 화면으로 먼저 보였다(장군님 실측 2026-09-15).
-    //   해제는 메인 본문 등장 완료(js/ws_main.js) · 첫 화면 본문 그리기(js/ws10_html.js) ·
-    //   로그인 화면 준비 완료(Login/Login.js)가 한다.
-    if (typeof setDomBusy === "function") {
-        setDomBusy("X");
-    } else {
-        console.error("[MFRM-001] setDomBusy not found - new window starts without busy");
-    }
 
     var oMetadata = res;
 

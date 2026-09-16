@@ -354,6 +354,16 @@
 
         }
 
+        // ★ [TEST 2026-09-15, 장군님 지시] 개발 실행에서만 — 창이 보인 뒤 10초 기다렸다가 메인을 시작한다.
+        //   새창이 뜨는 순간부터 busy 가 덮여 있는지 눈으로 확인하는 용도. 패키징본에서는 절대 안 돈다.
+        //   창은 이 줄 바로 위 show() 전까지 숨겨져 있어, 더 앞에서 기다리면 10초 동안 아무것도 안 보인다.
+        //   ※ 테스트 끝나면 이 블록을 지운다.
+        if (APP && APP.isPackaged === false) {
+            console.warn("[TEST] main start delayed 10s to verify busy on new window (dev only)");
+            setTimeout(_startMain, 10000);
+            return;
+        }
+
         _startMain();
 
     }; // end of oAPP.fnWindowOnInitLoad
