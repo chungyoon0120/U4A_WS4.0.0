@@ -2265,81 +2265,43 @@ var oAPP = (function () {
             oFormData.append("GET_LANGU", "X");
             oFormData.append("PRCCD", PARAM.PRCCD);
 
-            // ★ [2026-09-16, 장군님 지시] 원본(jQuery.ajax) 동작 그대로 되돌림.
-            //   [고친 이유] XHR onload 는 HTTP 4xx·5xx 에도 불린다. 상태 코드를 안 봐서 502 Bad Gateway 가
-            //   「하위 버전 서버(E998)」로 오인돼 「Server connection failed!」 창이 안 떴다(장군님 실측).
-            //   원본 jQuery.ajax 는 2xx·304 가 아니면 error 갈래(E999)로 간다 — 그 기준을 그대로 옮긴다.
-            //   원본에 없던 withCredentials 도 뺐다. 콘솔 안내 글은 원본 문장 그대로.
             const xhr = new XMLHttpRequest();
             xhr.timeout = 5000;
-
-            // 원본 jQuery.ajax error 콜백과 같은 자리 — error 원문(jQuery 의 errorThrown)을 먼저 남긴다.
-            function _onError(error) {
-
-                // 콘솔용 오류 메시지
-                var aConsoleMsg = [
-                    `[PATH]: www/Login/Login.js`,
-                    `=> _getSupportedLangu`,
-                    `=> 통신오류 발생!!`,
-                    `=> 접속 정보 확인 요망!!`,
-                    `=> 접속 서버가 SSO(SAML 2.0) 적용 서버일 경우, ZU4A_WBC 서비스에 SAML 삭제!!`,
-                ];
-
-                console.error(error);
-                console.error(aConsoleMsg.join("\r\n"));
-                console.trace();
-
-                return resolve({
-                    RETCD: "E",
-                    STCOD: "E999",
-                });
-
-            }
-
+            xhr.withCredentials = true;
             xhr.onload = function () {
-
-                // jQuery.ajax 의 성공 기준 — 이 밖이면 원본처럼 error 갈래
-                var iStatus = xhr.status;
-                if (!((iStatus >= 200 && iStatus < 300) || iStatus === 304)) {
-                    return _onError(xhr.statusText);
-                }
-
                 try {
-
                     var oRetJson = JSON.parse(xhr.response);
-
                 } catch (error) {
-
-                    // 콘솔용 오류 메시지
+                    // 2026-09-08 복원 — 원본이 남기던 상세 기록
                     var aConsoleMsg = [
                         `[PATH]: www/Login/Login.js`,
                         `=> _getSupportedLangu`,
                         `=> success`,
                         `=> JSON.parse error!`,
                         `=> 여기서 JSON Parse 오류 발생 시`,
-                        `=> 백엔드에 해당 체크 로직이 없어서 로그인 클래스에서 html이 리턴됨.`,
-                        `=> 그러므로 상위 WS 에서 하위 버전(3.4.x) 서버를 접근하는 것으로`,
-                        `=> 로그인 페이지의 언어 선택 영역이 서버 언어 입력 Input만 나오게 처리`,
+                        `=> 백엔드에 해당 체크 로직이 없어 로그인 클래스에서 html이 리턴됨.`,
+                        `=> 그러므로 현재 WS 버전 보다 하위(3.4.x) 버전을 지원하는 서버임`,
+                        `=> 로그인 페이지에서 언어 선택 영역과 언어 수동 입력 Input을 숨김처리`,
                     ];
-
-                    console.log(aConsoleMsg.join("\r\n"));
-                    console.trace();
-
-                    return resolve({
-                        RETCD: "E",
-                        STCOD: "E998",
-                    });
-
+                    console.error(aConsoleMsg.join("\r\n"));
+                    console.trace();   // 2026-09-08 복원 — 원본처럼 난 자리 전체를 남긴다
+                    return resolve({ RETCD: "E", STCOD: "E998" });
                 }
-
                 return resolve(oRetJson);
-
             };
-
-            // jQuery.ajax: 연결 실패 → errorThrown "" · 시간 초과 → errorThrown "timeout"
-            xhr.onerror = function () { _onError(""); };
-            xhr.ontimeout = function () { _onError("timeout"); };
-
+            xhr.onerror = xhr.ontimeout = function () {
+                // 2026-09-08 복원 — 원본이 남기던 상세 기록
+                var aConsoleMsg = [
+                    `[PATH]: www/Login/Login.js`,
+                    `=> _getSupportedLangu`,
+                    `=> 통신오류 발생!!`,
+                    `=> 서버 상태 확인 요망!!`,
+                    `=> 접속 서버가 SSO(SAML 2.0) 인증 설정일 경우, ZU4A_WBC 서비스에 SAML 설정!!`,
+                ];
+                console.error(aConsoleMsg.join("\r\n"));
+                console.trace();   // 2026-09-08 복원 — 원본처럼 난 자리 전체를 남긴다
+                return resolve({ RETCD: "E", STCOD: "E999" });
+            };
             xhr.open("POST", sServicePath);
             xhr.send(oFormData);
         });
@@ -2386,12 +2348,6 @@ var oAPP = (function () {
             document.getElementById("ws_langu_select_form").hidden = false;
 
             let aLangu = oLanguResult?.T_LANGU || [];
-
-            // 원본: model 이 없으면 그대로 진행(2026-09-16 원본대로 복원)
-            if (!oModel) {
-                return resolve();
-            }
-
             let sLangu = oModel.getProperty("/LOGIN/LANGU");
             if (!sLangu) {
                 oModel.setProperty("/LOGIN/LANGU", oLanguResult.DEFLANGU || "");
@@ -2415,36 +2371,30 @@ var oAPP = (function () {
             let SSO_HDR = `${SSO_TICKET}_XXX`;
             let oFormData = new FormData();
             oFormData.append("SSO_TICKET", SSO_TICKET);
-            // ★ [2026-09-16, 장군님 지시] 원본 그대로 되돌림 — 원본에 없던 30초 강제 끊기를 뺐고,
-            //   콘솔 안내 글도 원본 문장 그대로(종전 문장은 「SAML 삭제」가 「SAML 설정」으로 뜻이 반대였다).
             try {
-
-                var response = await fetch(sServerPath, {
-                    headers: {
-                        "sso_hdr": SSO_HDR,
-                    },
-                    method: "POST",
-                    body: oFormData
-
-                });
-
+                // 응답 없이 pending 으로 멈추면 _onViewReady 의 await 가 걸려 초기화(런치 busy)가
+                // 무한히 돈다 → AbortController 로 타임아웃 걸어 실제 실패(AbortError)로 종료시킨다.
+                const oCtrl = new AbortController();
+                const iTimer = setTimeout(() => oCtrl.abort(), LOGIN_XHR_TIMEOUT);
+                try {
+                    await fetch(sServerPath, { headers: { "sso_hdr": SSO_HDR }, method: "POST", body: oFormData, signal: oCtrl.signal });
+                } finally {
+                    clearTimeout(iTimer);
+                }
             } catch (error) {
-
-                // 콘솔용 오류 메시지
+                console.error(error);
+                // 2026-09-08 복원 — 원본이 남기던 상세 기록
                 var aConsoleMsg = [
                     `[PATH]: www/Login/Login.js`,
                     `=> _handleSSOLogin`,
                     `=> 통신오류 발생!!`,
-                    `=> SSO 관련 로그인 처리 실패!!`,
-                    `=> 접속 정보 확인 요망!!`,
-                    `=> 접속 서버가 SSO(SAML 2.0) 적용 서버일 경우, ZU4A_WBC 서비스에 SAML 삭제!!`,
+                    `=> SSO 자동 로그인 처리 실패!!`,
+                    `=> 서버 상태 확인 요망!!`,
+                    `=> 접속 서버가 SSO(SAML 2.0) 인증 설정일 경우, ZU4A_WBC 서비스에 SAML 설정!!`,
                 ];
-
-                console.error(error);
                 console.error(aConsoleMsg.join("\r\n"));
-                console.trace();
+                console.trace();   // 2026-09-08 복원 — 원본처럼 난 자리 전체를 남긴다
             }
-
             resolve();
         });
     }

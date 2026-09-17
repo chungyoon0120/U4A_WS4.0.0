@@ -39,7 +39,7 @@
 - 고치기 전 `_` 접두 백업 · 고친 이유 주석 · `node --check`
 - 코드 고치면 로그 같이 넣기 — `.works/DEV_STANDARD_로그.md`
 - 예외는 오류 코드로 표면화 — `.works/DEV_STANDARD_오류처리.md`
-- 소스 고치면 `.docs/history/` 이력 · 현황판 현행화 (`.docs/CURRENT.md` 는 장군님이 지시할 때만 — 2026-09-16 정정)
+- 소스 고치면 `.docs/history/` 이력 · 현황판 현행화 · `.docs/CURRENT.md` 반영
 
 **그 밖의 「하는 김에」는 전부 금지다.**
 
