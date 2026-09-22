@@ -1,6 +1,7 @@
-/**************************************************************************                                           
+/**************************************************************************
  * ws_fn_04.js
  **************************************************************************/
+// 오류코드 접두: WFN4 / 다음 번호: 004
 (function(window, $, oAPP) {
     "use strict";
 
@@ -60,7 +61,126 @@
 
         });
 
-    }; // end of oAPP.fn.fnSapGuiMultiLoginCheck    
+    }; // end of oAPP.fn.fnSapGuiMultiLoginCheck
+
+    /************************************************************************
+     * [2026-09-18 장군님 지시] VBS stderr 를 PC 코드페이지로 읽는다 (한글 깨짐 수정)
+     * ----------------------------------------------------------------------
+     * 원본은 stderr 를 data.toString()(UTF-8)으로 읽었다. 그런데 stderr 의 오류 줄은
+     * cscript 가 직접 찍고, 그 안의 오류 설명은 윈도우가 자기 언어·코드페이지로 만든다
+     * (한글 윈도우 = CP949) → 한글만 깨졌다.
+     * 시험(2026-09-18, cscript 단독 실행): 옵션 없이 받은 바이트를 euc-kr 로 풀면 한글 정상.
+     *   `cscript //U` 는 stderr 가 0바이트가 되어(오류 문장이 아예 안 옴) 쓰지 않는다.
+     * → PC 코드페이지(레지스트리 OEMCP)를 한 번 읽어 TextDecoder 로 푼다. 스크립트(.vbs)는 안 고친다.
+     *   표에 없는 코드페이지·읽기 실패 = 원본과 같은 utf-8.
+     * 조사 = .works/execControllerClass/02_오류창_폭_한글깨짐_점검사항언어_조사.md §5
+     ************************************************************************/
+    const VBS_CP_REG_KEY = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage";
+
+    // Windows codepage → TextDecoder label (Encoding Standard 에 있는 것만)
+    const VBS_CP_LABEL = {
+        "949": "euc-kr", "932": "shift_jis", "936": "gbk", "950": "big5",
+        "866": "ibm866", "874": "windows-874",
+        "1250": "windows-1250", "1251": "windows-1251", "1252": "windows-1252",
+        "1253": "windows-1253", "1254": "windows-1254", "1255": "windows-1255",
+        "1256": "windows-1256", "1257": "windows-1257", "1258": "windows-1258",
+        "65001": "utf-8"
+    };
+
+    let _pVbsStderrLabel = null;   // 창 하나에서 한 번만 읽는다(코드페이지는 재부팅 전엔 안 바뀜)
+
+    function _getVbsStderrLabel() {
+
+        if (_pVbsStderrLabel) { return _pVbsStderrLabel; }
+
+        _pVbsStderrLabel = new Promise(function (resolve) {
+
+            // 못 읽으면 원본과 같은 utf-8 — 다음 오류 때 다시 읽도록 캐시는 비운다.
+            function _fallback(sWhy) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("값이 없어 그만둠", "VBS stderr codepage", sWhy + ", decode as utf-8 (original behavior)");
+                }
+                _pVbsStderrLabel = null;
+                resolve("utf-8");
+            }
+
+            try {
+
+                parent.require('regedit').list([VBS_CP_REG_KEY], function (err, oResult) {
+
+                    if (err) {
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
+                        _fallback("regedit.list failed");
+                        return;
+                    }
+
+                    let oKey = oResult && oResult[VBS_CP_REG_KEY],
+                        oVal = oKey && oKey.values && oKey.values.OEMCP,
+                        sCp  = oVal ? String(oVal.value) : "",
+                        sLabel = VBS_CP_LABEL[sCp];
+
+                    if (!sLabel) {
+                        _fallback("OEMCP '" + sCp + "' not in label table");
+                        return;
+                    }
+
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                        U4ALOG.info("끝남", "VBS stderr codepage", "OEMCP " + sCp + " -> " + sLabel);
+                    }
+
+                    resolve(sLabel);
+
+                });
+
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                _fallback("regedit require/list threw");
+            }
+
+        });
+
+        return _pVbsStderrLabel;
+
+    } // end of _getVbsStderrLabel
+
+    /**
+     * stderr "data" 리스너를 만든다. 조각이 여러 번 와도 순서대로, 한 글자가 반으로 잘려도
+     * 이어서 풀리게(TextDecoder stream) 실행(spawn) 하나마다 하나씩 만든다.
+     * fnOnText 에는 원본의 data.toString() 자리에 들어갈 글자가 넘어간다.
+     */
+    function _makeVbsStderrReader(fnOnText) {
+
+        let oDecoder = null,
+            pChain = Promise.resolve();
+
+        return function (data) {
+
+            pChain = pChain.then(_getVbsStderrLabel).then(function (sLabel) {
+
+                if (!oDecoder) {
+                    try { oDecoder = new TextDecoder(sLabel); }
+                    catch (e) {
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                        oDecoder = new TextDecoder("utf-8");
+                    }
+                }
+
+                fnOnText(oDecoder.decode(data, { stream: true }));
+
+            }).catch(function (e) {
+
+                // 원본은 이 자리에서 터지면 전역 오류로 올라갔다 — 삼키지 않고 코드로 표면화한다.
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                console.error("[WFN4-003] VBS stderr handler failed", e);
+
+                try { parent.showMessage(null, 20, "E", "[WFN4-003] " + WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "227")); }
+                catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+
+            });
+
+        };
+
+    } // end of _makeVbsStderrReader
 
     /************************************************************************
      * SAP GUI 멀티 로그인 체크 성공시
@@ -142,10 +262,11 @@
         });
 
         //GUI 세션창이 존재하지않다면 ...
-        vbs.stderr.on("data", function(data) {
+        // [2026-09-18] data.toString() → PC 코드페이지로 푼 글자(sStderr) — _makeVbsStderrReader 참고
+        vbs.stderr.on("data", _makeVbsStderrReader(function(sStderr) {
 
-            //VBS 리턴 오류 CODE / MESSAGE 
-            var str = data.toString(),
+            //VBS 리턴 오류 CODE / MESSAGE
+            var str = sStderr,
                 Tstr = str.split(":"),
                 len = Tstr.length - 1;
 
@@ -191,10 +312,17 @@
 
             ];
 
+            // ★ [2026-09-17, 장군님 지시] 콘솔에는 비밀번호를 가린다.
+            //   원본은 aParam 을 통째로 찍어 SAP 비밀번호(oUserInfo.PW = 10번째, index 9)가 그대로 나갔다.
+            //   포장본은 렌더러 콘솔이 로그 파일로 들어간다(로그 표준 N1: 비밀번호 금지).
+            //   VBS 에 넘기는 aParam 자체는 그대로 둔다 — 찍는 사본만 가린다.
+            var aLogParam = aParam.slice();
+            aLogParam[9] = "******";
+
             // 콘솔 메시지
-            var aConsoleMsg = [             
+            var aConsoleMsg = [
                 `[VBS 실행 파라미터]:`,
-                `PARAM: ${JSON.stringify(aParam)}`
+                `PARAM: ${JSON.stringify(aLogParam)}`
             ];
 
             console.log(aConsoleMsg.join("\r\n"));
@@ -205,13 +333,14 @@
 
             });
 
-            vbs.stderr.on("data", function(data) {   
-                
+            // [2026-09-18] data.toString() → PC 코드페이지로 푼 글자(sStderr) — _makeVbsStderrReader 참고
+            vbs.stderr.on("data", _makeVbsStderrReader(function(sStderr) {
+
                 // 이전에 돌고 있는 인터벌이 혹시나 있으면 삭제
                 _clearIntervalSapGuiCheck();
 
-                //VBS 리턴 오류 CODE / MESSAGE 
-                var str = data.toString(),
+                //VBS 리턴 오류 CODE / MESSAGE
+                var str = sStderr,
                     Tstr = str.split(":"),
                     len = Tstr.length - 1;
 
@@ -241,9 +370,9 @@
                 // IPC Command로 컨트롤러 종료 정보를 전달한다.
                 _sendExecControllerIpcCommand({ status: "finish" });
 
-            });
+            }));
 
-        });
+        }));
 
     }; // end of oAPP.fn.fnSapGuiMultiLoginCheckThen
 
@@ -259,15 +388,28 @@
         // 전체 자식 윈도우에 Busy 킨다.
         oAPP.attr.oMainBroad.postMessage({ PRCCD:"BUSY_ON" });
 
+        // [2026-09-17 장군님 지시] 도움말 언어 = 로그인 Workspace 언어 우선.
+        //   원본은 WS_LANGU(ws_settings.json globalLanguage)만 봐서, 한글로 로그인해도 설정이 EN 이면
+        //   영어 도움말이 떴다. 같은 창 글자(WSUTIL.getWsMsgClsTxt)와 같은 순서로 맞춘다.
+        let sHelpLangu = (parent.process && parent.process.USERINFO && parent.process.USERINFO.LANGU) || WS_LANGU;
+
         let sHelpRoot = PATH.join(APPPATH, "help", "controllerClass");
-        let sHelpLanguPath = PATH.join(sHelpRoot, WS_LANGU, "index.html");
-        
+        let sHelpLanguPath = PATH.join(sHelpRoot, String(sHelpLangu), "index.html");
+
         if(!parent.FS.existsSync(sHelpLanguPath)){
 
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "help/controllerClass/" + sHelpLangu + "/index.html", "not found, fallback to EN");
+            }
+
             sHelpLanguPath = PATH.join(sHelpRoot, "EN", "index.html");
-            
-            if(!parent.FS.existsSync(sHelpLanguPath)){    
-                
+
+            if(!parent.FS.existsSync(sHelpLanguPath)){
+
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "help/controllerClass/EN/index.html", "not found, help popup not opened");
+                }
+
                 // 전체 자식 윈도우에 Busy 끈다.
                 oAPP.attr.oMainBroad.postMessage({ PRCCD:"BUSY_OFF" });
 
@@ -390,97 +532,165 @@
 
     /************************************************************************
      * 컨트롤러 오류 메시지 Dialog 실행
+     * ----------------------------------------------------------------------
+     * ★ [HTML5 2026-09-17, 장군님 지시] 원본 UI5 sap.m.Dialog → 공통 .u4a-dialog
+     *   변환 전: HTML5 메인 창의 sap 안전 스텁(ws_html5_shell.js)에는 sap.m.Dialog·Button 이 없어,
+     *   이 함수가 불리는 순간 "sap.m.Button is not a constructor" 로 크리티컬 스크립트 오류가 났다.
+     *   이 함수는 2차 VBS(sapgui_ws.vbs)가 stderr 를 쓸 때만 불려서(로그인 실패·세션 못 찾음 등)
+     *   재현이 드물었다. 조사 = .works/execControllerClass/01_sap_m_Button_크리티컬오류_조사.md
+     *
+     *   원본 내용 그대로 옮김(원본 U4A_WS3.0.0 ws_fn_04.js 395~486):
+     *   · 헤더: 아이콘(developer-settings ≈ screwdriver-wrench, fnKeyboardShortcutPopupOpen.js 매핑과 동일)
+     *           + 제목 「VBS 실행 오류」(ZMSG_WS_COMMON_001 227)
+     *   · 본문: 오류 원문(oPARAM.DESC, 줄바꿈 유지) + 「아래의 점검사항을 확인하세요.」(250)
+     *   · 푸터: 「점검사항」(249, question-mark ≈ circle-question) → _showControllerErrorHelpPopup
+     *           + 닫기(decline + Reject ≈ 공통 negative 아이콘 버튼)
+     *   · draggable/resizable → 공통 3종 세트. 원본 contentWidth 500px → 반응형 규칙상 rem 최소폭.
+     *   · 원본 state:"Error" 는 헤더 색으로 옮기지 않는다 — .analy/16 §2.5(헤더 선두 아이콘=accent,
+     *     의미색 예외는 메시지박스만).
+     *   · stderr 가 여러 조각으로 오면 원본은 창이 여러 개 쌓였다 — 같은 창을 새 내용으로 다시 연다
+     *     (변환된 다른 다이얼로그들과 같은 중복 방지 방식).
      ************************************************************************/
+    const CTRL_ERR_DIALOG_ID = "u4aCtrlVbsErrDlg";
+
+    function _closeControllerErrorDialog() {
+        let oDlg = document.getElementById(CTRL_ERR_DIALOG_ID);
+        if (!oDlg) { return; }
+        try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    }
+
     function _openControllerErrorDialog(oPARAM){
 
-        // VBS 실행 오류
-        let sTitle = WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "227");
+        let sDesc = (oPARAM && oPARAM.DESC) || "";
 
-        // 점검사항
-        let sMsg01 = WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "249");
+        let sTitle = "";
 
-        // 아래의 점검사항을 확인하세요.
-        let sMsg02 = WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "250");
+        try {
 
-        let oDialog = new sap.m.Dialog({
-            contentWidth: "500px",
-            draggable: true,
-            resizable: true,   
-            state: "Error",
-            buttons: [
-                new sap.m.Button({
-                    icon: "sap-icon://question-mark",
-                    text: sMsg01, /* 점검사항 */
-                    press: function(){        
+            // VBS 실행 오류
+            sTitle = WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "227");
 
-                        // 컨트롤러 오류 확인사항 가이드 Popup 실행
-                        _showControllerErrorHelpPopup();
-        
-                    }
-                }),
-                new sap.m.Button({
-                    icon: "sap-icon://decline",
-                    type: sap.m.ButtonType.Reject,
-                    press: function(){
-                        oDialog.close();
-                    }
-                })
-            ],
-            afterClose: function(){
-                oDialog.destroy();
+            // 이미 떠 있으면 제거 후 재오픈(중복 방지).
+            _closeControllerErrorDialog();
+
+            // 점검사항
+            let sMsg01 = WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "249");
+
+            // 아래의 점검사항을 확인하세요.
+            let sMsg02 = WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "250");
+
+            // Close
+            let sClose = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
+
+            // 스코프 스타일 1회 주입(공통 shell.css/bootstrap-skin 직접수정 금지 — .analy/12 §6.1).
+            if (!document.getElementById("u4aCtrlVbsErrStyle")) {
+                let oStyle = document.createElement("style");
+                oStyle.id = "u4aCtrlVbsErrStyle";
+                // [2026-09-17 장군님 지시] 원본 contentWidth:"500px" 고정 폭 — 이전엔 min-width 만 둬서
+                // 긴 오류 문장이 창을 화면 끝(90vw)까지 늘렸다. 31.25rem = 500px, 좁은 창은 90vw 까지.
+                oStyle.textContent =
+                    ".u4aCtrlVbsErrDlg { width: min(31.25rem, 90vw); max-width: 90vw; }" +
+                    ".u4aCtrlVbsErrDlg .u4a-dialog__header { cursor: move; user-select: none; }" +
+                    ".u4aCtrlVbsErrBody { display: flex; flex-direction: column; gap: 0.75rem; }" +
+                    ".u4aCtrlVbsErrDesc { font-weight: 600; white-space: pre-wrap; word-break: break-all; }" +
+                    ".u4aCtrlVbsErrGuide { font-weight: 600; }";
+                document.head.appendChild(oStyle);
             }
-        });
-    
-        oDialog.addStyleClass("sapUiContentPadding sapUiSizeCompact");
-    
-        let oToolbar1 = new sap.m.Toolbar();
-        oDialog.setCustomHeader(oToolbar1);
-    
-        let oIcon1 = new sap.ui.core.Icon({
-            src: "sap-icon://developer-settings",
-            size: "20px",
-        });
-        oToolbar1.addContent(oIcon1);
-        
-        // 제목 영역
-        let oTitle1 = new sap.m.Title({
-            text: sTitle
-        });
-        oToolbar1.addContent(oTitle1);
-    
-        let oVBox1 = new sap.m.VBox();
-        oDialog.addContent(oVBox1);
-        
-        // 오류 내용
-        let oTitle2 = new sap.m.Title({            
-            text: oPARAM.DESC || "",
-            wrapping: true
-        });
-        oVBox1.addItem(oTitle2);
-    
-        oTitle2.addStyleClass("sapUiSmallMarginBottom");
-        
-        // // 전달받은 파라미터에 오류 메시지 정보를 출력한다.
-        // let sErrMsg = ``;
-        // if(oPARAM && oPARAM.DESC){
-        //     sErrMsg = oPARAM.DESC || "";
-        // }            
 
-        // let oTitle3 = new sap.m.Title({
-        //     text: sErrMsg,
-        //     wrapping: true,
-        // });
-        // oVBox1.addItem(oTitle3);
-    
-        // oTitle3.addStyleClass("sapUiSmallMarginBottom");
-    
-        let oTitle4 = new sap.m.Title({
-            text: sMsg02, /* 아래의 점검사항을 확인하세요. */
-            wrapping: true,
-        });
-        oVBox1.addItem(oTitle4);
-    
-        oDialog.open();
+            let _fa = (s) => '<i class="fa-solid fa-' + s + '"></i>';
+
+            // ── 다이얼로그 골격 ──
+            let oDlg = document.createElement("dialog");
+            oDlg.className = "u4a-dialog u4aCtrlVbsErrDlg";
+            oDlg.id = CTRL_ERR_DIALOG_ID;
+
+            // 헤더 (아이콘 + 제목 + 닫기 X)
+            let oHeader = document.createElement("div");
+            oHeader.className = "u4a-dialog__header";
+            oHeader.innerHTML = _fa("screwdriver-wrench") + "<span></span>";
+            oHeader.querySelector("span").textContent = sTitle;
+
+            let oX = document.createElement("button");
+            oX.type = "button";
+            oX.className = "u4a-btn-icon";
+            oX.setAttribute("data-act", "close");
+            oX.innerHTML = _fa("xmark");
+            oX.title = sClose;
+            oX.addEventListener("click", _closeControllerErrorDialog);
+            oHeader.appendChild(oX);
+            oDlg.appendChild(oHeader);
+
+            // ── 바디 (오류 원문 + 점검 안내) ──
+            let oBody = document.createElement("div");
+            oBody.className = "u4a-dialog__body u4aCtrlVbsErrBody";
+
+            let oDesc = document.createElement("div");
+            oDesc.className = "u4aCtrlVbsErrDesc";
+            oDesc.textContent = sDesc;
+            oBody.appendChild(oDesc);
+
+            let oGuide = document.createElement("div");
+            oGuide.className = "u4aCtrlVbsErrGuide";
+            oGuide.textContent = sMsg02;
+            oBody.appendChild(oGuide);
+
+            oDlg.appendChild(oBody);
+
+            // ── 푸터 (점검사항 + 닫기) ──
+            let oFoot = document.createElement("div");
+            oFoot.className = "u4a-dialog__footer";
+
+            let oHelpBtn = document.createElement("button");
+            oHelpBtn.type = "button";
+            oHelpBtn.className = "u4a-btn";
+            oHelpBtn.innerHTML = _fa("circle-question") + "<span></span>";
+            oHelpBtn.querySelector("span").textContent = sMsg01;
+            oHelpBtn.addEventListener("click", function () {
+
+                // 컨트롤러 오류 확인사항 가이드 Popup 실행 (원본: 창은 닫지 않는다)
+                try { _showControllerErrorHelpPopup(); }
+                catch (e) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                    console.error("[WFN4-002] _showControllerErrorHelpPopup failed from VBS error dialog", e);
+                }
+
+            });
+            oFoot.appendChild(oHelpBtn);
+
+            let oCloseBtn = document.createElement("button");
+            oCloseBtn.type = "button";
+            oCloseBtn.className = "u4a-btn u4a-btn--negative";
+            oCloseBtn.innerHTML = _fa("xmark");
+            oCloseBtn.title = sClose;
+            oCloseBtn.addEventListener("click", _closeControllerErrorDialog);
+            oFoot.appendChild(oCloseBtn);
+
+            oDlg.appendChild(oFoot);
+
+            // ESC → 닫기
+            oDlg.addEventListener("cancel", (e) => { e.preventDefault(); _closeControllerErrorDialog(); });
+
+            // 헤더 드래그 / 더블클릭 리센터 / grip 리사이즈 — 공통 U4AUI.
+            if (window.U4AUI && U4AUI.makeDialogDraggable) { U4AUI.makeDialogDraggable(oDlg, oHeader); }
+            if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); }
+            if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 360, minH: 200 }); }
+
+            document.body.appendChild(oDlg);
+            oDlg.showModal();
+
+        } catch (e) {
+
+            // 오류 창을 못 만들면 fallback 창을 만들지 않고 코드로 표면화한다(오류처리 표준).
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            console.error("[WFN4-001] VBS error dialog could not be opened", e);
+
+            _closeControllerErrorDialog();
+
+            try { parent.showMessage(null, 20, "E", "[WFN4-001] " + sTitle); }
+            catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+
+        }
 
     } // end of _openControllerErrorDialog
 

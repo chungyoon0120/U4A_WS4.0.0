@@ -639,7 +639,9 @@ Save 버튼 press → ev_pressSaveBtn()
 
 ## 10. AI 컨버전 실행 사양 (WS30 USP 코드에디터)
 
-> 이 절은 **설계 산출물**이며, 실제 구현은 추후 진행한다. 추후 "WS30 USP 코드에디터까지 구현해" 요청 시, AI 는 이 절을 읽고 **기능 구현 + 테마 적용**까지 스스로 완결한다.  
+> ⚠️ **현행화 2026-09-22 — 이 영역은 이미 구현돼 돌고 있다.** WS30 USP 는 HTML5 파일(소스 tree·에디터·우클릭 메뉴)로 동작 중이고, Monaco 는 원래대로 iframe 으로 유지된다.
+> 따라서 이 절은 **다시 만들라는 지시서가 아니라 「원래 이래야 한다」는 대조 기준**이다. 고칠 일이 생기면 **현행 구현을 먼저 읽고** 이 절과 대조한다 — 새로 만들지 않는다.
+> 아래 원문은 처음 구축할 때 쓴 설계 산출물 그대로 남겨 둔다.  
 > 기능 매핑은 9장(표 A 유지 / 표 B 교체)을, **셸 크롬 테마**는 [12_테마_컨버전_전략.md](12_테마_컨버전_전략.md) 를 따른다. **Monaco 에디터 내부 테마는 Monaco 자체 API 유지**(4.4 테마 경계 분리)다. 세 축을 함께 적용해야 완성이다.
 
 ### 10.1 시안·참조 출처
@@ -648,7 +650,7 @@ Save 버튼 press → ev_pressSaveBtn()
 |---|---|---|
 | 기능/구조 분석 | 본 문서 1~7장 | NavContainer 구조·소스 트리·Monaco iframe·패턴/스니펫·파일 I/O 흐름 |
 | UI 교체 매핑 | 본 문서 9장 (표 A 유지 / 표 B 교체) | UI5 컨트롤 → HTML5 대체 |
-| 1차 변환 시안 | (해당 없음) — `.codex_tmp/` 에 Monaco/USP 전용 변환 시안 **미존재**. 셸 마크업 톤은 `.codex_tmp/ws10_html5/` 등 인접 시안을 참고(색 하드코딩 → 토큰화 필요) |
+| **현행 구현(기준)** | `www/ws30/ws10_20/js/usp/` (`ws_html5_usp.js` · 트리 · 에디터 · 우클릭 메뉴) | ★지금 실제로 도는 코드 — 고칠 일이 있으면 여기를 먼저 읽는다 |
 | 셸 테마 사양 | `.analy/12_테마_컨버전_전략.md` | 기준 `sap_horizon`·테마 5종(white/dark/purple/red/green)·토큰 계약(4.2)·전환 API(5.2)·불변 제약(6.4) |
 | Monaco 내부 테마 | `www/lib/monaco/themes/*.json` + Monaco API | iframe 안에서 Monaco 엔진이 직접 처리 (셸 토큰과 별개) |
 
@@ -726,7 +728,7 @@ www/ws30/ws10_20/theme/   ← 12번 문서 6.1 산출물 (선행 또는 병행)
 참조 문서:
 - .analy/04_WS30_USP_코드에디터.md (이 문서) — 1~7장 기능/모델, 9장 UI5→HTML5 매핑(표 A 유지/표 B 교체), 10장 실행 사양, 4.4 테마 경계 분리
 - .analy/12_테마_컨버전_전략.md — 셸 크롬 테마 토큰 계약/전환 API/불변 제약
-시안: .codex_tmp/ 에 Monaco/USP 전용 시안 없음 → 인접 셸 시안(ws10_html5 등)만 톤 참고
+현행 구현(기준): www/ws30/ws10_20/js/usp/ (ws_html5_usp.js 외)  ← 지금 도는 코드를 먼저 읽는다
 
 원칙:
 - Electron/Node 자원(9장 표 A: FS 파일 I/O, @electron/remote, IPC New Window, sendAjax, MessageChannel, WSUTIL/PATHINFO, 패턴 txt)은 호출부를 그대로 유지한다. UI 레이어만 교체한다.

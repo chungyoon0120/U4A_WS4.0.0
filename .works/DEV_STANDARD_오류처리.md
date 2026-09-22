@@ -88,6 +88,7 @@ UI5 미로드 가드, 브라우저 기능 지원 확인은 **정상 분기 그�
 | `TGSD` | electron/lib/log/ws_telegram.js (텔레그램 전송) |
 | `EDHT` | ws30/ws10_20/Popups/editorPopup/host/ (편집기 시리즈 Monaco host — 오류 페이지 에디터·소스 패턴도 이 host 를 쓴다) |
 | `VMHT` | ws30/ws10_20/Popups/versionMng/host/ (버전 관리 diff Monaco host) |
+| `WFN4` | ws30/ws10_20/js/ws_fn_04.js (컨트롤러 클래스 실행 — VBS 실행 오류 창 등, 2026-09-17) |
 | `CEHT` | ws30/ws10_20/js/codeeditor/ (범용 Monaco host — 클라이언트 이벤트 편집기가 쓴다) |
 | `EDTF` | ws30/ws10_20/Popups/editorPopup/editorFrame.js |
 | `EPEF` | ws30/ws10_20/Popups/errPageEditorPopup/errorPageEditorFrame.js |
