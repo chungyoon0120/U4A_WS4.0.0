@@ -205,6 +205,48 @@ HTML5 로 바꾸는 방향에 맞춰 **2026-09-08 부터 설치본에 싣지 않
 | 설치 도중 C++ 컴파일 오류 (`MSB...`, `Visual Studio not found`) | C++ 빌드 도구 없음 | Build Tools 2022 에서 **"C++를 사용한 데스크톱 개발"** 설치 |
 | 위를 다 고쳤는데도 같은 오류 | 예전에 실패한 찌꺼기가 남음 | `node_modules` 폴더를 통째로 지우고 `npm install` 부터 다시 |
 
+> Python 을 깔았는데도 계속 같은 오류면 → 아래 [Python 깔았는데도 안 잡힐 때](#python-깔았는데도-could-not-find-any-python-installation)
+
+---
+
+# Python 깔았는데도 `Could not find any Python installation`
+
+설치는 멀쩡한데 안 잡히는 경우다. **아래 순서대로만 하면 된다.**
+
+### 1. 진짜 깔렸는지 확인 (PowerShell)
+
+```powershell
+Get-ChildItem HKCU:\SOFTWARE\Python\PythonCore
+```
+
+아무것도 안 나오면 **안 깔린 것** — 파이썬부터 설치한다.
+
+> `where python` 에 `WindowsApps\python.exe` 가 잡히는 건 **0바이트 가짜 파일**이다. 이걸 보고 "깔렸네" 하면 안 된다.
+
+### 2. `PYTHON` 환경변수 박기 (PowerShell, 한 번만)
+
+```powershell
+[Environment]::SetEnvironmentVariable('PYTHON', "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe", 'User')
+```
+
+> `Python313` 은 깔린 버전에 맞춘다.
+> `npm config set python` 은 npm 11 부터 안 먹으니 쓰지 말 것.
+
+### 3. **VS Code · 터미널 전부 닫고 새로 켜기** ← 제일 중요
+
+환경변수는 **새로 켜는 창부터** 적용된다. 파이썬 설치 전에 켜둔 창에서는 아무리 고쳐도 계속 실패한다.
+탭만 새로 여는 건 소용없고 **VS Code 자체를 껐다 켜야** 한다.
+
+### 4. 새 창에서 확인 후 재빌드
+
+```bat
+py --version
+```
+
+```bat
+npm run sqlite:rebuild
+```
+
 ---
 
 # 저장소에 안 들어있는 것 (새 PC에서 따로 챙길 것)
