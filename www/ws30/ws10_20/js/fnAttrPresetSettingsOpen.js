@@ -53,7 +53,7 @@
     //   미로드/미변환(W2)이면 no-op.
     function _preview(sAttr) {
         if (typeof oAPP.fn.previewUIsetProp === "function") {
-            try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[WS20][preset] previewUIsetProp:", e && e.message); }
+            try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[WS20][preset] previewUIsetProp:", e && e.message, e); }
         }
     }
 
@@ -86,7 +86,7 @@
                 return _sRes;
             }
         } catch (e) {
-            console.error("[WS20][preset] chkValidProp exception (handled):", e && e.message);
+            console.error("[WS20][preset] chkValidProp exception (handled):", e && e.message, e);
         }
         return _sRes;
     }
@@ -260,7 +260,7 @@
                 var oWebPref = parent.WSUTIL.QueryString.parse(_w.getURL());
                 if (oWebPref && oWebPref.OBJTY === _popupName) { _w.send(_if_name, _IF_DATA); }
             }
-        } catch (e) { console.error("[WS20][preset] ATTR_CHANGE broadcast error:", e && e.message); }
+        } catch (e) { console.error("[WS20][preset] ATTR_CHANGE broadcast error:", e && e.message, e); }
     }
 
     /* ── Apply(원본 OK 콜백) ──
@@ -338,11 +338,11 @@
                 oHelpBtn.title = "U4A Help Document";   // TODO(i18n): 원본도 $$msg 하드코딩(메시지 키화 필요)
                 oHelpBtn.addEventListener("click", function () {
                     try { oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000278" }); }
-                    catch (e) { console.error("[WS20][preset] U4A Help Document open failed:", e && e.message); }
+                    catch (e) { console.error("[WS20][preset] U4A Help Document open failed:", e && e.message, e); }
                 });
                 oHeader.appendChild(oHelpBtn);
             }
-        } catch (e) { console.error("[WS20][preset] help button build error:", e && e.message); }
+        } catch (e) { console.error("[WS20][preset] help button build error:", e && e.message, e); }
 
         var oXBtn = _el("button", "u4a-btn-icon");
         oXBtn.type = "button";

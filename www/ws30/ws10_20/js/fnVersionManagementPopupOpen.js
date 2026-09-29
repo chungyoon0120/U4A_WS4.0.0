@@ -110,11 +110,11 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FVMP-001] Version Management window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FVMP-001] cleanup of the failed window failed:", e2 && e2.message); }
+                catch (e2) { console.error("[FVMP-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
                 try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
-        } catch (e) { console.error("[FVMP-001] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FVMP-001] did-fail-load register failed:", e && e.message, e); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) { oBrowserWindow.webContents.openDevTools(); }
@@ -138,7 +138,7 @@
             // ★ [2026-09-14] 전송이 실패하면 창은 busy 인 채로 남는다 — 자리를 남겨 표면화한다.
             //   (문서 로드 자체가 실패하는 경우는 위 did-fail-load 가 창을 정리한다.)
             try { oBrowserWindow.webContents.send('if-vermng-info', oSendData); }
-            catch (eSend) { console.error("[FVMP-001] initial data send to the window failed:", eSend && eSend.message); }
+            catch (eSend) { console.error("[FVMP-001] initial data send to the window failed:", eSend && eSend.message, eSend); }
 
             parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
         });

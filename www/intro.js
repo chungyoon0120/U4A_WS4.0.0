@@ -533,11 +533,11 @@
             if (bIsMainFrame === false || iErrCode === -3) { return; }
             console.error("[INTR-001] server list window load failed:", iErrCode, sErrDesc, sUrl);
             try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-            catch (e2) { console.error("[INTR-001] cleanup of the failed window failed:", e2 && e2.message); }
+            catch (e2) { console.error("[INTR-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
             // 인트로 창을 되살려 사용자가 창 없이 남지 않게 한다.
             try {
                 if (oCurrWindow && !oCurrWindow.isDestroyed()) { oCurrWindow.show(); oCurrWindow.focus(); }
-            } catch (e3) { console.error("[INTR-001] intro window could not be restored:", e3 && e3.message); }
+            } catch (e3) { console.error("[INTR-001] intro window could not be restored:", e3 && e3.message, e3); }
         });
 
         // if (!APP.isPackaged) {
@@ -1616,7 +1616,7 @@
             try {
                 var aCustPattData = JSON.parse(sCustPattJsonData);
             } catch (error) {
-                console.error("[Intro] read saved custom pattern file / JSON parse error");
+                console.error("[Intro] read saved custom pattern file / JSON parse error", error);
                 throw new Error(error.toString());
             }
 
@@ -1797,7 +1797,7 @@
                 ZIP.extractAllTo(sTargetFolderPath, /*overwrite*/ true);
 
             } catch (error) {
-                console.error(`${sSourcePath} unzip error`);
+                console.error(`${sSourcePath} unzip error`, error);
                 throw new Error(error.toString());
             }
 

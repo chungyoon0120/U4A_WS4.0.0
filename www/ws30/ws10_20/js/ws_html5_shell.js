@@ -309,7 +309,7 @@
                 if (oLanguTextResult.RETCD === "E") { resolve(); return; }
                 APPCOMMON.fnSetModelProperty("/WSLANGU", oLanguTextResult.RTDATA);
             } catch (e) {
-                console.warn("fnGetWsMsgModelData skip:", e && e.message);
+                console.warn("fnGetWsMsgModelData skip:", e && e.message, e);
             }
             resolve();
         });
@@ -369,15 +369,15 @@
     oAPP.fn.fnOnInitP13nSettings = function () {
         // 로그인 init 개인화 설정. 각 기능은 개별 가드하되 오류를 삼키지 말고 로깅한다(억제 금지).
         // 개인화 폴더 생성
-        try { oAPP.fn.fnOnP13nFolderCreate(); } catch (e) { console.warn("fnOnP13nFolderCreate skip:", e && e.message); }
+        try { oAPP.fn.fnOnP13nFolderCreate(); } catch (e) { console.warn("fnOnP13nFolderCreate skip:", e && e.message, e); }
         // 브라우저 zoom 정보
-        try { oAPP.fn.fnOnP13nBrowserZoom(); } catch (e) { console.warn("fnOnP13nBrowserZoom skip:", e && e.message); }
+        try { oAPP.fn.fnOnP13nBrowserZoom(); } catch (e) { console.warn("fnOnP13nBrowserZoom skip:", e && e.message, e); }
         // Default Browser 개인화(/DEFBR 적재) — 숏컷/실행 팝업 전제. 실패 시 오류로 노출해 진단 가능하게 한다.
         try { oAPP.fn.fnOnP13nExeDefaultBrowser(); } catch (e) { console.error("fnOnP13nExeDefaultBrowser error (/DEFBR load):", e); }
         // WS10 AppName Suggestion
-        try { oAPP.fn.fnGetP13nWs10AppSuggetion(); } catch (e) { console.warn("fnGetP13nWs10AppSuggetion skip:", e && e.message); }
+        try { oAPP.fn.fnGetP13nWs10AppSuggetion(); } catch (e) { console.warn("fnGetP13nWs10AppSuggetion skip:", e && e.message, e); }
         // T-Code Suggestion
-        try { oAPP.fn.fnOnInitTCodeSuggestion(); } catch (e) { console.warn("fnOnInitTCodeSuggestion skip:", e && e.message); }
+        try { oAPP.fn.fnOnInitTCodeSuggestion(); } catch (e) { console.warn("fnOnInitTCodeSuggestion skip:", e && e.message, e); }
     };
 
     /************************************************************************
@@ -950,7 +950,7 @@
                 try {
                     parent.UAI.setCustomEvent_WS_30();
                 } catch (e) {
-                    console.warn("[conversion pending] UAI.setCustomEvent_WS_30:", e && e.message);
+                    console.warn("[conversion pending] UAI.setCustomEvent_WS_30:", e && e.message, e);
                 }
                 // ★ WS30 단축키 등록은 여기서 하지 않는다 — WS30 콘텐츠(Monaco 에디터 iframe)는
                 //   비동기 로드라, 진입 즉시 F3 을 누르면 로드 중 백(fnMoveToWs10)이 실행돼 화면이 깨진다.
@@ -984,7 +984,7 @@
             try {
                 parent.UAI.setCustomEvent_WS_20();
             } catch (e) {
-                console.warn("[conversion pending] UAI.setCustomEvent_WS_20:", e && e.message);
+                console.warn("[conversion pending] UAI.setCustomEvent_WS_20:", e && e.message, e);
             }
 
             // 등록은 "가장 마지막" — 화면 렌더·세팅 뒤. (WS20 는 미리보기 로드까지 busy 유지라
@@ -1111,7 +1111,7 @@
             delete oAPP.DATA.APPDATA;
             try { if (oAPP.common.checkWLOList("C", "UHAK901369")) { delete oAPP.DATA.LIB; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         } catch (e) {
-            console.warn("[WS20] removeContent state reset:", e && e.message);
+            console.warn("[WS20] removeContent state reset:", e && e.message, e);
         }
 
         // WS20 디자인 모델 데이터 초기화 — 다음 진입 시 이전 앱의 트리/속성 잔상 방지.
@@ -1153,7 +1153,7 @@
                     }
                 } catch (e3) {
                     // 정리 중 실패해도 아래 틀 교체는 반드시 진행해야 한다(멈추면 더 나쁨).
-                    console.warn("[WS20] preview receive register release failed:", e3 && e3.message);
+                    console.warn("[WS20] preview receive register release failed:", e3 && e3.message, e3);
                 }
 
                 try { oPrevFrame.src = ""; } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
@@ -1163,7 +1163,7 @@
             }
             if (oAPP.attr.ui) { oAPP.attr.ui.frame = null; }
         } catch (e) {
-            console.warn("[WS20] removeContent preview iframe reset:", e && e.message);
+            console.warn("[WS20] removeContent preview iframe reset:", e && e.message, e);
         }
 
         // ★ 죽은 iframe(위에서 파괴됨)에 속했던 UI5 프리뷰 인스턴스 참조 정리.
@@ -1193,7 +1193,7 @@
             }
             if (oAPP.attr.ui) { oAPP.attr.ui.ws20 = undefined; }
         } catch (e) {
-            console.warn("[WS20] removeContent DOM clear:", e && e.message);
+            console.warn("[WS20] removeContent DOM clear:", e && e.message, e);
         }
 
     }; // end of oAPP.fn.removeContent

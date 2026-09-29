@@ -3109,9 +3109,9 @@
             if (bIsMainFrame === false || iErrCode === -3) { return; }
             console.error("[SVLS-001] main window load failed:", iErrCode, sErrDesc, sUrl);
             try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-            catch (e2) { console.error("[SVLS-001] cleanup of the failed window failed:", e2 && e2.message); }
+            catch (e2) { console.error("[SVLS-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
             try { oAPP.setBusy(false); }
-            catch (e3) { console.error("[SVLS-001] busy release failed:", e3 && e3.message); }
+            catch (e3) { console.error("[SVLS-001] busy release failed:", e3 && e3.message, e3); }
         });
 
         // if (!APP.isPackaged) {

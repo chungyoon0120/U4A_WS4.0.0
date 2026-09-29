@@ -73,7 +73,7 @@
     }
     function _msg(iKind, sType, sMsg, fnCb) {
         try { parent.showMessage(window.sap || null, iKind, sType, sMsg, fnCb); }
-        catch (e) { console.warn("[WS20][tplwiz] showMessage:", e && e.message); }
+        catch (e) { console.warn("[WS20][tplwiz] showMessage:", e && e.message, e); }
     }
     // 원본 MessageToast 대응 — 자동 사라짐·버튼 없음·중앙. 공통 .u4a-toast 스타일을 소비하되,
     //   위자드가 showModal(top-layer) 이라 body 토스트는 뒤로 가려짐(§2.10) → 위자드 다이얼로그 "안"에

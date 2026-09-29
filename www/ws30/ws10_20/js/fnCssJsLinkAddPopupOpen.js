@@ -114,7 +114,7 @@
     try {
       var oPrev = oAPP.attr && oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
       if (oPrev && typeof oPrev.setCSSLink === "function") { oPrev.setCSSLink(aUrls, true); }
-    } catch (e) { console.error("[cssLink] preview apply error:", e && e.message); }
+    } catch (e) { console.error("[cssLink] preview apply error:", e && e.message, e); }
   }
 
   // 저장/전체삭제로 변경분 발생 → WS20 동기화(클라이언트 에디터 lf_cb 와 동일 3종):

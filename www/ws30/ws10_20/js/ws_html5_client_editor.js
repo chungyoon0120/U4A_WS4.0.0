@@ -138,7 +138,7 @@
     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sMsg = ""; }
 
     try { parent.showMessage(null, 10, "E", sMsg); }
-    catch (e) { console.error("[CLED-002] failure message could not be shown:", e && e.message); }
+    catch (e) { console.error("[CLED-002] failure message could not be shown:", e && e.message, e); }
   }
 
   // 호스트(iframe)로 명령 전송.

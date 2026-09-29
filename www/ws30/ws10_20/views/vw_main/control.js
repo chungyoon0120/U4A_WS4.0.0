@@ -225,7 +225,7 @@ export async function getControl() {
         //   해제는 로그인 화면 준비 완료(Login.js) / 메인 본문 등장 완료(js/ws_main.js) 가 한다.
         //   타이머로 끄는 것은 금지(.analy 16 §2.11).
         try { if (typeof setDomBusy === "function") { setDomBusy("X"); } }
-        catch (e) { console.error("[VWMN-002] busy could not be shown before the window appears:", e && e.message); }
+        catch (e) { console.error("[VWMN-002] busy could not be shown before the window appears:", e && e.message, e); }
 
         parent.CURRWIN.setOpacity(1.0);
         parent.CURRWIN.show();
@@ -257,7 +257,7 @@ export async function getControl() {
         //   해제는 메인 본문 등장 완료 1회(js/ws_main.js fnWsStart) — 실패는 그 catch 와
         //   아래 onerror 가 푼다. 로그인 경로에서도 이미 켜져 있어 두 번 켜도 무해하다.
         try { if (typeof showLoadingPage === "function") { showLoadingPage("X"); } }
-        catch (e) { console.error("[VWMN-002] loading page show failed:", e && e.message); }
+        catch (e) { console.error("[VWMN-002] loading page show failed:", e && e.message, e); }
 
         document.getElementById("content").style.display = "none";
 
@@ -277,9 +277,9 @@ export async function getControl() {
         oScript.onerror = function () {
             console.error("[VWMN-001] main screen script could not be loaded:", oScript.src);
             try { if (typeof showLoadingPage === "function") { showLoadingPage(""); } }
-            catch (e) { console.error("[VWMN-001] loading page hide failed:", e && e.message); }
+            catch (e) { console.error("[VWMN-001] loading page hide failed:", e && e.message, e); }
             try { if (typeof setDomBusy === "function") { setDomBusy(""); } }
-            catch (e2) { console.error("[VWMN-001] dom busy release failed:", e2 && e2.message); }
+            catch (e2) { console.error("[VWMN-001] dom busy release failed:", e2 && e2.message, e2); }
         };
 
         document.body.appendChild(oScript);

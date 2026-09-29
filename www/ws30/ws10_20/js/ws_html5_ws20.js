@@ -127,7 +127,7 @@
     function _ws20MenuSelect(it) {
         var fn = oAPP.fn["fnWS20" + it.key];
         if (typeof fn === "function") {
-            try { fn(); } catch (e) { console.warn("[WS20] menu " + it.key + " error:", e && e.message); }
+            try { fn(); } catch (e) { console.warn("[WS20] menu " + it.key + " error:", e && e.message, e); }
             return;
         }
         console.warn("[WS20] menu not implemented:", it.key);
@@ -435,7 +435,7 @@
                     }
                 });
             }
-        } catch (e) { console.warn("[WS20] toolbar overflow attach failed:", e && e.message); }
+        } catch (e) { console.warn("[WS20] toolbar overflow attach failed:", e && e.message, e); }
 
         return BAR;
 
@@ -698,7 +698,7 @@
                 if (typeof fnClick === "function") { fnClick(); return; }
                 console.warn("[WS20] app header action not implemented (W2 pending):", sId);
             } catch (e) {
-                console.warn("[WS20] app header action error:", sId, e && e.message);
+                console.warn("[WS20] app header action error:", sId, e && e.message, e);
             }
         });
         return BTN;
@@ -725,7 +725,7 @@
                 }
                 console.warn("[WS20] ev_pageBack not available");
             } catch (e) {
-                console.warn("[WS20] ev_pageBack error:", e && e.message);
+                console.warn("[WS20] ev_pageBack error:", e && e.message, e);
             }
         });
         HDR.appendChild(BACK);
@@ -972,7 +972,7 @@
         try {
             var oSplit = document.getElementById("ws20DesignSplit");
             if (oSplit && oSplit.__ws20Panels) { return _ws20ArrangeSplit(oSplit, _ws20SavedLayoutOrder()); }
-        } catch (e) { console.warn("[WS20] setDesignLayout error:", e && e.message); }
+        } catch (e) { console.warn("[WS20] setDesignLayout error:", e && e.message, e); }
         return false;
     };
 
@@ -1118,7 +1118,7 @@
                             delete _ui.prevRootPage; delete _ui._page1;
                             delete _ui.prevPopupArea; delete _ui._hbox1; delete _ui.oMenu;
                         }
-                    } catch (e) { console.warn("[WS20][BR49] preview reference cleanup skipped:", e && e.message); }
+                    } catch (e) { console.warn("[WS20][BR49] preview reference cleanup skipped:", e && e.message, e); }
                     // [BR49-P2] 재부착으로 시작된 미리보기 재로드는 비동기라, 그 self-heal 이 끝나기 전에
                     //   팝업을 다시 열어 "같은 순서"로 재저장하면 아래 else 의 명시 재로드가 진행 중인 재로드와
                     //   두 번째 drawPreview 를 겹쳐 돌려 같은 파괴 경쟁이 열린다. → "재로드 진행 중" 표시를
@@ -1226,7 +1226,7 @@
         B.innerHTML = '<i class="fa-solid fa-' + sIcon + '"></i><span class="u4aWs20SideTxt"></span>';
         B.querySelector(".u4aWs20SideTxt").textContent = sText || "";
         B.addEventListener("click", function (ev) {
-            try { fn(ev); } catch (e) { console.warn("[WS20] side action error:", e && e.message); }
+            try { fn(ev); } catch (e) { console.warn("[WS20] side action error:", e && e.message, e); }
         });
         return B;
     }
@@ -1464,7 +1464,7 @@
                     })(30);
                 }
             }
-        } catch (e) { console.warn("[WS20] preview header overflow attach failed:", e && e.message); }
+        } catch (e) { console.warn("[WS20] preview header overflow attach failed:", e && e.message, e); }
 
         return HDR;
 
@@ -1538,7 +1538,7 @@
             if (oAPP.ws10html && typeof oAPP.ws10html.buildMenubar === "function") {
                 MAIN.appendChild(oAPP.ws10html.buildMenubar(_getWindowMenuWS20(), _ws20MenuSelect));
             }
-        } catch (e) { console.warn("[WS20] menubar build error:", e && e.message); }
+        } catch (e) { console.warn("[WS20] menubar build error:", e && e.message, e); }
 
         // (A0) 앱 헤더 줄 (← APPID Change Active ... 🔍 ⤓) — 툴바 위
         MAIN.appendChild(_buildWs20AppHeader());
@@ -1594,7 +1594,7 @@
             // 셸(툴바+3분할) 렌더. (W3 override 가 좌측 트리 컨테이너에 빈 HTML5 트리까지 렌더)
             oAPP.fn.fnRenderWs20Shell();
         } catch (e) {
-            console.warn("[WS20] fnMoveToWs20 render error:", e && e.message);
+            console.warn("[WS20] fnMoveToWs20 render error:", e && e.message, e);
         }
 
         // [문서 4장] WS20 진입 시작점 = setUIAreaEditable. (원본 fnMoveToWs20 633/647행)
@@ -1609,7 +1609,7 @@
                 oAPP.fn.fnLoadWs20TreeData();
             }
         } catch (e) {
-            console.warn("[WS20] setUIAreaEditable error:", e && e.message);
+            console.warn("[WS20] setUIAreaEditable error:", e && e.message, e);
         }
 
         // 새창(버전관리 등) MOVE20 자동진입 1회 소비 후 IF_DATA 제거(원본 ws_fn_02.js:668~676).
@@ -1646,7 +1646,7 @@
             try {
                 oAPP.fn.fnRenderWs20Shell();
             } catch (e) {
-                console.warn("[WS20] fnOnMoveToPage(WS20) render error:", e && e.message);
+                console.warn("[WS20] fnOnMoveToPage(WS20) render error:", e && e.message, e);
             }
 
             // [문서 4장] WS20 진입 시작점 = setUIAreaEditable.
@@ -1662,7 +1662,7 @@
                     oAPP.fn.fnLoadWs20TreeData();
                 }
             } catch (e) {
-                console.warn("[WS20] setUIAreaEditable error:", e && e.message);
+                console.warn("[WS20] setUIAreaEditable error:", e && e.message, e);
             }
         }
 

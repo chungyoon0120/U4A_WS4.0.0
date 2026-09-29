@@ -221,7 +221,7 @@ oAPP.views = window?.oAPP?.views || {};
                 oT.__t = setTimeout(function () { oT.dataset.show = "false"; }, 3000);
             } catch (e) {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 토스트 표시 실패는 오류코드로만 표면화한다.
-                console.error("[RSRC-001] toast show failed -", e && e.message, "message:", sMsg);
+                console.error("[RSRC-001] toast show failed -", e && e.message, "message:", sMsg, e);
             }
         }
         // 메시지 팝업(구 MessageBox) — 테마 native <dialog class="u4a-msgbox">.
@@ -264,7 +264,7 @@ oAPP.views = window?.oAPP?.views || {};
             oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(bCancel ? "CANCEL" : (bNo ? "NO" : "OK")); });
             try { document.body.appendChild(oDlg); oDlg.showModal(); } catch (e) {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 표시 실패는 오류코드 표면화 + fail-closed 종료.
-                console.error("[RSRC-003] _u4aMsgBox: showModal failed —", e && e.message);
+                console.error("[RSRC-003] _u4aMsgBox: showModal failed —", e && e.message, e);
                 lf_close(aBtns.length <= 1 ? "OK" : (bCancel ? "CANCEL" : "NO"));
             }
         }
@@ -702,7 +702,7 @@ oAPP.views = window?.oAPP?.views || {};
             //   덮고 있었다(금지 — .analy 16 §2.11). 이제는 실패도 같은 콜백으로 통지한다.
             if (typeof fnOnLoaded === "function") {
                 try { fnOnLoaded(null); }
-                catch (e2) { console.error("[RSRC-006] caller notice on load failure failed:", e2 && e2.message); }
+                catch (e2) { console.error("[RSRC-006] caller notice on load failure failed:", e2 && e2.message, e2); }
             }
         });
 
@@ -1419,7 +1419,7 @@ oAPP.views = window?.oAPP?.views || {};
             //   포커스는 showModal() 이 스펙대로 자동 처리(첫 포커스 가능 요소=CLOSE 버튼) — 손수 focus() 안 함.
             if (!oNetBusy.open) {
                 try { oNetBusy.showModal(); }
-                catch (e) { console.error("[RSRC-005] u4a_neterr showModal failed —", e && e.message); }
+                catch (e) { console.error("[RSRC-005] u4a_neterr showModal failed —", e && e.message, e); }
             }
             _startNetErrElapsedTimer(oNetBusy);
             return;

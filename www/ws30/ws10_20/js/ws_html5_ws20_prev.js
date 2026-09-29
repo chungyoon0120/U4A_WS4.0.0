@@ -877,7 +877,7 @@
             oWin.setPreviewUiTheme(sTheme);
             return true;
         } catch (e) {
-            console.error("[WS20][prev] setPreviewUiTheme error:", e && e.message);
+            console.error("[WS20][prev] setPreviewUiTheme error:", e && e.message, e);
             return false;
         }
     };
@@ -1287,13 +1287,13 @@
                 lf_wrap(oSapUi, "requireSync", "PREV-ERR-04", "sap.ui.requireSync");
                 lf_wrap(oSapUi.getCore(), "loadLibrary", "PREV-ERR-05", "sap.ui.getCore().loadLibrary");
             } catch (e) {
-                console.error("[WS20][prev][PREV-ERR-04] error while wrapping sap.ui loaders:", e && e.message);
+                console.error("[WS20][prev][PREV-ERR-04] error while wrapping sap.ui loaders:", e && e.message, e);
             }
 
         } // end of lf_wrapEngine
 
         try { lf_wrapEngine(); } catch (e) {
-            console.error("[WS20][prev][PREV-ERR-04] error while wrapping sap.ui loaders:", e && e.message);
+            console.error("[WS20][prev][PREV-ERR-04] error while wrapping sap.ui loaders:", e && e.message, e);
         }
 
     } // end of _installPrevErrorSurface
@@ -1359,7 +1359,7 @@
                 Object.defineProperty(ev, "which", { get: function () { return e.which || e.keyCode; } });
                 document.dispatchEvent(ev);
             } catch (err) {
-                console.warn("[WS20][prev] shortcut forward failed:", err && err.message);
+                console.warn("[WS20][prev] shortcut forward failed:", err && err.message, err);
             }
         }, true);   // capture — iframe 앱보다 먼저 가로채기
     }
@@ -1451,7 +1451,7 @@
                         }
                     });
                 } catch (e) {
-                    console.warn("[WS20][prev] isShortcutLock defineProperty skip:", e && e.message);
+                    console.warn("[WS20][prev] isShortcutLock defineProperty skip:", e && e.message, e);
                 }
             }
 
@@ -1476,7 +1476,7 @@
                     try {
                         oWin.setPreviewZoom(parseFloat(this.value));
                     } catch (e) {
-                        console.warn("[WS20][prev] setPreviewZoom error:", e && e.message);
+                        console.warn("[WS20][prev] setPreviewZoom error:", e && e.message, e);
                     }
                 });
             }
@@ -1497,7 +1497,7 @@
                     try {
                         oWin.setPreviewZoom(1);
                     } catch (e) {
-                        console.warn("[WS20][prev] setPreviewZoom error:", e && e.message);
+                        console.warn("[WS20][prev] setPreviewZoom error:", e && e.message, e);
                     }
                 });
             }
@@ -1516,7 +1516,7 @@
                         try {
                             oAPP.fn.prevFullScreen(this.checked);
                         } catch (e) {
-                            console.warn("[WS20][prev] prevFullScreen error:", e && e.message);
+                            console.warn("[WS20][prev] prevFullScreen error:", e && e.message, e);
                         }
                     });
                 }
@@ -1827,7 +1827,7 @@
                     lf_finish();
                 });
             } catch (e) {
-                console.warn("[WS20][prev] callDesignContextMenu load failed:", e && e.message);
+                console.warn("[WS20][prev] callDesignContextMenu load failed:", e && e.message, e);
                 lf_finish();
             }
         }
@@ -1839,12 +1839,12 @@
             oAPP.fn.getScript("design/js/uiPreviewArea", function () {
                 //원본이 실린 직후 우리 꾸밈 적용 처리를 다시 설치(원본 사본 무수정 원칙).
                 try { _installPrevCssApplyOverride(); } catch (e) {
-                    console.error("[WS20][prev][PREV-CSS-02] style-apply override install failed:", e && e.message);
+                    console.error("[WS20][prev][PREV-CSS-02] style-apply override install failed:", e && e.message, e);
                 }
                 lf_loadContextMenu();
             });
         } catch (e) {
-            console.warn("[WS20][prev] uiPreviewArea module load failed (preview disabled):", e && e.message);
+            console.warn("[WS20][prev] uiPreviewArea module load failed (preview disabled):", e && e.message, e);
             _bPrevModuleLoading = false;
             _aPrevModuleWaiters.splice(0); //로드 실패 — 대기 콜백 폐기(미리보기 skip)
         }
@@ -1923,7 +1923,7 @@
                     _ws20ReleasePrevBusy();
                 });
             } catch (e) {
-                console.warn("[WS20][prev] fireCellClick error:", e && e.message);
+                console.warn("[WS20][prev] fireCellClick error:", e && e.message, e);
                 _ws20ReleasePrevBusy();
             }
         };
@@ -2012,7 +2012,7 @@
                         try { oAPP.fn.fnWs20LoadPreview(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     });
                 } catch (e) {
-                    console.warn("[WS20][prev] LIB load failed — preview skip:", e && e.message);
+                    console.warn("[WS20][prev] LIB load failed — preview skip:", e && e.message, e);
                 }
                 return;
             }
@@ -2108,7 +2108,7 @@
             try {
                 oAPP.fn.loadPreviewFrame();
             } catch (e) {
-                console.warn("[WS20][prev] loadPreviewFrame error — busy release:", e && e.message);
+                console.warn("[WS20][prev] loadPreviewFrame error — busy release:", e && e.message, e);
                 _ws20ReleasePrevBusy();
             }
 
@@ -2140,7 +2140,7 @@
         try {
             oAPP.fn.uiPreviewArea();
         } catch (e) {
-            console.warn("[WS20][prev] fnRenderWs20Shell→uiPreviewArea error:", e && e.message);
+            console.warn("[WS20][prev] fnRenderWs20Shell→uiPreviewArea error:", e && e.message, e);
         }
 
     }; // end of [OVERRIDE] fnRenderWs20Shell

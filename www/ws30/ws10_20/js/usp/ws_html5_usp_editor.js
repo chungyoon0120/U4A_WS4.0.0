@@ -562,7 +562,7 @@
                     }
                 });
             }
-        } catch (e) { console.warn("[WS30] editor toolbar overflow attach failed:", e && e.message); }
+        } catch (e) { console.warn("[WS30] editor toolbar overflow attach failed:", e && e.message, e); }
 
         return TB;
     }

@@ -796,7 +796,7 @@
             try {
                 var sPath = oAPP.oDesign && oAPP.oDesign.pathInfo && oAPP.oDesign.pathInfo.bindPopupBroadCast;
                 if (sPath) { parent.require(sPath)("UPDATE-DESIGN-DATA"); }
-            } catch (e) { console.error("[WS20] updateBindPopupDesignData:", e && e.message); }
+            } catch (e) { console.error("[WS20] updateBindPopupDesignData:", e && e.message, e); }
         };
     }
 

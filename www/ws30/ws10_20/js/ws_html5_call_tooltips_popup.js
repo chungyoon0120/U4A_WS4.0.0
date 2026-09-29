@@ -114,10 +114,10 @@
                 //    도달할 일 없는 자리에 메시지 번호를 소모하지 않고, 만에 하나 터졌을 때는
                 //    추적 코드가 그대로 보이는 편이 원인 찾기에 낫다는 판단.
                 try { parent.showMessage(null, 10, "E", "WS20HELP-02"); }
-                catch (e) { console.error("[WS20HELP-02] error notice show failed:", e && e.message); }
+                catch (e) { console.error("[WS20HELP-02] error notice show failed:", e && e.message, e); }
 
                 try { if (oWin && !oWin.isDestroyed()) { oWin.destroy(); } }
-                catch (e) { console.error("[WS20HELP-02] window cleanup failed:", e && e.message); }
+                catch (e) { console.error("[WS20HELP-02] window cleanup failed:", e && e.message, e); }
             }
 
             _releaseLock();
@@ -148,7 +148,7 @@
 
                 // 부모 위치 가운데 배치한다.
                 try { oAPP.fn.setParentCenterBounds(oWin, opt); }
-                catch (e) { console.error("[WS20HELP-04] window centering failed (at ready):", e && e.message); }
+                catch (e) { console.error("[WS20HELP-04] window centering failed (at ready):", e && e.message, e); }
 
             });
 
@@ -201,10 +201,10 @@
     function _releaseLock() {
 
         try { oAPP.fn.setShortcutLock(false); }
-        catch (e) { console.error("[WS20HELP-03] shortcut lock release failed:", e && e.message); }
+        catch (e) { console.error("[WS20HELP-03] shortcut lock release failed:", e && e.message, e); }
 
         try { parent.setBusy(""); }
-        catch (e) { console.error("[WS20HELP-03] busy release failed:", e && e.message); }
+        catch (e) { console.error("[WS20HELP-03] busy release failed:", e && e.message, e); }
 
     }   //단축키 잠금 해제 + busy 해제.
 

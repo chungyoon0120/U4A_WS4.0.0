@@ -450,7 +450,7 @@
                     const _sm = _beginRelocalizeSM();
                     try { eval(param.SCRIPT); }                                   // eslint-disable-line no-eval
                     catch (e) {
-                        console.error("[package_change:INIT] SCRIPT run failed:", e && e.message, param.SCRIPT);
+                        console.error("[package_change:INIT] SCRIPT run failed:", e && e.message, param.SCRIPT, e);
                         if (param.RTMSG) { parent.showMessage(null, 20, "E", param.RTMSG); }
                     } finally { parent.showMessage = _sm; }
                     lf_closePopup(oDlg);
@@ -539,7 +539,7 @@
                     const _sm = _beginRelocalizeSM();
                     try { eval(param.SCRIPT); }                                   // eslint-disable-line no-eval
                     catch (e) {
-                        console.error("[package_change:CHNG_PACK] SCRIPT run failed:", e && e.message, param.SCRIPT);
+                        console.error("[package_change:CHNG_PACK] SCRIPT run failed:", e && e.message, param.SCRIPT, e);
                         if (param.RTMSG) { parent.showMessage(null, 20, "E", param.RTMSG); }
                     } finally { parent.showMessage = _sm; }
                     return;

@@ -131,7 +131,7 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
       if (lt.length > iCnt) { lt.splice(iCnt, lt.length); }
       oAPP.fn.fnSuggestionSave(sName, lt);
     } catch (e) {
-      console.error("[createEventMethod] suggest save failed:", e && e.message);
+      console.error("[createEventMethod] suggest save failed:", e && e.message, e);
     }
   }
 
@@ -324,7 +324,7 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
           // eslint-disable-next-line no-eval
           eval(param.SCRIPT);
         } catch (e) {
-          console.error("[createEventMethod] SCRIPT run failed:", e && e.message, param.SCRIPT);
+          console.error("[createEventMethod] SCRIPT run failed:", e && e.message, param.SCRIPT, e);
           //SCRIPT 가 깨져도 서버 메시지는 보여준다.
           if (param.RTMSG) { parent.showMessage(null, 20, "E", param.RTMSG); }
           parent.setBusy("");

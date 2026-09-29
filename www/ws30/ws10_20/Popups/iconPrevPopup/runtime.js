@@ -740,7 +740,7 @@ function fnGetSavedFavIconInfo() {
         } catch (error) {
 
             let sErrMsg = "[Saved Icon Read Error]: \n \n " + error.toString();
-            console.error(sErrMsg);
+            console.error(sErrMsg, error);
 
             throw new Error(sErrMsg);
 

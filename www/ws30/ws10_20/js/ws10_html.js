@@ -1142,7 +1142,7 @@
                     })(30);
                 }
             }
-        } catch (e) { console.error("[WS10] common header overflow attach failed:", e && e.message); }
+        } catch (e) { console.error("[WS10] common header overflow attach failed:", e && e.message, e); }
 
         return o;
     }

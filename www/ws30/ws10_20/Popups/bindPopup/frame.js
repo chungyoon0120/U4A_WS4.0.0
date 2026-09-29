@@ -199,7 +199,7 @@ oAPP.fn.onHelp = function (sStartMenuId) {
     try {
         parent.require("./utils/callTooltipsPopup.js")(oGV.area, oGV.code);
     } catch (e) {
-        console.error("[bindWindow] onHelp legacy tooltip:", e && e.message);
+        console.error("[bindWindow] onHelp legacy tooltip:", e && e.message, e);
         oAPP.fn.setBusyWS20Interaction(false);   // 로드 실패 시 busy 잔류 방지(callTooltipsPopup 이 켠 뒤 예외 시 짝).
     }
 };
@@ -222,7 +222,7 @@ function _bwpToggleLock(sKind, bEnable) {
     try {
         var aEl = document.querySelectorAll('[data-bwp-lock="' + sKind + '"]');
         for (var i = 0; i < aEl.length; i++) { aEl[i].disabled = !bEnable; }
-    } catch (e) { console.error("[bindWindow] _bwpToggleLock(" + sKind + "):", e && e.message); }
+    } catch (e) { console.error("[bindWindow] _bwpToggleLock(" + sKind + "):", e && e.message, e); }
 }
 
 // 메인 화면 잠금/해제 — 원본 index.js:8015 setViewEditable(bLock). bLock=true 활성 / false 잠금.
@@ -302,7 +302,7 @@ oAPP.fn.setBusyWS20Interaction = function (bBusy, sOption) {
             oBroad.postMessage(bOn
                 ? { PRCCD: "BUSY_ON", TITLE: sOption.TITLE || "", DESC: sOption.DESC || "", TYPE: "DIALOG" }
                 : { PRCCD: "BUSY_OFF" });
-        } catch (e) { console.error("[bindWindow] setBusyWS20Interaction broadcast:", e && e.message); }
+        } catch (e) { console.error("[bindWindow] setBusyWS20Interaction broadcast:", e && e.message, e); }
         _setBusy(bOn, { ISBROAD: true });   // 위에서 이미 보냈으므로 재방송 억제.
     } else {
         // 원본 index.js:3550 — sOption 없으면 WS20 에 방송하지 않는다(로컬 busy/닫기버튼만 처리).

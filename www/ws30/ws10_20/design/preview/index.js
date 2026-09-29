@@ -8,6 +8,18 @@
 parent.require(parent.PATHINFO.WSTRYCATCH)(window, document, console);
 
 /**
+ * 부모 창의 공통 로그 함수(U4ALOG)를 이어 받는다 (2026-09-29 — ws40-work-order A4)
+ * 오류코드 접두: PREV / 다음 번호: 002
+ * 미리보기 iframe 은 이 index.js 만 올리므로 U4ALOG 가 없었다 — 이 파일 안의
+ * `typeof U4ALOG !== "undefined"` 로 감싼 기록 호출이 전부 아무것도 남기지 않았다.
+ * 부모 창 것을 쓰면 줄이 부모 창 console(= 로그 파일)로 남는다.
+ */
+var U4ALOG = (parent && parent.U4ALOG) ? parent.U4ALOG : undefined;
+if (!U4ALOG) {
+	console.error("[PREV-001] parent.U4ALOG missing - logs from the design preview will not be recorded");
+}
+
+/**
  * UI5 controls rendered in the design preview iframe are synchronized with
  * the parent workspace, while selection and context markers stay isolated
  * from the controls' own DOM and layout.
@@ -3807,7 +3819,7 @@ function destroyUIPreView(OBJID, POBID, UIOBK, PUIOK) {
 	try {
 		parent.oAPP.attr.prev[OBJID].destroy();
 	} catch (e) {
-		console.log("destroyUIPreView - " + OBJID);
+		console.log("destroyUIPreView - " + OBJID, e);
 	}
 }
 
@@ -5075,7 +5087,8 @@ function createUIInstance(is_tree, it_0015) {
 	try {
 		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid(), setUIProperty(is_tree, lt_0015));
 	} catch (e) {
-	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+	    // 어느 UI·어느 class 에서 속성 적용이 실패했는지 같이 남긴다 (2026-09-29 — ws40-work-order A4-1)
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "createUIInstance OBJID=" + is_tree.OBJID + " LIBNM=" + ls_0022.LIBNM); }
 		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid());
 	}
 	addPreviewTabIndexCustomData(parent.oAPP.attr.prev[is_tree.OBJID]);
@@ -5207,7 +5220,18 @@ function isSkip0014(is_tree) {
  * Converts persisted design attribute values into runtime UI5 property values.
  */
 function parsePropertyValue(is_attr) {
-	
+
+	// 속성값이 0 이나 기본값으로 바뀐 것을 참고 등급으로 남긴다 (2026-09-29 — ws40-work-order A4-2)
+	// 원본(U4A_WS_DESIGN)에도 같은 동작이 있는 툴의 정상 흐름이라 경고가 아니라 참고다.
+	// 값은 앞 80자만 남긴다 — 업무 자료가 로그로 새지 않게. 변환이 성공하면 부르지 않는다.
+	function lf_noteCoerce(vVal, sTo) {
+		if (typeof U4ALOG === "undefined" || !U4ALOG.note) {
+			return;
+		}
+		U4ALOG.note("속성값 바뀜", is_attr.OBJID + "." + is_attr.UIATT,
+			is_attr.UIADT + " <- " + String(vVal).slice(0, 80) + " => " + sTo);
+	}
+
 	function lf_parseProp(vVal) {
 		var l_val;
 		switch (is_attr.UIADT.toUpperCase()) {
@@ -5220,6 +5244,7 @@ function parsePropertyValue(is_attr) {
 			case "FLOAT":
 				l_val = Number(vVal);
 				if (isNaN(l_val) === true) {
+					lf_noteCoerce(vVal, "0");
 					return 0;
 				}
 				return l_val;
@@ -5228,11 +5253,13 @@ function parsePropertyValue(is_attr) {
 				var l_enum = registEnumType(is_attr.UIADT);
 				var l_type = sap.ui.base.DataType.getType(is_attr.UIADT);
 				if (l_type && typeof l_type.isValid === "function" && l_type.isValid(l_val) === false) {
+					lf_noteCoerce(vVal, "undefined");
 					l_val = undefined;
 				}
 				if ((!l_type || typeof l_type.isValid !== "function") && l_enum && typeof l_enum === "object" && Object.keys(l_enum).some(function(sKey) {
 					return l_enum[sKey] === l_val;
 				}) === false) {
+					lf_noteCoerce(vVal, "undefined");
 					l_val = undefined;
 				}
 				return l_val;

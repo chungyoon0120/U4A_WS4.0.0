@@ -391,7 +391,7 @@
                 `######################################\n`,
             ];
 
-            console.error(aConsoleMsg.join("\r\n"));
+            console.error(aConsoleMsg.join("\r\n"), error);
 
         }
         
@@ -458,7 +458,7 @@
                 `######################################\n`,
             ];
 
-            console.error(aConsoleMsg.join("\r\n"));
+            console.error(aConsoleMsg.join("\r\n"), error);
 
         }
 

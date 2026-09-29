@@ -51,6 +51,14 @@
     var CAUGHT_FIRST = 3;      // 처음 3번은 그대로 남긴다
     var CAUGHT_EVERY = 500;    // 그 뒤로는 500번마다 한 번
 
+    /**
+     * 반복 억제 켜짐/꺼짐 (2026-09-29 — ws40-work-order A2)
+     * 자동 테스트 프로그램은 같은 오류를 0.1초마다 되풀이하므로 억제가 켜져 있으면
+     * 정작 사고가 났을 때 로그에 흔적이 없다. 테스트 쪽에서 끌 수 있게 한다.
+     * 기본값은 켜짐 — 평소 동작은 그대로다.
+     */
+    let _bCaughtThrottle = true;
+
     var MAX_LINE = 1000;        // 한 줄 최대 길이(너무 길면 뒤를 자른다)
 
     /* ================================================================= */
@@ -355,7 +363,11 @@
         // 2026-09-10 추가
         '늦어짐': 'SLOW',
         '반복': 'REPEAT',
-        '안 끝난 요청': 'PENDING'
+        '안 끝난 요청': 'PENDING',
+        // 2026-09-29 추가 (ws40-work-order A2)
+        '반복 억제 설정': 'THROTTLE',
+        // 2026-09-29 추가 (ws40-work-order A4-2)
+        '속성값 바뀜': 'PROP_COERCE'
     };
 
     function _levelEn(s) {
@@ -771,7 +783,44 @@
 
         /** 화면 이름 지정 — 화면이 바뀔 때마다 */
         setScreen: function (sName) {
-            _sScreenName = sName || '';
+
+            let sNext = sName || "";
+
+            // 화면이 바뀌면 반복 억제 카운터를 비운다 (2026-09-29 — A2)
+            // 비우지 않으면 한 번 3번을 넘긴 오류는 그 뒤 모든 화면에서 계속 묻힌다.
+            if (sNext !== _sScreenName) {
+                _oCaughtCount = {};
+            }
+
+            _sScreenName = sNext;
+        },
+
+        /**
+         * 반복 억제 켜기/끄기 (2026-09-29 — ws40-work-order A2)
+         * 자동 테스트 프로그램이 창에 붙자마자 부른다:
+         *   U4ALOG.setCaughtThrottle(false)   // 끈다 — 전부 남긴다
+         *   U4ALOG.setCaughtThrottle(true)    // 켠다 — 기본값
+         * 몇 번을 불러도 된다. 끌 때는 카운터도 비워, 이미 묻힌 오류가 곧바로 다시 남는다.
+         * @param {boolean} bOn - false 일 때만 끈다. 그 밖의 값은 켠다.
+         */
+        setCaughtThrottle: function (bOn) {
+
+            _bCaughtThrottle = (bOn !== false);
+
+            if (!_bCaughtThrottle) {
+                _oCaughtCount = {};
+            }
+
+            _write("알림", _buildLine("알림", "반복 억제 설정", "caught throttle",
+                _bCaughtThrottle ? "on" : "off (counter cleared)", -1, false));
+        },
+
+        /**
+         * 반복 억제 카운터 비우기 (2026-09-29 — A2)
+         * 앱이 바뀔 때 부른다. 화면 전환은 setScreen 이 알아서 비운다.
+         */
+        clearCaughtCount: function () {
+            _oCaughtCount = {};
         },
 
         getWindow: function () { return _sWindowName; },
@@ -793,6 +842,14 @@
         /** 알림 — 정상 흐름의 주요 지점 */
         info: function (sWhat, sTarget, sResult, iElapsedMs) {
             _write('알림', _buildLine('알림', sWhat, sTarget, sResult, iElapsedMs, false));
+        },
+
+        /**
+         * 참고 — 정상 흐름이지만 오류 직전 기록으로 값어치가 있는 것 (2026-09-29 — ws40-work-order A4-2)
+         * 예: 디자인 미리보기가 잘못된 속성값을 0·기본값으로 바꿀 때. 로그 파일에는 남고 빨간 줄은 아니다.
+         */
+        note: function (sWhat, sTarget, sResult) {
+            _write("참고", _buildLine("참고", sWhat, sTarget, sResult, -1, false));
         },
 
         /** 주의 — 정상은 아니지만 계속 진행 가능 */
@@ -864,8 +921,8 @@
 
                 var iCnt = _oCaughtCount[sKey];
 
-                // 처음 3번, 그 뒤로는 정해진 횟수마다
-                if (iCnt > CAUGHT_FIRST && (iCnt % CAUGHT_EVERY) !== 0) {
+                // 처음 3번, 그 뒤로는 정해진 횟수마다 (억제를 끈 동안은 전부 남긴다 — A2)
+                if (_bCaughtThrottle && iCnt > CAUGHT_FIRST && (iCnt % CAUGHT_EVERY) !== 0) {
                     return;
                 }
 

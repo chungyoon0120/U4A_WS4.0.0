@@ -211,7 +211,7 @@ let oAPP = (function (window) {
             } else {
                 // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 U4AUI.confirm 미로드는 오류코드 표면화 + fail-closed(NO).
                 console.error("[MIMF-001] showMessage confirm: common U4AUI.confirm not loaded - blocked. message:", sMsg || "");
-                try { fnCb("NO"); } catch (e) { console.error("[MIMF-002] showMessage callback exception:", e && e.message); }
+                try { fnCb("NO"); } catch (e) { console.error("[MIMF-002] showMessage callback exception:", e && e.message, e); }
             }
             return;
         }

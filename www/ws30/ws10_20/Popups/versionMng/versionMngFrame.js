@@ -1049,7 +1049,7 @@ function _initChrome() {
                 isSep: function (el) { return el.classList.contains("u4aVmDiffSep"); },
                 menuItem: _diffOvfMenuItem
             });
-        } catch (e) { console.error("[versionMng] diff toolbar overflow attach error:", e && e.message); }
+        } catch (e) { console.error("[versionMng] diff toolbar overflow attach error:", e && e.message, e); }
     }
 
     // 세로 스플리터 바 드래그.

@@ -177,8 +177,8 @@ function load() {
   let parsed;
   try {
     parsed = JSON.parse(raw);
-  } catch {
-    console.warn('[settings-store] JSON parse failed, restoring defaults. file text:', raw.slice(0, 120));
+  } catch (e) {
+    console.warn('[settings-store] JSON parse failed, restoring defaults. file text:', raw.slice(0, 120), e);
     _repairToDefaults();
     return { ...DEFAULTS };
   }

@@ -1942,7 +1942,7 @@ const WSUTIL = {
                 SHELL.showItemInFolder(sFilePath);
             } catch (e) {
                 // 탐색기 오픈 실패는 치명적이지 않으므로 경고만 출력
-                console.warn("downloadResponseData: explorer open failed", e.toString());
+                console.warn("downloadResponseData: explorer open failed", e.toString(), e);
             }
         }
 
@@ -2128,7 +2128,7 @@ const WSUTIL = {
 
         } catch (error) {
             let _sErrMsg = "[Icon Favorite save]: " + error.toString() + " \n\n ";
-            console.log("icon favorite save error", _sErrMsg);
+            console.log("icon favorite save error", _sErrMsg, error);
             throw new Error(error);
         }
 
@@ -2250,7 +2250,7 @@ const WSUTIL = {
                     `[STACK]: ${new Error("에디터의 스탠다드 테마 폴더의 하위 데이터 읽는 도중 문제 발생!!").stack}`,
                 ];
 
-                console.error(aConsoleMsg.join("\r\n"));
+                console.error(aConsoleMsg.join("\r\n"), error);
                 return [];
 
             }
@@ -2286,7 +2286,7 @@ const WSUTIL = {
                     `[STACK]: ${new Error(" 에디터의 Custom 테마 폴더의 하위 데이터 읽는 도중 문제 발생!!").stack}`,
                 ];
 
-                console.error(aConsoleMsg.join("\r\n"));
+                console.error(aConsoleMsg.join("\r\n"), error);
                 return [];
 
             }
@@ -2329,7 +2329,7 @@ const WSUTIL = {
                     `[STACK]: ${new Error("스탠다드 테마 정보 구하는 도중 문제 발생!").stack}`,
                 ];
 
-                console.error(aConsoleMsg.join("\r\n"));
+                console.error(aConsoleMsg.join("\r\n"), error);
                 return;
 
             }

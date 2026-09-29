@@ -166,7 +166,7 @@ let oAPP = parent.oAPP,
                     try {
                         fn_success(JSON.parse(xhr.response));
                     } catch (e) {
-                        console.error("[OTR] response parse error:", e && e.message);
+                        console.error("[OTR] response parse error:", e && e.message, e);
                         _setSearchBusy(false);
                         _fail(xhr);
                     }

@@ -80,7 +80,7 @@
                 var l3 = aSkle.find(function (a) { return a.NAME === "OPT_GLASS_DENSITY"; });
                 if (l3) { fDensity = parseFloat(l3.VALUE); }
             }
-        } catch (e) { console.error("[WS20][Skeleton] T_SKLE load error:", e && e.message); }
+        } catch (e) { console.error("[WS20][Skeleton] T_SKLE load error:", e && e.message, e); }
 
         oUI.wait.checked = bWait;
         oUI.glass.checked = bGlass;
@@ -113,7 +113,7 @@
                     oAPP.DATA.APPDATA.T_SKLE =
                         oAPP.attr.ui.frame.contentWindow._get_skeleton_tag_info(ls_opt);
                 } catch (e) {
-                    console.error("[WS20][Skeleton] _get_skeleton_tag_info error:", e && e.message);
+                    console.error("[WS20][Skeleton] _get_skeleton_tag_info error:", e && e.message, e);
                     return;
                 }
 

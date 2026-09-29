@@ -141,7 +141,7 @@
 
             if (fnPick) {
                 try { fnPick(oRowData); }
-                catch (e) { console.error("[DynL] callback error:", e && e.message); }
+                catch (e) { console.error("[DynL] callback error:", e && e.message, e); }
             }
 
             _close();

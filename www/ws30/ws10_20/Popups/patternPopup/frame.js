@@ -184,7 +184,7 @@ function _readPatternJson(sPath) {
         var a = JSON.parse(FS.readFileSync(sPath, "utf-8"));
         return Array.isArray(a) ? a : [];
     } catch (e) {
-        console.error("[WS30][patternPopup] pattern JSON load error:", sPath, e && e.message);
+        console.error("[WS30][patternPopup] pattern JSON load error:", sPath, e && e.message, e);
         return [];
     }
 }
@@ -567,7 +567,7 @@ function _writeCust(aFlat) {
     bSelfWrite = true;
     var bOk = true;
     try { FS.writeFileSync(PATHINFO.CUST_PATT, JSON.stringify(aFlat), "utf-8"); }
-    catch (e) { bOk = false; console.error("[WS30][patternPopup] custom pattern save error:", e && e.message); }
+    catch (e) { bOk = false; console.error("[WS30][patternPopup] custom pattern save error:", e && e.message, e); }
     setTimeout(function () { bSelfWrite = false; }, 300);   // watch 이벤트(rename+change) 소진 후 해제
     return bOk;
 }
@@ -583,7 +583,7 @@ function _initCustWatch() {
             }, 120);   // 짧은 디바운스(rename+change 다중 이벤트 합침)
         });
     } catch (e) {
-        console.error("[WS30][patternPopup] custom pattern watch config error:", e && e.message);
+        console.error("[WS30][patternPopup] custom pattern watch config error:", e && e.message, e);
     }
 }
 

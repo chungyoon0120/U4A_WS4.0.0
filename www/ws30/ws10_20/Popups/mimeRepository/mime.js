@@ -134,7 +134,7 @@
                     if (bBlob) { fn_success(xhr.response); }
                     else { fn_success(JSON.parse(xhr.response)); }
                 } catch (e) {
-                    console.error("[MIME] response parse error:", e && e.message);
+                    console.error("[MIME] response parse error:", e && e.message, e);
                     if (typeof fn_error === "function") { fn_error(e); }
                 }
             } else {
@@ -269,7 +269,7 @@
                 oUI.treeCtrl.rerender(false);
                 return;
             }
-        } catch (e) { console.error("[MIME] tree render error:", e && e.message); }
+        } catch (e) { console.error("[MIME] tree render error:", e && e.message, e); }
         try { if (oUI && oUI.tree) { oUI.tree.render(); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
     }
 

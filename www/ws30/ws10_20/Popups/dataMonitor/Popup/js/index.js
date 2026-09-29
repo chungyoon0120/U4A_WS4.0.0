@@ -1872,7 +1872,7 @@
         if (sIn.length > 2 && sIn.charAt(0) === "/" && sIn.charAt(sIn.length - 1) === "/") {
             try { return { RE: new RegExp(sIn.slice(1, -1)), K: "regex" }; }
             catch (e) {
-                console.warn("[DMWN-020] WARN EXCLUDE_BAD_REGEX rule=" + sIn + " - not usable");
+                console.warn("[DMWN-020] WARN EXCLUDE_BAD_REGEX rule=" + sIn + " - not usable", e);
                 return null;
             }
         }
@@ -1881,7 +1881,7 @@
         if (_excLooksRegex(sIn)) {
             try { return { RE: new RegExp(sIn), K: "regex" }; }
             catch (e) {
-                console.warn("[DMWN-020] WARN EXCLUDE_BAD_REGEX rule=" + sIn + " - not usable");
+                console.warn("[DMWN-020] WARN EXCLUDE_BAD_REGEX rule=" + sIn + " - not usable", e);
                 return null;
             }
         }
@@ -1899,7 +1899,7 @@
 
         try { return { RE: new RegExp("^" + sRe + "$"), K: bStar ? "glob" : "name" }; }
         catch (e) {
-            console.warn("[DMWN-020] WARN EXCLUDE_BAD_PATTERN rule=" + sIn + " - not usable");
+            console.warn("[DMWN-020] WARN EXCLUDE_BAD_PATTERN rule=" + sIn + " - not usable", e);
             return null;
         }
     }

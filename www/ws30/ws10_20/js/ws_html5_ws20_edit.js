@@ -145,7 +145,7 @@
             if (!w) { _runMid(); if (bStrict) { throw new Error("[BR62] rerender: 미리보기 창 없음"); } return; }
         } catch (e) { _runMid(); if (bStrict) { throw e; } return; }
         var R = _renderMod(); if (!R) { _runMid(); if (bStrict) { throw new Error("[BR62] rerender: 렌더 모듈 없음"); } return; }
-        function _safe(fn) { try { return fn(); } catch (e) { console.error("[WS20][insert] RTE re-render:", e && e.message); if (bStrict) { throw e; } } }
+        function _safe(fn) { try { return fn(); } catch (e) { console.error("[WS20][insert] RTE re-render:", e && e.message, e); if (bStrict) { throw e; } } }
         var oTarget = null, oDom = null, oPromise = null, aRte = [];
         _safe(function () { oTarget = R.getTargetAfterRenderingUI(oAPP.attr.prev[parentNode.OBJID]); });
         _safe(function () { oDom = (oTarget && typeof oTarget.getDomRef === "function") ? oTarget.getDomRef() : null; });
@@ -153,7 +153,7 @@
         _runMid();
         _safe(function () { aRte = R.renderingRichTextEditor(parentNode) || []; });
         if (oPromise) {
-            try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[WS20][insert] rerender:", e && e.message); if (bStrict) { throw e; } }
+            try { oTarget.rerender(); await oPromise; } catch (e) { console.error("[WS20][insert] rerender:", e && e.message, e); if (bStrict) { throw e; } }
         }
         // ★ BR46 검수 반영(안티 P2): RTE 렌더 완료 대기 실패를 조용히 삼키지 않고 표면화(code.md 규칙).
         try { await Promise.all(aRte); } catch (e) { console.error("[WS20][insert] waiting for RTE render:", e && e.message ? e.message : e); if (bStrict) { throw e; } }
@@ -637,7 +637,7 @@
             try {
                 var w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow;
                 if (w && typeof w.drawPreview === "function") { await w.drawPreview(); }
-            } catch (e) { console.warn("[WS20] undo/redo drawPreview:", e && e.message); }
+            } catch (e) { console.warn("[WS20] undo/redo drawPreview:", e && e.message, e); }
             //[BR62 검수/안티] 전체 재생성 직후엔 아직 화면 높이가 안 잡혀 스크롤 명령이 무시된다
             //  → 그리기가 실제로 끝난 다음 틱에 복원한다(두 번 기다림 + 시간 상한).
             await _afterPaint();
@@ -747,7 +747,7 @@
                 //  HTML5 이식 시 BUSY 만 배선되고 반영이 누락됐었다(장군님 발견 2026-07-28). 팝업 미오픈이면 방송모듈 가드로 no-op.
                 try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             } catch (e) {
-                console.error("[WS20] undo/redo restore error:", e && e.message);
+                console.error("[WS20] undo/redo restore error:", e && e.message, e);
             } finally {
                 //원본 역순 해제(자식창 → 단축키 → 화면). 어느 경로로 끝나도 반드시 짝을 맞춘다.
                 try { oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -1619,7 +1619,7 @@
                     try { parent.showMessage(null, 10, "W", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "000", is_0023.UIATT)); }
                     catch (e) { console.error("[WS20][insert] multi-binding notice text:", e && e.message ? e.message : e); }
                 }
-            } catch (e) { console.error("[WS20][insert] BR43 multi-binding clamp error:", e && e.message); }
+            } catch (e) { console.error("[WS20][insert] BR43 multi-binding clamp error:", e && e.message, e); }
 
             for (var c = 0; c < cnt; c++) {
                 var l14 = oAPP.fn.crtStru0014();
@@ -2702,7 +2702,7 @@
                 oItem.addEventListener("click", function (e) {
                     e.stopPropagation();
                     _closeMenu();
-                    try { it.fn(); } catch (err) { console.warn("[WS20] ctx menu " + it.key + " error:", err && err.message); }
+                    try { it.fn(); } catch (err) { console.warn("[WS20] ctx menu " + it.key + " error:", err && err.message, err); }
                 });
             }
             oMenu.appendChild(oItem);

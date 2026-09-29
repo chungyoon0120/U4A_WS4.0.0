@@ -117,11 +117,11 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FEPE-001] Error Page Editor window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FEPE-001] cleanup of the failed window failed:", e2 && e2.message); }
+                catch (e2) { console.error("[FEPE-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
                 try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
-        } catch (e) { console.error("[FEPE-001] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FEPE-001] did-fail-load register failed:", e && e.message, e); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -197,7 +197,7 @@
         oAPP.DATA.APPDATA.S_ERHTML.IS_USE = oSaveData.IS_USE;
 
         // 어플리케이션 정보에 변경 플래그
-        try { parent.setAppChange('X'); } catch (e) { console.error("[errPageEditor] setAppChange error:", e && e.message); }
+        try { parent.setAppChange('X'); } catch (e) { console.error("[errPageEditor] setAppChange error:", e && e.message, e); }
 
         // 저장으로 변경분 발생 → WS20 헤더 Active→Inactive 반영(에디터 시리즈 fnIpcMain_EditorSave 와 동일 처리).
         try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -286,11 +286,11 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FEPE-002] Error Page preview window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FEPE-002] cleanup of the failed window failed:", e2 && e2.message); }
+                catch (e2) { console.error("[FEPE-002] cleanup of the failed window failed:", e2 && e2.message, e2); }
                 try { parent.IPCRENDERER.send(`if-errorPageEditor-setBusy-${parent.getBrowserKey()}`, ""); }
-                catch (e3) { console.error("[FEPE-002] busy release notice to the editor window failed:", e3 && e3.message); }
+                catch (e3) { console.error("[FEPE-002] busy release notice to the editor window failed:", e3 && e3.message, e3); }
             });
-        } catch (e) { console.error("[FEPE-002] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FEPE-002] did-fail-load register failed:", e && e.message, e); }
 
         // // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {

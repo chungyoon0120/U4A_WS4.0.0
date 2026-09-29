@@ -338,7 +338,7 @@
         function _fireCallback(oRow) {
             if (oState.fnCb) {
                 try { oState.fnCb(oRow); }
-                catch (e) { if (typeof console !== "undefined") { console.error("[CTS] callback failed:", e && e.message); } }
+                catch (e) { if (typeof console !== "undefined") { console.error("[CTS] callback failed:", e && e.message, e); } }
             }
             _close();
         }

@@ -119,7 +119,7 @@
         try {
             return fn.apply(oThis || oAPP.fn, aArgs || []);
         } catch (e) {
-            console.warn("[WS20][tree] call error (conversion pending):", sFnName, e && e.message);
+            console.warn("[WS20][tree] call error (conversion pending):", sFnName, e && e.message, e);
         }
     }
 
@@ -249,7 +249,7 @@
                     //  받아야 하므로 HTML5 에서도 누른 버튼을 this 로 넘긴다.
                     oCfg.press.call(BTN);
                 } catch (e) {
-                    console.warn("[WS20][tree] toolbar press error:", oCfg.icon, e && e.message);
+                    console.warn("[WS20][tree] toolbar press error:", oCfg.icon, e && e.message, e);
                 }
             });
         }
@@ -492,7 +492,7 @@
                     }
                 });
             }
-        } catch (e) { console.warn("[WS20][tree] toolbar overflow attach failed:", e && e.message); }
+        } catch (e) { console.warn("[WS20][tree] toolbar overflow attach failed:", e && e.message, e); }
 
         return BAR;
     }
@@ -514,7 +514,7 @@
             }
             console.warn("[WS20][tree] undoRedo not available:", sMode);
         } catch (e) {
-            console.warn("[WS20][tree] executeHistory error:", sMode, e && e.message);
+            console.warn("[WS20][tree] executeHistory error:", sMode, e && e.message, e);
         }
     }
 
@@ -652,7 +652,7 @@
                     //   → 전역 미리보기-포커스 닫기 로직이 갓 뜬 메뉴를 즉시 제거했다(표시 직후 닫힘).
                     //   특정 UI 예외가 아니라 공통 흐름을 원본과 동일 순서로 되돌린다.
                     try { await _safeCall("setSelectTreeItem", [sObjid]); }
-                    catch (err) { console.warn("[WS20][tree] context select failed (menu still shown):", err && err.message); }
+                    catch (err) { console.warn("[WS20][tree] context select failed (menu still shown):", err && err.message, err); }
                     await new Promise(function (res) { setTimeout(res, 0); });
                     if (oAPP.fn.fnWs20ShowTreeContextMenu) { oAPP.fn.fnWs20ShowTreeContextMenu(n, iX, iY); }
                 });
@@ -720,7 +720,7 @@
                 oTree.scrollToKey(String(OBJID));
             }
         } catch (e) {
-            console.error("[WS20][tree] scroll-to-selected-row error:", e && e.message);
+            console.error("[WS20][tree] scroll-to-selected-row error:", e && e.message, e);
         }
     };
 
@@ -846,13 +846,13 @@
                 try {
                     await oAPP.fn.fnWs20SelectUI(oNode.OBJID);
                 } catch (e) {
-                    console.warn("[WS20][tree] fnWs20SelectUI error:", e && e.message);
+                    console.warn("[WS20][tree] fnWs20SelectUI error:", e && e.message, e);
                 }
             } else if (typeof oAPP.fn.setSelectTreeItem === "function") {
                 try {
                     await oAPP.fn.setSelectTreeItem(oNode.OBJID);
                 } catch (e) {
-                    console.warn("[WS20][tree] setSelectTreeItem error (property panel W4 / not converted):", e && e.message);
+                    console.warn("[WS20][tree] setSelectTreeItem error (property panel W4 / not converted):", e && e.message, e);
                 }
             } else {
                 console.warn("[WS20][tree] setSelectTreeItem not implemented (W4 pending)");
@@ -866,7 +866,7 @@
                 try {
                     oAPP.fn.selectBindingPopupOBJID(oNode);
                 } catch (e) {
-                    console.warn("[WS20][tree] selectBindingPopupOBJID error (preview W2 / not converted):", e && e.message);
+                    console.warn("[WS20][tree] selectBindingPopupOBJID error (preview W2 / not converted):", e && e.message, e);
                 }
             }
         } finally {
@@ -1275,7 +1275,7 @@
         try {
             oAPP.fn.fnRenderDesignTree();
         } catch (e) {
-            console.warn("[WS20][tree] uiDesignArea render error:", e && e.message);
+            console.warn("[WS20][tree] uiDesignArea render error:", e && e.message, e);
         }
 
     }; // end of [OVERRIDE] oAPP.fn.uiDesignArea
@@ -1299,13 +1299,13 @@
                 try {
                     oAPP.fn.fnRenderDesignTree();
                 } catch (e) {
-                    console.warn("[WS20][tree] refresh→render error:", e && e.message);
+                    console.warn("[WS20][tree] refresh→render error:", e && e.message, e);
                 }
                 return r;
             };
             oModel.__ws20TreeHooked = true;
         } catch (e) {
-            console.warn("[WS20][tree] model refresh hook error:", e && e.message);
+            console.warn("[WS20][tree] model refresh hook error:", e && e.message, e);
         }
     }; // end of fnHookWs20TreeModelRefresh
 
@@ -1332,7 +1332,7 @@
         try {
             oAPP.fn.uiDesignArea(oAPP.attr.ui && oAPP.attr.ui.ws20 && oAPP.attr.ui.ws20.tree);
         } catch (e) {
-            console.warn("[WS20][tree] fnRenderWs20Shell→uiDesignArea error:", e && e.message);
+            console.warn("[WS20][tree] fnRenderWs20Shell→uiDesignArea error:", e && e.message, e);
         }
 
     }; // end of [OVERRIDE] oAPP.fn.fnRenderWs20Shell

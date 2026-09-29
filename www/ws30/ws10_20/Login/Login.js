@@ -2322,8 +2322,8 @@ var oAPP = (function () {
                         `=> 로그인 페이지의 언어 선택 영역이 서버 언어 입력 Input만 나오게 처리`,
                     ];
 
-                    console.log(aConsoleMsg.join("\r\n"));
-                    console.trace();
+                    console.log(aConsoleMsg.join("\r\n"), error);
+                    console.trace(error);
 
                     return resolve({
                         RETCD: "E",

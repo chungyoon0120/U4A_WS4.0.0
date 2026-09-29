@@ -112,11 +112,11 @@ module.exports = function(REMOTE, oAPP){
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[APRO-001] attribute preset window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[APRO-001] cleanup of the failed window failed:", e2 && e2.message); }
-                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[APRO-001] busy release failed:", e3 && e3.message); }
+                catch (e2) { console.error("[APRO-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[APRO-001] busy release failed:", e3 && e3.message, e3); }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
-        } catch (e) { console.error("[APRO-001] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[APRO-001] did-fail-load register failed:", e && e.message, e); }
 
 
 
@@ -155,8 +155,8 @@ module.exports = function(REMOTE, oAPP){
             } catch (eSend) {
                 console.error("[APRO-001] initial data send to the attribute preset window failed:", eSend && eSend.message);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[APRO-001] cleanup of the failed window failed:", e2 && e2.message); }
-                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[APRO-001] busy release failed:", e3 && e3.message); }
+                catch (e2) { console.error("[APRO-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[APRO-001] busy release failed:", e3 && e3.message, e3); }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
                 return;
             }

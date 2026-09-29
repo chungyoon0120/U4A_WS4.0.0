@@ -219,7 +219,7 @@ export async function getControl() {
             var sOtherMenuJson = oFS.readFileSync(sMenuJsonPath, { encoding: "utf-8" });    
 
         } catch (error) {
-            console.error("_setOtherCssMenuConfig: menu.json file read error");
+            console.error("_setOtherCssMenuConfig: menu.json file read error", error);
             return;
         }        
 
@@ -229,7 +229,7 @@ export async function getControl() {
             var aOtherMenuList = JSON.parse(sOtherMenuJson);   
              
         } catch (error) {
-            console.error("_setOtherCssMenuConfig: Json Parse Error");
+            console.error("_setOtherCssMenuConfig: Json Parse Error", error);
             return;
         }        
 

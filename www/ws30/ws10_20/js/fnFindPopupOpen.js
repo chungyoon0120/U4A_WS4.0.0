@@ -121,11 +121,11 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FFPO-001] Find window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FFPO-001] cleanup of the failed window failed:", e2 && e2.message); }
-                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FFPO-001] busy release failed:", e3 && e3.message); }
+                catch (e2) { console.error("[FFPO-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FFPO-001] busy release failed:", e3 && e3.message, e3); }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
-        } catch (e) { console.error("[FFPO-001] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FFPO-001] did-fail-load register failed:", e && e.message, e); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) { oBrowserWindow.webContents.openDevTools(); }
@@ -160,16 +160,16 @@
                 } catch (eSend) {
                     console.error("[FFPO-002] initial data send to the Find window failed:", eSend && eSend.message);
                     try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                    catch (e2) { console.error("[FFPO-002] cleanup of the failed window failed:", e2 && e2.message); }
-                    try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FFPO-002] busy release failed:", e3 && e3.message); }
+                    catch (e2) { console.error("[FFPO-002] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                    try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FFPO-002] busy release failed:", e3 && e3.message, e3); }
                     try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
                 }
 
             }).catch(function (eErr) {
                 console.error("[FFPO-002] server event list read failed:", eErr && eErr.message);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FFPO-002] cleanup of the failed window failed:", e2 && e2.message); }
-                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FFPO-002] busy release failed:", e3 && e3.message); }
+                catch (e2) { console.error("[FFPO-002] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FFPO-002] busy release failed:", e3 && e3.message, e3); }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
 
@@ -245,7 +245,7 @@
             // 창이 계속 기다리지 않도록 빈 결과라도 반드시 보낸다(busy 해제 신호를 겸한다).
             try {
                 events.sender.send(`${events.sender.getWebPreferences().browserkey}--find--data--refresh--callback`, null);
-            } catch (e2) { console.error("[FFPO-003] empty result notice failed:", e2 && e2.message); }
+            } catch (e2) { console.error("[FFPO-003] empty result notice failed:", e2 && e2.message, e2); }
         });
 
     }; // end of oAPP.fn.fnIpcMain_Find_Data_Refresh

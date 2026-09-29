@@ -101,7 +101,7 @@
     // 미리보기 반영(W2 미변환/미로드면 no-op) — 원본 previewUIsetProp 1:1.
     function _preview(sAttr) {
         if (typeof oAPP.fn.previewUIsetProp === "function") {
-            try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[WS20][sameAttr] previewUIsetProp:", e && e.message); }
+            try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[WS20][sameAttr] previewUIsetProp:", e && e.message, e); }
         }
     }
 
@@ -240,7 +240,7 @@
                 var aEvt = await oAPP.fn.getServerEventList(null, true);
                 aDDLB = Array.isArray(aEvt) ? aEvt.slice() : [];
             } catch (e) {
-                console.error("[WS20][sameAttr] getServerEventList:", e && e.message);
+                console.error("[WS20][sameAttr] getServerEventList:", e && e.message, e);
                 aDDLB = [{ KEY: "", TEXT: "" }];
             }
         }
@@ -299,7 +299,7 @@
         try {
             if (typeof oAPP.fn.chkValidProp === "function") { bValid = oAPP.fn.chkValidProp(ls_0015) !== false; }
         } catch (e) {
-            console.error("[WS20][sameAttr] chkValidProp exception (handled):", e && e.message);
+            console.error("[WS20][sameAttr] chkValidProp exception (handled):", e && e.message, e);
         }
 
         //불가값 + DDLB 아닌 경우 → default 값으로 되돌림(원본 동일).
@@ -375,7 +375,7 @@
         //★ UNDO: 대상+소스 전체를 한 단위로 — 변경 "직전" 상태를 1회만 적재.
         // [BR59-4] 되돌리기 대상 = 값이 바뀌는 그 UI 와 그 속성 줄(원본 CL_CHANGE_ATTR 2278 기준).
         try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr && is_attr.OBJID ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK || "" } : undefined); } }
-        catch (e) { console.warn("[WS20][sameAttr] undo push skip:", e && e.message); }
+        catch (e) { console.warn("[WS20][sameAttr] undo push skip:", e && e.message, e); }
 
         try {
             var l_UIATV = oState.value;

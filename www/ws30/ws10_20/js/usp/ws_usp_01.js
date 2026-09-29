@@ -851,8 +851,8 @@
                 aConsoleMsg.push(error?.stack);
             }
 
-            console.error(aConsoleMsg.join("\r\n"));
-            console.trace();   
+            console.error(aConsoleMsg.join("\r\n"), error);
+            console.trace(error);   
 
             return;
 

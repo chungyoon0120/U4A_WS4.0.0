@@ -32,7 +32,7 @@
             return;
         }
         try { oChannel.postMessage(oData); }
-        catch (e) { console.error("[bindWindow] broadcast send error:", oData && oData.PRCCD, e && e.message); }
+        catch (e) { console.error("[bindWindow] broadcast send error:", oData && oData.PRCCD, e && e.message, e); }
     }
 
     // WS20 디자인 영역 busy off 요청(원본 sendDesignAreaBusyOff) — WS20 잠금 해제.
@@ -139,7 +139,7 @@
                 //   되돌아갔다. 원본대로 호출하지 않는다.
                 // (원본 289) oAPP.fn.setAdditialListData();
             } catch (e) {
-                console.error("[bindWindow] UPDATE_DESIGN_DATA rebuild error:", e && e.message);
+                console.error("[bindWindow] UPDATE_DESIGN_DATA rebuild error:", e && e.message, e);
             } finally {
                 _sendDesignAreaBusyOff();   // WS20 잠금 해제(불변 계약) — 처리 완료 후 반드시.
                 oAPP.fn.setBusy(false);
@@ -227,7 +227,7 @@
         if (!(oAPP.attr.designTree || []).length) { return; }
         if (typeof oAPP.fn.selectDesignNodeByObjid === "function") {
             try { oAPP.fn.selectDesignNodeByObjid(sObjid); }
-            catch (e) { console.error("[bindWindow] selectDesignNodeByObjid:", e && e.message); }
+            catch (e) { console.error("[bindWindow] selectDesignNodeByObjid:", e && e.message, e); }
         }
     }
 
@@ -243,7 +243,7 @@
         iBroadRaf = requestAnimationFrame(function () {
             iBroadRaf = 0;
             try { oAPP.fn.updateBindPopupDesignData(); }
-            catch (e) { console.error("[bindWindow] designBroadcastUpdate:", e && e.message); }
+            catch (e) { console.error("[bindWindow] designBroadcastUpdate:", e && e.message, e); }
         });
     };
 

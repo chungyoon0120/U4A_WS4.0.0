@@ -124,11 +124,11 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FEPO-001] Editor window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FEPO-001] cleanup of the failed window failed:", e2 && e2.message); }
+                catch (e2) { console.error("[FEPO-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
                 try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
-        } catch (e) { console.error("[FEPO-001] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FEPO-001] did-fail-load register failed:", e && e.message, e); }
 
 
         // no build 일 경우에는 개발자 툴을 실행한다.
@@ -207,7 +207,7 @@
         oAPP.fn.fnSetEditorData(oSaveData);
 
         // 어플리케이션 정보에 변경 플래그
-        try { parent.setAppChange(res.IS_CHAG); } catch (e) { console.error("[editor] setAppChange error:", e && e.message); }
+        try { parent.setAppChange(res.IS_CHAG); } catch (e) { console.error("[editor] setAppChange error:", e && e.message, e); }
 
         // 저장으로 변경분 발생 → WS20 헤더 Active→Inactive 반영(클라이언트 에디터 lf_cb 와 동일 처리).
         //   setAppInfo 가 글로벌 oAppInfo 에 ACTST="I"/IS_CHAG="X" 를 세팅했으므로 헤더만 다시 그린다.
@@ -285,7 +285,7 @@
                     if (oPrevWin && typeof oPrevWin.setCSSSource === "function") {
                         oPrevWin.setCSSSource(oSaveData.DATA);
                     }
-                } catch (e) { console.error("[editor] CSS live preview error:", e && e.message); }
+                } catch (e) { console.error("[editor] CSS live preview error:", e && e.message, e); }
                 break;
         }
 

@@ -178,12 +178,12 @@
         //  되돌리기 이력은 버튼 누를 때 이미 쌓였고(원본도 attrChange 진입부에서 1회),
         //  전용 예외처리 갈래는 다시 타지 않는다(원본 attrChangeProc 에는 그 갈래가 없다).
         try { oAPP.fn.fnWs20AttrChange(oCtx.attr, undefined, true, true, true); }
-        catch (e) { console.error("[WS20][ImageCompress] attr change handle error:", e && e.message); }
+        catch (e) { console.error("[WS20][ImageCompress] attr change handle error:", e && e.message, e); }
 
         //바인딩 팝업의 디자인 영역 갱신처리(원본 188행).
         if (typeof oAPP.fn.updateBindPopupDesignData === "function") {
             try { oAPP.fn.updateBindPopupDesignData(); }
-            catch (e) { console.error("[WS20][ImageCompress] binding popup refresh error:", e && e.message); }
+            catch (e) { console.error("[WS20][ImageCompress] binding popup refresh error:", e && e.message, e); }
         }
     }
 
@@ -253,12 +253,12 @@
                 oHelpBtn.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B44") || "U4A Help Document";
                 oHelpBtn.addEventListener("click", function () {
                     try { oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: C_HELP_MENU_ID }); }
-                    catch (e) { console.error("[WS20][ImageCompress] help document call error:", e && e.message); }
+                    catch (e) { console.error("[WS20][ImageCompress] help document call error:", e && e.message, e); }
                 });
                 oHeader.appendChild(oHelpBtn);
             }
         } catch (e) {
-            console.error("[WS20][ImageCompress] help button build error:", e && e.message);
+            console.error("[WS20][ImageCompress] help button build error:", e && e.message, e);
         }
 
         var oXBtn = _el("button", "u4a-btn-icon");
@@ -328,7 +328,7 @@
             oQty.input.step = "0.01";
             oQty.input.inputMode = "decimal";
         } catch (e) {
-            console.error("[WS20][ImageCompress] could not make the quality input numeric-only:", e && e.message);
+            console.error("[WS20][ImageCompress] could not make the quality input numeric-only:", e && e.message, e);
         }
         oRow.appendChild(oQty.el);
         oUI.qty = oQty;
@@ -419,7 +419,7 @@
         var _sSetting;
         try { _sSetting = JSON.parse((sAttr && sAttr.UIATV) || "{}"); }
         catch (e) {
-            console.error("[WS20][ImageCompress] could not read the saved config value (using default):", e && e.message);
+            console.error("[WS20][ImageCompress] could not read the saved config value (using default):", e && e.message, e);
             _sSetting = {};
         }
 

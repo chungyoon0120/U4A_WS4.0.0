@@ -95,7 +95,7 @@
   // 메시지 팝업(원본 parent.showMessage) — WS20 렌더러의 parent 셸 제공.
   function _msg(iKind, sType, sMsg, fnCb) {
     try { parent.showMessage(window.sap || null, iKind, sType, sMsg, fnCb); }
-    catch (e) { console.warn("[WS20][bind] showMessage failed:", e && e.message); }
+    catch (e) { console.warn("[WS20][bind] showMessage failed:", e && e.message, e); }
   }
   function _busy(bOn) { try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
@@ -177,7 +177,7 @@
       _msg(10, "I", "아직 작업중입니다");
 
     } catch (e) {
-      console.error("[WS20][bind] binding icon handle error:", e && e.message);
+      console.error("[WS20][bind] binding icon handle error:", e && e.message, e);
     }
 
     _unlock();
@@ -232,7 +232,7 @@
         if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
 
       } catch (e) {
-        console.error("[WS20][bind] AppID F4 callback handle error:", e && e.message);
+        console.error("[WS20][bind] AppID F4 callback handle error:", e && e.message, e);
       }
     }
 
@@ -302,7 +302,7 @@
         if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
 
       } catch (e) {
-        console.error("[WS20][bind] selectOption2 F4HelpID callback error:", e && e.message);
+        console.error("[WS20][bind] selectOption2 F4HelpID callback error:", e && e.message, e);
       }
     }
 
@@ -386,7 +386,7 @@
         if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
         if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
       } catch (e) {
-        console.error("[WS20][bind] selectOption2 F4HelpReturnField callback error:", e && e.message);
+        console.error("[WS20][bind] selectOption2 F4HelpReturnField callback error:", e && e.message, e);
       }
     }
 
@@ -499,7 +499,7 @@
         }
       }
     } catch (e) {
-      console.warn("[WS20][bind] attrChkBindAggrPossible error:", e && e.message);
+      console.warn("[WS20][bind] attrChkBindAggrPossible error:", e && e.message, e);
     }
   }; // end of attrChkBindAggrPossible
 
@@ -820,7 +820,7 @@
 
       }, "");
     } catch (e) {
-      console.warn("[WS20][bind] getBindAttrData call failed:", e && e.message);
+      console.warn("[WS20][bind] getBindAttrData call failed:", e && e.message, e);
       _fail();
     }
   }
@@ -1544,7 +1544,7 @@
 
     // 콜백으로 선택 라인 return → 적용.
     try { oS.fnCallback(true, ls_tree, oS.is_attr); }
-    catch (e) { console.error("[WS20][bind] bind callback error:", e && e.message); }
+    catch (e) { console.error("[WS20][bind] bind callback error:", e && e.message, e); }
 
     _busy(false);   // 적용 완료 → busy 해제(성공 경로). (형제창 busy 는 fnWs20AttrChange 가 짝맞춰 처리)
     lf_close();
@@ -1554,7 +1554,7 @@
   function lf_unbindBtnEvt() {
     if (!_isEdit()) { _busy(false); return; }
     try { oS.fnCallback(false, null, oS.is_attr); }
-    catch (e) { console.error("[WS20][bind] unbind callback error:", e && e.message); }
+    catch (e) { console.error("[WS20][bind] unbind callback error:", e && e.message, e); }
     lf_close();
   }
 
@@ -1601,7 +1601,7 @@
     if (bIsbind === false) {
       var bHasChild = bLive && oPrev._BIND_AGGR && oPrev._BIND_AGGR[is_attr.UIATT] && oPrev._BIND_AGGR[is_attr.UIATT].length !== 0;
       var doUnbind = function () {
-        if (bLive) { try { oAPP.fn.attrUnbindAggr(oPrev, is_attr.UIATT, is_attr.UIATV); } catch (e) { console.error("[bind] attrUnbindAggr:", e && e.message); } }
+        if (bLive) { try { oAPP.fn.attrUnbindAggr(oPrev, is_attr.UIATT, is_attr.UIATV); } catch (e) { console.error("[bind] attrUnbindAggr:", e && e.message, e); } }
         if (oAPP.oDesign && oAPP.oDesign.CS_ACTCD) { is_attr.ACTCD = oAPP.oDesign.CS_ACTCD.UNBIND_AGGR; }
         oAPP.fn.attrSetUnbindProp(is_attr);
         oAPP.fn.attrUnbindTree(is_attr);
@@ -1671,7 +1671,7 @@
     }
 
     // 변경 후속 처리(수집/변경표시/재렌더/undo).
-    try { oAPP.fn.fnWs20AttrChange(is_attr, ""); } catch (e) { console.error("[bind] fnWs20AttrChange:", e && e.message); }
+    try { oAPP.fn.fnWs20AttrChange(is_attr, ""); } catch (e) { console.error("[bind] fnWs20AttrChange:", e && e.message, e); }
 
     // n건 바인딩 부모 UI 매핑(라이브일 때만; 스탠드인이면 setModelBind 가 __PARENT 없어 no-op).
     if (typeof oAPP.fn.setModelBind === "function") { try { oAPP.fn.setModelBind(oPrev); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
@@ -1712,7 +1712,7 @@
     is_attr.ISBND = "";
     is_attr.MPROP = "";
 
-    try { oAPP.fn.fnWs20AttrChange(is_attr, ""); } catch (e) { console.error("[bind] fnWs20AttrChange:", e && e.message); }
+    try { oAPP.fn.fnWs20AttrChange(is_attr, ""); } catch (e) { console.error("[bind] fnWs20AttrChange:", e && e.message, e); }
   };
 
   // sap.m.Tree / TreeTable parent·child 예외 unbind (원본 attrUnbindTree 4652행).

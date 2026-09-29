@@ -260,7 +260,7 @@
         };
         try { oAPP.loadJs("fnSameAttrSyncPopupOpen", fn); }
         catch (e) {
-            console.error("[WS20][attr] fnSameAttrSyncPopupOpen load failed:", e && e.message);
+            console.error("[WS20][attr] fnSameAttrSyncPopupOpen load failed:", e && e.message, e);
             fn();
         }
     }
@@ -274,7 +274,7 @@
         };
         try { oAPP.loadJs("fnEventShortcutRegOpen", fn); }
         catch (e) {
-            console.error("[WS20][attr] fnEventShortcutRegOpen load failed:", e && e.message);
+            console.error("[WS20][attr] fnEventShortcutRegOpen load failed:", e && e.message, e);
             fn();
         }
     }
@@ -286,7 +286,7 @@
         //  파일 IIFE 는 함수 재정의뿐(전역 리스너 없음)이라 재-eval 안전. 원인 확정 후 캐시 가드 복원 고려.
         try { oAPP.loadJs("fnAttrPresetSettingsOpen", function () { oAPP.fn.fnAttrPresetSettingsOpen(is_attr); }); }
         catch (e) {
-            console.error("[WS20][attr] fnAttrPresetSettingsOpen load failed:", e && e.message);
+            console.error("[WS20][attr] fnAttrPresetSettingsOpen load failed:", e && e.message, e);
             if (typeof oAPP.fn.fnAttrPresetSettingsOpen === "function") { oAPP.fn.fnAttrPresetSettingsOpen(is_attr); }
         }
     }
@@ -303,7 +303,7 @@
     function _withBindModule(fn) {
         if (typeof oAPP.fn.attrSetUnbindProp === "function") { fn(); return; }
         try { oAPP.loadJs("fnBindPopupOpen", fn); }
-        catch (e) { console.error("[WS20][attr] fnBindPopupOpen load failed:", e && e.message); }
+        catch (e) { console.error("[WS20][attr] fnBindPopupOpen load failed:", e && e.message, e); }
     }
 
     /* ── M02 프로퍼티/애그리게이션 unbind — 구 attrContextMenuUnbind ── */
@@ -331,7 +331,7 @@
                     var oPrev = oAPP.attr.prev && oAPP.attr.prev[is_attr.OBJID];
                     if (oPrev && typeof oPrev.getMetadata === "function" && typeof oAPP.fn.attrUnbindAggr === "function") {
                         try { oAPP.fn.attrUnbindAggr(oPrev, is_attr.UIATT, is_attr.UIATV); }
-                        catch (e) { console.error("[WS20][attr] attrUnbindAggr:", e && e.message); }
+                        catch (e) { console.error("[WS20][attr] attrUnbindAggr:", e && e.message, e); }
                     }
                     var cd2 = _actcd("UNBIND_AGGR");
                     if (cd2 !== undefined) { is_attr.ACTCD = cd2; }
@@ -364,10 +364,10 @@
             //  → 여기서 먼저 push 하고, fnWs20AttrChange 는 bSkipUndo=true 로 재-push 방지(M03 과 동일 패턴).
             // [BR59-4] 되돌리기 대상 = 값이 바뀌는 그 UI 와 그 속성 줄(원본 CL_CHANGE_ATTR 2278 기준).
             try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr && is_attr.OBJID ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK || "" } : undefined); } }
-            catch (e) { console.warn("[WS20][attr] undo push skip:", e && e.message); }
+            catch (e) { console.warn("[WS20][attr] undo push skip:", e && e.message, e); }
 
             try { oAPP.fn.attrDelClientEvent(is_attr, l_OBJTY); }
-            catch (e) { console.error("[WS20][attr] attrDelClientEvent:", e && e.message); }
+            catch (e) { console.error("[WS20][attr] attrDelClientEvent:", e && e.message, e); }
 
             is_attr.ADDSC = "";   //js 설정됨 flag 제거
             var cd = _actcd("DEL_CLIENT_EVENT");

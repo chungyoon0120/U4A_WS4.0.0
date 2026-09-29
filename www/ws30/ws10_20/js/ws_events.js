@@ -332,7 +332,7 @@
                 try {
                     eval(oResult.SCRIPT);
                 } catch (e) {
-                    console.error("/app_delte SCRIPT eval failed (likely UI5 dependent):", e && e.message, oResult.SCRIPT);
+                    console.error("/app_delte SCRIPT eval failed (likely UI5 dependent):", e && e.message, oResult.SCRIPT, e);
                 }
             }
 
@@ -414,7 +414,7 @@
                 try {
                     eval(oResult.SCRIPT);
                 } catch (e) {
-                    console.error("/usp_app_delete SCRIPT eval failed (likely UI5 dependent):", e && e.message, oResult.SCRIPT);
+                    console.error("/usp_app_delete SCRIPT eval failed (likely UI5 dependent):", e && e.message, oResult.SCRIPT, e);
                 }
             }
 
@@ -1630,14 +1630,14 @@
         try { console.error("[" + sCode + "] " + sWhere + " — error:", e); } catch (e0) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e0); } }
 
         // ② 정리(cleanup) — 화면 잠금 해제
-        try { oAPP.common.fnSetBusyLock(""); } catch (e1) { console.error("[" + sCode + "] fnSetBusyLock release failed:", e1 && e1.message); }
-        try { parent.setBusy(""); } catch (e2) { console.error("[" + sCode + "] setBusy release failed:", e2 && e2.message); }
+        try { oAPP.common.fnSetBusyLock(""); } catch (e1) { console.error("[" + sCode + "] fnSetBusyLock release failed:", e1 && e1.message, e1); }
+        try { parent.setBusy(""); } catch (e2) { console.error("[" + sCode + "] setBusy release failed:", e2 && e2.message, e2); }
 
         // ②-2 자식 윈도우 잠금 회수 (BUSY_ON 을 이미 방송한 구간에서만 — 짝 필수)
         if (bBroadOff === true) {
             try {
                 if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
-            } catch (e3) { console.error("[" + sCode + "] child window busy release broadcast failed:", e3 && e3.message); }
+            } catch (e3) { console.error("[" + sCode + "] child window busy release broadcast failed:", e3 && e3.message, e3); }
         }
 
         // ②-3 자식 윈도우 다시 보이기 — 시작 때 fnChildWindowShow(false) 로 숨긴 뒤 터진 구간이면
@@ -1645,7 +1645,7 @@
         if (bChildShow === true) {
             try {
                 if (typeof oAPP.fn.fnChildWindowShow === "function") { oAPP.fn.fnChildWindowShow(true); }
-            } catch (e7) { console.error("[" + sCode + "] re-show child window failed:", e7 && e7.message); }
+            } catch (e7) { console.error("[" + sCode + "] re-show child window failed:", e7 && e7.message, e7); }
         }
 
         // ②-4 작업표시줄 깜빡임 (크리티컬 전례 usp/ws_usp.js fnCriticalErrorWs30)
@@ -1659,12 +1659,12 @@
             sMsg = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "314") || "";
             var sGuide = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "290") || "";
             if (sGuide) { sMsg += (sMsg ? " " : "") + sGuide; }
-        } catch (e4) { console.error("[" + sCode + "] message read failed:", e4 && e4.message); }
+        } catch (e4) { console.error("[" + sCode + "] message read failed:", e4 && e4.message, e4); }
 
         sMsg = "[" + sCode + "] " + sMsg;
 
         try { parent.showMessage(null, 20, "E", sMsg); }
-        catch (e6) { console.error("[" + sCode + "] error popup failed:", e6 && e6.message); }
+        catch (e6) { console.error("[" + sCode + "] error popup failed:", e6 && e6.message, e6); }
 
     } // end of _wsevCritical
 

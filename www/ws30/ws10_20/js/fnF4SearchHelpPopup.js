@@ -194,7 +194,7 @@
         // 선택 확정 → 콜백 + 닫기(원본 f_clientCallbak 후 close/destroy).
         function _pick(oRowData) {
             if (!oRowData) { return; }
-            if (fnPick) { try { fnPick(oRowData); } catch (e) { console.error("[F4SH] onPick error:", e && e.message); } }
+            if (fnPick) { try { fnPick(oRowData); } catch (e) { console.error("[F4SH] onPick error:", e && e.message, e); } }
             lf_close();
         }
 

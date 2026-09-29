@@ -293,7 +293,7 @@
                 try {
                     _evalServerScript(oResult.SCRIPT);
                 } catch (e) {
-                    console.error("/app_copy SCRIPT run failed:", e && e.message, oResult.SCRIPT);
+                    console.error("/app_copy SCRIPT run failed:", e && e.message, oResult.SCRIPT, e);
                     if (oResult.RTMSG) {
                         parent.showMessage(null, 20, (oResult.RETCD === "S" ? "S" : "E"), _relocalizeBakedMsg(oResult.RTMSG));
                     }

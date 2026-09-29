@@ -2419,7 +2419,7 @@
         try { document.body.appendChild(oDlg); oDlg.showModal(); }
         catch (e) {
             // ★[장군님 지시 2026-09-02] window.confirm fallback 금지 — 표시 실패는 오류코드로 표면화 + fail-closed 종료.
-            console.error("[U4AUI-002] confirm: showModal failed —", e && e.message);
+            console.error("[U4AUI-002] confirm: showModal failed —", e && e.message, e);
             _close(bHasCancel ? "CANCEL" : "NO");
             return;
         }

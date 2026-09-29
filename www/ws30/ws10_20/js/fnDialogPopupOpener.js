@@ -216,11 +216,11 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FDPO-010] U4A MIME Repository window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FDPO-010] cleanup of the failed window failed:", e2 && e2.message); }
+                catch (e2) { console.error("[FDPO-010] cleanup of the failed window failed:", e2 && e2.message, e2); }
                 try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
-        } catch (e) { console.error("[FDPO-010] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FDPO-010] did-fail-load register failed:", e && e.message, e); }
 
         oBrowserWindow.once('ready-to-show', () => {
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
@@ -801,10 +801,10 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FDPO-005] binding window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FDPO-005] cleanup of the failed window failed:", e2 && e2.message); }
-                try { parent.setBusy("", {}); } catch (e3) { console.error("[FDPO-005] busy release failed:", e3 && e3.message); }
+                catch (e2) { console.error("[FDPO-005] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { parent.setBusy("", {}); } catch (e3) { console.error("[FDPO-005] busy release failed:", e3 && e3.message, e3); }
             });
-        } catch (e) { console.error("[FDPO-005] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FDPO-005] did-fail-load register failed:", e && e.message, e); }
 
 
         //broadcase 통신 API 모듈 js path 정보.
@@ -878,10 +878,10 @@
             try {
                 oBrowserWindow.webContents.send('if_modelBindingPopup', oBindPopupData);
             } catch (eSend) {
-                console.error("[FDPO-005] initial data send to the binding window failed:", eSend && eSend.message);
+                console.error("[FDPO-005] initial data send to the binding window failed:", eSend && eSend.message, eSend);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FDPO-005] cleanup of the failed window failed:", e2 && e2.message); }
-                try { parent.setBusy("", {}); } catch (e3) { console.error("[FDPO-005] busy release failed:", e3 && e3.message); }
+                catch (e2) { console.error("[FDPO-005] cleanup of the failed window failed:", e2 && e2.message, e2, eSend); }
+                try { parent.setBusy("", {}); } catch (e3) { console.error("[FDPO-005] busy release failed:", e3 && e3.message, e3, eSend); }
                 return;
             }
 
@@ -893,7 +893,7 @@
             //    (updateAppData 등)는 아직 WS20 디자인 앱과 안 맞음 → 메시지가 흐르는 Stage6 에서 정합 배선.
             //    (attr.js selectBindingPopupOBJID 와 동일하게 try/catch 로 방어 — 헤드리스/미가용 시 skip.)
             try { parent.require(_channelPath)("CHANNEL-CREATE"); }
-            catch (e) { console.warn("[bindWindow] WS20 receive channel creation deferred (Stage6):", e && e.message); }
+            catch (e) { console.warn("[bindWindow] WS20 receive channel creation deferred (Stage6):", e && e.message, e); }
 
 
             // no build 일 경우에는 개발자 툴을 실행한다.
@@ -914,7 +914,7 @@
 
             //디자인상세화면(20화면) <-> BINDPOPUP 통신 채널 종료.
             try { parent.require(_channelPath)("CHANNEL-CLOSE"); }
-            catch (e) { console.warn("[bindWindow] WS20 receive channel teardown deferred (Stage6):", e && e.message); }
+            catch (e) { console.warn("[bindWindow] WS20 receive channel teardown deferred (Stage6):", e && e.message, e); }
 
             // Binding Popup 에서 콜백 이벤트 해제
             IPCRENDERER.off("if-bindPopup-callback", oAPP.fn.fnBindPopupIpcCallBack);
@@ -1460,11 +1460,11 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FDPO-011] App. Documentation window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FDPO-011] cleanup of the failed window failed:", e2 && e2.message); }
+                catch (e2) { console.error("[FDPO-011] cleanup of the failed window failed:", e2 && e2.message, e2); }
                 try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
-        } catch (e) { console.error("[FDPO-011] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FDPO-011] did-fail-load register failed:", e && e.message, e); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -1492,7 +1492,7 @@
             // ★ [2026-09-14] 전송이 실패하면 창은 busy 인 채로 남는다 — 자리를 남겨 표면화한다.
             //   (문서 로드 자체가 실패하는 경우는 위 did-fail-load 가 창을 정리한다.)
             try { oBrowserWindow.webContents.send('if-appdocu-info', oDocuData); }
-            catch (eSend) { console.error("[FDPO-011] initial data send to the window failed:", eSend && eSend.message); }
+            catch (eSend) { console.error("[FDPO-011] initial data send to the window failed:", eSend && eSend.message, eSend); }
 
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
@@ -2707,11 +2707,11 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FDPO-006] Runtime Class Navigator window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FDPO-006] cleanup of the failed window failed:", e2 && e2.message); }
-                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FDPO-006] busy release failed:", e3 && e3.message); }
+                catch (e2) { console.error("[FDPO-006] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FDPO-006] busy release failed:", e3 && e3.message, e3); }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
-        } catch (e) { console.error("[FDPO-006] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FDPO-006] did-fail-load register failed:", e && e.message, e); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -2761,8 +2761,8 @@
             } catch (eSend) {
                 console.error("[FDPO-006] initial data send to the Runtime Class Navigator window failed:", eSend && eSend.message);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FDPO-006] cleanup of the failed window failed:", e2 && e2.message); }
-                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FDPO-006] busy release failed:", e3 && e3.message); }
+                catch (e2) { console.error("[FDPO-006] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FDPO-006] busy release failed:", e3 && e3.message, e3); }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
                 return;
             }
@@ -3052,13 +3052,13 @@
             try { console.error("[" + sCode + "] error list window open failed - screen lock count: " + sDetail); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 본 화면 잠금 해제
-            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error("[" + sCode + "] fnSetBusyLock release failed:", e && e.message); }
-            try { parent.setBusy(""); } catch (e) { console.error("[" + sCode + "] setBusy release failed:", e && e.message); }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error("[" + sCode + "] fnSetBusyLock release failed:", e && e.message, e); }
+            try { parent.setBusy(""); } catch (e) { console.error("[" + sCode + "] setBusy release failed:", e && e.message, e); }
 
             // 자식 윈도우 잠금 회수 (진입 때 BUSY_ON 을 방송했으므로 짝 필수)
             try {
                 if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
-            } catch (e) { console.error("[" + sCode + "] child window busy release broadcast failed:", e && e.message); }
+            } catch (e) { console.error("[" + sCode + "] child window busy release broadcast failed:", e && e.message, e); }
 
             // 화면 안내 — `[코드] + 기존 메시지 키 문구`(표준 `.analy/19` §4·§5)
             try {
@@ -3067,7 +3067,7 @@
                 const sGuide = parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "290") || "";
                 if (sGuide) { sTxt += (sTxt ? " " : "") + sGuide; }
                 parent.showMessage(null, 20, "E", "[" + sCode + "] " + sTxt);
-            } catch (e) { console.error("[" + sCode + "] error popup failed:", e && e.message); }
+            } catch (e) { console.error("[" + sCode + "] error popup failed:", e && e.message, e); }
 
             // 반쯤 뜬 창 정리
             try {
@@ -3075,7 +3075,7 @@
                     if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oBrowserWindow); }
                     else { oBrowserWindow.setClosable(true); oBrowserWindow.close(); }
                 }
-            } catch (e) { console.error("[" + sCode + "] closing the failed window failed:", e && e.message); }
+            } catch (e) { console.error("[" + sCode + "] closing the failed window failed:", e && e.message, e); }
         }
 
         // 주소 읽기 자체가 실패한 경우(Electron 은 실패 시 거절을 돌려준다 — 종전엔 버려졌다).
@@ -3097,14 +3097,14 @@
                 if (bIsMainFrame === false) { return; }
                 lf_recoverOpenFail("FDPO-002", "(" + iErrCode + ") " + sErrDesc + " / " + sUrl);
             });
-        } catch (e) { console.error("[FDPO-002] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FDPO-002] did-fail-load register failed:", e && e.message, e); }
 
         // 창의 화면 프로세스가 죽은 경우.
         try {
             oBrowserWindow.webContents.on('render-process-gone', function (evt, oDetail) {
                 lf_recoverOpenFail("FDPO-003", (oDetail && oDetail.reason) ? oDetail.reason : "render-process-gone");
             });
-        } catch (e) { console.error("[FDPO-003] render-process-gone register failed:", e && e.message); }
+        } catch (e) { console.error("[FDPO-003] render-process-gone register failed:", e && e.message, e); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -3600,11 +3600,11 @@
                 if (bIsMainFrame === false || iErrCode === -3) { return; }
                 console.error("[FDPO-012] OTR Manager window load failed:", iErrCode, sErrDesc, sUrl);
                 try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
-                catch (e2) { console.error("[FDPO-012] cleanup of the failed window failed:", e2 && e2.message); }
+                catch (e2) { console.error("[FDPO-012] cleanup of the failed window failed:", e2 && e2.message, e2); }
                 try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
             });
-        } catch (e) { console.error("[FDPO-012] did-fail-load register failed:", e && e.message); }
+        } catch (e) { console.error("[FDPO-012] did-fail-load register failed:", e && e.message, e); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -3709,7 +3709,7 @@
 
         } catch (e) {
 
-            console.error("[WS20] UI5 Predefined CSS popup open failed:", e && e.message);
+            console.error("[WS20] UI5 Predefined CSS popup open failed:", e && e.message, e);
 
             // busy 끄고 Lock 풀기
             oAPP.common.fnSetBusyLock("");
@@ -3761,7 +3761,7 @@
             try {
                 oRes.WIN.webContents.send("if-ui5css-result", oPayload);
             } catch (e) {
-                console.error("[WS20] UI5 Predefined CSS result reply failed:", e && e.message);
+                console.error("[WS20] UI5 Predefined CSS result reply failed:", e && e.message, e);
             }
 
         }
@@ -3774,7 +3774,7 @@
                     oAPP.fn.setSelectTreeItem(oRes.OBJID, oRes.UIATK, "");
                 }
             } catch (e) {
-                console.error("[WS20] UI5 Predefined CSS binding UI select move failed:", e && e.message);
+                console.error("[WS20] UI5 Predefined CSS binding UI select move failed:", e && e.message, e);
             }
             return;
         }
@@ -3851,7 +3851,7 @@
         } catch (e) {
 
             //삼키지 않는다 — 콘솔에 남기고 팝업에도 오류로 알린다. (never-suppress-script-errors)
-            console.error("[WS20] UI5 Predefined CSS apply error:", e && e.message);
+            console.error("[WS20] UI5 Predefined CSS apply error:", e && e.message, e);
 
             lf_reply("E", "E", (e && e.message) || "");
 

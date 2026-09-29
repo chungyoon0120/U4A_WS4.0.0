@@ -133,7 +133,7 @@
             fn(oRootNode);
         } catch (e) {
             console.warn("[WS20][data] decorator skipped (depends on library / not converted):",
-                sFnName, e && e.message);
+                sFnName, e && e.message, e);
         }
     }
 
@@ -145,6 +145,10 @@
      *     원본 1:1 보존. UI5 렌더링(미리보기/속성/UI5 인스턴스)은 호출하지 않음.
      ************************************************************************/
     oAPP.fn.fnLoadWs20TreeData = function () {
+
+        // 앱이 바뀌면 로그 반복 억제 카운터를 비운다 (2026-09-29 — ws40-work-order A2)
+        // 앞 앱에서 3번을 넘긴 오류가 새 앱에서 첫 번째부터 묻히지 않게 한다.
+        if (typeof U4ALOG !== "undefined" && U4ALOG.clearCaughtCount) { U4ALOG.clearCaughtCount(); }
 
         // ── 사전 준비: servNm / APPID / appInfo (원본 main.fn / setUIAreaEditable 흐름) ──
         try {
@@ -163,7 +167,7 @@
                 oAPP.attr.APPID = oAppInfo.APPID;
             }
         } catch (e) {
-            console.warn("[WS20][data] appInfo/servNm not ready (server login may be pending):", e && e.message);
+            console.warn("[WS20][data] appInfo/servNm not ready (server login may be pending):", e && e.message, e);
         }
 
         // 서버 경로/APPID 가 없으면(헤드리스/비로그인) 서버 호출하지 않고 빈 트리 유지.
@@ -371,7 +375,7 @@
                             oAPP.fn.fnWs20LoadPreview();
                         }
                     } catch (e) {
-                        console.warn("[WS20][data] preview load call error:", e && e.message);
+                        console.warn("[WS20][data] preview load call error:", e && e.message, e);
                     }
 
                     //세션 랜덤키 얻기. (원본 592행 — 미리보기 DnD 가 참조)
@@ -380,7 +384,7 @@
                     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 } catch (e) {
-                    console.warn("[WS20][data] getAppData handle error:", e && e.message);
+                    console.warn("[WS20][data] getAppData handle error:", e && e.message, e);
                 } finally {
                     // 완료 시 busy lock 해제 — 단, 가운데 미리보기(iframe)가 busy 를 인수
                     // (부팅 중: __ws20PrevBooting)했으면 끄지 않는다. 미리보기 성공/실패/watchdog
@@ -458,7 +462,7 @@
                 _oUndoRedo.clearHistory();
                 _oUndoRedo.setUndoRedoButtonEnable();
             } catch (e) {
-                console.warn("[WS20][data] undo/redo init skip:", e && e.message);
+                console.warn("[WS20][data] undo/redo init skip:", e && e.message, e);
             }
 
             var _oRoot = (oAPP.attr.oModel.oData.zTREE && oAPP.attr.oModel.oData.zTREE[0]) || null;
@@ -539,7 +543,7 @@
                 _oUndoRedo2.clearHistory();
                 _oUndoRedo2.setUndoRedoButtonEnable();
             } catch (e) {
-                console.warn("[WS20][data] undo/redo init skip:", e && e.message);
+                console.warn("[WS20][data] undo/redo init skip:", e && e.message, e);
             }
 
             //design 레이아웃 순서 설정. (원본 823행 setDesignLayout — UI5 splitter 의존,

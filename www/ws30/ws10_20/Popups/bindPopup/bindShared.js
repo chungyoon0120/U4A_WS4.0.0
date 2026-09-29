@@ -113,18 +113,18 @@
                 _ajaxLog("끝남", "성공 (상태 " + ((typeof xhr !== "undefined" && xhr && xhr.status) ? xhr.status : "-") + ")");
                 var oRes = null;
                 try { oRes = JSON.parse(xhr.response); }
-                catch (e) { console.error("[bindWindow] response parse failed:", e && e.message); }
-                try { fn_success(oRes); } catch (e2) { console.error("[bindWindow] callback error:", e2 && e2.message); }
+                catch (e) { console.error("[bindWindow] response parse failed:", e && e.message, e); }
+                try { fn_success(oRes); } catch (e2) { console.error("[bindWindow] callback error:", e2 && e2.message, e2); }
             } else {
                 _ajaxFail("서버가 상태 " + xhr.status + " 를 돌려줌", xhr);
                 console.error("[bindWindow] server error status=", xhr.status, sPath);
-                try { fn_success(null); } catch (e3) { console.error("[bindWindow] callback error (server error branch):", e3 && e3.message); }
+                try { fn_success(null); } catch (e3) { console.error("[bindWindow] callback error (server error branch):", e3 && e3.message, e3); }
             }
         };
         xhr.onerror = function () {
             _ajaxFail("서버에 못 닿음 (연결 끊김·차단·주소 틀림)", xhr);
             console.error("[bindWindow] network error:", sPath);
-            try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (network branch):", e && e.message); }
+            try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (network branch):", e && e.message, e); }
         };
         // ★ [2026-09-14, 장군님 지시] 나머지 실패 경로도 같은 자리로 모은다.
         //   호출부는 busy 를 켜고 fn_success 하나만 기다린다 — 어느 경로로 끝나든 반드시 불러야
@@ -132,12 +132,12 @@
         xhr.onabort = function () {
             _ajaxFail("요청이 취소됨", xhr);
             console.error("[bindWindow] request aborted:", sPath);
-            try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (abort branch):", e && e.message); }
+            try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (abort branch):", e && e.message, e); }
         };
         xhr.ontimeout = function () {
             _ajaxFail("응답 시간 초과", xhr);
             console.error("[bindWindow] request timed out:", sPath);
-            try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (timeout branch):", e && e.message); }
+            try { fn_success(null); } catch (e) { console.error("[bindWindow] callback error (timeout branch):", e && e.message, e); }
         };
         xhr.withCredentials = true;
         xhr.open("post", sPath, true);
@@ -306,7 +306,7 @@
                 total += w;
             }
             oHost.style.setProperty("--u4act-total-w", (total + overhead) + "px");
-        } catch (e) { console.error("[bindWindow] autofitTreeColumns:", e && e.message); }
+        } catch (e) { console.error("[bindWindow] autofitTreeColumns:", e && e.message, e); }
     };
 
     /************************************************************************
@@ -361,7 +361,7 @@
             var total = 0;
             for (var m = 1; m <= nCol; m++) { oHost.style.setProperty("--u4act-c" + m + "-w", aCol[m - 1] + "px"); total += aCol[m - 1]; }
             oHost.style.setProperty("--u4act-total-w", (total + overhead) + "px");
-        } catch (e) { console.error("[bindWindow] fitTreeColumns:", e && e.message); }
+        } catch (e) { console.error("[bindWindow] fitTreeColumns:", e && e.message, e); }
     };
 
     /************************************************************************
