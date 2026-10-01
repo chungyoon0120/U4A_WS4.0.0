@@ -1,5 +1,5 @@
 # U4A Workspace 4.0
-ㅎㅎㅎ
+
 SAP UI5 기반 U4A Workspace 를 **HTML5 + 바닐라 JS** 로 바꾸는 Electron 데스크톱 앱.
 백엔드(Electron / IPC / Node)는 그대로 두고, 화면 그리는 부분만 UI5 → HTML5 로 교체한다.
 
