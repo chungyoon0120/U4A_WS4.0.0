@@ -105,7 +105,11 @@ self.onmessage = function (e) {
                     //1. 전체 다 닫는다.
                     self.postMessage({
                         RETCD: "E",
-                        RTMSG: "connection fail!"
+                        RTMSG: "connection fail!",
+                        // 로그용 (2026-10-01 — 장군님 지시 · 재현 시험): 세션 유지 호출이 왜 실패했는지.
+                        // 받는 쪽(fnServerSessionTimeOut)이 로그 한 줄에만 쓴다 — 이 값으로 갈라지는 동작은 없다
+                        HTTP_STATUS: xhr.status,
+                        HTTP_STATUS_TEXT: xhr.statusText
                     });
 
                 }

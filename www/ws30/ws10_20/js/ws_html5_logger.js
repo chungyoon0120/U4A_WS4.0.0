@@ -1,7 +1,7 @@
 /****************************************************************************************
  * 공통 로그 함수 (화면 쪽)
  * --------------------------------------------------------------------------------------
- * 오류코드 접두: ULOG / 다음 번호: 003
+ * 오류코드 접두: ULOG / 다음 번호: 004
  *
  * 왜 만들었나 (2026-09-08)
  *   지금은 화면마다 제각각으로 로그를 남겨 모양이 다르다.
@@ -367,7 +367,11 @@
         // 2026-09-29 추가 (ws40-work-order A2)
         '반복 억제 설정': 'THROTTLE',
         // 2026-09-29 추가 (ws40-work-order A4-2)
-        '속성값 바뀜': 'PROP_COERCE'
+        '속성값 바뀜': 'PROP_COERCE',
+        // 2026-10-01 추가 (ws40-work-order-2 A7)
+        '진입': 'ENTER',
+        // 2026-10-01 추가 (ws40-work-order-2 A8)
+        '콘솔 등급 설정': 'CONSOLE_LEVEL'
     };
 
     function _levelEn(s) {
@@ -813,6 +817,45 @@
 
             _write("알림", _buildLine("알림", "반복 억제 설정", "caught throttle",
                 _bCaughtThrottle ? "on" : "off (counter cleared)", -1, false));
+        },
+
+        /**
+         * exe 에서 console 로 내보낼 등급 바꾸기 (2026-10-01 — 장군님 지시, ws40-work-order-2 A8)
+         * 왜: exe 에서는 console 이 electron-log 로 바뀌고 error 등급만 console 로 나간다(ws_log.js).
+         *     그래서 caught(참고)·warn·info 줄이 console 만 읽는 테스트 프로그램에 안 닿았다.
+         * 자동 테스트 프로그램이 창에 붙자마자 부른다:
+         *   U4ALOG.setConsoleLevel("silly")   // 전부 console 에도 낸다
+         *   U4ALOG.setConsoleLevel("error")   // 기본값으로 되돌린다
+         * - 몇 번을 불러도 된다. 로그 파일 쪽 출력은 건드리지 않는다.
+         * - 개발 모드(exe 아님)에서는 console 이 원래 것이라 값만 바뀌고 보이는 것은 그대로다.
+         * - electron-log 는 창(BrowserWindow)마다 따로다. 창마다 한 번씩 불러야 한다.
+         *   같은 창 안의 디자인 미리보기 iframe 은 부모 창 것을 같이 쓰므로 한 번으로 된다.
+         * @param {string} sLevel - error / warn / info / verbose / debug / silly
+         * @returns {boolean} 바꿨으면 true
+         */
+        setConsoleLevel: function (sLevel) {
+
+            let aLevel = ["error", "warn", "info", "verbose", "debug", "silly"];
+
+            if (aLevel.indexOf(sLevel) === -1) {
+                _write("주의", _buildLine("주의", "콘솔 등급 설정", "console level", "rejected - unknown level: " + String(sLevel).slice(0, 20), -1, false));
+                return false;
+            }
+
+            let oElectronLog;
+
+            // 여기 오류는 U4ALOG 로 넘기지 않는다 — 로그 파일이 자기 오류를 자기에게 넘기면 무한 반복이다.
+            try {
+                oElectronLog = require("electron-log");
+                oElectronLog.transports.console.level = sLevel;
+            } catch (e) {
+                console.error("[ULOG-003] setConsoleLevel failed - electron-log not available", e);
+                return false;
+            }
+
+            _write("알림", _buildLine("알림", "콘솔 등급 설정", "console level", sLevel, -1, false));
+
+            return true;
         },
 
         /**

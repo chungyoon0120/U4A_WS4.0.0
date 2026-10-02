@@ -3955,6 +3955,9 @@ function getUiPosition(is_tree, it_tree, IT_UA015) {
  * Rebuilds a portion of the preview tree after a design change.
  */
 async function refreshPreview(is_tree) {
+
+	// 진입 기록 (2026-10-01 — 장군님 지시, ws40-work-order-2 A7): 오류 분석 때 이 길을 실제로 지났는지 알기 위해
+	if (typeof U4ALOG !== "undefined" && U4ALOG.info) { U4ALOG.info("진입", "refreshPreview", "OBJID=" + String(is_tree && is_tree.OBJID).slice(0, 40)); }
 	
 	return new Promise(async (resolve) => {
 		if (is_tree.OBJID === "ROOT") {
@@ -5142,6 +5145,9 @@ function addPreviewTabIndexCustomData(oUi) {
  * Builds the preview root controls and renders the current design tree into the iframe.
  */
 async function drawPreview() {
+
+	// 진입 기록 (2026-10-01 — 장군님 지시, ws40-work-order-2 A7): 오류 분석 때 이 길을 실제로 지났는지 알기 위해
+	if (typeof U4ALOG !== "undefined" && U4ALOG.info) { U4ALOG.info("진입", "drawPreview", ""); }
 	if (!jQuery.isEmptyObject(parent.oAPP.attr.prev)) {
 		parent.oAPP.DATA.APPDATA.T_0015 = parent.oAPP.fn.getAttrChangedData();
 		for (let _s0015 of parent.oAPP.DATA.APPDATA.T_0015) {

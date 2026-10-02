@@ -124,6 +124,8 @@ U4ALOG.warn('값이 없어 그만둠', 'T_ATTR', 'attribute list cannot be drawn
 | `SKIP_TEMP` | 장군님 지시로 임시로 꺼둔 로직을 건너뜀 |
 | `THROTTLE` | 오류 반복 억제를 켜거나 끔 — `U4ALOG.setCaughtThrottle` (2026-09-29 추가, ws40-work-order A2) |
 | `PROP_COERCE` | 디자인 미리보기가 잘못된 속성값을 0·기본값으로 바꿈 — `U4ALOG.note` · 참고 등급 (2026-09-29 추가, ws40-work-order A4-2) |
+| `ENTER` | 주요 함수에 들어옴 — 오류 분석 때 그 길을 실제로 지났는지 보는 발자국. 루프 안에는 넣지 않는다 (2026-10-01 추가, ws40-work-order-2 A7) |
+| `CONSOLE_LEVEL` | exe 에서 console 로 내보낼 등급을 바꿈 — `U4ALOG.setConsoleLevel` (2026-10-01 추가, ws40-work-order-2 A8) |
 
 > **표에 없는 새 사건**을 만들 때는 이 표에 한 줄 추가하고 쓴다. 임의로 만들어 쓰지 않는다.
 

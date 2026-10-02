@@ -25,6 +25,9 @@ module.exports = function (window, document, console) {
     //    로그 남기기와 전송은 이 flag 와 무관하게 계속된다(아래 _reportError 참고).
     var bIsError = false;
 
+    // console 에 찍는 stack 의 최대 길이 (2026-10-01). 로그는 고객사 PC 용량이라 상한을 둔다.
+    const MAX_STACK_LENGTH = 4000;
+
     /************************************************************************
      * 오류 한 건 보고 (2026-09-08 추가 — 장군님 지시)
      * ---------------------------------------------------------------------
@@ -41,7 +44,25 @@ module.exports = function (window, document, console) {
 
         // 1) 로그는 언제나 남긴다 (첫 1건 제한과 무관)
         try {
-            console.error(sMessage);
+
+            // stack 도 console 에 같이 찍는다 (2026-10-01 — 장군님 지시, ws40-work-order-2 A5)
+            // 왜: stack 이 IPC 로만 가서, console 만 읽는 테스트 프로그램·AI 분석이 터진 자리를 못 찾았다.
+            // 메시지 안에 이미 stack 이 들어 있으면(onunhandledrejection) 두 번 찍지 않는다.
+            // 받은 stack 은 다듬지 않는다. 너무 길 때만 뒤를 자르고 잘랐다고 적는다.
+            var sOut = sMessage;
+
+            if (sStack && String(sMessage).indexOf(sStack) === -1) {
+
+                var sStackOut = String(sStack);
+
+                if (sStackOut.length > MAX_STACK_LENGTH) {
+                    sStackOut = sStackOut.slice(0, MAX_STACK_LENGTH) + "\n...(stack truncated at " + MAX_STACK_LENGTH + " chars)";
+                }
+
+                sOut = sMessage + "\n" + sStackOut;
+            }
+
+            console.error(sOut);
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 2) 전송은 앱 본체에 맡긴다. 설정에 토큰이 없으면 앱 본체가 알아서 넘어간다.
@@ -155,7 +176,8 @@ module.exports = function (window, document, console) {
             return;   // 오류창만 두 번 띄우지 않는다
         }
 
-        console.trace(`[onError]: `);
+        // 표지 줄에 오류 글을 같이 싣는다 (2026-10-01, ws40-work-order-2 A6) — 빈 표지만 남아 사고 기록이 비던 것
+        console.trace(sErrMsg);
 
         // critical 오류이므로 창을 닫는다.
         showCriticalErrorDialog(sErrMsg);
@@ -183,7 +205,8 @@ module.exports = function (window, document, console) {
             return;   // 오류창만 두 번 띄우지 않는다
         }
 
-        console.trace(`[onunhandledrejection]: `);
+        // 표지 줄에 오류 글을 같이 싣는다 (2026-10-01, ws40-work-order-2 A6)
+        console.trace(sErrorMsg.indexOf("[onunhandledrejection]: ") === 0 ? sErrorMsg : "[onunhandledrejection]: " + sErrorMsg);
 
         // critical 오류이므로 창을 닫는다.
         showCriticalErrorDialog(sErrorMsg);

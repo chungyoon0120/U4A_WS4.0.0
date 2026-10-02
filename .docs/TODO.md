@@ -7,6 +7,8 @@
 
 사용자의 결정을 기다리거나 "보류하자" 로 미룬 것. 무엇을 정해야 하는지와 선택지를 적는다.
 
+- **지침서 2(오류 stack·오류 글을 console 까지 내보내기) — 커밋할지** : 코드 넣고 dev mode 실측 통과(2026-10-01). 커밋 안 함. exe 는 테스트하지 않기로 정함. `createUIInstance` 진입 기록은 안 넣은 상태. 결과 = [05_지침서2_현황판.md](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/ws40-work-order/05_지침서2_현황판.md)
+
 ## 할 일
 
 지금 당장은 안 하지만 나중에 해야 할 작업.

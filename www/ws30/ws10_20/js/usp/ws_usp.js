@@ -47,6 +47,9 @@
      ************************************************************************/
     oAPP.fn.fnCreateWs30 = () => {
 
+        // 진입 기록 (2026-10-01 — 장군님 지시, ws40-work-order-2 A7): 오류 분석 때 이 길을 실제로 지났는지 알기 위해
+        if (typeof U4ALOG !== "undefined" && U4ALOG.info) { U4ALOG.info("진입", "fnCreateWs30", ""); }
+
         // 현재 테마의 색상 정보 구하기
         gThemeColors = sap.ui.core.theming.Parameters.get();
 
