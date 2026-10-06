@@ -4,15 +4,7 @@ dist/
 node_modules/
 test/
 
-# 백업 파일
-*.analyupdbak
-*.stderrcpbak
-*.vbserrdlgbak
-*.widthhelplangubak
-*.uspappinfobak
-*.treecolfixbak
-*.ws30appinfosyncbak
-_*.bak
+# 백업 파일 — 만들지 않는다(2026-10-06 장군님 지시, git 이 백업이다). 확장자 예외도 더 추가하지 않는다.
 
 # Python 캐시
 __pycache__/
