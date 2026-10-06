@@ -9,7 +9,7 @@ parent.require(parent.PATHINFO.WSTRYCATCH)(window, document, console);
 
 /**
  * 부모 창의 공통 로그 함수(U4ALOG)를 이어 받는다 (2026-09-29 — ws40-work-order A4)
- * 오류코드 접두: PREV / 다음 번호: 002
+ * 오류코드 접두: PREV / 다음 번호: 003
  * 미리보기 iframe 은 이 index.js 만 올리므로 U4ALOG 가 없었다 — 이 파일 안의
  * `typeof U4ALOG !== "undefined"` 로 감싼 기록 호출이 전부 아무것도 남기지 않았다.
  * 부모 창 것을 쓰면 줄이 부모 창 console(= 로그 파일)로 남는다.
@@ -5039,6 +5039,92 @@ parent.oAPP.fn.exceptionRespGridLayout = function(UIOBK) {
 	};
 };
 
+//#region UI structure for log (2026-10-06 장군님 지시)
+// 왜 넣나: UI 하나가 터졌을 때 「그 UI 가 터졌다」만으로는 원인을 못 짚는다.
+//   장군님 지적(2026-10-06): "PAGE 밑에 input 을 넣었을때 오류난건지? 아니면 PAGE 밑에 vbox 넣고
+//   뭐 넣고 뭐넣고 여기까지는 성공인데 특정 ui 의 조합에 의해서 오류가 발생된건 어떻게 원인 분석하냐"
+// 어떻게: **터졌을 때만** ROOT 부터의 경로 + 그 부모 밑 형제 목록을 같이 남긴다. 성공하면 0자.
+//   버린 안 ① UI 하나마다 한 줄 — UI 1000개 앱이면 1000줄. 양이 감당 안 된다.
+//   버린 안 ② 구조가 바뀔 때마다 트리 전체 한 줄 — UI 1000개면 한 줄이 약 40KB 고,
+//     구조를 바꾸는 조작(추가·삭제·이동·붙여넣기)이 평상 작업이라 하루 용량 한도를 혼자 넘긴다.
+//     장군님 확인 2026-10-06 「그게 가장 현실적이다」 → 트리 전체를 남기는 길은 넣지 않는다.
+var _iUiPathMaxDepth = 100;          // circular 방어
+var _iUiSiblingMax = 30;             // 형제가 아주 많은 경우 앞쪽만 — 뒤는 개수로 적는다
+var _iUiPathMaxChars = 1000;         // 한 줄이 길어지지 않게 상한
+var _bUiTreeWarned = false;          // 구조를 못 읽었다는 경고는 한 번만
+
+function lf_uiTreeRows() {
+	var lt = parent && parent.oAPP && parent.oAPP.DATA && parent.oAPP.DATA.APPDATA
+		? parent.oAPP.DATA.APPDATA.T_0014 : undefined;
+	return (lt && lt.length) ? lt : undefined;
+}
+
+function lf_uiClassOf(sUiobk) {
+	var lt_0022 = parent && parent.oAPP && parent.oAPP.DATA && parent.oAPP.DATA.LIB
+		? parent.oAPP.DATA.LIB.T_0022 : undefined;
+	if (!lt_0022) { return ""; }
+	var ls = lt_0022.find(a => a.UIOBK === sUiobk);
+	return ls ? ls.LIBNM : "";
+}
+
+// 터진 UI 의 ROOT 부터의 경로 + 형제 몇 번째 — 예) "PATH=ROOT(sap.m.App) > P1(sap.m.Page) > I1(sap.m.Input) IDX=2/3"
+function lf_uiPathForLog(is_tree) {
+	try {
+		if (!is_tree || !is_tree.OBJID) { return ""; }
+		var lt = lf_uiTreeRows();
+		if (!lt) {
+			if (!_bUiTreeWarned && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+				_bUiTreeWarned = true;
+				U4ALOG.warn("값이 없어 그만둠", "parent.oAPP.DATA.APPDATA.T_0014",
+					"UI structure path cannot be built - failing UI combination stays unknown in the log");
+			}
+			return "";
+		}
+		var la_path = [];
+		var ls_cur = lt.find(a => a.OBJID === is_tree.OBJID) || is_tree;
+		var lo_seen = {};
+		var i = 0;
+		while (ls_cur && i < _iUiPathMaxDepth) {
+			if (lo_seen[ls_cur.OBJID]) { la_path.unshift("...circular at " + ls_cur.OBJID); break; }
+			lo_seen[ls_cur.OBJID] = true;
+			var l_cls = lf_uiClassOf(ls_cur.UIOBK);
+			la_path.unshift(l_cls ? (ls_cur.OBJID + "(" + l_cls + ")") : ls_cur.OBJID);
+			if (!ls_cur.POBID) { break; }
+			ls_cur = lt.find(a => a.OBJID === ls_cur.POBID);
+			i++;
+		}
+		if (i >= _iUiPathMaxDepth) { la_path.unshift("...max depth " + _iUiPathMaxDepth); }
+		// 형제 몇 번째인지 + 그 부모 밑에 무엇이 붙어 있었나 — 조합이 원인일 때 이게 답이다
+		var l_idx = "";
+		var l_sib = "";
+		var ls_self = lt.find(a => a.OBJID === is_tree.OBJID);
+		if (ls_self) {
+			var lt_sib = lt.filter(a => a.POBID === ls_self.POBID);
+			var l_pos = lt_sib.findIndex(a => a.OBJID === ls_self.OBJID);
+			if (l_pos >= 0) { l_idx = " IDX=" + (l_pos + 1) + "/" + lt_sib.length; }
+			var la_sib = lt_sib.slice(0, _iUiSiblingMax).map(function (a) {
+				var l_c = lf_uiClassOf(a.UIOBK);
+				return l_c ? (a.OBJID + "(" + l_c + ")") : a.OBJID;
+			});
+			if (lt_sib.length > _iUiSiblingMax) {
+				la_sib.push("...(" + (lt_sib.length - _iUiSiblingMax) + " more)");
+			}
+			if (la_sib.length) { l_sib = " SIBLINGS=" + la_sib.join(" "); }
+		}
+		var l_out = " PATH=" + la_path.join(" > ") + l_idx + l_sib;
+		if (l_out.length > _iUiPathMaxChars) {
+			l_out = l_out.slice(0, _iUiPathMaxChars) + "...(truncated at " + _iUiPathMaxChars + " chars)";
+		}
+		return l_out;
+	} catch (e) {
+		if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+		console.error("[PREV-002] lf_uiPathForLog failed - failing UI combination stays unknown in the log", e);
+		return "";
+	}
+}
+
+//#endregion
+
 /**
  * Creates a UI5 control instance for one design tree node and applies its attributes.
  */
@@ -5067,7 +5153,8 @@ function createUIInstance(is_tree, it_0015) {
 	try {
 		sap.ui.requireSync(ls_0022.LIBNM.replace(/\./g, "/"));
 	} catch (e) {
-	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+	    // 어느 조합에서 터졌는지 같이 남긴다 (2026-10-06 장군님 지시 — ROOT 부터의 경로 + 형제 몇 번째)
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "createUIInstance requireSync OBJID=" + is_tree.OBJID + " LIBNM=" + ls_0022.LIBNM + lf_uiPathForLog(is_tree)); }
 		parent.oAPP.attr.prev[is_tree.OBJID] = new sap.ui.core.Element();
 		var lt_0015 = it_0015 || parent.oAPP.DATA.APPDATA.T_0015.filter(a => a.OBJID === is_tree.OBJID);
 		parent.oAPP.attr.prev[is_tree.OBJID]._T_0015 = lt_0015;
@@ -5091,7 +5178,8 @@ function createUIInstance(is_tree, it_0015) {
 		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid(), setUIProperty(is_tree, lt_0015));
 	} catch (e) {
 	    // 어느 UI·어느 class 에서 속성 적용이 실패했는지 같이 남긴다 (2026-09-29 — ws40-work-order A4-1)
-	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "createUIInstance OBJID=" + is_tree.OBJID + " LIBNM=" + ls_0022.LIBNM); }
+	    // + 어느 조합에서 터졌는지 (2026-10-06 장군님 지시 — ROOT 부터의 경로 + 형제 몇 번째)
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "createUIInstance OBJID=" + is_tree.OBJID + " LIBNM=" + ls_0022.LIBNM + lf_uiPathForLog(is_tree)); }
 		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid());
 	}
 	addPreviewTabIndexCustomData(parent.oAPP.attr.prev[is_tree.OBJID]);
