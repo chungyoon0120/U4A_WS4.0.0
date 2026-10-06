@@ -1,4 +1,4 @@
-// 오류코드 접두: RSRC / 다음 번호: 009
+// 오류코드 접두: RSRC / 다음 번호: 010
 /**
  * index.js  (cleaned)
  *
@@ -510,6 +510,34 @@ oAPP.views = window?.oAPP?.views || {};
 
     // 8. AppID 및 Create, Change, Display 모드 정보 구하기
     oWS.utill.fn.getAppInfo = function () {
+
+        // ★[2026-10-06 장군님 지시] WS30(USP) 화면에서는 모델 /WS30/APP 이 진짜 값(SSOT)이다.
+        //   USP 는 Activate · Display↔Change 모드전환 · 저장 응답마다 /WS30/APP 을 "새 객체로"
+        //   갈아끼우는데, 전역 AppInfo 는 WS30 진입 시점 값에 멈춰 있어 ACTST · IS_EDIT · IS_CHAG
+        //   가 모델과 어긋났다(앱이 활성/비활성으로 바뀌어도 전역은 안 바뀜).
+        //   → WS30 에 있는 동안은 모델 값을 전역에 같은 객체로 맞춘 뒤 그 값을 돌려준다.
+        //   WS20 은 종전 그대로 전역 AppInfo 를 쓴다(setAppInfo 가 이미 같이 갱신한다).
+        //   currPage 는 setCurrPage(= 화면 전환 fnNavTo)가 넣는 값이다.
+        if (oWS.utill.attr.currPage === "WS30") {
+
+            try {
+
+                var oWs30App = (oAPP.common && oAPP.common.fnGetModelProperty)
+                    ? oAPP.common.fnGetModelProperty("/WS30/APP")
+                    : undefined;
+
+                if (oWs30App && Object.keys(oWs30App).length > 0) {
+                    // 전역을 모델과 "같은 객체"로 맞춘다 — 이후 모델을 그 자리에서 바꾸면 같이 반영된다.
+                    oWS.utill.attr.oAppInfo = oWs30App;
+                    return oWs30App;
+                }
+
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                console.error("[RSRC-009] getAppInfo: /WS30/APP read failed - returning stored AppInfo", e);
+            }
+
+        }
 
         if (!oWS.utill.attr.oAppInfo) {
             return;

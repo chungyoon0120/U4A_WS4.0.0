@@ -950,9 +950,10 @@
                 //   return 했으므로 WS30 에서는 parent.getAppInfo() 가 undefined 였다.
                 //   → USP 화면에서도 getAppInfo() 가 그 앱 정보를 돌려주게 추가.
                 //   해제는 기존 그대로 WS30 복귀(ws_html5_usp.js _doBackToWs10)의 setAppInfo(undefined).
-                //   ※ 진입 시점 값이다. USP 가 /WS30/APP 을 새 객체로 교체하는 자리
-                //     (Display↔Change 모드전환·저장 응답)에서는 전역이 따라가지 않으므로,
-                //     WS30 의 SSOT 는 계속 모델 /WS30/APP 이다. APPID 는 바뀌지 않는다.
+                //   ※ 진입 뒤의 변화(Activate · 모드전환 · 저장)는 getAppInfo() 쪽에서 따라간다 —
+                //     WS30 에 있는 동안은 getAppInfo() 가 모델 /WS30/APP 을 읽어 전역에 맞춘다
+                //     (resources/index.js oWS.utill.fn.getAppInfo, 2026-10-06 장군님 지시).
+                //     WS30 의 SSOT 는 계속 모델 /WS30/APP 이다.
                 try {
                     parent.setAppInfo(oAppInfo);
                 } catch (e) {
