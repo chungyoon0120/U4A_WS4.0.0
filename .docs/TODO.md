@@ -1,8 +1,9 @@
 # TODO — 남은 일 한눈에
 
-> 갱신 **2026-10-06** · 브랜치 `bootstrap` = `944efa87` / `main` = `c6f1d564` (둘 다 원격 일치, 작업트리 0건)
+> 갱신 **2026-10-06** · 브랜치 `bootstrap` = `df84f079` / `main` = `c6f1d564`
 > **앞으로 할 일은 이 파일 한 곳에만 둔다.** 끝난 항목은 지운다(끝난 일의 기록은 `history/` 에 남는다).
 > 지금 상태 = [CURRENT.md](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/CURRENT.md) · 왜 그렇게 했는지 = [history/](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/)
+> 아래 ☐ 숫자는 **표 안의 실제 테스트 줄만** 센 값이다(설명 줄의 ☐ 는 안 센다 — 2026-10-06 바로잡음).
 
 ---
 
@@ -23,8 +24,8 @@
 
 | 영역 | 지금까지 | 지시가 필요한 것 |
 |---|---|---|
-| busy 시작·끝 전수 점검 | 기준 확정 + 기존 코드 목록만 뽑음 · **코드는 한 줄도 안 고침** | **어느 순서로 판정하고 몇 개씩 보고할지** 정해 주시면 파일 단위로 시작 → [현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/busy시작끝/00_현황판.md) |
-| 반드시 있어야 할 것이 없을 때 | 기준 확정(앱 종료로 통일) · **코드는 한 줄도 안 고침** | **착수 지시** → [현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/필수의존성크리티컬/00_현황판.md) |
+| busy 시작·끝 전수 점검 | 기준 확정 + 기존 코드 목록만 뽑음 · **전수 판정분은 코드 한 줄도 안 고침** | **어느 순서로 판정할지** 정해 주시면 파일 단위로 시작 → [현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/busy시작끝/00_현황판.md) |
+| 반드시 있어야 할 것이 없을 때 | 기준 확정(앱 종료로 통일) · 보고 단위도 정해짐(파일 단위) · **코드는 한 줄도 안 고침** | **착수 지시** → [현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/필수의존성크리티컬/00_현황판.md) |
 
 ---
 
@@ -32,45 +33,45 @@
 
 제가 못 하는 일(비밀번호 입력 · 노션 조작)입니다.
 
-| 무엇 | 왜 장군님이 | 어디 |
-|---|---|---|
-| SAP 접속 정보 파일 만들기 | **비밀번호가 들어간다** — 접속 정보가 0건이라 그 기능을 돌려 본 적이 없음 | [sapAdt스킬 현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/sapAdt스킬/00_현황판.md) |
-| 노션 테스트 현황 확인 7건 | 노션 화면 조작 | [노션현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/노션현황판/00_현황판.md) |
+| 무엇 | 남은 ☐ | 왜 장군님이 | 어디 |
+|---|---|---|---|
+| SAP 접속 정보 파일 만들기 | 7 | **비밀번호가 들어간다** — 접속 정보가 0건이라 그 기능을 돌려 본 적이 없음 | [sapAdt스킬 현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/sapAdt스킬/00_현황판.md) |
+| 노션 테스트 현황 확인 | 7 | 노션 화면 조작 | [노션현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/노션현황판/00_현황판.md) |
 
 ---
 
-## 4️⃣ 앱 켜고 테스트해 주실 것 — 영역 25곳
+## 4️⃣ 앱 켜고 테스트해 주실 것 — 영역 24곳
 
 **전부 코드는 넣었고 앱 확인만 안 된 상태입니다.** 많으니 위에서부터 몇 개씩 하시면 됩니다.
 반드시 **앱을 껐다 켜고**(새로고침 아님), **dev mode** 로 보십시오(exe 는 테스트 안 하기로 정함).
 
-### 큰 묶음 (20건 이상)
+### 큰 묶음 (19건 이상)
 
 | 영역 | 남은 ☐ | 현황판 |
 |---|---|---|
 | 내부 데이터 모니터 | 62 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/데이터모니터/00_현황판.md) |
 | 오류 수집·전송 (1차 구현분) | 34 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/로그수집전송/00_현황판.md) |
 | 별창 — 뜨자마자 busy 켜기 | 32 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창busy시작/00_현황판.md) |
-| 대형 바인딩 팝업 | 29 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/bindpopup/00_현황판.md) |
-| UI 템플릿 마법사 | 25 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/wizard/00_현황판.md) |
-| UI5 미리 정의된 CSS 팝업 | 20 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/ui5csspopup/00_현황판.md) |
+| 대형 바인딩 팝업 | 28 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/bindpopup/00_현황판.md) |
+| UI 템플릿 마법사 | 24 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/wizard/00_현황판.md) |
+| 앞 화면↔편집 화면 왕복 중 검정 화면 멈춤 | 19 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/검정화면멈춤/00_현황판.md) |
+| UI5 미리 정의된 CSS 팝업 | 19 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/ui5csspopup/00_현황판.md) |
 
-### 중간 묶음 (6~19건)
+### 중간 묶음 (6~18건)
 
 | 영역 | 남은 ☐ | 현황판 |
 |---|---|---|
-| 앞 화면↔편집 화면 왕복 중 검정 화면 멈춤 | 19 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/검정화면멈춤/00_현황판.md) |
 | 쇼컷링크 생성 | 18 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/숏컷링크생성/00_현황판.md) |
 | 화면 이동 · 단축키 | 18 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/단축키생명주기/00_현황판.md) |
 | 앱 이름 입력칸이 기준 (권한 잠금) | 16 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/앱이름입력값기준/00_현황판.md) |
 | 원본 이식 전체 | 10 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/update/00_전체현황판.md) |
 | 컨트롤러(클래스 빌더) 실행 | 9 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/execControllerClass/00_현황판.md) |
 | 오류 stack·오류 글을 console 까지 (지침서 2) | 7 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/ws40-work-order/05_지침서2_현황판.md) |
-| 미리보기 오류 표면화 | 7 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/미리보기오류표면화/00_현황판.md) |
+| 미리보기 오류 표면화 | 6 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/미리보기오류표면화/00_현황판.md) |
 | 네트워크 끊김 화면 | 6 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/네트워크끊김화면/00_현황판.md) |
 | WS4.0 catch 오류 기록 보강 | 6 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/ws40-work-order/00_현황판.md) |
 
-### 작은 묶음 (1~5건)
+### 작은 묶음 (2~5건)
 
 | 영역 | 남은 ☐ | 현황판 |
 |---|---|---|
@@ -81,28 +82,12 @@
 | 2026-08-16 원본 갱신분 | 4 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/update/20260818/00_현황판.md) |
 | 메인 창 busy 를 공통 파일로 옮김 | 4 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/busy시작끝/00_현황판.md) |
 | 일러스트 메시지 팝업 | 3 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/일러스트팝업/00_현황판.md) |
-| 라이브러리 데이터 누락 — 다시 확인 | 1 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/라이브러리데이터누락/00_현황판.md) |
+| 라이브러리 데이터 누락 — 다시 확인 | 2 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/라이브러리데이터누락/00_현황판.md) |
 | 이미지 압축 설정 창 | 2 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/이미지압축설정/00_현황판.md) |
-| 디자인 트리 우클릭 메뉴 | 1 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/디자인트리컨텍스트메뉴/00_현황판.md) |
-| 속성 styleClass → CSS 편집기 | 1 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/속성styleClassCSS편집기/00_현황판.md) |
 
 ---
 
-## 5️⃣ 문서 손질 — 묵은 줄 고치기 (지시 대기)
-
-**현황판 맨 윗줄의 상태 설명이 묵은 것을 2곳에서 찾았습니다.** 그 줄만 믿으면 틀린 보고가 나옵니다.
-실제로 오늘 그 줄 때문에 「커밋 안 함」·「구현 착수 전」 을 장군님께 잘못 올렸습니다.
-
-| 어디 | 적혀 있는 말 | 실제 |
-|---|---|---|
-| 지침서 2 현황판 맨 위 | 「코드 넣음 · **커밋 안 함**」 | **2026-10-02 에 커밋됐고 `main` 에도 있다** |
-| 오류 수집·전송 현황판 맨 위 | 「**아직 구현 착수 전** — 내용 정리 단계」 | **1차 구현이 끝나 테스트 대기다**(같은 문서 아래쪽에 테스트 표가 있고, 해당 파일 5개가 실제로 있다) |
-
-→ 이 두 줄을 고칠지 지시해 주십시오. **나머지 현황판 23곳의 맨 윗줄도 같이 훑을까요?**
-
----
-
-## 6️⃣ 손대지 않은 채 남겨 둔 것 — 1건
+## 5️⃣ 손대지 않은 채 남겨 둔 것 — 1건
 
 | 무엇 | 왜 그대로 두나 |
 |---|---|
