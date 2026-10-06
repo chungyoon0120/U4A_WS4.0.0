@@ -530,6 +530,59 @@
     function _objKey(oNode) { return (oNode && oNode.OBJID != null) ? String(oNode.OBJID) : ""; }
     function _attrEsc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;"); }
 
+    /************************************************************************
+     * [+][삭제] 를 트리 깊이와 무관하게 고정 — "이름 칸" 묶기
+     * ----------------------------------------------------------------------
+     * ★[2026-10-06 장군님 지시] 깊이가 깊어지면 우측 [+][삭제] 가 같이 밀리던 것을 고친다.
+     *
+     *  원인: 공통 트리는 들여쓰기를 "행 전체의 padding-left" 로 준다. 그래서 깊어질수록
+     *        행이 쓸 수 있는 폭 자체가 줄고, 다 줄어든 뒤에는 우측 액션까지 밖으로 밀려
+     *        잘렸다(가로 스크롤 없음). position:sticky 보완책은 남는 폭이 있을 때까지만 버틴다.
+     *  원본: sap.ui.table.TreeTable 컬럼 2개 — [트리 컬럼][액션 컬럼 width 60px].
+     *        들여쓰기는 트리 컬럼 안에서만 일어나 액션 컬럼은 깊이와 무관했다.
+     *        (U4A_WS_DESIGN design/js/uiDesignArea.js 203 · 253행)
+     *  방법: 공통 컬럼 트리(makeColumnTree)가 쓰는 것과 같은 방식 — 행을 만든 뒤
+     *        [토글 + 체크박스 + UI 아이콘 + 이름] 을 "이름 칸" 하나로 묶는다.
+     *        들여쓰기는 CSS 에서 행 padding 이 아니라 "토글의 왼쪽 여백" 으로 옮기므로,
+     *        깊이는 이름 칸 "안에서만" 자리를 먹고 액션 칸 폭은 건드리지 못한다.
+     *        공통 자산(u4a-ui.js / shell.css)은 건드리지 않는다 — WS20 안에서 끝낸다.
+     *  순서: 토글 → 체크박스 → 아이콘 → 이름 (공통 컬럼 트리와 동일. 체크박스를 토글 뒤에 둬야
+     *        원본 TreeTable 셀 구조 [indent][chk+icon+name] 과 같이 들여쓰기를 따라간다.)
+     ************************************************************************/
+    var _bNameCellWarned = false;   // DOM_MISS 경고는 한 번만(행마다 찍히면 로그가 넘친다)
+    function _wrapNameCell(oRow) {
+        try {
+            if (!oRow || oRow.querySelector(".u4aWs20TreeNameCell")) { return; }
+
+            var oTog = oRow.querySelector(".u4a-tree__toggle");
+            var oChk = oRow.querySelector(".u4aWs20TreeChk");
+            var oIco = oRow.querySelector(".u4a-tree__icon");
+            var oLbl = oRow.querySelector(".u4a-tree__label");
+
+            // 토글과 이름은 공통 트리가 항상 만든다. 없으면 묶지 않고 종전 모양 그대로 둔다.
+            if (!oTog || !oLbl) {
+                if (!_bNameCellWarned && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    _bNameCellWarned = true;
+                    U4ALOG.warn("GUARD_EXIT", "u4a-tree__toggle / u4a-tree__label not found in WS20 tree row",
+                                "name cell not built - [+]/[delete] can drift right on deep nodes");
+                }
+                return;
+            }
+
+            var oCell = document.createElement("div");
+            oCell.className = "u4aWs20TreeNameCell";
+            oCell.appendChild(oTog);
+            if (oChk) { oCell.appendChild(oChk); }
+            if (oIco) { oCell.appendChild(oIco); }
+            oCell.appendChild(oLbl);
+            oRow.insertBefore(oCell, oRow.firstChild);
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            console.error("[WS20][tree] name cell wrap failed - [+]/[delete] can drift right on deep nodes", e);
+        }
+    }
+
     var _ws20tree = null;
     function _ensureWs20Tree() {
         if (_ws20tree) { return _ws20tree; }
@@ -637,6 +690,7 @@
                 oRow.classList.add("u4aWs20TreeRow");
                 var sObjid = _objKey(n);
                 oRow.setAttribute("data-objid", sObjid);
+                _wrapNameCell(oRow);   // [토글+체크박스+아이콘+이름] 을 한 칸으로 묶는다(아래 함수 주석)
                 // 우클릭 컨텍스트 메뉴 (구 callDesignContextMenu)
                 oRow.addEventListener("contextmenu", async function (e) {
                     e.preventDefault(); e.stopPropagation();

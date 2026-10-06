@@ -452,6 +452,28 @@
   display: flex; align-items: center; gap: 4px;
   min-width: 0; flex: 1 1 auto; overflow: hidden;
 }
+
+/* ★[2026-10-06 장군님 지시] 이름 칸 — [토글 + 체크박스 + UI 아이콘 + 이름] 묶음.
+   깊이가 깊어져도 우측 [+][삭제] 가 밀리지 않게 하는 핵심.
+   - 종전: 들여쓰기를 "행 전체 padding-left"(공통 shell.css)로 줬다 → 깊어질수록 행이 쓸 폭이
+     줄고, 다 줄어든 뒤엔 액션까지 밖으로 밀려 잘렸다(가로 스크롤 없음).
+   - 지금: 들여쓰기를 "토글의 왼쪽 여백"으로 옮기고, 이름 칸이 남는 폭을 전부 가져간다
+     (flex:1 1 0 + min-width:0 + overflow:hidden). 깊이는 이 칸 "안에서만" 자리를 먹으므로
+     aggr/액션 칸 폭을 건드리지 못한다 = 원본 TreeTable [트리 컬럼][액션 컬럼 60px] 과 같은 성질.
+   - 묶는 것은 WS20 트리 JS(_wrapNameCell)가 한다. 공통 자산은 건드리지 않았다.
+   - 공통 컬럼 트리(.u4aColTree*)가 쓰는 방법과 동일(shell.css 참조). */
+.u4aWs20TreeNameCell {
+  flex: 1 1 0; min-width: 0; overflow: hidden;
+  display: flex; align-items: center;
+  gap: 0.375rem;           /* 행 공통 gap 과 동일 — 묶어도 토글↔이름 간격이 달라지지 않게 */
+}
+/* 들여쓰기 이동: 행 padding(공통) 해제 → 토글 왼쪽 여백으로.
+   깊이(--u4a-tree-depth)·step(--u4a-tree-indent-step)은 공통이 행에 주는 값을 그대로 쓴다
+   (좁은 패널에서 step 이 줄어드는 공통 컨테이너 쿼리도 그대로 먹는다). */
+.u4aWs20TreeRow.u4a-tree__row { padding-left: 0.375rem; }
+.u4aWs20TreeRow .u4a-tree__toggle {
+  margin-left: calc(var(--u4a-tree-depth, 0) * var(--u4a-tree-indent-step, 1rem));
+}
 .u4aWs20TreeRowRight {
   /* ★ 우측 "두 컬럼"([aggr 고정폭 | 액션]) 정렬의 핵심 = display:contents 로 이 래퍼 박스를 없앤다.
      그래야 aggr·액션이 '행(.u4a-tree__row, flex)' 의 직접 항목이 되어 aggr 의 flex-basis(5rem)를
