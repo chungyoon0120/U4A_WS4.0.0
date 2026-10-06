@@ -9,6 +9,7 @@ test/
 *.stderrcpbak
 *.vbserrdlgbak
 *.widthhelplangubak
+*.uspappinfobak
 _*.bak
 
 # Python 캐시

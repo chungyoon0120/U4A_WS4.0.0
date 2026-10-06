@@ -376,8 +376,10 @@
 
             // 서버 세션 종료 → lf_success 에서 잠금 해제 + WS10 이동
             //   ★ 앱정보는 원본(ws_usp.js fnMoveToWs10)과 동일하게 모델 /WS30/APP 에서 읽는다.
-            //     (원본 fnGetAppInfo() === 모델 /WS30/APP. WS30 은 parent.getAppInfo() 를 채우지
-            //      않으므로 parent.getAppInfo() 로 읽으면 APPID 누락 → 세션종료·잠금해제가 어긋난다.)
+            //     (원본 fnGetAppInfo() === 모델 /WS30/APP. 이 모델이 WS30 의 SSOT 이다.)
+            //     ※ 2026-10-06 부터 WS30 진입 시 전역 AppInfo 도 같이 채운다
+            //       (ws_html5_shell.js fnOnEnterDispChangeMode USP 분기) — 그래도 여기서는
+            //       SSOT 인 모델을 그대로 읽는다.
             var oBackAppInfo = APPCOMMON.fnGetModelProperty("/WS30/APP");
             oAPP.fn.fnKillUserSession(oBackAppInfo, lf_success);
 
