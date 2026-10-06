@@ -15,7 +15,23 @@ window.require.config({
     }
 });
 
+// ★ [2026-09-14, 장군님 지시] AMD loader 의 실패 콜백(errback)을 배선한다.
+//   [고친 이유] 종전에는 성공 콜백만 넘겼다. 모듈을 못 읽으면 아무 일도 안 일어나고
+//   부모는 ready 를 영영 못 받았다. 부모가 그걸 타이머로 덮고 있었으나 타이머 폴백은
+//   금지(.analy 16 §2.11)라 걷어내고, 그 자리에 이 실패 콜백을 넣었다.
+//   _hostFail 은 index.html 인라인 스크립트가 정의한다(부모에 evt:"error" 통지).
 window.require(["vs/editor/editor.main"], function () {
+
+    try { _u4aHostBoot(); }
+    catch (e) { _hostFail("CEHT-004", "monaco editor create", e && e.message); }
+
+}, function (oErr) {
+
+    _hostFail("CEHT-003", "vs/editor/editor.main", (oErr && (oErr.message || oErr.requireType)) || "");
+
+});
+
+function _u4aHostBoot() {
 
     // 단일 에디터 인스턴스 생성(#content). 분할/스니펫/테마콤보 없음 — 인앱 팝업용 경량.
     window.editor = monaco.editor.create(document.getElementById("content"), {
@@ -55,18 +71,18 @@ window.require(["vs/editor/editor.main"], function () {
         try {
             var fs = editor.getOption(monaco.editor.EditorOption.fontInfo).fontSize;
             _toParent({ evt: "zoom", pct: Math.round((fs / C_BASE_FONT) * 100) });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     editor.onDidChangeConfiguration(function (e) {
         try { if (e.hasChanged(monaco.editor.EditorOption.fontInfo)) { _reportZoom(); } }
-        catch (e2) { _reportZoom(); }
+        catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } _reportZoom(); }
     });
     _reportZoom();
 
     // Shift+F1 = Pretty Print(포맷). ★에디터 한정★ — Monaco 키바인딩이라 에디터에 포커스가
     //   있을 때만 발화하고 iframe 경계 안에서 처리되어 부모(워크스페이스 단축키)로 새지 않는다.
     editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F1, function () {
-        try { editor.getAction("editor.action.formatDocument").run(); } catch (e) { }
+        try { editor.getAction("editor.action.formatDocument").run(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     // Ctrl/⌘+S = 저장(팝업 하단 ✓ 기능). ★에디터 한정★ — Monaco 가 Ctrl+S 를 가로채
@@ -80,7 +96,7 @@ window.require(["vs/editor/editor.main"], function () {
     // Ctrl/⌘+0 = 폰트 줌 원복(Ctrl+휠 확대/축소 되돌리기). Monaco 내장 액션 사용.
     var _KEY_0 = (monaco.KeyCode.Digit0 != null) ? monaco.KeyCode.Digit0 : monaco.KeyCode.KEY_0;
     editor.addCommand(monaco.KeyMod.CtrlCmd | _KEY_0, function () {
-        try { editor.getAction("editor.action.fontZoomReset").run(); } catch (e) { }
+        try { editor.getAction("editor.action.fontZoomReset").run(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     // ESC = 부모에 "닫기 요청" 위임(인앱 에디터 팝업 편의 — 부모가 변경분 확인 후 닫는다).
@@ -106,7 +122,7 @@ window.require(["vs/editor/editor.main"], function () {
                 if (cs.display !== "none" && cs.visibility !== "hidden") { return true; }
             }
             return false;
-        } catch (e) { return false; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
     editor.onKeyDown(function (e) {
         if (e.keyCode !== monaco.KeyCode.Escape) { return; }
@@ -117,4 +133,4 @@ window.require(["vs/editor/editor.main"], function () {
     // 로드 완료 통지 — 부모는 이 시점에 setValue / focus 수행.
     _toParent({ evt: "ready" });
 
-});
+}

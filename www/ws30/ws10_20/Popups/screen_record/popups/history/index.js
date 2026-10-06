@@ -110,7 +110,7 @@ function scanFiles() {
       })
       .filter(info => info.size > 0)  // 0바이트 파일 제외 (비정상 종료 파일 → Range 요청 에러 방지)
       .sort((a, b) => b.mtime - a.mtime);
-  } catch { return []; }
+  } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); } return []; }
 }
 
 // ── 리스트 아이템 생성 ─────────────────────────────────────────────────────────
@@ -340,6 +340,7 @@ async function deleteFile(filePath, fileName, itemEl) {
       }
     }, 260);
   } catch (err) {
+      if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
     // EBUSY: 파일이 다른 프로세스에서 사용 중 (e.g. 동영상 플레이어)
     const msg = err.code === 'EBUSY'
       ? MSG.M013
@@ -380,7 +381,8 @@ function startWatching() {
       watchText.textContent = MSG.M019;
       stopWatching();
     });
-  } catch {
+  } catch (_u4aErr) {
+      if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }
     watchBadge.classList.add('error');
     watchText.textContent = MSG.M018;
   }

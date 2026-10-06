@@ -14,7 +14,7 @@
 
     function _openTextSearch() {
         try { oAPP.fn.fnTextSearchPopupOpener(); }
-        catch (e) { console.error("[HTML5] text search open", e); }
+        catch (e) { console.error("text search open", e); }
     }
 
     if (typeof oAPP.common.getShortCutList === "function") {
@@ -25,9 +25,9 @@
             aList.forEach(function (o) {
                 if (o && o.KEY === "Ctrl+Shift+F") {
                     o.fn = function (e) {
-                        try { e.stopImmediatePropagation(); } catch (_e) { }
+                        try { e.stopImmediatePropagation(); } catch (_e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_e); } }
                         if (e && e.repeat === true) { return; }                     // [[shortcut-key-repeat-guard]]
-                        var r = ""; try { r = oAPP.common.fnShortCutExeAvaliableCheck(); } catch (_e) { }
+                        var r = ""; try { r = oAPP.common.fnShortCutExeAvaliableCheck(); } catch (_e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_e); } }
                         if (r === "X") { return; }                                  // [[nav-inflight-lock-fnNaviLock]]
                         _openTextSearch();
                     };

@@ -14,14 +14,14 @@
     var oMsg = document.getElementById("msg");
 
     function _toParent(o) {
-        try { o = o || {}; o.__u4apdf = true; o.hostId = HOSTID; window.parent.postMessage(o, "*"); } catch (e) { }
+        try { o = o || {}; o.__u4apdf = true; o.hostId = HOSTID; window.parent.postMessage(o, "*"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _showMsg(s) { if (oMsg) { oMsg.textContent = s || ""; oMsg.hidden = !s; } }
 
     if (!pdfjsLib) { _showMsg("PDF library not available"); _toParent({ evt: "error" }); return; }
 
     // 워커 경로 지정(코어와 같은 lib). 워커 실패 시 pdf.js 가 메인스레드 폴백(느려도 렌더됨).
-    try { pdfjsLib.GlobalWorkerOptions.workerSrc = window.__PDF_WORKER; } catch (e) { }
+    try { pdfjsLib.GlobalWorkerOptions.workerSrc = window.__PDF_WORKER; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     var _doc = null;          // 현재 PDFDocumentProxy
     var _token = 0;           // 렌더 취소 토큰(새 문서/리사이즈 시 이전 렌더 무효화)
@@ -69,10 +69,10 @@
         _showMsg("Loading…");
         var oTask;
         try { oTask = pdfjsLib.getDocument({ data: new Uint8Array(ab) }); }
-        catch (e) { _showMsg("Cannot open PDF"); _toParent({ evt: "error" }); return; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _showMsg("Cannot open PDF"); _toParent({ evt: "error" }); return; }
         oTask.promise.then(function (doc) {
             _doc = doc;
-            try { oWrap.scrollTop = 0; } catch (e) { }
+            try { oWrap.scrollTop = 0; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _render();
             _toParent({ evt: "rendered", pages: doc.numPages });
         }).catch(function () {

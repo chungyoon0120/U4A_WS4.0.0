@@ -28,11 +28,11 @@
     // 팝업 → WS20 방송 송신(원본 sendPostMessage). 채널 없으면 오류 로깅(삼킴 아님).
     function _sendPostMessage(oData) {
         if (!oChannel) {
-            console.error("[HTML5][bindWindow] 방송채널 없음 — 송신 불가:", oData && oData.PRCCD);
+            console.error("[bindWindow] no broadcast channel - send blocked:", oData && oData.PRCCD);
             return;
         }
         try { oChannel.postMessage(oData); }
-        catch (e) { console.error("[HTML5][bindWindow] 방송 송신 오류:", oData && oData.PRCCD, e && e.message); }
+        catch (e) { console.error("[bindWindow] broadcast send error:", oData && oData.PRCCD, e && e.message, e); }
     }
 
     // WS20 디자인 영역 busy off 요청(원본 sendDesignAreaBusyOff) — WS20 잠금 해제.
@@ -78,7 +78,7 @@
      ************************************************************************/
     oAPP.fn.updateBindPopupDesignData = function () {
         if (!oChannel) {
-            console.error("[HTML5][bindWindow] 방송채널 없음 — WS20 반영 불가(UPDATE-DESIGN-DATA)");
+            console.error("[bindWindow] no broadcast channel - WS20 apply blocked (UPDATE-DESIGN-DATA)");
             return;
         }
         oAPP.fn.setBusy(true);
@@ -101,7 +101,7 @@
 
         // [원본 updateDesignData:256 closeAllPopups] 재구성 前 열린 오류 팝오버 닫기(사라질 행에 앵커된 stale 방지).
         //   live 대응 = closeMessagePopover(원본 closeAllPopups 는 툴팁/F4 포함이나 팝업서 상시 열림은 오류 팝오버뿐).
-        if (typeof oAPP.fn.closeMessagePopover === "function") { try { oAPP.fn.closeMessagePopover(); } catch (e) { } }
+        if (typeof oAPP.fn.closeMessagePopover === "function") { try { oAPP.fn.closeMessagePopover(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
         // 광역변수 갱신(원본) — 즉시 세팅(다른 코드가 oAPP.attr.T_00xx 를 읽으므로 지연 금지).
         oAPP.attr.T_0014 = JSON.parse(JSON.stringify(d.T_0014 || []));
@@ -115,9 +115,19 @@
             try {
                 // 추가속성 화면 비활성 — 원본 setAdditLayout("", {KEEP_SPLITTER_SIZE:true}). 필수 호출 직접(삼킴 제거).
                 oAPP.fn.setAdditLayout("", { KEEP_SPLITTER_SIZE: true });
-                // [BR63] 우측 추가속성 바인딩 버튼 활성 — 원본 broadcastChannelBindPopup.js:282
-                //   setAdditBindButtonEnable(true). HTML5 에 누락돼 있던 원본 1:1 호출을 복원한다.
-                oAPP.fn.setAdditBindButtonEnable(true);
+                // ★[BR63 검수반영] 우측 추가속성 바인딩 버튼 활성(원본 282 setAdditBindButtonEnable(true))은
+                //   **여기서 하지 않는다**. 원본은 278행 await moveDesignPage() 로 동일속성 화면 teardown +
+                //   디자인 트리 복귀가 "끝난 뒤"에야 282 에서 버튼을 켜는 순서 계약이다. HTML5 이 경로에는
+                //   moveDesignPage 가 없어, 여기서 켜면 동일속성 화면이 잠가 둔(syncBindScreen.js:233) 버튼을
+                //   전환(0.26s) 도중에 남이 풀어버린다(잠금 소유자 침범 + busy 조기 해제).
+                //   그렇다고 여기에 moveDesignPage 를 넣어서도 안 된다 — HTML5 designSwapToPage/moveDesignPage
+                //   (designArea.js:1545·1569)는 진행 중 _swapTimer 를 clearTimeout 만 하고 그 타이머가 resolve 할
+                //   앞선 Promise 를 완료시키지 않아, 중복 호출 시 designArea.js:766 / syncBindScreen.js:305·354 의
+                //   await 가 영구 pending 되어 busy 해제·버튼 복원이 영영 실행되지 않는다(화면 잠김).
+                //   → 버튼 복원 소유자는 원래대로 동일속성 성공/뒤로가기 teardown(designArea.js:769,
+                //     syncBindScreen.js:357) 하나로 둔다. 일반 UPDATE 경로에는 버튼을 끄는 주체가 없으므로
+                //     여기서 켤 실익도 없다. 원본 278·282 미이식은 전환 직렬화 재설계가 필요한 별건.
+                // (원본 282) oAPP.fn.setAdditBindButtonEnable(true);
                 // 디자인 트리 재구성(재렌더 + 컬럼맞춤 포함).
                 oAPP.fn.setDesignTreeData();
                 // ★[BR63] 추가속성 리스트 재구성은 하지 않는다 — 원본 broadcastChannelBindPopup.js:288~289 가
@@ -129,7 +139,7 @@
                 //   되돌아갔다. 원본대로 호출하지 않는다.
                 // (원본 289) oAPP.fn.setAdditialListData();
             } catch (e) {
-                console.error("[HTML5][bindWindow] UPDATE_DESIGN_DATA 재구성 오류:", e && e.message);
+                console.error("[bindWindow] UPDATE_DESIGN_DATA rebuild error:", e && e.message, e);
             } finally {
                 _sendDesignAreaBusyOff();   // WS20 잠금 해제(불변 계약) — 처리 완료 후 반드시.
                 oAPP.fn.setBusy(false);
@@ -217,7 +227,7 @@
         if (!(oAPP.attr.designTree || []).length) { return; }
         if (typeof oAPP.fn.selectDesignNodeByObjid === "function") {
             try { oAPP.fn.selectDesignNodeByObjid(sObjid); }
-            catch (e) { console.error("[HTML5][bindWindow] selectDesignNodeByObjid:", e && e.message); }
+            catch (e) { console.error("[bindWindow] selectDesignNodeByObjid:", e && e.message, e); }
         }
     }
 
@@ -233,14 +243,14 @@
         iBroadRaf = requestAnimationFrame(function () {
             iBroadRaf = 0;
             try { oAPP.fn.updateBindPopupDesignData(); }
-            catch (e) { console.error("[HTML5][bindWindow] designBroadcastUpdate:", e && e.message); }
+            catch (e) { console.error("[bindWindow] designBroadcastUpdate:", e && e.message, e); }
         });
     };
 
     // [PUBLIC] 방송 채널 생성(원본 createChannel) — frame.js Stage6 에서 호출.
     oAPP.fn.createBindChannel = function () {
         if (!oAPP.attr.channelKey) {
-            console.error("[HTML5][bindWindow] channelKey 없음 — 방송채널 미생성(WS20 동기화 불가)");
+            console.error("[bindWindow] channelKey missing - cannot create the broadcast channel (WS20 sync blocked)");
             return;
         }
         if (oChannel) { return; }   // 중복 생성 방지.
@@ -276,7 +286,7 @@
     // [PUBLIC] 방송 채널 종료(원본 closeChannel) — 창 종료 시.
     oAPP.fn.closeBindChannel = function () {
         if (!oChannel) { return; }
-        try { oChannel.close(); } catch (e) { }
+        try { oChannel.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oChannel = null;
         oAPP.attr.oBindChannel = null;
     };

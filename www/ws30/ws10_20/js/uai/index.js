@@ -62,7 +62,7 @@ let AI = {};
      ****************************************************************/
     function _sendConnectInfo(oIF_DATA, fCallback){
         
-        console.log("ai와 논리적인 연결 시도");
+        console.log("ai logical connect start");
 
         // AI 서버에 요청 수행 타임아웃 변수 초기화
         if(AI.iConnTimeout){
@@ -103,7 +103,7 @@ let AI = {};
              *********************************************************************************/
             if(_oIF_DATA?.RETCD === "S"){
 
-                console.log("ai와 논리적인 연결 성공!");
+                console.log("ai logical connect ok");
 
                 // CLIENT.end 이벤트 걸기
                 attachEndEvent();
@@ -276,7 +276,7 @@ let AI = {};
      *************************************************************/
     AI.connect = function(oPARAM){
 
-        console.log("ai와 net 연결 시도");
+        console.log("ai net connect start");
 
         return new Promise(async (resolve) => {
             
@@ -302,7 +302,7 @@ let AI = {};
 
             CLIENT = NET.createConnection(C_PIPE_NANE, function(e){
                 
-                console.log("ai와 net 연결 성공");
+                console.log("ai net connect ok");
 
                 // AI에 전달할 I/F 데이터
                 let oIF_DATA = {
@@ -497,7 +497,7 @@ let AI = {};
      *************************************************************/
     AI.disconnect = function(oPARAM){
 
-        console.log("ai와 net 연결 해제");
+        console.log("ai net connect release");
 
         return new Promise(function(resolve){
 

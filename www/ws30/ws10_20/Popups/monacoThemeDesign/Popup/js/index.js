@@ -59,7 +59,7 @@
         try {
             const s = WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo, "");
             if (s && s.trim()) { return s; }
-        } catch (e) { console.error("[테마디자이너] 메시지 조회 실패:", sNo, e); }
+        } catch (e) { console.error("[monacoThemeDesign] message read failed:", sNo, e); }
         return sFallback || sNo;
     }
 
@@ -67,7 +67,7 @@
     const WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU);
     function mcMsg(sCls, sNo, sFallback) {
         try { const s = WSMSG.fnGetMsgClsText(sCls, sNo); if (s && s.trim()) { return s; } }
-        catch (e) { console.error("[테마디자이너] 메시지클래스 조회 실패:", sCls, sNo, e); }
+        catch (e) { console.error("[monacoThemeDesign] message class read failed:", sCls, sNo, e); }
         return sFallback || sNo;
     }
 
@@ -88,7 +88,7 @@
         oT.textContent = sMsg;
         oT.setAttribute("data-show", "true");
         clearTimeout(_toastTimer);
-        _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { } }, 3000);
+        _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 3000);
     }
 
     // busy(top-layer <dialog>) — 원본 oAPP.fn.setBusy(화면 lock + closable 토글).
@@ -100,7 +100,7 @@
         try {
             if (bIsBusy) { if (!oBusy.open) { oBusy.showModal(); } }
             else { if (oBusy.open) { oBusy.close(); } }
-        } catch (e) { console.error("[테마디자이너] busy 토글 오류:", e); }
+        } catch (e) { console.error("[monacoThemeDesign] busy toggle error:", e); }
     }
 
     // 자식창 일괄 busy 방송 수신 — 원본 frame.js _attachBroadCastEvent 이식.
@@ -131,13 +131,13 @@
                         break;
                 }
             };
-        } catch (e) { console.error("[테마디자이너] BroadCast 배선 오류:", e); }
+        } catch (e) { console.error("[monacoThemeDesign] BroadCast wiring error:", e); }
     }
 
     // 오류 모달(공통 U4AUI.confirm) — 원본 sap.m.MessageBox.error.
     function showErr(sMsg) {
         try { U4AUI.confirm({ type: "E", title: "", message: sMsg, buttons: [{ act: "OK", label: "OK", emphasized: true }] }); }
-        catch (e) { console.error("[테마디자이너] 오류 모달 실패:", e, sMsg); }
+        catch (e) { console.error("[monacoThemeDesign] error modal failed:", e, sMsg); }
     }
 
     // 실시간 워크스페이스 테마 변경 추종 — 원본 frame.js `if-p13n-themeChange-{SYSID}`
@@ -149,18 +149,18 @@
             const sPath = PATH.join(PATHINFO.THEME, SYSID + ".json");
             if (!FS.existsSync(sPath)) { return null; }
             return JSON.parse(FS.readFileSync(sPath, "utf-8"));
-        } catch (e) { console.error("[테마디자이너] 테마 정보 로드 오류:", e); return null; }
+        } catch (e) { console.error("[monacoThemeDesign] theme info load error:", e); return null; }
     }
 
     function _onThemeChange() {
         const oTheme = _getThemeInfo();
         if (!oTheme) { return; }
-        try { CURRWIN.webContents.insertCSS("html, body { margin: 0px; height: 100%; background-color: " + oTheme.BGCOL + "; }"); } catch (e) { }
+        try { CURRWIN.webContents.insertCSS("html, body { margin: 0px; height: 100%; background-color: " + oTheme.BGCOL + "; }"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try {
             if (window.U4ATheme && oTheme.THEME) {
                 window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(oTheme.THEME) : oTheme.THEME);
             }
-        } catch (e) { console.error("[테마디자이너] 테마 적용 오류:", e); }
+        } catch (e) { console.error("[monacoThemeDesign] theme apply error:", e); }
     }
 
     const _THEME_CH = SYSID ? ("if-p13n-themeChange-" + SYSID) : "";
@@ -460,6 +460,7 @@
         try {
             _aFileList = FS.readdirSync(themePath);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return _aThemeList;
         }
 
@@ -472,6 +473,7 @@
                 // 파일 or 폴더 정보 얻기.
                 _oDirInfo = FS.statSync(_filePath);
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 continue;
             }
 
@@ -491,6 +493,7 @@
                 const _themeJson = FS.readFileSync(PATH.join(themePath, _oFileInfo.base), "utf-8");
                 _sThemeInfo = JSON.parse(_themeJson);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -533,7 +536,7 @@
             const oFrame = document.querySelector(".EDITOR_FRAME1");
             if (!oFrame || !oFrame.contentWindow) { return; }
             oFrame.contentWindow.postMessage(oMsg);
-        } catch (e) { console.error("[테마디자이너] 프리뷰 송신 오류:", e); }
+        } catch (e) { console.error("[monacoThemeDesign] preview send error:", e); }
     }
 
     // 에디터 준비 대기 — monaco/ 는 비동기 로드(require vs/editor.main 후 window.editor 생성).
@@ -542,8 +545,8 @@
     function _ensureEditor(fnCb, iLeft) {
         const oFrame = document.querySelector(".EDITOR_FRAME1");
         let ed = null;
-        try { ed = oFrame && oFrame.contentWindow && oFrame.contentWindow.editor; } catch (e) { ed = null; }
-        if (ed) { try { fnCb(ed); } catch (e) { console.error("[테마디자이너] 에디터 콜백 오류:", e); } return; }
+        try { ed = oFrame && oFrame.contentWindow && oFrame.contentWindow.editor; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } ed = null; }
+        if (ed) { try { fnCb(ed); } catch (e) { console.error("[monacoThemeDesign] editor callback error:", e); } return; }
         const n = (typeof iLeft === "number") ? iLeft : 80;   // 80 × 80ms ≈ 6.4s
         if (n <= 0) { return; }
         setTimeout(function () { _ensureEditor(fnCb, n - 1); }, 80);
@@ -553,7 +556,7 @@
     function _applyLanguageSample(sLang) {
         const sCode = SAMPLES[sLang] || "";
         _ensureEditor(function (ed) {
-            try { ed.setValue(sCode); } catch (e) { console.error("[테마디자이너] 샘플 주입 오류:", e); }
+            try { ed.setValue(sCode); } catch (e) { console.error("[monacoThemeDesign] sample inject error:", e); }
         });
     }
 
@@ -569,7 +572,7 @@
     function _edAction(sActionId) {
         _ensureEditor(function (ed) {
             try { const a = ed.getAction(sActionId); if (a) { a.run(); } }
-            catch (e) { console.error("[테마디자이너] 에디터 액션 오류:", sActionId, e); }
+            catch (e) { console.error("[monacoThemeDesign] editor action error:", sActionId, e); }
         });
     }
 
@@ -597,7 +600,7 @@
                     }));
                 }
                 _updateZoomLabel();
-            } catch (e) { console.error("[테마디자이너] 줌 오류:", e); }
+            } catch (e) { console.error("[monacoThemeDesign] zoom error:", e); }
         });
     }
 
@@ -608,7 +611,7 @@
                 const px = Math.round(_readFontSize(ed));
                 const iDiff = px - _MONACO_BASE_FONT;
                 if (iDiff !== 0) { _zoomStep(-iDiff); } else { _updateZoomLabel(); }
-            } catch (e) { console.error("[테마디자이너] 줌 초기화 오류:", e); }
+            } catch (e) { console.error("[monacoThemeDesign] zoom init error:", e); }
         });
     }
 
@@ -620,7 +623,7 @@
             if (m && m.editor && m.editor.EditorOption && ed.getOption) {
                 return ed.getOption(m.editor.EditorOption.fontSize) || _MONACO_BASE_FONT;
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return _MONACO_BASE_FONT;
     }
 
@@ -632,7 +635,7 @@
                 const pct = Math.round(_readFontSize(ed) / _MONACO_BASE_FONT * 100);
                 const oBtn = document.getElementById("tdZoomBtn");
                 if (oBtn) { const sp = oBtn.querySelector("span"); if (sp) { sp.textContent = pct + "%"; } oBtn.title = pct + "%"; }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
 
@@ -645,7 +648,7 @@
             const ed = oFrame && oFrame.contentWindow && oFrame.contentWindow.editor;
             const a = ed && ed.getAction("editor.action.formatDocument");
             bSupported = !!(a && (typeof a.isSupported !== "function" || a.isSupported()));
-        } catch (e) { bSupported = false; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bSupported = false; }
         _setFormatCap(bSupported);
         return bSupported;
     }
@@ -671,7 +674,7 @@
             const ed = oFrame && oFrame.contentWindow && oFrame.contentWindow.editor;
             const m = ed && ed.getModel();
             return (m && m.getLanguageId) ? m.getLanguageId() : "";
-        } catch (e) { return ""; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
 
     let _fmtTk = 0;
@@ -705,7 +708,7 @@
                 if (ed.onDidChangeModelLanguage) {
                     ed.onDidChangeModelLanguage(function () { _updateFormatCapSettled(_curEditorLang()); });
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _bindEditorShortcuts(ed);
         });
     }
@@ -738,7 +741,7 @@
             }
 
             _bShortcutBound = true;
-        } catch (e) { console.error("[테마디자이너] 단축키 등록 오류:", e); }
+        } catch (e) { console.error("[monacoThemeDesign] shortcut register error:", e); }
     }
 
     // 에디터 테마 변경 처리(원본 changeEditorTheme).
@@ -855,6 +858,7 @@
             const _themeJson = FS.readFileSync(PATH.join(_rootPath, oData.S_THEME.NAME), "utf-8");
             _sThemeInfo = JSON.parse(_themeJson);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             // 339 Failed to load custom theme settings...
             showErr(wsMsg("339", "Failed to load custom theme settings."));
             fn_setBusy(false);
@@ -1072,7 +1076,7 @@
         try {
             if (bError) { oCustomNameField.setValueState("error", sMsg); }
             else { oCustomNameField.setValueState("none"); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /* ==================================================================
@@ -1225,7 +1229,7 @@
         try {
             window.U4AColorPicker.open(oAnchor, sColor, fnCb);
         } catch (e) {
-            console.error("[테마디자이너] 색상선택 팝업 오류:", e);
+            console.error("[monacoThemeDesign] color picker popup error:", e);
         }
     }
 
@@ -1244,7 +1248,7 @@
         if (checkCustomThemeName() === true) {
             // 세번째 step으로 이동 처리 + 포커스.
             U4ATplWiz.scrollToCard(oNav, 2);
-            try { oCustomNameField.focus(); } catch (e) { }
+            try { oCustomNameField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
 
@@ -1268,7 +1272,7 @@
             } catch (error) {
                 // 342 Failed to create theme save path...
                 //   순서 = 원본 control.js 동일(오류 표시 → busy off).
-                console.error("[테마디자이너] 테마 저장 경로 생성 오류:", error);
+                console.error("[monacoThemeDesign] theme save path create error:", error);
                 showErr(wsMsg("342", "Failed to create theme save path."));
                 fn_setBusy(false);
                 return;
@@ -1287,7 +1291,7 @@
         } catch (error) {
             // 330 Failed to save the theme settings...
             //   순서 = 원본 control.js 동일(오류 표시 → busy off).
-            console.error("[테마디자이너] 테마 저장 오류:", error);
+            console.error("[monacoThemeDesign] theme save error:", error);
             showErr(wsMsg("330", "Failed to save the theme settings."));
             fn_setBusy(false);
             return;
@@ -1348,7 +1352,7 @@
     // 🔊 테마 팝업 종료 이벤트(원본 onCloseThemeEditorPopup — parent.CURRWIN.close()).
     function onCloseThemeEditorPopup() {
         if (_bBusy) { return; }   // busy 중 닫기 차단
-        try { U4AUI.closeWindow(CURRWIN); } catch (e) { console.error("[테마디자이너] 닫기 오류:", e); }
+        try { U4AUI.closeWindow(CURRWIN); } catch (e) { console.error("[monacoThemeDesign] close error:", e); }
     }
 
     /* ==================================================================
@@ -1528,11 +1532,11 @@
     // 전체 재렌더(원본 oModel.refresh 대응).
     function _renderAll() {
         // 테마 콤보 / 커스텀명 / 서브텍스트 동기화.
-        try { oThemeField.setItems(_themeItems()); } catch (e) { }
-        try { oThemeField.setValue(oData.S_THEME.NAME); } catch (e) { }
-        try { oCustomNameField.setValue(oData.S_THEME.CUSTOM_NAME); } catch (e) { }
+        try { oThemeField.setItems(_themeItems()); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oThemeField.setValue(oData.S_THEME.NAME); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oCustomNameField.setValue(oData.S_THEME.CUSTOM_NAME); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 원본 Input enabled:"{/S_THEME/CUSTOM_NAME_EDIT}" = 비활성(disabled). readOnly 아님(15 §입력칸 구분).
-        try { oCustomNameField.input.disabled = (oData.S_THEME.CUSTOM_NAME_EDIT === false); } catch (e) { }
+        try { oCustomNameField.input.disabled = (oData.S_THEME.CUSTOM_NAME_EDIT === false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (oSubTxEl) { oSubTxEl.textContent = oData.S_THEME.THEME_SUBTX || ""; }
 
         _renderRules();
@@ -1617,7 +1621,7 @@
 
         // 툴바 반응형 오버플로(⋯) — 공통 attachOverflow(§11). btnClass 는 화면 툴바 버튼과 동일(평면).
         try { U4AUI.attachOverflow(document.getElementById("tdEdTools"), { noOvfAutoMargin: true, btnClass: "u4a-btn u4aTdFlat u4aTdOvfBtn" }); }
-        catch (e) { console.error("[테마디자이너] 에디터 툴바 오버플로 배선 오류:", e); }
+        catch (e) { console.error("[monacoThemeDesign] editor toolbar overflow wiring error:", e); }
 
         // Monaco 프리뷰 iframe — oAPP 전역 노출(setInitData) 이후에 src 주입(레이스 방지).
         const oFrame = document.getElementById("tdPreview");
@@ -1742,7 +1746,7 @@
         // 로고
         const oLogo = document.getElementById("tdLogo");
         if (oLogo) {
-            try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+            try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 제목(341)
         const oTitle = document.getElementById("tdTitle");
@@ -1759,12 +1763,12 @@
                 try {
                     const oI = oMax.querySelector("i");
                     if (oI) { oI.className = CURRWIN.isMaximized() ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             };
             oMax.addEventListener("click", function () {
-                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
-            try { CURRWIN.on("maximize", _syncMaxIcon); CURRWIN.on("unmaximize", _syncMaxIcon); } catch (e) { }
+            try { CURRWIN.on("maximize", _syncMaxIcon); CURRWIN.on("unmaximize", _syncMaxIcon); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _syncMaxIcon();
         }
     }
@@ -1785,7 +1789,7 @@
 
         // 좌|우 스플리터(공통) — 원본 SPLITTER1.
         try { U4AUI.wireSplitter(document.getElementById("tdSplit"), { axis: "x" }); }
-        catch (e) { console.error("[테마디자이너] 스플리터 배선 오류:", e); }
+        catch (e) { console.error("[monacoThemeDesign] splitter wiring error:", e); }
 
         _renderAll();
 
@@ -1804,23 +1808,23 @@
         _bInit = true;
         let sScope = "";
         try { sScope = (oOptionData && oOptionData.sEditorSettings && oOptionData.sEditorSettings.scopeCode) || ""; }
-        catch (e) { sScope = ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sScope = ""; }
 
         try {
             initUIBuild(sScope);
         } catch (e) {
-            console.error("[테마디자이너] 초기화 오류:", e);
+            console.error("[monacoThemeDesign] init error:", e);
         }
 
         // SYSID 테마 변경 IPC 등록(원본 frame.js _attachIpcEvents).
         if (_THEME_CH) {
             try { IPCMAIN.on(_THEME_CH, _onThemeChange); }
-            catch (e) { console.error("[테마디자이너] 테마 IPC 등록 오류:", e); }
+            catch (e) { console.error("[monacoThemeDesign] theme IPC register error:", e); }
         }
 
         // 준비 완료 → 창 노출(플래시 방지: opener show:false 로 열림).
         requestAnimationFrame(function () {
-            try { CURRWIN.show(); } catch (e) { }
+            try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             document.body.classList.add("u4a-visible");
             fn_setBusy(false);
         });
@@ -1832,8 +1836,8 @@
 
     // SYSID 테마 변경 IPC 해제(원본 frame.js _detachIpcEvents — pagehide once) + 방송 채널 종료.
     window.addEventListener("pagehide", function () {
-        if (_THEME_CH) { try { IPCMAIN.removeListener(_THEME_CH, _onThemeChange); } catch (e) { } }
-        if (_oBroadToChild) { try { _oBroadToChild.close(); } catch (e) { } _oBroadToChild = null; }
+        if (_THEME_CH) { try { IPCMAIN.removeListener(_THEME_CH, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+        if (_oBroadToChild) { try { _oBroadToChild.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } _oBroadToChild = null; }
     }, { once: true });
 
     // busy 중 닫기 차단(원본 window.onbeforeunload).

@@ -184,10 +184,23 @@
             }
         });
 
-        // 로더(loader.js) 로드 완료 → 본체(index.js) 로드.
+        /* ★ [2026-09-14, 장군님 지시] Monaco 로드 실패를 부모에 알린다 — 진짜 실패 이벤트 배선.
+         *   [고친 이유] 종전에는 loader.js / index.js 의 onerror 도, require 의 실패 콜백도 없었다.
+         *   파일을 못 읽으면 ready 가 영영 안 오고 아무 신호도 안 갔다. 부모는 그걸 "몇 초 지나면
+         *   busy 를 그냥 끈다"는 타이머로 덮고 있었는데 그건 금지된 방식이다(.analy 16 §2.11) —
+         *   busy 가 안 꺼지는 건 "고장났다"는 신호인데, 타이머로 꺼버리면 화면은 그대로인데 끝난 줄
+         *   착각하게 된다. 그래서 부모의 타이머를 걷어내고 여기에 실제 실패 이벤트를 배선했다.
+         *   오류 코드 접두: CEHT / 다음 번호: 005 */
+        function _hostFail(sCode, sWhere, sDetail) {
+            try { console.error("[" + sCode + "] monaco host load failed at " + sWhere + " : " + (sDetail || "")); } catch (e) { }
+            _toParent({ evt: "error", code: sCode, where: sWhere, detail: (sDetail || "") });
+        }
+
+        // 로더 로드 완료 → 본체(index.js) 로드.
         function onLoad() {
             var s = document.createElement("script");
             s.src = "index.js";
+            s.onerror = function () { _hostFail("CEHT-002", "host index.js", s.src); };
             document.head.append(s);
         }
 
@@ -195,6 +208,7 @@
             var loader = document.createElement("script");
             loader.src = MONACO_LOADER_PATH;
             loader.onload = onLoad;
+            loader.onerror = function () { _hostFail("CEHT-001", "monaco loader.js", MONACO_LOADER_PATH); };
             document.head.append(loader);
         });
     </script>

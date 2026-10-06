@@ -102,6 +102,16 @@ exports.start = async function(REMOTE_OBJ, CONSOLE){
     //출력 포멧 
     log.transports.console.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
     log.transports.console.level  = 'error';
+
+    /**
+     * 파일에는 등급을 안 붙인다 (2026-09-11 — 장군님 지시)
+     * -----------------------------------------------------------------
+     * 기본값이 '[시각] [{level}] 글' 이라 우리 줄이 [info] [DEBUG] 처럼 등급을 두 번 달았다.
+     * 게다가 앞엣것은 **틀리다** — console.log 로 남기는 DEBUG 줄도 info 로 찍혔다.
+     * 우리 줄이 이미 [INFO]/[WARN]/[ERROR]/[FATAL]/[DEBUG] 를 앞에 단다.
+     * 앱 본체(electron/lib/log/ws_main_log.js)도 같은 모양을 쓴다.
+     */
+    log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] {text}';
     
     //로그 저장위치 경로 
     if((typeof RESOLVE_PATH === "undefined") || RESOLVE_PATH === ""){
@@ -126,6 +136,15 @@ exports.start = async function(REMOTE_OBJ, CONSOLE){
 
     //로그파일 저장위치 설정
     log.transports.file.resolvePath = () => RESOLVE_PATH;
+
+    /* ================================================================= */
+    /* 파일 크기 상한 없앰 (2026-09-08 장군님 지시)
+       - 라이브러리 기본값은 1MB. 넘으면 이전 파일을 밀어내고 2개만 남는다.
+       - 그러면 오류 직전 기록이 사라져 원인을 못 찾는다.
+       - 0 으로 두면 밀어내기를 아예 하지 않는다(라이브러리 코드 확인).
+       - 오래된 파일 정리는 앱 시작 시 3개월 삭제 로직이 이미 하고 있으므로 손대지 않는다.
+    /* ================================================================= */
+    log.transports.file.maxSize = 0;
 
     // 빌드일 경우에만 console 기능을 electron log에 할당한다.
     if(APP && APP.isPackaged){

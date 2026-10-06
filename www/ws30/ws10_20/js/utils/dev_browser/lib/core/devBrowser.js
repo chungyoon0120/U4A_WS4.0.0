@@ -185,11 +185,11 @@ class CLDevBrowser extends EventEmitter {
                     // 테스트 모드 일 경우에는 새탭을 허용
                     // 크롬 extension 디버깅도 해야되기 때문..
                     if(parent.APP.isPackaged === false){
-                        console.log("개발모드여서 새창 감지 해제됨!");
+                        console.log("dev mode - new-window detection disabled");
                         return;
                     }
 
-                    console.log('[browser] - 새 탭이 감지되어 닫았습니다.');
+                    console.log('[browser] new tab detected - closed');
                     
                     await newPage.close();
                     
@@ -236,7 +236,7 @@ class CLDevBrowser extends EventEmitter {
                         message: text
                     });
 
-                } catch (e) {}
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
             });
         });
 
@@ -331,6 +331,7 @@ class CLDevBrowser extends EventEmitter {
             const u = new URL(url);
             return u.origin + u.pathname;
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return url.split('?')[0];
         }
 
@@ -383,6 +384,7 @@ class CLDevBrowser extends EventEmitter {
         try {
             this.browser = await puppeteer.launch(this.option.launchOptions);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return { RETCD: 'E', STCOD: DevBrowserStatusCode.LAUNCH_FAILED, MSGTX: error.message };
         }
 
@@ -400,6 +402,7 @@ class CLDevBrowser extends EventEmitter {
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             await this.browser.close();
 
@@ -452,6 +455,7 @@ class CLDevBrowser extends EventEmitter {
             this.page.evaluateOnNewDocument(this._getInjectionScript());
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             
             await this.page.close();
             await this.browser.close();
@@ -484,6 +488,7 @@ class CLDevBrowser extends EventEmitter {
             await this.page.goto(this.option.url);
   
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             await this.page.close();
             await this.browser.close();
@@ -516,7 +521,7 @@ class CLDevBrowser extends EventEmitter {
         //     try {
         //         await this.page.close();
         //         await this.browser.close(); 
-        //     } catch (error) {}        
+        //     } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}        
 
         //     return { RETCD: 'E', STCOD: DevBrowserStatusCode.PAGE_LOAD_FAILED, MSGTX: error.message };  
                       
@@ -533,6 +538,7 @@ class CLDevBrowser extends EventEmitter {
             const u = new URL(url);
             return u.origin + u.pathname;
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return url.split('?')[0];
         }
     }
@@ -542,7 +548,7 @@ class CLDevBrowser extends EventEmitter {
      */
     async reloadPage() {
         if (!this.page) return;
-        try { await this.page.reload(); } catch (error) {}
+        try { await this.page.reload(); } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }}
     }
 
 
@@ -597,6 +603,7 @@ class CLDevBrowser extends EventEmitter {
             // CDP 세션 생성
             client = await this.page.target().createCDPSession();
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return { RETCD: "E", STCOD: "E001", MSGTX: "client 생성 실패!" }            
         }
 
@@ -609,6 +616,7 @@ class CLDevBrowser extends EventEmitter {
             windowId = oClientInfo.windowId;
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return { RETCD: "E", STCOD: "E002", MSGTX: "Client 정보 구하기 실패!" };
         }
         
@@ -623,6 +631,7 @@ class CLDevBrowser extends EventEmitter {
             oBounds = bounds;
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return { RETCD: "E", STCOD: "E002", MSGTX: "Client 정보 구하기 실패!" };
         }
 

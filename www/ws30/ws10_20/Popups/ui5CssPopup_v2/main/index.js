@@ -48,7 +48,7 @@ for (const key in oBootStrap) {
 
 // 서버 UI5 부트 소스 로드 실패(통신/경로/서버다운) 즉시 감지 → 셸(frame.js)의 공통 오류 안내 후 창 닫기.
 oScript.onerror = function () {
-    try { if (parent.fnOnUi5LoadFail) { parent.fnOnUi5LoadFail("ui5-script-error(WS30_BOOT_PATH)"); } } catch (e) { }
+    try { if (parent.fnOnUi5LoadFail) { parent.fnOnUi5LoadFail("ui5-script-error(WS30_BOOT_PATH)"); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 };
 
 document.head.appendChild(oScript);
@@ -231,7 +231,7 @@ window.addEventListener("load", function(){
     //   아래 sap.ui.getCore() 접근 시 ReferenceError → ws_trycatch 크리티컬(APP.exit). 선제 감지 후 창만 닫는다.
     //   실체크(타임아웃 추측 아님)라 no-timeout-busy-fallback 위배 아님.
     if (typeof sap === "undefined" || !sap.ui || !sap.ui.getCore) {
-        try { if (parent.fnOnUi5LoadFail) { parent.fnOnUi5LoadFail("no-sap-after-onload"); } } catch (e) { }
+        try { if (parent.fnOnUi5LoadFail) { parent.fnOnUi5LoadFail("no-sap-after-onload"); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return;
     }
 
@@ -259,7 +259,7 @@ window.addEventListener("load", function(){
 
                 // [HTML5] 창 표시/오버레이 해제·메인 busy lock 해제는 최상위(frame.js)가 담당(frameless).
                 //   네이티브 show/opacity 직접 호출 제거 — frameless-opener-no-native-opacity.
-                try { if (parent.fnFinishOpen) { parent.fnFinishOpen(); } } catch (e) { }
+                try { if (parent.fnFinishOpen) { parent.fnFinishOpen(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 oAPP.onViewReady();
 

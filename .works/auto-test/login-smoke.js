@@ -24,7 +24,8 @@ const FRESH   = ARGV.includes("--fresh");
 const SERVER  = getArg("--server", "UHA");     // 서버리스트에서 접속할 서버(이름/시스템ID 부분일치)
 const STAFF   = getArg("--staff", "soccerhs");  // 자동 로그인 스태프 ID
 const APP     = getArg("--app", null);          // 지정 시 로그인 후 이 앱으로 편집(Change) 모드 진입까지 검증
-const BIND    = ARGV.includes("--bind");        // 지정 시 편집 진입 후 바인딩 팝업 실행까지 검증(--app 필요)
+const BIND    = ARGV.includes("--bind");
+const KEEP    = ARGV.includes("--keep");      // 지정 시 판정 후 로그오프하지 않고 앱을 띄워 둔다(후속 CDP 테스트용)        // 지정 시 편집 진입 후 바인딩 팝업 실행까지 검증(--app 필요)
 const PORT    = 9222;
 const DEBUG_HOST = `http://127.0.0.1:${PORT}`;
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
@@ -374,5 +375,5 @@ async function runBindPopup(mainTargetId) {
 
 // 성공/실패 무관하게 종료 시 정상 로그오프(락 반납·세션 종료). 강제 kill 은 최후수단.
 main()
-    .then(async (ok) => { await gracefulLogoff().catch(() => {}); process.exit(ok === false ? 1 : 0); })
-    .catch(async (e) => { console.error("[smoke] FAIL ❌ ", e.message); await gracefulLogoff().catch(() => {}); process.exit(1); });
+    .then(async (ok) => { if (!KEEP) { await gracefulLogoff().catch(() => {}); } else { log("--keep: 앱을 띄워 둡니다(로그오프 안 함)"); } process.exit(ok === false ? 1 : 0); })
+    .catch(async (e) => { console.error("[smoke] FAIL ❌ ", e.message); if (!KEEP) { await gracefulLogoff().catch(() => {}); } process.exit(1); });

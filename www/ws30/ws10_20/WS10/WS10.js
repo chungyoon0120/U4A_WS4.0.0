@@ -212,7 +212,7 @@
                 fn();
                 return;
             }
-        } catch (e) { /* fallthrough → 안내 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* fallthrough → 안내 */ }
         _showFooter("I", `${sLabel || sName} — 셸 통합 시 동작합니다.`);
     }
 
@@ -225,7 +225,7 @@
                 ev({ getParameter: () => ({ getProperty: () => sKey }) });
                 return;
             }
-        } catch (e) { /* fallthrough */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* fallthrough */ }
         _showFooter("I", `${sLabel} (${sKey}) — 셸 통합 시 동작합니다.`);
     }
 
@@ -536,7 +536,7 @@
      ********************************************************************/
     function _readPin() {
         try { return !!(window.oAPP && oAPP.common && oAPP.common.fnGetModelProperty && oAPP.common.fnGetModelProperty("/SETTING/ISPIN")); }
-        catch (e) { return false; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
     function _buildPinBtn() {
         const b = document.createElement("button");
@@ -547,9 +547,9 @@
         b.setAttribute("aria-pressed", _readPin() ? "true" : "false");
         b.addEventListener("click", () => {
             const bOn = !_readPin();
-            try { if (window.oAPP && oAPP.common && oAPP.common.fnSetModelProperty) { oAPP.common.fnSetModelProperty("/SETTING/ISPIN", bOn); } } catch (e) { }
+            try { if (window.oAPP && oAPP.common && oAPP.common.fnSetModelProperty) { oAPP.common.fnSetModelProperty("/SETTING/ISPIN", bOn); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             // ★ [Electron 버그] ON=(true,"screen-saver") / OFF=(false) — 실행부(ws_fn_04/uai/dev_browser)와 동일.
-            try { if (CURRWIN && CURRWIN.setAlwaysOnTop) { if (bOn) { CURRWIN.setAlwaysOnTop(true, "screen-saver"); } else { CURRWIN.setAlwaysOnTop(false); } } } catch (e) { }
+            try { if (CURRWIN && CURRWIN.setAlwaysOnTop) { if (bOn) { CURRWIN.setAlwaysOnTop(true, "screen-saver"); } else { CURRWIN.setAlwaysOnTop(false); } } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             b.setAttribute("aria-pressed", bOn ? "true" : "false");
         });
         return b;
@@ -562,8 +562,8 @@
      ********************************************************************/
     let _zoomPop = null;
     function _webFrame() {
-        try { if (parent && parent.WEBFRAME) { return parent.WEBFRAME; } } catch (e) { }
-        try { if (window.WEBFRAME) { return window.WEBFRAME; } } catch (e) { }
+        try { if (parent && parent.WEBFRAME) { return parent.WEBFRAME; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (window.WEBFRAME) { return window.WEBFRAME; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return null;
     }
     function _zoomPct(nLevel) { return Math.round(Math.pow(1.2, Number(nLevel) || 0) * 100); }
@@ -574,9 +574,9 @@
         document.removeEventListener("mousedown", oCtx.onOutside, true);
         document.removeEventListener("keydown", oCtx.onEsc, true);
         window.removeEventListener("resize", oCtx.onWinChange);
-        try { oCtx.el.remove(); } catch (e) { }
+        try { oCtx.el.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (oCtx.anchor) { oCtx.anchor.setAttribute("aria-expanded", "false"); }
-        try { if (window.oAPP && oAPP.fn && typeof oAPP.fn.setPersonWinZoom === "function") { oAPP.fn.setPersonWinZoom("S"); } } catch (e) { }
+        try { if (window.oAPP && oAPP.fn && typeof oAPP.fn.setPersonWinZoom === "function") { oAPP.fn.setPersonWinZoom("S"); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _openZoomPop(oAnchor) {
         if (_zoomPop) { _closeZoomPop(); return; }
@@ -588,7 +588,7 @@
         oRng.className = "u4a-zoom-pop__slider";
         oRng.min = "-5"; oRng.max = "5"; oRng.step = "0.1";
         let nCur = 0;
-        try { if (oWf && oWf.getZoomLevel) { nCur = oWf.getZoomLevel(); } } catch (e) { }
+        try { if (oWf && oWf.getZoomLevel) { nCur = oWf.getZoomLevel(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oRng.value = String(nCur);
         const oValEl = document.createElement("span");
         oValEl.className = "u4a-zoom-pop__val";
@@ -599,7 +599,7 @@
         });
         oRng.addEventListener("change", () => {
             const v = parseFloat(oRng.value);
-            try { if (oWf && oWf.setZoomLevel) { oWf.setZoomLevel(v); } } catch (e) { }
+            try { if (oWf && oWf.setZoomLevel) { oWf.setZoomLevel(v); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oValEl.textContent = _zoomPct(v) + "%";
         });
         oPop.appendChild(oRng);
@@ -621,7 +621,7 @@
             document.addEventListener("keydown", fnEsc, true);
             window.addEventListener("resize", fnWin);
         }, 0);
-        try { oRng.focus(); } catch (e) { }
+        try { oRng.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _buildZoomBtn() {
         const b = _iconBtn(ICON.zoom, "Zoom", () => _openZoomPop(b));

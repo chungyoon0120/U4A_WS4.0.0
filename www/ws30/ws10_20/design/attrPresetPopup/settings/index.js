@@ -232,6 +232,7 @@ async function _savePresetAttrData(sAttr){
         try {
             parent.FS.mkdirSync(_folderPath, {recursive: true});    
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             _sRes.RETCD = "E";
 
             //651   개인화 데이터 저장 폴더 생성에 실패했습니다.

@@ -27,7 +27,7 @@
     /* ── 닫기(원본 closeMessagePopover + afterClose) ─────────────────────── */
     oAPP.fn.closeMessagePopover = function () {
         if (!oPop) { return; }
-        try { oPop.remove(); } catch (e) { }
+        try { oPop.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oPop = null;
         if (fnOnDocDown) {
             document.removeEventListener("mousedown", fnOnDocDown, true);

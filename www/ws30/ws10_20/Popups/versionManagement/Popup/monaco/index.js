@@ -309,7 +309,7 @@ window.require([
         //✅ 테마 변경 이벤트
         const themeService = editor._themeService;
         themeService.onDidColorThemeChange((newTheme) => {
-          console.log("🎨 테마가 변경됨:", newTheme.themeName);
+          console.log("🎨 theme changed:", newTheme.themeName);
           // 원하는 로직 실행
         });
 
@@ -347,8 +347,8 @@ window.require([
                 //e.target.element  <-- dom 오브젝트
                 const position = e.target.position;
 
-                console.log('🖱️ 우클릭 위치:', position);
-                console.log('🖱️ 우클릭 위치:', e.target.element);
+                console.log('🖱️ right-click at:', position);
+                console.log('🖱️ right-click at:', e.target.element);
           
             }
         });
@@ -387,8 +387,8 @@ window.require([
 
         //✅ 현재 커서 위치 가져오기
         const position = editor.getPosition();
-        console.log("현재 줄:", position.lineNumber);
-        console.log("현재 칼럼:", position.column);
+        console.log("line:", position.lineNumber);
+        console.log("column:", position.column);
 
         //✅ 현재 커서 위치 이동 
         editor.setPosition({ lineNumber: 5, column: 1 }); // 5번째 줄, 첫 번째 칼럼로 이동
@@ -398,7 +398,7 @@ window.require([
         //✅ 현재 커서 자동 감지하려면 (커서가 이동할 때마다)
         editor.onDidChangeCursorPosition((e) => {
             const pos = e.position;
-            console.log(`📍 커서 위치 → 줄 ${pos.lineNumber}, 칼럼 ${pos.column}`);
+            console.log(`📍 cursor at → line ${pos.lineNumber}, column ${pos.column}`);
         });
 
 
@@ -406,7 +406,7 @@ window.require([
         //✅ 선택된 영역의 텍스트 가져오기
         const selection = editor.getSelection();
         const selectedText = editor.getModel().getValueInRange(selection);
-        console.log("📋 선택된 텍스트:\n", selectedText);
+        console.log("selected text:\n", selectedText);
         
         //✅ 특정 영역 블럭 선택 처리 1, 1 → 4번째 줄의 첫 번째 문자
         editor.setSelection(new monaco.Range(1, 1, 4, 1));
@@ -420,11 +420,11 @@ window.require([
             const text = editor.getModel().getValueInRange(range);
 
             if (text) {
-              console.log("🔸 선택됨:", text);
+              console.log("🔸 selected:", text);
             }
 
             if (text.trim().length > 0) {
-                console.log("🔸 선택됨:", text);
+                console.log("🔸 selected:", text);
             } 
             
         });
@@ -449,7 +449,7 @@ window.require([
 
         //✅ 텍스트 붙여넣기 
         editor.onDidPaste((event) => {
-            console.log("붙여넣은 내용:", event.range);
+            console.log("pasted text:", event.range);
         });
 
 
@@ -528,7 +528,7 @@ window.require([
         monaco.languages.register({ id: 'html' });
         monaco.languages.registerDocumentFormattingEditProvider('html', {
             provideDocumentFormattingEdits: function(model, options, token) {
-              console.log('📦 포맷 요청 들어옴!');
+              console.log('format request received');
               const original = model.getValue();
               const formatted = original.toUpperCase(); // 그냥 대문자로 바꾸는 테스트
           

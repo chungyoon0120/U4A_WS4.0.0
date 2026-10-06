@@ -98,6 +98,7 @@ oAPP.fn.toUI5Theme = function (sKey) {
             bDark = (String(sKey).indexOf("dark") !== -1);
         }
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         bDark = (String(sKey || "").indexOf("dark") !== -1);
     }
     return bDark ? "sap_horizon_dark" : "sap_horizon";
@@ -118,7 +119,7 @@ oAPP.fn._msgCls = function (sCode) {
         var sLangu = (process.USERINFO && process.USERINFO.LANGU) || oAPP.attr.WS_LANGU || "";
         if (!sSysID || !sLangu) { return ""; }
         return new WSUTIL.MessageClassText(sSysID, sLangu).fnGetMsgClsText("/U4A/CL_WS_COMMON", sCode, "", "", "", "");
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }; // end of oAPP.fn._msgCls
 
 // ZMSG_WS_COMMON_001 번호 텍스트(본문).
@@ -126,7 +127,7 @@ oAPP.fn._msgCommon = function (sNo) {
     try {
         var sLangu = (process.USERINFO && process.USERINFO.LANGU) || oAPP.attr.WS_LANGU || "";
         return WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sNo);
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }; // end of oAPP.fn._msgCommon
 
 // 로드 실패 공통 처리 — 오류 다이얼로그 + 확인 시 창 닫기. (frame.html script.onerror 에서만 호출)
@@ -135,7 +136,7 @@ oAPP.fn._onUi5LoadFail = function (sReason) {
     oAPP.attr.bLoadFailed = true;
     setBusy(false);
 
-    console.error("[illustMsgPopup] 서버 UI5 로드 실패 → 오류 안내 후 창 닫기: " + sReason);
+    console.error("[illustMsgPopup] server UI5 load failed → error notice after window close: " + sReason);
 
     var sTitle = oAPP.fn._msgCls("B93");         // 오류 제목
     var sMsg = oAPP.fn._msgCommon("391");        // 통신 오류... 네트워크 확인... 문의
@@ -163,7 +164,7 @@ oAPP.fn._closeOnError = function () {
             CURRWIN.setParentWindow(null);
             CURRWIN.close();
         }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }; // end of oAPP.fn._closeOnError
 
 // 최대화 상태에 따라 max 버튼 아이콘 스왑(원본 _attachCurrentWindowEvents maxWinBtn 대체).
@@ -173,7 +174,7 @@ oAPP.fn._syncMaxBtnIcon = function () {
     var oIcon = oMax.querySelector("i");
     if (!oIcon) { return; }
     var bMax = false;
-    try { bMax = CURRWIN.isMaximized(); } catch (e) { bMax = false; }
+    try { bMax = CURRWIN.isMaximized(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bMax = false; }
     oIcon.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
 }; // end of oAPP.fn._syncMaxBtnIcon
 
@@ -190,26 +191,26 @@ oAPP.fn._initChrome = function () {
     // 로고
     var oLogo = document.getElementById("illustpLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 제목 = opener 가 넘긴 창 제목(Image Icons [ - SYSID]) — 부트 스크립트가 document.title 에 세팅.
     var oTitle = document.getElementById("illustpTitle");
     if (oTitle) {
         var s = "";
-        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { s = document.title || ""; }
+        try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } s = document.title || ""; }
         oTitle.textContent = s;
     }
 
     // 최소화
     var oMin = document.getElementById("illustpWinMin");
-    if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { } }); }
+    if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }); }
 
     // 최대화/복원 토글
     var oMax = document.getElementById("illustpWinMax");
     if (oMax) {
         oMax.addEventListener("click", function () {
-            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
 
@@ -221,7 +222,7 @@ oAPP.fn._initChrome = function () {
     try {
         CURRWIN.on("maximize", oAPP.fn._syncMaxBtnIcon);
         CURRWIN.on("unmaximize", oAPP.fn._syncMaxBtnIcon);
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     oAPP.fn._syncMaxBtnIcon();
 
 }; // end of oAPP.fn._initChrome
@@ -244,22 +245,22 @@ oAPP.fn._onShellThemeChange = function () {
     try {
         let sWebConBodyCss = "html, body { margin: 0px; height: 100%; background-color: " + oThemeInfo.BGCOL + "; }";
         oAPP.REMOTE.getCurrentWindow().webContents.insertCSS(sWebConBodyCss);
-    } catch (e) { }
-    try { document.documentElement.style.setProperty("--boot-bg", oThemeInfo.BGCOL); } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { document.documentElement.style.setProperty("--boot-bg", oThemeInfo.BGCOL); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     try {
         if (window.U4ATheme) {
             U4ATheme.apply(U4ATheme.normalize ? U4ATheme.normalize(oThemeInfo.THEME) : oThemeInfo.THEME);
         }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }; // end of oAPP.fn._onShellThemeChange
 
 try {
     let _sSysID = process.USERINFO.SYSID;
     oAPP.IPCMAIN.on("if-p13n-themeChange-" + _sSysID, oAPP.fn._onShellThemeChange);
     window.addEventListener("beforeunload", function () {
-        try { oAPP.IPCMAIN.removeListener("if-p13n-themeChange-" + _sSysID, oAPP.fn._onShellThemeChange); } catch (e) { }
+        try { oAPP.IPCMAIN.removeListener("if-p13n-themeChange-" + _sSysID, oAPP.fn._onShellThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
-} catch (e) { }
+} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
 
 /************************************************************************
@@ -314,6 +315,7 @@ oAPP.fn.getThemeInfo = function () {
         var oThemeJsonData = JSON.parse(sThemeJson);
 
     } catch (error) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         return;
     }
 
@@ -335,6 +337,7 @@ oAPP.fn.fnOnParentWindowClosedEvent = () => {
         CURRWIN.close();
 
     } catch (error) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
     }
 
@@ -389,6 +392,16 @@ function fnInitLoad() {
     // 경로 앞에 접속 서버 호스트를 붙이지 말고 서버 경로 전체를 바라본다.
     if (oAPP.attr.sServerLibPath.substring(0, 10) !== "/zu4a_imp/") {
         oAPP.UI5LIB_SSRC = oAPP.attr.sServerLibPath;
+    }
+
+    // ★[2026-09-08 장군님 지시] ★패키지(APP.isPackaged)일 때만★ 뷰어(frame.html) 부트 소스를 로컬 리소스(resourceUrl) 대신
+    //   서버 UI5(UI5LIB_SSRC = 접속 서버 + LIBPATH, '/zu4a_imp/' 임시로직 포함)로. 패키지에 로컬 UI5 를 더 이상
+    //   싣지 않기 때문(node_modules/U4A 없음 → 뷰어가 못 떠 "통신 오류" 안내). 개발 모드는 원본 설계 그대로
+    //   resourceUrl(CDN) 유지 — 일부러 나눠 둔 설계. UI5 Predefined CSS 팝업(ui5CssPopup_v2/control.js)과 동일 컨셉.
+    //   ※ frame.html 주석의 "예전에 SSRC 로 바꿨다 sap 이 안 떠 백지" 선례 → 지금은 onerror + sap 없음 검사가 있어
+    //     백지 대신 오류 안내 후 닫힌다. 타이머·사전 ping 금지(장군님).
+    if (oAPP.APP.isPackaged) {
+        oAPP.UI5LIB_WSSRC = oAPP.UI5LIB_SSRC;
     }
 
     oAPP.UI5_LANGU = oAPP.attr.WS_LANGU;

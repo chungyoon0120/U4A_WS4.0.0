@@ -8,6 +8,18 @@
 parent.require(parent.PATHINFO.WSTRYCATCH)(window, document, console);
 
 /**
+ * 부모 창의 공통 로그 함수(U4ALOG)를 이어 받는다 (2026-09-29 — ws40-work-order A4)
+ * 오류코드 접두: PREV / 다음 번호: 002
+ * 미리보기 iframe 은 이 index.js 만 올리므로 U4ALOG 가 없었다 — 이 파일 안의
+ * `typeof U4ALOG !== "undefined"` 로 감싼 기록 호출이 전부 아무것도 남기지 않았다.
+ * 부모 창 것을 쓰면 줄이 부모 창 console(= 로그 파일)로 남는다.
+ */
+var U4ALOG = (parent && parent.U4ALOG) ? parent.U4ALOG : undefined;
+if (!U4ALOG) {
+	console.error("[PREV-001] parent.U4ALOG missing - logs from the design preview will not be recorded");
+}
+
+/**
  * UI5 controls rendered in the design preview iframe are synchronized with
  * the parent workspace, while selection and context markers stay isolated
  * from the controls' own DOM and layout.
@@ -101,11 +113,11 @@ function getPreviewSelectionEffectHostValue(sName) {
 
 	try {
 		aTargets.push(parent);
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	try {
 		aTargets.push(parent.parent);
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	aTargets.push(window);
 
@@ -114,7 +126,7 @@ function getPreviewSelectionEffectHostValue(sName) {
 			if (typeof aTargets[i]?.[sName] !== "undefined") {
 				return aTargets[i][sName];
 			}
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -131,7 +143,7 @@ function getPreviewSelectionEffectRequire() {
 		if (oRemote?.require) {
 			return oRemote.require.bind(oRemote);
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 function getPreviewSelectionEffectSysId() {
@@ -139,19 +151,19 @@ function getPreviewSelectionEffectSysId() {
 		if (parent?.process?.USERINFO?.SYSID) {
 			return parent.process.USERINFO.SYSID;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	try {
 		if (parent?.oAPP?.attr?.metadata?.USERINFO?.SYSID) {
 			return parent.oAPP.attr.metadata.USERINFO.SYSID;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	try {
 		if (u4aRootParent?.process?.USERINFO?.SYSID) {
 			return u4aRootParent.process.USERINFO.SYSID;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	return "";
 }
@@ -167,7 +179,7 @@ function getPreviewSelectionEffectP13nRoot() {
 		if (typeof parent?.getPath === "function") {
 			return parent.getPath("P13N_ROOT");
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	try {
 		var oPath = getPreviewSelectionEffectHostValue("PATH");
@@ -176,7 +188,7 @@ function getPreviewSelectionEffectP13nRoot() {
 		if (oPath && oRemote?.app?.getPath) {
 			return oPath.join(oRemote.app.getPath("userData"), "p13n");
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 function getPreviewSelectionEffectDbPath() {
@@ -188,6 +200,7 @@ function getPreviewSelectionEffectDbPath() {
 			var oRequire = getPreviewSelectionEffectRequire();
 			oPath = typeof oRequire === "function" ? oRequire("path") : null;
 		} catch (e) {
+		    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 			oPath = null;
 		}
 	}
@@ -224,6 +237,7 @@ function openPreviewSelectionEffectDb() {
 			fileMustExist: true
 		});
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		return null;
 	}
 }
@@ -292,11 +306,12 @@ function readPreviewSelectionEffectRow(sEffty) {
 
 		return oRow || null;
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		return null;
 	} finally {
 		try {
 			oDb.close();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -368,7 +383,7 @@ function attachPreviewSelectionEffectIpcEvent() {
 		oWS.sMark.sSelectionEffectIpcChannel = "if-p13n-selectionEffectChange-" + sSysID;
 		oIpcMain.on(oWS.sMark.sSelectionEffectIpcChannel, onPreviewSelectionEffectChange);
 		oWS.sMark.bSelectionEffectIpcAttached = true;
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 function detachPreviewSelectionEffectIpcEvent() {
@@ -385,7 +400,7 @@ function detachPreviewSelectionEffectIpcEvent() {
 		oWS.sMark.oSelectionEffectIpcMain = null;
 		oWS.sMark.sSelectionEffectIpcChannel = "";
 		oWS.sMark.bSelectionEffectIpcAttached = false;
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 window.addEventListener("pagehide", detachPreviewSelectionEffectIpcEvent);
@@ -403,6 +418,7 @@ function getPreviewSelectionPersonalization() {
 			parent?.oAPP?.DATA?.APPDATA?.PREVIEW_SELECTION_PERSONALIZATION ||
 			null;
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		oPers = null;
 	}
 	if (!oPers || typeof oPers !== "object") {
@@ -650,6 +666,7 @@ function getPreviewContextMenuPersonalization() {
 			parent?.oAPP?.DATA?.APPDATA?.PREVIEW_CONTEXT_PERSONALIZATION ||
 			null;
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		oPers = null;
 	}
 
@@ -754,7 +771,7 @@ function setPreviewRuntimePersonalization(sAttrName, sWindowName, oConfig) {
 		if (parent?.oAPP?.attr) {
 			parent.oAPP.attr[sAttrName] = oTarget;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	return oTarget;
 }
@@ -790,7 +807,7 @@ function getPreviewMarkVisiblePersonalization() {
 		if (typeof parent?.oAPP?.attr?.previewMarkVisible !== "undefined") {
 			return normalizePreviewMarkVisibleState(parent.oAPP.attr.previewMarkVisible);
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	if (typeof window._u4aPreviewMarkVisible !== "undefined") {
 		return normalizePreviewMarkVisibleState(window._u4aPreviewMarkVisible);
@@ -821,7 +838,7 @@ window.u4aSetPreviewMarkVisible = function(bVisible) {
 		if (parent?.oAPP?.attr) {
 			parent.oAPP.attr.previewMarkVisible = bState;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	return applyPreviewMarkVisibility(bState);
 };
@@ -1331,7 +1348,7 @@ function defineU4ACustomData() {
 				for (i = 0; i < aFound.length; i++) {
 					addDomCandidate(aDoms, aFound[i]);
 				}
-			} catch (e) {}
+			} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 		}
 
 		
@@ -1375,6 +1392,7 @@ function defineU4ACustomData() {
 								return oBaseDom;
 							}
 						} catch (e) {
+						    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 							return null;
 						}
 					}
@@ -1396,6 +1414,7 @@ function defineU4ACustomData() {
 			try {
 				return oBaseDom.querySelector(sSelector);
 			} catch (e) {
+			    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 				// 잘못된 CSS selector는 DOM 반영 대상 없음으로 처리한다.
 				return null;
 			}
@@ -2144,7 +2163,7 @@ function removePreviewMarkCustomData(oUi, sKey, vValue) {
 	try {
 		oUi.removeCustomData(oCustomData);
 		oCustomData.destroy();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 /**
@@ -2169,7 +2188,7 @@ function cleanupPreviewMarkDomFallback() {
 		for (var i = 0, l = aSelectedDom.length; i < l; i++) {
 			aSelectedDom[i].removeAttribute(oWS.sMark.selectedAttr);
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 
@@ -2190,7 +2209,7 @@ function cleanupPreviewContextMenuMarkDomFallback() {
 		for (var i = 0, l = aContextDom.length; i < l; i++) {
 			aContextDom[i].removeAttribute(oWS.sMark.contextAttr);
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 /**
@@ -2244,7 +2263,7 @@ function bindPreviewContextMenuMarkCleanup(oMenu) {
 		}
 		try {
 			oMenu[aCloseEvents[i]](removePreviewContextMenuMark);
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	if (typeof oMenu.close !== "function" || oMenu._u4aContextMarkCloseWrapped === true) {
 		return;
@@ -2363,7 +2382,7 @@ function collectPreviewSelectionDomCandidates(oUi) {
 			for (var i = 0, l = aFound.length; i < l; i++) {
 				lf_addDom(aFound[i]);
 			}
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	if (!oUi) {
 		return aDoms;
@@ -2431,6 +2450,7 @@ function getPreviewSelectionDomScore(oUi, oDom, oRect, iIndex) {
 	try {
 		oStyle = window.getComputedStyle ? window.getComputedStyle(oDom) : null;
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		oStyle = null;
 	}
 
@@ -2604,7 +2624,7 @@ function hasPreviewSelectionInteractiveSemantics(oTargetDom) {
 		if (typeof oTargetDom.querySelector === "function" && oTargetDom.querySelector(sInteractiveSelector)) {
 			return true;
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
 	return false;
 }
@@ -2641,12 +2661,12 @@ function disconnectPreviewSelectionObservers() {
 	if (oWS.sMark.oSelectionResizeObserver) {
 		try {
 			oWS.sMark.oSelectionResizeObserver.disconnect();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	if (oWS.sMark.oSelectionIntersectionObserver) {
 		try {
 			oWS.sMark.oSelectionIntersectionObserver.disconnect();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 
 	/**
@@ -2659,7 +2679,7 @@ function disconnectPreviewSelectionObservers() {
 	if (oWS.sMark.oSelectionMutationObserver) {
 		try {
 			oWS.sMark.oSelectionMutationObserver.disconnect();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	oWS.sMark.oSelectionResizeObserver = null;
 	oWS.sMark.oSelectionMutationObserver = null;
@@ -2703,7 +2723,7 @@ function observePreviewSelectionTarget(oTargetDom, oUi) {
 			} else if (document.documentElement) {
 				oWS.sMark.oSelectionResizeObserver.observe(document.documentElement);
 			}
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 
 	/**
@@ -2729,7 +2749,7 @@ function observePreviewSelectionTarget(oTargetDom, oUi) {
 					attributeFilter: ["class", "style"]
 				});
 			}
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	if (typeof window.IntersectionObserver === "function") {
 		
@@ -2751,7 +2771,7 @@ function observePreviewSelectionTarget(oTargetDom, oUi) {
 		});
 		try {
 			oWS.sMark.oSelectionIntersectionObserver.observe(oTargetDom);
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -2979,7 +2999,7 @@ function ensurePreviewSelectionLayerEvents() {
 				oCore.attachUIUpdated(requestPreviewMarkLayerUpdate);
 			}
 		}
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	oWS.sMark.bSelectionLayerEventBound = true;
 }
 //#endregion
@@ -3011,7 +3031,7 @@ oWS.sMark.fn_mark = function(oMarkUi) {
 	if (typeof oMarkUi.focus === "function") {
 		try {
 			oMarkUi.focus();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 
 	ensurePreviewSelectionLayerEvents();
@@ -3456,7 +3476,7 @@ function setUIProp(UIOBK, UILIB, T_0015, T_UA018, T_UA032, T_UA030) {
 	try {
 		var _oUi = getUIClassInstance(UILIB);
 		l_meta = _oUi.getMetadata();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	for (var i = 0, l = T_0015.length; i < l; i++) {
 		if (T_0015[i].UIASN === "DRAGABLE") {
 			continue;
@@ -3617,7 +3637,7 @@ function addUIObjPreView(OBJID, UIOBK, UILIB, UIFND, POBID, PUIOK, UIATT, T_0015
 	if (ls_0022 && ls_0022.TGLIB !== "" && ls_0022.UIFND.indexOf("U4A.") === -1 && ls_0022.UIFND.indexOf("SAPUI6.") === -1) {
 		try {
 			sap.ui.getCore().loadLibrary(ls_0022.TGLIB);
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 	var lt_0015 = [];
 	if (typeof T_0015 !== "undefined") {
@@ -3799,7 +3819,7 @@ function destroyUIPreView(OBJID, POBID, UIOBK, PUIOK) {
 	try {
 		parent.oAPP.attr.prev[OBJID].destroy();
 	} catch (e) {
-		console.log("destroyUIPreView - " + OBJID);
+		console.log("destroyUIPreView - " + OBJID, e);
 	}
 }
 
@@ -3856,7 +3876,7 @@ function freeUiDom(oUi) {
 	}
 	try {
 		l_dom.remove();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	freeUiDom(oUi);
 }
 
@@ -3894,7 +3914,7 @@ function removeAllTreeChild(is_tree) {
 		try {
 			parent.oAPP.attr.prev[is_tree.OBJID].removeAllAggregation(lt_aggr[i]);
 			parent.oAPP.attr.prev[is_tree.OBJID][l_remove]();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -3935,6 +3955,9 @@ function getUiPosition(is_tree, it_tree, IT_UA015) {
  * Rebuilds a portion of the preview tree after a design change.
  */
 async function refreshPreview(is_tree) {
+
+	// 진입 기록 (2026-10-01 — 장군님 지시, ws40-work-order-2 A7): 오류 분석 때 이 길을 실제로 지났는지 알기 위해
+	if (typeof U4ALOG !== "undefined" && U4ALOG.info) { U4ALOG.info("진입", "refreshPreview", "OBJID=" + String(is_tree && is_tree.OBJID).slice(0, 40)); }
 	
 	return new Promise(async (resolve) => {
 		if (is_tree.OBJID === "ROOT") {
@@ -3981,7 +4004,7 @@ async function refreshPreview(is_tree) {
 		var _oPromise = _oRender.setAfterRendering(parent.oAPP.attr.ui.prevRootPage);
 		try {
 			parent.oAPP.attr.ui.prevRootPage.removeAllContent();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 		parent.oAPP.attr.ui.prevRootPage.invalidate();
 		await _oPromise;
 		parent.oAPP.attr.UA015UI = parent.oAPP.attr.prev[is_tree.OBJID];
@@ -4417,7 +4440,7 @@ function destroyPreviewUi(is_tree) {
 	}
 	try {
 		parent.oAPP.attr.prev[is_tree.OBJID].destroy();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 
@@ -4431,14 +4454,14 @@ function destroyPlanningCalendarRow(is_tree) {
 	}
 	try {
 		l_ui.destroy();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	l_ui = sap.ui.getCore().byId(parent.oAPP.attr.prev[is_tree.OBJID].sId + "-CalRow");
 	if (!l_ui) {
 		return;
 	}
 	try {
 		l_ui.destroy();
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 }
 
 
@@ -4450,7 +4473,7 @@ function destroyPreviewUiOthers() {
 	for (var i in ls_ui) {
 		try {
 			ls_ui[i].destroy();
-		} catch (e) {}
+		} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	}
 }
 
@@ -5044,6 +5067,7 @@ function createUIInstance(is_tree, it_0015) {
 	try {
 		sap.ui.requireSync(ls_0022.LIBNM.replace(/\./g, "/"));
 	} catch (e) {
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 		parent.oAPP.attr.prev[is_tree.OBJID] = new sap.ui.core.Element();
 		var lt_0015 = it_0015 || parent.oAPP.DATA.APPDATA.T_0015.filter(a => a.OBJID === is_tree.OBJID);
 		parent.oAPP.attr.prev[is_tree.OBJID]._T_0015 = lt_0015;
@@ -5066,12 +5090,14 @@ function createUIInstance(is_tree, it_0015) {
 	try {
 		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid(), setUIProperty(is_tree, lt_0015));
 	} catch (e) {
+	    // 어느 UI·어느 class 에서 속성 적용이 실패했는지 같이 남긴다 (2026-09-29 — ws40-work-order A4-1)
+	    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "createUIInstance OBJID=" + is_tree.OBJID + " LIBNM=" + ls_0022.LIBNM); }
 		parent.oAPP.attr.prev[is_tree.OBJID] = new l_class(jQuery.sap.uid());
 	}
 	addPreviewTabIndexCustomData(parent.oAPP.attr.prev[is_tree.OBJID]);
 	try {
 		setUIPropertyDirectly(is_tree.OBJID, lt_0015);
-	} catch (e) {}
+	} catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 	parent.oAPP.attr.prev[is_tree.OBJID]._T_0015 = lt_0015;
 	parent.oAPP.attr.prev[is_tree.OBJID]._MODEL = {};
 	parent.oAPP.fn.setAggrBind(parent.oAPP.attr.prev[is_tree.OBJID]);
@@ -5119,6 +5145,9 @@ function addPreviewTabIndexCustomData(oUi) {
  * Builds the preview root controls and renders the current design tree into the iframe.
  */
 async function drawPreview() {
+
+	// 진입 기록 (2026-10-01 — 장군님 지시, ws40-work-order-2 A7): 오류 분석 때 이 길을 실제로 지났는지 알기 위해
+	if (typeof U4ALOG !== "undefined" && U4ALOG.info) { U4ALOG.info("진입", "drawPreview", ""); }
 	if (!jQuery.isEmptyObject(parent.oAPP.attr.prev)) {
 		parent.oAPP.DATA.APPDATA.T_0015 = parent.oAPP.fn.getAttrChangedData();
 		for (let _s0015 of parent.oAPP.DATA.APPDATA.T_0015) {
@@ -5197,7 +5226,18 @@ function isSkip0014(is_tree) {
  * Converts persisted design attribute values into runtime UI5 property values.
  */
 function parsePropertyValue(is_attr) {
-	
+
+	// 속성값이 0 이나 기본값으로 바뀐 것을 참고 등급으로 남긴다 (2026-09-29 — ws40-work-order A4-2)
+	// 원본(U4A_WS_DESIGN)에도 같은 동작이 있는 툴의 정상 흐름이라 경고가 아니라 참고다.
+	// 값은 앞 80자만 남긴다 — 업무 자료가 로그로 새지 않게. 변환이 성공하면 부르지 않는다.
+	function lf_noteCoerce(vVal, sTo) {
+		if (typeof U4ALOG === "undefined" || !U4ALOG.note) {
+			return;
+		}
+		U4ALOG.note("속성값 바뀜", is_attr.OBJID + "." + is_attr.UIATT,
+			is_attr.UIADT + " <- " + String(vVal).slice(0, 80) + " => " + sTo);
+	}
+
 	function lf_parseProp(vVal) {
 		var l_val;
 		switch (is_attr.UIADT.toUpperCase()) {
@@ -5210,6 +5250,7 @@ function parsePropertyValue(is_attr) {
 			case "FLOAT":
 				l_val = Number(vVal);
 				if (isNaN(l_val) === true) {
+					lf_noteCoerce(vVal, "0");
 					return 0;
 				}
 				return l_val;
@@ -5218,11 +5259,13 @@ function parsePropertyValue(is_attr) {
 				var l_enum = registEnumType(is_attr.UIADT);
 				var l_type = sap.ui.base.DataType.getType(is_attr.UIADT);
 				if (l_type && typeof l_type.isValid === "function" && l_type.isValid(l_val) === false) {
+					lf_noteCoerce(vVal, "undefined");
 					l_val = undefined;
 				}
 				if ((!l_type || typeof l_type.isValid !== "function") && l_enum && typeof l_enum === "object" && Object.keys(l_enum).some(function(sKey) {
 					return l_enum[sKey] === l_val;
 				}) === false) {
+					lf_noteCoerce(vVal, "undefined");
 					l_val = undefined;
 				}
 				return l_val;
@@ -5691,7 +5734,7 @@ function start() {
 								(!a || a && a.indexOf(t) < 0) && i.addAggregation("content", t, !0)
 							}
 						}), this)
-					} catch (t) {}
+					} catch (t) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(t); }}
 					return this
 				};
 				sap.ui.requireSync("sap/ui/layout/form/SimpleForm");
@@ -5799,6 +5842,24 @@ function start() {
 			});
 			
 			sap.ui.getCore().attachThemeChanged(function() {
+				/**
+				 * @since   2026-09-09
+				 * @author  Claude
+				 * @description
+				 * ★ 미리보기 부팅(로드) 중에는 여기서 busy 를 끄지 않는다. (장군님 지시 2026-09-09)
+				 * 원본(UI5)은 이 시점에 화면잠금(oAPP.attr.oCore.lock)이 살아 있어서, 여기서
+				 * setBusy("") 로 대기표시만 사라져도 사용자 조작은 계속 막혀 있었다.
+				 * HTML5 이식본은 그 화면잠금이 아무 일도 안 하는 껍데기(lock:_noop)라서,
+				 * 여기서 busy 를 끄면 실제로 조작이 열려 버린다 → 원본에 없던 구멍.
+				 * 그래서 부팅 중이면 건너뛰고, 미리보기 구성 완료(ROOT 선택 종료) 시점에
+				 * 한 번만 풀리게 한다. (부팅이 아닐 때 = 테마 변경 등 평소 동작은 원본 그대로)
+				 */
+				try {
+					if (parent.oAPP && parent.oAPP.attr && parent.oAPP.attr.__ws20PrevBooting === true) {
+						return;
+					}
+				} catch (e) { /* 부모 접근 실패시엔 원본 동작 그대로 진행 */ }
+
 				if (u4aRootParent.require(parent.oAPP.oDesign.pathInfo.bindPopupBroadCast)("IS-CHANNEL-CREATE") === false) {
 					u4aRootParent.setBusy("");
 				}

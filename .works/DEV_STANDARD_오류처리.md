@@ -23,6 +23,16 @@ if (typeof X === "function") { try { X(); } catch (e) { } }
 if (typeof X !== "function") { throw new Error("[BWP-MF-001] X 미정의"); }
 X();
 ```
+### 화면 메시지 형태 (장군님 지침 2026-09-01)
+- 사용자에게 보이는 문구는 **`[코드] 사용자 친화 문구`** 형태로 만든다.
+  예) `[WSEV-003] 알 수 없는 오류가 발생하였습니다. 다시시도 하시거나, 문제가 지속될 경우 U4A 솔루션 팀에 문의 하세요.`
+- 문구는 **기존 메시지 키만** 쓴다(임의 문구 생성 금지):
+  `ZMSG_WS_COMMON_001` **314**(알 수 없는 오류가 발생하였습니다.) + **290**(다시시도 하시거나, 문제가 지속될 경우 U4A 솔루션 팀에 문의 하세요.)
+- **예외 원문·스택은 화면에 노출하지 않는다** — 콘솔에만 남긴다(`[코드] 어느 자리인지 + 예외 원문`).
+- 저장·실행처럼 **반드시 성공해야 하는 프로세스**는, 전송 前 구간에서 하나라도 터지면
+  **서버로 보내지 않고 중단**한다(오류난 데이터를 저장하느니 저장을 안 한다).
+  저장이 끝난 뒤 구간은 되돌릴 수 없으므로 코드만 드러낸다.
+
 - 공통 헬퍼(선택): `raiseCritical(code, detail)` = `console.error("["+code+"] "+detail)` + `throw new Error("["+code+"] "+detail)`.
 - 이미 명시 함수가 있는 창은 `showCriticalErrorDialog("[코드] …")` 를 직접 불러도 됨(메인 창 방식).
 
@@ -32,6 +42,25 @@ X();
 - **접두 사전**(파일↔접두)만 이 문서 아래 표에서 한 곳 관리. 각 파일 상단에 `// 오류코드 접두: BWP-MF / 다음 번호: NNN` 주석.
 
 ### 접두 사전 (배정된 것만 — 늘려간다)
+## ★★★ 반드시 있어야 할 객체·함수가 없으면 — 앱 종료 (장군님 지시 2026-09-14 확정)
+
+**사용자가 편집 중이어도 예외 없다.** 종전 `.analy/19` 부록 A 의 「편집 중이면 앱은 살리고 그 동작만
+막는다」는 **필수 의존성 없음에는 적용하지 않는다.**
+
+| | 지금까지 | 2026-09-14 부터 |
+|---|---|---|
+| 반드시 있어야 할 객체·함수가 없다 | 조용히 빠져나가거나, 편집 중이면 앱을 살렸다 | **다음 행위 차단 + 크리티컬 메시지 + 앱 종료** |
+
+이유: 필수 함수가 없다는 건 **그 기능이 애초에 동작 불가**라는 뜻이다. 살려 두면 저장이 안 되는
+화면에서 계속 작업하다 결국 전부 날린다. **프로그램이 잘못 만들어진 것이므로 반드시 고친다.**
+
+**단, 아무 데나 적용하면 앱이 아무 데서나 죽는다.** 판정 갈래는
+[.works/필수의존성크리티컬/00_현황판.md](필수의존성크리티컬/00_현황판.md) §5 를 따른다 —
+「우리가 만든 함수·객체가 없다」만 앱 종료다. 화면 요소가 조건부로 없을 수 있는 자리,
+UI5 미로드 가드, 브라우저 기능 지원 확인은 **정상 분기 그대로 둔다.**
+
+---
+
 | 접두 | 파일/영역 |
 |---|---|
 | `BWP-MF` | bindPopup/modelFieldArea |
@@ -39,6 +68,43 @@ X();
 | `BWP-AI` | bindPopup/additInfoArea |
 | `BWP-BD` | bindPopup/designArea/bindData |
 | `BWP-FR` | bindPopup/frame |
+| `WSEV` | ws30/ws10_20/js/ws_events.js (WS20 화면 버튼 동작 — Activate·Save·Syntax Check) |
+| `FDPO` | ws30/ws10_20/js/fnDialogPopupOpener.js (각종 별도 창 열기) |
+| `DCHK` | ws30/ws10_20/design/js/checkAppData/designTreeData.js (디자인 값 검사) |
+| `U4AUI` | ws30/ws10_20/theme/u4a-ui.js (공통 UI 컴포넌트) |
+| `RSRC` | ws30/resources/index.js (공통 메시지·토스트·메시지박스) |
+| `SHEL` | ws30/ws10_20/js/ws_html5_shell.js (셸) |
+| `USP` | ws30/ws10_20/js/usp/ws_html5_usp.js (USP 화면) |
+| `W20E` | ws30/ws10_20/js/ws_html5_ws20_edit.js (WS20 디자인 트리 편집) |
+| `MIMF` | ws30/ws10_20/Popups/mimeRepository/frame.js |
+| `VMNG` | ws30/ws10_20/Popups/versionMng/versionMngFrame.js |
+| `UCSS` | ws30/ws10_20/Popups/ui5CssPopup_v2/control.js (UI5 Predefined CSS 팝업 오프너) |
+| `DMON` | ws30/ws10_20/js/ws_html5_datamon.js (내부 데이터 모니터 — 감시 알맹이) |
+| `DMOP` | ws30/ws10_20/Popups/dataMonitor/index.js (내부 데이터 모니터 — 창 여는 쪽) |
+| `DMWN` | ws30/ws10_20/Popups/dataMonitor/Popup/ (내부 데이터 모니터 — 창 화면) |
+| `MLOG` | electron/lib/log/ws_main_log.js (앱 본체 로그) |
+| `CRSH` | electron/lib/log/ws_crash_report.js (앱이 뻗었을 때 처리·보고서 만들기) |
+| `CDMP` | electron/lib/log/ws_crash_dump_read.js (죽은 흔적 덩어리를 글로 풀기) |
+| `TGSD` | electron/lib/log/ws_telegram.js (텔레그램 전송) |
+| `EDHT` | ws30/ws10_20/Popups/editorPopup/host/ (편집기 시리즈 Monaco host — 오류 페이지 에디터·소스 패턴도 이 host 를 쓴다) |
+| `VMHT` | ws30/ws10_20/Popups/versionMng/host/ (버전 관리 diff Monaco host) |
+| `WFN4` | ws30/ws10_20/js/ws_fn_04.js (컨트롤러 클래스 실행 — VBS 실행 오류 창 등, 2026-09-17) |
+| `CEHT` | ws30/ws10_20/js/codeeditor/ (범용 Monaco host — 클라이언트 이벤트 편집기가 쓴다) |
+| `EDTF` | ws30/ws10_20/Popups/editorPopup/editorFrame.js |
+| `EPEF` | ws30/ws10_20/Popups/errPageEditorPopup/errorPageEditorFrame.js |
+| `PATF` | ws30/ws10_20/Popups/patternPopup/frame.js (소스 패턴 창) |
+| `CLED` | ws30/ws10_20/js/ws_html5_client_editor.js (클라이언트 이벤트 편집기 팝업) |
+| `FFPO` | ws30/ws10_20/js/fnFindPopupOpen.js (Find 창 여는 쪽) |
+| `FEPE` | ws30/ws10_20/js/fnErrorPageEditorPopupOpen.js (Error Page Editor·미리보기 창 여는 쪽) |
+| `FVMP` | ws30/ws10_20/js/fnVersionManagementPopupOpen.js (Version Management 창 여는 쪽) |
+| `APRO` | ws30/ws10_20/design/attrPresetPopup/index.js (속성 기본값 팝업 여는 쪽) |
+| `FFIP` | ws30/ws10_20/js/fnFavIconPopupOpen.js (즐겨찾기 아이콘 값도움 창) |
+| `WMAI` | ws30/ws10_20/js/ws_main.js (WS 메인 화면 구성) |
+| `VWMN` | ws30/ws10_20/views/vw_main/control.js (창 첫 화면 — 로그인/메인 분기) |
+| `INTR` | intro.js (인트로 → 서버 목록 창) |
+| `SVLS` | ServerList_v2/ServerList.js (서버 목록 → 메인 창) |
+| `LPRL` | ws30/ws10_20/js/library-preload.js (로그인 후 창 — 메인 스크립트 읽기·시작) |
+| `UBSY` | ws30/ws10_20/theme/u4a-busy.js (공통 busy — window.U4ABusy, 2026-09-15) |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

@@ -561,6 +561,7 @@
       try {
         var _sAppData = JSON.parse(appData);
       } catch (error) {
+          if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         return;
       }
 
@@ -2983,7 +2984,7 @@
       let _oDom = _oRow.getDomRef() || undefined;
 
       if(typeof _oDom === "undefined"){
-        console.error("(uiDesignArea.js oAPP.fn.designCopyUI)UI 복사->추가 처리 이후 ROW의 DOM 정보 취득 실패", ls_copy.OBJID);
+        console.error("(uiDesignArea.js oAPP.fn.designCopyUI) UI copy->add: could not get the row DOM info afterwards", ls_copy.OBJID);
         break;
       }
 
@@ -5948,6 +5949,7 @@
     try{
       var ls_item = JSON.parse(parent.FS.readFileSync(l_path, "utf-8"));
     }catch(e){
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
       parent.showMessage(sap, 10, "E", e);
 
       //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.

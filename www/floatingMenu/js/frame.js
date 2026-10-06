@@ -680,7 +680,7 @@ function fn_UIUPdated() {
         oVertTB => 가장 밖의 세로 스플리터의 상단 바
         oVertBB => 가장 밖의 세로 스플리터의 하단 바 */
 
-    console.log('너는 4번 UI 생성 후 이벤트');
+    console.log('UI create after event (4)');
     sap.ui.getCore().detachEvent(sap.ui.core.Core.M_EVENTS.UIUpdated, fn_UIUPdated);
 
     if(oAPP.WATCH !== undefined) {
@@ -736,7 +736,7 @@ function fn_UIUPdated() {
                         visible: false
                     }),
                     press: function(e) {
-                        console.log('눌렸어');
+                        console.log('pressed');
                         GLV_DATA.FN.SERVER_ACTIVE(e);
                     }
                 }).addStyleClass('serverButton')
@@ -1036,7 +1036,7 @@ function createUi() {
                 press: function() {
                     // 플로팅 메뉴의 정보 팝업 펑션
                     // GLV_DATA.FN.FLOAT_INFO_POPUP();
-                    console.log('아직 준비 중');
+                    console.log('not ready yet ');
                 }
             })
         })

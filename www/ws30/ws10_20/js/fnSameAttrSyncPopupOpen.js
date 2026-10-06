@@ -70,7 +70,7 @@
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum);
             if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
     // /U4A/MSG_WS (055/268/001/005).
@@ -78,7 +78,7 @@
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNum);
             if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
     // ZMSG_WS_COMMON_001 (060/061) — Workspace 언어.
@@ -87,21 +87,21 @@
             var L = (parent.getUserInfo && parent.getUserInfo().LANGU) || "";
             var s = parent.WSUTIL.getWsMsgClsTxt(L, "ZMSG_WS_COMMON_001", sNr);
             if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNr;
     }
     // 토스트/메시지 — 공통 showMessage(KIND 10=토스트). 모달 top-layer 안에 자동 배치.
     function _toast(sType, sText) {
         if (!sText) { return; }
-        try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { }
+        try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     function _isEdit() {
-        try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { return false; }
+        try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
     // 미리보기 반영(W2 미변환/미로드면 no-op) — 원본 previewUIsetProp 1:1.
     function _preview(sAttr) {
         if (typeof oAPP.fn.previewUIsetProp === "function") {
-            try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[HTML5][WS20][sameAttr] previewUIsetProp:", e && e.message); }
+            try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[WS20][sameAttr] previewUIsetProp:", e && e.message, e); }
         }
     }
 
@@ -112,8 +112,8 @@
     /* ── 닫기 ──────────────────────────────────────────────────────────
      *   bSkipMsg=true 면 취소 안내(001) 생략(확인 성공 경로). 원본 lf_close 1:1. */
     function lf_close(bSkipMsg) {
-        try { if (window.U4AUI && U4AUI.closeColumnMenu) { U4AUI.closeColumnMenu(); } } catch (e) { }
-        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+        try { if (window.U4AUI && U4AUI.closeColumnMenu) { U4AUI.closeColumnMenu(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (bSkipMsg === true) { return; }
         //001 Cancel operation
         _toast("I", _msgM("001"));
@@ -240,7 +240,7 @@
                 var aEvt = await oAPP.fn.getServerEventList(null, true);
                 aDDLB = Array.isArray(aEvt) ? aEvt.slice() : [];
             } catch (e) {
-                console.error("[HTML5][WS20][sameAttr] getServerEventList:", e && e.message);
+                console.error("[WS20][sameAttr] getServerEventList:", e && e.message, e);
                 aDDLB = [{ KEY: "", TEXT: "" }];
             }
         }
@@ -264,7 +264,7 @@
         try {
             bShowF4 = (typeof oAPP.fn.attrIsIconProp === "function" && oAPP.fn.attrIsIconProp(is_attr) === true) ||
                 (typeof oAPP.fn.attrIsColorProp === "function" && oAPP.fn.attrIsColorProp(is_attr) === true);
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oFld = U4AUI.createField({
             type: "text",
@@ -299,7 +299,7 @@
         try {
             if (typeof oAPP.fn.chkValidProp === "function") { bValid = oAPP.fn.chkValidProp(ls_0015) !== false; }
         } catch (e) {
-            console.error("[HTML5][WS20][sameAttr] chkValidProp 예외(통과 처리):", e && e.message);
+            console.error("[WS20][sameAttr] chkValidProp exception (handled):", e && e.message, e);
         }
 
         //불가값 + DDLB 아닌 경우 → default 값으로 되돌림(원본 동일).
@@ -313,7 +313,7 @@
     function _callInputF4Help(is_attr, oAnchor) {
         //컬러 프로퍼티 → 컬러 피커(행과 동일 fnColorPickerOpen).
         var bColor = false;
-        try { bColor = (typeof oAPP.fn.attrIsColorProp === "function" && oAPP.fn.attrIsColorProp(is_attr) === true); } catch (e) { }
+        try { bColor = (typeof oAPP.fn.attrIsColorProp === "function" && oAPP.fn.attrIsColorProp(is_attr) === true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (bColor) {
             var fnDone = function (sHex) {
                 oState.value = sHex || "";
@@ -326,7 +326,7 @@
         }
         //아이콘 프로퍼티 → 콜백형 아이콘 선택기는 HTML5 미변환(fnIconListPopupOpener 는 콜백 없는 외부창).
         //  임의 대체 금지(원본에 없는 행위 방지) — 행의 미변환 F4 와 동일하게 경고만.
-        console.warn("[W4+ 예정] 동일속성 동기화 아이콘 F4(callIconListPopup) 미변환:", is_attr.UIATT);
+        console.warn("[W4+ pending] same-property sync icon F4 (callIconListPopup) not converted:", is_attr.UIATT);
     }
 
     /************************************************************************
@@ -351,8 +351,8 @@
             return;
         }
 
-        try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
-        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { }
+        try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         //★ UNDO 정확성(필수): fnWs20PushUndo 의 스냅샷(_snapshot)은 "그 시점 oAPP.attr.prev 에
         //  이미 존재하는 OBJID 키"의 _T_0015 만 담고, 되돌리기(_restoreSnap)는 그 담긴 키만 복원한다.
@@ -375,7 +375,7 @@
         //★ UNDO: 대상+소스 전체를 한 단위로 — 변경 "직전" 상태를 1회만 적재.
         // [BR59-4] 되돌리기 대상 = 값이 바뀌는 그 UI 와 그 속성 줄(원본 CL_CHANGE_ATTR 2278 기준).
         try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr && is_attr.OBJID ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK || "" } : undefined); } }
-        catch (e) { console.warn("[HTML5][WS20][sameAttr] undo push skip:", e && e.message); }
+        catch (e) { console.warn("[WS20][sameAttr] undo push skip:", e && e.message, e); }
 
         try {
             var l_UIATV = oState.value;
@@ -447,10 +447,10 @@
             //소스 커밋 + 속성패널 refresh(undo 재-push 금지 = bSkipUndo true).
             oAPP.fn.fnWs20AttrChange(is_attr, "", true);
         } catch (e) {
-            console.error("[HTML5][WS20][sameAttr] 동기화 처리 오류:", e && e.message, e);
+            console.error("[WS20][sameAttr] sync handle error:", e && e.message, e);
         } finally {
-            try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
-            try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+            try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         //닫기(취소 안내 생략) → 성공 토스트.
@@ -740,7 +740,7 @@
      ************************************************************************/
     oAPP.fn.fnSameAttrSyncPopupOpen = async function (is_attr) {
 
-        if (!is_attr) { try { oAPP.common.fnSetBusyLock(""); } catch (e) { } return; }
+        if (!is_attr) { try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
 
         //대상 수집 — 트리 전체에서 동일 속성 검색.
         var lt_list = [];
@@ -748,22 +748,22 @@
             var aRoot = oAPP.attr.oModel.oData.zTREE;
             if (aRoot && aRoot[0]) { _collectSameAttr(is_attr, aRoot[0].zTREE, lt_list); }
         } catch (e) {
-            console.error("[HTML5][WS20][sameAttr] 대상 수집 오류:", e && e.message, e);
+            console.error("[WS20][sameAttr] target collect error:", e && e.message, e);
         }
 
         //동일 속성 없음 → 055(W) + 잠금 해제(원본 동일).
         if (lt_list.length === 0) {
             //055 Processing does not exist.
             _toast("W", _msgM("055"));
-            try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
-            try { parent.setBusy && parent.setBusy(""); } catch (e) { }
-            try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+            try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
 
         //다이얼로그 최초 생성(DOM 이탈 시 재생성).
         if (!oUI || !oUI.dlg || !document.body.contains(oUI.dlg)) { oUI = {}; lf_build(); }
-        if (oUI.dlg.open) { try { oAPP.common.fnSetBusyLock(""); } catch (e) { } return; }
+        if (oUI.dlg.open) { try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
 
         //원본 인덱스 태깅(__idx) — 정렬/필터로 뷰 순서가 바뀌어도 선택을 원본 기준으로 유지.
         lt_list.forEach(function (o, i) { o.__idx = i; });
@@ -791,12 +791,12 @@
         //대상 목록 렌더.
         _renderList();
 
-        try { oUI.dlg.showModal(); } catch (e) { }
+        try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         //단축키 잠금 해제 + busy off(원본 afterOpen/lf_setBindVal 말미).
-        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
-        try { parent.setBusy && parent.setBusy(""); } catch (e) { }
-        try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     /************************************************************************

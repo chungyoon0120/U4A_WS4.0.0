@@ -53,7 +53,7 @@ module.exports = async function () {
                 iCount++;
             }
 
-            console.log(`[U4A] ${iCount}개 요소 강조 완료.`);
+            console.log(`[U4A] highlighted ${iCount} elements`);
         }
 
         /**

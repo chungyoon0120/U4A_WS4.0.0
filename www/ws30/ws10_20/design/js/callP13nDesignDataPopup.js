@@ -891,6 +891,7 @@
                 //HEADER 파일 잠금 해제 처리.
                 loApp.attr.lockFile.unlockSync(l_path);
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 //잠금 해제 실패 flag return;
                 
             }
@@ -921,6 +922,7 @@
             loApp.attr.lock = true;
 
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
         }        
 
@@ -1241,6 +1243,7 @@
             try{
                 parent.FS.mkdirSync(l_folderPath);
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
                 return true;
             }
@@ -1255,6 +1258,7 @@
             try{
                 parent.FS.mkdirSync(l_folderPath);
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
                 return true;
             }
@@ -1270,6 +1274,7 @@
                 //header 파일 생성 처리.
                 parent.FS.writeFileSync(l_filePath, JSON.stringify([]));
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
                 return true;
             }
@@ -1291,6 +1296,7 @@
             try{
                 parent.FS.mkdirSync(l_folderPath);
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
                 return;
             }
@@ -1311,6 +1317,7 @@
                 //기존 header 파일 제거 처리.
                 parent.FS.unlinkSync(l_filePath);
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
                 return;
             }
@@ -1392,6 +1399,7 @@
             //header 정보 저장 처리.
             parent.FS.writeFileSync(l_filePath, JSON.stringify(lt_head));
         }catch(e){
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             //header 정보 저장중 오류발생시 오류 메시지 처리.
             parent.showMessage(sap, 20, "E", e);
             return;
@@ -1437,6 +1445,7 @@
             parent.FS.writeFileSync(parent.PATH.join(parent.getPath("P13N_ROOT"), C_FOLDER, C_SYSID, is_head.fileName),
                 JSON.stringify(ls_item));
         }catch(e){
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(sap, 10, "E", e);
             return;
         }
@@ -1834,6 +1843,7 @@
                 try{
                     parent.FS.mkdirSync(l_folderPath);
                 }catch(e){
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                     parent.showMessage(sap, 10, "E", e);
                     return;
                 }
@@ -1854,6 +1864,7 @@
                     //기존 header 파일 제거 처리.
                     parent.FS.unlinkSync(l_filePath);
                 }catch(e){
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                     parent.showMessage(sap, 10, "E", e);
                     return;
                 }
@@ -1871,6 +1882,7 @@
                     //기존 item 파일 제거 처리.
                     parent.FS.unlinkSync(l_path);
                 }catch(e){
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
                 }
 
@@ -1884,6 +1896,7 @@
                 //header 정보 저장 처리.
                 parent.FS.writeFileSync(l_filePath, JSON.stringify(lt_head));
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 //header 정보 저장중 오류발생시 오류 메시지 처리.
                 parent.showMessage(sap, 20, "E", e);
                 return;

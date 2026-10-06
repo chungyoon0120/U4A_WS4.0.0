@@ -1013,6 +1013,7 @@
     try{
       _sValue = JSON.parse(_sValue);
     }catch(e){
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
       return false;
     }
 

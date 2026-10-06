@@ -86,7 +86,7 @@ var oAPP = (function () {
             // 등록된 옵저버(예: /BUSYPOP)에 동기화 통지
             for (const sPrefix in this._observers) {
                 if (sPath.indexOf(sPrefix) === 0) {
-                    try { this._observers[sPrefix](); } catch (e) { /* noop */ }
+                    try { this._observers[sPrefix](); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
                 }
             }
         },
@@ -129,7 +129,8 @@ var oAPP = (function () {
         try {
             return structuredClone(o);
         } catch (e) {
-            try { return JSON.parse(JSON.stringify(o)); } catch (e2) { return Object.assign({}, o); }
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            try { return JSON.parse(JSON.stringify(o)); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } return Object.assign({}, o); }
         }
     }
 
@@ -222,7 +223,7 @@ var oAPP = (function () {
         oDlg.showModal();
         (oFocusBtn || oFoot.querySelector("button")).focus();
 
-        if (TYPE === "E") { try { parent.setSoundMsg("02"); } catch (e) { } }
+        if (TYPE === "E") { try { parent.setSoundMsg("02"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     };
 
     /************************************************************************
@@ -263,6 +264,7 @@ var oAPP = (function () {
             var sMsgStr = parent.FS.readFileSync(sLanguPath, "utf8");
             var aServMsg = JSON.parse(sMsgStr);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
         oMeta.MSGCLS = aServMsg;
@@ -341,7 +343,7 @@ var oAPP = (function () {
                 const sCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
                 REMOTE.getCurrentWindow().webContents.insertCSS(sCss);
             }
-        } catch (e) { /* 기본 테마 유지 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 기본 테마 유지 */ }
     };
 
     /************************************************************************
@@ -470,7 +472,7 @@ var oAPP = (function () {
             if (parent.isU4A_RND_SERVER && parent.isU4A_RND_SERVER(oServerInfo.SYSID)) {
                 oCard.appendChild(oAPP.fn.fnGetStaffLoginButtons());
             }
-        } catch (e) { /* RND 아님 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* RND 아님 */ }
 
         oMain.appendChild(oCard);
 
@@ -782,6 +784,13 @@ var oAPP = (function () {
     //  있으므로 timeout 값만 지정하면 실제 timeout 이벤트로 정상 종료된다.
     const LOGIN_XHR_TIMEOUT = 30000;
 
+    // ★2026-09-11 장군님 지시 — 로그인 시 메이저/패치 업데이트 체크를 임시로 건너뜀.
+    //   true 인 동안 fnCheckCustomerLisenceThen 이 CDN 판별(fnConnectionGithub)/
+    //   메이저 체크(fnSetAutoUpdateForSAP·fnSetAutoUpdateForCDN)/패치 체크
+    //   (fnCheckSupportPackageVersion) 를 전부 건너뛰고 바로 로그인을 완료한다.
+    //   되돌릴 때는 이 값만 false 로.
+    const SKIP_UPDATE_CHECK_TEMP = true;
+
     /********************************************************************
      * 로그인 통신 대기 중, busy 팝업에 타임아웃까지 남은 시간(초) 카운트다운.
      *   공통 setDomBusy 는 스피너만 띄우므로(미변경), 호스트 busy 다이얼로그의
@@ -790,7 +799,7 @@ var oAPP = (function () {
      ********************************************************************/
     let _iLoginCountdownTimer = null;
     function _getBusyTextDom() {
-        try { return parent.document.getElementById("u4aWsBusyText"); } catch (e) { return null; }
+        try { return parent.document.getElementById("u4aWsBusyText"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
     }
     function _stopLoginCountdown() {
         if (_iLoginCountdownTimer) { clearInterval(_iLoginCountdownTimer); _iLoginCountdownTimer = null; }
@@ -802,10 +811,12 @@ var oAPP = (function () {
         const oText = _getBusyTextDom();
         if (!oText) { return; }
         const iDeadline = Date.now() + iMs;
+        // 서버리스트 종료 대기(fnShowShutdownAskPopup)와 동일 표기 — "안내문구… (Ns)".
+        // 안내문구는 원본(as-is) 메시지 키 656("대기 중")만 쓴다(임의 문구 생성 금지).
+        const sWaitMsg = oAPP.msg.M656 ? (oAPP.msg.M656 + "…") : "";
         const _tick = () => {
             const iSecLeft = Math.max(0, Math.ceil((iDeadline - Date.now()) / 1000));
-            // 서버리스트 종료 대기(fnShowShutdownAskPopup)와 동일 표기 — 스피너 + "(Ns)", 1초 간격.
-            oText.textContent = "(" + iSecLeft + "s)";
+            oText.textContent = sWaitMsg ? (sWaitMsg + " (" + iSecLeft + "s)") : ("(" + iSecLeft + "s)");
             if (iSecLeft <= 0 && _iLoginCountdownTimer) { clearInterval(_iLoginCountdownTimer); _iLoginCountdownTimer = null; }
         };
         _tick();
@@ -817,7 +828,7 @@ var oAPP = (function () {
                 oBusy.__loginCountdownHook = true;
                 oBusy.addEventListener("close", _stopLoginCountdown);
             }
-        } catch (e) { /* noop */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
     }
 
     /************************************************************************
@@ -879,7 +890,18 @@ var oAPP = (function () {
                 try {
                     JSON.parse(xhr.response);
                 } catch (error) {
+                    // 2026-09-08 복원 — 원본이 남기던 상세 기록(어느 파일·어느 함수·무엇을 하다 났는지)
+                    var aConsoleMsg = [
+                        `\n############# 로그인 오류 ###############`,
+                        `[PATH]: www/Login/Login.js`,
+                        `=> oAPP.events.ev_login`,
+                        `=> 'u4a_status' 응답 헤더에 값이 있을 경우에 JSON parse Error!!\n`,
+                        `[xhr.response]: ${xhr.response}`,
+                        `########################################\n`,
+                    ];
                     console.error(error);
+                    console.error(aConsoleMsg.join("\r\n"));
+                    console.trace();   // 2026-09-08 복원 — 원본처럼 난 자리 전체를 남긴다
                     let sErrMsg = oAPP.msg.M295 + "\n\n" + oAPP.msg.M290;
                     _openLoginErrorDialog({ TITLE: oAPP.msg.M417, DESC: sErrMsg });
                     parent.setDomBusy("");
@@ -896,7 +918,19 @@ var oAPP = (function () {
                 oResult = JSON.parse(xhr.response);
                 oResult.SERVER_SETTINGS = oLogInData.SERVER_SETTINGS;
             } catch (error) {
+                // 2026-09-08 복원 — 원본이 남기던 상세 기록
+                var aConsoleMsg = [
+                    `\n############# 로그인 오류 ###############`,
+                    `[PATH]: www/Login/Login.js`,
+                    `=> oAPP.events.ev_login`,
+                    `=> oResult = JSON.parse(xhr.response)`,
+                    `로그인 처리시 약속된 JSON 구조가 아님!!\n`,
+                    `[xhr.response]: ${xhr.response}`,
+                    `########################################\n`,
+                ];
                 console.error(error);
+                console.error(aConsoleMsg.join("\r\n"));
+                console.trace();   // 2026-09-08 복원 — 원본처럼 난 자리 전체를 남긴다
                 _openLoginErrorDialog({ TITLE: oAPP.msg.M417, DESC: oAPP.msg.M081 });
                 parent.setDomBusy("");
                 _showContentDom("X");
@@ -948,10 +982,31 @@ var oAPP = (function () {
                     oAPP.fn.fnMessageBox("E", oAuthInfo.MSG);
                     parent.setDomBusy("");
                     _showContentDom("X");
+
+                    // 2026-09-08 복원 — 원본이 남기던 상세 기록
+                    var aConsoleMsg = [
+                        `[PATH]: www/Login/Login.js`,
+                        `=> oAPP.events.ev_login`,
+                        `=> oAPP.fn.fnCheckAuthority`,
+                        `=> [RETURN]: ${JSON.stringify(oAuthInfo)}`,
+                        `=> [DESC]  : 권한 체크 중 오류 발생!!`,
+                    ];
+                    console.error(aConsoleMsg.join("\r\n"));
+
                     return;
                 }
             } catch (err) {
+                // 2026-09-08 복원 — 원본이 남기던 상세 기록
+                var aConsoleMsg = [
+                    `\n############# 로그인시 권한 체크 오류 ###############`,
+                    `[PATH]: www/Login/Login.js`,
+                    `=> oAPP.events.ev_login`,
+                    `=> var oAuthInfo = await oAPP.fn.fnCheckAuthority()\n`,
+                    `=> try...catch 오류`,
+                    `#####################################################\n`,
+                ];
                 console.error(err);
+                console.error(aConsoleMsg.join("\r\n"));
                 oAPP.fn.fnShowNoAuthIllustMsg(err);
                 parent.setDomBusy("");
                 _showContentDom("X");
@@ -975,7 +1030,18 @@ var oAPP = (function () {
         }; // end of xhr.onload
 
         function _onError(ev) {
+            // 2026-09-08 복원 — 원본이 남기던 상세 기록
+            var aConsoleMsg = [
+                `\n############# 로그인시 오류 발생!! ###############`,
+                `[PATH]: www/Login/Login.js`,
+                `=> oAPP.events.ev_login`,
+                `=> _onError\n`,
+                `[xhr.response]: ${xhr.response}`,
+                `########################################\n`,
+            ];
             console.error(ev);
+            console.error(aConsoleMsg.join("\r\n"));
+            console.trace();   // 2026-09-08 복원 — 원본처럼 난 자리 전체를 남긴다
             if (ev.type === "timeout") {
                 oAPP.fn.fnMessageBox("E", oAPP.msg.M294);
                 parent.setDomBusy("");
@@ -1092,6 +1158,10 @@ var oAPP = (function () {
      ************************************************************************/
     oAPP.fn.fnCheckAuthority = () => {
         return new Promise((resolve, reject) => {
+
+            // 2026-09-08 복원 — 원본에 있던 진행 상황 로그가 빠져 있었다(실측).
+            console.log("checking dev permission");
+
             var sServicePath = parent.getServerPath() + "/chk_u4a_authority";
             var oFormData = new FormData();
             let oSettings = WSUTIL.getWsSettingsInfo();
@@ -1110,9 +1180,28 @@ var oAPP = (function () {
                         var oResult;
                         try {
                             oResult = JSON.parse(xhr.response);
-                            console.log("## 개발 권한 결과!!", oResult);
+                            // 2026-09-08 복원 — 원본이 남기던 상세 기록.
+                            //   앞서 한 줄로 줄였다가, 원본 그대로가 맞아 되돌림.
+                            var aConsoleMsg = [
+                                `\n######################################`,
+                                `## 개발 권한 결과!!`,
+                                `######################################`,
+                                `=> [RESULT]: ${JSON.stringify(oResult)}`,
+                                `######################################`,
+                            ];
+                            console.log(aConsoleMsg.join("\r\n"));
                         } catch (error) {
-                            console.error("개발 권한 체크시 JSON parse error", error);
+                            // 2026-09-08 복원 — 원본이 남기던 상세 기록
+                            var aConsoleMsg = [
+                                `\n######################################`,
+                                `## 개발 권한 체크시 오류 발생!!!`,
+                                `######################################`,
+                                `=> oAPP.fn.fnCheckAuthority`,
+                                `=> 권한 결과 JSON parse error!`,
+                                `######################################`,
+                            ];
+                            console.error(error);
+                            console.error(aConsoleMsg.join("\r\n"));
                             var sCleanHtml = parent.setCleanHtml(xhr.response);
                             parent.showMessage(null, 99, "E", sCleanHtml);
                             parent.setDomBusy("");
@@ -1171,7 +1260,18 @@ var oAPP = (function () {
                         try {
                             resolve(JSON.parse(xhr.response));
                         } catch (error) {
-                            console.error("고객사 라이센스 체크시 JSON parse error", error);
+                            // 2026-09-08 복원 — 원본이 남기던 상세 기록
+                            var aConsoleMsg = [
+                                `\n############# 고객사 라이센스 체크시 오류 발생!! ###############`,
+                                `[PATH]: www/Login/Login.js`,
+                                `=> oAPP.fn.fnCheckCustomerLisence`,
+                                `=> JSON parse Error!!\n`,
+                                `[xhr.response]: ${xhr.response}`,
+                                `################################################################\n`,
+                            ];
+                            console.error(error);
+                            console.error(aConsoleMsg.join("\r\n"));
+                            console.trace();   // 2026-09-08 복원 — 원본처럼 난 자리 전체를 남긴다
                             var sCleanHtml = parent.setCleanHtml(xhr.response);
                             parent.showMessage(null, 99, "E", sCleanHtml);
                             parent.setDomBusy("");
@@ -1205,12 +1305,32 @@ var oAPP = (function () {
      ************************************************************************/
     oAPP.fn.fnCheckCustomerLisenceThen = function (oLicenseInfo) {
         if (oLicenseInfo.RETCD == "E") {
-            console.error("고객사 라이센스 체크 후 오류", oLicenseInfo);
+            // 2026-09-08 복원 — 원본이 남기던 상세 기록
+            var aConsoleMsg = [
+                `\n############# 고객사 라이센스 체크 후 오류 ###############`,
+                `[PATH]: www/Login/Login.js`,
+                `=> oAPP.fn.fnCheckCustomerLisenceThen\n`,
+                `=> [oLicenseInfo]: ${JSON.stringify(oLicenseInfo)}`,
+                `#####################################################\n`,
+            ];
+            console.error(aConsoleMsg.join("\r\n"));
             oAPP.fn.fnShowNoAuthIllustMsg(oLicenseInfo.RTMSG);
             parent.setDomBusy('');
             _showContentDom("X");
             return;
         }
+
+        // ★2026-09-11 장군님 지시 — 메이저/패치 업데이트 체크 임시 건너뜀(SKIP_UPDATE_CHECK_TEMP).
+        //   fnConnectionGithub(CDN 판별)/fnSetAutoUpdateForSAP·fnSetAutoUpdateForCDN(메이저)/
+        //   fnCheckSupportPackageVersion(패치) 를 전부 타지 않고 바로 로그인 완료로 넘어간다.
+        if (SKIP_UPDATE_CHECK_TEMP) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("SKIP_TEMP", "fnCheckCustomerLisenceThen", "major/patch update check skipped (SKIP_UPDATE_CHECK_TEMP=true)");
+            }
+            oAPP.fn.fnCheckVersionFinished(this.oResult, this.oAuthInfo);
+            return;
+        }
+
         var bIsCDN = parent.getIsCDN();
         if (bIsCDN == "X") {
             oAPP.fn.fnConnectionGithub().then(oAPP.fn.fnConnectionGithubThen.bind(this));
@@ -1258,6 +1378,7 @@ var oAPP = (function () {
             });
 
             autoUpdaterSAP.on('update-downloaded-sap', () => {
+                console.log('update done');     // 2026-09-08 복원(원본에 있던 줄)
                 oModel.setProperty("/BUSYPOP/TITLE", "Update Complete! Restarting...");
                 oModel.setProperty("/BUSYPOP/ILLUSTTYPE", "sapIllus-SuccessHighFive");
                 oModel.setProperty("/BUSYPOP/PERVALUE", 100);
@@ -1339,9 +1460,10 @@ var oAPP = (function () {
     oAPP.fn.fnSetAutoUpdateForCDN = (oPARAM) => {
         return new Promise((resolve) => {
 
-            autoUpdater.on('checking-for-update', () => console.log("CDN - 업데이트 확인 중..."));
+            autoUpdater.on('checking-for-update', () => console.log("CDN - update check ..."));
 
             autoUpdater.on('update-available', () => {
+                console.log("CDN - update available");   // 2026-09-08 복원(원본에 있던 줄)
                 _showContentDom("X");
                 let oBusyPop = oModel.getProperty("/BUSYPOP");
                 oBusyPop.PROGVISI = true;
@@ -1353,6 +1475,7 @@ var oAPP = (function () {
             });
 
             autoUpdater.on('update-not-available', () => {
+                console.log("CDN - already up to date");     // 2026-09-08 복원(원본에 있던 줄)
                 let oParam = { ISCDN: "X", oLoginInfo: oPARAM.oResult };
                 oAPP.fn.fnCheckSupportPackageVersion(resolve, oParam);
                 parent.setIsCDN("");
@@ -1375,7 +1498,7 @@ var oAPP = (function () {
                         }
                     }
                 });
-                console.log('CDN - 에러가 발생하였습니다. 에러내용 : ' + err);
+                console.log('CDN - error. errortext: ' + err);
             });
 
             autoUpdater.on('download-progress', (progressObj) => {
@@ -1387,6 +1510,7 @@ var oAPP = (function () {
             autoUpdater.on('update-downloaded', () => {
                 oModel.setProperty("/BUSYPOP/TITLE", "Update Complete! Restarting...");
                 oModel.setProperty("/BUSYPOP/ILLUSTTYPE", "sapIllus-SuccessHighFive");
+                console.log('CDN - update done');   // 2026-09-08 복원(원본에 있던 줄)
                 setTimeout(() => { parent.setIsCDN(""); autoUpdater.quitAndInstall(); }, 3000);
             });
 
@@ -1464,9 +1588,24 @@ var oAPP = (function () {
         const oIllust = document.getElementById("u4aWsVerIllust");
         if (oIllust) {
             const bDone = (o.ILLUSTTYPE === "sapIllus-SuccessHighFive");
-            // 완료=성공 아이콘, 진행중=공통 busy 스피너(.u4a-busy__spinner, 셸/ServerList 와 동일 이중 링)
-            oIllust.innerHTML = bDone ? ICON.success : '<div class="u4a-busy__spinner"></div>';
-            oIllust.dataset.spin = bDone ? "false" : "true";
+            const sKind = bDone ? "success" : "checking";
+            // ★2026-09-07: 원본 그림(진행중=sapIllus-BeforeSearch/완료=sapIllus-SuccessHighFive,
+            //   OpenUI5 1.107.1 공식 저장소)을 밝은/어두운 화면용 2벌씩 받아 배치
+            //   (.works/일러스트팝업/build-tnt-illustrations.js). 로드 실패시 기존 폴백(스피너/체크 아이콘) 유지.
+            //   다운로드 중엔 퍼센트(TITLE/DESC)만 계속 바뀌므로, kind 가 실제로 바뀔 때만 다시 그린다.
+            if (oIllust.dataset.kind !== sKind) {
+                var sFile = bDone ? "login-success" : "login-checking";
+                var sFallback = bDone ? ICON.success : '<div class="u4a-busy__spinner"></div>';
+                var sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+                oIllust.innerHTML = `<img class="u4a-login__verdlg-illust-img" alt="" aria-hidden="true"/><span class="u4a-login__verdlg-illust-fb">${sFallback}</span>`;
+                oIllust.dataset.kind = sKind;
+                var oImg = oIllust.querySelector(".u4a-login__verdlg-illust-img");
+                var oFb = oIllust.querySelector(".u4a-login__verdlg-illust-fb");
+                oImg.onload = function () { oImg.style.display = ""; oFb.style.display = "none"; };
+                oImg.onerror = function () { oImg.style.display = "none"; oFb.style.display = ""; };
+                oImg.style.display = "none";
+                try { oImg.src = new URL("../../../svg/" + sFile + "-" + sMode + ".svg", window.location.href).href; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            }
         }
     }
     oModel._observers["/BUSYPOP"] = _fnSyncVersionDialog;
@@ -1484,11 +1623,26 @@ var oAPP = (function () {
         oDlg.className = "u4a-dialog u4a-login__noauth";
         oDlg.innerHTML =
             `<div class="u4a-dialog__body u4a-login__noauth-body">` +
-            `<div class="u4a-login__noauth-illust">${ICON.noauth}</div>` +
+            `<div class="u4a-login__noauth-illust">` +
+            `<img class="u4a-login__noauth-illust-img" alt="" aria-hidden="true"/>` +
+            `<span class="u4a-login__noauth-illust-fb">${ICON.noauth}</span>` +
+            `</div>` +
             `<div class="u4a-login__noauth-title">No Authority!</div>` +
             `<div class="u4a-login__noauth-desc"></div>` +
             `</div>` +
             `<div class="u4a-dialog__footer"></div>`;
+        // ★2026-09-07: 원본 그림(tnt-UnsuccessfulAuth, OpenUI5 1.107.1 공식 저장소)을 밝은/어두운
+        //   화면용 2벌로 받아 배치(.works/일러스트팝업/build-tnt-illustrations.js). 기본은 기존 아이콘
+        //   표시, 로드 성공하면 그림으로 교체(파일 없거나 실패해도 아이콘으로 안전 폴백).
+        (function () {
+            var oImg = oDlg.querySelector(".u4a-login__noauth-illust-img");
+            var oFb = oDlg.querySelector(".u4a-login__noauth-illust-fb");
+            var sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+            oImg.onload = function () { oImg.style.display = ""; oFb.style.display = "none"; };
+            oImg.onerror = function () { oImg.style.display = "none"; oFb.style.display = ""; };
+            oImg.style.display = "none";
+            try { oImg.src = new URL("../../../svg/login-noauth-" + sMode + ".svg", window.location.href).href; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        })();
         oDlg.querySelector(".u4a-login__noauth-desc").textContent = sMsg || "";
         oDlg.addEventListener("cancel", (e) => e.preventDefault());
         const oOk = document.createElement("button");
@@ -1584,7 +1738,15 @@ var oAPP = (function () {
         }
 
         parent.oAPP.views.VW_MAIN.fn.loadWS30MainPage();
-        parent.showLoadingPage('');
+
+        // ★ [2026-09-14, 장군님 지시] 여기서 로딩 화면을 끄지 않는다.
+        //   [고친 이유] 종전에는 바로 윗줄 loadWS30MainPage() 뒤에 showLoadingPage('') 가 있었다.
+        //   그런데 loadWS30MainPage 는 <script> 를 붙여 놓기만 하고 바로 돌아온다 — 메인 화면은
+        //   아직 한 줄도 안 그려진 상태다. 그 순간 로딩 화면을 꺼 버리니, 메인이 다 그려질 때까지
+        //   테마 배경만 남아 "검은 화면"이 보였다(장군님 실측 2026-09-14, 다크 테마).
+        //   이제 해제는 메인이 실제로 다 그려진 시점에서 한 번만 한다
+        //   (js/ws_main.js 의 fnWsStart — 본문 등장 완료 콜백. 실패하면 그 catch 가 끈다).
+        //   타이머로 끄는 것은 금지(.analy 16 §2.11).
         parent.setSoundMsg('WELCOME');
 
     }; // end of fnOnLoginSuccess
@@ -1669,7 +1831,7 @@ var oAPP = (function () {
             oLoginInfo;
         try {
             oLoginInfo = JSON.parse(FS.readFileSync(sJsonPath, 'utf-8'));
-        } catch (e) { oLoginInfo = {}; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oLoginInfo = {}; }
         if (typeof oLoginInfo !== "object" || oLoginInfo == null) { oLoginInfo = {}; }
         if (typeof oLoginInfo[sSysID] == "undefined") { oLoginInfo[sSysID] = {}; }
         var oSysInfo = oLoginInfo[sSysID], bIsRemember = oLogInData.REMEMBER;
@@ -1686,7 +1848,7 @@ var oAPP = (function () {
     oAPP.fn.fnGetRememberLoginInfo = () => {
         var oServerInfo = parent.getServerInfo(), sSysID = oServerInfo.SYSID;
         let sJsonPath = PATH.join(USERDATA, "p13n", "login.json"), oLoginInfo;
-        try { oLoginInfo = JSON.parse(FS.readFileSync(sJsonPath, 'utf-8')); } catch (e) { return; }
+        try { oLoginInfo = JSON.parse(FS.readFileSync(sJsonPath, 'utf-8')); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return; }
         if (typeof oLoginInfo != "object" || oLoginInfo == null) { return; }
         if (typeof oLoginInfo[sSysID] == "undefined") { return; }
         return oLoginInfo[sSysID];
@@ -1695,7 +1857,7 @@ var oAPP = (function () {
     oAPP.fn.fnGetRememberCheck = () => {
         var oServerInfo = parent.getServerInfo(), sSysID = oServerInfo.SYSID;
         let sJsonPath = PATH.join(USERDATA, "p13n", "login.json"), oLoginInfo;
-        try { oLoginInfo = JSON.parse(FS.readFileSync(sJsonPath, 'utf-8')); } catch (e) { return false; }
+        try { oLoginInfo = JSON.parse(FS.readFileSync(sJsonPath, 'utf-8')); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
         if (typeof oLoginInfo != "object" || oLoginInfo == null) { return false; }
         if (typeof oLoginInfo[sSysID] == "undefined") { return false; }
         return oLoginInfo[sSysID].REMEMBER;
@@ -1707,7 +1869,7 @@ var oAPP = (function () {
         let oLoginInfo = {};
         try {
             if (FS.existsSync(sJsonPath)) { oLoginInfo = JSON.parse(FS.readFileSync(sJsonPath, 'utf-8')); }
-        } catch (e) { oLoginInfo = {}; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oLoginInfo = {}; }
         oLoginInfo.aIds = Array.isArray(oLoginInfo.aIds) ? oLoginInfo.aIds : [];
         oLoginInfo.aIds = oLoginInfo.aIds.filter(a => a.ID !== ID);
         oLoginInfo.aIds.unshift({ ID });
@@ -1718,7 +1880,7 @@ var oAPP = (function () {
 
     oAPP.fn.fnReadIDSuggData = () => {
         let sJsonPath = PATH.join(USERDATA, "p13n", "login.json"), oLoginInfo;
-        try { oLoginInfo = JSON.parse(FS.readFileSync(sJsonPath, 'utf-8')); } catch (e) { return []; }
+        try { oLoginInfo = JSON.parse(FS.readFileSync(sJsonPath, 'utf-8')); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return []; }
         if (typeof oLoginInfo != "object" || oLoginInfo == null || oLoginInfo.aIds == null) { return []; }
         return oLoginInfo.aIds;
     };
@@ -1770,6 +1932,8 @@ var oAPP = (function () {
      ************************************************************************/
     oAPP.fn.fnCheckSupportPackageVersion = (resolve, oParam) => {
 
+        console.log("WS Support Package Version Check...");   // 2026-09-08 복원(원본에 있던 줄)
+
         let oModelData = oModel.getProperty("/BUSYPOP");
         oModelData.ANIMATION = true;
         oModelData.PROGVISI = true;
@@ -1783,17 +1947,21 @@ var oAPP = (function () {
             spAutoUpdater = require(sSupportPackageCheckerPath);
 
         spAutoUpdater.on("checking-for-update-SP", (e) => {
-            console.log(e?.detail?.message || "패치 업데이트 확인중..");
+            console.log(e?.detail?.message || "checking patch update");
         });
 
         spAutoUpdater.on("update-available-SP", () => {
+            console.log("SP - update available");    // 2026-09-08 복원(원본에 있던 줄)
             _fnFadeLoginCard(0.3);
             oAPP.fn.fnVersionCheckDialogOpen();
             parent.setDomBusy("");
             _showContentDom("X");
         });
 
-        spAutoUpdater.on("update-not-available-SP", () => resolve());
+        spAutoUpdater.on("update-not-available-SP", () => {
+            console.log("SP - already up to date");          // 2026-09-08 복원(원본에 있던 줄)
+            resolve();
+        });
 
         spAutoUpdater.on("download-progress-SP", (e) => {
             oModel.setProperty("/BUSYPOP/TITLE", "Support Patch Downloading...");
@@ -1806,12 +1974,14 @@ var oAPP = (function () {
 
         spAutoUpdater.on("update-install-SP", () => {
             _supportPackageVersionCheckDialogProgressEnd();
+            console.log("SP - after patch file download: unpacking asar and installing");   // 2026-09-08 복원(원본에 있던 줄)
             oModel.setProperty("/BUSYPOP/TITLE", "Support Patch Installing...");
             oModel.setProperty("/BUSYPOP/PROGTXT", "Processing");
             _supportPackageVersionCheckDialogProgressStart();
         });
 
         spAutoUpdater.on("update-downloaded-SP", () => {
+            console.log('SP - update done');        // 2026-09-08 복원(원본에 있던 줄)
             _supportPackageVersionCheckDialogProgressEnd(true);
             oModel.setProperty("/BUSYPOP/TITLE", "Update Complete! Restarting...");
             oModel.setProperty("/BUSYPOP/PROGTXT", "Processing Complete!");
@@ -1837,7 +2007,7 @@ var oAPP = (function () {
                     APP.exit();
                 }
             });
-            console.log('SP - 패치 업데이트 중 에러 : ' + sRetMsg);
+            console.log('SP - patch update error: ' + sRetMsg);
         });
 
         let bIsCDN = (oParam.ISCDN == "X"),
@@ -1944,7 +2114,7 @@ var oAPP = (function () {
         if (FS.existsSync(sThemeJsonPath) === false) { return; }
         try {
             var oThemeJsonData = JSON.parse(FS.readFileSync(sThemeJsonPath, "utf-8"));
-        } catch (error) { return; }
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); } return; }
         oAPP.fn.fnApplyTheme(oThemeJsonData);
     };
 
@@ -2021,7 +2191,7 @@ var oAPP = (function () {
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
             parent.setDomBusy("");
             // 표시는 frame.html 이 iframe(매뉴얼) 로드 후 CURRWIN.show() 로 수행(흰 플래시 방지).
-            try { oBrowserWindow.closable = true; } catch (e) { }
+            try { oBrowserWindow.closable = true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
         oBrowserWindow.on('closed', () => { oBrowserWindow = null; CURRWIN.focus(); });
     }
@@ -2095,22 +2265,81 @@ var oAPP = (function () {
             oFormData.append("GET_LANGU", "X");
             oFormData.append("PRCCD", PARAM.PRCCD);
 
+            // ★ [2026-09-16, 장군님 지시] 원본(jQuery.ajax) 동작 그대로 되돌림.
+            //   [고친 이유] XHR onload 는 HTTP 4xx·5xx 에도 불린다. 상태 코드를 안 봐서 502 Bad Gateway 가
+            //   「하위 버전 서버(E998)」로 오인돼 「Server connection failed!」 창이 안 떴다(장군님 실측).
+            //   원본 jQuery.ajax 는 2xx·304 가 아니면 error 갈래(E999)로 간다 — 그 기준을 그대로 옮긴다.
+            //   원본에 없던 withCredentials 도 뺐다. 콘솔 안내 글은 원본 문장 그대로.
             const xhr = new XMLHttpRequest();
             xhr.timeout = 5000;
-            xhr.withCredentials = true;
+
+            // 원본 jQuery.ajax error 콜백과 같은 자리 — error 원문(jQuery 의 errorThrown)을 먼저 남긴다.
+            function _onError(error) {
+
+                // 콘솔용 오류 메시지
+                var aConsoleMsg = [
+                    `[PATH]: www/Login/Login.js`,
+                    `=> _getSupportedLangu`,
+                    `=> 통신오류 발생!!`,
+                    `=> 접속 정보 확인 요망!!`,
+                    `=> 접속 서버가 SSO(SAML 2.0) 적용 서버일 경우, ZU4A_WBC 서비스에 SAML 삭제!!`,
+                ];
+
+                console.error(error);
+                console.error(aConsoleMsg.join("\r\n"));
+                console.trace();
+
+                return resolve({
+                    RETCD: "E",
+                    STCOD: "E999",
+                });
+
+            }
+
             xhr.onload = function () {
-                try {
-                    var oRetJson = JSON.parse(xhr.response);
-                } catch (error) {
-                    console.log("[_getSupportedLangu] JSON.parse error (하위버전 서버 추정)");
-                    return resolve({ RETCD: "E", STCOD: "E998" });
+
+                // jQuery.ajax 의 성공 기준 — 이 밖이면 원본처럼 error 갈래
+                var iStatus = xhr.status;
+                if (!((iStatus >= 200 && iStatus < 300) || iStatus === 304)) {
+                    return _onError(xhr.statusText);
                 }
+
+                try {
+
+                    var oRetJson = JSON.parse(xhr.response);
+
+                } catch (error) {
+
+                    // 콘솔용 오류 메시지
+                    var aConsoleMsg = [
+                        `[PATH]: www/Login/Login.js`,
+                        `=> _getSupportedLangu`,
+                        `=> success`,
+                        `=> JSON.parse error!`,
+                        `=> 여기서 JSON Parse 오류 발생 시`,
+                        `=> 백엔드에 해당 체크 로직이 없어서 로그인 클래스에서 html이 리턴됨.`,
+                        `=> 그러므로 상위 WS 에서 하위 버전(3.4.x) 서버를 접근하는 것으로`,
+                        `=> 로그인 페이지의 언어 선택 영역이 서버 언어 입력 Input만 나오게 처리`,
+                    ];
+
+                    console.log(aConsoleMsg.join("\r\n"), error);
+                    console.trace(error);
+
+                    return resolve({
+                        RETCD: "E",
+                        STCOD: "E998",
+                    });
+
+                }
+
                 return resolve(oRetJson);
+
             };
-            xhr.onerror = xhr.ontimeout = function () {
-                console.error("[_getSupportedLangu] 통신오류");
-                return resolve({ RETCD: "E", STCOD: "E999" });
-            };
+
+            // jQuery.ajax: 연결 실패 → errorThrown "" · 시간 초과 → errorThrown "timeout"
+            xhr.onerror = function () { _onError(""); };
+            xhr.ontimeout = function () { _onError("timeout"); };
+
             xhr.open("POST", sServicePath);
             xhr.send(oFormData);
         });
@@ -2123,7 +2352,14 @@ var oAPP = (function () {
         return new Promise(async function (resolve) {
             let sLanguPRCCD = "GET_LANGU";
             let oLanguResult = await _getSupportedLangu({ PRCCD: sLanguPRCCD });
-            console.log("[_handleLoginLangu]", oLanguResult);
+            // 2026-09-08 복원 — 원본이 남기던 상세 기록.
+            //   앞서 한 줄로 줄였다가, 원본 그대로가 맞아 되돌림.
+            var aConsoleMsg = [
+                `[PATH]: www/Login/Login.js`,
+                `=> _handleLoginLangu`,
+            ];
+            console.log(aConsoleMsg.join("\r\n"));
+            console.log(oLanguResult);
 
             if (oLanguResult.RETCD === "E") {
                 let sErrMsg = "";
@@ -2150,6 +2386,12 @@ var oAPP = (function () {
             document.getElementById("ws_langu_select_form").hidden = false;
 
             let aLangu = oLanguResult?.T_LANGU || [];
+
+            // 원본: model 이 없으면 그대로 진행(2026-09-16 원본대로 복원)
+            if (!oModel) {
+                return resolve();
+            }
+
             let sLangu = oModel.getProperty("/LOGIN/LANGU");
             if (!sLangu) {
                 oModel.setProperty("/LOGIN/LANGU", oLanguResult.DEFLANGU || "");
@@ -2173,20 +2415,36 @@ var oAPP = (function () {
             let SSO_HDR = `${SSO_TICKET}_XXX`;
             let oFormData = new FormData();
             oFormData.append("SSO_TICKET", SSO_TICKET);
+            // ★ [2026-09-16, 장군님 지시] 원본 그대로 되돌림 — 원본에 없던 30초 강제 끊기를 뺐고,
+            //   콘솔 안내 글도 원본 문장 그대로(종전 문장은 「SAML 삭제」가 「SAML 설정」으로 뜻이 반대였다).
             try {
-                // 응답 없이 pending 으로 멈추면 _onViewReady 의 await 가 걸려 초기화(런치 busy)가
-                // 무한히 돈다 → AbortController 로 타임아웃 걸어 실제 실패(AbortError)로 종료시킨다.
-                const oCtrl = new AbortController();
-                const iTimer = setTimeout(() => oCtrl.abort(), LOGIN_XHR_TIMEOUT);
-                try {
-                    await fetch(sServerPath, { headers: { "sso_hdr": SSO_HDR }, method: "POST", body: oFormData, signal: oCtrl.signal });
-                } finally {
-                    clearTimeout(iTimer);
-                }
+
+                var response = await fetch(sServerPath, {
+                    headers: {
+                        "sso_hdr": SSO_HDR,
+                    },
+                    method: "POST",
+                    body: oFormData
+
+                });
+
             } catch (error) {
+
+                // 콘솔용 오류 메시지
+                var aConsoleMsg = [
+                    `[PATH]: www/Login/Login.js`,
+                    `=> _handleSSOLogin`,
+                    `=> 통신오류 발생!!`,
+                    `=> SSO 관련 로그인 처리 실패!!`,
+                    `=> 접속 정보 확인 요망!!`,
+                    `=> 접속 서버가 SSO(SAML 2.0) 적용 서버일 경우, ZU4A_WBC 서비스에 SAML 삭제!!`,
+                ];
+
                 console.error(error);
-                console.error("[_handleSSOLogin] 통신오류 — SSO 로그인 처리 실패");
+                console.error(aConsoleMsg.join("\r\n"));
+                console.trace();
             }
+
             resolve();
         });
     }
@@ -2216,6 +2474,7 @@ var oAPP = (function () {
             oAPP.msg.M290 = G("290"); oAPP.msg.M294 = G("294"); oAPP.msg.M295 = G("295");
             oAPP.msg.M414 = G("414"); oAPP.msg.M415 = G("415");
             oAPP.msg.M416 = G("416"); oAPP.msg.M417 = G("417");
+            oAPP.msg.M656 = G("656"); // "대기 중" — busy 카운트다운 안내 문구(서버리스트 종료대기와 동일 표기)
             resolve();
         });
     }
@@ -2267,25 +2526,33 @@ var oAPP = (function () {
             return;
         }
 
-        // 테스트 모드 자동 로그인 — ServerList 에서 전달한 TESTID 와 일치하는 스태프 계정으로 로그인.
-        //   (스태프 버튼과 동일한 fnStaffLogin 호출 = "일치하는 버튼 자동 클릭")
+        // 테스트 모드 자동 로그인 — ServerList 에서 전달한 ID/PW 로 그 계정 자동 로그인.
+        //   (스태프 버튼과 동일한 방식: ID/PW 필드 채우고 ev_login 호출)
         try {
             const sTestId = oServerInfo && oServerInfo.TESTID;
-            if (sTestId && parent.isU4A_RND_SERVER && parent.isU4A_RND_SERVER(oServerInfo.SYSID)) {
-                const sKey = String(sTestId).trim().toLowerCase();
-                const oStaff = oAPP.fn.fnGetStaffList().find(
-                    (o) => o.id.toLowerCase() === sKey || o.text === sTestId.trim()
-                );
-                if (oStaff) {
-                    _fnFadeInContent();
-                    parent.setDomBusy("");
-                    oAPP.fn.fnStaffLogin(oStaff.id);
-                    return;
+            if (sTestId && String(sTestId).trim()) {
+                const sId = String(sTestId).trim();
+                const sPw = (oServerInfo.TESTPW != null) ? String(oServerInfo.TESTPW) : "";
+                const sClient = (oServerInfo.TESTCLIENT != null) ? String(oServerInfo.TESTCLIENT).trim() : "";
+                const oId = document.getElementById("ws_id");
+                const oPw = document.getElementById("ws_pw");
+                const oClient = document.getElementById("ws_client");
+                // CLIENT 는 입력값이 있을 때만 채운다(비면 서버 기본/기억값 유지)
+                if (sClient) {
+                    if (oClient) { oClient.value = sClient; }
+                    oModel.setProperty("/LOGIN/CLIENT", sClient);
                 }
-                console.warn("[테스트 모드] 일치하는 스태프 계정 없음:", sTestId);
+                if (oId) { oId.value = sId; }
+                if (oPw) { oPw.value = sPw; }
+                oModel.setProperty("/LOGIN/ID", sId);
+                oModel.setProperty("/LOGIN/PW", sPw);
+                _fnFadeInContent();
+                parent.setDomBusy("");
+                oAPP.events.ev_login();
+                return;
             }
         } catch (e) {
-            console.error("[테스트 모드] 자동 로그인 실패:", e);
+            console.error("[test mode] auto login failed:", e);
         }
 
         _fnFadeInContent();
@@ -2306,7 +2573,7 @@ var oAPP = (function () {
         try {
             // 테마 적용 (parent 메타 기준)
             oAPP.fn.fnApplyTheme(parent.getThemeInfo());
-        } catch (e) { /* 기본 테마 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 기본 테마 */ }
 
         var oWsSettings = oAPP.fn.fnGetSettingsInfo();
 
@@ -2379,7 +2646,7 @@ window.onbeforeunload = () => {
         IPCMAIN.off('if-browser-interconnection', oAPP.fn.fnIpcMain_browser_interconnection);
         let oServerInfo = parent.getServerInfo();
         IPCMAIN.off(`if-p13n-themeChange-${oServerInfo.SYSID}`, oAPP.fn.onIpcMain_if_p13n_themeChange);
-    } catch (e) { /* noop */ }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
     oAPP.fn.fnOnBeforeUnload();
 };
 
@@ -2390,5 +2657,5 @@ document.addEventListener('DOMContentLoaded', function () {
     // 브라우저 타이틀 변경
     parent.CURRWIN.setTitle("U4A Workspace - Login");
     // 기본 zoom 레벨 적용
-    try { parent.WEBFRAME.setZoomLevel(0); } catch (e) { /* noop */ }
+    try { parent.WEBFRAME.setZoomLevel(0); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
 });

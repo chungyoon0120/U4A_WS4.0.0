@@ -192,7 +192,7 @@
       if(oWin.document?.documentElement?.classList){
         oWin.document.documentElement.classList.toggle("u4a_preview_mark_hidden", bState !== true);
       }
-    }catch(e){}
+    }catch(e){ if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
 
     return bState;
 
@@ -636,6 +636,7 @@
       try{
         oAPP.attr.prev[is_attr.OBJID][l_propnm]();
       }catch(e){
+          if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         
       }
       
@@ -749,6 +750,7 @@
       try{
         oAPP.attr.prev[is_attr.OBJID][l_propnm](l_prop);
       }catch(e){
+          if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
       }
 
@@ -1612,6 +1614,7 @@
     try{
       l_ui[l_propnm](l_prop);
     }catch(e){
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
     }
 

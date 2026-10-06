@@ -225,13 +225,13 @@
 
         // 이미 떠 있으면 제거 후 재생성.
         var oOld = document.getElementById("u4aSysNotiDlg");
-        if (oOld) { try { oOld.close(); } catch (e) { } oOld.remove(); }
+        if (oOld) { try { oOld.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } oOld.remove(); }
 
         var sClose = "Close";
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");
             if (s && s.indexOf("|") === -1) { sClose = s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oDlg = document.createElement("dialog");
         oDlg.id = "u4aSysNotiDlg";
@@ -323,8 +323,8 @@
     }
 
     function _sysNotiClose(oDlg) {
-        try { oDlg.close(); } catch (e) { }
-        try { oDlg.remove(); } catch (e) { }
+        try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
 
@@ -512,6 +512,7 @@
         try {
             var aMsgList = JSON.parse(sMsgListJson);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return `${sMsgCls}|${sPath}|${sLangu}|JSON Parse Error`;
         }
 
@@ -570,6 +571,7 @@
                 if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oResult.WINDOW); }
                 else { oResult.WINDOW.setClosable(true); oResult.WINDOW.close(); }
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             }
 
@@ -671,12 +673,12 @@
      * @param {Function} fnAction  실제 동작
      ************************************************************************/
     oAPP.common.fnRunShortCut = function (e, sPage, fnAction) {
-        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { }
-        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { }
+        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         if (e && e.repeat === true) { return; }                                                          // (1)
-        try { if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) { return; } } catch (x) { } // (2)
-        try { if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; } } catch (x) { } // (3)
-        try { fnAction(e); } catch (err) { console.error("[HTML5][shortcut][" + sPage + "]", err); }
+        try { if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (2)
+        try { if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (3)
+        try { fnAction(e); } catch (err) { console.error("[shortcut][" + sPage + "]", err); }
     }; // end of oAPP.common.fnRunShortCut
 
     /************************************************************************
@@ -686,20 +688,20 @@
      ************************************************************************/
     oAPP.common.fnNaviLock = function () {
         oAPP.attr.isNaviBusy = true;
-        try { clearTimeout(oAPP.attr._naviBusyTimer); } catch (x) { }
+        try { clearTimeout(oAPP.attr._naviBusyTimer); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         // backstop: 정상 경로는 완료 시 release 하지만, 서버응답 누락/예외로 release 를 놓쳐도
         //   8초 후 자동 해제(그 이상 걸리면 이미 행 상태) → 단축키가 영구로 막히지 않게.
         oAPP.attr._naviBusyTimer = setTimeout(function () { oAPP.attr.isNaviBusy = false; }, 8000);
     };
     oAPP.common.fnNaviRelease = function () {
         oAPP.attr.isNaviBusy = false;
-        try { clearTimeout(oAPP.attr._naviBusyTimer); oAPP.attr._naviBusyTimer = null; } catch (x) { }
+        try { clearTimeout(oAPP.attr._naviBusyTimer); oAPP.attr._naviBusyTimer = null; } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
     };
 
     oAPP.common.fnShortCutExeAvaliableCheck = () => {
 
         if (oAPP.attr.isShortcutLock === true) {
-            zconsole.log("!! isShortcutLock => true 여서 단축키 실행 불가 !! ");
+            zconsole.log("shortcut blocked: isShortcutLock=true ");
             return "X";
         }
 
@@ -712,19 +714,19 @@
         //   네비게이션 in-flight 플래그(isNaviBusy)로 대체한다. busy 가 비동기 이동 중 잠깐 풀리는
         //   구멍(저장확인창/주석처리된 busy 해제)으로 F3 연타 시 fnMoveToWs10 재진입→화면 깨짐 방지.
         if (oAPP.attr.isNaviBusy === true) {
-            zconsole.log("!! 페이지 이동 중이라 단축키 실행 불가!!");
+            zconsole.log("shortcut blocked: page is navigating");
             return "X";
         }
 
         // Busy Indicator가 실행중인지 확인
         if (parent.getBusy() == 'X') {
-            zconsole.log("!! Busy가 켜져 있어서 단축기 실행 불가!!");
+            zconsole.log("shortcut blocked: busy is on");
             return "X";
         }
 
         // [HTML5] 드롭다운 메뉴(.u4a-menu: 윈도우메뉴/오버플로/split 등)가 떠 있으면 단축키 실행 불가.
         if (document.querySelector(".u4a-menu")) {
-            zconsole.log("!! (HTML5) 메뉴가 떠 있어서 단축기 실행 불가!!");
+            zconsole.log("shortcut blocked: menu is open");
             return "X";
         }
 
@@ -734,7 +736,7 @@
             var sId = oMenuDom.id,
                 oMenu = sap.ui.getCore().byId(sId);
             if (oMenu && oMenu.bOpen) {
-                zconsole.log("!! 메뉴가 떠 있어서 단축기 실행 불가!!");
+                zconsole.log("shortcut blocked: menu is open");
                 return "X";
             }
         }
@@ -742,11 +744,11 @@
         // 현재 Dialog Popup이 실행 되어 있는지 확인. (HTML5 native <dialog open> 도 fnCheckIsDialogOpen 이 봄)
         var bIsDialogOpen = oAPP.fn.fnCheckIsDialogOpen();
         if (bIsDialogOpen) {
-            zconsole.log("!! Dialog 팝업이 떠 있어서 단축기 실행 불가!!");
+            zconsole.log("shortcut blocked: dialog is open");
             return "X";
         }
 
-        zconsole.log("!!___단축기 실행 가능__!!");
+        zconsole.log("shortcut allowed");
 
         return "";
 
@@ -857,7 +859,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -922,7 +924,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -974,7 +976,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1012,7 +1014,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1050,7 +1052,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! [F7] 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held (F7)");
                     return;
                 }
 
@@ -1101,7 +1103,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1146,7 +1148,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1184,7 +1186,7 @@
                 }
 
                 if (sap.ui.getCore().isLocked()) {
-                    zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                    zconsole.log("shortcut blocked: lock held");
                     return;
                 }
 
@@ -1252,7 +1254,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1283,7 +1285,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1336,7 +1338,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1578,7 +1580,7 @@
 
                     // split 버튼 본체 = 기본 실행(ev_pressAppExecBtn). firePress 대체로 이벤트 직접 호출.
                     try { oAPP.events.ev_pressAppExecBtn(); }
-                    catch (err) { if (typeof console !== "undefined") { console.warn("[WS20] F8 AppExec error", err); } }
+                    catch (err) { if (typeof console !== "undefined") { console.error("[WS20] F8 AppExec error", err); } }
 
                 }
             },
@@ -1599,7 +1601,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1636,7 +1638,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1673,7 +1675,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1712,7 +1714,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1757,7 +1759,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1794,7 +1796,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1840,7 +1842,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1877,7 +1879,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1913,7 +1915,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -1932,6 +1934,33 @@
 
                     oFindBtn.firePress();
                 }
+            },
+            {
+                /****************************************************************************************************
+                 * [WS20] shortcut library bug — Ctrl+Shift+F11 이 Undo 로 실행되는 것 막기. (2026-09-10)
+                 ****************************************************************************************************
+                 * 단축키 라이브러리가 키 번호를 그대로 글자로 바꿔 비교한다. F11 의 키 번호는 글자 'z' 와 같아서
+                 * Ctrl+Shift+F11 이 바로 아래 Ctrl+Shift+Z(Undo) 로 인식된다.
+                 *
+                 * 그전에는 앱 본체가 F11 을 보정키 상관없이 전부 가로채(전체화면) 화면까지 도달하지 못해
+                 * 이 문제가 가려져 있었다. electron/main.js 에서 보정키 붙은 F11 을 통과시키도록 고치면
+                 * 이 조합이 화면까지 오므로 Undo 가 잘못 실행된다 → 그래서 반드시 같이 막는다.
+                 *
+                 * 라이브러리는 남이 만든 것이라 고치지 않는다. 아무 동작도 안 하는 흡수용으로 이벤트를 삼킨다.
+                 * ★순서가 핵심 — 반드시 아래 Undo 항목보다 앞에 있어야 삼킬 수 있다.
+                 ****************************************************************************************************/
+                KEY: "Ctrl+Shift+F11",
+                VISIBLE: false,
+                fn: (e) => {
+
+                    try { e.stopImmediatePropagation(); } catch (err) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); } }
+
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "Ctrl+Shift+F11", "absorbed: shortcut lib maps F11 keycode to 'z' (= Ctrl+Shift+Z Undo). no action by design");
+                    }
+
+                },
+
             },
             {
                 // KEY: "Ctrl+Z", // [WS20] UNDO
@@ -1961,7 +1990,7 @@
                     e.stopImmediatePropagation();
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2013,7 +2042,7 @@
                     e.stopImmediatePropagation();
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2087,7 +2116,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2140,7 +2169,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! [F3] 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held (F3)");
                         return;
                     }
 
@@ -2209,7 +2238,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2260,7 +2289,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2322,7 +2351,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2383,7 +2412,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2430,7 +2459,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2467,7 +2496,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2504,7 +2533,7 @@
                     }
 
                     if (sap.ui.getCore().isLocked()) {
-                        zconsole.log("!! 락 걸려서 단축기 실행 불가!!");
+                        zconsole.log("shortcut blocked: lock held");
                         return;
                     }
 
@@ -2672,6 +2701,7 @@
                 };
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -2751,6 +2781,7 @@
                 }
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -2855,6 +2886,27 @@
     oAPP.common.fnSetCommonShortcut = function () {
 
         var oShortcut = oAPP.attr.oShortcut;
+
+        /****************************************************************************************************
+         * [창 공통] shortcut library bug — Ctrl+F8 을 누르면 창이 닫히는 것 막기. (2026-09-10)
+         ****************************************************************************************************
+         * 단축키 라이브러리가 키 번호를 그대로 글자로 바꿔 비교한다. F8 의 키 번호는 글자 'w' 와 같아서
+         * Ctrl+F8 이 Ctrl+W(브라우저 창 닫기)로 인식되어 작업 중이던 창이 그냥 닫혔다.
+         * 편집 화면에서 F8 이 "어플리케이션 실행"이라 Ctrl 을 같이 누르는 실수가 잦다.
+         *
+         * 라이브러리는 남이 만든 것이라 고치지 않는다. 대신 같은 조합을 "아무 동작도 안 하는 흡수용"으로
+         * 먼저 등록해 이벤트를 삼킨다. 기존 Ctrl+F4(저장키) 막이와 동일한 방식이다.
+         * ★등록 순서가 핵심 — 반드시 아래 창 닫기(Ctrl+W) 등록보다 앞이어야 삼킬 수 있다.
+         ****************************************************************************************************/
+        oShortcut.add("Ctrl+F8", (e) => {
+
+            try { e.stopImmediatePropagation(); } catch (err) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); } }
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "Ctrl+F8", "absorbed: shortcut lib maps F8 keycode to 'w' (= Ctrl+W close window). no action by design");
+            }
+
+        });
 
         // 새창 띄우기
         oShortcut.add("Ctrl+N", () => {
@@ -3691,14 +3743,9 @@
             oDlg = document.createElement("dialog");
             oDlg.id = sDialogId;
             oDlg.className = "u4aWsProgDlg";
-            // 위성 안테나 로딩 일러스트(www/svg/...) — fnIllustMsgDialogOpen 과 동일 자산/경로 규칙.
-            //   ws_common.js 는 ajax+eval 로드(스크립트 태그 없음)라 host 문서(www/ws30/ws10_20/) 기준.
-            var sArtRel = "../../svg/satellite-antenna-loading-animated.svg";
-            var sArtUrl = sArtRel;
-            try { sArtUrl = new URL(sArtRel, window.location.href).href; } catch (e) { }
             oDlg.innerHTML =
                 '<div class="u4aWsProgCard">' +
-                '<img class="u4aWsProgArt" src="' + sArtUrl + '" alt="" aria-hidden="true"/>' +
+                '<img class="u4aWsProgArt" alt="" aria-hidden="true"/>' +
                 '<div class="u4aWsProgTitle"></div>' +
                 '<div class="u4aWsProgDesc"></div>' +
                 '<div class="u4aWsProgBarWrap"><div class="u4aWsProgBar"></div>' +
@@ -3709,11 +3756,30 @@
             document.body.appendChild(oDlg);
         }
 
+        // ★2026-09-07: 원본은 이 팝업(도움말 다운로드 진행률)에 tnt-Systems 그림을 썼다(busy 팝업의
+        //   tnt-Radar 와 다른 그림 — 원본 소스 illustrationType 실측 확인). 그동안은 busy 팝업 그림(위성
+        //   안테나)을 임시로 재사용했었는데, SAP 공식 OpenUI5 저장소(Apache-2.0, 이 앱과 같은 v1.107.1)에서
+        //   tnt-Dialog-Systems.svg 실물을 받아, 실제 CDN(sap/m/themes/{테마}/library.css)에서 확인한
+        //   sap_horizon(밝게)/sap_horizon_dark(어둡게) 색상값을 입혀 www/svg/tnt-systems-light.svg,
+        //   tnt-systems-dark.svg 두 벌로 만들어 교체한다(빌드 스크립트: .works/일러스트팝업/build-tnt-systems-svg.js).
+        //   SAP 원본도 이 그림은 밝게/어둡게 2벌만 있고 그 외 테마 그림은 없어(원본 sap_hcb 테마 확인),
+        //   이 화면의 11개 테마 중 어두운 테마(horizon_dark) 여부만 보고 2벌 중 하나를 고르면 원본과 동일.
+        try {
+            var sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+            var sArtRel = "../../svg/tnt-systems-" + sMode + ".svg";
+            var sArtUrl = new URL(sArtRel, window.location.href).href;
+            var oArtImg = oDlg.querySelector(".u4aWsProgArt");
+            if (oArtImg.getAttribute("data-mode") !== sMode) {
+                oArtImg.src = sArtUrl;
+                oArtImg.setAttribute("data-mode", sMode);
+            }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 그림 갱신 실패는 진행률 표시 자체를 막지 않음 */ }
+
         oDlg.querySelector(".u4aWsProgTitle").textContent = oOptions.title || "";
         oDlg.querySelector(".u4aWsProgDesc").textContent = oOptions.description || "";
         lf_setWsProgValue(oDlg, oOptions.percentValue || 0, oOptions.displayValue || "");
 
-        try { if (!oDlg.hasAttribute("open")) { oDlg.showModal(); } } catch (e) { }
+        try { if (!oDlg.hasAttribute("open")) { oDlg.showModal(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.common.fnProgressDialogOpen
 
@@ -3736,7 +3802,7 @@
         // [HTML5] 네이티브 <dialog> 닫기 + 진행값 리셋(원본 afterClose).
         var oDlg = document.getElementById("u4aWsProgressDialog");
         if (oDlg) {
-            try { oDlg.close(); } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             lf_setWsProgValue(oDlg, 0, "");
         }
 
@@ -3752,8 +3818,10 @@
      * illustrationSize
      */
     // [HTML5] 구 sap.m.IllustratedMessage(tnt-Radar) + sap.m.Dialog → 네이티브 <dialog>.
-    //   위성 안테나 로딩 일러스트(www/svg/satellite-antenna-loading-animated.svg, <img> 로드) +
-    //   제목/설명 카드. sap 의존 제거. SAPGUI 실행 등 진행 안내 모달(IPC if-browser-interconnection).
+    //   ★2026-09-08: 그동안 임시로 쓰던 자체 제작 위성안테나 그림을, SAP 공식 OpenUI5 저장소
+    //   (Apache-2.0, 이 앱과 같은 v1.107.1)에서 받은 tnt-Radar 원본 그림(밝게/어둡게 2벌,
+    //   www/svg/tnt-radar-{light|dark}.svg, 빌드=.works/일러스트팝업/build-tnt-illustrations.js)
+    //   으로 교체. 제목/설명 카드. sap 의존 제거. SAPGUI 실행 등 진행 안내 모달(IPC if-browser-interconnection).
     oAPP.common.fnIllustMsgDialogOpen = (oOptions) => {
         oOptions = oOptions || {};
         var sDialogId = "u4aWsIllustedMsgDialog";
@@ -3793,20 +3861,9 @@
             //   레이더 카드(.u4aWsIllustCard)가 자체 배경·보더·그림자를 다 가지므로 다이얼로그는
             //   순수 컨테이너(.u4aWsIllustDlg)면 충분.
             oDlg.className = "u4aWsIllustDlg";
-            // [HTML5] 위성 안테나 로딩 일러스트(www/svg/satellite-antenna-loading-animated.svg)를
-            //   <img> 로 로드 — SVG 내부 <style>(generic .dish/.scan/.cross 등 클래스·keyframe)이
-            //   문서 전역으로 새어 충돌하는 것을 막기 위함(인라인하면 SVG <style> 이 document 스코프).
-            //   ws_common.js 는 <script src> 가 아니라 ajax+eval 로 로드되므로(스크립트 태그 없음)
-            //   호스트 문서(window.location.href, = www/ws30/ws10_20/) 기준으로 해석한다.
-            //   www/ws30/ws10_20/ → ../../svg/ = www/svg/ (preload 의 "./js/..." 해석과 동일 규칙).
-            var sArtRel = "../../svg/satellite-antenna-loading-animated.svg";
-            var sArtUrl = sArtRel;
-            try { sArtUrl = new URL(sArtRel, window.location.href).href; } catch (e) { }
             oDlg.innerHTML =
                 '<div class="u4aWsIllustCard">' +
-                // 위성 안테나 로딩 일러스트(접시 + 신호파 + 부유 애니메이션) — SVG 내부 CSS 애니메이션은
-                //   <img> 로 로드해도 정상 재생되며 스타일은 이미지 문서에 샌드박스된다.
-                '<img class="u4aWsIllustArt" src="' + sArtUrl + '" alt="" aria-hidden="true"/>' +
+                '<img class="u4aWsIllustArt" alt="" aria-hidden="true"/>' +
                 '<div class="u4aWsIllustTitle"></div>' +
                 '<div class="u4aWsIllustDesc"></div>' +
                 '</div>';
@@ -3815,10 +3872,25 @@
             document.body.appendChild(oDlg);
         }
 
+        // ★2026-09-08: 원본 tnt-Radar 그림(SAP 공식 OpenUI5 저장소 실물, sap_horizon/sap_horizon_dark
+        //   색상 실측 적용, .works/일러스트팝업/build-tnt-illustrations.js 빌드) 을 밝은/어두운 화면에 맞춰
+        //   교체. ws_common.js 는 ajax+eval 로 로드되므로(스크립트 태그 없음) 호스트 문서
+        //   (window.location.href, = www/ws30/ws10_20/) 기준으로 상대경로를 해석한다.
+        try {
+            var sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+            var sArtRel = "../../svg/tnt-radar-" + sMode + ".svg";
+            var sArtUrl = new URL(sArtRel, window.location.href).href;
+            var oArtImg = oDlg.querySelector(".u4aWsIllustArt");
+            if (oArtImg.getAttribute("data-mode") !== sMode) {
+                oArtImg.src = sArtUrl;
+                oArtImg.setAttribute("data-mode", sMode);
+            }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 그림 갱신 실패는 팝업 표시 자체를 막지 않음 */ }
+
         oDlg.querySelector(".u4aWsIllustTitle").textContent = oOptions.title || "";
         oDlg.querySelector(".u4aWsIllustDesc").textContent = oOptions.description || "";
 
-        try { if (!oDlg.hasAttribute("open")) { oDlg.showModal(); } } catch (e) { }
+        try { if (!oDlg.hasAttribute("open")) { oDlg.showModal(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.common.fnIllustMsgDialogOpen
 
@@ -3828,7 +3900,7 @@
     oAPP.common.fnIllustMsgDialogClose = () => {
         // [HTML5] 네이티브 <dialog> 닫기 (sap 의존 제거)
         var oDlg = document.getElementById("u4aWsIllustedMsgDialog");
-        if (oDlg) { try { oDlg.close(); } catch (e) { } }
+        if (oDlg) { try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
     }; // end of oAPP.common.fnIllustMsgDialogClose
 
@@ -4048,6 +4120,7 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         try {
             var oURL = new URL(sPath);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -4120,7 +4193,441 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
     }
 
 
-    zconsole.log(`[ajax 요청]: ${sPath}`);
+    // 2026-09-08 정리 — 아래 새 서버 통신 로그가 같은 내용을 담으므로 예전 줄은 뺐다(로그 두 벌 방지).
+
+    /**
+     * 서버 통신 로그 (2026-09-08 추가)
+     * ---------------------------------------------------------------------
+     * 왜 넣었나: 서버와 주고받다 난 오류가 로그에 안 남아 원인을 못 짚었다.
+     *           이 함수 한 곳으로 서버 통신이 다 지나가므로 여기서만 남기면 된다.
+     * 무엇을 남기나: 무엇을 요청했는지 / 성공인지 실패인지 / 걸린 시간.
+     * 값 자체는 안 남긴다. 요청 이름만 남긴다(개인정보·업무자료 보호).
+     */
+    var _iAjaxStartAt = Date.now();
+    var _sAjaxName = String(sPath).split("?")[0].split("/").pop() || sPath;
+
+    /**
+     * 서버 통신 로그 도구 (2026-09-10 — 장군님 지시로 방식 정리)
+     * -----------------------------------------------------------------
+     * 무엇이 바뀌었나
+     *  (1) 요청 하나에 세 줄 남기던 것 → **끝날 때 한 줄**
+     *      근거: 업계 표준(요청 하나당 완료 시점에 한 줄에 다 담는다).
+     *  (2) 대신 **안 끝나면** 5초/15초/30초에 한 줄씩 남긴다.
+     *      "눌렀는데 로딩이 계속 도는" 상황의 흔적이 사라지지 않게 하는 안전장치.
+     *  (4) 같은 요청이 짧은 시간에 여러 번 나가면 **묶어서 한 줄**.
+     *  (6) 진행 중 요청 목록을 들고 있다가, 뻗으면 크래시 보고서에 적힌다.
+     */
+    if (!window.__u4aReq) {
+
+        window.__u4aReq = {
+
+            live: {},          // 진행 중인 요청 (번호 → 정보)
+            burst: {},         // 짧은 시간에 반복된 요청 묶기
+            BURST_MS: 3000,    // 이 시간 안에
+            BURST_MIN: 5,      // 이만큼 넘게 같은 요청이 나가면 묶는다
+            SLOW_MS: [5000, 15000, 30000],   // 안 끝나면 알리는 시점
+
+            /** 진행 중 목록을 앱 본체에 알려 둔다 — 뻗었을 때 보고서에 적히게 */
+            report: function () {
+
+                try {
+
+                    var a = [];
+
+                    for (var k in this.live) {
+                        if (!Object.prototype.hasOwnProperty.call(this.live, k)) { continue; }
+                        a.push(this.live[k].name + " " + k + " (" + Math.round((Date.now() - this.live[k].at) / 100) / 10 + "s elapsed)");
+                    }
+
+                    var IPC = require("electron").ipcRenderer;
+                    IPC.send("u4a-log:pending", { list: a.slice(0, 20) });
+
+                } catch (e) {
+                    // 알릴 통로가 없어도 앱은 계속 간다.
+                }
+
+            }
+
+        };
+
+    }
+
+    /**
+     * 요청 번호 (2026-09-08 추가)
+     * 같은 요청이 한꺼번에 여러 번 나가면 응답이 뒤섞여 돌아온다(실측).
+     * 번호를 붙여야 보낸 줄과 받은 줄의 짝이 맞는다.
+     */
+    if (typeof window.__u4aAjaxSeq !== "number") { window.__u4aAjaxSeq = 0; }
+    window.__u4aAjaxSeq++;
+    var _sAjaxNo = "#" + window.__u4aAjaxSeq;
+
+    function _ajaxLog(sWhat, sResult) {
+
+        try {
+
+            if (typeof U4ALOG === "undefined") {
+                return;   // 공통 로그 함수가 아직 안 올라온 화면 — 조용히 넘어간다
+            }
+
+            U4ALOG.server(sWhat, _sAjaxName + " " + _sAjaxNo, sResult, Date.now() - _iAjaxStartAt);
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            // 로그 남기다 통신을 막으면 안 된다.
+        }
+
+    }
+
+    /**
+     * 서버 통신 실패를 자세히 남긴다 (2026-09-08 추가 — 장군님 지시)
+     * -----------------------------------------------------------------
+     * 왜 넣었나
+     *   서버가 500 을 돌려줬는데 로그에는 "실패: 통신 오류" 한 줄뿐이었다.
+     *   어느 주소로 보냈는지, 서버가 뭐라고 했는지가 없어 로그만 보고는 못 고친다.
+     *
+     * 무엇을 남기나 (실패했을 때만)
+     *   주소 / 방식 / 상태 번호 / 서버가 준 응답 내용 / 오류 표시 값 / 보낸 항목 이름
+     *   ※ 성공은 한 줄만 남긴다. 다 남기면 로그가 터진다.
+     */
+    var MAX_RES_TEXT = 4000;   // 응답이 길면 앞부분만
+
+    function _safePath(s) {
+
+        try {
+
+            var sp = String(s == null ? "" : s);
+            var i = sp.indexOf("?");
+
+            // 물음표 뒤에는 세션 정보가 붙어 온다 — 그대로 남기면 밖으로 샌다
+            return (i >= 0) ? (sp.slice(0, i) + " (뒤쪽 정보는 가림)") : sp;
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            return "(주소를 못 읽음)";
+        }
+
+    }
+
+    function _ajaxFail(sReason, oXhrLike) {
+
+        // 진행 중 목록에서 빼고 늦어짐 알림을 끈다 (2026-09-10)
+        _ajaxFinish();
+
+        // ① 한 줄 요약 — 실패는 묶지 않는다. 하나하나 다 남긴다
+        _ajaxLog("끝남", "FAILED: " + sReason);
+
+        try {
+
+            if (typeof U4ALOG === "undefined") { return; }
+
+            var x = oXhrLike || null;
+
+            // ② 어디로 무엇을 보냈나
+            U4ALOG.error("서버통신 실패 상세", "sent to: POST " + _safePath(sPath));
+
+            if (x) {
+
+                // ③ 서버가 준 상태
+                var iStatus = (typeof x.status === "number") ? x.status : "-";
+                var sStatusText = x.statusText || "";
+                U4ALOG.error("서버통신 실패 상세", "http status: " + iStatus + (sStatusText ? (" " + sStatusText) : ""));
+
+                // ④ 오류를 알리는 응답 표시 값들
+                try {
+
+                    if (typeof x.getResponseHeader === "function") {
+
+                        var aMark = ["sap-err-id", "u4a_status", "content-type"];
+
+                        for (var i = 0; i < aMark.length; i++) {
+                            var v = x.getResponseHeader(aMark[i]);
+                            if (v) { U4ALOG.error("서버통신 실패 상세", "response header " + aMark[i] + ": " + v); }
+                        }
+
+                    }
+
+                } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+
+                // ⑤ ★서버가 준 응답 내용 — 이게 원인을 짚는 핵심이다
+                try {
+
+                    var sBody = "";
+
+                    if (x.responseType === "blob" || x.responseType === "arraybuffer") {
+                        sBody = "(binary response - cannot be logged as text)";
+                    } else {
+                        sBody = (x.responseText != null) ? x.responseText : (x.response != null ? String(x.response) : "");
+                    }
+
+                    if (!sBody) {
+                        sBody = "(server returned an empty body)";
+                    } else if (sBody.length > MAX_RES_TEXT) {
+                        sBody = sBody.slice(0, MAX_RES_TEXT) + " ...(" + (sBody.length - MAX_RES_TEXT) + " more chars truncated)";
+                    }
+
+                    U4ALOG.error("서버통신 실패 상세", "response body: " + sBody);
+
+                } catch (e3) {
+                    U4ALOG.error("서버통신 실패 상세", "response body unreadable: " + e3);
+                }
+
+            } else {
+                U4ALOG.error("서버통신 실패 상세", "no response at all (connection dropped or server unreachable)");
+            }
+
+            // ⑥ 무엇을 보냈는지 — 항목 이름만 남긴다(값은 안 남긴다)
+            try {
+
+                if (typeof oFormData !== "undefined" && oFormData && typeof oFormData.keys === "function") {
+
+                    var aKeys = [];
+                    var it = oFormData.keys();
+                    var r = it.next();
+
+                    while (!r.done && aKeys.length < 40) {
+                        aKeys.push(r.value);
+                        r = it.next();
+                    }
+
+                    if (aKeys.length > 0) {
+                        U4ALOG.error("서버통신 실패 상세", "sent fields: " + aKeys.join(", "));
+                    }
+
+                }
+
+            } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            // 로그 남기다 통신을 막으면 안 된다.
+        }
+
+    }
+
+    /**
+     * 무슨 일로 보내는 요청인지 같이 남긴다 (2026-09-08 추가 — 장군님 지시)
+     * -----------------------------------------------------------------
+     * 왜 넣었나
+     *   앞서는 요청 이름만 남겨서, 로그를 봐도 사용자가 무슨 기능을 했는지 알 수 없었다.
+     *   요청에 담긴 기능 구분 항목을 같이 남기면 "무엇을 하다 났는지"가 읽힌다.
+     *
+     * 무엇을 남기나
+     *   짧은 값만 남긴다(40자까지). 긴 값은 업무 자료라 **길이만** 적고 내용은 안 남긴다.
+     *   비밀번호처럼 가려야 하는 이름이면 통째로 뺀다.
+     */
+    function _describeRequest() {
+
+        try {
+
+            if (!oFormData || typeof oFormData.entries !== "function") { return ""; }
+
+            var aOut = [];
+            var it = oFormData.entries();
+            var r = it.next();
+            var iSeen = 0;
+
+            while (!r.done && aOut.length < 12 && iSeen < 60) {
+
+                iSeen++;
+
+                var sKey = String(r.value[0] || "");
+                var vVal = r.value[1];
+                var sUp = sKey.toUpperCase();
+
+                // 가려야 하는 것은 통째로 뺀다
+                if (sUp.indexOf("PW") >= 0 || sUp.indexOf("PASS") >= 0
+                    || sUp.indexOf("TOKEN") >= 0 || sUp.indexOf("SESS") >= 0
+                    || sUp.indexOf("KEY") >= 0 || sUp.indexOf("AUTH") >= 0) {
+                    r = it.next();
+                    continue;
+                }
+
+                // 버전·패치처럼 매번 같은 것은 뺀다(줄만 길어진다)
+                if (sUp === "WSVER" || sUp === "WSPATCH_LEVEL") {
+                    r = it.next();
+                    continue;
+                }
+
+                if (typeof vVal !== "string") {
+                    aOut.push(sKey + "=(파일)");
+                } else if (vVal.length === 0) {
+                    aOut.push(sKey + "=(빈값)");
+                } else if (vVal.length <= 40) {
+                    aOut.push(sKey + "=" + vVal.replace(/\s+/g, " "));
+                } else {
+                    aOut.push(sKey + "=(" + vVal.length + "자)");
+                }
+
+                r = it.next();
+
+            }
+
+            return aOut.join(", ");
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            return "";
+        }
+
+    }
+
+    /**
+     * 서버가 준 값의 모양을 한 줄로 (2026-09-08 추가)
+     * 항목 이름 · 목록 건수 · 비어 있는 항목만 남긴다. 값은 안 남긴다.
+     */
+    function _shapeOf(oRes) {
+
+        try {
+
+            if (oRes == null) { return "NO VALUE AT ALL"; }
+            if (typeof oRes !== "object") { return "single scalar value"; }
+
+            var aHas = [];
+            var aEmpty = [];
+            var aList = [];
+            var iSeen = 0;
+
+            for (var k in oRes) {
+
+                if (!Object.prototype.hasOwnProperty.call(oRes, k)) { continue; }
+                if (++iSeen > 60) { break; }
+
+                var v = oRes[k];
+
+                if (v == null || v === "") {
+                    aEmpty.push(k);
+                } else if (Array.isArray(v)) {
+                    // 목록은 몇 건인지가 중요하다 - 0건이면 그게 원인일 때가 많다
+                    aList.push(k + "=" + v.length);
+                    aHas.push(k);
+                    if (v.length === 0) { aEmpty.push(k); }
+                } else {
+                    aHas.push(k);
+                }
+
+            }
+
+            /**
+             * ★받은 항목 이름은 개수만 (2026-09-11 - 장군님 지시)
+             * -------------------------------------------------------------
+             * 앞서는 받은 항목 이름을 전부 늘어놨다. 실측: 한 줄에 28개 이름, 500바이트.
+             * 그런데 **값이 온 항목은 원인을 짚는 데 안 쓴다.** 원인은 늘 비어 있는 쪽이다.
+             * 그래서 값이 온 것은 개수만, **비어 있는 것만 이름을 남긴다.**
+             * 목록이 몇 건인지는 그대로 남긴다 - 0건이면 그게 원인일 때가 많다.
+             */
+            var sTxt = "fields: " + aHas.length;
+
+            if (aList.length > 0) {
+                sTxt += " | lists: " + aList.join(", ");
+            }
+
+            if (aEmpty.length > 0) {
+                sTxt += " | EMPTY: " + aEmpty.join(", ");
+            }
+
+            return sTxt;
+
+        } catch (e) {
+            return "";
+        }
+
+    }
+
+    var _sReqDesc = _describeRequest();
+
+    /**
+     * (1) 보낼 때는 로그를 안 남긴다 — 끝날 때 한 줄에 다 담는다.
+     * (2) 대신 진행 중 목록에 넣고, 안 끝나면 5초/15초/30초에 알린다.
+     * (4) 같은 요청이 짧은 시간에 반복되면 묶는다.
+     */
+    var _oReq = window.__u4aReq;
+    var _aSlowTimers = [];
+
+    // 진행 중 목록에 넣는다
+    _oReq.live[_sAjaxNo] = { name: _sAjaxName, at: _iAjaxStartAt, desc: _sReqDesc };
+    _oReq.report();
+
+    // 안 끝나면 알린다
+    (function () {
+
+        for (var _t = 0; _t < _oReq.SLOW_MS.length; _t++) {
+
+            (function (ms) {
+
+                _aSlowTimers.push(setTimeout(function () {
+
+                    try {
+
+                        if (!_oReq.live[_sAjaxNo]) { return; }   // 이미 끝났다
+
+                        if (typeof U4ALOG !== "undefined") {
+                            U4ALOG.warn("늦어짐", _sAjaxName + " " + _sAjaxNo,
+                                "no response after " + Math.round(ms / 1000) + "s"
+                                + (_sReqDesc ? (" | what: " + _sReqDesc) : ""));
+                        }
+
+                    } catch (e) { }
+
+                }, ms));
+
+            })(_oReq.SLOW_MS[_t]);
+
+        }
+
+    })();
+
+    /** 요청이 끝났을 때 정리 — 어느 갈래로 끝나든 반드시 부른다 */
+    function _ajaxFinish() {
+
+        try {
+
+            for (var i = 0; i < _aSlowTimers.length; i++) { clearTimeout(_aSlowTimers[i]); }
+            _aSlowTimers.length = 0;
+
+            delete _oReq.live[_sAjaxNo];
+            _oReq.report();
+
+        } catch (e) { }
+
+    }
+
+    /**
+     * (4) 같은 요청이 짧은 시간에 여러 번이면 묶는다.
+     * 묶을 차례면 true 를 돌려준다(그 줄은 안 남기고 세기만 한다).
+     */
+    function _isBurst(bOk) {
+
+        try {
+
+            var b = _oReq.burst[_sAjaxName];
+            var now = Date.now();
+
+            if (!b || (now - b.first) > _oReq.BURST_MS) {
+
+                // 앞 묶음이 있으면 정리해 한 줄 남긴다
+                if (b && b.n >= _oReq.BURST_MIN && typeof U4ALOG !== "undefined") {
+                    U4ALOG.info("반복", _sAjaxName,
+                        b.n + " times | ok " + b.ok + " failed " + (b.n - b.ok)
+                        + " | over " + (Math.round((b.last - b.first) / 100) / 10) + "s");
+                }
+
+                _oReq.burst[_sAjaxName] = { first: now, last: now, n: 1, ok: bOk ? 1 : 0 };
+                return false;   // 첫 건은 그대로 남긴다
+
+            }
+
+            b.n++;
+            b.last = now;
+            if (bOk) { b.ok++; }
+
+            // 정해진 횟수를 넘어서면 그때부터 묶는다(안 남김)
+            return (b.n > _oReq.BURST_MIN);
+
+        } catch (e) {
+            return false;
+        }
+
+    }
 
     /**
      * 서버 통신 시 버전, 패치 레벨 정보를 무조건 전송 -- End
@@ -4145,7 +4652,10 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
     // 서버 요청에 대한 정상 응답
     oXHR.onload = function (e) {
 
-        zconsole.log(`[ajax 응답]: ${sPath}`);
+        // 2026-09-08 정리 — 아래 새 서버 통신 로그로 대체(로그 두 벌 방지).
+
+        // 서버 통신 로그 — 받은 것(2026-09-08 추가)
+        // (1) '받았음' 은 안 남긴다 — 끝날 때 한 줄에 상태를 같이 담는다(2026-09-10)
 
         // 서버 요청 메시지 팝업 타임아웃을 죽인다.
         if (typeof iReqMsgTimeout !== "undefined") {
@@ -4166,6 +4676,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         let sap_err = oXHR.getResponseHeader("sap-err-id");
         if (sap_err) {
 
+            // 서버 통신 로그 — 실패(2026-09-08 추가)
+            _ajaxFail("서버가 오류를 돌려줌", oXHR);
+
             // 현재 같은 세션으로 떠있는 브라우저 창을 전체 닫고 내 창은 Session Timeout 팝업 호출
             fn_logoff_success('X');
 
@@ -4182,6 +4695,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         // status 값이 있다면 서버에서 오류 발생
         if (u4a_status) {
 
+            // 서버 통신 로그 — 실패(2026-09-08 추가)
+            _ajaxFail("서버가 거절 (" + u4a_status + ")", oXHR);
+
             // 전역 busy 종료
             parent.setBusy("");
 
@@ -4193,6 +4709,10 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
                 var oResult = JSON.parse(oXHR.response);
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
+
+                // 서버 통신 로그 — 응답을 못 알아봄(2026-09-08 보완)
+                _ajaxFail("응답을 못 알아봄 — " + (error && error.message ? error.message : error), oXHR);
 
                 fnJsonParseError(error);
 
@@ -4207,6 +4727,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
         // 응답 타입이 Blob일 경우 응답 데이터를 success 콜백을 호출한다.
         if (oXHR.responseType === 'blob') {
+
+            // 서버 통신 로그 — 파일 받기 성공(2026-09-08 보완, 처음에 빠뜨렸던 갈래)
+            _ajaxLog("끝남", "OK (file received)");
 
             if (typeof fn_success === "function") {
                 fn_success(oXHR.response, oXHR);
@@ -4225,6 +4748,10 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
             var oResult = JSON.parse(oReturn);
 
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+
+            // 서버 통신 로그 — 응답을 못 알아봄(2026-09-08 보완, 두 번째 갈래)
+            _ajaxFail("응답을 못 알아봄 — " + (e && e.message ? e.message : e), oXHR);
 
             fnJsonParseError(e);
 
@@ -4233,6 +4760,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
         // Critical Error 일 경우 로그아웃 처리
         if (oResult.RETCD === "Z") {
+
+            // 서버 통신 로그 — 실패(2026-09-08 추가)
+            _ajaxFail("치명 오류로 로그아웃", oXHR);
 
             // 화면 Lock 해제
             sap.ui.getCore().unlock();
@@ -4248,6 +4778,9 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
         // 로그인 티켓 만료되면 로그인 페이지로 이동한다.
         if (oResult.TYPE === "E") {
 
+            // 서버 통신 로그 — 실패(2026-09-08 추가)
+            _ajaxFail("로그인 유효기간 만료", oXHR);
+
             // error 콜백이 있다면 호출
             if (typeof fn_error === "function") {
                 fn_error();
@@ -4260,6 +4793,37 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
 
         }
 
+        /**
+         * (1) 성공은 여기 한 줄에 다 담는다 (2026-09-10)
+         *   요청 이름 · 무슨 일 · 상태 · 걸린 시간 · 받은 항목 모양
+         */
+        _ajaxFinish();
+
+        if (!_isBurst(true)) {
+
+            var _sShape = _shapeOf(oResult);
+            var _sStatus = "OK (status " + ((oXHR && oXHR.status) ? oXHR.status : "-") + ")";
+
+            _ajaxLog("끝남", _sStatus
+                + (_sReqDesc ? (" | what: " + _sReqDesc) : "")
+                + (_sShape ? (" | " + _sShape) : ""));
+
+        }
+
+        /**
+         * 서버가 준 값의 모양을 남긴다 (2026-09-08 추가 — 장군님 지시)
+         * -----------------------------------------------------------------
+         * 왜 넣었나
+         *   서버가 준 값을 검사 없이 바로 쓰는 자리가 638곳이다(실측).
+         *   화면에 꼭 필요한 항목이 안 왔을 때, 로그에 "서버가 무엇을 줬는지" 가
+         *   없으면 서버 잘못인지 우리 잘못인지 못 가린다.
+         *
+         * 무엇을 남기나
+         *   항목 이름 / 목록은 몇 건인지 / 비어 있는 항목이 무엇인지.
+         *   값 자체는 안 남긴다(업무 자료 보호).
+         */
+        // (응답 모양은 위 '끝남' 한 줄에 같이 담긴다 — 따로 안 남긴다)
+
         if (typeof fn_success === "function") {
             fn_success(oResult);
         }
@@ -4271,6 +4835,25 @@ function sendAjax(sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_erro
      * 통신 오류 또는 timeout 발생 시
      ***********************************************/
     function _onError(e) {
+
+        /**
+         * 서버 통신 로그 — 실패 (2026-09-08 보완)
+         * 앞서는 상태 번호를 안 보고 무조건 "통신 오류" 라고 적었다.
+         * 실제로는 서버가 500 을 돌려준 것도 여기로 오는데 그게 안 보였다(장군님 지적).
+         */
+        var _oFailXhr = (e && e.target) ? e.target : null;
+        var _iFailStatus = (_oFailXhr && typeof _oFailXhr.status === "number") ? _oFailXhr.status : 0;
+        var _sFailReason;
+
+        if (e && e.type === "timeout") {
+            _sFailReason = "시간 초과 (서버가 제때 답을 안 줌)";
+        } else if (_iFailStatus > 0) {
+            _sFailReason = "서버가 상태 " + _iFailStatus + " 를 돌려줌";
+        } else {
+            _sFailReason = "서버에 못 닿음 (연결 끊김·차단·주소 틀림)";
+        }
+
+        _ajaxFail(_sFailReason, _oFailXhr);
 
         // 서버 요청 메시지 팝업 타임아웃을 죽인다.
         if (typeof iReqMsgTimeout !== "undefined") {

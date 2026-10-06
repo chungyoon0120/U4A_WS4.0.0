@@ -1,3 +1,4 @@
+// 오류코드 접두: EPEF / 다음 번호: 003
 /****************************************************************************
  * 오류 페이지 에디터 창 로직 (errorPageEditorFrame.js)
  * --------------------------------------------------------------------------
@@ -50,12 +51,12 @@ var C_HOSTID = "U4AERP";
 
 // 현재 상태(원본 모델 /EDITDATA, /APPINFO 대응).
 var oState = { EDITDATA: null, APPINFO: null, ready: false };
-var oFrame = null, bBusy = false, oToastTimer = null, iBusyWatch = null, iPrevWatch = null, bOpenDone = false;
+var oFrame = null, bBusy = false, oToastTimer = null, bOpenDone = false;
 
 // ── 로컬 헬퍼 ──────────────────────────────────────────────────────────
 function _msg(sCls, sCode, p1) {
     try { return WSMSG.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 
 // "Read me" = ZMSG_WS_COMMON_001/278(원본 getWsMsgClsTxt). CL_WS_COMMON D34 폴백.
@@ -63,7 +64,7 @@ function _readmeText() {
     try {
         var s = WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "278");
         if (s) { return s; }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     return _msg("/U4A/CL_WS_COMMON", "D34");
 }
 
@@ -83,7 +84,7 @@ function _monacoThemeFromBg(sBg) {
             r = +m2[1]; g = +m2[2]; b = +m2[3];
         }
         return (0.299 * r + 0.587 * g + 0.114 * b) < 128 ? "vs-dark" : "vs";
-    } catch (e) { return "vs-dark"; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return "vs-dark"; }
 }
 
 // SYSID 별 테마 정보 JSON 읽기(라이브 테마용).
@@ -92,7 +93,7 @@ function _getThemeInfo() {
         var sPath = PATH.join(USERDATA, "p13n", "theme_ws4", SYSID + ".json");
         if (!FS.existsSync(sPath)) { return null; }
         return JSON.parse(FS.readFileSync(sPath, "utf-8"));
-    } catch (e) { return null; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
 }
 
 // 호스트로 명령 전송.
@@ -102,11 +103,11 @@ function _toHost(oMsg) {
         oMsg.__u4aedh = true;
         oMsg.hostId = C_HOSTID;
         if (oFrame && oFrame.contentWindow) { oFrame.contentWindow.postMessage(oMsg, "*"); }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 function _readHost() {
-    try { return oFrame.contentWindow.editor.getValue(); } catch (e) { return null; }
+    try { return oFrame.contentWindow.editor.getValue(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
 }
 
 // 현재 화면(에디터 + 체크박스) 기준 저장/미리보기 데이터. 에디터 값은 라이브로 읽는다(원본 양방향 바인딩 대응).
@@ -125,9 +126,9 @@ function _setBusy(bOn, oOpt) {
     if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }   // 공통 .u4a-busy 토글
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
     //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
-    try { CURRWIN.closable = false; } catch (e) { }
+    try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
-        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
+        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 }
 
@@ -135,8 +136,7 @@ function _setBusy(bOn, oOpt) {
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { clearTimeout(iBusyWatch); } catch (e) { }
-    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { }
+    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _setBusy(false);
     _fadeInContent();
 }
@@ -160,7 +160,7 @@ function _toast(sText) {
     }
     oEl.textContent = sText;
     oEl.dataset.show = "true";
-    try { clearTimeout(oToastTimer); } catch (e) { }
+    try { clearTimeout(oToastTimer); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     oToastTimer = setTimeout(function () { oEl.dataset.show = "false"; }, 3000);
 }
 
@@ -210,6 +210,11 @@ function _loadHost() {
         THEME: _monacoThemeFromBg(BGCOL),
         READONLY: !_isEdit()
     };
+    // ★ [2026-09-14, 장군님 지시] iframe 이 host 문서 자체를 못 읽는 경우 — 진짜 실패 이벤트.
+    //   host 안쪽 실패(monaco loader.js / index.js / vs 모듈)는 host 가 evt:"error" 로 알려 준다.
+    try { oFrame.onerror = function () { _hostFatal("EPEF-002", { where: "host iframe", detail: oFrame.src }); }; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
     oFrame.src = "../editorPopup/host/index.html?PARAMS=" + encodeURIComponent(JSON.stringify(oPARAMS));
 }
 
@@ -239,19 +244,21 @@ function _preview() {
     var d = _curSaveData();
     if (d.HTML === null) { return; }
     _setBusy(true);
-    try { clearTimeout(iPrevWatch); } catch (e) { }
-    iPrevWatch = setTimeout(function () {
-        console.error("[HTML5][errPageEditor] 미리보기 로드 지연/실패 — busy 강제 해제");
-        _setBusy(false);
-    }, 15000);
+    // ★ [2026-09-14] 여기 있던 "15초 지나면 busy 를 그냥 끈다" 타이머를 걷어냈다(.analy 16 §2.11 금지).
+    //   해제는 미리보기 창이 실제로 뜬 신호(if-errorPageEditor-setBusy) 하나로만 한다.
+    //   미리보기 창 문서를 못 읽는 실패도 opener 의 did-fail-load 가 같은 신호를 보낸다
+    //   (fnErrorPageEditorPopupOpen.js FEPE-002).
     try { IPCRENDERER.send("if-ErrorPage-Preview", { BROWSKEY: BROWSKEY, SAVEDATA: d }); }
-    catch (e) { try { clearTimeout(iPrevWatch); } catch (e2) { } _setBusy(false); }
+    catch (e) {
+        console.error("[EPEF-001] preview request send failed:", e && e.message);
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        _setBusy(false);   // 요청 자체가 못 나갔다 = 확정 실패. 여기서 푸는 게 맞다.
+    }
 }
 
 // 미리보기 로드 완료 → opener 가 busy 해제 신호(원본 if-errorPageEditor-setBusy).
 function _onPrevBusy(event, res) {
     if (res === "X") { _setBusy(true); return; }
-    try { clearTimeout(iPrevWatch); } catch (e) { }
     _setBusy(false);
 }
 
@@ -263,8 +270,8 @@ function _onThemeChange() {
         if (oTheme.BGCOL) {
             CURRWIN.webContents.insertCSS("html,body{margin:0;height:100%;background-color:" + oTheme.BGCOL + ";}");
         }
-    } catch (e) { }
-    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oTheme.BGCOL) { BGCOL = oTheme.BGCOL; }
     _toHost({ cmd: "setTheme", theme: _monacoThemeFromBg(oTheme.BGCOL) });
 }
@@ -279,8 +286,50 @@ function _onHostMessage(oEvent) {
         _finishOpen();           // 에디터 완전 로드 → busy 1회 해제(중간 깜빡임 없음).
         return;
     }
+    if (d.evt === "error") { _hostFatal("EPEF-002", d); return; }   // host 로드 실패(실제 이벤트).
     if (d.evt === "save") { _save(); return; }   // 에디터 한정 Ctrl+S 위임.
     if (d.evt === "zoom") { _setZoom(d.pct); return; }
+}
+
+/* ── host 로드 실패 — 타이머 대신 실제 실패 이벤트로 처리 ──────────────────
+ * ★ [2026-09-14, 장군님 지시] 종전에는 "15초 지나면 busy 를 그냥 끈다"는 타이머가 있었다.
+ *   그건 금지된 방식이다(.analy 16 §2.11) — busy 가 안 꺼지는 건 "고장났다"는 신호인데
+ *   타이머로 꺼버리면 화면은 빈 채인데 사용자는 끝난 줄 착각한다. 타이머를 걷어내고
+ *   host 가 실제로 알려 주는 실패(iframe error · monaco loader.js/index.js onerror ·
+ *   require 실패 콜백)를 받아 여기서 잠금을 풀고 표면화한 뒤 창을 닫는다.
+ * ------------------------------------------------------------------------ */
+function _hostFatal(sCode, oDetail) {
+    console.error("[" + sCode + "] error page editor host load failed:",
+        (oDetail && oDetail.where) || "", (oDetail && oDetail.detail) || "", (oDetail && oDetail.code) || "");
+
+    _finishOpen();   // WS20 잠금 해제 + 창 busy 해제(1회) — 이걸 해야 창을 닫을 수 있다.
+
+    var sMsg = _zc("314") + "\n\n" + _zc("290");   // 알 수 없는 오류 + 안내
+    if (window.U4AUI && U4AUI.confirm) {
+        U4AUI.confirm({
+            type: "E",
+            title: _msg("/U4A/CL_WS_COMMON", "B93"),
+            message: sMsg,
+            buttons: [{ act: "OK", label: "OK", emphasized: true }],
+            onClose: _closeWindowNow
+        });
+        return;
+    }
+    // 공통 확인창이 없으면 fallback 을 만들지 않는다(window.alert 금지) — 코드로 표면화하고 닫는다.
+    console.error("[" + sCode + "] common U4AUI.confirm not loaded - message not shown:", sMsg);
+    _closeWindowNow();
+}
+
+function _closeWindowNow() {
+    if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); return; }
+    try { if (!CURRWIN.isDestroyed()) { CURRWIN.setClosable(true); CURRWIN.close(); } }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+}
+
+// ZMSG_WS_COMMON_001 문구(원본 getWsMsgClsTxt) — 314 = 알 수 없는 오류 / 290 = 안내.
+function _zc(sNo) {
+    try { return WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo) || ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 
 // ── 메인 → 창: 에디터 정보 수신(원본 if-editor-info) ─────────────────────
@@ -291,11 +340,8 @@ function _onEditorInfo(event, res) {
     if (oFrame && !oFrame.getAttribute("src")) {
         // 최초 로드 — busy 는 오프너가 켠 상태 그대로 유지(여기서 끄지 않음). 완전 로드/오류 시 _finishOpen.
         _setBusy(true);
-        try { clearTimeout(iBusyWatch); } catch (e) { }
-        iBusyWatch = setTimeout(function () {
-            console.error("[HTML5][errPageEditor] 호스트 로드 지연/실패 — busy 강제 해제");
-            _finishOpen();
-        }, 15000);
+        // ★ [2026-09-14] 여기 있던 "15초 지나면 busy 를 그냥 끈다" 타이머를 걷어냈다(.analy 16 §2.11 금지).
+        //   해제는 host 의 ready(정상) / evt:"error"(실패) 로만 한다 — _hostFatal 주석 참고.
         _loadHost();
     } else if (oState.ready) {
         // 재수신(방어) — 즉시 반영.
@@ -310,7 +356,7 @@ function _setTitle() {
     var oTitle = document.getElementById("errTitle");
     if (!oTitle) { return; }
     var s = "";
-    try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { s = document.title || ""; }
+    try { s = document.title || CURRWIN.getTitle() || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } s = document.title || ""; }
     oTitle.textContent = s;
 }
 
@@ -369,7 +415,7 @@ function _initChrome() {
     // 로고(메인 창과 동일 APPPATH/img/logo.png).
     var oLogo = document.getElementById("errLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     _setTitle();
 
@@ -379,7 +425,7 @@ function _initChrome() {
         oClose.addEventListener("click", function () {
             if (bBusy) { return; }
             if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); }
-            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { } }
+            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         });
     }
 
@@ -430,7 +476,7 @@ function _initChrome() {
 
 // ── 세션 유지(원본 fnKeepClientSession) ─────────────────────────────────
 function _keepSession() {
-    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { }
+    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // ── 자식창 busy 동기화 채널 ──────────────────────────────────────────────
@@ -443,7 +489,7 @@ function _initBroadcast() {
             if (sPrc === "BUSY_ON") { _setBusy(true, { ISBROAD: true }); }
             else if (sPrc === "BUSY_OFF") { _setBusy(false, { ISBROAD: true }); }
         };
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // ── 부트 ────────────────────────────────────────────────────────────────
@@ -451,7 +497,7 @@ window.addEventListener("load", function () {
 
     oFrame = document.getElementById("errHost");
 
-    try { CURRWIN.setMenu(null); } catch (e) { }
+    try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     _initChrome();
     _initBroadcast();
@@ -469,8 +515,17 @@ window.addEventListener("load", function () {
     window.addEventListener("keyup", _keepSession);
     _keepSession();
 
+    // ★ 창은 뜨자마자 무조건 busy 부터 켜고 시작한다(장군님 지시 2026-09-09 · 2026-09-11).
+    //   [고친 이유] 종전에는 busy 없이 show() 를 불렀다. 자기 오버레이는 opener 가 did-finish-load 에
+    //   보내는 if-editor-info 를 받아야 켜졌으므로, 그 사이 테마 배경만 깔린 빈 창이 먼저 보였다
+    //   (느린 PC·다크 테마 = 검은 화면). show() 보다 앞에 둬야 첫 화면부터 스피너가 보인다.
+    //   ※ 타임아웃으로 busy 를 강제 해제하는 안전장치는 두지 않는다(.analy 16 §2.11 · 장군님 지시).
+    //     busy 가 안 꺼지면 "뭔가 고장났다"는 신호다. 해제는 실제 완료/실패 이벤트로만 —
+    //     여기서는 오프너(fnErrorPageEditorPopupOpen)의 did-finish-load / did-fail-load 가 그 이벤트다.
+    _setBusy(true);
+
     // 창은 즉시 불투명 표시(네이티브 opacity 페이드 미사용). 등장 효과는 #errContent CSS opacity(_fadeInContent).
-    try { CURRWIN.show(); } catch (e) { }
+    try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // ★ busy 는 여기서 끄지 않는다 ★ — 오프너가 켠 WS20 busy 를 에디터 완전 로드까지 유지.
     //   해제는 host ready(_onHostMessage) 또는 오류 워치독(_onEditorInfo)에서 _finishOpen 으로 1회만.
@@ -482,7 +537,7 @@ window.onbeforeunload = function () {
     window.removeEventListener("click", _keepSession);
     window.removeEventListener("keyup", _keepSession);
     window.removeEventListener("message", _onHostMessage);
-    try { IPCRENDERER.removeListener("if-editor-info", _onEditorInfo); } catch (e) { }
-    try { IPCMAIN.removeListener("if-errorPageEditor-setBusy-" + BROWSKEY, _onPrevBusy); } catch (e) { }
-    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { }
+    try { IPCRENDERER.removeListener("if-editor-info", _onEditorInfo); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCMAIN.removeListener("if-errorPageEditor-setBusy-" + BROWSKEY, _onPrevBusy); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 };

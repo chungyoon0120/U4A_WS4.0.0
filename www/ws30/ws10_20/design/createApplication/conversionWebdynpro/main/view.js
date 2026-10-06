@@ -21,7 +21,7 @@ export async function createView(oParam) {
     const U = window.U4AUI;
 
     // ZMSG_WS_COMMON_001 코드 텍스트.
-    const _wt = function (sNo) { try { return parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", sNo); } catch (e) { return sNo; } };
+    const _wt = function (sNo) { try { return parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", sNo); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sNo; } };
     const _el = function (tag, cls, txt) { const o = document.createElement(tag); if (cls) { o.className = cls; } if (txt != null) { o.textContent = txt; } return o; };
 
     _ensureStyle();

@@ -1,3 +1,4 @@
+// 오류코드 접두: MFRM / 다음 번호: 002
 /*************************************************************
  * U4A Workspace - 메인 프레임 부트스트랩 (HTML5)
  *
@@ -101,6 +102,16 @@ async function _mainFrameInit() {
 // 전달받은 Meta 정보를 저장한다.
 IPCRENDERER.on('if-meta-info', (event, res) => {
 
+    // ★ [2026-09-15, 장군님 지시] 새창이 뜨면 처음 호출되는 곳 — 여기서 busy 부터 켠다.
+    //   [고친 이유] 로그인 후 새창이 busy 없이 검은 화면으로 먼저 보였다(장군님 실측 2026-09-15).
+    //   해제는 메인 본문 등장 완료(js/ws_main.js) · 첫 화면 본문 그리기(js/ws10_html.js) ·
+    //   로그인 화면 준비 완료(Login/Login.js)가 한다.
+    if (typeof setDomBusy === "function") {
+        setDomBusy("X");
+    } else {
+        console.error("[MFRM-001] setDomBusy not found - new window starts without busy");
+    }
+
     var oMetadata = res;
 
     // 메타데이터 정보
@@ -116,6 +127,36 @@ IPCRENDERER.on('if-meta-info', (event, res) => {
     // 서버 정보
     if (oMetadata.SERVERINFO) {
         oWS.oServerInfo = oMetadata.SERVERINFO;
+
+        /**
+         * 접속 서버 로그 (2026-09-08 추가)
+         * -------------------------------------------------------------
+         * 왜 여기인가: 창이 "어느 서버에 붙었는지" 처음 알게 되는 자리다.
+         * 무엇을 남기나: 서버 이름·시스템 번호·클라이언트 정도.
+         *              비밀번호나 접속 열쇠는 남기지 않는다.
+         */
+        try {
+
+            if (typeof U4ALOG !== "undefined") {
+
+                var _oSrv = oMetadata.SERVERINFO;
+                var _sSrv = "";
+
+                _sSrv += (_oSrv.NAME || _oSrv.host || "(이름 없음)");
+
+                if (_oSrv.SYSID) { _sSrv += " / 시스템 " + _oSrv.SYSID; }
+                if (_oSrv.CLIENT) { _sSrv += " / 클라이언트 " + _oSrv.CLIENT; }
+                if (_oSrv.LANGU) { _sSrv += " / 언어 " + _oSrv.LANGU; }
+
+                U4ALOG.info("접속 서버", _sSrv, "");
+
+            }
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            // 로그 때문에 창이 뜨는 것을 막으면 안 된다.
+        }
+
     }
 
     // 이전 서버 접속 정보
@@ -180,7 +221,7 @@ IPCRENDERER.on('if-meta-info', (event, res) => {
 window.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
         if (!_bMainFrameInited) {
-            console.log("[DEV] if-meta-info 미수신 → 폴백 초기화 실행");
+            console.warn("[WARN] could not get server info - initializing with defaults");
             _mainFrameInit();
         }
     }, 600);

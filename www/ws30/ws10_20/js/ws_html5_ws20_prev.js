@@ -103,7 +103,7 @@
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum);
             if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
 
@@ -180,6 +180,7 @@
                     oAPP.oDesign.pathInfo.designRootPath, "undoRedo", "undoRedo.js");
             }
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             // parent API 미가용(헤드리스) — skip. (미리보기 로드도 트리거되지 않음)
         }
     }
@@ -258,6 +259,7 @@
             try {
                 return l_meta[l_getfunc](UIATT)[param];
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
             }
 
@@ -763,19 +765,19 @@
             //잠금 flag 처리된경우.
             if (bLock) {
                 //단축키도 같이 잠금 처리. (원본 1:1)
-                try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { }
+                try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 //화면 잠금 처리. (구 oAPP.attr.oCore.lock())
-                try { oAPP.common.fnSetBusyLock("X"); } catch (e) { }
+                try { oAPP.common.fnSetBusyLock("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 return;
             }
 
             //잠금 flag가 없는경우 잠금 해제 처리. (구 oAPP.attr.oCore.unlock())
-            try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             //단축키도 같이 잠금 햐제 처리.
-            try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
+            try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         };  //디자인 area의 잠금/잠금해제 처리.
     }
@@ -797,7 +799,7 @@
                 return Promise.resolve(oAPP.fn.fnWs20SelectUI(OBJID, { UIATK: UIATK, TYPE: TYPE }));
             }
 
-            console.warn("[HTML5][WS20][prev] setSelectTreeItem: fnWs20SelectUI 미존재 — skip:", OBJID);
+            console.warn("[WS20][prev] setSelectTreeItem: fnWs20SelectUI missing — skip:", OBJID);
             return Promise.resolve();
 
         };  //tree item 선택 처리.
@@ -807,19 +809,19 @@
     //원본(uiDesignArea.js)은 UI5 TreeTable DnD 의존 → W2 에선 안전 가드만.
     if (typeof oAPP.fn.designTreeDragStart !== "function") {
         oAPP.fn.designTreeDragStart = function () {
-            console.warn("[HTML5][WS20][prev] designTreeDragStart 미변환(W3+ 예정) — skip.");
+            console.warn("[WS20][prev] designTreeDragStart not converted(W3+ pending) — skip.");
         };
     }
     if (typeof oAPP.fn.designDragEnd !== "function") {
         oAPP.fn.designDragEnd = function () {
-            console.warn("[HTML5][WS20][prev] designDragEnd 미변환(W3+ 예정) — skip.");
+            console.warn("[WS20][prev] designDragEnd not converted(W3+ pending) — skip.");
         };
     }
     if (typeof oAPP.fn.UIDrop !== "function") {
         oAPP.fn.UIDrop = function () {
-            console.warn("[HTML5][WS20][prev] UIDrop 미변환(W3+ 예정) — drop 무시.");
+            console.warn("[WS20][prev] UIDrop not converted (W3+ pending) - drop ignored.");
             //원본 의미: true return 시 호출처(iframe attachDrop)가 하위 로직 skip.
-            try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+            try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return true;
         };
     }
@@ -827,7 +829,7 @@
     //지연 로드시 원본이 정의됨. 로드 실패 대비 최소 가드만.
     if (typeof oAPP.fn.enableDesignContextMenu !== "function") {
         oAPP.fn.enableDesignContextMenu = function () {
-            console.warn("[HTML5][WS20][prev] enableDesignContextMenu 미로드 — skip.");
+            console.warn("[WS20][prev] enableDesignContextMenu not loaded — skip.");
         };
     }
 
@@ -868,14 +870,14 @@
         if (!oWin || typeof oWin.setPreviewUiTheme !== "function") {
             //미리보기 미로드/미완료 — 다음 미리보기 빌드시 drawPreview(index.js:8552)가
             //_T_0015 의 DH001021 값을 읽어 반영하므로, 여기선 조용히 skip.
-            console.warn("[HTML5][WS20][prev] setPreviewUiTheme 미가용(미리보기 미로드) — 테마 라이브반영 skip:", sTheme);
+            console.warn("[WS20][prev] setPreviewUiTheme unavailable (preview not loaded) - live theme apply skipped:", sTheme);
             return false;
         }
         try {
             oWin.setPreviewUiTheme(sTheme);
             return true;
         } catch (e) {
-            console.error("[HTML5][WS20][prev] setPreviewUiTheme 오류:", e && e.message);
+            console.error("[WS20][prev] setPreviewUiTheme error:", e && e.message, e);
             return false;
         }
     };
@@ -898,7 +900,7 @@
 
         //원본이 아직 안 실렸으면 설치 불가 — 조용히 넘기지 않고 드러낸다.
         if (typeof oAPP.fn.prevStyleClassApply !== "function") {
-            console.error("[HTML5][WS20][prev][PREV-CSS-01] 원본 꾸밈 적용 함수가 없어 덮어쓰기 실패");
+            console.error("[WS20][prev][PREV-CSS-01] original style-apply function missing - override failed");
             return;
         }
 
@@ -1073,38 +1075,127 @@
     } // end of _installPrevCssApplyOverride
 
     /************************************************************************
-     * [HTML5] 미리보기 오류 표면화 (장군님 지시 2026-08-14 "오류 삼킴 금지" 복원, 2026-08-31)
-     * ---------------------------------------------------------------------
-     *  미리보기 화면 파일(design/preview/index.js)은 원작 개발자가 통째로 갱신하는 자리라
-     *  한 줄도 고치지 않는다. 그 파일 안 4곳이 실패를 조용히 먹고 넘어가,
-     *  화면엔 아무 표시 없이 UI 가 빠지거나 빈 껍데기로 들어간다.
-     *    · 부품 정보 읽기            (setUIProp        내부 try/catch{})
-     *    · 화면 묶음 불러오기        (addUIObjPreView  내부 try/catch{})
-     *    · 속성 넣어 UI 만들기       (createUIInstance 내부 try → 빈 UI 로 대체)
-     *    · 속성 직접 적용            (createUIInstance 내부 try/catch{})
-     *  → 그 안에서 실제로 던지는 함수들을 iframe 쪽에서 감싸, 실패하면 오류코드와 함께
-     *    드러낸 뒤 원래대로 다시 던진다(원본 흐름·대비책은 그대로 유지, 표면화만 추가).
-     *  ※ 파일을 못 고치므로 try/catch 자체는 없앨 수 없다 — 표면화까지가 한계.
+     * [HTML5] 미리보기 오류 표면화 — _installPrevErrorSurface
+     * =====================================================================
+     *
+     * ■ 무엇을 하는 코드인가
+     *   미리보기 iframe(design/preview/index.js) 안에서 실패를 조용히 먹고 넘어가는
+     *   function 들을 바깥에서 wrap 해서, 실패하면 오류코드와 함께 console 에 남긴 뒤
+     *   원래대로 다시 throw 한다. 원본 흐름과 원본 catch 의 fallback 은 그대로 둔다.
+     *
+     * ■ 왜 필요한가
+     *   design/preview/index.js 는 원작 개발자가 통째로 갱신하는 파일이라 한 줄도 고칠 수 없다.
+     *   그 안 4곳이 try/catch 로 실패를 삼켜, 화면엔 아무 표시 없이 UI 가 빠지거나
+     *   빈 껍데기가 들어간다. 파일을 못 고치니 try/catch 자체는 못 없앤다 — wrap 이 한계다.
+     *   (장군님 지시 2026-08-14 "오류 삼킴 금지", 2026-08-31 복원)
+     *
+     * ■ wrap 대상과 오류코드 — 괄호 = 원본에서 이걸 부르는 자리
+     *   PREV-ERR-01  getUIClassInstance            (setUIProp)
+     *   PREV-ERR-02  setUIProperty                 (createUIInstance)
+     *   PREV-ERR-03  setUIPropertyDirectly         (createUIInstance)
+     *   PREV-ERR-04  sap.ui.requireSync            (addUIObjPreView / createUIInstance)
+     *   PREV-ERR-05  sap.ui.getCore().loadLibrary  (addUIObjPreView / createUIInstance)
+     *
+     * ■ 설치 순서
+     *   1) iframe 의 load 마다 이 function 이 불린다(아래쪽 addEventListener("load") 자리).
+     *   2) iframe 안 script 는 index.html 이 동적으로 붙여 실행하므로, load 시점엔
+     *      아직 getUIClassInstance 가 없을 수 있다 → 생길 때까지 200ms 간격으로 다시 본다.
+     *   3) getUIClassInstance 가 보이면 PREV-ERR-01~03 을 wrap 한다.
+     *   4) sap.ui 는 index.js 실행 뒤 start() 안에서 따로 올라오므로
+     *      PREV-ERR-04~05 는 별도로 더 기다린다.
+     *
+     * ■ AI 운영자용 — 로그로 판정하는 법
+     *   [PREV-ERR-00] 이 찍혔다 = wrap 설치를 포기했다(= 이 창에선 01~05 감시가 꺼졌다).
+     *     로그 뒤에 붙는 값으로 원인을 가른다:
+     *       iframe src=(none)        → src 조차 안 붙었다. loadPreviewFrame() 까지 못 간 것.
+     *                                  (예: WS20 진입 직후 F3 연타로 바로 빠져나감)
+     *       readyState=loading       → document 를 받는 중인데 5분 안에 못 끝냈다. 진짜 로드 지연.
+     *       readyState=complete 인데 function 이 없음
+     *                                → index.js 가 실행되다 중간에 throw 했을 가능성.
+     *                                  같은 시각대 iframe 안 다른 오류를 같이 본다.
+     *       waited / tries           → 실제로 기다린 ms 와 시도 횟수.
+     *   [PREV-ERR-04] 가 찍혔다 = 01~03 은 붙었는데 sap.ui 가 5분 안에 안 올라온 것.
+     *   ★ PREV-ERR-00 / 04 는 "미리보기가 깨졌다"가 아니라 "감시를 못 붙였다"는 뜻이다.
+     *     미리보기 자체는 원본 흐름대로 계속 돈다.
+     *
+     * ■ 원본(as-is) 과의 차이
+     *   원본 design/js/uiPreviewArea.js 의 loadPreviewFrame 은 contentWindow._loaded 라는
+     *   완료 신호 하나만 보고 판정하며 폴링이 아예 없다(_loaded 는 preview/index.js 에서 세움).
+     *   이 wrap 은 원본에 없는 HTML5 추가분이라 그 신호를 쓸 자리가 아니고,
+     *   "대상 함수가 생겼는지"를 직접 봐야 해서 폴링으로 간다.
+     *   (2026-09-11 장군님 지시 = 원본 방식으로 바꾸지 말고 폴링 유지 + 상한 5분)
      ************************************************************************/
+
+    /* 대기 상한 5분 · 다시 보는 간격 200ms. (장군님 지시 2026-09-11)
+     *
+     *   종전에는 "100회 × 200ms(약 20초)" 처럼 횟수로 끊었는데 두 가지가 깨졌다.
+     *     ① 느린 PC 에서 index.js 가 20초를 넘기면 그냥 포기했다.
+     *        → 실제 사고: 2026-09-11 09:50 cdp 자동화 WS10 <--> WS20 테스트에서 PREV-ERR-00 발생.
+     *     ② iframe load 마다 새 retry 가 생기는데 횟수는 contentWindow 에 공유돼,
+     *        retry 가 늘수록 상한을 빨리 소진 = "느릴수록 더 빨리 포기"하는 거꾸로 된 구조였다.
+     *   → 지금은 횟수가 아니라 "처음 시도한 시각부터의 경과"로 끊고(setTimeout 이 밀려도 정확),
+     *     retry 는 한 줄만 돌게 막는다.
+     *   ※ 이 값을 줄이려면 느린 PC 기준으로 재실측할 것. 빠른 개발 PC 기준으로 줄이지 말 것.
+     */
+    var PREV_ERR_SURFACE_WAIT_MS = 300000;
+    var PREV_ERR_SURFACE_POLL_MS = 200;
+
     function _installPrevErrorSurface(oFrame) {
 
         var w = null;
-        try { w = oFrame && oFrame.contentWindow; } catch (e) { w = null; }
+        try { w = oFrame && oFrame.contentWindow; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } w = null; }
         if (!w) { return; }
 
-        //iframe 문서가 새로 생길 때마다 1회만 설치(중복 감쌈 방지).
+        //iframe document 가 새로 생길 때마다 1회만 설치(중복 wrap 방지).
         if (w.__u4aPrevErrSurface === true) { return; }
 
-        //미리보기 스크립트는 index.html 이 동적으로 붙여 실행 → load 시점에 아직 없을 수 있다.
-        //  대상 함수가 생길 때까지 짧게 기다렸다가 설치(최대 약 20초).
+        /* ── getUIClassInstance 가 생길 때까지 대기 ──────────────────────
+         *  iframe 안 script 는 index.html 이 동적으로 붙여 실행하므로, load 시점엔
+         *  아직 없는 게 정상이다. 생길 때까지 PREV_ERR_SURFACE_POLL_MS 간격으로 다시 본다.
+         *
+         *  상태는 전부 contentWindow 에 붙여 둔다 — iframe 이 새 document 로 바뀌면
+         *  window 도 새로 생기므로 자동으로 초기화된다.
+         *    __u4aPrevErrSurfaceT0       처음 시도한 시각 (경과 판정 기준)
+         *    __u4aPrevErrSurfaceTry      시도 횟수 (로그에만 쓴다 — 포기 판정은 시각으로)
+         *    __u4aPrevErrSurfacePending  retry 예약이 이미 걸려 있는지
+         * ------------------------------------------------------------- */
         if (typeof w.getUIClassInstance !== "function") {
+
+            var iNow = Date.now();
+            if (!w.__u4aPrevErrSurfaceT0) { w.__u4aPrevErrSurfaceT0 = iNow; }
+
             var iTry = (w.__u4aPrevErrSurfaceTry || 0) + 1;
             w.__u4aPrevErrSurfaceTry = iTry;
-            if (iTry > 100) {
-                console.error("[HTML5][WS20][prev][PREV-ERR-00] 오류 표면화 설치 실패 — 미리보기 함수가 나타나지 않음");
+
+            var iElapsed = iNow - w.__u4aPrevErrSurfaceT0;
+
+            if (iElapsed > PREV_ERR_SURFACE_WAIT_MS) {
+
+                //포기할 때는 판정 근거를 같이 남긴다. 읽는 법은 이 파일 위쪽
+                //"AI 운영자용 — 로그로 판정하는 법" 참고.
+                var sSrc = "";
+                var sReady = "";
+                try { sSrc = (oFrame && oFrame.getAttribute("src")) || "(none)"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sSrc = "(read error)"; }
+                try { sReady = (w.document && w.document.readyState) || "(unknown)"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sReady = "(read error)"; }
+
+                console.error("[WS20][prev][PREV-ERR-00] error hook not installed - getUIClassInstance never appeared in the preview iframe"
+                    + " | waited=" + iElapsed + "ms (limit " + PREV_ERR_SURFACE_WAIT_MS + "ms)"
+                    + " | tries=" + iTry
+                    + " | iframe src=" + sSrc
+                    + " | readyState=" + sReady);
+
                 return;
             }
-            setTimeout(function () { try { _installPrevErrorSurface(oFrame); } catch (e) { } }, 200);
+
+            //retry 는 한 줄만 돌린다 — iframe load 가 여러 번 나도 예약이 겹쳐 쌓이지 않게.
+            if (w.__u4aPrevErrSurfacePending === true) { return; }
+            w.__u4aPrevErrSurfacePending = true;
+
+            setTimeout(function () {
+                try { w.__u4aPrevErrSurfacePending = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { _installPrevErrorSurface(oFrame); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            }, PREV_ERR_SURFACE_POLL_MS);
+
             return;
         }
 
@@ -1114,7 +1205,7 @@
         function lf_wrap(oHost, sName, sCode, sDesc) {
 
             if (!oHost || typeof oHost[sName] !== "function") {
-                console.error("[HTML5][WS20][prev][" + sCode + "] 감쌀 대상 없음: " + sName);
+                console.error("[WS20][prev][" + sCode + "] wrap target missing - " + sName + " is not a function");
                 return;
             }
 
@@ -1126,9 +1217,10 @@
                 try {
                     return fnOrg.apply(this, arguments);
                 } catch (e) {
+                    //iframe 안 console 은 WS20 쪽에서 안 보이므로 부모 console 로 올린다.
                     var oCon = (w.parent && w.parent.console) || console;
-                    oCon.error("[HTML5][WS20][prev][" + sCode + "] " + sDesc + " 실패:", e && e.message, e);
-                    throw e;
+                    oCon.error("[WS20][prev][" + sCode + "] " + sDesc + " threw:", e && e.message, e);
+                    throw e;   //원본 catch 의 fallback 이 그대로 돌도록 다시 던진다.
                 }
             };
 
@@ -1137,27 +1229,71 @@
 
         } // end of lf_wrap
 
-        //① 부품 정보 읽기 — setUIProp 의 try/catch{} 안에서 던지는 지점.
-        lf_wrap(w, "getUIClassInstance", "PREV-ERR-01", "UI 부품 정보 읽기");
+        //PREV-ERR-01 : setUIProp 안의 try/catch 가 이걸 부르다 삼킨다.
+        lf_wrap(w, "getUIClassInstance", "PREV-ERR-01", "getUIClassInstance");
 
-        //② 속성 넣어 UI 만들기 — createUIInstance 의 try 안에서 던지면 빈 UI 로 대체된다.
-        lf_wrap(w, "setUIProperty", "PREV-ERR-02", "UI 속성 구성");
+        //PREV-ERR-02 : createUIInstance 의 try 안. 여기서 throw 하면 빈 UI 로 대체된다.
+        lf_wrap(w, "setUIProperty", "PREV-ERR-02", "setUIProperty");
 
-        //③ 속성 직접 적용 — createUIInstance 의 try/catch{}.
-        lf_wrap(w, "setUIPropertyDirectly", "PREV-ERR-03", "UI 속성 직접 적용");
+        //PREV-ERR-03 : createUIInstance 안의 또 다른 try/catch.
+        lf_wrap(w, "setUIPropertyDirectly", "PREV-ERR-03", "setUIPropertyDirectly");
 
-        //④ 화면 묶음 불러오기 — addUIObjPreView / createUIInstance 의 try/catch{}.
-        try {
-            if (w.sap && w.sap.ui) {
-                lf_wrap(w.sap.ui, "requireSync", "PREV-ERR-04", "화면 묶음 즉시 불러오기");
-                if (typeof w.sap.ui.getCore === "function") {
-                    lf_wrap(w.sap.ui.getCore(), "loadLibrary", "PREV-ERR-05", "화면 묶음 불러오기");
+        /* ── PREV-ERR-04 / 05 : sap.ui loader 는 따로 기다렸다 wrap ──────
+         *  preview 는 index.js 를 먼저 실행한 뒤 start() 안에서 sap.ui 를 따로 불러온다.
+         *  그래서 이 자리에서 바로 찾으면 **아직 없는 게 정상**이다.
+         *  2026-09-08 이전에는 이걸 곧바로 빨간 오류로 찍고(헛경보) 다시 시도하지 않아
+         *  04/05 wrap 이 영영 안 걸렸다 → sap.ui 가 올라올 때까지 기다리도록 고쳤다.
+         * ------------------------------------------------------------- */
+        var iEngTry = 0;
+        var iEngT0 = 0;   //처음 시도한 시각. 위 T0 와 달리 이건 이 호출 안에서만 산다.
+
+        function lf_wrapEngine() {
+
+            //그 사이 iframe 이 새 document 로 바뀌었으면 예약된 시도는 조용히 접는다.
+            //(새 document 쪽에서 _installPrevErrorSurface 가 처음부터 다시 돈다.)
+            if (w.__u4aPrevErrSurface !== true) { return; }
+
+            var oSapUi = null;
+            try { oSapUi = w.sap && w.sap.ui; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oSapUi = null; }
+
+            if (!oSapUi || typeof oSapUi.getCore !== "function" || typeof oSapUi.requireSync !== "function") {
+
+                iEngTry++;
+
+                //대기 상한 = 5분(장군님 지시 2026-09-11). 종전 "150회 × 200ms(약 30초)" 는
+                //느린 PC 에서 sap.ui 가 30초를 넘기면 그냥 포기했다 → 경과 시각으로 판정.
+                if (!iEngT0) { iEngT0 = Date.now(); }
+                var iEngElapsed = Date.now() - iEngT0;
+
+                if (iEngElapsed > PREV_ERR_SURFACE_WAIT_MS) {
+
+                    var sEngReady = "";
+                    try { sEngReady = (w.document && w.document.readyState) || "(unknown)"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sEngReady = "(read error)"; }
+
+                    console.error("[WS20][prev][PREV-ERR-04] error hook not installed - sap.ui never appeared in the preview iframe"
+                        + " | waited=" + iEngElapsed + "ms (limit " + PREV_ERR_SURFACE_WAIT_MS + "ms)"
+                        + " | tries=" + iEngTry
+                        + " | readyState=" + sEngReady);
+
+                    return;
                 }
-            } else {
-                console.error("[HTML5][WS20][prev][PREV-ERR-04] 화면 묶음 함수 감쌈 실패 — 미리보기 엔진 미로드");
+
+                setTimeout(function () { try { lf_wrapEngine(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, PREV_ERR_SURFACE_POLL_MS);
+                return;
+
             }
-        } catch (e) {
-            console.error("[HTML5][WS20][prev][PREV-ERR-04] 화면 묶음 함수 감쌈 중 오류:", e && e.message);
+
+            try {
+                lf_wrap(oSapUi, "requireSync", "PREV-ERR-04", "sap.ui.requireSync");
+                lf_wrap(oSapUi.getCore(), "loadLibrary", "PREV-ERR-05", "sap.ui.getCore().loadLibrary");
+            } catch (e) {
+                console.error("[WS20][prev][PREV-ERR-04] error while wrapping sap.ui loaders:", e && e.message, e);
+            }
+
+        } // end of lf_wrapEngine
+
+        try { lf_wrapEngine(); } catch (e) {
+            console.error("[WS20][prev][PREV-ERR-04] error while wrapping sap.ui loaders:", e && e.message, e);
         }
 
     } // end of _installPrevErrorSurface
@@ -1176,7 +1312,7 @@
 
         var oDoc = null;
         try { oDoc = oFrame.contentDocument || (oFrame.contentWindow && oFrame.contentWindow.document); }
-        catch (e) { return; }              // cross-origin(이론상 없음, file://) → 포기
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return; }              // cross-origin(이론상 없음, file://) → 포기
         if (!oDoc || oDoc.__u4aScFwd) { return; }
         oDoc.__u4aScFwd = true;
 
@@ -1201,7 +1337,7 @@
             (oAPP.common.getShortCutList("WS20") || []).forEach(function (it) {
                 if (it && it.KEY) { oSet[_sigFromKeyStr(it.KEY)] = 1; }
             });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         oDoc.addEventListener("keydown", function (e) {
             var k = e.key || "";
@@ -1223,7 +1359,7 @@
                 Object.defineProperty(ev, "which", { get: function () { return e.which || e.keyCode; } });
                 document.dispatchEvent(ev);
             } catch (err) {
-                console.warn("[HTML5][WS20][prev] shortcut forward 실패:", err && err.message);
+                console.warn("[WS20][prev] shortcut forward failed:", err && err.message, err);
             }
         }, true);   // capture — iframe 앱보다 먼저 가로채기
     }
@@ -1233,7 +1369,7 @@
 
         var oPanel = document.getElementById("ws20DesignPreview");
         if (!oPanel) {
-            console.warn("[HTML5][WS20][prev] #ws20DesignPreview 미존재 — 셸 미렌더.");
+            console.warn("[WS20][prev] #ws20DesignPreview missing - rendering the shell only.");
             return;
         }
 
@@ -1271,12 +1407,12 @@
         // [HTML5] 미리보기 iframe 에 포커스가 가도 WS20 단축키가 동작하도록 keydown 포워딩 부착.
         //   src 설정/리로드로 load 가 날 때마다(=문서 새로 생길 때마다) 재부착.
         oFrame.addEventListener("load", function () {
-            try { _attachPreviewShortcutForward(oFrame); } catch (e) { }
-            try { _installPrevErrorSurface(oFrame); } catch (e) { }
+            try { _attachPreviewShortcutForward(oFrame); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { _installPrevErrorSurface(oFrame); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
         // 이미 로드된 상태(load 이벤트를 놓친 경우)도 즉시 시도.
-        try { _attachPreviewShortcutForward(oFrame); } catch (e) { }
-        try { _installPrevErrorSurface(oFrame); } catch (e) { }
+        try { _attachPreviewShortcutForward(oFrame); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { _installPrevErrorSurface(oFrame); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         /* ── 헤더(#ws20PrevHeader) 컨트롤 연결 ───────────────────────── */
 
@@ -1315,7 +1451,7 @@
                         }
                     });
                 } catch (e) {
-                    console.warn("[HTML5][WS20][prev] isShortcutLock defineProperty skip:", e && e.message);
+                    console.warn("[WS20][prev] isShortcutLock defineProperty skip:", e && e.message, e);
                 }
             }
 
@@ -1334,13 +1470,13 @@
                 oSlid.addEventListener("change", function () {
                     var oWin = _getFrameWin();
                     if (!oWin || typeof oWin.setPreviewZoom !== "function") {
-                        console.warn("[HTML5][WS20][prev] setPreviewZoom 미가용(미리보기 미로드).");
+                        console.warn("[WS20][prev] setPreviewZoom unavailable(preview not loaded).");
                         return;
                     }
                     try {
                         oWin.setPreviewZoom(parseFloat(this.value));
                     } catch (e) {
-                        console.warn("[HTML5][WS20][prev] setPreviewZoom 오류:", e && e.message);
+                        console.warn("[WS20][prev] setPreviewZoom error:", e && e.message, e);
                     }
                 });
             }
@@ -1355,13 +1491,13 @@
                     if (oSlid) { oSlid.value = "1"; } //구 oSlid.setValue(1)
                     var oWin = _getFrameWin();
                     if (!oWin || typeof oWin.setPreviewZoom !== "function") {
-                        console.warn("[HTML5][WS20][prev] setPreviewZoom 미가용(미리보기 미로드).");
+                        console.warn("[WS20][prev] setPreviewZoom unavailable(preview not loaded).");
                         return;
                     }
                     try {
                         oWin.setPreviewZoom(1);
                     } catch (e) {
-                        console.warn("[HTML5][WS20][prev] setPreviewZoom 오류:", e && e.message);
+                        console.warn("[WS20][prev] setPreviewZoom error:", e && e.message, e);
                     }
                 });
             }
@@ -1380,7 +1516,7 @@
                         try {
                             oAPP.fn.prevFullScreen(this.checked);
                         } catch (e) {
-                            console.warn("[HTML5][WS20][prev] prevFullScreen 오류:", e && e.message);
+                            console.warn("[WS20][prev] prevFullScreen error:", e && e.message, e);
                         }
                     });
                 }
@@ -1407,16 +1543,16 @@
                     try {
                         bPatch = (oAPP.common.checkWLOList("C", "UHAK901369") === true);
                     } catch (e) {
-                        console.error("[WS20HELP-30] 통합 도움말 등록여부 판정 실패:", e);
-                        try { parent.setBusy && parent.setBusy(""); } catch (e2) { }
+                        console.error("[WS20HELP-30] could not tell whether unified help is registered:", e);
+                        try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                         return;
                     }
 
                     if (bPatch) {
 
                         if (typeof oAPP.fn.fnU4AHelpDocuPopupOpener !== "function") {
-                            console.error("[WS20HELP-31] 통합 도움말 여는 기능 미로드 — 구성 확인 필요.");
-                            try { parent.setBusy && parent.setBusy(""); } catch (e3) { }
+                            console.error("[WS20HELP-31] unified help feature not loaded - check the build.");
+                            try { parent.setBusy && parent.setBusy(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                             return;
                         }
 
@@ -1426,13 +1562,13 @@
                             var oRet = oAPP.fn.fnU4AHelpDocuPopupOpener({ startMenuId: "000273" });
                             if (oRet && typeof oRet.catch === "function") {
                                 oRet.catch(function (e) {
-                                    console.error("[WS20HELP-31] 통합 도움말 팝업 호출 실패:", e);
-                                    try { parent.setBusy && parent.setBusy(""); } catch (e4) { }
+                                    console.error("[WS20HELP-31] help popup open failed:", e);
+                                    try { parent.setBusy && parent.setBusy(""); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
                                 });
                             }
                         } catch (e) {
-                            console.error("[WS20HELP-31] 통합 도움말 팝업 호출 실패:", e);
-                            try { parent.setBusy && parent.setBusy(""); } catch (e5) { }
+                            console.error("[WS20HELP-31] help popup open failed:", e);
+                            try { parent.setBusy && parent.setBusy(""); } catch (e5) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e5); } }
                         }
                         return;
                     }
@@ -1444,8 +1580,8 @@
                     //    정적 HTML 을 띄우는 방식이라 그대로 이식 가능했다.
                     //    (이식본 = ws_html5_call_tooltips_popup.js)
                     if (typeof oAPP.fn.callTooltipsPopup !== "function") {
-                        console.error("[WS20HELP-32] 도움말 팝업 미로드 — ws_html5_call_tooltips_popup.js 로드 확인 필요.");
-                        try { parent.setBusy && parent.setBusy(""); } catch (e3) { }
+                        console.error("[WS20HELP-32] help popup not loaded — ws_html5_call_tooltips_popup.js load check required.");
+                        try { parent.setBusy && parent.setBusy(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                         return;
                     }
                     //E22  Preview Area
@@ -1548,7 +1684,7 @@
 
             var aW = _aPrevModuleWaiters.splice(0);
             for (var i = 0; i < aW.length; i++) {
-                try { aW[i](); } catch (e) { }
+                try { aW[i](); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         }
 
@@ -1564,11 +1700,11 @@
                 var _orig = fnMove;
                 var _wrapped = function (sign, pos) {
                     var _isUndoRedo = false;
-                    try { _isUndoRedo = Array.prototype.slice.call(arguments).some(function (a) { return a && a.PRCCD === "UNDO_REDO"; }); } catch (e) { }
+                    try { _isUndoRedo = Array.prototype.slice.call(arguments).some(function (a) { return a && a.PRCCD === "UNDO_REDO"; }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     if (typeof pos === "undefined" && !_isUndoRedo && (sign === "-" || sign === "+") &&
                         typeof oAPP.fn.fnWs20MoveUI === "function") {
                         var l_objid = "";
-                        try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
+                        try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                         var ls_node = (typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid) : null;
                         if (ls_node) { return oAPP.fn.fnWs20MoveUI(ls_node, sign); }
                     }
@@ -1578,7 +1714,7 @@
                     if (typeof pos !== "undefined" && !_isUndoRedo &&
                         typeof oAPP.fn.fnWs20MoveUIToIndex === "function") {
                         var l_objid2 = "";
-                        try { l_objid2 = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
+                        try { l_objid2 = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                         var ls_node2 = (typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid2) : null;
                         if (ls_node2) { return oAPP.fn.fnWs20MoveUIToIndex(ls_node2, pos); }
                     }
@@ -1604,19 +1740,19 @@
                 var _wrappedCopy = function () {
                     var _canDelegate = (typeof oAPP.fn.fnWs20CopyUI === "function");
                     var l_objid = "";
-                    try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
+                    try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     var ls_node = (_canDelegate && typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid) : null;
                     try {
                         if (_canDelegate && ls_node) {
                             oAPP.fn.fnWs20CopyUI(ls_node);   // ROOT/APP 가드·깊은복사·복사버퍼 저장(원본 1:1)
                         } else {
                             // 정상 기동에선 도달하지 않음(선행 로드로 함수·노드 준비). 진단만 남기고 잠금 정리로 종료.
-                            console.error("[HTML5][WS20][prev][BR20] 복사 위임 불가 — fnWs20CopyUI=" + _canDelegate + ", node=" + (!!ls_node) + ", OBJID=" + l_objid);
+                            console.error("[WS20][prev][BR20] copy blocked - fnWs20CopyUI=" + _canDelegate + ", node=" + (!!ls_node) + ", OBJID=" + l_objid);
                         }
                     } finally {
                         // 원본 tail(callDesignContextMenu.js 708~710행)과 동일 — 예외에도 잠금/BUSY 해제 보장.
-                        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
-                        try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+                        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                        try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     }
                 };
                 _wrappedCopy.__ws20CopyDelegate = true;
@@ -1649,13 +1785,13 @@
                 var _origPaste = fnPaste;
                 var _wrappedPaste = function () {
                     var l_objid = "";
-                    try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { }
+                    try { l_objid = oAPP.attr.oModel.getProperty("/lcmenu/OBJID"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     //문서 최상위(ROOT)만 원본의 화면잠금 해제 EXIT 로 넘긴다.
                     if (l_objid === "ROOT") { return _origPaste.apply(this, arguments); }
                     var ls_node = (typeof oAPP.fn.getTreeData === "function") ? oAPP.fn.getTreeData(l_objid) : null;
                     //메뉴가 켠 화면잠금·단축키잠금 해제(코어가 소유하지 않음 — 조기종료에도 잔류 방지).
-                    try { parent.setBusy && parent.setBusy(""); } catch (e) { }
-                    try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { }
+                    try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     //대상 노드 못 얻으면 안전 종료(원본은 이 경우 크래시 — 위에서 잠금 해제했으니 무동작).
                     if (!ls_node) { return; }
                     //APP 포함 유효 노드는 트리와 동일 경로로 위임. 코어가 진행 시 자체 잠금(자식창 방송+단축키)을
@@ -1691,7 +1827,7 @@
                     lf_finish();
                 });
             } catch (e) {
-                console.warn("[HTML5][WS20][prev] callDesignContextMenu 로드 실패:", e && e.message);
+                console.warn("[WS20][prev] callDesignContextMenu load failed:", e && e.message, e);
                 lf_finish();
             }
         }
@@ -1703,12 +1839,12 @@
             oAPP.fn.getScript("design/js/uiPreviewArea", function () {
                 //원본이 실린 직후 우리 꾸밈 적용 처리를 다시 설치(원본 사본 무수정 원칙).
                 try { _installPrevCssApplyOverride(); } catch (e) {
-                    console.error("[HTML5][WS20][prev][PREV-CSS-02] 꾸밈 적용 덮어쓰기 설치 실패:", e && e.message);
+                    console.error("[WS20][prev][PREV-CSS-02] style-apply override install failed:", e && e.message, e);
                 }
                 lf_loadContextMenu();
             });
         } catch (e) {
-            console.warn("[HTML5][WS20][prev] uiPreviewArea 모듈 로드 실패(미리보기 비활성):", e && e.message);
+            console.warn("[WS20][prev] uiPreviewArea module load failed (preview disabled):", e && e.message, e);
             _bPrevModuleLoading = false;
             _aPrevModuleWaiters.splice(0); //로드 실패 — 대기 콜백 폐기(미리보기 skip)
         }
@@ -1759,6 +1895,7 @@
                     getBindingContext: function () { return oCtxt; }
                 }];
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 return [];
             }
         };
@@ -1779,14 +1916,14 @@
                 }
 
                 Promise.resolve(oP).catch(function (e) {
-                    console.warn("[HTML5][WS20][prev] fireCellClick 선택 오류:", e && e.message);
+                    console.warn("[WS20][prev] fireCellClick select error:", e && e.message);
                 }).finally(function () {
                     //미리보기 로드 완료 시점 — busy 안전 해제. (원본 의미:
                     // 미리보기 구성 완료 → ROOT 선택 완료 시점에 busy 가 풀림)
                     _ws20ReleasePrevBusy();
                 });
             } catch (e) {
-                console.warn("[HTML5][WS20][prev] fireCellClick 오류:", e && e.message);
+                console.warn("[WS20][prev] fireCellClick error:", e && e.message, e);
                 _ws20ReleasePrevBusy();
             }
         };
@@ -1819,19 +1956,19 @@
                 oAPP.attr.__ws20PrevDoneCbs = [];
                 _aDone.forEach(function (fnDone) {
                     try { fnDone(); }
-                    catch (e) { console.error("[HTML5][WS20][prev] 미리보기 로드 종료 콜백 오류:", e); }
+                    catch (e) { console.error("[WS20][prev] preview load end callback error:", e); }
                 });
             }
-        } catch (e) { console.error("[HTML5][WS20][prev] 미리보기 로드 종료 알림 오류:", e); }
+        } catch (e) { console.error("[WS20][prev] preview load-end notification error:", e); }
 
         if (!_bPrevBusyOn) { return; }
         _bPrevBusyOn = false;
-        try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+        try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     function _ws20EngagePrevBusy() {
         _bPrevBusyOn = true;
-        try { oAPP.common.fnSetBusyLock("X"); } catch (e) { }
+        try { oAPP.common.fnSetBusyLock("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     //[PUBLIC] 미리보기 로드 — 원본 loadPreviewFrame 호출부(getAppData 588행) 대응.
@@ -1850,10 +1987,10 @@
                 var _oAppInfo = parent.getAppInfo();
                 if (_oAppInfo) { oAPP.attr.appInfo = _oAppInfo; }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         if (!oAPP.attr.appInfo || !oAPP.attr.appInfo.APPID) {
-            console.warn("[HTML5][WS20][prev] appInfo(APPID) 미준비 — 미리보기 로드 skip.");
+            console.warn("[WS20][prev] appInfo(APPID) ready — preview load skip.");
             return;
         }
 
@@ -1863,53 +2000,34 @@
         if (!bLibReady) {
 
             if (oAPP.attr.__ws20PrevLibRetry === true) {
-                console.warn("[HTML5][WS20][prev] LIB(T_9011) 미준비(로드 실패/서버 미연결) — 미리보기 로드 skip.");
+                console.warn("[WS20][prev] LIB(T_9011) ready(load failed/server connect) — preview load skip.");
                 return;
             }
             oAPP.attr.__ws20PrevLibRetry = true;
 
             if (typeof oAPP.fn.fnLoadWs20LibData === "function") {
-                console.warn("[HTML5][WS20][prev] LIB 미준비 — LIB 로드 후 미리보기 재시도.");
+                console.warn("[WS20][prev] LIB ready - retrying preview after LIB load.");
                 try {
                     oAPP.fn.fnLoadWs20LibData(function () {
-                        try { oAPP.fn.fnWs20LoadPreview(); } catch (e) { }
+                        try { oAPP.fn.fnWs20LoadPreview(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     });
                 } catch (e) {
-                    console.warn("[HTML5][WS20][prev] LIB 로드 실패 — 미리보기 skip:", e && e.message);
+                    console.warn("[WS20][prev] LIB load failed — preview skip:", e && e.message, e);
                 }
                 return;
             }
 
-            console.warn("[HTML5][WS20][prev] LIB 로더 미존재 — 미리보기 로드 skip.");
+            console.warn("[WS20][prev] LIB loader missing - preview load skipped.");
             return;
         }
         oAPP.attr.__ws20PrevLibRetry = false;
 
-        /* ===== [임시 진단] 미리보기 UI5 부트스트랩 입력값 덤프 =====
-         * 'sap is not defined'(iframe bootstrap 실패) 원인 추적용.
-         * 실서버에서 한 번 확인 후 제거 예정. */
-        try {
-            var _diag = {
-                bootStrapUrl: (typeof oAPP.fn.getBootStrapUrl === "function") ? (function () { try { return oAPP.fn.getBootStrapUrl(); } catch (e) { return "ERR:" + e.message; } })() : "(fn 없음)",
-                ui5Libs: (typeof oAPP.fn.getUi5Libraries === "function") ? (function () { try { return oAPP.fn.getUi5Libraries(true); } catch (e) { return "ERR:" + e.message; } })() : "(fn 없음)",
-                theme: (oAPP.DATA && oAPP.DATA.APPDATA && oAPP.DATA.APPDATA.S_0010) ? oAPP.DATA.APPDATA.S_0010.UITHM : "(S_0010 없음)",
-                appId: oAPP.attr.appInfo && oAPP.attr.appInfo.APPID,
-                packg: oAPP.attr.appInfo && oAPP.attr.appInfo.PACKG,
-                ua025Cnt: (oAPP.attr.S_CODE && Array.isArray(oAPP.attr.S_CODE.UA025)) ? oAPP.attr.S_CODE.UA025.length : "(UA025 없음)",
-                t9011Cnt: (oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011)) ? oAPP.DATA.LIB.T_9011.length : "(T_9011 없음)"
-            };
-            console.warn("===== [WS20 PREVIEW DIAG] =====\n" + JSON.stringify(_diag, null, 2) + "\n===============================");
-        } catch (e) {
-            console.warn("[WS20 PREVIEW DIAG] dump 실패:", e && e.message);
-        }
-        /* ===== [임시 진단] 끝 ===== */
-
         // 호스트(iframe/툴바) 미구성시 구성. (재진입 안전 — idempotent)
-        try { _ws20RenderPreviewHost(); } catch (e) { }
+        try { _ws20RenderPreviewHost(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // iframe 컨테이너가 없으면(셸 미렌더) skip.
         if (!document.getElementById("prevHTML")) {
-            console.warn("[HTML5][WS20][prev] #prevHTML 미존재 — 미리보기 로드 skip.");
+            console.warn("[WS20][prev] #prevHTML missing — preview load skip.");
             return;
         }
 
@@ -1918,7 +2036,7 @@
             if (!oAPP.attr.DnDRandKey) {
                 oAPP.attr.DnDRandKey = parent.getSSID();
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // ROOT 선택 매핑 스텁 보강.
         _ws20PatchTreeStub();
@@ -1946,9 +2064,10 @@
          *   않도록 차단(transient). 완료/실패시 _ws20ReleasePrevBusy 에서 해제.
          * ---------------------------------------------------------------- */
         oAPP.attr.__ws20PrevBooting = true;
-        // busy 를 "여기서 동기로" 인수(+watchdog) — 데이터 finally 가 끄지 않도록 하고
-        // (모듈 로드/iframe 이 비동기라) 모든 후속 경로에서 watchdog 안전망이 작동하게 한다.
-        // (성공: fireCellClick → release / 실패: 아래 경로들 / 60s: watchdog → release)
+        // busy 를 "여기서 동기로" 인수 — 데이터 finally 가 끄지 않도록 한다.
+        // (성공: fireCellClick → release / 실패: 아래 경로들 → release)
+        // [2026-09-14] 종전 주석에 "60s watchdog" 이 적혀 있었으나 그런 타이머는 코드에 없다.
+        //   타이머 폴백은 금지다(.analy 16 §2.11) — 해제는 실제 완료/실패 경로로만 한다.
         _ws20EngagePrevBusy();
         try {
             for (var _k in oAPP.attr.prev) {
@@ -1956,13 +2075,13 @@
                     delete oAPP.attr.prev[_k];
                 }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 모듈(원본 uiPreviewArea.js + callDesignContextMenu.js) 확보 후 로드.
         oAPP.fn.fnWs20EnsurePreviewModule(function () {
 
             if (typeof oAPP.fn.loadPreviewFrame !== "function") {
-                console.warn("[HTML5][WS20][prev] loadPreviewFrame 미존재(모듈 로드 실패) — skip.");
+                console.warn("[WS20][prev] loadPreviewFrame missing(module load failed) — skip.");
                 //부팅 차단 해제 + busy 해제(스탠드인 모드 복귀 — 속성 패널 정상 동작 유지).
                 _ws20ReleasePrevBusy();
                 return;
@@ -1977,11 +2096,11 @@
                 if (oFrame && oFrame.__ws20ErrHooked !== true) {
                     oFrame.__ws20ErrHooked = true;
                     oFrame.addEventListener("error", function () {
-                        console.warn("[HTML5][WS20][prev] 미리보기 iframe 로드 오류 — busy 해제.");
+                        console.warn("[WS20][prev] preview iframe load error — busy release.");
                         _ws20ReleasePrevBusy();
                     });
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             //미리보기 화면 구성. (원본 getAppData 588행 1:1 — 원본 loadPreviewFrame:
             // _loaded 면 setUiLoadLibraries+drawPreview→ROOT 재선택 /
@@ -1989,7 +2108,7 @@
             try {
                 oAPP.fn.loadPreviewFrame();
             } catch (e) {
-                console.warn("[HTML5][WS20][prev] loadPreviewFrame 오류 — busy 해제:", e && e.message);
+                console.warn("[WS20][prev] loadPreviewFrame error — busy release:", e && e.message, e);
                 _ws20ReleasePrevBusy();
             }
 
@@ -2021,7 +2140,7 @@
         try {
             oAPP.fn.uiPreviewArea();
         } catch (e) {
-            console.warn("[HTML5][WS20][prev] fnRenderWs20Shell→uiPreviewArea error:", e && e.message);
+            console.warn("[WS20][prev] fnRenderWs20Shell→uiPreviewArea error:", e && e.message, e);
         }
 
     }; // end of [OVERRIDE] fnRenderWs20Shell

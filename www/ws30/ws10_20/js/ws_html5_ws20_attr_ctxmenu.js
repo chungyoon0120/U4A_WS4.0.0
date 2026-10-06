@@ -29,21 +29,21 @@
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNum);
             if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
     function _msgM(sNum) {   // /U4A/MSG_WS (263/264/005)
         try {
             var s = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNum);
             if (s != null && s !== "" && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNum;
     }
     function _msgW(sNr) {    // ZMSG_WS_COMMON_001 (805/627)
         try {
             var s = parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", sNr);
             if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNr;
     }
     function _fa(sName) { return '<i class="fa-solid fa-' + sName + '"></i>'; }
@@ -51,14 +51,14 @@
     // ACTION CODE(UNDO/이력 예외) — oAPP.oDesign.CS_ACTCD (없으면 undefined 안전).
     function _actcd(sName) {
         try { return oAPP.oDesign && oAPP.oDesign.CS_ACTCD ? oAPP.oDesign.CS_ACTCD[sName] : undefined; }
-        catch (e) { return undefined; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return undefined; }
     }
 
     // 미변환 별창(M03/M05/M06) 임시 안내 — 구 attrPresetPopup 토글 버튼과 동일.
     //   TODO(i18n): "아직 작업중입니다" 임시 하드코딩 → 각 별창(callSetSameAttrPopup /
     //   eventShortcutReg / attrPresetPopup settings) HTML5 변환 시 실제 오픈 로직으로 교체.
     function _todoToast() {
-        try { parent.showMessage(null, 10, "I", "아직 작업중입니다"); } catch (e) { }
+        try { parent.showMessage(null, 10, "I", "not implemented yet"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -115,7 +115,7 @@
                 var l_OBJTY = (is_attr.UIATK === "AT000011858") ? "HM" : "JS";
 
                 var aCevt = [];
-                try { aCevt = oAPP.DATA.APPDATA.T_CEVT || []; } catch (e) { aCevt = []; }
+                try { aCevt = oAPP.DATA.APPDATA.T_CEVT || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } aCevt = []; }
                 var l_index = aCevt.findIndex(function (a) {
                     return a.OBJID === is_attr.OBJID + is_attr.UIASN && a.OBJTY === l_OBJTY;
                 });
@@ -148,7 +148,7 @@
 
         //M05 단축키 등록 — WLO(UHAK901289) 패치 서버에서만 노출(원본 checkWLOList).
         var bShortcut = false;
-        try { bShortcut = APPCOMMON.checkWLOList("C", "UHAK901289") === true; } catch (e) { }
+        try { bShortcut = APPCOMMON.checkWLOList("C", "UHAK901289") === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (bShortcut) {
             aItems.push({ KEY: "M05", FA: "keyboard", TXT: _msgW("805"), VISIBLE: vis.vis05, ENABLED: true });   // sap-icon://keyboard-and-mouse
         }
@@ -247,7 +247,7 @@
                     break;
             }
         } catch (e) {
-            console.error("[HTML5][WS20][attr] 컨텍스트 메뉴 실행 오류:", sKey, e);
+            console.error("[WS20][attr] context menu run error:", sKey, e);
         }
     }
 
@@ -256,11 +256,11 @@
     function _openSameAttrSync(is_attr) {
         var fn = function () {
             if (typeof oAPP.fn.fnSameAttrSyncPopupOpen === "function") { oAPP.fn.fnSameAttrSyncPopupOpen(is_attr); }
-            else { console.warn("[HTML5][WS20][attr] fnSameAttrSyncPopupOpen 미로드"); _todoToast(); }
+            else { console.warn("[WS20][attr] fnSameAttrSyncPopupOpen not loaded"); _todoToast(); }
         };
         try { oAPP.loadJs("fnSameAttrSyncPopupOpen", fn); }
         catch (e) {
-            console.error("[HTML5][WS20][attr] fnSameAttrSyncPopupOpen 로드 실패:", e && e.message);
+            console.error("[WS20][attr] fnSameAttrSyncPopupOpen load failed:", e && e.message, e);
             fn();
         }
     }
@@ -270,11 +270,11 @@
     function _openEventShortcutReg(is_attr) {
         var fn = function () {
             if (typeof oAPP.fn.fnEventShortcutRegOpen === "function") { oAPP.fn.fnEventShortcutRegOpen(is_attr); }
-            else { console.warn("[HTML5][WS20][attr] fnEventShortcutRegOpen 미로드"); _todoToast(); }
+            else { console.warn("[WS20][attr] fnEventShortcutRegOpen not loaded"); _todoToast(); }
         };
         try { oAPP.loadJs("fnEventShortcutRegOpen", fn); }
         catch (e) {
-            console.error("[HTML5][WS20][attr] fnEventShortcutRegOpen 로드 실패:", e && e.message);
+            console.error("[WS20][attr] fnEventShortcutRegOpen load failed:", e && e.message, e);
             fn();
         }
     }
@@ -286,7 +286,7 @@
         //  파일 IIFE 는 함수 재정의뿐(전역 리스너 없음)이라 재-eval 안전. 원인 확정 후 캐시 가드 복원 고려.
         try { oAPP.loadJs("fnAttrPresetSettingsOpen", function () { oAPP.fn.fnAttrPresetSettingsOpen(is_attr); }); }
         catch (e) {
-            console.error("[HTML5][WS20][attr] fnAttrPresetSettingsOpen 로드 실패:", e && e.message);
+            console.error("[WS20][attr] fnAttrPresetSettingsOpen load failed:", e && e.message, e);
             if (typeof oAPP.fn.fnAttrPresetSettingsOpen === "function") { oAPP.fn.fnAttrPresetSettingsOpen(is_attr); }
         }
     }
@@ -303,7 +303,7 @@
     function _withBindModule(fn) {
         if (typeof oAPP.fn.attrSetUnbindProp === "function") { fn(); return; }
         try { oAPP.loadJs("fnBindPopupOpen", fn); }
-        catch (e) { console.error("[HTML5][WS20][attr] fnBindPopupOpen 로드 실패:", e && e.message); }
+        catch (e) { console.error("[WS20][attr] fnBindPopupOpen load failed:", e && e.message, e); }
     }
 
     /* ── M02 프로퍼티/애그리게이션 unbind — 구 attrContextMenuUnbind ── */
@@ -312,7 +312,7 @@
         _confirm(_msgM("263"), function () {
             _withBindModule(function () {
                 if (typeof oAPP.fn.attrSetUnbindProp !== "function") {
-                    console.warn("[HTML5][WS20][attr] unbind 미가용(fnBindPopupOpen 미로드)");
+                    console.warn("[WS20][attr] unbind unavailable(fnBindPopupOpen not loaded)");
                     _todoToast();
                     return;
                 }
@@ -331,7 +331,7 @@
                     var oPrev = oAPP.attr.prev && oAPP.attr.prev[is_attr.OBJID];
                     if (oPrev && typeof oPrev.getMetadata === "function" && typeof oAPP.fn.attrUnbindAggr === "function") {
                         try { oAPP.fn.attrUnbindAggr(oPrev, is_attr.UIATT, is_attr.UIATV); }
-                        catch (e) { console.error("[HTML5][WS20][attr] attrUnbindAggr:", e && e.message); }
+                        catch (e) { console.error("[WS20][attr] attrUnbindAggr:", e && e.message, e); }
                     }
                     var cd2 = _actcd("UNBIND_AGGR");
                     if (cd2 !== undefined) { is_attr.ACTCD = cd2; }
@@ -348,7 +348,7 @@
      *   (안전망) 미정의면 임시 안내 — 정상 경로에선 도달하지 않음. */
     function _removeClientEvent(is_attr) {
         if (typeof oAPP.fn.attrDelClientEvent !== "function") {
-            console.warn("[HTML5][WS20][attr] attrDelClientEvent 미로드(예외):", is_attr && is_attr.UIATT);
+            console.warn("[WS20][attr] attrDelClientEvent not loaded(exception):", is_attr && is_attr.UIATT);
             _todoToast();
             return;
         }
@@ -364,10 +364,10 @@
             //  → 여기서 먼저 push 하고, fnWs20AttrChange 는 bSkipUndo=true 로 재-push 방지(M03 과 동일 패턴).
             // [BR59-4] 되돌리기 대상 = 값이 바뀌는 그 UI 와 그 속성 줄(원본 CL_CHANGE_ATTR 2278 기준).
             try { if (typeof oAPP.fn.fnWs20PushUndo === "function") { oAPP.fn.fnWs20PushUndo(is_attr && is_attr.OBJID ? { OBJID: is_attr.OBJID, UIATK: is_attr.UIATK || "" } : undefined); } }
-            catch (e) { console.warn("[HTML5][WS20][attr] undo push skip:", e && e.message); }
+            catch (e) { console.warn("[WS20][attr] undo push skip:", e && e.message, e); }
 
             try { oAPP.fn.attrDelClientEvent(is_attr, l_OBJTY); }
-            catch (e) { console.error("[HTML5][WS20][attr] attrDelClientEvent:", e && e.message); }
+            catch (e) { console.error("[WS20][attr] attrDelClientEvent:", e && e.message, e); }
 
             is_attr.ADDSC = "";   //js 설정됨 flag 제거
             var cd = _actcd("DEL_CLIENT_EVENT");
@@ -380,7 +380,7 @@
 
     //005 Job finished.
     function _doneToast() {
-        try { parent.showMessage(null, 10, "I", _msgM("005")); } catch (e) { }
+        try { parent.showMessage(null, 10, "I", _msgM("005")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     //확인 팝업(YES/NO) — 바인딩 팝업과 동일하게 공통 U4AUI.confirm 우선.
@@ -389,7 +389,7 @@
             U4AUI.confirm({ type: "C", message: sMsg, onClose: function (act) { if (act === "YES") { fnYes(); } } });
         } else {
             try { parent.showMessage(null, 30, "I", sMsg, function (p) { if (p === "YES") { fnYes(); } }); }
-            catch (e) { }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     }
 
@@ -403,7 +403,7 @@
 
         //편집모드 아니면 메뉴 없음(원본 IS_EDIT !== true → exit).
         var bEdit = false;
-        try { bEdit = oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { }
+        try { bEdit = oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (!bEdit) { return; }
 
         var is_attr = oRow.__attrData;

@@ -23,7 +23,7 @@
             return;
         }
 
-        zconsole.log("시작!! -> " + Math.floor(+new Date() / 1000));
+        zconsole.log("start!! -> " + Math.floor(+new Date() / 1000));
 
         if (oAPP.attr._oWorker) {
 
@@ -313,14 +313,14 @@
 
                 var iSessionKeyLength = oAPP.attr.aSessionKeys.length;
 
-                zconsole.log(`같은 브라우저 총 갯수 : ${iSameBrowserLength} `);
-                zconsole.log(`수집된 키 총 갯수 : ${iSessionKeyLength} `);
+                zconsole.log(`same-browser count: ${iSameBrowserLength} `);
+                zconsole.log(`collected key count: ${iSessionKeyLength} `);
 
                 if (iSameBrowserLength != iSessionKeyLength) {
                     return;
                 }
 
-                zconsole.log("전체 키 수집!!!");
+                zconsole.log("collecting all keys");
 
                 // 현재 떠있는 브라우저 갯수와 수집된 브라우저 키의 갯수가 동일 하다면..
                 if (iSessionKeyLength == 1) {
@@ -675,6 +675,7 @@
             parent.setThemeInfo(oThemeJsonData);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -685,7 +686,7 @@
             var _oUT = (window.U4ATheme) || (parent && parent.U4ATheme);
             if (_oUT && _oUT.apply) { _oUT.apply(oThemeJsonData.THEME); }
         } catch (error) {
-            try { zconsole.error(error); } catch (e2) { }
+            try { zconsole.error(error); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         }
 
         // 일렉트론 창의 네이티브 backgroundColor 도 새 테마 배경으로 갱신한다. 안 하면 창 생성 시
@@ -695,7 +696,7 @@
             if (oThemeJsonData.BGCOL && parent.CURRWIN && parent.CURRWIN.setBackgroundColor) {
                 parent.CURRWIN.setBackgroundColor(oThemeJsonData.BGCOL);
             }
-        } catch (error) { /* noop */ }
+        } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); } /* noop */ }
 
         // (body/#content 의 부팅 캔버스 --boot-bg 는 U4ATheme.apply 가 테마 CSS 로드 후 --app-bg 로
         //   중앙 동기화한다(theme-api.js _syncBootBg) → 여기서 따로 손대지 않는다.)

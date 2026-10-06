@@ -422,10 +422,10 @@ GO_FN.CHECK_LISTKEY = (o_editLine, o_rowActItemProp) => {
 GO_FN.SELECT_ITEM_LINE = (ACTCD, PROP) => {
 
     if(PROP === undefined) {
-        console.log('PROP이 없어');
+        console.log('PROP missing');
         return;
     } else if (ACTCD === undefined) {
-        console.log('ACTCD가 없어');
+        console.log('ACTCD missing');
         return;
     };
 

@@ -1,3 +1,4 @@
+// 오류코드 접두: LPRL / 다음 번호: 003
 /************************************************************************
  * Copyright 2020. INFOCG Inc. all rights reserved. 
  * ----------------------------------------------------------------------
@@ -53,6 +54,14 @@
     {
         // URL: "../js/dateformat.js",
         URL: PATH.join(APPPATH, "js/dateformat.js"),
+        MIMETYPE: "script"
+    },
+    {
+        /**
+         * 공통 로그 함수 (2026-09-08 추가)
+         * ws_common.js 의 서버 통신 로그가 이 함수를 쓰므로 반드시 먼저 올라와야 한다.
+         */
+        URL: "./js/ws_html5_logger.js",
         MIMETYPE: "script"
     },
     {
@@ -235,6 +244,14 @@
         URL: "./js/ws_html5_call_tooltips_popup.js",
         MIMETYPE: "script"
     },
+    // [내부 데이터 모니터] 감시 알맹이 — 함수 정의만 하고 실제 실행은 테스트 메뉴를 누를 때라
+    //   로드 순서에 매이지 않는다. 위 도움말 팝업과 같은 이유로 목록 "맨 뒤"에 둔다
+    //   (앞쪽에 두면 이 파일이 배포에서 빠졌을 때 뒤따르는 파일이 안 실려 화면이 죽는다).
+    //   이 도구가 없어도 앱은 그대로 돈다.
+    {
+        URL: "./js/ws_html5_datamon.js",
+        MIMETYPE: "script"
+    },
     ];
 
     oAPP.loadLibrary = function (scripts, index, fnCallback) {
@@ -260,7 +277,7 @@
                 try {
                     window["eval"].call(window, data + sSourceURL);
                 } catch (e) {
-                    console.error("[HTML5] preload eval error: " + oLoadFile.URL, e);
+                    console.error("preload eval error: " + oLoadFile.URL, e);
                 }
 
                 // --- 재귀 로직 시작 ---
@@ -276,7 +293,7 @@
                 if (fnCallback) fnCallback();
             },
             error: function (xhr, status, err) {
-                console.error("로드 실패: " + oLoadFile.URL);
+                console.error("load failed: " + oLoadFile.URL);
             }
         });
     };
@@ -309,15 +326,35 @@
 
         // [UI5 제거] 구: sap.ui.getCore().attachInit(...) 래퍼 → UI5 없으므로 즉시 실행.
 
+        // [2026-09-15] busy 는 여기서 켜지 않는다 — 새창 처리의 시작점(ws10_20/index.js 메타 정보 수신 맨 위)에서
+        //   이미 켜져 있고, 메인 본문 등장 완료(js/ws_main.js)에서만 끈다(장군님 지시: 시작에 켜고 끝에서만 끈다).
+
         parent.CURRWIN.setOpacity(1.0);
 
         parent.CURRWIN.show();
 
-        // 초기 JS Load (모든 WS 스크립트 eval 로드)
-        oAPP.loadLibrary(oAPP.aPreloadScripts, 0);
+        function _startMain() {
 
-        // WS 시작
-        oAPP.main.fnWsStart();
+            try {
+
+                // 초기 JS Load (모든 WS 스크립트 eval 로드)
+                oAPP.loadLibrary(oAPP.aPreloadScripts, 0);
+
+                // WS 시작
+                oAPP.main.fnWsStart();
+
+            } catch (e) {
+                // 실제 실패 = 이 처리의 끝(실패 갈래). 시작점에서 켠 busy 를 여기서 풀고,
+                //   오류는 삼키지 않고 그대로 다시 던진다(전역 오류 감시가 받아 처리 — 종전 동작 유지).
+                console.error("[LPRL-002] main start failed - releasing busy:", e && e.message);
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                if (typeof parent.setDomBusy === "function") { parent.setDomBusy(""); }
+                throw e;
+            }
+
+        }
+
+        _startMain();
 
     }; // end of oAPP.fnWindowOnInitLoad
 

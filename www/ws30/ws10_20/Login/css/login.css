@@ -264,6 +264,19 @@ body {
 .u4a-login__verdlg-illust {
     font-size: 2.75rem;
     color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 8.5rem;
+    height: 8.5rem;
+}
+
+/* ★2026-09-07: 원본 그림(sapIllus-BeforeSearch/SuccessHighFive) 삽입 — 기본은 기존 폴백(스피너/체크
+   아이콘), 로드 성공시 그림으로 교체(JS, _fnSyncVersionDialog). */
+.u4a-login__verdlg-illust-img {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
 }
 
 .u4a-login__verdlg-title {
@@ -305,6 +318,18 @@ body {
 .u4a-login__noauth-illust {
     font-size: 2.75rem;
     color: var(--state-error);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 8.5rem;
+    height: 8.5rem;
+}
+
+/* ★2026-09-07: 원본 그림(tnt-UnsuccessfulAuth) 삽입 — 기본은 위 폴백 아이콘, 로드 성공시 그림으로 교체(JS). */
+.u4a-login__noauth-illust-img {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
 }
 
 .u4a-login__noauth-title {

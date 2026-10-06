@@ -71,6 +71,7 @@ let oAPP = (function (window) {
             var oThemeJsonData = JSON.parse(sThemeJson);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -99,7 +100,7 @@ let oAPP = (function (window) {
             if (oWin && oWin.U4ATheme) {
                 oWin.U4ATheme.apply(sKey);
             }
-        } catch (e) { /* iframe 미로드 시 무시 — 로드 시점에 부모 테마를 따라간다 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* iframe 미로드 시 무시 — 로드 시점에 부모 테마를 따라간다 */ }
 
         return sKey;
 
@@ -230,7 +231,7 @@ let oAPP = (function (window) {
                 // busy 중 닫기 차단 + 공통 closeWindow(setClosable→close) — 창은 closable:false 라 직접 close() 불가.
                 if (oAPP.fn.getBusy() === true || oAPP.fn.getBusy() === "X") { return; }
                 if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oAPP.REMOTE.getCurrentWindow()); }
-                else { try { var w = oAPP.REMOTE.getCurrentWindow(); if (!w.isDestroyed()) { w.setClosable(true); w.close(); } } catch (e) { } }
+                else { try { var w = oAPP.REMOTE.getCurrentWindow(); if (!w.isDestroyed()) { w.setClosable(true); w.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             });
         }
 
@@ -304,7 +305,7 @@ window.onload = function () {
         if (oTheme && oTheme.THEME) {
             oAPP.fn.applyTheme(oTheme.THEME);
         }
-    } catch (e) { /* 기본 라이트 토큰 */ }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 기본 라이트 토큰 */ }
 
     // 메뉴 라인 삭제 + 헤더 초기화 + 테마 변경 IPC 등록
     oAPP.CURRWIN.setMenu(null);

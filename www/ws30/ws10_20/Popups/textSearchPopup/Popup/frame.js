@@ -34,19 +34,19 @@
         var v = _input.value;
         if (v === "") {
             _prev = ""; _setCount("");
-            try { PARCON.stopFindInPage("clearSelection"); } catch (e) { }
+            try { PARCON.stopFindInPage("clearSelection"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
         var bFindNext = (_prev !== v);   // 새 검색어 → 처음부터, 같으면 다음 매치로
-        try { PARCON.findInPage(v, { forward: true, findNext: bFindNext }); } catch (e) { }
+        try { PARCON.findInPage(v, { forward: true, findNext: bFindNext }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _prev = v;
     }
 
     // ▲/▼ 및 Enter (원본 textSearchUp/textSearchDown)
     function _step(bForward) {
         var v = _input.value;
-        if (v === "") { try { PARCON.stopFindInPage("clearSelection"); } catch (e) { } _setCount(""); return; }
-        try { PARCON.findInPage(v, { forward: bForward, findNext: false }); } catch (e) { }
+        if (v === "") { try { PARCON.stopFindInPage("clearSelection"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } _setCount(""); return; }
+        try { PARCON.findInPage(v, { forward: bForward, findNext: false }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     function _onKeyDown(e) {
@@ -56,10 +56,10 @@
 
     // 닫기(원본 fnTextSearchClose) — 하이라이트 제거 + 리스너 해제 + 부모 포커스 + 창 닫기.
     function _close() {
-        try { PARCON.stopFindInPage("clearSelection"); } catch (e) { }
-        if (_onFound) { try { PARCON.off("found-in-page", _onFound); } catch (e) { } }
-        try { PARCON.focus(); } catch (e) { }
-        if (!CURRWIN.isDestroyed()) { try { CURRWIN.close(); } catch (e) { } }
+        try { PARCON.stopFindInPage("clearSelection"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        if (_onFound) { try { PARCON.off("found-in-page", _onFound); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+        try { PARCON.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        if (!CURRWIN.isDestroyed()) { try { CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     }
 
     function _build() {
@@ -86,7 +86,7 @@
         _onFound = function (ev, res) {
             _setCount(res && res.matches ? (res.activeMatchOrdinal + " / " + res.matches) : "0 / 0");
         };
-        try { PARCON.on("found-in-page", _onFound); } catch (e) { }
+        try { PARCON.on("found-in-page", _onFound); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 테마 적용(공통) — 창 배경 + U4ATheme.
@@ -100,24 +100,24 @@
             if (t.THEME && window.U4ATheme) {
                 window.U4ATheme.apply(window.U4ATheme.normalize(t.THEME));
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 전 창 테마 실시간 동기화([[browser-window-common-ux]] 5) — 구독 + 해제.
     var _sysid = parent.SYSID || (parent.USERINFO || {}).SYSID;
     function _onThemeChange() { _applyTheme(); }   // 변경 시 getThemeInfo 가 JSON 새로 읽어 새 테마 반영
     if (_sysid && parent.IPCMAIN) {
-        try { parent.IPCMAIN.on("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { }
+        try { parent.IPCMAIN.on("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         window.addEventListener("beforeunload", function () {
-            try { parent.IPCMAIN.off("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { }
+            try { parent.IPCMAIN.off("if-p13n-themeChange-" + _sysid, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
 
     function _start() {
         _applyTheme();
         _build();
-        try { CURRWIN.show(); CURRWIN.focus(); } catch (e) { }   // 원본 onViewReady: 준비되면 창 표시
-        setTimeout(function () { try { _input.focus(); } catch (e) { } }, 0);
+        try { CURRWIN.show(); CURRWIN.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 원본 onViewReady: 준비되면 창 표시
+        setTimeout(function () { try { _input.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
     }
 
     if (window.U4AUI && window.U4AUI.createField) { _start(); }

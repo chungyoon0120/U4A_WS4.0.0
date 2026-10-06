@@ -316,6 +316,7 @@ function gfn_crtUI_Item_SAP(oParent) {
                 oHandle.UI.TIMELINE.setBusy(false);
 
             } catch (err) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
 
                 //waiting off
                 oHandle.UI.PAGE.setBusy(false);

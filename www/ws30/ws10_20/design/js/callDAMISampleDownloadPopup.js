@@ -1479,6 +1479,7 @@ sap.ui.getCore().attachInit(function(){
         try {
             parent.FS.rmdirSync(l_downPath, {recursive: true, force: true});
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         
         }
 
@@ -1522,6 +1523,7 @@ sap.ui.getCore().attachInit(function(){
         try {
             parent.FS.mkdirSync(i_path);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(sap, 20, "E", "다운로드 작업 실패.");
             return true;
         }
@@ -1538,6 +1540,7 @@ sap.ui.getCore().attachInit(function(){
             parent.FS.writeFileSync(parent.PATH.join(i_path, i_fileName), i_content, "utf-8");
     
         }catch(e){
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(sap, 20, "E", "다운로드 작업 실패.");
             return true;
         }
@@ -1553,6 +1556,7 @@ sap.ui.getCore().attachInit(function(){
         try {
             parent.FS.rmdirSync(i_path, {recursive: true, force: true});
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         
         }
 
@@ -1577,6 +1581,7 @@ sap.ui.getCore().attachInit(function(){
                     l_page.setViewport({width: i_width, height: i_height});
 
                 } catch (error) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
    
                 }
 
@@ -1596,6 +1601,7 @@ sap.ui.getCore().attachInit(function(){
                         resolve(l_image);
                         
                     } catch (error) {
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                         
                     }
                     
@@ -1648,6 +1654,7 @@ sap.ui.getCore().attachInit(function(){
                 try{
                     var l_stat = await l_page.evaluate("(function(){if(typeof oU4A !== 'undefined' && oU4A.f_isWaiting){return oU4A.f_isWaiting();}})();");
                 }catch(e){
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                     return;
                 }
 
@@ -1658,6 +1665,7 @@ sap.ui.getCore().attachInit(function(){
                     var l_height = await l_page.evaluate("window.outerHeight");
                     
                 } catch (e) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                     return;
                 }
 
@@ -1934,6 +1942,7 @@ sap.ui.getCore().attachInit(function(){
         // try {
         //     parent.FS.rmdirSync(parent.PATH.join(ls_data.downPath, l_folder + ".tar"), {recursive: true, force: true});
         // } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         
         // }
 
@@ -1975,6 +1984,7 @@ sap.ui.getCore().attachInit(function(){
         try{
             cmd.runSync(l_command);
         }catch(e){
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(sap, 20, "E", "다운로드 작업 실패.");
             return true;
         }
@@ -1991,6 +2001,7 @@ sap.ui.getCore().attachInit(function(){
         try {
             parent.FS.copyFileSync(i_source, i_target);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             parent.showMessage(sap, 20, "E", "다운로드 작업 실패.");
             return true;
         }
@@ -2035,6 +2046,7 @@ sap.ui.getCore().attachInit(function(){
                 var zip = new oZipLib.Zip();
                 
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 20, "E", e);
                 return;
             }
@@ -2254,6 +2266,7 @@ sap.ui.getCore().attachInit(function(){
             return parent.FS.existsSync(i_path);
             
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return false;
         }
 
@@ -2269,6 +2282,7 @@ sap.ui.getCore().attachInit(function(){
             return parent.FS.readFileSync(i_path, "utf-8");
             
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         }
 
     }   //파일 정보 얻기.

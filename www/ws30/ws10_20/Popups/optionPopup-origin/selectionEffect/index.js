@@ -204,6 +204,7 @@
                 aParams[3] || ""
             ) || sMissingText;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return sMissingText;
         }
 
@@ -384,6 +385,7 @@
         try {
             OptionPopupDB.getDb();
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             OptionPopupPopup.toast(error.message || String(error), 6000);
             setBusy(false);
             return;
@@ -492,6 +494,7 @@
         try {
             loadType(sEffty, sSelky);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             OptionPopupPopup.toast(error.message || String(error), 6000);
         }
 
@@ -938,6 +941,7 @@
         try {
             oPreset = OptionPopupDB.getPreset(oState.selectedPreset?.SELKY) || oPreset;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             oPreset = oState.selectedPreset;
         }
 
@@ -1152,6 +1156,7 @@
             OptionPopupPopup.toast(text("PRESET_RENAMED"));
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             OptionPopupPopup.toast(error.message || String(error), 6000);
         } finally {
             setBusy(false);
@@ -1242,6 +1247,7 @@
                 notifySelectionEffectChange(oState.selectedPreset.SELKY);
                 OptionPopupPopup.toast(text("MAPPING_SAVED"));
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 OptionPopupPopup.toast(error.message || String(error), 6000);
             } finally {
                 setBusy(false);
@@ -1299,6 +1305,7 @@
             OptionPopupPopup.toast(text("USER_PRESET_SAVED"));
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             OptionPopupPopup.toast(error.message || String(error), 6000);
         } finally {
             setBusy(false);
@@ -1335,6 +1342,7 @@
             OptionPopupPopup.toast(text("USER_PRESET_UPDATED"));
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             OptionPopupPopup.toast(error.message || String(error), 6000);
         } finally {
             setBusy(false);
@@ -1381,6 +1389,7 @@
             OptionPopupPopup.toast(text("USER_PRESET_DELETED"));
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             OptionPopupPopup.toast(error.message || String(error), 6000);
         } finally {
             setBusy(false);

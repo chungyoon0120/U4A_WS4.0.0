@@ -36,7 +36,7 @@
     "use strict";
 
     if (typeof oAPP === "undefined" || !oAPP.fn) {
-        console.error("[WS20HELP-01] oAPP.fn 미구성 — 도움말 팝업 정의 실패.");
+        console.error("[WS20HELP-01] oAPP.fn not built - help popup definition failed.");
         return;
     }
 
@@ -70,7 +70,8 @@
             "width": 800,
             "modal": false,
             "show": false,
-            "opacity": 0.0,
+            // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
+            //   OS 합성이라 느린 PC 에서 무겁다. 표시는 아래 did-finish-load 의 show() 가 한다.
             "minHeight": 750,
             "minWidth": 500,
             "icon": "www/img/logo.png",
@@ -104,15 +105,19 @@
 
             if (bFail) {
 
-                console.error("[WS20HELP-02] 도움말 창 열기 실패(" + sWhy + ") — 경로:", l_path, oErr || "");
+                console.error("[WS20HELP-02] help window open failed(" + sWhy + ") — path:", l_path, oErr || "");
 
                 //추적 코드만 표시(내부 예외 원문 노출 금지 — 상세는 콘솔에 이미 있음).
-                //  정식 안내 문구 키는 장군님 번호 지정 대기(임의 문구·키 생성 금지).
+                //  ★ 정식 메시지 번호는 만들지 않는다(장군님 결정 2026-08-31).
+                //    도움말 문서는 빌드 시 앱 파일 안에 같이 말려 들어가므로(포함 목록에 www 전체,
+                //    바깥 리소스 아님) 배포본에서 파일이 없거나 못 읽는 일이 사실상 없다.
+                //    도달할 일 없는 자리에 메시지 번호를 소모하지 않고, 만에 하나 터졌을 때는
+                //    추적 코드가 그대로 보이는 편이 원인 찾기에 낫다는 판단.
                 try { parent.showMessage(null, 10, "E", "WS20HELP-02"); }
-                catch (e) { console.error("[WS20HELP-02] 오류 안내 표시 실패:", e && e.message); }
+                catch (e) { console.error("[WS20HELP-02] error notice show failed:", e && e.message, e); }
 
                 try { if (oWin && !oWin.isDestroyed()) { oWin.destroy(); } }
-                catch (e) { console.error("[WS20HELP-02] 창 정리 실패:", e && e.message); }
+                catch (e) { console.error("[WS20HELP-02] window cleanup failed:", e && e.message, e); }
             }
 
             _releaseLock();
@@ -143,7 +148,7 @@
 
                 // 부모 위치 가운데 배치한다.
                 try { oAPP.fn.setParentCenterBounds(oWin, opt); }
-                catch (e) { console.error("[WS20HELP-04] 창 가운데 배치 실패(준비 시점):", e && e.message); }
+                catch (e) { console.error("[WS20HELP-04] window centering failed (at ready):", e && e.message, e); }
 
             });
 
@@ -157,13 +162,13 @@
                     oWin.show();
 
                     // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-                    parent.WSUTIL.setBrowserOpacity(oWin);
+                    // [2026-09-13] 네이티브 투명도 페이드 제거 — 바로 위 show() 로 이미 표시했다.
 
                     // 부모 위치 가운데 배치한다.
                     oAPP.fn.setParentCenterBounds(oWin, opt);
 
                 } catch (e) {
-                    console.error("[WS20HELP-03] 도움말 창 표시 처리 실패:", e && e.message, e);
+                    console.error("[WS20HELP-03] help window show handle failed:", e && e.message, e);
                 }
 
                 //단축키 잠금 해제처리. + busy 해제.
@@ -183,6 +188,7 @@
             }
 
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
 
             lf_finish("창 생성 실패", e, true);
 
@@ -195,10 +201,10 @@
     function _releaseLock() {
 
         try { oAPP.fn.setShortcutLock(false); }
-        catch (e) { console.error("[WS20HELP-03] 단축키 잠금 해제 실패:", e && e.message); }
+        catch (e) { console.error("[WS20HELP-03] shortcut lock release failed:", e && e.message, e); }
 
         try { parent.setBusy(""); }
-        catch (e) { console.error("[WS20HELP-03] busy 해제 실패:", e && e.message); }
+        catch (e) { console.error("[WS20HELP-03] busy release failed:", e && e.message, e); }
 
     }   //단축키 잠금 해제 + busy 해제.
 

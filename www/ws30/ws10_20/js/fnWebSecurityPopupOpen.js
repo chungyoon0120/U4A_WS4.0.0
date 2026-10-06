@@ -38,14 +38,14 @@
   function _fa(s) { return '<i class="fa-solid fa-' + s + '"></i>'; }
   function _txt(sCls, sCode, p1) {
     try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, p1 || "", "", "", ""); }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
   function _wsCommon(sCode, p1) {
     try {
       var sLangu = "";
-      try { sLangu = (parent.getUserInfo() || {}).LANGU || ""; } catch (e) { }
+      try { sLangu = (parent.getUserInfo() || {}).LANGU || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       return parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", sCode, p1 || "") || "";
-    } catch (e) { return ""; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
   function _el(sTag, sClass, sText) {
     var o = document.createElement(sTag);
@@ -54,15 +54,15 @@
     return o;
   }
   function _randomKey() {
-    try { return parent.getRandomKey(10); } catch (e) { return "K" + Math.round(performance.now() * 1000) + "_" + (oUI ? oUI.seq++ : 0); }
+    try { return parent.getRandomKey(10); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return "K" + Math.round(performance.now() * 1000) + "_" + (oUI ? oUI.seq++ : 0); }
   }
   function _isEdit() {
     try { var o = APPCOMMON.fnGetModelProperty("/WS20/APP"); return !!(o && o.IS_EDIT === "X"); }
-    catch (e) { return false; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
   }
   function _msg(sType, sText) {
     if (!sText) { return; }
-    try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { }
+    try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // S_WSO / S_WSO_DEF 보장(쓰기/리셋 전 가드).
@@ -86,9 +86,9 @@
     try {
       var oInfo = parent.getAppInfo && parent.getAppInfo();
       if (oInfo) { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", oInfo.IS_CHAG || ""); }
-    } catch (e) { }
-    try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
-    try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (oAPP.fn.fnRenderWs20AttrRows) { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   // 호출처 콜백(원본 EventBus publish). HTML5 sap 스텁이라 가드.
@@ -97,11 +97,11 @@
       if (window.sap && sap.ui && sap.ui.getCore && sap.ui.getCore().getEventBus) {
         sap.ui.getCore().getEventBus().publish("WS20POPUP", "webSecurityPopupCallback", { ACTCD: sActcd, DATA: oData });
       }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
 
   function lf_close(bSkipCallback) {
-    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { }
+    try { if (oUI && oUI.dlg && oUI.dlg.open) { oUI.dlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (!bSkipCallback) { lf_publishCallback("CANCEL", undefined); }
   }
 
@@ -217,7 +217,7 @@
       var oLast = aTr[aTr.length - 1];
       var oInput = oLast && oLast.querySelector(".u4aWsecCell--sid input");
       if (oInput) { oInput.focus(); }
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
   }
   function lf_whitDelSel() {
     var aChk = oUI.whitBody.querySelectorAll(".u4aWsecRowChk");
@@ -234,7 +234,7 @@
     var sMsg = _txt("/U4A/MSG_WS", "010");   // 저장하시겠습니까?
     try {
       parent.showMessage(null, 30, "I", sMsg, function (sAct) { if (sAct === "YES") { lf_doSave(); } });
-    } catch (e) { lf_doSave(); }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } lf_doSave(); }
   }
   // 변경표시 판정(_isChangedRow DH001026)은 JSON.stringify(S_WSO)===JSON.stringify(S_WSO_DEF) 바이트 비교다.
   // 폼이 기본값과 "논리적으로" 같으면(키 순서·WHIT KEY 등 구조 차 무시) S_WSO 를 DEF 의 복사본으로 대입해
@@ -272,7 +272,7 @@
       ? JSON.parse(JSON.stringify(A.S_WSO_DEF))
       : oBuilt;
 
-    try { parent.setAppChange("X"); } catch (e) { }
+    try { parent.setAppChange("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     lf_syncWs20Changed();
 
     lf_close(true);
@@ -286,7 +286,7 @@
     var sMsg = _txt("/U4A/MSG_WS", "003");   // 정말 삭제하시겠습니까?
     try {
       parent.showMessage(null, 30, "W", sMsg, function (sAct) { if (sAct === "YES") { lf_doReset(); } });
-    } catch (e) { lf_doReset(); }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } lf_doReset(); }
   }
   function lf_doReset() {
     var A = _ensureData();
@@ -482,7 +482,7 @@
     if (!oUI || !oUI.dlg || !document.body.contains(oUI.dlg)) { oUI = null; lf_build(); }
 
     if (oUI.dlg.open) {
-      try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+      try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
       return;
     }
 
@@ -496,10 +496,10 @@
     oUI.saveBtn.hidden = !oState.bEdit;
     oUI.delFootBtn.hidden = !oState.bEdit;
 
-    try { oUI.dlg.showModal(); } catch (e) { }
+    try { oUI.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     // busy 끄고 Lock 풀기(원본 afterOpen).
-    try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+    try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
   }; // end of oAPP.fn.fnWebSecurityPopupOpen
 

@@ -130,6 +130,26 @@ npm start
 
 ## 6. 설치 파일(exe) 만들기 — 필요할 때만
 
+> ### ⚠ 빌드 전 필수 — `node_modules\U4A` 안에 이 파일 하나가 반드시 있어야 한다
+>
+> **필요한 건 파일 딱 하나다.** 프로젝트 폴더 기준 이 경로·이 이름으로 있어야 한다.
+>
+> ```
+> node_modules\U4A\SUPPORT\executor-node\index.exe
+> ```
+>
+> `npm install` 로는 안 생기고 저장소에도 없다. **없는 채로 빌드하면, 만들어진 설치 파일에서
+> 아래 기능들이 동작하지 않는다.**
+>
+> **가져올 곳** — 이미 설치돼 있는 U4A Workspace 의 **설치 폴더 안 `resources` 폴더**에 같은 파일이 들어 있다:
+>
+> ```
+> %LOCALAPPDATA%\Programs\com.u4a_ws3.app\resources\node_modules\U4A\SUPPORT\executor-node\index.exe
+> ```
+>
+> 이 파일을 위 경로 그대로 만들어 넣으면 된다(폴더 `SUPPORT\executor-node` 는 없으면 새로 만든다).
+> 왜 필요한지는 아래 [`node_modules/U4A` 가 뭔가](#node_modulesu4a-가-뭔가) 참고.
+
 ```bash
 npm run build
 ```
@@ -137,6 +157,43 @@ npm run build
 결과물은 `dist` 폴더에 생긴다.
 이렇게 만든 설치 파일을 받아 설치해서 쓰는 사람은 **이 문서의 절차를 하나도 할 필요가 없다.**
 필요한 부품이 설치 파일 안에 이미 같이 들어가기 때문이다.
+
+---
+
+# `node_modules/U4A` 가 뭔가
+
+**npm 에서 받는 라이브러리가 아니다.** 우리가 직접 챙겨 넣는 **곁들임 파일 묶음**이고,
+설치 파일을 만들 때 설치본의 `resources\node_modules\U4A` 자리로 그대로 복사된다
+(그렇게 하라고 `package.json` 의 "설치본에 같이 넣을 자료" 목록에 적혀 있다).
+
+## 지금 안에 들어 있는 것
+
+이 PC 의 설치본(2026-09-10 설치본 기준) 안을 열어 보면 **파일 딱 하나**다.
+그러니 폴더를 통째로 옮길 필요 없이 **이 파일 하나만 같은 경로에 두면 된다.**
+
+| 안에 든 것 (`node_modules\U4A` 아래) | 크기 | 무엇 |
+|---|---|---|
+| `SUPPORT\executor-node\index.exe` | 약 37MB | 내려받기·설치 작업을 대신 돌려 주는 실행 파일 |
+
+예전에는 **UI5 화면 라이브러리(1.107.1)** 도 이 안에 같이 들어 있었다.
+HTML5 로 바꾸는 방향에 맞춰 **2026-09-08 부터 설치본에 싣지 않기로** 해서, 지금은 위 실행 파일 하나만 남았다.
+
+## 이게 없으면 안 되는 기능 (소스에서 확인)
+
+셋 다 **"그 파일이 있는지 먼저 확인하고, 없으면 오류 안내를 띄운 뒤 그만둔다"** 로 짜여 있다.
+(원래 PowerShell 로 하던 일인데 2026-02-09 에 이 실행 파일 방식으로 바뀌었다.)
+
+| 안 되는 기능 | 소스 위치 |
+|---|---|
+| 프로그램 **큰 버전 올리기**(내려받기) | `www/lib/ws/electron-updater-sap.js:392` |
+| **패치(SP) 내려받기** | `www/lib/ws/SupportPackageChecker/index.js:800` |
+| **도움말 문서 내려받기** | `www/help/u4a_helpdoc/main.js:912` |
+
+## 소스 그대로 실행할 때는?
+
+- 큰 버전 올리기·패치 내려받기는 **설치본 안의 자리**를 보므로, 소스로 돌릴 때는 원래 동작하지 않는다.
+- 도움말 문서 내려받기만, 소스로 돌릴 때 **이 PC 에 깔린 설치본 폴더**를 대신 본다
+  (`%LOCALAPPDATA%\Programs\com.u4a_ws3.app\resources\...`). 그래서 설치본이 없으면 이것도 안 된다.
 
 ---
 
@@ -149,6 +206,48 @@ npm run build
 | 설치 도중 C++ 컴파일 오류 (`MSB...`, `Visual Studio not found`) | C++ 빌드 도구 없음 | Build Tools 2022 에서 **"C++를 사용한 데스크톱 개발"** 설치 |
 | 위를 다 고쳤는데도 같은 오류 | 예전에 실패한 찌꺼기가 남음 | `node_modules` 폴더를 통째로 지우고 `npm install` 부터 다시 |
 
+> Python 을 깔았는데도 계속 같은 오류면 → 아래 [Python 깔았는데도 안 잡힐 때](#python-깔았는데도-could-not-find-any-python-installation)
+
+---
+
+# Python 깔았는데도 `Could not find any Python installation`
+
+설치는 멀쩡한데 안 잡히는 경우다. **아래 순서대로만 하면 된다.**
+
+### 1. 진짜 깔렸는지 확인 (PowerShell)
+
+```powershell
+Get-ChildItem HKCU:\SOFTWARE\Python\PythonCore
+```
+
+아무것도 안 나오면 **안 깔린 것** — 파이썬부터 설치한다.
+
+> `where python` 에 `WindowsApps\python.exe` 가 잡히는 건 **0바이트 가짜 파일**이다. 이걸 보고 "깔렸네" 하면 안 된다.
+
+### 2. `PYTHON` 환경변수 박기 (PowerShell, 한 번만)
+
+```powershell
+[Environment]::SetEnvironmentVariable('PYTHON', "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe", 'User')
+```
+
+> `Python313` 은 깔린 버전에 맞춘다.
+> `npm config set python` 은 npm 11 부터 안 먹으니 쓰지 말 것.
+
+### 3. **VS Code · 터미널 전부 닫고 새로 켜기** ← 제일 중요
+
+환경변수는 **새로 켜는 창부터** 적용된다. 파이썬 설치 전에 켜둔 창에서는 아무리 고쳐도 계속 실패한다.
+탭만 새로 여는 건 소용없고 **VS Code 자체를 껐다 켜야** 한다.
+
+### 4. 새 창에서 확인 후 재빌드
+
+```bat
+py --version
+```
+
+```bat
+npm run sqlite:rebuild
+```
+
 ---
 
 # 저장소에 안 들어있는 것 (새 PC에서 따로 챙길 것)
@@ -158,7 +257,7 @@ npm run build
 | 라이브러리·빌드 결과 폴더 (`node_modules`, `dist`) | `npm install` / `npm run build` 로 다시 만든다 |
 | `.mcp.json` | Claude Code 용 설정. PC마다 경로가 달라 저장소에서 뺐다. 쓰려면 새로 만들어야 하고 `uv` 도 필요하다 |
 | **접속 서버 목록·개인 설정** | 소스가 아니라 PC 안에 저장된다 — 사용자 데이터 폴더(`%APPDATA%\com.u4a_ws3.app.dev`)와 윈도우 레지스트리(`HKCU\SOFTWARE\U4A\WS`). **새 PC에서는 서버를 다시 등록해야 한다** |
-| `node_modules/U4A` | 설치 파일 만들 때 참조하는 항목인데 이 개발 PC에도 없다(미확인). 앱 실행에는 영향 없음 |
+| **`node_modules\U4A\SUPPORT\executor-node\index.exe`** | **설치 파일을 만들 때 반드시 있어야 하는 파일 하나.** npm 이 받아주지 않으므로 설치본에서 가져와야 한다 → [자세히](#node_modulesu4a-가-뭔가) |
 
 ---
 

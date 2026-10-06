@@ -1007,6 +1007,7 @@ const
             return oDisplayFormat.format(oTime);
 
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             
             return "";
         }

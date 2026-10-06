@@ -78,7 +78,7 @@ floatwin = (REMOTE) =>{
 // _DIRNAME => 일렉트론의 www까지의 주소
 // SSID     => 시스템 아이디
 exports.open = function(REMOTE, SCREEN, _DIRNAME, SSID) {
-    console.log('2. 오픈 할 때 여기를 타');
+    console.log('2. runs here on open');
 
     let oFloatWin = floatwin(REMOTE);
     
@@ -134,7 +134,7 @@ exports.open = function(REMOTE, SCREEN, _DIRNAME, SSID) {
     oWIN.webContents.on('did-finish-load', function() {
         //호출대상 윈도우 oWIN(현재 상태는 index.html)  <<<<<<=====
         //로드가 완료되면 수행되는 이벤트!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        console.log('호출대상 윈도우가 로드가 완료되면 수행돼는 이벤트!!!!');
+        console.log('fires when the call target window finishes loading');
 
         // 일렉트론이 노빌드인 상태에서만
         // if (!REMOTE.app.isPackaged) {

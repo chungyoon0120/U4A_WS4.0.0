@@ -55,6 +55,7 @@
                 aParams[3] || ""
             ) || sMissingText;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return sMissingText;
         }
 
@@ -198,6 +199,7 @@
             OptionPopupPopup.toast(sSavedText);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             OptionPopupPopup.toast(error.message || String(error), 5000);
         } finally {
             setBusy(false);

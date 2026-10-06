@@ -18,13 +18,9 @@ body {
     height: 100%;
 }
 
-/* 링크 클릭/새로고침 등 사용자 액션 busy 는 즉시 표시 — 공통 .u4a-busy 의 0.3s 지연은
-   "짧은 자동 busy 깜빡임 방지"용이라, 사용자가 트리거한 서버 왕복(트리 이동/컨트롤러 실행)에서는
-   응답이 빠르면 스피너가 뜨기도 전에 꺼져 "busy 가 안 돈다"로 보인다. 스코프 override 로 지연 제거.
-   (특이도: #findBusy[data-busy] = (1,1,0) 가 공통 .u4a-busy[data-busy] = (0,2,0) 를 이긴다.) */
-#findBusy[data-busy="true"] {
-    transition: opacity 0.12s linear 0s, visibility 0s linear 0s;
-}
+/* [삭제 2026-09-11, 장군님 지시] busy 즉시 표시용 스코프 override 를 뺐다.
+   공통 .u4a-busy 의 0.3s 표시지연 자체를 shell.css 에서 없앴으므로(원본 = 지연 0) 이 화면만
+   따로 취소할 이유가 사라졌다. 남겨두면 0.12s 페이드가 붙어 오히려 공통보다 늦게 뜬다. */
 
 body {
     margin: 0;

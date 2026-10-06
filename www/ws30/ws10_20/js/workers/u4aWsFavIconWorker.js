@@ -28,7 +28,7 @@ self.onmessage = function (e) {
         postMessage('E');
 
         let sErrMsg = "[Icon Favorite save]: " + error.toString() + " \n\n ";
-        console.log(sErrMsg);
+        console.log(sErrMsg, error);
         throw new Error(sErrMsg);
 
     }

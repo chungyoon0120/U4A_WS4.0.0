@@ -62,7 +62,7 @@
         }
 
         // 받아온 PARAMS가 없어?? 리턴해
-        if (PARAMS === undefined) { console.log("favorite_list.js 에러"); return; };
+        if (PARAMS === undefined) { console.log("favorite_list.js error"); return; };
 
         let oPersTab = new sap.m.IconTabBar({
             stretchContentHeight: true,

@@ -39,7 +39,8 @@
             "width": 800,
             "modal": false,
             "show": false,
-            "opacity": 0.0,
+            // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
+            //   OS 합성이라 느린 PC 에서 무겁다. 표시는 아래 did-finish-load 의 show() 가 한다.
             "minHeight":750,
             "minWidth":500,
             "icon": "www/img/logo.png",
@@ -81,7 +82,7 @@
             oWin.show();
 
             // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            parent.WSUTIL.setBrowserOpacity(oWin);
+            // [2026-09-13] 네이티브 투명도 페이드 제거 — 바로 위 show() 로 이미 표시했다.
 
             // 부모 위치 가운데 배치한다.
             oAPP.fn.setParentCenterBounds(oWin, opt);

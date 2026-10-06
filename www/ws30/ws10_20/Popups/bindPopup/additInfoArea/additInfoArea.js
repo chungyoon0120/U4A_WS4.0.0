@@ -41,7 +41,7 @@
     // 161 컬럼최적화 — 공통 평면표의 컬럼 자동맞춤(내용 최장 폭). 원본 setUiTableAutoResizeColumn 대응. 실패 무해.
     function _fitCols(ctx) {
         if (!ctx || !ctx.dt || typeof ctx.dt.autoFit !== "function") { return; }
-        try { ctx.dt.autoFit(); } catch (e) { console.error("[HTML5][bindWindow] additFitCols:", e && e.message); }
+        try { ctx.dt.autoFit(); } catch (e) { console.error("[bindWindow] additFitCols:", e && e.message, e); }
     }
 
     // 161 컬럼최적화 외부 노출(우측 MAIN 버튼용 — 원본 setUiTableAutoResizeColumn 대응).
@@ -101,7 +101,7 @@
                 onInput: bConv ? (function (row) { return function () { oAPP.fn.clearConvError(row, oInp); }; })(r) : undefined,
                 onClear: (function (row) { return function () { row.val = ""; if (bConv) { oAPP.fn.clearConvError(row, oInp); } }; })(r)
             });
-            if (bConv && r.stat === "Error") { try { oInp.setValueState("error", r.statTxt || ""); } catch (e) { } }
+            if (bConv && r.stat === "Error") { try { oInp.setValueState("error", r.statTxt || ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             if (bConv) {
                 (function (row, inpEl) {
                     inpEl.addEventListener("focus", function () { oAPP.fn._bwpVsShow(inpEl, row); });
@@ -135,7 +135,7 @@
             if (bRO) { oBind.disabled = true; }
             oBind.addEventListener("click", function () {
                 if (typeof oAPP.fn.onMultiAdditionalBind === "function") {
-                    try { oAPP.fn.onMultiAdditionalBind(oBind); } catch (e) { console.error("[HTML5][bindWindow] onMultiAdditionalBind:", e && e.message); }
+                    try { oAPP.fn.onMultiAdditionalBind(oBind); } catch (e) { console.error("[bindWindow] onMultiAdditionalBind:", e && e.message, e); }
                 }
             });
             oA.MAIN.tool.appendChild(oBind);
@@ -149,7 +149,7 @@
             oA.MAIN.tool.appendChild(_oGearAddit);
             oA.MAIN.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
                 // [B4] 추가속성 도움말 문서 "000274"(원본 bindAdditInfo.js:348). 영역별 라우팅.
-                if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000274"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+                if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000274"); } catch (e) { console.error("[bindWindow] onHelp:", e && e.message, e); } }
             }));
             oAPP.fn.attachToolOverflow(oA.MAIN.tool);
 
@@ -181,7 +181,7 @@
             if (!oAPP.attr.editable) { oApply.disabled = true; }
             oApply.addEventListener("click", function () {
                 if (typeof oAPP.fn.applyDesignAdditBind === "function") {
-                    try { oAPP.fn.applyDesignAdditBind(oApply); } catch (e) { console.error("[HTML5][bindWindow] applyDesignAdditBind:", e && e.message); }
+                    try { oAPP.fn.applyDesignAdditBind(oApply); } catch (e) { console.error("[bindWindow] applyDesignAdditBind:", e && e.message, e); }
                 }
             });
             oA.SEL.tool.appendChild(oApply);
@@ -455,7 +455,7 @@
             //   그래야 "다른 곳을 클릭해 blur 시켜도 오류면 이 칸으로 다시 돌아오고 메시지가 뜬다".
             //   ★_bwpVsShow 는 DOM 입력요소(oInp.input)를 받는다(794행 배선과 동일) — 래퍼 넘기면 위치계산 실패.
             if (oInp && oInp.input) {
-                try { oInp.input.focus(); } catch (e) { }
+                try { oInp.input.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.fn._bwpVsShow(oInp.input, r);
             }
             return;
@@ -626,7 +626,7 @@
         try {
             var oTr = ctx.tbody && ctx.tbody.querySelector('tr[data-itmcd="' + sItmcd + '"]');
             if (oTr && typeof oTr.scrollIntoView === "function") { oTr.scrollIntoView({ block: "nearest" }); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     // 추가속성 오류 표시 초기화(원본 resetErrorField) — 양 패널.
@@ -722,10 +722,27 @@
         });
     }
 
-    // (GAP1 되돌림 2026-08-05) checkAdditData 는 원본 index.js:8380 에 코드로는 존재하나, 런타임에 이 케이스
-    //   (Conversion Routine 오류)를 실제로 막지 않음(장군님 실물 확인 — 오류 상태에서도 좌측 드래그 바인딩됨).
-    //   "코드 존재 ≠ 동작"이라 원본 파리티가 아님 → 함수 미정의 상태 유지(modelFieldArea:242 typeof 가드 = 무동작).
-    //   [[audit-logic-and-wiring-not-just-name]] 위반(런타임 미검증)이라 취소.
+    /************************************************************************
+     * [BR64] 추가속성 오류 점검 — 원본 checkAdditData(index.js:8380) 1:1.
+     *   좌측 바인딩 필드를 드래그(modelFieldArea setDragStart)할 때, 우측 스테이징(additRows)에 오류값
+     *   (_error===true, 예: 존재하지 않는 Conversion Routine)이 하나라도 있으면 RETCD="E"+RTMSG(146)를
+     *   반환한다. 그 값은 드래그 payload(oObj.RETCD/RTMSG)에 실려 → 드롭측 _checkDragData(designArea:196)가
+     *   RETCD==="E" 를 만나 쓰기 전에 차단(기존 프로퍼티 바인딩·추가속성 유지) + RTMSG 를 toast 로 안내한다.
+     *   ★ 원본은 oAddit.oModel.oData.T_MPROP 를, HTML5 는 그 대응 스토어 oAPP.attr.additRows 를 본다
+     *     (modelFieldArea:273 매핑과 동일). 판정 기준(_error)은 적용 버튼 경로 chkAdditBindData(:599 p06._error)와 같다.
+     *   (2026-08-05 'GAP1 되돌림'을 BR64로 재적용 — 원본 소스는 명확히 차단하고, BR64가 D&D 차단을 요구한다.)
+     ************************************************************************/
+    oAPP.fn.checkAdditData = function () {
+        var _sRes = { RETCD: "", RTMSG: "", T_ERMSG: [] };
+        var _aErr = (oAPP.attr.additRows || []).filter(function (i) { return i._error === true; });
+        if (_aErr.length === 0) { return _sRes; }                                   // 오류건 없으면 통과(정상 드래그).
+        for (var i = 0; i < _aErr.length; i++) {
+            _sRes.T_ERMSG.push({ ITMCD: _aErr[i].ITMCD, ERMSG: _aErr[i]._error_msg || "" });   // 원본 T_ERMSG(ITMCD+ERMSG) 수집.
+        }
+        _sRes.RETCD = "E";
+        _sRes.RTMSG = H.z("146");   // 146 바인딩 추가속성 정보에 오류건이 존재합니다.
+        return _sRes;
+    };
 
     /************************************************************************
      * [중앙하단 레이아웃] setAdditLayout — 원본 index.js:6052(BULK) 1:1.
@@ -748,7 +765,7 @@
         oShell.classList.toggle("u4aBwpShowAddit", bShow);
         if (bShow) {
             // 원본 setUiTableAutoResizeColumn(oAdditTab) — 표시 직후 컬럼 폭 맞춤(레이아웃 안정 후).
-            setTimeout(function () { try { _fitCols(oA.SEL); } catch (e) { } }, 0);
+            setTimeout(function () { try { _fitCols(oA.SEL); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
         }
     };
 
@@ -823,7 +840,7 @@
         try {
             if (oA.MAIN && oA.MAIN.tbody) { _renderRows(oA.MAIN); }
             if (oA.SEL && oA.SEL.tbody) { _renderRows(oA.SEL); }
-        } catch (e) { console.error("[HTML5][bindWindow] refreshAdditFieldsLock:", e && e.message); }
+        } catch (e) { console.error("[bindWindow] refreshAdditFieldsLock:", e && e.message, e); }
     };
 
 })();

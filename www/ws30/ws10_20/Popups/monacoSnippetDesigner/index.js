@@ -36,7 +36,7 @@ module.exports = function (REMOTE, oAPP, oPARAM) {
             oWindow.show();
             WSUTIL.setParentCenterBounds(REMOTE, oWindow);
         } catch (e) {
-            console.error("[HTML5][스니펫디자이너] 기존 창 포커스 오류:", e);
+            console.error("[monacoSnippetDesigner] focus existing window error:", e);
         }
         return;
     }
@@ -78,7 +78,7 @@ module.exports = function (REMOTE, oAPP, oPARAM) {
     let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
 
     // 자식창에서 @electron/remote 사용 가능하도록 enable(프레임리스 별창 표준).
-    try { parent.REMOTEMAIN.enable(oBrowserWindow.webContents); } catch (e) { console.error("[HTML5][스니펫디자이너] remote enable 오류:", e); }
+    try { parent.REMOTEMAIN.enable(oBrowserWindow.webContents); } catch (e) { console.error("[monacoSnippetDesigner] remote enable error:", e); }
 
     // 첫 페인트 배경(테마색) — 흰 플래시 방지.
     const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
@@ -105,7 +105,7 @@ module.exports = function (REMOTE, oAPP, oPARAM) {
     // if (!REMOTE.app.isPackaged) { oBrowserWindow.webContents.openDevTools(); }
 
     oBrowserWindow.once("ready-to-show", () => {
-        try { WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow); } catch (e) { }
+        try { WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     // 로드 완료 → 초기 데이터 push(자식이 받고 UI 빌드 + 스스로 show).
@@ -117,20 +117,20 @@ module.exports = function (REMOTE, oAPP, oPARAM) {
             });
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
         } catch (e) {
-            console.error("[HTML5][스니펫디자이너] if-data 전송 오류:", e);
+            console.error("[monacoSnippetDesigner] if-data send error:", e);
         }
     });
 
     oBrowserWindow.on("closed", () => {
         oBrowserWindow = null;
-        try { CURRWIN.focus(); } catch (e) { }
+        try { CURRWIN.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     // 메인 로드 실패 시 창 정리(타이틀바 미표시 → 사용자가 못 닫는 상황 방지).
     oBrowserWindow.webContents.on("did-fail-load", (event, errCode, errDesc, validatedURL, isMainFrame) => {
         if (!isMainFrame || errCode === -3) { return; }
-        console.error("[HTML5][스니펫디자이너] 메인 로드 실패:", errCode, errDesc);
-        try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { }
+        console.error("[monacoSnippetDesigner] main load failed:", errCode, errDesc);
+        try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
 };

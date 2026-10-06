@@ -76,7 +76,7 @@ var oState = {
 
 var oHeadField = null, oItemField = null,
     bBusy = false, oToastTimer = null, oBroad = null,
-    bOpenDone = false, iBusyWatch = false, bViewObserved = false;
+    bOpenDone = false, bViewObserved = false;
 
 
 /* ══════════════════════ 로컬 헬퍼 ══════════════════════ */
@@ -84,12 +84,12 @@ var oHeadField = null, oItemField = null,
 // ZMSG_WS_COMMON_001 메시지(원본이 쓰는 유일 클래스). 임의 생성 없음.
 function _zmsg(sNo, p1) {
     try { return WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo, (p1 == null ? "" : p1)) || ""; }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 
 function _fileUrl(sPath) {
     try { return encodeURI("file:///" + String(sPath).replace(/\\/g, "/")); }
-    catch (e) { return ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 
 // 테마 정보(theme_ws4). runtimeClassNav 동일 규약.
@@ -98,7 +98,7 @@ function _getThemeInfo() {
         var sPath = PATH.join(USERDATA, "p13n", "theme_ws4", SYSID + ".json");
         if (!FS.existsSync(sPath)) { return null; }
         return JSON.parse(FS.readFileSync(sPath, "utf-8"));
-    } catch (e) { return null; }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
 }
 
 // busy(로딩 오버레이 + 닫기 차단 + 자식창 브로드캐스트). runtimeClassNav/docPopup 동일 규약.
@@ -107,9 +107,9 @@ function _setBusy(bOn, oOpt) {
     var oEl = document.getElementById("apBusy");
     if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
-    try { CURRWIN.closable = false; } catch (e) { }
+    try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
-        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { }
+        try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 }
 
@@ -117,17 +117,16 @@ function _setBusy(bOn, oOpt) {
 //   화면에 보인다(원본 list/index.js _window_onload 의 show()+setOpacity(1) 대응). 누락 시 작업표시줄엔
 //   뜨지만 창이 완전 투명해 안 보인다.
 function _showWindow() {
-    try { CURRWIN.show(); } catch (e) { }
-    try { CURRWIN.setOpacity(1); } catch (e) { }
+    try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { CURRWIN.setOpacity(1); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // 로드 완료 — 메인 busy lock 해제(opener 의 webContents 'load-finish' 리스너) + 본문 표시(1회만).
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { if (iBusyWatch) { clearTimeout(iBusyWatch); } } catch (e) { }
     // opener(index.js) 가 webContents.on('load-finish') 에서 oMainBroad BUSY_OFF + fnSetBusyLock("") 처리.
-    try { CURRWIN.webContents.emit("load-finish"); } catch (e) { }
+    try { CURRWIN.webContents.emit("load-finish"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _setBusy(false);
     var oBody = document.getElementById("apBody");
     if (oBody) { oBody.classList.add("u4aApShown"); }
@@ -147,7 +146,7 @@ function _toast(sText) {
     }
     oEl.textContent = sText;
     oEl.dataset.show = "true";
-    try { clearTimeout(oToastTimer); } catch (e) { }
+    try { clearTimeout(oToastTimer); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     oToastTimer = setTimeout(function () { oEl.dataset.show = "false"; }, 3000);
 }
 
@@ -160,7 +159,7 @@ async function _createSqlite(bCreate) {
 
     if (!FS.existsSync(_folder)) {
         if (!bCreate) { return null; }
-        try { FS.mkdirSync(_folder, { recursive: true }); } catch (e) { return null; }
+        try { FS.mkdirSync(_folder, { recursive: true }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
     }
 
     // design/util/sqliteManager.js (ESM default export) — 코드베이스 표준 raw-path dynamic import.
@@ -181,7 +180,7 @@ async function _getPresetList(oWhere) {
     var _sqlite = await _createSqlite(false);
     if (!_sqlite) { return []; }
     try { return _sqlite.selectData({ tableName: "UI_ATTR_PRESET", where: oWhere }) || []; }
-    catch (e) { console.error("[UI_ATTR] selectData 오류:", e); return []; }
+    catch (e) { console.error("[UI_ATTR] selectData error:", e); return []; }
 }
 
 
@@ -488,7 +487,7 @@ function _renderItems() {
             oTdVal.dataset.label = _zmsg("650");
             if (window.U4AUI && U4AUI.createField) {
                 var oField = U4AUI.createField({ value: oRow.UIATV || "", readOnly: true });
-                try { oField.input.title = oRow.UIATV || ""; } catch (e) { }
+                try { oField.input.title = oRow.UIATV || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oTdVal.appendChild(oField.el);
             } else {
                 oTdVal.textContent = oRow.UIATV || "";
@@ -537,7 +536,7 @@ async function _selectHead(sUIOBK) {
         _renderSelHead();
         _renderItems();
     } catch (e) {
-        console.error("[UI_ATTR] UI 선택 처리 오류:", e);
+        console.error("[UI_ATTR] UI select handle error:", e);
     } finally {
         _setBusy(false);
     }
@@ -561,7 +560,7 @@ function _onResetLayout() {
 function _onHelp() {
     _setBusy(true);
     try { IPCRENDERER.send("if-attrPresetPopup-" + SYSID, { PRCCD: "U4A_HELP_DOCUMENT", DATA: { startMenuId: "000278" } }); }
-    catch (e) { console.error("[UI_ATTR] 도움말 요청 오류:", e); _setBusy(false); }
+    catch (e) { console.error("[UI_ATTR] help request error:", e); _setBusy(false); }
 }
 
 // 삭제(원본 onDeletePresetData/_deletePresetData) — 체크 행 삭제.
@@ -647,7 +646,7 @@ async function _doDelete(aUIATK) {
 
         _toast(_zmsg("633")); // 삭제 완료
     } catch (e) {
-        console.error("[UI_ATTR] 삭제 처리 오류:", e);
+        console.error("[UI_ATTR] delete handle error:", e);
     } finally {
         _setBusy(false);
     }
@@ -697,7 +696,7 @@ async function _onDownload() {
 
         try { FS.writeFileSync(sDownloadPath, sHex, "utf8"); }
         catch (e) {
-            console.error("[UI_ATTR] 다운로드 저장 오류:", e);
+            console.error("[UI_ATTR] downloadload save error:", e);
             U4AUI.confirm({ type: "E", title: _zmsg("652"), message: _zmsg("637"), buttons: [{ act: "YES", label: "" }] });
             _setBusy(false);
             return;
@@ -706,9 +705,9 @@ async function _onDownload() {
         _toast(_zmsg("638")); // 다운로드 완료
         _setBusy(false);
 
-        try { require("electron").shell.showItemInFolder(sDownloadPath); } catch (e) { }
+        try { require("electron").shell.showItemInFolder(sDownloadPath); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     } catch (e) {
-        console.error("[UI_ATTR] 다운로드 오류:", e);
+        console.error("[UI_ATTR] downloadload error:", e);
         _setBusy(false);
     }
 }
@@ -731,7 +730,7 @@ async function _onUpload() {
 
         var sHex;
         try { sHex = FS.readFileSync(oRes.filePaths[0], "utf8"); }
-        catch (e) { _toast(_zmsg("641")); _setBusy(false); return; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _toast(_zmsg("641")); _setBusy(false); return; }
 
         var oEnc = _bufferFrom(sHex, "hex");
         var oJsonBuf = _xorBuffer(oEnc, C_OBF_KEY);
@@ -739,7 +738,7 @@ async function _onUpload() {
 
         var aPreset;
         try { aPreset = JSON.parse(sJson); }
-        catch (e) { _toast(_zmsg("642")); _setBusy(false); return; } // 형식 오류
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _toast(_zmsg("642")); _setBusy(false); return; } // 형식 오류
 
         var _sqlite = await _createSqlite(true);
         if (!_sqlite) { _setBusy(false); return; }
@@ -751,7 +750,7 @@ async function _onUpload() {
         await _loadData();
         _setBusy(false);
     } catch (e) {
-        console.error("[UI_ATTR] 업로드 오류:", e);
+        console.error("[UI_ATTR] upload error:", e);
         _setBusy(false);
     }
 }
@@ -771,7 +770,7 @@ function _onToolsKey(e) {
 }
 function _closeToolsMenu() {
     if (!_oToolsMenu) { return; }
-    try { _oToolsMenu.remove(); } catch (e) { }
+    try { _oToolsMenu.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     _oToolsMenu = null;
     var oBtn = document.getElementById("apToolsBtn");
     if (oBtn) { oBtn.setAttribute("aria-expanded", "false"); }
@@ -919,17 +918,17 @@ function _initChrome() {
     // 제목(652).
     var oTitle = document.getElementById("apTitle");
     var sTitle = "";
-    try { sTitle = document.title || CURRWIN.getTitle() || ""; } catch (e) { sTitle = document.title || ""; }
+    try { sTitle = document.title || CURRWIN.getTitle() || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sTitle = document.title || ""; }
     if (!sTitle) { sTitle = _zmsg("652"); }
     if (oTitle) { oTitle.textContent = sTitle; }
 
     // 창 버튼(min/max/close).
     var oMin = document.getElementById("apWinMin");
-    if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { } }); }
+    if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }); }
     var oMax = document.getElementById("apWinMax");
     if (oMax) {
         oMax.addEventListener("click", function () {
-            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
     var oClose = document.querySelector('#apTitlebar [data-action="close"]');
@@ -937,7 +936,7 @@ function _initChrome() {
         oClose.addEventListener("click", function () {
             if (bBusy) { return; }
             if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(CURRWIN); }
-            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { } }
+            else { try { CURRWIN.setClosable(true); CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         });
     }
 
@@ -1008,7 +1007,7 @@ function _initBroadcast() {
             if (sPrc === "BUSY_ON") { _setBusy(true, { ISBROAD: true }); }
             else if (sPrc === "BUSY_OFF") { _setBusy(false, { ISBROAD: true }); }
         };
-    } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // 라이브 테마 변경(원본 _onIpcMain_if_p13n_themeChange). runtimeClassNav 동일.
@@ -1020,8 +1019,8 @@ function _onThemeChange() {
             CURRWIN.webContents.insertCSS("html,body{margin:0;height:100%;background-color:" + oTheme.BGCOL + ";}");
             BGCOL = oTheme.BGCOL;
         }
-    } catch (e) { }
-    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 // 메인(opener) → 팝업 통신(원본 _onIpcRender_if_attrPresetPopup).
@@ -1030,7 +1029,7 @@ async function _onIpcRender(events, data) {
         case "ATTR_CHANGE":
             // 메인에서 속성 개인화 발생 → 목록 새로고침.
             _setBusy(true);
-            try { await _loadData(); } catch (e) { console.error("[UI_ATTR] ATTR_CHANGE 갱신 오류:", e); }
+            try { await _loadData(); } catch (e) { console.error("[UI_ATTR] ATTR_CHANGE refresh error:", e); }
             _setBusy(false);
             _showWindow();
             break;
@@ -1045,14 +1044,14 @@ async function _onIpcRender(events, data) {
 }
 
 function _keepSession() {
-    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { }
+    try { IPCRENDERER.send("if-session-time", SESSKEY); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 }
 
 
 /* ══════════════════════ 부트 ══════════════════════ */
 
 async function _onload() {
-    try { CURRWIN.setMenu(null); } catch (e) { }
+    try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     _setBusy(true);
 
@@ -1078,7 +1077,7 @@ async function _onload() {
     try {
         await _loadData();
     } catch (e) {
-        console.error("[UI_ATTR] 초기 데이터 로드 오류:", e);
+        console.error("[UI_ATTR] initial data load error:", e);
     }
 
     _observeView();
@@ -1094,7 +1093,7 @@ function _ipcHandleOnInit(events, oInfo) {
     oThemeInfo = oInfo && oInfo.oThemeInfo ? oInfo.oThemeInfo : null;
 
     // 테마 재적용(첫 페인트 sync 보정).
-    try { if (oThemeInfo && oThemeInfo.THEME && window.U4ATheme) { U4ATheme.apply(oThemeInfo.THEME); } } catch (e) { }
+    try { if (oThemeInfo && oThemeInfo.THEME && window.U4ATheme) { U4ATheme.apply(oThemeInfo.THEME); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     if (document.readyState === "loading") {
         window.addEventListener("load", _onload);
@@ -1105,13 +1104,12 @@ function _ipcHandleOnInit(events, oInfo) {
 
 IPCRENDERER.once("HANDLE_ON_INIT", _ipcHandleOnInit);
 
-// 안전판 — HANDLE_ON_INIT 가 안 오면 busy 강제 해제(원본 동작엔 없던 방어).
-iBusyWatch = setTimeout(function () {
-    if (oState.gotInit) { return; }
-    console.error("[HTML5][attrPresetPopup] 초기화 정보 수신 지연 — busy 강제 해제");
-    _showWindow();
-    _finishOpen();
-}, 20000);
+// ★ [2026-09-14, 장군님 지시] 여기 있던 "20초 지나면 busy 를 그냥 끈다" 타이머를 걷어냈다.
+//   타이머 폴백은 금지다(.analy 16 §2.11) — busy 가 안 꺼지는 건 "고장났다"는 신호인데
+//   타이머로 꺼버리면 화면은 빈 채인데 사용자는 끝난 줄 착각한다.
+//   초기 데이터가 안 오는 진짜 경우(창 문서 로드 실패 · 데이터 전송 실패)는 오프너가
+//   did-fail-load / 전송 try-catch 에서 이 창을 정리하고 잠금을 푼다.
+//   (오프너 = design/attrPresetPopup/index.js APRO-001)
 
 
 /* ══════════════════════ 종료 ══════════════════════ */
@@ -1119,10 +1117,10 @@ iBusyWatch = setTimeout(function () {
 // busy 중 창 닫기 차단(원본 onbeforeunload). 정상 종료 시 리스너/IPC 해제.
 window.onbeforeunload = function () {
     if (bBusy) { return false; }
-    try { _closeToolsMenu(); } catch (e) { }
+    try { _closeToolsMenu(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     window.removeEventListener("click", _keepSession);
     window.removeEventListener("keyup", _keepSession);
     window.removeEventListener("resize", _applyView);
-    try { IPCRENDERER.removeListener("if-attrPresetPopup-" + SYSID, _onIpcRender); } catch (e) { }
-    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { }
+    try { IPCRENDERER.removeListener("if-attrPresetPopup-" + SYSID, _onIpcRender); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 };

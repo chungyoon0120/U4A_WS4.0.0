@@ -122,7 +122,7 @@
     function _safeDecorate(sFnName, oRootNode) {
         var fn = oAPP.fn && oAPP.fn[sFnName];
         if (typeof fn !== "function") {
-            console.warn("[HTML5][WS20][data] decorator not found (skip):", sFnName);
+            console.warn("[WS20][data] decorator not found (skip):", sFnName);
             return;
         }
         if (!oRootNode) {
@@ -132,8 +132,8 @@
         try {
             fn(oRootNode);
         } catch (e) {
-            console.warn("[HTML5][WS20][data] decorator skip (라이브러리/미변환 의존):",
-                sFnName, e && e.message);
+            console.warn("[WS20][data] decorator skipped (depends on library / not converted):",
+                sFnName, e && e.message, e);
         }
     }
 
@@ -145,6 +145,10 @@
      *     원본 1:1 보존. UI5 렌더링(미리보기/속성/UI5 인스턴스)은 호출하지 않음.
      ************************************************************************/
     oAPP.fn.fnLoadWs20TreeData = function () {
+
+        // 앱이 바뀌면 로그 반복 억제 카운터를 비운다 (2026-09-29 — ws40-work-order A2)
+        // 앞 앱에서 3번을 넘긴 오류가 새 앱에서 첫 번째부터 묻히지 않게 한다.
+        if (typeof U4ALOG !== "undefined" && U4ALOG.clearCaughtCount) { U4ALOG.clearCaughtCount(); }
 
         // ── 사전 준비: servNm / APPID / appInfo (원본 main.fn / setUIAreaEditable 흐름) ──
         try {
@@ -163,17 +167,17 @@
                 oAPP.attr.APPID = oAppInfo.APPID;
             }
         } catch (e) {
-            console.warn("[HTML5][WS20][data] appInfo/servNm 준비 실패(서버 미로그인 가능):", e && e.message);
+            console.warn("[WS20][data] appInfo/servNm not ready (server login may be pending):", e && e.message, e);
         }
 
         // 서버 경로/APPID 가 없으면(헤드리스/비로그인) 서버 호출하지 않고 빈 트리 유지.
         if (!oAPP.attr.servNm || !oAPP.attr.APPID) {
-            console.warn("[HTML5][WS20][data] servNm/APPID 없음 — 빈 트리 유지(서버 미로그인).");
+            console.warn("[WS20][data] servNm/APPID missing - keeping the empty tree (server login).");
             return;
         }
 
         // 시작 시 busy lock (원본 parent.setBusy("X") / designAreaLockUnlock 대체).
-        try { oAPP.common.fnSetBusyLock("X"); } catch (e) { }
+        try { oAPP.common.fnSetBusyLock("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // application명 서버전송 데이터 구성 — 원본 430~431행.
         var oFormData = new FormData();
@@ -191,7 +195,7 @@
 
                     // 서버 응답 방어(헤드리스/오류 응답).
                     if (!param || !param.APPDATA || !param.APPDATA.T_0014) {
-                        console.warn("[HTML5][WS20][data] APPDATA/T_0014 없음 — 빈 트리 유지.");
+                        console.warn("[WS20][data] APPDATA/T_0014 missing - keeping the empty tree.");
                         return;
                     }
 
@@ -274,7 +278,7 @@
                     //   로드 완료 후 fireCellClick(ROOT) 이 fresh prev(=새 APPDATA) 로 재구성한다.
                     oAPP.attr.oModel.oData.T_ATTR = [];
                     oAPP.attr.oModel.oData.uiinfo = undefined;
-                    try { if (typeof oAPP.fn.fnRenderWs20AttrRows === "function") { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { }
+                    try { if (typeof oAPP.fn.fnRenderWs20AttrRows === "function") { oAPP.fn.fnRenderWs20AttrRows(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                     //application ui design, attribute 정보 매핑.
                     oAPP.attr.oModel.oData.TREE = oAPP.DATA.APPDATA.T_0014;
@@ -333,7 +337,7 @@
                             var _oFltIco = _oFiltBtn.querySelector("i");
                             if (_oFltIco) { _oFltIco.className = "fa-solid fa-filter"; }
                         }
-                    } catch (e) { }
+                    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                     //ui design tree 전체 접힘 후 2레벨까지 펼침. (원본 566~570행
                     // collapseAll + expandToLevel(2) — 문서 5장 10단계)
@@ -341,7 +345,7 @@
                         if (typeof oAPP.fn.fnWs20TreeExpandToLevel === "function") {
                             oAPP.fn.fnWs20TreeExpandToLevel(2);
                         }
-                    } catch (e) { }
+                    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                     //design tree 선택 처리 해제. (원본 574행 clearSelection — 문서 5장 11단계)
                     oAPP.attr.ws20SelectedObjid = null;
@@ -352,15 +356,16 @@
                             typeof oAPP.attr.ui.oRTab1.removeSelections === "function") {
                             oAPP.attr.ui.oRTab1.removeSelections();
                         }
-                    } catch (e) { }
+                    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                     //design 영역 invalidate 처리. (원본 582행 — 문서 5장 13단계.
                     // HTML5: 모델 refresh 훅(W3)이 fnRenderDesignTree 재렌더 수행)
                     try {
                         oAPP.attr.oModel.refresh();
                     } catch (e) {
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                         // 모델 refresh 가 없거나 훅이 미연결인 경우 직접 렌더.
-                        try { oAPP.fn.fnRenderDesignTree(); } catch (e2) { }
+                        try { oAPP.fn.fnRenderDesignTree(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                     }
 
                     //미리보기 화면 구성. (원본 588행 loadPreviewFrame — 문서 5장 14단계:
@@ -370,34 +375,34 @@
                             oAPP.fn.fnWs20LoadPreview();
                         }
                     } catch (e) {
-                        console.warn("[HTML5][WS20][data] 미리보기 로드 호출 오류:", e && e.message);
+                        console.warn("[WS20][data] preview load call error:", e && e.message, e);
                     }
 
                     //세션 랜덤키 얻기. (원본 592행 — 미리보기 DnD 가 참조)
                     try {
                         oAPP.attr.DnDRandKey = parent.getSSID();
-                    } catch (e) { }
+                    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 } catch (e) {
-                    console.warn("[HTML5][WS20][data] getAppData 처리 오류:", e && e.message);
+                    console.warn("[WS20][data] getAppData handle error:", e && e.message, e);
                 } finally {
                     // 완료 시 busy lock 해제 — 단, 가운데 미리보기(iframe)가 busy 를 인수
                     // (부팅 중: __ws20PrevBooting)했으면 끄지 않는다. 미리보기 성공/실패/watchdog
                     // 시점에 _ws20ReleasePrevBusy 가 최종 해제(사용자 요구: 미리보기까지 로드 성공 시 해제).
                     if (!oAPP.attr.__ws20PrevBooting) {
-                        try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
+                        try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     }
                 }
 
             }, "X", true, "GET", function (e) {
                 // 오류 발생 시(서버 미연결 등) busy 해제 + 빈 트리 유지.
-                console.warn("[HTML5][WS20][data] getAppData 서버 호출 실패 — 빈 트리 유지.");
-                try { oAPP.common.fnSetBusyLock(""); } catch (e2) { }
+                console.warn("[WS20][data] getAppData server call failed - keeping the empty tree.");
+                try { oAPP.common.fnSetBusyLock(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
             });
         } catch (e) {
             // sendAjax 자체가 throw(헤드리스 환경 등) → busy 해제 + 빈 트리 유지.
-            console.warn("[HTML5][WS20][data] sendAjax 호출 실패 — 빈 트리 유지:", e && e.message);
-            try { oAPP.common.fnSetBusyLock(""); } catch (e2) { }
+            console.warn("[WS20][data] sendAjax call failed - keeping the empty tree:", e && e.message);
+            try { oAPP.common.fnSetBusyLock(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         }
 
     }; // end of oAPP.fn.fnLoadWs20TreeData
@@ -429,6 +434,7 @@
         try {
             oAPP.attr.appInfo = parent.getAppInfo() || {};
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             oAPP.attr.appInfo = oAPP.attr.appInfo || {};
         }
 
@@ -456,7 +462,7 @@
                 _oUndoRedo.clearHistory();
                 _oUndoRedo.setUndoRedoButtonEnable();
             } catch (e) {
-                console.warn("[HTML5][WS20][data] undo/redo 초기화 skip:", e && e.message);
+                console.warn("[WS20][data] undo/redo init skip:", e && e.message, e);
             }
 
             var _oRoot = (oAPP.attr.oModel.oData.zTREE && oAPP.attr.oModel.oData.zTREE[0]) || null;
@@ -476,21 +482,21 @@
                 if (_oWin && _oWin._loaded === true && typeof _oWin.removeDropConfig === "function") {
                     _oWin.removeDropConfig();
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             //css 미리보기 적용건 해제 처리. (원본 782행 — uiPreviewArea.js 지연 로드 전 skip)
             try {
                 if (typeof oAPP.fn.prevStyleClassApply === "function") {
                     oAPP.fn.prevStyleClassApply([]);
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             //attribute 초기화버튼 비활성처리. (원본 785행)
             try {
                 if (oAPP.attr.oModel.oData.uiinfo) {
                     oAPP.attr.oModel.oData.uiinfo.vis02 = false;
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             //design tree의 row action 활성여부 설정. (원본 788행 — UI5 미로드시 skip)
             _safeDecorate("designTreeSetRowAction", _oRoot);
@@ -501,16 +507,16 @@
                 for (var _i = 0; _i < _aAttr.length; _i++) {
                     _aAttr[_i].edit = false;
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             //디자인 영역 모델 갱신(트리 재렌더 훅) 후 wait off 처리. (원본 802~807행)
-            try { oAPP.attr.oModel.refresh(); } catch (e) { }
+            try { oAPP.attr.oModel.refresh(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             try {
                 if (typeof oAPP.fn.fnRenderWs20AttrPanel === "function") {
                     oAPP.fn.fnRenderWs20AttrPanel();
                 }
-            } catch (e) { }
-            try { parent.setBusy(""); } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             return;
 
@@ -526,7 +532,7 @@
             _bLibLoaded = !!(_oLib
                 && Array.isArray(_oLib.T_9011) && _oLib.T_9011.length > 0
                 && Array.isArray(_oLib.T_0022) && _oLib.T_0022.length > 0);
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         if (_bLibLoaded) {
 
@@ -537,7 +543,7 @@
                 _oUndoRedo2.clearHistory();
                 _oUndoRedo2.setUndoRedoButtonEnable();
             } catch (e) {
-                console.warn("[HTML5][WS20][data] undo/redo 초기화 skip:", e && e.message);
+                console.warn("[WS20][data] undo/redo init skip:", e && e.message, e);
             }
 
             //design 레이아웃 순서 설정. (원본 823행 setDesignLayout — UI5 splitter 의존,
@@ -546,7 +552,7 @@
                 if (typeof oAPP.fn.setDesignLayout === "function") {
                     oAPP.fn.setDesignLayout();
                 }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             //어플리케이션 정보 구성을 위한 서버 호출. (원본 826행 getAppData)
             oAPP.fn.fnLoadWs20TreeData();
@@ -566,7 +572,7 @@
         }
 
         //LIB 로더 미존재(이론상 없음) — 트리 로드만 진행.
-        console.warn("[HTML5][WS20][data] fnLoadWs20LibData 미존재 — LIB 없이 트리 로드.");
+        console.warn("[WS20][data] fnLoadWs20LibData missing - loading the tree without LIB.");
         oAPP.fn.fnLoadWs20TreeData();
 
     }; // end of oAPP.fn.setUIAreaEditable

@@ -74,7 +74,7 @@ export async function createControl(oParam) {
             if (!ws || !be || ws === be) { return sText; }
             const cls = parent.REMOTE.getGlobal("WsMsgCls");
             return (cls && cls.relocalize) ? cls.relocalize(sText, be, ws) : sText;
-        } catch (e) { return sText; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sText; }
     }
 
     // ★서버 SCRIPT 는 eval 하지 않는다 — 이 화면의 서버 오류 SCRIPT 는 정체가 '모달로 메시지 띄우기'라
@@ -408,7 +408,7 @@ export async function createControl(oParam) {
     oContr.fn._focus = function (sKey) {
         const oF = oContr.ui[sKey];
         if (!oF || typeof oF.focus !== "function") { return; }
-        setTimeout(function () { try { oF.focus(); } catch (e) { } }, 0);
+        setTimeout(function () { try { oF.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
     };
 
 
@@ -809,8 +809,8 @@ export async function createControl(oParam) {
 
         try {
             const _dlg = sParmas && sParmas.oUIobj && sParmas.oUIobj.oCreateDialog;
-            if (_dlg) { try { _dlg.close(); } catch (e) { } try { _dlg.remove(); } catch (e) { } }
-        } catch (e) { }
+            if (_dlg) { try { _dlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } try { _dlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
 

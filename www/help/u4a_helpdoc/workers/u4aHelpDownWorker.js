@@ -81,6 +81,7 @@ self.onmessage = async function(e){
         self[oIF_DATA.PRCCD](oPARAM);
         
     } catch (error) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
     
         oRES.PRCCD = PRC.ERROR;
         oRES.STCOD = "onmessage-E003";
@@ -130,6 +131,7 @@ async function gfn_fileDel(oFS, PATH) {
         try {
             oFS.unlink(PATH, (e) => { });
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
         }
 
@@ -320,7 +322,7 @@ function _getHelpDocuDataFromPowerShell(oPARAM){
         // 실행 완료 이벤트 처리
         ps.on("close", (code) => {
             
-            console.log(`Document 다운로드 종료: ${code}`);            
+            console.log(`Document downloadload end: ${code}`);            
 
             if (!ps.killed) {              
                 ps.kill();
@@ -397,6 +399,7 @@ self.WS_HELP_DOCU_DOWN = async function (oPARAM) {
         oFS.writeFileSync(LV_VESN_PATH, JSON.stringify(HEAD_DATA.DATA), 'utf-8');
 
     } catch (error) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
        
         oRES.PRCCD = PRC.ERROR;
         oRES.STCOD = "WS_HELP_DOCU_DOWN-E001";

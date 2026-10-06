@@ -1,3 +1,4 @@
+// 오류코드 접두: SVLS / 다음 번호: 003
 /************************************************************************
  * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
@@ -61,6 +62,7 @@
         const WSERR = parent.require(PATHINFO.WSTRYCATCH);
         window.zconsole = WSERR(window, document, console);
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         window.zconsole = console;
     }
 
@@ -69,6 +71,7 @@
     try {
         SETTINGS = require(PATHINFO.WSSETTINGS);
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         SETTINGS = require(PATH.join(APPPATH, "settings", "ws_settings.json"));
     }
 
@@ -105,7 +108,7 @@
     try {
         const vbsDirectory = PATH.join(PATH.dirname(APP.getPath('exe')), 'resources/regedit/vbs');
         REGEDIT.setExternalVBSLocation(vbsDirectory);
-    } catch (e) { /* dev 환경 무시 */ }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* dev 환경 무시 */ }
 
     // PowerShell 경로
     const PS_ROOT_PATH = PATH.join(USERDATA, "ext_api", "ps");
@@ -139,7 +142,7 @@
      *  (구: 여기 THEME_MAP/applyBsTheme → theme-api 로 이관, 중복 제거)
      ********************************************************************/
     oAPP.fn.fnApplyTheme = function (sKey) {
-        try { U4ATheme.apply(sKey); } catch (e) { }
+        try { U4ATheme.apply(sKey); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     };
 
     /********************************************************************
@@ -238,6 +241,11 @@
     oAPP.fn.setBusyIndicator = function (sIsBusy, sMsg) {
         const oDom = document.getElementById("u4aWsBusyIndicator");
         if (!oDom) {
+            // 흔적 없이 그만두면 "왜 busy 가 안 뜨나" 를 알 수 없다. 같은 이름이라 한 번만 남긴다.
+            if (!oAPP.fn.setBusyIndicator.__missLogged) {
+                oAPP.fn.setBusyIndicator.__missLogged = true;
+                console.error("[SVLS-002] setBusyIndicator: busy overlay element not found - busy is not shown on this screen");
+            }
             return;
         }
         const bBusy = (sIsBusy === "X");
@@ -364,8 +372,20 @@
             oAudio.src = "";
             oAudio.src = sAudioPath;
             oAudio.play();
-        } catch (e) { /* 사운드 실패는 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 사운드 실패는 무시 */ }
     };
+
+    /********************************************************************
+     * ★ [2026-09-16, 장군님 지시] 창이 뜰 때 busy 부터 — 화면 파일을 읽는 지금 켠다.
+     * ------------------------------------------------------------------
+     * [고친 이유] 이 창을 여는 쪽(www/intro.js)은 문서 로드가 끝나면 설정 정보를
+     *   보내고 **곧바로 show()** 한다. 그런데 busy 를 켜는 곳은 그 설정 정보를 받은 뒤
+     *   도는 시작 처리(fnOnMainStart) 맨 위였다 — 그 사이 창이 busy 없이 보였다.
+     *   이 줄은 문서를 읽는 동안(= show() 보다 먼저) 돌아, 창이 보이는 순간 이미 busy 가 돈다.
+     *   끄는 곳은 종전 그대로 fnOnMainStart 의 끝 한 곳뿐이다(중간 해제 없음).
+     *   busy 요소는 이 스크립트보다 위(ServerList.html <body>)에 있어 지금 찾을 수 있다.
+     ********************************************************************/
+    oAPP.fn.setBusyIndicator("X");
 
     /********************************************************************
      * 진입 — if-globalSetting-info IPC (유지)
@@ -383,6 +403,7 @@
             const sUi5Theme = (oTheme && oTheme.value) ? oTheme.value : SETTINGS.defaultTheme;
             oAPP.fn.fnApplyTheme(sUi5Theme);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             oAPP.fn.fnApplyTheme("horizon_white");
         }
         // [흰색 플래시] 첫 페인트용 동기 배경(--boot-bg, intro 가 BGCOL 로 전달)은 테마 CSS 가
@@ -392,7 +413,7 @@
             requestAnimationFrame(function () {
                 document.documentElement.style.removeProperty("--boot-bg");
             });
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oAPP.fn.fnOnMainStart();
     };
 
@@ -427,7 +448,7 @@
         try {
             await oU4ASERV.createServer();
         } catch (e) {
-            console.error("[Named Pipe] createServer 실패:", e);
+            console.error("[Named Pipe] createServer failed:", e);
         }
 
         oAPP.setBusy(false);
@@ -455,7 +476,7 @@
             oAPP.msg.M017 = "A problem occurred while saving the server settings.";
         } catch (e) {
             // 메시지 조회 실패 시 영문 폴백 (display 차단 방지)
-            console.warn("[fnWsGlobalMsgList] 메시지 조회 실패, 폴백 사용:", e);
+            console.warn("[fnWsGlobalMsgList] message read failed, using fallback:", e);
             oAPP.msg.M03 = "Please Check the SAPGUI is Installed and whether saved Server exists!";
             oAPP.msg.M04 = "Server information does not exist in the SAPGUI logon file.";
             oAPP.msg.M05 = "No SAPGUI version information.";
@@ -485,7 +506,7 @@
             }
             M.setProperty("/WSLANGU", oLanguTextResult.RTDATA);
         } catch (e) {
-            console.warn("[fnOnInitModeling] i18n 모델 구성 실패, 폴백 사용:", e);
+            console.warn("[fnOnInitModeling] i18n model build failed, using fallback:", e);
         }
     };
 
@@ -536,7 +557,7 @@
                 .filter(entry => entry !== null);
             oAPP.data.SAPLogon.aSys32MsgServPort = sapmsEntries;
         } catch (e) {
-            console.warn("[_getMsgServPortList] 실패:", e);
+            console.warn("[_getMsgServPortList] failed:", e);
         }
     }
 
@@ -554,6 +575,7 @@
         try {
             oResult = await oAPP.fn.fnGetRegInfoForSAPLogon();
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return oAPP.fn.fnPromiseError(error);
         }
         await oAPP.fn.fnGetRegInfoForSAPLogonThen(oResult);
@@ -608,6 +630,7 @@
             try {
                 oReadResult = await oAPP.fn.fnReadSAPLogonData("LandscapeFile", sLandscapeFilePath);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 oAPP.fn.fnPromiseError(error);
                 return;
             }
@@ -671,7 +694,7 @@
                     "HKCU\\SOFTWARE\\U4A\\WS\\GUIPath": { "GUIVer": { value: oCheckVer.RTPATH, type: "REG_DEFAULT" } }
                 });
             } catch (e) {
-                console.warn("[fnReadSAPLogonDataThen] 레지스트리 저장 실패:", e);
+                console.warn("[fnReadSAPLogonDataThen] registry save failed:", e);
             }
 
             // Landscape 정보 저장
@@ -755,7 +778,7 @@
             });
 
             ps.on("error", (err) => {
-                console.error("[_checkSapGuiInfoShell] PowerShell 실행 오류:", err);
+                console.error("[_checkSapGuiInfoShell] PowerShell run error:", err);
                 resolve({ SUBRC: 999, LOG: err.toString() });
             });
         });
@@ -933,7 +956,7 @@
                     return o.viewMode;
                 }
             }
-        } catch (e) { /* 손상/누락 → 기본값 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 손상/누락 → 기본값 */ }
         return VIEW_MODES.TREE;
     };
     oAPP.fn.fnSaveViewMode = function (sMode) {
@@ -942,11 +965,11 @@
             if (!FS.existsSync(sDir)) { FS.mkdirSync(sDir, { recursive: true }); }
             FS.writeFileSync(_viewStateFilePath(), JSON.stringify({ viewMode: sMode }, null, 2), "utf-8");
         } catch (e) {
-            console.error("[ServerList] 뷰 모드 저장 실패:", e);
+            console.error("[ServerList] view mode save failed:", e);
         }
     };
 
-    /** 테스트 모드 상태(스위치 on/off + 자동 로그인 ID) — appdata 영속화 */
+    /** 테스트 모드 상태(스위치 on/off + 자동 로그인 ID/PW) — appdata 영속화 */
     function _testStateFilePath() {
         return PATH.join(USERDATA, "p13n", "serverlist_test.json");
     }
@@ -955,10 +978,15 @@
             const sPath = _testStateFilePath();
             if (FS.existsSync(sPath)) {
                 const o = JSON.parse(FS.readFileSync(sPath, "utf-8") || "{}");
-                return { testMode: !!o.testMode, testId: typeof o.testId === "string" ? o.testId : "" };
+                return {
+                    testMode: !!o.testMode,
+                    testClient: typeof o.testClient === "string" ? o.testClient : "",
+                    testId: typeof o.testId === "string" ? o.testId : "",
+                    testPw: typeof o.testPw === "string" ? o.testPw : ""
+                };
             }
-        } catch (e) { /* 손상/누락 → 기본값 */ }
-        return { testMode: false, testId: "" };
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 손상/누락 → 기본값 */ }
+        return { testMode: false, testClient: "", testId: "", testPw: "" };
     }
     function _saveTestState() {
         try {
@@ -966,25 +994,29 @@
             if (!FS.existsSync(sDir)) { FS.mkdirSync(sDir, { recursive: true }); }
             FS.writeFileSync(_testStateFilePath(), JSON.stringify({
                 testMode: !!oAPP.attr._testMode,
-                testId: oAPP.attr._testId || ""
+                testClient: oAPP.attr._testClient || "",
+                testId: oAPP.attr._testId || "",
+                testPw: oAPP.attr._testPw || ""
             }, null, 2), "utf-8");
         } catch (e) {
-            console.error("[ServerList] 테스트 상태 저장 실패:", e);
+            console.error("[ServerList] test state save failed:", e);
         }
     }
 
     /** 서브헤더 뷰 전환 세그먼트 (Tree / Master-Detail) — Bootstrap btn-group */
-    /** 테스트 모드 스위치 + 자동 로그인 ID 입력 — 개발(비패키지)에서만 노출/활성.
+    /** 테스트 모드 스위치 + 자동 로그인 ID/PW 입력 — 개발(비패키지)에서만 노출/활성.
      *  패키지(배포) 상태에선 아예 렌더하지 않는다(null 반환).
-     *  스위치 ON → ID 입력칸 노출. 입력한 ID 는 서버 더블클릭 시 로그인 창으로 전달되어
-     *  하단 스태프 버튼 중 일치하는 계정으로 자동 로그인된다. (개발/테스트 전용, 라벨 하드코딩) */
+     *  스위치 ON → ID·PW 입력칸 노출. 입력한 ID/PW 는 서버 더블클릭 시 로그인 창으로 전달되어
+     *  그 계정으로 자동 로그인된다. (개발/테스트 전용, 라벨 하드코딩) */
     function _buildTestModeToggle() {
         if (APP.isPackaged) { return null; } // 배포 빌드에선 스위치 자체를 만들지 않음
 
         // 마지막 입력값/스위치 상태 복원(appdata)
         if (oAPP.attr._testId === undefined) {
             const oTs = _loadTestState();
+            oAPP.attr._testClient = oTs.testClient;
             oAPP.attr._testId = oTs.testId;
+            oAPP.attr._testPw = oTs.testPw;
             oAPP.attr._testMode = oTs.testMode;
         }
 
@@ -998,24 +1030,32 @@
         oChk.checked = !!oAPP.attr._testMode;
         oSwitch.append(oChk, _el("span", "u4a-switch__slider"));
 
-        // 자동 로그인 ID 입력칸 — 스위치 ON 일 때만 노출
-        const oIdInput = _el("input", "u4a-input u4a-bar__testmode-input");
-        oIdInput.type = "text";
-        oIdInput.placeholder = "자동 로그인 ID";
-        oIdInput.value = oAPP.attr._testId || "";
-        oIdInput.hidden = !oAPP.attr._testMode;
-        // 입력 중엔 라이브로 반영, 커밋(blur/Enter) 시점에 영속화
-        oIdInput.addEventListener("input", () => { oAPP.attr._testId = oIdInput.value; });
-        oIdInput.addEventListener("change", () => { oAPP.attr._testId = oIdInput.value; _saveTestState(); });
+        // 자동 로그인 입력칸(CLIENT/ID/PW) — 스위치 ON 일 때만 노출. 로그인은 넷 다 필요.
+        const _mkTestField = (sType, sPlaceholder, sAttr, iWidth) => {
+            const oInp = _el("input", "u4a-input u4a-bar__testmode-input");
+            oInp.type = sType;
+            oInp.placeholder = sPlaceholder;
+            if (iWidth) { oInp.style.width = iWidth; }
+            oInp.value = oAPP.attr[sAttr] || "";
+            oInp.hidden = !oAPP.attr._testMode;
+            oInp.addEventListener("input", () => { oAPP.attr[sAttr] = oInp.value; });
+            oInp.addEventListener("change", () => { oAPP.attr[sAttr] = oInp.value; _saveTestState(); });
+            return oInp;
+        };
+        const oClientInput = _mkTestField("text", "CLIENT", "_testClient", "5rem");
+        const oIdInput = _mkTestField("text", "자동 로그인 ID", "_testId", null);
+        const oPwInput = _mkTestField("password", "자동 로그인 PW", "_testPw", null);
 
         oChk.addEventListener("change", () => {
             oAPP.attr._testMode = oChk.checked;
+            oClientInput.hidden = !oChk.checked;
             oIdInput.hidden = !oChk.checked;
+            oPwInput.hidden = !oChk.checked;
             _saveTestState();
-            if (oChk.checked) { setTimeout(() => oIdInput.focus(), 0); }
+            if (oChk.checked) { setTimeout(() => oClientInput.focus(), 0); }
         });
 
-        oWrap.append(oText, oSwitch, oIdInput);
+        oWrap.append(oText, oSwitch, oClientInput, oIdInput, oPwInput);
         return oWrap;
     }
 
@@ -1170,7 +1210,7 @@
                 const o = JSON.parse(FS.readFileSync(p, "utf-8") || "{}");
                 if (o && typeof o === "object") { return o; }
             }
-        } catch (e) { /* 손상/누락 → 빈 이력 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 손상/누락 → 빈 이력 */ }
         return {};
     }
     // 이력 엔트리 정규화(구 포맷 number → {ts,count} 호환)
@@ -1191,14 +1231,14 @@
             const e = _recentEntry(o[sUuid]);
             o[sUuid] = { ts: Date.now(), count: e.count + 1 };
             _writeRecentMap(o);
-        } catch (e) { console.error("[ServerList] 접속 이력 저장 실패:", e); }
+        } catch (e) { console.error("[ServerList] connection history save failed:", e); }
     };
     // 최근 카드에서 항목 제거(× 버튼)
     oAPP.fn.fnRemoveRecent = function (sUuid) {
         try {
             const o = _loadRecentMap();
             if (o[sUuid] != null) { delete o[sUuid]; _writeRecentMap(o); }
-        } catch (e) { console.error("[ServerList] 접속 이력 삭제 실패:", e); }
+        } catch (e) { console.error("[ServerList] connection history delete failed:", e); }
     };
     // 상대 시간 표기 — 오늘/어제 HH:MM, 그 외 MM-DD HH:MM (오늘/어제는 i18n)
     function _fmtConnTime(ts) {
@@ -1238,7 +1278,7 @@
         try {
             const r = oAPP.fn.fnGetSavedServerListDataAll();
             if (r.RETCD === "S") { r.RETDATA.forEach((s) => oSaved.add(s.uuid)); }
-        } catch (e) { /* 저장파일 없음 → 전부 미저장 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 저장파일 없음 → 전부 미저장 */ }
         return aAll.map((o) => Object.assign({}, o, { ISSAVE: oSaved.has(o.uuid) }));
     }
     function _getRecentServers(iLimit) {
@@ -1482,7 +1522,7 @@
 
             // 활성 행 보이게 스크롤
             const oActiveRow = oList.querySelector(".u4a-lnch__row.active");
-            if (oActiveRow && oActiveRow.scrollIntoView) { try { oActiveRow.scrollIntoView({ block: "nearest" }); } catch (e) { } }
+            if (oActiveRow && oActiveRow.scrollIntoView) { try { oActiveRow.scrollIntoView({ block: "nearest" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
             // 활성 서버 기준으로 푸터 버튼 상태/선택 동기화
             const oActSrv = aRes[oAPP.attr._launcherActiveIdx] || null;
@@ -1532,7 +1572,7 @@
         const iKeepScroll = oAPP.attr._lnchScroll || 0;
         oBodyArea.scrollTop = iKeepScroll;
         setTimeout(() => {
-            try { oInput.focus({ preventScroll: true }); oInput.setSelectionRange(oInput.value.length, oInput.value.length); } catch (e) { }
+            try { oInput.focus({ preventScroll: true }); oInput.setSelectionRange(oInput.value.length, oInput.value.length); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oBodyArea.scrollTop = iKeepScroll; // 포커스 후에도 위치 유지
         }, 0);
     };
@@ -1606,7 +1646,7 @@
 
         // 헤더: 폴더명 · N servers / M active
         let sFolder = "";
-        try { sFolder = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { }
+        try { sFolder = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         const iActive = aItems.filter(o => o.ISSAVE === true).length;
         const oHead = _el("div", "u4a-md__listhead");
         const oHInfo = _el("div", "u4a-md__listinfo");
@@ -1710,7 +1750,7 @@
 
         // 필드 그리드
         let sGroup = "";
-        try { sGroup = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { }
+        try { sGroup = (oAPP.attr._selectedTreeNodeData && oAPP.attr._selectedTreeNodeData._attributes && oAPP.attr._selectedTreeNodeData._attributes.name) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         const _field = (sLabel, sVal) => {
             const oF = _el("div", "u4a-md__field");
             oF.append(_el("div", "u4a-md__flabel", sLabel), _el("div", "u4a-md__fval", sVal || "—"));
@@ -1833,6 +1873,7 @@
             const oS = WSUTIL.getWsSettingsInfo();
             return String((oS && oS.globalLanguage) || "EN").toUpperCase();
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return "EN";
         }
     }
@@ -2041,7 +2082,7 @@
             const RegeditPromisified = parent.require('regedit').promisified;
             await RegeditPromisified.putValue(oRegData);
         } catch (e) {
-            console.warn("[setRegistryLastSelectedNodeKey] 실패:", e);
+            console.warn("[setRegistryLastSelectedNodeKey] failed:", e);
         }
     };
 
@@ -2056,7 +2097,7 @@
             const RegeditPromisified = parent.require('regedit').promisified;
             await RegeditPromisified.putValue(oRegData);
         } catch (e) {
-            console.warn("[setRegistryLastSelectedServerKey] 실패:", e);
+            console.warn("[setRegistryLastSelectedServerKey] failed:", e);
         }
     };
 
@@ -2075,7 +2116,7 @@
                     oAPP.attr._lastSelectedServerKey = oRegData.values["LastSelectedServerKey"].value;
                 }
             }
-        } catch (e) { /* 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
 
         // 선택 노드 키는 뷰(트리 유무)와 무관하게 메모리에 보관 — 런처로 시작했다가
         //  나중에 트리/마스터로 전환할 때 폴더 선택을 복원하기 위함.
@@ -2587,6 +2628,7 @@
             FS.writeFileSync(PATHINFO.SERVERINFO_V2, JSON.stringify(aSaveServerData, null, 2), 'utf-8');
             return { RETCD: "S" };
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return { RETCD: "E" };
         }
     }
@@ -2754,9 +2796,11 @@
             SETTINGS: oBindData.settings || undefined
         };
 
-        // 테스트 모드: 입력한 ID 를 로그인 창으로 전달 → 일치하는 스태프 버튼 자동 로그인
+        // 테스트 모드: 입력한 CLIENT/ID/PW 를 로그인 창으로 전달 → 그 계정으로 자동 로그인
         if (oAPP.attr._testMode && oAPP.attr._testId && oAPP.attr._testId.trim()) {
+            oLoginInfo.TESTCLIENT = (oAPP.attr._testClient || "").trim();
             oLoginInfo.TESTID = oAPP.attr._testId.trim();
+            oLoginInfo.TESTPW = oAPP.attr._testPw || "";
         }
 
         // 사용자 테마 정보
@@ -2772,7 +2816,7 @@
         oAPP.fn.fnRecordConnection(sUUID);
         // Launcher 가 떠 있으면 즉시 RECENT 갱신(연결 새 창은 별도 → 이 창은 남아있음)
         if (oAPP.attr._viewMode === VIEW_MODES.LAUNCHER) {
-            try { oAPP.fn.fnRenderLauncher(); } catch (e) { }
+            try { oAPP.fn.fnRenderLauncher(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         fnLoginPage(oLoginInfo);
@@ -2922,6 +2966,7 @@
         try {
             aSavedData = JSON.parse(sFileContent);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             aSavedData = [];
         }
         if (!Array.isArray(aSavedData)) {
@@ -3016,7 +3061,10 @@
         const oWebPreferences = oBrowserOptions.webPreferences;
         const oThemeInfo = oLoginInfo.oThemeInfo;
 
-        oBrowserOptions.opacity = 0.0;
+        // ★ [2026-09-14, 장군님 지시] 네이티브 투명도로 숨기지 않는다 — 표준은 show:false 다
+        //   (.analy 16 §2.6). 종전에는 창이 "보이지만 투명한" 채로 작업표시줄에만 떠 있었다.
+        //   표시는 창 문서가 한다(ws10_20/views/vw_main/control.js onInit — setOpacity(1.0)+show()).
+        oBrowserOptions.show = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.titleBarStyle = 'hidden';
         oBrowserOptions.autoHideMenuBar = true;
@@ -3052,6 +3100,19 @@
         };
         const sLoadUrl = WSUTIL.QueryString.build(PATHINFO.MAINFRAME, oQueryParams);
         oBrowserWindow.loadURL(sLoadUrl);
+
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   [고친 이유] 서버를 고르면 이 화면은 busy 를 켜고, 아래 did-finish-load 에서만 푼다.
+        //   문서 로드가 실패하면 그 신호가 안 와 busy 가 영영 안 풀리고 새 창도 안 보인다.
+        //   타이머로 덮는 것은 금지(.analy 16 §2.11)이므로 실패 이벤트에서 창을 정리하고 잠금을 푼다.
+        oBrowserWindow.webContents.on('did-fail-load', function (e, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+            if (bIsMainFrame === false || iErrCode === -3) { return; }
+            console.error("[SVLS-001] main window load failed:", iErrCode, sErrDesc, sUrl);
+            try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+            catch (e2) { console.error("[SVLS-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
+            try { oAPP.setBusy(false); }
+            catch (e3) { console.error("[SVLS-001] busy release failed:", e3 && e3.message, e3); }
+        });
 
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
@@ -3129,7 +3190,7 @@
                 const sCreatePath = `${sSystemPath}\\${oServerInfo.SYSID}`;
                 await _regeditCreateKey([sCreatePath]);
             } catch (e) {
-                console.warn("[_registSelectedSystemInfo] 실패:", e);
+                console.warn("[_registSelectedSystemInfo] failed:", e);
             }
             resolve();
         });
@@ -3215,14 +3276,14 @@
                 const aDir = FS.readdirSync(sMsgDirPath);
                 if (aDir.length) { aLangu = aDir.map(s => ({ KEY: s })); }
             }
-        } catch (e) { /* 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
 
         // 현재 선택 언어
         let sSelected = "EN";
         try {
             const oWsLangu = await WSUTIL.getGlobalSettingInfo("language");
             if (oWsLangu && oWsLangu.value) { sSelected = oWsLangu.value; }
-        } catch (e) { /* 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
 
         const oSel = _createSelect(aLangu.map(l => ({ value: l.KEY, text: l.KEY })), sSelected);
 
@@ -3259,7 +3320,7 @@
             await oAPP.fn.fnOnInitModeling();
             oAPP.fn.fnRefreshShellTexts();
         } catch (e) {
-            console.warn("[_saveWsLangu] 실패:", e);
+            console.warn("[_saveWsLangu] failed:", e);
         }
         oCtl.close();
         oAPP.setBusy(false);
@@ -3317,7 +3378,7 @@
             WSUTIL.setWsSettingsInfo(oSettingInfo);
             await WSUTIL.saveGlobalSettingInfo("theme", sKey);
         } catch (e) {
-            console.warn("[_saveWsThemeInfo] 실패:", e);
+            console.warn("[_saveWsThemeInfo] failed:", e);
         }
         oAPP.fn.fnApplyTheme(sKey);
         oCtl.close();
@@ -3356,7 +3417,7 @@
             try {
                 const oResult = await WSUTIL.getGlobalSettingInfo("sound");
                 if (oResult && oResult.value === "X") { oChk.checked = true; }
-            } catch (e) { /* 무시 */ }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
         })();
     }
 
@@ -3368,7 +3429,7 @@
             WSUTIL.setWsSettingsInfo(oSettingInfo);
             await WSUTIL.saveGlobalSettingInfo("sound", sState);
         } catch (e) {
-            console.warn("[_saveWsSound] 실패:", e);
+            console.warn("[_saveWsSound] failed:", e);
         }
         oCtl.close();
         oAPP.fn.showToast(oAPP.msg.M01);
@@ -3413,6 +3474,7 @@
             try {
                 oWebPref = WSUTIL.QueryString.parse(oBrows.getURL());
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
             if (oWebPref.OBJTY === "SERVERLIST" || oWebPref.OBJTY === "FLTMENU") { continue; }
@@ -3426,9 +3488,18 @@
             APP.exit();
             return;
         }
-        // 활성 자식 창이 있을 경우 안내 (UI5 IllustratedMessage 대체)
-        oAPP.fn.fnShowMessageBox("W", T("043") || "An activated window exists. Please close all activated windows first.", () => {
-            oAPP.fn.fnShowMainWindow();
+        // ★2026-09-07: 원본 그림(tnt-Teams, OpenUI5 1.107.1 공식 저장소)을 밝은/어두운 화면용 2벌
+        //   받아 배치(.works/일러스트팝업/build-tnt-illustrations.js). 텍스트만 뜨던 것을 원본처럼
+        //   그림 있는 안내 팝업으로 복원(원본은 확인 버튼 1개만).
+        _showIllustDialog({
+            id: "u4aWsServListClsDlg",
+            title: "",
+            desc: T("043") || "An activated window exists. Please close all activated windows first.",
+            imgBase: "activated-windows",
+            fallbackIcon: ICON.warning,
+            buttons: [
+                { text: T("002") || "OK", emphasized: true, onClick: () => oAPP.fn.fnShowMainWindow() },
+            ],
         });
     };
 
@@ -3446,7 +3517,7 @@
             const oDisp = SCREEN.getDisplayMatching(oParent);
             oWorkArea = (oDisp && oDisp.workArea) ? oDisp.workArea : null;
         } catch (e) {
-            console.error("[fnShowMainWindow] 화면 정보 조회 실패:", e);
+            console.error("[fnShowMainWindow] screen info read failed:", e);
         }
 
         for (const oBrows of aBrowserList) {
@@ -3473,7 +3544,7 @@
                 oBrows.show();
                 if (!oFirst) { oFirst = oBrows; }
             } catch (error) {
-                console.error("[fnShowMainWindow] 활성 창 이동/표시 실패:", error);
+                console.error("[fnShowMainWindow] active window move/show failed:", error);
                 continue;
             }
         }
@@ -3508,7 +3579,7 @@
                 CURRWIN.setAlwaysOnTop(true, "screen-saver");
                 CURRWIN.show();
                 CURRWIN.setAlwaysOnTop(false);
-            } catch (e) { /* 무시 */ }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 무시 */ }
 
             // 자식 창이 없으면 정상 종료 허용 (Electron: undefined 반환 → 닫기 진행)
             if (_countActiveChildWindows() === 0) { return undefined; }
@@ -3541,8 +3612,78 @@
                 }
             }]);
         } catch (e) {
-            console.warn("[_createTaskBarMenu] 실패(무시):", e);
+            console.warn("[_createTaskBarMenu] failed (ignored):", e);
         }
+    }
+
+    /********************************************************************
+     * 일러스트 확인 팝업(그림 있는 헤더 없는 카드형, 원본 sap.m.Dialog(showHeader:false) 대체)
+     *   fnShowShutdownAskPopup(exit-confirm)/fnRequestClose(activated-windows) 전용.
+     *   ws_fn_03.js 의 fnShowIllustMsgDialog(WS20 세션타임아웃)와 동일 컨벤션(카드+그림+폴백 아이콘),
+     *   버튼 여러 개(OK/CANCEL) 지원만 다르다. §16 2.3.
+     * @param {Object} o {id, title, desc, imgBase(밝게/어둡게 svg 파일명 접두), fallbackIcon(HTML),
+     *                    buttons:[{text, emphasized, onClick(oDlg)}]}
+     ********************************************************************/
+    function _showIllustDialog(o) {
+        let oExist = document.getElementById(o.id);
+        if (oExist) { if (!oExist.open) { try { oExist.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } return; }
+
+        if (!document.getElementById("u4aWsExitStyle")) {
+            const oSt = document.createElement("style");
+            oSt.id = "u4aWsExitStyle";
+            oSt.textContent =
+                ".u4aWsExitDlg{border:0;padding:0;background:transparent;overflow:visible;" +
+                "min-width:0;max-width:none;width:fit-content;box-shadow:none;border-radius:0}" +
+                ".u4aWsExitDlg::backdrop{background:rgba(15,18,28,.32);backdrop-filter:blur(1.5px)}" +
+                ".u4aWsExitCard{display:flex;flex-direction:column;align-items:center;gap:.5rem;" +
+                "padding:1.7rem 2.2rem 1.45rem;text-align:center;min-width:18rem;max-width:26rem;" +
+                "background:var(--surface-raised,#1b2128);color:var(--text,#fff);" +
+                "border:1px solid var(--line,#33414f);border-radius:16px;" +
+                "box-shadow:var(--popover-shadow,0 18px 50px rgba(0,0,0,.55))}" +
+                ".u4aWsExitArt{width:8.5rem;height:8.5rem;display:flex;align-items:center;justify-content:center;margin-bottom:.2rem}" +
+                ".u4aWsExitArtImg{max-width:100%;max-height:100%;display:block}" +
+                ".u4aWsExitArtFb{font-size:3rem;line-height:1;color:var(--text-muted,#9aa3ad)}" +
+                ".u4aWsExitTitle{font-weight:700;font-size:1.06rem;letter-spacing:.2px}" +
+                ".u4aWsExitTitle:empty{display:none}" +
+                ".u4aWsExitDesc{font-size:.8125rem;color:var(--text-muted,#9aa3ad);line-height:1.5;white-space:pre-line}" +
+                ".u4aWsExitFoot{margin-top:.85rem;display:flex;gap:.5rem;justify-content:center}";
+            document.head.appendChild(oSt);
+        }
+
+        const oDlg = document.createElement("dialog");
+        oDlg.id = o.id;
+        oDlg.className = "u4aWsExitDlg";
+        oDlg.innerHTML =
+            '<div class="u4aWsExitCard">' +
+            '<div class="u4aWsExitArt"><img class="u4aWsExitArtImg" alt="" aria-hidden="true"/>' +
+            '<span class="u4aWsExitArtFb"></span></div>' +
+            '<div class="u4aWsExitTitle"></div>' +
+            '<div class="u4aWsExitDesc"></div>' +
+            '<div class="u4aWsExitFoot"></div></div>';
+        oDlg.querySelector(".u4aWsExitTitle").textContent = o.title || "";
+        oDlg.querySelector(".u4aWsExitDesc").textContent = o.desc || "";
+        oDlg.querySelector(".u4aWsExitArtFb").innerHTML = o.fallbackIcon || "";
+        oDlg.addEventListener("cancel", (e) => e.preventDefault()); // esc 로 안 닫힘(원본 escapeHandler 빈 함수)
+
+        const oFoot = oDlg.querySelector(".u4aWsExitFoot");
+        (o.buttons || []).forEach((b) => {
+            const oBtn = document.createElement("button");
+            oBtn.type = "button";
+            oBtn.className = "u4a-btn" + (b.emphasized ? " u4a-btn--emphasized" : "");
+            oBtn.textContent = b.text || "";
+            oBtn.addEventListener("click", () => { oDlg.close(); oDlg.remove(); b.onClick(); });
+            oFoot.appendChild(oBtn);
+        });
+
+        document.body.appendChild(oDlg);
+        try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        const oImg = oDlg.querySelector(".u4aWsExitArtImg");
+        const oFb = oDlg.querySelector(".u4aWsExitArtFb");
+        const sMode = (document.documentElement.getAttribute("data-sl-theme") === "dark") ? "dark" : "light";
+        oImg.onload = () => { oImg.style.display = ""; oFb.style.display = "none"; };
+        oImg.onerror = () => { oImg.style.display = "none"; oFb.style.display = ""; };
+        try { oImg.src = new URL(`../svg/${o.imgBase}-${sMode}.svg`, window.location.href).href; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /********************************************************************
@@ -3554,47 +3695,60 @@
         const sMsg = (oAPP.msg.M048 || "Unsaved data will be lost.") + " \n " +
             (oAPP.msg.M049 || "Are you sure you want to exit the Program?");
 
-        oAPP.fn.fnShowMessageBox("C", sMsg, (sAction) => {
-            if (sAction !== "OK") { return; }
-
-            // 종료 진행 동안 busy 오버레이 + 안내 문구로 사용자 인지 ("종료 중… (남은초)")
-            const sExiting = L("exiting");
-            const sBase = sExiting ? sExiting + "…" : "";
-            const _renderBusy = (iSec) => {
-                oAPP.setBusy(true, sBase ? `${sBase} (${iSec}s)` : `(${iSec}s)`);
-            };
-
-            oAPP.fn.fnProgramShuttDown(); // 전체 자식 프로그램 종료 요청
-
-            if (oAPP.attr.windowCloseInterval) {
-                clearInterval(oAPP.attr.windowCloseInterval);
-                delete oAPP.attr.windowCloseInterval;
-            }
-
-            // 자식(MAIN) 창이 모두 닫히면 즉시 종료. 단, 최대 30초까지만 기다리고
-            // 그래도 안 닫힌 창이 있으면 강제로 파기한 뒤 앱을 종료한다(무한 대기 방지).
-            let iLeft = 30;
-            _renderBusy(iLeft);
-            const _finish = () => {
-                clearInterval(oAPP.attr.windowCloseInterval);
-                delete oAPP.attr.windowCloseInterval;
-                APP.exit();
-            };
-            oAPP.attr.windowCloseInterval = setInterval(() => {
-                if (_checkMainProgramExit()) { _finish(); return; }
-
-                iLeft -= 1;
-                if (iLeft <= 0) {
-                    // 30초 경과 — 정상 종료에 응답하지 않는 MAIN 창을 강제 파기 후 종료
-                    console.warn("[shutdown] 30초 경과 — 남은 MAIN 창 강제 종료");
-                    _forceCloseRemainMain();
-                    _finish();
-                    return;
-                }
-                _renderBusy(iLeft);
-            }, 1000);
+        // ★2026-09-07: 원본 그림(sapIllus-Connection, OpenUI5 1.107.1 공식 저장소)을 밝은/어두운
+        //   화면용 2벌 받아 배치(.works/일러스트팝업/build-tnt-illustrations.js). 텍스트만 뜨던 것을
+        //   원본처럼 그림 있는 확인 팝업으로 복원.
+        _showIllustDialog({
+            id: "u4aProgramExitDlg",
+            title: "",
+            desc: sMsg,
+            imgBase: "exit-confirm",
+            fallbackIcon: ICON.confirm,
+            buttons: [
+                { text: T("002") || "OK", emphasized: true, onClick: () => _onShutdownOk() },
+                { text: T("003") || "Cancel", onClick: () => { } },
+            ],
         });
     };
+
+    function _onShutdownOk() {
+        // 종료 진행 동안 busy 오버레이 + 안내 문구로 사용자 인지 ("종료 중… (남은초)")
+        const sExiting = L("exiting");
+        const sBase = sExiting ? sExiting + "…" : "";
+        const _renderBusy = (iSec) => {
+            oAPP.setBusy(true, sBase ? `${sBase} (${iSec}s)` : `(${iSec}s)`);
+        };
+
+        oAPP.fn.fnProgramShuttDown(); // 전체 자식 프로그램 종료 요청
+
+        if (oAPP.attr.windowCloseInterval) {
+            clearInterval(oAPP.attr.windowCloseInterval);
+            delete oAPP.attr.windowCloseInterval;
+        }
+
+        // 자식(MAIN) 창이 모두 닫히면 즉시 종료. 단, 최대 30초까지만 기다리고
+        // 그래도 안 닫힌 창이 있으면 강제로 파기한 뒤 앱을 종료한다(무한 대기 방지).
+        let iLeft = 30;
+        _renderBusy(iLeft);
+        const _finish = () => {
+            clearInterval(oAPP.attr.windowCloseInterval);
+            delete oAPP.attr.windowCloseInterval;
+            APP.exit();
+        };
+        oAPP.attr.windowCloseInterval = setInterval(() => {
+            if (_checkMainProgramExit()) { _finish(); return; }
+
+            iLeft -= 1;
+            if (iLeft <= 0) {
+                // 30초 경과 — 정상 종료에 응답하지 않는 MAIN 창을 강제 파기 후 종료
+                console.warn("[shutdown] 30s elapsed - force closing the remaining MAIN window");
+                _forceCloseRemainMain();
+                _finish();
+                return;
+            }
+            _renderBusy(iLeft);
+        }, 1000);
+    }
 
     /** 전체 프로그램 종료 요청 (IPC — 원본 PRCCD "04" 유지) */
     oAPP.fn.fnProgramShuttDown = function () {
@@ -3611,6 +3765,7 @@
             try {
                 oWebPref = WSUTIL.QueryString.parse(oBrows.getURL());
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
             if (oWebPref.OBJTY !== "MAIN") { continue; }
@@ -3628,13 +3783,14 @@
             try {
                 oWebPref = WSUTIL.QueryString.parse(oBrows.getURL());
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
             if (oWebPref.OBJTY !== "MAIN") { continue; }
             try {
                 oBrows.destroy();
             } catch (e) {
-                console.error("[shutdown] MAIN 창 강제 종료 실패:", e);
+                console.error("[shutdown] MAIN window force end failed:", e);
             }
         }
     }
@@ -3721,7 +3877,7 @@
 
         const oCtl = {
             dlg: oDlg,
-            close() { try { oDlg.close(); } catch (e) { oDlg.remove(); } }
+            close() { try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oDlg.remove(); } }
         };
 
         const _cancel = () => {
@@ -3788,11 +3944,11 @@
                 if (U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg); }
                 if (U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHead); }
             }
-        } catch (e) { /* 헬퍼 없으면 무시 */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 헬퍼 없으면 무시 */ }
 
         // 초기 포커스
         if (opt.initialFocusEl) {
-            setTimeout(() => { try { opt.initialFocusEl.focus(); } catch (e) { } }, 0);
+            setTimeout(() => { try { opt.initialFocusEl.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
         }
         return oCtl;
     }

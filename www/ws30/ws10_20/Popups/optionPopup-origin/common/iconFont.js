@@ -153,6 +153,7 @@
                 oWin = oWin.parent;
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 return;
             }
 
@@ -165,6 +166,7 @@
         try {
             return global.OptionPopupUtil?.getPath?.();
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -175,6 +177,7 @@
         try {
             return global.OptionPopupUtil?.getFs?.();
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -185,6 +188,7 @@
         try {
             return global.OptionPopupUtil?.getPathInfo?.();
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -228,6 +232,7 @@
                 }
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 
@@ -277,6 +282,7 @@
             }
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             oMap = null;
         }
 
@@ -333,6 +339,7 @@
             return oSap.ui.core?.IconPool;
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 
@@ -347,6 +354,7 @@
         try {
             return new URL(url, baseWindow?.location?.href || global.location.href).href;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return url;
         }
 
@@ -365,6 +373,7 @@
         try {
             return toAbsoluteUrl(oSap.ui.require.toUrl(sPath), oSapWindow);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return "";
         }
 
@@ -469,6 +478,7 @@
                 oIconPool.getIconInfo(oParsed.name, oParsed.collection) :
                 oIconPool.getIconInfo(oParsed.name);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return;
         }
 

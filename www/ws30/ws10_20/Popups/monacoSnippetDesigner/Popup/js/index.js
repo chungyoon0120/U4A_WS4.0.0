@@ -44,7 +44,7 @@
     const WSMSG = new WSUTIL.MessageClassText(SYSID, LANGU);
     function mcMsg(sCls, sNo, sFallback) {
         try { const s = WSMSG.fnGetMsgClsText(sCls, sNo); if (s && s.trim()) { return s; } }
-        catch (e) { console.error("[스니펫디자이너] 메시지클래스 조회 실패:", sCls, sNo, e); }
+        catch (e) { console.error("[monacoSnippetDesigner] message class read failed:", sCls, sNo, e); }
         return sFallback || sNo;
     }
 
@@ -100,7 +100,7 @@
         try {
             const s = WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", sNo, sP1);
             if (s && s.trim()) { return s; }
-        } catch (e) { console.error("[스니펫디자이너] 메시지 조회 실패:", sNo, e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] message read failed:", sNo, e); }
         return (sFallback || sNo).replace(/&1/g, sP1);
     }
 
@@ -124,7 +124,7 @@
         oT.textContent = sMsg;
         oT.setAttribute("data-show", "true");
         clearTimeout(_toastTimer);
-        _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { } }, 3000);
+        _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 3000);
     }
 
     // busy(top-layer <dialog>) 제어.
@@ -135,7 +135,7 @@
         try {
             if (bIsBusy) { if (!oBusy.open) { oBusy.showModal(); } }
             else { if (oBusy.open) { oBusy.close(); } }
-        } catch (e) { console.error("[스니펫디자이너] busy 토글 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] busy toggle error:", e); }
     }
 
     // 자식창 일괄 busy 방송 수신 — 원본 frame.js _attachBroadCastEvent 이식(장군님 지시로 복원).
@@ -166,13 +166,13 @@
                         break;
                 }
             };
-        } catch (e) { console.error("[스니펫디자이너] BroadCast 배선 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] BroadCast wiring error:", e); }
     }
 
     // 오류 모달(공통 U4AUI.confirm) — 저장/삭제 실패 등. 단추는 OK 하나.
     function showErr(sMsg, sTitle) {
         try { U4AUI.confirm({ type: "E", title: sTitle || "", message: sMsg, buttons: [{ act: "OK", label: "OK", emphasized: true }] }); }
-        catch (e) { console.error("[스니펫디자이너] 오류 모달 실패:", e, sMsg); }
+        catch (e) { console.error("[monacoSnippetDesigner] error modal failed:", e, sMsg); }
     }
 
     // 랜덤키(원본 getRandomKey — A-Za-z0-9, 30자).
@@ -196,7 +196,7 @@
             const sMode = document.documentElement.getAttribute("data-sl-theme");
             if (sMode === "dark") { return "vs-dark"; }
             if (sMode === "light") { return "vs"; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return "vs-dark";
     }
 
@@ -212,17 +212,17 @@
             const sPath = PATH.join(PATHINFO.THEME, SYSID + ".json");
             if (!FS.existsSync(sPath)) { return null; }
             return JSON.parse(FS.readFileSync(sPath, "utf-8"));
-        } catch (e) { console.error("[스니펫디자이너] 테마 정보 로드 오류:", e); return null; }
+        } catch (e) { console.error("[monacoSnippetDesigner] theme info load error:", e); return null; }
     }
     function _onThemeChange() {
         const oTheme = _getThemeInfo();
         if (!oTheme) { return; }
-        try { CURRWIN.webContents.insertCSS("html, body { margin: 0px; height: 100%; background-color: " + oTheme.BGCOL + "; }"); } catch (e) { }
+        try { CURRWIN.webContents.insertCSS("html, body { margin: 0px; height: 100%; background-color: " + oTheme.BGCOL + "; }"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try {
             if (window.U4ATheme && oTheme.THEME) {
                 window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(oTheme.THEME) : oTheme.THEME);
             }
-        } catch (e) { console.error("[스니펫디자이너] 테마 적용 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] theme apply error:", e); }
     }
     const _THEME_CH = SYSID ? ("if-p13n-themeChange-" + SYSID) : "";
 
@@ -244,7 +244,7 @@
                 };
             }).filter(function (o) { return o._key; });
         } catch (e) {
-            console.error("[스니펫디자이너] list.json 로드 오류:", e);
+            console.error("[monacoSnippetDesigner] list.json load error:", e);
             return [];
         }
     }
@@ -256,7 +256,7 @@
             if (!FS.existsSync(sFile)) { return ""; }
             return FS.readFileSync(sFile, "utf-8");
         } catch (e) {
-            console.error("[스니펫디자이너] 코드 파일 로드 오류:", sKey, e);
+            console.error("[monacoSnippetDesigner] code file load error:", sKey, e);
             return "";
         }
     }
@@ -271,7 +271,7 @@
             FS.writeFileSync(SNIPPET_LIST_JSON, JSON.stringify(aSave), "utf-8");
             return { RETCD: "S" };
         } catch (e) {
-            console.error("[스니펫디자이너] list.json 저장 오류:", e);
+            console.error("[monacoSnippetDesigner] list.json save error:", e);
             return { RETCD: "E" };
         }
     }
@@ -283,7 +283,7 @@
             FS.writeFileSync(PATH.join(SNIPPET_ROOT, sKey), sCode == null ? "" : String(sCode), "utf-8");
             return { RETCD: "S" };
         } catch (e) {
-            console.error("[스니펫디자이너] 코드 파일 저장 오류:", sKey, e);
+            console.error("[monacoSnippetDesigner] code file save error:", sKey, e);
             return { RETCD: "E" };
         }
     }
@@ -293,7 +293,7 @@
         try {
             const sFile = PATH.join(SNIPPET_ROOT, sKey);
             if (FS.existsSync(sFile)) { FS.unlinkSync(sFile); }
-        } catch (e) { console.error("[스니펫디자이너] 코드 파일 삭제 오류:", sKey, e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] code file delete error:", sKey, e); }
     }
 
     // 통합 저장(원본 _saveP13nSnippetData): 신규건 제외한 목록에 update/unshift → 목록 + 코드 저장.
@@ -319,7 +319,7 @@
     // 저장·삭제 후 방송(불변 계약).
     function _broadcastChange() {
         try { IPCRENDERER.send("if-browser-interconnection", { PRCCD: "MONACO_SNIPPET_CHANGE" }); }
-        catch (e) { console.error("[스니펫디자이너] snippet_change 방송 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] snippet_change broadcast error:", e); }
     }
 
     /* ==================================================================
@@ -333,7 +333,7 @@
             oMsg[HOST_CH] = true;
             oMsg.hostId = HOSTID;
             oFrame.contentWindow.postMessage(oMsg, "*");
-        } catch (e) { console.error("[스니펫디자이너] 호스트 송신 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] host send error:", e); }
     }
 
     // 줌 % 라벨 갱신(호스트 evt:zoom). 숫자라 i18n 불필요.
@@ -364,7 +364,7 @@
             if (oFrame && oFrame.contentWindow && oFrame.contentWindow.editor) {
                 return oFrame.contentWindow.editor.getValue();
             }
-        } catch (e) { console.error("[스니펫디자이너] 에디터 값 읽기 오류:", e); }
+        } catch (e) { console.error("[monacoSnippetDesigner] editor value read error:", e); }
         return "";
     }
 
@@ -470,8 +470,8 @@
         // 전환 후 Monaco 레이아웃 재계산(자동레이아웃 보조).
         _toHost({ cmd: "layout" });
         // 숨김→표시로 폭이 확정되면 편집 페이지 툴바 오버플로 재계산(폭 0 시점 오판 보정).
-        if (_ovfTools) { try { _ovfTools.reflow(); } catch (e) { } }
-        if (_ovfInfoActs) { try { _ovfInfoActs.reflow(); } catch (e) { } }
+        if (_ovfTools) { try { _ovfTools.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+        if (_ovfInfoActs) { try { _ovfInfoActs.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         _syncActionButtons();
     }
 
@@ -603,9 +603,9 @@
         };
 
         // 폼 반영
-        try { oLanguField.setValue(oState.cur.snippet_langu); } catch (e) { }
-        try { oNameField.setValue(oState.cur.snippet_name); } catch (e) { }
-        try { oDescField.setValue(oState.cur.snippet_desc); } catch (e) { }
+        try { oLanguField.setValue(oState.cur.snippet_langu); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oNameField.setValue(oState.cur.snippet_name); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDescField.setValue(oState.cur.snippet_desc); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         _clearValueStates();
 
         _showEdit();
@@ -628,7 +628,7 @@
 
     function _clearValueStates() {
         _setLanguVs(false);
-        try { oNameField.setValueState("none"); } catch (e) { }
+        try { oNameField.setValueState("none"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /* ==================================================================
@@ -643,7 +643,7 @@
             oState.list.unshift({ _key: sKey, snippet_langu: "", snippet_name: "", snippet_desc: "", _isnew: true });
             renderList();
             _loadIntoEdit(sKey);
-            setTimeout(function () { try { oNameField.focus(); } catch (e) { } }, 0);
+            setTimeout(function () { try { oNameField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 0);
         });
     }
 
@@ -778,17 +778,17 @@
         // ★필드 검증 메시지는 토스트가 아니라 valueState 메시지로(장군님 지시) — 포커스 이동으로 노출된다.
         if (!sLangu) {
             _setLanguVs(true, wsMsg("349", "Language is required."));
-            try { oLanguField.focus(); } catch (e) { }
+            try { oLanguField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return { RETCD: "E" };
         }
         if (!sName) {
             oNameField.setValueState("error", wsMsg("350", "Snippet name is required."));
-            try { oNameField.focus(); } catch (e) { }
+            try { oNameField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return { RETCD: "E" };
         }
         if (/\s/.test(sName)) {
             oNameField.setValueState("error", wsMsg("351", "Snippet name cannot contain spaces."));
-            try { oNameField.focus(); } catch (e) { }
+            try { oNameField.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return { RETCD: "E" };
         }
         // 코드는 입력 필드가 아니라 에디터 → 붙일 valueState 자리가 없어 토스트 유지(원본 M352 동일).
@@ -821,10 +821,10 @@
         if (!oState.cur) { return; }
         oState.cur._ischg = true;
         const sName = oNameField.getValue() || "";
-        try { oNameField.setValueState("none"); } catch (e) { }
+        try { oNameField.setValueState("none"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (/\s/.test(sName)) {
             // 입력 중이라 이미 포커스가 있어 valueState 메시지가 바로 보인다(토스트 사용 안 함).
-            try { oNameField.setValueState("error", wsMsg("351", "Snippet name cannot contain spaces.")); } catch (e) { }
+            try { oNameField.setValueState("error", wsMsg("351", "Snippet name cannot contain spaces.")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         _syncActionButtons();
     }
@@ -925,7 +925,7 @@
                 if (h < minH) { h = minH; }
                 if (h >= maxH) { h = maxH; ta.style.overflowY = "auto"; } else { ta.style.overflowY = "hidden"; }
                 ta.style.height = h + "px";
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         };
     }
 
@@ -938,7 +938,7 @@
         _descFit = _makeTextareaGrow(oDescField.input, 2, 5);
 
         // 초기 미선택 상태.
-        try { oLanguField.setValue(""); } catch (e) { }
+        try { oLanguField.setValue(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         const oGrid = document.createElement("div");
         oGrid.className = "u4aSnipInfoGrid";
@@ -993,7 +993,7 @@
         // 로고
         const oLogo = document.getElementById("snipLogo");
         if (oLogo) {
-            try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+            try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 제목
         const oTitle = document.getElementById("snipTitle");
@@ -1010,19 +1010,19 @@
                 try {
                     const oI = oMax.querySelector("i");
                     if (oI) { oI.className = CURRWIN.isMaximized() ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             };
             oMax.addEventListener("click", function () {
-                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { }
+                try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
-            try { CURRWIN.on("maximize", _syncMaxIcon); CURRWIN.on("unmaximize", _syncMaxIcon); } catch (e) { }
+            try { CURRWIN.on("maximize", _syncMaxIcon); CURRWIN.on("unmaximize", _syncMaxIcon); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _syncMaxIcon();
         }
     }
 
     function fn_close() {
         if (oState.isBusy) { return; }   // busy 중 닫기 차단
-        try { U4AUI.closeWindow(CURRWIN); } catch (e) { console.error("[스니펫디자이너] 닫기 오류:", e); }
+        try { U4AUI.closeWindow(CURRWIN); } catch (e) { console.error("[monacoSnippetDesigner] close error:", e); }
     }
 
     function _bindStaticTexts() {
@@ -1063,22 +1063,22 @@
         _setFormatCap(false);   // 언어 반영(fmtcap) 전까지 비활성.
 
         // 좌|우 스플리터(공통).
-        try { U4AUI.wireSplitter(document.getElementById("snipSplit"), { axis: "x" }); } catch (e) { console.error("[스니펫디자이너] 스플리터 배선 오류:", e); }
+        try { U4AUI.wireSplitter(document.getElementById("snipSplit"), { axis: "x" }); } catch (e) { console.error("[monacoSnippetDesigner] splitter wiring error:", e); }
 
         // 테마 변경 추종 — U4ATheme.apply() 가 쏘는 u4a-theme-changed 를 받아 에디터 테마도 전환.
         //   (IPC if-p13n-themeChange 핸들러도 결국 U4ATheme.apply 를 부르므로 이 한 곳으로 수렴.)
         try { if (window.U4ATheme && U4ATheme.onChange) { U4ATheme.onChange(_applyMonacoTheme); } }
-        catch (e) { console.error("[스니펫디자이너] 테마 변경 구독 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] theme change subscribe error:", e); }
 
         // 헤더/툴바 반응형 오버플로(⋯) — 공통 U4AUI.attachOverflow(§11). 좁아지면 넘치는 액션을 ⋯ 로 접는다.
         //   ★ btnClass 를 반드시 넘긴다 — 기본값(u4a-tx-*)은 테마 CSS 미정의라 브라우저 기본 박스로 뜬다.
         //     레퍼런스(bindShared/fnP13nDesignPopupOpen)처럼 화면 툴바 버튼과 동일 스타일로 맞춘다(여기선 평면 u4aSnipFlat).
         try { _ovfTools = U4AUI.attachOverflow(document.getElementById("snipEdTools"), { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); }
-        catch (e) { console.error("[스니펫디자이너] 코드 툴바 오버플로 배선 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] code toolbar overflow wiring error:", e); }
         try { if (oListActsBar) { _ovfActs = U4AUI.attachOverflow(oListActsBar, { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
-        catch (e) { console.error("[스니펫디자이너] 리스트 헤더 오버플로 배선 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] list header overflow wiring error:", e); }
         try { if (oInfoPanel && oInfoPanel.actions) { _ovfInfoActs = U4AUI.attachOverflow(oInfoPanel.actions, { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
-        catch (e) { console.error("[스니펫디자이너] 기본정보 헤더 오버플로 배선 오류:", e); }
+        catch (e) { console.error("[monacoSnippetDesigner] default-info header overflow wiring error:", e); }
 
         // 초기 데이터 로드 + 렌더 + 빈상태.
         oState.list = _readList();
@@ -1091,7 +1091,7 @@
      * ================================================================== */
     // opener 초기 데이터(scope/theme) — 없어도 동작(테마/타이틀은 쿼리로 이미 반영).
     IPCRENDERER.on("if-data", function (event, oData) {
-        try { oState.scopeCode = (oData && oData.scopeCode) || ""; } catch (e) { }
+        try { oState.scopeCode = (oData && oData.scopeCode) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     });
 
     document.addEventListener("DOMContentLoaded", function () {
@@ -1102,24 +1102,24 @@
             initUIBuild();
 
             // 실시간 테마 변경 추종 등록(원본 frame.js 동일).
-            if (_THEME_CH) { try { IPCMAIN.on(_THEME_CH, _onThemeChange); } catch (e) { console.error("[스니펫디자이너] 테마 IPC 등록 오류:", e); } }
+            if (_THEME_CH) { try { IPCMAIN.on(_THEME_CH, _onThemeChange); } catch (e) { console.error("[monacoSnippetDesigner] theme IPC register error:", e); } }
 
             // 준비 완료 → 창 노출(플래시 방지: opener show:false 로 열림).
             requestAnimationFrame(function () {
-                try { CURRWIN.show(); } catch (e) { }
+                try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 document.body.classList.add("u4a-visible");
                 fn_setBusy(false);
             });
         } catch (e) {
-            console.error("[스니펫디자이너] 초기화 오류:", e);
-            try { CURRWIN.show(); } catch (e2) { }
+            console.error("[monacoSnippetDesigner] init error:", e);
+            try { CURRWIN.show(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
         }
     });
 
     // 창 제거 시 IPC 리스너 해제(누수 방지) + 방송 채널 종료.
     window.addEventListener("pagehide", function () {
-        if (_THEME_CH) { try { IPCMAIN.removeListener(_THEME_CH, _onThemeChange); } catch (e) { } }
-        if (_oBroadToChild) { try { _oBroadToChild.close(); } catch (e) { } _oBroadToChild = null; }
+        if (_THEME_CH) { try { IPCMAIN.removeListener(_THEME_CH, _onThemeChange); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+        if (_oBroadToChild) { try { _oBroadToChild.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } _oBroadToChild = null; }
     }, { once: true });
 
     // busy 중 닫기 차단.

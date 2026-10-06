@@ -30,7 +30,7 @@
     // 메시지 클래스 텍스트 헬퍼(원본 fnGetMsgClsText 호출 그대로).
     function _txt(sCls, sCode) {
         try { return APPCOMMON.fnGetMsgClsText(sCls, sCode, "", "", "", ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     const _fa = (sName) => '<i class="fa-solid fa-' + sName + '"></i>';
 
@@ -244,14 +244,20 @@
                 { v: _fmtTime(oRow.AS4TIME), cls: "u4aCtsColC" }
             ];
             aCell.forEach(function (c) { oTr.appendChild(_el("td", c.cls, c.v || "")); });
-            oTr.addEventListener("click", function () { _selectRow(oRow); });
+            // ★ 드래그로 텍스트 블럭을 잡은 채 뗀 click 은 행 선택으로 치지 않는다(장군님 지시 2026-09-10) — 블럭(복사) 보존.
+            oTr.addEventListener("click", function () {
+                if (window.U4AUI && U4AUI.isTextDragSelecting && U4AUI.isTextDragSelecting()) { return; }
+                _selectRow(oRow);
+            });
             oTr.addEventListener("dblclick", function () { _selectRow(oRow); _accept(true); });
             return oTr;
         }
 
         // 선택 강조 반영 — 가상 스크롤이면 키(TRKORR)로(setSel+refresh), 폴백이면 보이는 tr 순회.
         function _applySel() {
-            if (_vs) { _vs.setSel(oState.oSel ? oState.oSel.TRKORR : null); _vs.refresh(); return; }
+            // ★ 선택 강조는 재렌더(refresh) 대신 경량 토글(markSel) — 드래그로 잡은 text selection(블럭)을
+            //   보존해 값 복사가 되게 한다(장군님 보고 2026-09-10). markSel 없으면(구버전) 기존 경로로 폴백.
+            if (_vs) { var k = oState.oSel ? oState.oSel.TRKORR : null; if (_vs.markSel) { _vs.markSel(k); } else { _vs.setSel(k); _vs.refresh(); } return; }
             const aTr = oTbody.querySelectorAll("tr");
             for (let i = 0; i < aTr.length; i++) {
                 aTr[i].setAttribute("aria-selected", aTr[i].__row === oState.oSel ? "true" : "false");
@@ -332,14 +338,14 @@
         function _fireCallback(oRow) {
             if (oState.fnCb) {
                 try { oState.fnCb(oRow); }
-                catch (e) { if (typeof console !== "undefined") { console.error("[CTS] callback 실패:", e && e.message); } }
+                catch (e) { if (typeof console !== "undefined") { console.error("[CTS] callback failed:", e && e.message, e); } }
             }
             _close();
         }
 
         function _close() {
-            try { oDlg.close(); } catch (e) { }
-            try { oDlg.remove(); } catch (e) { }
+            try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // ESC → 닫기.

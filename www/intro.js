@@ -1,3 +1,4 @@
+// 오류코드 접두: INTR / 다음 번호: 002
 /**************************************************************************
  * intro.js
  * ************************************************************************
@@ -51,9 +52,9 @@
 
         // 인트로 페인트를 막지 않도록 다음 틱으로 미루고, 실패해도 무시한다(워밍 목적).
         setTimeout(() => {
-            try { require("events"); }        catch (e) {}
-            try { require("puppeteer-core"); } catch (e) {}
-            try { require("crypto"); }         catch (e) {}
+            try { require("events"); }        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
+            try { require("puppeteer-core"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
+            try { require("crypto"); }         catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
         }, 0);
 
     } // end of _preloadHeavyModules
@@ -118,15 +119,15 @@
         let battery = await systeminfo.battery();
 
         console.log("============ System Information ==============");
-        console.log("**os 정보: ", JSON.stringify(os, null, 4));
-        console.log("**cpu 정보: ", JSON.stringify(cpu, null, 4));
-        console.log("**메인보드 정보: ", JSON.stringify(mainboard, null, 4));
-        console.log("**바이오스 정보: ", JSON.stringify(bios, null, 4));
-        console.log("**그래픽카드 정보: ", JSON.stringify(graphics, null, 4));
-        console.log("**하드디스크 정보: ", JSON.stringify(disk, null, 4));
-        console.log("**하드디스크 드라이브 정보: ", JSON.stringify(drive, null, 4));
-        console.log("**메모리 정보: ", JSON.stringify(memory, null, 4));
-        console.log("**배터리 정보: ", JSON.stringify(battery, null, 4));
+        console.log("**os info: ", JSON.stringify(os, null, 4));
+        console.log("**cpu info: ", JSON.stringify(cpu, null, 4));
+        console.log("**motherboard info: ", JSON.stringify(mainboard, null, 4));
+        console.log("**bios info: ", JSON.stringify(bios, null, 4));
+        console.log("**gpu info: ", JSON.stringify(graphics, null, 4));
+        console.log("**disk info: ", JSON.stringify(disk, null, 4));
+        console.log("**disk drive info: ", JSON.stringify(drive, null, 4));
+        console.log("**memory info: ", JSON.stringify(memory, null, 4));
+        console.log("**battery info: ", JSON.stringify(battery, null, 4));
         console.log("==============================================");
 
     } // end of _logOsSystemInfo
@@ -206,7 +207,8 @@
 
             oAPP.endTime = new Date().getTime();
 
-            let iTime = 100,
+            // 패키지 빌드: 5.5초 최소 노출, 미패키지(개발) 실행: 0.1초(장군님 지시 2026-09-08)
+            let iTime = APP.isPackaged ? 5500 : 100,
                 timeDiff = oAPP.endTime - oAPP.startTime;
 
             if (iTime - timeDiff >= 0) {
@@ -486,7 +488,8 @@
         oBrowserOptions.titleBarStyle = 'hidden';
 
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.opacity = 0.0;
+        // ★ [2026-09-14] 네이티브 투명도로 숨기지 않는다 — 바로 위 show:false 로 이미 숨겨져 있고,
+        //   표준도 show:false 다(.analy 16 §2.6). 아래 did-finish-load 가 setOpacity(1.0)+show() 한다.
         oBrowserOptions.resizable = true;
         oBrowserOptions.movable = true;
         // 최소 크기 — 메인 윈도우(ServerList.js fnLoginPage)와 동일하게 1000x800 으로 고정
@@ -520,6 +523,23 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 서버 목록 화면을 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   [고친 이유] 바로 위에서 인트로 창을 이미 감췄다(oCurrWindow.hide()). 아래 did-finish-load
+        //   에서만 새 창을 보여주므로, 문서 로드가 실패하면 **화면에 아무 창도 안 남는다**
+        //   (앱이 사라진 것처럼 보인다). 타이머로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 실패한 창을 정리하고 인트로 창을 되살린다.
+        //   하위 프레임 실패(isMainFrame=false)와 사용자 취소(-3)는 창 실패가 아니다.
+        oBrowserWindow.webContents.on('did-fail-load', function (e, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+            if (bIsMainFrame === false || iErrCode === -3) { return; }
+            console.error("[INTR-001] server list window load failed:", iErrCode, sErrDesc, sUrl);
+            try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+            catch (e2) { console.error("[INTR-001] cleanup of the failed window failed:", e2 && e2.message, e2); }
+            // 인트로 창을 되살려 사용자가 창 없이 남지 않게 한다.
+            try {
+                if (oCurrWindow && !oCurrWindow.isDestroyed()) { oCurrWindow.show(); oCurrWindow.focus(); }
+            } catch (e3) { console.error("[INTR-001] intro window could not be restored:", e3 && e3.message, e3); }
+        });
+
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
         // }
@@ -552,6 +572,7 @@
             try {
                 oCurrWindow.close();    
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 
             }
 
@@ -1070,7 +1091,7 @@
         FS.readdirSync(USERDATA)
         .filter(f => /\.(exe|zip|dmg|AppImage)$/.test(f))
         .forEach(f => {
-            try { FS.unlinkSync(PATH.join(USERDATA, f)); } catch (e) {}
+            try { FS.unlinkSync(PATH.join(USERDATA, f)); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }}
         });
 
 
@@ -1230,6 +1251,7 @@
             sAppVersion = oPackageJson.version;
             
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             
             sAppVersion = APP.getVersion();
 
@@ -1343,7 +1365,7 @@
                 // 패턴 관련 작업 중 오류 발생 시 공통 메시지 출력
                 lf_sourcePatternErrorMsg(resolve, sMsg);
 
-                console.error("[Intro] WWW에 있는 기본 패턴파일을 USERDATA에 복사하다가 오류");
+                console.error("[Intro] copy default pattern file from WWW to USERDATA error");
 
                 return;
 
@@ -1549,7 +1571,7 @@
             let oDefPattDataResult = await USP_UTIL.getDefaultPatternData();
             if (oDefPattDataResult.RETCD == "E") {
                 resolve(oDefPattDataResult);
-                console.error("[Intro] 기본 패턴 정보 오류");
+                console.error("[Intro] default pattern info error");
                 return;
             }
 
@@ -1561,7 +1583,7 @@
             let oWriteJsonResult = await WSUTIL.fsWriteFile(sDefPattJsonPath, sDefPattJsonData);
             if (oWriteJsonResult.RETCD == "E") {
                 resolve(oDefPattDataResult);
-                console.error("[Intro] 기본패턴 정보 JSON 저장하다가 오류");
+                console.error("[Intro] error while saving default pattern JSON");
                 return;
             }
 
@@ -1582,7 +1604,7 @@
                 let oWriteResult = await WSUTIL.fsWriteFile(sCustPattJsonPath, sCustPattInitJsonData);
                 if (oWriteResult.RETCD == "E") {
                     resolve(oWriteResult);
-                    console.error("[Intro] 커스텀 패턴 파일 저장하다가 오류");
+                    console.error("[Intro] custom pattern file save error");
                     return;
                 }
 
@@ -1594,7 +1616,7 @@
             try {
                 var aCustPattData = JSON.parse(sCustPattJsonData);
             } catch (error) {
-                console.error("[Intro] 기 저장된 커스텀 패턴 파일읽어서 JSON 파싱하다가 오류");
+                console.error("[Intro] read saved custom pattern file / JSON parse error", error);
                 throw new Error(error.toString());
             }
 
@@ -1612,7 +1634,7 @@
             let oWriteCustJsonResult = await WSUTIL.fsWriteFile(sCustPattJsonPath, sCustPattJson);
             if (oWriteCustJsonResult.RETCD == "E") {
                 resolve(oWriteCustJsonResult);
-                console.error("[Intro] 기본패턴 정보 JSON 저장하다가 오류");
+                console.error("[Intro] error while saving default pattern JSON");
                 return;
             }
 
@@ -1701,7 +1723,7 @@
 
             let oCopyResult = await WSUTIL.fsCopy(sPsSourcePath, sPsTargetPath);
             if (oCopyResult.RETCD == "E") {
-                console.error("ws_ps.zip 파일 복사하다가 오류!!");
+                console.error("ws_ps.zip copy error");
                 throw Error(oCopyResult.RTMSG);
             }
 
@@ -1711,7 +1733,7 @@
             // 압축푼 zip 파일 삭제
             let oRemoveResult = await WSUTIL.fsRemove(sPsTargetPath);
             if (oRemoveResult.RETCD == "E") {
-                console.error("ws_ps.zip 파일 압축풀고 삭제하다가 오류!!");
+                console.error("ws_ps.zip unzip/delete error");
                 throw Error(oRemoveResult.RTMSG);
             }
 
@@ -1739,7 +1761,7 @@
 
             let oCopyResult = await WSUTIL.fsCopy(sVbsSourcePath, sVbsTargetPath);
             if (oCopyResult.RETCD == "E") {
-                console.error("Vbs Zip 파일 복사하다가 오류!!");
+                console.error("vbs zip copy error");
                 throw Error(oCopyResult.RTMSG);
             }
         
@@ -1749,7 +1771,7 @@
             // 압축푼 zip 파일 삭제
             let oRemoveResult = await WSUTIL.fsRemove(sVbsTargetPath);
             if (oRemoveResult.RETCD == "E") {
-                console.error("vbs zip 파일 압축풀고 삭제하다가 오류!!");
+                console.error("vbs zip unzip/delete error");
                 throw Error(oRemoveResult.RTMSG);
             }
 
@@ -1775,7 +1797,7 @@
                 ZIP.extractAllTo(sTargetFolderPath, /*overwrite*/ true);
 
             } catch (error) {
-                console.error(`${sSourcePath}\n 파일 압축 풀다가 오류!!`);
+                console.error(`${sSourcePath} unzip error`, error);
                 throw new Error(error.toString());
             }
 
@@ -1795,7 +1817,7 @@
             let sIconsPath = PATH.join(PATHINFO.WS10_20_ROOT, "icons");
 
             if (!FS.existsSync(sIconsPath)) {
-                console.error("u4a icons 폴더 없음");
+                console.error("u4a icons folder not found");
                 resolve();
                 return;
             }

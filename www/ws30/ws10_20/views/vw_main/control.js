@@ -1,3 +1,4 @@
+// 오류코드 접두: VWMN / 다음 번호: 003
 /*************************************************************
  * vw_main / control.js  (HTML5)
  *
@@ -106,7 +107,7 @@ export async function getControl() {
                 var qs = qp.toString();
                 if (qs) { sLoginPath += (sLoginPath.indexOf("?") >= 0 ? "&" : "?") + qs; }
             }
-        } catch (e) { /* noop */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
 
         // ★ 창 드래그 근본 해결: 로그인은 iframe 안에 있어 자체 타이틀바를 그리면
         //   iframe 내부 -webkit-app-region:drag 가 창 리사이즈 후 죽는다(알려진 버그).
@@ -151,17 +152,17 @@ export async function getControl() {
                     try {
                         var sTheme = oData && oData.THEME;
                         if (!sTheme) { return; }
-                        try { if (parent.U4ATheme) { parent.U4ATheme.apply(sTheme); } } catch (e1) { }
-                        try { if (window.U4ATheme) { window.U4ATheme.apply(sTheme); } } catch (e2) { }
-                        try { if (oIframe && oIframe.contentWindow && oIframe.contentWindow.U4ATheme) { oIframe.contentWindow.U4ATheme.apply(sTheme); } } catch (e3) { }
-                        try { if (parent.setThemeInfo) { parent.setThemeInfo(oData); } } catch (e4) { }
-                        try { if (oData.BGCOL && parent.CURRWIN) { parent.CURRWIN.setBackgroundColor(oData.BGCOL); } } catch (e5) { }
+                        try { if (parent.U4ATheme) { parent.U4ATheme.apply(sTheme); } } catch (e1) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e1); } }
+                        try { if (window.U4ATheme) { window.U4ATheme.apply(sTheme); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+                        try { if (oIframe && oIframe.contentWindow && oIframe.contentWindow.U4ATheme) { oIframe.contentWindow.U4ATheme.apply(sTheme); } } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                        try { if (parent.setThemeInfo) { parent.setThemeInfo(oData); } } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+                        try { if (oData.BGCOL && parent.CURRWIN) { parent.CURRWIN.setBackgroundColor(oData.BGCOL); } } catch (e5) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e5); } }
                         // (--boot-bg 는 위 각 프레임의 U4ATheme.apply 가 테마 CSS 로드 후 --app-bg 로 중앙
                         //   동기화한다(theme-api.js _syncBootBg) → 여기서 따로 손대지 않는다.)
-                    } catch (e) { /* noop */ }
+                    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
                 });
             }
-        } catch (e) { /* noop */ }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* noop */ }
 
     } // end of _loadLoginPage
 
@@ -185,10 +186,10 @@ export async function getControl() {
             oWin.setBounds({ x: b.x, y: b.y, width: b.width + 1, height: b.height + 1 });
             requestAnimationFrame(function () {
                 requestAnimationFrame(function () {
-                    try { if (!oWin.isDestroyed()) { oWin.setBounds(b); } } catch (_) { /* noop */ }
+                    try { if (!oWin.isDestroyed()) { oWin.setBounds(b); } } catch (_) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_); } /* noop */ }
                 });
             });
-        } catch (_) { /* noop */ }
+        } catch (_) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_); } /* noop */ }
     } // end of _kickHostDragRegion
 
 
@@ -216,6 +217,16 @@ export async function getControl() {
         //   컨텐츠(로그인 iframe 타이틀바)가 렌더되며 계산된다. 표시를 iframe 로드 뒤로
         //   미루면 최대화 상태에서 drag 영역이 등록되지 않아 헤더 드래그가 안 먹는다.
         //   (흰색 플래시는 --boot-bg 동기 캔버스로 이미 방지됨)
+        //
+        // ★ [2026-09-14, 장군님 지시] 창이 화면에 나타나는 그 순간부터 스피너가 켜져 있어야 한다.
+        //   [고친 이유] 위 사정 때문에 show() 는 컨텐츠보다 먼저 불러야 한다. 그런데 종전에는 그 시점에
+        //   켜 둔 것이 아무것도 없어서, 본문이 그려질 때까지 테마 배경만 보였다
+        //   ("새창 띄우면 busy 없이 검은 화면" — 장군님 실측 2026-09-14, 다크 테마).
+        //   해제는 로그인 화면 준비 완료(Login.js) / 메인 본문 등장 완료(js/ws_main.js) 가 한다.
+        //   타이머로 끄는 것은 금지(.analy 16 §2.11).
+        try { if (typeof setDomBusy === "function") { setDomBusy("X"); } }
+        catch (e) { console.error("[VWMN-002] busy could not be shown before the window appears:", e && e.message, e); }
+
         parent.CURRWIN.setOpacity(1.0);
         parent.CURRWIN.show();
 
@@ -241,6 +252,13 @@ export async function getControl() {
      *************************************************************/
     oContr.fn.loadWS30MainPage = async function () {
 
+        // ★ [2026-09-14, 장군님 지시] 메인 화면을 만드는 동안 로딩 화면을 켜 둔다.
+        //   아래에서 #content 를 숨기므로, 이걸 안 켜면 메인이 다 그려질 때까지 배경만 보인다.
+        //   해제는 메인 본문 등장 완료 1회(js/ws_main.js fnWsStart) — 실패는 그 catch 와
+        //   아래 onerror 가 푼다. 로그인 경로에서도 이미 켜져 있어 두 번 켜도 무해하다.
+        try { if (typeof showLoadingPage === "function") { showLoadingPage("X"); } }
+        catch (e) { console.error("[VWMN-002] loading page show failed:", e && e.message, e); }
+
         document.getElementById("content").style.display = "none";
 
         // 구 vw_main 프레임 제거
@@ -250,6 +268,19 @@ export async function getControl() {
 
         let oScript = document.createElement("script");
         oScript.src = "./js/library-preload.js";
+
+        // ★ [2026-09-14, 장군님 지시] 메인 스크립트를 못 읽는 경우 — 진짜 실패 이벤트를 배선한다.
+        //   [고친 이유] 이 <script> 는 붙여 놓기만 하고 바로 돌아온다. 로딩 화면은 이것이 다 돌아
+        //   메인이 그려질 때까지 켜져 있다(ws_main.js 가 끈다). 파일을 못 읽으면 그 코드가 아예
+        //   안 돌아 로딩 화면이 영영 안 꺼진다. 타이머로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 로딩 화면을 풀고 표면화한다.
+        oScript.onerror = function () {
+            console.error("[VWMN-001] main screen script could not be loaded:", oScript.src);
+            try { if (typeof showLoadingPage === "function") { showLoadingPage(""); } }
+            catch (e) { console.error("[VWMN-001] loading page hide failed:", e && e.message, e); }
+            try { if (typeof setDomBusy === "function") { setDomBusy(""); } }
+            catch (e2) { console.error("[VWMN-001] dom busy release failed:", e2 && e2.message, e2); }
+        };
 
         document.body.appendChild(oScript);
 

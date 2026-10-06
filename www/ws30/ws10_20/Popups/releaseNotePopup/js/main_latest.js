@@ -341,6 +341,7 @@ function gfn_crtUI_Item_SAP() {
 
 
             } catch (err) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(err); }
                 //waiting off
                 oHandle.UI.DYNAMICPAGE1.setBusy(false);
             }
@@ -375,6 +376,7 @@ async function gfn_crtUI_Item_GITHUB() {
 
         });
     } catch (error) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         //waiting off
         oHandle.UI.DYNAMICPAGE1.setBusy(false);
         return;

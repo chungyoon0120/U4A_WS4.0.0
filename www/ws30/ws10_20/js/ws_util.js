@@ -358,6 +358,7 @@ const WSUTIL = {
                     };
 
                 } catch (error) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
                     _oDatabase.close();
 
@@ -837,6 +838,7 @@ const WSUTIL = {
             try {
                 await this.putRegeditValue(oRegData);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 resolve({
                     RETCD: "E",
                     RTMSG: error?.toString() || "Register Save Error!!"
@@ -1094,6 +1096,7 @@ const WSUTIL = {
             try {
                 var sText = this.getWsMsgClsTxt(sWsLangu, sARBGB, sMSGNR);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 // 조회 오류 시 반복문 탈출 (데이터 정합성 보장)
                 break;
             }
@@ -1249,6 +1252,7 @@ const WSUTIL = {
                         oBrowserWindow.setOpacity(1.0);
                         if (typeof fnFinish === "function") fnFinish();
                     } catch (error) {
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                         if (typeof fnFinish === "function") fnFinish();
                     }
 
@@ -1269,6 +1273,7 @@ const WSUTIL = {
             try {
                 oBrowserWindow.setOpacity(iOpa);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 clearInterval(iInterval);
                 iInterval = undefined;
             }
@@ -1297,30 +1302,60 @@ const WSUTIL = {
 
         // --- 1. 필수 인자 유효성 검사 ---
         if (!REMOTE || typeof REMOTE.getCurrentWindow !== 'function' || typeof REMOTE.require !== 'function') {
-            console.error("setParentCenterBounds: 유효하지 않거나 불완전한 REMOTE 객체가 제공되었습니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: invalid or incomplete REMOTE object. aborted.");
             return;
         }
 
         if (!oChildWinow || typeof oChildWinow.getBounds !== 'function' || typeof oChildWinow.setBounds !== 'function') {
-            console.error("setParentCenterBounds: 유효하지 않은 자식 윈도우(oChildWinow) 객체입니다. getBounds 및 setBounds 메소드를 가진 BrowserWindow 인스턴스여야 합니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: invalid child window (oChildWinow). it must be a BrowserWindow with getBounds/setBounds. aborted.");
             return;
+        }
+
+        /**
+         * 별창 열림 로그 (2026-09-08 추가)
+         * -------------------------------------------------------------
+         * 왜 여기인가: 별창 여는 함수가 19종으로 흩어져 공통 진입점이 없는데,
+         *             위치를 잡는 이 함수는 거의 모든 별창이 지나간다.
+         * 무엇을 남기나: 어떤 별창이 열렸는지.
+         */
+        try {
+
+            if (typeof U4ALOG !== "undefined") {
+
+                var _sWinName = "";
+
+                try {
+                    _sWinName = (oChildWinow.getTitle && oChildWinow.getTitle()) || "";
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+                if (!_sWinName && oBrowserOptions && oBrowserOptions.webPreferences) {
+                    _sWinName = oBrowserOptions.webPreferences.OBJTY || "";
+                }
+
+                U4ALOG.info("별창 열림", _sWinName || "(untitled)", "");
+
+            }
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            // 로그 때문에 창 열기가 막히면 안 된다.
         }
 
         const oMainWindow = REMOTE.getCurrentWindow();
         if (!oMainWindow || typeof oMainWindow.getPosition !== 'function' || typeof oMainWindow.getSize !== 'function') {
-            console.error("setParentCenterBounds: 메인 윈도우(oMainWindow)가 유효하지 않거나 접근할 수 없습니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: main window (oMainWindow) is invalid or unreachable. aborted.");
             return;
         }
 
         // --- 2. CURRWIN 전역변수 유효성 검사 ---
         if (!global.CURRWIN || typeof global.CURRWIN.getBounds !== 'function' || (typeof global.CURRWIN.isDestroyed === 'function' && global.CURRWIN.isDestroyed())) {
-            console.error("setParentCenterBounds: 전역 CURRWIN이 유효한 BrowserWindow 인스턴스가 아니거나 파괴되었습니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: global CURRWIN is not a valid BrowserWindow or was destroyed. aborted.");
             return;
         }
 
         const SCREEN = REMOTE.require("electron").screen;
         if (!SCREEN || typeof SCREEN.getDisplayMatching !== 'function') {
-            console.error("setParentCenterBounds: Electron 'screen' 모듈에 접근할 수 없습니다. 작업을 중단합니다.");
+            console.error("setParentCenterBounds: cannot access the Electron 'screen' module. aborted.");
             return;
         }
 
@@ -1329,7 +1364,7 @@ const WSUTIL = {
         const [parentWidth, parentHeight] = oMainWindow.getSize();
 
         if (isNaN(parentX) || isNaN(parentY) || isNaN(parentWidth) || isNaN(parentHeight)) {
-            console.error(`setParentCenterBounds: 유효하지 않은 부모 윈도우 경계가 감지되었습니다. X=${parentX}, Y=${parentY}, W=${parentWidth}, H=${parentHeight}. 작업을 중단합니다.`);
+            console.error(`setParentCenterBounds: invalid parent window bounds. X=${parentX}, Y=${parentY}, W=${parentWidth}, H=${parentHeight}. action .`);
             return;
         }
 
@@ -1341,7 +1376,7 @@ const WSUTIL = {
         // --- 5. 자식 창의 현재 위치/크기 가져오기 ---
         let oChildBounds = oChildWinow.getBounds();
         if (isNaN(oChildBounds.width) || isNaN(oChildBounds.height)) {
-            console.error(`setParentCenterBounds: 유효하지 않은 초기 자식 윈도우 경계가 감지되었습니다. 너비=${oChildBounds.width}, 높이=${oChildBounds.height}. 작업을 중단합니다.`);
+            console.error(`setParentCenterBounds: invalid initial child window bounds. width=${oChildBounds.width}, height=${oChildBounds.height}. aborted.`);
             return;
         }
 
@@ -1399,10 +1434,10 @@ const WSUTIL = {
                 oChildWinow.setBounds(oBounds);
                 oChildWinow.setBounds(oBounds);
             } catch (e) {
-                console.error(`setParentCenterBounds: setBounds 호출 중 오류 발생: ${e.message}`, e);
+                console.error(`setParentCenterBounds: setBounds call error: ${e.message}`, e);
             }
         } else {
-            console.error(`setParentCenterBounds: 최종 계산된 경계가 유효하지 않습니다. setBounds 호출을 중단합니다. 유효하지 않은 경계: ${JSON.stringify(oBounds)}`);
+            console.error(`setParentCenterBounds: computed bounds are invalid. setBounds skipped. bounds: ${JSON.stringify(oBounds)}`);
         }
 
     },
@@ -1606,6 +1641,7 @@ const WSUTIL = {
             try {
                 var aWLO = JSON.parse(sWLOJson);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 resolve([]);
                 return;
             }
@@ -1845,6 +1881,7 @@ const WSUTIL = {
                 ? JSON.stringify(oData, null, 2)
                 : String(oData);
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return {
                 RETCD:   "E",
                 RTMSG:   "데이터 직렬화 중 오류가 발생했습니다: " + e.toString(),
@@ -1872,6 +1909,7 @@ const WSUTIL = {
                 FS.mkdirSync(sDownloadFolder, { recursive: true });
             }
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return {
                 RETCD:   "E",
                 RTMSG:   "다운로드 폴더 생성 중 오류가 발생했습니다: " + e.toString(),
@@ -1889,6 +1927,7 @@ const WSUTIL = {
         try {
             FS.writeFileSync(sFilePath, sContent, { encoding: "utf-8" });
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return {
                 RETCD:   "E",
                 RTMSG:   "파일 저장 중 오류가 발생했습니다: " + e.toString(),
@@ -1903,7 +1942,7 @@ const WSUTIL = {
                 SHELL.showItemInFolder(sFilePath);
             } catch (e) {
                 // 탐색기 오픈 실패는 치명적이지 않으므로 경고만 출력
-                console.warn("downloadResponseData: 탐색기 오픈 실패", e.toString());
+                console.warn("downloadResponseData: explorer open failed", e.toString(), e);
             }
         }
 
@@ -2089,7 +2128,7 @@ const WSUTIL = {
 
         } catch (error) {
             let _sErrMsg = "[Icon Favorite save]: " + error.toString() + " \n\n ";
-            console.log("아이콘 즐겨찾기 저장 오류", _sErrMsg);
+            console.log("icon favorite save error", _sErrMsg, error);
             throw new Error(error);
         }
 
@@ -2115,6 +2154,7 @@ const WSUTIL = {
             var sJsonData = FS.readFileSync(sIconFavFilePath, 'utf-8');
             var aFavIcon  = JSON.parse(sJsonData);
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return [];
         }
 
@@ -2210,7 +2250,7 @@ const WSUTIL = {
                     `[STACK]: ${new Error("에디터의 스탠다드 테마 폴더의 하위 데이터 읽는 도중 문제 발생!!").stack}`,
                 ];
 
-                console.error(aConsoleMsg.join("\r\n"));
+                console.error(aConsoleMsg.join("\r\n"), error);
                 return [];
 
             }
@@ -2246,7 +2286,7 @@ const WSUTIL = {
                     `[STACK]: ${new Error(" 에디터의 Custom 테마 폴더의 하위 데이터 읽는 도중 문제 발생!!").stack}`,
                 ];
 
-                console.error(aConsoleMsg.join("\r\n"));
+                console.error(aConsoleMsg.join("\r\n"), error);
                 return [];
 
             }
@@ -2289,7 +2329,7 @@ const WSUTIL = {
                     `[STACK]: ${new Error("스탠다드 테마 정보 구하는 도중 문제 발생!").stack}`,
                 ];
 
-                console.error(aConsoleMsg.join("\r\n"));
+                console.error(aConsoleMsg.join("\r\n"), error);
                 return;
 
             }
@@ -2316,6 +2356,7 @@ const WSUTIL = {
                 var oThemeInfo = JSON.parse(sThemeInfo);
                 return { themeName: sThemeName, themeInfo: oThemeInfo };
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 return;
             }
 
@@ -2349,6 +2390,7 @@ const WSUTIL = {
                 var sThemeInfo = FS.readFileSync(sPath, { encoding: "utf-8" });
                 return JSON.parse(sThemeInfo);
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 return;
             }
 
@@ -2452,6 +2494,7 @@ const WSUTIL = {
                     'utf-8'
                 );
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 return false;
             }
 
@@ -2610,6 +2653,7 @@ const WSUTIL = {
                 return { ISOPEN: true, WINDOW: oWin };
 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 continue;
             }
 

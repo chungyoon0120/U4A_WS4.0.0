@@ -66,6 +66,7 @@
                 aParams[3] || ""
             ) || sMissingText;
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return sMissingText;
         }
 

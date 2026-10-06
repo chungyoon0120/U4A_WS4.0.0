@@ -2,7 +2,8 @@
  * Copyright 2020. INFOCG Inc. all rights reserved. 
  * ----------------------------------------------------------------------
  * - file Name : ws_main.js
- * - file Desc : ws 메인 
+ * - file Desc : ws 메인
+ * - 오류코드 접두: WMAI / 다음 번호: 002
  ************************************************************************/
 
 (function (window, oAPP) {
@@ -982,7 +983,7 @@
         // (브라우저가 about:blank를 처리할 시간을 아주 미세하게 주는 게 안전함)
         oIframe.src = jsPath;
 
-        console.log("🚀 Iframe 실행 경로 변경됨:", jsPath);
+        console.log("iframe run path changed:", jsPath);
 
     };
 
@@ -994,7 +995,7 @@
         // 2. 환경 변수 체크
         const sLocalRoot = process?.env?.U4A_WS_LOCAL_ROOT;
         if (!sLocalRoot) {
-            console.warn("[js 실행 경로 추출] - 환경 변수 'U4A_WS_LOCAL_ROOT'가 지정되지 않았습니다.");
+            console.warn("[js run path] env var 'U4A_WS_LOCAL_ROOT' is not set");
             return;
         }
 
@@ -1050,7 +1051,7 @@
             // 5. 최종 데이터 검증 및 실행
             const sJsPath = aJsPaths[0];
             if (sJsPath) {
-                console.log("🚀 실행 경로 발췌 완료:", sJsPath);
+                console.log("run path resolved:", sJsPath);
                 runScriptInIframe(sJsPath);
             }
 
@@ -1069,10 +1070,10 @@
             // [UI5 제거] jQuery.sap.require(...) 제거 (UI5 없음).
 
             // 마우스 휠 이벤트 적용하기 (줌 기능)
-            try { oAPP.fn.fnAttachMouseWheelEvent(); } catch (e) { console.warn("[HTML5] fnAttachMouseWheelEvent skip:", e && e.message); }
+            try { oAPP.fn.fnAttachMouseWheelEvent(); } catch (e) { console.warn("fnAttachMouseWheelEvent skip:", e && e.message, e); }
 
             // 화면 보호기 감지 이벤트
-            try { oAPP.fn.fnAttachPowerMonitorEvent(); } catch (e) { console.warn("[HTML5] fnAttachPowerMonitorEvent skip:", e && e.message); }
+            try { oAPP.fn.fnAttachPowerMonitorEvent(); } catch (e) { console.warn("fnAttachPowerMonitorEvent skip:", e && e.message, e); }
 
             /**
              * [RND Tool] 현재 영역(Window/Iframe)에 소스 탐색 이벤트 주입
@@ -1086,13 +1087,13 @@
             }
 
             // 공통 인스턴스 정의
-            try { oAPP.main.fnPredefineGlobalObject(); } catch (e) { console.warn("[HTML5] fnPredefineGlobalObject skip:", e && e.message); }
+            try { oAPP.main.fnPredefineGlobalObject(); } catch (e) { console.warn("fnPredefineGlobalObject skip:", e && e.message, e); }
 
             // 초기 모델 바인딩
-            try { oAPP.main.fnOnInitModelBinding(); } catch (e) { console.warn("[HTML5] fnOnInitModelBinding skip:", e && e.message); }
+            try { oAPP.main.fnOnInitModelBinding(); } catch (e) { console.warn("fnOnInitModelBinding skip:", e && e.message, e); }
 
             // 초기 현재 화면 위치 정보 저장
-            try { parent.setCurrPage("WS10"); } catch (e) { }
+            try { parent.setCurrPage("WS10"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // [UI5 제거] parent.oWS.utill.attr.sap = sap; 제거 (sap 없음).
 
@@ -1106,15 +1107,15 @@
             // _attach_AI_Events();
 
             // 작업표시줄 메뉴 생성하기
-            try { _createTaskBarMenu(); } catch (e) { console.warn("[HTML5] _createTaskBarMenu skip:", e && e.message); }
+            try { _createTaskBarMenu(); } catch (e) { console.warn("_createTaskBarMenu skip:", e && e.message, e); }
 
             // 현재 브라우저의 이벤트 핸들러
-            try { _attachCurrentWindowEvents(); } catch (e) { console.warn("[HTML5] _attachCurrentWindowEvents skip:", e && e.message); }
+            try { _attachCurrentWindowEvents(); } catch (e) { console.warn("_attachCurrentWindowEvents skip:", e && e.message, e); }
 
             // [UI5 무력화] illustration/SAP/U4A 아이콘 등록은 UI5 전용 → sap 참조 시 크래시. 가드.
-            try { if (oAPP.fn.fnRegisterIllustrationPool) oAPP.fn.fnRegisterIllustrationPool(); } catch (e) { }
-            try { if (oAPP.fn.fnRegisterSAPIcons) oAPP.fn.fnRegisterSAPIcons(); } catch (e) { }
-            try { if (oAPP.fn.fnRegisterU4AIcons) oAPP.fn.fnRegisterU4AIcons(); } catch (e) { }
+            try { if (oAPP.fn.fnRegisterIllustrationPool) oAPP.fn.fnRegisterIllustrationPool(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oAPP.fn.fnRegisterSAPIcons) oAPP.fn.fnRegisterSAPIcons(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oAPP.fn.fnRegisterU4AIcons) oAPP.fn.fnRegisterU4AIcons(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // // 초기 현재 화면 위치 정보 저장
             // parent.setCurrPage("WS10");
@@ -1131,7 +1132,7 @@
             // oAPP.common.fnSetGlobalShortcut();
 
             // APP 전체 대상 공통 Shortcut 지정하기
-            try { oAPP.common.fnSetCommonShortcut(); } catch (e) { console.warn("[HTML5] fnSetCommonShortcut skip:", e && e.message); }
+            try { oAPP.common.fnSetCommonShortcut(); } catch (e) { console.warn("fnSetCommonShortcut skip:", e && e.message, e); }
 
             // // 초기 모델 바인딩
             // oAPP.main.fnOnInitModelBinding();
@@ -1140,36 +1141,44 @@
             await oAPP.main.fnGetWsMsgModelData();
 
             // WS Global 메시지 글로벌 변수 설정
-            try { await oAPP.fn.fnWsGlobalMsgList(); } catch (e) { console.warn("[HTML5] fnWsGlobalMsgList skip:", e && e.message); }
+            try { await oAPP.fn.fnWsGlobalMsgList(); } catch (e) { console.warn("fnWsGlobalMsgList skip:", e && e.message, e); }
 
             // 초기 화면 그리기 (HTML5: ws_fn_01.fnOnInitRendering → ws10_html.fnRenderWs10Html)
             //   렌더가 실패해도 빈 화면이 되지 않도록 폴백으로 WS10 직접 렌더를 재시도한다.
             try {
                 oAPP.fn.fnOnInitRendering();
             } catch (e) {
-                console.error("[HTML5] fnOnInitRendering error:", e);
-                try { oAPP.fn.fnRenderWs10Html && oAPP.fn.fnRenderWs10Html(); } catch (e2) { console.error("[HTML5] fnRenderWs10Html error:", e2); }
+                console.error("fnOnInitRendering error:", e);
+                try { oAPP.fn.fnRenderWs10Html && oAPP.fn.fnRenderWs10Html(); } catch (e2) { console.error("fnRenderWs10Html error:", e2); }
             }
 
             // 개인화 정보 설정 (HTML5: ws_html5_shell 스텁)
-            try { oAPP.fn.fnOnInitP13nSettings(); } catch (e) { console.warn("[HTML5] fnOnInitP13nSettings skip:", e && e.message); }
+            try { oAPP.fn.fnOnInitP13nSettings(); } catch (e) { console.warn("fnOnInitP13nSettings skip:", e && e.message, e); }
 
             // 서버 세션 타임아웃 체크
-            try { oAPP.fn.fnServerSession(); } catch (e) { console.warn("[HTML5] fnServerSession skip:", e && e.message); }
+            try { oAPP.fn.fnServerSession(); } catch (e) { console.warn("fnServerSession skip:", e && e.message, e); }
 
             // DOM 감지
-            try { oAPP.fn.fnSetMutationObserver(); } catch (e) { console.warn("[HTML5] fnSetMutationObserver skip:", e && e.message); }
+            try { oAPP.fn.fnSetMutationObserver(); } catch (e) { console.warn("fnSetMutationObserver skip:", e && e.message, e); }
 
             // 공통 IPCMAIN 이벤트 걸기
-            try { oAPP.fn.fnIpcMain_Attach_Event_Handler(); } catch (e) { console.warn("[HTML5] fnIpcMain_Attach skip:", e && e.message); }
+            try { oAPP.fn.fnIpcMain_Attach_Event_Handler(); } catch (e) { console.warn("fnIpcMain_Attach skip:", e && e.message, e); }
 
             // 공통 BroadCast 이벤트 걸기
-            try { oAPP.fn.fnBroadCast_Attach_Event_Handler(); } catch (e) { console.warn("[HTML5] fnBroadCast_Attach skip:", e && e.message); }
+            try { oAPP.fn.fnBroadCast_Attach_Event_Handler(); } catch (e) { console.warn("fnBroadCast_Attach skip:", e && e.message, e); }
 
             // [UI5 제거] 구: sap.ui.getCore().attachEvent(UIUpdated, ...) → 렌더 직후 1회 직접 실행.
             await (async function _afterRender() {
 
-                if (parent.oWS.utill.attr.UIUpdated) { return; }
+                if (parent.oWS.utill.attr.UIUpdated) {
+                    // ★ [2026-09-15, 장군님 지시] 이 갈래도 메인 시작의 끝이다 — 시작점에서 켠 busy 를 여기서 끈다.
+                    //   [고친 이유] 한 창에서 메인이 두 번째로 시작되면(표시가 이미 "X") 아래 본문 등장 완료 해제를
+                    //   건너뛴다. 종전엔 첫 화면 본문 그리기(js/ws10_html.js)가 중간에 꺼 줘서 가려져 있었다.
+                    zconsole.warn("fnWsStart: UIUpdated already set - skip after-render, release busy");
+                    parent.setBusy("");
+                    parent.setDomBusy("");
+                    return;
+                }
 
                 // [UI5 제거] _applyWs10ContPageThemeClass / attachThemeChanged 는 UI5 테마 의존
                 //            → ws10_html.js 가 U4ATheme 로 처리. 여기선 생략.
@@ -1177,7 +1186,7 @@
                 parent.oWS.utill.attr.UIUpdated = "X";
 
                 // WS 10번 화면 관련 AI 커스텀 이벤트 등록
-                try { if (parent.UAI && parent.UAI.setCustomEvent_WS_10) parent.UAI.setCustomEvent_WS_10(); } catch (e) { }
+                try { if (parent.UAI && parent.UAI.setCustomEvent_WS_10) parent.UAI.setCustomEvent_WS_10(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 // 시스템 공지사항이 있을 경우 화면에 출력
                 try {
@@ -1192,7 +1201,7 @@
                          * ──────────────────────────────────────────────────────────────── */
                         await oAPP.common.showSystemNotiMsg();
                     }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 // 새창 띄우면서 IF_DATA에 파라미터가 존재할 경우
                 let oNewWin_IF_DATA = parent.getNewBrowserIF_DATA && parent.getNewBrowserIF_DATA();
@@ -1220,7 +1229,7 @@
                                 // 진입 트리거 후 입력칸 비움(원본 950행).
                                 if (oInp) { setTimeout(function () { oInp.value = ""; }, 0); }
                             } catch (e) {
-                                console.error("[HTML5][MOVE20] 새창 WS20 자동진입 오류:", e && e.message);
+                                console.error("[MOVE20] auto-enter WS20 in the new window error:", e && e.message, e);
                             }
 
                             break;
@@ -1241,13 +1250,19 @@
                             browserKey: parent.getBrowserKey()
                         });
                         zconsole.log("IPC_HANDLER.command - WS_MAIN_UI_UPDATED!");
-                    } catch (e) { }
+                    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                     jQuery('#content').fadeIn({
                         duration: 300,
                         complete: function () {
                             parent.setBusy("");
                             parent.setDomBusy("");
+                            // ★ [2026-09-14, 장군님 지시] 로그인 로딩 화면도 여기서 끈다.
+                            //   [고친 이유] 종전에는 로그인 쪽(Login.js fnOnLoginSuccess)이 메인 로드를
+                            //   "시작만" 해 놓고 곧바로 껐다. 메인이 아직 안 그려져 검은 화면이 보였다.
+                            //   여기가 메인 본문이 실제로 다 그려진 시점이다 — 해제는 여기 한 곳에서만.
+                            try { if (typeof parent.showLoadingPage === "function") { parent.showLoadingPage(""); } }
+                            catch (e) { console.error("[WMAI-001] loading page hide failed:", e && e.message, e); }
                         }
                     });
 
@@ -1256,9 +1271,12 @@
             })();
 
         })().catch(function (e) {
-            console.error("[HTML5] fnWsStart error:", e);
+            // ★ 실제 실패 이벤트 — 메인 구성이 터졌다. 잠금과 로딩 화면을 여기서 푼다(타이머 아님).
+            console.error("[WMAI-001] fnWsStart failed - main screen could not be built:", e && e.message, e);
             parent.setBusy && parent.setBusy("");
             parent.setDomBusy && parent.setDomBusy("");
+            try { if (typeof parent.showLoadingPage === "function") { parent.showLoadingPage(""); } }
+            catch (e2) { console.error("[WMAI-001] loading page hide failed:", e2 && e2.message, e2); }
         }); // end of fnWsStart async
 
         /************************************************************************

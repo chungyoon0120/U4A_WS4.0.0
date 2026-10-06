@@ -51,21 +51,132 @@ let oAPP = parent.oAPP,
     /************************************************************************
      * 서버 전송 (원본 sendAjax 동일 — FormData POST, withCredentials)
      ************************************************************************/
-    function sendAjax(sPath, oFormData, fn_success) {
+    // [2026-09-14] fn_error 추가 — 종전에는 실패 콜백 자리가 아예 없어서, 통신이 실패하면
+    //   부르는 쪽이 켜 둔 로딩 표시가 영영 안 꺼졌다. 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+    //   빠져 있던 실패 이벤트를 실제로 배선한다(상태코드 오류 · 응답 해석 실패 · 연결 끊김 3가지).
+    function sendAjax(sPath, oFormData, fn_success, fn_error) {
+
+        /**
+         * 서버 통신 로그 (2026-09-08 추가)
+         * 이 별창은 자기 서버 통신 코드를 따로 갖고 있어 공통 자리에 안 잡힌다.
+         * 그래서 여기에도 같은 모양으로 남긴다. 요청 이름만 남기고 값은 안 남긴다.
+         */
+        var _iAjaxStartAt = Date.now();
+        var _sAjaxName = String(sPath).split("?")[0].split("/").pop() || sPath;
+
+        /**
+         * 요청 번호 (2026-09-08 추가)
+         * 같은 요청이 한꺼번에 여러 번 나가면 응답이 뒤섞여 돌아온다(실측).
+         * 번호를 붙여야 보낸 줄과 받은 줄의 짝이 맞는다.
+         */
+        if (typeof window.__u4aAjaxSeq !== "number") { window.__u4aAjaxSeq = 0; }
+        window.__u4aAjaxSeq++;
+        var _sAjaxNo = "#" + window.__u4aAjaxSeq;
+
+        /**
+         * 서버 통신 실패를 자세히 남긴다 (2026-09-08 추가 — 장군님 지시)
+         * 앞서는 "실패: 통신 오류" 한 줄뿐이라 서버가 뭐라고 했는지 알 수 없었다.
+         * 실패했을 때만 주소·상태·서버가 준 내용을 남긴다(성공은 한 줄 그대로).
+         */
+        function _ajaxFail(sReason, oXhrLike) {
+
+            _ajaxLog("끝남", "실패: " + sReason);
+
+            try {
+
+                if (typeof U4ALOG === "undefined") { return; }
+
+                var _sp = String(sPath == null ? "" : sPath);
+                var _i = _sp.indexOf("?");
+                if (_i >= 0) { _sp = _sp.slice(0, _i) + " (뒤쪽 정보는 가림)"; }
+
+                U4ALOG.error("서버통신 실패 상세", "sent to: " + _sp);
+
+                var x = oXhrLike || null;
+
+                if (!x) {
+                    U4ALOG.error("서버통신 실패 상세", "no response at all (connection dropped or server unreachable)");
+                    return;
+                }
+
+                U4ALOG.error("서버통신 실패 상세", "http status: "
+                    + ((typeof x.status === "number") ? x.status : "-")
+                    + (x.statusText ? (" " + x.statusText) : ""));
+
+                try {
+                    if (typeof x.getResponseHeader === "function") {
+                        var _aMark = ["sap-err-id", "u4a_status", "content-type"];
+                        for (var _k = 0; _k < _aMark.length; _k++) {
+                            var _v = x.getResponseHeader(_aMark[_k]);
+                            if (_v) { U4ALOG.error("서버통신 실패 상세", "response header " + _aMark[_k] + ": " + _v); }
+                        }
+                    }
+                } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+
+                try {
+
+                    var _sBody = (x.responseText != null) ? x.responseText : (x.response != null ? String(x.response) : "");
+
+                    if (!_sBody) {
+                        _sBody = "(서버가 아무 내용도 안 줬음)";
+                    } else if (_sBody.length > 4000) {
+                        _sBody = _sBody.slice(0, 4000) + " ...(" + (_sBody.length - 4000) + " more chars truncated)";
+                    }
+
+                    U4ALOG.error("서버통신 실패 상세", "response body: " + _sBody);
+
+                } catch (e3) {
+                    U4ALOG.error("서버통신 실패 상세", "response body unreadable: " + e3);
+                }
+
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                // 로그 남기다 통신을 막으면 안 된다.
+            }
+
+        }
+
+
+        function _ajaxLog(sWhat, sResult) {
+            try {
+                if (typeof U4ALOG === "undefined") { return; }
+                U4ALOG.server(sWhat, _sAjaxName + " " + _sAjaxNo, sResult, Date.now() - _iAjaxStartAt);
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+        // 보낼 때는 안 남긴다 — 끝날 때 한 줄에 다 담는다 (2026-09-10)
+
+        // 실패 콜백은 어느 경로로 끝나든 딱 한 번만 부른다.
+        var bFailSent = false;
+        function _fail(oXhrLike) {
+            if (bFailSent) { return; }
+            bFailSent = true;
+            if (typeof fn_error === "function") { fn_error(oXhrLike); }
+        }
 
         var xhr = new XMLHttpRequest();
         xhr.onreadystatechange = function () {
             if (xhr.readyState === xhr.DONE) {
+                if (xhr.status !== 200 && xhr.status !== 201) {
+                    _ajaxFail("서버가 상태 " + xhr.status + " 를 돌려줌", xhr);
+                    _fail(xhr);
+                }
                 if (xhr.status === 200 || xhr.status === 201) {
+                    _ajaxLog("끝남", "성공 (상태 " + ((typeof xhr !== "undefined" && xhr && xhr.status) ? xhr.status : "-") + ")");
                     try {
                         fn_success(JSON.parse(xhr.response));
                     } catch (e) {
-                        console.error("[HTML5][OTR] 응답 파싱 오류:", e && e.message);
+                        console.error("[OTR] response parse error:", e && e.message, e);
                         _setSearchBusy(false);
+                        _fail(xhr);
                     }
                 }
             }
         };
+
+        // 연결 자체가 끊긴 경우 — onreadystatechange 의 DONE 이 status 0 으로 오거나 아예 안 온다.
+        xhr.onerror = function () { _ajaxFail("연결이 끊김", xhr); _fail(xhr); };
+        xhr.onabort = function () { _ajaxFail("요청이 취소됨", xhr); _fail(xhr); };
 
         xhr.withCredentials = true;
         xhr.open("post", sPath, true);
@@ -119,7 +230,7 @@ let oAPP = parent.oAPP,
         document.body.appendChild(oTextArea);
         oTextArea.select();
 
-        try { document.execCommand('copy'); } catch (e) { }
+        try { document.execCommand('copy'); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         document.body.removeChild(oTextArea);
 
@@ -205,7 +316,7 @@ let oAPP = parent.oAPP,
         //   단일클릭=행선택(내장), 더블클릭=복사(_copyAlias). 선택키=행 인덱스(ALIAS 빈행 많아 부적합 → rowKey:idx).
         oEl.tableWrap = U4AUI.el("div", "u4a-table-wrap u4aOtr__tableWrap");
         var sNoData0 = "";
-        try { sNoData0 = oAPP.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "946"); } catch (e) { }
+        try { sNoData0 = oAPP.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "946"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oState.dt = U4AUI.makeDataTable(oEl.tableWrap, {
             virtual: true,
             columns: [],
@@ -371,15 +482,25 @@ let oAPP = parent.oAPP,
             try {
                 var PARWIN = oAPP.CURRWIN.getParentWindow();
                 if (PARWIN) { PARWIN.webContents.send("if-otr-callback", "X"); }
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 로딩 종료 + 본문 CSS 페이드인(셸) + 메인 영역 Busy Lock 해제(원본 동일)
             parent.oAPP.setBusyLoading('');
-            try { if (oAPP.fn && oAPP.fn.fnShowContent) { oAPP.fn.fnShowContent(); } } catch (e) { }
+            try { if (oAPP.fn && oAPP.fn.fnShowContent) { oAPP.fn.fnShowContent(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" });
             // ★형제 창 BUSY_OFF broadcast(opener 가 oMainBroad BUSY_ON 으로 형제창 잠금 → 짝맞춤).
             //   SETBUSYLOCK 은 "메인" busy 만 풀어 형제창(docPopup 등)은 안 풀린다 → 영구 busy+닫기차단 방지.
-            try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } catch (e) { }
+            try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        }, function () {
+
+            // [2026-09-14] 실패 콜백 — 창이 뜰 때 켜 둔 로더를 여기서 끈다(진짜 실패 이벤트).
+            //   서버가 준 내용은 sendAjax 안의 실패 로그가 이미 남긴다. 여기서는 화면만 정리한다.
+            //   ※ 타임아웃으로 끄지 않는다(.analy 16 §2.11) — 이 콜백이 그 자리를 대신한다.
+            try { parent.oAPP.setBusyLoading(''); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oAPP.fn && oAPP.fn.fnShowContent) { oAPP.fn.fnShowContent(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.IPCRENDERER.send(`if-send-action-${oAPP.BROWSKEY}`, { ACTCD: "BROAD_BUSY", PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         });
 
@@ -423,7 +544,7 @@ let oAPP = parent.oAPP,
                 if (iCnt > 5) { oEl.panel.setCollapsed(true); }
 
                 var oData = {};
-                try { oData = JSON.parse(param.TEXT[0].VALUE); } catch (e) { oData = {}; }
+                try { oData = JSON.parse(param.TEXT[0].VALUE); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oData = {}; }
                 _renderRows(oData.TF4LIST || []);
 
             } else if (param.TEXT[0].NAME === "NOTFOUND") {
@@ -451,9 +572,9 @@ let oAPP = parent.oAPP,
             var oTheme = (oAPP.attr.oThemeInfo && oAPP.attr.oThemeInfo.THEME) ? oAPP.attr.oThemeInfo : oAPP.fn.getThemeInfo();
             if (window.U4ATheme && oTheme && oTheme.THEME) {
                 window.U4ATheme.apply(oTheme.THEME);
-                try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { }
+                try { document.documentElement.style.removeProperty("--boot-bg"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 정적 골격
         _buildSkeleton();
@@ -465,7 +586,7 @@ let oAPP = parent.oAPP,
         document.addEventListener("keydown", function (ev) {
             if (ev.repeat) { return; }
             if (ev.key === "Escape") {
-                try { if (oAPP.fn && oAPP.fn.fnClose) { oAPP.fn.fnClose(); } } catch (e) { }
+                try { if (oAPP.fn && oAPP.fn.fnClose) { oAPP.fn.fnClose(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         });
 

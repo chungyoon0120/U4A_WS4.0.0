@@ -105,7 +105,7 @@
         var oBar = H.el("div", "u4aBwpTool u4aBwpSyncListTool");
         var oApply = _btn("check", H.z("141"), H.z("141"), "u4a-btn--emphasized", function () {   // 141 일괄적용.
             if (typeof oAPP.fn.onSetSyncAttr === "function") {
-                try { oAPP.fn.onSetSyncAttr(); } catch (e) { console.error("[HTML5][bindWindow] onSetSyncAttr:", e && e.message); }
+                try { oAPP.fn.onSetSyncAttr(); } catch (e) { console.error("[bindWindow] onSetSyncAttr:", e && e.message, e); }
             }
         });
         oApply.setAttribute("data-bwp-sync-apply", "1");
@@ -122,12 +122,15 @@
         oBody.appendChild(oWrap);
 
         oSync.tbl = U4AUI.makeDataTable(oHost, {
-            virtual: false, zebra: true,
+            // ★후보가 많을 수 있어(동일 속성 UI 오브젝트 다수) 보이는 행만 그리는 가상 스크롤로 전환.
+            //   ★가상 모드는 보이는 구간만 폭을 재는 특성상 auto 레이아웃이면 스크롤할 때마다 칸 폭이 흔들린다
+            //   → 칸마다 폭을 정해(고정 레이아웃, 아래 frame.css) 흔들림 제거. 넘치는 글자는 …로 줄이고 마우스 올리면 전체(title).
+            virtual: true, zebra: true,
             rowKey: function (r, i) { return r.OBJID + "|" + r.UIATK + "|" + i; },
             emptyText: H.z("312"),   // 312 No data Found.
             columns: [
                 {
-                    label: "", className: "u4aBwpSyncChkCol", align: "center",
+                    label: "", className: "u4aBwpSyncChkCol", align: "center", width: "2.5rem",
                     cell: function (r) {
                         var cb = H.el("input", "u4aBwpSyncChk"); cb.type = "checkbox"; cb.checked = !!r._chk;
                         cb.addEventListener("click", function (e) { e.stopPropagation(); });     // 행 클릭 선택과 분리.
@@ -135,13 +138,13 @@
                         return cb;
                     }
                 },
-                { label: H.z("190"), key: "OBJID" },   // UI Object ID.
-                { label: H.z("191"), key: "UIATT" },   // Attribute ID.
-                { label: H.z("178"), key: "UIATV" },   // Value(=바인딩 필드).
-                { label: H.z("194"), key: "UILIB" },   // UI Object Module.
-                { label: H.z("195"), key: "UIOBK" },   // UI Object Key.
-                { label: H.z("196"), key: "POBID" },   // Parent UI Object ID.
-                { label: H.z("197"), key: "PUIOK" }    // Parent Object Module.
+                { label: H.z("190"), key: "OBJID", width: "10rem" },   // UI Object ID.
+                { label: H.z("191"), key: "UIATT", width: "9rem" },    // Attribute ID.
+                { label: H.z("178"), key: "UIATV", width: "14rem" },   // Value(=바인딩 필드).
+                { label: H.z("194"), key: "UILIB", width: "12rem" },   // UI Object Module.
+                { label: H.z("195"), key: "UIOBK", width: "9rem" },    // UI Object Key.
+                { label: H.z("196"), key: "POBID", width: "10rem" },   // Parent UI Object ID.
+                { label: H.z("197"), key: "PUIOK" }                    // Parent Object Module(마지막 = 남는 폭 흡수).
             ]
         });
         oSync.tbl.setRows(oSync.aList || []);
@@ -206,7 +209,7 @@
         tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
         tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {   // 198 Help
             // [B4] 동일속성 화면 도움말 문서 "000277"(원본 synchronizionBind.js:796). 영역별 라우팅.
-            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000277"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000277"); } catch (e) { console.error("[bindWindow] onHelp:", e && e.message, e); } }
         }));
         page.appendChild(tool);
 
@@ -248,7 +251,7 @@
         // 원본 662 setBusyWS20Interaction(true)[sOption 없음] = 팝업 lock, WS20 미방송(225 유지).
         oAPP.fn.setBusy(true, { ISBROAD: true });
         if (oBtn) { oBtn.disabled = true; }   // 원본 666 self setEnabled(false) — 닫아도 재활성 안 함.
-        try { if (document.activeElement) { document.activeElement.blur(); } } catch (e) { }
+        try { if (document.activeElement) { document.activeElement.blur(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aBwpSyncDlg";
@@ -296,7 +299,7 @@
         _clearSyncListSelection();
 
         oSync.oDialog = oDlg;
-        try { oDlg.show(); } catch (e) { try { oDlg.open = true; } catch (e2) { } }   // ★비모달(원본 setModal(false)).
+        try { oDlg.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } try { oDlg.open = true; } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } }   // ★비모달(원본 setModal(false)).
 
         // afterOpen: 팝업 busy off(원본 694). WS20(225)는 유지.
         oAPP.fn.setBusy(false, { ISBROAD: true });
@@ -310,8 +313,8 @@
         var oDlg = oSync.oDialog;
         if (!oDlg) { return; }
         _setSyncViewLayout(true);   // 원본 beforeClose(698): 좌/가운데/우 잠금 해제.
-        try { oDlg.close(); } catch (e) { }
-        try { oDlg.remove(); } catch (e) { }
+        try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         oSync.oDialog = null;
         oAPP.fn.setBusyWS20Interaction(false, {});   // 원본 afterClose(711) broadToChild BUSY_OFF.
     }

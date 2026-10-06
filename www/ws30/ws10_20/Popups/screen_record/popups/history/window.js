@@ -53,7 +53,7 @@ function _alignToParent(win, parentWin) {
     if (x < da.x) x = da.x + Math.round((da.width - wb.width) / 2);
     y = Math.max(da.y, Math.min(pb.y, da.y + da.height - wb.height));
     win.setPosition(x, y, false);
-  } catch { win.center(); }
+  } catch (_u4aErr) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); } win.center(); }
 }
 
 /**

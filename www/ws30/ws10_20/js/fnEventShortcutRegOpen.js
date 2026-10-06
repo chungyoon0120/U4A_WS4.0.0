@@ -273,17 +273,17 @@
         try {
             var s = parent.WSUTIL.getWsMsgClsTxt.apply(parent.WSUTIL, ["", "ZMSG_WS_COMMON_001", sNr].concat(aRest));
             if (s && s.indexOf("|") === -1) { return s; }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return sNr;
     }
     // 편집 모드(원본 _sAppInfo.IS_EDIT==="X") — HTML5 SSOT = 속성 모델 IS_EDIT===true (ctxmenu/M03 동일).
     function _isEdit() {
-        try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { return false; }
+        try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
     // 토스트(§2.4 공통 정중앙) — 다이얼로그가 닫힌 후에만 사용(§2.10 top-layer).
     function _toast(sType, sText) {
         if (!sText) { return; }
-        try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { }
+        try { parent.showMessage(null, 10, sType || "I", sText); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
@@ -296,7 +296,7 @@
 
         //클라이언트 이벤트 존재 확인.
         var aCevt = [];
-        try { aCevt = oAPP.DATA.APPDATA.T_CEVT || []; } catch (e) { aCevt = []; }
+        try { aCevt = oAPP.DATA.APPDATA.T_CEVT || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } aCevt = []; }
         var sCevt = aCevt.find(function (a) { return a.OBJID === is_attr.OBJID + is_attr.UIASN; });
 
         //서버이벤트(UIATV) 미입력 + 클라이언트 이벤트 미등록 → 이벤트 등록 먼저.
@@ -309,7 +309,7 @@
 
         //대상 UI 정보(UILIB) 조회.
         var sUiInfo = null;
-        try { sUiInfo = oAPP.fn.getTreeData(is_attr.OBJID); } catch (e) { }
+        try { sUiInfo = oAPP.fn.getTreeData(is_attr.OBJID); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         var sUILIB = sUiInfo ? sUiInfo.UILIB : "";
 
         //단축키 등록이 가능한 UI + 이벤트 조합(allow-list) 확인.
@@ -328,7 +328,7 @@
         try {
             var oPrev = (oAPP.attr.prev && oAPP.attr.prev[is_attr.OBJID]) ? oAPP.attr.prev[is_attr.OBJID] : null;
             sModel = oAPP.fn.getParentAggrBind(oPrev);
-        } catch (e) { sModel = undefined; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sModel = undefined; }
         if (typeof sModel !== "undefined" && sModel !== "") {
             sRes.RETCD = "E";
             //485 모델 바인딩 처리된 경우 이벤트의 단축키 등록을 처리할 수 없습니다.
@@ -346,7 +346,7 @@
      ************************************************************************/
     function _checkDupl(sKey, sPre) {
         var a15;
-        try { a15 = oAPP.fn.getAttrChangedData(); } catch (e) { a15 = []; }
+        try { a15 = oAPP.fn.getAttrChangedData(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } a15 = []; }
         if (!a15 || a15.length === 0) { return false; }
 
         //단축키 등록건만 발췌.
@@ -359,7 +359,7 @@
             if (sPre.OBJID === s.OBJID && sPre.UIATT === s.UIATT) { continue; }
 
             var sc = s.SHCUT;
-            if (typeof sc === "string") { try { sc = JSON.parse(sc); } catch (e) { continue; } }
+            if (typeof sc === "string") { try { sc = JSON.parse(sc); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } continue; } }
             if (sc && sc.SCKEY === sKey) { return true; }
         }
         return false;
@@ -492,7 +492,7 @@
             }
             _renderCapture();
             //클릭 시 포커스(키 캡처는 window 리스너라 포커스와 무관하나, "입력 대기" 시각 표시용).
-            oCapture.addEventListener("click", function () { try { oCapture.focus(); } catch (e) { } });
+            oCapture.addEventListener("click", function () { try { oCapture.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
             oBody.appendChild(oCapture);
 
             //createField 호환 어댑터(나머지 로직은 oField.getValue/setValue/input 만 사용).
@@ -567,12 +567,12 @@
             if (window.U4AUI && U4AUI.makeDialogResizable) { U4AUI.makeDialogResizable(oDlg, { minW: 420, minH: 300 }); }
 
             document.body.appendChild(oDlg);
-            try { oDlg.showModal(); } catch (e) { }
+            try { oDlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             //원본 afterOpen: busy off + keydown 캡처 등록 + 입력 포커스.
-            try { parent.setBusy && parent.setBusy(""); } catch (e) { }
+            try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _addKeyDown();
-            try { oField.input.focus(); } catch (e) { }
+            try { oField.input.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             /* ── 키 캡처 (원본 addKeyDown/removeKeyDown/onKeyDown) ── */
             function _addKeyDown() { window.addEventListener("keydown", _onKeyDown, true); }
@@ -630,11 +630,11 @@
                     if (!bYes) {
                         //취소 — 키 캡처 재등록 후 유지(원본). 캡처 존 포커스 복귀("입력 대기" 표시).
                         _addKeyDown();
-                        try { oField.input.focus(); } catch (e) { }
+                        try { oField.input.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                         return;
                     }
 
-                    try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
+                    try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     _removeKeyDown();
 
                     var bFocus = oChk.checked;
@@ -647,7 +647,7 @@
                 if (bResolved) { return; }
                 bResolved = true;
                 _removeKeyDown();
-                try { if (oDlg.open) { oDlg.close(); } } catch (e) { }
+                try { if (oDlg.open) { oDlg.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 resolve({ ACTCD: sActcd, RDATA: oRdata || null });
             }
         });
@@ -659,6 +659,7 @@
         try {
             parent.showMessage(null, 30, "I", sMsg, function (p) { fnDone(p === "YES"); });
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             //폴백 — showMessage 부재 시 안전하게 취소 처리(임의 진행 금지).
             fnDone(false);
         }
@@ -672,17 +673,17 @@
 
         if (!is_attr) { return; }
 
-        try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
-        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { }
+        try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         //단축키 등록전 가능여부 점검.
         var sRes = _checkValidate(is_attr);
 
         //점검 오류 → 오류박스(kind 20) 후 종료(다이얼로그 열기 전이라 top-layer 무관).
         if (sRes.RETCD === "E") {
-            try { parent.showMessage(null, 20, "E", sRes.RTMSG); } catch (e) { }
-            try { oAPP.fn.setShortcutLock(false); } catch (e) { }
-            try { parent.setBusy(""); } catch (e) { }
+            try { parent.showMessage(null, 20, "E", sRes.RTMSG); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
 
@@ -690,25 +691,25 @@
         var sPre = { OBJID: is_attr.OBJID, UIATT: is_attr.UIATT };
         var pre = is_attr.SHCUT;
         //SHCUT 은 object(당세션 등록) 또는 JSON string(로드 직후 등) 혼재 가능 → 정규화.
-        if (typeof pre === "string" && pre !== "") { try { pre = JSON.parse(pre); } catch (e) { pre = null; } }
+        if (typeof pre === "string" && pre !== "") { try { pre = JSON.parse(pre); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } pre = null; } }
         if (pre && typeof pre === "object" && Object.keys(pre).length > 0) {
             sPre.keyBinding = pre.SCKEY;
             sPre.autoFocus = pre.ATFOC === "X";
         }
 
         //다이얼로그 오픈 전 락 해제(원본). 열려 있는 동안은 공통 가드(<dialog open>)가 WS20 단축키 차단.
-        try { oAPP.fn.setShortcutLock(false); } catch (e) { }
+        try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         //키바인딩 다이얼로그 호출.
         var oInfo = await _openKeybindingDialog(sPre);
 
-        try { parent.setBusy && parent.setBusy("X"); } catch (e) { }
-        try { oAPP.fn.setShortcutLock(true); } catch (e) { }
+        try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         //등록(APPLY) 이외 처리(취소/닫기) → 정리 후 종료.
         if (!oInfo || oInfo.ACTCD !== "APPLY") {
-            try { oAPP.fn.setShortcutLock(false); } catch (e) { }
-            try { parent.setBusy(""); } catch (e) { }
+            try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             return;
         }
 

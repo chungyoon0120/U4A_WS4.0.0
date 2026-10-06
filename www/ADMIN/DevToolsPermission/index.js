@@ -82,6 +82,7 @@ function fn_decrypt(CryptoJS, encryptData) {
     try {
         Ldecrypt = cipher.toString(CryptoJS.enc.Utf8);
     } catch (error) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
         return {
             "RETCD": "E",
             "RTMSG": MSGCLS.M01
@@ -101,6 +102,7 @@ function fn_decrypt(CryptoJS, encryptData) {
     try {
         var oDescrypt = JSON.parse(Ldecrypt);
     } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         return {
             "RETCD": "E",
             "RTMSG": MSGCLS.M01

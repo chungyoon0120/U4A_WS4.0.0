@@ -1,3 +1,4 @@
+// 오류코드 접두: RSRC / 다음 번호: 009
 /**
  * index.js  (cleaned)
  *
@@ -149,11 +150,11 @@ oAPP.views = window?.oAPP?.views || {};
             if (typeof HTMLDialogElement === "undefined" || HTMLDialogElement.prototype.__tlSeqWrapped) { return; }
             var _orig = HTMLDialogElement.prototype.showModal, _seq = 0;
             HTMLDialogElement.prototype.showModal = function () {
-                try { this.dataset.tlSeq = String(++_seq); } catch (e) { }
+                try { this.dataset.tlSeq = String(++_seq); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return _orig.apply(this, arguments);
             };
             HTMLDialogElement.prototype.__tlSeqWrapped = true;
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     })();
 
     oWS.utill.fn.showMessage = function (oUI5, KIND, TYPE, MSG, fn_callback) {
@@ -187,7 +188,7 @@ oAPP.views = window?.oAPP?.views || {};
         //   렌더한다. 구 oUI5.m.MessageToast/MessageBox 의존 제거(oUI5 인자 무시). KIND 99(네이티브)만 유지.
         //   기존 모든 parent.showMessage(sap, KIND, TYPE, MSG, cb) 호출부가 그대로 동작.
         function lf_sound(t) {
-            try { if (t === "S") { setSoundMsg("01"); } else if (t === "W" || t === "E") { setSoundMsg("02"); } } catch (e) { }
+            try { if (t === "S") { setSoundMsg("01"); } else if (t === "W" || t === "E") { setSoundMsg("02"); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 토스트(구 MessageToast) — 싱글톤 .u4a-toast, 3초 자동 숨김
         function _u4aToast(sMsg) {
@@ -218,20 +219,25 @@ oAPP.views = window?.oAPP?.views || {};
                 oT.dataset.show = "true";
                 if (oT.__t) { clearTimeout(oT.__t); }
                 oT.__t = setTimeout(function () { oT.dataset.show = "false"; }, 3000);
-            } catch (e) { try { alert(sMsg); } catch (e2) { } }
+            } catch (e) {
+                // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 토스트 표시 실패는 오류코드로만 표면화한다.
+                console.error("[RSRC-001] toast show failed -", e && e.message, "message:", sMsg, e);
+            }
         }
         // 메시지 팝업(구 MessageBox) — 테마 native <dialog class="u4a-msgbox">.
         //   aBtns: [{act,label,emphasized}] → 콜백에 UI5 Action 과 동일한 act("OK"/"YES"/"NO"/"CANCEL") 전달.
         function _u4aMsgBox(sType, sTitle, sMsg, aBtns, fnCb) {
-            function lf_cb(sAct) { if (typeof fnCb === "function") { try { fnCb(sAct); } catch (e) { } } }
+            function lf_cb(sAct) { if (typeof fnCb === "function") { try { fnCb(sAct); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } } }
             var bCancel = aBtns.some(function (b) { return b.act === "CANCEL"; });
             var bNo = aBtns.some(function (b) { return b.act === "NO"; });
             var oDlg;
-            try { oDlg = document.createElement("dialog"); } catch (e) { oDlg = null; }
+            try { oDlg = document.createElement("dialog"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oDlg = null; }
             if (!oDlg || typeof oDlg.showModal !== "function") {
-                if (aBtns.length <= 1) { try { alert(sMsg); } catch (e) { } lf_cb("OK"); return; }
-                var bOk = false; try { bOk = confirm(sMsg); } catch (e) { }
-                lf_cb(bOk ? "YES" : (bCancel ? "CANCEL" : "NO")); return;
+                // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — <dialog>.showModal 은 메시지 팝업의 필수 의존성.
+                //   미지원이면 삼키지 말고 오류코드로 표면화하고 fail-closed 로 종료(버튼 1개=OK, 여러 개=진행 안 함).
+                console.error("[RSRC-002] _u4aMsgBox: <dialog>.showModal unsupported - message popup blocked. message:", sMsg);
+                lf_cb(aBtns.length <= 1 ? "OK" : (bCancel ? "CANCEL" : "NO"));
+                return;
             }
             // 서버리스트/셸/로그인 메시지박스와 동일한 .u4a-dialog(헤더 아이콘 + 본문 + 푸터) 디자인으로 통일.
             var oTypeIcon = { C: "circle-question", S: "circle-check", E: "circle-xmark", W: "triangle-exclamation", I: "circle-info" };
@@ -245,7 +251,7 @@ oAPP.views = window?.oAPP?.views || {};
                 '<div class="u4a-dialog__footer"></div>';
             oDlg.querySelector(".u4a-dialog__header span").textContent = sTitle || "";
             oDlg.querySelector(".u4a-dialog__body").textContent = sMsg || "";
-            function lf_close(sAct) { try { oDlg.close(); } catch (e) { } try { oDlg.remove(); } catch (e) { } lf_cb(sAct); }
+            function lf_close(sAct) { try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } try { oDlg.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } lf_cb(sAct); }
             var oFooter = oDlg.querySelector(".u4a-dialog__footer");
             aBtns.forEach(function (b) {
                 var oBtn = document.createElement("button");
@@ -257,8 +263,9 @@ oAPP.views = window?.oAPP?.views || {};
             });
             oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(bCancel ? "CANCEL" : (bNo ? "NO" : "OK")); });
             try { document.body.appendChild(oDlg); oDlg.showModal(); } catch (e) {
-                if (aBtns.length <= 1) { try { alert(sMsg); } catch (e2) { } lf_close("OK"); }
-                else { var ok = false; try { ok = confirm(sMsg); } catch (e2) { } lf_close(ok ? "YES" : (bCancel ? "CANCEL" : "NO")); }
+                // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 표시 실패는 오류코드 표면화 + fail-closed 종료.
+                console.error("[RSRC-003] _u4aMsgBox: showModal failed —", e && e.message, e);
+                lf_close(aBtns.length <= 1 ? "OK" : (bCancel ? "CANCEL" : "NO"));
             }
         }
 
@@ -604,7 +611,10 @@ oAPP.views = window?.oAPP?.views || {};
             oBrowserOptions = JSON.parse(JSON.stringify(oDefaultOption.browserWindow));
 
         oBrowserOptions.title = "U4A Workspace - #Main";
-        oBrowserOptions.opacity = 0.0;
+        // ★ [2026-09-14, 장군님 지시] 네이티브 투명도로 숨기지 않는다 — 표준은 show:false 다
+        //   (.analy 16 §2.6). 종전에는 opacity 0 으로 만들어 창이 "보이지만 투명한" 채로 작업표시줄에만
+        //   떠 있었다. 창 문서가 setOpacity(1.0) + show() 로 되살리는 건 그대로다(vw_main/control.js).
+        oBrowserOptions.show = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
         oBrowserOptions.titleBarStyle = 'hidden';
@@ -681,9 +691,19 @@ oAPP.views = window?.oAPP?.views || {};
         // 브라우저가 오픈이 다 되면 타는 이벤트
         // 로드 실패시(네트워크 단절/잘못된 URL 등) 에도 did-finish-load 는 오지 않으므로,
         //   실패를 타임아웃으로 추측하지 않고 Electron 이 주는 실제 실패 이벤트로 해제한다.
-        oBrowserWindow.webContents.on('did-fail-load', function (e, errorCode, errorDescription) {
-            console.warn("[HTML5][onNewWindow] did-fail-load:", errorCode, errorDescription);
+        oBrowserWindow.webContents.on('did-fail-load', function (e, errorCode, errorDescription, validatedURL, isMainFrame) {
+            // 하위 프레임 실패(isMainFrame=false)와 사용자 취소(-3)는 창 실패가 아니다.
+            if (isMainFrame === false || errorCode === -3) { return; }
+            console.error("[RSRC-006] new window load failed:", errorCode, errorDescription, validatedURL);
             _releaseBusy();
+            // ★ [2026-09-14, 장군님 지시] 실패도 호출자에게 알린다.
+            //   종전에는 성공(did-finish-load)에서만 fnOnLoaded 를 불렀다. 그래서 새창 로드가 실패하면
+            //   호출자(버전 관리 창 등)의 busy 가 영영 안 풀렸고, 그걸 "5초 지나면 그냥 끈다"는 타이머로
+            //   덮고 있었다(금지 — .analy 16 §2.11). 이제는 실패도 같은 콜백으로 통지한다.
+            if (typeof fnOnLoaded === "function") {
+                try { fnOnLoaded(null); }
+                catch (e2) { console.error("[RSRC-006] caller notice on load failure failed:", e2 && e2.message, e2); }
+            }
         });
 
         oBrowserWindow.webContents.on('did-finish-load', function () {
@@ -693,7 +713,7 @@ oAPP.views = window?.oAPP?.views || {};
 
             // 새창을 요청한 호출자(예: 버전관리 팝업)에 "로드 완료" 통지(옵션). 호출자가 자기 busy 를 끈다.
             if (typeof fnOnLoaded === "function") {
-                try { fnOnLoaded(oBrowserWindow); } catch (e) { }
+                try { fnOnLoaded(oBrowserWindow); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
 
             var oSAPServerInfo = getServerInfo();
@@ -1137,6 +1157,8 @@ oAPP.views = window?.oAPP?.views || {};
 
         if (bIsShow == 'X') {
             oLoadPg.style.background = "linear-gradient(to right, #1c2228, #1c2228)";
+            // [2026-09-15] 원본대로 되돌림 — 인라인 display 를 건드리지 않는다(원본에서 이 화면은 늘 숨겨져 있다).
+            //   2026-09-14 에 지시 없이 display 를 켜게 바꿨다가 빨간 LOADING 원이 보이게 됐다(장군님 지적).
             oLoadPg.classList.remove("u4a_loadersInactive");
 
         } else {
@@ -1317,7 +1339,32 @@ oAPP.views = window?.oAPP?.views || {};
 
     };
 
+    // 39-0. 접속 언어(WS Language)에 맞는 메시지 DB 문구 조회 — 없으면 fallback 그대로.
+    //   [보강 2026-09-07, 장군님 지시] 원본은 언어 상관없이 영문 고정이었으나, 이제 메시지 DB 값을 따라
+    //   접속 언어대로 나온다. 미등록·미로드 시엔 fallback(영문) 반환(oAPP.common.fnGetMsgClsText 는
+    //   미등록 시 "" 또는 "클래스|번호" 반환 — "|" 감지 가드).
+    function _netErrMsg(sCls, sNum, sFallback) {
+        try {
+            if (oAPP.common && oAPP.common.fnGetMsgClsText) {
+                var s = oAPP.common.fnGetMsgClsText(sCls, sNum);
+                if (s && s.indexOf("|") === -1) { return s; }
+            }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        return sFallback;
+    }
+
     // 39. 네트워크 상태에 따른 Busy Indicator 실행 메소드
+    //   [보강 2026-09-07] 원본은 아이콘+문구만 있던 화면 — 제목·설명 문구(메시지DB 연동) + 경과시간
+    //   표시 + 종료 버튼 추가.
+    //   ★재시작(RETRY) 버튼 없음(장군님 지시) — 네트워크가 끊겨서 뜨는 화면인데 앱만 다시 켠다고
+    //     네트워크가 돌아오는 게 아니라 재시작은 의미가 없음. 종료 버튼만 둔다.
+    //   ★화면 자체를 버튼으로 그냥 닫는 길도 없음(장군님 지시) — 네트워크가 살아있을 때만 동작하는
+    //     게 솔루션 컨셉. 온라인 이벤트로만 자동 해제된다(setNetworkBusy(false)).
+    //   종료 동작은 Login.js 의 업데이트 오류창 CLOSE(APP.exit()) 와 동일 패턴 재사용.
+    //   ★[수정 2026-09-08, 장군님 지시] <div>+class 토글 → <dialog>+showModal()/close(). class 토글
+    //     방식은 진짜로 막는 게 아니라 실측상 Tab 키가 뒤 화면(검색창 등)으로 새어나가 배경을 그대로
+    //     조작할 수 있었다(심각). u4aWsBusyIndicator 와 같은 방식으로 전환 — 포커스 가둠은 브라우저
+    //     top-layer 가 네이티브로 처리(손수 포커스트랩 구현 안 함, §오버레이는 공통 하나로).
     oWS.utill.fn.setNetworkBusy = (bIsBusy, iZindex) => {
 
         var oNetBusy = document.getElementById("u4a_neterr");
@@ -1325,20 +1372,88 @@ oAPP.views = window?.oAPP?.views || {};
             return;
         }
 
-        oNetBusy.classList.add("u4a_neterrInactive");
+        // 버튼 배선은 최초 1회만. 이 스크립트는 #u4a_neterr 보다 먼저 파싱되어(head 쪽 <script>),
+        //   여기(호출 시점)가 DOM 존재가 보장되는 가장 이른 지점이라 여기서 지연 배선한다.
+        if (!oNetBusy.dataset.wired) {
+            oNetBusy.dataset.wired = "1";
+            // ESC 로 못 닫게(원본 escapeHandler 빈 함수와 동일 취지) — 네트워크 복구 전엔 절대 안 닫힘.
+            oNetBusy.addEventListener("cancel", function (e) { e.preventDefault(); });
+            var oExitBtn = oNetBusy.querySelector("#u4a_neterr_exit");
+            if (oExitBtn) {
+                oExitBtn.addEventListener("click", function () {
+                    // ★[보강 2026-09-07, 장군님 지시] 종료 전 확인창 필수. window.confirm 절대 금지
+                    //   → 공통 U4AUI.confirm 만 사용(§code.md). 문구는 기존 메시지 DB 키 그대로 참조
+                    //   (ZMSG_WS_COMMON_001 049 "프로그램을 종료하시겠습니까?" / CL_WS_COMMON B87 예·B88 아니오).
+                    if (typeof U4AUI === "undefined" || !U4AUI.confirm) {
+                        // 확인창은 필수 의존성 — 못 띄우면 삼키지 말고 오류코드 표면화 + fail-closed(종료 안 함).
+                        console.error("[RSRC-004] u4a_neterr exit: common U4AUI.confirm not loaded — checkwindow show blocked, end cancel");
+                        return;
+                    }
+                    U4AUI.confirm({
+                        type: "C",
+                        message: _netErrMsg("ZMSG_WS_COMMON_001", "049", "Are you sure you want to Exit the Program?"),
+                        buttons: [
+                            { act: "YES", label: _netErrMsg("/U4A/CL_WS_COMMON", "B87", "Yes"), emphasized: true },
+                            { act: "NO", label: _netErrMsg("/U4A/CL_WS_COMMON", "B88", "No") }
+                        ],
+                        onClose: function (sAct) {
+                            if (sAct === "YES") { APP.exit(); }
+                        }
+                    });
+                });
+            }
+        }
+
+        _clearNetErrElapsedTimer(); // WP1 ② — 겹침 방지: 새 상태 진입 전 이전 타이머 핸들부터 정리.
 
         if (bIsBusy) {
 
-            setTimeout(() => {
-                oNetBusy.focus();
-            }, 0);
+            // 제목·설명 — ZMSG_WS_COMMON_002 007(제목)/008(설명), 매번 재적용(로그인 사이 언어가
+            //   바뀌어도 최신 값으로 반영). 확인창(049/B87/B88)과 같은 조회 경로라 항상 같은 언어로 나온다.
+            var oTitle = oNetBusy.querySelector("#u4a_loaders_msg");
+            var oDesc = oNetBusy.querySelector("#u4a_neterr_desc");
+            if (oTitle) { oTitle.textContent = _netErrMsg("ZMSG_WS_COMMON_002", "007", "Network connection lost"); }
+            if (oDesc) { oDesc.textContent = _netErrMsg("ZMSG_WS_COMMON_002", "008", "Please check your internet connection. This screen will close automatically once the connection is restored."); }
 
-            oNetBusy.classList.remove("u4a_neterrInactive");
-            oNetBusy.style.zIndex = iZindex ? iZindex : 999999;
+            // showModal() 은 이미 열려있으면 예외(InvalidStateError) — 재진입 가드.
+            //   포커스는 showModal() 이 스펙대로 자동 처리(첫 포커스 가능 요소=CLOSE 버튼) — 손수 focus() 안 함.
+            if (!oNetBusy.open) {
+                try { oNetBusy.showModal(); }
+                catch (e) { console.error("[RSRC-005] u4a_neterr showModal failed —", e && e.message, e); }
+            }
+            _startNetErrElapsedTimer(oNetBusy);
             return;
         }
 
+        // 복구 — 열려있을 때만 close(중복 호출 예외 방지).
+        if (oNetBusy.open) {
+            try { oNetBusy.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
     };
+
+    // 39-1. 네트워크 끊김 경과 시간(분:초) — 1초마다 갱신, 복구(setNetworkBusy(false))·재진입 시 정지.
+    var _iNetErrElapsedTimer = null;
+    function _clearNetErrElapsedTimer() {
+        if (_iNetErrElapsedTimer) {
+            clearInterval(_iNetErrElapsedTimer);
+            _iNetErrElapsedTimer = null;
+        }
+    }
+    function _startNetErrElapsedTimer(oNetBusy) {
+        var oElapsed = oNetBusy.querySelector("#u4a_neterr_elapsed");
+        if (!oElapsed) {
+            return;
+        }
+        var iStart = Date.now();
+        function _tick() {
+            var iSec = Math.floor((Date.now() - iStart) / 1000);
+            var iM = Math.floor(iSec / 60), iS = iSec % 60;
+            oElapsed.textContent = "Disconnected " + iM + ":" + (iS < 10 ? "0" : "") + iS;
+        }
+        _tick();
+        _iNetErrElapsedTimer = setInterval(_tick, 1000);
+    }
 
 })(oWS);
 
@@ -1503,38 +1618,26 @@ function getErrorMsg() {
 
 function setDomBusy(bIsBusy) {
 
-    let oBusyDom = document.getElementById("u4aWsBusyIndicator");
-    if (!oBusyDom) {
-        return;
-    }
-
-    // busy 요소가 <dialog> 면 showModal() 로 띄운다 — 모달 팝업(showModal)도 top-layer 라
-    //   일반 <div>(z-index 무한대라도) busy 는 그 뒤로 가려 안 보인다. busy 도 모달이어야
-    //   어떤 모달 팝업 위에도 보인다(전 화면 공통 — 모든 parent.setBusy 가 그대로 위에 뜸).
-    //   <dialog> 가 아니면(다른 창) 기존 display 토글로 폴백.
-    var bIsDialog = (typeof oBusyDom.showModal === "function");
-
-    if (bIsBusy === "X") {
-        if (bIsDialog) {
-            if (!oBusyDom.__escGuard) {
-                oBusyDom.__escGuard = true;
-                // busy 중 ESC 로 닫히지 않게(닫혀도 작업은 계속되지만 시각 잠금 유지).
-                oBusyDom.addEventListener("cancel", function (e) { e.preventDefault(); });
-            }
-            if (!oBusyDom.open) {
-                try { oBusyDom.showModal(); } catch (e) { oBusyDom.style.display = "flex"; }
-            }
-        } else {
-            oBusyDom.style.display = "flex"; // 카드 중앙정렬 (스크림 flex center)
+    // ★ [2026-09-15, 장군님 지시] busy 본체를 공통 화면 리소스 theme/u4a-busy.js(U4ABusy)로 옮겼다.
+    //   busy 도 하나의 UI 이고, 화면 시작 때 가장 먼저 로드돼야 해서다(ws10_20/index.html <head> 맨 앞).
+    //   이 함수 이름은 그대로 둔다 — parent.setDomBusy 로 부르는 곳이 전부 이 이름을 쓴다.
+    //   옛 본체 = _index.js.busythemebak
+    if (typeof U4ABusy === "undefined" || !U4ABusy) {
+        // u4a-busy.js 로드가 빠진 창이다. 장군님 결정(2026-09-15): 앱 종료 없이 로그만 남긴다
+        //   (없을 수가 없고, 빠지면 테스트 때 busy 가 안 떠서 바로 드러난다). 같은 창에서 한 번만 남긴다.
+        if (!setDomBusy.__missLogged) {
+            setDomBusy.__missLogged = true;
+            console.error("[RSRC-008] setDomBusy: U4ABusy not loaded - theme/u4a-busy.js missing in this window, busy not shown");
         }
         return;
     }
 
-    if (bIsDialog) {
-        if (oBusyDom.open) { try { oBusyDom.close(); } catch (e) { } }
-    } else {
-        oBusyDom.style.display = "none";
+    if (bIsBusy === "X") {
+        U4ABusy.show();
+        return;
     }
+
+    U4ABusy.hide();
 
 }
 
@@ -1692,26 +1795,68 @@ function getLocalAppDataPath() {
 }
 
 // 텍스트 클립보드 복사
+//   ★[수정 2026-09-14, 장군님 지시] 원본은 임시 <textarea> + document.execCommand('copy') 뿐이었다.
+//   같은 document 에 native <dialog>.showModal() 로 연 모달이 있으면 dialog 바깥이 inert 라
+//   body 에 붙인 textarea 를 select() 할 수 없다 → 실제로는 아무것도 복사되지 않는데
+//   execCommand 는 true 를 돌려주므로 실패를 아무도 모른다.
+//   실측(Electron 14.2.9 / Chromium 93): 모달 열린 상태 execCommand=true, selection length=0, clipboard 변화 없음.
+//     - 증상 사례: 즐겨찾기 아이콘 팝업(favIconPopup) 의 아이콘 이름 복사.
+//     - 원본(UI5)은 sap.m.ResponsivePopover 라 native 모달이 아니어서 inert 가 안 걸렸다.
+//   → Electron clipboard 모듈을 먼저 쓴다(DOM inert 와 무관). 이 프로젝트의 patternPopup /
+//     fontStyleWizard / illustMsgPopup 이 이미 쓰는 방식과 같다. 실패하면 원본 방식으로 내려간다.
+//   반환값 = 복사 성공 여부. 호출측은 이 값으로 "복사됨" 안내 여부를 정한다.
 function setClipBoardTextCopy(sText, fnCallback) {
 
     if (typeof sText !== "string") {
-        return;
+        return false;
     }
 
-    var oTextArea = document.createElement("textarea");
-    oTextArea.value = sText;
+    var bOk = false;
 
-    document.body.appendChild(oTextArea);
+    // 1) Electron clipboard — 모달(<dialog>) 이 열려 있어도 동작한다.
+    try {
+        var oClip = require("electron").clipboard;
+        if (oClip && typeof oClip.writeText === "function") {
+            oClip.writeText(sText);
+            bOk = true;
+        }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-    oTextArea.select();
+    // 2) fallback — 원본 방식(textarea + execCommand).
+    if (!bOk) {
 
-    document.execCommand('copy');
+        var oTextArea = null;
 
-    document.body.removeChild(oTextArea);
+        try {
+
+            oTextArea = document.createElement("textarea");
+            oTextArea.value = sText;
+
+            document.body.appendChild(oTextArea);
+
+            oTextArea.select();
+
+            // execCommand 는 실패해도 true 를 돌려준다 → selection length 로 실제 성공을 확인한다.
+            bOk = (document.execCommand('copy') === true && String(document.getSelection()).length > 0);
+
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        if (oTextArea && oTextArea.parentNode) {
+            try { document.body.removeChild(oTextArea); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+    }
+
+    if (!bOk) {
+        console.error("[RSRC-007] setClipBoardTextCopy: nothing copied - electron clipboard unavailable and execCommand copy made no selection (an open modal <dialog> makes document.body inert). text length:", sText.length);
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) { U4ALOG.warn("GUARD_EXIT", "clipboard write", "text not copied, length=" + sText.length); }
+    }
 
     if (typeof fnCallback === "function") {
-        fnCallback();
+        fnCallback(bOk);
     }
+
+    return bOk;
 
 }
 
@@ -2378,6 +2523,7 @@ function getSameBrowsers() {
                 oWebPref = oWebCon.getWebPreferences();
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             continue;
         }
 

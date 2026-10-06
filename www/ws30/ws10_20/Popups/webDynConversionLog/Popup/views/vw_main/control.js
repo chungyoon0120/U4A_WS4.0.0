@@ -453,6 +453,7 @@ export async function getControl() {
             var _sRes = await _sendAjax(_url, _oFormData);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return error;
         }
 
@@ -580,6 +581,7 @@ export async function getControl() {
             var _sRes = await _sendAjax(_url, _oFormData);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             return error;
         }
 

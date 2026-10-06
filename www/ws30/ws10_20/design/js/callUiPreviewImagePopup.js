@@ -156,6 +156,7 @@
             var lt_json = JSON.parse(parent.FS.readFileSync(l_path, "utf-8"));
 
         }catch(e){
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             return false;
         }
 

@@ -106,7 +106,7 @@ ACTION_MAP.set('EXEC_U4A_WORKSPACE', async function (message) {
 
         // 같은 세션키가 아니라면 빠져나감
         if(parent.getSessionKey() !== oParams.sessionKey){
-            console.log("같은 세션이 아니라서 빠져나감!!");
+            console.log("different session - skipped");
             return;
         }
 

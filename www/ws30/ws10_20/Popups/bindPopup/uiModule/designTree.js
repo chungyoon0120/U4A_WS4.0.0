@@ -850,6 +850,7 @@ function designControl(oArea){
                 try {
                     var _sBindData = JSON.parse(oData);    
                 } catch (error) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                     //메시지 처리.                    
                     _sRes.RETCD = "E";
 
@@ -1375,6 +1376,7 @@ function designControl(oArea){
                 var _sDragData = JSON.parse(oData);
                 
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
                 return false;
             }
 

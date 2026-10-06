@@ -13,6 +13,7 @@
  *   iframe 콘텐츠(design/favIconPopup/index.html·index.js)는 SAP 아이콘 폰트를 로드해
  *   즐겨찾기 아이콘을 렌더한다 → 임의 SAP 아이콘 정확 렌더를 위해 iframe 유지가 필수.
  ************************************************************************/
+// 오류코드 접두: FFIP / 다음 번호: 002
 (function () {
     "use strict";
 
@@ -29,25 +30,25 @@
     function _el(sTag, sCls) { var e = document.createElement(sTag); if (sCls) { e.className = sCls; } return e; }
     function _fa(sName) { return '<i class="fa-solid fa-' + sName + '"></i>'; }
 
-    function _glangu() { try { return oAPP.oDesign.settings.GLANGU; } catch (e) { return ""; } }
+    function _glangu() { try { return oAPP.oDesign.settings.GLANGU; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; } }
 
     //ZMSG_WS_COMMON_001 메시지(078/079 등).
     function _wsCommon(sId, p1) {
         try { return parent.WSUTIL.getWsMsgClsTxt(_glangu(), "ZMSG_WS_COMMON_001", sId, p1 || "", "", "", ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     //  /U4A/MSG_WS 메시지(271/272/365).
     function _msgWs(sId, p1) {
         try { return oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", sId, p1 || "", "", "", ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     //  /U4A/CL_WS_COMMON 메시지(A39 Close).
     function _clsWs(sId) {
         try { return oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", sId, "", "", "", ""); }
-        catch (e) { return ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     //공통 정중앙 토스트(원본 parent.showMessage(sap,...) → HTML5 는 첫 인자 null).
-    function _toast(sType, sMsg) { try { parent.showMessage(null, 10, sType, sMsg); } catch (e) { } }
+    function _toast(sType, sMsg) { try { parent.showMessage(null, 10, sType, sMsg); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
 
 
     /************************************************************************
@@ -61,17 +62,17 @@
 
         //접속 SYSID 별 즐겨찾기 아이콘 목록(로컬 JSON).
         var sSysId = "";
-        try { sSysId = parent.getUserInfo().SYSID; } catch (e) { }
+        try { sSysId = parent.getUserInfo().SYSID; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var aFav = [];
-        try { aFav = parent.WSUTIL.getIconFavorite(sSysId) || []; } catch (e) { aFav = []; }
+        try { aFav = parent.WSUTIL.getIconFavorite(sSysId) || []; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } aFav = []; }
 
         //즐겨찾기 항목이 없으면 안내(079 &1 does not exist / &1 = 078 Icon favorite list) 후 종료.
         if (aFav.length === 0) {
             var sNo = "";
             try {
                 sNo = parent.WSUTIL.getWsMsgClsTxt(_glangu(), "ZMSG_WS_COMMON_001", "079", _wsCommon("078"), "", "", "");
-            } catch (e) { sNo = _wsCommon("078"); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sNo = _wsCommon("078"); }
             _toast("E", sNo);
             return;
         }
@@ -97,7 +98,7 @@
 
     /* ── 모달 open ──────────────────────────────────────────── */
     function _showModal() {
-        try { loApp.ui.dlg.showModal(); } catch (e) { }
+        try { loApp.ui.dlg.showModal(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         //원본 afterOpen: 테마 변경 구독(팝업 열린 동안 iframe 테마 동기화).
         _attachTheme();
     }
@@ -105,7 +106,7 @@
     function _close() {
         //원본 afterClose: 테마 변경 구독 해제.
         _detachTheme();
-        try { loApp.ui.dlg.close(); } catch (e) { }
+        try { loApp.ui.dlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
 
@@ -113,22 +114,22 @@
      *    HTML5 U4ATheme.onChange = window 'u4a-theme-changed' 이벤트) ── */
     function _onThemeChanged() {
         var _p = { ACTCD: "THEME_CHANGE" };
-        try { _p.S_THEME = parent.getThemeInfo(); } catch (e) { _p.S_THEME = {}; }
+        try { _p.S_THEME = parent.getThemeInfo(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _p.S_THEME = {}; }
         _sendToChild(_p);
     }
 
     function _attachTheme() {
         if (loApp.attr._themeBound) { return; }   //재오픈 중복 등록 방지.
         //테마 변경 이벤트는 셸(parent)에서 발생 — parent 우선, 로컬도 안전망으로 구독.
-        try { if (parent && parent.addEventListener) { parent.addEventListener("u4a-theme-changed", _onThemeChanged); } } catch (e) { }
-        try { window.addEventListener("u4a-theme-changed", _onThemeChanged); } catch (e) { }
+        try { if (parent && parent.addEventListener) { parent.addEventListener("u4a-theme-changed", _onThemeChanged); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { window.addEventListener("u4a-theme-changed", _onThemeChanged); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         loApp.attr._themeBound = true;
     }
 
     function _detachTheme() {
         if (!loApp.attr._themeBound) { return; }
-        try { if (parent && parent.removeEventListener) { parent.removeEventListener("u4a-theme-changed", _onThemeChanged); } } catch (e) { }
-        try { window.removeEventListener("u4a-theme-changed", _onThemeChanged); } catch (e) { }
+        try { if (parent && parent.removeEventListener) { parent.removeEventListener("u4a-theme-changed", _onThemeChanged); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { window.removeEventListener("u4a-theme-changed", _onThemeChanged); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         loApp.attr._themeBound = false;
     }
 
@@ -219,10 +220,10 @@
 
         var sSrc = "";
         try { sSrc = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "favIconPopup", "index.html"); }
-        catch (e) { sSrc = ""; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sSrc = ""; }
 
         oFrame.onload = function () {
-            try { this.contentWindow.PARENT_DOM_ID = loApp.ui.dlg.id; } catch (e) { }
+            try { this.contentWindow.PARENT_DOM_ID = loApp.ui.dlg.id; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         };
 
         //재사용 시에도 새로 로드(FRAME_LOADED → SET_INIT 재수행).
@@ -254,14 +255,14 @@
 
             case "BUSY_ON":
                 //원본 lf_FavIconCustomEvent BUSY_ON: setBusy("X") + 단축키 잠금.
-                try { parent.setBusy("X"); } catch (e) { }
-                try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(true); } } catch (e) { }
+                try { parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 break;
 
             case "BUSY_OFF":
                 //원본 lf_FavIconCustomEvent BUSY_OFF: 단축키 잠금 해제 + setBusy("").
-                try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } } catch (e) { }
-                try { parent.setBusy(""); } catch (e) { }
+                try { if (typeof oAPP.fn.setShortcutLock === "function") { oAPP.fn.setShortcutLock(false); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 break;
 
             default:
@@ -287,7 +288,7 @@
         _p.ACTCD = "SET_INIT_FAV_LIST";
 
         //UI5에 적용된 테마 정보.
-        try { _p.S_THEME = parent.getThemeInfo(); } catch (e) { _p.S_THEME = {}; }
+        try { _p.S_THEME = parent.getThemeInfo(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _p.S_THEME = {}; }
 
         //CSS 링크(폰트 로드용).
         _p.T_CSS = _setFavIconListCSSLink();
@@ -317,7 +318,7 @@
 
         if (list.length === 0) { return out; }
 
-        var prePath = ""; try { prePath = parent.getHost(); } catch (e) { }
+        var prePath = ""; try { prePath = parent.getHost(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         for (var i = 0; i < list.length; i++) {
             var u = list[i];
@@ -338,7 +339,7 @@
      ************************************************************************/
     function _setURLPrePath() {
 
-        var host = ""; try { host = parent.getHost(); } catch (e) { }
+        var host = ""; try { host = parent.getHost(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (!host) { return ""; }
 
         var aUA025 = (oAPP.attr.S_CODE && oAPP.attr.S_CODE.UA025) || [];
@@ -362,13 +363,13 @@
         var prePath = _setURLPrePath();
 
         var theme = "";
-        try { theme = (parent.getThemeInfo() && parent.getThemeInfo().THEME) || ""; } catch (e) { }
+        try { theme = (parent.getThemeInfo() && parent.getThemeInfo().THEME) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var aUA007 = (oAPP.attr.S_CODE && oAPP.attr.S_CODE.UA007) || [];
 
         //1.120.21 이후 패치의 경우 허용 가능 테마 필드값.
         var FLD03 = "";
-        try { if (oAPP.common.checkWLOList("C", "UHAK900889") === true) { FLD03 = "X"; } } catch (e) { }
+        try { if (oAPP.common.checkWLOList("C", "UHAK900889") === true) { FLD03 = "X"; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         //현재 테마가 미리보기 사용 가능 테마가 아니면 default 로 대체(원본 로직 1:1).
         if (aUA007.findIndex(function (it) { return it.FLD01 === theme && it.FLD03 === FLD03; }) === -1) {
@@ -405,10 +406,10 @@
 
         //미리보기 iframe 의 IconPool(없으면 content 미해석 — 크래시 없이 진행).
         var IP = null;
-        try { IP = oAPP.attr.ui.frame.contentWindow.sap.ui.core.IconPool; } catch (e) { IP = null; }
+        try { IP = oAPP.attr.ui.frame.contentWindow.sap.ui.core.IconPool; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } IP = null; }
 
         //IconPool 미존재(미리보기/UI5 미로드) — 아이콘 glyph 가 빈 채로 렌더될 수 있어 실패를 드러낸다.
-        if (!IP) { console.warn("[HTML5][WS20][favIcon] 미리보기 IconPool 미존재 — 아이콘 content 미해석(빈 glyph 가능)"); }
+        if (!IP) { console.warn("[WS20][favIcon] preview IconPool missing - icon content may resolve to an empty glyph"); }
 
         for (var i = 0; i < T.length; i++) {
 
@@ -423,7 +424,7 @@
 
             if (IP) {
                 var info = null;
-                try { info = IP.getIconInfo(row.ICON_SRC); } catch (e) { info = null; }
+                try { info = IP.getIconInfo(row.ICON_SRC); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } info = null; }
                 if (info) {
                     row.fontFamily = info.fontFamily;
                     row.content = info.content;
@@ -431,6 +432,12 @@
             }
 
             out.push(row);
+        }
+
+        //ICON_SRC 가 없는 항목은 타일 검색·이름 복사·선택이 모두 안 된다 — 몇 건인지 남긴다(즐겨찾기 파일 손상 감지).
+        var iNoSrc = out.filter(function (r) { return !r.ICON_SRC; }).length;
+        if (iNoSrc > 0 && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "ICON_SRC missing", "favorite rows not searchable/copyable, count=" + iNoSrc + "/" + out.length);
         }
 
         return out;
@@ -465,7 +472,19 @@
 
         if (!oData || !oData.sList || oData.sList.ICON_SRC == null) { return; }
 
-        try { parent.setClipBoardTextCopy(oData.sList.ICON_SRC); } catch (e) { }
+        //★[수정 2026-09-14] 이 팝업은 native <dialog>.showModal() 이라 셸의 임시 textarea 가 inert 였고,
+        //  복사는 실패하는데 "복사되었습니다" 안내만 뜨고 있었다(실측). 셸 복사 함수가 이제 성공 여부를
+        //  돌려주므로, 실제로 복사된 경우에만 안내한다.
+        var bOk = false;
+
+        try { bOk = (parent.setClipBoardTextCopy(oData.sList.ICON_SRC) === true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        if (bOk !== true) {
+            //복사 실패 — 성공 안내를 띄우지 않는다. 실패 전용 메시지 키가 없어 화면 안내는 하지 않고 오류코드로만 표면화.
+            console.error("[FFIP-001] _copyText: clipboard write failed - icon name not copied. ICON_SRC:", oData.sList.ICON_SRC);
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) { U4ALOG.warn("GUARD_EXIT", "clipboard write", "icon name not copied, no success message shown"); }
+            return;
+        }
 
         //272  &1 has been copied.
         _toast("S", _msgWs("272", oData.sList.ICON_SRC));

@@ -86,7 +86,7 @@ oAPP.fn.attachInit = async () => {
     jQuery.sap.require("sap.m.MessageBox");
 
     // 셸 공통 .u4a-busy 해제(초기 서버 UI5 로드 인디케이터) — 이후 콘텐츠 busy 는 oAPP.setBusy(UI5).
-    try { parent.oAPP.fn.setShellBusy(false); } catch (e) { }
+    try { parent.oAPP.fn.setShellBusy(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     oAPP.setBusy("X");
 
@@ -481,7 +481,7 @@ function fnGetSapTntIcons() {
             oIconListResult = await getJsonAsync(sUrl);
 
         if (oIconListResult.RETCD == "E") {
-            console.log("[fnGetSapTntIcons]:  SAP-icons-TNT.json 파일 없음");
+            console.log("[fnGetSapTntIcons]: SAP-icons-TNT.json file none");
             resolve();
             return;
         }
@@ -740,7 +740,7 @@ function fnGetSavedFavIconInfo() {
         } catch (error) {
 
             let sErrMsg = "[Saved Icon Read Error]: \n \n " + error.toString();
-            console.error(sErrMsg);
+            console.error(sErrMsg, error);
 
             throw new Error(sErrMsg);
 
@@ -1581,7 +1581,7 @@ function fnAnimationFrame(aObservEntry, observer) {
  ************************************************************************/
 function fnIntersectionObserverCallback(aObservEntry, observe) {
 
-    zconsole.log("observer 완료 : " + aObservEntry.length);
+    zconsole.log("observer done: " + aObservEntry.length);
 
     oAPP.ani = window.requestAnimationFrame(fnAnimationFrame.bind(oAPP.ani, aObservEntry, observe));
 

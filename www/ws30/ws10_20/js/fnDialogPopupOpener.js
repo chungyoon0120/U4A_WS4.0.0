@@ -1,8 +1,21 @@
 /************************************************************************
- * Copyright 2020. INFOCG Inc. all rights reserved. 
+ * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
  * - file Name : fnDialogPopupOpener.js
  * - file Desc : 각종 Dialog Popup Opener
+ * ----------------------------------------------------------------------
+ * 오류코드 접두: FDPO / 다음 번호: 007
+ *   (표준 SSOT = `.analy/19_예외처리_크리티컬오류_표준.md`,
+ *    실무 규약 = `.works/DEV_STANDARD_오류처리.md` §3)
+ *
+ * ── 코드 사전 ──
+ *  FDPO-001  오류 목록 창(fnMultiFooterMsg) — 주소 읽기 자체가 실패
+ *  FDPO-002  오류 목록 창 — 내용을 못 읽음(파일 없음 등, 본 문서 기준)
+ *  FDPO-003  오류 목록 창 — 창의 화면 프로세스가 죽음
+ *  FDPO-004  오류 목록 창 — 내용을 다 띄우기 前에 닫힘
+ *
+ * ★[BR55] 2026-09-01 수정 전에는 이 창이 **뜨다가** 실패하면 잠금을 풀어 줄 신호가
+ *   영영 오지 않아 편집화면이 흐려진 채 멈췄다(안내도 없음). 백업 = `_fnDialogPopupOpener.js.br55bak`.
  ************************************************************************/
 (function (window, $, oAPP) {
     "use strict";
@@ -100,7 +113,7 @@
 
         // busy 키고 Lock 걸기 + 전체 자식 윈도우 Busy
         oAPP.common.fnSetBusyLock("X");
-        try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { }
+        try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_ON" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         let sPopupName = "MIMEPOP";
 
@@ -113,15 +126,15 @@
                 let oW = aAll[wi];
                 if (!oW || oW.isDestroyed()) { continue; }
                 let sT = "";
-                try { sT = WSUTIL.QueryString.parse(oW.getURL()).OBJTY; } catch (e) { sT = ""; }
+                try { sT = WSUTIL.QueryString.parse(oW.getURL()).OBJTY; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sT = ""; }
                 if (sT !== sPopupName) { continue; }
-                try { if (oW.isMinimized()) { oW.restore(); } } catch (e) { }
-                try { oW.focus(); } catch (e) { }
+                try { if (oW.isMinimized()) { oW.restore(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { oW.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.common.fnSetBusyLock("");
-                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return;
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         let SESSKEY2 = parent.getSessionKey(),
             BROWSKEY2 = parent.getBrowserKey(),
@@ -130,13 +143,13 @@
 
         // WLO(UHAK901016) 지연로드 플래그 — WS20 에서 판정해 전달(별도창은 모델 비결합).
         let bWloLazy = false;
-        try { bWloLazy = (oAPP.common.checkWLOList("C", "UHAK901016") === true); } catch (e) { bWloLazy = false; }
+        try { bWloLazy = (oAPP.common.checkWLOList("C", "UHAK901016") === true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bWloLazy = false; }
 
         // 현재 편집 중인 APP 정보 — 원본 fnMimePopupOpen _appInfo() 와 동일하게 모델에서 읽어 전달.
         //   (getAppInfo()=워크스페이스 레벨이라 WS20 편집 대상과 다를 수 있어 트리 스코프가 어긋남)
         let oMimeAppInfo = {};
-        try { oMimeAppInfo = oAPP.common.fnGetModelProperty("/WS20/APP") || {}; } catch (e) { oMimeAppInfo = {}; }
-        try { var _w3 = oAPP.common.fnGetModelProperty("/WS30/APP"); if (_w3 && _w3.APPID) { oMimeAppInfo = _w3; } } catch (e) { }
+        try { oMimeAppInfo = oAPP.common.fnGetModelProperty("/WS20/APP") || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oMimeAppInfo = {}; }
+        try { var _w3 = oAPP.common.fnGetModelProperty("/WS30/APP"); if (_w3 && _w3.APPID) { oMimeAppInfo = _w3; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 브라우저 옵션
         let sSettingsJsonPath = parent.getPath("BROWSERSETTINGS"),
@@ -169,8 +182,8 @@
         //   뒤로가기/모드전환(fnCloseAllWs20Dialogs → fnChildWindowClose → _closeAllChildWindowMap)에
         //   같은 브라우저키 팝업으로 자동 닫히게 한다. (닫힐 때 맵에서 제거)
         let oChildMap = null;
-        try { oChildMap = parent.CURRWIN && parent.CURRWIN._aChildWinMap; } catch (e) { oChildMap = null; }
-        try { if (oChildMap) { oChildMap.set(oBrowserWindow.id, oBrowserWindow); } } catch (e) { }
+        try { oChildMap = parent.CURRWIN && parent.CURRWIN._aChildWinMap; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oChildMap = null; }
+        try { if (oChildMap) { oChildMap.set(oBrowserWindow.id, oBrowserWindow); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
         oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
@@ -193,6 +206,22 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고 시작하므로, 문서 로드가 실패하면 did-finish-load 가 안 와
+        //   busy 가 영영 안 풀리고 창도 안 보인다(show:false). 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 창을 정리하고 잠금을 푼다. 하위 프레임 실패(bIsMainFrame=false)와
+        //   사용자 취소(-3)는 제외한다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-010] U4A MIME Repository window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-010] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FDPO-010] did-fail-load register failed:", e && e.message, e); }
+
         oBrowserWindow.once('ready-to-show', () => {
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
         });
@@ -214,7 +243,7 @@
 
         let iMimeWinId = oBrowserWindow.id;
         oBrowserWindow.on('closed', () => {
-            try { if (oChildMap) { oChildMap.delete(iMimeWinId); } } catch (e) { }
+            try { if (oChildMap) { oChildMap.delete(iMimeWinId); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oBrowserWindow = null;
             CURRWIN.focus();
         });
@@ -762,6 +791,21 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고, 아래 did-finish-load 가 보내는 if_modelBindingPopup 을
+        //   받아야 본문이 그려진다. 문서 로드가 실패하면 그 데이터가 영영 안 와 busy 가 고착된다.
+        //   타이머로 덮는 것은 금지(.analy 16 §2.11)이므로 실패 이벤트에서 창을 정리한다
+        //   (창이 닫히면 아래 'closed' 가 parent.setBusy("") 로 잠금을 푼다).
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-005] binding window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-005] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { parent.setBusy("", {}); } catch (e3) { console.error("[FDPO-005] busy release failed:", e3 && e3.message, e3); }
+            });
+        } catch (e) { console.error("[FDPO-005] did-fail-load register failed:", e && e.message, e); }
+
 
         //broadcase 통신 API 모듈 js path 정보.
         //(design/bindPopupHandler/broadcastChannelBindPopup.js)
@@ -830,7 +874,16 @@
                 channelKey: _channelKey
             };
 
-            oBrowserWindow.webContents.send('if_modelBindingPopup', oBindPopupData);
+            // ★ [2026-09-14] 전송 자체가 실패하면 창은 busy 인 채로 남는다 — 창을 정리하고 잠금을 푼다.
+            try {
+                oBrowserWindow.webContents.send('if_modelBindingPopup', oBindPopupData);
+            } catch (eSend) {
+                console.error("[FDPO-005] initial data send to the binding window failed:", eSend && eSend.message, eSend);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-005] cleanup of the failed window failed:", e2 && e2.message, e2, eSend); }
+                try { parent.setBusy("", {}); } catch (e3) { console.error("[FDPO-005] busy release failed:", e3 && e3.message, e3, eSend); }
+                return;
+            }
 
 
             //디자인상세화면(20화면) <-> BINDPOPUP 통신을 위한 WS20측 수신 채널 생성.
@@ -840,7 +893,7 @@
             //    (updateAppData 등)는 아직 WS20 디자인 앱과 안 맞음 → 메시지가 흐르는 Stage6 에서 정합 배선.
             //    (attr.js selectBindingPopupOBJID 와 동일하게 try/catch 로 방어 — 헤드리스/미가용 시 skip.)
             try { parent.require(_channelPath)("CHANNEL-CREATE"); }
-            catch (e) { console.warn("[HTML5][bindWindow] WS20 수신채널 생성 보류(Stage6):", e && e.message); }
+            catch (e) { console.warn("[bindWindow] WS20 receive channel creation deferred (Stage6):", e && e.message, e); }
 
 
             // no build 일 경우에는 개발자 툴을 실행한다.
@@ -861,7 +914,7 @@
 
             //디자인상세화면(20화면) <-> BINDPOPUP 통신 채널 종료.
             try { parent.require(_channelPath)("CHANNEL-CLOSE"); }
-            catch (e) { console.warn("[HTML5][bindWindow] WS20 수신채널 종료 보류(Stage6):", e && e.message); }
+            catch (e) { console.warn("[bindWindow] WS20 receive channel teardown deferred (Stage6):", e && e.message, e); }
 
             // Binding Popup 에서 콜백 이벤트 해제
             IPCRENDERER.off("if-bindPopup-callback", oAPP.fn.fnBindPopupIpcCallBack);
@@ -1397,6 +1450,22 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고 시작하므로, 문서 로드가 실패하면 did-finish-load 가 안 와
+        //   busy 가 영영 안 풀리고 창도 안 보인다(show:false). 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 창을 정리하고 잠금을 푼다. 하위 프레임 실패(bIsMainFrame=false)와
+        //   사용자 취소(-3)는 제외한다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-011] App. Documentation window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-011] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FDPO-011] did-fail-load register failed:", e && e.message, e); }
+
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
@@ -1420,7 +1489,10 @@
                 SERVPATH: parent.getServerPath()
             };
 
-            oBrowserWindow.webContents.send('if-appdocu-info', oDocuData);
+            // ★ [2026-09-14] 전송이 실패하면 창은 busy 인 채로 남는다 — 자리를 남겨 표면화한다.
+            //   (문서 로드 자체가 실패하는 경우는 위 did-fail-load 가 창을 정리한다.)
+            try { oBrowserWindow.webContents.send('if-appdocu-info', oDocuData); }
+            catch (eSend) { console.error("[FDPO-011] initial data send to the window failed:", eSend && eSend.message, eSend); }
 
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
@@ -1487,7 +1559,8 @@
         // frameless + 공통 .u4a-titlebar(optionMain.js) 로 창 크롬을 그린다. (16번 §1 공통화)
         oBrowserOptions.frame = false;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
+        //   (창 표시는 optionMain.js _ready 가 CURRWIN.show() 로 한다.)
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
@@ -1573,6 +1646,7 @@
             try {
                 CURRWIN.focus();
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             }
 
@@ -1825,7 +1899,10 @@
 
         oBrowserOptions.title = WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "047"); // Icon List
         oBrowserOptions.titleBarStyle = 'hidden';
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.resizable = true;
         oBrowserOptions.movable = true;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL; //테마별 색상 처리
@@ -1906,8 +1983,9 @@
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         });
 
@@ -1976,7 +2054,10 @@
         // oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.titleBarStyle = 'hidden';
         // oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.resizable = true;
         oBrowserOptions.movable = true;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
@@ -2055,8 +2136,9 @@
 
             oBrowserWindow.webContents.send('if-illust-prev', oOptionData);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.
             oAPP.fn.setParentCenterBounds(oBrowserWindow, oBrowserOptions);
@@ -2307,8 +2389,8 @@
         };
 
         if (sFlag === "EXPORT") {
-            // [HTML5] /WS10/APPID 모델이 비어있을 수 있어, 검증 통과한 입력값(sValue)을 우선 사용.
-            oSendData.APPID = sValue || sAppId;
+            // 원본과 동일 — 모델값 사용([HTML5] 입력칸 ↔ /WS10/APPID 묶임 복원으로 입력칸값과 동일).
+            oSendData.APPID = sAppId;
         }
 
         // 브라우저 실행 경로에 붙일 QueryString 정보
@@ -2429,7 +2511,7 @@
         oBrowserOptions.titleBarStyle = "hidden";
         // 테마 정보 1회 조회(창 배경 + 쿼리 전달 공용).
         let oAboutTheme = {};
-        try { oAboutTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { oAboutTheme = {}; }
+        try { oAboutTheme = (parent.getThemeInfo && parent.getThemeInfo()) || {}; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } oAboutTheme = {}; }
         // [흰 플래시 방지 ①] BrowserWindow 배경을 테마색으로 → 첫 OS 페인트부터 흰색이 아니라 테마색.
         if (oAboutTheme.BGCOL) { oBrowserOptions.backgroundColor = oAboutTheme.BGCOL; }
         // [HTML5 표준] 네이티브 opacity 페이드(setBrowserOpacity) 미사용 — 저사양 PC 성능부하 이슈.
@@ -2456,7 +2538,7 @@
             if (oAboutTheme.BGCOL) {
                 oBrowserWindow.webContents.insertCSS("html, body { margin:0; height:100%; background-color:" + oAboutTheme.BGCOL + "; }");
             }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 브라우저 실행 경로에 붙일 QueryString 정보
         const oQueryParams = {
@@ -2507,7 +2589,7 @@
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
             // 콘텐츠(frame.html) 준비 후 index.html 이 CURRWIN.show() 로 표시(setBrowserOpacity 페이드 미사용).
-            try { oBrowserWindow.closable = true; } catch (error) { }
+            try { oBrowserWindow.closable = true; } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); } }
 
         });
 
@@ -2616,6 +2698,21 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고, 아래 did-finish-load 가 보내는 if-runtime-info 를 받아야
+        //   목록이 채워진다. 문서 로드가 실패하면 그 데이터가 영영 안 와 busy 가 고착된다.
+        //   타이머로 덮는 것은 금지(.analy 16 §2.11)이므로 실패 이벤트에서 창을 정리하고 잠금을 푼다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-006] Runtime Class Navigator window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-006] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FDPO-006] busy release failed:", e3 && e3.message, e3); }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FDPO-006] did-fail-load register failed:", e && e.message, e); }
+
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
@@ -2658,7 +2755,17 @@
             };
 
             // 오픈할 URL 파라미터 전송
-            oBrowserWindow.webContents.send('if-runtime-info', oRuntimeInfo);
+            // ★ [2026-09-14] 전송 자체가 실패하면 창은 busy 인 채로 남는다 — 창을 정리하고 잠금을 푼다.
+            try {
+                oBrowserWindow.webContents.send('if-runtime-info', oRuntimeInfo);
+            } catch (eSend) {
+                console.error("[FDPO-006] initial data send to the Runtime Class Navigator window failed:", eSend && eSend.message);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-006] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { console.error("[FDPO-006] busy release failed:", e3 && e3.message, e3); }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+                return;
+            }
 
             // 부모 위치 가운데 배치한다.            
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
@@ -2822,7 +2929,10 @@
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A12"); // Icon List
         oBrowserOptions.url = sPath;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.parent = oCurrWin;
         oBrowserOptions.webPreferences.partition = SESSKEY;
         oBrowserOptions.webPreferences.browserkey = BROWSERKEY;
@@ -2854,6 +2964,7 @@
                 if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oResult.WINDOW); }
                 else { oResult.WINDOW.setClosable(true); oResult.WINDOW.close(); }
             } catch (error) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             }
 
@@ -2871,7 +2982,10 @@
 
         oBrowserOptions.title = sTitle;
         oBrowserOptions.center = true;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.titleBarStyle = "hidden";
         oBrowserOptions.autoHideMenuBar = true;
@@ -2917,7 +3031,80 @@
         // URL에 QueryString 파라미터를 적용한다.
         const sLoadUrl = parent.WSUTIL.QueryString.build(sUrlPath, oQueryParams);
 
-        oBrowserWindow.loadURL(sLoadUrl);
+        /********************************************************************
+         * [BR55/FDPO-001] 오류 목록 창 **띄우기 실패 회수 장치**.
+         * ------------------------------------------------------------------
+         *  이 함수는 들어오자마자 본 화면과 자식 윈도우를 잠근다. 잠금을 푸는 길은
+         *  **오직 하나 — 창 내용이 다 뜬 뒤 그 창이 보내오는 신호**뿐이었다.
+         *  그래서 창이 **뜨다가** 실패하면(파일 없음 · 화면 프로세스 죽음 · 다 뜨기 전 닫힘)
+         *  신호가 영영 오지 않아 **편집화면이 흐려진 채 멈춰** 있었다(안내도 없음).
+         *  → 실패·조기 닫힘일 때 잠금을 풀고 오류 코드를 남기는 정리를 **한 곳**에 둔다.
+         *  ※ 정상으로 다 뜨면 이 정리는 동작하지 않는다(원래 신호가 잠금을 푼다).
+         ********************************************************************/
+        let bErrWinReady = false;   // 내용이 다 떴나(= 원래 경로로 잠금이 풀릴 예정인가)
+        let bErrWinFailed = false;  // 회수 1회만
+
+        function lf_recoverOpenFail(sCode, sDetail) {
+
+            if (bErrWinReady === true || bErrWinFailed === true) { return; }
+            bErrWinFailed = true;
+
+            try { console.error("[" + sCode + "] error list window open failed - screen lock count: " + sDetail); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+            // 본 화면 잠금 해제
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error("[" + sCode + "] fnSetBusyLock release failed:", e && e.message, e); }
+            try { parent.setBusy(""); } catch (e) { console.error("[" + sCode + "] setBusy release failed:", e && e.message, e); }
+
+            // 자식 윈도우 잠금 회수 (진입 때 BUSY_ON 을 방송했으므로 짝 필수)
+            try {
+                if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
+            } catch (e) { console.error("[" + sCode + "] child window busy release broadcast failed:", e && e.message, e); }
+
+            // 화면 안내 — `[코드] + 기존 메시지 키 문구`(표준 `.analy/19` §4·§5)
+            try {
+                const sLangu = (parent.getUserInfo() || {}).LANGU || "";
+                let sTxt = parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "314") || "";
+                const sGuide = parent.WSUTIL.getWsMsgClsTxt(sLangu, "ZMSG_WS_COMMON_001", "290") || "";
+                if (sGuide) { sTxt += (sTxt ? " " : "") + sGuide; }
+                parent.showMessage(null, 20, "E", "[" + sCode + "] " + sTxt);
+            } catch (e) { console.error("[" + sCode + "] error popup failed:", e && e.message, e); }
+
+            // 반쯤 뜬 창 정리
+            try {
+                if (oBrowserWindow && oBrowserWindow.isDestroyed() === false) {
+                    if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oBrowserWindow); }
+                    else { oBrowserWindow.setClosable(true); oBrowserWindow.close(); }
+                }
+            } catch (e) { console.error("[" + sCode + "] closing the failed window failed:", e && e.message, e); }
+        }
+
+        // 주소 읽기 자체가 실패한 경우(Electron 은 실패 시 거절을 돌려준다 — 종전엔 버려졌다).
+        try {
+            const oLoad = oBrowserWindow.loadURL(sLoadUrl);
+            if (oLoad && typeof oLoad.catch === "function") {
+                oLoad.catch(function (err) {
+                    lf_recoverOpenFail("FDPO-001", (err && err.message) ? err.message : String(err));
+                });
+            }
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            lf_recoverOpenFail("FDPO-001", (e && e.message) ? e.message : String(e));
+        }
+
+        // 내용을 못 읽은 경우(파일 없음 등). 하위 프레임 실패는 무시하고 본 문서만 본다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false) { return; }
+                lf_recoverOpenFail("FDPO-002", "(" + iErrCode + ") " + sErrDesc + " / " + sUrl);
+            });
+        } catch (e) { console.error("[FDPO-002] did-fail-load register failed:", e && e.message, e); }
+
+        // 창의 화면 프로세스가 죽은 경우.
+        try {
+            oBrowserWindow.webContents.on('render-process-gone', function (evt, oDetail) {
+                lf_recoverOpenFail("FDPO-003", (oDetail && oDetail.reason) ? oDetail.reason : "render-process-gone");
+            });
+        } catch (e) { console.error("[FDPO-003] render-process-gone register failed:", e && e.message, e); }
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -2935,6 +3122,9 @@
         // 브라우저가 오픈이 다 되면 타는 이벤트
         oBrowserWindow.webContents.on('did-finish-load', function () {
 
+            // [BR55] 여기까지 왔으면 원래 경로(창이 보내는 신호)로 잠금이 풀린다 → 회수 장치 해제.
+            bErrWinReady = true;
+
             const oSendData = {
                 oUserInfo: parent.getUserInfo(), // 로그인 사용자 정보
                 oThemeInfo: oThemeInfo, // 테마 개인화 정보
@@ -2946,8 +3136,9 @@
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         });
 
@@ -2955,6 +3146,10 @@
         oBrowserWindow.on('closed', () => {
 
             IPCMAIN.off(`${BROWSKEY}--errormsg--click`, oAPP.fn.fnIpcMain_errmsg_click);
+
+            // [BR55/FDPO-004] 내용이 다 뜨기 前에 닫힌 경우 — 잠금을 풀어 줄 신호가 영영 안 온다.
+            //   (다 뜬 뒤 사용자가 닫은 정상 경우는 bErrWinReady 가 true 라 아무 일도 안 한다.)
+            lf_recoverOpenFail("FDPO-004", "오류 목록 창이 내용을 다 띄우기 전에 닫혔습니다.");
 
             oBrowserWindow = null;
 
@@ -3004,7 +3199,10 @@
         oBrowserOptions.url = sPath;
         oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
 
         oBrowserOptions.webPreferences.partition = SESSKEY;
@@ -3167,7 +3365,10 @@
 
         oBrowserOptions.autoHideMenuBar = true;
         oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.height = 700;
         oBrowserOptions.width = 700;
@@ -3236,8 +3437,11 @@
             // 부모 위치 가운데 배치한다.
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow, () => {
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            //   페이드가 끝난 뒤에 하던 뒷처리(closable)는 표시 직후로 옮긴다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            (() => {
 
                 if (oBrowserWindow.isDestroyed()) {
                     return;
@@ -3246,10 +3450,11 @@
                 try {
                     oBrowserWindow.closable = true;
                 } catch (error) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
                 }
 
-            });
+            })();
 
         });
 
@@ -3385,6 +3590,22 @@
 
         oBrowserWindow.loadURL(sLoadUrl);
 
+        // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
+        //   이 창은 뜨자마자 busy 를 켜고 시작하므로, 문서 로드가 실패하면 did-finish-load 가 안 와
+        //   busy 가 영영 안 풀리고 창도 안 보인다(show:false). 타임아웃으로 덮는 것은 금지(.analy 16 §2.11)이므로
+        //   실패 이벤트에서 창을 정리하고 잠금을 푼다. 하위 프레임 실패(bIsMainFrame=false)와
+        //   사용자 취소(-3)는 제외한다.
+        try {
+            oBrowserWindow.webContents.on('did-fail-load', function (evt, iErrCode, sErrDesc, sUrl, bIsMainFrame) {
+                if (bIsMainFrame === false || iErrCode === -3) { return; }
+                console.error("[FDPO-012] OTR Manager window load failed:", iErrCode, sErrDesc, sUrl);
+                try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } }
+                catch (e2) { console.error("[FDPO-012] cleanup of the failed window failed:", e2 && e2.message, e2); }
+                try { oAPP.common.fnSetBusyLock(""); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
+                try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e4) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e4); } }
+            });
+        } catch (e) { console.error("[FDPO-012] did-fail-load register failed:", e && e.message, e); }
+
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
         //     oBrowserWindow.webContents.openDevTools();
@@ -3488,7 +3709,7 @@
 
         } catch (e) {
 
-            console.error("[WS20] UI5 Predefined CSS 팝업 오픈 실패:", e && e.message);
+            console.error("[WS20] UI5 Predefined CSS popup open failed:", e && e.message, e);
 
             // busy 끄고 Lock 풀기
             oAPP.common.fnSetBusyLock("");
@@ -3540,7 +3761,7 @@
             try {
                 oRes.WIN.webContents.send("if-ui5css-result", oPayload);
             } catch (e) {
-                console.error("[WS20] UI5 Predefined CSS 결과 회신 실패:", e && e.message);
+                console.error("[WS20] UI5 Predefined CSS result reply failed:", e && e.message, e);
             }
 
         }
@@ -3553,7 +3774,7 @@
                     oAPP.fn.setSelectTreeItem(oRes.OBJID, oRes.UIATK, "");
                 }
             } catch (e) {
-                console.error("[WS20] UI5 Predefined CSS 바인딩 UI 선택 이동 실패:", e && e.message);
+                console.error("[WS20] UI5 Predefined CSS binding UI select move failed:", e && e.message, e);
             }
             return;
         }
@@ -3630,7 +3851,7 @@
         } catch (e) {
 
             //삼키지 않는다 — 콘솔에 남기고 팝업에도 오류로 알린다. (never-suppress-script-errors)
-            console.error("[WS20] UI5 Predefined CSS 적용 오류:", e && e.message);
+            console.error("[WS20] UI5 Predefined CSS apply error:", e && e.message, e);
 
             lf_reply("E", "E", (e && e.message) || "");
 
@@ -3665,7 +3886,10 @@
 
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B58"); // UI5 Predefined CSS
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드(opacity 0 → setBrowserOpacity) 제거.
+        //   OS 합성이라 느린 PC 에서 무겁고, 그 사이 창이 투명한 채 작업표시줄에만 떠 있다.
+        //   표준(.analy 16 §2.6) 대로 show:false 로 만들고 준비되면 표시한다.
+        oBrowserOptions.show = false;
         oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.width = 1200;
@@ -3737,8 +3961,9 @@
             // 오픈할 URL 파라미터 전송
             oBrowserWindow.webContents.send('if-ui5css-info', oSendData);
 
-            // 윈도우 오픈할때 opacity를 이용하여 자연스러운 동작 연출
-            WSUTIL.setBrowserOpacity(oBrowserWindow);
+            // 준비가 끝났으니 창을 표시한다(show:false 로 만들어 뒀다).
+            //   [2026-09-13] 종전의 네이티브 투명도 페이드는 느린 PC 에서 무거워 걷어냈다.
+            try { oBrowserWindow.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.
             oAPP.fn.setParentCenterBounds(oBrowserWindow, oBrowserOptions);
@@ -3982,22 +4207,22 @@
         oBrowserWindow.on('closed', () => {
             oBrowserWindow = null;
             // 자식이 정상 초기화(IPC)로 busy 를 못 풀고 닫힌 경우(초기화 예외·조기 close) 대비 — 여기서 해제 보장(멱등).
-            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { console.error('[숏컷] closed busy-off 실패:', e); }
-            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error('[숏컷] closed lock 해제 실패:', e); }
-            try { CURRWIN.focus(); } catch (e) { console.error('[숏컷] closed 포커스 실패:', e); }
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { console.error('[shortcut] closed busy-off failed:', e); }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { console.error('[shortcut] closed lock release failed:', e); }
+            try { CURRWIN.focus(); } catch (e) { console.error('[shortcut] closed focus failed:', e); }
         });
 
         // 페이지 메인 로드 실패 시 busy 잔류 방지 + 창 정리(로드 실패면 타이틀바가 안 그려져 사용자가 못 닫음).
         oBrowserWindow.webContents.on('did-fail-load', (event, errCode, errDesc, validatedURL, isMainFrame) => {
             if (!isMainFrame || errCode === -3) { return; }   // 서브리소스/사용자취소(-3)는 무시
-            console.error('[숏컷] 자식창 메인 로드 실패:', errCode, errDesc);
-            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { }
-            try { oAPP.common.fnSetBusyLock(""); } catch (e) { }
-            try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { console.error('[숏컷] 로드실패 창 정리 실패:', e); }
+            console.error('[shortcut] childwindow main load failed:', errCode, errDesc);
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { if (oBrowserWindow && !oBrowserWindow.isDestroyed()) { oBrowserWindow.destroy(); } } catch (e) { console.error('[shortcut] cleanup of the failed window failed:', e); }
         });
 
         } catch (e) {
-            console.error("[숏컷] U4A 숏컷 링크 생성 오류:", e);
+            console.error("[shortcut] U4A shortcut link create error:", e);
 
             // 전체 자식 윈도우에 Busy 끈다.
             oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });

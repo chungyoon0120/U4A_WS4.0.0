@@ -1,5 +1,49 @@
 /**************************************************************************
  * ws_events.js
+ **************************************************************************
+ * 오류코드 접두: WSEV / 다음 번호: 020   (018 사용, 019 는 아직 빈 번호)
+ *   (개발표준 = `.works/DEV_STANDARD_오류처리.md` §3 — 파일별 유일 접두 + 파일 내 로컬 번호.
+ *    번호는 이 파일 안에서 위에서 아래로 증가. 다른 파일과 절대 중복되지 않는다.)
+ *
+ * ── 코드 사전 (SR 접수 시 화면 캡처의 코드만 보고 위치를 바로 찾기 위한 표) ──
+ *  WSEV-001  Syntax Check(구문 검사) 버튼 — 디자인 영역 오류 점검(chkExcepionAttr) 실패
+ *  WSEV-002  Syntax Check(구문 검사) 버튼 — 오류 목록 창 열기(fnMultiFooterMsg) 실패
+ *  WSEV-003  Activate(활성화) 버튼 — 디자인 영역 오류 점검(chkExcepionAttr) 실패
+ *  WSEV-004  Activate(활성화) 버튼 — 오류 목록 창 열기(fnMultiFooterMsg) 실패
+ *  WSEV-005  Activate(활성화) 버튼 — 자식 윈도우 숨기기(fnChildWindowShow(false)) 실패
+ *  WSEV-006  Activate(활성화) 버튼 — 서버 주소·전송 꾸러미 준비(getServerPath / FormData / TRKORR·IS_ACT) 실패
+ *  WSEV-007  Activate(활성화) 버튼 — 저장 데이터 만들기(getSaveData + 복제) 실패
+ *  WSEV-008  Activate(활성화) 버튼 — 저장 데이터를 전송 형식으로 바꾸기(_convertSaveDataToFormData / APPDATA) 실패
+ *  WSEV-009  Activate(활성화) 버튼 — [서버 저장 성공 後] 앱 헤더(Active 표기) 갱신 실패
+ *  WSEV-010  Activate(활성화) 버튼 — [서버 저장 성공 後] Undo/Redo 이력 비우기 실패
+ *  WSEV-011  Save(저장) 버튼 — 자식 윈도우 숨기기(fnChildWindowShow(false)) 실패
+ *  WSEV-012  Save(저장) 버튼 — 서버 주소·전송 꾸러미 준비(getServerPath / FormData / TRKORR) 실패
+ *  WSEV-013  Save(저장) 버튼 — 저장 데이터 만들기(getSaveData + 복제) 실패
+ *  WSEV-014  Save(저장) 버튼 — 저장 데이터를 전송 형식으로 바꾸기(_convertSaveDataToFormData / APPDATA) 실패
+ *  WSEV-015  Save(저장) 버튼 — 저장 요청 보내기(sendAjax) 실패
+ *  WSEV-016  Save(저장) 버튼 — [서버 저장 성공 後] 앱 헤더 갱신 실패
+ *  WSEV-017  Save(저장) 버튼 — [서버 저장 성공 後] Undo/Redo 이력 비우기 실패
+ *  WSEV-018  Save·Activate·Syntax Check — [서버 처리 後] 선택 UI 다시 클릭(_ws20ReselectSelectedUI) 실패
+ *
+ * ★ Activate(활성화)·Save(저장) 은 둘 다 저장 행위다.
+ *   서버 전송 前 구간(WSEV-003~008 / WSEV-011~015)은 하나라도 터지면
+ *   **서버로 보내지 않고 중단**한다(오류난 데이터를 저장하지 않는다).
+ *   전송 後 구간(WSEV-009·010 / WSEV-016·017)은 이미 저장이 끝나 되돌릴 수 없으므로 코드만 드러낸다.
+ *   ※ 중단할 때 시작 시 숨긴 자식 윈도우는 다시 보이도록 되돌린다(_wsevCritical 5번째 인자).
+ *
+ * ★ 처리 방식 = 표준 SSOT `.analy/19_예외처리_크리티컬오류_표준.md` 부록 A 「표면화 수단(창 종류별)」.
+ *   **이 창에도 전역 오류 감시(ws_trycatch)는 걸려 있다**(실측 2026-09-01:
+ *   `ws30/ws10_20/index.html` 73행이 `../resources/index.js` 를 직접 싣고, 그 파일 1380행이
+ *   최상위에서 감시를 설치한다. 화면 안 iframe 은 주석 처리돼 안 쓰므로 이 코드도 같은 창에서 돈다).
+ *   → 그래서 **throw 하면 감시가 잡아 치명적 오류 창을 띄우고, 닫으면 로그 폴더를 연 뒤 앱이 종료된다.**
+ *   실행·저장은 **편집 중**에 눌리므로 앱이 종료되면 **저장 안 한 앱 설계가 통째로 사라진다.**
+ *   → 그래서 던지지 않고 **명시 호출 방식**을 쓴다:
+ *   `_wsevCritical(코드, 위치, 예외, …)` = 콘솔 로그 + 화면 잠금 해제 + 자식 윈도우 잠금 회수
+ *   + 화면 오류 팝업 → 호출측 `return`(fail-closed). 앱은 살아 있고 저장만 막힌다.
+ *   ※ 참고: 원본은 이 구간에 예외 처리가 거의 없어, 터지면 위 감시가 잡아 **앱이 종료**됐다.
+ *   화면 문구 = `[코드] 알 수 없는 오류가 발생하였습니다. 다시시도 하시거나, 문제가 지속될
+ *   경우 U4A 솔루션 팀에 문의 하세요.` (기존 키 ZMSG_WS_COMMON_001 314 + 290).
+ *   예외 원문·스택은 화면에 노출하지 않고 콘솔에만 남긴다.
  **************************************************************************/
 
 (function (window, $, oAPP) {
@@ -288,7 +332,7 @@
                 try {
                     eval(oResult.SCRIPT);
                 } catch (e) {
-                    console.error("[HTML5] /app_delte SCRIPT eval 실패 (UI5 의존 추정):", e && e.message, oResult.SCRIPT);
+                    console.error("/app_delte SCRIPT eval failed (likely UI5 dependent):", e && e.message, oResult.SCRIPT, e);
                 }
             }
 
@@ -370,7 +414,7 @@
                 try {
                     eval(oResult.SCRIPT);
                 } catch (e) {
-                    console.error("[HTML5] /usp_app_delete SCRIPT eval 실패 (UI5 의존 추정):", e && e.message, oResult.SCRIPT);
+                    console.error("/usp_app_delete SCRIPT eval failed (likely UI5 dependent):", e && e.message, oResult.SCRIPT, e);
                 }
             }
 
@@ -854,7 +898,8 @@
         oBrowserOptions.modal = true;        
         oBrowserOptions.parent = oCurrWin;
 
-        oBrowserOptions.opacity = 0.0;
+        // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
+        //   (창 표시는 extopen.js 가 iframe 로드 완료 후 CURRWIN.show() 로 한다.)
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;
         
@@ -1130,8 +1175,9 @@
         if (oAPP.common && typeof oAPP.common.fnConfirmBox === "function") {
             oAPP.common.fnConfirmBox('I', sMsg, lf_MsgCallback);
         } else {
-            // 폴백: 헬퍼 미로드 시 브라우저 confirm
-            lf_MsgCallback(window.confirm(sMsg) ? "YES" : "NO");
+            // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(NO).
+            console.error("[WSEV-018] checkwindow: common fnConfirmBox not loaded — show blocked. message:", sMsg);
+            lf_MsgCallback("NO");
         }
 
         function lf_MsgCallback(TYPE) {
@@ -1210,7 +1256,7 @@
 
         // 사용자 응답을 대기하므로 busy 해제 + 떠있는 팝업 잠시 숨김
         oAPP.common.fnSetBusyLock("");
-        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 저장 여부 질문 (구: parent.showMessage(sap, 40, 'W', ...) — sap 의존 →
         //   HTML5 확인창. YES=저장 후 이동 / NO=저장 안 하고 이동 / CANCEL=머무름.)
@@ -1221,7 +1267,9 @@
                 { act: "CANCEL", label: "Cancel" }
             ]);
         } else {
-            oAPP.events.ev_pageBack_MsgCallBack(window.confirm(sMsg) ? "YES" : "CANCEL");
+            // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(CANCEL=머무름).
+            console.error("[WSEV-019] page back confirm: common fnConfirmBox not loaded - blocked. message:", sMsg);
+            oAPP.events.ev_pageBack_MsgCallBack("CANCEL");
         }
 
     }; // end of oAPP.events.ev_pageBack
@@ -1250,15 +1298,15 @@
             //   → 저장 핸들러 직접 호출(ISBACK="X" → 저장 성공 후 WS10 으로 이동).
             if (typeof oAPP.events.ev_pressSaveBtn !== "function") {
                 oAPP.common.fnSetBusyLock("");
-                try { parent.showMessage(null, 20, "E", "[Save] ev_pressSaveBtn 미정의"); } catch (e) { }
+                try { parent.showMessage(null, 20, "E", "[Save] ev_pressSaveBtn undefined"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return;
             }
             try {
                 oAPP.events.ev_pressSaveBtn({ ISBACK: "X" });
             } catch (e) {
                 oAPP.common.fnSetBusyLock("");
-                try { parent.showMessage(null, 20, "E", "[Save] " + (e && e.message ? e.message : String(e))); } catch (e2) { }
-                console.error("[HTML5][WS20] save(ISBACK) error:", e);
+                try { parent.showMessage(null, 20, "E", "[Save] " + (e && e.message ? e.message : String(e))); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+                console.error("[WS20] save(ISBACK) error:", e);
             }
 
             return;
@@ -1329,8 +1377,9 @@
             }
             T_excep = oAPP.fn.chkExcepionAttr() || [];
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             // 여기는 fnMultiFooterMsg 호출 前 → 자식창 BUSY_ON 방송이 아직 안 나갔다(회수 불필요).
-            _ws20CriticalError("WS20SYN-CHK01", e, false);
+            _wsevCritical("WSEV-001", "Syntax Check(구문 검사) — 디자인 영역 오류 점검(chkExcepionAttr)", e, false);
             return;
         }
 
@@ -1346,7 +1395,8 @@
                 }
                 oAPP.fn.fnMultiFooterMsg(T_excep);
             } catch (e) {
-                _ws20CriticalError("WS20SYN-CHK02", e, true);
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                _wsevCritical("WSEV-002", "Syntax Check(구문 검사) — 오류 목록 창 열기(fnMultiFooterMsg)", e, true);
             }
 
             // 작업표시줄 깜빡임
@@ -1373,6 +1423,9 @@
 
                 // busy 끄고 Lock 풀기
                 oAPP.common.fnSetBusyLock("");
+
+                // [2026-09-03 장군님 지시] 서버 왕복까지 끝난 시점 → 왼쪽 UI 트리의 선택 줄 다시 클릭.
+                _ws20ReselectSelectedUI("Syntax Check(구문 검사)");
 
                 return;
             }
@@ -1508,7 +1561,7 @@
             if (!wsL || (beL && beL === wsL)) { return sText; }
             var WC = REMOTE.getGlobal("WsMsgCls");
             return (WC && WC.relocalize) ? WC.relocalize(sText, beL, wsL) : sText;
-        } catch (e) { return sText; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return sText; }
     }
     // eval(SCRIPT) 동안만 parent.showMessage 를 역현지화로 감싼다(원본 반환값=복원용). eval 은 반드시
     //   인라인 유지 — 서버 스크립트가 참조하는 지역 oNewEvent/모듈 lf_saveActiveCtsPopup 스코프 보존.
@@ -1528,61 +1581,123 @@
             var w = (typeof CURRWIN !== "undefined" && CURRWIN) ? CURRWIN
                   : (parent.REMOTE ? parent.REMOTE.getCurrentWindow() : (parent.CURRWIN || null));
             if (w && w.flashFrame) { w.flashFrame(true); }
-        } catch (e) { }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     /************************************************************************
      * [BR55] WS20 크리티컬 오류 공통 처리.
+     *   SSOT = `.analy/19_예외처리_크리티컬오류_표준.md` (실무 규약 = `.works/DEV_STANDARD_오류처리.md`)
      * ---------------------------------------------------------------------
-     *  프로젝트 기존 크리티컬 전례를 그대로 따른다:
-     *   · ws_common.js 4009~4027 fnJsonParseError — console.error → 화면 Lock 해제
-     *     → parent.setBusy("") → 메시지 "/U4A/MSG_WS 192"(Fatal Error! Please contact
-     *     your system administrator.) + 예외 원문 → showMessage(KIND 20, "E") 1버튼 팝업.
-     *   · usp/ws_usp.js 4048~4074 fnCriticalErrorWs30 — 오류음 + 작업표시줄 깜빡임.
-     *  ※ KIND 20 은 공통 오류 팝업(1버튼 OK)이며 내부에서 오류음을 낸다
-     *    (resources/index.js 293~298 lf_sound) → 여기서 소리를 따로 내지 않는다.
-     *  ※ 세션 전체 창을 닫는 fnCriticalError 콜백은 붙이지 않는다 — WS20 은 저장 안 한
-     *    앱 설계가 메모리에 있어 강제 로그오프 시 작업분이 사라진다(장군님 판단 대기).
-     *  호출측은 이 함수 뒤에 반드시 return 하여 다음 처리를 진행하지 않는다(fail-closed).
+     *  ★표준 부록 A 「표면화 수단(창 종류별)」:
+     *    · 별도 창  = 전역 오류 감시(`ws_trycatch.js`)가 걸려 있어 코드 담아 `throw` 하면 처리된다.
+     *    · **WS20(메인 창)도 전역 감시가 걸려 있다** — 실측 2026-09-01:
+     *      `ws30/ws10_20/index.html` 73행이 `../resources/index.js` 를 직접 싣고 그 파일 1380행이
+     *      최상위에서 감시를 설치한다(화면 안 iframe 은 주석 처리 — 이 코드도 같은 창에서 돈다).
+     *      **그래서 `throw` 하면 치명적 오류 창이 뜨고, 닫으면 로그 폴더를 연 뒤 앱이 종료된다.**
+     *      실행·저장은 **편집 중**에 눌리므로 앱이 죽으면 **저장 안 한 앱 설계가 통째로 사라진다.**
+     *      → 던지지 않고 **명시 호출 방식**을 쓴다(앱은 살리고 그 동작만 막는다).
      *
-     *  @param {string} sCode      구간 추적 코드 (예: "WS20ACT-CHK01")
-     *  @param {*}      e          잡은 예외
-     *  @param {boolean} bBroadOff 자식창 잠금(BUSY_ON) 방송이 이미 나갔으면 true → BUSY_OFF 회수
+     *  이 함수가 하는 일 (표준 §3·§4·§5, 부록 A):
+     *    ① 콘솔에 [코드] + 어느 자리인지(한글) + 예외 원문   ← SR 추적용(§3)
+     *    ② 화면 잠금 해제 · 자식 윈도우 잠금 회수 · 자식 윈도우 다시 보이기 (정리)
+     *    ③ 화면 오류 팝업 `[코드] + 기존 메시지 키 문구` (§4·§5)
+     *    ④ 호출측은 곧바로 `return` — 저장·실행의 전송 前 구간이면 서버로 보내지 않는다(§1·§6, fail-closed).
+     *
+     *  화면 문구 = `[코드] 알 수 없는 오류가 발생하였습니다. 다시시도 하시거나, …`
+     *   (기존 메시지 키 ZMSG_WS_COMMON_001 314 + 290 만 사용, 임의 문구 생성 금지.
+     *    예외 원문·스택은 화면에 노출하지 않는다 — ① 에만 남긴다.)
+     *  ※ 세션 강제 종료 콜백은 붙이지 않는다 — 저장 안 한 앱 설계가 메모리에 있기 때문(부록 A).
+     *
+     *  @param {string}  sCode      오류 코드 (파일 머리 코드 사전 참조. 예: "WSEV-003")
+     *  @param {string}  sWhere     어느 자리인지 한글 설명 (콘솔에만 남긴다 — 화면엔 코드만)
+     *  @param {*}       e          잡은 예외
+     *  @param {boolean} bBroadOff  자식 윈도우 잠금(BUSY_ON) 방송이 이미 나갔으면 true → BUSY_OFF 회수
+     *  @param {boolean} bChildShow 시작 때 자식 윈도우를 숨겼으면 true → 다시 보이기로 되돌림
      ************************************************************************/
-    function _ws20CriticalError(sCode, e, bBroadOff) {
+    function _wsevCritical(sCode, sWhere, e, bBroadOff, bChildShow) {
 
-        // ① 콘솔에 구간 코드 + 예외 원문 (조용한 삼킴 금지 — 현장 SR 추적용)
-        try { console.error("[" + sCode + "] critical:", e); } catch (e0) { }
+        // ⓪ 안쪽에서 **이미 코드를 붙여 던진 예외**면 그 코드를 그대로 쓴다(더 정확한 발생 위치).
+        //   예) 값 검사 모듈이 `[DCHK-003] …` 로 던지면 화면·콘솔 모두 DCHK-003 으로 남는다.
+        //   바깥 코드로 덮어쓰면 SR 캡처의 코드가 실제 위치와 달라져 추적이 어긋난다.
+        try {
+            if (e && typeof e.message === "string") {
+                var aInner = e.message.match(/^\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3})\]/);
+                if (aInner) { sCode = aInner[1]; }
+            }
+        } catch (e9) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e9); } }
 
-        // ② 화면 잠금 해제 (원본 fnJsonParseError: sap unlock + parent.setBusy(""))
-        try { oAPP.common.fnSetBusyLock(""); } catch (e1) { console.error("[" + sCode + "] fnSetBusyLock 해제 실패:", e1 && e1.message); }
-        try { parent.setBusy(""); } catch (e2) { console.error("[" + sCode + "] setBusy 해제 실패:", e2 && e2.message); }
+        // ① 콘솔에 [코드] + 위치 + 예외 원문 (조용한 삼킴 금지 — 현장 SR 추적용)
+        try { console.error("[" + sCode + "] " + sWhere + " — error:", e); } catch (e0) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e0); } }
 
-        // ③ 자식창 잠금 회수 (BUSY_ON 을 이미 방송한 구간에서만 — 짝 필수)
+        // ② 정리(cleanup) — 화면 잠금 해제
+        try { oAPP.common.fnSetBusyLock(""); } catch (e1) { console.error("[" + sCode + "] fnSetBusyLock release failed:", e1 && e1.message, e1); }
+        try { parent.setBusy(""); } catch (e2) { console.error("[" + sCode + "] setBusy release failed:", e2 && e2.message, e2); }
+
+        // ②-2 자식 윈도우 잠금 회수 (BUSY_ON 을 이미 방송한 구간에서만 — 짝 필수)
         if (bBroadOff === true) {
             try {
                 if (oAPP.attr && oAPP.attr.oMainBroad) { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); }
-            } catch (e3) { console.error("[" + sCode + "] 자식창 busy 해제 방송 실패:", e3 && e3.message); }
+            } catch (e3) { console.error("[" + sCode + "] child window busy release broadcast failed:", e3 && e3.message, e3); }
         }
 
-        // ④ 작업표시줄 깜빡임 (크리티컬 전례 fnCriticalErrorWs30 4052)
+        // ②-3 자식 윈도우 다시 보이기 — 시작 때 fnChildWindowShow(false) 로 숨긴 뒤 터진 구간이면
+        //     되돌리지 않을 경우 자식 윈도우가 숨은 채로 남는다.
+        if (bChildShow === true) {
+            try {
+                if (typeof oAPP.fn.fnChildWindowShow === "function") { oAPP.fn.fnChildWindowShow(true); }
+            } catch (e7) { console.error("[" + sCode + "] re-show child window failed:", e7 && e7.message, e7); }
+        }
+
+        // ②-4 작업표시줄 깜빡임 (크리티컬 전례 usp/ws_usp.js fnCriticalErrorWs30)
         _ws20FlashFrame();
 
-        // ⑤ 공통 오류 팝업 — 문구는 기존 메시지 키만 사용(임의 문구 생성 금지).
-        //    192 = Fatal Error! Please contact your system administrator.
+        // ③ 화면 오류 팝업 — `[코드] + 기존 메시지 키 문구`(표준 §4·§5, 부록 A).
+        //    맨 앞 [코드] = SR 캡처에서 이것만 보면 발생 위치가 특정된다.
+        //    KIND 20 = 공통 오류 팝업(1버튼)이며 내부에서 오류음까지 낸다(resources/index.js lf_sound).
         var sMsg = "";
-        try { sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "192") || ""; }
-        catch (e4) { console.error("[" + sCode + "] 메시지 조회 실패:", e4 && e4.message); }
+        try {
+            sMsg = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "314") || "";
+            var sGuide = parent.WSUTIL.getWsMsgClsTxt(LANGU, "ZMSG_WS_COMMON_001", "290") || "";
+            if (sGuide) { sMsg += (sMsg ? " " : "") + sGuide; }
+        } catch (e4) { console.error("[" + sCode + "] message read failed:", e4 && e4.message, e4); }
 
-        var sDetail = "";
-        try { sDetail = (e && e.message) ? e.message : String(e); } catch (e5) { sDetail = ""; }
-
-        sMsg += (sMsg ? "\n\n" : "") + "[" + sCode + "] " + sDetail;
+        sMsg = "[" + sCode + "] " + sMsg;
 
         try { parent.showMessage(null, 20, "E", sMsg); }
-        catch (e6) { console.error("[" + sCode + "] 오류 팝업 표시 실패:", e6 && e6.message); }
+        catch (e6) { console.error("[" + sCode + "] error popup failed:", e6 && e6.message, e6); }
 
-    } // end of _ws20CriticalError
+    } // end of _wsevCritical
+
+    /************************************************************************
+     * [공통] 서버 왕복이 끝난 뒤 왼쪽 UI 트리의 선택 줄을 "다시 클릭"한다.
+     *   장군님 지시 2026-09-03 — Save(저장) / Activate(활성화) / Syntax Check(구문 검사)
+     *   가 서버까지 갔다가 다 끝나는 시점에, 지금 선택돼 있는 UI 를 한 번 더 클릭한
+     *   효과를 준다(속성 영역·미리보기 선택이 클릭과 똑같이 다시 맞춰진다).
+     *
+     *   ★새 동작을 만들지 않는다 — 트리 클릭 핸들러를 그대로 다시 부르는
+     *     fnWs20TreeReselectCurrent(ws_html5_ws20_tree.js) 에 위임한다.
+     *   ★이 시점은 서버 저장이 이미 끝난 뒤라 되돌릴 수 없다. 그래서 여기서 터져도
+     *     저장을 되돌리지 않고, 조용히 삼키지도 않고 코드로 드러내기만 한다(WSEV-018).
+     *   선택된 줄이 없으면 아무것도 하지 않는다.
+     ************************************************************************/
+    function _ws20ReselectSelectedUI(sWhere) {
+
+        try {
+
+            if (typeof oAPP.fn.fnWs20TreeReselectCurrent !== "function") {
+                throw new Error("oAPP.fn.fnWs20TreeReselectCurrent 미정의(WS20 트리 모듈 미로드)");
+            }
+
+            //비동기(속성영역·미리보기 선택까지) — 안에서 실패해도 코드로 드러낸다.
+            Promise.resolve(oAPP.fn.fnWs20TreeReselectCurrent()).catch(function (e) {
+                console.error("[WSEV-018] " + sWhere + " — [server handle after] select UI re-click failed:", e);
+            });
+
+        } catch (e) {
+            console.error("[WSEV-018] " + sWhere + " — [server handle after] select UI re-click failed:", e);
+        }
+
+    } // end of _ws20ReselectSelectedUI
 
     /************************************************************************
      * Activate Button Event
@@ -1612,12 +1727,13 @@
             }
             T_excep = oAPP.fn.chkExcepionAttr() || [];
         } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             //[BR55] 점검 실패 = 검증되지 않은 상태 → 활성화 중단(fail-closed).
             //  점검부(chkExcepionAttr → chkExcepUiTable / designTreeData.js)에는 방어 없는
             //  참조가 여러 곳 있어(자세한 목록 = .audit/br55/04_final.md) 실제로 터질 수 있다.
             //  크리티컬 공통 처리로 화면 잠금 해제 + 공통 오류 팝업까지 수행한다.
             //  ※ 여기는 fnMultiFooterMsg 호출 前이라 자식창 BUSY_ON 방송이 아직 안 나갔다 → 회수 불필요.
-            _ws20CriticalError("WS20ACT-CHK01", e, false);
+            _wsevCritical("WSEV-003", "Activate(활성화) — 디자인 영역 오류 점검(chkExcepionAttr)", e, false);
             return;
         }
 
@@ -1638,10 +1754,11 @@
                 }
                 oAPP.fn.fnMultiFooterMsg(T_excep);
             } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 //[BR55-P1] fnMultiFooterMsg 는 진입 즉시 본창 busy + 자식창 BUSY_ON 을 함께 건다
                 //  (fnDialogPopupOpener.js 2822~2826). 도중 실패로 여기 오면 본창만 풀어선 안 되고
                 //  이미 나간 자식창 잠금도 같이 회수해야 한다(BUSY_ON 잠그면 BUSY_OFF 필수) → 3번째 인자 true.
-                _ws20CriticalError("WS20ACT-CHK02", e, true);
+                _wsevCritical("WSEV-004", "Activate(활성화) — 오류 목록 창 열기(fnMultiFooterMsg)", e, true);
             }
 
             // 작업표시줄 깜빡임
@@ -1655,36 +1772,67 @@
         }
 
         // 자식 윈도우 숨기기
-        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+        try {
+            if (typeof oAPP.fn.fnChildWindowShow !== "function") {
+                throw new Error("oAPP.fn.fnChildWindowShow 미정의");
+            }
+            oAPP.fn.fnChildWindowShow(false);
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            // 여기부터는 저장(서버 전송) 직전 구간이다. 자식 윈도우 정리가 실패한 채로 저장을 진행하면
+            //  잠금 상태가 어긋난 채 서버에 데이터가 올라간다 → 코드 남기고 저장하지 않는다.
+            _wsevCritical("WSEV-005", "Activate(활성화) — 자식 윈도우 숨기기(fnChildWindowShow(false))", e, false);
+            return;
+        }
 
         // [HTML5] oEvent 는 HTML5 버튼/단축키에서 미전달될 수 있음(옵셔널).
         //   구 sap.ui.base.Event 기반 oNewEvent 는 이후 미사용(사장 코드)이라 제거.
         oEvent = oEvent || {};
         var TRKORR = (typeof oEvent.getParameter === "function") ? oEvent.getParameter("TRKORR") : oEvent.TRKORR;
 
-        var sPath = parent.getServerPath() + '/save_active_appdata#active',
+        //  ★서버 주소·전송 꾸러미 준비. 여기서 터지면 어디로 무엇을 보낼지가 깨진 것이므로 보내지 않는다.
+        var sPath = "", oFormData = null;
+        try {
+            sPath = parent.getServerPath() + '/save_active_appdata#active';
             oFormData = new FormData();
 
-        var sReqNo = "";
+            var sReqNo = "";
 
-        // 기존에 CTS 번호가 있을 경우
-        if (oAPP.attr.appInfo.REQNO != "") {
-            sReqNo = oAPP.attr.appInfo.REQNO;
+            // 기존에 CTS 번호가 있을 경우
+            if (oAPP.attr.appInfo.REQNO != "") {
+                sReqNo = oAPP.attr.appInfo.REQNO;
+            }
+
+            if (TRKORR) {
+                sReqNo = TRKORR;
+            }
+
+            if (sReqNo != "") {
+                oFormData.append("TRKORR", sReqNo);
+            }
+
+            oFormData.append("IS_ACT", 'X');
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            _wsevCritical("WSEV-006", "Activate(활성화) — 서버 주소·전송 꾸러미 준비(getServerPath / FormData / TRKORR·IS_ACT)", e, false, true);
+            return;
         }
-
-        if (TRKORR) {
-            sReqNo = TRKORR;
-        }
-
-        if (sReqNo != "") {
-            oFormData.append("TRKORR", sReqNo);
-        }
-
-        oFormData.append("IS_ACT", 'X');
 
 
         // 어플리케이션 저장 데이터
-        let oSaveData = JSON.parse(JSON.stringify(oAPP.fn.getSaveData()));
+        //  ★여기가 "저장할 내용"을 만드는 자리다. 만들다 터지면 반쪽짜리 데이터가 서버로 갈 수 있으므로
+        //   반드시 잡아 코드를 남기고 **서버로 보내지 않는다**(오류난 채로 저장하느니 저장을 안 한다).
+        let oSaveData = null;
+        try {
+            if (typeof oAPP.fn.getSaveData !== "function") {
+                throw new Error("oAPP.fn.getSaveData 미정의");
+            }
+            oSaveData = JSON.parse(JSON.stringify(oAPP.fn.getSaveData()));
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            _wsevCritical("WSEV-007", "Activate(활성화) — 저장 데이터 만들기(getSaveData + 복제)", e, false, true);
+            return;
+        }
 
         /**
          * @description
@@ -1706,10 +1854,17 @@
          * @author soccerhs
          */
         // 어플리케이션 저장 데이터에서 FormData로 변환
-        _convertSaveDataToFormData(oFormData, oSaveData);
+        //  ★전송 직전 마지막 가공. 여기서 터지면 서버로 아무것도 보내지 않는다.
+        try {
+            _convertSaveDataToFormData(oFormData, oSaveData);
 
-        // oFormData.append("APPDATA", JSON.stringify(oAPP.fn.getSaveData()));
-        oFormData.append("APPDATA", JSON.stringify(oSaveData));
+            // oFormData.append("APPDATA", JSON.stringify(oAPP.fn.getSaveData()));
+            oFormData.append("APPDATA", JSON.stringify(oSaveData));
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            _wsevCritical("WSEV-008", "Activate(활성화) — 저장 데이터를 전송 형식으로 바꾸기(_convertSaveDataToFormData / APPDATA)", e, false, true);
+            return;
+        }
 
         // Ajax 서버 호출
         sendAjax(sPath, oFormData, function (oResult) {
@@ -1836,18 +1991,36 @@
             oAPP.attr.appInfo = oAppInfo;                        // ③ WS20 로컬(동일 참조)
 
             // [HTML5] 앱헤더(Active/Inactive)·트랜잭션 버튼 상태 갱신
-            try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+            //  ★여기부터는 서버 저장이 이미 끝난 뒤다 — 되돌릴 수 없으므로 "저장 중단"은 못 한다.
+            //   대신 삼키지 않고 코드로 드러내, 화면 표기가 실제 상태와 어긋난 것을 바로 알게 한다.
+            try {
+                if (typeof oAPP.fn.fnUpdateWs20AppHeader !== "function") {
+                    throw new Error("oAPP.fn.fnUpdateWs20AppHeader 미정의");
+                }
+                oAPP.fn.fnUpdateWs20AppHeader();
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                _wsevCritical("WSEV-009", "Activate(활성화) — [저장 성공 後] 앱 헤더(Active 표기) 갱신", e, false);
+            }
 
             // undo, redo 이력/버튼 초기화 (저장/활성화 후 이전 편집 히스토리 비움)
             //  ★ HTML5 편집 undo/redo 는 스냅샷 스택(fnWs20ClearHistory)이 본체다. 원본 design
             //    모듈 clearHistory 만 호출하면 스냅샷 스택이 안 비워져 "저장/활성화 후에도 Undo 가능"
             //    버그가 난다(data.js setUIAreaEditable 과 동일하게 스냅샷 clear 를 함께 호출).
+            //  ★서버 저장이 끝난 뒤라 되돌릴 수 없다. 다만 여기서 실패하면 활성화 뒤에도
+            //   Undo 가 살아 있어 "저장된 것과 화면이 어긋나는" 상태가 되므로 삼키지 않고 코드로 드러낸다.
             try {
-                if (oAPP.fn.fnWs20ClearHistory) { oAPP.fn.fnWs20ClearHistory(); } // HTML5 스냅샷 undo/redo
+                if (typeof oAPP.fn.fnWs20ClearHistory !== "function") {
+                    throw new Error("oAPP.fn.fnWs20ClearHistory 미정의");
+                }
+                oAPP.fn.fnWs20ClearHistory();                                     // HTML5 스냅샷 undo/redo
                 var _oUndoRedo = parent.require(oAPP.oDesign.pathInfo.undoRedo);
                 _oUndoRedo.clearHistory();
                 _oUndoRedo.setUndoRedoButtonEnable();
-            } catch (e) { console.warn("[HTML5][WS20] undoRedo skip:", e && e.message); }
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                _wsevCritical("WSEV-010", "Activate(활성화) — [저장 성공 後] Undo/Redo 이력 비우기", e, false);
+            }
 
             oAPP.attr.oModel.refresh();
 
@@ -1870,10 +2043,13 @@
 
             // activate 이벤트 전파
             let oIpcHandler = new parent.CLIpcHandler();
-                oIpcHandler.command("activate", { 
+                oIpcHandler.command("activate", {
                     fromPage  : parent.getCurrPage(),       // Activate 수행한 화면
                     browserKey: parent.getBrowserKey()      // 현재 브라우저 고유 키
                 });
+
+            // [2026-09-03 장군님 지시] 서버 왕복까지 끝난 시점 → 왼쪽 UI 트리의 선택 줄 다시 클릭.
+            _ws20ReselectSelectedUI("Activate(활성화)");
 
         });
 
@@ -1989,7 +2165,17 @@
         oAPP.common.fnSetBusyLock("X");
 
         // 자식 윈도우 숨기기
-        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { }
+        try {
+            if (typeof oAPP.fn.fnChildWindowShow !== "function") {
+                throw new Error("oAPP.fn.fnChildWindowShow 미정의");
+            }
+            oAPP.fn.fnChildWindowShow(false);
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            // 저장 직전 구간이다. 자식 윈도우 정리가 실패한 채 저장하면 잠금 상태가 어긋난 데이터가 올라간다.
+            _wsevCritical("WSEV-011", "Save(저장) — 자식 윈도우 숨기기(fnChildWindowShow(false))", e, false, false);
+            return;
+        }
 
         // 푸터 메시지가 있을 경우 닫기
         APPCOMMON.fnHideFloatingFooterMsg();
@@ -1999,33 +2185,52 @@
         oEvent = oEvent || {};
         function _ev(sKey) { return (typeof oEvent.getParameter === "function") ? oEvent.getParameter(sKey) : oEvent[sKey]; }
 
-        var sPath = parent.getServerPath() + '/save_active_appdata#save',
+        //  ★서버 주소·전송 꾸러미 준비. 여기서 터지면 어디로 무엇을 보낼지가 깨진 것이므로 보내지 않는다.
+        var sPath = "", oFormData = null;
+        var ISBACK, ISDISP, TRKORR;
+        try {
+            sPath = parent.getServerPath() + '/save_active_appdata#save';
             oFormData = new FormData();
 
-        var ISBACK = _ev("ISBACK"), // 저장후 뒤로 갈 경우 (20 -> 10)
-            ISDISP = _ev("ISDISP"), // 저장후 Display 모드로 전환일 경우
+            ISBACK = _ev("ISBACK"); // 저장후 뒤로 갈 경우 (20 -> 10)
+            ISDISP = _ev("ISDISP"); // 저장후 Display 모드로 전환일 경우
             TRKORR = _ev("TRKORR");
 
-        try {
+            var sReqNo = "";
 
-        var sReqNo = "";
+            // 기존에 CTS 번호가 있을 경우
+            if (oAPP.attr.appInfo && oAPP.attr.appInfo.REQNO != "") {
+                sReqNo = oAPP.attr.appInfo.REQNO;
+            }
 
-        // 기존에 CTS 번호가 있을 경우
-        if (oAPP.attr.appInfo && oAPP.attr.appInfo.REQNO != "") {
-            sReqNo = oAPP.attr.appInfo.REQNO;
-        }
+            // CTS 팝업에서 선택한 CTS 번호가 있을 경우.
+            if (TRKORR) {
+                sReqNo = TRKORR;
+            }
 
-        // CTS 팝업에서 선택한 CTS 번호가 있을 경우.
-        if (TRKORR) {
-            sReqNo = TRKORR;
-        }
-
-        if (sReqNo != "") {
-            oFormData.append("TRKORR", sReqNo);
+            if (sReqNo != "") {
+                oFormData.append("TRKORR", sReqNo);
+            }
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            _wsevCritical("WSEV-012", "Save(저장) — 서버 주소·전송 꾸러미 준비(getServerPath / FormData / TRKORR)", e, false, true);
+            return;
         }
 
         // 어플리케이션 저장 데이터
-        let oSaveData = JSON.parse(JSON.stringify(oAPP.fn.getSaveData()));
+        //  ★저장할 내용을 만드는 자리. 만들다 터지면 반쪽짜리 데이터가 서버로 갈 수 있으므로
+        //   반드시 잡아 코드를 남기고 **서버로 보내지 않는다**(오류난 채로 저장하느니 저장을 안 한다).
+        let oSaveData = null;
+        try {
+            if (typeof oAPP.fn.getSaveData !== "function") {
+                throw new Error("oAPP.fn.getSaveData 미정의");
+            }
+            oSaveData = JSON.parse(JSON.stringify(oAPP.fn.getSaveData()));
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            _wsevCritical("WSEV-013", "Save(저장) — 저장 데이터 만들기(getSaveData + 복제)", e, false, true);
+            return;
+        }
 
         /**
          * @description
@@ -2048,20 +2253,27 @@
          */
 
         // 어플리케이션 저장 데이터에서 FormData로 변환
-        _convertSaveDataToFormData(oFormData, oSaveData);
+        //  ★전송 직전 마지막 가공. 여기서 터지면 서버로 아무것도 보내지 않는다.
+        try {
+            _convertSaveDataToFormData(oFormData, oSaveData);
 
-        // oFormData.append("APPDATA", JSON.stringify(oAPP.fn.getSaveData()));
-        oFormData.append("APPDATA", JSON.stringify(oSaveData));
+            // oFormData.append("APPDATA", JSON.stringify(oAPP.fn.getSaveData()));
+            oFormData.append("APPDATA", JSON.stringify(oSaveData));
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            _wsevCritical("WSEV-014", "Save(저장) — 저장 데이터를 전송 형식으로 바꾸기(_convertSaveDataToFormData / APPDATA)", e, false, true);
+            return;
+        }
 
         // Ajax 서버 호출
-        sendAjax(sPath, oFormData, lf_getAppInfo);
-
-        } catch (oSaveErr) {
-            // [HTML5] 저장 데이터 구성/전송 중 동기 오류 → 조용한 실패 대신 사용자에게 표시.
-            oAPP.common.fnSetBusyLock("");
-            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { }
-            try { parent.showMessage(null, 20, "E", "[Save] " + (oSaveErr && oSaveErr.message ? oSaveErr.message : String(oSaveErr))); } catch (e) { }
-            console.error("[HTML5][WS20] ev_pressSaveBtn error:", oSaveErr);
+        //  ※ 종전엔 위 구간 전체를 한 덩어리 try 로 묶어 "[Save] 예외원문" 만 띄웠다(어느 자리인지 알 수 없었다).
+        //    구간을 쪼개 코드(WSEV-011~015)를 부여해 SR 캡처만으로 위치를 특정한다.
+        try {
+            sendAjax(sPath, oFormData, lf_getAppInfo);
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            _wsevCritical("WSEV-015", "Save(저장) — 저장 요청 보내기(sendAjax)", e, false, true);
+            return;
         }
 
         // 서버 호출 callback
@@ -2130,8 +2342,8 @@
                     oAPP.fn.fnMoveToWs10();
                 } catch (eMove) {
                     oAPP.common.fnSetBusyLock("");
-                    try { parent.showMessage(null, 20, "E", "[Back] " + (eMove && eMove.message ? eMove.message : String(eMove))); } catch (e) { }
-                    console.error("[HTML5][WS20] fnMoveToWs10 error:", eMove);
+                    try { parent.showMessage(null, 20, "E", "[Back] " + (eMove && eMove.message ? eMove.message : String(eMove))); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    console.error("[WS20] fnMoveToWs10 error:", eMove);
                 }
 
                 return;
@@ -2167,18 +2379,36 @@
             oAPP.attr.appInfo = oAppInfo;                        // ③ WS20 로컬(동일 참조)
 
             // [HTML5] 앱헤더(Active/Inactive)·트랜잭션 버튼 상태 갱신 (IS_CHAG="" → 저장 반영)
-            try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { }
+            //  ★서버 저장이 이미 끝난 뒤다 — 되돌릴 수 없으므로 "저장 중단"은 못 한다.
+            //   대신 삼키지 않고 코드로 드러내, 화면 표기가 실제 상태와 어긋난 것을 바로 알게 한다.
+            try {
+                if (typeof oAPP.fn.fnUpdateWs20AppHeader !== "function") {
+                    throw new Error("oAPP.fn.fnUpdateWs20AppHeader 미정의");
+                }
+                oAPP.fn.fnUpdateWs20AppHeader();
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                _wsevCritical("WSEV-016", "Save(저장) — [저장 성공 後] 앱 헤더 갱신", e, false, false);
+            }
 
             // undo, redo 이력/버튼 초기화 (저장/활성화 후 이전 편집 히스토리 비움)
             //  ★ HTML5 편집 undo/redo 는 스냅샷 스택(fnWs20ClearHistory)이 본체다. 원본 design
             //    모듈 clearHistory 만 호출하면 스냅샷 스택이 안 비워져 "저장/활성화 후에도 Undo 가능"
             //    버그가 난다(data.js setUIAreaEditable 과 동일하게 스냅샷 clear 를 함께 호출).
+            //  ★저장이 끝난 뒤라 되돌릴 수 없다. 다만 실패하면 저장 뒤에도 Undo 가 살아 있어
+            //   "저장된 것과 화면이 어긋나는" 상태가 되므로 삼키지 않고 코드로 드러낸다.
             try {
-                if (oAPP.fn.fnWs20ClearHistory) { oAPP.fn.fnWs20ClearHistory(); } // HTML5 스냅샷 undo/redo
+                if (typeof oAPP.fn.fnWs20ClearHistory !== "function") {
+                    throw new Error("oAPP.fn.fnWs20ClearHistory 미정의");
+                }
+                oAPP.fn.fnWs20ClearHistory();                                     // HTML5 스냅샷 undo/redo
                 var _oUndoRedo = parent.require(oAPP.oDesign.pathInfo.undoRedo);
                 _oUndoRedo.clearHistory();
                 _oUndoRedo.setUndoRedoButtonEnable();
-            } catch (e) { console.warn("[HTML5][WS20] undoRedo skip:", e && e.message); }
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                _wsevCritical("WSEV-017", "Save(저장) — [저장 성공 後] Undo/Redo 이력 비우기", e, false, false);
+            }
 
             oAPP.attr.oModel.refresh();
 
@@ -2199,7 +2429,12 @@
 
             }
 
-        } // end of lf_getAppInfo      
+            // [2026-09-03 장군님 지시] 서버 왕복까지 끝난 시점 → 왼쪽 UI 트리의 선택 줄 다시 클릭.
+            //  ※ 위쪽 ISBACK(WS10 로 이동) / ISDISP(Display 모드 전환) 분기는 화면 자체가 바뀌므로
+            //    그 앞에서 이미 return 되어 여기 오지 않는다(다시 클릭도 하지 않는다).
+            _ws20ReselectSelectedUI("Save(저장)");
+
+        } // end of lf_getAppInfo
 
     }; // end of oAPP.events.ev_pressSaveBtn
 

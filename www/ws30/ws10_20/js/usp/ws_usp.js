@@ -47,6 +47,9 @@
      ************************************************************************/
     oAPP.fn.fnCreateWs30 = () => {
 
+        // 진입 기록 (2026-10-01 — 장군님 지시, ws40-work-order-2 A7): 오류 분석 때 이 길을 실제로 지났는지 알기 위해
+        if (typeof U4ALOG !== "undefined" && U4ALOG.info) { U4ALOG.info("진입", "fnCreateWs30", ""); }
+
         // 현재 테마의 색상 정보 구하기
         gThemeColors = sap.ui.core.theming.Parameters.get();
 
@@ -5175,7 +5178,7 @@
             let sUspHeaderLength = xhr.getResponseHeader('usp_head_data_Length');
             if (sUspHeaderLength) {
 
-                zconsole.log(`[usp_head_data_Length] USP 응답 헤더에 데이터 길이 정보 존재!`);
+                zconsole.log(`[usp_head_data_Length] USP response header has data length info`);
 
                 let oUspBytes = new TextEncoder().encode(sJsonResult);
                 let oDecoder = new TextDecoder('utf-8');
@@ -5535,6 +5538,7 @@
             return oThemeInfo;
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
             return;
 
@@ -5834,7 +5838,7 @@
      **************************************************************************/
     function ev_getRootNodeRowsUpdated(oEvent) {
 
-        zconsole.log("[USP] 루트 노드 구하기");
+        zconsole.log("[USP] get root node");
 
         var oTable = oEvent.getSource();
         var aRows = oTable.getRows(),
@@ -7319,7 +7323,7 @@
 
             case "_C": // 신규 생성일 경우.     
 
-                console.log("[USP] 신규생성");
+                console.log("[USP] create new");
 
                 _fnCreateUspNode(oEvent);
 
@@ -7330,7 +7334,7 @@
 
             case "C": // 변경된 데이터 저장 후 프로세스가 신규 생성일 경우.
 
-                console.log("[USP] 변경된 데이터 저장 후 신규 생성");
+                console.log("[USP] create new after saving changed data");
 
                 fnCreateUspNodePopup(oTreeTable);
 
@@ -7352,7 +7356,7 @@
 
             case "_RN": //rename 일 경우.
 
-                console.log("[USP] 이름변경");
+                console.log("[USP] namechange");
 
                 fnRenameUspNode(oEvent);
 
@@ -7363,7 +7367,7 @@
 
             case "RN": // 변경된 데이터 저장 후 프로세스가 Rename일 경우
 
-                console.log("[USP] 변경된 데이터 저장 후 Rename");
+                console.log("[USP] change data save after Rename");
 
                 fnRenameUspNodePopup(oTreeTable);
 

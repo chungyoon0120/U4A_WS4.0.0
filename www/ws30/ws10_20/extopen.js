@@ -40,14 +40,14 @@ var oAPP = {};
         // 로고 (메인 창과 동일: APPPATH/img/logo.png)
         var oLogo = document.getElementById("extopenLogo");
         if (oLogo) {
-            try { oLogo.src = lf_toFileUrl(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { }
+            try { oLogo.src = lf_toFileUrl(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         // 제목 (head 의 조기 스크립트가 쿼리 TITLE → document.title 로 세팅, 없으면 창 제목)
         var oTitle = document.getElementById("extopenTitle");
         if (oTitle) {
             var sTitle = "";
-            try { sTitle = document.title || CURRWIN.getTitle() || ""; } catch (e) { sTitle = document.title || ""; }
+            try { sTitle = document.title || CURRWIN.getTitle() || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sTitle = document.title || ""; }
             oTitle.textContent = sTitle;
         }
 
@@ -55,7 +55,7 @@ var oAPP = {};
         var oMin = document.querySelector('#extopenTitlebar [data-action="min"]');
         if (oMin) {
             oMin.addEventListener("click", function () {
-                try { CURRWIN.minimize(); } catch (e) { }
+                try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
 
@@ -66,19 +66,19 @@ var oAPP = {};
                 var oIco = oMax.querySelector("i");
                 if (!oIco) { return; }
                 var bMax = false;
-                try { bMax = CURRWIN.isMaximized(); } catch (e) { bMax = false; }
+                try { bMax = CURRWIN.isMaximized(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } bMax = false; }
                 oIco.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
                 oMax.title = bMax ? "Restore" : "Maximize";
             };
             oMax.addEventListener("click", function () {
                 try {
                     if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); }
-                } catch (e) { }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
             try {
                 CURRWIN.on("maximize", lf_syncMaxIcon);
                 CURRWIN.on("unmaximize", lf_syncMaxIcon);
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             lf_syncMaxIcon();
         }
 
@@ -86,11 +86,11 @@ var oAPP = {};
         var oClose = document.querySelector('#extopenTitlebar [data-action="close"]');
         if (oClose) {
             oClose.addEventListener("click", function () {
-                try { CURRWIN.close(); } catch (e) { }
+                try { CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             });
         }
 
-    } catch (e) { /* 헤더 초기화 실패해도 본문(iframe)은 정상 동작 */ }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 헤더 초기화 실패해도 본문(iframe)은 정상 동작 */ }
 
 })();
 
@@ -212,7 +212,7 @@ IPCRENDERER.on('if-extopen-url', (event, res) => {
         // 브라우저 활성화
         CURRWIN.show();
                 
-        WSUTIL.setBrowserOpacity(CURRWIN);
+        // [2026-09-13] 네이티브 투명도 페이드 제거 — 바로 위 CURRWIN.show() 로 이미 표시했다.
 
         // 화면이 다 그려지고 난 후 메인 영역 Busy 끄기
         IPCRENDERER.send(`if-send-action-${BROWSKEY}`, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); 
@@ -231,6 +231,13 @@ IPCRENDERER.on('if-extopen-url', (event, res) => {
     };
 
     oFrame.src = res;
+
+    // ★ [2026-09-14] 창은 여기서 바로 보여준다 — 로딩 표시를 켠 채로.
+    //   [고친 이유] 종전에는 iframe 이 다 로드된 뒤(onload)에야 창을 보여줬다. 오프너가 창을
+    //   show:false 로 만들므로, 서버가 안 오면 창이 영영 안 보였다. 그걸 타임아웃으로 덮으려 했으나
+    //   타임아웃 폴백은 금지(.analy 16 §2.11)다 — 창을 먼저 띄우고 로딩 표시로 상태를 보여주는 것이
+    //   표준이자 정답이다(팝업은 뜨자마자 busy 부터 켜고 시작).
+    try { CURRWIN.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
 });
 

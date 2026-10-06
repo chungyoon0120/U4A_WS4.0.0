@@ -216,7 +216,7 @@
                         try {
                             oAPP.fn.contextMenuP13nDesignPopup();
                         } catch (e) {
-                            console.error("[HTML5][design] My Pattern:", e && e.message ? e.message : e);
+                            console.error("[design] My Pattern:", e && e.message ? e.message : e);
                             // 예외 시, 메뉴 선택에서 미리 건 BUSY/단축키 잠금 해제(원본 종료 경로와 동일).
                             oAPP.fn.setShortcutLock(false);
                             parent.setBusy("");
@@ -226,12 +226,12 @@
                     if (typeof oAPP.fn.fnP13nDesignPopupOpen === "function") { run(); return; }
                     // 미로드면 로드 후 실행(loadJs 는 동기 로드).
                     try { oAPP.loadJs("fnP13nDesignPopupOpen", run); }
-                    catch (e) { console.error("[HTML5][design] My Pattern load:", e && e.message ? e.message : e); }
+                    catch (e) { console.error("[design] My Pattern load:", e && e.message ? e.message : e); }
                     // loadJs 는 성공 콜백만 있고 오류 콜백이 없다(동기 AJAX). 로드 실패로 run 이
                     // 불리지 않고 여전히 미로드면, 메뉴 선택에서 건 BUSY/단축키 잠금을 해제한다
                     // (BR23 권장수정: 모든 종료 경로에서 해제 — 코덱스 사후검증 지적 반영).
                     if (typeof oAPP.fn.fnP13nDesignPopupOpen !== "function") {
-                        console.error("[HTML5][design] My Pattern: fnP13nDesignPopupOpen load failed");
+                        console.error("[design] My Pattern: fnP13nDesignPopupOpen load failed");
                         oAPP.fn.setShortcutLock(false);
                         parent.setBusy("");
                     }
@@ -1548,6 +1548,7 @@
             try{
                 parent.FS.mkdirSync(l_folderPath);
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
 
                 //단축키 잠금 해제처리.
@@ -1568,6 +1569,7 @@
             try{
                 parent.FS.mkdirSync(l_folderPath);
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
 
                 //단축키 잠금 해제처리.
@@ -1589,6 +1591,7 @@
                 //header 파일 생성 처리.
                 parent.FS.writeFileSync(l_filePath, JSON.stringify([]));
             }catch(e){
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
                 parent.showMessage(sap, 10, "E", e);
 
                 //단축키 잠금 해제처리.

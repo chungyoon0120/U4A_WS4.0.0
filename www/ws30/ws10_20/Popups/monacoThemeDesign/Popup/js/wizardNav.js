@@ -48,7 +48,7 @@
         oNav.appendChild(oMini);
         nav.els.nav = oNav; nav.els.navFull = oFull; nav.els.navMini = oMini;
         if (window.ResizeObserver) {
-            try { nav.ro = new window.ResizeObserver(function () { _wzNavResize(nav); }); nav.ro.observe(oNav); } catch (e) { }
+            try { nav.ro = new window.ResizeObserver(function () { _wzNavResize(nav); }); nav.ro.observe(oNav); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         aNavs.push(nav);
         _syncNav(nav);
@@ -257,13 +257,13 @@
 
     function _wzClosePop(nav) {
         if (!nav) { return; }
-        if (nav._popOutside) { try { window.document.removeEventListener("mousedown", nav._popOutside, true); } catch (e) { } nav._popOutside = null; }
+        if (nav._popOutside) { try { window.document.removeEventListener("mousedown", nav._popOutside, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } nav._popOutside = null; }
         if (nav._popClose) {
-            try { window.removeEventListener("resize", nav._popClose); } catch (e) { }
-            if (nav._popScroller) { try { nav._popScroller.removeEventListener("scroll", nav._popClose, true); } catch (e) { } }
+            try { window.removeEventListener("resize", nav._popClose); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            if (nav._popScroller) { try { nav._popScroller.removeEventListener("scroll", nav._popClose, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
             nav._popClose = null; nav._popScroller = null;
         }
-        if (nav.els && nav.els.pop) { try { nav.els.pop.remove(); } catch (e) { } nav.els.pop = null; }
+        if (nav.els && nav.els.pop) { try { nav.els.pop.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } nav.els.pop = null; }
     }
 
     /* ==================================================================
@@ -296,7 +296,7 @@
     function _scrollToCard(nav, idx) {
         var c = nav.els.cards[idx];
         if (c && c.root && !c.root.hidden) {
-            try { c.root.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { }
+            try { c.root.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     }
 
@@ -346,7 +346,7 @@
                 roPad.observe(oPage);
                 if (oContent) { roPad.observe(oContent); }
                 oPage.__ro = roPad;
-            } catch (e) { }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         oPage.addEventListener("scroll", function () {
             if (oPage.__spyRaf) { return; }

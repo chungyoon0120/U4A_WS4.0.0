@@ -89,7 +89,7 @@
         // 198 Help — 도움말 문서(원본 onHelp = U4A_HELP_DOC_OPEN 브로드캐스트)는 통신 단계(Stage6)에서 배선.
         oM.tool.appendChild(H.iconBtn("circle-question", H.z("198"), function () {  // 198 Help
             // [B4] 모델필드 도움말 문서 "000276"(원본 index.js:4872). 영역별 라우팅.
-            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000276"); } catch (e) { console.error("[HTML5][bindWindow] onHelp:", e && e.message); } }
+            if (typeof oAPP.fn.onHelp === "function") { try { oAPP.fn.onHelp("000276"); } catch (e) { console.error("[bindWindow] onHelp:", e && e.message, e); } }
         }));
 
         // 패널 좁아질 때 넘치는 버튼을 ⋯ 오버플로 메뉴로(16 §11, 공통 attachOverflow).
@@ -145,7 +145,7 @@
                 // 클릭한 행에 선택 강조(aria-selected) — 원본 좌측 트리 selectionMode:"Single"(index.js:4335)
                 //   의 행 하이라이트 재현. 공통 트리는 강조 API(selectKey)만 제공하고 화면이 호출한다.
                 //   bScroll=false: 사용자가 직접 클릭한 행이라 스크롤 점프 금지.
-                if (oM.ctrl && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(n.CHILD, false); } catch (e) { } }
+                if (oM.ctrl && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(n.CHILD, false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
                 // 모델필드 선택 변경 → 우측 참조필드(P05) 재구성(원본 onSelTabRow → setRefFieldList, P3-C).
                 oAPP.fn.setRefFieldList();   // [표준] 필수 호출 직접(삼킴 제거).
             }
@@ -173,8 +173,8 @@
                 if (iRaf) { return; }
                 iRaf = requestAnimationFrame(function () { iRaf = 0; _fixEmpty(); });
             }
-            try { new MutationObserver(_schedule).observe(oHost, { childList: true, subtree: true }); } catch (e) { }
-            try { new ResizeObserver(_schedule).observe(oHost); } catch (e) { }
+            try { new MutationObserver(_schedule).observe(oHost, { childList: true, subtree: true }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { new ResizeObserver(_schedule).observe(oHost); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             _fixEmpty();
         })();
 
@@ -278,23 +278,23 @@
                         var r = oAPP.fn.checkAdditData();
                         if (r && r.RETCD === "E") { oObj.RETCD = "E"; oObj.RTMSG = r.RTMSG || ""; oObj.T_ERMSG = r.T_ERMSG || []; }
                     }
-                } catch (e2) { }
+                } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
                 ev.dataTransfer.setData("prc001", JSON.stringify(oObj));
                 ev.dataTransfer.effectAllowed = "copy";
                 oAPP.attr.dragModelNode = oNode;
                 document.body.classList.add("u4a-dragging");   // iframe 위 드래그 끊김 방지(공통).
                 // 중앙 트리 drop 가능표시(증분2에서 구현되면 자동 배선).
-                try { if (typeof oAPP.fn.designSetDropFlag === "function") { oAPP.fn.designSetDropFlag(oNode); } } catch (e3) { }
+                try { if (typeof oAPP.fn.designSetDropFlag === "function") { oAPP.fn.designSetDropFlag(oNode); } } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } }
                 // [G-2] 원본 setDragStart 말미(index.js:8544 setSelectedIndex "라인 재 선택 처리") 이식.
                 //   드래그 시작 = 그 행을 좌측 선택으로 잡아야, 드롭 후 참조필드(P05)가 드래그한 필드 기준으로 뜬다.
                 //   클릭 경로(onSelect)를 그대로 재사용 — select: selNode 설정 + 강조 + setRefFieldList.
                 oM.ctrl.select(oNode);
-            } catch (e) { console.error("[HTML5][bindWindow] 모델필드 dragstart:", e && e.message); }
+            } catch (e) { console.error("[bindWindow] model field dragstart:", e && e.message, e); }
         });
         oRow.addEventListener("dragend", function () {
             oAPP.attr.dragModelNode = null;
             document.body.classList.remove("u4a-dragging");
-            try { if (typeof oAPP.fn.designResetDropFlag === "function") { oAPP.fn.designResetDropFlag(); } } catch (e) { }
+            try { if (typeof oAPP.fn.designResetDropFlag === "function") { oAPP.fn.designResetDropFlag(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         });
     }
 
@@ -310,7 +310,7 @@
         var sKey = oSel ? oSel.CHILD : null;
         var iTop = oM.host ? oM.host.scrollTop : 0;
         oM.ctrl.rerender(false);   // 첫 루트 자동선택 방지
-        if (sKey && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(sKey, false); } catch (e) { } }
+        if (sKey && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(sKey, false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
         if (oM.host) { oM.host.scrollTop = iTop; }
     };
 
@@ -319,7 +319,7 @@
     //   makeTree 의 expandAll 을 ctrl.tree 로 소비(공통 무수정). 원본 expandToLevel(99999) = 전체 펼침.
     oAPP.fn.expandModelFieldTree = function () {
         if (oM.ctrl && oM.ctrl.tree && typeof oM.ctrl.tree.expandAll === "function") {
-            try { oM.ctrl.tree.expandAll(); } catch (e) { }
+            try { oM.ctrl.tree.expandAll(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
     };
 
@@ -344,7 +344,7 @@
         if (!oNode) { return; }   // 좌측에 없는 경로 = 무동작.
         // 접힌 조상 먼저 펼침(대상 행 DOM 이 있어야 선택·스크롤이 먹음 — R3b 패턴).
         if (oM.ctrl.tree && typeof oM.ctrl.tree.setExpanded === "function") {
-            for (var e2 = 0; e2 < aAnc.length; e2++) { try { oM.ctrl.tree.setExpanded(aAnc[e2], true); } catch (e3) { } }
+            for (var e2 = 0; e2 < aAnc.length; e2++) { try { oM.ctrl.tree.setExpanded(aAnc[e2], true); } catch (e3) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e3); } } }
         }
         // ★마우스 클릭과 동일하게 선택(공통 select) → onSelect 발화 = selNode 설정 + 우측 참조필드(setRefFieldList) 등
         //   후속 로직이 알아서 작동(장군님 지적 2026-07-30). selectKey(강조만)로는 우측이 안 채워짐.
@@ -368,7 +368,7 @@
 
         var oInfo = oAPP.attr.oAppInfo || {};
         if (!oAPP.attr.servNm || !oInfo.CLSID) {
-            console.warn("[HTML5][bindWindow] 모델필드 로드 skip — servNm/CLSID 없음");
+            console.warn("[bindWindow] model field load skipped - servNm/CLSID missing");
             oM.ctrl.rerender();
             return;
         }
@@ -420,7 +420,7 @@
                 oAPP.fn.expandModelFieldTree();   // 전체 펼침(원본 expandToLevel(99999)) — 여기서 DOM 재생성.
                 // 펼침(재렌더) 뒤 첫 행 강조를 재적용 → 화면에 선택바 유지(selNode 는 JS 변수라 재렌더에도 보존됨).
                 var _oFirst = (typeof oM.ctrl.getSelected === "function") ? oM.ctrl.getSelected() : null;
-                if (_oFirst && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(_oFirst.CHILD, false); } catch (e) { } }
+                if (_oFirst && typeof oM.ctrl.selectKey === "function") { try { oM.ctrl.selectKey(_oFirst.CHILD, false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
                 oAPP.attr.selModelNode = _oFirst || null;
                 // 공통 selectByKey 는 강조/selNode 전용이라 onSelect 콜백을 안 태운다 → 원본 onSelTabRow→
                 //   setRefFieldList(우측 참조필드 P05) 를 명시 호출(중복 아님).
@@ -428,7 +428,7 @@
                 oAPP.fn.fitTreeColumns(oM.host);   // 데이터 반영 후 컬럼 자동맞춤(원본)
 
             } catch (e) {
-                console.error("[HTML5][bindWindow] 모델필드 로드 처리 오류:", e && e.message);
+                console.error("[bindWindow] model field load handler error:", e && e.message, e);
                 oM.ctrl.rerender();
             } finally {
                 oAPP.attr.isBindLoading = false;

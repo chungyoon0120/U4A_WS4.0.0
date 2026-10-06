@@ -36,6 +36,7 @@ class ReleaseApp {
             window.WSUTIL = require(_pathinfo.WSUTIL);
 
         } catch (error) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
             
             //😡 개별 실행용 메시지 유틸 객체
             // - 메인 프로젝트와 통합되면 공통 WSUTIL 을 사용하므로 이 영역은 개발/테스트용 대체 로직이다.
@@ -126,7 +127,8 @@ class ReleaseApp {
       if (!_raw) return {};
       try {
         return JSON.parse(decodeURIComponent(_raw));
-      } catch {
+      } catch (_u4aErr) {
+          if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(_u4aErr); }
         return {};
       }
 
@@ -508,10 +510,10 @@ class DataManager {
 
             if (error.name === 'AbortError') {
                 _errorCode = 'REL-001';
-                console.error(`[${_errorCode}] 요청 시간이 초과되었습니다.`, error);
+                console.error(`[${_errorCode}] request timed out`, error);
             } else {
                 _errorCode = 'REL-002';
-                console.error(`[${_errorCode}] 데이터 로드 중 에러 발생`, error);
+                console.error(`[${_errorCode}] data load error`, error);
             }
 
             // _errorMessage = `오류코드: ${_errorCode}\n요청을 처리하는 중 문제가 발생했습니다.\n잠시 후 다시 시도해 주세요.\n동일한 문제가 계속 발생하면 담당자에게 문의해 주세요.`;
@@ -783,7 +785,7 @@ class TranslationManager {
             });
         });
 
-        console.log(`언어가 [${langCode}]로 변경되었습니다.`);
+        console.log(`language changed to [${langCode}]`);
     }
 
     /**

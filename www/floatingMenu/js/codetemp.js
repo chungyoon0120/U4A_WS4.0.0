@@ -795,7 +795,7 @@ function fn_setItemData(e, ACTCD) {
         break;
     
         default:
-            console.error('크리티컬 에러');
+            console.error('critical error');
         break;
     };
 
