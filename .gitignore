@@ -10,6 +10,7 @@ test/
 *.vbserrdlgbak
 *.widthhelplangubak
 *.uspappinfobak
+*.ws30appinfosyncbak
 _*.bak
 
 # Python 캐시
