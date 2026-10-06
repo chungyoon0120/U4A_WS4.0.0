@@ -36,41 +36,57 @@ if [ "$BR" = "$MAIN" ]; then
   exit 2
 fi
 
-MSG="$(cat)"
-[ -z "${MSG// /}" ] && { echo "STOP: 커밋 메시지가 비었다." >&2; exit 1; }
+CHANGED="$(git status --porcelain | wc -l | tr -d ' ')"
+
+# 바뀐 파일이 없고 --to-main 이면 "머지만" 한다(커밋 메시지도 안 받는다).
+MERGE_ONLY=0
+if [ "$CHANGED" = "0" ] && [ "$TO_MAIN" = "1" ]; then
+  MERGE_ONLY=1
+  MSG=""
+else
+  MSG="$(cat)"
+  [ -z "${MSG// /}" ] && { echo "STOP: 커밋 메시지가 비었다." >&2; exit 1; }
+fi
+
+if [ "$MERGE_ONLY" = "1" ]; then
+  echo "== 바뀐 파일 없음 → ${MAIN} 머지만 한다 =="
+fi
 
 # 제목에 날짜시간 접두가 없으면 붙인다
-case "$MSG" in
+[ "$MERGE_ONLY" = "1" ] || case "$MSG" in
   \[20*) : ;;
   *) MSG="[$(date '+%Y-%m-%d %H:%M')] ${MSG}" ;;
 esac
 # 끝에 Co-Authored-By 가 없으면 붙인다
-case "$MSG" in
+[ "$MERGE_ONLY" = "1" ] || case "$MSG" in
   *"Co-Authored-By:"*) : ;;
   *) MSG="${MSG}"$'\n\n'"${ATTR}" ;;
 esac
 
-CHANGED="$(git status --porcelain | wc -l | tr -d ' ')"
-if [ "$CHANGED" = "0" ]; then
-  echo "STOP: 바뀐 파일이 없다(커밋할 것 없음)." >&2
+if [ "$CHANGED" = "0" ] && [ "$MERGE_ONLY" = "0" ]; then
+  echo "STOP: 바뀐 파일이 없다(커밋할 것 없음). ${MAIN} 머지만 하려면 --to-main 을 붙인다." >&2
   exit 3
 fi
 
-echo "== 올릴 파일 (${CHANGED}건) =="
-git status --short
+if [ "$MERGE_ONLY" = "0" ]; then
+  echo "== 올릴 파일 (${CHANGED}건) =="
+  git status --short
+fi
 
 if [ "$DRY" = "1" ]; then
   echo
   echo "== 커밋 메시지(미리보기) =="
-  echo "$MSG"
+  echo "${MSG:-(머지 전용 — 커밋 없음)}"
   echo
   echo "(--dry 라 아무것도 하지 않았다)"
   exit 0
 fi
 
-git add -A || exit 1
-git commit -q -F - <<< "$MSG" || exit 1
-git push -q origin "$BR" || exit 1
+if [ "$MERGE_ONLY" = "0" ]; then
+  git add -A || exit 1
+  git commit -q -F - <<< "$MSG" || exit 1
+  git push -q origin "$BR" || exit 1
+fi
 
 if [ "$TO_MAIN" = "1" ]; then
   git checkout -q "$MAIN" || exit 1
