@@ -2765,10 +2765,13 @@
                     sBrowsKey = oWebPref.browserkey,
                     sOBJTY = oWebPref.OBJTY;
 
-                // // 현재 떠있는 브라우저의 키와 같은것을 찾는다.
-                // if (sCurrWinBrowsKey !== sBrowsKey) {
-                //     continue;
-                // }
+                // 현재 떠있는 브라우저의 키와 같은것을 찾는다.
+                //   2026-10-07 장군님 결정으로 주석을 풀었다 - OBJTY 만 보면 같은 로그인의
+                //     다른 메인 창에서 띄운 같은 종류 팝업을 "이미 열려있다"고 잘못 집는다.
+                //     판단은 OBJTY + browserkey 둘 다 같을 때만. (.analy/20_별창_아키텍처.md)
+                if (sCurrWinBrowsKey !== sBrowsKey) {
+                    continue;
+                }
 
                 // OBJTY가 있는지
                 if (!sOBJTY) {
@@ -2799,6 +2802,77 @@
         };
 
     };
+
+
+    /************************************************************************
+     * !! 같은 브라우저키로 떠있는 별창 목록 !!
+     *************************************************************************
+     * 왜 생겼나 (2026-10-07 장군님 지시 — 별창 parent 제거):
+     *   별창을 열 때 parent 를 지정하던 것을 뺀다. 제목줄을 직접 그리는 창에서 parent 를 두면
+     *   Minimize 한 뒤 Restore 할 길이 화면에 없어진다(작업표시줄에도 안 남는다).
+     *   그런데 "뒤로가기 때 일괄 닫기"·"팝업·busy 중 숨겼다 되살리기"·"이미 열린 창 찾기" 가
+     *   전부 getChildWindows()(= parent 기반)를 쓰고 있어, parent 를 빼면 자식이 0개로 나와
+     *   그냥 안 돌아간다. 그래서 판단 기준을 브라우저키 비교로 바꾼다.
+     *   세션키는 쓰지 않는다 - 세션키는 로그인 단위라 같은 로그인으로 띄운 다른 메인 창의
+     *   별창까지 섞인다(장군님 결정 2026-09-07). 설계 = .analy/20_별창_아키텍처.md
+     *
+     * 무엇을 돌려주나: 지금 창과 browserkey 가 같은 별창만. 지금 창 자신은 뺀다
+     *   (안 빼면 뒤로가기가 자기 자신을 닫는다). OBJTY 가 없는 창도 뺀다.
+     *
+     * @return {Array} BrowserWindow 목록 (없으면 빈 배열)
+     ************************************************************************/
+    oAPP.common.getSiblingWindows = function () {
+
+        var aOut = [];
+
+        try {
+
+            var oCurrWin = REMOTE.getCurrentWindow();
+            if (!oCurrWin || oCurrWin.isDestroyed()) { return aOut; }
+
+            var sCurrKey = "";
+            try { sCurrKey = oCurrWin.webContents.getWebPreferences().browserkey || ""; }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sCurrKey = ""; }
+
+            if (!sCurrKey) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("값이 없어 그만둠", "webPreferences.browserkey of current window",
+                        "sibling browser windows cannot be collected - back-close and busy hide/show will do nothing");
+                }
+                return aOut;
+            }
+
+            var iCurrId = oCurrWin.id;
+            var aAll = REMOTE.BrowserWindow.getAllWindows();
+
+            for (var i = 0; i < aAll.length; i++) {
+
+                var oWin = aAll[i];
+                if (!oWin || oWin.isDestroyed()) { continue; }
+                if (oWin.id === iCurrId) { continue; }   // 자기 자신(메인 창) 제외
+
+                try {
+
+                    var oPref = oWin.webContents.getWebPreferences();
+                    if (!oPref || !oPref.OBJTY) { continue; }
+                    if (oPref.browserkey !== sCurrKey) { continue; }
+
+                } catch (e) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                    continue;
+                }
+
+                aOut.push(oWin);
+
+            }
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        return aOut;
+
+    }; // end of oAPP.common.getSiblingWindows
 
 
     /************************************************************************

@@ -2121,15 +2121,12 @@
      ************************************************************************/
     oAPP.fn.fnChildWindowClose = function () {
 
-        // 현재 윈도우 객체에서 맵으로 관리하고 있는 자식 윈도우를 닫아준다.
-        _closeAllChildWindowMap();
-
-        var oCurrWin = parent.REMOTE.getCurrentWindow();
-        if (oCurrWin.isDestroyed()) {
-            return;
-        }
-
-        var aChild = oCurrWin.getChildWindows(),
+        // 2026-10-07 장군님 지시 (별창 parent 제거) - 판단 기준을 브라우저키로 바꿨다.
+        //   종전: getChildWindows()(parent 기반) + 메인 창의 자식창 맵(_closeAllChildWindowMap).
+        //   parent 를 빼면 자식이 0개로 나와 하나도 안 닫힌다. 그래서 같은 브라우저키로 떠있는
+        //   별창 전체를 대상으로 한다. 맵 등록 방식은 두 갈래가 섞여 못 찾게 되므로 쓰지 않는다.
+        //   설계·근거 = .analy/20_별창_아키텍처.md
+        var aChild = oAPP.common.getSiblingWindows(),
             iChildCnt = aChild.length;
 
         if (iChildCnt <= 0) {
@@ -2179,12 +2176,9 @@
      ************************************************************************/
     oAPP.fn.fnChildWindowShow = function (bShow) {
 
-        var oCurrWin = REMOTE.getCurrentWindow();
-        if (oCurrWin.isDestroyed()) {
-            return;
-        }
-
-        var aChild = oCurrWin.getChildWindows(),
+        // 2026-10-07 장군님 지시 (별창 parent 제거) - 위 fnChildWindowClose 와 같은 이유로
+        //   getChildWindows()(parent 기반) 대신 같은 브라우저키 별창 전체를 대상으로 한다.
+        var aChild = oAPP.common.getSiblingWindows(),
             iChildCnt = aChild.length;
 
         if (iChildCnt <= 0) {
@@ -2279,13 +2273,30 @@
             "EXAMPLE",
             "PATTPOPUP",
             "FLTMENU",
+            // 아이콘 목록 — 2026-10-07 장군님 지시 「1번으로 해라」로 추가. 뒤로가기 때 닫지 않는다.
+            //   원본도 이 창은 **아이콘을 골라 돌려주는 값도움으로 열 때만** parent 를 준다.
+            //   그래서 메뉴로 연 아이콘 목록은 원본에서 자식 창 목록에 안 잡혀 **안 닫혔다**(실측 2026-10-07).
+            //   판단 기준을 브라우저키로 바꾸면서 잡히게 됐으므로, 목록에 넣어 원본과 같게 되돌린다.
+            "ICONPREV",
+            // 옵션 창 — 2026-10-07 장군님 지시로 추가. 뒤로가기 때 닫지 않는다.
+            //   원본에도 이 목록에는 없었다. 원본은 옵션 창에 parent 를 지정하지 않아
+            //   자식 창 목록에 안 잡혀서 "결과적으로" 안 닫혔을 뿐이다.
+            //   장군님 판단: 그건 원본 버그였고, parent 가 빠졌다는 이유로 안 닫히는 것은
+            //   정상이 아니다. 옵션 창은 **목록에 넣어서** 뜻대로 안 닫는 것으로 한다.
+            "WSOPTS",
         ];
 
         if (!OBJTY) {
             return false;
         }
 
-        return (aExceptionList.find(element => element == OBJTY) == null ? false : true);
+        // 2026-10-07 — 이름이 똑같을 때만 걸러서는 안 된다.
+        //   아이콘 목록은 접속 서버마다 창 하나를 쓰려고 이름 뒤에 "_" + SYSID 를 붙인다
+        //   (fnDialogPopupOpener.js, 메뉴로 열 때만). 그래서 "ICONPREV" 와 글자가 안 맞아
+        //   예외에 안 걸렸다(실측 2026-10-07). 뒤에 "_" 가 붙은 것도 같은 창으로 본다.
+        return (aExceptionList.find(function (element) {
+            return (OBJTY === element) || (OBJTY.indexOf(element + "_") === 0);
+        }) == null ? false : true);
 
 
     }; // end of oAPP.fn.fnCheckPopupCloseException

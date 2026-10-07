@@ -1524,8 +1524,16 @@
         const sPopupName = "WSOPTS";
 
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        const oResult = WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-07 장군님 지시 (별창 parent 제거) - parent 를 빼면 getChildWindows() 로는
+        //     못 찾으므로, 전체 창에서 OBJTY + browserkey 로 찾는 쪽으로 바꿨다.
+        const oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
+
+            // Minimize 된 채로 있으면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.            
             WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
@@ -1552,7 +1560,10 @@
 
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B52"); // Options
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.parent = CURRWIN;
+        // 2026-10-07 장군님 지시 - parent 를 지정하지 않는다.
+        //   제목줄을 직접 그리는 창에서 parent 를 두면 Minimize 뒤 Restore 할 길이 없어진다.
+        //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
+        //   뒤로가기 일괄 닫기·busy 중 숨기기는 브라우저키 비교(getSiblingWindows)가 대신한다.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
         // 네이티브 OS 프레임 제거 — 앱 전 창(메인/ServerList/floatingMenu/help)과 동일하게
