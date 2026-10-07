@@ -212,8 +212,12 @@
     }
 
     // label + control 슬롯 row. 반환: {row, control(붙일 컨테이너), msg(value state 텍스트)}
-    function _row(sLabel, bRequired) {
+    function _row(sLabel, bRequired, sName) {
         const oRow = _el("div", "u4a-form__row u4aCapRow");
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 (요청 = u4a-ws4-mcp WS4_REQUEST.md).
+        //   줄 19개가 전부 같은 class 하나뿐이라 구분할 것이 label 글자밖에 없었다.
+        //   값은 그 줄이 쓰는 모델 경로의 칸 이름 그대로(CREATE_APPNM 처럼) - 새로 짓지 않는다.
+        if (sName) { oRow.setAttribute("data-row", sName); }
         const oLabel = _el("label", "u4a-label" + (bRequired ? " u4a-label--required" : ""), sLabel);
         oRow.appendChild(oLabel);
         const oCtrl = _el("div", "u4aCapControl");
@@ -493,6 +497,7 @@
         oLocal.type = "button";
         oLocal.innerHTML = _fa("desktop");   // 아이콘만 (텍스트 라벨 제거)
         oLocal.title = _txt("/U4A/CL_WS_COMMON", "B07");
+        oLocal.setAttribute("data-act", "LOCAL");   // 2026-10-08 자동 테스트 도구가 가리킬 표식(로컬에만 만든다)
         oLocal.addEventListener("click", function () { lf_createApplication(oModel, oUIobj, appid, true); });
         oFoot.appendChild(oLocal);
 
@@ -503,6 +508,7 @@
         oCreate.type = "button";
         oCreate.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
         oCreate.title = _txt("/U4A/CL_WS_COMMON", "B08");
+        oCreate.setAttribute("data-act", "CREATE");   // 2026-10-08 자동 테스트 도구가 가리킬 표식(★서버에 진짜 앱이 생긴다)
         oCreate.addEventListener("click", function () { lf_createApplication(oModel, oUIobj, appid, false); });
         oFoot.appendChild(oCreate);
 
@@ -511,6 +517,7 @@
         oClose.type = "button";
         oClose.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
         oClose.title = _txt("/U4A/CL_WS_COMMON", "A39");
+        oClose.setAttribute("data-act", "CLOSE");   // 2026-10-08 자동 테스트 도구가 가리킬 표식
         oClose.addEventListener("click", function () { lf_closeDialog(oDlg); });
         oFoot.appendChild(oClose);
 
@@ -546,7 +553,7 @@
         oPage.appendChild(oGrid);
 
         // APP Description (A91)
-        let oR = _row(_txt("/U4A/CL_WS_COMMON", "A91"), true);
+        let oR = _row(_txt("/U4A/CL_WS_COMMON", "A91"), true, "CREATE_APPNM");
         oUIobj.gen.oInpDesc = _buildInput(oModel, oR, {
             valPath: "/CREATE/APPNM", statPath: "/CREATE/APPNM_stat", stxtPath: "/CREATE/APPNM_stxt",
             maxLength: 40, clear: true
@@ -554,7 +561,7 @@
         oGrid.appendChild(oR.row);
 
         // Language Key (A98) — ComboBox → createSelect
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "A98"), true);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "A98"), true, "CREATE_LANGU");
         oUIobj.gen.oInpLang = _buildSelect(oModel, oR, {
             keyPath: "/CREATE/LANGU", items: oModel.oData.T_LANGU,
             statPath: "/CREATE/LANGU_stat", stxtPath: "/CREATE/LANGU_stxt"
@@ -562,7 +569,7 @@
         oGrid.appendChild(oR.row);
 
         // Character Format (A99)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "A99"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "A99"), false, "CREATE_CODPG");
         oUIobj.gen.oSelFormat = _buildSelect(oModel, oR, {
             keyPath: "/CREATE/CODPG", items: oModel.oData.T_CODPG,
             statPath: "/CREATE/CODPG_stat", stxtPath: "/CREATE/CODPG_stxt"
@@ -570,7 +577,7 @@
         oGrid.appendChild(oR.row);
 
         // UI5 UI Theme (B01)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "B01"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "B01"), false, "CREATE_UITHM");
         oUIobj.gen.oSelTheme = _buildSelect(oModel, oR, {
             keyPath: "/CREATE/UITHM", items: oModel.oData.T_UITHM,
             statPath: "/CREATE/UITHM_stat", stxtPath: "/CREATE/UITHM_stxt"
@@ -578,14 +585,14 @@
         oGrid.appendChild(oR.row);
 
         // Web Application Type (B02)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "B02"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "B02"), false, "CREATE_APPTY");
         oUIobj.gen.oSelType = _buildSelect(oModel, oR, {
             keyPath: "/CREATE/APPTY", items: oModel.oData.T_APPTY, enabledPath: "/CREATE/APPTY_edit"
         });
         oGrid.appendChild(oR.row);
 
         // Package (A22)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "A22"), true);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "A22"), true, "CREATE_PACKG");
         oUIobj.gen.oInpPack = _buildInput(oModel, oR, {
             valPath: "/CREATE/PACKG", statPath: "/CREATE/PACKG_stat", stxtPath: "/CREATE/PACKG_stxt",
             editPath: "/CREATE/PACKG_edit", maxLength: 30, upper: true, clear: true,
@@ -594,7 +601,7 @@
         oGrid.appendChild(oR.row);
 
         // Request No (B03) — value help only (CTS F4)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "B03"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "B03"), false, "CREATE_REQNR");
         oUIobj.gen.oInpReqNo = _buildInput(oModel, oR, {
             valPath: "/CREATE/REQNR", statPath: "/CREATE/REQNR_stat", stxtPath: "/CREATE/REQNR_stxt",
             editPath: "/CREATE/REQNR_edit", requPath: "/CREATE/REQNR_requ", maxLength: 20,
@@ -603,7 +610,7 @@
         oGrid.appendChild(oR.row);
 
         // Request Desc (B04) — 읽기 전용(Request No 선택 시 자동 채움). 편집 가능 필드와 '잠긴 톤'으로 구분.
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "B04"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "B04"), false, "CREATE_REQTX");
         oUIobj.gen.oInpReqTx = _buildInput(oModel, oR, { valPath: "/CREATE/REQTX", display: true });
         oGrid.appendChild(oR.row);
 
@@ -641,7 +648,7 @@
         oGrid.appendChild(oLeft);
 
         // Object Type radio (B27): Database View(B28) / Transparent Table(B29)
-        let oR = _row(_txt("/U4A/CL_WS_COMMON", "B27"), false);
+        let oR = _row(_txt("/U4A/CL_WS_COMMON", "B27"), false, "DATASET_RB");
         const oRadios = _el("div", "u4aCapRadios");
         const aObjType = [
             { txt: _txt("/U4A/CL_WS_COMMON", "B28"), prop: "RB01" },
@@ -671,7 +678,7 @@
         oLeft.appendChild(oR.row);
 
         // Object Name (OBJNM 라벨은 모델 바인딩) — view/table 입력 + F4
-        oR = _row("", true);
+        oR = _row("", true, "DATASET_TABNM");
         // ★ oR 은 이후 행마다 재할당되는 let 이라, 바인딩 클로저에서 oR.label 을 그대로 참조하면
         //   refresh 시점의 oR(=마지막 행=검색 레이아웃)에 OBJNM 이 찍힌다(라벨 뒤바뀜 버그).
         //   → 이 행의 라벨을 전용 const 로 박제해서 바인딩한다.
@@ -689,7 +696,7 @@
         oLeft.appendChild(oR.row);
 
         // APP Description (A91)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "A91"), true);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "A91"), true, "DATASET_APPNM");
         oUIobj.dataset.oInpDesc = _buildInput(oModel, oR, {
             valPath: "/DATASET/APPNM", statPath: "/DATASET/APPNM_stat", stxtPath: "/DATASET/APPNM_stxt",
             maxLength: 40, clear: true
@@ -697,7 +704,7 @@
         oLeft.appendChild(oR.row);
 
         // Language Key (A98)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "A98"), true);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "A98"), true, "DATASET_LANGU");
         oUIobj.dataset.oInpLang = _buildSelect(oModel, oR, {
             keyPath: "/DATASET/LANGU", items: oModel.oData.T_LANGU,
             statPath: "/DATASET/LANGU_stat", stxtPath: "/DATASET/LANGU_stxt"
@@ -705,7 +712,7 @@
         oLeft.appendChild(oR.row);
 
         // Character Format (A99)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "A99"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "A99"), false, "DATASET_CODPG");
         oUIobj.dataset.oSelFormat = _buildSelect(oModel, oR, {
             keyPath: "/DATASET/CODPG", items: oModel.oData.T_CODPG,
             statPath: "/DATASET/CODPG_stat", stxtPath: "/DATASET/CODPG_stxt"
@@ -713,7 +720,7 @@
         oLeft.appendChild(oR.row);
 
         // UI5 UI Theme (B01) — 변경 시 미리보기 이미지 갱신
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "B01"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "B01"), false, "DATASET_UITHM");
         oUIobj.dataset.oSelTheme = _buildSelect(oModel, oR, {
             keyPath: "/DATASET/UITHM", items: oModel.oData.T_UITHM,
             statPath: "/DATASET/UITHM_stat", stxtPath: "/DATASET/UITHM_stxt",
@@ -722,7 +729,7 @@
         oLeft.appendChild(oR.row);
 
         // Package (A22)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "A22"), true);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "A22"), true, "DATASET_PACKG");
         oUIobj.dataset.oInpPack = _buildInput(oModel, oR, {
             valPath: "/DATASET/PACKG", statPath: "/DATASET/PACKG_stat", stxtPath: "/DATASET/PACKG_stxt",
             editPath: "/DATASET/PACKG_edit", maxLength: 30, upper: true, clear: true,
@@ -731,7 +738,7 @@
         oLeft.appendChild(oR.row);
 
         // Request No (B03)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "B03"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "B03"), false, "DATASET_REQNR");
         oUIobj.dataset.oInpReqNo = _buildInput(oModel, oR, {
             valPath: "/DATASET/REQNR", statPath: "/DATASET/REQNR_stat", stxtPath: "/DATASET/REQNR_stxt",
             editPath: "/DATASET/REQNR_edit", requPath: "/DATASET/REQNR_requ", maxLength: 20,
@@ -740,7 +747,7 @@
         oLeft.appendChild(oR.row);
 
         // Request Desc (B04) — 읽기 전용(General 탭과 동일하게 '잠긴 톤'으로 구분)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "B04"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "B04"), false, "DATASET_REQTX");
         oUIobj.dataset.oInpReqTx = _buildInput(oModel, oR, { valPath: "/DATASET/REQTX", display: true });
         oLeft.appendChild(oR.row);
 
@@ -749,7 +756,7 @@
         oGrid.appendChild(oRight);
 
         // Search Layout radio (E09): One/Two/Three/Four columns (E12~E15)
-        oR = _row(_txt("/U4A/CL_WS_COMMON", "E09"), false);
+        oR = _row(_txt("/U4A/CL_WS_COMMON", "E09"), false, "DATASET_SCCNT");
         const oScRadios = _el("div", "u4aCapRadios");
         const aScTxt = [
             _txt("/U4A/CL_WS_COMMON", "E12"), _txt("/U4A/CL_WS_COMMON", "E13"),

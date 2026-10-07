@@ -414,6 +414,8 @@
      * 공통 드롭다운/메뉴 (shell.css .u4a-menu)
      ********************************************************************/
     var _openAnchor = null;
+    // 메뉴 줄에 고유 이름이 없다는 경고는 한 번만 — 메뉴를 열 때마다 되풀이하면 로그만 늘어난다.
+    var _bMenuKeyWarned = false;
 
     // 서브헤더(트랜잭션 툴바) 오버플로 상태 — 좁아지면 넘치는 버튼을 ⋯ 메뉴로 접는다.
     var _oSubHeaderEl = null;   // 툴바 컨테이너
@@ -446,6 +448,17 @@
             var oItem = document.createElement("div");
             oItem.className = "u4a-menu__item";
             oItem.setAttribute("role", "menuitem");
+            // 2026-10-08 장군님 지시 — 메뉴 한 줄을 밖에서 가리킬 수 있게 고유 이름을 화면에 내보낸다.
+            //   요청: u4a-ws4-mcp `.docs/guide/WS4_REQUEST.md` (자동 테스트 도구가 누를 단추를 집어야 한다).
+            //   머리(추가 정보·유틸리티 …)에는 이미 data-menu-anchor 가 있는데 그 안의 줄에는 없었다.
+            //   새로 짓지 않고 **코드가 이미 쓰는 it.key 그대로** 내보낸다(장군님 결정 2026-10-08 「1번으로 해라」).
+            //   하위 메뉴를 여는 줄도 같이 붙는다 — 거기까지 눌러야 안쪽 줄에 닿는다.
+            if (it.key) { oItem.setAttribute("data-menu-item", it.key); }
+            else if (!_bMenuKeyWarned && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                _bMenuKeyWarned = true;
+                U4ALOG.warn("값이 없어 그만둠", "menu item key",
+                    "data-menu-item cannot be set - this menu row stays unreachable for the automation tool");
+            }
             if (it.disabled) { oItem.setAttribute("aria-disabled", "true"); }
             var sIcon = it.icon ? (it.brand ? '<i class="fa-brands fa-' + it.icon + '"></i>' : _fa(it.icon)) : "<i></i>";
             oItem.innerHTML = sIcon + '<span class="u4a-menu__item-text">' + it.text + "</span>";
@@ -1036,6 +1049,9 @@
         var oEye = _iconBtn(ICON.eyeSlash, "", function () {
             try { oAPP.fn.fnSetHideWindow(); } catch (e) { console.error("[WS10] window hide popup open", e); }
         });
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 이 단추는 글자도 title 도 aria-label 도 없어
+        //   집을 방법이 아예 없었다. 값은 이 단추가 여는 별창의 종류 이름 그대로(WINSHOWHIDE).
+        oEye.setAttribute("data-act", "WINSHOWHIDE");
         o.appendChild(oEye);
 
         // SAP 로고 (svg) — T-CODE 좌측. 클릭 시 T-CODE 실행 로직으로 SMEN(SAP 메인메뉴) 실행.
@@ -1062,6 +1078,12 @@
             onEnter: function (v) { _runTcode(v); }   // 선택은 채움만, 실행은 Enter(원본 동일)
         });
         oTcodeFld.input.autocomplete = "off";
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 이 칸의 지우기 단추는 title 이 "Clear" 뿐이라
+        //   다른 지우기 단추와 구분이 안 됐다. 칸의 id(sapTcode) 를 그대로 붙인다.
+        try {
+            var oTcodeClr = oTcodeFld.el.querySelector(".u4a-field__clear");
+            if (oTcodeClr) { oTcodeClr.setAttribute("data-clear", "sapTcode"); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         o.appendChild(oTcodeFld.el);
 
         var oPin = _buildPinBtn();
@@ -1073,6 +1095,8 @@
         var oSearch = _iconBtn(ICON.search, "window Text Search", function () {
             try { oAPP.fn.fnTextSearchPopupOpener(); } catch (e) { console.error("[WS10] text search open", e); }
         });
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 값은 이 단추가 여는 별창의 종류 이름 그대로(TXTSRCH).
+        oSearch.setAttribute("data-act", "TXTSRCH");
         o.appendChild(oSearch);
 
         var oPower = _iconBtn(ICON.power, _txt("B53"), function () {

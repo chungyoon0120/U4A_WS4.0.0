@@ -136,6 +136,17 @@
             className: "u4aAppF4Field",
             width: opt.w
         });
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 (요청 = u4a-ws4-mcp WS4_REQUEST.md).
+        //   화면 글자로 찾으면 화면 언어를 영어로 바꿀 때 전부 깨진다 -> 안 바뀌는 이름을 내보낸다.
+        //   값은 서버가 쓰는 칸 이름 그대로(PACKG/ERUSR/APPID/APPNM/HITS) - 새로 짓지 않는다.
+        //   칸 지우기 단추는 전부 title 이 "Clear" 로 똑같아 어느 칸 것인지 구분이 안 됐다 -> 같은 이름을 붙인다.
+        if (opt.name) {
+            try {
+                fld.input.setAttribute("data-field", opt.name);
+                var oClr = fld.el.querySelector(".u4a-field__clear");
+                if (oClr) { oClr.setAttribute("data-clear", opt.name); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
         // 기존 호출부 계약 유지({ wrap, input }).
         return { wrap: fld.el, input: fld.input };
     }
@@ -341,6 +352,9 @@
         var oTab1Btn = _el("button", "u4aAppF4Tab", "[U4A] " + _txt("/U4A/CL_WS_COMMON", "B94")); // All App.
         var oTab2Btn = _el("button", "u4aAppF4Tab", "[U4A] " + _txt("/U4A/CL_WS_COMMON", "B98")); // Hierarchy By Packages
         oTab1Btn.type = "button"; oTab2Btn.type = "button";
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 탭은 화면 글자뿐이라 언어를 바꾸면 깨진다.
+        oTab1Btn.setAttribute("data-tab", "ALL");
+        oTab2Btn.setAttribute("data-tab", "BYPKG");
         oTabs.append(oTab1Btn, oTab2Btn);
         oDlg.appendChild(oTabs);
 
@@ -359,6 +373,7 @@
         oCloseBtn.type = "button";
         oCloseBtn.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
         oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
+        oCloseBtn.setAttribute("data-act", "CLOSE");   // 2026-10-08 자동 테스트 도구가 가리킬 표식
         oCloseBtn.addEventListener("click", lf_close);
         oFoot.appendChild(oCloseBtn);
         oDlg.appendChild(oFoot);
@@ -411,11 +426,11 @@
 
         var bTrial = false; try { bTrial = !!(parent.getIsTrial && parent.getIsTrial()); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-        var oPkg = _mkField(initCond.PACKG || "", { upper: true, disabled: bTrial, onEnter: _doSearch });
-        var oUsr = _mkField(initCond.ERUSR || "", { upper: true, disabled: bTrial, onEnter: _doSearch });
-        var oApp = _mkField(initCond.APPID || "", { upper: true, onEnter: _doSearch });
-        var oDesc = _mkField(initCond.APPNM || "", { onEnter: _doSearch });
-        var oHits = _mkField(initCond.HITS != null ? initCond.HITS : 500, { onEnter: _doSearch });
+        var oPkg = _mkField(initCond.PACKG || "", { name: "PACKG", upper: true, disabled: bTrial, onEnter: _doSearch });
+        var oUsr = _mkField(initCond.ERUSR || "", { name: "ERUSR", upper: true, disabled: bTrial, onEnter: _doSearch });
+        var oApp = _mkField(initCond.APPID || "", { name: "APPID", upper: true, onEnter: _doSearch });
+        var oDesc = _mkField(initCond.APPNM || "", { name: "APPNM", onEnter: _doSearch });
+        var oHits = _mkField(initCond.HITS != null ? initCond.HITS : 500, { name: "HITS", onEnter: _doSearch });
 
         var aApptyItems = [
             { value: "M", text: "M ( " + _txt("/U4A/CL_WS_COMMON", "B96") + " )" }, // U4A Application
@@ -504,6 +519,7 @@
         var oT1Bar = _el("div", "u4aAppF4TreeBar u4aAppF4T1Bar");
         var oT1ClearBtn = _actBtn("filter-circle-xmark", MSG_CLEARFILTER, function () { _clearAllT1SF(); });
         oT1ClearBtn.disabled = true;   // 걸린 정렬/필터 없을 땐 비활성(첫 렌더에서 _syncT1ClearBtn 가 갱신)
+        oT1ClearBtn.setAttribute("data-act", "RESET");   // 2026-10-08 자동 테스트 도구가 가리킬 표식(탭1)
         oT1ClearBtn.classList.add("u4aAppF4ClearBtn");   // 탭1·탭2 공통: 툴바 우측 끝 정렬(margin-left:auto)
         oT1Bar.appendChild(oT1ClearBtn);
 
@@ -752,6 +768,7 @@
         //   per-column 초기화(A69)와 같은 의미라 툴팁도 MSG_CLEARFILTER 재사용.
         var oClearAllBtn = _actBtn("filter-circle-xmark", MSG_CLEARFILTER, function () { _clearAllTreeSF(); });
         oClearAllBtn.disabled = true;   // 걸린 정렬/필터/검색 없을 땐 비활성(첫 렌더에서 _syncClearAllBtn 가 갱신)
+        oClearAllBtn.setAttribute("data-act", "RESET");   // 2026-10-08 자동 테스트 도구가 가리킬 표식(탭2)
         oClearAllBtn.classList.add("u4aAppF4ClearBtn");   // 탭1·탭2 공통: 툴바 우측 끝 정렬(margin-left:auto)
         oTBar.append(oExpandBtn, oCollapseBtn, _el("span", "u4aAppF4TBarSep"), oTSrch.wrap, oClearAllBtn);
 
