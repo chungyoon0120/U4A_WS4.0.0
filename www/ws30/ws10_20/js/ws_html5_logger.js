@@ -170,6 +170,29 @@
     var MY_FILE = 'ws_html5_logger.js';
 
     /** 설치 폴더 경로를 프로젝트 기준으로 줄인다 */
+    /**
+     * 주소에서 물음표 뒤를 뗀다 (2026-10-07 장군님 지시 「고쳐라」).
+     *
+     * 왜: 미리보기가 UI5 를 서버에서 받아오다 실패했을 때 터진 자리 주소가 그대로 로그에 실렸고,
+     *     그 주소의 물음표 뒤에 **접속 아이디와 비밀번호가 평문으로** 들어 있었다(2026-10-07 실측).
+     *     로그 표준의 「비밀번호·접속 열쇠·주소 물음표 뒤는 남기지 않는다」(2026-09-10) 위반이다.
+     * 무엇을: http:// · https:// 로 시작하는 주소의 ? · # 뒤를 통째로 뗀다.
+     *     끝에 붙은 :줄 · :줄:칸 은 **살린다** — 그게 있어야 터진 자리를 연다.
+     */
+    function _stripQuery(sText) {
+
+        try {
+            return String(sText).replace(
+                /(https?:\/\/[^\s'"()\\]+?)[?#][^\s'"()\\]*?(:\d+(?::\d+)?)?(?=[\s'"()\\]|$)/g,
+                "$1$2"
+            );
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            return String(sText);
+        }
+
+    }
+
     function _shortPath(sFile) {
 
         try {
@@ -184,6 +207,9 @@
                 sTail = mTail[1];
                 s2 = s2.slice(0, s2.length - sTail.length);
             }
+
+            // 주소의 물음표 뒤에 접속 정보가 실려 로그에 남았다 (2026-10-07 장군님 지시) — 떼어낸다.
+            s2 = s2.replace(/[?#].*$/, "");
 
             /**
              * .../app.asar/www/ws30/ws10_20/js/x.js → js/x.js (2026-09-11 - 장군님 지시)
@@ -262,6 +288,9 @@
                 // 프로그램 안쪽 줄은 원인과 무관하다 — 뺀다
                 if (L.indexOf('node:internal') >= 0) { continue; }
                 if (L.indexOf('chrome-extension:') >= 0) { continue; }
+
+                // stack 줄에는 http 주소가 그대로 실린다 — 물음표 뒤(접속 정보)를 먼저 뗀다(2026-10-07)
+                L = _stripQuery(L);
 
                 aOut.push(L.replace(/\(?((?:[A-Za-z]:[\\/]|file:\/\/)[^)\s]+)\)?/g, function (whole, p1) {
                     return '(' + _shortPath(p1) + ')';
@@ -476,6 +505,10 @@
     function _write(sLevel, sLine) {
 
         try {
+
+            // 마지막 그물 — 어느 길로 왔든 나가기 직전에 주소 물음표 뒤를 뗀다(2026-10-07 장군님 지시).
+            //   서버가 준 오류 글·예외 message 안에도 주소가 실려 올 수 있다.
+            sLine = _stripQuery(sLine);
 
             if (sLevel === '오류' || sLevel === '치명') {
                 console.error(sLine);
