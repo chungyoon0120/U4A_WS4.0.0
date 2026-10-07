@@ -461,6 +461,9 @@
             const oBtn = _el("button", "u4aCapTab", t.text);
             oBtn.type = "button";
             oBtn.setAttribute("aria-selected", "false");
+            // 2026-10-08 자동 테스트 도구가 알아보도록 탭의 고유 이름을 내보낸다.
+            //   요청서 2판은 「라디오 3개」로 적었지만 실제 화면은 탭 3개다.
+            oBtn.setAttribute("data-tab", t.key);
             if (!t.enabled) { oBtn.disabled = true; }
             oBtn.addEventListener("click", function () { _selectTab(t.key); });
             oTabs.appendChild(oBtn);

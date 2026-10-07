@@ -68,11 +68,20 @@
             const o = aItems.find(i => i.value === v);
             return o ? o.text : "";
         }
+        // 2026-10-08 자동 테스트 도구가 알아보도록, 지금 고른 값을 data-value 로 내보낸다.
+        //   (요청서 2판 = u4a-ws4-mcp WS4_REQUEST.md) 이 콤보는 <select> 가 아니라
+        //   고른 값이 JavaScript 변수에만 있었다. 모양·동작은 안 바뀐다.
+        function _syncValAttr() {
+            if (sCurrent == null || sCurrent === "") { oCombo.removeAttribute("data-value"); }
+            else { oCombo.setAttribute("data-value", String(sCurrent)); }
+        }
+
         oText.textContent = _label(sCurrent);
+        _syncValAttr();
 
         Object.defineProperty(oCombo, "value", {
             get() { return sCurrent; },
-            set(v) { sCurrent = v; oText.textContent = _label(v); }
+            set(v) { sCurrent = v; oText.textContent = _label(v); _syncValAttr(); }
         });
 
         // 항목 동적 교체 — 펼치기 직전에 서버 목록을 다시 받아 채우는 콤보(이벤트 DDLB 등)용.
@@ -148,6 +157,8 @@
                 }
                 const oItem = _el("div", "u4a-combo__item");
                 oItem.setAttribute("role", "option");
+                // 2026-10-08 항목마다 그 항목의 값 — 글자로만 그리던 항목에 식별값을 둔다.
+                if (it.value != null) { oItem.setAttribute("data-value", String(it.value)); }
                 if (it.value === sCurrent) {
                     oItem.setAttribute("aria-selected", "true");
                     iActive = idx;
@@ -208,6 +219,7 @@
             const bChanged = it.value !== sCurrent;
             sCurrent = it.value;
             oText.textContent = it.text;
+            _syncValAttr();   // 2026-10-08 자동 테스트 도구가 알아보는 값
             _close();
             oCombo.focus();
             if (bChanged && typeof fnChange === "function") {

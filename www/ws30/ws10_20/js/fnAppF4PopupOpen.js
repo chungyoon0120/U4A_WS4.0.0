@@ -379,9 +379,12 @@
         oDlg.appendChild(oFoot);
 
         /* ── 공통 액션 아이콘 버튼 ───────────────────────────────── */
-        function _actBtn(sIcon, sTip, fn) {
+        function _actBtn(sIcon, sTip, fn, sAct) {
             var b = _el("button", "u4a-btn-icon u4aAppF4ActBtn");
             b.type = "button"; b.title = sTip || ""; b.innerHTML = _fa(sIcon);
+            // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청 2판 = u4a-ws4-mcp WS4_REQUEST.md).
+            //   아이콘만 있는 단추라 도구가 어느 단추인지 가를 것이 없었다.
+            if (sAct) { b.setAttribute("data-act", sAct); }
             b.addEventListener("click", fn);
             return b;
         }
@@ -597,14 +600,14 @@
                 var td = _el("td", c.align === "center" ? "is-center" : null);
                 if (c.action === "run") {
                     td.classList.add("is-action");
-                    td.appendChild(_actBtn("globe", MSG_RUN, function (e) { e.stopPropagation(); _doRun(row); }));
+                    td.appendChild(_actBtn("globe", MSG_RUN, function (e) { e.stopPropagation(); _doRun(row); }, "RUN"));
                 } else if (c.action === "disp") {
                     td.classList.add("is-action");
                     var b = _actBtn("desktop", MSG_DISP, function (e) {
                         e.stopPropagation();
                         _selectT1(row.APPID);   // 원본 _setUiTableSelectedRow — 복귀 시 강조 유지
                         _doDisplay(row);
-                    });
+                    }, "DISPLAY");
                     if (!bWS10) { b.disabled = true; }
                     td.appendChild(b);
                 } else {

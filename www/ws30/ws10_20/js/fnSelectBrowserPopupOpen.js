@@ -125,11 +125,18 @@
             if (oDef.NAME === "DEV_BROWSER") { return; }
 
             var oItem = _el("div", "u4aSelBrwsItem");
+            // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청서 2판 = u4a-ws4-mcp WS4_REQUEST.md).
+            //   줄마다 표식이 없어 도구가 어느 브라우저 줄인지 가를 것이 없었다.
+            //   값은 이 창이 이미 쓰는 브라우저 이름 그대로(CHROME / EDGE … ).
+            //   ★요청서 2판은 「입력 칸 4개」로 적었지만 실제로는 입력 칸이 아니라
+            //     브라우저마다 「기본으로 고르기」 + 「앱모드 활성」 한 쌍이다.
+            oItem.setAttribute("data-browser", oDef.NAME == null ? "" : String(oDef.NAME));
 
             // 헤더(라디오 + 브랜드 아이콘 + 이름) — 클릭 시 기본 브라우저로 선택.
             var oHead = _el("div", "u4aSelBrwsHead");
             var oRadio = document.createElement("input");
             oRadio.type = "radio";
+            oRadio.setAttribute("data-act", "SELECTED");   // 기본 브라우저로 고르기
             oRadio.name = "u4aSelBrwsRbg"; // 구 groupName: defaultBrowserRbg
             var oBrand = _el("span", "u4aSelBrwsBrand");
             oBrand.innerHTML = _brandIco(oDef.NAME);
@@ -143,6 +150,7 @@
             var oAppWrap = _el("label", "u4aSelBrwsApp");
             var oAppChk = document.createElement("input");
             oAppChk.type = "checkbox";
+            oAppChk.setAttribute("data-act", "APP_MODE");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
             oAppWrap.appendChild(oAppChk);
             oAppWrap.appendChild(_el("span", null, sAppModeTxt));
             oItem.appendChild(oAppWrap);
@@ -183,6 +191,7 @@
         oSave.type = "button";
         oSave.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
         oSave.title = _txt("/U4A/CL_WS_COMMON", "A40"); // Confirm/확인
+        oSave.setAttribute("data-act", "SAVE");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         oSave.addEventListener("click", oAPP.events.ev_selectBrowserSave);
         oFoot.appendChild(oSave);
 
@@ -190,6 +199,7 @@
         oClose.type = "button";
         oClose.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
         oClose.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
+        oClose.setAttribute("data-act", "CLOSE");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         oClose.addEventListener("click", oAPP.events.ev_selectBrowserClose);
         oFoot.appendChild(oClose);
         oDlg.appendChild(oFoot);

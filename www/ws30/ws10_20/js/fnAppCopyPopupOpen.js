@@ -147,6 +147,11 @@
         // Source App. ID (B91) — 복사 원본(읽기 전용 표시).
         let oR = _row(_txt("/U4A/CL_WS_COMMON", "B91"), false);
         const oSrcInp = _el("input", "u4a-input u4a-input--display");
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청서 2판 = u4a-ws4-mcp WS4_REQUEST.md).
+        //   세 칸 전부 아무 표식이 없어 도구가 「몇 번째 줄」 로 찾고 있었다 — 줄 하나만 끼면
+        //   엉뚱한 칸에 값이 들어가고, 그대로 복사되면 되돌릴 수 없다.
+        //   값은 이 창이 이미 쓰는 칸 이름 그대로(SOURCEID / TARGETID / PACKG).
+        oSrcInp.setAttribute("data-field", "SOURCEID");
         oSrcInp.readOnly = true;
         oSrcInp.tabIndex = -1;
         oR.control.appendChild(oSrcInp);
@@ -158,9 +163,12 @@
         const oTgtWrap = _el("div", "u4a-field");
         oTgtWrap.setAttribute("data-trail", "1");
         const oTgtInp = _el("input", "u4a-input u4a-field__input");
+        oTgtInp.setAttribute("data-field", "TARGETID");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         oTgtInp.maxLength = oAPP.attr.iAppNameMaxLength || 15;
         oTgtWrap.appendChild(oTgtInp);
         const oTgtClear = _buildClearBtn();
+        // 지우기 단추는 두 칸 모두 Clear 로 똑같아 어느 칸 것인지 구분이 안 됐다 → 칸 이름을 같이 싣는다.
+        oTgtClear.setAttribute("data-clear", "TARGETID");
         oTgtWrap.appendChild(oTgtClear);
         oR.control.appendChild(oTgtWrap);
         const oTgtMsg = oR.msg;
@@ -171,10 +179,13 @@
         const oPackWrap = _el("div", "u4a-field");
         oPackWrap.setAttribute("data-trail", "2"); // clear + value-help 둘 다
         const oPackInp = _el("input", "u4a-input u4a-field__input");
+        oPackInp.setAttribute("data-field", "PACKG");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         oPackWrap.appendChild(oPackInp);
         const oPackClear = _buildClearBtn();
+        oPackClear.setAttribute("data-clear", "PACKG");
         oPackWrap.appendChild(oPackClear);
         const oVh = _el("button", "u4a-field__vh");
+        oVh.setAttribute("data-act", "PKG_F4");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         oVh.type = "button";
         oVh.innerHTML = _fa("magnifying-glass");
         oVh.title = _txt("/U4A/CL_WS_COMMON", "A22"); // Package
@@ -190,6 +201,8 @@
         oOk.type = "button";
         oOk.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
         oOk.title = _txt("/U4A/CL_WS_COMMON", "A04"); // Copy
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — ★이 단추를 누르면 서버에 진짜 복사된다.
+        oOk.setAttribute("data-act", "COPY");
         oOk.addEventListener("click", oAPP.events.ev_AppCopyDlgOK);
         oFoot.appendChild(oOk);
 
@@ -197,6 +210,7 @@
         oCancel.type = "button";
         oCancel.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
         oCancel.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
+        oCancel.setAttribute("data-act", "CLOSE");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         oCancel.addEventListener("click", oAPP.events.ev_AppCopyDlgCancel);
         oFoot.appendChild(oCancel);
         oDlg.appendChild(oFoot);
