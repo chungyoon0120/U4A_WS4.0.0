@@ -262,6 +262,24 @@
             oRow.control.appendChild(oInput);
         }
 
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청 2판 뒤 추가 요청, u4a-ws4-mcp).
+        //   줄에는 이미 이름이 붙어 있는데(data-row) 그 안의 칸·단추에는 없어서,
+        //   CTS 번호 줄처럼 한 줄에 칸이 둘인 자리에서 둘을 가릴 수 없었다.
+        //   값은 새로 짓지 않고 그 줄의 이름을 그대로 쓴다 → 줄과 칸이 같은 글자가 된다.
+        //   ★접두(CREATE_ / DATASET_)를 떼지 않는다 — 두 탭이 동시에 DOM 에 있고
+        //     안 보이는 탭은 hidden 만 걸리므로, 접두가 없으면 안 보이는 탭의 칸이 잡힌다.
+        try {
+            const sRowName = (oRow && oRow.row && oRow.row.getAttribute) ? oRow.row.getAttribute("data-row") : null;
+            if (sRowName) {
+                oInput.setAttribute("data-field", sRowName);
+                if (oClearBtn) { oClearBtn.setAttribute("data-clear", sRowName); }
+                if (oVhBtn) { oVhBtn.setAttribute("data-act", sRowName + "_F4"); }
+            } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("값이 없어 그만둠", "data-row on form row",
+                    "data-field cannot be set - this input stays unreachable for the automation tool");
+            }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
         if (cfg.maxLength) { oInput.maxLength = cfg.maxLength; }
         if (cfg.readOnly) {
             oInput.readOnly = true;
@@ -662,6 +680,9 @@
             const oLab = _el("label", "u4aCapRadio");
             const oRb = _el("input");
             oRb.type = "radio";
+            // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 둘 다 글자뿐이라 가를 것이 없었다.
+            //   값은 이 창이 이미 쓰는 이름 그대로(RB01 = Database View, RB02 = Transparent Table).
+            oRb.setAttribute("data-act", o.prop);
             oRb.name = "u4aCapObjType";
             oRb.addEventListener("change", function () {
                 oModel.setProperty("/DATASET/RB01", idx === 0);

@@ -749,11 +749,11 @@
         var oExpandBtn = _actBtn("angles-down", _txt("/U4A/CL_WS_COMMON", "C27"), function () {
             var node = _selTreeNode();
             if (node) { _expandSubtree(node); _renderTree(); }
-        });
+        }, "EXPAND");
         var oCollapseBtn = _actBtn("angles-up", _txt("/U4A/CL_WS_COMMON", "C28"), function () {
             var node = _selTreeNode();
             if (node) { oExpand[node._uid] = false; _renderTree(); }
-        });
+        }, "COLLAPSE");
         var oTSrch = _mkField("", { w: "16rem", ph: _wsTxt("565") }); // 어플리케이션 검색
         var _filtT = null;
         oTSrch.input.addEventListener("input", function () {
@@ -862,6 +862,9 @@
             if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }
             tr.setAttribute("data-row-idx", String(idx));     // 고정/스크롤 페인 행 hover 동기 키
             tr.setAttribute("data-uid", String(node._uid));   // 선택 동기 키
+            // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 첫 탭의 결과 표 줄과 같은 규칙.
+            //   ROOT·패키지 줄은 앱 ID 가 없어 빈 값이 된다(첫 탭도 같다).
+            tr.setAttribute("data-appid", node.APPID == null ? "" : String(node.APPID));
             if (oT2G.isHovered(idx)) { tr.classList.add("is-hover"); }   // 렌더 시 hover 상태 반영(타이밍 경합 무관)
             if (_isRoot(node)) { tr.classList.add("is-root"); }
             if (bHasKids) { tr.setAttribute("aria-expanded", bExp ? "true" : "false"); }
@@ -879,6 +882,7 @@
                     var inner = _el("span", "u4aAppF4TreeInner");   // td 는 table-cell 유지(정렬), 안쪽만 flex
                     var tog = _el("button", "u4a-tree__toggle");
                     tog.type = "button";
+                    tog.setAttribute("data-act", "TOGGLE");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값(줄 하나 접기/펼치기)
                     tog.innerHTML = _fa("chevron-right");   // 공통 트리: 우향 셰브론이 aria-expanded 로 회전
                     if (bHasKids) {
                         tog.addEventListener("click", function (e) {
@@ -898,7 +902,7 @@
                     td.appendChild(inner);
                 } else if (c.action === "disp") {
                     td.classList.add("is-action");
-                    var b = _actBtn("desktop", MSG_DISP, function (e) { e.stopPropagation(); _doTreeDisplay(node); });
+                    var b = _actBtn("desktop", MSG_DISP, function (e) { e.stopPropagation(); _doTreeDisplay(node); }, "DISPLAY");
                     if (!bWS10 || bHasKids || _isRoot(node)) { b.disabled = true; }
                     td.appendChild(b);
                 } else if (c.link && !bPickOnly) {
@@ -907,6 +911,9 @@
                     var a = _el("a", "u4aAppF4Link", node[c.key] || "");
                     a.href = "javascript:void(0)";
                     a.title = node[c.key] || "";   // 원본 tooltip="{APPID}"
+                    // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 첫 탭은 아이콘 단추지만
+                    //   이 탭은 앱 ID 글자 자체를 누르면 실행된다. 값은 첫 탭과 같게 맞춘다.
+                    a.setAttribute("data-act", "RUN");
                     a.addEventListener("click", function (e) { e.stopPropagation(); _doTreeRun(node); });
                     td.appendChild(a);
                 } else {
