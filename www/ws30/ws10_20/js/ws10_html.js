@@ -260,7 +260,7 @@
             { id: "appCopyBtn", icon: "copy", text: _txt("A04"), sc: "Shift+F11", ev: "ev_AppCopy", devOnly: true },
             { sep: true, devOnly: true },
             { id: "displayBtn", icon: "display", text: _txt("A05"), sc: "F7", ev: "ev_AppDisplay" },
-            { id: "appExecMenuBtn", icon: "globe", text: _txt("A06"), sc: "F8", ev: "ev_AppExec", split: true },
+            { id: "appExecMenuBtn", icon: "globe", text: _txt("A06"), sc: "F8", ev: "ev_AppExec", split: true, act: "RUN" },
             { sep: true },
             { id: "examBtn", icon: "graduation-cap", text: _txt("A07"), sc: "Ctrl+F1", ev: "ev_AppExam" },
             { id: "multiPrevBtn", icon: "mobile-screen-button", text: _txt("A08"), sc: "Ctrl+F3", ev: "ev_MultiPrev" },
@@ -700,6 +700,10 @@
         var main = document.createElement("button");
         main.className = "u4a-split__main";
         main.type = "button";
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청 = u4a-ws4-mcp).
+        //   반반 버튼은 왼쪽(본체)과 오른쪽(목록 펼치기)이 따로 눌린다 → 왼쪽에만 붙인다.
+        //   이 생성기는 반반 버튼 전체가 쓰므로 이름을 받은 것에만 붙인다.
+        if (cfg.act) { main.setAttribute("data-act", cfg.act); }
         main.title = cfg.tooltip || (cfg.text ? (cfg.text + (cfg.sc ? " (" + cfg.sc + ")" : "")) : "");
         main.innerHTML = (cfg.icon ? (cfg.brand ? '<i class="fa-brands fa-' + cfg.icon + '"></i>' : _fa(cfg.icon)) : "")
             + (cfg.text ? "<span>" + cfg.text + "</span>" : "");
@@ -1104,6 +1108,7 @@
             if (!_callReal("fnWS10WMENU30_04", _txt("B53"))) { _showFooter("I", _txt("B53") + " — 셸 필요"); }
         });
         oPower.classList.add("u4a-btn-power");
+        oPower.setAttribute("data-act", "LOGOFF");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         o.appendChild(oPower);
 
         // 창이 좁아지면 우측 공통버튼이 잘려 사라지지 않게 ⋯ 오버플로 메뉴로 접는다(좌측 카테고리는 고정).
@@ -1207,6 +1212,9 @@
         var b = document.createElement("button");
         b.className = "u4a-btn-icon u4a-pin-btn";
         b.type = "button";
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청 = u4a-ws4-mcp).
+        //   CSS class 로만 잡혀서 CSS 를 손대면 그쪽 도구가 깨진다.
+        b.setAttribute("data-act", "PIN");
         b.title = "Browser Pin";   // 원본 tooltip 동일(고정 문자열)
         b.innerHTML = ICON.pin;
         b.setAttribute("aria-pressed", _readPin() ? "true" : "false");
@@ -1346,7 +1354,7 @@
     // App 실행 split 버튼 — 공통 빌더(buildSplitButton)에 위임(정렬/busy/토글은 빌더가 강제).
     function _renderSplitButton(cfg) {
         return _buildSplitButton({
-            id: cfg.id, icon: cfg.icon, text: cfg.text, sc: cfg.sc,
+            id: cfg.id, icon: cfg.icon, text: cfg.text, sc: cfg.sc, act: cfg.act,
             onMain: function () { _invoke(cfg.ev, cfg.text); },                 // 본체 = 기본 브라우저로 실행
             getItems: _getAppExecBrowsers,                                       // 동적 /DEFBR 목록
             onPick: function (it) { _execAppInBrowser(it.key); },                // 선택 브라우저로 실행
