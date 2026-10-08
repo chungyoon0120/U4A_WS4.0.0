@@ -459,6 +459,7 @@
         // 조회 조건 = 공통 접이식 패널(원본 sap.m.Panel expandable) — 헤더에 제목 + 검색 버튼, 바디에 폼.
         var oSrchBtn = _el("button", "u4a-btn u4a-btn--emphasized");
         oSrchBtn.type = "button";
+        oSrchBtn.setAttribute("data-act", "SEARCH");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         oSrchBtn.innerHTML = _fa("magnifying-glass") + "<span></span>";
         oSrchBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A75"); // Search
         oSrchBtn.addEventListener("click", _doSearch);

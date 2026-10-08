@@ -717,6 +717,9 @@
         arrow.title = cfg.text || "";
         arrow.setAttribute("aria-haspopup", "true");
         arrow.setAttribute("data-menu-anchor", "split");
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 왼쪽(본체)과 가르기 위해 오른쪽에도 이름을 준다.
+        //   WS20 에도 실행 버튼이 있어서 「반반 버튼 전부가 쓰는 값」만으로는 언젠가 겹친다.
+        if (cfg.act) { arrow.setAttribute("data-act", cfg.act + "_MENU"); }
         arrow.innerHTML = (ICON && ICON.caret) ? ICON.caret : _fa("angle-down");
         arrow.addEventListener("click", function () {
             // 이미 열림 → busy/prepare 없이 즉시 닫기(토글)
@@ -1416,7 +1419,12 @@
         oInput.autocomplete = "off";
         oInput.setAttribute("role", "combobox");
         oInput.title = "";
-        try { oSearchFld.el.querySelector(".u4a-field__vh").title = "Search Help (F4)"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 이 돋보기는 안내 글자로만 집히고 있었다.
+        try {
+            var oSearchVh = oSearchFld.el.querySelector(".u4a-field__vh");
+            oSearchVh.title = "Search Help (F4)";
+            oSearchVh.setAttribute("data-act", "APPNM_F4");
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // F4 키 → 값도움(버튼 클릭과 동일), Enter → no-op(원본 SearchField 동일), 더블클릭 → 전체선택.
         oInput.addEventListener("keydown", function (e) {
             if (e.key === "F4") { e.preventDefault(); _invoke("ev_AppValueHelp", "App Search Help (F4)"); }

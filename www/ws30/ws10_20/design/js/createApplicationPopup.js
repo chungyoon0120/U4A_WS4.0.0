@@ -413,6 +413,9 @@
         // ── 다이얼로그 골격 ─────────────────────────────────────────────
         const oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aCapDlg";
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 창 안쪽은 다 이름이 있는데
+        //   창 자체를 집는 이름만 없어서 CSS class 로 집고 있었다.
+        oDlg.setAttribute("data-dlg", "CAP");
         oUIobj.oCreateDialog = oDlg;
 
         // B05  Create Option

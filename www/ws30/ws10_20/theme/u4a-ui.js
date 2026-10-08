@@ -2413,6 +2413,10 @@
             const oBtn = document.createElement("button");
             oBtn.type = "button";
             oBtn.className = "u4a-btn" + (b.emphasized ? " u4a-btn--emphasized" : "") + (b.negative ? " u4a-btn--negative" : "");
+            // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청 = u4a-ws4-mcp).
+            //   아이콘만 남는 모양이 많아 글자로 집히던 자리다. 이미 들고 있는 act 를 그대로 내보낸다
+            //   (YES / NO / CANCEL, 화면이 따로 준 버튼도 그 act 그대로).
+            if (b.act) { oBtn.setAttribute("data-act", b.act); }
             const sLabel = b.label || b.act;
             const sIcon = b.icon || (bIconize ? ICONMAP[b.act] : null);
             if (sIcon) {
