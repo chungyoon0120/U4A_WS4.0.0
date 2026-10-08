@@ -1,6 +1,6 @@
-# TODO — 남은 일 한눈에 (1~37번)
+# TODO — 남은 일 한눈에 (1~36번)
 
-> 갱신 **2026-10-08** · `bootstrap` = `e9284df4` / `main` = `2ab835c3`(안 올림)
+> 갱신 **2026-10-08** · `bootstrap` = `66be9cbe` / `main` = `2ab835c3`(안 올림)
 > **번호는 문서 전체에 이어서 매긴다 — 「12번 해」 처럼 번호만 말하면 된다.**
 > 끝난 항목은 지우고 **번호를 다시 매긴다**(빈 번호를 남기지 않는다).
 > 지금 상태 = [CURRENT.md](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/CURRENT.md) · 왜 그렇게 했는지 = [history/](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/)
@@ -9,9 +9,9 @@
 
 | 누가 | 번호 | 건수 |
 |---|---|---|
-| **장군님** | 1~6 (정하기) · 11~12 (직접) · 13~35 (테스트) | **31** |
-| 저 | 7~10 (착수 지시만 주시면) | 4 |
-| 아무도 (그대로 둠) | 36~37 | 2 |
+| **장군님** | 1~6 (정하기) · 10~11 (직접) · 12~34 (테스트) | **31** |
+| 저 | 7~9 (착수 지시만 주시면) | 3 |
+| 아무도 (그대로 둠) | 35~36 | 2 |
 
 > **지금 안 끝난 것**: 버그 작업을 시작하려면 **버그 목록을 어디서 가져올지** 정해 주셔야 합니다 —
 > ① 노션 이슈 DB(추천) ② 장군님이 말씀하시는 증상 ③ 앱 로그 파일. 정하시면 그 결과를 여기 번호로 올립니다.
@@ -31,67 +31,66 @@
 
 ---
 
-## B. 제 코드 작업 — 착수 지시 대기 — 7~10번
+## B. 제 코드 작업 — 착수 지시 대기 — 7~9번
 
 | 번호 | 영역 | 지금까지 | 지시가 필요한 것 |
 |---|---|---|---|
 | **7** | busy 시작·끝 전수 점검 | 기준 확정 + 기존 코드 목록만 뽑음 · **전수 판정분은 코드 한 줄도 안 고침** | **어느 순서로 판정할지** 정해 주시면 파일 단위로 시작 → [현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/busy시작끝/00_현황판.md) |
 | **8** | 반드시 있어야 할 것이 없을 때 | 기준 확정(앱 종료로 통일) · 보고 단위도 정해짐(파일 단위) · **코드 한 줄도 안 고침** | **착수 지시** → [현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/필수의존성크리티컬/00_현황판.md) |
 | **9** | 별창 팝업 parent 제거 — 7~26번 (21곳) | 공통 전환 끝 · **1~5번 장군님 테스트 통과** · 6번은 답 대기 | **6번 답 + 다음 번호 지시** → [진행현황](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창팝업/01_parent제거_진행현황.md) |
-| **10** | 자동 테스트 식별값 — 단추 3개 더 | 요청자가 새로 부탁: 타이틀바 **Browser Pin** · 타이틀바 **로그오프** · WS10 툴바 **실행 (F8)**. 지금은 CSS 클래스로만 잡혀 CSS 를 손대면 깨진다 | **착수 지시** → [현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/자동테스트_표식달기/00_현황판.md) |
 
 ---
 
-## C. 장군님이 직접 하실 준비 작업 — 11~12번
+## C. 장군님이 직접 하실 준비 작업 — 10~11번
 
 제가 못 하는 일(비밀번호 입력 · 노션 조작)입니다.
 
 | 번호 | 무엇 | 남은 ☐ | 왜 장군님이 | 어디 |
 |---|---|---|---|---|
-| **11** | SAP 접속 정보 파일 만들기 | 7 | **비밀번호가 들어간다** — 접속 정보가 0건이라 그 기능을 돌려 본 적이 없음 | [sapAdt스킬 현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/sapAdt스킬/00_현황판.md) |
-| **12** | 노션 테스트 현황 확인 | 7 | 노션 화면 조작 | [노션현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/노션현황판/00_현황판.md) |
+| **10** | SAP 접속 정보 파일 만들기 | 7 | **비밀번호가 들어간다** — 접속 정보가 0건이라 그 기능을 돌려 본 적이 없음 | [sapAdt스킬 현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/sapAdt스킬/00_현황판.md) |
+| **11** | 노션 테스트 현황 확인 | 7 | 노션 화면 조작 | [노션현황판](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/노션현황판/00_현황판.md) |
 
 ---
 
-## D. 앱 켜고 테스트해 주실 것 — 13~35번
+## D. 앱 켜고 테스트해 주실 것 — 12~34번
 
 **전부 코드는 넣었고 앱 확인만 안 된 상태입니다.** 급하지 않습니다 — **번호 큰 것(건수 적은 것)부터** 하시면 빨리 줄어듭니다.
 반드시 **앱을 껐다 켜고**(새로고침 아님), **dev mode** 로 보십시오(exe 는 테스트 안 하기로 정함).
 
 | 번호 | 영역 | 남은 ☐ | 현황판 |
 |---|---|---|---|
-| **13** | 내부 데이터 모니터 | 62 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/데이터모니터/00_현황판.md) |
-| **14** | 오류 수집·전송 (1차 구현분) | 34 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/로그수집전송/00_현황판.md) |
-| **15** | 별창 — 뜨자마자 busy 켜기 | 32 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창busy시작/00_현황판.md) |
-| **16** | 대형 바인딩 팝업 | 28 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/bindpopup/00_현황판.md) |
-| **17** | UI 템플릿 마법사 | 24 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/wizard/00_현황판.md) |
-| **18** | 앞 화면↔편집 화면 왕복 중 검정 화면 멈춤 | 19 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/검정화면멈춤/00_현황판.md) |
-| **19** | UI5 미리 정의된 CSS 팝업 | 19 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/ui5csspopup/00_현황판.md) |
-| **20** | 쇼컷링크 생성 | 18 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/숏컷링크생성/00_현황판.md) |
-| **21** | 화면 이동 · 단축키 | 18 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/단축키생명주기/00_현황판.md) |
-| **22** | 앱 이름 입력칸이 기준 (권한 잠금) | 16 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/앱이름입력값기준/00_현황판.md) |
-| **23** | 원본 이식 전체 | 10 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/update/00_전체현황판.md) |
-| **24** | 컨트롤러(클래스 빌더) 실행 | 9 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/execControllerClass/00_현황판.md) |
-| **25** | 미리보기 오류 표면화 | 6 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/미리보기오류표면화/00_현황판.md) |
-| **26** | 네트워크 끊김 화면 | 6 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/네트워크끊김화면/00_현황판.md) |
-| **27** | WS4.0 catch 오류 기록 보강 | 6 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/ws40-work-order/00_현황판.md) |
-| **28** | 클립보드 복사 | 5 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/클립보드복사/00_현황판.md) |
-| **29** | 미리보기 우클릭 삭제 시 확인창 먹통 | 5 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/미리보기삭제BUSY/00_현황판.md) |
-| **30** | UI 추가 팝업 (WS20) | 5 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/UI추가팝업/00_현황판.md) |
-| **31** | 드래그 텍스트 복사 | 4 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/드래그복사/00_현황판.md) |
-| **32** | 2026-08-16 원본 갱신분 | 4 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/update/20260818/00_현황판.md) |
-| **33** | 메인 창 busy 를 공통 파일로 옮김 | 4 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/busy시작끝/00_현황판.md) |
-| **34** | 일러스트 메시지 팝업 | 3 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/일러스트팝업/00_현황판.md) |
-| **35** | 이미지 압축 설정 창 | 2 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/이미지압축설정/00_현황판.md) |
+| **12** | 내부 데이터 모니터 | 62 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/데이터모니터/00_현황판.md) |
+| **13** | 오류 수집·전송 (1차 구현분) | 34 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/로그수집전송/00_현황판.md) |
+| **14** | 별창 — 뜨자마자 busy 켜기 | 32 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창busy시작/00_현황판.md) |
+| **15** | 대형 바인딩 팝업 | 28 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/bindpopup/00_현황판.md) |
+| **16** | UI 템플릿 마법사 | 24 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/wizard/00_현황판.md) |
+| **17** | 앞 화면↔편집 화면 왕복 중 검정 화면 멈춤 | 19 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/검정화면멈춤/00_현황판.md) |
+| **18** | UI5 미리 정의된 CSS 팝업 | 19 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/ui5csspopup/00_현황판.md) |
+| **19** | 쇼컷링크 생성 | 18 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/숏컷링크생성/00_현황판.md) |
+| **20** | 화면 이동 · 단축키 | 18 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/단축키생명주기/00_현황판.md) |
+| **21** | 앱 이름 입력칸이 기준 (권한 잠금) | 16 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/앱이름입력값기준/00_현황판.md) |
+| **22** | 원본 이식 전체 | 10 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/update/00_전체현황판.md) |
+| **23** | 컨트롤러(클래스 빌더) 실행 | 9 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/execControllerClass/00_현황판.md) |
+| **24** | 미리보기 오류 표면화 | 6 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/미리보기오류표면화/00_현황판.md) |
+| **25** | 네트워크 끊김 화면 | 6 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/네트워크끊김화면/00_현황판.md) |
+| **26** | WS4.0 catch 오류 기록 보강 | 6 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/ws40-work-order/00_현황판.md) |
+| **27** | 클립보드 복사 | 5 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/클립보드복사/00_현황판.md) |
+| **28** | 미리보기 우클릭 삭제 시 확인창 먹통 | 5 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/미리보기삭제BUSY/00_현황판.md) |
+| **29** | UI 추가 팝업 (WS20) | 5 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/UI추가팝업/00_현황판.md) |
+| **30** | 드래그 텍스트 복사 | 4 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/드래그복사/00_현황판.md) |
+| **31** | 2026-08-16 원본 갱신분 | 4 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/update/20260818/00_현황판.md) |
+| **32** | 메인 창 busy 를 공통 파일로 옮김 | 4 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/busy시작끝/00_현황판.md) |
+| **33** | 일러스트 메시지 팝업 | 3 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/일러스트팝업/00_현황판.md) |
+| **34** | 이미지 압축 설정 창 | 2 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/이미지압축설정/00_현황판.md) |
 
 ---
 
-## E. 손대지 않은 채 남겨 둔 것 — 36~37번
+## E. 손대지 않은 채 남겨 둔 것 — 35~36번
 
 | 번호 | 무엇 | 왜 그대로 두나 |
 |---|---|---|
-| **36** | 옛 UI5 판 CSS 팝업에 테스트 잔재 | 그 화면 소스에 **「테스트 끝나면 반드시 주석을 풀것!!」** 이라 적힌 채 창 닫기 처리가 주석 처리돼 있다(2026-09-14 발견). 그 파일이 지금 로드되는 곳을 못 찾았다. 제가 만든 게 아니라 손대지 않았다 |
-| **37** | Claude 도구 폴더 안 설치 파일 4개 | `.claude/mcp/` 아래 Python 설치 정보 파일들이다. **제가 고친 것이 아니다** — 그 도구를 돌릴 때 스스로 바뀐 것으로 보인다. 앞으로 또 바뀌면 깃에서 빼 둘지(`.gitignore`) 지시를 기다린다 |
+| **35** | 옛 UI5 판 CSS 팝업에 테스트 잔재 | 그 화면 소스에 **「테스트 끝나면 반드시 주석을 풀것!!」** 이라 적힌 채 창 닫기 처리가 주석 처리돼 있다(2026-09-14 발견). 그 파일이 지금 로드되는 곳을 못 찾았다. 제가 만든 게 아니라 손대지 않았다 |
+| **36** | Claude 도구 폴더 안 설치 파일 4개 | `.claude/mcp/` 아래 Python 설치 정보 파일들이다. **제가 고친 것이 아니다** — 그 도구를 돌릴 때 스스로 바뀐 것으로 보인다. 앞으로 또 바뀌면 깃에서 빼 둘지(`.gitignore`) 지시를 기다린다 |
 
 ---
 
