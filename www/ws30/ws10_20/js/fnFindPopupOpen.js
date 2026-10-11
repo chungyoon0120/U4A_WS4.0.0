@@ -40,8 +40,17 @@
         const sPopupName = "UIFIND";
 
         // 기존에 Find 창이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        const oResult = parent.WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-08 장군님 지시 (별창 parent 제거 7번) - parent 를 빼면 getChildWindows() 로는
+        //     못 찾으므로, 전체 창에서 OBJTY + browserkey 로 찾는 쪽으로 바꿨다. 1번 옵션 창과 같은 방식.
+        const oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
+
+            // Minimize 된 채로 있으면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             parent.WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
             oAPP.common.fnSetBusyLock("");
             try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -68,7 +77,10 @@
         // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
         oBrowserOptions.titleBarStyle = 'hidden';
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;   // 테마별 배경(첫 페인트 플래시 방지)
-        oBrowserOptions.parent = CURRWIN;
+        // 2026-10-08 장군님 지시 (별창 parent 제거 7번) - parent 를 지정하지 않는다.
+        //   제목줄을 직접 그리는 창에서 parent 를 두면 Minimize 뒤 Restore 할 길이 없어진다.
+        //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
+        //   뒤로가기 일괄 닫기·busy 중 숨기기는 브라우저키 비교(getSiblingWindows)가 대신한다.
         // [HTML5] 네이티브 opacity 페이드 미사용 — backgroundColor 로 즉시 불투명, show=false 로 위치 잡고 표시.
         oBrowserOptions.show = false;
         oBrowserOptions.closable = false;

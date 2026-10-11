@@ -2049,36 +2049,12 @@
     ************************************************************************/
     oAPP.fn.fnChildWindowAllClose = () => {
 
-        var oCurrWin = parent.REMOTE.getCurrentWindow();
-        if (oCurrWin.isDestroyed()) {
-            return;
-        }
-
-        var aChild = oCurrWin.getChildWindows(),
-            iChildCnt = aChild.length;
-
-        if (iChildCnt <= 0) {
-            return;
-        }
-
-        for (var i = 0; i < iChildCnt; i++) {
-
-            var oChild = aChild[i];
-            if (oChild.isDestroyed()) {
-                continue;
-            }
-
-            try {
-                // ★ frameless 별창 다수가 closable:false(OS 닫기 차단)라 raw close() 가 무시된다.
-                //   공통 U4AUI.closeWindow(setClosable(true)+close())로 닫아야 실제로 닫힌다. (ws_common.js:566 선례)
-                if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oChild); }
-                else { oChild.setClosable(true); oChild.close(); }
-            } catch (error) {
-                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
-
-            }
-
-        }
+        // 2026-10-08 장군님 지시 (메인 창이 죽으면 별창도 예외 없이 전부) - 판단 기준을 브라우저키로 바꿨다.
+        //   종전 getChildWindows()(parent 기반)는 parent 를 뺀 창을 0개로 봐서 하나도 안 닫았다.
+        //   2026-10-07 에 fnChildWindowClose 만 고치고 이 함수를 빠뜨렸다. 같은 기준으로 맞춘다.
+        //   이 함수는 이름 그대로 「전부」라서 예외 목록을 안 탄다.
+        oAPP.fn.fnChildWindowClose("X");
+        return;
 
     }; // end of oAPP.fn.fnChildWindowAllClose
 
@@ -2119,7 +2095,12 @@
     /************************************************************************
      * Electron Browser들 예외 대상 제외한 전체 닫는 function
      ************************************************************************/
-    oAPP.fn.fnChildWindowClose = function () {
+    oAPP.fn.fnChildWindowClose = function (FORCEALL) {
+
+        // 2026-10-08 장군님 지시 - FORCEALL("X") 이면 예외 목록을 건너뛰고 전부 닫는다.
+        //   메인 창이 죽는 자리(로그오프 · 창 닫기)에서는 남길 별창이 없다.
+        //   인자 없이 부르면 종전 그대로(예외 목록 적용) - 뒤로가기·모드전환 호출부는 안 바뀐다.
+        var bForceAll = (FORCEALL === "X");
 
         // 2026-10-07 장군님 지시 (별창 parent 제거) - 판단 기준을 브라우저키로 바꿨다.
         //   종전: getChildWindows()(parent 기반) + 메인 창의 자식창 맵(_closeAllChildWindowMap).
@@ -2150,8 +2131,22 @@
                     sOBJTY = oWebPref.OBJTY;
 
                 // child window 닫을 때 예외 팝업 체크
-                var bIsHideExp = oAPP.fn.fnCheckPopupCloseException(sOBJTY);
-                if (bIsHideExp) {
+                //   2026-10-08 장군님 지시 - 메인 창이 죽는 자리(FORCEALL)에서는 예외도 전부 닫는다.
+                if (!bForceAll) {
+                    var bIsHideExp = oAPP.fn.fnCheckPopupCloseException(sOBJTY);
+                    if (bIsHideExp) {
+                        continue;
+                    }
+                }
+
+                // 2026-10-09 장군님 지시 (메인이 없으면 자식도 없다) - 메인 창이 죽는 자리에서는
+                //   별창이 스스로 거는 "처리 중에는 못 닫음" 차단을 타지 않고 없앤다.
+                //   보통의 닫기 요청은 별창의 onbeforeunload 가 false 를 돌려 거부할 수 있어
+                //   (UI 찾기 · 대형 바인딩 · 기술 문서 · 소스 편집기 · 오류 페이지 에디터 등)
+                //   세션 타임아웃처럼 별창이 바쁜 와중에 끝나면 그 창만 화면에 남았다.
+                //   앱이 끝나는 자리라 별창의 정리 코드를 못 돌려도 문제가 없다.
+                if (bForceAll) {
+                    oChild.destroy();
                     continue;
                 }
 
