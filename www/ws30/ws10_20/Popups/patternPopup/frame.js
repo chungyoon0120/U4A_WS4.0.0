@@ -1092,6 +1092,49 @@ function _initChrome() {
     var oEmptyDesc = document.getElementById("pattEmptyDesc");
     if (oEmptyDesc) { oEmptyDesc.textContent = _m("277"); }
 
+    // 최소화 · 최대화(타이틀바) — 2026-10-12 장군님 지시.
+    //   원본은 OS 기본 제목줄이라 최소화·최대화가 있었는데, frameless 로 바꾸면서 닫기만 남아 빠져 있었다.
+    //   _win-popup-template 과 같은 방식. 창 옵션은 minimizable·maximizable 을 끄지 않아 기본 허용이다.
+    var oWinMin = document.getElementById("pattWinMin");
+    if (oWinMin) {
+        oWinMin.addEventListener("click", function () {
+            try { CURRWIN.minimize(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "pattWinMin", "minimize button not wired");
+    }
+
+    var oWinMax = document.getElementById("pattWinMax");
+    if (oWinMax) {
+
+        // 최대화 상태에 따라 아이콘·tooltip 을 Maximize / Restore 로 바꾼다.
+        var _syncMaxBtn = function () {
+            try {
+                var bMax = CURRWIN.isMaximized(),
+                    oIcon = oWinMax.querySelector("i");
+                oWinMax.title = bMax ? "Restore" : "Maximize";
+                if (oIcon) { oIcon.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        };
+
+        oWinMax.addEventListener("click", function () {
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+
+        // 더블클릭 등 창 쪽에서 바뀌는 경우도 아이콘을 맞춘다.
+        try {
+            CURRWIN.on("maximize", _syncMaxBtn);
+            CURRWIN.on("unmaximize", _syncMaxBtn);
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        _syncMaxBtn();
+
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "pattWinMax", "maximize button not wired");
+    }
+
     // 닫기(타이틀바 X) — busy 중 차단 + 공통 closeWindow(창이 closable:false 라 직접 close() 불가).
     var oClose = document.querySelector('#pattTitlebar [data-action="close"]');
     if (oClose) {
