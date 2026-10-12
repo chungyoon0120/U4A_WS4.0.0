@@ -270,12 +270,26 @@
                 Tstr = str.split(":"),
                 len = Tstr.length - 1;
 
+            // 2026-10-12 장군님 지시 - 1차 VBS(newSESSTION.vbs) 가 쓴 stderr 를 남긴다.
+            //   종전에는 이 글을 받아서 버렸다. SAPGUI 시작 대기 팝업이 30초를 채우는 건이
+            //   간헐적이라, 터진 순간의 이 한 줄이 없으면 원인을 짚을 수 없다.
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("터짐", "newSESSTION.vbs stderr", String(sStderr).trim());
+            }
+
             // console.error("[VBS 실행 오류] \n\n " + sNewSessionVbsFullPath + " \n\n " + str);
 
             if (len !== 0) {
 
                 str = Tstr[len];
                 if (str.indexOf("|") != -1) {
+
+                    // 2026-10-12 장군님 지시 - 여기서 멈추면 2차 VBS 를 안 띄운다.
+                    //   ActionParam 은 1차가 이미 썼을 수 있으나 /n/U4A/CTRL_PROXY 는 안 간다.
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("값이 없어 그만둠", "sapgui_ws.vbs", "2nd VBS not launched - stderr tail has pipe");
+                    }
+
                     return;
                 }
 
@@ -326,6 +340,11 @@
             ];
 
             console.log(aConsoleMsg.join("\r\n"));
+
+            // 2026-10-12 장군님 지시 - 2차 VBS 를 실제로 띄웠는지 남긴다.
+            if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                U4ALOG.info("알림", "sapgui_ws.vbs", "2nd VBS launched");
+            }
 
             var vbs = parent.SPAWN('cscript.exe', aParam);
             vbs.stdout.on("data", function(data) {
@@ -782,6 +801,15 @@
             let iMaxTime = 30,
                 iCurrTime = 0;
 
+            // 2026-10-12 장군님 지시 - 1초 감시가 무엇을 지켜보는지·무엇을 읽었는지 남긴다.
+            //   종전에는 이 자리에 로그가 0줄이라, 읽기가 실패해도 조용히 30초를 채우고
+            //   그 사실이 어디에도 안 남았다. sLastSeen 은 30초를 다 채웠을 때 마지막 상태를 적기 위한 것.
+            let sLastSeen = "(not read yet)";
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                U4ALOG.info("알림", "cSession watch start", "browserkey " + BROWSKEY);
+            }
+
             oAPP.attr.sapguiInterval = setInterval(async () => {
 
                 iCurrTime += 1;
@@ -802,6 +830,11 @@
 
                     iCurrTime = 0;
 
+                    // 2026-10-12 장군님 지시 - 30초를 꽉 채우고 끝났다. 마지막으로 본 상태를 남긴다.
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("값이 없어 그만둠", "cSession watch timeout", "30s elapsed, last seen: " + sLastSeen);
+                    }
+
                     // 인터벌 죽이기
                     _clearIntervalSapGuiCheck();
 
@@ -816,7 +849,24 @@
                 }
 
                 // 레지스트리 목록을 구한다
-                const oResult = await Regedit.list(sRegPath);
+                //   2026-10-12 장군님 지시 - 읽기가 터지면 종전에는 조용히 넘어갔다. 그 자리를 남긴다.
+                let oResult;
+                try {
+                    oResult = await Regedit.list(sRegPath);
+                } catch (e) {
+                    sLastSeen = "read error";
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "cSession watch read"); }
+                    return;
+                }
+
+                // 읽은 상태를 기록해 둔다 - 처음 3번과 5초마다만 남긴다(양 조절).
+                sLastSeen = (oResult && oResult[sRegPath] && oResult[sRegPath].values &&
+                             oResult[sRegPath].values[BROWSKEY]) ? "browserkey still there" : "browserkey gone";
+
+                if (typeof U4ALOG !== "undefined" && U4ALOG.info &&
+                    (iCurrTime <= 3 || iCurrTime % 5 === 0)) {
+                    U4ALOG.info("알림", "cSession watch", sLastSeen + " (" + iCurrTime + "/" + iMaxTime + ")");
+                }
 
                 // 레지스트리의 값 중, 현재 브라우저 키의 정보가 있는지 확인한다.
                 let oSession = oResult[sRegPath];
