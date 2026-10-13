@@ -306,7 +306,17 @@
             let REMOTE = parent.gfn_remote(),
                 oWin = REMOTE.getCurrentWindow();
 
-            oWin.setOverlayIcon(null, '');
+            /************************************************************************
+             * 2026-10-13 — setOverlayIcon(null) 은 받는 길이 없어 창을 닫을 때마다
+             * 'conversion failure' 로 터졌고, 그 뒤 critical 오류 창이 떠서
+             * 자동 테스트가 연쇄로 막혔다. 지우는 것은 빈 NativeImage 로 넘긴다.
+             * (원본 WS3.0.0 도 같은 코드 — 원본 결함. 자동 테스트 요청으로 고침)
+             ************************************************************************/
+            try {
+                oWin.setOverlayIcon(require('electron').nativeImage.createEmpty(), '');
+            } catch (e) {
+                console.error("[ABOUTFRM-001] setOverlayIcon clear failed on window close", e);
+            }
 
         });
 

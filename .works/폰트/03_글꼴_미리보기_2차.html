@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>글꼴 비교 2차 — 계열이 다른 것만</title>
+<!--
+  만든 까닭 2026-10-08 — 장군님 「IBM Plex Sans KR, Spoqa Han Sans Neo 빼고는 다 비슷해 보여」
+  + 그 둘도 맘에 안 든다고 하셨다.
+  1차 후보(Pretendard·SUIT·Noto Sans KR·Spoqa)는 전부 본고딕(Source Han Sans) 한글을 바탕으로
+  만든 것이라 닮아 보이는 것이 맞다. 그래서 2차는 본고딕 바탕이 아닌 것만 모았다.
+  ★WS4.0 소스는 한 줄도 고치지 않았다. 이 파일은 비교 샘플일 뿐이다.
+  ★글꼴을 CDN 에서 받는다 — 실제 적용 때는 파일을 프로젝트에 넣는다.
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;700&family=Asta+Sans:wght@400;700&family=Nanum+Gothic:wght@400;700&display=swap">
+<style>
+@font-face {
+    font-family: "Paperlogy"; font-weight: 400; font-display: swap;
+    src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-4Regular.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Paperlogy"; font-weight: 700; font-display: swap;
+    src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-7Bold.woff2") format("woff2");
+}
+@font-face {
+    font-family: "SamplePretendard"; font-weight: 400; font-display: swap;
+    src: url("https://cdn.jsdelivr.net/npm/pretendard@latest/dist/web/static/woff2/Pretendard-Regular.woff2") format("woff2");
+}
+@font-face {
+    font-family: "SamplePretendard"; font-weight: 700; font-display: swap;
+    src: url("https://cdn.jsdelivr.net/npm/pretendard@latest/dist/web/static/woff2/Pretendard-Bold.woff2") format("woff2");
+}
+
+* { box-sizing: border-box; }
+body {
+    margin: 0; padding: 1.5rem; background: #f5f6f7; color: #223654;
+    font-family: Arial, Helvetica, sans-serif; font-size: 0.875rem;
+}
+h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+h1 + p { margin: 0 0 1.25rem; color: #5b738b; }
+
+#loadstate {
+    position: sticky; top: 0; z-index: 10;
+    background: #223654; color: #fff; border-radius: 0.375rem;
+    padding: 0.625rem 1rem; margin-bottom: 1.25rem; font-size: 0.8125rem;
+}
+#loadstate ul { margin: 0.375rem 0 0; padding-left: 1.25rem; }
+#loadstate li { margin-bottom: 0.125rem; }
+#loadstate .ok { color: #7ee787; }
+#loadstate .ng { color: #ff9c9c; }
+
+.note {
+    background: #fff; border: 1px solid #d9dde3; border-left: 0.25rem solid #0a6ed1;
+    border-radius: 0.375rem; padding: 0.875rem 1rem; margin-bottom: 1.25rem;
+}
+.note ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.note li { margin-bottom: 0.25rem; }
+
+.card { background: #fff; border: 1px solid #d9dde3; border-radius: 0.5rem; margin-bottom: 1.25rem; overflow: hidden; }
+.card > header {
+    display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;
+    padding: 0.625rem 1rem; background: #eef1f4; border-bottom: 1px solid #d9dde3;
+}
+.card > header b { font-size: 1rem; }
+.card > header .meta { color: #5b738b; font-size: 0.8125rem; }
+.card > header .tag { background: #223654; color: #fff; border-radius: 0.75rem; padding: 0.0625rem 0.5rem; font-size: 0.75rem; }
+.card > .body { padding: 1rem; }
+.sample { font-size: 0.875rem; }
+
+.toolbar {
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    padding: 0.5rem; background: #fafbfc; border: 1px solid #e3e7ec; border-radius: 0.375rem; margin-bottom: 0.875rem;
+}
+.btn { border: 1px solid #b6c0cc; background: #fff; color: #223654; border-radius: 0.25rem; padding: 0.3125rem 0.75rem; font: inherit; cursor: default; }
+.btn.primary { background: #0a6ed1; border-color: #0a6ed1; color: #fff; }
+.btn.danger { background: #fff; border-color: #bb0000; color: #bb0000; }
+
+.field { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.field label { width: 7.5rem; color: #5b738b; text-align: right; }
+.field input { flex: 1; min-width: 0; font: inherit; color: inherit; border: 1px solid #b6c0cc; border-radius: 0.25rem; padding: 0.3125rem 0.5rem; background: #fff; }
+
+.big { margin-top: 0.875rem; padding: 0.75rem 0.875rem; background: #f7f9fb; border: 1px solid #e3e7ec; border-radius: 0.375rem; }
+.big .ko { font-size: 2.75rem; line-height: 1.25; letter-spacing: -0.01em; }
+.big .en { font-size: 2.25rem; line-height: 1.3; }
+.big .nu { font-size: 2.25rem; line-height: 1.3; font-variant-numeric: tabular-nums; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 0.875rem; }
+th, td { border-bottom: 1px solid #e3e7ec; padding: 0.375rem 0.5rem; text-align: left; }
+th { background: #f0f3f6; color: #5b738b; font-weight: 700; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.small { font-size: 0.75rem; color: #5b738b; margin-top: 0.625rem; }
+.rare { margin-top: 0.625rem; padding: 0.5rem; background: #fff8e1; border: 1px solid #f0d58c; border-radius: 0.25rem; }
+.rare b { color: #8a6100; }
+.sizes { margin-top: 0.75rem; }
+.sizes div { margin-bottom: 0.1875rem; }
+.s11 { font-size: 0.6875rem; } .s12 { font-size: 0.75rem; } .s14 { font-size: 0.875rem; } .s16 { font-size: 1rem; }
+</style>
+</head>
+<body>
+
+<div id="loadstate"><b>글꼴을 받았는지 확인 중…</b></div>
+
+<h1>글꼴 비교 2차 — 계열이 다른 것만 모았습니다</h1>
+<p>1차가 다 비슷했던 까닭은 Pretendard·SUIT·Noto Sans KR·Spoqa 가 <b>전부 본고딕(Source Han Sans) 한글을 바탕</b>으로 만들어졌기 때문입니다.</p>
+
+<div class="note">
+    <b>이번에 바뀐 것</b>
+    <ul>
+        <li><b>본고딕 바탕이 아닌 것만</b> 새로 골랐습니다 — ②③④⑤</li>
+        <li>맘에 안 드신 <b>IBM Plex Sans KR · Spoqa Han Sans Neo 는 뺐습니다</b></li>
+        <li><b>⑥ Pretendard 하나만</b> 남겼습니다 — 얼마나 다른지 견주어 보시라고</li>
+        <li>차이는 <b>큰 글자 줄</b>에서 가장 잘 보입니다. <b>노란 칸이 네모(□)로 보이면</b> 그 글꼴은 그 글자를 안 담은 것입니다</li>
+    </ul>
+</div>
+
+<div class="card">
+    <header>
+        <b>① 지금 WS4.0 상태</b>
+        <span class="tag">기준</span>
+        <span class="meta">72 파일이 없어 Arial → Windows 한글 글꼴(맑은 고딕)으로 떨어짐</span>
+    </header>
+    <div class="body sample" style="font-family: "72","72full",Arial,Helvetica,sans-serif;">
+        <div class="toolbar">
+            <button class="btn primary">실행 (F8)</button>
+            <button class="btn">앱 생성</button>
+            <button class="btn">로컬 앱 생성</button>
+            <button class="btn danger">앱 삭제</button>
+            <button class="btn">패키지별 앱 계층 구조</button>
+        </div>
+        <div class="field"><label>앱 이름</label><input value="ZUA_WS_MAIN_SCREEN_0001" readonly></div>
+        <div class="field"><label>담당자</label><input value="이청윤 (CHUNGYOON0120)" readonly></div>
+        <div class="big">
+            <div class="ko">앱 생성 힘찬 홍길동 쌓였고</div>
+            <div class="en">Rgaq ijl 1Il0O — ZUA_WORKBENCH</div>
+            <div class="nu">0123456789</div>
+        </div>
+        <table>
+            <thead><tr><th>앱 ID</th><th>앱 이름</th><th>패키지</th><th class="num">호출 건수</th><th class="num">용량(KB)</th></tr></thead>
+            <tbody>
+                <tr><td>UA0001</td><td>로그인 화면</td><td>ZUA_WORKBENCH</td><td class="num">1,048,576</td><td class="num">1,117.2</td></tr>
+                <tr><td>UA0018</td><td>앱 검색 도움말</td><td>ZUA_COMMON</td><td class="num">90,112</td><td class="num">58.0</td></tr>
+                <tr><td>UA0237</td><td>디자인 영역 — 속성 바인딩</td><td>ZUA_DESIGN</td><td class="num">2,780</td><td class="num">764.8</td></tr>
+            </tbody>
+        </table>
+        <div class="rare"><b>드문 한글 시험 →</b> 똠방각하 뷁 쀍 똣 쫬 햏 괞 쬧 뛝 쒼 ㉿ ① ㎡ ℓ №</div>
+        <div class="sizes">
+            <div class="s16">16px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s14">14px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s12">12px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s11">11px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+        </div>
+        <div class="small">1234567890 · O0 I1l · T-CODE: /UA0WS · 2026-10-08 15:31:42 · 99.9% · ₩1,234,567</div>
+    </div>
+</div>
+
+<div class="card">
+    <header>
+        <b>② Gothic A1</b>
+        <span class="tag">새 후보</span>
+        <span class="meta">한양정보통신 · 9굵기 · OFL(Google Fonts 수록) · 본고딕 바탕 아님</span>
+    </header>
+    <div class="body sample" style="font-family: "Gothic A1",sans-serif;">
+        <div class="toolbar">
+            <button class="btn primary">실행 (F8)</button>
+            <button class="btn">앱 생성</button>
+            <button class="btn">로컬 앱 생성</button>
+            <button class="btn danger">앱 삭제</button>
+            <button class="btn">패키지별 앱 계층 구조</button>
+        </div>
+        <div class="field"><label>앱 이름</label><input value="ZUA_WS_MAIN_SCREEN_0001" readonly></div>
+        <div class="field"><label>담당자</label><input value="이청윤 (CHUNGYOON0120)" readonly></div>
+        <div class="big">
+            <div class="ko">앱 생성 힘찬 홍길동 쌓였고</div>
+            <div class="en">Rgaq ijl 1Il0O — ZUA_WORKBENCH</div>
+            <div class="nu">0123456789</div>
+        </div>
+        <table>
+            <thead><tr><th>앱 ID</th><th>앱 이름</th><th>패키지</th><th class="num">호출 건수</th><th class="num">용량(KB)</th></tr></thead>
+            <tbody>
+                <tr><td>UA0001</td><td>로그인 화면</td><td>ZUA_WORKBENCH</td><td class="num">1,048,576</td><td class="num">1,117.2</td></tr>
+                <tr><td>UA0018</td><td>앱 검색 도움말</td><td>ZUA_COMMON</td><td class="num">90,112</td><td class="num">58.0</td></tr>
+                <tr><td>UA0237</td><td>디자인 영역 — 속성 바인딩</td><td>ZUA_DESIGN</td><td class="num">2,780</td><td class="num">764.8</td></tr>
+            </tbody>
+        </table>
+        <div class="rare"><b>드문 한글 시험 →</b> 똠방각하 뷁 쀍 똣 쫬 햏 괞 쬧 뛝 쒼 ㉿ ① ㎡ ℓ №</div>
+        <div class="sizes">
+            <div class="s16">16px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s14">14px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s12">12px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s11">11px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+        </div>
+        <div class="small">1234567890 · O0 I1l · T-CODE: /UA0WS · 2026-10-08 15:31:42 · 99.9% · ₩1,234,567</div>
+    </div>
+</div>
+
+<div class="card">
+    <header>
+        <b>③ Asta Sans (구 42dot Sans)</b>
+        <span class="tag">새 후보</span>
+        <span class="meta">42dot 제작 · 6굵기 · OFL(Google Fonts 수록) · 한글 바탕 글꼴 미확인</span>
+    </header>
+    <div class="body sample" style="font-family: "Asta Sans",sans-serif;">
+        <div class="toolbar">
+            <button class="btn primary">실행 (F8)</button>
+            <button class="btn">앱 생성</button>
+            <button class="btn">로컬 앱 생성</button>
+            <button class="btn danger">앱 삭제</button>
+            <button class="btn">패키지별 앱 계층 구조</button>
+        </div>
+        <div class="field"><label>앱 이름</label><input value="ZUA_WS_MAIN_SCREEN_0001" readonly></div>
+        <div class="field"><label>담당자</label><input value="이청윤 (CHUNGYOON0120)" readonly></div>
+        <div class="big">
+            <div class="ko">앱 생성 힘찬 홍길동 쌓였고</div>
+            <div class="en">Rgaq ijl 1Il0O — ZUA_WORKBENCH</div>
+            <div class="nu">0123456789</div>
+        </div>
+        <table>
+            <thead><tr><th>앱 ID</th><th>앱 이름</th><th>패키지</th><th class="num">호출 건수</th><th class="num">용량(KB)</th></tr></thead>
+            <tbody>
+                <tr><td>UA0001</td><td>로그인 화면</td><td>ZUA_WORKBENCH</td><td class="num">1,048,576</td><td class="num">1,117.2</td></tr>
+                <tr><td>UA0018</td><td>앱 검색 도움말</td><td>ZUA_COMMON</td><td class="num">90,112</td><td class="num">58.0</td></tr>
+                <tr><td>UA0237</td><td>디자인 영역 — 속성 바인딩</td><td>ZUA_DESIGN</td><td class="num">2,780</td><td class="num">764.8</td></tr>
+            </tbody>
+        </table>
+        <div class="rare"><b>드문 한글 시험 →</b> 똠방각하 뷁 쀍 똣 쫬 햏 괞 쬧 뛝 쒼 ㉿ ① ㎡ ℓ №</div>
+        <div class="sizes">
+            <div class="s16">16px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s14">14px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s12">12px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s11">11px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+        </div>
+        <div class="small">1234567890 · O0 I1l · T-CODE: /UA0WS · 2026-10-08 15:31:42 · 99.9% · ₩1,234,567</div>
+    </div>
+</div>
+
+<div class="card">
+    <header>
+        <b>④ Nanum Gothic</b>
+        <span class="tag">새 후보</span>
+        <span class="meta">네이버 · 3굵기 · OFL(Google Fonts 수록) · 본고딕 바탕 아님</span>
+    </header>
+    <div class="body sample" style="font-family: "Nanum Gothic",sans-serif;">
+        <div class="toolbar">
+            <button class="btn primary">실행 (F8)</button>
+            <button class="btn">앱 생성</button>
+            <button class="btn">로컬 앱 생성</button>
+            <button class="btn danger">앱 삭제</button>
+            <button class="btn">패키지별 앱 계층 구조</button>
+        </div>
+        <div class="field"><label>앱 이름</label><input value="ZUA_WS_MAIN_SCREEN_0001" readonly></div>
+        <div class="field"><label>담당자</label><input value="이청윤 (CHUNGYOON0120)" readonly></div>
+        <div class="big">
+            <div class="ko">앱 생성 힘찬 홍길동 쌓였고</div>
+            <div class="en">Rgaq ijl 1Il0O — ZUA_WORKBENCH</div>
+            <div class="nu">0123456789</div>
+        </div>
+        <table>
+            <thead><tr><th>앱 ID</th><th>앱 이름</th><th>패키지</th><th class="num">호출 건수</th><th class="num">용량(KB)</th></tr></thead>
+            <tbody>
+                <tr><td>UA0001</td><td>로그인 화면</td><td>ZUA_WORKBENCH</td><td class="num">1,048,576</td><td class="num">1,117.2</td></tr>
+                <tr><td>UA0018</td><td>앱 검색 도움말</td><td>ZUA_COMMON</td><td class="num">90,112</td><td class="num">58.0</td></tr>
+                <tr><td>UA0237</td><td>디자인 영역 — 속성 바인딩</td><td>ZUA_DESIGN</td><td class="num">2,780</td><td class="num">764.8</td></tr>
+            </tbody>
+        </table>
+        <div class="rare"><b>드문 한글 시험 →</b> 똠방각하 뷁 쀍 똣 쫬 햏 괞 쬧 뛝 쒼 ㉿ ① ㎡ ℓ №</div>
+        <div class="sizes">
+            <div class="s16">16px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s14">14px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s12">12px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s11">11px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+        </div>
+        <div class="small">1234567890 · O0 I1l · T-CODE: /UA0WS · 2026-10-08 15:31:42 · 99.9% · ₩1,234,567</div>
+    </div>
+</div>
+
+<div class="card">
+    <header>
+        <b>⑤ Paperlogy</b>
+        <span class="tag">새 후보</span>
+        <span class="meta">한글은 G마켓 산스 · 영문은 Montserrat 바탕 · OFL · 본고딕 바탕 아님</span>
+    </header>
+    <div class="body sample" style="font-family: "Paperlogy",sans-serif;">
+        <div class="toolbar">
+            <button class="btn primary">실행 (F8)</button>
+            <button class="btn">앱 생성</button>
+            <button class="btn">로컬 앱 생성</button>
+            <button class="btn danger">앱 삭제</button>
+            <button class="btn">패키지별 앱 계층 구조</button>
+        </div>
+        <div class="field"><label>앱 이름</label><input value="ZUA_WS_MAIN_SCREEN_0001" readonly></div>
+        <div class="field"><label>담당자</label><input value="이청윤 (CHUNGYOON0120)" readonly></div>
+        <div class="big">
+            <div class="ko">앱 생성 힘찬 홍길동 쌓였고</div>
+            <div class="en">Rgaq ijl 1Il0O — ZUA_WORKBENCH</div>
+            <div class="nu">0123456789</div>
+        </div>
+        <table>
+            <thead><tr><th>앱 ID</th><th>앱 이름</th><th>패키지</th><th class="num">호출 건수</th><th class="num">용량(KB)</th></tr></thead>
+            <tbody>
+                <tr><td>UA0001</td><td>로그인 화면</td><td>ZUA_WORKBENCH</td><td class="num">1,048,576</td><td class="num">1,117.2</td></tr>
+                <tr><td>UA0018</td><td>앱 검색 도움말</td><td>ZUA_COMMON</td><td class="num">90,112</td><td class="num">58.0</td></tr>
+                <tr><td>UA0237</td><td>디자인 영역 — 속성 바인딩</td><td>ZUA_DESIGN</td><td class="num">2,780</td><td class="num">764.8</td></tr>
+            </tbody>
+        </table>
+        <div class="rare"><b>드문 한글 시험 →</b> 똠방각하 뷁 쀍 똣 쫬 햏 괞 쬧 뛝 쒼 ㉿ ① ㎡ ℓ №</div>
+        <div class="sizes">
+            <div class="s16">16px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s14">14px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s12">12px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s11">11px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+        </div>
+        <div class="small">1234567890 · O0 I1l · T-CODE: /UA0WS · 2026-10-08 15:31:42 · 99.9% · ₩1,234,567</div>
+    </div>
+</div>
+
+<div class="card">
+    <header>
+        <b>⑥ Pretendard</b>
+        <span class="tag">지난번 1추천</span>
+        <span class="meta">본고딕 바탕 — 얼마나 다른지 견주어 보시라고 하나만 남겨 두었습니다</span>
+    </header>
+    <div class="body sample" style="font-family: "SamplePretendard",sans-serif;">
+        <div class="toolbar">
+            <button class="btn primary">실행 (F8)</button>
+            <button class="btn">앱 생성</button>
+            <button class="btn">로컬 앱 생성</button>
+            <button class="btn danger">앱 삭제</button>
+            <button class="btn">패키지별 앱 계층 구조</button>
+        </div>
+        <div class="field"><label>앱 이름</label><input value="ZUA_WS_MAIN_SCREEN_0001" readonly></div>
+        <div class="field"><label>담당자</label><input value="이청윤 (CHUNGYOON0120)" readonly></div>
+        <div class="big">
+            <div class="ko">앱 생성 힘찬 홍길동 쌓였고</div>
+            <div class="en">Rgaq ijl 1Il0O — ZUA_WORKBENCH</div>
+            <div class="nu">0123456789</div>
+        </div>
+        <table>
+            <thead><tr><th>앱 ID</th><th>앱 이름</th><th>패키지</th><th class="num">호출 건수</th><th class="num">용량(KB)</th></tr></thead>
+            <tbody>
+                <tr><td>UA0001</td><td>로그인 화면</td><td>ZUA_WORKBENCH</td><td class="num">1,048,576</td><td class="num">1,117.2</td></tr>
+                <tr><td>UA0018</td><td>앱 검색 도움말</td><td>ZUA_COMMON</td><td class="num">90,112</td><td class="num">58.0</td></tr>
+                <tr><td>UA0237</td><td>디자인 영역 — 속성 바인딩</td><td>ZUA_DESIGN</td><td class="num">2,780</td><td class="num">764.8</td></tr>
+            </tbody>
+        </table>
+        <div class="rare"><b>드문 한글 시험 →</b> 똠방각하 뷁 쀍 똣 쫬 햏 괞 쬧 뛝 쒼 ㉿ ① ㎡ ℓ №</div>
+        <div class="sizes">
+            <div class="s16">16px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s14">14px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s12">12px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+            <div class="s11">11px — 저장하시겠습니까? 변경한 내용이 서버에 반영됩니다.</div>
+        </div>
+        <div class="small">1234567890 · O0 I1l · T-CODE: /UA0WS · 2026-10-08 15:31:42 · 99.9% · ₩1,234,567</div>
+    </div>
+</div>
+
+<div class="note">
+    <b>이 파일에 대해</b>
+    <ul>
+        <li>글꼴을 <b>CDN 에서 받아</b> 그립니다 — <b>인터넷이 끊겨 있으면 ①번과 똑같이 보입니다.</b></li>
+        <li>실제 적용 때는 <b>글꼴 파일을 프로젝트에 넣습니다</b>(이 앱은 인터넷 없이도 떠야 합니다).</li>
+        <li><b>WS4.0 소스는 한 줄도 고치지 않았습니다.</b></li>
+    </ul>
+</div>
+
+<script>
+// 글꼴이 진짜 받아졌는지 화면에 표시한다. 안 받아졌으면 전부 똑같아 보인다.
+(function () {
+    var LIST = [
+        ["② Gothic A1", "Gothic A1"],
+        ["③ Asta Sans", "Asta Sans"],
+        ["④ Nanum Gothic", "Nanum Gothic"],
+        ["⑤ Paperlogy", "Paperlogy"],
+        ["⑥ Pretendard", "SamplePretendard"]
+    ];
+    function render() {
+        var ok = 0, html = "";
+        for (var i = 0; i < LIST.length; i++) {
+            var got = false;
+            try { got = document.fonts.check('16px "' + LIST[i][1] + '"'); } catch (e) { got = false; }
+            if (got) { ok++; }
+            html += '<li>' + LIST[i][0] + ' &mdash; <span class="' + (got ? "ok" : "ng") + '">'
+                 + (got ? "받았음" : "못 받음") + '</span></li>';
+        }
+        var head = (ok === LIST.length)
+            ? "<b>글꼴 " + ok + "개 전부 받았습니다. 아래 차이는 진짜 차이입니다.</b>"
+            : "<b>★" + (LIST.length - ok) + "개를 못 받았습니다 — 그 글꼴은 1번과 똑같이 보입니다. 인터넷 연결을 확인하거나, 이 파일을 브라우저에서 직접 여십시오.</b>";
+        document.getElementById("loadstate").innerHTML = head + "<ul>" + html + "</ul>";
+    }
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(render).catch(render);
+    } else {
+        render();
+    }
+})();
+</script>
+</body>
+</html>
