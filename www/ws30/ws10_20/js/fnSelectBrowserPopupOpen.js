@@ -131,6 +131,9 @@
             //   ★요청서 2판은 「입력 칸 4개」로 적었지만 실제로는 입력 칸이 아니라
             //     브라우저마다 「기본으로 고르기」 + 「앱모드 활성」 한 쌍이다.
             oItem.setAttribute("data-browser", oDef.NAME == null ? "" : String(oDef.NAME));
+            // 2026-10-13 — 밖에서 집는 이름은 data-act 하나로 모은다(사장님 결정).
+            //   data-browser 는 그대로 둔다(이 창 안에서 쓰고 있다).
+            if (oDef.NAME) { oItem.setAttribute("data-act", "BROWSER_" + String(oDef.NAME)); }
 
             // 헤더(라디오 + 브랜드 아이콘 + 이름) — 클릭 시 기본 브라우저로 선택.
             var oHead = _el("div", "u4aSelBrwsHead");

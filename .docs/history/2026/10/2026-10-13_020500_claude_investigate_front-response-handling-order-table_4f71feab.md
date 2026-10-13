@@ -262,3 +262,32 @@ B1 `callP13nDesignDataPopup` = getScript, `fnP13nDesignPopupOpen` = loadJs).
   그 경우는 오류 기록 + 단축키 잠금 해제 + busy 해제로 처리된다(callDesignContextMenu.js:226~238).
 
 → **미확인 0건.** 남은 지적 3건(A2 1자리 · A3 · B1) 전부 원본 동일, 전부 live 확인.
+
+### 1번(getOTRTextsAlias) 영향 상향 — 「값이 지워진다」가 아니라 「터진다」 (2026-10-13)
+장군님 질문(「1번 항목 설명해줘」)에 답하려고 `T_OTR` 의 **쓰는 쪽**을 처음 읽었다. 결과:
+
+- 오류 응답에는 `T_OTR` 이 없다 → `oAPP.DATA.APPDATA.T_OTR = oRet.T_OTR` 로 **`undefined` 가 들어간다.**
+- 그 값을 쓰는 `design/js/uiPreviewArea.js:1208` 은 `oAPP.DATA.APPDATA.T_OTR.length === 0` 을 **가드 없이** 읽는다
+  → `undefined.length` **TypeError**. 호출자는 미리보기 iframe(`design/preview/index.js:3508 · 5366`)이고
+  `uiPreviewArea.js` 는 live(`ws_html5_ws20_prev.js` 가 getScript).
+- **원본도 같다**(`U4A_WS3.0.0 .../uiPreviewArea.js:1206` 가드 없음) → 「변환 탓 0건」은 유지.
+- 내 파일 `ws_html5_ws20_dnd.js:1105` 는 `typeof` 가드로 덮지 않으므로 그 경로에선 안 터진다.
+
+**내가 왜 틀렸나(4번째)**: 조사 기준을 **「콜백 안에서 터지나」로만** 잡았다. 응답 값이 **전역 저장소에 들어간 뒤
+다른 함수가 가드 없이 쓰는 경우**를 기준에 넣지 않았다. 「다 봤다 기준」에 **「그 응답 값을 나중에 쓰는 곳」** 을
+추가해야 한다. 그래서 문서의 결론 문구도 「받는 자리에서 깨지는 곳 0건」으로 범위를 명시해 고쳤다.
+
+### 1번 영향 재정정(5번째) — 서버가 오류에도 `"T_OTR":[]` 를 준다 (2026-10-13)
+장군님이 「서버 디버깅으로 눈으로 보겠다, 순서 알려줘」 하셔서 **서버 FORM 을 끝까지 읽었다.**
+`/U4A/WS000004` `GETOTRTEXTSALIAS`(2919~3053):
+- 오류 경로 2개(2949 ALIAS 미입력 · 3016 SOTR 조회 0건) **둘 다** `{"RETCD":"E","RTMSG":"…","T_OTR":[]}` 로
+  **빈 배열을 같이 준다** → 프론트가 덮어도 `[]` 이고 `uiPreviewArea.js:1208` 의 `[].length === 0` 은 안전.
+  → **앞 턴에 쓴 「오류면 터진다」는 틀렸다. 철회.**
+- 남는 경로는 **응답 본문이 비는 것** 하나뿐: 2995행 `CHECK LT_TEXT IS NOT INITIAL.` 탈락(ALIAS 가 JSON 으로
+  안 풀릴 때) → `_RESPONSE_JSON` 을 안 부르고 FORM 종료 → 본문 없음 → 공통 함수가 `{}` 로 바꿈 →
+  `oRet.T_OTR` 가 `undefined` → 덮임 → 그 뒤 미리보기에서 TypeError.
+- **미확인 1건(새로 생김)**: 응답을 안 보냈을 때 HTTP status 가 200 인지. 200 이면 성공 콜백이 돌아 터지고,
+  아니면 `ws_common.js:4743` 이 공통 실패 처리로 보낸다. **이건 실행해 봐야 안다** → 장군님 디버깅 시험 항목.
+
+**내가 왜 틀렸나**: 응답 **모양을 서버 소스로 확인하지 않고** 「오류면 그 field 가 없겠지」로 단정했다.
+앞서 같은 조사에서 「서버 모양을 먼저 보고 프론트를 본다」를 원칙으로 세웠는데, 이 건에서 그걸 건너뛰었다.

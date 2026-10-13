@@ -5662,6 +5662,81 @@
      * 속성 행 1건의 "값 컨트롤" 생성 — 원본 행 템플릿(oRInp2/oRCmb1/oRChk1/oRBtn1)
      *   의 visible 플래그(inp_visb/sel_visb/chk_visb/btn_visb) 분기 그대로.
      ************************************************************************/
+    /************************************************************************
+     * 자동 테스트 도구가 집을 이름 (2026-10-13 — 사장님 결정: 밖에서 집는 이름은 data-act 하나로)
+     * ---------------------------------------------------------------------
+     * 왜 표가 필요한가: 속성 줄이 쓰는 고유 이름은 UIATK(DH001000 …) 뿐이라 번호만으로는
+     *   무엇을 넣는 칸인지 밖에서 알 수 없다. 앞 18개는 WS4.0 앱 정보 구조가 쓰는 칸 이름
+     *   그대로이고, 뒤 14개는 그 구조에 짝이 없어 자동 테스트 쪽과 맞춘 이름이다.
+     *   요청·근거 = u4a-ws4-mcp .docs/request/2026-10-13_ws20-data-attr.md
+     * ★한 번 정한 값은 바꾸지 않는다. 바꾸면 자동 테스트 쪽이 조용히 어긋난다.
+     * ★data-uiatk 는 WS4.0 이 안에서 쓰는 것이라 그대로 둔다 — data-act 를 하나 더 다는 것이다.
+     ************************************************************************/
+    var ATTR_ACT_BY_UIATK = {
+        DH001000: "APPID",         // Web Application ID
+        DH001010: "APPNM",         // Web Application Name
+        DH001020: "APPVR",         // Web Application Version
+        DH001021: "UITHM",         // UI Theme
+        DH001022: "CSSLINK",       // CSS Link Add
+        DH001023: "JSLINK",        // JS Link Add
+        DH001024: "INITNOWAIT",    // Init not Loding Waiting
+        DH001025: "REQNR",         // Request/Task
+        DH001026: "WEBSEC",        // Web Security Settings
+        DH001030: "LANGU",         // Language Key
+        DH001040: "CODPG",         // Code Page
+        DH001050: "PACKG",         // Dev. Package
+        DH001060: "CLSID",         // Assigned Class Object ID
+        DH001070: "PGMID",         // Program ID in Requests and Tasks
+        DH001090: "OBJTY",         // Object Type
+        DH001091: "DUMPWRITE",     // Enable Dump Write
+        DH001100: "AUTHG",         // Authorization Group
+        DH001101: "USEROUTER",     // Whether to use Router
+        DH001102: "USESKELETON",   // Whether to use Skeleton Screen
+        DH001103: "USEMOBILEZOOM", // Whether to use Mobile Zoom
+        DH001104: "SESSTYPE",      // Session stateful type
+        DH001105: "WAITTYPE",      // Wait Type
+        DH001106: "USEPRESCREEN",  // Use init pre-screen event
+        DH001107: "TOUCHSTYLE",    // Touch style
+        DH001108: "ICONURL",       // Shortcut Icon URL
+        DH001109: "BODYBGCOLOR",   // Body Background Color
+        DH001110: "ERUSR",         // Create User
+        DH001120: "ERDAT",         // Create Date
+        DH001130: "ERTIM",         // Create Time
+        DH001140: "AEUSR",         // Change User
+        DH001150: "AEDAT",         // Change Date
+        DH001160: "AETIM"          // Change Time
+    };
+
+    // 속성 줄 하나의 값 칸·지우기·찾기(F4) 단추에 이름을 붙인다.
+    //   값 칸 = <이름> / 지우기 = <이름>_CLEAR / 찾기 = <이름>_F4
+    //   표에 없는 UIATK(ROOT 가 아닌 UI 속성)는 붙이지 않는다 — 빈 값으로 두면 빈 값끼리 잡힌다.
+    var _bAttrActWarned = false;
+    function _tagAttrAct(oValCell, sAttr) {
+        try {
+            if (!oValCell || !sAttr) { return; }
+            var sAct = ATTR_ACT_BY_UIATK[sAttr.UIATK];
+            if (!sAct) {
+                if (!_bAttrActWarned && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    _bAttrActWarned = true;
+                    U4ALOG.warn("GUARD_EXIT", "UIATK not in ATTR_ACT_BY_UIATK",
+                                "data-act not set - this attribute row stays unreachable for the automation tool");
+                }
+                return;
+            }
+            var oInp = oValCell.querySelector("input, textarea, .u4a-combo");
+            if (oInp) { oInp.setAttribute("data-act", sAct); }
+            var oClr = oValCell.querySelector(".u4a-field__clear");
+            if (oClr) { oClr.setAttribute("data-act", sAct + "_CLEAR"); }
+            var oVh = oValCell.querySelector(".u4a-field__vh");
+            if (oVh) { oVh.setAttribute("data-act", sAct + "_F4"); }
+            var oBtn = oValCell.querySelector("button:not(.u4a-field__clear):not(.u4a-field__vh)");
+            if (oBtn) { oBtn.setAttribute("data-act", sAct); }
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            console.error("[WS20][attr] data-act tagging failed - automation tool cannot reach this row", e);
+        }
+    }
+
     function _buildValueControl(sAttr) {
 
         var BOX = document.createElement("div");
@@ -6695,6 +6770,7 @@
             VAL.className = "u4aWs20AttrRowVal";
             VAL.setAttribute("data-ctx-key", "AT02");   //구 oRInp2/oRSel1.data("CONTEXT_MENU","AT02")
             VAL.appendChild(_buildValueControl(sAttr));
+            _tagAttrAct(VAL, sAttr);   // 2026-10-13 자동 테스트 도구가 집을 이름(값 칸·지우기·찾기)
             //── [필드→속성 드래그 바인딩] 놓기 받기는 목록 전체(ROWS)에 위임 — 위 fnRenderWs20AttrRows 진입부 참조. ──
             ROW.appendChild(VAL);
 

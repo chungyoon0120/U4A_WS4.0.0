@@ -272,7 +272,8 @@
             const sRowName = (oRow && oRow.row && oRow.row.getAttribute) ? oRow.row.getAttribute("data-row") : null;
             if (sRowName) {
                 oInput.setAttribute("data-field", sRowName);
-                if (oClearBtn) { oClearBtn.setAttribute("data-clear", sRowName); }
+                oInput.setAttribute("data-act", sRowName);   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
+                if (oClearBtn) { oClearBtn.setAttribute("data-clear", sRowName); oClearBtn.setAttribute("data-act", sRowName + "_CLEAR"); }
                 if (oVhBtn) { oVhBtn.setAttribute("data-act", sRowName + "_F4"); }
             } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
                 U4ALOG.warn("값이 없어 그만둠", "data-row on form row",

@@ -364,6 +364,32 @@
     };
 
     /************************************************************************
+     * busy 가 화면에 그려질 틈을 한 번 준다 (장군님 지시 2026-10-13)
+     * ----------------------------------------------------------------------
+     * 왜 필요한가: setBusy("X") → 무거운 동기 로직 → setBusy("") 가 한 호흡 안에서
+     *   끝나면 브라우저는 중간에 한 번도 paint 하지 않는다. 그래서 busy 가 아예 안 보인다.
+     *   「짧아서 안 보임」이 아니라 「그려질 기회가 없음」.
+     * 쓰는 법:
+     *     parent.setBusy("X");
+     *     await oAPP.common.fnYieldToPaint();
+     *     // ↓ 여기서부터 무거운 동기 로직 (busy 가 이미 화면에 떠 있다)
+     * requestAnimationFrame 뒤에 setTimeout(0) 을 두는 까닭: rAF 콜백은 paint 직전에
+     *   불리므로, 그 안의 setTimeout 은 그 frame 이 실제로 그려진 뒤에 실행된다.
+     *   setTimeout(0) 만 쓰면 timer task 가 paint 보다 먼저 실행될 수 있다.
+     ************************************************************************/
+    oAPP.common.fnYieldToPaint = function () {
+        return new Promise(function (resolve) {
+            try {
+                if (typeof requestAnimationFrame === "function") {
+                    requestAnimationFrame(function () { setTimeout(resolve, 0); });
+                    return;
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            setTimeout(resolve, 0);
+        });
+    };
+
+    /************************************************************************
      * 개인화 설정 (구 fnOnInitP13nSettings) — 추후 변환 스텁(WS20 영역)
      ************************************************************************/
     oAPP.fn.fnOnInitP13nSettings = function () {

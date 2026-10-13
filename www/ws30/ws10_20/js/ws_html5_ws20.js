@@ -61,34 +61,40 @@
     /************************************************************************
      * WS20 윈도우 메뉴 데이터 (구 fnGetWindowMenuListWS20 / fnGetWindowMenuWS20 미러)
      *   sap-icon → FontAwesome 매핑. ws10_html.js 의 공유 buildMenubar 가 소비.
+     *   2026-10-13 — CSS 스타일 클래스·유틸리티·특수 에디터 메뉴 16줄에 act 를 더했다.
+     *     왜: key(WMENU20_03 …) 는 자리순이라 같은 번호가 화면마다 다른 메뉴가 된다.
+     *         화면 글자는 언어를 바꾸면 깨진다. act 는 하는 일이라 둘 다 안 깨진다.
+     *     요청 = u4a-ws4-mcp .docs/request/2026-10-13_ws20-data-attr.md (6절)
+     *     ★key·핸들러 이름·순서·모양·동작은 그대로 — act 속성만 더했다.
+     *       한 번 정한 값은 바꾸지 않는다(바꾸면 자동 테스트 쪽이 조용히 어긋난다).
      ************************************************************************/
     function _getWindowMenuWS20() {
         return [
             { key: "WMENU10", text: _msg("B37"), items: [
-                { key: "WMENU10_01", icon: "palette", text: _msg("B56"), disabled: true },
-                { key: "WMENU10_02", icon: "bold", text: _msg("B57") },
-                { key: "WMENU10_03", icon: "pen-ruler", text: _msg("B58") }
+                { key: "WMENU10_01", act: "THEMEDESIGNER", icon: "palette", text: _msg("B56"), disabled: true },
+                { key: "WMENU10_02", act: "FONTWIZARD", icon: "bold", text: _msg("B57") },
+                { key: "WMENU10_03", act: "UI5CSS", icon: "pen-ruler", text: _msg("B58") }
             ] },
             { key: "WMENU20", text: _msg("B35"), items: [
-                { key: "WMENU20_01", icon: "globe", text: _msg("B49") },
-                { key: "WMENU20_02", icon: "language", text: _msg("B59") },
-                { key: "WMENU20_03", icon: "video", text: _wsMsg("808") },
-                { key: "WMENU20_05", icon: "code", text: _wsMsg("059") },
-                { key: "WMENU20_04", icon: "icons", text: _wsMsg("068"), items: [
-                    { key: "WMENU20_04_01", icon: "icons", text: _wsMsg("047") },
-                    { key: "WMENU20_04_02", icon: "image", text: _wsMsg("067") }
+                { key: "WMENU20_01", act: "SELECTBROWSER", icon: "globe", text: _msg("B49") },
+                { key: "WMENU20_02", act: "OTRMANAGER", icon: "language", text: _msg("B59") },
+                { key: "WMENU20_03", act: "SCREENREC", icon: "video", text: _wsMsg("808") },
+                { key: "WMENU20_05", act: "SRCPATTERN", icon: "code", text: _wsMsg("059") },
+                { key: "WMENU20_04", act: "ICONVIEWER", icon: "icons", text: _wsMsg("068"), items: [
+                    { key: "WMENU20_04_01", act: "ICONLIST", icon: "icons", text: _wsMsg("047") },
+                    { key: "WMENU20_04_02", act: "IMAGEICONS", icon: "image", text: _wsMsg("067") }
                 ] },
-                { key: "WMENU20_06", icon: "code-branch", text: _wsMsg("403") }
+                { key: "WMENU20_06", act: "VERSIONMNG", icon: "code-branch", text: _wsMsg("403") }
             ] },
             { key: "WMENU30", text: _msg("B38"), items: [
-                { key: "WMENU30_01", icon: "css3-alt", brand: true, text: _msg("B60") },
-                { key: "WMENU30_02", icon: "js", brand: true, text: _msg("B61") },
-                { key: "WMENU30_03", icon: "html5", brand: true, text: _msg("B62") },
-                { key: "WMENU30_04", icon: "file-lines", text: _msg("B63") },
+                { key: "WMENU30_01", act: "CSSEDITOR", icon: "css3-alt", brand: true, text: _msg("B60") },
+                { key: "WMENU30_02", act: "JSEDITOR", icon: "js", brand: true, text: _msg("B61") },
+                { key: "WMENU30_03", act: "HTMLEDITOR", icon: "html5", brand: true, text: _msg("B62") },
+                { key: "WMENU30_04", act: "ERRPAGEEDITOR", icon: "file-lines", text: _msg("B63") },
                 // 스켈레톤 화면 설정 — 조회(Display) 모드면 비활성(원본 enabled formatter).
                 //   getter 로 두어 메뉴를 열 때마다(buildMenubar→_buildMenuEl 가 it.disabled 라이브 읽음)
                 //   현재 모드를 재평가 → 모드 전환 시 메뉴 재빌드 없이 양방향 자동 반영.
-                { key: "WMENU30_05", icon: "sliders", text: _msg("B64"), get disabled() { return !_isEditMode(); } }
+                { key: "WMENU30_05", act: "SKELETON", icon: "sliders", text: _msg("B64"), get disabled() { return !_isEditMode(); } }
             ] },
             { key: "WMENU40", text: _msg("B36"), items: [
                 { key: "WMENU40_01", act: "NEWWINDOW", icon: "plus", text: _msg("A09") },
@@ -247,6 +253,8 @@
             var oIco = APP_EXEC_BROWSER_ICON[sName] || {};
             return {
                 key: sName,
+                // act = BROWSER_ + key (2026-10-13 자동 테스트 도구가 집을 이름 — WS10 과 같은 값)
+                act: sName ? ("BROWSER_" + sName) : "",
                 text: oBr.DESC || sName,    // "Google Chrome Browser" 등
                 icon: oIco.icon,
                 brand: oIco.brand,
@@ -266,6 +274,7 @@
         }
         return oAPP.ws10html.buildSplitButton({
             id: oCfg.id, icon: oCfg.fa, brand: oCfg.brand, text: oCfg.text, tooltip: oCfg.tooltip,
+            act: oCfg.act,                                              // 2026-10-13 자동 테스트 도구가 집을 이름
             onMain: function () {                                       // 본체 = 기본 실행(ev_pressAppExecBtn)
                 var fn = oAPP.events && oAPP.events[oCfg.ev];
                 if (typeof fn !== "function") { console.warn("[WS20] transaction action not implemented:", oCfg.ev); return; }
@@ -298,8 +307,8 @@
             id: "iconViewerBtn", menuBtn: true, fa: "icons",
             text: _wsMsg("068"), tooltip: _wsMsg("068"),                       // Icon Viewer
             items: [
-                { key: "WMENU20_04_01", icon: "icons", text: _wsMsg("047"), tooltip: _wsMsg("047") + " (Ctrl+Shift+F10)" },  // Icon List
-                { key: "WMENU20_04_02", icon: "image", text: _wsMsg("067"), tooltip: _wsMsg("067") }                          // Image Icons
+                { key: "WMENU20_04_01", act: "ICONLIST", icon: "icons", text: _wsMsg("047"), tooltip: _wsMsg("047") + " (Ctrl+Shift+F10)" },  // Icon List
+                { key: "WMENU20_04_02", act: "IMAGEICONS", icon: "image", text: _wsMsg("067"), tooltip: _wsMsg("067") }                          // Image Icons
             ],
             onPick: function (it) {
                 var fn = oAPP.fn["fnWS20" + it.key];
@@ -389,7 +398,7 @@
             { id: "controllerBtn", fa: "screwdriver-wrench", text: _msg("A11"), tooltip: _msg("C38") + " (Ctrl+F12)", ev: "ev_pressControllerBtn" },
             // Application Execution 메뉴 버튼 (원본 ws20_appExecMenuBtn: split MenuButton, text A06)
             //   split:true → 본체=기본 실행(ev_pressAppExecBtn) + 화살표=브라우저 선택 메뉴(/DEFBR)
-            { id: "ws20_appExecMenuBtn", split: true, fa: "globe", text: _msg("A06"), tooltip: _msg("A06") + " (F8)", ev: "ev_pressAppExecBtn" },
+            { id: "ws20_appExecMenuBtn", split: true, act: "RUN", fa: "globe", text: _msg("A06"), tooltip: _msg("A06") + " (F8)", ev: "ev_pressAppExecBtn" },
             // App Multi Preview (원본 ws20_multiPrevBtn: icon desktop-mobile, text A08)
             { id: "ws20_multiPrevBtn", fa: "mobile-screen-button", text: _msg("A08"), tooltip: _msg("A08") + " (Ctrl+F5)", ev: "ev_pressMultiPrevBtn" },
             // Icon Viewer / Icon List — checkWLOList 조건으로 드롭다운(Icon Viewer) ↔ 평평버튼(Icon List)
@@ -414,6 +423,7 @@
         try {
             if (window.U4AUI && window.U4AUI.attachOverflow) {
                 _ws20TbOvf = window.U4AUI.attachOverflow(BAR, {
+                    act: "MORE_TOOLBAR",   // 2026-10-13 자동 테스트 도구가 집을 이름(트리 툴바 ⋯ 와 구분)
                     // split 버튼(App 실행)이 오버플로로 접힐 때: 본체(기본 동작)를 실행하도록 위임.
                     menuItem: function (el) {
                         var oI = el.querySelector("i");
@@ -1239,6 +1249,8 @@
         var TOG = document.createElement("button");
         TOG.type = "button";
         TOG.className = "u4aWs20SideBtn u4aWs20SideToggle";
+        // 2026-10-13 자동 테스트 도구가 집을 이름 — 글자가 없는 단추라 글자로는 집지 못한다.
+        TOG.setAttribute("data-act", "SIDETOGGLE");
         TOG.innerHTML = '<i class="fa-solid fa-bars"></i>';
         TOG.addEventListener("click", function () { SIDE.classList.toggle("is-expanded"); });
         SIDE.appendChild(TOG);
@@ -1246,20 +1258,24 @@
         // 상단 메뉴 (Split Position Change)
         var TOP = document.createElement("div");
         TOP.className = "u4aWs20SideTop";
-        TOP.appendChild(_ws20SideItem("table-columns", _msg("B31"), function () {
+        var SPLITPOS = _ws20SideItem("table-columns", _msg("B31"), function () {
             // 구 fnWs20SideMENUITEM_10 → callDesignLayoutChangePopupOpener.
             //   HTML5 레이아웃 변경 팝업(3분할 순서 재정렬) 직접 호출.
             try { oAPP.fn.fnWs20OpenLayoutPopup(); }
             catch (e) { console.error("[WS20] Split Position Change (layout change popup) error:", e); }
-        }));
+        });
+        SPLITPOS.setAttribute("data-act", "SPLITPOS");   // 2026-10-13 자동 테스트 도구가 집을 이름
+        TOP.appendChild(SPLITPOS);
         SIDE.appendChild(TOP);
 
         // 하단 고정 (System Information — 접속 서버 정보)
         var FIX = document.createElement("div");
         FIX.className = "u4aWs20SideFix";
-        FIX.appendChild(_ws20SideItem("server", _msg("B32"), function (ev) {
+        var SYSINFO = _ws20SideItem("server", _msg("B32"), function (ev) {
             _ws20ShowServerInfo(ev.currentTarget);
-        }));
+        });
+        SYSINFO.setAttribute("data-act", "SYSINFO");   // 2026-10-13 자동 테스트 도구가 집을 이름
+        FIX.appendChild(SYSINFO);
         SIDE.appendChild(FIX);
 
         return SIDE;
@@ -1418,6 +1434,7 @@
         try {
             if (window.U4AUI && U4AUI.attachOverflow) {
                 var oOvfCtl = U4AUI.attachOverflow(HDR, {
+                    act: "MORE_PREVIEW",   // 2026-10-13 자동 테스트 도구가 집을 이름(툴바·트리 ⋯ 와 구분)
                     noOvfAutoMargin: true,
                     isSkip: function (el) { return el.classList.contains("u4aWs20PanelHdrSpacer"); },
                     isSep: function () { return false; },

@@ -1,4 +1,4 @@
-# TODO — 할 일 전부 (1~44번)
+# TODO — 할 일 전부 (0~47번)
 
 > 갱신 **2026-10-13** · 번호는 **문서 전체에 이어서** 매긴다 → 「12번 해」 처럼 번호만 말하면 된다.
 > 끝난 항목은 지우고 번호를 다시 매긴다. **설명은 여기 한 줄 · 자세한 것은 「열기」 링크 안에.**
@@ -7,8 +7,8 @@
 
 ## 🔴 지금 하실 것 — 딱 하나
 
-**[테스트 하나씩](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창팝업/07_테스트_하나씩.md)** 의 **맨 위 한 줄만** 하시고 「1번 O」 라고만 주십시오.
-끝나면 제가 다음 한 줄을 그 문서 맨 위로 올립니다. **아래 표는 지금 안 보셔도 됩니다.**
+**[UI 개인화 busy](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창팝업/08_UI개인화_느림_검수.md)** 의 **맨 위 표 2줄만** 보시고 「1번 O」 처럼 주십시오.
+(앞서 드린 [별창 최소화 테스트](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창팝업/07_테스트_하나씩.md) 1줄은 그대로 남아 있습니다.) **아래 표는 지금 안 보셔도 됩니다.**
 
 ## 🔵 제가 지금 하는 것
 
@@ -22,7 +22,8 @@
 
 | 번호 | 무엇 | 누가 | 상태 | 열기 |
 |---:|---|:---:|---|---|
-| 0 | 워크스페이스 정보 창 덧아이콘 오류 3곳 | 장군님 | **테스트 ☐ 3** (OV1~OV3) | [오버레이아이콘](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/오버레이아이콘/00_현황판.md) |
+| 0 | 워크스페이스 정보 창 덧아이콘 오류 3곳 | 장군님 | **테스트 ☐ 3** (OV1~OV3) |
+| 0-1 | 자동 테스트 식별값을 `data-act` 하나로 통일 (WS10·WS20·속성 창·로그인) | 장군님 | **테스트 ☐ 5** (WD1~WD5) | [WS20식별값](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/WS20식별값/00_현황판.md) | [오버레이아이콘](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/오버레이아이콘/00_현황판.md) |
 | 1 | 별창 팝업 — 「추가 디테일한 기능」이 화면인가 동작인가 | 장군님 | **정해 주세요** | [별창팝업](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창팝업/00_현황판.md) |
 | 2 | 별창 팝업 — busy 방송 결함 2건을 지금 고칠까 | 장군님 | **정해 주세요** · 제 생각 = 지금 고친다 | [별창팝업](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창팝업/00_현황판.md) |
 | 3 | 개발서버에 빠진 UI 1건을 채울까 | 장군님 | **정해 주세요** · 제 생각 = 채운다 | [라이브러리데이터누락](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/라이브러리데이터누락/00_현황판.md) |
@@ -66,6 +67,9 @@
 | 41 | 서버에서 터질 때 뜨는 안내 문구가 원인과 어긋난다 | — | **보고만** (고칠 자리가 SAP ABAP) | [근거](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/2026/10/2026-10-13_112000_claude_investigate_init-prc-backend-full-evidence_4f71feab.md) |
 | 42 | 창 닫을 때 서버가 최대 약 120초 머물고, 그 결과를 아무도 안 받는다 | — | **보고만** (고칠 자리가 SAP ABAP) | [근거](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/2026/10/2026-10-13_112000_claude_investigate_init-prc-backend-full-evidence_4f71feab.md) |
 | 43 | 창 닫기가 고객 시스템 `Z` class 3개에 매달려 있다 | — | **보고만** (UHA 는 3개 다 있다) | [근거](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/2026/10/2026-10-13_112000_claude_investigate_init-prc-backend-full-evidence_4f71feab.md) |
+| 45 | UI 개인화 팝업 — busy 가 보이게(공통 양보 함수 적용 2곳) | 장군님 | **테스트 ☐ 2** | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창팝업/08_UI개인화_느림_검수.md) |
+| 46 | UI 개인화 팝업 — 나머지 4곳(연필·갱신·뒤로가기·저장)에도 같은 busy 를 걸까 | 장군님 | **정해 주세요** · 제 생각 = 걸어 둔다 | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창팝업/08_UI개인화_느림_검수.md) |
+| 47 | UI 개인화 팝업 — 줄 고를 때 목록 전체를 다시 그리는 결함 3개를 고칠까 | 장군님 | **정해 주세요** · 제 생각 = 고친다(선택 표시만 바꾸게) | [열기](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/별창팝업/08_UI개인화_느림_검수.md) |
 | 44 | 프론트가 서버 응답에 제대로 대응하는지 조사 | 저 | **전수 끝 + 적절성 재판정 끝** — 깨진 자리 **0건** · 변환 탓 부적절 **0건** · 원본동일 3 · 죽은코드 9 · 보고만 7 · **미확인 0** | [서버호출경로조사](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.works/서버호출경로조사/00_현황판.md) |
 
 ---

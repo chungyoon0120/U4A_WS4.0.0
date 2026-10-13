@@ -185,7 +185,7 @@
         return [
             {
                 key: "WMENU10", text: _txt("B34"), items: [
-                    { key: "WMENU10_01", icon: "arrows-rotate", text: _txt("B40"), disabled: !_bDevMenu },
+                    { key: "WMENU10_01", act: "PKGCHANGE", icon: "arrows-rotate", text: _txt("B40"), disabled: !_bDevMenu },
                     {
                         key: "WMENU10_02", icon: "right-left", text: _txt("B41"), items: [
                             { key: "WMENU10_02_01", act: "APPIMPORT", icon: "file-import", text: _txt("B42"), disabled: !_bDevMenu },
@@ -194,7 +194,7 @@
                     },
                     {
                         key: "WMENU10_04", icon: "share-from-square", text: _txt("B45"), items: [
-                            { key: "WMENU10_04_01", icon: "bolt", text: _txt("B46") }
+                            { key: "WMENU10_04_01", act: "SHORTCUT", icon: "bolt", text: _txt("B46") }
                         ]
                     },
                     { key: "WMENU10_05", act: "WSINFO", icon: "circle-info", text: _txt("B48") }
@@ -202,13 +202,13 @@
             },
             {
                 key: "WMENU20", text: _txt("B35"), items: [
-                    { key: "WMENU20_01", icon: "globe", text: _txt("B49") },
-                    { key: "WMENU20_03", icon: "video", text: _wsTxt("808") },
-                    { key: "WMENU20_05", icon: "code", text: _txt("M059") },
+                    { key: "WMENU20_01", act: "SELECTBROWSER", icon: "globe", text: _txt("B49") },
+                    { key: "WMENU20_03", act: "SCREENREC", icon: "video", text: _wsTxt("808") },
+                    { key: "WMENU20_05", act: "SRCPATTERN", icon: "code", text: _txt("M059") },
                     {
-                        key: "WMENU20_04", icon: "icons", text: _txt("M068"), items: [
-                            { key: "WMENU20_04_01", icon: "icons", text: _txt("M047") },
-                            { key: "WMENU20_04_02", icon: "image", text: _txt("M067") }
+                        key: "WMENU20_04", act: "ICONVIEWER", icon: "icons", text: _txt("M068"), items: [
+                            { key: "WMENU20_04_01", act: "ICONLIST", icon: "icons", text: _txt("M047") },
+                            { key: "WMENU20_04_02", act: "IMAGEICONS", icon: "image", text: _txt("M067") }
                         ]
                     }
                 ]
@@ -269,9 +269,11 @@
         ];
     }
 
+    // 2026-10-13 — 자동 테스트 도구가 집을 이름(act)을 같이 둔다. 값은 코드가 쓰는 key 에
+    //   BROWSER_ 를 붙인 것이라, 브라우저가 늘어나도 그쪽이 고칠 것이 없다.
     var APP_EXEC_BROWSERS = [
-        { key: "CHROME", text: "Chrome", icon: "chrome", brand: true },
-        { key: "MSEDGE", text: "Edge", icon: "edge", brand: true }
+        { key: "CHROME", act: "BROWSER_CHROME", text: "Chrome", icon: "chrome", brand: true },
+        { key: "MSEDGE", act: "BROWSER_MSEDGE", text: "Edge", icon: "edge", brand: true }
     ];
 
     // [WS20 와 동작 통일] App 실행 분할버튼 — 정적 Chrome/Edge 대신 실제 설치 브라우저(/DEFBR)를
@@ -286,7 +288,8 @@
             var ic = APPEXEC_BR_ICON[o.NAME] || {};
             var en = !(!o.NAME || o.ENABLED === false);
             if (o.NAME === "DEV_BROWSER" && bPackaged) { en = false; }
-            return { key: o.NAME, text: o.DESC || o.NAME, icon: ic.icon, brand: ic.brand, disabled: !en };
+            // act = BROWSER_ + key (2026-10-13 자동 테스트 도구가 집을 이름). /DEFBR 로 늘어나도 그대로 돈다.
+            return { key: o.NAME, act: o.NAME ? ("BROWSER_" + o.NAME) : "", text: o.DESC || o.NAME, icon: ic.icon, brand: ic.brand, disabled: !en };
         });
     }
     // 선택 브라우저로 실행 (WS10 = AppNmInput 의 앱).
@@ -1098,7 +1101,7 @@
         //   다른 지우기 단추와 구분이 안 됐다. 칸의 id(sapTcode) 를 그대로 붙인다.
         try {
             var oTcodeClr = oTcodeFld.el.querySelector(".u4a-field__clear");
-            if (oTcodeClr) { oTcodeClr.setAttribute("data-clear", "sapTcode"); }
+            if (oTcodeClr) { oTcodeClr.setAttribute("data-clear", "sapTcode"); oTcodeClr.setAttribute("data-act", "sapTcode_CLEAR"); }   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         o.appendChild(oTcodeFld.el);
 

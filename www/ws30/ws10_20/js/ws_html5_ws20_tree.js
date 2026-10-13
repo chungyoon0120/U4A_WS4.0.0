@@ -350,14 +350,27 @@
             {
                 icon: "sap-icon://user-settings", fa: "user-gear",
                 tooltip: _msg("E28"),
-                press: function () {
+                // ★busy 를 켠 뒤 fnYieldToPaint 로 한 프레임 양보한 다음 무거운 동기 로직을 돈다
+                //   (장군님 지시 2026-10-13). 이 버튼의 무거운 구간은 둘 다 동기다:
+                //     ① fnP13nDesignPopupOpen.js(1715줄)를 동기 ajax 로 받아 eval (첫 클릭만)
+                //     ② 팝업 DOM 통째 생성 + 머리 파일 읽기/그리기
+                //   양보 전에는 busy 가 paint 될 기회가 없어 화면이 그냥 멈춰 보였다.
+                press: async function () {
                     var run = function () {
                         try { oAPP.fn.fnP13nDesignPopupOpen("R"); }
                         catch (e) { console.error("[WS20] UI Personalization List:", e && e.message ? e.message : e); }
                     };
                     try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    try { await oAPP.common.fnYieldToPaint(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     if (typeof oAPP.fn.fnP13nDesignPopupOpen === "function") { run(); }
-                    else { try { oAPP.loadJs("fnP13nDesignPopupOpen", run); } catch (e) { console.error("[WS20] p13n load:", e && e.message ? e.message : e); } }
+                    else {
+                        try { oAPP.loadJs("fnP13nDesignPopupOpen", run); }
+                        catch (e) {
+                            console.error("[WS20] p13n load:", e && e.message ? e.message : e);
+                            // 받아오지 못하면 팝업이 안 열리므로 busy 를 반드시 풀어 준다(안 풀면 영영 잠김).
+                            try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+                        }
+                    }
                 }
             },
             { sep: true },
@@ -472,6 +485,7 @@
         try {
             if (window.U4AUI && window.U4AUI.attachOverflow) {
                 _treeTbOvf = window.U4AUI.attachOverflow(BAR, {
+                    act: "MORE_TREE",   // 2026-10-13 자동 테스트 도구가 집을 이름(WS20 툴바 ⋯ 와 구분)
                     btnClass: "u4a-btn-icon",
                     btnHtml: '<span class="u4aWs20TreeTbIcon"><i class="fa-solid fa-ellipsis"></i></span>',
                     isSep: function (el) { return el.classList.contains("u4aWs20TreeTbSep"); },
@@ -571,6 +585,8 @@
 
             var oCell = document.createElement("div");
             oCell.className = "u4aWs20TreeNameCell";
+            // 2026-10-13 자동 테스트 도구가 집을 이름 — 이 칸을 눌러 줄을 고른다.
+            oCell.setAttribute("data-act", "TREENAME");
             oCell.appendChild(oTog);
             if (oChk) { oCell.appendChild(oChk); }
             if (oIco) { oCell.appendChild(oIco); }
@@ -661,6 +677,9 @@
                     var ADD = document.createElement("button");
                     ADD.type = "button"; ADD.className = "u4aWs20TreeActBtn add";
                     ADD.title = _msg("A54", "Insert Element");
+                    // 2026-10-13 자동 테스트 도구가 집을 이름 — 줄마다 같은 값이고, 어느 줄인지는
+                    //   행의 data-objid 로 가린다(요청 = u4a-ws4-mcp 2026-10-13_ws20-data-attr.md 2절).
+                    ADD.setAttribute("data-act", "INSOBJ");
                     ADD.innerHTML = '<i class="fa-solid fa-plus"></i>';
                     ADD.addEventListener("click", function (e) { e.stopPropagation(); _safeCall("designUIAdd", [n]); });
                     ACT.appendChild(ADD);
@@ -672,6 +691,7 @@
                     var DEL = document.createElement("button");
                     DEL.type = "button"; DEL.className = "u4aWs20TreeActBtn del";
                     DEL.title = _msg("A03", "Delete");
+                    DEL.setAttribute("data-act", "DELOBJ");   // 2026-10-13 자동 테스트 도구가 집을 이름
                     DEL.innerHTML = '<i class="fa-solid fa-trash"></i>';
                     DEL.addEventListener("click", function (e) { e.stopPropagation(); _safeCall("designUIDelete", [n]); });
                     ACT.appendChild(DEL);

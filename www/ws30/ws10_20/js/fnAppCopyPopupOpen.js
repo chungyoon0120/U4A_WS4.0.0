@@ -152,6 +152,7 @@
         //   엉뚱한 칸에 값이 들어가고, 그대로 복사되면 되돌릴 수 없다.
         //   값은 이 창이 이미 쓰는 칸 이름 그대로(SOURCEID / TARGETID / PACKG).
         oSrcInp.setAttribute("data-field", "SOURCEID");
+        oSrcInp.setAttribute("data-act", "SOURCEID");   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
         oSrcInp.readOnly = true;
         oSrcInp.tabIndex = -1;
         oR.control.appendChild(oSrcInp);
@@ -164,11 +165,13 @@
         oTgtWrap.setAttribute("data-trail", "1");
         const oTgtInp = _el("input", "u4a-input u4a-field__input");
         oTgtInp.setAttribute("data-field", "TARGETID");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
+        oTgtInp.setAttribute("data-act", "TARGETID");   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
         oTgtInp.maxLength = oAPP.attr.iAppNameMaxLength || 15;
         oTgtWrap.appendChild(oTgtInp);
         const oTgtClear = _buildClearBtn();
         // 지우기 단추는 두 칸 모두 Clear 로 똑같아 어느 칸 것인지 구분이 안 됐다 → 칸 이름을 같이 싣는다.
         oTgtClear.setAttribute("data-clear", "TARGETID");
+        oTgtClear.setAttribute("data-act", "TARGETID_CLEAR");
         oTgtWrap.appendChild(oTgtClear);
         oR.control.appendChild(oTgtWrap);
         const oTgtMsg = oR.msg;
@@ -180,9 +183,11 @@
         oPackWrap.setAttribute("data-trail", "2"); // clear + value-help 둘 다
         const oPackInp = _el("input", "u4a-input u4a-field__input");
         oPackInp.setAttribute("data-field", "PACKG");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
+        oPackInp.setAttribute("data-act", "PACKG");   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
         oPackWrap.appendChild(oPackInp);
         const oPackClear = _buildClearBtn();
         oPackClear.setAttribute("data-clear", "PACKG");
+        oPackClear.setAttribute("data-act", "PACKG_CLEAR");
         oPackWrap.appendChild(oPackClear);
         const oVh = _el("button", "u4a-field__vh");
         oVh.setAttribute("data-act", "PKG_F4");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값

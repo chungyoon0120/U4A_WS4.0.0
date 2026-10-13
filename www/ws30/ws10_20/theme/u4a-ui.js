@@ -539,6 +539,9 @@
         oOvf.type = "button";
         oOvf.title = opt.title || "More";
         oOvf.innerHTML = opt.btnHtml || _fa("ellipsis");
+        // 2026-10-13 — 자동 테스트 도구가 집을 이름(.analy/21 §2.3 "이름을 받는 옵션").
+        //   ⋯ 는 툴바마다 하나씩 생기므로 이름을 받은 것에만 붙인다. 안 주면 전과 똑같다.
+        if (opt.act) { oOvf.setAttribute("data-act", opt.act); }
         if (!opt.noOvfAutoMargin) { oOvf.style.marginLeft = "auto"; }
         oOvf.hidden = true;
         oBar.appendChild(oOvf);

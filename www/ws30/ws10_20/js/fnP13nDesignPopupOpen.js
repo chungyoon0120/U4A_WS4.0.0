@@ -1180,6 +1180,11 @@
             return;
         }
 
+        // 편집·삭제 tooltip 은 줄마다 다시 읽지 않는다 — 메시지 조회는 Electron 건너 SQLite 라
+        //   줄수×2 만큼 동기 호출이 난다. 원본(UI5)은 화면 만들 때 한 번만 읽었다.
+        var sEditTip = _cl("B38");   // B38 Edit
+        var sDelTip = _cl("A03");    // A03 Delete
+
         aHead.forEach(function (h) {
             var oTr = _el("tr", "u4aP13nRow");
             // 처리 불가(라이브러리 버전 불일치) — 원본 u4aP13nNegativeLine(취소선+옅게) 1:1.
@@ -1207,7 +1212,7 @@
                 var oEdit = _el("button", "u4aWs20TreeActBtn add u4aP13nRowAct");
                 oEdit.type = "button";
                 oEdit.innerHTML = _fa("pen");
-                oEdit.title = _cl("B38");   // B38 Edit
+                oEdit.title = sEditTip;
                 oEdit.addEventListener("click", function (ev) { ev.stopPropagation(); lf_setHeaderLineEdit(h); });
                 oTdAct.appendChild(oEdit);
             }
@@ -1215,17 +1220,43 @@
                 var oDel = _el("button", "u4aWs20TreeActBtn del u4aP13nRowAct");
                 oDel.type = "button";
                 oDel.innerHTML = _fa("trash");
-                oDel.title = _cl("A03");   // A03 Delete
+                oDel.title = sDelTip;
                 oDel.addEventListener("click", function (ev) { ev.stopPropagation(); lf_setHeaderLineDelete(h.fileName); });
                 oTdAct.appendChild(oDel);
             }
             oTr.appendChild(oTdAct);
 
             // 라인 선택 → 미리보기.
-            oTr.addEventListener("click", function () { lf_rowSelect(h); });
+            // ★busy 를 켠 뒤 fnYieldToPaint 로 한 프레임 양보한 다음 무거운 동기 로직을 돈다
+            //   (장군님 지시 2026-10-13). 이 줄 선택의 무거운 구간은 전부 동기다 —
+            //   목록 전체 재생성(설명이 긴 항목이 있으면 그 글자 수만큼 비싸다) · 개인화 파일 읽기 ·
+            //   tree 재렌더 · 미리보기 HTML 주입. 양보 전에는 busy 가 paint 될 기회가 없어
+            //   화면이 그냥 멈춰 보였다. lf_rowSelect 자체는 동기로 둔다 — 저장/갱신/뒤로가기 같은
+            //   내부 호출부가 그 뒤에 busy 를 끄는 순서에 의존하므로 async 로 바꾸면 순서가 깨진다.
+            oTr.addEventListener("click", async function () {
+                _busy(true);
+                try { await APPCOMMON.fnYieldToPaint(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                lf_rowSelect(h);
+            });
 
             oUI.tbody.appendChild(oTr);
         });
+    }
+
+    // 선택 표시만 옮긴다(원본 lf_resetMarkLine + oModel.setProperty("highlight", ...) 1:1).
+    //   ★목록을 다시 그리지 않는다 — 원본(UI5)도 선택 표시 속성만 바꿨다. 다시 그리면 설명이 긴
+    //     항목이 하나라도 있을 때 그 글자를 매번 새로 넣고 한 줄로 다시 재게 돼 줄 선택이 아주 느려진다
+    //     (장군님 실측 2026-10-13 — 내용이 거의 없는 줄을 눌러도 똑같이 느렸다).
+    function lf_markSelectedRow() {
+        if (!oUI || !oUI.tbody) { return; }
+        var aRows = oUI.tbody.querySelectorAll("tr[data-file]");
+        for (var i = 0; i < aRows.length; i++) {
+            if (oS.selFileName !== "" && aRows[i].getAttribute("data-file") === oS.selFileName) {
+                aRows[i].setAttribute("aria-selected", "true");
+            } else {
+                aRows[i].removeAttribute("aria-selected");
+            }
+        }
     }
 
     // 헤더 라인 드래그 시작(원본 lf_dragStart).
@@ -1362,7 +1393,7 @@
     function lf_rowSelect(is_head) {
         _busy(true);
         oS.selFileName = is_head.fileName;
-        lf_renderList();   // 선택강조 갱신.
+        lf_markSelectedRow();   // 선택강조만 옮긴다(원본 동일 — 목록 재생성 금지).
 
         var ls_item = lf_getItemData(is_head);
         if (!ls_item) { _busy(false); return; }
@@ -1421,7 +1452,7 @@
         // 이전 선택 라인 없음/미발견 → 선택 해제 + 초기(빈) 미리보기(원본 oPrevNav.to(oInitPage)).
         if (!ls_head) {
             oS.selFileName = "";
-            lf_renderList();
+            lf_markSelectedRow();
             lf_showRight(false);
             _busy(false);
             return;

@@ -143,8 +143,9 @@
         if (opt.name) {
             try {
                 fld.input.setAttribute("data-field", opt.name);
+                fld.input.setAttribute("data-act", opt.name);   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
                 var oClr = fld.el.querySelector(".u4a-field__clear");
-                if (oClr) { oClr.setAttribute("data-clear", opt.name); }
+                if (oClr) { oClr.setAttribute("data-clear", opt.name); oClr.setAttribute("data-act", opt.name + "_CLEAR"); }
             } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 기존 호출부 계약 유지({ wrap, input }).
