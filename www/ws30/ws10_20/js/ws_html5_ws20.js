@@ -91,21 +91,21 @@
                 { key: "WMENU30_05", icon: "sliders", text: _msg("B64"), get disabled() { return !_isEditMode(); } }
             ] },
             { key: "WMENU40", text: _msg("B36"), items: [
-                { key: "WMENU40_01", icon: "plus", text: _msg("A09") },
-                { key: "WMENU40_02", icon: "xmark", text: _msg("B51") },
-                { key: "WMENU40_03", icon: "gear", text: _msg("B52") },
-                { key: "WMENU40_04", icon: "right-from-bracket", text: _msg("B53") },
-                { key: "WMENU40_06", icon: "user-gear", text: _msg("B55"), items: [
-                    { key: "WMENU40_06_01", icon: "bug", text: _wsMsg("252") },
-                    { key: "WMENU40_06_02", icon: "note-sticky", text: _msg("B54") },
-                    { key: "WMENU40_06_03", icon: "triangle-exclamation", text: _msg("B70") }
+                { key: "WMENU40_01", act: "NEWWINDOW", icon: "plus", text: _msg("A09") },
+                { key: "WMENU40_02", act: "CLOSEWINDOW", icon: "xmark", text: _msg("B51") },
+                { key: "WMENU40_03", act: "OPTIONS", icon: "gear", text: _msg("B52") },
+                { key: "WMENU40_04", act: "LOGOFF", icon: "right-from-bracket", text: _msg("B53") },
+                { key: "WMENU40_06", act: "ADMIN", icon: "user-gear", text: _msg("B55"), items: [
+                    { key: "WMENU40_06_01", act: "DEVTOOL", icon: "bug", text: _wsMsg("252") },
+                    { key: "WMENU40_06_02", act: "RELEASENOTE", icon: "note-sticky", text: _msg("B54") },
+                    { key: "WMENU40_06_03", act: "ERRORLOG", icon: "triangle-exclamation", text: _msg("B70") }
                 ] },
-                { key: "WMENU40_07", icon: "server", text: _msg("C42") }
+                { key: "WMENU40_07", act: "SERVERINFO", icon: "server", text: _msg("C42") }
             ] },
             { key: "WMENU50", text: _msg("B39"), items: [
-                { key: "WMENU50_01", icon: "book-open-reader", text: _msg("B44") },
-                { key: "WMENU50_03", icon: "book", text: _msg("B65") },
-                { key: "WMENU50_04", icon: "keyboard", text: _wsMsg("253") }
+                { key: "WMENU50_01", act: "HELPDOC", icon: "book-open-reader", text: _msg("B44") },
+                { key: "WMENU50_03", act: "APPDOC", icon: "book", text: _msg("B65") },
+                { key: "WMENU50_04", act: "SHORTCUTS", icon: "keyboard", text: _wsMsg("253") }
             ] },
             { key: "Test20", text: _msg("B69"), staffOnly: true, items: [
                 { key: "Test90", text: "Busy 강제실행" },

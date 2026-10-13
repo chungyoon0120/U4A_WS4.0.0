@@ -31,10 +31,15 @@ module.exports = function (REMOTE, oAPP, sEditorSettings) {
     const sPopupName = "monacoThemeDesign";
 
     // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다(원본 동일).
-    const oResult = WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+    //   2026-10-12 장군님 지시 - parent 를 빼면 getChildWindows() 로는 못 찾으므로
+    //     전체 창에서 OBJTY + browserkey 로 찾는다. 8·9·10·11번과 같은 방식.
+    const oResult = oAPP.common.getCheckAlreadyOpenWindow2(sPopupName);
     if (oResult.ISOPEN) {
         try {
             const oWindow = oResult.WINDOW;
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oWindow.isMinimized()) { oWindow.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             WSUTIL.setParentCenterBounds(REMOTE, oWindow);
             // frameless 는 show:false 로 열리므로 재포커스 시 show 보장(원본 UI5 는 opacity 로 처리).
             oWindow.show();
@@ -59,7 +64,10 @@ module.exports = function (REMOTE, oAPP, sEditorSettings) {
     // 341  monaco Theme Designer (원본 동일 키)
     oBrowserOptions.title = WSUTIL.getWsMsgClsTxt(USERINFO.LANGU, "ZMSG_WS_COMMON_001", "341");
     oBrowserOptions.autoHideMenuBar = true;
-    oBrowserOptions.parent = CURRWIN;
+    // 2026-10-12 장군님 지시 (최소화 버튼 추가 + parent 제거) - parent 를 지정하지 않는다.
+    //   제목줄을 직접 그리는 창에서 parent 를 두면 Minimize 뒤 Restore 할 길이 없어진다.
+    //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
+    //   뒤로가기 일괄 닫기·busy 중 숨기기는 browserkey 를 비교하는 getSiblingWindows 가 맡는다.
     oBrowserOptions.modal = false;                          // 원본 동일(비모달)
     oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;     // 흰색 플래시 방지(즉시 불투명)
 

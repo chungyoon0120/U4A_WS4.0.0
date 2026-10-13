@@ -1004,6 +1004,19 @@
         if (oClose) { oClose.addEventListener("click", fn_close); }
 
         // 최대화 토글 + 아이콘 동기.
+
+        // 최소화 (2026-10-12 장군님 지시) — 원본은 OS 기본 제목줄이라 이 버튼이 있었는데,
+        //   frameless 로 바꾸면서 빠졌다. 8번·9번 창과 같은 짝.
+        const oMin = document.getElementById("snipWinMin");
+        if (oMin) {
+            oMin.addEventListener("click", function () {
+                try { CURRWIN.minimize(); }
+                catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            });
+        } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "snipWinMin", "minimize button not wired");
+        }
+
         const oMax = document.getElementById("snipWinMax");
         if (oMax) {
             const _syncMaxIcon = function () {

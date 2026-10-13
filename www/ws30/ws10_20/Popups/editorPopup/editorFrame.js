@@ -402,6 +402,50 @@ function _initChrome() {
     _setTitle();
 
     // 닫기(타이틀바 X) — frameless 창 닫기.
+    /**
+     * 최소화·최대화 (2026-10-13 장군님 지시 — parent 제거 16번)
+     *   원본은 OS 기본 제목줄이라 이 두 버튼이 있었는데, frameless 로 바꾸며 닫기만 남았다.
+     *   8·9·14번과 같은 짝으로 넣는다.
+     */
+    var oWinMin = document.getElementById("editorWinMin");
+    if (oWinMin) {
+        oWinMin.addEventListener("click", function () {
+            try { CURRWIN.minimize(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "editorWinMin", "minimize button not wired");
+    }
+
+    var oWinMax = document.getElementById("editorWinMax");
+    if (oWinMax) {
+
+        // 최대화 상태에 따라 아이콘·tooltip 을 Maximize / Restore 로 바꾼다.
+        var _syncMaxBtn = function () {
+            try {
+                var bMax = CURRWIN.isMaximized(),
+                    oIcon = oWinMax.querySelector("i");
+                oWinMax.title = bMax ? "Restore" : "Maximize";
+                if (oIcon) { oIcon.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        };
+
+        oWinMax.addEventListener("click", function () {
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+
+        try {
+            CURRWIN.on("maximize", _syncMaxBtn);
+            CURRWIN.on("unmaximize", _syncMaxBtn);
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        _syncMaxBtn();
+
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "editorWinMax", "maximize button not wired");
+    }
+
     var oClose = document.querySelector('#editorTitlebar [data-action="close"]');
     if (oClose) { oClose.addEventListener("click", function () { try { CURRWIN.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }); }
 

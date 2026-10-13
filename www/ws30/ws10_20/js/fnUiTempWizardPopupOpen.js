@@ -451,7 +451,20 @@
         if (window.ResizeObserver) {
             try {
                 var oContent = oPage.firstElementChild; // wz/wz3/note (pad 앞)
-                var roPad = new ResizeObserver(function () { _updateScrollPad(oPage); });
+                // 2026-10-13 장군님 지시 - ResizeObserver 콜백 안에서
+                //   크기를 재고 그 자리에서 레이아웃을 바꾸는 것이 원인이다.
+                //   반지 끌에 다시 통지되어 "ResizeObserver loop limit exceeded" 로 터진다.
+                //   → 다음 프레임으로 밀어 한 번만 돌린다(근거 = .analy/16 §3.4.2,
+                //   공통 attachOverflow 의 _scheduleReflow 와 같은 방식).
+                //   ★onError 에서 오류를 삼키는 가드는 절대 금지(2026-07-10 장군님 지시).
+                //   같은 사례 = Popups/monacoThemeDesign/Popup/js/wizardNav.js (2026-10-12 제보로 수정).
+                var roPad = new ResizeObserver(function () {
+                    if (oPage.__padRaf) { return; }
+                    oPage.__padRaf = requestAnimationFrame(function () {
+                        oPage.__padRaf = 0;
+                        _updateScrollPad(oPage);
+                    });
+                });
                 roPad.observe(oPage);
                 if (oContent) { roPad.observe(oContent); }
                 oPg.__ro = roPad; // 정리 대상: oUI.pages[key] = oPg (외부 래퍼)
@@ -869,7 +882,19 @@
         oNav.appendChild(oMini);
         nav.els.nav = oNav; nav.els.navFull = oFull; nav.els.navMini = oMini;
         if (window.ResizeObserver) {
-            try { nav.ro = new ResizeObserver(function () { _wzNavResize(nav); }); nav.ro.observe(oNav); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            // 2026-10-13 장군님 지시 - 위 _updateScrollPad 와 같은 이유로
+            //   다음 프레임으로 밀어 한 번만 돌린다. 이 콜백은 is-collapsed class 를
+            //   토글하고 축소(mini) 줄을 innerHTML 로 통째 다시 그린다(넘칠 때까지 while 반복).
+            try {
+                nav.ro = new ResizeObserver(function () {
+                    if (nav.__roRaf) { return; }
+                    nav.__roRaf = requestAnimationFrame(function () {
+                        nav.__roRaf = 0;
+                        _wzNavResize(nav);
+                    });
+                });
+                nav.ro.observe(oNav);
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         if (oS) { (oS.navs = oS.navs || []).push(nav); } // lf_close 정리 대상
         _syncNav(nav);

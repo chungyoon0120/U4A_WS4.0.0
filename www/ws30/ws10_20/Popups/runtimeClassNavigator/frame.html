@@ -40,6 +40,10 @@
         <img class="u4a-titlebar__logo" id="rtmLogo" src="" alt="U4A">
         <span class="u4a-titlebar__title" id="rtmTitle"></span>
         <span class="u4a-titlebar__spacer"></span>
+        <!-- 2026-10-13 장군님 지시 (parent 제거 14번) - 원본(OS 기본 제목줄)에 있던 최소화·최대화를 커스텀 헤더에도 둔다.
+             frameless 로 바꾸면서 닫기만 남아 원본보다 기능이 빠져 있었다. (8·9번과 같은 짝) -->
+        <button type="button" class="u4a-winbtn" id="rtmWinMin" title="Minimize" aria-label="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="rtmWinMax" title="Maximize" aria-label="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
         <button class="u4a-winbtn u4a-winbtn--close" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </header>
 

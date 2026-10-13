@@ -67,7 +67,7 @@ var oState = {
     selCustKey: ""      // 현재 선택된 커스텀 노드 CKEY(watch 재로드 시 선택 보존)
 };
 var oDefTree = null, oCustTree = null;
-var oFrame = null, bBusy = false, oToastTimer = null, bOpenDone = false, oBroad = null;
+var oFrame = null, bBusy = false, oToastTimer = null, bOpenDone = false, oBroad = null, bConfirmOpen = false;
 var bSelfWrite = false, oCustWatcher = null, iWatchTimer = null;   // 커스텀 파일 watch(라이브 반영) + 자기저장 가드
 
 /* ── 로컬 헬퍼 ──────────────────────────────────────────────────────────── */
@@ -199,6 +199,25 @@ function _setBusy(bOn, oOpt) {
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
         try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
+}
+
+/**
+ * 확인창이 떠 있는 동안 형제 별창·WS20 만 잠근다 (원본 index.js 커스텀 패턴 삭제 1:1).
+ *   원본 순서: 삭제 버튼 → 자기 busy ON(형제도 ON) → 확인창 띄운 직후 자기 busy 만 OFF
+ *             (형제는 ON 유지) → 취소면 자기·형제 둘 다 OFF / 확인이면 자기·형제 다시 ON 후 처리.
+ *   확인창 자체가 이 창의 뒤를 막으므로 자기 로딩 덮개는 걷어 둔다.
+ * 2026-10-12 장군님 지시 — 별창팝업 현황판 「새로 생긴 문제」 2번.
+ */
+function _broadSiblingBusy(bOn) {
+    bConfirmOpen = !!bOn;
+    if (!oBroad) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "oBroad", "sibling windows not locked during the confirm dialog");
+        }
+        return;
+    }
+    try { oBroad.postMessage({ PRCCD: bOn ? "BUSY_ON" : "BUSY_OFF" }); }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "_broadSiblingBusy"); } }
 }
 
 // 오픈 busy 는 "한 번 켜서 끝까지 유지 → 완전 로드(또는 오류) 시 1회만 해제"(editorFrame 정책).
@@ -622,6 +641,7 @@ function _deleteFromDlg() {
     if (!oDlgUI || oDlgUI.PRCCD !== "U" || !oDlgUI.CKEY) { return; }
     var sKey = oDlgUI.CKEY;
     var sDesc = (oDlgUI.titleField.getValue() || "");
+    _setBusy(true);                              // 원본 삭제와 같은 짝 — 누르는 즉시 busy ON (형제창도 함께)
     U4AUI.confirm({
         type: "W",
         title: _m("022") + " " + _m("029"),                          // Custom Pattern Delete
@@ -629,19 +649,27 @@ function _deleteFromDlg() {
         yesLabel: _m("038"),   // YES
         noLabel: _m("039"),    // NO
         onClose: function (sAct) {
-            if (sAct !== "YES") { return; }
+            // 확인창이 닫혔다 — 취소면 자기·형제창 잠금을 둘 다 푼다(원본 1:1).
+            bConfirmOpen = false;
+            if (sAct !== "YES") { _setBusy(false); return; }
+            _setBusy(true);      // 확인을 누르면 다시 ON 하고 처리에 들어간다
             var aFlat = _readPatternJson(PATHINFO.CUST_PATT);
             var iF = aFlat.findIndex(function (e) { return e && e.CKEY === sKey; });
-            if (iF < 0) { _closeCreateDlg(); return; }
+            if (iF < 0) { _closeCreateDlg(); _setBusy(false); return; }
             aFlat.splice(iF, 1);
-            if (!_writeCust(aFlat)) { return; }
+            if (!_writeCust(aFlat)) { _setBusy(false); return; }
             _closeCreateDlg();
             _reloadCust("");
             if (oCustTree) { _tof(oCustTree).selectByKey(""); }
             _showEmpty();
             _toast(_m("008"));   // Delete success
+            _setBusy(false);     // 처리가 끝난 뒤에만 끈다
         }
     });
+
+    // 확인창을 띄운 뒤 — 자기 로딩 덮개만 걷고 형제창은 잠근 채 둔다(원본 1:1).
+    _setBusy(false, { ISBROAD: true });
+    _broadSiblingBusy(true);
 }
 
 // 다이얼로그 폼 행(라벨 + 컨트롤).
@@ -867,6 +895,7 @@ function _saveCreateDlg() {
 function _deleteCust(oNode) {
     if (!oNode || !oNode.CKEY) { return; }
     _selectPattern(oCustTree, oDefTree, oNode);   // 삭제 전 해당 행 선택 표시(원본)
+    _setBusy(true);                              // 원본: 삭제 버튼 누르는 즉시 busy ON (형제창도 함께)
     U4AUI.confirm({
         type: "W",
         title: _m("022") + " " + _m("029"),                          // Custom Pattern Delete
@@ -874,18 +903,26 @@ function _deleteCust(oNode) {
         yesLabel: _m("038"),   // YES
         noLabel: _m("039"),    // NO
         onClose: function (sAct) {
-            if (sAct !== "YES") { return; }
+            // 확인창이 닫혔다 — 취소면 자기·형제창 잠금을 둘 다 푼다(원본 1:1).
+            bConfirmOpen = false;
+            if (sAct !== "YES") { _setBusy(false); return; }
+            _setBusy(true);      // 원본: 확인을 누르면 다시 ON 하고 처리에 들어간다
             var aFlat = _readPatternJson(PATHINFO.CUST_PATT);
             var iF = aFlat.findIndex(function (e) { return e && e.CKEY === oNode.CKEY; });
-            if (iF < 0) { return; }
+            if (iF < 0) { _setBusy(false); return; }
             aFlat.splice(iF, 1);
-            if (!_writeCust(aFlat)) { return; }
+            if (!_writeCust(aFlat)) { _setBusy(false); return; }
             _reloadCust("");
             if (oCustTree) { _tof(oCustTree).selectByKey(""); }
             _showEmpty();
             _toast(_m("008"));   // Delete success
+            _setBusy(false);     // 원본: 처리가 끝난 뒤에만 끈다
         }
     });
+
+    // 확인창을 띄운 뒤 — 자기 로딩 덮개만 걷고(확인창이 뒤를 막는다) 형제창은 잠근 채 둔다(원본 1:1).
+    _setBusy(false, { ISBROAD: true });
+    _broadSiblingBusy(true);
 }
 
 /* ── 스플리터 드래그(가로/세로) — 공통 CSS(.u4a-splitter*) 소비, 폭 계산만 화면별(§4.3, MIME 미러).
@@ -1092,6 +1129,49 @@ function _initChrome() {
     var oEmptyDesc = document.getElementById("pattEmptyDesc");
     if (oEmptyDesc) { oEmptyDesc.textContent = _m("277"); }
 
+    // 최소화 · 최대화(타이틀바) — 2026-10-12 장군님 지시.
+    //   원본은 OS 기본 제목줄이라 최소화·최대화가 있었는데, frameless 로 바꾸면서 닫기만 남아 빠져 있었다.
+    //   _win-popup-template 과 같은 방식. 창 옵션은 minimizable·maximizable 을 끄지 않아 기본 허용이다.
+    var oWinMin = document.getElementById("pattWinMin");
+    if (oWinMin) {
+        oWinMin.addEventListener("click", function () {
+            try { CURRWIN.minimize(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "pattWinMin", "minimize button not wired");
+    }
+
+    var oWinMax = document.getElementById("pattWinMax");
+    if (oWinMax) {
+
+        // 최대화 상태에 따라 아이콘·tooltip 을 Maximize / Restore 로 바꾼다.
+        var _syncMaxBtn = function () {
+            try {
+                var bMax = CURRWIN.isMaximized(),
+                    oIcon = oWinMax.querySelector("i");
+                oWinMax.title = bMax ? "Restore" : "Maximize";
+                if (oIcon) { oIcon.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        };
+
+        oWinMax.addEventListener("click", function () {
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+
+        // 더블클릭 등 창 쪽에서 바뀌는 경우도 아이콘을 맞춘다.
+        try {
+            CURRWIN.on("maximize", _syncMaxBtn);
+            CURRWIN.on("unmaximize", _syncMaxBtn);
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        _syncMaxBtn();
+
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "pattWinMax", "maximize button not wired");
+    }
+
     // 닫기(타이틀바 X) — busy 중 차단 + 공통 closeWindow(창이 closable:false 라 직접 close() 불가).
     var oClose = document.querySelector('#pattTitlebar [data-action="close"]');
     if (oClose) {
@@ -1203,6 +1283,12 @@ window.addEventListener("load", function () {
 // busy 중에는 창 닫기 차단(원본 onbeforeunload). 정상 종료 시 리스너/IPC 해제(누수 방지).
 window.onbeforeunload = function () {
     if (bBusy) { return false; }
+    /**
+     * 확인창이 열린 채 이 창이 닫힐 때 형제 별창·WS20 잠금을 푸는 살아나기
+     *   (원본 docPopup _setBroadCastBusy 와 같은 짝 — 이게 없으면 다른 창이 영영 잠긴다).
+     * 2026-10-12 장군님 지시.
+     */
+    if (bConfirmOpen) { _broadSiblingBusy(false); }
     // 브라우저 닫는 시점에 busy 켜져있으면 형제창 busy 해제(broadcast-busy-pair).
     window.removeEventListener("click", _keepSession);
     window.removeEventListener("keyup", _keepSession);

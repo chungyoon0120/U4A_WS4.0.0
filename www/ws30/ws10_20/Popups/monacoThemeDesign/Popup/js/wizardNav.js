@@ -48,7 +48,21 @@
         oNav.appendChild(oMini);
         nav.els.nav = oNav; nav.els.navFull = oFull; nav.els.navMini = oMini;
         if (window.ResizeObserver) {
-            try { nav.ro = new window.ResizeObserver(function () { _wzNavResize(nav); }); nav.ro.observe(oNav); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            // 2026-10-12 장군님 제보 - 창을 최대화하면 "ResizeObserver loop limit exceeded" 로 터졌다.
+            //   기록을 받은 곳에서 바로 모양을 바꾸면(is-collapsed 토글 + mini 다시 그리기)
+            //   같은 프레임에 다시 통지돼 되돌이가 된다. 다음 프레임으로 미뤄 한 번만 돌린다.
+            //   근거 = .analy/16 §3.4.2 · 공통 attachOverflow 가 쓰는 방식과 같다.
+            //   ★오류를 onError 에서 삼키는 가드는 절대 금지 - 발생 자체를 없았다.
+            try {
+                nav.ro = new window.ResizeObserver(function () {
+                    if (nav.__roRaf) { return; }
+                    nav.__roRaf = window.requestAnimationFrame(function () {
+                        nav.__roRaf = 0;
+                        _wzNavResize(nav);
+                    });
+                });
+                nav.ro.observe(oNav);
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         aNavs.push(nav);
         _syncNav(nav);
@@ -342,7 +356,15 @@
         if (window.ResizeObserver) {
             try {
                 var oContent = oPage.firstElementChild;
-                var roPad = new window.ResizeObserver(function () { _updateScrollPad(oPage); });
+                // 2026-10-12 - 위와 같은 이유로 다음 프레임으로 미뤄 한 번만 돌린다.
+                //   여기도 기록을 받은 곳에서 관측 대상 안의 여백 높이를 바꾼다.
+                var roPad = new window.ResizeObserver(function () {
+                    if (oPage.__padRaf) { return; }
+                    oPage.__padRaf = window.requestAnimationFrame(function () {
+                        oPage.__padRaf = 0;
+                        _updateScrollPad(oPage);
+                    });
+                });
                 roPad.observe(oPage);
                 if (oContent) { roPad.observe(oContent); }
                 oPage.__ro = roPad;

@@ -63,7 +63,7 @@ var oState = {
 };
 
 var oTiny = null, oTitleField = null, bBusy = false, oToastTimer = null,
-    bOpenDone = false, oBroad = null;
+    bOpenDone = false, oBroad = null, bConfirmOpen = false;
 
 // ── 로컬 헬퍼 ──────────────────────────────────────────────────────────
 function _msg(sCls, sCode, p1) {
@@ -182,6 +182,25 @@ function _setBusy(bOn, oOpt) {
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {
         try { oBroad.postMessage({ PRCCD: bBusy ? "BUSY_ON" : "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
+}
+
+/**
+ * 확인창이 떠 있는 동안 형제 별창·WS20 만 잠근다 (원본 doc.js 삭제/저장 버튼 1:1).
+ *   원본은 MessageBox 를 띄운 직후 BUSY_ON 을, onClose 에서 BUSY_OFF 를 방송한다.
+ *   이 창 자신은 busy 를 켜지 않는다 — 확인창 자체가 모달이라 이미 막혀 있다.
+ *   그래서 _setBusy 를 쓰지 않고 방송만 한다(_setBusy 는 자기 오버레이까지 켠다).
+ * 2026-10-12 장군님 지시 — 별창팝업 현황판 「새로 생긴 문제」 1번.
+ */
+function _broadSiblingBusy(bOn) {
+    bConfirmOpen = !!bOn;
+    if (!oBroad) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "oBroad", "sibling windows not locked during the confirm dialog");
+        }
+        return;
+    }
+    try { oBroad.postMessage({ PRCCD: bOn ? "BUSY_ON" : "BUSY_OFF" }); }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e, "_broadSiblingBusy"); } }
 }
 
 function _finishOpen() {
@@ -441,7 +460,10 @@ function _delete() {
             { act: "NO", label: _msg("/U4A/CL_WS_COMMON", "A39") }
         ],
         onClose: function (sAct) {
-            if (sAct !== "YES") { return; }
+            // 확인창이 닫혔다 — 취소라면 여기서 항상 형제 별창 잠금을 푸다(원본 1:1).
+            //   YES 는 여기서 폴지 않는다 — 바로 _xhrSave 가 다시 잠금을 건다(깜박이지 않게).
+            bConfirmOpen = false;
+            if (sAct !== "YES") { _broadSiblingBusy(false); return; }
 
             // 서버는 개별 삭제 API 없이 전달받은 T_DOCLIST 전체를 덮어쓴다.
             // 삭제 전 상태를 보관했다가 SAVE 실패 시 화면을 원상 복구한다.
@@ -464,6 +486,9 @@ function _delete() {
             });
         }
     });
+
+    // 확인창을 띄운 뒤 형제 별창·WS20 을 잠긴다 (원본 doc.js 삭제 버튼 1:1).
+    _broadSiblingBusy(true);
 }
 
 function _delLine(sKey) {
@@ -499,10 +524,16 @@ function _save() {
             { act: "NO", label: _msg("/U4A/CL_WS_COMMON", "A39") }
         ],
         onClose: function (sAct) {
-            if (sAct !== "YES") { return; }
+            // 확인창이 닫혔다 — 취소라면 형제 별창 잠금을 푸다(원본 1:1).
+            //   YES 는 여기서 폴지 않는다 — 바로 _xhrSave 가 다시 잠금을 건다(깜박이지 않게).
+            bConfirmOpen = false;
+            if (sAct !== "YES") { _broadSiblingBusy(false); return; }
             _xhrSave();
         }
     });
+
+    // 확인창을 띄운 뒤 형제 별창·WS20 을 잠긴다 (원본 doc.js 저장 버튼 1:1).
+    _broadSiblingBusy(true);
 }
 
 // ── 치명 오류(원본 fn_setMsgMove / MessagePage) ──────────────────────────
@@ -766,6 +797,51 @@ function _initChrome() {
         oTitle.textContent = s;
     }
 
+    /**
+     * 최소화·최대화 (2026-10-12 장군님 지시)
+     *   원본은 OS 기본 제목줄이라 이 두 버튼이 있었는데, frameless 로 바니며 닫기만 남았다.
+     *   9번 소스 패턴 창과 같은 짝으로 넣는다.
+     */
+    var oWinMin = document.getElementById("docWinMin");
+    if (oWinMin) {
+        oWinMin.addEventListener("click", function () {
+            try { CURRWIN.minimize(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "docWinMin", "minimize button not wired");
+    }
+
+    var oWinMax = document.getElementById("docWinMax");
+    if (oWinMax) {
+
+        // 최대화 상태에 따라 아이콘·tooltip 을 Maximize / Restore 로 바꾼다.
+        var _syncMaxBtn = function () {
+            try {
+                var bMax = CURRWIN.isMaximized(),
+                    oIcon = oWinMax.querySelector("i");
+                oWinMax.title = bMax ? "Restore" : "Maximize";
+                if (oIcon) { oIcon.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        };
+
+        oWinMax.addEventListener("click", function () {
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+
+        // 더블클릭 등 창 쪽에서 바뀜는 경우도 아이콘을 맞힌다.
+        try {
+            CURRWIN.on("maximize", _syncMaxBtn);
+            CURRWIN.on("unmaximize", _syncMaxBtn);
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        _syncMaxBtn();
+
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "docWinMax", "maximize button not wired");
+    }
+
     var oClose = document.querySelector('#docTitlebar [data-action="close"]');
     if (oClose) {
         oClose.addEventListener("click", function () {
@@ -919,6 +995,12 @@ window.addEventListener("load", function () {
 // busy 중에는 창 닫기 차단(원본 onbeforeunload). 정상 종료 시 리스너/IPC/에디터 해제.
 window.onbeforeunload = function () {
     if (bBusy) { return false; }
+    /**
+     * 확인창이 열린 채 이 창이 닫힐 때 형제 별창·WS20 잠금을 푸는 살아나기
+     *   (원본 doc.js _setBroadCastBusy — 원본은 열린 MessageBox 가 있는지를 보고 방삭한다).
+     *   이게 없으면 BUSY_ON 을 방삭해 놓고 창이 사라지므로 다른 창이 영우 잠긴 상황이 된다.
+     */
+    if (bConfirmOpen) { _broadSiblingBusy(false); }
     window.removeEventListener("click", _keepSession);
     window.removeEventListener("keyup", _keepSession);
     try { document.removeEventListener("mousedown", _onDocMouseDownCloseOverflow, true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }

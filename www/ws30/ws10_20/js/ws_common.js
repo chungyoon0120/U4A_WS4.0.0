@@ -5149,7 +5149,9 @@ function fnServerSessionClose() {
     oAPP.main.fnDetachBeforeunloadEvent();
 
     // 현재 세션에서 파생된 Childwindow를 닫는다.
-    oAPP.fn.fnChildWindowClose(); // #[ws_fn_02.js]
+    //   2026-10-08 장군님 지시 - 여기는 메인 창이 죽는 자리(세션 타임아웃 · 강제 로그오프)라
+    //   예외 목록을 타지 않고 전부 닫는다. 인자 없이 부르면 예외 3개가 화면에 남았다.
+    oAPP.fn.fnChildWindowClose("X"); // #[ws_fn_02.js]
 
     if (oAPP.attr._oWorker && oAPP.attr._oWorker.terminate) {
         oAPP.attr._oWorker.terminate();

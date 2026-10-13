@@ -188,8 +188,8 @@
                     { key: "WMENU10_01", icon: "arrows-rotate", text: _txt("B40"), disabled: !_bDevMenu },
                     {
                         key: "WMENU10_02", icon: "right-left", text: _txt("B41"), items: [
-                            { key: "WMENU10_02_01", icon: "file-import", text: _txt("B42"), disabled: !_bDevMenu },
-                            { key: "WMENU10_02_02", icon: "file-export", text: _txt("B43") }
+                            { key: "WMENU10_02_01", act: "APPIMPORT", icon: "file-import", text: _txt("B42"), disabled: !_bDevMenu },
+                            { key: "WMENU10_02_02", act: "APPEXPORT", icon: "file-export", text: _txt("B43") }
                         ]
                     },
                     {
@@ -197,7 +197,7 @@
                             { key: "WMENU10_04_01", icon: "bolt", text: _txt("B46") }
                         ]
                     },
-                    { key: "WMENU10_05", icon: "circle-info", text: _txt("B48") }
+                    { key: "WMENU10_05", act: "WSINFO", icon: "circle-info", text: _txt("B48") }
                 ]
             },
             {
@@ -215,24 +215,24 @@
             },
             {
                 key: "WMENU30", text: _txt("B36"), items: [
-                    { key: "WMENU30_01", icon: "plus", text: _txt("A09") },
-                    { key: "WMENU30_02", icon: "xmark", text: _txt("B51") },
-                    { key: "WMENU30_03", icon: "gear", text: _txt("B52") },
-                    { key: "WMENU30_04", icon: "right-from-bracket", text: _txt("B53") },
+                    { key: "WMENU30_01", act: "NEWWINDOW", icon: "plus", text: _txt("A09") },
+                    { key: "WMENU30_02", act: "CLOSEWINDOW", icon: "xmark", text: _txt("B51") },
+                    { key: "WMENU30_03", act: "OPTIONS", icon: "gear", text: _txt("B52") },
+                    { key: "WMENU30_04", act: "LOGOFF", icon: "right-from-bracket", text: _txt("B53") },
                     {
-                        key: "WMENU30_06", icon: "user-gear", text: _txt("B55"), items: [
-                            { key: "WMENU30_06_01", icon: "bug", text: _txt("M252") },
-                            { key: "WMENU30_06_02", icon: "note-sticky", text: _txt("B54") },
-                            { key: "WMENU30_06_03", icon: "triangle-exclamation", text: _txt("B70") }
+                        key: "WMENU30_06", act: "ADMIN", icon: "user-gear", text: _txt("B55"), items: [
+                            { key: "WMENU30_06_01", act: "DEVTOOL", icon: "bug", text: _txt("M252") },
+                            { key: "WMENU30_06_02", act: "RELEASENOTE", icon: "note-sticky", text: _txt("B54") },
+                            { key: "WMENU30_06_03", act: "ERRORLOG", icon: "triangle-exclamation", text: _txt("B70") }
                         ]
                     },
-                    { key: "WMENU30_07", icon: "server", text: _txt("C42") }
+                    { key: "WMENU30_07", act: "SERVERINFO", icon: "server", text: _txt("C42") }
                 ]
             },
             {
                 key: "WMENU50", text: _txt("B39"), items: [
-                    { key: "WMENU50_01", icon: "book-open-reader", text: _txt("B44") },
-                    { key: "WMENU50_04", icon: "keyboard", text: _txt("M253") }
+                    { key: "WMENU50_01", act: "HELPDOC", icon: "book-open-reader", text: _txt("B44") },
+                    { key: "WMENU50_04", act: "SHORTCUTS", icon: "keyboard", text: _txt("M253") }
                 ]
             },
             {
@@ -260,7 +260,7 @@
             { id: "appCopyBtn", icon: "copy", text: _txt("A04"), sc: "Shift+F11", ev: "ev_AppCopy", devOnly: true },
             { sep: true, devOnly: true },
             { id: "displayBtn", icon: "display", text: _txt("A05"), sc: "F7", ev: "ev_AppDisplay" },
-            { id: "appExecMenuBtn", icon: "globe", text: _txt("A06"), sc: "F8", ev: "ev_AppExec", split: true },
+            { id: "appExecMenuBtn", icon: "globe", text: _txt("A06"), sc: "F8", ev: "ev_AppExec", split: true, act: "RUN" },
             { sep: true },
             { id: "examBtn", icon: "graduation-cap", text: _txt("A07"), sc: "Ctrl+F1", ev: "ev_AppExam" },
             { id: "multiPrevBtn", icon: "mobile-screen-button", text: _txt("A08"), sc: "Ctrl+F3", ev: "ev_MultiPrev" },
@@ -414,6 +414,8 @@
      * 공통 드롭다운/메뉴 (shell.css .u4a-menu)
      ********************************************************************/
     var _openAnchor = null;
+    // 메뉴 줄에 고유 이름이 없다는 경고는 한 번만 — 메뉴를 열 때마다 되풀이하면 로그만 늘어난다.
+    var _bMenuKeyWarned = false;
 
     // 서브헤더(트랜잭션 툴바) 오버플로 상태 — 좁아지면 넘치는 버튼을 ⋯ 메뉴로 접는다.
     var _oSubHeaderEl = null;   // 툴바 컨테이너
@@ -446,6 +448,26 @@
             var oItem = document.createElement("div");
             oItem.className = "u4a-menu__item";
             oItem.setAttribute("role", "menuitem");
+            // 2026-10-08 장군님 지시 — 메뉴 한 줄을 밖에서 가리킬 수 있게 고유 이름을 화면에 내보낸다.
+            //   요청: u4a-ws4-mcp `.docs/guide/WS4_REQUEST.md` (자동 테스트 도구가 누를 단추를 집어야 한다).
+            //   머리(추가 정보·유틸리티 …)에는 이미 data-menu-anchor 가 있는데 그 안의 줄에는 없었다.
+            //   새로 짓지 않고 **코드가 이미 쓰는 it.key 그대로** 내보낸다(장군님 결정 2026-10-08 「1번으로 해라」).
+            //   하위 메뉴를 여는 줄도 같이 붙는다 — 거기까지 눌러야 안쪽 줄에 닿는다.
+            if (it.key) { oItem.setAttribute("data-menu-item", it.key); }
+            // 2026-10-13 장군님 지시 - 메뉴 번호(it.key)는 하는 일이 아니라
+            //   자리순으로 붙어 있어 **같은 번호가 화면마다 다른 메뉴**가 된다
+            //   (WS20 에만 메뉴가 둘 더 있어 뒤가 한 칸식 밀렸다 —
+            //    WMENU30_03 = WS10 에서는 Options, WS20 에서는 HTML5 Editor).
+            //   그래서 하는 일을 적은 it.act 를 따로 내보낸다 — 번호가 무엇이든
+            //   하는 일로 집을 수 있다. 요슭 = u4a-ws4-mcp .docs/request/2026-10-12_menu-code.md
+            //   ★번호·핸들러 이름·구조는 그대로 다 — 속성만 더한다.
+            //   값 없는 줄(편집기 메뉴·Test 메뉴)은 붙이지 않는다(.analy/21).
+            if (it.act) { oItem.setAttribute("data-act", it.act); }
+            else if (!_bMenuKeyWarned && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                _bMenuKeyWarned = true;
+                U4ALOG.warn("값이 없어 그만둠", "menu item key",
+                    "data-menu-item cannot be set - this menu row stays unreachable for the automation tool");
+            }
             if (it.disabled) { oItem.setAttribute("aria-disabled", "true"); }
             var sIcon = it.icon ? (it.brand ? '<i class="fa-brands fa-' + it.icon + '"></i>' : _fa(it.icon)) : "<i></i>";
             oItem.innerHTML = sIcon + '<span class="u4a-menu__item-text">' + it.text + "</span>";
@@ -687,6 +709,10 @@
         var main = document.createElement("button");
         main.className = "u4a-split__main";
         main.type = "button";
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청 = u4a-ws4-mcp).
+        //   반반 버튼은 왼쪽(본체)과 오른쪽(목록 펼치기)이 따로 눌린다 → 왼쪽에만 붙인다.
+        //   이 생성기는 반반 버튼 전체가 쓰므로 이름을 받은 것에만 붙인다.
+        if (cfg.act) { main.setAttribute("data-act", cfg.act); }
         main.title = cfg.tooltip || (cfg.text ? (cfg.text + (cfg.sc ? " (" + cfg.sc + ")" : "")) : "");
         main.innerHTML = (cfg.icon ? (cfg.brand ? '<i class="fa-brands fa-' + cfg.icon + '"></i>' : _fa(cfg.icon)) : "")
             + (cfg.text ? "<span>" + cfg.text + "</span>" : "");
@@ -700,6 +726,9 @@
         arrow.title = cfg.text || "";
         arrow.setAttribute("aria-haspopup", "true");
         arrow.setAttribute("data-menu-anchor", "split");
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 왼쪽(본체)과 가르기 위해 오른쪽에도 이름을 준다.
+        //   WS20 에도 실행 버튼이 있어서 「반반 버튼 전부가 쓰는 값」만으로는 언젠가 겹친다.
+        if (cfg.act) { arrow.setAttribute("data-act", cfg.act + "_MENU"); }
         arrow.innerHTML = (ICON && ICON.caret) ? ICON.caret : _fa("angle-down");
         arrow.addEventListener("click", function () {
             // 이미 열림 → busy/prepare 없이 즉시 닫기(토글)
@@ -1036,6 +1065,9 @@
         var oEye = _iconBtn(ICON.eyeSlash, "", function () {
             try { oAPP.fn.fnSetHideWindow(); } catch (e) { console.error("[WS10] window hide popup open", e); }
         });
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 이 단추는 글자도 title 도 aria-label 도 없어
+        //   집을 방법이 아예 없었다. 값은 이 단추가 여는 별창의 종류 이름 그대로(WINSHOWHIDE).
+        oEye.setAttribute("data-act", "WINSHOWHIDE");
         o.appendChild(oEye);
 
         // SAP 로고 (svg) — T-CODE 좌측. 클릭 시 T-CODE 실행 로직으로 SMEN(SAP 메인메뉴) 실행.
@@ -1062,6 +1094,12 @@
             onEnter: function (v) { _runTcode(v); }   // 선택은 채움만, 실행은 Enter(원본 동일)
         });
         oTcodeFld.input.autocomplete = "off";
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 이 칸의 지우기 단추는 title 이 "Clear" 뿐이라
+        //   다른 지우기 단추와 구분이 안 됐다. 칸의 id(sapTcode) 를 그대로 붙인다.
+        try {
+            var oTcodeClr = oTcodeFld.el.querySelector(".u4a-field__clear");
+            if (oTcodeClr) { oTcodeClr.setAttribute("data-clear", "sapTcode"); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         o.appendChild(oTcodeFld.el);
 
         var oPin = _buildPinBtn();
@@ -1073,6 +1111,8 @@
         var oSearch = _iconBtn(ICON.search, "window Text Search", function () {
             try { oAPP.fn.fnTextSearchPopupOpener(); } catch (e) { console.error("[WS10] text search open", e); }
         });
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 값은 이 단추가 여는 별창의 종류 이름 그대로(TXTSRCH).
+        oSearch.setAttribute("data-act", "TXTSRCH");
         o.appendChild(oSearch);
 
         var oPower = _iconBtn(ICON.power, _txt("B53"), function () {
@@ -1080,6 +1120,7 @@
             if (!_callReal("fnWS10WMENU30_04", _txt("B53"))) { _showFooter("I", _txt("B53") + " — 셸 필요"); }
         });
         oPower.classList.add("u4a-btn-power");
+        oPower.setAttribute("data-act", "LOGOFF");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         o.appendChild(oPower);
 
         // 창이 좁아지면 우측 공통버튼이 잘려 사라지지 않게 ⋯ 오버플로 메뉴로 접는다(좌측 카테고리는 고정).
@@ -1183,6 +1224,9 @@
         var b = document.createElement("button");
         b.className = "u4a-btn-icon u4a-pin-btn";
         b.type = "button";
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청 = u4a-ws4-mcp).
+        //   CSS class 로만 잡혀서 CSS 를 손대면 그쪽 도구가 깨진다.
+        b.setAttribute("data-act", "PIN");
         b.title = "Browser Pin";   // 원본 tooltip 동일(고정 문자열)
         b.innerHTML = ICON.pin;
         b.setAttribute("aria-pressed", _readPin() ? "true" : "false");
@@ -1322,7 +1366,7 @@
     // App 실행 split 버튼 — 공통 빌더(buildSplitButton)에 위임(정렬/busy/토글은 빌더가 강제).
     function _renderSplitButton(cfg) {
         return _buildSplitButton({
-            id: cfg.id, icon: cfg.icon, text: cfg.text, sc: cfg.sc,
+            id: cfg.id, icon: cfg.icon, text: cfg.text, sc: cfg.sc, act: cfg.act,
             onMain: function () { _invoke(cfg.ev, cfg.text); },                 // 본체 = 기본 브라우저로 실행
             getItems: _getAppExecBrowsers,                                       // 동적 /DEFBR 목록
             onPick: function (it) { _execAppInBrowser(it.key); },                // 선택 브라우저로 실행
@@ -1384,7 +1428,12 @@
         oInput.autocomplete = "off";
         oInput.setAttribute("role", "combobox");
         oInput.title = "";
-        try { oSearchFld.el.querySelector(".u4a-field__vh").title = "Search Help (F4)"; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 이 돋보기는 안내 글자로만 집히고 있었다.
+        try {
+            var oSearchVh = oSearchFld.el.querySelector(".u4a-field__vh");
+            oSearchVh.title = "Search Help (F4)";
+            oSearchVh.setAttribute("data-act", "APPNM_F4");
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // F4 키 → 값도움(버튼 클릭과 동일), Enter → no-op(원본 SearchField 동일), 더블클릭 → 전체선택.
         oInput.addEventListener("keydown", function (e) {
             if (e.key === "F4") { e.preventDefault(); _invoke("ev_AppValueHelp", "App Search Help (F4)"); }

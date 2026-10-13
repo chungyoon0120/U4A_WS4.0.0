@@ -1378,9 +1378,16 @@
         const sPopupName = "APPDOCU";
 
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        const oResult = WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-12 장군님 지시 (최소화·최대화 버튼 추가 + parent 제거 8번) - parent 를 빼면
+        //     getChildWindows() 로는 못 찾으므로 전체 창에서 OBJTY + browserkey 로 찾는다. 9번 소스 패턴과 같은 방식.
+        const oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
 
         if (oResult.ISOPEN) {
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.            
             WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
@@ -1403,7 +1410,10 @@
 
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B65"); // Document
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.parent = CURRWIN;
+        // 2026-10-12 장군님 지시 (최소화·최대화 버튼 추가 8번) - parent 를 지정하지 않는다.
+        //   제목줄을 직접 그리는 창에서 parent 를 두면 Minimize 뒤 Restore 할 길이 없어진다.
+        //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
+        //   뒤로가기 일괄 닫기·busy 중 숨기기는 browserkey 를 비교하는 getSiblingWindows 가 맡는다.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
         // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
@@ -1682,8 +1692,16 @@
         const sPopupName = "PATTPOPUP";
 
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        const oResult = WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-12 장군님 지시 (최소화·최대화 버튼 추가 + parent 제거 9번) - parent 를 빼면
+        //     getChildWindows() 로는 못 찾으므로 전체 창에서 OBJTY + browserkey 로 찾는다. 1번 옵션·7번 UI 찾기와 같은 방식.
+        const oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
+
+            // Minimize 된 채로 있으면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.            
             WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
@@ -1709,7 +1727,11 @@
         oBrowserOptions.autoHideMenuBar = true;
         // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
         oBrowserOptions.titleBarStyle = 'hidden';
-        oBrowserOptions.parent = CURRWIN;
+        // 2026-10-12 장군님 지시 (최소화·최대화 버튼 추가 9번) - parent 를 지정하지 않는다.
+        //   제목줄을 직접 그리는 창에서 parent 를 두면 Minimize 뒤 Restore 할 길이 없어진다.
+        //   최소화 버튼을 넣는 이상 parent 를 같이 빼야 한다(2026-10-07 지시 기준).
+        //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
+        //   뒤로가기 일괄 닫기·busy 중 숨기기는 브라우저키 비교(getSiblingWindows)가 대신한다.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL; //테마별 색상 처리
 
         // [HTML5] 네이티브 창 opacity 페이드 미사용(errorPageEditor 트랙) — 창은 boot-bg 로 처음부터 불투명,
@@ -2636,8 +2658,16 @@
         let sPopupName = "RTMCLS";
 
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        let oResult = WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-13 장군님 지시 (parent 제거 14번) - parent 를 빼면 getChildWindows() 로는
+        //     못 찾으므로 전체 창에서 OBJTY + browserkey 로 찾는다. 8~13번과 같은 방식.
+        let oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
+
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.            
             WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
@@ -2664,7 +2694,10 @@
 
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A14"); // Runtime Class Navigator
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.parent = CURRWIN;
+        // 2026-10-13 장군님 지시 (parent 제거 14번) - parent 를 지정하지 않는다.
+        //   원본은 OS 기본 제목줄이라 최소화·최대화가 있었는데 frameless 로 바꾸며 닫기만 남아 있었다 →
+        //   제목줄에 최소화·최대화를 넣고(frame.html/frame.js) parent 도 같이 뺐다. 8·9번과 같은 짝.
+        //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
         // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
@@ -2808,8 +2841,15 @@
         let sPopupName = "FONTSTYLE";
 
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        var oResult = APPCOMMON.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-12 장군님 지시 (parent 제거 10번) - parent 를 빼면 getChildWindows() 로는
+        //     못 찾으므로 전체 창에서 OBJTY + browserkey 로 찾는다. 8번·9번과 같은 방식.
+        var oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.            
             parent.WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
@@ -2835,7 +2875,11 @@
 
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "B57"); // Font Style Wizard
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.parent = CURRWIN;
+        // 2026-10-12 장군님 지시 (parent 제거 10번) - parent 를 지정하지 않는다.
+        //   이 창은 제목줄에 최소화·최대화 버튼이 이미 있는데(원본은 OS 기본 제목줄이라 있었다),
+        //   parent 를 두면 Minimize 뒤 Restore 할 길이 없어진다.
+        //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
+        //   뒤로가기 일괄 닫기·busy 중 숨기기는 browserkey 를 비교하는 getSiblingWindows 가 맡는다.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.titleBarStyle = "hidden";
         oBrowserOptions.show = false;
@@ -3518,8 +3562,16 @@
         let sPopupName = "U4AOTRPOP";
 
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        let oResult = APPCOMMON.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-13 장군님 지시 (parent 제거 12번) - parent 를 빼면 getChildWindows() 로는
+        //     못 찾으므로 전체 창에서 OBJTY + browserkey 로 찾는다. 8~11번과 같은 방식.
+        let oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
+
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.            
             parent.WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
@@ -3551,7 +3603,11 @@
 
         oBrowserOptions.title = sOtrTitle;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.parent = CURRWIN;
+        // 2026-10-13 장군님 지시 (parent 제거 12번) - parent 를 지정하지 않는다.
+        //   이 창은 제목줄에 Minimize·Maximize 버튼이 이미 있는데(frame.html 공통 .u4a-titlebar),
+        //   parent 를 두면 Minimize 뒤 작업표시줄에 안 남아 되살릴 길이 없어진다.
+        //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
+        //   뒤로가기 일괄 닫기·busy 중 숨기기는 browserkey 를 비교하는 getSiblingWindows 가 맡는다.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         // [HTML5] frameless — 네이티브 OS 헤더 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
         oBrowserOptions.titleBarStyle = "hidden";
@@ -3678,8 +3734,15 @@
         let sPopupName = "UI5CSSPOP_V2";
 
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        let oResult = APPCOMMON.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-12 장군님 지시 (parent 제거 11번) - parent 를 빼면 getChildWindows() 로는
+        //     못 찾으므로 전체 창에서 OBJTY + browserkey 로 찾는다. 8·9·10번과 같은 방식.
+        let oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.            
             parent.WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);

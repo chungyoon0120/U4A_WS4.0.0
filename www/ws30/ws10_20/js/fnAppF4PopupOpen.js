@@ -136,6 +136,17 @@
             className: "u4aAppF4Field",
             width: opt.w
         });
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 (요청 = u4a-ws4-mcp WS4_REQUEST.md).
+        //   화면 글자로 찾으면 화면 언어를 영어로 바꿀 때 전부 깨진다 -> 안 바뀌는 이름을 내보낸다.
+        //   값은 서버가 쓰는 칸 이름 그대로(PACKG/ERUSR/APPID/APPNM/HITS) - 새로 짓지 않는다.
+        //   칸 지우기 단추는 전부 title 이 "Clear" 로 똑같아 어느 칸 것인지 구분이 안 됐다 -> 같은 이름을 붙인다.
+        if (opt.name) {
+            try {
+                fld.input.setAttribute("data-field", opt.name);
+                var oClr = fld.el.querySelector(".u4a-field__clear");
+                if (oClr) { oClr.setAttribute("data-clear", opt.name); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
         // 기존 호출부 계약 유지({ wrap, input }).
         return { wrap: fld.el, input: fld.input };
     }
@@ -341,6 +352,9 @@
         var oTab1Btn = _el("button", "u4aAppF4Tab", "[U4A] " + _txt("/U4A/CL_WS_COMMON", "B94")); // All App.
         var oTab2Btn = _el("button", "u4aAppF4Tab", "[U4A] " + _txt("/U4A/CL_WS_COMMON", "B98")); // Hierarchy By Packages
         oTab1Btn.type = "button"; oTab2Btn.type = "button";
+        // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 탭은 화면 글자뿐이라 언어를 바꾸면 깨진다.
+        oTab1Btn.setAttribute("data-tab", "ALL");
+        oTab2Btn.setAttribute("data-tab", "BYPKG");
         oTabs.append(oTab1Btn, oTab2Btn);
         oDlg.appendChild(oTabs);
 
@@ -359,14 +373,18 @@
         oCloseBtn.type = "button";
         oCloseBtn.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
         oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
+        oCloseBtn.setAttribute("data-act", "CLOSE");   // 2026-10-08 자동 테스트 도구가 가리킬 표식
         oCloseBtn.addEventListener("click", lf_close);
         oFoot.appendChild(oCloseBtn);
         oDlg.appendChild(oFoot);
 
         /* ── 공통 액션 아이콘 버튼 ───────────────────────────────── */
-        function _actBtn(sIcon, sTip, fn) {
+        function _actBtn(sIcon, sTip, fn, sAct) {
             var b = _el("button", "u4a-btn-icon u4aAppF4ActBtn");
             b.type = "button"; b.title = sTip || ""; b.innerHTML = _fa(sIcon);
+            // 2026-10-08 자동 테스트 도구가 알아볼 식별값 (요청 2판 = u4a-ws4-mcp WS4_REQUEST.md).
+            //   아이콘만 있는 단추라 도구가 어느 단추인지 가를 것이 없었다.
+            if (sAct) { b.setAttribute("data-act", sAct); }
             b.addEventListener("click", fn);
             return b;
         }
@@ -411,11 +429,11 @@
 
         var bTrial = false; try { bTrial = !!(parent.getIsTrial && parent.getIsTrial()); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-        var oPkg = _mkField(initCond.PACKG || "", { upper: true, disabled: bTrial, onEnter: _doSearch });
-        var oUsr = _mkField(initCond.ERUSR || "", { upper: true, disabled: bTrial, onEnter: _doSearch });
-        var oApp = _mkField(initCond.APPID || "", { upper: true, onEnter: _doSearch });
-        var oDesc = _mkField(initCond.APPNM || "", { onEnter: _doSearch });
-        var oHits = _mkField(initCond.HITS != null ? initCond.HITS : 500, { onEnter: _doSearch });
+        var oPkg = _mkField(initCond.PACKG || "", { name: "PACKG", upper: true, disabled: bTrial, onEnter: _doSearch });
+        var oUsr = _mkField(initCond.ERUSR || "", { name: "ERUSR", upper: true, disabled: bTrial, onEnter: _doSearch });
+        var oApp = _mkField(initCond.APPID || "", { name: "APPID", upper: true, onEnter: _doSearch });
+        var oDesc = _mkField(initCond.APPNM || "", { name: "APPNM", onEnter: _doSearch });
+        var oHits = _mkField(initCond.HITS != null ? initCond.HITS : 500, { name: "HITS", onEnter: _doSearch });
 
         var aApptyItems = [
             { value: "M", text: "M ( " + _txt("/U4A/CL_WS_COMMON", "B96") + " )" }, // U4A Application
@@ -441,6 +459,7 @@
         // 조회 조건 = 공통 접이식 패널(원본 sap.m.Panel expandable) — 헤더에 제목 + 검색 버튼, 바디에 폼.
         var oSrchBtn = _el("button", "u4a-btn u4a-btn--emphasized");
         oSrchBtn.type = "button";
+        oSrchBtn.setAttribute("data-act", "SEARCH");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
         oSrchBtn.innerHTML = _fa("magnifying-glass") + "<span></span>";
         oSrchBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A75"); // Search
         oSrchBtn.addEventListener("click", _doSearch);
@@ -504,6 +523,7 @@
         var oT1Bar = _el("div", "u4aAppF4TreeBar u4aAppF4T1Bar");
         var oT1ClearBtn = _actBtn("filter-circle-xmark", MSG_CLEARFILTER, function () { _clearAllT1SF(); });
         oT1ClearBtn.disabled = true;   // 걸린 정렬/필터 없을 땐 비활성(첫 렌더에서 _syncT1ClearBtn 가 갱신)
+        oT1ClearBtn.setAttribute("data-act", "RESET");   // 2026-10-08 자동 테스트 도구가 가리킬 표식(탭1)
         oT1ClearBtn.classList.add("u4aAppF4ClearBtn");   // 탭1·탭2 공통: 툴바 우측 끝 정렬(margin-left:auto)
         oT1Bar.appendChild(oT1ClearBtn);
 
@@ -581,14 +601,14 @@
                 var td = _el("td", c.align === "center" ? "is-center" : null);
                 if (c.action === "run") {
                     td.classList.add("is-action");
-                    td.appendChild(_actBtn("globe", MSG_RUN, function (e) { e.stopPropagation(); _doRun(row); }));
+                    td.appendChild(_actBtn("globe", MSG_RUN, function (e) { e.stopPropagation(); _doRun(row); }, "RUN"));
                 } else if (c.action === "disp") {
                     td.classList.add("is-action");
                     var b = _actBtn("desktop", MSG_DISP, function (e) {
                         e.stopPropagation();
                         _selectT1(row.APPID);   // 원본 _setUiTableSelectedRow — 복귀 시 강조 유지
                         _doDisplay(row);
-                    });
+                    }, "DISPLAY");
                     if (!bWS10) { b.disabled = true; }
                     td.appendChild(b);
                 } else {
@@ -730,11 +750,11 @@
         var oExpandBtn = _actBtn("angles-down", _txt("/U4A/CL_WS_COMMON", "C27"), function () {
             var node = _selTreeNode();
             if (node) { _expandSubtree(node); _renderTree(); }
-        });
+        }, "EXPAND");
         var oCollapseBtn = _actBtn("angles-up", _txt("/U4A/CL_WS_COMMON", "C28"), function () {
             var node = _selTreeNode();
             if (node) { oExpand[node._uid] = false; _renderTree(); }
-        });
+        }, "COLLAPSE");
         var oTSrch = _mkField("", { w: "16rem", ph: _wsTxt("565") }); // 어플리케이션 검색
         var _filtT = null;
         oTSrch.input.addEventListener("input", function () {
@@ -752,6 +772,7 @@
         //   per-column 초기화(A69)와 같은 의미라 툴팁도 MSG_CLEARFILTER 재사용.
         var oClearAllBtn = _actBtn("filter-circle-xmark", MSG_CLEARFILTER, function () { _clearAllTreeSF(); });
         oClearAllBtn.disabled = true;   // 걸린 정렬/필터/검색 없을 땐 비활성(첫 렌더에서 _syncClearAllBtn 가 갱신)
+        oClearAllBtn.setAttribute("data-act", "RESET");   // 2026-10-08 자동 테스트 도구가 가리킬 표식(탭2)
         oClearAllBtn.classList.add("u4aAppF4ClearBtn");   // 탭1·탭2 공통: 툴바 우측 끝 정렬(margin-left:auto)
         oTBar.append(oExpandBtn, oCollapseBtn, _el("span", "u4aAppF4TBarSep"), oTSrch.wrap, oClearAllBtn);
 
@@ -842,6 +863,9 @@
             if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }
             tr.setAttribute("data-row-idx", String(idx));     // 고정/스크롤 페인 행 hover 동기 키
             tr.setAttribute("data-uid", String(node._uid));   // 선택 동기 키
+            // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 첫 탭의 결과 표 줄과 같은 규칙.
+            //   ROOT·패키지 줄은 앱 ID 가 없어 빈 값이 된다(첫 탭도 같다).
+            tr.setAttribute("data-appid", node.APPID == null ? "" : String(node.APPID));
             if (oT2G.isHovered(idx)) { tr.classList.add("is-hover"); }   // 렌더 시 hover 상태 반영(타이밍 경합 무관)
             if (_isRoot(node)) { tr.classList.add("is-root"); }
             if (bHasKids) { tr.setAttribute("aria-expanded", bExp ? "true" : "false"); }
@@ -859,6 +883,7 @@
                     var inner = _el("span", "u4aAppF4TreeInner");   // td 는 table-cell 유지(정렬), 안쪽만 flex
                     var tog = _el("button", "u4a-tree__toggle");
                     tog.type = "button";
+                    tog.setAttribute("data-act", "TOGGLE");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값(줄 하나 접기/펼치기)
                     tog.innerHTML = _fa("chevron-right");   // 공통 트리: 우향 셰브론이 aria-expanded 로 회전
                     if (bHasKids) {
                         tog.addEventListener("click", function (e) {
@@ -878,7 +903,7 @@
                     td.appendChild(inner);
                 } else if (c.action === "disp") {
                     td.classList.add("is-action");
-                    var b = _actBtn("desktop", MSG_DISP, function (e) { e.stopPropagation(); _doTreeDisplay(node); });
+                    var b = _actBtn("desktop", MSG_DISP, function (e) { e.stopPropagation(); _doTreeDisplay(node); }, "DISPLAY");
                     if (!bWS10 || bHasKids || _isRoot(node)) { b.disabled = true; }
                     td.appendChild(b);
                 } else if (c.link && !bPickOnly) {
@@ -887,6 +912,9 @@
                     var a = _el("a", "u4aAppF4Link", node[c.key] || "");
                     a.href = "javascript:void(0)";
                     a.title = node[c.key] || "";   // 원본 tooltip="{APPID}"
+                    // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 첫 탭은 아이콘 단추지만
+                    //   이 탭은 앱 ID 글자 자체를 누르면 실행된다. 값은 첫 탭과 같게 맞춘다.
+                    a.setAttribute("data-act", "RUN");
                     a.addEventListener("click", function (e) { e.stopPropagation(); _doTreeRun(node); });
                     td.appendChild(a);
                 } else {

@@ -487,6 +487,72 @@ function bindAppEvents() {
         //자식 창에 remote 허용
         remoteMain.enable(window.webContents);
 
+        // 2026-10-09 장군님 지시 (메인이 없으면 자식도 없다) — 메인 창이 사라지면 그 메인에서
+        //   파생된 별창을 전부 없앤다. 별창에 parent 를 두지 않기로 해서(커스텀 헤더 창은 parent 가
+        //   있으면 Minimize 후 되살릴 길이 없다) OS 가 같이 닫아 주던 그물이 사라졌다.
+        //   화면 코드(로그오프·창 닫기·세션 종료)에도 넣었지만, 그 코드가 아예 안 도는 경우
+        //   (화면이 터져 죽음 · 작업 관리자로 강제 종료)는 여기서만 잡힌다. 여기는 창을 누가
+        //   만들었든 전부 걸리는 유일한 한 곳이다.
+        try {
+
+            // 창 설정값을 읽는다. 창이 만들어진 직후에는 아직 비어 있을 수 있어
+            //   문서 로드가 끝난 뒤에도 한 번 더 읽는다. 창이 사라진 뒤에는 못 읽으므로 미리 기억해 둔다.
+            const _readPref = function (oTarget) {
+                try {
+                    const oWebCon = oTarget.webContents;
+                    if (!oWebCon || oWebCon.isDestroyed()) { return {}; }
+                    if (typeof oWebCon.getWebPreferences === "function") {
+                        return oWebCon.getWebPreferences() || {};
+                    }
+                    if (typeof oWebCon.getLastWebPreferences === "function") {
+                        return oWebCon.getLastWebPreferences() || {};
+                    }
+                } catch (e) { /* 아래에서 빈 값으로 처리 */ }
+                return {};
+            };
+
+            const iWinId = window.id;
+            let sMainKey = "";
+
+            const _remember = function () {
+                const oPref = _readPref(window);
+                // 메인 창만 OBJTY=MAIN 이다. 별창이면 기억할 것이 없다.
+                if (oPref.OBJTY === "MAIN" && oPref.browserkey) { sMainKey = oPref.browserkey; }
+            };
+
+            _remember();
+            window.webContents.on('did-finish-load', _remember);
+
+            window.on('closed', () => {
+
+                if (!sMainKey) { return; }   // 메인 창이 아니었다
+
+                let iKilled = 0;
+
+                BrowserWindow.getAllWindows().forEach((oWin) => {
+                    try {
+                        if (!oWin || oWin.isDestroyed() || oWin.id === iWinId) { return; }
+                        const oChildPref = _readPref(oWin);
+                        if (oChildPref.browserkey !== sMainKey) { return; }
+                        if (oChildPref.OBJTY === "MAIN") { return; }   // 다른 메인 창은 건드리지 않는다
+                        // destroy: 별창이 "처리 중에는 못 닫음"으로 거는 차단을 타지 않는다.
+                        oWin.destroy();
+                        iKilled++;
+                    } catch (e) {
+                        console.error("[MAIN-010] child window cleanup failed:", e && e.message, e);
+                    }
+                });
+
+                if (iKilled > 0) {
+                    console.log("[MAIN-010] main window gone - destroyed " + iKilled + " child window(s)");
+                }
+
+            });
+
+        } catch (e) {
+            console.error("[MAIN-010] child window cleanup hook not installed:", e && e.message, e);
+        }
+
         if (!app.isPackaged) {
             window.webContents.openDevTools();
         }

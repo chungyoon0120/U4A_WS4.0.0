@@ -428,6 +428,12 @@
             // beforeunload 이벤트 무력화 (창 닫기 시 확인창 방지)
             window.onbeforeunload = () => { };
 
+            // 2026-10-08 장군님 지시 - 메인 창이 죽으면 별창도 예외 없이 전부 닫는다.
+            //   종전에는 parent 가 달려 있어 OS 가 자식 창을 같이 닫아 줬다. parent 를 뺀 창은
+            //   OS 가 안 닫아 메인 창을 닫은 뒤에도 화면에 남는다. 메인 창을 닫기 전에 먼저 닫는다.
+            try { oAPP.fn.fnChildWindowClose("X"); } // => [ws_fn_02.js]
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             // 창 닫기
             top.window.close();
 

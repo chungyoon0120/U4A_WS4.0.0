@@ -43,8 +43,16 @@
         sBrowserTitle += " " + oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D23"); // Editor
 
         // 기존에 Editor 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        var oResult = parent.WSUTIL.getCheckAlreadyOpenWindow(oEditInfo.OBJTY);
+        //   2026-10-13 장군님 지시 (parent 제거 16번) - parent 를 빼면 getChildWindows() 로는
+        //     못 찾으므로 전체 창에서 OBJTY + browserkey 로 찾는다. 8~15번과 같은 방식.
+        var oResult = oAPP.common.getCheckAlreadyOpenWindow2(oEditInfo.OBJTY);
         if (oResult.ISOPEN) {
+
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             if (oEditInfo.OBJTY === "CS") {
                 lf_webContentSend(oResult.WINDOW, sSearchValue);
@@ -72,7 +80,10 @@
         oBrowserOptions.autoHideMenuBar = true;
         // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
         oBrowserOptions.titleBarStyle = 'hidden';
-        oBrowserOptions.parent = oCurrWin;
+        // 2026-10-13 장군님 지시 (parent 제거 16번) - parent 를 지정하지 않는다.
+        //   원본은 OS 기본 제목줄이라 최소화·최대화가 있었는데 frameless 로 바꾸며 닫기만 남아 있었다 →
+        //   제목줄에 최소화·최대화를 넣고(editorFrame.html/editorFrame.js) parent 도 같이 뺐다.
+        //   되돌리려면 oBrowserOptions.parent = oCurrWin; 한 줄을 다시 넣으면 된다.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         
         // [HTML5] 네이티브 창 opacity 페이드 미사용 — OS 레벨 리컴포짓이라 무겁다. 창은 즉시

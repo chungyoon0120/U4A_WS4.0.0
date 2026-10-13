@@ -136,28 +136,49 @@ module.exports = function (window, document, console) {
         let sTitle = "[Critical Error]: ";
         sTitle += "Please contact the solution team.";
 
-        DIALOG.showMessageBox(CURRWIN, {
-            title: sTitle,
-            message: sErrorMsg,
-            type: "error"
-        }).then(() => {
-  
-            bIsError = false;
+        /**
+         * 2026-10-13 변경 — showMessageBox(promise) → showMessageBoxSync
+         * ---------------------------------------------------------------------
+         * 왜 고쳤나:
+         *   오류가 창이 닫히는 중(beforeunload)에 나면 renderer 가 사라지고,
+         *   promise 를 resolve 받을 곳이 없어 .then 안의 APP.exit() 이 아예 안 돌았다.
+         *   → 확인을 눌러도 앱이 안 꺼지고, 화면을 막은 채 멈췄다(자동 테스트 54건 중 11번).
+         *   sync 는 그 줄에서 renderer 를 멈추므로 창이 먼저 죽지 않는다.
+         * 바꾸지 않은 것: 창 모양·문구·로그 폴더 열기·앱 종료 순서는 그대로다.
+         */
+        try {
 
-            /**
-             * @since   2026-01-29 14:44:39
-             * @version v3.5.8-0
-             * @author  soccerhs
-             * @description
-             * 
-             * 크리티컬 오류 발생 시, 
-             * 메시지 닫을 때 로그 폴더 오픈 기능 추가
-             */
+            if (CURRWIN && !CURRWIN.isDestroyed()) {
+                DIALOG.showMessageBoxSync(CURRWIN, { title: sTitle, message: sErrorMsg, type: "error" });
+            } else {
+                // 부모 창이 이미 사라졌으면 부모 없이 띄운다
+                console.error("[WSERR-902] critical dialog shown without parent window, current window is destroyed");
+                DIALOG.showMessageBoxSync({ title: sTitle, message: sErrorMsg, type: "error" });
+            }
+
+        } catch (e) {
+            // 창을 못 띄워도 앱은 반드시 끝낸다 (critical 후 조작 금지)
+            console.error("[WSERR-903] showMessageBoxSync failed", e);
+        }
+
+        bIsError = false;
+
+        /**
+         * @since   2026-01-29 14:44:39
+         * @version v3.5.8-0
+         * @author  soccerhs
+         * @description
+         * 
+         * 크리티컬 오류 발생 시, 
+         * 메시지 닫을 때 로그 폴더 오픈 기능 추가
+         */
+        try {
             WSLOG.openLOG(true);
-            
-            APP.exit();
+        } catch (e) {
+            console.error("[WSERR-904] openLOG failed", e);
+        }
 
-        });
+        APP.exit();
 
     } // end of showCriticalErrorDialog
 
