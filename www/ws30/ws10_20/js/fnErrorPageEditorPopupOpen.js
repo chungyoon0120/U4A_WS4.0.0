@@ -29,10 +29,18 @@
         const sPopupName = "ERRPAGE";
 
         // 기존에 Editor 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        const oResult = parent.WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-13 장군님 지시 (별창 parent 제거 17번) - parent 를 빼면 getChildWindows() 로는
+        //     못 찾으므로 전체 창에서 OBJTY + browserkey 로 찾는다. 8번 기술 문서 창과 같은 방식.
+        const oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
 
-            // 부모 위치 가운데 배치한다.            
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+            // 부모 위치 가운데 배치한다.
             parent.WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
 
             // busy 끄고 Lock 풀기
@@ -66,7 +74,9 @@
         // [HTML5] frameless — 네이티브 타이틀바 제거(공통 .u4a-titlebar 사용). browser-window-common-ux 표준.
         oBrowserOptions.titleBarStyle = 'hidden';
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
-        oBrowserOptions.parent = oCurrWin;
+        // 2026-10-13 장군님 지시 (별창 parent 제거 17번) - parent 를 두면 최소화 뒤 다시 올릴 길이 없다.
+        //   이미 열렸는지는 위에서 OBJTY + browserkey 로 찾는다.
+        // oBrowserOptions.parent = oCurrWin;
 
         // [HTML5] 네이티브 창 opacity 페이드 미사용(OS 리컴포짓이라 무겁다) — 창은 즉시 띄우고(show=false 로
         //   위치 잡힌 뒤 표시), 등장 효과는 창 안 컨텐츠를 CSS opacity transition 으로 처리(errorPageEditorFrame).

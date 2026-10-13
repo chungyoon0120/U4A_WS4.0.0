@@ -2243,6 +2243,13 @@
                 // oChild.show();
                 try {
                     oChild.setOpacity(1);
+
+                    // 2026-10-14 장군님 지시 - 되돌릴 때 맨 위로 올린다.
+                    //   숨길 때 hide() 가 아니라 투명도 0 이라(원본 동일) 창은 제자리에 그대로 있다.
+                    //   그 사이 메인 창이 앞으로 와 있으면 투명도만 돌려도 메인 뒤에 깔린 채로 보인다.
+                    //   parent 를 뗀 뒤로는 「자식은 늘 부모 위」 보장도 없다 → moveTop 으로 올린다.
+                    //   focus 는 주지 않는다(메인에서 하던 입력을 뺏지 않게) - moveTop 은 z-order 만 바꾼다.
+                    oChild.moveTop();
                 } catch (error) {
                     if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
 
