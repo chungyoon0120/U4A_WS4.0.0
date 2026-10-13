@@ -188,8 +188,8 @@
                     { key: "WMENU10_01", icon: "arrows-rotate", text: _txt("B40"), disabled: !_bDevMenu },
                     {
                         key: "WMENU10_02", icon: "right-left", text: _txt("B41"), items: [
-                            { key: "WMENU10_02_01", icon: "file-import", text: _txt("B42"), disabled: !_bDevMenu },
-                            { key: "WMENU10_02_02", icon: "file-export", text: _txt("B43") }
+                            { key: "WMENU10_02_01", act: "APPIMPORT", icon: "file-import", text: _txt("B42"), disabled: !_bDevMenu },
+                            { key: "WMENU10_02_02", act: "APPEXPORT", icon: "file-export", text: _txt("B43") }
                         ]
                     },
                     {
@@ -197,7 +197,7 @@
                             { key: "WMENU10_04_01", icon: "bolt", text: _txt("B46") }
                         ]
                     },
-                    { key: "WMENU10_05", icon: "circle-info", text: _txt("B48") }
+                    { key: "WMENU10_05", act: "WSINFO", icon: "circle-info", text: _txt("B48") }
                 ]
             },
             {
@@ -215,24 +215,24 @@
             },
             {
                 key: "WMENU30", text: _txt("B36"), items: [
-                    { key: "WMENU30_01", icon: "plus", text: _txt("A09") },
-                    { key: "WMENU30_02", icon: "xmark", text: _txt("B51") },
-                    { key: "WMENU30_03", icon: "gear", text: _txt("B52") },
-                    { key: "WMENU30_04", icon: "right-from-bracket", text: _txt("B53") },
+                    { key: "WMENU30_01", act: "NEWWINDOW", icon: "plus", text: _txt("A09") },
+                    { key: "WMENU30_02", act: "CLOSEWINDOW", icon: "xmark", text: _txt("B51") },
+                    { key: "WMENU30_03", act: "OPTIONS", icon: "gear", text: _txt("B52") },
+                    { key: "WMENU30_04", act: "LOGOFF", icon: "right-from-bracket", text: _txt("B53") },
                     {
-                        key: "WMENU30_06", icon: "user-gear", text: _txt("B55"), items: [
-                            { key: "WMENU30_06_01", icon: "bug", text: _txt("M252") },
-                            { key: "WMENU30_06_02", icon: "note-sticky", text: _txt("B54") },
-                            { key: "WMENU30_06_03", icon: "triangle-exclamation", text: _txt("B70") }
+                        key: "WMENU30_06", act: "ADMIN", icon: "user-gear", text: _txt("B55"), items: [
+                            { key: "WMENU30_06_01", act: "DEVTOOL", icon: "bug", text: _txt("M252") },
+                            { key: "WMENU30_06_02", act: "RELEASENOTE", icon: "note-sticky", text: _txt("B54") },
+                            { key: "WMENU30_06_03", act: "ERRORLOG", icon: "triangle-exclamation", text: _txt("B70") }
                         ]
                     },
-                    { key: "WMENU30_07", icon: "server", text: _txt("C42") }
+                    { key: "WMENU30_07", act: "SERVERINFO", icon: "server", text: _txt("C42") }
                 ]
             },
             {
                 key: "WMENU50", text: _txt("B39"), items: [
-                    { key: "WMENU50_01", icon: "book-open-reader", text: _txt("B44") },
-                    { key: "WMENU50_04", icon: "keyboard", text: _txt("M253") }
+                    { key: "WMENU50_01", act: "HELPDOC", icon: "book-open-reader", text: _txt("B44") },
+                    { key: "WMENU50_04", act: "SHORTCUTS", icon: "keyboard", text: _txt("M253") }
                 ]
             },
             {
@@ -454,6 +454,15 @@
             //   새로 짓지 않고 **코드가 이미 쓰는 it.key 그대로** 내보낸다(장군님 결정 2026-10-08 「1번으로 해라」).
             //   하위 메뉴를 여는 줄도 같이 붙는다 — 거기까지 눌러야 안쪽 줄에 닿는다.
             if (it.key) { oItem.setAttribute("data-menu-item", it.key); }
+            // 2026-10-13 장군님 지시 - 메뉴 번호(it.key)는 하는 일이 아니라
+            //   자리순으로 붙어 있어 **같은 번호가 화면마다 다른 메뉴**가 된다
+            //   (WS20 에만 메뉴가 둘 더 있어 뒤가 한 칸식 밀렸다 —
+            //    WMENU30_03 = WS10 에서는 Options, WS20 에서는 HTML5 Editor).
+            //   그래서 하는 일을 적은 it.act 를 따로 내보낸다 — 번호가 무엇이든
+            //   하는 일로 집을 수 있다. 요슭 = u4a-ws4-mcp .docs/request/2026-10-12_menu-code.md
+            //   ★번호·핸들러 이름·구조는 그대로 다 — 속성만 더한다.
+            //   값 없는 줄(편집기 메뉴·Test 메뉴)은 붙이지 않는다(.analy/21).
+            if (it.act) { oItem.setAttribute("data-act", it.act); }
             else if (!_bMenuKeyWarned && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
                 _bMenuKeyWarned = true;
                 U4ALOG.warn("값이 없어 그만둠", "menu item key",

@@ -32,6 +32,9 @@ module.exports = function (REMOTE, oAPP, oPARAM) {
     if (oResult.ISOPEN) {
         try {
             let oWindow = oResult.WINDOW;
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oWindow.isMinimized()) { oWindow.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             WSUTIL.setParentCenterBounds(REMOTE, oWindow);
             oWindow.show();
             WSUTIL.setParentCenterBounds(REMOTE, oWindow);
@@ -52,7 +55,10 @@ module.exports = function (REMOTE, oAPP, oPARAM) {
 
     oBrowserOptions.title = WSUTIL.getWsMsgClsTxt(USERINFO.LANGU, "ZMSG_WS_COMMON_001", "343"); // Code Editor Snippet Designer
     oBrowserOptions.autoHideMenuBar = true;
-    oBrowserOptions.parent = CURRWIN;
+    // 2026-10-12 장군님 지시 (최소화 버튼 추가 + parent 제거) - parent 를 지정하지 않는다.
+    //   제목줄을 직접 그리는 창에서 parent 를 두면 Minimize 뒤 Restore 할 길이 없어진다.
+    //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
+    //   뒤로가기 일괄 닫기·busy 중 숨기기는 browserkey 를 비교하는 getSiblingWindows 가 맡는다.
     oBrowserOptions.modal = false;             // 비모달 — 부모 계속 사용(parent 지정으로 항상 위).
     oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;   // 흰색 플래시 방지(즉시 불투명)
 

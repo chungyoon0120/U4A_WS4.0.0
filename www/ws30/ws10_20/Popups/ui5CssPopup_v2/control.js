@@ -83,7 +83,10 @@ export async function start(require, IF_DATA, fnCallback){
 
         oBrowserOptions.title = fnGetMsgClsText("/U4A/CL_WS_COMMON", "B58"); // UI5 Predefined CSS
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.parent = CURRWIN;
+        // 2026-10-12 장군님 지시 (parent 제거 11번) - parent 를 지정하지 않는다.
+        //   이 창은 제목줄에 최소화·최대화 버튼이 이미 있는데 parent 가 있어
+        //   Minimize 뒤 Restore 할 길이 없었다. 되돌리려면 이 줄을 다시 넣으면 된다.
+        //   뒤로가기 일괄 닫기·busy 중 숨기기는 browserkey 를 비교하는 getSiblingWindows 가 맡는다.
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
         oBrowserOptions.width = 1200;
 

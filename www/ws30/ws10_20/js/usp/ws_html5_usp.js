@@ -206,20 +206,20 @@
                 { key: "WMENU20_05", icon: "code", text: _wsMsg("059") }        // Source Pattern
             ] },
             { key: "WMENU30", text: _msg("B36"), items: [
-                { key: "WMENU30_01", icon: "window-restore", text: _msg("A09") },          // New Window
-                { key: "WMENU30_02", icon: "xmark", text: _msg("B51") },                   // Close Window
-                { key: "WMENU30_03", icon: "gear", text: _msg("B52") },                    // Options
-                { key: "WMENU30_04", icon: "right-from-bracket", text: _msg("B53") },      // Logoff
-                { key: "WMENU30_06", icon: "user-gear", text: _msg("B55"), items: [        // Administrator
-                    { key: "WMENU30_06_01", icon: "bug", text: _wsMsg("252") },            // DevTool
-                    { key: "WMENU30_06_02", icon: "note-sticky", text: _msg("B54") },      // Release Notes
-                    { key: "WMENU30_06_03", icon: "triangle-exclamation", text: _msg("B70") } // Error Log
+                { key: "WMENU30_01", act: "NEWWINDOW", icon: "window-restore", text: _msg("A09") },          // New Window
+                { key: "WMENU30_02", act: "CLOSEWINDOW", icon: "xmark", text: _msg("B51") },                   // Close Window
+                { key: "WMENU30_03", act: "OPTIONS", icon: "gear", text: _msg("B52") },                    // Options
+                { key: "WMENU30_04", act: "LOGOFF", icon: "right-from-bracket", text: _msg("B53") },      // Logoff
+                { key: "WMENU30_06", act: "ADMIN", icon: "user-gear", text: _msg("B55"), items: [        // Administrator
+                    { key: "WMENU30_06_01", act: "DEVTOOL", icon: "bug", text: _wsMsg("252") },            // DevTool
+                    { key: "WMENU30_06_02", act: "RELEASENOTE", icon: "note-sticky", text: _msg("B54") },      // Release Notes
+                    { key: "WMENU30_06_03", act: "ERRORLOG", icon: "triangle-exclamation", text: _msg("B70") } // Error Log
                 ] },
-                { key: "WMENU30_07", icon: "server", text: _msg("C42") }                   // Server Information
+                { key: "WMENU30_07", act: "SERVERINFO", icon: "server", text: _msg("C42") }                   // Server Information
             ] },
             { key: "WMENU50", text: _msg("B39"), items: [
-                { key: "WMENU50_01", icon: "book-open-reader", text: _msg("B44") },         // U4A Help Document
-                { key: "WMENU50_04", icon: "keyboard", text: _wsMsg("253") }               // Keyboard Shortcut List
+                { key: "WMENU50_01", act: "HELPDOC", icon: "book-open-reader", text: _msg("B44") },         // U4A Help Document
+                { key: "WMENU50_04", act: "SHORTCUTS", icon: "keyboard", text: _wsMsg("253") }               // Keyboard Shortcut List
             ] },
             { key: "Test10", text: _msg("B69"), staffOnly: true, items: [
                 { key: "Test97", text: "개발툴" },
