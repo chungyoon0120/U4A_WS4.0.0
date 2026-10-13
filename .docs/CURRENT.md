@@ -68,12 +68,12 @@ SAP U4A Workspace 를 **UI5 → HTML5(순수 DOM + 공통 컴포넌트)** 로 1:
 ## 일하는 순서
 
 1. **`.docs/history/` 에서 건드릴 화면 이름으로 지난 이력을 찾아 읽는다** (전체를 다 읽지 말 것)
-2. 그 영역의 `.works/<영역>/00_현황판.md` 에서 남은 테스트를 본다
+2. `.docs/TODO.md` 에서 남은 테스트·정할 것을 본다 (현황판 파일은 만들지 않는다 — 2026-10-13 지시)
 3. 화면·UX 작업이면 `.analy/16_공통_화면UX_표준.md` + 해당 기능 문서를 읽는다
 4. 고친다 — 로그를 같이 넣는다
 5. `node --check` 로 문법을 본다
 6. **이력을 남긴다.** 소스를 고쳤으면 안 남길 때 답변이 안 끝난다 (`.docs/README.md` 참고)
-7. 이 문서는 **장군님이 지시할 때만** 고친다 — 할 일·테스트는 그 영역 현황판에 남긴다
+7. 이 문서는 **지금 상태**만 담는다(덮어쓴다) — 앞으로 할 일은 `.docs/TODO.md`, 지나간 일은 `.docs/history/`
 
 ---
 
@@ -83,10 +83,20 @@ SAP U4A Workspace 를 **UI5 → HTML5(순수 DOM + 공통 컴포넌트)** 로 1:
 |---|---|
 | 변환 표준 (SSOT) | `.analy/` — 입구는 `00_개요_및_컨버전전략.md`, 작업 방식은 `13_AI_작업지시_가이드.md`, 화면은 `16_공통_화면UX_표준.md` |
 | 원본 소스 위치 (읽기 전용) | `.analy/18_원본소스_위치_SSOT.md` |
-| 영역별 테스트·이력 | `.works/<영역>/00_현황판.md` · `00_히스토리.md` (폴더 51개) |
+| 앞으로 할 일 · 테스트 | `.docs/TODO.md` 한 곳 |
+| 지나간 일 | `.docs/history/` (맨 아래 「최근 이력」 링크에서 출발) |
 | 로그·오류처리 표준 | `.works/DEV_STANDARD_로그.md` · `.works/DEV_STANDARD_오류처리.md` |
 | 화면 소스 | `www/ws30/ws10_20/` |
 | 공통 컴포넌트 | `www/ws30/ws10_20/theme/` (`u4a-ui.js` · `tokens.css` · `shell.css` · `bootstrap-skin`) — **직접 고치지 말고 스코프로 덧댄다** |
 | 앱 본체 | `electron/` |
 | 작업 규칙 | `CLAUDE.md` · `AGENTS.md` · `.claude/rules/` |
 | 탐색 제외 | 폴더 이름이 `_` 로 시작하면 백업·폐기물이다. 현행으로 인용하지 않는다 |
+
+---
+
+## 최근 이력
+
+- [2026-10-13 · UI 개인화 팝업 크래시 — 공통 tooltip 글자 수 상한](history/2026/10/2026-10-13_195800_claude_fix_tooltip-clamp-renderer-crash_abc286a4.md)
+- [2026-10-13 · UI 개인화 팝업 — 모든 버튼 busy + 줄 선택 느림](history/2026/10/2026-10-13_154700_claude_fix_p13n-popup-busy-yield-to-paint_abc286a4.md)
+- [2026-10-13 · 텔레그램 전송 차단](history/2026/10/2026-10-13_161500_claude_fix_block-telegram-send_c015f13b.md)
+- [2026-10-13 · 자동 테스트 식별값 통일 (WS10·WS20)](history/2026/10/2026-10-13_153000_claude_feat_data-act-unify-ws10-ws20_c015f13b.md)
