@@ -80,6 +80,18 @@
         catch (e) { console.warn("[WS20][p13n] showMessage failed:", e && e.message, e); }
     }
     function _busy(bOn) { try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+    /**
+     * busy 를 켠 뒤 한 프레임 양보하고 무거운 동기 로직을 돈다 (장군님 지시 2026-10-13).
+     *   이 팝업의 조작(줄 선택·편집·삭제·뒤로·저장·갱신)은 전부 동기라 양보가 없으면
+     *   busy 가 그려질 틈이 없어 화면이 그냥 멈춰 보인다. 실측: 뒤로가기 한 번에 10.6초 멈춤.
+     *   ★끄는 것은 각 흐름의 끝점에서만 한다(lf_setPrevNav / 저장·삭제 끝) — 여기서 끄지 않는다.
+     */
+    async function _busyThen(fn) {
+        _busy(true);
+        try { await APPCOMMON.fnYieldToPaint(); }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        fn();
+    }
     function _unlock() { try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     function _lock() { try { oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     function _esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
@@ -443,7 +455,8 @@
             onClose: function (act) {
                 if (act !== "YES") { return; }
 
-                _busy(true);
+                // ★확인창에서 YES 를 받은 뒤부터가 무거운 구간 — busy 를 켜고 한 프레임 양보한 뒤 돈다.
+                _busyThen(function () {
 
                 var l_folder = _userSysPath();
                 if (!parent.FS.existsSync(l_folder)) {
@@ -477,6 +490,7 @@
                 _busy(false);
                 // 015 Removed.
                 _msg(10, "S", _mw("015"));
+                });
             }
         });
     }
@@ -733,7 +747,7 @@
         oUI.btnBack.type = "button";
         oUI.btnBack.innerHTML = _fa("chevron-left");
         oUI.btnBack.title = _cl("E30");   // E30 Back
-        oUI.btnBack.addEventListener("click", function () { lf_back(); });
+        oUI.btnBack.addEventListener("click", function () { _busyThen(lf_back); });
         oTool.appendChild(oUI.btnBack);
 
         oTool.appendChild(_el("span", "u4aP13nTbSep"));   // 원본 ToolbarSeparator.
@@ -742,7 +756,7 @@
         oUI.btnSave.type = "button";
         oUI.btnSave.innerHTML = _fa("floppy-disk");
         oUI.btnSave.title = _cl("A64");   // A64 Save
-        oUI.btnSave.addEventListener("click", function () { lf_saveP13nData(); });
+        oUI.btnSave.addEventListener("click", function () { _busyThen(lf_saveP13nData); });
         oTool.appendChild(oUI.btnSave);
 
         oUI.btnRegDel = _el("button", "u4a-btn u4a-btn--negative u4aP13nIcoBtn");
@@ -782,7 +796,7 @@
         oUI.btnRefresh.type = "button";
         oUI.btnRefresh.innerHTML = _fa("rotate");
         oUI.btnRefresh.title = _cl("A48");   // A48 Refresh
-        oUI.btnRefresh.addEventListener("click", function () { lf_refresh(); });
+        oUI.btnRefresh.addEventListener("click", function () { _busyThen(lf_refresh); });
         oTool.appendChild(oUI.btnRefresh);
         oPage.appendChild(oTool);
 
@@ -1213,7 +1227,7 @@
                 oEdit.type = "button";
                 oEdit.innerHTML = _fa("pen");
                 oEdit.title = sEditTip;
-                oEdit.addEventListener("click", function (ev) { ev.stopPropagation(); lf_setHeaderLineEdit(h); });
+                oEdit.addEventListener("click", function (ev) { ev.stopPropagation(); _busyThen(function () { lf_setHeaderLineEdit(h); }); });
                 oTdAct.appendChild(oEdit);
             }
             if (h.visible_delete) {
@@ -1233,11 +1247,7 @@
             //   tree 재렌더 · 미리보기 HTML 주입. 양보 전에는 busy 가 paint 될 기회가 없어
             //   화면이 그냥 멈춰 보였다. lf_rowSelect 자체는 동기로 둔다 — 저장/갱신/뒤로가기 같은
             //   내부 호출부가 그 뒤에 busy 를 끄는 순서에 의존하므로 async 로 바꾸면 순서가 깨진다.
-            oTr.addEventListener("click", async function () {
-                _busy(true);
-                try { await APPCOMMON.fnYieldToPaint(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-                lf_rowSelect(h);
-            });
+            oTr.addEventListener("click", function () { _busyThen(function () { lf_rowSelect(h); }); });
 
             oUI.tbody.appendChild(oTr);
         });

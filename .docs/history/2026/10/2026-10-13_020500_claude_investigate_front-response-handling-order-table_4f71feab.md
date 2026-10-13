@@ -291,3 +291,43 @@ B1 `callP13nDesignDataPopup` = getScript, `fnP13nDesignPopupOpen` = loadJs).
 
 **내가 왜 틀렸나**: 응답 **모양을 서버 소스로 확인하지 않고** 「오류면 그 field 가 없겠지」로 단정했다.
 앞서 같은 조사에서 「서버 모양을 먼저 보고 프론트를 본다」를 원칙으로 세웠는데, 이 건에서 그걸 건너뛰었다.
+
+## 판정 기준 재정립 — 「서버가 실제로 낼 수 있는 응답」 (2026-10-13, 장군님 지적)
+
+장군님 지적 두 번:
+1. 「아니 백앤드에서 undefined 로 날라오는 케이스가 없는데 콘솔에서 왜 강제로 테스트를 그렇게 하냐??」
+2. 「지금 백앤드 응답기준으로 프론트에서 지금 뭘 확인하는건지 아직도 목적을 모르냐?」
+
+**목적 = 서버가 실제로 낼 수 있는 응답을 서버 소스에서 먼저 뽑고, 그 응답마다 프론트 대응을 본다.**
+서버가 낼 수 없는 값을 만들어 시험하는 것은 목적 밖이다. 내가 그걸 어겼다.
+
+### 1번(OTR) 철회 — 6번째이자 마지막 정정
+
+- 목록 없이 끝나는 서버 경로: `/U4A/WS000004` `GETOTRTEXTSALIAS` 2995행 `CHECK LT_TEXT IS NOT INITIAL.` 하나.
+- 거기 닿는 조건: 보내온 `ALIAS` 가 빈 배열(deserialize 결과 `LT_ALIAS` 가 비는 것).
+- 부르는 3곳 전부 수집 0건이면 **호출 자체를 안 한다**:
+  `design/js/callDesignContextMenu.js`:1060 · `design/js/uiDesignArea.js`:6436 · `js/ws_html5_ws20_dnd.js`:1100.
+- 오류 두 갈래는 `"T_OTR":[]` 를 같이 보낸다(2958·3024행).
+→ **일어날 수 없다.** 고칠 것도 시험할 것도 아니며, 내가 드린 콘솔 시험·ABAP 디버깅 절차는 **둘 다 폐기**.
+
+### 남은 2건을 같은 기준으로 재확인
+
+| # | 자리 | 서버가 내는 응답 (서버 소스 확인) | 판정 |
+|---:|---|---|---|
+| 1 | `js/ws_html5_ws20_attr.js`:2286 `getLibData` | `/U4A/WS000001` `_GET_LIB_DATA2`: 조회 0건 → `{"ERROR":"X"}` / 끝 → `{"T_DATA":…,"END":"X"}` / 이어받기 → `T_DATA`+`dbtot·dbcnt·fkey·skey`. 본문 빈 응답은 상단 3 CHECK 뿐인데 `CREATE DATA … TYPE TABLE OF (U_TABNM)` 는 실패 시 예외라 핸들러가 `u4a_status: UA0001` 로 가로챈다(handler 97~106행) → 성공 콜백 안 불림 | `ERROR` 유효. 메시지 뒤 `return` → 트리 로드가 안 불려 busy 안 풀림. **원본 동일** |
+| 2 | `js/fnP13nDesignPopupOpen.js`:564 `getP13nPreviewHTML` | `/U4A/WS000007` 684행~: 오류 갈래 없이 **늘 HTML** 을 만든다. FORM 진입 전 실패 시에만 핸들러의 「미지원 안내」 JSON | 이 자리는 **sendAjax 가 아니라 숨은 form POST + iframe**(`oForm.submit()`). busy 해제는 서버 HTML 안의 `CALLBACKFUNC` 한 줄뿐 → 응답이 HTML 이 아니면 영영 안 풀림. **원본 동일**(`U4A_WS3.0.0 … design/js/callP13nDesignDataPopup.js`:1051·1079) |
+
+### 곁가지로 확인한 것 (추측 아니고 소스 확인)
+
+- `getLibData` 는 **GET** 이다(7번째 인자까지 원본과 같게 `"X", true, "GET", fn_error` 를 넘긴다 —
+  `ws_html5_ws20_attr.js`:2357). `ws_common.js`:4246~4266 이 GET 이면 FormData 를 query 로 옮기고
+  `oFormData = undefined` 로 바꾸므로 파라미터는 정상 전달된다.
+- 서버는 ETag 로 **304 Not Modified** 를 낼 수 있다(`ws000001.abap` GETLIBDATA 의 if-none-match 분기).
+  다만 `_RESPONSE_JSON` 이 `cache-control: no-cache` 를 주므로 Chromium 이 저장·재검증하고 **304 를
+  캐시된 200 으로 바꿔 XHR 에 준다** → JS 는 304 를 못 본다. `ws_common.js`:4743 의 status 분기에 안 걸린다.
+- 핸들러는 FORM 안의 모든 예외를 `CATCH CX_ROOT` 로 받아 `(SERVER, ME)` 로 한 번 더 시도하고,
+  그것도 실패하면 `u4a_status: UA0001` + `{"RETCD":"W",…}` 를 보낸다 → 공통 가로채기로 성공 콜백 안 불림.
+
+### 되돌린 것
+- 현황판의 「1번을 눈으로 확인하는 순서(서버 디버깅)」 표 · 「1번 부르는 자리 전부」 표 삭제.
+- 「정해 주실 것」 3개 → **2개**.

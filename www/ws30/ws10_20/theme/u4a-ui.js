@@ -747,6 +747,26 @@
 
         let oTip = null, iTimer = null, oCur = null;
         let _mx = 0, _my = 0;   // 최근 커서 좌표(텍스트가 안 보일 수 있는 영역은 커서 기준 배치)
+
+        // ★ tooltip 글자 수 상한 (장군님 지시 2026-10-13 — 크래시 실측 뒤 적용).
+        //   아주 긴 글을 그대로 넣으면 이 tooltip 은 max-width: 24rem + 줄바꿈 허용이라
+        //   그 글자 전부의 줄바꿈 위치를 계산한다 → renderer 가 죽는다.
+        //   실측(CDP, 2026-10-13): UI 개인화 목록의 866,250 글자짜리 줄에 마우스를 올리면 1초 안에 사망.
+        //   native title 은 브라우저가 알아서 앞부분만 보여 준다(그래서 원본 UI5 는 멀쩡하다) —
+        //   같은 안전장치를 공통에 둔다.
+        const TIP_MAX_CHARS = 1000;
+        let _bTipClampLogged = false;
+        function _clampTip(s) {
+            if (typeof s !== "string" || s.length <= TIP_MAX_CHARS) { return s; }
+            if (!_bTipClampLogged) {
+                _bTipClampLogged = true;   // 같은 줄에 올릴 때마다 쌓이지 않게 한 번만
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("TEXT_CLAMP", "tooltip text " + s.length + " chars",
+                        "shown first " + TIP_MAX_CHARS + " chars only (renderer dies on very long tooltip)");
+                }
+            }
+            return s.slice(0, TIP_MAX_CHARS) + " …";
+        }
         document.addEventListener("mousemove", function (e) { _mx = e.clientX; _my = e.clientY; }, true);
 
         function _ensure() {
@@ -779,7 +799,7 @@
             //   드래그/리사이즈가 transform 이 아닌 position:fixed+left/top 라 부모를 바꿔도 fixed 좌표계는 그대로.
             const oTipHost = (el.closest && el.closest("dialog[open]")) || document.body;
             if (t.parentNode !== oTipHost) { oTipHost.appendChild(t); }
-            t.textContent = sText;
+            t.textContent = _clampTip(sText);
             // ★ 측정 전 중립 위치(0,0)로 리셋 — 이전 표시 위치(예: 뷰포트 우측 끝)에 둔 채로 재면
             //   브라우저가 오른쪽 경계에 맞춰 텍스트를 미리 개행해 offsetWidth 가 좁게 잡히고
             //   (white-space:normal + overflow-wrap:anywhere 라 "More"→"Mo/re" 처럼 짧은 단어도 쪼개짐),
@@ -806,8 +826,9 @@
             if (!el.hasAttribute("title")) { return; }
             const sT = el.getAttribute("title");
             if (sT) {
-                el.setAttribute("data-tip", sT);
-                if (!el.hasAttribute("aria-label")) { el.setAttribute("aria-label", sT); }
+                const sTipT = _clampTip(sT);
+                el.setAttribute("data-tip", sTipT);
+                if (!el.hasAttribute("aria-label")) { el.setAttribute("aria-label", sTipT); }
             }
             el.removeAttribute("title");
         }
@@ -819,7 +840,7 @@
             if (cell.hasAttribute("data-tip") || cell.hasAttribute("title")) { return cell; }
             const s = (cell.textContent || "").trim();
             if (!s) { return null; }
-            cell.setAttribute("data-tip", s);
+            cell.setAttribute("data-tip", _clampTip(s));
             cell.setAttribute("data-tip-trunc", "");   // 잘렸을 때만 표시(_show 가 scrollWidth 검사)
             return cell;
         }
