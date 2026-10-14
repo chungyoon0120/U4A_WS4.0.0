@@ -71,7 +71,7 @@
         .u4aCapDlg { width: min(76vw, 980px); max-height: min(86vh, 780px); padding: 0; display: flex; flex-direction: column; }
         .u4aCapDlg .u4a-dialog__header { cursor: move; user-select: none; }
         .u4aCapDlg .u4a-dialog__header span { flex: 1 1 auto; }
-        /* 닫기 X 스타일은 공통 .u4a-btn-icon(+data-act=close hover 빨강)으로 통일 — 개별 .u4aCapX 스타일 제거 */
+        /* 닫기 X 스타일은 공통 .u4a-btn-icon(+data-act=CLOSE hover 빨강)으로 통일 — 개별 .u4aCapX 스타일 제거 */
         .u4aCapTabs { display: flex; gap: 0.25rem; padding: 0 1rem; border-bottom: 0.0625rem solid var(--line);
                       background: var(--surface); flex: 0 0 auto; }
         .u4aCapTab { appearance: none; border: 0; background: transparent; color: var(--text-muted);
@@ -426,11 +426,11 @@
         // 헤더 아이콘은 메인 툴바 Create 버튼(WS10.js appCreateBtn: fa-file)과 동일하게 — 사용자 인지 통일.
         oHeader.innerHTML = _fa("file") + '<span></span>';
         oHeader.querySelector("span").textContent = sTitle;
-        // 닫기 X — 다른 다이얼로그(Change Layout/Insert)와 동일하게 공통 .u4a-btn-icon + data-act="close".
+        // 닫기 X — 다른 다이얼로그(Change Layout/Insert)와 동일하게 공통 .u4a-btn-icon + data-act="CLOSE".
         //   (.u4aCapX 는 드래그 제외용 JS 훅으로만 유지, 스타일은 공통 컴포넌트가 담당)
         const oXBtn = _el("button", "u4a-btn-icon u4aCapX");
         oXBtn.type = "button";
-        oXBtn.setAttribute("data-act", "close");
+        oXBtn.setAttribute("data-act", "CLOSE");   // 2026-10-15 장군님 지시 — 다른 창과 같은 대문자로 맞춤
         oXBtn.innerHTML = _fa("xmark");
         oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oXBtn.addEventListener("click", function () { lf_closeDialog(oDlg); });
