@@ -254,7 +254,7 @@
 
     function _getSubHeaderButtons() {
         return [
-            { id: "appCreateBtn", icon: "file", text: _txt("A01"), sc: "Ctrl+F12", ev: "ev_AppCreate", devOnly: true },
+            { id: "appCreateBtn", act: "CREATE_APP", icon: "file", text: _txt("A01"), sc: "Ctrl+F12", ev: "ev_AppCreate", devOnly: true },
             { id: "appChangeBtn", act: "CHANGE", icon: "pen-to-square", text: _txt("A02"), sc: "F6", ev: "ev_AppChange", devOnly: true },
             { id: "appDelBtn", act: "DELETE_APP", icon: "trash", text: _txt("A03"), sc: "Ctrl+F10", ev: "ev_AppDelete", devOnly: true, reject: true },
             { id: "appCopyBtn", act: "COPY_APP", icon: "copy", text: _txt("A04"), sc: "Shift+F11", ev: "ev_AppCopy", devOnly: true },
@@ -1168,6 +1168,7 @@
                             var oMInp = document.createElement("input");
                             oMInp.type = "text";
                             oMInp.className = "u4a-tcode";
+                    oMInp.setAttribute("data-act", "TCODE_INPUT");   // 2026-10-14 접혀도 같은 이름으로 집히게
                             oMInp.placeholder = "SAP T-CODE";
                             oMInp.autocomplete = "off";
                             var oSrc = oTcodeFld.input || el.querySelector("input");

@@ -69,3 +69,30 @@ WS10 메뉴에 쓰이고 있어, 툴바에 같은 값을 또 달면 **한 화면
 
 - WS10 서브헤더는 `_renderSubHeader` 안에서 **split 과 평범한 버튼이 분기**된다. split 쪽은
   `_renderSplitButton` 이 이미 `act` 를 처리하므로, 평범한 분기에만 한 줄 넣어야 중복이 안 생긴다.
+
+---
+
+## 이어서 (세 번째 요청 — 요청서 6절 ①~④)
+
+| 번호 | 어디 | 값 |
+|---|---|---|
+| ① | WS10 생성 단추(`appCreateBtn`) | `CREATE_APP` |
+| ② | WS30(USP) 툴바 — `js/usp/ws_html5_usp.js` 의 `_txBtn()` 에 한 줄 + 7곳 | `DISPLAY_MODE`·`CHANGE_MODE`·`ACTIVATE`·`SAVE_APP`·`MIME`·`CONTROLLER`·`RUN`(WS20 과 같은 값) |
+| ③ | 창이 좁아 ⋯ 안에 새로 만들어지는 T-CODE 칸(`ws10_html.js` 공통버튼 오버플로) | `TCODE_INPUT` |
+| ④ | USP 의 T-CODE 칸(UI5 `SearchField`) — `ws_common.js` 의 `onAfterRendering` 에서 이미 잡아 둔 속 `input` 에 한 줄 | `TCODE_INPUT` |
+
+전 파일 `node --check` 통과.
+
+### 알고도 그렇게 한 것 — 같은 이름이 DOM 에 둘 이상
+
+`ACTIVATE`·`SAVE_APP`·`MIME`·`CONTROLLER`·`DISPLAY_MODE`·`CHANGE_MODE`·`RUN`·`TCODE_INPUT` 은
+이제 **WS20 과 WS30(USP) 양쪽에** 있다. WS10/WS20/WS30 은 한 프레임에서 안 쓰는 쪽을
+`display:none` 으로 숨기므로 **같은 이름이 DOM 에 동시에 남는다.**
+상대 창이 「보이는 것만 누른다(꺼진 것·화면이 내려 둔 것은 안 누른다)」고 명시했고, 같은 값을
+달라고 지정했으므로 그대로 했다. **상대 도구가 보임 여부를 안 보면 엉뚱한 화면을 누른다.**
+
+### 또 밟을 함정
+
+- UI5 컨트롤(`SearchField`)에는 생성 시점에 속성을 못 붙인다 — UI5 가 DOM 을 다시 그리면
+  사라진다. `onAfterRendering` 안에서 `getDomRef("I")` 로 속 `input` 을 잡아 붙여야 한다.
+  그 자리가 이미 `maxlength` 때문에 있어 거기에 한 줄만 더했다.

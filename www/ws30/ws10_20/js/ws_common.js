@@ -3643,6 +3643,8 @@
                 }
 
                 oSFInput.setAttribute("maxlength", oSF.getMaxLength());
+                //2026-10-14 자동 테스트 도구가 집을 이름(.analy/21). UI5 가 id 를 스스로 지어 밖에서 못 집던 자리.
+                oSFInput.setAttribute("data-act", "TCODE_INPUT");
 
             }
         });

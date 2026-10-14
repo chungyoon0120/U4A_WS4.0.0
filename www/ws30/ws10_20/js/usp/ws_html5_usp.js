@@ -265,6 +265,8 @@
         if (oCfg.id) { BTN.id = oCfg.id; }
         BTN.className = "u4a-tx-btn" + (oCfg.reject ? " u4a-tx-btn--reject" : "");
         BTN.title = oCfg.tooltip || oCfg.text || "";
+        // 2026-10-14 — 자동 테스트 도구가 집을 이름(.analy/21). 값은 WS20 과 같은 것을 쓴다.
+        if (oCfg.act) { BTN.setAttribute("data-act", oCfg.act); }
         BTN.innerHTML = (oCfg.fa ? _fa(oCfg.fa, oCfg.brand) : "")
             + (oCfg.text ? "<span>" + _esc(oCfg.text) + "</span>" : "");
 
@@ -2000,10 +2002,10 @@
         // Display 모드 버튼 (Change 모드에서 노출 — display 아이콘으로 Display 로 전환). 단축키 Ctrl+F1 동일.
         // mousedown 에서 플래그를 세워 click(mouseup 후) 전에 F3 가 발사되는 경쟁 조건을 막는다.
         (function () {
-            var b1 = _txBtn({ id: "ws30_displayModeBtn", fa: "display", tooltip: sDispChg, evFn: _uspToggleMode });
+            var b1 = _txBtn({ id: "ws30_displayModeBtn", act: "DISPLAY_MODE", fa: "display", tooltip: sDispChg, evFn: _uspToggleMode });
             b1.addEventListener("mousedown", function () { oAPP.attr.uspModeChanging = true; });
             BAR.appendChild(b1);
-            var b2 = _txBtn({ id: "ws30_changeModeBtn", fa: "pen-to-square", tooltip: sDispChg, evFn: _uspToggleMode });
+            var b2 = _txBtn({ id: "ws30_changeModeBtn", act: "CHANGE_MODE", fa: "pen-to-square", tooltip: sDispChg, evFn: _uspToggleMode });
             b2.addEventListener("mousedown", function () { oAPP.attr.uspModeChanging = true; });
             BAR.appendChild(b2);
         }());
@@ -2011,20 +2013,20 @@
         BAR.appendChild(_sep("ws30_sepEdit"));
 
         // Activate (Change 모드) — WS20 와 동일 마법사 아이콘. 단축키 Ctrl+F3 와 동일 핸들러.
-        BAR.appendChild(_txBtn({ id: "ws30_activateBtn", fa: "wand-magic-sparkles", tooltip: _msg("B73") + " (Ctrl+F3)", evFn: _uspActivate }));
+        BAR.appendChild(_txBtn({ id: "ws30_activateBtn", act: "ACTIVATE", fa: "wand-magic-sparkles", tooltip: _msg("B73") + " (Ctrl+F3)", evFn: _uspActivate }));
         // Save (Change 모드 + 개발 권한) — 단축키 Ctrl+S 와 동일 핸들러.
-        BAR.appendChild(_txBtn({ id: "ws30_saveBtn", fa: "floppy-disk", tooltip: _msg("A64") + " (Ctrl+S)", evFn: _uspSave }));
+        BAR.appendChild(_txBtn({ id: "ws30_saveBtn", act: "SAVE_APP", fa: "floppy-disk", tooltip: _msg("A64") + " (Ctrl+S)", evFn: _uspSave }));
 
         BAR.appendChild(_sep());
 
         // MIME Repository — 원본 oAPP.events.ev_pressMimeBtn (가드)
-        BAR.appendChild(_txBtn({ id: "ws30_MimeBtn", fa: "image", text: _msg("A10"),
+        BAR.appendChild(_txBtn({ id: "ws30_MimeBtn", act: "MIME", fa: "image", text: _msg("A10"),
             tooltip: _msg("A10") + " (Ctrl+Shift+F12)", ev: "ev_pressMimeBtn" }));
         // Controller (Class Builder) — USP 전용(일반 핸들러는 oAppInfo 누락). evFn 으로 /WS30/APP 전달.
-        BAR.appendChild(_txBtn({ id: "ws30_controllerBtn", fa: "screwdriver-wrench", text: _msg("A11"),
+        BAR.appendChild(_txBtn({ id: "ws30_controllerBtn", act: "CONTROLLER", fa: "screwdriver-wrench", text: _msg("A11"),
             tooltip: _msg("C38") + " (Ctrl+F12)", evFn: _uspControllerClass }));
         // Application Execution — USP 전용 ev_AppExec(일반 핸들러는 USP 미지원). evFn 직접 연결.
-        BAR.appendChild(_txBtn({ id: "ws30_appExecBtn", fa: "globe", text: _msg("A06"),
+        BAR.appendChild(_txBtn({ id: "ws30_appExecBtn", act: "RUN", fa: "globe", text: _msg("A06"),
             tooltip: _msg("A06") + " (F8)", evFn: _uspAppExec }));
 
         return BAR;
