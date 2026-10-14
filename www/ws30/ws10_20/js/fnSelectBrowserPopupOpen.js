@@ -96,6 +96,7 @@
 
         var oDlg = document.createElement("dialog");
         oDlg.id = C_DLG_ID;
+        oDlg.setAttribute("data-act", "DLG_BROWSER");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
         oDlg.className = "u4a-dialog u4aSelBrwsDlg";
 
         // ── 헤더 (구 internet-browser 아이콘 + C99 Select Default Browser) ──

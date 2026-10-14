@@ -325,6 +325,7 @@
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aAppF4Dlg";
         oDlg.id = "u4aAppF4Dlg";
+        oDlg.setAttribute("data-act", "DLG_APPF4");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
         // ★ 공통 "닫으면 DOM 제거" 위임에서 제외(opt-out). 이 팝업은 닫기 경로를 직접 구분한다:
         //   · 앱 조회(_doDisplay) = lf_hide() 숨김(DOM 유지) → WS10 복귀/다음 F4 에 재표시(원본 setVisible 상태보존)
         //   · 명시적 닫기(X·푸터·ESC·선택완료) = lf_close() 숨긴 뒤 DOM 제거 → 다음 열기는 새 build(상태 폐기)

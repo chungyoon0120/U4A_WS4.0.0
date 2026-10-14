@@ -1532,6 +1532,7 @@
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aSvrInfoDlg";
         oDlg.id = "u4aSvrInfoDlg";
+        oDlg.setAttribute("data-act", "DLG_SRVINFO");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
 
         function lf_close() {
             try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }

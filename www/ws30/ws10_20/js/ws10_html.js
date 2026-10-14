@@ -1119,7 +1119,7 @@
         //   다른 지우기 단추와 구분이 안 됐다. 칸의 id(sapTcode) 를 그대로 붙인다.
         try {
             var oTcodeClr = oTcodeFld.el.querySelector(".u4a-field__clear");
-            if (oTcodeClr) { oTcodeClr.setAttribute("data-clear", "sapTcode"); oTcodeClr.setAttribute("data-act", "sapTcode_CLEAR"); }   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
+            if (oTcodeClr) { oTcodeClr.setAttribute("data-clear", "sapTcode"); oTcodeClr.setAttribute("data-act", "TCODE_INPUT_CLEAR"); }   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         o.appendChild(oTcodeFld.el);
 

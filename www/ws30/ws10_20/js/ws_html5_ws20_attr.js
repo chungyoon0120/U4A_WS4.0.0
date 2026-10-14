@@ -5522,6 +5522,7 @@
          *    Aggregations, sticky)만으로 구분. 섹션 바는 그룹 헤더와 "Properties" 중복이었음) */
         var ROWS = document.createElement("div");
         ROWS.id = "ws20AttrRows";
+        ROWS.setAttribute("data-act", "ATTR_ROWS");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
         ROWS.className = "u4aWs20AttrRows";
         SCROLLER.appendChild(ROWS);
 

@@ -96,3 +96,36 @@ WS10 메뉴에 쓰이고 있어, 툴바에 같은 값을 또 달면 **한 화면
 - UI5 컨트롤(`SearchField`)에는 생성 시점에 속성을 못 붙인다 — UI5 가 DOM 을 다시 그리면
   사라진다. `onAfterRendering` 안에서 `getDomRef("I")` 로 속 `input` 을 잡아 붙여야 한다.
   그 자리가 이미 `maxlength` 때문에 있어 거기에 한 줄만 더했다.
+
+---
+
+## 이어서 (네 번째 — 요청서 2-4 의 10곳 + 지우기 이름 맞추기)
+
+자동 테스트 쪽 대화창이 값을 보내 와 그대로 달았다.
+
+| 어디 | 값 | 고친 파일 |
+|---|---|---|
+| 앱 검색 도움말 창 | `DLG_APPF4` | `fnAppF4PopupOpen.js` |
+| 복사 창 | `DLG_APPCOPY` | `fnAppCopyPopupOpen.js` |
+| 서버 정보 창 | `DLG_SRVINFO` | `ws_fn_04.js` |
+| 단축키 창 | `DLG_SHORTCUT` | `fnKeyboardShortcutPopupOpen.js` |
+| 브라우저 선택 창 | `DLG_BROWSER` | `fnSelectBrowserPopupOpen.js` |
+| 속성 줄이 사는 자리 | `ATTR_ROWS` | `ws_html5_ws20_attr.js` |
+| 알림 글 WS10·WS20·WS30 | `FOOTER` (셋 다 같은 값) | **공통 생성기 `footerMarkup` 한 곳**(`theme/u4a-ui.js`) |
+| 처리중 막 (메인 셸) | `BUSY` | `theme/u4a-busy.js` — 처음 켤 때 스스로 만드는 자리 |
+| 처리중 막 (MIME 창) | `BUSY` | `Popups/mimeRepository/frame.html` |
+| SAP T-CODE 칸 지우기 | `sapTcode_CLEAR` → **`TCODE_INPUT_CLEAR`** | `ws10_html.js` |
+
+전 파일 `node --check` 통과.
+
+### 왜 이름을 바꿔도 안 깨지나
+
+어제 정한 `sapTcode_CLEAR` 는 「한 번 정한 이름은 바꾸지 않는다」에 걸려 그대로 뒀었다.
+상대가 **먼저 둘 다 받게 고쳐 두겠다**(`TCODE_INPUT_CLEAR` 를 먼저 찾고 없으면 옛 이름)고
+알려 와 그 전제 아래 바꿨다. 이름을 바꿀 때는 **받는 쪽이 둘 다 받게 된 것을 확인한 뒤**에만 바꾼다.
+
+### 안 건드린 것
+
+- 서버 리스트 화면(`www/ServerList_v2/ServerList.html`)의 처리중 막. 요청 목록에 없다.
+- 창이 좁아 ⋯ 안으로 접힌 단추용 범위(scope)는 **상대 몫**으로 정리됐다(숨은 것이 둘일 때
+  첫 번째를 집으므로). 우리가 더 할 것은 없다.

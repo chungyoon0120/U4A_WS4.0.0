@@ -43,6 +43,7 @@
         var oDlg = document.createElement("dialog");
         oDlg.id = BUSY_ID;
         oDlg.className = "u4aWsBusyIndicator";
+        oDlg.setAttribute("data-act", "BUSY");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
         oDlg.innerHTML =
             '<div class="u4aWsBusyCard">' +
                 '<div class="u4aWsSpinner"></div>' +

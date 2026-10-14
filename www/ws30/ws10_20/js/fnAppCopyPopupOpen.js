@@ -125,6 +125,7 @@
         // ── 다이얼로그 골격 ────────────────────────────────────────────
         const oDlg = document.createElement("dialog");
         oDlg.id = C_APP_COPY_DLG_ID;
+        oDlg.setAttribute("data-act", "DLG_APPCOPY");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
         oDlg.className = "u4a-dialog u4aCopyDlg";
 
         // 헤더 — 메인 툴바 Copy 버튼(fa-copy)과 동일 아이콘으로 인지 통일.

@@ -1842,7 +1842,8 @@
     function _footerEl(elOrId) { return (typeof elOrId === "string") ? document.getElementById(elOrId) : elOrId; }
     function footerMarkup(sId) {
         return '' +
-            '<div class="u4a-footer" id="' + (sId || "") + '" data-show="false" data-type="I">' +
+            // 2026-10-14 — 자동 테스트 도구는 보이는 것 하나를 집으므로 화면마다 같은 이름을 쓴다(.analy/21).
+            '<div class="u4a-footer" id="' + (sId || "") + '" data-act="FOOTER" data-show="false" data-type="I">' +
             '<span class="u4a-footer__icon"><i class="fa-solid fa-circle-info"></i></span>' +
             '<span class="u4a-footer__text"></span>' +
             '<button class="u4a-btn-icon u4a-footer__close" type="button" title="Close" data-u4a-footer-close><i class="fa-solid fa-xmark"></i></button>' +
