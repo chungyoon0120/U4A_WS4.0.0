@@ -18,6 +18,45 @@
         APPCOMMON = oAPP.common;
 
 
+    /************************************************************************
+     * 창을 "호출한 창" 가운데로 놓는다 (장군님 지시 2026-10-14)
+     * ----------------------------------------------------------------------
+     *  「호출한 윈도우 위에 뜨는게 맞는거 같아 사람 인지 심리로 봤을때」.
+     *  공통 setParentCenterBounds 는 늘 메인 창(CURRWIN) 기준이라, 별창이 띄운 창도
+     *  메인 한가운데에 떠서 "내가 누른 창"과 멀어진다.
+     *  화면(작업 영역) 밖으로 나가지 않게 가둔다. 성공하면 true.
+     ************************************************************************/
+    function lf_centerOnWindow(oChildWin, oBaseWin) {
+
+        try {
+
+            if (!oChildWin || oChildWin.isDestroyed()) { return false; }
+            if (!oBaseWin || oBaseWin.isDestroyed()) { return false; }
+
+            const oBase = oBaseWin.getBounds(),
+                  oChild = oChildWin.getBounds();
+
+            let iX = Math.round(oBase.x + (oBase.width - oChild.width) / 2),
+                iY = Math.round(oBase.y + (oBase.height - oChild.height) / 2);
+
+            const SCREEN = REMOTE.require("electron").screen,
+                  oArea = SCREEN.getDisplayMatching(oBase).workArea;
+
+            iX = Math.min(Math.max(iX, oArea.x), oArea.x + oArea.width - oChild.width);
+            iY = Math.min(Math.max(iY, oArea.y), oArea.y + oArea.height - oChild.height);
+
+            oChildWin.setBounds({ x: iX, y: iY, width: oChild.width, height: oChild.height });
+
+            return true;
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            return false;
+        }
+
+    } // end of lf_centerOnWindow
+
+
     oAPP.fn.fnErrorPageEditorPopupOpen = function () {
 
         // busy 키고 Lock 걸기
@@ -217,6 +256,28 @@
     /************************************************************************
      * Error Page Editor 팝업의 미리보기 IPCMAIN 이벤트
      * **********************************************************************/
+    /************************************************************************
+     * 미리보기 창을 그것을 띄운 오류 페이지 에디터 창 가운데로 옮긴다.
+     ************************************************************************/
+    function lf_centerOnPreviewOpener(oPrevWin) {
+
+        try {
+
+            const oEditWin = APPCOMMON.getCheckAlreadyOpenWindow2("ERRPAGE");
+
+            if (!oEditWin.ISOPEN) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "ERRPAGE window", "error page preview stays centered on the main window");
+                }
+                return;
+            }
+
+            lf_centerOnWindow(oPrevWin, oEditWin.WINDOW);
+
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+    } // end of lf_centerOnPreviewOpener
+
     oAPP.fn.fnIpcMain_ErrorPagePreview = function (event, res) {        
 
         const BROWSKEY = parent.getBrowserKey();
@@ -337,8 +398,13 @@
         // 브라우저가 활성화 될 준비가 될때 타는 이벤트
         oBrowserWindow.once('ready-to-show', () => {
 
-            // 부모 위치 가운데 배치한다.
-            parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);            
+            // 부모 위치 가운데 배치한다. (별창 열림 로그도 이 공통 함수가 남긴다)
+            parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
+
+            // 2026-10-14 장군님 지시 - 「호출한 윈도우 위에 뜨는게 맞다」.
+            //   이 창을 띄운 것은 메인 창이 아니라 오류 페이지 에디터 창이므로 그 창 가운데로 옮긴다.
+            //   못 찾으면 위 공통 배치(메인 가운데) 그대로 둔다.
+            lf_centerOnPreviewOpener(oBrowserWindow);
 
         });
 
@@ -347,7 +413,10 @@
             oBrowserWindow.webContents.send('if-Error-Page-prev', oSaveData);
 
             // 부모 위치 가운데 배치한다.
-            parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);            
+            parent.WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);
+
+            // 2026-10-14 장군님 지시 - 호출한 창(오류 페이지 에디터 창) 가운데로 옮긴다.
+            lf_centerOnPreviewOpener(oBrowserWindow);
 
             // [HTML5] 네이티브 opacity 페이드 제거 — 로드 완료 시 닫기 버튼만 즉시 활성화.
             //   [2026-09-13] 여기서 창을 표시한다(show:false 로 만들어 뒀다) — 빈 창 먼저 보이는 것 방지.

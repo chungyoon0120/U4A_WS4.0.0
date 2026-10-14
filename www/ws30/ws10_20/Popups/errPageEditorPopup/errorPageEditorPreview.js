@@ -18,16 +18,21 @@
 
 var REMOTE = require('@electron/remote'),
     IPCRENDERER = require('electron').ipcRenderer,
+    IPCMAIN = REMOTE.require('electron').ipcMain,
     PATH = REMOTE.require('path'),
     APP = REMOTE.app,
     APPPATH = APP.getAppPath(),
+    FS = REMOTE.require('fs'),
+    USERDATA = APP.getPath('userData'),
     PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")),
     WSUTIL = require(PATHINFO.WSUTIL),
     CURRWIN = REMOTE.getCurrentWindow();
 
 var oQueryParams = WSUTIL.QueryString.parse(location.href);
 
-var BGCOL = oQueryParams.BGCOL,
+var USERINFO = oQueryParams.USERINFO,
+    SYSID = (USERINFO && USERINFO.SYSID) || "",
+    BGCOL = oQueryParams.BGCOL,
     TITLE = oQueryParams.TITLE;
 
 // 사용자 HTML 과 iframe 준비 상태 — 어느 쪽이 늦게 와도 그린다(느린 PC 에서 순서가 바뀐다).
@@ -79,6 +84,45 @@ function _renderHtml() {
     } catch (error) {
         console.error("[EPEV-001] writing user HTML into the preview body failed:", error && error.message, error);
     }
+
+}
+
+/************************************************************************
+ * 라이브 테마 변경 추종 (★별창 공통 필수 — .analy/16 §2.6.2)
+ * --------------------------------------------------------------------------
+ *  장군님 지시 2026-10-14 — 「테마 변경될 때 같이 바뀌는 로직이 빠졌어 이거 필수야」.
+ *  공통 헤더(.u4a-titlebar)를 쓰는 창은 워크스페이스 테마를 **켜져 있는 동안에도** 따라가야 한다.
+ *  안 넣으면 사용자가 테마를 바꿔도 그 창만 옛 색으로 남는다.
+ *  ※ 본문 iframe 은 사용자가 작성한 오류 페이지라 테마를 입히지 않는다(원본 그대로 보여 준다).
+ ************************************************************************/
+function _getThemeInfo() {
+    try {
+        if (!SYSID) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "SYSID", "live theme change cannot be followed in the error page preview window");
+            }
+            return null;
+        }
+        var sPath = PATH.join(USERDATA, "p13n", "theme_ws4", SYSID + ".json");
+        if (!FS.existsSync(sPath)) { return null; }
+        return JSON.parse(FS.readFileSync(sPath, "utf-8"));
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return null; }
+}
+
+function _onThemeChange() {
+
+    var oTheme = _getThemeInfo();
+    if (!oTheme || !oTheme.THEME) { return; }
+
+    try {
+        if (oTheme.BGCOL) {
+            CURRWIN.webContents.insertCSS("html,body{margin:0;height:100%;background-color:" + oTheme.BGCOL + ";}");
+            BGCOL = oTheme.BGCOL;
+        }
+    } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+    try { if (window.U4ATheme) { U4ATheme.apply(oTheme.THEME); } }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
 }
 
@@ -197,4 +241,18 @@ document.addEventListener("DOMContentLoaded", function () {
     try { CURRWIN.setMenu(null); }
     catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
+    // 라이브 테마 변경 구독(SYSID 별) — 17번 에디터 창과 같은 짝.
+    if (SYSID) {
+        try { IPCMAIN.on("if-p13n-themeChange-" + SYSID, _onThemeChange); }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    }
+
 });
+
+// 창이 닫힐 때 구독 해제(누수 방지) — 17번 에디터 창과 같은 짝.
+window.onbeforeunload = function () {
+    if (SYSID) {
+        try { IPCMAIN.removeListener("if-p13n-themeChange-" + SYSID, _onThemeChange); }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    }
+};
