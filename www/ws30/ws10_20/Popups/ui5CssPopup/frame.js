@@ -48,7 +48,31 @@ let oAPP = (function (window) {
         return oThemeJsonData;
 
     } // end of oAPP.fn.getThemeInfo
-    
+
+    /************************************************************************
+     * HTML5 WS4 테마 키(예: horizon_white/horizon_dark) → UI5 표준 테마명으로 단순화.
+     *   ★ raw 키를 서버(/getui5_pre_css)로 그대로 넘기면 서버에 해당 테마 CSS 가 없어
+     *     .../themes/<key>/library.css 404 → sap.ui.core.theming.Parameters 실패 → 색 깨짐.
+     *   UI5 는 sap_horizon / sap_horizon_dark 만 로드 → 다크/라이트로만 단순화.
+     *   판정: 키에 "dark" 포함 or 배경색(BGCOL) 휘도가 어두우면 dark. (.analy/12 §5.3)
+     *   2026-10-14 장군님 지시 — 신 버전 창(ui5CssPopup_v2/main/frame.js)과 같은 방식으로 맞춤.
+     ************************************************************************/
+    oAPP.fn.toUI5Theme = function (sKey, sBgCol) {
+        var bDark = String(sKey || "").toLowerCase().indexOf("dark") !== -1;
+        if (!bDark && sBgCol) {
+            var s = String(sBgCol).trim().replace(/^#/, ""), r, g, b;
+            if (/^[0-9a-f]{3}$/i.test(s)) { s = s.replace(/(.)/g, "$1$1"); }   // 3자리 단축 hex(#abc)→6자리
+            var mHex = s.match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+            if (mHex) { r = parseInt(mHex[1], 16); g = parseInt(mHex[2], 16); b = parseInt(mHex[3], 16); }
+            else {
+                var mRgb = s.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+                if (mRgb) { r = +mRgb[1]; g = +mRgb[2]; b = +mRgb[3]; }
+            }
+            if (typeof r === "number") { bDark = (0.299 * r + 0.587 * g + 0.114 * b) < 128; }
+        }
+        return bDark ? "sap_horizon_dark" : "sap_horizon";
+    }; // end of oAPP.fn.toUI5Theme
+
 
     oAPP.setBusyIndicator = (bIsBusy) => {
 
@@ -181,7 +205,11 @@ let oAPP = (function (window) {
         oAPP.attr.oIconUrl = oInfo.oIconUrl; // SAP ICON PATH
 
         let oIconUrl = oInfo.oIconUrl, // sap icon url
-            sThemeName = oInfo.oThemeInfo.THEME, // 테마정보
+            // 2026-10-14 장군님 지시 — WS4 테마 키(horizon_white 등)를 그대로 서버에 넘기면
+            //   그 이름의 UI5 테마 CSS 가 없어 library.css 404 → 색이 깨진다.
+            //   신 버전 창(ui5CssPopup_v2)과 같이 UI5 표준 테마명으로 바꿔 넘긴다.
+            sThemeName = oAPP.fn.toUI5Theme(oInfo.oThemeInfo && oInfo.oThemeInfo.THEME,
+                                            oInfo.oThemeInfo && oInfo.oThemeInfo.BGCOL), // 테마정보
             sUrl = oInfo.sServerPath + "/getui5_pre_css"; // 서버 호출 url
 
         // 서버로 던질 파라미터
