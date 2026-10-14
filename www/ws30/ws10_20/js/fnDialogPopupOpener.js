@@ -716,15 +716,104 @@
 
         var sPopupName = "BINDPOPUP";
 
-        // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        var oResult = APPCOMMON.getCheckAlreadyOpenWindow(sPopupName);
-        if (oResult.ISOPEN) {
+        /********************************************************************
+         * [parent 제거 — 원본(as-is) 1:1 이식, 2026-10-14]
+         * 원본 U4A_WS3.0.0 fnDialogPopupOpener.js(v3.6.4-3, PES)가 이미
+         *   oBrowserOptions.parent 매핑을 빼고 독립 창으로 띄우도록 바꿔 두었다.
+         *   (까닭: 바인딩 창 안에서 dialog 를 띄우면 호출한 창의 제목줄 드래그가 막힌다)
+         * parent 를 빼면 따라오는 것 3가지도 원본 그대로 가져온다.
+         *   ① 이미 열림 판정 — getChildWindows() 기반 공통 함수로는 못 찾으므로
+         *      호출한 창 id 별로 창 참조를 직접 보관해 재사용한다.
+         *   ② 최소화·숨김 상태면 되살린 뒤 focus.
+         *   ③ 호출한 창이 WS10 으로 돌아가거나 사라질 때 직접 닫는다
+         *      (parent 가 없으면 Electron 이 자동으로 안 닫는다).
+         ********************************************************************/
+        var iBindPopupParentId = CURRWIN.id;
 
-            parent.setBusy("", {});
+        // 끝나는 길이 여럿(재사용·로드완료·창닫힘)이라 busy 해제를 한 곳으로 모은다 — 원본과 동일.
+        function lf_releaseBindPopupBusy() {
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { parent.setBusy("", {}); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
 
-            // 전체 자식 윈도우에 Busy 끈다.
-            oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
+        function lf_isAliveBindPopupWindow(oWindow) {
+            if (!oWindow) { return false; }
+            try {
+                if (typeof oWindow.isDestroyed === "function" && oWindow.isDestroyed() === true) { return false; }
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                return false;
+            }
+            return true;
+        }
 
+        function lf_getBindPopupRef() {
+            var oBindPopupMap = oAPP.attr.oBindPopupWindow || {},
+                oBindPopupRef = oBindPopupMap[iBindPopupParentId] || undefined;
+            if (!oBindPopupRef) { return; }
+            if (lf_isAliveBindPopupWindow(oBindPopupRef.WINDOW) !== true) {
+                delete oBindPopupMap[iBindPopupParentId];
+                return;
+            }
+            return oBindPopupRef;
+        }
+
+        function lf_showBindPopupWindow(oWindow) {
+            if (lf_isAliveBindPopupWindow(oWindow) !== true) { return; }
+            try {
+                if (typeof oWindow.isMinimized === "function" && oWindow.isMinimized() === true) { oWindow.restore(); }
+                if (typeof oWindow.isVisible === "function" && oWindow.isVisible() !== true) { oWindow.show(); }
+
+                // 되살릴 때도 호출한 창 가운데로 다시 놓는다 (.analy/16 §2.6.3 - 별도 창은 늘 호출한 창 가운데).
+                //   처음 열 때만 가운데로 잡으면, 사용자가 창을 구석으로 끌어 놓거나 최소화해 둔 뒤
+                //   다시 불렀을 때 엉뚱한 자리에서 나타난다.
+                try { WSUTIL.setParentCenterBounds(REMOTE, oWindow); }
+                catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+
+                oWindow.focus();
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+        function lf_closeBindPopupWindow() {
+            var oBindPopupRef = lf_getBindPopupRef();
+            if (!oBindPopupRef) { return; }
+            try { oBindPopupRef.WINDOW.close(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+        /**
+         * 호출한 창이 WS10 으로 돌아가면 바인딩 창을 닫는다 — 원본 lf_attachCloseBindPopupOnWs10Move 와 같은 일.
+         *   원본은 UI5 NavContainer 의 attachAfterNavigate 를 썼으나 HTML5 에는 그 이벤트가 없다.
+         *   화면 전환은 전부 oAPP.fn.fnNavTo 한 곳을 지나므로(ws10_html.js) 그 함수를 한 번만 감싼다.
+         */
+        function lf_attachCloseBindPopupOnWs10Move() {
+            if (typeof oAPP.fn.fnNavTo !== "function") {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "oAPP.fn.fnNavTo", "binding window will stay open when the caller returns to WS10");
+                }
+                return;
+            }
+            if (oAPP.attr._bBindPopupCloseOnWs10 === true) { return; }
+            oAPP.attr._bBindPopupCloseOnWs10 = true;
+
+            var fnOrgNavTo = oAPP.fn.fnNavTo;
+            oAPP.fn.fnNavTo = function (sToId) {
+                var vRet = fnOrgNavTo.apply(this, arguments);
+                try {
+                    if (sToId === "WS10") { lf_closeBindPopupWindow(); }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                return vRet;
+            };
+        }
+
+        lf_attachCloseBindPopupOnWs10Move();
+
+        // 같은 호출처에 이미 열려 있으면 새로 띄우지 않고 되살려 focus — 원본과 동일.
+        var oBindPopupRef = lf_getBindPopupRef();
+        if (oBindPopupRef) {
+            lf_showBindPopupWindow(oBindPopupRef.WINDOW);
+            lf_releaseBindPopupBusy();
             return;
         }
 
@@ -744,7 +833,10 @@
         oBrowserOptions.minWidth = 900;
         oBrowserOptions.minHeight = 650;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.parent = CURRWIN;
+        // [parent 제거 — 원본 1:1, 2026-10-14] 원본도 아래 줄을 주석 처리해 독립 창으로 띄운다.
+        //   (바인딩 창 안에서 dialog 를 띄우면 호출한 창의 제목줄 드래그가 막히기 때문)
+        // oBrowserOptions.parent = CURRWIN;
+        oBrowserOptions.modal = false;
         oBrowserOptions.closable = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
@@ -762,6 +854,19 @@
 
         // 브라우저 오픈
         var oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
+
+        // [parent 제거 — 원본 1:1] change/display 때 자식 창을 한꺼번에 닫는 목록에 넣는다.
+        try {
+            if (CURRWIN && CURRWIN._aChildWinMap) { CURRWIN._aChildWinMap.set(sPopupName, oBrowserWindow); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        // [parent 제거 — 원본 1:1] 호출한 창 id 로 창 참조를 보관한다(중복 생성 방지 + 되살려 focus).
+        if (!oAPP.attr.oBindPopupWindow) { oAPP.attr.oBindPopupWindow = {}; }
+        oAPP.attr.oBindPopupWindow[iBindPopupParentId] = {
+            PARENT_ID: iBindPopupParentId,
+            WINDOW: oBrowserWindow
+        };
+
         REMOTEMAIN.enable(oBrowserWindow.webContents);
 
         // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
@@ -910,6 +1015,21 @@
 
             parent.setBusy("", {});
 
+            // [parent 제거 — 원본 1:1] 닫힌 창 참조를 치운다.
+            //   남겨 두면 다음에 열 때 죽은 창을 되살리려 하거나, 자식 창 일괄 처리에서 터진다.
+            try {
+                if (CURRWIN && CURRWIN._aChildWinMap && CURRWIN._aChildWinMap.get(sPopupName) === oBrowserWindow) {
+                    CURRWIN._aChildWinMap.delete(sPopupName);
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+            try {
+                var oMap = oAPP.attr.oBindPopupWindow || {};
+                if (oMap[iBindPopupParentId] && oMap[iBindPopupParentId].WINDOW === oBrowserWindow) {
+                    delete oMap[iBindPopupParentId];
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             oBrowserWindow = null;
 
             //디자인상세화면(20화면) <-> BINDPOPUP 통신 채널 종료.
@@ -922,6 +1042,17 @@
             CURRWIN.focus();
 
         });
+
+        /**
+         * [parent 제거 — 원본 1:1] 호출한 창이 사라질 때 바인딩 창을 직접 닫는다.
+         *   parent 를 매핑했을 때는 Electron 이 같이 닫아 줬지만, 이제는 아무도 안 닫는다.
+         */
+        window.addEventListener('pagehide', function () {
+            var oRef = lf_getBindPopupRef();
+            if (!oRef) { return; }
+            try { oRef.WINDOW.close(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }, { once: true });
 
     }; // end of oAPP.fn.fnBindWindowPopupOpener
 
