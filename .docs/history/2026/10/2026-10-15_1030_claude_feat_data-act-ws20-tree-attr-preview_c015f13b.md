@@ -33,3 +33,20 @@
 
 - `design/js/createApplicationPopup.js` 의 앱 생성 창 닫기 X 가 아직 **소문자 `close`** 다. 요청 목록에 없어 두었다. 「같은 일에는 같은 값」 기준으로는 `CLOSE` 가 맞다 — 상대에게 알리고 지시를 받는다.
 - 설명 팝업의 입력칸은 **원어·번역 두 개**라 `DESCPOP_TEXT` 가 한 창에 둘이다(요청은 값 하나). 보이는 것 하나를 집는 그쪽 방식이면 첫 번째가 걸린다.
+
+## 뒤따라 — 설명 팝업의 번역 칸을 갈랐다
+
+원어 칸과 번역 칸이 같은 값이어서 상대가 순서로 집어야 했다(둘 중 하나만 있을 때도 있어 조용히
+엉뚱한 칸을 읽는다). 상대 요청대로 번역 칸만 `DESCPOP_TEXT_TRN` 으로 바꿨다. 원어 칸은 그대로.
+
+## 기다리는 일 — 소문자 `close` 를 한 번에 올리기 (상대 신호 대기)
+
+상대가 다시 세어 **WS20 밖에 소문자 `close` 가 16곳 + 앱 생성 창 X 1곳 + `theme/shell.css` 의
+소문자 셀렉터 2줄** 이라고 알려 왔다. 하나만 먼저 올리면 규칙이 더 섞이므로 **한 번에** 올린다.
+순서는 ① 상대가 소문자를 집는 자리(앱 검색 F4 창 · 서버 정보 창)를 대소문자 둘 다 받게 고친 뒤
+신호 → ② 그때 우리가 전부 `CLOSE` 로. **신호가 오기 전에는 손대지 않는다.**
+
+상대가 알려 준 16곳: `fnAppF4PopupOpen.js` · `fnAppCopyPopupOpen.js` · `fnCtsPopupOpen.js` ·
+`fnDynListPopup.js` · `fnF4SearchHelpPopup.js` · `fnSelectBrowserPopupOpen.js` ·
+`callDataSetFieldListPopop.js` · `changeAppPackagePopup.js` · `createApplicationPopup.js`(2) ·
+`ws_common.js` · `ws_fn_04.js`(3) · `ws_html5_client_editor.js` · `frame.js`

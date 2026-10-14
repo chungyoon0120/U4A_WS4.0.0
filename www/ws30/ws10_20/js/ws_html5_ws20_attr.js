@@ -6999,7 +6999,7 @@
         if (sRight !== "") {
             var TA2 = document.createElement("textarea");
             TA2.className = "u4aWs20DescArea";
-            TA2.setAttribute("data-act", "DESCPOP_TEXT");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
+            TA2.setAttribute("data-act", "DESCPOP_TEXT_TRN");   // 번역 칸 — 원어 칸과 값을 가른다(한 창에 둘이면 순서로 집어야 해서)   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
             TA2.readOnly = true;
             TA2.value = sRight;
             BODY.appendChild(TA2);
