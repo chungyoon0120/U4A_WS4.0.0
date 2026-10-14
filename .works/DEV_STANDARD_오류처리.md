@@ -93,6 +93,7 @@ UI5 미로드 가드, 브라우저 기능 지원 확인은 **정상 분기 그�
 | `EDTF` | ws30/ws10_20/Popups/editorPopup/editorFrame.js |
 | `EPEF` | ws30/ws10_20/Popups/errPageEditorPopup/errorPageEditorFrame.js |
 | `EPEV` | ws30/ws10_20/Popups/errPageEditorPopup/errorPageEditorPreview.js (오류 페이지 미리보기 창) |
+| `CEHP` | ws30/ws10_20/Popups/controllerErrorHelpPopup/frame.js (컨트롤러 실행 오류 점검사항 창) |
 | `PATF` | ws30/ws10_20/Popups/patternPopup/frame.js (소스 패턴 창) |
 | `CLED` | ws30/ws10_20/js/ws_html5_client_editor.js (클라이언트 이벤트 편집기 팝업) |
 | `FFPO` | ws30/ws10_20/js/fnFindPopupOpen.js (Find 창 여는 쪽) |
