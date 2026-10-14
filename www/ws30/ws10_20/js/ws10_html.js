@@ -901,11 +901,25 @@
                 // 로그 때문에 화면 전환이 막히면 안 된다.
             }
 
+            /**
+             * [2026-10-14] 화면 전환이 끝난 자리에서 해야 하는 일.
+             *   · WS10 에 도착하면 — 예제 열기 창에서 「Workbench Move」 로 들어왔다가 뒤로 나온 경우,
+             *     숨겨 둔 예제 창을 다시 보여 준다(원본 afterNavigate 의 _checkExamPopup 과 같은 일).
+             *     원본은 UI5 NavContainer 의 afterNavigate 에 있었는데 WS4.0 은 그 전환을 안 쓴다.
+             */
+            var _fnAfterNav = function () {
+                if (sToId !== "WS10") { return; }
+                try {
+                    if (oAPP.fn && typeof oAPP.fn.fnCheckExamPopup === "function") { oAPP.fn.fnCheckExamPopup(); }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            };
+
             // 나갈 페이지가 없으면(초기) 애니메이션 없이 표시
             if (!oFrom || oFrom === oTo) {
                 Object.keys(oPages).forEach(function (k) {
                     if (oPages[k]) { oPages[k].classList.toggle("u4aWsHidden", k !== sToId); }
                 });
+                _fnAfterNav();
                 return;
             }
 
@@ -936,6 +950,7 @@
                 oFrom.classList.add("u4aWsHidden");
                 oFrom.classList.remove(sOut);
                 oTo.classList.remove(sIn);
+                _fnAfterNav();
             };
             oFrom.addEventListener("animationend", _done);
             setTimeout(_done, 400); // 폴백(animationend 미발생 대비)

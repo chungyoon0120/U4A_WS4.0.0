@@ -730,18 +730,61 @@
      ************************************************************************/
     oAPP.fn.fnExamMoveToPageWs20 = (sAppID) => {
 
-        var oAppInput = sap.ui.getCore().byId("AppNmInput"),
-            oDispModeBtn = sap.ui.getCore().byId("displayBtn");
+        /********************************************************************
+         * [HTML5 이식 2026-10-14] 예제 창의 「Workbench Move」 가 아무 일도 안 하던 것 수정.
+         * --------------------------------------------------------------------
+         * 원본은 UI5 로 앱 이름 입력칸과 조회 버튼을 집었다.
+         *     sap.ui.getCore().byId("AppNmInput") / byId("displayBtn")
+         * WS4.0 에는 UI5 가 없고 전역 sap 은 byId 가 늘 null 을 주는 스텁이라,
+         * 첫 가드에서 조용히 빠져나가 버튼을 눌러도 아무 반응이 없었다.
+         * → 같은 입력칸·버튼을 쓰는 다른 두 곳(앱 복사 팝업 _evalServerScript ·
+         *   앱 검색 도움말 _doDisplay)이 이미 쓰는 식 그대로 화면 요소를 직접 집는다.
+         *   · 입력칸  = document.getElementById("AppNmInput")
+         *   · 조회 발화 = oAPP.events.ev_AppDisplay()   (원본 displayBtn.firePress 와 같은 일)
+         *   · 값을 넣을 때 ws10html.setAppId 로 모델도 같이 갱신(원본 setValue = 바인딩).
+         * ★ 원본 가드는 `!입력칸 && !버튼`(둘 다 없을 때만 중단)이라 하나만 없으면 그대로 터진다.
+         *   HTML5 에서는 선례(_doDisplay)와 같이 `||` 로 바꿔 하나라도 없으면 중단한다.
+         ********************************************************************/
+        var oAppInput = document.getElementById("AppNmInput"),
+            fnDisplay = oAPP.events && oAPP.events.ev_AppDisplay;
 
-        if (!oAppInput && !oDispModeBtn) {
+        if (!oAppInput || typeof fnDisplay !== "function") {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT",
+                    (!oAppInput ? "AppNmInput" : "oAPP.events.ev_AppDisplay"),
+                    "Workbench Move cannot open the app in WS20");
+            }
             return;
         }
 
-        var sAppID = sAppID.toUpperCase();
+        var sAppIDUpper = String(sAppID == null ? "" : sAppID).toUpperCase();
 
-        oAppInput.setValue(sAppID);
+        if (!sAppIDUpper) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "APPID", "Workbench Move got an empty app id");
+            }
+            return;
+        }
 
-        oDispModeBtn.firePress();
+        // 원본 oAppInput.setValue(sAppID) — 입력칸 값 + 모델(/WS10/APPID) 동기.
+        oAppInput.value = sAppIDUpper;
+        try {
+            if (oAPP.ws10html && oAPP.ws10html.setAppId) { oAPP.ws10html.setAppId(sAppIDUpper); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        // 지우기(X) 표시 동기 — 선례(_doDisplay)와 동일.
+        try {
+            var oFld = oAppInput.closest ? oAppInput.closest(".u4a-field") : null;
+            if (oFld) { oFld.setAttribute("data-filled", "true"); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        // 원본 oDispModeBtn.firePress() — 조회(Display) 발화.
+        try { fnDisplay(); }
+        catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            console.error("[WS30-EXAM] Workbench Move display failed:", e && e.message, e);
+            return;
+        }
 
         // Example로 실행 했다는 플래그
         oAPP.attr.isExam = "X";
