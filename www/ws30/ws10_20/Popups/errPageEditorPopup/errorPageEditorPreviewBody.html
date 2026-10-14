@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- ===================================================================
+         오류 페이지 미리보기 — 본문(빈 문서)
+         -------------------------------------------------------------------
+         사용자가 작성한 오류 페이지 HTML 을 여기에 통째로 그린다
+         (errorPageEditorPreview.js 가 이 문서에 write 한다).
+
+         왜 빈 문서를 따로 두나 (2026-10-14 장군님 지시 — 공통 헤더 전환):
+           원본은 창 문서에 바로 document.write 했다. 공통 .u4a-titlebar 를 두면 그 write 가
+           헤더까지 지우므로 본문만 iframe 으로 내렸다. about:blank 가 아니라 이 파일을 쓰는 까닭은
+           사용자 HTML 이 상대 경로(이미지·CSS)를 참조할 때 기준 주소가 원본과 같아야 하기 때문이다.
+         =================================================================== -->
+    <script>
+        // [흰색 플래시 방지 — 동기] 부모가 src 에 붙여 준 BGCOL 을 첫 페인트 전에 적용 (.analy/16 §2.6).
+        (function () {
+            try {
+                var sBg = new URLSearchParams(location.search).get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+            } catch (e) { /* 배경만 못 깔린다 - 본문은 사용자 HTML 로 곧 덮인다 */ }
+        })();
+    </script>
+
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: var(--boot-bg, #ffffff);
+        }
+    </style>
+</head>
+
+<body></body>
+
+</html>

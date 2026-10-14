@@ -180,6 +180,8 @@
         BTN.id = oCfg.id;
         BTN.className = "u4a-tx-btn" + (oCfg.reject ? " u4a-tx-btn--reject" : "");
         BTN.title = oCfg.tooltip || oCfg.text || "";
+        // 2026-10-14 — 자동 테스트 도구가 집을 이름(.analy/21). 모양·동작은 그대로, 값만 더한다.
+        if (oCfg.act) { BTN.setAttribute("data-act", oCfg.act); }
 
         // 아이콘(FA) + 텍스트(있을 때만) — WS10 _renderSubHeader 와 동일 마크업
         BTN.innerHTML = (oCfg.fa ? _fa(oCfg.fa, oCfg.brand) : "")
@@ -304,7 +306,7 @@
             return { id: "iconListBtn", fa: "icons", text: _msg("A12"), tooltip: _msg("A12") + " (Ctrl+Shift+F10)", ev: "ev_pressIconListBtn" };
         }
         return {
-            id: "iconViewerBtn", menuBtn: true, fa: "icons",
+            id: "iconViewerBtn", menuBtn: true, act: "ICONVIEWER", fa: "icons",
             text: _wsMsg("068"), tooltip: _wsMsg("068"),                       // Icon Viewer
             items: [
                 { key: "WMENU20_04_01", act: "ICONLIST", icon: "icons", text: _wsMsg("047"), tooltip: _wsMsg("047") + " (Ctrl+Shift+F10)" },  // Icon List
@@ -325,7 +327,7 @@
             return _txBtn(oCfg);   // 폴백: 평범한 버튼(드롭다운 없음)
         }
         return oAPP.ws10html.buildMenuButton({
-            id: oCfg.id, icon: oCfg.fa, brand: oCfg.brand, text: oCfg.text, tooltip: oCfg.tooltip,
+            id: oCfg.id, act: oCfg.act, icon: oCfg.fa, brand: oCfg.brand, text: oCfg.text, tooltip: oCfg.tooltip,
             getItems: function () { return oCfg.items || []; },
             onPick: oCfg.onPick
         });
@@ -379,37 +381,37 @@
          */
         var aBtns = [
             // Display 모드 버튼 (원본 displayModeBtn: icon display)
-            { id: "displayModeBtn", fa: "display", text: "", tooltip: sDispChgTxt, ev: "ev_pressDisplayModeBtn" },
+            { id: "displayModeBtn", act: "DISPLAY_MODE", fa: "display", text: "", tooltip: sDispChgTxt, ev: "ev_pressDisplayModeBtn" },
             // Change 모드 버튼 (원본 changeModeBtn: icon edit)
-            { id: "changeModeBtn", fa: "pen-to-square", text: "", tooltip: sDispChgTxt, ev: "ev_pressDisplayModeBtn" },
+            { id: "changeModeBtn", act: "CHANGE_MODE", fa: "pen-to-square", text: "", tooltip: sDispChgTxt, ev: "ev_pressDisplayModeBtn" },
             // dev/admin 구분선 (원본 ToolbarSeparator: IS_DEV=="D" && !admin-block 일 때만 노출)
             { sep: true, sepId: "ws20DevSep" },
             // Syntax Check (원본 syntaxCheckBtn: icon validate, B72 + Ctrl+F2)
-            { id: "syntaxCheckBtn", fa: "check-double", text: "", tooltip: _msg("B72") + " (Ctrl+F2)", ev: "ev_pressSyntaxCheckBtn" },
+            { id: "syntaxCheckBtn", act: "SYNTAX", fa: "check-double", text: "", tooltip: _msg("B72") + " (Ctrl+F2)", ev: "ev_pressSyntaxCheckBtn" },
             // Activate (원본 activateBtn: icon activate, B73 + Ctrl+F3)
             //   아이콘=마법사(wand-magic-sparkles) — 사용자 요청(액티브 버튼을 마법사 아이콘으로).
-            { id: "activateBtn", fa: "wand-magic-sparkles", text: "", tooltip: _msg("B73") + " (Ctrl+F3)", ev: "ev_pressActivateBtn" },
+            { id: "activateBtn", act: "ACTIVATE", fa: "wand-magic-sparkles", text: "", tooltip: _msg("B73") + " (Ctrl+F3)", ev: "ev_pressActivateBtn" },
             // Save (원본 saveBtn: icon save, A64 + Ctrl+S)
-            { id: "saveBtn", fa: "floppy-disk", text: "", tooltip: _msg("A64") + " (Ctrl+S)", ev: "ev_pressSaveBtn" },
+            { id: "saveBtn", act: "SAVE_APP", fa: "floppy-disk", text: "", tooltip: _msg("A64") + " (Ctrl+S)", ev: "ev_pressSaveBtn" },
             { sep: true, sepId: "ws20ActionSep" },
             // MIME Repository (원본 mimeBtn: icon picture, text A10)
-            { id: "mimeBtn", fa: "image", text: _msg("A10"), tooltip: _msg("A10") + " (Ctrl+Shift+F12)", ev: "ev_pressMimeBtn" },
+            { id: "mimeBtn", act: "MIME", fa: "image", text: _msg("A10"), tooltip: _msg("A10") + " (Ctrl+Shift+F12)", ev: "ev_pressMimeBtn" },
             // Controller (Class Builder) (원본 controllerBtn: icon developer-settings, text A11)
-            { id: "controllerBtn", fa: "screwdriver-wrench", text: _msg("A11"), tooltip: _msg("C38") + " (Ctrl+F12)", ev: "ev_pressControllerBtn" },
+            { id: "controllerBtn", act: "CONTROLLER", fa: "screwdriver-wrench", text: _msg("A11"), tooltip: _msg("C38") + " (Ctrl+F12)", ev: "ev_pressControllerBtn" },
             // Application Execution 메뉴 버튼 (원본 ws20_appExecMenuBtn: split MenuButton, text A06)
             //   split:true → 본체=기본 실행(ev_pressAppExecBtn) + 화살표=브라우저 선택 메뉴(/DEFBR)
             { id: "ws20_appExecMenuBtn", split: true, act: "RUN", fa: "globe", text: _msg("A06"), tooltip: _msg("A06") + " (F8)", ev: "ev_pressAppExecBtn" },
             // App Multi Preview (원본 ws20_multiPrevBtn: icon desktop-mobile, text A08)
-            { id: "ws20_multiPrevBtn", fa: "mobile-screen-button", text: _msg("A08"), tooltip: _msg("A08") + " (Ctrl+F5)", ev: "ev_pressMultiPrevBtn" },
+            { id: "ws20_multiPrevBtn", act: "MULTIPREV", fa: "mobile-screen-button", text: _msg("A08"), tooltip: _msg("A08") + " (Ctrl+F5)", ev: "ev_pressMultiPrevBtn" },
             // Icon Viewer / Icon List — checkWLOList 조건으로 드롭다운(Icon Viewer) ↔ 평평버튼(Icon List)
             //   분기(_iconToolEntry, 원본 oIconList 로직). 원본 모습=Icon Viewer 메뉴.
             _iconToolEntry(),
             // Add Event Method (원본 addEventBtn: icon touch, text A13)
-            { id: "addEventBtn", fa: "hand-pointer", text: _msg("A13"), tooltip: _msg("A13") + " (Shift+F1)", ev: "ev_pressAddEventBtn" },
+            { id: "addEventBtn", act: "ADDEVENT", fa: "hand-pointer", text: _msg("A13"), tooltip: _msg("A13") + " (Shift+F1)", ev: "ev_pressAddEventBtn" },
             // Runtime Class Navigator (원본 runtimeBtn: icon functional-location, text A14)
-            { id: "runtimeBtn", fa: "diagram-project", text: _msg("A14"), tooltip: _msg("A14"), ev: "ev_pressRuntimeBtn" },
+            { id: "runtimeBtn", act: "RUNTIMECLS", fa: "diagram-project", text: _msg("A14"), tooltip: _msg("A14"), ev: "ev_pressRuntimeBtn" },
             // Binding Popup (원본 bindPopupBtn: icon connected, text A15)
-            { id: "bindPopupBtn", fa: "link", text: _msg("A15"), tooltip: _msg("A15"), ev: "ev_pressBindPopupBtn" }
+            { id: "bindPopupBtn", act: "BINDPOP", fa: "link", text: _msg("A15"), tooltip: _msg("A15"), ev: "ev_pressBindPopupBtn" }
         ];
 
         aBtns.forEach(function (oCfg) {

@@ -1,17 +1,112 @@
-<script>
+<!DOCTYPE html>
+<html>
 
-    var REMOTE = require('@electron/remote');
-    var IPCRENDERER = require('electron').ipcRenderer;
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
+    <!-- ===== 공통 헤더(.u4a-titlebar)·버튼·토큰 (errorPageEditorFrame 과 동일 짝) ===== -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
 
-    IPCRENDERER.on("if-Error-Page-prev", (events, oInfo) => {
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
 
-        if(!oInfo || !oInfo.HTML){
-            return;
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 (.analy/16 §2.6) -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* errorPageEditorPreview.js 에서 재적용 */ }
+        })();
+    </script>
+
+    <style>
+        /* 창 골격 = [공통 .u4a-titlebar] + [본문 iframe]. 헤더 높이는 공통(shell.css)이 정한다. */
+        html, body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            background: var(--boot-bg, var(--app-bg));
         }
 
-        document.write(oInfo.HTML);
+        body {
+            display: flex;
+            flex-direction: column;
+        }
 
-    });
+        /* 본문 = 사용자 HTML 을 그리는 iframe. 남는 높이를 전부 쓴다. */
+        .u4aPrevBody {
+            flex: 1 1 auto;
+            min-height: 0;
+            /* 등장 효과 = 본문 CSS opacity transition (.analy/16 §2.6) — 네이티브 창 페이드 미사용. */
+            opacity: 0;
+            transition: opacity .3s;
+        }
 
-</script>
+        .u4aPrevBody.u4aPrevShown {
+            opacity: 1;
+        }
+
+        .u4aPrevBody > iframe {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .u4aPrevBody { transition: none; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/최소화/최대화/닫기 ===== -->
+    <header class="u4a-titlebar" id="prevTitlebar">
+        <img class="u4a-titlebar__logo" id="prevLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="prevTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button type="button" class="u4a-winbtn" id="prevWinMin" data-action="minimize" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="prevWinMax" data-action="maximize" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="prevWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- ===== 본문 = 사용자가 작성한 오류 페이지 HTML (iframe 안에 그린다) =====
+         원본은 창 문서에 document.write 로 통째로 그렸다. 공통 헤더를 두면 그 write 가 헤더까지
+         지우므로, 에디터 창(errorPageEditorFrame)과 같은 [헤더 + 본문 iframe] 2단으로 바꿨다.
+         src 는 errorPageEditorPreview.js 가 테마 쿼리를 붙여 넣는다(iframe 도 흰 번쩍 방지, §2.6). -->
+    <div class="u4aPrevBody" id="prevBody">
+        <iframe id="prevFrame" name="prevFrame" allowfullscreen></iframe>
+    </div>
+
+    <script>
+        /************************************************************************
+         * 에러 감지 (원본 errorPageEditorPreview.html 과 동일 짝)
+         ************************************************************************/
+        var REMOTE = require('@electron/remote'),
+            PATH = REMOTE.require('path'),
+            APP = REMOTE.app,
+            APPPATH = APP.getAppPath(),
+            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
+            PATHINFO = require(PATHINFOURL),
+            WSERR = require(PATHINFO.WSTRYCATCH);
+
+        var zconsole = WSERR(window, document, console);
+    </script>
+
+    <script src="errorPageEditorPreview.js"></script>
+</body>
+
+</html>

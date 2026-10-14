@@ -375,7 +375,7 @@
                 '<div class="u4a-titlebar__spacer"></div>' +
                 '<button type="button" class="u4a-winbtn" id="optWinMin" title="Minimize">' + _fa("window-minimize") + '</button>' +
                 '<button type="button" class="u4a-winbtn" id="optWinMax" title="Maximize">' + _fa("window-maximize") + '</button>' +
-                '<button type="button" class="u4a-winbtn u4a-winbtn--close" id="optWinClose" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
+                '<button type="button" class="u4a-winbtn u4a-winbtn--close" id="optWinClose" data-act="CLOSE" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
               '</header>' +
               // 마스터-디테일 — 공통 스플리터(16번 §4: shell.css .u4a-splitter* 골격+그립 소비).
               //   사이드바=고정 basis 패널, 콘텐츠=잔여(1 1 auto) 마지막 패널, 가운데 공통 그립 바.
@@ -387,8 +387,8 @@
               // 푸터 — 공통 .modal-footer(48px·토큰 보더, bootstrap-skin 단일출처) + 프로젝트 버튼.
               //   다른 모든 팝업과 동일: 강조=u4a-btn--emphasized / 닫기=u4a-btn--negative(Reject 느낌)
               '<div class="modal-footer">' +
-                '<button type="button" class="u4a-btn u4a-btn--emphasized" id="optApply" title="' + (_txt("/U4A/CL_WS_COMMON", "C63") || "Apply") + '">' + _fa("check") + '</button>' +
-                '<button type="button" class="u4a-btn u4a-btn--negative" id="optClose" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
+                '<button type="button" class="u4a-btn u4a-btn--emphasized" id="optApply" data-act="APPLY" title="' + (_txt("/U4A/CL_WS_COMMON", "C63") || "Apply") + '">' + _fa("check") + '</button>' +
+                '<button type="button" class="u4a-btn u4a-btn--negative" id="optClose" data-act="CLOSE" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
               '</div>' +
             '</div>';
 

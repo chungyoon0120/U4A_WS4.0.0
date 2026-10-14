@@ -255,17 +255,17 @@
     function _getSubHeaderButtons() {
         return [
             { id: "appCreateBtn", icon: "file", text: _txt("A01"), sc: "Ctrl+F12", ev: "ev_AppCreate", devOnly: true },
-            { id: "appChangeBtn", icon: "pen-to-square", text: _txt("A02"), sc: "F6", ev: "ev_AppChange", devOnly: true },
-            { id: "appDelBtn", icon: "trash", text: _txt("A03"), sc: "Ctrl+F10", ev: "ev_AppDelete", devOnly: true, reject: true },
-            { id: "appCopyBtn", icon: "copy", text: _txt("A04"), sc: "Shift+F11", ev: "ev_AppCopy", devOnly: true },
+            { id: "appChangeBtn", act: "CHANGE", icon: "pen-to-square", text: _txt("A02"), sc: "F6", ev: "ev_AppChange", devOnly: true },
+            { id: "appDelBtn", act: "DELETE_APP", icon: "trash", text: _txt("A03"), sc: "Ctrl+F10", ev: "ev_AppDelete", devOnly: true, reject: true },
+            { id: "appCopyBtn", act: "COPY_APP", icon: "copy", text: _txt("A04"), sc: "Shift+F11", ev: "ev_AppCopy", devOnly: true },
             { sep: true, devOnly: true },
-            { id: "displayBtn", icon: "display", text: _txt("A05"), sc: "F7", ev: "ev_AppDisplay" },
+            { id: "displayBtn", act: "DISPLAY", icon: "display", text: _txt("A05"), sc: "F7", ev: "ev_AppDisplay" },
             { id: "appExecMenuBtn", icon: "globe", text: _txt("A06"), sc: "F8", ev: "ev_AppExec", split: true, act: "RUN" },
             { sep: true },
-            { id: "examBtn", icon: "graduation-cap", text: _txt("A07"), sc: "Ctrl+F1", ev: "ev_AppExam" },
-            { id: "multiPrevBtn", icon: "mobile-screen-button", text: _txt("A08"), sc: "Ctrl+F3", ev: "ev_MultiPrev" },
+            { id: "examBtn", act: "EXAMPLE", icon: "graduation-cap", text: _txt("A07"), sc: "Ctrl+F1", ev: "ev_AppExam" },
+            { id: "multiPrevBtn", act: "MULTIPREV", icon: "mobile-screen-button", text: _txt("A08"), sc: "Ctrl+F3", ev: "ev_MultiPrev" },
             { sep: true },
-            { id: "newWindowBtn", icon: "window-restore", text: _txt("A09"), sc: "Ctrl+N", ev: "ev_NewWindow" }
+            { id: "newWindowBtn", act: "NEWWIN", icon: "window-restore", text: _txt("A09"), sc: "Ctrl+N", ev: "ev_NewWindow" }
         ];
     }
 
@@ -778,6 +778,8 @@
         btn.title = cfg.tooltip || cfg.text || "";
         btn.setAttribute("aria-haspopup", "true");
         btn.setAttribute("data-menu-anchor", "menu");
+        // 2026-10-14 — 자동 테스트 도구가 집을 이름(.analy/21). act 를 준 소비처만 붙는다.
+        if (cfg.act) { btn.setAttribute("data-act", cfg.act); }
         btn.innerHTML =
             (cfg.icon ? (cfg.brand ? '<i class="fa-brands fa-' + cfg.icon + '"></i>' : _fa(cfg.icon)) : "")
             + (cfg.text ? "<span>" + cfg.text + "</span>" : "")
@@ -1097,6 +1099,7 @@
             onEnter: function (v) { _runTcode(v); }   // 선택은 채움만, 실행은 Enter(원본 동일)
         });
         oTcodeFld.input.autocomplete = "off";
+        oTcodeFld.input.setAttribute("data-act", "TCODE_INPUT");   // 2026-10-14 자동 테스트 도구가 집을 이름
         // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 이 칸의 지우기 단추는 title 이 "Clear" 뿐이라
         //   다른 지우기 단추와 구분이 안 됐다. 칸의 id(sapTcode) 를 그대로 붙인다.
         try {
@@ -1272,6 +1275,8 @@
                 el.type = "button";
                 el.id = cfg.id;
                 el.title = cfg.text + " (" + cfg.sc + ")";
+                // 2026-10-14 — 자동 테스트 도구가 집을 이름(.analy/21). id 는 그대로 두고 값만 더한다.
+                if (cfg.act) { el.setAttribute("data-act", cfg.act); }
                 el.innerHTML = _fa(cfg.icon) + "<span>" + cfg.text + "</span>";
                 el.addEventListener("click", function () { _invoke(cfg.ev, cfg.text); });
             }
@@ -1430,6 +1435,7 @@
         var oInput = oSearchFld.input;
         oInput.autocomplete = "off";
         oInput.setAttribute("role", "combobox");
+        oInput.setAttribute("data-act", "APPNM_INPUT");   // 2026-10-14 자동 테스트 도구가 집을 이름
         oInput.title = "";
         // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 이 돋보기는 안내 글자로만 집히고 있었다.
         try {

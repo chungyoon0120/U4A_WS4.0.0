@@ -227,17 +227,26 @@
         const sPopupName = "ERRPAGEPREV";
 
         // 기존에 Error Page Editor 미리보기 팝업이 열렸을 경우 창을 닫고 다시 띄운다.
-        const oResult = parent.WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-14 장군님 지시 (별창 parent 제거 18번) - parent 를 빼면 getChildWindows() 로는
+        //     못 찾으므로 전체 창에서 OBJTY + browserkey 로 찾는다. 17번 에디터 창과 같은 방식.
+        //     못 찾으면 닫지 못해 미리보기 창이 겹겹이 쌓인다.
+        const oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
-            oResult.WINDOW.close();
-            // return;
+            // 2026-10-14 장군님 지시 (공통 헤더 전환) - 이 창은 closable:false 를 끝까지 유지하므로
+            //   raw close() 가 OS 레벨에서 무시된다 → 공통 closeWindow(setClosable+close) 로 닫는다
+            //   (.analy/16 §2.6.1). 못 닫으면 Preview 를 누르는 만큼 창이 쌓인다.
+            try {
+                if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oResult.WINDOW); }
+                else { oResult.WINDOW.setClosable(true); oResult.WINDOW.close(); }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
         const 
             oCurrWin = REMOTE.getCurrentWindow(),
             oSaveData = res.SAVEDATA,
             oParWin = res.PARWIN,
-            SESSKEY = parent.getSessionKey();
+            SESSKEY = parent.getSessionKey(),
+            oThemeInfo = parent.getThemeInfo(); // theme 정보 (frameless 첫 페인트 배경 + 창 안 테마 적용)
 
         const 
             sSettingsJsonPath = parent.getPath("BROWSERSETTINGS"),
@@ -256,7 +265,18 @@
         //   표시는 아래 did-finish-load 에서 한다(.analy 16 §2.6).
         oBrowserOptions.show = false;
         oBrowserOptions.devTools = false;
-        oBrowserOptions.parent = oCurrWin;
+        // 2026-10-14 장군님 지시 (공통 UX 지침대로 공통 헤더로 전환) - 네이티브 타이틀바를 떼고
+        //   창 안 공통 .u4a-titlebar [로고·제목·최소화·최대화·닫기] 를 쓴다(.analy/16 §2.2·§2.6).
+        //   첫 페인트 흰 플래시 방지로 창 배경을 처음부터 테마색으로 둔다(§2.6).
+        oBrowserOptions.titleBarStyle = 'hidden';
+        oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
+        // 2026-10-14 장군님 지시 (별창 parent 제거 18번) - parent 를 지정하지 않는다.
+        //   parent 를 두면 Minimize 한 뒤 작업표시줄에도 안 남아 다시 띄울 길이 없다.
+        //   위치(부모 중앙)는 setParentCenterBounds 가 CURRWIN 으로 잡으므로 parent 와 무관하다.
+        //   되돌리려면 oBrowserOptions.parent = oCurrWin; 한 줄을 다시 넣으면 된다.
+        // oBrowserOptions.parent = oCurrWin;
+        // ★ closable 은 창 수명 내내 false 로 둔다(.analy/16 §2.6.1) — OS 닫기(Alt+F4)를 막고
+        //   닫기는 창 안 X 버튼(공통 U4AUI.closeWindow)으로만 한다.
         oBrowserOptions.closable = false;
 
         oBrowserOptions.webPreferences.partition = SESSKEY;
@@ -270,13 +290,20 @@
         let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);       
 
         // 브라우저 상단 메뉴 없애기
-        oBrowserWindow.setMenu(null);       
-     
+        oBrowserWindow.setMenu(null);
+
+        // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용(17번 에디터 창과 같은 짝).
+        oBrowserWindow.webContents.insertCSS(`html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`);
+
         const oQueryParams = {
             browserkey: oBrowserOptions?.webPreferences?.browserkey,
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            // [HTML5] frameless 창의 첫 페인트 플래시 방지 + 공통 타이틀바 — 테마/배경/제목 전달.
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: sTitle,
         };
 
         const sUrlPath = parent.getPath(sPopupName);
@@ -324,8 +351,11 @@
 
             // [HTML5] 네이티브 opacity 페이드 제거 — 로드 완료 시 닫기 버튼만 즉시 활성화.
             //   [2026-09-13] 여기서 창을 표시한다(show:false 로 만들어 뒀다) — 빈 창 먼저 보이는 것 방지.
+            //   ★ 2026-10-14 - 종전에는 여기서 closable = true 로 돌렸는데, 그러면 idle 상태에서
+            //     Alt+F4 가 창을 닫는다(.analy/16 §2.6.1 금지 사항). closable 은 false 로 유지하고
+            //     닫기는 창 안 X 버튼(공통 U4AUI.closeWindow)으로만 한다.
             try {
-                if (!oBrowserWindow.isDestroyed()) { oBrowserWindow.show(); oBrowserWindow.closable = true; }
+                if (!oBrowserWindow.isDestroyed()) { oBrowserWindow.show(); }
             } catch (error) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); } }
 
             // 오류 페이지 미리보기가 로드가 되면 오류 페이지 에디터에 실행중인 Busy를 끄라고 알린다.
@@ -338,7 +368,34 @@
 
             oBrowserWindow = null;
 
-            CURRWIN.focus();
+            // 2026-10-14 장군님 지시 - 미리보기를 닫으면 **그 미리보기를 띄운 오류 페이지 에디터 창**에
+            //   포커스를 준다. 종전에는 CURRWIN(= WS20 메인 창)에 줬는데, 원본에서는 에디터 창의
+            //   parent 가 메인이라 「자식은 늘 부모 위」 규칙으로 메인 위에 남았다. 17번에서 parent 를
+            //   뗀 뒤로는 그 보장이 없어, 메인이 앞으로 오면서 에디터 창이 뒤로 깔렸다.
+            //   에디터 창을 못 찾으면 종전대로 메인에 준다(미리보기만 남는 일이 없게).
+            let bFocused = false;
+
+            try {
+
+                const oEditWin = APPCOMMON.getCheckAlreadyOpenWindow2("ERRPAGE");
+
+                if (oEditWin.ISOPEN && oEditWin.WINDOW && !oEditWin.WINDOW.isDestroyed()) {
+                    if (oEditWin.WINDOW.isMinimized()) { oEditWin.WINDOW.restore(); }
+                    oEditWin.WINDOW.focus();
+                    bFocused = true;
+                }
+
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+            if (!bFocused) {
+
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "ERRPAGE window", "error page editor window not found - focus goes to the main window instead");
+                }
+
+                CURRWIN.focus();
+
+            }
 
         });
 

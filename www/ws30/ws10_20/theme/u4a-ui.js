@@ -609,6 +609,11 @@
                     if (bDis === undefined) { bDis = el.disabled === true || el.classList.contains("is-disabled"); }
                     const oItem = _el("div", "u4a-menu__item");
                     oItem.setAttribute("role", "menuitem");
+                    // 2026-10-14 — 접혀서 ⋯ 안으로 들어간 줄에도 원래 버튼의 이름을 복사한다
+                    //   (.analy/21 — 창이 좁아 접힌 단추도 자동 테스트 도구가 이름으로 집게).
+                    //   menuItem 이 one.act 를 주면 그것을 쓰고, 없으면 원래 버튼 것을 쓴다.
+                    const sMiAct = one.act || (el.getAttribute ? el.getAttribute("data-act") : null);
+                    if (sMiAct) { oItem.setAttribute("data-act", sMiAct); }
                     if (bDis) { oItem.setAttribute("aria-disabled", "true"); }
                     oItem.innerHTML = (one.iconHtml || "<i></i>") + '<span class="u4a-menu__item-text"></span>';
                     oItem.querySelector(".u4a-menu__item-text").textContent = one.text;
