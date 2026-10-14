@@ -315,15 +315,34 @@ oAPP.fn.setBusyWS20Interaction = function (bBusy, sOption) {
     //   여기서 따로 토글하지 않는다(중복 제거). busy off 가 setBusy(false) 로 오는 경로도 _setBusy 가 복원한다.
 };
 
+/****************************************************************************
+ * 호출한 창(WS20)의 busy 를 푼다 — 딱 한 번만.
+ * --------------------------------------------------------------------------
+ * [2026-10-14 장군님 지적으로 수정] 전에는 _finishOpen 첫 줄에서 **가드 없이** 이걸 보냈다.
+ *   그래서 바인딩 창이 서버에서 데이터를 받아오는 중인데 WS20 의 busy 가 먼저 꺼졌다
+ *   (바로 아랫줄의 isBindLoading 가드가 아무 소용이 없었다).
+ * 원본(U4A_WS3.0.0)은 창이 다 뜬 시점에 **한 번** 푼다 — 그 규약에 맞춘다.
+ ****************************************************************************/
+var bOpenerBusyReleased = false;
+oAPP.fn.releaseOpenerBusy = function () {
+    if (bOpenerBusyReleased) { return; }
+    bOpenerBusyReleased = true;
+    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+};
+
 // 로드 완료 — 메인 busy lock 해제 + 공용 BUSY_OFF + 본문 표시(1회만).
 function _finishOpen() {
     if (bOpenDone) { return; }
     bOpenDone = true;
-    try { IPCRENDERER.send("if-send-action-" + BROWSKEY, { ACTCD: "SETBUSYLOCK", ISBUSY: "" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // ★ 초기 모델트리 로드가 진행 중이면 busy 를 끄지 않는다 — loadBindData 가 비동기 ajax 를 던진 직후
     //   부트가 여기로 오므로, 여기서 끄면 로드~렌더 구간이 무오버레이가 된다(장군님 지적 2026-08-03 "대량 로드 시 busy 안 뜸").
     //   로드의 finally(modelFieldArea loadBindData)가 렌더 완료 후 busy 를 끈다. 원본 UIUpdated 가 로드~렌더를 감싼 것과 동일.
-    if (!(oAPP.attr && oAPP.attr.isBindLoading)) { _setBusy(false); }
+    //   ★★ 호출한 창의 busy 해제도 같은 가드 안에 둔다(2026-10-14) — 밖에 두면 로드 중에 WS20 이 먼저 풀린다.
+    if (!(oAPP.attr && oAPP.attr.isBindLoading)) {
+        oAPP.fn.releaseOpenerBusy();
+        _setBusy(false);
+    }
     var oShell = document.getElementById("bwpShell");
     if (oShell) { oShell.classList.add("u4aBwpShown"); }
 }

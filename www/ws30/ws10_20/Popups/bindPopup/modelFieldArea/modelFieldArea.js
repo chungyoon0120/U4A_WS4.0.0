@@ -432,6 +432,11 @@
                 oM.ctrl.rerender();
             } finally {
                 oAPP.attr.isBindLoading = false;
+                // 호출한 창(WS20)의 busy 도 여기서 푼다 (2026-10-14 장군님 지적).
+                //   창이 뜨자마자 풀면 이 로드~렌더 구간에 WS20 이 조작 가능해진다 — 원본은 다 뜬 뒤 한 번 푼다.
+                //   (frame.js releaseOpenerBusy 는 한 번만 실제로 보낸다.)
+                try { if (typeof oAPP.fn.releaseOpenerBusy === "function") { oAPP.fn.releaseOpenerBusy(); } }
+                catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.fn.setBusy(false);
             }
         });
