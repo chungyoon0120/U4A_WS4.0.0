@@ -130,6 +130,12 @@
                 if (sT !== sPopupName) { continue; }
                 try { if (oW.isMinimized()) { oW.restore(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 try { oW.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                // 2026-10-14 장군님 지시 (TODO 49) - 이미 열려 있는 창을 다시 불렀을 때도
+                //   호출한 창 가운데로 자리를 다시 잡는다. 이 창은 처음 뜰 때도 가운데로 띄운다
+                //   (아래 ready-to-show / did-finish-load).
+                //   ※ 처음부터 고정 자리로 띄우는 창(Text Search 등)은 대상이 아니다.
+                try { WSUTIL.setParentCenterBounds(REMOTE, oW); }
+                catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.common.fnSetBusyLock("");
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return;
@@ -3100,6 +3106,14 @@
         if (oResult.ISOPEN) {
 
             oResult.WINDOW.webContents.send('if-extopen-url', sPath);
+
+            // 2026-10-14 장군님 지시 (TODO 49) - 이미 열려 있는 창을 다시 불렀을 때도
+            //   호출한 창 가운데로 자리를 다시 잡는다. 이 창은 처음 뜰 때도 가운데로 띄우므로
+            //   (아래 ready-to-show / did-finish-load) 다시 부를 때 자리가 그대로면 어긋난다.
+            //   ※ 처음부터 고정 자리로 띄우는 창(Text Search 등)은 대상이 아니다.
+            try { WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             return;
 
         }
@@ -3369,6 +3383,13 @@
         if (oResult.ISOPEN) {
 
             oResult.WINDOW.webContents.send('if-extopen-url', sPath);
+
+            // 2026-10-14 장군님 지시 (TODO 49) - 이미 열려 있는 창을 다시 불렀을 때도
+            //   호출한 창 가운데로 자리를 다시 잡는다. 이 창은 처음 뜰 때도 가운데로 띄운다
+            //   (fnExternalOpen 의 ready-to-show / did-finish-load).
+            //   ※ 처음부터 고정 자리로 띄우는 창(Text Search 등)은 대상이 아니다.
+            try { WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // busy 끄고 Lock 풀기
             oAPP.common.fnSetBusyLock("");
@@ -4074,10 +4095,18 @@
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
         const oResult = WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
         if (oResult.ISOPEN) {
+
+            // 2026-10-14 장군님 지시 (TODO 49) - 이미 열려 있는 창을 다시 불렀을 때도
+            //   호출한 창 가운데로 자리를 다시 잡는다. 이 창은 처음 뜰 때도 가운데로 띄운다
+            //   (아래 ready-to-show / did-finish-load).
+            //   ※ 처음부터 고정 자리로 띄우는 창(Text Search 등)은 대상이 아니다.
+            try { WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             return;
         }
 
-        const 
+        const
             SESSKEY = parent.getSessionKey(),
             BROWSKEY = parent.getBrowserKey(),
             oUserInfo = parent.getUserInfo(),
