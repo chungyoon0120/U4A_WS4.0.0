@@ -5058,6 +5058,7 @@
         /* ── (a) 헤더: [UI 아이콘] [UI명] … [UILIB] (구 DynamicPageTitle Toolbar) ── */
         var HDR = document.createElement("div");
         HDR.id = "ws20AttrHeader";
+        HDR.setAttribute("data-act", "ATTR_HEADER");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         HDR.className = "u4aWs20AttrHeader";
 
         var ICO = document.createElement("img");
@@ -5070,6 +5071,7 @@
 
         var TIT = document.createElement("span");
         TIT.id = "ws20AttrHdrTitle";
+        TIT.setAttribute("data-act", "ATTR_HDR_OBJID");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         TIT.className = "u4aWs20AttrHdrTitle";
         HDR.appendChild(TIT);
 
@@ -5080,6 +5082,7 @@
         //라이브러리명 text (구 oRLibText — 더블클릭시 복사. 원본 103행)
         var LIB = document.createElement("span");
         LIB.id = "ws20AttrHdrLib";
+        LIB.setAttribute("data-act", "ATTR_HDR_UILIB");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         LIB.className = "u4aWs20AttrHdrLib";
         LIB.title = _msg("B15", "UI5 library Reference");
         LIB.addEventListener("dblclick", function () {
@@ -5092,6 +5095,7 @@
         var SMP = document.createElement("button");
         SMP.type = "button";
         SMP.id = "ws20AttrHdrSampleBtn";
+        SMP.setAttribute("data-act", "ATTR_SAMPLE");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         SMP.className = "u4aWs20AttrHdrBtn";
         SMP.title = _msg("B16", "UI Sample");
         SMP.innerHTML = '<i class="fa-solid fa-table-cells"></i>';
@@ -5188,6 +5192,7 @@
             }
         });
         var INP = oObjFld.input;   // 하위 호환(아래 Copy 버튼 등에서 참조)
+        INP.setAttribute("data-act", "ATTR_OBJID");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         oAPP.attr.uiObjIdField = oObjFld;   // attrChnageOBJID 의 valueState 표시/값 반영용 참조.
         ROW1.appendChild(oObjFld.el);
 
@@ -5195,6 +5200,7 @@
         var CPY = document.createElement("button");
         CPY.type = "button";
         CPY.id = "ws20AttrObjIdCopyBtn";
+        CPY.setAttribute("data-act", "ATTR_OBJID_COPY");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         CPY.className = "u4aWs20AttrSmBtn";
         CPY.title = _msg("A04", "Copy");
         // 클립보드 복사 — F4 값도움(fa-clone, 겹친 사각형)과 구분되게 fa-copy(문서 복사) 사용(사용자 피드백 2026-06-17)
@@ -5216,6 +5222,7 @@
         //Description 입력 TextArea (원본 oRTAr1 rows:4) — 공통 팩토리(U4AUI.createField textarea).
         var oDescFld = window.U4AUI.createField({ type: "textarea", id: "ws20AttrDescTxa", inputClassName: "u4aWs20AttrTxa", rows: 4 });
         var TXA = oDescFld.input;   // 하위 호환(아래 change 핸들러에서 참조)
+        TXA.setAttribute("data-act", "ATTR_DESC");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         TXA.addEventListener("change", function () {
 
             // busy 키고 (원본 Description 변경 이벤트 297행 보존)
@@ -5273,6 +5280,7 @@
         var COL = document.createElement("button");
         COL.type = "button";
         COL.id = "ws20AttrInfoCollapseBtn";
+        COL.setAttribute("data-act", "ATTR_INFO_COLLAPSE");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         COL.className = "u4aWs20AttrSmBtn";
         COL.title = "Expand/Collapse Header";
         COL.innerHTML = '<i class="fa-solid fa-chevron-up"></i>';
@@ -5295,6 +5303,7 @@
         var PIN = document.createElement("button");
         PIN.type = "button";
         PIN.id = "ws20AttrInfoPinBtn";
+        PIN.setAttribute("data-act", "ATTR_INFO_PIN");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         PIN.className = "u4aWs20AttrSmBtn";
         PIN.title = "Pin Header";
         PIN.innerHTML = '<i class="fa-solid fa-thumbtack"></i>';
@@ -5334,6 +5343,7 @@
         var RST = document.createElement("button");
         RST.type = "button";
         RST.id = "ws20AttrResetBtn";
+        RST.setAttribute("data-act", "ATTR_RESET");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         RST.className = "u4aWs20AttrTbBtn reset";
         RST.title = _msg("B17", "Reset");
         //아이콘/텍스트 분리(필터 버튼과 동일 구조) — 좁아지면 ⋯ 로 접힘.
@@ -5353,6 +5363,7 @@
         var FLT = document.createElement("button");
         FLT.type = "button";
         FLT.id = "ws20AttrShowChangedBtn";
+        FLT.setAttribute("data-act", "ATTR_SHOWCHANGED");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         FLT.className = "u4aWs20AttrTbBtn emph";
         //815 변경된 항목만 필터링하여 표시...
         FLT.title = _wsMsg("815", "Show only changed Property/Event/Aggregation items.");
@@ -5405,6 +5416,7 @@
         var PRE = document.createElement("button");
         PRE.type = "button";
         PRE.id = "ws20AttrPresetBtn";
+        PRE.setAttribute("data-act", "ATTR_PRESET");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         PRE.className = "u4aWs20AttrTbBtn";
         PRE.title = _wsMsg("652", "UI Attribute Personalization List");
         PRE.innerHTML = '<i class="fa-solid fa-user-gear"></i><span>' + _wsMsg("652", "UI Attribute Personalization List") + '</span>';
@@ -5423,6 +5435,7 @@
         var HLP = document.createElement("button");
         HLP.type = "button";
         HLP.id = "ws20AttrHelpBtn";
+        HLP.setAttribute("data-act", "ATTR_HELP");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         HLP.className = "u4aWs20AttrTbBtn";
         HLP.title = _msg("B39", "Help");
         HLP.innerHTML = '<i class="fa-solid fa-circle-question"></i>';
@@ -5716,15 +5729,21 @@
         try {
             if (!oValCell || !sAttr) { return; }
             var sAct = ATTR_ACT_BY_UIATK[sAttr.UIATK];
+            // 2026-10-15 — 표에 없는 UIATK 는 UI5 속성 이름(UIATT) 그대로 PROP_<UIATT> 로 받는다.
+            //   까닭: UI 오브젝트(APP·PAGE…)를 고르면 ROOT 와 전혀 다른 속성이 나오는데 표에 없어
+            //   이름이 하나도 안 붙었다. UIATT 는 UI5 속성 이름이라 화면 언어와 무관하고 대소문자가
+            //   뜻을 가지므로 그대로 쓴다(UIASN 18자 줄임은 이름이 겹친다).
+            if (!sAct && sAttr.UIATT) { sAct = "PROP_" + sAttr.UIATT; }
             if (!sAct) {
                 if (!_bAttrActWarned && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
                     _bAttrActWarned = true;
-                    U4ALOG.warn("GUARD_EXIT", "UIATK not in ATTR_ACT_BY_UIATK",
+                    U4ALOG.warn("GUARD_EXIT", "UIATK not in ATTR_ACT_BY_UIATK and UIATT is empty",
                                 "data-act not set - this attribute row stays unreachable for the automation tool");
                 }
                 return;
             }
-            var oInp = oValCell.querySelector("input, textarea, .u4a-combo");
+            // select 포함 — 공통 콤보가 안 실린 폴백 경로에서 값 칸이 native select 로 만들어진다.
+            var oInp = oValCell.querySelector("input, textarea, select, .u4a-combo");
             if (oInp) { oInp.setAttribute("data-act", sAct); }
             var oClr = oValCell.querySelector(".u4a-field__clear");
             if (oClr) { oClr.setAttribute("data-act", sAct + "_CLEAR"); }
@@ -6960,6 +6979,7 @@
         var X = document.createElement("button");
         X.type = "button";
         X.className = "u4aWs20DescX";
+        X.setAttribute("data-act", "DESCPOP_CLOSE");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         X.title = _msg("A39", "Close");
         X.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         HD.appendChild(X);
@@ -6971,6 +6991,7 @@
         if (sLeft !== "") {
             var TA1 = document.createElement("textarea");
             TA1.className = "u4aWs20DescArea";
+            TA1.setAttribute("data-act", "DESCPOP_TEXT");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
             TA1.readOnly = true;
             TA1.value = sLeft;
             BODY.appendChild(TA1);
@@ -6978,6 +6999,7 @@
         if (sRight !== "") {
             var TA2 = document.createElement("textarea");
             TA2.className = "u4aWs20DescArea";
+            TA2.setAttribute("data-act", "DESCPOP_TEXT");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
             TA2.readOnly = true;
             TA2.value = sRight;
             BODY.appendChild(TA2);

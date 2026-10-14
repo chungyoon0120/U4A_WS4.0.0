@@ -714,16 +714,16 @@ export async function getControl() {
             };
         }
 
-        // CSS 팝업 메인 윈도우
-        let oCURRWIN = oREMOTE.getCurrentWindow();
-
-        // CSS 팝업 메인 윈도우 자식 윈도우
-        let aChildWindows = oCURRWIN.getChildWindows();
+        // CSS 팝업 메인 윈도우가 띄운 하위 윈도우
+        //   2026-10-15 장군님 지시 - 하위 창 제목줄에 최소화를 넣으며 parent 를 뺐다.
+        //     parent 가 없으면 getChildWindows() 가 늘 빈 배열이라 「이미 열림」 판정이 죽는다
+        //     → browserkey + OBJTY 로 찾는 공통 목록을 쓴다(.analy/20 전략1).
+        let aChildWindows = oParentAPP.fn.getOpenedChildWindows();
         if(!aChildWindows || Array.isArray(aChildWindows) === false || aChildWindows.length === 0){
             return {
                 RETCD: "E"
             };
-        }       
+        }
 
         for(const oChild of aChildWindows){
 
@@ -760,6 +760,10 @@ export async function getControl() {
 
     /*******************************************************
      * @function - 부모창이 위치한 모니터의 가운데로 이동
+     * -----------------------------------------------------
+     * ★2026-10-15 현재 호출처 0. 장군님 지시 「나중에 쓸일이 있을수 있으니 지우지마」로 남겨 둔다.
+     *   TODO 46 에서 하위 창 재배치를 공통 WSUTIL.setParentCenterBounds(= 호출한 창 가운데)로
+     *   바꾸면서 호출을 뺐다. 이 함수는 「부모 창이 있는 모니터 한가운데」라 기준이 다르다.
      *******************************************************/
     oContr.fn.moveToParentWin = function(oCHILD){
         
@@ -810,8 +814,16 @@ export async function getControl() {
         let oCheckIsOpen = oContr.fn.checkIsExistsAlreadyOpen(REMOTE, sChildKey);
         if(oCheckIsOpen.RETCD === "S"){
 
-            // 부모창이 위치한 모니터의 가운데로 이동
-            oContr.fn.moveToParentWin(oCheckIsOpen.WIN);
+            // 2026-10-15 장군님 지시 (TODO 46) - 종전에는 「부모 창이 있는 모니터 한가운데」로 옮겨
+            //   창을 화면 구석에 두고 쓰면 이 창만 모니터 복판으로 튀었다.
+            //   TODO 49 에서 맞춘 공통 규칙대로 **호출한 창 가운데**로 다시 잡는다.
+            // 2026-10-15 장군님 지시 - parent 를 뺐으므로 최소화된 창은 작업표시줄에 남아 있다.
+            //   먼저 Restore 해야 자리 재배치·focus 가 눈에 보인다(.analy/20 전략1).
+            try { if (oCheckIsOpen.WIN.isMinimized()) { oCheckIsOpen.WIN.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+            try { parent.WSUTIL.setParentCenterBounds(REMOTE, oCheckIsOpen.WIN); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             oCheckIsOpen.WIN.focus();
             
@@ -851,8 +863,11 @@ export async function getControl() {
                 partition: oContr.IF_DATA.SESSKEY,
                 // USERINFO: oContr.IF_DATA.USER_LOGIN_INFO
                 USERINFO: parent.process.USERINFO
-            },
-            parent: CURRWIN
+            }
+            // 2026-10-15 장군님 지시 - parent 를 지정하지 않는다.
+            //   이 창 제목줄에 최소화 버튼을 넣었는데, parent 가 있으면 최소화한 뒤
+            //   되살릴 길이 없다(작업표시줄에도 안 남는다). 되돌리려면 parent: CURRWIN 을 다시 넣는다.
+            //   이미 열림 판정·전체 닫기·부모와 함께 닫기는 getOpenedChildWindows(browserkey + OBJTY)가 맡는다.
         };
 
         // 브라우저 오픈
@@ -970,8 +985,16 @@ export async function getControl() {
         let oCheckIsOpen = oContr.fn.checkIsExistsAlreadyOpen(REMOTE, sChildKey);
         if(oCheckIsOpen.RETCD === "S"){
 
-            // 부모창이 위치한 모니터의 가운데로 이동
-            oContr.fn.moveToParentWin(oCheckIsOpen.WIN);
+            // 2026-10-15 장군님 지시 (TODO 46) - 종전에는 「부모 창이 있는 모니터 한가운데」로 옮겨
+            //   창을 화면 구석에 두고 쓰면 이 창만 모니터 복판으로 튀었다.
+            //   TODO 49 에서 맞춘 공통 규칙대로 **호출한 창 가운데**로 다시 잡는다.
+            // 2026-10-15 장군님 지시 - parent 를 뺐으므로 최소화된 창은 작업표시줄에 남아 있다.
+            //   먼저 Restore 해야 자리 재배치·focus 가 눈에 보인다(.analy/20 전략1).
+            try { if (oCheckIsOpen.WIN.isMinimized()) { oCheckIsOpen.WIN.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+            try { parent.WSUTIL.setParentCenterBounds(REMOTE, oCheckIsOpen.WIN); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             oCheckIsOpen.WIN.focus();
             
@@ -1008,8 +1031,11 @@ export async function getControl() {
                 browserkey: oContr.IF_DATA.BROWSKEY,
                 partition: oContr.IF_DATA.SESSKEY,
                 USERINFO: oContr.IF_DATA.USER_LOGIN_INFO
-            },
-            parent: CURRWIN        
+            }
+            // 2026-10-15 장군님 지시 - parent 를 지정하지 않는다.
+            //   이 창 제목줄에 최소화 버튼을 넣었는데, parent 가 있으면 최소화한 뒤
+            //   되살릴 길이 없다(작업표시줄에도 안 남는다). 되돌리려면 parent: CURRWIN 을 다시 넣는다.
+            //   이미 열림 판정·전체 닫기·부모와 함께 닫기는 getOpenedChildWindows(browserkey + OBJTY)가 맡는다.
         };
 
         // 브라우저 오픈
@@ -1703,13 +1729,9 @@ export async function getControl() {
      *******************************************************/
     oContr.fn.clearAllChildWindow = function(){
 
-        let oREMOTE = parent.REMOTE;
-
-        // CSS 팝업 메인 윈도우
-        let oCURRWIN = oREMOTE.getCurrentWindow();
-
-        // CSS 팝업 메인 윈도우 자식 윈도우
-        let aChildWindows = oCURRWIN.getChildWindows();
+        // CSS 팝업 메인 윈도우가 띄운 하위 윈도우
+        //   2026-10-15 장군님 지시 - parent 를 뺐으므로 getChildWindows() 는 쓸 수 없다.
+        let aChildWindows = oParentAPP.fn.getOpenedChildWindows();
         if(!aChildWindows || Array.isArray(aChildWindows) === false || aChildWindows.length === 0){
 
             // ★ 닫을 창이 없을 때 무반응이면 버튼 고장으로 오인 → 안내(신규 M987). 작업 대상 없음이라
@@ -1789,11 +1811,9 @@ export async function getControl() {
             return;
         }
 
-        // CSS 팝업 메인 윈도우
-        let oCURRWIN = oREMOTE.getCurrentWindow();
-
-        // CSS 팝업 메인 윈도우 자식 윈도우
-        let aChildWindows = oCURRWIN.getChildWindows();
+        // CSS 팝업 메인 윈도우가 띄운 하위 윈도우
+        //   2026-10-15 장군님 지시 - parent 를 뺐으므로 getChildWindows() 는 쓸 수 없다.
+        let aChildWindows = oParentAPP.fn.getOpenedChildWindows();
         if(!aChildWindows || Array.isArray(aChildWindows) === false || aChildWindows.length === 0){
             return;
         }

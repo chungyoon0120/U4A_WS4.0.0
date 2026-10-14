@@ -1429,6 +1429,7 @@
                 var oLock = document.createElement("span");
                 oLock.id = "ws20PrevLockIcon";
                 oLock.className = "u4aWs20PrevLockIcon";
+                oLock.setAttribute("data-act", "PREV_LOCK");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
                 oLock.title = "Shortcut Locked";
                 oLock.innerHTML = '<i class="fa-solid fa-lock"></i>';
                 oLock.style.display = "none"; //원본 visible:false

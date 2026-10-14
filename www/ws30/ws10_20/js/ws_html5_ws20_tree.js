@@ -223,6 +223,8 @@
         if (oCfg.reject) { BTN.style.color = "var(--error)"; }
         else if (oCfg.accept) { BTN.style.color = "var(--success)"; }
         BTN.title = oCfg.tooltip || "";
+        // 2026-10-15 — 자동 테스트 도구가 집을 이름(.analy/21). 글(title)은 화면 언어를 바꾸면 깨진다.
+        if (oCfg.act) { BTN.setAttribute("data-act", oCfg.act); }
         if (oCfg.disabled) { BTN.disabled = true; BTN.classList.add("is-disabled"); }
         if (oCfg.icon) { BTN.setAttribute("data-sap-icon", oCfg.icon); }
         if (oCfg.editOnly) { BTN.setAttribute("data-edit-only", "X"); }
@@ -297,33 +299,33 @@
             //   아이콘=원본 sap-icon://expand-group(이중 쉐브론 ↓) 모양으로 복원(fa-angles-down).
             {
                 icon: "sap-icon://expand-group", fa: "angles-down",
-                tooltip: _msg("B21", "Expand"),
+                act: "TREE_EXPAND", tooltip: _msg("B21", "Expand"),
                 press: function () { oAPP.fn.fnWs20TreeExpandSelected(); }
             },
             // B22 Collapse — 선택 라인 접힘 (원본 oLTree1.collapse(selectedIndex))
             //   아이콘=원본 sap-icon://collapse-group(이중 쉐브론 ↑) 모양으로 복원(fa-angles-up).
             {
                 icon: "sap-icon://collapse-group", fa: "angles-up",
-                tooltip: _msg("B22", "Collapse"),
+                act: "TREE_COLLAPSE", tooltip: _msg("B22", "Collapse"),
                 press: function () { oAPP.fn.fnWs20TreeCollapseSelected(); }
             },
             { sep: true },
             // A70 Find UI — 검색 팝업 (원본 callDesignTreeFindPopup) [가드]
             {
                 icon: "sap-icon://search", gly: "🔍",
-                tooltip: _msg("A70", "Find UI"),
+                act: "TREE_FINDUI", tooltip: _msg("A70", "Find UI"),
                 press: function () { _safeCall("callDesignTreeFindPopup", []); }
             },
             // B23 Clear selection — 체크박스 전체 해제 (원본 designClearCheckAll)
             {
                 icon: "sap-icon://multiselect-none", gly: "≣", editOnly: true,
-                tooltip: _msg("B23", "Clear selection"),
+                act: "TREE_CLEARSEL", tooltip: _msg("B23", "Clear selection"),
                 press: function () { _safeCall("designClearCheckAll", []); }
             },
             // A03 Delete — 멀티 삭제 (원본 designTreeMultiDeleteItem) [가드]
             {
                 icon: "sap-icon://delete", gly: "🗑", reject: true, editOnly: true,
-                tooltip: _msg("A03", "Delete"),
+                act: "TREE_DELETE", tooltip: _msg("A03", "Delete"),
                 press: function () { _safeCall("designTreeMultiDeleteItem", []); }
             },
             // B24 UI Template Wizard (원본 designCallWizardPopup) [가드]
@@ -331,7 +333,7 @@
             //   변환 때 wand-magic-sparkles(🪄)로 바뀌었던 것을 원복 — 마법사 wand 는 Activate 버튼으로 이동.
             {
                 icon: "sap-icon://responsive", fa: "display", accept: true, editOnly: true,
-                tooltip: _msg("B24", "UI Template Wizard"),
+                act: "TREE_WIZARD", tooltip: _msg("B24", "UI Template Wizard"),
                 // UI Template Wizard(HTML5) — 원본 uiDesignArea.js 729~748행 press 재현:
                 //   busy ON + 단축키 잠금 → designCallWizardPopup(HTML5, ws_html5_ws20_wizard.js).
                 //   (선택 노드 검사 → 서버 WZD_CHKER → fnUiTempWizardPopupOpener → 팝업)
@@ -349,7 +351,7 @@
             // E28 UI Personalization List — HTML5 인앱 팝업(fnP13nDesignPopupOpen "R" 리스트) 지연 로드.
             {
                 icon: "sap-icon://user-settings", fa: "user-gear",
-                tooltip: _msg("E28"),
+                act: "TREE_P13NLIST", tooltip: _msg("E28"),
                 // ★busy 를 켠 뒤 fnYieldToPaint 로 한 프레임 양보한 다음 무거운 동기 로직을 돈다
                 //   (장군님 지시 2026-10-13). 이 버튼의 무거운 구간은 둘 다 동기다:
                 //     ① fnP13nDesignPopupOpen.js(1715줄)를 동기 ajax 로 받아 eval (첫 클릭만)
@@ -377,13 +379,13 @@
             // 247 Undo (원본 undoRedo.executeHistory("UNDO")) [가드]
             {
                 icon: "sap-icon://undo", gly: "↶", editOnly: true, uract: "UNDO",
-                tooltip: _wsMsg("247"),
+                act: "TREE_UNDO", tooltip: _wsMsg("247"),
                 press: function () { _execHistory("UNDO"); }
             },
             // 248 Redo (원본 undoRedo.executeHistory("REDO")) [가드]
             {
                 icon: "sap-icon://redo", gly: "↷", editOnly: true, uract: "REDO",
-                tooltip: _wsMsg("248"),
+                act: "TREE_REDO", tooltip: _wsMsg("248"),
                 press: function () { _execHistory("REDO"); }
             },
             { sep: true },
@@ -391,7 +393,7 @@
             //   U4A_CVT_WDR(웹딘→U4A 변환) 플러그인 설치 서버에서만 활성. 별도 Electron 팝업.
             {
                 icon: "sap-icon://detail-view", fa: "rectangle-list",
-                tooltip: _wsMsg("469"),
+                act: "TREE_WDRLOG", tooltip: _wsMsg("469"),
                 disabled: !_hasWdrPlugin(),
                 press: function () {
                     // [임시] Web Dynpro 변환 로그 미완 — 안내 토스트만(사용자 지시). TODO(i18n) + 재개 시 원본 복원.
@@ -411,7 +413,7 @@
             // B39 Help (원본 도움말 팝업) [가드]
             {
                 icon: "sap-icon://question-mark", gly: "?",
-                tooltip: _msg("B39"),
+                act: "TREE_HELP", tooltip: _msg("B39"),
                 press: function () {
 
                     var l_ui = this;   //원본 uiDesignArea.js 983행 `var l_ui = this;`
@@ -639,6 +641,7 @@
                 var CHK = document.createElement("input");
                 CHK.type = "checkbox";
                 CHK.className = "u4aWs20TreeChk";
+                CHK.setAttribute("data-act", "TREECHK");   // 2026-10-15 자동 테스트 도구가 집을 이름(어느 줄인지는 줄의 data-objid 로 가린다)
                 CHK.checked = (n.chk === true);
                 CHK.addEventListener("click", function (e) { e.stopPropagation(); });
                 CHK.addEventListener("change", function (e) {

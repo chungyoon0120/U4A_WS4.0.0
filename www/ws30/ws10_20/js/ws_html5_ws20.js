@@ -697,12 +697,13 @@
      *   - 우측 아이콘 2개: 자리만(정적) — 클릭 시 console.warn 가드
      *   - 텍스트 값은 fnUpdateWs20AppHeader 가 채움 (재진입 시마다 갱신)
      ************************************************************************/
-    function _appHdrIconBtn(sId, sGly, sTooltip, fnClick) {
+    function _appHdrIconBtn(sId, sGly, sTooltip, fnClick, sAct) {
         var BTN = document.createElement("button");
         BTN.type = "button";
         BTN.id = sId;
         BTN.className = "u4aWs20AppHdrBtn";
         BTN.title = sTooltip || "";
+        if (sAct) { BTN.setAttribute("data-act", sAct); }   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         BTN.innerHTML = sGly; // FontAwesome 아이콘 HTML
         BTN.addEventListener("click", function () {
             try {
@@ -728,6 +729,7 @@
         BACK.id = "ws20AppHeaderBackBtn";
         BACK.className = "u4aWs20AppHdrBtn back";
         BACK.title = "Back";
+        BACK.setAttribute("data-act", "APPHDR_BACK");   // 2026-10-15 WS30(USP) 뒤로 단추와 같은 값(.analy/21)
         BACK.innerHTML = _fa("chevron-left");
         BACK.addEventListener("click", function () {
             try {
@@ -746,18 +748,21 @@
         var APPID = document.createElement("span");
         APPID.id = "ws20AppHeaderAppId";
         APPID.className = "u4aWs20AppHdrAppId";
+        APPID.setAttribute("data-act", "APPHDR_APPID");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         HDR.appendChild(APPID);
 
         // 모드 (Change / Display)
         var MODE = document.createElement("span");
         MODE.id = "ws20AppHeaderMode";
         MODE.className = "u4aWs20AppHdrMode";
+        MODE.setAttribute("data-act", "APPHDR_MODE");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         HDR.appendChild(MODE);
 
         // 상태 (Active / Inactive — ACTST 없으면 빈값)
         var STAT = document.createElement("span");
         STAT.id = "ws20AppHeaderStatus";
         STAT.className = "u4aWs20AppHdrStat";
+        STAT.setAttribute("data-act", "APPHDR_STATUS");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         HDR.appendChild(STAT);
 
         // 아이콘 버튼 2개 (구 ws20_findBtn / ws20_newWinBtn) — 원본처럼 상태 텍스트 "바로 뒤"에 배치.
@@ -770,15 +775,15 @@
             // 원본 ws20_findBtn.firePress → HTML5 별도창 opener(지연로드 래퍼, sap 무관).
             if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") { oAPP.fn.fnFindPopupOpener(); return; }
             console.warn("[WS20] fnFindPopupOpener not available");
-        }));
+        }, "APPHDR_FINDUI"));
         HDR.appendChild(_appHdrIconBtn("ws20AppHeaderExportBtn", _fa("window-restore"), _msg("A09") + " (Ctrl+N)", function () {
             // WS10 ev_NewWindow 와 동일 경로 호출 (ws_events.js:966 → parent.onNewWindow())
             if (oAPP.events && typeof oAPP.events.ev_NewWindow === "function") {
                 oAPP.events.ev_NewWindow();
                 return;
             }
-            console.warn("[WS20] ev_NewWindow not available");
-        }));
+            console.warn("[WS20] ev_NewWindow not available");   // id 는 Export 지만 하는 일은 새 창
+        }, "APPHDR_NEWWIN"));
 
         // 스페이서 — 아이콘 클러스터 뒤(우측 남는 공간 흡수). 원본은 [상태][Find][New] 가 좌측에 모임.
         var SPC = document.createElement("span");
@@ -822,7 +827,11 @@
         // 모드 (IS_EDIT === "X" → Change(A02), 그 외 Display(A05)) — 원본 fnGetHeaderToolbarContentWs20 동일 코드.
         var sIsEdit = (oInfo && oInfo.IS_EDIT != null) ? oInfo.IS_EDIT : lf_model("/WS20/APP/IS_EDIT");
         var sModeTxt = (sIsEdit === "X") ? _msg("A02") : _msg("A05");
-        if (elMode) { elMode.textContent = sModeTxt; }
+        if (elMode) {
+            elMode.textContent = sModeTxt;
+            // 2026-10-15 — 글자는 접속 언어를 타므로 상태를 값으로도 남긴다(.analy/21).
+            elMode.setAttribute("data-state", (sIsEdit === "X") ? "EDIT" : "DISPLAY");
+        }
 
         // 상태 (ACTST: "A" → Active(B66), 그 외 → Inactive(B67), 필드 없으면 빈값)
         //   단, 변경분이 있으면(IS_CHAG === "X") 아직 액티브 전이라 Inactive 로 표시
@@ -836,7 +845,14 @@
         } else if (sActst != null && sActst !== "") {
             sStatTxt = (sActst === "A") ? _msg("B66") : _msg("B67");
         }
-        if (elStat) { elStat.textContent = sStatTxt; }
+        if (elStat) {
+            elStat.textContent = sStatTxt;
+            // 2026-10-15 — 글자(Active/Inactive)는 접속 언어를 타므로 값으로도 남긴다(.analy/21).
+            //   표시 규칙은 위와 같다 — 변경분이 있으면 아직 액티브 전이라 INACTIVE.
+            if (sStatTxt === "") { elStat.removeAttribute("data-state"); }
+            else if (sIsChag === "X") { elStat.setAttribute("data-state", "INACTIVE"); }
+            else { elStat.setAttribute("data-state", (sActst === "A") ? "ACTIVE" : "INACTIVE"); }
+        }
 
         // 윈도우 타이틀/헤더 타이틀 갱신 (원본 동일: "U4A Workspace - {APPID} {모드} {상태}")
         //   "U4A Workspace - " 접두는 원본도 리터럴(영문 고정) — 미러.
@@ -1010,13 +1026,13 @@
         DLG.innerHTML =
             '<div class="u4a-dialog__header">' +
             '  <i class="fa-solid fa-table-columns"></i><span>' + _esc(_msg("A62")) + '</span>' +   // Change Layout
-            '  <button type="button" class="u4a-btn-icon u4aWs20LayoutX" data-act="close" title="' + _esc(_msg("A39")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn-icon u4aWs20LayoutX" data-act="CLOSE" title="' + _esc(_msg("A39")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             '<div class="u4a-dialog__body"><div class="u4aWs20LayoutCards"></div></div>' +
             '<div class="u4a-dialog__footer">' +
-            '  <button type="button" class="u4a-btn" data-act="default" title="' + _esc(_msg("A63")) + '"><i class="fa-solid fa-rotate-left"></i></button>' +   // Default (아이콘만)
-            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="save" title="' + _esc(_msg("A64")) + '"><i class="fa-solid fa-floppy-disk"></i></button>' +   // Save (아이콘만)
-            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="close" title="' + _esc(_msg("A39")) + '"><i class="fa-solid fa-xmark"></i></button>' +   // Close (X 아이콘만 · Reject 느낌)
+            '  <button type="button" class="u4a-btn" data-act="DEFAULT" title="' + _esc(_msg("A63")) + '"><i class="fa-solid fa-rotate-left"></i></button>' +   // Default (아이콘만)
+            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="SAVE" title="' + _esc(_msg("A64")) + '"><i class="fa-solid fa-floppy-disk"></i></button>' +   // Save (아이콘만)
+            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="CLOSE" title="' + _esc(_msg("A39")) + '"><i class="fa-solid fa-xmark"></i></button>' +   // Close (X 아이콘만 · Reject 느낌)
             '</div>';
 
         var CARDS = DLG.querySelector(".u4aWs20LayoutCards");
@@ -1208,9 +1224,9 @@
             var oBtn = e.target.closest("[data-act]");
             if (!oBtn) { return; }
             var sAct = oBtn.getAttribute("data-act");
-            if (sAct === "close") { _close(); }
-            else if (sAct === "default") { aWork = _ws20DefaultOrder(); _renderCards(); }
-            else if (sAct === "save") { _save(); }
+            if (sAct === "CLOSE") { _close(); }
+            else if (sAct === "DEFAULT") { aWork = _ws20DefaultOrder(); _renderCards(); }
+            else if (sAct === "SAVE") { _save(); }
         });
         DLG.addEventListener("cancel", function (e) { e.preventDefault(); _close(); }); // ESC
 
@@ -1387,12 +1403,15 @@
         HDR.appendChild(SPC);
 
         // 헤더 아이콘 버튼 1개 생성 (정적/가드)
-        function lf_hdrBtn(sId, sGly, sTooltip) {
+        function lf_hdrBtn(sId, sGly, sTooltip, sAct) {
             var BTN = document.createElement("button");
             BTN.type = "button";
             BTN.id = sId;
             BTN.className = "u4aWs20PanelHdrBtn";
             BTN.title = sTooltip || "";
+            // 2026-10-15 — 자동 테스트 도구가 집을 이름. id 는 Refresh 인데 하는 일은 줌 Reset 이라
+            //   id 로 짐작하지 않게 "하는 일"로 받는다(.analy/21).
+            if (sAct) { BTN.setAttribute("data-act", sAct); }
             BTN.innerHTML = sGly; // FontAwesome 아이콘 HTML
             BTN.addEventListener("click", function () {
                 try {
@@ -1403,13 +1422,14 @@
         }
 
         // 새로고침 (자리만)
-        HDR.appendChild(lf_hdrBtn("ws20PrevRefreshBtn", _fa("rotate-right"), "Refresh"));
+        HDR.appendChild(lf_hdrBtn("ws20PrevRefreshBtn", _fa("rotate-right"), "Refresh", "PREV_RESET"));
 
         // 줌 슬라이더 (비활성 — 자리만)
         var ZOOM = document.createElement("input");
         ZOOM.type = "range";
         ZOOM.id = "ws20PrevZoomSlider";
         ZOOM.className = "u4aWs20PrevZoom";
+        ZOOM.setAttribute("data-act", "PREV_ZOOM");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         ZOOM.disabled = true;
         HDR.appendChild(ZOOM);
 
@@ -1418,10 +1438,12 @@
         var TGL = document.createElement("label");
         TGL.id = "ws20PrevOffToggle";
         TGL.className = "u4a-switch";   // 공통 컴포넌트 그대로(체크리스트 F)
+        TGL.setAttribute("data-act", "PREV_FULLSCREEN");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         TGL.title = "Full Screen";
         var TGLIN = document.createElement("input");
         TGLIN.type = "checkbox";
         TGLIN.id = "ws20PrevOffInput";
+        TGLIN.setAttribute("data-act", "PREV_FULLSCREEN_INPUT");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         var TGLSL = document.createElement("span");
         TGLSL.className = "u4a-switch__slider";
         TGL.appendChild(TGLIN);
@@ -1429,7 +1451,7 @@
         HDR.appendChild(TGL);
 
         // 도움말 (자리만)
-        HDR.appendChild(lf_hdrBtn("ws20PrevHelpBtn", _fa("circle-question"), "Help"));
+        HDR.appendChild(lf_hdrBtn("ws20PrevHelpBtn", _fa("circle-question"), "Help", "PREV_HELP"));
 
         // 패널 좁아지면 우측 컨트롤(⟳/줌/OFF/?)이 잘려 사라지지 않도록 ⋯ 오버플로 메뉴로 접는다
         //   (트리 툴바와 동일 — U4AUI.attachOverflow). 스페이서만 isSkip, 우측정렬이라 noOvfAutoMargin.

@@ -10,7 +10,8 @@
     <!-- ==================================================================================
          [HTML5] 별도창(win=X)일 때만 공통 frameless 크롬 활성화. (browser-window-common-ux / .analy/16 §2.6)
            · 이 페이지는 인팝업 미리보기 iframe 으로도 겸용 → win 없으면 아무것도 안 함(기존 동작 100% 보존).
-           · minimize 버튼 제외(장군님 지시) — 로고/제목/최대화/닫기만.
+           · 2026-10-15 장군님 지시 「최소화 넣고」 — 로고/제목/최소화/최대화/닫기.
+             (그 전에는 minimize 를 빼 뒀는데, 원본은 Windows 기본 창틀이라 최소화가 있었다.)
          ================================================================================== -->
     <script>
         // 창 크롬 배선 — 공통 자산(theme-api/u4a-ui) 로드 완료 후 호출. (안전망에서도 호출되므로 1회 가드)
@@ -33,7 +34,11 @@
                 var oTitle = document.getElementById("dtlTitle");
                 if (oTitle) { oTitle.textContent = document.title || ""; }
 
-                // 최대화/복원 토글 + 아이콘 스왑 (minimize 없음)
+                // 최소화 (2026-10-15 장군님 지시)
+                var oMin = document.getElementById("dtlWinMin");
+                if (oMin) { oMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }); }
+
+                // 최대화/복원 토글 + 아이콘 스왑
                 var oMax = document.getElementById("dtlWinMax");
                 function _syncMax() {
                     var i = oMax && oMax.querySelector("i");
@@ -141,11 +146,12 @@
 
 <body>
 
-    <!-- 별도창 전용 공통 타이틀바(frameless) — minimize 제외: 로고/제목/최대화/닫기. 임베드 미리보기에선 CSS로 숨김. -->
+    <!-- 별도창 전용 공통 타이틀바(frameless) — 로고/제목/최소화/최대화/닫기. 임베드 미리보기에선 CSS로 숨김. -->
     <header class="u4a-titlebar" id="dtlTitlebar">
         <img class="u4a-titlebar__logo" id="dtlLogo" src="" alt="U4A">
         <span class="u4a-titlebar__title" id="dtlTitle"></span>
         <div class="u4a-titlebar__spacer"></div>
+        <button type="button" class="u4a-winbtn" id="dtlWinMin" data-action="minimize" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
         <button type="button" class="u4a-winbtn" id="dtlWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
         <button type="button" class="u4a-winbtn u4a-winbtn--close" id="dtlWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </header>

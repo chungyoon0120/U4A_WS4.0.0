@@ -1871,7 +1871,7 @@
             '  <i class="fa-solid fa-image" aria-hidden="true"></i><span class="u4aWs20UiPrevTitle"></span>' +
             //040 Rotation On/Off — 자동 넘김 토글(공통 .u4a-switch).
             '  <label class="u4a-switch u4aWs20UiPrevRot" title="' + _esc(_wsTxtEdit("040")) + '"><input type="checkbox" checked><span class="u4a-switch__slider"></span></label>' +
-            '  <button type="button" class="u4a-btn-icon" data-act="close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn-icon" data-act="CLOSE" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             '<div class="u4aWs20UiPrevBody">' +
             '  <button type="button" class="u4a-btn-icon u4aWs20UiPrevNav u4aWs20UiPrevPrev" title="&#9664;"><i class="fa-solid fa-chevron-left"></i></button>' +
@@ -1913,7 +1913,7 @@
             // 닫기 = 우상단 흰색 X 아이콘만(일반 이미지 뷰어 스타일, 배경/박스 없음). 아무 데나 클릭/ESC 로도 닫힘.
             oZoom.innerHTML =
                 '<img class="u4aWs20UiPrevZoomImg" alt="" src="' + _esc(sSrc) + '">' +
-                '<button type="button" class="u4aWs20UiPrevZoomX" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>';
+                '<button type="button" class="u4aWs20UiPrevZoomX" data-act="CLOSE" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>';
             function _zclose() { try { oZoom.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } try { oZoom.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } setTimeout(function () { _zoomOpen = false; }, 0); _startTimer(); }
             oZoom.addEventListener("click", _zclose);                                   // 아무 데나 클릭 닫기
             oZoom.addEventListener("cancel", function (e) { e.preventDefault(); _zclose(); });   // ESC
@@ -1957,7 +1957,7 @@
         oPop.querySelector(".u4aWs20UiPrevPrev").addEventListener("click", function () { _go(iCur - 1); _startTimer(); });
         oPop.querySelector(".u4aWs20UiPrevNext").addEventListener("click", function () { _go(iCur + 1); _startTimer(); });
         oRot.addEventListener("change", _startTimer);
-        oPop.querySelector('[data-act="close"]').addEventListener("click", _close);
+        oPop.querySelector('[data-act="CLOSE"]').addEventListener("click", _close);
         oPop.addEventListener("mousedown", function (e) { e.stopPropagation(); });   // 내부 클릭은 라이트 디스미스 제외.
 
         // 삽입 다이얼로그(top-layer) 안에 붙여 모달 위로(openColumnMenu 와 동일 전략).
@@ -2068,30 +2068,30 @@
             '<div class="u4a-dialog__header u4aWs20InsHead">' +
             '  <i class="fa-solid fa-layer-group"></i>' +
             '  <span class="u4aWs20InsTitle"></span>' +
-            '  <button type="button" class="u4a-btn-icon u4aWs20InsX" data-act="cancel" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn-icon u4aWs20InsX" data-act="CANCEL" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             '<div class="u4a-dialog__body">' +
             '  <div class="u4aWs20InsForm">' +
-            '    <div class="u4aWs20InsRow"><label>' + _esc(_msg("D98", "Aggregation Name")) + '</label><span class="u4aWs20InsAgg"></span></div>' +
+            '    <div class="u4aWs20InsRow"><label>' + _esc(_msg("D98", "Aggregation Name")) + '</label><span class="u4aWs20InsAgg" data-act="INS_AGG"></span></div>' +
             '    <div class="u4aWs20InsRow u4aWs20InsCntRow" hidden><label>' + _esc(_msg("D99", "Generated Cnt")) + '</label>' +
             '      <div class="u4aWs20InsStep">' +
-            '        <button type="button" class="u4a-btn-icon" data-step="-1"><i class="fa-solid fa-minus"></i></button>' +
-            '        <input type="text" inputmode="numeric" class="u4a-input u4aWs20InsCnt" value="1">' +
-            '        <button type="button" class="u4a-btn-icon" data-step="1"><i class="fa-solid fa-plus"></i></button>' +
+            '        <button type="button" class="u4a-btn-icon" data-step="-1" data-act="INS_CNT_DEC"><i class="fa-solid fa-minus"></i></button>' +
+            '        <input type="text" inputmode="numeric" class="u4a-input u4aWs20InsCnt" data-act="INS_CNT" value="1">' +
+            '        <button type="button" class="u4a-btn-icon" data-step="1" data-act="INS_CNT_INC"><i class="fa-solid fa-plus"></i></button>' +
             '        <span class="u4aWs20InsMax">' + _esc(_msg("B25", "Max")) + ' : ' + CV_INS_MAX + '</span>' +
             '      </div>' +
             '    </div>' +
             '    <div class="u4aWs20InsRow"><label>' + _esc(_msg("E01", "UI Object")) + '</label>' +
             //공통 입력 clear(X) — .u4a-field[data-trail] 래퍼 + .u4a-field__clear(값 있을 때만 노출, attachClear).
             '      <div class="u4a-field u4aWs20InsSearchWrap" data-trail="1">' +
-            '        <input type="text" class="u4a-input u4a-field__input u4aWs20InsSearch" autocomplete="off">' +
-            '        <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear"><i class="fa-solid fa-xmark"></i></button>' +
+            '        <input type="text" class="u4a-input u4a-field__input u4aWs20InsSearch" data-act="INS_SEARCH" autocomplete="off">' +
+            '        <button type="button" class="u4a-field__clear" data-act="INS_SEARCH_CLEAR" tabindex="-1" title="Clear"><i class="fa-solid fa-xmark"></i></button>' +
             '      </div></div>' +
-            '    <label class="u4aWs20InsChkRow"><input type="checkbox" class="u4aWs20InsP13n"><span>' + _esc(_p13nText()) + '</span></label>' +
+            '    <label class="u4aWs20InsChkRow"><input type="checkbox" class="u4aWs20InsP13n" data-act="INS_P13N"><span>' + _esc(_p13nText()) + '</span></label>' +
             '  </div>' +
             '  <div class="u4aWs20InsTableWrap u4a-table-wrap">' +
             //행높이=공통 .u4a-table 기본(레퍼런스 F4 탭1·Login 동일). --compact 안 씀(혼자 좁아지지 않게).
-            '    <table class="u4aWs20InsTable u4a-table">' +
+            '    <table class="u4aWs20InsTable u4a-table" data-act="INS_LIST">' +
             //헤더는 _renderHead 가 동적 구성(공통 .u4a-th--menu 클릭→U4AUI.openColumnMenu, 정렬/필터 표시자 갱신).
             '      <thead></thead>' +
             '      <tbody></tbody>' +
@@ -2100,8 +2100,8 @@
             '  </div>' +
             '</div>' +
             '<div class="u4a-dialog__footer">' +
-            '  <button type="button" class="u4a-btn u4aWs20InsConfirm" data-act="ok" disabled><i class="fa-solid fa-check"></i> ' + _esc(_msg("A40", "Confirm")) + '</button>' +
-            '  <button type="button" class="u4a-btn u4aWs20InsCancel" data-act="cancel"><i class="fa-solid fa-xmark"></i> ' + _esc(_msg("A41", "Cancel")) + '</button>' +
+            '  <button type="button" class="u4a-btn u4aWs20InsConfirm" data-act="OK" disabled><i class="fa-solid fa-check"></i> ' + _esc(_msg("A40", "Confirm")) + '</button>' +
+            '  <button type="button" class="u4a-btn u4aWs20InsCancel" data-act="CANCEL"><i class="fa-solid fa-xmark"></i> ' + _esc(_msg("A41", "Cancel")) + '</button>' +
             '</div>';
 
         oDlg.querySelector(".u4aWs20InsTitle").textContent = sTitle;
@@ -2112,7 +2112,7 @@
         var oTbody = oDlg.querySelector(".u4aWs20InsTable tbody");
         var oEmpty = oDlg.querySelector(".u4aWs20InsEmpty");
         var oSearch = oDlg.querySelector(".u4aWs20InsSearch");
-        var oOk = oDlg.querySelector('[data-act="ok"]');
+        var oOk = oDlg.querySelector('[data-act="OK"]');
         var oCntRow = oDlg.querySelector(".u4aWs20InsCntRow");
         var oCntInp = oDlg.querySelector(".u4aWs20InsCnt");
         var oAggSlot = oDlg.querySelector(".u4aWs20InsAgg");
@@ -2238,6 +2238,8 @@
         function _buildInsRow(ui, idx) {
             var tr = document.createElement("tr");
             if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }   // 공통 zebra
+            // 2026-10-15 — 자동 테스트 도구가 어떤 UI 를 고를지 값으로 가리게(.analy/21). 칸 글자로 찾던 자리.
+            if (ui && ui.UIOBK) { tr.setAttribute("data-uiobk", ui.UIOBK); }
             var sImg = _iconSrc(ui.UICON);
             tr.innerHTML =
                 '<td class="u4aWs20InsTdSym">' + (sImg ? '<img src="' + _esc(sImg) + '" alt="" title="' + _esc(_msg("A67", "Preview")) + '" onerror="this.style.display=\'none\'">' : "") + '</td>' +
@@ -2399,7 +2401,7 @@
         //   확정(lf_confirm)만 lf_close 로 안내 없이 닫는다.
         function lf_cancel() { try { parent.showMessage(null, 10, "I", _msgWs("001")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } lf_close(); }
         oOk.addEventListener("click", lf_confirm);
-        Array.prototype.forEach.call(oDlg.querySelectorAll('[data-act="cancel"]'), function (b) {
+        Array.prototype.forEach.call(oDlg.querySelectorAll('[data-act="CANCEL"]'), function (b) {
             b.addEventListener("click", lf_cancel);
         });
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_cancel(); }); // (모달 전용, 폴백) ESC=취소 안내 후 닫기(장군님 통일 결정)
@@ -2523,7 +2525,7 @@
         oDlg.innerHTML =
             '<div class="u4a-dialog__header">' +
             '  <i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span>' + _esc(_msg("A57", "Move Position") + " - " + oNode.OBJID) + '</span>' +
-            '  <button type="button" class="u4a-btn-icon" data-act="cancel" aria-label="Close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn-icon" data-act="CANCEL" aria-label="Close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             '<div class="u4a-dialog__body" style="flex:1 1 auto;display:flex;flex-direction:column;gap:1rem;padding:1.25rem 1.5rem;overflow:visible">' +
             '  <div style="display:flex;align-items:baseline;justify-content:center;gap:0.4rem">' +
@@ -2537,8 +2539,8 @@
             '  </div>' +
             '</div>' +
             '<div class="u4a-dialog__footer">' +
-            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="ok" title="' + _esc(_msg("A40", "Confirm")) + '"><i class="fa-solid fa-check"></i></button>' +
-            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="cancel" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="OK" title="' + _esc(_msg("A40", "Confirm")) + '"><i class="fa-solid fa-check"></i></button>' +
+            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="CANCEL" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>';
         var oInp = oDlg.querySelector(".u4aWs20MovePos");
         // 이동 가능 위치 + 이동 대상(자기) + 대상 위치를 디자인 트리에 미리 강조(원본 designMoveMark 1:1 이식).
@@ -2567,7 +2569,7 @@
             // 실제 이동은 공용 함수로(트리·미리보기 위치이동 팝업 공용). 동일 위치면 내부에서 no-op.
             oAPP.fn.fnWs20MoveUIToIndex(oNode, iTarget);
         }
-        oDlg.querySelector('[data-act="ok"]').addEventListener("click", lf_ok);
+        oDlg.querySelector('[data-act="OK"]').addEventListener("click", lf_ok);
         // 슬라이더 ↔ 숫자 input 동기화(둘 다 1..nTot 클램프).
         var oRange = oDlg.querySelector(".u4aWs20MovePosRange");
         function lf_clamp(v) { v = parseInt(v, 10); if (!(v >= 1)) { v = 1; } if (v > nTot) { v = nTot; } return v; }
@@ -2577,11 +2579,11 @@
         oInp.addEventListener("input", function () { oRange.value = String(lf_clamp(oInp.value)); });
         oRange.addEventListener("change", function () { lf_moveMark(lf_clamp(oRange.value)); });
         oInp.addEventListener("change", function () { lf_moveMark(lf_clamp(oInp.value)); });
-        // 헤더 X + 푸터 ✗ 둘 다 data-act="cancel" → 닫기.
-        oDlg.querySelectorAll('[data-act="cancel"]').forEach(function (b) { b.addEventListener("click", lf_close); });
+        // 헤더 X + 푸터 ✗ 둘 다 data-act="CANCEL" → 닫기.
+        oDlg.querySelectorAll('[data-act="CANCEL"]').forEach(function (b) { b.addEventListener("click", lf_close); });
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
         // 숫자 input Enter → 확인 버튼으로 포커스 이동(원본 keydown 13 → oBtn1.focus() 1:1. 즉시 확정 아님).
-        oInp.addEventListener("keydown", function (e) { if (e.key !== "Enter") { return; } e.preventDefault(); try { oDlg.querySelector('[data-act="ok"]').focus(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } });
+        oInp.addEventListener("keydown", function (e) { if (e.key !== "Enter") { return; } e.preventDefault(); try { oDlg.querySelector('[data-act="OK"]').focus(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } });
         document.body.appendChild(oDlg);
         var oHeader = oDlg.querySelector(".u4a-dialog__header");
         try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }

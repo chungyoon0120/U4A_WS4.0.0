@@ -323,6 +323,7 @@
         BACK.type = "button";
         BACK.id = "ws30AppHeaderBackBtn";
         BACK.className = "u4aWs30AppHdrBtn back";
+        BACK.setAttribute("data-act", "APPHDR_BACK");   // 2026-10-15 WS20 뒤로 단추와 같은 값(.analy/21)
         BACK.title = "Back";
         BACK.innerHTML = _fa("chevron-left");
         BACK.addEventListener("click", _uspBack);
@@ -348,6 +349,7 @@
         NEWWIN.type = "button";
         NEWWIN.id = "ws30AppHeaderNewWinBtn";
         NEWWIN.className = "u4aWs30AppHdrBtn";
+        NEWWIN.setAttribute("data-act", "APPHDR_NEWWIN");   // 2026-10-15 WS20 새 창 단추와 같은 값
         NEWWIN.title = _msg("A09") + " (Ctrl+N)";
         NEWWIN.innerHTML = _fa("window-restore");
         NEWWIN.addEventListener("click", function () {

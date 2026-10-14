@@ -532,6 +532,7 @@
         var oX = document.createElement("button");
         oX.type = "button"; oX.className = "u4a-btn-icon";
         oX.title = sClose;
+        oX.setAttribute("data-act", "CLOSE");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         oX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         oHeader.appendChild(oX);
         DLG.appendChild(oHeader);
@@ -548,10 +549,12 @@
         if (window.U4AUI && U4AUI.createSelect) {
             var oSel = U4AUI.createSelect(aItems, sSelKey, _onPick);
             oSel.classList.add("u4aWs20AggrSel");
+            oSel.setAttribute("data-act", "AGGR_SEL");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
             oBody.appendChild(oSel);
         } else {
             var oNative = document.createElement("select");
             oNative.className = "u4a-input u4aWs20AggrSel";
+            oNative.setAttribute("data-act", "AGGR_SEL");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
             aItems.forEach(function (it) { var o = document.createElement("option"); o.value = it.value; o.textContent = it.text; oNative.appendChild(o); });
             oNative.value = sSelKey;
             oNative.addEventListener("change", function () { sSelKey = oNative.value; });
@@ -568,10 +571,12 @@
         var oOk = document.createElement("button");
         oOk.type = "button"; oOk.className = "u4a-btn u4a-btn--emphasized";
         oOk.title = sConfirm;
+        oOk.setAttribute("data-act", "OK");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         oOk.innerHTML = '<i class="fa-solid fa-check"></i>';
         var oCancel = document.createElement("button");
         oCancel.type = "button"; oCancel.className = "u4a-btn u4a-btn--negative";
         oCancel.title = sClose;
+        oCancel.setAttribute("data-act", "CANCEL");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         oCancel.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         oFoot.appendChild(oOk);
         oFoot.appendChild(oCancel);
