@@ -3508,6 +3508,14 @@
                 language: oUserInfo.LANGU,
                 sysid: oUserInfo.SYSID,
                 sessionkey: parent.getSessionKey(),
+                // ★ [2026-10-15, 장군님 지시] 이 창에 별창 식별값 2개를 달아 준다.
+                //   공통 getSiblingWindows(ws_common.js)는 webPreferences 에 OBJTY 와 browserkey 가
+                //   **둘 다** 있는 창만 모은다. 종전에는 이 창이 둘 다 없어 **별창 목록에서 통째로 빠졌고**,
+                //   그래서 확인창이 떠도 안 숨고(TODO 44) 뒤로가기 일괄 닫기에도 안 잡혔다.
+                //   OBJTY 는 옛 릴리즈 노트 창(RELNOTEPOP)과 **일부러 다르게** 둔다 — 옛 경로가
+                //   getCheckAlreadyOpenWindow("RELNOTEPOP") 로 이 창을 「이미 열림」으로 잘못 집지 않게.
+                objty: "RELNOTEPOPV2",
+                browserkey: parent.getBrowserKey(),
                 service: {
                     host: parent.getServerHost(),
                     // params:{

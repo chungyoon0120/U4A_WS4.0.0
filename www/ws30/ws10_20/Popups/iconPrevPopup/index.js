@@ -2,6 +2,7 @@
  * Copyright 2020. INFOCG Inc. all rights reserved. 
  * ----------------------------------------------------------------------
  * - file Name : iconPrevPopup/index.js
+ * - 오류코드 접두: ICONP / 다음 번호: 003
  ************************************************************************/
 
 /************************************************************************
@@ -49,22 +50,101 @@ var
  *       close = 비콜백(뷰어)→CURRWIN.hide()(SYSID당 1개 재사용) / 콜백(F4)→부모에 취소 통지(RETCD:C)+setParentWindow(null)+CURRWIN.close()(파괴, 누수방지 B안)
  ************************************************************************/
 
+// 이 창 자신의 바쁨(초기엔 켜짐 — index.html 에서 data-busy="true" 로 시작).
+oAPP.attr.bSelfBusy = true;
+
+// ★ [2026-10-15, 장군님 지시] 다른 창이 방송한 바쁨 — **자기 바쁨과 따로** 기억한다.
+//   한 변수로 쓰면 짝이 어긋난다: 방송 바쁨이 켜져 있는 동안 이 창의 부팅이 끝나면서 바쁨을 끄면
+//   메인은 아직 바쁜데 이 창만 조작이 열린다. 그 반대도 마찬가지다.
+oAPP.attr.bBroadBusy = false;
+
 // 공통 .u4a-busy 토글 — runtime.js(iframe) 가 부팅 완료 시 parent.oAPP.fn.setShellBusy(false) 로 호출.
 oAPP.fn.setShellBusy = function (bBusy) {
-    var oDom = document.getElementById("iconpBusy");
-    if (!oDom) { return; }
-    // 공통 .u4a-busy 표시 트리거 = data-busy="true" (shell.css). 빈값/removeAttribute 는 안 뜸(전 소비처 규약).
-    if (bBusy) { oDom.setAttribute("data-busy", "true"); }
-    else { oDom.setAttribute("data-busy", "false"); }
+
+    oAPP.attr.bSelfBusy = (bBusy === true);
+
+    oAPP.fn._applyShellBusy();
 
     // [흰색 플래시 방지] 본문 iframe(KEEP-UI5)은 초기에 숨김(index.html #ws_frame). 서버 UI5 부팅이
     // 실제로 끝났을 때(bBootOk + busy 해제)만 노출한다 → 그 전까지는 호스트 --boot-bg(테마색)만 보인다.
     // 로드 실패(_onUi5LoadFail)는 bBootOk 가 안 서므로 흰 프레임이 드러나지 않는다.
-    if (!bBusy && oAPP.attr.bBootOk === true) {
+    //   ★이 노출 판단은 **자기 바쁨만** 본다 — 다른 창이 바쁘다고 본문을 영영 안 보여 주면 안 된다.
+    if (!oAPP.attr.bSelfBusy && oAPP.attr.bBootOk === true) {
         var oFrame = document.getElementById("ws_frame");
         if (oFrame) { oFrame.classList.add("is-ready"); }
     }
 }; // end of oAPP.fn.setShellBusy
+
+// 자기 바쁨 · 방송 바쁨을 합쳐 화면에 반영한다. 하나라도 켜져 있으면 막는다.
+oAPP.fn._applyShellBusy = function () {
+
+    var oDom = document.getElementById("iconpBusy");
+    if (!oDom) { return; }
+
+    var bOn = (oAPP.attr.bSelfBusy === true || oAPP.attr.bBroadBusy === true);
+
+    // 공통 .u4a-busy 표시 트리거 = data-busy="true" (shell.css). 빈값/removeAttribute 는 안 뜸(전 소비처 규약).
+    oDom.setAttribute("data-busy", bOn ? "true" : "false");
+
+}; // end of oAPP.fn._applyShellBusy
+
+/************************************************************************
+ * ★ [2026-10-15, 장군님 지시] 다른 창이 보내는 「바쁨 켜기/끄기」를 받는다.
+ ************************************************************************
+ * 이 창은 **속성 영역의 icon F4 로 열면 고른 아이콘 값을 WS20 속성에 넘기고**, 즐겨찾기 폴더·파일도
+ * 만든다(runtime.js). 그래서 다른 창이 저장하는 동안 이 창도 막아야 한다.
+ * 종전에는 받는 쪽이 아예 없었다 — 창을 묶는 열쇠(browserkey)는 **여는 쪽이 주소에 이미 넘겨 주는데**
+ * 창 안에서 그 값을 읽지 않았다(실측 2026-10-15).
+ * 채널 이름·처리 방식은 다른 별창(오류 페이지 에디터 창 등)과 같다.
+ ************************************************************************/
+oAPP.fn._initBroadcast = function () {
+
+    var sBrowsKey = "";
+
+    try {
+        sBrowsKey = new URLSearchParams(location.search).get("browserkey") || "";
+    } catch (e) {
+        console.error("[ICONP-001] reading browserkey from the window url failed:", e && e.message, e);
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+    }
+
+    if (!sBrowsKey) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "browserkey",
+                "icon list window does not receive busy broadcasts - it stays operable while other windows are busy");
+        }
+        return;
+    }
+
+    try {
+
+        oAPP.attr.oBroad = new BroadcastChannel("broadcast-to-child-window_" + sBrowsKey);
+
+        oAPP.attr.oBroad.onmessage = function (oEvent) {
+
+            var sPrc = oEvent && oEvent.data && oEvent.data.PRCCD;
+
+            if (sPrc === "BUSY_ON") { oAPP.attr.bBroadBusy = true; oAPP.fn._applyShellBusy(); }
+            else if (sPrc === "BUSY_OFF") { oAPP.attr.bBroadBusy = false; oAPP.fn._applyShellBusy(); }
+
+        };
+
+    } catch (e) {
+        console.error("[ICONP-002] subscribing to the busy broadcast channel failed:", e && e.message, e);
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+    }
+
+}; // end of oAPP.fn._initBroadcast
+
+oAPP.fn._closeBroadcast = function () {
+
+    try {
+        if (oAPP.attr.oBroad) { oAPP.attr.oBroad.close(); oAPP.attr.oBroad = null; }
+    } catch (e) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+    }
+
+}; // end of oAPP.fn._closeBroadcast
 
 /************************************************************************
  * HTML5 WS4 테마 키(theme_ws4/{SYSID}.json THEME, 예: "horizon_white") → iframe UI5 테마명.
@@ -283,6 +363,15 @@ if (document.readyState === "loading") {
 } else {
     oAPP.fn._initChrome();
 }
+
+// ★ 다른 창이 방송하는 「바쁨 켜기/끄기」 구독 — 종전에 받는 쪽이 통째로 없었다(2026-10-15).
+//   DOM 과 무관하므로 바로 건다(늦게 걸면 그 사이 방송을 놓친다).
+oAPP.fn._initBroadcast();
+
+// 창이 사라질 때 구독 해제(누수 방지).
+window.addEventListener("pagehide", function () {
+    oAPP.fn._closeBroadcast();
+}, { once: true });
 
 /************************************************************************
  * 라이브 테마 변경 추종(셸 타이틀바/배경) — versionMng _onThemeChange 동일 패턴.

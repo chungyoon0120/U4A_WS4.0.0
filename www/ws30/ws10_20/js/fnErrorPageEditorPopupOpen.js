@@ -4,6 +4,7 @@
  * - file Name : fnErrorPageEditorPopupOpen.js
  * - file Desc : Error Page Editor
  ************************************************************************/
+// 오류코드 접두: FEPE / 다음 번호: 004
 
 (function (window, $, oAPP) {
     "use strict";
@@ -250,6 +251,37 @@
 
         // 저장으로 변경분 발생 → WS20 헤더 Active→Inactive 반영(에디터 시리즈 fnIpcMain_EditorSave 와 동일 처리).
         try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        // ★ [2026-10-15, 장군님 지시 (TODO 45)] SAVE 를 누르면 미리보기 창에도 바로 반영한다.
+        //   장군님 결정 = 「미리보기 창이 **열려 있을 때만** 갱신」 — 닫혀 있으면 새로 띄우지 않는다.
+        //   원본(as-is)에는 없는 신규 기능이다(원본은 Preview 버튼으로만 미리보기를 갱신했다).
+        //
+        //   왜 여기인가 — 저장 신호(if-ErrorPageEditor-Save)가 이미 SAVEDATA 를 들고 오고,
+        //   이 함수는 메인 창 쪽이라 창 목록(getCheckAlreadyOpenWindow2)을 바로 볼 수 있다.
+        //   미리보기 창(errorPageEditorPreview.js)의 if-Error-Page-prev 수신부는 상시 on 이라
+        //   같은 신호를 다시 보내면 본문 iframe 을 그 HTML 로 다시 그린다.
+        //
+        //   ★함정 — Preview 버튼 경로(fnIpcMain_ErrorPagePreview)는 **이미 열린 창을 닫고 새로 띄우는**
+        //     쪽이다. 거기에 이 갱신을 얹으면 창이 닫히고 다시 뜨므로 손대지 않는다. 두 경로는 별개다.
+        try {
+
+            const oPrevWin = APPCOMMON.getCheckAlreadyOpenWindow2("ERRPAGEPREV");
+
+            if (oPrevWin.ISOPEN && oPrevWin.WINDOW && !oPrevWin.WINDOW.isDestroyed()) {
+
+                oPrevWin.WINDOW.webContents.send("if-Error-Page-prev", oSaveData);
+
+                if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                    U4ALOG.info("끝남", "ERRPAGEPREV", "saved HTML sent to the open error page preview window");
+                }
+
+            }
+            // 닫혀 있으면 아무것도 하지 않는다 — 장군님 결정대로 창을 새로 띄우지 않는다(정상 흐름, 로그 없음).
+
+        } catch (e) {
+            console.error("[FEPE-003] refreshing the open error page preview window on save failed:", e && e.message, e);
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
 
     }; // end of oAPP.fn.fnIpcMain_ErrorPageEditorSave
 

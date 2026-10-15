@@ -366,40 +366,64 @@
 
     
     /************************************************************************
-     * Mutation에서 Dialog 감지 예외 대상이 있는지 체크
+     * [HTML5] 「가리는 창」 셀렉터 — 이것이 하나라도 열려 있으면 별창을 숨긴다.
+     ************************************************************************
+     *  ★원본(UI5)이 정해 둔 기준을 그대로 옮긴 것이다. 내가 새로 정한 것이 아니다.
+     *   원본 감시는 열린 UI5 Dialog(`.sapMDialogOpen`) 전부를 보되, Dialog 에
+     *   `MUTATION_EXCEP="X"` 가 붙은 것만 건너뛰었다. 그 표시가 붙은 곳은
+     *   원본 전체에서 **딱 하나 — ws_main.js 의 직접 만든 BusyDialog** 였다(실측 grep 3건,
+     *   그중 현행은 ws_main.js 889 하나. 나머지는 `_` 계열 사본).
+     *   즉 원본 규칙 = **busy 를 뺀 Dialog 가 하나라도 열려 있으면 숨긴다.**
+     *
+     *  ★WS4.0 에서 busy 를 반드시 빼야 하는 까닭 (안 빼면 동작이 원본과 달라진다):
+     *   원본 busy 는 화면에 박힌 `<div id="u4aWsBusyIndicator">` 라 Dialog 가 아니었고
+     *   (원본 index.html 50), UI5 BusyDialog 를 쓸 때도 위 예외 표시로 빠졌다.
+     *   WS4.0 은 top-layer 문제로 busy 를 `<dialog>`+showModal 로 바꿨으므로
+     *   (theme/u4a-busy.js), 그냥 `dialog[open]` 만 보면 **busy 가 켜질 때마다
+     *   별창이 전부 사라졌다 돌아온다.** 그래서 busy 의 class 로 뺀다.
+     *
+     *  ★토스트(`<div class="u4a-toast">`)는 `<dialog>` 가 아니라 애초에 안 걸린다(실측).
+     *  ★`.sapMDialogOpen` 은 WS4.0 에 뜨지 않지만(UI5 미사용) fnCheckIsDialogOpen 과
+     *   기준을 맞춰 두려고 남긴다 — 비용 0.
      ************************************************************************/
-    function _checkMutationExpDialog(){
+    var SEL_BLOCKING_DIALOG = "dialog[open]:not(.u4aWsBusyIndicator), .sapMDialogOpen";
 
-        var aOpendDialog = $(".sapMDialogOpen");
-        if(aOpendDialog.length === 0){
-            return false;
+    // 마지막으로 반영한 상태(true = 숨긴 상태). 같은 상태면 다시 부르지 않는다.
+    var bChildHidden = false;
+
+    /************************************************************************
+     * 지금 열린 「가리는 창」 유무에 맞춰 별창을 숨기거나 되살린다.
+     ************************************************************************/
+    function _syncChildWindowByDialog() {
+
+        var bBlocking = (document.querySelector(SEL_BLOCKING_DIALOG) !== null);
+
+        // 상태가 안 바뀌었으면 아무것도 안 한다.
+        //   ★원본은 UI5 모달 전용 영역(sap-ui-static) 하나만 봐서 콜백이 드물었다.
+        //    WS4.0 은 팝업 <dialog> 54개가 전부 <body> 직속이라(실측) <body> 를 봐야 하고,
+        //    그러면 화면을 그릴 때마다 콜백이 온다. 상태 비교 없이 매번 부르면 느린 PC 에서
+        //    별창 개수만큼 setOpacity 가 쏟아진다. 동작은 원본과 같고 횟수만 줄인다.
+        if (bBlocking === bChildHidden) {
+            return;
         }
 
-        let iOpendCount = aOpendDialog.length;
-        for(var i = 0; i < iOpendCount; i++){
+        bChildHidden = bBlocking;
 
-            let oDialogDom = aOpendDialog[i];
-            if(!oDialogDom){
-                continue;
+        if (typeof oAPP.fn.fnChildWindowShow !== "function") {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnChildWindowShow", "child windows are not hidden while a dialog is open");
             }
-
-            let sDialogId = oDialogDom.id;
-            let oDialog = sap.ui.getCore().byId(sDialogId);
-            if(!oDialog){
-                continue;
-            }
-
-            // Dialog에 Mutation 감지 예외 대상인지 확인
-            let isExp = oDialog.data("MUTATION_EXCEP");
-            if(isExp === "X"){                
-                return true;
-            }
-
+            return;
         }
-        
-        return false;
 
-    } // end of _checkMutationExpDialog
+        // 가리는 창이 열렸으면 숨기고(false), 전부 닫혔으면 되살린다(true).
+        oAPP.fn.fnChildWindowShow(!bBlocking);   // [ws_fn_02.js]
+
+        if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+            U4ALOG.info("끝남", "child windows", bBlocking ? "hidden - a blocking dialog is open" : "restored - no blocking dialog left");
+        }
+
+    } // end of _syncChildWindowByDialog
 
     /************************************************************************
      * Dialog의 Dom 정보를 감시한다.
@@ -409,60 +433,39 @@
      *   자식 윈도우에 가려져서 사용자가 인지를 못하므로
      *   Dialog가 뜨는걸 감지해서 자식 윈도우를 비활성화 했다가
      *   Dialog가 닫히면 자식 윈도우를 활성화 시키는 목적으로 만들어짐
+     ************************************************************************
+     *  ★[2026-10-15, TODO 44] HTML5 기준으로 되살렸다.
+     *   종전에는 첫 줄에서 `sap-ui-static` 을 찾고 없으면 조용히 return 했는데,
+     *   WS4.0 은 UI5 를 띄우지 않아 그 요소가 아예 없어 **감시가 시작조차 안 됐다.**
+     *   로그도 없어 안 도는 것조차 안 보였다(2026-10-14 조사).
+     *
+     *  ★감시자를 2개 거는 까닭 — 한 개로는 둘 중 하나를 놓친다:
+     *   ① <body> 바로 아래 추가/제거 — 팝업 54개는 만들었다 지우는 식이라 childList 로 잡힌다.
+     *      subtree 를 켜지 않는다(켜면 화면 그릴 때마다 콜백이 쏟아진다).
+     *   ② open 속성 토글 — 화면에 박아 둔 채 showModal/close 만 하는 창
+     *      (네트워크 끊김 창 `u4a_neterr` 등)은 ①로 안 잡힌다. subtree 가 필요하지만
+     *      attributeFilter 를 open 하나로 묶어 다른 속성 변화에는 안 불리게 한다.
      ************************************************************************/
     function _setDialogObserver() {
 
-        // sap-ui-static 영역만 감지한다.
-        var oSapUiStatic = document.getElementById("sap-ui-static");
-        if (oSapUiStatic == null) {
+        var oBody = document.body;
+        if (!oBody) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "document.body", "dialog observer not started - child windows will not hide when a dialog opens");
+            }
             return;
         }
 
-        // 감시자 인스턴스 만들기
-        var observer = new MutationObserver(function (mutations) {
-         
-            // Dialog 중 감지 예외 대상인것 찾기
-            let bIsExp = _checkMutationExpDialog();
-            if(bIsExp === true){
-                return;
-            }
+        var observer = new MutationObserver(function () { _syncChildWindowByDialog(); });
 
-            // Open 된 Dialog가 없으면 숨겼던 child window 전체를 보여준다.
-            var $oOpendDialog = $(".sapMDialogOpen");
-            if (!$oOpendDialog.length) {
+        // ① <body> 바로 아래 팝업 <dialog> 추가/제거
+        observer.observe(oBody, { childList: true });
 
-                oAPP.fn.fnChildWindowShow(true); // [ws_fn_02.js]
-                return;
-            }
+        // ② 이미 붙어 있는 <dialog> 의 open 토글
+        observer.observe(oBody, { attributes: true, attributeFilter: ["open"], subtree: true });
 
-            // // Dialog 중 감지 예외 대상인것 찾기
-            // let bIsExp = _checkMutationExpDialog();
-            // if(bIsExp === true){
-            //     return;
-            // }
-
-            // Dialog 가 Open 되면 child window 전체를 숨긴다.
-            oAPP.fn.fnChildWindowShow(false); // [ws_fn_02.js]
-
-        });
-
-
-        // 감지할 대상 DOM의 하위가 변화될때 감지하라는 옵션
-        var config = {
-            childList: true,
-        };
-
-        // // 감지할 대상 DOM의 하위가 변화될때 감지하라는 옵션
-        // var config = {
-        //     attributes: true,
-        //     childList             : true,
-        //     subtree               : true,
-        //     attributeOldValue     : true,
-        //     characterData         : true,
-        //     characterDataOldValue : true,
-        // };
-
-        observer.observe(oSapUiStatic, config);
+        // 켤 때의 현재 상태를 한 번 맞춰 둔다(이미 뭔가 떠 있는 채로 시작하는 경우).
+        _syncChildWindowByDialog();
 
     }
 

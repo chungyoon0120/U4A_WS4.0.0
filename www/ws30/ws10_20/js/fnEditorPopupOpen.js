@@ -38,9 +38,14 @@
             BROWSKEY = parent.getBrowserKey(),
             oAppInfo = parent.getAppInfo(),
             // sBrowserTitle = oAppInfo.APPID + " - " + oEditInfo.OBJNM + " Editor";
-            sBrowserTitle = oAppInfo.APPID + " - " + oEditInfo.OBJNM;
+            // ★ [2026-10-15, 장군님 지시] 제목 순서를 뒤집었다 —
+            //   종전 「앱이름 - CSS Editor」 → 「CSS Editor - 앱이름」.
+            //   무엇을 여는 창인지가 앞에 와야 작업표시줄에서 창을 가려낼 수 있다.
+            //   이 창 여는 함수는 CSS · Javascript · Html 에디터가 같이 쓰므로 셋 다 같이 바뀐다.
+            sBrowserTitle = oEditInfo.OBJNM;
 
         sBrowserTitle += " " + oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D23"); // Editor
+        sBrowserTitle += " - " + oAppInfo.APPID;
 
         // 기존에 Editor 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
         //   2026-10-13 장군님 지시 (parent 제거 16번) - parent 를 빼면 getChildWindows() 로는

@@ -1,4 +1,5 @@
 
+// 오류코드 접두: RELN / 다음 번호: 002
 const remote = require('@electron/remote');
 const path   = require('path');
 const { EventEmitter } = require('events');
@@ -55,8 +56,19 @@ function open(options={}){
 
         // 이미 열려있으면 포커스만
         if (oWindow && !oWindow.isDestroyed()) {
+
+            // ★ [2026-10-15, 장군님 지시] 이미 떠 있는 창을 다시 불렀을 때도 **호출한 창 가운데로 다시 놓는다.**
+            //   종전에는 그 자리에 그대로 있어, 창을 구석으로 끌어 둔 뒤 다시 부르면 안 움직였다.
+            //   다른 별창(fnDialogPopupOpener.js 의 「이미 열린 창이면 포커스만」 분기)과 같은 처리다.
+            try { if (oWindow.isMinimized()) { oWindow.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             oWindow.show();
+
+            _centerOnOpener();
+
             oWindow.focus();
+
             return resolve();
         }
 
@@ -88,9 +100,67 @@ function open(options={}){
                 nativeWindowOpen  : true,
                 webSecurity       : false,
                 partition         : options.sessionkey,
+                // ★ [2026-10-15, 장군님 지시] 별창 식별값 2개 — 이 둘이 **다 있어야** 별창으로 센다.
+                //   공통 getSiblingWindows(js/ws_common.js)가 OBJTY 없는 창 · browserkey 가 다른 창을
+                //   건너뛰므로, 종전에는 이 창이 별창 목록에서 통째로 빠져 있었다.
+                //   그래서 확인창이 떠도 안 숨고(TODO 44) 뒤로가기 일괄 닫기에도 안 잡혔다.
+                //   값은 부른 쪽(js/fnDialogPopupOpener.js 의 fnReleaseNotePopupOpenerV2)이 넘긴다.
+                OBJTY             : options.objty,
+                browserkey        : options.browserkey,
             },
 
         });
+
+        // ★ [2026-10-15, 장군님 지시 TODO 57] 뜨는 자리 = 「호출한 창」 가운데.
+        //   종전에는 자리 잡는 줄이 아예 없어 Electron 기본값인 모니터 한가운데에 떴다.
+        //   ★**두 번 부른다** — 만든 직후와, 보이기 직전(`ready-to-show`).
+        //    이 창은 show:false 로 만들고 **창 안에서 show()** 하므로, 열기가 끝난 뒤에 옮기면
+        //    이미 보인 뒤라 늦다. `ready-to-show` 는 `show()` 보다 반드시 먼저 온다.
+        function _centerOnOpener() {
+
+            try {
+
+                if (!oWindow || oWindow.isDestroyed()) { return; }
+
+                const oOpener = remote.getCurrentWindow();
+
+                if (!oOpener || oOpener.isDestroyed()) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "opener window", "release notes window stays at the screen center");
+                    }
+                    return;
+                }
+
+                const oBase = oOpener.getBounds(),
+                      oSelf = oWindow.getBounds(),
+                      oArea = remote.require("electron").screen.getDisplayMatching(oBase).workArea;
+
+                let iX = Math.round(oBase.x + (oBase.width - oSelf.width) / 2),
+                    iY = Math.round(oBase.y + (oBase.height - oSelf.height) / 2);
+
+                // 화면(작업 영역) 밖으로 나가지 않게 가둔다.
+                iX = Math.min(Math.max(iX, oArea.x), oArea.x + oArea.width - oSelf.width);
+                iY = Math.min(Math.max(iY, oArea.y), oArea.y + oArea.height - oSelf.height);
+
+                oWindow.setBounds({ x: iX, y: iY, width: oSelf.width, height: oSelf.height });
+
+            } catch (e) {
+                console.error("[RELN-001] centering the release notes window failed:", e && e.message, e);
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            }
+
+        } // end of _centerOnOpener
+
+        _centerOnOpener();                               // ① 만든 직후
+        oWindow.once("ready-to-show", _centerOnOpener);  // ② 보이기 직전
+
+        // 값이 안 넘어오면 위 효과가 조용히 사라지므로 흔적을 남긴다(동작은 종전대로 계속).
+        if (!options.objty || !options.browserkey) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "objty/browserkey of release notes window",
+                    "this window is left out of the sibling window list - it will not hide behind dialogs or close on back");
+            }
+        }
 
         // 로드 완료 시 resolve (개발 환경에서는 DevTools 자동 오픈)
         oWindow.webContents.on('did-finish-load', function () {
