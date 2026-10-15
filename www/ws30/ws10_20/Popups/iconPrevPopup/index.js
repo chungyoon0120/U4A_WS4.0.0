@@ -129,6 +129,12 @@ oAPP.fn._initBroadcast = function () {
 
         };
 
+        // 구독이 실제로 걸렸다는 자취 — 바쁨이 안 뜰 때 「구독은 됐는데 방송이 안 왔다」 와
+        //   「구독 자체가 안 됐다」 를 로그만으로 가르기 위해 남긴다(창 하나에 한 번만 나온다).
+        if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+            U4ALOG.info("끝남", "ICONPREV", "subscribed to the busy broadcast channel");
+        }
+
     } catch (e) {
         console.error("[ICONP-002] subscribing to the busy broadcast channel failed:", e && e.message, e);
         if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
