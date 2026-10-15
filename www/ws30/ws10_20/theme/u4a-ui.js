@@ -254,7 +254,42 @@
             _open();
         }
 
-        oCombo.addEventListener("click", () => { _requestOpen(); });
+        /* [2026-10-15] 값 글자를 마우스로 끌어 복사할 수 있게 한다(구글 시트 19번).
+         *   원본 UI5 는 sap.m.ComboBox = <input> 이라 값 글자를 끌어서 복사할 수 있었다.
+         *   HTML5 공통 콤보는 div+span 이라 전역 user-select:none(.analy/16 §2.9)에 걸려 복사가 안 됐다.
+         *   → 값 글자(.u4a-combo__text)만 shell.css 에서 user-select:text 로 열고, 여기서는
+         *     "끌어서 글자를 고른 경우"에만 목록 열기를 건너뛴다. 그냥 클릭(안 움직임)은 그대로 열린다.
+         *   판정 조건 2개를 모두 만족할 때만 억제 → 손떨림으로 클릭이 죽지 않게 한다.
+         *     ① 누른 지점에서 4px 이상 움직였다  ② 콤보 값 글자 안에 실제 선택 영역이 생겼다 */
+        let iDownX = 0, iDownY = 0, bTextPicked = false;
+
+        oCombo.addEventListener("mousedown", (ev) => {
+            iDownX = ev.clientX; iDownY = ev.clientY; bTextPicked = false;
+        });
+
+        oCombo.addEventListener("mouseup", (ev) => {
+            if (Math.abs(ev.clientX - iDownX) + Math.abs(ev.clientY - iDownY) < 4) { return; }
+            try {
+                // 끌기 시작점이 글자 밖(값 칸 여백)일 수 있으므로 시작·끝 어느 쪽이든 이 칸 안이면 인정한다.
+                const oSel = window.getSelection();
+                const bInCombo = !!oSel && (
+                    (oSel.anchorNode && oCombo.contains(oSel.anchorNode)) ||
+                    (oSel.focusNode && oCombo.contains(oSel.focusNode))
+                );
+                if (bInCombo && String(oSel) !== "") { bTextPicked = true; }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+
+        oCombo.addEventListener("click", () => {
+            if (bTextPicked) {
+                bTextPicked = false;
+                if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                    U4ALOG.info("SKIP_OPEN", "combo list", "value text was selected by drag for copy");
+                }
+                return;
+            }
+            _requestOpen();
+        });
         // [opt:closeOnDblClick] 값칸을 두 번 클릭하면 목록을 열지 않는다(기본 꺼짐, 하위호환).
         //   두 번 클릭 신호는 실제로 두 번 눌렀을 때만 오므로 한 번 클릭 열기(위 click)는 그대로 유지된다.
         //   첫 클릭이 이미 시작한 비동기 열기는 억제 플래그로 취소하고, 이미 열렸으면 닫는다.

@@ -4,7 +4,7 @@
  * - file Name : fnDialogPopupOpener.js
  * - file Desc : 각종 Dialog Popup Opener
  * ----------------------------------------------------------------------
- * 오류코드 접두: FDPO / 다음 번호: 007
+ * 오류코드 접두: FDPO / 다음 번호: 008
  *   (표준 SSOT = `.analy/19_예외처리_크리티컬오류_표준.md`,
  *    실무 규약 = `.works/DEV_STANDARD_오류처리.md` §3)
  *
@@ -13,6 +13,9 @@
  *  FDPO-002  오류 목록 창 — 내용을 못 읽음(파일 없음 등, 본 문서 기준)
  *  FDPO-003  오류 목록 창 — 창의 화면 프로세스가 죽음
  *  FDPO-004  오류 목록 창 — 내용을 다 띄우기 前에 닫힘
+ *  FDPO-005  바인딩 별창 — 창 로드/초기 데이터 전달 실패 (아래 본문)
+ *  FDPO-006  Runtime Class Navigator 별창 — 창 로드/초기 데이터 전달 실패 (아래 본문)
+ *  FDPO-007  Package(DEVCLASS) 서치헬프 — 공통 F4 모듈(fnF4SearchHelpOpen) 로드 실패
  *
  * ★[BR55] 2026-09-01 수정 전에는 이 창이 **뜨다가** 실패하면 잠금을 풀어 줄 신호가
  *   영영 오지 않아 편집화면이 흐려진 채 멈췄다(안내도 없음). 백업 = `_fnDialogPopupOpener.js.br55bak`.
@@ -464,16 +467,33 @@
             return;
         }
 
-        if (oAPP.fn.callF4HelpPopup) {
-            //f4 help 팝업 function load 이후 팝업 호출.
-            oAPP.fn.callF4HelpPopup("DEVCLASS", "DEVCLASS", [], [], fnCallback);
+        // ★2026-10-15 수정(구글시트 8번 — Application Copy 팝업 Package 서치헬프 크래시).
+        //   이전: $.getScript("design/js/callF4HelpPopup.js") → UI5 전용 팝업.
+        //   그 파일 336행 sap.ui.getCore().loadLibrary("sap.m") 가 메인 창의 sap 호환 스텁
+        //   (ws_html5_shell.js — loadLibrary 없음)에 걸려 TypeError → Critical Error 창.
+        //   HTML5 대체 = 공통 F4 모듈 fnF4SearchHelpOpen(= changeAppPackagePopup / createApplicationPopup
+        //   과 동일 경로, 백엔드 /f4serverData 계약 동일이라 결과 행 셀키 DEVCLASS/CTEXT 도 그대로).
+        function _openF4() {
+
+            if (typeof oAPP.fn.fnF4SearchHelpOpen !== "function") {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "oAPP.fn.fnF4SearchHelpOpen", "package(DEVCLASS) search help popup cannot open");
+                }
+                // 950 Value help is not available.
+                parent.showMessage(null, 20, "E", "[FDPO-007] " + WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "950"));
+                return;
+            }
+
+            oAPP.fn.fnF4SearchHelpOpen({ shlpname: "DEVCLASS", onPick: fnCallback });
+        }
+
+        if (typeof oAPP.fn.fnF4SearchHelpOpen === "function") {
+            _openF4();
             return;
         }
 
-        $.getScript("design/js/callF4HelpPopup.js", function () {
-            //f4 help 팝업 function load 이후 팝업 호출.
-            oAPP.fn.callF4HelpPopup("DEVCLASS", "DEVCLASS", [], [], fnCallback);
-        });
+        // 공통 F4 모듈 미로드 시 지연 로드 후 오픈.
+        oAPP.loadJs("fnF4SearchHelpPopup", _openF4);
 
     }; // end of oAPP.fn.fnPackgSchpPopupOpener
 

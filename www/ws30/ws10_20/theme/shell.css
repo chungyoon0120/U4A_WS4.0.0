@@ -1634,7 +1634,13 @@ body.u4a-dragging iframe { pointer-events: none; }
     background: var(--surface-raised);
     color: var(--text);
     cursor: pointer;
-    user-select: none;
+    /* [2026-10-15] 값 글자를 끌어서 복사할 수 있어야 한다(.analy/16 §2.9 — 데이터로 보여지는 텍스트).
+       ★글자 span 만 열면 "글자에 정확히 조준해야만" 블럭이 잡힌다 — 테이블에서 td 가 아니라 tbody 를
+       열기로 한 것과 같은 이유(§2.9 2026-09-10). 사람은 보통 글자 오른쪽 빈 칸부터 끌기 시작하므로
+       칸 전체를 연다. 화살표만 none 으로 되돌린다(아래). 끌어서 고른 뒤 목록을 안 여는 처리는
+       theme/u4a-ui.js createSelect. */
+    -webkit-user-select: text;
+    user-select: text;
 }
 /* hidden 속성 존중 — `.u4a-combo{display:flex}` 가 UA `[hidden]{display:none}` 를 특이도로
    이겨버려, el.hidden=true 로도 콤보가 안 숨겨졌다. 오버플로 툴바(U4AUI.attachOverflow)가
@@ -1658,12 +1664,26 @@ body.u4a-dragging iframe { pointer-events: none; }
 }
 
 .u4a-combo__text {
+    /* 남은 폭을 글자 span 이 채운다 — 글자 오른쪽 빈 칸에서 끌기 시작해도 블럭이 잡히게.
+       (min-width:0 이 있어야 ellipsis 가 그대로 작동한다.) 글자·화살표 위치는 그대로. */
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    /* [2026-10-15] 값 글자는 마우스로 끌어서 복사할 수 있어야 한다(.analy/16 §2.9 — "데이터로
+       보여지는 텍스트"). 원본 UI5 는 sap.m.ComboBox = <input> 이라 가능했는데, 공통 콤보는
+       div+span 이라 전역 none 에 걸려 막혀 있었다(구글 시트 19번). 화살표·빈 칸은 none 유지
+       (.u4a-combo) → 눌러서 펴는 동작은 그대로. 끌어서 고른 뒤 떼면 목록을 열지 않는 처리는
+       theme/u4a-ui.js createSelect 쪽에 있다. */
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 .u4a-combo__arrow {
+    /* 펴는 버튼 자리 — 선택 대상 아님(칸 전체를 text 로 연 것을 여기서만 되돌린다). */
+    -webkit-user-select: none;
+    user-select: none;
     flex: 0 0 auto;
     display: inline-flex;
     color: var(--icon-muted);

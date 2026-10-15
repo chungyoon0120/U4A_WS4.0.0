@@ -525,6 +525,14 @@
 
         oAPP.fn.fnPackgSchpPopupOpener(function (oResult) {
 
+            // F4 를 값 선택 없이 닫은 경우(결과 없음) — 그대로 두고 끝낸다.
+            if (!oResult) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "package search help result", "package input keeps its previous value");
+                }
+                return;
+            }
+
             var sPackage = oResult.DEVCLASS;
 
             lf_modelSet("PACKG", sPackage);
