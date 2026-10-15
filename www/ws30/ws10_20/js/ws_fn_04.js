@@ -671,7 +671,7 @@
             let oX = document.createElement("button");
             oX.type = "button";
             oX.className = "u4a-btn-icon";
-            oX.setAttribute("data-act", "close");
+            oX.setAttribute("data-act", "CLOSE");
             oX.innerHTML = _fa("xmark");
             oX.title = sClose;
             oX.addEventListener("click", _closeControllerErrorDialog);
@@ -1262,7 +1262,7 @@
         let oX = document.createElement("button");
         oX.type = "button";
         oX.className = "u4a-btn-icon";
-        oX.setAttribute("data-act", "close");
+        oX.setAttribute("data-act", "CLOSE");
         oX.innerHTML = _fa("xmark");
         oX.title = sClose;
         oX.addEventListener("click", oAPP.fn.fnCloseAdminDevToolDlg);
@@ -1548,7 +1548,7 @@
         var oX = document.createElement("button");
         oX.type = "button";
         oX.className = "u4a-btn-icon u4aSvrInfoX";                                // 공통 닫기 X(+data-act=close hover 빨강)
-        oX.setAttribute("data-act", "close");
+        oX.setAttribute("data-act", "CLOSE");
         oX.innerHTML = _fa("xmark");
         oX.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");         // Close
         oX.addEventListener("click", lf_close);

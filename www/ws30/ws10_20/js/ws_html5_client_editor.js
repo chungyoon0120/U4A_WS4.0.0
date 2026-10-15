@@ -350,7 +350,7 @@
 
     var oXBtn = _el("button", "u4a-btn-icon");
     oXBtn.type = "button";
-    oXBtn.setAttribute("data-act", "close");
+    oXBtn.setAttribute("data-act", "CLOSE");
     oXBtn.innerHTML = _fa("xmark");
     oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
     oXBtn.addEventListener("click", function () { lf_requestClose(); });

@@ -243,7 +243,7 @@
         oHeader.querySelector("span").textContent = sHeaderTitle || "System Message";
         var oX = _sysNotiEl("button", "u4a-btn-icon");
         oX.type = "button";
-        oX.setAttribute("data-act", "close");
+        oX.setAttribute("data-act", "CLOSE");
         oX.innerHTML = _fa_sn("xmark");
         oX.title = sClose;
         oX.addEventListener("click", function () { _sysNotiClose(oDlg); });

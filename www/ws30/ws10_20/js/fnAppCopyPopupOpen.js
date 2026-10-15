@@ -134,7 +134,7 @@
         oHeader.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "B90"); // Application Copy
         const oXBtn = _el("button", "u4a-btn-icon");
         oXBtn.type = "button";
-        oXBtn.setAttribute("data-act", "close");
+        oXBtn.setAttribute("data-act", "CLOSE");
         oXBtn.innerHTML = _fa("xmark");
         oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oXBtn.addEventListener("click", oAPP.events.ev_AppCopyDlgCancel);

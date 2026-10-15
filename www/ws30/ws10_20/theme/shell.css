@@ -367,10 +367,8 @@ button:focus-visible {
 
 /* 닫기/취소용 아이콘 버튼은 hover 시 의미색(빨강)으로 — close=dismiss 어포던스를 전 다이얼로그 통일.
    (생성팝업 X·Change Layout X·Insert X 등 data-act=close|cancel 인 .u4a-btn-icon 전부) */
-.u4a-btn-icon[data-act="close"]:hover,
-.u4a-btn-icon[data-act="cancel"]:hover,
-/* 2026-10-15 — 자동 테스트가 집는 값을 대문자로 통일(CLOSE·CANCEL)해, 같은 규칙을 대문자에도 둔다.
-   이 줄이 없으면 값만 바꾼 창들에서 hover 빨강이 사라진다(모양이 바뀐다). */
+/* 2026-10-15 — 자동 테스트가 집는 값을 대문자로 통일(CLOSE·CANCEL). 소문자 셀렉터는
+   가리킬 자리가 남지 않아 지웠다(장군님 지시 2026-10-15). */
 .u4a-btn-icon[data-act="CLOSE"]:hover,
 .u4a-btn-icon[data-act="CANCEL"]:hover {
     color: var(--state-error);

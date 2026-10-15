@@ -78,7 +78,7 @@
         var bUp = _btn("chevron-up", function () { _step(false); });   // 원본 ▲ navigation-up-arrow
         var bDn = _btn("chevron-down", function () { _step(true); });  // 원본 ▼ navigation-down-arrow
         var bCl = _btn("xmark", _close);                              // 원본 ✕ decline
-        bCl.setAttribute("data-act", "close");                       // 공통 닫기 의미색(빨강 hover)
+        bCl.setAttribute("data-act", "CLOSE");                       // 공통 닫기 의미색(빨강 hover)
 
         root.append(field.el, _countEl, sep, bUp, bDn, bCl);
 

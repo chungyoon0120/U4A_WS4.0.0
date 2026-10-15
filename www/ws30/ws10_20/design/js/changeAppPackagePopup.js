@@ -341,7 +341,7 @@
         oHeader.innerHTML = _fa("right-left") + '<span></span>';
         oHeader.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A93");
         const oXBtn = _el("button", "u4a-btn-icon");
-        oXBtn.type = "button"; oXBtn.setAttribute("data-act", "close");
+        oXBtn.type = "button"; oXBtn.setAttribute("data-act", "CLOSE");
         oXBtn.innerHTML = _fa("xmark");
         oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oXBtn.addEventListener("click", function () { lf_closePopup(oDlg); });

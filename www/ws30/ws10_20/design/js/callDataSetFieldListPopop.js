@@ -156,7 +156,7 @@
         oHeader.innerHTML = _fa("list-check") + "<span></span>";
         oHeader.querySelector("span").textContent = sTitle;
         var oXBtn = _el("button", "u4a-btn-icon");
-        oXBtn.type = "button"; oXBtn.setAttribute("data-act", "close");
+        oXBtn.type = "button"; oXBtn.setAttribute("data-act", "CLOSE");
         oXBtn.title = _txt(oAPP, "/U4A/CL_WS_COMMON", "A39"); oXBtn.innerHTML = _fa("xmark");  // Close
         oXBtn.addEventListener("click", _cancel);
         oHeader.appendChild(oXBtn);

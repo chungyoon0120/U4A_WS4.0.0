@@ -343,7 +343,7 @@
         oHeader.querySelector("span").textContent =
             _txt("/U4A/CL_WS_COMMON", "B96") + " " + _txt("/U4A/CL_WS_COMMON", "A26");
         var oX = _el("button", "u4a-btn-icon");
-        oX.type = "button"; oX.setAttribute("data-act", "close");
+        oX.type = "button"; oX.setAttribute("data-act", "CLOSE");
         oX.title = _txt("/U4A/CL_WS_COMMON", "A39"); oX.innerHTML = _fa("xmark");
         oX.addEventListener("click", lf_close);
         oHeader.appendChild(oX);
