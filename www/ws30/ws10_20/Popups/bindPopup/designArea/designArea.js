@@ -1272,8 +1272,13 @@
         // 957 화면 커스터마이징 — 원본 designTree.js:4025 createBindLayoutCustomizingButton(좌·중·우 공통).
         //   ★동일속성 적용 팝업 열림(bSyncDialogLock) 동안 비활성(가운데 기어) — 첫 조사 C8 누락분. 기어는 1회 생성이라 캡처+토글 OK.
         var _oGearMid = H.iconBtn("gear", H.z("957"), function () {
-            if (oAPP.attr.editable === false || oAPP.attr.bSyncDialogLock === true) { return; }
-            if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
+        // [2026-10-16] 조회 모드 가드 삭제(구글시트 13번). 원본은 이 기어 버튼을
+        //   enabled="{/edit_layout_customizing}" 하나로만 묶고, 그 값의 초기값이 true 다.
+        //   조회 모드에서는 setViewEditable 이 맨 앞에서 return 하므로 값이 안 바뀐다 →
+        //   원본은 조회 모드에서도 눌린다. 화면 영역 보이기/숨기기일 뿐이라 편집 권한과 무관.
+        //   ★동일속성 적용 팝업 잠금(bSyncDialogLock)은 원본에도 있는 동작이라 그대로 둔다.
+        if (oAPP.attr.bSyncDialogLock === true) { return; }
+        if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
         });
         if (oAPP.attr.bSyncDialogLock === true) { _oGearMid.disabled = true; }
         _oGearMid.setAttribute("data-bwp-design-edit", "");   // 팝업 열/닫 토글 대상.

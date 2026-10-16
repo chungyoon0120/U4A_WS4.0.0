@@ -259,8 +259,20 @@ function _getThemeInfo() {
 //   oOpt.ISBROAD=true → 브로드캐스트 재전송 안 함(수신으로 인한 busy).
 function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
-    var oEl = document.getElementById("bwpBusy");
-    if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
+    // [2026-10-16] 공통 busy 로 교체(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음).
+    //   종전엔 이 창의 자체 겹침 div(#bwpBusy)를 썼는데, 이 창 안에서 showModal() 로 연 팝업
+    //   (화면 커스터마이징 등)이 top layer 에 올라가 busy 가 그 뒤로 숨었다.
+    //   공통 busy 는 <dialog>.showModal() 이라 어떤 모달 위에도 보인다.
+    if (window.U4ABusy && typeof U4ABusy.show === "function") {
+        if (bBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+    } else {
+        // 공통 모듈 미로드 — 창은 멈추면 안 되므로 옛 겹침 div 로 버틴다(모달 위에서는 가려진다).
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+        }
+        var oEl = document.getElementById("bwpBusy");
+        if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
+    }
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
     try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // ★ 원본 setBusy(index.js:3473/3488) = lf_setCurrentWindowClosable(!bBusy) — 닫기(X)버튼도 busy 와 대칭 토글.

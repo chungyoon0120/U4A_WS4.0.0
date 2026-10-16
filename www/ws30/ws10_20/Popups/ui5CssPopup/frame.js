@@ -82,10 +82,15 @@ let oAPP = (function (window) {
             return;
         }
 
-        if (bIsBusy) {
-            oBusy.style.visibility = "visible";
+        // [2026-10-16] 공통 busy(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음).
+        //   공통은 <dialog>.showModal() = top layer 라 모달 팝업 위에도 보인다.
+        if (window.U4ABusy && typeof U4ABusy.show === "function") {
+            if (bIsBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
         } else {
-            oBusy.style.visibility = "hidden";
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+            }
+            oBusy.style.visibility = (bIsBusy) ? "visible" : "hidden";
         }
 
     };

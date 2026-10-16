@@ -126,7 +126,14 @@ debugger;
 
         if (bIsBusy === "X") {
 
-            oBusy.style.visibility = "visible";
+            // [2026-10-16] 공통 busy(.analy/16 §2.10). 공통이 없으면 옛 겹침 div 로 버틴다.
+            if (window.U4ABusy && typeof U4ABusy.show === "function") { U4ABusy.show(); }
+            else {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+                }
+                oBusy.style.visibility = "visible";
+            }
 
             // 브라우저 창 닫기 버튼 비활성
             oAPP.CURRWIN.closable = false;
@@ -137,7 +144,8 @@ debugger;
             }      
 
         } else {
-            oBusy.style.visibility = "hidden";
+            if (window.U4ABusy && typeof U4ABusy.hide === "function") { U4ABusy.hide(); }
+            else { oBusy.style.visibility = "hidden"; }
 
             // 브라우저 창 닫기 버튼 활성
             oAPP.CURRWIN.closable = true;

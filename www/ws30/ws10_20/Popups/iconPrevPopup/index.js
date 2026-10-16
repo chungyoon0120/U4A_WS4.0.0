@@ -78,13 +78,20 @@ oAPP.fn.setShellBusy = function (bBusy) {
 // 자기 바쁨 · 방송 바쁨을 합쳐 화면에 반영한다. 하나라도 켜져 있으면 막는다.
 oAPP.fn._applyShellBusy = function () {
 
-    var oDom = document.getElementById("iconpBusy");
-    if (!oDom) { return; }
-
+    // [2026-10-16] 공통 busy 로 교체(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음).
+    //   공통 busy 는 <dialog>.showModal() = top layer 라 모달 팝업 위에도 보이고,
+    //   모양을 바꿀 때 theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
     var bOn = (oAPP.attr.bSelfBusy === true || oAPP.attr.bBroadBusy === true);
 
-    // 공통 .u4a-busy 표시 트리거 = data-busy="true" (shell.css). 빈값/removeAttribute 는 안 뜸(전 소비처 규약).
-    oDom.setAttribute("data-busy", bOn ? "true" : "false");
+    if (window.U4ABusy && typeof U4ABusy.show === "function") {
+        if (bOn) { U4ABusy.show(); } else { U4ABusy.hide(); }
+    } else {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+        }
+        var oDom = document.getElementById("iconpBusy");
+        if (oDom) { oDom.setAttribute("data-busy", bOn ? "true" : "false"); }
+    }
 
 }; // end of oAPP.fn._applyShellBusy
 
