@@ -66,6 +66,10 @@ function setBusy(bIsBusy) {
     //   모양을 바꿀 때 theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
     if (window.U4ABusy && typeof U4ABusy.show === "function") {
         if (bIsBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+        // ★ 이 창의 옛 겹침 표시도 index.html 에서 켜진 채 시작한다 — 공통으로 넘어오면 같이 꺼야
+        //   화면에 남지 않는다(아이콘 목록 창과 같은 결함, 2026-10-16).
+        var oOld = document.getElementById("illustpBusy");
+        if (oOld) { oOld.setAttribute("data-busy", "false"); }
     } else {
         if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
             U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");

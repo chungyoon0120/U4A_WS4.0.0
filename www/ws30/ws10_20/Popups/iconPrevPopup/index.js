@@ -85,6 +85,11 @@ oAPP.fn._applyShellBusy = function () {
 
     if (window.U4ABusy && typeof U4ABusy.show === "function") {
         if (bOn) { U4ABusy.show(); } else { U4ABusy.hide(); }
+        // ★ 이 창의 옛 겹침 표시는 index.html 에서 **켜진 채로** 시작한다(창이 뜨는 순간부터 보이게).
+        //   공통 busy 로 넘어온 뒤에는 그것을 꺼 주지 않으면 화면에 그대로 남아 "busy 가 안 꺼진다"
+        //   (2026-10-16 실측). 공통을 쓸 때는 옛 표시를 반드시 같이 끈다.
+        var oOld = document.getElementById("iconpBusy");
+        if (oOld) { oOld.setAttribute("data-busy", "false"); }
     } else {
         if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
             U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");

@@ -532,7 +532,10 @@
         try {
 
             if (typeof oAPP.fn.fnChildWindowShow === "function") {
-                oAPP.fn.fnChildWindowShow(true);
+                // [2026-10-16 장군님 지시] **살아남는 창만** 되살린다.
+                //   종전에는 전부 되살려서, 뒤로가기 확인창의 「예」·「아니오」에서 닫힐 창까지
+                //   한 번 떴다가 꺼지는 깜빡임이 보였다(원본 WS3.0 은 닫을 창을 되살리지 않는다).
+                oAPP.fn.fnChildWindowShow(true, { ONLYCLOSEEXCEPT: true });
             } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
                 U4ALOG.warn("GUARD_EXIT", "fnChildWindowShow",
                     "browser windows that survive the page move stay invisible");
@@ -2194,7 +2197,17 @@
     /************************************************************************
      * Electron Browser들 전체 활성/비활성화
      ************************************************************************/
-    oAPP.fn.fnChildWindowShow = function (bShow) {
+    /************************************************************************
+     * @param {boolean} bShow  true=보이기 / false=숨기기
+     * @param {Object}  [oOpt] 선택
+     *   · ONLYCLOSEEXCEPT=true : **뒤로가기 때 닫지 않는 창(닫기 예외 목록)만** 대상으로 한다.
+     *     [2026-10-16 장군님 지시] 뒤로가기 확인창에서 「예」·「아니오」를 누르면 어차피 닫을 창까지
+     *     되살렸다가 닫아서 **숨었다 떴다 꺼지는** 깜빡임이 보였다. 원본 WS3.0 은 닫을 창을
+     *     되살리지 않고 바로 종료시킨다. 그래서 이동 길목에서는 **살아남는 창만** 되살린다.
+     ************************************************************************/
+    oAPP.fn.fnChildWindowShow = function (bShow, oOpt) {
+
+        var bOnlyCloseExcept = !!(oOpt && oOpt.ONLYCLOSEEXCEPT === true);
 
         // 2026-10-07 장군님 지시 (별창 parent 제거) - 위 fnChildWindowClose 와 같은 이유로
         //   getChildWindows()(parent 기반) 대신 같은 브라우저키 별창 전체를 대상으로 한다.
@@ -2226,6 +2239,11 @@
                 // child window들 활성 or 비활성 시 예외 대상 팝업 체크
                 var bIsHideExp = oAPP.fn.fnCheckPopupHideException(sOBJTY);
                 if (bIsHideExp) {
+                    continue;
+                }
+
+                // [2026-10-16] 살아남는 창만 되살리는 모드 — 닫힐 창은 건드리지 않는다(깜빡임 방지).
+                if (bOnlyCloseExcept && oAPP.fn.fnCheckPopupCloseException(sOBJTY) !== true) {
                     continue;
                 }
 
