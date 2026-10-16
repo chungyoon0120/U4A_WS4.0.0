@@ -2205,6 +2205,20 @@
      *     되살렸다가 닫아서 **숨었다 떴다 꺼지는** 깜빡임이 보였다. 원본 WS3.0 은 닫을 창을
      *     되살리지 않고 바로 종료시킨다. 그래서 이동 길목에서는 **살아남는 창만** 되살린다.
      ************************************************************************/
+    /************************************************************************
+     * [2026-10-16 장군님 지시] **내가 숨긴 창만 되살린다.**
+     * ----------------------------------------------------------------------
+     *  왜: 숨기기는 setOpacity(0) 인데, 사용자가 그 창의 닫기(X)를 누르면 창 자체가
+     *      hide() 로 사라진다(예: 아이콘 목록 창). 그 상태에서 화면 안 창을 여닫으면
+     *      되살리기가 **그 창까지** setOpacity(1)+moveTop 해서 **OS 창만 올라오고
+     *      문서는 hidden 그대로** 남는다 → 테두리만 있는 빈 창(2026-10-16 실측,
+     *      자동 테스트 쪽이 OS 보임 true / visibilityState hidden / 내용 206줄로 확인).
+     *  그래서 숨길 때 그 창 id 를 적어 두고, 되살릴 때 적어 둔 것만 되살린다.
+     *  창이 죽으면 id 가 재사용될 수 있으나, 숨김~되살림은 한 쌍으로 짧게 끝나고
+     *  되살린 뒤 목록을 비우므로 섞이지 않는다.
+     ************************************************************************/
+    var aHiddenByMe = [];
+
     oAPP.fn.fnChildWindowShow = function (bShow, oOpt) {
 
         var bOnlyCloseExcept = !!(oOpt && oOpt.ONLYCLOSEEXCEPT === true);
@@ -2249,6 +2263,25 @@
 
                 var isVisible = oChild.isVisible();
 
+                // ★[2026-10-16] 되살리기는 **내가 숨긴 창**만. 사용자가 닫기(X)로 숨긴 창은 손대지 않는다.
+                if (bShow && aHiddenByMe.indexOf(oChild.id) === -1) {
+                    continue;
+                }
+
+                // ★[2026-10-16] 숨기기는 **지금 보이는 창**만. 이미 안 보이는 창은 적어 두지 않는다
+                //   (적어 두면 되살릴 때 그 창까지 올려 빈 창이 된다).
+                if (!bShow) {
+
+                    if (isVisible !== true) {
+                        continue;
+                    }
+
+                    if (aHiddenByMe.indexOf(oChild.id) === -1) {
+                        aHiddenByMe.push(oChild.id);
+                    }
+
+                }
+
                 // 숨기려는 경우
                 if (!bShow) {
 
@@ -2275,11 +2308,17 @@
                 }
 
 
-                // if (isVisible) {
-                //     continue;
-                // }
-
                 if (oChild.isDestroyed()) {
+                    continue;
+                }
+
+                // ★[2026-10-16] 내가 숨긴 뒤 **사용자가 그 창의 닫기(X)를 눌러** 창이 사라졌으면
+                //   되살리지 않는다. 투명도만 돌려도 OS 창이 올라오고 문서는 hidden 이라 빈 창이 되고,
+                //   show() 로 깨우면 사용자가 닫은 창을 억지로 되살리는 셈이다. 둘 다 틀렸다.
+                if (oChild.isVisible() !== true) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                        U4ALOG.info("끝남", "child window", "not restored - closed by the user while hidden");
+                    }
                     continue;
                 }
 
@@ -2304,6 +2343,13 @@
                 continue;
             }
 
+        }
+
+        // ★[2026-10-16] 되살렸으면 적어 둔 목록을 비운다. 다음 숨김이 새로 적는다.
+        //   ONLYCLOSEEXCEPT(뒤로가기 길목)는 **일부만** 되살리는 모드라 비우지 않는다 —
+        //   비우면 아직 투명한 채로 남은 창을 다시 되살릴 길이 없어진다.
+        if (bShow && !bOnlyCloseExcept) {
+            aHiddenByMe = [];
         }
 
     }; // end of oAPP.fn.fnChildWindowShow
