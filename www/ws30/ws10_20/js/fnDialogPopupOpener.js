@@ -2046,6 +2046,21 @@
 
                 let oIconWindow = oResult.WINDOW;
 
+                // ★[2026-10-16 장군님 지시] 보여 주기 전에 **투명도를 1 로 보장**한다.
+                //   이 창의 닫기는 창을 숨기는 것이라 재사용되는데, 그 사이 「가리는 창」 때문에
+                //   투명도가 0 으로 바뀌어 남아 있으면 show() 만으로는 **투명한 채로 떠서 안 보인다**
+                //   (자동 테스트도 문서 가시성만 보므로 이 상태를 못 잡는다 — 그쪽 확인 2026-10-16).
+                //   ★단 가리는 창이 떠 있는 동안에는 돌리지 않는다 — 그 창 위로 튀어나온다.
+                //     그때는 가리는 창이 닫힐 때 되살리기(ws_fn_02 fnChildWindowShow)가 돌려준다.
+                try {
+                    var bBlkOpen = (oAPP.fn && typeof oAPP.fn.fnIsBlockingDialogOpen === "function")
+                        ? oAPP.fn.fnIsBlockingDialogOpen() : false;
+                    if (bBlkOpen !== true) { oIconWindow.setOpacity(1); }
+                    else if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                        U4ALOG.info("끝남", "child window", "opacity left as is - a blocking dialog is open");
+                    }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
                 oIconWindow.show();
 
                 // 부모 위치 가운데 배치한다.
@@ -2214,6 +2229,22 @@
             WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
 
             let oIconWindow = oResult.WINDOW;
+
+            // ★[2026-10-16 장군님 지시] 보여 주기 전에 **투명도를 1 로 보장**한다.
+            //   이 창의 닫기는 창을 숨기는 것이라 재사용되는데, 그 사이 「가리는 창」 때문에
+            //   투명도가 0 으로 바뀌어 남아 있으면 show() 만으로는 **투명한 채로 떠서 안 보인다**
+            //   (자동 테스트도 문서 가시성만 보므로 이 상태를 못 잡는다 — 그쪽 확인 2026-10-16).
+            //   ★단 가리는 창이 떠 있는 동안에는 돌리지 않는다 — 그 창 위로 튀어나온다.
+            //     그때는 가리는 창이 닫힐 때 되살리기(ws_fn_02 fnChildWindowShow)가 돌려준다.
+            try {
+                var bBlkOpen = (oAPP.fn && typeof oAPP.fn.fnIsBlockingDialogOpen === "function")
+                    ? oAPP.fn.fnIsBlockingDialogOpen() : false;
+                if (bBlkOpen !== true) { oIconWindow.setOpacity(1); }
+                else if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                    U4ALOG.info("끝남", "child window", "opacity left as is - a blocking dialog is open");
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             oIconWindow.show();
             return;
         }
