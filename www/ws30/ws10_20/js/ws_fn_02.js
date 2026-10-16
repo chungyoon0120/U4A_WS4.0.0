@@ -2316,8 +2316,15 @@
                 //   되살리지 않는다. 투명도만 돌려도 OS 창이 올라오고 문서는 hidden 이라 빈 창이 되고,
                 //   show() 로 깨우면 사용자가 닫은 창을 억지로 되살리는 셈이다. 둘 다 틀렸다.
                 if (oChild.isVisible() !== true) {
+
+                    // ★그래도 **투명도만은 1 로 돌려놓는다**(창은 띄우지 않는다).
+                    //   안 돌려놓으면 투명도 0 인 채 남아, 사용자가 그 창을 **다시 열 때
+                    //   show() 는 되는데 화면에 안 보인다**(2026-10-16 실측 — 내가 이 가드를
+                    //   넣으면서 만든 회귀. 재사용하는 창(아이콘 목록·이미지 아이콘)이 해당).
+                    try { oChild.setOpacity(1); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+
                     if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
-                        U4ALOG.info("끝남", "child window", "not restored - closed by the user while hidden");
+                        U4ALOG.info("끝남", "child window", "not shown - closed by the user while hidden (opacity restored)");
                     }
                     continue;
                 }
