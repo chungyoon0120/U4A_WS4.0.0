@@ -1833,8 +1833,16 @@
 
     function _uspModeMsgCb(ACTCD) {
         oAPP.common.fnSetBusyLock("X");
+
+        // 머무름 — 숨겨 둔 별창을 그대로 되살린다.
+        if (ACTCD == null || ACTCD === "CANCEL") {
+            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
         try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        if (ACTCD == null || ACTCD === "CANCEL") { oAPP.common.fnSetBusyLock(""); return; }
+
         if (ACTCD === "YES") { oAPP.fn.fnSaveUspWs30({ ISDISP: "X" }); return; }   // 저장 후 display
         _uspSetDisplayMode();                                                      // 저장 안 하고 display
     }

@@ -58,15 +58,24 @@
     var oBroad = null, bBusy = false, _bBroadInit = false;
     function _setBusy(bOn, oOpt) {
         bBusy = !!bOn;
-        var oEl = document.getElementById("optBusy");
-        if (!oEl) {   // _toast 와 동일하게 body 에 1회 지연 생성 → _build 의 innerHTML 재작성에 안 지워진다.
-            oEl = document.createElement("div");
-            oEl.id = "optBusy";
-            oEl.className = "u4a-busy";
-            oEl.innerHTML = '<div class="u4a-busy__card"><div class="u4a-busy__spinner"></div><div class="u4a-busy__label"></div></div>';
-            document.body.appendChild(oEl);
+        // ★[2026-10-16 장군님 지시] busy 는 예외 없이 공통(theme/u4a-busy.js)만 쓴다.
+        //   종전에는 이 창이 자체 오버레이 div 를 만들어 썼다 — 모달 팝업(showModal) 뒤로 숨는다.
+        if (window.U4ABusy && typeof U4ABusy.show === "function") {
+            if (bBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+        } else {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+            }
+            var oEl = document.getElementById("optBusy");
+            if (!oEl) {   // _toast 와 동일하게 body 에 1회 지연 생성 → _build 의 innerHTML 재작성에 안 지워진다.
+                oEl = document.createElement("div");
+                oEl.id = "optBusy";
+                oEl.className = "u4a-busy";
+                oEl.innerHTML = '<div class="u4a-busy__card"><div class="u4a-busy__spinner"></div><div class="u4a-busy__label"></div></div>';
+                document.body.appendChild(oEl);
+            }
+            oEl.setAttribute("data-busy", bBusy ? "true" : "false");
         }
-        oEl.setAttribute("data-busy", bBusy ? "true" : "false");
         // 닫기 차단은 closable 을 항상 false 로 유지 + _close/onbeforeunload 의 busy 가드로(공통 browser-window-common-ux).
         try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 수신(ISBROAD)으로 켠 건 되쏘지 않는다(수신↔발신 무한 루프 방지). 자체 busy 만 형제창에 전파.

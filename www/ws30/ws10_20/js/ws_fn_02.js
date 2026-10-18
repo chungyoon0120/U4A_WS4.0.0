@@ -520,29 +520,32 @@
     oAPP.fn.fnMoveToWs10 = function () {
 
         /********************************************************************
-         * ★ [2026-10-15, 장군님 지시] 화면을 떠나기 전에 **살아남는 별창을 되살린다.**
+         * ★ [2026-10-16 장군님 지시] 떠나기로 했으면 **먼저 닫는다.**
          ********************************************************************
-         * 뒤로가기는 확인창을 띄우기 전에 별창을 숨긴다(ws_events.js ev_pageBack).
-         * 그런데 되살리는 코드는 **「취소」 분기에만** 있고, 이동하는 분기(「예」·「아니오」)에는 없다.
-         * 종전에는 이동하면서 fnChildWindowClose() 가 별창을 전부 닫아 버려 이 구멍이 안 보였다.
-         * 도움말 문서 창·릴리즈 노트 창처럼 **안 닫는 창**이 생기면서, 그 창만 투명도 0 인 채로
-         * WS10 에 와서도 영영 안 보이게 됐다(장군님 실측 2026-10-15).
-         * → 이동하는 길목인 여기서 한 번 되살린다. 닫히는 창들은 어차피 바로 닫히므로 영향이 없다.
+         * 「뒤로가기 눌렀을때 변경된게 없으니까 busy가 켜지면 숨겨진 이후에 창을 닫는다.
+         *   아니면 닫는거 먼저 하던지」 → 닫는 쪽을 먼저 한다. 그러면 숨길 필요가 없다.
+         *  · 닫는 기준은 기존 예외 목록(fnCheckPopupCloseException) 그대로 — 창을 가리지 않는다.
+         *  · 닫고 나면 남는 것은 안 닫는 예외 창뿐이라, 바로 되살려도 깜빡일 것이 없다.
+         *    (그 창들은 확인창이 뜰 때 숨겨져 있어 되살리지 않으면 WS10 에서도 안 보인다.)
+         * ※ 원본(WS3.0)에는 이 자리에 닫기/되살리기가 없다 — 서버에서 잠금을 푼 뒤에만 닫는다.
+         *   장군님이 **원본과 다르게 간다**고 정하셨다(2026-10-16).
          ********************************************************************/
         try {
 
-            if (typeof oAPP.fn.fnChildWindowShow === "function") {
-                // [2026-10-16 장군님 지시] **살아남는 창만** 되살린다.
-                //   종전에는 전부 되살려서, 뒤로가기 확인창의 「예」·「아니오」에서 닫힐 창까지
-                //   한 번 떴다가 꺼지는 깜빡임이 보였다(원본 WS3.0 은 닫을 창을 되살리지 않는다).
-                oAPP.fn.fnChildWindowShow(true, { ONLYCLOSEEXCEPT: true });
+            if (typeof oAPP.fn.fnChildWindowClose === "function") {
+                oAPP.fn.fnChildWindowClose();
             } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
-                U4ALOG.warn("GUARD_EXIT", "fnChildWindowShow",
-                    "browser windows that survive the page move stay invisible");
+                U4ALOG.warn("GUARD_EXIT", "fnChildWindowClose", "browser windows stay open while the page moves to WS10");
+            }
+
+            if (typeof oAPP.fn.fnChildWindowShow === "function") {
+                oAPP.fn.fnChildWindowShow(true);
+            } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnChildWindowShow", "browser windows that survive the page move stay invisible");
             }
 
         } catch (e) {
-            console.error("[WSFN2-001] restoring the surviving browser windows before moving to WS10 failed:", e && e.message, e);
+            console.error("[WSFN2-001] closing the browser windows before moving to WS10 failed:", e && e.message, e);
             if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
         }
 
@@ -613,6 +616,7 @@
 
             // WS20 화면에서 떠있는 Dialog, Popup 종류, Electron Browser들 전체 닫는 function
             oAPP.fn.fnCloseAllWs20Dialogs();
+
 
             // WS20 페이지 삭제
             oAPP.fn.removeContent();
@@ -2198,14 +2202,6 @@
      * Electron Browser들 전체 활성/비활성화
      ************************************************************************/
     /************************************************************************
-     * @param {boolean} bShow  true=보이기 / false=숨기기
-     * @param {Object}  [oOpt] 선택
-     *   · ONLYCLOSEEXCEPT=true : **뒤로가기 때 닫지 않는 창(닫기 예외 목록)만** 대상으로 한다.
-     *     [2026-10-16 장군님 지시] 뒤로가기 확인창에서 「예」·「아니오」를 누르면 어차피 닫을 창까지
-     *     되살렸다가 닫아서 **숨었다 떴다 꺼지는** 깜빡임이 보였다. 원본 WS3.0 은 닫을 창을
-     *     되살리지 않고 바로 종료시킨다. 그래서 이동 길목에서는 **살아남는 창만** 되살린다.
-     ************************************************************************/
-    /************************************************************************
      * [2026-10-16 장군님 지시] **내가 숨긴 창만 되살린다.**
      * ----------------------------------------------------------------------
      *  왜: 숨기기는 setOpacity(0) 인데, 사용자가 그 창의 닫기(X)를 누르면 창 자체가
@@ -2219,9 +2215,7 @@
      ************************************************************************/
     var aHiddenByMe = [];
 
-    oAPP.fn.fnChildWindowShow = function (bShow, oOpt) {
-
-        var bOnlyCloseExcept = !!(oOpt && oOpt.ONLYCLOSEEXCEPT === true);
+    oAPP.fn.fnChildWindowShow = function (bShow) {
 
         // 2026-10-07 장군님 지시 (별창 parent 제거) - 위 fnChildWindowClose 와 같은 이유로
         //   getChildWindows()(parent 기반) 대신 같은 브라우저키 별창 전체를 대상으로 한다.
@@ -2253,11 +2247,6 @@
                 // child window들 활성 or 비활성 시 예외 대상 팝업 체크
                 var bIsHideExp = oAPP.fn.fnCheckPopupHideException(sOBJTY);
                 if (bIsHideExp) {
-                    continue;
-                }
-
-                // [2026-10-16] 살아남는 창만 되살리는 모드 — 닫힐 창은 건드리지 않는다(깜빡임 방지).
-                if (bOnlyCloseExcept && oAPP.fn.fnCheckPopupCloseException(sOBJTY) !== true) {
                     continue;
                 }
 
@@ -2353,9 +2342,7 @@
         }
 
         // ★[2026-10-16] 되살렸으면 적어 둔 목록을 비운다. 다음 숨김이 새로 적는다.
-        //   ONLYCLOSEEXCEPT(뒤로가기 길목)는 **일부만** 되살리는 모드라 비우지 않는다 —
-        //   비우면 아직 투명한 채로 남은 창을 다시 되살릴 길이 없어진다.
-        if (bShow && !bOnlyCloseExcept) {
+        if (bShow) {
             aHiddenByMe = [];
         }
 

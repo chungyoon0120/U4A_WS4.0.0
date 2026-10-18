@@ -3553,6 +3553,22 @@
             }
         });
 
+        // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21) — WS10·WS20 과 같은 값.
+        //   UI5 는 id 를 스스로 지어 밖에서 못 집는다. 다시 그릴 때마다 사라지므로
+        //   onAfterRendering 에서 붙인다(T-CODE 칸과 같은 방법).
+        BUTTON1.addEventDelegate({
+            onAfterRendering: function (oEvent) {
+                var oDom = oEvent.srcControl.getDomRef();
+                if (!oDom) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "WINSHOWHIDE button DOM", "data-act not set - the automation tool cannot reach this button");
+                    }
+                    return;
+                }
+                oDom.setAttribute("data-act", "WINSHOWHIDE");
+            }
+        });
+
         // 해당 실행 스크립트 파일경로 및 소스 라인 정보 저장
         parent.DEV_SOURCE_FINDER.setRunScriptPath(BUTTON1);
 
@@ -3646,6 +3662,14 @@
                 //2026-10-14 자동 테스트 도구가 집을 이름(.analy/21). UI5 가 id 를 스스로 지어 밖에서 못 집던 자리.
                 oSFInput.setAttribute("data-act", "TCODE_INPUT");
 
+                // 2026-10-19 그 칸의 지우기(✕) — UI5 SearchField 가 스스로 그리는 자리.
+                //   WS10 의 지우기와 같은 값. 못 찾으면 로그만 남기고 넘어간다(그 칸 자체는 집힌다).
+                var oSFReset = oSF.getDomRef("reset");
+                if (oSFReset) { oSFReset.setAttribute("data-act", "TCODE_INPUT_CLEAR"); }
+                else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "SearchField reset DOM", "TCODE_INPUT_CLEAR not set - the automation tool cannot reach the clear button");
+                }
+
             }
         });
 
@@ -3658,6 +3682,20 @@
             pressed: "{/SETTING/ISPIN}",
             tooltip: "Browser Pin",
             press: oAPP.events.ev_windowPinBtn
+        });
+
+        // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21) — WS10·WS20 과 같은 값.
+        BUTTON2.addEventDelegate({
+            onAfterRendering: function (oEvent) {
+                var oDom = oEvent.srcControl.getDomRef();
+                if (!oDom) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "PIN button DOM", "data-act not set - the automation tool cannot reach this button");
+                    }
+                    return;
+                }
+                oDom.setAttribute("data-act", "PIN");
+            }
         });
 
         // 해당 실행 스크립트 파일경로 및 소스 라인 정보 저장

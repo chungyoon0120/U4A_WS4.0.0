@@ -257,6 +257,10 @@ oAPP.views = window?.oAPP?.views || {};
                 var oBtn = document.createElement("button");
                 oBtn.type = "button";
                 oBtn.className = "u4a-btn" + (b.emphasized ? " u4a-btn--emphasized" : "");
+                // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21). 값은 콜백에 넘기는 그것 그대로
+                //   (YES · NO · CANCEL · OK) — 새로 짓지 않는다. 단추가 셋인 확인창이 글자뿐이라
+                //   화면 언어를 바꾸면 못 집었다.
+                oBtn.setAttribute("data-act", b.act);
                 oBtn.textContent = b.label || b.act;
                 oBtn.addEventListener("click", function () { lf_close(b.act); });
                 oFooter.appendChild(oBtn);

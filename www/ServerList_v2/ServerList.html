@@ -45,6 +45,9 @@
       </script>
 
       <!-- 테마 API + 공통 UI 컴포넌트 라이브러리 (shell.css 의 짝) -->
+      <!-- 공통 busy (SSOT = theme/u4a-busy.js · u4a-busy.css) — 2026-10-16 장군님 지시로 자체 오버레이에서 전환 -->
+      <link rel="stylesheet" href="../ws30/ws10_20/theme/u4a-busy.css">
+      <script src="../ws30/ws10_20/theme/u4a-busy.js"></script>
       <script src="../ws30/ws10_20/theme/theme-api.js"></script>
       <script src="../ws30/ws10_20/theme/u4a-ui.js"></script>
 
@@ -82,8 +85,10 @@
       <!-- 셸 컨텐츠 (ServerList.js 가 동적 렌더) -->
       <div id="content" class="u4a-fade"></div>
 
-      <!-- Busy 오버레이 (BusyIndicator 대체) — 메인 셸 busy 카드(.u4aWsBusyCard)와 동일 구조 -->
-      <div id="u4aWsBusyIndicator" class="u4a-busy" data-act="BUSY" role="progressbar" aria-valuetext="Busy">
+      <!-- ★[2026-10-16 장군님 지시] busy 는 공통(theme/u4a-busy.js)을 쓴다. 아래는 공통이 못 올라왔을 때만 쓰는 폴백.
+           ★id 를 공통(u4aWsBusyIndicator)과 다르게 둔다 — 같으면 공통이 자기 <dialog> 를 만들지 않고
+             이 div 를 집어 쓰게 되어 모달 위로 뜨지 못한다. -->
+      <div id="u4aWsBusyIndicatorLegacy" class="u4a-busy" data-act="BUSY" role="progressbar" aria-valuetext="Busy">
             <div class="u4a-busy__card">
                   <div class="u4a-busy__spinner"></div>
             </div>

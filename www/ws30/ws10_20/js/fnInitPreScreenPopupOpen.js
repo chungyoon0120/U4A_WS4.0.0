@@ -110,6 +110,7 @@
     var oDlg = document.createElement("dialog");
     oDlg.id = C_DLG_ID;
     oDlg.className = "u4a-dialog u4aIpsDlg";
+    oDlg.setAttribute("data-act", "USEPRESCREEN_DLG");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
 
     // ── 헤더 — 제목 + [U4A 도움말 문서 버튼] + 닫기 X ──
     var oHeader = _el("div", "u4a-dialog__header");
@@ -124,6 +125,7 @@
           oAPP.common.checkWLOList("C", "UHAK901369") === true &&
           typeof oAPP.fn.fnU4AHelpDocuPopupOpener === "function") {
         var oHelpBtn = _el("button", "u4a-btn-icon u4aIpsHelpBtn");
+        oHelpBtn.setAttribute("data-act", "HELP");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
         oHelpBtn.type = "button";
         oHelpBtn.innerHTML = _fa("book-open-reader");
         // B44  U4A Help Document
@@ -137,6 +139,7 @@
     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     var oXBtn = _el("button", "u4a-btn-icon");
+    oXBtn.setAttribute("data-act", "CLOSE");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oXBtn.type = "button";
     oXBtn.innerHTML = _fa("xmark");
     oXBtn.title = _wsTxt("056") || _wsTxt("003");   // close / Cancel
@@ -157,6 +160,7 @@
     var oSwitch = _el("label", "u4a-switch u4aIpsSwitch");
     var oSwIn = document.createElement("input");
     oSwIn.type = "checkbox";
+    oSwIn.setAttribute("data-act", "TOGGLE");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oSwitch.appendChild(oSwIn);
     oSwitch.appendChild(_el("span", "u4a-switch__slider"));
     oBody.appendChild(oSwitch);
@@ -168,11 +172,13 @@
     var oFoot = _el("div", "u4a-dialog__footer u4aIpsFoot");
     oFoot.appendChild(_el("span", "u4aIpsFootSpacer"));
     var oApplyBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aIpsIcoBtn");
+    oApplyBtn.setAttribute("data-act", "APPLY");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oApplyBtn.type = "button";
     oApplyBtn.innerHTML = _fa("check");
     oApplyBtn.title = _wsTxt("232");   // Apply / 적용
     oApplyBtn.addEventListener("click", function () { lf_apply(); });
     var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aIpsIcoBtn");
+    oCloseBtn.setAttribute("data-act", "CANCEL");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oCloseBtn.type = "button";
     oCloseBtn.innerHTML = _fa("xmark");
     oCloseBtn.title = _wsTxt("003") || _wsTxt("056");   // Cancel / 취소
