@@ -1,4 +1,4 @@
-// 오류코드 접두: USP / 다음 번호: 002
+// 오류코드 접두: USP / 다음 번호: 003
 /************************************************************************
  * ws_html5_usp.js  (HTML5)  — WS30 USP 코드에디터 "셸"
  * ----------------------------------------------------------------------
@@ -372,6 +372,34 @@
     //   fnMoveToWs10 → removeContent() 가 WS20 DOM/상태를 지우므로
     //   WS30에서 호출하면 WS20 콘텐츠가 날아간다.
     function _doBackToWs10() {
+
+        /********************************************************************
+         * ★ [2026-10-16 장군님 지시] 떠나기로 했으면 **먼저 닫는다.** (WS20 fnMoveToWs10 과 같은 모양)
+         ********************************************************************
+         *  · 닫는 기준은 기존 예외 목록(fnCheckPopupCloseException) 그대로 — 창을 가리지 않는다.
+         *  · 닫고 나면 남는 것은 안 닫는 예외 창뿐이라, 바로 되살려도 깜빡일 것이 없다.
+         *    (그 창들은 저장 확인창이 뜰 때 숨겨져 있어 되살리지 않으면 WS10 에서도 안 보인다.)
+         * ※ 원본(ws_usp.js)은 서버에서 세션을 끊고 잠금을 푼 **뒤에만** 닫는다 —
+         *   장군님이 **원본과 다르게 간다**고 정하셨다(2026-10-16). 아래 lf_success 의 닫기는 그대로 둔다.
+         ********************************************************************/
+        try {
+
+            if (typeof oAPP.fn.fnChildWindowClose === "function") {
+                oAPP.fn.fnChildWindowClose();
+            } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnChildWindowClose", "browser windows stay open while the page moves to WS10");
+            }
+
+            if (typeof oAPP.fn.fnChildWindowShow === "function") {
+                oAPP.fn.fnChildWindowShow(true);
+            } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnChildWindowShow", "browser windows that survive the page move stay invisible");
+            }
+
+        } catch (e) {
+            console.error("[USP-002] closing the browser windows before moving to WS10 failed:", e && e.message, e);
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
 
         try {
             // busy + navLock 은 _uspBack 에서 이미 걸려 있다.
