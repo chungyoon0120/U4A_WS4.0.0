@@ -1,4 +1,4 @@
-// 오류코드 접두: W20E / 다음 번호: 007
+// 오류코드 접두: W20E / 다음 번호: 008
 /************************************************************************
  * ws_html5_ws20_edit.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -2364,6 +2364,17 @@
 
         function lf_confirm() {
             if (!oSelUI) { return; }
+
+            // ★ 확인을 누르자마자 화면을 잠근다. (장군님 지시 2026-10-20 — 느린 PC 에서 100건 추가 시
+            //   잠깐 멈춘 것처럼 보이던 것) 원본도 확인 버튼 첫 줄에서 잠근다 —
+            //   U4A_WS_DESIGN/design/insertUIPopop/index.js 1022~1032행(parent.setBusy("X") + 바인딩 팝업 BUSY_ON).
+            //   끄는 것은 아래 체인 마지막 — 원본은 끝의 setSelectTreeItem 안쪽이 끄고(그 앞에서 미리보기
+            //   렌더 종료를 await 한다), 조기취소 분기는 저마다 끈다. 여기서는 한 자리에서 둘 다 처리한다.
+            try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            // 자식창 잠금(원본 삽입 시 BUSY_ON) — designAddUIObject 는 async 라 완료 후 BUSY_OFF.
+            //  ※ D&D 삽입 경로는 dnd.js _bindBusy 가 이미 처리하므로 여기(팝업 confirm)에서만 브로드캐스트.
+            _broadBusy(true);
+
             var cnt = oSelAgg.ISMLB === "X" ? lf_clampCnt() : 1;
             var ls_0022 = T_0022.find(function (a) { return a.UIOBK === oSelUI.UIOBK; }) || oSelUI;
             var ls_0023 = T_0023.find(function (a) { return a.UIATK === oSelAgg.UIATK; }) || oSelAgg;
@@ -2371,12 +2382,25 @@
             // UI명 suggestion 이력 저장 (구 insertUIPopop saveUiSuggest("insertUiName", UIOBJ, 10))
             _saveInsertSuggest("insertUiName", ls_0022.UIOBJ, 10);
             lf_close();
-            // 자식창 잠금(원본 삽입 시 BUSY_ON) — designAddUIObject 는 async 라 완료 후 BUSY_OFF.
-            //  ※ D&D 삽입 경로는 dnd.js _bindBusy 가 이미 처리하므로 여기(팝업 confirm)에서만 브로드캐스트.
-            _broadBusy(true);
-            Promise.resolve(oAPP.fn.designAddUIObject(is_tree, ls_0022, ls_0023, cnt, oP13n.checked))
+
+            Promise.resolve()
+                // ★ busy 가 화면에 그려질 틈을 한 번 준다 — 이게 없으면 잠그자마자 아래 추가 처리(다건이면
+                //   100번 도는 동기 루프)가 이어져 브라우저가 한 번도 그리지 못하고, 잠금이 아예 안 보인다.
+                .then(function () {
+                    if (!oAPP.common || typeof oAPP.common.fnYieldToPaint !== "function") {
+                        throw new Error("[W20E-007] fnYieldToPaint undefined (ws_html5_shell.js not loaded)");
+                    }
+                    return oAPP.common.fnYieldToPaint();
+                })
+                .then(function () { return oAPP.fn.designAddUIObject(is_tree, ls_0022, ls_0023, cnt, oP13n.checked); })
                 .catch(function (e) { console.error("[WS20] designAddUIObject:", e && e.message ? e.message : e); })
-                .then(function () { _broadBusy(false); });
+                .then(function () {
+                    _broadBusy(false);
+                    // 검사에 걸려 되돌아온 경우(선택 흐름을 안 지남)에도 반드시 풀리게 여기서 끈다.
+                    //   성공 경로는 끝의 선택 흐름(fnWs20SelectUI)이 이미 껐지만, 공통 busy 는 깊이를
+                    //   세지 않으므로 두 번 꺼도 문제가 없다(resources/index.js setBusy).
+                    try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                });
         }
 
         // aggregation 셀렉트(공통 U4AUI.createSelect — 빈 라인 포함). 원본 Item text:"{UIATT}" 그대로.
@@ -2415,7 +2439,26 @@
                 lf_clampCnt();
             });
         });
-        oCntInp.addEventListener("change", lf_clampCnt);
+        /* ★ 생성 건수 칸을 원본과 같게 만든다. (장군님 지적 2026-10-20 「max값 체크도 없고 입력도 되고」)
+         *   원본 = sap.m.StepInput({max:100, min:1, value:1})  — 숫자 전용 입력 컴포넌트.
+         *          U4A_WS_DESIGN/design/insertUIPopop/index.js 508행.
+         *   원본 값 변경 이벤트(같은 파일 512~544행):
+         *     ① 빈 값이면 1 로 되돌리고 UI 오브젝트 검색칸(oInp2)으로 포커스를 옮긴 뒤 끝낸다.
+         *     ② 숫자로 바꿔 100 초과면 100, 1 미만이면 1 로 맞춘다.
+         *     ③ 맞춘 값을 다시 넣고 UI 오브젝트 검색칸으로 포커스를 옮긴다.
+         *   이식본에 빠져 있던 것 = 숫자 전용(여긴 글자도 쳐졌다) · 값 바꾼 뒤 검색칸으로 포커스 이동.
+         *   ※ 1~100 으로 맞추는 것(lf_clampCnt)은 종전에도 있었고 그대로 쓴다.
+         *   ※ +/- 단추는 값을 코드로 바꾸므로 change 가 나지 않는다 → 연타해도 포커스가 안 옮겨진다. */
+        oCntInp.addEventListener("input", function () {
+            // 숫자가 아닌 글자는 아예 안 들어가게 한다(원본은 숫자 전용 컴포넌트라 애초에 못 친다).
+            var sOnlyNum = oCntInp.value.replace(/[^0-9]/g, "");
+            if (sOnlyNum !== oCntInp.value) { oCntInp.value = sOnlyNum; }
+        });
+        oCntInp.addEventListener("change", function () {
+            lf_clampCnt();
+            // 원본 516~520·540~542행 — 값을 바꾸면 UI 오브젝트 검색칸으로 포커스가 간다.
+            try { oSearch.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
         oCntInp.addEventListener("blur", lf_clampCnt);
 
         /* [D25] 검색어가 빈 값이 되면 결과 목록의 정렬·컬럼 필터까지 초기화한다.

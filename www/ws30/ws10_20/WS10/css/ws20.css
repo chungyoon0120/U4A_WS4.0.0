@@ -661,7 +661,14 @@
 .u4aWs20InsConfirm:disabled {
   background: var(--success); border-color: var(--success); color: #fff;
 }
-.u4aWs20InsConfirm:hover:not(:disabled) { filter: brightness(1.08); }
+/* 마우스 오버에서도 녹색·흰 글자를 유지한다. (장군님 지적 2026-10-20 — 올리면 글자가 사라짐)
+   까닭: 공통 .u4a-btn:hover(bootstrap-skin.css)가 셀렉터 세기 0,2,0 이라 위 .u4aWs20InsConfirm(0,1,0)의
+   background 를 덮는다. 색은 덮이는데 color:#fff 는 남아 밝은 바탕에 흰 글자가 돼 안 보였다.
+   여기서 background/border-color/color 를 다시 적어 덮이지 않게 한다(같은 파일 .reset:hover 와 같은 방식). */
+.u4aWs20InsConfirm:hover:not(:disabled) {
+  background: var(--success); border-color: var(--success); color: #fff;
+  filter: brightness(1.08);
+}
 .u4aWs20InsConfirm:disabled { opacity: 0.5; cursor: default; }
 .u4aWs20InsHead { cursor: move; user-select: none; }
 .u4aWs20InsTitle {

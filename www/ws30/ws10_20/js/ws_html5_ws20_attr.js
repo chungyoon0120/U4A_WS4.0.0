@@ -1,4 +1,4 @@
-// 오류코드 접두: W20A / 다음 번호: 004   ※ 기존 [WS20ATTR-CHK01](2026-08-21)은 구형식 — 전수 개조 금지 규칙으로 그대로 둔다.
+// 오류코드 접두: W20A / 다음 번호: 005   ※ 기존 [WS20ATTR-CHK01](2026-08-21)은 구형식 — 전수 개조 금지 규칙으로 그대로 둔다.
 /************************************************************************
  * ws_html5_ws20_attr.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -3161,6 +3161,71 @@
         }
     }
 
+    /************************************************************************
+     * busy(화면 덮는 표시)가 "실제로 닫히기"를 기다린다. (장군님 지시 2026-10-20)
+     *
+     *   왜 필요한가: parent.setBusy("") 는 끄라는 "신호"일 뿐이고, 실제로 닫히는 것은
+     *   화면이 잠잠해진 뒤다(2026-10-19 반영 — resources/index.js _u4aBusyOffWhenSettled,
+     *   MutationObserver 2 frame 무변경 + requestIdleCallback). 공통 busy 는
+     *   <dialog>.showModal() 모달이라 열려 있는 동안 문서 전체가 inert 가 되고 그 상태가
+     *   iframe 안 document 까지 번진다 → 미리보기 선택(selPreviewUI → sMark.fn_mark)이
+     *   쓰는 focus() 가 무시돼, 스크롤 아래에 있는 UI 를 골라도 미리보기가 그 UI 로
+     *   이동하지 않는다(CDP 실측 = ws_html5_ws20_tree.js 914~920행 기록과 일치).
+     *   원본은 setBusy("") 가 그 자리에서 닫혀 아래 10·11단계가 "닫힌 뒤"에 돌았다
+     *   (원본 U4A_WS_DESIGN/design/js/uiDesignArea.js 2570~2579행).
+     *
+     *   ★공통 busy 는 건드리지 않는다(장군님 지시) — 여기서 닫힘만 지켜본다.
+     *   ★느린 PC 를 고려해 시간을 못 박지 않고 "닫혔는지"를 확인한다. 상한에 닿으면
+     *     오류 코드를 남기고 그대로 진행한다(공통 busy 자체 상한 5초보다 길게 둔다).
+     *   ★창이 숨겨지면 requestAnimationFrame 이 멈추므로 setTimeout 으로도 상한을 건다
+     *     (뒤로가기로 WS20 화면이 숨는 경로가 있다 — 안 걸면 영영 안 끝난다).
+     ************************************************************************/
+    var _WS20_BUSY_WAIT_LIMIT_MS = 6000;
+
+    function _waitBusyClosed() {
+
+        var oDlg = null;
+
+        try {
+            var oDoc = parent.document;
+            oDlg = oDoc && oDoc.getElementById("u4aWsBusyIndicator");
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            return Promise.resolve();
+        }
+
+        // busy 요소가 없거나 이미 닫혀 있으면 기다릴 것이 없다(원본과 같은 상태).
+        if (!oDlg || oDlg.open !== true) { return Promise.resolve(); }
+
+        return new Promise(function (resolve) {
+
+            var bDone = false, iTimer = 0;
+
+            function _end(bLimit) {
+                if (bDone) { return; }
+                bDone = true;
+                if (iTimer) { clearTimeout(iTimer); }
+                if (bLimit) {
+                    console.error("[W20A-004] busy dialog still open after "
+                        + _WS20_BUSY_WAIT_LIMIT_MS + "ms - preview selection runs with focus blocked");
+                }
+                resolve();
+            }
+
+            iTimer = setTimeout(function () { _end(true); }, _WS20_BUSY_WAIT_LIMIT_MS);
+
+            function _tick() {
+                if (bDone) { return; }
+                if (oDlg.open !== true) { _end(false); return; }
+                requestAnimationFrame(_tick);
+            }
+
+            requestAnimationFrame(_tick);
+
+        });
+
+    } // end of _waitBusyClosed
+
     // ★ 선택 테두리가 안 뜬 경우 다시 그려달라고 요청(선택 직후 짧은 구간만).
     //   증상: 글자편집기(RichTextEditor)를 고르면 테두리가 아예 안 뜬다.
     //   원인(CDP 실측): 선택표시 함수가 대상에 포커스를 준 "직후" 곧바로 테두리를 계산하는데,
@@ -3664,6 +3729,11 @@
             }
 
         }
+
+        // ★ busy 가 "실제로" 닫히기를 기다린다. (장군님 지시 2026-10-20 — _waitBusyClosed 설명 참조)
+        //   아래 10·11단계는 원본에서 busy 가 꺼진 뒤에 돌던 것이고, 둘 다 focus 를 쓴다.
+        //   2026-10-19 부터 setBusy("") 가 바로 끄지 않으므로 여기서 닫힘을 기다려 원본 순서를 지킨다.
+        await _waitBusyClosed();
 
         //10. attribute 영역 선택처리. (원본 2407행 — busy 해제 "후" 수행, UIATK 입력시)
         try { oAPP.fn.setAttrFocus(oOpt.UIATK, oOpt.TYPE); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
