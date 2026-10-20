@@ -1,3 +1,4 @@
+// 오류코드 접두: W20D / 다음 번호: 002
 /************************************************************************
  * ws_html5_ws20_data.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -382,6 +383,50 @@
                     try {
                         oAPP.attr.DnDRandKey = parent.getSSID();
                     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+                    /**
+                     * 어플리케이션에 설정된 테마가 공통코드에 존재하지 않는경우, 메시지 팝업 호출 처리.
+                     * ------------------------------------------------------------------------
+                     *  ★원본 1:1 (U4A_WS_DESIGN/design/js/main.js 593~611행 — 세션 랜덤키 바로 뒤 자리).
+                     *   이식본에 이 블록이 통째로 빠져 있었다 — 장군님 지시 2026-10-19(화면 캡처).
+                     *   예: ZDWU0020 의 UI Theme 가 sap_bluecrystal 인데 서버 공통코드에 없는 경우.
+                     *  ★자리를 여기로 잡은 까닭: 원본은 design/js/main.js 의 getAppData 콜백 안이지만
+                     *   HTML5 는 **그 함수를 쓰지 않는다**(ws_html5_ws20_attr.js 가 전 테이블 로드 뒤
+                     *   fnLoadWs20TreeData 를 부른다). 앱 데이터 수신을 맡는 곳은 이 파일이고,
+                     *   원본 588행(미리보기 구성)·592행(세션 키) 대응이 바로 위에 있다.
+                     *   ※ 사본(design/js/main.js)에 넣으면 영영 안 돈다 — 2026-10-20 실제 사고.
+                     *  ★검사는 그 서버에 해당 보정이 적용된 경우에만 돈다(원본과 동일) — 안 떠 있으면 건너뛴다.
+                     *  ※ 원본 showMessage 첫 인자 sap 은 HTML5 에 없으므로 null (전 호출부 동일 관행).
+                     *  ※ 원본에는 try/catch 가 없다 — 여기서 터지면 앱 열기가 깨지므로 우리 예외 표준대로 감싼다.
+                     */
+                    try {
+
+                        if (oAPP.common.checkWLOList("C", "UHAK901500") === true) {
+
+                            var sAppTheme = oAPP.DATA.APPDATA.S_0010.UITHM || "";
+                            var aThemeCode = oAPP.attr.S_CODE.UA007 || [];
+
+                            //현재 어플리케이션에 설정된 테마가 공통코드에 존재하지 않는경우.
+                            if (sAppTheme !== "" &&
+                                aThemeCode.findIndex(function (item) { return item.FLD01 === sAppTheme && item.FLD03 === "X"; }) === -1) {
+
+                                //006 현재 어플리케이션에 설정된 테마 &1가 공통코드에 존재하지 않습니다.
+                                parent.showMessage(null, 20, "W",
+                                    parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_002", "006", sAppTheme));
+
+                                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                                    U4ALOG.warn("GUARD_EXIT", "app theme " + sAppTheme + " not registered in common code UA007",
+                                        "warning popup shown - the preview falls back to whatever theme the server serves");
+                                }
+
+                            }
+
+                        }
+
+                    } catch (eTheme) {
+                        console.error("[W20D-001] app theme check:", eTheme && eTheme.message, eTheme);
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(eTheme); }
+                    }
 
                 } catch (e) {
                     console.warn("[WS20][data] getAppData handle error:", e && e.message, e);
