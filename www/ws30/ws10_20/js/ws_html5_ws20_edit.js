@@ -1,4 +1,4 @@
-// 오류코드 접두: W20E / 다음 번호: 004
+// 오류코드 접두: W20E / 다음 번호: 007
 /************************************************************************
  * ws_html5_ws20_edit.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -926,7 +926,17 @@
         parent.setBusy("");
         // [F-4] 확인창 뜨는 동안 자식창(바인딩팝업 등) 잠금(원본). 모든 종료 경로에서 BUSY_OFF 로 짝 맞춤.
         _broadBusy(true);
+        //★[2026-10-20] 확인창 콜백을 async 로 바꿨다(미리보기 렌더링 완료를 기다리려면 await 가 필요).
+        //  공통 확인창은 콜백을 try/catch 로 감싸 부르지만(ws_html5_shell.js:486 · theme/u4a-ui.js:2440)
+        //  **async 가 던지는 예외는 그 catch 가 못 잡는다**(Promise 로 가므로) → 여기서 직접 잡고
+        //  모든 경로에서 잠금을 반드시 해제한다. lf_do 자체는 동기로 남겨 호출처(확인창)에 영향 0.
         function lf_do(act) {
+            _lf_doAsync(act).catch(function (e) {
+                console.error("[W20E-005] single delete failed - locks released:", e);
+                _broadBusy(false); _unlock();
+            });
+        }
+        async function _lf_doAsync(act) {
             if (act !== "YES") { _broadBusy(false); _unlock(); return; }   // 취소 → 잠금 해제.
             var oParent = _node(oNode.POBID);
             if (!oParent || !oParent.zTREE) { _broadBusy(false); _unlock(); return; }   // 가드 실패 → 잠금 해제.
@@ -935,10 +945,16 @@
             //  선택하지 않으므로, 대상을 안 남기면 딴 줄이 선택된 채 복원된다.
             //  다시하기(재삭제) 때는 그 UI가 없으므로 기존 폴백(선택 유지 → 부모)이 걸려 원본과 같다.
             oAPP.fn.fnWs20PushUndo({ OBJID: oNode.OBJID });
-            // 미리보기 제거(가드, 시그니처 1:1)
-            _removeNodePreview(oNode);
-            // [BR26] 하위 UI 를 oAPP.attr.prev 에서 재귀 제거(원본 재귀 삭제 1:1). 최상위는 _removeNodePreview 가 이미 제거.
-            _purgePrevSubtree(oNode);
+            //★[2026-10-20 장군님 지시] ① 미리보기에 반영 → ② 렌더링 종료 감지 → ③ busy off 순서.
+            //  원본 designUIDelete 의 확인창 콜백도 async 로 같은 순서다
+            //  (원본 uiDesignArea.js: 7039 감지 등록 → 7057 미리보기 제거 → 7072 await → 7082 부모 배열 제거).
+            //  감지 대상은 "지우는 UI 의 부모"(원본 7039 oAPP.attr.prev[ls_tree.POBID]).
+            await oAPP.fn.fnWs20AwaitPrevRender(oParent, function () {
+                // 미리보기 제거(가드, 시그니처 1:1)
+                _removeNodePreview(oNode);
+                // [BR26] 하위 UI 를 oAPP.attr.prev 에서 재귀 제거(원본 재귀 삭제 1:1). 최상위는 _removeNodePreview 가 이미 제거.
+                _purgePrevSubtree(oNode);
+            }, "deleteUI");
             // 부모 배열에서 제거
             var idx = oParent.zTREE.findIndex(function (a) { return a.OBJID === oNode.OBJID; });
             if (idx !== -1) { oParent.zTREE.splice(idx, 1); }
@@ -1095,7 +1111,16 @@
             // [F-4] 원본(uiDesignArea.js:707) = 다중 삭제 버튼 즉시 BUSY_ON → ★확인창 동안★ 팝업 잠금.
             //   HTML5 는 YES 후에만 잠갔었음 → 확인창 前으로 이동. 취소 시 BUSY_OFF 로 짝 맞춤.
             _broadBusy(true);
+            //★[2026-10-20] 확인창 콜백을 async 로 바꿨다(미리보기 렌더링 완료를 기다리려면 await 가 필요).
+            //  공통 확인창은 콜백 반환값을 안 쓰지만 **async 가 던지는 예외는 그쪽 try/catch 가 못 잡는다**
+            //  → 여기서 직접 잡고 잠금을 반드시 해제한다. lf_do 는 동기로 남겨 호출처 영향 0.
             function lf_do(act) {
+                _lf_doMultiAsync(act).catch(function (e) {
+                    console.error("[W20E-006] multi delete failed - locks released:", e);
+                    _broadBusy(false);
+                });
+            }
+            async function _lf_doMultiAsync(act) {
                 if (act !== "YES") { _broadBusy(false); return; }   // 취소 → 잠금 해제.
                 //[BR62-C] 다건 삭제도 되돌리기 대상을 남긴다 — 원본 추가 처리도 대표 1건만 선택한다.
                 //  ★[2026-09-02 수정] 예전엔 aChecked[0](첫 번째)를 썼으나 원본은 **마지막**이다.
@@ -1114,21 +1139,47 @@
                 })(_tree());
                 var _oUndoAnchor = _aUndoCand.length ? _aUndoCand[_aUndoCand.length - 1] : aChecked[aChecked.length - 1];
                 oAPP.fn.fnWs20PushUndo((_oUndoAnchor && _oUndoAnchor.OBJID) ? { OBJID: _oUndoAnchor.OBJID } : undefined);
-                // bottom-up(자식 먼저) 재귀 삭제 — 구 lf_delSelLine: chk===true 노드만 제거.
-                (function del(arr) {
-                    if (!arr) { return; }
-                    for (var i = arr.length - 1; i >= 0; i--) {
-                        var n = arr[i];
-                        del(n.zTREE);                 // 자식 먼저
-                        if (n.chk !== true) { continue; }
-                        _removeNodePreview(n);
-                        // [BR26] 체크된 노드가 부모면 그 아래 남은 하위 UI 도 화면에서 함께 사라지므로
-                        //   oAPP.attr.prev 를 재귀 정리(단건 삭제와 동일 논리). 정상 조작에선 체크 전파로
-                        //   하위도 chk===true 라 개별 처리되어 no-op, 그 밖의 경우만 잔존 방지.
-                        _purgePrevSubtree(n);
-                        arr.splice(i, 1);
+                //★[2026-10-20 장군님 지시] ① 미리보기에 반영 → ② 렌더링 종료 감지 → ③ busy off 순서.
+                //  원본 designTreeMultiDeleteItem 도 확인창 콜백이 async 이고 이 순서다
+                //  (원본 uiDesignArea.js: 4747 부모 수집 → 4759 감지 등록(addMultiDelAfterRendering)
+                //   → 4763 lf_delSelLine 삭제 → 4772 await Promise.all → 4776 모델 갱신).
+                //  감지 대상 = "살아남는 부모"만. 원본도 복사본에서 체크된 라인을 먼저 지워
+                //  (deleteCheckedLine 4756) 지워질 노드를 대상에서 뺀다 → 여기서는 부모·조상에
+                //  체크된 것이 있으면 제외한다(그 노드 자체가 사라지므로 신호가 안 온다).
+                var aDelParent = [], oSeenParent = {};
+                for (var pi = 0; pi < aChecked.length; pi++) {
+                    var sPobid = aChecked[pi] && aChecked[pi].POBID;
+                    if (!sPobid || oSeenParent[sPobid] === true) { continue; }
+                    oSeenParent[sPobid] = true;
+                    var oPar = _node(sPobid);
+                    if (!oPar) { continue; }
+                    //부모 자신이나 그 조상이 체크됐으면(=함께 지워짐) 감지 대상에서 뺀다.
+                    var bGone = false, oUp = oPar, nGuard = 0;
+                    while (oUp && nGuard < 200) {
+                        if (oUp.chk === true) { bGone = true; break; }
+                        if (!oUp.POBID) { break; }
+                        oUp = _node(oUp.POBID); nGuard++;
                     }
-                })(_tree());
+                    if (bGone) { continue; }
+                    aDelParent.push(oPar);
+                }
+                await oAPP.fn.fnWs20AwaitPrevRenderMulti(aDelParent, function () {
+                    // bottom-up(자식 먼저) 재귀 삭제 — 구 lf_delSelLine: chk===true 노드만 제거.
+                    (function del(arr) {
+                        if (!arr) { return; }
+                        for (var i = arr.length - 1; i >= 0; i--) {
+                            var n = arr[i];
+                            del(n.zTREE);                 // 자식 먼저
+                            if (n.chk !== true) { continue; }
+                            _removeNodePreview(n);
+                            // [BR26] 체크된 노드가 부모면 그 아래 남은 하위 UI 도 화면에서 함께 사라지므로
+                            //   oAPP.attr.prev 를 재귀 정리(단건 삭제와 동일 논리). 정상 조작에선 체크 전파로
+                            //   하위도 chk===true 라 개별 처리되어 no-op, 그 밖의 경우만 잔존 방지.
+                            _purgePrevSubtree(n);
+                            arr.splice(i, 1);
+                        }
+                    })(_tree());
+                }, "multiDelete");
                 if (!_node(sSelAfter)) { sSelAfter = "ROOT"; }
                 _refreshTree();
                 _selectNode(sSelAfter);

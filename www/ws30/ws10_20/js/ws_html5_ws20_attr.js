@@ -1,3 +1,4 @@
+// 오류코드 접두: W20A / 다음 번호: 004   ※ 기존 [WS20ATTR-CHK01](2026-08-21)은 구형식 — 전수 개조 금지 규칙으로 그대로 둔다.
 /************************************************************************
  * ws_html5_ws20_attr.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -4085,7 +4086,147 @@
     //      경로까지 예외처리 갈래를 타게 되어 원본과 달라진다. 그런 경로는 이 스위치로 원본과 맞춘다.
     //      (원본 호출처 전수 대조 결과 = RESET_ATTR 루프 2206·2219 / AppID·F4 계열 5705·5716·5786·5796·
     //       6171·6185 / autoGrowing 확인 콜백 3197·3214 / 덤프 이력 기록 2953 / 초기화면 이벤트 185.)
-    oAPP.fn.fnWs20AttrChange = function (sAttr, uityp, bSkipUndo, bSkipAutoGrow, bSkipAttrExc) {
+    /* ********************************************************************
+     * 속성 값 반영 본문 — 원본 attrChangeProc(uiAttributeArea.js:1929) 1:1. **동기**.
+     *   ★[2026-10-20 장군님 지시] 원본처럼 두 함수로 쪼갰다.
+     *     원본 구조: attrChange(1781, async — 앞 관문 + 뒤 마무리 + 미리보기 렌더링 완료 대기)
+     *               이 중간에서 attrChangeProc(1929, 동기 — 값 반영 본문)를 부른다.
+     *     WS4.0 은 둘을 fnWs20AttrChange 하나로 합쳐 뒀던 것을 원본 경계대로 다시 나눴다.
+     *   ★이 함수는 동기다 — 안에서 await 를 쓰지 않는다. 기다림은 부르는 쪽(fnWs20AttrChange)이 한다.
+     *   반환: { ok: true|false, attr: <모델의 실제 T_ATTR 줄> }
+     *     ok=false = 입력값 점검 실패(fail-closed) → 부르는 쪽은 뒤 마무리를 건너뛴다(원본 동일).
+     *     attr     = 넘겨받은 sAttr 이 복사본일 수 있어 모델의 실제 줄로 재지정한 것(아래 T_ATTR 동기).
+     * ******************************************************************** */
+    oAPP.fn.fnWs20AttrChangeProc = function (sAttr, uityp) {
+
+        //화면에서 UI추가, 이동, 삭제 및 attr 변경시 변경 flag 처리. (원본 attrChangeProc 1912행)
+        //  주의: setChangeFlag 본체는 design/js/main.js 가 먼저 정의(IS_CHAG="X"+setAppInfo)하므로
+        //  여기서 헤더/상태 갱신을 직접 호출해야 한다(원본은 sap 모델 바인딩이 자동 갱신했음).
+        try {
+            oAPP.fn.setChangeFlag();
+        } catch (e) {
+            console.warn("[WS20][attr] setChangeFlag skip:", e && e.message, e);
+        }
+        // 변경 즉시 모델/앱헤더 반영 → 상태 Active→Inactive
+        try { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        //[원본 attrChangeProc 이식 — setChangeFlag 직후 블록] 넘겨받은 sAttr 이 모델의 실제 줄이 아니라
+        //  복사본일 수 있어, 모델(T_ATTR)에서 같은 UIATK 줄을 찾아 값을 옮겨 넣고(moveCorresponding),
+        //  이후 처리(검증·수집·스타일·렌더)를 그 "실제 줄"로 진행한다. 이 재지정이 없으면 복사본에만
+        //  값이 반영돼 화면/모델이 어긋나는 원본 버그가 그대로 남는다.
+        try {
+            var _pos = oAPP.attr.oModel.oData.T_ATTR.findIndex(item => item.UIATK === sAttr.UIATK);
+            if (_pos !== -1) {
+                oAPP.fn.moveCorresponding(sAttr, oAPP.attr.oModel.oData.T_ATTR[_pos]);
+                sAttr = oAPP.attr.oModel.oData.T_ATTR[_pos];
+            }
+        } catch (e) {
+            console.warn("[WS20][attr] T_ATTR row sync skipped:", e && e.message, e);
+        }
+
+        //(원본 1957행 checkPropertyValue(designTreeData.js): 입력값 점검 모듈.
+        // 원본은 try/catch 없이 무조건 호출한다 — 실패하면 그대로 크게 드러난다.)
+        try {
+            var _oDesignChkModule = parent.require(
+                parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "js", "checkAppData", "designTreeData.js"));
+
+            var _aReuireError = _oDesignChkModule.checkPropertyValue(sAttr);
+
+            //입력한 값에 오류가 존재하는경우. (원본 1965행)
+            if (_aReuireError && _aReuireError.RETCD === "E") {
+
+                sAttr.valst = "Error";
+                sAttr.valtx = _aReuireError.RTMSG;
+
+                //기존 입력값을 DEFAULT 값으로 변경.
+                sAttr.UIATV = (oAPP.DATA.LIB.T_0023.find(a => a.UIATK === sAttr.UIATK) || {}).DEFVL || "";
+
+            }
+        } catch (e) {
+            //[BR51] 점검 모듈 로드/실행 실패를 조용히 삼키지 않는다(코딩규칙: 조용한 catch 금지).
+            //  구간 오류코드로 콘솔에 남기고 화면에도 드러낸다(현장 SR 추적용).
+            //  ※ 정상 설치 환경에서는 로드가 항상 성공하므로 이 갈래는 원래 타지 않는다.
+            console.error("[WS20ATTR-CHK01] input validation module (designTreeData.js) load/run failed - skipping validation:", e);
+            //화면 안내는 추적 코드만 표시(내부 예외 원문 노출 금지 — 상세는 콘솔에 이미 있음).
+            //  정식 안내 문구 키는 장군님 번호 지정 대기(임의 문구·키 생성 금지).
+            try {
+                parent.showMessage(null, 10, "E", "WS20ATTR-CHK01");
+            } catch (e2) {
+                console.error("[WS20ATTR-CHK01] error notice show failed:", e2 && e2.message, e2);
+            }
+            //[BR51-P1] 원본은 점검 실패(예외)가 그대로 전파돼 이후 수집(attrChgAttrVal)·스타일·재렌더에
+            //  도달하지 않는다(fail-closed). 여기서도 동일 경계를 지킨다 — 검증되지 않은 값을
+            //  변경 수집(prev._T_0015)·저장 후보에 넣지 않도록 후속 처리를 중단하고 종료.
+            //  아래 finally 가 busy·단축키·자식창 잠금·재진입 플래그를 원복한다(autoGrowing 조기 return 과 동일 패턴).
+            return { ok: false, attr: sAttr };
+        }
+
+        //attr 변경처리(로컬 모델 수집). (원본 1939행)
+        try {
+            oAPP.fn.attrChgAttrVal(sAttr, uityp);
+        } catch (e) {
+            console.warn("[WS20][attr] attrChgAttrVal error:", e && e.message, e);
+        }
+
+        //DDLB 변경 라인 STYLE 처리. (원본 1944행)
+        try { oAPP.fn.attrSetLineStyle(sAttr); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        //[BR31] dropAble 프로퍼티 변경건 예외처리 — DnDDrop 이벤트 연동.
+        //  원본 attrChange 1798행 attrChangeDropAbleProp → attrSetDropAbleException(is_attr,true,true).
+        //  dropAble 을 끄면 DnDDrop 이벤트 입력을 잠그고 등록된 서버/클라이언트 이벤트를 초기화,
+        //  켜면 입력 잠금을 해제한다. dropAble 라인 자체 수집(attrChgAttrVal)은 위에서 이미 마쳤고,
+        //  뒤따르는 재렌더/바인딩팝업 반영을 공통 경로가 처리하므로 여기선 DnDDrop 부수효과만 태운다.
+        try {
+            if (sAttr && sAttr.UIASN === "DROPABLE" && typeof oAPP.fn.attrSetDropAbleException === "function") {
+                oAPP.fn.attrSetDropAbleException(sAttr, false, true);
+            }
+        } catch (e) {
+            console.warn("[WS20][attr] dropAble exceptionhandle skip:", e && e.message, e);
+        }
+
+        //F4 HELP 버튼 활성여부 처리. (원본 1947행)
+        try { oAPP.fn.attrSetShowValueHelp(sAttr); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        //입력필드 입력 가능여부 처리. (원본 1950행)
+        try { oAPP.fn.setAttrEditable(sAttr); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        //(원본 1953행 previewUIsetProp + 1884행 selPreviewUI: 미리보기 반영 — W2 예정)
+        //  ※ previewUIsetProp 은 원본도 ROOT(OBJID==="ROOT")를 즉시 스킵(uiPreviewArea.js:486)하므로
+        //    ROOT 테마 반영은 아래 별도 분기(원본 attrDocumentProc 상당)에서 처리한다.
+        if (typeof oAPP.fn.previewUIsetProp !== "function") {
+            console.warn("[WS20][attr] preview apply skip (W2 pending):", sAttr.UIATT);
+        } else {
+            _safeCall("previewUIsetProp", [sAttr]);
+        }
+
+        //[HTML5] ROOT DOCUMENT 속성의 미리보기 라이브 반영 (원본 attrDocumentProc 이식분).
+        //  UI Theme(DH001021): 원본 uiAttributeArea.js attrDocumentProc(2664행)이
+        //  setPreviewUiTheme 로 iframe 테마를 즉시 바꾸던 경로가 HTML5 변환시 누락돼(위 3337~3338 주석)
+        //  테마를 바꿔도 미리보기가 안 바뀌던 문제 → 프레임에 재적용한다.
+        //  (CSS/JS Link·Web Security 는 원본도 미리보기 직접반영이 아니라 팝업 저장→designRefershModel
+        //   경로라 여기 대상 아님. undo/redo 는 스냅샷 복원 경로에서 별도 처리.)
+        try {
+            if (sAttr && sAttr.OBJID === "ROOT" && sAttr.UIATK === "DH001021"
+                && typeof oAPP.fn.fnWs20ApplyPrevTheme === "function") {
+                oAPP.fn.fnWs20ApplyPrevTheme(sAttr.UIATV);
+            }
+        } catch (e) {
+            console.warn("[WS20][attr] ROOT theme preview apply skip:", e && e.message, e);
+        }
+
+        //모델 갱신 처리. (원본 1959행 — HTML5: 속성 행 재렌더)
+        oAPP.fn.fnRenderWs20AttrRows();
+
+        return { ok: true, attr: sAttr };
+
+    }; // end of oAPP.fn.fnWs20AttrChangeProc
+
+    /* ★[2026-10-20 장군님 지시] async 로 바꿨다 — 미리보기 렌더링 완료를 await 하기 위해.
+     *   원본 attrChange(uiAttributeArea.js:1781)도 async 다. 값 반영 본문은 위 fnWs20AttrChangeProc(동기).
+     *   ★호출처 영향: 이 함수는 이제 Promise 를 돌려준다. 반환값을 쓰는 곳은 없었고(실측),
+     *     try/catch 로 감싼 8곳은 .catch 로 보정했다 — 특히 fnStyleClassPopupOpen 의 값 롤백. */
+    oAPP.fn.fnWs20AttrChange = async function (sAttr, uityp, bSkipUndo, bSkipAutoGrow, bSkipAttrExc) {
 
         //[BR34] 동기 재진입 방지 — 값 변경 후 속성 행을 다시 그릴 때(fnRenderWs20AttrRows→ROWS.innerHTML="")
         //  포커스가 있던 입력칸이 제거되며 change/blur 가 다시 발생해 이 함수가 재귀 호출되면, 안쪽 호출이
@@ -4098,6 +4239,13 @@
         //[BR54] 전용 예외처리 모듈에 넘긴 경우 true. 이때는 아래 finally 가 잠금을 풀지 않고,
         //  그 모듈이 끝난 뒤에 푼다(도는 동안 화면이 열려 연타가 들어가면 상태가 꼬인다).
         var _bExcPending = false;
+
+        //★[2026-10-20] 이 함수의 결과. 반환 규약:
+        //   true      = 값 반영까지 끝났다
+        //   false     = 예외로 실패했다(아래 catch 가 로그를 남긴다)
+        //   undefined = 조기 종료 — 재진입 가드 / autoGrowing 확인창 경로 / 전용 예외처리 모듈 경로 /
+        //               입력값 점검 실패(fail-closed). 어느 것도 "예외"가 아니다.
+        var _bAttrChangeOk = true;
 
         try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try { oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -4168,6 +4316,9 @@
                         //  잠금을 푼 뒤 예외 갈래만 건너뛰고 다시 들어가 값 처리를 이어간다.
                         //  (되돌리기 이력은 위에서 이미 쌓았으므로 생략, autoGrowing 게이트도 통과했으므로 생략.)
                         if (bHandled !== true) {
+                            //★[2026-10-20] 이제 async 다. 그 함수는 스스로 catch 해서 [WS20ATTR-ERR01] 로
+                            //  남기고 실패를 false 로 돌려주므로(reject 하지 않는다) 여기서 받을 것이 없다.
+                            //  여기는 이미 .then 안이라 기다릴 필요도 없다 — 잠금은 위에서 이미 풀었다.
                             oAPP.fn.fnWs20AttrChange(sAttr, uityp, true, true, true);
                         }
 
@@ -4184,124 +4335,34 @@
                 return;
             }
 
-            //화면에서 UI추가, 이동, 삭제 및 attr 변경시 변경 flag 처리. (원본 attrChangeProc 1912행)
-            //  주의: setChangeFlag 본체는 design/js/main.js 가 먼저 정의(IS_CHAG="X"+setAppInfo)하므로
-            //  여기서 헤더/상태 갱신을 직접 호출해야 한다(원본은 sap 모델 바인딩이 자동 갱신했음).
-            try {
-                oAPP.fn.setChangeFlag();
-            } catch (e) {
-                console.warn("[WS20][attr] setChangeFlag skip:", e && e.message, e);
-            }
-            // 변경 즉시 모델/앱헤더 반영 → 상태 Active→Inactive
-            try { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-            try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            //★[2026-10-20 장군님 지시] 원본 attrChange 1850 과 같은 자리 — 값 반영 본문(동기) 호출.
+            var _oProcRes = oAPP.fn.fnWs20AttrChangeProc(sAttr, uityp);
 
-            //[원본 attrChangeProc 이식 — setChangeFlag 직후 블록] 넘겨받은 sAttr 이 모델의 실제 줄이 아니라
-            //  복사본일 수 있어, 모델(T_ATTR)에서 같은 UIATK 줄을 찾아 값을 옮겨 넣고(moveCorresponding),
-            //  이후 처리(검증·수집·스타일·렌더)를 그 "실제 줄"로 진행한다. 이 재지정이 없으면 복사본에만
-            //  값이 반영돼 화면/모델이 어긋나는 원본 버그가 그대로 남는다.
+            //입력값 점검 실패(fail-closed) → 원본도 여기서 끊긴다. finally 가 잠금을 원복한다.
+            if (!_oProcRes || _oProcRes.ok !== true) { return; }
+
+            //모델의 실제 T_ATTR 줄로 재지정된 것을 이어서 쓴다(아래 _attrVsRefocus 가 valst 를 본다).
+            sAttr = _oProcRes.attr || sAttr;
+
+            //★[2026-10-20 장군님 지시] ② 미리보기 렌더링 종료 감지 → ③ busy off(아래 finally).
+            //  원본 attrChange 1872~1897 과 같은 자리·같은 방식:
+            //    getTargetAfterRenderingUI(oAPP.attr.prev[_sTree.POBID]) → getDomRef() 확인
+            //    → setAfterRendering 등록 → ★invalidate()★ → await.
+            //  원본이 invalidate() 를 쓰는 자리라 Multi 쪽 헬퍼를 쓴다(그쪽이 invalidate 를 쓴다).
+            //  감지 대상 = 값을 바꾼 UI 의 "부모"(원본 1873 과 동일 — 자기 자신에 걸면 신호가 안 온다).
+            //  ★필수 의존성이 없으면 조용히 건너뛰지 않는다 — 코드로 드러낸다.
+            //    (.works/DEV_STANDARD_오류처리.md §4·§6 / 전례 ws_events.js _ws20ReselectSelectedUI)
             try {
-                var _pos = oAPP.attr.oModel.oData.T_ATTR.findIndex(item => item.UIATK === sAttr.UIATK);
-                if (_pos !== -1) {
-                    oAPP.fn.moveCorresponding(sAttr, oAPP.attr.oModel.oData.T_ATTR[_pos]);
-                    sAttr = oAPP.attr.oModel.oData.T_ATTR[_pos];
+                if (typeof oAPP.fn.fnWs20AwaitPrevRenderMulti !== "function") {
+                    throw new Error("oAPP.fn.fnWs20AwaitPrevRenderMulti 미정의(ws_html5_ws20_prev.js 미로드)");
                 }
+                var _oTreeAC = _findTreeNode((sAttr && sAttr.OBJID) || "");
+                var _oParAC = (_oTreeAC && _oTreeAC.POBID) ? _findTreeNode(_oTreeAC.POBID) : null;
+                await oAPP.fn.fnWs20AwaitPrevRenderMulti(_oParAC ? [_oParAC] : [], undefined, "attrChange");
             } catch (e) {
-                console.warn("[WS20][attr] T_ATTR row sync skipped:", e && e.message, e);
+                console.error("[W20A-001] attrChange — preview render await failed:", e);
             }
 
-            //(원본 1957행 checkPropertyValue(designTreeData.js): 입력값 점검 모듈.
-            // 원본은 try/catch 없이 무조건 호출한다 — 실패하면 그대로 크게 드러난다.)
-            try {
-                var _oDesignChkModule = parent.require(
-                    parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "js", "checkAppData", "designTreeData.js"));
-
-                var _aReuireError = _oDesignChkModule.checkPropertyValue(sAttr);
-
-                //입력한 값에 오류가 존재하는경우. (원본 1965행)
-                if (_aReuireError && _aReuireError.RETCD === "E") {
-
-                    sAttr.valst = "Error";
-                    sAttr.valtx = _aReuireError.RTMSG;
-
-                    //기존 입력값을 DEFAULT 값으로 변경.
-                    sAttr.UIATV = (oAPP.DATA.LIB.T_0023.find(a => a.UIATK === sAttr.UIATK) || {}).DEFVL || "";
-
-                }
-            } catch (e) {
-                //[BR51] 점검 모듈 로드/실행 실패를 조용히 삼키지 않는다(코딩규칙: 조용한 catch 금지).
-                //  구간 오류코드로 콘솔에 남기고 화면에도 드러낸다(현장 SR 추적용).
-                //  ※ 정상 설치 환경에서는 로드가 항상 성공하므로 이 갈래는 원래 타지 않는다.
-                console.error("[WS20ATTR-CHK01] input validation module (designTreeData.js) load/run failed - skipping validation:", e);
-                //화면 안내는 추적 코드만 표시(내부 예외 원문 노출 금지 — 상세는 콘솔에 이미 있음).
-                //  정식 안내 문구 키는 장군님 번호 지정 대기(임의 문구·키 생성 금지).
-                try {
-                    parent.showMessage(null, 10, "E", "WS20ATTR-CHK01");
-                } catch (e2) {
-                    console.error("[WS20ATTR-CHK01] error notice show failed:", e2 && e2.message, e2);
-                }
-                //[BR51-P1] 원본은 점검 실패(예외)가 그대로 전파돼 이후 수집(attrChgAttrVal)·스타일·재렌더에
-                //  도달하지 않는다(fail-closed). 여기서도 동일 경계를 지킨다 — 검증되지 않은 값을
-                //  변경 수집(prev._T_0015)·저장 후보에 넣지 않도록 후속 처리를 중단하고 종료.
-                //  아래 finally 가 busy·단축키·자식창 잠금·재진입 플래그를 원복한다(autoGrowing 조기 return 과 동일 패턴).
-                return;
-            }
-
-            //attr 변경처리(로컬 모델 수집). (원본 1939행)
-            try {
-                oAPP.fn.attrChgAttrVal(sAttr, uityp);
-            } catch (e) {
-                console.warn("[WS20][attr] attrChgAttrVal error:", e && e.message, e);
-            }
-
-            //DDLB 변경 라인 STYLE 처리. (원본 1944행)
-            try { oAPP.fn.attrSetLineStyle(sAttr); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-
-            //[BR31] dropAble 프로퍼티 변경건 예외처리 — DnDDrop 이벤트 연동.
-            //  원본 attrChange 1798행 attrChangeDropAbleProp → attrSetDropAbleException(is_attr,true,true).
-            //  dropAble 을 끄면 DnDDrop 이벤트 입력을 잠그고 등록된 서버/클라이언트 이벤트를 초기화,
-            //  켜면 입력 잠금을 해제한다. dropAble 라인 자체 수집(attrChgAttrVal)은 위에서 이미 마쳤고,
-            //  뒤따르는 재렌더/바인딩팝업 반영을 공통 경로가 처리하므로 여기선 DnDDrop 부수효과만 태운다.
-            try {
-                if (sAttr && sAttr.UIASN === "DROPABLE" && typeof oAPP.fn.attrSetDropAbleException === "function") {
-                    oAPP.fn.attrSetDropAbleException(sAttr, false, true);
-                }
-            } catch (e) {
-                console.warn("[WS20][attr] dropAble exceptionhandle skip:", e && e.message, e);
-            }
-
-            //F4 HELP 버튼 활성여부 처리. (원본 1947행)
-            try { oAPP.fn.attrSetShowValueHelp(sAttr); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-
-            //입력필드 입력 가능여부 처리. (원본 1950행)
-            try { oAPP.fn.setAttrEditable(sAttr); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-
-            //(원본 1953행 previewUIsetProp + 1884행 selPreviewUI: 미리보기 반영 — W2 예정)
-            //  ※ previewUIsetProp 은 원본도 ROOT(OBJID==="ROOT")를 즉시 스킵(uiPreviewArea.js:486)하므로
-            //    ROOT 테마 반영은 아래 별도 분기(원본 attrDocumentProc 상당)에서 처리한다.
-            if (typeof oAPP.fn.previewUIsetProp !== "function") {
-                console.warn("[WS20][attr] preview apply skip (W2 pending):", sAttr.UIATT);
-            } else {
-                _safeCall("previewUIsetProp", [sAttr]);
-            }
-
-            //[HTML5] ROOT DOCUMENT 속성의 미리보기 라이브 반영 (원본 attrDocumentProc 이식분).
-            //  UI Theme(DH001021): 원본 uiAttributeArea.js attrDocumentProc(2664행)이
-            //  setPreviewUiTheme 로 iframe 테마를 즉시 바꾸던 경로가 HTML5 변환시 누락돼(위 3337~3338 주석)
-            //  테마를 바꿔도 미리보기가 안 바뀌던 문제 → 프레임에 재적용한다.
-            //  (CSS/JS Link·Web Security 는 원본도 미리보기 직접반영이 아니라 팝업 저장→designRefershModel
-            //   경로라 여기 대상 아님. undo/redo 는 스냅샷 복원 경로에서 별도 처리.)
-            try {
-                if (sAttr && sAttr.OBJID === "ROOT" && sAttr.UIATK === "DH001021"
-                    && typeof oAPP.fn.fnWs20ApplyPrevTheme === "function") {
-                    oAPP.fn.fnWs20ApplyPrevTheme(sAttr.UIATV);
-                }
-            } catch (e) {
-                console.warn("[WS20][attr] ROOT theme preview apply skip:", e && e.message, e);
-            }
-
-            //모델 갱신 처리. (원본 1959행 — HTML5: 속성 행 재렌더)
-            oAPP.fn.fnRenderWs20AttrRows();
 
             //[BR34] 값 확정 직후 오류가 남으면 그 오류 입력칸에 커서를 다시 놓아 안내문구가 저절로 뜨게 한다.
             //  원본은 확정 직후 오류면 문구를 자동으로 연다(uiAttributeArea.js:831). 오류 없으면 예약 취소.
@@ -4313,10 +4374,22 @@
             //  팝업 열려 있으면 방송(UPDATE-DESIGN-DATA), 미오픈이면 방송모듈 isCreateChannel 가드로 no-op(안전).
             try { if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
+        } catch (e) {
+            //★[2026-10-20] 이 함수가 async 가 되면서 **호출처의 try/catch 는 예외를 못 잡는다**(Promise 로 가므로).
+            //  이 함수엔 원래 catch 가 없어 예외가 호출처로 나갔고, 동기였을 때는 호출처 try/catch 가 잡았다.
+            //  async 로 바꾼 뒤에도 **오류를 조용히 삼키지 않도록** 여기서 한 번 잡아 반드시 남긴다.
+            //  (호출처 38곳 + 구 이름 별명 경로에 .catch 를 각각 붙이는 대신 이 한 곳에서 처리한다.)
+            //  실패는 반환값 false 로 알린다 — 값 롤백이 필요한 호출처(fnStyleClassPopupOpen)가 그것을 본다.
+            _bAttrChangeOk = false;
+            console.error("[W20A-003] attrChange failed - OBJID=" + ((sAttr && sAttr.OBJID) || "?") +
+                " UIATK=" + ((sAttr && sAttr.UIATK) || "?") + " uityp=" + (uityp || "?") + ":",
+                e && e.message ? e.message : e, e);
         } finally {
             //[BR54] 전용 예외처리 모듈로 넘긴 경우엔 여기서 풀지 않는다 — 그 모듈이 끝난 뒤에 푼다.
             if (_bExcPending !== true) { _releaseAttrChangeLock(); }
         }
+
+        return _bAttrChangeOk;
 
     }; // end of oAPP.fn.fnWs20AttrChange
 
@@ -4347,7 +4420,11 @@
      *     두 변경 bSkipUndo=true. 자식창 busy 브로드캐스트는 fnWs20AttrChange 가 담당(이 함수는 그걸 거침).
      ************************************************************************/
     if (typeof oAPP.fn.attrAppF4Del !== "function") {
-        oAPP.fn.attrAppF4Del = function (is_attr) {
+        //★[2026-10-20] async 로 바꿨다 — 안에서 fnWs20AttrChange 를 **연달아 두 번** 부르므로
+        //  await 로 하나씩 기다려야 한다([BR34] 재진입 가드에 걸려 두 번째 값이 누락되는 것을 막는다).
+        //  원본 attrAppF4Del 도 async 다(uiAttributeArea.js:2549 가 `await` 로 부른다).
+        //  WS4.0 호출처(6303)는 반환값을 쓰지 않는다 — 그 자리에 .catch 를 붙였다.
+        oAPP.fn.attrAppF4Del = async function (is_attr) {
 
             //appcontainer 의 AppID 프로퍼티가 아닌경우 exit.
             if (is_attr.UIATK !== "EXT00000030") { return; }
@@ -4361,14 +4438,14 @@
 
                 //AppID 입력값 초기화 + ATTR 변경(undo 는 위에서 1회 → skip).
                 is_attr.UIATV = "";
-                oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppF4Del 5786).
+                await oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppF4Del 5786).
 
                 //AppDescript(EXT00000031) 프로퍼티 초기화(원본 5737행).
                 var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
                 var ls_desc = aAttr.find(function (a) { return a.UIATK === "EXT00000031"; });
                 if (ls_desc) {
                     ls_desc.UIATV = "";
-                    oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppF4Del 5796).
+                    await oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppF4Del 5796).
                 }
 
                 //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 5750·5754행).
@@ -4399,7 +4476,10 @@
      *   반환 true = 호출처(아이콘 핸들러) 후속 분기 skip(원본 동일).
      ************************************************************************/
     if (typeof oAPP.fn.attrSelOption2F4HelpIDDel !== "function") {
-        oAPP.fn.attrSelOption2F4HelpIDDel = function (is_attr) {
+        //★[2026-10-20] async 로 바꿨다 — 위 attrAppF4Del 과 같은 까닭(연달아 두 번 호출).
+        //  원본도 async 다(uiAttributeArea.js:2539 가 `await` 로 부른다).
+        //  WS4.0 호출처(6314)는 반환값을 쓰지 않는다 — 그 자리에 .catch 를 붙였다.
+        oAPP.fn.attrSelOption2F4HelpIDDel = async function (is_attr) {
 
             //selectOption2/3 의 F4HelpID·F4HelpReturnField 가 아닌경우 exit(원본 6069행).
             if (is_attr.UIATK !== "EXT00001188" && is_attr.UIATK !== "EXT00001189" &&
@@ -4423,14 +4503,14 @@
                     //F4HelpID 입력값·바인딩 초기화 후 변경(undo 는 위 1회 → skip).
                     is_attr.UIATV = "";
                     is_attr.ISBND = "";
-                    oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpIDDel 6171).
+                    await oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpIDDel 6171).
 
                     //짝 ReturnField — 바인딩 안 됐으면 함께 초기화(원본 6124행).
                     var ls_attr = aAttr.find(function (a) { return a.UIATK === l_UIATK; });
                     if (ls_attr && ls_attr.ISBND !== "X") {
                         ls_attr.UIATV = "";
                         ls_attr.ISBND = "";
-                        oAPP.fn.fnWs20AttrChange(ls_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpIDDel 6185).
+                        await oAPP.fn.fnWs20AttrChange(ls_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpIDDel 6185).
                     }
 
                     //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 6138·6142행).
@@ -4447,7 +4527,7 @@
 
                     is_attr.UIATV = "";
                     is_attr.ISBND = "";
-                    oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpIDDel 6224).
+                    await oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpIDDel 6224).
 
                     if (typeof oAPP.fn.designRefershModel === "function") { oAPP.fn.designRefershModel(); }
                     if (typeof oAPP.fn.updateBindPopupDesignData === "function") { oAPP.fn.updateBindPopupDesignData(); }
@@ -4872,7 +4952,11 @@
                 (oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "113", "", "", "", "") || "");
 
             //초기화 전 확인 팝업(원본 showMessage KIND 30 → HTML5 동일 라우팅).
-            parent.showMessage(null, 30, "I", sMsg, function (sAct) {
+            //★[2026-10-20] 콜백을 async 로 바꿨다 — 미리보기 렌더링 완료를 await 하기 위해.
+            //  확인창은 콜백 반환값을 쓰지 않는다(resources/index.js lf_cb) → 호출처 영향 0.
+            //  async 예외는 확인창 쪽 try/catch 가 못 잡지만, 이 콜백 본문이 이미
+            //  try/catch/finally 로 감싸여 있어 그 안에서 잡히고 finally 에서 잠금이 풀린다.
+            parent.showMessage(null, 30, "I", sMsg, async function (sAct) {
 
                 //YES 가 아니면 종료.
                 if (sAct !== "YES") { return; }
@@ -4936,12 +5020,27 @@
 
                         var uityp = _sAttr.chk_visb ? "CHECK" : (_sAttr.sel_visb ? "DDLB" : "INPUT");
                         //[BR42] undo 는 위에서 1회만 → 개별 변경은 bSkipUndo=true 로 스냅샷 생략.
-                        try { oAPP.fn.fnWs20AttrChange(_sAttr, uityp, true, false, true); }   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrResetAttr 2206·2219).
+                        //★[2026-10-20] fnWs20AttrChange 가 async 가 됐다 — 루프에서 await 로 **하나씩** 돌린다.
+                        //  안 기다리면 [BR34] 재진입 가드(_fnAttrChangeBusy)에 걸려 2번째부터 값이 누락된다.
+                        try { await oAPP.fn.fnWs20AttrChange(_sAttr, uityp, true, false, true); }   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrResetAttr 2206·2219).
                         catch (e) { console.error("[WS20][attr] reset change error:", _sAttr.UIATT, e && e.message, e); }
                     }
 
                     //필터 끔 반영 + 변경표시 제거 확정(마지막 1회 재렌더 — fnWs20AttrChange 가 안 불린 경우 대비).
                     oAPP.fn.fnRenderWs20AttrRows();
+
+                    //★[2026-10-20 장군님 지시] ② 미리보기 렌더링 종료 감지 → ③ busy off(아래 finally).
+                    //  원본 attrResetAttr 도 같은 자리·같은 방식이다
+                    //  (원본 uiAttributeArea.js: 2266 모듈 load → 2271 감지 대상 = 고른 UI 의 부모
+                    //   → 2284 등록 → 2291 invalidate() → 2294 await → 2299 designRefershModel).
+                    //  ★원본이 invalidate() 를 쓰는 자리라 Multi 쪽 헬퍼를 쓴다(그쪽이 invalidate 를 쓴다).
+                    var _oTreeReset = _findTreeNode((oData && oData.uiinfo && oData.uiinfo.OBJID) || "");
+                    var _oParReset = (_oTreeReset && _oTreeReset.POBID) ? _findTreeNode(_oTreeReset.POBID) : null;
+                    //★필수 의존성이 없으면 조용히 건너뛰지 않는다(아래 기존 catch 가 코드까지 콘솔에 남긴다).
+                    if (typeof oAPP.fn.fnWs20AwaitPrevRenderMulti !== "function") {
+                        throw new Error("[W20A-002] oAPP.fn.fnWs20AwaitPrevRenderMulti 미정의(ws_html5_ws20_prev.js 미로드)");
+                    }
+                    await oAPP.fn.fnWs20AwaitPrevRenderMulti(_oParReset ? [_oParReset] : [], undefined, "attrReset");
 
                 } catch (e) {
                     console.error("[WS20][attr] Attribute Reset error:", e && e.message, e);
@@ -6232,6 +6331,8 @@
                 try {
                     //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 삭제 처리.
                     if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
+                    //★[2026-10-20] async 가 됐다. 그 함수는 본문 전체가 try/catch 라 reject 하지 않고
+                    //  스스로 로그를 남긴다(함수 본문 확인) → 여기서 받을 것이 없다.
                     oAPP.fn.attrAppF4Del(sAttr);
                 } catch (e) { console.error("[WS20][attr] AppID delete call error:", e && e.message, e); }
                 return;
@@ -6243,6 +6344,8 @@
                 try {
                     //원본 attrIcon2Proc 진입부: 오류 표현 필드 초기화 후 F4값 삭제 처리.
                     if (typeof oAPP.fn.attrClearErrorField === "function") { oAPP.fn.attrClearErrorField(true); }
+                    //★[2026-10-20] async 가 됐다. 그 함수는 본문 전체가 try/catch 라 reject 하지 않고
+                    //  스스로 로그를 남긴다(함수 본문 확인) → 여기서 받을 것이 없다.
                     oAPP.fn.attrSelOption2F4HelpIDDel(sAttr);
                 } catch (e) { console.error("[WS20][attr] F4 value delete call error:", e && e.message, e); }
                 return;

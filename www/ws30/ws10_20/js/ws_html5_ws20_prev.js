@@ -1,3 +1,4 @@
+// 오류코드 접두: PREV-ERR / 다음 번호: 015   ※ 기존 PREV-ERR-00~05 는 구형식(2자리) — 전수 개조 금지 규칙으로 그대로 둔다.
 /************************************************************************
  * ws_html5_ws20_prev.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -2116,6 +2117,181 @@
         });
 
     }; // end of oAPP.fn.fnWs20LoadPreview
+
+    /* ********************************************************************
+     * 미리보기 렌더링 종료 감지 — 공통 함수 (장군님 지시 2026-10-20)
+     *
+     *   「UI 관련된 내용을 추가·변경·삭제 시 각 프로세스에서 가장 마지막에는 반드시
+     *     미리보기에 반영하는 것이고, 미리보기 렌더링이 끝난 이후에 busy 가 꺼지는 것이다.
+     *     이 내용이 항상 각 프로세스의 마지막 로직이어야 된다.」
+     *
+     *   프로세스의 끝 = ① 미리보기에 반영 → ② 렌더링 종료 감지 → ③ busy off.
+     *   이 함수가 ②(+①을 midFn 으로 끼워 넣음)를 맡는다.
+     *
+     *   순서는 원본 호출처 15군데가 전부 쓰는 꼴 그대로다:
+     *     getTargetAfterRenderingUI → getDomRef() 확인 → setAfterRendering 등록
+     *     → midFn(미리보기 반영) → rerender() → await → renderingRichTextEditor 묶음 await
+     *
+     *   ★원본 모듈 design/js/previewRender/setOnAfterRender.js 는 수정하지 않는다
+     *    (장군님 지시 2026-10-20) — 그 모듈 함수를 부르기만 한다.
+     *   SSOT = .analy/05_디자인영역.md §4-3.
+     *
+     *   parentNode = 기다릴 대상의 "부모" design tree 줄.
+     *                ★고른 UI 자신에 걸면 안 된다 — invalidate 가 부모를 다시 그리는 UI 가 많아
+     *                  신호가 안 오고, visible 을 끄면 그 UI 는 안 그려져 신호가 없다.
+     *   midFn      = 등록 뒤 · 다시 그리기 앞에 끼워 넣을 미리보기 반영(없으면 생략 가능).
+     *                ★어떤 조기 종료 경로에서도 반드시 1회 실행한다(반영 자체가 사라지면 안 됨).
+     *   sWhere     = 콘솔 로그에 찍을 자리 이름(어느 프로세스인지 — 순서 확인용).
+     * ******************************************************************** */
+    oAPP.fn.fnWs20AwaitPrevRender = async function (parentNode, midFn, sWhere) {
+
+        var sTag = sWhere || "?";
+        var nT0 = 0;
+        try { nT0 = performance.now(); } catch (e) { nT0 = 0; }
+
+        var bMidDone = false;
+        function _runMid() {
+            if (bMidDone || typeof midFn !== "function") { return; }
+            bMidDone = true;
+            try { midFn(); }
+            catch (e) { console.error("[PREV-ERR-006] preview apply (midFn) failed at " + sTag + ":", e && e.message, e); }
+        }
+
+
+        //부모 정보가 없으면 기다릴 대상이 없다 → 반영만 하고 종료.
+        if (!parentNode || !parentNode.OBJID) {
+            _runMid();
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnWs20AwaitPrevRender parentNode missing at " + sTag, "preview render not awaited");
+            }
+            return;
+        }
+
+        //미리보기 iframe 미로드 → 반영만 하고 종료.
+        var w = null;
+        try { w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow; }
+        catch (e) { w = null; }
+        if (!w) {
+            _runMid();
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnWs20AwaitPrevRender preview window missing at " + sTag, "preview render not awaited");
+            }
+            return;
+        }
+
+        //원본 모듈(setOnAfterRender.js) — 부르기만 한다.
+        var R = null;
+        //★필수 모듈이다 — 없으면 조용히 건너뛰지 않고 코드를 담아 던진다.
+        //  (.works/DEV_STANDARD_오류처리.md §4·§6 / 전례 ws_events.js _ws20ReselectSelectedUI)
+        //  ★단 미리보기 반영(midFn)은 어떤 종료 경로에서도 1회 실행한다 — 반영이 사라지면
+        //    design tree 와 미리보기가 어긋난 채 남는다.
+        try { R = parent.require(oAPP.oDesign.pathInfo.setOnAfterRender); } catch (e) { R = null; }
+        if (!R) {
+            _runMid();
+            throw new Error("[PREV-ERR-007] setOnAfterRender require failed at " + sTag +
+                            " (design/js/previewRender/setOnAfterRender.js 미로드)");
+        }
+
+        function _safe(fn) {
+            try { return fn(); }
+            catch (e) { console.error("[PREV-ERR-008] preview render detect failed at " + sTag + ":", e && e.message, e); }
+        }
+
+        var oTarget = null, oDom = null, oPromise = null, aRte = [];
+
+        _safe(function () { oTarget = R.getTargetAfterRenderingUI(oAPP.attr.prev[parentNode.OBJID]); });
+
+        //★ DOM 에 떠 있을 때만 등록한다 — 안 떠 있으면 onAfterRendering 이 안 와서 영영 안 끝난다.
+        _safe(function () { oDom = (oTarget && typeof oTarget.getDomRef === "function") ? oTarget.getDomRef() : null; });
+        _safe(function () { if (oDom) { oPromise = R.setAfterRendering(oTarget); } });
+
+        _runMid();
+
+        _safe(function () { aRte = R.renderingRichTextEditor(parentNode) || []; });
+
+        if (oPromise) {
+            try { oTarget.rerender(); await oPromise; }
+            catch (e) { console.error("[PREV-ERR-009] rerender/await failed at " + sTag + ":", e && e.message, e); }
+        }
+        try { await Promise.all(aRte); }
+        catch (e) { console.error("[PREV-ERR-010] RichTextEditor render await failed at " + sTag + ":", e && e.message, e); }
+
+    };
+
+    /* ********************************************************************
+     * 미리보기 렌더링 종료 감지 — 부모가 여러 개일 때 (멀티 삭제용).
+     *   원본 addMultiDelAfterRendering(uiDesignArea.js:4848) 1:1:
+     *     부모마다 getTargetAfterRenderingUI → getDomRef() 확인 → setAfterRendering 등록
+     *     → renderingRichTextEditor 묶음 더하기 → ★invalidate()★ (단건의 rerender 아님)
+     *   그 뒤 midFn(실제 삭제)을 실행하고 await Promise.all — 원본 호출 흐름(4759~4772) 그대로.
+     *
+     *   aParentNodes = 감지할 부모 design tree 줄 배열(중복은 부른 쪽에서 제거).
+     *   midFn        = 등록 뒤에 실행할 미리보기 반영(원본 lf_delSelLine 자리).
+     * ******************************************************************** */
+    oAPP.fn.fnWs20AwaitPrevRenderMulti = async function (aParentNodes, midFn, sWhere) {
+
+        var sTag = sWhere || "?";
+        var nT0 = 0;
+        try { nT0 = performance.now(); } catch (e) { nT0 = 0; }
+
+        var bMidDone = false;
+        function _runMid() {
+            if (bMidDone || typeof midFn !== "function") { return; }
+            bMidDone = true;
+            try { midFn(); }
+            catch (e) { console.error("[PREV-ERR-011] preview apply (midFn) failed at " + sTag + ":", e && e.message, e); }
+        }
+
+
+        var w = null;
+        try { w = oAPP.attr.ui && oAPP.attr.ui.frame && oAPP.attr.ui.frame.contentWindow; }
+        catch (e) { w = null; }
+        if (!w) {
+            _runMid();
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnWs20AwaitPrevRenderMulti preview window missing at " + sTag, "preview render not awaited");
+            }
+            return;
+        }
+
+        var R = null;
+        //★필수 모듈 — 위 fnWs20AwaitPrevRender 와 같은 취급(코드를 담아 던진다).
+        try { R = parent.require(oAPP.oDesign.pathInfo.setOnAfterRender); } catch (e) { R = null; }
+        if (!R) {
+            _runMid();
+            throw new Error("[PREV-ERR-012] setOnAfterRender require failed at " + sTag +
+                            " (design/js/previewRender/setOnAfterRender.js 미로드)");
+        }
+
+        var aPromise = [], nReg = 0;
+
+        for (var i = 0; i < (aParentNodes || []).length; i++) {
+            var oNode = aParentNodes[i];
+            if (!oNode || !oNode.OBJID) { continue; }
+            try {
+                var oPrev = oAPP.attr.prev[oNode.OBJID];
+                if (typeof oPrev === "undefined") { continue; }            //원본 4877: 부모 UI 없으면 skip
+                var oTarget = R.getTargetAfterRenderingUI(oPrev);
+                if (typeof oTarget === "undefined" || oTarget === null) { continue; }   //원본 4885
+                if (typeof oTarget.getDomRef !== "function") { continue; }              //원본 4891
+                var oDom = oTarget.getDomRef();
+                if (typeof oDom === "undefined" || oDom === null) { continue; }         //원본 4898 — 안 떠 있으면 신호가 안 온다
+                aPromise.push(R.setAfterRendering(oTarget));
+                var aRte = R.renderingRichTextEditor(oNode);
+                if (aRte && aRte.length > 0) { aPromise = aPromise.concat(aRte); }
+                oTarget.invalidate();                                                   //원본 4913 — rerender 아님
+                nReg++;
+            } catch (e) {
+                console.error("[PREV-ERR-013] preview render detect failed at " + sTag + " OBJID=" + oNode.OBJID + ":", e && e.message, e);
+            }
+        }
+
+        _runMid();
+
+        try { await Promise.all(aPromise); }
+        catch (e) { console.error("[PREV-ERR-014] render await failed at " + sTag + ":", e && e.message, e); }
+
+    };
 
     /************************************************************************
      * [정리 — 문서 정합] (구) "트리 렌더 시점 감지" 미리보기 로드 트리거는 제거됨.

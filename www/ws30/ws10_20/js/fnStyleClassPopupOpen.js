@@ -1,3 +1,4 @@
+// 오류코드 접두: SCPO / 다음 번호: 002
 /************************************************************************
  * fnStyleClassPopupOpen.js  (HTML5) — WS20 속성 styleClass 값도움(F4) "미리 정의된 CSS"
  * ----------------------------------------------------------------------
@@ -156,16 +157,27 @@
         var iY = (oUI && oUI.content) ? oUI.content.scrollTop : 0;
         var sPrev = (oCtx.attr.UIATV != null) ? oCtx.attr.UIATV : "";   // 커밋 실패 시 롤백용
         oCtx.attr.UIATV = aCls.join(" ");
-        try {
-            oAPP.fn.fnWs20AttrChange(oCtx.attr, "INPUT");
-        } catch (e) {
-            //★ 커밋(undo/미리보기/모델동기화) 실패 시 값 롤백 — 안 하면 화면만 성공처럼 보이고
-            //  실제 저장(prev._T_0015)엔 반영 안 돼 UI-데이터 불일치가 남는다(코덱스 검수 지적).
-            oCtx.attr.UIATV = sPrev;
-            console.error("[WS20][styleClass] commit failed - value rolled back:", e && e.message, e);
+
+        //★[2026-10-20 장군님 지시] fnWs20AttrChange 가 async 가 됐다(미리보기 렌더링 완료 대기).
+        //  그 함수는 **스스로 catch 해서 로그를 남기고 실패를 false 로 돌려준다**(reject 하지 않는다 —
+        //  본문 전체가 try/catch 이고 finally 의 _releaseAttrChangeLock 도 안을 전부 감싸 던지지 않는다).
+        //  ★ 커밋(undo/미리보기/모델동기화) 실패 시 값 롤백 — 안 하면 화면만 성공처럼 보이고
+        //    실제 저장(prev._T_0015)엔 반영 안 돼 UI-데이터 불일치가 남는다(코덱스 검수 지적).
+        //  뒤처리(_renderAll·스크롤 복원)는 커밋이 끝난 뒤에 한다 — 원래 순서를 그대로 지킨다.
+        function _after() {
+            _renderAll();
+            if (oUI && oUI.content) { oUI.content.scrollTop = iY; _spy(); }
         }
-        _renderAll();
-        if (oUI && oUI.content) { oUI.content.scrollTop = iY; _spy(); }
+
+        oAPP.fn.fnWs20AttrChange(oCtx.attr, "INPUT").then(function (bOk) {
+            //false = 그 함수 안에서 예외가 났다(오류 내용은 거기서 [WS20ATTR-ERR01] 로 남겼다) → 값 되돌리기.
+            //  undefined 는 조기 종료(재진입 가드 등)로 예외가 아니다 → 되돌리지 않는다.
+            if (bOk === false) {
+                oCtx.attr.UIATV = sPrev;
+                console.error("[SCPO-001] styleClass commit failed - value rolled back to:", sPrev);
+            }
+            _after();
+        });
     }
     function _addClass(sCls) {
         if (!sCls || !oCtx || oCtx.edit !== true) { return; }

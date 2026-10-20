@@ -1,3 +1,4 @@
+// 오류코드 접두: SASP / 다음 번호: 004
 /************************************************************************
  * fnSameAttrSyncPopupOpen.js  (HTML5) — WS20 속성 컨텍스트 메뉴 M03 "동일 속성 동기화"
  * ----------------------------------------------------------------------
@@ -98,11 +99,37 @@
     function _isEdit() {
         try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
+    //★[2026-10-20] 미리보기에 반영한 UI 의 OBJID 수집 — 반영이 끝난 뒤 그 부모들의
+    //  렌더링 종료를 한 번에 기다리기 위해(일괄 적용이라 대상이 여러 개다).
+    var _aPrevApplied = [];
     // 미리보기 반영(W2 미변환/미로드면 no-op) — 원본 previewUIsetProp 1:1.
     function _preview(sAttr) {
         if (typeof oAPP.fn.previewUIsetProp === "function") {
             try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[WS20][sameAttr] previewUIsetProp:", e && e.message, e); }
         }
+        try { if (sAttr && sAttr.OBJID && _aPrevApplied.indexOf(sAttr.OBJID) === -1) { _aPrevApplied.push(sAttr.OBJID); } }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    }
+    //★[2026-10-20] 수집한 OBJID 들의 "부모" design tree 줄 목록(중복 제거) — 감지 대상.
+    function _parentNodesOfApplied() {
+        var aOut = [], oSeen = {};
+        try {
+            //★필수 의존성이 없으면 조용히 건너뛰지 않는다 — 코드로 드러낸다.
+            //  (.works/DEV_STANDARD_오류처리.md §4·§6 / 전례 ws_events.js _ws20ReselectSelectedUI)
+            if (typeof oAPP.fn.getTreeData !== "function") {
+                throw new Error("oAPP.fn.getTreeData 미정의(WS20 디자인 트리 모듈 미로드)");
+            }
+            for (var i = 0; i < _aPrevApplied.length; i++) {
+                var oNode = oAPP.fn.getTreeData(_aPrevApplied[i]);
+                if (!oNode || !oNode.POBID || oSeen[oNode.POBID] === true) { continue; }
+                oSeen[oNode.POBID] = true;
+                var oPar = oAPP.fn.getTreeData(oNode.POBID);
+                if (oPar) { aOut.push(oPar); }
+            }
+        } catch (e) {
+            console.error("[SASP-001] sameAttrSync — parent node list for preview render await failed:", e);
+        }
+        return aOut;
     }
 
     /* ── 단일 인스턴스 + 컨텍스트 ─────────────────────────────────────── */
@@ -332,7 +359,9 @@
     /************************************************************************
      * 확인 — 원본 lf_setSyncAttr 1:1. 선택 라인들에 입력값 일괄 동기화.
      ************************************************************************/
-    function lf_setSyncAttr() {
+    //★[2026-10-20] async 로 바꿨다 — 미리보기 렌더링 완료를 await 하기 위해.
+    //  호출처는 714행 확인 버튼 클릭 핸들러 1곳이고 반환값을 쓰지 않는다(아래에서 .catch 로 받는다).
+    async function lf_setSyncAttr() {
         var is_attr = oState.attr;
 
         //확인 직전 텍스트 필드 최신값 확정(blur change 미발화 대비) → 검증 경유.
@@ -351,6 +380,7 @@
             return;
         }
 
+        _aPrevApplied.length = 0;   //★[2026-10-20] 이번 적용에서 미리보기에 반영한 UI 수집 시작.
         try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
@@ -446,6 +476,13 @@
 
             //소스 커밋 + 속성패널 refresh(undo 재-push 금지 = bSkipUndo true).
             oAPP.fn.fnWs20AttrChange(is_attr, "", true);
+
+            //★[2026-10-20 장군님 지시] ① 미리보기에 반영 완료 → ② 렌더링 종료 감지 → ③ busy off(아래 finally).
+            //  일괄 적용이라 반영 대상이 여러 개 → 그 UI 들의 "부모"를 모아 한 번에 기다린다.
+            if (typeof oAPP.fn.fnWs20AwaitPrevRenderMulti !== "function") {
+                throw new Error("[SASP-002] oAPP.fn.fnWs20AwaitPrevRenderMulti 미정의(ws_html5_ws20_prev.js 미로드)");
+            }
+            await oAPP.fn.fnWs20AwaitPrevRenderMulti(_parentNodesOfApplied(), undefined, "sameAttrSync");
         } catch (e) {
             console.error("[WS20][sameAttr] sync handle error:", e && e.message, e);
         } finally {
@@ -711,7 +748,14 @@
         oConfirm.type = "button";
         oConfirm.innerHTML = _fa("check") + "<span></span>";
         oConfirm.querySelector("span").textContent = _msgC("A40");   // Confirm
-        oConfirm.addEventListener("click", function () { lf_setSyncAttr(); });
+        //★[2026-10-20] lf_setSyncAttr 가 async 가 됐다 — 예외를 삼키지 않게 .catch 로 받아 잠금까지 해제.
+        oConfirm.addEventListener("click", function () {
+            lf_setSyncAttr().catch(function (e) {
+                console.error("[SASP-003] sameAttrSync — sync failed, locks released:", e);
+                try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+                try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+            });
+        });
         var oCancel = _el("button", "u4a-btn u4a-btn--negative u4aSaBtn");
         oCancel.type = "button";
         oCancel.innerHTML = _fa("xmark") + "<span></span>";

@@ -14,6 +14,43 @@ var oAPP = parent.oAPP;
  ********************************************************/
 module.exports.setAfterRendering = function(oTarget){
 
+    /*********************************************************
+     * ★[장군님 지시 2026-10-20] 콘솔 로그만 추가 — 기존 로직은 한 줄도 바꾸지 않았다.
+     *   (「수정 금지는 맞는데 콘솔 찍었다고 기존 소스가 잘못 도는건 아니잖아 콘솔까지는 추가 허용이야」)
+     *
+     *   미리보기 렌더링 종료를 기다리는 자리는 호출처 30여 곳이 전부 이 함수를 지난다
+     *   (uiDesignArea · uiAttributeArea · callDesignContextMenu · undoRedo · preview/index.js ·
+     *    ws_html5_ws20_prev/edit/dnd.js). 그래서 여기 한 곳만 찍으면
+     *   「미리보기가 다 그려진 뒤에 busy 가 꺼지는지」를 콘솔 순서로 확인할 수 있다.
+     *   이 줄 뒤에 busy 종료 로그가 오면 순서가 맞은 것이다.
+     *
+     *   ★장군님 지시 2026-10-20 「미리보기가 다 그렸다 라고 판단되는 부분에만 로그를 남겨」 —
+     *     그래서 실제로 다 그려진 두 자리에만 남긴다:
+     *       how=AWAITED : onAfterRendering 까지 기다렸다
+     *       how=RTE     : RichTextEditor 준비(readyRecurring)까지 기다렸다
+     *     기다리지 않고 바로 끝나는 갈래(oTarget 없음 / addEventDelegate 없음 / onAfterRendering 없음)는
+     *     "다 그렸다" 가 아니므로 찍지 않는다.
+     *   개발 모드에서만 찍는다. 확인이 끝나면 이 블록과 _prevRenderLog 호출만 지우면 원래대로다.
+     ********************************************************/
+    var _nPrevT0 = 0, _bPrevDev = false;
+    try {
+        _bPrevDev = (parent.REMOTE && parent.REMOTE.app && parent.REMOTE.app.isPackaged === false);
+        _nPrevT0 = performance.now();
+    } catch (e) { _bPrevDev = false; }
+
+    function _prevRenderLog(sHow){
+        if (_bPrevDev !== true) { return; }
+        try {
+            var _d = new Date();
+            var _sTime = ("0" + _d.getHours()).slice(-2) + ":" + ("0" + _d.getMinutes()).slice(-2) + ":" +
+                         ("0" + _d.getSeconds()).slice(-2) + "." + ("00" + _d.getMilliseconds()).slice(-3);
+            var _nMs = Math.round(performance.now() - _nPrevT0);
+            var _sId = (oTarget && oTarget._OBJID) ? oTarget._OBJID : "?";
+            console.log("[PREV] preview rendering done how=" + sHow + " OBJID=" + _sId +
+                        " " + _nMs + "ms " + _sTime);
+        } catch (e) { }
+    }
+
     return new Promise((resolve)=>{
 			
 		if(typeof oTarget === "undefined"){
@@ -39,6 +76,8 @@ module.exports.setAfterRendering = function(oTarget){
 				//(am5 차트, richtextEditor과 같이 onAfterRendering 이후에
 				//UI 내부에서 사용하고 있는 다른 라이브러리를 통해 화면이 그려지는것을 기다리는 로직)
 				await awaitPreviewExcepionUI(oTarget);
+
+				_prevRenderLog("RTE");
 
 				return resolve();
 
@@ -66,6 +105,8 @@ module.exports.setAfterRendering = function(oTarget){
 				//(am5 차트, richtextEditor과 같이 onAfterRendering 이후에
 				//UI 내부에서 사용하고 있는 다른 라이브러리를 통해 화면이 그려지는것을 기다리는 로직)
 				await awaitPreviewExcepionUI(oTarget);
+
+				_prevRenderLog("AWAITED");
 
 				return resolve();
 			}

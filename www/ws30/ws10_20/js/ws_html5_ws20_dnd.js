@@ -800,7 +800,33 @@
         oAPP.fn.updateBindPopupDesignData = function () {
             try {
                 var sPath = oAPP.oDesign && oAPP.oDesign.pathInfo && oAPP.oDesign.pathInfo.bindPopupBroadCast;
-                if (sPath) { parent.require(sPath)("UPDATE-DESIGN-DATA"); }
+                if (!sPath) { return; }
+
+                var fnBroad = parent.require(sPath);
+
+                /* ★[장군님 지시 2026-10-20] 바인딩 팝업이 안 열려 있으면 아예 부르지 않는다.
+                 *   왜: 방송모듈 updateBindPopupDesignData 는 들어가자마자 parent.setBusy("X") + 단축키 잠금을
+                 *       켜고, 채널이 없으면(isCreateChannel() === false) 곧바로 되돌려 끈다
+                 *       (design/bindPopupHandler/broadcastChannelBindPopup.js:612~631 — 원본도 동일).
+                 *       그 "켰다 바로 끄는" 한 쌍이 UI 추가·삭제·이동·속성변경 때마다 화면 깜빡임으로 보였다
+                 *       (2026-10-20 UI 추가 팝업 실측: busy 가 중간에 한 번 더 켜졌다 꺼짐).
+                 *   영향도(2026-10-20 전수 확인): 그 갈래가 남기는 순효과는 자식창 BUSY_OFF 방송 1회뿐이고,
+                 *       BUSY_ON 을 켜는 자리(직접 3곳 + _broadBusy/_bindBusy/_broadChildBusy)는 전부 자기 짝
+                 *       OFF 를 맞춘다. 호출처 43곳(내 파일 24 + 지연 로드되는 사본 19) 중 이 함수의 해제에
+                 *       기대는 곳은 없었다. 팝업이 열려 있을 때는 이 함수가 busy 를 끄지 않으므로(팝업 응답이
+                 *       끈다 — 같은 파일 366~376) 열린 경로는 건드리지 않는다. */
+                if (fnBroad("IS-CHANNEL-CREATE") !== true) {
+                    //로그는 한 번만 — UI 편집마다 불리는 자리라 매번 남기면 로그가 폭증한다.
+                    if (!oAPP.attr.__ws20BindBroadSkipLogged) {
+                        oAPP.attr.__ws20BindBroadSkipLogged = true;
+                        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                            U4ALOG.warn("GUARD_EXIT", "bind popup channel not created", "UPDATE-DESIGN-DATA broadcast skipped (logged once)");
+                        }
+                    }
+                    return;
+                }
+
+                fnBroad("UPDATE-DESIGN-DATA");
             } catch (e) { console.error("[WS20] updateBindPopupDesignData:", e && e.message, e); }
         };
     }
