@@ -2217,6 +2217,29 @@
 
     oAPP.fn.fnChildWindowShow = function (bShow) {
 
+        /********************************************************************
+         * ★ 되살리기는 「가리는 창」이 하나도 없을 때만 한다. (장군님 지적 2026-10-20
+         *   「창 앞으로 보내기 전에 체크하면 되는거 아니냐?」)
+         * ------------------------------------------------------------------
+         *  원본(U4A_WS3.0.0/www/ws30/ws10_20/js/ws_fn_02.js 2120행)의 되살리기는
+         *  setOpacity(1) 뿐이고 moveTop 이 없다 — 별창에 parent 가 붙어 있어 자식이
+         *  늘 부모 위였기 때문이다. 2026-10-07 에 parent 를 떼면서 moveTop 을 넣었고,
+         *  그 뒤로 확인창이 떠 있는 동안 되살리면 **별창이 그 위로 튀어나왔다가** 다시
+         *  숨겨진다(깜빡임). 그래서 올리기 전에 먼저 본다.
+         *  ★목록(aHiddenByMe)은 비우지 않는다 — 그 창이 닫히면 감시자(_syncChildWindowByDialog,
+         *    ws_fn_03.js)가 제대로 되살린다. 비우면 되살릴 길이 없어진다.
+         ********************************************************************/
+        if (bShow === true &&
+            typeof oAPP.fn.fnIsBlockingDialogOpen === "function" &&
+            oAPP.fn.fnIsBlockingDialogOpen() === true) {
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnChildWindowShow(true)",
+                    "a blocking dialog is still open - windows stay hidden until it closes");
+            }
+            return;
+        }
+
         // 2026-10-07 장군님 지시 (별창 parent 제거) - 위 fnChildWindowClose 와 같은 이유로
         //   getChildWindows()(parent 기반) 대신 같은 브라우저키 별창 전체를 대상으로 한다.
         var aChild = oAPP.common.getSiblingWindows(),
@@ -2282,7 +2305,7 @@
 
                         try {
 
-                            // oChild.hide(); 
+                            // oChild.hide();
 
                             oChild.setOpacity(0);
 

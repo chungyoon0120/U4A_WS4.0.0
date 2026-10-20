@@ -408,6 +408,38 @@
         return (document.querySelector(SEL_BLOCKING_DIALOG) !== null);
     }; // end of oAPP.fn.fnIsBlockingDialogOpen
 
+    /************************************************************************
+     * 지금 처리중 표시(busy)가 떠 있나 — **되살리기 판정에만** 쓴다.
+     * ----------------------------------------------------------------------
+     *  왜 필요한가(장군님 실측 2026-10-20, 콘솔):
+     *    뒤로가기 → 「예」 → 확인창이 닫히는 순간 이 감시자가
+     *    「restored - no blocking dialog left」 를 찍고 **별창을 전부 되살렸다.**
+     *    그런데 그 뒤 흐름은 저장하고 **창을 닫으러** 간다 → 보였다가 닫힌다(깜빡임).
+     *  원본은 처리중 표시가 sap.m.Dialog 라 위 셀렉터(.sapMDialogOpen)에 **같이 걸려서**
+     *  표시가 켜져 있는 동안 별창이 숨은 채 유지됐다. WS4.0 은 top-layer 문제로 표시를
+     *  <dialog>+showModal 로 바꾸면서 그 셀렉터에서 뺐는데(안 빼면 표시를 켤 때마다 별창이
+     *  전부 사라졌다 돌아온다), 그 바람에 **되살리기까지 풀렸다.**
+     *  → 숨기기는 종전대로 두고(표시는 안 센다), 되살리기만 표시가 꺼지기를 기다린다.
+     *  ★표시는 메인 창에 있고 이 코드는 틀 안 화면에서 돌 수 있어 부모 문서도 같이 본다.
+     ************************************************************************/
+    function _isBusyShown() {
+
+        try {
+            if (window.parent && window.parent !== window) {
+                var oPar = window.parent.document.getElementById("u4aWsBusyIndicator");
+                if (oPar && oPar.open === true) { return true; }
+            }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        try {
+            var oSelf = document.getElementById("u4aWsBusyIndicator");
+            if (oSelf && oSelf.open === true) { return true; }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        return false;
+
+    } // end of _isBusyShown
+
     function _syncChildWindowByDialog() {
 
         var bBlocking = oAPP.fn.fnIsBlockingDialogOpen();
@@ -418,6 +450,13 @@
         //    그러면 화면을 그릴 때마다 콜백이 온다. 상태 비교 없이 매번 부르면 느린 PC 에서
         //    별창 개수만큼 setOpacity 가 쏟아진다. 동작은 원본과 같고 횟수만 줄인다.
         if (bBlocking === bChildHidden) {
+            return;
+        }
+
+        // ★ 되살리기는 처리중 표시까지 꺼진 뒤에 한다(위 _isBusyShown 설명 — 깜빡임의 원인).
+        //   아직 떠 있으면 **상태도 바꾸지 않고** 그대로 둔다. 표시가 닫히는 것도 DOM 변경이라
+        //   이 감시자가 다시 돌고, 그때 되살린다. 상태를 바꿔 버리면 그 기회를 잃는다.
+        if (bBlocking === false && _isBusyShown() === true) {
             return;
         }
 
