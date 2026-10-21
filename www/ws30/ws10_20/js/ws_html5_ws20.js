@@ -587,87 +587,192 @@
      *    · 미리보기 iframe 포커스: ws_html5_ws20_prev.js _attachPreviewShortcutForward 가 합성 keydown 재발송.
      *  공통 가드(_ws20ScGuard): e.repeat(꾹 누름)·현재 페이지 WS20·busy.
      ************************************************************************/
-    function _ws20ScGuard(e, fn) {
-        // 공통 가드(ws_common.js fnRunShortCut)에 위임 — 꾹누름·화면일치(WS20)·종합체크
-        //   (busy/메뉴열림/다이얼로그열림/isShortcutLock/페이지이동 in-flight) 단일 방어 통로.
+    /************************************************************************
+     * 공통 가드(ws_common.js fnRunShortCut)에 위임 — 꾹누름·화면일치(WS20)·종합체크
+     *   (busy/메뉴열림/다이얼로그열림/isShortcutLock/페이지이동 in-flight) 단일 방어 통로.
+     * @param {Function} [fnBeforeCheck]  검사 앞에서 할 일 — 원본에 그 단계가 있는 단축키만 넘긴다.
+     ************************************************************************/
+    function _ws20ScGuard(e, fn, fnBeforeCheck) {
+
         if (oAPP.common && typeof oAPP.common.fnRunShortCut === "function") {
-            oAPP.common.fnRunShortCut(e, "WS20", fn);
+            oAPP.common.fnRunShortCut(e, "WS20", fn, fnBeforeCheck);
             return;
         }
-        // 폴백(공통 미로드 시) — 최소 가드
-        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (e && e.repeat === true) { return; }
-        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS20") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { fn(e); } catch (err) { console.error("[WS20] shortcut:", err); }
+
+        /********************************************************************
+         * 폴백 — 공통 가드가 아직 안 올라온 때만 탄다. 최소한의 검사만 한다.
+         ********************************************************************/
+
+        try {
+            if (e && e.stopImmediatePropagation) {
+                e.stopImmediatePropagation();
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        try {
+            if (e && e.preventDefault) {
+                e.preventDefault();
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        //꾹 누름 — 한 번만 돈다.
+        if (e && e.repeat === true) {
+            return;
+        }
+
+        //지금 화면이 WS20 이 아니면 안 돈다.
+        try {
+            if (parent.getCurrPage && parent.getCurrPage() !== "WS20") {
+                return;
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        try {
+            if (typeof fnBeforeCheck === "function") {
+                fnBeforeCheck();
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        //처리중 표시가 켜져 있으면 안 돈다.
+        try {
+            if (parent.getBusy && parent.getBusy() === "X") {
+                return;
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        try {
+            fn(e);
+        } catch (err) {
+            console.error("[WS20] shortcut:", err);
+        }
     }
+
+    /************************************************************************
+     * F3(뒤로가기)만 검사 **앞에서** 메뉴 팝오버를 닫는다 — 원본 1085행 그대로.
+     *   원본에서 이 단계를 가진 단축키는 F3 하나뿐이라, 공통에 넣지 않고 F3 에만 넘긴다.
+     ************************************************************************/
+    function _ws20CloseMenuPopover() {
+
+        if (!oAPP.common || typeof oAPP.common.fnCloseMenuPopover !== "function") {
+            return;
+        }
+
+        oAPP.common.fnCloseMenuPopover();
+    }
+
+    /************************************************************************
+     * 아래 동작 함수들은 **공통 가드(fnRunShortCut)를 거쳐서만** 불린다.
+     * ★★★[2026-10-21 장군님 지시 「원본대로 해라」] 여기 있던 **메뉴 닫기 · 실행 가능 여부 검사**를
+     *   전부 뺐다. 공통 가드가 이미 그 둘을 하므로 두 번 돌고 있었다(콘솔에 같은 줄이 두 번 찍혔다).
+     *   원본은 단축키 하나당 **한 번**이다. 내가 2026-06-23 에 공통 가드를 만들면서 여기 것도
+     *   안 치워 생긴 중복이다. 근거는 없었다.
+     ************************************************************************/
 
     //F3 — 뒤로가기(원본 ws_common.js 1281 [WS20] Back Button). ← 버튼과 동일한 ev_pageBack 수행.
     function _ws20Back() {
-        //메뉴 팝오버 닫기(원본 fnCloseMenuPopover).
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        //단축키 실행 가능 여부(원본 fnShortCutExeAvaliableCheck) — "X" 면 중단.
-        try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+
         //입력 중 포커스 날리기(편집값 반영 — 원본 동일).
-        try { if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try {
+            if (document.activeElement && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
         //뒤로가기 — ← 버튼과 동일.
-        if (oAPP.events && typeof oAPP.events.ev_pageBack === "function") { oAPP.events.ev_pageBack(); }
-        else { console.warn("[WS20] ev_pageBack not available (F3)"); }
+        if (oAPP.events && typeof oAPP.events.ev_pageBack === "function") {
+            oAPP.events.ev_pageBack();
+            return;
+        }
+
+        console.warn("[WS20] ev_pageBack not available (F3)");
     }
 
     //Ctrl+Shift+F12 — MIME Repository(별도창). 원본 ws_common.js 의 sap.byId("mimeBtn").firePress(UI5)
     //  는 HTML5 서 무동작이라, 버튼과 동일한 핸들러(ev_pressMimeBtn → fnMimeWindowOpener)로 교체.
     function _ws20Mime() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (oAPP.events && typeof oAPP.events.ev_pressMimeBtn === "function") { oAPP.events.ev_pressMimeBtn(); }
-        else { console.warn("[WS20] ev_pressMimeBtn not available (Ctrl+Shift+F12)"); }
+
+        if (oAPP.events && typeof oAPP.events.ev_pressMimeBtn === "function") {
+            oAPP.events.ev_pressMimeBtn();
+            return;
+        }
+
+        console.warn("[WS20] ev_pressMimeBtn not available (Ctrl+Shift+F12)");
     }
 
     //Ctrl+F — WS20 Find(별도창). 원본 ws_common.js 의 sap.byId("ws20_findBtn").firePress(UI5)
-    //  는 HTML5 서 무동작이라, 헤더 Find 버튼과 동일 핸들러(fnFindPopupOpen → 별도창)로 교체.
+    //  는 HTML5 서 무동작이라, 헤더 Find 버튼과 동일 핸들러(fnFindPopupOpener → 별도창)로 교체.
     function _ws20Find() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") { oAPP.fn.fnFindPopupOpener(); }
-        else { console.warn("[WS20] fnFindPopupOpener not available (Ctrl+F)"); }
+
+        if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") {
+            oAPP.fn.fnFindPopupOpener();
+            return;
+        }
+
+        console.warn("[WS20] fnFindPopupOpener not available (Ctrl+F)");
     }
 
     //Ctrl+Shift+Z — [WS20] Undo(247). 원본 ws_common.js fn 은 require(undoRedo).executeHistory("UNDO")
     //  (UI5 iframe/bindPopup 의존 design 모듈) → HTML5 스냅샷 스택 진입점 fnWs20ExecHistory 로 교체.
     //  트리 툴바 버튼(↶)과 동일 함수라 활성/이력유무/초기화가 완전히 일치한다.
     function _ws20Undo() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+
         //편집모드에서만 (원본 fn: IS_EDIT !== "X" 면 중단).
-        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } return; }
-        try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("UNDO"); }
-        else { console.warn("[WS20] fnWs20ExecHistory not available (Undo)"); }
+        if (_ws20IsEditMode() === false) {
+            return;
+        }
+
+        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") {
+            oAPP.fn.fnWs20ExecHistory("UNDO");
+            return;
+        }
+
+        console.warn("[WS20] fnWs20ExecHistory not available (Undo)");
     }
 
     //Ctrl+Shift+X — [WS20] Redo(248). (Undo 와 동일 정책 — REDO 수행)
     function _ws20Redo() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } return; }
+
+        if (_ws20IsEditMode() === false) {
+            return;
+        }
+
+        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") {
+            oAPP.fn.fnWs20ExecHistory("REDO");
+            return;
+        }
+
+        console.warn("[WS20] fnWs20ExecHistory not available (Redo)");
+    }
+
+    //편집 모드인가 — Undo/Redo 가 같은 판정을 써서 한 곳으로 뺐다(원본 fn: IS_EDIT !== "X" 면 중단).
+    function _ws20IsEditMode() {
+
+        var oAppInfo = null;
+
         try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("REDO"); }
-        else { console.warn("[WS20] fnWs20ExecHistory not available (Redo)"); }
+            oAppInfo = parent.getAppInfo();
+        } catch (x) {
+            _caughtWs20Sc(x);
+            return false;
+        }
+
+        if (!oAppInfo || oAppInfo.IS_EDIT !== "X") {
+            return false;
+        }
+
+        return true;
     }
 
     /************************************************************************
@@ -718,35 +823,6 @@
         "F8": { btn: "ws20_appExecMenuBtn", ev: "ev_pressAppExecBtn" }           // Application Execution
     };
 
-    //단축키 공통 앞머리 — 메뉴 닫기 + 실행 가능 여부. 그만둬야 하면 false.
-    function _ws20ScPrepare() {
-
-        //열려 있는 메뉴를 먼저 닫는다.
-        try {
-
-            if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") {
-                oAPP.common.fnCloseMenuPopover();
-            }
-
-        } catch (x) {
-            _caughtWs20Sc(x);
-        }
-
-        //지금 단축키를 실행해도 되는 상태인가 — 잠금 · 화면 이동 중 · 처리중 · 메뉴 · 팝업.
-        try {
-
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
-                return false;
-            }
-
-        } catch (x) {
-            _caughtWs20Sc(x);
-        }
-
-        return true;
-    }
-
     //위 두 자리의 오류 흔적 — 같은 줄이 되풀이돼 한 곳으로 뺐다.
     function _caughtWs20Sc(oErr) {
 
@@ -759,8 +835,6 @@
 
     //툴바 버튼 단축키 공통 — 버튼이 눌릴 수 있을 때 그 버튼과 같은 핸들러를 부른다.
     function _ws20ToolbarSc(sBtnId, sEv, sKey) {
-
-        if (_ws20ScPrepare() === false) { return; }
 
         //버튼이 그 모드에서 안 보이면 원본처럼 조용히 그만둔다.
         if (_ws20BtnReady(sBtnId) === false) { return; }
@@ -779,8 +853,6 @@
     //  · 아이콘 뷰어 메뉴가 뜬 경우 = 그 메뉴의 첫 항목(Icon List)과 같은 함수
     //  · 평평한 버튼인 경우        = 그 버튼과 같은 핸들러
     function _ws20IconList() {
-
-        if (_ws20ScPrepare() === false) { return; }
 
         if (_ws20BtnReady("iconViewerBtn") === true) {
 
@@ -812,8 +884,6 @@
     //  고르면 ev_pressAppExecBtnByBrowser(이름) 가 돈다 — 같은 자리로 바로 간다.
     //  ★패키징(운영)본에서는 그 항목이 비활성이라 여기서도 그만둔다(원본 getEnabled 와 같은 판정).
     function _ws20ExecDevBrowser() {
-
-        if (_ws20ScPrepare() === false) { return; }
 
         if (_ws20BtnReady("ws20_appExecMenuBtn") === false) { return; }
 
@@ -856,7 +926,10 @@
 
             //① 별도 함수가 있는 것 — 창을 열거나 되돌리는 것들.
             var oFnMap = {
-                "F3": function (e) { _ws20ScGuard(e, _ws20Back); },               // 뒤로가기
+                //F3 만 세 번째 인자를 넘긴다 — 원본은 F3 하나만 검사 앞에서 메뉴를 닫는다(원본 1085행).
+                "F3": function (e) {
+                    _ws20ScGuard(e, _ws20Back, _ws20CloseMenuPopover);            // 뒤로가기
+                },
                 "Ctrl+F": function (e) { _ws20ScGuard(e, _ws20Find); },           // Find(별도창)
                 "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); },   // MIME Repository(별도창)
                 "Ctrl+Shift+Z": function (e) { _ws20ScGuard(e, _ws20Undo); },     // Undo(247)

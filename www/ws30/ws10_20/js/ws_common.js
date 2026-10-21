@@ -661,25 +661,97 @@
     /************************************************************************
      * [HTML5] 단축키 공통 가드 — 모든 페이지 단축키 핸들러의 단일 방어 통로.
      *   화면별 super-wrap(_scGuard/_ws20ScGuard 등)이 이 함수에 위임한다(중복 제거).
-     *   순서대로 방어:
+     *   ★★★[2026-10-21 장군님 지시] 순서를 **원본 그대로** 맞췄다.
+     *     원본(ws_common.js aShortCutWS20 의 F3, 변환 전 1070~1094행)은 각 단축키 안에서
+     *     「이벤트 전파 막기 → 꾹 누름 → 메뉴 닫기 → 실행 가능 여부 검사」 순으로 돌았다.
+     *     [내가 깨뜨린 것] 이 가드를 만들면서(2026-06-23) ① **메뉴 닫기를 빼고** 검사부터 했고
+     *       ② 각 화면 동작 함수에 **같은 검사를 또** 남겨 두 번 돌았다. 둘 다 원본과 다르다.
+     *     [지금] 메뉴 닫기를 검사 앞에 되돌리고, 동작 함수 쪽 중복은 거기서 뺐다.
+     *
+     *   순서대로 방어 (원본과 같음):
      *     (1) 꾹 누름(auto-repeat) — e.repeat
      *     (2) 현재 화면 일치 — parent.getCurrPage() === sPage (다른 화면 단축키 오발화 방지)
-     *     (3) 종합 실행가능 체크 — fnShortCutExeAvaliableCheck(): busy / 메뉴열림(.u4a-menu) /
+     *     (3) fnBeforeCheck — **그 단축키만** 검사 앞에서 해야 하는 일. 안 넘기면 아무 일도 안 한다.
+     *         ★원본에서 **F3(뒤로가기) 하나만** 검사 앞에 메뉴 팝오버 닫기를 둔다(원본 1085행).
+     *           나머지 단축키에는 그 단계가 **없다.** 그래서 공통으로 넣지 않고 인자로 받는다.
+     *           검사 앞이어야 하는 까닭: (4)가 「메뉴 열림」을 보고 막으므로, 안 닫고 검사하면
+     *           메뉴를 열어 둔 채 F3 을 눌렀을 때 원본과 달리 아무 일도 안 일어난다.
+     *     (4) 종합 실행가능 체크 — fnShortCutExeAvaliableCheck(): busy / 메뉴열림(.u4a-menu) /
      *         다이얼로그열림 / isShortcutLock / 페이지이동중(isNaviBusy) 전부 포함(원본 종합 체크).
-     *   ※ "연타/재진입"은 (3)의 isNaviBusy·busy·다이얼로그 체크가 막는다(비동기 액션이 in-flight
+     *   ※ "연타/재진입"은 (4)의 isNaviBusy·busy·다이얼로그 체크가 막는다(비동기 액션이 in-flight
      *      플래그를 들고 있는 동안 같은/다른 단축키 모두 차단). 동기 액션은 즉시 끝나 영향 없음.
      * @param {KeyboardEvent} e
      * @param {string} sPage  이 단축키가 유효한 화면 ("WS10"/"WS20"/"WS30")
      * @param {Function} fnAction  실제 동작
+     * @param {Function} [fnBeforeCheck]  검사 앞에서 할 일 (원본에 그 단계가 있는 단축키만 넘긴다)
      ************************************************************************/
-    oAPP.common.fnRunShortCut = function (e, sPage, fnAction) {
-        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (e && e.repeat === true) { return; }                                                          // (1)
-        try { if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (2)
-        try { if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (3)
-        try { fnAction(e); } catch (err) { console.error("[shortcut][" + sPage + "]", err); }
+    oAPP.common.fnRunShortCut = function (e, sPage, fnAction, fnBeforeCheck) {
+
+        try {
+            if (e && e.stopImmediatePropagation) {
+                e.stopImmediatePropagation();
+            }
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        try {
+            if (e && e.preventDefault) {
+                e.preventDefault();
+            }
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        //(1) 꾹 누름 — 한 번만 돈다.
+        if (e && e.repeat === true) {
+            return;
+        }
+
+        //(2) 지금 그 화면이 아니면 안 돈다.
+        try {
+            if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) {
+                return;
+            }
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        //(3) 그 단축키만 검사 앞에서 해야 하는 일 — 안 넘기면 건너뛴다.
+        try {
+            if (typeof fnBeforeCheck === "function") {
+                fnBeforeCheck();
+            }
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        //(4) 실행 가능 여부 — 잠금 · 화면 이동 중 · 처리중 · 메뉴 · 팝업.
+        try {
+            if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
+                return;
+            }
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        try {
+            fnAction(e);
+        } catch (err) {
+            console.error("[shortcut][" + sPage + "]", err);
+        }
+
     }; // end of oAPP.common.fnRunShortCut
+
+    //위 가드의 오류 흔적 — 같은 줄이 되풀이돼 한 곳으로 뺐다.
+    function _caughtRunShortCut(oErr) {
+
+        if (typeof U4ALOG === "undefined" || !U4ALOG.caught) {
+            return;
+        }
+
+        U4ALOG.caught(oErr);
+    }
 
     /************************************************************************
      * [HTML5] 페이지 이동 in-flight 락 set/clear — 원본 sap.lock/isLocked 재진입 락 대체.
