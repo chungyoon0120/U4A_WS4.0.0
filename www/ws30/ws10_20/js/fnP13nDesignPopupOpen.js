@@ -630,6 +630,8 @@
         var oDlg = document.createElement("dialog");
         oDlg.id = C_DLG_ID;
         oDlg.className = "u4a-dialog u4aP13nDlg";
+        //자동 테스트 식별값(.analy/21) — 어느 창인지. 자동 테스트 쪽 요청 2026-10-20.
+        oDlg.setAttribute("data-act", "P13NLIST_DLG");
 
         // ── 헤더(48px): 아이콘 + 제목 + 전체화면 토글 + 닫기 X ──
         var oHeader = _el("div", "u4a-dialog__header u4aP13nHead");
@@ -640,6 +642,7 @@
         oUI.btnFull.type = "button";
         oUI.btnFull.innerHTML = _fa("expand");
         oUI.btnFull.title = _cl("A05");   // (전체화면 토글)
+        oUI.btnFull.setAttribute("data-act", "P13N_FULLSCREEN");
         oUI.btnFull.addEventListener("click", function () { lf_toggleFull(); });
         oHeader.appendChild(oUI.btnFull);
 
@@ -647,6 +650,8 @@
         oXBtn.type = "button";
         oXBtn.innerHTML = _fa("xmark");
         oXBtn.title = _cl("A39");
+        //★이 창은 화면 안 <dialog> 라 운영체제 창 닫기로는 안 닫힌다 — 자동 테스트가 닫을 유일한 길.
+        oXBtn.setAttribute("data-act", "CLOSE");
         oXBtn.addEventListener("click", function () { lf_closeCancel(); });
         oHeader.appendChild(oXBtn);
         oDlg.appendChild(oHeader);
@@ -682,6 +687,7 @@
         oCloseBtn.type = "button";
         oCloseBtn.innerHTML = _fa("xmark");
         oCloseBtn.title = _cl("A39");
+        oCloseBtn.setAttribute("data-act", "CANCEL");
         oCloseBtn.addEventListener("click", function () { lf_closeCancel(); });
         oFoot.appendChild(oCloseBtn);
         oDlg.appendChild(oFoot);
@@ -747,6 +753,7 @@
         oUI.btnBack.type = "button";
         oUI.btnBack.innerHTML = _fa("chevron-left");
         oUI.btnBack.title = _cl("E30");   // E30 Back
+        oUI.btnBack.setAttribute("data-act", "P13N_BACK");
         oUI.btnBack.addEventListener("click", function () { _busyThen(lf_back); });
         oTool.appendChild(oUI.btnBack);
 
@@ -756,6 +763,7 @@
         oUI.btnSave.type = "button";
         oUI.btnSave.innerHTML = _fa("floppy-disk");
         oUI.btnSave.title = _cl("A64");   // A64 Save
+        oUI.btnSave.setAttribute("data-act", "SAVE");
         oUI.btnSave.addEventListener("click", function () { _busyThen(lf_saveP13nData); });
         oTool.appendChild(oUI.btnSave);
 
@@ -763,6 +771,7 @@
         oUI.btnRegDel.type = "button";
         oUI.btnRegDel.innerHTML = _fa("trash");
         oUI.btnRegDel.title = _cl("A03");   // A03 Delete
+        oUI.btnRegDel.setAttribute("data-act", "P13N_DELETE");
         oUI.btnRegDel.hidden = true;
         oUI.btnRegDel.addEventListener("click", function () {
             lf_setHeaderLineDelete(oS.is_head ? oS.is_head.fileName : "");
@@ -777,6 +786,13 @@
             placeholder: _cl("A35"),   // A35 Description
             className: "u4aP13nDescField"
         });
+        //자동 테스트 식별값(.analy/21) — 자동 테스트 쪽은 data-act 하나만 본다.
+        if (oUI.descInput && oUI.descInput.input) {
+            oUI.descInput.input.setAttribute("data-act", "P13N_DESC");
+        } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "p13n descInput.input missing", "data-act not set - automated test cannot type the description");
+        }
+
         var oDescWrap = _el("div", "u4aP13nRegBody");
         oDescWrap.appendChild(oUI.descInput.el);
         oPage.appendChild(oDescWrap);
@@ -796,6 +812,7 @@
         oUI.btnRefresh.type = "button";
         oUI.btnRefresh.innerHTML = _fa("rotate");
         oUI.btnRefresh.title = _cl("A48");   // A48 Refresh
+        oUI.btnRefresh.setAttribute("data-act", "P13N_REFRESH");
         oUI.btnRefresh.addEventListener("click", function () { _busyThen(lf_refresh); });
         oTool.appendChild(oUI.btnRefresh);
         oPage.appendChild(oTool);
@@ -1205,6 +1222,9 @@
             if (h.notAllow === true) { oTr.classList.add("u4aP13nNegativeLine"); }
             if (h.fileName === oS.selFileName) { oTr.setAttribute("aria-selected", "true"); }
             oTr.setAttribute("data-file", h.fileName);
+            //자동 테스트 식별값(.analy/21) — 줄은 같은 data-act + 그 줄의 키(fileName)로 가른다.
+            oTr.setAttribute("data-act", "P13N_ROW");
+            oTr.setAttribute("data-row", h.fileName);
             oTr.title = h.tooltip || h.title || "";
 
             // 드래그 소스(패턴 적용 — dataTransfer 세팅. 수신부는 별도 항목).
@@ -1227,6 +1247,7 @@
                 oEdit.type = "button";
                 oEdit.innerHTML = _fa("pen");
                 oEdit.title = sEditTip;
+                oEdit.setAttribute("data-act", "P13N_ROW_EDIT");
                 oEdit.addEventListener("click", function (ev) { ev.stopPropagation(); _busyThen(function () { lf_setHeaderLineEdit(h); }); });
                 oTdAct.appendChild(oEdit);
             }
@@ -1235,6 +1256,7 @@
                 oDel.type = "button";
                 oDel.innerHTML = _fa("trash");
                 oDel.title = sDelTip;
+                oDel.setAttribute("data-act", "P13N_ROW_DEL");
                 oDel.addEventListener("click", function (ev) { ev.stopPropagation(); lf_setHeaderLineDelete(h.fileName); });
                 oTdAct.appendChild(oDel);
             }

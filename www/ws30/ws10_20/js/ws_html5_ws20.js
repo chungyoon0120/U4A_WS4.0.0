@@ -590,12 +590,11 @@
     /************************************************************************
      * 공통 가드(ws_common.js fnRunShortCut)에 위임 — 꾹누름·화면일치(WS20)·종합체크
      *   (busy/메뉴열림/다이얼로그열림/isShortcutLock/페이지이동 in-flight) 단일 방어 통로.
-     * @param {Function} [fnBeforeCheck]  검사 앞에서 할 일 — 원본에 그 단계가 있는 단축키만 넘긴다.
      ************************************************************************/
-    function _ws20ScGuard(e, fn, fnBeforeCheck) {
+    function _ws20ScGuard(e, fn) {
 
         if (oAPP.common && typeof oAPP.common.fnRunShortCut === "function") {
-            oAPP.common.fnRunShortCut(e, "WS20", fn, fnBeforeCheck);
+            oAPP.common.fnRunShortCut(e, "WS20", fn);
             return;
         }
 
@@ -633,14 +632,6 @@
             _caughtWs20Sc(x);
         }
 
-        try {
-            if (typeof fnBeforeCheck === "function") {
-                fnBeforeCheck();
-            }
-        } catch (x) {
-            _caughtWs20Sc(x);
-        }
-
         //처리중 표시가 켜져 있으면 안 돈다.
         try {
             if (parent.getBusy && parent.getBusy() === "X") {
@@ -655,19 +646,6 @@
         } catch (err) {
             console.error("[WS20] shortcut:", err);
         }
-    }
-
-    /************************************************************************
-     * F3(뒤로가기)만 검사 **앞에서** 메뉴 팝오버를 닫는다 — 원본 1085행 그대로.
-     *   원본에서 이 단계를 가진 단축키는 F3 하나뿐이라, 공통에 넣지 않고 F3 에만 넘긴다.
-     ************************************************************************/
-    function _ws20CloseMenuPopover() {
-
-        if (!oAPP.common || typeof oAPP.common.fnCloseMenuPopover !== "function") {
-            return;
-        }
-
-        oAPP.common.fnCloseMenuPopover();
     }
 
     /************************************************************************
@@ -926,10 +904,7 @@
 
             //① 별도 함수가 있는 것 — 창을 열거나 되돌리는 것들.
             var oFnMap = {
-                //F3 만 세 번째 인자를 넘긴다 — 원본은 F3 하나만 검사 앞에서 메뉴를 닫는다(원본 1085행).
-                "F3": function (e) {
-                    _ws20ScGuard(e, _ws20Back, _ws20CloseMenuPopover);            // 뒤로가기
-                },
+                "F3": function (e) { _ws20ScGuard(e, _ws20Back); },               // 뒤로가기
                 "Ctrl+F": function (e) { _ws20ScGuard(e, _ws20Find); },           // Find(별도창)
                 "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); },   // MIME Repository(별도창)
                 "Ctrl+Shift+Z": function (e) { _ws20ScGuard(e, _ws20Undo); },     // Undo(247)

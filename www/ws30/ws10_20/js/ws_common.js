@@ -671,11 +671,12 @@
      *   순서대로 방어 (원본과 같음):
      *     (1) 꾹 누름(auto-repeat) — e.repeat
      *     (2) 현재 화면 일치 — parent.getCurrPage() === sPage (다른 화면 단축키 오발화 방지)
-     *     (3) fnBeforeCheck — **그 단축키만** 검사 앞에서 해야 하는 일. 안 넘기면 아무 일도 안 한다.
-     *         ★원본에서 **F3(뒤로가기) 하나만** 검사 앞에 메뉴 팝오버 닫기를 둔다(원본 1085행).
-     *           나머지 단축키에는 그 단계가 **없다.** 그래서 공통으로 넣지 않고 인자로 받는다.
-     *           검사 앞이어야 하는 까닭: (4)가 「메뉴 열림」을 보고 막으므로, 안 닫고 검사하면
-     *           메뉴를 열어 둔 채 F3 을 눌렀을 때 원본과 달리 아무 일도 안 일어난다.
+     *     (3) 메뉴가 열려 있으면 닫는다 — **모든 단축키에 똑같이.**
+     *         ★[2026-10-21 장군님 지시 「이걸 왜 케이스 바이 케이스로 하지」]
+     *         원본은 4곳에만 이 단계를 두었다(WS10 F6·F7 · WS20 F3 · WS30 F3).
+     *         그러면 자리마다 따로 넣어야 하고 빠뜨린 자리가 생긴다 — 실제로 WS30 F3 이 빠져 있었다.
+     *         바로 뒤 (4)가 「메뉴 열림」을 막으므로, 안 닫으면 메뉴를 열어 둔 채로는
+     *         아무 단축키도 안 돌고 화면은 멈춰 있는 것처럼 보인다.
      *     (4) 종합 실행가능 체크 — fnShortCutExeAvaliableCheck(): busy / 메뉴열림(.u4a-menu) /
      *         다이얼로그열림 / isShortcutLock / 페이지이동중(isNaviBusy) 전부 포함(원본 종합 체크).
      *   ※ "연타/재진입"은 (4)의 isNaviBusy·busy·다이얼로그 체크가 막는다(비동기 액션이 in-flight
@@ -683,9 +684,8 @@
      * @param {KeyboardEvent} e
      * @param {string} sPage  이 단축키가 유효한 화면 ("WS10"/"WS20"/"WS30")
      * @param {Function} fnAction  실제 동작
-     * @param {Function} [fnBeforeCheck]  검사 앞에서 할 일 (원본에 그 단계가 있는 단축키만 넘긴다)
      ************************************************************************/
-    oAPP.common.fnRunShortCut = function (e, sPage, fnAction, fnBeforeCheck) {
+    oAPP.common.fnRunShortCut = function (e, sPage, fnAction) {
 
         try {
             if (e && e.stopImmediatePropagation) {
@@ -717,11 +717,9 @@
             _caughtRunShortCut(x);
         }
 
-        //(3) 그 단축키만 검사 앞에서 해야 하는 일 — 안 넘기면 건너뛴다.
+        //(3) 떠 있는 것을 전부 닫는다 — 모든 단축키에 똑같이(위 주석 참조).
         try {
-            if (typeof fnBeforeCheck === "function") {
-                fnBeforeCheck();
-            }
+            oAPP.common.fnCloseAllOverlays();
         } catch (x) {
             _caughtRunShortCut(x);
         }
@@ -759,6 +757,18 @@
      *   release 누락으로 영구 잠김 되지 않도록 lock 시 안전 타임아웃(backstop) 자동 설정.
      ************************************************************************/
     oAPP.common.fnNaviLock = function () {
+
+        //페이지를 떠나기 전에 떠 있는 것(메뉴 · 펼침 목록 · 툴팁)을 전부 닫는다.
+        //  ★[2026-10-21 장군님 지시] 단축키만 막으면 버튼으로 뒤로 갈 때 그대로 남는다.
+        //  화면을 바꾸는 길은 여기 하나라, 단축키든 버튼이든 여기서 한 번에 치운다.
+        try {
+            oAPP.common.fnCloseAllOverlays();
+        } catch (x) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(x);
+            }
+        }
+
         oAPP.attr.isNaviBusy = true;
         try { clearTimeout(oAPP.attr._naviBusyTimer); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         // backstop: 정상 경로는 완료 시 release 하지만, 서버응답 누락/예외로 release 를 놓쳐도
@@ -3145,7 +3155,66 @@
             oPopover.style.visibility = "hidden";
         }
 
+        //[HTML5 2026-10-21] 위 두 가지는 UI5 시절 DOM 이라 지금 화면엔 아예 없다(만드는 곳 0건).
+        //  지금 상단 메뉴바 드롭다운은 .u4a-menu 이고, 그것을 닫는 공통은 ws10_html.js 의 closeMenus 다
+        //  (메뉴를 remove 하고 바깥클릭·ESC·resize 리스너까지 정리한다).
+        //  이것을 안 부르면 메뉴를 열어 둔 채 F3 을 눌렀을 때 바로 뒤의 실행 가능 여부 검사가
+        //  "menu is open" 으로 막아, 원본과 달리 아무 일도 안 일어난다.
+        if (!oAPP.ws10html || typeof oAPP.ws10html.closeMenus !== "function") {
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "oAPP.ws10html.closeMenus", "menu (.u4a-menu) stays open, shortcut will be blocked by fnShortCutExeAvaliableCheck");
+            }
+
+            return;
+        }
+
+        oAPP.ws10html.closeMenus();
+
     }; // end of oAPP.common.fnCloseMenuPopover
+
+    /************************************************************************
+     * 떠 있는 것을 전부 닫는다 — 메뉴 · 드롭다운 펼침 목록 · 툴팁 · 표 컬럼 메뉴.
+     * ----------------------------------------------------------------------
+     * ★[2026-10-21 장군님 지시] 「F3 뒤로가기 같은 거 페이지 이동할 때, 현재 떠 있는
+     *   메뉴·팝오버 등등 전체 종료하는 공통 함수가 있어야 할 것 같다. 앞으로 또 추가될 것 같다」
+     *   실제 사고: 속성 영역의 UI Theme 펼침 목록을 펼친 채 F3 으로 뒤로 가면
+     *   그 목록만 첫 화면 위에 그대로 남아 있었다.
+     *
+     * [어떻게] 이 화면의 떠 있는 것들은 **전부 document 의 mousedown 바깥클릭으로 닫힌다**
+     *   (theme/u4a-ui.js 198 · 403 · 684 · 904 · 2213). 그래서 body 에 mousedown 을 한 번
+     *   흉내 내면 각자 **자기 경로로 정상 종료**한다 — 안쪽 변수와 리스너 정리까지 같이 된다.
+     *   직접 지우면 그 정리가 안 돼 다음에 열 때 어긋난다.
+     *
+     * [다른 것에 영향 없나] 같은 mousedown 을 듣는 나머지(다이얼로그 헤더 끌기 1073 ·
+     *   스플릿바 1140)는 전부 `e.target.closest(...)` 로 자기 것이 아니면 바로 빠진다.
+     *   body 에 보내면 target 이 body 라 전부 그냥 빠진다. 끌기는 시작되지 않는다.
+     *   같은 방법을 미리보기 영역을 눌렀을 때 이미 쓰고 있다(u4a-ui.js 1856).
+     *
+     * [안전망] 그래도 남은 메뉴는 fnCloseMenuPopover 가 치운다.
+     *   펼침 목록은 **직접 지우지 않는다** — 위에 적은 까닭 그대로다.
+     ************************************************************************/
+    oAPP.common.fnCloseAllOverlays = function () {
+
+        //① 바깥 클릭을 한 번 흉내 낸다.
+        try {
+            document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+        } catch (x) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(x);
+            }
+        }
+
+        //② 안전망 — 남은 메뉴를 공통 닫기로 치운다.
+        try {
+            oAPP.common.fnCloseMenuPopover();
+        } catch (x) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(x);
+            }
+        }
+
+    }; // end of oAPP.common.fnCloseAllOverlays
 
     /************************************************************************
      * 확장자만 발췌
