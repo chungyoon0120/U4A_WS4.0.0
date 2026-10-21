@@ -3718,9 +3718,20 @@
                     if (typeof oAPP.fn.fnRenderDesignTree === "function") {
                         oAPP.fn.fnRenderDesignTree();
                     }
-                } else {
-                    oAPP.fn.fnWs20TreeMarkSelected(OBJID);
                 }
+
+                // ★★★[2026-10-21 장군님 지적] 선택 표시는 **어느 갈래든 반드시** 지난다.
+                //   [증상] ROOT 를 접어 둔 채 미리보기에서 UI 를 고르면 ROOT 줄과 고른 줄이 **둘 다** 파랬다.
+                //   [원인] 선택 표시를 들고 있는 곳이 둘이다 —
+                //     ① 공통 트리(theme/u4a-ui.js)가 기억하는 선택 키: 다시 그릴 때 그 줄에 붙인다
+                //     ② 이 파일이 바로 위에서 넣은 ws20SelectedObjid: 줄을 만들 때 붙인다(ws_html5_ws20_tree.js)
+                //     펼침이 바뀌는 갈래는 다시 그리기만 하고 ① 을 안 바꿔 줘서, ① 은 옛 줄(ROOT)에
+                //     ② 는 새 줄에 붙어 둘이 남았다. 아래 함수가 ① 을 갱신하면서 **나머지 줄의 표시를 전부 지운다.**
+                //   [원본] design/js/uiDesignArea.js 2546 은 펼침 뒤 setSelectedIndex 한 줄뿐이다 —
+                //     UI5 TreeTable 이 선택을 하나만 들고 있어 이전 선택을 알아서 지웠다. 갈래가 없었다.
+                //   [속도] 다시 그리는 갈래에만 한 번 더 붙는 것이고, 이 함수는 줄을 새로 만들지 않는다.
+                oAPP.fn.fnWs20TreeMarkSelected(OBJID);
+
             } catch (e) {
                 console.error("[W20A-005] tree select mark failed - OBJID=" + OBJID + ":", e && e.message, e);
                 if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
