@@ -3165,8 +3165,8 @@
      * busy(화면 덮는 표시)가 "실제로 닫히기"를 기다린다. (장군님 지시 2026-10-20)
      *
      *   왜 필요한가: parent.setBusy("") 는 끄라는 "신호"일 뿐이고, 실제로 닫히는 것은
-     *   화면이 잠잠해진 뒤다(2026-10-19 반영 — resources/index.js _u4aBusyOffWhenSettled,
-     *   MutationObserver 2 frame 무변경 + requestIdleCallback). 공통 busy 는
+     *   화면이 잠잠해진 뒤다(2026-10-21 반영 — theme/u4a-busy.js U4ABusy.hide,
+     *   MutationObserver 0.3초 창 + requestIdleCallback + 0.3초). 공통 busy 는
      *   <dialog>.showModal() 모달이라 열려 있는 동안 문서 전체가 inert 가 되고 그 상태가
      *   iframe 안 document 까지 번진다 → 미리보기 선택(selPreviewUI → sMark.fn_mark)이
      *   쓰는 focus() 가 무시돼, 스크롤 아래에 있는 UI 를 골라도 미리보기가 그 UI 로

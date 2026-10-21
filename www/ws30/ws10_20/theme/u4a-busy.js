@@ -266,13 +266,33 @@
      *
      * 기다리는 중 show() 가 오면 끄기를 버린다(세대 번호).
      * 상한에 닿으면 끄고 ERROR 로그 — 정상 경로가 아니라 고장 알림용.
+     *
+     * ★[2026-10-21 장군님 지시] fnDone — **창이 실제로 닫힌 뒤** 불린다.
+     *   까닭: 메인 창 setBusy 가 끄기와 함께 하는 일(마우스 막기 풀기 · 포커스 복원 ·
+     *     창 닫기 버튼 활성 · 작업표시줄 진행바)이 **닫힌 뒤에** 돌아야 화면과 어긋나지 않는다.
+     *   기다리는 중에 show() 가 와서 이 끄기를 버린 경우에는 **부르지 않는다**(창이 안 닫혔으니).
+     *   인자 없이 부르면 종전과 똑같다 — 별창 20여 곳이 그렇게 부른다.
      * ================================================================== */
-    function hide() {
+    function hide(fnDone) {
+
+        function _done() {
+
+            if (typeof fnDone !== "function") {
+                return;
+            }
+
+            try {
+                fnDone();
+            } catch (e) {
+                _caught("UBSY-003", "U4ABusy.hide: fnDone failed", e);
+            }
+        }
 
         // 한 번도 안 켰으면 요소가 없다 — 끌 것이 없는 정상 상태라 로그를 남기지 않는다.
         var oBusyDom = document.getElementById(BUSY_ID);
 
         if (!oBusyDom) {
+            _done();                        // 끌 것이 없다 = 이미 꺼진 상태 → 뒷정리는 해 준다
             return;
         }
 
@@ -280,10 +300,12 @@
 
             if (typeof oBusyDom.showModal !== "function") {
                 oBusyDom.style.display = "none";
+                _done();
                 return;
             }
 
             if (!oBusyDom.open) {
+                _done();                    // 이미 닫혀 있다 → 뒷정리는 해 준다
                 return;
             }
 
@@ -292,6 +314,8 @@
             } catch (e) {
                 _caught("UBSY-003", "U4ABusy.hide: close failed", e);
             }
+
+            _done();
         }
 
         // 쓸 수 없는 환경이면 종전대로 즉시 끈다(동작 유지).

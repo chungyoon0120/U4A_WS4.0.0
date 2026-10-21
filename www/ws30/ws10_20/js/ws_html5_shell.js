@@ -239,11 +239,16 @@
             setText: function (s) { _set("u4aWsBusyText", s); },
             setTitle: function (s) { _set("u4aWsBusyTitle", s); },
             isOpen: function () { return this._open; },
-            open: function () { this._open = true; parent.setDomBusy && parent.setDomBusy("X"); },
+            // ★★★[2026-10-21 장군님 지시] 여기서 parent.setDomBusy 를 부르던 두 줄을 없앴다.
+            //   [까닭] 공통 busy 창을 여닫는 자리가 두 길로 갈라져 있었다 —
+            //     전역 setBusy(resources/index.js) 와 여기. 끄기 한 번에 공통 busy 의
+            //     「다 그려졌나」 기다림이 두 번 돌아 0.6초가 1.2초가 됐다.
+            //   [지금] 공통 busy 를 부르는 자리는 전역 setBusy 한 곳뿐이다.
+            //     이 객체는 busy 카드의 제목·문구와 열림 여부만 들고 있는다.
+            open: function () { this._open = true; },
             close: function () {
                 this._open = false;
                 _set("u4aWsBusyText", ""); _set("u4aWsBusyTitle", "");
-                parent.setDomBusy && parent.setDomBusy("");
             }
         };
     };

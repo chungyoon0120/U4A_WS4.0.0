@@ -618,14 +618,18 @@ var BUSY_DOM_ID = "u4aWsBusyIndicator";
             return;
         }
         oWS.utill.attr._bNewWinInProgress = true;
-        oWS.utill.fn.setBusy("X");
+
+        // ★[2026-10-21] 안쪽 함수(oWS.utill.fn.setBusy) 를 바로 부르지 않고 전역 setBusy 를 쓴다.
+        //   까닭: 공통 busy(U4ABusy) 창을 여닫는 것은 전역 setBusy 한 곳에만 있다.
+        //     안쪽 함수를 바로 부르면 공통 busy 창이 안 열리고/안 닫힌다.
+        setBusy("X");
 
         let _busyReleased = false;
         const _releaseBusy = function () {
             if (_busyReleased) { return; }
             _busyReleased = true;
             oWS.utill.attr._bNewWinInProgress = false;
-            oWS.utill.fn.setBusy("");
+            setBusy("");
         };
 
         const WINDOWSTATE = REMOTE.getGlobal("mainRequire")('electron-window-state');
@@ -936,9 +940,10 @@ var BUSY_DOM_ID = "u4aWsBusyIndicator";
         // 1. 중복 실행 방지
         // 이미 Busy 상태인데 다시 'X'를 요청받은 경우 무시
         //   ★[2026-10-21 장군님 지시] 전역 변수 대신 getBusy()(busy 창 DOM 상태)로 본다.
-        //     여기서 무시돼도 안전하다 — 세대 번호(__u4aBusyGen)는 전역 setBusy 가 이 함수보다
-        //     먼저 올리므로, 기다리던 끄기는 이미 버려진다. 마우스 막기·포커스 저장·닫기 버튼·
-        //     진행바도 앞서 켤 때 이미 걸려 있고 아직 안 풀렸다.
+        //     여기서 그만둬도 안전하다 — 마우스 막기·포커스 저장·닫기 버튼·진행바는 앞서 켤 때
+        //     이미 걸려 있고, 그 풀기는 공통 busy 창이 닫힌 뒤에야 돈다(전역 setBusy 의 콜백).
+        //   ★단 공통 busy 창을 띄우는 setDomBusy("X") 는 전역 setBusy 가 이 함수 **뒤에** 부른다.
+        //     그래서 여기서 그만둬도 「기다리던 끄기 버리기」(U4ABusy.show 의 세대 번호)는 반드시 돈다.
         if (sIsBusy === "X" && util.fn.getBusy() === "X") {
             return;
         }
@@ -1190,7 +1195,7 @@ var BUSY_DOM_ID = "u4aWsBusyIndicator";
      *     그 사이 이 값으로 막던 것들(메뉴 누르기 fnHmws.js · 팝업 열기 · AI · 바인딩 창)이 열렸다.
      *   [판정 방식] 로그 쪽(ws_html5_logger.js)이 이미 쓰는 것과 같다 —
      *     <dialog> 면 열려 있는지(open), 아니면 보이는지(display:flex).
-     *   ★전역 변수 isBusy 자체는 그대로 둔다 — 켜기 중복 방지(위 setBusy 933행)가 쓴다.
+     *   ★전역 변수 isBusy 는 없앴다 — 켜기 중복 방지(위 oWS.utill.fn.setBusy)도 이 함수를 쓴다.
      ************************************************************************/
     oWS.utill.fn.getBusy = function () {
 
@@ -1679,12 +1684,19 @@ function getErrorMsg() {
     return oWS.utill.fn.getErrorMsg();
 }
 
-function setDomBusy(bIsBusy) {
+/************************************************************************
+ * busy 켜고 끄기 — 공통 busy(theme/u4a-busy.js 의 U4ABusy) 로 넘긴다.
+ *
+ * ★ [2026-09-15, 장군님 지시] busy 본체를 공통 화면 리소스 theme/u4a-busy.js(U4ABusy)로 옮겼다.
+ *   busy 도 하나의 UI 이고, 화면 시작 때 가장 먼저 로드돼야 해서다(ws10_20/index.html <head> 맨 앞).
+ *   이 함수 이름은 그대로 둔다 — parent.setDomBusy 로 부르는 곳이 전부 이 이름을 쓴다.
+ *   옛 본체 = _index.js.busythemebak
+ *
+ * ★ [2026-10-21 장군님 지시] fnDone — 끌 때, **창이 실제로 닫힌 뒤** 불린다.
+ *   인자 없이 부르면 종전과 똑같다(로그인·메인 시작 등 여러 곳이 그렇게 부른다).
+ ************************************************************************/
+function setDomBusy(bIsBusy, fnDone) {
 
-    // ★ [2026-09-15, 장군님 지시] busy 본체를 공통 화면 리소스 theme/u4a-busy.js(U4ABusy)로 옮겼다.
-    //   busy 도 하나의 UI 이고, 화면 시작 때 가장 먼저 로드돼야 해서다(ws10_20/index.html <head> 맨 앞).
-    //   이 함수 이름은 그대로 둔다 — parent.setDomBusy 로 부르는 곳이 전부 이 이름을 쓴다.
-    //   옛 본체 = _index.js.busythemebak
     if (typeof U4ABusy === "undefined" || !U4ABusy) {
         // u4a-busy.js 로드가 빠진 창이다. 장군님 결정(2026-09-15): 앱 종료 없이 로그만 남긴다
         //   (없을 수가 없고, 빠지면 테스트 때 busy 가 안 떠서 바로 드러난다). 같은 창에서 한 번만 남긴다.
@@ -1692,6 +1704,16 @@ function setDomBusy(bIsBusy) {
             setDomBusy.__missLogged = true;
             console.error("[RSRC-008] setDomBusy: U4ABusy not loaded - theme/u4a-busy.js missing in this window, busy not shown");
         }
+
+        //공통 busy 가 없어도 뒷정리(마우스·포커스 복원 등)는 해야 화면이 잠긴 채 남지 않는다.
+        if (bIsBusy !== "X" && typeof fnDone === "function") {
+            try {
+                fnDone();
+            } catch (e) {
+                console.error("[RSRC-016] setDomBusy: fnDone failed -", e && e.message);
+            }
+        }
+
         return;
     }
 
@@ -1700,327 +1722,9 @@ function setDomBusy(bIsBusy) {
         return;
     }
 
-    U4ABusy.hide();
-
+    U4ABusy.hide(fnDone);
 }
 
-
-/************************************************************************
- * busy 를 끄기 전에 「화면이 다 그려졌는지」를 확인한다 (장군님 지시 2026-10-19)
- * ----------------------------------------------------------------------
- * 왜: busy 가 꺼지는 순간부터 조작이 열리는데, 그때 화면이 아직 채워지는 중이면
- *     사용자가 덜 그려진 화면을 누르게 된다. 실측(2026-10-19) 결과 busy 를 끈 뒤에도
- *     DOM 이 계속 바뀌고 있었다 — 가장 무거운 ZDWU0020 조회에서 5~23건, 최대 124건.
- *
- * 어떻게(★2026-10-21 장군님 지시로 바뀐 판정 — 0.3초 창):
- *     ① 끄는 신호가 오면 MutationObserver 를 켜고 0.3초마다 확인한다.
- *     ② 그 0.3초 안에 변경이 있었으면 다시 0.3초 기다린다.
- *     ③ 0.3초가 지나도 변경이 없으면 그때 requestIdleCallback 을 건다.
- *     ④ 거기 도착하면 0.3초 더 기다린 뒤 끈다.
- *   ★④ 의 0.3초 동안 일어난 변경은 판정에 쓰지 않는다 — 장군님 「4번이면 이미 끝난 것으로 보라」.
- *     세기만 해서 로그에 남긴다. 다시 세기로 하면 조금씩 계속 바뀌는 화면에서 영영 안 꺼진다.
- *   (구) requestAnimationFrame 으로 「변경 없는 frame 2번 연속」 — 간격이 ~16ms 로 너무 짧았다.
- *
- * 안전장치:
- *     · 기다리는 중 busy 를 다시 켜면(세대 번호 불일치) 끄기를 버린다.
- *       — 모달 팝업을 띄우고 busy 를 껐다 켜는 자리가 있어서, 안 하면 켠 것을 꺼 버린다.
- *     · 상한에 닿으면 끄고 ERROR 로그. 정상 경로가 아니라 고장 알림용이다.
- *     · MutationObserver 가 없거나 <body> 가 아직 없으면 종전대로 즉시 끈다.
- *
- * 로그(양 최소): 정상은 남기지 않는다. 상한 도달(ERROR)과 마지막 여유 중의 변경(WARN)만.
- ************************************************************************/
-
-/** 개발 모드인가 — 패키징본에서는 확인용 줄을 안 찍는다. 창에 따라 APP 이 다른 자리에 있다. */
-function _u4aIsDev() {
-
-    try {
-        if (typeof APP !== "undefined" && APP && APP.isPackaged === false) {
-            return true;
-        }
-    } catch (e) { /* 이 창에 APP 없음 */ }
-
-    try {
-        if (window.parent && window.parent !== window
-            && window.parent.APP && window.parent.APP.isPackaged === false) {
-            return true;
-        }
-    } catch (e) { /* cross-origin */ }
-
-    try {
-        if (typeof oAPP !== "undefined" && oAPP && oAPP.APP && oAPP.APP.isPackaged === false) {
-            return true;
-        }
-    } catch (e) { /* oAPP 없음 */ }
-
-    return false;
-}
-
-/** 이 변경이 busy 자신(또는 그 안)에서 난 것인가. */
-function _u4aIsBusySelf(oTarget) {
-
-    for (var el = oTarget; el; el = el.parentNode) {
-
-        if (el.id === BUSY_DOM_ID) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/** busy 자신을 뺀 변경 건수. */
-function _u4aCountOutside(aMut) {
-
-    var nCnt = 0;
-
-    for (var i = 0; i < aMut.length; i++) {
-
-        if (_u4aIsBusySelf(aMut[i].target) === false) {
-            nCnt++;
-        }
-    }
-
-    return nCnt;
-}
-
-/** 가장 넓은 범위로 관찰 — 요소 생김·사라짐 · 속성 · 글자 · 하위 전부. */
-function _u4aObserveBody(oObs) {
-    oObs.observe(document.body, { childList: true, attributes: true, characterData: true, subtree: true });
-}
-
-
-var __u4aBusyGen = 0;                       // busy 를 켤 때마다 증가. 대기 중 끄기를 무효화한다.
-
-/************************************************************************
- * busy 켠 순간부터 DOM 변경을 세어 둔다 (장군님 지시 2026-10-19 — 눈으로 확인용)
- *   끌 때 「마지막 DOM 변경이 끄기 몇 ms 전이었나」를 같이 찍는다.
- *   그 값이 양수면 끈 시점엔 이미 조용했다는 뜻 = 정확한 시점에 껐다는 증거.
- *   ★끄기 판정에는 쓰이지 않는다. 개발 모드에서만 돈다.
- ************************************************************************/
-var __u4aBusyWatch = null;
-
-function _u4aBusyWatchStart() {
-
-    if (!_u4aIsDev()) {
-        return;
-    }
-
-    if (__u4aBusyWatch || typeof MutationObserver !== "function" || !document.body) {
-        return;
-    }
-
-    var w = { t0: performance.now(), mut: 0, last: -1, obs: null };
-
-    try {
-
-        w.obs = new MutationObserver(function (aMut) {
-
-            var n = _u4aCountOutside(aMut);
-
-            if (n > 0) {
-                w.mut += n;
-                w.last = performance.now();
-            }
-        });
-
-        _u4aObserveBody(w.obs);
-
-    } catch (e) {
-        console.error("[RSRC-013] busy watch: observe failed -", e && e.message);
-        return;
-    }
-
-    __u4aBusyWatch = w;
-}
-
-function _u4aBusyWatchEnd() {
-
-    var w = __u4aBusyWatch;
-    __u4aBusyWatch = null;
-
-    if (!w) {
-        return null;
-    }
-
-    try {
-        if (w.obs) {
-            w.obs.disconnect();
-        }
-    } catch (e) {
-        console.error("[RSRC-013] busy watch: disconnect failed -", e && e.message);
-    }
-
-    var nNow = performance.now();
-
-    return {
-        onToOff: Math.round(nNow - w.t0),
-        mut: w.mut,
-        lastBeforeOff: (w.last < 0 ? -1 : Math.round(nNow - w.last))
-    };
-}
-// 끄기 전 기다림의 두 시간값.
-var __U4A_BUSY_SETTLE_LIMIT_MS = 5000;      // 상한 — 고장 알림용(정상 경로 아님)
-var __U4A_BUSY_QUIET_WINDOW_MS = 300;       // 조용함을 보는 창 · 마지막 여유도 같은 값(장군님 지시 2026-10-21)
-
-
-/** busy 끄기 — 화면이 조용해진 뒤에 끈다. 판정 순서는 위 머리 설명의 ①②③④. */
-function _u4aBusyOffWhenSettled(fnOff) {
-
-    var nMyGen = __u4aBusyGen;
-
-    // 쓸 수 없는 환경이면 종전대로 즉시 끈다(동작 유지).
-    if (typeof MutationObserver !== "function" || !document.body) {
-        fnOff();
-        return;
-    }
-
-    var t0 = performance.now();
-    var oObs = null;
-    var bEnded = false;
-    var bDirty = false;                     // 지금 0.3초 창 안에 변경이 있었나
-    var nQuietMs = -1;                      // 조용해진 시점(-1 = 아직)
-    var nIdleMs = -1;                       // 한가해진 시점(-1 = 아직)
-    var nLateMut = 0;                       // 마지막 여유 중의 변경 건수(기록용)
-    var nRounds = 0;                        // 0.3초 창을 다시 센 횟수
-
-
-    function _finish(sHow) {
-
-        if (bEnded) {
-            return;
-        }
-        bEnded = true;
-
-        try {
-            if (oObs) {
-                oObs.disconnect();
-                oObs = null;
-            }
-        } catch (e) {
-            console.error("[RSRC-013] busy settle: observer disconnect failed -", e && e.message);
-        }
-
-        // 기다리는 사이에 busy 를 다시 켰다 → 그 busy 를 끄면 안 된다.
-        if (nMyGen !== __u4aBusyGen) {
-            return;
-        }
-
-        var nTotal = Math.round(performance.now() - t0);
-
-        if (sHow === "LIMIT") {
-            console.error("[RSRC-014] BUSY_OFF_LIMIT: DOM not settled within "
-                + __U4A_BUSY_SETTLE_LIMIT_MS + "ms - turning busy off anyway");
-
-        } else if (nLateMut > 0) {
-            console.warn("[RSRC-015] BUSY_OFF_LATE_DOM: " + nLateMut + " mutations during final grace"
-                + ", quiet=" + nQuietMs + "ms total=" + nTotal + "ms");
-        }
-
-        // ★ [2026-10-19 장군님 지시] 눈으로 확인하실 수 있게 개발 모드에서는 꺼질 때마다 한 줄 찍는다.
-        //   패키징본에서는 안 찍는다(양 규칙). 확인이 끝나면 이 블록만 지우면 된다.
-        if (_u4aIsDev()) {
-
-            var oW = _u4aBusyWatchEnd();
-
-            if (oW) {
-                console.log("[BUSY] on→off=" + oW.onToOff + "ms"
-                    + " mut=" + oW.mut
-                    + " lastChangeBeforeOff=" + (oW.lastBeforeOff < 0 ? "none" : oW.lastBeforeOff + "ms")
-                    + " lateMut=" + nLateMut
-                    + " (offSignal→off=" + nTotal + "ms"
-                    + " quiet=" + nQuietMs + "ms idle=" + nIdleMs + "ms rounds=" + nRounds + ")");
-            }
-        }
-
-        fnOff();
-    }
-
-
-    try {
-
-        oObs = new MutationObserver(function (aMut) {
-
-            var nCnt = _u4aCountOutside(aMut);
-
-            if (nCnt === 0) {
-                return;
-            }
-
-            // 아직 조용함을 못 봤다 → 지금 창을 「변경 있었음」 으로(창을 다시 센다).
-            if (nQuietMs < 0) {
-                bDirty = true;
-                return;
-            }
-
-            // 마지막 여유 중 → 세기만 한다(판정에 쓰지 않음 — 머리 설명의 ★ 참조).
-            nLateMut += nCnt;
-        });
-
-        _u4aObserveBody(oObs);
-
-    } catch (e) {
-        console.error("[RSRC-013] busy settle: observe failed -", e && e.message);
-        fnOff();
-        return;
-    }
-
-
-    // ①② 0.3초 창 — 그 안에 변경이 있었으면 다시 0.3초. 없으면 조용해진 것으로 본다.
-    function _checkQuiet() {
-
-        if (bEnded) {
-            return;
-        }
-
-        if (bDirty === true) {
-
-            bDirty = false;
-            nRounds++;
-
-            // 상한은 이 자리에서만 본다 — 계속 바뀌는 화면에서 영영 안 꺼지는 것을 막는다.
-            if (performance.now() - t0 > __U4A_BUSY_SETTLE_LIMIT_MS) {
-                _finish("LIMIT");
-                return;
-            }
-
-            setTimeout(_checkQuiet, __U4A_BUSY_QUIET_WINDOW_MS);
-            return;
-        }
-
-        nQuietMs = Math.round(performance.now() - t0);
-
-        _waitIdle();
-    }
-
-
-    // ③④ 브라우저가 한가해지면 0.3초 더 기다린 뒤 끈다(그 사이 변경은 보지 않는다).
-    function _waitIdle() {
-
-        if (typeof requestIdleCallback !== "function") {
-            _afterIdle();                   // 없는 환경이면 ①② 만으로 판정
-            return;
-        }
-
-        // 남은 상한만큼만 기다린다 — 한가해지지 않아도 그 시간에 도착한다.
-        var nLeft = __U4A_BUSY_SETTLE_LIMIT_MS - (performance.now() - t0);
-
-        requestIdleCallback(_afterIdle, { timeout: (nLeft > 0 ? nLeft : 0) });
-    }
-
-    function _afterIdle() {
-
-        if (bEnded) {
-            return;
-        }
-
-        nIdleMs = Math.round(performance.now() - t0);
-
-        setTimeout(function () { _finish("BOTH"); }, __U4A_BUSY_QUIET_WINDOW_MS);
-    }
-
-
-    setTimeout(_checkQuiet, __U4A_BUSY_QUIET_WINDOW_MS);
-}
 
 // 19. Busy Indicator 실행
 // - 파라미터에 Option이 존재할 경우는 busyDialog로 호출함
@@ -2033,29 +1737,36 @@ function setBusy(bIsBusy, oOptions) {
     //busy on 처리 건인경우.
     if (bIsBusy === "X") {
 
-        // ★ 켤 때 세대를 올린다 — 대기 중이던 끄기가 이 busy 를 꺼 버리지 않게.
-        __u4aBusyGen++;
-
-        // 켠 순간부터 DOM 변경을 세어 둔다(개발 모드 확인용).
-        try {
-            _u4aBusyWatchStart();
-        } catch (e) {
-            console.error("[RSRC-013] busy watch start failed -", e && e.message);
-        }
-
-        // 파라미터에 옵션을 추가했을 경우는 BusyDialog로 호출함!!
+        // ① 먼저 부수 작업 — 마우스 막기 · 포커스 저장 · 창 닫기 버튼 비활성 ·
+        //    작업표시줄 진행바 · busy 카드의 제목·문구.
+        //    ★여기가 먼저여야 한다. 안쪽 함수(oWS.utill.fn.setBusy)는 「이미 켜져 있으면 그만둔다」로
+        //      시작하는데, 그 판단을 getBusy()(= busy 창이 떠 있나)로 하기 때문이다.
+        //      공통 busy 창을 먼저 띄우면 그 판단에 걸려 부수 작업을 전부 건너뛴다.
         if (typeof oOptions === "object") {
             oWS.utill.fn.setBusyDialog(bIsBusy, oOptions);
-            return;
+        } else {
+            oWS.utill.fn.setBusy(bIsBusy);
         }
 
-        oWS.utill.fn.setBusy(bIsBusy);
+        // ② 공통 busy 창을 띄운다 — ★★★[2026-10-21 장군님 지시] 공통 busy 를 부르는 자리는
+        //    이 한 곳뿐이다. 종전에는 더미 busy 객체(ws_html5_shell.js fnCreateDummyBusy)의
+        //    open()·close() 안에서 parent.setDomBusy 를 또 불러 두 길로 갈라져 있었다.
+        //    ★U4ABusy.show() 가 「기다리던 끄기」를 여기서 버린다(세대 번호). 그래서 안쪽 함수가
+        //      위 ① 에서 그만뒀더라도 이 줄은 반드시 타야 한다 — 안 타면 기다리던 끄기가
+        //      방금 켠 busy 를 꺼 버린다.
+        setDomBusy("X");
 
         return;
     }
 
-    // ★ 끄기는 「화면이 다 그려진 뒤」로 미룬다(위 설명 참조). 끄는 내용 자체는 종전과 같다.
-    _u4aBusyOffWhenSettled(function () {
+    // ★★★[2026-10-21 장군님 지시] 끄기는 **공통 busy 하나만** 부른다.
+    //   [고친 이유] 종전에는 여기서 먼저 0.6초를 기다린 뒤 끄기를 실행했고, 그 끄기가
+    //     더미 busy 객체 → setDomBusy → 공통 busy 로 내려가 **거기서 또 0.6초**를 기다렸다.
+    //     같은 기다림을 두 번 타서 setBusy("") 한 번에 1.2초가 걸렸다(WS20 은 전부 이 경로).
+    //   [지금] 기다림은 공통 busy(U4ABusy.hide) 한 곳에만 있다 → 0.6초.
+    //   [순서] 창이 **닫힌 뒤에** 뒷정리를 한다 — 마우스 막기 풀기 · 포커스 복원 ·
+    //     창 닫기 버튼 활성 · 작업표시줄 진행바. 종전에는 닫기 전에 풀어 화면과 어긋났다.
+    setDomBusy("", function () {
 
         //busy dialog 종료처리.
         oWS.utill.fn.setBusyDialog("", oOptions);
