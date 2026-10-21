@@ -1,3 +1,4 @@
+// 오류코드 접두: W20T / 다음 번호: 003
 /************************************************************************
  * ws_html5_ws20_tree.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -802,6 +803,38 @@
     };
 
     /************************************************************************
+     * [PUBLIC] 선택 강조만 바꾼다 — 트리를 다시 그리지 않는다. (장군님 지시 2026-10-20)
+     * ----------------------------------------------------------------------
+     *  [왜 만들었나] 선택 표시 하나 바꾸려고 fnRenderDesignTree 로 **보이는 줄을 전부 새로 만들고** 있었다.
+     *    줄을 만들 때마다 ＋·삭제 버튼을 만들고 그 버튼 제목을 메인 프로세스에서 꺼내 오는데
+     *    (@electron/remote = 동기 IPC, 글자 하나당 왕복 3번), 줄 수만큼 쌓여 화면이 멈췄다.
+     *    Performance 실측(2026-10-20): 그 왕복이 886ms. 화면이 멈춘 전체 시간의 절반 이상.
+     *  [어떻게] 공통 트리의 selectByKey 는 **지금 그려진 줄의 강조만** 바꾸고, 가상 스크롤에도 선택 키를
+     *    넣어 둬 그 줄이 화면 밖으로 나갔다 다시 들어와도 강조가 복원된다(theme/u4a-ui.js selectByKey).
+     *  [★쓰면 안 되는 때] **펼침 상태가 바뀌었을 때** — 줄 목록 자체가 달라지므로 fnRenderDesignTree 를 써야 한다.
+     *    (호출처 ws_html5_ws20_attr.js fnWs20SelectUI 가 그 조건을 보고 갈라 부른다.)
+     *  스크롤은 하지 않는다(두 번째 인자 false) — 줄 이동은 호출처가 따로 한다(_scrollTreeRowIntoView).
+     ************************************************************************/
+    oAPP.fn.fnWs20TreeMarkSelected = function (OBJID) {
+
+        _setSelectedObjid(OBJID);
+
+        var oTree = _ensureWs20Tree();
+
+        //공통 트리가 없으면 선택 표시 자체가 불가능하다 — 조용히 넘기지 않고 코드를 담아 던진다.
+        //★[2026-10-20] 이름 주의: U4AUI.createTree 가 주는 것은 selectByKey 다.
+        //  selectKey 는 **다른 생성기(컬럼 트리)** 의 이름이라 여기엔 없다. 처음에 그걸 잘못 보고
+        //  selectKey 로 썼다가 UI 를 고를 때마다 터졌다(2026-10-20 실제 사고).
+        if (!oTree || typeof oTree.selectByKey !== "function") {
+            throw new Error("[W20T-001] U4AUI.createTree selectByKey undefined (theme/u4a-ui.js not loaded)");
+        }
+
+        //두 번째 인자 false = reveal(스크롤) 안 함. 줄 이동은 호출처가 따로 한다.
+        oTree.selectByKey(String(OBJID), false);
+
+    }; // end of oAPP.fn.fnWs20TreeMarkSelected
+
+    /************************************************************************
      * [PUBLIC] 수동 렌더 — 원본 TreeTable rows 바인딩(/zTREE) 대체.
      *   /zTREE 가 갱신되면(designAddTreeData/undoRedo 등 → 모델 set) 이 함수를
      *   호출하여 다시 그린다. 데이터가 비어있어도 안전하게 빈 트리 렌더.
@@ -899,8 +932,14 @@
         if (!oNode) { return; }
 
         // UI 전용 선택 표시 갱신 (즉시 하이라이트)
-        _setSelectedObjid(oNode.OBJID);
-        oAPP.fn.fnRenderDesignTree();
+        //   ★[2026-10-20 장군님 지시] 트리를 다시 그리지 않고 "선택 강조만" 바꾼다.
+        //     까닭 = 아래 fnWs20TreeMarkSelected 설명. 클릭한 줄은 이미 화면에 있고 펼침도 안 바뀌므로
+        //     줄을 새로 만들 이유가 없다(종전엔 fnRenderDesignTree 로 보이는 줄을 전부 새로 만들었다).
+        try { oAPP.fn.fnWs20TreeMarkSelected(oNode.OBJID); }
+        catch (e) {
+            console.error("[W20T-002] tree select mark failed - OBJID=" + oNode.OBJID + ":", e && e.message, e);
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
 
         // 단축키 잠금 + 자식 윈도우 BUSY (원본과 동일, 존재 시에만)
         try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }

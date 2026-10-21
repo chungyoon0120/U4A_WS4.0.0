@@ -116,6 +116,7 @@ UI5 미로드 가드, 브라우저 기능 지원 확인은 **정상 분기 그�
 | `FBPO` | ws30/ws10_20/js/fnBindPopupOpen.js (속성 바인딩 팝업 여는 쪽, 2026-10-20) |
 | `BCBP` | ws30/ws10_20/design/bindPopupHandler/broadcastChannelBindPopup.js (바인딩 팝업 방송 수신, 2026-10-20) |
 | `W20D` | ws30/ws10_20/js/ws_html5_ws20_data.js (WS20 앱 데이터 수신, 2026-10-20) |
+| `W20T` | ws30/ws10_20/js/ws_html5_ws20_tree.js (WS20 UI 트리, 2026-10-20) |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

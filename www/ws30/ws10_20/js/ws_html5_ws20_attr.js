@@ -1,4 +1,4 @@
-// 오류코드 접두: W20A / 다음 번호: 005   ※ 기존 [WS20ATTR-CHK01](2026-08-21)은 구형식 — 전수 개조 금지 규칙으로 그대로 둔다.
+// 오류코드 접두: W20A / 다음 번호: 006   ※ 기존 [WS20ATTR-CHK01](2026-08-21)은 구형식 — 전수 개조 금지 규칙으로 그대로 둔다.
 /************************************************************************
  * ws_html5_ws20_attr.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -3502,7 +3502,10 @@
      *   lf_getTreePath + lf_expand(2188~2302행) 의 HTML5 대응(사이드맵).
      *   (문서 8.1 3~5단계 "Tree path 검색 → 대상 path 기준 Tree 펼침")
      ************************************************************************/
+    //★[2026-10-20] 반환값 = "실제로 새로 펼친 조상이 있었나". 호출처(6단계)가 이 값으로
+    //  트리를 다시 그릴지(줄 목록이 달라짐) 선택 강조만 바꿀지를 가른다.
     function _expandTreePathTo(OBJID) {
+        var bChanged = false;
         try {
             oAPP.attr.ws20TreeExpanded = oAPP.attr.ws20TreeExpanded || {};
             var oMap = oAPP.attr.ws20TreeExpanded;
@@ -3515,6 +3518,7 @@
                     if (oN.OBJID === OBJID) { return true; }
                     if (lf_path(oN.zTREE)) {
                         //조상 노드 펼침. (원본 lf_expand 의 expand 의미)
+                        if (oMap[oN.OBJID] !== true) { bChanged = true; }
                         oMap[oN.OBJID] = true;
                         return true;
                     }
@@ -3524,6 +3528,7 @@
 
             lf_path(oAPP.attr.oModel.oData.zTREE);
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        return bChanged;
     }
 
     /************************************************************************
@@ -3698,15 +3703,28 @@
             //4. Tree filter 해제. (원본 2354~2357행 — HTML5 트리는 필터 미구현, 해당 없음)
 
             //5. 대상 path 기준으로 Tree 펼침. (원본 lf_expand — 사이드맵 조상 펼침)
-            _expandTreePathTo(OBJID);
+            var bTreeExpandChanged = _expandTreePathTo(OBJID);
 
-            //6. 대상 row 선택. (원본 2378행 setSelectedIndex — HTML5: 선택 표시 + 재렌더)
+            //6. 대상 row 선택. (원본 2378행 setSelectedIndex — HTML5: 선택 표시)
+            //   ★[2026-10-20 장군님 지시] 펼침이 **안 바뀌었으면 트리를 다시 그리지 않고 선택 강조만** 바꾼다.
+            //     [까닭] 다시 그리면 보이는 줄을 전부 새로 만들고, 줄마다 ＋·삭제 버튼 제목을 메인 프로세스에서
+            //       꺼내 온다(@electron/remote = 동기 IPC, 글자 하나당 왕복 3번). Performance 실측 886ms —
+            //       화면이 멈춘 전체 시간의 절반 이상이었다. 미리보기에서 UI 를 고를 때 특히 길었다.
+            //     [펼침이 바뀐 경우] 줄 목록 자체가 달라지므로 종전대로 다시 그린다. 이 갈래를 빼면 새로 펼친
+            //       조상의 자식 줄이 화면에 안 나타난다.
             oAPP.attr.ws20SelectedObjid = OBJID;
             try {
-                if (typeof oAPP.fn.fnRenderDesignTree === "function") {
-                    oAPP.fn.fnRenderDesignTree();
+                if (bTreeExpandChanged === true) {
+                    if (typeof oAPP.fn.fnRenderDesignTree === "function") {
+                        oAPP.fn.fnRenderDesignTree();
+                    }
+                } else {
+                    oAPP.fn.fnWs20TreeMarkSelected(OBJID);
                 }
-            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            } catch (e) {
+                console.error("[W20A-005] tree select mark failed - OBJID=" + OBJID + ":", e && e.message, e);
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            }
 
             //7. attr 영역 갱신 및 미리보기 화면 갱신. (원본 2382행 — 문서 8.2 의 8단계)
             await oAPP.fn.fnWs20DesignTreeItemPress(oNode);

@@ -862,11 +862,33 @@
         oAPP.attr.ui = oAPP.attr.ui || {};
         oAPP.attr.ui.WSAPP = WSAPP;
         oAPP.attr.ui.pages = { WS10: WS10, WS20: WS20, WS30: WS30 };
-        oAPP.attr.ui._navGen = 0;   // generation counter: stale _done 차단용
+        // 화면 전환 진행 상황 — 원본 UI5 sap.m.NavContainer 와 같은 방식(_bNavigating / _aQueue).
+        //   여기(oAPP.attr.ui)에 둔 이유: fnNavTo 는 매번 새 호출이라 함수 안 변수로는 상황을 이어갈 수 없다.
+        oAPP.attr.ui._navBusy = false;
+        oAPP.attr.ui._navQueue = [];
         oAPP.fn.fnNavTo = oAPP.fn.fnNavTo || function (sToId) {
             var oPages = (oAPP.attr.ui && oAPP.attr.ui.pages) || {};
             var oTo = oPages[sToId];
             if (!oTo) { return; }
+
+            /**
+             * [2026-10-20] ★ 전환이 도는 도중에 들어오는 전환은 겹치게 시작하지 않고 줄을 세운다.
+             * ------------------------------------------------------------------
+             *  [증상] WS10 ↔ WS20 을 빨리 오가면 지나간 화면이 남아 겹쳐 보인다(구글시트 15번).
+             *  [원인] 겹치면 나가던 페이지에 들어오는 클래스까지 같이 붙고, animation-fill-mode:both 로
+             *         눌러 둔 끝 상태(opacity:0)가 앞 전환이 클래스를 떼는 순간 풀려 이미 나간 화면이 되살아난다.
+             *  [원본 참고] UI5 sap.m.NavContainer 는 겹침을 나중에 수습하지 않고 아예 만들지 않는다 —
+             *         _bNavigating 이 true 면 _aQueue 에 넣어 두고, _afterTransitionCallback 에서
+             *         _dequeueNavigation() 으로 꺼내 실행한다. 같은 방식을 여기에 이식했다.
+             */
+            if (oAPP.attr.ui._navBusy === true) {
+                oAPP.attr.ui._navQueue.push(sToId);
+                if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                    U4ALOG.info("화면 이동", "queued -> " + sToId, "another transition is in progress");
+                }
+                return;
+            }
+
             try { parent.setCurrPage(sToId); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 현재 보이는 페이지(나갈 페이지) 탐색
@@ -914,12 +936,23 @@
                 } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             };
 
+            // 전환이 끝나면 줄 서 있는 다음 전환을 꺼내 실행 — UI5 _dequeueNavigation 과 같다.
+            //   이 함수 자신이 아니라 oAPP.fn.fnNavTo 로 부른다 — 바인딩 창 닫기처럼 밖에서 감싼 처리도 같이 돌아야 한다.
+            var _fnDequeueNav = function () {
+                if (oAPP.attr.ui._navQueue.length === 0) { return; }
+                var sNext = oAPP.attr.ui._navQueue.shift();
+                oAPP.fn.fnNavTo(sNext);
+            };
+
             // 나갈 페이지가 없으면(초기) 애니메이션 없이 표시
             if (!oFrom || oFrom === oTo) {
                 Object.keys(oPages).forEach(function (k) {
                     if (oPages[k]) { oPages[k].classList.toggle("u4aWsHidden", k !== sToId); }
                 });
                 _fnAfterNav();
+                // 여기서도 줄을 꺼낸다 — 같은 페이지를 연달아 누르면 큐의 두 번째가 이 갈래로 빠지는데,
+                // 꺼내지 않으면 그 뒤에 줄 서 있는 전환이 영영 안 돌아 화면이 멈춘 것처럼 보인다.
+                _fnDequeueNav();
                 return;
             }
 
@@ -929,31 +962,37 @@
             var sIn = bFwd ? "u4aWsNavInFwd" : "u4aWsNavInBack";
             var sOut = bFwd ? "u4aWsNavOutFwd" : "u4aWsNavOutBack";
 
-            // 들어올 페이지 표시 + 인/아웃 애니메이션 시작
-            // 이전 애니메이션의 stale _done 이 400ms 뒤에 오는 페이지를 다시 숨기는 것을 방지하기 위해
-            // generation 카운터를 증가시키고 _done 진입 시 검사한다.
-            var gen = ++(oAPP.attr.ui._navGen);
+            // 들어올 페이지 표시 + 인/아웃 애니메이션 시작. 이 사이에 들어오는 전환은 위에서 줄을 세운다.
+            oAPP.attr.ui._navBusy = true;
             oTo.classList.remove("u4aWsHidden");
             oTo.classList.add(sIn);
             oFrom.classList.add(sOut);
 
-            var _done = function () {
+            var bDone = false;
+            var iFallback = null;
+            var _done = function (oEv) {
+                // 페이지 속 요소(WS10 큰 제목·설명 글자에도 나타나는 여림이 있다)의 animationend 가
+                // 올라온 것은 전환이 끝난 게 아니다 — animationend 는 부모로 번진다(bubble).
+                if (oEv && oEv.target !== oFrom) { return; }
+                if (bDone === true) { return; }
+                bDone = true;
+                if (iFallback !== null) { clearTimeout(iFallback); iFallback = null; }
                 oFrom.removeEventListener("animationend", _done);
-                if (oAPP.attr.ui._navGen !== gen) {
-                    // stale: 새 fnNavTo가 이미 시작됨 → u4aWsHidden 추가는 건너뛰되
-                    // animation-fill-mode:both 로 인해 opacity:0/transform 이 남는
-                    // zombie 클래스는 반드시 제거해야 화면이 보임
-                    oFrom.classList.remove(sOut);
-                    oTo.classList.remove(sIn);
-                    return;
-                }
+
+                // ★ 끝낼 때 순서를 지킨다 — 먼저 감춘 다음에 애니메이션 클래스를 뗀다.
+                //   거꾸로 하면 animation-fill-mode:both 로 눌러 둔 끝 상태(opacity:0)가 한 frame 풀려
+                //   나간 화면이 번쩍한다. 원본 UI5 _fadeInAnimationEnd 도 sapMNavItemHidden 을 붙이고
+                //   나서 sapMNavItemFading·sapMNavItemTransparent 을 뗀다.
                 oFrom.classList.add("u4aWsHidden");
                 oFrom.classList.remove(sOut);
                 oTo.classList.remove(sIn);
+
+                oAPP.attr.ui._navBusy = false;
                 _fnAfterNav();
+                _fnDequeueNav();
             };
             oFrom.addEventListener("animationend", _done);
-            setTimeout(_done, 400); // 폴백(animationend 미발생 대비)
+            iFallback = setTimeout(_done, 400); // 폴백(animationend 미발생 대비 — prefers-reduced-motion 은 animation:none)
         };
 
         // 공개 메뉴 닫기 (fnOnMoveToPage 가 페이지 전환 시 열린 윈도우 메뉴 닫음)

@@ -3023,10 +3023,16 @@ oWS.sMark.fn_mark = function(oMarkUi) {
 
 	// 2026-10-20: Busy dialog이 focus를 점유해도 선택 UI의 DOM 위치로 이동한다.
 	// DOM이 없는 UI는 스크롤만 생략하고 기존 focus/선택 표시/Promise 흐름을 유지한다.
+	//
+	// ★[2026-10-20 장군님 지시] 원본(design/preview/index.js 3017행)은 scrollIntoView(true) =
+	//   block:"start" 라 **이미 화면에 보이는 UI 를 골라도 무조건 맨 위로 끌어올린다**.
+	//   장군님 지적: 「미리보기 쪽에 UI 선택하면 이미 보이는 화면인데 왜 스크롤을 최상위로 이동시키냐」.
+	//   block/inline 을 "nearest" 로 바꾼다 — 이미 보이면 움직이지 않고, 가려졌을 때만 최소로 움직인다.
+	//   ※ 이 한 줄만 원본과 다르다. 선택 표시·focus·Promise 흐름은 원본 그대로다.
 	if (typeof oMarkUi.getDomRef === "function") {
 		var oDom = oMarkUi.getDomRef();
 		if (typeof oDom?.scrollIntoView === "function") {
-			oDom.scrollIntoView(true);
+			oDom.scrollIntoView({ block: "nearest", inline: "nearest" });
 		}
 	}
 
