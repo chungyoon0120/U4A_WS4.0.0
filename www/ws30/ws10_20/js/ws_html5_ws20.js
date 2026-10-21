@@ -670,6 +670,130 @@
         else { console.warn("[WS20] fnWs20ExecHistory not available (Redo)"); }
     }
 
+    /************************************************************************
+     * (아래 8종) 상단 툴바 버튼을 누르는 단축키 — 2026-10-21 장군님 지시로 되살림
+     * ----------------------------------------------------------------------
+     * [증상] 구글시트 3번 「단축키 안됨」. 단축키 목록 화면에는 보이는데 눌러도 아무 일이 없었다.
+     * [원인] 원본(ws_common.js)의 그 8종은 UI5 버튼을 sap.ui.getCore().byId(...) 로 찾아
+     *   firePress() 하는 코드 그대로다. UI5 를 뺐으므로 byId 는 늘 null 을 돌려주고,
+     *   바로 다음 줄의 `if (!버튼) { return; }` 에 걸려 **조용히 빠져나갔다**(터지지 않아 로그도 없음).
+     *   예 = ws_common.js 1300~1303(Ctrl+F2). 2026년 변환 때 아래 6종만 바꿔 두고 나머지를 빠뜨렸다.
+     * [고친 방식] 이미 도는 6종과 똑같이 — **화면 버튼과 같은 핸들러를 직접 부른다.**
+     *   원본의 getEnabled()/getVisible() 검사는 그 버튼의 DOM 상태(disabled / display:none)로 1:1 옮겼다.
+     *   버튼이 숨겨져 있으면 원본처럼 **조용히** 그만둔다(모드별 숨김은 정상 상황이라 로그를 남기지 않는다).
+     ************************************************************************/
+
+    //화면 버튼이 눌릴 수 있는 상태인가 — 원본 getEnabled()/getVisible() 1:1.
+    //  (툴바 버튼의 DOM id = 정의한 id 그대로. 숨김은 fnUpdateWs20Toolbar 가 display:none 으로 한다.)
+    function _ws20BtnReady(sBtnId) {
+
+        var oBtn = document.getElementById(sBtnId);
+
+        if (!oBtn) { return false; }
+        if (oBtn.disabled === true) { return false; }
+        if (oBtn.style && oBtn.style.display === "none") { return false; }
+
+        return true;
+    }
+
+    //단축키 공통 앞머리 — 메뉴 닫기 + 실행 가능 여부. 그만둬야 하면 false.
+    function _ws20ScPrepare() {
+
+        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } }
+        catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+
+        try {
+            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
+                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return false; }
+        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+
+        return true;
+    }
+
+    //툴바 버튼 단축키 공통 — 버튼이 눌릴 수 있을 때 그 버튼과 같은 핸들러를 부른다.
+    function _ws20ToolbarSc(sBtnId, sEv, sKey) {
+
+        if (_ws20ScPrepare() === false) { return; }
+
+        //버튼이 그 모드에서 안 보이면 원본처럼 조용히 그만둔다.
+        if (_ws20BtnReady(sBtnId) === false) { return; }
+
+        var fn = oAPP.events && oAPP.events[sEv];
+
+        if (typeof fn !== "function") {
+            console.warn("[WS20] " + sEv + " not available (" + sKey + ")");
+            return;
+        }
+
+        fn();
+    }
+
+    //Ctrl+Shift+F10 — Icon List. 화면이 두 모양이다(원본 oIconList 분기 그대로):
+    //  · 아이콘 뷰어 메뉴가 뜬 경우 = 그 메뉴의 첫 항목(Icon List)과 같은 함수
+    //  · 평평한 버튼인 경우        = 그 버튼과 같은 핸들러
+    function _ws20IconList() {
+
+        if (_ws20ScPrepare() === false) { return; }
+
+        if (_ws20BtnReady("iconViewerBtn") === true) {
+
+            var fnMenu = oAPP.fn && oAPP.fn.fnWS20WMENU20_04_01;
+
+            if (typeof fnMenu !== "function") {
+                console.warn("[WS20] fnWS20WMENU20_04_01 not available (Ctrl+Shift+F10)");
+                return;
+            }
+
+            fnMenu();
+            return;
+        }
+
+        if (_ws20BtnReady("iconListBtn") === false) { return; }
+
+        var fnBtn = oAPP.events && oAPP.events.ev_pressIconListBtn;
+
+        if (typeof fnBtn !== "function") {
+            console.warn("[WS20] ev_pressIconListBtn not available (Ctrl+Shift+F10)");
+            return;
+        }
+
+        fnBtn();
+    }
+
+    //F12 — U4A DEV Browser 로 실행. 원본은 실행 메뉴에서 DEV_BROWSER 항목을 눌렀다
+    //  (ws_common.js 1729~1740). HTML5 는 그 항목을 _buildAppExecMenuItems 가 만들고,
+    //  고르면 ev_pressAppExecBtnByBrowser(이름) 가 돈다 — 같은 자리로 바로 간다.
+    //  ★패키징(운영)본에서는 그 항목이 비활성이라 여기서도 그만둔다(원본 getEnabled 와 같은 판정).
+    function _ws20ExecDevBrowser() {
+
+        if (_ws20ScPrepare() === false) { return; }
+
+        if (_ws20BtnReady("ws20_appExecMenuBtn") === false) { return; }
+
+        var aItems = [];
+
+        try { aItems = _buildAppExecMenuItems() || []; }
+        catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } return; }
+
+        var oDev = null;
+
+        for (var i = 0; i < aItems.length; i++) {
+            if (aItems[i] && aItems[i].key === "DEV_BROWSER") { oDev = aItems[i]; break; }
+        }
+
+        //목록에 없거나 비활성 → 원본과 같이 조용히 그만둔다.
+        if (!oDev || oDev.disabled === true) { return; }
+
+        var fnExec = oAPP.events && oAPP.events.ev_pressAppExecBtnByBrowser;
+
+        if (typeof fnExec !== "function") {
+            console.warn("[WS20] ev_pressAppExecBtnByBrowser not available (F12)");
+            return;
+        }
+
+        fnExec("DEV_BROWSER");
+    }
+
     //getShortCutList(ws_common.js)가 먼저 로드된 경우에만 super-wrap(미정의면 전 페이지 단축키가
     //  []로 깨지므로 가드). 정상 로드 순서(ws_common → ws_html5_ws20)에선 항상 통과.
     if (typeof oAPP.common.getShortCutList === "function") {
@@ -682,7 +806,19 @@
                 "Ctrl+F": function (e) { _ws20ScGuard(e, _ws20Find); },        // Find(별도창)
                 "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); }, // MIME Repository(별도창)
                 "Ctrl+Shift+Z": function (e) { _ws20ScGuard(e, _ws20Undo); }, // Undo(247)
-                "Ctrl+Shift+X": function (e) { _ws20ScGuard(e, _ws20Redo); }  // Redo(248)
+                "Ctrl+Shift+X": function (e) { _ws20ScGuard(e, _ws20Redo); },  // Redo(248)
+
+                // ★[2026-10-21] 아래 8종을 더했다 — 위 설명 참조.
+                "Ctrl+F2": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("syntaxCheckBtn", "ev_pressSyntaxCheckBtn", "Ctrl+F2"); }); },   // Syntax Check
+                "Ctrl+F12": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("controllerBtn", "ev_pressControllerBtn", "Ctrl+F12"); }); },  // Controller(Class Builder)
+                "Ctrl+F5": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("ws20_multiPrevBtn", "ev_pressMultiPrevBtn", "Ctrl+F5"); }); }, // App Multi Preview
+                "Shift+F1": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("addEventBtn", "ev_pressAddEventBtn", "Shift+F1"); }); },      // Add Event Method
+                "F9": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("runtimeBtn", "ev_pressRuntimeBtn", "F9"); }); },                    // Runtime Class Navigator
+                //★F8 은 목록에 두 벌 있다(옛 UI5 판 + 먼저 고쳐 둔 HTML5 판). 둘 다 이 동작으로 덮어
+                //  어느 쪽이 등록되든 같게 만든다.
+                "F8": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("ws20_appExecMenuBtn", "ev_pressAppExecBtn", "F8"); }); },           // Application Execution
+                "Ctrl+Shift+F10": function (e) { _ws20ScGuard(e, _ws20IconList); },                                                                   // Icon List
+                "F12": function (e) { _ws20ScGuard(e, _ws20ExecDevBrowser); }                                                                         // U4A DEV Browser
             };
             aList.forEach(function (o) { if (o && oFnMap[o.KEY]) { o.fn = oFnMap[o.KEY]; } });
             return aList;
