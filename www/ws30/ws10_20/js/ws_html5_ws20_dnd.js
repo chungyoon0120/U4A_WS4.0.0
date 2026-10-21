@@ -1491,8 +1491,11 @@
         oAPP.fn.setModelBind(oAPP.attr.prev[i_drag.OBJID]);
 
         await oAPP.fn.designRefershModel();
-        await oAPP.fn.setSelectTreeItem(i_drag.OBJID);
+        // [2026-10-22 Codex] drag 잔상/허용 상태 정리는 design tree DOM을 변경한다.
+        // setSelectTreeItem은 선택 완료 후 Busy를 종료하므로, drag 정리를 먼저 마쳐
+        // Busy 종료 뒤 designDragEnd가 DOM을 변경하지 않도록 순서를 유지한다.
         oAPP.fn.designDragEnd();
+        await oAPP.fn.setSelectTreeItem(i_drag.OBJID);
         oAPP.fn.setChangeFlag();
         // 005 Job finished.
         _toast("I", _msg("/U4A/MSG_WS", "005"));

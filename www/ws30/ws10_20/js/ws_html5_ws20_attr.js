@@ -3168,11 +3168,10 @@
      *   화면이 잠잠해진 뒤다(2026-10-21 반영 — theme/u4a-busy.js U4ABusy.hide,
      *   MutationObserver 로 조용함을 보는 창 + requestIdleCallback + 한 창 더). 공통 busy 는
      *   <dialog>.showModal() 모달이라 열려 있는 동안 문서 전체가 inert 가 되고 그 상태가
-     *   iframe 안 document 까지 번진다 → 미리보기 선택(selPreviewUI → sMark.fn_mark)이
-     *   쓰는 focus() 가 무시돼, 스크롤 아래에 있는 UI 를 골라도 미리보기가 그 UI 로
-     *   이동하지 않는다(CDP 실측 = ws_html5_ws20_tree.js 914~920행 기록과 일치).
-     *   원본은 setBusy("") 가 그 자리에서 닫혀 아래 10·11단계가 "닫힌 뒤"에 돌았다
-     *   (원본 U4A_WS_DESIGN/design/js/uiDesignArea.js 2570~2579행).
+     *   iframe 안 document 까지 번진다. attribute 입력 필드도 Busy가 열린 동안
+     *   focus()가 무시되므로, 종료 요청 뒤 실제 닫힘을 기다린 후 setAttrFocus를 호출한다.
+     *   [2026-10-22 Codex] 미리보기 선택은 DOM 변경을 수반하므로 이 대기보다 먼저,
+     *   Busy가 켜져 있을 때 완료한다. 미리보기 선택을 대기 뒤로 다시 옮기지 않는다.
      *
      *   ★공통 busy 는 건드리지 않는다(장군님 지시) — 여기서 닫힘만 지켜본다.
      *   ★느린 PC 를 고려해 시간을 못 박지 않고 "닫혔는지"를 확인한다. 상한에 닿으면
@@ -3207,7 +3206,7 @@
                 if (iTimer) { clearTimeout(iTimer); }
                 if (bLimit) {
                     console.error("[W20A-004] busy dialog still open after "
-                        + _WS20_BUSY_WAIT_LIMIT_MS + "ms - preview selection runs with focus blocked");
+                        + _WS20_BUSY_WAIT_LIMIT_MS + "ms - attribute focus may be blocked");
                 }
                 resolve();
             }
@@ -3565,7 +3564,7 @@
      *
      *   ※ 미리보기측 호출은 전부 frame/contentWindow/_loaded 가드(_frameWin).
      *     selPreviewUI 는 여기가 아니라 setSelectTreeItem(fnWs20SelectUI)의
-     *     "마지막"(문서 8.1 11단계)에서 호출한다.
+     *     Busy 종료 전 단계에서 호출한다(2026-10-22 순서 변경).
      ************************************************************************/
     oAPP.fn.fnWs20DesignTreeItemPress = async function (oNode) {
 
@@ -3663,9 +3662,9 @@
      *    7. Attribute 영역 갱신               (2382행 await designTreeItemPress)
      *    8. Tree scroll 위치 보정             (2387행 desginSetFirstVisibleRow)
      *    9. Binding Popup에 선택 OBJID 전달   (2392행 selectBindingPopupOBJID)
-     *      → BUSY_OFF / 잠금해제 / busy off   (2396~2403행)
-     *   10. Attribute focus 처리             (2407행 setAttrFocus)
-     *   11. Preview UI 선택 표시 — 마지막     (frame.contentWindow.selPreviewUI)
+     *   10. Preview UI 선택 및 보정 요청     (await frame.contentWindow.selPreviewUI)
+     *      → BUSY_OFF / 잠금해제 / busy off   (2026-10-22: 선택 DOM 변경 이후)
+     *   11. 실제 Busy 닫힘 대기 → Attribute focus (setAttrFocus, 마지막)
      *
      *   oOpt.bSkipBusy     : 호출처(트리 행 클릭 핸들러)가 이미 busy/잠금 처리한 경우.
      *   oOpt.UIATK / TYPE  : 원본 setSelectTreeItem(OBJID, UIATK, TYPE) 대응.
@@ -3688,6 +3687,21 @@
             } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
 
+        // [2026-10-22 Codex] 정상 완료/대상 미발견/예외의 Busy 해제 책임을 유지한다.
+        // 정상 경로에서는 미리보기 선택 DOM 변경 후 호출하고, 외부 Busy 소유권(bSkipBusy)은 보존한다.
+        function _endSelectionBusy() {
+
+            // BUSY_OFF / 잠금 해제 / busy off. (원본 2396~2403행 — 가드)
+            if (!oOpt.bSkipBusy) {
+                try {
+                    oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            }
+
+        }
+
         var oNode = null;
 
         try {
@@ -3696,7 +3710,8 @@
             oNode = _findTreeNode(OBJID);
 
             if (!oNode) {
-                console.warn("[WS20][attr] selected node found - skip:", OBJID);
+                console.warn("[WS20][attr] selected node not found - skip:", OBJID);
+                _endSelectionBusy();
                 return;
             }
 
@@ -3746,41 +3761,38 @@
             //9. 바인딩 팝업에 UI 라인 선택 처리. (원본 2392행)
             try { oAPP.fn.selectBindingPopupOBJID(oNode); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-        } finally {
 
-            // BUSY_OFF / 잠금 해제 / busy off. (원본 2396~2403행 — 가드)
-            if (!oOpt.bSkipBusy) {
-                try {
-                    oAPP.attr.oMainBroad && oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
-                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-                try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-                try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            //10. [2026-10-22 Codex] 미리보기 선택을 Busy 종료보다 먼저 수행한다.
+            //   기존 순서에서는 Busy 종료 후 선택 표시로 미리보기 DOM이 변경되었다.
+            //   선택 Promise 완료와 화면 위치/테두리 보정 요청 후에만 Busy 종료를 요청한다.
+            //   frame/contentWindow/_loaded 가드 및 미로드 시 skip은 유지한다.
+            try {
+                var oWin = _frameWin();
+                if (oWin && oNode && typeof oWin.selPreviewUI === "function") {
+                    await oWin.selPreviewUI(OBJID);
+                    // 화면(Page 등) 자체를 고른 경우 그 화면 처음이 보이도록 맞춤(낱개 UI 는 원본 동작 유지).
+                    _alignPreviewToScreenTop(OBJID);
+                    // 테두리가 안 뜬 경우(글자편집기 등) 뜰 때까지 짧게 다시 그려달라고 요청.
+                    _reassertPreviewSelection(OBJID);
+                }
+            } catch (e) {
+                console.warn("[WS20][attr] selPreviewUI error:", e && e.message, e);
             }
 
-        }
-
-        // ★ busy 가 "실제로" 닫히기를 기다린다. (장군님 지시 2026-10-20 — _waitBusyClosed 설명 참조)
-        //   아래 10·11단계는 원본에서 busy 가 꺼진 뒤에 돌던 것이고, 둘 다 focus 를 쓴다.
-        //   2026-10-19 부터 setBusy("") 가 바로 끄지 않으므로 여기서 닫힘을 기다려 원본 순서를 지킨다.
-        await _waitBusyClosed();
-
-        //10. attribute 영역 선택처리. (원본 2407행 — busy 해제 "후" 수행, UIATK 입력시)
-        try { oAPP.fn.setAttrFocus(oOpt.UIATK, oOpt.TYPE); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-
-        //11. 미리보기 ui 선택 처리 — 반드시 마지막. (문서 8.1 11단계 —
-        //    frame/contentWindow/_loaded 가드. 미리보기 미로드시 skip)
-        try {
-            var oWin = _frameWin();
-            if (oWin && oNode && typeof oWin.selPreviewUI === "function") {
-                await oWin.selPreviewUI(OBJID);
-                // 화면(Page 등) 자체를 고른 경우 그 화면 처음이 보이도록 맞춤(낱개 UI 는 원본 동작 유지).
-                _alignPreviewToScreenTop(OBJID);
-                // 테두리가 안 뜬 경우(글자편집기 등) 뜰 때까지 짧게 다시 그려달라고 요청.
-                _reassertPreviewSelection(OBJID);
-            }
         } catch (e) {
-            console.warn("[WS20][attr] selPreviewUI error:", e && e.message, e);
+            // 예외에서도 잠금이 남지 않게 정리하고, 기존 호출처에 실패를 전달한다.
+            _endSelectionBusy();
+            console.error("[WS20][attr] UI selection failed:", e);
+            throw e;
         }
+
+        _endSelectionBusy();
+
+        //11. [2026-10-22 Codex] Busy 종료 요청과 실제 dialog 닫힘은 다르다.
+        //   열린 modal의 inert 상태에서는 attribute 입력 필드 focus가 이동하지 않으므로
+        //   실제 닫힘을 기다린 다음 마지막으로 attribute focus를 처리한다.
+        await _waitBusyClosed();
+        try { oAPP.fn.setAttrFocus(oOpt.UIATK, oOpt.TYPE); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
     }; // end of oAPP.fn.fnWs20SelectUI
 
