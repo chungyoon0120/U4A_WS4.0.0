@@ -25,6 +25,9 @@ oAPP.msg = window?.oAPP?.msg || {};
 oAPP.attr = window?.oAPP?.attr || {};
 oAPP.views = window?.oAPP?.views || {};
 
+// busy 창(<dialog>)의 id — 아래 getBusy 와 busy 끄기 쪽에서 함께 쓴다.
+var BUSY_DOM_ID = "u4aWsBusyIndicator";
+
 (function (oWS) {
     "use strict";
 
@@ -42,8 +45,10 @@ oAPP.views = window?.oAPP?.views || {};
     // AI와 인터페이스 관련 맵 정보
     oWS.utill.attr.AI_IF_MAP = new Map();
 
-    // Busy Indicator 상태
-    oWS.utill.attr.isBusy = "";
+    // ★[2026-10-21 장군님 지시] busy 상태를 담던 전역 변수(isBusy)를 없앴다.
+    //   까닭: 끄라는 신호를 받아도 「화면이 다 그려졌는지」를 기다린 뒤에 끄는데, 그 변수는
+    //     기다리기 전에 이미 "" 로 바뀌어 화면과 어긋났다. 이제 getBusy() 가 busy 창의
+    //     DOM 상태를 직접 본다 — 어긋날 수 없다.
 
     oWS.utill.attr.paths = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"));
 
@@ -930,12 +935,14 @@ oAPP.views = window?.oAPP?.views || {};
 
         // 1. 중복 실행 방지
         // 이미 Busy 상태인데 다시 'X'를 요청받은 경우 무시
-        if (sIsBusy === "X" && attr.isBusy === "X") {
+        //   ★[2026-10-21 장군님 지시] 전역 변수 대신 getBusy()(busy 창 DOM 상태)로 본다.
+        //     여기서 무시돼도 안전하다 — 세대 번호(__u4aBusyGen)는 전역 setBusy 가 이 함수보다
+        //     먼저 올리므로, 기다리던 끄기는 이미 버려진다. 마우스 막기·포커스 저장·닫기 버튼·
+        //     진행바도 앞서 켤 때 이미 걸려 있고 아직 안 풀렸다.
+        if (sIsBusy === "X" && util.fn.getBusy() === "X") {
             return;
         }
 
-        // 상태 업데이트
-        attr.isBusy = sIsBusy;
         const bIsBusy = (sIsBusy === "X");
 
         // 2. 사용자 인터랙션 차단 (마우스 이벤트 제어)
@@ -1020,8 +1027,7 @@ oAPP.views = window?.oAPP?.views || {};
 
         // [UI5 제거] 구: if(!attr.sap) return; → BusyDialog 가 sap 의존이라 HTML5 에선
         //   아무것도 안 떴음. 이제 attr.oBusy(더미 busy = DOM 카드 컨트롤러)로 동작.
-
-        oWS.utill.attr.isBusy = sIsbusy;
+        // ★[2026-10-21] 여기 있던 전역 변수(isBusy) 기록을 없앴다 — getBusy() 가 DOM 을 직접 본다.
 
         var bIsBusy = (sIsbusy === "X" ? true : false);
 
@@ -1174,9 +1180,34 @@ oAPP.views = window?.oAPP?.views || {};
 
     }; // end of oWS.utill.fn.setBusyDialog
 
-    // 현재 Busy Indicator 상태를 리턴해준다.
+    /************************************************************************
+     * 현재 Busy Indicator 상태를 리턴해준다. ("X" = 켜짐 / "" = 꺼짐)
+     * ----------------------------------------------------------------------
+     * ★★★[2026-10-21 장군님 지시] 전역 변수(isBusy) 대신 **busy 창의 DOM 상태**로 판단한다.
+     *   [까닭] 2026-10-19 부터 끄라는 신호를 받아도 「화면이 다 그려졌는지」를 기다린 뒤에 끈다.
+     *     그런데 전역 변수는 **기다리기 전에 이미 "" 로** 바뀌어 있었다(setBusy/setBusyDialog 안).
+     *     그래서 busy 창이 화면에 떠 있는데 getBusy() 가 "" 를 돌려주는 구간이 생겼고,
+     *     그 사이 이 값으로 막던 것들(메뉴 누르기 fnHmws.js · 팝업 열기 · AI · 바인딩 창)이 열렸다.
+     *   [판정 방식] 로그 쪽(ws_html5_logger.js)이 이미 쓰는 것과 같다 —
+     *     <dialog> 면 열려 있는지(open), 아니면 보이는지(display:flex).
+     *   ★전역 변수 isBusy 자체는 그대로 둔다 — 켜기 중복 방지(위 setBusy 933행)가 쓴다.
+     ************************************************************************/
     oWS.utill.fn.getBusy = function () {
-        return oWS.utill.attr.isBusy;
+
+        var oBusyDom = document.getElementById(BUSY_DOM_ID);
+
+        //한 번도 켠 적이 없다 → 꺼진 상태.
+        if (!oBusyDom) {
+            return "";
+        }
+
+        //<dialog> 로 띄우는 창(메인 화면) — 열려 있으면 켜짐.
+        if (typeof oBusyDom.showModal === "function") {
+            return (oBusyDom.open === true ? "X" : "");
+        }
+
+        //<dialog> 가 아닌 창 — 보이면 켜짐.
+        return (oBusyDom.style && oBusyDom.style.display === "flex" ? "X" : "");
     };
 
     // 20. Page Loading 실행
@@ -1698,8 +1729,6 @@ function setDomBusy(bIsBusy) {
  *
  * 로그(양 최소): 정상은 남기지 않는다. 상한 도달(ERROR)과 마지막 여유 중의 변경(WARN)만.
  ************************************************************************/
-
-var BUSY_DOM_ID = "u4aWsBusyIndicator";     // busy 요소 — 자신의 변경은 세지 않으려고 쓴다
 
 /** 개발 모드인가 — 패키징본에서는 확인용 줄을 안 찍는다. 창에 따라 APP 이 다른 자리에 있다. */
 function _u4aIsDev() {
@@ -2277,8 +2306,9 @@ function setProgressBar(TYPE, bIsShow) {
     },
         iStatus = (bIsShow ? 1 : 0);
 
-    // 현재 Busy Indicator 상태정보를 글로벌 변수에 저장한다.
-    oWS.utill.attr.isBusy = (bIsShow == true ? "X" : "");
+    // ★[2026-10-21] 여기서 busy 상태 전역 변수를 덮어쓰던 줄을 없앴다.
+    //   이 함수는 작업표시줄 진행바만 다루는데, busy 상태까지 같이 바꿔 버려 실제 화면과 어긋났다.
+    //   이제 busy 상태는 getBusy() 가 busy 창의 DOM 을 직접 보고 판단한다.
 
     switch (TYPE) {
         case "S":
