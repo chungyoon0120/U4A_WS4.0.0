@@ -1763,7 +1763,8 @@ function setBusy(bIsBusy, oOptions) {
     //   [고친 이유] 종전에는 여기서 먼저 0.6초를 기다린 뒤 끄기를 실행했고, 그 끄기가
     //     더미 busy 객체 → setDomBusy → 공통 busy 로 내려가 **거기서 또 0.6초**를 기다렸다.
     //     같은 기다림을 두 번 타서 setBusy("") 한 번에 1.2초가 걸렸다(WS20 은 전부 이 경로).
-    //   [지금] 기다림은 공통 busy(U4ABusy.hide) 한 곳에만 있다 → 0.6초.
+    //   [지금] 기다림은 공통 busy(U4ABusy.hide) 한 곳에만 있다.
+    //     걸리는 시간 = 조용함을 보는 창(theme/u4a-busy.js QUIET_WINDOW_MS) × 2 — 지금 0.3초.
     //   [순서] 창이 **닫힌 뒤에** 뒷정리를 한다 — 마우스 막기 풀기 · 포커스 복원 ·
     //     창 닫기 버튼 활성 · 작업표시줄 진행바. 종전에는 닫기 전에 풀어 화면과 어긋났다.
     setDomBusy("", function () {
