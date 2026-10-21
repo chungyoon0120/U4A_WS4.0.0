@@ -1610,130 +1610,125 @@
         return window.U4AUI ? window.U4AUI.footerMarkup("ws10Footer") : "";
     }
 
+    /************************************************************************
+     * WS10 단축키 — 공통 목록의 동작만 화면 버튼으로 덮는다 (WS20·WS30 과 같은 방식)
+     * ----------------------------------------------------------------------
+     * ★[2026-10-21 장군님 지시 「원본처럼 진행해」]
+     * [종전] 여기서 document 에 keydown 을 **따로 걸어** WS10 만 다른 길로 돌았다
+     *   (2026-06-15 변환 때 추가). 그 길은 **원본에 없다** — 원본은 공통 목록
+     *   (getShortCutList) + 공통 등록(setShortCut) 한 길뿐이고, WS20·WS30 도 그 길이다.
+     *   게다가 2026-06-24 에 공통 등록을 되살리면서 이 길을 안 걷어내 **두 길이 겹쳐 있었다.**
+     *   두 길 다 document 의 같은 단계에 걸려, 등록 순서가 바뀌면 WS10 단축키가 통째로 죽는 모양이었다.
+     * [지금] 그 길을 걷어내고, 공통 목록의 **동작(fn)만** 화면 버튼과 같은 것으로 바꾼다.
+     * [왜 바꿔야 하나] 공통 목록의 원본 동작은 UI5 버튼을 sap.ui.getCore().byId(...) 로 찾아
+     *   firePress() 하는 코드다. UI5 를 뺐으므로 늘 빈 값을 받아 **조용히 아무 일도 안 한다.**
+     * [검사] 꾹 누름 · 화면 일치(WS10) · 단축키 잠금 · 처리중 표시 · 메뉴 열림 · 팝업 열림은
+     *   공통 가드(ws_common.js fnRunShortCut)가 본다 — WS20·WS30 과 같은 통로.
+     * [개발 권한] 따로 보지 않는다. 권한이 없으면 그 버튼을 **아예 안 만들므로**
+     *   (_getSubHeaderButtons 의 devOnly) 아래 "버튼이 있나" 검사에서 걸러진다.
+     *   원본의 getVisible() 검사와 같은 결과다.
+     ************************************************************************/
+
+    // 단축키 → 화면 버튼. id·ev 는 위 _getSubHeaderButtons 의 것과 같아야 한다.
+    //   KEY 표기는 공통 목록(ws_common.js aShortCutWS10)의 것과 **글자까지 같아야** 짝이 맞는다.
+    var WS10_SC_MAP = {
+        "Ctrl+F12": { id: "appCreateBtn", ev: "ev_AppCreate", msg: "A01" },    // Application Create
+        "F6": { id: "appChangeBtn", ev: "ev_AppChange", msg: "A02" },          // Application Change
+        "Ctrl+F10": { id: "appDelBtn", ev: "ev_AppDelete", msg: "A03" },       // Application Delete
+        "Shift+F11": { id: "appCopyBtn", ev: "ev_AppCopy", msg: "A04" },       // Application Copy
+        "F7": { id: "displayBtn", ev: "ev_AppDisplay", msg: "A05" },           // Display
+        "F8": { id: "appExecMenuBtn", ev: "ev_AppExec", msg: "A06" },          // Application Execution
+        "Ctrl+F1": { id: "examBtn", ev: "ev_AppExam", msg: "A07" },            // Example Open
+        "Ctrl+F3": { id: "multiPrevBtn", ev: "ev_MultiPrev", msg: "A08" }      // Multi Preview
+        // ※ Ctrl+N(새 창)은 여기 없다 — 공통 목록에도 없고(원본 동일), 앱 글로벌 단축키
+        //   (ws_common.js fnSetCommonShortcut)가 owner 다. 여기 넣으면 새 창이 2개 뜬다.
+    };
+
+    // 화면 버튼이 눌릴 수 있는 상태인가 — 원본 getEnabled()/getVisible() 1:1.
+    function _ws10BtnReady(sBtnId) {
+
+        var oBtn = document.getElementById(sBtnId);
+
+        if (!oBtn) { return false; }
+        if (oBtn.disabled === true) { return false; }
+        if (oBtn.style && oBtn.style.display === "none") { return false; }
+
+        return true;
+    }
+
+    /************************************************************************
+     * 단축키 하나 실행 — 그 버튼을 클릭한 것과 **똑같이** 부른다(_invoke = 버튼 click 과 같은 함수).
+     *   로그는 2026-09-11 에 넣은 것을 그대로 가져왔다. 그전에는 조용히 빠져나가서
+     *   "눌렀는데 아무 일도 안 일어난다" 를 로그만 보고 짚을 수 없었다
+     *   (실제로 Shift+F11 어플리케이션 복사가 안 되는 원인을 못 찾아 헤맸다).
+     ************************************************************************/
+    function _ws10RunSc(sKey, oCfg) {
+
+        if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+            U4ALOG.info("SHORTCUT", sKey + " -> " + oCfg.ev, "matched on WS10");
+        }
+
+        if (_ws10BtnReady(oCfg.id) === false) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", sKey + " -> " + oCfg.ev,
+                    "button " + oCfg.id + " missing, hidden or disabled (dev-only button is not created without IS_DEV)");
+            }
+            return;
+        }
+
+        _invoke(oCfg.ev, _txt(oCfg.msg));
+    }
+
+    // 공통 가드에 위임 — WS20·WS30 의 가드와 같은 모양.
+    function _ws10ScGuard(e, sKey, oCfg) {
+
+        if (oAPP.common && typeof oAPP.common.fnRunShortCut === "function") {
+            oAPP.common.fnRunShortCut(e, "WS10", function () { _ws10RunSc(sKey, oCfg); });
+            return;
+        }
+
+        // 폴백(공통 미로드 시) — 최소 가드
+        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        if (e && e.repeat === true) { return; }
+        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS10") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try { _ws10RunSc(sKey, oCfg); } catch (err) { console.error("[WS10] shortcut:", err); }
+    }
+
     function _wireShortcuts() {
-        var aMap = [
-            { sc: "ctrl+F12", ev: "ev_AppCreate", t: _txt("A01"), dev: true },
-            { sc: "F6", ev: "ev_AppChange", t: _txt("A02"), dev: true },
-            { sc: "ctrl+F10", ev: "ev_AppDelete", t: _txt("A03"), dev: true },
-            { sc: "shift+F11", ev: "ev_AppCopy", t: _txt("A04"), dev: true },
-            { sc: "F7", ev: "ev_AppDisplay", t: _txt("A05") },
-            { sc: "F8", ev: "ev_AppExec", t: _txt("A06") },
-            { sc: "ctrl+F1", ev: "ev_AppExam", t: _txt("A07") },
-            { sc: "ctrl+F3", ev: "ev_MultiPrev", t: _txt("A08") }
-            // ※ Ctrl+N(새 창)은 여기서 등록하지 않는다 — 앱 글로벌 단축키(ws_common.js
-            //   fnSetCommonShortcut → shortcut.js, ws_main 부팅 시 등록)가 원본 owner 다.
-            //   여기 또 넣으면 두 핸들러가 같이 발화해 새 창이 2개 뜬다(원본 getShortCutList
-            //   에도 Ctrl+N 은 없음 = 페이지 단축키가 아니라 글로벌). 새 창 버튼 클릭은
-            //   ev_NewWindow(WIRED_EVENTS)로 정상 동작, 툴바의 "Ctrl+N" 힌트는 글로벌이 충족.
-        ];
+
         // 중복 등록 방지
         if (oAPP.ws10html._scWired) { return; }
         oAPP.ws10html._scWired = true;
-        document.addEventListener("keydown", function (e) {
 
-            // 자동 반복(키 꾹 누름) 중복 발화 방지.
-            if (e.repeat) {
-                return;
-            }
+        // 공통 목록이 없으면 덮을 것이 없다 — WS10 단축키가 전부 죽으므로 조용히 넘기지 않는다.
+        if (!oAPP.common || typeof oAPP.common.getShortCutList !== "function") {
+            console.error("[WS10] getShortCutList not loaded - WS10 shortcuts will not work (check load order: ws_common.js before ws10_html.js)");
+            return;
+        }
 
-            // ★ WS10 단축키는 WS10 화면에서만 동작한다.
-            //   WS10·WS20 는 같은 문서(#content 교체)라 이 document 리스너가 페이지 이동 후에도
-            //   살아있다 → WS20 에서 같은 키를 눌러도 WS10 액션이 발화되던 버그. 현재 페이지가
-            //   WS10 이 아니면 무시(WS20 undo/redo 핸들러의 getCurrPage 가드와 동일 패턴).
-            try {
-                if (parent.getCurrPage && parent.getCurrPage() !== "WS10") {
-                    return;
-                }
-            } catch (e2) {
-                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
-                    U4ALOG.caught(e2);
-                }
-            }
+        var _ws10GetShortCutList_super = oAPP.common.getShortCutList;
 
-            // 눌린 키 조합을 만들어 이 화면 단축키 목록에서 찾는다.
-            var parts = [];
+        oAPP.common.getShortCutList = function (sPgNo) {
 
-            if (e.ctrlKey) {
-                parts.push("ctrl");
-            }
+            var aList = (typeof _ws10GetShortCutList_super === "function") ? _ws10GetShortCutList_super(sPgNo) : [];
 
-            if (e.shiftKey) {
-                parts.push("shift");
-            }
+            if (sPgNo !== "WS10" || !Array.isArray(aList)) { return aList; }
 
-            if (e.altKey) {
-                parts.push("alt");
-            }
+            aList.forEach(function (o) {
 
-            parts.push(e.key);
+                if (!o) { return; }
 
-            var sCombo = parts.join("+").toLowerCase();
-            var hit = null;
+                var oCfg = WS10_SC_MAP[o.KEY];
 
-            for (var i = 0; i < aMap.length; i++) {
-                if (aMap[i].sc.toLowerCase() === sCombo) {
-                    hit = aMap[i];
-                    break;
-                }
-            }
+                if (!oCfg) { return; }
 
-            // 이 화면 단축키가 아니면 여기서 끝(공통 체크까지 가지 않는다 — 글자 입력마다 로그가 쌓이지 않게).
-            if (!hit) {
-                return;
-            }
+                o.fn = function (e) { _ws10ScGuard(e, o.KEY, oCfg); };
+            });
 
-            /********************************************************************
-             * 단축키 실행 할지 말지 여부 체크 (2026-09-09 추가 — 장군님 지시)
-             * ------------------------------------------------------------------
-             * 원본(as-is) ws_common.js 의 각 단축키 fn 과 동일한 컨셉으로, 공통 함수
-             *   oAPP.common.fnShortCutExeAvaliableCheck() 하나로 아래를 전부 본다.
-             *   ① 단축키 잠금  ② 화면 이동 중  ③ busy(처리중)  ④ 메뉴 열림  ⑤ 팝업 열림
-             *
-             * 왜 고쳤나:
-             *   - 전에는 이 자리에서 팝업만 따로 봤다(document.querySelector("dialog[open]")).
-             *     그런데 busy 표시도 같은 <dialog> 를 showModal() 로 띄우므로(resources/index.js
-             *     setDomBusy) 팝업 검사에 busy 까지 걸려, busy 중에는 단축키가 로그 한 줄 없이
-             *     조용히 삼켜졌다. 원본이라면 "Busy가 켜져 있어서 단축기 실행 불가" 가 찍힌다.
-             *   - 또 ①②④ 는 아예 보지 않아, 화면 전환 중에도 이 화면 단축키가 그냥 실행됐다.
-             *   ※ 팝업 검사는 없어진 게 아니라 공통 함수 안(fnCheckIsDialogOpen)으로 들어갔다.
-             ********************************************************************/
-            /********************************************************************
-             * 로그 (2026-09-11 추가 — 장군님 지시)
-             * ------------------------------------------------------------------
-             * 그전에는 아래 세 갈래가 전부 로그 한 줄 없이 조용히 빠져나가서,
-             * "단축키를 눌렀는데 아무 일도 안 일어난다" 를 로그만 보고는 짚을 수 없었다
-             * (실제로 Shift+F11 어플리케이션 복사가 안 되는 원인을 못 찾아 헤맸다).
-             * 여기까지 왔다는 것은 이 화면의 등록된 단축키가 실제로 눌렸다는 뜻이므로
-             * 빈도가 낮다 → 로그 양 걱정 없음.
-             ********************************************************************/
-            if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
-                U4ALOG.info("SHORTCUT", hit.sc + " -> " + hit.ev, "matched on WS10");
-            }
-
-            var sScChkResult = oAPP.common.fnShortCutExeAvaliableCheck();
-
-            // X 이면 실행 불가
-            if (sScChkResult === "X") {
-                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
-                    U4ALOG.warn("GUARD_EXIT", hit.sc + " -> " + hit.ev,
-                        "blocked by fnShortCutExeAvaliableCheck (shortcut lock / navigating / busy / menu open / dialog open)");
-                }
-                return;
-            }
-
-            //[DM1] 개발 전용 단축키 — 원본과 동일하게 IS_DEV 로 막는다.
-            if (hit.dev && !_isDevAuth()) {
-                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
-                    U4ALOG.warn("GUARD_EXIT", hit.sc + " -> " + hit.ev,
-                        "blocked: dev-only shortcut but IS_DEV is not 'D'");
-                }
-                return;
-            }
-
-            e.preventDefault();
-            _invoke(hit.ev, hit.t);
-
-        });
+            return aList;
+        };
     }
 
 })();

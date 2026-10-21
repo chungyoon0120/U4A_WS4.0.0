@@ -1552,39 +1552,6 @@
                 }
             },
             {
-                KEY: "F8", // [WS20] Application Execution (실행) — 원본 앱헤더 ev_pressAppExecBtn (F8)
-                DESC: oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A06"), // Application Execution
-                fn: (e) => {
-
-                    e.stopImmediatePropagation();
-
-                    if (e.repeat === true) {
-                        return;
-                    }
-
-                    // [HTML5] 표시 여부는 DOM 기준(App Exec 는 split 버튼 → 본체 동작은 이벤트 직접 호출)
-                    var oExecBtn = document.getElementById("ws20_appExecMenuBtn");
-                    if (!oExecBtn || oExecBtn.hidden || oExecBtn.style.display === "none") {
-                        return;
-                    }
-
-                    // 단축키 실행 할지 말지 여부 체크 (busy/락/메뉴/다이얼로그 가드 — HTML5-safe)
-                    if (oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
-                        return;
-                    }
-
-                    // 커서 포커스 날리기
-                    if (document.activeElement && document.activeElement.blur) {
-                        document.activeElement.blur();
-                    }
-
-                    // split 버튼 본체 = 기본 실행(ev_pressAppExecBtn). firePress 대체로 이벤트 직접 호출.
-                    try { oAPP.events.ev_pressAppExecBtn(); }
-                    catch (err) { if (typeof console !== "undefined") { console.error("[WS20] F8 AppExec error", err); } }
-
-                }
-            },
-            {
                 KEY: "Ctrl+Shift+F12", // [WS20] Mime Button
                 DESC: oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A10"), // Mime Repository
                 CODE: `new sap.m.Button({
