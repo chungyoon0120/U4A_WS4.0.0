@@ -342,6 +342,7 @@
     var oDlg = document.createElement("dialog");
     oDlg.id = C_DLG_ID;
     oDlg.className = "u4a-dialog u4aCliEdDlg";
+    oDlg.setAttribute("data-act", "CLIENT_EDITOR_DLG");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
 
     // 헤더 — syntax(code) 아이콘 + "{TITLE} -- {OBJID}" + 닫기(X). 제목은 open 마다 갱신.
     var oHeader = _el("div", "u4a-dialog__header");
@@ -361,6 +362,7 @@
     var oBody = _el("div", "u4a-dialog__body u4aCliEdBody");
     var oFrame = document.createElement("iframe");
     oFrame.className = "u4aCliEdFrame";
+    oFrame.setAttribute("data-act", "CEVT_SRC");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
     oFrame.setAttribute("frameborder", "0");
     var oQuery = encodeURIComponent(JSON.stringify({
       HOSTID: C_HOSTID,
@@ -395,6 +397,7 @@
 
     var oPrettyBtn = _el("button", "u4a-btn u4aCliEdPretty");
     oPrettyBtn.type = "button";
+    oPrettyBtn.setAttribute("data-act", "CEVT_PRETTY");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
     oPrettyBtn.innerHTML = _fa("wand-magic-sparkles") + "<span></span>";
     oPrettyBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "C25");   // Pretty Print(꾸밈정렬)
     oPrettyBtn.title = _txt("/U4A/CL_WS_COMMON", "C25") + " (Shift+F1)";   // 단축키 안내(에디터 한정)
@@ -407,6 +410,7 @@
 
     var oZoomOut = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdZoomStep");
     oZoomOut.type = "button";
+    oZoomOut.setAttribute("data-act", "CEVT_ZOOM_OUT");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
     oZoomOut.innerHTML = _fa("minus");
     oZoomOut.title = "Ctrl + Wheel ↓";   // 축소(단축키 안내 — 줌 전용 메시지 키 없음, 숫자/기호 표기)
     oZoomOut.addEventListener("click", function () { lf_toHost({ cmd: "fontZoomOut" }); });
@@ -414,12 +418,14 @@
 
     var oZoomBtn = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdZoomPct");
     oZoomBtn.type = "button";
+    oZoomBtn.setAttribute("data-act", "CEVT_ZOOM");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
     oZoomBtn.innerHTML = _fa("magnifying-glass") + "<span>100%</span>";
     oZoomBtn.addEventListener("click", function () { lf_toHost({ cmd: "fontZoomReset" }); });   // 클릭=원복(Ctrl+0)
     oZoomGrp.appendChild(oZoomBtn);
 
     var oZoomIn = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdZoomStep");
     oZoomIn.type = "button";
+    oZoomIn.setAttribute("data-act", "CEVT_ZOOM_IN");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
     oZoomIn.innerHTML = _fa("plus");
     oZoomIn.title = "Ctrl + Wheel ↑";   // 확대
     oZoomIn.addEventListener("click", function () { lf_toHost({ cmd: "fontZoomIn" }); });
@@ -435,6 +441,7 @@
     //   톤 = 보조(투명 중립), 아이콘 전용 + 툴팁(A04 Copy). 꾸밈정렬 뒤·결정 그룹 앞에 배치.
     var oCopyBtn = _el("button", "u4a-btn u4aCliEdPretty u4aCliEdIcoBtn");
     oCopyBtn.type = "button";
+    oCopyBtn.setAttribute("data-act", "CEVT_COPY");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
     oCopyBtn.innerHTML = _fa("copy");
     oCopyBtn.title = _txt("/U4A/CL_WS_COMMON", "A04");   // Copy
     oCopyBtn.addEventListener("click", function () { lf_copyToClipboard(); });
@@ -442,6 +449,7 @@
 
     var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aCliEdIcoBtn");
     oSaveBtn.type = "button";
+    oSaveBtn.setAttribute("data-act", "SAVE");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
     oSaveBtn.innerHTML = _fa("check");
     oSaveBtn.title = _txt("/U4A/CL_WS_COMMON", "A64") + " (Ctrl+S)";   // Save + 단축키 안내(에디터 한정)
     oSaveBtn.addEventListener("click", function () { lf_save(); });
@@ -449,6 +457,7 @@
 
     var oDelBtn = _el("button", "u4a-btn u4aCliEdIcoBtn u4aCliEdDel");
     oDelBtn.type = "button";
+    oDelBtn.setAttribute("data-act", "CEVT_DELETE");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
     oDelBtn.innerHTML = _fa("trash");
     oDelBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete
     oDelBtn.addEventListener("click", function () { lf_clear(); });
@@ -456,6 +465,7 @@
 
     var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aCliEdIcoBtn u4aCliEdClose");
     oCloseBtn.type = "button";
+    oCloseBtn.setAttribute("data-act", "CLOSE");   // 2026-10-21 자동 테스트 도구가 집을 이름(.analy/21)
     oCloseBtn.innerHTML = _fa("xmark");
     oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
     oCloseBtn.addEventListener("click", function () { lf_requestClose(); });
