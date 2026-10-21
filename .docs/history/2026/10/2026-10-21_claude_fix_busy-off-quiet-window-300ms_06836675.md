@@ -102,3 +102,25 @@ UI5 가 조금씩 이어 그리는 사이에 「조용해졌다」로 보기 쉬
   수치는 상수 선언 한 곳에서만 말하고, 설명은 「창」·「한 창 더」로 쓴다.
 - **상한(SETTLE_LIMIT_MS 5000)은 ② 자리에서만 본다** — ④ 의 한 창은 상한 뒤에 붙을 수 있어
   최악은 5.15초다(종전 5.3초).
+
+## [후속] 실측 — 150ms 창이 충분하다 (2026-10-21, 장군님 콘솔 캡처)
+
+속성 변경(미리보기 `refreshPreview` 7건) 경로 3회:
+
+```
+[BUSY] on→off=343ms mut=55 lastChangeBeforeOff=315ms lateMut=0 (offSignal→off=315ms quiet=151ms idle=164ms rounds=0)
+[BUSY] on→off=341ms mut=41 lastChangeBeforeOff=319ms lateMut=0 (offSignal→off=318ms quiet=151ms idle=167ms rounds=0)
+[BUSY] on→off=340ms mut=55 lastChangeBeforeOff=311ms lateMut=0 (offSignal→off=311ms quiet=151ms idle=161ms rounds=0)
+```
+
+- `lateMut=0` · `rounds=0` 3회 모두 → **첫 창부터 조용**했고 마지막 여유 중에도 변경 0.
+- `offSignal→off` 311~318ms → **목표 0.3초 달성**(종전 1.2초).
+- `idle` − `quiet` = 10~16ms → `requestIdleCallback` 이 거의 바로 도착.
+- `lastChangeBeforeOff` ≈ `offSignal→off` → 끄기 신호 **뒤로는 화면이 한 번도 안 바뀌었다.**
+
+**판정: 150ms 유지.** 더 줄일 근거가 없다.
+
+★이 숫자로 단정하면 안 되는 것:
+- **메인 창 DOM 만 센 값**이다. 미리보기는 별도 iframe 이라 이 감시에 안 잡힌다.
+- **속성 변경 경로 하나**만 잰 것이다. UI 추가·삭제·이동은 안 재 봤다 — 그쪽에서 `rounds` 가
+  올라가거나 `lateMut` 이 0 보다 크면 그때 값을 올린다(고칠 자리 = `QUIET_WINDOW_MS` 한 줄).
