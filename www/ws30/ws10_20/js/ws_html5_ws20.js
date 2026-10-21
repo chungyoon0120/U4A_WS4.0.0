@@ -689,25 +689,72 @@
 
         var oBtn = document.getElementById(sBtnId);
 
-        if (!oBtn) { return false; }
-        if (oBtn.disabled === true) { return false; }
-        if (oBtn.style && oBtn.style.display === "none") { return false; }
+        if (!oBtn) {
+            return false;
+        }
+
+        if (oBtn.disabled === true) {
+            return false;
+        }
+
+        if (oBtn.style && oBtn.style.display === "none") {
+            return false;
+        }
 
         return true;
     }
 
+    /************************************************************************
+     * 상단 툴바 버튼을 그냥 누르는 단축키 — 키 → 버튼 · 그 버튼의 핸들러.
+     *   btn·ev 는 위 aBtns(툴바 버튼 정의)의 id·ev 와 **같아야** 한다.
+     *   동작이 다 같은 모양이라 표로 두고 아래 getShortCutList 에서 한 번에 채운다.
+     ************************************************************************/
+    var WS20_TOOLBAR_SC = {
+        "Ctrl+F2": { btn: "syntaxCheckBtn", ev: "ev_pressSyntaxCheckBtn" },      // Syntax Check
+        "Ctrl+F12": { btn: "controllerBtn", ev: "ev_pressControllerBtn" },       // Controller(Class Builder)
+        "Ctrl+F5": { btn: "ws20_multiPrevBtn", ev: "ev_pressMultiPrevBtn" },     // App Multi Preview
+        "Shift+F1": { btn: "addEventBtn", ev: "ev_pressAddEventBtn" },           // Add Event Method
+        "F9": { btn: "runtimeBtn", ev: "ev_pressRuntimeBtn" },                   // Runtime Class Navigator
+        "F8": { btn: "ws20_appExecMenuBtn", ev: "ev_pressAppExecBtn" }           // Application Execution
+    };
+
     //단축키 공통 앞머리 — 메뉴 닫기 + 실행 가능 여부. 그만둬야 하면 false.
     function _ws20ScPrepare() {
 
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } }
-        catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-
+        //열려 있는 메뉴를 먼저 닫는다.
         try {
+
+            if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") {
+                oAPP.common.fnCloseMenuPopover();
+            }
+
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        //지금 단축키를 실행해도 되는 상태인가 — 잠금 · 화면 이동 중 · 처리중 · 메뉴 · 팝업.
+        try {
+
             if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return false; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+                oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
+                return false;
+            }
+
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
 
         return true;
+    }
+
+    //위 두 자리의 오류 흔적 — 같은 줄이 되풀이돼 한 곳으로 뺐다.
+    function _caughtWs20Sc(oErr) {
+
+        if (typeof U4ALOG === "undefined" || !U4ALOG.caught) {
+            return;
+        }
+
+        U4ALOG.caught(oErr);
     }
 
     //툴바 버튼 단축키 공통 — 버튼이 눌릴 수 있을 때 그 버튼과 같은 핸들러를 부른다.
@@ -798,29 +845,48 @@
     //  []로 깨지므로 가드). 정상 로드 순서(ws_common → ws_html5_ws20)에선 항상 통과.
     if (typeof oAPP.common.getShortCutList === "function") {
         var _ws20GetShortCutList_super = oAPP.common.getShortCutList;
-        oAPP.common.getShortCutList = function (sPgNo) {
-            var aList = (typeof _ws20GetShortCutList_super === "function") ? _ws20GetShortCutList_super(sPgNo) : [];
-            if (sPgNo !== "WS20" || !Array.isArray(aList)) { return aList; }
-            var oFnMap = {
-                "F3": function (e) { _ws20ScGuard(e, _ws20Back); },           // 뒤로가기
-                "Ctrl+F": function (e) { _ws20ScGuard(e, _ws20Find); },        // Find(별도창)
-                "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); }, // MIME Repository(별도창)
-                "Ctrl+Shift+Z": function (e) { _ws20ScGuard(e, _ws20Undo); }, // Undo(247)
-                "Ctrl+Shift+X": function (e) { _ws20ScGuard(e, _ws20Redo); },  // Redo(248)
 
-                // ★[2026-10-21] 아래 8종을 더했다 — 위 설명 참조.
-                "Ctrl+F2": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("syntaxCheckBtn", "ev_pressSyntaxCheckBtn", "Ctrl+F2"); }); },   // Syntax Check
-                "Ctrl+F12": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("controllerBtn", "ev_pressControllerBtn", "Ctrl+F12"); }); },  // Controller(Class Builder)
-                "Ctrl+F5": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("ws20_multiPrevBtn", "ev_pressMultiPrevBtn", "Ctrl+F5"); }); }, // App Multi Preview
-                "Shift+F1": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("addEventBtn", "ev_pressAddEventBtn", "Shift+F1"); }); },      // Add Event Method
-                "F9": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("runtimeBtn", "ev_pressRuntimeBtn", "F9"); }); },                    // Runtime Class Navigator
-                //★F8 은 목록에 두 벌 있다(옛 UI5 판 + 먼저 고쳐 둔 HTML5 판). 둘 다 이 동작으로 덮어
-                //  어느 쪽이 등록되든 같게 만든다.
-                "F8": function (e) { _ws20ScGuard(e, function () { _ws20ToolbarSc("ws20_appExecMenuBtn", "ev_pressAppExecBtn", "F8"); }); },           // Application Execution
-                "Ctrl+Shift+F10": function (e) { _ws20ScGuard(e, _ws20IconList); },                                                                   // Icon List
-                "F12": function (e) { _ws20ScGuard(e, _ws20ExecDevBrowser); }                                                                         // U4A DEV Browser
+        oAPP.common.getShortCutList = function (sPgNo) {
+
+            var aList = (typeof _ws20GetShortCutList_super === "function") ? _ws20GetShortCutList_super(sPgNo) : [];
+
+            if (sPgNo !== "WS20" || !Array.isArray(aList)) {
+                return aList;
+            }
+
+            //① 별도 함수가 있는 것 — 창을 열거나 되돌리는 것들.
+            var oFnMap = {
+                "F3": function (e) { _ws20ScGuard(e, _ws20Back); },               // 뒤로가기
+                "Ctrl+F": function (e) { _ws20ScGuard(e, _ws20Find); },           // Find(별도창)
+                "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); },   // MIME Repository(별도창)
+                "Ctrl+Shift+Z": function (e) { _ws20ScGuard(e, _ws20Undo); },     // Undo(247)
+                "Ctrl+Shift+X": function (e) { _ws20ScGuard(e, _ws20Redo); },     // Redo(248)
+                "Ctrl+Shift+F10": function (e) { _ws20ScGuard(e, _ws20IconList); },       // Icon List(화면이 두 모양)
+                "F12": function (e) { _ws20ScGuard(e, _ws20ExecDevBrowser); }             // U4A DEV Browser
             };
-            aList.forEach(function (o) { if (o && oFnMap[o.KEY]) { o.fn = oFnMap[o.KEY]; } });
+
+            //② 상단 툴바 버튼을 그냥 누르는 것 — 모양이 같아 표로 두고 아래에서 한 번에 채운다.
+            Object.keys(WS20_TOOLBAR_SC).forEach(function (sKey) {
+
+                var oCfg = WS20_TOOLBAR_SC[sKey];
+
+                oFnMap[sKey] = function (e) {
+                    _ws20ScGuard(e, function () {
+                        _ws20ToolbarSc(oCfg.btn, oCfg.ev, sKey);
+                    });
+                };
+            });
+
+            //목록에서 같은 키를 찾아 동작만 바꾼다(같은 키가 두 벌이면 둘 다 바뀐다).
+            aList.forEach(function (o) {
+
+                if (!o || !oFnMap[o.KEY]) {
+                    return;
+                }
+
+                o.fn = oFnMap[o.KEY];
+            });
+
             return aList;
         };
     }

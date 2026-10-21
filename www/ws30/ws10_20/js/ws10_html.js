@@ -1649,9 +1649,18 @@
 
         var oBtn = document.getElementById(sBtnId);
 
-        if (!oBtn) { return false; }
-        if (oBtn.disabled === true) { return false; }
-        if (oBtn.style && oBtn.style.display === "none") { return false; }
+        //개발 권한이 없으면 그 버튼은 아예 안 만든다 → 여기서 걸러진다.
+        if (!oBtn) {
+            return false;
+        }
+
+        if (oBtn.disabled === true) {
+            return false;
+        }
+
+        if (oBtn.style && oBtn.style.display === "none") {
+            return false;
+        }
 
         return true;
     }
@@ -1683,17 +1692,72 @@
     function _ws10ScGuard(e, sKey, oCfg) {
 
         if (oAPP.common && typeof oAPP.common.fnRunShortCut === "function") {
-            oAPP.common.fnRunShortCut(e, "WS10", function () { _ws10RunSc(sKey, oCfg); });
+
+            oAPP.common.fnRunShortCut(e, "WS10", function () {
+                _ws10RunSc(sKey, oCfg);
+            });
+
             return;
         }
 
-        // 폴백(공통 미로드 시) — 최소 가드
-        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (e && e.repeat === true) { return; }
-        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS10") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { _ws10RunSc(sKey, oCfg); } catch (err) { console.error("[WS10] shortcut:", err); }
+        /********************************************************************
+         * 폴백 — 공통 가드가 아직 안 올라온 때만 탄다. 최소한의 검사만 한다.
+         ********************************************************************/
+
+        try {
+            if (e && e.stopImmediatePropagation) {
+                e.stopImmediatePropagation();
+            }
+        } catch (x) {
+            _caughtWs10Sc(x);
+        }
+
+        try {
+            if (e && e.preventDefault) {
+                e.preventDefault();
+            }
+        } catch (x) {
+            _caughtWs10Sc(x);
+        }
+
+        //꾹 누름 — 한 번만 돈다.
+        if (e && e.repeat === true) {
+            return;
+        }
+
+        //지금 화면이 WS10 이 아니면 안 돈다.
+        try {
+            if (parent.getCurrPage && parent.getCurrPage() !== "WS10") {
+                return;
+            }
+        } catch (x) {
+            _caughtWs10Sc(x);
+        }
+
+        //처리중 표시가 켜져 있으면 안 돈다.
+        try {
+            if (parent.getBusy && parent.getBusy() === "X") {
+                return;
+            }
+        } catch (x) {
+            _caughtWs10Sc(x);
+        }
+
+        try {
+            _ws10RunSc(sKey, oCfg);
+        } catch (err) {
+            console.error("[WS10] shortcut:", err);
+        }
+    }
+
+    //위 폴백의 오류 흔적 — 같은 줄이 다섯 번 되풀이돼 한 곳으로 뺐다.
+    function _caughtWs10Sc(oErr) {
+
+        if (typeof U4ALOG === "undefined" || !U4ALOG.caught) {
+            return;
+        }
+
+        U4ALOG.caught(oErr);
     }
 
     function _wireShortcuts() {
@@ -1714,7 +1778,9 @@
 
             var aList = (typeof _ws10GetShortCutList_super === "function") ? _ws10GetShortCutList_super(sPgNo) : [];
 
-            if (sPgNo !== "WS10" || !Array.isArray(aList)) { return aList; }
+            if (sPgNo !== "WS10" || !Array.isArray(aList)) {
+                return aList;
+            }
 
             aList.forEach(function (o) {
 
