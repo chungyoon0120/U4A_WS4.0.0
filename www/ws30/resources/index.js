@@ -1680,26 +1680,85 @@ function setDomBusy(bIsBusy) {
  * 왜: busy 가 꺼지는 순간부터 조작이 열리는데, 그때 화면이 아직 채워지는 중이면
  *     사용자가 덜 그려진 화면을 누르게 된다. 실측(2026-10-19) 결과 busy 를 끈 뒤에도
  *     DOM 이 계속 바뀌고 있었다 — 가장 무거운 ZDWU0020 조회에서 5~23건, 최대 124건.
- * 어떻게: 끄는 신호가 와도 바로 끄지 않고 두 신호를 함께 기다렸다가 둘 다 오면 끈다.
- *     ① DOM 이 조용해짐 — MutationObserver, 2 frame 연속 변경 없음
- *     ② 브라우저가 한가해짐 — requestIdleCallback
- *     장군님 결정: 방어 쪽이 넓으므로 둘 다 기다린다. 실측 추가 대기 10~51ms(체감 밖).
+ *
+ * 어떻게(★2026-10-21 장군님 지시로 바뀐 판정 — 0.3초 창):
+ *     ① 끄는 신호가 오면 MutationObserver 를 켜고 0.3초마다 확인한다.
+ *     ② 그 0.3초 안에 변경이 있었으면 다시 0.3초 기다린다.
+ *     ③ 0.3초가 지나도 변경이 없으면 그때 requestIdleCallback 을 건다.
+ *     ④ 거기 도착하면 0.3초 더 기다린 뒤 끈다.
+ *   ★④ 의 0.3초 동안 일어난 변경은 판정에 쓰지 않는다 — 장군님 「4번이면 이미 끝난 것으로 보라」.
+ *     세기만 해서 로그에 남긴다. 다시 세기로 하면 조금씩 계속 바뀌는 화면에서 영영 안 꺼진다.
+ *   (구) requestAnimationFrame 으로 「변경 없는 frame 2번 연속」 — 간격이 ~16ms 로 너무 짧았다.
+ *
  * 안전장치:
  *     · 기다리는 중 busy 를 다시 켜면(세대 번호 불일치) 끄기를 버린다.
  *       — 모달 팝업을 띄우고 busy 를 껐다 켜는 자리가 있어서, 안 하면 켠 것을 꺼 버린다.
  *     · 상한에 닿으면 끄고 ERROR 로그. 정상 경로가 아니라 고장 알림용이다.
  *     · MutationObserver 가 없거나 <body> 가 아직 없으면 종전대로 즉시 끈다.
- * 로그(양 최소): 정상은 남기지 않는다. 상한 도달(ERROR)과,
- *     「DOM 이 조용해진 뒤에도 더 바뀐 경우」(WARN)만 남긴다 — 후자가 ② 를 기다린 값어치다.
- *     이 두 줄이 안 쌓이면 ② 는 빼도 된다는 근거가 된다.
+ *
+ * 로그(양 최소): 정상은 남기지 않는다. 상한 도달(ERROR)과 마지막 여유 중의 변경(WARN)만.
  ************************************************************************/
+
+var BUSY_DOM_ID = "u4aWsBusyIndicator";     // busy 요소 — 자신의 변경은 세지 않으려고 쓴다
+
 /** 개발 모드인가 — 패키징본에서는 확인용 줄을 안 찍는다. 창에 따라 APP 이 다른 자리에 있다. */
 function _u4aIsDev() {
-    try { if (typeof APP !== "undefined" && APP && APP.isPackaged === false) { return true; } } catch (e) { /* 창에 APP 없음 */ }
-    try { if (window.parent && window.parent !== window && window.parent.APP && window.parent.APP.isPackaged === false) { return true; } } catch (e) { /* cross-origin */ }
-    try { if (typeof oAPP !== "undefined" && oAPP && oAPP.APP && oAPP.APP.isPackaged === false) { return true; } } catch (e) { /* oAPP 없음 */ }
+
+    try {
+        if (typeof APP !== "undefined" && APP && APP.isPackaged === false) {
+            return true;
+        }
+    } catch (e) { /* 이 창에 APP 없음 */ }
+
+    try {
+        if (window.parent && window.parent !== window
+            && window.parent.APP && window.parent.APP.isPackaged === false) {
+            return true;
+        }
+    } catch (e) { /* cross-origin */ }
+
+    try {
+        if (typeof oAPP !== "undefined" && oAPP && oAPP.APP && oAPP.APP.isPackaged === false) {
+            return true;
+        }
+    } catch (e) { /* oAPP 없음 */ }
+
     return false;
 }
+
+/** 이 변경이 busy 자신(또는 그 안)에서 난 것인가. */
+function _u4aIsBusySelf(oTarget) {
+
+    for (var el = oTarget; el; el = el.parentNode) {
+
+        if (el.id === BUSY_DOM_ID) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/** busy 자신을 뺀 변경 건수. */
+function _u4aCountOutside(aMut) {
+
+    var nCnt = 0;
+
+    for (var i = 0; i < aMut.length; i++) {
+
+        if (_u4aIsBusySelf(aMut[i].target) === false) {
+            nCnt++;
+        }
+    }
+
+    return nCnt;
+}
+
+/** 가장 넓은 범위로 관찰 — 요소 생김·사라짐 · 속성 · 글자 · 하위 전부. */
+function _u4aObserveBody(oObs) {
+    oObs.observe(document.body, { childList: true, attributes: true, characterData: true, subtree: true });
+}
+
 
 var __u4aBusyGen = 0;                       // busy 를 켤 때마다 증가. 대기 중 끄기를 무효화한다.
 
@@ -1707,51 +1766,78 @@ var __u4aBusyGen = 0;                       // busy 를 켤 때마다 증가. �
  * busy 켠 순간부터 DOM 변경을 세어 둔다 (장군님 지시 2026-10-19 — 눈으로 확인용)
  *   끌 때 「마지막 DOM 변경이 끄기 몇 ms 전이었나」를 같이 찍는다.
  *   그 값이 양수면 끈 시점엔 이미 조용했다는 뜻 = 정확한 시점에 껐다는 증거.
- *   개발 모드에서만 돈다.
+ *   ★끄기 판정에는 쓰이지 않는다. 개발 모드에서만 돈다.
  ************************************************************************/
 var __u4aBusyWatch = null;
 
 function _u4aBusyWatchStart() {
-    if (!_u4aIsDev() || __u4aBusyWatch || typeof MutationObserver !== "function" || !document.body) { return; }
+
+    if (!_u4aIsDev()) {
+        return;
+    }
+
+    if (__u4aBusyWatch || typeof MutationObserver !== "function" || !document.body) {
+        return;
+    }
+
     var w = { t0: performance.now(), mut: 0, last: -1, obs: null };
+
     try {
+
         w.obs = new MutationObserver(function (aMut) {
-            var n = 0;
-            for (var i = 0; i < aMut.length; i++) {
-                var bSelf = false;
-                for (var el = aMut[i].target; el; el = el.parentNode) {
-                    if (el.id === "u4aWsBusyIndicator") { bSelf = true; break; }
-                }
-                if (!bSelf) { n++; }
+
+            var n = _u4aCountOutside(aMut);
+
+            if (n > 0) {
+                w.mut += n;
+                w.last = performance.now();
             }
-            if (n > 0) { w.mut += n; w.last = performance.now(); }
         });
-        w.obs.observe(document.body, { childList: true, attributes: true, characterData: true, subtree: true });
+
+        _u4aObserveBody(w.obs);
+
     } catch (e) {
         console.error("[RSRC-013] busy watch: observe failed -", e && e.message);
         return;
     }
+
     __u4aBusyWatch = w;
 }
 
 function _u4aBusyWatchEnd() {
+
     var w = __u4aBusyWatch;
     __u4aBusyWatch = null;
-    if (!w) { return null; }
-    try { if (w.obs) { w.obs.disconnect(); } }
-    catch (e) { console.error("[RSRC-013] busy watch: disconnect failed -", e && e.message); }
+
+    if (!w) {
+        return null;
+    }
+
+    try {
+        if (w.obs) {
+            w.obs.disconnect();
+        }
+    } catch (e) {
+        console.error("[RSRC-013] busy watch: disconnect failed -", e && e.message);
+    }
+
     var nNow = performance.now();
+
     return {
         onToOff: Math.round(nNow - w.t0),
         mut: w.mut,
         lastBeforeOff: (w.last < 0 ? -1 : Math.round(nNow - w.last))
     };
 }
+// 끄기 전 기다림의 두 시간값.
 var __U4A_BUSY_SETTLE_LIMIT_MS = 5000;      // 상한 — 고장 알림용(정상 경로 아님)
+var __U4A_BUSY_QUIET_WINDOW_MS = 300;       // 조용함을 보는 창 · 마지막 여유도 같은 값(장군님 지시 2026-10-21)
 
+
+/** busy 끄기 — 화면이 조용해진 뒤에 끈다. 판정 순서는 위 머리 설명의 ①②③④. */
 function _u4aBusyOffWhenSettled(fnOff) {
 
-    var nGen = __u4aBusyGen;
+    var nMyGen = __u4aBusyGen;
 
     // 쓸 수 없는 환경이면 종전대로 즉시 끈다(동작 유지).
     if (typeof MutationObserver !== "function" || !document.body) {
@@ -1760,98 +1846,151 @@ function _u4aBusyOffWhenSettled(fnOff) {
     }
 
     var t0 = performance.now();
-    var nLast = t0, nPrev = -1, nQuietFrames = 0;
-    var oObs = null, bEnded = false;
-    var nQuietMs = -1, nIdleMs = -1, nMutAfterQuiet = 0;
+    var oObs = null;
+    var bEnded = false;
+    var bDirty = false;                     // 지금 0.3초 창 안에 변경이 있었나
+    var nQuietMs = -1;                      // 조용해진 시점(-1 = 아직)
+    var nIdleMs = -1;                       // 한가해진 시점(-1 = 아직)
+    var nLateMut = 0;                       // 마지막 여유 중의 변경 건수(기록용)
+    var nRounds = 0;                        // 0.3초 창을 다시 센 횟수
+
 
     function _finish(sHow) {
 
-        if (bEnded) { return; }
+        if (bEnded) {
+            return;
+        }
         bEnded = true;
 
-        try { if (oObs) { oObs.disconnect(); oObs = null; } }
-        catch (e) { console.error("[RSRC-013] busy settle: observer disconnect failed -", e && e.message); }
+        try {
+            if (oObs) {
+                oObs.disconnect();
+                oObs = null;
+            }
+        } catch (e) {
+            console.error("[RSRC-013] busy settle: observer disconnect failed -", e && e.message);
+        }
 
         // 기다리는 사이에 busy 를 다시 켰다 → 그 busy 를 끄면 안 된다.
-        if (nGen !== __u4aBusyGen) { return; }
+        if (nMyGen !== __u4aBusyGen) {
+            return;
+        }
 
         var nTotal = Math.round(performance.now() - t0);
 
         if (sHow === "LIMIT") {
-            console.error("[RSRC-014] BUSY_OFF_LIMIT: DOM not settled within " + __U4A_BUSY_SETTLE_LIMIT_MS + "ms - turning busy off anyway");
-        } else if (nMutAfterQuiet > 0) {
-            // DOM 이 조용해졌다고 본 뒤에도 더 바뀐 경우 = requestIdleCallback 까지 기다린 값어치.
-            console.warn("[RSRC-015] BUSY_OFF_LATE_DOM: " + nMutAfterQuiet + " mutations after quiet, quiet=" + nQuietMs + "ms total=" + nTotal + "ms");
+            console.error("[RSRC-014] BUSY_OFF_LIMIT: DOM not settled within "
+                + __U4A_BUSY_SETTLE_LIMIT_MS + "ms - turning busy off anyway");
+
+        } else if (nLateMut > 0) {
+            console.warn("[RSRC-015] BUSY_OFF_LATE_DOM: " + nLateMut + " mutations during final grace"
+                + ", quiet=" + nQuietMs + "ms total=" + nTotal + "ms");
         }
 
         // ★ [2026-10-19 장군님 지시] 눈으로 확인하실 수 있게 개발 모드에서는 꺼질 때마다 한 줄 찍는다.
-        //   패키징본에서는 안 찍는다(양 규칙). 확인이 끝나면 이 한 줄만 지우면 된다.
+        //   패키징본에서는 안 찍는다(양 규칙). 확인이 끝나면 이 블록만 지우면 된다.
         if (_u4aIsDev()) {
+
             var oW = _u4aBusyWatchEnd();
+
             if (oW) {
-                    console.log("[BUSY] on→off=" + (oW ? oW.onToOff : "?") + "ms"
-                + " mut=" + (oW ? oW.mut : "?")
-                + " lastChangeBeforeOff=" + (oW ? (oW.lastBeforeOff < 0 ? "none" : oW.lastBeforeOff + "ms") : "?")
-                + " lateMut=" + nMutAfterQuiet
-                + " (offSignal→off=" + nTotal + "ms quiet=" + nQuietMs + "ms idle=" + nIdleMs + "ms)");
-                }
+                console.log("[BUSY] on→off=" + oW.onToOff + "ms"
+                    + " mut=" + oW.mut
+                    + " lastChangeBeforeOff=" + (oW.lastBeforeOff < 0 ? "none" : oW.lastBeforeOff + "ms")
+                    + " lateMut=" + nLateMut
+                    + " (offSignal→off=" + nTotal + "ms"
+                    + " quiet=" + nQuietMs + "ms idle=" + nIdleMs + "ms rounds=" + nRounds + ")");
+            }
         }
 
         fnOff();
     }
 
+
     try {
+
         oObs = new MutationObserver(function (aMut) {
-            var nCnt = 0;
-            for (var i = 0; i < aMut.length; i++) {
-                // busy 자신의 열고 닫힘은 센다는 뜻이 아니므로 뺀다.
-                var bSelf = false;
-                for (var el = aMut[i].target; el; el = el.parentNode) {
-                    if (el.id === "u4aWsBusyIndicator") { bSelf = true; break; }
-                }
-                if (!bSelf) { nCnt++; }
+
+            var nCnt = _u4aCountOutside(aMut);
+
+            if (nCnt === 0) {
+                return;
             }
-            if (nCnt === 0) { return; }
-            if (nQuietMs < 0) { nLast = performance.now(); }
-            else { nMutAfterQuiet += nCnt; }
+
+            // 아직 조용함을 못 봤다 → 지금 창을 「변경 있었음」 으로(창을 다시 센다).
+            if (nQuietMs < 0) {
+                bDirty = true;
+                return;
+            }
+
+            // 마지막 여유 중 → 세기만 한다(판정에 쓰지 않음 — 머리 설명의 ★ 참조).
+            nLateMut += nCnt;
         });
-        oObs.observe(document.body, { childList: true, attributes: true, characterData: true, subtree: true });
+
+        _u4aObserveBody(oObs);
+
     } catch (e) {
         console.error("[RSRC-013] busy settle: observe failed -", e && e.message);
         fnOff();
         return;
     }
 
-    // ① DOM 이 조용해졌나 — 2 frame 연속 변경 없음
-    function _tick() {
-        if (bEnded) { return; }
-        if (nQuietMs >= 0) { return; }
-        if (nLast === nPrev) { nQuietFrames++; } else { nQuietFrames = 0; nPrev = nLast; }
-        if (nQuietFrames >= 2) {
-            nQuietMs = Math.round(nLast - t0);
-            if (bIdleCame) { _finish("BOTH"); }
+
+    // ①② 0.3초 창 — 그 안에 변경이 있었으면 다시 0.3초. 없으면 조용해진 것으로 본다.
+    function _checkQuiet() {
+
+        if (bEnded) {
             return;
         }
-        if (performance.now() - t0 > __U4A_BUSY_SETTLE_LIMIT_MS) { _finish("LIMIT"); return; }
-        requestAnimationFrame(_tick);
+
+        if (bDirty === true) {
+
+            bDirty = false;
+            nRounds++;
+
+            // 상한은 이 자리에서만 본다 — 계속 바뀌는 화면에서 영영 안 꺼지는 것을 막는다.
+            if (performance.now() - t0 > __U4A_BUSY_SETTLE_LIMIT_MS) {
+                _finish("LIMIT");
+                return;
+            }
+
+            setTimeout(_checkQuiet, __U4A_BUSY_QUIET_WINDOW_MS);
+            return;
+        }
+
+        nQuietMs = Math.round(performance.now() - t0);
+
+        _waitIdle();
     }
 
-    // ② 브라우저가 한가해졌나
-    var bIdleCame = false;
-    function _onIdle() {
-        bIdleCame = true;
+
+    // ③④ 브라우저가 한가해지면 0.3초 더 기다린 뒤 끈다(그 사이 변경은 보지 않는다).
+    function _waitIdle() {
+
+        if (typeof requestIdleCallback !== "function") {
+            _afterIdle();                   // 없는 환경이면 ①② 만으로 판정
+            return;
+        }
+
+        // 남은 상한만큼만 기다린다 — 한가해지지 않아도 그 시간에 도착한다.
+        var nLeft = __U4A_BUSY_SETTLE_LIMIT_MS - (performance.now() - t0);
+
+        requestIdleCallback(_afterIdle, { timeout: (nLeft > 0 ? nLeft : 0) });
+    }
+
+    function _afterIdle() {
+
+        if (bEnded) {
+            return;
+        }
+
         nIdleMs = Math.round(performance.now() - t0);
-        if (nQuietMs >= 0) { _finish("BOTH"); }
+
+        setTimeout(function () { _finish("BOTH"); }, __U4A_BUSY_QUIET_WINDOW_MS);
     }
 
-    requestAnimationFrame(_tick);
 
-    if (typeof requestIdleCallback === "function") {
-        requestIdleCallback(_onIdle, { timeout: __U4A_BUSY_SETTLE_LIMIT_MS });
-    } else {
-        _onIdle();                          // 없는 환경이면 ① 만으로 판정
-    }
-
+    setTimeout(_checkQuiet, __U4A_BUSY_QUIET_WINDOW_MS);
 }
 
 // 19. Busy Indicator 실행
@@ -1869,7 +2008,11 @@ function setBusy(bIsBusy, oOptions) {
         __u4aBusyGen++;
 
         // 켠 순간부터 DOM 변경을 세어 둔다(개발 모드 확인용).
-        try { _u4aBusyWatchStart(); } catch (e) { console.error("[RSRC-013] busy watch start failed -", e && e.message); }
+        try {
+            _u4aBusyWatchStart();
+        } catch (e) {
+            console.error("[RSRC-013] busy watch start failed -", e && e.message);
+        }
 
         // 파라미터에 옵션을 추가했을 경우는 BusyDialog로 호출함!!
         if (typeof oOptions === "object") {
