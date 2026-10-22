@@ -255,6 +255,16 @@
                 oVhBtn.innerHTML = _fa("magnifying-glass");
                 oVhBtn.addEventListener("click", function () { cfg.vh(oModel, oInput); });
                 oWrap.appendChild(oVhBtn);
+
+                //칸에 커서를 두고 F4 를 눌러도 이 단추를 누른 것과 같게 한다.
+                //  ★이 창은 공통 createField 를 쓰지 않고 단추를 손으로 만들기 때문에
+                //    공통이 자동으로 걸어 주지 못한다 — 여기서 직접 건다
+                //    (.claude/rules/code.md 「값도움 단추를 단 입력칸은 F4 도 반드시」).
+                if (window.U4AUI && typeof window.U4AUI.attachF4 === "function") {
+                    window.U4AUI.attachF4(oInput, oVhBtn);
+                } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "U4AUI.attachF4", "create application popup: F4 will not open the search help");
+                }
             }
             oRow.control.appendChild(oWrap);
         } else {
@@ -621,7 +631,7 @@
         oUIobj.gen.oInpPack = _buildInput(oModel, oR, {
             valPath: "/CREATE/PACKG", statPath: "/CREATE/PACKG_stat", stxtPath: "/CREATE/PACKG_stxt",
             editPath: "/CREATE/PACKG_edit", maxLength: 30, upper: true, clear: true,
-            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset
+            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset, vh: lf_PackageF4help
         });
         oGrid.appendChild(oR.row);
 
@@ -761,7 +771,7 @@
         oUIobj.dataset.oInpPack = _buildInput(oModel, oR, {
             valPath: "/DATASET/PACKG", statPath: "/DATASET/PACKG_stat", stxtPath: "/DATASET/PACKG_stxt",
             editPath: "/DATASET/PACKG_edit", maxLength: 30, upper: true, clear: true,
-            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset
+            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset, vh: lf_PackageF4help
         });
         oLeft.appendChild(oR.row);
 
@@ -1417,6 +1427,57 @@
         } catch (e) {
             if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "949")); // Value help is not available.
+        }
+    }
+
+    /**
+     * 패키지 F4 HELP — 앱 복사 창과 **같은 길**(`fnPackgSchpPopupOpener`).
+     *
+     * ★원본에는 이 칸에 값도움이 없다(원본 `sap.m.Input` 403·581행에 `showValueHelp` 없음).
+     *   장군님 지시 2026-10-22 「앱 생성 팝업에서 패키지 input 에도 동일하게 돋보기 버튼 만들어줘.
+     *   앱 복사 팝업에서 쓰던 로직 그대로 해줘」 로 **더한 기능**이다.
+     * ★고른 뒤에는 **손으로 친 것과 똑같이 검증을 태운다**(`lf_packageChangeEvent`).
+     *   안 태우면 존재검사가 미확정(`PACKG_ok !== true`)으로 남아 「확인」에서
+     *   「존재하지 않는 패키지」로 걸린다.
+     * ※ 이 함수 하나로 **일반 탭과 데이터 세트 탭 둘 다** 처리된다 —
+     *   `lf_getStruName` 이 지금 보고 있는 탭의 경로를 돌려준다(CTS 번호 값도움과 같은 구조).
+     */
+    function lf_PackageF4help(oModel, oInput) {
+
+        const ls_stru = lf_getStruName(oModel);
+
+        if (!ls_stru) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "lf_getStruName", "package value help cannot tell which tab is active");
+            }
+            return;
+        }
+
+        try {
+            oAPP.fn.fnPackgSchpPopupOpener(function (oResult) {
+
+                //값을 안 고르고 닫은 경우 — 쓰던 값을 그대로 둔다(앱 복사 창과 같다).
+                if (!oResult) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "package search help result", "package input keeps its previous value");
+                    }
+                    return;
+                }
+
+                const sPackage = (oResult.DEVCLASS == null) ? "" : oResult.DEVCLASS;
+
+                oModel.setProperty(ls_stru + "/PACKG", sPackage);
+
+                //모델 → DOM 반영은 포커스가 입력칸에 없을 때만 돌므로 여기서도 직접 넣는다.
+                if (oInput) {
+                    oInput.value = sPackage;
+                }
+
+                lf_packageChangeEvent(oModel, oInput);
+            });
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "950")); // Value help is not available.
         }
     }
 
