@@ -1498,10 +1498,11 @@
             oSearchVh.title = "Search Help (F4)";
             oSearchVh.setAttribute("data-act", "APPNM_F4");
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        // F4 키 → 값도움(버튼 클릭과 동일), Enter → no-op(원본 SearchField 동일), 더블클릭 → 전체선택.
+        // Enter → no-op(원본 SearchField 동일), 더블클릭 → 전체선택.
+        //   ★[2026-10-22] F4 는 여기서 뺀다 — 공통 createField({f4}) 가 걸어 주므로
+        //   두 줄 다 있으면 검색 팝업이 **두 번** 열린다. 동작은 전과 같다.
         oInput.addEventListener("keydown", function (e) {
-            if (e.key === "F4") { e.preventDefault(); _invoke("ev_AppValueHelp", "App Search Help (F4)"); }
-            else if (e.key === "Enter") { e.preventDefault(); }
+            if (e.key === "Enter") { e.preventDefault(); }
         });
         oInput.addEventListener("dblclick", function () { oInput.select(); });
 

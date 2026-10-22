@@ -289,8 +289,10 @@
         // (B) 일반 입력(+ 아이콘·컬러 F4) → 공통 createField.
         var bShowF4 = false;
         try {
+            //★styleClass 도 값도움 대상이다(장군님 지시 2026-10-22) — 아래 _callInputF4Help 설명 참고.
             bShowF4 = (typeof oAPP.fn.attrIsIconProp === "function" && oAPP.fn.attrIsIconProp(is_attr) === true) ||
-                (typeof oAPP.fn.attrIsColorProp === "function" && oAPP.fn.attrIsColorProp(is_attr) === true);
+                (typeof oAPP.fn.attrIsColorProp === "function" && oAPP.fn.attrIsColorProp(is_attr) === true) ||
+                (is_attr.UIATT === "styleClass");
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oFld = U4AUI.createField({
@@ -305,6 +307,7 @@
             f4Disabled: false
         });
         oState.field = oFld;
+
         return oFld.el;
     }
 
@@ -351,9 +354,116 @@
             else { oAPP.loadJs("fnColorPickerPopover", function () { if (oAPP.fn.fnColorPickerOpen) { oAPP.fn.fnColorPickerOpen(oAnchor, oState.value, fnDone); } }); }
             return;
         }
-        //아이콘 프로퍼티 → 콜백형 아이콘 선택기는 HTML5 미변환(fnIconListPopupOpener 는 콜백 없는 외부창).
-        //  임의 대체 금지(원본에 없는 행위 방지) — 행의 미변환 F4 와 동일하게 경고만.
-        console.warn("[W4+ pending] same-property sync icon F4 (callIconListPopup) not converted:", is_attr.UIATT);
+        //styleClass → CSS 클래스 고르기 창을 **값을 돌려주는 모드**로 연다(장군님 지시 2026-10-22).
+        //  ★원본에는 이 창에 styleClass 값도움이 없다 — 단추만 뜨고 눌러도 아무 일이 없었다.
+        //    장군님이 「원본은 없는 게 맞다 우리는 추가해라」 하셔서 **더한 기능**이다.
+        //  ★속성에 바로 쓰지 않는다 — 이 창은 「확인」을 눌러야 고른 줄들에 한꺼번에 반영된다.
+        if (is_attr.UIATT === "styleClass") {
+
+            var fnScDone = function (sVal) {
+                oState.value = (sVal != null) ? sVal : "";
+
+                if (oState.field && oState.field.input) {
+                    oState.field.input.value = oState.value;
+                }
+
+                _onChangeValue();
+            };
+
+            var fnScOpen = function () {
+                oAPP.fn.fnStyleClassPopupOpen(is_attr, { value: oState.value, onChange: fnScDone });
+            };
+
+            if (typeof oAPP.fn.fnStyleClassPopupOpen === "function") {
+                fnScOpen();
+                return;
+            }
+
+            oAPP.loadJs("fnStyleClassPopupOpen", function () {
+
+                if (typeof oAPP.fn.fnStyleClassPopupOpen !== "function") {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "fnStyleClassPopupOpen", "styleClass value help cannot open");
+                    }
+                    return;
+                }
+
+                fnScOpen();
+            });
+
+            return;
+        }
+
+        //아이콘 프로퍼티 → 이미 있는 아이콘 팝업(별창)을 콜백 모드로 연다(장군님 지시 2026-10-22).
+        //  ★그 창은 한 함수로 두 가지로 쓴다 — 콜백을 넘기면 고른 아이콘을 돌려주고(값도움),
+        //    안 넘기면 보여 주기만 한다(fnDialogPopupOpener.js 의 fnIconPreviewPopupOpener 1999행).
+        //    속성 영역 F4(ws_html5_ws20_attr.js)가 이미 같은 길로 간다 — 여기만 빠져 있었다.
+        //  ★서버 허용 게이트(UHAK900630)도 속성 영역과 같게 둔다 — 그 화면이 없는 옛 서버가 있다.
+        var bIcon = false;
+
+        try {
+            bIcon = (typeof oAPP.fn.attrIsIconProp === "function" && oAPP.fn.attrIsIconProp(is_attr) === true);
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        if (bIcon !== true) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "attrIsIconProp", "not a color/icon property, F4 opens nothing: " + is_attr.UIATT);
+            }
+            return;
+        }
+
+        var bAllowed = false;
+
+        try {
+            bAllowed = (oAPP.common.checkWLOList("C", "UHAK900630") === true);
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        if (bAllowed !== true || typeof oAPP.fn.fnIconPreviewPopupOpener !== "function") {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnIconPreviewPopupOpener", "icon popup not available on this server (UHAK900630), icon F4 does nothing");
+            }
+            return;
+        }
+
+        //팝업을 여는 동안 조작을 막는다(원본 4065 parent.setBusy).
+        try {
+            parent.setBusy && parent.setBusy("X");
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        oAPP.fn.fnIconPreviewPopupOpener(function (e) {
+
+            try {
+                parent.setBusy && parent.setBusy("");
+            } catch (er) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(er); }
+            }
+
+            //취소(원본 RETCD = "C").
+            if (!e || e.RETCD === "C") {
+                return;
+            }
+
+            var sIcon = e.RTDATA;
+
+            //빈 값은 반영하지 않는다(원본 동일).
+            if (sIcon == null || sIcon === "") {
+                return;
+            }
+
+            oState.value = sIcon;
+
+            if (oState.field && oState.field.input) {
+                oState.field.input.value = sIcon;
+            }
+
+            _onChangeValue();
+        });
     }
 
     /************************************************************************

@@ -197,6 +197,11 @@
         oVh.title = _txt("/U4A/CL_WS_COMMON", "A22"); // Package
         oVh.addEventListener("click", oAPP.events.ev_packageSchpEvt);
         oPackWrap.appendChild(oVh);
+        // 커서를 둔 채 F4 를 누르면 돋보기를 누른 것과 같게(2026-10-22 장군님 지시).
+        //   이 칸은 공통 createField 를 안 쓰고 손으로 만들어서 여기서 직접 건다.
+        if (window.U4AUI && typeof window.U4AUI.attachF4 === "function") {
+            window.U4AUI.attachF4(oPackInp, oVh);
+        }
         oR.control.appendChild(oPackWrap);
         const oPackMsg = oR.msg;
         oBody.appendChild(oR.row);

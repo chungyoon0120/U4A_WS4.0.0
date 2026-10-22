@@ -523,6 +523,52 @@
         return _sync;
     }
 
+    /************************************************************************
+     * 입력칸에 F4(값도움) 키를 건다 — 커서를 둔 채 F4 를 누르면 **그 칸의 돋보기를 누른 것과 같다.**
+     * ----------------------------------------------------------------------
+     * ★[2026-10-22 장군님 지시] 「input 에 돋보기 아이콘 누르면 검색 팝업 나오는 경우는,
+     *   그 input 에 커서를 대고 F4 를 누르면 검색 팝업이 나오게」 — 원본 UI5 Input 의
+     *   valueHelpRequest 와 같은 느낌이다. **앞으로 돋보기를 다는 칸은 전부 이것을 건다.**
+     *
+     * createField({ f4: ... }) 로 만든 칸은 **자동으로 걸린다.**
+     * 돋보기를 손으로 만든 화면만 이 함수를 직접 부른다.
+     *
+     * @param {HTMLInputElement|HTMLTextAreaElement} oInput 대상 입력
+     * @param {HTMLElement} oVhBtn 그 칸의 값도움(돋보기) 버튼
+     ************************************************************************/
+    function attachF4(oInput, oVhBtn) {
+
+        if (!oInput || !oVhBtn) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "attachF4", "input or value-help button missing, F4 will not open the search popup");
+            }
+            return;
+        }
+
+        oInput.addEventListener("keydown", function (ev) {
+
+            if (ev.key !== "F4") {
+                return;
+            }
+
+            //꾹 누름 — 한 번만 연다.
+            if (ev.repeat === true) {
+                return;
+            }
+
+            //버튼이 꺼져 있으면 돋보기를 눌러도 안 열리는 상태다 — F4 도 안 열리게 맞춘다.
+            if (oVhBtn.disabled === true) {
+                return;
+            }
+
+            //브라우저 기본 동작과 바깥 단축키로 새지 않게 막는다.
+            ev.preventDefault();
+            ev.stopPropagation();
+
+            oVhBtn.click();
+        });
+    }
+
     /* 창 이동은 네이티브 -webkit-app-region:drag(shell.css .u4a-titlebar)로 처리한다.
        JS 포인터 기반 창 이동은 근본 해결이 안 돼(레이아웃/컴포지팅 문제) 제거함.
        iframe stale 은 호스트의 _kickHostDragRegion 가, 컴포지팅 레이어는 CSS 정적화로
@@ -1990,6 +2036,18 @@
             if (opts.f4Disabled) { oVh.disabled = true; }
             oVh.addEventListener("click", () => { try { opts.f4(oInput); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
             oWrap.appendChild(oVh); iTrail++;
+            //커서를 둔 채 F4 를 누르면 이 단추를 누른 것과 같게 한다(2026-10-22 장군님 지시).
+            //  ★걸리는 모양은 **두 가지뿐**이다 — 장군님 기준 2026-10-22
+            //  (「돋보기 아이콘 또는 네모 겹친 아이콘을 만들 경우에는 반드시 F4 를」).
+            //    · 돋보기(magnifying-glass) — 기본값
+            //    · 겹친 네모(clone) — 속성값 칸 등에서 쓴다
+            //  폴더·이미지처럼 그 밖의 모양을 쓰는 값도움은 대상이 아니다.
+            var sF4Mark = String(opts.f4IconHtml || opts.f4Icon || "magnifying-glass");
+            var bF4Key = (sF4Mark.indexOf("magnifying-glass") >= 0) || (sF4Mark.indexOf("clone") >= 0);
+
+            if (bF4Key) {
+                attachF4(oInput, oVh);
+            }
         }
         if (iTrail) { oWrap.setAttribute("data-trail", String(iTrail)); }
 
@@ -3357,6 +3415,7 @@
         createSelect: createSelect,
         attachSuggest: attachSuggest,
         attachClear: attachClear,
+        attachF4: attachF4,
         attachOverflow: attachOverflow,
         openColumnMenu: openColumnMenu,
         closeColumnMenu: closeColumnMenu,

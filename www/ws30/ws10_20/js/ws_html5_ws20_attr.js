@@ -6103,6 +6103,7 @@
                 onEnter: function (v) { sAttr.UIATV = v; oAPP.fn.fnWs20AttrChange(sAttr, "INPUT"); }
             });
             oValFld.input.title = oValFld.input.value;
+
             //F4Only + 편집모드 = readOnly 지만 '편집 가능' 외관 유지(직접 타이핑만 차단, F4·clear 는 동작).
             //  display 모드(bFieldEdit=false)는 일반 readonly(평문) 룩 그대로 → vho 미부여.
             if (bF4Only && bFieldEdit) {

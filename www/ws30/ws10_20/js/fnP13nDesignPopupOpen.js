@@ -1609,8 +1609,38 @@
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try { oUI.dlg.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-        // afterOpen 처리.
-        lf_afterOpen();
+        /********************************************************************
+         * ★[2026-10-22 장군님 지시] 여는 길에도 **한 번 양보**한다.
+         * ------------------------------------------------------------------
+         * 안 하면 show() 바로 뒤에 무거운 동기 작업(미리보기 HTML · 목록 그리기)이
+         * 쉬지 않고 이어져, 브라우저가 화면을 다시 그릴 틈이 없다.
+         * 실제 증상(장군님 2026-10-22): **busy 만 돌다가, busy 가 꺼진 뒤에야 팝업이 한꺼번에 뜬다.**
+         * 올바른 순서 = busy 켜기 → **껍데기 보이기** → 내용 그리기 → busy 끄기.
+         *
+         * ★이 함수는 **동기 그대로** 둔다(async 로 바꾸지 않는다) — 호출처 2곳이
+         *   try/catch 로 감싸는데(ws_html5_ws20_edit.js · ws_html5_ws20_tree.js),
+         *   async 로 바꾸면 그 catch 가 예외를 못 잡는다(.claude/rules/code.md).
+         ********************************************************************/
+        var fnAfter = function () {
+            try {
+                lf_afterOpen();
+            } catch (e) {
+                console.error("[WS20][p13n] afterOpen failed:", e && e.message, e);
+                _unlock();
+                _busy(false);
+            }
+        };
+
+        if (APPCOMMON && typeof APPCOMMON.fnYieldToPaint === "function") {
+            APPCOMMON.fnYieldToPaint().then(fnAfter, fnAfter);
+            return;
+        }
+
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "fnYieldToPaint", "popup shell cannot be painted first - the dialog appears only after everything is drawn");
+        }
+
+        fnAfter();
     };
 
     // ★UI5 원본 callP13nDesignDataPopup(new sap.m.Dialog)이 런타임에 로드돼 있을 수 있으므로

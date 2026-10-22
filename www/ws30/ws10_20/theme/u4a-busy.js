@@ -26,7 +26,25 @@
     var nGen = 0;
 
     // 끄기 전 기다림의 두 시간값.
-    var SETTLE_LIMIT_MS = 5000;         // 상한 — 고장 알림용(정상 경로 아님)
+    /************************************************************************
+     * ★★[2026-10-22 장군님 결정] 시간이 지났다고 **busy 를 강제로 끄지 않는다.**
+     * ----------------------------------------------------------------------
+     * 「차라리 오류가 나서 busy 가 안 꺼지는 게 더 낫지, 괜히 일정 시간 지났다고
+     *  강제로 껐다가 다른 액션에서 꼬이거나 데이터 잘못되면 책임 누가 질 건데?」
+     * 「제일 리스크는 잘못된 데이터가 저장되버리면 이거 복구하기도 힘들잖아」
+     *
+     * busy 는 **하나의 요청이 끝날 때까지 중복 요청을 막아 프로세스가 꼬이지 않게** 하는 것이다.
+     * 화면 그리기도 그 요청의 일부라, 다 안 그려졌는데 끄면 그 목적이 깨진다.
+     * → **fail-closed**: 못 끝내면 켠 채로 둔다. 멈춘 것처럼 보이는 편이
+     *   잘못된 데이터가 저장되는 것보다 낫다(매번 백업하는 전략도 없다).
+     *
+     * 아래 값은 **끄는 기준이 아니다** — 「너무 오래 걸린다」고 한 번 알리는 기준이다.
+     ************************************************************************/
+    var SLOW_WARN_MS = 5000;
+
+    // 한가해지기를 기다리는 자리의 상한 — 거긴 **이미 조용해진 뒤**라 곧 온다.
+    //   한가해지지 않아도 이 시간에 진행한다(조용한 상태였으므로 끄는 것이 맞다).
+    var IDLE_TIMEOUT_MS = 5000;
 
     // 조용함을 보는 창. 마지막 여유도 같은 값을 쓰므로, 끄기 신호부터 실제로 꺼지기까지
     //   **최소 이 값의 2배**가 걸린다(지금 150 × 2 = 300ms).
@@ -269,7 +287,7 @@
      *   ★④ 의 그 창 동안 일어난 변경은 판정에 쓰지 않는다 — 장군님 「4번이면 이미 끝난 것으로 보라」.
      *     세기만 해서 로그에 남긴다. 다시 세기로 하면 조금씩 계속 바뀌는 화면에서 영영 안 꺼진다.
      *   (구) requestAnimationFrame 으로 「변경 없는 frame 2번 연속」 — 간격이 ~16ms 로 너무 짧았다.
-     *   상한(SETTLE_LIMIT_MS)은 ② 자리에서만 본다 — ④ 의 한 창은 상한 뒤에 붙을 수 있다.
+     *   ★상한에 닿아도 **끄지 않는다** — 위 SLOW_WARN_MS 설명 참조(장군님 결정 2026-10-22).
      *
      * 기다리는 중 show() 가 오면 끄기를 버린다(세대 번호).
      * 상한에 닿으면 끄고 ERROR 로그 — 정상 경로가 아니라 고장 알림용.
@@ -339,6 +357,7 @@
         var nQuietMs = -1;                  // 조용해진 시점(-1 = 아직)
         var nIdleMs = -1;                   // 한가해진 시점(-1 = 아직)
         var nLateMut = 0;                   // 마지막 여유 중의 변경 건수(기록용)
+        var bSlowWarned = false;            // 「너무 오래 걸린다」 알림을 이미 찍었나(한 번만)
         var nRounds = 0;                    // 창을 다시 센 횟수
 
 
@@ -365,11 +384,7 @@
 
             var nTotal = Math.round(performance.now() - t0);
 
-            if (sHow === "LIMIT") {
-                console.error("[UBSY-005] BUSY_OFF_LIMIT: DOM not settled within "
-                    + SETTLE_LIMIT_MS + "ms - turning busy off anyway");
-
-            } else if (nLateMut > 0) {
+            if (nLateMut > 0) {
                 console.warn("[UBSY-006] BUSY_OFF_LATE_DOM: " + nLateMut + " mutations during final grace"
                     + ", quiet=" + nQuietMs + "ms total=" + nTotal + "ms");
             }
@@ -434,10 +449,11 @@
                 bDirty = false;
                 nRounds++;
 
-                // 상한은 이 자리에서만 본다 — 계속 바뀌는 화면에서 영영 안 꺼지는 것을 막는다.
-                if (performance.now() - t0 > SETTLE_LIMIT_MS) {
-                    _finish("LIMIT");
-                    return;
+                //너무 오래 걸리면 **한 번만** 알린다 — 그래도 끄지 않고 계속 기다린다(위 SLOW_WARN_MS 설명).
+                if (bSlowWarned === false && performance.now() - t0 > SLOW_WARN_MS) {
+                    bSlowWarned = true;
+                    console.error("[UBSY-005] BUSY_STILL_ON: DOM still changing after "
+                        + SLOW_WARN_MS + "ms - busy stays on until it settles (on purpose)");
                 }
 
                 setTimeout(_checkQuiet, QUIET_WINDOW_MS);
@@ -458,10 +474,7 @@
                 return;
             }
 
-            // 남은 상한만큼만 기다린다 — 한가해지지 않아도 그 시간에 도착한다.
-            var nLeft = SETTLE_LIMIT_MS - (performance.now() - t0);
-
-            requestIdleCallback(_afterIdle, { timeout: (nLeft > 0 ? nLeft : 0) });
+            requestIdleCallback(_afterIdle, { timeout: IDLE_TIMEOUT_MS });
         }
 
         function _afterIdle() {
