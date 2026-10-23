@@ -452,7 +452,9 @@
                 //너무 오래 걸리면 **한 번만** 알린다 — 그래도 끄지 않고 계속 기다린다(위 SLOW_WARN_MS 설명).
                 if (bSlowWarned === false && performance.now() - t0 > SLOW_WARN_MS) {
                     bSlowWarned = true;
-                    console.error("[UBSY-005] BUSY_STILL_ON: DOM still changing after "
+                    // ★[2026-10-23 장군님 지시 「내려라」] console.error → console.warn.
+                    //   결함이 아니라 「오래 걸린다」는 알림이다 — 빨간 줄로 찍으면 진짜 오류와 섞인다.
+                    console.warn("[UBSY-005] BUSY_STILL_ON: DOM still changing after "
                         + SLOW_WARN_MS + "ms - busy stays on until it settles (on purpose)");
                 }
 
