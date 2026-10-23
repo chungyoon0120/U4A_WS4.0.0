@@ -1179,8 +1179,13 @@
         if (_SPLIT_RESET_ON || typeof document === "undefined") { return; }
         _SPLIT_RESET_ON = true;
 
+        // ★옆 패널은 드래그와 똑같은 기준으로 찾는다 — 바와 "숨겨진 패널"을 건너뛴다.
+        //   예전엔 바로 옆 형제를 그대로 썼다. 그래서 화면 커스터마이징으로 숨긴 영역에 home 을 적고,
+        //   정작 드래그로 폭이 바뀌는 패널은 기록이 없어 더블클릭 복귀가 아무것도 안 했다
+        //   (2026-10-22 바인딩 팝업 실제 사고 — DESIGN TREE 숨긴 뒤 더블클릭 먹통).
+        //   바가 연달아 있을 때 바 자체를 home 대상으로 잡던 것도 같이 없어진다.
         function _sides(oBar) {
-            return [oBar.previousElementSibling, oBar.nextElementSibling].filter(Boolean);
+            return [_splitPrevPane(oBar), _splitNextPane(oBar)].filter(Boolean);
         }
         // 드래그 시작 직전(capture) — 인접 패널의 현재 flex 를 home 으로 1회 기록(미기록 시에만)
         document.addEventListener("mousedown", function (e) {
@@ -1261,14 +1266,32 @@
         if (/\d(?:\.\d+)?px/.test(el.style.flex || "")) { return false; }   // 드래그로 px 고정됨
         return (parseFloat(getComputedStyle(el).flexGrow) > 0);
     }
+    // 숨겨진 패널(화면 커스터마이징으로 display:none 된 영역)은 드래그 대상에서 뺀다.
+    //   창 크기 변경 때 쓰는 _splitReclampOne 은 이미 숨김 패널을 빼고 세는데, 드래그 쪽만 빠져 있었다.
+    //   실제 사고(2026-10-22, 바인딩 팝업 — 구글시트와 별개로 장군님이 직접 잡아 주신 건):
+    //   가운데 DESIGN TREE 를 숨기자 남은 바가 숨어 있는 가운데 패널을 붙잡아 양옆 어느 쪽도 안 움직였다.
+    //   원본 UI5 는 커스터마이징 때 활성 영역만으로 sap.ui.layout.Splitter 를 다시 만들어 이 상황 자체가 없다.
+    function _splitIsHidden(el) {
+        if (!el || el.nodeType !== 1) {
+            return false;
+        }
+        return getComputedStyle(el).display === "none";
+    }
+    function _splitSkip(el) {
+        return _splitIsBar(el) || _splitIsHidden(el);
+    }
     function _splitPrevPane(oBar) {
         var el = oBar.previousElementSibling;
-        while (el && _splitIsBar(el)) { el = el.previousElementSibling; }
+        while (el && _splitSkip(el)) {
+            el = el.previousElementSibling;
+        }
         return el;
     }
     function _splitNextPane(oBar) {
         var el = oBar.nextElementSibling;
-        while (el && _splitIsBar(el)) { el = el.nextElementSibling; }
+        while (el && _splitSkip(el)) {
+            el = el.nextElementSibling;
+        }
         return el;
     }
     // oA·oB 를 뺀 나머지 패널의 현재 크기 합(단일 패널 조절 시 상한 계산용).
@@ -1352,8 +1375,14 @@
             document.removeEventListener("mouseup", lf_up);
         }
         oBar.addEventListener("mousedown", function (ev) {
-            oA = _splitPrevPane(oBar); oB = _splitNextPane(oBar);
-            if (!oA || !oB) { return; }
+            oA = _splitPrevPane(oBar);
+            oB = _splitNextPane(oBar);
+            if (!oA || !oB) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "wireSplitter", "no visible pane on one side of the bar: drag ignored");
+                }
+                return;
+            }
             bDrag = true;
             iStart = ev[AX.pos];
             iLastPos = iStart;
@@ -2835,13 +2864,50 @@
                 if (n > 1) { w += iGap * (n - 1); }
                 return w + 2;
             }
-            var iTxt = _measTxt((oCell.textContent || "").trim(), oCell);
-            var iEl = 0;   // 텍스트 없는 요소(상태 아이콘 등) 폭 가산
-            for (var e = 0; e < oCell.children.length; e++) {
-                var el = oCell.children[e];
-                if (!(el.textContent || "").trim()) { iEl += el.getBoundingClientRect().width; }
+            if (!oCell.children.length) {
+                return _measTxt((oCell.textContent || "").trim(), oCell) + iPad + 4;
             }
-            return iTxt + iEl + iPad + 4;
+            return _natW(oCell) + 4;
+        }
+        // 요소 하나의 자연폭(px) — 자식이 있으면 안쪽까지 들어가 더한다.
+        //   ★글자가 있는 자식도 반드시 들어간다(장군님 지적 2026-10-22 「... 이 나오면 안 되잖아」).
+        //   예전엔 "글자 없는 자식"만 실측해 더했다. 그래서 아이콘과 글자를 한 덩어리로 감싼 칸
+        //   (바인딩 팝업 「유형」 = 상태 아이콘 + 유형 글자)은 그 덩어리에 글자가 있다는 이유로 통째로
+        //   건너뛰어, 아이콘 폭과 사이 간격(gap)이 빠진 폭이 나왔다 → 자동 맞춤 뒤에도 "..." 이 남았다.
+        //   ★글자는 measureText 로 잰다 — 이미 말줄임된 rect 를 쓰면 잘린 폭에 그대로 맞춰 버린다.
+        //   ★글자 없는 요소(아이콘)만 rect 로 잰다 — 글리프 폭은 그 요소의 실측값이 정확하다.
+        function _natW(el) {
+            var cs = getComputedStyle(el);
+            var iPad = _px(cs.paddingLeft) + _px(cs.paddingRight);
+            var iBor = _px(cs.borderLeftWidth) + _px(cs.borderRightWidth);
+            var iMar = _px(cs.marginLeft) + _px(cs.marginRight);
+            var aKids = el.children;
+            if (!aKids.length) {
+                var sTxt = (el.textContent || "").trim();
+                if (!sTxt) {
+                    return el.getBoundingClientRect().width + iMar;
+                }
+                return _measTxt(sTxt, el) + iPad + iBor + iMar;
+            }
+            var iSum = 0;
+            for (var k = 0; k < aKids.length; k++) {
+                iSum += _natW(aKids[k]);
+            }
+            if (aKids.length > 1) {
+                iSum += _px(cs.columnGap || cs.gap) * (aKids.length - 1);
+            }
+            // 자식 요소 사이에 끼어 있는 맨 글자도 더한다(두 가지가 섞인 칸).
+            for (var t = 0; t < el.childNodes.length; t++) {
+                var oNd = el.childNodes[t];
+                if (oNd.nodeType !== 3) {
+                    continue;
+                }
+                var sOwn = (oNd.nodeValue || "").trim();
+                if (sOwn) {
+                    iSum += _measTxt(sOwn, el);
+                }
+            }
+            return iSum + iPad + iBor + iMar;
         }
         function _autoW(iCol) {
             var oH = aHeadCells[iCol];
