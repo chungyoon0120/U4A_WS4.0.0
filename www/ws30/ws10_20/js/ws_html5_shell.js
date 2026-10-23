@@ -1120,14 +1120,45 @@
      *  구: sap.m.InstanceManager.closeAllPopovers/LightBoxes → sap 없음(크래시).
      *  신: 열려있는 native <dialog> 전부 닫기(HTML5). 뒤로가기(fnMoveToWs10) 경로의
      *      "sap is not defined" 크래시 제거.
+     *
+     *  ★[2026-10-23 장군님 지시 "빼라"] 공통 busy <dialog> 는 닫지 않는다.
+     *    까닭: 공통 busy 도 <dialog>.showModal() 이라(theme/u4a-busy.js) 종전에는 여기서
+     *      같이 닫혔다. WS20→WS10 이동(ws_fn_02.js fnMoveToWs10)은 흐름 맨 앞에서
+     *      fnCloseAllWs20Dialogs → 이 함수를 부르므로, busy 창이 시작 지점에서 사라지고
+     *      그 뒤 WS20 DOM 초기화(removeContent)·페이지 전환이 전부 조작 가능한 상태로 돌았다.
+     *      테스트 도구가 "busy 가 실제로 닫힌 뒤 DOM 변경이 감지된다"고 잡아낸 그 사고다.
+     *    busy 를 끄는 것은 공통(U4ABusy.hide — DOM 변경이 조용해질 때까지 기다린다)의 몫이다.
+     *      여기서는 건드리지 않는다.
      ************************************************************************/
     oAPP.fn.fnCloseAllDialog = function () {
+
+        var BUSY_DLG_ID = "u4aWsBusyIndicator";
+
         try {
+
             var aDlg = document.querySelectorAll("dialog[open]");
+
             for (var i = 0; i < aDlg.length; i++) {
-                try { aDlg[i].close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+                if (aDlg[i].id === BUSY_DLG_ID) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                        U4ALOG.info("DONE", "fnCloseAllDialog", "kept " + BUSY_DLG_ID + " open - only U4ABusy.hide may close it");
+                    }
+                    continue;
+                }
+
+                try {
+                    aDlg[i].close();
+                } catch (e) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                }
+
             }
-        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
     };
 
     /************************************************************************

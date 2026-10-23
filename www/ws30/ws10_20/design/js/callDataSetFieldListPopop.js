@@ -190,25 +190,85 @@
         oBar.appendChild(oTotLb);
         oBody.appendChild(oBar);
 
-        // ── 테이블(공통 .u4a-table + 멀티선택 체크박스 열) ──
-        var oWrap = _el("div", "u4a-table-wrap u4a-table-wrap--boxed u4aDsFldTableWrap");
-        var oTable = _el("table", "u4a-table u4aDsFldTable");
-        var oThead = _el("thead");
-        var oHtr = _el("tr");
-        var oThChk = _el("th", "u4aDsFldColChk");
-        var oHeadChk = _el("input"); oHeadChk.type = "checkbox"; oHeadChk.className = "u4aDsFldHeadChk";
+        // ── 테이블 — 공통 생성기(U4AUI.makeDataTable) 소비 ──────────────────
+        //   [2026-10-23 장군님 지적] 전에는 <table> 을 손으로 만들고 받은 행을 **전부** <tr> 로 넣었다.
+        //   299건이면 299행이 통째로 DOM 에 들어간다 — 원본 sap.ui.table.Table 은 보이는 행만 그린다.
+        //   공통 생성기는 **가상 스크롤이 기본**이라 보이는 행만 그린다. 행이 다시 그려져도
+        //   체크 상태가 남도록 **선택 여부는 DOM 이 아니라 데이터(r.SEL)에서 읽는다.**
+        var oWrap = _el("div", "u4a-table-wrap--boxed u4aDsFldTableWrap");
+        oBody.appendChild(oWrap);
+
+        var oHeadChk = _el("input");
+        oHeadChk.type = "checkbox";
+        oHeadChk.className = "u4aDsFldHeadChk";
         oHeadChk.title = _txt(oAPP, "/U4A/CL_WS_COMMON", "B33");
         oHeadChk.addEventListener("change", function () { _selectAll(oHeadChk.checked); });
-        oThChk.appendChild(oHeadChk);
-        oHtr.appendChild(oThChk);
-        oHtr.appendChild(_el("th", null, _txt(oAPP, "/U4A/CL_WS_COMMON", "D68")));                 // Field Name
-        oHtr.appendChild(_el("th", "u4aDsFldColKey", _txt(oAPP, "/U4A/CL_WS_COMMON", "E16")));      // Key Field
-        oHtr.appendChild(_el("th", null, _txt(oAPP, "/U4A/CL_WS_COMMON", "A35")));                  // Description
-        oThead.appendChild(oHtr);
-        var oTbody = _el("tbody");
-        oTable.append(oThead, oTbody);
-        oWrap.appendChild(oTable);
-        oBody.appendChild(oWrap);
+
+        // 선택 체크박스 셀 — 행이 다시 그려질 때마다 새로 만든다(상태는 r.SEL 이 갖는다).
+        function _cellSel(r) {
+            var oChk = _el("input");
+            oChk.type = "checkbox";
+            oChk.className = "u4aDsFldRowChk";
+            oChk.checked = r.SEL === true;
+            oChk.disabled = !r.ENAB_SEL;
+            oChk.addEventListener("change", function () {
+                r.SEL = oChk.checked;
+                var oTr = oChk.closest("tr");
+                if (oTr) { oTr.setAttribute("aria-selected", r.SEL ? "true" : "false"); }
+                _afterSelChange();
+            });
+            return oChk;
+        }
+
+        // Key 여부 — 읽기전용 체크박스(원본과 같은 표시).
+        function _cellKey(r) {
+            var oKey = _el("input");
+            oKey.type = "checkbox";
+            oKey.className = "u4aDsFldKeyChk";
+            oKey.checked = r.isKey === true;
+            oKey.disabled = true;
+            return oKey;
+        }
+
+        var oTbl = null;
+        if (window.U4AUI && typeof window.U4AUI.makeDataTable === "function") {
+            oTbl = window.U4AUI.makeDataTable(oWrap, {
+                tableClass: "u4aDsFldTable",
+                selectable: false,          // 선택은 체크박스로만(원본 selectionMode:"None")
+                emptyText: _wsTxt("946"),   // 데이터 없음(공통)
+                rowKey: function (r, i) { return (r && r.FLDNM) || i; },
+                columns: [
+                    { key: "SEL", label: "", className: "u4aDsFldColChk", cellClass: "u4aDsFldColChk", cell: _cellSel },
+                    { key: "FLDNM", label: _txt(oAPP, "/U4A/CL_WS_COMMON", "D68") },                                            // Field Name
+                    { key: "isKey", label: _txt(oAPP, "/U4A/CL_WS_COMMON", "E16"), className: "u4aDsFldColKey", cellClass: "u4aDsFldColKey", cell: _cellKey },
+                    { key: "FLDTX", label: _txt(oAPP, "/U4A/CL_WS_COMMON", "A35") }                                             // Description
+                ],
+                rowHook: function (oTr, r) {
+                    if (!r.ENAB_SEL) { oTr.setAttribute("data-disabled", "true"); }
+                    oTr.setAttribute("aria-selected", r.SEL ? "true" : "false");
+                    // 설명 칸 — 부가설명(FLDTT)이 있으면 공통 툴팁으로. 네이티브 title 은 쓰지 않는다.
+                    var oTdTx = oTr.cells[3];
+                    if (!oTdTx) { return; }
+                    oTdTx.removeAttribute("title");
+                    if (r.FLDTT) { oTdTx.setAttribute("data-tip", r.FLDTT); }
+                }
+            });
+        }
+        if (!oTbl) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "U4AUI.makeDataTable", "search field list cannot be rendered");
+            }
+            _resolveOnce({ RETCD: "E" });
+            return;
+        }
+        // 머리글 첫 칸에 전체선택 체크박스(공통 생성기는 머리글에 글자만 넣는다).
+        var oThChk = oTbl.thead && oTbl.thead.rows[0] && oTbl.thead.rows[0].cells[0];
+        if (oThChk) {
+            oThChk.textContent = "";
+            oThChk.appendChild(oHeadChk);
+        } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "head checkbox cell", "select-all checkbox not placed");
+        }
 
         // ── 선택 필드 토큰(칩) ──
         var oTokens = _el("div", "u4aDsFldTokens");
@@ -232,60 +292,6 @@
         /* ── 렌더/상태 함수 ─────────────────────────────────────── */
         function _selCount() { return aRows.filter(function (r) { return r.SEL === true; }).length; }
 
-        function _buildRow(r, idx) {
-            var oTr = _el("tr");
-            if (idx % 2 === 1) { oTr.setAttribute("data-odd", "true"); }   // zebra — 공통 [data-odd](형제 팝업 동일)
-            if (!r.ENAB_SEL) { oTr.setAttribute("data-disabled", "true"); }
-            oTr.setAttribute("aria-selected", r.SEL ? "true" : "false");
-
-            // (1) 선택 체크박스
-            var oTdChk = _el("td", "u4aDsFldColChk");
-            var oChk = _el("input"); oChk.type = "checkbox"; oChk.className = "u4aDsFldRowChk";
-            oChk.checked = r.SEL === true;
-            oChk.disabled = !r.ENAB_SEL;
-            oChk.addEventListener("change", function () {
-                r.SEL = oChk.checked;
-                oTr.setAttribute("aria-selected", r.SEL ? "true" : "false");
-                _afterSelChange();
-            });
-            r.__chk = oChk;
-            oTdChk.appendChild(oChk);
-            oTr.appendChild(oTdChk);
-
-            // (2) 필드명 — 말줄임 시 공통 .u4a-table 자동 툴팁(data-tip-trunc). 네이티브 title 금지.
-            var oTdNm = _el("td", null, r.FLDNM);
-            oTr.appendChild(oTdNm);
-
-            // (3) Key 여부(읽기전용 체크박스)
-            var oTdKey = _el("td", "u4aDsFldColKey");
-            var oKey = _el("input"); oKey.type = "checkbox"; oKey.className = "u4aDsFldKeyChk";
-            oKey.checked = r.isKey === true; oKey.disabled = true;
-            oTdKey.appendChild(oKey);
-            oTr.appendChild(oTdKey);
-
-            // (4) 설명 — 부가설명(FLDTT)이 있으면 공통 툴팁(data-tip, 항상). 없으면 셀 자동 말줄임 툴팁.
-            var oTdTx = _el("td", null, r.FLDTX || "");
-            if (r.FLDTT) { oTdTx.setAttribute("data-tip", r.FLDTT); }
-            oTr.appendChild(oTdTx);
-
-            return oTr;   // 선택은 체크박스로만(원본 selectionMode:"None" + 체크박스 템플릿과 동일)
-        }
-
-        function _renderTable() {
-            oTbody.innerHTML = "";
-            if (!aRows.length) {
-                var oTrN = _el("tr", "u4a-table__nodata");
-                var oTdN = _el("td", null, _wsTxt("946"));   // 데이터 없음(공통)
-                oTdN.colSpan = 4;
-                oTrN.appendChild(oTdN);
-                oTbody.appendChild(oTrN);
-                return;
-            }
-            var oFrag = document.createDocumentFragment();
-            for (var i = 0; i < aRows.length; i++) { oFrag.appendChild(_buildRow(aRows[i], i)); }
-            oTbody.appendChild(oFrag);
-        }
-
         function _renderTokens() {
             oTokens.innerHTML = "";
             aRows.forEach(function (r) {
@@ -296,7 +302,7 @@
                 oXt.type = "button"; oXt.title = r.FLDNM; oXt.innerHTML = _fa("xmark");
                 oXt.addEventListener("click", function () {
                     r.SEL = false;
-                    if (r.__chk) { r.__chk.checked = false; var tr = r.__chk.closest("tr"); if (tr) { tr.setAttribute("aria-selected", "false"); } }
+                    oTbl.refresh();            // 보이는 행만 다시 그린다(스크롤 자리 유지)
                     _afterSelChange();
                 });
                 oTok.appendChild(oXt);
@@ -328,8 +334,8 @@
             aRows.forEach(function (r) {
                 if (!r.ENAB_SEL) { return; }
                 r.SEL = bSel;
-                if (r.__chk) { r.__chk.checked = bSel; var tr = r.__chk.closest("tr"); if (tr) { tr.setAttribute("aria-selected", bSel ? "true" : "false"); } }
             });
+            oTbl.refresh();                    // 보이는 행만 다시 그린다(스크롤 자리 유지)
             _afterSelChange();
         }
 
@@ -357,7 +363,7 @@
         }
 
         // ── 초기 렌더 ──
-        _renderTable();
+        oTbl.setRows(aRows);
         _afterSelChange();
 
         // ESC 무동작 — 원본 escapeHandler:function(){} 와 동일(실수 닫힘 방지, 닫기는 X/취소 버튼으로만).
