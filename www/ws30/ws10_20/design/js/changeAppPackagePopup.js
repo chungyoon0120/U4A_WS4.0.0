@@ -210,6 +210,16 @@
                 oVhBtn.innerHTML = _fa("magnifying-glass");
                 oVhBtn.addEventListener("click", function () { cfg.vh(oModel, oInput); });
                 oWrap.appendChild(oVhBtn);
+
+                //칸에 커서를 두고 F4 를 눌러도 이 단추를 누른 것과 같게 한다.
+                //  ★이 창은 공통 createField 를 쓰지 않고 단추를 손으로 만들기 때문에
+                //    공통이 자동으로 걸어 주지 못한다 — 여기서 직접 건다
+                //    (.claude/rules/code.md 「값도움 단추를 단 입력칸은 F4 도 반드시」).
+                if (window.U4AUI && typeof window.U4AUI.attachF4 === "function") {
+                    window.U4AUI.attachF4(oInput, oVhBtn);
+                } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "U4AUI.attachF4", "package change popup: F4 will not open the search help");
+                }
             }
             oRow.control.appendChild(oWrap);
         } else {
@@ -341,7 +351,7 @@
         oHeader.innerHTML = _fa("right-left") + '<span></span>';
         oHeader.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A93");
         const oXBtn = _el("button", "u4a-btn-icon");
-        oXBtn.type = "button"; oXBtn.setAttribute("data-act", "close");
+        oXBtn.type = "button"; oXBtn.setAttribute("data-act", "CLOSE");
         oXBtn.innerHTML = _fa("xmark");
         oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oXBtn.addEventListener("click", function () { lf_closePopup(oDlg); });

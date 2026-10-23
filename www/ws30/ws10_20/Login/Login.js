@@ -395,7 +395,7 @@ var oAPP = (function () {
             label: "CLIENT",
             ctrl: `<div class="u4a-login__field u4a-field" data-trail="1">` +
                 `<input id="ws_client" class="u4a-input u4a-field__input" type="number" inputmode="numeric" maxlength="3" autocomplete="off">` +
-                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_client" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_client" data-act="ws_client_CLEAR" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
                 `</div>`,
             id: "ws_client"
         }));
@@ -404,7 +404,7 @@ var oAPP = (function () {
             label: "ID",
             ctrl: `<div class="u4a-login__field u4a-field" data-trail="1">` +
                 `<input id="ws_id" class="u4a-input u4a-field__input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">` +
-                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_id" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_id" data-act="ws_id_CLEAR" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
                 `</div>`,
             id: "ws_id"
         }));
@@ -413,7 +413,7 @@ var oAPP = (function () {
             label: "PASSWORD",
             ctrl: `<div class="u4a-login__pw u4a-field" data-trail="2">` +
                 `<input id="ws_pw" class="u4a-input u4a-field__input" type="password" autocomplete="off">` +
-                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_pw" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_pw" data-act="ws_pw_CLEAR" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
                 `<button type="button" id="ws_pw_toggle" class="u4a-login__pw-toggle u4a-field__pw" title="Show / Hide" tabindex="-1">${ICON.eye}</button>` +
                 `</div>`,
             id: "ws_pw"
@@ -426,7 +426,7 @@ var oAPP = (function () {
             hidden: true,
             ctrl: `<div class="u4a-login__field u4a-field" data-trail="1">` +
                 `<input id="ws_langu" class="u4a-input u4a-field__input" type="text" maxlength="2" autocomplete="off">` +
-                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_langu" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
+                `<button type="button" class="u4a-login__clear u4a-field__clear" data-clear="ws_langu" data-act="ws_langu_CLEAR" title="Clear" aria-label="Clear" tabindex="-1">${ICON.clear}</button>` +
                 `</div>`,
             id: "ws_langu"
         }));

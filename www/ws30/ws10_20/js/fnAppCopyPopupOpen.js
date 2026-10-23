@@ -125,6 +125,7 @@
         // ── 다이얼로그 골격 ────────────────────────────────────────────
         const oDlg = document.createElement("dialog");
         oDlg.id = C_APP_COPY_DLG_ID;
+        oDlg.setAttribute("data-act", "DLG_APPCOPY");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
         oDlg.className = "u4a-dialog u4aCopyDlg";
 
         // 헤더 — 메인 툴바 Copy 버튼(fa-copy)과 동일 아이콘으로 인지 통일.
@@ -133,7 +134,7 @@
         oHeader.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "B90"); // Application Copy
         const oXBtn = _el("button", "u4a-btn-icon");
         oXBtn.type = "button";
-        oXBtn.setAttribute("data-act", "close");
+        oXBtn.setAttribute("data-act", "CLOSE");
         oXBtn.innerHTML = _fa("xmark");
         oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oXBtn.addEventListener("click", oAPP.events.ev_AppCopyDlgCancel);
@@ -152,6 +153,7 @@
         //   엉뚱한 칸에 값이 들어가고, 그대로 복사되면 되돌릴 수 없다.
         //   값은 이 창이 이미 쓰는 칸 이름 그대로(SOURCEID / TARGETID / PACKG).
         oSrcInp.setAttribute("data-field", "SOURCEID");
+        oSrcInp.setAttribute("data-act", "SOURCEID");   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
         oSrcInp.readOnly = true;
         oSrcInp.tabIndex = -1;
         oR.control.appendChild(oSrcInp);
@@ -164,11 +166,13 @@
         oTgtWrap.setAttribute("data-trail", "1");
         const oTgtInp = _el("input", "u4a-input u4a-field__input");
         oTgtInp.setAttribute("data-field", "TARGETID");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
+        oTgtInp.setAttribute("data-act", "TARGETID");   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
         oTgtInp.maxLength = oAPP.attr.iAppNameMaxLength || 15;
         oTgtWrap.appendChild(oTgtInp);
         const oTgtClear = _buildClearBtn();
         // 지우기 단추는 두 칸 모두 Clear 로 똑같아 어느 칸 것인지 구분이 안 됐다 → 칸 이름을 같이 싣는다.
         oTgtClear.setAttribute("data-clear", "TARGETID");
+        oTgtClear.setAttribute("data-act", "TARGETID_CLEAR");
         oTgtWrap.appendChild(oTgtClear);
         oR.control.appendChild(oTgtWrap);
         const oTgtMsg = oR.msg;
@@ -180,9 +184,11 @@
         oPackWrap.setAttribute("data-trail", "2"); // clear + value-help 둘 다
         const oPackInp = _el("input", "u4a-input u4a-field__input");
         oPackInp.setAttribute("data-field", "PACKG");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
+        oPackInp.setAttribute("data-act", "PACKG");   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
         oPackWrap.appendChild(oPackInp);
         const oPackClear = _buildClearBtn();
         oPackClear.setAttribute("data-clear", "PACKG");
+        oPackClear.setAttribute("data-act", "PACKG_CLEAR");
         oPackWrap.appendChild(oPackClear);
         const oVh = _el("button", "u4a-field__vh");
         oVh.setAttribute("data-act", "PKG_F4");   // 2026-10-08 자동 테스트 도구가 알아볼 식별값
@@ -191,6 +197,11 @@
         oVh.title = _txt("/U4A/CL_WS_COMMON", "A22"); // Package
         oVh.addEventListener("click", oAPP.events.ev_packageSchpEvt);
         oPackWrap.appendChild(oVh);
+        // 커서를 둔 채 F4 를 누르면 돋보기를 누른 것과 같게(2026-10-22 장군님 지시).
+        //   이 칸은 공통 createField 를 안 쓰고 손으로 만들어서 여기서 직접 건다.
+        if (window.U4AUI && typeof window.U4AUI.attachF4 === "function") {
+            window.U4AUI.attachF4(oPackInp, oVh);
+        }
         oR.control.appendChild(oPackWrap);
         const oPackMsg = oR.msg;
         oBody.appendChild(oR.row);
@@ -518,6 +529,14 @@
     oAPP.events.ev_packageSchpEvt = function (oEvent) {
 
         oAPP.fn.fnPackgSchpPopupOpener(function (oResult) {
+
+            // F4 를 값 선택 없이 닫은 경우(결과 없음) — 그대로 두고 끝낸다.
+            if (!oResult) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "package search help result", "package input keeps its previous value");
+                }
+                return;
+            }
 
             var sPackage = oResult.DEVCLASS;
 

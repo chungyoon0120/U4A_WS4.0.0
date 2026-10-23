@@ -1,3 +1,4 @@
+// 오류코드 접두: BCBP / 다음 번호: 002
 const
     REMOTE = parent.REMOTE,
     PATH = REMOTE.require('path'),
@@ -335,7 +336,32 @@ async function updateAppData(oEvent){
 
     }
 
-    
+
+    //★[2026-10-20 장군님 지시] ① 미리보기에 반영(위 previewUIsetProp 루프) → ② 렌더링 종료 감지
+    //  → ③ busy off(아래 parent.setBusy("", {})). 감지 대상 = 반영한 UI 들의 "부모"(중복 제거).
+    //  반영 대상이 여러 개라 Multi 쪽 헬퍼를 쓴다(ws_html5_ws20_prev.js).
+    //  ★필수 의존성이 없으면 조용히 건너뛰지 않는다 — 코드로 드러낸다.
+    //    (.works/DEV_STANDARD_오류처리.md §4·§6 / 전례 ws_events.js _ws20ReselectSelectedUI)
+    try {
+        if (typeof oAPP.fn.fnWs20AwaitPrevRenderMulti !== "function") {
+            throw new Error("oAPP.fn.fnWs20AwaitPrevRenderMulti 미정의(ws_html5_ws20_prev.js 미로드)");
+        }
+        if (typeof oAPP.fn.getTreeData !== "function") {
+            throw new Error("oAPP.fn.getTreeData 미정의(WS20 디자인 트리 모듈 미로드)");
+        }
+        var _aParBind = [], _oSeenBind = {};
+        for (const _k in oEvent.data.oPrev) {
+            var _oNodeB = oAPP.fn.getTreeData(_k);
+            if (!_oNodeB || !_oNodeB.POBID || _oSeenBind[_oNodeB.POBID] === true) { continue; }
+            _oSeenBind[_oNodeB.POBID] = true;
+            var _oParB = oAPP.fn.getTreeData(_oNodeB.POBID);
+            if (_oParB) { _aParBind.push(_oParB); }
+        }
+        await oAPP.fn.fnWs20AwaitPrevRenderMulti(_aParBind, undefined, "bindPopupBroadcast");
+    } catch (e) {
+        console.error("[BCBP-001] bindPopupBroadcast — preview render await failed:", e);
+    }
+
     //BUSY OFF 요청 처리.
     sendBindPopupBusyOff();
 

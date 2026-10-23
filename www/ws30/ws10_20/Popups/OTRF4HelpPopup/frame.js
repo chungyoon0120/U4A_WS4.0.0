@@ -145,12 +145,26 @@ let oAPP = (function (window) {
      ***********************************************************/
     oAPP.setBusyLoading = function (bIsShow) {
 
+        // ★[2026-10-16 장군님 지시] busy 는 예외 없이 공통(theme/u4a-busy.js)만 쓴다.
+        //   종전에는 이 창의 자체 오버레이 div 를 켰다 — 모달 팝업(showModal) 뒤로 숨는다.
+        if (window.U4ABusy && typeof U4ABusy.show === "function") {
+            if (bIsShow === 'X') { U4ABusy.show(); } else { U4ABusy.hide(); }
+            // 공통으로 바꾸기 전의 옛 표시가 html 에 켜진 채 남아 있을 수 있어 같이 끈다.
+            var oOld = document.getElementById("u4a_main_load");
+            if (oOld) { oOld.setAttribute("data-busy", "false"); }
+            return;
+        }
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+            }
+
         var oLoadPg = document.getElementById("u4a_main_load");
         if (!oLoadPg) {
             return;
         }
 
-        oLoadPg.setAttribute("data-busy", bIsShow === 'X' ? "true" : "false");   // 공통 .u4a-busy 토글
+        oLoadPg.setAttribute("data-busy", bIsShow === 'X' ? "true" : "false");
 
     };
 

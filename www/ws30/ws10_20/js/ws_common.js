@@ -243,7 +243,7 @@
         oHeader.querySelector("span").textContent = sHeaderTitle || "System Message";
         var oX = _sysNotiEl("button", "u4a-btn-icon");
         oX.type = "button";
-        oX.setAttribute("data-act", "close");
+        oX.setAttribute("data-act", "CLOSE");
         oX.innerHTML = _fa_sn("xmark");
         oX.title = sClose;
         oX.addEventListener("click", function () { _sysNotiClose(oDlg); });
@@ -661,25 +661,95 @@
     /************************************************************************
      * [HTML5] 단축키 공통 가드 — 모든 페이지 단축키 핸들러의 단일 방어 통로.
      *   화면별 super-wrap(_scGuard/_ws20ScGuard 등)이 이 함수에 위임한다(중복 제거).
-     *   순서대로 방어:
+     *   ★★★[2026-10-21 장군님 지시] 순서를 **원본 그대로** 맞췄다.
+     *     원본(ws_common.js aShortCutWS20 의 F3, 변환 전 1070~1094행)은 각 단축키 안에서
+     *     「이벤트 전파 막기 → 꾹 누름 → 메뉴 닫기 → 실행 가능 여부 검사」 순으로 돌았다.
+     *     [내가 깨뜨린 것] 이 가드를 만들면서(2026-06-23) ① **메뉴 닫기를 빼고** 검사부터 했고
+     *       ② 각 화면 동작 함수에 **같은 검사를 또** 남겨 두 번 돌았다. 둘 다 원본과 다르다.
+     *     [지금] 메뉴 닫기를 검사 앞에 되돌리고, 동작 함수 쪽 중복은 거기서 뺐다.
+     *
+     *   순서대로 방어 (원본과 같음):
      *     (1) 꾹 누름(auto-repeat) — e.repeat
      *     (2) 현재 화면 일치 — parent.getCurrPage() === sPage (다른 화면 단축키 오발화 방지)
-     *     (3) 종합 실행가능 체크 — fnShortCutExeAvaliableCheck(): busy / 메뉴열림(.u4a-menu) /
+     *     (3) 메뉴가 열려 있으면 닫는다 — **모든 단축키에 똑같이.**
+     *         ★[2026-10-21 장군님 지시 「이걸 왜 케이스 바이 케이스로 하지」]
+     *         원본은 4곳에만 이 단계를 두었다(WS10 F6·F7 · WS20 F3 · WS30 F3).
+     *         그러면 자리마다 따로 넣어야 하고 빠뜨린 자리가 생긴다 — 실제로 WS30 F3 이 빠져 있었다.
+     *         바로 뒤 (4)가 「메뉴 열림」을 막으므로, 안 닫으면 메뉴를 열어 둔 채로는
+     *         아무 단축키도 안 돌고 화면은 멈춰 있는 것처럼 보인다.
+     *     (4) 종합 실행가능 체크 — fnShortCutExeAvaliableCheck(): busy / 메뉴열림(.u4a-menu) /
      *         다이얼로그열림 / isShortcutLock / 페이지이동중(isNaviBusy) 전부 포함(원본 종합 체크).
-     *   ※ "연타/재진입"은 (3)의 isNaviBusy·busy·다이얼로그 체크가 막는다(비동기 액션이 in-flight
+     *   ※ "연타/재진입"은 (4)의 isNaviBusy·busy·다이얼로그 체크가 막는다(비동기 액션이 in-flight
      *      플래그를 들고 있는 동안 같은/다른 단축키 모두 차단). 동기 액션은 즉시 끝나 영향 없음.
      * @param {KeyboardEvent} e
      * @param {string} sPage  이 단축키가 유효한 화면 ("WS10"/"WS20"/"WS30")
      * @param {Function} fnAction  실제 동작
      ************************************************************************/
     oAPP.common.fnRunShortCut = function (e, sPage, fnAction) {
-        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (e && e.repeat === true) { return; }                                                          // (1)
-        try { if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (2)
-        try { if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } } // (3)
-        try { fnAction(e); } catch (err) { console.error("[shortcut][" + sPage + "]", err); }
+
+        try {
+            if (e && e.stopImmediatePropagation) {
+                e.stopImmediatePropagation();
+            }
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        try {
+            if (e && e.preventDefault) {
+                e.preventDefault();
+            }
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        //(1) 꾹 누름 — 한 번만 돈다.
+        if (e && e.repeat === true) {
+            return;
+        }
+
+        //(2) 지금 그 화면이 아니면 안 돈다.
+        try {
+            if (sPage && parent.getCurrPage && parent.getCurrPage() !== sPage) {
+                return;
+            }
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        //(3) 떠 있는 것을 전부 닫는다 — 모든 단축키에 똑같이(위 주석 참조).
+        try {
+            oAPP.common.fnCloseAllOverlays();
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        //(4) 실행 가능 여부 — 잠금 · 화면 이동 중 · 처리중 · 메뉴 · 팝업.
+        try {
+            if (oAPP.common.fnShortCutExeAvaliableCheck && oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
+                return;
+            }
+        } catch (x) {
+            _caughtRunShortCut(x);
+        }
+
+        try {
+            fnAction(e);
+        } catch (err) {
+            console.error("[shortcut][" + sPage + "]", err);
+        }
+
     }; // end of oAPP.common.fnRunShortCut
+
+    //위 가드의 오류 흔적 — 같은 줄이 되풀이돼 한 곳으로 뺐다.
+    function _caughtRunShortCut(oErr) {
+
+        if (typeof U4ALOG === "undefined" || !U4ALOG.caught) {
+            return;
+        }
+
+        U4ALOG.caught(oErr);
+    }
 
     /************************************************************************
      * [HTML5] 페이지 이동 in-flight 락 set/clear — 원본 sap.lock/isLocked 재진입 락 대체.
@@ -687,6 +757,18 @@
      *   release 누락으로 영구 잠김 되지 않도록 lock 시 안전 타임아웃(backstop) 자동 설정.
      ************************************************************************/
     oAPP.common.fnNaviLock = function () {
+
+        //페이지를 떠나기 전에 떠 있는 것(메뉴 · 펼침 목록 · 툴팁)을 전부 닫는다.
+        //  ★[2026-10-21 장군님 지시] 단축키만 막으면 버튼으로 뒤로 갈 때 그대로 남는다.
+        //  화면을 바꾸는 길은 여기 하나라, 단축키든 버튼이든 여기서 한 번에 치운다.
+        try {
+            oAPP.common.fnCloseAllOverlays();
+        } catch (x) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(x);
+            }
+        }
+
         oAPP.attr.isNaviBusy = true;
         try { clearTimeout(oAPP.attr._naviBusyTimer); } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
         // backstop: 정상 경로는 완료 시 release 하지만, 서버응답 누락/예외로 release 를 놓쳐도
@@ -1548,39 +1630,6 @@
 
                     // [HTML5] firePress → click (버튼 click 핸들러가 oAPP.events.ev_pressSaveBtn 호출)
                     oSaveBtn.click();
-
-                }
-            },
-            {
-                KEY: "F8", // [WS20] Application Execution (실행) — 원본 앱헤더 ev_pressAppExecBtn (F8)
-                DESC: oAPP.common.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A06"), // Application Execution
-                fn: (e) => {
-
-                    e.stopImmediatePropagation();
-
-                    if (e.repeat === true) {
-                        return;
-                    }
-
-                    // [HTML5] 표시 여부는 DOM 기준(App Exec 는 split 버튼 → 본체 동작은 이벤트 직접 호출)
-                    var oExecBtn = document.getElementById("ws20_appExecMenuBtn");
-                    if (!oExecBtn || oExecBtn.hidden || oExecBtn.style.display === "none") {
-                        return;
-                    }
-
-                    // 단축키 실행 할지 말지 여부 체크 (busy/락/메뉴/다이얼로그 가드 — HTML5-safe)
-                    if (oAPP.common.fnShortCutExeAvaliableCheck() === "X") {
-                        return;
-                    }
-
-                    // 커서 포커스 날리기
-                    if (document.activeElement && document.activeElement.blur) {
-                        document.activeElement.blur();
-                    }
-
-                    // split 버튼 본체 = 기본 실행(ev_pressAppExecBtn). firePress 대체로 이벤트 직접 호출.
-                    try { oAPP.events.ev_pressAppExecBtn(); }
-                    catch (err) { if (typeof console !== "undefined") { console.error("[WS20] F8 AppExec error", err); } }
 
                 }
             },
@@ -3106,7 +3155,66 @@
             oPopover.style.visibility = "hidden";
         }
 
+        //[HTML5 2026-10-21] 위 두 가지는 UI5 시절 DOM 이라 지금 화면엔 아예 없다(만드는 곳 0건).
+        //  지금 상단 메뉴바 드롭다운은 .u4a-menu 이고, 그것을 닫는 공통은 ws10_html.js 의 closeMenus 다
+        //  (메뉴를 remove 하고 바깥클릭·ESC·resize 리스너까지 정리한다).
+        //  이것을 안 부르면 메뉴를 열어 둔 채 F3 을 눌렀을 때 바로 뒤의 실행 가능 여부 검사가
+        //  "menu is open" 으로 막아, 원본과 달리 아무 일도 안 일어난다.
+        if (!oAPP.ws10html || typeof oAPP.ws10html.closeMenus !== "function") {
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "oAPP.ws10html.closeMenus", "menu (.u4a-menu) stays open, shortcut will be blocked by fnShortCutExeAvaliableCheck");
+            }
+
+            return;
+        }
+
+        oAPP.ws10html.closeMenus();
+
     }; // end of oAPP.common.fnCloseMenuPopover
+
+    /************************************************************************
+     * 떠 있는 것을 전부 닫는다 — 메뉴 · 드롭다운 펼침 목록 · 툴팁 · 표 컬럼 메뉴.
+     * ----------------------------------------------------------------------
+     * ★[2026-10-21 장군님 지시] 「F3 뒤로가기 같은 거 페이지 이동할 때, 현재 떠 있는
+     *   메뉴·팝오버 등등 전체 종료하는 공통 함수가 있어야 할 것 같다. 앞으로 또 추가될 것 같다」
+     *   실제 사고: 속성 영역의 UI Theme 펼침 목록을 펼친 채 F3 으로 뒤로 가면
+     *   그 목록만 첫 화면 위에 그대로 남아 있었다.
+     *
+     * [어떻게] 이 화면의 떠 있는 것들은 **전부 document 의 mousedown 바깥클릭으로 닫힌다**
+     *   (theme/u4a-ui.js 198 · 403 · 684 · 904 · 2213). 그래서 body 에 mousedown 을 한 번
+     *   흉내 내면 각자 **자기 경로로 정상 종료**한다 — 안쪽 변수와 리스너 정리까지 같이 된다.
+     *   직접 지우면 그 정리가 안 돼 다음에 열 때 어긋난다.
+     *
+     * [다른 것에 영향 없나] 같은 mousedown 을 듣는 나머지(다이얼로그 헤더 끌기 1073 ·
+     *   스플릿바 1140)는 전부 `e.target.closest(...)` 로 자기 것이 아니면 바로 빠진다.
+     *   body 에 보내면 target 이 body 라 전부 그냥 빠진다. 끌기는 시작되지 않는다.
+     *   같은 방법을 미리보기 영역을 눌렀을 때 이미 쓰고 있다(u4a-ui.js 1856).
+     *
+     * [안전망] 그래도 남은 메뉴는 fnCloseMenuPopover 가 치운다.
+     *   펼침 목록은 **직접 지우지 않는다** — 위에 적은 까닭 그대로다.
+     ************************************************************************/
+    oAPP.common.fnCloseAllOverlays = function () {
+
+        //① 바깥 클릭을 한 번 흉내 낸다.
+        try {
+            document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+        } catch (x) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(x);
+            }
+        }
+
+        //② 안전망 — 남은 메뉴를 공통 닫기로 치운다.
+        try {
+            oAPP.common.fnCloseMenuPopover();
+        } catch (x) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(x);
+            }
+        }
+
+    }; // end of oAPP.common.fnCloseAllOverlays
 
     /************************************************************************
      * 확장자만 발췌
@@ -3553,6 +3661,22 @@
             }
         });
 
+        // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21) — WS10·WS20 과 같은 값.
+        //   UI5 는 id 를 스스로 지어 밖에서 못 집는다. 다시 그릴 때마다 사라지므로
+        //   onAfterRendering 에서 붙인다(T-CODE 칸과 같은 방법).
+        BUTTON1.addEventDelegate({
+            onAfterRendering: function (oEvent) {
+                var oDom = oEvent.srcControl.getDomRef();
+                if (!oDom) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "WINSHOWHIDE button DOM", "data-act not set - the automation tool cannot reach this button");
+                    }
+                    return;
+                }
+                oDom.setAttribute("data-act", "WINSHOWHIDE");
+            }
+        });
+
         // 해당 실행 스크립트 파일경로 및 소스 라인 정보 저장
         parent.DEV_SOURCE_FINDER.setRunScriptPath(BUTTON1);
 
@@ -3643,6 +3767,16 @@
                 }
 
                 oSFInput.setAttribute("maxlength", oSF.getMaxLength());
+                //2026-10-14 자동 테스트 도구가 집을 이름(.analy/21). UI5 가 id 를 스스로 지어 밖에서 못 집던 자리.
+                oSFInput.setAttribute("data-act", "TCODE_INPUT");
+
+                // 2026-10-19 그 칸의 지우기(✕) — UI5 SearchField 가 스스로 그리는 자리.
+                //   WS10 의 지우기와 같은 값. 못 찾으면 로그만 남기고 넘어간다(그 칸 자체는 집힌다).
+                var oSFReset = oSF.getDomRef("reset");
+                if (oSFReset) { oSFReset.setAttribute("data-act", "TCODE_INPUT_CLEAR"); }
+                else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "SearchField reset DOM", "TCODE_INPUT_CLEAR not set - the automation tool cannot reach the clear button");
+                }
 
             }
         });
@@ -3656,6 +3790,20 @@
             pressed: "{/SETTING/ISPIN}",
             tooltip: "Browser Pin",
             press: oAPP.events.ev_windowPinBtn
+        });
+
+        // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21) — WS10·WS20 과 같은 값.
+        BUTTON2.addEventDelegate({
+            onAfterRendering: function (oEvent) {
+                var oDom = oEvent.srcControl.getDomRef();
+                if (!oDom) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "PIN button DOM", "data-act not set - the automation tool cannot reach this button");
+                    }
+                    return;
+                }
+                oDom.setAttribute("data-act", "PIN");
+            }
         });
 
         // 해당 실행 스크립트 파일경로 및 소스 라인 정보 저장

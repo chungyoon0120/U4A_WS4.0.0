@@ -1,4 +1,4 @@
-// 오류코드 접두: W20E / 다음 번호: 004
+// 오류코드 접두: W20E / 다음 번호: 008
 /************************************************************************
  * ws_html5_ws20_edit.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -926,7 +926,17 @@
         parent.setBusy("");
         // [F-4] 확인창 뜨는 동안 자식창(바인딩팝업 등) 잠금(원본). 모든 종료 경로에서 BUSY_OFF 로 짝 맞춤.
         _broadBusy(true);
+        //★[2026-10-20] 확인창 콜백을 async 로 바꿨다(미리보기 렌더링 완료를 기다리려면 await 가 필요).
+        //  공통 확인창은 콜백을 try/catch 로 감싸 부르지만(ws_html5_shell.js:486 · theme/u4a-ui.js:2440)
+        //  **async 가 던지는 예외는 그 catch 가 못 잡는다**(Promise 로 가므로) → 여기서 직접 잡고
+        //  모든 경로에서 잠금을 반드시 해제한다. lf_do 자체는 동기로 남겨 호출처(확인창)에 영향 0.
         function lf_do(act) {
+            _lf_doAsync(act).catch(function (e) {
+                console.error("[W20E-005] single delete failed - locks released:", e);
+                _broadBusy(false); _unlock();
+            });
+        }
+        async function _lf_doAsync(act) {
             if (act !== "YES") { _broadBusy(false); _unlock(); return; }   // 취소 → 잠금 해제.
             var oParent = _node(oNode.POBID);
             if (!oParent || !oParent.zTREE) { _broadBusy(false); _unlock(); return; }   // 가드 실패 → 잠금 해제.
@@ -935,10 +945,16 @@
             //  선택하지 않으므로, 대상을 안 남기면 딴 줄이 선택된 채 복원된다.
             //  다시하기(재삭제) 때는 그 UI가 없으므로 기존 폴백(선택 유지 → 부모)이 걸려 원본과 같다.
             oAPP.fn.fnWs20PushUndo({ OBJID: oNode.OBJID });
-            // 미리보기 제거(가드, 시그니처 1:1)
-            _removeNodePreview(oNode);
-            // [BR26] 하위 UI 를 oAPP.attr.prev 에서 재귀 제거(원본 재귀 삭제 1:1). 최상위는 _removeNodePreview 가 이미 제거.
-            _purgePrevSubtree(oNode);
+            //★[2026-10-20 장군님 지시] ① 미리보기에 반영 → ② 렌더링 종료 감지 → ③ busy off 순서.
+            //  원본 designUIDelete 의 확인창 콜백도 async 로 같은 순서다
+            //  (원본 uiDesignArea.js: 7039 감지 등록 → 7057 미리보기 제거 → 7072 await → 7082 부모 배열 제거).
+            //  감지 대상은 "지우는 UI 의 부모"(원본 7039 oAPP.attr.prev[ls_tree.POBID]).
+            await oAPP.fn.fnWs20AwaitPrevRender(oParent, function () {
+                // 미리보기 제거(가드, 시그니처 1:1)
+                _removeNodePreview(oNode);
+                // [BR26] 하위 UI 를 oAPP.attr.prev 에서 재귀 제거(원본 재귀 삭제 1:1). 최상위는 _removeNodePreview 가 이미 제거.
+                _purgePrevSubtree(oNode);
+            }, "deleteUI");
             // 부모 배열에서 제거
             var idx = oParent.zTREE.findIndex(function (a) { return a.OBJID === oNode.OBJID; });
             if (idx !== -1) { oParent.zTREE.splice(idx, 1); }
@@ -1095,7 +1111,16 @@
             // [F-4] 원본(uiDesignArea.js:707) = 다중 삭제 버튼 즉시 BUSY_ON → ★확인창 동안★ 팝업 잠금.
             //   HTML5 는 YES 후에만 잠갔었음 → 확인창 前으로 이동. 취소 시 BUSY_OFF 로 짝 맞춤.
             _broadBusy(true);
+            //★[2026-10-20] 확인창 콜백을 async 로 바꿨다(미리보기 렌더링 완료를 기다리려면 await 가 필요).
+            //  공통 확인창은 콜백 반환값을 안 쓰지만 **async 가 던지는 예외는 그쪽 try/catch 가 못 잡는다**
+            //  → 여기서 직접 잡고 잠금을 반드시 해제한다. lf_do 는 동기로 남겨 호출처 영향 0.
             function lf_do(act) {
+                _lf_doMultiAsync(act).catch(function (e) {
+                    console.error("[W20E-006] multi delete failed - locks released:", e);
+                    _broadBusy(false);
+                });
+            }
+            async function _lf_doMultiAsync(act) {
                 if (act !== "YES") { _broadBusy(false); return; }   // 취소 → 잠금 해제.
                 //[BR62-C] 다건 삭제도 되돌리기 대상을 남긴다 — 원본 추가 처리도 대표 1건만 선택한다.
                 //  ★[2026-09-02 수정] 예전엔 aChecked[0](첫 번째)를 썼으나 원본은 **마지막**이다.
@@ -1114,21 +1139,47 @@
                 })(_tree());
                 var _oUndoAnchor = _aUndoCand.length ? _aUndoCand[_aUndoCand.length - 1] : aChecked[aChecked.length - 1];
                 oAPP.fn.fnWs20PushUndo((_oUndoAnchor && _oUndoAnchor.OBJID) ? { OBJID: _oUndoAnchor.OBJID } : undefined);
-                // bottom-up(자식 먼저) 재귀 삭제 — 구 lf_delSelLine: chk===true 노드만 제거.
-                (function del(arr) {
-                    if (!arr) { return; }
-                    for (var i = arr.length - 1; i >= 0; i--) {
-                        var n = arr[i];
-                        del(n.zTREE);                 // 자식 먼저
-                        if (n.chk !== true) { continue; }
-                        _removeNodePreview(n);
-                        // [BR26] 체크된 노드가 부모면 그 아래 남은 하위 UI 도 화면에서 함께 사라지므로
-                        //   oAPP.attr.prev 를 재귀 정리(단건 삭제와 동일 논리). 정상 조작에선 체크 전파로
-                        //   하위도 chk===true 라 개별 처리되어 no-op, 그 밖의 경우만 잔존 방지.
-                        _purgePrevSubtree(n);
-                        arr.splice(i, 1);
+                //★[2026-10-20 장군님 지시] ① 미리보기에 반영 → ② 렌더링 종료 감지 → ③ busy off 순서.
+                //  원본 designTreeMultiDeleteItem 도 확인창 콜백이 async 이고 이 순서다
+                //  (원본 uiDesignArea.js: 4747 부모 수집 → 4759 감지 등록(addMultiDelAfterRendering)
+                //   → 4763 lf_delSelLine 삭제 → 4772 await Promise.all → 4776 모델 갱신).
+                //  감지 대상 = "살아남는 부모"만. 원본도 복사본에서 체크된 라인을 먼저 지워
+                //  (deleteCheckedLine 4756) 지워질 노드를 대상에서 뺀다 → 여기서는 부모·조상에
+                //  체크된 것이 있으면 제외한다(그 노드 자체가 사라지므로 신호가 안 온다).
+                var aDelParent = [], oSeenParent = {};
+                for (var pi = 0; pi < aChecked.length; pi++) {
+                    var sPobid = aChecked[pi] && aChecked[pi].POBID;
+                    if (!sPobid || oSeenParent[sPobid] === true) { continue; }
+                    oSeenParent[sPobid] = true;
+                    var oPar = _node(sPobid);
+                    if (!oPar) { continue; }
+                    //부모 자신이나 그 조상이 체크됐으면(=함께 지워짐) 감지 대상에서 뺀다.
+                    var bGone = false, oUp = oPar, nGuard = 0;
+                    while (oUp && nGuard < 200) {
+                        if (oUp.chk === true) { bGone = true; break; }
+                        if (!oUp.POBID) { break; }
+                        oUp = _node(oUp.POBID); nGuard++;
                     }
-                })(_tree());
+                    if (bGone) { continue; }
+                    aDelParent.push(oPar);
+                }
+                await oAPP.fn.fnWs20AwaitPrevRenderMulti(aDelParent, function () {
+                    // bottom-up(자식 먼저) 재귀 삭제 — 구 lf_delSelLine: chk===true 노드만 제거.
+                    (function del(arr) {
+                        if (!arr) { return; }
+                        for (var i = arr.length - 1; i >= 0; i--) {
+                            var n = arr[i];
+                            del(n.zTREE);                 // 자식 먼저
+                            if (n.chk !== true) { continue; }
+                            _removeNodePreview(n);
+                            // [BR26] 체크된 노드가 부모면 그 아래 남은 하위 UI 도 화면에서 함께 사라지므로
+                            //   oAPP.attr.prev 를 재귀 정리(단건 삭제와 동일 논리). 정상 조작에선 체크 전파로
+                            //   하위도 chk===true 라 개별 처리되어 no-op, 그 밖의 경우만 잔존 방지.
+                            _purgePrevSubtree(n);
+                            arr.splice(i, 1);
+                        }
+                    })(_tree());
+                }, "multiDelete");
                 if (!_node(sSelAfter)) { sSelAfter = "ROOT"; }
                 _refreshTree();
                 _selectNode(sSelAfter);
@@ -1871,7 +1922,7 @@
             '  <i class="fa-solid fa-image" aria-hidden="true"></i><span class="u4aWs20UiPrevTitle"></span>' +
             //040 Rotation On/Off — 자동 넘김 토글(공통 .u4a-switch).
             '  <label class="u4a-switch u4aWs20UiPrevRot" title="' + _esc(_wsTxtEdit("040")) + '"><input type="checkbox" checked><span class="u4a-switch__slider"></span></label>' +
-            '  <button type="button" class="u4a-btn-icon" data-act="close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn-icon" data-act="CLOSE" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             '<div class="u4aWs20UiPrevBody">' +
             '  <button type="button" class="u4a-btn-icon u4aWs20UiPrevNav u4aWs20UiPrevPrev" title="&#9664;"><i class="fa-solid fa-chevron-left"></i></button>' +
@@ -1913,7 +1964,7 @@
             // 닫기 = 우상단 흰색 X 아이콘만(일반 이미지 뷰어 스타일, 배경/박스 없음). 아무 데나 클릭/ESC 로도 닫힘.
             oZoom.innerHTML =
                 '<img class="u4aWs20UiPrevZoomImg" alt="" src="' + _esc(sSrc) + '">' +
-                '<button type="button" class="u4aWs20UiPrevZoomX" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>';
+                '<button type="button" class="u4aWs20UiPrevZoomX" data-act="CLOSE" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>';
             function _zclose() { try { oZoom.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } try { oZoom.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } setTimeout(function () { _zoomOpen = false; }, 0); _startTimer(); }
             oZoom.addEventListener("click", _zclose);                                   // 아무 데나 클릭 닫기
             oZoom.addEventListener("cancel", function (e) { e.preventDefault(); _zclose(); });   // ESC
@@ -1957,7 +2008,7 @@
         oPop.querySelector(".u4aWs20UiPrevPrev").addEventListener("click", function () { _go(iCur - 1); _startTimer(); });
         oPop.querySelector(".u4aWs20UiPrevNext").addEventListener("click", function () { _go(iCur + 1); _startTimer(); });
         oRot.addEventListener("change", _startTimer);
-        oPop.querySelector('[data-act="close"]').addEventListener("click", _close);
+        oPop.querySelector('[data-act="CLOSE"]').addEventListener("click", _close);
         oPop.addEventListener("mousedown", function (e) { e.stopPropagation(); });   // 내부 클릭은 라이트 디스미스 제외.
 
         // 삽입 다이얼로그(top-layer) 안에 붙여 모달 위로(openColumnMenu 와 동일 전략).
@@ -2068,30 +2119,30 @@
             '<div class="u4a-dialog__header u4aWs20InsHead">' +
             '  <i class="fa-solid fa-layer-group"></i>' +
             '  <span class="u4aWs20InsTitle"></span>' +
-            '  <button type="button" class="u4a-btn-icon u4aWs20InsX" data-act="cancel" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn-icon u4aWs20InsX" data-act="CANCEL" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             '<div class="u4a-dialog__body">' +
             '  <div class="u4aWs20InsForm">' +
-            '    <div class="u4aWs20InsRow"><label>' + _esc(_msg("D98", "Aggregation Name")) + '</label><span class="u4aWs20InsAgg"></span></div>' +
+            '    <div class="u4aWs20InsRow"><label>' + _esc(_msg("D98", "Aggregation Name")) + '</label><span class="u4aWs20InsAgg" data-act="INS_AGG"></span></div>' +
             '    <div class="u4aWs20InsRow u4aWs20InsCntRow" hidden><label>' + _esc(_msg("D99", "Generated Cnt")) + '</label>' +
             '      <div class="u4aWs20InsStep">' +
-            '        <button type="button" class="u4a-btn-icon" data-step="-1"><i class="fa-solid fa-minus"></i></button>' +
-            '        <input type="text" inputmode="numeric" class="u4a-input u4aWs20InsCnt" value="1">' +
-            '        <button type="button" class="u4a-btn-icon" data-step="1"><i class="fa-solid fa-plus"></i></button>' +
+            '        <button type="button" class="u4a-btn-icon" data-step="-1" data-act="INS_CNT_DEC"><i class="fa-solid fa-minus"></i></button>' +
+            '        <input type="text" inputmode="numeric" class="u4a-input u4aWs20InsCnt" data-act="INS_CNT" value="1">' +
+            '        <button type="button" class="u4a-btn-icon" data-step="1" data-act="INS_CNT_INC"><i class="fa-solid fa-plus"></i></button>' +
             '        <span class="u4aWs20InsMax">' + _esc(_msg("B25", "Max")) + ' : ' + CV_INS_MAX + '</span>' +
             '      </div>' +
             '    </div>' +
             '    <div class="u4aWs20InsRow"><label>' + _esc(_msg("E01", "UI Object")) + '</label>' +
             //공통 입력 clear(X) — .u4a-field[data-trail] 래퍼 + .u4a-field__clear(값 있을 때만 노출, attachClear).
             '      <div class="u4a-field u4aWs20InsSearchWrap" data-trail="1">' +
-            '        <input type="text" class="u4a-input u4a-field__input u4aWs20InsSearch" autocomplete="off">' +
-            '        <button type="button" class="u4a-field__clear" tabindex="-1" title="Clear"><i class="fa-solid fa-xmark"></i></button>' +
+            '        <input type="text" class="u4a-input u4a-field__input u4aWs20InsSearch" data-act="INS_SEARCH" autocomplete="off">' +
+            '        <button type="button" class="u4a-field__clear" data-act="INS_SEARCH_CLEAR" tabindex="-1" title="Clear"><i class="fa-solid fa-xmark"></i></button>' +
             '      </div></div>' +
-            '    <label class="u4aWs20InsChkRow"><input type="checkbox" class="u4aWs20InsP13n"><span>' + _esc(_p13nText()) + '</span></label>' +
+            '    <label class="u4aWs20InsChkRow"><input type="checkbox" class="u4aWs20InsP13n" data-act="INS_P13N"><span>' + _esc(_p13nText()) + '</span></label>' +
             '  </div>' +
             '  <div class="u4aWs20InsTableWrap u4a-table-wrap">' +
             //행높이=공통 .u4a-table 기본(레퍼런스 F4 탭1·Login 동일). --compact 안 씀(혼자 좁아지지 않게).
-            '    <table class="u4aWs20InsTable u4a-table">' +
+            '    <table class="u4aWs20InsTable u4a-table" data-act="INS_LIST">' +
             //헤더는 _renderHead 가 동적 구성(공통 .u4a-th--menu 클릭→U4AUI.openColumnMenu, 정렬/필터 표시자 갱신).
             '      <thead></thead>' +
             '      <tbody></tbody>' +
@@ -2100,8 +2151,8 @@
             '  </div>' +
             '</div>' +
             '<div class="u4a-dialog__footer">' +
-            '  <button type="button" class="u4a-btn u4aWs20InsConfirm" data-act="ok" disabled><i class="fa-solid fa-check"></i> ' + _esc(_msg("A40", "Confirm")) + '</button>' +
-            '  <button type="button" class="u4a-btn u4aWs20InsCancel" data-act="cancel"><i class="fa-solid fa-xmark"></i> ' + _esc(_msg("A41", "Cancel")) + '</button>' +
+            '  <button type="button" class="u4a-btn u4aWs20InsConfirm" data-act="OK" disabled><i class="fa-solid fa-check"></i> ' + _esc(_msg("A40", "Confirm")) + '</button>' +
+            '  <button type="button" class="u4a-btn u4aWs20InsCancel" data-act="CANCEL"><i class="fa-solid fa-xmark"></i> ' + _esc(_msg("A41", "Cancel")) + '</button>' +
             '</div>';
 
         oDlg.querySelector(".u4aWs20InsTitle").textContent = sTitle;
@@ -2112,7 +2163,7 @@
         var oTbody = oDlg.querySelector(".u4aWs20InsTable tbody");
         var oEmpty = oDlg.querySelector(".u4aWs20InsEmpty");
         var oSearch = oDlg.querySelector(".u4aWs20InsSearch");
-        var oOk = oDlg.querySelector('[data-act="ok"]');
+        var oOk = oDlg.querySelector('[data-act="OK"]');
         var oCntRow = oDlg.querySelector(".u4aWs20InsCntRow");
         var oCntInp = oDlg.querySelector(".u4aWs20InsCnt");
         var oAggSlot = oDlg.querySelector(".u4aWs20InsAgg");
@@ -2238,6 +2289,8 @@
         function _buildInsRow(ui, idx) {
             var tr = document.createElement("tr");
             if (idx % 2 === 1) { tr.setAttribute("data-odd", "true"); }   // 공통 zebra
+            // 2026-10-15 — 자동 테스트 도구가 어떤 UI 를 고를지 값으로 가리게(.analy/21). 칸 글자로 찾던 자리.
+            if (ui && ui.UIOBK) { tr.setAttribute("data-uiobk", ui.UIOBK); }
             var sImg = _iconSrc(ui.UICON);
             tr.innerHTML =
                 '<td class="u4aWs20InsTdSym">' + (sImg ? '<img src="' + _esc(sImg) + '" alt="" title="' + _esc(_msg("A67", "Preview")) + '" onerror="this.style.display=\'none\'">' : "") + '</td>' +
@@ -2311,6 +2364,17 @@
 
         function lf_confirm() {
             if (!oSelUI) { return; }
+
+            // ★ 확인을 누르자마자 화면을 잠근다. (장군님 지시 2026-10-20 — 느린 PC 에서 100건 추가 시
+            //   잠깐 멈춘 것처럼 보이던 것) 원본도 확인 버튼 첫 줄에서 잠근다 —
+            //   U4A_WS_DESIGN/design/insertUIPopop/index.js 1022~1032행(parent.setBusy("X") + 바인딩 팝업 BUSY_ON).
+            //   끄는 것은 아래 체인 마지막 — 원본은 끝의 setSelectTreeItem 안쪽이 끄고(그 앞에서 미리보기
+            //   렌더 종료를 await 한다), 조기취소 분기는 저마다 끈다. 여기서는 한 자리에서 둘 다 처리한다.
+            try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            // 자식창 잠금(원본 삽입 시 BUSY_ON) — designAddUIObject 는 async 라 완료 후 BUSY_OFF.
+            //  ※ D&D 삽입 경로는 dnd.js _bindBusy 가 이미 처리하므로 여기(팝업 confirm)에서만 브로드캐스트.
+            _broadBusy(true);
+
             var cnt = oSelAgg.ISMLB === "X" ? lf_clampCnt() : 1;
             var ls_0022 = T_0022.find(function (a) { return a.UIOBK === oSelUI.UIOBK; }) || oSelUI;
             var ls_0023 = T_0023.find(function (a) { return a.UIATK === oSelAgg.UIATK; }) || oSelAgg;
@@ -2318,12 +2382,25 @@
             // UI명 suggestion 이력 저장 (구 insertUIPopop saveUiSuggest("insertUiName", UIOBJ, 10))
             _saveInsertSuggest("insertUiName", ls_0022.UIOBJ, 10);
             lf_close();
-            // 자식창 잠금(원본 삽입 시 BUSY_ON) — designAddUIObject 는 async 라 완료 후 BUSY_OFF.
-            //  ※ D&D 삽입 경로는 dnd.js _bindBusy 가 이미 처리하므로 여기(팝업 confirm)에서만 브로드캐스트.
-            _broadBusy(true);
-            Promise.resolve(oAPP.fn.designAddUIObject(is_tree, ls_0022, ls_0023, cnt, oP13n.checked))
+
+            Promise.resolve()
+                // ★ busy 가 화면에 그려질 틈을 한 번 준다 — 이게 없으면 잠그자마자 아래 추가 처리(다건이면
+                //   100번 도는 동기 루프)가 이어져 브라우저가 한 번도 그리지 못하고, 잠금이 아예 안 보인다.
+                .then(function () {
+                    if (!oAPP.common || typeof oAPP.common.fnYieldToPaint !== "function") {
+                        throw new Error("[W20E-007] fnYieldToPaint undefined (ws_html5_shell.js not loaded)");
+                    }
+                    return oAPP.common.fnYieldToPaint();
+                })
+                .then(function () { return oAPP.fn.designAddUIObject(is_tree, ls_0022, ls_0023, cnt, oP13n.checked); })
                 .catch(function (e) { console.error("[WS20] designAddUIObject:", e && e.message ? e.message : e); })
-                .then(function () { _broadBusy(false); });
+                .then(function () {
+                    _broadBusy(false);
+                    // 검사에 걸려 되돌아온 경우(선택 흐름을 안 지남)에도 반드시 풀리게 여기서 끈다.
+                    //   성공 경로는 끝의 선택 흐름(fnWs20SelectUI)이 이미 껐지만, 공통 busy 는 깊이를
+                    //   세지 않으므로 두 번 꺼도 문제가 없다(resources/index.js setBusy).
+                    try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                });
         }
 
         // aggregation 셀렉트(공통 U4AUI.createSelect — 빈 라인 포함). 원본 Item text:"{UIATT}" 그대로.
@@ -2362,7 +2439,26 @@
                 lf_clampCnt();
             });
         });
-        oCntInp.addEventListener("change", lf_clampCnt);
+        /* ★ 생성 건수 칸을 원본과 같게 만든다. (장군님 지적 2026-10-20 「max값 체크도 없고 입력도 되고」)
+         *   원본 = sap.m.StepInput({max:100, min:1, value:1})  — 숫자 전용 입력 컴포넌트.
+         *          U4A_WS_DESIGN/design/insertUIPopop/index.js 508행.
+         *   원본 값 변경 이벤트(같은 파일 512~544행):
+         *     ① 빈 값이면 1 로 되돌리고 UI 오브젝트 검색칸(oInp2)으로 포커스를 옮긴 뒤 끝낸다.
+         *     ② 숫자로 바꿔 100 초과면 100, 1 미만이면 1 로 맞춘다.
+         *     ③ 맞춘 값을 다시 넣고 UI 오브젝트 검색칸으로 포커스를 옮긴다.
+         *   이식본에 빠져 있던 것 = 숫자 전용(여긴 글자도 쳐졌다) · 값 바꾼 뒤 검색칸으로 포커스 이동.
+         *   ※ 1~100 으로 맞추는 것(lf_clampCnt)은 종전에도 있었고 그대로 쓴다.
+         *   ※ +/- 단추는 값을 코드로 바꾸므로 change 가 나지 않는다 → 연타해도 포커스가 안 옮겨진다. */
+        oCntInp.addEventListener("input", function () {
+            // 숫자가 아닌 글자는 아예 안 들어가게 한다(원본은 숫자 전용 컴포넌트라 애초에 못 친다).
+            var sOnlyNum = oCntInp.value.replace(/[^0-9]/g, "");
+            if (sOnlyNum !== oCntInp.value) { oCntInp.value = sOnlyNum; }
+        });
+        oCntInp.addEventListener("change", function () {
+            lf_clampCnt();
+            // 원본 516~520·540~542행 — 값을 바꾸면 UI 오브젝트 검색칸으로 포커스가 간다.
+            try { oSearch.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
         oCntInp.addEventListener("blur", lf_clampCnt);
 
         /* [D25] 검색어가 빈 값이 되면 결과 목록의 정렬·컬럼 필터까지 초기화한다.
@@ -2399,7 +2495,7 @@
         //   확정(lf_confirm)만 lf_close 로 안내 없이 닫는다.
         function lf_cancel() { try { parent.showMessage(null, 10, "I", _msgWs("001")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } lf_close(); }
         oOk.addEventListener("click", lf_confirm);
-        Array.prototype.forEach.call(oDlg.querySelectorAll('[data-act="cancel"]'), function (b) {
+        Array.prototype.forEach.call(oDlg.querySelectorAll('[data-act="CANCEL"]'), function (b) {
             b.addEventListener("click", lf_cancel);
         });
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_cancel(); }); // (모달 전용, 폴백) ESC=취소 안내 후 닫기(장군님 통일 결정)
@@ -2523,7 +2619,7 @@
         oDlg.innerHTML =
             '<div class="u4a-dialog__header">' +
             '  <i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span>' + _esc(_msg("A57", "Move Position") + " - " + oNode.OBJID) + '</span>' +
-            '  <button type="button" class="u4a-btn-icon" data-act="cancel" aria-label="Close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn-icon" data-act="CANCEL" aria-label="Close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             '<div class="u4a-dialog__body" style="flex:1 1 auto;display:flex;flex-direction:column;gap:1rem;padding:1.25rem 1.5rem;overflow:visible">' +
             '  <div style="display:flex;align-items:baseline;justify-content:center;gap:0.4rem">' +
@@ -2537,8 +2633,8 @@
             '  </div>' +
             '</div>' +
             '<div class="u4a-dialog__footer">' +
-            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="ok" title="' + _esc(_msg("A40", "Confirm")) + '"><i class="fa-solid fa-check"></i></button>' +
-            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="cancel" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="OK" title="' + _esc(_msg("A40", "Confirm")) + '"><i class="fa-solid fa-check"></i></button>' +
+            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="CANCEL" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>';
         var oInp = oDlg.querySelector(".u4aWs20MovePos");
         // 이동 가능 위치 + 이동 대상(자기) + 대상 위치를 디자인 트리에 미리 강조(원본 designMoveMark 1:1 이식).
@@ -2567,7 +2663,7 @@
             // 실제 이동은 공용 함수로(트리·미리보기 위치이동 팝업 공용). 동일 위치면 내부에서 no-op.
             oAPP.fn.fnWs20MoveUIToIndex(oNode, iTarget);
         }
-        oDlg.querySelector('[data-act="ok"]').addEventListener("click", lf_ok);
+        oDlg.querySelector('[data-act="OK"]').addEventListener("click", lf_ok);
         // 슬라이더 ↔ 숫자 input 동기화(둘 다 1..nTot 클램프).
         var oRange = oDlg.querySelector(".u4aWs20MovePosRange");
         function lf_clamp(v) { v = parseInt(v, 10); if (!(v >= 1)) { v = 1; } if (v > nTot) { v = nTot; } return v; }
@@ -2577,11 +2673,11 @@
         oInp.addEventListener("input", function () { oRange.value = String(lf_clamp(oInp.value)); });
         oRange.addEventListener("change", function () { lf_moveMark(lf_clamp(oRange.value)); });
         oInp.addEventListener("change", function () { lf_moveMark(lf_clamp(oInp.value)); });
-        // 헤더 X + 푸터 ✗ 둘 다 data-act="cancel" → 닫기.
-        oDlg.querySelectorAll('[data-act="cancel"]').forEach(function (b) { b.addEventListener("click", lf_close); });
+        // 헤더 X + 푸터 ✗ 둘 다 data-act="CANCEL" → 닫기.
+        oDlg.querySelectorAll('[data-act="CANCEL"]').forEach(function (b) { b.addEventListener("click", lf_close); });
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_close(); });
         // 숫자 input Enter → 확인 버튼으로 포커스 이동(원본 keydown 13 → oBtn1.focus() 1:1. 즉시 확정 아님).
-        oInp.addEventListener("keydown", function (e) { if (e.key !== "Enter") { return; } e.preventDefault(); try { oDlg.querySelector('[data-act="ok"]').focus(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } });
+        oInp.addEventListener("keydown", function (e) { if (e.key !== "Enter") { return; } e.preventDefault(); try { oDlg.querySelector('[data-act="OK"]').focus(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } } });
         document.body.appendChild(oDlg);
         var oHeader = oDlg.querySelector(".u4a-dialog__header");
         try { if (window.U4AUI && U4AUI.makeDialogRecenter) { U4AUI.makeDialogRecenter(oDlg, oHeader); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }

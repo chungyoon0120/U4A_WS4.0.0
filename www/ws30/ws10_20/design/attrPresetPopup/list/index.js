@@ -104,8 +104,19 @@ function _getThemeInfo() {
 // busy(로딩 오버레이 + 닫기 차단 + 자식창 브로드캐스트). runtimeClassNav/docPopup 동일 규약.
 function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
-    var oEl = document.getElementById("apBusy");
-    if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
+    // ★[2026-10-16 장군님 지시] busy 는 예외 없이 공통(theme/u4a-busy.js)만 쓴다.
+    //   종전에는 이 창의 자체 오버레이 div 를 켰다 — 모달 팝업(showModal) 뒤로 숨는다.
+    if (window.U4ABusy && typeof U4ABusy.show === "function") {
+        if (bBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+        var oOldAp = document.getElementById("apBusy");
+        if (oOldAp) { oOldAp.setAttribute("data-busy", "false"); }
+    } else {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+        }
+        var oEl = document.getElementById("apBusy");
+        if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
+    }
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
     try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {

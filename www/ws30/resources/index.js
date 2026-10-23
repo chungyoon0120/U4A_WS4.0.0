@@ -1,4 +1,4 @@
-// 오류코드 접두: RSRC / 다음 번호: 010
+// 오류코드 접두: RSRC / 다음 번호: 016
 /**
  * index.js  (cleaned)
  *
@@ -25,6 +25,9 @@ oAPP.msg = window?.oAPP?.msg || {};
 oAPP.attr = window?.oAPP?.attr || {};
 oAPP.views = window?.oAPP?.views || {};
 
+// busy 창(<dialog>)의 id — 아래 getBusy 와 busy 끄기 쪽에서 함께 쓴다.
+var BUSY_DOM_ID = "u4aWsBusyIndicator";
+
 (function (oWS) {
     "use strict";
 
@@ -42,8 +45,10 @@ oAPP.views = window?.oAPP?.views || {};
     // AI와 인터페이스 관련 맵 정보
     oWS.utill.attr.AI_IF_MAP = new Map();
 
-    // Busy Indicator 상태
-    oWS.utill.attr.isBusy = "";
+    // ★[2026-10-21 장군님 지시] busy 상태를 담던 전역 변수(isBusy)를 없앴다.
+    //   까닭: 끄라는 신호를 받아도 「화면이 다 그려졌는지」를 기다린 뒤에 끄는데, 그 변수는
+    //     기다리기 전에 이미 "" 로 바뀌어 화면과 어긋났다. 이제 getBusy() 가 busy 창의
+    //     DOM 상태를 직접 본다 — 어긋날 수 없다.
 
     oWS.utill.attr.paths = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"));
 
@@ -257,6 +262,10 @@ oAPP.views = window?.oAPP?.views || {};
                 var oBtn = document.createElement("button");
                 oBtn.type = "button";
                 oBtn.className = "u4a-btn" + (b.emphasized ? " u4a-btn--emphasized" : "");
+                // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21). 값은 콜백에 넘기는 그것 그대로
+                //   (YES · NO · CANCEL · OK) — 새로 짓지 않는다. 단추가 셋인 확인창이 글자뿐이라
+                //   화면 언어를 바꾸면 못 집었다.
+                oBtn.setAttribute("data-act", b.act);
                 oBtn.textContent = b.label || b.act;
                 oBtn.addEventListener("click", function () { lf_close(b.act); });
                 oFooter.appendChild(oBtn);
@@ -609,14 +618,18 @@ oAPP.views = window?.oAPP?.views || {};
             return;
         }
         oWS.utill.attr._bNewWinInProgress = true;
-        oWS.utill.fn.setBusy("X");
+
+        // ★[2026-10-21] 안쪽 함수(oWS.utill.fn.setBusy) 를 바로 부르지 않고 전역 setBusy 를 쓴다.
+        //   까닭: 공통 busy(U4ABusy) 창을 여닫는 것은 전역 setBusy 한 곳에만 있다.
+        //     안쪽 함수를 바로 부르면 공통 busy 창이 안 열리고/안 닫힌다.
+        setBusy("X");
 
         let _busyReleased = false;
         const _releaseBusy = function () {
             if (_busyReleased) { return; }
             _busyReleased = true;
             oWS.utill.attr._bNewWinInProgress = false;
-            oWS.utill.fn.setBusy("");
+            setBusy("");
         };
 
         const WINDOWSTATE = REMOTE.getGlobal("mainRequire")('electron-window-state');
@@ -926,12 +939,15 @@ oAPP.views = window?.oAPP?.views || {};
 
         // 1. 중복 실행 방지
         // 이미 Busy 상태인데 다시 'X'를 요청받은 경우 무시
-        if (sIsBusy === "X" && attr.isBusy === "X") {
+        //   ★[2026-10-21 장군님 지시] 전역 변수 대신 getBusy()(busy 창 DOM 상태)로 본다.
+        //     여기서 그만둬도 안전하다 — 마우스 막기·포커스 저장·닫기 버튼·진행바는 앞서 켤 때
+        //     이미 걸려 있고, 그 풀기는 공통 busy 창이 닫힌 뒤에야 돈다(전역 setBusy 의 콜백).
+        //   ★단 공통 busy 창을 띄우는 setDomBusy("X") 는 전역 setBusy 가 이 함수 **뒤에** 부른다.
+        //     그래서 여기서 그만둬도 「기다리던 끄기 버리기」(U4ABusy.show 의 세대 번호)는 반드시 돈다.
+        if (sIsBusy === "X" && util.fn.getBusy() === "X") {
             return;
         }
 
-        // 상태 업데이트
-        attr.isBusy = sIsBusy;
         const bIsBusy = (sIsBusy === "X");
 
         // 2. 사용자 인터랙션 차단 (마우스 이벤트 제어)
@@ -1016,8 +1032,7 @@ oAPP.views = window?.oAPP?.views || {};
 
         // [UI5 제거] 구: if(!attr.sap) return; → BusyDialog 가 sap 의존이라 HTML5 에선
         //   아무것도 안 떴음. 이제 attr.oBusy(더미 busy = DOM 카드 컨트롤러)로 동작.
-
-        oWS.utill.attr.isBusy = sIsbusy;
+        // ★[2026-10-21] 여기 있던 전역 변수(isBusy) 기록을 없앴다 — getBusy() 가 DOM 을 직접 본다.
 
         var bIsBusy = (sIsbusy === "X" ? true : false);
 
@@ -1170,9 +1185,34 @@ oAPP.views = window?.oAPP?.views || {};
 
     }; // end of oWS.utill.fn.setBusyDialog
 
-    // 현재 Busy Indicator 상태를 리턴해준다.
+    /************************************************************************
+     * 현재 Busy Indicator 상태를 리턴해준다. ("X" = 켜짐 / "" = 꺼짐)
+     * ----------------------------------------------------------------------
+     * ★★★[2026-10-21 장군님 지시] 전역 변수(isBusy) 대신 **busy 창의 DOM 상태**로 판단한다.
+     *   [까닭] 2026-10-19 부터 끄라는 신호를 받아도 「화면이 다 그려졌는지」를 기다린 뒤에 끈다.
+     *     그런데 전역 변수는 **기다리기 전에 이미 "" 로** 바뀌어 있었다(setBusy/setBusyDialog 안).
+     *     그래서 busy 창이 화면에 떠 있는데 getBusy() 가 "" 를 돌려주는 구간이 생겼고,
+     *     그 사이 이 값으로 막던 것들(메뉴 누르기 fnHmws.js · 팝업 열기 · AI · 바인딩 창)이 열렸다.
+     *   [판정 방식] 로그 쪽(ws_html5_logger.js)이 이미 쓰는 것과 같다 —
+     *     <dialog> 면 열려 있는지(open), 아니면 보이는지(display:flex).
+     *   ★전역 변수 isBusy 는 없앴다 — 켜기 중복 방지(위 oWS.utill.fn.setBusy)도 이 함수를 쓴다.
+     ************************************************************************/
     oWS.utill.fn.getBusy = function () {
-        return oWS.utill.attr.isBusy;
+
+        var oBusyDom = document.getElementById(BUSY_DOM_ID);
+
+        //한 번도 켠 적이 없다 → 꺼진 상태.
+        if (!oBusyDom) {
+            return "";
+        }
+
+        //<dialog> 로 띄우는 창(메인 화면) — 열려 있으면 켜짐.
+        if (typeof oBusyDom.showModal === "function") {
+            return (oBusyDom.open === true ? "X" : "");
+        }
+
+        //<dialog> 가 아닌 창 — 보이면 켜짐.
+        return (oBusyDom.style && oBusyDom.style.display === "flex" ? "X" : "");
     };
 
     // 20. Page Loading 실행
@@ -1644,12 +1684,19 @@ function getErrorMsg() {
     return oWS.utill.fn.getErrorMsg();
 }
 
-function setDomBusy(bIsBusy) {
+/************************************************************************
+ * busy 켜고 끄기 — 공통 busy(theme/u4a-busy.js 의 U4ABusy) 로 넘긴다.
+ *
+ * ★ [2026-09-15, 장군님 지시] busy 본체를 공통 화면 리소스 theme/u4a-busy.js(U4ABusy)로 옮겼다.
+ *   busy 도 하나의 UI 이고, 화면 시작 때 가장 먼저 로드돼야 해서다(ws10_20/index.html <head> 맨 앞).
+ *   이 함수 이름은 그대로 둔다 — parent.setDomBusy 로 부르는 곳이 전부 이 이름을 쓴다.
+ *   옛 본체 = _index.js.busythemebak
+ *
+ * ★ [2026-10-21 장군님 지시] fnDone — 끌 때, **창이 실제로 닫힌 뒤** 불린다.
+ *   인자 없이 부르면 종전과 똑같다(로그인·메인 시작 등 여러 곳이 그렇게 부른다).
+ ************************************************************************/
+function setDomBusy(bIsBusy, fnDone) {
 
-    // ★ [2026-09-15, 장군님 지시] busy 본체를 공통 화면 리소스 theme/u4a-busy.js(U4ABusy)로 옮겼다.
-    //   busy 도 하나의 UI 이고, 화면 시작 때 가장 먼저 로드돼야 해서다(ws10_20/index.html <head> 맨 앞).
-    //   이 함수 이름은 그대로 둔다 — parent.setDomBusy 로 부르는 곳이 전부 이 이름을 쓴다.
-    //   옛 본체 = _index.js.busythemebak
     if (typeof U4ABusy === "undefined" || !U4ABusy) {
         // u4a-busy.js 로드가 빠진 창이다. 장군님 결정(2026-09-15): 앱 종료 없이 로그만 남긴다
         //   (없을 수가 없고, 빠지면 테스트 때 busy 가 안 떠서 바로 드러난다). 같은 창에서 한 번만 남긴다.
@@ -1657,6 +1704,16 @@ function setDomBusy(bIsBusy) {
             setDomBusy.__missLogged = true;
             console.error("[RSRC-008] setDomBusy: U4ABusy not loaded - theme/u4a-busy.js missing in this window, busy not shown");
         }
+
+        //공통 busy 가 없어도 뒷정리(마우스·포커스 복원 등)는 해야 화면이 잠긴 채 남지 않는다.
+        if (bIsBusy !== "X" && typeof fnDone === "function") {
+            try {
+                fnDone();
+            } catch (e) {
+                console.error("[RSRC-016] setDomBusy: fnDone failed -", e && e.message);
+            }
+        }
+
         return;
     }
 
@@ -1665,9 +1722,9 @@ function setDomBusy(bIsBusy) {
         return;
     }
 
-    U4ABusy.hide();
-
+    U4ABusy.hide(fnDone);
 }
+
 
 // 19. Busy Indicator 실행
 // - 파라미터에 Option이 존재할 경우는 busyDialog로 호출함
@@ -1679,22 +1736,46 @@ function setBusy(bIsBusy, oOptions) {
 
     //busy on 처리 건인경우.
     if (bIsBusy === "X") {
-        // 파라미터에 옵션을 추가했을 경우는 BusyDialog로 호출함!!
+
+        // ① 먼저 부수 작업 — 마우스 막기 · 포커스 저장 · 창 닫기 버튼 비활성 ·
+        //    작업표시줄 진행바 · busy 카드의 제목·문구.
+        //    ★여기가 먼저여야 한다. 안쪽 함수(oWS.utill.fn.setBusy)는 「이미 켜져 있으면 그만둔다」로
+        //      시작하는데, 그 판단을 getBusy()(= busy 창이 떠 있나)로 하기 때문이다.
+        //      공통 busy 창을 먼저 띄우면 그 판단에 걸려 부수 작업을 전부 건너뛴다.
         if (typeof oOptions === "object") {
             oWS.utill.fn.setBusyDialog(bIsBusy, oOptions);
-            return;
+        } else {
+            oWS.utill.fn.setBusy(bIsBusy);
         }
 
-        oWS.utill.fn.setBusy(bIsBusy);
+        // ② 공통 busy 창을 띄운다 — ★★★[2026-10-21 장군님 지시] 공통 busy 를 부르는 자리는
+        //    이 한 곳뿐이다. 종전에는 더미 busy 객체(ws_html5_shell.js fnCreateDummyBusy)의
+        //    open()·close() 안에서 parent.setDomBusy 를 또 불러 두 길로 갈라져 있었다.
+        //    ★U4ABusy.show() 가 「기다리던 끄기」를 여기서 버린다(세대 번호). 그래서 안쪽 함수가
+        //      위 ① 에서 그만뒀더라도 이 줄은 반드시 타야 한다 — 안 타면 기다리던 끄기가
+        //      방금 켠 busy 를 꺼 버린다.
+        setDomBusy("X");
 
         return;
     }
 
-    //busy dialog 종료처리.
-    oWS.utill.fn.setBusyDialog("", oOptions);
+    // ★★★[2026-10-21 장군님 지시] 끄기는 **공통 busy 하나만** 부른다.
+    //   [고친 이유] 종전에는 여기서 먼저 0.6초를 기다린 뒤 끄기를 실행했고, 그 끄기가
+    //     더미 busy 객체 → setDomBusy → 공통 busy 로 내려가 **거기서 또 0.6초**를 기다렸다.
+    //     같은 기다림을 두 번 타서 setBusy("") 한 번에 1.2초가 걸렸다(WS20 은 전부 이 경로).
+    //   [지금] 기다림은 공통 busy(U4ABusy.hide) 한 곳에만 있다.
+    //     걸리는 시간 = 조용함을 보는 창(theme/u4a-busy.js QUIET_WINDOW_MS) × 2 — 지금 0.3초.
+    //   [순서] 창이 **닫힌 뒤에** 뒷정리를 한다 — 마우스 막기 풀기 · 포커스 복원 ·
+    //     창 닫기 버튼 활성 · 작업표시줄 진행바. 종전에는 닫기 전에 풀어 화면과 어긋났다.
+    setDomBusy("", function () {
 
-    //기존 busy 종료 처리.
-    oWS.utill.fn.setBusy("");
+        //busy dialog 종료처리.
+        oWS.utill.fn.setBusyDialog("", oOptions);
+
+        //기존 busy 종료 처리.
+        oWS.utill.fn.setBusy("");
+
+    });
 
 }
 
@@ -1937,8 +2018,9 @@ function setProgressBar(TYPE, bIsShow) {
     },
         iStatus = (bIsShow ? 1 : 0);
 
-    // 현재 Busy Indicator 상태정보를 글로벌 변수에 저장한다.
-    oWS.utill.attr.isBusy = (bIsShow == true ? "X" : "");
+    // ★[2026-10-21] 여기서 busy 상태 전역 변수를 덮어쓰던 줄을 없앴다.
+    //   이 함수는 작업표시줄 진행바만 다루는데, busy 상태까지 같이 바꿔 버려 실제 화면과 어긋났다.
+    //   이제 busy 상태는 getBusy() 가 busy 창의 DOM 을 직접 보고 판단한다.
 
     switch (TYPE) {
         case "S":

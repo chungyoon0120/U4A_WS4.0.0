@@ -139,22 +139,22 @@
     function _defItems(oRes) {
         var vis = oRes.vis;
         var aItems = [
-            { KEY: "M00", FA: "bars",           TXT: oRes.UIATT,   VISIBLE: true,      ENABLED: false },   // sap-icon://menu2
-            { KEY: "M01", FA: "clock",          TXT: _msgC("A42"), VISIBLE: vis.vis01, ENABLED: true },    // sap-icon://lateness
-            { KEY: "M02", FA: "link-slash",     TXT: _msgC("A43"), VISIBLE: vis.vis02, ENABLED: true },    // sap-icon://disconnected
-            { KEY: "M03", FA: "paste",          TXT: _msgC("A44"), VISIBLE: vis.vis03, ENABLED: true },    // sap-icon://paste
-            { KEY: "M04", FA: "trash",          TXT: _msgC("A45"), VISIBLE: vis.vis04, ENABLED: true }     // sap-icon://delete
+            { KEY: "M00", ACT: "ATTR_MENU_HEAD",     FA: "bars",       TXT: oRes.UIATT,   VISIBLE: true,      ENABLED: false },   // sap-icon://menu2
+            { KEY: "M01", ACT: "ATTR_MENU_WAIT",     FA: "clock",      TXT: _msgC("A42"), VISIBLE: vis.vis01, ENABLED: true },    // sap-icon://lateness
+            { KEY: "M02", ACT: "ATTR_MENU_UNBIND",   FA: "link-slash", TXT: _msgC("A43"), VISIBLE: vis.vis02, ENABLED: true },    // sap-icon://disconnected
+            { KEY: "M03", ACT: "ATTR_MENU_SYNC",     FA: "paste",      TXT: _msgC("A44"), VISIBLE: vis.vis03, ENABLED: true },    // sap-icon://paste
+            { KEY: "M04", ACT: "ATTR_MENU_CEVT_DEL", FA: "trash",      TXT: _msgC("A45"), VISIBLE: vis.vis04, ENABLED: true }     // sap-icon://delete
         ];
 
         //M05 단축키 등록 — WLO(UHAK901289) 패치 서버에서만 노출(원본 checkWLOList).
         var bShortcut = false;
         try { bShortcut = APPCOMMON.checkWLOList("C", "UHAK901289") === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (bShortcut) {
-            aItems.push({ KEY: "M05", FA: "keyboard", TXT: _msgW("805"), VISIBLE: vis.vis05, ENABLED: true });   // sap-icon://keyboard-and-mouse
+            aItems.push({ KEY: "M05", ACT: "ATTR_MENU_SHORTCUT", FA: "keyboard", TXT: _msgW("805"), VISIBLE: vis.vis05, ENABLED: true });   // sap-icon://keyboard-and-mouse
         }
 
         //M06 개인화 팝업.
-        aItems.push({ KEY: "M06", FA: "user", TXT: _msgW("627"), VISIBLE: vis.vis06, ENABLED: true });   // sap-icon://account
+        aItems.push({ KEY: "M06", ACT: "ATTR_MENU_PRESET", FA: "user", TXT: _msgW("627"), VISIBLE: vis.vis06, ENABLED: true });   // sap-icon://account
 
         return aItems;
     }
@@ -183,6 +183,8 @@
         var oWrap = document.createElement("div");
         oWrap.className = "u4a-menu";
         oWrap.setAttribute("role", "menu");
+        //자동 테스트 식별값(.analy/21) — 메뉴 뿌리. 자동 테스트 쪽 요청 2026-10-20.
+        oWrap.setAttribute("data-act", "ATTR_CTXMENU");
 
         var bAny = false;   // 이미 렌더된 항목 존재(첫 항목 앞엔 구분선 없음)
         aItems.forEach(function (mi) {
@@ -196,6 +198,14 @@
             var oItem = document.createElement("div");
             oItem.className = "u4a-menu__item";
             oItem.setAttribute("role", "menuitem");
+
+            //자동 테스트 식별값(.analy/21) — 줄마다 고정값. 값이 없으면 로그만 남기고 속성은 두지 않는다.
+            if (mi.ACT) {
+                oItem.setAttribute("data-act", mi.ACT);
+            } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "attr ctxmenu item has no ACT: " + mi.KEY, "data-act not set - automated test cannot pick this item");
+            }
+
             if (mi.ENABLED === false) { oItem.setAttribute("aria-disabled", "true"); }
             oItem.innerHTML = _fa(mi.FA) + '<span class="u4a-menu__item-text"></span>';
             oItem.querySelector(".u4a-menu__item-text").textContent = mi.TXT;

@@ -143,8 +143,9 @@
         if (opt.name) {
             try {
                 fld.input.setAttribute("data-field", opt.name);
+                fld.input.setAttribute("data-act", opt.name);   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
                 var oClr = fld.el.querySelector(".u4a-field__clear");
-                if (oClr) { oClr.setAttribute("data-clear", opt.name); }
+                if (oClr) { oClr.setAttribute("data-clear", opt.name); oClr.setAttribute("data-act", opt.name + "_CLEAR"); }
             } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 기존 호출부 계약 유지({ wrap, input }).
@@ -324,6 +325,7 @@
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aAppF4Dlg";
         oDlg.id = "u4aAppF4Dlg";
+        oDlg.setAttribute("data-act", "DLG_APPF4");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
         // ★ 공통 "닫으면 DOM 제거" 위임에서 제외(opt-out). 이 팝업은 닫기 경로를 직접 구분한다:
         //   · 앱 조회(_doDisplay) = lf_hide() 숨김(DOM 유지) → WS10 복귀/다음 F4 에 재표시(원본 setVisible 상태보존)
         //   · 명시적 닫기(X·푸터·ESC·선택완료) = lf_close() 숨긴 뒤 DOM 제거 → 다음 열기는 새 build(상태 폐기)
@@ -341,7 +343,7 @@
         oHeader.querySelector("span").textContent =
             _txt("/U4A/CL_WS_COMMON", "B96") + " " + _txt("/U4A/CL_WS_COMMON", "A26");
         var oX = _el("button", "u4a-btn-icon");
-        oX.type = "button"; oX.setAttribute("data-act", "close");
+        oX.type = "button"; oX.setAttribute("data-act", "CLOSE");
         oX.title = _txt("/U4A/CL_WS_COMMON", "A39"); oX.innerHTML = _fa("xmark");
         oX.addEventListener("click", lf_close);
         oHeader.appendChild(oX);

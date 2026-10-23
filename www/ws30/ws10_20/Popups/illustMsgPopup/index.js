@@ -61,11 +61,22 @@ oAPP.USERDATA = oAPP.APP.getPath("userData");
 
 // 공통 .u4a-busy 토글 — child frame(frame.js) 이 로드 완료 시 parent.setBusy("") 로 호출(원본 시그니처 유지).
 function setBusy(bIsBusy) {
-    var oBusy = document.getElementById("illustpBusy");
-    if (!oBusy) { return; }
-    // 공통 .u4a-busy 표시 트리거 = data-busy="true" (shell.css). 빈값/removeAttribute 는 안 뜸(전 소비처 규약).
-    if (bIsBusy) { oBusy.setAttribute("data-busy", "true"); }
-    else { oBusy.setAttribute("data-busy", "false"); }
+    // [2026-10-16] 공통 busy 로 교체(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음).
+    //   공통 busy 는 <dialog>.showModal() = top layer 라 모달 팝업 위에도 보이고,
+    //   모양을 바꿀 때 theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
+    if (window.U4ABusy && typeof U4ABusy.show === "function") {
+        if (bIsBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+        // ★ 이 창의 옛 겹침 표시도 index.html 에서 켜진 채 시작한다 — 공통으로 넘어오면 같이 꺼야
+        //   화면에 남지 않는다(아이콘 목록 창과 같은 결함, 2026-10-16).
+        var oOld = document.getElementById("illustpBusy");
+        if (oOld) { oOld.setAttribute("data-busy", "false"); }
+    } else {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+        }
+        var oBusy = document.getElementById("illustpBusy");
+        if (oBusy) { oBusy.setAttribute("data-busy", bIsBusy ? "true" : "false"); }
+    }
 
     // [흰색 플래시 방지] 본문 iframe(KEEP-UI5)은 초기에 숨김(index.html #floatFrame). UI5 부팅 완료로
     // busy 가 해제될 때만 노출한다 → 그 전까지는 호스트 --boot-bg(테마색)만 보인다.

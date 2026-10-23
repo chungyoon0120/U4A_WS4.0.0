@@ -76,6 +76,8 @@ module.exports = (() => {
         // Popup Paths..        
         ERRPAGE: PATH.join(POPUP_ROOT, "errPageEditorPopup", "errorPageEditorFrame.html"),
         ERRPAGEPREV: PATH.join(POPUP_ROOT, "errPageEditorPopup", "errorPageEditorPreview.html"),
+        // 컨트롤러 실행 오류 점검사항 — 공통 헤더 틀(본문 설명서는 iframe 으로 www/help/controllerClass/<언어>/index.html)
+        CTRLERRHELP: PATH.join(POPUP_ROOT, "controllerErrorHelpPopup", "frame.html"),
         UIFIND: PATH.join(POPUP_ROOT, "findPopup", "findFrame.html"),
         RTMCLS: PATH.join(POPUP_ROOT, "runtimeClassNavigator", "frame.html"), // runtime class navigator
         FONTSTYLE: PATH.join(POPUP_ROOT, "fontStyleWizard", "frame.html"), // Font Style Wizard (opener getPath("FONTSTYLE"))

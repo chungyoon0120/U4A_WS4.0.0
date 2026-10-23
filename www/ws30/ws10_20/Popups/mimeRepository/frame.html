@@ -14,6 +14,9 @@
          경로: Popups/mimeRepository 기준 → theme=../../theme, lib=../../../../lib. (browser-window-common-ux) -->
     <link rel="stylesheet" href="../../theme/tokens.css">
     <link rel="stylesheet" href="../../theme/shell.css">
+    <!-- [2026-10-16] 공통 busy(.analy/16 §2.10) — 모든 별창은 예외 없이 공통 busy 를 쓴다. -->
+    <link rel="stylesheet" href="../../theme/u4a-busy.css">
+    <script src="../../theme/u4a-busy.js"></script>
     <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
     <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
     <link rel="stylesheet" href="mime.css">
@@ -46,9 +49,9 @@
         <img class="u4a-titlebar__logo" id="mimeLogo" src="" alt="U4A">
         <span class="u4a-titlebar__title" id="mimeTitle"></span>
         <div class="u4a-titlebar__spacer"></div>
-        <button type="button" class="u4a-winbtn" id="mimeWinMin" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
-        <button type="button" class="u4a-winbtn" id="mimeWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
-        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="mimeWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" class="u4a-winbtn" id="mimeWinMin" data-act="MINIMIZE" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="mimeWinMax" data-act="MAXIMIZE" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="mimeWinClose" data-action="close" data-act="CLOSE" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </header>
 
     <!-- 본문 = 트리/속성/미리보기(mime.js 가 직접 렌더). 데이터 도착 후 페이드인 -->
@@ -59,7 +62,7 @@
     <!-- Busy = 공통 카드/이중링 스피너(.u4a-busy__*, shell.css SSOT) 를 top-layer <dialog> 로.
          생성/가져오기 팝업이 showModal(top-layer)이라 일반 div busy 는 가려짐 → busy 도 모달이어야
          그 위에 보인다(modal-dialog-busy-toplayer). frame.js setBusy 가 showModal()/close() 제어(지연 0 = 켜는 즉시 표시). -->
-    <dialog class="u4aMimeBusy" id="mimeBusy" role="progressbar" aria-valuetext="Busy">
+    <dialog class="u4aMimeBusy" id="mimeBusy" data-act="BUSY" role="progressbar" aria-valuetext="Busy">
         <div class="u4a-busy__card">
             <div class="u4a-busy__spinner"></div>
         </div>

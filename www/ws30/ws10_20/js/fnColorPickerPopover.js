@@ -82,6 +82,37 @@
     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
   }
 
+  /**********************************************************************
+   * 팝오버를 어디에 붙일지 정한다 — 앵커가 떠 있는 <dialog> 안이면 그 안으로.
+   *
+   * ★왜 필요한가 (2026-10-22 장군님 지적):
+   *   showModal() 로 연 <dialog> 는 top layer 에 올라간다.
+   *   top layer 밖(=보통 DOM)에 있는 것은 z-index 를 아무리 키워도 그 아래로 깔린다.
+   *   그래서 「Propery 모두 바꾸기」 창에서 값 변경 칸의 값도움을 눌러도
+   *   색 고르기가 창 뒤에 숨어 아무 일도 안 일어난 것처럼 보였다.
+   *   같은 창의 컬럼 메뉴도 이미 같은 이유로 dialog 안에 붙이고 있다
+   *   (fnSameAttrSyncPopupOpen 의 openColumnMenu container).
+   **********************************************************************/
+  function lf_hostOf(oAnchorEl) {
+    if (!oAnchorEl) {
+      return document.body;
+    }
+    if (typeof oAnchorEl.closest !== "function") {
+      return document.body;
+    }
+
+    var oDlg = oAnchorEl.closest("dialog");
+
+    if (!oDlg) {
+      return document.body;
+    }
+    if (oDlg.open !== true) {
+      return document.body;
+    }
+
+    return oDlg;
+  }
+
   // 닫기(취소) — DOM 은 남기고 숨김 + 리스너 해제.
   function lf_close() {
     if (oUI && oUI.pop) { oUI.pop.style.display = "none"; }
@@ -300,6 +331,23 @@
 
     fnOnConfirm = (typeof fnConfirm === "function") ? fnConfirm : null;
     oAnchorCur = oAnchorEl || null;
+
+    // 붙는 자리를 정한다 — 떠 있는 <dialog> 안이면 그 안으로(위 lf_hostOf 설명).
+    var oHost = lf_hostOf(oAnchorEl);
+
+    if (oUI.pop.parentNode !== oHost) {
+      oHost.appendChild(oUI.pop);
+    }
+
+    var sHostDesc = "host=body";
+
+    if (oHost !== document.body) {
+      sHostDesc = "host=dialog (top layer)";
+    }
+
+    if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+      U4ALOG.info("OPEN", "fnColorPickerOpen", sHostDesc);
+    }
 
     // 초기색 → 상태.
     var rgb = hex2rgb(sInitColor) || { r: 255, g: 255, b: 255 };

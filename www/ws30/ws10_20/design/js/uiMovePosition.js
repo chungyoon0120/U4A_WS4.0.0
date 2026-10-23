@@ -64,7 +64,7 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
   oDlg.innerHTML =
     '<div class="u4a-dialog__header">' +
     '  <i class="fa-solid fa-up-down-left-right" aria-hidden="true"></i><span>' + _esc(_msg("A57", "Move Position") + " - " + OBJID) + '</span>' +
-    '  <button type="button" class="u4a-btn-icon" data-act="cancel" aria-label="Close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+    '  <button type="button" class="u4a-btn-icon" data-act="CANCEL" aria-label="Close" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
     '</div>' +
     '<div class="u4a-dialog__body" style="flex:1 1 auto;display:flex;flex-direction:column;gap:1rem;padding:1.25rem 1.5rem;overflow:visible">' +
     '  <div style="display:flex;align-items:baseline;justify-content:center;gap:0.4rem">' +
@@ -78,8 +78,8 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
     '  </div>' +
     '</div>' +
     '<div class="u4a-dialog__footer">' +
-    '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="ok" title="' + _esc(_msg("A40", "Confirm")) + '"><i class="fa-solid fa-check"></i></button>' +
-    '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="cancel" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+    '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="OK" title="' + _esc(_msg("A40", "Confirm")) + '"><i class="fa-solid fa-check"></i></button>' +
+    '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="CANCEL" title="' + _esc(_msg("A39", "Close")) + '"><i class="fa-solid fa-xmark"></i></button>' +
     '</div>';
 
   var oInp = oDlg.querySelector(".u4aWs20MovePos");
@@ -137,7 +137,7 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
   }
 
   // 확인 버튼.
-  oDlg.querySelector('[data-act="ok"]').addEventListener("click", lf_ok);
+  oDlg.querySelector('[data-act="OK"]').addEventListener("click", lf_ok);
 
   // 값 표시(숫자칸↔슬라이더 위치)는 실시간(input)으로 동기화하되,
   //  트리 다시 그리기(미리강조)는 마우스를 놓는 순간(change)에만 → 슬라이더 끌 때 매번 트리를 다시
@@ -147,8 +147,8 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
   oRange.addEventListener("change", function () { lf_moveMark(lf_clamp(oRange.value)); });
   oInp.addEventListener("change", function () { lf_moveMark(lf_clamp(oInp.value)); });
 
-  // 헤더 X + 푸터 ✗ 둘 다 data-act="cancel" → 취소.
-  oDlg.querySelectorAll('[data-act="cancel"]').forEach(function (b) { b.addEventListener("click", lf_cancel); });
+  // 헤더 X + 푸터 ✗ 둘 다 data-act="CANCEL" → 취소.
+  oDlg.querySelectorAll('[data-act="CANCEL"]').forEach(function (b) { b.addEventListener("click", lf_cancel); });
   oDlg.addEventListener("cancel", function (e) { e.preventDefault(); lf_cancel(); });
 
   // 숫자 input Enter → 확인 버튼으로 포커스 이동(원본 attachBrowserEvent keydown 13 → oBtn1.focus() 1:1).
@@ -156,7 +156,7 @@ oAPP.fn.uiMovePosition = function (is_parent, OBJID, pos, max, f_callBack, i_x, 
   oInp.addEventListener("keydown", function (e) {
     if (e.key !== "Enter") { return; }
     e.preventDefault();
-    try { oDlg.querySelector('[data-act="ok"]').focus(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+    try { oDlg.querySelector('[data-act="OK"]').focus(); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
   });
 
   document.body.appendChild(oDlg);

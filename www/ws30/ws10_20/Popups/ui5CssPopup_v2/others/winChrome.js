@@ -3,7 +3,8 @@
  * --------------------------------------------------------------------------
  *  "다른 CSS 가이드" 새창(M1~M4/index.html) 공통 frameless 크롬(.u4a-titlebar).
  *   openNewBrowserOthers 가 titleBarStyle:hidden + closable:false + query THEME/BGCOL/TITLE 로 띄운 창에
- *   공통 헤더(로고/제목/최대화/닫기 — ★minimize 제외, 디테일 새창과 동일)를 입힌다.
+ *   공통 헤더(로고/제목/최소화/최대화/닫기 — 디테일 새창과 동일)를 입힌다.
+ *   2026-10-15 장군님 지시 「최소화 넣고」 — 종전엔 minimize 를 빼 뒀다(원본은 Windows 기본 창틀이라 있었다).
  *   (browser-window-common-ux / .analy/16 §2.6 · §2.6.1)
  *
  *  · 이 스크립트는 각 M/index.html <head> 에서 로드(파서 블로킹) → boot-bg/테마 동기 적용(흰 플래시 방지)
@@ -83,7 +84,7 @@
                 try { CURRWIN.setMenu(null); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 try { if (window.U4AUI && U4AUI.initWindowFocusState) { U4AUI.initWindowFocusState(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-                // 타이틀바 구성 — 로고 / 제목 / 최대화 / 닫기 (minimize 없음)
+                // 타이틀바 구성 — 로고 / 제목 / 최소화 / 최대화 / 닫기
                 var hd = document.createElement("header");
                 hd.className = "u4a-titlebar";
                 hd.id = "u4aOtherTitlebar";
@@ -98,6 +99,11 @@
                 var sp = document.createElement("div");
                 sp.className = "u4a-titlebar__spacer";
 
+                var btnMin = document.createElement("button");
+                btnMin.type = "button"; btnMin.className = "u4a-winbtn"; btnMin.title = "Minimize";
+                btnMin.setAttribute("data-action", "minimize");
+                btnMin.innerHTML = '<i class="fa-solid fa-window-minimize"></i>';
+
                 var btnMax = document.createElement("button");
                 btnMax.type = "button"; btnMax.className = "u4a-winbtn"; btnMax.title = "Maximize";
                 btnMax.innerHTML = '<i class="fa-solid fa-window-maximize"></i>';
@@ -107,7 +113,7 @@
                 btnClose.setAttribute("data-action", "close");
                 btnClose.innerHTML = '<i class="fa-solid fa-xmark"></i>';
 
-                hd.appendChild(logo); hd.appendChild(tit); hd.appendChild(sp); hd.appendChild(btnMax); hd.appendChild(btnClose);
+                hd.appendChild(logo); hd.appendChild(tit); hd.appendChild(sp); hd.appendChild(btnMin); hd.appendChild(btnMax); hd.appendChild(btnClose);
                 document.body.insertBefore(hd, document.body.firstChild);
 
                 // 타이틀바 높이만큼 본문 밀기(동적 실측 + 리사이즈 재적용)
@@ -126,6 +132,7 @@
                     var m = false; try { m = CURRWIN.isMaximized(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     i.className = m ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize";
                 }
+                btnMin.addEventListener("click", function () { try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
                 btnMax.addEventListener("click", function () { try { CURRWIN.isMaximized() ? CURRWIN.unmaximize() : CURRWIN.maximize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
                 try { CURRWIN.on("maximize", _syncMax); CURRWIN.on("unmaximize", _syncMax); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 _syncMax();

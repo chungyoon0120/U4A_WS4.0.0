@@ -243,6 +243,7 @@
         // ── 다이얼로그 ──
         var oDlg = document.createElement("dialog");
         oDlg.id = C_DLG_ID;
+        oDlg.setAttribute("data-act", "DLG_SHORTCUT");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
         oDlg.className = "u4a-dialog u4aKbdDlg";
 
         // 헤더(keyboard 아이콘 + 253 + 닫기 X).

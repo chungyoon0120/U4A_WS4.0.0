@@ -232,6 +232,27 @@
     function _wizFinish(OBJID) {
         return Promise.resolve()
             .then(function () {
+                //★[2026-10-20 장군님 지시] ① 미리보기에 반영(createUiLine 들이 addUIObjPreView 로 이미 넣었다)
+                //  → ② 렌더링 종료 감지 → ③ busy off(호출 쪽 _unlock / BUSY_OFF).
+                //  감지 대상 = 추가된 UI 의 "부모". 생성 헬퍼(createUiLine)는 UI 한 줄마다 동기로 여러 번
+                //  불리고 상위가 그 반환값을 바로 쓰므로 거기서는 기다릴 수 없다 → 전부 끝난 이 자리에서 한 번.
+                //★필수 의존성이 없으면 조용히 건너뛰지 않는다 — 코드로 드러낸다.
+                //  (.works/DEV_STANDARD_오류처리.md §4·§6 / 전례 ws_events.js _ws20ReselectSelectedUI)
+                try {
+                    if (typeof oAPP.fn.fnWs20AwaitPrevRender !== "function") {
+                        throw new Error("oAPP.fn.fnWs20AwaitPrevRender 미정의(ws_html5_ws20_prev.js 미로드)");
+                    }
+                    if (typeof oAPP.fn.getTreeData !== "function") {
+                        throw new Error("oAPP.fn.getTreeData 미정의(WS20 디자인 트리 모듈 미로드)");
+                    }
+                    var oNodeW = OBJID ? oAPP.fn.getTreeData(OBJID) : null;
+                    var oParW = (oNodeW && oNodeW.POBID) ? oAPP.fn.getTreeData(oNodeW.POBID) : null;
+                    return oAPP.fn.fnWs20AwaitPrevRender(oParW, undefined, "templateWizard");
+                } catch (e) {
+                    console.error("[W20W-001] templateWizard — preview render await failed:", e);
+                }
+            })
+            .then(function () {
                 // 디자인 영역 모델 갱신 대기 (원본 designRefershModel).
                 if (typeof oAPP.fn.designRefershModel === "function") { return oAPP.fn.designRefershModel(); }
             })

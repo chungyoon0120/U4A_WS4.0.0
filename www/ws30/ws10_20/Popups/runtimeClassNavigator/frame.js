@@ -79,8 +79,19 @@ function _getThemeInfo() {
 // busy(로딩 오버레이 + 닫기 차단 + 자식창 브로드캐스트). docPopup 과 동일 규약.
 function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
-    var oEl = document.getElementById("rtmBusy");
-    if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
+    // [2026-10-16] 공통 busy 로 교체(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음).
+    //   자체 겹침 div 는 이 창 안에서 showModal() 로 연 팝업(top layer) 뒤로 숨는다.
+    //   공통 busy 는 <dialog>.showModal() 이라 어떤 모달 위에도 보이고, 모양을 바꿀 때
+    //   theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
+    if (window.U4ABusy && typeof U4ABusy.show === "function") {
+        if (bBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+    } else {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+        }
+        var oEl = document.getElementById("rtmBusy");
+        if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
+    }
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
     try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {

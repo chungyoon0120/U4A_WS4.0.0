@@ -1,4 +1,4 @@
-// 오류코드 접두: USP / 다음 번호: 002
+// 오류코드 접두: USP / 다음 번호: 003
 /************************************************************************
  * ws_html5_usp.js  (HTML5)  — WS30 USP 코드에디터 "셸"
  * ----------------------------------------------------------------------
@@ -265,6 +265,8 @@
         if (oCfg.id) { BTN.id = oCfg.id; }
         BTN.className = "u4a-tx-btn" + (oCfg.reject ? " u4a-tx-btn--reject" : "");
         BTN.title = oCfg.tooltip || oCfg.text || "";
+        // 2026-10-14 — 자동 테스트 도구가 집을 이름(.analy/21). 값은 WS20 과 같은 것을 쓴다.
+        if (oCfg.act) { BTN.setAttribute("data-act", oCfg.act); }
         BTN.innerHTML = (oCfg.fa ? _fa(oCfg.fa, oCfg.brand) : "")
             + (oCfg.text ? "<span>" + _esc(oCfg.text) + "</span>" : "");
 
@@ -321,6 +323,7 @@
         BACK.type = "button";
         BACK.id = "ws30AppHeaderBackBtn";
         BACK.className = "u4aWs30AppHdrBtn back";
+        BACK.setAttribute("data-act", "APPHDR_BACK");   // 2026-10-15 WS20 뒤로 단추와 같은 값(.analy/21)
         BACK.title = "Back";
         BACK.innerHTML = _fa("chevron-left");
         BACK.addEventListener("click", _uspBack);
@@ -346,6 +349,7 @@
         NEWWIN.type = "button";
         NEWWIN.id = "ws30AppHeaderNewWinBtn";
         NEWWIN.className = "u4aWs30AppHdrBtn";
+        NEWWIN.setAttribute("data-act", "APPHDR_NEWWIN");   // 2026-10-15 WS20 새 창 단추와 같은 값
         NEWWIN.title = _msg("A09") + " (Ctrl+N)";
         NEWWIN.innerHTML = _fa("window-restore");
         NEWWIN.addEventListener("click", function () {
@@ -368,6 +372,34 @@
     //   fnMoveToWs10 → removeContent() 가 WS20 DOM/상태를 지우므로
     //   WS30에서 호출하면 WS20 콘텐츠가 날아간다.
     function _doBackToWs10() {
+
+        /********************************************************************
+         * ★ [2026-10-16 장군님 지시] 떠나기로 했으면 **먼저 닫는다.** (WS20 fnMoveToWs10 과 같은 모양)
+         ********************************************************************
+         *  · 닫는 기준은 기존 예외 목록(fnCheckPopupCloseException) 그대로 — 창을 가리지 않는다.
+         *  · 닫고 나면 남는 것은 안 닫는 예외 창뿐이라, 바로 되살려도 깜빡일 것이 없다.
+         *    (그 창들은 저장 확인창이 뜰 때 숨겨져 있어 되살리지 않으면 WS10 에서도 안 보인다.)
+         * ※ 원본(ws_usp.js)은 서버에서 세션을 끊고 잠금을 푼 **뒤에만** 닫는다 —
+         *   장군님이 **원본과 다르게 간다**고 정하셨다(2026-10-16). 아래 lf_success 의 닫기는 그대로 둔다.
+         ********************************************************************/
+        try {
+
+            if (typeof oAPP.fn.fnChildWindowClose === "function") {
+                oAPP.fn.fnChildWindowClose();
+            } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnChildWindowClose", "browser windows stay open while the page moves to WS10");
+            }
+
+            if (typeof oAPP.fn.fnChildWindowShow === "function") {
+                oAPP.fn.fnChildWindowShow(true);
+            } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnChildWindowShow", "browser windows that survive the page move stay invisible");
+            }
+
+        } catch (e) {
+            console.error("[USP-002] closing the browser windows before moving to WS10 failed:", e && e.message, e);
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
 
         try {
             // busy + navLock 은 _uspBack 에서 이미 걸려 있다.
@@ -1829,8 +1861,16 @@
 
     function _uspModeMsgCb(ACTCD) {
         oAPP.common.fnSetBusyLock("X");
+
+        // 머무름 — 숨겨 둔 별창을 그대로 되살린다.
+        if (ACTCD == null || ACTCD === "CANCEL") {
+            try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            oAPP.common.fnSetBusyLock("");
+            return;
+        }
+
         try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        if (ACTCD == null || ACTCD === "CANCEL") { oAPP.common.fnSetBusyLock(""); return; }
+
         if (ACTCD === "YES") { oAPP.fn.fnSaveUspWs30({ ISDISP: "X" }); return; }   // 저장 후 display
         _uspSetDisplayMode();                                                      // 저장 안 하고 display
     }
@@ -2000,10 +2040,10 @@
         // Display 모드 버튼 (Change 모드에서 노출 — display 아이콘으로 Display 로 전환). 단축키 Ctrl+F1 동일.
         // mousedown 에서 플래그를 세워 click(mouseup 후) 전에 F3 가 발사되는 경쟁 조건을 막는다.
         (function () {
-            var b1 = _txBtn({ id: "ws30_displayModeBtn", fa: "display", tooltip: sDispChg, evFn: _uspToggleMode });
+            var b1 = _txBtn({ id: "ws30_displayModeBtn", act: "DISPLAY_MODE", fa: "display", tooltip: sDispChg, evFn: _uspToggleMode });
             b1.addEventListener("mousedown", function () { oAPP.attr.uspModeChanging = true; });
             BAR.appendChild(b1);
-            var b2 = _txBtn({ id: "ws30_changeModeBtn", fa: "pen-to-square", tooltip: sDispChg, evFn: _uspToggleMode });
+            var b2 = _txBtn({ id: "ws30_changeModeBtn", act: "CHANGE_MODE", fa: "pen-to-square", tooltip: sDispChg, evFn: _uspToggleMode });
             b2.addEventListener("mousedown", function () { oAPP.attr.uspModeChanging = true; });
             BAR.appendChild(b2);
         }());
@@ -2011,20 +2051,20 @@
         BAR.appendChild(_sep("ws30_sepEdit"));
 
         // Activate (Change 모드) — WS20 와 동일 마법사 아이콘. 단축키 Ctrl+F3 와 동일 핸들러.
-        BAR.appendChild(_txBtn({ id: "ws30_activateBtn", fa: "wand-magic-sparkles", tooltip: _msg("B73") + " (Ctrl+F3)", evFn: _uspActivate }));
+        BAR.appendChild(_txBtn({ id: "ws30_activateBtn", act: "ACTIVATE", fa: "wand-magic-sparkles", tooltip: _msg("B73") + " (Ctrl+F3)", evFn: _uspActivate }));
         // Save (Change 모드 + 개발 권한) — 단축키 Ctrl+S 와 동일 핸들러.
-        BAR.appendChild(_txBtn({ id: "ws30_saveBtn", fa: "floppy-disk", tooltip: _msg("A64") + " (Ctrl+S)", evFn: _uspSave }));
+        BAR.appendChild(_txBtn({ id: "ws30_saveBtn", act: "SAVE_APP", fa: "floppy-disk", tooltip: _msg("A64") + " (Ctrl+S)", evFn: _uspSave }));
 
         BAR.appendChild(_sep());
 
         // MIME Repository — 원본 oAPP.events.ev_pressMimeBtn (가드)
-        BAR.appendChild(_txBtn({ id: "ws30_MimeBtn", fa: "image", text: _msg("A10"),
+        BAR.appendChild(_txBtn({ id: "ws30_MimeBtn", act: "MIME", fa: "image", text: _msg("A10"),
             tooltip: _msg("A10") + " (Ctrl+Shift+F12)", ev: "ev_pressMimeBtn" }));
         // Controller (Class Builder) — USP 전용(일반 핸들러는 oAppInfo 누락). evFn 으로 /WS30/APP 전달.
-        BAR.appendChild(_txBtn({ id: "ws30_controllerBtn", fa: "screwdriver-wrench", text: _msg("A11"),
+        BAR.appendChild(_txBtn({ id: "ws30_controllerBtn", act: "CONTROLLER", fa: "screwdriver-wrench", text: _msg("A11"),
             tooltip: _msg("C38") + " (Ctrl+F12)", evFn: _uspControllerClass }));
         // Application Execution — USP 전용 ev_AppExec(일반 핸들러는 USP 미지원). evFn 직접 연결.
-        BAR.appendChild(_txBtn({ id: "ws30_appExecBtn", fa: "globe", text: _msg("A06"),
+        BAR.appendChild(_txBtn({ id: "ws30_appExecBtn", act: "RUN", fa: "globe", text: _msg("A06"),
             tooltip: _msg("A06") + " (F8)", evFn: _uspAppExec }));
 
         return BAR;

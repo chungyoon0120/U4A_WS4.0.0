@@ -105,8 +105,19 @@ function _readHost() {
 // busy(로딩 오버레이 + 닫기 차단 + 자식창 브로드캐스트).
 function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
-    var oEl = document.getElementById("editorBusy");
-    if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }   // 공통 .u4a-busy 토글
+    // [2026-10-16] 공통 busy 로 교체(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음).
+    //   자체 겹침 div 는 이 창 안에서 showModal() 로 연 팝업(top layer) 뒤로 숨는다.
+    //   공통 busy 는 <dialog>.showModal() 이라 어떤 모달 위에도 보이고, 모양을 바꿀 때
+    //   theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
+    if (window.U4ABusy && typeof U4ABusy.show === "function") {
+        if (bBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+    } else {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+        }
+        var oEl = document.getElementById("editorBusy");
+        if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
+    }
     try { CURRWIN.closable = !bBusy; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     // 자식창 busy 동기화(원본 broadToChild). ISBROAD 면 내가 수신측이라 재발송 안 함.
     if (oBroad && !(oOpt && oOpt.ISBROAD)) {

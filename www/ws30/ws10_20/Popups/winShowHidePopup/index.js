@@ -62,6 +62,9 @@
         btnClose.type = "button";
         btnClose.className = "u4a-winbtn u4a-winbtn--close";   // 공통 닫기 X(빨강 hover)
         btnClose.title = "Close";
+        //자동 테스트 식별값(.analy/21) — 이 창을 닫는 유일한 단추. 자동 테스트 쪽 요청 2026-10-20.
+        //  ★닫기가 없으면 본 창이 반투명 + 클릭통과(setIgnoreMouseEvents)로 남는다.
+        btnClose.setAttribute("data-act", "CLOSE");
         btnClose.innerHTML = _fa("xmark");
         btnClose.addEventListener("click", _close);
 
@@ -76,6 +79,8 @@
         _slider.className = "u4aWinHide__slider";
         _slider.min = "0"; _slider.max = "100"; _slider.step = "1";   // 원본 sap.m.Slider(0~100)
         _slider.value = String(DEFAULT_PCT);
+        //자동 테스트 식별값(.analy/21) — 투명도 슬라이더.
+        _slider.setAttribute("data-act", "WINHIDE_OPACITY");
         // 원본 liveChange — 드래그 내내 실시간 반영(input).
         _slider.addEventListener("input", function () { _applyOpacity(parseInt(_slider.value, 10)); });
 
@@ -86,6 +91,9 @@
             b.type = "button";
             b.className = "u4a-btn";
             b.textContent = String(n);
+            //자동 테스트 식별값(.analy/21) — 프리셋은 같은 이름 + 값으로 가른다.
+            b.setAttribute("data-act", "WINHIDE_PRESET");
+            b.setAttribute("data-opacity", String(n));
             // 원본 _pressOpacityButton — 슬라이더 동기화 + 부모창 투명도 적용.
             b.addEventListener("click", function () { _slider.value = String(n); _applyOpacity(n); });
             presets.appendChild(b);

@@ -1,7 +1,7 @@
 /**************************************************************************
  * ws_events.js
  **************************************************************************
- * 오류코드 접두: WSEV / 다음 번호: 020   (018 사용, 019 는 아직 빈 번호)
+ * 오류코드 접두: WSEV / 다음 번호: 020   (019 까지 사용)
  *   (개발표준 = `.works/DEV_STANDARD_오류처리.md` §3 — 파일별 유일 접두 + 파일 내 로컬 번호.
  *    번호는 이 파일 안에서 위에서 아래로 증가. 다른 파일과 절대 중복되지 않는다.)
  *
@@ -24,6 +24,7 @@
  *  WSEV-016  Save(저장) 버튼 — [서버 저장 성공 後] 앱 헤더 갱신 실패
  *  WSEV-017  Save(저장) 버튼 — [서버 저장 성공 後] Undo/Redo 이력 비우기 실패
  *  WSEV-018  Save·Activate·Syntax Check — [서버 처리 後] 선택 UI 다시 클릭(_ws20ReselectSelectedUI) 실패
+ *  WSEV-019  뒤로가기 저장 확인창 — 공통 확인창(fnConfirmBox) 미로드로 중단(머무름)
  *
  * ★ Activate(활성화)·Save(저장) 은 둘 다 저장 행위다.
  *   서버 전송 前 구간(WSEV-003~008 / WSEV-011~015)은 하나라도 터지면
@@ -1260,11 +1261,16 @@
         sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "118"); // Application has been changed
         sMsg += " \n " + APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "119"); // Save before leaving editor?
 
-        // 사용자 응답을 대기하므로 busy 해제 + 떠있는 팝업 잠시 숨김
-        oAPP.common.fnSetBusyLock("");
-        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        /********************************************************************
+         * ★ 순서는 원본 그대로다 — ①확인창 ②별창 숨기기 ③busy 끄기.
+         *   (원본 U4A_WS3.0.0/www/ws30/ws10_20/js/ws_events.js 1149~1155행)
+         *   ★이 순서를 바꾸면 별창이 깜빡인다(장군님 지적 2026-10-20):
+         *   별창 숨기기는 setTimeout(0) 안에서 듣는데(fnChildWindowShow), busy 를 먼저 끄면
+         *   그 한 틱 동안 화면을 덮는 것이 없어 **별창이 확인창 위에 보였다가 사라진다.**
+         *   busy 를 마지막에 끄면 그 구간이 busy 로 덮여 있어 깜빡일 것이 없다.
+         ********************************************************************/
 
-        // 저장 여부 질문 (구: parent.showMessage(sap, 40, 'W', ...) — sap 의존 →
+        // ① 저장 여부 질문 (구: parent.showMessage(sap, 40, 'W', ...) — sap 의존 →
         //   HTML5 확인창. YES=저장 후 이동 / NO=저장 안 하고 이동 / CANCEL=머무름.)
         if (oAPP.common && typeof oAPP.common.fnConfirmBox === "function") {
             oAPP.common.fnConfirmBox('W', sMsg, oAPP.events.ev_pageBack_MsgCallBack, [
@@ -1274,9 +1280,18 @@
             ]);
         } else {
             // ★[장군님 지시 2026-09-02] window.confirm/alert 금지 — 공통 fnConfirmBox 미로드는 오류코드 표면화 + fail-closed(CANCEL=머무름).
+            //   확인창이 안 떴으므로 별창을 숨기지 않고(숨기면 안 보인 채 남는다) busy 만 풀고 끝낸다.
             console.error("[WSEV-019] page back confirm: common fnConfirmBox not loaded - blocked. message:", sMsg);
+            oAPP.common.fnSetBusyLock("");
             oAPP.events.ev_pageBack_MsgCallBack("CANCEL");
+            return;
         }
+
+        // ② 현재 떠있는 별창들을 잠시 숨긴다.
+        try { if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        // ③ 사용자 응답을 대기하므로 busy 해제 — 반드시 마지막.
+        oAPP.common.fnSetBusyLock("");
 
     }; // end of oAPP.events.ev_pageBack
 
@@ -1293,6 +1308,7 @@
 
             return;
         }
+
 
         // 저장 후 이동한다.
         if (ACTCD == "YES") {

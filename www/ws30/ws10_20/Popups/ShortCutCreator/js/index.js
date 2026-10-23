@@ -310,11 +310,17 @@
         if (bWant === _bBusyShown) { return; }   // 상태 변화 없음 — 화면도 전파도 그대로
         _bBusyShown = bWant;
 
-        const busyOverlay = document.getElementById("u4aShortcutBusy");
-        if (bWant) {
-            if (busyOverlay && !busyOverlay.open) { busyOverlay.showModal(); }
+        // [2026-10-16] 공통 busy(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음). 자체 <dialog> 도 공통으로 모은다:
+        //   모양을 바꿀 때 theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
+        if (window.U4ABusy && typeof U4ABusy.show === "function") {
+            if (bWant) { U4ABusy.show(); } else { U4ABusy.hide(); }
         } else {
-            if (busyOverlay && busyOverlay.open) { busyOverlay.close(); }
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local busy dialog");
+            }
+            const busyOverlay = document.getElementById("u4aShortcutBusy");
+            if (bWant) { if (busyOverlay && !busyOverlay.open) { busyOverlay.showModal(); } }
+            else { if (busyOverlay && busyOverlay.open) { busyOverlay.close(); } }
         }
 
         // 내 창에서 시작한 처리만 자식 창에 전파(부모가 보낸 지시는 되돌려 보내지 않는다 — 원래 동작).

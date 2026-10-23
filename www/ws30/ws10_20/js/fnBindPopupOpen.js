@@ -1,3 +1,4 @@
+// 오류코드 접두: FBPO / 다음 번호: 003
 /************************************************************************
  * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
@@ -204,7 +205,17 @@
     if (is_attr.UIATK !== "EXT00000030") { return; }
 
     //선택 앱 콜백(원본 lf_appCallback).
+    //★[2026-10-20] 안에서 fnWs20AttrChange 를 **연달아 두 번** 부르므로 await 로 하나씩 기다려야 한다
+    //  ([BR34] 재진입 가드에 걸려 두 번째 값이 누락되는 것을 막는다) → 본문을 async 로 떼어냈다.
+    //  ★겉(lf_appCallback)은 동기로 남긴다 — 호출처가 `fnAppF4PopupOpen(l_opt, lf_appCallback)` 로
+    //    함수를 넘기는 콜백이라 그 자리에 .catch 를 붙일 수 없다. 여기서 받아 오류를 반드시 남긴다
+    //    (본문의 try 는 전체를 감싸지 않아 그 밖 코드가 던질 수 있다).
     function lf_appCallback(param) {
+      _lf_appCallbackAsync(param)["catch"](function (e) {
+        console.error("[FBPO-001] lf_appCallback failed:", e);
+      });
+    }
+    async function _lf_appCallbackAsync(param) {
 
       //편집상태가 아닌경우 exit(원본 5628행).
       if (!_isEdit()) { return; }
@@ -217,14 +228,14 @@
 
         //APPLICATION ID 매핑 + ATTR 변경(undo 는 위에서 1회 → skip).
         is_attr.UIATV = param.APPID != null ? param.APPID : "";
-        oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppf4Popup 5705).
+        await oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppf4Popup 5705).
 
         //AppDescript(EXT00000031) 프로퍼티에 APPNM 매핑(원본 5656행).
         var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
         var ls_desc = aAttr.find(function (a) { return a.UIATK === "EXT00000031"; });
         if (ls_desc) {
           ls_desc.UIATV = param.APPNM != null ? param.APPNM : "";
-          oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppf4Popup 5716).
+          await oAPP.fn.fnWs20AttrChange(ls_desc, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrAppf4Popup 5716).
         }
 
         //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 5669·5673행).
@@ -272,7 +283,15 @@
     if (is_attr.UIATK !== "EXT00002534" && bSelOpt3 === true) { return; }
 
     //DDIC 검색도움 선택 콜백(원본 lf_returnDOC).
+    //★[2026-10-20] 위 lf_appCallback 과 같은 까닭(연달아 두 번 호출) → 본문을 async 로 떼어냈다.
+    //  ★겉(lf_returnDOC)은 동기로 남긴다 — 호출처가 `var fnCb = ... ? lf_returnDOC : null;` 로
+    //    함수를 변수에 담아 넘기므로 그 자리에 .catch 를 붙일 수 없다. 여기서 받아 오류를 남긴다.
     function lf_returnDOC(param) {
+      _lf_returnDOCAsync(param)["catch"](function (e) {
+        console.error("[FBPO-002] lf_returnDOC failed:", e);
+      });
+    }
+    async function _lf_returnDOCAsync(param) {
 
       //편집상태가 아닌경우/선택값 없는경우 exit.
       if (!_isEdit()) { return; }
@@ -285,7 +304,7 @@
 
         //F4 HELP 선택 SHLPNAME 매핑 + ATTR 변경(undo skip).
         is_attr.UIATV = param.SHLPNAME != null ? param.SHLPNAME : "";
-        oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpID 5924).
+        await oAPP.fn.fnWs20AttrChange(is_attr, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpID 5924).
 
         //짝인 F4HelpReturnField 초기화(원본 5876행 — 바인딩건은 제외). selOpt2=1189 / selOpt3=2535(원본 5850·5854행).
         var aAttr = (oAPP.attr.oModel && oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.T_ATTR) || [];
@@ -294,7 +313,7 @@
         if (ls_ret && ls_ret.ISBND !== "X") {
           ls_ret.UIATV = "";
           ls_ret.ISBND = "";
-          oAPP.fn.fnWs20AttrChange(ls_ret, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpID 5939).
+          await oAPP.fn.fnWs20AttrChange(ls_ret, "INPUT", true, false, true);   //[BR54] 원본은 이 자리에서 attrChangeProc 직접 호출 = 전용 예외처리 갈래 없음(원본 attrSelOption2F4HelpID 5939).
         }
 
         //디자인 영역(트리)/바인딩 팝업 데이터 갱신(원본 5892·5896행).

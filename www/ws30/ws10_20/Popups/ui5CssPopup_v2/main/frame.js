@@ -295,6 +295,94 @@ function _initChrome() {
 
 } // end of _initChrome
 
+/************************************************************************
+ * 이 창이 띄운 자식 창(미리보기 새창 · Other CSS 가이드 창) 목록.
+ *   2026-10-15 장군님 지시 — 제목줄에 최소화를 넣었으므로 그 창들의 parent 를 뺐다
+ *   (parent 가 있으면 최소화한 창을 되살릴 길이 없다 — .analy/20 전략1).
+ *   ★parent 가 없으면 getChildWindows() 가 늘 빈 배열이다 → 전체 창에서
+ *     ① browserkey 가 이 창과 같고 ② OBJTY 가 그 browserkey 로 시작하는 창만 고른다.
+ *     (이 창의 자식 OBJTY = BROWSKEY + 메뉴 KEY. 다른 별창은 고정 이름을 쓰므로 안 걸린다.)
+ *   공통 getSiblingWindows 와 같은 기준(브라우저키)이지만, 그것은 메인 창의 형제 별창 전부를
+ *   돌려주므로 여기선 쓸 수 없다(이 창이 띄운 것만 골라야 한다).
+ ************************************************************************/
+oAPP.fn.getOpenedChildWindows = function () {
+
+    var aOut = [];
+    var sBrowsKey = "";
+
+    try { sBrowsKey = CURRWIN.webContents.getWebPreferences().browserkey || ""; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+    if (!sBrowsKey) {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "webPreferences.browserkey of ui5CssPopup_v2 main window",
+                "child windows cannot be collected - already-open check, close-all and close-with-opener do nothing");
+        }
+        return aOut;
+    }
+
+    var iCurrId = -1;
+    try { iCurrId = CURRWIN.id; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+    var aAll = [];
+    try { aAll = REMOTE.BrowserWindow.getAllWindows() || []; }
+    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return aOut; }
+
+    for (var i = 0; i < aAll.length; i++) {
+
+        var oWin = aAll[i];
+        if (!oWin || oWin.isDestroyed()) { continue; }
+        if (oWin.id === iCurrId) { continue; }
+
+        try {
+            var oPref = oWin.webContents.getWebPreferences();
+            if (!oPref || oPref.browserkey !== sBrowsKey) { continue; }
+            if (!oPref.OBJTY || String(oPref.OBJTY).indexOf(sBrowsKey) !== 0) { continue; }
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            continue;
+        }
+
+        aOut.push(oWin);
+
+    }
+
+    return aOut;
+
+}; // end of oAPP.fn.getOpenedChildWindows
+
+/************************************************************************
+ * 이 창이 닫힐 때, 이 창이 띄운 자식 창(미리보기 새창 · Other CSS 가이드 창)도 같이 닫는다.
+ *   2026-10-15 장군님 지시 — 「호출한 창이 죽으면 같이 죽어야 돼」.
+ *   ★자식 창은 closable:false 로 열려 raw close() 가 무시된다 → 공통 U4AUI.closeWindow
+ *     (setClosable(true)+close) 로 닫는다(childwin-bulkclose-needs-closewindow).
+ *   최소화해 둔 자식 창은 화면에 안 보이므로, 안 닫으면 작업표시줄에만 남는다.
+ ************************************************************************/
+function _closeChildWindows() {
+
+    var aChild = oAPP.fn.getOpenedChildWindows();
+
+    if (aChild.length === 0) { return; }
+
+    var iClosed = 0;
+
+    for (var i = 0; i < aChild.length; i++) {
+        try {
+            var oChild = aChild[i];
+            if (!oChild || oChild.isDestroyed()) { continue; }
+            if (window.U4AUI && U4AUI.closeWindow) { U4AUI.closeWindow(oChild); }
+            else { oChild.setClosable(true); oChild.close(); }
+            iClosed++;
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    }
+
+    if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+        U4ALOG.info("WIN_CLOSE", "child windows closed with opener", iClosed + "/" + aChild.length);
+    }
+
+} // end of _closeChildWindows
+
 // 최대화 상태에 따라 max 버튼 아이콘 스왑.
 function _syncMaxBtnIcon() {
     var oMax = document.getElementById("ui5cssWinMax");
@@ -337,6 +425,10 @@ window.addEventListener("load", function () {
 
     _initChrome();
     _initBroadcast();
+
+    // 이 창이 닫히면 이 창이 띄운 자식 창도 같이 닫는다(2026-10-15 장군님 지시).
+    //   닫기 버튼·WS20 모드 전환 일괄 닫기·앱 종료 어느 경로든 unload 를 지나므로 여기서 한 번만 건다.
+    window.addEventListener("beforeunload", _closeChildWindows);
 
     // 셸 테마 변경 IPC 구독(SYSID 별).
     try {

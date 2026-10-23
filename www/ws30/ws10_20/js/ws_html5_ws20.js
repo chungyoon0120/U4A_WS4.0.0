@@ -61,34 +61,40 @@
     /************************************************************************
      * WS20 윈도우 메뉴 데이터 (구 fnGetWindowMenuListWS20 / fnGetWindowMenuWS20 미러)
      *   sap-icon → FontAwesome 매핑. ws10_html.js 의 공유 buildMenubar 가 소비.
+     *   2026-10-13 — CSS 스타일 클래스·유틸리티·특수 에디터 메뉴 16줄에 act 를 더했다.
+     *     왜: key(WMENU20_03 …) 는 자리순이라 같은 번호가 화면마다 다른 메뉴가 된다.
+     *         화면 글자는 언어를 바꾸면 깨진다. act 는 하는 일이라 둘 다 안 깨진다.
+     *     요청 = u4a-ws4-mcp .docs/request/2026-10-13_ws20-data-attr.md (6절)
+     *     ★key·핸들러 이름·순서·모양·동작은 그대로 — act 속성만 더했다.
+     *       한 번 정한 값은 바꾸지 않는다(바꾸면 자동 테스트 쪽이 조용히 어긋난다).
      ************************************************************************/
     function _getWindowMenuWS20() {
         return [
             { key: "WMENU10", text: _msg("B37"), items: [
-                { key: "WMENU10_01", icon: "palette", text: _msg("B56"), disabled: true },
-                { key: "WMENU10_02", icon: "bold", text: _msg("B57") },
-                { key: "WMENU10_03", icon: "pen-ruler", text: _msg("B58") }
+                { key: "WMENU10_01", act: "THEMEDESIGNER", icon: "palette", text: _msg("B56"), disabled: true },
+                { key: "WMENU10_02", act: "FONTWIZARD", icon: "bold", text: _msg("B57") },
+                { key: "WMENU10_03", act: "UI5CSS", icon: "pen-ruler", text: _msg("B58") }
             ] },
             { key: "WMENU20", text: _msg("B35"), items: [
-                { key: "WMENU20_01", icon: "globe", text: _msg("B49") },
-                { key: "WMENU20_02", icon: "language", text: _msg("B59") },
-                { key: "WMENU20_03", icon: "video", text: _wsMsg("808") },
-                { key: "WMENU20_05", icon: "code", text: _wsMsg("059") },
-                { key: "WMENU20_04", icon: "icons", text: _wsMsg("068"), items: [
-                    { key: "WMENU20_04_01", icon: "icons", text: _wsMsg("047") },
-                    { key: "WMENU20_04_02", icon: "image", text: _wsMsg("067") }
+                { key: "WMENU20_01", act: "SELECTBROWSER", icon: "globe", text: _msg("B49") },
+                { key: "WMENU20_02", act: "OTRMANAGER", icon: "language", text: _msg("B59") },
+                { key: "WMENU20_03", act: "SCREENREC", icon: "video", text: _wsMsg("808") },
+                { key: "WMENU20_05", act: "SRCPATTERN", icon: "code", text: _wsMsg("059") },
+                { key: "WMENU20_04", act: "ICONVIEWER", icon: "icons", text: _wsMsg("068"), items: [
+                    { key: "WMENU20_04_01", act: "ICONLIST", icon: "icons", text: _wsMsg("047") },
+                    { key: "WMENU20_04_02", act: "IMAGEICONS", icon: "image", text: _wsMsg("067") }
                 ] },
-                { key: "WMENU20_06", icon: "code-branch", text: _wsMsg("403") }
+                { key: "WMENU20_06", act: "VERSIONMNG", icon: "code-branch", text: _wsMsg("403") }
             ] },
             { key: "WMENU30", text: _msg("B38"), items: [
-                { key: "WMENU30_01", icon: "css3-alt", brand: true, text: _msg("B60") },
-                { key: "WMENU30_02", icon: "js", brand: true, text: _msg("B61") },
-                { key: "WMENU30_03", icon: "html5", brand: true, text: _msg("B62") },
-                { key: "WMENU30_04", icon: "file-lines", text: _msg("B63") },
+                { key: "WMENU30_01", act: "CSSEDITOR", icon: "css3-alt", brand: true, text: _msg("B60") },
+                { key: "WMENU30_02", act: "JSEDITOR", icon: "js", brand: true, text: _msg("B61") },
+                { key: "WMENU30_03", act: "HTMLEDITOR", icon: "html5", brand: true, text: _msg("B62") },
+                { key: "WMENU30_04", act: "ERRPAGEEDITOR", icon: "file-lines", text: _msg("B63") },
                 // 스켈레톤 화면 설정 — 조회(Display) 모드면 비활성(원본 enabled formatter).
                 //   getter 로 두어 메뉴를 열 때마다(buildMenubar→_buildMenuEl 가 it.disabled 라이브 읽음)
                 //   현재 모드를 재평가 → 모드 전환 시 메뉴 재빌드 없이 양방향 자동 반영.
-                { key: "WMENU30_05", icon: "sliders", text: _msg("B64"), get disabled() { return !_isEditMode(); } }
+                { key: "WMENU30_05", act: "SKELETON", icon: "sliders", text: _msg("B64"), get disabled() { return !_isEditMode(); } }
             ] },
             { key: "WMENU40", text: _msg("B36"), items: [
                 { key: "WMENU40_01", act: "NEWWINDOW", icon: "plus", text: _msg("A09") },
@@ -174,6 +180,8 @@
         BTN.id = oCfg.id;
         BTN.className = "u4a-tx-btn" + (oCfg.reject ? " u4a-tx-btn--reject" : "");
         BTN.title = oCfg.tooltip || oCfg.text || "";
+        // 2026-10-14 — 자동 테스트 도구가 집을 이름(.analy/21). 모양·동작은 그대로, 값만 더한다.
+        if (oCfg.act) { BTN.setAttribute("data-act", oCfg.act); }
 
         // 아이콘(FA) + 텍스트(있을 때만) — WS10 _renderSubHeader 와 동일 마크업
         BTN.innerHTML = (oCfg.fa ? _fa(oCfg.fa, oCfg.brand) : "")
@@ -247,6 +255,8 @@
             var oIco = APP_EXEC_BROWSER_ICON[sName] || {};
             return {
                 key: sName,
+                // act = BROWSER_ + key (2026-10-13 자동 테스트 도구가 집을 이름 — WS10 과 같은 값)
+                act: sName ? ("BROWSER_" + sName) : "",
                 text: oBr.DESC || sName,    // "Google Chrome Browser" 등
                 icon: oIco.icon,
                 brand: oIco.brand,
@@ -266,6 +276,7 @@
         }
         return oAPP.ws10html.buildSplitButton({
             id: oCfg.id, icon: oCfg.fa, brand: oCfg.brand, text: oCfg.text, tooltip: oCfg.tooltip,
+            act: oCfg.act,                                              // 2026-10-13 자동 테스트 도구가 집을 이름
             onMain: function () {                                       // 본체 = 기본 실행(ev_pressAppExecBtn)
                 var fn = oAPP.events && oAPP.events[oCfg.ev];
                 if (typeof fn !== "function") { console.warn("[WS20] transaction action not implemented:", oCfg.ev); return; }
@@ -295,11 +306,11 @@
             return { id: "iconListBtn", fa: "icons", text: _msg("A12"), tooltip: _msg("A12") + " (Ctrl+Shift+F10)", ev: "ev_pressIconListBtn" };
         }
         return {
-            id: "iconViewerBtn", menuBtn: true, fa: "icons",
+            id: "iconViewerBtn", menuBtn: true, act: "ICONVIEWER", fa: "icons",
             text: _wsMsg("068"), tooltip: _wsMsg("068"),                       // Icon Viewer
             items: [
-                { key: "WMENU20_04_01", icon: "icons", text: _wsMsg("047"), tooltip: _wsMsg("047") + " (Ctrl+Shift+F10)" },  // Icon List
-                { key: "WMENU20_04_02", icon: "image", text: _wsMsg("067"), tooltip: _wsMsg("067") }                          // Image Icons
+                { key: "WMENU20_04_01", act: "ICONLIST", icon: "icons", text: _wsMsg("047"), tooltip: _wsMsg("047") + " (Ctrl+Shift+F10)" },  // Icon List
+                { key: "WMENU20_04_02", act: "IMAGEICONS", icon: "image", text: _wsMsg("067"), tooltip: _wsMsg("067") }                          // Image Icons
             ],
             onPick: function (it) {
                 var fn = oAPP.fn["fnWS20" + it.key];
@@ -316,7 +327,7 @@
             return _txBtn(oCfg);   // 폴백: 평범한 버튼(드롭다운 없음)
         }
         return oAPP.ws10html.buildMenuButton({
-            id: oCfg.id, icon: oCfg.fa, brand: oCfg.brand, text: oCfg.text, tooltip: oCfg.tooltip,
+            id: oCfg.id, act: oCfg.act, icon: oCfg.fa, brand: oCfg.brand, text: oCfg.text, tooltip: oCfg.tooltip,
             getItems: function () { return oCfg.items || []; },
             onPick: oCfg.onPick
         });
@@ -370,37 +381,37 @@
          */
         var aBtns = [
             // Display 모드 버튼 (원본 displayModeBtn: icon display)
-            { id: "displayModeBtn", fa: "display", text: "", tooltip: sDispChgTxt, ev: "ev_pressDisplayModeBtn" },
+            { id: "displayModeBtn", act: "DISPLAY_MODE", fa: "display", text: "", tooltip: sDispChgTxt, ev: "ev_pressDisplayModeBtn" },
             // Change 모드 버튼 (원본 changeModeBtn: icon edit)
-            { id: "changeModeBtn", fa: "pen-to-square", text: "", tooltip: sDispChgTxt, ev: "ev_pressDisplayModeBtn" },
+            { id: "changeModeBtn", act: "CHANGE_MODE", fa: "pen-to-square", text: "", tooltip: sDispChgTxt, ev: "ev_pressDisplayModeBtn" },
             // dev/admin 구분선 (원본 ToolbarSeparator: IS_DEV=="D" && !admin-block 일 때만 노출)
             { sep: true, sepId: "ws20DevSep" },
             // Syntax Check (원본 syntaxCheckBtn: icon validate, B72 + Ctrl+F2)
-            { id: "syntaxCheckBtn", fa: "check-double", text: "", tooltip: _msg("B72") + " (Ctrl+F2)", ev: "ev_pressSyntaxCheckBtn" },
+            { id: "syntaxCheckBtn", act: "SYNTAX", fa: "check-double", text: "", tooltip: _msg("B72") + " (Ctrl+F2)", ev: "ev_pressSyntaxCheckBtn" },
             // Activate (원본 activateBtn: icon activate, B73 + Ctrl+F3)
             //   아이콘=마법사(wand-magic-sparkles) — 사용자 요청(액티브 버튼을 마법사 아이콘으로).
-            { id: "activateBtn", fa: "wand-magic-sparkles", text: "", tooltip: _msg("B73") + " (Ctrl+F3)", ev: "ev_pressActivateBtn" },
+            { id: "activateBtn", act: "ACTIVATE", fa: "wand-magic-sparkles", text: "", tooltip: _msg("B73") + " (Ctrl+F3)", ev: "ev_pressActivateBtn" },
             // Save (원본 saveBtn: icon save, A64 + Ctrl+S)
-            { id: "saveBtn", fa: "floppy-disk", text: "", tooltip: _msg("A64") + " (Ctrl+S)", ev: "ev_pressSaveBtn" },
+            { id: "saveBtn", act: "SAVE_APP", fa: "floppy-disk", text: "", tooltip: _msg("A64") + " (Ctrl+S)", ev: "ev_pressSaveBtn" },
             { sep: true, sepId: "ws20ActionSep" },
             // MIME Repository (원본 mimeBtn: icon picture, text A10)
-            { id: "mimeBtn", fa: "image", text: _msg("A10"), tooltip: _msg("A10") + " (Ctrl+Shift+F12)", ev: "ev_pressMimeBtn" },
+            { id: "mimeBtn", act: "MIME", fa: "image", text: _msg("A10"), tooltip: _msg("A10") + " (Ctrl+Shift+F12)", ev: "ev_pressMimeBtn" },
             // Controller (Class Builder) (원본 controllerBtn: icon developer-settings, text A11)
-            { id: "controllerBtn", fa: "screwdriver-wrench", text: _msg("A11"), tooltip: _msg("C38") + " (Ctrl+F12)", ev: "ev_pressControllerBtn" },
+            { id: "controllerBtn", act: "CONTROLLER", fa: "screwdriver-wrench", text: _msg("A11"), tooltip: _msg("C38") + " (Ctrl+F12)", ev: "ev_pressControllerBtn" },
             // Application Execution 메뉴 버튼 (원본 ws20_appExecMenuBtn: split MenuButton, text A06)
             //   split:true → 본체=기본 실행(ev_pressAppExecBtn) + 화살표=브라우저 선택 메뉴(/DEFBR)
-            { id: "ws20_appExecMenuBtn", split: true, fa: "globe", text: _msg("A06"), tooltip: _msg("A06") + " (F8)", ev: "ev_pressAppExecBtn" },
+            { id: "ws20_appExecMenuBtn", split: true, act: "RUN", fa: "globe", text: _msg("A06"), tooltip: _msg("A06") + " (F8)", ev: "ev_pressAppExecBtn" },
             // App Multi Preview (원본 ws20_multiPrevBtn: icon desktop-mobile, text A08)
-            { id: "ws20_multiPrevBtn", fa: "mobile-screen-button", text: _msg("A08"), tooltip: _msg("A08") + " (Ctrl+F5)", ev: "ev_pressMultiPrevBtn" },
+            { id: "ws20_multiPrevBtn", act: "MULTIPREV", fa: "mobile-screen-button", text: _msg("A08"), tooltip: _msg("A08") + " (Ctrl+F5)", ev: "ev_pressMultiPrevBtn" },
             // Icon Viewer / Icon List — checkWLOList 조건으로 드롭다운(Icon Viewer) ↔ 평평버튼(Icon List)
             //   분기(_iconToolEntry, 원본 oIconList 로직). 원본 모습=Icon Viewer 메뉴.
             _iconToolEntry(),
             // Add Event Method (원본 addEventBtn: icon touch, text A13)
-            { id: "addEventBtn", fa: "hand-pointer", text: _msg("A13"), tooltip: _msg("A13") + " (Shift+F1)", ev: "ev_pressAddEventBtn" },
+            { id: "addEventBtn", act: "ADDEVENT", fa: "hand-pointer", text: _msg("A13"), tooltip: _msg("A13") + " (Shift+F1)", ev: "ev_pressAddEventBtn" },
             // Runtime Class Navigator (원본 runtimeBtn: icon functional-location, text A14)
-            { id: "runtimeBtn", fa: "diagram-project", text: _msg("A14"), tooltip: _msg("A14"), ev: "ev_pressRuntimeBtn" },
+            { id: "runtimeBtn", act: "RUNTIMECLS", fa: "diagram-project", text: _msg("A14"), tooltip: _msg("A14"), ev: "ev_pressRuntimeBtn" },
             // Binding Popup (원본 bindPopupBtn: icon connected, text A15)
-            { id: "bindPopupBtn", fa: "link", text: _msg("A15"), tooltip: _msg("A15"), ev: "ev_pressBindPopupBtn" }
+            { id: "bindPopupBtn", act: "BINDPOP", fa: "link", text: _msg("A15"), tooltip: _msg("A15"), ev: "ev_pressBindPopupBtn" }
         ];
 
         aBtns.forEach(function (oCfg) {
@@ -414,6 +425,7 @@
         try {
             if (window.U4AUI && window.U4AUI.attachOverflow) {
                 _ws20TbOvf = window.U4AUI.attachOverflow(BAR, {
+                    act: "MORE_TOOLBAR",   // 2026-10-13 자동 테스트 도구가 집을 이름(트리 툴바 ⋯ 와 구분)
                     // split 버튼(App 실행)이 오버플로로 접힐 때: 본체(기본 동작)를 실행하도록 위임.
                     menuItem: function (el) {
                         var oI = el.querySelector("i");
@@ -575,104 +587,354 @@
      *    · 미리보기 iframe 포커스: ws_html5_ws20_prev.js _attachPreviewShortcutForward 가 합성 keydown 재발송.
      *  공통 가드(_ws20ScGuard): e.repeat(꾹 누름)·현재 페이지 WS20·busy.
      ************************************************************************/
+    /************************************************************************
+     * 공통 가드(ws_common.js fnRunShortCut)에 위임 — 꾹누름·화면일치(WS20)·종합체크
+     *   (busy/메뉴열림/다이얼로그열림/isShortcutLock/페이지이동 in-flight) 단일 방어 통로.
+     ************************************************************************/
     function _ws20ScGuard(e, fn) {
-        // 공통 가드(ws_common.js fnRunShortCut)에 위임 — 꾹누름·화면일치(WS20)·종합체크
-        //   (busy/메뉴열림/다이얼로그열림/isShortcutLock/페이지이동 in-flight) 단일 방어 통로.
+
         if (oAPP.common && typeof oAPP.common.fnRunShortCut === "function") {
             oAPP.common.fnRunShortCut(e, "WS20", fn);
             return;
         }
-        // 폴백(공통 미로드 시) — 최소 가드
-        try { if (e && e.stopImmediatePropagation) { e.stopImmediatePropagation(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { if (e && e.preventDefault) { e.preventDefault(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (e && e.repeat === true) { return; }
-        try { if (parent.getCurrPage && parent.getCurrPage() !== "WS20") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { if (parent.getBusy && parent.getBusy() === "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { fn(e); } catch (err) { console.error("[WS20] shortcut:", err); }
+
+        /********************************************************************
+         * 폴백 — 공통 가드가 아직 안 올라온 때만 탄다. 최소한의 검사만 한다.
+         ********************************************************************/
+
+        try {
+            if (e && e.stopImmediatePropagation) {
+                e.stopImmediatePropagation();
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        try {
+            if (e && e.preventDefault) {
+                e.preventDefault();
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        //꾹 누름 — 한 번만 돈다.
+        if (e && e.repeat === true) {
+            return;
+        }
+
+        //지금 화면이 WS20 이 아니면 안 돈다.
+        try {
+            if (parent.getCurrPage && parent.getCurrPage() !== "WS20") {
+                return;
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        //처리중 표시가 켜져 있으면 안 돈다.
+        try {
+            if (parent.getBusy && parent.getBusy() === "X") {
+                return;
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
+        try {
+            fn(e);
+        } catch (err) {
+            console.error("[WS20] shortcut:", err);
+        }
     }
+
+    /************************************************************************
+     * 아래 동작 함수들은 **공통 가드(fnRunShortCut)를 거쳐서만** 불린다.
+     * ★★★[2026-10-21 장군님 지시 「원본대로 해라」] 여기 있던 **메뉴 닫기 · 실행 가능 여부 검사**를
+     *   전부 뺐다. 공통 가드가 이미 그 둘을 하므로 두 번 돌고 있었다(콘솔에 같은 줄이 두 번 찍혔다).
+     *   원본은 단축키 하나당 **한 번**이다. 내가 2026-06-23 에 공통 가드를 만들면서 여기 것도
+     *   안 치워 생긴 중복이다. 근거는 없었다.
+     ************************************************************************/
 
     //F3 — 뒤로가기(원본 ws_common.js 1281 [WS20] Back Button). ← 버튼과 동일한 ev_pageBack 수행.
     function _ws20Back() {
-        //메뉴 팝오버 닫기(원본 fnCloseMenuPopover).
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        //단축키 실행 가능 여부(원본 fnShortCutExeAvaliableCheck) — "X" 면 중단.
-        try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+
         //입력 중 포커스 날리기(편집값 반영 — 원본 동일).
-        try { if (document.activeElement && document.activeElement.blur) { document.activeElement.blur(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+        try {
+            if (document.activeElement && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+        } catch (x) {
+            _caughtWs20Sc(x);
+        }
+
         //뒤로가기 — ← 버튼과 동일.
-        if (oAPP.events && typeof oAPP.events.ev_pageBack === "function") { oAPP.events.ev_pageBack(); }
-        else { console.warn("[WS20] ev_pageBack not available (F3)"); }
+        if (oAPP.events && typeof oAPP.events.ev_pageBack === "function") {
+            oAPP.events.ev_pageBack();
+            return;
+        }
+
+        console.warn("[WS20] ev_pageBack not available (F3)");
     }
 
     //Ctrl+Shift+F12 — MIME Repository(별도창). 원본 ws_common.js 의 sap.byId("mimeBtn").firePress(UI5)
     //  는 HTML5 서 무동작이라, 버튼과 동일한 핸들러(ev_pressMimeBtn → fnMimeWindowOpener)로 교체.
     function _ws20Mime() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (oAPP.events && typeof oAPP.events.ev_pressMimeBtn === "function") { oAPP.events.ev_pressMimeBtn(); }
-        else { console.warn("[WS20] ev_pressMimeBtn not available (Ctrl+Shift+F12)"); }
+
+        if (oAPP.events && typeof oAPP.events.ev_pressMimeBtn === "function") {
+            oAPP.events.ev_pressMimeBtn();
+            return;
+        }
+
+        console.warn("[WS20] ev_pressMimeBtn not available (Ctrl+Shift+F12)");
     }
 
     //Ctrl+F — WS20 Find(별도창). 원본 ws_common.js 의 sap.byId("ws20_findBtn").firePress(UI5)
-    //  는 HTML5 서 무동작이라, 헤더 Find 버튼과 동일 핸들러(fnFindPopupOpen → 별도창)로 교체.
+    //  는 HTML5 서 무동작이라, 헤더 Find 버튼과 동일 핸들러(fnFindPopupOpener → 별도창)로 교체.
     function _ws20Find() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") { oAPP.fn.fnFindPopupOpener(); }
-        else { console.warn("[WS20] fnFindPopupOpener not available (Ctrl+F)"); }
+
+        if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") {
+            oAPP.fn.fnFindPopupOpener();
+            return;
+        }
+
+        console.warn("[WS20] fnFindPopupOpener not available (Ctrl+F)");
     }
 
     //Ctrl+Shift+Z — [WS20] Undo(247). 원본 ws_common.js fn 은 require(undoRedo).executeHistory("UNDO")
     //  (UI5 iframe/bindPopup 의존 design 모듈) → HTML5 스냅샷 스택 진입점 fnWs20ExecHistory 로 교체.
     //  트리 툴바 버튼(↶)과 동일 함수라 활성/이력유무/초기화가 완전히 일치한다.
     function _ws20Undo() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
+
         //편집모드에서만 (원본 fn: IS_EDIT !== "X" 면 중단).
-        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } return; }
-        try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("UNDO"); }
-        else { console.warn("[WS20] fnWs20ExecHistory not available (Undo)"); }
+        if (_ws20IsEditMode() === false) {
+            return;
+        }
+
+        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") {
+            oAPP.fn.fnWs20ExecHistory("UNDO");
+            return;
+        }
+
+        console.warn("[WS20] fnWs20ExecHistory not available (Undo)");
     }
 
     //Ctrl+Shift+X — [WS20] Redo(248). (Undo 와 동일 정책 — REDO 수행)
     function _ws20Redo() {
-        try { if (oAPP.common && typeof oAPP.common.fnCloseMenuPopover === "function") { oAPP.common.fnCloseMenuPopover(); } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        try { var oAI = parent.getAppInfo(); if (!oAI || oAI.IS_EDIT !== "X") { return; } } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } return; }
+
+        if (_ws20IsEditMode() === false) {
+            return;
+        }
+
+        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") {
+            oAPP.fn.fnWs20ExecHistory("REDO");
+            return;
+        }
+
+        console.warn("[WS20] fnWs20ExecHistory not available (Redo)");
+    }
+
+    //편집 모드인가 — Undo/Redo 가 같은 판정을 써서 한 곳으로 뺐다(원본 fn: IS_EDIT !== "X" 면 중단).
+    function _ws20IsEditMode() {
+
+        var oAppInfo = null;
+
         try {
-            if (oAPP.common && typeof oAPP.common.fnShortCutExeAvaliableCheck === "function" &&
-                oAPP.common.fnShortCutExeAvaliableCheck() === "X") { return; }
-        } catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } }
-        if (oAPP.fn && typeof oAPP.fn.fnWs20ExecHistory === "function") { oAPP.fn.fnWs20ExecHistory("REDO"); }
-        else { console.warn("[WS20] fnWs20ExecHistory not available (Redo)"); }
+            oAppInfo = parent.getAppInfo();
+        } catch (x) {
+            _caughtWs20Sc(x);
+            return false;
+        }
+
+        if (!oAppInfo || oAppInfo.IS_EDIT !== "X") {
+            return false;
+        }
+
+        return true;
+    }
+
+    /************************************************************************
+     * (아래 8종) 상단 툴바 버튼을 누르는 단축키 — 2026-10-21 장군님 지시로 되살림
+     * ----------------------------------------------------------------------
+     * [증상] 구글시트 3번 「단축키 안됨」. 단축키 목록 화면에는 보이는데 눌러도 아무 일이 없었다.
+     * [원인] 원본(ws_common.js)의 그 8종은 UI5 버튼을 sap.ui.getCore().byId(...) 로 찾아
+     *   firePress() 하는 코드 그대로다. UI5 를 뺐으므로 byId 는 늘 null 을 돌려주고,
+     *   바로 다음 줄의 `if (!버튼) { return; }` 에 걸려 **조용히 빠져나갔다**(터지지 않아 로그도 없음).
+     *   예 = ws_common.js 1300~1303(Ctrl+F2). 2026년 변환 때 아래 6종만 바꿔 두고 나머지를 빠뜨렸다.
+     * [고친 방식] 이미 도는 6종과 똑같이 — **화면 버튼과 같은 핸들러를 직접 부른다.**
+     *   원본의 getEnabled()/getVisible() 검사는 그 버튼의 DOM 상태(disabled / display:none)로 1:1 옮겼다.
+     *   버튼이 숨겨져 있으면 원본처럼 **조용히** 그만둔다(모드별 숨김은 정상 상황이라 로그를 남기지 않는다).
+     ************************************************************************/
+
+    //화면 버튼이 눌릴 수 있는 상태인가 — 원본 getEnabled()/getVisible() 1:1.
+    //  (툴바 버튼의 DOM id = 정의한 id 그대로. 숨김은 fnUpdateWs20Toolbar 가 display:none 으로 한다.)
+    function _ws20BtnReady(sBtnId) {
+
+        var oBtn = document.getElementById(sBtnId);
+
+        if (!oBtn) {
+            return false;
+        }
+
+        if (oBtn.disabled === true) {
+            return false;
+        }
+
+        if (oBtn.style && oBtn.style.display === "none") {
+            return false;
+        }
+
+        return true;
+    }
+
+    /************************************************************************
+     * 상단 툴바 버튼을 그냥 누르는 단축키 — 키 → 버튼 · 그 버튼의 핸들러.
+     *   btn·ev 는 위 aBtns(툴바 버튼 정의)의 id·ev 와 **같아야** 한다.
+     *   동작이 다 같은 모양이라 표로 두고 아래 getShortCutList 에서 한 번에 채운다.
+     ************************************************************************/
+    var WS20_TOOLBAR_SC = {
+        "Ctrl+F2": { btn: "syntaxCheckBtn", ev: "ev_pressSyntaxCheckBtn" },      // Syntax Check
+        "Ctrl+F12": { btn: "controllerBtn", ev: "ev_pressControllerBtn" },       // Controller(Class Builder)
+        "Ctrl+F5": { btn: "ws20_multiPrevBtn", ev: "ev_pressMultiPrevBtn" },     // App Multi Preview
+        "Shift+F1": { btn: "addEventBtn", ev: "ev_pressAddEventBtn" },           // Add Event Method
+        "F9": { btn: "runtimeBtn", ev: "ev_pressRuntimeBtn" },                   // Runtime Class Navigator
+        "F8": { btn: "ws20_appExecMenuBtn", ev: "ev_pressAppExecBtn" }           // Application Execution
+    };
+
+    //위 두 자리의 오류 흔적 — 같은 줄이 되풀이돼 한 곳으로 뺐다.
+    function _caughtWs20Sc(oErr) {
+
+        if (typeof U4ALOG === "undefined" || !U4ALOG.caught) {
+            return;
+        }
+
+        U4ALOG.caught(oErr);
+    }
+
+    //툴바 버튼 단축키 공통 — 버튼이 눌릴 수 있을 때 그 버튼과 같은 핸들러를 부른다.
+    function _ws20ToolbarSc(sBtnId, sEv, sKey) {
+
+        //버튼이 그 모드에서 안 보이면 원본처럼 조용히 그만둔다.
+        if (_ws20BtnReady(sBtnId) === false) { return; }
+
+        var fn = oAPP.events && oAPP.events[sEv];
+
+        if (typeof fn !== "function") {
+            console.warn("[WS20] " + sEv + " not available (" + sKey + ")");
+            return;
+        }
+
+        fn();
+    }
+
+    //Ctrl+Shift+F10 — Icon List. 화면이 두 모양이다(원본 oIconList 분기 그대로):
+    //  · 아이콘 뷰어 메뉴가 뜬 경우 = 그 메뉴의 첫 항목(Icon List)과 같은 함수
+    //  · 평평한 버튼인 경우        = 그 버튼과 같은 핸들러
+    function _ws20IconList() {
+
+        if (_ws20BtnReady("iconViewerBtn") === true) {
+
+            var fnMenu = oAPP.fn && oAPP.fn.fnWS20WMENU20_04_01;
+
+            if (typeof fnMenu !== "function") {
+                console.warn("[WS20] fnWS20WMENU20_04_01 not available (Ctrl+Shift+F10)");
+                return;
+            }
+
+            fnMenu();
+            return;
+        }
+
+        if (_ws20BtnReady("iconListBtn") === false) { return; }
+
+        var fnBtn = oAPP.events && oAPP.events.ev_pressIconListBtn;
+
+        if (typeof fnBtn !== "function") {
+            console.warn("[WS20] ev_pressIconListBtn not available (Ctrl+Shift+F10)");
+            return;
+        }
+
+        fnBtn();
+    }
+
+    //F12 — U4A DEV Browser 로 실행. 원본은 실행 메뉴에서 DEV_BROWSER 항목을 눌렀다
+    //  (ws_common.js 1729~1740). HTML5 는 그 항목을 _buildAppExecMenuItems 가 만들고,
+    //  고르면 ev_pressAppExecBtnByBrowser(이름) 가 돈다 — 같은 자리로 바로 간다.
+    //  ★패키징(운영)본에서는 그 항목이 비활성이라 여기서도 그만둔다(원본 getEnabled 와 같은 판정).
+    function _ws20ExecDevBrowser() {
+
+        if (_ws20BtnReady("ws20_appExecMenuBtn") === false) { return; }
+
+        var aItems = [];
+
+        try { aItems = _buildAppExecMenuItems() || []; }
+        catch (x) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(x); } return; }
+
+        var oDev = null;
+
+        for (var i = 0; i < aItems.length; i++) {
+            if (aItems[i] && aItems[i].key === "DEV_BROWSER") { oDev = aItems[i]; break; }
+        }
+
+        //목록에 없거나 비활성 → 원본과 같이 조용히 그만둔다.
+        if (!oDev || oDev.disabled === true) { return; }
+
+        var fnExec = oAPP.events && oAPP.events.ev_pressAppExecBtnByBrowser;
+
+        if (typeof fnExec !== "function") {
+            console.warn("[WS20] ev_pressAppExecBtnByBrowser not available (F12)");
+            return;
+        }
+
+        fnExec("DEV_BROWSER");
     }
 
     //getShortCutList(ws_common.js)가 먼저 로드된 경우에만 super-wrap(미정의면 전 페이지 단축키가
     //  []로 깨지므로 가드). 정상 로드 순서(ws_common → ws_html5_ws20)에선 항상 통과.
     if (typeof oAPP.common.getShortCutList === "function") {
         var _ws20GetShortCutList_super = oAPP.common.getShortCutList;
+
         oAPP.common.getShortCutList = function (sPgNo) {
+
             var aList = (typeof _ws20GetShortCutList_super === "function") ? _ws20GetShortCutList_super(sPgNo) : [];
-            if (sPgNo !== "WS20" || !Array.isArray(aList)) { return aList; }
+
+            if (sPgNo !== "WS20" || !Array.isArray(aList)) {
+                return aList;
+            }
+
+            //① 별도 함수가 있는 것 — 창을 열거나 되돌리는 것들.
             var oFnMap = {
-                "F3": function (e) { _ws20ScGuard(e, _ws20Back); },           // 뒤로가기
-                "Ctrl+F": function (e) { _ws20ScGuard(e, _ws20Find); },        // Find(별도창)
-                "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); }, // MIME Repository(별도창)
-                "Ctrl+Shift+Z": function (e) { _ws20ScGuard(e, _ws20Undo); }, // Undo(247)
-                "Ctrl+Shift+X": function (e) { _ws20ScGuard(e, _ws20Redo); }  // Redo(248)
+                "F3": function (e) { _ws20ScGuard(e, _ws20Back); },               // 뒤로가기
+                "Ctrl+F": function (e) { _ws20ScGuard(e, _ws20Find); },           // Find(별도창)
+                "Ctrl+Shift+F12": function (e) { _ws20ScGuard(e, _ws20Mime); },   // MIME Repository(별도창)
+                "Ctrl+Shift+Z": function (e) { _ws20ScGuard(e, _ws20Undo); },     // Undo(247)
+                "Ctrl+Shift+X": function (e) { _ws20ScGuard(e, _ws20Redo); },     // Redo(248)
+                "Ctrl+Shift+F10": function (e) { _ws20ScGuard(e, _ws20IconList); },       // Icon List(화면이 두 모양)
+                "F12": function (e) { _ws20ScGuard(e, _ws20ExecDevBrowser); }             // U4A DEV Browser
             };
-            aList.forEach(function (o) { if (o && oFnMap[o.KEY]) { o.fn = oFnMap[o.KEY]; } });
+
+            //② 상단 툴바 버튼을 그냥 누르는 것 — 모양이 같아 표로 두고 아래에서 한 번에 채운다.
+            Object.keys(WS20_TOOLBAR_SC).forEach(function (sKey) {
+
+                var oCfg = WS20_TOOLBAR_SC[sKey];
+
+                oFnMap[sKey] = function (e) {
+                    _ws20ScGuard(e, function () {
+                        _ws20ToolbarSc(oCfg.btn, oCfg.ev, sKey);
+                    });
+                };
+            });
+
+            //목록에서 같은 키를 찾아 동작만 바꾼다(같은 키가 두 벌이면 둘 다 바뀐다).
+            aList.forEach(function (o) {
+
+                if (!o || !oFnMap[o.KEY]) {
+                    return;
+                }
+
+                o.fn = oFnMap[o.KEY];
+            });
+
             return aList;
         };
     }
@@ -685,12 +947,13 @@
      *   - 우측 아이콘 2개: 자리만(정적) — 클릭 시 console.warn 가드
      *   - 텍스트 값은 fnUpdateWs20AppHeader 가 채움 (재진입 시마다 갱신)
      ************************************************************************/
-    function _appHdrIconBtn(sId, sGly, sTooltip, fnClick) {
+    function _appHdrIconBtn(sId, sGly, sTooltip, fnClick, sAct) {
         var BTN = document.createElement("button");
         BTN.type = "button";
         BTN.id = sId;
         BTN.className = "u4aWs20AppHdrBtn";
         BTN.title = sTooltip || "";
+        if (sAct) { BTN.setAttribute("data-act", sAct); }   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         BTN.innerHTML = sGly; // FontAwesome 아이콘 HTML
         BTN.addEventListener("click", function () {
             try {
@@ -716,6 +979,7 @@
         BACK.id = "ws20AppHeaderBackBtn";
         BACK.className = "u4aWs20AppHdrBtn back";
         BACK.title = "Back";
+        BACK.setAttribute("data-act", "APPHDR_BACK");   // 2026-10-15 WS30(USP) 뒤로 단추와 같은 값(.analy/21)
         BACK.innerHTML = _fa("chevron-left");
         BACK.addEventListener("click", function () {
             try {
@@ -734,18 +998,21 @@
         var APPID = document.createElement("span");
         APPID.id = "ws20AppHeaderAppId";
         APPID.className = "u4aWs20AppHdrAppId";
+        APPID.setAttribute("data-act", "APPHDR_APPID");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         HDR.appendChild(APPID);
 
         // 모드 (Change / Display)
         var MODE = document.createElement("span");
         MODE.id = "ws20AppHeaderMode";
         MODE.className = "u4aWs20AppHdrMode";
+        MODE.setAttribute("data-act", "APPHDR_MODE");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         HDR.appendChild(MODE);
 
         // 상태 (Active / Inactive — ACTST 없으면 빈값)
         var STAT = document.createElement("span");
         STAT.id = "ws20AppHeaderStatus";
         STAT.className = "u4aWs20AppHdrStat";
+        STAT.setAttribute("data-act", "APPHDR_STATUS");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         HDR.appendChild(STAT);
 
         // 아이콘 버튼 2개 (구 ws20_findBtn / ws20_newWinBtn) — 원본처럼 상태 텍스트 "바로 뒤"에 배치.
@@ -758,15 +1025,15 @@
             // 원본 ws20_findBtn.firePress → HTML5 별도창 opener(지연로드 래퍼, sap 무관).
             if (oAPP.fn && typeof oAPP.fn.fnFindPopupOpener === "function") { oAPP.fn.fnFindPopupOpener(); return; }
             console.warn("[WS20] fnFindPopupOpener not available");
-        }));
+        }, "APPHDR_FINDUI"));
         HDR.appendChild(_appHdrIconBtn("ws20AppHeaderExportBtn", _fa("window-restore"), _msg("A09") + " (Ctrl+N)", function () {
             // WS10 ev_NewWindow 와 동일 경로 호출 (ws_events.js:966 → parent.onNewWindow())
             if (oAPP.events && typeof oAPP.events.ev_NewWindow === "function") {
                 oAPP.events.ev_NewWindow();
                 return;
             }
-            console.warn("[WS20] ev_NewWindow not available");
-        }));
+            console.warn("[WS20] ev_NewWindow not available");   // id 는 Export 지만 하는 일은 새 창
+        }, "APPHDR_NEWWIN"));
 
         // 스페이서 — 아이콘 클러스터 뒤(우측 남는 공간 흡수). 원본은 [상태][Find][New] 가 좌측에 모임.
         var SPC = document.createElement("span");
@@ -810,7 +1077,11 @@
         // 모드 (IS_EDIT === "X" → Change(A02), 그 외 Display(A05)) — 원본 fnGetHeaderToolbarContentWs20 동일 코드.
         var sIsEdit = (oInfo && oInfo.IS_EDIT != null) ? oInfo.IS_EDIT : lf_model("/WS20/APP/IS_EDIT");
         var sModeTxt = (sIsEdit === "X") ? _msg("A02") : _msg("A05");
-        if (elMode) { elMode.textContent = sModeTxt; }
+        if (elMode) {
+            elMode.textContent = sModeTxt;
+            // 2026-10-15 — 글자는 접속 언어를 타므로 상태를 값으로도 남긴다(.analy/21).
+            elMode.setAttribute("data-state", (sIsEdit === "X") ? "EDIT" : "DISPLAY");
+        }
 
         // 상태 (ACTST: "A" → Active(B66), 그 외 → Inactive(B67), 필드 없으면 빈값)
         //   단, 변경분이 있으면(IS_CHAG === "X") 아직 액티브 전이라 Inactive 로 표시
@@ -824,7 +1095,14 @@
         } else if (sActst != null && sActst !== "") {
             sStatTxt = (sActst === "A") ? _msg("B66") : _msg("B67");
         }
-        if (elStat) { elStat.textContent = sStatTxt; }
+        if (elStat) {
+            elStat.textContent = sStatTxt;
+            // 2026-10-15 — 글자(Active/Inactive)는 접속 언어를 타므로 값으로도 남긴다(.analy/21).
+            //   표시 규칙은 위와 같다 — 변경분이 있으면 아직 액티브 전이라 INACTIVE.
+            if (sStatTxt === "") { elStat.removeAttribute("data-state"); }
+            else if (sIsChag === "X") { elStat.setAttribute("data-state", "INACTIVE"); }
+            else { elStat.setAttribute("data-state", (sActst === "A") ? "ACTIVE" : "INACTIVE"); }
+        }
 
         // 윈도우 타이틀/헤더 타이틀 갱신 (원본 동일: "U4A Workspace - {APPID} {모드} {상태}")
         //   "U4A Workspace - " 접두는 원본도 리터럴(영문 고정) — 미러.
@@ -998,13 +1276,13 @@
         DLG.innerHTML =
             '<div class="u4a-dialog__header">' +
             '  <i class="fa-solid fa-table-columns"></i><span>' + _esc(_msg("A62")) + '</span>' +   // Change Layout
-            '  <button type="button" class="u4a-btn-icon u4aWs20LayoutX" data-act="close" title="' + _esc(_msg("A39")) + '"><i class="fa-solid fa-xmark"></i></button>' +
+            '  <button type="button" class="u4a-btn-icon u4aWs20LayoutX" data-act="CLOSE" title="' + _esc(_msg("A39")) + '"><i class="fa-solid fa-xmark"></i></button>' +
             '</div>' +
             '<div class="u4a-dialog__body"><div class="u4aWs20LayoutCards"></div></div>' +
             '<div class="u4a-dialog__footer">' +
-            '  <button type="button" class="u4a-btn" data-act="default" title="' + _esc(_msg("A63")) + '"><i class="fa-solid fa-rotate-left"></i></button>' +   // Default (아이콘만)
-            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="save" title="' + _esc(_msg("A64")) + '"><i class="fa-solid fa-floppy-disk"></i></button>' +   // Save (아이콘만)
-            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="close" title="' + _esc(_msg("A39")) + '"><i class="fa-solid fa-xmark"></i></button>' +   // Close (X 아이콘만 · Reject 느낌)
+            '  <button type="button" class="u4a-btn" data-act="DEFAULT" title="' + _esc(_msg("A63")) + '"><i class="fa-solid fa-rotate-left"></i></button>' +   // Default (아이콘만)
+            '  <button type="button" class="u4a-btn u4a-btn--emphasized" data-act="SAVE" title="' + _esc(_msg("A64")) + '"><i class="fa-solid fa-floppy-disk"></i></button>' +   // Save (아이콘만)
+            '  <button type="button" class="u4a-btn u4a-btn--negative" data-act="CLOSE" title="' + _esc(_msg("A39")) + '"><i class="fa-solid fa-xmark"></i></button>' +   // Close (X 아이콘만 · Reject 느낌)
             '</div>';
 
         var CARDS = DLG.querySelector(".u4aWs20LayoutCards");
@@ -1196,9 +1474,9 @@
             var oBtn = e.target.closest("[data-act]");
             if (!oBtn) { return; }
             var sAct = oBtn.getAttribute("data-act");
-            if (sAct === "close") { _close(); }
-            else if (sAct === "default") { aWork = _ws20DefaultOrder(); _renderCards(); }
-            else if (sAct === "save") { _save(); }
+            if (sAct === "CLOSE") { _close(); }
+            else if (sAct === "DEFAULT") { aWork = _ws20DefaultOrder(); _renderCards(); }
+            else if (sAct === "SAVE") { _save(); }
         });
         DLG.addEventListener("cancel", function (e) { e.preventDefault(); _close(); }); // ESC
 
@@ -1239,6 +1517,8 @@
         var TOG = document.createElement("button");
         TOG.type = "button";
         TOG.className = "u4aWs20SideBtn u4aWs20SideToggle";
+        // 2026-10-13 자동 테스트 도구가 집을 이름 — 글자가 없는 단추라 글자로는 집지 못한다.
+        TOG.setAttribute("data-act", "SIDETOGGLE");
         TOG.innerHTML = '<i class="fa-solid fa-bars"></i>';
         TOG.addEventListener("click", function () { SIDE.classList.toggle("is-expanded"); });
         SIDE.appendChild(TOG);
@@ -1246,20 +1526,24 @@
         // 상단 메뉴 (Split Position Change)
         var TOP = document.createElement("div");
         TOP.className = "u4aWs20SideTop";
-        TOP.appendChild(_ws20SideItem("table-columns", _msg("B31"), function () {
+        var SPLITPOS = _ws20SideItem("table-columns", _msg("B31"), function () {
             // 구 fnWs20SideMENUITEM_10 → callDesignLayoutChangePopupOpener.
             //   HTML5 레이아웃 변경 팝업(3분할 순서 재정렬) 직접 호출.
             try { oAPP.fn.fnWs20OpenLayoutPopup(); }
             catch (e) { console.error("[WS20] Split Position Change (layout change popup) error:", e); }
-        }));
+        });
+        SPLITPOS.setAttribute("data-act", "SPLITPOS");   // 2026-10-13 자동 테스트 도구가 집을 이름
+        TOP.appendChild(SPLITPOS);
         SIDE.appendChild(TOP);
 
         // 하단 고정 (System Information — 접속 서버 정보)
         var FIX = document.createElement("div");
         FIX.className = "u4aWs20SideFix";
-        FIX.appendChild(_ws20SideItem("server", _msg("B32"), function (ev) {
+        var SYSINFO = _ws20SideItem("server", _msg("B32"), function (ev) {
             _ws20ShowServerInfo(ev.currentTarget);
-        }));
+        });
+        SYSINFO.setAttribute("data-act", "SYSINFO");   // 2026-10-13 자동 테스트 도구가 집을 이름
+        FIX.appendChild(SYSINFO);
         SIDE.appendChild(FIX);
 
         return SIDE;
@@ -1369,12 +1653,15 @@
         HDR.appendChild(SPC);
 
         // 헤더 아이콘 버튼 1개 생성 (정적/가드)
-        function lf_hdrBtn(sId, sGly, sTooltip) {
+        function lf_hdrBtn(sId, sGly, sTooltip, sAct) {
             var BTN = document.createElement("button");
             BTN.type = "button";
             BTN.id = sId;
             BTN.className = "u4aWs20PanelHdrBtn";
             BTN.title = sTooltip || "";
+            // 2026-10-15 — 자동 테스트 도구가 집을 이름. id 는 Refresh 인데 하는 일은 줌 Reset 이라
+            //   id 로 짐작하지 않게 "하는 일"로 받는다(.analy/21).
+            if (sAct) { BTN.setAttribute("data-act", sAct); }
             BTN.innerHTML = sGly; // FontAwesome 아이콘 HTML
             BTN.addEventListener("click", function () {
                 try {
@@ -1385,13 +1672,14 @@
         }
 
         // 새로고침 (자리만)
-        HDR.appendChild(lf_hdrBtn("ws20PrevRefreshBtn", _fa("rotate-right"), "Refresh"));
+        HDR.appendChild(lf_hdrBtn("ws20PrevRefreshBtn", _fa("rotate-right"), "Refresh", "PREV_RESET"));
 
         // 줌 슬라이더 (비활성 — 자리만)
         var ZOOM = document.createElement("input");
         ZOOM.type = "range";
         ZOOM.id = "ws20PrevZoomSlider";
         ZOOM.className = "u4aWs20PrevZoom";
+        ZOOM.setAttribute("data-act", "PREV_ZOOM");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         ZOOM.disabled = true;
         HDR.appendChild(ZOOM);
 
@@ -1400,10 +1688,12 @@
         var TGL = document.createElement("label");
         TGL.id = "ws20PrevOffToggle";
         TGL.className = "u4a-switch";   // 공통 컴포넌트 그대로(체크리스트 F)
+        TGL.setAttribute("data-act", "PREV_FULLSCREEN");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         TGL.title = "Full Screen";
         var TGLIN = document.createElement("input");
         TGLIN.type = "checkbox";
         TGLIN.id = "ws20PrevOffInput";
+        TGLIN.setAttribute("data-act", "PREV_FULLSCREEN_INPUT");   // 2026-10-15 자동 테스트 도구가 집을 이름(.analy/21)
         var TGLSL = document.createElement("span");
         TGLSL.className = "u4a-switch__slider";
         TGL.appendChild(TGLIN);
@@ -1411,13 +1701,14 @@
         HDR.appendChild(TGL);
 
         // 도움말 (자리만)
-        HDR.appendChild(lf_hdrBtn("ws20PrevHelpBtn", _fa("circle-question"), "Help"));
+        HDR.appendChild(lf_hdrBtn("ws20PrevHelpBtn", _fa("circle-question"), "Help", "PREV_HELP"));
 
         // 패널 좁아지면 우측 컨트롤(⟳/줌/OFF/?)이 잘려 사라지지 않도록 ⋯ 오버플로 메뉴로 접는다
         //   (트리 툴바와 동일 — U4AUI.attachOverflow). 스페이서만 isSkip, 우측정렬이라 noOvfAutoMargin.
         try {
             if (window.U4AUI && U4AUI.attachOverflow) {
                 var oOvfCtl = U4AUI.attachOverflow(HDR, {
+                    act: "MORE_PREVIEW",   // 2026-10-13 자동 테스트 도구가 집을 이름(툴바·트리 ⋯ 와 구분)
                     noOvfAutoMargin: true,
                     isSkip: function (el) { return el.classList.contains("u4aWs20PanelHdrSpacer"); },
                     isSep: function () { return false; },

@@ -142,7 +142,10 @@
             oA.MAIN.tool.appendChild(H.el("span", "u4aBwpToolSpacer"));
             oA.MAIN.tool.appendChild(H.iconBtn("arrows-left-right-to-line", H.z("161"), function () { _fitCols(oA.MAIN); }));   // 161 컬럼최적화
             var _oGearAddit = H.iconBtn("gear", H.z("957"), function () {   // 957 화면 커스터마이징
-                if (oAPP.attr.editable === false) { return; }
+            // [2026-10-16] 조회 모드 가드 삭제(구글시트 13번). 원본은 이 기어 버튼을
+            //   enabled="{/edit_layout_customizing}" 하나로만 묶고, 그 값의 초기값이 true 다.
+            //   조회 모드에서는 setViewEditable 이 맨 앞에서 return 하므로 값이 안 바뀐다 →
+            //   원본은 조회 모드에서도 눌린다. 화면 영역 보이기/숨기기일 뿐이라 편집 권한과 무관.
                 if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
             });
             _oGearAddit.setAttribute("data-bwp-lock", "layout-addit");   // [S1a] setLayoutCustomizingEditable 대상.

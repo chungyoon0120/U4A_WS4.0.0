@@ -1,3 +1,4 @@
+// 오류코드 접두: W20T / 다음 번호: 003
 /************************************************************************
  * ws_html5_ws20_tree.js  (HTML5)
  * ----------------------------------------------------------------------
@@ -223,6 +224,8 @@
         if (oCfg.reject) { BTN.style.color = "var(--error)"; }
         else if (oCfg.accept) { BTN.style.color = "var(--success)"; }
         BTN.title = oCfg.tooltip || "";
+        // 2026-10-15 — 자동 테스트 도구가 집을 이름(.analy/21). 글(title)은 화면 언어를 바꾸면 깨진다.
+        if (oCfg.act) { BTN.setAttribute("data-act", oCfg.act); }
         if (oCfg.disabled) { BTN.disabled = true; BTN.classList.add("is-disabled"); }
         if (oCfg.icon) { BTN.setAttribute("data-sap-icon", oCfg.icon); }
         if (oCfg.editOnly) { BTN.setAttribute("data-edit-only", "X"); }
@@ -297,33 +300,33 @@
             //   아이콘=원본 sap-icon://expand-group(이중 쉐브론 ↓) 모양으로 복원(fa-angles-down).
             {
                 icon: "sap-icon://expand-group", fa: "angles-down",
-                tooltip: _msg("B21", "Expand"),
+                act: "TREE_EXPAND", tooltip: _msg("B21", "Expand"),
                 press: function () { oAPP.fn.fnWs20TreeExpandSelected(); }
             },
             // B22 Collapse — 선택 라인 접힘 (원본 oLTree1.collapse(selectedIndex))
             //   아이콘=원본 sap-icon://collapse-group(이중 쉐브론 ↑) 모양으로 복원(fa-angles-up).
             {
                 icon: "sap-icon://collapse-group", fa: "angles-up",
-                tooltip: _msg("B22", "Collapse"),
+                act: "TREE_COLLAPSE", tooltip: _msg("B22", "Collapse"),
                 press: function () { oAPP.fn.fnWs20TreeCollapseSelected(); }
             },
             { sep: true },
             // A70 Find UI — 검색 팝업 (원본 callDesignTreeFindPopup) [가드]
             {
                 icon: "sap-icon://search", gly: "🔍",
-                tooltip: _msg("A70", "Find UI"),
+                act: "TREE_FINDUI", tooltip: _msg("A70", "Find UI"),
                 press: function () { _safeCall("callDesignTreeFindPopup", []); }
             },
             // B23 Clear selection — 체크박스 전체 해제 (원본 designClearCheckAll)
             {
                 icon: "sap-icon://multiselect-none", gly: "≣", editOnly: true,
-                tooltip: _msg("B23", "Clear selection"),
+                act: "TREE_CLEARSEL", tooltip: _msg("B23", "Clear selection"),
                 press: function () { _safeCall("designClearCheckAll", []); }
             },
             // A03 Delete — 멀티 삭제 (원본 designTreeMultiDeleteItem) [가드]
             {
                 icon: "sap-icon://delete", gly: "🗑", reject: true, editOnly: true,
-                tooltip: _msg("A03", "Delete"),
+                act: "TREE_DELETE", tooltip: _msg("A03", "Delete"),
                 press: function () { _safeCall("designTreeMultiDeleteItem", []); }
             },
             // B24 UI Template Wizard (원본 designCallWizardPopup) [가드]
@@ -331,7 +334,7 @@
             //   변환 때 wand-magic-sparkles(🪄)로 바뀌었던 것을 원복 — 마법사 wand 는 Activate 버튼으로 이동.
             {
                 icon: "sap-icon://responsive", fa: "display", accept: true, editOnly: true,
-                tooltip: _msg("B24", "UI Template Wizard"),
+                act: "TREE_WIZARD", tooltip: _msg("B24", "UI Template Wizard"),
                 // UI Template Wizard(HTML5) — 원본 uiDesignArea.js 729~748행 press 재현:
                 //   busy ON + 단축키 잠금 → designCallWizardPopup(HTML5, ws_html5_ws20_wizard.js).
                 //   (선택 노드 검사 → 서버 WZD_CHKER → fnUiTempWizardPopupOpener → 팝업)
@@ -349,28 +352,41 @@
             // E28 UI Personalization List — HTML5 인앱 팝업(fnP13nDesignPopupOpen "R" 리스트) 지연 로드.
             {
                 icon: "sap-icon://user-settings", fa: "user-gear",
-                tooltip: _msg("E28"),
-                press: function () {
+                act: "TREE_P13NLIST", tooltip: _msg("E28"),
+                // ★busy 를 켠 뒤 fnYieldToPaint 로 한 프레임 양보한 다음 무거운 동기 로직을 돈다
+                //   (장군님 지시 2026-10-13). 이 버튼의 무거운 구간은 둘 다 동기다:
+                //     ① fnP13nDesignPopupOpen.js(1715줄)를 동기 ajax 로 받아 eval (첫 클릭만)
+                //     ② 팝업 DOM 통째 생성 + 머리 파일 읽기/그리기
+                //   양보 전에는 busy 가 paint 될 기회가 없어 화면이 그냥 멈춰 보였다.
+                press: async function () {
                     var run = function () {
                         try { oAPP.fn.fnP13nDesignPopupOpen("R"); }
                         catch (e) { console.error("[WS20] UI Personalization List:", e && e.message ? e.message : e); }
                     };
                     try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    try { await oAPP.common.fnYieldToPaint(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                     if (typeof oAPP.fn.fnP13nDesignPopupOpen === "function") { run(); }
-                    else { try { oAPP.loadJs("fnP13nDesignPopupOpen", run); } catch (e) { console.error("[WS20] p13n load:", e && e.message ? e.message : e); } }
+                    else {
+                        try { oAPP.loadJs("fnP13nDesignPopupOpen", run); }
+                        catch (e) {
+                            console.error("[WS20] p13n load:", e && e.message ? e.message : e);
+                            // 받아오지 못하면 팝업이 안 열리므로 busy 를 반드시 풀어 준다(안 풀면 영영 잠김).
+                            try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+                        }
+                    }
                 }
             },
             { sep: true },
             // 247 Undo (원본 undoRedo.executeHistory("UNDO")) [가드]
             {
                 icon: "sap-icon://undo", gly: "↶", editOnly: true, uract: "UNDO",
-                tooltip: _wsMsg("247"),
+                act: "TREE_UNDO", tooltip: _wsMsg("247"),
                 press: function () { _execHistory("UNDO"); }
             },
             // 248 Redo (원본 undoRedo.executeHistory("REDO")) [가드]
             {
                 icon: "sap-icon://redo", gly: "↷", editOnly: true, uract: "REDO",
-                tooltip: _wsMsg("248"),
+                act: "TREE_REDO", tooltip: _wsMsg("248"),
                 press: function () { _execHistory("REDO"); }
             },
             { sep: true },
@@ -378,7 +394,7 @@
             //   U4A_CVT_WDR(웹딘→U4A 변환) 플러그인 설치 서버에서만 활성. 별도 Electron 팝업.
             {
                 icon: "sap-icon://detail-view", fa: "rectangle-list",
-                tooltip: _wsMsg("469"),
+                act: "TREE_WDRLOG", tooltip: _wsMsg("469"),
                 disabled: !_hasWdrPlugin(),
                 press: function () {
                     // [임시] Web Dynpro 변환 로그 미완 — 안내 토스트만(사용자 지시). TODO(i18n) + 재개 시 원본 복원.
@@ -398,7 +414,7 @@
             // B39 Help (원본 도움말 팝업) [가드]
             {
                 icon: "sap-icon://question-mark", gly: "?",
-                tooltip: _msg("B39"),
+                act: "TREE_HELP", tooltip: _msg("B39"),
                 press: function () {
 
                     var l_ui = this;   //원본 uiDesignArea.js 983행 `var l_ui = this;`
@@ -472,6 +488,7 @@
         try {
             if (window.U4AUI && window.U4AUI.attachOverflow) {
                 _treeTbOvf = window.U4AUI.attachOverflow(BAR, {
+                    act: "MORE_TREE",   // 2026-10-13 자동 테스트 도구가 집을 이름(WS20 툴바 ⋯ 와 구분)
                     btnClass: "u4a-btn-icon",
                     btnHtml: '<span class="u4aWs20TreeTbIcon"><i class="fa-solid fa-ellipsis"></i></span>',
                     isSep: function (el) { return el.classList.contains("u4aWs20TreeTbSep"); },
@@ -571,6 +588,8 @@
 
             var oCell = document.createElement("div");
             oCell.className = "u4aWs20TreeNameCell";
+            // 2026-10-13 자동 테스트 도구가 집을 이름 — 이 칸을 눌러 줄을 고른다.
+            oCell.setAttribute("data-act", "TREENAME");
             oCell.appendChild(oTog);
             if (oChk) { oCell.appendChild(oChk); }
             if (oIco) { oCell.appendChild(oIco); }
@@ -623,6 +642,7 @@
                 var CHK = document.createElement("input");
                 CHK.type = "checkbox";
                 CHK.className = "u4aWs20TreeChk";
+                CHK.setAttribute("data-act", "TREECHK");   // 2026-10-15 자동 테스트 도구가 집을 이름(어느 줄인지는 줄의 data-objid 로 가린다)
                 CHK.checked = (n.chk === true);
                 CHK.addEventListener("click", function (e) { e.stopPropagation(); });
                 CHK.addEventListener("change", function (e) {
@@ -661,6 +681,9 @@
                     var ADD = document.createElement("button");
                     ADD.type = "button"; ADD.className = "u4aWs20TreeActBtn add";
                     ADD.title = _msg("A54", "Insert Element");
+                    // 2026-10-13 자동 테스트 도구가 집을 이름 — 줄마다 같은 값이고, 어느 줄인지는
+                    //   행의 data-objid 로 가린다(요청 = u4a-ws4-mcp 2026-10-13_ws20-data-attr.md 2절).
+                    ADD.setAttribute("data-act", "INSOBJ");
                     ADD.innerHTML = '<i class="fa-solid fa-plus"></i>';
                     ADD.addEventListener("click", function (e) { e.stopPropagation(); _safeCall("designUIAdd", [n]); });
                     ACT.appendChild(ADD);
@@ -672,6 +695,7 @@
                     var DEL = document.createElement("button");
                     DEL.type = "button"; DEL.className = "u4aWs20TreeActBtn del";
                     DEL.title = _msg("A03", "Delete");
+                    DEL.setAttribute("data-act", "DELOBJ");   // 2026-10-13 자동 테스트 도구가 집을 이름
                     DEL.innerHTML = '<i class="fa-solid fa-trash"></i>';
                     DEL.addEventListener("click", function (e) { e.stopPropagation(); _safeCall("designUIDelete", [n]); });
                     ACT.appendChild(DEL);
@@ -779,6 +803,38 @@
     };
 
     /************************************************************************
+     * [PUBLIC] 선택 강조만 바꾼다 — 트리를 다시 그리지 않는다. (장군님 지시 2026-10-20)
+     * ----------------------------------------------------------------------
+     *  [왜 만들었나] 선택 표시 하나 바꾸려고 fnRenderDesignTree 로 **보이는 줄을 전부 새로 만들고** 있었다.
+     *    줄을 만들 때마다 ＋·삭제 버튼을 만들고 그 버튼 제목을 메인 프로세스에서 꺼내 오는데
+     *    (@electron/remote = 동기 IPC, 글자 하나당 왕복 3번), 줄 수만큼 쌓여 화면이 멈췄다.
+     *    Performance 실측(2026-10-20): 그 왕복이 886ms. 화면이 멈춘 전체 시간의 절반 이상.
+     *  [어떻게] 공통 트리의 selectByKey 는 **지금 그려진 줄의 강조만** 바꾸고, 가상 스크롤에도 선택 키를
+     *    넣어 둬 그 줄이 화면 밖으로 나갔다 다시 들어와도 강조가 복원된다(theme/u4a-ui.js selectByKey).
+     *  [★쓰면 안 되는 때] **펼침 상태가 바뀌었을 때** — 줄 목록 자체가 달라지므로 fnRenderDesignTree 를 써야 한다.
+     *    (호출처 ws_html5_ws20_attr.js fnWs20SelectUI 가 그 조건을 보고 갈라 부른다.)
+     *  스크롤은 하지 않는다(두 번째 인자 false) — 줄 이동은 호출처가 따로 한다(_scrollTreeRowIntoView).
+     ************************************************************************/
+    oAPP.fn.fnWs20TreeMarkSelected = function (OBJID) {
+
+        _setSelectedObjid(OBJID);
+
+        var oTree = _ensureWs20Tree();
+
+        //공통 트리가 없으면 선택 표시 자체가 불가능하다 — 조용히 넘기지 않고 코드를 담아 던진다.
+        //★[2026-10-20] 이름 주의: U4AUI.createTree 가 주는 것은 selectByKey 다.
+        //  selectKey 는 **다른 생성기(컬럼 트리)** 의 이름이라 여기엔 없다. 처음에 그걸 잘못 보고
+        //  selectKey 로 썼다가 UI 를 고를 때마다 터졌다(2026-10-20 실제 사고).
+        if (!oTree || typeof oTree.selectByKey !== "function") {
+            throw new Error("[W20T-001] U4AUI.createTree selectByKey undefined (theme/u4a-ui.js not loaded)");
+        }
+
+        //두 번째 인자 false = reveal(스크롤) 안 함. 줄 이동은 호출처가 따로 한다.
+        oTree.selectByKey(String(OBJID), false);
+
+    }; // end of oAPP.fn.fnWs20TreeMarkSelected
+
+    /************************************************************************
      * [PUBLIC] 수동 렌더 — 원본 TreeTable rows 바인딩(/zTREE) 대체.
      *   /zTREE 가 갱신되면(designAddTreeData/undoRedo 등 → 모델 set) 이 함수를
      *   호출하여 다시 그린다. 데이터가 비어있어도 안전하게 빈 트리 렌더.
@@ -876,8 +932,14 @@
         if (!oNode) { return; }
 
         // UI 전용 선택 표시 갱신 (즉시 하이라이트)
-        _setSelectedObjid(oNode.OBJID);
-        oAPP.fn.fnRenderDesignTree();
+        //   ★[2026-10-20 장군님 지시] 트리를 다시 그리지 않고 "선택 강조만" 바꾼다.
+        //     까닭 = 아래 fnWs20TreeMarkSelected 설명. 클릭한 줄은 이미 화면에 있고 펼침도 안 바뀌므로
+        //     줄을 새로 만들 이유가 없다(종전엔 fnRenderDesignTree 로 보이는 줄을 전부 새로 만들었다).
+        try { oAPP.fn.fnWs20TreeMarkSelected(oNode.OBJID); }
+        catch (e) {
+            console.error("[W20T-002] tree select mark failed - OBJID=" + oNode.OBJID + ":", e && e.message, e);
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
 
         // 단축키 잠금 + 자식 윈도우 BUSY (원본과 동일, 존재 시에만)
         try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }

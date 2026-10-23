@@ -81,8 +81,11 @@
         }));
         // 957 화면 커스터마이징 — 3영역(바인딩필드/DESIGN TREE/추가속성) 표시·숨김 팝업(원본 좌측 툴바).
         var _oGearMain = H.iconBtn("gear", H.z("957"), function () {
-            if (oAPP.attr.editable === false) { return; }   // 원본 enabled="{/edit_layout_customizing}"
-            if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
+        // [2026-10-16] 조회 모드 가드 삭제(구글시트 13번). 원본은 이 기어 버튼을
+        //   enabled="{/edit_layout_customizing}" 하나로만 묶고, 그 값의 초기값이 true 다.
+        //   조회 모드에서는 setViewEditable 이 맨 앞에서 return 하므로 값이 안 바뀐다 →
+        //   원본은 조회 모드에서도 눌린다. 화면 영역 보이기/숨기기일 뿐이라 편집 권한과 무관.
+        if (typeof oAPP.fn.openLayoutCustomizingPopup === "function") { oAPP.fn.openLayoutCustomizingPopup(); }
         });
         _oGearMain.setAttribute("data-bwp-lock", "layout-main");   // [S1a] setViewEditable(edit_layout_customizing) 대상.
         oM.tool.appendChild(_oGearMain);
@@ -432,6 +435,11 @@
                 oM.ctrl.rerender();
             } finally {
                 oAPP.attr.isBindLoading = false;
+                // 호출한 창(WS20)의 busy 도 여기서 푼다 (2026-10-14 장군님 지적).
+                //   창이 뜨자마자 풀면 이 로드~렌더 구간에 WS20 이 조작 가능해진다 — 원본은 다 뜬 뒤 한 번 푼다.
+                //   (frame.js releaseOpenerBusy 는 한 번만 실제로 보낸다.)
+                try { if (typeof oAPP.fn.releaseOpenerBusy === "function") { oAPP.fn.releaseOpenerBusy(); } }
+                catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.fn.setBusy(false);
             }
         });

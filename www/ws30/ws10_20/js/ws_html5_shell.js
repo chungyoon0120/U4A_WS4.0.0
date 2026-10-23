@@ -239,11 +239,16 @@
             setText: function (s) { _set("u4aWsBusyText", s); },
             setTitle: function (s) { _set("u4aWsBusyTitle", s); },
             isOpen: function () { return this._open; },
-            open: function () { this._open = true; parent.setDomBusy && parent.setDomBusy("X"); },
+            // ★★★[2026-10-21 장군님 지시] 여기서 parent.setDomBusy 를 부르던 두 줄을 없앴다.
+            //   [까닭] 공통 busy 창을 여닫는 자리가 두 길로 갈라져 있었다 —
+            //     전역 setBusy(resources/index.js) 와 여기. 끄기 한 번에 공통 busy 의
+            //     「다 그려졌나」 기다림이 두 번 돌아 0.6초가 1.2초가 됐다.
+            //   [지금] 공통 busy 를 부르는 자리는 전역 setBusy 한 곳뿐이다.
+            //     이 객체는 busy 카드의 제목·문구와 열림 여부만 들고 있는다.
+            open: function () { this._open = true; },
             close: function () {
                 this._open = false;
                 _set("u4aWsBusyText", ""); _set("u4aWsBusyTitle", "");
-                parent.setDomBusy && parent.setDomBusy("");
             }
         };
     };
@@ -361,6 +366,32 @@
             return;
         }
         parent.setBusy("");
+    };
+
+    /************************************************************************
+     * busy 가 화면에 그려질 틈을 한 번 준다 (장군님 지시 2026-10-13)
+     * ----------------------------------------------------------------------
+     * 왜 필요한가: setBusy("X") → 무거운 동기 로직 → setBusy("") 가 한 호흡 안에서
+     *   끝나면 브라우저는 중간에 한 번도 paint 하지 않는다. 그래서 busy 가 아예 안 보인다.
+     *   「짧아서 안 보임」이 아니라 「그려질 기회가 없음」.
+     * 쓰는 법:
+     *     parent.setBusy("X");
+     *     await oAPP.common.fnYieldToPaint();
+     *     // ↓ 여기서부터 무거운 동기 로직 (busy 가 이미 화면에 떠 있다)
+     * requestAnimationFrame 뒤에 setTimeout(0) 을 두는 까닭: rAF 콜백은 paint 직전에
+     *   불리므로, 그 안의 setTimeout 은 그 frame 이 실제로 그려진 뒤에 실행된다.
+     *   setTimeout(0) 만 쓰면 timer task 가 paint 보다 먼저 실행될 수 있다.
+     ************************************************************************/
+    oAPP.common.fnYieldToPaint = function () {
+        return new Promise(function (resolve) {
+            try {
+                if (typeof requestAnimationFrame === "function") {
+                    requestAnimationFrame(function () { setTimeout(resolve, 0); });
+                    return;
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            setTimeout(resolve, 0);
+        });
     };
 
     /************************************************************************
@@ -1089,14 +1120,45 @@
      *  구: sap.m.InstanceManager.closeAllPopovers/LightBoxes → sap 없음(크래시).
      *  신: 열려있는 native <dialog> 전부 닫기(HTML5). 뒤로가기(fnMoveToWs10) 경로의
      *      "sap is not defined" 크래시 제거.
+     *
+     *  ★[2026-10-23 장군님 지시 "빼라"] 공통 busy <dialog> 는 닫지 않는다.
+     *    까닭: 공통 busy 도 <dialog>.showModal() 이라(theme/u4a-busy.js) 종전에는 여기서
+     *      같이 닫혔다. WS20→WS10 이동(ws_fn_02.js fnMoveToWs10)은 흐름 맨 앞에서
+     *      fnCloseAllWs20Dialogs → 이 함수를 부르므로, busy 창이 시작 지점에서 사라지고
+     *      그 뒤 WS20 DOM 초기화(removeContent)·페이지 전환이 전부 조작 가능한 상태로 돌았다.
+     *      테스트 도구가 "busy 가 실제로 닫힌 뒤 DOM 변경이 감지된다"고 잡아낸 그 사고다.
+     *    busy 를 끄는 것은 공통(U4ABusy.hide — DOM 변경이 조용해질 때까지 기다린다)의 몫이다.
+     *      여기서는 건드리지 않는다.
      ************************************************************************/
     oAPP.fn.fnCloseAllDialog = function () {
+
+        var BUSY_DLG_ID = "u4aWsBusyIndicator";
+
         try {
+
             var aDlg = document.querySelectorAll("dialog[open]");
+
             for (var i = 0; i < aDlg.length; i++) {
-                try { aDlg[i].close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+                if (aDlg[i].id === BUSY_DLG_ID) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                        U4ALOG.info("DONE", "fnCloseAllDialog", "kept " + BUSY_DLG_ID + " open - only U4ABusy.hide may close it");
+                    }
+                    continue;
+                }
+
+                try {
+                    aDlg[i].close();
+                } catch (e) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                }
+
             }
-        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
     };
 
     /************************************************************************

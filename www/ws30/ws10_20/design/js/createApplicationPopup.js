@@ -71,7 +71,7 @@
         .u4aCapDlg { width: min(76vw, 980px); max-height: min(86vh, 780px); padding: 0; display: flex; flex-direction: column; }
         .u4aCapDlg .u4a-dialog__header { cursor: move; user-select: none; }
         .u4aCapDlg .u4a-dialog__header span { flex: 1 1 auto; }
-        /* 닫기 X 스타일은 공통 .u4a-btn-icon(+data-act=close hover 빨강)으로 통일 — 개별 .u4aCapX 스타일 제거 */
+        /* 닫기 X 스타일은 공통 .u4a-btn-icon(+data-act=CLOSE hover 빨강)으로 통일 — 개별 .u4aCapX 스타일 제거 */
         .u4aCapTabs { display: flex; gap: 0.25rem; padding: 0 1rem; border-bottom: 0.0625rem solid var(--line);
                       background: var(--surface); flex: 0 0 auto; }
         .u4aCapTab { appearance: none; border: 0; background: transparent; color: var(--text-muted);
@@ -255,6 +255,16 @@
                 oVhBtn.innerHTML = _fa("magnifying-glass");
                 oVhBtn.addEventListener("click", function () { cfg.vh(oModel, oInput); });
                 oWrap.appendChild(oVhBtn);
+
+                //칸에 커서를 두고 F4 를 눌러도 이 단추를 누른 것과 같게 한다.
+                //  ★이 창은 공통 createField 를 쓰지 않고 단추를 손으로 만들기 때문에
+                //    공통이 자동으로 걸어 주지 못한다 — 여기서 직접 건다
+                //    (.claude/rules/code.md 「값도움 단추를 단 입력칸은 F4 도 반드시」).
+                if (window.U4AUI && typeof window.U4AUI.attachF4 === "function") {
+                    window.U4AUI.attachF4(oInput, oVhBtn);
+                } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "U4AUI.attachF4", "create application popup: F4 will not open the search help");
+                }
             }
             oRow.control.appendChild(oWrap);
         } else {
@@ -272,7 +282,8 @@
             const sRowName = (oRow && oRow.row && oRow.row.getAttribute) ? oRow.row.getAttribute("data-row") : null;
             if (sRowName) {
                 oInput.setAttribute("data-field", sRowName);
-                if (oClearBtn) { oClearBtn.setAttribute("data-clear", sRowName); }
+                oInput.setAttribute("data-act", sRowName);   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
+                if (oClearBtn) { oClearBtn.setAttribute("data-clear", sRowName); oClearBtn.setAttribute("data-act", sRowName + "_CLEAR"); }
                 if (oVhBtn) { oVhBtn.setAttribute("data-act", sRowName + "_F4"); }
             } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
                 U4ALOG.warn("값이 없어 그만둠", "data-row on form row",
@@ -425,11 +436,11 @@
         // 헤더 아이콘은 메인 툴바 Create 버튼(WS10.js appCreateBtn: fa-file)과 동일하게 — 사용자 인지 통일.
         oHeader.innerHTML = _fa("file") + '<span></span>';
         oHeader.querySelector("span").textContent = sTitle;
-        // 닫기 X — 다른 다이얼로그(Change Layout/Insert)와 동일하게 공통 .u4a-btn-icon + data-act="close".
+        // 닫기 X — 다른 다이얼로그(Change Layout/Insert)와 동일하게 공통 .u4a-btn-icon + data-act="CLOSE".
         //   (.u4aCapX 는 드래그 제외용 JS 훅으로만 유지, 스타일은 공통 컴포넌트가 담당)
         const oXBtn = _el("button", "u4a-btn-icon u4aCapX");
         oXBtn.type = "button";
-        oXBtn.setAttribute("data-act", "close");
+        oXBtn.setAttribute("data-act", "CLOSE");   // 2026-10-15 장군님 지시 — 다른 창과 같은 대문자로 맞춤
         oXBtn.innerHTML = _fa("xmark");
         oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
         oXBtn.addEventListener("click", function () { lf_closeDialog(oDlg); });
@@ -620,7 +631,7 @@
         oUIobj.gen.oInpPack = _buildInput(oModel, oR, {
             valPath: "/CREATE/PACKG", statPath: "/CREATE/PACKG_stat", stxtPath: "/CREATE/PACKG_stxt",
             editPath: "/CREATE/PACKG_edit", maxLength: 30, upper: true, clear: true,
-            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset
+            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset, vh: lf_PackageF4help
         });
         oGrid.appendChild(oR.row);
 
@@ -760,7 +771,7 @@
         oUIobj.dataset.oInpPack = _buildInput(oModel, oR, {
             valPath: "/DATASET/PACKG", statPath: "/DATASET/PACKG_stat", stxtPath: "/DATASET/PACKG_stxt",
             editPath: "/DATASET/PACKG_edit", maxLength: 30, upper: true, clear: true,
-            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset
+            onChange: lf_packageChangeEvent, onInput: lf_packageLiveReset, vh: lf_PackageF4help
         });
         oLeft.appendChild(oR.row);
 
@@ -1416,6 +1427,57 @@
         } catch (e) {
             if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
             parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "949")); // Value help is not available.
+        }
+    }
+
+    /**
+     * 패키지 F4 HELP — 앱 복사 창과 **같은 길**(`fnPackgSchpPopupOpener`).
+     *
+     * ★원본에는 이 칸에 값도움이 없다(원본 `sap.m.Input` 403·581행에 `showValueHelp` 없음).
+     *   장군님 지시 2026-10-22 「앱 생성 팝업에서 패키지 input 에도 동일하게 돋보기 버튼 만들어줘.
+     *   앱 복사 팝업에서 쓰던 로직 그대로 해줘」 로 **더한 기능**이다.
+     * ★고른 뒤에는 **손으로 친 것과 똑같이 검증을 태운다**(`lf_packageChangeEvent`).
+     *   안 태우면 존재검사가 미확정(`PACKG_ok !== true`)으로 남아 「확인」에서
+     *   「존재하지 않는 패키지」로 걸린다.
+     * ※ 이 함수 하나로 **일반 탭과 데이터 세트 탭 둘 다** 처리된다 —
+     *   `lf_getStruName` 이 지금 보고 있는 탭의 경로를 돌려준다(CTS 번호 값도움과 같은 구조).
+     */
+    function lf_PackageF4help(oModel, oInput) {
+
+        const ls_stru = lf_getStruName(oModel);
+
+        if (!ls_stru) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "lf_getStruName", "package value help cannot tell which tab is active");
+            }
+            return;
+        }
+
+        try {
+            oAPP.fn.fnPackgSchpPopupOpener(function (oResult) {
+
+                //값을 안 고르고 닫은 경우 — 쓰던 값을 그대로 둔다(앱 복사 창과 같다).
+                if (!oResult) {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "package search help result", "package input keeps its previous value");
+                    }
+                    return;
+                }
+
+                const sPackage = (oResult.DEVCLASS == null) ? "" : oResult.DEVCLASS;
+
+                oModel.setProperty(ls_stru + "/PACKG", sPackage);
+
+                //모델 → DOM 반영은 포커스가 입력칸에 없을 때만 돌므로 여기서도 직접 넣는다.
+                if (oInput) {
+                    oInput.value = sPackage;
+                }
+
+                lf_packageChangeEvent(oModel, oInput);
+            });
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            parent.showMessage(null, 20, "E", parent.WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "950")); // Value help is not available.
         }
     }
 

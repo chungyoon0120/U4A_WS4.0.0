@@ -443,8 +443,16 @@
         const sPopupName = "CONTROLLER_ERROR";
 
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        const oResult = parent.WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-14 장군님 지시 (parent 제거) - parent 를 빼면 getChildWindows() 로는 못 찾으므로
+        //     전체 창에서 OBJTY + browserkey 로 찾는다(17번 오류 페이지 에디터 창과 같은 방식).
+        const oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
+
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try { if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oResult.WINDOW.focus(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 부모 위치 가운데 배치한다.            
             parent.WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
@@ -474,8 +482,14 @@
 
         oBrowserOptions.title = WSUTIL.getWsMsgClsTxt(WS_LANGU, "ZMSG_WS_COMMON_001", "251"); /* 컨트롤러 실행 오류 점검사항 */
         oBrowserOptions.autoHideMenuBar = true;        
-        oBrowserOptions.parent = CURRWIN;
+        // [parent 제거 2026-10-14, 장군님 지시] 공통 헤더로 바꾸며 최소화 버튼이 생겼다.
+        //   parent 가 붙어 있으면 최소화해도 작업표시줄에 안 잡혀 되살릴 수 없다(다른 별창과 같은 사유).
+        // oBrowserOptions.parent = CURRWIN;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
+
+        // [공통 헤더 2026-10-14, 장군님 지시 TODO 47] OS 기본 창틀을 떼고 창 안 공통 제목줄을 쓴다(.analy/16 §2.2).
+        //   설명서 HTML 은 손대지 않고 frame.html 의 본문 iframe 으로 띄운다(언어별 여러 벌 + 상대 경로 자원).
+        oBrowserOptions.titleBarStyle = "hidden";
 
         // [HTML5 2026-09-13, 장군님 지시] 네이티브 창 투명도 페이드 제거 — show:false 로만 숨긴다.
         oBrowserOptions.show = false;
@@ -488,6 +502,12 @@
 
         // 브라우저 오픈
         let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);        
+
+        // [parent 제거 2026-10-14] 메인 창이 죽을 때 같이 닫히도록 자식 창 목록에 넣는다.
+        //   parent 가 있을 때는 OS 가 같이 닫아 줬다 - 이제 아무도 안 닫는다.
+        try {
+            if (CURRWIN && CURRWIN._aChildWinMap) { CURRWIN._aChildWinMap.set(sPopupName, oBrowserWindow); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
         const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
@@ -502,10 +522,19 @@
             sessionKey: oBrowserOptions?.webPreferences?.partition,
             OBJTY: sPopupName,
             USERINFO: parent.process.USERINFO,
+            // [공통 헤더 2026-10-14] 첫 페인트부터 테마·제목을 쓰도록 넘긴다(.analy/16 §2.6).
+            THEME: oThemeInfo.THEME,
+            BGCOL: oThemeInfo.BGCOL,
+            TITLE: oBrowserOptions.title,
+            // 본문 iframe 이 띄울 설명서 파일(언어별). frame.js 가 iframe src 로 쓴다.
+            HELPURL: encodeURI("file:///" + String(sHelpLanguPath).replaceAll("\\", "/"))
         };
 
+        // [공통 헤더 2026-10-14] 설명서를 직접 열지 않고 공통 제목줄이 있는 frame.html 을 연다.
+        const sFramePath = parent.getPath("CTRLERRHELP");
+
         // URL에 QueryString 파라미터를 적용한다.
-        const sLoadUrl = parent.WSUTIL.QueryString.build(sHelpLanguPath, oQueryParams);
+        const sLoadUrl = parent.WSUTIL.QueryString.build(sFramePath, oQueryParams);
 
         oBrowserWindow.loadURL(sLoadUrl);
 
@@ -533,12 +562,21 @@
             // busy 끄고 Lock 풀기
             oAPP.common.fnSetBusyLock("");
 
-            oBrowserWindow.closable = true;
+            // [공통 헤더 2026-10-14] closable 을 true 로 되돌리지 않는다 — 창 수명 내내 false 유지(.analy/16 §2.6.1).
+            //   되돌리면 idle 상태에서 Alt+F4 가 먹어 공통 닫기 경로를 건너뛴다.
+            //   닫기는 창 안 X 버튼(공통 U4AUI.closeWindow)으로만 한다.
 
         });
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
+
+            // [parent 제거 2026-10-14] 닫힌 창 참조를 치운다 - 남기면 자식 창 일괄 처리에서 터진다.
+            try {
+                if (CURRWIN && CURRWIN._aChildWinMap && CURRWIN._aChildWinMap.get(sPopupName) === oBrowserWindow) {
+                    CURRWIN._aChildWinMap.delete(sPopupName);
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             oBrowserWindow = null;
 
@@ -633,7 +671,7 @@
             let oX = document.createElement("button");
             oX.type = "button";
             oX.className = "u4a-btn-icon";
-            oX.setAttribute("data-act", "close");
+            oX.setAttribute("data-act", "CLOSE");
             oX.innerHTML = _fa("xmark");
             oX.title = sClose;
             oX.addEventListener("click", _closeControllerErrorDialog);
@@ -712,6 +750,14 @@
         }
 
     } // end of _openControllerErrorDialog
+
+    /************************************************************************
+     * [2026-10-14] 위 오류 메시지 창을 밖에서도 부를 수 있게 이름만 내보낸다.
+     *   동작은 그대로다 — 이 창은 SAPGUI 실행이 실제로 실패해야만 떠서 눈으로 확인하기 어렵다.
+     *   개발자 도구 콘솔에서 아래 한 줄로 띄워 확인한다(그 창의 「점검사항」 버튼으로 도움말 창까지).
+     *     oAPP.fn.fnOpenControllerErrorDialog({ DESC: "test" });
+     ************************************************************************/
+    oAPP.fn.fnOpenControllerErrorDialog = _openControllerErrorDialog;
 
     // 이전에 돌고 있는 인터벌이 혹시나 있으면 삭제
     function _clearIntervalSapGuiCheck() {
@@ -1216,7 +1262,7 @@
         let oX = document.createElement("button");
         oX.type = "button";
         oX.className = "u4a-btn-icon";
-        oX.setAttribute("data-act", "close");
+        oX.setAttribute("data-act", "CLOSE");
         oX.innerHTML = _fa("xmark");
         oX.title = sClose;
         oX.addEventListener("click", oAPP.fn.fnCloseAdminDevToolDlg);
@@ -1486,6 +1532,7 @@
         var oDlg = document.createElement("dialog");
         oDlg.className = "u4a-dialog u4aSvrInfoDlg";
         oDlg.id = "u4aSvrInfoDlg";
+        oDlg.setAttribute("data-act", "DLG_SRVINFO");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
 
         function lf_close() {
             try { oDlg.close(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -1501,7 +1548,7 @@
         var oX = document.createElement("button");
         oX.type = "button";
         oX.className = "u4a-btn-icon u4aSvrInfoX";                                // 공통 닫기 X(+data-act=close hover 빨강)
-        oX.setAttribute("data-act", "close");
+        oX.setAttribute("data-act", "CLOSE");
         oX.innerHTML = _fa("xmark");
         oX.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "A39");         // Close
         oX.addEventListener("click", lf_close);

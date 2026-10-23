@@ -1,3 +1,4 @@
+// 오류코드 접두: APSO / 다음 번호: 002
 /************************************************************************
  * fnAttrPresetSettingsOpen.js  (HTML5) — WS20 속성 컨텍스트 메뉴 M06 "UI Attribute 개인화"
  * ----------------------------------------------------------------------
@@ -54,6 +55,24 @@
     function _preview(sAttr) {
         if (typeof oAPP.fn.previewUIsetProp === "function") {
             try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[WS20][preset] previewUIsetProp:", e && e.message, e); }
+        }
+    }
+    //★[2026-10-20] 미리보기 렌더링 종료 감지 대상 = 그 속성이 붙은 UI 의 부모 design tree 줄.
+    function _parentNodeOfAttr(sAttr) {
+        try {
+            //★필수 의존성이 없으면 조용히 건너뛰지 않는다 — 코드로 드러낸다.
+            //  (.works/DEV_STANDARD_오류처리.md §4·§6 / 전례 ws_events.js _ws20ReselectSelectedUI)
+            if (typeof oAPP.fn.getTreeData !== "function") {
+                throw new Error("oAPP.fn.getTreeData 미정의(WS20 디자인 트리 모듈 미로드)");
+            }
+            //값이 아직 없는 경우는 정상 — 기다릴 대상이 없다는 뜻이다.
+            if (!sAttr || !sAttr.OBJID) { return null; }
+            var oNode = oAPP.fn.getTreeData(sAttr.OBJID);
+            if (!oNode || !oNode.POBID) { return null; }
+            return oAPP.fn.getTreeData(oNode.POBID) || null;
+        } catch (e) {
+            console.error("[APSO-001] attrPreset — parent node lookup for preview render await failed:", e);
+            return null;
         }
     }
 
@@ -286,7 +305,12 @@
             if (_sRes.RETCD === "E") { _errMsg = _sRes.RTMSG; return; }
 
             //미리보기 원본값 복원(원본 previewUIsetProp(sParam.sAttr)).
-            _preview(oCtx.orig);
+            //★[2026-10-20 장군님 지시] ① 미리보기에 반영 → ② 렌더링 종료 감지 → ③ busy off(finally).
+            //  감지 대상 = 그 속성이 붙은 UI 의 "부모"(고른 UI 자신에 걸면 신호가 안 온다).
+            //  원본(settings/index.js)에는 이 감지가 없다 — 장군님 규칙(미리보기를 바꿨으면 반드시 감지)에 따라 넣는다.
+            await oAPP.fn.fnWs20AwaitPrevRender(_parentNodeOfAttr(oCtx.orig), function () {
+                _preview(oCtx.orig);
+            }, "attrPreset");
 
             //열린 list 팝업 새로고침.
             _broadcastAttrChange(oCtx.clone);

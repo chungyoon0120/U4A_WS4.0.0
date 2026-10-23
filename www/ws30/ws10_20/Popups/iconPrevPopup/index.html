@@ -14,6 +14,10 @@
          경로: Popups/iconPrevPopup 기준 → theme=../../theme, lib=../../../../lib. (browser-window-common-ux) -->
     <link rel="stylesheet" href="../../theme/tokens.css">
     <link rel="stylesheet" href="../../theme/shell.css">
+    <!-- [2026-10-16] 공통 busy(.analy/16 §2.10) — 모든 별창은 예외 없이 공통 busy 를 쓴다.
+         <dialog>.showModal() = top layer 라 이 창 안의 어떤 모달 팝업 위에도 보인다. -->
+    <link rel="stylesheet" href="../../theme/u4a-busy.css">
+    <script src="../../theme/u4a-busy.js"></script>
     <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
     <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
 
@@ -79,7 +83,7 @@
         <div class="u4a-titlebar__spacer"></div>
         <button type="button" class="u4a-winbtn" id="iconpWinMin" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
         <button type="button" class="u4a-winbtn" id="iconpWinMax" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
-        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="iconpWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="iconpWinClose" data-action="close" data-act="CLOSE" title="Close"><i class="fa-solid fa-xmark"></i></button>
     </header>
 
     <!-- 본문 = 서버 getP13nPreviewHTML(UI5 부트스트랩) 을 로드하는 iframe. 콘텐츠=KEEP-UI5(runtime.js). -->

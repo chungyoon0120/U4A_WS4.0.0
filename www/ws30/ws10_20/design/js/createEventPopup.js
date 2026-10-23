@@ -67,9 +67,11 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
     return o;
   }
   // clear(X) 버튼 — 전 화면 공통 글리프(fa-xmark). 텍스트 "×" 금지.
-  function _buildClearBtn() {
+  // sAct — 자동 테스트 도구가 집을 이름(.analy/21 §2.3 "이름을 받는 옵션"). 안 주면 전과 같다.
+  function _buildClearBtn(sAct) {
     var o = _el("button", "u4a-field__clear");
     o.type = "button";
+    if (sAct) { o.setAttribute("data-act", sAct); }
     o.title = "Clear";
     o.tabIndex = -1;
     o.innerHTML = _fa("xmark");
@@ -453,7 +455,7 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   //A39  Close — 우상단 닫기버튼(공통 .u4a-btn-icon, hover 빨강).
   var oXBtn = _el("button", "u4a-btn-icon");
   oXBtn.type = "button";
-  oXBtn.setAttribute("data-act", "close");
+  oXBtn.setAttribute("data-act", "CLOSE");
   oXBtn.innerHTML = _fa("xmark");
   oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");
   oXBtn.addEventListener("click", function () { lf_dialogClose(); });
@@ -472,8 +474,9 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   oMethInp.maxLength = 27;                 //원본 maxLength:27
   oMethInp.autocomplete = "off";           //원본 autocomplete:false(브라우저 자동완성 방지)
   oMethInp.setAttribute("spellcheck", "false");
+  oMethInp.setAttribute("data-act", "EVTNM");        //.analy/21 — 자동 테스트 식별값(서버 칸 이름)
   oMethWrap.appendChild(oMethInp);
-  var oMethClear = _buildClearBtn();
+  var oMethClear = _buildClearBtn("EVTNM_CLEAR");
   oMethWrap.appendChild(oMethClear);
   oR1.control.appendChild(oMethWrap);
   var oMethMsg = oR1.msg;
@@ -487,8 +490,9 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   oDescInp.maxLength = 40;                  //원본 maxLength:40
   oDescInp.autocomplete = "off";
   oDescInp.setAttribute("spellcheck", "false");
+  oDescInp.setAttribute("data-act", "EVTTX");        //.analy/21 — 자동 테스트 식별값(서버 칸 이름)
   oDescWrap.appendChild(oDescInp);
-  var oDescClear = _buildClearBtn();
+  var oDescClear = _buildClearBtn("EVTTX_CLEAR");
   oDescWrap.appendChild(oDescClear);
   oR2.control.appendChild(oDescWrap);
   var oDescMsg = oR2.msg;
@@ -500,6 +504,7 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   //A01  Create — 이벤트 생성 버튼(emphasized).
   var oOkBtn = _el("button", "u4a-btn u4a-btn--emphasized");
   oOkBtn.type = "button";
+  oOkBtn.setAttribute("data-act", "CREATE");
   oOkBtn.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
   oOkBtn.title = _txt("/U4A/CL_WS_COMMON", "A01");
   oFoot.appendChild(oOkBtn);
@@ -507,6 +512,7 @@ oAPP.fn.createEventPopup = function (is_attr, f_callBack) {
   //A39  Close — 닫기 버튼(Reject 느낌 negative).
   var oCancelBtn = _el("button", "u4a-btn u4a-btn--negative");
   oCancelBtn.type = "button";
+  oCancelBtn.setAttribute("data-act", "CLOSE");
   oCancelBtn.innerHTML = _fa("xmark");   // X 아이콘만 (텍스트 라벨 제거)
   oCancelBtn.title = _txt("/U4A/CL_WS_COMMON", "A39"); // Close
   oFoot.appendChild(oCancelBtn);

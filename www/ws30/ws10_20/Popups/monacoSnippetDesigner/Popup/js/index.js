@@ -130,6 +130,14 @@
     // busy(top-layer <dialog>) 제어.
     function fn_setBusy(bIsBusy) {
         oState.isBusy = !!bIsBusy;
+        // [2026-10-16] 공통 busy(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음). 자체 <dialog> 도 공통으로 모은다:
+        if (window.U4ABusy && typeof U4ABusy.show === "function") {
+            if (bIsBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+            return;
+        }
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local busy dialog");
+        }
         const oBusy = document.getElementById("snipBusy");
         if (!oBusy) { return; }
         try {

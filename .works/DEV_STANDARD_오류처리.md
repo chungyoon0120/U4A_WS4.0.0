@@ -92,6 +92,8 @@ UI5 미로드 가드, 브라우저 기능 지원 확인은 **정상 분기 그�
 | `CEHT` | ws30/ws10_20/js/codeeditor/ (범용 Monaco host — 클라이언트 이벤트 편집기가 쓴다) |
 | `EDTF` | ws30/ws10_20/Popups/editorPopup/editorFrame.js |
 | `EPEF` | ws30/ws10_20/Popups/errPageEditorPopup/errorPageEditorFrame.js |
+| `EPEV` | ws30/ws10_20/Popups/errPageEditorPopup/errorPageEditorPreview.js (오류 페이지 미리보기 창) |
+| `CEHP` | ws30/ws10_20/Popups/controllerErrorHelpPopup/frame.js (컨트롤러 실행 오류 점검사항 창) |
 | `PATF` | ws30/ws10_20/Popups/patternPopup/frame.js (소스 패턴 창) |
 | `CLED` | ws30/ws10_20/js/ws_html5_client_editor.js (클라이언트 이벤트 편집기 팝업) |
 | `FFPO` | ws30/ws10_20/js/fnFindPopupOpen.js (Find 창 여는 쪽) |
@@ -105,6 +107,16 @@ UI5 미로드 가드, 브라우저 기능 지원 확인은 **정상 분기 그�
 | `SVLS` | ServerList_v2/ServerList.js (서버 목록 → 메인 창) |
 | `LPRL` | ws30/ws10_20/js/library-preload.js (로그인 후 창 — 메인 스크립트 읽기·시작) |
 | `UBSY` | ws30/ws10_20/theme/u4a-busy.js (공통 busy — window.U4ABusy, 2026-09-15) |
+| `PREV-ERR` | ws30/ws10_20/js/ws_html5_ws20_prev.js (WS20 미리보기 — 로드·테마·렌더링 종료 감지, 2026-10-20) ※ 기존 `PREV-ERR-00`~`05` 는 구형식(2자리), 신규분부터 3자리 |
+| `W20A` | ws30/ws10_20/js/ws_html5_ws20_attr.js (WS20 속성 영역, 2026-10-20) ※ 기존 `WS20ATTR-CHK01` 은 구형식 |
+| `W20W` | ws30/ws10_20/js/ws_html5_ws20_wizard.js (WS20 UI 템플릿 마법사, 2026-10-20) |
+| `APSO` | ws30/ws10_20/js/fnAttrPresetSettingsOpen.js (UI Attribute 개인화 팝업, 2026-10-20) |
+| `SASP` | ws30/ws10_20/js/fnSameAttrSyncPopupOpen.js (동일 속성 동기화 팝업, 2026-10-20) |
+| `SCPO` | ws30/ws10_20/js/fnStyleClassPopupOpen.js (styleClass 팝업, 2026-10-20) |
+| `FBPO` | ws30/ws10_20/js/fnBindPopupOpen.js (속성 바인딩 팝업 여는 쪽, 2026-10-20) |
+| `BCBP` | ws30/ws10_20/design/bindPopupHandler/broadcastChannelBindPopup.js (바인딩 팝업 방송 수신, 2026-10-20) |
+| `W20D` | ws30/ws10_20/js/ws_html5_ws20_data.js (WS20 앱 데이터 수신, 2026-10-20) |
+| `W20T` | ws30/ws10_20/js/ws_html5_ws20_tree.js (WS20 UI 트리, 2026-10-20) |
 | (추가) | 작업하며 배정 |
 
 ## 4. 필수 vs 선택 판정 (판단 가이드)

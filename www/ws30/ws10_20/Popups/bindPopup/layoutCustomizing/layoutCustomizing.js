@@ -160,8 +160,10 @@
     }
 
     oAPP.fn.openLayoutCustomizingPopup = function () {
-        // 편집 불가(조회 모드)면 열지 않음 — 원본 enabled="{/edit_layout_customizing}".
-        if (oAPP.attr.editable === false) { return; }
+        // [2026-10-16] 조회 모드 가드 삭제(구글시트 13번 2차).
+        //   원본은 이 팝업을 여는 자리에 조회 모드 조건이 없다(index.js:3112 openBindLayoutCustomizingPopup).
+        //   버튼의 enabled="{/edit_layout_customizing}" 하나뿐이고 그 값은 조회 모드에서 true 로 남는다
+        //   (setViewEditable 이 IS_EDIT==="" 이면 맨 앞에서 return). 영역 보이기/숨기기라 편집 권한과 무관.
 
         var oExist = document.getElementById("bwpLcDlg");
         if (oExist) { try { oExist.close(); oExist.remove(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }

@@ -20,9 +20,13 @@
     var _input = null, _countEl = null, _onFound = null;
     var _prev = "";   // 직전 검색어(원본 gBeforeSearchText) — 새 검색어면 findNext=true(처음부터)
 
-    function _btn(sIcon, fn) {
+    function _btn(sIcon, sAct, fn) {
         var b = document.createElement("button");
-        b.type = "button"; b.className = "u4a-btn-icon"; b.innerHTML = _fa(sIcon);
+        b.type = "button";
+        b.className = "u4a-btn-icon";
+        b.innerHTML = _fa(sIcon);
+        //자동 테스트 식별값(.analy/21) — 아이콘만 다른 단추들이라 class 로는 못 가른다.
+        b.setAttribute("data-act", sAct);
         b.addEventListener("click", fn);
         return b;
     }
@@ -65,20 +69,27 @@
     function _build() {
         var root = document.getElementById("u4aTxtSrch");
         root.className = "u4aTxtSrchWin";
+        //자동 테스트 식별값(.analy/21) — 어느 창인지. 자동 테스트 쪽 요청 2026-10-20.
+        root.setAttribute("data-act", "TXTSRCH_DLG");
 
         var field = window.U4AUI.createField({ type: "text", clear: true, className: "u4aTxtSrchField" });
         _input = field.input;
         _input.autocomplete = "off";
+        _input.setAttribute("data-act", "TXTSRCH_INPUT");
         _input.addEventListener("input", _onInput);
         _input.addEventListener("keydown", _onKeyDown);
 
-        _countEl = document.createElement("span"); _countEl.className = "u4aTxtSrchWin__count";
-        var sep = document.createElement("span"); sep.className = "u4aTxtSrchWin__sep";
+        _countEl = document.createElement("span");
+        _countEl.className = "u4aTxtSrchWin__count";
+        //찾은 수("활성 / 전체") — 읽기용.
+        _countEl.setAttribute("data-act", "TXTSRCH_COUNT");
 
-        var bUp = _btn("chevron-up", function () { _step(false); });   // 원본 ▲ navigation-up-arrow
-        var bDn = _btn("chevron-down", function () { _step(true); });  // 원본 ▼ navigation-down-arrow
-        var bCl = _btn("xmark", _close);                              // 원본 ✕ decline
-        bCl.setAttribute("data-act", "close");                       // 공통 닫기 의미색(빨강 hover)
+        var sep = document.createElement("span");
+        sep.className = "u4aTxtSrchWin__sep";
+
+        var bUp = _btn("chevron-up", "TXTSRCH_PREV", function () { _step(false); });   // 원본 ▲ navigation-up-arrow
+        var bDn = _btn("chevron-down", "TXTSRCH_NEXT", function () { _step(true); });  // 원본 ▼ navigation-down-arrow
+        var bCl = _btn("xmark", "CLOSE", _close);                                      // 원본 ✕ decline (공통 닫기 의미색)
 
         root.append(field.el, _countEl, sep, bUp, bDn, bCl);
 

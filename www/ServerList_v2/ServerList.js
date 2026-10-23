@@ -239,7 +239,23 @@
      * Busy / Toast / MessageBox (UI5 BusyIndicator/Toast/MessageBox 대체)
      ********************************************************************/
     oAPP.fn.setBusyIndicator = function (sIsBusy, sMsg) {
-        const oDom = document.getElementById("u4aWsBusyIndicator");
+        const bBusyOn = (sIsBusy === "X");
+
+        // ★[2026-10-16 장군님 지시] busy 는 예외 없이 공통(theme/u4a-busy.js)만 쓴다.
+        //   종전에는 이 화면의 자체 오버레이 div 를 켰다 — 모달 팝업(showModal) 뒤로 숨는다.
+        if (window.U4ABusy && typeof U4ABusy.show === "function") {
+            document.body.style.pointerEvents = bBusyOn ? "none" : "";
+            if (bBusyOn) { U4ABusy.show(); } else { U4ABusy.hide(); }
+            // 안내 문구(예: 종료 중)는 공통 busy 카드의 글자 자리에 넣는다. 비면 :empty 로 자동 숨김.
+            const oTxt = document.getElementById("u4aWsBusyText");
+            if (oTxt) { oTxt.textContent = (bBusyOn && sMsg) ? sMsg : ""; }
+            return;
+        }
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+        }
+
+        const oDom = document.getElementById("u4aWsBusyIndicatorLegacy");
         if (!oDom) {
             // 흔적 없이 그만두면 "왜 busy 가 안 뜨나" 를 알 수 없다. 같은 이름이라 한 번만 남긴다.
             if (!oAPP.fn.setBusyIndicator.__missLogged) {

@@ -185,7 +185,7 @@
         return [
             {
                 key: "WMENU10", text: _txt("B34"), items: [
-                    { key: "WMENU10_01", icon: "arrows-rotate", text: _txt("B40"), disabled: !_bDevMenu },
+                    { key: "WMENU10_01", act: "PKGCHANGE", icon: "arrows-rotate", text: _txt("B40"), disabled: !_bDevMenu },
                     {
                         key: "WMENU10_02", icon: "right-left", text: _txt("B41"), items: [
                             { key: "WMENU10_02_01", act: "APPIMPORT", icon: "file-import", text: _txt("B42"), disabled: !_bDevMenu },
@@ -194,7 +194,7 @@
                     },
                     {
                         key: "WMENU10_04", icon: "share-from-square", text: _txt("B45"), items: [
-                            { key: "WMENU10_04_01", icon: "bolt", text: _txt("B46") }
+                            { key: "WMENU10_04_01", act: "SHORTCUT", icon: "bolt", text: _txt("B46") }
                         ]
                     },
                     { key: "WMENU10_05", act: "WSINFO", icon: "circle-info", text: _txt("B48") }
@@ -202,13 +202,13 @@
             },
             {
                 key: "WMENU20", text: _txt("B35"), items: [
-                    { key: "WMENU20_01", icon: "globe", text: _txt("B49") },
-                    { key: "WMENU20_03", icon: "video", text: _wsTxt("808") },
-                    { key: "WMENU20_05", icon: "code", text: _txt("M059") },
+                    { key: "WMENU20_01", act: "SELECTBROWSER", icon: "globe", text: _txt("B49") },
+                    { key: "WMENU20_03", act: "SCREENREC", icon: "video", text: _wsTxt("808") },
+                    { key: "WMENU20_05", act: "SRCPATTERN", icon: "code", text: _txt("M059") },
                     {
-                        key: "WMENU20_04", icon: "icons", text: _txt("M068"), items: [
-                            { key: "WMENU20_04_01", icon: "icons", text: _txt("M047") },
-                            { key: "WMENU20_04_02", icon: "image", text: _txt("M067") }
+                        key: "WMENU20_04", act: "ICONVIEWER", icon: "icons", text: _txt("M068"), items: [
+                            { key: "WMENU20_04_01", act: "ICONLIST", icon: "icons", text: _txt("M047") },
+                            { key: "WMENU20_04_02", act: "IMAGEICONS", icon: "image", text: _txt("M067") }
                         ]
                     }
                 ]
@@ -254,24 +254,26 @@
 
     function _getSubHeaderButtons() {
         return [
-            { id: "appCreateBtn", icon: "file", text: _txt("A01"), sc: "Ctrl+F12", ev: "ev_AppCreate", devOnly: true },
-            { id: "appChangeBtn", icon: "pen-to-square", text: _txt("A02"), sc: "F6", ev: "ev_AppChange", devOnly: true },
-            { id: "appDelBtn", icon: "trash", text: _txt("A03"), sc: "Ctrl+F10", ev: "ev_AppDelete", devOnly: true, reject: true },
-            { id: "appCopyBtn", icon: "copy", text: _txt("A04"), sc: "Shift+F11", ev: "ev_AppCopy", devOnly: true },
+            { id: "appCreateBtn", act: "CREATE_APP", icon: "file", text: _txt("A01"), sc: "Ctrl+F12", ev: "ev_AppCreate", devOnly: true },
+            { id: "appChangeBtn", act: "CHANGE", icon: "pen-to-square", text: _txt("A02"), sc: "F6", ev: "ev_AppChange", devOnly: true },
+            { id: "appDelBtn", act: "DELETE_APP", icon: "trash", text: _txt("A03"), sc: "Ctrl+F10", ev: "ev_AppDelete", devOnly: true, reject: true },
+            { id: "appCopyBtn", act: "COPY_APP", icon: "copy", text: _txt("A04"), sc: "Shift+F11", ev: "ev_AppCopy", devOnly: true },
             { sep: true, devOnly: true },
-            { id: "displayBtn", icon: "display", text: _txt("A05"), sc: "F7", ev: "ev_AppDisplay" },
+            { id: "displayBtn", act: "DISPLAY", icon: "display", text: _txt("A05"), sc: "F7", ev: "ev_AppDisplay" },
             { id: "appExecMenuBtn", icon: "globe", text: _txt("A06"), sc: "F8", ev: "ev_AppExec", split: true, act: "RUN" },
             { sep: true },
-            { id: "examBtn", icon: "graduation-cap", text: _txt("A07"), sc: "Ctrl+F1", ev: "ev_AppExam" },
-            { id: "multiPrevBtn", icon: "mobile-screen-button", text: _txt("A08"), sc: "Ctrl+F3", ev: "ev_MultiPrev" },
+            { id: "examBtn", act: "EXAMPLE", icon: "graduation-cap", text: _txt("A07"), sc: "Ctrl+F1", ev: "ev_AppExam" },
+            { id: "multiPrevBtn", act: "MULTIPREV", icon: "mobile-screen-button", text: _txt("A08"), sc: "Ctrl+F3", ev: "ev_MultiPrev" },
             { sep: true },
-            { id: "newWindowBtn", icon: "window-restore", text: _txt("A09"), sc: "Ctrl+N", ev: "ev_NewWindow" }
+            { id: "newWindowBtn", act: "NEWWIN", icon: "window-restore", text: _txt("A09"), sc: "Ctrl+N", ev: "ev_NewWindow" }
         ];
     }
 
+    // 2026-10-13 — 자동 테스트 도구가 집을 이름(act)을 같이 둔다. 값은 코드가 쓰는 key 에
+    //   BROWSER_ 를 붙인 것이라, 브라우저가 늘어나도 그쪽이 고칠 것이 없다.
     var APP_EXEC_BROWSERS = [
-        { key: "CHROME", text: "Chrome", icon: "chrome", brand: true },
-        { key: "MSEDGE", text: "Edge", icon: "edge", brand: true }
+        { key: "CHROME", act: "BROWSER_CHROME", text: "Chrome", icon: "chrome", brand: true },
+        { key: "MSEDGE", act: "BROWSER_MSEDGE", text: "Edge", icon: "edge", brand: true }
     ];
 
     // [WS20 와 동작 통일] App 실행 분할버튼 — 정적 Chrome/Edge 대신 실제 설치 브라우저(/DEFBR)를
@@ -286,7 +288,8 @@
             var ic = APPEXEC_BR_ICON[o.NAME] || {};
             var en = !(!o.NAME || o.ENABLED === false);
             if (o.NAME === "DEV_BROWSER" && bPackaged) { en = false; }
-            return { key: o.NAME, text: o.DESC || o.NAME, icon: ic.icon, brand: ic.brand, disabled: !en };
+            // act = BROWSER_ + key (2026-10-13 자동 테스트 도구가 집을 이름). /DEFBR 로 늘어나도 그대로 돈다.
+            return { key: o.NAME, act: o.NAME ? ("BROWSER_" + o.NAME) : "", text: o.DESC || o.NAME, icon: ic.icon, brand: ic.brand, disabled: !en };
         });
     }
     // 선택 브라우저로 실행 (WS10 = AppNmInput 의 앱).
@@ -775,6 +778,8 @@
         btn.title = cfg.tooltip || cfg.text || "";
         btn.setAttribute("aria-haspopup", "true");
         btn.setAttribute("data-menu-anchor", "menu");
+        // 2026-10-14 — 자동 테스트 도구가 집을 이름(.analy/21). act 를 준 소비처만 붙는다.
+        if (cfg.act) { btn.setAttribute("data-act", cfg.act); }
         btn.innerHTML =
             (cfg.icon ? (cfg.brand ? '<i class="fa-brands fa-' + cfg.icon + '"></i>' : _fa(cfg.icon)) : "")
             + (cfg.text ? "<span>" + cfg.text + "</span>" : "")
@@ -857,11 +862,33 @@
         oAPP.attr.ui = oAPP.attr.ui || {};
         oAPP.attr.ui.WSAPP = WSAPP;
         oAPP.attr.ui.pages = { WS10: WS10, WS20: WS20, WS30: WS30 };
-        oAPP.attr.ui._navGen = 0;   // generation counter: stale _done 차단용
+        // 화면 전환 진행 상황 — 원본 UI5 sap.m.NavContainer 와 같은 방식(_bNavigating / _aQueue).
+        //   여기(oAPP.attr.ui)에 둔 이유: fnNavTo 는 매번 새 호출이라 함수 안 변수로는 상황을 이어갈 수 없다.
+        oAPP.attr.ui._navBusy = false;
+        oAPP.attr.ui._navQueue = [];
         oAPP.fn.fnNavTo = oAPP.fn.fnNavTo || function (sToId) {
             var oPages = (oAPP.attr.ui && oAPP.attr.ui.pages) || {};
             var oTo = oPages[sToId];
             if (!oTo) { return; }
+
+            /**
+             * [2026-10-20] ★ 전환이 도는 도중에 들어오는 전환은 겹치게 시작하지 않고 줄을 세운다.
+             * ------------------------------------------------------------------
+             *  [증상] WS10 ↔ WS20 을 빨리 오가면 지나간 화면이 남아 겹쳐 보인다(구글시트 15번).
+             *  [원인] 겹치면 나가던 페이지에 들어오는 클래스까지 같이 붙고, animation-fill-mode:both 로
+             *         눌러 둔 끝 상태(opacity:0)가 앞 전환이 클래스를 떼는 순간 풀려 이미 나간 화면이 되살아난다.
+             *  [원본 참고] UI5 sap.m.NavContainer 는 겹침을 나중에 수습하지 않고 아예 만들지 않는다 —
+             *         _bNavigating 이 true 면 _aQueue 에 넣어 두고, _afterTransitionCallback 에서
+             *         _dequeueNavigation() 으로 꺼내 실행한다. 같은 방식을 여기에 이식했다.
+             */
+            if (oAPP.attr.ui._navBusy === true) {
+                oAPP.attr.ui._navQueue.push(sToId);
+                if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                    U4ALOG.info("화면 이동", "queued -> " + sToId, "another transition is in progress");
+                }
+                return;
+            }
+
             try { parent.setCurrPage(sToId); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
             // 현재 보이는 페이지(나갈 페이지) 탐색
@@ -896,11 +923,36 @@
                 // 로그 때문에 화면 전환이 막히면 안 된다.
             }
 
+            /**
+             * [2026-10-14] 화면 전환이 끝난 자리에서 해야 하는 일.
+             *   · WS10 에 도착하면 — 예제 열기 창에서 「Workbench Move」 로 들어왔다가 뒤로 나온 경우,
+             *     숨겨 둔 예제 창을 다시 보여 준다(원본 afterNavigate 의 _checkExamPopup 과 같은 일).
+             *     원본은 UI5 NavContainer 의 afterNavigate 에 있었는데 WS4.0 은 그 전환을 안 쓴다.
+             */
+            var _fnAfterNav = function () {
+                if (sToId !== "WS10") { return; }
+                try {
+                    if (oAPP.fn && typeof oAPP.fn.fnCheckExamPopup === "function") { oAPP.fn.fnCheckExamPopup(); }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            };
+
+            // 전환이 끝나면 줄 서 있는 다음 전환을 꺼내 실행 — UI5 _dequeueNavigation 과 같다.
+            //   이 함수 자신이 아니라 oAPP.fn.fnNavTo 로 부른다 — 바인딩 창 닫기처럼 밖에서 감싼 처리도 같이 돌아야 한다.
+            var _fnDequeueNav = function () {
+                if (oAPP.attr.ui._navQueue.length === 0) { return; }
+                var sNext = oAPP.attr.ui._navQueue.shift();
+                oAPP.fn.fnNavTo(sNext);
+            };
+
             // 나갈 페이지가 없으면(초기) 애니메이션 없이 표시
             if (!oFrom || oFrom === oTo) {
                 Object.keys(oPages).forEach(function (k) {
                     if (oPages[k]) { oPages[k].classList.toggle("u4aWsHidden", k !== sToId); }
                 });
+                _fnAfterNav();
+                // 여기서도 줄을 꺼낸다 — 같은 페이지를 연달아 누르면 큐의 두 번째가 이 갈래로 빠지는데,
+                // 꺼내지 않으면 그 뒤에 줄 서 있는 전환이 영영 안 돌아 화면이 멈춘 것처럼 보인다.
+                _fnDequeueNav();
                 return;
             }
 
@@ -910,30 +962,37 @@
             var sIn = bFwd ? "u4aWsNavInFwd" : "u4aWsNavInBack";
             var sOut = bFwd ? "u4aWsNavOutFwd" : "u4aWsNavOutBack";
 
-            // 들어올 페이지 표시 + 인/아웃 애니메이션 시작
-            // 이전 애니메이션의 stale _done 이 400ms 뒤에 오는 페이지를 다시 숨기는 것을 방지하기 위해
-            // generation 카운터를 증가시키고 _done 진입 시 검사한다.
-            var gen = ++(oAPP.attr.ui._navGen);
+            // 들어올 페이지 표시 + 인/아웃 애니메이션 시작. 이 사이에 들어오는 전환은 위에서 줄을 세운다.
+            oAPP.attr.ui._navBusy = true;
             oTo.classList.remove("u4aWsHidden");
             oTo.classList.add(sIn);
             oFrom.classList.add(sOut);
 
-            var _done = function () {
+            var bDone = false;
+            var iFallback = null;
+            var _done = function (oEv) {
+                // 페이지 속 요소(WS10 큰 제목·설명 글자에도 나타나는 여림이 있다)의 animationend 가
+                // 올라온 것은 전환이 끝난 게 아니다 — animationend 는 부모로 번진다(bubble).
+                if (oEv && oEv.target !== oFrom) { return; }
+                if (bDone === true) { return; }
+                bDone = true;
+                if (iFallback !== null) { clearTimeout(iFallback); iFallback = null; }
                 oFrom.removeEventListener("animationend", _done);
-                if (oAPP.attr.ui._navGen !== gen) {
-                    // stale: 새 fnNavTo가 이미 시작됨 → u4aWsHidden 추가는 건너뛰되
-                    // animation-fill-mode:both 로 인해 opacity:0/transform 이 남는
-                    // zombie 클래스는 반드시 제거해야 화면이 보임
-                    oFrom.classList.remove(sOut);
-                    oTo.classList.remove(sIn);
-                    return;
-                }
+
+                // ★ 끝낼 때 순서를 지킨다 — 먼저 감춘 다음에 애니메이션 클래스를 뗀다.
+                //   거꾸로 하면 animation-fill-mode:both 로 눌러 둔 끝 상태(opacity:0)가 한 frame 풀려
+                //   나간 화면이 번쩍한다. 원본 UI5 _fadeInAnimationEnd 도 sapMNavItemHidden 을 붙이고
+                //   나서 sapMNavItemFading·sapMNavItemTransparent 을 뗀다.
                 oFrom.classList.add("u4aWsHidden");
                 oFrom.classList.remove(sOut);
                 oTo.classList.remove(sIn);
+
+                oAPP.attr.ui._navBusy = false;
+                _fnAfterNav();
+                _fnDequeueNav();
             };
             oFrom.addEventListener("animationend", _done);
-            setTimeout(_done, 400); // 폴백(animationend 미발생 대비)
+            iFallback = setTimeout(_done, 400); // 폴백(animationend 미발생 대비 — prefers-reduced-motion 은 animation:none)
         };
 
         // 공개 메뉴 닫기 (fnOnMoveToPage 가 페이지 전환 시 열린 윈도우 메뉴 닫음)
@@ -1094,11 +1153,12 @@
             onEnter: function (v) { _runTcode(v); }   // 선택은 채움만, 실행은 Enter(원본 동일)
         });
         oTcodeFld.input.autocomplete = "off";
+        oTcodeFld.input.setAttribute("data-act", "TCODE_INPUT");   // 2026-10-14 자동 테스트 도구가 집을 이름
         // 2026-10-08 자동 테스트 도구가 가리킬 표식 - 이 칸의 지우기 단추는 title 이 "Clear" 뿐이라
         //   다른 지우기 단추와 구분이 안 됐다. 칸의 id(sapTcode) 를 그대로 붙인다.
         try {
             var oTcodeClr = oTcodeFld.el.querySelector(".u4a-field__clear");
-            if (oTcodeClr) { oTcodeClr.setAttribute("data-clear", "sapTcode"); }
+            if (oTcodeClr) { oTcodeClr.setAttribute("data-clear", "sapTcode"); oTcodeClr.setAttribute("data-act", "TCODE_INPUT_CLEAR"); }   // 2026-10-13 밖에서 집는 이름은 data-act 하나로(사장님 결정) — 기존 속성은 그대로 둔다
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         o.appendChild(oTcodeFld.el);
 
@@ -1147,6 +1207,7 @@
                             var oMInp = document.createElement("input");
                             oMInp.type = "text";
                             oMInp.className = "u4a-tcode";
+                    oMInp.setAttribute("data-act", "TCODE_INPUT");   // 2026-10-14 접혀도 같은 이름으로 집히게
                             oMInp.placeholder = "SAP T-CODE";
                             oMInp.autocomplete = "off";
                             var oSrc = oTcodeFld.input || el.querySelector("input");
@@ -1269,6 +1330,8 @@
                 el.type = "button";
                 el.id = cfg.id;
                 el.title = cfg.text + " (" + cfg.sc + ")";
+                // 2026-10-14 — 자동 테스트 도구가 집을 이름(.analy/21). id 는 그대로 두고 값만 더한다.
+                if (cfg.act) { el.setAttribute("data-act", cfg.act); }
                 el.innerHTML = _fa(cfg.icon) + "<span>" + cfg.text + "</span>";
                 el.addEventListener("click", function () { _invoke(cfg.ev, cfg.text); });
             }
@@ -1427,6 +1490,7 @@
         var oInput = oSearchFld.input;
         oInput.autocomplete = "off";
         oInput.setAttribute("role", "combobox");
+        oInput.setAttribute("data-act", "APPNM_INPUT");   // 2026-10-14 자동 테스트 도구가 집을 이름
         oInput.title = "";
         // 2026-10-08 자동 테스트 도구가 알아볼 식별값 — 이 돋보기는 안내 글자로만 집히고 있었다.
         try {
@@ -1434,10 +1498,11 @@
             oSearchVh.title = "Search Help (F4)";
             oSearchVh.setAttribute("data-act", "APPNM_F4");
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        // F4 키 → 값도움(버튼 클릭과 동일), Enter → no-op(원본 SearchField 동일), 더블클릭 → 전체선택.
+        // Enter → no-op(원본 SearchField 동일), 더블클릭 → 전체선택.
+        //   ★[2026-10-22] F4 는 여기서 뺀다 — 공통 createField({f4}) 가 걸어 주므로
+        //   두 줄 다 있으면 검색 팝업이 **두 번** 열린다. 동작은 전과 같다.
         oInput.addEventListener("keydown", function (e) {
-            if (e.key === "F4") { e.preventDefault(); _invoke("ev_AppValueHelp", "App Search Help (F4)"); }
-            else if (e.key === "Enter") { e.preventDefault(); }
+            if (e.key === "Enter") { e.preventDefault(); }
         });
         oInput.addEventListener("dblclick", function () { oInput.select(); });
 
@@ -1546,130 +1611,191 @@
         return window.U4AUI ? window.U4AUI.footerMarkup("ws10Footer") : "";
     }
 
+    /************************************************************************
+     * WS10 단축키 — 공통 목록의 동작만 화면 버튼으로 덮는다 (WS20·WS30 과 같은 방식)
+     * ----------------------------------------------------------------------
+     * ★[2026-10-21 장군님 지시 「원본처럼 진행해」]
+     * [종전] 여기서 document 에 keydown 을 **따로 걸어** WS10 만 다른 길로 돌았다
+     *   (2026-06-15 변환 때 추가). 그 길은 **원본에 없다** — 원본은 공통 목록
+     *   (getShortCutList) + 공통 등록(setShortCut) 한 길뿐이고, WS20·WS30 도 그 길이다.
+     *   게다가 2026-06-24 에 공통 등록을 되살리면서 이 길을 안 걷어내 **두 길이 겹쳐 있었다.**
+     *   두 길 다 document 의 같은 단계에 걸려, 등록 순서가 바뀌면 WS10 단축키가 통째로 죽는 모양이었다.
+     * [지금] 그 길을 걷어내고, 공통 목록의 **동작(fn)만** 화면 버튼과 같은 것으로 바꾼다.
+     * [왜 바꿔야 하나] 공통 목록의 원본 동작은 UI5 버튼을 sap.ui.getCore().byId(...) 로 찾아
+     *   firePress() 하는 코드다. UI5 를 뺐으므로 늘 빈 값을 받아 **조용히 아무 일도 안 한다.**
+     * [검사] 꾹 누름 · 화면 일치(WS10) · 단축키 잠금 · 처리중 표시 · 메뉴 열림 · 팝업 열림은
+     *   공통 가드(ws_common.js fnRunShortCut)가 본다 — WS20·WS30 과 같은 통로.
+     * [개발 권한] 따로 보지 않는다. 권한이 없으면 그 버튼을 **아예 안 만들므로**
+     *   (_getSubHeaderButtons 의 devOnly) 아래 "버튼이 있나" 검사에서 걸러진다.
+     *   원본의 getVisible() 검사와 같은 결과다.
+     ************************************************************************/
+
+    // 단축키 → 화면 버튼. id·ev 는 위 _getSubHeaderButtons 의 것과 같아야 한다.
+    //   KEY 표기는 공통 목록(ws_common.js aShortCutWS10)의 것과 **글자까지 같아야** 짝이 맞는다.
+    var WS10_SC_MAP = {
+        "Ctrl+F12": { id: "appCreateBtn", ev: "ev_AppCreate", msg: "A01" },    // Application Create
+        "F6": { id: "appChangeBtn", ev: "ev_AppChange", msg: "A02" },          // Application Change
+        "Ctrl+F10": { id: "appDelBtn", ev: "ev_AppDelete", msg: "A03" },       // Application Delete
+        "Shift+F11": { id: "appCopyBtn", ev: "ev_AppCopy", msg: "A04" },       // Application Copy
+        "F7": { id: "displayBtn", ev: "ev_AppDisplay", msg: "A05" },           // Display
+        "F8": { id: "appExecMenuBtn", ev: "ev_AppExec", msg: "A06" },          // Application Execution
+        "Ctrl+F1": { id: "examBtn", ev: "ev_AppExam", msg: "A07" },            // Example Open
+        "Ctrl+F3": { id: "multiPrevBtn", ev: "ev_MultiPrev", msg: "A08" }      // Multi Preview
+        // ※ Ctrl+N(새 창)은 여기 없다 — 공통 목록에도 없고(원본 동일), 앱 글로벌 단축키
+        //   (ws_common.js fnSetCommonShortcut)가 owner 다. 여기 넣으면 새 창이 2개 뜬다.
+    };
+
+    // 화면 버튼이 눌릴 수 있는 상태인가 — 원본 getEnabled()/getVisible() 1:1.
+    function _ws10BtnReady(sBtnId) {
+
+        var oBtn = document.getElementById(sBtnId);
+
+        //개발 권한이 없으면 그 버튼은 아예 안 만든다 → 여기서 걸러진다.
+        if (!oBtn) {
+            return false;
+        }
+
+        if (oBtn.disabled === true) {
+            return false;
+        }
+
+        if (oBtn.style && oBtn.style.display === "none") {
+            return false;
+        }
+
+        return true;
+    }
+
+    /************************************************************************
+     * 단축키 하나 실행 — 그 버튼을 클릭한 것과 **똑같이** 부른다(_invoke = 버튼 click 과 같은 함수).
+     *   로그는 2026-09-11 에 넣은 것을 그대로 가져왔다. 그전에는 조용히 빠져나가서
+     *   "눌렀는데 아무 일도 안 일어난다" 를 로그만 보고 짚을 수 없었다
+     *   (실제로 Shift+F11 어플리케이션 복사가 안 되는 원인을 못 찾아 헤맸다).
+     ************************************************************************/
+    function _ws10RunSc(sKey, oCfg) {
+
+        if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+            U4ALOG.info("SHORTCUT", sKey + " -> " + oCfg.ev, "matched on WS10");
+        }
+
+        if (_ws10BtnReady(oCfg.id) === false) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", sKey + " -> " + oCfg.ev,
+                    "button " + oCfg.id + " missing, hidden or disabled (dev-only button is not created without IS_DEV)");
+            }
+            return;
+        }
+
+        _invoke(oCfg.ev, _txt(oCfg.msg));
+    }
+
+    // 공통 가드에 위임 — WS20·WS30 의 가드와 같은 모양.
+    function _ws10ScGuard(e, sKey, oCfg) {
+
+        if (oAPP.common && typeof oAPP.common.fnRunShortCut === "function") {
+
+            oAPP.common.fnRunShortCut(e, "WS10", function () {
+                _ws10RunSc(sKey, oCfg);
+            });
+
+            return;
+        }
+
+        /********************************************************************
+         * 폴백 — 공통 가드가 아직 안 올라온 때만 탄다. 최소한의 검사만 한다.
+         ********************************************************************/
+
+        try {
+            if (e && e.stopImmediatePropagation) {
+                e.stopImmediatePropagation();
+            }
+        } catch (x) {
+            _caughtWs10Sc(x);
+        }
+
+        try {
+            if (e && e.preventDefault) {
+                e.preventDefault();
+            }
+        } catch (x) {
+            _caughtWs10Sc(x);
+        }
+
+        //꾹 누름 — 한 번만 돈다.
+        if (e && e.repeat === true) {
+            return;
+        }
+
+        //지금 화면이 WS10 이 아니면 안 돈다.
+        try {
+            if (parent.getCurrPage && parent.getCurrPage() !== "WS10") {
+                return;
+            }
+        } catch (x) {
+            _caughtWs10Sc(x);
+        }
+
+        //처리중 표시가 켜져 있으면 안 돈다.
+        try {
+            if (parent.getBusy && parent.getBusy() === "X") {
+                return;
+            }
+        } catch (x) {
+            _caughtWs10Sc(x);
+        }
+
+        try {
+            _ws10RunSc(sKey, oCfg);
+        } catch (err) {
+            console.error("[WS10] shortcut:", err);
+        }
+    }
+
+    //위 폴백의 오류 흔적 — 같은 줄이 다섯 번 되풀이돼 한 곳으로 뺐다.
+    function _caughtWs10Sc(oErr) {
+
+        if (typeof U4ALOG === "undefined" || !U4ALOG.caught) {
+            return;
+        }
+
+        U4ALOG.caught(oErr);
+    }
+
     function _wireShortcuts() {
-        var aMap = [
-            { sc: "ctrl+F12", ev: "ev_AppCreate", t: _txt("A01"), dev: true },
-            { sc: "F6", ev: "ev_AppChange", t: _txt("A02"), dev: true },
-            { sc: "ctrl+F10", ev: "ev_AppDelete", t: _txt("A03"), dev: true },
-            { sc: "shift+F11", ev: "ev_AppCopy", t: _txt("A04"), dev: true },
-            { sc: "F7", ev: "ev_AppDisplay", t: _txt("A05") },
-            { sc: "F8", ev: "ev_AppExec", t: _txt("A06") },
-            { sc: "ctrl+F1", ev: "ev_AppExam", t: _txt("A07") },
-            { sc: "ctrl+F3", ev: "ev_MultiPrev", t: _txt("A08") }
-            // ※ Ctrl+N(새 창)은 여기서 등록하지 않는다 — 앱 글로벌 단축키(ws_common.js
-            //   fnSetCommonShortcut → shortcut.js, ws_main 부팅 시 등록)가 원본 owner 다.
-            //   여기 또 넣으면 두 핸들러가 같이 발화해 새 창이 2개 뜬다(원본 getShortCutList
-            //   에도 Ctrl+N 은 없음 = 페이지 단축키가 아니라 글로벌). 새 창 버튼 클릭은
-            //   ev_NewWindow(WIRED_EVENTS)로 정상 동작, 툴바의 "Ctrl+N" 힌트는 글로벌이 충족.
-        ];
+
         // 중복 등록 방지
         if (oAPP.ws10html._scWired) { return; }
         oAPP.ws10html._scWired = true;
-        document.addEventListener("keydown", function (e) {
 
-            // 자동 반복(키 꾹 누름) 중복 발화 방지.
-            if (e.repeat) {
-                return;
+        // 공통 목록이 없으면 덮을 것이 없다 — WS10 단축키가 전부 죽으므로 조용히 넘기지 않는다.
+        if (!oAPP.common || typeof oAPP.common.getShortCutList !== "function") {
+            console.error("[WS10] getShortCutList not loaded - WS10 shortcuts will not work (check load order: ws_common.js before ws10_html.js)");
+            return;
+        }
+
+        var _ws10GetShortCutList_super = oAPP.common.getShortCutList;
+
+        oAPP.common.getShortCutList = function (sPgNo) {
+
+            var aList = (typeof _ws10GetShortCutList_super === "function") ? _ws10GetShortCutList_super(sPgNo) : [];
+
+            if (sPgNo !== "WS10" || !Array.isArray(aList)) {
+                return aList;
             }
 
-            // ★ WS10 단축키는 WS10 화면에서만 동작한다.
-            //   WS10·WS20 는 같은 문서(#content 교체)라 이 document 리스너가 페이지 이동 후에도
-            //   살아있다 → WS20 에서 같은 키를 눌러도 WS10 액션이 발화되던 버그. 현재 페이지가
-            //   WS10 이 아니면 무시(WS20 undo/redo 핸들러의 getCurrPage 가드와 동일 패턴).
-            try {
-                if (parent.getCurrPage && parent.getCurrPage() !== "WS10") {
-                    return;
-                }
-            } catch (e2) {
-                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
-                    U4ALOG.caught(e2);
-                }
-            }
+            aList.forEach(function (o) {
 
-            // 눌린 키 조합을 만들어 이 화면 단축키 목록에서 찾는다.
-            var parts = [];
+                if (!o) { return; }
 
-            if (e.ctrlKey) {
-                parts.push("ctrl");
-            }
+                var oCfg = WS10_SC_MAP[o.KEY];
 
-            if (e.shiftKey) {
-                parts.push("shift");
-            }
+                if (!oCfg) { return; }
 
-            if (e.altKey) {
-                parts.push("alt");
-            }
+                o.fn = function (e) { _ws10ScGuard(e, o.KEY, oCfg); };
+            });
 
-            parts.push(e.key);
-
-            var sCombo = parts.join("+").toLowerCase();
-            var hit = null;
-
-            for (var i = 0; i < aMap.length; i++) {
-                if (aMap[i].sc.toLowerCase() === sCombo) {
-                    hit = aMap[i];
-                    break;
-                }
-            }
-
-            // 이 화면 단축키가 아니면 여기서 끝(공통 체크까지 가지 않는다 — 글자 입력마다 로그가 쌓이지 않게).
-            if (!hit) {
-                return;
-            }
-
-            /********************************************************************
-             * 단축키 실행 할지 말지 여부 체크 (2026-09-09 추가 — 장군님 지시)
-             * ------------------------------------------------------------------
-             * 원본(as-is) ws_common.js 의 각 단축키 fn 과 동일한 컨셉으로, 공통 함수
-             *   oAPP.common.fnShortCutExeAvaliableCheck() 하나로 아래를 전부 본다.
-             *   ① 단축키 잠금  ② 화면 이동 중  ③ busy(처리중)  ④ 메뉴 열림  ⑤ 팝업 열림
-             *
-             * 왜 고쳤나:
-             *   - 전에는 이 자리에서 팝업만 따로 봤다(document.querySelector("dialog[open]")).
-             *     그런데 busy 표시도 같은 <dialog> 를 showModal() 로 띄우므로(resources/index.js
-             *     setDomBusy) 팝업 검사에 busy 까지 걸려, busy 중에는 단축키가 로그 한 줄 없이
-             *     조용히 삼켜졌다. 원본이라면 "Busy가 켜져 있어서 단축기 실행 불가" 가 찍힌다.
-             *   - 또 ①②④ 는 아예 보지 않아, 화면 전환 중에도 이 화면 단축키가 그냥 실행됐다.
-             *   ※ 팝업 검사는 없어진 게 아니라 공통 함수 안(fnCheckIsDialogOpen)으로 들어갔다.
-             ********************************************************************/
-            /********************************************************************
-             * 로그 (2026-09-11 추가 — 장군님 지시)
-             * ------------------------------------------------------------------
-             * 그전에는 아래 세 갈래가 전부 로그 한 줄 없이 조용히 빠져나가서,
-             * "단축키를 눌렀는데 아무 일도 안 일어난다" 를 로그만 보고는 짚을 수 없었다
-             * (실제로 Shift+F11 어플리케이션 복사가 안 되는 원인을 못 찾아 헤맸다).
-             * 여기까지 왔다는 것은 이 화면의 등록된 단축키가 실제로 눌렸다는 뜻이므로
-             * 빈도가 낮다 → 로그 양 걱정 없음.
-             ********************************************************************/
-            if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
-                U4ALOG.info("SHORTCUT", hit.sc + " -> " + hit.ev, "matched on WS10");
-            }
-
-            var sScChkResult = oAPP.common.fnShortCutExeAvaliableCheck();
-
-            // X 이면 실행 불가
-            if (sScChkResult === "X") {
-                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
-                    U4ALOG.warn("GUARD_EXIT", hit.sc + " -> " + hit.ev,
-                        "blocked by fnShortCutExeAvaliableCheck (shortcut lock / navigating / busy / menu open / dialog open)");
-                }
-                return;
-            }
-
-            //[DM1] 개발 전용 단축키 — 원본과 동일하게 IS_DEV 로 막는다.
-            if (hit.dev && !_isDevAuth()) {
-                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
-                    U4ALOG.warn("GUARD_EXIT", hit.sc + " -> " + hit.ev,
-                        "blocked: dev-only shortcut but IS_DEV is not 'D'");
-                }
-                return;
-            }
-
-            e.preventDefault();
-            _invoke(hit.ev, hit.t);
-
-        });
+            return aList;
+        };
     }
 
 })();

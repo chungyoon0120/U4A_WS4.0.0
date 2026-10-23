@@ -58,15 +58,24 @@
     var oBroad = null, bBusy = false, _bBroadInit = false;
     function _setBusy(bOn, oOpt) {
         bBusy = !!bOn;
-        var oEl = document.getElementById("optBusy");
-        if (!oEl) {   // _toast 와 동일하게 body 에 1회 지연 생성 → _build 의 innerHTML 재작성에 안 지워진다.
-            oEl = document.createElement("div");
-            oEl.id = "optBusy";
-            oEl.className = "u4a-busy";
-            oEl.innerHTML = '<div class="u4a-busy__card"><div class="u4a-busy__spinner"></div><div class="u4a-busy__label"></div></div>';
-            document.body.appendChild(oEl);
+        // ★[2026-10-16 장군님 지시] busy 는 예외 없이 공통(theme/u4a-busy.js)만 쓴다.
+        //   종전에는 이 창이 자체 오버레이 div 를 만들어 썼다 — 모달 팝업(showModal) 뒤로 숨는다.
+        if (window.U4ABusy && typeof U4ABusy.show === "function") {
+            if (bBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+        } else {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+            }
+            var oEl = document.getElementById("optBusy");
+            if (!oEl) {   // _toast 와 동일하게 body 에 1회 지연 생성 → _build 의 innerHTML 재작성에 안 지워진다.
+                oEl = document.createElement("div");
+                oEl.id = "optBusy";
+                oEl.className = "u4a-busy";
+                oEl.innerHTML = '<div class="u4a-busy__card"><div class="u4a-busy__spinner"></div><div class="u4a-busy__label"></div></div>';
+                document.body.appendChild(oEl);
+            }
+            oEl.setAttribute("data-busy", bBusy ? "true" : "false");
         }
-        oEl.setAttribute("data-busy", bBusy ? "true" : "false");
         // 닫기 차단은 closable 을 항상 false 로 유지 + _close/onbeforeunload 의 busy 가드로(공통 browser-window-common-ux).
         try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         // 수신(ISBROAD)으로 켠 건 되쏘지 않는다(수신↔발신 무한 루프 방지). 자체 busy 만 형제창에 전파.
@@ -375,7 +384,7 @@
                 '<div class="u4a-titlebar__spacer"></div>' +
                 '<button type="button" class="u4a-winbtn" id="optWinMin" title="Minimize">' + _fa("window-minimize") + '</button>' +
                 '<button type="button" class="u4a-winbtn" id="optWinMax" title="Maximize">' + _fa("window-maximize") + '</button>' +
-                '<button type="button" class="u4a-winbtn u4a-winbtn--close" id="optWinClose" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
+                '<button type="button" class="u4a-winbtn u4a-winbtn--close" id="optWinClose" data-act="CLOSE" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
               '</header>' +
               // 마스터-디테일 — 공통 스플리터(16번 §4: shell.css .u4a-splitter* 골격+그립 소비).
               //   사이드바=고정 basis 패널, 콘텐츠=잔여(1 1 auto) 마지막 패널, 가운데 공통 그립 바.
@@ -387,8 +396,8 @@
               // 푸터 — 공통 .modal-footer(48px·토큰 보더, bootstrap-skin 단일출처) + 프로젝트 버튼.
               //   다른 모든 팝업과 동일: 강조=u4a-btn--emphasized / 닫기=u4a-btn--negative(Reject 느낌)
               '<div class="modal-footer">' +
-                '<button type="button" class="u4a-btn u4a-btn--emphasized" id="optApply" title="' + (_txt("/U4A/CL_WS_COMMON", "C63") || "Apply") + '">' + _fa("check") + '</button>' +
-                '<button type="button" class="u4a-btn u4a-btn--negative" id="optClose" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
+                '<button type="button" class="u4a-btn u4a-btn--emphasized" id="optApply" data-act="APPLY" title="' + (_txt("/U4A/CL_WS_COMMON", "C63") || "Apply") + '">' + _fa("check") + '</button>' +
+                '<button type="button" class="u4a-btn u4a-btn--negative" id="optClose" data-act="CLOSE" title="' + (_txt("/U4A/CL_WS_COMMON", "A39") || "Close") + '">' + _fa("xmark") + '</button>' +
               '</div>' +
             '</div>';
 

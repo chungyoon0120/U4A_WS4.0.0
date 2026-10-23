@@ -153,6 +153,7 @@
     oState.rows.forEach(function (oRow, i) {
       var oTr = document.createElement("tr");
       oTr.setAttribute("data-key", oRow.KEY);
+      oTr.setAttribute("data-row", String(i));   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
       if (i % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
 
       // (1) 선택 체크박스(멀티선택) — 편집모드에서만.
@@ -161,6 +162,7 @@
         var oChk = document.createElement("input");
         oChk.type = "checkbox";
         oChk.className = "u4aCslRowChk";
+        oChk.setAttribute("data-act", "ROW_CHECK");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
         oChk.setAttribute("data-key", oRow.KEY);
         oChk.addEventListener("change", function () {
           oTr.setAttribute("aria-selected", oChk.checked ? "true" : "false");
@@ -179,6 +181,7 @@
         className: "u4aCslUrlField",
         onInput: function (v) { oRow.URL = v; if (oField.setValueState) { oField.setValueState("none", ""); } }
       });
+      try { oField.input.setAttribute("data-act", "ROW_URL"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
       oRow.field = oField;
       oTdUrl.appendChild(oField.el);
       oTr.appendChild(oTdUrl);
@@ -189,6 +192,7 @@
         var oSw = _el("label", "u4a-switch");
         var oSwIn = document.createElement("input");
         oSwIn.type = "checkbox";
+        oSwIn.setAttribute("data-act", "ROW_EXCLUDE");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
         oSwIn.checked = (oRow.INACTIVE === "X");
         oSwIn.disabled = !bEdit;
         oSwIn.addEventListener("change", function () { oRow.INACTIVE = oSwIn.checked ? "X" : ""; });
@@ -347,6 +351,7 @@
     var oHeaderTitle = oHeader.querySelector("span");
     var oXBtn = _el("button", "u4a-btn-icon");
     oXBtn.type = "button";
+    oXBtn.setAttribute("data-act", "CLOSE");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oXBtn.innerHTML = _fa("xmark");
     oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
     oXBtn.addEventListener("click", function () { lf_close(); });
@@ -360,14 +365,17 @@
     // 아이콘 전용 + 의미색(아웃라인) — Add=accent 파랑(생성) / Del=negative 빨강(삭제) / MIME=중립. 이름은 툴팁.
     var oAddBtn = _el("button", "u4a-btn u4aCslToolBtn u4aCslIcoBtn u4aCslAdd");
     oAddBtn.type = "button";
+    oAddBtn.setAttribute("data-act", "ROW_ADD");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oAddBtn.innerHTML = _fa("file-circle-plus");   // 툴팁(title)은 open 마다 "{TYPE} Link Add" 로 갱신.
     oAddBtn.addEventListener("click", function () { lf_addRow(); });
     var oDelBtn = _el("button", "u4a-btn u4aCslToolBtn u4aCslIcoBtn u4a-btn--negative");
     oDelBtn.type = "button";
+    oDelBtn.setAttribute("data-act", "ROW_DEL");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oDelBtn.innerHTML = _fa("trash");
     oDelBtn.addEventListener("click", function () { lf_delSelected(); });
     var oMimeBtn = _el("button", "u4a-btn u4aCslToolBtn u4aCslMime");
     oMimeBtn.type = "button";
+    oMimeBtn.setAttribute("data-act", "MIME_OPEN");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oMimeBtn.innerHTML = _fa("image") + "<span></span>";
     oMimeBtn.querySelector("span").textContent = _txt("/U4A/CL_WS_COMMON", "A10");   // MIME Repository — 텍스트 유지(아이콘 전용은 Add/Del 만, 사용자 지시).
     oMimeBtn.addEventListener("click", function () { try { oAPP.fn.fnMimeWindowOpener(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });   // 별도창 판(롤백=fnMimeDialogOpener)
@@ -389,6 +397,7 @@
     var oHeadChk = document.createElement("input");
     oHeadChk.type = "checkbox";
     oHeadChk.className = "u4aCslHeadChk";
+    oHeadChk.setAttribute("data-act", "HEAD_CHECK");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oHeadChk.title = "";
     oHeadChk.addEventListener("change", function () {
       var b = oHeadChk.checked;
@@ -428,12 +437,14 @@
     oFoot.appendChild(_el("span", "u4aCslFootSpacer"));
     var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aCslIcoBtn");
     oSaveBtn.type = "button";
+    oSaveBtn.setAttribute("data-act", "SAVE");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oSaveBtn.innerHTML = _fa("check");   // 아이콘만 (텍스트 라벨 제거)
     oSaveBtn.title = _txt("/U4A/CL_WS_COMMON", "A64");   // Save
     oSaveBtn.addEventListener("click", function () { lf_save(); });
     oFoot.appendChild(oSaveBtn);
     var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aCslIcoBtn");
     oCloseBtn.type = "button";
+    oCloseBtn.setAttribute("data-act", "CANCEL");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oCloseBtn.innerHTML = _fa("xmark");
     oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
     oCloseBtn.addEventListener("click", function () { lf_close(); });
@@ -471,6 +482,11 @@
 
     // 최초 1회 생성(DOM 에서 사라졌으면 재생성).
     if (!oUI || !document.body.contains(oUI.dlg)) { oUI = null; lf_build(); }
+
+    // 2026-10-19 자동 테스트 도구가 「지금 열린 창이 CSS 인지 JS 인지」를 값으로 가리게 한다(.analy/21).
+    //   창은 하나를 CSS·JS 가 **같이 쓰므로**(class 가 똑같다) 열 때마다 다시 단다.
+    //   없으면 머리 글자로 판단해야 하고 화면 언어를 바꾸면 깨진다.
+    oUI.dlg.setAttribute("data-act", (TYPE === C_CSS) ? "CSSLINK_DLG" : "JSLINK_DLG");
 
     // 이미 열려 있으면(중복 호출) busy 만 풀고 반환(원본).
     if (oUI.dlg.open) {

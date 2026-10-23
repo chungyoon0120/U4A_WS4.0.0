@@ -52,11 +52,26 @@ var oAPP = {};
         }
 
         // 최소화
+        //   2026-10-14 장군님 지시 - **예제 열기 창에서는 최소화 버튼을 뺀다.**
+        //   그 창은 모달이라, 최소화하면 창은 사라졌는데 뒤 화면은 모달에 막혀 클릭이 안 된다
+        //   → 사용자가 「화면이 먹통」으로 착각한다.
+        //   이 화면은 예제 열기·아이콘 목록·속성 도움말이 같이 쓰므로 **창 종류(OBJTY)로 가른다**
+        //   (나머지 두 창은 종전대로 최소화가 된다).
         var oMin = document.querySelector('#extopenTitlebar [data-action="min"]');
         if (oMin) {
-            oMin.addEventListener("click", function () {
-                try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-            });
+
+            var sWinType = "";
+            try { sWinType = CURRWIN.webContents.getWebPreferences().OBJTY || ""; }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sWinType = ""; }
+
+            if (sWinType === "EXAMPLE") {
+                oMin.remove();
+            } else {
+                oMin.addEventListener("click", function () {
+                    try { CURRWIN.minimize(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                });
+            }
+
         }
 
         // 최대화 / 복원 (아이콘 토글)

@@ -162,6 +162,7 @@
     oState.whit.forEach(function (oRow, i) {
       var oTr = _el("div", "u4aWsecRow");
       oTr.setAttribute("data-key", oRow.KEY);
+      oTr.setAttribute("data-row", String(i));   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
       if (i % 2 === 1) { oTr.setAttribute("data-odd", "true"); }
 
       // 선택 체크박스(멀티선택 — 편집 && Allow-From 일 때만).
@@ -169,6 +170,7 @@
       if (bEditCell) {
         var oChk = document.createElement("input");
         oChk.type = "checkbox"; oChk.className = "u4aWsecRowChk";
+        oChk.setAttribute("data-act", "ROW_CHECK");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
         oChk.setAttribute("data-key", oRow.KEY);
         oChk.addEventListener("change", function () {
           oTr.setAttribute("aria-selected", oChk.checked ? "true" : "false");
@@ -183,6 +185,7 @@
         type: "text", value: oRow.SID || "", readOnly: !bEditCell, className: "u4aWsecCellField",
         onInput: function (v) { oRow.SID = v; }
       });
+      try { oSidF.input.setAttribute("data-act", "ROW_SID"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
       oTr.appendChild(_cell("sid", oSidF.el));
 
       // Target Host URL(SRC).
@@ -190,6 +193,7 @@
         type: "text", value: oRow.SRC || "", readOnly: !bEditCell, className: "u4aWsecCellField",
         onInput: function (v) { oRow.SRC = v; }
       });
+      try { oSrcF.input.setAttribute("data-act", "ROW_SRC"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
       oTr.appendChild(_cell("src", oSrcF.el));
 
       oUI.whitBody.appendChild(oTr);
@@ -327,6 +331,7 @@
     var oDlg = document.createElement("dialog");
     oDlg.id = C_DLG_ID;
     oDlg.className = "u4a-dialog u4aWsecDlg";
+    oDlg.setAttribute("data-act", "WEBSEC_DLG");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
 
     // 헤더 — shield 아이콘 + "[U4A] Web Security Management" + 닫기 X.
     var oHeader = _el("div", "u4a-dialog__header");
@@ -334,6 +339,7 @@
     oHeader.querySelector("span").textContent = "[U4A] " + _txt("/U4A/CL_WS_COMMON", "C86");
     var oXBtn = _el("button", "u4a-btn-icon");
     oXBtn.type = "button";
+    oXBtn.setAttribute("data-act", "CLOSE");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oXBtn.innerHTML = _fa("xmark");
     oXBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
     oXBtn.addEventListener("click", function () { lf_close(); });
@@ -351,6 +357,10 @@
       var oLab = _el("label", "u4a-check");
       var oIn = document.createElement("input");
       oIn.type = "radio"; oIn.name = "u4aWsecAca";
+      // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21).
+      //   ★값은 **서버가 쓰는 칸 이름 그대로**(M01·M02·M03) — 라벨 글자는 화면 언어를 타고,
+      //   새 이름을 지어내면 서버 값과 어긋난다. lf_setAca 가 그 칸을 세운다.
+      oIn.setAttribute("data-act", "ACA_M0" + (i + 1));
       oIn.addEventListener("change", function () { if (oIn.checked) { lf_setAca(i); lf_applyEnable(); } });
       var oSp = _el("span", "", _txt("/U4A/CL_WS_COMMON", a[0]));
       oLab.appendChild(oIn); oLab.appendChild(oSp);
@@ -363,6 +373,7 @@
     var oEulRow = _el("div", "u4aWsecFieldRow");
     oEulRow.appendChild(_el("span", "u4aWsecFieldLbl", _txt("/U4A/CL_WS_COMMON", "C73")));   // External Host URL
     var oEulField = U4AUI.createField({ type: "text", value: "", className: "u4aWsecEul", onInput: function (v) { oState.aca.EUL = v; } });
+    try { oEulField.input.setAttribute("data-act", "ACA_EUL"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oEulRow.appendChild(oEulField.el);
     oAcaPanel.body.appendChild(oEulRow);
     oUI.eulField = oEulField;
@@ -376,6 +387,8 @@
       var oLab = _el("label", "u4a-check");
       var oIn = document.createElement("input");
       oIn.type = "radio"; oIn.name = "u4aWsecXfo";
+      // 2026-10-19 값은 서버가 쓰는 칸 이름 그대로(M01~M04). lf_setXfo 가 그 칸을 세운다.
+      oIn.setAttribute("data-act", "XFO_M0" + (i + 1));
       oIn.addEventListener("change", function () {
         if (!oIn.checked) { return; }
         lf_setXfo(i);
@@ -400,10 +413,12 @@
     oWhitBar.appendChild(_el("span", "u4aWsecBarSpacer"));
     var oAddBtn = _el("button", "u4a-btn u4aWsecToolBtn u4a-btn--accent-outline");
     oAddBtn.type = "button"; oAddBtn.innerHTML = _fa("file-circle-plus");
+    oAddBtn.setAttribute("data-act", "ROW_ADD");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oAddBtn.title = _txt("/U4A/CL_WS_COMMON", "C98");   // Add
     oAddBtn.addEventListener("click", function () { lf_whitAdd(); });
     var oDelBtn = _el("button", "u4a-btn u4aWsecToolBtn u4a-btn--negative");
     oDelBtn.type = "button"; oDelBtn.innerHTML = _fa("trash");
+    oDelBtn.setAttribute("data-act", "ROW_DEL");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oDelBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete
     oDelBtn.addEventListener("click", function () { lf_whitDelSel(); });
     oWhitBar.appendChild(oAddBtn); oWhitBar.appendChild(oDelBtn);
@@ -419,6 +434,7 @@
     var oHChkCell = _cell("chk");
     var oHeadChk = document.createElement("input");
     oHeadChk.type = "checkbox"; oHeadChk.className = "u4aWsecHeadChk";
+    oHeadChk.setAttribute("data-act", "HEAD_CHECK");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oHeadChk.addEventListener("change", function () {
       var b = oHeadChk.checked;
       oUI.whitBody.querySelectorAll(".u4aWsecRowChk").forEach(function (c) {
@@ -447,14 +463,17 @@
     oFoot.appendChild(_el("span", "u4aWsecFootSpacer"));
     var oSaveBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aWsecIcoBtn");
     oSaveBtn.type = "button"; oSaveBtn.innerHTML = _fa("check");   // 아이콘만(텍스트 제거 — Close 와 통일)
+    oSaveBtn.setAttribute("data-act", "SAVE");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oSaveBtn.title = _txt("/U4A/CL_WS_COMMON", "A64");   // Save
     oSaveBtn.addEventListener("click", function () { lf_save(); });
     var oDelFootBtn = _el("button", "u4a-btn u4a-btn--negative u4aWsecIcoBtn");
     oDelFootBtn.type = "button"; oDelFootBtn.innerHTML = _fa("trash");   // 아이콘만
+    oDelFootBtn.setAttribute("data-act", "DELETE_ALL");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oDelFootBtn.title = _txt("/U4A/CL_WS_COMMON", "A03");   // Delete(기본값 리셋)
     oDelFootBtn.addEventListener("click", function () { lf_delReset(); });
     var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aWsecIcoBtn u4aWsecClose");
     oCloseBtn.type = "button"; oCloseBtn.innerHTML = _fa("xmark");
+    oCloseBtn.setAttribute("data-act", "CANCEL");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oCloseBtn.title = _txt("/U4A/CL_WS_COMMON", "A39");   // Close
     oCloseBtn.addEventListener("click", function () { lf_close(); });
     oFoot.appendChild(oSaveBtn); oFoot.appendChild(oDelFootBtn); oFoot.appendChild(oCloseBtn);

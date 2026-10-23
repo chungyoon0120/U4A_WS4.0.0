@@ -4,7 +4,7 @@
  * - file Name : fnDialogPopupOpener.js
  * - file Desc : 각종 Dialog Popup Opener
  * ----------------------------------------------------------------------
- * 오류코드 접두: FDPO / 다음 번호: 007
+ * 오류코드 접두: FDPO / 다음 번호: 008
  *   (표준 SSOT = `.analy/19_예외처리_크리티컬오류_표준.md`,
  *    실무 규약 = `.works/DEV_STANDARD_오류처리.md` §3)
  *
@@ -13,6 +13,9 @@
  *  FDPO-002  오류 목록 창 — 내용을 못 읽음(파일 없음 등, 본 문서 기준)
  *  FDPO-003  오류 목록 창 — 창의 화면 프로세스가 죽음
  *  FDPO-004  오류 목록 창 — 내용을 다 띄우기 前에 닫힘
+ *  FDPO-005  바인딩 별창 — 창 로드/초기 데이터 전달 실패 (아래 본문)
+ *  FDPO-006  Runtime Class Navigator 별창 — 창 로드/초기 데이터 전달 실패 (아래 본문)
+ *  FDPO-007  Package(DEVCLASS) 서치헬프 — 공통 F4 모듈(fnF4SearchHelpOpen) 로드 실패
  *
  * ★[BR55] 2026-09-01 수정 전에는 이 창이 **뜨다가** 실패하면 잠금을 풀어 줄 신호가
  *   영영 오지 않아 편집화면이 흐려진 채 멈췄다(안내도 없음). 백업 = `_fnDialogPopupOpener.js.br55bak`.
@@ -130,6 +133,12 @@
                 if (sT !== sPopupName) { continue; }
                 try { if (oW.isMinimized()) { oW.restore(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 try { oW.focus(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                // 2026-10-14 장군님 지시 (TODO 49) - 이미 열려 있는 창을 다시 불렀을 때도
+                //   호출한 창 가운데로 자리를 다시 잡는다. 이 창은 처음 뜰 때도 가운데로 띄운다
+                //   (아래 ready-to-show / did-finish-load).
+                //   ※ 처음부터 고정 자리로 띄우는 창(Text Search 등)은 대상이 아니다.
+                try { WSUTIL.setParentCenterBounds(REMOTE, oW); }
+                catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 oAPP.common.fnSetBusyLock("");
                 try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
                 return;
@@ -458,16 +467,33 @@
             return;
         }
 
-        if (oAPP.fn.callF4HelpPopup) {
-            //f4 help 팝업 function load 이후 팝업 호출.
-            oAPP.fn.callF4HelpPopup("DEVCLASS", "DEVCLASS", [], [], fnCallback);
+        // ★2026-10-15 수정(구글시트 8번 — Application Copy 팝업 Package 서치헬프 크래시).
+        //   이전: $.getScript("design/js/callF4HelpPopup.js") → UI5 전용 팝업.
+        //   그 파일 336행 sap.ui.getCore().loadLibrary("sap.m") 가 메인 창의 sap 호환 스텁
+        //   (ws_html5_shell.js — loadLibrary 없음)에 걸려 TypeError → Critical Error 창.
+        //   HTML5 대체 = 공통 F4 모듈 fnF4SearchHelpOpen(= changeAppPackagePopup / createApplicationPopup
+        //   과 동일 경로, 백엔드 /f4serverData 계약 동일이라 결과 행 셀키 DEVCLASS/CTEXT 도 그대로).
+        function _openF4() {
+
+            if (typeof oAPP.fn.fnF4SearchHelpOpen !== "function") {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "oAPP.fn.fnF4SearchHelpOpen", "package(DEVCLASS) search help popup cannot open");
+                }
+                // 950 Value help is not available.
+                parent.showMessage(null, 20, "E", "[FDPO-007] " + WSUTIL.getWsMsgClsTxt("", "ZMSG_WS_COMMON_001", "950"));
+                return;
+            }
+
+            oAPP.fn.fnF4SearchHelpOpen({ shlpname: "DEVCLASS", onPick: fnCallback });
+        }
+
+        if (typeof oAPP.fn.fnF4SearchHelpOpen === "function") {
+            _openF4();
             return;
         }
 
-        $.getScript("design/js/callF4HelpPopup.js", function () {
-            //f4 help 팝업 function load 이후 팝업 호출.
-            oAPP.fn.callF4HelpPopup("DEVCLASS", "DEVCLASS", [], [], fnCallback);
-        });
+        // 공통 F4 모듈 미로드 시 지연 로드 후 오픈.
+        oAPP.loadJs("fnF4SearchHelpPopup", _openF4);
 
     }; // end of oAPP.fn.fnPackgSchpPopupOpener
 
@@ -716,15 +742,104 @@
 
         var sPopupName = "BINDPOPUP";
 
-        // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        var oResult = APPCOMMON.getCheckAlreadyOpenWindow(sPopupName);
-        if (oResult.ISOPEN) {
+        /********************************************************************
+         * [parent 제거 — 원본(as-is) 1:1 이식, 2026-10-14]
+         * 원본 U4A_WS3.0.0 fnDialogPopupOpener.js(v3.6.4-3, PES)가 이미
+         *   oBrowserOptions.parent 매핑을 빼고 독립 창으로 띄우도록 바꿔 두었다.
+         *   (까닭: 바인딩 창 안에서 dialog 를 띄우면 호출한 창의 제목줄 드래그가 막힌다)
+         * parent 를 빼면 따라오는 것 3가지도 원본 그대로 가져온다.
+         *   ① 이미 열림 판정 — getChildWindows() 기반 공통 함수로는 못 찾으므로
+         *      호출한 창 id 별로 창 참조를 직접 보관해 재사용한다.
+         *   ② 최소화·숨김 상태면 되살린 뒤 focus.
+         *   ③ 호출한 창이 WS10 으로 돌아가거나 사라질 때 직접 닫는다
+         *      (parent 가 없으면 Electron 이 자동으로 안 닫는다).
+         ********************************************************************/
+        var iBindPopupParentId = CURRWIN.id;
 
-            parent.setBusy("", {});
+        // 끝나는 길이 여럿(재사용·로드완료·창닫힘)이라 busy 해제를 한 곳으로 모은다 — 원본과 동일.
+        function lf_releaseBindPopupBusy() {
+            try { oAPP.common.fnSetBusyLock(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { parent.setBusy("", {}); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" }); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
 
-            // 전체 자식 윈도우에 Busy 끈다.
-            oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
+        function lf_isAliveBindPopupWindow(oWindow) {
+            if (!oWindow) { return false; }
+            try {
+                if (typeof oWindow.isDestroyed === "function" && oWindow.isDestroyed() === true) { return false; }
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+                return false;
+            }
+            return true;
+        }
 
+        function lf_getBindPopupRef() {
+            var oBindPopupMap = oAPP.attr.oBindPopupWindow || {},
+                oBindPopupRef = oBindPopupMap[iBindPopupParentId] || undefined;
+            if (!oBindPopupRef) { return; }
+            if (lf_isAliveBindPopupWindow(oBindPopupRef.WINDOW) !== true) {
+                delete oBindPopupMap[iBindPopupParentId];
+                return;
+            }
+            return oBindPopupRef;
+        }
+
+        function lf_showBindPopupWindow(oWindow) {
+            if (lf_isAliveBindPopupWindow(oWindow) !== true) { return; }
+            try {
+                if (typeof oWindow.isMinimized === "function" && oWindow.isMinimized() === true) { oWindow.restore(); }
+                if (typeof oWindow.isVisible === "function" && oWindow.isVisible() !== true) { oWindow.show(); }
+
+                // 되살릴 때도 호출한 창 가운데로 다시 놓는다 (.analy/16 §2.6.3 - 별도 창은 늘 호출한 창 가운데).
+                //   처음 열 때만 가운데로 잡으면, 사용자가 창을 구석으로 끌어 놓거나 최소화해 둔 뒤
+                //   다시 불렀을 때 엉뚱한 자리에서 나타난다.
+                try { WSUTIL.setParentCenterBounds(REMOTE, oWindow); }
+                catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+
+                oWindow.focus();
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+        function lf_closeBindPopupWindow() {
+            var oBindPopupRef = lf_getBindPopupRef();
+            if (!oBindPopupRef) { return; }
+            try { oBindPopupRef.WINDOW.close(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }
+
+        /**
+         * 호출한 창이 WS10 으로 돌아가면 바인딩 창을 닫는다 — 원본 lf_attachCloseBindPopupOnWs10Move 와 같은 일.
+         *   원본은 UI5 NavContainer 의 attachAfterNavigate 를 썼으나 HTML5 에는 그 이벤트가 없다.
+         *   화면 전환은 전부 oAPP.fn.fnNavTo 한 곳을 지나므로(ws10_html.js) 그 함수를 한 번만 감싼다.
+         */
+        function lf_attachCloseBindPopupOnWs10Move() {
+            if (typeof oAPP.fn.fnNavTo !== "function") {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "oAPP.fn.fnNavTo", "binding window will stay open when the caller returns to WS10");
+                }
+                return;
+            }
+            if (oAPP.attr._bBindPopupCloseOnWs10 === true) { return; }
+            oAPP.attr._bBindPopupCloseOnWs10 = true;
+
+            var fnOrgNavTo = oAPP.fn.fnNavTo;
+            oAPP.fn.fnNavTo = function (sToId) {
+                var vRet = fnOrgNavTo.apply(this, arguments);
+                try {
+                    if (sToId === "WS10") { lf_closeBindPopupWindow(); }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                return vRet;
+            };
+        }
+
+        lf_attachCloseBindPopupOnWs10Move();
+
+        // 같은 호출처에 이미 열려 있으면 새로 띄우지 않고 되살려 focus — 원본과 동일.
+        var oBindPopupRef = lf_getBindPopupRef();
+        if (oBindPopupRef) {
+            lf_showBindPopupWindow(oBindPopupRef.WINDOW);
+            lf_releaseBindPopupBusy();
             return;
         }
 
@@ -744,7 +859,10 @@
         oBrowserOptions.minWidth = 900;
         oBrowserOptions.minHeight = 650;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.parent = CURRWIN;
+        // [parent 제거 — 원본 1:1, 2026-10-14] 원본도 아래 줄을 주석 처리해 독립 창으로 띄운다.
+        //   (바인딩 창 안에서 dialog 를 띄우면 호출한 창의 제목줄 드래그가 막히기 때문)
+        // oBrowserOptions.parent = CURRWIN;
+        oBrowserOptions.modal = false;
         oBrowserOptions.closable = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL;
 
@@ -762,6 +880,19 @@
 
         // 브라우저 오픈
         var oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
+
+        // [parent 제거 — 원본 1:1] change/display 때 자식 창을 한꺼번에 닫는 목록에 넣는다.
+        try {
+            if (CURRWIN && CURRWIN._aChildWinMap) { CURRWIN._aChildWinMap.set(sPopupName, oBrowserWindow); }
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        // [parent 제거 — 원본 1:1] 호출한 창 id 로 창 참조를 보관한다(중복 생성 방지 + 되살려 focus).
+        if (!oAPP.attr.oBindPopupWindow) { oAPP.attr.oBindPopupWindow = {}; }
+        oAPP.attr.oBindPopupWindow[iBindPopupParentId] = {
+            PARENT_ID: iBindPopupParentId,
+            WINDOW: oBrowserWindow
+        };
+
         REMOTEMAIN.enable(oBrowserWindow.webContents);
 
         // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
@@ -910,6 +1041,21 @@
 
             parent.setBusy("", {});
 
+            // [parent 제거 — 원본 1:1] 닫힌 창 참조를 치운다.
+            //   남겨 두면 다음에 열 때 죽은 창을 되살리려 하거나, 자식 창 일괄 처리에서 터진다.
+            try {
+                if (CURRWIN && CURRWIN._aChildWinMap && CURRWIN._aChildWinMap.get(sPopupName) === oBrowserWindow) {
+                    CURRWIN._aChildWinMap.delete(sPopupName);
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+            try {
+                var oMap = oAPP.attr.oBindPopupWindow || {};
+                if (oMap[iBindPopupParentId] && oMap[iBindPopupParentId].WINDOW === oBrowserWindow) {
+                    delete oMap[iBindPopupParentId];
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             oBrowserWindow = null;
 
             //디자인상세화면(20화면) <-> BINDPOPUP 통신 채널 종료.
@@ -922,6 +1068,17 @@
             CURRWIN.focus();
 
         });
+
+        /**
+         * [parent 제거 — 원본 1:1] 호출한 창이 사라질 때 바인딩 창을 직접 닫는다.
+         *   parent 를 매핑했을 때는 Electron 이 같이 닫아 줬지만, 이제는 아무도 안 닫는다.
+         */
+        window.addEventListener('pagehide', function () {
+            var oRef = lf_getBindPopupRef();
+            if (!oRef) { return; }
+            try { oRef.WINDOW.close(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        }, { once: true });
 
     }; // end of oAPP.fn.fnBindWindowPopupOpener
 
@@ -1889,6 +2046,21 @@
 
                 let oIconWindow = oResult.WINDOW;
 
+                // ★[2026-10-16 장군님 지시] 보여 주기 전에 **투명도를 1 로 보장**한다.
+                //   이 창의 닫기는 창을 숨기는 것이라 재사용되는데, 그 사이 「가리는 창」 때문에
+                //   투명도가 0 으로 바뀌어 남아 있으면 show() 만으로는 **투명한 채로 떠서 안 보인다**
+                //   (자동 테스트도 문서 가시성만 보므로 이 상태를 못 잡는다 — 그쪽 확인 2026-10-16).
+                //   ★단 가리는 창이 떠 있는 동안에는 돌리지 않는다 — 그 창 위로 튀어나온다.
+                //     그때는 가리는 창이 닫힐 때 되살리기(ws_fn_02 fnChildWindowShow)가 돌려준다.
+                try {
+                    var bBlkOpen = (oAPP.fn && typeof oAPP.fn.fnIsBlockingDialogOpen === "function")
+                        ? oAPP.fn.fnIsBlockingDialogOpen() : false;
+                    if (bBlkOpen !== true) { oIconWindow.setOpacity(1); }
+                    else if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                        U4ALOG.info("끝남", "child window", "opacity left as is - a blocking dialog is open");
+                    }
+                } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
                 oIconWindow.show();
 
                 // 부모 위치 가운데 배치한다.
@@ -2057,6 +2229,22 @@
             WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
 
             let oIconWindow = oResult.WINDOW;
+
+            // ★[2026-10-16 장군님 지시] 보여 주기 전에 **투명도를 1 로 보장**한다.
+            //   이 창의 닫기는 창을 숨기는 것이라 재사용되는데, 그 사이 「가리는 창」 때문에
+            //   투명도가 0 으로 바뀌어 남아 있으면 show() 만으로는 **투명한 채로 떠서 안 보인다**
+            //   (자동 테스트도 문서 가시성만 보므로 이 상태를 못 잡는다 — 그쪽 확인 2026-10-16).
+            //   ★단 가리는 창이 떠 있는 동안에는 돌리지 않는다 — 그 창 위로 튀어나온다.
+            //     그때는 가리는 창이 닫힐 때 되살리기(ws_fn_02 fnChildWindowShow)가 돌려준다.
+            try {
+                var bBlkOpen = (oAPP.fn && typeof oAPP.fn.fnIsBlockingDialogOpen === "function")
+                    ? oAPP.fn.fnIsBlockingDialogOpen() : false;
+                if (bBlkOpen !== true) { oIconWindow.setOpacity(1); }
+                else if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                    U4ALOG.info("끝남", "child window", "opacity left as is - a blocking dialog is open");
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             oIconWindow.show();
             return;
         }
@@ -2969,6 +3157,14 @@
         if (oResult.ISOPEN) {
 
             oResult.WINDOW.webContents.send('if-extopen-url', sPath);
+
+            // 2026-10-14 장군님 지시 (TODO 49) - 이미 열려 있는 창을 다시 불렀을 때도
+            //   호출한 창 가운데로 자리를 다시 잡는다. 이 창은 처음 뜰 때도 가운데로 띄우므로
+            //   (아래 ready-to-show / did-finish-load) 다시 부를 때 자리가 그대로면 어긋난다.
+            //   ※ 처음부터 고정 자리로 띄우는 창(Text Search 등)은 대상이 아니다.
+            try { WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             return;
 
         }
@@ -3239,6 +3435,13 @@
 
             oResult.WINDOW.webContents.send('if-extopen-url', sPath);
 
+            // 2026-10-14 장군님 지시 (TODO 49) - 이미 열려 있는 창을 다시 불렀을 때도
+            //   호출한 창 가운데로 자리를 다시 잡는다. 이 창은 처음 뜰 때도 가운데로 띄운다
+            //   (fnExternalOpen 의 ready-to-show / did-finish-load).
+            //   ※ 처음부터 고정 자리로 띄우는 창(Text Search 등)은 대상이 아니다.
+            try { WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             // busy 끄고 Lock 풀기
             oAPP.common.fnSetBusyLock("");
 
@@ -3356,6 +3559,14 @@
                 language: oUserInfo.LANGU,
                 sysid: oUserInfo.SYSID,
                 sessionkey: parent.getSessionKey(),
+                // ★ [2026-10-15, 장군님 지시] 이 창에 별창 식별값 2개를 달아 준다.
+                //   공통 getSiblingWindows(ws_common.js)는 webPreferences 에 OBJTY 와 browserkey 가
+                //   **둘 다** 있는 창만 모은다. 종전에는 이 창이 둘 다 없어 **별창 목록에서 통째로 빠졌고**,
+                //   그래서 확인창이 떠도 안 숨고(TODO 44) 뒤로가기 일괄 닫기에도 안 잡혔다.
+                //   OBJTY 는 옛 릴리즈 노트 창(RELNOTEPOP)과 **일부러 다르게** 둔다 — 옛 경로가
+                //   getCheckAlreadyOpenWindow("RELNOTEPOP") 로 이 창을 「이미 열림」으로 잘못 집지 않게.
+                objty: "RELNOTEPOPV2",
+                browserkey: parent.getBrowserKey(),
                 service: {
                     host: parent.getServerHost(),
                     // params:{
@@ -3943,10 +4154,18 @@
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
         const oResult = WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
         if (oResult.ISOPEN) {
+
+            // 2026-10-14 장군님 지시 (TODO 49) - 이미 열려 있는 창을 다시 불렀을 때도
+            //   호출한 창 가운데로 자리를 다시 잡는다. 이 창은 처음 뜰 때도 가운데로 띄운다
+            //   (아래 ready-to-show / did-finish-load).
+            //   ※ 처음부터 고정 자리로 띄우는 창(Text Search 등)은 대상이 아니다.
+            try { WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
             return;
         }
 
-        const 
+        const
             SESSKEY = parent.getSessionKey(),
             BROWSKEY = parent.getBrowserKey(),
             oUserInfo = parent.getUserInfo(),

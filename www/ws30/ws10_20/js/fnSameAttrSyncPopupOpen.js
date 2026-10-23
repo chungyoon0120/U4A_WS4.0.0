@@ -1,3 +1,4 @@
+// 오류코드 접두: SASP / 다음 번호: 004
 /************************************************************************
  * fnSameAttrSyncPopupOpen.js  (HTML5) — WS20 속성 컨텍스트 메뉴 M03 "동일 속성 동기화"
  * ----------------------------------------------------------------------
@@ -98,11 +99,37 @@
     function _isEdit() {
         try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
+    //★[2026-10-20] 미리보기에 반영한 UI 의 OBJID 수집 — 반영이 끝난 뒤 그 부모들의
+    //  렌더링 종료를 한 번에 기다리기 위해(일괄 적용이라 대상이 여러 개다).
+    var _aPrevApplied = [];
     // 미리보기 반영(W2 미변환/미로드면 no-op) — 원본 previewUIsetProp 1:1.
     function _preview(sAttr) {
         if (typeof oAPP.fn.previewUIsetProp === "function") {
             try { oAPP.fn.previewUIsetProp(sAttr); } catch (e) { console.error("[WS20][sameAttr] previewUIsetProp:", e && e.message, e); }
         }
+        try { if (sAttr && sAttr.OBJID && _aPrevApplied.indexOf(sAttr.OBJID) === -1) { _aPrevApplied.push(sAttr.OBJID); } }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    }
+    //★[2026-10-20] 수집한 OBJID 들의 "부모" design tree 줄 목록(중복 제거) — 감지 대상.
+    function _parentNodesOfApplied() {
+        var aOut = [], oSeen = {};
+        try {
+            //★필수 의존성이 없으면 조용히 건너뛰지 않는다 — 코드로 드러낸다.
+            //  (.works/DEV_STANDARD_오류처리.md §4·§6 / 전례 ws_events.js _ws20ReselectSelectedUI)
+            if (typeof oAPP.fn.getTreeData !== "function") {
+                throw new Error("oAPP.fn.getTreeData 미정의(WS20 디자인 트리 모듈 미로드)");
+            }
+            for (var i = 0; i < _aPrevApplied.length; i++) {
+                var oNode = oAPP.fn.getTreeData(_aPrevApplied[i]);
+                if (!oNode || !oNode.POBID || oSeen[oNode.POBID] === true) { continue; }
+                oSeen[oNode.POBID] = true;
+                var oPar = oAPP.fn.getTreeData(oNode.POBID);
+                if (oPar) { aOut.push(oPar); }
+            }
+        } catch (e) {
+            console.error("[SASP-001] sameAttrSync — parent node list for preview render await failed:", e);
+        }
+        return aOut;
     }
 
     /* ── 단일 인스턴스 + 컨텍스트 ─────────────────────────────────────── */
@@ -262,8 +289,10 @@
         // (B) 일반 입력(+ 아이콘·컬러 F4) → 공통 createField.
         var bShowF4 = false;
         try {
+            //★styleClass 도 값도움 대상이다(장군님 지시 2026-10-22) — 아래 _callInputF4Help 설명 참고.
             bShowF4 = (typeof oAPP.fn.attrIsIconProp === "function" && oAPP.fn.attrIsIconProp(is_attr) === true) ||
-                (typeof oAPP.fn.attrIsColorProp === "function" && oAPP.fn.attrIsColorProp(is_attr) === true);
+                (typeof oAPP.fn.attrIsColorProp === "function" && oAPP.fn.attrIsColorProp(is_attr) === true) ||
+                (is_attr.UIATT === "styleClass");
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
         var oFld = U4AUI.createField({
@@ -278,6 +307,7 @@
             f4Disabled: false
         });
         oState.field = oFld;
+
         return oFld.el;
     }
 
@@ -324,15 +354,124 @@
             else { oAPP.loadJs("fnColorPickerPopover", function () { if (oAPP.fn.fnColorPickerOpen) { oAPP.fn.fnColorPickerOpen(oAnchor, oState.value, fnDone); } }); }
             return;
         }
-        //아이콘 프로퍼티 → 콜백형 아이콘 선택기는 HTML5 미변환(fnIconListPopupOpener 는 콜백 없는 외부창).
-        //  임의 대체 금지(원본에 없는 행위 방지) — 행의 미변환 F4 와 동일하게 경고만.
-        console.warn("[W4+ pending] same-property sync icon F4 (callIconListPopup) not converted:", is_attr.UIATT);
+        //styleClass → CSS 클래스 고르기 창을 **값을 돌려주는 모드**로 연다(장군님 지시 2026-10-22).
+        //  ★원본에는 이 창에 styleClass 값도움이 없다 — 단추만 뜨고 눌러도 아무 일이 없었다.
+        //    장군님이 「원본은 없는 게 맞다 우리는 추가해라」 하셔서 **더한 기능**이다.
+        //  ★속성에 바로 쓰지 않는다 — 이 창은 「확인」을 눌러야 고른 줄들에 한꺼번에 반영된다.
+        if (is_attr.UIATT === "styleClass") {
+
+            var fnScDone = function (sVal) {
+                oState.value = (sVal != null) ? sVal : "";
+
+                if (oState.field && oState.field.input) {
+                    oState.field.input.value = oState.value;
+                }
+
+                _onChangeValue();
+            };
+
+            var fnScOpen = function () {
+                oAPP.fn.fnStyleClassPopupOpen(is_attr, { value: oState.value, onChange: fnScDone });
+            };
+
+            if (typeof oAPP.fn.fnStyleClassPopupOpen === "function") {
+                fnScOpen();
+                return;
+            }
+
+            oAPP.loadJs("fnStyleClassPopupOpen", function () {
+
+                if (typeof oAPP.fn.fnStyleClassPopupOpen !== "function") {
+                    if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                        U4ALOG.warn("GUARD_EXIT", "fnStyleClassPopupOpen", "styleClass value help cannot open");
+                    }
+                    return;
+                }
+
+                fnScOpen();
+            });
+
+            return;
+        }
+
+        //아이콘 프로퍼티 → 이미 있는 아이콘 팝업(별창)을 콜백 모드로 연다(장군님 지시 2026-10-22).
+        //  ★그 창은 한 함수로 두 가지로 쓴다 — 콜백을 넘기면 고른 아이콘을 돌려주고(값도움),
+        //    안 넘기면 보여 주기만 한다(fnDialogPopupOpener.js 의 fnIconPreviewPopupOpener 1999행).
+        //    속성 영역 F4(ws_html5_ws20_attr.js)가 이미 같은 길로 간다 — 여기만 빠져 있었다.
+        //  ★서버 허용 게이트(UHAK900630)도 속성 영역과 같게 둔다 — 그 화면이 없는 옛 서버가 있다.
+        var bIcon = false;
+
+        try {
+            bIcon = (typeof oAPP.fn.attrIsIconProp === "function" && oAPP.fn.attrIsIconProp(is_attr) === true);
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        if (bIcon !== true) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "attrIsIconProp", "not a color/icon property, F4 opens nothing: " + is_attr.UIATT);
+            }
+            return;
+        }
+
+        var bAllowed = false;
+
+        try {
+            bAllowed = (oAPP.common.checkWLOList("C", "UHAK900630") === true);
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        if (bAllowed !== true || typeof oAPP.fn.fnIconPreviewPopupOpener !== "function") {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "fnIconPreviewPopupOpener", "icon popup not available on this server (UHAK900630), icon F4 does nothing");
+            }
+            return;
+        }
+
+        //팝업을 여는 동안 조작을 막는다(원본 4065 parent.setBusy).
+        try {
+            parent.setBusy && parent.setBusy("X");
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        oAPP.fn.fnIconPreviewPopupOpener(function (e) {
+
+            try {
+                parent.setBusy && parent.setBusy("");
+            } catch (er) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(er); }
+            }
+
+            //취소(원본 RETCD = "C").
+            if (!e || e.RETCD === "C") {
+                return;
+            }
+
+            var sIcon = e.RTDATA;
+
+            //빈 값은 반영하지 않는다(원본 동일).
+            if (sIcon == null || sIcon === "") {
+                return;
+            }
+
+            oState.value = sIcon;
+
+            if (oState.field && oState.field.input) {
+                oState.field.input.value = sIcon;
+            }
+
+            _onChangeValue();
+        });
     }
 
     /************************************************************************
      * 확인 — 원본 lf_setSyncAttr 1:1. 선택 라인들에 입력값 일괄 동기화.
      ************************************************************************/
-    function lf_setSyncAttr() {
+    //★[2026-10-20] async 로 바꿨다 — 미리보기 렌더링 완료를 await 하기 위해.
+    //  호출처는 714행 확인 버튼 클릭 핸들러 1곳이고 반환값을 쓰지 않는다(아래에서 .catch 로 받는다).
+    async function lf_setSyncAttr() {
         var is_attr = oState.attr;
 
         //확인 직전 텍스트 필드 최신값 확정(blur change 미발화 대비) → 검증 경유.
@@ -351,6 +490,7 @@
             return;
         }
 
+        _aPrevApplied.length = 0;   //★[2026-10-20] 이번 적용에서 미리보기에 반영한 UI 수집 시작.
         try { parent.setBusy && parent.setBusy("X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
@@ -446,6 +586,13 @@
 
             //소스 커밋 + 속성패널 refresh(undo 재-push 금지 = bSkipUndo true).
             oAPP.fn.fnWs20AttrChange(is_attr, "", true);
+
+            //★[2026-10-20 장군님 지시] ① 미리보기에 반영 완료 → ② 렌더링 종료 감지 → ③ busy off(아래 finally).
+            //  일괄 적용이라 반영 대상이 여러 개 → 그 UI 들의 "부모"를 모아 한 번에 기다린다.
+            if (typeof oAPP.fn.fnWs20AwaitPrevRenderMulti !== "function") {
+                throw new Error("[SASP-002] oAPP.fn.fnWs20AwaitPrevRenderMulti 미정의(ws_html5_ws20_prev.js 미로드)");
+            }
+            await oAPP.fn.fnWs20AwaitPrevRenderMulti(_parentNodesOfApplied(), undefined, "sameAttrSync");
         } catch (e) {
             console.error("[WS20][sameAttr] sync handle error:", e && e.message, e);
         } finally {
@@ -711,7 +858,14 @@
         oConfirm.type = "button";
         oConfirm.innerHTML = _fa("check") + "<span></span>";
         oConfirm.querySelector("span").textContent = _msgC("A40");   // Confirm
-        oConfirm.addEventListener("click", function () { lf_setSyncAttr(); });
+        //★[2026-10-20] lf_setSyncAttr 가 async 가 됐다 — 예외를 삼키지 않게 .catch 로 받아 잠금까지 해제.
+        oConfirm.addEventListener("click", function () {
+            lf_setSyncAttr().catch(function (e) {
+                console.error("[SASP-003] sameAttrSync — sync failed, locks released:", e);
+                try { oAPP.fn.setShortcutLock && oAPP.fn.setShortcutLock(false); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+                try { parent.setBusy && parent.setBusy(""); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+            });
+        });
         var oCancel = _el("button", "u4a-btn u4a-btn--negative u4aSaBtn");
         oCancel.type = "button";
         oCancel.innerHTML = _fa("xmark") + "<span></span>";

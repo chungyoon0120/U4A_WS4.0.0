@@ -1,4 +1,4 @@
-// 오류코드 접두: MIMF / 다음 번호: 003
+// 오류코드 접두: MIMF / 다음 번호: 004
 /************************************************************************
  * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
@@ -169,14 +169,47 @@ let oAPP = (function (window) {
         var bOn = (bIsBusy === true || bIsBusy === "X");
         oAPP.attr.isBusy = bOn ? "X" : "";
 
-        // 공통 카드/스피너를 top-layer <dialog> 로 — 생성/가져오기 showModal 모달 위에도 보임.
-        var oB = document.getElementById("mimeBusy");
-        if (oB) {
-            if (bOn) {
-                if (!oB.__cancelBound) { oB.addEventListener("cancel", function (e) { e.preventDefault(); }); oB.__cancelBound = true; } // ESC 닫힘 차단
-                try { if (!oB.open) { oB.showModal(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-            } else {
-                try { if (oB.open) { oB.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        _applyBusyUi();
+
+    }; // end of oAPP.fn.setBusy
+
+    /***********************************************************
+     * ★ [2026-10-15, 장군님 지시] 다른 창이 방송한 바쁨 — **자기 바쁨과 따로** 기억한다.
+     ***********************************************************
+     * 섞어서 한 변수로 쓰면 짝이 어긋난다. 예를 들어 방송 바쁨이 켜져 있는 동안 이 창의 일이
+     * 끝나면서 바쁨을 끄면, 메인은 아직 바쁜데 이 창만 조작이 열린다. 그 반대도 마찬가지다.
+     * → 둘을 따로 두고 **하나라도 켜져 있으면** 바쁨 표시를 띄운다.
+     ***********************************************************/
+    function _setBroadBusy(bOn) {
+
+        oAPP.attr.isBroadBusy = bOn ? "X" : "";
+
+        _applyBusyUi();
+
+    } // end of _setBroadBusy
+
+    /***********************************************************
+     * 자기 바쁨 · 방송 바쁨을 합쳐 실제 화면에 반영한다.
+     ***********************************************************/
+    function _applyBusyUi() {
+
+        var bOn = (oAPP.attr.isBusy === "X" || oAPP.attr.isBroadBusy === "X");
+
+        // [2026-10-16] 공통 busy(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음). 자체 <dialog> 도 공통으로 모은다:
+        if (window.U4ABusy && typeof U4ABusy.show === "function") {
+            if (bOn) { U4ABusy.show(); } else { U4ABusy.hide(); }
+        } else {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local busy dialog");
+            }
+            var oB = document.getElementById("mimeBusy");
+            if (oB) {
+                if (bOn) {
+                    if (!oB.__cancelBound) { oB.addEventListener("cancel", function (e) { e.preventDefault(); }); oB.__cancelBound = true; } // ESC 닫힘 차단
+                    try { if (!oB.open) { oB.showModal(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                } else {
+                    try { if (oB.open) { oB.close(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                }
             }
         }
 
@@ -184,7 +217,55 @@ let oAPP = (function (window) {
         //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
         try { oAPP.CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-    }; // end of oAPP.fn.setBusy
+    } // end of _applyBusyUi
+
+    /***********************************************************
+     * ★ [2026-10-15, 장군님 지시] 다른 창이 방송하는 「바쁨 켜기/끄기」를 받는다.
+     ***********************************************************
+     * 종전에는 이 창에 **받는 쪽이 통째로 없었다**(이 폴더 파일 4개에 BroadcastChannel 0건).
+     * 그래서 다른 별창이 서버로 전송해 메인이 형제 창 전부를 잠가도 **이 창만 조작이 열려 있었다.**
+     * 보내는 쪽은 이미 있었다(창이 뜨면 BUSY_OFF 를 한 번 쏜다) — 받는 쪽만 빠져 짝이 안 맞았다.
+     * 채널 이름·처리 방식은 다른 별창(오류 페이지 에디터 창 등)과 같다.
+     ***********************************************************/
+    oAPP.fn.initBroadcast = function () {
+
+        if (!oAPP.BROWSKEY) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "browserkey",
+                    "MIME repository window does not receive busy broadcasts - it stays operable while other windows are busy");
+            }
+            return;
+        }
+
+        try {
+
+            oAPP.attr.oBroad = new BroadcastChannel("broadcast-to-child-window_" + oAPP.BROWSKEY);
+
+            oAPP.attr.oBroad.onmessage = function (oEvent) {
+
+                var sPrc = oEvent && oEvent.data && oEvent.data.PRCCD;
+
+                if (sPrc === "BUSY_ON") { _setBroadBusy(true); }
+                else if (sPrc === "BUSY_OFF") { _setBroadBusy(false); }
+
+            };
+
+        } catch (e) {
+            console.error("[MIMF-003] subscribing to the busy broadcast channel failed:", e && e.message, e);
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+    }; // end of oAPP.fn.initBroadcast
+
+    oAPP.fn.closeBroadcast = function () {
+
+        try {
+            if (oAPP.attr.oBroad) { oAPP.attr.oBroad.close(); oAPP.attr.oBroad = null; }
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+    }; // end of oAPP.fn.closeBroadcast
 
     // 본문(mime.js)이 부르는 별칭 — 원본 oAPP.common.fnSetBusyLock / parent.setBusy / parent.getBusy 대응.
     oAPP.common.fnSetBusyLock = function (s) { oAPP.fn.setBusy(s === "X" ? "X" : ""); };
@@ -498,6 +579,9 @@ window.onload = function () {
 
     oAPP.fn.fnInitHeader();
     oAPP.fn.attachIpcEvents();
+
+    // ★ 다른 창이 방송하는 「바쁨 켜기/끄기」 구독 — 종전에 통째로 빠져 있었다(2026-10-15).
+    oAPP.fn.initBroadcast();
     oAPP.fn.attachOpenerCloseWatch();   // 메인창 닫히면 함께 종료
 
     // ★ ESC 로 창 전체를 닫지 않는다 — 조회 창(docPopup/versionMng 동일). ESC 는 열린 하위
@@ -521,4 +605,5 @@ window.onbeforeunload = function () {
 window.addEventListener('pagehide', function () {
     oAPP.fn.detachIpcEvents();
     oAPP.fn.detachOpenerCloseWatch();
+    oAPP.fn.closeBroadcast();           // 방송 구독 해제(누수 방지)
 }, { once: true });

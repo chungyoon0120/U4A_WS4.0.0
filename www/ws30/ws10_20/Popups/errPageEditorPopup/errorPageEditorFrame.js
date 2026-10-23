@@ -122,8 +122,19 @@ function _curSaveData() {
 // busy(로딩 오버레이 + 닫기 차단 + 자식창 브로드캐스트). editorFrame 동일.
 function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
-    var oEl = document.getElementById("errBusy");
-    if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }   // 공통 .u4a-busy 토글
+    // [2026-10-16] 공통 busy 로 교체(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음).
+    //   자체 겹침 div 는 이 창 안에서 showModal() 로 연 팝업(top layer) 뒤로 숨는다.
+    //   공통 busy 는 <dialog>.showModal() 이라 어떤 모달 위에도 보이고, 모양을 바꿀 때
+    //   theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
+    if (window.U4ABusy && typeof U4ABusy.show === "function") {
+        if (bBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+    } else {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+        }
+        var oEl = document.getElementById("errBusy");
+        if (oEl) { oEl.setAttribute("data-busy", bBusy ? "true" : "false"); }
+    }
     // ★ closable 은 항상 false 유지(Alt+F4/OS X 차단). 닫기는 닫기버튼(공통 closeWindow)으로만.
     //   (idle 시 closable=true 주면 Alt+F4 가 먹는 버그. 공통 표준 browser-window-common-ux)
     try { CURRWIN.closable = false; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -418,6 +429,51 @@ function _initChrome() {
         try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     _setTitle();
+
+    /**
+     * 최소화·최대화 (장군님 지시 2026-10-13 — 별창 parent 제거 17번).
+     *   원본은 OS 기본 제목줄이라 이 두 버튼이 있었는데, frameless 로 바꾸며 닫기만 남았다.
+     *   8번 기술 문서 창·9번 소스 패턴 창과 같은 짝으로 넣는다.
+     */
+    var oWinMin = document.getElementById("errWinMin");
+    if (oWinMin) {
+        oWinMin.addEventListener("click", function () {
+            try { CURRWIN.minimize(); }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "errWinMin", "minimize button not wired");
+    }
+
+    var oWinMax = document.getElementById("errWinMax");
+    if (oWinMax) {
+
+        // 최대화 상태에 따라 아이콘·tooltip 을 Maximize / Restore 로 바꾼다.
+        var _syncMaxBtn = function () {
+            try {
+                var bMax = CURRWIN.isMaximized(),
+                    oIcon = oWinMax.querySelector("i");
+                oWinMax.title = bMax ? "Restore" : "Maximize";
+                if (oIcon) { oIcon.className = bMax ? "fa-solid fa-window-restore" : "fa-solid fa-window-maximize"; }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        };
+
+        oWinMax.addEventListener("click", function () {
+            try { if (CURRWIN.isMaximized()) { CURRWIN.unmaximize(); } else { CURRWIN.maximize(); } }
+            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+
+        // 더블클릭 등 창 쪽에서 바뀌는 경우도 아이콘을 맞춘다.
+        try {
+            CURRWIN.on("maximize", _syncMaxBtn);
+            CURRWIN.on("unmaximize", _syncMaxBtn);
+        } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        _syncMaxBtn();
+
+    } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+        U4ALOG.warn("GUARD_EXIT", "errWinMax", "maximize button not wired");
+    }
 
     // 닫기(타이틀바 X) — busy 중 차단 + 공통 closeWindow(창이 closable:false 라 직접 close() 불가).
     var oClose = document.querySelector('#errTitlebar [data-action="close"]');

@@ -140,12 +140,14 @@
     var oDlg = document.createElement("dialog");
     oDlg.id = C_DLG_ID;
     oDlg.className = "u4a-dialog u4aDumpDlg";
+    oDlg.setAttribute("data-act", "DUMPWRITE_DLG");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
 
     // ── 헤더 — bug 아이콘 + "덤프 이력 기록"(492) + 닫기 X ──
     var oHeader = _el("div", "u4a-dialog__header");
     oHeader.innerHTML = _fa("bug") + "<span></span>";
     oHeader.querySelector("span").textContent = _wsTxt("492");   // 덤프 이력 기록
     var oXBtn = _el("button", "u4a-btn-icon");
+    oXBtn.setAttribute("data-act", "CLOSE");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oXBtn.type = "button";
     oXBtn.innerHTML = _fa("xmark");
     oXBtn.title = _wsTxt("056") || _wsTxt("003");   // close / Cancel
@@ -222,6 +224,7 @@
     var oSwitch = _el("label", "u4a-switch u4aDumpSwitch");
     var oSwIn = document.createElement("input");
     oSwIn.type = "checkbox";
+    oSwIn.setAttribute("data-act", "TOGGLE");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oSwitch.appendChild(oSwIn);
     oSwitch.appendChild(_el("span", "u4a-switch__slider"));
     oToggleBar.appendChild(oSwitch);
@@ -237,11 +240,13 @@
     var oFoot = _el("div", "u4a-dialog__footer u4aDumpFoot");
     oFoot.appendChild(_el("span", "u4aDumpFootSpacer"));
     var oApplyBtn = _el("button", "u4a-btn u4a-btn--emphasized u4aDumpIcoBtn");
+    oApplyBtn.setAttribute("data-act", "APPLY");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oApplyBtn.type = "button";
     oApplyBtn.innerHTML = _fa("check");
     oApplyBtn.title = _wsTxt("232");   // Apply
     oApplyBtn.addEventListener("click", function () { lf_apply(); });
     var oCloseBtn = _el("button", "u4a-btn u4a-btn--negative u4aDumpIcoBtn");
+    oCloseBtn.setAttribute("data-act", "CANCEL");   // 2026-10-19 자동 테스트 도구가 집을 이름(.analy/21)
     oCloseBtn.type = "button";
     oCloseBtn.innerHTML = _fa("xmark");
     oCloseBtn.title = _wsTxt("056") || _wsTxt("003");   // close / Cancel

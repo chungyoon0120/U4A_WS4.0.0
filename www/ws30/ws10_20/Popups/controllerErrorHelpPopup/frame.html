@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- ===================================================================
+         컨트롤러 실행 오류 점검사항 — 공통 헤더 틀
+         -------------------------------------------------------------------
+         이 파일은 "창틀"만 맡는다. 본문(설명서)은 아래 iframe 이
+         www/help/controllerClass/<언어>/index.html 을 그대로 띄운다.
+
+         왜 설명서 파일을 직접 안 열고 이 틀을 두나 (2026-10-14 장군님 지시 — TODO 47):
+           종전에는 설명서 HTML 을 창에 바로 띄워 OS 기본 창틀이 나왔다. 공통 제목줄도,
+           테마도 안 따라갔다. 설명서는 언어별로 여러 벌이고 자기 CSS·이미지를 상대 경로로
+           참조하므로, 설명서는 손대지 않고 iframe 으로 내렸다(오류 페이지 미리보기 창과 같은 식).
+         =================================================================== -->
+    <link rel="stylesheet" href="../../theme/tokens.css">
+    <link rel="stylesheet" href="../../theme/shell.css">
+    <link rel="stylesheet" href="../../theme/bootstrap-skin.css">
+    <link rel="stylesheet" href="../../../../lib/fontawesome/7.2.0/css/all.min.css">
+
+    <script src="../../theme/theme-api.js"></script>
+    <script src="../../theme/u4a-ui.js"></script>
+
+    <!-- [흰색 플래시 방지 — 동기] opener 가 넘긴 THEME/BGCOL/TITLE 을 첫 페인트 전에 적용 (.analy/16 §2.6) -->
+    <script>
+        (function () {
+            try {
+                var q = new URLSearchParams(location.search);
+                var sBg = q.get("BGCOL");
+                if (sBg) { document.documentElement.style.setProperty("--boot-bg", sBg); }
+                var sTheme = q.get("THEME");
+                if (sTheme && window.U4ATheme) {
+                    window.U4ATheme.apply(window.U4ATheme.normalize ? window.U4ATheme.normalize(sTheme) : sTheme);
+                }
+                var sTitle = q.get("TITLE");
+                if (sTitle) { document.title = sTitle; }
+            } catch (e) { /* frame.js 에서 재적용 */ }
+        })();
+    </script>
+
+    <style>
+        /* 창 골격 = [공통 .u4a-titlebar] + [본문 iframe]. 헤더 높이는 공통(shell.css)이 정한다. */
+        html, body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            background: var(--boot-bg, var(--app-bg));
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .u4aCehBody {
+            flex: 1 1 auto;
+            min-height: 0;
+            /* 등장 효과 = 본문 CSS opacity transition (.analy/16 §2.6) — 네이티브 창 페이드 미사용. */
+            opacity: 0;
+            transition: opacity .3s;
+        }
+
+        .u4aCehBody.u4aCehShown {
+            opacity: 1;
+        }
+
+        .u4aCehBody > iframe {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .u4aCehBody { transition: none; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ===== 공통 커스텀 헤더(frameless) — 로고/제목/최소화/최대화/닫기 ===== -->
+    <header class="u4a-titlebar" id="cehTitlebar">
+        <img class="u4a-titlebar__logo" id="cehLogo" src="" alt="U4A">
+        <span class="u4a-titlebar__title" id="cehTitle"></span>
+        <span class="u4a-titlebar__spacer"></span>
+        <button type="button" class="u4a-winbtn" id="cehWinMin" data-action="minimize" title="Minimize"><i class="fa-solid fa-window-minimize"></i></button>
+        <button type="button" class="u4a-winbtn" id="cehWinMax" data-action="maximize" title="Maximize"><i class="fa-solid fa-window-maximize"></i></button>
+        <button type="button" class="u4a-winbtn u4a-winbtn--close" id="cehWinClose" data-action="close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+
+    <!-- ===== 본문 = 설명서 HTML (언어별 파일을 그대로 띄운다. src 는 frame.js 가 넣는다) ===== -->
+    <div class="u4aCehBody" id="cehBody">
+        <iframe id="cehFrame" name="cehFrame"></iframe>
+    </div>
+
+    <script>
+        /************************************************************************
+         * 에러 감지 (다른 별창과 동일 짝)
+         ************************************************************************/
+        var REMOTE = require('@electron/remote'),
+            PATH = REMOTE.require('path'),
+            APP = REMOTE.app,
+            APPPATH = APP.getAppPath(),
+            PATHINFOURL = PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"),
+            PATHINFO = require(PATHINFOURL),
+            WSERR = require(PATHINFO.WSTRYCATCH);
+
+        var zconsole = WSERR(window, document, console);
+    </script>
+
+    <script src="frame.js"></script>
+</body>
+
+</html>

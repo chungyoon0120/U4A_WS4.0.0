@@ -1,3 +1,4 @@
+// 오류코드 접두: SCPO / 다음 번호: 002
 /************************************************************************
  * fnStyleClassPopupOpen.js  (HTML5) — WS20 속성 styleClass 값도움(F4) "미리 정의된 CSS"
  * ----------------------------------------------------------------------
@@ -116,6 +117,10 @@
     function _msgM(sNr) {   // /U4A/MSG_WS (294=검색 placeholder, 174=결과 없음)
         return APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", sNr);
     }
+    //  /U4A/CL_WS_COMMON (A40=Confirm) — 다른 창들의 확인 단추와 같은 키를 쓴다.
+    function _clsC(sNr) {
+        return APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", sNr);
+    }
     function _isEdit() {
         try { return oAPP.attr.oModel.oData.IS_EDIT === true; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return false; }
     }
@@ -151,21 +156,90 @@
         var v = (oCtx && oCtx.attr && oCtx.attr.UIATV != null) ? String(oCtx.attr.UIATV) : "";
         return v.split(/\s+/).filter(Boolean);
     }
-    function _commit(aCls) {
+    /**
+     * 고른 목록을 **이 창 안에서만** 바꾼다 — 밖으로는 아무것도 내보내지 않는다.
+     *
+     * ★[2026-10-22 장군님 지시] 「css 를 선택하자마자 콜백을 해서 속성에 값을 넣고 있는데,
+     *   그렇게 하지 말고 … 팝업 하단에 표시되면서 **확인 버튼을 누를 때만** 선택한 css 정보를
+     *   콜백해 주는 방식으로」.
+     *   그래서 고른 것은 아래 값 바에 쌓여 보이기만 하고, 실제 반영은 푸터의 「확인」(_confirm)이 한다.
+     *   덤: 전에는 클래스를 더하거나 뺄 때마다 미리보기를 다시 그리고 undo 에도 한 번씩 쌓였는데,
+     *       이제 **확인 한 번에 한 번만** 일어난다.
+     */
+    function _applyLocal(aCls) {
         //추가/삭제로 목록을 재구성해도 보던 구획을 잃지 않게 스크롤 위치 보존.
         var iY = (oUI && oUI.content) ? oUI.content.scrollTop : 0;
-        var sPrev = (oCtx.attr.UIATV != null) ? oCtx.attr.UIATV : "";   // 커밋 실패 시 롤백용
+
         oCtx.attr.UIATV = aCls.join(" ");
-        try {
-            oAPP.fn.fnWs20AttrChange(oCtx.attr, "INPUT");
-        } catch (e) {
-            //★ 커밋(undo/미리보기/모델동기화) 실패 시 값 롤백 — 안 하면 화면만 성공처럼 보이고
-            //  실제 저장(prev._T_0015)엔 반영 안 돼 UI-데이터 불일치가 남는다(코덱스 검수 지적).
-            oCtx.attr.UIATV = sPrev;
-            console.error("[WS20][styleClass] commit failed - value rolled back:", e && e.message, e);
-        }
+
         _renderAll();
-        if (oUI && oUI.content) { oUI.content.scrollTop = iY; _spy(); }
+
+        if (oUI && oUI.content) {
+            oUI.content.scrollTop = iY;
+            _spy();
+        }
+    }
+
+    /**
+     * 확인 — 고른 값을 **한 번에** 넘기고 닫는다.
+     *   · 값을 돌려주는 모드  → 콜백에 값만 넘긴다(속성은 부르는 쪽이 알아서 한다).
+     *   · 그냥 쓰는 모드      → 진짜 속성 행에 넣고 커밋한다(속성 영역 F4).
+     */
+    function _confirm() {
+
+        if (!oCtx) {
+            return;
+        }
+
+        //조회 모드이거나 바인딩 표현식이면 바꿀 것이 없다 — 그냥 닫는다(값 바도 숨어 있다).
+        if (oCtx.edit !== true || oCtx.attr.ISBND === "X") {
+            _close();
+            return;
+        }
+
+        var sVal = (oCtx.attr.UIATV != null) ? oCtx.attr.UIATV : "";
+
+        if (typeof oCtx.onChange === "function") {
+
+            try {
+                oCtx.onChange(sVal);
+            } catch (e) {
+                console.error("[SCPO-002] styleClass onChange failed:", e && e.message, e);
+            }
+
+            _close();
+            return;
+        }
+
+        var oSrc = oCtx.src;
+
+        if (!oSrc) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "styleClass confirm", "no target attribute row, value not applied");
+            }
+            _close();
+            return;
+        }
+
+        var sPrev = (oSrc.UIATV != null) ? oSrc.UIATV : "";   // 커밋 실패 시 롤백용
+
+        oSrc.UIATV = sVal;
+
+        //★[2026-10-20 장군님 지시] fnWs20AttrChange 는 async 다(미리보기 렌더링 완료를 기다린다).
+        //  그 함수는 **스스로 catch 해서 로그를 남기고 실패를 false 로 돌려준다**(reject 하지 않는다).
+        //  ★커밋(undo/미리보기/모델동기화) 실패 시 값 롤백 — 안 하면 화면만 성공처럼 보이고
+        //    실제 저장(prev._T_0015)엔 반영 안 돼 UI-데이터 불일치가 남는다.
+        oAPP.fn.fnWs20AttrChange(oSrc, "INPUT").then(function (bOk) {
+
+            //false = 그 함수 안에서 예외가 났다 → 값 되돌리기.
+            //  undefined 는 조기 종료(재진입 가드 등)로 예외가 아니다 → 되돌리지 않는다.
+            if (bOk === false) {
+                oSrc.UIATV = sPrev;
+                console.error("[SCPO-001] styleClass commit failed - value rolled back to:", sPrev);
+            }
+        });
+
+        _close();
     }
     function _addClass(sCls) {
         if (!sCls || !oCtx || oCtx.edit !== true) { return; }
@@ -173,12 +247,12 @@
         var a = _curArr();
         if (a.indexOf(sCls) !== -1) { return; }
         a.push(sCls);
-        _commit(a);
+        _applyLocal(a);
     }
     function _removeClass(sCls) {
         if (!sCls || !oCtx || oCtx.edit !== true) { return; }
         if (oCtx.attr.ISBND === "X") { return; }   // 바인딩 보호(_addClass 와 대칭) — 바인딩 표현식 손상 방지
-        _commit(_curArr().filter(function (c) { return c !== sCls; }));
+        _applyLocal(_curArr().filter(function (c) { return c !== sCls; }));
     }
 
     /* ── 적용 값 바 ── */
@@ -442,15 +516,27 @@
 
         oDlg.appendChild(oBody);
 
-        //푸터 — 닫기.
+        //푸터 — 확인 + 닫기.
+        //  ★확인을 눌러야 고른 클래스가 반영된다(장군님 지시 2026-10-22). 닫기는 반영 없이 닫는다.
         var oFoot = _el("div", "u4a-dialog__footer u4aScsFoot");
         oFoot.appendChild(_el("span", "u4aScsFootSpacer"));
+
+        var oOk = _el("button", "u4a-btn u4a-btn--emphasized u4aScsBtn");
+        oOk.type = "button";
+        oOk.innerHTML = _fa("check") + "<span></span>";
+        oOk.querySelector("span").textContent = _clsC("A40");
+        oOk.setAttribute("data-act", "STYLECLASS_CONFIRM");
+        oOk.addEventListener("click", function () { _confirm(); });
+        oFoot.appendChild(oOk);
+
         var oClose = _el("button", "u4a-btn u4a-btn--negative u4aScsBtn");
         oClose.type = "button";
         oClose.innerHTML = _fa("xmark") + "<span></span>";
         oClose.querySelector("span").textContent = _wsC("056");
+        oClose.setAttribute("data-act", "STYLECLASS_CLOSE");
         oClose.addEventListener("click", function () { _close(); });
         oFoot.appendChild(oClose);
+
         oDlg.appendChild(oFoot);
 
         oDlg.addEventListener("cancel", function (e) { e.preventDefault(); _close(); });
@@ -470,13 +556,46 @@
     /************************************************************************
      * 공개 진입점.
      ************************************************************************/
-    oAPP.fn.fnStyleClassPopupOpen = function (is_attr) {
+    /**
+     * @param {object}   is_attr  대상 속성 행.
+     * @param {object}   [opts]   값을 돌려받는 모드일 때만 넘긴다.
+     *   @param {string}   opts.value     시작 값(속성 행이 아니라 이 값에서 시작한다).
+     *   @param {function} opts.onChange  **확인**을 누르면 고른 값 전체를 돌려준다.
+     *
+     * ★고르는 동안에는 아무 데도 쓰지 않는다(장군님 지시 2026-10-22).
+     *   고른 클래스는 창 아래 값 바에 쌓여 보이고, **「확인」을 눌러야** 밖으로 나간다.
+     *   · opts 없이     = 확인 때 **속성값에 쓰고 커밋**한다(속성 영역 F4).
+     *   · opts 와 함께  = 확인 때 **쓰지 않고 값만 돌려준다**. 「동일 속성 동기화」 창처럼
+     *     그 창의 「확인」이 따로 있어 거기서 여러 줄에 반영하는 화면에서 쓴다.
+     *   ※ 원본에는 「동일 속성 동기화」 창에 이 값도움이 없다. 단추만 뜨고 눌러도 아무 일이 없었다.
+     *     장군님 지시로 **더한 기능**이다 — 「원본은 없는 게 맞다 우리는 추가해라」.
+     */
+    oAPP.fn.fnStyleClassPopupOpen = function (is_attr, opts) {
         if (!is_attr) { return; }
 
         if (!oUI || !oUI.dlg || !document.body.contains(oUI.dlg)) { oUI = null; _build(); }
         if (oUI.dlg.open) { return; }
 
-        oCtx = { attr: is_attr, edit: _isEdit() };
+        var fnOnChange = null;
+
+        if (opts && typeof opts.onChange === "function") {
+            fnOnChange = opts.onChange;
+        }
+
+        //화면에서 고치는 값은 **언제나 임시 그릇**에 담는다 — 「확인」을 눌러야 밖으로 나간다.
+        //  이 파일이 그 그릇에서 쓰는 칸은 UIATV 와 ISBND 둘뿐이다(파일 안 전수 확인).
+        var sStart = (is_attr.UIATV != null) ? String(is_attr.UIATV) : "";
+
+        if (fnOnChange && opts.value != null) {
+            sStart = String(opts.value);
+        }
+
+        oCtx = {
+            src: is_attr,
+            attr: { UIATV: sStart, ISBND: is_attr.ISBND },
+            edit: _isEdit(),
+            onChange: fnOnChange
+        };
         oUI.dlg.querySelector(".u4aScsBody").setAttribute("data-edit", oCtx.edit ? "true" : "false");
 
         //검색 초기화.

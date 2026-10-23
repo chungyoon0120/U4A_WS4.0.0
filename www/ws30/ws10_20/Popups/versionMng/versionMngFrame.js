@@ -117,18 +117,31 @@ function _toHost(oMsg) {
    (없으면 생성, 비면 :empty 로 자동 숨김 — 구 BusyDialog DESC). */
 function _setBusy(bOn, oOpt) {
     bBusy = !!bOn;
-    var oDom = document.getElementById("vmBusy");
-    if (oDom) {
-        oDom.dataset.busy = bBusy ? "true" : "false";
-        var oCard = oDom.querySelector(".u4a-busy__card");
-        if (oCard) {
-            var oLabel = oCard.querySelector(".u4a-busy__label");
-            if (!oLabel) {
-                oLabel = document.createElement("div");
-                oLabel.className = "u4a-busy__label";
-                oCard.appendChild(oLabel);
+    // [2026-10-16] 공통 busy 로 교체(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음).
+    //   공통 busy 는 <dialog>.showModal() = top layer 라 모달 팝업 위에도 보이고,
+    //   모양을 바꿀 때 theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
+    //   안내 문구(DESC)는 공통 busy 가 가진 글자 자리에 그대로 넣는다.
+    if (window.U4ABusy && typeof U4ABusy.show === "function") {
+        if (bBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+        var oTxt = document.getElementById("u4aWsBusyText");
+        if (oTxt) { oTxt.textContent = (bBusy && oOpt && oOpt.DESC) ? oOpt.DESC : ""; }
+    } else {
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local overlay (hidden behind modals)");
+        }
+        var oDom = document.getElementById("vmBusy");
+        if (oDom) {
+            oDom.dataset.busy = bBusy ? "true" : "false";
+            var oCard = oDom.querySelector(".u4a-busy__card");
+            if (oCard) {
+                var oLabel = oCard.querySelector(".u4a-busy__label");
+                if (!oLabel) {
+                    oLabel = document.createElement("div");
+                    oLabel.className = "u4a-busy__label";
+                    oCard.appendChild(oLabel);
+                }
+                oLabel.textContent = (bBusy && oOpt && oOpt.DESC) ? oOpt.DESC : "";
             }
-            oLabel.textContent = (bBusy && oOpt && oOpt.DESC) ? oOpt.DESC : "";
         }
     }
     // busy 동안 입력 차단(공통 패턴) — 오버레이가 data-busy 시 pointer-events:auto 라 카드는 살아있음.

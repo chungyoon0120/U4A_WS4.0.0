@@ -254,7 +254,42 @@
             _open();
         }
 
-        oCombo.addEventListener("click", () => { _requestOpen(); });
+        /* [2026-10-15] 값 글자를 마우스로 끌어 복사할 수 있게 한다(구글 시트 19번).
+         *   원본 UI5 는 sap.m.ComboBox = <input> 이라 값 글자를 끌어서 복사할 수 있었다.
+         *   HTML5 공통 콤보는 div+span 이라 전역 user-select:none(.analy/16 §2.9)에 걸려 복사가 안 됐다.
+         *   → 값 글자(.u4a-combo__text)만 shell.css 에서 user-select:text 로 열고, 여기서는
+         *     "끌어서 글자를 고른 경우"에만 목록 열기를 건너뛴다. 그냥 클릭(안 움직임)은 그대로 열린다.
+         *   판정 조건 2개를 모두 만족할 때만 억제 → 손떨림으로 클릭이 죽지 않게 한다.
+         *     ① 누른 지점에서 4px 이상 움직였다  ② 콤보 값 글자 안에 실제 선택 영역이 생겼다 */
+        let iDownX = 0, iDownY = 0, bTextPicked = false;
+
+        oCombo.addEventListener("mousedown", (ev) => {
+            iDownX = ev.clientX; iDownY = ev.clientY; bTextPicked = false;
+        });
+
+        oCombo.addEventListener("mouseup", (ev) => {
+            if (Math.abs(ev.clientX - iDownX) + Math.abs(ev.clientY - iDownY) < 4) { return; }
+            try {
+                // 끌기 시작점이 글자 밖(값 칸 여백)일 수 있으므로 시작·끝 어느 쪽이든 이 칸 안이면 인정한다.
+                const oSel = window.getSelection();
+                const bInCombo = !!oSel && (
+                    (oSel.anchorNode && oCombo.contains(oSel.anchorNode)) ||
+                    (oSel.focusNode && oCombo.contains(oSel.focusNode))
+                );
+                if (bInCombo && String(oSel) !== "") { bTextPicked = true; }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        });
+
+        oCombo.addEventListener("click", () => {
+            if (bTextPicked) {
+                bTextPicked = false;
+                if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+                    U4ALOG.info("SKIP_OPEN", "combo list", "value text was selected by drag for copy");
+                }
+                return;
+            }
+            _requestOpen();
+        });
         // [opt:closeOnDblClick] 값칸을 두 번 클릭하면 목록을 열지 않는다(기본 꺼짐, 하위호환).
         //   두 번 클릭 신호는 실제로 두 번 눌렀을 때만 오므로 한 번 클릭 열기(위 click)는 그대로 유지된다.
         //   첫 클릭이 이미 시작한 비동기 열기는 억제 플래그로 취소하고, 이미 열렸으면 닫는다.
@@ -488,6 +523,52 @@
         return _sync;
     }
 
+    /************************************************************************
+     * 입력칸에 F4(값도움) 키를 건다 — 커서를 둔 채 F4 를 누르면 **그 칸의 돋보기를 누른 것과 같다.**
+     * ----------------------------------------------------------------------
+     * ★[2026-10-22 장군님 지시] 「input 에 돋보기 아이콘 누르면 검색 팝업 나오는 경우는,
+     *   그 input 에 커서를 대고 F4 를 누르면 검색 팝업이 나오게」 — 원본 UI5 Input 의
+     *   valueHelpRequest 와 같은 느낌이다. **앞으로 돋보기를 다는 칸은 전부 이것을 건다.**
+     *
+     * createField({ f4: ... }) 로 만든 칸은 **자동으로 걸린다.**
+     * 돋보기를 손으로 만든 화면만 이 함수를 직접 부른다.
+     *
+     * @param {HTMLInputElement|HTMLTextAreaElement} oInput 대상 입력
+     * @param {HTMLElement} oVhBtn 그 칸의 값도움(돋보기) 버튼
+     ************************************************************************/
+    function attachF4(oInput, oVhBtn) {
+
+        if (!oInput || !oVhBtn) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("GUARD_EXIT", "attachF4", "input or value-help button missing, F4 will not open the search popup");
+            }
+            return;
+        }
+
+        oInput.addEventListener("keydown", function (ev) {
+
+            if (ev.key !== "F4") {
+                return;
+            }
+
+            //꾹 누름 — 한 번만 연다.
+            if (ev.repeat === true) {
+                return;
+            }
+
+            //버튼이 꺼져 있으면 돋보기를 눌러도 안 열리는 상태다 — F4 도 안 열리게 맞춘다.
+            if (oVhBtn.disabled === true) {
+                return;
+            }
+
+            //브라우저 기본 동작과 바깥 단축키로 새지 않게 막는다.
+            ev.preventDefault();
+            ev.stopPropagation();
+
+            oVhBtn.click();
+        });
+    }
+
     /* 창 이동은 네이티브 -webkit-app-region:drag(shell.css .u4a-titlebar)로 처리한다.
        JS 포인터 기반 창 이동은 근본 해결이 안 돼(레이아웃/컴포지팅 문제) 제거함.
        iframe stale 은 호스트의 _kickHostDragRegion 가, 컴포지팅 레이어는 CSS 정적화로
@@ -539,6 +620,9 @@
         oOvf.type = "button";
         oOvf.title = opt.title || "More";
         oOvf.innerHTML = opt.btnHtml || _fa("ellipsis");
+        // 2026-10-13 — 자동 테스트 도구가 집을 이름(.analy/21 §2.3 "이름을 받는 옵션").
+        //   ⋯ 는 툴바마다 하나씩 생기므로 이름을 받은 것에만 붙인다. 안 주면 전과 똑같다.
+        if (opt.act) { oOvf.setAttribute("data-act", opt.act); }
         if (!opt.noOvfAutoMargin) { oOvf.style.marginLeft = "auto"; }
         oOvf.hidden = true;
         oBar.appendChild(oOvf);
@@ -606,6 +690,11 @@
                     if (bDis === undefined) { bDis = el.disabled === true || el.classList.contains("is-disabled"); }
                     const oItem = _el("div", "u4a-menu__item");
                     oItem.setAttribute("role", "menuitem");
+                    // 2026-10-14 — 접혀서 ⋯ 안으로 들어간 줄에도 원래 버튼의 이름을 복사한다
+                    //   (.analy/21 — 창이 좁아 접힌 단추도 자동 테스트 도구가 이름으로 집게).
+                    //   menuItem 이 one.act 를 주면 그것을 쓰고, 없으면 원래 버튼 것을 쓴다.
+                    const sMiAct = one.act || (el.getAttribute ? el.getAttribute("data-act") : null);
+                    if (sMiAct) { oItem.setAttribute("data-act", sMiAct); }
                     if (bDis) { oItem.setAttribute("aria-disabled", "true"); }
                     oItem.innerHTML = (one.iconHtml || "<i></i>") + '<span class="u4a-menu__item-text"></span>';
                     oItem.querySelector(".u4a-menu__item-text").textContent = one.text;
@@ -744,6 +833,26 @@
 
         let oTip = null, iTimer = null, oCur = null;
         let _mx = 0, _my = 0;   // 최근 커서 좌표(텍스트가 안 보일 수 있는 영역은 커서 기준 배치)
+
+        // ★ tooltip 글자 수 상한 (장군님 지시 2026-10-13 — 크래시 실측 뒤 적용).
+        //   아주 긴 글을 그대로 넣으면 이 tooltip 은 max-width: 24rem + 줄바꿈 허용이라
+        //   그 글자 전부의 줄바꿈 위치를 계산한다 → renderer 가 죽는다.
+        //   실측(CDP, 2026-10-13): UI 개인화 목록의 866,250 글자짜리 줄에 마우스를 올리면 1초 안에 사망.
+        //   native title 은 브라우저가 알아서 앞부분만 보여 준다(그래서 원본 UI5 는 멀쩡하다) —
+        //   같은 안전장치를 공통에 둔다.
+        const TIP_MAX_CHARS = 1000;
+        let _bTipClampLogged = false;
+        function _clampTip(s) {
+            if (typeof s !== "string" || s.length <= TIP_MAX_CHARS) { return s; }
+            if (!_bTipClampLogged) {
+                _bTipClampLogged = true;   // 같은 줄에 올릴 때마다 쌓이지 않게 한 번만
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("TEXT_CLAMP", "tooltip text " + s.length + " chars",
+                        "shown first " + TIP_MAX_CHARS + " chars only (renderer dies on very long tooltip)");
+                }
+            }
+            return s.slice(0, TIP_MAX_CHARS) + " …";
+        }
         document.addEventListener("mousemove", function (e) { _mx = e.clientX; _my = e.clientY; }, true);
 
         function _ensure() {
@@ -776,7 +885,7 @@
             //   드래그/리사이즈가 transform 이 아닌 position:fixed+left/top 라 부모를 바꿔도 fixed 좌표계는 그대로.
             const oTipHost = (el.closest && el.closest("dialog[open]")) || document.body;
             if (t.parentNode !== oTipHost) { oTipHost.appendChild(t); }
-            t.textContent = sText;
+            t.textContent = _clampTip(sText);
             // ★ 측정 전 중립 위치(0,0)로 리셋 — 이전 표시 위치(예: 뷰포트 우측 끝)에 둔 채로 재면
             //   브라우저가 오른쪽 경계에 맞춰 텍스트를 미리 개행해 offsetWidth 가 좁게 잡히고
             //   (white-space:normal + overflow-wrap:anywhere 라 "More"→"Mo/re" 처럼 짧은 단어도 쪼개짐),
@@ -803,8 +912,9 @@
             if (!el.hasAttribute("title")) { return; }
             const sT = el.getAttribute("title");
             if (sT) {
-                el.setAttribute("data-tip", sT);
-                if (!el.hasAttribute("aria-label")) { el.setAttribute("aria-label", sT); }
+                const sTipT = _clampTip(sT);
+                el.setAttribute("data-tip", sTipT);
+                if (!el.hasAttribute("aria-label")) { el.setAttribute("aria-label", sTipT); }
             }
             el.removeAttribute("title");
         }
@@ -816,7 +926,7 @@
             if (cell.hasAttribute("data-tip") || cell.hasAttribute("title")) { return cell; }
             const s = (cell.textContent || "").trim();
             if (!s) { return null; }
-            cell.setAttribute("data-tip", s);
+            cell.setAttribute("data-tip", _clampTip(s));
             cell.setAttribute("data-tip-trunc", "");   // 잘렸을 때만 표시(_show 가 scrollWidth 검사)
             return cell;
         }
@@ -1069,8 +1179,13 @@
         if (_SPLIT_RESET_ON || typeof document === "undefined") { return; }
         _SPLIT_RESET_ON = true;
 
+        // ★옆 패널은 드래그와 똑같은 기준으로 찾는다 — 바와 "숨겨진 패널"을 건너뛴다.
+        //   예전엔 바로 옆 형제를 그대로 썼다. 그래서 화면 커스터마이징으로 숨긴 영역에 home 을 적고,
+        //   정작 드래그로 폭이 바뀌는 패널은 기록이 없어 더블클릭 복귀가 아무것도 안 했다
+        //   (2026-10-22 바인딩 팝업 실제 사고 — DESIGN TREE 숨긴 뒤 더블클릭 먹통).
+        //   바가 연달아 있을 때 바 자체를 home 대상으로 잡던 것도 같이 없어진다.
         function _sides(oBar) {
-            return [oBar.previousElementSibling, oBar.nextElementSibling].filter(Boolean);
+            return [_splitPrevPane(oBar), _splitNextPane(oBar)].filter(Boolean);
         }
         // 드래그 시작 직전(capture) — 인접 패널의 현재 flex 를 home 으로 1회 기록(미기록 시에만)
         document.addEventListener("mousedown", function (e) {
@@ -1151,14 +1266,32 @@
         if (/\d(?:\.\d+)?px/.test(el.style.flex || "")) { return false; }   // 드래그로 px 고정됨
         return (parseFloat(getComputedStyle(el).flexGrow) > 0);
     }
+    // 숨겨진 패널(화면 커스터마이징으로 display:none 된 영역)은 드래그 대상에서 뺀다.
+    //   창 크기 변경 때 쓰는 _splitReclampOne 은 이미 숨김 패널을 빼고 세는데, 드래그 쪽만 빠져 있었다.
+    //   실제 사고(2026-10-22, 바인딩 팝업 — 구글시트와 별개로 장군님이 직접 잡아 주신 건):
+    //   가운데 DESIGN TREE 를 숨기자 남은 바가 숨어 있는 가운데 패널을 붙잡아 양옆 어느 쪽도 안 움직였다.
+    //   원본 UI5 는 커스터마이징 때 활성 영역만으로 sap.ui.layout.Splitter 를 다시 만들어 이 상황 자체가 없다.
+    function _splitIsHidden(el) {
+        if (!el || el.nodeType !== 1) {
+            return false;
+        }
+        return getComputedStyle(el).display === "none";
+    }
+    function _splitSkip(el) {
+        return _splitIsBar(el) || _splitIsHidden(el);
+    }
     function _splitPrevPane(oBar) {
         var el = oBar.previousElementSibling;
-        while (el && _splitIsBar(el)) { el = el.previousElementSibling; }
+        while (el && _splitSkip(el)) {
+            el = el.previousElementSibling;
+        }
         return el;
     }
     function _splitNextPane(oBar) {
         var el = oBar.nextElementSibling;
-        while (el && _splitIsBar(el)) { el = el.nextElementSibling; }
+        while (el && _splitSkip(el)) {
+            el = el.nextElementSibling;
+        }
         return el;
     }
     // oA·oB 를 뺀 나머지 패널의 현재 크기 합(단일 패널 조절 시 상한 계산용).
@@ -1242,8 +1375,14 @@
             document.removeEventListener("mouseup", lf_up);
         }
         oBar.addEventListener("mousedown", function (ev) {
-            oA = _splitPrevPane(oBar); oB = _splitNextPane(oBar);
-            if (!oA || !oB) { return; }
+            oA = _splitPrevPane(oBar);
+            oB = _splitNextPane(oBar);
+            if (!oA || !oB) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("GUARD_EXIT", "wireSplitter", "no visible pane on one side of the bar: drag ignored");
+                }
+                return;
+            }
             bDrag = true;
             iStart = ev[AX.pos];
             iLastPos = iStart;
@@ -1813,7 +1952,8 @@
     function _footerEl(elOrId) { return (typeof elOrId === "string") ? document.getElementById(elOrId) : elOrId; }
     function footerMarkup(sId) {
         return '' +
-            '<div class="u4a-footer" id="' + (sId || "") + '" data-show="false" data-type="I">' +
+            // 2026-10-14 — 자동 테스트 도구는 보이는 것 하나를 집으므로 화면마다 같은 이름을 쓴다(.analy/21).
+            '<div class="u4a-footer" id="' + (sId || "") + '" data-act="FOOTER" data-show="false" data-type="I">' +
             '<span class="u4a-footer__icon"><i class="fa-solid fa-circle-info"></i></span>' +
             '<span class="u4a-footer__text"></span>' +
             '<button class="u4a-btn-icon u4a-footer__close" type="button" title="Close" data-u4a-footer-close><i class="fa-solid fa-xmark"></i></button>' +
@@ -1925,6 +2065,18 @@
             if (opts.f4Disabled) { oVh.disabled = true; }
             oVh.addEventListener("click", () => { try { opts.f4(oInput); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } });
             oWrap.appendChild(oVh); iTrail++;
+            //커서를 둔 채 F4 를 누르면 이 단추를 누른 것과 같게 한다(2026-10-22 장군님 지시).
+            //  ★걸리는 모양은 **두 가지뿐**이다 — 장군님 기준 2026-10-22
+            //  (「돋보기 아이콘 또는 네모 겹친 아이콘을 만들 경우에는 반드시 F4 를」).
+            //    · 돋보기(magnifying-glass) — 기본값
+            //    · 겹친 네모(clone) — 속성값 칸 등에서 쓴다
+            //  폴더·이미지처럼 그 밖의 모양을 쓰는 값도움은 대상이 아니다.
+            var sF4Mark = String(opts.f4IconHtml || opts.f4Icon || "magnifying-glass");
+            var bF4Key = (sF4Mark.indexOf("magnifying-glass") >= 0) || (sF4Mark.indexOf("clone") >= 0);
+
+            if (bF4Key) {
+                attachF4(oInput, oVh);
+            }
         }
         if (iTrail) { oWrap.setAttribute("data-trail", String(iTrail)); }
 
@@ -2712,13 +2864,50 @@
                 if (n > 1) { w += iGap * (n - 1); }
                 return w + 2;
             }
-            var iTxt = _measTxt((oCell.textContent || "").trim(), oCell);
-            var iEl = 0;   // 텍스트 없는 요소(상태 아이콘 등) 폭 가산
-            for (var e = 0; e < oCell.children.length; e++) {
-                var el = oCell.children[e];
-                if (!(el.textContent || "").trim()) { iEl += el.getBoundingClientRect().width; }
+            if (!oCell.children.length) {
+                return _measTxt((oCell.textContent || "").trim(), oCell) + iPad + 4;
             }
-            return iTxt + iEl + iPad + 4;
+            return _natW(oCell) + 4;
+        }
+        // 요소 하나의 자연폭(px) — 자식이 있으면 안쪽까지 들어가 더한다.
+        //   ★글자가 있는 자식도 반드시 들어간다(장군님 지적 2026-10-22 「... 이 나오면 안 되잖아」).
+        //   예전엔 "글자 없는 자식"만 실측해 더했다. 그래서 아이콘과 글자를 한 덩어리로 감싼 칸
+        //   (바인딩 팝업 「유형」 = 상태 아이콘 + 유형 글자)은 그 덩어리에 글자가 있다는 이유로 통째로
+        //   건너뛰어, 아이콘 폭과 사이 간격(gap)이 빠진 폭이 나왔다 → 자동 맞춤 뒤에도 "..." 이 남았다.
+        //   ★글자는 measureText 로 잰다 — 이미 말줄임된 rect 를 쓰면 잘린 폭에 그대로 맞춰 버린다.
+        //   ★글자 없는 요소(아이콘)만 rect 로 잰다 — 글리프 폭은 그 요소의 실측값이 정확하다.
+        function _natW(el) {
+            var cs = getComputedStyle(el);
+            var iPad = _px(cs.paddingLeft) + _px(cs.paddingRight);
+            var iBor = _px(cs.borderLeftWidth) + _px(cs.borderRightWidth);
+            var iMar = _px(cs.marginLeft) + _px(cs.marginRight);
+            var aKids = el.children;
+            if (!aKids.length) {
+                var sTxt = (el.textContent || "").trim();
+                if (!sTxt) {
+                    return el.getBoundingClientRect().width + iMar;
+                }
+                return _measTxt(sTxt, el) + iPad + iBor + iMar;
+            }
+            var iSum = 0;
+            for (var k = 0; k < aKids.length; k++) {
+                iSum += _natW(aKids[k]);
+            }
+            if (aKids.length > 1) {
+                iSum += _px(cs.columnGap || cs.gap) * (aKids.length - 1);
+            }
+            // 자식 요소 사이에 끼어 있는 맨 글자도 더한다(두 가지가 섞인 칸).
+            for (var t = 0; t < el.childNodes.length; t++) {
+                var oNd = el.childNodes[t];
+                if (oNd.nodeType !== 3) {
+                    continue;
+                }
+                var sOwn = (oNd.nodeValue || "").trim();
+                if (sOwn) {
+                    iSum += _measTxt(sOwn, el);
+                }
+            }
+            return iSum + iPad + iBor + iMar;
         }
         function _autoW(iCol) {
             var oH = aHeadCells[iCol];
@@ -3292,6 +3481,7 @@
         createSelect: createSelect,
         attachSuggest: attachSuggest,
         attachClear: attachClear,
+        attachF4: attachF4,
         attachOverflow: attachOverflow,
         openColumnMenu: openColumnMenu,
         closeColumnMenu: closeColumnMenu,

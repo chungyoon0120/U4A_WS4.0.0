@@ -3021,6 +3021,21 @@ oWS.sMark.fn_mark = function(oMarkUi) {
 	oWS.sMark.oSelectedUi = oMarkUi;
 	addPreviewMarkCustomData(oMarkUi, oWS.sMark.selectedAttr, oWS.sMark.selectedValue);
 
+	// 2026-10-20: Busy dialog이 focus를 점유해도 선택 UI의 DOM 위치로 이동한다.
+	// DOM이 없는 UI는 스크롤만 생략하고 기존 focus/선택 표시/Promise 흐름을 유지한다.
+	//
+	// ★[2026-10-20 장군님 지시] 원본(design/preview/index.js 3017행)은 scrollIntoView(true) =
+	//   block:"start" 라 **이미 화면에 보이는 UI 를 골라도 무조건 맨 위로 끌어올린다**.
+	//   장군님 지적: 「미리보기 쪽에 UI 선택하면 이미 보이는 화면인데 왜 스크롤을 최상위로 이동시키냐」.
+	//   block/inline 을 "nearest" 로 바꾼다 — 이미 보이면 움직이지 않고, 가려졌을 때만 최소로 움직인다.
+	//   ※ 이 한 줄만 원본과 다르다. 선택 표시·focus·Promise 흐름은 원본 그대로다.
+	if (typeof oMarkUi.getDomRef === "function") {
+		var oDom = oMarkUi.getDomRef();
+		if (typeof oDom?.scrollIntoView === "function") {
+			oDom.scrollIntoView({ block: "nearest", inline: "nearest" });
+		}
+	}
+
 	/**
 	 * @since   2026-07-01 01:18:45
 	 * @version vNAN-NAN
@@ -3145,6 +3160,12 @@ function setUiLoadLibraries(it_lib) {
 
 
 function lf_excepRequire(UIOBK) {
+	// 2026-10-20: UHAK901500은 서버 UI5 소스를 수정한 패치다.
+	// WS3와 동일하게 패치 적용 시 이 함수의 기존 예외 보정 전체를 생략한다.
+	// 미적용 서버에서는 아래 WS4 보정 본문(DOM 방어 포함)을 그대로 사용한다.
+	if (parent.oAPP.common.checkWLOList("C", "UHAK901500") === true) {
+		return;
+	}
 	switch (UIOBK) {
 		case "UO00455":
 			
@@ -4851,6 +4872,13 @@ function GF_ConvPropIntConvArray(sVal) {
 }
 
 
+// 2026-10-20: UA032.FLD07에서 참조하는 변환 함수. 실패는 기존 호출부가 기록/처리한다.
+// JSON.parse의 반환값 및 예외 계약을 유지하며 입력값을 별도 로그로 남기지 않는다.
+function GF_ConvPropJsonParse(sVal) {
+	return JSON.parse(sVal);
+}
+
+
 function GF_ConvSap2jsIndex(sVal) {
 	return sVal - 1;
 }
@@ -5023,6 +5051,10 @@ function _get_skeleton_tag_info(opt) {
 
 parent.oAPP.fn.exceptionRespGridLayout = function(UIOBK) {
 	if (UIOBK !== "UO01008") {
+		return;
+	}
+	// 2026-10-20: 서버 패치가 반영된 renderer를 클라이언트 보정으로 덮어쓰지 않는다.
+	if (parent.oAPP.common.checkWLOList("C", "UHAK901500") === true) {
 		return;
 	}
 	
@@ -5758,145 +5790,165 @@ function start() {
 			definePreviewControl();
 			defineU4ACustomData();
 
-			
-			(function() {
-				sap.ui.requireSync("sap/ui/layout/ResponsiveFlowLayout");
+			// 2026-10-20: 서버 UI5 패치가 없을 때만 기존 초기화 보정을 실행한다.
+			// 등록/테마/완료 처리와 WS4.0 Busy 보호는 이 조건 밖에서 항상 실행한다.
+			// 패치/라이브러리가 변경되면 기존 prototype 보정 초기화를 위해 새 iframe이 필요하다.
+			if (parent.oAPP.common.checkWLOList("C", "UHAK901500") !== true) {
+				(function() {
+					sap.ui.requireSync("sap/ui/layout/ResponsiveFlowLayout");
 				
-				sap.ui.layout.ResponsiveFlowLayout.prototype.exit = function() {
-					delete this._rows;
-					if (this._IntervalCall) {
-						clearTimeout(this._IntervalCall);
-						this._IntervalCall = void 0
-					}
-					this._resizeHandlerComputeWidthsID && sap.ui.core.ResizeHandler.deregister(this._resizeHandlerComputeWidthsID);
-					delete this._resizeHandlerComputeWidthsID;
-					if (this.oRm) {
-						this.oRm.destroy();
-						delete this.oRm
-					}
-					delete this._$DomRef;
-					delete this._oDomRef;
-					delete this._iRowCounter
-				};
-				sap.ui.requireSync("sap/m/Carousel");
+					sap.ui.layout.ResponsiveFlowLayout.prototype.exit = function() {
+						delete this._rows;
+						if (this._IntervalCall) {
+							clearTimeout(this._IntervalCall);
+							this._IntervalCall = void 0
+						}
+						this._resizeHandlerComputeWidthsID && sap.ui.core.ResizeHandler.deregister(this._resizeHandlerComputeWidthsID);
+						delete this._resizeHandlerComputeWidthsID;
+						if (this.oRm) {
+							this.oRm.destroy();
+							delete this.oRm
+						}
+						delete this._$DomRef;
+						delete this._oDomRef;
+						delete this._iRowCounter
+					};
+					sap.ui.requireSync("sap/m/Carousel");
 				
-				sap.m.Carousel.prototype._changePage = function(t, e) {
-					this._adjustHUDVisibility(e);
-					var i = this.getActivePage(),
-						a = this.getPages();
-					t && (i = a[t - 1] && a[t - 1].getId());
-					var s = a[e - 1] && a[e - 1].getId();
-					this.setAssociation("activePage", s, !0);
-					var o = this._getPageIndicatorText(e);
-					sap.ui.Device.system.desktop || jQuery(document.activeElement).trigger("blur");
-					this._oMobifyCarousel && this._oMobifyCarousel.getShouldFireEvent() && this.firePageChanged({
-						oldActivePageId: i,
-						newActivePageId: s,
-						activePages: this._aAllActivePagesIndexes
-					});
+					sap.m.Carousel.prototype._changePage = function(t, e) {
+						this._adjustHUDVisibility(e);
+						var i = this.getActivePage(),
+							a = this.getPages();
+						t && (i = a[t - 1] && a[t - 1].getId());
+						var s = a[e - 1] && a[e - 1].getId();
+						this.setAssociation("activePage", s, !0);
+						var o = this._getPageIndicatorText(e);
+						sap.ui.Device.system.desktop || jQuery(document.activeElement).trigger("blur");
+						this._oMobifyCarousel && this._oMobifyCarousel.getShouldFireEvent() && this.firePageChanged({
+							oldActivePageId: i,
+							newActivePageId: s,
+							activePages: this._aAllActivePagesIndexes
+						});
 					
-					this._oMobifyCarousel.$items.each((function(t, e) {
-						e.className.indexOf("sapMCrslActive") <= -1 ? e.setAttribute("aria-selected", !1) : e.setAttribute("aria-selected", !0)
-					}));
-					this.$("slide-number").text(o)
-				};
-				sap.ui.requireSync("sap/uxap/ObjectPageSubSection");
+						this._oMobifyCarousel.$items.each((function(t, e) {
+							e.className.indexOf("sapMCrslActive") <= -1 ? e.setAttribute("aria-selected", !1) : e.setAttribute("aria-selected", !0)
+						}));
+						this.$("slide-number").text(o)
+					};
+					sap.ui.requireSync("sap/uxap/ObjectPageSubSection");
 				
-				sap.uxap.ObjectPageSubSection.prototype._applyLayout = function(t) {
-					var e, i = this._getGrid(),
-						a = i.getAggregation("content"),
-						s = this.getMode(),
-						o = t.getSubSectionLayout(),
-						r = this._calculateLayoutConfiguration(o, t),
-						n = this.getBlocks(),
-						u = n.concat(this.getMoreBlocks());
-					this._oLayoutConfig = r;
-					this._resetLayoutData(u);
-					e = s === sap.uxap.ObjectPageSubSectionMode.Expanded ? u : n;
-					this._assignLayoutData(e, r);
-					try {
+					sap.uxap.ObjectPageSubSection.prototype._applyLayout = function(t) {
+						var e, i = this._getGrid(),
+							a = i.getAggregation("content"),
+							s = this.getMode(),
+							o = t.getSubSectionLayout(),
+							r = this._calculateLayoutConfiguration(o, t),
+							n = this.getBlocks(),
+							u = n.concat(this.getMoreBlocks());
+						this._oLayoutConfig = r;
+						this._resetLayoutData(u);
+						e = s === sap.uxap.ObjectPageSubSectionMode.Expanded ? u : n;
+						this._assignLayoutData(e, r);
+						try {
 						
-						e.forEach((function(t) {
-							if (!0 !== t.isDestroyed()) {
-								this._setBlockMode(t, s);
-								(!a || a && a.indexOf(t) < 0) && i.addAggregation("content", t, !0)
-							}
-						}), this)
-					} catch (t) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(t); }}
-					return this
-				};
-				sap.ui.requireSync("sap/ui/layout/form/SimpleForm");
-				
-				sap.ui.layout.form.SimpleForm.prototype._suggestTitleId = function(t) {
-					var e = this.getAggregation("form") || void 0;
-					if (void 0 !== e) {
-						e._suggestTitleId(t);
+							e.forEach((function(t) {
+								if (!0 !== t.isDestroyed()) {
+									this._setBlockMode(t, s);
+									(!a || a && a.indexOf(t) < 0) && i.addAggregation("content", t, !0)
+								}
+							}), this)
+						} catch (t) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(t); }}
 						return this
-					}
-				};
-				sap.ui.requireSync("sap/f/GridContainer");
+					};
+					sap.ui.requireSync("sap/ui/layout/form/SimpleForm");
 				
-				sap.f.GridContainer.prototype._applyItemAutoRows = function(t) {
+					sap.ui.layout.form.SimpleForm.prototype._suggestTitleId = function(t) {
+						var e = this.getAggregation("form") || void 0;
+						if (void 0 !== e) {
+							e._suggestTitleId(t);
+							return this
+						}
+					};
+					sap.ui.requireSync("sap/f/GridContainer");
+				
+					sap.f.GridContainer.prototype._applyItemAutoRows = function(t) {
 					
-					function e(t) {
-						var e = t.getLayoutData();
-						return !e?.isA?.("sap.f.GridContainerItemLayoutData") || (!e || e.hasAutoHeight())
-					}
+						function e(t) {
+							var e = t.getLayoutData();
+							return !e?.isA?.("sap.f.GridContainerItemLayoutData") || (!e || e.hasAutoHeight())
+						}
 
 					
-					function i(t) {
-						var e = t.getLayoutData();
-						return e?.isA?.("sap.f.GridContainerItemLayoutData") && e ? e.getActualRows() : 1
-					}
-					if (this._isRenderingFinished && !this.getInlineBlockLayout() && e(t)) {
-						var a = t.$(),
-							s = this.getActiveLayoutSettings(),
-							o = t.getDomRef() ? t.getDomRef().getBoundingClientRect().height : 0,
-							r = s.calculateRowsForItem(Math.round(o));
-						if (!r)
-							return;
-						a.parent().css({
-							"grid-row": "span " + Math.max(r, i(t))
-						})
-					}
-				};
+						function i(t) {
+							var e = t.getLayoutData();
+							return e?.isA?.("sap.f.GridContainerItemLayoutData") && e ? e.getActualRows() : 1
+						}
+						if (this._isRenderingFinished && !this.getInlineBlockLayout() && e(t)) {
+							var a = t.$(),
+								s = this.getActiveLayoutSettings(),
+								o = t.getDomRef() ? t.getDomRef().getBoundingClientRect().height : 0,
+								r = s.calculateRowsForItem(Math.round(o));
+							if (!r)
+								return;
+							a.parent().css({
+								"grid-row": "span " + Math.max(r, i(t))
+							})
+						}
+					};
 				
-				sap.f.GridContainer.prototype._enforceMaxColumns = function() {
+					sap.f.GridContainer.prototype._enforceMaxColumns = function() {
 					
-					function t(t) {
-						var e = t.getLayoutData();
-						return e?.isA?.("sap.f.GridContainerItemLayoutData") && e ? e.getColumns() : 1
-					}
-					var e, i = this.getActiveLayoutSettings();
-					if (i) {
-						e = i.getComputedColumnsCount(this.$().innerWidth());
+						function t(t) {
+							var e = t.getLayoutData();
+							return e?.isA?.("sap.f.GridContainerItemLayoutData") && e ? e.getColumns() : 1
+						}
+						var e, i = this.getActiveLayoutSettings();
+						if (i) {
+							e = i.getComputedColumnsCount(this.$().innerWidth());
 						
-						e && this.getItems().forEach((function(i) {
-							i.$().parent().css("grid-column", "span " + Math.min(t(i), e))
-						}))
-					}
-				};
-				sap.ui.requireSync("sap/f/GridContainerRenderer");
+							e && this.getItems().forEach((function(i) {
+								i.$().parent().css("grid-column", "span " + Math.min(t(i), e))
+							}))
+						}
+					};
+					sap.ui.requireSync("sap/f/GridContainerRenderer");
 				
-				sap.f.GridContainerRenderer.getStylesForItemWrapper = function(t, e) {
-					var i, a, s = new Map,
-						o = ["sapFGridContainerItemWrapper"],
-						r = t.getLayoutData();
-					if (r?.isA?.("sap.f.GridContainerItemLayoutData")) {
-						i = r.getColumns();
-						a = e.getActiveLayoutSettings().getColumns();
-						i && a && (i = Math.min(i, a));
-						i && s.set("grid-column", "span " + i);
-						e.getInlineBlockLayout() ? s.set("grid-row", "span 1") : (r.getRows() || r.getMinRows()) && s.set("grid-row", "span " + r.getActualRows());
-						r.hasAutoHeight() || o.push("sapFGridContainerItemFixedRows")
-					}
-					t.getVisible() || o.push("sapFGridContainerInvisiblePlaceholder");
-					return {
-						styles: s,
-						classes: o
-					}
-				};
-			})();
+					sap.f.GridContainerRenderer.getStylesForItemWrapper = function(t, e) {
+						var i, a, s = new Map,
+							o = ["sapFGridContainerItemWrapper"],
+							r = t.getLayoutData();
+						if (r?.isA?.("sap.f.GridContainerItemLayoutData")) {
+							i = r.getColumns();
+							a = e.getActiveLayoutSettings().getColumns();
+							i && a && (i = Math.min(i, a));
+							i && s.set("grid-column", "span " + i);
+							e.getInlineBlockLayout() ? s.set("grid-row", "span 1") : (r.getRows() || r.getMinRows()) && s.set("grid-row", "span " + r.getActualRows());
+							r.hasAutoHeight() || o.push("sapFGridContainerItemFixedRows")
+						}
+						t.getVisible() || o.push("sapFGridContainerInvisiblePlaceholder");
+						return {
+							styles: s,
+							classes: o
+						}
+					};
+					// 2026-10-20: WS3 FeedListItem 보정 이식. 부모가 위치 정보를 제공할 때만
+					// 접근성 속성을 갱신한다. UHAK901500 미적용 분기 안에서만 설치한다.
+					sap.ui.requireSync("sap/m/FeedListItem");
+					sap.m.FeedListItem.prototype.onfocusin = function(oEvent) {
+						var oItem = oEvent.srcControl,
+							oItemDomRef = oItem.getDomRef();
+						var oParent = this.getParent();
+						if (!oParent?.getAccessbilityPosition) {
+							return;
+						}
+						var mPosition = oParent.getAccessbilityPosition(oItem);
+						if (oItem instanceof sap.m.FeedListItem) {
+							oItemDomRef.setAttribute("aria-posinset", mPosition.posInset);
+							oItemDomRef.setAttribute("aria-setsize", mPosition.setSize);
+						}
+					};
+				})();
+			}
 			sap.ui.requireSync("sap/ui/core/IconPool");
 			sap.ui.core.IconPool.registerFont({
 				collectionName: "SAP-icons-TNT",

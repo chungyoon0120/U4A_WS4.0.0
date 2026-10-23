@@ -80,6 +80,18 @@
         catch (e) { console.warn("[WS20][p13n] showMessage failed:", e && e.message, e); }
     }
     function _busy(bOn) { try { parent.setBusy && parent.setBusy(bOn ? "X" : ""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
+    /**
+     * busy 를 켠 뒤 한 프레임 양보하고 무거운 동기 로직을 돈다 (장군님 지시 2026-10-13).
+     *   이 팝업의 조작(줄 선택·편집·삭제·뒤로·저장·갱신)은 전부 동기라 양보가 없으면
+     *   busy 가 그려질 틈이 없어 화면이 그냥 멈춰 보인다. 실측: 뒤로가기 한 번에 10.6초 멈춤.
+     *   ★끄는 것은 각 흐름의 끝점에서만 한다(lf_setPrevNav / 저장·삭제 끝) — 여기서 끄지 않는다.
+     */
+    async function _busyThen(fn) {
+        _busy(true);
+        try { await APPCOMMON.fnYieldToPaint(); }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        fn();
+    }
     function _unlock() { try { oAPP.fn.setShortcutLock(false); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     function _lock() { try { oAPP.fn.setShortcutLock(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }
     function _esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
@@ -443,7 +455,8 @@
             onClose: function (act) {
                 if (act !== "YES") { return; }
 
-                _busy(true);
+                // ★확인창에서 YES 를 받은 뒤부터가 무거운 구간 — busy 를 켜고 한 프레임 양보한 뒤 돈다.
+                _busyThen(function () {
 
                 var l_folder = _userSysPath();
                 if (!parent.FS.existsSync(l_folder)) {
@@ -477,6 +490,7 @@
                 _busy(false);
                 // 015 Removed.
                 _msg(10, "S", _mw("015"));
+                });
             }
         });
     }
@@ -616,6 +630,8 @@
         var oDlg = document.createElement("dialog");
         oDlg.id = C_DLG_ID;
         oDlg.className = "u4a-dialog u4aP13nDlg";
+        //자동 테스트 식별값(.analy/21) — 어느 창인지. 자동 테스트 쪽 요청 2026-10-20.
+        oDlg.setAttribute("data-act", "P13NLIST_DLG");
 
         // ── 헤더(48px): 아이콘 + 제목 + 전체화면 토글 + 닫기 X ──
         var oHeader = _el("div", "u4a-dialog__header u4aP13nHead");
@@ -626,6 +642,7 @@
         oUI.btnFull.type = "button";
         oUI.btnFull.innerHTML = _fa("expand");
         oUI.btnFull.title = _cl("A05");   // (전체화면 토글)
+        oUI.btnFull.setAttribute("data-act", "P13N_FULLSCREEN");
         oUI.btnFull.addEventListener("click", function () { lf_toggleFull(); });
         oHeader.appendChild(oUI.btnFull);
 
@@ -633,6 +650,8 @@
         oXBtn.type = "button";
         oXBtn.innerHTML = _fa("xmark");
         oXBtn.title = _cl("A39");
+        //★이 창은 화면 안 <dialog> 라 운영체제 창 닫기로는 안 닫힌다 — 자동 테스트가 닫을 유일한 길.
+        oXBtn.setAttribute("data-act", "CLOSE");
         oXBtn.addEventListener("click", function () { lf_closeCancel(); });
         oHeader.appendChild(oXBtn);
         oDlg.appendChild(oHeader);
@@ -668,6 +687,7 @@
         oCloseBtn.type = "button";
         oCloseBtn.innerHTML = _fa("xmark");
         oCloseBtn.title = _cl("A39");
+        oCloseBtn.setAttribute("data-act", "CANCEL");
         oCloseBtn.addEventListener("click", function () { lf_closeCancel(); });
         oFoot.appendChild(oCloseBtn);
         oDlg.appendChild(oFoot);
@@ -733,7 +753,8 @@
         oUI.btnBack.type = "button";
         oUI.btnBack.innerHTML = _fa("chevron-left");
         oUI.btnBack.title = _cl("E30");   // E30 Back
-        oUI.btnBack.addEventListener("click", function () { lf_back(); });
+        oUI.btnBack.setAttribute("data-act", "P13N_BACK");
+        oUI.btnBack.addEventListener("click", function () { _busyThen(lf_back); });
         oTool.appendChild(oUI.btnBack);
 
         oTool.appendChild(_el("span", "u4aP13nTbSep"));   // 원본 ToolbarSeparator.
@@ -742,13 +763,15 @@
         oUI.btnSave.type = "button";
         oUI.btnSave.innerHTML = _fa("floppy-disk");
         oUI.btnSave.title = _cl("A64");   // A64 Save
-        oUI.btnSave.addEventListener("click", function () { lf_saveP13nData(); });
+        oUI.btnSave.setAttribute("data-act", "SAVE");
+        oUI.btnSave.addEventListener("click", function () { _busyThen(lf_saveP13nData); });
         oTool.appendChild(oUI.btnSave);
 
         oUI.btnRegDel = _el("button", "u4a-btn u4a-btn--negative u4aP13nIcoBtn");
         oUI.btnRegDel.type = "button";
         oUI.btnRegDel.innerHTML = _fa("trash");
         oUI.btnRegDel.title = _cl("A03");   // A03 Delete
+        oUI.btnRegDel.setAttribute("data-act", "P13N_DELETE");
         oUI.btnRegDel.hidden = true;
         oUI.btnRegDel.addEventListener("click", function () {
             lf_setHeaderLineDelete(oS.is_head ? oS.is_head.fileName : "");
@@ -763,6 +786,13 @@
             placeholder: _cl("A35"),   // A35 Description
             className: "u4aP13nDescField"
         });
+        //자동 테스트 식별값(.analy/21) — 자동 테스트 쪽은 data-act 하나만 본다.
+        if (oUI.descInput && oUI.descInput.input) {
+            oUI.descInput.input.setAttribute("data-act", "P13N_DESC");
+        } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "p13n descInput.input missing", "data-act not set - automated test cannot type the description");
+        }
+
         var oDescWrap = _el("div", "u4aP13nRegBody");
         oDescWrap.appendChild(oUI.descInput.el);
         oPage.appendChild(oDescWrap);
@@ -782,7 +812,8 @@
         oUI.btnRefresh.type = "button";
         oUI.btnRefresh.innerHTML = _fa("rotate");
         oUI.btnRefresh.title = _cl("A48");   // A48 Refresh
-        oUI.btnRefresh.addEventListener("click", function () { lf_refresh(); });
+        oUI.btnRefresh.setAttribute("data-act", "P13N_REFRESH");
+        oUI.btnRefresh.addEventListener("click", function () { _busyThen(lf_refresh); });
         oTool.appendChild(oUI.btnRefresh);
         oPage.appendChild(oTool);
 
@@ -1180,12 +1211,20 @@
             return;
         }
 
+        // 편집·삭제 tooltip 은 줄마다 다시 읽지 않는다 — 메시지 조회는 Electron 건너 SQLite 라
+        //   줄수×2 만큼 동기 호출이 난다. 원본(UI5)은 화면 만들 때 한 번만 읽었다.
+        var sEditTip = _cl("B38");   // B38 Edit
+        var sDelTip = _cl("A03");    // A03 Delete
+
         aHead.forEach(function (h) {
             var oTr = _el("tr", "u4aP13nRow");
             // 처리 불가(라이브러리 버전 불일치) — 원본 u4aP13nNegativeLine(취소선+옅게) 1:1.
             if (h.notAllow === true) { oTr.classList.add("u4aP13nNegativeLine"); }
             if (h.fileName === oS.selFileName) { oTr.setAttribute("aria-selected", "true"); }
             oTr.setAttribute("data-file", h.fileName);
+            //자동 테스트 식별값(.analy/21) — 줄은 같은 data-act + 그 줄의 키(fileName)로 가른다.
+            oTr.setAttribute("data-act", "P13N_ROW");
+            oTr.setAttribute("data-row", h.fileName);
             oTr.title = h.tooltip || h.title || "";
 
             // 드래그 소스(패턴 적용 — dataTransfer 세팅. 수신부는 별도 항목).
@@ -1207,25 +1246,49 @@
                 var oEdit = _el("button", "u4aWs20TreeActBtn add u4aP13nRowAct");
                 oEdit.type = "button";
                 oEdit.innerHTML = _fa("pen");
-                oEdit.title = _cl("B38");   // B38 Edit
-                oEdit.addEventListener("click", function (ev) { ev.stopPropagation(); lf_setHeaderLineEdit(h); });
+                oEdit.title = sEditTip;
+                oEdit.setAttribute("data-act", "P13N_ROW_EDIT");
+                oEdit.addEventListener("click", function (ev) { ev.stopPropagation(); _busyThen(function () { lf_setHeaderLineEdit(h); }); });
                 oTdAct.appendChild(oEdit);
             }
             if (h.visible_delete) {
                 var oDel = _el("button", "u4aWs20TreeActBtn del u4aP13nRowAct");
                 oDel.type = "button";
                 oDel.innerHTML = _fa("trash");
-                oDel.title = _cl("A03");   // A03 Delete
+                oDel.title = sDelTip;
+                oDel.setAttribute("data-act", "P13N_ROW_DEL");
                 oDel.addEventListener("click", function (ev) { ev.stopPropagation(); lf_setHeaderLineDelete(h.fileName); });
                 oTdAct.appendChild(oDel);
             }
             oTr.appendChild(oTdAct);
 
             // 라인 선택 → 미리보기.
-            oTr.addEventListener("click", function () { lf_rowSelect(h); });
+            // ★busy 를 켠 뒤 fnYieldToPaint 로 한 프레임 양보한 다음 무거운 동기 로직을 돈다
+            //   (장군님 지시 2026-10-13). 이 줄 선택의 무거운 구간은 전부 동기다 —
+            //   목록 전체 재생성(설명이 긴 항목이 있으면 그 글자 수만큼 비싸다) · 개인화 파일 읽기 ·
+            //   tree 재렌더 · 미리보기 HTML 주입. 양보 전에는 busy 가 paint 될 기회가 없어
+            //   화면이 그냥 멈춰 보였다. lf_rowSelect 자체는 동기로 둔다 — 저장/갱신/뒤로가기 같은
+            //   내부 호출부가 그 뒤에 busy 를 끄는 순서에 의존하므로 async 로 바꾸면 순서가 깨진다.
+            oTr.addEventListener("click", function () { _busyThen(function () { lf_rowSelect(h); }); });
 
             oUI.tbody.appendChild(oTr);
         });
+    }
+
+    // 선택 표시만 옮긴다(원본 lf_resetMarkLine + oModel.setProperty("highlight", ...) 1:1).
+    //   ★목록을 다시 그리지 않는다 — 원본(UI5)도 선택 표시 속성만 바꿨다. 다시 그리면 설명이 긴
+    //     항목이 하나라도 있을 때 그 글자를 매번 새로 넣고 한 줄로 다시 재게 돼 줄 선택이 아주 느려진다
+    //     (장군님 실측 2026-10-13 — 내용이 거의 없는 줄을 눌러도 똑같이 느렸다).
+    function lf_markSelectedRow() {
+        if (!oUI || !oUI.tbody) { return; }
+        var aRows = oUI.tbody.querySelectorAll("tr[data-file]");
+        for (var i = 0; i < aRows.length; i++) {
+            if (oS.selFileName !== "" && aRows[i].getAttribute("data-file") === oS.selFileName) {
+                aRows[i].setAttribute("aria-selected", "true");
+            } else {
+                aRows[i].removeAttribute("aria-selected");
+            }
+        }
     }
 
     // 헤더 라인 드래그 시작(원본 lf_dragStart).
@@ -1362,7 +1425,7 @@
     function lf_rowSelect(is_head) {
         _busy(true);
         oS.selFileName = is_head.fileName;
-        lf_renderList();   // 선택강조 갱신.
+        lf_markSelectedRow();   // 선택강조만 옮긴다(원본 동일 — 목록 재생성 금지).
 
         var ls_item = lf_getItemData(is_head);
         if (!ls_item) { _busy(false); return; }
@@ -1421,7 +1484,7 @@
         // 이전 선택 라인 없음/미발견 → 선택 해제 + 초기(빈) 미리보기(원본 oPrevNav.to(oInitPage)).
         if (!ls_head) {
             oS.selFileName = "";
-            lf_renderList();
+            lf_markSelectedRow();
             lf_showRight(false);
             _busy(false);
             return;
@@ -1546,8 +1609,38 @@
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         try { oUI.dlg.show(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-        // afterOpen 처리.
-        lf_afterOpen();
+        /********************************************************************
+         * ★[2026-10-22 장군님 지시] 여는 길에도 **한 번 양보**한다.
+         * ------------------------------------------------------------------
+         * 안 하면 show() 바로 뒤에 무거운 동기 작업(미리보기 HTML · 목록 그리기)이
+         * 쉬지 않고 이어져, 브라우저가 화면을 다시 그릴 틈이 없다.
+         * 실제 증상(장군님 2026-10-22): **busy 만 돌다가, busy 가 꺼진 뒤에야 팝업이 한꺼번에 뜬다.**
+         * 올바른 순서 = busy 켜기 → **껍데기 보이기** → 내용 그리기 → busy 끄기.
+         *
+         * ★이 함수는 **동기 그대로** 둔다(async 로 바꾸지 않는다) — 호출처 2곳이
+         *   try/catch 로 감싸는데(ws_html5_ws20_edit.js · ws_html5_ws20_tree.js),
+         *   async 로 바꾸면 그 catch 가 예외를 못 잡는다(.claude/rules/code.md).
+         ********************************************************************/
+        var fnAfter = function () {
+            try {
+                lf_afterOpen();
+            } catch (e) {
+                console.error("[WS20][p13n] afterOpen failed:", e && e.message, e);
+                _unlock();
+                _busy(false);
+            }
+        };
+
+        if (APPCOMMON && typeof APPCOMMON.fnYieldToPaint === "function") {
+            APPCOMMON.fnYieldToPaint().then(fnAfter, fnAfter);
+            return;
+        }
+
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "fnYieldToPaint", "popup shell cannot be painted first - the dialog appears only after everything is drawn");
+        }
+
+        fnAfter();
     };
 
     // ★UI5 원본 callP13nDesignDataPopup(new sap.m.Dialog)이 런타임에 로드돼 있을 수 있으므로
