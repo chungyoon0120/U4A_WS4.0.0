@@ -67,8 +67,7 @@
     }
     function _markChanged() {
         try { if (typeof oAPP.fn.setChangeFlag === "function") { oAPP.fn.setChangeFlag(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        try { APPCOMMON.fnSetModelProperty && APPCOMMON.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        //[2026-10-26] 모델값 쓰기 + 앱헤더 갱신 2줄 제거 — setChangeFlag 안에서 같은 함수에 같은 값을 이미 쓴다(중복). 장군님 지시.
     }
     // 재선택 = setSelectTreeItem(→fnWs20SelectUI, async: refreshPreview+selPreviewUI 대기).
     //  ★ Promise 를 반환한다 — undo/redo 가 이 완료(=편집하던 페이지 복원)까지 await 해야

@@ -543,6 +543,25 @@
     }; // end of oAPP.fn.fnUpdateWs20Toolbar
 
     /************************************************************************
+     * 모드가 바뀐 뒤 툴바 버튼 표시를 다시 정한다.
+     *   2026-10-26 — fnUpdateWs20AppHeader 끝에 있던 호출을 여기로 떼어냈다.
+     *   까닭: 헤더는 변경 flag·저장·Activate·팝업에서도 불리는데, 그때마다 툴바 폭을
+     *   다시 재서 버튼이 숨었다 나타났다 했다(처리중 표시가 꺼진 뒤에 일어나 눈에 보였다).
+     *   fnUpdateWs20Toolbar 가 읽는 값은 IS_EDIT·S_APP_VMS·ADMIN_APP·IS_DEV·ISADM 뿐이고
+     *   IS_CHAG·ACTST 는 보지 않으므로, 그 값이 바뀌는 자리에서만 부르면 된다.
+     ************************************************************************/
+    function _refreshWs20Toolbar() {
+
+        try {
+            oAPP.fn.fnUpdateWs20Toolbar();
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(e);
+            }
+        }
+    }
+
+    /************************************************************************
      * 툴바 구분선 정리 — 현재 버튼 가시성을 기준으로 구조적 구분선을 접는다.
      *   규칙(보이는 요소 기준):
      *     · 선행 구분선(앞에 보이는 버튼이 없음) → 숨김
@@ -1115,8 +1134,9 @@
             }
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-        // 모드별 트랜잭션 버튼 표시/숨김도 함께 갱신 (헤더와 동일 타이밍 = 모든 재진입/모드전환)
-        try { oAPP.fn.fnUpdateWs20Toolbar(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        // ★툴바 버튼 표시는 여기서 갱신하지 않는다(2026-10-26 분리).
+        //   헤더는 IS_CHAG·ACTST 로도 불리지만 툴바는 그 두 값을 보지 않는다.
+        //   그래서 모드(IS_EDIT)가 바뀌는 자리에서만 _refreshWs20Toolbar() 를 직접 부른다.
 
     }; // end of oAPP.fn.fnUpdateWs20AppHeader
 
@@ -1811,6 +1831,8 @@
         // 이미 셸이 렌더되어 있으면 스킵 (앱 헤더 텍스트만 최신값으로 갱신)
         if (oWS20.getAttribute("data-ws20-shell") === "X") {
             try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            // 툴바 버튼 표시 갱신 — 셸이 이미 있는 재진입 — 모드가 달라져 들어올 수 있다(2026-10-26 헤더에서 분리).
+            _refreshWs20Toolbar();
             return;
         }
 
@@ -1852,6 +1874,8 @@
 
         // 앱 헤더 텍스트 채움 (APPID / 모드 / 상태)
         try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        // 툴바 버튼 표시 갱신 — 셸을 방금 그렸다(2026-10-26 헤더에서 분리).
+        _refreshWs20Toolbar();
 
         // 렌더 "전"에 설정된 /FMSG/WS20 메시지 리플레이 — Change 모드 lock 메시지는
         // fnOnEnterDispChangeMode 가 fnOnMoveToPage(→렌더) 보다 먼저 호출하므로,
@@ -2014,6 +2038,8 @@
 
             // [HTML5] 앱 헤더(모드 표기) 갱신
             try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            // 툴바 버튼 표시 갱신 — Change 모드로 바뀌었다(2026-10-26 헤더에서 분리).
+            _refreshWs20Toolbar();
 
             // 푸터 메시지 처리
             var sMsg = APPCOMMON.fnGetMsgClsText("/U4A/MSG_WS", "020"); // Switch to edit mode.
@@ -2103,6 +2129,8 @@
 
             // [HTML5] 앱 헤더(모드 표기) 갱신
             try { oAPP.fn.fnUpdateWs20AppHeader(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            // 툴바 버튼 표시 갱신 — Display 모드로 바뀌었다(2026-10-26 헤더에서 분리).
+            _refreshWs20Toolbar();
 
             // AI 서버 연결되어있을 경우 연결 해제 하기 (원본 1:1 — 가드)
             try {

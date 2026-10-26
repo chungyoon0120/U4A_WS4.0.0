@@ -865,7 +865,11 @@
         }
         function _hide() {
             if (iTimer) { clearTimeout(iTimer); iTimer = null; }
-            if (oTip) { oTip.dataset.show = "false"; }
+            // ★[2026-10-26] 값이 다를 때만 쓴다. 같은 값을 다시 쓰면 MutationRecord 가 나고
+            //   (Chromium 93 실측), 공통 busy 의 끄기 판정이 그것을 「화면이 아직 바뀐다」로 센다.
+            if (oTip && oTip.dataset.show !== "false") {
+                oTip.dataset.show = "false";
+            }
             oCur = null;
         }
         function _show(el) {
@@ -1200,7 +1204,20 @@
             });
         }, true);
         // 스플릿바 드래그 종료 → iframe 포인터 복구(어디서 떼든). 화면별 드래그 핸들러와 무관하게 항상 해제.
-        document.addEventListener("mouseup", function () { document.body.classList.remove("u4a-dragging"); }, true);
+        //   ★[2026-10-26] 붙어 있을 때만 지운다. classList.remove 는 없는 클래스에도 class 속성을
+        //   다시 써서 MutationRecord 를 낸다(Chromium 93 실측). 그러면 공통 busy 의 끄기 판정이
+        //   「화면이 아직 바뀌고 있다」로 세어, 마우스를 움직이는 동안 처리중 표시가 꺼지지 않았다.
+        document.addEventListener("mouseup", function () {
+
+            if (!document.body) {
+                return;
+            }
+
+            if (document.body.classList.contains("u4a-dragging")) {
+                document.body.classList.remove("u4a-dragging");
+            }
+
+        }, true);
         // 더블클릭 — 인접 패널을 home 으로 복귀
         document.addEventListener("dblclick", function (e) {
             if (!e.target.closest) { return; }

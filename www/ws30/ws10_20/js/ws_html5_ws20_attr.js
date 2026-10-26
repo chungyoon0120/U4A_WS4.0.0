@@ -4218,9 +4218,7 @@
         } catch (e) {
             console.warn("[WS20][attr] setChangeFlag skip:", e && e.message, e);
         }
-        // 변경 즉시 모델/앱헤더 반영 → 상태 Active→Inactive
-        try { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
-        try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        //[2026-10-26] 모델값 쓰기 + 앱헤더 갱신 2줄 제거 — setChangeFlag 안에서 같은 함수에 같은 값을 이미 쓴다(중복). 장군님 지시.
 
         //[원본 attrChangeProc 이식 — setChangeFlag 직후 블록] 넘겨받은 sAttr 이 모델의 실제 줄이 아니라
         //  복사본일 수 있어, 모델(T_ATTR)에서 같은 UIATK 줄을 찾아 값을 옮겨 넣고(moveCorresponding),
@@ -5446,9 +5444,7 @@
 
                     //화면에서 UI추가, 이동, 삭제 및 attr 변경시 변경 flag 처리.
                     oAPP.fn.setChangeFlag();
-                    // 변경 즉시 상태 Active→Inactive 반영
-                    try { oAPP.common.fnSetModelProperty("/WS20/APP/IS_CHAG", "X"); } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
-                    try { if (oAPP.fn.fnUpdateWs20AppHeader) { oAPP.fn.fnUpdateWs20AppHeader(); } } catch (e2) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e2); } }
+                    //[2026-10-26] 모델값 쓰기 + 앱헤더 갱신 2줄 제거 — setChangeFlag 안에서 같은 함수에 같은 값을 이미 쓴다(중복). 장군님 지시.
 
                     //모델 /uiinfo/DESC 동기화.
                     if (oAPP.attr.oModel.oData.uiinfo) {
