@@ -317,6 +317,29 @@
     let _bBroadBusy = false;  // 부모 창이 "지금 바쁘다"고 알려온 상태
     let _bBusyShown = false;  // 지금 화면에 실제로 떠 있는지
 
+    // ★[2026-10-27] busy 가 **다 꺼진 뒤** 할 일을 쌓아 두는 곳. fn_setBusy 의 ONDONE 이 여기 들어온다.
+    let _aAfterBusyOff = [];
+
+    function _runAfterBusyOff() {
+
+        if (_aAfterBusyOff.length === 0) {
+            return;
+        }
+
+        const aRun = _aAfterBusyOff.slice();
+        _aAfterBusyOff = [];
+
+        aRun.forEach(function (fnTask) {
+
+            try {
+                fnTask();
+            } catch (e) {
+                console.error("[shortcut] after-busy-off task failed:", e);
+            }
+
+        });
+    }
+
     function fn_setBusy(bIsBusy, sOption) {
         const _ISBROAD = sOption?.ISBROAD || undefined;
         const bFromBroad = (typeof _ISBROAD !== "undefined");
@@ -326,7 +349,12 @@
         //   먹지 않는다(inert). 게다가 닫힐 때 브라우저가 "열기 전 커서"로 포커스를 되돌린다.
         //   공통 U4ABusy.hide 는 화면이 조용해질 때까지 기다렸다 닫으므로(최소 300ms),
         //   fn_setBusy(false) 바로 뒤에 focus 를 걸면 그 포커스가 통째로 날아간다.
-        const fnAfterBusyOff = sOption?.ONDONE;
+        //   ★그리고 이 콜백은 **쌓아 둔다.** 아래 「상태 변화 없음」 으로 일찍 빠지는 길에서
+        //     busy 가 아직 켜져 있으면(겹친 처리가 남았거나 부모가 방송한 바쁨이 걸려 있으면)
+        //     그 자리에서 버려져 영영 안 불렸다. 쌓아 두면 실제로 꺼지는 그때 불린다.
+        if (typeof sOption?.ONDONE === "function") {
+            _aAfterBusyOff.push(sOption.ONDONE);
+        }
 
         if (bFromBroad) {
             _bBroadBusy = (bIsBusy === true);
@@ -341,9 +369,9 @@
 
         if (bWant === _bBusyShown) {
 
-            // 상태 변화 없음 — 화면도 전파도 그대로. 다만 이미 꺼져 있으면 뒷일은 바로 해 준다.
-            if (!bWant && typeof fnAfterBusyOff === "function") {
-                fnAfterBusyOff();
+            // 상태 변화 없음 — 화면도 전파도 그대로. 다만 이미 꺼져 있으면 쌓인 뒷일을 지금 한다.
+            if (!bWant) {
+                _runAfterBusyOff();
             }
 
             return;
@@ -353,7 +381,7 @@
         // [2026-10-16] 공통 busy(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음). 자체 <dialog> 도 공통으로 모은다:
         //   모양을 바꿀 때 theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
         if (window.U4ABusy && typeof U4ABusy.show === "function") {
-            if (bWant) { U4ABusy.show(); } else { U4ABusy.hide(fnAfterBusyOff); }
+            if (bWant) { U4ABusy.show(); } else { U4ABusy.hide(_runAfterBusyOff); }
         } else {
             if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
                 U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local busy dialog");
@@ -364,7 +392,7 @@
                 if (busyOverlay && !busyOverlay.open) { busyOverlay.showModal(); }
             } else {
                 if (busyOverlay && busyOverlay.open) { busyOverlay.close(); }
-                if (typeof fnAfterBusyOff === "function") { fnAfterBusyOff(); }
+                _runAfterBusyOff();
             }
         }
 
@@ -520,8 +548,8 @@
     //   그러면 마우스를 뗀 곳이 버튼이 아니라 처리중 표시라 **click 이 아예 만들어지지 않는다**
     //   → 잘못된 앱 ID 를 고쳐 적고 바로 「쇼컷 링크 저장」을 누르면, 앱 Name 만 채워지고
     //     「바로가기 만들기를 진행하시겠습니까」 확인 팝업이 안 떴다(장군님 실측).
-    //   ★앱 ID 검사가 빠지는 것이 아니다 — 저장 흐름의 fn_Check_value 가 맨 먼저 fn_CheckAppId 를
-    //     다시 부른다. 오히려 서버 왕복이 한 번 줄어든다.
+    //   ★앱 ID 검사가 빠지는 것이 아니다 — 저장 흐름의 fn_Check_required 가 **첫 칸**으로
+    //     앱 ID 를 서버에 다시 묻는다. 오히려 서버 왕복이 한 번 줄어든다.
     //   (원본 UI5 의 앱 ID 칸에는 change 이벤트가 아예 없어 이 사고가 없었다. HTML5 에서 생긴 것이다.)
     //   누를 때 커서가 빠지지 않게만 하는 것(이미 click 이 걸려 있는 버튼용).
     function _keepFocusOnMouseDown(sId) {
@@ -613,6 +641,11 @@
             return;
         }
 
+        // 아래 _failAt 로그의 짝 — 둘이 쌍으로 찍혀야 커서·스크롤이 실제로 돌았다는 뜻이다.
+        if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+            U4ALOG.info("진입", "_goToFirstBadField", "busy is off - focusing and scrolling to the first invalid field");
+        }
+
         _refocus(oField);
 
         if (!oField.el || typeof oField.el.scrollIntoView !== "function") {
@@ -637,64 +670,74 @@
         }, 0);
     }
 
-    function fn_Check_required() {
-        let Lret = "";
-        const aBad = [];   // 오류 난 칸 전부. 첫 하나만 가지고 있으면 다른 패널의 오류가 접힌 채 남는다.
+    // 검사에 걸렸다 — 그 칸이 접힌 패널 안이면 펼치고, 커서 갈 자리로 기억해 둔다.
+    //   실제로 커서를 두고 화면을 옮기는 것은 busy 가 **다 꺼진 뒤**(_goToFirstBadField).
+    function _failAt(oField) {
 
+        _revealField(oField);
+        _oFirstBadField = oField;
+
+        // _goToFirstBadField 로그의 짝. 이 줄만 있고 그 줄이 없으면 busy 가 안 꺼진 것이다.
+        if (typeof U4ALOG !== "undefined" && U4ALOG.info) {
+            U4ALOG.info("진입", "_failAt", "stopped at the first invalid field - waiting for busy off to focus");
+        }
+
+        return "E";
+    }
+
+    // ★[2026-10-27 장군님 지시] **화면에 보이는 순서대로 하나씩 보고, 첫 오류에서 멈춘다.**
+    //   「오류 체크는 위에서부터 순차적으로 해서 체크가 성공하면 그 다음을 순차적으로 체크해서
+    //     오류 발생되면 커서를 주면 되잖아」
+    //   종전에는 네 칸을 **전부** 검사해 전부 빨갛게 칠한 뒤 「빈 칸」 중 첫째로 커서를 보냈다.
+    //   그래서 앱 ID 가 **없는 앱 ID** 일 때(= 값은 있으니 빈 칸 검사는 통과) 저장 경로가 먼저
+    //   잡혀 엉뚱한 칸으로 커서가 갔다. 앱 ID 가 서버에 있는지는 여기서 그 자리에 같이 본다.
+    //   검사 순서 = 앱 ID → 파일 이름 → 저장 경로 → 대상 호스트 URL (화면에 놓인 순서 그대로)
+    async function fn_Check_required() {
+
+        _oFirstBadField = null;
+
+        // ① 앱 ID — 비었나, 그 다음 서버에 있나
         if (oAppIdField.getValue() === "") {
-            Lret = "E";
             oAppIdField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C67", "APP ID")));
-            aBad.push(oAppIdField);
-        } else {
-            oAppIdField.setValueState("none");
+            return _failAt(oAppIdField);
         }
 
+        if (await fn_CheckAppId() === "E") {
+            // 빨간 테두리와 메시지는 fn_CheckAppId 가 이미 칠했다(서버가 준 글 그대로).
+            return _failAt(oAppIdField);
+        }
+
+        // ② 파일 이름 — 선택 입력이지만 값이 있으면 형식까지 본다(비면 앱ID 로 대체된다)
+        if (fn_Check_fileName() === "E") {
+            return _failAt(oFileNameField);
+        }
+
+        // ③ 저장 경로
         if (oSavePathField.getValue() === "") {
-            Lret = "E";
             oSavePathField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C69", "Save As Path")));
-            aBad.push(oSavePathField);
-        } else {
-            oSavePathField.setValueState("none");
+            return _failAt(oSavePathField);
         }
 
+        oSavePathField.setValueState("none");
+
+        // ④ 대상 호스트 URL
         if (oHostInputField.getValue() === "") {
-            Lret = "E";
             oHostInputField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C71", "Target Host URL")));
-            aBad.push(oHostInputField);
-        } else if (!/^https?:\/\/[^\s/?#]+/i.test(oHostInputField.getValue().trim())) {
-            // ★외부 호스트 URL 은 사용자가 직접 타이핑한다(내부는 읽기전용). 형식 검사가 없으면 "uha.u4aide.com" 처럼
-            //   스킴 없는 값이 그대로 URL 로 붙어, 브라우저가 이를 '주소'가 아니라 '검색어'로 처리해 엉뚱한 페이지가 뜬다.
-            //   MSG_WS 109 = "유효성 문제. ( &1 )"
-            Lret = "E";
+            return _failAt(oHostInputField);
+        }
+
+        // ★외부 호스트 URL 은 사용자가 직접 타이핑한다(내부는 읽기전용). 형식 검사가 없으면 "uha.u4aide.com" 처럼
+        //   스킴 없는 값이 그대로 URL 로 붙어, 브라우저가 이를 '주소'가 아니라 '검색어'로 처리해 엉뚱한 페이지가 뜬다.
+        //   MSG_WS 109 = "유효성 문제. ( &1 )"
+        if (!/^https?:\/\/[^\s/?#]+/i.test(oHostInputField.getValue().trim())) {
             oHostInputField.setValueState("error",
                 oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "109", getMsgText("/U4A/CL_WS_COMMON", "C71", "Target Host URL")));
-            aBad.push(oHostInputField);
-        } else {
-            oHostInputField.setValueState("none");
+            return _failAt(oHostInputField);
         }
 
-        // 파일 이름 — 필수는 아니지만(비면 앱ID로 대체) 값이 있으면 여기서 형식까지 검사한다.
-        //   ★확인 팝업 '이후'가 아니라 '이전'에 걸러야 한다(§ 핸들러 = 검증 먼저).
-        if (fn_Check_fileName() === "E") {
-            Lret = "E";
-            aBad.push(oFileNameField);
-        }
+        oHostInputField.setValueState("none");
 
-        if (Lret === "E") {
-
-            // ★[2026-10-27] 오류 난 칸이 든 패널을 **전부** 펼친다. 하나만 펼치면 다른 패널의 오류가
-            //   접힌 채로 남아 무엇이 잘못됐는지 또 안 보인다.
-            aBad.forEach(_revealField);
-
-            // ★[2026-10-27 장군님 지적] 스크롤·포커스는 **여기서 하지 않는다.**
-            //   이 함수는 busy 가 켜진 채로 불린다(fn_CreateShortcut 첫 줄). busy 가 열려 있는 동안
-            //   건 포커스는 먹지 않고, busy 가 닫히면서 커서가 「쇼컷 링크 저장」을 누르기 전 칸으로
-            //   돌아가 버린다. 그래서 빨간 안내 글도 안 떴다(안내 글은 그 줄에 커서가 있을 때만 보인다).
-            //   → 첫 오류 칸만 기억해 두고, busy 가 다 꺼진 뒤 _goToFirstBadField 가 처리한다.
-            _oFirstBadField = aBad[0];
-        }
-
-        return Lret;
+        return "";
     }
 
     // APP ID 서버 검증 및 파라미터 유효성 검사
@@ -707,7 +750,7 @@
     async function fn_CheckAppId() {
         fn_setBusy(true);
         try { return await _fn_CheckAppIdRun(); }
-        finally { fn_setBusy(false); }
+        finally { fn_setBusy(false, { ONDONE: _goToFirstBadField }); }
     }
     async function _fn_CheckAppIdRun() {
         const mySeq = ++_appIdCheckSeq;   // 이번 요청 순번(응답 적용 전 최신인지 확인)
@@ -758,9 +801,10 @@
 
                 case "E":
                     oAppIdField.setValueState("error", _relocalizeServer(e.RTMSG));
-                    const mainArea = document.querySelector(".u4aShortcutMain");
-                    if (mainArea) { mainArea.scrollTo({ top: 0, behavior: 'smooth' }); }
-                    _refocus(oAppIdField);   // 공통 §3.5.4: 서버검증 오류도 해당 필드 자동 포커스(비동기 콜백 — busy 는 이미 해제됨)
+                    // ★[2026-10-27] 맨 위로 올리고 바로 커서를 주던 것을 바꿨다 — 저장 흐름에서는
+                    //   busy 가 켜진 채라 그 커서가 먹지 않는다. 커서 갈 자리만 기억하고,
+                    //   busy 가 다 꺼진 뒤 _goToFirstBadField 가 커서와 화면을 함께 옮긴다.
+                    _failAt(oAppIdField);
                     return "E";
 
                 default:
@@ -783,9 +827,10 @@
         return "";   // 앱 ID 존재 확인 성공(앱 Name 채움 완료)
     }
 
-    // 제출 전 전체 검증 — 앱 ID 존재검사(fn_CheckAppId) + 추가 파라미터 검증
+    // 제출 전 나머지 검증 — 추가 매개변수(이름 형식·중복). 앱 ID 존재검사는 fn_Check_required 가 한다.
     async function fn_Check_value() {
-        if (await fn_CheckAppId() === "E") { return "E"; }
+        // ★[2026-10-27] 앱 ID 존재 검사는 fn_Check_required 가 **화면 순서 첫 칸**으로 이미 했다.
+        //   여기서 또 부르면 서버를 두 번 다녀온다.
 
         // 파라미터 검증
         //   ★이름(name) 허용문자 = URI 표준(RFC 3986) 의 'unreserved' 집합: A-Z a-z 0-9 - . _ ~
@@ -895,7 +940,7 @@
         oSavePathField.setValueState("none");
         oHostInputField.setValueState("none");
 
-        if (fn_Check_required() === "E") {
+        if (await fn_Check_required() === "E") {
             // busy 가 **다 꺼진 뒤**에 첫 오류 칸으로 간다(열려 있는 동안 건 포커스는 먹지 않는다).
             fn_setBusy(false, { ONDONE: _goToFirstBadField });
             return;
