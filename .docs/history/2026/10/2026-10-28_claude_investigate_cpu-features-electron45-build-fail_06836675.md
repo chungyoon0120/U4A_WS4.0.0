@@ -269,3 +269,8 @@ if (this.prodDeps.has(`${prefix}${modulePath}`) && (!this.onlyModules || this.on
 2. 프로젝트의 rebuild 로 그 폴더를 대상 지정해 실행
    `npx @electron/rebuild -f -o better-sqlite3 -v 45.0.0 -m <임시폴더>`
 3. 결과: **EXIT=0 · `Rebuild Complete` · 로그에 `cpu-features` 0회** → 건너뛴 것이 확인됐다
+
+### 결과 — 통과 (2026-10-28, 장군님 실측)
+
+오류 났던 PC 에서 `git pull && npm install` → **오류 없이 끝까지 통과.**
+이 건은 닫는다. 커밋 = `a24e1cc6`(설치 뒤처리 교체) + `d40fdddc`(옵션 `-w` → `-o` 정정).

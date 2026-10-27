@@ -162,8 +162,28 @@
                     type: "error"
                 }).then(function () {
 
-                    // ③ 닫을 때 로그 폴더 열기(있을 때만)
-                    try { WSLOG && WSLOG.openLOG && WSLOG.openLOG(true); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                    // ③ 닫을 때 로그 폴더 열기
+                    // ★[2026-10-28 지시] 패키징된 앱(exe)일 때만 여다.
+                    //   개발 모드에선 터밌널에 로그가 그대로 찍힐니 탐색기 창은 방해만 된다.
+                    if (APP && APP.isPackaged === true) {
+
+                        try {
+
+                            if (WSLOG && WSLOG.openLOG) {
+                                WSLOG.openLOG(true);
+                            }
+
+                        } catch (e) {
+
+                            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                                U4ALOG.caught(e);
+                            }
+
+                        }
+
+                    } else {
+                        console.log("[Critical] log folder open skipped | not packaged");
+                    }
 
                     // ④ critical 오류 → 앱 종료
                     try { APP && APP.exit(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }

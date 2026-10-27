@@ -172,10 +172,21 @@ module.exports = function (window, document, console) {
          * 크리티컬 오류 발생 시, 
          * 메시지 닫을 때 로그 폴더 오픈 기능 추가
          */
-        try {
-            WSLOG.openLOG(true);
-        } catch (e) {
-            console.error("[WSERR-904] openLOG failed", e);
+        /**
+         * ★[2026-10-28 지시] 패키징된 앱(exe)일 때만 로그 폴더를 여다.
+         *   개발 모드(no-build)에선 터밌널에 로그가 그대로 찍힐니 소스도 바로 여다 보니,
+         *   오류마다 탐색기 창이 뜨면 방해만 된다.
+         */
+        if (APP && APP.isPackaged === true) {
+
+            try {
+                WSLOG.openLOG(true);
+            } catch (e) {
+                console.error("[WSERR-904] openLOG failed", e);
+            }
+
+        } else {
+            console.log("[WSERR-905] log folder open skipped | not packaged");
         }
 
         APP.exit();
