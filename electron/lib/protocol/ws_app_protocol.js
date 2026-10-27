@@ -163,7 +163,14 @@ async function _serve(oRequest) {
 
     if (!fs.existsSync(sFullPath)) {
 
-        if (!_missLogged.has(sPathname)) {
+        // ★[2026-10-27 장군님 지시] source map(`.map`)이 없다는 줄은 남기지 않는다.
+        //   개발자 도구가 혼자 찾아보는 것이라 **없어도 앱 동작에 아무 영향이 없고**,
+        //   no-build 로 켤 때마다 개발자 도구가 자동으로 열리면서 수십 줄이 한꺼번에 쌓인다
+        //   (puppeteer-core 한 묶음만 16줄 — 2026-10-27 실측).
+        //   ※ 파일이 실제로 있으면 위에서 그대로 내준다 — 내주는 동작은 한 줄도 안 바뀐다.
+        const bSourceMap = sPathname.toLowerCase().endsWith('.map');
+
+        if (!bSourceMap && !_missLogged.has(sPathname)) {
             _missLogged.add(sPathname);
             _writeLog('주의', 'DOM_MISS | file not found | ' + sPathname);
         }

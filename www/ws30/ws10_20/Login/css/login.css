@@ -83,8 +83,16 @@ body {
     height: 2.5rem;
     padding: 0.5rem;
     object-fit: contain;
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    border: 0.0625rem solid color-mix(in srgb, var(--accent) 22%, transparent);
+    /* ★[2026-10-27 장군님 지시 — 원래대로] 로고 뒤 배지(배경+테두리)를 끈다.
+     *   이 두 줄은 2026-09-08 부터 적혀 있었지만, 그때 쓰던 Electron 14 = Chromium 93 은
+     *   `color-mix` 를 모른다. 그래서 선언이 통째로 무효가 돼 **아무것도 안 그려졌고**,
+     *   장군님이 보시던 모습이 그것이다. Electron 45 로 올리면서 Chromium 이 이 값을
+     *   읽게 되자 배지가 갑자기 나타났다 — 고장이 아니라 **이제야 그려진 것**이다.
+     *   되살리려면 아래 주석을 풀면 된다. 단 그때는 `color-mix` 대신 테마 토큰이나
+     *   고정 색으로 적어, 옛 Chromium 에서도 같은 모습이 되게 할 것.
+     */
+    /* background: color-mix(in srgb, var(--accent) 12%, transparent); */
+    /* border: 0.0625rem solid color-mix(in srgb, var(--accent) 22%, transparent); */
     border-radius: 0.625rem;
 }
 

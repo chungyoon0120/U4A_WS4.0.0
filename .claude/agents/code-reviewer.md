@@ -25,7 +25,7 @@ model: sonnet
 - **에러 처리**: 예외는 `console.error`, 미구현만 `warn`. 스크립트 오류 삼키기/조용한 catch/stopPropagation 금지.
 - **busy 처리**: 별도창 BUSY_ON은 로드 완료 시 BUSY_OFF 짝 필수. setTimeout 눈속임 금지, 실제 이벤트로만 해제.
 - **정확성 버그**: null/undefined 참조, 경계값, 비동기 경쟁, 이벤트 미배선, 재진입 락(fnNaviLock) 등.
-- **Chromium93 제약**: `color-mix` 금지(솔리드 rgba로), Monaco `readOnly`는 `domReadOnly` 동반.
+- **`color-mix` 는 써도 된다**(2026-10-27 Electron 45 로 올리며 풀림). Monaco `readOnly`는 `domReadOnly` 동반.
 
 ## 보고 형식
 - 심각도(치명/높음/중간/낮음) 순으로 정렬.

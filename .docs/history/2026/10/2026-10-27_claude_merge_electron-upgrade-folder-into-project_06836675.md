@@ -110,3 +110,112 @@
   앞에 대입이 붙은 줄이 하나 있어 16/17 로 모자랐다.
   → 치환은 **반드시 건수를 세어 기준(업그레이드 폴더)과 맞춘다.**
 - 주석 줄의 `loadURL`·`insertCSS` 는 바꾸지 않는다(주석 4곳). 건수를 셀 때도 주석을 빼고 센다.
+
+## 켤 때 쏟아지던 `.js.map` 못 찾음 줄 없앰 (장군님 지시 2026-10-27)
+
+`npm start` 로 켜면 아래 같은 줄이 한꺼번에 16줄 넘게 찍혔다.
+
+```
+[WARN] [main] DOM_MISS | file not found | /puppeteer-core.js.map
+[WARN] [main] DOM_MISS | file not found | /Browser.js.map
+...
+```
+
+### 왜 나왔나
+
+- 찍는 자리 = `electron/lib/protocol/ws_app_protocol.js` 의 요청 처리 함수. 파일이 없으면 404 를 주며 한 줄 남긴다.
+- 요청하는 쪽 = **개발자 도구**다. `puppeteer-core` 쪽 파일에 붙은 source map 주소를 보고 혼자 찾아본다.
+  (`www/intro.js` 가 켤 때 `puppeteer-core` 를 미리 읽어 두므로 그 묶음이 통째로 걸린다.)
+- 그 `.map` 파일들은 앱 안에 없다 → 전부 못 찾음. **앱 동작에는 아무 영향이 없다**(개발자 도구의 디버깅 편의용).
+- no-build 로 켜면 개발자 도구가 자동으로 열리므로(`ws30/resources/index.js`) 켤 때마다 반복됐다.
+
+### 조치
+
+못 찾은 경로가 `.map` 으로 끝나면 **기록만 건너뛴다**. 404 를 주는 동작은 그대로다.
+실제로 `.map` 파일이 있으면 지금처럼 그대로 내준다(프로젝트 안에 6개 있다).
+
+### 또 밟을 함정
+
+- **custom protocol 핸들러의 「파일 없음」 로그는 개발자 도구 요청까지 전부 받는다.**
+  source map·favicon 처럼 **브라우저가 알아서 찾아보는 것**은 앱 결함이 아니므로 기록에서 뺀다.
+  안 그러면 진짜 결함 줄이 그 속에 묻힌다(로그 양 표준 = `.works/DEV_STANDARD_로그.md`).
+
+## 로그인 화면 로고 뒤에 네모 배경이 생긴 까닭 — `color-mix` (조사, 2026-10-27)
+
+장군님 질문: 「원래 로고에 저런 배경 표시가 없었는데 일렉트론 업그레이드 때문이냐, CSS 로드가 잘못된 거냐」
+
+**일렉트론 업그레이드 때문이 맞다. CSS 로드는 정상이다.**
+
+- 로고 스타일은 `Login/css/login.css` 에 **원래부터** 둥근 배지로 적혀 있었다(마지막 변경 2026-09-08, 이번 커밋과 무관).
+  ```css
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 0.0625rem solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 0.625rem;
+  ```
+- `color-mix` 는 **Chromium 111 부터** 읽는다. 일렉트론 14 = **Chromium 93** 이라 그 두 줄이 통째로 무효가 됐고,
+  그래서 배경도 테두리도 안 그려졌다 — 장군님이 보시던 모습이 그것이다.
+- 일렉트론 45 는 Chromium 이 훨씬 높아 `color-mix` 를 읽는다 → **CSS 에 적힌 의도대로 이제야 그려진다.**
+
+### 같은 일이 생길 자리 — 전수 22곳 / 11개 파일
+
+| 파일 | 건수 |
+|---|---:|
+| `WS10/css/ws20.css` | 7 |
+| `Login/css/login.css` | 4 |
+| `theme/shell.css` · `Popups/mimeRepository/mime.css` | 각 2 |
+| `ux-gallery.html` · `js/fnDumpWritePopupOpen.js` · `design/js/prevSetSkeletonScreen.js` · 옵션 팝업(옛 판) 2 · 내부 데이터 모니터 · 바인딩 팝업 | 각 1 |
+
+로그인 화면 4건 = 로고 배경 1 · 로고 테두리 1 · 로그인 버튼 그림자 2.
+
+### 또 밟을 함정
+
+- **이 프로젝트는 「Chromium 93 이라 `color-mix` 를 못 쓴다」를 전제로 짜여 있다**
+  (`.claude/rules/code.md` · `.analy/15` · `.analy/16`). 일렉트론 45 로 올라가면 그 전제가 깨진다.
+  → **지금까지 「안 먹어서 안 보이던」 스타일이 한꺼번에 살아난다.** 화면이 달라 보이는 곳이 더 나오면 먼저 이걸 의심한다.
+- 규칙 문서의 「`color-mix` 금지(Chromium 93)」 문구도 일렉트론 버전이 확정되면 같이 손봐야 한다. (아직 안 고침)
+
+### 조치 — 로고 배지만 껐다 (장군님 지시 「원래대로」)
+
+`Login/css/login.css` 의 로고 배경·테두리 **두 줄만 주석 처리**했다. 지우지 않고 까닭을 그 자리에 남겼다.
+- `border-radius` 와 `padding` 은 건드리지 않았다 — 배경·테두리가 없으면 눈에 안 보이는 값이라 **원래 모습 그대로**다.
+- 덮어쓰는 CSS 가 없음을 확인했다(`card-logo` 는 `www` 전체에서 이 한 곳뿐, 그리고 가장 나중에 로드된다).
+- **로그인 버튼 그림자 2곳은 건드리지 않았다** — 장군님이 지적하지 않으셨다. 나머지 20곳도 그대로다.
+
+## 문서 현행화 — Chromium 93 전제를 걷어냄 (장군님 지시 2026-10-27)
+
+### 확인한 사실
+
+- 설치된 것 = **Electron 45.0.0**(`node_modules/electron/dist/version` 실측).
+- 그 Node ABI = **150**(`node-abi` 표에서 조회). 전에는 Electron 14 → ABI 89 였다.
+- `color-mix` 가 **실제로 그려진다** — 로그인 화면 로고 배지가 Electron 45 에서 나타난 것이 그 증거다.
+
+### 고친 문서 (7개 파일 · 19곳)
+
+| 파일 | 고친 것 |
+|---|---|
+| `.claude/rules/code.md` | `color-mix` 금지 → **써도 된다**(하드코딩 hex 금지는 유지) |
+| `.claude/agents/code-reviewer.md` | 같은 항목 |
+| `.claude/skills/common-ux/SKILL.md` | `color-mix` 1곳 + 컨테이너 쿼리 1곳 + 함정 절 제목 1곳 |
+| `.analy/15_공통_입력UX_가이드.md` | 라이트 테마 틴트(정적 hex 사유) 1곳 + 미확인 표시 2곳 |
+| `.analy/16_공통_화면UX_표준.md` | 금지 표에서 `color-mix` 제거 + 드롭존 색 1곳 |
+| `.analy/00_개요_및_컨버전전략.md` | 플랫폼 Electron 14 → **45** |
+| `.analy/09_환경구축_런북.md` | 8곳 — 설치 버전 · `package.json` 예시(`overrides.node-abi` 추가 · better-sqlite3 13) · ABI 89 → **150** · 확인 명령 기대값 |
+
+### 일부러 안 바꾼 것
+
+- **`color-mix` 말고 Chromium 93 을 전제한 나머지 항목은 「이제 된다」고 쓰지 않았다.**
+  실제로 재 보지 않았기 때문이다. 대신 **「Electron 45 에서는 다시 확인하지 않았다」** 표시만 달았다.
+  - 컨테이너 쿼리 미지원 → 카드 뷰를 `ResizeObserver` 로 토글하는 것(코드도 그대로)
+  - sticky 헤더가 스크롤바 폭만큼 어긋나던 렌더 버그
+  - blur/change/click 처리 도중 동기 `focus()` 가 무시되던 것
+  - Monaco `readOnly` 로 IME(한글) 조합 입력을 못 막던 것
+- **`.works/` 안 옛 계획서 9개**에도 같은 문구가 남아 있지만 손대지 않았다. 끝난 작업의 계획서이고,
+  현행 표준이 아니다(폐지된 폴더 — 2026-10-13 지시).
+- **코드는 한 줄도 안 고쳤다.** `color-mix` 를 쓰던 22곳 중 로그인 로고 2줄만 장군님 지시로 껐고 나머지는 그대로다.
+
+### 또 밟을 함정
+
+- **엔진 버전이 올라가면 「엔진이 못 읽어서 조용히 무시되던 선언」이 한꺼번에 살아난다.**
+  문서의 「못 쓴다」는 금지는 풀어도, **그 금지를 피하려고 짠 코드(정적 hex·`ResizeObserver` 등)는 그대로다.**
+  문서만 고치고 코드를 안 고치면 둘이 어긋나므로, 문서에 **코드가 아직 옛 방식임을 같이 적었다.**
+- **「이제 될 것이다」는 추측이다.** 실제로 재 본 것(`color-mix`)만 단정하고, 나머지는 미확인으로 남겼다.

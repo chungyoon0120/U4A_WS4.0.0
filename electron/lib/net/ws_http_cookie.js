@@ -29,6 +29,13 @@
 const SCHEME_HTTP = 'http:';
 
 /**
+ * ★[2026-10-27 장군님 지시] 어디서 끊기는지 보려고 넣은 진단 로그의 상한.
+ *   요청마다 남기면 로그가 쏟아지므로 **처음 몇 번만** 남긴다(로그 양 표준).
+ *   쿠키 값은 절대 남기지 않는다 — 인증 표다. 이름과 개수만 남긴다.
+ */
+const LOG_FIRST_N = 5;
+
+/**
  * host 별 쿠키 보관함.  Map<host, Map<name, value>>
  * session 마다 따로 두려고 install() 안에서 만든다.
  */
@@ -149,6 +156,12 @@ function install(oSession) {
 
     const oFilter = { urls: ['http://*/*'] };
 
+    // 진단용 — 처음 몇 번만 남기려고 센다.
+    let iReqLogged = 0;
+    let iResLogged = 0;
+
+    _writeLog('알림', 'HTTP_COOKIE | hooked on a session');
+
     /************************************************************************************
      * ① 응답에서 Set-Cookie 를 거둔다.
      * ----------------------------------------------------------------------------------
@@ -175,6 +188,20 @@ function install(oSession) {
                 if (sKey.toLowerCase() === 'set-cookie') {
                     aSetCookie = oHeaders[sKey] || [];
                 }
+
+            }
+
+            // ★[2026-10-27] 「서버가 안 보냈다」와 「헤더가 우리 눈에 안 보인다」를 가른다.
+            //   Chromium 은 Set-Cookie 를 리스너에 안 보여 줄 수 있다. 그때는 헤더 개수는 세어지는데
+            //   set-cookie 만 0 으로 나온다 — 그 모양이 보이면 거두는 자리를 옮겨야 한다.
+            if (iResLogged < LOG_FIRST_N) {
+
+                iResLogged = iResLogged + 1;
+
+                _writeLog('알림', 'HTTP_COOKIE | response seen | host=' + sHost
+                    + ' | status=' + oDetails.statusCode
+                    + ' | headerCount=' + Object.keys(oHeaders).length
+                    + ' | setCookieCount=' + aSetCookie.length);
 
             }
 
@@ -223,6 +250,17 @@ function install(oSession) {
 
             const sHost = _getHttpHost(oDetails.url);
             const oHostJar = sHost ? oJar.get(sHost) : null;
+
+            // ★[2026-10-27] 요청이 여기까지 오기는 하는지부터 본다.
+            //   아무 줄도 안 나오면 이 자리 자체가 안 불리는 것이다(걸린 session 이 다르다는 뜻).
+            if (iReqLogged < LOG_FIRST_N) {
+
+                iReqLogged = iReqLogged + 1;
+
+                _writeLog('알림', 'HTTP_COOKIE | request seen | host=' + (sHost || '(not http)')
+                    + ' | kept=' + (oHostJar ? oHostJar.size : 0));
+
+            }
 
             if (!oHostJar || oHostJar.size === 0) {
                 fnCallback({ cancel: false, requestHeaders: oDetails.requestHeaders });
@@ -305,7 +343,19 @@ function installAll(oApp) {
 
         install(session.defaultSession);
 
-        oApp.on('session-created', install);
+        // ★[2026-10-27] 창마다 session 이 달라, 나중에 생기는 session 에도 걸려야 한다.
+        //   몇 개에 걸렸는지 세어 둔다 — 로그인 창의 session 에 안 걸렸으면 여기 수가 안 는다.
+        let iSession = 1;
+
+        oApp.on('session-created', function (oNewSession) {
+
+            iSession = iSession + 1;
+
+            install(oNewSession);
+
+            _writeLog('알림', 'HTTP_COOKIE | new session hooked | total=' + iSession);
+
+        });
 
         _writeLog('알림', 'HTTP_COOKIE | installed on every session');
 

@@ -1,4 +1,4 @@
-// 오류코드 접두: SVLS / 다음 번호: 003
+// 오류코드 접두: SVLS / 다음 번호: 004
 /************************************************************************
  * Copyright 2020. INFOCG Inc. all rights reserved.
  * ----------------------------------------------------------------------
@@ -3153,24 +3153,119 @@
     }
     oAPP.fn.fnLoginPage = fnLoginPage;
 
+    /********************************************************************
+     * 로그인 창 session 의 쿠키를 다른 site 에서도 쓸 수 있게 고친다.
+     *
+     * 2026-10-27 Electron 45 로 올리면서 고쳤다
+     * (장군님 보고 「https 인데 로그인 쿠키가 유지가 안된다」).
+     *
+     * 화면은 `u4a-ws://` 이고 SAP 서버는 다른 site 다. 그래서 쿠키가 실리려면
+     * `SameSite=None` 과 `Secure` 두 가지가 다 있어야 한다.
+     * 전에는 그 두 규칙이 Chromium switch 로 꺼져 있어서 그냥 됐는데
+     * (`electron/main.js` 의 disable-features), 그 기능이 Chromium 에서
+     * 없어져 스위치가 아무 일도 하지 않는다. 그래서 여기서 직접 붙인다.
+     *
+     * ★`main.js` 의 같은 이름 함수와 **같은 모양**이다. 한쪽만 고치지 말 것.
+     * ★http 응답은 건드리지 않는다 — `electron/lib/net/ws_http_cookie.js` 가 맡는다.
+     ********************************************************************/
+    function _toCrossSiteCookie(sSetCookieLine) {
+
+        let sCookie = String(sSetCookieLine);
+
+        // SameSite 값을 None 으로. Strict · Lax · OFF 전부 해당한다.
+        // 속성이 아예 없으면 붙인다 — 없으면 Lax 로 취급돼 다른 site 에 안 실린다.
+        if (/;\s*SameSite\s*=/i.test(sCookie)) {
+            sCookie = sCookie.replace(/;\s*SameSite\s*=\s*[^;]*/i, "; SameSite=None");
+        } else {
+            sCookie = sCookie + "; SameSite=None";
+        }
+
+        // SameSite=None 인데 Secure 가 없으면 Chromium 이 쿠키를 통째로 거부한다.
+        if (!/;\s*Secure\s*(;|$)/i.test(sCookie)) {
+            sCookie = sCookie + "; Secure";
+        }
+
+        return sCookie;
+
+    }
+
+    // 응답 헤더의 키는 서버가 보낸 대소문자 그대로 올 수 있다('Set-Cookie' · 'set-cookie').
+    function _findSetCookieKey(oHeaders) {
+
+        for (const sKey in oHeaders) {
+
+            if (sKey.toLowerCase() === "set-cookie") {
+                return sKey;
+            }
+
+        }
+
+        return "";
+
+    }
+
+    // 같은 host 는 한 번만 남긴다 — 응답마다 남기면 로그만 커진다.
+    const _oCookieFixLoggedHosts = new Set();
+
+    function _logCookieFix(sUrl, aBefore) {
+
+        let sHost = "";
+
+        try {
+            sHost = new URL(sUrl).host;
+        } catch (e) {
+            sHost = "";
+        }
+
+        if (!sHost) {
+            return;
+        }
+
+        if (_oCookieFixLoggedHosts.has(sHost)) {
+            return;
+        }
+
+        _oCookieFixLoggedHosts.add(sHost);
+
+        // 쿠키 값은 인증 표다 — 남기지 않는다. 이름과 개수만 남긴다.
+        const aNames = aBefore.map((sLine) => String(sLine).split("=")[0].trim());
+        const iNoSameSite = aBefore.filter((sLine) => !/;\s*SameSite\s*=/i.test(sLine)).length;
+        const iNoSecure = aBefore.filter((sLine) => !/;\s*Secure\s*(;|$)/i.test(sLine)).length;
+
+        console.log("[SVLS-003] INFO | COOKIE_FIX | host=" + sHost
+            + " | count=" + aBefore.length
+            + " | names=" + aNames.join(",")
+            + " | sameSiteMissing=" + iNoSameSite
+            + " | secureMissing=" + iNoSecure);
+
+    }
+
     function configureSession(oBrowserWindow) {
+
         const session = oBrowserWindow.webContents.session;
         const filter = { urls: ["http://*/*", "https://*/*"] };
+
         session.webRequest.onHeadersReceived(filter, (details, callback) => {
-            const cookies = (details.responseHeaders['set-cookie'] || []).map((cookie) => {
-                if (cookie.indexOf("SameSite=OFF") > 0 || cookie.indexOf("SameSite=None") > 0) {
-                    return cookie;
+
+            const oHeaders = details.responseHeaders || {};
+            const sKey = _findSetCookieKey(oHeaders);
+            const bHttps = String(details.url || "").toLowerCase().indexOf("https:") === 0;
+
+            if (sKey && bHttps) {
+
+                const aBefore = oHeaders[sKey] || [];
+
+                if (aBefore.length > 0) {
+                    _logCookieFix(details.url, aBefore);
+                    oHeaders[sKey] = aBefore.map(_toCrossSiteCookie);
                 }
-                let sCookie = cookie;
-                sCookie = sCookie.replace('SameSite=Strict', 'SameSite=None');
-                sCookie = sCookie.replace('SameSite=Lax', 'SameSite=None');
-                return sCookie;
-            });
-            if (cookies.length > 0) {
-                details.responseHeaders['set-cookie'] = cookies;
+
             }
+
             callback({ cancel: false, responseHeaders: details.responseHeaders });
+
         });
+
     }
 
     function fnP13nCreateTheme(SYSID) {

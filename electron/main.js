@@ -274,7 +274,95 @@ function getAppIconPath() {
 }
 
 
-// samesite 회피
+/***************************************************************************************
+ * samesite 회피 — https 응답의 쿠키를 다른 site 에서도 쓸 수 있게 고친다.
+ *
+ * 2026-10-27 Electron 45 로 올리면서 고쳤다 (장군님 보고 「https 인데 로그인 쿠키가 유지가 안된다」).
+ *
+ * 우리 화면은 `u4a-ws://` 이고 SAP 서버는 **다른 site** 다. 그래서 쿠키가 실리려면
+ * **`SameSite=None` 과 `Secure` 두 가지가 다 있어야 한다.**
+ *
+ * 전에는 그 두 규칙이 Chromium switch 로 꺼져 있어서 그냥 됐다
+ * (이 파일 위쪽 `disable-features` 의 `SameSiteByDefaultCookies` ·
+ *  `CookiesWithoutSameSiteMustBeSecure`). **그 기능이 Chromium 에서 없어져 스위치가
+ * 아무 일도 하지 않는다.** 그래서 여기서 직접 붙인다.
+ *
+ * ★`http` 응답은 건드리지 않는다 — http 는 `Secure` 쿠키를 저장할 수 없어서
+ *   `electron/lib/net/ws_http_cookie.js` 가 쿠키를 직접 들고 다닌다.
+ ***************************************************************************************/
+function toCrossSiteCookie(sSetCookieLine) {
+
+    let sCookie = String(sSetCookieLine);
+
+    // SameSite 값을 None 으로. Strict · Lax · OFF 전부 해당한다.
+    // 속성이 아예 없으면 붙인다 — 없으면 Lax 로 취급돼 다른 site 에 안 실린다.
+    if (/;\s*SameSite\s*=/i.test(sCookie)) {
+        sCookie = sCookie.replace(/;\s*SameSite\s*=\s*[^;]*/i, "; SameSite=None");
+    } else {
+        sCookie = sCookie + "; SameSite=None";
+    }
+
+    // SameSite=None 인데 Secure 가 없으면 Chromium 이 쿠키를 통째로 거부한다.
+    if (!/;\s*Secure\s*(;|$)/i.test(sCookie)) {
+        sCookie = sCookie + "; Secure";
+    }
+
+    return sCookie;
+
+}
+
+// 응답 헤더의 키는 서버가 보낸 대소문자 그대로 올 수 있다('Set-Cookie' · 'set-cookie').
+// 소문자로 박아 두면 못 찾고 그냥 지나간다.
+function findSetCookieKey(oHeaders) {
+
+    for (const sKey in oHeaders) {
+
+        if (sKey.toLowerCase() === "set-cookie") {
+            return sKey;
+        }
+
+    }
+
+    return "";
+
+}
+
+// 같은 host 는 한 번만 남긴다 — 응답마다 남기면 로그만 커지고 새 정보가 없다.
+const oCookieFixLoggedHosts = new Set();
+
+function logCookieFix(sUrl, aBefore) {
+
+    let sHost = "";
+
+    try {
+        sHost = new URL(sUrl).host;
+    } catch (e) {
+        sHost = "";
+    }
+
+    if (!sHost) {
+        return;
+    }
+
+    if (oCookieFixLoggedHosts.has(sHost)) {
+        return;
+    }
+
+    oCookieFixLoggedHosts.add(sHost);
+
+    // 쿠키 값은 인증 표다 — 남기지 않는다. 이름과 개수만 남긴다.
+    const aNames = aBefore.map((sLine) => String(sLine).split("=")[0].trim());
+    const iNoSameSite = aBefore.filter((sLine) => !/;\s*SameSite\s*=/i.test(sLine)).length;
+    const iNoSecure = aBefore.filter((sLine) => !/;\s*Secure\s*(;|$)/i.test(sLine)).length;
+
+    console.log("[MAIN-011] INFO | COOKIE_FIX | host=" + sHost
+        + " | count=" + aBefore.length
+        + " | names=" + aNames.join(",")
+        + " | sameSiteMissing=" + iNoSameSite
+        + " | secureMissing=" + iNoSecure);
+
+}
+
 function configureSession() {
 
     const filter = {
@@ -283,23 +371,19 @@ function configureSession() {
 
     session.defaultSession.webRequest.onHeadersReceived(filter, (details, callback) => {
 
-        let cookies = (details.responseHeaders['set-cookie'] || []).map((cookie) => {
+        const oHeaders = details.responseHeaders || {};
+        const sKey = findSetCookieKey(oHeaders);
+        const bHttps = String(details.url || "").toLowerCase().indexOf("https:") === 0;
 
-            if (cookie.indexOf("SameSite=OFF") > 0 || cookie.indexOf("SameSite=None") > 0) {
-                return cookie;
+        if (sKey && bHttps) {
+
+            const aBefore = oHeaders[sKey] || [];
+
+            if (aBefore.length > 0) {
+                logCookieFix(details.url, aBefore);
+                oHeaders[sKey] = aBefore.map(toCrossSiteCookie);
             }
 
-            let sCookie = cookie;
-
-            sCookie = sCookie.replace('SameSite=Strict', 'SameSite=None');
-            sCookie = sCookie.replace('SameSite=Lax', 'SameSite=None');
-
-            return sCookie;
-
-        });
-
-        if (cookies.length > 0) {
-            details.responseHeaders['set-cookie'] = cookies;
         }
 
         callback({

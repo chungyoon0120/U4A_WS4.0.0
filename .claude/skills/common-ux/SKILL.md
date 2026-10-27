@@ -21,7 +21,7 @@ description: U4A WS4.0 공통 화면 UX 표준(.analy/16 SSOT) 안내. **사용�
 - 공통 파일(`shell.css` / `bootstrap-skin.css` / `u4a-ui.js` / `tokens.css`)을 **직접 수정하지 않는다.**
   화면 고유 요구는 그 화면 스코프에서 **override**로 덧댄다. 공통 승격이 필요하면 사용자에게 먼저 묻는다.
 - 모양/동작은 화면마다 새로 만들지 말고 **공통 컴포넌트를 소비**한다.
-- 색은 `theme/tokens.css`의 **의미 토큰만**. 하드코딩 hex 금지. `color-mix` 금지(Chromium 93)→ 솔리드 rgba.
+- 색은 `theme/tokens.css`의 **의미 토큰만**. 하드코딩 hex 금지. `color-mix` 는 **써도 된다**(2026-10-27 Electron 45 로 올리며 풀림).
 - 문구는 **메시지 키**(SQLite)만. 임의 메시지 생성 금지 — 필요 키는 수집해 보고.
 - **고정 px 폭 금지 = 반응형**(§12 7장). 반응형 기준은 뷰포트가 아니라 컨테이너 폭(ResizeObserver).
 
@@ -71,7 +71,7 @@ description: U4A WS4.0 공통 화면 UX 표준(.analy/16 SSOT) 안내. **사용�
 - **셀 말줄임 자동 툴팁**: `td`·`.u4a-th__label`은 가로로 잘리면 공통 `initTooltip`이 `data-tip`+`data-tip-trunc` 자동 부여. per-cell title 달지 말 것.
 
 ### 카드(반응형) 뷰 — 옵트인
-- `.u4a-table-wrap[data-view="card"]`. **컨테이너쿼리 미지원(Ch93)** → 화면 JS가 `ResizeObserver`로 `data-view` 토글.
+- `.u4a-table-wrap[data-view="card"]`. 화면 JS가 `ResizeObserver`로 `data-view` 토글 — Electron 14 = Chromium 93 이 컨테이너 쿼리를 몰라서 이렇게 짰다. **Electron 45 에서 컨테이너 쿼리가 되는지는 아직 안 재 봤고, 코드도 그대로다.**
 - ⚠️ **사용자/원본 별도 언급 없이는 적용 금지**. 기본 `data-view="table"`(가로 스크롤). 특히 인라인 편집 그리드(입력칸/스위치/체크박스)엔 넣지 말 것.
 
 ### 컬럼 헤더 정렬/필터 메뉴 — 서버리스트 기준 (§16 6.2)
@@ -98,7 +98,7 @@ SSOT 레퍼런스 = USP `usp.css`(.u4aWs30Tree*) / MIME `mime.css`(.u4aMimeTree*
 6. **우측 컬럼 2개↑ = 헤더에도 `gap:0.375rem`**(공통 행 gap과 일치).
 7. **★컬럼헤더는 스크롤 컨테이너 "안"에 `position:sticky;top:0`** — 절대 스크롤러 바깥 형제로 두지 말 것. 밖에 두면 세로 스크롤바 뜰 때 바디만 줄어 어긋남.
 
-### 자주 물리는 함정 (Chromium 93 / 렌더)
+### 자주 물리는 함정 (렌더) — ★`Ch93` 표시 항목은 **Electron 45 에서 다시 확인하지 않았다**(2026-10-27)
 - ⚠️ **sticky 헤더 어긋남**(Ch93): 세로 스크롤바 뜨면 sticky thead가 바디와 스크롤바 폭만큼 어긋남. 정적 페이지로 재현 불가 → 엔진 버전부터 의심. 회피=div flex 그리드(헤더를 스크롤 컨테이너 안 sticky), `<table>`이면 `table-layout:fixed`인지부터 확인.
 - ⚠️ **sticky 헤더 hover 반투명 함정**: `th:hover{background:var(--hover-bg)}` 단독이면 뒤 데이터 비쳐 글자 겹침 → `background:linear-gradient(var(--hover-bg),var(--hover-bg)),var(--surface)`(불투명 위 틴트).
 - ⚠️ **"셀 옆 점(dot)" 방어**: Bootstrap 등 로드로 셀에 `::before/::after` 글리프가 붙을 수 있음 → 새 테이블 CSS에 `td::before,td::after{content:none!important}` + 체크박스 `margin:0`.
