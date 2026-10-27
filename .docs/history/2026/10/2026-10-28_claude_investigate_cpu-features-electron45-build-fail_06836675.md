@@ -220,3 +220,52 @@ Node-API 는 ABI 중립이라 Electron 버전과 무관하게 그대로 돈다.
 `앱 내장 Node 14.17.0` · `Chromium 93.0.4577.82` · `네이티브 ABI 89`.
 같은 문서 다른 줄에는 `Electron 45 → ABI 150` 으로 맞게 적혀 있어 **서로 어긋난다.**
 실제 값은 Electron 45 를 켜 봐야 알 수 있어 지금은 손대지 않았다.
+
+---
+
+## ★정정 (2026-10-28) — `-w` 가 아니라 `-o` 다
+
+### 무엇이 틀렸나
+
+`npx @electron/rebuild -f -w better-sqlite3` 로 고쳐 넣고 「그것만 다시 빌드한다」고 보고했으나 **틀렸다.**
+장군님이 오류 난 PC 에서 그 명령을 돌렸는데 **그대로 `cpu-features` 를 다시 빌드하다 멈췄다.**
+
+```
+npm error command ... npx @electron/rebuild -f -w better-sqlite3
+node-gyp failed to rebuild '...\node_modules\cpu-features'
+```
+
+### 실제 옵션 뜻 (`node_modules/@electron/rebuild/lib/cli.js` 실측)
+
+| 옵션 | 설명(원문) | 뜻 |
+|---|---|---|
+| `-w, --which-module` | "A specific module to build… Modules will only be rebuilt if they also match the types of dependencies being rebuilt" | **이 모듈도 빌드** — 다른 것을 빼지 않는다 |
+| `-o, --only` | "Only build specified module, or comma separated list of modules. **All others are ignored.**" | **이것만** 빌드 |
+
+걸러내는 자리 = `module-walker.js:113`
+```js
+if (this.prodDeps.has(`${prefix}${modulePath}`) && (!this.onlyModules || this.onlyModules.includes(modulePath))) {
+    this.modulesToRebuild.push(realPath);
+}
+```
+`onlyModules`(= `-o`)가 있으면 **그 목록에 있는 이름만** 다시 빌드 목록에 들어간다.
+`-w`(extraModules)는 `prodDeps` 집합에 **더하는** 것일 뿐이다.
+
+### 왜 내 검증이 통과한 것처럼 보였나 (★되풀이하지 말 것)
+
+이 PC 에는 `cpu-features` 가 **없다.** 그래서 대상이 `better-sqlite3` 하나뿐이었고
+`-w` 든 `-o` 든 결과가 같았다. **재현되지 않는 PC 에서 돌린 것을 「통과」로 보고한 것이 잘못이다.**
+→ 어느 PC 에서만 나는 결함은 **그 조건을 만들어 놓고** 검증해야 한다.
+
+### 고친 것 · 검증
+
+- `package.json` 의 `postinstall` 과 `sqlite:rebuild` **둘 다** `-w` → **`-o`**
+  (`sqlite:rebuild` 도 원래 `-w` 였다 — 같은 결함을 갖고 있었다)
+- `.analy/09_환경구축_런북.md` 4곳 + 규칙 문구(`-o` 뒤에 쉼표로 적는다)
+
+검증 (임시 폴더, 프로젝트는 건드리지 않음):
+1. 짧은 경로 임시 폴더에 `better-sqlite3@13.0.3` + `node-ssh@13.0.1` 설치
+   → **`node_modules/cpu-features` 가 깔린 상태를 만들었다**
+2. 프로젝트의 rebuild 로 그 폴더를 대상 지정해 실행
+   `npx @electron/rebuild -f -o better-sqlite3 -v 45.0.0 -m <임시폴더>`
+3. 결과: **EXIT=0 · `Rebuild Complete` · 로그에 `cpu-features` 0회** → 건너뛴 것이 확인됐다
