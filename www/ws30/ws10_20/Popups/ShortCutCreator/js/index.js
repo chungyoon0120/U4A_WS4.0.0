@@ -416,9 +416,54 @@
         } else { console.error('[shortcut] fnAppF4PopupOpen not loaded'); }
     }
 
+    // ★[2026-10-27 장군님 지시] 검증에 걸린 칸이 **접힌 패널** 안에 있으면 그 패널을 펼친다.
+    //   공통 패널은 접히면 본문이 display:none 이라 빨간 테두리도 메시지도 안 보이고 focus() 조차 안 먹는다.
+    //   그래서 패널을 다 접은 채 「쇼컷 링크 저장」을 누르면 화면에 아무 반응이 없었다.
+    //   (원본 UI5 는 sap.m.Panel 에 expandable 을 안 줘서 애초에 접히지 않았다 — 접기는 HTML5 에서 생긴 것이다.)
+    //   ★패널의 접힘 상태는 공통이 가진다. 속성을 직접 쓰지 않고 그 패널의 접기 버튼을 눌러
+    //     공통의 setCollapsed 를 타게 한다(aria-expanded 와 onToggle 이 같이 맞춰진다).
+    function _revealField(oField) {
+
+        if (!oField || !oField.el || typeof oField.el.closest !== "function") {
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("값이 없어 그만둠", "field element", "cannot expand the panel - validation error stays hidden");
+            }
+
+            return;
+        }
+
+        const oPanel = oField.el.closest(".u4a-panel");
+
+        if (!oPanel) {
+            return;
+        }
+
+        if (oPanel.getAttribute("data-collapsed") !== "X") {
+            return;
+        }
+
+        const oToggle = oPanel.querySelector(".u4a-panel__toggle");
+
+        if (!oToggle) {
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("값이 없어 그만둠", "panel toggle button", "collapsed panel stays closed - validation error stays hidden");
+            }
+
+            return;
+        }
+
+        oToggle.click();
+    }
+
     // 검증 실패 필드 자동 포커스(공통 §3.5.4) — Chromium93 함정 A(진행중 포커스에 밀림) 회피 위해 다음 틱으로 미룸.
     //   호출측이 busy/모달을 먼저 닫은 뒤(동기) 실행되도록 setTimeout(0) 사용(함정 B).
     function _refocus(oField) {
+
+        // 접힌 패널 안이면 먼저 펼친다 — 안 그러면 숨은 칸이라 focus 가 안 먹는다.
+        _revealField(oField);
+
         if (oField && typeof oField.focus === "function") {
             setTimeout(function () { try { oField.focus(); } catch (e) { console.error("[shortcut] re-focus error:", e); } }, 0);
         }
@@ -464,15 +509,15 @@
         return "";
     }
 
-    // 필수 입력 필드 유효성 점검 — 오류 시 첫 오류 필드 자동 포커스(공통 §3.5.4)
+    // 필수 입력 필드 유효성 점검 — 오류 시 그 칸이 든 패널을 모두 펼치고 첫 오류 필드에 포커스(공통 §3.5.4)
     function fn_Check_required() {
         let Lret = "";
-        let oFirstBad = null;
+        const aBad = [];   // 오류 난 칸 전부. 첫 하나만 가지고 있으면 다른 패널의 오류가 접힌 채 남는다.
 
         if (oAppIdField.getValue() === "") {
             Lret = "E";
             oAppIdField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C67", "APP ID")));
-            if (!oFirstBad) { oFirstBad = oAppIdField; }
+            aBad.push(oAppIdField);
         } else {
             oAppIdField.setValueState("none");
         }
@@ -480,7 +525,7 @@
         if (oSavePathField.getValue() === "") {
             Lret = "E";
             oSavePathField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C69", "Save As Path")));
-            if (!oFirstBad) { oFirstBad = oSavePathField; }
+            aBad.push(oSavePathField);
         } else {
             oSavePathField.setValueState("none");
         }
@@ -488,7 +533,7 @@
         if (oHostInputField.getValue() === "") {
             Lret = "E";
             oHostInputField.setValueState("error", _msgRequired(getMsgText("/U4A/CL_WS_COMMON", "C71", "Target Host URL")));
-            if (!oFirstBad) { oFirstBad = oHostInputField; }
+            aBad.push(oHostInputField);
         } else if (!/^https?:\/\/[^\s/?#]+/i.test(oHostInputField.getValue().trim())) {
             // ★외부 호스트 URL 은 사용자가 직접 타이핑한다(내부는 읽기전용). 형식 검사가 없으면 "uha.u4aide.com" 처럼
             //   스킴 없는 값이 그대로 URL 로 붙어, 브라우저가 이를 '주소'가 아니라 '검색어'로 처리해 엉뚱한 페이지가 뜬다.
@@ -496,7 +541,7 @@
             Lret = "E";
             oHostInputField.setValueState("error",
                 oAPP.common.fnGetMsgClsText("/U4A/MSG_WS", "109", getMsgText("/U4A/CL_WS_COMMON", "C71", "Target Host URL")));
-            if (!oFirstBad) { oFirstBad = oHostInputField; }
+            aBad.push(oHostInputField);
         } else {
             oHostInputField.setValueState("none");
         }
@@ -505,13 +550,22 @@
         //   ★확인 팝업 '이후'가 아니라 '이전'에 걸러야 한다(§ 핸들러 = 검증 먼저).
         if (fn_Check_fileName() === "E") {
             Lret = "E";
-            if (!oFirstBad) { oFirstBad = oFileNameField; }
+            aBad.push(oFileNameField);
         }
 
         if (Lret === "E") {
+
+            // ★[2026-10-27] 오류 난 칸이 든 패널을 **전부** 펼친다. 하나만 펼치면 다른 패널의 오류가
+            //   접힌 채로 남아 무엇이 잘못됐는지 또 안 보인다.
+            aBad.forEach(_revealField);
+
             const mainArea = document.querySelector(".u4aShortcutMain");
-            if (mainArea) { mainArea.scrollTo({ top: 0, behavior: 'smooth' }); }
-            _refocus(oFirstBad);   // 첫 오류 필드로 포커스 → 빨간 테두리 + 메시지 함께 표시
+
+            if (mainArea) {
+                mainArea.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            _refocus(aBad[0]);   // 첫 오류 필드로 포커스 → 빨간 테두리 + 메시지 함께 표시
         }
 
         return Lret;
