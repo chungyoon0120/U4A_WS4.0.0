@@ -119,6 +119,23 @@
         return (sFallback || sNo).replace(/&1/g, sP1);
     }
 
+    // ★[2026-10-27 장군님 지시] 알림(성공·실패·오류)은 **확인 버튼 하나**다.
+    //   공통 확인창은 buttons 를 안 넘기면 기본이 「예 / 아니요」라, 「처리가 완료되었습니다」에도
+    //   체크·X 두 개가 떴다. 원본 UI5 도 성공·실패는 actions:[OK] 하나였고,
+    //   「예/아니요」는 바로가기 만들기 **진행 확인** 하나뿐이다(그 자리는 그대로 둔다).
+    function _alert(oOpt) {
+
+        var sOk = getMsgText("/U4A/CL_WS_COMMON", "A40", "OK");
+
+        U4AUI.confirm({
+            type: oOpt.type,
+            title: oOpt.title,
+            message: oOpt.message,
+            buttons: [{ act: "OK", label: sOk, emphasized: true }],
+            onClose: oOpt.onClose
+        });
+    }
+
     // window 전역 노출 / shim 추가 (fnAppF4PopupOpen.js 의존성 대비)
     window.oAPP = oAPP;
     window.$ = window.$ || {};              // $ 미사용이나 IIFE 인자 ReferenceError 방지
@@ -128,7 +145,15 @@
     window.getUserInfo = function () { return oAPP.attr.oUserInfo; };
     window.getServerPath = function () { return (oAPP.config && oAPP.config.SHOST) || ''; };
     window.getIsTrial = function () { return false; };
-    window.showMessage = function (oSap, iCode, sType, sText) { try { U4AUI.confirm({ type: sType, title: getMsgText('/U4A/CL_WS_COMMON','C00','fail'), message: sText }); } catch (e) { console.error('[shortcut] showMessage shim error:', e); } };
+    window.showMessage = function (oSap, iCode, sType, sText) {
+
+        try {
+            _alert({ type: sType, title: getMsgText('/U4A/CL_WS_COMMON', 'C00', 'fail'), message: sText });
+        } catch (e) {
+            console.error('[shortcut] showMessage shim error:', e);
+        }
+
+    };
     // fnAppF4PopupOpen 의 전역 sendAjax(ws_common.js) 경량 shim — 자식창엔 원본이 없어 fetch 로 대체(FormData+WSVER 계약 유지).
     window.sendAjax = function (sPath, oFormData, fn_success, bIsBusy, bIsAsync, meth, fn_error) {
 
@@ -296,6 +321,13 @@
         const _ISBROAD = sOption?.ISBROAD || undefined;
         const bFromBroad = (typeof _ISBROAD !== "undefined");
 
+        // ★[2026-10-27 장군님 지시] busy 가 **실제로 다 꺼진 뒤**에 할 일.
+        //   공통 busy 는 <dialog> + showModal 이라, 열려 있는 동안 바깥 요소에 focus() 를 불러도
+        //   먹지 않는다(inert). 게다가 닫힐 때 브라우저가 "열기 전 커서"로 포커스를 되돌린다.
+        //   공통 U4ABusy.hide 는 화면이 조용해질 때까지 기다렸다 닫으므로(최소 300ms),
+        //   fn_setBusy(false) 바로 뒤에 focus 를 걸면 그 포커스가 통째로 날아간다.
+        const fnAfterBusyOff = sOption?.ONDONE;
+
         if (bFromBroad) {
             _bBroadBusy = (bIsBusy === true);
         } else if (bIsBusy === true) {
@@ -307,20 +339,33 @@
         const bWant = (_iBusyDepth > 0) || _bBroadBusy;
         oAPP.attr.isBusy = bWant;
 
-        if (bWant === _bBusyShown) { return; }   // 상태 변화 없음 — 화면도 전파도 그대로
+        if (bWant === _bBusyShown) {
+
+            // 상태 변화 없음 — 화면도 전파도 그대로. 다만 이미 꺼져 있으면 뒷일은 바로 해 준다.
+            if (!bWant && typeof fnAfterBusyOff === "function") {
+                fnAfterBusyOff();
+            }
+
+            return;
+        }
         _bBusyShown = bWant;
 
         // [2026-10-16] 공통 busy(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음). 자체 <dialog> 도 공통으로 모은다:
         //   모양을 바꿀 때 theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
         if (window.U4ABusy && typeof U4ABusy.show === "function") {
-            if (bWant) { U4ABusy.show(); } else { U4ABusy.hide(); }
+            if (bWant) { U4ABusy.show(); } else { U4ABusy.hide(fnAfterBusyOff); }
         } else {
             if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
                 U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local busy dialog");
             }
             const busyOverlay = document.getElementById("u4aShortcutBusy");
-            if (bWant) { if (busyOverlay && !busyOverlay.open) { busyOverlay.showModal(); } }
-            else { if (busyOverlay && busyOverlay.open) { busyOverlay.close(); } }
+
+            if (bWant) {
+                if (busyOverlay && !busyOverlay.open) { busyOverlay.showModal(); }
+            } else {
+                if (busyOverlay && busyOverlay.open) { busyOverlay.close(); }
+                if (typeof fnAfterBusyOff === "function") { fnAfterBusyOff(); }
+            }
         }
 
         // 내 창에서 시작한 처리만 자식 창에 전파(부모가 보낸 지시는 되돌려 보내지 않는다 — 원래 동작).
@@ -469,6 +514,48 @@
         }
     }
 
+    // ★[2026-10-27 장군님 지시] 이 창의 버튼은 **누를 때 입력칸에서 커서가 빠지지 않게** 한다.
+    //   커서가 빠지면 앱 ID 칸의 change 가 터져 서버 검사가 시작되고, 그 순간 처리중 표시가
+    //   화면 맨 위를 덮는다(공통 busy = <dialog> + showModal, top-layer).
+    //   그러면 마우스를 뗀 곳이 버튼이 아니라 처리중 표시라 **click 이 아예 만들어지지 않는다**
+    //   → 잘못된 앱 ID 를 고쳐 적고 바로 「쇼컷 링크 저장」을 누르면, 앱 Name 만 채워지고
+    //     「바로가기 만들기를 진행하시겠습니까」 확인 팝업이 안 떴다(장군님 실측).
+    //   ★앱 ID 검사가 빠지는 것이 아니다 — 저장 흐름의 fn_Check_value 가 맨 먼저 fn_CheckAppId 를
+    //     다시 부른다. 오히려 서버 왕복이 한 번 줄어든다.
+    //   (원본 UI5 의 앱 ID 칸에는 change 이벤트가 아예 없어 이 사고가 없었다. HTML5 에서 생긴 것이다.)
+    //   누를 때 커서가 빠지지 않게만 하는 것(이미 click 이 걸려 있는 버튼용).
+    function _keepFocusOnMouseDown(sId) {
+
+        const oBtn = document.getElementById(sId);
+
+        if (!oBtn) {
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("값이 없어 그만둠", sId, "button not found - its click can still be swallowed by the busy overlay");
+            }
+
+            return null;
+        }
+
+        oBtn.addEventListener("mousedown", function (oEvt) {
+            oEvt.preventDefault();
+        });
+
+        return oBtn;
+    }
+
+    //   커서 빠짐 막기 + click 바인딩을 한 번에.
+    function _bindFooterButton(sId, fnOnClick) {
+
+        const oBtn = _keepFocusOnMouseDown(sId);
+
+        if (!oBtn) {
+            return;
+        }
+
+        oBtn.addEventListener("click", fnOnClick);
+    }
+
     // 서버가 백엔드 로그온 언어로 구운 오류 텍스트(RTMSG)를 워크스페이스 언어로 역현지화(공통 WsMsgCls.relocalize SSOT 위임).
     //   자식창은 백엔드 언어를 몰라 beLangu=null(공통이 EN/KO 후보로 시도). 못 찾으면 원문 폴백. (mimeRepository 동일 패턴, .analy/17)
     function _relocalizeServer(sText) {
@@ -510,6 +597,46 @@
     }
 
     // 필수 입력 필드 유효성 점검 — 오류 시 그 칸이 든 패널을 모두 펼치고 첫 오류 필드에 포커스(공통 §3.5.4)
+    // ★[2026-10-27 장군님 지적 — 「오류 위치에 맞게 스크롤 이동 한다며?」]
+    //   검사에 걸린 첫 칸. busy 가 다 꺼진 뒤 _goToFirstBadField 가 꺼내 쓰고 비운다.
+    let _oFirstBadField = null;
+
+    // 첫 오류 칸을 화면 **가운데**로 올리고 커서를 둔다.
+    //   종전에는 맨 위(top: 0)로만 올려서, 아래쪽 패널에 있는 오류는 화면 밖에 그대로 남았다.
+    //   순서가 중요하다 — focus() 가 먼저 대충 스크롤하므로, 가운데 맞추기를 그 뒤에 한 번 더 한다.
+    function _goToFirstBadField() {
+
+        const oField = _oFirstBadField;
+        _oFirstBadField = null;
+
+        if (!oField) {
+            return;
+        }
+
+        _refocus(oField);
+
+        if (!oField.el || typeof oField.el.scrollIntoView !== "function") {
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("값이 없어 그만둠", "field element", "cannot scroll to the first invalid field");
+            }
+
+            return;
+        }
+
+        // _refocus 의 focus() 는 setTimeout 으로 한 박자 뒤에 돈다. 가운데 맞추기를 지금 하면
+        //   그 focus() 가 일으키는 기본 스크롤이 나중에 덮어쓴다 — 그래서 한 박자 더 뒤에 맞춘다.
+        setTimeout(function () {
+
+            try {
+                oField.el.scrollIntoView({ block: "center", behavior: "smooth" });
+            } catch (e) {
+                console.error("[shortcut] scroll to the first invalid field failed:", e);
+            }
+
+        }, 0);
+    }
+
     function fn_Check_required() {
         let Lret = "";
         const aBad = [];   // 오류 난 칸 전부. 첫 하나만 가지고 있으면 다른 패널의 오류가 접힌 채 남는다.
@@ -559,13 +686,12 @@
             //   접힌 채로 남아 무엇이 잘못됐는지 또 안 보인다.
             aBad.forEach(_revealField);
 
-            const mainArea = document.querySelector(".u4aShortcutMain");
-
-            if (mainArea) {
-                mainArea.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-
-            _refocus(aBad[0]);   // 첫 오류 필드로 포커스 → 빨간 테두리 + 메시지 함께 표시
+            // ★[2026-10-27 장군님 지적] 스크롤·포커스는 **여기서 하지 않는다.**
+            //   이 함수는 busy 가 켜진 채로 불린다(fn_CreateShortcut 첫 줄). busy 가 열려 있는 동안
+            //   건 포커스는 먹지 않고, busy 가 닫히면서 커서가 「쇼컷 링크 저장」을 누르기 전 칸으로
+            //   돌아가 버린다. 그래서 빨간 안내 글도 안 떴다(안내 글은 그 줄에 커서가 있을 때만 보인다).
+            //   → 첫 오류 칸만 기억해 두고, busy 가 다 꺼진 뒤 _goToFirstBadField 가 처리한다.
+            _oFirstBadField = aBad[0];
         }
 
         return Lret;
@@ -620,7 +746,7 @@
 
             switch (e.RETCD) {
                 case "Z":
-                    U4AUI.confirm({
+                    _alert({
                         type: "E",
                         title: getMsgText("/U4A/CL_WS_COMMON", "C00", "fail"),
                         message: _relocalizeServer(e.RTMSG),
@@ -646,7 +772,7 @@
         } catch (err) {
             console.error("[shortcut] App ID server validation / parameter check error:", err);
             const Lmsg = err.message || err.responseText || "";
-            U4AUI.confirm({
+            _alert({
                 type: "E",
                 title: getMsgText("/U4A/CL_WS_COMMON", "B93", "Error"),
                 message: Lmsg
@@ -770,7 +896,8 @@
         oHostInputField.setValueState("none");
 
         if (fn_Check_required() === "E") {
-            fn_setBusy(false);
+            // busy 가 **다 꺼진 뒤**에 첫 오류 칸으로 간다(열려 있는 동안 건 포커스는 먹지 않는다).
+            fn_setBusy(false, { ONDONE: _goToFirstBadField });
             return;
         }
 
@@ -807,7 +934,7 @@
         } catch (e) {
             console.error("[shortcut] validation before shortcut create threw:", e);
             fn_setBusy(false);
-            U4AUI.confirm({
+            _alert({
                 type: "E",
                 title: getMsgText("/U4A/CL_WS_COMMON", "B93", "Error"),
                 message: e.message || e.toString()
@@ -867,7 +994,7 @@
             if (!oFound) {
                 console.error("[shortcut] Chrome browser info not found.");
                 let sMsg = getMsgText("/U4A/MSG_WS", "333", "Installed browser information not found.");
-                U4AUI.confirm({
+                _alert({
                     type: "E",
                     title: getMsgText("/U4A/CL_WS_COMMON", "C00", "fail"),
                     message: sMsg
@@ -882,7 +1009,7 @@
             if (!oFound) {
                 console.error("[shortcut] Edge browser info not found.");
                 let sMsg = getMsgText("/U4A/MSG_WS", "333", "Installed browser information not found.");
-                U4AUI.confirm({
+                _alert({
                     type: "E",
                     title: getMsgText("/U4A/CL_WS_COMMON", "C00", "fail"),
                     message: sMsg
@@ -906,7 +1033,7 @@
 
         if (res) {
             const sSuccessMsg = getMsgText("/U4A/MSG_WS", "322", "processing is complete");
-            U4AUI.confirm({
+            _alert({
                 type: "S",
                 title: getMsgText("/U4A/CL_WS_COMMON", "D86", "Success"),
                 message: sSuccessMsg,
@@ -919,7 +1046,7 @@
         } else {
             const sFailMsg = getMsgText("/U4A/MSG_WS", "323", "processing failed");
             const sTitle = getMsgText("/U4A/CL_WS_COMMON", "C00", "fail");
-            U4AUI.confirm({
+            _alert({
                 type: "E",
                 title: sTitle,
                 message: sFailMsg
@@ -929,7 +1056,7 @@
         } catch (e) {
             console.error("[shortcut] shortcut file create threw:", e);
             fn_setBusy(false);
-            U4AUI.confirm({
+            _alert({
                 type: "E",
                 title: getMsgText("/U4A/CL_WS_COMMON", "B93", "Error"),
                 message: e.message || e.toString()
@@ -1330,6 +1457,10 @@
         // (구) 하단 Footer 메시지 바 제거 — 메시지는 공통 .u4a-toast(화면 정중앙) _toast() 로 출력(원본 MessageToast 대응).
 
         // Param Event 바인딩
+        //   ★[2026-10-27] 이 두 버튼도 누를 때 커서가 빠지면 처리중 표시가 클릭을 가로챈다(저장 버튼과 같은 사고).
+        _keepFocusOnMouseDown("btnParamAdd");
+        _keepFocusOnMouseDown("btnParamDelete");
+
         document.getElementById("btnParamAdd").addEventListener("click", function () {
             aParams.push({ name: "", value: "", state: "None" });
             renderParamsTable();
@@ -1467,14 +1598,38 @@
         fn_setBusy(true);
 
         // 타이틀바 & 취소/저장 액션 바인딩
-        document.getElementById("u4aShortcutWinClose").addEventListener("click", fn_close);
-        document.getElementById("btnCancel").addEventListener("click", fn_close);
-        document.getElementById("btnSave").addEventListener("click", fn_CreateShortcut);
+        _bindFooterButton("u4aShortcutWinClose", fn_close);
+        _bindFooterButton("btnCancel", fn_close);
+        _bindFooterButton("btnSave", fn_CreateShortcut);
+
+        // 최소화 버튼 (2026-10-27 장군님 지시) — 이 창은 parent 를 안 두므로 최소화 뒤 작업표시줄에서 되돌린다.
+        (function () {
+
+            var oMin = _keepFocusOnMouseDown("u4aShortcutWinMin");
+
+            if (!oMin) {
+                return;
+            }
+
+            oMin.addEventListener("click", function () {
+
+                try {
+                    oAPP.CURRWIN.minimize();
+                } catch (e) {
+                    console.error("[shortcut] minimize error:", e);
+                }
+
+            });
+
+        })();
 
         // 최대화 버튼 — 토글 + 아이콘 동기(공통 .u4a-winbtn, fontStyleWizard 동일 패턴)
         (function () {
             var oMax = document.getElementById("u4aShortcutWinMax");
             if (!oMax) { return; }
+
+            // ★[2026-10-27] 최대화도 같은 사고를 탄다 — 누를 때 커서가 빠지지 않게 한다.
+            _keepFocusOnMouseDown("u4aShortcutWinMax");
             function _syncMaxIcon() {
                 try {
                     var oI = oMax.querySelector("i");

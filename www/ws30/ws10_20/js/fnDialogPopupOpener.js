@@ -4346,8 +4346,23 @@
         const sPopupName = "SHORTCUTPOP";
 
         // 기존 팝업이 열렸을 경우 새창 띄우지 말고 해당 윈도우에 포커스를 준다.
-        const oResult = WSUTIL.getCheckAlreadyOpenWindow(sPopupName);
+        //   2026-10-27 장군님 지시 (parent 제거) - parent 를 빼면 getChildWindows() 로는 못 찾으므로
+        //     전체 창에서 OBJTY + browserkey 로 찾는다. 8번·10번 창과 같은 방식.
+        const oResult = APPCOMMON.getCheckAlreadyOpenWindow2(sPopupName);
         if (oResult.ISOPEN) {
+
+            // Minimize 된 상태면 먼저 Restore 한다 - parent 가 없어 작업표시줄에 남아 있을 수 있다.
+            try {
+                if (oResult.WINDOW.isMinimized()) { oResult.WINDOW.restore(); }
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            }
+
+            try {
+                oResult.WINDOW.focus();
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            }
 
             // 부모 위치 가운데 배치한다.            
             WSUTIL.setParentCenterBounds(REMOTE, oResult.WINDOW);
@@ -4377,10 +4392,14 @@
         oBrowserOptions.title = APPCOMMON.fnGetMsgClsText("/U4A/CL_WS_COMMON", "D31"); // ShortCut Creator    
         oBrowserOptions.skipTaskbar = false;
         oBrowserOptions.autoHideMenuBar = true;
-        oBrowserOptions.minimizable = false;  // 최소화 비활성(모달 창 — 최소화 버튼도 disabled 처리)
-        oBrowserOptions.maximizable = true;   // 타이틀바 최대화 버튼(u4aShortcutWinMax) 동작 위해 허용
-        oBrowserOptions.parent = CURRWIN;
-        oBrowserOptions.modal = false;        // 비모달 — 부모(메인) 창 계속 사용 가능. parent 지정으로 항상 위에는 유지.
+        // 2026-10-27 장군님 지시 — 제목줄 최소화 버튼을 넣으면서 최소화를 허용한다.
+        oBrowserOptions.minimizable = true;
+        oBrowserOptions.maximizable = true;   // 타이틀바 최대화 버튼 동작 위해 허용
+        // 2026-10-27 장군님 지시 — parent 를 지정하지 않는다(8번·10번 창이 2026-10-12 에 간 길과 같다).
+        //   제목줄을 직접 그리는 창에서 parent 를 두면 Minimize 뒤 Restore 할 길이 없어진다.
+        //   되돌리려면 oBrowserOptions.parent = CURRWIN; 한 줄을 다시 넣으면 된다.
+        //   뒤로가기 일괄 닫기·busy 중 숨기기는 browserkey 를 비교하는 getSiblingWindows 가 맡는다.
+        oBrowserOptions.modal = false;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL; //테마별 색상 처리               
         oBrowserOptions.height = 760;
         oBrowserOptions.width = 650;
