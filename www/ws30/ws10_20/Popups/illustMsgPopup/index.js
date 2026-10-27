@@ -202,7 +202,7 @@ oAPP.fn._initChrome = function () {
     // 로고
     var oLogo = document.getElementById("illustpLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 제목 = opener 가 넘긴 창 제목(Image Icons [ - SYSID]) — 부트 스크립트가 document.title 에 세팅.

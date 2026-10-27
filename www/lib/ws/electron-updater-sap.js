@@ -661,7 +661,8 @@ exports.autoUpdaterSAP = {
                     let sUpdateFilename = xhr.getResponseHeader('UPDT_FNAME');
                     if(sUpdateFilename){
 
-                        var YAML = REMOTE.require('yamljs');
+                        // 2026-10-27 Electron 45: REMOTE.require 는 npm 모듈을 못 찾는다 — 앱 본체 require 로 부른다.
+                        var YAML = REMOTE.getGlobal("mainRequire")('yamljs');
 
                         var nativeObject = YAML.parse(xhr.response);
 

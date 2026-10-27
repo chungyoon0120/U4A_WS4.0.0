@@ -158,7 +158,7 @@
                 // 로고 = 메인 창과 동일(APPPATH/img/logo.png)
                 var oLogo = document.getElementById("aboutLogo");
                 if (oLogo) {
-                    try { oLogo.src = encodeURI("file:///" + path.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { }
+                    try { oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(path.join(APPPATH, "img", "logo.png")); } catch (e) { }
                 }
                 // 제목 = opener 가 넘긴 창 제목(About U4A WS IDE)
                 var oTitle = document.getElementById("aboutTitle");

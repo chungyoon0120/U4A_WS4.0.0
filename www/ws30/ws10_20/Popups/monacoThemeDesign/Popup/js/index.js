@@ -1754,7 +1754,7 @@
         // 로고
         const oLogo = document.getElementById("tdLogo");
         if (oLogo) {
-            try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            try { oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         }
         // 제목(341)
         const oTitle = document.getElementById("tdTitle");

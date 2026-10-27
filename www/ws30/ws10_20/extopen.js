@@ -32,7 +32,7 @@ var oAPP = {};
 (function _initCommonTitlebar() {
 
     function lf_toFileUrl(p) {
-        return encodeURI("file:///" + String(p).replaceAll("\\", "/"));
+        return REMOTE.getGlobal("u4aToAppUrl")(String(p));
     }
 
     try {

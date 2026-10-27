@@ -203,13 +203,16 @@ function open(options={}){
         });        
 
 
-        oWindow.loadFile(
-            _toFilePath(path.join(__dirname, 'views', 'index.html')),
-            {
-                query: {
-                    options: encodeURIComponent(JSON.stringify(_options))
+        // 2026-10-27 Electron 45: loadFile 을 쓰지 않는다. custom protocol 주소로 바꿔 loadURL 로 연다.
+        oWindow.loadURL(
+            remote.getGlobal("u4aToAppUrl")(
+                _toFilePath(path.join(__dirname, 'views', 'index.html')),
+                {
+                    query: {
+                        options: encodeURIComponent(JSON.stringify(_options))
+                    }
                 }
-            }
+            )
         );
 
 

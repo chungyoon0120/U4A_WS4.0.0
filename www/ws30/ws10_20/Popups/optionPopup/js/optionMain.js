@@ -104,7 +104,7 @@
         try { return (WSMSG && WSMSG.fnGetMsgClsText(sCls, sCode, "", "", "", "")) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
     }
     var _fa = function (s) { return '<i class="fa-solid fa-' + s + '"></i>'; };
-    function _toFileUrl(sPath) { return encodeURI("file:///" + String(sPath).replace(/\\/g, "/")); }
+    function _toFileUrl(sPath) { return REMOTE.getGlobal("u4aToAppUrl")(sPath); }
 
     // 공통 스플리터 드래그(16번 §4.3) — 바 양옆 인접 두 패널만 재분배. 사이드바(고정 패널)를 px 로
     //   바꾸고 콘텐츠(마지막 1 1 auto)가 잔여를 채운다. 마지막 패널 최소폭 보호 + 창 축소 재클램프.

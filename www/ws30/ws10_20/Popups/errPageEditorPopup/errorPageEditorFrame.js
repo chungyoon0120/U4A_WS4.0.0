@@ -426,7 +426,7 @@ function _initChrome() {
     // 로고(메인 창과 동일 APPPATH/img/logo.png).
     var oLogo = document.getElementById("errLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     _setTitle();
 

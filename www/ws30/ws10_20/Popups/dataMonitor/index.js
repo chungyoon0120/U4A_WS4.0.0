@@ -87,8 +87,8 @@ module.exports = function (REMOTE, oAPP) {
 
     //첫 페인트 배경 — 흰 번쩍 방지.
     try {
-        oBrowserWindow.webContents.insertCSS(
-            "html, body { margin: 0px; height: 100%; background-color: " + oThemeInfo.BGCOL + "; }");
+        // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+        parent.REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, "html, body { margin: 0px; height: 100%; background-color: " + oThemeInfo.BGCOL + "; }");
     } catch (e) { console.error("[DMOP-003] first-paint background set failed:", e); }
 
     oBrowserWindow.setMenu(null);
@@ -104,7 +104,7 @@ module.exports = function (REMOTE, oAPP) {
     };
 
     const sPopupPath = PATH.join(__dirname, "Popup", "index.html");
-    oBrowserWindow.loadURL(WSUTIL.QueryString.build(sPopupPath, oQueryParams));
+    oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(WSUTIL.QueryString.build(sPopupPath, oQueryParams)));
 
     oBrowserWindow.once("ready-to-show", () => {
         try { WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow); }

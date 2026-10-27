@@ -1333,7 +1333,7 @@
             // URL에 QueryString 파라미터를 적용한다.
             const sLoadUrl = parent.WSUTIL.QueryString.build(sExtOpenHtmlUrl, oQueryParams);
 
-            oBrowserWindow.loadURL(sLoadUrl);
+            oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
             // no build 일 경우에는 개발자 툴을 실행한다.
             // if (!APP.isPackaged) {

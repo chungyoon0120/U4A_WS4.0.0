@@ -156,7 +156,8 @@
                 _oFrameDom = document.createElement("iframe");
 
 
-                _oFrameDom.src = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "favIconPopup", "index.html");
+                // 2026-10-27 Electron 45: 화면이 u4a-ws:// 라 OS 경로를 그대로 넣으면 안 된다.
+                _oFrameDom.src = parent.REMOTE.getGlobal("u4aToAppUrl")(parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "favIconPopup", "index.html"));
                 _oFrameDom.style.width = "100%";
                 _oFrameDom.style.height = "calc(100% - 70px)";
                 _oFrameDom.style.border = "0px";

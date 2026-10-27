@@ -90,7 +90,7 @@ function openDrawingWindow(params = {}) {
   const sUrlPath     = PATH.join(__dirname, 'index.html');
   const oQueryParams = { theme: theme, sessionKey: sessionKey, USERINFO: USERINFO, browserKey: browserKey };
   const sLoadUrl     = WSUTIL.QueryString.build(sUrlPath, oQueryParams);
-  win.loadURL(sLoadUrl);
+  win.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
   // ── 배경색 CSS 주입 생략 ───────────────────────────────────────────────────
   // drawing 은 transparent: true / backgroundColor: '#00000000' 창입니다.

@@ -1150,7 +1150,7 @@
             // _image_src = fnGetSapIconPath(UICON) = raw OS 경로 → file:/// 변환(WS20 tree.js:503 동일).
             if (n._image_visible && n._image_src) {
                 var p = String(n._image_src);
-                var src = /^(file:|https?:|data:|\/)/i.test(p) ? p : ("file:///" + p.replace(/\\/g, "/"));
+                var src = /^(file:|https?:|data:|\/)/i.test(p) ? p : (oAPP.REMOTE.getGlobal("u4aToAppUrl")(p.replace)(/\\/g, "/"));
                 src = src.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 return '<img class="u4aBwpTreeIcon" src="' + src + '" alt="" onerror="this.style.display=\'none\'">';
             }

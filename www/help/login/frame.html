@@ -93,7 +93,7 @@
                 CURRWIN = REMOTE.getCurrentWindow();
 
             function lf_toFileUrl(sPath) {
-                return encodeURI("file:///" + String(sPath).replaceAll("\\", "/"));
+                return REMOTE.getGlobal("u4aToAppUrl")(String(sPath));
             }
 
             document.addEventListener('DOMContentLoaded', function () {

@@ -385,7 +385,10 @@
       return;
     }
 
-    const sUrl = parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "preview", "index.html");
+    // 2026-10-27 Electron 45: 화면이 u4a-ws:// 라 OS 경로를 그대로 넣으면 안 된다.
+    //   file:// 로 들어가면 미리보기 iframe 과 바깥이 서로 다른 origin 이 되어
+    //   `parent.require` · `parent.document` 읽기가 전부 막힌다(2026-10-27 WS20 에서 실제로 막혔다).
+    const sUrl = parent.REMOTE.getGlobal("u4aToAppUrl")(parent.PATH.join(oAPP.oDesign.pathInfo.designRootPath, "preview", "index.html"));
 
     oFrame.onload = function(){
       /**

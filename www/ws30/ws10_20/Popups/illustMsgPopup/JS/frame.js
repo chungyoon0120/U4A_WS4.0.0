@@ -16,7 +16,8 @@ function _onIpcMain_if_p13n_themeChange(){
 
     let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
     let oBrowserWindow = oAPP.REMOTE.getCurrentWindow();
-        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+        // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+        REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
 
     // ★ oThemeInfo.THEME 은 HTML5 WS4 키 → UI5 테마명으로 매핑(그대로 넘기면 UI5 가 못 찾고 기본 폴백).
     //   frame.js 의 oAPP 은 parent.gfn_parent() 라 셸(index.js)의 toUI5Theme 를 직접 사용.

@@ -62,7 +62,7 @@
 
         oWin.setMenu(null);
 
-        oWin.loadURL(l_path);
+        oWin.loadURL(parent.REMOTE.getGlobal("u4aToAppUrl")(l_path));
         // oWin.webContents.on("did-finish-load", ()=> {
         //     oWin.show();
         // });

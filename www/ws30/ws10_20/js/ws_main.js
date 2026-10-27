@@ -987,7 +987,8 @@
 
         // 3. 약간의 딜레이를 주거나 즉시 새 JS 경로 주입
         // (브라우저가 about:blank를 처리할 시간을 아주 미세하게 주는 게 안전함)
-        oIframe.src = jsPath;
+        // 2026-10-27 Electron 45: 화면이 u4a-ws:// 라 OS 경로를 그대로 넣으면 안 된다.
+        oIframe.src = REMOTE.getGlobal("u4aToAppUrl")(jsPath);
 
         console.log("iframe run path changed:", jsPath);
 

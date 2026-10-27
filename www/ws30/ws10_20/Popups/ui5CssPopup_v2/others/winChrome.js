@@ -91,7 +91,7 @@
 
                 var logo = document.createElement("img");
                 logo.className = "u4a-titlebar__logo"; logo.alt = "U4A";
-                try { logo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { logo.src = encodeURI(REMOTE.getGlobal("u4aToAppUrl")(PATH.join)(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
                 var tit = document.createElement("span");
                 tit.className = "u4a-titlebar__title"; tit.textContent = document.title || "";

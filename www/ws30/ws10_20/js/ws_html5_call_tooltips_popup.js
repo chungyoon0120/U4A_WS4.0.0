@@ -177,7 +177,7 @@
             });
 
             //loadURL 은 약속(Promise)을 돌려준다 → 실패는 여기서 받는다.
-            var oLoad = oWin.loadURL(l_path);
+            var oLoad = oWin.loadURL(parent.REMOTE.getGlobal("u4aToAppUrl")(l_path));
             if (oLoad && typeof oLoad.catch === "function") {
                 oLoad.catch(function (e) {
                     //취소(ERR_ABORTED)는 창을 먼저 닫은 경우라 오류로 보지 않는다.

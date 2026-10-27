@@ -385,7 +385,8 @@
     try { oFrame.onerror = function () { lf_hostFatal({ where: "host iframe", detail: oFrame.src }); }; }
     catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 
-    oFrame.src = sHostSrc + "?PARAMS=" + oQuery;
+    // 2026-10-27 Electron 45: 화면이 u4a-ws:// 라 OS 경로를 그대로 넣으면 안 된다.
+    oFrame.src = REMOTE.getGlobal("u4aToAppUrl")(sHostSrc + "?PARAMS=" + oQuery);
     oBody.appendChild(oFrame);
     oDlg.appendChild(oBody);
 

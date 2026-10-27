@@ -103,7 +103,8 @@
 
         // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
         const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
-        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+        // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+        REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
 
         // 브라우저 상단 메뉴 없애기
         oBrowserWindow.setMenu(null);
@@ -122,7 +123,7 @@
         const sUrlPath = parent.getPath(sPopupName);
         const sLoadUrl = parent.WSUTIL.QueryString.build(sUrlPath, oQueryParams);
 
-        oBrowserWindow.loadURL(sLoadUrl);
+        oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
         // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
         //   이 창은 뜨자마자 busy 를 켜고, 아래 did-finish-load 가 보내는 if-find-info 를 받아야

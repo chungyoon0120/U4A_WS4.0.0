@@ -119,6 +119,18 @@ self.onmessage = function (e) {
         };
 
         xhr.open('POST', sServerPath); // 메소드와 주소 설정
+
+        /**
+         * 2026-10-27 Electron 45 — 이 줄이 없으면 **쿠키가 안 실린다.**
+         *   화면이 custom protocol(u4a-ws://) 로 뜨면서 진짜 origin 이 생겼고,
+         *   SAP 서버는 다른 origin 이라 기본값으로는 쿠키를 안 보낸다.
+         *   그러면 서버가 `Sap-Err-Id: ICFLOGONREQUIRED` 를 주고
+         *   화면은 「세션이 종료되었습니다 (Err code: 999)」 로 끝난다.
+         *   ※ 메인 화면 쪽은 전부터 `withCredentials = true` 를 쓰고 있다(ServerList.js:55).
+         *   ※ 여기는 Worker 라 메인 화면 설정이 따라오지 않는다 — 자리마다 따로 켜야 한다.
+         */
+        xhr.withCredentials = true;
+
         xhr.send(oFormData);
 
     } // end of sendAjax

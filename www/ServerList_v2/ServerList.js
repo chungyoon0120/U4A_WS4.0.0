@@ -386,7 +386,8 @@
                 return;
             }
             oAudio.src = "";
-            oAudio.src = sAudioPath;
+            // 2026-10-27 Electron 45: 화면이 u4a-ws:// 라 OS 경로를 그대로 넣으면 안 된다.
+            oAudio.src = REMOTE.getGlobal("u4aToAppUrl")(sAudioPath);
             oAudio.play();
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } /* 사운드 실패는 무시 */ }
     };
@@ -3099,7 +3100,8 @@
         let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
 
         const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
-        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+        // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+        REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
         oBrowserWindow.setMenu(null);
         mainWindowState.manage(oBrowserWindow);
 
@@ -3115,7 +3117,7 @@
             BGCOL: oThemeInfo.BGCOL || ""
         };
         const sLoadUrl = WSUTIL.QueryString.build(PATHINFO.MAINFRAME, oQueryParams);
-        oBrowserWindow.loadURL(sLoadUrl);
+        oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
         // ★ [2026-09-14, 장군님 지시] 창 문서를 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
         //   [고친 이유] 서버를 고르면 이 화면은 busy 를 켜고, 아래 did-finish-load 에서만 푼다.

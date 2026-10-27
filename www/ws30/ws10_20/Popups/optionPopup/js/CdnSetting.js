@@ -4,7 +4,8 @@
     const
         REMOTE = oAPP.remote,
         PATHINFO = parent.PATHINFO,
-        OCTOKIT = REMOTE.require("@octokit/core").Octokit,
+        // 2026-10-27 Electron 45: REMOTE.require 는 npm 모듈을 못 찾는다 — 앱 본체 require 로 부른다.
+        OCTOKIT = REMOTE.getGlobal("mainRequire")("@octokit/core").Octokit,
         BINDROOT = "/OPTS/CDN",
         APPCOMMON = oAPP.common;
 

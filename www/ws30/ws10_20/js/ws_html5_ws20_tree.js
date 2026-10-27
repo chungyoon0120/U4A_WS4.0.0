@@ -624,7 +624,7 @@
             icon: function (n) {
                 if (!(n && n.icon_visible === true && n.UICON)) { return ""; }
                 var p = n.UICON;
-                var src = /^(file:|https?:|data:|\/)/i.test(p) ? p : ("file:///" + String(p).replace(/\\/g, "/"));
+                var src = /^(https?:|data:)/i.test(p) ? p : REMOTE.getGlobal("u4aToAppUrl")(p);
                 return '<img class="u4aWs20TreeIcon" src="' + _attrEsc(src) + '" alt="" onerror="this.style.display=\'none\'">';
             },
 

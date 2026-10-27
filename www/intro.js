@@ -1,4 +1,4 @@
-// 오류코드 접두: INTR / 다음 번호: 002
+// 오류코드 접두: INTR / 다음 번호: 005
 /**************************************************************************
  * intro.js
  * ************************************************************************
@@ -14,14 +14,25 @@
     const
         REMOTE = require('@electron/remote'),
         CURRWIN = REMOTE.getCurrentWindow(),
-        REMOTEMAIN = REMOTE.require('@electron/remote/main'),
+
+        /**
+         * 2026-10-27 — Electron 45 에서 REMOTE.require() 가 npm 모듈을 못 찾는다.
+         *   @electron/remote 가 main 쪽에서 process.mainModule.require 로 찾는데,
+         *   그 기준 자리가 Electron 내부(electron)라 node_modules 를 못 본다.
+         *   → 앱 본체의 require(global.mainRequire)를 받아 그것으로 부른다.
+         *   (장군님 지시 2026-10-27, 이슈 5. 같은 방식이 ws30/resources/index.js:1535 에 이미 있다)
+         *   ※ path · fs 같은 내장 모듈은 그대로 REMOTE.require 로 둬도 된다.
+         */
+        MAIN_REQUIRE = REMOTE.getGlobal("mainRequire"),
+
+        REMOTEMAIN = MAIN_REQUIRE('@electron/remote/main'),
         APP = REMOTE.app,
         DIALOG = REMOTE.dialog,
         PATH = REMOTE.require('path'),
         APPPATH = APP.getAppPath(),
         USERDATA = APP.getPath("userData"),
 
-        FS = REMOTE.require('fs-extra'),
+        FS = MAIN_REQUIRE('fs-extra'),
         REGEDIT = require('regedit'),
         PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")),
         WSUTIL = require(PATHINFO.WSUTIL),
@@ -270,7 +281,8 @@
         var oWsSettings = oAPP.fn.fnGetSettingsInfo(),
             oServerInfo = oWsSettings.trialServerInfo;
 
-        const WINDOWSTATE = REMOTE.require('electron-window-state');
+        // 2026-10-27 — Electron 45: npm 모듈은 앱 본체 require 로 부른다(위 MAIN_REQUIRE 주석 참고).
+        const WINDOWSTATE = MAIN_REQUIRE('electron-window-state');
 
         // 창 크기 기본값 설정
         let mainWindowState = WINDOWSTATE({
@@ -322,7 +334,7 @@
         // URL에 QueryString 파라미터를 적용한다.
         let sLoadUrl = WSUTIL.QueryString.build(PATHINFO.MAINFRAME, oQueryParams);
 
-        oBrowserWindow.loadURL(sLoadUrl);
+        oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
         // no build 일 경우에는 개발자 툴을 실행한다.
         // if (!APP.isPackaged) {
@@ -506,7 +518,9 @@
 
         // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
         let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${sBgColor}; }`;
-        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+
+        // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+        REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
 
         // 브라우저 상단 메뉴 없애기
         oBrowserWindow.setMenu(null);
@@ -521,7 +535,19 @@
         // URL에 QueryString 파라미터를 적용한다.
         let sLoadUrl = WSUTIL.QueryString.build(PATHINFO.SERVERLIST_v2, oQueryParams);
 
-        oBrowserWindow.loadURL(sLoadUrl);
+        /**
+         * 2026-10-27 — 깨져도 까닭을 받는다 (위 insertCSS 와 같은 까닭).
+         *   주소를 못 열면 그 까닭이 여기로 온다. 받지 않으면 앱이 통째로 종료된다.
+         */
+        oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl)).catch(function (e) {
+
+            console.error("[INTR-003] loadURL failed:", sLoadUrl, "|", e && e.message ? e.message : e);
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(e);
+            }
+
+        });
 
         // ★ [2026-09-14, 장군님 지시] 서버 목록 화면을 못 읽은 경우 — 진짜 실패 이벤트를 배선한다.
         //   [고친 이유] 바로 위에서 인트로 창을 이미 감췄다(oCurrWindow.hide()). 아래 did-finish-load
@@ -545,20 +571,36 @@
         // }
 
         oBrowserWindow.webContents.on('did-finish-load', async function() {
-            
-            // 글로벌 설정 정보를 ServerList에 전달한다.
-            oBrowserWindow.webContents.send('if-globalSetting-info', oGlobalSettings);
 
-            oBrowserWindow.webContents.send('window-id', oBrowserWindow.id);
+            /**
+             * 2026-10-27 — 이 함수는 async 라, 안에서 깨지면 받는 사람이 없어 앱이 통째로 종료된다.
+             *   어디서 깨졌는지 알아야 고칠 수 있으므로 감싸서 까닭을 남긴다.
+             */
+            try {
 
-            oBrowserWindow.setOpacity(1.0);
+                // 글로벌 설정 정보를 ServerList에 전달한다.
+                oBrowserWindow.webContents.send('if-globalSetting-info', oGlobalSettings);
 
-            oBrowserWindow.show();
-            oBrowserWindow.focus();
+                oBrowserWindow.webContents.send('window-id', oBrowserWindow.id);
 
-            await oAPP.intro.stop();
+                oBrowserWindow.setOpacity(1.0);
 
-            oCurrWindow.close();
+                oBrowserWindow.show();
+                oBrowserWindow.focus();
+
+                await oAPP.intro.stop();
+
+                oCurrWindow.close();
+
+            } catch (e) {
+
+                console.error("[INTR-004] did-finish-load failed:", e && e.message ? e.message : e);
+
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                    U4ALOG.caught(e);
+                }
+
+            }
 
         });
 

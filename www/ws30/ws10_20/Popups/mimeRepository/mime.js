@@ -170,7 +170,7 @@
         if (typeof sText !== "undefined") { o.textContent = sText; }
         return o;
     }
-    function _fileUrl(p) { return "file:///" + encodeURI(String(p).replace(/\\/g, "/")); }
+    function _fileUrl(p) { return REMOTE.getGlobal("u4aToAppUrl")(p); }
 
     // 현재 진입한 APP 정보 — opener 가 if-mime-info 로 전달(parent.getAppInfo()).
     function _appInfo() { return oAPP.attr.oAppInfo || {}; }

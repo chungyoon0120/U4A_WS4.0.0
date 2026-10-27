@@ -227,7 +227,8 @@
         };
 
         //재사용 시에도 새로 로드(FRAME_LOADED → SET_INIT 재수행).
-        oFrame.src = sSrc;
+        // 2026-10-27 Electron 45: 화면이 u4a-ws:// 라 OS 경로를 그대로 넣으면 안 된다.
+        oFrame.src = REMOTE.getGlobal("u4aToAppUrl")(sSrc);
     }
 
 

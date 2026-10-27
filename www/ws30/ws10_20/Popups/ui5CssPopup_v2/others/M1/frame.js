@@ -53,7 +53,8 @@ function _onIpcMain_if_p13n_themeChange(){
 
     let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
     let oBrowserWindow = oParentAPP.REMOTE.getCurrentWindow();
-        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+        // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+        REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
 
     sap.ui.getCore().applyTheme(oParentAPP.fn.toUI5Theme(oThemeInfo.THEME, oThemeInfo.BGCOL));
 

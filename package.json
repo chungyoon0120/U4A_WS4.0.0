@@ -16,9 +16,12 @@
   "author": "U4A Solution R&D Team",
   "license": "ISC",
   "type": "commonjs",
+  "overrides": {
+    "node-abi": "^4.40.0"
+  },
   "devDependencies": {
     "@electron/rebuild": "^3.7.2",
-    "electron": "^14.2.9",
+    "electron": "^45.0.0",
     "electron-builder": "^26.0.12"
   },
   "repository": {
@@ -97,7 +100,7 @@
     "adm-zip": "^0.5.10",
     "arraybuffer-to-buffer": "^0.0.7",
     "basic-ftp": "^5.0.2",
-    "better-sqlite3": "^12.9.0",
+    "better-sqlite3": "^13.0.3",
     "child_process": "^1.0.2",
     "dicer": "^0.3.1",
     "directory-tree": "^3.6.0",

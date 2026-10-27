@@ -122,7 +122,7 @@ async function openHistoryWindow(opts = {}) {
     const sUrlPath     = PATH.join(__dirname, 'index.html');
     const oQueryParams = { theme: effectTheme, sessionKey: sessionKey, panelSessionKey: panelSessionKey, USERINFO: USERINFO, browserKey: browserKey };
     const sLoadUrl     = WSUTIL.QueryString.build(sUrlPath, oQueryParams);
-    win.loadURL(sLoadUrl);
+    win.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
     // ── 팝업 실행 시 배경색 CSS 주입 ────────────────────────────────────────
     win.webContents.on('did-finish-load', () => {

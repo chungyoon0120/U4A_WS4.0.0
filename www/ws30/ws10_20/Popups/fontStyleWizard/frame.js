@@ -496,7 +496,7 @@ function _syncMaxIcon() {
 function _initChrome() {
     var oLogo = document.getElementById("fwxLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); }
+        try { oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(APPPATH, "img", "logo.png")); }
         catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _err("[fontStyleWizard] logo path failed", e); }
     }
 

@@ -393,7 +393,8 @@
 
             let REMOTE = parent.gfn_remote();
             let PATH = REMOTE.require('path');
-            let REGEDIT = REMOTE.require('regedit');
+            // 2026-10-27 Electron 45: REMOTE.require 는 npm 모듈을 못 찾는다 — 앱 본체 require 로 부른다.
+            let REGEDIT = REMOTE.getGlobal("mainRequire")('regedit');
             let {
                 execFile
             } = REMOTE.require('child_process');

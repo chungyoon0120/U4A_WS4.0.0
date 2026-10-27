@@ -121,7 +121,7 @@ function scanFiles() {
  */
 function createItem(info, isNew) {
   const { filePath, fileName, size, mtime } = info;
-  const fileUrl = pathToFileURL(filePath).href;
+  const fileUrl = REMOTE.getGlobal("u4aToAppUrl")(filePath);
 
   const item = document.createElement('div');
   item.className = `list-item${isNew ? ' is-new' : ''}`;

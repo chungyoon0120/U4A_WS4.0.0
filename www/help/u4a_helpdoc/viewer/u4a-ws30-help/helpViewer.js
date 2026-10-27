@@ -222,7 +222,8 @@ function openHelpViewer(options = {}) {
    helpWindow.once("ready-to-show", function () { _centerOnOpener(helpWindow); });
 
    const remoteMain = require('@electron/remote');
-   remoteMain.require('@electron/remote/main').enable(helpWindow.webContents);
+   // 2026-10-27 Electron 45: remote.require 는 npm 모듈을 못 찾는다 — 앱 본체 require 로 부른다.
+   remoteMain.getGlobal("mainRequire")('@electron/remote/main').enable(helpWindow.webContents);
 
    // if(!app.isPackaged){
    //    helpWindow.webContents.openDevTools({ mode: 'detach' });
@@ -239,13 +240,16 @@ function openHelpViewer(options = {}) {
    //    startMenuId = '', // 초기 보여줄 메뉴 ID
    //    languages:"en", //ko, en
 
-   helpWindow.loadFile(
-      toFilePath(indexPath),
-      {
-         query: {
-            options: encodeURIComponent(JSON.stringify(_options))
+   // 2026-10-27 Electron 45: loadFile 을 쓰지 않는다. custom protocol 주소로 바꿔 loadURL 로 연다.
+   helpWindow.loadURL(
+      remote.getGlobal("u4aToAppUrl")(
+         toFilePath(indexPath),
+         {
+            query: {
+               options: encodeURIComponent(JSON.stringify(_options))
+            }
          }
-      }
+      )
    );
 
 

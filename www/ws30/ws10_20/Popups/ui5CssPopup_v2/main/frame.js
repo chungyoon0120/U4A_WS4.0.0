@@ -253,7 +253,7 @@ function _initChrome() {
     // 로고(메인 창과 동일 APPPATH/img/logo.png).
     var oLogo = document.getElementById("ui5cssLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oLogo.src = encodeURI(REMOTE.getGlobal("u4aToAppUrl")(PATH.join)(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 제목(opener 가 넘긴 TITLE — 부트 스크립트가 document.title 에 세팅).

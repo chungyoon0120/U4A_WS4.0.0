@@ -3103,7 +3103,7 @@
         var oLogo = $("dmLogo");
         if (oLogo) {
             try {
-                oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/"));
+                oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(APPPATH, "img", "logo.png"));
             } catch (e) {
                 console.error("[DMWN-004] logo image path build failed:", e);
             }

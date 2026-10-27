@@ -457,7 +457,7 @@ let oAPP = (function (window) {
             var oLogo = document.getElementById("mimeLogo");
             if (oLogo) {
                 var sLogoPath = String(oAPP.PATHINFO.WS_LOGO).replace(/\\/g, "/");
-                oLogo.src = encodeURI("file:///" + sLogoPath);
+                oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(sLogoPath);
             }
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 

@@ -322,7 +322,7 @@ async function open(opts = {}) {
     const sUrlPath_panel     = PATH.join(__dirname, 'index.html');
     const oQueryParams_panel = { OBJTY: 'SCR_REC', theme: theme, sessionKey: sessionKey, USERINFO: USERINFO, browserKey: browserKey };
     const sLoadUrl_panel     = WSUTIL.QueryString.build(sUrlPath_panel, oQueryParams_panel);
-    panelWin.loadURL(sLoadUrl_panel);
+    panelWin.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl_panel));
 
     // ── 팝업 실행 시 배경색 CSS 주입 ────────────────────────────────────────
     // did-finish-load: 페이지가 완전히 로드된 직후 실행됩니다.

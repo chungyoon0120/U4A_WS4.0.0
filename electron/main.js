@@ -126,6 +126,40 @@ app.commandLine.appendSwitch('allow-running-insecure-content');
 app.commandLine.appendSwitch('disable-site-isolation-trials');
 
 /***************************************************************************************
+ * 화면을 내주는 custom protocol (u4a-ws://app/...)
+ * -------------------------------------------------------------------------------------
+ * 2026-10-27 장군님 지시 — 「우선 커스텀 프로토콜 방식으로 실행해야되고, 모든 브라우저
+ *   윈도우 실행 부분은 커스텀 프로토콜 + 경로로, loadFile 로 하는게 아니고 loadUrl 함수로」.
+ * scheme 등록은 app ready 전에 해야 먹으므로 여기(명령줄 옵션 바로 뒤)에서 부른다.
+ * 화면 코드(renderer)는 REMOTE.getGlobal('u4aAppProtocol').toAppUrl(경로) 로 쓴다.
+ ***************************************************************************************/
+const WsAppProtocol = require('./lib/protocol/ws_app_protocol');
+const WsHttpCookie = require('./lib/net/ws_http_cookie');
+
+WsAppProtocol.registerScheme();
+
+global.u4aAppProtocol = WsAppProtocol;
+
+/**
+ * 2026-10-27 — 화면 코드가 창에 배경색 CSS 를 넣을 때 쓰는 함수.
+ *   창을 만든 직후에 바로 insertCSS 를 부르면 Electron 45 에서 깨지고 앱이 종료된다.
+ *   화면 코드는 다음 한 줄로 부른다:
+ *     REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
+ */
+global.u4aSetWindowCss = WsAppProtocol.setWindowCss;
+
+/**
+ * 2026-10-27 — 화면 코드가 창을 띄울 때 주소를 바꾸는 함수.
+ *   OS 경로(`D:\…\x.html`)는 Electron 45 에서 안 열린다. custom protocol 주소로 바꿔서 넘긴다.
+ *   화면 코드는 다음 한 줄로 쓴다:
+ *     oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
+ *   옛 loadFile 자리는 이렇게 옮긴다(loadFile 은 쓰지 않는다 — 장군님 지시):
+ *     oWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sPath, { query: {...} }));
+ *   http · https(SAP 서버) 주소는 그대로 통과한다.
+ */
+global.u4aToAppUrl = WsAppProtocol.toAppUrl;
+
+/***************************************************************************************
  * Remote Main Initialize
  ***************************************************************************************/
 remoteMain.initialize();
@@ -171,7 +205,8 @@ function configureDeepLink() {
     let sDeepLinkId = 'u4a-ws';
 
     if (!app.isPackaged) {
-        sDeepLinkId = 'u4a-ws-dev';
+        // 2026-10-27 임시: 기존 WS4.0 과 OS 에 같은 deep link 가 등록되어 겹치지 않게 한다.
+        sDeepLinkId = 'u4a-ws-dev-elecup';
     }
 
     if (process.defaultApp) {
@@ -306,7 +341,9 @@ function createWindow() {
         }
     });
 
-    const loadUrl = path.join(app.getAppPath(), 'intro3.html');
+    // 2026-10-27 장군님 지시 — file:// 이 아니라 custom protocol 로 띄운다.
+    const loadUrl = WsAppProtocol.toAppUrl(path.join(app.getAppPath(), 'intro3.html'));
+
     mainWindow.loadURL(loadUrl);
 
     // if (!app.isPackaged) {
@@ -471,6 +508,20 @@ function bindAppEvents() {
 
     app.whenReady().then(() => {
 
+        // 2026-10-27 — 창을 만들기 전에 u4a-ws 핸들러를 설치해야 첫 화면부터 내줄 수 있다.
+        WsAppProtocol.install(app);
+
+        // 2026-10-27 — 화면의 __dirname 을 되살리는 preload 를 모든 session 에 건다.
+        WsAppProtocol.installRendererDirname(app);
+
+        /**
+         * 2026-10-27 장군님 지시 — http SAP 서버에서도 로그인이 되게 한다.
+         *   http 응답의 쿠키는 Chromium 이 저장을 거부한다(SameSite=None 에는 Secure 가 필요하고,
+         *   Secure 쿠키는 https 응답만 저장할 수 있다). 그래서 **http 에 한해** 앱이 쿠키를
+         *   직접 보관했다가 요청에 직접 붙인다. 까닭은 ws_http_cookie.js 머리말 참고.
+         */
+        WsHttpCookie.installAll(app);
+
         createWindow();
 
         app.on('activate', () => {
@@ -486,6 +537,17 @@ function bindAppEvents() {
 
         //자식 창에 remote 허용
         remoteMain.enable(window.webContents);
+
+        // 2026-10-27 — 창이 주소를 못 열면 로그에 남긴다. 안 남기면 화면에는 엉뚱한 오류만 보인다.
+        window.webContents.on('did-fail-load', (e, iErrCode, sErrDesc, sUrl, bIsMainFrame) => {
+
+            if (bIsMainFrame === false) {
+                return;
+            }
+
+            WsMainLog.writeLog('오류', 'NAV_FAIL | ' + sUrl + ' | code=' + iErrCode + ' | ' + sErrDesc);
+
+        });
 
         // 2026-10-09 장군님 지시 (메인이 없으면 자식도 없다) — 메인 창이 사라지면 그 메인에서
         //   파생된 별창을 전부 없앤다. 별창에 parent 를 두지 않기로 해서(커스텀 헤더 창은 parent 가

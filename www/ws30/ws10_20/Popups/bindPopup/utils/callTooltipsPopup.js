@@ -48,7 +48,7 @@ module.exports = function(sArea, sCODE){
 
     oWin.setMenu(null);
 
-    oWin.loadURL(l_path);
+    oWin.loadURL(oAPP.REMOTE.getGlobal("u4aToAppUrl")(l_path));
     // oWin.webContents.on("did-finish-load", ()=> {
     //     oWin.show();
     // });

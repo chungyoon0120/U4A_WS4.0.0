@@ -33,7 +33,8 @@ export async function getView() {
     // 로고 (구 sap.m.Image)
     const LOGO = document.createElement("img");
     LOGO.className = "u4a-titlebar__logo";
-    LOGO.src = parent.PATHINFO.WS_LOGO;
+    // 2026-10-27 Electron 45: 화면이 u4a-ws:// 라 OS 경로를 그대로 넣으면 안 된다.
+    LOGO.src = parent.REMOTE.getGlobal("u4aToAppUrl")(parent.PATHINFO.WS_LOGO);
     LOGO.setAttribute("draggable", "false");
     HEADER.appendChild(LOGO);
 

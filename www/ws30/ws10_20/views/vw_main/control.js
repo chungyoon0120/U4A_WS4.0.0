@@ -92,9 +92,16 @@ export async function getControl() {
      *************************************************************/
     function _loadLoginPage() {
 
-        let URL = require('url');
+        /**
+         * 2026-10-27 Electron 45 — iframe 주소도 custom protocol 로 만든다.
+         *   전에는 `file://` 로 넣었는데, 바깥 화면은 `u4a-ws://` 라 **서로 다른 origin** 이 된다.
+         *   그러면 로그인 화면이 `parent.require` 를 못 읽고 다음 오류로 멈춘다:
+         *     SecurityError: Blocked a frame with origin "file://" from accessing a cross-origin frame.
+         *   (2026-10-27 실제로 로그인 버튼에서 막혔다)
+         */
+        let REMOTE = require('@electron/remote');
 
-        let sLoginPath = URL.pathToFileURL(PATH.join(PATHINFO.WS10_20_ROOT, "Login", "Login.html")).href;
+        let sLoginPath = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(PATHINFO.WS10_20_ROOT, "Login", "Login.html"));
 
         // [흰색 방지] 로그인 iframe 에도 설정 테마/배경색을 넘겨, 첫 페인트부터 테마 배경이 되게 한다
         //   (Login.html head 가 --boot-bg + U4ATheme.apply 로 동기 소비).

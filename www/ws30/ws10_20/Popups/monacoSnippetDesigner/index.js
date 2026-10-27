@@ -88,7 +88,8 @@ module.exports = function (REMOTE, oAPP, oPARAM) {
 
     // 첫 페인트 배경(테마색) — 흰 플래시 방지.
     const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
-    oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+    // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+    parent.REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
     oBrowserWindow.setMenu(null);
 
     // 콘텐츠 URL + 쿼리(테마/타이틀/키) — index.html 인라인 스크립트가 첫 페인트 전에 소비.
@@ -105,7 +106,7 @@ module.exports = function (REMOTE, oAPP, oPARAM) {
     let sPopupPath = PATH.join(__dirname, "Popup", "index.html");
     const sLoadUrl = WSUTIL.QueryString.build(sPopupPath, oQueryParams);
 
-    oBrowserWindow.loadURL(sLoadUrl);
+    oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
     // no build 시 개발자 툴(필요할 때만 수동으로 켠다).
     // if (!REMOTE.app.isPackaged) { oBrowserWindow.webContents.openDevTools(); }

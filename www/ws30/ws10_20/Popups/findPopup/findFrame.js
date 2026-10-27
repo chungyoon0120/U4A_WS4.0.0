@@ -890,7 +890,7 @@ function _onThemeChange() {
 function _initChrome() {
     var oLogo = document.getElementById("findLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     var oTitle = document.getElementById("findTitle");

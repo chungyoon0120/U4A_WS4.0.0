@@ -36,11 +36,12 @@ var oAPP = (function () {
         IPCMAIN = REMOTE.require('electron').ipcMain,
         PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js")),
         WSUTIL = require(PATHINFO.WSUTIL),
-        autoUpdater = REMOTE.require("electron-updater").autoUpdater,
+        // 2026-10-27 Electron 45: REMOTE.require 는 npm 모듈을 못 찾는다 — 앱 본체 require 로 부른다.
+        autoUpdater = REMOTE.getGlobal("mainRequire")("electron-updater").autoUpdater,
         autoUpdaterSAP = require(parent.getPath("AUTOUPDSAP")).autoUpdaterSAP,
         SERVPATH = parent.getServerPath(),
         autoUpdaterServerUrl = `${SERVPATH}/update_check`,
-        OCTOKIT = REMOTE.require("@octokit/core").Octokit,
+        OCTOKIT = REMOTE.getGlobal("mainRequire")("@octokit/core").Octokit,
         WSLOG = require(PATH.join(PATHINFO.WS10_20_ROOT, "js", "ws_log.js"));
 
     let oAPP = {};
@@ -2171,7 +2172,8 @@ var oAPP = (function () {
         oBrowserOptions.webPreferences.OBJTY = sPopupName;
         let oBrowserWindow = new REMOTE.BrowserWindow(oBrowserOptions);
         const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
-        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+        // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+        REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
         oBrowserWindow.setMenu(null);
         // 공통 프레임리스 셸(frame.html) 로드 — 매뉴얼(KO/EN index.html)은 셸 내부 iframe 으로 호스팅.
         const sFramePath = PATH.join(sHelpRoot, "frame.html");
@@ -2185,7 +2187,7 @@ var oAPP = (function () {
             LANGU: sLangDir
         };
         const sLoadUrl = WSUTIL.QueryString.build(sFramePath, oQueryParams);
-        oBrowserWindow.loadURL(sLoadUrl);
+        oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
         oBrowserWindow.once('ready-to-show', () => { WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow); });
         oBrowserWindow.webContents.on('did-finish-load', function () {
             WSUTIL.setParentCenterBounds(REMOTE, oBrowserWindow);

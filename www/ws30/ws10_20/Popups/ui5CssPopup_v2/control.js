@@ -110,7 +110,8 @@ export async function start(require, IF_DATA, fnCallback){
     // 오픈할 브라우저 백그라운드 색상을 테마 색상으로 적용
     const sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
 
-    oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+    // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+    REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
 
     // 브라우저 상단 메뉴 없애기        
     oBrowserWindow.setMenu(null);
@@ -131,7 +132,7 @@ export async function start(require, IF_DATA, fnCallback){
     // URL에 QueryString 파라미터를 적용한다.
     const sLoadUrl = parent.WSUTIL.QueryString.build(sUrlPath, oQueryParams);
 
-    oBrowserWindow.loadURL(sLoadUrl);
+    oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
     // no build 일 경우에는 개발자 툴을 실행한다.
     // if (!APP.isPackaged) {

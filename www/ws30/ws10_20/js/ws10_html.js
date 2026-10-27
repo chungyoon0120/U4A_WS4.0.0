@@ -38,7 +38,7 @@
             var p = (parent && parent.PATHINFO && parent.PATHINFO.WS_LOGO) || null;
             if (p) {
                 var s = String(p).replaceAll("\\", "/");
-                return encodeURI("file:///" + s);
+                return parent.REMOTE.getGlobal("u4aToAppUrl")(s);
             }
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         return "../../img/logo.png";

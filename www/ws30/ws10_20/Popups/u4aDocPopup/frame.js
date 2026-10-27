@@ -22,7 +22,8 @@ let oAPP = (function (window) {
     oAPP.APP = oAPP.REMOTE.app;
     oAPP.APPPATH = oAPP.APP.getAppPath();
     oAPP.USERDATA = oAPP.APP.getPath("userData");
-    oAPP.FS = oAPP.REMOTE.require('fs-extra');
+    // 2026-10-27 Electron 45: REMOTE.require 는 npm 모듈을 못 찾는다 — 앱 본체 require 로 부른다.
+    oAPP.FS = oAPP.REMOTE.getGlobal("mainRequire")('fs-extra');
     oAPP.DIALOG = oAPP.REMOTE.require('electron').dialog;
 
     /*******************************************************

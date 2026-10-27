@@ -160,7 +160,7 @@ function _iconHtml(sIcon) {
     var sSrc = s;
     try {
         if (/^[a-z]:[\\/]/i.test(s) || s.indexOf("\\") >= 0) {
-            sSrc = "file:///" + s.replace(/\\/g, "/");
+            sSrc = REMOTE.getGlobal("u4aToAppUrl")(s.replace)(/\\/g, "/");
         }
     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     return '<img src="' + encodeURI(sSrc) + '" alt="" style="width:1rem;height:1rem;object-fit:contain">';
@@ -1124,7 +1124,7 @@ function _initChrome() {
     // 로고(메인 창과 동일 APPPATH/img/logo.png).
     var oLogo = document.getElementById("pattLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oLogo.src = encodeURI(REMOTE.getGlobal("u4aToAppUrl")(PATH.join)(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
     // 제목(opener 가 넘긴 TITLE).
     var oTitle = document.getElementById("pattTitle");

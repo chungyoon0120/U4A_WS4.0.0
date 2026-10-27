@@ -112,13 +112,16 @@ exports.start = async (params)=>{
        * --------------------------------------------------------
        * params 를 query 로 전달 → Renderer 에서 decode 사용
        */
-      oWindow.loadFile(
-         toFilePath(path.join(__dirname, _seasonName, 'index.html')),
-         {
-            query: {
-               params: encodeURIComponent(JSON.stringify(_params))
+      // 2026-10-27 Electron 45: loadFile 을 쓰지 않는다. custom protocol 주소로 바꿔 loadURL 로 연다.
+      oWindow.loadURL(
+         remote.getGlobal("u4aToAppUrl")(
+            toFilePath(path.join(__dirname, _seasonName, 'index.html')),
+            {
+               query: {
+                  params: encodeURIComponent(JSON.stringify(_params))
+               }
             }
-         }
+         )
       );
 
       /**

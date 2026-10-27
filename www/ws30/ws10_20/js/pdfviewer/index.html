@@ -45,7 +45,7 @@
                 }
                 return parent;
             }
-            function _fileUrl(p) { return "file:///" + encodeURI(String(p).replace(/\\/g, "/")); }
+            function _fileUrl(p) { return _appWin().REMOTE.getGlobal("u4aToAppUrl")(p); }
             var H = _appWin();
             var sLib = H.PATH.join(H.APPPATH, "lib", "pdfjs");
             window.__PDF_CORE = _fileUrl(H.PATH.join(sLib, "pdf.min.js"));

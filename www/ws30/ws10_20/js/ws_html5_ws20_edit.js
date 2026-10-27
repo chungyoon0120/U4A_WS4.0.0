@@ -1903,7 +1903,7 @@
         var aImgs = [];
         if (entry && entry.T_IMG) {
             for (var i = 0; i < entry.T_IMG.length; i++) {
-                try { aImgs.push("file:///" + String(parent.PATH.join(_uiPreviewPath(), entry.T_IMG[i].FNAME_R)).replace(/\\/g, "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+                try { aImgs.push(parent.REMOTE.getGlobal("u4aToAppUrl")(parent.PATH.join(_uiPreviewPath(), entry.T_IMG[i].FNAME_R))); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             }
         }
         if (!aImgs.length) {
@@ -2054,7 +2054,7 @@
         try { p = oAPP.fn.fnGetSapIconPath(sKey) || ""; } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         if (!p) { return ""; }
         if (/^(file:|https?:|data:|\/)/i.test(p)) { return p; }
-        return "file:///" + String(p).replace(/\\/g, "/");
+        return parent.REMOTE.getGlobal("u4aToAppUrl")(p);
     }
     function _esc(s) {
         return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {

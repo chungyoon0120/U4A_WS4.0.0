@@ -177,7 +177,8 @@ function gf_initData(oLoginInfo) {
         sPatch_repo_url = oGitInfo.PATCH_REPO_URL,
         sServerHost = getHost();
 
-    Octokit = REMOTE.require("@octokit/core").Octokit;
+    // 2026-10-27 Electron 45: REMOTE.require 는 npm 모듈을 못 찾는다 — 앱 본체 require 로 부른다.
+    Octokit = REMOTE.getGlobal("mainRequire")("@octokit/core").Octokit;
 
     ADMIN.PATCH_SEP = "💛";
 

@@ -106,7 +106,7 @@
     // UI 아이콘(UICON) src 정규화 — WS20 트리와 동일(.gif OS경로 → file:// URL). sap-icon:// 등은 제외(빈값).
     function _uiconSrc(p) {
         if (!p || /^sap-icon:/i.test(p)) { return ""; }
-        return /^(file:|https?:|data:|\/)/i.test(p) ? p : ("file:///" + String(p).replace(/\\/g, "/"));
+        return /^(https?:|data:)/i.test(p) ? p : parent.REMOTE.getGlobal("u4aToAppUrl")(p);
     }
 
     // ── 모듈 상태 ─────────────────────────────────────────────────────────

@@ -122,7 +122,7 @@ function openTextInputWindow(params) {
   const sUrlPath     = PATH.join(__dirname, 'index.html');
   const oQueryParams = { theme: theme, USERINFO: USERINFO, browserKey: browserKey };
   const sLoadUrl     = WSUTIL.QueryString.build(sUrlPath, oQueryParams);
-  win.loadURL(sLoadUrl);
+  win.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
   // ── 테마 배경색 CSS 주입 ──────────────────────────────────────────────────
   win.webContents.on('did-finish-load', function () {

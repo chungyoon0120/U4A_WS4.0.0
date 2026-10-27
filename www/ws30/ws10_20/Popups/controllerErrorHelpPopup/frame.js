@@ -81,7 +81,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // 로고 — 공통 헤더 규약(.analy/16 §2.2).
     var oLogo = document.getElementById("cehLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); }
+        try { oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(APPPATH, "img", "logo.png")); }
         catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 

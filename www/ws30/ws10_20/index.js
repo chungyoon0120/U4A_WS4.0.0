@@ -40,9 +40,14 @@ async function _initRendering() {
 
     let sViewPath = PATHINFO.WS10_20_ROOT + "/views/vw_main/view.js";
 
-    // file:/// URL 로 변환 (윈도우 경로 → ESM import 가능 형태)
-    let URL = require('url');
-    let sViewUrl = URL.pathToFileURL(sViewPath).href;
+    /**
+     * 2026-10-27 Electron 45 — 화면 모듈 주소도 custom protocol 로 만든다.
+     *   전에는 `file://` 주소로 import 했는데, 이 화면이 `u4a-ws://` 로 뜨면서
+     *   **다른 origin 의 모듈이라 import 가 막힌다.** 막히면 메인 화면이 안 그려지고
+     *   busy 가 영영 안 풀린다(2026-10-27 로그인 뒤 실제로 그렇게 멈췄다).
+     */
+    let REMOTE = require('@electron/remote');
+    let sViewUrl = REMOTE.getGlobal("u4aToAppUrl")(sViewPath);
 
     const oRes = await import(sViewUrl);
     const oView = await oRes.getView();

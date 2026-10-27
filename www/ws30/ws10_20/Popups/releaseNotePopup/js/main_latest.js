@@ -46,7 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
     //electron API 오브젝트 
     oAPP = parent.fn_getParent();
 
-    oAPP.Octokit = oAPP.remote.require("@octokit/core").Octokit;
+    // 2026-10-27 Electron 45: remote.require 는 npm 모듈을 못 찾는다 — 앱 본체 require 로 부른다.
+    oAPP.Octokit = oAPP.remote.getGlobal("mainRequire")("@octokit/core").Octokit;
 
     //Releases Update data 통신방식 
     oHandle.isCDN = oAPP.fnGetIsCDN();
@@ -115,7 +116,8 @@ function _onIpcMain_if_p13n_themeChange(){
 
     let sWebConBodyCss = `html, body { margin: 0px; height: 100%; background-color: ${oThemeInfo.BGCOL}; }`;
     let oBrowserWindow = oAPP.REMOTE.getCurrentWindow();
-        oBrowserWindow.webContents.insertCSS(sWebConBodyCss);
+        // 2026-10-27 Electron 45: 창을 만들자마자 넣으면 화면이 없어 깨진다 — 화면이 들어간 뒤에 넣는다.
+        REMOTE.getGlobal("u4aSetWindowCss")(oBrowserWindow, sWebConBodyCss);
 
     sap.ui.getCore().applyTheme(oThemeInfo.THEME);
 

@@ -106,7 +106,7 @@ function createIndicatorWindow(params = {}) {
   const sUrlPath     = PATH.join(__dirname, 'index.html');
   const oQueryParams = { theme: theme, sessionKey: sessionKey, monitorIndex: String(monitorIndex), USERINFO: USERINFO, browserKey: browserKey };
   const sLoadUrl     = WSUTIL.QueryString.build(sUrlPath, oQueryParams);
-  win.loadURL(sLoadUrl);
+  win.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
   // ── DPI 환산 재적용 (모니터별 다른 배율 대응) ─────────────────────────────────
   // 생성자 x/y/width/height 는 창이 처음 뜨는 모니터(주 모니터)의 scaleFactor 로

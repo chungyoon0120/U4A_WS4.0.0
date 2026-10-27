@@ -87,7 +87,7 @@ async function openSettingsWindow(opts = {}) {
     const sUrlPath     = PATH.join(__dirname, 'index.html');
     const oQueryParams = { theme: theme, sessionKey: sessionKey, USERINFO: USERINFO, browserKey: browserKey };
     const sLoadUrl     = WSUTIL.QueryString.build(sUrlPath, oQueryParams);
-    win.loadURL(sLoadUrl);
+    win.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
     // ── 팝업 실행 시 배경색 CSS 주입 ────────────────────────────────────────
     win.webContents.on('did-finish-load', () => {

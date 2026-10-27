@@ -88,7 +88,7 @@ function _zmsg(sNo, p1) {
 }
 
 function _fileUrl(sPath) {
-    try { return encodeURI("file:///" + String(sPath).replace(/\\/g, "/")); }
+    try { return REMOTE.getGlobal("u4aToAppUrl")(sPath); }
     catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } return ""; }
 }
 

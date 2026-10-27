@@ -29,7 +29,7 @@
 
                 // 로고
                 var oLogo = document.getElementById("dtlLogo");
-                if (oLogo) { try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { } }
+                if (oLogo) { try { oLogo.src = encodeURI(REMOTE.getGlobal("u4aToAppUrl")(PATH.join)(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { } }
                 // 제목(opener 가 넘긴 TITLE → document.title)
                 var oTitle = document.getElementById("dtlTitle");
                 if (oTitle) { oTitle.textContent = document.title || ""; }

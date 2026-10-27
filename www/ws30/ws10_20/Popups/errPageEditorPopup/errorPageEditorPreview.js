@@ -152,7 +152,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // 로고 — 에디터·매니저류 창은 U4A 로고(.analy/16 §2.2).
     var oLogo = document.getElementById("prevLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI("file:///" + PATH.join(APPPATH, "img", "logo.png").replaceAll("\\", "/")); }
+        try { oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(APPPATH, "img", "logo.png")); }
         catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
@@ -178,7 +178,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         var sSrc = "errorPageEditorPreviewBody.html";
         if (BGCOL) { sSrc += "?BGCOL=" + encodeURIComponent(BGCOL); }
-        oFrame.src = sSrc;
+        // 2026-10-27 Electron 45: 화면이 u4a-ws:// 라 OS 경로를 그대로 넣으면 안 된다.
+        oFrame.src = REMOTE.getGlobal("u4aToAppUrl")(sSrc);
 
     } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
         U4ALOG.warn("GUARD_EXIT", "prevFrame", "error page preview body iframe not found - nothing can be shown");
