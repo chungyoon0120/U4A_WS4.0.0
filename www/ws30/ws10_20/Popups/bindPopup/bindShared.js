@@ -207,6 +207,7 @@
     oAPP.fn.attachToolOverflow = function (oTool) {
         if (!oTool || !window.U4AUI || typeof U4AUI.attachOverflow !== "function") { return null; }
         var oOvf = U4AUI.attachOverflow(oTool, {
+            act: "MORE_BIND",   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — ⋯ 단추 자신
             noOvfAutoMargin: true,
             btnClass: "u4a-btn-icon u4aBwpOvfBtn",
             isSep: function (el) { return el.classList.contains("u4aBwpToolSep"); },

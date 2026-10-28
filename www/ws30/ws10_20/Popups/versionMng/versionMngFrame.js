@@ -1056,6 +1056,7 @@ function _initChrome() {
     if (oTools && window.U4AUI && U4AUI.attachOverflow) {
         try {
             oState._diffOvf = U4AUI.attachOverflow(oTools, {
+                act: "MORE_VERSION_DIFF",   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — ⋯ 단추 자신
                 btnClass: "u4a-btn u4aVmIconBtn",
                 noOvfAutoMargin: true,                                 // 스페이서가 우측정렬 담당
                 isSkip: function (el) { return el.classList.contains("u4aVmDiffSpacer"); },   // flex-grow 스페이서만 측정 제외

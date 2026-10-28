@@ -3155,9 +3155,14 @@
 
         var sWinObjType = "ICONLIST",
             sHost = parent.getServerHost(),
-            oUserInfo = parent.getUserInfo(),
             sServerPath = parent.getServerPath(),
-            sIconListUrl = sHost + "/zu4a_acs/icon_exp?ws-platform=3.0&sap-user=" + oUserInfo.ID + "&sap-password=" + oUserInfo.PW + "&sap-language=" + oUserInfo.LANGU + "&WS=X#/overview/SAP-icons",
+            // [2026-10-28 장군님 지시 「아이디 비번, 언어 세개 빼라」]
+            //   주소에 sap-user / sap-password 를 달면 SAP 이 새로 로그인을 하고,
+            //   그 응답이 쓰던 세션 쿠키를 expires=1980 으로 지워 버린다.
+            //   그래서 창 안 SAP 앱이 상대경로로 부르는 Component-preload.js 부터
+            //   JavaScript 대신 로그인 화면 HTML 이 온다(2026-10-28 실제 오류).
+            //   WS20 미리보기도 같은 자리를 막아 고쳤다 — 쿠키만으로 받아진다.
+            sIconListUrl = sHost + "/zu4a_acs/icon_exp?ws-platform=3.0&WS=X#/overview/SAP-icons",
             sUrl = encodeURI(sIconListUrl),
             // sUrl = encodeURI("/zu4a_acs/icon_exp?WS=X#/overview/SAP-icons"),
             sPath = sServerPath + "/external_open?ws-platform=3.0&URL=" + encodeURIComponent(sUrl);

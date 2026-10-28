@@ -1094,11 +1094,11 @@
         // 헤더/툴바 반응형 오버플로(⋯) — 공통 U4AUI.attachOverflow(§11). 좁아지면 넘치는 액션을 ⋯ 로 접는다.
         //   ★ btnClass 를 반드시 넘긴다 — 기본값(u4a-tx-*)은 테마 CSS 미정의라 브라우저 기본 박스로 뜬다.
         //     레퍼런스(bindShared/fnP13nDesignPopupOpen)처럼 화면 툴바 버튼과 동일 스타일로 맞춘다(여기선 평면 u4aSnipFlat).
-        try { _ovfTools = U4AUI.attachOverflow(document.getElementById("snipEdTools"), { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); }
+        try { _ovfTools = U4AUI.attachOverflow(document.getElementById("snipEdTools"), { act: "MORE_SNIPPET_TOOLS", noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); }
         catch (e) { console.error("[monacoSnippetDesigner] code toolbar overflow wiring error:", e); }
-        try { if (oListActsBar) { _ovfActs = U4AUI.attachOverflow(oListActsBar, { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
+        try { if (oListActsBar) { _ovfActs = U4AUI.attachOverflow(oListActsBar, { act: "MORE_SNIPPET_LIST", noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
         catch (e) { console.error("[monacoSnippetDesigner] list header overflow wiring error:", e); }
-        try { if (oInfoPanel && oInfoPanel.actions) { _ovfInfoActs = U4AUI.attachOverflow(oInfoPanel.actions, { noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
+        try { if (oInfoPanel && oInfoPanel.actions) { _ovfInfoActs = U4AUI.attachOverflow(oInfoPanel.actions, { act: "MORE_SNIPPET_INFO", noOvfAutoMargin: true, btnClass: "u4a-btn u4aSnipFlat u4aSnipOvfBtn" }); } }
         catch (e) { console.error("[monacoSnippetDesigner] default-info header overflow wiring error:", e); }
 
         // 초기 데이터 로드 + 렌더 + 빈상태.

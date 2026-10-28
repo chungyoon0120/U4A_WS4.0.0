@@ -300,8 +300,17 @@
      *     거짓 → 평평한 "Icon List" 버튼(A12) → ev_pressIconListBtn (fnIconListPopupOpener)
      ************************************************************************/
     function _iconToolEntry() {
+
         var bIconViewer = false;
-        try { bIconViewer = APPCOMMON.checkWLOList("C", "UHAK900630"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+
+        try {
+            bIconViewer = APPCOMMON.checkWLOList("C", "UHAK900630");
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(e);
+            }
+        }
+
         if (!bIconViewer) {
             return { id: "iconListBtn", fa: "icons", text: _msg("A12"), tooltip: _msg("A12") + " (Ctrl+Shift+F10)", ev: "ev_pressIconListBtn" };
         }

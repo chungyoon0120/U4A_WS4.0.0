@@ -5,14 +5,25 @@
  **************************************************************************/
 var REMOTE = require('@electron/remote'),
     IPCRENDERER = require('electron').ipcRenderer,
-    CURRWIN = REMOTE.getCurrentWindow(),
-    BROWSKEY = CURRWIN.webContents.getWebPreferences().browserkey;
+    CURRWIN = REMOTE.getCurrentWindow();
 
 var PATH = REMOTE.require('path');
 var APP = REMOTE.app;
 var APPPATH = APP.getAppPath();
 var WSMSGPATH = PATH.join(APPPATH, "ws30", "ws10_20", "js", "ws_util.js");
 var WSUTIL = require(WSMSGPATH);
+
+// 브라우저의 쿼리 스트링 정보
+//   [2026-10-28 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가
+//   없어져 browserkey · OBJTY 를 그 쪽에서 못 받는다. 창을 여는 fnExternalOpen 이
+//   같은 값을 주소 쿼리로 넘겨 주므로, 다른 별창과 같은 방식으로 여기서 읽는다.
+var oQueryParams = WSUTIL.QueryString.parse(location.href);
+
+var BROWSKEY = oQueryParams.browserkey;
+
+if (!BROWSKEY) {
+    console.warn("[extopen] GUARD_EXIT | browserkey not in window url | parent busy off will not be sent");
+}
 
 
 var oAPP = {};
@@ -60,9 +71,7 @@ var oAPP = {};
         var oMin = document.querySelector('#extopenTitlebar [data-action="min"]');
         if (oMin) {
 
-            var sWinType = "";
-            try { sWinType = CURRWIN.webContents.getWebPreferences().OBJTY || ""; }
-            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sWinType = ""; }
+            var sWinType = oQueryParams.OBJTY || "";
 
             if (sWinType === "EXAMPLE") {
                 oMin.remove();
@@ -298,9 +307,7 @@ window.addEventListener('message', function (e) {
 
     var oMsg = e.data,
         MODE = oMsg.MODE,
-        oCurrWin = REMOTE.getCurrentWindow(),
-        oWebCon = oCurrWin.webContents,
-        oWebPref = oWebCon.getWebPreferences();
+        oCurrWin = REMOTE.getCurrentWindow();
 
     // 다른곳에서 메시지 전송 시 스킵하기 위한 로직.
     if (oMsg.TRCOD != "ELEC") {
@@ -312,7 +319,7 @@ window.addEventListener('message', function (e) {
 
     }
 
-    oMsg.BROWSERKEY = oWebPref.browserkey;
+    oMsg.BROWSERKEY = BROWSKEY;
 
     IPCRENDERER.send("if-exam-move", oMsg);
 

@@ -1189,6 +1189,7 @@
         try {
             if (window.U4AUI && U4AUI.attachOverflow) {
                 var oOvfCtl = U4AUI.attachOverflow(o, {
+                    act: "MORE_HEADER",   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — ⋯ 단추 자신
                     noOvfAutoMargin: true,
                     isSep: function () { return false; },
                     btnClass: "u4a-btn-icon u4a-ws10__common-ovf",
@@ -1346,6 +1347,8 @@
         ovf.id = "ws10OverflowBtn";
         ovf.title = "More";
         ovf.setAttribute("data-menu-anchor", "overflow");
+        //2026-10-28 자동 테스트 도구가 집을 이름(.analy/21). 공통 attachOverflow 가 아니라 여기서 직접 달았다.
+        ovf.setAttribute("data-act", "MORE_BAR");
         ovf.innerHTML = ICON.overflow;
         ovf.hidden = true;
         ovf.addEventListener("click", function () { _showOverflowMenu(ovf); });
@@ -1412,6 +1415,7 @@
                 if (cfg.split) {
                     // App 실행 분할버튼 → 동적 /DEFBR 브라우저 서브메뉴(화살표 메뉴와 동일, WS20 통일)
                     return {
+                        act: cfg.act,   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — 원래 단추와 같은 이름
                         icon: cfg.icon, text: cfg.text,
                         items: _getAppExecBrowsers().map(function (b) {
                             return {
@@ -1421,7 +1425,14 @@
                         })
                     };
                 }
-                return { icon: cfg.icon, text: cfg.text, action: function () { _invoke(cfg.ev, cfg.text); } };
+                return {
+                    act: cfg.act,   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — 원래 단추와 같은 이름
+                    icon: cfg.icon,
+                    text: cfg.text,
+                    action: function () {
+                        _invoke(cfg.ev, cfg.text);
+                    }
+                };
             });
         _openMenuAt(oAnchor, aItems, function (it) { if (typeof it.action === "function") { it.action(); } }, "right");
     }

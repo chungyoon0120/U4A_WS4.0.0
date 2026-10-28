@@ -5709,6 +5709,7 @@
         try {
             if (window.U4AUI && window.U4AUI.attachOverflow) {
                 _attrTbOvf = window.U4AUI.attachOverflow(TBR, {
+                    act: "MORE_ATTR",   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — ⋯ 단추 자신
                     btnClass: "u4aWs20AttrTbBtn",
                     noOvfAutoMargin: true,
                     isSkip: function (el) { return el.classList.contains("u4aWs20AttrTbSpacer"); }

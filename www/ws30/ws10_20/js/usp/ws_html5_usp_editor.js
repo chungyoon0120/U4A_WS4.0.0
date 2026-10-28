@@ -527,6 +527,7 @@
         try {
             if (window.U4AUI && U4AUI.attachOverflow) {
                 _editorTbOvf = U4AUI.attachOverflow(TB, {
+                    act: "MORE_USP_EDITOR",   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — ⋯ 단추 자신
                     noOvfAutoMargin: true,
                     // 스페이서만 측정 제외(가변). 제목(파일명)은 폭에 포함시켜 그 폭만큼 콤보/버튼이
                     //   먼저 ⋯ 로 접히게 한다 → 제목은 끝까지 보존(핵심 정보). 제목은 DOM 첫 항목이라

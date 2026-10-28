@@ -1628,7 +1628,7 @@
         if (_byId("tdFormatBtn")) { _byId("tdFormatBtn").addEventListener("click", function () { _edAction("editor.action.formatDocument"); }); }
 
         // 툴바 반응형 오버플로(⋯) — 공통 attachOverflow(§11). btnClass 는 화면 툴바 버튼과 동일(평면).
-        try { U4AUI.attachOverflow(document.getElementById("tdEdTools"), { noOvfAutoMargin: true, btnClass: "u4a-btn u4aTdFlat u4aTdOvfBtn" }); }
+        try { U4AUI.attachOverflow(document.getElementById("tdEdTools"), { act: "MORE_THEME_TOOLS", noOvfAutoMargin: true, btnClass: "u4a-btn u4aTdFlat u4aTdOvfBtn" }); }
         catch (e) { console.error("[monacoThemeDesign] editor toolbar overflow wiring error:", e); }
 
         // Monaco 프리뷰 iframe — oAPP 전역 노출(setInitData) 이후에 src 주입(레이스 방지).

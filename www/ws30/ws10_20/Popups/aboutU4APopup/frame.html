@@ -330,9 +330,14 @@
 
                 let oSettings = parent.WSUTIL.getWsSettingsInfo();
 
-                let PATH = parent.require('path'),
-                    sUrlParam = `about_u4aide?WSVER=${oSettings.appVersion}&WSPATCH_LEVEL=${oSettings.patch_level}`,
-                    sURL = PATH.join(parent.SERVPATH, sUrlParam);
+                let sUrlParam = `about_u4aide?WSVER=${oSettings.appVersion}&WSPATCH_LEVEL=${oSettings.patch_level}`,
+                    sURL = parent.SERVPATH + "/" + sUrlParam;
+
+                // [2026-10-28 장군님 지시] 종전엔 path.join(SERVPATH, …) 으로 주소를 만들었다.
+                //   path.join 은 파일 경로용이라 Windows 에서 역슬래시로 이어 붙인다 — 주소가 아니라
+                //   상대 경로다. 화면이 `u4a-ws://` 로 뜨는 Electron 45 에선 그 상대 경로가
+                //   서버가 아니라 **앱 폴더 안**을 가리켜 빈 응답이 왔고,
+                //   그걸 JSON.parse 가 받아 「Unexpected end of JSON input」 으로 터졌다.
 
                 var xhr = new XMLHttpRequest();
                 xhr.onreadystatechange = function () {

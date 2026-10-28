@@ -885,6 +885,7 @@
         try {
             if (window.U4AUI && U4AUI.attachOverflow) {
                 oUI.prevOvf = U4AUI.attachOverflow(oPTool, {
+                    act: "MORE_P13N_PREVIEW",   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — ⋯ 단추 자신
                     noOvfAutoMargin: true,
                     btnClass: "u4a-btn-icon u4aP13nPrevOvf",
                     btnHtml: _fa("ellipsis"),

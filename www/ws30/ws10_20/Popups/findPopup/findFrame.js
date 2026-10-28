@@ -387,7 +387,11 @@ function _buildHead(oMode) {
 
     // 공통 오버플로(§11) — 좁으면 액션을 ⋯ 로 접음. [hidden] override CSS + reflow 재시도(폭 0 오판 방지).
     if (window.U4AUI && typeof U4AUI.attachOverflow === "function") {
-        var oOvf = U4AUI.attachOverflow(oActions, { noOvfAutoMargin: true, btnClass: "u4a-btn-icon" });
+        var oOvf = U4AUI.attachOverflow(oActions, {
+            act: "MORE_FIND",   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — ⋯ 단추 자신
+            noOvfAutoMargin: true,
+            btnClass: "u4a-btn-icon"
+        });
         if (oOvf && typeof requestAnimationFrame === "function") {
             (function _try(n) {
                 if (oActions.clientWidth > 0) { try { oOvf.reflow(); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } return; }
@@ -602,6 +606,7 @@ function _buildPane(oPaneDef, aCtx) {
     //   검색=menuItem {node}(원본 el 이동 없이 ⋯ 메뉴에 새 검색 생성, 동일 oSearch 핸들러 — fnP13n 콤보 패턴).
     if (oSrchOvf && window.U4AUI && typeof U4AUI.attachOverflow === "function") {
         var oOvf = U4AUI.attachOverflow(oSrchOvf, {
+            act: "MORE_FIND_SEARCH",   // 2026-10-28 자동 테스트 도구가 집을 이름(.analy/21) — ⋯ 단추 자신
             noOvfAutoMargin: true,
             btnClass: "u4a-btn-icon",
             isSep: function () { return false; },
