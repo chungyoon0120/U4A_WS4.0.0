@@ -112,7 +112,12 @@ const oAPP = {
 
                 let sUrlParam = `app_export_import?ACTCD=IMPORT&WSVER=${oSettings.appVersion}&WSPATCH_LEVEL=${oSettings.patch_level}`;
 
-                let sURL = oAPP.path.join(oAPP.SERVPATH, sUrlParam),
+                // [2026-10-28 장군님 지시] 종전엔 path.join 으로 주소를 만들었다.
+                //   path.join 은 파일 경로용이라 Windows 에서 역슬래시로 이어 붙여 주소가 아니라
+                //   상대 경로가 된다. 화면이 `u4a-ws://` 로 뜨는 Electron 45 에선 그게
+                //   서버가 아니라 앱 폴더 안을 가리켜 요청이 서버에 안 간다.
+                //   같은 병으로 「U4A 워크스페이스 정보」 창이 터졌다(2026-10-28).
+                let sURL = oAPP.SERVPATH + "/" + sUrlParam,
                     oformData = new FormData();
 
                 var oBin = new Blob([Buffer.from(data)]);
@@ -269,7 +274,8 @@ const oAPP = {
 
             let oSettings = WSUTIL.getWsSettingsInfo();
 
-            let sURL = oAPP.path.join(oAPP.SERVPATH, `app_export_import?ACTCD=EXPORT&APPID=${oAPP.APPID}`);
+            // [2026-10-28 장군님 지시] 위와 같은 까닭 — 주소는 path.join 이 아니라 문자열로 잇는다.
+            let sURL = oAPP.SERVPATH + `/app_export_import?ACTCD=EXPORT&APPID=${oAPP.APPID}`;
 
             var xhr = new XMLHttpRequest(),
                 oformData = new FormData();

@@ -35,7 +35,12 @@
 ★이름은 **이미 있던 세 개와 같은 모양(`MORE_*`)으로 맞췄다** — `MORE_TOOLBAR`(WS20 툴바) ·
 `MORE_PREVIEW`(WS20 미리보기 머리) · `MORE_TREE`(WS20 트리). 요청서가 쓴 `HEADER_OVERFLOW` ·
 `BAR_OVERFLOW` 는 보기일 뿐이라고 했고, 기존 세 개와 모양이 달라지므로 쓰지 않았다.
-이로써 `attachOverflow` 를 쓰는 **18곳 전부**에 이름이 생겼다(앞서 3 + 이번 12 + 손제작 1).
+이로써 `attachOverflow` **호출 15곳 전부 + 손으로 만든 ⋯ 1 = 이름 16개**가 됐다(았서 3 + 이번 12 + 손제작 1).
+
+★**처음 보고에 「18곳」이라 적은 것은 틀렸다.** `grep "attachOverflow("` 결과 18줄에 **주석 줄 셋**이 섞여 있었다
+(`findFrame.js:350` · `monacoSnippetDesigner/Popup/js/index.js:1094` · `monacoThemeDesign/Popup/js/index.js:1630`).
+자동 테스트 죽이 집어 다시 세어 바로잡았다 — **분 자리는 없다.**
+→ 함정: **건수를 `grep` 줄 수로 세지 말 것.** 주석·정의 줄이 호출로 섞인다(`.claude/rules/code.md` 영향도 3번 항목).
 
 ### WS10 서브헤더 ⋯ 메뉴 **안의 줄** (`_showOverflowMenu`)
 
