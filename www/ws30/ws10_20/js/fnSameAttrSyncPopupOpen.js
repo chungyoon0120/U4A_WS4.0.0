@@ -265,7 +265,11 @@
             oState.islst = "X";
             try {
                 var aEvt = await oAPP.fn.getServerEventList(null, true);
-                aDDLB = Array.isArray(aEvt) ? aEvt.slice() : [];
+                //2026-10-28: 실제 조회 배열은 유지하고, 값 해제용 공백은 화면에만 추가.
+                aDDLB = [
+                    { KEY: "", TEXT: "", DESC: "" },
+                    ...(Array.isArray(aEvt) ? aEvt : [])
+                ];
             } catch (e) {
                 console.error("[WS20][sameAttr] getServerEventList:", e && e.message, e);
                 aDDLB = [{ KEY: "", TEXT: "" }];

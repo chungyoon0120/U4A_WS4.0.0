@@ -640,7 +640,8 @@
      *  ★ 원본은 UI5 디자인영역(uiAttributeArea.js)에만 있고 HTML5 프레임엔 미로드.
      *    UI5 의존부가 없어(ajax + designAreaLockUnlock + parent.setBusy) 그대로 이식한다.
      *  컨트롤러 클래스(CLSID)의 서버 이벤트 메소드 목록을 받아 DDLB 형태
-     *  [{KEY,TEXT,DESC}, ...](선두 빈 라인 포함)로 콜백/Promise 전달.
+     *  [{KEY,TEXT,DESC}, ...](실제 이벤트만)로 콜백/Promise 전달.
+     *  2026-10-28: 공백 선택지는 호출 화면에서 구성. 요청/응답 로그는 공통 sendAjax 사용.
      *  bSkipUnLock=true → busy/lock 해제를 호출처에 위임(원본 동일).
      ************************************************************************/
     if (typeof oAPP.fn.getServerEventList !== "function") {
@@ -651,7 +652,7 @@
                 //서버이벤트 호출전 lock처리.
                 oAPP.fn.designAreaLockUnlock(true);
 
-                var lt_ddlb = [{ KEY: "", TEXT: "", DESC: "" }];
+                var lt_ddlb = [];
 
                 //클래스명 서버 전송 데이터에 구성.
                 var oFormData = new FormData();
@@ -6194,12 +6195,12 @@
                     //   서버 RETCD!=="S"·통신오류에는 콜백(f_cb)을 부르지 않고, 성공에만 f_cb(lt_ddlb) 를
                     //   부른다. 검증을 성공 콜백에 두면 통신/세션/백엔드 오류를 "목록에 없음"으로 오판해
                     //   정상 이벤트에 빨간표시를 다는 [코덱스 P1] 문제가 사라진다(실패 시 기존 상태 보존).
-                    var fnOk = function (aDdlb) {
-                        aDdlb = aDdlb || [{ KEY: "", TEXT: "", DESC: "" }];
+                    var fnOk = function (aServerEvents) {
+                        //2026-10-28: 실제 서버 목록과 값 해제용 화면 목록을 분리한다.
+                        var aDdlb = [{ KEY: "", TEXT: "", DESC: "" }, ...aServerEvents];
                         sAttr.T_DDLB = aDdlb;   //서버이벤트 항목 매핑(원본 _sAttr.T_DDLB = _aEvent).
-                        var aNew = [], bHas = false;
+                        var aNew = [], bHas = aServerEvents.some(function (item) { return item.KEY === sAttr.UIATV; });
                         for (var k = 0; k < aDdlb.length; k++) {
-                            if (aDdlb[k].KEY === sAttr.UIATV) { bHas = true; }
                             aNew.push({
                                 value: aDdlb[k].KEY != null ? aDdlb[k].KEY : "",
                                 text: aDdlb[k].TEXT != null ? aDdlb[k].TEXT : ""

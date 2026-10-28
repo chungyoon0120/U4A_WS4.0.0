@@ -282,7 +282,8 @@
                 ls_binfo.T_DDLB = await new Promise((res)=>{
                     oAPP.fn.getServerEventList(function(oParam){
                         
-                        res(oParam);
+                        //2026-10-28: 조회 배열을 변경하지 않고 선택 UI에만 공백 행 추가.
+                        res([{KEY:"", TEXT:"", DESC:""}, ...oParam]);
 
                     }, true);
                 });

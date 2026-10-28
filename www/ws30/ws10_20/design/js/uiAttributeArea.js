@@ -1098,7 +1098,11 @@
       });
 
        //서버이벤트 항목 매핑.
-      _sAttr.T_DDLB = JSON.parse(JSON.stringify(_aEvent));
+      //2026-10-28: 조회 결과는 실제 이벤트만 유지하고, 값 해제용 공백은 화면 목록에만 추가.
+      _sAttr.T_DDLB = [
+        {KEY:"", TEXT:"", DESC:""},
+        ...JSON.parse(JSON.stringify(_aEvent))
+      ];
       
       /**
        * @since   2026-08-14 00:33:00
@@ -1322,7 +1326,8 @@
       });
 
        //서버이벤트 항목 매핑.
-      _sAttr.T_DDLB = _aEvent;
+      //2026-10-28: F4 경로도 실제 조회 배열을 변경하지 않고 공백 선택지를 구성.
+      _sAttr.T_DDLB = [{KEY:"", TEXT:"", DESC:""}, ..._aEvent];
 
       _sAttr.valst = "None";
       _sAttr.valtx = "";
@@ -7128,7 +7133,9 @@
       //서버이벤트 호출전 lock처리.
       oAPP.fn.designAreaLockUnlock(true);
 
-      var lt_ddlb = [{KEY:"", TEXT:"", DESC:""}];
+      //2026-10-28: 실제 서버 이벤트만 반환. 공백 선택지는 각 화면에서 구성한다.
+      //서버 요청/응답 로그는 공통 sendAjax에서 기록한다.
+      var lt_ddlb = [];
 
       //클래스명 서버 전송 데이터에 구성.
       var oFormData = new FormData();
@@ -7182,8 +7189,9 @@
           if(bSkipUnLock !== true){
             //lock 해제 처리.
             oAPP.fn.designAreaLockUnlock();
-            resolve();
           }
+          //2026-10-28: unlock 생략 여부와 관계없이 성공 목록으로 Promise 완료.
+          resolve(lt_ddlb);
           return;
         }
 
@@ -7196,7 +7204,8 @@
           oAPP.fn.designAreaLockUnlock();
         }
 
-        resolve();
+        //2026-10-28: callback과 Promise가 같은 실제 이벤트 목록을 전달한다.
+        resolve(lt_ddlb);
 
         /**
          * @since   2026-01-29 02:17:10
