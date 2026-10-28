@@ -129,7 +129,8 @@ function _getUpdateFileWorker(oPARAM) {
     let oWsVerInfo = oPARAM.WSVER_INFO;     // 설치할 WS 버전 정보
     let oLoginInfo = oPARAM.LOGIN_INFO;     // 로그인 정보
 
-    let oWorker = new Worker(_sWorkerPath);
+    // [2026-10-28 장군님 지시] 창이 `u4a-ws://` 라 생경로 워커는 origin 이 달라 막힌다.
+    let oWorker = new Worker(REMOTE.getGlobal("u4aToAppUrl")(_sWorkerPath));
 
     oWorker.onmessage = function(e){
         

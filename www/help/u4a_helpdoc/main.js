@@ -484,7 +484,9 @@ function _getHelpDocFileDown(oPARAM){
         // Document 다운로드 처리에 대한 Worker js
         let _sWorkerPath = PATH.join(APPPATH, "help", "u4a_helpdoc", "workers", "u4aHelpDownWorker.js");
 
-        let oWorker = new Worker(_sWorkerPath);
+        // [2026-10-28 장군님 지시] 창이 `u4a-ws://` 라 생경로 워커는 origin 이 달라 막힌다.
+        //   커스텀 프로토콜 주소로 바꿔야 워커가 만들어진다.
+        let oWorker = new Worker(REMOTE.getGlobal("u4aToAppUrl")(_sWorkerPath));
 
         oWorker.onmessage = async function(e){
             

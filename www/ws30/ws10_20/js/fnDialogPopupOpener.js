@@ -2117,6 +2117,22 @@
         oBrowserOptions.movable = true;
         oBrowserOptions.backgroundColor = oThemeInfo.BGCOL; //테마별 색상 처리
         oBrowserOptions.webPreferences.nodeIntegrationInWorker = true;
+
+        /**
+         * [2026-10-29 장군님 지시] 아이콘 즐겨찾기가 저장되지 않던 것.
+         * -----------------------------------------------------------------
+         * Electron 45 부터 **워커를 만든 frame 자신이** Node 를 가져야 그 워커에 Node 가 붙는다.
+         *   44 까지는 바로 위 `nodeIntegrationInWorker` 하나면 됐다.
+         * 이 창은 본문이 iframe(`iconPrevPopup/index.html` 의 ws_frame)이고, 즐겨찾기 저장 워커를
+         *   그 iframe 안에서 만든다(`iconPrevPopup/runtime.js`). 그래서 이 옵션이 없으면
+         *   워커 안 `require("fs")` 가 없어 `require is not defined` 로 터진다.
+         * 근거 = Electron Breaking Changes 45.0
+         *   「workers created by subframes need nodeIntegrationInSubFrames for Node.js integration」
+         *   https://www.electronjs.org/docs/latest/breaking-changes
+         * ※ 공통 설정 파일이 아니라 **이 창에만** 켠다. 바로 아래 Image Icons 창은 워커를 안 써서 대상이 아니다.
+         */
+        oBrowserOptions.webPreferences.nodeIntegrationInSubFrames = true;
+
         oBrowserOptions.webPreferences.partition = SESSKEY;
         oBrowserOptions.webPreferences.browserkey = BROWSKEY;
         oBrowserOptions.webPreferences.OBJTY = sPopupName;

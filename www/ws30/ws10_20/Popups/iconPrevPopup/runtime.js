@@ -1912,7 +1912,8 @@ function ev_iconFavoChange(oEvent) {
         sIconFavFilePath = PATH.join(sIconFavFolderPath, `${SYSID}.json`),
         sWorkerPath = PATH.join(PATHINFO.WORKER_ROOT, "u4aWsFavIconWorker.js"),
 
-        oIconFavWorker = new Worker(sWorkerPath);
+        // [2026-10-28 장군님 지시] 창이 `u4a-ws://` 라 생경로 워커는 origin 이 달라 막힌다.
+        oIconFavWorker = new Worker(REMOTE.getGlobal("u4aToAppUrl")(sWorkerPath));
 
     let oIconFavBindParam = {
         oWorker: oIconFavWorker, // Worker Instance        

@@ -573,6 +573,35 @@ oAPP.fn.onFrameLoadSuccess = () => {
         return;
     }
 
+    /**
+     * [2026-10-29 장군님 지시] UI5 부팅이 끝났으니 Node 전역을 되살린다.
+     * -----------------------------------------------------------------
+     * 이 iframe 은 `nodeIntegrationInSubFrames` 로 Node 가 켜져 있다(즐겨찾기 저장 워커 때문).
+     * 그런데 서버 UI5 의 `sap/ui/thirdparty/URI.js` 는 UMD 라 **`require` 가 보이면 CommonJS 로**
+     * 꺾여 `Cannot find module './punycode'` 로 부팅이 깨진다(2026-10-29 실측).
+     * 그래서 preload(`electron/lib/protocol/ws_renderer_dirname.js`)가 이 frame 의
+     * `require`·`module`·`exports` 를 `__node` 에 담아 두고 지워 뒀다. **부팅이 끝난 지금 되돌린다.**
+     *
+     * 원본도 같은 방식이다 — `ServerList_v2/ServerList.js` 「UI5와 Electron Node의 충돌 방지 로직」,
+     * 되살리기는 `ws30/ws10_20/index.js` 의 `_restoreNodeGlobals()`.
+     */
+    if (oContWindow.__node) {
+
+        oContWindow.require = oContWindow.__node.require;
+        oContWindow.module = oContWindow.__node.module;
+        oContWindow.exports = oContWindow.__node.exports;
+
+        delete oContWindow.__node;
+
+    } else {
+
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "__node in the iframe",
+                "node globals were not stashed - the favorite icon worker may fail with require is not defined");
+        }
+
+    }
+
     // 성공 확정 — 로드 감시 해제.
     oAPP.attr.bBootOk = true;
     oAPP.fn._clearLoadGuards();

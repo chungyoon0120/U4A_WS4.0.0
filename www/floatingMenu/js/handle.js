@@ -123,7 +123,9 @@ exports.open = function(REMOTE, SCREEN, _DIRNAME, SSID) {
 
     var oWIN = new REMOTE.BrowserWindow(op); // 상단의 옵션을 갖는 새로운 윈도우 창
 
-    var url = `file://${_DIRNAME}/floatingMenu/index.html`;
+    // [2026-10-28 장군님 지시] 종전엔 이 창만 `file://` 로 떴다.
+    //   다른 창은 전부 `u4a-ws://` 라 origin 이 달라, 이 창은 창 사이 통신·저장소가 끊긴다.
+    var url = REMOTE.getGlobal("u4aToAppUrl")(`${_DIRNAME}/floatingMenu/index.html`);
 
     oWIN.loadURL(url); // 해당 url을 로드 해
     // 브라우저 로드 밑에

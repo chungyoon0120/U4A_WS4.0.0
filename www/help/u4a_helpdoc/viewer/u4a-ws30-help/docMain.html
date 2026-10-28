@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- 오류코드 접두: HDOC / 다음 번호: 002 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
@@ -198,7 +199,29 @@ body.theme-dark .header:hover {
       this.maxBtn = document.getElementById("maxBtn");
       this.closeBtn = document.getElementById("closeBtn");
 
-      this.webview.preload = './preload.js';
+      /**
+       * [2026-10-29 장군님 지시] Electron 은 preload 에 `file:` 주소만 받는다.
+       *   이 창이 `u4a-ws://` 로 뜨면서 './preload.js' 가 그 origin 으로 풀려
+       *   `Only "file:" protocol is supported in "preload" attribute` 오류가 났다.
+       *   preload 가 안 걸리면 도움말 문서 쪽에서 보내는
+       *   setZoom · setTheme · setBack · setForward 가 이 창에 닿지 않는다.
+       *
+       *   `window.__dirname` 은 custom protocol 로 떠도 되살아난다
+       *   (electron/lib/protocol/ws_renderer_dirname.js 가 모든 session 에 건다).
+       */
+      const sHelpDir = window.__dirname;
+
+      if (!sHelpDir) {
+
+        console.warn('[HDOC] HDOC-001 | window.__dirname is empty | webview preload not attached - setZoom/setTheme/setBack/setForward from the help document will not reach this window');
+
+      } else {
+
+        const sPreloadPath = this.path.join(sHelpDir, 'preload.js');
+
+        this.webview.preload = encodeURI('file:///' + sPreloadPath.replace(/\\/g, '/'));
+
+      }
 
       //🔹이벤트 바인딩
       this.bindEvents();

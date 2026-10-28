@@ -58,11 +58,13 @@
         var oScript = document.createElement("script");
         oScript.id = "sap-ui-bootstrap";
 
-        // ★ UI5 부트 소스 = UI5LIB_WSSRC. [2026-09-08 장군님 지시] 개발(APP.isPackaged=false)=resourceUrl(CDN) 원본 그대로 /
-        //   ★패키지에서만★ index.js 가 WSSRC 에 서버 UI5(UI5LIB_SSRC)를 넣는다(패키지에 로컬 UI5 미탑재). 아래 선례 참고.
-        //   ※ 한때 UI5LIB_SSRC(sServerHost+LIBPATH)로 바꿨더니 sap 이 안 떠서 frame.js 크래시 → 바깥 프레임까지
-        //     백지가 됐음(200 오응답이면 onerror 도 안 떠 오류 다이얼로그도 없음). 원본 설계=frame.js:WSSRC /
-        //     selectSAP:SSRC 분리 로 원복. (selectSAP.html 은 원본대로 SSRC 유지 = KEEP-UI5)
+        // ★ UI5 부트 소스 = UI5LIB_WSSRC. [2026-10-29 장군님 지시] 개발·패키지 구분 없이 **언제나 접속 서버의 UI5**다
+        //   (index.js 가 WSSRC 에 UI5LIB_SSRC = 접속 서버 + LIBPATH 를 넣는다). 까닭은 index.js 그 자리 주석 참고.
+        //   그 전(2026-09-08)에는 패키지에서만 서버 UI5 였고 개발 모드는 설정의 고정 주소를 썼다.
+        //   ※ 한때 UI5LIB_SSRC 로 바꿨더니 sap 이 안 떠서 frame.js 크래시 → 바깥 프레임까지 백지가 됐음
+        //     (200 오응답이면 onerror 도 안 떠 오류 다이얼로그도 없었음). 지금은 index.js 의 서버 UI5 로드 실패
+        //     처리(onerror + sap 없음 검사)가 받아 줘 백지 대신 오류 안내 후 닫힌다.
+        //   (selectSAP.html 은 원본대로 SSRC 유지 = KEEP-UI5)
         oScript.setAttribute("src", oAPP.UI5LIB_WSSRC);
         oScript.setAttribute('data-sap-ui-theme', oAPP.UI5_THEME);
         oScript.setAttribute("data-sap-ui-language", oAPP.UI5_LANGU);

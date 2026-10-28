@@ -6,27 +6,56 @@
 
 ---
 
-# ⚡ Electron 45 — 창 사이 값 전달이 끊긴 것
+# ⚡ Electron 45 — 마지막 정리 하나 (⑤)
 
-> Electron 45 에서 `webContents.getWebPreferences()` 가 없어졌습니다. 그 값을 **주소 쿼리에서 읽도록** 바꿉니다.
-> **번호를 주시면 그걸 합니다.** 자리마다 소스 링크 = [전수 목록](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/2026/10/2026-10-28_claude_investigate_getwebpreferences-all-call-sites_06836675.md) · 경위 = [이력](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/2026/10/2026-10-28_claude_fix_browserkey-from-url-query_06836675.md)
+> `webContents.getWebPreferences()` 가 없어져 생긴 일은 **②③④ 가 전부 끝났고 테스트도 통과**했습니다
+> (E1~E12). 남은 것은 **그때 임시로 되살려 붙여 둔 장치를 걷어내는 것** 하나뿐입니다.
+> 경위 = [이력](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/2026/10/2026-10-28_claude_fix_browserkey-from-url-query_06836675.md)
 
-| 순서 | 무엇을 하나 | 줄 | 고치면 무엇이 나아지나 |
-|:---:|---|---:|---|
-| ② | ~~자기 창 값을 주소에서 읽기~~ | 0 | ✅ **끝났습니다** (마지막 자리는 테스트 E8) |
-| ③ | ~~IPC 를 보낸 창 값~~ | 0 | ✅ **끝났습니다** (테스트 E9) |
-| ④ | ~~남의 창 값을 그 창 주소에서 읽기~~ | 0 | ✅ **끝났습니다** (테스트 E10~E12) |
-| ⑤ | 없어진 함수를 다시 만들어 붙인 자리 걷어내기 | 3 | 정리용 — **맨 마지막** (먼저 빼면 전부 멈춤) |
+| 번호 | 걷어낼 자리 | 할 수 있나 |
+|:---:|---|---|
+| ⑤-1 | [main.js:448](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/electron/main.js:448) — 없어진 함수를 되살려 붙이는 자리 | 네 — ②③④ 가 끝났습니다 |
+| ⑤-2 | [main.js:650](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/electron/main.js:650) — 그것을 쓰는 자리 | 네 |
 
-★ ① (여는 주소에 값 채우기) = **대상 0곳**으로 끝났습니다. 실제로 도는 창은 이미 제대로 싣고 있었습니다.
-★ **안 도는 코드는 미리 걸러 뒀습니다** — ②에서 8줄 · ④에서 3줄. 아래 표에서 자리를 누르면 그 소스가 열립니다.
+★ 걷어내기 전에 **같이 고쳐야 하는 두 곳**이 있습니다 — 아직 그 없어진 함수를 그대로 부릅니다.
+  [ws_util.js:54](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/ws_util.js:54) ·
+  [floatingMenu/js/handle.js:60](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/floatingMenu/js/handle.js:60)
 
-### ⑤ 의 3줄 — 없어진 함수를 다시 만들어 붙인 자리 (맨 마지막)
+---
 
-| 번호 | 고칠 자리 | 줄 | 할 수 있나 |
-|:---:|---|---:|---|
-| ⑤-1 | [main.js:448](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/electron/main.js:448) — 없어진 함수를 되살려 붙이는 자리 | 1 | ②③④ 가 **다 끝난 뒤에만** |
-| ⑤-2 | [main.js:650](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/electron/main.js:650) — 그것을 쓰는 자리 | 2 | ②③④ 가 **다 끝난 뒤에만** |
+# 📁 아직 파일 경로를 주소로 쓰는 자리 (2026-10-28)
+
+> 창은 `u4a-ws://` 인데 **Windows 생경로**나 `file:///` 를 주소 자리에 주는 곳입니다.
+> 자세한 목록·판정 = [이력](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/2026/10/2026-10-28_claude_investigate_file-protocol-remaining_06836675.md)
+
+| 묶음 | 건수 | 무엇 | 상태 |
+|:---:|---:|---|---|
+| **W** 워커 | 4 | `new Worker(생경로)` | ✅ **끝났습니다** (테스트 F1·F2) |
+| **L** 창 열기 | 1 | `loadURL(file://)` | ✅ **끝났습니다** (테스트 불가 — 아래) |
+| **I** 동적 import | 51 | `await import(생경로)` | ✅ **고칠 것 없음** (아래 근거) |
+| **U** `file:///` 직접 | 6 | `file:///` 문자열을 만든다 | ☐ **다음 할 것** |
+
+★ **L 은 3곳이 아니라 1곳**이었습니다. 나머지 2곳(인트로 테마 · 릴리즈 노트)은 **이미 올바르게** 되어 있었습니다.
+★ **L 은 테스트할 수 없습니다** — 고친 창(떠다니는 메뉴)을 **켜는 자리가 지금 없습니다**(아래 1-19 와 같은 건).
+★ **I 는 지금 막히지 않습니다.** 근거: [fnDialogPopupOpener.js:3990](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/fnDialogPopupOpener.js:3990) 의
+  생경로 `await import` 가 **UI5 Predefined Css 창을 여는 바로 그 자리**이고, 그 창은 E3~E7 에서 정상으로 떴습니다.
+  그리고 51곳 중 **`design/js/` 쪽 13곳은 UI5 의존이라 HTML5 에서 아예 안 돕니다**(죽은 코드).
+
+### U 의 6곳 — `file:///` 문자열을 손으로 만드는 자리 (다음 할 것)
+
+| 번호 | 고칠 자리 | 무엇을 만드나 |
+|:---:|---|---|
+| U-1 | [intro.js:1319](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/intro.js:1319) | UI5 부트 주소 |
+| U-2 | [ws_util.js:1140](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/ws_util.js:1140) | 아이콘 글꼴 루트 |
+| U-3 | [ServerList.js:3953](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ServerList_v2/ServerList.js:3953) | ★U-3~U-6 은 **똑같은 함수를 4번 복붙**한 것입니다 |
+| U-4 | [Login.js:141](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Login/Login.js:141) | 〃 |
+| U-5 | [bindPopup/index.js:210](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Popups/bindPopup/index.js:210) | 〃 |
+| U-6 | [optionPopup-origin/common/iconFont.js:203](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Popups/optionPopup-origin/common/iconFont.js:203) | 〃 (폴더 이름이 `-origin` — **도는 코드인지 먼저 가립니다**) |
+
+★ U-3~U-6 은 장군님 지적(「공통적인 부분은 WSUTIL 같은 공통에다가 만들어서 처리를 해야지」) 그대로입니다 —
+  **공통 함수 하나로 빼고 네 곳이 그것을 부르게** 하겠습니다.
+★ 주의: 커스텀 프로토콜은 **앱 폴더 밖 파일을 거부**합니다([핸들러 159행](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/electron/lib/protocol/ws_app_protocol.js:159)).
+  그래서 자리마다 **앱 안 파일인지 밖 파일인지** 먼저 가려야 합니다 — 밖이면 다른 방법이 필요합니다.
 
 ---
 
@@ -54,13 +83,23 @@
 
 | 코드 | 동작 | 조작·확인 포인트 | O/X |
 |---|---|---|---|
-| E9 | Find 창 **새로고침**이 끝까지 돈다 (종전엔 처리중 표시가 안 꺼졌습니다) | ① WS20 작업화면에서 **찾기** 버튼을 눌러 Find 창을 연다 ② 그 창의 **새로고침** 버튼을 누른다 ③ **처리중 표시가 꺼지고** 목록이 다시 채워지는지 본다 | ☐ |
-| E10 | **뒤로가기**를 누르면 열어 둔 별창이 전부 같이 닫힌다 | ① WS20 작업화면에서 별창을 **3개** 연다(서로 다른 것으로) ② 첫 화면으로 돌아간다(뒤로가기) ③ 별창 3개가 **모두** 닫히는지 본다 | ☐ |
-| E11 | **도움말 창**을 두 번 열면 새 창이 안 뜨고 그 창이 앞으로 온다 | ① WS20 에서 도움말을 연다 ② 같은 자리에서 도움말을 **다시** 연다 ③ 창이 하나만 있고 앞으로 오는지 본다 | ☐ |
-| E12 | **예제 열기** 창과 **AI 창**이 제대로 찾아진다 | ① 예제 열기 창을 연 뒤 같은 버튼을 다시 누른다 ② 새 창이 안 뜨고 그 창이 앞으로 오는지 본다 | ☐ |
 ---
 
-# 1부. 장군님이 정해 주실 것 (20건)
+# 1부. 장군님이 정해 주실 것 (21건)
+
+### 1-0-1. 인트로가 뜰 때 흰 배경이 보입니다 — 한 줄로 막을까요 (2026-10-29 발견)
+
+인트로 창([seasons/index.js:69](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/u4a-intro/themes/seasons/index.js:69))에 **배경색이 없어** 화면이 그려지기 전까지 Electron 기본 흰색이 보입니다.
+그 파일에 **이미 주석으로 적혀 있는 한 줄**(`// "backgroundColor": '#00000000'`)을 풀면 막힙니다.
+※ 터미널의 `GetGpuDriverOverlayInfo` 오류는 **하드웨어 가속을 꺼 둔 탓**(최초 커밋부터 있던 설정)이고,
+  가속이 꺼져 있으면 투명 창이 소프트웨어로 합성돼 흰색이 더 잘 보입니다. 위 한 줄은 그와 무관하게 막습니다.
+
+### 1-0. 도움말 문서에서 `ESC` 를 누르면 터지는 자리 — 어느 쪽으로 고칠까요 (2026-10-29 발견)
+
+[docMain.html:412](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/help/u4a_helpdoc/viewer/u4a-ws30-help/docMain.html:412) 가 없는 함수(`setGoBack`)를 부릅니다.
+통로 쪽([preload.js](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/help/u4a_helpdoc/viewer/u4a-ws30-help/preload.js))에는 뒤로가기가 `setBack` 이라는 이름으로 있습니다.
+**① 통로에 `setGoBack` 을 더한다 / ② 부르는 쪽을 `setBack` 으로 바꾼다** — 제 안은 **②** 입니다(이름이 하나로 모입니다).
+
 
 > **정해 주시면 제가 빨리 끝낼 수 있는 것부터** 위에 놓았습니다.
 
