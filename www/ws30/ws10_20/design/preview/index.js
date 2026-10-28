@@ -4617,8 +4617,27 @@ function loadUi5BootstrapScript(fnCallback) {
 	}
 	const _userInfo = u4aRootParent.getUserInfo();
 	const oParam = new URLSearchParams();
-	oParam.append("sap-user", _userInfo.ID);
-	oParam.append("sap-password", _userInfo.PW);
+	/**
+	 * 2026-10-28 장군님 지시 「우선 주석 막어줘」 — sap-user / sap-password 두 줄을 막는다.
+	 *
+	 * 왜 막나 (2026-10-28 Network 탭 실측):
+	 *   이 주소로 요청하면 SAP 이 그 아이디·비번으로 **새로 로그인**을 한다.
+	 *   새 로그인이 기존 세션을 밀어내는데, 응답에는 새 세션 쿠키가 오지 않는다
+	 *   (돌아온 Set-Cookie 는 sap-usercontext 하나뿐).
+	 *   그래서 바로 다음 요청(sap/ui/layout/library-preload.js)이 죽은 세션으로 가서
+	 *   JavaScript 대신 로그인 화면 HTML 을 받고(200 + text/html + Saploginstatus: Logon),
+	 *   그 응답이 MYSAPSSO2 · SAP_SESSIONID 를 expires=1980 으로 지워 버린다.
+	 *   → 미리보기가 Unexpected token '<' 로 깨진다.
+	 *
+	 *   같은 요청의 Cookie 헤더에 MYSAPSSO2 · SAP_SESSIONID_U4A_800 이 이미 실려 있는 것을
+	 *   확인했다. 즉 쿠키만으로 인증이 되므로 이 두 줄은 필요 없다.
+	 *
+	 *   ★원본(U4A_WS_DESIGN design/preview/index.js 4608~4609행)에는 이 두 줄이 있다.
+	 *     원본과 달라지는 변경이라 장군님 지시를 받고 막았다.
+	 *   ★sap-client · sap-language 는 그대로 둔다 — 설정값일 뿐 새 로그인을 일으키지 않는다.
+	 */
+	// oParam.append("sap-user", _userInfo.ID);
+	// oParam.append("sap-password", _userInfo.PW);
 	oParam.append("sap-client", _userInfo.CLIENT);
 	oParam.append("sap-language", _userInfo.LANGU);
 	var oScript = document.createElement("script");

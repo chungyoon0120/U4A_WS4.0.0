@@ -19,14 +19,31 @@
  *     ② 그 host 로 나가는 요청에 `Cookie` 헤더로 다시 붙인다.
  *   Chromium 의 쿠키 저장소를 안 거치므로 위 두 규칙을 아예 안 탄다.
  *
+ * ★2026-10-28 추가 — https 도 같이 본다 (장군님 지시 「우선 고쳐바」).
+ *   WS20 미리보기가 서버 UI5 를 올리다 깨졌다(Unexpected token '<' — JavaScript 자리에 로그인 화면 HTML).
+ *   Network 탭 실측으로 가른 것:
+ *     · `<script>` 태그로 받는 sap-ui-core.js 는 쿠키가 실려 **성공**한다.
+ *     · UI5 가 내부에서 쓰는 요청(sap.ui.requireSync · library-preload)은 **cross-origin XHR** 이라,
+ *       withCredentials 가 꺼져 있으면 Chromium 이 Cookie 를 빼고 내보낸다 → 서버가 로그인 화면을 준다.
+ *     · 그 로그인 화면 응답이 MYSAPSSO2 · SAP_SESSIONID 를 expires=1980 으로 **지워 버려** 뒤가 전부 무너진다.
+ *   UI5 는 남의 라이브러리라 그 설정을 켤 수 없다. 그래서 **나가기 직전에 여기서 Cookie 를 붙인다** —
+ *   webRequest 는 화면 밖(메인 process)이라 cross-origin 규칙을 타지 않는다.
+ *   ★이미 Cookie 가 붙어 있으면 덮지 않고 **없는 것만** 더하므로 중복되지 않는다.
+ *
  * 지키는 것:
- *   - **https 는 손대지 않는다.** 지금 잘 되고 있고, 건드릴 이유가 없다.
  *   - **쿠키 값은 로그에 남기지 않는다** — 인증 표다(로그 표준). 개수와 host 만 남긴다.
  *   - 이미 Chromium 이 붙인 `Cookie` 가 있으면 **덮지 않고 없는 것만 더한다.**
  *   - 이 파일 때문에 앱이 죽으면 안 된다. 실패는 코드와 함께 남기고 그냥 통과시킨다.
  ****************************************************************************************/
 
+/**
+ * 쿠키를 들고 다닐 대상 scheme.
+ *
+ * ★[2026-10-28 장군님 지시 「우선 고쳐바」] https 를 넣었다. 그 전에는 http 만 봤다.
+ *   까닭은 이 파일 머리말의 「2026-10-28 추가」 참고.
+ */
 const SCHEME_HTTP = 'http:';
+const SCHEME_HTTPS = 'https:';
 
 /**
  * ★[2026-10-27 장군님 지시] 어디서 끊기는지 보려고 넣은 진단 로그의 상한.
@@ -76,9 +93,12 @@ function _errText(e) {
 }
 
 /****************************************************************************************
- * 주소에서 host 를 꺼낸다. http 가 아니면 빈 글자(= 손대지 않는다).
+ * 주소에서 host 를 꺼낸다. http · https 가 아니면 빈 글자(= 손대지 않는다).
+ *
+ * ★[2026-10-28] https 를 받아들이게 넓혔다. 이름도 _getHttpHost 에서 바꿨다 —
+ *   이제 http 만 보는 함수가 아니다. 부르는 곳은 이 파일 안 2곳뿐이다(전수 확인).
  ****************************************************************************************/
-function _getHttpHost(sUrl) {
+function _getCookieHost(sUrl) {
 
     let oUrl = null;
 
@@ -88,7 +108,7 @@ function _getHttpHost(sUrl) {
         return '';
     }
 
-    if (oUrl.protocol !== SCHEME_HTTP) {
+    if (oUrl.protocol !== SCHEME_HTTP && oUrl.protocol !== SCHEME_HTTPS) {
         return '';
     }
 
@@ -154,11 +174,18 @@ function install(oSession) {
 
     const oJar = new Map();
 
-    const oFilter = { urls: ['http://*/*'] };
+    const oFilter = { urls: ['http://*/*', 'https://*/*'] };
 
     // 진단용 — 처음 몇 번만 남기려고 센다.
     let iReqLogged = 0;
     let iResLogged = 0;
+
+    /**
+     * ★[2026-10-28] host 마다 한 번만 남기려고 기억한다.
+     *   https 를 보기 시작하면서 요청이 수백 건으로 늘었다 — 요청마다 남기면 로그가 쏟아진다(로그 양 표준).
+     */
+    const oKeptLoggedHosts = new Set();
+    const oAttachLoggedHosts = new Set();
 
     _writeLog('알림', 'HTTP_COOKIE | hooked on a session');
 
@@ -174,7 +201,7 @@ function install(oSession) {
 
         try {
 
-            const sHost = _getHttpHost(oDetails.url);
+            const sHost = _getCookieHost(oDetails.url);
 
             if (!sHost) {
                 return;
@@ -231,7 +258,14 @@ function install(oSession) {
 
                 }
 
-                _writeLog('알림', 'HTTP_COOKIE | kept | host=' + sHost + ' | count=' + oHostJar.size);
+                // host 마다 한 번만 — 응답마다 남기면 로그만 커지고 새 정보가 없다.
+                if (!oKeptLoggedHosts.has(sHost)) {
+
+                    oKeptLoggedHosts.add(sHost);
+
+                    _writeLog('알림', 'HTTP_COOKIE | kept | host=' + sHost + ' | count=' + oHostJar.size);
+
+                }
 
             }
 
@@ -248,7 +282,7 @@ function install(oSession) {
 
         try {
 
-            const sHost = _getHttpHost(oDetails.url);
+            const sHost = _getCookieHost(oDetails.url);
             const oHostJar = sHost ? oJar.get(sHost) : null;
 
             // ★[2026-10-27] 요청이 여기까지 오기는 하는지부터 본다.
@@ -313,7 +347,14 @@ function install(oSession) {
 
                 oHeaders[sCookieKey || 'Cookie'] = sMerged;
 
-                _writeLog('알림', 'HTTP_COOKIE | attached | host=' + sHost + ' | added=' + aAdd.length);
+                // host 마다 한 번만 — 요청마다 남기면 https 는 수백 줄이 된다.
+                if (!oAttachLoggedHosts.has(sHost)) {
+
+                    oAttachLoggedHosts.add(sHost);
+
+                    _writeLog('알림', 'HTTP_COOKIE | attached | host=' + sHost + ' | added=' + aAdd.length);
+
+                }
 
             }
 
