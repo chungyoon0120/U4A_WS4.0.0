@@ -2697,6 +2697,52 @@ const WSUTIL = {
             return QS.parse(new URL(url).search, { ignoreQueryPrefix: true });
         }
 
+        /**
+         * 그 창에 실린 값(browserkey · OBJTY · USERINFO …)을 **그 창의 주소 쿼리**에서 읽어 돌려줍니다.
+         *
+         *   [2026-10-28 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어졌습니다.
+         *   창을 열 때 webPreferences 에 넣은 값은 **되읽을 수 없고**, 같은 값을 주소 쿼리로 싣고 있으므로
+         *   읽는 쪽은 전부 이 함수를 씁니다. 창마다 복사하지 않습니다(복붙 금지 — .claude/rules/code.md).
+         *
+         *   ★자기 창도 `location.href` 가 아니라 이 함수를 쓰는 편이 안전합니다 —
+         *     iframe 안에서 도는 코드의 `location.href` 는 **창 주소가 아니라 iframe 주소**입니다.
+         *
+         * @param {BrowserWindow|WebContents} oTarget - 창 또는 그 창의 webContents
+         * @returns {Object} 그 창 주소의 QueryString Object (못 읽으면 빈 객체)
+         */
+        static parseWindow(oTarget) {
+
+            if (!oTarget) {
+                return {};
+            }
+
+            let oWebCon = oTarget;
+
+            // BrowserWindow 를 받은 경우 — 그 창의 webContents 로 바꾼다.
+            if (oTarget.webContents) {
+                oWebCon = oTarget.webContents;
+            }
+
+            if (!oWebCon || typeof oWebCon.getURL !== "function") {
+                return {};
+            }
+
+            try {
+
+                return this.parse(oWebCon.getURL());
+
+            } catch (e) {
+
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                    U4ALOG.caught(e);
+                }
+
+                return {};
+
+            }
+
+        }
+
     }
     /************** end of Class (QueryString) ***************/
 

@@ -253,7 +253,7 @@ function _initChrome() {
     // 로고(메인 창과 동일 APPPATH/img/logo.png).
     var oLogo = document.getElementById("ui5cssLogo");
     if (oLogo) {
-        try { oLogo.src = encodeURI(REMOTE.getGlobal("u4aToAppUrl")(PATH.join)(APPPATH, "img", "logo.png").replace(/\\/g, "/")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+        try { oLogo.src = REMOTE.getGlobal("u4aToAppUrl")(PATH.join(APPPATH, "img", "logo.png")); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     }
 
     // 제목(opener 가 넘긴 TITLE — 부트 스크립트가 document.title 에 세팅).
@@ -310,12 +310,13 @@ oAPP.fn.getOpenedChildWindows = function () {
     var aOut = [];
     var sBrowsKey = "";
 
-    try { sBrowsKey = CURRWIN.webContents.getWebPreferences().browserkey || ""; }
-    catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+    // [2026-10-28 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어졌다.
+    //   이 창 값은 위(31행)에서 이미 주소 쿼리로 받아 둔 것을 쓴다.
+    sBrowsKey = oQueryParams.browserkey || "";
 
     if (!sBrowsKey) {
         if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
-            U4ALOG.warn("GUARD_EXIT", "webPreferences.browserkey of ui5CssPopup_v2 main window",
+            U4ALOG.warn("GUARD_EXIT", "browserkey in the ui5CssPopup_v2 main window url",
                 "child windows cannot be collected - already-open check, close-all and close-with-opener do nothing");
         }
         return aOut;
@@ -336,7 +337,9 @@ oAPP.fn.getOpenedChildWindows = function () {
         if (oWin.id === iCurrId) { continue; }
 
         try {
-            var oPref = oWin.webContents.getWebPreferences();
+            // 남의 창 값은 그 창의 주소 쿼리에서 읽는다 — 가리는 기준(① browserkey 가 같다
+            //   ② OBJTY 가 그 browserkey 로 시작한다)은 그대로 둔다.
+            var oPref = WSUTIL.QueryString.parse(oWin.webContents.getURL());
             if (!oPref || oPref.browserkey !== sBrowsKey) { continue; }
             if (!oPref.OBJTY || String(oPref.OBJTY).indexOf(sBrowsKey) !== 0) { continue; }
         } catch (e) {

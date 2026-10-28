@@ -239,9 +239,20 @@
         //   성공 콜백이 안 불려 busy 가 영영 안 풀렸다.
         Promise.resolve(oAPP.fn.getServerEventList()).then(function (aServerEventList) {
 
+            // [2026-10-28 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어졌다.
+            //   IPC 를 보낸 창의 키는 그 창의 주소 쿼리에서 읽는다 — 창을 여는 쪽(:113)이 싣고 있다.
+            //   읽는 방법은 공통(WSUTIL.QueryString.parseWindow)을 쓴다 — 창마다 복사하지 않는다.
             const oSender = events.sender,
-                oWebPref = oSender.getWebPreferences(),
-                sBrowserKey = oWebPref.browserkey;
+                sBrowserKey = parent.WSUTIL.QueryString.parseWindow(oSender).browserkey;
+
+            if (!sBrowserKey) {
+
+                if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                    U4ALOG.warn("값이 없어 그만둠", "browserkey in the sender window url",
+                        "find refresh callback cannot be routed - the Find window stays busy");
+                }
+
+            }
 
             const oFindData = {
                 oUserInfo: parent.getUserInfo(),
@@ -257,7 +268,7 @@
             console.error("[FFPO-003] Find data refresh failed:", eErr && eErr.message);
             // 창이 계속 기다리지 않도록 빈 결과라도 반드시 보낸다(busy 해제 신호를 겸한다).
             try {
-                events.sender.send(`${events.sender.getWebPreferences().browserkey}--find--data--refresh--callback`, null);
+                events.sender.send(`${parent.WSUTIL.QueryString.parseWindow(events.sender).browserkey}--find--data--refresh--callback`, null);
             } catch (e2) { console.error("[FFPO-003] empty result notice failed:", e2 && e2.message, e2); }
         });
 

@@ -640,7 +640,13 @@ export async function getControl() {
         let sBrowsKey = oContr.IF_DATA.BROWSKEY;
 
         // Prev iframe에 src 지정
-        oPrevFrame.src = `${C_DETAIL_HTML_PATH}?browskey=${sBrowsKey}&mid=${oItemData.KEY}`;
+        //   [2026-10-28 장군님 지시] 파일 경로를 그대로 넣어 이 iframe 만 `file://` 로 떴다.
+        //   창은 `u4a-ws://` 라 서로 다른 origin 이 되고, 그러면 BroadcastChannel 이 안 통한다
+        //   (채널 이름은 others/M1·M2 의 index.js 가 browskey + mid 로 만든다).
+        //   별창을 여는 자리(아래 openNewBrowserMenu)와 똑같이 커스텀 프로토콜로 바꾼다.
+        let sPrevUrl = `${C_DETAIL_HTML_PATH}?browskey=${sBrowsKey}&mid=${oItemData.KEY}`;
+
+        oPrevFrame.src = parent.REMOTE.getGlobal("u4aToAppUrl")(sPrevUrl);
 
         // 브로드캐스트 channal Id
         let sChennalId = sBrowsKey + oItemData.KEY;

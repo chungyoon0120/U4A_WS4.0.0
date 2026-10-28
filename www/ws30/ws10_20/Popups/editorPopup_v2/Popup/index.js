@@ -12,13 +12,21 @@
     var CURRWIN = REMOTE.getCurrentWindow();
     var USERDATA = APP.getPath("userData");	
     var FS = REMOTE.require('fs');
-    var WEBCON = CURRWIN.webContents;
-    var WEBPREF = WEBCON.getWebPreferences();
-    var BROWSKEY = WEBPREF.browserkey;
-    var USERINFO = WEBPREF.USERINFO;
-    var PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"));    
+    var PATHINFO = require(PATH.join(APPPATH, "ws30", "resources", "pathInfo.js"));
     var WSUTIL_PATH = PATH.join(APPPATH, "ws30", "ws10_20", "js", "ws_util.js");
     var WSUTIL = require(WSUTIL_PATH);
+
+    // 브라우저의 쿼리 스트링 정보
+    //   [2026-10-28 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어져
+    //   browserkey · USERINFO 를 그 쪽에서 못 받는다. 창을 여는 editorPopup_v2/index.js 가
+    //   같은 값을 주소 쿼리로 넘겨 주므로, 다른 별창과 같은 방식으로 여기서 읽는다.
+    const oQueryParams = WSUTIL.QueryString.parse(location.href);
+
+    var BROWSKEY = oQueryParams.browserkey;
+    var USERINFO = oQueryParams.USERINFO;
+    // SYSID 는 쿼리 문자열 우선(객체 직렬화 깨짐 방어) — 테마 JSON 경로에 쓴다.
+    var SYSID = oQueryParams.SYSID || (USERINFO && USERINFO.SYSID) || "";
+
     var WSMSG = new WSUTIL.MessageClassText(USERINFO.SYSID, USERINFO.LANGU);
 
     // 오류 감지 객체
@@ -52,8 +60,9 @@
      *************************************************************/
     oAPP.fn.getThemeInfo = function (){
 
-        let oUserInfo = USERINFO;
-        let sSysID = oUserInfo.SYSID;
+        // [2026-10-28] SYSID 는 위에서 쿼리 문자열로 따로 받은 것을 쓴다.
+        //   USERINFO(객체)만 믿으면 쿼리 직렬화가 깨졌을 때 테마 JSON 경로가 어긋난다.
+        let sSysID = SYSID;
         
         // 해당 SYSID별 테마 정보 JSON을 읽는다.
         let sThemeJsonPath = PATH.join(USERDATA, "p13n", "theme_ws4", `${sSysID}.json`);

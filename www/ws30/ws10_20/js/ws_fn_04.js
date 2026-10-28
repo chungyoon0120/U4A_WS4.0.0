@@ -1022,8 +1022,10 @@
                     continue;
                 }
 
+                // [2026-10-28 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어져
+                //   그 창에 실린 값은 주소 쿼리에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
                 var oWebCon = oBrows.webContents,
-                    oWebPref = oWebCon.getWebPreferences();
+                    oWebPref = WSUTIL.QueryString.parseWindow(oWebCon);
 
                 if (oWebPref.OBJTY !== sPopupName) {
                     continue;
@@ -1654,11 +1656,14 @@
 
             try {                
           
+                // [2026-10-28 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어져
+                //   그 창에 실린 값은 주소 쿼리에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
+                //   ★partition 은 주소 쿼리에 sessionKey 라는 이름으로 실린다.
                 let oWebCon     = oWin.webContents,
-                    oWebPref    = oWebCon.getWebPreferences(),
+                    oWebPref    = WSUTIL.QueryString.parseWindow(oWebCon),
                     sOBJTY      = oWebPref.OBJTY,
                     sSYSID      = oWebPref.SYSID,
-                    sPartition  = oWebPref.partition;
+                    sPartition  = oWebPref.sessionKey;
 
                 // OBJTY가 없으면 next
                 if (!sOBJTY) {

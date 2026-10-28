@@ -195,15 +195,15 @@ IPCRENDERER.on('if-meta-info', (event, res) => {
     }
 
     // 새창일 경우 process object에 USERINFO 정보를 저장한다.
-    const
-        CURRWIN = REMOTE.getCurrentWindow(),
-        WEBCON = CURRWIN.webContents,
-        WEBPREF = WEBCON.getWebPreferences(),
-        USERINFO = WEBPREF.USERINFO;
+    //   [2026-10-28 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어졌다.
+    //   종전엔 창 설정 칸에서 USERINFO 를 되읽었지만, **같은 값을 위(173행)에서 메타 정보로
+    //   이미 받는다** — 새 창을 띄우는 쪽(ws30/resources/index.js:766)이 둘 다 보내고 있었다.
+    //   그래서 창 설정 칸을 볼 필요 없이 받은 것을 그대로 쓴다.
+    const CURRWIN = REMOTE.getCurrentWindow();
 
-    if (USERINFO) {
+    if (oMetadata.USERINFO) {
         // 새창 띄울 경우 process
-        setProcessEnvUserInfo(USERINFO);
+        setProcessEnvUserInfo(oMetadata.USERINFO);
     }
 
     // 타이틀 설정

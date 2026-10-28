@@ -2734,8 +2734,10 @@
 
             try {
 
+                // [2026-10-28 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어져
+                //   그 창에 실린 값은 주소 쿼리에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
                 var oWebCon = oWin.webContents;
-                var oWebPref = oWebCon.getWebPreferences();
+                var oWebPref = parent.WSUTIL.QueryString.parseWindow(oWebCon);
                 var sType = oWebPref.OBJTY;
 
                 if (sObjType != sType) {
@@ -2793,10 +2795,32 @@
         }
 
         // 현재 떠있는 브라우저의 키를 구한다.
+        //   [2026-10-28 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어졌다.
+        //   창에 실린 값은 그 창의 주소 쿼리에서 읽는다 — 자기 창도 남의 창도 getURL() 을 본다.
         let oCurrWin = REMOTE.getCurrentWindow(),
             oCurrWinWebCon = oCurrWin.webContents,
-            oCurrWinWebPref = oCurrWinWebCon.getWebPreferences(),
-            sCurrWinBrowsKey = oCurrWinWebPref.browserkey;
+            sCurrWinBrowsKey = "";
+
+        try {
+
+            sCurrWinBrowsKey = parent.WSUTIL.QueryString.parse(oCurrWinWebCon.getURL()).browserkey || "";
+
+        } catch (e) {
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                U4ALOG.caught(e);
+            }
+
+        }
+
+        if (!sCurrWinBrowsKey) {
+
+            if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+                U4ALOG.warn("값이 없어 그만둠", "browserkey in the current window url",
+                    "already-open check cannot run - a duplicate window may be opened");
+            }
+
+        }
 
         for (var i = 0; i < iAllWinLength; i++) {
 
@@ -2810,9 +2834,9 @@
             try {
 
                 let oWebCon = oWin.webContents,
-                    oWebPref = oWebCon.getWebPreferences(),
-                    sBrowsKey = oWebPref.browserkey,
-                    sOBJTY = oWebPref.OBJTY;
+                    oWinQuery = parent.WSUTIL.QueryString.parse(oWebCon.getURL()),
+                    sBrowsKey = oWinQuery.browserkey,
+                    sOBJTY = oWinQuery.OBJTY;
 
                 // 현재 떠있는 브라우저의 키와 같은것을 찾는다.
                 //   2026-10-07 장군님 결정으로 주석을 풀었다 - OBJTY 만 보면 같은 로그인의
@@ -2879,13 +2903,27 @@
             var oCurrWin = REMOTE.getCurrentWindow();
             if (!oCurrWin || oCurrWin.isDestroyed()) { return aOut; }
 
+            // [2026-10-28 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어졌다.
+            //   창에 실린 값은 그 창의 주소 쿼리에서 읽는다 — 자기 창도 남의 창도 getURL() 을 본다.
             var sCurrKey = "";
-            try { sCurrKey = oCurrWin.webContents.getWebPreferences().browserkey || ""; }
-            catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } sCurrKey = ""; }
+
+            try {
+
+                sCurrKey = parent.WSUTIL.QueryString.parse(oCurrWin.webContents.getURL()).browserkey || "";
+
+            } catch (e) {
+
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) {
+                    U4ALOG.caught(e);
+                }
+
+                sCurrKey = "";
+
+            }
 
             if (!sCurrKey) {
                 if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
-                    U4ALOG.warn("값이 없어 그만둠", "webPreferences.browserkey of current window",
+                    U4ALOG.warn("값이 없어 그만둠", "browserkey in the current window url",
                         "sibling browser windows cannot be collected - back-close and busy hide/show will do nothing");
                 }
                 return aOut;
@@ -2902,7 +2940,7 @@
 
                 try {
 
-                    var oPref = oWin.webContents.getWebPreferences();
+                    var oPref = parent.WSUTIL.QueryString.parse(oWin.webContents.getURL());
                     if (!oPref || !oPref.OBJTY) { continue; }
                     if (oPref.browserkey !== sCurrKey) { continue; }
 

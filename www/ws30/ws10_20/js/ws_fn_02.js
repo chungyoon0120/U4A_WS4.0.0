@@ -1828,8 +1828,10 @@
 
             try {
 
+                // [2026-10-28 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어져
+                //   그 창에 실린 값은 주소 쿼리에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
                 var oWebCon = oBrows.webContents,
-                    oWebPref = oWebCon.getWebPreferences();
+                    oWebPref = parent.WSUTIL.QueryString.parseWindow(oWebCon);
 
             } catch (error) {
                 if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
@@ -1837,7 +1839,7 @@
             }
 
             // session 정보가 없으면 skip.
-            var sSessionKey = oWebPref.partition;
+            var sSessionKey = oWebPref.sessionKey;   // 주소 쿼리에서는 partition 을 sessionKey 로 싣는다
             if (!sSessionKey) {
                 continue;
             }
@@ -1890,8 +1892,10 @@
 
             try {
 
+                // [2026-10-28 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어져
+                //   그 창에 실린 값은 주소 쿼리에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
                 var oWebCon = oBrows.webContents,
-                    oWebPref = oWebCon.getWebPreferences();
+                    oWebPref = parent.WSUTIL.QueryString.parseWindow(oWebCon);
 
             } catch (error) {
                 if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }
@@ -1899,7 +1903,7 @@
             }
 
             // session 정보가 없으면 skip.
-            var sSessionKey = oWebPref.partition;
+            var sSessionKey = oWebPref.sessionKey;   // 주소 쿼리에서는 partition 을 sessionKey 로 싣는다
             if (!sSessionKey) {
                 continue;
             }
@@ -2158,8 +2162,10 @@
             // (이미 브라우저가 죽었기 때문에 아래 하위 로직은 의미가 없음)
             try {
 
+                // [2026-10-28 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어져
+                //   그 창에 실린 값은 주소 쿼리에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
                 var oWebCon = oChild.webContents,
-                    oWebPref = oWebCon.getWebPreferences(),
+                    oWebPref = parent.WSUTIL.QueryString.parseWindow(oWebCon),
                     sOBJTY = oWebPref.OBJTY;
 
                 // child window 닫을 때 예외 팝업 체크
@@ -2263,8 +2269,10 @@
             // (이미 브라우저가 죽었기 때문에 아래 하위 로직은 의미가 없음)
             try {
 
+                // [2026-10-28 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어져
+                //   그 창에 실린 값은 주소 쿼리에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
                 var oWebCon = oChild.webContents,
-                    oWebPref = oWebCon.getWebPreferences(),
+                    oWebPref = parent.WSUTIL.QueryString.parseWindow(oWebCon),
                     sOBJTY = oWebPref.OBJTY;
 
                 // child window들 활성 or 비활성 시 예외 대상 팝업 체크

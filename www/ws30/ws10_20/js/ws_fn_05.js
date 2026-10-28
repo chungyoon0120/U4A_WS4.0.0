@@ -28,8 +28,10 @@
 
             try {               
             
+                // [2026-10-28 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어져
+                //   그 창에 실린 값은 주소 쿼리에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
                 var _oWebCon = _oWin.webContents;
-                var _oWebPref = _oWebCon.getWebPreferences();
+                var _oWebPref = parent.WSUTIL.QueryString.parseWindow(_oWebCon);
                 var _sBrowsKey = _oWebPref.browserkey;
 
             } catch (error) {

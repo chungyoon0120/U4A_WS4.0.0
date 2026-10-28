@@ -86,9 +86,33 @@ module.exports = function(REMOTE, oAPP, oParams){
     // 브라우저 상단 메뉴 없애기
     oBrowserWindow.setMenu(null);
 
+    // [2026-10-28 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어졌다.
+    //   창 안에서는 위에 넣은 webPreferences 값(browserkey·OBJTY·USERINFO)을 되읽을 수 없다.
+    //   그래서 같은 값을 주소 쿼리로 함께 넘긴다 — 본보기 = Popups/textSearchPopup/index.js
+    let oQueryParams = {
+        browserkey: BROWSKEY,
+        sessionKey: SESSKEY,
+        OBJTY: sPopupName,
+        USERINFO: parent.process.USERINFO,
+        // SYSID 를 문자열로 직접 전달 — USERINFO(객체)는 쿼리 직렬화에서 깨질 수 있어
+        //   테마 JSON 경로/테마변경 IPC 채널이 어긋난다.
+        SYSID: (parent.process.USERINFO && parent.process.USERINFO.SYSID) || "",
+    };
+
+    if (!BROWSKEY) {
+
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "browserkey", "editor window opens without a browser key - busy off and window lookup will not work");
+        }
+
+    }
+
     let sPopupPath = PATH.join(__dirname, "Popup", "index.html");
 
-    oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sPopupPath));
+    // URL 에 QueryString 파라미터를 적용한다.
+    let sLoadUrl = parent.WSUTIL.QueryString.build(sPopupPath, oQueryParams);
+
+    oBrowserWindow.loadURL(REMOTE.getGlobal("u4aToAppUrl")(sLoadUrl));
 
     // no build 일 경우에는 개발자 툴을 실행한다.
     if (!REMOTE.app.isPackaged) {

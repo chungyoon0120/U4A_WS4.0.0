@@ -13,16 +13,27 @@
 
 ---
 
-## ① 전제 — 여는 주소에 값을 채워야 하는 창 (2곳)
+## ① 전제 — 여는 주소에 값을 채워야 하는 창 (1곳)
 
 | 위치 | 무엇 |
 |---|---|
-| [fnDialogPopupOpener.js:1230](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/fnDialogPopupOpener.js:1230) | 속성 도움말의 작은 투명 창 — 쿼리 없음 |
 | [index.js:91](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Popups/editorPopup_v2/index.js:91) | 코드 편집기 창 — 쿼리 없음 |
 
-이 둘은 `webPreferences` 에는 네 값(partition·browserkey·OBJTY·USERINFO)을 넣지만
+`webPreferences` 에는 네 값(partition·browserkey·OBJTY·USERINFO)을 넣지만
 **주소 쿼리에는 아무것도 안 넣는다.** 먼저 넣어야 ②④ 를 고칠 수 있다.
 
+싣는 본보기 = [textSearchPopup/index.js:71](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Popups/textSearchPopup/index.js:71)
+— browserkey · sessionKey · OBJTY · USERINFO · SYSID 를 `QueryString.build` 로 싣는다.
+
+### ★2026-10-28 정정 — 2곳이 아니라 1곳이다
+
+처음엔 [fnDialogPopupOpener.js:1230](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/fnDialogPopupOpener.js:1230) 도 대상이라 했다. **아니다.**
+그 자리는 Text 검색 팝업을 여는 함수 안인데, 그 함수는 **맨 위에서 `textSearchPopup/index.js` 를
+부르고 [`return`](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/fnDialogPopupOpener.js:1178) 한다** — 그 아래는 **안 도는 죽은 코드**다.
+그리고 실제로 도는 그 파일은 **이미 쿼리를 제대로 싣는다.**
+
+→ 내가 안 본 것: `webPreferences` 를 넣는 줄은 봤지만 **그 위에 `return` 이 있는지 안 봤다.**
+  **앞으로: 고칠 줄을 찾으면 그 줄이 도는 코드인지(위쪽 `return`·주석 여부)를 먼저 본다.**
 ---
 
 ## ② 자기 창 값 (16줄)

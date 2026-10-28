@@ -96,8 +96,10 @@
 
             try {
 
+                // [2026-10-28 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어져
+                //   그 창에 실린 값은 주소 쿼리에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
                 var oWebCon = oChild.webContents,
-                    oWebPref = oWebCon.getWebPreferences(),
+                    oWebPref = parent.WSUTIL.QueryString.parseWindow(oWebCon),
                     sOBJTY = oWebPref.OBJTY;
 
                 if (sOBJTY !== "EXAMPLE") {

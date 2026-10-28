@@ -10,6 +10,9 @@ const remote = require("@electron/remote");
 const { BrowserWindow, app } = remote.require("electron");
 const path = require('path');
 const fs = require('fs');
+// [2026-10-28 장군님 지시] 창에 실린 값을 주소 쿼리에서 읽는 공통(WSUTIL.QueryString.parseWindow)을 쓴다.
+const PATHINFO = require(path.join(app.getAppPath(), "ws30", "resources", "pathInfo.js"));
+const WSUTIL = require(PATHINFO.WSUTIL);
 
 
 /************************************************************************
@@ -70,7 +73,7 @@ function _getOpenerBrowserKey() {
       const oOpener = remote.getCurrentWindow();
       if (!oOpener || oOpener.isDestroyed()) { return ""; }
 
-      return oOpener.webContents.getWebPreferences().browserkey || "";
+      return WSUTIL.QueryString.parseWindow(oOpener).browserkey || "";
 
    } catch (e) {
       console.error("[HLPV-002] reading browserkey of the opener window failed:", e && e.message, e);
@@ -101,7 +104,7 @@ function _findOpenedHelpWindow(sBrowsKey) {
          if (!oWin || oWin.isDestroyed()) { continue; }
 
          let oPref = null;
-         try { oPref = oWin.webContents.getWebPreferences(); }
+         try { oPref = WSUTIL.QueryString.parseWindow(oWin); }
          catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } continue; }
 
          if (!oPref || oPref.OBJTY !== "U4AHELP") { continue; }
@@ -137,7 +140,7 @@ function openHelpViewer(options = {}) {
    const _sBrowsKey = _getOpenerBrowserKey();
 
    if (!_sBrowsKey && typeof U4ALOG !== "undefined" && U4ALOG.warn) {
-      U4ALOG.warn("GUARD_EXIT", "webPreferences.browserkey of opener window",
+      U4ALOG.warn("GUARD_EXIT", "browserkey in the opener window url",
          "help document window is left out of the sibling window list - it will not hide behind dialogs or close on back");
    }
 
@@ -246,7 +249,11 @@ function openHelpViewer(options = {}) {
          toFilePath(indexPath),
          {
             query: {
-               options: encodeURIComponent(JSON.stringify(_options))
+               options: encodeURIComponent(JSON.stringify(_options)),
+               // [2026-10-28 장군님 지시] 창을 찾는 두 값을 주소에도 싣는다 —
+               //   Electron 45 에서 webPreferences 는 되읽을 수 없다.
+               OBJTY: "U4AHELP",
+               browserkey: _sBrowsKey
             }
          }
       )
