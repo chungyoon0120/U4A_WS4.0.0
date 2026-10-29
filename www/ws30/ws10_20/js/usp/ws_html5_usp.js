@@ -872,6 +872,23 @@
             return;
         }
 
+        /**
+         * 변경 저장 완료 → **고른 파일 열기** (구 _fnSaveBeforeLeavEditMsgCb 의 YES 경로).
+         * 2026-10-29 장군님 지적으로 되살렸다 — 원본은 저장 버튼에 `ISROW` 를 실어 보내
+         * 저장이 끝나면 그 행을 열었는데, HTML5 변환 때 「컨텍스트메뉴 CRUD 미구현이라 발생 안 함」
+         * 으로 보고 통째로 생략했다. 그래서 **고친 내용이 말없이 사라졌다.**
+         * HTML5 는 AFPRC 로 분기하는 구조이므로 `_C`·`_RN` 과 같은 모양으로 맞춘다.
+         */
+        if (oParams.AFPRC === "_OPEN") {
+            // busy 는 fnUspTreeTableRowSelect 의 응답 콜백이 해제한다(_C 경로와 같다).
+            try { oAPP.fn.fnUspTreeTableRowSelect(oParams._openNode); }
+            catch (e) {
+                console.error("[WS30] open after save failed:", e);
+                oAPP.common.fnSetBusyLock("");
+            }
+            return;
+        }
+
         _uspRefreshAfterMode();
         oAPP.common.fnSetBusyLock("");
 
@@ -2383,7 +2400,11 @@
         try {
             // 구 fnGetUspIntroPageWs30: PATH.join(APPPATH, "img", "intro.png"). 없으면 미표시(깨진 아이콘 방지).
             var sImg = parent.PATH.join(parent.APPPATH, "img", "intro.png");
-            if (sImg && (!parent.FS || parent.FS.existsSync(sImg))) { IMG.src = sImg; }
+
+            if (sImg && (!parent.FS || parent.FS.existsSync(sImg))) {
+                // 있는지는 OS 경로로 보고, src 에는 **주소**를 넣는다 — OS 경로를 넣으면 file:// 가 된다.
+                IMG.src = parent.REMOTE.getGlobal("u4aToAppUrl")(sImg);
+            }
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         IMG.alt = "";
         INTRO.appendChild(IMG);
@@ -2759,6 +2780,95 @@
      * ---------------------------------------------------------------------
      *  UI5 row 대신 선택 노드 데이터(oNodeData) 를 받는다(트리 모듈이 전달).
      ************************************************************************/
+    /************************************************************************
+     * 트리에서 **다른 파일을 고르기 전** 변경분을 묻는다 (구 ev_uspTreeItemDblClickEvent 앞단).
+     *   원본: ws_usp.js:4605 — IS_CHAG == "X" 면 메시지 119 를 띄우고 Yes/No/Cancel.
+     *   2026-10-29 장군님 지적으로 되살렸다. 변환 때 통째로 빠져 있어서
+     *   **고친 내용이 말없이 사라졌다.**
+     *
+     *   · YES    → 저장하고, 저장이 끝나면 그 파일을 연다 (AFPRC "_OPEN")
+     *   · NO     → 변경을 버리고(에디터 원복 + 플래그 해제) 그 파일을 연다
+     *   · CANCEL → 아무것도 하지 않는다. 숨긴 별창만 되살린다
+     *
+     *   ★이 검사는 **클릭 핸들러**에서만 부른다. fnUspTreeTableRowSelect 안에 넣으면
+     *     루트 자동 선택·신규 노드 추가 때도 확인창이 떠 버린다(그 함수는 세 군데서 불린다).
+     ************************************************************************/
+    oAPP.fn.fnUspAskBeforeOpen = function (oNodeData) {
+
+        if (!oNodeData) { return; }
+
+        var oApp = _model("/WS30/APP") || {};
+
+        // 변경분이 없거나 Display 모드 → 묻지 않고 바로 연다(원본 동일).
+        if (oApp.IS_CHAG !== "X" || oApp.IS_EDIT !== "X") {
+            oAPP.fn.fnUspTreeTableRowSelect(oNodeData);
+            return;
+        }
+
+        // 확인창 동안 떠 있는 별창을 잠시 숨긴다(원본 fnChildWindowShow(false)).
+        try {
+            if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(false); }
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        var sMsg = _msgWs("118") + " \n " + _msgWs("119");   // 변경됨 / 저장 후 나갈까요?
+
+        if (!oAPP.common || typeof oAPP.common.fnConfirmBox !== "function") {
+            // 공통 확인창이 없으면 **진행하지 않는다**(fail-closed) — 변경분을 말없이 버리지 않는다.
+            console.error("[USP-002] open-other-file confirm: common fnConfirmBox not loaded - stayed on current file");
+            try {
+                if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); }
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            }
+            return;
+        }
+
+        oAPP.common.fnConfirmBox("W", sMsg, _uspOpenOtherCb.bind(null, oNodeData), [
+            { act: "YES", label: "Yes", emphasized: true },
+            { act: "NO", label: "No" },
+            { act: "CANCEL", label: "Cancel" }
+        ]);
+
+    };
+
+    // 위 확인창의 답 처리 (구 _fnSaveBeforeLeavEditMsgCb).
+    function _uspOpenOtherCb(oNodeData, ACTCD) {
+
+        // 머무름 — 숨겨 둔 별창을 그대로 되살리고 끝낸다.
+        if (ACTCD == null || ACTCD === "CANCEL") {
+            try {
+                if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); }
+            } catch (e) {
+                if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+            }
+            return;
+        }
+
+        try {
+            if (oAPP.fn.fnChildWindowShow) { oAPP.fn.fnChildWindowShow(true); }
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        // 저장하고 그 파일 열기 — 저장 콜백의 AFPRC "_OPEN" 분기가 이어서 연다.
+        if (ACTCD === "YES") {
+            oAPP.fn.fnSaveUspWs30({ AFPRC: "_OPEN", _openNode: oNodeData });
+            return;
+        }
+
+        // 변경 버리고 그 파일 열기 — 에디터 원복 + 변경 플래그 해제(구 _fnSaveCancel).
+        try {
+            if (oAPP.fn.fnUspSaveCancel) { oAPP.fn.fnUspSaveCancel(); }
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        oAPP.fn.fnUspTreeTableRowSelect(oNodeData);
+
+    }
+
     oAPP.fn.fnUspTreeTableRowSelect = function (oNodeData) {
 
         if (!oNodeData) { return; }

@@ -61,8 +61,14 @@
         var PATH = GF.PATH;
         var APPPATH = GF.APPPATH;
 
-        var MONACO_VS_ROOT_PATH = PATH.join(APPPATH, "lib", "monaco", "vs");
-        var MONACO_LOADER_PATH = PATH.join(MONACO_VS_ROOT_PATH, "loader.js");
+        /**
+         * vs 경로는 **주소**다 — OS 경로를 주면 안 된다 (2026-10-29 장군님 지시).
+         * Monaco 가 이 값으로 worker 주소를 만드는데, OS 경로면 `file:///C:/…` 가 되고
+         * 창은 `u4a-ws://` 라 **origin 이 달라 worker 가 막힌다.**
+         * 자세한 경위 = js/codeeditor/index.html 같은 자리 주석.
+         */
+        var MONACO_VS_ROOT_PATH = new URL("/lib/monaco/vs", location.href).href;
+        var MONACO_LOADER_PATH = MONACO_VS_ROOT_PATH + "/loader.js";
 
         // URL PARAMS 파싱 — { HOSTID, THEME, LANG }
         var oURL = new URL(location.href);

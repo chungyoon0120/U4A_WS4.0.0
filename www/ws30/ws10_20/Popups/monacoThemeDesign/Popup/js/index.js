@@ -405,14 +405,21 @@
 
         oAttr.scopeCode = sScopeCode || "";
 
-        // monaco editor 에디터 path.
+        // monaco editor 에디터 path — 파일을 읽을 때 쓰는 OS 경로다. 주소로 쓰지 않는다.
         oAttr.monacoLibPath = PATH.join(APPPATH, "lib", "monaco");
 
-        // monaco editor 폴더 경로.
-        oAttr.monacoVSPath = PATH.join(oAttr.monacoLibPath, "vs");
+        /**
+         * monaco editor 폴더 경로 — 이것은 **주소**다. OS 경로를 주면 안 된다
+         * (2026-10-29 장군님 지시).
+         * Monaco 가 이 값으로 worker 주소(vs/base/worker/workerMain.js)를 만드는데,
+         * OS 경로면 `file:///C:/…` 가 되고 창은 `u4a-ws://` 라
+         * **origin 이 달라 worker 가 통째로 막힌다.**
+         * 자세한 경위 = js/codeeditor/index.html 같은 자리 주석.
+         */
+        oAttr.monacoVSPath = new URL("/lib/monaco/vs", location.href).href;
 
-        // monaco editor loader js 파일 경로.
-        oAttr.monacoLoaderPath = PATH.join(oAttr.monacoVSPath, "loader.js");
+        // monaco editor loader js 파일 경로 — 위와 같은 주소 체계로 잇는다.
+        oAttr.monacoLoaderPath = oAttr.monacoVSPath + "/loader.js";
 
         // standard 테마 경로.
         oAttr.standardThemePath = PATH.join(APPPATH, "lib", "monaco", "themes");

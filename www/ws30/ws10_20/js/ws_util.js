@@ -1139,11 +1139,12 @@ const WSUTIL = {
 
         sap.ui.requireSync("sap/ui/core/IconPool");
 
-        // 로컬 경로를 file:// 프로토콜로 변환 후 URI 인코딩
-        let sUrlRoot = PATHINFO.U4AICON_ROOT;
-        sUrlRoot     = sUrlRoot.replaceAll("\\", "/");
-        sUrlRoot     = `file:///${sUrlRoot}`;
-        sUrlRoot     = encodeURI(sUrlRoot);
+        /**
+         * 글꼴 파일이 있는 곳을 **주소**로 바꾼다 (2026-10-29 장군님 지시).
+         * 전에는 `file:///` 를 직접 만들었는데, 창이 `u4a-ws://` 라 origin 이 달라
+         * 글꼴을 못 받아 온다. 공통 변환은 이 폴더가 앱 데이터 폴더 아래인 것도 알아서 가려 준다.
+         */
+        let sUrlRoot = REMOTE.getGlobal("u4aToAppUrl")(String(PATHINFO.U4AICON_ROOT));
 
         sap.ui.core.IconPool.registerFont({ collectionName: oFwCollNames.regular, fontFamily: oFwList.regular, fontURI: sUrlRoot, lazy: true });
         sap.ui.core.IconPool.registerFont({ collectionName: oFwCollNames.brands,  fontFamily: oFwList.brands,  fontURI: sUrlRoot, lazy: true });

@@ -111,9 +111,16 @@
                 if (sDesc) { t.setAttribute("data-tip", sDesc); t.setAttribute("data-tip-trunc", ""); }
                 return { c2: t };
             },
-            // 단일 클릭 = 열기(우측 페이지 + Monaco).
+            /**
+             * 단일 클릭 = 열기(우측 페이지 + Monaco).
+             * 2026-10-29 장군님 지적 — **고친 내용이 있으면 먼저 묻는다.**
+             *   원본은 더블클릭 핸들러에서 `IS_CHAG == "X"` 를 보고 메시지 119 를 띄웠는데,
+             *   변환 때 그 검사가 통째로 빠져 **고친 내용이 말없이 사라졌다.**
+             *   묻는 쪽은 fnUspAskBeforeOpen 하나에 모아 뒀다(ws_html5_usp.js).
+             *   그 함수가 변경분이 없으면 바로 fnUspTreeTableRowSelect 로 넘긴다.
+             */
             onSelect: function (n) {
-                try { oAPP.fn.fnUspTreeTableRowSelect(n); }
+                try { oAPP.fn.fnUspAskBeforeOpen(n); }
                 catch (e) { console.error("[WS30] tree click open error:", e); }
             },
             // WS30 확장 — 컨텍스트메뉴 트리거 클래스(.u4aWs30TreeRow)·식별(data-objky)·선택표시(ISSEL)·노드 stash.

@@ -78,10 +78,20 @@
         const GRAND_FATHER = parent.parent;
         const PATH = GRAND_FATHER.PATH;
 
-        // 모나코 라이브러리 경로(USP 호스트와 동일 — APPPATH/lib/monaco/vs).
+        // 모나코 라이브러리 경로(USP 호스트와 동일 — APPPATH/lib/monaco).
+        //   ★이 값은 파일을 읽을 때 쓰는 OS 경로다. 주소로 쓰지 않는다.
         const MONACO_LIB_PATH = PATH.join(GRAND_FATHER.APPPATH, "lib", "monaco");
-        const MONACO_VS_ROOT_PATH = PATH.join(MONACO_LIB_PATH, "vs");
-        const MONACO_LOADER_PATH = PATH.join(MONACO_VS_ROOT_PATH, "loader.js");
+
+        /**
+         * vs 경로는 **주소**다 — OS 경로를 주면 안 된다 (2026-10-29 장군님 지시).
+         * Monaco 는 이 값을 기준으로 worker 주소(vs/base/worker/workerMain.js)를 만든다.
+         * OS 경로를 주면 `file:///C:/…` 가 되는데, 창은 `u4a-ws://` 라 **origin 이 달라
+         * worker 가 통째로 막힌다**(소스 패턴 창 실측 — workerMain.js 가 canceled).
+         * 창 주소 기준 절대 경로로 만들면 같은 origin 이 되어 그대로 뜬다.
+         *   `u4a-ws://app/` = www 폴더 → Monaco 는 `u4a-ws://app/lib/monaco/vs`.
+         */
+        const MONACO_VS_ROOT_PATH = new URL("/lib/monaco/vs", location.href).href;
+        const MONACO_LOADER_PATH = MONACO_VS_ROOT_PATH + "/loader.js";
 
         // URL PARAMS 파싱 — { HOSTID, LANG, THEME, READONLY }
         const oURL = new URL(location.href);

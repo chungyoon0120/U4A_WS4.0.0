@@ -333,7 +333,14 @@
 
     // Monaco iframe 1개 생성 (sPageId: EDITPAGE1/EDITPAGE2, sFrameCls: EDITOR_FRAME1/EDITOR_FRAME2[ EDITOR_MAIN])
     function _buildOneFrame(sPageId, sFrameCls) {
-        var sEditorIndexPath = PATH.join(PATHINFO.USP_ROOT, "monaco", "index.html");
+        /**
+         * iframe 주소는 **주소**다 — OS 경로를 주면 안 된다 (2026-10-29 장군님 지시).
+         * OS 경로를 `src` 에 넣으면 그 iframe 이 `file://` 로 뜬다. 부모 창은 `u4a-ws://` 라
+         * **origin 이 달라 부모의 값(PATH 등)을 못 읽고** 아래 오류로 터진다 —
+         *   `SecurityError: Blocked a frame with origin "file://" from accessing a cross-origin frame`
+         * (2026-10-29 USP 편집기 실측).
+         */
+        var sEditorIndexPath = parent.REMOTE.getGlobal("u4aToAppUrl")(PATH.join(PATHINFO.USP_ROOT, "monaco", "index.html"));
         var sQuery = encodeURIComponent(JSON.stringify({ PAGEID: sPageId }));
 
         var IFR = document.createElement("iframe");

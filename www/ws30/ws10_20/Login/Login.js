@@ -135,10 +135,13 @@ var oAPP = (function () {
         }
     }
 
-    // 절대 경로 → file:// URL (img src 용 — ServerList 와 동일 규칙)
+    /**
+     * OS 경로 → 화면이 쓸 수 있는 **주소** (img src 용 — ServerList 와 동일 규칙).
+     * 2026-10-29 장군님 지시로 `file:///` 를 직접 만들지 않는다 —
+     * 창이 `u4a-ws://` 라 `file://` 자원은 origin 이 달라 막히거나 조용히 안 뜬다.
+     */
     function _toFileUrl(sPath) {
-        let s = String(sPath).replaceAll("\\", "/");
-        return encodeURI(`file:///${s}`);
+        return REMOTE.getGlobal("u4aToAppUrl")(String(sPath));
     }
 
     /********************************************************************

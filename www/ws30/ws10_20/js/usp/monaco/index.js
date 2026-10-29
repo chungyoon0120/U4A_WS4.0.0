@@ -159,6 +159,9 @@ function _getP13nSnippetList(sLanguage){
 /**********************************************************************
  * Language에 해당하는 스니펫 데이터를 구한다.
  **********************************************************************/
+// 스니펫 폴더가 없다고 이미 알린 언어 — 같은 언어를 몇 번 열어도 줄이 한 번만 남게 한다.
+var _aNoSnippetLogged = [];
+
 function _getStandardSnippetData(sLanguage){
 
     if(!sLanguage){
@@ -173,19 +176,26 @@ function _getStandardSnippetData(sLanguage){
 	// 	sSnippetRootPath = PATH.join("C:\\u4a_temp\\U4A USP\\monaco", "snippet", sLanguage);
 	// }
 
-    // 스니펫 루트 폴더가 없을 경우 빠져나감.
+    /**
+     * 스니펫 루트 폴더가 없으면 그냥 빠져나간다 — **오류가 아니다**.
+     * 2026-10-29 장군님 지시 「오류가 아니면 빼라」로 `console.error` 를 걷어냈다.
+     *
+     * 스니펫 파일은 일부 언어에만 만들어 둔다(지금: css · html · javascript).
+     * 원본 WS3.0.0 도 그 셋뿐이라, xml 같은 언어를 열면 이 길로 들어오는 것이 **정상**이다.
+     * 편집기는 그대로 뜨고 편집도 된다 — 자동완성 조각만 없다.
+     *
+     * 흔적은 남기되 **같은 언어는 한 번만**, 색 없는 안내로 남긴다.
+     * (아예 없애면 나중에 「왜 자동완성이 없지?」 할 때 단서가 0이 된다)
+     */
     if(FS.existsSync(sSnippetRootPath) === false){
 
-        // 콘솔용 오류 메시지
-        var aConsoleMsg = [             
-            `[PATH]: www\\ws10_20\\js\\usp\\monaco\\index.js`,
-            `=> _getStandardSnippetData`,
-            `=> Snippet Langage: ${sLanguage}`,
-            `=> SnippetRootPath: ${sSnippetRootPath}`,
-            `=> 스니펫 루트 경로가 없음!!`,
-        ];
+        if(_aNoSnippetLogged.indexOf(sLanguage) === -1){
 
-        console.error(aConsoleMsg.join("\r\n"));
+            _aNoSnippetLogged.push(sLanguage);
+
+            console.log(`[USP monaco] no snippet folder for "${sLanguage}" - completion snippets are skipped (not an error). ${sSnippetRootPath}`);
+
+        }
 
         return;
     }

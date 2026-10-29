@@ -3948,10 +3948,14 @@
         return o;
     }
 
+    /**
+     * OS 경로 → 화면이 쓸 수 있는 **주소**.
+     * 2026-10-29 장군님 지시로 `file:///` 를 직접 만들지 않는다 —
+     * 창이 `u4a-ws://` 라 `file://` 자원은 origin 이 달라 막히거나 조용히 안 뜬다.
+     * 공통 변환(`u4aToAppUrl`)은 앱 폴더·앱 데이터 폴더를 알아서 가려 준다.
+     */
     function _toFileUrl(sPath) {
-        let s = sPath.replaceAll("\\", "/");
-        s = encodeURI(`file:///${s}`);
-        return s;
+        return REMOTE.getGlobal("u4aToAppUrl")(String(sPath));
     }
 
     // CSS 변수를 실제 색(rgb(...))으로 해석 (var() 미해석 문제 회피)
