@@ -421,8 +421,6 @@
     //어플리케이션 정보 검색.
     oAPP.fn.getAppData = function(){
       
-      //테스트!!!!!!!!!!
-      console.time("APP DATA 로드 시간");
 
       //application정보 구성전 화면 잠금 처리.
       oAPP.fn.designAreaLockUnlock(true);
@@ -434,12 +432,6 @@
       //서버 호출.
       sendAjax(oAPP.attr.servNm + "/getAppData", oFormData, async function(param){
         
-        //테스트!!!!!!!!!!
-        console.timeEnd("APP DATA 로드 시간");
-
-        //테스트!!!!!!!!!!
-        console.time("APP DATA 처리 시간");
-
         parent.setBusy("X");
 
         //application정보 구성전 화면 잠금 처리.
@@ -508,7 +500,8 @@
         oAPP.DATA.APPDATA = param.APPDATA;
 
         //application ui design, attribute 정보 매핑.
-        oAPP.attr.oModel.oData.TREE = oAPP.DATA.APPDATA.T_0014;
+        //2026-10-29: 중간 TREE 참조 없이 T_0014에서 zTREE를 직접 구성한다.
+        // oAPP.attr.oModel.oData.TREE = oAPP.DATA.APPDATA.T_0014;
 
         var l_edit = true;
 
@@ -539,7 +532,12 @@
         
 
         //tree 바인딩 정보 구성.
-        oAPP.fn.setTreeJson(oAPP.attr.oModel,"TREE","OBJID","POBID","zTREE");
+        // oAPP.fn.setTreeJson(oAPP.attr.oModel,"TREE","OBJID","POBID","zTREE");
+
+        //2026-10-29: 모델의 중간 TREE를 경유하지 않고 계층 변환 결과를 직접 매핑한다.
+        //setTreeData의 인자 순서는 원본 데이터, 부모 필드, 자식 필드, 하위 tree 필드이다.
+        oAPP.attr.oModel.oData.zTREE = oAPP.fn.setTreeData(
+          oAPP.DATA.APPDATA.T_0014, "POBID", "OBJID", "zTREE");
 
         //tree drag & drop 처리 활성여부 처리.
         oAPP.fn.setTreeDnDEnable(oAPP.attr.oModel.oData.zTREE[0]);
@@ -582,8 +580,6 @@
         //design 영역 invalidate 처리.
         oAPP.fn.invalidateDesignArea();
 
-        //테스트!!!!!!!!!!
-        console.timeEnd("APP DATA 처리 시간");
 
         //미리보기 화면 구성.
         oAPP.fn.loadPreviewFrame();
@@ -745,11 +741,6 @@
 
       //APPLICATION의 세부 정보 광역화.
       oAPP.attr.appInfo = parent.getAppInfo();
-
-      //테스트!!!!!!!!!!!!!!!
-      console.time("미리보기 로드 시간");
-      console.time("라이브러리 로드 시간");
-      //테스트!!!!!!!!!!!!!!!
 
       //어플리케이션 정보가 출력된 상태에서 변경된 내용 없이 display로 전환된경우
       //(변경건 없이 EDIT -> DISP 로 전환되는경우)

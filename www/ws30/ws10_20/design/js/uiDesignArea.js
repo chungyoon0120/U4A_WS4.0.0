@@ -508,18 +508,20 @@
 
 
       //테스트!!!!!!!!!!!!!!!!!!!!!!!!!
-      var _drag = oEvent.mParameters.browserEvent.dataTransfer.getData("text/plain");
+      if(parent.REMOTE.app.isPackaged === false){
+        var _drag = oEvent.mParameters.browserEvent.dataTransfer.getData("text/plain");
 
-      //AI 테스트.
-      if(oAPP.oDesign.fn.testAIDataDrop(_drag, ls_drop) === true){
-        //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
-        parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
+        //AI 테스트.
+        if(oAPP.oDesign.fn.testAIDataDrop(_drag, ls_drop) === true){
+          //WS 20 -> 바인딩 팝업 BUSY OFF 요청 처리.
+          parent.require(oAPP.oDesign.pathInfo.bindPopupBroadCast)("BUSY_OFF");
 
-        //단축키 잠금 해제 처리.
-        oAPP.fn.setShortcutLock(false);
+          //단축키 잠금 해제 처리.
+          oAPP.fn.setShortcutLock(false);
 
-        parent.setBusy("");
-        return;
+          parent.setBusy("");
+          return;
+        }
       }       
       //테스트!!!!!!!!!!!!!!!!!!!!!!!!!
 
