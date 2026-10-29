@@ -14,10 +14,14 @@
  *      standard 라야 u4a-ws://host/path 모양으로 읽히고, secure 라야 보안 컨텍스트가 된다.
  *   ② 앱이 준비된 뒤 u4a-ws://app/<경로> 요청을 화면 뿌리 폴더(www)의 파일로 내준다.
  *   ③ OS 경로를 u4a-ws://app/... 주소로 바꿔 주는 함수(toAppUrl)를 준다.
+ *   ④ 2026-10-29 — u4a-ws://data/<경로> 로 **앱 데이터 폴더**(app.getPath('userData'))의
+ *      파일도 내준다. 녹화 영상 · p13n · 패턴 · 아이콘처럼 앱이 실행 중에 만드는 것들이다.
  *
  * 지키는 것:
- *   - host 는 app 하나만 받는다. 다른 host(link 등)는 나중에 deep link 로 쓸 자리라 비워 둔다.
+ *   - host 는 app · data 둘만 받는다. 다른 host(link 등)는 나중에 deep link 로 쓸 자리라 비워 둔다.
  *     까닭: scheme 이름 u4a-ws 가 deep link 이름과 같아서, 주소 한 벌을 host 로 갈라 쓴다.
+ *   - 뿌리를 둘로 **가르는** 것이 핵심이다. 한 host 로 두 폴더를 다루면 `..` 가 섞인 주소가 생기고,
+ *     브라우저가 그 `..` 를 접어 버려 엉뚱한 자리를 찾는다(2026-10-29 녹화 기록 창 404 실측).
  *   - 뿌리 폴더 밖으로 나가는 요청은 내주지 않는다(.. 로 빠져나가기 차단).
  *   - 쿼리스트링은 파일을 찾을 때 쓰지 않는다 — 창에 값을 넘기는 용도라 그대로 둔다.
  *   - 이 파일 때문에 앱이 죽으면 안 된다. 실패는 코드와 함께 로그에 남기고 계속 간다.
@@ -31,9 +35,51 @@ const { pathToFileURL } = require('url');
 const SCHEME = 'u4a-ws';   // 장군님 지시 2026-10-27
 const HOST = 'app';        // 화면 파일을 내주는 host. deep link 용으로는 link 를 비워 둔다.
 
+/**
+ * 앱이 **만들어 낸** 파일을 내주는 host — 2026-10-29 장군님 지시로 더했다.
+ * 녹화 영상 · 개인화(p13n) · 패턴 · 아이콘처럼 앱이 실행 중에 만드는 것은
+ * 앱 폴더가 아니라 **앱 데이터 폴더**(`app.getPath('userData')`)에 쌓인다.
+ * 뿌리가 둘이므로 host 로 가른다 — 한 host 로 두면 `..` 로 빠져나가는 주소가 생긴다.
+ */
+const HOST_DATA = 'data';
+
 let _appRoot = '';         // 화면 파일이 있는 뿌리 폴더 (= app.getAppPath(), 실제로는 www)
+let _dataRoot = '';        // 앱이 만든 파일이 쌓이는 폴더 (= app.getPath('userData'))
 let _registered = false;   // 중복 등록 방지
 let _handled = false;      // 중복 설치 방지
+
+/**
+ * 경로가 그 뿌리 아래인가. `_serve` 의 빠져나가기 검사와 `toAppUrl` 의 뿌리 판별이
+ * 같은 일을 하므로 한 곳에 둔다.
+ */
+function _isUnder(sRoot, sFullPath) {
+
+    if (!sRoot) {
+        return false;
+    }
+
+    const sRootWithSep = path.resolve(sRoot) + path.sep;
+
+    return (path.resolve(sFullPath) + path.sep).startsWith(sRootWithSep);
+
+}
+
+/**
+ * host 이름으로 뿌리 폴더를 고른다. 모르는 host 면 빈 값.
+ */
+function _getRootByHost(sHost) {
+
+    if (sHost === HOST) {
+        return _appRoot;
+    }
+
+    if (sHost === HOST_DATA) {
+        return _dataRoot;
+    }
+
+    return '';
+
+}
 
 /**
  * 없는 파일은 같은 경로에 딱 한 번만 남긴다(로그 표준).
@@ -139,7 +185,9 @@ async function _serve(oRequest) {
         return new Response('', { status: 400 });
     }
 
-    if (oUrl.hostname !== HOST) {
+    const sRoot = _getRootByHost(oUrl.hostname);
+
+    if (!sRoot) {
         _writeLog('주의', 'GUARD_EXIT | unknown host | ' + oUrl.hostname + ' | nothing served');
         return new Response('', { status: 404 });
     }
@@ -153,11 +201,10 @@ async function _serve(oRequest) {
         return new Response('', { status: 400 });
     }
 
-    const sFullPath = path.resolve(path.join(_appRoot, sPathname));
-    const sRootWithSep = path.resolve(_appRoot) + path.sep;
+    const sFullPath = path.resolve(path.join(sRoot, sPathname));
 
-    if (!(sFullPath + path.sep).startsWith(sRootWithSep)) {
-        _writeLog('주의', 'GUARD_EXIT | path escapes app root | ' + sPathname + ' | nothing served');
+    if (!_isUnder(sRoot, sFullPath)) {
+        _writeLog('주의', 'GUARD_EXIT | path escapes root | ' + oUrl.hostname + ' | ' + sPathname + ' | nothing served');
         return new Response('', { status: 403 });
     }
 
@@ -198,6 +245,9 @@ function install(oApp) {
 
     _appRoot = oApp.getAppPath();
 
+    // 2026-10-29 — 앱이 실행 중에 만드는 파일(녹화 영상·p13n·패턴·아이콘)이 쌓이는 폴더.
+    _dataRoot = oApp.getPath('userData');
+
     const { session } = require('electron');
     const oDone = new Set();
 
@@ -234,7 +284,7 @@ function install(oApp) {
 
         _handled = true;
 
-        _writeLog('알림', 'PROTOCOL | handler installed on every session | root=' + _appRoot);
+        _writeLog('알림', 'PROTOCOL | handler installed on every session | app=' + _appRoot + ' | data=' + _dataRoot);
 
     } catch (e) {
         _writeLog('치명', 'PROT-005 | protocol.handle failed | ' + _errText(e));
@@ -326,13 +376,6 @@ function toAppUrl(sPath, oOptions) {
 
     }
 
-    const sRoot = sRootOverride || _appRoot;
-
-    if (!sRoot) {
-        _writeLog('주의', 'GUARD_EXIT | toAppUrl has no app root | returned input as is');
-        return sPath;
-    }
-
     let sBody = sPath;
     let sTail = '';
 
@@ -341,6 +384,51 @@ function toAppUrl(sPath, oOptions) {
     if (iMark > -1) {
         sTail = sBody.substring(iMark);
         sBody = sBody.substring(0, iMark);
+    }
+
+    /**
+     * 어느 뿌리에 속하는지 고른다 — 2026-10-29 장군님 지시로 뿌리가 둘이 됐다.
+     * ① root 를 직접 넘겼으면 그것 (옛 동작 그대로, host 는 app)
+     * ② 앱 폴더 아래  → app
+     * ③ 앱 데이터 폴더 아래 → data   (녹화 영상 · p13n · 패턴 · 아이콘 …)
+     * ④ 상대 경로면 앱 폴더 기준 (옛 동작 그대로)
+     *
+     * ★전에는 무조건 앱 폴더 기준이라, 앱 데이터 폴더 파일을 넘기면
+     *   `../../../../AppData/…` 가 만들어지고 브라우저가 그 `..` 를 접어 버려
+     *   **엉뚱한 자리를 찾다가 404** 가 났다(2026-10-29 녹화 기록 창 실측).
+     */
+    let sRoot = sRootOverride || _appRoot;
+    let sHost = HOST;
+
+    if (!sRootOverride && path.isAbsolute(sBody)) {
+
+        if (_isUnder(_appRoot, sBody)) {
+
+            sRoot = _appRoot;
+
+        } else if (_isUnder(_dataRoot, sBody)) {
+
+            sRoot = _dataRoot;
+            sHost = HOST_DATA;
+
+        } else {
+
+            /**
+             * 두 뿌리 어디에도 없다 — 주소로 바꿀 수 없다.
+             * 전에는 `..` 가 섞인 주소를 **조용히** 만들어 돌려줬다. 그러면 화면에서는
+             * 그저 404 로만 보여 원인을 찾을 수 없다. 이제는 자리를 남기고 입력을 그대로 둔다.
+             */
+            _writeLog('주의', 'GUARD_EXIT | toAppUrl path is outside both roots | ' + sBody + ' | returned input as is');
+
+            return sPath;
+
+        }
+
+    }
+
+    if (!sRoot) {
+        _writeLog('주의', 'GUARD_EXIT | toAppUrl has no app root | returned input as is');
+        return sPath;
     }
 
     let sRelative = sBody;
@@ -359,7 +447,7 @@ function toAppUrl(sPath, oOptions) {
         return encodeURIComponent(sPart);
     });
 
-    let sUrl = SCHEME + '://' + HOST + '/' + aEncoded.join('/') + sTail;
+    let sUrl = SCHEME + '://' + sHost + '/' + aEncoded.join('/') + sTail;
 
     /**
      * 옛 `loadFile(경로, { query·search·hash })` 자리를 `loadURL` 로 옮길 때 쓴다.
@@ -459,6 +547,7 @@ function setWindowCss(oWindow, sCss) {
 module.exports = {
     SCHEME: SCHEME,
     HOST: HOST,
+    HOST_DATA: HOST_DATA,
     setWindowCss: setWindowCss,
     registerScheme: registerScheme,
     install: install,

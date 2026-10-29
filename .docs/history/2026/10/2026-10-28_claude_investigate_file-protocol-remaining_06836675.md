@@ -741,6 +741,24 @@ oAPP.UI5LIB_WSSRC = oAPP.UI5LIB_SSRC;
   가속이 꺼져 있으면 투명 창이 소프트웨어로 합성된다.
 - 간헐적으로 보였다가 지금은 안 보인다 → **타이밍·GPU 상태를 탄다.**
 
+### 【정정 2026-10-29】 원인은 **dock 된 DevTools** 였다 — 위 추정은 틀렸다
+
+장군님 실측 — 「개발자도구가 dock 되면 그렇게 보이는건가본데?」 → 「undock 하니까 괜찮은거 같고」.
+
+dock 된 DevTools 는 페이지와 **같은 OS 창 안에서 함께 그려진다.** 그 상태에서는 Chromium 이
+창을 투명하게 합성하지 못해 불투명 바탕이 깔린다. **앱 결함이 아니다 — 고칠 것이 없다.**
+설치본에는 DevTools 가 없으므로 고객사에서는 생기지 않는다.
+
+**위에 적은 「창에 색이 없으면 Electron 기본 흰색이 깔린다」는 틀린 추정이다.**
+그것이 원인이라면 undock 상태에서도 흰색이어야 한다. `transparent: true` 면
+`backgroundColor` 가 없어도 Electron 이 투명하게 처리한다.
+
+**또 밟을 함정**: 투명 창(`transparent: true`)의 색이 이상해 보이면
+**DevTools 가 dock 돼 있는지부터 본다.** 창 옵션과 CSS 만 보고 판정하면 또 틀린다.
+확인하려면 DevTools 를 undock(또는 닫고)하고 다시 본다.
+해당 창: 인트로(`www/u4a-intro/themes/seasons/index.js`) · 메인 인트로(`electron/main.js` `createWindow`).
+둘 다 `transparent: true` · `frame: false` 다.
+
 ★곁다리: `www/u4a-intro/themes/christmas/index.js` 는 **빈 파일(0줄)** 이다.
   `IntroRuntime._decideThemeGroup()` 이 **12월이면 christmas 를 고른다** — 그대로 두면 12월에 인트로가 깨진다.
   이번 지시 범위 밖이라 보고만 한다.

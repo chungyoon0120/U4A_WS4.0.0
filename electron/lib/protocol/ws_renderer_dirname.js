@@ -1,7 +1,7 @@
 /****************************************************************************************
  * 화면(renderer) 의 __dirname · __filename 을 되살린다 — preload 로 먼저 돈다.
  * --------------------------------------------------------------------------------------
- * 오류코드 접두: PDIR / 다음 번호: 003
+ * 오류코드 접두: PDIR / 다음 번호: 004
  *
  * 왜 만들었나 (2026-10-27):
  *   화면을 custom protocol(u4a-ws://) 로 띄우면 Electron 이 화면의 `__dirname` 을
@@ -16,6 +16,9 @@
  * 무엇을 하나:
  *   u4a-ws://app/<경로>/페이지.html → `__filename` = <www>\<경로>\페이지.html ·
  *   `__dirname` = 그 폴더. `file://` 때와 같은 값이 된다.
+ *   2026-10-29 추가 — `module.filename` · `module.paths` 도 같이 넣는다.
+ *   Electron 이 `file:` 때 넣어 주는 4개를 전부 채우는 것이다. 이 둘이 빠져 있어서
+ *   `<script src>` 로 실린 화면 코드의 `require('./…')` 가 터졌다 (아래 그 자리 주석).
  *
  * 지키는 것:
  *   - u4a-ws 로 뜬 페이지에서만 손댄다. 다른 주소는 Electron 이 준 값을 그대로 둔다.
@@ -23,6 +26,7 @@
  ****************************************************************************************/
 
 const path = require('path');
+const Module = require('module');
 
 const SCHEME = 'u4a-ws:';
 
@@ -71,6 +75,37 @@ function _getAppRoot() {
 
     window.__filename = sFullPath;
     window.__dirname = path.dirname(sFullPath);
+
+    /**
+     * require('./…') 의 기준도 같이 바로잡는다 (2026-10-29 장군님 지시 N3)
+     * ----------------------------------------------------------------------------------
+     * Electron 은 주소가 `file:` 일 때 `__filename` · `__dirname` 과 **함께**
+     * `module.filename` · `module.paths` 까지 넣어 준다 (`lib/renderer/init.ts`).
+     * 다른 주소는 `else` 로 가서 `__filename` 에
+     * `<resources>/electron.asar/renderer/init.js` 라는 **가짜 경로**를 넣는다.
+     *
+     * 2026-10-27 에 이 파일은 앞의 두 개만 넣었다. 그래서 HTML 의 `<script src>` 로 실린
+     * 화면 코드의 `require('./msg')` 가 그 가짜 경로를 기준으로 삼아 터졌다
+     * — `Cannot find module './msg'`, 화면 녹화 창 8줄 (2026-10-29 장군님 발견).
+     *
+     * 왜 `module.filename` 인가: Node 는 상대 경로 require 를 **부르는 쪽 모듈의 filename**
+     * 기준으로 푼다. `node` 로 실측했다 — 그 값을 바로잡으면 `require('./msg')` 가
+     * 손대지 않은 채 그대로 그 폴더를 찾는다.
+     * `module.paths` 는 `require('이름')` 으로 npm 모듈을 찾을 때 쓰는 목록이다.
+     *
+     * 지키는 것:
+     *   - `require()` 로 로드된 모듈 안의 상대 경로는 **원래부터 잘 됐다** — Node 가 그 파일을
+     *     기준으로 풀기 때문이다. 이 블록은 그 길을 건드리지 않는다.
+     *   - `module.filename` · `module.paths` 를 읽거나 쓰는 코드는 `www` · `electron` 전체에
+     *     **0곳**이다 (2026-10-29 전수 확인). 그래서 바꿔도 깨질 자리가 없다.
+     */
+    if (!window.module) {
+        console.warn('[PDIR] PDIR-003 | window.module not ready in preload | relative require stays broken in <script src> files');
+        return;
+    }
+
+    window.module.filename = sFullPath;
+    window.module.paths = Module._nodeModulePaths(window.__dirname);
 
 })();
 

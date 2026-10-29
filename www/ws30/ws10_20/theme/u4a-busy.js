@@ -217,9 +217,17 @@
         oDlg.className = "u4aWsBusyIndicator";
         oDlg.setAttribute("data-act", "BUSY");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
 
+        // ★[2026-10-29 장군님 결정] 모양 = Sparkle 시안(u4a-busy.css 의 「중앙 카드 = Sparkle」 참조).
+        //   <i> = WS 로고(CSS mask + 지나가는 빛줄기), <b> 3개 = 빛이 지나는 자리에 튀는 별빛.
+        //   빈 요소라 글자는 없다 — 모양은 전부 CSS 가 그린다.
         oDlg.innerHTML =
             '<div class="u4aWsBusyCard">' +
-                '<div class="u4aWsSpinner"></div>' +
+                '<div class="u4aWsSpinner">' +
+                    '<i></i>' +
+                    '<b></b>' +
+                    '<b></b>' +
+                    '<b></b>' +
+                '</div>' +
                 '<div class="u4aWsBusyTitle" id="u4aWsBusyTitle"></div>' +
                 '<div class="u4aWsBusyText" id="u4aWsBusyText"></div>' +
             '</div>';

@@ -62,22 +62,64 @@ dialog.u4aWsBusyIndicator[open] {
 }
 dialog.u4aWsBusyIndicator::backdrop { background: transparent; }
 
-/* 중앙 카드 (구 BusyDialog 다이얼로그) — 테마 표면색 + 라운드 + 그림자.
-   사이즈를 키우고(가독성) 등장 시 살짝 팝업되어 존재감을 준다. */
+/************************************************************************
+ * 중앙 카드 = Sparkle (장군님 결정 2026-10-29)
+ * ----------------------------------------------------------------------
+ * 「멋있는 로그인 페이지」 세션의 시안 6안 05 Sparkle 을 그대로 옮겼다.
+ *   지침서 = D:/workspace/yoon-history-test/test2/handoff/ws4-busy-sparkle/GUIDE.md
+ *   은은하게 켜진 WS 로고 위로 금속 광택 빛줄기가 비스듬히 지나가고,
+ *   빛이 지나는 자리마다 작은 별빛이 튄다. 카드 테두리는 빛이 한 바퀴 돈다.
+ *
+ * ★테마 — 켜고 끄는 로직은 한 줄도 바꾸지 않았다. 모양만 바꿨다.
+ *   · 카드 배경·테두리·그림자·글자색은 **종전처럼 테마 의미 토큰**을 쓴다
+ *     → 테마 11종 전부 저절로 맞는다(테마별 하드코딩 없음).
+ *   · 다크/화이트는 `html[data-sl-theme="dark"]` 하나로 가른다(theme-api.js 의 _applySkin 이 붙인다).
+ *     기본(선택자 없음) = 밝은 테마 — 테마 11종 중 10종이 밝은 테마이고 기본값도 horizon_white 다.
+ *   · 테마를 바꾸면 그 속성이 바로 바뀌므로 **busy 가 떠 있는 중에도 바로 따라 바뀐다**(JS 없음).
+ ************************************************************************/
+
+/* 카드 테두리를 한 바퀴 도는 빛의 각도. 이름은 busy 전용(u4aWs*). */
+@property --u4aWsEdgeAngle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
 .u4aWsBusyCard {
+    /* 로고 보라 — 시안이 정한 값(WS 로고 색). 한곳에서만 쓰므로 여기 두 줄이 유일한 출처다. */
+    --busy-accent: #c705f7;
+    --busy-accent-2: #ff7af5;
+
+    /* 밝은 테마 기준값 — 흰 바탕에서 사라지는 흰 빛은 보조 색으로, 번지는 빛은 옅게.
+       ★--busy-dim 은 시안의 72% 가 아니라 **진하게**(100%) 쓴다 — 흰 카드 위에서 72% 로 깔면
+         로고가 연분홍으로 바래 「또렷이 보인다」는 기준(지침서 3-2)을 못 맞춘다(2026-10-29 실측). */
+    --busy-hi: var(--busy-accent-2);
+    --busy-glow: color-mix(in srgb, var(--busy-accent) 25%, transparent);
+    --busy-dim: var(--busy-accent);
+    --busy-sweep-hi: #ffffff;
+
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 18px;
     min-width: 300px;
     max-width: 440px;
-    padding: 32px 48px;
+    padding: 28px 34px 24px;
+    overflow: hidden;
     background: var(--popover-bg, var(--surface-raised, var(--surface)));
     color: var(--text);
     border: 1px solid var(--line);
-    border-radius: var(--radius, 8px);
+    border-radius: 14px;
     box-shadow: var(--popover-shadow, var(--elevation, 0 14px 44px rgba(0, 0, 0, 0.45)));
     animation: u4aWsBusyCardIn 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* 어두운 테마 — 별빛은 흰색으로, 번지는 빛은 진하게, 로고 바탕은 옅게. */
+html[data-sl-theme="dark"] .u4aWsBusyCard {
+    --busy-hi: #ffffff;
+    --busy-glow: color-mix(in srgb, var(--busy-accent) 60%, transparent);
+    --busy-dim: color-mix(in srgb, var(--busy-accent) 45%, transparent);
 }
 
 @keyframes u4aWsBusyCardIn {
@@ -85,65 +127,129 @@ dialog.u4aWsBusyIndicator::backdrop { background: transparent; }
     to   { opacity: 1; transform: none; }
 }
 
-/* 스피너 = 이중 카운터-로테이션 링 + 은은한 액센트 글로우 펄스 (구 단일 회전 링 대체) */
+/* 카드 테두리 전체를 따라 한 바퀴씩 도는 빛. */
+.u4aWsBusyCard::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1.5px;
+    border-radius: inherit;
+    background: conic-gradient(from var(--u4aWsEdgeAngle), transparent 0 62%, var(--busy-accent) 80%, var(--busy-accent-2) 93%, transparent 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    animation: u4aWsBusyEdge 3s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes u4aWsBusyEdge {
+    to { --u4aWsEdgeAngle: 360deg; }
+}
+
+/* ===== 로고 + 별빛 =====
+   u4a-busy.js 가 만드는 마크업 = <div class="u4aWsSpinner"><i></i><b></b><b></b><b></b></div> */
 .u4aWsBusyCard .u4aWsSpinner {
     position: relative;
     box-sizing: border-box;
-    width: 60px;
-    height: 60px;
+    width: 58px;
+    height: 59px;
     border: 0;
-    border-radius: 50%;
-    animation: u4aWsBusyGlow 1.6s ease-in-out infinite;
-}
-.u4aWsBusyCard .u4aWsSpinner::before,
-.u4aWsBusyCard .u4aWsSpinner::after {
-    content: "";
-    position: absolute;
-    border-radius: 50%;
-    box-sizing: border-box;
-}
-/* 바깥 링 — 굵게, 시계방향 */
-.u4aWsBusyCard .u4aWsSpinner::before {
-    inset: 0;
-    border: 5px solid var(--line);
-    border-top-color: var(--accent);
-    animation: u4aWsSpin 0.9s linear infinite;
-}
-/* 안쪽 링 — 반대방향, 다른 속도/색 → 입체적인 움직임 */
-.u4aWsBusyCard .u4aWsSpinner::after {
-    inset: 11px;
-    border: 4px solid transparent;
-    border-bottom-color: var(--accent-strong, var(--accent));
-    animation: u4aWsSpinRev 0.7s linear infinite;
+    filter: drop-shadow(0 0 6px var(--busy-glow));
 }
 
-/* 제목 (굵게) / 메시지 (보조색) — 비어있으면 숨김(스피너만) */
+/* 화면 쪽 전역 스타일이 로고·별을 찌그러뜨리지 않게 막는다(지침서 5절 함정). */
+.u4aWsBusyCard .u4aWsSpinner i,
+.u4aWsBusyCard .u4aWsSpinner b {
+    box-sizing: border-box;
+    font: inherit;
+    line-height: 0;
+    max-width: none;
+}
+
+/* WS 로고(CSS mask) 위로 금속 광택 빛줄기가 비스듬히 지나간다. */
+.u4aWsBusyCard .u4aWsSpinner i {
+    display: block;
+    width: 100%;
+    height: 100%;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20307%20311'%3E%3Cpath%20d%3D%22M4%204%2050%204%2050%20211%209%20211Z%22%2F%3E%3Cpath%20d%3D%22M91%204%20127%204%2054%20211%2021%20211Z%22%2F%3E%3Cpath%20d%3D%22M98%204%20134%204%20134%20211%20102%20211Z%22%2F%3E%3Cpath%20d%3D%22M176%204%20222%204%20146%20211%20106%20211Z%22%2F%3E%3Cpath%20d%3D%22M236%2093%20254%2093%20266%2095%20270%2096%20277%2099%20283%20103%20288%20107%20294%20114%20296%20117%20299%20122%20301%20128%20302%20132%20303%20139%20303%20154%20302%20158%20301%20159%20258%20159%20257%20158%20257%20157%20257%20146%20255%20141%20254%20139%20251%20136%20248%20134%20244%20133%20238%20132%20233%20132%20230%20133%20225%20135%20219%20139%20215%20145%20213%20149%20212%20153%20212%20158%20213%20163%20217%20169%20221%20173%20224%20175%20234%20178%20259%20189%20269%20194%20276%20200%20280%20204%20283%20208%20287%20214%20289%20220%20290%20224%20290%20233%20290%20238%20289%20247%20287%20255%20284%20263%20281%20269%20277%20274%20272%20280%20267%20285%20255%20294%20249%20298%20242%20301%20234%20304%20226%20306%20214%20307%20196%20307%20184%20305%20180%20304%20172%20301%20166%20297%20161%20293%20156%20287%20154%20284%20151%20278%20149%20273%20148%20269%20146%20261%20146%20247%20147%20242%20148%20242%20191%20242%20192%20243%20193%20244%20193%20255%20194%20259%20196%20262%20199%20265%20202%20267%20205%20268%20211%20268%20216%20268%20219%20267%20225%20265%20230%20261%20235%20256%20236%20252%20237%20248%20237%20242%20236%20237%20233%20232%20228%20228%20225%20226%20215%20222%20191%20212%20181%20206%20174%20201%20169%20197%20166%20193%20163%20186%20161%20180%20160%20176%20159%20168%20160%20162%20161%20154%20163%20146%20166%20138%20169%20132%20172%20126%20177%20121%20183%20115%20194%20106%20200%20103%20207%20100%20215%2097%20223%2095Z%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20307%20311'%3E%3Cpath%20d%3D%22M4%204%2050%204%2050%20211%209%20211Z%22%2F%3E%3Cpath%20d%3D%22M91%204%20127%204%2054%20211%2021%20211Z%22%2F%3E%3Cpath%20d%3D%22M98%204%20134%204%20134%20211%20102%20211Z%22%2F%3E%3Cpath%20d%3D%22M176%204%20222%204%20146%20211%20106%20211Z%22%2F%3E%3Cpath%20d%3D%22M236%2093%20254%2093%20266%2095%20270%2096%20277%2099%20283%20103%20288%20107%20294%20114%20296%20117%20299%20122%20301%20128%20302%20132%20303%20139%20303%20154%20302%20158%20301%20159%20258%20159%20257%20158%20257%20157%20257%20146%20255%20141%20254%20139%20251%20136%20248%20134%20244%20133%20238%20132%20233%20132%20230%20133%20225%20135%20219%20139%20215%20145%20213%20149%20212%20153%20212%20158%20213%20163%20217%20169%20221%20173%20224%20175%20234%20178%20259%20189%20269%20194%20276%20200%20280%20204%20283%20208%20287%20214%20289%20220%20290%20224%20290%20233%20290%20238%20289%20247%20287%20255%20284%20263%20281%20269%20277%20274%20272%20280%20267%20285%20255%20294%20249%20298%20242%20301%20234%20304%20226%20306%20214%20307%20196%20307%20184%20305%20180%20304%20172%20301%20166%20297%20161%20293%20156%20287%20154%20284%20151%20278%20149%20273%20148%20269%20146%20261%20146%20247%20147%20242%20148%20242%20191%20242%20192%20243%20193%20244%20193%20255%20194%20259%20196%20262%20199%20265%20202%20267%20205%20268%20211%20268%20216%20268%20219%20267%20225%20265%20230%20261%20235%20256%20236%20252%20237%20248%20237%20242%20236%20237%20233%20232%20228%20228%20225%20226%20215%20222%20191%20212%20181%20206%20174%20201%20169%20197%20166%20193%20163%20186%20161%20180%20160%20176%20159%20168%20160%20162%20161%20154%20163%20146%20166%20138%20169%20132%20172%20126%20177%20121%20183%20115%20194%20106%20200%20103%20207%20100%20215%2097%20223%2095Z%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
+    background: linear-gradient(115deg, var(--busy-dim) 0 40%, var(--busy-sweep-hi) 48%, var(--busy-accent-2) 53%, var(--busy-dim) 62% 100%);
+    background-size: 300% 100%;
+    animation: u4aWsBusySweep 1.9s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+
+/* 네 갈래 별 — 빛줄기가 그 자리를 지나는 때에 맞춰 차례로 튄다. */
+.u4aWsBusyCard .u4aWsSpinner b {
+    position: absolute;
+    display: block;
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    background: var(--busy-hi);
+    clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+    transform: scale(0);
+    animation: u4aWsBusyStar 1.9s ease-out infinite;
+}
+
+.u4aWsBusyCard .u4aWsSpinner b:nth-of-type(1) {
+    left: 16%;
+    top: 14%;
+    animation-delay: 0.62s;
+}
+
+.u4aWsBusyCard .u4aWsSpinner b:nth-of-type(2) {
+    left: 52%;
+    top: 62%;
+    animation-delay: 0.9s;
+}
+
+.u4aWsBusyCard .u4aWsSpinner b:nth-of-type(3) {
+    left: 86%;
+    top: 44%;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    animation-delay: 1.12s;
+}
+
+@keyframes u4aWsBusySweep {
+    0%   { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}
+
+@keyframes u4aWsBusyStar {
+    0%        { transform: scale(0) rotate(0deg); }
+    7%        { transform: scale(1.15) rotate(45deg); }
+    20%, 100% { transform: scale(0) rotate(90deg); }
+}
+
+/* 제목 (굵게) / 메시지 (보조색) — 비어있으면 숨김(로고만).
+   ★id 는 그대로 둔다 — 카드 제목·문구를 넣는 곳(ws_html5_shell.js)과
+     로그인 남은 초 표시(Login.js)가 이 id 로 찾는다. */
 .u4aWsBusyTitle {
     font-size: 15px;
     font-weight: 700;
     color: var(--text);
     text-align: center;
 }
+
 .u4aWsBusyText {
     font-size: 13px;
+    letter-spacing: 0.01em;
     color: var(--text-muted);
     text-align: center;
     line-height: 1.4;
 }
+
 .u4aWsBusyTitle:empty,
 .u4aWsBusyText:empty { display: none; }
 
-@keyframes u4aWsSpin { to { transform: rotate(360deg); } }
-@keyframes u4aWsSpinRev { to { transform: rotate(-360deg); } }
-@keyframes u4aWsBusyGlow {
-    0%, 100% { box-shadow: 0 0 0 0 transparent; }
-    50%      { box-shadow: 0 0 14px 1px var(--accent); }
-}
-
-/* 모션 최소화 선호 시 — 회전/글로우/팝 모두 정지(정적 링만 표시) */
+/* 움직임 줄이기 설정 — 시안 그대로 느리게만 한다(멈추지 않는다). */
 @media (prefers-reduced-motion: reduce) {
-    .u4aWsBusyCard,
-    .u4aWsBusyCard .u4aWsSpinner,
-    .u4aWsBusyCard .u4aWsSpinner::before,
-    .u4aWsBusyCard .u4aWsSpinner::after { animation: none; }
+    .u4aWsBusyCard::before,
+    .u4aWsBusyCard .u4aWsSpinner i,
+    .u4aWsBusyCard .u4aWsSpinner b {
+        animation-duration: 6s;
+    }
 }
