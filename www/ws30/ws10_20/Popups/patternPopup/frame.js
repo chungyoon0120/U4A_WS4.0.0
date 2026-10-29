@@ -160,7 +160,8 @@ function _iconHtml(sIcon) {
     var sSrc = s;
     try {
         if (/^[a-z]:[\\/]/i.test(s) || s.indexOf("\\") >= 0) {
-            sSrc = REMOTE.getGlobal("u4aToAppUrl")(s.replace)(/\\/g, "/");
+            // 2026-10-29 — 괄호 자리를 바로잡았다(designArea.js:1153 과 같은 오타).
+            sSrc = REMOTE.getGlobal("u4aToAppUrl")(s.replace(/\\/g, "/"));
         }
     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     return '<img src="' + encodeURI(sSrc) + '" alt="" style="width:1rem;height:1rem;object-fit:contain">';

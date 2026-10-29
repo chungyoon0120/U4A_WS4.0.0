@@ -1150,7 +1150,10 @@
             // _image_src = fnGetSapIconPath(UICON) = raw OS 경로 → file:/// 변환(WS20 tree.js:503 동일).
             if (n._image_visible && n._image_src) {
                 var p = String(n._image_src);
-                var src = /^(file:|https?:|data:|\/)/i.test(p) ? p : (oAPP.REMOTE.getGlobal("u4aToAppUrl")(p.replace)(/\\/g, "/"));
+                // 2026-10-29 — 괄호 자리를 바로잡았다. 10-27 Electron 45 치환 때 `(p.replace)(…)` 로
+                //   잘못 옮겨져, toAppUrl 에 **함수 p.replace 자체**를 넘기고 그 결과를 또 호출해
+                //   `is not a function` 으로 터졌다(바인딩 팝업 실측).
+                var src = /^(file:|https?:|data:|\/)/i.test(p) ? p : oAPP.REMOTE.getGlobal("u4aToAppUrl")(p.replace(/\\/g, "/"));
                 src = src.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 return '<img class="u4aBwpTreeIcon" src="' + src + '" alt="" onerror="this.style.display=\'none\'">';
             }
