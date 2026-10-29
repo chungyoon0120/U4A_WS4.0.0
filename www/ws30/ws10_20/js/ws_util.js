@@ -51,9 +51,14 @@ REGEDIT.setExternalVBSLocation(vbsDirectory);
 
 const CURRWIN  = REMOTE.getCurrentWindow();
 const WEBCON   = CURRWIN.webContents;
-const WEBPREF  = WEBCON.getWebPreferences();
 
-var USERINFO = WEBPREF.USERINFO;
+/**
+ * [2026-10-29 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어졌다.
+ *   종전에는 여기서 창 설정의 USERINFO 를 1차로 읽었지만, **바로 아래 두 갈래가 이미 받아 준다** —
+ *   ① 이 문서의 주소 쿼리(USERINFO) ② 그래도 없으면 부모 창의 getUserInfo().
+ *   그래서 창 설정을 읽는 줄을 걷어냈다.
+ */
+var USERINFO;
 
 // 현재 문서의 QueryString에서 USERINFO를 추출하여 우선 적용
 const oQueryParams = QS.parse(location.href, { ignoreQueryPrefix: true });

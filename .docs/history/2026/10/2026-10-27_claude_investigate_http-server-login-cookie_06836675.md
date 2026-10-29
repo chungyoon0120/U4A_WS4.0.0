@@ -174,3 +174,77 @@
 - **「지금은 멀쩡하다」가 「코드가 맞다」는 뜻이 아니다.** 이 결함은 Chromium 스위치가 덮어 주고 있었을 뿐이다.
   엔진을 올리면 **덮개가 사라지면서 한꺼번에 드러난다.**
 - **같은 코드가 두 파일에 복사돼 있다**(앱 본체 · 서버 목록 화면). 한쪽만 고치면 창마다 동작이 갈린다.
+
+---
+
+## 2026-10-29 — 테스트 조합을 설계했다 (장군님 지시, RZ11 권한 보유)
+
+장군님 목적: 「배포된 고객사가 100개가 넘고 각 고객사마다 보안 정책이 다르니,
+**어떠한 경우에도** WS4.0 이 구동되게 하는 것」. 그래서 **접속 주소 · https 인증서 · 서버 파라미터**를
+바꿔 가며 본다. 조합표는 `.docs/TODO.md` 의 CK4~CK8.
+
+### 조합을 추리려고 소스로 확인한 것
+
+| 확인한 것 | 결과 | 그래서 |
+|---|---|---|
+| 화면 코드가 쿠키를 직접 읽나(`document.cookie` 등) | **`www` 전체에 0곳** | **`icf/set_HTTPonly_flag_on_cookies` 는 테스트 축에서 뺐다.** 우리는 응답 헤더를 가로채 고치므로 `HttpOnly` 여도 손댈 수 있다 |
+| `ws_http_cookie.js` 가 보는 범위 | `http` **와 `https` 둘 다**(2026-10-28 에 https 추가). `installAll` 로 defaultSession + 새로 생기는 모든 session | http 조합에서 이 모듈이 **처음** 검증된다 |
+| 그 모듈이 쓰는 자리 | 응답 = `onCompleted`(읽기만) · 요청 = `onBeforeSendHeaders` | `onHeadersReceived` 를 **일부러 피했다** — 그 자리는 session 당 하나만 걸 수 있어 `main.js`·`ServerList.js` 를 밀어낸다. **충돌 없음** |
+| 창들이 같은 session 을 쓰나 | **쓴다.** 메인 창 = `partition = SESSKEY`(`ServerList.js:3095`, `RANDOM.generate(40)`), 별창도 같은 값(`fnDialogPopupOpener.js:148` `SESSKEY2 = parent.getSessionKey()` — 이름만 2 다) | 쿠키 고치기를 메인 창 session 에 한 번 걸면 별창까지 덮는다 |
+| 쿠키 고치기가 걸리는 session | `main.js` = **defaultSession 만**(= 서버 목록 화면) · `ServerList.js` = 메인 창 session | 그래서 **로그를 보는 곳이 둘로 갈린다**(터미널 / 창 개발자 도구) |
+| 인증서 오류 처리 | `app.commandLine.appendSwitch('ignore-certificate-errors')` — `electron/main.js` **106행과 124행에 두 번** | 중복이다(보고만, 안 고쳤다) |
+
+### 미확인 — 테스트가 가려 줄 것
+
+1. `ignore-certificate-errors` 스위치가 **최신 Chromium 에서 아직 먹는지.** Chromium 은 쓸모없어진 스위치를
+   남겨 두고 아무 일도 안 하게 만든 전례가 있다 — 이번 쿠키 결함이 바로 그 경우였다
+   (`SameSiteByDefaultCookies` · `CookiesWithoutSameSiteMustBeSecure`).
+2. **인증서가 깨진 연결에 `Secure` 쿠키가 저장되는지.** Chromium 은 "trustworthy origin" 기준으로 판단하는데,
+   인증서 오류를 무시한 연결을 그렇게 쳐 주는지 확인하지 못했다.
+
+### 또 밟을 함정
+
+- **스위치가 있다 ≠ 스위치가 먹는다.** Chromium 은 기능을 들어내면서 스위치 이름만 남겨 둔다.
+  「전에는 됐다」를 근거로 삼지 말고 **지금 버전에서 눌러 본다.**
+- `onHeadersReceived` 는 **session 당 하나**다. 쿠키·헤더를 가로채는 코드를 새로 넣을 때는
+  이미 걸린 자리가 있는지 먼저 보고, 읽기만 하면 `onCompleted` 를 쓴다.
+
+## 2026-10-29 (2) — 빠져 있던 RZ11 파라미터 두 개를 찾았다
+
+장군님이 참고 문서를 주시며(SCM 7.00 EHP2 판 「Activating HTTP Security Session Management on AS ABAP」)
+최신판에서 더 볼 파라미터가 없는지 확인하라고 하셨다. 그 문서는 **11개**를 적고 있다 —
+`login/create_sso2_ticket` · `login/accept_sso2_ticket` · `login/ticketcache_entries_max` ·
+`login/ticketcache_off` · `login/ticket_only_by_https` · `icf/set_HTTPonly_flag_on_cookies` ·
+`icf/user_recheck` · `http/security_session_timeout` · `http/security_context_cache_size` ·
+`rdisp/plugin_auto_logout` · `rdisp/autothtime`.
+
+### ★ 찾은 것 1 — `login/ticket_only_to_host` (그 문서에 **없다**)
+
+- **0(기본)** = 로그온 티켓을 **도메인 안의 모든 서버**에 보낸다 → 쿠키에 **넓은 `domain=` 속성**이 붙는다.
+- **1** = 티켓을 **만든 서버에만** 보낸다 → `domain` 이 host 로 좁혀진다.
+
+★**이것이 이 문서 위쪽에 「아직 남은 것」으로 적어 둔 `domain=.com` 문제의 원인이다.**
+  서버 이름이 `….com` 이고 이 값이 0 이면 SAP 가 `domain=.com` 을 붙여 보내는데, `.com` 은
+  공용 접미사(public suffix)라 **Chromium 이 `Secure` 를 붙여도 그 쿠키를 통째로 거부**한다.
+  → **고객사에서 같은 증상이 나오면 이 값을 먼저 본다. 0 → 1 로 바꾸면 사라진다.**
+
+### 찾은 것 2 — HTTP security session 자체의 켜짐/꺼짐 (SICF_SESSIONS)
+
+RZ11 파라미터가 아니라 **SICF_SESSIONS** 에서 켜고 끈다. 켜면 세션 쿠키(`SAP_SESSIONID_*`)를 쓰고,
+끄면 SSO 티켓(`MYSAPSSO2`)만 온다 — **쿠키 종류 자체가 달라지므로** 우리 코드가 둘 다 받아내는지 봐야 한다.
+
+### 테스트 축에서 뺀 것과 그 까닭
+
+| 파라미터 | 왜 뺐나 |
+|---|---|
+| `icf/set_HTTPonly_flag_on_cookies` | 화면이 쿠키를 직접 읽는 자리가 `www` 전체에 **0곳**. 우리는 응답 헤더를 가로채 고치므로 영향 없다 |
+| `http/security_session_timeout` · `rdisp/plugin_auto_logout` | 쿠키 **속성**이 아니라 **세션 수명**이다. 「오래 두면 끊기나」는 별개 테스트 |
+| `login/ticketcache_*` · `icf/user_recheck` · `rdisp/autothtime` | 서버 안쪽 동작이라 쿠키 속성이 바뀌지 않는다 |
+| `login/create_sso2_ticket` | 0 이면 티켓 자체를 안 만든다 — 쿠키 유지 문제가 아니라 **로그인 방식**이 달라지는 것 |
+
+### 또 밟을 함정
+
+- **SAP 쪽 문서는 버전마다 파라미터 목록이 다르다.** 장군님이 주신 7.00 EHP2 판에는
+  `login/ticket_only_to_host` 와 `icm/HTTP/samesite` 가 **둘 다 없다**(후자는 ABAP Platform 2020 부터).
+  **쿠키가 안 붙는 증상은 「그 버전 문서에 없는 파라미터」가 원인일 수 있다.**
+- `icm/HTTP/samesite` 의 **값 형식은 아직 확인하지 못했다**(SAP Note 2893546). ICM 파라미터라 재기동이 필요할 수 있다.

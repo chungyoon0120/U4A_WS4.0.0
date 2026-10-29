@@ -2,8 +2,24 @@ html,
 body,
 .u4aWsContent {
   height: 100%;
-  -webkit-app-region: no-drag;  
 }
+
+/* ★[2026-10-29 장군님 지시 N1] 여기 있던 `-webkit-app-region: no-drag` 를 뺐다.
+   [증상] 공통 busy 나 모달 팝업이 떠 있는 동안 창 헤더를 끌어도 창이 안 움직였다
+          (장군님 2026-10-28). Electron 14 에서는 움직였고, 45 로 올리고 나서 생겼다.
+   [원인] Chromium 152 부터 app-region 이 **상속되는 속성**으로 바뀌었다
+          (Chromium commit 9100cdc8 / CSSWG issue 13101. Electron 45 = Chromium 156).
+          그래서 body 에 no-drag 를 걸면 이 문서의 모든 요소가 no-drag 를 물려받는다.
+          화면 전체를 덮는 요소(theme/u4a-busy.js 의 <dialog> · 모달 팝업의 ::backdrop)는
+          <body> 끝 + top layer 라 문서 순서상 **헤더보다 뒤**에 놓이고, 드래그 영역은
+          문서 순서대로 drag 는 더하고 no-drag 는 빼면서 쌓이므로 헤더 몫이 통째로 깎였다.
+   [왜 빼도 되나] Electron 14(Chromium 93)에선 상속이 없어 이 선언은 html·body 자기
+          사각형만 뺐고, 그 자리는 문서 맨 앞 = 아직 빈 영역이라 효과가 0 이었다.
+          헤더 안에서 눌러야 하는 것들은 저마다 no-drag 를 직접 달고 있다
+          (.u4a-titlebar__logo · .u4a-winbtn · .u4aWsBrowserDraggable .sapMBtn/.sapMSlt
+           · .u4a-sap-logo). 이 선언을 빼도 그 구멍은 그대로다.
+   ★이 문서(ws30/ws10_20/index.html)가 www 에서 html·body 에 no-drag 를 건 유일한 곳이다.
+     별창들은 작은 요소에만 걸어 두어 같은 증상이 없다. */
 
 .u4aWsApp.sapUiSizeCompact
   .sapMPageWithFooter.sapMPageWithFloatingFooter

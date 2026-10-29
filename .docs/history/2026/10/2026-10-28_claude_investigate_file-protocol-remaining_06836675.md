@@ -726,3 +726,120 @@ oAPP.UI5LIB_WSSRC = oAPP.UI5LIB_SSRC;
 **남은 의문(확인 전)**: UHA 처럼 `LIBPATH` 가 `/zu4a_imp/` 로 시작하지 않는 서버에서는
 임시로직이 **접속 서버 호스트를 안 붙이고 그 값을 주소로 그대로** 쓴다(4곳 동일).
 `getMetadata().LIBPATH` 값을 보면 확정된다. 원본 로직이라 손대지 않았다.
+
+## 【결정】 인트로 창은 손대지 않는다 (장군님 2026-10-29)
+
+「인트로 내용을 바꾸면 안 되고.. 근데 지금 다시 실행해보면 투명하게 잘 나와」
+→ **고치지 않는다.** TODO 에서 뺐다.
+
+조사해 둔 사실만 남긴다(다시 보일 때 참고):
+- 인트로 창(`www/u4a-intro/themes/seasons/index.js`) 옵션에 **`backgroundColor` 가 주석 처리**돼 있다
+  (`// "backgroundColor": '#00000000'`). 창은 `transparent: true`, 화면은 `background: transparent !important`
+  (네 계절 전부)이므로 **창에 색이 없으면 Electron 기본 흰색이 깔린다.**
+- 터미널의 `GetGpuDriverOverlayInfo: Failed to retrieve video device` 는
+  `electron/main.js:103 app.disableHardwareAcceleration()` 탓(**2026-06-12 최초 커밋부터** 있던 줄).
+  가속이 꺼져 있으면 투명 창이 소프트웨어로 합성된다.
+- 간헐적으로 보였다가 지금은 안 보인다 → **타이밍·GPU 상태를 탄다.**
+
+★곁다리: `www/u4a-intro/themes/christmas/index.js` 는 **빈 파일(0줄)** 이다.
+  `IntroRuntime._decideThemeGroup()` 이 **12월이면 christmas 를 고른다** — 그대로 두면 12월에 인트로가 깨진다.
+  이번 지시 범위 밖이라 보고만 한다.
+
+---
+
+## 2026-10-29 재확인 — U-1 (`intro.js:1319`) 은 「주소만 바꾸면 되는 자리」가 아니다
+
+장군님 「u-1이 대상 맞는지 다시 확인해」. 의심이 맞았다. 내가 U 6곳을 한 묶음으로 올린 것이 잘못이다.
+
+### 읽은 것 (「다 봤다 기준」 대조)
+
+| 확인한 것 | 결과 |
+|---|---|
+| `_setUI5BootStrapUrl` 본문 (intro.js 1312~1345) | `PATH.join(process.resourcesPath, UI5.localResource)` → `file:///…` → `oSettings.UI5.resourceUrl` |
+| `resourceUrl` 에 **값을 넣는 곳 전수** | `intro.js:1322`(로컬 `file:///`) · `intro.js:1342`(**`APP.isPackaged === false` 면 `testResource` 로 덮음**) — 두 곳뿐 |
+| `resourceUrl` 을 **읽는 곳 전수** | **14곳** — 전부 `oScript.setAttribute("src", oSetting_UI5.resourceUrl)` (별창들의 UI5 bootstrap) |
+| `localResource` 값 (`www/settings/ws_settings.json:14`) | `node_modules/U4A/WS/lib/ui5/v11071/resources/sap-ui-core.js` |
+| `testResource` 값 (같은 파일 13행) | `https://u000.u4aide.com:10001/…/sap-ui-core.js` |
+| 패키징 설정 (`package.json` build) | `asar: true` · `extraResources` 로 `node_modules/U4A` → `resources/node_modules/U4A` |
+| 프로토콜 허용 범위 (`ws_app_protocol.js:156~162`) | `_appRoot = app.getAppPath()` 밖이면 **403**. 패키징본의 `getAppPath()` = `resources/app.asar` |
+| 스킴 권한 (같은 파일 105~116) | `standard` · `secure` · `bypassCSP` 등 |
+| 그 14개 창의 `webSecurity` | 대부분 기본값(켜짐). `webSecurity:false` 는 `fnDialogPopupOpener.js` 2곳 · `bindPopup/utils/callTooltipsPopup.js` 1곳뿐 |
+| `node_modules/U4A` 실제 존재 | **이 PC 에 없다.** `package.json` `dependencies` 에도 없다(npm 이 설치하는 것이 아니다) |
+
+### 판정
+
+1. **개발 모드에서는 이 자리가 아예 안 탄다** — `intro.js:1342` 가 `resourceUrl` 을 인터넷 UI5 주소로 덮는다.
+   → **장군님이 no-build 로 확인할 수 없는 자리다**(exe 전용 = 「미확인」으로 둘 항목).
+2. **패키징본에서만 `file:///` 가 쓰이고, 거기서는 `u4a-ws://` 로 바꿀 수 없다** —
+   가리키는 파일이 `resources/node_modules/U4A/…` = **asar 밖·앱 root 밖**이라 핸들러가 403 으로 막는다.
+3. 게다가 그 폴더가 지금 **이 PC 에 없어** 빌드해도 그 파일이 안 들어간다. 패키징본에서 그 14개 창의
+   UI5 bootstrap 이 실제로 무엇을 받는지는 **exe 로 확인하지 않았다 — 미검증.**
+
+→ 그래서 U-1 은 U-2~U-6 과 같은 「주소 문자열 고치기」가 아니고, **구조를 정하는 일**이다.
+   선택지와 내 안(①: 그 창들도 접속 서버 UI5 를 보게 한다)은 `.docs/TODO.md` 의 ★U-1 절에 적었다.
+   근거: 이미지 아이콘 창을 같은 방식으로 고쳐 통과했다(테스트 G1, 2026-10-29).
+
+### 또 밟을 함정
+
+- `oSettings.UI5.resourceUrl` 은 **개발 모드와 패키징본에서 서로 다른 값**이다(CDN / 로컬 파일).
+  개발 모드에서 멀쩡하다고 패키징본도 멀쩡한 것이 아니다 — 이 변수를 건드릴 때는 **두 모드를 따로** 본다.
+- `process.resourcesPath` 는 `app.getAppPath()`(= `resources/app.asar`)의 **부모**다. 커스텀 프로토콜로
+  바꿀 수 있는 것은 `getAppPath()` 아래뿐이다.
+
+---
+
+## 2026-10-29 (2) — U-1 은 **대상이 아니다**. 장군님 지적이 맞았다
+
+장군님 「U-1은 이제 안쓰는거 아니야? 이전 원본 ws3.0에서 사용했던.. 거기는 UI5로 만들어졌기 때문에」 → **맞다.**
+
+`oSettings.UI5.resourceUrl` 을 **읽는 곳 16곳을 하나씩** 확인했다(앞 절에서는 건수만 세고 생사를 안 봤다 — 내 잘못).
+
+| 자리 | 생사 | 근거 |
+|---|---|---|
+| `ui5CssPopup_v2/control.js:55` | **살아 있고 이미 처리됨** | 2026-09-08 장군님 지시 주석(48~54행): 「패키지에 로컬 UI5 를 더 이상 싣지 않기 때문(node_modules/U4A 없음)」 → `APP.isPackaged` 면 서버 UI5. 개발 모드는 `resourceUrl`(=CDN) 유지가 **일부러 나눠 둔 설계** |
+| `fnDialogPopupOpener.js:4466` | **살아 있음** | `oAPP.fn.fnAppShortCutDownPopupOpener`(쇼컷링크 생성 창). 값이 `config: S_config`(4539행)로 그 창에 넘어가고, 용도는 **바깥 브라우저(Chrome·Edge)** 용이라 `u4a-ws://` 로 바꿀 자리가 아니다 |
+| `releaseNotePopup/js/main.js:30` · `main_latest.js:30` | **조건부 — 미확인** | `fnReleaseNotePopupOpener` 가 `checkWLOList("C","UHAK901369")` 면 V2(`relese_notes`)로 빠진다. 서버에 그 항목이 없으면 옛 창이 뜬다 |
+| `findPopup/index.js` · `bindPopup/index.js` · `u4aDocPopup/index.js` · `uspNewPopup/index.js` · `errPageEditorPopup/errorPageEditor.js` | 죽음 | 그 `index.html`(옛 UI5 쪽)을 여는 곳이 `www` 어디에도 없다. `pathInfo.js` 는 새 HTML5 프레임(`findFrame.html`·`frame.html`·`errorPageEditorFrame.html`)을 가리킨다 |
+| `optionPopup/optionS.html` · `optionPopup-origin/optionS.html` | 죽음 | 살아 있는 `optionM.html` 은 새 `js/optionMain.js` 만 로드한다(옛 `js/index.js` 가 `optionS.html` 을 iframe 에 넣던 길은 끊겼다) |
+| `versionManagement/Popup/frame.js` | 죽음 | `pathInfo` VERMNG = `versionMng`(HTML5). `versionManagement` 는 UI5 원본 |
+| `webDynConversionLog/Popup/frame.js` · `editorPopup_v2/Popup/frame.js` | 죽음 | `pathInfo` 에 없다 |
+| `design/testFolder/AiInterface/index.js:97` | 죽음 | 화면에서 숨김 처리(`ws10_html.js`) |
+| `floatingMenu/frame.html:48` · `ABAP.html:20` | 죽음 | 그 창을 켜는 자리가 없다(이 문서 L 항목) |
+
+→ **U-1 은 U 묶음(주소를 `u4a-ws://` 로 바꿀 자리)에서 뺀다.** 남는 것은 쇼컷링크 창의 설정값을
+   접속 서버 UI5 로 바꿀지 하나뿐이고, 그것은 **주소 방식 문제가 아니라 결정 사항**이라 TODO ★U-1 절에 옮겼다.
+
+### 내가 틀렸던 것
+
+- 앞 절에서 「읽는 곳 14곳」이라고 **건수만** 세고 **그 14곳이 지금 도는 코드인지 보지 않았다.**
+  「소스에 있다 ≠ 지금 돈다」를 또 어겼다. 이 프로젝트는 옛 UI5 창과 새 HTML5 창이
+  **같은 폴더 안에 짝으로** 남아 있어(`index.html`/`index.js` = 옛 · `*Frame.html`/`*Frame.js` = 새),
+  **`pathInfo.js` 에 등록된 쪽이 사는 쪽**이다. 생사 판정은 거기서 시작한다.
+
+---
+
+## 2026-10-29 (3) — 화면 녹화 창: 렌더러의 상대경로 `require` 가 깨진다 (조사만, 아직 안 고침)
+
+장군님 발견 — 「화면 선택」 창에서 `Uncaught Error: Cannot find module './msg'`,
+`Require stack: internal/electron/js2c/renderer_init`. 추정(「커스텀 프로토콜 때문인 것 같다」)이 **맞다.**
+
+- 창 주소 = `u4a-ws://app/ws30/ws10_20/Popups/screen_record/popups/monitor-select/index.html?…`
+  (`monitor-select/window.js:101` 이 `u4aToAppUrl` 로 띄운다. `nodeIntegration:true`·`contextIsolation:false`).
+- 렌더러의 `<script src>` 로 들어온 코드는 모듈이 아니라 **기준 폴더가 없다.** `file://` 때는 Electron 이
+  문서 주소로 기준을 잡아 줘서 `./msg` 가 풀렸다. `u4a-ws://` 에서는 못 잡아 `renderer_init` 이 기준이 된다.
+- `msg` 는 **폴더**이고 그 안에 `index.js` 가 있다.
+- 이미 있는 preload(`electron/lib/protocol/ws_renderer_dirname.js`, 모든 세션에 `registerPreloadScript`)가
+  `window.__dirname` 을 되살려 두었으므로, **`require(__dirname + '/msg')` 같은 절대경로로 바꾸면 된다.**
+  preload 는 `__dirname` 만 되살린다 — `require` 의 기준 폴더는 되살리지 못한다(그래서 자리마다 고쳐야 한다).
+
+### 고칠 자리 (렌더러 7개 파일 8줄)
+
+`popups/` 아래 `control-panel/index.js:21` · `drawing/index.js:30`(`./text-input/window`)·`:31` ·
+`drawing/text-input/index.js:55` · `history/index.js:20` · `indicator/index.js:28` ·
+`monitor-select/index.js:29` · `settings/index.js:23` — 전부 각 폴더 `index.html` 이 `<script src="./index.js">` 로 읽는다(확인함).
+`window.js` 쪽의 상대 `require`(`../../core/theme` 등)는 **Node 가 파일 경로로 푸는 자리라 문제 없다.**
+
+### 같은 종류가 화면 녹화 밖에도 있다 (보고만)
+
+- `bindPopup/frame.js:200` · `bindPopup/index.js` 3곳 — `parent.require("./utils/…")`.
+  `frame.js` 는 살아 있는 창이다. 남의 라이브러리(ace·monaco) 안의 상대 `require` 는 자체 모듈 시스템이라 해당 없다.

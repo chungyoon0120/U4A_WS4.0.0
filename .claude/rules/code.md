@@ -135,6 +135,19 @@
     `js/`(내가 쓴 것) · `design/`(원본 사본) · `Popups/`(별창). `js/` 만 훑고 「전수」라고 보고하면
     빠진다. 실제로 「패키지 변경」·「앱 생성」 두 창이 `design/js/` 에 있어 통째로 빠졌다.
   - SSOT = `.analy/15_공통_입력UX_가이드.md` §3.8.5.
+- **★★★`html` · `body` · `*` 에 `-webkit-app-region` 을 걸지 말 것**(2026-10-29 N1 실제 사고).
+  Chromium 152(= Electron 45 는 156)부터 **`app-region` 이 상속되는 속성**으로 바뀌었다
+  (Chromium commit `9100cdc8` / CSSWG issue 13101). 그래서 `body` 에 `no-drag` 를 걸면
+  **그 문서의 모든 요소가 물려받고**, 화면 전체를 덮는 요소(공통 busy 의 `<dialog>` ·
+  모달 팝업의 `::backdrop`)가 문서 순서상 헤더보다 뒤에 놓여 **창 드래그 영역을 통째로 깎는다**
+  → busy·팝업이 떠 있는 동안 창 헤더를 끌어도 창이 안 움직였다.
+  1. `no-drag` 는 **드래그 영역 안에서 눌러야 하는 그 요소에만** 건다(단추·로고 등).
+  2. 반대쪽도 같다 — `drag` 를 건 요소의 **자식이 그 요소 밖으로 넘쳐 그려지면**(헤더 안에서
+     아래로 펼쳐지는 메뉴 등) 그 자식도 `drag` 를 물려받아 **눌리지 않고 창이 끌린다.**
+     그런 자식에는 `no-drag` 를 직접 건다. 겹쳐 뜨는 것은 되도록 `document.body` 에 붙인다.
+  3. 드래그 영역이 의심되면 `ELECTRON_DEBUG_DRAGGABLE_REGIONS` 환경변수를 켜서 눈으로 본다
+     (패키징 안 한 앱에서만 돈다).
+  이력 = `.docs/history/2026/10/2026-10-29_claude_fix_titlebar-drag-dead-while-busy_06836675.md`
 - 하드코딩 hex 금지. **`color-mix` 는 써도 된다**(2026-10-27 Electron 45 로 올리며 풀림 — 그 전 Electron 14 = Chromium 93 은 못 읽어서 선언이 통째로 무효였다). 색은 여전히 `tokens.css` 의미 토큰에서 섞는다.
 - 메시지: 기존은 **원본(as-is) 키 참조**, 원본에 없고 지시 없으면 `ZMSG_WS_COMMON_001`(포화 임박→추후 `_002`). 임의 문구·키 생성 금지, 필요 키 보고.
 - **메시지 DB(`MESSAGE_CLASS.db`) 직접 INSERT·수정 금지** — 문구는 **장군님이 직접** 넣는다. 나는 메시지 함수(`getWsMsgClsTxt`/`fnGetMsgClsText`)로 **키(번호)만 배선**. 승인 선택지에 "등록 포함"이라 적혀 있어도 DB 파일 쓰기는 월권.

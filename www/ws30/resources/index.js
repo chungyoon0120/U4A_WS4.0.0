@@ -2631,8 +2631,10 @@ function getSameBrowsers() {
 
         try {
 
+            // [2026-10-29 장군님 지시] Electron 45 에서 webContents.getWebPreferences() 가 없어졌다.
+            //   그 창에 실린 값은 **그 창의 주소 쿼리**에서 읽는다(공통 WSUTIL.QueryString.parseWindow).
             var oWebCon = oBrows.webContents,
-                oWebPref = oWebCon.getWebPreferences();
+                oWebPref = WSUTIL.QueryString.parseWindow(oWebCon);
 
         } catch (error) {
             if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(error); }

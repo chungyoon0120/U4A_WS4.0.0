@@ -18,10 +18,9 @@ const
 const oQueryParams = WSUTIL.QueryString.parse(location.href);
 
 // 브라우저 키
-let sBrowserKey = CURRWIN?.webContents?.getWebPreferences?.()?.browserkey || "";
-if(!sBrowserKey){
-    sBrowserKey = oQueryParams.browserkey;
-}
+// [2026-10-29 장군님 지시] Electron 45 에서 getWebPreferences() 가 없어졌다.
+//   종전에도 그것이 비면 주소 쿼리를 쓰는 갈래가 있었으므로, 그 갈래만 남긴다.
+let sBrowserKey = oQueryParams.browserkey || "";
 
 //디자인상세화면(20화면) <-> BINDPOPUP 통신 채널 키 정보 구성.
 //(브라우저창의 세션키 + 디자인상세화면(20화면) + bindpopup)

@@ -442,15 +442,20 @@ function createWindow() {
 
 /***************************************************************************************
  * WebContents Helper
+ * --------------------------------------------------------------------------------------
+ * [2026-10-29 장군님 지시] `redefineGetWebPreferences()` 를 걷어냈다.
+ *   Electron 45 에서 `webContents.getWebPreferences()` 가 없어져, 2026-10-28 에 임시로
+ *   `getLastWebPreferences()` 를 그 이름으로 되살려 붙여 두었다. 다만 그렇게 해도
+ *   **창을 열 때 끼워 넣은 값(browserkey · OBJTY · USERINFO)은 오지 않는다** —
+ *   그래서 그 값들을 전부 **창 주소의 쿼리**에서 읽도록 바꿨고(WSUTIL.QueryString.parseWindow),
+ *   이제 이 되살리기 장치가 필요 없다.
+ *
+ * ※ 아직 `getWebPreferences()` 를 그대로 부르는 파일이 3개 남아 있지만 **전부 지금 안 도는 코드**다 —
+ *   `Popups/designTreeUiSearchPopup/index.js`(여는 곳이 주석) ·
+ *   `Popups/u4aDocPopup/frame.js`(여는 곳 0건) ·
+ *   `www/floatingMenu/js/handle.js`(켜는 곳 0건).
+ *   **되살릴 때는 여는 쪽 주소에 그 값을 실고, 읽는 쪽도 주소 쿼리로 바꿔야 한다.**
  ***************************************************************************************/
-function redefineGetWebPreferences(contents) {
-
-    contents.getWebPreferences = function() {
-        const prefs = this.getLastWebPreferences() || {};
-        return prefs;
-    };
-
-}
 
 /***************************************************************************************
  * Alt + F4 Handling
@@ -647,9 +652,6 @@ function bindAppEvents() {
                 try {
                     const oWebCon = oTarget.webContents;
                     if (!oWebCon || oWebCon.isDestroyed()) { return {}; }
-                    if (typeof oWebCon.getWebPreferences === "function") {
-                        return oWebCon.getWebPreferences() || {};
-                    }
                     if (typeof oWebCon.getLastWebPreferences === "function") {
                         return oWebCon.getLastWebPreferences() || {};
                     }
@@ -716,7 +718,6 @@ function bindAppEvents() {
      ***********************************************************************/
     app.on('web-contents-created', (event, contents) => {
 
-        redefineGetWebPreferences(contents);
         attachBeforeInputEvent(contents);
 
     });
