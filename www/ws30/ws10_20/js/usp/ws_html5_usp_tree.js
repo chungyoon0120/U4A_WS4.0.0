@@ -7,6 +7,8 @@
  *      shell.css 공통 컴포넌트가 단일 출처로 담당. USP 는 아이콘(SVG)·설명(DESC) 슬롯만 확장.
  *  - 데이터: /WS30/USPTREE (중첩 OBJKY/PUJKY/USPTREE) — ws_html5_usp.js 가 채움.
  *  - 아이콘: ISFLD/EXTEN → APP.getAppPath()/svg/*.svg (Node FS) — 원본 formatter 1:1.
+ *    ★<img src> 에는 OS 경로가 아니라 u4aToAppUrl 로 바꾼 주소를 넣는다(2026-10-29). 생경로를 넣으면
+ *      Chromium 이 file:///C:/… 로 바꾸는데, 설치본에서는 그 자리가 app.asar 안이라 없다.
  *  - 단일 클릭: oAPP.fn.fnUspTreeTableRowSelect(node) (ws_html5_usp.js). 토글(셰브론)만 펼침/접힘.
  *  - 펼침/접힘: createTree 컨트롤러(expandAll/collapseAll). 기본 루트만 펼침(구 numberOfExpandedLevels:1).
  ************************************************************************/
@@ -23,10 +25,17 @@
 
     // SVG 파일 목록(확장자 아이콘 해석용) — 구 gaFileExtendImgList. 1회 로드.
     var _svgList = null;
-    var _svgFolder = "";
+    var _svgFolder = "";      // OS 경로 — FS.readdirSync 가 쓴다
+    var _svgUrlRoot = "";     // 화면 주소 — <img src> 가 쓴다 (2026-10-29 장군님 지시)
+
     function _ensureSvgList() {
-        if (_svgList !== null) { return; }
+
+        if (_svgList !== null) {
+            return;
+        }
+
         _svgList = [];
+
         try {
             _svgFolder = PATH.join(APP.getAppPath(), "svg");
             _svgList = FS.readdirSync(_svgFolder) || [];
@@ -34,19 +43,68 @@
             console.error("[WS30] svg list load error:", e);
             _svgList = [];
         }
+
+        if (!_svgFolder) {
+            return;
+        }
+
+        /**
+         * OS 경로를 그대로 <img src> 에 넣으면 Chromium 이 file:///C:/… 로 바꾼다.
+         * 이 창은 u4a-ws:// 로 떠 있고, 설치본에서는 그 자리가 app.asar 안이라 없다.
+         * 게다가 못 읽으면 onerror 가 조용히 숨겨 아무도 모른다 — 그래서 주소로 바꿔 둔다.
+         * IPC 가 한 번만 돌도록 뿌리 폴더만 바꾸고, 파일 이름은 _svgUrl 이 붙인다.
+         */
+        try {
+            _svgUrlRoot = parent.REMOTE.getGlobal("u4aToAppUrl")(_svgFolder);
+        } catch (e) {
+            console.error("[WS30] svg url root convert error:", e);
+            _svgUrlRoot = "";
+        }
+
+        if (_svgUrlRoot) {
+            return;
+        }
+
+        if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
+            U4ALOG.warn("GUARD_EXIT", "u4aToAppUrl for svg folder", "USP tree icons are hidden");
+        }
+
+    }
+
+    // SVG 파일 이름 → 화면이 쓸 수 있는 주소. 이름은 폴더에서 읽은 것이라 인코딩한다.
+    function _svgUrl(sFile) {
+
+        if (!_svgUrlRoot) {
+            return "";
+        }
+
+        return _svgUrlRoot + "/" + encodeURIComponent(sFile);
+
     }
 
     // 구 트리 Name 컬럼 아이콘 formatter(ISFLD/EXTEN) 1:1 이식
     function _iconSrc(ISFLD, EXTEN, bExpanded) {
+
         _ensureSvgList();
-        if (!_svgFolder) { return ""; }
+
         // 폴더: 펼침=열린 폴더 / 접힘=닫힌 폴더 (펼침 상태는 createTree 가 icon 콜백 oCtx.expanded 로 전달).
-        if (ISFLD === "X") { return _svgFolder + (bExpanded ? "/folder-open.svg" : "/folder.svg"); }
-        if (!EXTEN) { return _svgFolder + "/file.svg"; }
+        if (ISFLD === "X") {
+            return _svgUrl(bExpanded ? "folder-open.svg" : "folder.svg");
+        }
+
+        if (!EXTEN) {
+            return _svgUrl("file.svg");
+        }
+
         var sLow = String(EXTEN).toLowerCase();
         var sFind = _svgList.find(function (elem) { return elem.indexOf(sLow) === 0; });
-        if (!sFind) { return _svgFolder + "/file.svg"; }
-        return _svgFolder + "/" + sFind;
+
+        if (!sFind) {
+            return _svgUrl("file.svg");
+        }
+
+        return _svgUrl(sFind);
+
     }
 
     function _attrEsc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;"); }

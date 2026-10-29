@@ -60,3 +60,48 @@
 
 - **앱에서의 실제 확인.** 실행은 장군님이 하신다 — 테마 CSS 를 그대로 가져다 만든 미리보기로만 확인했다.
 - (B) 교체 — 영향도(파일 20여 개 + 공통 자산 `shell.css`)가 커서 지시를 받고 하기로 했다.
+
+---
+
+## 후속 (2026-10-29) — 아이콘 목록 창 · 이미지 아이콘 창은 새 모양이 안 나왔다
+
+장군님 지적: 「이미지 아이콘 별창 팝업은 공통 busy 안쓰나봐? 지금 바뀐걸로 안나오고 이전게 나오네?」 — 맞다.
+
+### 원인 (소스 확인)
+
+두 창은 `theme/u4a-busy.css` · `u4a-busy.js` 를 **로드하고 쓴다**. 그런데
+- `index.html` 에 옛 `.u4a-busy` 마크업이 **`data-busy="true"` 로 켜진 채** 박혀 있었고,
+- 그 창의 busy 를 **켜는 호출이 어디에도 없었다**. 호출은 끄기 하나뿐 —
+  `iconPrevPopup`: `index.js:255` · `runtime.js:89` 둘 다 `setShellBusy(false)`.
+  `illustMsgPopup`: 자식 frame 이 `parent.setBusy("")` 로 끄기만.
+
+→ 창이 떠서 UI5 를 읽는 **그 내내 보이는 것은 HTML 에 박힌 옛 동그라미**였고,
+   공통 busy(Sparkle)는 그 첫 로딩에서 한 번도 뜨지 않았다. `_applyShellBusy`/`setBusy` 는
+   **끌 때 처음 불려서** 옛 표시를 꺼 주는 역할만 했다.
+
+### 고친 것
+
+| 파일 | 무엇 |
+|---|---|
+| `Popups/iconPrevPopup/index.html` | `#iconpBusy` → `data-busy="false"`(공통이 없을 때만 쓰는 대비용) |
+| `Popups/iconPrevPopup/index.js` | `_applyShellBusy` 정의 바로 뒤에 `oAPP.fn._applyShellBusy();` 한 줄 — 뜨자마자 공통 busy 를 켠다 |
+| `Popups/illustMsgPopup/index.html` | `#illustpBusy` → `data-busy="false"` |
+| `Popups/illustMsgPopup/index.js` | `setShellBusy` 별칭 뒤에 `setBusy(true);` 한 줄 |
+
+켜고 끄는 **로직·시점은 그대로다** — 끄기는 전과 같이 UI5 부팅 완료에서만 일어난다.
+`node --check` 두 파일 통과.
+
+### 안 고친 것
+
+`Popups/ui5CssPopup_v2/main/frame.html` — 같은 `data-busy="true"` 패턴이지만 **공통 busy 를 아예 안 쓴다**
+(`u4a-busy.css`/`.js` 로드 없음). 별창 전체 `.u4a-busy` → Sparkle 교체(= `shell.css` 공통 자산 + 창 HTML 약 20개)와
+같은 덩어리라 따로 지시를 기다린다.
+
+### 또 밟을 함정
+
+- **`index.html` 에 busy 를 켜진 채 박아 두면** 공통 busy 를 쓰는 창이어도 **첫 로딩은 옛 모양으로 보인다.**
+  켜는 자리를 JS 로 옮기지 않으면 모양을 바꿔도 그 창에서는 안 바뀐다.
+- **「그 창이 공통 busy 를 쓰나」를 `u4a-busy.js` 로드 여부로만 판정하면 틀린다.** 켜는 호출이 있는지까지 봐야 한다.
+  내가 앞서 이 창을 「별창 = 옛 busy」로 뭉뚱그린 것이 그 때문이다.
+- 두 창은 **닫으면 파괴하지 않고 숨겨 두고 다시 쓴다**(SYSID당 1개 상주 뷰어). 그래서 **앱을 켜고 처음 열 때만**
+  로딩이 보인다 — 두 번째부터 로딩이 안 보인다고 결함으로 보지 말 것. 테스트도 그 전제로 써야 한다.

@@ -89,9 +89,12 @@
     <!-- 본문 = frame.html(로컬 UI5 부트스트랩) 을 로드하는 iframe. src 는 index.js fnInitLoad 가 세팅. 콘텐츠=KEEP-UI5(frame.js). -->
     <iframe id="floatFrame" frameborder="0"></iframe>
 
-    <!-- Busy 오버레이 — ★공통 .u4a-busy★(shell.css 단일 출처). 초기 로컬 UI5 로드 중 표시,
-         frame.js 부팅 완료 시 parent.setBusy("") 로 해제(index.js setBusy 가 이 요소 토글). -->
-    <div id="illustpBusy" class="u4a-busy" data-busy="true" role="progressbar" aria-valuetext="Busy">
+    <!-- Busy 오버레이 — ★공통 busy(theme/u4a-busy.js) 가 없을 때만 쓰는 대비용. 꺼진 채로 시작한다.
+         ★[2026-10-29 장군님 지시] 전에는 data-busy="true" 로 **켜진 채** 시작했고 setBusy(true) 를
+           부르는 자리가 없어서, 창이 뜨는 내내 공통 busy 가 아니라 이 옛 표시만 보였다(실측).
+           지금은 index.js 가 뜨자마자 공통 busy 를 켠다.
+         해제 = frame.js 부팅 완료 시 parent.setBusy(""). -->
+    <div id="illustpBusy" class="u4a-busy" data-busy="false" role="progressbar" aria-valuetext="Busy">
         <div class="u4a-busy__card">
             <div class="u4a-busy__spinner"></div>
         </div>

@@ -91,9 +91,12 @@
 
     <form method="post" id="u4asendform" target="u4aForm"></form>
 
-    <!-- Busy 오버레이 — ★공통 .u4a-busy★(shell.css 단일 출처). 초기 서버 UI5 로드 중 표시,
-         runtime.js 부팅 완료(attachInit) 시 oAPP.fn.setShellBusy(false) 로 해제. -->
-    <div id="iconpBusy" class="u4a-busy" data-busy="true" role="progressbar" aria-valuetext="Busy">
+    <!-- Busy 오버레이 — ★공통 busy(theme/u4a-busy.js) 가 없을 때만 쓰는 대비용. 꺼진 채로 시작한다.
+         ★[2026-10-29 장군님 지시] 전에는 data-busy="true" 로 **켜진 채** 시작했고, 이 창을 켜는
+           setShellBusy(true) 호출이 어디에도 없어서 창이 뜨는 내내 공통 busy 가 아니라 이 옛 표시만
+           보였다(실측). 지금은 index.js 가 뜨자마자 공통 busy 를 켠다.
+         해제 = runtime.js 부팅 완료(attachInit) 시 oAPP.fn.setShellBusy(false). -->
+    <div id="iconpBusy" class="u4a-busy" data-busy="false" role="progressbar" aria-valuetext="Busy">
         <div class="u4a-busy__card">
             <div class="u4a-busy__spinner"></div>
         </div>

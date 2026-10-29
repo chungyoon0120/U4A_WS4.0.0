@@ -37,23 +37,29 @@
     oAPP.common = {};
     oAPP.wmenu = {}; // window menu
 
+    /**
+     * ★주소는 전부 **이 화면 기준 상대경로**다 (2026-10-29 장군님 지적).
+     *   아래 loadLibrary 가 $.ajax 로 읽으므로, OS 경로(PATH.join(APPPATH, …))를 넣으면
+     *   브라우저가 file:///C:/… 로 바꿔 버린다. 이 창은 u4a-ws:// 로 떠 있고,
+     *   설치본에서는 그 자리가 app.asar 안이라 없다.
+     *   이 파일은 www/ws30/ws10_20/ 에 있으므로 www/js/ = "../../js/" ·
+     *   www/ws30/ws10_20/js/ = "./js/" 다. index.html 도 ../../js/jquery.min.js 로 부른다.
+     *   ※ pathInfo.js 의 JQUERYUI 등은 Node(FS)용 OS 경로 사전이라 그대로 둔다.
+     */
     oAPP.aPreloadScripts = [{
-        URL: parent.getPath("JQUERYUI"),
+        URL: "../../js/jquery-ui.min.js",
         MIMETYPE: "script"
     },
     {
-        // URL: "../js/shortcut.js",
-        URL: PATH.join(APPPATH, "js/shortcut.js"),
+        URL: "../../js/shortcut.js",
         MIMETYPE: "script"
     },
     {
-        // URL: "../js/download.js",
-        URL: PATH.join(APPPATH, "js/download.js"),
+        URL: "../../js/download.js",
         MIMETYPE: "script"
     },
     {
-        // URL: "../js/dateformat.js",
-        URL: PATH.join(APPPATH, "js/dateformat.js"),
+        URL: "../../js/dateformat.js",
         MIMETYPE: "script"
     },
     {

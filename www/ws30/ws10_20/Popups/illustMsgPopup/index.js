@@ -66,8 +66,7 @@ function setBusy(bIsBusy) {
     //   모양을 바꿀 때 theme/u4a-busy.js · u4a-busy.css 두 곳만 고치면 전 화면이 함께 바뀐다.
     if (window.U4ABusy && typeof U4ABusy.show === "function") {
         if (bIsBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
-        // ★ 이 창의 옛 겹침 표시도 index.html 에서 켜진 채 시작한다 — 공통으로 넘어오면 같이 꺼야
-        //   화면에 남지 않는다(아이콘 목록 창과 같은 결함, 2026-10-16).
+        // ★ 옛 겹침 표시는 공통 busy 가 없을 때만 쓰는 대비용이다 — 공통을 쓰는 동안에는 꺼 둔다.
         var oOld = document.getElementById("illustpBusy");
         if (oOld) { oOld.setAttribute("data-busy", "false"); }
     } else {
@@ -89,6 +88,12 @@ function setBusy(bIsBusy) {
 
 // 셸 busy 별칭(다른 소비처 대비, 동일 대상).
 oAPP.fn.setShellBusy = function (bBusy) { setBusy(bBusy); };
+
+// ★ [2026-10-29 장군님 지시] 창이 뜨는 그 순간부터 **공통 busy** 를 띄운다.
+//   까닭: setBusy(true) 를 부르는 자리가 없다 — 호출은 frame.js 의 끄기(parent.setBusy("")) 하나뿐이다.
+//   그래서 종전에는 창이 뜨는 내내 index.html 에 박힌 옛 표시만 보였고 공통 busy 는 한 번도 안 떴다.
+//   index.js 는 <body> 끝에서 읽히므로 이 자리에서 <dialog>.showModal() 이 된다.
+setBusy(true);
 
 /************************************************************************
  * HTML5 WS4 테마 키(theme_ws4/{SYSID}.json THEME, 예: "horizon_white") → iframe UI5 테마명.

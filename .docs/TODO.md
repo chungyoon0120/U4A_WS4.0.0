@@ -1,13 +1,16 @@
 # TODO — 위에서부터 순서대로
 
 > **「4-5 해」 처럼 번호만 주시면 됩니다.** 괄호 안은 옛 번호라 그것으로 말씀하셔도 찾습니다.
-> 순서 기준 = **빨리 끝나는 것 · 막고 있는 것 먼저.** 갱신 2026-10-29.
+> 순서 기준 = **빨리 끝나는 것 · 막고 있는 것 먼저 — 위에서부터 차례로.** 갱신 2026-10-29.
+> ★**절 번호는 한 번 붙이면 안 바꿉니다.** 급한 절을 위로 올려도 번호는 그대로라,
+>   「10-1 해」 처럼 예전에 보신 번호로 말씀하셔도 그대로 찾습니다.
 
 ## 📑 어디에 뭐가 있나 — 눌러서 바로 갑니다
 
 | | 무엇 | 몇 개 |
 |---:|---|---:|
-| [1](#1-지금-눌러-봐-주실-것-앱-켜고-10분) | **지금 눌러 봐 주실 것** (앱 켜고 10분) | 9 |
+| [1](#1-지금-눌러-봐-주실-것) | **지금 눌러 봐 주실 것** | 0 |
+| [10](#10-지금-진행-중--file-자리를-커스텀-프로토콜로-제가-합니다) | **지금 진행 중** — `file://` 자리를 커스텀 프로토콜로 (제가 합니다) | 3 |
 | [2](#2-그래-한마디면-끝나는-것) | 「그래」 한마디면 끝나는 것 | 5 |
 | [3](#3-값내용을-주셔야-제가-움직이는-것) | 값·내용을 주셔야 제가 움직이는 것 | 3 |
 | [4](#4-해라-하시면-제가-하는-것--작은-것부터) | 「해라」 하시면 제가 하는 것 (작은 것부터) | 13 |
@@ -16,15 +19,12 @@
 | [7](#7-로그인-쿠키-테스트--뒤로-미뤘습니다) | 로그인 쿠키 테스트 (미뤄 둠) | 9 |
 | [8](#8-쌓여-있는-테스트-묶음--짬날-때) | 쌓여 있는 테스트 묶음 (짬날 때) | 23 |
 | [9](#9-장군님이-직접-하셔야-하는-것) | 직접 하셔야 하는 것 | 2 |
-| [10](#10-제가-할-것--보실-것-아닙니다) | 제가 할 것 (보실 것 아님) | 5 |
 
 ---
 
 # 1. 지금 눌러 봐 주실 것
 
-**없습니다.** 2026-10-29 에 올린 24칸을 전부 통과하셨습니다 —
-괄호 오타 2곳 · Monaco worker 6곳 · `file://` 6곳 · USP 저장확인 · 스니펫 로그 · Electron 45 회귀.
-새로 고친 것이 생기면 여기 다시 올라옵니다.
+**지금은 없습니다.**
 
 ---
 
@@ -139,17 +139,3 @@
 | **9-2** | 노션 테스트 현황 확인 (노션 화면 조작) |
 
 ---
-
-# 10. 제가 할 것 — 보실 것 아닙니다
-
-| 번호 | 무엇 | 상태 |
-|---:|---|---|
-| **10-1** | **아직 상대경로인 워커 2곳** — `new Worker("./js/workers/u4aWsServerSessionWorker.js")`([fnServerSession.js:24](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/fnServerSession.js:24)) · `u4aWsClientSessionWorker.js`([ws_fn_03.js:34](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/ws_fn_03.js:34)) | ☐ **다음 할 것** |
-| **10-2** | **옵션 팝업(`optionPopup-origin`)의 아이콘 글꼴이 `file:///` 를 직접 만드는 것**([iconFont.js:203](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Popups/optionPopup-origin/common/iconFont.js:203)). 그 파일은 `REMOTE` 에 못 닿고 폴더 이름이 `-origin` 이라 **지금 도는 코드인지부터** 가려야 한다 | ☐ |
-| **10-3** | 서버 주소를 `path.join` 으로 만드는 자리 전수 조사 — 전체 `path.join` 879건 중 첫 인자가 서버 주소인 것을 가려낸다 | ☐ |
-
-**10-4 의 다섯 자리** — [ws_util.js:1140](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/ws_util.js:1140) · [ServerList.js:3953](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ServerList_v2/ServerList.js:3953) · [Login.js:141](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Login/Login.js:141) · [bindPopup/index.js:210](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Popups/bindPopup/index.js:210) · [iconFont.js:203](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Popups/optionPopup-origin/common/iconFont.js:203)
-전에는 「커스텀 프로토콜이 앱 폴더 밖 파일을 거부한다」가 걸림돌이었는데, 2026-10-29 에 앱 데이터 폴더용 host(`u4a-ws://data/…`)를 더해 **그 제약이 없어졌습니다.**
-
-**끝난 묶음** — 워커 4곳(`new Worker(생경로)`) ✅ · 창 열기 1곳(`loadURL(file://)`) ✅ · 동적 import 51곳 = 고칠 것 없음 · UI5 부트 주소 1곳 = 대상 아님(죽은 코드).
-근거 = [이력](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/.docs/history/2026/10/2026-10-28_claude_investigate_file-protocol-remaining_06836675.md)

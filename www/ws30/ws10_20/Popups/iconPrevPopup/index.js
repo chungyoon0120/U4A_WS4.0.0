@@ -50,7 +50,7 @@ var
  *       close = 비콜백(뷰어)→CURRWIN.hide()(SYSID당 1개 재사용) / 콜백(F4)→부모에 취소 통지(RETCD:C)+setParentWindow(null)+CURRWIN.close()(파괴, 누수방지 B안)
  ************************************************************************/
 
-// 이 창 자신의 바쁨(초기엔 켜짐 — index.html 에서 data-busy="true" 로 시작).
+// 이 창 자신의 바쁨(초기엔 켜짐 — 아래 _applyShellBusy() 첫 호출로 공통 busy 를 띄운다).
 oAPP.attr.bSelfBusy = true;
 
 // ★ [2026-10-15, 장군님 지시] 다른 창이 방송한 바쁨 — **자기 바쁨과 따로** 기억한다.
@@ -85,9 +85,7 @@ oAPP.fn._applyShellBusy = function () {
 
     if (window.U4ABusy && typeof U4ABusy.show === "function") {
         if (bOn) { U4ABusy.show(); } else { U4ABusy.hide(); }
-        // ★ 이 창의 옛 겹침 표시는 index.html 에서 **켜진 채로** 시작한다(창이 뜨는 순간부터 보이게).
-        //   공통 busy 로 넘어온 뒤에는 그것을 꺼 주지 않으면 화면에 그대로 남아 "busy 가 안 꺼진다"
-        //   (2026-10-16 실측). 공통을 쓸 때는 옛 표시를 반드시 같이 끈다.
+        // ★ 옛 겹침 표시는 공통 busy 가 없을 때만 쓰는 대비용이다 — 공통을 쓰는 동안에는 꺼 둔다.
         var oOld = document.getElementById("iconpBusy");
         if (oOld) { oOld.setAttribute("data-busy", "false"); }
     } else {
@@ -99,6 +97,12 @@ oAPP.fn._applyShellBusy = function () {
     }
 
 }; // end of oAPP.fn._applyShellBusy
+
+// ★ [2026-10-29 장군님 지시] 창이 뜨는 그 순간부터 **공통 busy** 를 띄운다.
+//   까닭: 이 창을 켜는 setShellBusy(true) 호출이 어디에도 없다 — 호출은 runtime.js 의 끄기 하나뿐이다.
+//   그래서 종전에는 창이 뜨는 내내 index.html 에 박힌 옛 표시만 보였고 공통 busy 는 한 번도 안 떴다.
+//   index.js 는 <body> 끝에서 읽히므로 이 자리에서 <dialog>.showModal() 이 된다.
+oAPP.fn._applyShellBusy();
 
 /************************************************************************
  * ★ [2026-10-15, 장군님 지시] 다른 창이 보내는 「바쁨 켜기/끄기」를 받는다.
