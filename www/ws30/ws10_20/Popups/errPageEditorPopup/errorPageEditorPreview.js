@@ -177,9 +177,20 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         var sSrc = "errorPageEditorPreviewBody.html";
-        if (BGCOL) { sSrc += "?BGCOL=" + encodeURIComponent(BGCOL); }
-        // 2026-10-27 Electron 45: 화면이 u4a-ws:// 라 OS 경로를 그대로 넣으면 안 된다.
-        oFrame.src = REMOTE.getGlobal("u4aToAppUrl")(sSrc);
+
+        if (BGCOL) {
+            sSrc += "?BGCOL=" + encodeURIComponent(BGCOL);
+        }
+
+        /**
+         * ★상대경로는 그대로 넣는다 (2026-10-29 장군님 지적으로 드러남).
+         * 이 파일은 창 자신(errorPageEditorPreview.html)과 같은 폴더에 있으므로
+         * iframe 이 자기 문서 기준으로 풀어 준다.
+         * u4aToAppUrl 에 넘기면 안 된다 — 그 함수는 상대경로를 **앱 뿌리(www/) 기준**으로 만들어
+         * u4a-ws://app/errorPageEditorPreviewBody.html 이 되고, 그 자리에는 파일이 없어 404 였다.
+         * (2026-10-27 일괄 치환 때 OS 경로와 상대경로를 가리지 않고 한꺼번에 감쌌다.)
+         */
+        oFrame.src = sSrc;
 
     } else if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
         U4ALOG.warn("GUARD_EXIT", "prevFrame", "error page preview body iframe not found - nothing can be shown");

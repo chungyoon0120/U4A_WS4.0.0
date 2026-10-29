@@ -132,7 +132,10 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
     content: "";
     position: absolute;
     inset: 0;
-    padding: 1.5px;
+
+    /* 두께는 정수 px 로 — 1.5px 이면 카드가 반 픽셀 자리에 놓일 때 좌우만 1px 로 얇아 보인다
+       (장군님 2026-10-29 「상단 하단은 좋은데 좌측 우측은 얇아 보여」 → 시안에서 3px 확인 후 「딱좋다」). */
+    padding: 3px;
     border-radius: inherit;
     background: conic-gradient(from var(--u4aWsEdgeAngle), transparent 0 62%, var(--busy-accent) 80%, var(--busy-accent-2) 93%, transparent 100%);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
