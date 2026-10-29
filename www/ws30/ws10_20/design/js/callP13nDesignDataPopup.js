@@ -1047,11 +1047,16 @@
         //접속 언어 파라메터 추가.
         lf_setParam(oForm, "sap-language", l_info.LANGU);
         
-        //SAP 접속 ID 파라메터 추가.
-        lf_setParam(oForm, "sap-user", l_info.ID);
-
-        //SAP 접속 PW 파라메터 추가.
-        lf_setParam(oForm, "sap-password", l_info.PW);
+        /**
+         * 2026-10-29 사용자 요청: sap-user / sap-password 전송을 주석 처리한다.
+         * 참고: design/preview/index.js의 loadUi5BootstrapScript 주석.
+         * 해당 bootstrap 요청의 Network 확인에서는 ID/PW 재전송으로 새 로그인이 발생해
+         * 기존 세션이 무효화되고, 새 세션 쿠키 없이 후속 JS 요청에 로그인 HTML이 반환됐다.
+         * 기존 세션 쿠키를 사용하는 방향에 맞춰 이 POST form에서도 ID/PW를 보내지 않는다.
+         * sap-client / sap-language는 유지한다. 이 POST 경로의 쿠키 인증 성공은 별도 검증이 필요하다.
+         */
+        // lf_setParam(oForm, "sap-user", l_info.ID);
+        // lf_setParam(oForm, "sap-password", l_info.PW);
 
         //라이브러리 bootstrap 경로 파라메터 추가.
         lf_setParam(oForm, "LIBPATH", loApp.attr.bootPath);
