@@ -364,15 +364,14 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
  * ★backdrop-filter 는 **요소 뒤**만 흐리게 한다 — 자식인 카드는 또렷하게 남는다.
  ************************************************************************/
 dialog.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] {
+    /* ★[2026-10-30 장군님 지시] 「배경이 그리고 너무 투명해」 → 6% → 뒤가 비치되 또렷하게 덮는다. */
     background: color-mix(in srgb, var(--busy-accent) 6%, transparent);
-    -webkit-backdrop-filter: blur(6px);
-            backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(1.5px);
+            backdrop-filter: blur(1.5px);
 }
 
-/* 짝 마크업 = u4a-busy.js 의 _create():
-     <span class="u4aWsBusyAura"><b class="glow"><i></i></b><b class="line"><i></i></b></span>
-   두 겹이다 — 뒤의 두꺼운 번짐(glow) 위에 앞의 가는 선(line)이 겹쳐 네온처럼 보인다.
-   평소에는 숨고, AI 모드에서만 보인다. */
+/* 짝 마크업 = u4a-busy.js 의 _create(): <span class="u4aWsBusyAura"><i></i></span>
+   화면 가장자리에만 빛이 깔리고, 밝기가 숨 쉬듯 오르내린다. 평소에는 숨는다. */
 .u4aWsBusyAura {
     display: none;
 }
@@ -383,59 +382,32 @@ dialog.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] {
     inset: 0;
     pointer-events: none;
 
-    /* 둘레 전체에 깔리는 고정 바탕 빛 — 흐르는 띠가 지나지 않는 쪽도 비어 보이지 않게 한다.
-       움직이지 않으므로 무거운 작업 중에도 그대로 있다. */
-    box-shadow: inset 0 0 120px color-mix(in srgb, var(--busy-accent) 42%, transparent),
-                inset 0 0 40px color-mix(in srgb, var(--busy-accent-2) 34%, transparent);
+    /* 빛은 바깥 테두리를 꽉 채우고, 안쪽을 **둥근 사각형**으로 뚫는다.
+       네 변 그라데이션을 더하는 방식은 모서리에서 두 변이 다 옅어져 빛이 끊긴다(실측 2026-10-30). */
+    overflow: hidden;
 }
 
-/* 두 겹 공통 — 테두리 모양으로 잘라낸다. */
-.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAura b {
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAura i {
     position: absolute;
     inset: 0;
     display: block;
-    overflow: hidden;
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
+
+    /* 화면 가운데에서 바깥으로 퍼지는 빛 — 경계선이 아예 없다.
+       가운데는 완전히 투명하고, 가장자리로 갈수록 서서히 진해진다. */
+    background: radial-gradient(ellipse at center,
+                                transparent 0%,
+                                transparent 58%,
+                                color-mix(in srgb, var(--busy-accent) 14%, transparent) 78%,
+                                color-mix(in srgb, var(--busy-accent) 30%, transparent) 92%,
+                                color-mix(in srgb, var(--busy-accent-2) 46%, transparent) 100%);
+
+    mix-blend-mode: screen;
+    animation: u4aWsBusyAuraBreath 2.6s ease-in-out infinite;
 }
 
-/* 뒤 — 두껍게 번지는 빛 */
-.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAura b.glow {
-    padding: 34px;
-    filter: blur(20px);
-}
-
-/* 앞 — 가늘고 선명한 선 */
-.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAura b.line {
-    padding: 3px;
-}
-
-/* 화면보다 훨씬 큰 원뿔 판 — 화면 가운데를 축으로 돌면 테두리 위로 빛이 한 바퀴 돈다.
-   ★판은 **화면 대각선보다 커야** 한다. 3200px 은 2560×1440(대각선 약 2938px)까지 덮는다.
-     더 큰 화면을 쓰게 되면 이 숫자를 키운다 — 안 키우면 모서리에서 띠가 끊긴다. */
-.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAura i {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    display: block;
-    width: 3200px;
-    height: 3200px;
-    margin: -1600px 0 0 -1600px;
-    background: conic-gradient(transparent 0 20%,
-                               color-mix(in srgb, var(--busy-accent) 35%, transparent) 46%,
-                               color-mix(in srgb, var(--busy-accent) 80%, transparent) 68%,
-                               var(--busy-accent-2) 84%,
-                               #ffffff 92%,
-                               var(--busy-accent-2) 96%,
-                               transparent 100%);
-    will-change: transform;
-    animation: u4aWsBusyAura 4s linear infinite;
-}
-
-@keyframes u4aWsBusyAura {
-    to { transform: rotate(360deg); }
+@keyframes u4aWsBusyAuraBreath {
+    0%, 100% { opacity: 0.5; }
+    50%      { opacity: 1; }
 }
 
 /* ★[2026-10-30 장군님 지시] 「busy dialog 크기만 키울게 아니라 그 안에 svg 도 같이 키워야지」
@@ -698,7 +670,6 @@ dialog.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] {
     100% { opacity: 0; transform: translate(-50%, 0); }
 }
 
-
 /* ======================================================================
    setAIBusy 전용 그림 = 시안 「40안 · 조합」 01번 Beam + Data Flow  (장군님 지시 2026-10-30)
    ----------------------------------------------------------------------
@@ -895,6 +866,11 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
 
 /* 입자 — 시작 자리(--x, --y)에서 로고 가운데로, 2.4s 흐름 */
 .u4aWsBusyAi .p {
+    /* 출발 자리 = 카드 안쪽 크기 × 비율. 변수는 u4a-busy.js 의 _syncAiSpread() 가 넣는다.
+       값이 아직 없을 때를 대비해 기본값(실측한 지금 카드 크기)을 둔다. */
+    --x: calc(var(--u4aWsAiOX, 0px) + var(--u4aWsAiW, 283px) * var(--fx, 0));
+    --y: calc(var(--u4aWsAiOY, 0px) + var(--u4aWsAiH, 176px) * var(--fy, 0));
+
     position: absolute;
     width: 4px;
     height: 4px;
@@ -912,7 +888,6 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
     85% { opacity: 0.9; }
     100% { transform: translate(0, 0) scale(0.3); opacity: 0; }
 }
-
 
 /* 제목 (굵게) / 메시지 (보조색) — 비어있으면 숨김(로고만).
    ★id 는 그대로 둔다 — 카드 제목·문구를 넣는 곳(ws_html5_shell.js)과
@@ -951,7 +926,7 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
 
 </style>
 <script>
-// 오류코드 접두: UBSY / 다음 번호: 012
+// 오류코드 접두: UBSY / 다음 번호: 013
 /************************************************************************
  * U4A Workspace — 공통 busy (window.U4ABusy)  · 짝 = u4a-busy.css
  * ----------------------------------------------------------------------
@@ -1171,22 +1146,108 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
      * ★[2026-10-30 장군님 지시] AI 전용 그림 = 시안 40안 01 Beam + Data Flow.
      *   입자는 로고 칸(.lg) 안에 두고, 로고 가운데에서 --x · --y 만큼 떨어진 곳에서 출발해
      *   로고로 빨려 든다. 카드 가운데 기준으로 옮기면 엉뚱한 곳으로 모인다(지침서 2절).
+     *   ★[2026-10-30 장군님 지시] 출발 자리를 **카드 크기에 대한 비율(fx · fy)** 로 둔다.
+     *     desc 가 길어 카드가 커지면 입자도 같이 퍼져야 한다 — px 로 박아 두면 로고 둘레에만 몰린다.
+     *     실제 px = 카드 안쪽 크기(--u4aWsAiW · --u4aWsAiH) × 비율. 그 두 변수는 _syncAiSpread() 가 넣는다.
      *   줄마다 복붙하지 않고 표로 둔다 — 자리를 고칠 때 이 표 한 곳만 고친다.
      */
     var AI_PARTICLES = [
-        { x: -150, y: -46, delay: "0s" },
-        { x: 96, y: -50, delay: "-0.3s" },
-        { x: -120, y: 52, delay: "-0.6s" },
-        { x: 92, y: 48, delay: "-0.9s" },
-        { x: -60, y: -64, delay: "-1.2s" },
-        { x: 40, y: -66, delay: "-1.5s" },
-        { x: -176, y: 4, delay: "-1.8s" },
-        { x: 110, y: 0, delay: "-2.1s" },
-        { x: -30, y: 64, delay: "-0.45s" },
-        { x: 60, y: 60, delay: "-0.75s" },
-        { x: -10, y: -70, delay: "-1.05s" },
-        { x: 10, y: 70, delay: "-1.65s" }
+        { fx: -0.42, fy: -0.30, delay: "0s" },
+        { fx: 0.40, fy: -0.33, delay: "-0.3s" },
+        { fx: -0.35, fy: 0.32, delay: "-0.6s" },
+        { fx: 0.33, fy: 0.30, delay: "-0.9s" },
+        { fx: -0.18, fy: -0.40, delay: "-1.2s" },
+        { fx: 0.15, fy: -0.42, delay: "-1.5s" },
+        { fx: -0.45, fy: 0.03, delay: "-1.8s" },
+        { fx: 0.44, fy: 0, delay: "-2.1s" },
+        { fx: -0.10, fy: 0.40, delay: "-0.45s" },
+        { fx: 0.20, fy: 0.38, delay: "-0.75s" },
+        { fx: -0.05, fy: -0.44, delay: "-1.05s" },
+        { fx: 0.06, fy: 0.44, delay: "-1.65s" }
     ];
+
+    /**
+     * AI 전용 그림의 입자가 **카드 크기를 따라가게** 한다.
+     * 카드 안쪽 크기를 재어 --u4aWsAiW · --u4aWsAiH 로 넣어 두면 CSS 가 비율로 곱한다.
+     * ★clientWidth 는 카드 자신의 zoom 이 적용된 뒤의 CSS px 이고, 입자는 그림 묶음의 zoom
+     *   안쪽 좌표계에 있다. 그래서 그림 묶음의 zoom 으로 한 번 더 나눈다(2026-10-30 실측).
+     */
+    function _syncAiSpread() {
+
+        var oCard = document.querySelector(".u4aWsBusyCard");
+        var oAi = document.querySelector(".u4aWsBusyAi");
+
+        if (!oCard || !oAi) {
+            return;
+        }
+
+        var nZoom = parseFloat(getComputedStyle(oAi).zoom) || 1;
+        var nW = oCard.clientWidth / nZoom;
+        var nH = oCard.clientHeight / nZoom;
+
+        if (nW <= 0 || nH <= 0) {
+            return;   // 아직 안 그려졌다 — ResizeObserver 가 다시 부른다
+        }
+
+        oAi.style.setProperty("--u4aWsAiW", nW + "px");
+        oAi.style.setProperty("--u4aWsAiH", nH + "px");
+
+        // ★입자는 로고 칸 안에 있어서 **로고 가운데**가 기준이 된다. 그런데 desc 가 길어지면
+        //   로고는 카드 위쪽으로 올라가고 가로로도 오른쪽에 치우친다. 그대로 두면 입자가
+        //   위로 넘치고 아래는 빈다(실측 2026-10-30: 위 -64px, 아래 +127px).
+        //   그래서 **로고 가운데 → 카드 가운데** 만큼을 더해 카드 한가운데를 기준으로 삼는다.
+        var oLg = oAi.querySelector(".lg");
+
+        if (!oLg) {
+            return;
+        }
+
+        var nCardZoom = parseFloat(getComputedStyle(oCard).zoom) || 1;
+        var nScale = nZoom * nCardZoom;          // 그림 좌표계 1px = 화면 nScale px
+        var oCr = oCard.getBoundingClientRect();
+        var oLr = oLg.getBoundingClientRect();
+        var nOX = ((oCr.left + oCr.width / 2) - (oLr.left + oLr.width / 2)) / nScale;
+        var nOY = ((oCr.top + oCr.height / 2) - (oLr.top + oLr.height / 2)) / nScale;
+
+        oAi.style.setProperty("--u4aWsAiOX", nOX + "px");
+        oAi.style.setProperty("--u4aWsAiOY", nOY + "px");
+    }
+
+    var oAiSpreadRO = null;
+
+    /**
+     * 카드 크기가 바뀔 때마다 입자 퍼짐 범위를 다시 맞춘다.
+     * ★desc 를 넣은 **직후**에는 카드가 아직 안 커져 있다 — 그때 한 번만 재면 입자가 로고 둘레에만
+     *   몰린다(장군님 지적 2026-10-30, 실측으로 확인). 그래서 ResizeObserver 로 따라간다.
+     */
+    function _watchAiSpread() {
+
+        var oCard = document.querySelector(".u4aWsBusyCard");
+
+        if (!oCard || typeof ResizeObserver === "undefined") {
+            return;
+        }
+
+        if (oAiSpreadRO) {
+            oAiSpreadRO.disconnect();
+        }
+
+        oAiSpreadRO = new ResizeObserver(function () {
+            _syncAiSpread();
+        });
+
+        oAiSpreadRO.observe(oCard);
+    }
+
+    function _unwatchAiSpread() {
+
+        if (!oAiSpreadRO) {
+            return;
+        }
+
+        oAiSpreadRO.disconnect();
+        oAiSpreadRO = null;
+    }
 
     function _aiParticlesHtml() {
 
@@ -1198,7 +1259,7 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
 
             oP = AI_PARTICLES[i];
 
-            sHtml += '<i class="p" style="--x:' + oP.x + 'px;--y:' + oP.y + 'px;animation-delay:' + oP.delay + '"></i>';
+            sHtml += '<i class="p" style="--fx:' + oP.fx + ';--fy:' + oP.fy + ';animation-delay:' + oP.delay + '"></i>';
         }
 
         return sHtml;
@@ -1229,17 +1290,10 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
         //   JSON 이 돌아오면 "200 OK" 가 뜬다 — 서버와 통신하는 중이라는 뜻.
         //   시안 출처 = busy_indicators.html #18-api. 모양은 전부 짝 CSS(.u4aWsBusyApi)가 그린다.
         oDlg.innerHTML =
-            // ★[2026-10-30 장군님 지시] AI 모드일 때 **화면 테두리를 따라 빛줄기가 돈다**
-            //   (「너네 computer use 키면 모니터 테두리에 효과주잖아」).
-            //   카드 테두리 빛과 같은 방식 — 화면보다 훨씬 큰 원뿔 판을 돌리고 테두리 모양 mask 로 가린다.
+            // ★[2026-10-30 장군님 지시] AI 모드일 때 화면 가장자리에 빛이 깔리고 **숨 쉬듯** 밝기가 오르내린다.
             //   평소에는 CSS 가 숨긴다. 모양은 전부 짝 CSS(.u4aWsBusyAura)가 그린다.
             '<span class="u4aWsBusyAura">' +
-                '<b class="glow">' +
-                    '<i></i>' +
-                '</b>' +
-                '<b class="line">' +
-                    '<i></i>' +
-                '</b>' +
+                '<i></i>' +
             '</span>' +
             '<div class="u4aWsBusyCard">' +
                 '<span class="u4aWsBusyEdge">' +
@@ -1303,6 +1357,9 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
         if (!oBusyDom) {
             return;
         }
+
+        // 이 창이 **실제로 닫히는** 그 순간을 잡아 둔다(아래 afterOff 절 참조).
+        _bindFlushOnClose(oBusyDom);
 
         // busy 요소가 <dialog> 면 showModal() 로 띄운다 — 모달 팝업(showModal)도 top-layer 라
         //   일반 <div>(z-index 무한대라도) busy 는 그 뒤로 가려 안 보인다. busy 도 모달이어야
@@ -1442,6 +1499,13 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
 
             // 기다리는 사이에 다시 켰다 → 그 busy 를 끄면 안 된다.
             if (nMyGen !== nGen) {
+
+                // 맡겨 둔 뒷일은 버리지 않는다 — 창이 실제로 닫힐 때 불린다(아래 afterOff 절 참조).
+                if (aAfterOff.length > 0) {
+                    console.warn("[UBSY-012] BUSY_OFF_DROPPED: busy was shown again while waiting - "
+                        + aAfterOff.length + " afterOff task(s) kept, they run when the dialog actually closes");
+                }
+
                 return;
             }
 
@@ -1598,9 +1662,70 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
      *   · 끄기를 거는 쪽과 뒷일을 거는 쪽이 달라도 된다 — 그래서 화면 쪽은
      *     「끄기 한 줄 + afterOff 한 줄」로 끝난다. busy 함수를 창마다 고칠 필요가 없다.
      *   · AI 자물쇠로 끄기가 막혀 있으면 그동안 기다렸다가, AI busy 가 꺼질 때 같이 불린다.
+     *
+     * ★★★[2026-10-30 장군님 지시 「결론 1 진행해」] 구멍 두 개를 막았다.
+     *   ① **기다리는 중에 busy 가 다시 켜지면** 그 끄기가 버려진다(세대 번호 — _finish 참조).
+     *      종전에는 대기열을 비우는 자리가 그 끄기의 끝(_done) **한 곳뿐**이어서, 버려지면
+     *      맡긴 토스트가 한참 뒤 엉뚱한 끄기에 끼어 뜨거나, 그 busy 가 fail-closed 로
+     *      안 꺼지면 **영영 안 떴다.**
+     *      → 대기열을 비우는 책임을 **<dialog> 의 close 이벤트**로도 옮겼다(_bindFlushOnClose).
+     *        누가 어느 경로로 끄든 **창이 실제로 닫히는 그 순간** 비워진다.
+     *        close 는 close() 다음 task 에 오므로 평소 타이밍은 종전과 같다 —
+     *        버려진 경우의 보험으로만 돈다. 두 번 불려도 _flushAfterOff 가 한 번만 실행한다.
+     *   ② **「떠 있나」를 .open 으로만 봤다.** showModal() 이 실패하면 display:flex 로 띄우는데
+     *      그때 .open 은 false 다 → busy 가 화면에 떠 있는데도 토스트를 **바로** 띄웠다.
+     *      → _isBusyVisible() 로 둘 다 본다.
      * ================================================================== */
 
     var aAfterOff = [];
+
+    /**
+     * busy 가 지금 화면에 보이나.
+     *   showModal() 로 열렸으면 .open 이 true 다. 그것이 없거나 실패해 display 로 띄운 경우는
+     *   .open 이 false 라서 style.display 를 같이 본다(_showCore 의 fallback 과 짝).
+     */
+    function _isBusyVisible() {
+
+        var oBusyDom = document.getElementById(BUSY_ID);
+
+        if (!oBusyDom) {
+            return false;
+        }
+
+        if (oBusyDom.open === true) {
+            return true;
+        }
+
+        return oBusyDom.style.display === "flex";
+    }
+
+    /** busy 창이 **실제로 닫히는** 그 순간에도 대기열을 비운다(위 ★① 참조). 창마다 한 번만 건다. */
+    function _bindFlushOnClose(oBusyDom) {
+
+        if (oBusyDom.__afterOffGuard) {
+            return;
+        }
+
+        if (typeof oBusyDom.addEventListener !== "function") {
+            return;
+        }
+
+        oBusyDom.__afterOffGuard = true;
+
+        oBusyDom.addEventListener("close", function () {
+
+            // ★★[2026-10-30 실측] 이 신호는 close() **다음 task** 에 온다. 그 사이에 busy 가
+            //   다시 켜지면, 이 늦은 신호가 **방금 맡긴** 일을 비워 버린다 —
+            //   끄기 직후 microtask 안에서 바로 다시 켜는 흐름에서 그렇게 됐다
+            //   (끄기와 다음 켜기 사이를 50ms 띄우면 정상이었다 → 전/후를 갈라 확정).
+            //   그래서 비우기 전에 **지금도 닫혀 있는지** 다시 본다.
+            if (_isBusyVisible() === true) {
+                return;
+            }
+
+            _flushAfterOff();
+        });
+    }
 
     function afterOff(fnDone) {
 
@@ -1608,10 +1733,8 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
             return;
         }
 
-        var oBusyDom = document.getElementById(BUSY_ID);
-
         // 떠 있지 않으면 기다릴 것이 없다.
-        if (!oBusyDom || !oBusyDom.open) {
+        if (_isBusyVisible() === false) {
             _runDone(fnDone);
             return;
         }
@@ -1765,6 +1888,11 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
             _setAIMode(true);
             _setAIText(sDesc);
 
+            // desc 를 넣어 카드 크기가 정해진 **뒤에** 입자가 퍼질 범위를 맞춘다.
+            // 바로 재면 아직 안 커져 있으므로 ResizeObserver 로 계속 따라가게 한다.
+            _syncAiSpread();
+            _watchAiSpread();
+
             bAILocked = true;
 
             // 별창도 같이 막는다(이 창이 잠긴 뒤에 쏜다 — 되받은 신호가 setBusy 를 못 타게).
@@ -1780,6 +1908,7 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
         _hideCore(function () {
             _setAIText("");
             _setAIMode(false);
+            _unwatchAiSpread();
         }, true);
 
         // 별창을 푼다 — 이 창이 닫힌 뒤에 쏜다(별창이 먼저 열려 조작되는 틈을 만들지 않는다).

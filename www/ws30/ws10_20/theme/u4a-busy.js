@@ -1,4 +1,4 @@
-// 오류코드 접두: UBSY / 다음 번호: 012
+// 오류코드 접두: UBSY / 다음 번호: 013
 /************************************************************************
  * U4A Workspace — 공통 busy (window.U4ABusy)  · 짝 = u4a-busy.css
  * ----------------------------------------------------------------------
@@ -430,6 +430,9 @@
             return;
         }
 
+        // 이 창이 **실제로 닫히는** 그 순간을 잡아 둔다(아래 afterOff 절 참조).
+        _bindFlushOnClose(oBusyDom);
+
         // busy 요소가 <dialog> 면 showModal() 로 띄운다 — 모달 팝업(showModal)도 top-layer 라
         //   일반 <div>(z-index 무한대라도) busy 는 그 뒤로 가려 안 보인다. busy 도 모달이어야
         //   어떤 모달 팝업 위에도 보인다. <dialog> 가 아니면(다른 창) display 토글.
@@ -568,6 +571,13 @@
 
             // 기다리는 사이에 다시 켰다 → 그 busy 를 끄면 안 된다.
             if (nMyGen !== nGen) {
+
+                // 맡겨 둔 뒷일은 버리지 않는다 — 창이 실제로 닫힐 때 불린다(아래 afterOff 절 참조).
+                if (aAfterOff.length > 0) {
+                    console.warn("[UBSY-012] BUSY_OFF_DROPPED: busy was shown again while waiting - "
+                        + aAfterOff.length + " afterOff task(s) kept, they run when the dialog actually closes");
+                }
+
                 return;
             }
 
@@ -724,9 +734,70 @@
      *   · 끄기를 거는 쪽과 뒷일을 거는 쪽이 달라도 된다 — 그래서 화면 쪽은
      *     「끄기 한 줄 + afterOff 한 줄」로 끝난다. busy 함수를 창마다 고칠 필요가 없다.
      *   · AI 자물쇠로 끄기가 막혀 있으면 그동안 기다렸다가, AI busy 가 꺼질 때 같이 불린다.
+     *
+     * ★★★[2026-10-30 장군님 지시 「결론 1 진행해」] 구멍 두 개를 막았다.
+     *   ① **기다리는 중에 busy 가 다시 켜지면** 그 끄기가 버려진다(세대 번호 — _finish 참조).
+     *      종전에는 대기열을 비우는 자리가 그 끄기의 끝(_done) **한 곳뿐**이어서, 버려지면
+     *      맡긴 토스트가 한참 뒤 엉뚱한 끄기에 끼어 뜨거나, 그 busy 가 fail-closed 로
+     *      안 꺼지면 **영영 안 떴다.**
+     *      → 대기열을 비우는 책임을 **<dialog> 의 close 이벤트**로도 옮겼다(_bindFlushOnClose).
+     *        누가 어느 경로로 끄든 **창이 실제로 닫히는 그 순간** 비워진다.
+     *        close 는 close() 다음 task 에 오므로 평소 타이밍은 종전과 같다 —
+     *        버려진 경우의 보험으로만 돈다. 두 번 불려도 _flushAfterOff 가 한 번만 실행한다.
+     *   ② **「떠 있나」를 .open 으로만 봤다.** showModal() 이 실패하면 display:flex 로 띄우는데
+     *      그때 .open 은 false 다 → busy 가 화면에 떠 있는데도 토스트를 **바로** 띄웠다.
+     *      → _isBusyVisible() 로 둘 다 본다.
      * ================================================================== */
 
     var aAfterOff = [];
+
+    /**
+     * busy 가 지금 화면에 보이나.
+     *   showModal() 로 열렸으면 .open 이 true 다. 그것이 없거나 실패해 display 로 띄운 경우는
+     *   .open 이 false 라서 style.display 를 같이 본다(_showCore 의 fallback 과 짝).
+     */
+    function _isBusyVisible() {
+
+        var oBusyDom = document.getElementById(BUSY_ID);
+
+        if (!oBusyDom) {
+            return false;
+        }
+
+        if (oBusyDom.open === true) {
+            return true;
+        }
+
+        return oBusyDom.style.display === "flex";
+    }
+
+    /** busy 창이 **실제로 닫히는** 그 순간에도 대기열을 비운다(위 ★① 참조). 창마다 한 번만 건다. */
+    function _bindFlushOnClose(oBusyDom) {
+
+        if (oBusyDom.__afterOffGuard) {
+            return;
+        }
+
+        if (typeof oBusyDom.addEventListener !== "function") {
+            return;
+        }
+
+        oBusyDom.__afterOffGuard = true;
+
+        oBusyDom.addEventListener("close", function () {
+
+            // ★★[2026-10-30 실측] 이 신호는 close() **다음 task** 에 온다. 그 사이에 busy 가
+            //   다시 켜지면, 이 늦은 신호가 **방금 맡긴** 일을 비워 버린다 —
+            //   끄기 직후 microtask 안에서 바로 다시 켜는 흐름에서 그렇게 됐다
+            //   (끄기와 다음 켜기 사이를 50ms 띄우면 정상이었다 → 전/후를 갈라 확정).
+            //   그래서 비우기 전에 **지금도 닫혀 있는지** 다시 본다.
+            if (_isBusyVisible() === true) {
+                return;
+            }
+
+            _flushAfterOff();
+        });
+    }
 
     function afterOff(fnDone) {
 
@@ -734,10 +805,8 @@
             return;
         }
 
-        var oBusyDom = document.getElementById(BUSY_ID);
-
         // 떠 있지 않으면 기다릴 것이 없다.
-        if (!oBusyDom || !oBusyDom.open) {
+        if (_isBusyVisible() === false) {
             _runDone(fnDone);
             return;
         }

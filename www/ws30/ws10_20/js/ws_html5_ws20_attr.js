@@ -3198,13 +3198,22 @@
      *   [2026-10-22 Codex] 미리보기 선택은 DOM 변경을 수반하므로 이 대기보다 먼저,
      *   Busy가 켜져 있을 때 완료한다. 미리보기 선택을 대기 뒤로 다시 옮기지 않는다.
      *
-     *   ★공통 busy 는 건드리지 않는다(장군님 지시) — 여기서 닫힘만 지켜본다.
-     *   ★느린 PC 를 고려해 시간을 못 박지 않고 "닫혔는지"를 확인한다. 상한에 닿으면
-     *     오류 코드를 남기고 그대로 진행한다(공통 busy 자체 상한 5초보다 길게 둔다).
-     *   ★창이 숨겨지면 requestAnimationFrame 이 멈추므로 setTimeout 으로도 상한을 건다
-     *     (뒤로가기로 WS20 화면이 숨는 경로가 있다 — 안 걸면 영영 안 끝난다).
+     * ★★★[2026-10-30 장군님 지시 「2번부터 진행」] 공통 `U4ABusy.afterOff` 로 모았다.
+     *   [종전] 이 자리에서 requestAnimationFrame 으로 직접 돌며 <dialog>.open 을 봤고,
+     *     창이 숨으면 rAF 가 멈추므로 setTimeout 6000ms 상한을 따로 걸었다.
+     *   [왜 바꿨나]
+     *     ① 공통 busy 의 afterOff 와 **똑같은 일**이라, 고칠 때 두 곳을 봐야 했다.
+     *     ② 그 6초 상한이 공통의 결정과 어긋났다 — 공통은 상한에 닿아도 끄지 않는다
+     *        (fail-closed, 장군님 결정 2026-10-22). 장군님 지적(2026-10-30) — 서버를
+     *        다녀오는 무거운 처리였다면 6초로 단정할 수 없고, 상한에 닿으면 커서 주기가
+     *        **조용히 실패**했다(W20A-004 로그만 남았다).
+     *     ③ afterOff 는 rAF 를 쓰지 않는다 — 공통이 실제로 끈 자리와 <dialog> 의 close
+     *        두 길에서 불린다. 그래서 창이 숨어도 신호가 오고, 상한이 필요 없다.
+     *   [호출처] `await` 를 그대로 쓰도록 **Promise 로 감쌌다** — 부르는 곳 4곳
+     *     (ws20_edit.js:84 · ws20_prev.js:806 · ws20_prev.js:1923 · ws20_tree.js:963)은
+     *     한 줄도 바뀌지 않는다.
+     *   [못 끝내면] busy 가 영영 안 닫히면 커서도 안 준다. 그것이 fail-closed 로 맞다.
      ************************************************************************/
-    var _WS20_BUSY_WAIT_LIMIT_MS = 6000;
 
     function _waitBusyClosed() {
 
@@ -3219,33 +3228,26 @@
         }
 
         // busy 요소가 없거나 이미 닫혀 있으면 기다릴 것이 없다(원본과 같은 상태).
-        if (!oDlg || oDlg.open !== true) { return Promise.resolve(); }
+        if (!oDlg || oDlg.open !== true) {
+            return Promise.resolve();
+        }
+
+        var oBusy = null;
+
+        try {
+            oBusy = parent.U4ABusy;
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        // 공통이 없으면 기다릴 길이 없다 — 그대로 진행하면 커서가 안 가므로 표면화한다.
+        if (!oBusy || typeof oBusy.afterOff !== "function") {
+            console.error("[W20A-004] parent.U4ABusy.afterOff not found - attribute focus runs while the busy dialog is still open");
+            return Promise.resolve();
+        }
 
         return new Promise(function (resolve) {
-
-            var bDone = false, iTimer = 0;
-
-            function _end(bLimit) {
-                if (bDone) { return; }
-                bDone = true;
-                if (iTimer) { clearTimeout(iTimer); }
-                if (bLimit) {
-                    console.error("[W20A-004] busy dialog still open after "
-                        + _WS20_BUSY_WAIT_LIMIT_MS + "ms - attribute focus may be blocked");
-                }
-                resolve();
-            }
-
-            iTimer = setTimeout(function () { _end(true); }, _WS20_BUSY_WAIT_LIMIT_MS);
-
-            function _tick() {
-                if (bDone) { return; }
-                if (oDlg.open !== true) { _end(false); return; }
-                requestAnimationFrame(_tick);
-            }
-
-            requestAnimationFrame(_tick);
-
+            oBusy.afterOff(resolve);
         });
 
     } // end of _waitBusyClosed
