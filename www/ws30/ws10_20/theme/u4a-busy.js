@@ -1,4 +1,4 @@
-// 오류코드 접두: UBSY / 다음 번호: 010
+// 오류코드 접두: UBSY / 다음 번호: 012
 /************************************************************************
  * U4A Workspace — 공통 busy (window.U4ABusy)  · 짝 = u4a-busy.css
  * ----------------------------------------------------------------------
@@ -276,6 +276,11 @@
         //   JSON 이 돌아오면 "200 OK" 가 뜬다 — 서버와 통신하는 중이라는 뜻.
         //   시안 출처 = busy_indicators.html #18-api. 모양은 전부 짝 CSS(.u4aWsBusyApi)가 그린다.
         oDlg.innerHTML =
+            // ★[2026-10-30 장군님 지시] AI 모드일 때 화면 가장자리에 빛이 깔리고 **숨 쉬듯** 밝기가 오르내린다.
+            //   평소에는 CSS 가 숨긴다. 모양은 전부 짝 CSS(.u4aWsBusyAura)가 그린다.
+            '<span class="u4aWsBusyAura">' +
+                '<i></i>' +
+            '</span>' +
             '<div class="u4aWsBusyCard">' +
                 '<span class="u4aWsBusyEdge">' +
                     '<i></i>' +
@@ -744,6 +749,48 @@
         oBusyDom.removeAttribute("data-u4a-busy-mode");
     }
 
+    /**
+     * 다른 창(별창)에도 「지금 막아라 / 풀어라」를 알린다.
+     *   ★[2026-10-30 장군님 지시 「같이 broadcast 로 다른 창에서도 못건들게 해라」]
+     *     자물쇠는 창마다 따로라, AI 가 이 창을 잠가도 띄워 둔 별창은 그대로 조작된다.
+     *     별창은 이미 BUSY_ON / BUSY_OFF 를 받아 자기 화면을 덮는 길을 갖고 있으므로
+     *     **그 길에 쏘기만 하면 된다** — 받는 쪽은 한 줄도 고치지 않는다.
+     *   ★메인 창도 이 신호를 받아 setBusy 를 부르지만, 자물쇠가 걸린 동안에는
+     *     setBusy 가 통째로 그만두므로(resources/index.js) 겹쳐서 켜지지 않는다.
+     */
+    function _broadcastAIBusy(bOn) {
+
+        try {
+
+            if (typeof BroadcastChannel !== "function") {
+                return;
+            }
+
+            var fnKey = null;
+
+            if (typeof global.getBrowserKey === "function") {
+                fnKey = global.getBrowserKey;
+            } else if (global.parent && typeof global.parent.getBrowserKey === "function") {
+                fnKey = global.parent.getBrowserKey;
+            }
+
+            if (!fnKey) {
+                console.warn("[UBSY-010] setAIBusy: getBrowserKey not found - other windows are NOT locked");
+                return;
+            }
+
+            var oCh = new BroadcastChannel("broadcast-to-child-window_" + fnKey());
+
+            oCh.postMessage({ PRCCD: (bOn ? "BUSY_ON" : "BUSY_OFF") });
+
+            oCh.close();
+
+        } catch (e) {
+            _caught("UBSY-011", "setAIBusy: broadcast failed - other windows may stay unlocked", e);
+        }
+    }
+
+
     function setAIBusy(bOn, oOpt) {
 
         var oOption = oOpt || {};
@@ -760,6 +807,9 @@
 
             bAILocked = true;
 
+            // 별창도 같이 막는다(이 창이 잠긴 뒤에 쏜다 — 되받은 신호가 setBusy 를 못 타게).
+            _broadcastAIBusy(true);
+
             return;
         }
 
@@ -771,6 +821,9 @@
             _setAIText("");
             _setAIMode(false);
         }, true);
+
+        // 별창을 푼다 — 이 창이 닫힌 뒤에 쏜다(별창이 먼저 열려 조작되는 틈을 만들지 않는다).
+        _broadcastAIBusy(false);
     }
 
 

@@ -78,50 +78,86 @@ async function main() {
     await new Promise(function (r) { setTimeout(r, 1500); });
 
     let out = {};
-    let replay = lines();
-    out.replayCount = replay.length;
-    out.replayErrors = replay.filter(function (s) { return s.indexOf("error |") === 0; }).slice(-15);
-    out.prev001 = replay.filter(function (s) { return s.indexOf("PREV-001") >= 0; });
-    out.propCoerce = replay.filter(function (s) { return s.indexOf("PROP_COERCE") >= 0; });
-    out.caughtLines = replay.filter(function (s) { return s.indexOf("CAUGHT") >= 0; }).length;
 
-    // 1) 공개 함수가 있나
-    out.api = await ev("JSON.stringify({ logger: typeof U4ALOG, throttle: typeof U4ALOG.setCaughtThrottle, clear: typeof U4ALOG.clearCaughtCount, note: typeof U4ALOG.note, page: (typeof getCurrPage === 'function') ? getCurrPage() : '?' })");
+    // [2026-10-30] AI 전용 busy 의 화면 테두리 띠(.u4aWsBusyAura) 실측 — 장군님 지시 「cdp 붙여서 실측해」
+    const PROBE = `(function () {
+        var r = {};
+        var dlg = document.getElementById("u4aWsBusyIndicator");
+        r.dialogExists = !!dlg;
+        if (!dlg) { return JSON.stringify(r); }
+        r.open = dlg.hasAttribute("open");
+        r.mode = dlg.getAttribute("data-u4a-busy-mode");
+        var dc = getComputedStyle(dlg);
+        r.dlgBackdropFilter = dc.backdropFilter || dc.webkitBackdropFilter;
+        r.accentOnDialog = dc.getPropertyValue("--busy-accent").trim();
+        var aura = dlg.querySelector(".u4aWsBusyAura");
+        r.auraExists = !!aura;
+        if (aura) {
+            var ac = getComputedStyle(aura);
+            var ar = aura.getBoundingClientRect();
+            r.auraDisplay = ac.display;
+            r.auraPosition = ac.position;
+            r.auraPadding = ac.padding;
+            r.auraMask = (ac.webkitMaskImage || ac.maskImage || "").slice(0, 60);
+            r.auraRect = [Math.round(ar.width), Math.round(ar.height)];
+            r.auraAccent = ac.getPropertyValue("--busy-accent").trim();
+            r.auraBoxShadow = (ac.boxShadow || "").slice(0, 120);
+            r.auraMaskImage = (ac.webkitMaskImage || ac.maskImage || "").slice(0, 200);
+            r.auraMaskComposite = (ac.maskComposite || "") + " / " + (ac.webkitMaskComposite || "");
+            var pl2 = aura.querySelector("i");
+            if (pl2) { r.plateBgImage = getComputedStyle(pl2).backgroundImage.slice(0, 120); }
+            r.auraChildren = Array.prototype.map.call(aura.children, function (c) {
+                var cc = getComputedStyle(c);
+                var crr = c.getBoundingClientRect();
+                return c.className + " | pad=" + cc.padding + " | filter=" + cc.filter + " | op=" + cc.opacity + " | rect=" + Math.round(crr.width) + "x" + Math.round(crr.height);
+            });
+            var pl = aura.querySelector("i");
+            r.plateExists = !!pl;
+            if (pl) {
+                var pc = getComputedStyle(pl);
+                var pr = pl.getBoundingClientRect();
+                r.plateRect = [Math.round(pr.width), Math.round(pr.height)];
+                r.plateBg = pc.backgroundImage.slice(0, 140);
+                r.plateAnim = pc.animationName + " " + pc.animationDuration;
+            }
+        }
+        var card = dlg.querySelector(".u4aWsBusyCard");
+        if (card) {
+            var cr = card.getBoundingClientRect();
+            r.cardRect = [Math.round(cr.width), Math.round(cr.height)];
+            r.cardZoom = getComputedStyle(card).zoom;
+        }
+        return JSON.stringify(r);
+    })()`;
 
-    // 2) 미리보기 iframe 이 부모 U4ALOG 를 이어 받았나
-    out.preview = await ev("(function(){ var fr = Array.prototype.slice.call(document.querySelectorAll('iframe')); var r = []; fr.forEach(function(f){ try { var w = f.contentWindow; if (w && typeof w.parsePropertyValue === 'function') { r.push({ src: (f.getAttribute('src')||'').slice(-40), hasLog: typeof w.U4ALOG, same: w.U4ALOG === window.U4ALOG }); } } catch (e) { r.push({ err: String(e) }); } }); return JSON.stringify(r); })()");
+    out.before = JSON.parse(await ev(PROBE));
 
-    // 3) 반복 억제: 켜진 상태로 같은 오류 10번 → 끄고 10번 → 다시 켬
-    consoleEvents = [];
-    await ev("(function(){ for (var i = 0; i < 10; i++) { U4ALOG.caught(new Error('ws40-probe-on')); } })()");
-    await new Promise(function (r) { setTimeout(r, 400); });
-    out.throttleOnLines = lines().filter(function (s) { return s.indexOf("ws40-probe-on") >= 0; }).length;
+    // [2026-10-30] ★Electron 은 한 번 읽은 CSS 를 다시 읽지 않는다 — 파일을 고쳐도 화면은 옛 CSS 다.
+    //   그래서 u4a-busy.css 링크에 뒤에 붙는 값을 바꿔 **강제로 다시 읽힌다.** 앱 상태는 그대로다.
+    out.cssReload = await ev("(function(){ var ls = document.querySelectorAll('link[rel=stylesheet]'); var n = 0; for (var i = 0; i < ls.length; i++) { var h = ls[i].getAttribute('href') || ''; if (h.indexOf('u4a-busy.css') >= 0) { ls[i].setAttribute('href', h.split('?')[0] + '?v=' + Date.now()); n++; } } return n; })()");
+    await new Promise(function (r) { setTimeout(r, 900); });
 
-    consoleEvents = [];
-    await ev("U4ALOG.setCaughtThrottle(false)");
-    await ev("(function(){ for (var i = 0; i < 10; i++) { U4ALOG.caught(new Error('ws40-probe-off')); } })()");
-    await new Promise(function (r) { setTimeout(r, 400); });
-    let offLines = lines();
-    out.throttleOffLine = offLines.filter(function (s) { return s.indexOf("THROTTLE") >= 0; });
-    out.throttleOffLines = offLines.filter(function (s) { return s.indexOf("ws40-probe-off") >= 0; }).length;
+    // ★시안 비교 때 요소에 직접 입힌 style 이 남아 있으면 CSS 를 덮어 화면이 안 바뀐다. 먼저 지운다.
+    out.clearInline = await ev("(function(){ var el = document.querySelector('.u4aWsBusyAura i'); if (!el) { return 'no el'; } el.removeAttribute('style'); return 'cleared'; })()");
 
-    consoleEvents = [];
-    await ev("U4ALOG.setCaughtThrottle(true)");
-    await new Promise(function (r) { setTimeout(r, 300); });
-    out.throttleOnAgainLine = lines().filter(function (s) { return s.indexOf("THROTTLE") >= 0; });
+    await ev("setAIBusy(true, { desc: 'CDP 실측' })");
 
-    // 4) 미리보기 쪽에서 caught 를 부르면 부모 console 로 줄이 오고, 터진 자리가 미리보기 파일로 찍히나
-    consoleEvents = [];
-    out.previewCaught = await ev("(function(){ var fr = Array.prototype.slice.call(document.querySelectorAll('iframe')); for (var i = 0; i < fr.length; i++) { var w = fr[i].contentWindow; if (w && typeof w.parsePropertyValue === 'function') { w.eval(\"try { null.x; } catch (e) { if (typeof U4ALOG !== 'undefined' && U4ALOG.caught) { U4ALOG.caught(e, 'ws40-probe-preview'); } }\"); return 'called'; } } return 'no preview'; })()");
-    await new Promise(function (r) { setTimeout(r, 400); });
-    out.previewCaughtLines = lines().filter(function (s) { return s.indexOf("ws40-probe-preview") >= 0; });
+    // [2026-10-30] 앱은 이미 만들어 둔 busy DOM 을 다시 쓴다 — u4a-busy.js 를 고쳐도 반영되지 않는다.
+    //   그래서 화면 테두리 띠 안쪽만 새 마크업으로 바꿔 넣고 CSS 를 눈으로 본다.
+    await ev("(function(){ var a = document.querySelector('.u4aWsBusyAura'); if (!a) { return 'no aura'; } a.innerHTML = '<b class=\'glow\'><i></i></b><b class=\'line\'><i></i></b>'; return 'replaced'; })()");
+    await new Promise(function (r) { setTimeout(r, 500); });
+    await new Promise(function (r) { setTimeout(r, 700); });
+    out.afterAIBusyOn = JSON.parse(await ev(PROBE));
 
-    // 5) console.error 에 오류 객체를 넘기면 CDP 로 무엇이 오나 (지침서의 「측정」 — 참고용)
-    consoleEvents = [];
-    await ev("console.error('ws40-probe-err:', new Error('probe-stack-test'))");
-    await new Promise(function (r) { setTimeout(r, 400); });
-    let pe = consoleEvents.find(function (p) { return (p.args || []).some(function (a) { return a.value === "ws40-probe-err:"; }); });
-    out.errObjArg = pe ? { argTypes: pe.args.map(function (a) { return a.type + (a.subtype ? "/" + a.subtype : ""); }), description: (pe.args[1] && pe.args[1].description || "").split("\n").slice(0, 3), hasPreview: !!(pe.args[1] && pe.args[1].preview), stackTop: (pe.stackTrace && pe.stackTrace.callFrames || []).slice(0, 1) } : "not captured";
+    // 화면 캡처
+    let shot = await send("Page.captureScreenshot", { format: "png" });
+    let data = shot.result && shot.result.data;
+    if (data) {
+        require("fs").writeFileSync(process.argv[2] || "ai-busy.png", Buffer.from(data, "base64"));
+        out.screenshot = process.argv[2] || "ai-busy.png";
+    } else {
+        out.screenshot = "캡처 실패";
+    }
 
     console.log(JSON.stringify(out, null, 2));
     ws.close();

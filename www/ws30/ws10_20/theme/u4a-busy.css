@@ -20,6 +20,14 @@
 
 .u4aWsBusyIndicator {
     z-index: 2000000;
+
+    /* 로고 보라 — 시안이 정한 값(WS 로고 색). 이 두 줄이 유일한 출처다.
+       ★[2026-10-30] 종전에는 .u4aWsBusyCard 에 있었다. 그러면 **카드 밖**에 있는
+         화면 테두리 띠(.u4aWsBusyAura)가 이 값을 못 받아 **색 없이 투명하게 그려진다**
+         (장군님 화면에서 띠가 아예 안 보였다 — CSS 변수는 부모에게서만 내려온다).
+         카드는 여기서 상속받으므로 종전과 똑같이 보인다. */
+    --busy-accent: #c705f7;
+    --busy-accent-2: #ff7af5;
 }
 
 /* ===== Busy Indicator (구 sap.m.BusyDialog 대체 — 스크림 + 테마 카드) =====
@@ -79,10 +87,6 @@ dialog.u4aWsBusyIndicator::backdrop { background: transparent; }
  ************************************************************************/
 
 .u4aWsBusyCard {
-    /* 로고 보라 — 시안이 정한 값(WS 로고 색). 한곳에서만 쓰므로 여기 두 줄이 유일한 출처다. */
-    --busy-accent: #c705f7;
-    --busy-accent-2: #ff7af5;
-
     /* 밝은 테마 기준값 — 흰 바탕에서 사라지는 흰 빛은 보조 색으로, 번지는 빛은 옅게.
        ★--busy-dim 은 시안의 72% 가 아니라 **진하게**(100%) 쓴다 — 흰 카드 위에서 72% 로 깔면
          로고가 연분홍으로 바래 「또렷이 보인다」는 기준(지침서 3-2)을 못 맞춘다(2026-10-29 실측). */
@@ -191,6 +195,66 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
 .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyCard {
     min-height: 120px;
     justify-content: center;
+}
+
+/************************************************************************
+ * AI 모드 — 화면 전체 효과 (장군님 지시 2026-10-30)
+ * ----------------------------------------------------------------------
+ * 「AI busy일때는 busydialog 켤때 배경에 마치 computer use 애니메이션 효과를
+ *   배경 전체에 블러처리까지 해줘」
+ * 「너네 computer use 키면 모니터 테두리에 효과주잖아」
+ *   → ① 뒤 화면 전체를 흐리게 ② **화면 테두리를 따라 빛줄기가 한 바퀴씩 돈다.**
+ * ★처음에 ②를 「가장자리에서 안쪽으로 번지는 빛이 깜빡임」으로 잘못 만들었다가 지적받고 고쳤다.
+ *   computer use 는 **테두리를 따라 흐르는 띠**다.
+ * ★AI 모드일 때만. 일반 busy 의 배경은 종전대로 투명하고 흐려지지 않는다.
+ * ★움직임은 transform 하나뿐이라 무거운 작업 중에도 안 멈춘다.
+ * ★backdrop-filter 는 **요소 뒤**만 흐리게 한다 — 자식인 카드는 또렷하게 남는다.
+ ************************************************************************/
+dialog.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] {
+    /* ★[2026-10-30 장군님 지시] 「배경이 그리고 너무 투명해」 → 6% → 뒤가 비치되 또렷하게 덮는다. */
+    background: color-mix(in srgb, var(--busy-accent) 6%, transparent);
+    -webkit-backdrop-filter: blur(1.5px);
+            backdrop-filter: blur(1.5px);
+}
+
+/* 짝 마크업 = u4a-busy.js 의 _create(): <span class="u4aWsBusyAura"><i></i></span>
+   화면 가장자리에만 빛이 깔리고, 밝기가 숨 쉬듯 오르내린다. 평소에는 숨는다. */
+.u4aWsBusyAura {
+    display: none;
+}
+
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAura {
+    display: block;
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+
+    /* 빛은 바깥 테두리를 꽉 채우고, 안쪽을 **둥근 사각형**으로 뚫는다.
+       네 변 그라데이션을 더하는 방식은 모서리에서 두 변이 다 옅어져 빛이 끊긴다(실측 2026-10-30). */
+    overflow: hidden;
+}
+
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAura i {
+    position: absolute;
+    inset: 0;
+    display: block;
+
+    /* 화면 가운데에서 바깥으로 퍼지는 빛 — 경계선이 아예 없다.
+       가운데는 완전히 투명하고, 가장자리로 갈수록 서서히 진해진다. */
+    background: radial-gradient(ellipse at center,
+                                transparent 0%,
+                                transparent 58%,
+                                color-mix(in srgb, var(--busy-accent) 14%, transparent) 78%,
+                                color-mix(in srgb, var(--busy-accent) 30%, transparent) 92%,
+                                color-mix(in srgb, var(--busy-accent-2) 46%, transparent) 100%);
+
+    mix-blend-mode: screen;
+    animation: u4aWsBusyAuraBreath 2.6s ease-in-out infinite;
+}
+
+@keyframes u4aWsBusyAuraBreath {
+    0%, 100% { opacity: 0.5; }
+    50%      { opacity: 1; }
 }
 
 /* ★[2026-10-30 장군님 지시] 「busy dialog 크기만 키울게 아니라 그 안에 svg 도 같이 키워야지」
@@ -453,7 +517,6 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
     100% { opacity: 0; transform: translate(-50%, 0); }
 }
 
-
 /* ======================================================================
    setAIBusy 전용 그림 = 시안 「40안 · 조합」 01번 Beam + Data Flow  (장군님 지시 2026-10-30)
    ----------------------------------------------------------------------
@@ -668,7 +731,6 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
     100% { transform: translate(0, 0) scale(0.3); opacity: 0; }
 }
 
-
 /* 제목 (굵게) / 메시지 (보조색) — 비어있으면 숨김(로고만).
    ★id 는 그대로 둔다 — 카드 제목·문구를 넣는 곳(ws_html5_shell.js)과
      로그인 남은 초 표시(Login.js)가 이 id 로 찾는다. */
@@ -696,6 +758,7 @@ html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBu
 
 /* 움직임 줄이기 설정 — 시안 그대로 느리게만 한다(멈추지 않는다). */
 @media (prefers-reduced-motion: reduce) {
+    .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAura i,
     .u4aWsBusyEdge i,
     .u4aWsBusyCard .u4aWsSpinner i s,
     .u4aWsBusyCard .u4aWsSpinner b {
