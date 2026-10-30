@@ -197,7 +197,8 @@ oAPP.fn.onHelp = function (sStartMenuId) {
     var oGV = oLegacy[_sMenuId];
     if (!oGV) { return; }   // 레이아웃 커스터마이징(000281) 등 = 원본도 구버전 도움말 없음(미등록 시 종료).
     try {
-        parent.require("./utils/callTooltipsPopup.js")(oGV.area, oGV.code);
+        // [2026-10-30 장군님 지시] require·module 조작을 걷어내려고 상대경로 → __dirname 절대경로.
+        parent.require(PATH.join(__dirname, "utils", "callTooltipsPopup.js"))(oGV.area, oGV.code);
     } catch (e) {
         console.error("[bindWindow] onHelp legacy tooltip:", e && e.message, e);
         oAPP.fn.setBusyWS20Interaction(false);   // 로드 실패 시 busy 잔류 방지(callTooltipsPopup 이 켠 뒤 예외 시 짝).

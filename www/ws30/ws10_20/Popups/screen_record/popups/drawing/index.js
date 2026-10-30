@@ -27,8 +27,10 @@ const path            = require('path');
 const remote          = require('@electron/remote');
 const { ipcRenderer } = require('electron');
 const store           = remote.require(path.join(__dirname, '../../core/store'));
-const textInputModule = require('./text-input/window');
-const MSG             = require('./msg');
+// [2026-10-30 장군님 지시] require·module 조작을 걷어내려고 상대경로 → __dirname 절대경로.
+const textInputModule = require(path.join(__dirname, 'text-input', 'window'));
+// [2026-10-30 장군님 지시] require·module 조작을 걷어내려고 상대경로 → __dirname 절대경로.
+const MSG             = require(path.join(__dirname, 'msg'));
 
 const params     = WSUTIL.QueryString.parse(location.href);
 const theme      = params.theme      || 'dark';

@@ -17,7 +17,8 @@ const
 
 'use strict';
 
-const MSG = require('./msg');
+// [2026-10-30 장군님 지시] require·module 조작을 걷어내려고 상대경로 → __dirname 절대경로.
+const MSG = require(PATH.join(__dirname, 'msg'));
 
 const fs     = require('fs');
 const path   = require('path');
