@@ -145,6 +145,25 @@ function _finishOpen() {
 }
 
 // 공통 .u4a-toast(화면 정중앙) — 싱글톤 div + data-show + 3초.
+// busy 가 **실제로 꺼진 뒤**에 알림을 띄운다.
+//   공통 busy 는 hide() 를 불러도 바로 꺼지지 않는다(화면이 조용해질 때까지 기다린다 — 최소 0.3초).
+//   그래서 끄기 바로 뒤에 토스트를 띄우면 busy 와 겹쳐 보인다(장군님 지적 2026-10-30).
+//   공통 busy 가 없는 환경에서는 그냥 띄운다.
+function _toastAfterBusy(sText) {
+
+    if (window.U4ABusy && typeof U4ABusy.afterOff === "function") {
+
+        U4ABusy.afterOff(function () {
+            _toast(sText);
+        });
+
+        return;
+    }
+
+    _toast(sText);
+}
+
+
 function _toast(sText) {
     if (!sText) { return; }
     var oEl = document.getElementById("u4aApToast");
@@ -682,8 +701,8 @@ async function _onDownload() {
         var aPreset = await _getPresetList({ LIBVER: LIB.LIBVER, SYSID: SYSID, UNAME: USERINFO.ID });
 
         if (aPreset.length === 0) {
-            _toast(_zmsg("634")); // 다운로드할 개인화 정보 없음
             _setBusy(false);
+            _toastAfterBusy(_zmsg("634")); // 다운로드할 개인화 정보 없음
             return;
         }
 
@@ -693,8 +712,8 @@ async function _onDownload() {
         });
 
         if (oRes.canceled || !oRes.filePaths || !oRes.filePaths[0]) {
-            _toast(_zmsg("636"));                // 다운로드 취소
             _setBusy(false);
+            _toastAfterBusy(_zmsg("636"));       // 다운로드 취소
             return;
         }
 
@@ -713,8 +732,8 @@ async function _onDownload() {
             return;
         }
 
-        _toast(_zmsg("638")); // 다운로드 완료
         _setBusy(false);
+        _toastAfterBusy(_zmsg("638")); // 다운로드 완료
 
         try { require("electron").shell.showItemInFolder(sDownloadPath); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
     } catch (e) {
@@ -734,14 +753,14 @@ async function _onUpload() {
         });
 
         if (oRes.canceled || !oRes.filePaths || !oRes.filePaths[0]) {
-            _toast(_zmsg("640"));                // 업로드 취소
             _setBusy(false);
+            _toastAfterBusy(_zmsg("640"));       // 업로드 취소
             return;
         }
 
         var sHex;
         try { sHex = FS.readFileSync(oRes.filePaths[0], "utf8"); }
-        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _toast(_zmsg("641")); _setBusy(false); return; }
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _setBusy(false); _toastAfterBusy(_zmsg("641")); return; }
 
         var oEnc = _bufferFrom(sHex, "hex");
         var oJsonBuf = _xorBuffer(oEnc, C_OBF_KEY);
@@ -749,17 +768,17 @@ async function _onUpload() {
 
         var aPreset;
         try { aPreset = JSON.parse(sJson); }
-        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _toast(_zmsg("642")); _setBusy(false); return; } // 형식 오류
+        catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } _setBusy(false); _toastAfterBusy(_zmsg("642")); return; } // 형식 오류
 
         var _sqlite = await _createSqlite(true);
         if (!_sqlite) { _setBusy(false); return; }
 
         _sqlite.upsertData({ tableName: "UI_ATTR_PRESET", data: aPreset });
 
-        _toast(_zmsg("643")); // 업로드 완료
-
         await _loadData();
+
         _setBusy(false);
+        _toastAfterBusy(_zmsg("643")); // 업로드 완료
     } catch (e) {
         console.error("[UI_ATTR] upload error:", e);
         _setBusy(false);

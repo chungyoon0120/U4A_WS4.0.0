@@ -285,6 +285,25 @@
         oAPP.fn.setBusyIndicator(bIsBusy ? "X" : "", sMsg);
     };
 
+    // busy 가 **실제로 꺼진 뒤**에 알림을 띄운다.
+    //   공통 busy 는 hide() 를 불러도 바로 꺼지지 않는다(화면이 조용해질 때까지 기다린다 — 최소 0.3초).
+    //   그래서 끄기 바로 뒤에 토스트를 띄우면 busy 와 겹쳐 보인다(장군님 지적 2026-10-30).
+    //   공통 busy 가 없는 환경에서는 그냥 띄운다.
+    oAPP.fn.showToastAfterBusy = function (sText) {
+
+        if (window.U4ABusy && typeof U4ABusy.afterOff === "function") {
+
+            U4ABusy.afterOff(function () {
+                oAPP.fn.showToast(sText);
+            });
+
+            return;
+        }
+
+        oAPP.fn.showToast(sText);
+    };
+
+
     let _iToastTimer;
     oAPP.fn.showToast = function (sMsg) {
         let oToast = document.getElementById("u4aWsToast");
@@ -3437,7 +3456,7 @@
         }
         oCtl.close();
         oAPP.setBusy(false);
-        oAPP.fn.showToast(oAPP.msg.M01);
+        oAPP.fn.showToastAfterBusy(oAPP.msg.M01);
     }
 
     /********************************************************************
@@ -3496,7 +3515,7 @@
         oAPP.fn.fnApplyTheme(sKey);
         oCtl.close();
         oAPP.setBusy(false);
-        oAPP.fn.showToast(oAPP.msg.M01);
+        oAPP.fn.showToastAfterBusy(oAPP.msg.M01);
     }
 
     /********************************************************************

@@ -242,6 +242,25 @@ function _finishOpen() {
 }
 
 // 저장/복사 토스트 — 공통 .u4a-toast(shell.css 단일 출처: 화면 정중앙).
+// busy 가 **실제로 꺼진 뒤**에 알림을 띄운다.
+//   공통 busy 는 hide() 를 불러도 바로 꺼지지 않는다(화면이 조용해질 때까지 기다린다 — 최소 0.3초).
+//   그래서 끄기 바로 뒤에 토스트를 띄우면 busy 와 겹쳐 보인다(장군님 지적 2026-10-30).
+//   공통 busy 가 없는 환경에서는 그냥 띄운다.
+function _toastAfterBusy(sText) {
+
+    if (window.U4ABusy && typeof U4ABusy.afterOff === "function") {
+
+        U4ABusy.afterOff(function () {
+            _toast(sText);
+        });
+
+        return;
+    }
+
+    _toast(sText);
+}
+
+
 function _toast(sText) {
     if (!sText) { return; }
     var oEl = document.getElementById("u4aPattToast");
@@ -674,8 +693,8 @@ function _deleteFromDlg() {
             _reloadCust("");
             if (oCustTree) { _tof(oCustTree).selectByKey(""); }
             _showEmpty();
-            _toast(_m("008"));   // Delete success
             _setBusy(false);     // 처리가 끝난 뒤에만 끈다
+            _toastAfterBusy(_m("008"));   // Delete success
         }
     });
 
@@ -927,8 +946,8 @@ function _deleteCust(oNode) {
             _reloadCust("");
             if (oCustTree) { _tof(oCustTree).selectByKey(""); }
             _showEmpty();
-            _toast(_m("008"));   // Delete success
             _setBusy(false);     // 원본: 처리가 끝난 뒤에만 끈다
+            _toastAfterBusy(_m("008"));   // Delete success
         }
     });
 

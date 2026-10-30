@@ -79,6 +79,9 @@ UI5 미로드 가드, 브라우저 기능 지원 확인은 **정상 분기 그�
 | `MIMF` | ws30/ws10_20/Popups/mimeRepository/frame.js |
 | `VMNG` | ws30/ws10_20/Popups/versionMng/versionMngFrame.js |
 | `UCSS` | ws30/ws10_20/Popups/ui5CssPopup_v2/control.js (UI5 Predefined CSS 팝업 오프너) |
+| `UCSSD` | ws30/ws10_20/Popups/ui5CssPopup_v2/detail/index.html (UI5 Predefined CSS 팝업 — 오른쪽 미리보기 iframe) |
+| `UCSSM` | ws30/ws10_20/Popups/ui5CssPopup_v2/main/index.html (UI5 Predefined CSS 팝업 — 왼쪽 목록 iframe) |
+| `MSNIP` | ws30/ws10_20/Popups/monacoSnippetDesigner/Popup/js/index.js (코드 에디터 스니펫 디자이너) |
 | `DMON` | ws30/ws10_20/js/ws_html5_datamon.js (내부 데이터 모니터 — 감시 알맹이) |
 | `DMOP` | ws30/ws10_20/Popups/dataMonitor/index.js (내부 데이터 모니터 — 창 여는 쪽) |
 | `DMWN` | ws30/ws10_20/Popups/dataMonitor/Popup/ (내부 데이터 모니터 — 창 화면) |

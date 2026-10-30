@@ -78,13 +78,6 @@ dialog.u4aWsBusyIndicator::backdrop { background: transparent; }
  *   · 테마를 바꾸면 그 속성이 바로 바뀌므로 **busy 가 떠 있는 중에도 바로 따라 바뀐다**(JS 없음).
  ************************************************************************/
 
-/* 카드 테두리를 한 바퀴 도는 빛의 각도. 이름은 busy 전용(u4aWs*). */
-@property --u4aWsEdgeAngle {
-    syntax: "<angle>";
-    inherits: false;
-    initial-value: 0deg;
-}
-
 .u4aWsBusyCard {
     /* 로고 보라 — 시안이 정한 값(WS 로고 색). 한곳에서만 쓰므로 여기 두 줄이 유일한 출처다. */
     --busy-accent: #c705f7;
@@ -127,31 +120,96 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
     to   { opacity: 1; transform: none; }
 }
 
-/* 카드 테두리 전체를 따라 한 바퀴씩 도는 빛. */
-.u4aWsBusyCard::before {
-    content: "";
+/* 카드 테두리 전체를 따라 한 바퀴씩 도는 빛.
+   ★[2026-10-30] 각도 값(@property) 애니메이션을 **transform rotate** 로 바꿨다.
+     까닭: 각도 값 애니메이션은 매 프레임 main thread 가 다시 그린다 — 무거운 동기 작업이
+     main thread 를 붙잡으면 빛이 멈춘다(장군님 「busy 키는건 좋은데 왜 애니메이션이 무거운
+     프로그램 돌때 끈키냐」). transform 은 compositor 에서 돌아 멈추지 않는다.
+     실측(헤드리스 크롬, 3초 붙잡는 동안 첫·끝 프레임 차이) = 각도 7px → transform 1,413px. */
+.u4aWsBusyEdge {
     position: absolute;
     inset: 0;
 
     /* 두께는 정수 px 로 — 1.5px 이면 카드가 반 픽셀 자리에 놓일 때 좌우만 1px 로 얇아 보인다
        (장군님 2026-10-29 「상단 하단은 좋은데 좌측 우측은 얇아 보여」 → 시안에서 3px 확인 후 「딱좋다」). */
     padding: 3px;
+    overflow: hidden;
     border-radius: inherit;
-    background: conic-gradient(from var(--u4aWsEdgeAngle), transparent 0 62%, var(--busy-accent) 80%, var(--busy-accent-2) 93%, transparent 100%);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
             mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
             mask-composite: exclude;
-    animation: u4aWsBusyEdge 3s linear infinite;
     pointer-events: none;
 }
 
+/* 카드보다 훨씬 큰 원뿔 판 — 카드 가운데를 축으로 돌면 테두리 위로 빛이 한 바퀴 돈다.
+   ★판은 **카드 대각선보다 커야** 한다 — 작으면 모서리에서 빛이 끊긴다.
+     지금 카드는 max-width: 440px 이라 640px 로 넉넉하다(AI 모드는 카드가 커서 따로 키운다 — 아래). */
+.u4aWsBusyEdge i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 640px;
+    height: 640px;
+    margin: -320px 0 0 -320px;
+    background: conic-gradient(transparent 0 62%, var(--busy-accent) 80%, var(--busy-accent-2) 93%, transparent 100%);
+    will-change: transform;
+    animation: u4aWsBusyEdge 3s linear infinite;
+}
+
 @keyframes u4aWsBusyEdge {
-    to { --u4aWsEdgeAngle: 360deg; }
+    to { transform: rotate(360deg); }
+}
+
+/************************************************************************
+ * AI 모드만 크게 (장군님 지시 2026-10-30)
+ * ----------------------------------------------------------------------
+ * 「공통 busy만 겁나 커졌는데 공통 busy는 원래 크기로 원복하고 ai busy만 지금 상태로 해줘.
+ *   어짜피 대표 css 클래스로 분기해서 처리하면 변경할 것도 많이 없잖아」
+ *   → 공통 카드는 종전 값 그대로 두고, **AI 모드 표시(data-u4a-busy-mode="ai") 로만 분기**해
+ *     이 네 덩어리를 덮어쓴다. 일반 busy(API Call)는 한 글자도 안 바뀐다.
+ *   ★AI 전용 CSS 덩어리(아래 「40안 01」) 밖에 두었다 — 그 덩어리는 시안에서 통째로 받아
+ *     덮어쓰는 자리라, 여기 두면 다시 받아 붙여도 이 크기 설정이 살아남는다.
+ ************************************************************************/
+
+/* 카드 1.4배 — 종전 = gap 18px / min-width 300px / max-width 440px / padding 28px 34px 24px */
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyCard {
+    gap: 24px;
+    min-width: 420px;
+    max-width: 600px;
+    padding: 40px 48px 36px;
+}
+
+/* 테두리 빛도 커진 카드에 맞춘다. 두께는 정수 px — 1.4배인 4.2px 은 쓰지 않는다. */
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyEdge {
+    padding: 4px;
+}
+
+/* 원뿔 판은 카드 대각선보다 커야 한다 — AI 모드 카드(max-width 600px)에는 640px 로는 모자라
+   모서리에서 빛이 끊긴다. 카드를 또 키우면 이 숫자도 같이 키운다. */
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyEdge i {
+    width: 900px;
+    height: 900px;
+    margin: -450px 0 0 -450px;
+}
+
+/* 안내 문구(setAIBusy 의 desc) 만 키운다 — 장군님 지시 2026-10-30
+   「ai busy 에서 desc 폰트만 좀 키웠으면 좋겠다」. 공통 = 13px, AI 모드 = 17px.
+   ★.u4aWsBusyAi 의 zoom 은 그림에만 걸리므로 문구는 안 커진다 — 그래서 여기서 따로 키운다. */
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyText {
+    font-size: 17px;
+}
+
+/* 그림 1.6배 — zoom 한 줄이면 글씨·로고·선·빛 입자가 전부 같은 비율로 커진다.
+   시안에서 받은 숫자(크기·좌표·박자)를 하나도 고치지 않으므로 다음에 시안을 고쳐도 어긋나지 않는다.
+   되돌릴 때는 이 한 줄만 지운다. (Electron 45 = Chromium 156 → zoom 이 레이아웃까지 적용)
+   ★.u4aWsBusyAi 는 AI 모드에서만 보이므로 이 선택자 하나로 충분하다. */
+.u4aWsBusyAi {
+    zoom: 1.6;
 }
 
 /* ===== 로고 + 별빛 =====
-   u4a-busy.js 가 만드는 마크업 = <div class="u4aWsSpinner"><i></i><b></b><b></b><b></b></div> */
+   u4a-busy.js 가 만드는 마크업 = <div class="u4aWsSpinner"><i><s></s></i><b></b><b></b><b></b></div> */
 .u4aWsBusyCard .u4aWsSpinner {
     position: relative;
     box-sizing: border-box;
@@ -163,22 +221,38 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
 
 /* 화면 쪽 전역 스타일이 로고·별을 찌그러뜨리지 않게 막는다(지침서 5절 함정). */
 .u4aWsBusyCard .u4aWsSpinner i,
+.u4aWsBusyCard .u4aWsSpinner s,
 .u4aWsBusyCard .u4aWsSpinner b {
     box-sizing: border-box;
     font: inherit;
     line-height: 0;
     max-width: none;
+    text-decoration: none;
 }
 
-/* WS 로고(CSS mask) 위로 금속 광택 빛줄기가 비스듬히 지나간다. */
+/* WS 로고(CSS mask) 위로 금속 광택 빛줄기가 비스듬히 지나간다.
+   ★[2026-10-30] 로고 모양(mask)은 고정하고 **바탕색만** 깐다 — 광택은 안쪽 <s> 판이 맡는다.
+     종전 background-position 애니메이션은 main thread 가 그려 무거운 작업 중 멈췄다. */
 .u4aWsBusyCard .u4aWsSpinner i {
     display: block;
     width: 100%;
     height: 100%;
     -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20307%20311'%3E%3Cpath%20d%3D%22M4%204%2050%204%2050%20211%209%20211Z%22%2F%3E%3Cpath%20d%3D%22M91%204%20127%204%2054%20211%2021%20211Z%22%2F%3E%3Cpath%20d%3D%22M98%204%20134%204%20134%20211%20102%20211Z%22%2F%3E%3Cpath%20d%3D%22M176%204%20222%204%20146%20211%20106%20211Z%22%2F%3E%3Cpath%20d%3D%22M236%2093%20254%2093%20266%2095%20270%2096%20277%2099%20283%20103%20288%20107%20294%20114%20296%20117%20299%20122%20301%20128%20302%20132%20303%20139%20303%20154%20302%20158%20301%20159%20258%20159%20257%20158%20257%20157%20257%20146%20255%20141%20254%20139%20251%20136%20248%20134%20244%20133%20238%20132%20233%20132%20230%20133%20225%20135%20219%20139%20215%20145%20213%20149%20212%20153%20212%20158%20213%20163%20217%20169%20221%20173%20224%20175%20234%20178%20259%20189%20269%20194%20276%20200%20280%20204%20283%20208%20287%20214%20289%20220%20290%20224%20290%20233%20290%20238%20289%20247%20287%20255%20284%20263%20281%20269%20277%20274%20272%20280%20267%20285%20255%20294%20249%20298%20242%20301%20234%20304%20226%20306%20214%20307%20196%20307%20184%20305%20180%20304%20172%20301%20166%20297%20161%20293%20156%20287%20154%20284%20151%20278%20149%20273%20148%20269%20146%20261%20146%20247%20147%20242%20148%20242%20191%20242%20192%20243%20193%20244%20193%20255%20194%20259%20196%20262%20199%20265%20202%20267%20205%20268%20211%20268%20216%20268%20219%20267%20225%20265%20230%20261%20235%20256%20236%20252%20237%20248%20237%20242%20236%20237%20233%20232%20228%20228%20225%20226%20215%20222%20191%20212%20181%20206%20174%20201%20169%20197%20166%20193%20163%20186%20161%20180%20160%20176%20159%20168%20160%20162%20161%20154%20163%20146%20166%20138%20169%20132%20172%20126%20177%20121%20183%20115%20194%20106%20200%20103%20207%20100%20215%2097%20223%2095Z%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
             mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20307%20311'%3E%3Cpath%20d%3D%22M4%204%2050%204%2050%20211%209%20211Z%22%2F%3E%3Cpath%20d%3D%22M91%204%20127%204%2054%20211%2021%20211Z%22%2F%3E%3Cpath%20d%3D%22M98%204%20134%204%20134%20211%20102%20211Z%22%2F%3E%3Cpath%20d%3D%22M176%204%20222%204%20146%20211%20106%20211Z%22%2F%3E%3Cpath%20d%3D%22M236%2093%20254%2093%20266%2095%20270%2096%20277%2099%20283%20103%20288%20107%20294%20114%20296%20117%20299%20122%20301%20128%20302%20132%20303%20139%20303%20154%20302%20158%20301%20159%20258%20159%20257%20158%20257%20157%20257%20146%20255%20141%20254%20139%20251%20136%20248%20134%20244%20133%20238%20132%20233%20132%20230%20133%20225%20135%20219%20139%20215%20145%20213%20149%20212%20153%20212%20158%20213%20163%20217%20169%20221%20173%20224%20175%20234%20178%20259%20189%20269%20194%20276%20200%20280%20204%20283%20208%20287%20214%20289%20220%20290%20224%20290%20233%20290%20238%20289%20247%20287%20255%20284%20263%20281%20269%20277%20274%20272%20280%20267%20285%20255%20294%20249%20298%20242%20301%20234%20304%20226%20306%20214%20307%20196%20307%20184%20305%20180%20304%20172%20301%20166%20297%20161%20293%20156%20287%20154%20284%20151%20278%20149%20273%20148%20269%20146%20261%20146%20247%20147%20242%20148%20242%20191%20242%20192%20243%20193%20244%20193%20255%20194%20259%20196%20262%20199%20265%20202%20267%20205%20268%20211%20268%20216%20268%20219%20267%20225%20265%20230%20261%20235%20256%20236%20252%20237%20248%20237%20242%20236%20237%20233%20232%20228%20228%20225%20226%20215%20222%20191%20212%20181%20206%20174%20201%20169%20197%20166%20193%20163%20186%20161%20180%20160%20176%20159%20168%20160%20162%20161%20154%20163%20146%20166%20138%20169%20132%20172%20126%20177%20121%20183%20115%20194%20106%20200%20103%20207%20100%20215%2097%20223%2095Z%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
+    position: relative;
+    overflow: hidden;
+    background: var(--busy-dim);
+}
+
+/* 로고 모양 안에서 빛줄기 판만 옮긴다(transform 이라 main thread 가 막혀도 계속 돈다). */
+.u4aWsBusyCard .u4aWsSpinner i s {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 300%;
+    height: 100%;
     background: linear-gradient(115deg, var(--busy-dim) 0 40%, var(--busy-sweep-hi) 48%, var(--busy-accent-2) 53%, var(--busy-dim) 62% 100%);
-    background-size: 300% 100%;
+    will-change: transform;
     animation: u4aWsBusySweep 1.9s cubic-bezier(0.6, 0, 0.4, 1) infinite;
 }
 
@@ -192,6 +266,7 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
     background: var(--busy-hi);
     clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
     transform: scale(0);
+    will-change: transform;
     animation: u4aWsBusyStar 1.9s ease-out infinite;
 }
 
@@ -216,9 +291,10 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
     animation-delay: 1.12s;
 }
 
+/* 종전 background-position 100% → 0 과 같은 움직임을 transform 으로 낸다. */
 @keyframes u4aWsBusySweep {
-    0%   { background-position: 100% 0; }
-    100% { background-position: 0 0; }
+    0%   { transform: translateX(-66.667%); }
+    100% { transform: translateX(0); }
 }
 
 @keyframes u4aWsBusyStar {
@@ -226,6 +302,374 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
     7%        { transform: scale(1.15) rotate(45deg); }
     20%, 100% { transform: scale(0) rotate(90deg); }
 }
+
+/* ======================================================================
+   가운데 그림 = 시안 「18안 · 개발 툴킷」 04번 API Call  (장군님 지시 2026-10-30)
+   ----------------------------------------------------------------------
+   WS 앱(왼쪽 로고)에서 서버(오른쪽 칸 3개)로 GET 이 날아가고, 서버가 깜빡여 처리한 뒤
+   JSON 이 돌아오면 "200 OK" 가 뜬다 — 서버와 통신하는 중이라는 뜻.
+   짝 마크업 = u4a-busy.js 의 _create():
+     <div class="u4aWsBusyApi"><svg class="logo">…</svg><b class="wire"></b>
+       <span class="pk req"><em>GET</em></span><span class="pk res"><em>JSON</em></span>
+       <div class="srv"><i></i><i></i><i></i></div><span class="ok">200 OK</span></div>
+   색은 이 파일 위쪽의 --busy-* 토큰을 그대로 쓴다(테마가 바뀌면 같이 바뀐다).
+   ====================================================================== */
+
+.u4aWsBusyApi {
+    position: relative;
+    width: 124px;
+    height: 60px;
+    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+
+/* 화면 쪽 전역 스타일이 이 그림을 찌그러뜨리지 않게 막는다(기존 로고 블록과 같은 방어). */
+.u4aWsBusyApi,
+.u4aWsBusyApi * {
+    box-sizing: border-box;
+}
+
+/* 앱(왼쪽) — 응답이 도착하면(78%) 빛난다 */
+.u4aWsBusyApi .logo {
+    position: absolute;
+    left: 0;
+    top: 18px;
+    width: 26px;
+    height: 27px;
+    fill: var(--busy-accent);
+    animation: u4aWsBusyApiApp 3.2s infinite;
+}
+
+@keyframes u4aWsBusyApiApp {
+    0%, 76%, 100% { filter: drop-shadow(0 0 3px var(--busy-glow)); }
+    82% { filter: drop-shadow(0 0 10px var(--busy-glow)); }
+}
+
+/* 통신 선 */
+.u4aWsBusyApi .wire {
+    position: absolute;
+    left: 32px;
+    right: 30px;
+    top: 31px;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--busy-accent) 45%, transparent) 0 3px, transparent 3px 6px);
+}
+
+/* 요청 · 응답 조각 (위에 작은 글씨) */
+.u4aWsBusyApi .pk {
+    position: absolute;
+    left: 32px;
+    top: 28px;
+    width: 8px;
+    height: 7px;
+    border-radius: 2px;
+    opacity: 0;
+}
+
+.u4aWsBusyApi .pk em {
+    position: absolute;
+    left: 50%;
+    bottom: 9px;
+    font-size: 7px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    transform: translateX(-50%);
+}
+
+.u4aWsBusyApi .req {
+    background: var(--busy-accent);
+    box-shadow: 0 0 6px var(--busy-glow);
+    animation: u4aWsBusyApiReq 3.2s infinite;
+}
+
+.u4aWsBusyApi .req em { color: var(--busy-accent); }
+
+.u4aWsBusyApi .res {
+    background: var(--busy-accent-2);
+    box-shadow: 0 0 6px var(--busy-accent-2);
+    animation: u4aWsBusyApiRes 3.2s infinite;
+}
+
+.u4aWsBusyApi .res em { color: var(--busy-accent-2); }
+
+@keyframes u4aWsBusyApiReq {
+    0%, 4% { transform: translateX(0); opacity: 0; animation-timing-function: cubic-bezier(0.5, 0, 0.5, 1); }
+    8% { opacity: 1; }
+    32% { transform: translateX(54px); opacity: 1; }
+    36%, 100% { transform: translateX(54px); opacity: 0; }
+}
+
+@keyframes u4aWsBusyApiRes {
+    0%, 46% { transform: translateX(54px); opacity: 0; animation-timing-function: cubic-bezier(0.5, 0, 0.5, 1); }
+    50% { opacity: 1; }
+    74% { transform: translateX(0); opacity: 1; }
+    78%, 100% { transform: translateX(0); opacity: 0; }
+}
+
+/* 서버 — 칸 3개가 처리하는 동안(36~46%) 차례로 깜빡인다 */
+.u4aWsBusyApi .srv {
+    position: absolute;
+    right: 0;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 24px;
+}
+
+.u4aWsBusyApi .srv i {
+    height: 7px;
+    border-radius: 2px;
+    border: 1px solid color-mix(in srgb, var(--busy-accent) 55%, transparent);
+    background: color-mix(in srgb, var(--busy-accent) 12%, transparent);
+    animation: u4aWsBusyApiSrv 3.2s infinite;
+}
+
+.u4aWsBusyApi .srv i:nth-child(2) { animation-delay: 0.1s; }
+.u4aWsBusyApi .srv i:nth-child(3) { animation-delay: 0.2s; }
+
+@keyframes u4aWsBusyApiSrv {
+    0%, 34%, 50%, 100% { background: color-mix(in srgb, var(--busy-accent) 12%, transparent); }
+    40% { background: var(--busy-accent-2); }
+}
+
+/* 응답 도착 -> 200 OK */
+.u4aWsBusyApi .ok {
+    position: absolute;
+    left: 50%;
+    top: 2px;
+    padding: 1px 6px;
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--busy-accent-2);
+    border: 1px solid color-mix(in srgb, var(--busy-accent-2) 60%, transparent);
+    border-radius: 99px;
+    transform: translateX(-50%);
+    opacity: 0;
+    animation: u4aWsBusyApiOk 3.2s infinite;
+}
+
+@keyframes u4aWsBusyApiOk {
+    0%, 76% { opacity: 0; transform: translate(-50%, 4px); }
+    82%, 92% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, 0); }
+}
+
+
+/* ======================================================================
+   setAIBusy 전용 그림 = 시안 「40안 · 조합」 01번 Beam + Data Flow  (장군님 지시 2026-10-30)
+   ----------------------------------------------------------------------
+   30안 05 Beam Link + 37안 04 AI Data Flow.
+   「AI」 글씨에서 빛줄기가 뻗어 WS 로고에 닿으면 로고 뒤가 환해지고(1.8초 박자),
+   사방에서 빛 입자 12개가 로고로 빨려 든다(2.4초).
+   AI 모드에서도 카드 테두리 빛은 켜 둔다(장군님 지시 2026-10-30 — 아래 u4aWsBusyEdge 규칙).
+
+   ★이 덩어리는 「멋있는 Busy Indicator 만들기」 세션(Claude)이 시안 스튜디오의
+     실제 CSS(busy_indicators.html #40-flow)를 값 하나 바꾸지 않고 WS4.0 이름으로만 옮긴 것이다.
+     (사용자 2026-10-30 「서브 개발자가 똑같이 못만들던데?」 → 시안과 같게 나오도록 통째로 넘김)
+     숫자 · 색 · 박자를 고치면 시안과 달라진다 — 고칠 일이 있으면 시안부터 고친다.
+     시안 → WS4.0 이름 바꿈:
+       .ub-card:has(.ub-n1)  → .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyCard
+       .ub-n1 .hero          → .u4aWsBusyAi            (가운데 한 줄)
+       .ub-light (화이트)     → 기본(선택자 없음) / 다크 = html[data-sl-theme="dark"]
+       .ub-msg               → .u4aWsBusyTitle · .u4aWsBusyText
+       @keyframes ub-n1-*    → u4aWsBusyAi*
+   짝 마크업 = u4a-busy.js 의 _create():
+     <div class="u4aWsBusyAi"><span class="ai">AI</span>
+       <b class="ln"><i class="flare"></i><i class="ray"></i></b>
+       <span class="lg"><i class="core"></i><i class="p" style="--x:…;--y:…;animation-delay:…"></i>×12
+         <i class="glow"></i><svg class="logo">…</svg></span></div>
+   움직이는 속성은 transform · opacity 만(무거운 작업 중에도 안 멈춤).
+   ====================================================================== */
+
+/* ---------- 그림 바꿔 끼우기 — AI 모드면 API Call 을 숨기고 이쪽을 보인다 ---------- */
+.u4aWsBusyAi {
+    display: none;
+}
+
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyApi {
+    display: none;
+}
+
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAi {
+    display: flex;
+}
+
+/* ---------- AI 모드 카드 — 테두리 빛 끄고, 카드 색은 시안 값 ---------- */
+/* ★[2026-10-30 장군님 지시] 시안 CSS 에 있던 `min-width: 220px` 를 뺐다.
+   「ai busy가 너무 작어」 → AI 모드 카드는 위 「AI 모드만 크게」 덩어리의 min-width 420px 를 쓴다.
+   그 줄이 이 자리(뒤쪽)에 남아 있으면 같은 특이도라 **뒤가 이겨서** 420px 가 220px 로 덮였다. */
+
+/* 기본 = 밝은 테마 (시안의 화이트) */
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyCard {
+    background: rgba(255, 255, 255, 0.94);
+    border-color: color-mix(in srgb, var(--busy-accent) 18%, transparent);
+    box-shadow: 0 18px 44px rgba(40, 20, 80, 0.16), 0 0 30px color-mix(in srgb, var(--busy-accent) 10%, transparent);
+}
+
+/* 어두운 테마 (시안의 다크) */
+html[data-sl-theme="dark"] .u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyCard {
+    background: rgba(13, 15, 22, 0.92);
+    border-color: color-mix(in srgb, var(--busy-accent) 22%, transparent);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 40px color-mix(in srgb, var(--busy-accent) 12%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ★[2026-10-30 장군님 지시] AI 모드에서도 카드 테두리 빛을 **켠다.**
+   종전 = display: none (시안에서 넘어온 규칙 — 「테두리 효과대신 AI 전용으로」로 꺼 두었다).
+   장군님이 「공통 busy의 테두리 효과는?」으로 물으시고 「AI 처리중일 때도 켠다」를 고르셨다.
+   그래서 이 규칙을 지우지 않고 display: block 으로 **되살려** 둔다 — 다시 끄려면 none 으로 바꾼다. */
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyEdge {
+    display: block;
+}
+
+/* 제목 · 문구는 입자 · 빛보다 위로 */
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyTitle,
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyText {
+    position: relative;
+    z-index: 1;
+}
+
+/* ---------- 가운데 한 줄: 「AI」 ─ 빛줄기 ─ 로고 ---------- */
+.u4aWsBusyAi {
+    position: relative;
+    z-index: 1;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 화면 쪽 전역 스타일(svg 위치 · 크기, box-sizing)이 그림을 바꾸지 않게 시안 기준으로 고정 */
+.u4aWsBusyAi,
+.u4aWsBusyAi * {
+    box-sizing: content-box;
+}
+
+.u4aWsBusyAi svg {
+    flex-shrink: 0;
+    max-width: none;
+}
+
+.u4aWsBusyAi .logo {
+    position: relative;
+    display: block;
+    width: 36px;
+    height: 36px;
+    fill: var(--busy-accent);
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--busy-accent) 60%, transparent));
+}
+
+.u4aWsBusyAi .ai {
+    position: relative;
+    z-index: 1;
+    font: 900 28px/1 "Pretendard", system-ui, sans-serif;
+    letter-spacing: 0.02em;
+    background: linear-gradient(120deg, var(--busy-accent), var(--busy-accent-2));
+    -webkit-background-clip: text;
+            background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--busy-accent) 45%, transparent));
+}
+
+/* 연결선 (고정) + 출발 빛 + 뻗는 빛줄기 */
+.u4aWsBusyAi .ln {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 58px;
+    height: 2px;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--busy-accent) 22%, transparent);
+}
+
+.u4aWsBusyAi .ray {
+    position: absolute;
+    left: 0;
+    top: -1px;
+    width: 22px;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--busy-accent-2), var(--busy-hi, #fff));
+    box-shadow: 0 0 8px var(--busy-accent-2);
+    opacity: 0;
+    will-change: transform;
+    animation: u4aWsBusyAiRay 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes u4aWsBusyAiRay {
+    0% { transform: translateX(-10px); opacity: 0; }
+    15% { opacity: 1; }
+    60% { transform: translateX(40px); opacity: 1; }
+    70%, 100% { transform: translateX(40px); opacity: 0; }
+}
+
+.u4aWsBusyAi .flare {
+    position: absolute;
+    left: -6px;
+    top: -6px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--busy-accent-2) 80%, transparent), transparent 70%);
+    animation: u4aWsBusyAiFlare 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes u4aWsBusyAiFlare {
+    0%, 100% { opacity: 0.2; transform: scale(0.6); }
+    12% { opacity: 1; transform: scale(1); }
+    40% { opacity: 0.2; transform: scale(0.6); }
+}
+
+/* 로고 칸 — 입자 · 빛의 기준점(가운데) */
+.u4aWsBusyAi .lg {
+    position: relative;
+    display: grid;
+    place-items: center;
+}
+
+/* 닿으면 로고 뒤가 환해짐 */
+.u4aWsBusyAi .glow {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--busy-accent) 60%, transparent), transparent 68%);
+    opacity: 0;
+    animation: u4aWsBusyAiGlow 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes u4aWsBusyAiGlow {
+    0%, 55% { opacity: 0; transform: scale(0.7); }
+    68% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.1); }
+}
+
+/* 로고 둘레 은은한 빛 (고정, 37안 04) */
+.u4aWsBusyAi .core {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, color-mix(in srgb, var(--busy-accent) 26%, transparent), transparent 62%);
+}
+
+/* 입자 — 시작 자리(--x, --y)에서 로고 가운데로, 2.4s 흐름 */
+.u4aWsBusyAi .p {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--busy-accent-2);
+    box-shadow: 0 0 6px var(--busy-accent-2);
+    opacity: 0;
+    will-change: transform, opacity;
+    animation: u4aWsBusyAiP 2.4s cubic-bezier(0.55, 0, 0.8, 0.4) infinite;
+}
+
+@keyframes u4aWsBusyAiP {
+    0% { transform: translate(var(--x), var(--y)) scale(1); opacity: 0; }
+    20% { opacity: 1; }
+    85% { opacity: 0.9; }
+    100% { transform: translate(0, 0) scale(0.3); opacity: 0; }
+}
+
 
 /* 제목 (굵게) / 메시지 (보조색) — 비어있으면 숨김(로고만).
    ★id 는 그대로 둔다 — 카드 제목·문구를 넣는 곳(ws_html5_shell.js)과
@@ -243,6 +687,10 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
     color: var(--text-muted);
     text-align: center;
     line-height: 1.4;
+
+    /* ★[2026-10-30] setAIBusy 의 desc 가 "\n" 으로 줄을 나눈다 — 그대로 개행으로 그린다.
+       pre-line 은 연속 공백을 하나로 합치므로 "\n" 이 없는 기존 글은 보이는 것이 같다. */
+    white-space: pre-line;
 }
 
 .u4aWsBusyTitle:empty,
@@ -250,8 +698,8 @@ html[data-sl-theme="dark"] .u4aWsBusyCard {
 
 /* 움직임 줄이기 설정 — 시안 그대로 느리게만 한다(멈추지 않는다). */
 @media (prefers-reduced-motion: reduce) {
-    .u4aWsBusyCard::before,
-    .u4aWsBusyCard .u4aWsSpinner i,
+    .u4aWsBusyEdge i,
+    .u4aWsBusyCard .u4aWsSpinner i s,
     .u4aWsBusyCard .u4aWsSpinner b {
         animation-duration: 6s;
     }

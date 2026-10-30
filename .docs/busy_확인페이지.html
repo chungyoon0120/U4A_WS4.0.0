@@ -1,0 +1,1523 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>busy check</title>
+<!-- www/ws30/ws10_20/theme/u4a-busy.css + u4a-busy.js 를 그대로 인라인한 확인용 페이지. -->
+<!-- 고칠 것은 그 두 파일을 고치고 이 페이지를 다시 만든다. 여기서 직접 고치지 않는다. -->
+<style>
+/************************************************************************
+ * U4A Workspace — 테마 토큰 (doc 12 §4.1 / §4.2)
+ * ----------------------------------------------------------------------
+ * Layer 1: Primitive  — sap_horizon 중립 팔레트 + 강조색 램프
+ * Layer 2: Semantic   — 컴포넌트는 이 토큰만 소비 (:root = white 기본)
+ * Layer 3: 테마        — themes/*.css 에서 색 토큰만 override
+ *
+ * ⚠ 중립색 값은 doc 12 §4.1 harvest 기준 초기값(제안)이다.
+ *   실제 sap_horizon / sap_horizon_dark 파라미터 덤프로 추후 교체 가능.
+ *   shape(radius/elevation/font)는 horizon 공통 고정.
+ ************************************************************************/
+
+/* ── Layer 1: Primitive ─────────────────────────────────────────── */
+:root {
+    /* horizon neutrals (light) */
+    --c-white: #ffffff;
+    --c-bg-light: #f5f6f7;
+    --c-text: #1d2d3e;
+    --c-text-muted: #556b82;
+    --c-line: #d9d9d9;
+
+    /* horizon neutrals (dark) */
+    --c-bg-dark: #12171c;
+    --c-surface-dark: #1c2228;
+    --c-text-dark: #eaecee;
+    --c-line-dark: #2c3540;
+
+    /* accent ramps */
+    --c-blue: #0070f2;
+    --c-blue-strong: #0064d9;
+    --c-purple: #7858ff;
+    --c-purple-strong: #5d36ff;
+    --c-red: #e8000d;
+    --c-red-strong: #c60017;
+    --c-green: #188918;
+    --c-green-strong: #0e6b0e;
+
+    /* horizon 상태색 (테마 공통) */
+    --c-success: #107e3e;
+    --c-success-strong: #0d6b35;   /* 성공 초록의 진한 짝(파랑 --c-blue/--c-blue-strong 과 대칭) — Accept 버튼 마우스 올림용. */
+    --c-warning: #e76500;
+    --c-error: #e90b0b;
+}
+
+/* ── Layer 2: Semantic (:root = white 기본) ─────────────────────── */
+:root {
+    /* 네이티브 컨트롤(체크박스/라디오/스크롤바 등)을 테마 모드에 맞춰 렌더 */
+    color-scheme: light;
+
+    /* color */
+    --app-bg: var(--c-bg-light);
+    --surface: var(--c-white);
+    --surface-raised: var(--c-white);
+    --text: var(--c-text);
+    --text-muted: var(--c-text-muted);
+    --line: var(--c-line);
+    --divider: var(--line);
+    --accent: var(--c-blue);
+    --accent-strong: var(--c-blue-strong);
+    --success: var(--c-success);
+    --warning: var(--c-warning);
+    --error: var(--c-error);
+
+    /* interaction states (체크리스트 B) */
+    --hover-bg: rgba(85, 107, 130, .08);
+    --active-bg: rgba(85, 107, 130, .16);
+    --selected-bg: rgba(0, 112, 242, .18);
+    --selected-text: var(--accent);
+    --focus-ring: var(--accent);
+    --disabled-bg: #f5f6f7;
+    --disabled-text: #a9b4be;
+    --disabled-opacity: .4;
+    --switch-off: #c4ccd4;
+
+    /* value states — UI5 ValueState (체크리스트 B/F) */
+    --state-error: var(--c-error);
+    --state-error-bg: #ffeaea;
+    --state-warning: var(--c-warning);
+    --state-warning-bg: #fff8e5;
+    --state-success: var(--c-success);
+    --state-success-strong: var(--c-success-strong);   /* Accept(성공) 채운 버튼 마우스 올림 — 파랑 --accent-strong 과 대칭. */
+    --state-success-bg: #eafaf0;
+    --state-info: var(--accent);
+    --state-info-bg: #e8f1ff;
+
+    /* scrollbar (체크리스트 A) */
+    --scrollbar-thumb: #c4ccd4;
+    --scrollbar-thumb-hover: #a9b4be;
+    --scrollbar-track: transparent;
+    --scrollbar-size: 0.75rem;
+
+    /* overlay / popup (체크리스트 C) */
+    --overlay-scrim: rgba(0, 0, 0, .45);
+    /* busy 베일 — 검정 스크림 대신 밝은 톤(깜빡임/눈부심 완화) */
+    --busy-scrim: rgba(245, 246, 247, .6);
+    --popover-bg: var(--c-white);
+    --popover-shadow: 0 0.5rem 2rem rgba(34, 54, 84, .20);
+
+    /* form / text 표면 (체크리스트 A/F) */
+    --placeholder: #8b97a3;
+    --selection-bg: rgba(0, 112, 242, .20);
+    --caret: var(--accent);
+
+    /* link / icon (체크리스트 G) */
+    --link: var(--accent);
+    --link-hover: var(--accent-strong);
+    --icon: currentColor;
+    /* 아이콘색 = 본문색(--text). 회색(muted)은 disable 처럼 보인다는 피드백 →
+       활성 아이콘은 본문과 같은 또렷한 색으로. (실제 disabled 는 별도 --disabled-text 가 덮음) */
+    --icon-muted: var(--text);
+    /* 트리 폴더 아이콘(앰버) — 서버리스트 기준을 공통 표준으로 승격(2026-07-02). 테마별 override 가능. */
+    --folder-icon: #e6a93a;
+
+    /* titlebar / desktop (체크리스트 H) */
+    --titlebar-bg: var(--surface);
+    /* 비활성(blur) 타이틀바 위에 덮는 고정 베일 — 타이틀바에 opacity 를 주면 반투명이 되어
+       "뒤 배경"이 비치는데 그 배경이 창마다 달라(Main=본문 --app-bg / Login 호스트 프레임 등)
+       같은 비활성인데도 헤더색이 달라진다. 불투명 배경 위에 이 베일을 덮어 어느 창에서나 동일한
+       흐림으로 통일한다. 중립 회색(저채도화) — 라이트/다크 공통. */
+    --titlebar-blur-veil: rgba(130, 130, 138, 0.34);
+    --close-hover-bg: var(--c-red);
+    --close-hover-text: var(--c-white);
+
+    /* shape — horizon 공통(테마 무관 고정) */
+    --radius: 0.5rem;
+    --radius-sm: 0.25rem;
+    --elevation: 0 0.125rem 0.5rem rgba(34, 54, 84, .10);
+    --focus-ring-width: 0.125rem;
+    --focus-ring-offset: 0.0625rem;
+    --font: "72", "72full", Arial, Helvetica, sans-serif;
+    --motion: .15s;
+}
+
+/* prefers-reduced-motion 시 트랜지션 끔 (체크리스트 I) */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --motion: 0s;
+    }
+}
+
+html, body { height: 100%; margin: 0; background: var(--surface); color: var(--text); font: 13px system-ui; }
+.bar { position: fixed; left: 12px; top: 12px; z-index: 2; }
+.hint { position: fixed; left: 12px; top: 48px; z-index: 2; color: var(--text-muted); line-height: 1.8; }
+.hint b { color: var(--text); }
+button { padding: 6px 10px; margin-right: 6px; }
+/************************************************************************
+ * U4A Workspace — 공통 busy CSS (u4a-busy.js 의 짝)
+ * ----------------------------------------------------------------------
+ * [2026-09-15, 장군님 지시] busy 도 하나의 UI — 공통 화면 리소스(theme/) 전용 파일로 옮기고,
+ *   화면 시작 때 가장 먼저 로드한다(ws10_20/index.html <head> 맨 앞).
+ *   옮겨온 곳 = ws10_20/css/frame.css (규칙·순서·값을 그대로 옮겼다 — 모양 변화 없음).
+ *
+ * ★ 다른 화면에 영향 주지 않는 규칙 (반드시 지킬 것)
+ *   · 선택자는 전부 busy 전용 이름(u4aWsBusy* · u4aWsSpinner)으로만 시작한다.
+ *     `*` · html · body · 맨 dialog · :root 규칙을 넣지 않는다. 색 변수는 쓰기만 하고 정의하지 않는다.
+ *   · 애니메이션 이름도 busy 전용(u4aWs*). shell.css 의 .u4a-busy(서버리스트·별창용)와 이름이 다르다.
+ *   · 이 파일을 맨 앞에 로드해도 되는 이유: var(--*) 는 CSS 파일 순서와 상관없이 그릴 때 값을 찾고,
+ *     뒤에 로드되는 CSS 중 busy 이름을 쓰는 것이 없다(2026-09-15 확인).
+ ************************************************************************/
+
+/* BusyIndicator */
+#u4aWsBusyIndicator {
+    right: 0;
+}
+
+.u4aWsBusyIndicator {
+    z-index: 2000000;
+}
+
+/* ===== Busy Indicator (구 sap.m.BusyDialog 대체 — 스크림 + 테마 카드) =====
+   setBusy/setDomBusy 가 display 토글. setBusy("X",{TITLE,DESC}) → 카드에 메시지 표시. */
+.u4aWsBusyIndicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;           /* setDomBusy 가 'flex' 로 토글 */
+    align-items: center;
+    justify-content: center;
+    /* 스크림(어두운 배경) 제거 — 빠른 busy on/off 시 배경 깜빡임 방지.
+       투명이어도 전체를 덮는 오버레이라 busy 동안 클릭은 그대로 차단됨. */
+    background: transparent;
+    z-index: 9999;
+}
+
+/* busy 요소가 <dialog> 일 때 — U4ABusy.show() 가 showModal() 로 띄워
+   모달 팝업 위(top-layer)에도 보이게 한다. 전체화면 투명 + 카드 중앙 + 무스크림 backdrop. */
+dialog.u4aWsBusyIndicator {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: hidden;
+}
+dialog.u4aWsBusyIndicator:not([open]) { display: none; }
+dialog.u4aWsBusyIndicator[open] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+dialog.u4aWsBusyIndicator::backdrop { background: transparent; }
+
+/************************************************************************
+ * 중앙 카드 = Sparkle (장군님 결정 2026-10-29)
+ * ----------------------------------------------------------------------
+ * 「멋있는 로그인 페이지」 세션의 시안 6안 05 Sparkle 을 그대로 옮겼다.
+ *   지침서 = D:/workspace/yoon-history-test/test2/handoff/ws4-busy-sparkle/GUIDE.md
+ *   은은하게 켜진 WS 로고 위로 금속 광택 빛줄기가 비스듬히 지나가고,
+ *   빛이 지나는 자리마다 작은 별빛이 튄다. 카드 테두리는 빛이 한 바퀴 돈다.
+ *
+ * ★테마 — 켜고 끄는 로직은 한 줄도 바꾸지 않았다. 모양만 바꿨다.
+ *   · 카드 배경·테두리·그림자·글자색은 **종전처럼 테마 의미 토큰**을 쓴다
+ *     → 테마 11종 전부 저절로 맞는다(테마별 하드코딩 없음).
+ *   · 다크/화이트는 `html[data-sl-theme="dark"]` 하나로 가른다(theme-api.js 의 _applySkin 이 붙인다).
+ *     기본(선택자 없음) = 밝은 테마 — 테마 11종 중 10종이 밝은 테마이고 기본값도 horizon_white 다.
+ *   · 테마를 바꾸면 그 속성이 바로 바뀌므로 **busy 가 떠 있는 중에도 바로 따라 바뀐다**(JS 없음).
+ ************************************************************************/
+
+.u4aWsBusyCard {
+    /* 로고 보라 — 시안이 정한 값(WS 로고 색). 한곳에서만 쓰므로 여기 두 줄이 유일한 출처다. */
+    --busy-accent: #c705f7;
+    --busy-accent-2: #ff7af5;
+
+    /* 밝은 테마 기준값 — 흰 바탕에서 사라지는 흰 빛은 보조 색으로, 번지는 빛은 옅게.
+       ★--busy-dim 은 시안의 72% 가 아니라 **진하게**(100%) 쓴다 — 흰 카드 위에서 72% 로 깔면
+         로고가 연분홍으로 바래 「또렷이 보인다」는 기준(지침서 3-2)을 못 맞춘다(2026-10-29 실측). */
+    --busy-hi: var(--busy-accent-2);
+    --busy-glow: color-mix(in srgb, var(--busy-accent) 25%, transparent);
+    --busy-dim: var(--busy-accent);
+    --busy-sweep-hi: #ffffff;
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    min-width: 300px;
+    max-width: 440px;
+    padding: 28px 34px 24px;
+    overflow: hidden;
+    background: var(--popover-bg, var(--surface-raised, var(--surface)));
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--popover-shadow, var(--elevation, 0 14px 44px rgba(0, 0, 0, 0.45)));
+    animation: u4aWsBusyCardIn 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* 어두운 테마 — 별빛은 흰색으로, 번지는 빛은 진하게, 로고 바탕은 옅게. */
+html[data-sl-theme="dark"] .u4aWsBusyCard {
+    --busy-hi: #ffffff;
+    --busy-glow: color-mix(in srgb, var(--busy-accent) 60%, transparent);
+    --busy-dim: color-mix(in srgb, var(--busy-accent) 45%, transparent);
+}
+
+@keyframes u4aWsBusyCardIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.94); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* 카드 테두리 전체를 따라 한 바퀴씩 도는 빛.
+   ★[2026-10-30] 각도 값(@property) 애니메이션을 **transform rotate** 로 바꿨다.
+     까닭: 각도 값 애니메이션은 매 프레임 main thread 가 다시 그린다 — 무거운 동기 작업이
+     main thread 를 붙잡으면 빛이 멈춘다(장군님 「busy 키는건 좋은데 왜 애니메이션이 무거운
+     프로그램 돌때 끈키냐」). transform 은 compositor 에서 돌아 멈추지 않는다.
+     실측(헤드리스 크롬, 3초 붙잡는 동안 첫·끝 프레임 차이) = 각도 7px → transform 1,413px. */
+.u4aWsBusyEdge {
+    position: absolute;
+    inset: 0;
+
+    /* 두께는 정수 px 로 — 1.5px 이면 카드가 반 픽셀 자리에 놓일 때 좌우만 1px 로 얇아 보인다
+       (장군님 2026-10-29 「상단 하단은 좋은데 좌측 우측은 얇아 보여」 → 시안에서 3px 확인 후 「딱좋다」). */
+    padding: 3px;
+    overflow: hidden;
+    border-radius: inherit;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* 카드보다 훨씬 큰 원뿔 판 — 카드 가운데를 축으로 돌면 테두리 위로 빛이 한 바퀴 돈다.
+   ★카드가 지금보다 커지면(대각선이 640px 넘으면) 이 판도 같이 키워야 한다.
+     지금 카드는 max-width: 440px 이라 넉넉하다. */
+.u4aWsBusyEdge i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 640px;
+    height: 640px;
+    margin: -320px 0 0 -320px;
+    background: conic-gradient(transparent 0 62%, var(--busy-accent) 80%, var(--busy-accent-2) 93%, transparent 100%);
+    will-change: transform;
+    animation: u4aWsBusyEdge 3s linear infinite;
+}
+
+@keyframes u4aWsBusyEdge {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== 로고 + 별빛 =====
+   u4a-busy.js 가 만드는 마크업 = <div class="u4aWsSpinner"><i><s></s></i><b></b><b></b><b></b></div> */
+.u4aWsBusyCard .u4aWsSpinner {
+    position: relative;
+    box-sizing: border-box;
+    width: 58px;
+    height: 59px;
+    border: 0;
+    filter: drop-shadow(0 0 6px var(--busy-glow));
+}
+
+/* 화면 쪽 전역 스타일이 로고·별을 찌그러뜨리지 않게 막는다(지침서 5절 함정). */
+.u4aWsBusyCard .u4aWsSpinner i,
+.u4aWsBusyCard .u4aWsSpinner s,
+.u4aWsBusyCard .u4aWsSpinner b {
+    box-sizing: border-box;
+    font: inherit;
+    line-height: 0;
+    max-width: none;
+    text-decoration: none;
+}
+
+/* WS 로고(CSS mask) 위로 금속 광택 빛줄기가 비스듬히 지나간다.
+   ★[2026-10-30] 로고 모양(mask)은 고정하고 **바탕색만** 깐다 — 광택은 안쪽 <s> 판이 맡는다.
+     종전 background-position 애니메이션은 main thread 가 그려 무거운 작업 중 멈췄다. */
+.u4aWsBusyCard .u4aWsSpinner i {
+    display: block;
+    width: 100%;
+    height: 100%;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20307%20311'%3E%3Cpath%20d%3D%22M4%204%2050%204%2050%20211%209%20211Z%22%2F%3E%3Cpath%20d%3D%22M91%204%20127%204%2054%20211%2021%20211Z%22%2F%3E%3Cpath%20d%3D%22M98%204%20134%204%20134%20211%20102%20211Z%22%2F%3E%3Cpath%20d%3D%22M176%204%20222%204%20146%20211%20106%20211Z%22%2F%3E%3Cpath%20d%3D%22M236%2093%20254%2093%20266%2095%20270%2096%20277%2099%20283%20103%20288%20107%20294%20114%20296%20117%20299%20122%20301%20128%20302%20132%20303%20139%20303%20154%20302%20158%20301%20159%20258%20159%20257%20158%20257%20157%20257%20146%20255%20141%20254%20139%20251%20136%20248%20134%20244%20133%20238%20132%20233%20132%20230%20133%20225%20135%20219%20139%20215%20145%20213%20149%20212%20153%20212%20158%20213%20163%20217%20169%20221%20173%20224%20175%20234%20178%20259%20189%20269%20194%20276%20200%20280%20204%20283%20208%20287%20214%20289%20220%20290%20224%20290%20233%20290%20238%20289%20247%20287%20255%20284%20263%20281%20269%20277%20274%20272%20280%20267%20285%20255%20294%20249%20298%20242%20301%20234%20304%20226%20306%20214%20307%20196%20307%20184%20305%20180%20304%20172%20301%20166%20297%20161%20293%20156%20287%20154%20284%20151%20278%20149%20273%20148%20269%20146%20261%20146%20247%20147%20242%20148%20242%20191%20242%20192%20243%20193%20244%20193%20255%20194%20259%20196%20262%20199%20265%20202%20267%20205%20268%20211%20268%20216%20268%20219%20267%20225%20265%20230%20261%20235%20256%20236%20252%20237%20248%20237%20242%20236%20237%20233%20232%20228%20228%20225%20226%20215%20222%20191%20212%20181%20206%20174%20201%20169%20197%20166%20193%20163%20186%20161%20180%20160%20176%20159%20168%20160%20162%20161%20154%20163%20146%20166%20138%20169%20132%20172%20126%20177%20121%20183%20115%20194%20106%20200%20103%20207%20100%20215%2097%20223%2095Z%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20307%20311'%3E%3Cpath%20d%3D%22M4%204%2050%204%2050%20211%209%20211Z%22%2F%3E%3Cpath%20d%3D%22M91%204%20127%204%2054%20211%2021%20211Z%22%2F%3E%3Cpath%20d%3D%22M98%204%20134%204%20134%20211%20102%20211Z%22%2F%3E%3Cpath%20d%3D%22M176%204%20222%204%20146%20211%20106%20211Z%22%2F%3E%3Cpath%20d%3D%22M236%2093%20254%2093%20266%2095%20270%2096%20277%2099%20283%20103%20288%20107%20294%20114%20296%20117%20299%20122%20301%20128%20302%20132%20303%20139%20303%20154%20302%20158%20301%20159%20258%20159%20257%20158%20257%20157%20257%20146%20255%20141%20254%20139%20251%20136%20248%20134%20244%20133%20238%20132%20233%20132%20230%20133%20225%20135%20219%20139%20215%20145%20213%20149%20212%20153%20212%20158%20213%20163%20217%20169%20221%20173%20224%20175%20234%20178%20259%20189%20269%20194%20276%20200%20280%20204%20283%20208%20287%20214%20289%20220%20290%20224%20290%20233%20290%20238%20289%20247%20287%20255%20284%20263%20281%20269%20277%20274%20272%20280%20267%20285%20255%20294%20249%20298%20242%20301%20234%20304%20226%20306%20214%20307%20196%20307%20184%20305%20180%20304%20172%20301%20166%20297%20161%20293%20156%20287%20154%20284%20151%20278%20149%20273%20148%20269%20146%20261%20146%20247%20147%20242%20148%20242%20191%20242%20192%20243%20193%20244%20193%20255%20194%20259%20196%20262%20199%20265%20202%20267%20205%20268%20211%20268%20216%20268%20219%20267%20225%20265%20230%20261%20235%20256%20236%20252%20237%20248%20237%20242%20236%20237%20233%20232%20228%20228%20225%20226%20215%20222%20191%20212%20181%20206%20174%20201%20169%20197%20166%20193%20163%20186%20161%20180%20160%20176%20159%20168%20160%20162%20161%20154%20163%20146%20166%20138%20169%20132%20172%20126%20177%20121%20183%20115%20194%20106%20200%20103%20207%20100%20215%2097%20223%2095Z%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
+    position: relative;
+    overflow: hidden;
+    background: var(--busy-dim);
+}
+
+/* 로고 모양 안에서 빛줄기 판만 옮긴다(transform 이라 main thread 가 막혀도 계속 돈다). */
+.u4aWsBusyCard .u4aWsSpinner i s {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 300%;
+    height: 100%;
+    background: linear-gradient(115deg, var(--busy-dim) 0 40%, var(--busy-sweep-hi) 48%, var(--busy-accent-2) 53%, var(--busy-dim) 62% 100%);
+    will-change: transform;
+    animation: u4aWsBusySweep 1.9s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+
+/* 네 갈래 별 — 빛줄기가 그 자리를 지나는 때에 맞춰 차례로 튄다. */
+.u4aWsBusyCard .u4aWsSpinner b {
+    position: absolute;
+    display: block;
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    background: var(--busy-hi);
+    clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+    transform: scale(0);
+    will-change: transform;
+    animation: u4aWsBusyStar 1.9s ease-out infinite;
+}
+
+.u4aWsBusyCard .u4aWsSpinner b:nth-of-type(1) {
+    left: 16%;
+    top: 14%;
+    animation-delay: 0.62s;
+}
+
+.u4aWsBusyCard .u4aWsSpinner b:nth-of-type(2) {
+    left: 52%;
+    top: 62%;
+    animation-delay: 0.9s;
+}
+
+.u4aWsBusyCard .u4aWsSpinner b:nth-of-type(3) {
+    left: 86%;
+    top: 44%;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    animation-delay: 1.12s;
+}
+
+/* 종전 background-position 100% → 0 과 같은 움직임을 transform 으로 낸다. */
+@keyframes u4aWsBusySweep {
+    0%   { transform: translateX(-66.667%); }
+    100% { transform: translateX(0); }
+}
+
+@keyframes u4aWsBusyStar {
+    0%        { transform: scale(0) rotate(0deg); }
+    7%        { transform: scale(1.15) rotate(45deg); }
+    20%, 100% { transform: scale(0) rotate(90deg); }
+}
+
+/* ======================================================================
+   가운데 그림 = 시안 「18안 · 개발 툴킷」 04번 API Call  (장군님 지시 2026-10-30)
+   ----------------------------------------------------------------------
+   WS 앱(왼쪽 로고)에서 서버(오른쪽 칸 3개)로 GET 이 날아가고, 서버가 깜빡여 처리한 뒤
+   JSON 이 돌아오면 "200 OK" 가 뜬다 — 서버와 통신하는 중이라는 뜻.
+   짝 마크업 = u4a-busy.js 의 _create():
+     <div class="u4aWsBusyApi"><svg class="logo">…</svg><b class="wire"></b>
+       <span class="pk req"><em>GET</em></span><span class="pk res"><em>JSON</em></span>
+       <div class="srv"><i></i><i></i><i></i></div><span class="ok">200 OK</span></div>
+   색은 이 파일 위쪽의 --busy-* 토큰을 그대로 쓴다(테마가 바뀌면 같이 바뀐다).
+   ====================================================================== */
+.u4aWsBusyApi {
+    position: relative;
+    width: 124px;
+    height: 60px;
+    font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+
+/* 화면 쪽 전역 스타일이 이 그림을 찌그러뜨리지 않게 막는다(기존 로고 블록과 같은 방어). */
+.u4aWsBusyApi,
+.u4aWsBusyApi * {
+    box-sizing: border-box;
+}
+
+/* 앱(왼쪽) — 응답이 도착하면(78%) 빛난다 */
+.u4aWsBusyApi .logo {
+    position: absolute;
+    left: 0;
+    top: 18px;
+    width: 26px;
+    height: 27px;
+    fill: var(--busy-accent);
+    animation: u4aWsBusyApiApp 3.2s infinite;
+}
+
+@keyframes u4aWsBusyApiApp {
+    0%, 76%, 100% { filter: drop-shadow(0 0 3px var(--busy-glow)); }
+    82% { filter: drop-shadow(0 0 10px var(--busy-glow)); }
+}
+
+/* 통신 선 */
+.u4aWsBusyApi .wire {
+    position: absolute;
+    left: 32px;
+    right: 30px;
+    top: 31px;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--busy-accent) 45%, transparent) 0 3px, transparent 3px 6px);
+}
+
+/* 요청 · 응답 조각 (위에 작은 글씨) */
+.u4aWsBusyApi .pk {
+    position: absolute;
+    left: 32px;
+    top: 28px;
+    width: 8px;
+    height: 7px;
+    border-radius: 2px;
+    opacity: 0;
+}
+
+.u4aWsBusyApi .pk em {
+    position: absolute;
+    left: 50%;
+    bottom: 9px;
+    font-size: 7px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    transform: translateX(-50%);
+}
+
+.u4aWsBusyApi .req {
+    background: var(--busy-accent);
+    box-shadow: 0 0 6px var(--busy-glow);
+    animation: u4aWsBusyApiReq 3.2s infinite;
+}
+
+.u4aWsBusyApi .req em { color: var(--busy-accent); }
+
+.u4aWsBusyApi .res {
+    background: var(--busy-accent-2);
+    box-shadow: 0 0 6px var(--busy-accent-2);
+    animation: u4aWsBusyApiRes 3.2s infinite;
+}
+
+.u4aWsBusyApi .res em { color: var(--busy-accent-2); }
+
+@keyframes u4aWsBusyApiReq {
+    0%, 4% { transform: translateX(0); opacity: 0; animation-timing-function: cubic-bezier(0.5, 0, 0.5, 1); }
+    8% { opacity: 1; }
+    32% { transform: translateX(54px); opacity: 1; }
+    36%, 100% { transform: translateX(54px); opacity: 0; }
+}
+
+@keyframes u4aWsBusyApiRes {
+    0%, 46% { transform: translateX(54px); opacity: 0; animation-timing-function: cubic-bezier(0.5, 0, 0.5, 1); }
+    50% { opacity: 1; }
+    74% { transform: translateX(0); opacity: 1; }
+    78%, 100% { transform: translateX(0); opacity: 0; }
+}
+
+/* 서버 — 칸 3개가 처리하는 동안(36~46%) 차례로 깜빡인다 */
+.u4aWsBusyApi .srv {
+    position: absolute;
+    right: 0;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 24px;
+}
+
+.u4aWsBusyApi .srv i {
+    height: 7px;
+    border-radius: 2px;
+    border: 1px solid color-mix(in srgb, var(--busy-accent) 55%, transparent);
+    background: color-mix(in srgb, var(--busy-accent) 12%, transparent);
+    animation: u4aWsBusyApiSrv 3.2s infinite;
+}
+
+.u4aWsBusyApi .srv i:nth-child(2) { animation-delay: 0.1s; }
+.u4aWsBusyApi .srv i:nth-child(3) { animation-delay: 0.2s; }
+
+@keyframes u4aWsBusyApiSrv {
+    0%, 34%, 50%, 100% { background: color-mix(in srgb, var(--busy-accent) 12%, transparent); }
+    40% { background: var(--busy-accent-2); }
+}
+
+/* 응답 도착 -> 200 OK */
+.u4aWsBusyApi .ok {
+    position: absolute;
+    left: 50%;
+    top: 2px;
+    padding: 1px 6px;
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--busy-accent-2);
+    border: 1px solid color-mix(in srgb, var(--busy-accent-2) 60%, transparent);
+    border-radius: 99px;
+    transform: translateX(-50%);
+    opacity: 0;
+    animation: u4aWsBusyApiOk 3.2s infinite;
+}
+
+@keyframes u4aWsBusyApiOk {
+    0%, 76% { opacity: 0; transform: translate(-50%, 4px); }
+    82%, 92% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, 0); }
+}
+
+
+/* ======================================================================
+   setAIBusy 전용 그림 = 시안 「23안 · AI 제어 3」 03번 AI Steering  (장군님 지시 2026-10-30)
+   ----------------------------------------------------------------------
+   「AI」 가 박힌 다이얼이 이리저리 돌면 WS 로고도 똑같이 돈다 —
+   AI 가 핸들을 잡고 WS4.0 을 조종하는 중이라는 뜻.
+   짝 마크업 = u4a-busy.js 의 _create():
+     <div class="u4aWsBusyAi"><b class="dial"><span class="ai">AI</span><i></i></b>
+       <b class="arm"></b><b class="lgw"><svg class="logo">…</svg></b></div>
+   평소에는 숨어 있고, 카드에 data-u4a-busy-mode="ai" 가 붙을 때만 이쪽이 보인다.
+   ====================================================================== */
+.u4aWsBusyAi {
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 화면 쪽 전역 스타일이 이 그림을 찌그러뜨리지 않게 막는다. */
+.u4aWsBusyAi,
+.u4aWsBusyAi * {
+    box-sizing: border-box;
+}
+
+/* 그림 바꿔 끼우기 — AI 모드면 API Call 을 숨기고 이쪽을 보인다. */
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyApi {
+    display: none;
+}
+
+.u4aWsBusyIndicator[data-u4a-busy-mode="ai"] .u4aWsBusyAi {
+    display: flex;
+}
+
+/* 「AI」 글자 — 그라데이션 글자 */
+.u4aWsBusyAi .ai {
+    font: 900 17px/1 "Pretendard", system-ui, sans-serif;
+    letter-spacing: 0.02em;
+    background: linear-gradient(135deg, var(--busy-hi, #fff), var(--busy-accent-2) 40%, var(--busy-accent));
+    -webkit-background-clip: text;
+            background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 6px var(--busy-glow));
+}
+
+.u4aWsBusyAi .logo {
+    width: 30px;
+    height: 30px;
+    fill: var(--busy-accent);
+    filter: drop-shadow(0 0 5px var(--busy-glow));
+}
+
+/* 다이얼 — 「AI」 는 가운데 고정, 바늘 판만 돈다 */
+.u4aWsBusyAi .dial {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--busy-accent) 45%, transparent);
+    background: color-mix(in srgb, var(--busy-accent) 10%, transparent);
+}
+
+.u4aWsBusyAi .dial i {
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    will-change: transform;
+    animation: u4aWsBusyAiTurn 2.8s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+
+.u4aWsBusyAi .dial i::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 7px;
+    height: 7px;
+    margin-left: -3.5px;
+    border-radius: 50%;
+    background: var(--busy-accent-2);
+    box-shadow: 0 0 6px var(--busy-accent-2);
+}
+
+/* 다이얼에서 로고로 이어지는 막대 */
+.u4aWsBusyAi .arm {
+    width: 10px;
+    height: 2px;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--busy-accent) 45%, transparent);
+}
+
+.u4aWsBusyAi .lgw {
+    line-height: 0;
+    will-change: transform;
+    animation: u4aWsBusyAiTurn 2.8s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+
+@keyframes u4aWsBusyAiTurn {
+    0%, 8% { transform: rotate(0deg); }
+    30%, 40% { transform: rotate(-50deg); }
+    64%, 74% { transform: rotate(40deg); }
+    96%, 100% { transform: rotate(0deg); }
+}
+
+
+/* 제목 (굵게) / 메시지 (보조색) — 비어있으면 숨김(로고만).
+   ★id 는 그대로 둔다 — 카드 제목·문구를 넣는 곳(ws_html5_shell.js)과
+     로그인 남은 초 표시(Login.js)가 이 id 로 찾는다. */
+.u4aWsBusyTitle {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+}
+
+.u4aWsBusyText {
+    font-size: 13px;
+    letter-spacing: 0.01em;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.4;
+
+    /* ★[2026-10-30] setAIBusy 의 desc 가 "\n" 으로 줄을 나눈다 — 그대로 개행으로 그린다.
+       pre-line 은 연속 공백을 하나로 합치므로 "\n" 이 없는 기존 글은 보이는 것이 같다. */
+    white-space: pre-line;
+}
+
+.u4aWsBusyTitle:empty,
+.u4aWsBusyText:empty { display: none; }
+
+/* 움직임 줄이기 설정 — 시안 그대로 느리게만 한다(멈추지 않는다). */
+@media (prefers-reduced-motion: reduce) {
+    .u4aWsBusyEdge i,
+    .u4aWsBusyCard .u4aWsSpinner i s,
+    .u4aWsBusyCard .u4aWsSpinner b {
+        animation-duration: 6s;
+    }
+}
+
+</style>
+<script>
+// 오류코드 접두: UBSY / 다음 번호: 010
+/************************************************************************
+ * U4A Workspace — 공통 busy (window.U4ABusy)  · 짝 = u4a-busy.css
+ * ----------------------------------------------------------------------
+ * [2026-09-15, 장군님 지시] busy 도 하나의 UI — 공통 화면 리소스(theme/) 전용 파일로 옮기고,
+ *   화면 시작 때 가장 먼저 로드한다(ws10_20/index.html <head> 맨 앞, jQuery 보다 앞).
+ *   옮겨온 곳 = resources/index.js 의 setDomBusy 본체 + ws10_20/index.html 의 <dialog>.
+ *
+ *   · U4ABusy.show() / U4ABusy.hide()
+ *   · busy 화면(<dialog>)은 처음 show() 때 스스로 만들어 <body> 끝에 붙인다.
+ *     로드되자마자 만들지 않는 이유: <head> 에서 로드되는 순간엔 <body> 가 아직 없다.
+ *     busy 를 켜는 호출은 전부 <body> 가 생긴 뒤에 온다.
+ *   · id·class 는 옛 이름 그대로(u4aWsBusyIndicator · u4aWsBusyTitle · u4aWsBusyText) —
+ *     카드 제목·문구 넣는 곳(ws_html5_shell.js), 로그인 남은 초 표시(Login.js),
+ *     로그의 busy 상태 확인(ws_html5_logger.js)이 이 id 로 찾는다.
+ *   · 켜고 끄는 동작은 옛 setDomBusy 그대로(showModal · ESC 막기 · showModal 실패 시 display flex).
+ *   · 기존 호출 이름 setDomBusy(resources/index.js)는 그대로 두고 여기로 넘긴다.
+ *   · U4AUI 아래에 두지 않는다 — u4a-ui.js 가 global.U4AUI 를 새 객체로 통째로 대입해 지워진다.
+ ************************************************************************/
+(function (global) {
+    "use strict";
+
+    var BUSY_ID = "u4aWsBusyIndicator";
+
+    // WS 로고 SVG — busy 그림 두 가지가 같이 쓴다. 복사하지 말고 이 상수를 쓴다.
+    var WS_LOGO_SVG =
+        '<svg class="logo" viewBox="0 0 307 311" aria-hidden="true">' +
+            '<path d="M4 4 50 4 50 211 9 211Z"/>' +
+            '<path d="M91 4 127 4 54 211 21 211Z"/>' +
+            '<path d="M98 4 134 4 134 211 102 211Z"/>' +
+            '<path d="M176 4 222 4 146 211 106 211Z"/>' +
+            '<path d="M236 93 254 93 266 95 270 96 277 99 283 103 288 107 294 114 296 117 299 122 301 128 302 132 303 139 303 154 302 158 301 159 258 159 257 158 257 157 257 146 255 141 254 139 251 136 248 134 244 133 238 132 233 132 230 133 225 135 219 139 215 145 213 149 212 153 212 158 213 163 217 169 221 173 224 175 234 178 259 189 269 194 276 200 280 204 283 208 287 214 289 220 290 224 290 233 290 238 289 247 287 255 284 263 281 269 277 274 272 280 267 285 255 294 249 298 242 301 234 304 226 306 214 307 196 307 184 305 180 304 172 301 166 297 161 293 156 287 154 284 151 278 149 273 148 269 146 261 146 247 147 242 148 242 191 242 192 243 193 244 193 255 194 259 196 262 199 265 202 267 205 268 211 268 216 268 219 267 225 265 230 261 235 256 236 252 237 248 237 242 236 237 233 232 228 228 225 226 215 222 191 212 181 206 174 201 169 197 166 193 163 186 161 180 160 176 159 168 160 162 161 154 163 146 166 138 169 132 172 126 177 121 183 115 194 106 200 103 207 100 215 97 223 95Z"/>' +
+        '</svg>';
+
+
+    // busy 를 켤 때마다 증가 — 기다리는 중에 다시 켜면 그 끄기를 버린다(hide 참조).
+    var nGen = 0;
+
+    // 끄기 전 기다림의 두 시간값.
+    /************************************************************************
+     * ★★[2026-10-22 장군님 결정] 시간이 지났다고 **busy 를 강제로 끄지 않는다.**
+     * ----------------------------------------------------------------------
+     * 「차라리 오류가 나서 busy 가 안 꺼지는 게 더 낫지, 괜히 일정 시간 지났다고
+     *  강제로 껐다가 다른 액션에서 꼬이거나 데이터 잘못되면 책임 누가 질 건데?」
+     * 「제일 리스크는 잘못된 데이터가 저장되버리면 이거 복구하기도 힘들잖아」
+     *
+     * busy 는 **하나의 요청이 끝날 때까지 중복 요청을 막아 프로세스가 꼬이지 않게** 하는 것이다.
+     * 화면 그리기도 그 요청의 일부라, 다 안 그려졌는데 끄면 그 목적이 깨진다.
+     * → **fail-closed**: 못 끝내면 켠 채로 둔다. 멈춘 것처럼 보이는 편이
+     *   잘못된 데이터가 저장되는 것보다 낫다(매번 백업하는 전략도 없다).
+     *
+     * 아래 값은 **끄는 기준이 아니다** — 「너무 오래 걸린다」고 한 번 알리는 기준이다.
+     ************************************************************************/
+    var SLOW_WARN_MS = 5000;
+
+    // 한가해지기를 기다리는 자리의 상한 — 거긴 **이미 조용해진 뒤**라 곧 온다.
+    //   한가해지지 않아도 이 시간에 진행한다(조용한 상태였으므로 끄는 것이 맞다).
+    var IDLE_TIMEOUT_MS = 5000;
+
+    // 조용함을 보는 창. 마지막 여유도 같은 값을 쓰므로, 끄기 신호부터 실제로 꺼지기까지
+    //   **최소 이 값의 2배**가 걸린다(지금 150 × 2 = 300ms).
+    //   ★[2026-10-21 장군님 지시] 300 → 150 («0.6초도 왠지 느린 거 같은데.. 전체 0.3초로 맞춰바»).
+    //     처음 정한 값은 300 이었고, 그때는 합이 600ms 였다.
+    //   ★이 값을 바꾸면 양쪽이 같이 바뀐다 — 고칠 자리는 여기 한 줄뿐이다.
+    var QUIET_WINDOW_MS = 150;
+
+
+    /* ==================================================================
+     * 공통 — DOM 변경 세기
+     * ================================================================== */
+
+    /** 이 변경이 busy 자신(또는 그 안)에서 난 것인가. */
+    function _isBusySelf(oTarget) {
+
+        for (var el = oTarget; el; el = el.parentNode) {
+
+            if (el.id === BUSY_ID) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** busy 자신을 뺀 변경 건수. */
+    function _countOutside(aMut) {
+
+        var nCnt = 0;
+
+        for (var i = 0; i < aMut.length; i++) {
+
+            if (_isBusySelf(aMut[i].target) === false) {
+                nCnt++;
+            }
+        }
+
+        return nCnt;
+    }
+
+    /** 가장 넓은 범위로 관찰 — 요소 생김·사라짐 · 속성 · 글자 · 하위 전부. */
+    function _observeBody(oObs) {
+        oObs.observe(document.body, { childList: true, attributes: true, characterData: true, subtree: true });
+    }
+
+
+    /* ==================================================================
+     * 개발 모드 확인용 — busy 켠 순간부터 DOM 변경을 세어 둔다
+     *   (장군님 지시 2026-10-19) 끌 때 「마지막 변경이 끄기 몇 ms 전이었나」를 같이 찍는다.
+     *   ★끄기 판정에는 쓰이지 않는다. 패키징본에서는 아예 돌지 않는다.
+     * ================================================================== */
+
+    var oWatch = null;
+
+    function _watchStart() {
+
+        if (!_isDev()) {
+            return;
+        }
+
+        if (oWatch || typeof MutationObserver !== "function" || !document.body) {
+            return;
+        }
+
+        var w = { t0: performance.now(), mut: 0, last: -1, obs: null };
+
+        try {
+
+            w.obs = new MutationObserver(function (aMut) {
+
+                var n = _countOutside(aMut);
+
+                if (n > 0) {
+                    w.mut += n;
+                    w.last = performance.now();
+                }
+            });
+
+            _observeBody(w.obs);
+
+        } catch (e) {
+            _caught("UBSY-004", "U4ABusy watch: observe failed", e);
+            return;
+        }
+
+        oWatch = w;
+    }
+
+    function _watchEnd() {
+
+        var w = oWatch;
+        oWatch = null;
+
+        if (!w) {
+            return null;
+        }
+
+        try {
+            if (w.obs) {
+                w.obs.disconnect();
+            }
+        } catch (e) {
+            _caught("UBSY-004", "U4ABusy watch: disconnect failed", e);
+        }
+
+        var nNow = performance.now();
+
+        return {
+            onToOff: Math.round(nNow - w.t0),
+            mut: w.mut,
+            lastBeforeOff: (w.last < 0 ? -1 : Math.round(nNow - w.last))
+        };
+    }
+
+    /** 개발 모드인가 — 패키징본에서는 확인용 줄을 안 찍는다. 창마다 APP 이 다른 자리에 있다. */
+    function _isDev() {
+
+        try {
+            if (typeof APP !== "undefined" && APP && APP.isPackaged === false) {
+                return true;
+            }
+        } catch (e) { /* 이 창에 APP 없음 */ }
+
+        try {
+            if (global.parent && global.parent !== global
+                && global.parent.APP && global.parent.APP.isPackaged === false) {
+                return true;
+            }
+        } catch (e) { /* cross-origin */ }
+
+        try {
+            if (typeof oAPP !== "undefined" && oAPP && oAPP.APP && oAPP.APP.isPackaged === false) {
+                return true;
+            }
+        } catch (e) { /* oAPP 없음 */ }
+
+        return false;
+    }
+
+    /** 오류 흔적 — U4ALOG 는 이 파일보다 늦게 로드되므로, 있으면 쓰고 없으면 console. */
+    function _caught(sCode, sWhere, e) {
+
+        if (typeof global.U4ALOG !== "undefined" && global.U4ALOG && global.U4ALOG.caught) {
+            global.U4ALOG.caught(e);
+            return;
+        }
+
+        console.error("[" + sCode + "] " + sWhere + " -", e && e.message);
+    }
+
+
+    /* ==================================================================
+     * busy 켜기
+     * ================================================================== */
+
+    /** busy <dialog> 를 만들어 <body> 에 붙인다(구 ws10_20/index.html 마크업과 같은 구조). */
+    function _create() {
+
+        var oBody = document.body;
+
+        if (!oBody) {
+            console.error("[UBSY-001] U4ABusy.show: document.body not ready - busy dialog not created, busy not shown");
+            return null;
+        }
+
+        var oDlg = document.createElement("dialog");
+
+        oDlg.id = BUSY_ID;
+        oDlg.className = "u4aWsBusyIndicator";
+        oDlg.setAttribute("data-act", "BUSY");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
+
+        // ★[2026-10-29 장군님 결정] 모양 = Sparkle 시안(u4a-busy.css 의 「중앙 카드 = Sparkle」 참조).
+        //   <i> = WS 로고(CSS mask + 지나가는 빛줄기), <b> 3개 = 빛이 지나는 자리에 튀는 별빛.
+        //   빈 요소라 글자는 없다 — 모양은 전부 CSS 가 그린다.
+        // ★[2026-10-30] 요소 2개를 더했다 — 움직임을 전부 transform 으로 돌리기 위해서다.
+        //   무거운 동기 작업이 main thread 를 붙잡으면 각도·background-position 애니메이션은 멈추지만
+        //   transform 은 compositor 에서 돌아 계속 움직인다. 겉모습은 종전과 같다.
+        //   · <span class="u4aWsBusyEdge"><i></i></span> = 카드 테두리를 도는 빛(큰 원뿔 판을 rotate)
+        //   · 로고 <i> 안의 <s> = 로고 위를 지나가는 광택 빛줄기(translateX)
+        // ★[2026-10-30 장군님 지시] 가운데 그림 = 시안 「18안 · 개발 툴킷」의 04번 API Call.
+        //   WS 앱(왼쪽 로고)에서 서버(오른쪽 칸 3개)로 GET 이 날아가고, 서버가 깜빡여 처리한 뒤
+        //   JSON 이 돌아오면 "200 OK" 가 뜬다 — 서버와 통신하는 중이라는 뜻.
+        //   시안 출처 = busy_indicators.html #18-api. 모양은 전부 짝 CSS(.u4aWsBusyApi)가 그린다.
+        oDlg.innerHTML =
+            '<div class="u4aWsBusyCard">' +
+                '<span class="u4aWsBusyEdge">' +
+                    '<i></i>' +
+                '</span>' +
+                '<div class="u4aWsBusyApi">' +
+                    WS_LOGO_SVG +
+                    '<b class="wire"></b>' +
+                    '<span class="pk req"><em>GET</em></span>' +
+                    '<span class="pk res"><em>JSON</em></span>' +
+                    '<div class="srv">' +
+                        '<i></i>' +
+                        '<i></i>' +
+                        '<i></i>' +
+                    '</div>' +
+                    '<span class="ok">200 OK</span>' +
+                '</div>' +
+
+                // ★[2026-10-30 장군님 지시] setAIBusy 전용 그림 = 시안 「23안 · AI 제어 3」의 03번 AI Steering.
+                //   「AI」 가 박힌 다이얼이 이리저리 돌면 WS 로고도 똑같이 돈다 —
+                //   AI 가 핸들을 잡고 WS4.0 을 조종하는 중이라는 뜻.
+                //   평소에는 숨어 있고, 카드에 data-u4a-busy-mode="ai" 가 붙으면 이쪽이 보인다.
+                '<div class="u4aWsBusyAi">' +
+                    '<b class="dial">' +
+                        '<span class="ai">AI</span>' +
+                        '<i></i>' +
+                    '</b>' +
+                    '<b class="arm"></b>' +
+                    '<b class="lgw">' +
+                        WS_LOGO_SVG +
+                    '</b>' +
+                '</div>' +
+                '<div class="u4aWsBusyTitle" id="u4aWsBusyTitle"></div>' +
+                '<div class="u4aWsBusyText" id="u4aWsBusyText"></div>' +
+            '</div>';
+
+        oBody.appendChild(oDlg);
+
+        return oDlg;
+    }
+
+    function _showCore() {
+
+        // ★ 켤 때 세대를 올린다 — 대기 중이던 끄기가 이 busy 를 꺼 버리지 않게(아래 hide 설명).
+        nGen++;
+
+        // 켠 순간부터 DOM 변경을 세어 둔다(개발 모드 확인용).
+        try {
+            _watchStart();
+        } catch (e) {
+            _caught("UBSY-004", "U4ABusy watch start failed", e);
+        }
+
+        var oBusyDom = document.getElementById(BUSY_ID) || _create();
+
+        if (!oBusyDom) {
+            return;
+        }
+
+        // busy 요소가 <dialog> 면 showModal() 로 띄운다 — 모달 팝업(showModal)도 top-layer 라
+        //   일반 <div>(z-index 무한대라도) busy 는 그 뒤로 가려 안 보인다. busy 도 모달이어야
+        //   어떤 모달 팝업 위에도 보인다. <dialog> 가 아니면(다른 창) display 토글.
+        if (typeof oBusyDom.showModal !== "function") {
+            oBusyDom.style.display = "flex";     // 카드 중앙정렬 (스크림 flex center)
+            return;
+        }
+
+        // busy 중 ESC 로 닫히지 않게(닫혀도 작업은 계속되지만 시각 잠금 유지).
+        if (!oBusyDom.__escGuard) {
+            oBusyDom.__escGuard = true;
+            oBusyDom.addEventListener("cancel", function (e) { e.preventDefault(); });
+        }
+
+        if (oBusyDom.open) {
+            return;
+        }
+
+        try {
+            oBusyDom.showModal();
+        } catch (e) {
+            _caught("UBSY-002", "U4ABusy.show: showModal failed", e);
+            oBusyDom.style.display = "flex";
+        }
+    }
+
+
+    /* ==================================================================
+     * busy 끄기 — 화면이 조용해진 뒤에 끈다
+     * ------------------------------------------------------------------
+     * 메인 창의 전역 setBusy 와 같은 규칙이다(resources/index.js 참조).
+     *
+     * ★★★[2026-10-21 장군님 지시] 판정 방식 — 조용함을 보는 창(QUIET_WINDOW_MS).
+     *   ① 끄는 시점에 MutationObserver 를 켜고 그 창마다 확인한다.
+     *   ② 그 창 안에 변경이 있었으면 한 창 더 기다린다.
+     *   ③ 한 창이 지나도 변경이 없으면 그때 requestIdleCallback 을 건다.
+     *   ④ 거기 도착하면 한 창 더 기다린 뒤 끈다.
+     *   ★④ 의 그 창 동안 일어난 변경은 판정에 쓰지 않는다 — 장군님 「4번이면 이미 끝난 것으로 보라」.
+     *     세기만 해서 로그에 남긴다. 다시 세기로 하면 조금씩 계속 바뀌는 화면에서 영영 안 꺼진다.
+     *   (구) requestAnimationFrame 으로 「변경 없는 frame 2번 연속」 — 간격이 ~16ms 로 너무 짧았다.
+     *   ★상한에 닿아도 **끄지 않는다** — 위 SLOW_WARN_MS 설명 참조(장군님 결정 2026-10-22).
+     *
+     * 기다리는 중 show() 가 오면 끄기를 버린다(세대 번호).
+     * 상한에 닿으면 끄고 ERROR 로그 — 정상 경로가 아니라 고장 알림용.
+     *
+     * ★[2026-10-21 장군님 지시] fnDone — **창이 실제로 닫힌 뒤** 불린다.
+     *   까닭: 메인 창 setBusy 가 끄기와 함께 하는 일(마우스 막기 풀기 · 포커스 복원 ·
+     *     창 닫기 버튼 활성 · 작업표시줄 진행바)이 **닫힌 뒤에** 돌아야 화면과 어긋나지 않는다.
+     *   기다리는 중에 show() 가 와서 이 끄기를 버린 경우에는 **부르지 않는다**(창이 안 닫혔으니).
+     *   인자 없이 부르면 종전과 똑같다 — 별창 20여 곳이 그렇게 부른다.
+     * ================================================================== */
+    function _hideCore(fnDone, bNow) {
+
+        function _done() {
+
+            // 기다리던 뒷일(afterOff)을 먼저 비운다 — 여기가 「실제로 꺼진」 자리다.
+            _flushAfterOff();
+
+            _runDone(fnDone);
+        }
+
+        // 한 번도 안 켰으면 요소가 없다 — 끌 것이 없는 정상 상태라 로그를 남기지 않는다.
+        var oBusyDom = document.getElementById(BUSY_ID);
+
+        if (!oBusyDom) {
+            _done();                        // 끌 것이 없다 = 이미 꺼진 상태 → 뒷정리는 해 준다
+            return;
+        }
+
+        function _doHide() {
+
+            if (typeof oBusyDom.showModal !== "function") {
+                oBusyDom.style.display = "none";
+                _done();
+                return;
+            }
+
+            if (!oBusyDom.open) {
+                _done();                    // 이미 닫혀 있다 → 뒷정리는 해 준다
+                return;
+            }
+
+            try {
+                oBusyDom.close();
+            } catch (e) {
+                _caught("UBSY-003", "U4ABusy.hide: close failed", e);
+            }
+
+            _done();
+        }
+
+        // ★★★[2026-10-30 장군님 지시 「그렇게 해라」] AI busy 끄기는 기다리지 않고 바로 끈다.
+        //   [까닭] 아래 기다림은 「미리보기가 다 그려졌나」를 보는 것이다. AI busy 는 AI 가
+        //     「내 일 끝났다」고 직접 끄는 것이라 그것을 볼 이유가 없다. 오히려 AI 가 화면을
+        //     바꾸는 중이면 조용해질 때까지 창을 계속 다시 세어 한참 안 꺼졌다
+        //     (빈 화면 실측 333ms = QUIET_WINDOW_MS x2 + idle, 실제 화면은 더 길다).
+        //   [범위] 이 길은 setAIBusy(false) 만 탄다. U4ABusy.hide() 는 종전 그대로다.
+        if (bNow === true) {
+            _doHide();
+            return;
+        }
+
+        // 쓸 수 없는 환경이면 종전대로 즉시 끈다(동작 유지).
+        if (typeof MutationObserver !== "function" || !document.body) {
+            _doHide();
+            return;
+        }
+
+        var nMyGen = nGen;
+        var t0 = performance.now();
+        var oObs = null;
+        var bEnded = false;
+        var bDirty = false;                 // 지금 창 안에 변경이 있었나
+        var nQuietMs = -1;                  // 조용해진 시점(-1 = 아직)
+        var nIdleMs = -1;                   // 한가해진 시점(-1 = 아직)
+        var nLateMut = 0;                   // 마지막 여유 중의 변경 건수(기록용)
+        var bSlowWarned = false;            // 「너무 오래 걸린다」 알림을 이미 찍었나(한 번만)
+        var nRounds = 0;                    // 창을 다시 센 횟수
+
+
+        function _finish(sHow) {
+
+            if (bEnded) {
+                return;
+            }
+            bEnded = true;
+
+            try {
+                if (oObs) {
+                    oObs.disconnect();
+                    oObs = null;
+                }
+            } catch (e) {
+                _caught("UBSY-004", "U4ABusy.hide: observer disconnect failed", e);
+            }
+
+            // 기다리는 사이에 다시 켰다 → 그 busy 를 끄면 안 된다.
+            if (nMyGen !== nGen) {
+                return;
+            }
+
+            var nTotal = Math.round(performance.now() - t0);
+
+            if (nLateMut > 0) {
+                console.warn("[UBSY-006] BUSY_OFF_LATE_DOM: " + nLateMut + " mutations during final grace"
+                    + ", quiet=" + nQuietMs + "ms total=" + nTotal + "ms");
+            }
+
+            // ★ [2026-10-19 장군님 지시] 눈으로 확인하실 수 있게 개발 모드에서는 꺼질 때마다 한 줄 찍는다.
+            if (_isDev()) {
+
+                var oW = _watchEnd();
+
+                if (oW) {
+                    console.log("[BUSY] on→off=" + oW.onToOff + "ms"
+                        + " mut=" + oW.mut
+                        + " lastChangeBeforeOff=" + (oW.lastBeforeOff < 0 ? "none" : oW.lastBeforeOff + "ms")
+                        + " lateMut=" + nLateMut
+                        + " (offSignal→off=" + nTotal + "ms"
+                        + " quiet=" + nQuietMs + "ms idle=" + nIdleMs + "ms rounds=" + nRounds + ")");
+                }
+            }
+
+            _doHide();
+        }
+
+
+        try {
+
+            oObs = new MutationObserver(function (aMut) {
+
+                var nCnt = _countOutside(aMut);
+
+                if (nCnt === 0) {
+                    return;
+                }
+
+                // 아직 조용함을 못 봤다 → 지금 창을 「변경 있었음」 으로(창을 다시 센다).
+                if (nQuietMs < 0) {
+                    bDirty = true;
+                    return;
+                }
+
+                // 마지막 여유 중 → 세기만 한다(판정에 쓰지 않음 — 위 ★ 참조).
+                nLateMut += nCnt;
+            });
+
+            _observeBody(oObs);
+
+        } catch (e) {
+            _caught("UBSY-004", "U4ABusy.hide: observe failed", e);
+            _doHide();
+            return;
+        }
+
+
+        // ①② 조용함을 보는 창 — 그 안에 변경이 있었으면 한 창 더. 없으면 조용해진 것으로 본다.
+        function _checkQuiet() {
+
+            if (bEnded) {
+                return;
+            }
+
+            if (bDirty === true) {
+
+                bDirty = false;
+                nRounds++;
+
+                //너무 오래 걸리면 **한 번만** 알린다 — 그래도 끄지 않고 계속 기다린다(위 SLOW_WARN_MS 설명).
+                if (bSlowWarned === false && performance.now() - t0 > SLOW_WARN_MS) {
+                    bSlowWarned = true;
+                    // ★[2026-10-23 장군님 지시 「내려라」] console.error → console.warn.
+                    //   결함이 아니라 「오래 걸린다」는 알림이다 — 빨간 줄로 찍으면 진짜 오류와 섞인다.
+                    console.warn("[UBSY-005] BUSY_STILL_ON: DOM still changing after "
+                        + SLOW_WARN_MS + "ms - busy stays on until it settles (on purpose)");
+                }
+
+                setTimeout(_checkQuiet, QUIET_WINDOW_MS);
+                return;
+            }
+
+            nQuietMs = Math.round(performance.now() - t0);
+
+            _waitIdle();
+        }
+
+
+        // ③④ 브라우저가 한가해지면 한 창 더 기다린 뒤 끈다(그 사이 변경은 보지 않는다).
+        function _waitIdle() {
+
+            if (typeof requestIdleCallback !== "function") {
+                _afterIdle();               // 없는 환경이면 ①② 만으로 판정
+                return;
+            }
+
+            requestIdleCallback(_afterIdle, { timeout: IDLE_TIMEOUT_MS });
+        }
+
+        function _afterIdle() {
+
+            if (bEnded) {
+                return;
+            }
+
+            nIdleMs = Math.round(performance.now() - t0);
+
+            setTimeout(function () { _finish("BOTH"); }, QUIET_WINDOW_MS);
+        }
+
+
+        setTimeout(_checkQuiet, QUIET_WINDOW_MS);
+    }
+
+
+    /* ==================================================================
+     * AI 가 제어하는 동안 다른 busy 가 끼어들지 못하게 막는 자물쇠
+     * ------------------------------------------------------------------
+     * [2026-10-30 장군님 지시] 「setAIBusy 를 실행중에 다른 setBusy 가 켜지는건 막는걸로 해줘」
+     *
+     *   · 켜기(show)뿐 아니라 **끄기(hide)도 막는다.** 켜기만 막으면 달라지는 것이 없기 때문이다 —
+     *     화면 안 다른 처리는 켜기와 끄기를 짝으로 부르므로, 켜기만 막아도 그 짝인 **끄기가 와서
+     *     AI busy 를 꺼 버린다.** 그러면 「AI 가 제어하는 동안 유지한다」는 목적이 깨진다.
+     *   · 다만 막을 때도 **부르는 쪽이 넘긴 뒷정리(fnDone)는 해 준다** — 그쪽은 자기 작업이
+     *     끝난 뒤 토스트 등을 띄워야 한다. busy 를 언제 끌지는 AI 쪽이 책임진다.
+     *   · 자물쇠가 풀려 있으면(=평소) show / hide 는 **전과 한 줄도 다르지 않게** 돈다.
+     * ================================================================== */
+
+    var bAILocked = false;
+
+    /** 부르는 쪽이 넘긴 뒷정리 — _hideCore 안의 _done 과 같은 일을 한 곳에서 한다. */
+    function _runDone(fnDone) {
+
+        if (typeof fnDone !== "function") {
+            return;
+        }
+
+        try {
+            fnDone();
+        } catch (e) {
+            _caught("UBSY-003", "U4ABusy.hide: fnDone failed", e);
+        }
+    }
+
+    /* ==================================================================
+     * busy 가 **실제로 꺼진 뒤** 할 일 — U4ABusy.afterOff(fn)
+     * ------------------------------------------------------------------
+     * [2026-10-30] hide() 는 화면이 조용해질 때까지 기다렸다 끄므로 **부르자마자 꺼지지 않는다**
+     *   (최소 0.3초). 그래서 hide() 바로 뒤에 토스트를 띄우면 busy 와 겹쳐 보인다
+     *   (장군님 지적 2026-10-30 「처리가 다 끝나고 메시지가 나와야 하지 않아?」).
+     *
+     *   · busy 가 떠 있지 않으면 **바로** 부른다. 떠 있으면 꺼지는 그때 부른다.
+     *   · 끄기를 거는 쪽과 뒷일을 거는 쪽이 달라도 된다 — 그래서 화면 쪽은
+     *     「끄기 한 줄 + afterOff 한 줄」로 끝난다. busy 함수를 창마다 고칠 필요가 없다.
+     *   · AI 자물쇠로 끄기가 막혀 있으면 그동안 기다렸다가, AI busy 가 꺼질 때 같이 불린다.
+     * ================================================================== */
+
+    var aAfterOff = [];
+
+    function afterOff(fnDone) {
+
+        if (typeof fnDone !== "function") {
+            return;
+        }
+
+        var oBusyDom = document.getElementById(BUSY_ID);
+
+        // 떠 있지 않으면 기다릴 것이 없다.
+        if (!oBusyDom || !oBusyDom.open) {
+            _runDone(fnDone);
+            return;
+        }
+
+        aAfterOff.push(fnDone);
+    }
+
+    /** 실제로 꺼진 그 자리에서 대기열을 비운다. */
+    function _flushAfterOff() {
+
+        if (aAfterOff.length === 0) {
+            return;
+        }
+
+        var aList = aAfterOff;
+
+        aAfterOff = [];
+
+        for (var i = 0; i < aList.length; i++) {
+            _runDone(aList[i]);
+        }
+    }
+
+
+    function show() {
+
+        if (bAILocked) {
+            console.warn("[UBSY-008] U4ABusy.show ignored - setAIBusy holds the lock");
+            return;
+        }
+
+        _showCore();
+    }
+
+    function hide(fnDone) {
+
+        if (bAILocked) {
+            console.warn("[UBSY-009] U4ABusy.hide ignored - setAIBusy holds the lock");
+            _runDone(fnDone);
+            return;
+        }
+
+        _hideCore(fnDone);
+    }
+
+
+    /* ==================================================================
+     * AI 전용 busy — setAIBusy(bOn, oOpt)
+     * ------------------------------------------------------------------
+     * [2026-10-30 장군님 지시] AI 가 WS4.0 을 제어하는 동안 쓰는 busy.
+     *   화면·동작은 **공통 busy 그대로**다 — 아래에서 show() / hide() 를 그대로 부른다.
+     *   다른 점은 카드에 **무슨 작업 중인지 글(desc)을 띄운다**는 것뿐이다.
+     *
+     *     setAIBusy(true, { desc: "작업중입니다. \n 잠시만 기다려 주세요" });
+     *     setAIBusy(false);
+     *
+     *   · 두 번째 인자는 **object** 로 받는다 — 나중에 항목을 더할 수 있게. 지금은 desc 하나.
+     *   · desc 안의 "\n" 은 **그대로 개행**으로 보인다 — 짝 CSS 의
+     *     .u4aWsBusyText { white-space: pre-line } 가 그렇게 그린다.
+     *     innerHTML 을 쓰지 않는다 — desc 에 태그가 섞여 들어와도 글자로만 보이게.
+     *   · 글자 자리(#u4aWsBusyText)는 다른 화면도 쓰는 **공용 자리**라, 끌 때 반드시 비운다.
+     *     비우는 시점은 busy 가 **실제로 꺼진 뒤**다(hide 의 콜백) — 먼저 비우면
+     *     busy 가 아직 떠 있는 동안 글만 사라져 이상하게 보인다.
+     * ================================================================== */
+
+    var AI_TEXT_ID = "u4aWsBusyText";
+
+    /** busy 카드의 글자 자리에 글을 넣는다(빈 글자면 지운다). */
+    function _setAIText(sDesc) {
+
+        var oTxt = document.getElementById(AI_TEXT_ID);
+
+        if (!oTxt) {
+            console.warn("[UBSY-007] setAIBusy: #" + AI_TEXT_ID + " not found - desc not shown");
+            return;
+        }
+
+        oTxt.textContent = sDesc;
+    }
+
+    /** busy 카드를 AI 모드로 바꾼다(그림이 AI Steering 으로 바뀐다) / 되돌린다. */
+    function _setAIMode(bOn) {
+
+        var oBusyDom = document.getElementById(BUSY_ID);
+
+        if (!oBusyDom) {
+            return;
+        }
+
+        if (bOn) {
+            oBusyDom.setAttribute("data-u4a-busy-mode", "ai");
+            return;
+        }
+
+        oBusyDom.removeAttribute("data-u4a-busy-mode");
+    }
+
+    function setAIBusy(bOn, oOpt) {
+
+        var oOption = oOpt || {};
+        var sDesc = (typeof oOption.desc === "string") ? oOption.desc : "";
+
+        if (bOn) {
+
+            // 자기 자신은 자물쇠에 걸리면 안 되므로 _showCore 를 바로 부른다.
+            _showCore();
+
+            // _showCore 가 카드를 만든 뒤라야 그림·글자 자리가 있다 — 순서를 바꾸지 말 것.
+            _setAIMode(true);
+            _setAIText(sDesc);
+
+            bAILocked = true;
+
+            return;
+        }
+
+        // 먼저 자물쇠를 풀어야 아래 _hideCore 가 평소대로 돈다.
+        bAILocked = false;
+
+        // 두 번째 인자 true = 기다리지 않고 바로 끈다(위 _hideCore 의 ★ 참조).
+        _hideCore(function () {
+            _setAIText("");
+            _setAIMode(false);
+        }, true);
+    }
+
+
+    /**
+     * AI 가 제어 중인가(setAIBusy 가 자물쇠를 쥐고 있나).
+     *   ★[2026-10-30 장군님 지시] 메인 창 전역 setBusy(resources/index.js)가 이것을 보고
+     *     통째로 그만둔다. 공통 busy 층만 막으면 그 바깥의 부수 작업(마우스 막기 풀기 ·
+     *     창 닫기 버튼 활성 · busy 카드 글자 덮어쓰기)이 그대로 돌아 AI busy 가 깨진다.
+     */
+    function isAILocked() {
+        return bAILocked === true;
+    }
+
+    global.U4ABusy = { show: show, hide: hide, afterOff: afterOff, setAIBusy: setAIBusy, isAILocked: isAILocked };
+
+    // 부르는 쪽이 setAIBusy(true, {...}) 로 바로 쓰도록 전역에도 둔다(장군님 호출 예시).
+    global.setAIBusy = setAIBusy;
+
+})(window);
+
+</script>
+</head>
+
+<body>
+
+<div class="bar">
+  <button id="b1">① 보통 busy 켜기 (1)</button>
+  <button id="b2">② 보통 busy 끄기 (2)</button>
+  <button id="b3">③ AI busy 켜기 (3)</button>
+  <button id="b4">④ AI busy 끄기 (4)</button>
+  <span id="s"></span>
+</div>
+<p class="hint">
+busy 가 켜지면 <b>화면 전체를 덮어</b> 위 단추를 마우스로 누를 수 없습니다(원래 그렇게 만든 것입니다).<br>
+그래서 <b>숫자키 1 · 2 · 3 · 4</b> 로도 같은 일을 할 수 있게 해 뒀습니다. busy 가 떠 있으면 <b>키로</b> 끄십시오.<br>
+<b>자물쇠 확인</b> : <b>3</b> 으로 AI busy 를 켜 놓고 <b>1</b> · <b>2</b> 를 눌러 보십시오 — 그림이 바뀌지 않고 그대로면 통과입니다.
+</p>
+<script>
+function fnBusyOn() {
+    U4ABusy.show();
+}
+function fnBusyOff() {
+    U4ABusy.hide();
+}
+function fnAiOn() {
+    setAIBusy(true, { desc: "작업중입니다. \n 잠시만 기다려 주세요" });
+}
+function fnAiOff() {
+    setAIBusy(false);
+}
+
+var oActions = {
+    "b1": fnBusyOn,
+    "b2": fnBusyOff,
+    "b3": fnAiOn,
+    "b4": fnAiOff
+};
+
+Object.keys(oActions).forEach(function (sId) {
+    document.getElementById(sId).addEventListener("click", oActions[sId]);
+});
+
+// busy 가 화면을 덮어 단추를 못 누르므로 숫자키로도 같은 일을 한다.
+var oKeys = {
+    "1": fnBusyOn,
+    "2": fnBusyOff,
+    "3": fnAiOn,
+    "4": fnAiOff
+};
+
+document.addEventListener("keydown", function (oEvent) {
+    var fn = oKeys[oEvent.key];
+    if (!fn) {
+        return;
+    }
+    oEvent.preventDefault();
+    fn();
+}, true);
+
+window.addEventListener("load", function () {
+    var sState = (typeof setAIBusy === "function") ? "loaded" : "NOT loaded";
+    document.getElementById("s").textContent = sState;
+});
+</script>
+
+</body>
+</html>

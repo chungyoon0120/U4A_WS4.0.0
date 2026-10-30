@@ -6,7 +6,6 @@
 
 | | 무엇 | 몇 개 |
 |---:|---|---:|
-| [10](#10-지금-진행-중--file-자리를-커스텀-프로토콜로-제가-합니다) | **지금 진행 중** — `file://` 자리를 커스텀 프로토콜로 (제가 합니다) | 3 |
 | [2](#2-그래-한마디면-끝나는-것) | 「그래」 한마디면 끝나는 것 | 5 |
 | [3](#3-값내용을-주셔야-제가-움직이는-것) | 값·내용을 주셔야 제가 움직이는 것 | 3 |
 | [4](#4-해라-하시면-제가-하는-것--작은-것부터) | 「해라」 하시면 제가 하는 것 (작은 것부터) | 12 |
@@ -14,18 +13,6 @@
 | [7](#7-로그인-쿠키-테스트--뒤로-미뤘습니다) | 로그인 쿠키 테스트 (미뤄 둠) | 9 |
 | [8](#8-쌓여-있는-테스트-묶음--짬날-때) | 쌓여 있는 테스트 묶음 (짬날 때) | 23 |
 | [9](#9-장군님이-직접-하셔야-하는-것) | 직접 하셔야 하는 것 | 2 |
-
----
-
-# 10. 지금 진행 중 — `file://` 자리를 커스텀 프로토콜로 (제가 합니다)
-
-| 번호 | 무엇 | 상태 |
-|---:|---|---|
-| **10-1** | **아직 상대경로인 워커 2곳** — `new Worker("./js/workers/u4aWsServerSessionWorker.js")`([fnServerSession.js:24](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/fnServerSession.js:24)) · `u4aWsClientSessionWorker.js`([ws_fn_03.js:34](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/js/ws_fn_03.js:34)) | ☐ **다음 할 것** |
-| **10-2** | **옵션 팝업(`optionPopup-origin`)의 아이콘 글꼴이 `file:///` 를 직접 만드는 것**([iconFont.js:203](C:/Users/socce/Documents/Github/CHUNGYOON0120/U4A_WS4.0.0/www/ws30/ws10_20/Popups/optionPopup-origin/common/iconFont.js:203)). 그 파일은 `REMOTE` 에 못 닿고 폴더 이름이 `-origin` 이라 **지금 도는 코드인지부터** 가려야 한다 | ☐ |
-| **10-3** | 서버 주소를 `path.join` 으로 만드는 자리 전수 조사 — 전체 `path.join` 879건 중 첫 인자가 서버 주소인 것을 가려낸다 | ☐ |
-
----
 
 # 2. 「그래」 한마디면 끝나는 것
 

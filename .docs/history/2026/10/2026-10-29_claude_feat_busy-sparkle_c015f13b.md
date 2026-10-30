@@ -152,3 +152,42 @@ TODO 에서 busy 줄을 전부 뺐다. **없어지면 안 되는 내용이라 �
 | 5-2 | `setBusy` · `setDomBusy` 를 하나로 합칠까 (호출처 43곳 = 로그인 34 · 메인 시작 3 · 창 뜨는 쪽 6) | **보류**(장군님 2026-10-21 「우선 보류」). 합치는 것 자체는 맞다(뒤가 앞의 일부). 걸리는 것 = 로그인 화면 포커스 — 포커스 찾는 코드가 iframe 안을 못 봐서 합치면 로그인 실패 후 커서가 비밀번호 칸으로 안 돌아갈 수 있다. 조사 = `2026-10-21_claude_analysis_setbusy-setdombusy-merge-impact_06836675.md` |
 
 함정: **busy 는 TODO 의 소재가 아니다.** 눌러 볼 것·정할 것이 생겨도 TODO 에 쓰지 말고 이력에 쓰고 채팅으로 묻는다.
+
+---
+
+## 후속 — 애니메이션을 transform 으로 옮김 (2026-10-30)
+
+「멋있는 로그인 페이지」 세션이 장군님 확정(「넣어」)과 함께 보낸 요청. 장군님 말씀 =
+「busy 키는건 좋은데 왜 애니메이션이 무거운 프로그램 돌때 끈키냐」.
+
+### 원인
+| 무엇 | 종전 | 왜 멈추나 |
+|---|---|---|
+| 카드 테두리 빛 | `@property --u4aWsEdgeAngle` 각도 애니메이션 | 각도 값이 바뀔 때마다 main thread 가 conic-gradient 를 다시 그린다. 무거운 동기 작업이 main thread 를 붙잡으면 그 사이 한 프레임도 안 그려진다 |
+| 로고 광택 | `background-position` 애니메이션 | 같은 이유 |
+| 별빛 | `transform` | 멈추지 않았다(그대로 둠) |
+
+transform·opacity 만 compositor 에서 돈다. 요청자 실측(헤드리스 크롬, 3초 붙잡는 동안
+첫·끝 프레임 차이) = 각도 방식 7px vs transform 방식 1,413px.
+
+### 고친 것 (2파일)
+| 파일 | 무엇 |
+|---|---|
+| `www/ws30/ws10_20/theme/u4a-busy.js` | `_create()` 마크업에 요소 2개 추가 — `<span class="u4aWsBusyEdge"><i></i></span>` (카드 첫 자녀) · 로고 `<i>` 안에 `<s></s>` |
+| `www/ws30/ws10_20/theme/u4a-busy.css` | `@property` 블록·`::before` 규칙 삭제 → `.u4aWsBusyEdge`(테두리 mask) + `.u4aWsBusyEdge i`(640px conic 판, `rotate` 3s) / 로고 `i` = mask 고정 + `background: var(--busy-dim)` + `position:relative; overflow:hidden` / 새 `.u4aWsSpinner i s` = 115deg 그라데이션 판, `translateX(-66.667%)→0` 1.9s / `b` 에 `will-change:transform` / 전역 방어 선택자에 `s` 추가(`text-decoration:none` — `<s>` 는 기본이 취소선) / `prefers-reduced-motion` 대상 교체 |
+
+겉모습·두께(3px)·테마 변수·켜고 끄는 로직은 한 줄도 안 바꿨다. 외부 CDN 0.
+
+### 안 한 것
+- **busy 켠 뒤 한 프레임 쉬게 하라(요청 5번)** — 호출처를 안 고쳤다. 공통 `fnYieldToPaint` 가
+  이미 있고, 어디에 넣을지는 호출처 전수 영향도부터 봐야 한다. 지시 받고 착수한다.
+- `shell.css` 쪽 `.u4a-busy`(별창 18곳·로그인 화면)는 아직 옛 동그라미 — 교체 지시 대기.
+
+### 함정
+- **마크업은 `u4a-busy.js` `_create()` 한 곳에서만 만든다**(www 전체 grep 확인). CSS 를
+  마크업 바꾸는 쪽으로 고치면 그 한 곳만 같이 고치면 된다 — 창 HTML 에는 이 카드가 없다.
+- **`<s>` 는 기본 취소선**이다. 빈 요소라 글자는 없지만 방어 규칙에 `text-decoration:none` 을 넣어 둔다.
+- **conic 판 크기 640px 는 카드 대각선보다 커야** 한다. 카드가 지금(`max-width:440px`)보다
+  커지면 판도 키운다 — 안 키우면 모서리에서 빛이 끊긴다.
+- 로컬 테스트 페이지를 browser pane 으로 띄워 눈으로 보려 했으나, **file:// 는 그 pane 에서
+  screenshot·DOM 조작이 안 된다**(static snapshot 으로만 뜬다). 눈 확인은 앱에서 해야 한다.

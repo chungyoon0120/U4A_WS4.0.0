@@ -2400,12 +2400,64 @@ function collectPreviewSelectionDomCandidates(oUi) {
 	return aDoms;
 }
 
+/**
+ * 미리보기 문서에 걸린 zoom 배율을 돌려준다(없으면 1).
+ *
+ * ★[2026-10-30 장군님 지시] 선택 표시가 zoom 슬라이더로 확대·축소하면 어긋나던 것을 고친다.
+ *   까닭: setPreviewZoom 이 <html> 에 style.zoom 을 건다. 그러면
+ *     · getBoundingClientRect() 는 **zoom 이 이미 곱해진** 화면 좌표를 돌려주고,
+ *     · 오버레이도 같은 zoom 안에 있어 style.left 에 넣은 값에 zoom 이 **한 번 더** 곱해진다.
+ *   그래서 넣기 전에 zoom 으로 나눈다. zoom 이 1 이면 나누기 1 이라 전과 똑같다.
+ *   실측(Chromium 152): zoom 2 → 좌표가 2배로, zoom 0.5 → 절반으로 어긋났다.
+ */
+function getPreviewZoomFactor() {
+
+	var oStyle = window.getComputedStyle ? window.getComputedStyle(document.documentElement) : null;
+	var fZoom = oStyle ? parseFloat(oStyle.zoom) : 1;
+
+	if (!fZoom || isNaN(fZoom) || fZoom <= 0) {
+		return 1;
+	}
+
+	return fZoom;
+}
+
+
+/**
+ * getBoundingClientRect() 값을 **zoom 1배 기준**으로 되돌린 사본을 만든다.
+ *
+ * ★[2026-10-30] 아래 판정들이 전부 **절대 픽셀 값**을 기준으로 한다 —
+ *   · 어느 DOM 에 표시할지 고르는 점수 : `width <= 2 || height <= 2` 감점, 넓이 가산
+ *   · 작은 글자 UI 인가(여백 3px)      : `height > 28 || width > 260`
+ *   · 테두리 안쪽 여백                 : `Math.min(width, height) <= 12`
+ *   zoom 이 걸리면 이 값들이 같이 커지고 작아져서 **판정이 바뀐다.**
+ *   확대했더니 다른 요소에 표시되거나 테두리 모양이 달라지던 것이 이 때문이다
+ *   (장군님 지적 2026-10-30 「조금 아직도 어긋나는 부분이 있어」).
+ *   → rect 를 만드는 자리에서 한 번 나눠 두면 **판정도 배치도 모두 zoom 1배 기준**이 된다.
+ */
+function scalePreviewRectToCss(oRect, fZoom) {
+
+	if (!oRect || fZoom === 1) {
+		return oRect;
+	}
+
+	return {
+		left: oRect.left / fZoom,
+		top: oRect.top / fZoom,
+		right: oRect.right / fZoom,
+		bottom: oRect.bottom / fZoom,
+		width: oRect.width / fZoom,
+		height: oRect.height / fZoom
+	};
+}
+
+
 function getPreviewSelectionDomRect(oDom) {
 	if (!oDom || typeof oDom.getBoundingClientRect !== "function") {
 		return null;
 	}
 
-	return oDom.getBoundingClientRect();
+	return scalePreviewRectToCss(oDom.getBoundingClientRect(), getPreviewZoomFactor());
 }
 
 function isPreviewSelectionUsableRect(oRect) {
@@ -2527,7 +2579,9 @@ function getPreviewSelectionScrollRoot(oDom) {
 
 function getPreviewSelectionRootRect(oRoot) {
 	if (oRoot && typeof oRoot.getBoundingClientRect === "function") {
-		return oRoot.getBoundingClientRect();
+		// 비교 상대(요소 rect)가 zoom 1배 기준이므로 여기도 같은 기준으로 맞춘다.
+		//   아래 window.innerWidth/innerHeight 는 이미 CSS 픽셀이라 그대로 둔다.
+		return scalePreviewRectToCss(oRoot.getBoundingClientRect(), getPreviewZoomFactor());
 	}
 	return {
 		top: 0,
@@ -2839,6 +2893,7 @@ function updatePreviewContextLayer() {
 	var oStyle;
 	var iScrollTop;
 	var iScrollLeft;
+	var fZoom;
 	oWS.sMark.iContextLayerRaf = 0;
 	if (!oUi) {
 		hidePreviewContextLayer();
@@ -2850,8 +2905,9 @@ function updatePreviewContextLayer() {
 		hidePreviewContextLayer();
 		return;
 	}
-	oRect = oTargetDom.getBoundingClientRect();
-	if (oRect.width <= 0 || oRect.height <= 0 || !isPreviewSelectionTargetVisible(oTargetDom, oRect)) {
+	// zoom 1배 기준 rect — 판정과 배치가 같은 기준이어야 한다(scalePreviewRectToCss 주석 참조).
+	oRect = getPreviewSelectionDomRect(oTargetDom);
+	if (!oRect || oRect.width <= 0 || oRect.height <= 0 || !isPreviewSelectionTargetVisible(oTargetDom, oRect)) {
 		hidePreviewContextLayer();
 		return;
 	}
@@ -2861,8 +2917,10 @@ function updatePreviewContextLayer() {
 	oStyle = window.getComputedStyle ? window.getComputedStyle(oTargetDom) : null;
 
 	syncPreviewContextLayerClass(oLayer);
-	oLayer.style.left = (oRect.left + iScrollLeft) + "px";
-	oLayer.style.top = (oRect.top + iScrollTop) + "px";
+	// oRect 는 이미 zoom 1배 기준이다 — 스크롤 값만 같은 기준으로 바꿔 더한다.
+	fZoom = getPreviewZoomFactor();
+	oLayer.style.left = (oRect.left + iScrollLeft / fZoom) + "px";
+	oLayer.style.top = (oRect.top + iScrollTop / fZoom) + "px";
 	oLayer.style.width = oRect.width + "px";
 	oLayer.style.height = oRect.height + "px";
 	if (oStyle) {
@@ -2902,6 +2960,7 @@ function updatePreviewSelectionLayer() {
 	var iScrollLeft;
 	var bCompactTextTarget;
 	var iLayerOffset;
+	var fZoom;
 	oWS.sMark.iSelectionLayerRaf = 0;
 	if (!oUi) {
 		hidePreviewSelectionLayer();
@@ -2914,8 +2973,9 @@ function updatePreviewSelectionLayer() {
 		hidePreviewSelectionLayer();
 		return;
 	}
-	oRect = oTargetDom.getBoundingClientRect();
-	if (oRect.width <= 0 || oRect.height <= 0) {
+	// zoom 1배 기준 rect — 판정과 배치가 같은 기준이어야 한다(scalePreviewRectToCss 주석 참조).
+	oRect = getPreviewSelectionDomRect(oTargetDom);
+	if (!oRect || oRect.width <= 0 || oRect.height <= 0) {
 		disconnectPreviewSelectionObservers();
 		hidePreviewSelectionLayer();
 		return;
@@ -2949,8 +3009,11 @@ function updatePreviewSelectionLayer() {
 	oStyle = window.getComputedStyle ? window.getComputedStyle(oTargetDom) : null;
 	bCompactTextTarget = isPreviewSelectionCompactTextTarget(oTargetDom, oRect, oUi);
 	iLayerOffset = bCompactTextTarget ? 3 : 0;
-	oLayer.style.left = (oRect.left + iScrollLeft - iLayerOffset) + "px";
-	oLayer.style.top = (oRect.top + iScrollTop - iLayerOffset) + "px";
+	// oRect 는 이미 zoom 1배 기준이다 — 스크롤 값만 같은 기준으로 바꿔 더한다.
+	//   iLayerOffset(작은 글자 UI 의 여백 3px)도 CSS 픽셀이라 그대로 쓴다.
+	fZoom = getPreviewZoomFactor();
+	oLayer.style.left = (oRect.left + iScrollLeft / fZoom - iLayerOffset) + "px";
+	oLayer.style.top = (oRect.top + iScrollTop / fZoom - iLayerOffset) + "px";
 	oLayer.style.width = (oRect.width + (iLayerOffset * 2)) + "px";
 	oLayer.style.height = (oRect.height + (iLayerOffset * 2)) + "px";
 	oLayer.style.setProperty(
@@ -4952,6 +5015,13 @@ function setPreviewZoom(fVal) {
 		return;
 	}
 	l_tag[0].style.zoom = String(fVal);
+
+	// ★[2026-10-30 장군님 지시] zoom 을 바꾸면 선택 표시를 다시 그린다.
+	//   zoom 변경은 scroll 도 sap.ui 의 UIUpdated 도 발화시키지 않는다.
+	//   ResizeObserver 도 믿을 수 없다 — 실측(Chromium 152)에서 **확대 때는 아예 안 불렸다**.
+	if (typeof requestPreviewMarkLayerUpdate === "function") {
+		requestPreviewMarkLayerUpdate();
+	}
 }
 
 

@@ -8,18 +8,38 @@
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
 
-    <!-- [흰 플래시 방지] UI5 콘텐츠라 테마 인프라가 없어 로드 전 흰색. 부모(frame.html)의 --boot-bg 를
-         첫 페인트 전 문서 배경으로 상속(동일 origin). UI5 렌더 완료되면 UI5 배경이 덮는다. -->
+    <!-- ==================================================================================
+         [흰 플래시 방지] 이 문서는 UI5 콘텐츠라 테마 인프라가 없어 로드 전에는 흰색이다.
+           **최상위(window.top) 문서의 --boot-bg** 를 첫 페인트 전 문서 배경으로 깔아 둔다.
+           그 뒤 UI5 렌더가 끝나면 UI5 배경이 덮는다 — 목적은 **뜨는 순간의 깜빡임만** 없애는 것이다.
+         · 2026-10-30 장군님 결정 — 바로 위 부모(parent)를 보면 iframe 이 한 겹만 더 깊어져도 값을
+           못 찾는다. top 은 겹이 몇이든 한 번에 닿는다.
+           「첫 실행만 최상위 테마 색, 그 뒤는 각 화면 색」 — 장군님 2026-10-30.
+         · 공통 표준 = .analy/16 §2.6.
+         · 읽기가 막히면(cross-origin) 그냥 넘어간다 — 흰 번쩍만 보이고 기능은 돈다.
+         ================================================================================== -->
     <script>
         (function () {
+
             try {
-                var bg = parent.document.documentElement.style.getPropertyValue("--boot-bg");
-                if (bg) {
-                    var s = document.createElement("style");
-                    s.textContent = "html,body{background:" + bg + ";}";
-                    document.head.appendChild(s);
+
+                var sBg = window.top.document.documentElement.style.getPropertyValue("--boot-bg");
+
+                if (!sBg) {
+                    return;
                 }
-            } catch (e) { }
+
+                var oStyle = document.createElement("style");
+
+                oStyle.textContent = "html,body{background:" + sBg + ";}";
+
+                document.head.appendChild(oStyle);
+
+            } catch (e) {
+                // 첫 페인트 전이라 U4ALOG 가 아직 없다.
+                console.error("[UCSSM-001] boot background inherit failed:", e && e.message);
+            }
+
         })();
     </script>
 

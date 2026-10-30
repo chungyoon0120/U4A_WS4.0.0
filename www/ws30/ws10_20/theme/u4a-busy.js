@@ -1,4 +1,4 @@
-// 오류코드 접두: UBSY / 다음 번호: 007
+// 오류코드 접두: UBSY / 다음 번호: 010
 /************************************************************************
  * U4A Workspace — 공통 busy (window.U4ABusy)  · 짝 = u4a-busy.css
  * ----------------------------------------------------------------------
@@ -21,6 +21,17 @@
     "use strict";
 
     var BUSY_ID = "u4aWsBusyIndicator";
+
+    // WS 로고 SVG — busy 그림 두 가지가 같이 쓴다. 복사하지 말고 이 상수를 쓴다.
+    var WS_LOGO_SVG =
+        '<svg class="logo" viewBox="0 0 307 311" aria-hidden="true">' +
+            '<path d="M4 4 50 4 50 211 9 211Z"/>' +
+            '<path d="M91 4 127 4 54 211 21 211Z"/>' +
+            '<path d="M98 4 134 4 134 211 102 211Z"/>' +
+            '<path d="M176 4 222 4 146 211 106 211Z"/>' +
+            '<path d="M236 93 254 93 266 95 270 96 277 99 283 103 288 107 294 114 296 117 299 122 301 128 302 132 303 139 303 154 302 158 301 159 258 159 257 158 257 157 257 146 255 141 254 139 251 136 248 134 244 133 238 132 233 132 230 133 225 135 219 139 215 145 213 149 212 153 212 158 213 163 217 169 221 173 224 175 234 178 259 189 269 194 276 200 280 204 283 208 287 214 289 220 290 224 290 233 290 238 289 247 287 255 284 263 281 269 277 274 272 280 267 285 255 294 249 298 242 301 234 304 226 306 214 307 196 307 184 305 180 304 172 301 166 297 161 293 156 287 154 284 151 278 149 273 148 269 146 261 146 247 147 242 148 242 191 242 192 243 193 244 193 255 194 259 196 262 199 265 202 267 205 268 211 268 216 268 219 267 225 265 230 261 235 256 236 252 237 248 237 242 236 237 233 232 228 228 225 226 215 222 191 212 181 206 174 201 169 197 166 193 163 186 161 180 160 176 159 168 160 162 161 154 163 146 166 138 169 132 172 126 177 121 183 115 194 106 200 103 207 100 215 97 223 95Z"/>' +
+        '</svg>';
+
 
     // busy 를 켤 때마다 증가 — 기다리는 중에 다시 켜면 그 끄기를 버린다(hide 참조).
     var nGen = 0;
@@ -202,6 +213,44 @@
      * ================================================================== */
 
     /** busy <dialog> 를 만들어 <body> 에 붙인다(구 ws10_20/index.html 마크업과 같은 구조). */
+    /**
+     * AI 전용 그림의 빛 입자 12개 HTML.
+     * ★[2026-10-30 장군님 지시] AI 전용 그림 = 시안 40안 01 Beam + Data Flow.
+     *   입자는 로고 칸(.lg) 안에 두고, 로고 가운데에서 --x · --y 만큼 떨어진 곳에서 출발해
+     *   로고로 빨려 든다. 카드 가운데 기준으로 옮기면 엉뚱한 곳으로 모인다(지침서 2절).
+     *   줄마다 복붙하지 않고 표로 둔다 — 자리를 고칠 때 이 표 한 곳만 고친다.
+     */
+    var AI_PARTICLES = [
+        { x: -150, y: -46, delay: "0s" },
+        { x: 96, y: -50, delay: "-0.3s" },
+        { x: -120, y: 52, delay: "-0.6s" },
+        { x: 92, y: 48, delay: "-0.9s" },
+        { x: -60, y: -64, delay: "-1.2s" },
+        { x: 40, y: -66, delay: "-1.5s" },
+        { x: -176, y: 4, delay: "-1.8s" },
+        { x: 110, y: 0, delay: "-2.1s" },
+        { x: -30, y: 64, delay: "-0.45s" },
+        { x: 60, y: 60, delay: "-0.75s" },
+        { x: -10, y: -70, delay: "-1.05s" },
+        { x: 10, y: 70, delay: "-1.65s" }
+    ];
+
+    function _aiParticlesHtml() {
+
+        var sHtml = "";
+        var i;
+        var oP;
+
+        for (i = 0; i < AI_PARTICLES.length; i++) {
+
+            oP = AI_PARTICLES[i];
+
+            sHtml += '<i class="p" style="--x:' + oP.x + 'px;--y:' + oP.y + 'px;animation-delay:' + oP.delay + '"></i>';
+        }
+
+        return sHtml;
+    }
+
     function _create() {
 
         var oBody = document.body;
@@ -218,15 +267,50 @@
         oDlg.setAttribute("data-act", "BUSY");   // 2026-10-14 자동 테스트 도구가 집을 이름(.analy/21)
 
         // ★[2026-10-29 장군님 결정] 모양 = Sparkle 시안(u4a-busy.css 의 「중앙 카드 = Sparkle」 참조).
-        //   <i> = WS 로고(CSS mask + 지나가는 빛줄기), <b> 3개 = 빛이 지나는 자리에 튀는 별빛.
         //   빈 요소라 글자는 없다 — 모양은 전부 CSS 가 그린다.
+        // ★[2026-10-30] 움직임은 전부 transform · opacity 로만 낸다 — 무거운 동기 작업이 main thread 를
+        //   붙잡으면 각도(@property)·background-position 애니메이션은 멈추지만 transform 은 안 멈춘다.
+        //   · <span class="u4aWsBusyEdge"><i></i></span> = 카드 테두리를 도는 빛(큰 원뿔 판을 rotate)
+        // ★[2026-10-30 장군님 지시] 가운데 그림 = 시안 「18안 · 개발 툴킷」의 04번 API Call.
+        //   WS 앱(왼쪽 로고)에서 서버(오른쪽 칸 3개)로 GET 이 날아가고, 서버가 깜빡여 처리한 뒤
+        //   JSON 이 돌아오면 "200 OK" 가 뜬다 — 서버와 통신하는 중이라는 뜻.
+        //   시안 출처 = busy_indicators.html #18-api. 모양은 전부 짝 CSS(.u4aWsBusyApi)가 그린다.
         oDlg.innerHTML =
             '<div class="u4aWsBusyCard">' +
-                '<div class="u4aWsSpinner">' +
+                '<span class="u4aWsBusyEdge">' +
                     '<i></i>' +
-                    '<b></b>' +
-                    '<b></b>' +
-                    '<b></b>' +
+                '</span>' +
+                '<div class="u4aWsBusyApi">' +
+                    WS_LOGO_SVG +
+                    '<b class="wire"></b>' +
+                    '<span class="pk req"><em>GET</em></span>' +
+                    '<span class="pk res"><em>JSON</em></span>' +
+                    '<div class="srv">' +
+                        '<i></i>' +
+                        '<i></i>' +
+                        '<i></i>' +
+                    '</div>' +
+                    '<span class="ok">200 OK</span>' +
+                '</div>' +
+
+                // ★[2026-10-30 장군님 지시] setAIBusy 전용 그림 = 시안 「40안 · 조합」의 01번 Beam + Data Flow.
+                //   종전 23안 03 AI Steering 을 대체한다(두 벌 남기지 않는다).
+                //   「AI」 글씨에서 빛줄기가 뻗어 WS 로고에 닿으면 로고 뒤가 환해지고(1.8초 박자),
+                //   사방에서 빛 입자 12개가 로고로 빨려 든다(2.4초) — AI 가 WS4.0 으로 일을 보내는 중이라는 뜻.
+                //   평소에는 숨어 있고, 카드에 data-u4a-busy-mode="ai" 가 붙으면 이쪽이 보인다.
+                //   ★AI 모드에서는 카드 테두리를 도는 빛(u4aWsBusyEdge)을 CSS 로 끈다.
+                '<div class="u4aWsBusyAi">' +
+                    '<span class="ai">AI</span>' +
+                    '<b class="ln">' +
+                        '<i class="flare"></i>' +
+                        '<i class="ray"></i>' +
+                    '</b>' +
+                    '<span class="lg">' +
+                        '<i class="core"></i>' +
+                        _aiParticlesHtml() +
+                        '<i class="glow"></i>' +
+                        WS_LOGO_SVG +
+                    '</span>' +
                 '</div>' +
                 '<div class="u4aWsBusyTitle" id="u4aWsBusyTitle"></div>' +
                 '<div class="u4aWsBusyText" id="u4aWsBusyText"></div>' +
@@ -237,7 +321,7 @@
         return oDlg;
     }
 
-    function show() {
+    function _showCore() {
 
         // ★ 켤 때 세대를 올린다 — 대기 중이던 끄기가 이 busy 를 꺼 버리지 않게(아래 hide 설명).
         nGen++;
@@ -306,19 +390,14 @@
      *   기다리는 중에 show() 가 와서 이 끄기를 버린 경우에는 **부르지 않는다**(창이 안 닫혔으니).
      *   인자 없이 부르면 종전과 똑같다 — 별창 20여 곳이 그렇게 부른다.
      * ================================================================== */
-    function hide(fnDone) {
+    function _hideCore(fnDone, bNow) {
 
         function _done() {
 
-            if (typeof fnDone !== "function") {
-                return;
-            }
+            // 기다리던 뒷일(afterOff)을 먼저 비운다 — 여기가 「실제로 꺼진」 자리다.
+            _flushAfterOff();
 
-            try {
-                fnDone();
-            } catch (e) {
-                _caught("UBSY-003", "U4ABusy.hide: fnDone failed", e);
-            }
+            _runDone(fnDone);
         }
 
         // 한 번도 안 켰으면 요소가 없다 — 끌 것이 없는 정상 상태라 로그를 남기지 않는다.
@@ -349,6 +428,17 @@
             }
 
             _done();
+        }
+
+        // ★★★[2026-10-30 장군님 지시 「그렇게 해라」] AI busy 끄기는 기다리지 않고 바로 끈다.
+        //   [까닭] 아래 기다림은 「미리보기가 다 그려졌나」를 보는 것이다. AI busy 는 AI 가
+        //     「내 일 끝났다」고 직접 끄는 것이라 그것을 볼 이유가 없다. 오히려 AI 가 화면을
+        //     바꾸는 중이면 조용해질 때까지 창을 계속 다시 세어 한참 안 꺼졌다
+        //     (빈 화면 실측 333ms = QUIET_WINDOW_MS x2 + idle, 실제 화면은 더 길다).
+        //   [범위] 이 길은 setAIBusy(false) 만 탄다. U4ABusy.hide() 는 종전 그대로다.
+        if (bNow === true) {
+            _doHide();
+            return;
         }
 
         // 쓸 수 없는 환경이면 종전대로 즉시 끈다(동작 유지).
@@ -503,6 +593,200 @@
     }
 
 
-    global.U4ABusy = { show: show, hide: hide };
+    /* ==================================================================
+     * AI 가 제어하는 동안 다른 busy 가 끼어들지 못하게 막는 자물쇠
+     * ------------------------------------------------------------------
+     * [2026-10-30 장군님 지시] 「setAIBusy 를 실행중에 다른 setBusy 가 켜지는건 막는걸로 해줘」
+     *
+     *   · 켜기(show)뿐 아니라 **끄기(hide)도 막는다.** 켜기만 막으면 달라지는 것이 없기 때문이다 —
+     *     화면 안 다른 처리는 켜기와 끄기를 짝으로 부르므로, 켜기만 막아도 그 짝인 **끄기가 와서
+     *     AI busy 를 꺼 버린다.** 그러면 「AI 가 제어하는 동안 유지한다」는 목적이 깨진다.
+     *   · 다만 막을 때도 **부르는 쪽이 넘긴 뒷정리(fnDone)는 해 준다** — 그쪽은 자기 작업이
+     *     끝난 뒤 토스트 등을 띄워야 한다. busy 를 언제 끌지는 AI 쪽이 책임진다.
+     *   · 자물쇠가 풀려 있으면(=평소) show / hide 는 **전과 한 줄도 다르지 않게** 돈다.
+     * ================================================================== */
+
+    var bAILocked = false;
+
+    /** 부르는 쪽이 넘긴 뒷정리 — _hideCore 안의 _done 과 같은 일을 한 곳에서 한다. */
+    function _runDone(fnDone) {
+
+        if (typeof fnDone !== "function") {
+            return;
+        }
+
+        try {
+            fnDone();
+        } catch (e) {
+            _caught("UBSY-003", "U4ABusy.hide: fnDone failed", e);
+        }
+    }
+
+    /* ==================================================================
+     * busy 가 **실제로 꺼진 뒤** 할 일 — U4ABusy.afterOff(fn)
+     * ------------------------------------------------------------------
+     * [2026-10-30] hide() 는 화면이 조용해질 때까지 기다렸다 끄므로 **부르자마자 꺼지지 않는다**
+     *   (최소 0.3초). 그래서 hide() 바로 뒤에 토스트를 띄우면 busy 와 겹쳐 보인다
+     *   (장군님 지적 2026-10-30 「처리가 다 끝나고 메시지가 나와야 하지 않아?」).
+     *
+     *   · busy 가 떠 있지 않으면 **바로** 부른다. 떠 있으면 꺼지는 그때 부른다.
+     *   · 끄기를 거는 쪽과 뒷일을 거는 쪽이 달라도 된다 — 그래서 화면 쪽은
+     *     「끄기 한 줄 + afterOff 한 줄」로 끝난다. busy 함수를 창마다 고칠 필요가 없다.
+     *   · AI 자물쇠로 끄기가 막혀 있으면 그동안 기다렸다가, AI busy 가 꺼질 때 같이 불린다.
+     * ================================================================== */
+
+    var aAfterOff = [];
+
+    function afterOff(fnDone) {
+
+        if (typeof fnDone !== "function") {
+            return;
+        }
+
+        var oBusyDom = document.getElementById(BUSY_ID);
+
+        // 떠 있지 않으면 기다릴 것이 없다.
+        if (!oBusyDom || !oBusyDom.open) {
+            _runDone(fnDone);
+            return;
+        }
+
+        aAfterOff.push(fnDone);
+    }
+
+    /** 실제로 꺼진 그 자리에서 대기열을 비운다. */
+    function _flushAfterOff() {
+
+        if (aAfterOff.length === 0) {
+            return;
+        }
+
+        var aList = aAfterOff;
+
+        aAfterOff = [];
+
+        for (var i = 0; i < aList.length; i++) {
+            _runDone(aList[i]);
+        }
+    }
+
+
+    function show() {
+
+        if (bAILocked) {
+            console.warn("[UBSY-008] U4ABusy.show ignored - setAIBusy holds the lock");
+            return;
+        }
+
+        _showCore();
+    }
+
+    function hide(fnDone) {
+
+        if (bAILocked) {
+            console.warn("[UBSY-009] U4ABusy.hide ignored - setAIBusy holds the lock");
+            _runDone(fnDone);
+            return;
+        }
+
+        _hideCore(fnDone);
+    }
+
+
+    /* ==================================================================
+     * AI 전용 busy — setAIBusy(bOn, oOpt)
+     * ------------------------------------------------------------------
+     * [2026-10-30 장군님 지시] AI 가 WS4.0 을 제어하는 동안 쓰는 busy.
+     *   화면·동작은 **공통 busy 그대로**다 — 아래에서 show() / hide() 를 그대로 부른다.
+     *   다른 점은 카드에 **무슨 작업 중인지 글(desc)을 띄운다**는 것뿐이다.
+     *
+     *     setAIBusy(true, { desc: "작업중입니다. \n 잠시만 기다려 주세요" });
+     *     setAIBusy(false);
+     *
+     *   · 두 번째 인자는 **object** 로 받는다 — 나중에 항목을 더할 수 있게. 지금은 desc 하나.
+     *   · desc 안의 "\n" 은 **그대로 개행**으로 보인다 — 짝 CSS 의
+     *     .u4aWsBusyText { white-space: pre-line } 가 그렇게 그린다.
+     *     innerHTML 을 쓰지 않는다 — desc 에 태그가 섞여 들어와도 글자로만 보이게.
+     *   · 글자 자리(#u4aWsBusyText)는 다른 화면도 쓰는 **공용 자리**라, 끌 때 반드시 비운다.
+     *     비우는 시점은 busy 가 **실제로 꺼진 뒤**다(hide 의 콜백) — 먼저 비우면
+     *     busy 가 아직 떠 있는 동안 글만 사라져 이상하게 보인다.
+     * ================================================================== */
+
+    var AI_TEXT_ID = "u4aWsBusyText";
+
+    /** busy 카드의 글자 자리에 글을 넣는다(빈 글자면 지운다). */
+    function _setAIText(sDesc) {
+
+        var oTxt = document.getElementById(AI_TEXT_ID);
+
+        if (!oTxt) {
+            console.warn("[UBSY-007] setAIBusy: #" + AI_TEXT_ID + " not found - desc not shown");
+            return;
+        }
+
+        oTxt.textContent = sDesc;
+    }
+
+    /** busy 카드를 AI 모드로 바꾼다(그림이 AI Steering 으로 바뀐다) / 되돌린다. */
+    function _setAIMode(bOn) {
+
+        var oBusyDom = document.getElementById(BUSY_ID);
+
+        if (!oBusyDom) {
+            return;
+        }
+
+        if (bOn) {
+            oBusyDom.setAttribute("data-u4a-busy-mode", "ai");
+            return;
+        }
+
+        oBusyDom.removeAttribute("data-u4a-busy-mode");
+    }
+
+    function setAIBusy(bOn, oOpt) {
+
+        var oOption = oOpt || {};
+        var sDesc = (typeof oOption.desc === "string") ? oOption.desc : "";
+
+        if (bOn) {
+
+            // 자기 자신은 자물쇠에 걸리면 안 되므로 _showCore 를 바로 부른다.
+            _showCore();
+
+            // _showCore 가 카드를 만든 뒤라야 그림·글자 자리가 있다 — 순서를 바꾸지 말 것.
+            _setAIMode(true);
+            _setAIText(sDesc);
+
+            bAILocked = true;
+
+            return;
+        }
+
+        // 먼저 자물쇠를 풀어야 아래 _hideCore 가 평소대로 돈다.
+        bAILocked = false;
+
+        // 두 번째 인자 true = 기다리지 않고 바로 끈다(위 _hideCore 의 ★ 참조).
+        _hideCore(function () {
+            _setAIText("");
+            _setAIMode(false);
+        }, true);
+    }
+
+
+    /**
+     * AI 가 제어 중인가(setAIBusy 가 자물쇠를 쥐고 있나).
+     *   ★[2026-10-30 장군님 지시] 메인 창 전역 setBusy(resources/index.js)가 이것을 보고
+     *     통째로 그만둔다. 공통 busy 층만 막으면 그 바깥의 부수 작업(마우스 막기 풀기 ·
+     *     창 닫기 버튼 활성 · busy 카드 글자 덮어쓰기)이 그대로 돌아 AI busy 가 깨진다.
+     */
+    function isAILocked() {
+        return bAILocked === true;
+    }
+
+    global.U4ABusy = { show: show, hide: hide, afterOff: afterOff, setAIBusy: setAIBusy, isAILocked: isAILocked };
+
+    // 부르는 쪽이 setAIBusy(true, {...}) 로 바로 쓰도록 전역에도 둔다(장군님 호출 예시).
+    global.setAIBusy = setAIBusy;
 
 })(window);

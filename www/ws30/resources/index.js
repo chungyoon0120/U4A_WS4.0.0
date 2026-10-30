@@ -1,4 +1,4 @@
-// 오류코드 접두: RSRC / 다음 번호: 016
+// 오류코드 접두: RSRC / 다음 번호: 018
 /**
  * index.js  (cleaned)
  *
@@ -932,6 +932,31 @@ var BUSY_DOM_ID = "u4aWsBusyIndicator";
      * 기존 소스 리펙토링
      *
      */
+    /**
+     * busy 카드의 제목·문구를 비운다.
+     *   ★[2026-10-30 장군님 지시] setBusy("X") 처럼 **인자를 안 넘기고** 켜면 앞서 넣어 둔 글이
+     *     그대로 남아 엉뚱한 메시지가 보였다. 아래 oWS.utill.fn.setBusy 는 「이미 켜져 있으면
+     *     그만둔다」로 시작해서 글 비우기까지 건너뛰기 때문이다.
+     *   ★같은 두 줄을 여러 자리에 복사하지 않으려고 여기 한 곳에 둔다.
+     */
+    oWS.utill.fn.clearBusyText = function () {
+
+        var oBusy = oWS.utill.attr.oBusy;
+
+        if (!oBusy) {
+            return;
+        }
+
+        if (typeof oBusy.setTitle === "function") {
+            oBusy.setTitle("");
+        }
+
+        if (typeof oBusy.setText === "function") {
+            oBusy.setText("");
+        }
+    };
+
+
     oWS.utill.fn.setBusy = (sIsBusy) => {
 
         // 공통 참조 변수 캐싱 (반복 접근 최소화)
@@ -989,8 +1014,7 @@ var BUSY_DOM_ID = "u4aWsBusyIndicator";
         if (oBusy) {
             if (bIsBusy) {
                 // UI 초기화 및 오픈
-                if (typeof oBusy.setTitle === "function") oBusy.setTitle("");
-                if (typeof oBusy.setText === "function") oBusy.setText("");
+                oWS.utill.fn.clearBusyText();
 
                 // 이미 열려있지 않다면 오픈 (isOpen 메서드가 있다면 활용 권장)
                 // if (!oBusy.isOpen || !oBusy.isOpen()) { oBusy.open(); }
@@ -1730,11 +1754,41 @@ function setDomBusy(bIsBusy, fnDone) {
 
 // 19. Busy Indicator 실행
 // - 파라미터에 Option이 존재할 경우는 busyDialog로 호출함
+/**
+ * AI 가 WS4.0 을 제어하는 동안인가(공통 busy 의 setAIBusy 가 자물쇠를 쥐고 있나).
+ *   U4ABusy 가 없는 창이거나 옛 판이면 false — 종전과 똑같이 돈다.
+ */
+function isAIBusyLocked() {
+
+    if (typeof U4ABusy === "undefined" || !U4ABusy) {
+        return false;
+    }
+
+    if (typeof U4ABusy.isAILocked !== "function") {
+        return false;
+    }
+
+    return U4ABusy.isAILocked() === true;
+}
+
 function setBusy(bIsBusy, oOptions) {
 
     // console.trace(`Busy: ${bIsBusy}`);
 
     zconsole.warn("setBusy", `bIsBusy: "${bIsBusy}", oOptions: ${oOptions}`);
+
+    // ★★★[2026-10-30 장군님 지시 「해라」] AI 가 제어하는 동안(setAIBusy)은 여기서 통째로 그만둔다.
+    //   [까닭] 공통 busy 층(U4ABusy.show/hide)만 막아서는 모자랐다. 이 함수가 그 바깥에서
+    //     하는 일이 AI busy 를 깨뜨린다 —
+    //     · 켤 때  : setBusyDialog 가 busy 카드의 제목·문구를 빈 값으로 덮어써 AI 의 글이 지워진다.
+    //     · 끌 때  : 공통 busy 가 막혀도 뒷정리 콜백이 돌아 마우스 막기 풀기 · 창 닫기 버튼 활성 ·
+    //                포커스 복원이 실행된다 → AI busy 창은 떠 있는데 조작이 열린다.
+    //   [풀린 뒤] 잠긴 동안 버려진 끄기가 나중에 다시 와도 안전하다 — 그때는 busy 창이 닫혀 있어
+    //     공통 busy 가 뒷정리만 해 준다.
+    if (isAIBusyLocked() === true) {
+        console.warn("[RSRC-017] setBusy ignored - setAIBusy holds the lock, bIsBusy: \"" + bIsBusy + "\"");
+        return;
+    }
 
     //busy on 처리 건인경우.
     if (bIsBusy === "X") {
@@ -1747,6 +1801,12 @@ function setBusy(bIsBusy, oOptions) {
         if (typeof oOptions === "object") {
             oWS.utill.fn.setBusyDialog(bIsBusy, oOptions);
         } else {
+
+            // ★[2026-10-30 장군님 지시] 인자를 안 넘기고 켜는 것이니 앞서 넣어 둔 글을 먼저 지운다.
+            //   안쪽 함수는 「이미 켜져 있으면 그만둔다」로 시작해 글 비우기까지 건너뛴다 —
+            //   그래서 setBusy("X", { DESC: "…" }) 뒤에 setBusy("X") 를 부르면 옛 글이 남아 있었다.
+            oWS.utill.fn.clearBusyText();
+
             oWS.utill.fn.setBusy(bIsBusy);
         }
 

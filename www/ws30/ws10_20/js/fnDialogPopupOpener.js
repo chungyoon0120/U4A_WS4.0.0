@@ -21,6 +21,35 @@
  *   영영 오지 않아 편집화면이 흐려진 채 멈췄다(안내도 없음). 백업 = `_fnDialogPopupOpener.js.br55bak`.
  ************************************************************************/
 (function (window, $, oAPP) {
+
+    /************************************************************************
+     * 별창이 닫힐 때 **잠금·방송을 푼다** — 창을 열며 잠근 것의 짝.
+     * ----------------------------------------------------------------------
+     * ★[2026-10-30 장군님 지시] 「브라우저 닫기 이벤트 … 거기서 신호 보내고 닫으면 되는 거 아니야?」
+     *
+     *   창을 열 때 opener 가 `fnSetBusyLock("X")` + `BUSY_ON` 방송으로 **형제 창까지 잠근다.**
+     *   푸는 코드는 보통 「창이 다 뜬 뒤」에만 있어서, **창이 뜨기 전에 닫히면**
+     *   (문서 로드 실패 · 바로 닫음 등) 형제 창이 **잠긴 채로 남는다.**
+     *   `closed` 는 **어떻게 닫히든 반드시 타므로** 여기서 짝을 맞춘다.
+     *
+     *   · 이미 풀린 뒤에 또 풀어도 해가 없다 — 끌 것이 없으면 그냥 끝난다.
+     *   · 바인딩 별창만은 원본에 제 함수(lf_releaseBindPopupBusy)가 있어 그것을 그대로 쓴다.
+     ************************************************************************/
+    function lf_releaseChildWindowBusy() {
+
+        try {
+            oAPP.common.fnSetBusyLock("");
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+
+        try {
+            oAPP.attr.oMainBroad.postMessage({ PRCCD: "BUSY_OFF" });
+        } catch (e) {
+            if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); }
+        }
+    }
+
     "use strict";
 
     const
@@ -253,6 +282,10 @@
 
         let iMimeWinId = oBrowserWindow.id;
         oBrowserWindow.on('closed', () => {
+
+            // 창이 뜨기 전에 닫혀도 형제 창 잠금을 푼다(헬퍼 주석 참조).
+            lf_releaseChildWindowBusy();
+
             try { if (oChildMap) { oChildMap.delete(iMimeWinId); } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
             oBrowserWindow = null;
             CURRWIN.focus();
@@ -1041,7 +1074,12 @@
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
 
-            parent.setBusy("", {});
+            // ★[2026-10-30 장군님 지적] 「바인딩 팝업에서 busy 가 켜진 상태에서 창을 닫으면 …
+            //   ws20 화면은 busy 가 잘 종료 되는데 **다른 창에서는 busy 가 안꺼져**」
+            //   여기만 parent.setBusy("", {}) 한 줄이었다 — 그것은 **WS20 한 창**만 끈다.
+            //   켤 때는 방송으로 **모든 창**을 켜 놓으므로 끌 때도 방송을 해야 풀린다.
+            //   위에 이미 있는 공통 해제 함수(잠금 해제 + WS20 끄기 + 방송)를 부른다 — 원본과 같다.
+            lf_releaseBindPopupBusy();
 
             // [parent 제거 — 원본 1:1] 닫힌 창 참조를 치운다.
             //   남겨 두면 다음에 열 때 죽은 창을 되살리려 하거나, 자식 창 일괄 처리에서 터진다.
@@ -1671,6 +1709,9 @@
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
+            // 창이 뜨기 전에 닫혀도 형제 창 잠금을 푼다(lf_releaseChildWindowBusy 주석 참조).
+            lf_releaseChildWindowBusy();
+
 
             oBrowserWindow = null;
 
@@ -1820,6 +1861,9 @@
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
+            // 창이 뜨기 전에 닫혀도 형제 창 잠금을 푼다(lf_releaseChildWindowBusy 주석 참조).
+            lf_releaseChildWindowBusy();
+
 
             IPCMAIN.off(`${BROWSKEY}-cdn-save`, lf_IpcMainCdnSave);
 
@@ -1969,6 +2013,9 @@
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
+            // 창이 뜨기 전에 닫혀도 형제 창 잠금을 푼다(lf_releaseChildWindowBusy 주석 참조).
+            lf_releaseChildWindowBusy();
+
 
             // console.log("cccccc");
 
@@ -2391,6 +2438,9 @@
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
+            // 창이 뜨기 전에 닫혀도 형제 창 잠금을 푼다(lf_releaseChildWindowBusy 주석 참조).
+            lf_releaseChildWindowBusy();
+
 
             oBrowserWindow = null;
 
@@ -3031,6 +3081,9 @@
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
+            // 창이 뜨기 전에 닫혀도 형제 창 잠금을 푼다(lf_releaseChildWindowBusy 주석 참조).
+            lf_releaseChildWindowBusy();
+
 
             oBrowserWindow = null;
 
@@ -3155,6 +3208,9 @@
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
+            // 창이 뜨기 전에 닫혀도 형제 창 잠금을 푼다(lf_releaseChildWindowBusy 주석 참조).
+            lf_releaseChildWindowBusy();
+
 
             oBrowserWindow = null;
 
@@ -3427,6 +3483,9 @@
 
         // 브라우저를 닫을때 타는 이벤트
         oBrowserWindow.on('closed', () => {
+            // 창이 뜨기 전에 닫혀도 형제 창 잠금을 푼다(lf_releaseChildWindowBusy 주석 참조).
+            lf_releaseChildWindowBusy();
+
 
             IPCMAIN.off(`${BROWSKEY}--errormsg--click`, oAPP.fn.fnIpcMain_errmsg_click);
 

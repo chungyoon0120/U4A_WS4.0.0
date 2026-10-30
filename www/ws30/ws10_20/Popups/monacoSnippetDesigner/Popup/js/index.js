@@ -11,6 +11,8 @@
  *   · 저장·삭제 후 IPC(if-browser-interconnection / PRCCD:MONACO_SNIPPET_CHANGE) 방송 →
  *           열린 모든 USP 본편집기 자동완성 스니펫 갱신(js/usp/monaco 가 동일 파일 소비).
  *   · 언어 목록: javascript / css / html (원본 하드코딩).
+ *
+ *  [오류코드 접두] MSNIP / 다음 번호: 003
  ************************************************************************/
 
 (function () {
@@ -127,23 +129,76 @@
         _toastTimer = setTimeout(function () { try { oT.setAttribute("data-show", "false"); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } } }, 3000);
     }
 
-    // busy(top-layer <dialog>) 제어.
-    function fn_setBusy(bIsBusy) {
+    // busy 제어.
+    //   [2026-10-16] 공통 busy(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음).
+    //
+    //   ★ fnDone = **busy 가 실제로 꺼진 뒤** 할 일(토스트 등). 끌 때만 쓴다.
+    //     공통 busy 의 hide() 는 화면이 조용해질 때까지 기다렸다 끄므로 **부르자마자 꺼지지 않는다**
+    //     (theme/u4a-busy.js QUIET_WINDOW_MS × 2 — 최소 0.3초, 화면이 계속 바뀌면 더).
+    //     그래서 hide() 바로 뒤에 토스트를 띄우면 busy 와 **겹쳐 보인다**.
+    //     장군님 지적 2026-10-30 「보통 busy라고 하면 뭔가 처리중 표시인데 처리가 다 끝나고
+    //     메시지가 나와야하지 않아?」 → hide() 가 주는 콜백 자리로 미룬다.
+    function fn_setBusy(bIsBusy, fnDone) {
+
         oState.isBusy = !!bIsBusy;
-        // [2026-10-16] 공통 busy(.analy/16 §2.10 — 모든 화면·영역·별창 예외 없음). 자체 <dialog> 도 공통으로 모은다:
+
         if (window.U4ABusy && typeof U4ABusy.show === "function") {
-            if (bIsBusy) { U4ABusy.show(); } else { U4ABusy.hide(); }
+
+            if (bIsBusy) {
+                U4ABusy.show();
+                return;
+            }
+
+            U4ABusy.hide(fnDone);
             return;
         }
+
         if (typeof U4ALOG !== "undefined" && U4ALOG.warn) {
             U4ALOG.warn("GUARD_EXIT", "window.U4ABusy", "common busy not loaded - falling back to the local busy dialog");
         }
+
+        // 공통 busy 가 없는 환경 — 자체 <dialog> 로 떨어진다. 이쪽은 close() 가 바로 끝난다.
         const oBusy = document.getElementById("snipBusy");
-        if (!oBusy) { return; }
+
+        if (!oBusy) {
+            _runBusyDone(fnDone);
+            return;
+        }
+
         try {
-            if (bIsBusy) { if (!oBusy.open) { oBusy.showModal(); } }
-            else { if (oBusy.open) { oBusy.close(); } }
-        } catch (e) { console.error("[monacoSnippetDesigner] busy toggle error:", e); }
+
+            if (bIsBusy) {
+
+                if (!oBusy.open) {
+                    oBusy.showModal();
+                }
+
+                return;
+            }
+
+            if (oBusy.open) {
+                oBusy.close();
+            }
+
+        } catch (e) {
+            console.error("[MSNIP-001] busy toggle failed:", e);
+        }
+
+        _runBusyDone(fnDone);
+    }
+
+    // fn_setBusy 의 뒷정리 호출 — 콜백이 터져도 흐름이 끊기지 않게 한 곳에서 감싼다.
+    function _runBusyDone(fnDone) {
+
+        if (typeof fnDone !== "function") {
+            return;
+        }
+
+        try {
+            fnDone();
+        } catch (e) {
+            console.error("[MSNIP-002] busy done callback failed:", e);
+        }
     }
 
     // 자식창 일괄 busy 방송 수신 — 원본 frame.js _attachBroadCastEvent 이식(장군님 지시로 복원).
@@ -744,12 +799,19 @@
             _broadcastChange();
             bSaved = true;
         } finally {
-            fn_setBusy(false);
-        }
 
-        // ★ busy 해제 후에 토스트 — busy(top-layer dialog)가 열린 채로 띄우면 그 위에 가려지거나
-        //   busy 가 닫힐 때 함께 사라져 사용자가 저장 여부를 못 본다(원본 M366 = "저장되었습니다!").
-        if (bSaved) { _toast(wsMsg("366", "Saved.")); }
+            // ★ 토스트는 **busy 가 실제로 꺼진 뒤**에 띄운다(fn_setBusy 의 두 번째 인자).
+            //   공통 busy 는 hide() 를 불러도 바로 꺼지지 않아, 그냥 띄우면 busy 와 겹쳐 보인다.
+            //   장군님 지적 2026-10-30. 원본 M366 = "저장되었습니다!".
+            fn_setBusy(false, function () {
+
+                if (!bSaved) {
+                    return;
+                }
+
+                _toast(wsMsg("366", "Saved."));
+            });
+        }
     }
 
     function cancelSnippet() {
