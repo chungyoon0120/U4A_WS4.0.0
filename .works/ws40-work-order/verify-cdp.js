@@ -75,7 +75,31 @@ async function main() {
 
     // 지난 콘솔도 다시 받는다(Runtime.enable 이 쌓인 메시지를 되돌려 준다)
     await send("Runtime.enable");
-    await new Promise(function (r) { setTimeout(r, 1500); });
+
+    /**
+     * ★시간으로 기다리지 않는다(장군님 지시 2026-10-30 「불분명한 시간 재기는 넣지마」).
+     * 브라우저 안에서 **조건이 참이 될 때까지** 지켜보고, 참이 되면 그때 돌아온다.
+     * 상한에 닿으면 왜 못 기다렸는지 함께 돌려준다.
+     */
+    async function waitFor(sCondExpr, sWhat) {
+        let r = await ev(`(function(){
+            return new Promise(function (res) {
+                var t0 = Date.now();
+                function tick() {
+                    var ok = false;
+                    try { ok = !!(${sCondExpr}); } catch (e) { ok = false; }
+                    if (ok) { return res("ok " + (Date.now() - t0) + "ms"); }
+                    if (Date.now() - t0 > 15000) { return res("TIMEOUT"); }
+                    requestAnimationFrame(tick);
+                }
+                tick();
+            });
+        })()`);
+        if (String(r).indexOf("TIMEOUT") === 0) {
+            out["wait_" + sWhat] = "못 기다렸다: " + sCondExpr;
+        }
+        return r;
+    }
 
     let out = {};
 
@@ -132,24 +156,45 @@ async function main() {
 
     out.before = JSON.parse(await ev(PROBE));
 
-    // [2026-10-30] ★Electron 은 한 번 읽은 CSS 를 다시 읽지 않는다 — 파일을 고쳐도 화면은 옛 CSS 다.
-    //   그래서 u4a-busy.css 링크에 뒤에 붙는 값을 바꿔 **강제로 다시 읽힌다.** 앱 상태는 그대로다.
+    // ★Electron 은 한 번 읽은 CSS 를 다시 읽지 않는다 — href 에 값을 붙여 강제로 다시 읽힌다.
     out.cssReload = await ev("(function(){ var ls = document.querySelectorAll('link[rel=stylesheet]'); var n = 0; for (var i = 0; i < ls.length; i++) { var h = ls[i].getAttribute('href') || ''; if (h.indexOf('u4a-busy.css') >= 0) { ls[i].setAttribute('href', h.split('?')[0] + '?v=' + Date.now()); n++; } } return n; })()");
-    await new Promise(function (r) { setTimeout(r, 900); });
 
-    // ★시안 비교 때 요소에 직접 입힌 style 이 남아 있으면 CSS 를 덮어 화면이 안 바뀐다. 먼저 지운다.
+    // CSS 가 실제로 다시 읽혔는지 — 그 파일의 규칙이 다시 잡힐 때까지 기다린다.
+    out.cssReady = await waitFor("Array.prototype.some.call(document.styleSheets, function (ss) { try { return (ss.href || '').indexOf('u4a-busy.css') >= 0 && ss.cssRules.length > 0; } catch (e) { return false; } })", "css");
+
+    // ★시안 비교 때 요소에 직접 입힌 style 이 남아 있으면 CSS 를 덮는다. 먼저 지운다.
     out.clearInline = await ev("(function(){ var el = document.querySelector('.u4aWsBusyAura i'); if (!el) { return 'no el'; } el.removeAttribute('style'); return 'cleared'; })()");
 
-    await ev("setAIBusy(true, { desc: 'CDP 실측' })");
+    // ① 켠다 (desc 를 길게 넣어 카드가 커진 상태를 본다)
+    out.onCall = await ev("setAIBusy(true, { desc: 'asdfasfsadfsadfsadfsadfsadfasdfsafsadf\\n\\nasdfsadfsadfasfsafasdf' }), 'called'");
 
-    // [2026-10-30] 앱은 이미 만들어 둔 busy DOM 을 다시 쓴다 — u4a-busy.js 를 고쳐도 반영되지 않는다.
-    //   그래서 화면 테두리 띠 안쪽만 새 마크업으로 바꿔 넣고 CSS 를 눈으로 본다.
-    await ev("(function(){ var a = document.querySelector('.u4aWsBusyAura'); if (!a) { return 'no aura'; } a.innerHTML = '<b class=\'glow\'><i></i></b><b class=\'line\'><i></i></b>'; return 'replaced'; })()");
-    await new Promise(function (r) { setTimeout(r, 500); });
-    await new Promise(function (r) { setTimeout(r, 700); });
+    // 카드가 **실제로 그려져 크기가 잡힐 때까지** 기다린다(시간으로 재지 않는다).
+    out.cardReady = await waitFor("(function(){ var c = document.querySelector('.u4aWsBusyCard'); return c && c.clientWidth > 0 && c.clientHeight > 0; })()", "card");
+
+    // ② 입자를 카드 크기에 맞춰 퍼지게 한다(앱은 고친 u4a-busy.js 를 다시 읽지 않으므로 여기서 흉내낸다)
+    out.spread = await ev(`(function(){
+        var card = document.querySelector(".u4aWsBusyCard");
+        var ai = document.querySelector(".u4aWsBusyAi");
+        if (!card || !ai) { return "no"; }
+        var z = parseFloat(getComputedStyle(ai).zoom) || 1;
+        ai.style.setProperty("--u4aWsAiW", (card.clientWidth / z) + "px");
+        ai.style.setProperty("--u4aWsAiH", (card.clientHeight / z) + "px");
+        var F = [[-0.53,-0.26],[0.34,-0.28],[-0.42,0.30],[0.33,0.27],[-0.21,-0.36],[0.14,-0.38],
+                 [-0.62,0.02],[0.39,0],[-0.11,0.36],[0.21,0.34],[-0.04,-0.40],[0.04,0.40]];
+        var ps = ai.querySelectorAll(".p");
+        for (var i = 0; i < ps.length && i < F.length; i++) {
+            var d = getComputedStyle(ps[i]).animationDelay;
+            ps[i].setAttribute("style", "--fx:" + F[i][0] + ";--fy:" + F[i][1] + ";animation-delay:" + d);
+        }
+        return ps.length + " particles / W=" + Math.round(card.clientWidth / z) + " H=" + Math.round(card.clientHeight / z);
+    })()`);
+
+    // 입자가 새 자리로 다시 그려질 때까지 — 변수가 들어갔는지로 본다.
+    out.spreadReady = await waitFor("(function(){ var a = document.querySelector('.u4aWsBusyAi'); return a && a.style.getPropertyValue('--u4aWsAiW') !== ''; })()", "spread");
+
     out.afterAIBusyOn = JSON.parse(await ev(PROBE));
 
-    // 화면 캡처
+    // ③ 켜진 채로 캡처
     let shot = await send("Page.captureScreenshot", { format: "png" });
     let data = shot.result && shot.result.data;
     if (data) {
@@ -157,6 +202,13 @@ async function main() {
         out.screenshot = process.argv[2] || "ai-busy.png";
     } else {
         out.screenshot = "캡처 실패";
+    }
+
+    // ④ **반드시 끈다** — 켜 놓고 가면 화면이 잠긴 채로 남는다(장군님 지적 2026-10-30).
+    if (process.env.U4A_KEEP_BUSY !== "1") {
+        await ev("setAIBusy(false)");
+        await waitFor("(function(){ var d = document.getElementById('u4aWsBusyIndicator'); return !d || !d.hasAttribute('open'); })()", "busyOff");
+        out.busyOff = await ev("(function(){ var d = document.getElementById('u4aWsBusyIndicator'); return d ? (d.hasAttribute('open') ? 'still open' : 'closed') : 'no dialog'; })()");
     }
 
     console.log(JSON.stringify(out, null, 2));

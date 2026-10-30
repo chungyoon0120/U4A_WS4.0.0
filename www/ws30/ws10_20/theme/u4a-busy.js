@@ -218,22 +218,108 @@
      * ★[2026-10-30 장군님 지시] AI 전용 그림 = 시안 40안 01 Beam + Data Flow.
      *   입자는 로고 칸(.lg) 안에 두고, 로고 가운데에서 --x · --y 만큼 떨어진 곳에서 출발해
      *   로고로 빨려 든다. 카드 가운데 기준으로 옮기면 엉뚱한 곳으로 모인다(지침서 2절).
+     *   ★[2026-10-30 장군님 지시] 출발 자리를 **카드 크기에 대한 비율(fx · fy)** 로 둔다.
+     *     desc 가 길어 카드가 커지면 입자도 같이 퍼져야 한다 — px 로 박아 두면 로고 둘레에만 몰린다.
+     *     실제 px = 카드 안쪽 크기(--u4aWsAiW · --u4aWsAiH) × 비율. 그 두 변수는 _syncAiSpread() 가 넣는다.
      *   줄마다 복붙하지 않고 표로 둔다 — 자리를 고칠 때 이 표 한 곳만 고친다.
      */
     var AI_PARTICLES = [
-        { x: -150, y: -46, delay: "0s" },
-        { x: 96, y: -50, delay: "-0.3s" },
-        { x: -120, y: 52, delay: "-0.6s" },
-        { x: 92, y: 48, delay: "-0.9s" },
-        { x: -60, y: -64, delay: "-1.2s" },
-        { x: 40, y: -66, delay: "-1.5s" },
-        { x: -176, y: 4, delay: "-1.8s" },
-        { x: 110, y: 0, delay: "-2.1s" },
-        { x: -30, y: 64, delay: "-0.45s" },
-        { x: 60, y: 60, delay: "-0.75s" },
-        { x: -10, y: -70, delay: "-1.05s" },
-        { x: 10, y: 70, delay: "-1.65s" }
+        { fx: -0.42, fy: -0.30, delay: "0s" },
+        { fx: 0.40, fy: -0.33, delay: "-0.3s" },
+        { fx: -0.35, fy: 0.32, delay: "-0.6s" },
+        { fx: 0.33, fy: 0.30, delay: "-0.9s" },
+        { fx: -0.18, fy: -0.40, delay: "-1.2s" },
+        { fx: 0.15, fy: -0.42, delay: "-1.5s" },
+        { fx: -0.45, fy: 0.03, delay: "-1.8s" },
+        { fx: 0.44, fy: 0, delay: "-2.1s" },
+        { fx: -0.10, fy: 0.40, delay: "-0.45s" },
+        { fx: 0.20, fy: 0.38, delay: "-0.75s" },
+        { fx: -0.05, fy: -0.44, delay: "-1.05s" },
+        { fx: 0.06, fy: 0.44, delay: "-1.65s" }
     ];
+
+    /**
+     * AI 전용 그림의 입자가 **카드 크기를 따라가게** 한다.
+     * 카드 안쪽 크기를 재어 --u4aWsAiW · --u4aWsAiH 로 넣어 두면 CSS 가 비율로 곱한다.
+     * ★clientWidth 는 카드 자신의 zoom 이 적용된 뒤의 CSS px 이고, 입자는 그림 묶음의 zoom
+     *   안쪽 좌표계에 있다. 그래서 그림 묶음의 zoom 으로 한 번 더 나눈다(2026-10-30 실측).
+     */
+    function _syncAiSpread() {
+
+        var oCard = document.querySelector(".u4aWsBusyCard");
+        var oAi = document.querySelector(".u4aWsBusyAi");
+
+        if (!oCard || !oAi) {
+            return;
+        }
+
+        var nZoom = parseFloat(getComputedStyle(oAi).zoom) || 1;
+        var nW = oCard.clientWidth / nZoom;
+        var nH = oCard.clientHeight / nZoom;
+
+        if (nW <= 0 || nH <= 0) {
+            return;   // 아직 안 그려졌다 — ResizeObserver 가 다시 부른다
+        }
+
+        oAi.style.setProperty("--u4aWsAiW", nW + "px");
+        oAi.style.setProperty("--u4aWsAiH", nH + "px");
+
+        // ★입자는 로고 칸 안에 있어서 **로고 가운데**가 기준이 된다. 그런데 desc 가 길어지면
+        //   로고는 카드 위쪽으로 올라가고 가로로도 오른쪽에 치우친다. 그대로 두면 입자가
+        //   위로 넘치고 아래는 빈다(실측 2026-10-30: 위 -64px, 아래 +127px).
+        //   그래서 **로고 가운데 → 카드 가운데** 만큼을 더해 카드 한가운데를 기준으로 삼는다.
+        var oLg = oAi.querySelector(".lg");
+
+        if (!oLg) {
+            return;
+        }
+
+        var nCardZoom = parseFloat(getComputedStyle(oCard).zoom) || 1;
+        var nScale = nZoom * nCardZoom;          // 그림 좌표계 1px = 화면 nScale px
+        var oCr = oCard.getBoundingClientRect();
+        var oLr = oLg.getBoundingClientRect();
+        var nOX = ((oCr.left + oCr.width / 2) - (oLr.left + oLr.width / 2)) / nScale;
+        var nOY = ((oCr.top + oCr.height / 2) - (oLr.top + oLr.height / 2)) / nScale;
+
+        oAi.style.setProperty("--u4aWsAiOX", nOX + "px");
+        oAi.style.setProperty("--u4aWsAiOY", nOY + "px");
+    }
+
+    var oAiSpreadRO = null;
+
+    /**
+     * 카드 크기가 바뀔 때마다 입자 퍼짐 범위를 다시 맞춘다.
+     * ★desc 를 넣은 **직후**에는 카드가 아직 안 커져 있다 — 그때 한 번만 재면 입자가 로고 둘레에만
+     *   몰린다(장군님 지적 2026-10-30, 실측으로 확인). 그래서 ResizeObserver 로 따라간다.
+     */
+    function _watchAiSpread() {
+
+        var oCard = document.querySelector(".u4aWsBusyCard");
+
+        if (!oCard || typeof ResizeObserver === "undefined") {
+            return;
+        }
+
+        if (oAiSpreadRO) {
+            oAiSpreadRO.disconnect();
+        }
+
+        oAiSpreadRO = new ResizeObserver(function () {
+            _syncAiSpread();
+        });
+
+        oAiSpreadRO.observe(oCard);
+    }
+
+    function _unwatchAiSpread() {
+
+        if (!oAiSpreadRO) {
+            return;
+        }
+
+        oAiSpreadRO.disconnect();
+        oAiSpreadRO = null;
+    }
 
     function _aiParticlesHtml() {
 
@@ -245,7 +331,7 @@
 
             oP = AI_PARTICLES[i];
 
-            sHtml += '<i class="p" style="--x:' + oP.x + 'px;--y:' + oP.y + 'px;animation-delay:' + oP.delay + '"></i>';
+            sHtml += '<i class="p" style="--fx:' + oP.fx + ';--fy:' + oP.fy + ';animation-delay:' + oP.delay + '"></i>';
         }
 
         return sHtml;
@@ -805,6 +891,11 @@
             _setAIMode(true);
             _setAIText(sDesc);
 
+            // desc 를 넣어 카드 크기가 정해진 **뒤에** 입자가 퍼질 범위를 맞춘다.
+            // 바로 재면 아직 안 커져 있으므로 ResizeObserver 로 계속 따라가게 한다.
+            _syncAiSpread();
+            _watchAiSpread();
+
             bAILocked = true;
 
             // 별창도 같이 막는다(이 창이 잠긴 뒤에 쏜다 — 되받은 신호가 setBusy 를 못 타게).
@@ -820,6 +911,7 @@
         _hideCore(function () {
             _setAIText("");
             _setAIMode(false);
+            _unwatchAiSpread();
         }, true);
 
         // 별창을 푼다 — 이 창이 닫힌 뒤에 쏜다(별창이 먼저 열려 조작되는 틈을 만들지 않는다).
