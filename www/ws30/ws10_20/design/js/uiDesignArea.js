@@ -1708,7 +1708,10 @@
   oAPP.fn.designChkUnique = function(UIOBK, iCnt){
     
     //[워크벤치] 특정 API / UI 에 대한 중복 대상 관리 여부건인지 확인.
-    var ls_UA039 = oAPP.DATA.LIB.T_9011.find( a=> a.CATCD === "UA039" && a.FLD02 === UIOBK && a.FLD04 === "X");
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+    // var ls_UA039 = oAPP.DATA.LIB.T_9011.find( a=> a.CATCD === "UA039" && a.FLD02 === UIOBK && a.FLD04 === "X");
+    var ls_UA039 = oAPP.attr.S_CODE.UA039.find( a=> a.FLD02 === UIOBK && a.FLD04 === "X");
     if(!ls_UA039){
       //대상건이 아닌경우 exit.
       return;
@@ -1744,7 +1747,10 @@
   oAPP.fn.designChkHiddenAreaUi = function(UIOBK, PUIOK, UIATT){
 
     //U4A_HIDDEN_AREA DIV 영역에 추가대상 UI 정보 여부 확인.
-    var ls_UA040 = oAPP.DATA.LIB.T_9011.find( a=> a.CATCD === "UA040" && a.FLD01 === UIOBK && a.FLD07 !== "X" );
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+    // var ls_UA040 = oAPP.DATA.LIB.T_9011.find( a=> a.CATCD === "UA040" && a.FLD01 === UIOBK && a.FLD07 !== "X" );
+    var ls_UA040 = oAPP.attr.S_CODE.UA040.find( a=> a.FLD01 === UIOBK && a.FLD07 !== "X" );
 
     //대상건이 아닌경우 exit.
     if(!ls_UA040){return;}
@@ -2840,20 +2846,30 @@
 
 
 
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //아래 UA018 / UA026 / UA030 / UA032 / UA050 은
+    //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+
     //공통코드 미리보기 UI Property 고정값 정보 검색.
-    var lt_ua018 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA018");
-            
+    // var lt_ua018 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA018");
+    //(CATCD 외 조건이 없으므로 원본과 같이 새 배열을 반환하도록 slice 처리.)
+    var lt_ua018 = oAPP.attr.S_CODE.UA018.slice();
+
     //부모 UI에 추가 불필요 대상 UI 정보 검색.
-    var lt_ua026 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA026" && a.FLD02 !== "X" );
+    // var lt_ua026 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA026" && a.FLD02 !== "X" );
+    var lt_ua026 = oAPP.attr.S_CODE.UA026.filter( a=> a.FLD02 !== "X" );
 
     //UI 프로퍼티 고정값 설정 정보 검색.
-    var lt_ua030 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA030" && a.FLD06 !== "X" );
+    // var lt_ua030 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA030" && a.FLD06 !== "X" );
+    var lt_ua030 = oAPP.attr.S_CODE.UA030.filter( a=> a.FLD06 !== "X" );
 
     //UI 프로퍼티 type 예외처리 정보 검색.
-    var lt_ua032 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA032" && a.FLD06 !== "X" );
+    // var lt_ua032 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA032" && a.FLD06 !== "X" );
+    var lt_ua032 = oAPP.attr.S_CODE.UA032.filter( a=> a.FLD06 !== "X" );
 
     //UI 프로퍼티 type 예외처리 정보 검색.
-    var lt_ua050 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA050" && a.FLD08 !== "X" );
+    // var lt_ua050 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA050" && a.FLD08 !== "X" );
+    var lt_ua050 = oAPP.attr.S_CODE.UA050.filter( a=> a.FLD08 !== "X" );
 
 
 
@@ -3372,8 +3388,11 @@
     //DRAG UI의 부모에서 DRAG UI정보 제거.
     l_parent.zTREE.splice(l_indx, 1);
     
-    var lt_ua050 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA050" && a.FLD08 !== "X" );
-        
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+    // var lt_ua050 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA050" && a.FLD08 !== "X" );
+    var lt_ua050 = oAPP.attr.S_CODE.UA050.filter( a=> a.FLD08 !== "X" );
+
     //자식 UI가 필수인 UI에 자식이 없는경우 강제추가 예외처리.
     oAPP.attr.ui.frame.contentWindow.setChildUiException(l_parent.UIOBK, l_parent.OBJID, l_parent.zTREE, lt_ua050);
 

@@ -346,7 +346,11 @@
         if(oAPP.attr.S_CODE.UA007){
             lt_UA007 = oAPP.attr.S_CODE.UA007.filter( a => a.FLD03 === "X" );
         }else{
-            lt_UA007 = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === "UA007" && a.FLD03 === "X" );
+            //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+            //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+            //(S_CODE 에 UA007 이 없는 경우이므로 T_9011 에도 대상건이 없음 → 빈 배열 유지.)
+            // lt_UA007 = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === "UA007" && a.FLD03 === "X" );
+            lt_UA007 = [];
         }
 
         //테마 정보.

@@ -1208,7 +1208,17 @@
             oAPP.attr.appInfo = {};
             delete oAPP.attr.T_EVT;
             delete oAPP.DATA.APPDATA;
-            try { if (oAPP.common.checkWLOList("C", "UHAK901369")) { delete oAPP.DATA.LIB; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            // try { if (oAPP.common.checkWLOList("C", "UHAK901369")) { delete oAPP.DATA.LIB; } } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
+            //[변경사유] oAPP.attr.S_CODE 는 라이브러리 정보(oAPP.DATA.LIB.T_9011)로 구성되는 파생 데이터이다.
+            //라이브러리 정보를 제거할 때 S_CODE 만 남겨두면 이전 코드마스터 정보가 메모리에 잔류하고
+            //LIB 와 S_CODE 의 존재 여부가 서로 달라지므로 같이 제거한다.
+            //(재진입 시 fnLoadWs20LibData → setCodeMasterData 에서 다시 구성됨.)
+            try {
+                if (oAPP.common.checkWLOList("C", "UHAK901369")) {
+                    delete oAPP.DATA.LIB;
+                    delete oAPP.attr.S_CODE;
+                }
+            } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
         } catch (e) {
             console.warn("[WS20] removeContent state reset:", e && e.message, e);
         }

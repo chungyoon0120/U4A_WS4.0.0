@@ -271,6 +271,11 @@
 
             //코드마스터 데이터가 존재하지 않는경우 EXIT.
             if (oAPP.DATA.LIB.T_9011.length === 0) {
+
+                //[변경사유] 이후 로직은 T_9011 이 아닌 oAPP.attr.S_CODE 만 참조하므로
+                //T_9011 필드를 삭제하여, 남아있는 T_9011 참조 로직이 있다면 오류로 확인될 수 있도록 처리.
+                delete oAPP.DATA.LIB.T_9011;
+
                 return;
             }
 
@@ -286,6 +291,11 @@
                 oAPP.attr.S_CODE[oAPP.DATA.LIB.T_9011[i].CATCD].push(oAPP.DATA.LIB.T_9011[i]);
 
             }
+
+            //[변경사유] 코드마스터 정보를 oAPP.attr.S_CODE 로 재구성 완료 후
+            //더 이상 T_9011 필드는 참조하지 않으므로 삭제 처리.
+            //(삭제 이후 T_9011 을 참조하는 로직이 남아있다면 오류(덤프)로 확인하기 위함.)
+            delete oAPP.DATA.LIB.T_9011;
 
         };  //코드마스터정보 코드별로 재구성 처리.
     }
@@ -2543,8 +2553,11 @@
                 if (ls_attr) { ls_attr.UIATV = it_attr[i].UIATV; continue; }
 
                 //코드마스터(UA003)에서 document attr 정보 얻기.
-                var ls_ua003 = (oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011))
-                    ? oAPP.DATA.LIB.T_9011.find(a => a.CATCD === "UA003" && a.ITMCD === it_attr[i].UIATK) : null;
+                //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+                //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+                // var ls_ua003 = (oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011))
+                //     ? oAPP.DATA.LIB.T_9011.find(a => a.CATCD === "UA003" && a.ITMCD === it_attr[i].UIATK) : null;
+                var ls_ua003 = oAPP.attr.S_CODE.UA003.find(a => a.ITMCD === it_attr[i].UIATK);
                 if (!ls_ua003) { continue; }
 
                 //신규 라인 생성.
@@ -2668,13 +2681,20 @@
         //코드마스터 기준 DDLB 정보 구성. (원본 lf_DDLB 1:1)
         function lf_DDLB(CATCD, USEFLD, KEY, TEXT) {
 
+            //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+            //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+            //(CATCD 는 파라메터로 전달되므로 oAPP.attr.S_CODE[CATCD] 로 접근.)
+
             //코드마스터 기준 DDLB 값 검색. (LIB 미로드 방어 — 없으면 빈 목록)
-            var lt_9011 = (oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011)) ? oAPP.DATA.LIB.T_9011 : [];
+            // var lt_9011 = (oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011)) ? oAPP.DATA.LIB.T_9011 : [];
             if (typeof USEFLD === "undefined") {
-                var lt_ITM = lt_9011.filter(a => a.CATCD === CATCD);
+                // var lt_ITM = lt_9011.filter(a => a.CATCD === CATCD);
+                //(CATCD 외 조건이 없으므로 원본과 같이 새 배열을 반환하도록 slice 처리.)
+                var lt_ITM = oAPP.attr.S_CODE[CATCD].slice();
 
             } else {
-                var lt_ITM = lt_9011.filter(a => a.CATCD === CATCD && a[USEFLD] === "X");
+                // var lt_ITM = lt_9011.filter(a => a.CATCD === CATCD && a[USEFLD] === "X");
+                var lt_ITM = oAPP.attr.S_CODE[CATCD].filter(a => a[USEFLD] === "X");
             }
 
             var lt_ddlb = [],
@@ -2697,7 +2717,11 @@
 
 
         //공통코드의 DOCUMENT 구성 정보 검색.
-        var lt_ua003 = oAPP.DATA.LIB.T_9011.filter(a => a.CATCD === "UA003");
+        //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+        //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+        // var lt_ua003 = oAPP.DATA.LIB.T_9011.filter(a => a.CATCD === "UA003");
+        //(CATCD 외 조건이 없으므로 원본과 같이 새 배열을 반환하도록 slice 처리.)
+        var lt_ua003 = oAPP.attr.S_CODE.UA003.slice();
 
         //세팅된 DOCUMENT 정보 검색. (prev 스탠드인 — 상단 주석 참조)
         //([HTML5] 미리보기 로드중(transient)에도 안전하도록 _ensurePrev 경유)
@@ -3595,7 +3619,10 @@
 
         // LIB/APPDATA 미로딩(헤드리스/비로그인)시 — 속성은 비어 보임(정상), 크래시 금지.
         var bHasLib = !!(oAPP.DATA && oAPP.DATA.LIB &&
-            Array.isArray(oAPP.DATA.LIB.T_0023) && Array.isArray(oAPP.DATA.LIB.T_9011));
+            //[변경사유] oAPP.DATA.LIB.T_9011 은 oAPP.fn.setCodeMasterData 에서
+            //oAPP.attr.S_CODE 구성 후 삭제(delete)되므로, 코드마스터 로드 여부는 S_CODE 로 판정.
+            // Array.isArray(oAPP.DATA.LIB.T_0023) && Array.isArray(oAPP.DATA.LIB.T_9011));
+            Array.isArray(oAPP.DATA.LIB.T_0023) && !!oAPP.attr.S_CODE && Object.keys(oAPP.attr.S_CODE).length > 0);
         var bHasApp = !!(oAPP.DATA && oAPP.DATA.APPDATA);
 
         if (bHasLib && bHasApp) {
@@ -5317,8 +5344,13 @@
                 var oUiInfo = (oAPP.attr.oModel.oData && oAPP.attr.oModel.oData.uiinfo) || {};
 
                 //UI5 bootstrap 활성 라이브러리(UA025/APP/FLD06=X) 검색. 없으면 종료.
-                var ls_UA025 = (oAPP.DATA.LIB.T_9011 || []).find(function (a) {
-                    return a.CATCD === "UA025" && a.FLD01 === "APP" && a.FLD06 === "X";
+                //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+                //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+                // var ls_UA025 = (oAPP.DATA.LIB.T_9011 || []).find(function (a) {
+                //     return a.CATCD === "UA025" && a.FLD01 === "APP" && a.FLD06 === "X";
+                // });
+                var ls_UA025 = oAPP.attr.S_CODE.UA025.find(function (a) {
+                    return a.FLD01 === "APP" && a.FLD06 === "X";
                 });
                 if (!ls_UA025) {
                     try { parent.setBusy && parent.setBusy(""); } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
@@ -6016,9 +6048,12 @@
                     //   선택 행의 반환 필드를 UIATK 별로 매핑(DH001040→CPATTR / DH001100→P_GROUP).
                     var sShlp = "";
                     try {
-                        var aUA003 = (oAPP.attr.S_CODE && Array.isArray(oAPP.attr.S_CODE.UA003)) ? oAPP.attr.S_CODE.UA003
-                            : ((oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011))
-                                ? oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA003"; }) : []);
+                        //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+                        //T_9011 대체 경로를 제거하고 oAPP.attr.S_CODE(CATCD별 공통코드) 만 참조하도록 변경.
+                        // var aUA003 = (oAPP.attr.S_CODE && Array.isArray(oAPP.attr.S_CODE.UA003)) ? oAPP.attr.S_CODE.UA003
+                        //     : ((oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011))
+                        //         ? oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA003"; }) : []);
+                        var aUA003 = oAPP.attr.S_CODE.UA003;
                         // SHLPNAME(FLD05) 보유 행 = F4 대상 행(중복 ITMCD 중 default-value 행 회피).
                         var oUA = aUA003.find(function (a) { return a.ITMCD === sAttr.UIATK && a.FLD05; });
                         if (oUA) { sShlp = oUA.FLD05; }

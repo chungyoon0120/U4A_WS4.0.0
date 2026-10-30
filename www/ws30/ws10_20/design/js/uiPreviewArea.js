@@ -465,9 +465,14 @@
   oAPP.fn.getBootStrapUrl = function(){
     var ls_ua025;
 
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //아래 1~3차 필터의 UA025 는 oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+
     //-1차 필터 별도 Application
-    ls_ua025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025" 
-      && a.FLD01 === "WOK_" + oAPP.attr.appInfo.APPID
+    // ls_ua025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025"
+    //   && a.FLD01 === "WOK_" + oAPP.attr.appInfo.APPID
+    //   && a.FLD06 === "X" );
+    ls_ua025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "WOK_" + oAPP.attr.appInfo.APPID
       && a.FLD06 === "X" );
 
     if(typeof ls_ua025 !== "undefined"){
@@ -476,8 +481,10 @@
     }
 
     //-2차 필터 패키지
-    ls_ua025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025" 
-      && a.FLD01 === "WOK_" + oAPP.attr.appInfo.PACKG
+    // ls_ua025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025"
+    //   && a.FLD01 === "WOK_" + oAPP.attr.appInfo.PACKG
+    //   && a.FLD06 === "X" );
+    ls_ua025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "WOK_" + oAPP.attr.appInfo.PACKG
       && a.FLD06 === "X" );
 
     if(typeof ls_ua025 !== "undefined"){
@@ -486,8 +493,9 @@
     }
 
     //-3차 필터 전체대상
-    ls_ua025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025" 
-      && a.FLD01 === "WOK" && a.FLD06 === "X" );
+    // ls_ua025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025"
+    //   && a.FLD01 === "WOK" && a.FLD06 === "X" );
+    ls_ua025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "WOK" && a.FLD06 === "X" );
 
     if(typeof ls_ua025 !== "undefined"){
       // return encodeURIComponent(ls_ua025.FLD04 + ls_ua025.FLD05);
@@ -696,7 +704,10 @@
 
 
       //예외처리 대상 프로퍼티입력건 여부 확인.
-      var l_ua032 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA032" && a.FLD01 === is_attr.UIOBK && a.FLD03 === is_attr.UIATT && a.FLD06 !== "X" );
+      //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+      //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+      // var l_ua032 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA032" && a.FLD01 === is_attr.UIOBK && a.FLD03 === is_attr.UIATT && a.FLD06 !== "X" );
+      var l_ua032 = oAPP.attr.S_CODE.UA032.find( a => a.FLD01 === is_attr.UIOBK && a.FLD03 === is_attr.UIATT && a.FLD06 !== "X" );
       
       //예외처리 대상 프로퍼티를 입력한 경우.
       if(l_ua032 && l_ua032.FLD07 !== ""){

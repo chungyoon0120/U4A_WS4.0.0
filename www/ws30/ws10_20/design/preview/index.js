@@ -3452,7 +3452,10 @@ function excepSapui6Library(LIBNM) {
 function setFixedProp(UIOBK, it_ua018, it_ua032) {
 	var lt_ua018 = it_ua018;
 	if (!lt_ua018) {
-		lt_ua018 = parent.oAPP.DATA.LIB.T_9011.filter(a => a.CATCD === "UA018" && a.FLD05 === UIOBK);
+		//[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+		//oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+		// lt_ua018 = parent.oAPP.DATA.LIB.T_9011.filter(a => a.CATCD === "UA018" && a.FLD05 === UIOBK);
+		lt_ua018 = parent.oAPP.attr.S_CODE.UA018.filter(a => a.FLD05 === UIOBK);
 	}
 	if (lt_ua018.length === 0) {
 		return "";
@@ -3624,7 +3627,10 @@ function setUIProp(UIOBK, UILIB, T_0015, T_UA018, T_UA032, T_UA030) {
 function setChildUiException(UIOBK, OBJID, it_child, it_ua050, bIgnore) {
 	var lt_ua050 = [];
 	if (typeof it_ua050 === "undefined") {
-		lt_ua050 = parent.oAPP.DATA.LIB.T_9011.filter(a => a.CATCD === "UA050" && a.FLD01 === UIOBK && a.FLD08 !== "X");
+		//[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+		//oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+		// lt_ua050 = parent.oAPP.DATA.LIB.T_9011.filter(a => a.CATCD === "UA050" && a.FLD01 === UIOBK && a.FLD08 !== "X");
+		lt_ua050 = parent.oAPP.attr.S_CODE.UA050.filter(a => a.FLD01 === UIOBK && a.FLD08 !== "X");
 	} else {
 		lt_ua050 = it_ua050.filter(a => a.FLD01 === UIOBK && a.FLD08 !== "X");
 	}
@@ -3729,7 +3735,10 @@ function addUIObjPreView(OBJID, UIOBK, UILIB, UIFND, POBID, PUIOK, UIATT, T_0015
 	}
 	var lt_ua050 = T_UA050;
 	if (typeof lt_ua050 === "undefined") {
-		lt_ua050 = parent.oAPP.DATA.LIB.T_9011.filter(a => a.CATCD === "UA050" && a.FLD08 !== "X");
+		//[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+		//oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+		// lt_ua050 = parent.oAPP.DATA.LIB.T_9011.filter(a => a.CATCD === "UA050" && a.FLD08 !== "X");
+		lt_ua050 = parent.oAPP.attr.S_CODE.UA050.filter(a => a.FLD08 !== "X");
 	}
 	var _sTree = parent.oAPP.fn.crtStru0014();
 	_sTree.UIOBK = UIOBK;
@@ -4187,7 +4196,10 @@ function collectPopup(UILIB, OBJID, IT_UA015) {
 	if (IT_UA015) {
 		var ls_ua015 = IT_UA015.find(a => a.FLD01 === l_UIFND && a.FLD03 !== "X" && a.FLD03 !== "");
 	} else {
-		var ls_ua015 = parent.oAPP.DATA.LIB.T_9011.find(a => a.CATCD === "UA015" && a.FLD01 === l_UIFND && a.FLD03 !== "");
+		//[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+		//oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+		// var ls_ua015 = parent.oAPP.DATA.LIB.T_9011.find(a => a.CATCD === "UA015" && a.FLD01 === l_UIFND && a.FLD03 !== "");
+		var ls_ua015 = parent.oAPP.attr.S_CODE.UA015.find(a => a.FLD01 === l_UIFND && a.FLD03 !== "");
 	}
 	if (!ls_ua015) {
 		return;

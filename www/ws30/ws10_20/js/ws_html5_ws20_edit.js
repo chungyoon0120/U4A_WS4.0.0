@@ -1220,7 +1220,10 @@
         var iIdx = iPos;
         // 같은 그룹 형제 중 "부모에 추가되지 않는 UI(UA026)"는 미리보기 삽입 index 계산에서 뺀다(원본 534~543).
         var aUa026 = [];
-        try { aUa026 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA026" && a.FLD02 !== "X"; }); }
+        //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+        //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+        // try { aUa026 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA026" && a.FLD02 !== "X"; }); }
+        try { aUa026 = oAPP.attr.S_CODE.UA026.filter(function (a) { return a.FLD02 !== "X"; }); }
         catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } aUa026 = []; }
         for (var i = 0; i < iPos; i++) {
             var sUilib = aFilt[i].UILIB;

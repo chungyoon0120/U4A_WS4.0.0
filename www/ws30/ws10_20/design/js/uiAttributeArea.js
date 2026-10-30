@@ -3750,8 +3750,11 @@
     if(is_attr.UIATY !== "1"){return;}
 
     //UI5 bootstrap 라이브러리 관리 정보(MIME PATH) 얻기.
-    var ls_ua025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025" &&
-      a.FLD01 === "APP" && a.FLD06 === "X" );
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+    // var ls_ua025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025" &&
+    //   a.FLD01 === "APP" && a.FLD06 === "X" );
+    var ls_ua025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "APP" && a.FLD06 === "X" );
 
     if(typeof ls_ua025 === "undefined"){return;}
 
@@ -3890,7 +3893,10 @@
 
 
     //코드마스터 DOCUMENT항목의 해당하는 itmcd 정보 얻기.
-    var ls_ua003 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA003" && a.ITMCD === is_attr.UIATK );
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+    // var ls_ua003 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA003" && a.ITMCD === is_attr.UIATK );
+    var ls_ua003 = oAPP.attr.S_CODE.UA003.find( a => a.ITMCD === is_attr.UIATK );
 
     //가능엔트리 항목이 존재하지 않는경우 EXIT.
     if(!ls_ua003 || ls_ua003.FLD05 === ""){
@@ -6380,12 +6386,19 @@
     //코드마스터 기준 DDLB 정보 구성.
     function lf_DDLB(CATCD, USEFLD, KEY, TEXT){
 
+      //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+      //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+      //(CATCD 는 파라메터로 전달되므로 oAPP.attr.S_CODE[CATCD] 로 접근.)
+
       //코드마스터 기준 DDLB 값 검색.
       if(typeof USEFLD === "undefined"){
-        var lt_ITM = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === CATCD);
+        // var lt_ITM = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === CATCD);
+        //(CATCD 외 조건이 없으므로 원본과 같이 새 배열을 반환하도록 slice 처리.)
+        var lt_ITM = oAPP.attr.S_CODE[CATCD].slice();
 
       }else{
-        var lt_ITM = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === CATCD && a[USEFLD] === "X");
+        // var lt_ITM = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === CATCD && a[USEFLD] === "X");
+        var lt_ITM = oAPP.attr.S_CODE[CATCD].filter( a => a[USEFLD] === "X");
       }
 
       var lt_ddlb = [],
@@ -6408,7 +6421,11 @@
 
 
     //공통코드의 DOCUMENT 구성 정보 검색.
-    var lt_ua003 = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === "UA003" );
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+    // var lt_ua003 = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === "UA003" );
+    //(CATCD 외 조건이 없으므로 원본과 같이 새 배열을 반환하도록 slice 처리.)
+    var lt_ua003 = oAPP.attr.S_CODE.UA003.slice();
 
     //세팅된 DOCUMENT 정보 검색.
     var lt_0015 = oAPP.attr.prev[OBJID]._T_0015.filter( a => a.OBJID === OBJID );
@@ -8462,7 +8479,10 @@
       }
 
       //기존에 수집된 항목에 존재하지 않는경우 코드마스터에서 document attr정보 얻기.
-      var ls_ua003 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA003" && a.ITMCD === it_attr[i].UIATK );
+      //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+      //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+      // var ls_ua003 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA003" && a.ITMCD === it_attr[i].UIATK );
+      var ls_ua003 = oAPP.attr.S_CODE.UA003.find( a => a.ITMCD === it_attr[i].UIATK );
       
       //코드마스터에 존재하지 않는경우 skip.
       if(!ls_ua003){continue;}
@@ -9503,7 +9523,10 @@
   oAPP.fn.attrCallUiSample = function(){
 
     //UI5 bootstrap 라이브러리 활성화건 검색.
-    var ls_UA025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025" && a.FLD01 === "APP" && a.FLD06 === "X" );
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+    // var ls_UA025 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA025" && a.FLD01 === "APP" && a.FLD06 === "X" );
+    var ls_UA025 = oAPP.attr.S_CODE.UA025.find( a => a.FLD01 === "APP" && a.FLD06 === "X" );
 
     if(!ls_UA025){
 

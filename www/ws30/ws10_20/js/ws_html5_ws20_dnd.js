@@ -329,7 +329,10 @@
 
     // U4A_HIDDEN_AREA DIV 영역 추가대상 점검. (원본 1591행 1:1)
     oAPP.fn.designChkHiddenAreaUi = function (UIOBK, PUIOK, UIATT) {
-        var ls_UA040 = oAPP.DATA.LIB.T_9011.find(function (a) { return a.CATCD === "UA040" && a.FLD01 === UIOBK && a.FLD07 !== "X"; });
+        //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+        //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+        // var ls_UA040 = oAPP.DATA.LIB.T_9011.find(function (a) { return a.CATCD === "UA040" && a.FLD01 === UIOBK && a.FLD07 !== "X"; });
+        var ls_UA040 = oAPP.attr.S_CODE.UA040.find(function (a) { return a.FLD01 === UIOBK && a.FLD07 !== "X"; });
         if (!ls_UA040) { return; }
         if (ls_UA040.FLD04 !== PUIOK) {
             // 131 Target API and UI &1 can only target Location &2.
@@ -341,7 +344,10 @@
     // 앱당 1개만 허용되는 UI(UA039) 중복 점검. (원본 designChkUnique 1555행 1:1)
     if (typeof oAPP.fn.designChkUnique !== "function") {
         oAPP.fn.designChkUnique = function (UIOBK, iCnt) {
-            var ls_UA039 = oAPP.DATA.LIB.T_9011.find(function (a) { return a.CATCD === "UA039" && a.FLD02 === UIOBK && a.FLD04 === "X"; });
+            //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+            //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+            // var ls_UA039 = oAPP.DATA.LIB.T_9011.find(function (a) { return a.CATCD === "UA039" && a.FLD02 === UIOBK && a.FLD04 === "X"; });
+            var ls_UA039 = oAPP.attr.S_CODE.UA039.find(function (a) { return a.FLD02 === UIOBK && a.FLD04 === "X"; });
             if (!ls_UA039) { return; }                                    // 중복관리 대상 아님.
             if (typeof iCnt !== "undefined" && iCnt >= 2) {
                 // 130 Target API and UI &1 does not allow one or more assign.
@@ -1155,11 +1161,19 @@
         if (!is_target.zTREE) { is_target.zTREE = []; }
 
         // 공통코드(원본 lf_setPasteCopiedData 인자 · designCopyUI 와 동일 필터).
-        var lt_ua018 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA018"; });
-        var lt_ua026 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA026" && a.FLD02 !== "X"; });
-        var lt_ua030 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA030" && a.FLD06 !== "X"; });
-        var lt_ua032 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA032" && a.FLD06 !== "X"; });
-        var lt_ua050 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA050" && a.FLD08 !== "X"; });
+        //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+        //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+        // var lt_ua018 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA018"; });
+        //(CATCD 외 조건이 없으므로 원본과 같이 새 배열을 반환하도록 slice 처리.)
+        var lt_ua018 = oAPP.attr.S_CODE.UA018.slice();
+        // var lt_ua026 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA026" && a.FLD02 !== "X"; });
+        var lt_ua026 = oAPP.attr.S_CODE.UA026.filter(function (a) { return a.FLD02 !== "X"; });
+        // var lt_ua030 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA030" && a.FLD06 !== "X"; });
+        var lt_ua030 = oAPP.attr.S_CODE.UA030.filter(function (a) { return a.FLD06 !== "X"; });
+        // var lt_ua032 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA032" && a.FLD06 !== "X"; });
+        var lt_ua032 = oAPP.attr.S_CODE.UA032.filter(function (a) { return a.FLD06 !== "X"; });
+        // var lt_ua050 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA050" && a.FLD08 !== "X"; });
+        var lt_ua050 = oAPP.attr.S_CODE.UA050.filter(function (a) { return a.FLD08 !== "X"; });
 
         // top 노드 drop index — getDropTargetLine 이 심은 dropLineInfo.dropIndex 우선(원본 6483~6494),
         //   없으면 대상 zTREE 끝. 사용 후 원본처럼 제거.
@@ -1409,7 +1423,10 @@
         // 기존 부모에서 제거.
         l_parentC.zTREE.splice(l_indx, 1);
 
-        var lt_ua050 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA050" && a.FLD08 !== "X"; });
+        //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+        //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+        // var lt_ua050 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA050" && a.FLD08 !== "X"; });
+        var lt_ua050 = oAPP.attr.S_CODE.UA050.filter(function (a) { return a.FLD08 !== "X"; });
         _safe(function () { if (wC && typeof wC.setChildUiException === "function") { wC.setChildUiException(l_parentC.UIOBK, l_parentC.OBJID, l_parentC.zTREE, lt_ua050); } });
 
         oAPP.fn.previewSetStrAggr(i_drag);
@@ -1545,11 +1562,19 @@
             _sDropLineInfo = { dropPosition: undefined, dropIndex: is_p.zTREE.length };
         }
 
-        var lt_ua018 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA018"; });
-        var lt_ua026 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA026" && a.FLD02 !== "X"; });
-        var lt_ua030 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA030" && a.FLD06 !== "X"; });
-        var lt_ua032 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA032" && a.FLD06 !== "X"; });
-        var lt_ua050 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA050" && a.FLD08 !== "X"; });
+        //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+        //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+        // var lt_ua018 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA018"; });
+        //(CATCD 외 조건이 없으므로 원본과 같이 새 배열을 반환하도록 slice 처리.)
+        var lt_ua018 = oAPP.attr.S_CODE.UA018.slice();
+        // var lt_ua026 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA026" && a.FLD02 !== "X"; });
+        var lt_ua026 = oAPP.attr.S_CODE.UA026.filter(function (a) { return a.FLD02 !== "X"; });
+        // var lt_ua030 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA030" && a.FLD06 !== "X"; });
+        var lt_ua030 = oAPP.attr.S_CODE.UA030.filter(function (a) { return a.FLD06 !== "X"; });
+        // var lt_ua032 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA032" && a.FLD06 !== "X"; });
+        var lt_ua032 = oAPP.attr.S_CODE.UA032.filter(function (a) { return a.FLD06 !== "X"; });
+        // var lt_ua050 = oAPP.DATA.LIB.T_9011.filter(function (a) { return a.CATCD === "UA050" && a.FLD08 !== "X"; });
+        var lt_ua050 = oAPP.attr.S_CODE.UA050.filter(function (a) { return a.FLD08 !== "X"; });
 
         function lf_copy0015(is_14, is_tree, i_aggr) {
             var oPrev = oAPP.attr.prev[is_tree.OBJID];

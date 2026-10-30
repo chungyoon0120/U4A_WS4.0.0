@@ -327,7 +327,10 @@
                 if (OBJID !== "ROOT") { return; }
 
                 //UI5 Document 속성 정보 검색.
-                var ls_ua003 = oAPP.DATA.LIB.T_9011.find(a => a.CATCD === "UA003" && a.ITMCD === is_0015.UIATK);
+                //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+                //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+                // var ls_ua003 = oAPP.DATA.LIB.T_9011.find(a => a.CATCD === "UA003" && a.ITMCD === is_0015.UIATK);
+                var ls_ua003 = oAPP.attr.S_CODE.UA003.find(a => a.ITMCD === is_0015.UIATK);
 
                 //UI5 Document 속성 정보를 찾지 못한 경우 EXIT.
                 if (!ls_ua003) { return; }
@@ -438,7 +441,10 @@
             //ROOT(DOCUMENT) 입력정보를 ZTU4A0010 필드에 매핑
             var aRoot = (oAPP.attr.prev && oAPP.attr.prev.ROOT && oAPP.attr.prev.ROOT._T_0015) || [];
             for (var i = 0, l = aRoot.length; i < l; i++) {
-                var ls_ua003 = oAPP.DATA.LIB.T_9011.find(function (a) { return a.CATCD === "UA003" && a.ITMCD === aRoot[i].UIATK; });
+                //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+                //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+                // var ls_ua003 = oAPP.DATA.LIB.T_9011.find(function (a) { return a.CATCD === "UA003" && a.ITMCD === aRoot[i].UIATK; });
+                var ls_ua003 = oAPP.attr.S_CODE.UA003.find(function (a) { return a.ITMCD === aRoot[i].UIATK; });
                 if (ls_ua003) { ls_0010[ls_ua003.FLD08] = aRoot[i].UIATV; }
             }
 
@@ -1998,7 +2004,10 @@
 
         // (b) LIB(T_9011 — getBootStrapUrl/getUI5ResourceRoot 가 즉시 참조).
         //     미준비면 LIB 로더 완료 후 1회 재시도. (로더 실패 시 skip — 크래시 금지)
-        var bLibReady = !!(oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011) && oAPP.DATA.LIB.T_9011.length > 0);
+        //[변경사유] oAPP.DATA.LIB.T_9011 은 oAPP.fn.setCodeMasterData 에서
+        //oAPP.attr.S_CODE 구성 후 삭제(delete)되므로, 코드마스터 준비 여부는 S_CODE 로 판정.
+        // var bLibReady = !!(oAPP.DATA && oAPP.DATA.LIB && Array.isArray(oAPP.DATA.LIB.T_9011) && oAPP.DATA.LIB.T_9011.length > 0);
+        var bLibReady = !!(oAPP.DATA && oAPP.DATA.LIB && oAPP.attr.S_CODE && Object.keys(oAPP.attr.S_CODE).length > 0);
         if (!bLibReady) {
 
             if (oAPP.attr.__ws20PrevLibRetry === true) {

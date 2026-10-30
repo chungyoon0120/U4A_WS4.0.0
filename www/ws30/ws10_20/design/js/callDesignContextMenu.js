@@ -546,7 +546,10 @@
             var l_cnt = l_indx2;
 
             //부모 UI에 추가 불필요 대상 UI 정보 얻기.
-            var lt_UA026 = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === "UA026" && a.FLD02 !== "X" );
+            //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+            //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+            // var lt_UA026 = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === "UA026" && a.FLD02 !== "X" );
+            var lt_UA026 = oAPP.attr.S_CODE.UA026.filter( a => a.FLD02 !== "X" );
 
             //같은 aggregation안에 있는 UI중 부모에 추가되지 않은 UI 존재 여부 확인.
             for(var i = 0; i < l_indx2; i++){
@@ -918,19 +921,28 @@
         async function lf_paste_cb(param, i_cdata, bKeep){
             
             //공통코드 미리보기 UI Property 고정값 정보 검색.
-            var lt_ua018 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA018");
+            //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+            //아래 UA018 / UA026 / UA030 / UA032 / UA050 은
+            //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+            // var lt_ua018 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA018");
+            //(CATCD 외 조건이 없으므로 원본과 같이 새 배열을 반환하도록 slice 처리.)
+            var lt_ua018 = oAPP.attr.S_CODE.UA018.slice();
             
             //부모 UI에 추가 불필요 대상 UI 정보 검색.
-            var lt_ua026 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA026" && a.FLD02 !== "X" );
+            // var lt_ua026 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA026" && a.FLD02 !== "X" );
+            var lt_ua026 = oAPP.attr.S_CODE.UA026.filter( a=> a.FLD02 !== "X" );
 
             //UI 프로퍼티 고정값 설정 정보 검색.
-            var lt_ua030 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA030" && a.FLD06 !== "X" );
+            // var lt_ua030 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA030" && a.FLD06 !== "X" );
+            var lt_ua030 = oAPP.attr.S_CODE.UA030.filter( a=> a.FLD06 !== "X" );
 
             //UI 프로퍼티 type 예외처리 정보 검색.
-            var lt_ua032 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA032" && a.FLD06 !== "X" );
+            // var lt_ua032 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA032" && a.FLD06 !== "X" );
+            var lt_ua032 = oAPP.attr.S_CODE.UA032.filter( a=> a.FLD06 !== "X" );
 
             //UI 프로퍼티 type 예외처리 정보 검색.
-            var lt_ua050 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA050" && a.FLD08 !== "X" );
+            // var lt_ua050 = oAPP.DATA.LIB.T_9011.filter( a=> a.CATCD === "UA050" && a.FLD08 !== "X" );
+            var lt_ua050 = oAPP.attr.S_CODE.UA050.filter( a=> a.FLD08 !== "X" );
 
 
             //복사한 UI 붙여넣기 처리.

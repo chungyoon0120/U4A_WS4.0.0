@@ -135,7 +135,15 @@ module.exports = function(REMOTE, oAPP){
 
         // 브라우저가 오픈이 다 되면 타는 이벤트
         oBrowserWindow.webContents.on('did-finish-load', function () {
-         
+
+            //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 oAPP.fn.setCodeMasterData 에서
+            //oAPP.attr.S_CODE(CATCD별 공통코드) 구성 후 삭제(delete)되므로,
+            //팝업에 전달할 코드마스터 정보는 S_CODE 를 원본(T_9011) 형식의 배열로 재구성하여 전달.
+            const _aT_9011 = [];
+            for(var CATCD in oAPP.attr.S_CODE){
+                _aT_9011.push(...oAPP.attr.S_CODE[CATCD]);
+            }
+
             let oOptionData = {
                 // BROWSKEY: BROWSKEY, // 브라우저 고유키 
                 // oUserInfo: oUserInfo, // 로그인 사용자 정보
@@ -145,7 +153,8 @@ module.exports = function(REMOTE, oAPP){
                     T_0022: oAPP.DATA.LIB.T_0022,
                     T_0023: oAPP.DATA.LIB.T_0023,
                     T_0024: oAPP.DATA.LIB.T_0024,
-                    T_9011: oAPP.DATA.LIB.T_9011,
+                    // T_9011: oAPP.DATA.LIB.T_9011,
+                    T_9011: _aT_9011,
                 },
                 oThemeInfo: oThemeInfo, // 테마 정보                
             };

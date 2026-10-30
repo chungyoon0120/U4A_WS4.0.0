@@ -1235,7 +1235,11 @@
 
     var lt_ua028 = [];
     try {
-      lt_ua028 = (oAPP.DATA.LIB.T_9011 || []).filter(function (a) { return a.CATCD === "UA028"; });
+      //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+      //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+      //(CATCD 외 조건이 없으므로 새 배열을 반환하도록 slice 처리 — 아래 sort 가 S_CODE 원본 순서를 바꾸지 않도록.)
+      // lt_ua028 = (oAPP.DATA.LIB.T_9011 || []).filter(function (a) { return a.CATCD === "UA028"; });
+      lt_ua028 = oAPP.attr.S_CODE.UA028.slice();
     } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } lt_ua028 = []; }
     lt_ua028.sort(function (a, b) { return a.ITMCD.localeCompare(b.ITMCD); });
 

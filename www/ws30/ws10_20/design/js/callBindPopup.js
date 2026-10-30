@@ -665,7 +665,12 @@ oAPP.fn.callBindPopup = function(sTitle, CARDI, f_callback, UIATK){
 
 
     //바인딩 추가속성 리스트 얻기.
-    var lt_ua028 = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === "UA028" );
+    //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+    //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+    // var lt_ua028 = oAPP.DATA.LIB.T_9011.filter( a => a.CATCD === "UA028" );
+    //(CATCD 외 조건이 없으므로 원본과 같이 새 배열을 반환하도록 slice 처리.
+    // 아래에서 SORT 처리하므로 원본 S_CODE 배열의 순서가 바뀌지 않도록 복사본 사용.)
+    var lt_ua028 = oAPP.attr.S_CODE.UA028.slice();
 
     //20240625 PES -START.
     //공통코드 SORT 로직 추가.

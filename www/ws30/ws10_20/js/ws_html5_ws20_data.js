@@ -574,8 +574,13 @@
         var _bLibLoaded = false;
         try {
             var _oLib = oAPP.DATA.LIB;
+            //[변경사유] oAPP.DATA.LIB.T_9011 은 oAPP.fn.setCodeMasterData 에서
+            //oAPP.attr.S_CODE 구성 후 삭제(delete)되므로, 코드마스터 로드 여부는 S_CODE 로 판정.
+            // _bLibLoaded = !!(_oLib
+            //     && Array.isArray(_oLib.T_9011) && _oLib.T_9011.length > 0
+            //     && Array.isArray(_oLib.T_0022) && _oLib.T_0022.length > 0);
             _bLibLoaded = !!(_oLib
-                && Array.isArray(_oLib.T_9011) && _oLib.T_9011.length > 0
+                && oAPP.attr.S_CODE && Object.keys(oAPP.attr.S_CODE).length > 0
                 && Array.isArray(_oLib.T_0022) && _oLib.T_0022.length > 0);
         } catch (e) { if (typeof U4ALOG !== "undefined" && U4ALOG.caught) { U4ALOG.caught(e); } }
 

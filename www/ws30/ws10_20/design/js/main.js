@@ -975,6 +975,10 @@
        */
       if(oAPP.common.checkWLOList("C", "UHAK901369")){
         delete oAPP.DATA.LIB;
+
+        //[변경사유] oAPP.attr.S_CODE 는 라이브러리 정보(oAPP.DATA.LIB.T_9011)로 구성되는 파생 데이터이므로
+        //라이브러리 정보를 제거할 때 같이 제거한다. (재진입 시 setCodeMasterData 에서 다시 구성됨.)
+        delete oAPP.attr.S_CODE;
       }
       
 
@@ -1125,7 +1129,10 @@
       //DOCUMENT에 입력된 정보중 ZTU4A0010 테이블에 매핑 정보 구성 처리.
       for(var i=0, l= oAPP.attr.prev.ROOT._T_0015.length; i<l; i++){
 
-        var ls_ua003 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA003" && a.ITMCD === oAPP.attr.prev.ROOT._T_0015[i].UIATK );
+        //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+        //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+        // var ls_ua003 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA003" && a.ITMCD === oAPP.attr.prev.ROOT._T_0015[i].UIATK );
+        var ls_ua003 = oAPP.attr.S_CODE.UA003.find( a => a.ITMCD === oAPP.attr.prev.ROOT._T_0015[i].UIATK );
 
         ls_0010[ls_ua003.FLD08] = oAPP.attr.prev.ROOT._T_0015[i].UIATV;
 
@@ -1162,7 +1169,10 @@
         if(OBJID !== "ROOT"){return;}
 
         //UI5 Document 속성 정보 검색.
-        var ls_ua003 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA003" && a.ITMCD === is_0015.UIATK );
+        //[변경사유] oAPP.DATA.LIB.T_9011 공통코드는 더 이상 사용하지 않으므로
+        //oAPP.attr.S_CODE(CATCD별 공통코드) 를 참조하도록 변경.
+        // var ls_ua003 = oAPP.DATA.LIB.T_9011.find( a => a.CATCD === "UA003" && a.ITMCD === is_0015.UIATK );
+        var ls_ua003 = oAPP.attr.S_CODE.UA003.find( a => a.ITMCD === is_0015.UIATK );
 
         //UI5 Document 속성 정보를 찾지 못한 경우 EXIT.
         if(!ls_ua003){return;}
@@ -1238,6 +1248,11 @@
       
       //코드마스터 데이터가 존재하지 않는경우 EXIT.
       if(oAPP.DATA.LIB.T_9011.length === 0){
+
+        //[변경사유] 이후 로직은 T_9011 이 아닌 oAPP.attr.S_CODE 만 참조하므로
+        //T_9011 필드를 삭제하여, 남아있는 T_9011 참조 로직이 있다면 오류로 확인될 수 있도록 처리.
+        delete oAPP.DATA.LIB.T_9011;
+
         return;
       }
       
@@ -1251,9 +1266,14 @@
         
         //코드에 해당하는 데이터 수집 처리.
         oAPP.attr.S_CODE[oAPP.DATA.LIB.T_9011[i].CATCD].push(oAPP.DATA.LIB.T_9011[i]);
-        
-      }	
-      
+
+      }
+
+      //[변경사유] 코드마스터 정보를 oAPP.attr.S_CODE 로 재구성 완료 후
+      //더 이상 T_9011 필드는 참조하지 않으므로 삭제 처리.
+      //(삭제 이후 T_9011 을 참조하는 로직이 남아있다면 오류(덤프)로 확인하기 위함.)
+      delete oAPP.DATA.LIB.T_9011;
+
     };  //END OF oAPP.fn.setCodeMasterData //코드마스터정보 코드별로 재구성 처리.
 
 
